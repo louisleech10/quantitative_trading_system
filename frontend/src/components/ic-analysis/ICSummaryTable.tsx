@@ -128,6 +128,8 @@ export default function ICSummaryTable({
   };
 
   useEffect(() => () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); }, []);
+  // URL 還原／外部改 params.search ⇒ 同步搜尋框（B2 review COMPOSER-R1-P2-01）
+  useEffect(() => { setSearchText(params?.search ?? ''); }, [params?.search]);
   const handleSearchChange = (value: string) => {
     setSearchText(value);
     if (!onParamsChange) return;
@@ -156,7 +158,10 @@ export default function ICSummaryTable({
   const handleSelectAll = (checked: boolean) => {
     if (!onSelectFeatures) return;
     if (!checked) {
-      onSelectFeatures([]);
+      // 取消全選＝只移除當頁（B2 review CODEX-R1-P1-02）；其他頁已勾者保留
+      const next = new Set(selectedSet);
+      for (const item of sortedData) next.delete(item.feature_name);
+      onSelectFeatures(Array.from(next));
       return;
     }
     // 全選＝當頁；保留其他頁已勾者（Set 跨頁保留）
@@ -214,9 +219,11 @@ export default function ICSummaryTable({
     }
 
     let updatedCount = 0;
+    const skipped: string[] = [];
     for (const featureName of selectedFeatures) {
       const item = sortedData.find((row) => row.feature_name === featureName);
       if (!item) {
+        skipped.push(featureName); // 不在當頁 ⇒ 無 row 資料可回寫（B2 review CODEX-R1-P2-06：明示僅當頁）
         continue;
       }
 
@@ -240,7 +247,11 @@ export default function ICSummaryTable({
       return;
     }
     setWatchlistError(null);
-    setWatchlistInfo(`已將 ${updatedCount} 個因子標記為已驗證`);
+    setWatchlistInfo(
+      skipped.length > 0
+        ? `已將 ${updatedCount} 個因子標記為已驗證；${skipped.length} 個不在當頁未處理（批次操作僅作用於當頁）`
+        : `已將 ${updatedCount} 個因子標記為已驗證`
+    );
   };
 
   const autoSuggestToWatchlist = () => {
@@ -290,7 +301,7 @@ export default function ICSummaryTable({
     }
 
     setWatchlistError(null);
-    setWatchlistInfo(`Auto-Suggest 已更新 ${updatedCount} 個候選因子`);
+    setWatchlistInfo(serverMode ? `Auto-Suggest 已更新 ${updatedCount} 個候選因子（僅評分當頁 ${sortedData.length} 列）` : `Auto-Suggest 已更新 ${updatedCount} 個候選因子`);
   };
 
   // silence unused prop lint (仍由 caller 傳入以保持 API 相容)

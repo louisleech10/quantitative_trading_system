@@ -94,3 +94,25 @@ describe('ICSummaryTable — 伺服器分頁', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ICSummaryTable — B2 review R1 閉合', () => {
+  it('取消表頭全選只移除當頁（其他頁已勾者保留）', () => {
+    let selected: string[] = ['feat_0', 'feat_50', 'feat_51'];
+    const onSelectFeatures = (names: string[]) => { selected = names; };
+    render(<ICSummaryTable page={page(50)} params={{ ...params, offset: 50 }} onParamsChange={() => undefined} selectable selectedFeatures={selected} onSelectFeatures={onSelectFeatures} />);
+    const header = document.querySelector('thead [role="checkbox"]') as HTMLElement;
+    fireEvent.click(header); // 當頁未全選 ⇒ 先全選當頁
+    expect(selected).toContain('feat_0');
+    expect(selected.length).toBe(51);
+    cleanup();
+    render(<ICSummaryTable page={page(50)} params={{ ...params, offset: 50 }} onParamsChange={() => undefined} selectable selectedFeatures={selected} onSelectFeatures={onSelectFeatures} />);
+    fireEvent.click(document.querySelector('thead [role="checkbox"]') as HTMLElement); // 已全選 ⇒ 取消當頁
+    expect(selected).toEqual(['feat_0']);
+  });
+
+  it('params.search 變更 ⇒ 搜尋框同步（URL 還原可見）', () => {
+    const { rerender } = render(<ICSummaryTable page={page()} params={params} onParamsChange={() => undefined} />);
+    rerender(<ICSummaryTable page={page()} params={{ ...params, search: 'close' }} onParamsChange={() => undefined} />);
+    expect((screen.getByTestId('ic-summary-search') as HTMLInputElement).value).toBe('close');
+  });
+});

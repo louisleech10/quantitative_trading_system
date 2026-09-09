@@ -24,16 +24,11 @@ export default function FilterFunnelChart({ funnel }: FilterFunnelChartProps) {
       if (stage.startsWith('_')) continue; // 合成 probe stage 不畫
       const input = values?.input;
       const output = values?.output;
-      if (typeof output !== 'number') {
-        na.push(stage);
+      if (typeof output !== 'number' || typeof input !== 'number') {
+        na.push(stage); // 任一為 null ⇒ 不適用，不以另一值回填（B2 review CODEX-R1-P1-03）
         continue;
       }
-      rows.push({
-        stage,
-        input: typeof input === 'number' ? input : output,
-        output,
-        removed: typeof input === 'number' ? Math.max(input - output, 0) : 0,
-      });
+      rows.push({ stage, input, output, removed: Math.max(input - output, 0) });
     }
     return { chartData: rows, notApplicable: na };
   }, [funnel]);

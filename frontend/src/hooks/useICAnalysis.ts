@@ -167,8 +167,10 @@ export function useICAnalysis() {
             const page = await requestJson<ICSummaryPage>(`/result/${taskId}/summary?${buildQuery(revision)}`, { signal: controller.signal });
             if (controller.signal.aborted) return null;
             const current = useICAnalysisStore.getState().resultRevision;
-            if (current !== null && page.result_revision !== null && page.result_revision !== current) {
-              return null; // 舊世代回應：丟棄
+            if (current !== null && page.result_revision !== current) {
+              // 舊世代或無戳回應：一律丟棄（B2 review CODEX-R1-P1-05：null 不得當萬用）
+              setSummaryError(page.result_revision === null ? '後端回應缺少 result_revision（版本不相容）' : null);
+              return null;
             }
             setSummaryPage(page);
             return page;
@@ -208,13 +210,29 @@ export function useICAnalysis() {
         detailAbortRef.current = controller;
         setFeatureDetail(null, 'loading');
         detailTimerRef.current = setTimeout(async () => {
+          let revision = useICAnalysisStore.getState().resultRevision;
           try {
-            const revision = useICAnalysisStore.getState().resultRevision;
-            const q = revision !== null ? `?revision=${revision}` : '';
-            const detail = await requestJson<ICFeatureDetail>(`/result/${taskId}/feature/${encodeURIComponent(featureName)}${q}`, { signal: controller.signal });
-            if (controller.signal.aborted) return resolve(null);
+            let detail: ICFeatureDetail | null = null;
+            for (let attempt = 0; attempt < 2; attempt += 1) {
+              try {
+                const q = revision !== null ? `?revision=${revision}` : '';
+                detail = await requestJson<ICFeatureDetail>(`/result/${taskId}/feature/${encodeURIComponent(featureName)}${q}`, { signal: controller.signal });
+                break;
+              } catch (err) {
+                // 與 summary 同形：409 ⇒ 以 current_revision 重拉一次（B2 review CODEX-R1-P1-04）
+                const status = (err as { status?: number })?.status;
+                const d = (err as { detail?: { current_revision?: number } })?.detail;
+                if (status === 409 && attempt === 0 && typeof d?.current_revision === 'number') {
+                  revision = d.current_revision;
+                  setResultRevision(revision);
+                  continue;
+                }
+                throw err;
+              }
+            }
+            if (controller.signal.aborted || !detail) return resolve(null);
             const current = useICAnalysisStore.getState().resultRevision;
-            if (current !== null && detail.result_revision !== null && detail.result_revision !== current) return resolve(null);
+            if (current !== null && detail.result_revision !== current) return resolve(null); // 舊世代／無戳：丟棄
             setFeatureDetail(detail, 'ready');
             resolve(detail);
           } catch (err) {
@@ -229,7 +247,7 @@ export function useICAnalysis() {
           }
         }, 150);
       }),
-    [setFeatureDetail]
+    [setFeatureDetail, setResultRevision]
   );
 
   /**
@@ -725,12 +743,17 @@ export function useICAnalysis() {
         method: 'POST',
         body: JSON.stringify({ thresholds: buildRefilterPayload(thresholds) }),
       });
+      // 與 fetchResult 同形守衛（B2 review 三家一致）：回應無 view:'light' ⇒ 後端過舊，不 setReport、保留舊 report
+      if (!result || (result as { view?: string }).view !== 'light') {
+        setError('後端版本過舊：refilter 未回 light 視圖（請重啟後端後重試）');
+        return null;
+      }
       abortProjections();
       setReport(result);
       useICAnalysisStore.getState().setSummaryParams({ offset: 0 });
       return result;
     },
-    [abortProjections, setReport]
+    [abortProjections, setError, setReport]
   );
 
   const applyTransforms = useCallback(

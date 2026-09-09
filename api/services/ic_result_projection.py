@@ -269,7 +269,11 @@ def project_feature(report: Mapping[str, Any], name: str, contract: Mapping[str,
         if _is_section_status(node):
             out[sec] = node
         elif sec == "grouped_ic":
-            out[sec] = {g: (v.get(name) if isinstance(v, dict) else None) for g, v in node.items()}
+            # 實機形狀＝{kind: {label: {feature: value}}}（B2 review GROK-R1-P1-01）⇒ 投影為 {kind: {label: value_for_feature}}
+            out[sec] = {
+                kind: ({label: (inner.get(name) if isinstance(inner, dict) else None) for label, inner in labels.items()} if isinstance(labels, dict) else None)
+                for kind, labels in node.items()
+            }
         else:
             out[sec] = node.get(name)
     return out

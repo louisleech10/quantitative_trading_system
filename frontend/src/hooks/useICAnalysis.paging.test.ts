@@ -143,3 +143,60 @@ describe('useICAnalysis — ICRESULT_PAGING', () => {
     expect(useICAnalysisStore.getState().summaryParams.offset).toBe(0);
   });
 });
+
+describe('useICAnalysis — B2 review R1 閉合', () => {
+  beforeEach(() => {
+    useICAnalysisStore.getState().resetReport();
+    useICAnalysisStore.setState({ taskId: 't1', status: 'completed', error: null });
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+  it('refilter 回應無 view:light（舊後端全量）⇒ setError、不 setReport、舊 report 保留', async () => {
+    useICAnalysisStore.getState().setReport(light(1) as never);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ summary_table: new Array(39000).fill({ feature_name: 'x' }) })));
+    const { result } = renderHook(() => useICAnalysis());
+    await act(async () => { await result.current.refilter('t1', { ic_mean_min: 0, icir_min: 0, p_value_max: 1, correlation_threshold: 0.7 } as never); });
+    const st = useICAnalysisStore.getState();
+    expect((st.report as { view?: string })?.view).toBe('light');
+    expect((st.report as { summary_table?: unknown[] })?.summary_table).toBeUndefined();
+    expect(st.error).toContain('後端版本過舊');
+  });
+
+  it('feature detail 409 ⇒ 以 current_revision 重拉一次；第二次 409 ⇒ error', async () => {
+    vi.useFakeTimers();
+    useICAnalysisStore.setState({ resultRevision: 1 });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(err(409, { detail: { message: 'stale', current_revision: 2 } }))
+      .mockResolvedValueOnce(ok({ feature_name: 'a', summary_row: { feature_name: 'a' }, result_revision: 2 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useICAnalysis());
+    act(() => { void result.current.fetchFeatureDetail('t1', 'a'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[1][0])).toContain('revision=2');
+    expect(useICAnalysisStore.getState().featureDetailStatus).toBe('ready');
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue(err(409, { detail: { message: 'stale', current_revision: 3 } }));
+    act(() => { void result.current.fetchFeatureDetail('t1', 'b'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(useICAnalysisStore.getState().featureDetailStatus).toBe('error');
+  });
+
+  it('revision 嚴格比較：store=5、回應 result_revision=null ⇒ summary／detail 皆丟棄', async () => {
+    vi.useFakeTimers();
+    useICAnalysisStore.setState({ resultRevision: 5 });
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => Promise.resolve(
+      String(url).includes('/summary')
+        ? ok({ total: 1, offset: 0, limit: 50, sort_by: 'icir', sort_order: 'desc', result_revision: null, rows: [{ feature_name: 'stale' }] })
+        : ok({ feature_name: 'stale', summary_row: { feature_name: 'stale' }, result_revision: null })
+    )));
+    const { result } = renderHook(() => useICAnalysis());
+    await act(async () => { await result.current.fetchSummaryPage('t1', { sort_by: 'icir', sort_order: 'desc', offset: 0, limit: 50 }); });
+    expect(useICAnalysisStore.getState().summaryPage).toBeNull();
+    expect(useICAnalysisStore.getState().summaryError).toContain('result_revision');
+    act(() => { void result.current.fetchFeatureDetail('t1', 'stale'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    expect(useICAnalysisStore.getState().featureDetail).toBeNull();
+  });
+});

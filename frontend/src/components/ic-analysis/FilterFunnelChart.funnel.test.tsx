@@ -38,3 +38,11 @@ describe('FilterFunnelChart — funnel adapter', () => {
     expect(screen.getByText('暫無漏斗數據')).toBeTruthy();
   });
 });
+
+describe('FilterFunnelChart — B2 review CODEX-R1-P1-03', () => {
+  it('input=null、output=7 ⇒ 不適用（不以 output 回填 input）', () => {
+    render(<FilterFunnelChart funnel={{ s: { input: null, output: 7 } }} />);
+    expect(screen.getByTestId('funnel-not-applicable').textContent).toContain('s');
+    expect(screen.getByText('暫無漏斗數據')).toBeTruthy();
+  });
+});

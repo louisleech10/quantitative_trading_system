@@ -544,3 +544,20 @@ def test_size_probe_blocked_on_setup_failure(monkeypatch):
     lines = [ln for ln in out.stdout.splitlines() if ln.startswith("SIZE_GATE=")]
     assert lines == ["SIZE_GATE=BLOCKED"] and out.returncode == 2
     assert any(ln.startswith("SIZE_REASON=setup failed") for ln in out.stdout.splitlines())
+
+
+def test_feature_detail_grouped_ic_three_level_projection(client, task, fixture_report):
+    """B2 review GROK-R1-P1-01：實機 grouped_ic＝{kind:{label:{feature:value}}} ⇒ 投影 {kind:{label:value}}，有限值不得全 null。"""
+    tid, _ = task
+    name = fixture_report["summary_table"][0]["feature_name"]
+    body = client.get(f"{API}/result/{tid}/feature/{name}").json()
+    g = body["grouped_ic"]
+    src = fixture_report["grouped_ic"]
+    for kind, labels in src.items():
+        if not isinstance(labels, dict):
+            assert g[kind] is None
+            continue
+        assert set(g[kind]) == set(labels)
+        for label, inner in labels.items():
+            assert g[kind][label] == (inner.get(name) if isinstance(inner, dict) else None)
+    assert any(isinstance(v, (int, float)) for labels in g.values() if isinstance(labels, dict) for v in labels.values())

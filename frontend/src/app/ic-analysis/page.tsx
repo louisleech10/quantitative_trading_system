@@ -47,6 +47,7 @@ import { useAutoRefilter } from '@/hooks/useAutoRefilter';
 import { icFeatureCountLabel, icPollFailed, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
 import { icFallbackLabel, icSubProgressLabel, icTaskWarningLabel } from "@/lib/icProgressLabel";
 import { isSectionStatus } from "@/lib/types";
+import { reshapeGroupedForFeature } from '@/lib/icGrouped';
 import type { GroupedICData, ICDecayData, ICReportLight, QuantileReturnData, SectionStatusObject, SummaryPageParams, TurnoverFeatureData } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
@@ -287,11 +288,7 @@ function ICAnalysisPageContent() {
   const featureGroupedMap = useMemo<GroupedICData | null>(() => {
     const g = featureDetail?.grouped_ic;
     if (!g || !activeFeature || isSectionStatus(g)) return null;
-    const out: GroupedICData = {};
-    for (const [group, value] of Object.entries(g as Record<string, unknown>)) {
-      out[group] = { [activeFeature]: value } as unknown as GroupedICData[string];
-    }
-    return out;
+    return reshapeGroupedForFeature(g as Record<string, Record<string, unknown> | null>, activeFeature);
   }, [featureDetail, activeFeature]);
 
   const deepTabVisible = Boolean(report?.deep_analysis_enabled || deepAnalysisReport?.deep_analysis_enabled);

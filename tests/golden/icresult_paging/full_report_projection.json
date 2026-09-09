@@ -31,7 +31,7 @@
    "turnover_analysis": "d4b9f8ed550c0d6e4c8a28427ca81310df5a1610e28529b6921a07bda82ac2f5",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "1e64db9b77a4484b97045ec7190da3f63272c908b007fbec8f527aa55699a34d",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "ec8992014d00d210687089b9a0fdc4cda190c3cf3a24181555093a9a1eaeeeb3"
   },
   "close_12h_cycle_HT-SINE-LeadSine_Range_W3": {
    "ic_decay": "997a916c123dcce9082b43d2ada7bbe8e4e9a2b5f97527477779c2c26c5c67c4",
@@ -39,7 +39,7 @@
    "turnover_analysis": "98e65fcec13dc9a16db399641ba1a3d1509e229538bd5985c62e056b58a71815",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "948ce8823fed0f6772dd2544599ca7fc32e36011d5091ff1201d731271e0f6ab",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "8b549ce92ca601ac02e1ac3bbce602d35f2ef4f03737510bae2b864de28be77e"
   },
   "close_12h_cycle_HT-TRENDMODE_Sign": {
    "ic_decay": "44cb07696413a618472024581695af4b09813ad16cb0b8a79db969111e7a5ebf",
@@ -47,7 +47,7 @@
    "turnover_analysis": "71dbf2937b175c0e459c56a59730e835e21c9d61e8790978b39bcf1799d3f0f9",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "a12d716d7c0c99fd8ff8bb9b0c98c6161428526b410aaed4feafa78483457448",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "831c005b70da4237ae7594174e9a75e264cfdff3804b356fd1aa54874a64a677"
   },
   "close_12h_cycle_HT-TRENDMODE_TsArgmax_W13": {
    "ic_decay": "9cc9753018bdd12dfd783d5e33a75ac55d42089c45e89c3dd3de83ebf1896400",
@@ -55,7 +55,7 @@
    "turnover_analysis": "e0d87dce88a437b8218731dee7b9d8efeed49f2907f4c0bac45850b8d661a24a",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "ced9fb43ba482ee28db63698520ae4b6072e73e9cc18cca86ab60bf5c361c29b",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "f218ecb6ef97ed724ea190356de56d293975264d68f8861cf36823626755448c"
   },
   "close_12h_momentum_APO_12-26-0": {
    "ic_decay": "e7359ba71cfba2340b3d506c3a2b0ed271e5055cb2852b51100826605789c277",
@@ -63,7 +63,7 @@
    "turnover_analysis": "6991ecdbdeada0eae4efaf2db4d08d26852ea3760470a3efabf164e027297d6d",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "ffec6d7d0efb855e4af004704e4d1c0afdcf7a61e7f020fa498c1c1521a3bd9a",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "cf0652c5813938f6718b98aa9673b49ef832daa15930430d5bcb9c4bcfd4d516"
   },
   "close_12h_momentum_APO_12-26-0_TsArgmin_W5": {
    "ic_decay": "88baf121b0bcd5092741ab3f6ed522152489fb50bb6c2c9568ef85b237caf9c6",
@@ -71,7 +71,7 @@
    "turnover_analysis": "b5835b3d6fc29a820ebda8fa50e7002f395ef73f5743cf20c7d94912b7747d42",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "8173d87ee4b7ccc97f32467b6e517b7d03850c1ca51caad4653be9f656bcb1dc",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "daf3be4b2ede819721cc4822b354b5551a2ea58dbfbefb812242c0e06a2435f6"
   },
   "close_12h_momentum_APO_13-34-0_Kurt_W13": {
    "ic_decay": "f43e562f1cebf468a4c586537e9beba51ee373a42fdb573cad12a4a66ee6818c",
@@ -79,7 +79,7 @@
    "turnover_analysis": "1ba3cc5c47cabc689dadf3dcb23229f38e229923a90526e24c47740611ad35d2",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "f2abf5b9afe3a14f43ecea6905b671e1649ef9295bfda5f8c08ea062f91ed4f8",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "118e22ed306124f99523bf41f0cd196ec53227f347e41a90239041c5d2e434a8"
   },
   "close_12h_momentum_APO_13-55-0_Kurt_W13": {
    "ic_decay": "254b63079771ca66b374bdf0af130b4eb5581c703129a38570c3ca6174e4a3ec",
@@ -87,7 +87,7 @@
    "turnover_analysis": "74f4f6a164d8ae98baf9a1e0c25b14d23dc672367d69bf9c2088e29336ca0ff3",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "5555c0d9b932861bbc1c066ca3fdd923472e302acfbd44cf9fbcea0ef30ca522",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "4c61f14b2dc66d649ba4aae9fd742a0eb5c997dbff5ae0602bfe001dac741ca1"
   },
   "close_12h_momentum_APO_13-55-0_Log1p": {
    "ic_decay": "6ea2951ffc8cf6643d8182405e904106bb74cb9d89f031c8d2de185e9bc7e684",
@@ -95,7 +95,7 @@
    "turnover_analysis": "114e3c86440f1956bef1dc6d14c66ea55e3a95d69a35f8a16babc9f3268a98dd",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "cf1893ebee1a3c61ccddf34d2246bbff31312653daa117b4cfd1a3e454f4e263",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "4dda834c5664ff0fe7288546e860dc1ada10c1431f45873e65134af5a67a0f06"
   },
   "close_12h_momentum_APO_13-55-0_Momentum_L144": {
    "ic_decay": "ec802781b48e9907f5f24509d5b96c7eb03483d5fc8c99aff750667cd10af712",
@@ -103,7 +103,7 @@
    "turnover_analysis": "2220a02fdb03a66345e0253423945c77f3f2e3ef8531ea87b2c0f121334c9fe5",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "3f2d575d29847c3df866ceaa47e4ccfc50b3a07d3e27ccfea02722240ad6445c",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "85954f00e97f7d0367e37e961cf4f0dfc1c6cfe226ef67da0ce41eaf458e9c6c"
   },
   "close_12h_momentum_APO_21-55-0_Momentum_L144": {
    "ic_decay": "8bbff1e3ced3c922674a9e80a33a6740fc56621a189ebf25a1486c2b7aabd317",
@@ -111,7 +111,7 @@
    "turnover_analysis": "16018b812a0f13af8cef9ec158b8a1df27f42862d17daf7b21bcb2d5aa066ac6",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "106ba88fad62499636754d1cc3a84dfee40da51292bf0a52eb3014194f023ec6",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "e9f2133995501d51f1b090f99f6b18389f0f2f99bea4189f2e120ec769d24ecc"
   },
   "close_12h_momentum_APO_34-89-0_Abs": {
    "ic_decay": "6c3ee39550b0ef8c0c965ae3305991552df23fba7475368be533323fb48cbefb",
@@ -119,7 +119,7 @@
    "turnover_analysis": "96df38df4ac332888d71753fcc0aa9e8b94a3d54485db0415714dbebc6cc9da7",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "2a5a75800f26be08500de266f7dc95f5d71f394f479e7b396769e9f9aaa6a7bf",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "a45fd5e417a71a0bd6004f0ba9ec8845fcf2ddc3c1d3ec6e88dba0b29fdcf57e"
   },
   "hlc_12h_momentum_ADXR_89_Abs": {
    "ic_decay": "6346730b44f66adb031cd53083d52cc9e552b9563f75ded0d5f66d53fb7e2f58",
@@ -127,7 +127,7 @@
    "turnover_analysis": "68f1e2e9fea0c20468af7dbec50d0ce781550aac62ee3c8dee4c4dddb2a610a8",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "c98ca8825b64677dc24f4f33c9117a8e97fbfc65cbceeea36ecb6c29a12a9dec",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "371d2740f745e65aed325713ec5810ff5fa314ff11abc8fd590f8c6c09c4322e"
   },
   "volume_12h_trend_MAVP_21_TsArgmin_W5": {
    "ic_decay": "4682f00f1cd64381a8c77ed75747d4dc035f17776832e3cc77e795b268ccc65d",
@@ -135,7 +135,7 @@
    "turnover_analysis": "d43fa53b76336f0c3d97266e24dd64a4de3312313740dd62fb7aa5d5e6b9c4f3",
    "coverage_analysis": "7e50b650ec9cdb68ad6c467d6fcf25c5644061923c37004361d083f95e1ac22e",
    "rolling_ic_series": "c2d076c0b6b5cdf73b0958bdd37ddbf90b9e52d52fa6e2d52daaa12e28a85cb1",
-   "grouped_ic": "3e6b8541a97a73eac5335525257c1259840258a5474cd455d5b15ce437436629"
+   "grouped_ic": "ff2c13daccf31ecc73182179b294df81b4a3a1028803365deff3a1cc4d736851"
   }
  },
  "sort_golden": {

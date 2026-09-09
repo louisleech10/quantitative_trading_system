@@ -174,7 +174,10 @@ def build_golden(body: Dict[str, Any], raw_sha: str, contract: Dict[str, Any]) -
             if isinstance(node, dict) and n in node:
                 feature_samples[n][sec] = _sha(node[n])
             elif sec == "grouped_ic" and isinstance(node, dict):
-                feature_samples[n][sec] = _sha({g: (v.get(n) if isinstance(v, dict) else None) for g, v in node.items()})
+                feature_samples[n][sec] = _sha({
+                    kind: ({label: (inner.get(n) if isinstance(inner, dict) else None) for label, inner in labels.items()} if isinstance(labels, dict) else None)
+                    for kind, labels in node.items()
+                })
             else:
                 feature_samples[n][sec] = None
     four = [{"feature_name": "A", "icir": 0.5}, {"feature_name": "B", "icir": 0.5}, {"feature_name": "C", "icir": None}, {"feature_name": "D", "icir": float("nan")}]
