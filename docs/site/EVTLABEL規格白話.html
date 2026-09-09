@@ -134,6 +134,56 @@
 </tbody>
 </table></div>
 <hr />
+<h2 id="附為什麼全域-run-和事件-run-的隔離區不一樣你-910-問的">附：為什麼全域 run 和事件 run 的隔離區不一樣（你 9/10 問的）</h2>
+<p>先講隔離區是幹嘛的：切分成「訓練段」和「驗證段」時，中間要空一段，讓訓練段最後幾根的<strong>答案</strong>（往後看的報酬）不會偷看到驗證段的價格。空多少，取決於「答案往後看了多遠」。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>全域 run（1h 特徵）</th>
+<th>事件 run（12h 事件 × 1h 特徵）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>答案是誰算的</td>
+<td>平台：每根 1h 看<strong>往後 5 根</strong>（<code>return_5</code>，設定檔 <code>default_horizon=5</code>）</td>
+<td>你的 label 規則：每個事件看<strong>往後 h 根 12h</strong>（這次 h=1 ＝ 12 根 1h）</td>
+</tr>
+<tr>
+<td>答案往後看多遠</td>
+<td>5 小時</td>
+<td>12 小時（h=1）；h=3 就是 36 小時</td>
+</tr>
+<tr>
+<td><strong>purge</strong>（答案窗）現況</td>
+<td>5 根 ✅</td>
+<td>5 根 ❌（抄了全域的數字，跟你的 h 無關）</td>
+</tr>
+<tr>
+<td><strong>purge</strong> 改後</td>
+<td>5 根（不變）</td>
+<td><strong>max(5, 你的 label 視窗)</strong> ＝ 12 根</td>
+</tr>
+<tr>
+<td>批次有沒有「額外往後看」</td>
+<td>沒有</td>
+<td>有：你在 /search 篩正例時用了<strong>往後 12 根 12h</strong> 的資訊（批次宣告 <code>lookahead_bars_declared=12</code>）＝ 144 小時</td>
+</tr>
+<tr>
+<td><strong>embargo</strong></td>
+<td>0（設定檔預設，沒有東西抬它）</td>
+<td>144 根（被那個 144 小時的宣告抬上去）</td>
+</tr>
+<tr>
+<td>總隔離</td>
+<td>5 根</td>
+<td>現況 149 → 改後 156</td>
+</tr>
+</tbody>
+</table></div>
+<p>一句話：<strong>全域 run 的答案是平台算的、窗只有 5 小時、沒有事先「偷看」，所以隔離只要 5 根。事件 run 的答案是你定的（窗隨 h 變），而且你挑事件時已經用了未來 6 天的資訊，所以要多空 144 根。</strong> 兩邊不一樣不是 bug，是答案的來源和「事先看了多遠」本來就不同；EVTLABEL 第 2 段修的是「事件 run 的 purge 應該跟你的 h 走，而不是抄全域的 5」。</p>
+<p>另外你問「全域 purge 是不是要按選的每個 horizon 各做一次」：不用。跨越訓練／驗證邊界的答案只有 <code>return_5</code> 那條；你選的其他 horizon（1,2,3,8,13,21）是「IC 衰減」圖，只在驗證段裡面算、不跨邊界，所以 purge 不必跟著它們變。</p>
 <h2 id="我要你回答的">我要你回答的</h2>
 <ol>
 <li>「餵 ML」交付到倖存者檔＋接收端契約測試為止——<strong>接受／不接受</strong>。</li>
