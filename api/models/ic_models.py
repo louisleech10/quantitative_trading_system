@@ -407,3 +407,21 @@ class ApplyTransformsResponse(BaseModel):
         default=None,
         description="root 鏡像；False 表示無 OOS 保證",
     )
+
+
+# ── ICRESULT_PAGING（docs/ICRESULT_PAGING_SPEC.md）：contract JSON 為單一真相源 ───────────────
+_IC_RESULT_PAGING_CONTRACT_PATH = (
+    __import__("pathlib").Path(__file__).resolve().parents[2]
+    / "momentum" / "Analysis" / "contracts" / "ic_result_paging_contract.json"
+)
+_IC_RESULT_PAGING_CONTRACT_CACHE: Optional[Dict[str, Any]] = None
+
+
+def load_ic_result_paging_contract() -> Dict[str, Any]:
+    """讀取 `ic_result_paging_contract.json`（白名單／投影規則／排序契約／預算）；只讀一次快取。"""
+    global _IC_RESULT_PAGING_CONTRACT_CACHE
+    if _IC_RESULT_PAGING_CONTRACT_CACHE is None:
+        import json as _json
+
+        _IC_RESULT_PAGING_CONTRACT_CACHE = _json.loads(_IC_RESULT_PAGING_CONTRACT_PATH.read_text(encoding="utf-8"))
+    return _IC_RESULT_PAGING_CONTRACT_CACHE

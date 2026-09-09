@@ -1,0 +1,46 @@
+{
+  "contract": "ic_result_paging",
+  "version": 1,
+  "spec": "docs/ICRESULT_PAGING_SPEC.md",
+  "sort_fields": ["icir", "ic_mean", "ic_std", "ic_hit_rate", "p_value", "p_value_adj", "t_stat", "ic_half_life", "turnover_rate", "coverage", "monotonicity_score", "long_short_spread", "feature_name"],
+  "sort_order_values": ["asc", "desc"],
+  "limit_default": 50,
+  "limit_max": 500,
+  "sort_policy": {
+    "missing_values": "sink_both_directions",
+    "missing_definition": "None, NaN, +inf, -inf, non-numeric",
+    "tie_breaker": "feature_name asc (string)",
+    "string_fields": ["feature_name"]
+  },
+  "drop_sections": ["summary_table", "ic_decay", "quantile_returns", "turnover_analysis", "coverage_analysis", "rolling_ic_series", "grouped_ic"],
+  "per_feature_sections": ["ic_decay", "quantile_returns", "turnover_analysis", "coverage_analysis", "rolling_ic_series", "grouped_ic"],
+  "metadata_keep_keys": [
+    "event_filter", "oos_downgrade", "isolation", "ic_window_disclosure", "period_alignment",
+    "ic_train_test_split", "n_timestamps", "n_symbols", "mode", "survivor_output", "compute_warnings",
+    "selection_scope", "symbol", "timeframe", "config_hash",
+    "fit_mode", "fit_mode_source", "conditional_ic", "alpha_source", "significance", "baseline_subset",
+    "scope", "tiebreaker_effective", "n_samples", "quality", "density_metrics", "total_bars", "total_klines",
+    "calculation_time_ms", "time_range", "case_id", "label_kind", "label_source", "horizon", "horizon_source",
+    "deep_analysis_enabled", "features_path", "labels_path", "start_time", "end_time", "n_features_input", "n_features_output"
+  ],
+  "collection_to_count_paths": [
+    {"path": ["filter_log", "*"]},
+    {"path": ["metadata", "selection_scope"]}
+  ],
+  "collection_to_count_rule": "for the target dict node only (one level, no recursion): list/dict values -> '<key>_count': len(value) on a private copy; scalars unchanged; missing or non-dict target -> no-op",
+  "funnel_stage_adapter": {
+    "input_keys": ["input_features", "feature_count_original"],
+    "output_keys": ["output_features", "feature_count_filtered"],
+    "dict_count_key": "count",
+    "rule": "first present key; int as-is; dict with dict_count_key -> that int; other dict/list -> len; none present -> null; funnel is computed from the ORIGINAL filter_log before collection_to_count"
+  },
+  "light_added_keys": ["view", "total_features", "result_revision", "summary_page", "filter_log_funnel"],
+  "sort_index_cache": {"index_dtype": "int32", "max_keys_per_task": 8, "max_tasks_process_wide": 32},
+  "latency_budget_ms": {
+    "light": {"p50": 150, "p95": 300},
+    "summary": {"p50": 100, "p95": 200},
+    "feature": {"p50": 50, "p95": 100},
+    "summary_cache_hit_p50": 20
+  },
+  "size_budget_bytes": {"light": 262144, "summary_limit_50": 102400, "feature": 2097152}
+}

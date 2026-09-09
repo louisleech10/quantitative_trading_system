@@ -1,0 +1,134 @@
+2026-09-09 09:25:03,330 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-09-09 09:25:03,374] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-09 09:25:03,374 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+[2026-09-09 09:25:05,484] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 09:25:05,484 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 09:25:05,486 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 09:25:05,494 - h5py._conv - DEBUG - Creating converter from 3 to 5
+2026-09-09 09:25:05,502 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 09:25:05,502 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.006s
+[2026-09-09 09:25:05,505] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:25:05,505 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:25:05,505] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:25:05,505 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:25:05,532] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 09:25:05,532 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 09:25:05,534 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 09:25:05,534 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+[2026-09-09 09:25:05,535] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:25:05,535 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:25:05,897] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=14
+2026-09-09 09:25:05,897 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=14
+2026-09-09 09:25:05,900 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 09:25:05,900 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 09:25:06,030] INFO momentum.Analysis.ic_engine: Decay: 4/14 fit warnings summarized (low_r2=4)
+2026-09-09 09:25:06,030 - momentum.Analysis.ic_engine - INFO - Decay: 4/14 fit warnings summarized (low_r2=4)
+[2026-09-09 09:25:12,109] INFO momentum.Analysis.redundancy_filter: Redundancy filter completed: method=greedy input=2 output=2
+2026-09-09 09:25:12,109 - momentum.Analysis.redundancy_filter - INFO - Redundancy filter completed: method=greedy input=2 output=2
+[2026-09-09 09:25:15,073] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+2026-09-09 09:25:15,073 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+2026-09-09 09:25:15,075 - h5py._conv - DEBUG - Creating converter from 5 to 3
+[2026-09-09 09:25:15,076] INFO momentum.Analysis.ic_reporter: Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/features/ETHUSDT_12h_filtered.h5
+2026-09-09 09:25:15,076 - momentum.Analysis.ic_reporter - INFO - Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/features/ETHUSDT_12h_filtered.h5
+[2026-09-09 09:25:15,123] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/reports/ic_report_ic_gatekeeper.json
+2026-09-09 09:25:15,123 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 09:25:15,126] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 09:25:15,126 - momentum.Analysis.ic_reporter - INFO - IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 09:25:15,171] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/reports/ic_report_ic_gatekeeper.json
+2026-09-09 09:25:15,171 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/reports/ic_report_ic_gatekeeper.json
+2026-09-09 09:25:15,458 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-09 09:25:15,462 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+[2026-09-09 09:25:15,462] INFO momentum.FeatureEngineering.adapters.adapter_registry: Registered adapter: crypto_spot
+2026-09-09 09:25:15,462 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Registered adapter: crypto_spot
+[2026-09-09 09:25:15,462] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:25:15,462 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+2026-09-09 09:25:15,527 - api.feature_factory_service - INFO - CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+2026-09-09 09:25:15,707 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 09:25:15,800 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 09:25:15,853 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 09:25:15,859 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_cfg_batch_ret: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/cfg_batch_ret/feature_manifest.json
+2026-09-09 09:25:15,982 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 09:25:16,064 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 09:25:16,118 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 09:25:16,124 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_cfg_batch_ret: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/cfg_batch_ret/feature_manifest.json
+2026-09-09 09:25:16,266 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 09:25:16,342 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 09:25:16,350 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_be993398916ee054e0b681732961caff: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/be993398916ee054e0b681732961caff/feature_manifest.json
+2026-09-09 09:25:16,395 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 09:25:16,399 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_abc9b9fecb7a4f42cb8e03099285b67b: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/abc9b9fecb7a4f42cb8e03099285b67b/feature_manifest.json
+2026-09-09 09:25:16,400 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_1ab3fe2f34732cc9adf693a36b2ddf8d: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/1ab3fe2f34732cc9adf693a36b2ddf8d/feature_manifest.json
+2026-09-09 09:25:16,400 - api.feature_factory_service - INFO - Restored 15 persisted feature task(s) from disk
+2026-09-09 09:25:16,401 - api.middleware - INFO - 所有中間件已設置完成
+2026-09-09 09:25:16,401 - api.exception_handler - INFO - 異常處理器設置完成
+2026-09-09 09:25:16,431 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+[2026-09-09 09:25:16,460] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:25:16,460 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+2026-09-09 09:25:16,462 - api.case_storage - INFO - Loaded 60/60 cases from JSON
+2026-09-09 09:25:16,462 - api.case_storage - INFO - Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+2026-09-09 09:25:16,462 - api.case_storage - INFO - CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+2026-09-09 09:25:16,462 - api.case_storage - INFO - Created global CaseStorageManager instance
+2026-09-09 09:25:16,462 - api.case_import_service - INFO - CaseImportService initialized
+2026-09-09 09:25:16,462 - api.case_import_service - INFO - Created global CaseImportService instance with shared storage
+2026-09-09 09:25:16,462 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+2026-09-09 09:25:16,462 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-09 09:25:16,508 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.binance.com:443
+2026-09-09 09:25:16,577 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-09 09:25:16,577 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-09 09:25:16,577 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-09 09:25:16,577 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-09 09:25:16,577 - api.batch_download_service - INFO - Registered BinanceProvider to KlineDownloadService
+2026-09-09 09:25:16,577 - api.batch_download_service - INFO - BatchDownloadService initialized
+2026-09-09 09:25:16,577 - api.batch_download_service - INFO - Created global BatchDownloadService instance with shared storage
+2026-09-09 09:25:16,594 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-09-09 09:25:16,594 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-09 09:25:16,597 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.binance.com:443
+2026-09-09 09:25:16,662 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-09 09:25:16,662 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-09 09:25:16,662 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-09 09:25:16,662 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-09 09:25:16,662 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-09-09 09:25:16,662 - momentum.Indicators.indicator_engine - INFO - IndicatorEngine initialized
+2026-09-09 09:25:16,662 - api.chart_data_service - INFO - ChartDataService initialized with IndicatorEngine
+2026-09-09 09:25:16,696 - api.optimization_task_service - INFO - OptimizationTaskService initialized
+[2026-09-09 09:25:16,862] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:25:16,862 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 09:25:16,864] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:25:16,864 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 09:25:16,928] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:25:16,928 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 09:25:17,037] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:25:17,037 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+2026-09-09 09:25:17,047 - api.websocket_manager - INFO - WebSocketConnectionManager initialized
+2026-09-09 09:25:17,128 - api.routes - INFO - All API routes registered successfully
+2026-09-09 09:25:17,131 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-09 09:25:17,131 - api.startup - INFO - 正在啟動 Case Search API...
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 運行環境: Production
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2026-09-09 09:25:17 - api.middleware.request - [32mINFO[0m - [ed3a5ad5] GET /api/v1/ic/result/icresult-paging-golden-fixture - 200 - 0.089s
+2026-09-09 09:25:17 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-golden-fixture "HTTP/1.1 200 OK"
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 正在啟動 Case Search API...
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-09-09 09:25:17 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 運行環境: Production
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2026-09-09 09:25:17 - api.middleware.request - [32mINFO[0m - [dbde41d6] GET /api/v1/ic/result/icresult-paging-golden-fixture - 200 - 0.087s
+2026-09-09 09:25:17 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-golden-fixture "HTTP/1.1 200 OK"
+2026-09-09 09:25:17 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+idempotent_default_body=YES sha=f31a8614a706
+WROTE /Users/louis/Desktop/quantitative_trading_system/tests/golden/icresult_paging/full_report_projection.json rows=14 fixture_bytes=713187
+write_rc=0
