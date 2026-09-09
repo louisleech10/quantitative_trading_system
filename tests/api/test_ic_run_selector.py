@@ -241,3 +241,21 @@ def test_relaxed_explicit_features_path_passes_through(
 
     assert status["status"] == "completed", status.get("error")
     assert captured.get("features_path") == features_path
+
+
+@pytest.mark.ic_run_selector
+def test_service_sees_runs_registered_after_startup(pinned_registry: Path) -> None:
+    """UAT 2026-09-09：後端啟動後才用 Feature Factory 生成的 run，IC 一律回「run not found」——
+    service 之 registry 為啟動時快照。修法＝解析 run 前 `reload_registry()`；本測試在 service 建立**之後**
+    才把 run 寫進 registry 檔，斷言不再是 run not found（會走到載入資料而以別的理由失敗，但錯誤字串不得含 run not found）。"""
+    service = ICAnalysisService()  # 此時 registry 快照不含 LATE_HASH
+    late_hash = "22222222222222222222222222222222"
+    from momentum.FeatureEngineering.feature_registry import FeatureRegistry
+
+    writer = FeatureRegistry(path=pinned_registry)
+    writer.add({"symbol": SYMBOL, "timeframe": TIMEFRAME, "config_hash": late_hash, "run_status": "complete",
+                "features_path": str(pinned_registry.parent / "missing_late.h5"), "feature_count": 1})
+    assert FeatureRegistry(path=pinned_registry).get(SYMBOL, TIMEFRAME, late_hash) is not None, "registry 檔須已含新 run"
+    request = ICAnalyzeRequest(symbol=SYMBOL, timeframe=TIMEFRAME, config_hash=late_hash, mode="longitudinal")
+    status = asyncio.run(_drive_to_terminal(service, request))
+    assert "run not found" not in str(status.get("error", "")), status.get("error")

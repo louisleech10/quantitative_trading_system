@@ -536,6 +536,7 @@ class ICAnalysisService:
             #    ② hash 為 falsy（含**空字串**）⇒ 該標的走 `find_latest_materialized`，
             #       與 `feature_library.load(config_hash=None)` 之 `if config_hash:` 一致
             entries = []
+            self._feature_library.reload_registry()
             for sym in dict.fromkeys(symbols_resolved):
                 raw = (config_hashes or {}).get(sym)
                 run_hash = raw.strip() if isinstance(raw, str) else ""
@@ -562,6 +563,7 @@ class ICAnalysisService:
         if not (symbol and timeframe):
             return None
         config_hash = (getattr(request, "config_hash", None) or "").strip()
+        self._feature_library.reload_registry()
         entry = (
             self._feature_library.get_entry(symbol, timeframe, config_hash)
             if config_hash
@@ -1500,6 +1502,8 @@ class ICAnalysisService:
                 feature_manifest_hint: Optional[str] = None   # registry 條目之 manifest 路徑（G3-D10）
 
                 if symbol and timeframe:
+                    # UAT 2026-09-09：service 之 registry 為啟動時快照 ⇒ 啟動後生成的 run 一律 run not found；解析前重讀
+                    self._feature_library.reload_registry()
                     if config_hash:
                         entry = self._feature_library.get_entry(symbol, timeframe, config_hash)
                         # fail-closed 僅在需要由 registry 解析/物化資料時才強制——這才是 run-selector

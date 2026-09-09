@@ -48,6 +48,10 @@ class FeatureRegistry:
         self._corrupt_backup_created = False
         self._load()
 
+    def reload(self) -> None:
+        """重讀 registry 檔（UAT 2026-09-09：IC service 持久 instance 只在啟動時載入，之後生成的 run 全部「run not found」）。"""
+        self._load()
+
     @property
     def corrupt(self) -> bool:
         """回傳 registry 是否處於 fail-closed 狀態。"""

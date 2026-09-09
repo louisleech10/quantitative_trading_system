@@ -51,6 +51,10 @@ class FeatureLibrary:
             entries = [entry for entry in entries if entry.get("timeframe") == timeframe]
         return [self._to_entry(entry) for entry in entries]
 
+    def reload_registry(self) -> None:
+        """重讀 registry（長壽命 service 於每次解析 run 前呼叫，避免看不到啟動後新生成的 run）。"""
+        self._registry.reload()
+
     def get_entry(
         self,
         symbol: str,
