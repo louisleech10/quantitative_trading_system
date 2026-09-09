@@ -3272,3 +3272,59 @@ export interface ICTaskFallback {
   reason: string;
   details?: { train_rows?: number | null; test_rows?: number | null; min_test_rows?: number | null } | null;
 }
+
+// ===== ICRESULT_PAGING（SoT＝momentum/Analysis/contracts/ic_result_paging_contract.json；docs/ICRESULT_PAGING_SPEC.md §C-6～8） =====
+export type ICSortOrder = 'asc' | 'desc';
+
+/** summary 分頁參數（命名對齊 Feature Factory `/browse/{task}/features`）。 */
+export interface SummaryPageParams {
+  sort_by: string;
+  sort_order: ICSortOrder;
+  offset: number;
+  limit: number;
+  search?: string;
+  pass_class?: string;
+}
+
+export interface ICSummaryPage {
+  total: number;
+  offset: number;
+  limit: number;
+  sort_by: string;
+  sort_order: ICSortOrder;
+  result_revision: number | null;
+  rows: ICFeatureInfo[];
+}
+
+/** 單特徵詳情：contract `per_feature_sections` 六段＋summary_row；段缺席 ⇒ null（不補假值）。 */
+export interface ICFeatureDetail {
+  feature_name: string;
+  summary_row: ICFeatureInfo;
+  result_revision: number | null;
+  ic_decay?: ICDecayData | SectionStatusObject | null;
+  quantile_returns?: QuantileReturnData | SectionStatusObject | null;
+  turnover_analysis?: TurnoverFeatureData | SectionStatusObject | null;
+  coverage_analysis?: unknown;
+  rolling_ic_series?: RollingICSeries | null;
+  grouped_ic?: Record<string, unknown> | SectionStatusObject | null;
+}
+
+/** 漏斗 adapter 輸出：每 stage `{input, output}`，皆可 null（顯示不適用，不補 0）。 */
+export type FilterLogFunnel = Record<string, { input: number | null; output: number | null }>;
+
+/**
+ * light 視圖＝全量報告刪 contract `drop_sections` 七段（Omit 與之對齊，讀已刪段為編譯錯誤）＋附加鍵。
+ * 因 ICReport 全欄 optional，ICReportLight 可指派給接受 ICReport 的既有元件。
+ */
+export type ICReportLight = Omit<
+  ICReport,
+  'summary_table' | 'ic_decay' | 'quantile_returns' | 'turnover_analysis' | 'coverage_analysis' | 'rolling_ic_series' | 'grouped_ic'
+> & {
+  view: 'light';
+  total_features: number;
+  result_revision: number | null;
+  summary_page: ICSummaryPage;
+  filter_log_funnel: FilterLogFunnel;
+};
+
+export type FeatureDetailStatus = 'idle' | 'loading' | 'ready' | 'missing' | 'error';

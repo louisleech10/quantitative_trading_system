@@ -462,7 +462,8 @@ describe('G3-D2 B-D4 R2 閉合 — codex 三條 P2', () => {
   it('🔴 `CODEX-R2-P2-02`：`/task` 失敗但 `/result` 成功 ⇒ 報告仍在，且**說出**揭露欄沒拿到', async () => {
     const fetchMock = vi.fn(async (url: string) => (String(url).includes('/task/')
       ? { ok: false, statusText: 'Internal Server Error', json: async () => ({ detail: 'boom-task' }) }
-      : { ok: true, json: async () => ({ summary: { ok: true } }) }));
+      // ICRESULT_PAGING：fetchResult 改吃 light 視圖（無 view:'light' ⇒ 視為後端過舊、不 setReport），故 mock 回 light 形狀
+      : { ok: true, json: async () => ({ view: 'light', result_revision: 1, total_features: 0, filter_log_funnel: {}, summary_page: { total: 0, offset: 0, limit: 50, sort_by: 'icir', sort_order: 'desc', result_revision: 1, rows: [] }, summary: { ok: true } }) }));
     vi.stubGlobal('fetch', fetchMock);
     const { result } = renderHook(() => useICAnalysis());
     act(() => { result.current.connectProgress('t'); });

@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Star } from 'lucide-react';
-import { ICAnalysisConfig, ICFeatureInfo, WatchlistStatus } from '@/lib/types';
+import { ICAnalysisConfig, ICFeatureInfo, ICSummaryPage, SummaryPageParams, WatchlistStatus } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -20,7 +20,15 @@ import { Input } from '@/components/ui/input';
 import { useWatchlistStore } from '@/store/watchlistStore';
 
 interface ICSummaryTableProps {
-  data: ICFeatureInfo[];
+  /** legacy：直接給列（不分頁、不本地排序——後端序即顯示序）。 */
+  data?: ICFeatureInfo[];
+  /** ICRESULT_PAGING Task 2.2：伺服器分頁模式（優先於 data）。 */
+  page?: ICSummaryPage | null;
+  params?: SummaryPageParams;
+  onParamsChange?: (patch: Partial<SummaryPageParams>) => void;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   selectedFeature?: string | null;
   onSelectFeature?: (featureName: string) => void;
   selectable?: boolean;
@@ -42,9 +50,9 @@ type SortField =
   | 'p_value_adj'
   | 'monotonicity_score';
 
-type SortDirection = 'asc' | 'desc';
-
 const AUTO_SUGGEST_LIMIT = 12;
+const PAGE_SIZES = [50, 100, 200] as const;
+const SEARCH_DEBOUNCE_MS = 300; // SPEC §C-10：搜尋去抖 owner＝表格搜尋框（hook 不再去抖）
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
@@ -60,6 +68,12 @@ function formatFinite(value: unknown, digits: number): string {
 
 export default function ICSummaryTable({
   data,
+  page = null,
+  params,
+  onParamsChange,
+  loading = false,
+  error = null,
+  onRetry,
   selectedFeature,
   onSelectFeature,
   selectable = false,
@@ -70,8 +84,13 @@ export default function ICSummaryTable({
   crossSectionalSymbolCount = 0,
   taskId = null,
 }: ICSummaryTableProps) {
-  const [sortField, setSortField] = useState<SortField>('icir');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const serverMode = page !== null && page !== undefined;
+  const sortField = (params?.sort_by ?? page?.sort_by ?? 'icir') as SortField;
+  const sortDirection = params?.sort_order ?? page?.sort_order ?? 'desc';
+  // 翻頁時保留舊列到新列到達（不閃白）；skeleton 以 overlay 呈現
+  const lastRowsRef = useRef<ICFeatureInfo[]>([]);
+  const [searchText, setSearchText] = useState(params?.search ?? '');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [watchlistFeature, setWatchlistFeature] = useState<ICFeatureInfo | null>(null);
   const [watchlistStatus, setWatchlistStatus] = useState<WatchlistStatus>('candidate');
   const [watchlistNote, setWatchlistNote] = useState('');
@@ -88,32 +107,34 @@ export default function ICSummaryTable({
     [watchlistEntries]
   );
 
-  const getSortValue = useCallback((item: ICFeatureInfo, field: SortField): number => {
-    const value = item[field as keyof ICFeatureInfo];
-    return isFiniteNumber(value) ? value : Number.NEGATIVE_INFINITY;
-  }, []);
-
-  const sortedData = useMemo(() => {
-    const cloned = [...data];
-    cloned.sort((a, b) => {
-      const aVal = getSortValue(a, sortField);
-      const bVal = getSortValue(b, sortField);
-      if (aVal === bVal) return 0;
-      if (sortDirection === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      }
-      return aVal < bVal ? 1 : -1;
-    });
-    return cloned;
-  }, [data, sortDirection, sortField, getSortValue]);
+  // ICRESULT_PAGING §C-8：排序一律在後端（分頁序取代前端本地序）；legacy data 模式亦不本地排序
+  const sortedData = useMemo<ICFeatureInfo[]>(() => {
+    if (serverMode) {
+      const rows = page?.rows ?? [];
+      if (rows.length > 0 || !loading) lastRowsRef.current = rows;
+      return loading && rows.length === 0 ? lastRowsRef.current : rows;
+    }
+    return data ?? [];
+  }, [data, loading, page, serverMode]);
+  const selectedSet = useMemo(() => new Set(selectedFeatures), [selectedFeatures]);
+  const total = serverMode ? (page?.total ?? 0) : sortedData.length;
+  const offset = serverMode ? (page?.offset ?? 0) : 0;
+  const limit = serverMode ? (params?.limit ?? page?.limit ?? 50) : sortedData.length;
 
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
+    if (!onParamsChange) return;
+    const nextOrder = sortField === field ? (sortDirection === 'asc' ? 'desc' : 'asc') : 'desc';
+    onParamsChange({ sort_by: field, sort_order: nextOrder, offset: 0 });
+  };
+
+  useEffect(() => () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); }, []);
+  const handleSearchChange = (value: string) => {
+    setSearchText(value);
+    if (!onParamsChange) return;
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      onParamsChange({ search: value.trim(), offset: 0 });
+    }, SEARCH_DEBOUNCE_MS);
   };
 
   const SortButton = ({ field, label }: { field: SortField; label: string }) => (
@@ -121,6 +142,8 @@ export default function ICSummaryTable({
       variant="ghost"
       size="sm"
       onClick={() => handleSort(field)}
+      disabled={!onParamsChange}
+      data-sort-field={field}
       className="h-8 px-2 text-xs"
     >
       {label}
@@ -128,7 +151,7 @@ export default function ICSummaryTable({
     </Button>
   );
 
-  const allSelected = sortedData.length > 0 && sortedData.every((item) => selectedFeatures.includes(item.feature_name));
+  const allSelected = sortedData.length > 0 && sortedData.every((item) => selectedSet.has(item.feature_name));
 
   const handleSelectAll = (checked: boolean) => {
     if (!onSelectFeatures) return;
@@ -136,16 +159,17 @@ export default function ICSummaryTable({
       onSelectFeatures([]);
       return;
     }
-    onSelectFeatures(sortedData.map((item) => item.feature_name));
+    // 全選＝當頁；保留其他頁已勾者（Set 跨頁保留）
+    const next = new Set(selectedSet);
+    for (const item of sortedData) next.add(item.feature_name);
+    onSelectFeatures(Array.from(next));
   };
 
   const toggleFeature = (featureName: string, checked: boolean) => {
     if (!onSelectFeatures) return;
-    if (checked) {
-      onSelectFeatures(Array.from(new Set([...selectedFeatures, featureName])));
-      return;
-    }
-    onSelectFeatures(selectedFeatures.filter((item) => item !== featureName));
+    const next = new Set(selectedSet);
+    if (checked) next.add(featureName); else next.delete(featureName);
+    onSelectFeatures(Array.from(next));
   };
 
   const openWatchlistDialog = (item: ICFeatureInfo) => {
@@ -299,12 +323,46 @@ export default function ICSummaryTable({
         )}
       </CardHeader>
       <CardContent>
-        {sortedData.length === 0 ? (
+        {serverMode && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Input
+              value={searchText}
+              onChange={(event) => handleSearchChange(event.target.value)}
+              placeholder="搜尋特徵名（300 ms 去抖）"
+              className="h-8 w-64 text-xs"
+              data-testid="ic-summary-search"
+            />
+            <span className="text-xs text-slate-400" data-testid="ic-summary-range">
+              {total === 0 ? '共 0 列' : `第 ${offset + 1}–${Math.min(offset + limit, total)} 列，共 ${total} 列`}
+              {selectedFeatures.length > 0 ? `；已選 ${selectedFeatures.length}` : ''}
+            </span>
+            {error && (
+              <span className="text-xs text-rose-300" data-testid="ic-summary-error">
+                {error}{' '}
+                {onRetry && (
+                  <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" onClick={onRetry} data-testid="ic-summary-retry">
+                    重試
+                  </Button>
+                )}
+              </span>
+            )}
+          </div>
+        )}
+        {sortedData.length === 0 && !loading ? (
           <div className="flex items-center justify-center h-[200px] text-slate-400">
-            暫無分析結果
+            {serverMode && (params?.search || '').length > 0 ? '沒有符合搜尋的特徵' : '暫無分析結果'}
           </div>
         ) : (
-          <div className="rounded-md border border-white/10">
+          <div className="relative rounded-md border border-white/10">
+            {loading && (
+              <div
+                className="absolute inset-0 z-10 flex items-start justify-center bg-slate-950/40 pt-3 text-xs text-slate-300"
+                data-testid="ic-summary-skeleton"
+                aria-busy="true"
+              >
+                載入中…
+              </div>
+            )}
             <Table>
               <TableHeader>
                 <TableRow>
@@ -368,12 +426,12 @@ export default function ICSummaryTable({
                       {selectable && (
                         <TableCell onClick={(event) => event.stopPropagation()}>
                           <Checkbox
-                            checked={selectedFeatures.includes(item.feature_name)}
+                            checked={selectedSet.has(item.feature_name)}
                             onCheckedChange={(checked) => toggleFeature(item.feature_name, Boolean(checked))}
                           />
                         </TableCell>
                       )}
-                      <TableCell className="text-sm text-slate-300">#{item.rank ?? index + 1}</TableCell>
+                      <TableCell className="text-sm text-slate-300">#{item.rank ?? offset + index + 1}</TableCell>
                       <TableCell className="font-medium text-slate-100">
                         {item.feature_name}
                       </TableCell>
@@ -437,6 +495,48 @@ export default function ICSummaryTable({
                 })}
               </TableBody>
             </Table>
+          </div>
+        )}
+        {serverMode && total > 0 && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300" data-testid="ic-summary-pager">
+            <div className="flex items-center gap-2">
+              <span>每頁</span>
+              {PAGE_SIZES.map((size) => (
+                <Button
+                  key={size}
+                  variant={limit === size ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 px-2 text-[11px]"
+                  onClick={() => onParamsChange?.({ limit: size, offset: 0 })}
+                  disabled={!onParamsChange}
+                >
+                  {size}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => onParamsChange?.({ offset: Math.max(0, offset - limit) })}
+                disabled={!onParamsChange || offset === 0}
+                data-testid="ic-summary-prev"
+              >
+                上一頁
+              </Button>
+              <span data-testid="ic-summary-pageno">第 {Math.floor(offset / limit) + 1} / {Math.max(1, Math.ceil(total / limit))} 頁</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-[11px]"
+                onClick={() => onParamsChange?.({ offset: offset + limit })}
+                disabled={!onParamsChange || offset + limit >= total}
+                data-testid="ic-summary-next"
+              >
+                下一頁
+              </Button>
+            </div>
           </div>
         )}
       </CardContent>

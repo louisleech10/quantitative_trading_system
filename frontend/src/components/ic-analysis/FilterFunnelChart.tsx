@@ -1,33 +1,53 @@
 'use client';
 
 import { useMemo } from 'react';
-import { FilterLogData } from '@/lib/types';
+import { FilterLogFunnel } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface FilterFunnelChartProps {
-  filterLog?: FilterLogData | null;
+  /**
+   * ICRESULT_PAGING §C-6 (iv)：後端 `filter_log_funnel`（每 stage `{input, output}`，皆可 null）。
+   * null ⇒ 該 stage 顯示「不適用」，**不補 0**（改前讀 `filter_log.*.input/output` 之鍵名錯配已由 adapter 修正）。
+   */
+  funnel?: FilterLogFunnel | null;
 }
 
-export default function FilterFunnelChart({ filterLog }: FilterFunnelChartProps) {
-  const chartData = useMemo(() => {
-    if (!filterLog) {
-      return [];
+export default function FilterFunnelChart({ funnel }: FilterFunnelChartProps) {
+  const { chartData, notApplicable } = useMemo(() => {
+    if (!funnel) {
+      return { chartData: [], notApplicable: [] as string[] };
     }
-
-    return Object.entries(filterLog).map(([stage, values]) => ({
-      stage,
-      output: values.output,
-      input: values.input,
-      removed: Math.max(values.input - values.output, 0),
-    }));
-  }, [filterLog]);
+    const rows: Array<{ stage: string; input: number; output: number; removed: number }> = [];
+    const na: string[] = [];
+    for (const [stage, values] of Object.entries(funnel)) {
+      if (stage.startsWith('_')) continue; // 合成 probe stage 不畫
+      const input = values?.input;
+      const output = values?.output;
+      if (typeof output !== 'number') {
+        na.push(stage);
+        continue;
+      }
+      rows.push({
+        stage,
+        input: typeof input === 'number' ? input : output,
+        output,
+        removed: typeof input === 'number' ? Math.max(input - output, 0) : 0,
+      });
+    }
+    return { chartData: rows, notApplicable: na };
+  }, [funnel]);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">篩選漏斗</CardTitle>
         <CardDescription>各階段特徵數變化</CardDescription>
+        {notApplicable.length > 0 && (
+          <div className="text-[11px] text-slate-500" data-testid="funnel-not-applicable">
+            不適用（該階段無特徵計數）：{notApplicable.join('、')}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         {chartData.length === 0 ? (

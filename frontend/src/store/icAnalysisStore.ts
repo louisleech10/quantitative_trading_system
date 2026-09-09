@@ -12,6 +12,11 @@ import {
   ICReport,
   ModuleStatus,
   NetICAnalysisRequest,
+  ICSummaryPage,
+  ICFeatureDetail,
+  ICReportLight,
+  SummaryPageParams,
+  FeatureDetailStatus,
 } from '@/lib/types';
 
 type ICAnalysisStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
@@ -36,7 +41,17 @@ interface ICAnalysisState {
    */
   eventScanDisclosure: ICEventScanDisclosure | null;
   error: string | null;
-  report: ICReport | null;
+  /** ICRESULT_PAGING：light 視圖（無七段 per-feature 資料；表格／圖表各走投影端點）。 */
+  report: ICReport | ICReportLight | null;
+  /** ICRESULT_PAGING §C-7：結果世代戳；summary／feature 回應之 revision 不符者一律丟棄。 */
+  resultRevision: number | null;
+  summaryPage: ICSummaryPage | null;
+  summaryParams: SummaryPageParams;
+  summaryLoading: boolean;
+  summaryError: string | null;
+  featureDetail: ICFeatureDetail | null;
+  featureDetailStatus: FeatureDetailStatus;
+  featureDetailError: string | null;
   selectedFeature: string | null;
   availableFeatures: FeatureListItem[];
   featureFilter: FeatureFilterConfig;
@@ -61,7 +76,13 @@ interface ICAnalysisState {
   setTaskFallback: (fallback: ICTaskFallback | null) => void;
   setEventScanDisclosure: (d: ICEventScanDisclosure | null) => void;
   setStatus: (status: ICAnalysisStatus) => void;
-  setReport: (report: ICReport | null) => void;
+  setReport: (report: ICReport | ICReportLight | null) => void;
+  setResultRevision: (revision: number | null) => void;
+  setSummaryPage: (page: ICSummaryPage | null) => void;
+  setSummaryParams: (patch: Partial<SummaryPageParams>) => void;
+  setSummaryLoading: (loading: boolean) => void;
+  setSummaryError: (error: string | null) => void;
+  setFeatureDetail: (detail: ICFeatureDetail | null, status: FeatureDetailStatus, error?: string | null) => void;
   setError: (error: string | null) => void;
   setSelectedFeature: (featureName: string | null) => void;
   setAvailableFeatures: (features: FeatureListItem[]) => void;
@@ -227,6 +248,14 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   eventScanDisclosure: null,
   error: null,
   report: null,
+  resultRevision: null,
+  summaryPage: null,
+  summaryParams: { sort_by: 'icir', sort_order: 'desc', offset: 0, limit: 50, search: '' },
+  summaryLoading: false,
+  summaryError: null,
+  featureDetail: null,
+  featureDetailStatus: 'idle',
+  featureDetailError: null,
   selectedFeature: null,
   availableFeatures: [],
   featureFilter: {
@@ -287,7 +316,20 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   setTaskFallback: (taskFallback) => set({ taskFallback }),
   setEventScanDisclosure: (eventScanDisclosure) => set({ eventScanDisclosure }),
   setStatus: (status) => set({ status }),
-  setReport: (report) => set({ report }),
+  setReport: (report) =>
+    set({
+      report,
+      resultRevision: report && typeof (report as ICReportLight).result_revision === 'number' ? (report as ICReportLight).result_revision : null,
+      summaryPage: report && (report as ICReportLight).view === 'light' ? (report as ICReportLight).summary_page : null,
+    }),
+  setResultRevision: (resultRevision) => set({ resultRevision }),
+  setSummaryPage: (summaryPage) => set({ summaryPage }),
+  setSummaryParams: (patch) => set((state) => ({ summaryParams: { ...state.summaryParams, ...patch } })),
+  setSummaryLoading: (summaryLoading) => set({ summaryLoading }),
+  setSummaryError: (summaryError) => set({ summaryError }),
+  // 切換特徵時**不清空**舊 detail（SPEC §C-10：保留舊圖＋遮罩）；只有 ready／missing／error 才換內容
+  setFeatureDetail: (detail, status, error = null) =>
+    set((state) => ({ featureDetail: status === 'loading' ? state.featureDetail : detail, featureDetailStatus: status, featureDetailError: error })),
   setError: (error) => set({ error }),
   setSelectedFeature: (featureName) => set({ selectedFeature: featureName }),
   setAvailableFeatures: (features) => set({ availableFeatures: features }),
@@ -419,6 +461,14 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
   resetReport: () =>
     set({
       report: null,
+      resultRevision: null,
+      summaryPage: null,
+      summaryParams: { sort_by: 'icir', sort_order: 'desc', offset: 0, limit: 50, search: '' },
+      summaryLoading: false,
+      summaryError: null,
+      featureDetail: null,
+      featureDetailStatus: 'idle',
+      featureDetailError: null,
       selectedFeature: null,
       progress: 0,
       currentStage: null,

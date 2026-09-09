@@ -9,6 +9,10 @@ import {
   ICSubProgress,
   ICTaskFallback,
   ICTaskWarning,
+  ICReportLight,
+  ICSummaryPage,
+  ICFeatureDetail,
+  SummaryPageParams,
 } from '@/lib/types';
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { httpErrorMessage } from '@/lib/httpError';
@@ -29,8 +33,9 @@ const requestJson = async <T>(path: string, options?: RequestInit): Promise<T> =
 
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    const err = new Error(httpErrorMessage(payload, response.statusText)) as Error & { status?: number };
-    err.status = response.status;   // 呼叫端據此判「任務已不存在（404）」等終態，停止輪詢
+    const err = new Error(httpErrorMessage(payload, response.statusText)) as Error & { status?: number; detail?: unknown };
+    err.status = response.status;
+    err.detail = (payload as { detail?: unknown })?.detail;   // ICRESULT_PAGING：409 帶 current_revision   // 呼叫端據此判「任務已不存在（404）」等終態，停止輪詢
     throw err;
   }
 
@@ -79,7 +84,15 @@ export function useICAnalysis() {
     setStatus,
     setError,
     setReport,
+    setResultRevision,
+    setSummaryPage,
+    setSummaryLoading,
+    setSummaryError,
+    setFeatureDetail,
   } = useICAnalysisStore();
+  const summaryAbortRef = useRef<AbortController | null>(null);
+  const detailAbortRef = useRef<AbortController | null>(null);
+  const detailTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -98,13 +111,125 @@ export function useICAnalysis() {
     }
   }, []);
 
+  /** ICRESULT_PAGING §C-7：refilter／換 task 後把進行中的 summary／feature 請求全部 abort（丟棄舊世代回應）。 */
+  const abortProjections = useCallback(() => {
+    summaryAbortRef.current?.abort();
+    summaryAbortRef.current = null;
+    detailAbortRef.current?.abort();
+    detailAbortRef.current = null;
+    if (detailTimerRef.current) {
+      clearTimeout(detailTimerRef.current);
+      detailTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * ICRESULT_PAGING Task 2.1：改吃 light 視圖（`?view=light`）。
+   * 後端版本過舊（回應無 `view:'light'`）⇒ setError，**不**吃整份全量報告（39k 特徵 119 MB 會凍頁）。
+   */
   const fetchResult = useCallback(
     async (taskId: string) => {
-      const result = await requestJson<ICReport>(`/result/${taskId}`);
+      abortProjections();
+      const result = await requestJson<ICReportLight>(`/result/${taskId}?view=light`);
+      if (!result || (result as { view?: string }).view !== 'light') {
+        setError('後端版本過舊：未回 light 視圖（請重啟後端後重試）');
+        return null;
+      }
       setReport(result);
       return result;
     },
-    [setReport]
+    [abortProjections, setError, setReport]
+  );
+
+  /** Task 2.1：summary 分頁（命名對齊 Feature Factory /browse）；revision 不符（409）⇒ 以 current_revision 重拉一次。 */
+  const fetchSummaryPage = useCallback(
+    async (taskId: string, params: SummaryPageParams): Promise<ICSummaryPage | null> => {
+      summaryAbortRef.current?.abort();
+      const controller = new AbortController();
+      summaryAbortRef.current = controller;
+      const buildQuery = (revision: number | null) => {
+        const q = new URLSearchParams();
+        q.set('sort_by', params.sort_by);
+        q.set('sort_order', params.sort_order);
+        q.set('offset', String(params.offset));
+        q.set('limit', String(params.limit));
+        if (params.search) q.set('search', params.search);
+        if (params.pass_class) q.set('pass_class', params.pass_class);
+        if (revision !== null) q.set('revision', String(revision));
+        return q.toString();
+      };
+      setSummaryLoading(true);
+      setSummaryError(null);
+      try {
+        let revision = useICAnalysisStore.getState().resultRevision;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const page = await requestJson<ICSummaryPage>(`/result/${taskId}/summary?${buildQuery(revision)}`, { signal: controller.signal });
+            if (controller.signal.aborted) return null;
+            const current = useICAnalysisStore.getState().resultRevision;
+            if (current !== null && page.result_revision !== null && page.result_revision !== current) {
+              return null; // 舊世代回應：丟棄
+            }
+            setSummaryPage(page);
+            return page;
+          } catch (err) {
+            const status = (err as { status?: number })?.status;
+            const detail = (err as { detail?: { current_revision?: number } })?.detail;
+            if (status === 409 && attempt === 0 && typeof detail?.current_revision === 'number') {
+              revision = detail.current_revision;
+              setResultRevision(revision);
+              continue;
+            }
+            throw err;
+          }
+        }
+        return null;
+      } catch (err) {
+        if ((err as { name?: string })?.name === 'AbortError') return null;
+        setSummaryError(err instanceof Error ? err.message : '載入表格失敗');
+        return null;
+      } finally {
+        if (summaryAbortRef.current === controller) {
+          summaryAbortRef.current = null;
+          setSummaryLoading(false);
+        }
+      }
+    },
+    [setResultRevision, setSummaryError, setSummaryLoading, setSummaryPage]
+  );
+
+  /** Task 2.1：單特徵詳情；去抖 150 ms＋abort 前一請求；切換期間保留舊 detail（store 只在 ready 時換）。 */
+  const fetchFeatureDetail = useCallback(
+    (taskId: string, featureName: string): Promise<ICFeatureDetail | null> =>
+      new Promise((resolve) => {
+        if (detailTimerRef.current) clearTimeout(detailTimerRef.current);
+        detailAbortRef.current?.abort();
+        const controller = new AbortController();
+        detailAbortRef.current = controller;
+        setFeatureDetail(null, 'loading');
+        detailTimerRef.current = setTimeout(async () => {
+          try {
+            const revision = useICAnalysisStore.getState().resultRevision;
+            const q = revision !== null ? `?revision=${revision}` : '';
+            const detail = await requestJson<ICFeatureDetail>(`/result/${taskId}/feature/${encodeURIComponent(featureName)}${q}`, { signal: controller.signal });
+            if (controller.signal.aborted) return resolve(null);
+            const current = useICAnalysisStore.getState().resultRevision;
+            if (current !== null && detail.result_revision !== null && detail.result_revision !== current) return resolve(null);
+            setFeatureDetail(detail, 'ready');
+            resolve(detail);
+          } catch (err) {
+            if ((err as { name?: string })?.name === 'AbortError') return resolve(null);
+            const status = (err as { status?: number })?.status;
+            if (status === 404) {
+              setFeatureDetail(null, 'missing', '此特徵無詳情');
+            } else {
+              setFeatureDetail(null, 'error', err instanceof Error ? err.message : '載入特徵詳情失敗');
+            }
+            resolve(null);
+          }
+        }, 150);
+      }),
+    [setFeatureDetail]
   );
 
   /**
@@ -595,14 +720,17 @@ export function useICAnalysis() {
 
   const refilter = useCallback(
     async (taskId: string, thresholds: ICAnalysisConfig['thresholds']) => {
-      const result = await requestJson<ICReport>(`/refilter?task_id=${taskId}`, {
+      // ICRESULT_PAGING §C-7 handshake：refilter 回 light（含新 result_revision）；成功後 abort 進行中投影、重拉首頁
+      const result = await requestJson<ICReportLight>(`/refilter?task_id=${taskId}&view=light`, {
         method: 'POST',
         body: JSON.stringify({ thresholds: buildRefilterPayload(thresholds) }),
       });
+      abortProjections();
       setReport(result);
+      useICAnalysisStore.getState().setSummaryParams({ offset: 0 });
       return result;
     },
-    [setReport]
+    [abortProjections, setReport]
   );
 
   const applyTransforms = useCallback(
@@ -648,6 +776,9 @@ export function useICAnalysis() {
   }, []);
 
   return {
+    fetchSummaryPage,
+    fetchFeatureDetail,
+    abortProjections,
     startAnalysis,
     fetchTaskStatus,
     fetchResult,

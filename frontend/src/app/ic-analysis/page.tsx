@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Sparkles, AlertTriangle, Activity } from 'lucide-react';
 import ICConfigPanel from '@/components/ic-analysis/ICConfigPanel';
@@ -47,7 +47,7 @@ import { useAutoRefilter } from '@/hooks/useAutoRefilter';
 import { icFeatureCountLabel, icPollFailed, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
 import { icFallbackLabel, icSubProgressLabel, icTaskWarningLabel } from "@/lib/icProgressLabel";
 import { isSectionStatus } from "@/lib/types";
-import type { SectionStatusObject } from '@/lib/types';
+import type { GroupedICData, ICDecayData, ICReportLight, QuantileReturnData, SectionStatusObject, SummaryPageParams, TurnoverFeatureData } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
 
 const EXPORT_TARGET_ID = 'ic-analysis-export';
@@ -67,6 +67,15 @@ function ICAnalysisPageContent() {
     eventScanDisclosure,
     error,
     report,
+    resultRevision,
+    summaryPage,
+    summaryParams,
+    summaryLoading,
+    summaryError,
+    featureDetail,
+    featureDetailStatus,
+    featureDetailError,
+    setSummaryParams,
     selectedFeature,
     availableFeatures,
     featureFilter,
@@ -101,6 +110,8 @@ function ICAnalysisPageContent() {
   const {
     startAnalysis,
     fetchResult,
+    fetchSummaryPage,
+    fetchFeatureDetail,
     fetchSummary,
     fetchAvailableFeatures,
     startDeepAnalysis,
@@ -137,7 +148,45 @@ function ICAnalysisPageContent() {
     output_cols: number;
   } | null>(null);
 
-  const summaryTable = useMemo(() => report?.summary_table ?? [], [report?.summary_table]);
+  // ICRESULT_PAGING Task 2.2：表格改吃伺服器分頁（light 報告不含 summary_table）
+  const summaryTable = useMemo(() => summaryPage?.rows ?? [], [summaryPage]);
+  const reportLight = report && (report as { view?: string }).view === 'light' ? (report as ICReportLight) : null;
+
+  // §C-10：頁碼／每頁／排序／搜尋同步到 URL query，重整還原
+  const urlSyncedRef = useRef(false);
+  useEffect(() => {
+    if (urlSyncedRef.current) return;
+    urlSyncedRef.current = true;
+    const page = Number(searchParams.get('page') || '');
+    const limit = Number(searchParams.get('limit') || '');
+    const sortBy = searchParams.get('sort_by') || '';
+    const sortOrder = searchParams.get('sort_order') || '';
+    const search = searchParams.get('search') || '';
+    const patch: Partial<SummaryPageParams> = {};
+    if (Number.isFinite(limit) && limit > 0) patch.limit = limit;
+    if (Number.isFinite(page) && page > 1) patch.offset = (page - 1) * (patch.limit ?? summaryParams.limit);
+    if (sortBy) patch.sort_by = sortBy;
+    if (sortOrder === 'asc' || sortOrder === 'desc') patch.sort_order = sortOrder;
+    if (search) patch.search = search;
+    if (Object.keys(patch).length > 0) setSummaryParams(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !reportLight) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('page', String(Math.floor(summaryParams.offset / summaryParams.limit) + 1));
+    url.searchParams.set('limit', String(summaryParams.limit));
+    url.searchParams.set('sort_by', summaryParams.sort_by);
+    url.searchParams.set('sort_order', summaryParams.sort_order);
+    if (summaryParams.search) url.searchParams.set('search', summaryParams.search); else url.searchParams.delete('search');
+    window.history.replaceState(window.history.state, '', url.toString());
+  }, [reportLight, summaryParams]);
+
+  // Task 2.1：參數變更 ⇒ 重拉分頁（light 首頁已內含 summary_page，僅在參數偏離預設或 revision 變更時再拉）
+  useEffect(() => {
+    if (!taskId || !reportLight) return;
+    void fetchSummaryPage(taskId, summaryParams);
+  }, [taskId, reportLight, resultRevision, summaryParams, fetchSummaryPage]);
 
   const crossSectionalFeatureCount = useMemo(() => {
     const keyword = (featureFilter.include_pattern || '').trim();
@@ -213,19 +262,37 @@ function ICAnalysisPageContent() {
 
   const activeFeature = selectedFeature || summaryTable[0]?.feature_name || null;
 
+  // Task 2.1：activeFeature 變更 ⇒ 拉單特徵詳情（去抖＋abort 前一請求；切換期間保留舊圖＋遮罩）
+  useEffect(() => {
+    if (!taskId || !reportLight || !activeFeature) return;
+    void fetchFeatureDetail(taskId, activeFeature);
+  }, [taskId, reportLight, resultRevision, activeFeature, fetchFeatureDetail]);
+
   // ICHC Task 3.2：五節 union 分流——status 物件（如 xsec 不適用）vs legacy feature map
   const sectionSplit = useMemo(() => {
     const split = <T,>(node: SectionStatusObject | T | undefined) =>
       isSectionStatus(node)
         ? { status: node as SectionStatusObject, map: undefined as T | undefined }
         : { status: null, map: node as T | undefined };
+    // ICRESULT_PAGING Task 2.3：六段改吃 featureDetail（light 已刪 per-feature 段）
     return {
-      icDecay: split(report?.ic_decay),
-      quantile: split(report?.quantile_returns),
-      grouped: split(report?.grouped_ic),
-      turnover: split(report?.turnover_analysis),
+      icDecay: split(featureDetail?.ic_decay ?? undefined),
+      quantile: split(featureDetail?.quantile_returns ?? undefined),
+      grouped: split(featureDetail?.grouped_ic ?? undefined),
+      turnover: split(featureDetail?.turnover_analysis ?? undefined),
     };
-  }, [report?.ic_decay, report?.quantile_returns, report?.grouped_ic, report?.turnover_analysis]);
+  }, [featureDetail]);
+  const detailLoading = featureDetailStatus === 'loading';
+  // grouped_ic 單特徵投影 `{group: value}` ⇒ 還原為既有圖表期望的 `{group: {feature: value}}` 形狀
+  const featureGroupedMap = useMemo<GroupedICData | null>(() => {
+    const g = featureDetail?.grouped_ic;
+    if (!g || !activeFeature || isSectionStatus(g)) return null;
+    const out: GroupedICData = {};
+    for (const [group, value] of Object.entries(g as Record<string, unknown>)) {
+      out[group] = { [activeFeature]: value } as unknown as GroupedICData[string];
+    }
+    return out;
+  }, [featureDetail, activeFeature]);
 
   const deepTabVisible = Boolean(report?.deep_analysis_enabled || deepAnalysisReport?.deep_analysis_enabled);
 
@@ -687,7 +754,12 @@ function ICAnalysisPageContent() {
               />
 
               <ICSummaryTable
-                data={summaryTable}
+                page={summaryPage}
+                params={summaryParams}
+                onParamsChange={setSummaryParams}
+                loading={summaryLoading}
+                error={summaryError}
+                onRetry={() => { if (taskId) void fetchSummaryPage(taskId, summaryParams); }}
                 selectedFeature={activeFeature}
                 onSelectFeature={setSelectedFeature}
                 selectable
@@ -847,7 +919,7 @@ function ICAnalysisPageContent() {
                       status={{ status: 'not_applicable', reason: 'cross_sectional_mode' }}
                     />
                   ) : (
-                    <FilterFunnelChart filterLog={report?.filter_log} />
+                    <FilterFunnelChart funnel={reportLight?.filter_log_funnel ?? null} />
                   )}
 
                   {resultMode === 'cross_sectional' && (
@@ -856,12 +928,38 @@ function ICAnalysisPageContent() {
                     </ChartErrorBoundary>
                   )}
 
+                  {/* ICRESULT_PAGING §C-10：切換特徵時保留舊圖＋遮罩（不清空）；失敗顯示重試 */}
+                  <div className="relative" data-testid="ic-feature-charts" aria-busy={detailLoading}>
+                    {detailLoading && (
+                      <div className="absolute inset-0 z-10 rounded-2xl bg-slate-950/40 flex items-start justify-center pt-4 text-xs text-slate-300" data-testid="ic-feature-charts-overlay">
+                        載入 {activeFeature} 的圖表…
+                      </div>
+                    )}
+                    {featureDetailStatus === 'idle' && reportLight && (
+                      <div className="text-xs text-slate-400 mb-2" data-testid="ic-feature-charts-initial">載入中</div>
+                    )}
+                    {featureDetailStatus === 'missing' && (
+                      <div className="text-xs text-amber-300 mb-2" data-testid="ic-feature-charts-missing">此特徵無詳情</div>
+                    )}
+                    {featureDetailStatus === 'error' && (
+                      <div className="text-xs text-rose-300 mb-2" data-testid="ic-feature-charts-error">
+                        {featureDetailError || '載入特徵詳情失敗'}{' '}
+                        <button
+                          type="button"
+                          className="underline"
+                          data-testid="ic-feature-charts-retry"
+                          onClick={() => { if (taskId && activeFeature) void fetchFeatureDetail(taskId, activeFeature); }}
+                        >
+                          重試
+                        </button>
+                      </div>
+                    )}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {sectionSplit.icDecay.status ? (
                       <SectionStatusNotice title="IC 衰減" status={sectionSplit.icDecay.status} />
                     ) : (
                       <ICDecayChart
-                        data={sectionSplit.icDecay.map?.[activeFeature || ''] || null}
+                        data={(sectionSplit.icDecay.map as ICDecayData | undefined) || null}
                         featureName={activeFeature}
                         timeframe={config.timeframe}
                       />
@@ -870,7 +968,7 @@ function ICAnalysisPageContent() {
                       <SectionStatusNotice title="分位數收益" status={sectionSplit.quantile.status} />
                     ) : (
                       <QuantileReturnChart
-                        data={sectionSplit.quantile.map?.[activeFeature || ''] || null}
+                        data={(sectionSplit.quantile.map as QuantileReturnData | undefined) || null}
                         featureName={activeFeature}
                       />
                     )}
@@ -878,14 +976,14 @@ function ICAnalysisPageContent() {
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <RollingICChart
-                      series={report?.rolling_ic_series?.[activeFeature || ''] || null}
+                      series={featureDetail?.rolling_ic_series || null}
                       featureName={activeFeature}
                     />
                     {sectionSplit.grouped.status ? (
                       <SectionStatusNotice title="分組 IC" status={sectionSplit.grouped.status} />
                     ) : (
                       <GroupedICBarChart
-                        groupedIC={sectionSplit.grouped.map || null}
+                        groupedIC={sectionSplit.grouped.map ? featureGroupedMap : null}
                         featureName={activeFeature}
                       />
                     )}
@@ -895,9 +993,10 @@ function ICAnalysisPageContent() {
                     {sectionSplit.grouped.status ? (
                       <SectionStatusNotice title="Regime 雷達" status={sectionSplit.grouped.status} />
                     ) : (
-                      <RegimeRadarChart groupedIC={sectionSplit.grouped.map || null} featureName={activeFeature} />
+                      <RegimeRadarChart groupedIC={sectionSplit.grouped.map ? featureGroupedMap : null} featureName={activeFeature} />
                     )}
                     <CorrelationHeatmap matrix={report?.correlation_matrix || null} />
+                  </div>
                   </div>
 
                   {/* GAP-2 Task 5.1（A1-5 補正）：邊際 IC／多因子組合唯讀表格——base 報告節，掛 basic 分頁末段（deep 分頁受 deepTabVisible gating） */}
@@ -928,7 +1027,7 @@ function ICAnalysisPageContent() {
                             <SectionStatusNotice title="換手率時間序列" status={sectionSplit.turnover.status} />
                           ) : (
                             <TurnoverTimeSeriesChart
-                              data={sectionSplit.turnover.map?.[activeFeature || ''] || null}
+                              data={(sectionSplit.turnover.map as TurnoverFeatureData | undefined) || null}
                               featureName={activeFeature}
                             />
                           )}
@@ -936,7 +1035,7 @@ function ICAnalysisPageContent() {
                       )}
                       <ChartErrorBoundary title="Factor Equity Curve">
                         <FactorEquityCurveChart
-                          data={sectionSplit.quantile.map?.[activeFeature || ''] || null}
+                          data={(sectionSplit.quantile.map as QuantileReturnData | undefined) || null}
                           featureName={activeFeature}
                           loading={isDeepRunning || deepAnalysisStatus === 'running'}
                           error={
