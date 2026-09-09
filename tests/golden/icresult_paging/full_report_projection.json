@@ -1,7 +1,7 @@
 {
  "fixture_report": "fixture_report.json",
- "raw_body_sha256": "f31a8614a7068dfa6d30a843b9c78940c24ed0d3a9a410528c3a03028b0ce188",
- "report_canonical_sha": "2a4bf5cdb1f1860c35f4faee508df3ec6246dd4e608364052fdabab77bd91bcd",
+ "raw_body_sha256": "85ec16e8be1dc44faa1602cec75a22d09946a3d6fb1c26aa30561d4a76216c6f",
+ "report_canonical_sha": "279e453ab39ec37496b2d5185914634cb754bf756dad0a68f88d92e06ee64a32",
  "summary_rows": 14,
  "feature_set_sha256": "64023cbb5d632a1727160379d93957230a431f8a0567cf13abee4bbe309721b6",
  "section_key_sha256": {
@@ -286,6 +286,10 @@
   "stage6_redundancy": {
    "input": 0,
    "output": 0
+  },
+  "_adapter_probe": {
+   "input": 1,
+   "output": 2
   }
  },
  "shape_expected_funnel": {
@@ -312,6 +316,10 @@
   "stage6_redundancy": {
    "input": 0,
    "output": 0
+  },
+  "_adapter_probe": {
+   "input": 1,
+   "output": 2
   }
  }
 }

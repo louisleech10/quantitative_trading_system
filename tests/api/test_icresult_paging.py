@@ -101,7 +101,8 @@ def test_funnel_shape_fixture_matches_expected(golden):
     assert golden["shape_funnel"] == golden["shape_expected_funnel"]
     assert golden["shape_funnel"]["stage5_thresholds"] == {"input": 39346, "output": 0}
     assert golden["shape_funnel"]["stage3_event_filter"] == {"input": None, "output": None}
-    assert set(golden["shape_funnel"]) == {"stage0_ingestion", "stage1_preprocessing", "stage3_event_filter", "feature_filter", "stage5_thresholds", "stage6_redundancy"}
+    assert set(golden["shape_funnel"]) == {"stage0_ingestion", "stage1_preprocessing", "stage3_event_filter", "feature_filter", "stage5_thresholds", "stage6_redundancy", "_adapter_probe"}
+    assert golden["shape_funnel"]["_adapter_probe"] == {"input": 1, "output": 2}  # 兩組候選鍵同時存在 ⇒ 取第一存在者
 
 
 def test_collections_to_counts_does_not_mutate_source(fixture_report, contract):
@@ -485,3 +486,17 @@ def test_cache_capacity_process_wide(contract, fixture_report):
 
 
 import numpy as np  # noqa: E402  （cache_capacity 用）
+
+
+def test_cache_key_includes_revision(fixture_report, contract, monkeypatch):
+    """§C-9：同 task 不同 revision 不得命中同一索引（快取 key 含 revision）。"""
+    calls = {"n": 0}
+    orig = proj.build_sort_index
+    monkeypatch.setattr(proj, "build_sort_index", lambda *a, **k: (calls.__setitem__("n", calls["n"] + 1), orig(*a, **k))[1])
+    rows = fixture_report["summary_table"]
+    kw = dict(sort_by="icir", sort_order="desc", offset=0, limit=5, contract=contract, task_id="rev-key-task")
+    proj.paginate_summary(rows, revision=1, **kw); proj.paginate_summary(rows, revision=1, **kw)
+    assert calls["n"] == 1
+    proj.paginate_summary(rows, revision=2, **kw)
+    assert calls["n"] == 2
+    proj.sort_index_cache(contract).invalidate_task("rev-key-task")

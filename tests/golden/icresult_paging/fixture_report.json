@@ -1,6 +1,6 @@
 {
  "version": "1.0",
- "generated_at": "2026-09-09T01:25:15.073353",
+ "generated_at": "2026-09-09T01:37:31.259960",
  "metadata": {
   "baseline_subset": {
    "actual_default_N": 218410,
@@ -278,13 +278,13 @@
   },
   "alpha_source": "threshold_default",
   "filtered_features_written": true,
-  "filtered_features_path": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/features/ETHUSDT_12h_filtered.h5",
-  "filtered_generated_at": "2026-09-09T01:25:15.073353",
+  "filtered_features_path": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_e3re6obt/features/ETHUSDT_12h_filtered.h5",
+  "filtered_generated_at": "2026-09-09T01:37:31.259960",
   "survivor_output": {
    "status": "ok",
    "reason": null,
-   "path": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n3uh2v9o/reports/ic_survivors_ic_gatekeeper.json",
-   "sha256": "12ac94d3b8ec26f5c4ff19aeacb2b1102f957dab2e51f5670bdbaeef84e6f8ae",
+   "path": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_e3re6obt/reports/ic_survivors_ic_gatekeeper.json",
+   "sha256": "652590c10e8fa3cc2e0ea07fc69a6c1cd0e135ab5fb08414ee02045a3be6c619",
    "case_id": "ic_gatekeeper"
   }
  },

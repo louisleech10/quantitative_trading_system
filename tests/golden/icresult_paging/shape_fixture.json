@@ -1,19 +1,112 @@
 {
-  "_source": "SPEC docs/ICRESULT_PAGING_SPEC.md §A FACT-RECEIPT（jq 抄錄自 39,346 特徵實機報告 data_cache/reports/ic_report_ic_gatekeeper.json 之 filter_log 六 stage 鍵名＋型別；無數值，list/dict 以最小代表值示形）",
+  "_source": "SPEC docs/ICRESULT_PAGING_SPEC.md §A FACT-RECEIPT（jq 抄錄自 39,346 特徵實機報告 data_cache/reports/ic_report_ic_gatekeeper.json 之 filter_log 六 stage 鍵名＋型別；無數值，list/dict 以最小代表值示形）；`_adapter_probe` 為合成 stage：兩組候選鍵同時存在以鎖「取第一存在者」（mutation P11 之紅錨）",
   "filter_log": {
-    "stage0_ingestion": {"input_features": 39400, "removed_nan_features": ["f_a", "f_b"]},
-    "stage1_preprocessing": {"removed_features": {"f_c": "reason"}, "winsorized_features": ["f_d"], "skipped_winsorization": [], "fit_mode": "train_mask", "pit_stats_version": "v1", "oos_guarantees": true, "per_bar_validity": {"k": 1}},
-    "stage3_event_filter": {"mode": "conditional", "query": null, "n_events": 34, "tier": "intermediate", "adjusted_p_threshold": 0.05, "n_timestamps_requested": 34, "label_source": "event_label_value", "statistic_kind": "pooled", "sample_scope_kind": "test", "label_kind": "event", "consumed_event_count": 34, "consumed_event_labels": {"e1": 0.1}, "split_mask": {"train": 20, "test": 14}},
-    "feature_filter": {"feature_count_original": 39398, "feature_count_filtered": 39346, "feature_filter_applied": true, "truncation_mode": "none", "truncation_order": null},
-    "stage5_thresholds": {"input_features": 39346, "output_features": {"count": 0, "pass_class": "oos"}, "removed_features": {"f_e": "icir"}, "alpha_effective": 0.05, "n_tests": 39346, "fdr_enabled": true, "alpha_source": "threshold_default", "pass_class": "oos"},
-    "stage6_redundancy": {"method": "correlation", "input_features": 0, "output_features": 0, "removed_features": [], "scope": "test"}
+    "stage0_ingestion": {
+      "input_features": 39400,
+      "removed_nan_features": [
+        "f_a",
+        "f_b"
+      ]
+    },
+    "stage1_preprocessing": {
+      "removed_features": {
+        "f_c": "reason"
+      },
+      "winsorized_features": [
+        "f_d"
+      ],
+      "skipped_winsorization": [],
+      "fit_mode": "train_mask",
+      "pit_stats_version": "v1",
+      "oos_guarantees": true,
+      "per_bar_validity": {
+        "k": 1
+      }
+    },
+    "stage3_event_filter": {
+      "mode": "conditional",
+      "query": null,
+      "n_events": 34,
+      "tier": "intermediate",
+      "adjusted_p_threshold": 0.05,
+      "n_timestamps_requested": 34,
+      "label_source": "event_label_value",
+      "statistic_kind": "pooled",
+      "sample_scope_kind": "test",
+      "label_kind": "event",
+      "consumed_event_count": 34,
+      "consumed_event_labels": {
+        "e1": 0.1
+      },
+      "split_mask": {
+        "train": 20,
+        "test": 14
+      }
+    },
+    "feature_filter": {
+      "feature_count_original": 39398,
+      "feature_count_filtered": 39346,
+      "feature_filter_applied": true,
+      "truncation_mode": "none",
+      "truncation_order": null
+    },
+    "stage5_thresholds": {
+      "input_features": 39346,
+      "output_features": {
+        "count": 0,
+        "pass_class": "oos"
+      },
+      "removed_features": {
+        "f_e": "icir"
+      },
+      "alpha_effective": 0.05,
+      "n_tests": 39346,
+      "fdr_enabled": true,
+      "alpha_source": "threshold_default",
+      "pass_class": "oos"
+    },
+    "stage6_redundancy": {
+      "method": "correlation",
+      "input_features": 0,
+      "output_features": 0,
+      "removed_features": [],
+      "scope": "test"
+    },
+    "_adapter_probe": {
+      "input_features": 1,
+      "feature_count_original": 99,
+      "output_features": 2,
+      "feature_count_filtered": 98
+    }
   },
   "expected_funnel": {
-    "stage0_ingestion": {"input": 39400, "output": null},
-    "stage1_preprocessing": {"input": null, "output": null},
-    "stage3_event_filter": {"input": null, "output": null},
-    "feature_filter": {"input": 39398, "output": 39346},
-    "stage5_thresholds": {"input": 39346, "output": 0},
-    "stage6_redundancy": {"input": 0, "output": 0}
+    "stage0_ingestion": {
+      "input": 39400,
+      "output": null
+    },
+    "stage1_preprocessing": {
+      "input": null,
+      "output": null
+    },
+    "stage3_event_filter": {
+      "input": null,
+      "output": null
+    },
+    "feature_filter": {
+      "input": 39398,
+      "output": 39346
+    },
+    "stage5_thresholds": {
+      "input": 39346,
+      "output": 0
+    },
+    "stage6_redundancy": {
+      "input": 0,
+      "output": 0
+    },
+    "_adapter_probe": {
+      "input": 1,
+      "output": 2
+    }
   }
 }
