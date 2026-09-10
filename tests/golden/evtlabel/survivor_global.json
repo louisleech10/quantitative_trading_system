@@ -1,0 +1,38 @@
+{
+  "event_keys": [],
+  "null_paths": [
+    "composite.oos_guarantees",
+    "composite.reason",
+    "reason",
+    "removed_candidates.z.reason",
+    "sample_scope.event"
+  ],
+  "sha256": "ebd484b8cdb119b2e70403d0795f9bff254c8e5f55f7c0efca76afe97202e5c7",
+  "size_bytes": 3586,
+  "top_keys": [
+    "algorithm_version",
+    "analysis_status",
+    "case_id",
+    "composite",
+    "feature_names",
+    "feature_set_hash",
+    "generated_at",
+    "independent_oos_validation",
+    "oos_guarantees",
+    "oos_semantics",
+    "pass_class",
+    "projection_space",
+    "provenance",
+    "reason",
+    "removed_candidates",
+    "sample_scope",
+    "schema_version",
+    "selection_sample",
+    "split",
+    "statistic",
+    "status",
+    "survivors",
+    "symbol",
+    "timeframe"
+  ]
+}
