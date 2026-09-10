@@ -358,7 +358,7 @@
 - 不可做：置換 p 不取代 MW p；不對全表跑置換；不改 `baseline.py`。
 - 邊界：①倖存者 0 ⇒ `skipped:no_survivors`；②`budget_floor_hit`；③`n_blocks<10`。
 - 風險緩解：M-P3-4、M-P3-6。
-- **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_oracle.py -q` rc=0：植入特徵留下；植入 fixture（200 合成特徵×真實 kline 165 列，含 1 植入）⇒ `n_observed > q95(counts)`、survivor 可寫；全 null fixture ⇒ `n_observed <= q95` ⇒ `survivor_output.status=="suppressed"`、`reason=="negative_control_failed"`、無 consumable 檔；monkeypatch `_permute_blocks` 恆等 ⇒ raise；`L=3` fixture ⇒ 置換後同 block 標籤仍相鄰；密集段 fixture（前 10 事件 gap=1、後段 gap=20、W=12）⇒ `L>=12`（`test_dense_cluster_block_len`）；W=156／median_gap=1 ⇒ `n_blocks<10`、`unavailable:insufficient_blocks`、無 consumable；benchmark 兩道（R3 codex P1-03）：(a) `handoffs/20260910-probe-oracle-bench.py` K=2000、budget 200000、39,373×165 `< 120s`；(b) `handoffs/20260910-probe-mw-bench.py 31 39373 50` 之 clean 與 10% NaN 路徑各 `< 120s`；任一超時 **測試 FAIL**。
+- **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_oracle.py -q` rc=0：植入特徵留下；植入 fixture（200 合成特徵×真實 kline 165 列，含 1 植入）⇒ `n_observed > q95(counts)`、survivor 可寫；全 null fixture ⇒ `n_observed <= q95` ⇒ `survivor_output.status=="unavailable"`、`reason=="negative_control_failed"`、無 consumable 檔；monkeypatch `_permute_blocks` 恆等 ⇒ raise；`L=3` fixture ⇒ 置換後同 block 標籤仍相鄰；密集段 fixture（前 10 事件 gap=1、後段 gap=20、W=12）⇒ `L>=12`（`test_dense_cluster_block_len`）；W=156／median_gap=1 ⇒ `n_blocks<10`、`unavailable:insufficient_blocks`、無 consumable；benchmark 兩道（R3 codex P1-03）：(a) `handoffs/20260910-probe-oracle-bench.py` K=2000、budget 200000、39,373×165 `< 120s`；(b) `handoffs/20260910-probe-mw-bench.py 31 39373 50` 之 clean 與 10% NaN 路徑各 `< 120s`；任一超時 **測試 FAIL**。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 
@@ -442,7 +442,7 @@
 - 不可做：不接 ML 訓練殼、不加 API caller、不改 consumer 行為。
 - 邊界：①倖存者 0 之空 `survivors[]` ⇒ 既有 loud raise；②`schema_version=1` ⇒ 既有 validator 拒收；③suppressed stub 無 `survivors` 鍵 ⇒ 既有 raise。
 - 風險緩解：⊘
-- **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q -k suppressed_not_consumable WHEN survivor_status=suppressed THEN rc=0`。
+- **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q -k suppressed_not_consumable WHEN survivor_reason=negative_control_failed THEN rc=0`。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
 

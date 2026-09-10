@@ -737,9 +737,14 @@ export default function EventBatchDisclosurePanel({
             `taskId` 缺席或沒有掃描 ⇒ 元件自己回 null（不是顯示空表）。 */}
         <ScanCubeBrowser
           taskId={taskId}
-          hasScan={Boolean(scanResult && scanResult.capability === 'available')}
+          /* 🔴 B5 review（grok）：選了匯入標籤模式時，**上一趟**掃描的立方體仍可能留在 store
+             而被畫出來——使用者會以為那些格子是這次 0/1 分析的結果。
+             掃描與匯入標籤模式互斥（後端擋兩次），畫面也不得殘留。 */
+          hasScan={Boolean(
+            labelMode !== 'imported_binary' && scanResult && scanResult.capability === 'available',
+          )}
           /* 🔴 就緒訊號：立方體是網格跑完才寫的，`scanResult` 存在**不代表**寫好了。 */
-          cube={scanResult?.cube}
+          cube={labelMode === 'imported_binary' ? undefined : scanResult?.cube}
         />
 
         {/* 🔴 本次答案窗之可算／缺筆數 ＋ 本次 purge 下界（式之權威在 §D-3′-a(ii)，本區只顯示結果） */}

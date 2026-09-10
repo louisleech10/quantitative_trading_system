@@ -110,3 +110,26 @@ def test_scan_grid_with_return_rule_still_allowed() -> None:
     event_label_mode="return_rule",
   )
   assert request.event_label_mode == "return_rule" and request.event_label_scan is not None
+
+
+def test_empty_import_id_is_rejected_not_silently_ignored() -> None:
+  """🔴 B5 review（grok）：空字串 `""` 是 falsy。
+
+  只擋 `is None` 的話，model 放行、下游 `if request.event_import_id` 為假 ⇒ **不進事件分支**，
+  於是「我要用匯入的 0/1」被靜默跑成一般全域分析——報告上完全看不出來。
+  """
+  import pytest
+
+  for mode in ("imported_binary", "return_rule"):
+    with pytest.raises(ValueError, match="event_import_id"):
+      ICAnalyzeRequest(symbol="BTCUSDT", timeframe="1h",
+                       event_import_id="", event_label_mode=mode)
+
+
+def test_empty_import_id_also_rejected_for_spec_and_scan() -> None:
+  """同一個 falsy 陷阱在 `event_label_spec`／`event_label_scan` 兩條不變式上也成立。"""
+  import pytest
+
+  with pytest.raises(ValueError, match="event_import_id"):
+    ICAnalyzeRequest(symbol="BTCUSDT", timeframe="1h", event_import_id="",
+                     event_label_scan={"decision_offset_bars_max": 2, "horizon_bars_max": 3})

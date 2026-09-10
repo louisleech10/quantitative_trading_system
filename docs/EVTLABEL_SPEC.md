@@ -235,7 +235,7 @@ P1（小）①報告＋隔離區揭露實際 label 規則（h／k／進場價／
 - 檔案：`momentum/Analysis/ic_filter_orchestrator.py` stage5 binary 分支末；`momentum/Analysis/binary_discrimination.py::block_permutation_oracle(values, y, block_ids, stat_fn, oracle_config)`（新；置換單位＝block，沿 `baseline.py::permutation_oracle` 三道硬檢，`_permute` 改為 block 級置換供 mutation guard）。
 - 既有 caller/影響面：`baseline.py::permutation_oracle` 不改（B1.4 仍用）；常數欄已於 3.5 `unavailable`，不進倖存者。
 - 改法：block 長度 `L = max(1, ceil(W / max(1, min_gap_rows)), ceil(W / median_gap_rows))`（W＝`label_window_feature_bars`；取較大者以吸收局部密集段——R2 D3），事件依時間順序每 L 個為一 block；`n_blocks < 10`（預註冊常數，非推導）⇒ 置換 `unavailable:insufficient_blocks`，該特徵不得成為 consumable 倖存者（記 `removed["permutation_unavailable"]`），`permutation_receipt.status` 與 `label_mode.note` loud 揭露（長視窗之預期限制，見 §N R-7）。預算（R1 C14a）：候選 K 依 `|rb|` desc／`feature_name` 排序；`n_perm = clamp(perm_budget_total // K, 200, 1000)`；receipt（seed、`n_perm`、`L`、`n_blocks`、`first_permutation_digest`）寫 `metadata.event_label_rule.permutation_receipt`。受理 run（h=1、事件間距 ≥1 根 12h）⇒ `L=1`，與普通置換等價。
-- **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_oracle.py -q` rc=0：植入特徵 `in_band==False` 留下；植入 fixture（200 合成特徵×165 真實 kline 列，含 1 個植入）⇒ `n_observed > q95(shuffled_counts)`、survivor 可寫；全 null fixture（無植入）⇒ `n_observed <= q95` ⇒ `survivor_output.status=="suppressed"`、`reason=="negative_control_failed"`、無 consumable 檔（M-P3-6）；mutation：monkeypatch `_permute_blocks` 為恆等 ⇒ 硬檢 (ii) raise；`L=3` fixture ⇒ 同一 block 內標籤在置換後仍相鄰（block 完整性）；密集段 fixture（前 10 事件 gap=1、其後 gap=20、W=12）⇒ `L>=12`（`test_dense_cluster_block_len`）；W=156、median_gap=1 fixture ⇒ `n_blocks<10`、`status=unavailable:insufficient_blocks`、無 consumable；benchmark（兩道獨立閘，R3 codex P1-03）：(a) per-survivor 置換 K=2000、`perm_budget_total=200000` 於 39,373×165 fixture `< 120s`；(b) 負對照 N=50 於 39,373×31 之 clean 與 10% NaN 兩形狀各 `< 120s`；任一超時 **FAIL**（非只印 receipt）。
+- **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_oracle.py -q` rc=0：植入特徵 `in_band==False` 留下；植入 fixture（200 合成特徵×165 真實 kline 列，含 1 個植入）⇒ `n_observed > q95(shuffled_counts)`、survivor 可寫；全 null fixture（無植入）⇒ `n_observed <= q95` ⇒ `survivor_output.status=="unavailable"`、`reason=="negative_control_failed"`、無 consumable 檔（M-P3-6）；mutation：monkeypatch `_permute_blocks` 為恆等 ⇒ 硬檢 (ii) raise；`L=3` fixture ⇒ 同一 block 內標籤在置換後仍相鄰（block 完整性）；密集段 fixture（前 10 事件 gap=1、其後 gap=20、W=12）⇒ `L>=12`（`test_dense_cluster_block_len`）；W=156、median_gap=1 fixture ⇒ `n_blocks<10`、`status=unavailable:insufficient_blocks`、無 consumable；benchmark（兩道獨立閘，R3 codex P1-03）：(a) per-survivor 置換 K=2000、`perm_budget_total=200000` 於 39,373×165 fixture `< 120s`；(b) 負對照 N=50 於 39,373×31 之 clean 與 10% NaN 兩形狀各 `< 120s`；任一超時 **FAIL**（非只印 receipt）。
 - **邊界**：①倖存者 0 ⇒ 不跑置換、receipt 寫 `skipped:no_survivors`；②`n_perm` 下限 200，`perm_budget_total < 200×K` ⇒ n_perm=200 並記 `budget_floor_hit`；③`n_blocks < 10`。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
@@ -245,7 +245,7 @@ P1（小）①報告＋隔離區揭露實際 label 規則（h／k／進場價／
 - 目標：`survivor_output.sample_scope = {kind: "event", event: {…六鍵, label_source: "imported_binary_label", label_binary: {import_id, n_pos, n_neg, label_origin_values}}}`；`statistic_kind` 進 `sample_scope.event`（Task 3.1 契約）。
 - 檔案：`momentum/Analysis/survivor_contract.py::build_survivor_output`（`:411-700`）、`validate_survivor_output`（`:238-310`）；`_write_survivor_output`。
 - 既有 caller/影響面：`tests/momentum/Analysis/test_survivor_contract.py`、`test_gap2_survivor_persist.py`（return_rule／全域 payload 逐位元組不變）。
-- 改法：由 `event_context`＋`event_info` 導出；`return_rule` 下 `label_binary=null`；`negative_control_failed`（Task 3.7）⇒ `survivor_output={status:"suppressed", reason:"negative_control_failed"}`，不寫 consumable 檔（reason 入 `_survivor_reason` 詞彙表）。
+- 改法：由 `event_context`＋`event_info` 導出；`return_rule` 下 `label_binary=null`；`negative_control_failed`（Task 3.7）⇒ `survivor_output={status:"unavailable", reason:"negative_control_failed"}`，不寫 consumable 檔（reason 入 `_survivor_reason` 詞彙表）。
 - **驗證**：`pytest tests/momentum/Analysis/test_survivor_contract.py tests/momentum/Analysis/test_gap2_survivor_persist.py -q` rc=0；G-6 survivor golden 逐項相等；新測：binary run 之倖存者檔 `sample_scope.event.label_source=="imported_binary_label"`、`label_binary.n_pos==136`；`validate_survivor_output` 對 `label_binary` 缺 `import_id` ⇒ raise。
 - **邊界**：①倖存者 0 ⇒ 既有 suppressed stub 路徑、`sample_scope` 仍寫；②掃描格不寫 survivor（既有）。
 - **存活至**：全票完工後保留；此檔即「餵 ML」之交接物。
@@ -253,7 +253,7 @@ P1（小）①報告＋隔離區揭露實際 label 規則（h／k／進場價／
 - 不可做：不改 `sample_scope_kind_values`；不改倖存者檔路徑規則。
 
 **Task 3.9 — 前端：模式選擇＋表格欄＋揭露**
-- 目標：事件參數面板加 `label_mode` 三選（auto／return_rule／imported_binary，`data-testid="ic-param-label-mode"`，顯示批內正反數）；結果頁 summary 表在 binary 模式優先顯示 `AUC／rank-biserial r／U／p／q／n⁺／n⁻`（**表頭一律統計學標準名、不自創**——使用者 2026-09-10；rank-biserial correlation＝Cureton 1956、q＝Benjamini–Hochberg），報酬版 IC 欄後移並標「第二欄」；隔離區第四行改「已用」分支；`DegradedBanner` 顯示 `label_mode.reason`（auto 回退時）；`imported_binary` 生效時亦顯示非 degrade 之模式摘要 banner（`data-testid="label-mode-banner"`：「本次 IC 對象＝你匯入的 0/1 標籤（selection 段正 n／反 m）」，R1 C14b）；`survivor_output.status=suppressed` 且 `reason=negative_control_failed` ⇒ 紅色 banner（R1 C3／R2 D2）；`permutation_receipt.status=unavailable:insufficient_blocks` ⇒ 琥珀 banner「label 視窗太長、可置換區塊不足：本次無法做依賴感知放行，倖存者不可餵 ML（預期限制，見說明）」（R2 D3）。
+- 目標：事件參數面板加 `label_mode` 三選（auto／return_rule／imported_binary，`data-testid="ic-param-label-mode"`，顯示批內正反數）；結果頁 summary 表在 binary 模式優先顯示 `AUC／rank-biserial r／U／p／q／n⁺／n⁻`（**表頭一律統計學標準名、不自創**——使用者 2026-09-10；rank-biserial correlation＝Cureton 1956、q＝Benjamini–Hochberg），報酬版 IC 欄後移並標「第二欄」；隔離區第四行改「已用」分支；`DegradedBanner` 顯示 `label_mode.reason`（auto 回退時）；`imported_binary` 生效時亦顯示非 degrade 之模式摘要 banner（`data-testid="label-mode-banner"`：「本次 IC 對象＝你匯入的 0/1 標籤（selection 段正 n／反 m）」，R1 C14b）；`reason=negative_control_failed`（status 為 `unavailable`） ⇒ 紅色 banner（R1 C3／R2 D2）；`permutation_receipt.status=unavailable:insufficient_blocks` ⇒ 琥珀 banner「label 視窗太長、可置換區塊不足：本次無法做依賴感知放行，倖存者不可餵 ML（預期限制，見說明）」（R2 D3）。
 - 檔案：`frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx`、`ICSummaryTable.tsx`、`IsolationNote.tsx`／`icLabelRule.ts`、`DegradedBanner.tsx`、`lib/types.ts`、`store/icAnalysisStore.ts`。
 - 既有 caller/影響面：`ICSummaryTable.paging.test.tsx`（欄動態，分頁不變）；`gap3_event_mode_entry.test.tsx`。
 - 改法：欄位存在與否由報告列鍵決定（有 `rank_biserial` 鍵才切 binary 版面），不由 config 推。
@@ -279,7 +279,7 @@ P1（小）①報告＋隔離區揭露實際 label 規則（h／k／進場價／
 - 檔案：`tests/momentum/Analysis/test_evtlabel_survivor_consumer.py`；consumer＝`momentum/Analysis/event_samples/pattern_bridge.py`（`survivor_v2` 入口，`:52-64`／`:89-105`）。
 - 既有 caller/影響面：無（測試）；**不接** ML 訓練殼、不加 API caller（成熟度地圖 2026-08-17 禁改殼）。
 - 改法：以 Task 3.10 之 binary run 產出 survivor payload → 餵 `pattern_bridge` 之 `survivor_v2` 入口 → 斷言接收成功、`sample_scope.event.label_source=="imported_binary_label"`、`label_binary` 四鍵保留、倖存特徵集合與 payload 一致；`return_rule` payload 同測（`label_binary=null`）。
-- **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q -k suppressed_not_consumable WHEN survivor_status=suppressed THEN rc=0`（negative_control_failed 之 payload 餵入 ⇒ consumer raise／拒收）。
+- **驗證**：`pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q` rc=0；`ASSERT venv/bin/python -m pytest tests/momentum/Analysis/test_evtlabel_survivor_consumer.py -q -k suppressed_not_consumable WHEN survivor_reason=negative_control_failed THEN rc=0`（negative_control_failed 之 payload 餵入 ⇒ consumer raise／拒收）。
 - **邊界**：①倖存者 0 之 stub payload ⇒ consumer **loud raise**（既有 `_survivor_feature_names` 對空 `survivors[]` raise，`pattern_bridge.py:24`；Claude 讀碼 2026-09-10）；②`schema_version=1` 舊 payload ⇒ 既有 validator 拒收（`:17-18`）；③suppressed stub 無 `survivors` 鍵 ⇒ 既有 raise（`:20-21`）——三者皆為「不得靜默回空」之既有行為，測試只釘住不改。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無。
@@ -316,6 +316,21 @@ P1（小）①報告＋隔離區揭露實際 label 規則（h／k／進場價／
 - Golden FAIL（G-1..G-4）⇒ 不 merge。
 
 ---
+
+## §DEV 實作期偏離（具名，非放寬）
+
+**D-1（2026-09-10，B5 review 三家指出文件仍寫舊字面）：`survivor_output.status`
+由 `suppressed` 改為 `unavailable` ＋ `reason="negative_control_failed"`。**
+
+理由：該欄之契約是 `status ∈ capability_status`
+（`ic_report_contract.json`：ok／not_applicable／not_computed／computation_failed／
+disabled／unavailable），`suppressed` **不在**其中。為了一個 reason 去撐開一個跨報告
+共用的封閉枚舉，代價大於收益。`unavailable` ＋ reason 之語意完全一致
+（可消費的倖存者輸出不可用，原因是負對照失敗），且枚舉維持封閉。
+
+影響面：前端一律以 **reason** 判紅色 banner，不靠 status 字面
+（`LabelModeBanner`）；`tests/momentum/Analysis/test_gap2_survivor_persist.py`
+以一條測試釘住「`suppressed` 不在枚舉裡」，避免日後有人回頭把它加進去。
 
 ## §N N/A 登記與殘留
 

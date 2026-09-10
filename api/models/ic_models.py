@@ -251,7 +251,7 @@ class ICAnalyzeRequest(BaseModel):
            理由：兩者都在說「要分析哪些事件」，同時給就有兩個真相源。
            legacy 非事件呼叫端只帶 `event_timestamps`、不帶 `event_import_id`，**行為不變**。
         """
-        if self.event_label_spec is not None and self.event_import_id is None:
+        if self.event_label_spec is not None and not self.event_import_id:
             raise ValueError(
                 "event_label_spec 需搭配 event_import_id（GAP-3 Task 7.0b ③）"
                 "——只給分析參數而不說對哪一批，會靜默套到預設批上"
@@ -263,7 +263,7 @@ class ICAnalyzeRequest(BaseModel):
             )
         # 🔴 `G3-D2` D4.3：`event_label_scan` 與 `event_label_spec` 同一條理由——
         #    「要掃什麼網格」沒有「對哪一批」就沒有意義。
-        if self.event_label_scan is not None and self.event_import_id is None:
+        if self.event_label_scan is not None and not self.event_import_id:
             raise ValueError(
                 "event_label_scan 需搭配 event_import_id（GAP-3 D4.3）"
                 "——只給掃描網格而不說對哪一批，會靜默套到預設批上"
@@ -279,7 +279,10 @@ class ICAnalyzeRequest(BaseModel):
         # 🔴 EVTLABEL Task 3.2 之兩條 transport 不變式。
         # ① 指定非 auto 的模式卻沒說「對哪一批」⇒ 400。同 `event_label_spec` 的理由：
         #    0/1 標籤住在事件批裡，沒有批就沒有標籤可用，放行只會靜默退回報酬版。
-        if self.event_label_mode != "auto" and self.event_import_id is None:
+        # 🔴 `GROK-R1`（B5 review）：原本只擋 `is None`，但空字串 `""` 是 falsy——
+        #    model 放行、下游 `if request.event_import_id` 為假 ⇒ **不進事件分支**，
+        #    於是「我要用匯入的 0/1」被靜默跑成一般全域分析，報告上看不出來。
+        if self.event_label_mode != "auto" and not self.event_import_id:
             raise ValueError(
                 "event_label_mode 需搭配 event_import_id（EVTLABEL Task 3.2）"
                 "——0/1 標籤住在事件批裡，沒有批就沒有標籤可用"
