@@ -85,6 +85,36 @@ def test_purge_source_copied_from_orchestrator_not_recomputed():
     assert report2["metadata"]["isolation"]["purge"]["source"] == "mainline_horizon"
 
 
+def test_equal_window_and_horizon_note_says_both_counted():
+    """B2 review R1（三家同提）：W==H 時來源仍是 mainline，但 note 必須講明「兩者都算進去了」。"""
+    report = _report(purge=5, horizon=5)
+    report["metadata"]["ic_train_test_split"]["purge_gap_source"] = "mainline_horizon"
+    _inject_isolation_source(
+        {"lookahead_depth_rows": 144, "label_window_rows": 5, "embargo_before_event": 0}, report
+    )
+    note = report["metadata"]["isolation"]["purge"]["note"]
+    assert "相等" in note and "都已算進去" in note
+    assert "沒有比它長" not in note
+
+
+def test_scan_cell_embargo_source_uses_pristine_config_value():
+    """B2 review R1 `CODEX-R1-P2-01`：掃描格之 `embargo_before_event` 必須是**抬高前**的值。
+
+    外層在進掃描格前已把 config embargo 抬到深度；若每格讀那個已抬高的值當「原始設定」，
+    來源會全部誤標 `config_embargo`（實跑：incoming=144 ⇒ 誤標）。
+    """
+    import inspect
+
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    src = inspect.getsource(ICAnalysisService._run_scan_cell)
+    assert "original_embargo if original_embargo is not None" in src, "掃描格未使用抬高前之原始值"
+    grid = inspect.getsource(ICAnalysisService._run_scan_grid)
+    assert "original_embargo" in grid, "掃描格入口未接收原始值"
+    # 顯式參數，不得改回塞 config_override（那正是本票剛擋掉的通道）
+    assert "_ORIGINAL_EMBARGO_KEY" not in src
+
+
 def test_legacy_report_without_new_key_falls_back():
     """舊報告（無 `purge_gap_source`）⇒ 沿用舊字串，前端仍有對應文案。"""
     report = _report()

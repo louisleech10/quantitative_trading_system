@@ -415,6 +415,47 @@ def test_contract_params_expose_five_scan_cube_keys():
 # Task 2.3 — 接線 ＋ report 不得洩進 HTTP
 # ══════════════════════════════════════════════════════════════════════════
 
+# 🔴 `_run_scan_cell` 從 staged 取的鍵之替身。必須與 `_run_event_label_stages` 之真實回傳同形。
+#    出生事故：本 stub 少鍵時，`_run_scan_cell` 直接 KeyError ⇒ 下方 suppress 測試自
+#    `efb16e4c`（EVTALIGN B1 加 `event_label_owners` 與三元組守衛）起**靜默紅兩天**，
+#    EVTLABEL B2 再加一個 `lookahead_depth_rows` 才被發現。
+#    生產側刻意**不**補 `.get(..., 0)` 回退——那會讓 embargo 靜默變小＝fail-open。
+#    改由 `test_scan_cell_staged_stub_covers_every_required_key` 機械擋，不靠紀律。
+_SCAN_CELL_STAGED_STUB = {
+    "event_timestamps": [1, 2], "event_label_values": {1: 1.0, 2: 0.0}, "event_context": {},
+    "purge_rows": 0, "analysis_alignment_receipt_hash": "h",
+    "label_window_rows": 0, "lookahead_depth_rows": 0,
+    "event_label_owners": {1: "e1", 2: "e2"},
+    "event_label_by_id": {"e1": 1.0, "e2": 0.0},
+    "event_isolation": None,
+}
+
+
+def test_scan_cell_staged_stub_covers_every_required_key():
+    """機械擋 stub 漂移：`_run_scan_cell` 以 `staged["X"]` 硬取的每個 X 都必須在替身裡。
+
+    新增一個 `staged["新鍵"]` 而沒更新替身 ⇒ 本條先紅（訊息指名缺哪個鍵），
+    而不是讓下游測試以難解的 KeyError 靜默紅掉。`.get(...)` 取的鍵不在此列（本來就可缺）。
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(ICAnalysisService._run_scan_cell)))
+    required = {
+        node.slice.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Name) and node.value.id == "staged"
+        and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str)
+        and isinstance(node.ctx, ast.Load)
+    }
+    assert required, "沒解析到任何 staged[...] 讀取 ⇒ 本守衛失效（函式改名或改寫法）"
+    missing = sorted(required - set(_SCAN_CELL_STAGED_STUB))
+    assert not missing, f"_SCAN_CELL_STAGED_STUB 缺鍵 {missing}；`_run_scan_cell` 會 KeyError"
+
 
 def test_no_shared_persist_scan_cell_sets_suppress_flag():
     """🔴 `_run_scan_cell` 必須在 `analyze()` **之前**把該格 analyzer 設為不落檔。
@@ -438,13 +479,18 @@ def test_no_shared_persist_scan_cell_sets_suppress_flag():
         def analyze(self, **kwargs):
             # 在真正跑分析的那一刻，旗標必須已經是 True
             seen["suppress_at_analyze"] = self._suppress_persist
-            return {"summary_table": [], "analysis_status": "ok_oos"}
+            # 🔴 真實 analyzer 於事件路徑**恆**回報 metadata.event_filter 之三元組欄位；
+            #    stub 少了它 ⇒ `_assert_event_triple_bound` fail-closed（本測試曾因此紅）。
+            return {
+                "summary_table": [], "analysis_status": "ok_oos",
+                "metadata": {"event_filter": {
+                    "label_source": "event_label_value",
+                    "consumed_event_labels": {"e1": 1.0, "e2": 0.0},
+                }},
+            }
 
     service = ICAnalysisService.__new__(ICAnalysisService)
-    staged = {
-        "event_timestamps": [1, 2], "event_label_values": {}, "event_context": {},
-        "purge_rows": 0, "analysis_alignment_receipt_hash": "h",
-    }
+    staged = dict(_SCAN_CELL_STAGED_STUB)
     service._run_event_label_stages = lambda *a, **k: staged  # type: ignore[method-assign]
     service._scan_cell_summary = lambda r: None  # type: ignore[method-assign]
 

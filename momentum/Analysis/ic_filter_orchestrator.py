@@ -1204,6 +1204,7 @@ class ICFilterOrchestrator:
                     event_label_values=event_label_values,
                     event_label_owners=event_label_owners,
                     event_context=event_context,
+                    event_isolation=event_isolation,
                 )
             train_plan, test_plan = split_result
             train_mask, test_mask = _derive_stage_masks(
@@ -1268,6 +1269,7 @@ class ICFilterOrchestrator:
                     event_label_values=event_label_values,
                     event_label_owners=event_label_owners,
                     event_context=event_context,
+                    event_isolation=event_isolation,
                 )
 
         self._report_progress(1, "preprocessing", 0.12, "preprocessing features")
@@ -1407,6 +1409,7 @@ class ICFilterOrchestrator:
                 event_label_values=event_label_values,
                 event_label_owners=event_label_owners,
                 event_context=event_context,
+                event_isolation=event_isolation,
             )
 
         self._report_progress(
@@ -1497,8 +1500,15 @@ class ICFilterOrchestrator:
         event_label_values: Optional[dict] = None,
         event_label_owners: Optional[dict] = None,
         event_context: Optional[dict] = None,
+        event_isolation: Optional[EventIsolationRows] = None,
     ) -> dict:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
+
+        🔴 `event_isolation`（B2 review R1 `CODEX-R1-P2-02`／`GROK-R1-P2-01`，兩家同判）：
+        本函式**不用**它——full-sample 沒有切分，隔離區無處可套。收下並原樣透傳只為
+        **簽名對稱**：`analyze` 有而 fallback 沒有時，下一個改這條路徑的人會誤以為
+        「fallback 也套了隔離」，或依 TODO 傳入而 TypeError。內層 `analyze` 之
+        `ic_train_test_split` 因 flag-off 不會建立，三鍵自然不寫。
 
         LA-0 RULING-3：呼叫前鎖 fit_mode=full_sample + oos_guarantees=False 紅標。
         LA-1 B3：logger.warning + 禁內層 persist + root 紅標後唯一寫出。
@@ -1553,6 +1563,7 @@ class ICFilterOrchestrator:
                 event_label_values=event_label_values,  # GAP-3 B2.3：A′ 透傳亦保留事件 label（禁靜默丟）
                 event_label_owners=event_label_owners,
                 event_context=event_context,
+                event_isolation=event_isolation,  # 對稱透傳；full-sample 無切分 ⇒ 不影響結果
             )
         finally:
             self._suppress_persist = prev_suppress

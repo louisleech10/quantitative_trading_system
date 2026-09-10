@@ -222,6 +222,14 @@ def _inject_label_rule_disclosure(staged: Dict[str, Any], report: Any) -> None:
 def _inject_isolation_source(staged: Dict[str, Any], report: Any) -> None:
     """EVTALIGN Task 5.1：事件分析之隔離區兩塊來源分開揭露 → `report.metadata.isolation`。
 
+    🔴 **EVTLABEL Task 2.3 起語意已變**（B2 review R1 三家同判 docstring 過期）：
+    `purge` 之來源**抄** orchestrator 寫的 `ic_train_test_split.purge_gap_source`
+    （唯一判定點；值為 `event_label_window`／`mainline_horizon`，舊報告缺鍵才回退 `global_default_horizon`）；
+    `embargo` 之來源由**本函式**判——比較 `lookahead_depth_rows`（挑樣本時偷看多遠）與
+    `embargo_before_event`（抬高前之 config 值），只有 service 知道後者。
+    答案窗**不再**參與 embargo 之來源判定：它現在歸 purge 管（Task 2.2）。
+
+    以下為 EVTALIGN 時代之原始說明，保留以理解舊報告：
     使用者混淆點（三家 R1 點名）：`purge_gap` 用**全域 default_horizon** 算，與事件 label 設的 h 無關；
     `embargo` 則是本 service 以事件 look-ahead（`purge_rows`）抬高後的值。兩塊**相加**＝總隔離（保守，非洩漏）。
     數字**全部取自** orchestrator 已寫的 `metadata.ic_train_test_split`（單一來源、不重算、不改算法）；本函式只補
@@ -248,8 +256,13 @@ def _inject_isolation_source(staged: Dict[str, Any], report: Any) -> None:
     # 🔴 EVTLABEL Task 2.3：purge 之來源改抄 orchestrator 寫的 `purge_gap_source`（唯一判定點），
     #    embargo 之來源仍由**本函式**判（R1 C7：只有 service 知道「抬高前的原 config embargo」）。
     purge_source = split.get("purge_gap_source") or "global_default_horizon"
+    # 🔴 B2 review R1（三家同提）：W==H 時來源標 `mainline_horizon` 算術正確，但字面易讓使用者
+    #    以為「答案窗沒被算進去」。⇒ note 分三種寫法，把「兩者相等」講明白（來源字面不動，
+    #    因為它是機器判定值，改成第三個值會讓下游枚舉變大）。
     if purge_source == "event_label_window":
         purge_note = f"由你設的 label 答案窗換算：max(主線 horizon {effective_horizon}, 答案窗 {window_rows} 根)"
+    elif window_rows and window_rows == effective_horizon:
+        purge_note = f"答案窗（{window_rows} 根）與主線 horizon 相等，兩者都已算進去（max 取同值）"
     else:
         purge_note = f"由主線 horizon 決定（{effective_horizon} 根）；label 答案窗（{window_rows} 根）沒有比它長"
     metadata["isolation"] = {
@@ -1182,8 +1195,13 @@ class ICAnalysisService:
         kline_reader: Any,
         config_override: Optional[Dict[str, Any]],
         progress_callback: Any,
+        original_embargo: int = 0,
     ) -> Dict[str, Any]:
         """逐格跑五階段＋條件 IC，回 `{"scan_results": [...], "scan_total": n, ...}`。
+
+        `original_embargo`（B2 review R1 `CODEX-R1-P2-01`）：**抬高前**的 config embargo。
+        外層在進入本函式前已把 `config_override["embargo"]` 抬到 look-ahead 深度，
+        每格若直接讀它當「原始設定」，隔離區來源會全部誤標成 `config_embargo`。
 
         🔴 **每格獨立 `prepared_token`／`analysis_alignment_receipt_hash`**：格與格之間
         不得重用 prepare 之產物——重用會讓「用 k=0 對齊、用 k=2 算值」這種錯配全綠。
@@ -1254,6 +1272,7 @@ class ICAnalysisService:
                             feature_manifest_path=feature_manifest_path,
                             labels_path=labels_path, kline_reader=kline_reader,
                             config_override=config_override,
+                            original_embargo=original_embargo,
                         ),
                         timeout=min(per_cell_timeout, remaining),
                     )
@@ -1347,8 +1366,12 @@ class ICAnalysisService:
         labels_path: Optional[str],
         kline_reader: Any,
         config_override: Optional[Dict[str, Any]],
+        original_embargo: Optional[int] = None,
     ) -> Dict[str, Any]:
         """單格：五階段 ＋ 條件 IC（**同步**；由 `_run_scan_grid` 以 `to_thread` 呼叫）。
+
+        `original_embargo`（B2 review R1 `CODEX-R1-P2-01`）：抬高前之 config embargo；
+        `None` ⇒ 回退讀 `config_override`（單格直呼之相容路徑）。
 
         🔴 `CODEX-R1-P1-01`：analyzer **由本格自己造**（`analyzer_factory(cell_override)`），
         用完即棄。逾時之格即使仍在背景跑，改的也只是它自己那一份。
@@ -1359,7 +1382,13 @@ class ICAnalysisService:
             feature_manifest_path=feature_manifest_path,
         )
         cell_override = dict(config_override or {})
-        staged["embargo_before_event"] = int(cell_override.get("embargo") or 0)  # EVTALIGN Task 5.1：揭露來源用
+        # 🔴 B2 review R1 `CODEX-R1-P2-01`：`config_override["embargo"]` 在**進掃描格之前**
+        #    已被外層抬高（主路徑 :1651-1657）⇒ 在此讀它當「原始設定」會把每一格的來源
+        #    誤標成 `config_embargo`（實跑：incoming=144 ⇒ 誤標）。原始值由外層以**顯式參數**
+        #    `original_embargo` 傳入（不塞 config_override）；`None` 才回退讀 override（單格直呼之相容路徑）。
+        staged["embargo_before_event"] = int(
+            original_embargo if original_embargo is not None else (cell_override.get("embargo") or 0)
+        )
         # 🔴 EVTLABEL Task 2.1：embargo 只承載**批次宣告之 look-ahead 深度**（挑樣本時看了多遠），
         #    答案窗改由 `event_isolation.label_window_rows` 抬 purge。舊版用 `purge_rows`
         #    （＝max(深度, 窗)）抬 embargo ⇒ 答案窗的身分在下游消失。
@@ -1650,6 +1679,9 @@ class ICAnalysisService:
                     #    只在**現行值較小**時提高——不得因為事件分析而放寬既有設定。
                     config_override = dict(config_override or {})
                     staged["embargo_before_event"] = int(config_override.get("embargo") or 0)  # EVTALIGN Task 5.1
+                    # 🔴 B2 review R1 `CODEX-R1-P2-01`：**抬高前**的原始 embargo 另存，
+                    #    以顯式參數傳給掃描格（不塞進 config_override——那正是本票剛擋掉的通道）。
+                    original_embargo = int(config_override.get("embargo") or 0)
                     # 🔴 EVTLABEL Task 2.1（同掃描格路徑）：embargo 只承載 look-ahead 深度；
                     #    答案窗改由 `event_isolation.label_window_rows` 抬 purge（Task 2.2）。
                     config_override["embargo"] = max(
@@ -1669,6 +1701,7 @@ class ICAnalysisService:
                             labels_path=labels_path, kline_reader=kline_reader,
                             config_override=config_override,
                             progress_callback=progress_callback,
+                            original_embargo=original_embargo,
                         )
                     else:
                         scan = None
