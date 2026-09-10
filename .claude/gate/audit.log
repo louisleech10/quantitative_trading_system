@@ -56457,3 +56457,55 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "cf46ed97-c369-47e1-a7c5-897b0acb263f", "cli_rc": "0", "event": "committee_family_result", "event_id": "eda27af9-5601-4e89-b145-5cf16717096e", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-splitunify-x-review-r3-grok.md", "output_sha256": "a7c38163e4ff7d4b5e07b168cbedd5a4ff79929bc36dd2efb694fbb5407ea31a", "producer": "audit_append.sh", "result_state": "success", "round_id": "2e73ebf4-459a-45dd-a5ed-ccf6dd111973", "schema_version": 1, "sequence": 3393, "ts": "2026-09-10T16:51:29Z"}
 {"actor": "cx_run", "attempt_id": "2088ac3b-c8a7-47e8-9ede-da2733c2a5da", "cli_rc": "0", "event": "committee_family_result", "event_id": "71fc24c1-77c9-4c30-bac6-0224b71e7038", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-splitunify-x-review-r3-codex.md", "output_sha256": "d151fc473b8e523bf237ed8bc189478e6564134e488ce656ad83431773690c09", "producer": "audit_append.sh", "result_state": "success", "round_id": "2e73ebf4-459a-45dd-a5ed-ccf6dd111973", "schema_version": 1, "sequence": 3394, "ts": "2026-09-10T16:56:25Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "21fa4df0-1d0e-4e73-910a-5f21102389f0", "lock_sha256": "67693d817f1258d9e901b04ae3e7326bd4c778471c23f775be3107e17c5d4c83", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "2e73ebf4-459a-45dd-a5ed-ccf6dd111973", "schema_version": 1, "sequence": 3395, "session_id": "20260911-splitunify-x-review-r3", "synth_sha256": "39de3c383014e5f404478b31abef74eb11f8e084465b4e8507fe0e5797e0799c", "ts": "2026-09-10T16:57:47Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-X-CONFIRM-R4", "ts": "2026-09-10T17:02:45Z"}
+=== 2026-09-11 01:02:45 | dispatch ===
+  ts=2026-09-11 01:02:45
+  kind=dispatch
+  intent=SPLITUNIFY E1/E2 定向確認輪
+  risk=low
+  facts_asked=E1 兩段式第一段條件式是否正確/E2 event_keys 由誰組裝/介面可執行性/可否進 B1
+  review_role=adversarial reviewer, 禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-X-REVIEW-R4", "ts": "2026-09-10T17:03:17Z"}
+=== 2026-09-11 01:03:17 | dispatch ===
+  ts=2026-09-11 01:03:17
+  kind=dispatch
+  intent=SPLITUNIFY E1/E2 定向確認輪
+  risk=low
+  facts_asked=E1 兩段式第一段條件式是否正確/E2 event_keys 由誰組裝/介面可執行性/可否進 B1
+  review_role=adversarial reviewer, 禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-X-REVIEW-R4", "ts": "2026-09-10T17:03:23Z"}
+=== 2026-09-11 01:03:23 | dispatch ===
+  ts=2026-09-11 01:03:23
+  kind=dispatch
+  intent=SPLITUNIFY E1/E2 定向確認輪
+  risk=low
+  facts_asked=E1 兩段式第一段條件式是否正確/E2 event_keys 由誰組裝/介面可執行性/可否進 B1
+  review_role=adversarial reviewer, 禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260911-SPLITUNIFY-E1E2-CONFIRM-BRIEF.md", "brief_sha256": "87b35ba0159825db3b957689ef6e92886df38d1248d9fe859deded560d811a2f", "brief_sha256_norm": "87b35ba0159825db3b957689ef6e92886df38d1248d9fe859deded560d811a2f", "event": "committee_round_open", "event_id": "f7791fdc-89ca-4fcb-a694-9ccd4563f227", "expected_outputs": {"codex": "handoffs/20260911-splitunify-x-review-r4-codex.md", "composer": "handoffs/20260911-splitunify-x-review-r4-composer.md", "grok": "handoffs/20260911-splitunify-x-review-r4-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "9adc961a-0858-4d03-9cf1-743c1a8aa8ea", "schema_version": 1, "sequence": 3396, "session_name": "20260911-splitunify-x-review-r4", "task_id": "20260911-SPLITUNIFY-X-REVIEW-R4", "ts": "2026-09-10T17:03:29Z"}
