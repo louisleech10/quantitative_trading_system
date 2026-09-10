@@ -144,9 +144,9 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     Mutation(
         "M-P3-5-validated-cache-swapped-not-caught", "3b", ORCH,
-        "            if (int(ts), int(y_i)) not in by_row:",
-        "            if False and (int(ts), int(y_i)) not in by_row:",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "row_not_in_validated"],
+        "            if int(entry[1]) != int(y_i):",
+        "            if False and int(entry[1]) != int(y_i):",
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "row_not_in_validated or full_triple"],
         "rows_frozenset 守衛拿掉 ⇒ 換 cache 應 raise 之斷言紅",
     ),
     Mutation(
