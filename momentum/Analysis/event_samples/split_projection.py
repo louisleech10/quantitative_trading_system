@@ -123,6 +123,43 @@ def _index_as_ms(index: Any) -> np.ndarray:
     )  # 🔴 feature_index **必須**嚴格遞增：下游以 row_index[0] 取「最早時刻」
 
 
+def _plan_bounds_as_ms(plan: Any, *, label: str) -> tuple:
+    """把 `SplitPlan.time_bounds` 正規化為 **epoch 毫秒**（型別分派，**不猜單位**）。
+
+    🔴 分派規則與 `_index_as_ms` 同一套（B3 review R1 收斂）：
+      · datetime-like（`pd.Timestamp`／`np.datetime64`）⇒ 轉毫秒（IC orchestrator 之
+        `_time_bounds_for_rows` 產出的就是 `pd.Timestamp`）；
+      · 整數 ⇒ **必須**是毫秒，過 `assert_epoch_ms_array`；餵秒會被指名擋下。
+    **不做**「看起來像秒就 ×1000」那種magnitude 猜測——那正是本票在別處禁掉的東西。
+    """
+    bounds = getattr(plan, "time_bounds", None)
+    if bounds is None or len(tuple(bounds)) != 2 or any(b is None for b in tuple(bounds)):
+        raise ValueError(
+            f"derive_event_split_from_plans: {label}_plan.time_bounds 缺失或非兩元組"
+            f"（實得 {bounds!r}）——沒有時間端點就無法對證同源（fail-closed）"
+        )
+    lo, hi = tuple(bounds)
+    out = []
+    for value, side in ((lo, "start"), (hi, "end")):
+        if isinstance(value, (pd.Timestamp, np.datetime64)):
+            ts = pd.Timestamp(value)
+            if pd.isna(ts):
+                raise ValueError(
+                    f"derive_event_split_from_plans: {label}_plan.time_bounds.{side} 為 NaT（fail-closed）"
+                )
+            out.append(int(ts.value // 10 ** 6))
+            continue
+        out.append(
+            int(
+                assert_epoch_ms_array(
+                    np.asarray([value]),
+                    role=f"derive_event_split_from_plans: {label}_plan.time_bounds.{side}",
+                )[0]
+            )
+        )
+    return out[0], out[1]
+
+
 def build_event_keys(
     receipts: AlignmentReceipts,
     *,
@@ -325,6 +362,28 @@ def derive_event_split_from_plans(
     if test_rows.size == 0:
         # 🔴 先 fail-closed，禁與 None 比較（R4 之 F1）。
         raise ValueError(f"{_REASON_MISSING_TEST}: test_plan.row_index 為空（fail-closed）")
+
+    # 🔴 **同源對證**（B3 review R1：codex／composer／grok 三家獨立實跑證明的同一個洞）：
+    #    到這裡為止，plan 只被驗過「row_index 在 universe 長度內」與「兩 plan hash 相同」——
+    #    `base_universe_hash` 是**字面**，plan 可以帶著相同字面卻建在**另一份網格**上。
+    #    三家各自的反例都成立：①plan 建在較短網格、傳入長 `feature_index` ⇒ 靜默成功、
+    #    同一個 row number 指到不同時刻；②`feature_index` **同長度**整體平移 50 根 ⇒
+    #    control 的 `ev3=test` 變成 `train`，`labels_equal=False`，全程 `NO_RAISE`。
+    #    ⇒ 以 plan 自己帶的 `time_bounds` 與**傳入的** `feature_index` 在該 plan 之
+    #    首尾列上逐值對證。三家提的修法都是這個形狀，且**不動** `base_universe_hash` 的輸入
+    #    （改它會移動既有 IC golden digest）。
+    for plan, rows, label in ((train_plan, train_rows, "train"), (test_plan, test_rows, "test")):
+        if rows.size == 0:
+            continue  # train 可為空（極端切分）；空段沒有首尾可對，交由上面的長度閘
+        lo, hi = _plan_bounds_as_ms(plan, label=label)
+        actual_lo, actual_hi = int(index_ms[rows[0]]), int(index_ms[rows[-1]])
+        if (lo, hi) != (actual_lo, actual_hi):
+            raise ValueError(
+                f"derive_event_split_from_plans: {label}_plan 與傳入的 feature_index **不同源**"
+                f"——plan.time_bounds=({lo}, {hi})，但 feature_index 在該 plan 首尾列上是"
+                f"({actual_lo}, {actual_hi})。同一個 row number 指到不同時刻 ⇒ 會靜默錯分"
+                "（fail-closed；`base_universe_hash` 只是字面，擋不住這件事）"
+            )
 
     train_ms = set(index_ms[train_rows].tolist())
     test_ms = set(index_ms[test_rows].tolist())

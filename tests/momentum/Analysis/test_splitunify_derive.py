@@ -284,6 +284,74 @@ def test_plan_universes_differ_is_fail_closed() -> None:
         derive_event_split_from_plans(train, other_universe, keys, index, manifest=man, bucket_ms=H1)
 
 
+def test_same_source_shifted_feature_index_is_fail_closed() -> None:
+    """🔴 B3 review R1（三家獨立實跑）：`feature_index` **同長度整體平移** ⇒ 必須擋。
+
+    grok 的反例逐字：control `ev3=test`，把 index 整體 +50 根後 `ev3` 變 `train`、
+    `labels_equal=False`，而全程 `NO_RAISE`。`base_universe_hash` 只是**字面**，
+    plan 帶著相同字面卻建在另一份網格上時，同一個 row number 指到不同時刻。
+    """
+    index, train, test, keys, man, _ = _basic_case()
+    shifted = pd.Index([int(v) + 50 * H1 for v in index], dtype="int64")
+    with pytest.raises(ValueError, match="不同源"):
+        derive_event_split_from_plans(train, test, keys, shifted, manifest=man, bucket_ms=H1)
+
+
+def test_same_source_plans_from_shorter_grid_is_fail_closed() -> None:
+    """🔴 B3 review R1（codex／composer 反例）：plan 建在**較短網格**、傳入長 `feature_index`。
+
+    row_index 落在長 index 的長度內 ⇒ 既有的長度閘放行，但同一個 row number 指到不同時刻，
+    投影**靜默成功**（composer 實跑 `RESULT: succeeded`；codex 實跑
+    `RETURNED {'assignments': 2, 'purged': 2}`）。
+    """
+    index, _, _, keys, man, _ = _basic_case()
+    short = pd.Index([int(index[0]) + i * H1 * 2 for i in range(len(index))], dtype="int64")
+    short_train, short_test, _ = _plans(short)          # 同 symbol、同 hash 字面，網格不同
+    with pytest.raises(ValueError, match="不同源"):
+        derive_event_split_from_plans(short_train, short_test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_same_source_accepts_datetime_time_bounds() -> None:
+    """🔴 IC orchestrator 產出的 `time_bounds` 是 `pd.Timestamp`（不是 int ms）。
+
+    同源對證必須接受它——否則 B4 把 IC 的 plan 接上投影時會被自己的守衛擋死。
+    單位分派是**型別驅動**：datetime-like 轉毫秒；整數必須本來就是毫秒（餵秒會被擋）。
+    """
+    index, train, test, keys, man, _ = _basic_case()
+    ts_train = SplitPlan(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.asarray(train.row_index, dtype=int),
+        time_bounds=(pd.Timestamp(int(train.time_bounds[0]), unit="ms"),
+                     pd.Timestamp(int(train.time_bounds[1]), unit="ms")),
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="deadbeef",
+        symbol=SYM,
+    )
+    plan = derive_event_split_from_plans(ts_train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert not plan.assignments.empty
+
+
+def test_same_source_rejects_second_unit_time_bounds() -> None:
+    """整數 `time_bounds` 只接受**毫秒**：餵秒必須被指名擋下（不得靜默 ×1000）。"""
+    index, train, test, keys, man, _ = _basic_case()
+    seconds = SplitPlan(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.asarray(train.row_index, dtype=int),
+        time_bounds=(int(train.time_bounds[0]) // 1000, int(train.time_bounds[1]) // 1000),
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="deadbeef",
+        symbol=SYM,
+    )
+    with pytest.raises(ValueError, match="epoch seconds"):
+        derive_event_split_from_plans(seconds, test, keys, index, manifest=man, bucket_ms=H1)
+
+
 def test_single_symbol_batch_unaffected() -> None:
     index, train, test, keys, man, _ = _basic_case()
     derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)

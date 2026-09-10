@@ -107,10 +107,31 @@
   ②**真的有測試在寫生產路徑** `data_cache/reports/`。兩者皆早於本票，列入 `REDSWEEP`。
   **刻意不把它加進凍結清單**——那是把新紅合法化（測試遊戲化），不是修好。
 
+## B3 三家審碼 R1（`handoffs/reconcile/20260911-splitunify-b4-review-r1/synth.md`；債已清）
+三家 findings **收斂成同一條**，分歧只在嚴重度：codex P1／**不可進 B4**；composer MAJOR／
+可進但「B4 接 IC 前必須關」；grok P2／不擋。🔴 **依較嚴版當輪修完**——不是數人頭，是碼證
+只有一個方向：三家**各自獨立**跑出可重現的靜默錯分，而判「不擋」的理由都是時序性的
+（「現行生產呼叫點不走投影」），那個理由會隨 B4 第一個 caller 消失。
+- **L1（三方獨立命中）**：投影只比兩 plan 的 `base_universe_hash` **字面**，沒對證
+  「plan 的 universe ＝ 傳入的 `feature_index`」。反例：①plan 建在較短網格＋長 index
+  ⇒ 靜默成功；②index 同長度整體平移 50 根 ⇒ `ev3` 由 test 變 train、`labels_equal=False`、
+  全程 `NO_RAISE`。⇒ 以 `plan.time_bounds` 與傳入 index 在該 plan **首尾列**上逐值對證
+  （`_plan_bounds_as_ms`；單位**型別驅動**：datetime-like 轉毫秒、整數必須本來就是毫秒，
+  餵秒指名擋下，**不做** magnitude 猜測）。四條測試＋mutation `M-SU-B3-10`。
+- **L2（我的 brief 前提過寬）**：我寫「事件端永遠拿不到 FF run」，codex 實查指出
+  `ic_analysis_service` 的事件分支（`event_import_id`＋FeatureLibrary run）**確實同時握有
+  事件與特徵 universe**（已複查屬實）。正確敘述＝**`case_import_service` 的掃描端**拿不到
+  （Task 3.3 裁定不變），**IC 路由那條有**——那正是 B4／R-5 要接投影的地方。
+- **L3**：`test_hermetic_no_production_write` 維持不加進凍結清單，另開 `REDSWEEP`（三家附議）。
+- **L4**：四參數介面三家一致判「對」；B4 之約束＝由**同一** `features_df` 一次產出
+  `(train_plan, test_plan, feature_index)` 三元組，禁 service 層拆開組裝。
+- **L5**：前端再露 `execution_mode`／`estimand_scope` ⇒ 併入 B4 一起做。
+- `SU-RESID-3` **收窄**：現在只剩「首尾相同、中間間距不同」的對抗性網格（plan 身上只有兩個
+  端點可比）；要關掉需 producer 隨 plan 傳完整時刻指紋（動 IC 契約），屬 R-5／B4 之後。
+
 ## 下一步（順序）
-1. **B3 三家審碼**：brief `handoffs/20260911-SPLITUNIFY-B3-REVIEW-BRIEF.md`
-   （task-id `20260911-SPLITUNIFY-B4-REVIEW-R1`——`batch` 只准 `b<數字>`，審查對象仍是 B3）。
-2. **B4**：報告與畫面只暴露**一個**驗證段。
+1. **B4**：報告與畫面只暴露**一個**驗證段（併做 L5；遵守 L4 之三元組約束）。
+2. `GLOBALH`（中票）→ **使用者 UAT B26–B34**。
 
 ## 🔴 既有紅盤點（非本票造成，建議另立 `REDSWEEP`）
 🔴 以 B1 凍結之 receipt 為準：`tests/momentum/Analysis` **19 failed / 1103 passed / 15 skipped**（清單 `tests/baselines/analysis_known_failures.nodeids`）；舊記的「20 failed / 1615 passed」是不同收集面的舊量測，不再引用：①8 條單獨跑會綠（測試間污染）
