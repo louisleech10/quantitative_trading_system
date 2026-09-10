@@ -11,8 +11,10 @@
 <main>
 <h1 id="evtlabel-批次施工進度工作進度表">EVTLABEL 批次施工進度（工作進度表）</h1>
 <blockquote>
-<p>更新：2026-09-10 晚｜這份只講「做完什麼／在做什麼／還沒做」。
+<p>更新：2026-09-10 深夜｜這份只講「做完什麼／在做什麼／還沒做」。
 範圍＝EVTLABEL 三段＋其前後的 TIERTOGGLE／SPLITUNIFY／GLOBALH／UAT。
+<strong>每個大項底下若有細項，一律逐條列在下方「細項進度」節</strong>（使用者 2026-09-10 定）；
+每完成一個小項就改那一列的狀態，不等整個大項做完才更新。
 （其他 epic 的進度各有自己的檔：<code>GAP-3施工進度.md</code>、<code>GAP-1施工進度.md</code>、<code>IC健檢施工進度.md</code>）
 想看每張票在幹嘛 → <a href="接下來要做的票.html">接下來要做的票.md</a>；想看 EVTLABEL 規格細節 → <a href="EVTLABEL規格白話.html">EVTLABEL規格白話.md</a></p>
 </blockquote>
@@ -54,7 +56,7 @@
 </tr>
 <tr>
 <td><strong>EVTLABEL 第 3 段（匯入標籤模式）</strong></td>
-<td>🔨 <strong>進行中</strong>（你的主目標；共四批，第 1 批完工）</td>
+<td>🔨 <strong>進行中</strong>（你的主目標；11 小項完成 3，見下方細項表）</td>
 <td>9/10</td>
 </tr>
 <tr>
@@ -71,6 +73,299 @@
 <td><strong>你的 UAT 驗收</strong></td>
 <td>⬜ <strong>最後</strong>（B26–B34＋新增項目）</td>
 <td>—</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="細項進度每個大項底下的小項逐條">細項進度（每個大項底下的小項，逐條）</h2>
+<blockquote>
+<p>狀態符號：✅ 完成｜🔨 進行中｜⬜ 未開工｜⏸ 具名殘留（有理由、不是忘了）</p>
+</blockquote>
+<h3 id="tiertoggle-幽靈開關3-小項全完成">TIERTOGGLE — 幽靈開關（3 小項，全完成）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>小項</th>
+<th>狀態</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>T-1</td>
+<td>前端具名 preset 送出全部開關</td>
+<td>✅</td>
+<td>以前選「基礎」時，畫面關掉 IC Decay／Grouped IC，後端沒收到、照跑</td>
+</tr>
+<tr>
+<td>T-2</td>
+<td>後端全量接收 stage 開關</td>
+<td>✅</td>
+<td>具名 preset 分支改成全量消費，不再只認兩個鍵</td>
+</tr>
+<tr>
+<td>T-3</td>
+<td>防再犯：兩端對照同一份契約檔</td>
+<td>✅</td>
+<td>新增開關沒歸類就紅；後端 12 條、前端 7 條測試</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="第-1-段-揭露這次用了什麼-label3-小項全完成">第 1 段 — 揭露這次用了什麼 label（3 小項，全完成）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>小項</th>
+<th>狀態</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1.1</td>
+<td>報告寫出 label 規則（後端）</td>
+<td>✅</td>
+<td>h、k、進場價、報酬公式、0/1 存在與否、事件重疊度</td>
+</tr>
+<tr>
+<td>1.2</td>
+<td>隔離區下方加「label 怎麼算」（前端）</td>
+<td>✅</td>
+<td>你在畫面上看得到這次實際用的規則</td>
+</tr>
+<tr>
+<td>1.3</td>
+<td>h／k 輸入框旁標單位（前端）</td>
+<td>✅</td>
+<td>明寫「單位＝事件週期的根數」；k 旁說明 k=0 已取到 t₀ 前最後一根</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="第-2-段-purge-依答案窗換算3-小項全完成">第 2 段 — purge 依答案窗換算（3 小項，全完成）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>小項</th>
+<th>狀態</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2.1</td>
+<td>隔離兩項分開換算成特徵列數</td>
+<td>✅</td>
+<td>你那批＝答案窗 12 根、往後看深度 144 根</td>
+</tr>
+<tr>
+<td>2.2</td>
+<td>切分的 purge 改吃答案窗</td>
+<td>✅</td>
+<td><code>purge = max(主線 horizon, 答案窗)</code>；只走專用參數，塞設定檔會當場失敗</td>
+</tr>
+<tr>
+<td>2.3</td>
+<td>隔離區揭露改讀新來源</td>
+<td>✅</td>
+<td>報告與畫面說的，跟實際擋住的變成同一件事</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="第-3-段-匯入標籤模式11-小項你的主目標">第 3 段 — 匯入標籤模式（11 小項；你的主目標）</h3>
+<p><strong>第 1 批（資料進得來，尚無統計）— 完工，審查中</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>小項</th>
+<th>狀態</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3.1</td>
+<td>枚舉單一真相源＋契約</td>
+<td>✅</td>
+<td>模式／來源／統計種類等字面只住一個 JSON；倖存者檔加標籤來源欄位</td>
+</tr>
+<tr>
+<td>3.2</td>
+<td>請求欄 <code>label_mode</code> 三選</td>
+<td>✅</td>
+<td>自動／只用報酬版／只用匯入 0/1；兩道防呆（沒選批、掃描互斥）</td>
+</tr>
+<tr>
+<td>3.3</td>
+<td>staging：0/1 向量＋值域閘＋預檢</td>
+<td>✅</td>
+<td>值域先擋、提前告知樣本不足、標籤逐筆對帳</td>
+</tr>
+<tr>
+<td>—</td>
+<td>三家 code review</td>
+<td>🔨</td>
+<td><strong>進行中</strong>（已派出，實作者不自審）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>第 2 批（核心統計）— 未開工</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>小項</th>
+<th>狀態</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3.4</td>
+<td>切分後決定用哪一種 label</td>
+<td>⬜</td>
+<td>驗證段每類夠 ⇒ 用 0/1；不夠 ⇒ 退回報酬版並寫明原因。兩種 label 都要過驗證</td>
+</tr>
+<tr>
+<td>3.5</td>
+<td>純統計模組（AUC／rank-biserial／Mann-Whitney）</td>
+<td>⬜</td>
+<td>逐欄向量化算；NaN 逐欄去列並記實際用了幾筆</td>
+</tr>
+<tr>
+<td>3.6</td>
+<td>統計進表格＋套門檻</td>
+<td>⬜</td>
+<td>主統計＝rank-biserial，p 值走 Mann-Whitney→FDR；報酬版 IC 留第二欄</td>
+</tr>
+<tr>
+<td>3.7</td>
+<td>置換自檢＋整批負對照</td>
+<td>⬜</td>
+<td>倖存者逐一用區塊置換重驗；整批打亂 50 次，篩得出來就不交付倖存者</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>第 3 批（輸出與畫面）— 未開工</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>小項</th>
+<th>狀態</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3.8</td>
+<td>倖存者輸出帶標籤來源</td>
+<td>⬜</td>
+<td>檔案裡寫明「這批是用哪一次匯入的 0/1 篩出來的」，正反各幾個</td>
+</tr>
+<tr>
+<td>3.9</td>
+<td>前端：模式三選＋表格欄＋揭露</td>
+<td>⬜</td>
+<td>參數面板顯示批內正反數；結果表頭用統計學標準名，不自創</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>第 4 批（端到端與交接 ML）— 未開工</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>小項</th>
+<th>狀態</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>3.10</td>
+<td>真實 K 線端到端驗證</td>
+<td>⬜</td>
+<td>用真實 12h close 造 0/1 標籤跑完整流程，作為三方簽核的判準</td>
+</tr>
+<tr>
+<td>3.11</td>
+<td>倖存者檔的 ML 消費契約測試</td>
+<td>⬜</td>
+<td>證明產出的檔<strong>真的餵得進</strong> ML，不是只生出一個檔案</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="具名殘留有理由不是忘了">具名殘留（有理由、不是忘了）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>小項</th>
+<th>狀態</th>
+<th>為什麼現在不做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R-9</td>
+<td>7 個純前端開關按了沒作用</td>
+<td>⏸</td>
+<td>其中一半不是開關而是「選哪一種方法」，接成開／關反而是錯的；需逐條定義。契約已具名列出，不是幽靈</td>
+</tr>
+<tr>
+<td>R-1</td>
+<td>事件重疊的樣本唯一性加權</td>
+<td>⏸</td>
+<td>本票只<strong>揭露</strong>重疊度、不參與計算；加權法屬另票，資料已預留不必重工</td>
+</tr>
+<tr>
+<td>—</td>
+<td>混週期批次視窗取最大值</td>
+<td>⏸</td>
+<td>畫面已自動改口，取大＝隔離更保守；真要改比問題本身大</td>
+</tr>
+<tr>
+<td>—</td>
+<td>同一次分析內重跑段之秒數累加</td>
+<td>⏸</td>
+<td>刻意的（要看總耗時）；畫面要不要拆開顯示等 GLOBALH 一起設計</td>
+</tr>
+<tr>
+<td>—</td>
+<td>既有紅約 17 條</td>
+<td>⏸</td>
+<td>非本票造成、與匯入標籤無關；混進來會讓這張票沒人審得動。建議另開 <code>REDSWEEP</code></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="後續三張票的細項尚未開工列出範圍供你對照">後續三張票的細項（尚未開工，列出範圍供你對照）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>票</th>
+<th>小項</th>
+<th>狀態</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SPLITUNIFY</td>
+<td>兩套切分（事件切分 vs 時間切分）統一成一套；切法交委員會定共識</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>GLOBALH</td>
+<td>每個 horizon 都完整算；每列標 h／k；可篩選；頁面註明時間 ×N</td>
+<td>⬜</td>
+</tr>
+<tr>
+<td>你的 UAT</td>
+<td>B26–B34＋本票新增項目</td>
+<td>⬜</td>
 </tr>
 </tbody>
 </table></div>
