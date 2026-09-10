@@ -1,0 +1,48 @@
+[reconcile_build] session=/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r2  roster=codex,composer,grok  sources=3 round_id=unbound mode=discovery
+OK: wrote /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r2/sources.lock (3 sources, roster=['codex', 'composer', 'grok'], mode=discovery)
+[reconcile_build] synth.md 已建；每檔抽到 findings：
+    20260909-ICRESULTPAGING-X-REVIEW-R2-codex.md: 6
+    20260909-ICRESULTPAGING-X-REVIEW-R2-composer.md: 3
+    20260909-ICRESULTPAGING-X-REVIEW-R2-grok.md: 2
+[reconcile_build] === completeness_check ===
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r2/sources/20260909-ICRESULTPAGING-X-REVIEW-R2-codex.md — 6/6 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r2/sources/20260909-ICRESULTPAGING-X-REVIEW-R2-composer.md — 3/3 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r2/sources/20260909-ICRESULTPAGING-X-REVIEW-R2-grok.md — 2/2 個 ID 全在綜合檔。
+COMPLETENESS PASS(dropped-ID+schema+lock+body-hash 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。
+[reconcile_build] completeness rc=0
+[reconcile_build] === 群集歸戶自檢（提示，不擋）===
+── CODEX-R2-P1-01
+   附錄斷言: SPEC 與 TODO 對 G-6 的四列 asc 預期互相矛盾，會讓同一實作同時被判定通過與失敗。
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R2-P1-02
+   附錄斷言: `result_revision` 雖已加入 light／summary／feature 的目標契約，refilter 的成功回應與前端 r
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R2-P1-03
+   附錄斷言: G-5 的 artifact 缺席行為與 B1 gate 的必須 `rc=0`／`UNCOVERED=0` 無法在乾淨 checkout 同
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R2-P1-04
+   附錄斷言: R1 新增的 `filter_log.*` light 投影規則仍不能產出現有 `FilterFunnelChart` 所需的 `input
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R2-P1-05
+   附錄斷言: B2a 的 gate 允許 light fetch／summary table 已切換，但 `page.tsx` 的 per-feature
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R2-P2-06
+   附錄斷言: `collection_to_count_paths` 的 `filter_log.*` wildcard 沒有定義 path matche
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R2-P1-01
+   附錄斷言: SPEC §G G-6 四列並列 fixture 之 `asc` 期望序為 `[A,B,C,D]`，但 TODO Task 1.1 驗證寫 
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R2-P2-01
+   附錄斷言: `metadata_keep_keys` 三份來源清單不一致——§A receipt、TODO 0.1 檔案欄、`_light_size_p
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R2-P2-02
+   附錄斷言: `IP-RESID-4` 之 `needs-research` 理由成立，但 B34 UAT 若含漏斗互動，在 light `filter_
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R2-P1-01
+   附錄斷言: SPEC §G-6 與 TODO Task 1.1 對「四列並列 fixture」的 asc 期望序互相矛盾（SPEC=`[A,B,C,D]
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R2-P2-01
+   附錄斷言: §N `IP-RESID-4` 以 `needs-research` 為「為何現在不做」已不成立——FilterFunnelChart／型別
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r2/synth.md
+[reconcile_build] ✅ 完成。接著：手填 /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r2/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。

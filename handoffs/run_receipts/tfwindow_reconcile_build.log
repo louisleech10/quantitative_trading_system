@@ -1,0 +1,36 @@
+[reconcile_build] session=/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-evtwarmup-x-review-r5  roster=codex,composer,grok  sources=3 round_id=unbound mode=discovery
+OK: wrote /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-evtwarmup-x-review-r5/sources.lock (3 sources, roster=['codex', 'composer', 'grok'], mode=discovery)
+[reconcile_build] synth.md 已建；每檔抽到 findings：
+    20260909-EVTWARMUP-X-REVIEW-R5-codex.md: 4
+    20260909-EVTWARMUP-X-REVIEW-R5-composer.md: 2
+    20260909-EVTWARMUP-X-REVIEW-R5-grok.md: 1
+[reconcile_build] === completeness_check ===
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-evtwarmup-x-review-r5/sources/20260909-EVTWARMUP-X-REVIEW-R5-codex.md — 4/4 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-evtwarmup-x-review-r5/sources/20260909-EVTWARMUP-X-REVIEW-R5-composer.md — 2/2 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-evtwarmup-x-review-r5/sources/20260909-EVTWARMUP-X-REVIEW-R5-grok.md — 1/1 個 ID 全在綜合檔。
+COMPLETENESS PASS(dropped-ID+schema+lock+body-hash 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。
+[reconcile_build] completeness rc=0
+[reconcile_build] === 群集歸戶自檢（提示，不擋）===
+── CODEX-R5-P1-01
+   附錄斷言: refreeze probe 比對已被 `--write` 更新的 PRE_PATH，故目前驗收命令會把正確的「只差 disclosure」
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R5-P1-02
+   附錄斷言: `set_timeframe` 將 `0h`、`-1h`、`infh`、`nanh` 視為 `applied`，可靜默錯算、全變 1 或拋例
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R5-P2-03
+   附錄斷言: `analyze(config_override=...)` 的 disclosure 可使用 effective `reference_t
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R5-P2-04
+   附錄斷言: 1h golden 未鎖定 fallback 狀態／原因／計數，且 SPEC 的缺 tf「揭露」措辭與 analyze 實際 fail-cl
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R5-P2-01
+   附錄斷言: `handoffs/20260909-probe-tfwindow-refreeze.py` 在 gap2 pre 已 `--write` 
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R5-P2-02
+   附錄斷言: `docs/TFWINDOW_SPEC.md` Task 3.1 邊界③④「視窗不變＋揭露」與實作（analyze 切分前 `ValueEr
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R5-P3-00
+   附錄斷言: 本輪逐項核對後無 finding——Task 3.1 之 `set_timeframe` 注入、全路徑 `ic_window_disclos
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-evtwarmup-x-review-r5/synth.md
+[reconcile_build] ✅ 完成。接著：手填 /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-evtwarmup-x-review-r5/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。

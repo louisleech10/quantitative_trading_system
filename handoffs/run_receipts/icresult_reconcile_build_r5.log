@@ -1,0 +1,45 @@
+[reconcile_build] session=/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r5  roster=codex,composer,grok  sources=3 round_id=unbound mode=discovery
+OK: wrote /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r5/sources.lock (3 sources, roster=['codex', 'composer', 'grok'], mode=discovery)
+[reconcile_build] synth.md 已建；每檔抽到 findings：
+    20260909-ICRESULTPAGING-X-REVIEW-R5-codex.md: 6
+    20260909-ICRESULTPAGING-X-REVIEW-R5-composer.md: 1
+    20260909-ICRESULTPAGING-X-REVIEW-R5-grok.md: 3
+[reconcile_build] === completeness_check ===
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r5/sources/20260909-ICRESULTPAGING-X-REVIEW-R5-codex.md — 6/6 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r5/sources/20260909-ICRESULTPAGING-X-REVIEW-R5-composer.md — 1/1 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r5/sources/20260909-ICRESULTPAGING-X-REVIEW-R5-grok.md — 3/3 個 ID 全在綜合檔。
+COMPLETENESS PASS(dropped-ID+schema+lock+body-hash 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。
+[reconcile_build] completeness rc=0
+[reconcile_build] === 群集歸戶自檢（提示，不擋）===
+── CODEX-R5-P1-01
+   附錄斷言: §C-7 同時保留 `result` 與完整 `result_normalized`，會把每個完成 task 的 119 MB 報告至少保留
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R5-P1-02
+   附錄斷言: 守衛 raise 的 task 狀態語意與現行行為不一致且 refilter 沒有失敗轉態；現行讀取時 raise 回 500 但 task
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R5-P1-03
+   附錄斷言: G-9 的 warm-up、20 次、nearest-rank 第 19 小與固定請求集已可重現，但 LATENCY_GATE 尚未被批次 
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R5-P1-04
+   附錄斷言: 文件稱 snapshot 不可變，但 `_snapshot_result` 回傳可變 `dict`，而 `project_light_vie
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R5-P2-01
+   附錄斷言: 搜尋 300 ms debounce 同時被分派給 hook (`TODO:125`) 與表格 (`TODO:144`)，責任未定義；兩層都
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R5-P2-02
+   附錄斷言: 32-task／8-key LRU 的 `cache_bytes()` 可測性仍不足以證明 process-wide memory cap：
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R5-P3-00
+   附錄斷言: 本輪對 R4 群集 W1–W6、必答 1–7、§1 十一類與 §0 可覆核前提逐項重判後，無需新增 P0／P1／P2 finding。
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R5-P1-01
+   附錄斷言: TODO Task 1.1 仍寫 `get_result_summary_page`「lock 內取 `result`」，與 §C-7／Ta
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R5-P1-02
+   附錄斷言: SPEC Task 1.3 與 TODO Task 1.3 仍要求在投影前執行 `deny_factor_in_ok_oos`，與 R4 W
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R5-P2-01
+   附錄斷言: Task 2.1 將 `ICReportLight` 寫成 `Omit<ICReport, per-feature 四段|…>`，未把 `r
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r5/synth.md
+[reconcile_build] ✅ 完成。接著：手填 /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r5/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。

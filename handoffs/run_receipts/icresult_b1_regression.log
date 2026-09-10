@@ -1,0 +1,744 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+09:32:16 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:32:16 [INFO] Registered adapter: crypto_spot
+09:32:16 [INFO] Loaded feature registry with 15 entries
+09:32:16 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+09:32:17 [INFO] Restored 15 persisted feature task(s) from disk
+09:32:17 [INFO] 所有中間件已設置完成
+09:32:17 [INFO] 異常處理器設置完成
+09:32:17 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+09:32:17 [INFO] Loaded feature registry with 15 entries
+09:32:17 [INFO] Loaded 60/60 cases from JSON
+09:32:17 [INFO] Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+09:32:17 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+09:32:17 [INFO] Created global CaseStorageManager instance
+09:32:17 [INFO] CaseImportService initialized
+09:32:17 [INFO] Created global CaseImportService instance with shared storage
+09:32:17 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+09:32:17 [INFO] KlineDownloadService initialized
+09:32:17 [INFO] Rate limiter initialized: 1000 req/min
+09:32:17 [INFO] BinanceProvider initialized
+09:32:17 [INFO] Registered provider: binance (rate_limit=1000/min)
+09:32:17 [INFO] Registered BinanceProvider to KlineDownloadService
+09:32:17 [INFO] BatchDownloadService initialized
+09:32:17 [INFO] Created global BatchDownloadService instance with shared storage
+09:32:17 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+09:32:17 [INFO] KlineDownloadService initialized
+09:32:17 [INFO] Rate limiter initialized: 1000 req/min
+09:32:17 [INFO] BinanceProvider initialized
+09:32:17 [INFO] Registered provider: binance (rate_limit=1000/min)
+09:32:17 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+09:32:17 [INFO] IndicatorEngine initialized
+09:32:17 [INFO] ChartDataService initialized with IndicatorEngine
+09:32:17 [INFO] OptimizationTaskService initialized
+09:32:17 [INFO] Loaded feature registry with 15 entries
+09:32:17 [INFO] Loaded feature registry with 15 entries
+09:32:18 [INFO] Loaded feature registry with 15 entries
+09:32:18 [INFO] Loaded feature registry with 15 entries
+09:32:18 [INFO] WebSocketConnectionManager initialized
+09:32:18 [INFO] All API routes registered successfully
+collected 240 items
+
+tests/api/test_export_api.py::test_export_csv_summary_200 
+-------------------------------- live log setup --------------------------------
+09:32:18 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+09:32:18 [INFO] Read 1696 klines from ETHUSDT/12h in 0.013s
+09:32:18 [INFO] 正在啟動 Case Search API...
+ERROR                                                                    [  0%]
+tests/api/test_export_api.py::test_export_csv_detailed_factor_return ERROR [  0%]
+tests/api/test_export_api.py::test_export_ai_json_200 ERROR              [  1%]
+tests/api/test_export_api.py::test_export_markdown_200 ERROR             [  1%]
+tests/api/test_export_api.py::test_export_hdf5_200 ERROR                 [  2%]
+tests/api/test_export_api.py::test_export_unknown_task_404 PASSED        [  2%]
+tests/api/test_export_api.py::test_export_invalid_format_422 ERROR       [  2%]
+tests/api/test_export_api.py::test_export_csv_detailed_without_module_422 ERROR [  3%]
+tests/api/test_export_routes.py::test_export_download_success PASSED     [  3%]
+tests/api/test_export_routes.py::test_export_preview_success PASSED      [  4%]
+tests/api/test_export_routes.py::test_export_missing_task_returns_404 PASSED [  4%]
+tests/api/test_export_routes.py::test_export_invalid_format_returns_422 PASSED [  5%]
+tests/api/test_export_routes.py::test_export_invalid_scope_returns_422 PASSED [  5%]
+tests/api/test_ic_analysis_api.py::test_ic_task_status PASSED            [  5%]
+tests/api/test_ic_analysis_api.py::test_ic_result PASSED                 [  6%]
+tests/api/test_ic_analysis_api.py::test_ic_summary PASSED                [  6%]
+tests/api/test_ic_analysis_api.py::test_ic_top_features PASSED           [  7%]
+tests/api/test_ic_analysis_api.py::test_ic_quantile_and_correlation PASSED [  7%]
+tests/api/test_ic_analysis_api.py::test_ic_grouped PASSED                [  7%]
+tests/api/test_ic_analysis_api.py::test_ic_config_update PASSED          [  8%]
+tests/api/test_ic_analysis_api.py::test_ic_refilter PASSED               [  8%]
+tests/api/test_ic_analysis_api.py::test_ic_summary_tolerates_none_icir PASSED [  9%]
+tests/api/test_ic_analysis_api.py::test_ic_refilter_nan_inf_are_json_safe PASSED [  9%]
+tests/api/test_ic_analysis_api.py::test_ic_export_csv PASSED             [ 10%]
+tests/api/test_ic_analysis_api.py::test_ic_export_hdf5 PASSED            [ 10%]
+tests/api/test_ic_analysis_service.py::test_analyze_real_run_split_validation_passes_with_real_axis PASSED [ 10%]
+tests/api/test_ic_analysis_service.py::test_resolve_run_path_contains_config_hash PASSED [ 11%]
+tests/api/test_ic_analysis_service.py::test_run_analysis_does_not_block_event_loop PASSED [ 11%]
+tests/api/test_ic_analysis_service.py::test_progress_callback_from_to_thread_schedules_on_event_loop PASSED [ 12%]
+tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_real_3sym_oracle PASSED [ 12%]
+tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise PASSED [ 12%]
+tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_mutation_rangeindex_regresses PASSED [ 13%]
+tests/api/test_ic_analysis_service.py::test_cross_sectional_coverage_guard_short_series_all_nan PASSED [ 13%]
+tests/api/test_ic_analysis_service.py::test_cross_sectional_coverage_guard_all_nan_raises PASSED [ 14%]
+tests/api/test_ic_analysis_service.py::test_cross_sectional_coverage_guard_one_symbol_all_nan_raises PASSED [ 14%]
+tests/api/test_ic_analysis_service.py::test_cross_sectional_coverage_guard_normal_passes_metadata PASSED [ 15%]
+tests/api/test_ic_response_v2.py::test_flag_off_get_result_no_eval_status_key PASSED [ 15%]
+tests/api/test_ic_response_v2.py::test_flag_off_deep_equal_baseline PASSED [ 15%]
+tests/api/test_ic_response_v2.py::test_route_v2_negotiation PASSED       [ 16%]
+tests/api/test_ic_response_v2.py::test_v2_top_n_derived_from_artifact PASSED [ 16%]
+tests/api/test_ic_response_v2.py::test_flag_off_subroutes_unchanged PASSED [ 17%]
+tests/api/test_ic_response_v2.py::test_export_route_streaming PASSED     [ 17%]
+tests/api/test_ic_response_v2.py::test_no_artifact_uri_none PASSED       [ 17%]
+tests/api/test_ic_deep_analysis.py::test_list_available_features_success PASSED [ 18%]
+tests/api/test_ic_deep_analysis.py::test_list_available_features_not_found PASSED [ 18%]
+tests/api/test_ic_deep_analysis.py::test_start_deep_analysis_and_get_result PASSED [ 19%]
+tests/api/test_ic_deep_analysis.py::test_api_deep_cache_key_includes_fit_mode PASSED [ 19%]
+tests/api/test_ic_deep_analysis.py::test_start_deep_analysis_invalid_task_id PASSED [ 20%]
+tests/api/test_ic_deep_analysis.py::test_get_deep_analysis_result_invalid_task_id PASSED [ 20%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_endpoint PASSED   [ 20%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_with_deep_analysis_config PASSED [ 21%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_request_validation_top_n PASSED [ 21%]
+tests/api/test_ic_deep_analysis.py::test_full_analysis_request_validation_required_labels_path PASSED [ 22%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_start PASSED      [ 22%]
+tests/api/test_ic_deep_analysis.py::test_deep_analysis_result_serializes_numpy_scalars PASSED [ 22%]
+tests/api/test_ic_deep_analysis.py::test_cost_bps_range_422 PASSED       [ 23%]
+tests/api/test_ic_deep_analysis.py::test_config_override_net_ic_rejected PASSED [ 23%]
+tests/api/test_ic_deep_analysis.py::test_legacy_request_gross_only PASSED [ 24%]
+tests/api/test_ic_deep_analysis.py::test_cost_bps_fullstack_wiring PASSED [ 24%]
+tests/api/test_ic_deep_analysis.py::test_e2e_unavailable_union_shape PASSED [ 25%]
+tests/api/test_ic_deep_analysis.py::test_build_deep_module_override_typed_last PASSED [ 25%]
+tests/api/test_ic_deep_analysis.py::test_mutation_m7_allow_override_key PASSED [ 25%]
+tests/api/test_ic_deep_analysis.py::test_mutation_m10_api_drop_validator PASSED [ 26%]
+tests/api/test_ic_deep_analysis.py::test_mutation_m4_drop_cost_passthrough PASSED [ 26%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_cache_hit_legacy PASSED [ 27%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_cache_force_merge_legacy PASSED [ 27%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_raw_json_legacy PASSED [ 27%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_task_storage_roundtrip PASSED [ 28%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_csv_legacy PASSED     [ 28%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_ai_json_legacy PASSED [ 29%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_markdown_legacy PASSED [ 29%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_export_all_legacy PASSED [ 30%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_save_report_legacy_no_leak PASSED [ 30%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_summary_null_keys_in_fixture PASSED [ 30%]
+tests/api/test_ic_deep_analysis.py::test_sanitizer_idempotent PASSED     [ 31%]
+tests/api/test_ic_deep_analysis.py::test_mutation_m2_bypass_sanitizer PASSED [ 31%]
+tests/api/test_ic_deep_analysis.py::test_mutation_m2b_clear_summary_null_keys PASSED [ 32%]
+tests/api/test_ic_deep_analysis.py::test_mutation_m2c_restore_finite_metadata PASSED [ 32%]
+tests/api/test_ic_deep_analysis.py::test_mutation_m2d_markdown_restore_size_meta PASSED [ 32%]
+tests/api/test_ic_deep_analysis.py::test_export_envelope_unwrapped PASSED [ 33%]
+tests/api/test_ic_deep_analysis.py::test_legacy_module_statuses_not_completed PASSED [ 33%]
+tests/api/test_ic_deep_analysis.py::test_readiness_helper_does_not_force_completed PASSED [ 34%]
+tests/api/test_ic_deep_analysis.py::test_f2_ok_union_passthrough_and_completed PASSED [ 34%]
+tests/api/test_ic_deep_analysis.py::test_f2_legacy_bare_map_blocked PASSED [ 35%]
+tests/api/test_ic_deep_analysis.py::test_f2_ok_reason_null PASSED        [ 35%]
+tests/api/test_ic_deep_analysis.py::test_f2_cache_key_includes_schema_version PASSED [ 35%]
+tests/api/test_ic_deep_analysis.py::test_f2_conditional_metric_keys_shape PASSED [ 36%]
+tests/api/test_ic_deep_analysis.py::test_mutation_turnover PASSED        [ 36%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_has_exactly_three_write_sites_with_precedence PASSED [ 37%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_carries_the_four_numbers_from_details PASSED [ 37%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_unchanged_by_this_task PASSED [ 37%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[oos_false] PASSED [ 38%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[full_sample] PASSED [ 38%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[split_applied] PASSED [ 39%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[oos_true] PASSED [ 39%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_never_initialised_as_empty_dict PASSED [ 40%]
+tests/api/test_gap3_oos_downgrade.py::test_frontend_reads_metadata_not_task_status PASSED [ 40%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_actually_writes_oos_downgrade_into_metadata PASSED [ 40%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_are_null_when_details_incomplete PASSED [ 41%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details0-expected0] PASSED [ 41%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details1-expected1] PASSED [ 42%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details2-expected2] PASSED [ 42%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details3-expected3] PASSED [ 42%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details4-expected4] PASSED [ 43%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[oos_false] PASSED [ 43%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[full_sample] PASSED [ 44%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[event_fallback] PASSED [ 44%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_not_applied] PASSED [ 45%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_oos_false] PASSED [ 45%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[empty] PASSED [ 45%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_ok] PASSED [ 46%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[oos_true] PASSED [ 46%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_is_thin_wrapper_of_single_judgment PASSED [ 47%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_backfills_downgrade_for_non_fallback_paths PASSED [ 47%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_does_not_overwrite_fallback_rich_version PASSED [ 47%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_writes_nothing_when_ok_oos PASSED [ 48%]
+tests/api/test_gap3_oos_downgrade.py::test_one_shot_guard_reads_in_fallback_rerun_not_suppress_persist PASSED [ 48%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta0-rolling_warmup_insufficient] PASSED [ 49%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta1-event_filter_fallback] PASSED [ 49%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta2-fit_mode_full_sample] PASSED [ 50%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta3-split_not_applied] PASSED [ 50%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta4-meta_oos_guarantees_false] PASSED [ 50%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta0] PASSED [ 51%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta1] PASSED [ 51%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta2] PASSED [ 52%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta3] PASSED [ 52%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta4] PASSED [ 52%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta0-fit_mode_full_sample_forced] PASSED [ 53%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta1-fit_mode_full_sample] PASSED [ 53%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta2-fit_mode_full_sample_forced] PASSED [ 54%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_stamps_fit_mode_source PASSED [ 54%]
+tests/api/test_evtwarmup.py::test_precheck_predicates_two_stage PASSED   [ 55%]
+tests/api/test_evtwarmup.py::test_precheck_event_conditional_skips_bar_warmup_but_global_keeps_it PASSED [ 55%]
+tests/api/test_evtwarmup.py::test_precheck_mainline_keeps_bar_rows_even_with_timestamps PASSED [ 55%]
+tests/api/test_evtwarmup.py::test_refilter_uses_same_scores_helper_as_analyze PASSED [ 56%]
+tests/api/test_evtwarmup.py::test_min_test_events_floor_keeps_holdout_and_flags_reason PASSED [ 56%]
+tests/api/test_evtwarmup.py::test_min_test_events_floor_disabled_gives_oos PASSED [ 57%]
+tests/api/test_evtwarmup.py::test_event_path_without_split_still_discloses_window_and_icir_role PASSED [ 57%]
+tests/api/test_evtwarmup.py::test_abandoned_conditional_path_is_not_flagged_insufficient_test_events PASSED [ 57%]
+tests/api/test_evtwarmup.py::test_icir_not_a_gate_on_event_path_but_still_gate_on_global PASSED [ 58%]
+tests/api/test_evtwarmup.py::test_finite_or_neg_inf_and_top_features_sort_none_safe PASSED [ 58%]
+tests/api/test_evtwarmup.py::test_serialization_entries_have_no_nan_literal PASSED [ 59%]
+tests/api/test_evtwarmup.py::test_sanitize_converts_nonfinite_icir_and_ic_mean_to_null PASSED [ 59%]
+tests/api/test_evtwarmup.py::test_global_run_unchanged_vs_golden PASSED  [ 60%]
+tests/api/test_tfwindow.py::test_engine_set_timeframe_adjusts_windows_and_discloses PASSED [ 60%]
+tests/api/test_tfwindow.py::test_12h_fixture_windows_unchanged_and_applied PASSED [ 60%]
+tests/api/test_tfwindow.py::test_1h_fixture_window_keys_scaled_by_12 PASSED [ 61%]
+tests/api/test_tfwindow.py::test_1h_golden_rolling_keys_values PASSED    [ 61%]
+tests/api/test_tfwindow.py::test_missing_timeframe_fails_closed_before_stage4 PASSED [ 62%]
+tests/api/test_tfwindow.py::test_invalid_timeframe_fails_closed_before_stage4 PASSED [ 62%]
+tests/api/test_tfwindow.py::test_1h_golden_locks_fallback_and_features PASSED [ 62%]
+tests/api/test_tfwindow.py::test_engine_rejects_semantic_invalid_timeframes PASSED [ 63%]
+tests/api/test_tfwindow.py::test_config_override_reference_tf_reaches_engine PASSED [ 63%]
+tests/api/test_stage_progress.py::test_progress_report_count_within_bounds_not_hot_loop[1] PASSED [ 64%]
+tests/api/test_stage_progress.py::test_progress_report_count_within_bounds_not_hot_loop[2] PASSED [ 64%]
+tests/api/test_stage_progress.py::test_progress_report_count_within_bounds_not_hot_loop[3] PASSED [ 65%]
+tests/api/test_stage_progress.py::test_progress_report_count_within_bounds_not_hot_loop[14] PASSED [ 65%]
+tests/api/test_stage_progress.py::test_progress_report_count_within_bounds_not_hot_loop[157] PASSED [ 65%]
+tests/api/test_stage_progress.py::test_progress_report_count_within_bounds_not_hot_loop[350] PASSED [ 66%]
+tests/api/test_stage_progress.py::test_progress_report_count_within_bounds_not_hot_loop[1000] PASSED [ 66%]
+tests/api/test_stage_progress.py::test_progress_interval_values PASSED   [ 67%]
+tests/api/test_stage_progress.py::test_first_report_is_estimating_no_fake_eta PASSED [ 67%]
+tests/api/test_stage_progress.py::test_progress_done_counts_only_processed_columns PASSED [ 67%]
+tests/api/test_stage_progress.py::test_progress_hook_exception_does_not_break_preprocess PASSED [ 68%]
+tests/api/test_stage_progress.py::test_memory_warn_is_not_blocking_and_emitted_once PASSED [ 68%]
+tests/api/test_stage_progress.py::test_no_warn_when_memory_normal PASSED [ 69%]
+tests/api/test_stage_progress.py::test_memory_pressure_rules PASSED      [ 69%]
+tests/api/test_stage_progress.py::test_service_stores_sub_progress_and_dedupes_warnings PASSED [ 70%]
+tests/api/test_stage_progress.py::test_report_progress_propagates_cancel_but_swallows_other_callback_errors PASSED [ 70%]
+tests/api/test_stage_progress.py::test_ws_payload_forwards_sub_progress_and_warning_fields PASSED [ 70%]
+tests/api/test_stage_progress.py::test_precheck_rolling_warmup_uses_same_rule_as_stage4_and_counts_event_rows_in_test PASSED [ 71%]
+tests/api/test_stage_progress.py::test_fallback_reason_is_pushed_live_and_ws_forwards_it PASSED [ 71%]
+tests/api/test_stage_progress.py::test_cancel_task_states PASSED         [ 72%]
+tests/api/test_stage_progress.py::test_real_fixture_analyze_emits_sub_progress_within_bounds PASSED [ 72%]
+tests/api/test_stage_progress.py::test_terminal_status_clears_sub_progress_in_service_source PASSED [ 72%]
+tests/api/test_period_auto_align.py::test_partial_coverage_drops_events_and_discloses_dropped_ids_exactly PASSED [ 73%]
+tests/api/test_period_auto_align.py::test_all_dropped_is_fail_closed_with_periods_in_message PASSED [ 73%]
+tests/api/test_period_auto_align.py::test_inject_period_alignment_only_when_something_dropped PASSED [ 74%]
+tests/api/test_period_auto_align.py::test_live_event_stages_drop_out_of_range_event_and_shrink_allowed_set PASSED [ 74%]
+tests/api/test_period_auto_align.py::test_features_trimmed_to_kline_period_with_exact_head_tail_disclosure PASSED [ 75%]
+tests/api/test_period_auto_align.py::test_empty_intersection_is_fail_closed_with_all_periods PASSED [ 75%]
+tests/api/test_period_auto_align.py::test_stage0_applies_trim_before_split_and_stage2_generates_on_trimmed_features PASSED [ 75%]
+tests/api/test_period_auto_align.py::test_report_metadata_key_present_only_when_trimmed_real_fixture PASSED [ 76%]
+tests/api/test_isolation_disclosure.py::test_isolation_total_equals_sum_and_sources_nonempty PASSED [ 76%]
+tests/api/test_isolation_disclosure.py::test_isolation_source_reflects_event_lookahead_or_config PASSED [ 77%]
+tests/api/test_isolation_disclosure.py::test_isolation_absent_when_split_not_applied PASSED [ 77%]
+tests/api/test_isolation_disclosure.py::test_isolation_purge_matches_split_golden_baseline PASSED [ 77%]
+tests/api/test_isolation_disclosure.py::test_non_event_report_unchanged_without_injection PASSED [ 78%]
+tests/api/test_scan_cube_api.py::test_manifest_returns_two_tier_state PASSED [ 78%]
+tests/api/test_scan_cube_api.py::test_missing_task_is_404_not_empty_rows PASSED [ 79%]
+tests/api/test_scan_cube_api.py::test_pagination_is_complete_and_unique PASSED [ 79%]
+tests/api/test_scan_cube_api.py::test_total_is_filtered_count_not_page_size PASSED [ 80%]
+tests/api/test_scan_cube_api.py::test_offset_beyond_total_returns_empty_rows_with_real_total PASSED [ 80%]
+tests/api/test_scan_cube_api.py::test_unknown_metric_is_400_not_silently_ignored PASSED [ 80%]
+tests/api/test_scan_cube_api.py::test_limit_over_page_max_is_400_not_clamped PASSED [ 81%]
+tests/api/test_scan_cube_api.py::test_sort_field_must_be_a_known_metric PASSED [ 81%]
+tests/api/test_scan_cube_api.py::test_tier_a_not_stored_is_409_not_empty_page PASSED [ 82%]
+tests/api/test_scan_cube_api.py::test_tier_b_not_stored_is_409_with_fits_hint PASSED [ 82%]
+tests/api/test_scan_cube_api.py::test_charts_returns_report_shaped_slice PASSED [ 82%]
+tests/api/test_scan_cube_api.py::test_charts_unknown_cell_is_404 PASSED  [ 83%]
+tests/api/test_ic_la1_degraded_gate.py::test_summary_table_pass_class_gate PASSED [ 83%]
+tests/api/test_ic_la1_degraded_gate.py::test_summary_table_pass_class_missing_marker PASSED [ 84%]
+tests/api/test_ic_la1_degraded_gate.py::test_filter_log_output_features_gate PASSED [ 84%]
+tests/api/test_ic_la1_degraded_gate.py::test_filter_log_output_features_missing_marker PASSED [ 85%]
+tests/api/test_ic_la1_degraded_gate.py::test_hdf5_attr_gate PASSED       [ 85%]
+tests/api/test_ic_la1_degraded_gate.py::test_hdf5_attr_missing_marker PASSED [ 85%]
+tests/api/test_ic_la1_degraded_gate.py::test_ai_json_oos_text_gate PASSED [ 86%]
+tests/api/test_ic_la1_degraded_gate.py::test_ai_json_oos_text_missing_marker PASSED [ 86%]
+tests/api/test_ic_la1_degraded_gate.py::test_api_hdf5_carrier PASSED     [ 87%]
+tests/api/test_ic_la1_degraded_gate.py::test_api_hdf5_carrier_missing_marker PASSED [ 87%]
+tests/api/test_ic_la1_degraded_gate.py::test_api_csv_carrier PASSED      [ 87%]
+tests/api/test_ic_la1_degraded_gate.py::test_api_csv_carrier_missing_marker PASSED [ 88%]
+tests/api/test_ic_la1_degraded_gate.py::test_api_transforms_carrier PASSED [ 88%]
+tests/api/test_ic_la1_degraded_gate.py::test_api_transforms_carrier_missing_marker PASSED [ 89%]
+tests/api/test_ic_la1_degraded_gate.py::test_task_payload_status PASSED  [ 89%]
+tests/api/test_ic_la1_degraded_gate.py::test_task_payload_status_missing_marker PASSED [ 90%]
+tests/api/test_ic_la1_degraded_gate.py::test_b3_cx01_cross_sectional_report_has_root_status PASSED [ 90%]
+tests/api/test_ic_la1_degraded_gate.py::test_b3_h501_export_rejects_stale_or_empty_filtered PASSED [ 90%]
+tests/api/test_ic_la1_degraded_gate.py::test_b3_task01_completion_callback_payload_requires_status PASSED [ 91%]
+tests/api/test_ic_la1_degraded_gate.py::test_b3_enum01_unknown_or_missing_status_is_degraded PASSED [ 91%]
+tests/api/test_ic_la1_degraded_gate.py::test_b3_enum01_read_points_fail_closed_reporter_route_service PASSED [ 92%]
+tests/api/test_ic_la1_degraded_gate.py::test_b3_test01_routes_service_callback_real_chain PASSED [ 92%]
+tests/api/test_ic_la1_degraded_gate.py::test_b3_test01_gc_persisted_output_has_status FAILED [ 92%]
+tests/api/test_ic_la1_degraded_gate.py::test_b3_xform01_attr_write_failure_raises PASSED [ 93%]
+tests/api/test_ic_la1_degraded_gate.py::test_callback_completion_degraded_real_chain_a PASSED [ 93%]
+tests/api/test_ic_la1_degraded_gate.py::test_callback_completion_ok_real_chain_a FAILED [ 94%]
+tests/api/test_ic_la1_degraded_gate.py::test_callback_completion_degraded_real_chain_b PASSED [ 94%]
+tests/api/test_ic_la1_degraded_gate.py::test_callback_payload_missing_status_detected PASSED [ 95%]
+tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_exposes_feature_count PASSED [ 95%]
+tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_stage_set_is_open_not_fixed_enum PASSED [ 95%]
+tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_no_fake_value_when_unresolvable PASSED [ 96%]
+tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis PASSED [ 96%]
+tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_resolver_reads_registry_only PASSED [ 97%]
+tests/momentum/Analysis/test_gap2_golden.py::test_g1_golden_unchanged PASSED [ 97%]
+tests/momentum/Analysis/test_gap2_golden.py::test_g2_section_and_survivor_file_deterministic PASSED [ 97%]
+tests/momentum/Analysis/test_gap2_golden.py::test_budget_bench_receipt PASSED [ 98%]
+tests/momentum/Analysis/test_gap2_golden.py::test_mutation_scrub_extra_key_breaks_canonical_sha PASSED [ 98%]
+tests/momentum/Analysis/test_gap2_golden.py::test_mutation_counter_without_fit_call_breaks_spy PASSED [ 99%]
+tests/api/test_ic_models.py::test_ic_analyze_request_config_hash_optional PASSED [ 99%]
+tests/api/test_ic_models.py::test_ic_analyze_request_cross_sectional_runs PASSED [100%]
+
+==================================== ERRORS ====================================
+________________ ERROR at setup of test_export_csv_summary_200 _________________
+tests/api/test_export_api.py:90: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:55: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+---------------------------- Captured stdout setup -----------------------------
+2026-09-09 09:32:18 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2026-09-09 09:32:18 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-09-09 09:32:18 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2026-09-09 09:32:18 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2026-09-09 09:32:18 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2026-09-09 09:32:18 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-09-09 09:32:18 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2026-09-09 09:32:18 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2026-09-09 09:32:18 - api.startup - [32mINFO[0m - 運行環境: Production
+2026-09-09 09:32:18 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2026-09-09 09:32:18 - momentum.Analysis.ic_config_schema - [32mINFO[0m - IC config loaded
+2026-09-09 09:32:18 - api.ic_analysis_service - [32mINFO[0m - IC analysis task started: ba0f5bd1-49d6-48a8-a210-3c6758dea5fd
+2026-09-09 09:32:18 - api.middleware.request - [32mINFO[0m - [219178ab] POST /api/v1/ic/analyze - 200 - 0.028s
+2026-09-09 09:32:18 - httpx - [32mINFO[0m - HTTP Request: POST http://testserver/api/v1/ic/analyze "HTTP/1.1 200 OK"
+2026-09-09 09:32:18 - api.middleware.request - [32mINFO[0m - [8291ef57] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.008s
+2026-09-09 09:32:18 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - Resolved label horizon from labels_df column
+2026-09-09 09:32:18 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - Resolved label horizon from labels_df column
+2026-09-09 09:32:18 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+2026-09-09 09:32:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:19 - momentum.Analysis.data_preprocessor - [32mINFO[0m - Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+2026-09-09 09:32:19 - api.middleware.request - [32mINFO[0m - [434399b4] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:19 - momentum.Analysis.ic_engine - [32mINFO[0m - IC autocorr persistent: count=7
+2026-09-09 09:32:19 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:32:19 - api.middleware.request - [32mINFO[0m - [8710ac67] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:19 - api.middleware.request - [32mINFO[0m - [c82c8ae1] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:19 - api.middleware.request - [32mINFO[0m - [599b44d3] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:20 - api.middleware.request - [32mINFO[0m - [2719000b] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:20 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:20 - api.middleware.request - [32mINFO[0m - [28835ac5] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.081s
+2026-09-09 09:32:20 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:20 - api.middleware.request - [32mINFO[0m - [e92d4cdd] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:20 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:20 - api.middleware.request - [32mINFO[0m - [4ede7142] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:20 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:21 - api.middleware.request - [32mINFO[0m - [e25e3c75] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:21 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:21 - api.middleware.request - [32mINFO[0m - [267918b9] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:21 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:21 - api.middleware.request - [32mINFO[0m - [3110d2e2] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:21 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:21 - api.middleware.request - [32mINFO[0m - [5a7b65e3] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:21 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:21 - api.middleware.request - [32mINFO[0m - [8706cf29] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:21 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:22 - api.middleware.request - [32mINFO[0m - [35f9a23e] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:22 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:22 - api.middleware.request - [32mINFO[0m - [9487f6c4] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:22 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:22 - api.middleware.request - [32mINFO[0m - [33084322] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.003s
+2026-09-09 09:32:22 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:22 - api.middleware.request - [32mINFO[0m - [3a32f4fd] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.012s
+2026-09-09 09:32:22 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:23 - api.middleware.request - [32mINFO[0m - [dd174b39] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:23 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:23 - api.middleware.request - [32mINFO[0m - [6447c893] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:23 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:23 - api.middleware.request - [32mINFO[0m - [26648307] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:23 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:23 - api.middleware.request - [32mINFO[0m - [7980d87a] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:23 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:23 - api.middleware.request - [32mINFO[0m - [e8094254] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:23 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:24 - api.middleware.request - [32mINFO[0m - [f4b7eb1a] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:24 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:24 - api.middleware.request - [32mINFO[0m - [61d7173c] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:24 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:24 - api.middleware.request - [32mINFO[0m - [9f38d83b] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:24 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:24 - momentum.Analysis.redundancy_filter - [32mINFO[0m - Redundancy filter completed: method=greedy input=7 output=6
+2026-09-09 09:32:24 - api.middleware.request - [32mINFO[0m - [ba4c0504] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.003s
+2026-09-09 09:32:24 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:25 - api.middleware.request - [32mINFO[0m - [a7ac3417] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.003s
+2026-09-09 09:32:25 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:25 - api.middleware.request - [32mINFO[0m - [1da0bbdd] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.003s
+2026-09-09 09:32:25 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:25 - api.middleware.request - [32mINFO[0m - [be3169e3] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:25 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:25 - api.middleware.request - [32mINFO[0m - [c044c0c5] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:25 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:25 - api.middleware.request - [32mINFO[0m - [57c2b765] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:25 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:26 - api.middleware.request - [32mINFO[0m - [82f1c12c] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.067s
+2026-09-09 09:32:26 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:26 - api.middleware.request - [32mINFO[0m - [211b748b] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.001s
+2026-09-09 09:32:26 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:26 - api.middleware.request - [32mINFO[0m - [313e8955] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:26 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:27 - api.middleware.request - [32mINFO[0m - [6db4aab1] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:27 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:27 - api.middleware.request - [32mINFO[0m - [97cd7f7b] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:27 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:27 - api.middleware.request - [32mINFO[0m - [50321de8] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:27 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:27 - api.middleware.request - [32mINFO[0m - [20255c7d] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:27 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:27 - api.middleware.request - [32mINFO[0m - [f29fa708] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:27 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:28 - api.middleware.request - [32mINFO[0m - [880997e2] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.001s
+2026-09-09 09:32:28 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:28 - api.middleware.request - [32mINFO[0m - [f984fe20] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:28 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:28 - api.middleware.request - [32mINFO[0m - [35caad32] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.008s
+2026-09-09 09:32:28 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:28 - api.middleware.request - [32mINFO[0m - [d92ed7f9] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:28 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:29 - api.middleware.request - [32mINFO[0m - [8d2d097e] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:29 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:29 - api.middleware.request - [32mINFO[0m - [d141c678] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:29 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:29 - api.middleware.request - [32mINFO[0m - [008b437c] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.003s
+2026-09-09 09:32:29 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:29 - api.middleware.request - [32mINFO[0m - [ba3b77e2] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.003s
+2026-09-09 09:32:29 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:29 - api.middleware.request - [32mINFO[0m - [383d9e54] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:29 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:30 - api.middleware.request - [32mINFO[0m - [601b2293] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:30 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:30 - api.middleware.request - [32mINFO[0m - [74f31d6e] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.006s
+2026-09-09 09:32:30 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:30 - api.middleware.request - [32mINFO[0m - [c7044af6] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.007s
+2026-09-09 09:32:30 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:30 - api.middleware.request - [32mINFO[0m - [ce13631b] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.008s
+2026-09-09 09:32:30 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:31 - api.middleware.request - [32mINFO[0m - [6bd89bbb] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:31 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:31 - api.middleware.request - [32mINFO[0m - [51b7ce69] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.003s
+2026-09-09 09:32:31 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:31 - api.middleware.request - [32mINFO[0m - [29ee2fbc] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:31 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:31 - api.middleware.request - [32mINFO[0m - [2f1fceb7] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:31 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:31 - api.middleware.request - [32mINFO[0m - [e817cb79] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.009s
+2026-09-09 09:32:31 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:32 - api.middleware.request - [32mINFO[0m - [23259762] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.001s
+2026-09-09 09:32:32 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:32 - api.middleware.request - [32mINFO[0m - [72ad61c8] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:32 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:32 - api.middleware.request - [32mINFO[0m - [8f34bbb8] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.003s
+2026-09-09 09:32:32 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:32 - api.middleware.request - [32mINFO[0m - [e7da8ee0] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.007s
+2026-09-09 09:32:32 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:33 - api.middleware.request - [32mINFO[0m - [26456d85] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:33 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:33 - api.middleware.request - [32mINFO[0m - [82286c43] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.004s
+2026-09-09 09:32:33 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:33 - api.middleware.request - [32mINFO[0m - [c17d5c0c] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:33 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:33 - api.middleware.request - [32mINFO[0m - [22d32a36] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.008s
+2026-09-09 09:32:33 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:33 - api.middleware.request - [32mINFO[0m - [78840632] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:33 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:34 - api.middleware.request - [32mINFO[0m - [912026f4] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:34 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:34 - api.middleware.request - [32mINFO[0m - [6666beca] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:34 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:34 - api.middleware.request - [32mINFO[0m - [1042ee1d] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.013s
+2026-09-09 09:32:34 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:34 - api.middleware.request - [32mINFO[0m - [b5c4f18e] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:34 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:35 - api.middleware.request - [32mINFO[0m - [68beb892] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:35 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:35 - api.middleware.request - [32mINFO[0m - [32264d44] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:35 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:35 - api.middleware.request - [32mINFO[0m - [13283dfd] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.011s
+2026-09-09 09:32:35 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:35 - api.middleware.request - [32mINFO[0m - [07a176a8] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:35 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:35 - api.middleware.request - [32mINFO[0m - [7feef3e2] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:35 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:36 - api.middleware.request - [32mINFO[0m - [7ef98f34] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:36 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:36 - api.middleware.request - [32mINFO[0m - [9def43b8] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.007s
+2026-09-09 09:32:36 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:36 - api.middleware.request - [32mINFO[0m - [ed15e5c7] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:36 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:36 - api.middleware.request - [32mINFO[0m - [7e52ec48] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.001s
+2026-09-09 09:32:36 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:37 - api.middleware.request - [32mINFO[0m - [2e917f7c] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:37 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:37 - api.middleware.request - [32mINFO[0m - [7c4c4a7a] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:37 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:37 - api.middleware.request - [32mINFO[0m - [a989ba0d] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.008s
+2026-09-09 09:32:37 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:37 - api.middleware.request - [32mINFO[0m - [f3cc0389] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.009s
+2026-09-09 09:32:37 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:37 - api.middleware.request - [32mINFO[0m - [f9999e5f] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:37 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:38 - api.middleware.request - [32mINFO[0m - [996fa868] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.005s
+2026-09-09 09:32:38 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:38 - api.middleware.request - [32mINFO[0m - [0955ef5b] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:38 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:38 - api.middleware.request - [32mINFO[0m - [705c9ba5] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.002s
+2026-09-09 09:32:38 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:38 - api.middleware.request - [32mINFO[0m - [22df5122] GET /api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd - 200 - 0.007s
+2026-09-09 09:32:38 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/task/ba0f5bd1-49d6-48a8-a210-3c6758dea5fd "HTTP/1.1 200 OK"
+2026-09-09 09:32:39 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+2026-09-09 09:32:40 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - IC stage6b marginal_ic: status=ok reason=None survivors=6 removed=1 n_regressions=13 fit_scope=full_sample
+2026-09-09 09:32:40 - momentum.Analysis.ic_reporter - [32mINFO[0m - Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-755/ic_redirect0/features/ETHUSDT_12h_filtered.h5
+2026-09-09 09:32:40 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-755/ic_redirect0/reports/ic_report_ic_api_real_kline.json
+2026-09-09 09:32:40 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-755/ic_redirect0/reports/ic_survivors_ic_api_real_kline.json
+2026-09-09 09:32:40 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-755/ic_redirect0/reports/ic_report_ic_api_real_kline.json
+---------------------------- Captured stderr setup -----------------------------
+2026-09-09 09:32:18,612 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 09:32:18,625 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.013s
+2026-09-09 09:32:18,641 - h5py._conv - DEBUG - Creating converter from 5 to 3
+2026-09-09 09:32:18,925 - matplotlib - DEBUG - matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+2026-09-09 09:32:18,930 - matplotlib - DEBUG - CONFIGDIR=/Users/louis/.matplotlib
+2026-09-09 09:32:18,931 - matplotlib - DEBUG - interactive is False
+2026-09-09 09:32:18,931 - matplotlib - DEBUG - platform is darwin
+2026-09-09 09:32:18,955 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-09 09:32:18,956 - api.startup - INFO - 正在啟動 Case Search API...
+[2026-09-09 09:32:18,984] INFO momentum.Analysis.ic_config_schema: IC config loaded
+[2026-09-09 09:32:18,998] INFO momentum.Analysis.ic_filter_orchestrator: Resolved label horizon from labels_df column
+[2026-09-09 09:32:18,999] INFO momentum.Analysis.ic_filter_orchestrator: Resolved label horizon from labels_df column
+[2026-09-09 09:32:18,999] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+[2026-09-09 09:32:19,015] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+[2026-09-09 09:32:19,417] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=7
+[2026-09-09 09:32:19,418] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:32:24,698] INFO momentum.Analysis.redundancy_filter: Redundancy filter completed: method=greedy input=7 output=6
+[2026-09-09 09:32:40,753] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=ok reason=None survivors=6 removed=1 n_regressions=13 fit_scope=full_sample
+[2026-09-09 09:32:40,764] INFO momentum.Analysis.ic_reporter: Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-755/ic_redirect0/features/ETHUSDT_12h_filtered.h5
+[2026-09-09 09:32:40,831] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-755/ic_redirect0/reports/ic_report_ic_api_real_kline.json
+[2026-09-09 09:32:40,835] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-755/ic_redirect0/reports/ic_survivors_ic_api_real_kline.json
+[2026-09-09 09:32:40,891] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-755/ic_redirect0/reports/ic_report_ic_api_real_kline.json
+------------------------------ Captured log setup ------------------------------
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.013s
+DEBUG    h5py._conv:dataset.py:178 Creating converter from 5 to 3
+DEBUG    matplotlib:__init__.py:341 matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+DEBUG    matplotlib:__init__.py:341 CONFIGDIR=/Users/louis/.matplotlib
+DEBUG    matplotlib:__init__.py:1512 interactive is False
+DEBUG    matplotlib:__init__.py:1513 platform is darwin
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     api.startup:main.py:44 正在啟動 Case Search API...
+___________ ERROR at setup of test_export_csv_detailed_factor_return ___________
+tests/api/test_export_api.py:90: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:55: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+__________________ ERROR at setup of test_export_ai_json_200 ___________________
+tests/api/test_export_api.py:90: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:55: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+__________________ ERROR at setup of test_export_markdown_200 __________________
+tests/api/test_export_api.py:90: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:55: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+____________________ ERROR at setup of test_export_hdf5_200 ____________________
+tests/api/test_export_api.py:90: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:55: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+_______________ ERROR at setup of test_export_invalid_format_422 _______________
+tests/api/test_export_api.py:90: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:55: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+________ ERROR at setup of test_export_csv_detailed_without_module_422 _________
+tests/api/test_export_api.py:90: in export_task
+    _wait_for_task(task_id)
+tests/api/test_export_api.py:55: in _wait_for_task
+    pytest.fail("task timeout")
+E   Failed: task timeout
+=================================== FAILURES ===================================
+________________ test_b3_test01_gc_persisted_output_has_status _________________
+tests/api/test_ic_la1_degraded_gate.py:731: in test_b3_test01_gc_persisted_output_has_status
+    assert written, "expected filtered HDF5 persist after annotate"
+E   AssertionError: expected filtered HDF5 persist after annotate
+E   assert []
+----------------------------- Captured stdout call -----------------------------
+2026-09-09 09:38:39 - momentum.Analysis.ic_config_schema - [32mINFO[0m - IC config loaded
+2026-09-09 09:38:39 - momentum.DataExtraction.kline_storage - [32mINFO[0m - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 09:38:39 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 20352 klines from BTCUSDT/1h in 0.009s
+2026-09-09 09:38:39 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:38:39 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:38:39 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - IC full-sample fallback triggered: reason=insufficient_data train_rows=80 test_rows=15 min_test_rows=10000 fit_mode=full_sample
+2026-09-09 09:38:39 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 20352 klines from BTCUSDT/1h in 0.007s
+2026-09-09 09:38:39 - momentum.Analysis.data_preprocessor - [32mINFO[0m - Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+2026-09-09 09:38:39 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 20352 klines from BTCUSDT/1h in 0.007s
+2026-09-09 09:38:39 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:38:39 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 20352 klines from BTCUSDT/1h in 0.006s
+2026-09-09 09:38:40 - momentum.Analysis.ic_engine - [32mINFO[0m - Decay: 15/15 fit warnings summarized (insufficient_points=15)
+2026-09-09 09:38:40 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:38:40 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+2026-09-09 09:38:40 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+2026-09-09 09:38:40 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 09:38:40 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+----------------------------- Captured stderr call -----------------------------
+[2026-09-09 09:38:39,895] INFO momentum.Analysis.ic_config_schema: IC config loaded
+[2026-09-09 09:38:39,909] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:38:39,909] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:38:39,909] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=insufficient_data train_rows=80 test_rows=15 min_test_rows=10000 fit_mode=full_sample
+[2026-09-09 09:38:39,933] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+[2026-09-09 09:38:39,941] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:38:40,450] INFO momentum.Analysis.ic_engine: Decay: 15/15 fit warnings summarized (insufficient_points=15)
+[2026-09-09 09:38:40,450] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:38:40,507] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+[2026-09-09 09:38:40,515] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 09:38:40,517] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 09:38:40,524] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+------------------------------ Captured log call -------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.009s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:1409 IC full-sample fallback triggered: reason=insufficient_data train_rows=80 test_rows=15 min_test_rows=10000 fit_mode=full_sample
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.007s
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.007s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.006s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:415 Decay: 15/15 fit warnings summarized (insufficient_points=15)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:4626 IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:893 IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_survivors_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+___________________ test_callback_completion_ok_real_chain_a ___________________
+tests/api/test_ic_la1_degraded_gate.py:1016: in test_callback_completion_ok_real_chain_a
+    _assert_callback_task_mirror(
+tests/api/test_ic_la1_degraded_gate.py:907: in _assert_callback_task_mirror
+    assert payload.get("analysis_status") == expect_status
+E   AssertionError: assert 'degraded_full_sample' == 'ok_oos'
+E     
+E     - ok_oos
+E     + degraded_full_sample
+----------------------------- Captured stdout call -----------------------------
+2026-09-09 09:38:41 - momentum.FeatureEngineering.feature_registry - [32mINFO[0m - Loaded feature registry with 15 entries
+2026-09-09 09:38:41 - momentum.Analysis.ic_config_schema - [32mINFO[0m - IC config loaded
+2026-09-09 09:38:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 09:38:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 20352 klines from BTCUSDT/1h in 0.006s
+2026-09-09 09:38:41 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:38:41 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:38:41 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 09:38:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 20352 klines from BTCUSDT/1h in 0.006s
+2026-09-09 09:38:41 - momentum.Analysis.data_preprocessor - [32mINFO[0m - Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+2026-09-09 09:38:41 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 20352 klines from BTCUSDT/1h in 0.006s
+2026-09-09 09:38:41 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:38:42 - momentum.Analysis.ic_engine - [32mINFO[0m - IC autocorr persistent: count=15
+2026-09-09 09:38:42 - momentum.DataExtraction.kline_storage - [32mINFO[0m - Read 20352 klines from BTCUSDT/1h in 0.007s
+2026-09-09 09:38:43 - momentum.Analysis.ic_engine - [32mINFO[0m - Decay: 15/15 fit warnings summarized (insufficient_points=15)
+2026-09-09 09:38:43 - momentum.Analysis.ic_filter_orchestrator - [33mWARNING[0m - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 09:39:39 - momentum.Analysis.redundancy_filter - [32mINFO[0m - Redundancy filter completed: method=greedy input=13 output=11
+2026-09-09 09:40:01 - momentum.Analysis.ic_filter_orchestrator - [32mINFO[0m - IC stage6b marginal_ic: status=ok reason=None survivors=11 removed=2 n_regressions=24 fit_scope=full_sample
+2026-09-09 09:40:01 - momentum.Analysis.ic_reporter - [32mINFO[0m - Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/features/BTCUSDT_1h_filtered.h5
+2026-09-09 09:40:01 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+2026-09-09 09:40:01 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 09:40:01 - momentum.Analysis.ic_reporter - [32mINFO[0m - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+2026-09-09 09:40:01 - api.ic_analysis_service - [32mINFO[0m - IC analysis task completed: b3-cb-chain-a-ok
+----------------------------- Captured stderr call -----------------------------
+[2026-09-09 09:38:41,173] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+[2026-09-09 09:38:41,188] INFO momentum.Analysis.ic_config_schema: IC config loaded
+[2026-09-09 09:38:41,198] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:38:41,199] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:38:41,205] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+[2026-09-09 09:38:41,228] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+[2026-09-09 09:38:41,236] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:38:42,125] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=15
+[2026-09-09 09:38:43,079] INFO momentum.Analysis.ic_engine: Decay: 15/15 fit warnings summarized (insufficient_points=15)
+[2026-09-09 09:38:43,079] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 09:39:39,988] INFO momentum.Analysis.redundancy_filter: Redundancy filter completed: method=greedy input=13 output=11
+[2026-09-09 09:40:01,143] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=ok reason=None survivors=11 removed=2 n_regressions=24 fit_scope=full_sample
+[2026-09-09 09:40:01,165] INFO momentum.Analysis.ic_reporter: Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/features/BTCUSDT_1h_filtered.h5
+[2026-09-09 09:40:01,334] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 09:40:01,339] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 09:40:01,506] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+------------------------------ Captured log call -------------------------------
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 15 entries
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.006s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:1409 IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.006s
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.006s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.ic_engine:ic_engine.py:506 IC autocorr persistent: count=15
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.007s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:415 Decay: 15/15 fit warnings summarized (insufficient_points=15)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.redundancy_filter:redundancy_filter.py:144 Redundancy filter completed: method=greedy input=13 output=11
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:4626 IC stage6b marginal_ic: status=ok reason=None survivors=11 removed=2 n_regressions=24 fit_scope=full_sample
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:829 Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/features/BTCUSDT_1h_filtered.h5
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:893 IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_survivors_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/la1_b0_sidefx_f0t451m2/reports/ic_report_ic_gatekeeper.json
+INFO     api.ic_analysis_service:ic_analysis_service.py:1675 IC analysis task completed: b3-cb-chain-a-ok
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/fastapi/applications.py:1051
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/fastapi/applications.py:1051: PytestCollectionWarning: cannot collect 'test_app' because it is not a function.
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+
+tests/api/test_ic_analysis_service.py: 1695 warnings
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[:, None]
+
+tests/api/test_ic_analysis_service.py: 1695 warnings
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2898: RuntimeWarning: invalid value encountered in divide
+    c /= stddev[None, :]
+
+tests/api/test_evtwarmup.py::test_event_path_without_split_still_discloses_window_and_icir_role
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2889: RuntimeWarning: Degrees of freedom <= 0 for slice
+    c = cov(x, y, rowvar, dtype=dtype)
+
+tests/api/test_evtwarmup.py::test_event_path_without_split_still_discloses_window_and_icir_role
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2748: RuntimeWarning: divide by zero encountered in divide
+    c *= np.true_divide(1, fact)
+
+tests/api/test_evtwarmup.py::test_event_path_without_split_still_discloses_window_and_icir_role
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2748: RuntimeWarning: invalid value encountered in multiply
+    c *= np.true_divide(1, fact)
+
+tests/api/test_tfwindow.py::test_invalid_timeframe_fails_closed_before_stage4
+  /Users/louis/Desktop/quantitative_trading_system/momentum/DataExtraction/kline_storage.py:411: DeprecationWarning: _import_from_legacy_cache() is deprecated and will be removed in a future release. Please migrate data access to kline_cache.h5 directly.
+    imported = self._import_from_legacy_cache(symbol, timeframe)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/api/test_ic_la1_degraded_gate.py::test_b3_test01_gc_persisted_output_has_status
+FAILED tests/api/test_ic_la1_degraded_gate.py::test_callback_completion_ok_real_chain_a
+ERROR tests/api/test_export_api.py::test_export_csv_summary_200 - Failed: tas...
+ERROR tests/api/test_export_api.py::test_export_csv_detailed_factor_return - ...
+ERROR tests/api/test_export_api.py::test_export_ai_json_200 - Failed: task ti...
+ERROR tests/api/test_export_api.py::test_export_markdown_200 - Failed: task t...
+ERROR tests/api/test_export_api.py::test_export_hdf5_200 - Failed: task timeout
+ERROR tests/api/test_export_api.py::test_export_invalid_format_422 - Failed: ...
+ERROR tests/api/test_export_api.py::test_export_csv_detailed_without_module_422
+====== 2 failed, 231 passed, 3395 warnings, 7 errors in 625.50s (0:10:25) ======

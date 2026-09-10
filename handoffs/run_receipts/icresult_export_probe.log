@@ -1,0 +1,56 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+09:38:22 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:38:22 [INFO] Registered adapter: crypto_spot
+09:38:22 [INFO] Loaded feature registry with 15 entries
+09:38:22 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+09:38:23 [INFO] Restored 15 persisted feature task(s) from disk
+09:38:23 [INFO] 所有中間件已設置完成
+09:38:23 [INFO] 異常處理器設置完成
+09:38:23 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+09:38:23 [INFO] Loaded feature registry with 15 entries
+09:38:23 [INFO] Loaded 60/60 cases from JSON
+09:38:23 [INFO] Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+09:38:23 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+09:38:23 [INFO] Created global CaseStorageManager instance
+09:38:23 [INFO] CaseImportService initialized
+09:38:23 [INFO] Created global CaseImportService instance with shared storage
+09:38:23 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+09:38:23 [INFO] KlineDownloadService initialized
+09:38:23 [INFO] Rate limiter initialized: 1000 req/min
+09:38:23 [INFO] BinanceProvider initialized
+09:38:23 [INFO] Registered provider: binance (rate_limit=1000/min)
+09:38:23 [INFO] Registered BinanceProvider to KlineDownloadService
+09:38:23 [INFO] BatchDownloadService initialized
+09:38:23 [INFO] Created global BatchDownloadService instance with shared storage
+09:38:23 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+09:38:23 [INFO] KlineDownloadService initialized
+09:38:23 [INFO] Rate limiter initialized: 1000 req/min
+09:38:23 [INFO] BinanceProvider initialized
+09:38:23 [INFO] Registered provider: binance (rate_limit=1000/min)
+09:38:23 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+09:38:23 [INFO] IndicatorEngine initialized
+09:38:23 [INFO] ChartDataService initialized with IndicatorEngine
+09:38:23 [INFO] OptimizationTaskService initialized
+09:38:24 [INFO] Loaded feature registry with 15 entries
+09:38:24 [INFO] Loaded feature registry with 15 entries
+09:38:24 [INFO] Loaded feature registry with 15 entries
+09:38:24 [INFO] Loaded feature registry with 15 entries
+09:38:24 [INFO] WebSocketConnectionManager initialized
+09:38:24 [INFO] All API routes registered successfully
+collected 8 items / 7 deselected / 1 selected
+
+tests/api/test_export_api.py::test_export_csv_summary_200 
+-------------------------------- live log setup --------------------------------
+09:38:24 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+09:38:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:38:24 [INFO] 正在啟動 Case Search API...
+PASSED                                                                   [100%]
+
+======================= 1 passed, 7 deselected in 17.24s =======================

@@ -1,0 +1,8 @@
+GATE FAIL: mutation rc=1
+SKIP P2-sort-whitelist-relaxed: 錨點出現 0 處（需恰 1）— 白名單放寬 ⇒ 400 測試紅
+FAIL P11-funnel-keys-reversed rc=0（期望 紅）— 候選鍵序反轉 ⇒ G-8 紅
+FAIL P14-cache-key-without-revision rc=0（期望 紅）— 快取 key 不含 revision ⇒ 紅
+GATE FAIL: mutation UNCOVERED=3
+SIZE_GATE=PASS
+GATE FAIL: phase=1
+gate_rc=1

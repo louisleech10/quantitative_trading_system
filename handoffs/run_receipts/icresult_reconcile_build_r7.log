@@ -1,0 +1,13 @@
+[reconcile_build] session=/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-stamp-r7  roster=codex,composer,grok  sources=3 round_id=unbound mode=discovery
+OK: wrote /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-stamp-r7/sources.lock (3 sources, roster=['codex', 'composer', 'grok'], mode=discovery)
+[reconcile_build] synth.md 已建；每檔抽到 findings：
+    20260909-ICRESULTPAGING-X-STAMP-R7-codex.md: 0
+    20260909-ICRESULTPAGING-X-STAMP-R7-composer.md: 1
+    20260909-ICRESULTPAGING-X-STAMP-R7-grok.md: 1
+[reconcile_build] === completeness_check ===
+COMPLETENESS WARN: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-stamp-r7/sources/20260909-ICRESULTPAGING-X-STAMP-R7-codex.md 抽不到任何 heading ID(來源未用 ## <ID>?) → 本腳本無法保護,須人工/覆議
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-stamp-r7/sources/20260909-ICRESULTPAGING-X-STAMP-R7-composer.md — 1/1 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-stamp-r7/sources/20260909-ICRESULTPAGING-X-STAMP-R7-grok.md — 1/1 個 ID 全在綜合檔。
+COMPLETENESS FAIL: 完整性檢查未過(invalid ID / empty shell / 缺 digest / dup / dropped-ID / body-hash / unknown)。補齊後重跑。
+[reconcile_build] completeness rc=1
+[reconcile_build] ⚠️ completeness 未過——多半是某來源檔有非法 ID / 空殼 finding；看上面訊息指的檔+heading。

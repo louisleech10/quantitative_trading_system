@@ -1,0 +1,424 @@
+2026-09-09 09:39:08,698 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-09-09 09:39:08,744] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-09 09:39:08,744 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+[2026-09-09 09:39:10,299] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:39:10,299 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+2026-09-09 09:39:10,492 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-09 09:39:10,496 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+[2026-09-09 09:39:10,496] INFO momentum.FeatureEngineering.adapters.adapter_registry: Registered adapter: crypto_spot
+2026-09-09 09:39:10,496 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Registered adapter: crypto_spot
+[2026-09-09 09:39:10,496] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:39:10,496 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+2026-09-09 09:39:10,566 - api.feature_factory_service - INFO - CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+2026-09-09 09:39:10,827 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 09:39:10,918 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 09:39:10,979 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 09:39:10,986 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_cfg_batch_ret: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/cfg_batch_ret/feature_manifest.json
+2026-09-09 09:39:11,112 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 09:39:11,213 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 09:39:11,268 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 09:39:11,275 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_cfg_batch_ret: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/cfg_batch_ret/feature_manifest.json
+2026-09-09 09:39:11,423 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 09:39:11,515 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 09:39:11,523 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_be993398916ee054e0b681732961caff: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/be993398916ee054e0b681732961caff/feature_manifest.json
+2026-09-09 09:39:11,573 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 09:39:11,578 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_abc9b9fecb7a4f42cb8e03099285b67b: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/abc9b9fecb7a4f42cb8e03099285b67b/feature_manifest.json
+2026-09-09 09:39:11,579 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_1ab3fe2f34732cc9adf693a36b2ddf8d: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/1ab3fe2f34732cc9adf693a36b2ddf8d/feature_manifest.json
+2026-09-09 09:39:11,579 - api.feature_factory_service - INFO - Restored 15 persisted feature task(s) from disk
+2026-09-09 09:39:11,580 - api.middleware - INFO - 所有中間件已設置完成
+2026-09-09 09:39:11,580 - api.exception_handler - INFO - 異常處理器設置完成
+2026-09-09 09:39:11,613 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+2026-09-09 09:39:11,643 - api.case_storage - INFO - Loaded 60/60 cases from JSON
+2026-09-09 09:39:11,643 - api.case_storage - INFO - Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+2026-09-09 09:39:11,643 - api.case_storage - INFO - CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+2026-09-09 09:39:11,643 - api.case_storage - INFO - Created global CaseStorageManager instance
+2026-09-09 09:39:11,643 - api.case_import_service - INFO - CaseImportService initialized
+2026-09-09 09:39:11,643 - api.case_import_service - INFO - Created global CaseImportService instance with shared storage
+2026-09-09 09:39:11,643 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+2026-09-09 09:39:11,643 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-09 09:39:11,676 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.binance.com:443
+2026-09-09 09:39:11,741 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-09 09:39:11,741 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-09 09:39:11,741 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-09 09:39:11,741 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-09 09:39:11,741 - api.batch_download_service - INFO - Registered BinanceProvider to KlineDownloadService
+2026-09-09 09:39:11,741 - api.batch_download_service - INFO - BatchDownloadService initialized
+2026-09-09 09:39:11,741 - api.batch_download_service - INFO - Created global BatchDownloadService instance with shared storage
+2026-09-09 09:39:11,754 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-09-09 09:39:11,754 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-09 09:39:11,756 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.binance.com:443
+2026-09-09 09:39:11,818 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-09 09:39:11,818 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-09 09:39:11,818 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-09 09:39:11,818 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-09 09:39:11,818 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-09-09 09:39:11,818 - momentum.Indicators.indicator_engine - INFO - IndicatorEngine initialized
+2026-09-09 09:39:11,818 - api.chart_data_service - INFO - ChartDataService initialized with IndicatorEngine
+2026-09-09 09:39:11,841 - api.optimization_task_service - INFO - OptimizationTaskService initialized
+[2026-09-09 09:39:12,581] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:39:12,581 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 09:39:12,583] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:39:12,583 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 09:39:12,671] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:39:12,671 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 09:39:12,735] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 09:39:12,735 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+2026-09-09 09:39:12,746 - api.websocket_manager - INFO - WebSocketConnectionManager initialized
+2026-09-09 09:39:12,842 - api.routes - INFO - All API routes registered successfully
+2026-09-09 09:39:18,770 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-09 09:39:18,770 - api.startup - INFO - 正在啟動 Case Search API...
+2026-09-09 09:39:18 - api.startup - [32mINFO[0m - 日誌系統已初始化 - 級別: INFO
+2026-09-09 09:39:18 - api.startup - [32mINFO[0m - 日誌路徑: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-09-09 09:39:18 - api.config_check - [32mINFO[0m - 幣安API憑證已設置
+2026-09-09 09:39:18 - api.config_check - [32mINFO[0m - 數據緩存目錄: /Users/louis/Desktop/quantitative_trading_system/data_cache
+2026-09-09 09:39:18 - api.config_check - [32mINFO[0m - 結果輸出目錄: /Users/louis/Desktop/quantitative_trading_system/search_results
+2026-09-09 09:39:18 - api.config_check - [32mINFO[0m - 日誌目錄: /Users/louis/Desktop/quantitative_trading_system/logs
+2026-09-09 09:39:18 - api.config_check - [32mINFO[0m - Momentum模組路徑: /Users/louis/Desktop/quantitative_trading_system/momentum
+2026-09-09 09:39:18 - api.startup - [32mINFO[0m - API 服務器啟動成功 - Case Search API v1.0.0
+2026-09-09 09:39:18 - api.startup - [32mINFO[0m - 運行環境: Production
+2026-09-09 09:39:18 - api.startup - [32mINFO[0m - API 前綴: /api/v1
+2026-09-09 09:39:18 - api.middleware.request - [32mINFO[0m - [3802e484] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.039s
+2026-09-09 09:39:18 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [97954dee] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [8b43b0cc] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [3c553018] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [e7c680b7] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [944ea9c3] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f22d529a] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [3e540e2e] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [b97b0dfa] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.005s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a3b4b42a] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.010s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [da7749cd] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.006s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f64db55f] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [22d684b2] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5132f4c5] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [b735462e] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [9ac5ee59] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f977cb45] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [4b81e6ca] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [b27b58ae] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [3a4936c8] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a3312ccf] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.003s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f11e2db5] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f641cda6] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [fb298dd7] GET /api/v1/ic/result/icresult-paging-size-probe - 200 - 0.004s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe?view=light "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [b6c62952] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [c7f061b5] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [e7d29fef] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [522303a6] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [c6df5745] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [41a4cf89] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f2c3ffa5] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [962a959f] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [faf79136] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a490516b] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [189f2264] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [1c77e9a3] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [ab2e7c0c] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [42ba2f3a] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [18df187c] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [826383c8] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [559ebad4] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [d478e1e9] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [e1f04de9] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [88c4ee45] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [88dedd8a] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [b47d2034] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [b1840a70] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [cbacfb52] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.038s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [8e7648fc] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5afddd02] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [cfd612c5] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5f836640] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [76969700] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [4ed1994f] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [78c8a095] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [529a4249] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [0131d7b5] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5aad6717] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [3bd47dbd] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [ab8ffa8e] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a3e62665] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [7aa62348] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [64913caa] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [93170476] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [6ef14396] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [917cacd5] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [eeebaec7] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [97486091] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [07597c71] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [9e25f4c4] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=feature_name&sort_order=asc "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [b1174125] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.020s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [d5e0618f] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [9d4f61ca] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [ec3f6cec] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [dd2c9230] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [4f3b1dd8] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a40eefea] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [d5afeaa8] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [51f3dd75] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [78d6701a] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [ba6f3d2c] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [e5973c05] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [9d421df5] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [25226db1] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [ede86309] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [d9bc1473] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [d4eda815] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [851fd6e0] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [8622313d] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [e3cc2f3c] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [53e30321] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [dd5a3c28] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5421eb6a] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&search=close "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [08cb8bf4] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.042s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [31c95e03] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.002s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [d97783e9] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [d73c358a] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a11f4c80] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [3c8637d8] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.002s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [8ff57ac5] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [aa8dbbd5] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [69786482] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [7a776865] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [bb04832c] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [4d89b867] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f2385ba4] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [977cc98c] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [036c51e6] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a7a52edc] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f800725e] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [3afc2921] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [c1e1379c] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [7ad6a9d6] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [6cead631] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [ba9d39e7] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [bc16a739] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&pass_class=oos "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [23e6d06b] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.002s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [785d6ccf] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [3ca9513f] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [3ba361ab] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [23fb1d72] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5e403576] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [e6bf2a16] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [771ec05c] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a82e1d06] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [4ee6165a] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f89010bb] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [dffe4df4] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [918465a1] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [996a1c33] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [fb1e62d1] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [c24b2992] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [91e7dbcf] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [28c64478] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [bf9e4896] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [10449c5d] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [468174a5] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [18157988] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [8f41070d] GET /api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/None_1h_tail_risk_gpr_21_100_Cross "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [60490dd6] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [9b439d6d] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [a42ca4ba] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [047c25a1] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f711b71a] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [1c8ac04e] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5a8133fb] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [8fba87c9] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [03b8a53c] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [9564a19b] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [4bfa3e6b] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [9ae23768] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [e9508441] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [fc68fbc0] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [f9f986c9] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [ecbb4f83] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [13adcb65] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [af5dce77] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5d6fa517] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [5e6fde54] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [85b80834] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [6903fcbd] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [e7865977] GET /api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/feature/taker-ratio_1h_trend_EMA_200_Momentum_L8 "HTTP/1.1 200 OK"
+2026-09-09 09:39:19 - api.middleware.request - [32mINFO[0m - [2352f5d0] GET /api/v1/ic/result/icresult-paging-size-probe/summary - 200 - 0.001s
+2026-09-09 09:39:19 - httpx - [32mINFO[0m - HTTP Request: GET http://testserver/api/v1/ic/result/icresult-paging-size-probe/summary?limit=50&sort_by=icir&sort_order=desc "HTTP/1.1 200 OK"
+LATENCY_GATE=PASS
+LATENCY_REASON=measured
+LATENCY_light_p50_ms=4.43
+LATENCY_light_p95_ms=7.51
+LATENCY_summary_icir_desc_p50_ms=2.09
+LATENCY_summary_icir_desc_p95_ms=2.22
+LATENCY_summary_name_asc_p50_ms=2.08
+LATENCY_summary_name_asc_p95_ms=2.15
+LATENCY_summary_search_p50_ms=2.18
+LATENCY_summary_search_p95_ms=2.28
+LATENCY_summary_pass_class_p50_ms=2.22
+LATENCY_summary_pass_class_p95_ms=2.36
+LATENCY_feature_first_p50_ms=1.51
+LATENCY_feature_first_p95_ms=1.60
+LATENCY_feature_biggest_p50_ms=1.52
+LATENCY_feature_biggest_p95_ms=1.62
+LATENCY_summary_cache_hit_ms=2.17
+2026-09-09 09:39:19 - api.startup - [32mINFO[0m - 正在關閉 Case Search API...
+lat_rc=0

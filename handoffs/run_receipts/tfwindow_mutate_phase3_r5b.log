@@ -1,0 +1,10 @@
+PASS T1-timeframe-injection-removed rc=1（期望 紅）— 注入拿掉 ⇒ 1h 視窗鍵仍 [21,63,126] ⇒ 主 gate 紅（引擎層測試仍綠）
+PASS T2-missing-timeframe-fake-applied rc=1（期望 紅）— 缺 timeframe 假換算 ⇒ 引擎層揭露測試紅（analyze 層缺 tf 於切分先 fail-closed）
+PASS T3-semantic-invalid-timeframe-accepted rc=1（期望 紅）— 0h／inf／nan 當 applied ⇒ 引擎邊界測試紅（R5 CODEX-R5-P1-02）
+PASS T4-reference-tf-not-synced rc=1（期望 紅）— effective reference 不進引擎 ⇒ 揭露≠實際鍵 紅（R5 CODEX-R5-P2-03）
+PASS C1-comment-only-control-phase3 rc=0（期望 綠）— 對照組：只改註解 ⇒ 全綠
+
+RESTORED clean=True []
+SUMMARY pass=5 fail=0 skip=0 / 5
+UNCOVERED=0
+mut_rc=0

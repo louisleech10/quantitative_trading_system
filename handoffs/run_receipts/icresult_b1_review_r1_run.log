@@ -1,0 +1,19 @@
+[session_name] ✓ 20260909-icresultpaging-b1-review-r1 / 20260909-ICRESULTPAGING-B1-REVIEW-R1
+[committee_run] === role gate preflight (before gate.sh dispatch) ===
+[committee_run] session=20260909-icresultpaging-b1-review-r1 brief=handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-BRIEF.md  families=codex,composer,grok(3 家)  out=handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-<family>.md
+[committee_run] === gate.sh dispatch ===
+GATE PASS：已發 dispatch token（有效 900s）。審計 → .claude/gate/audit.log
+使用者可稽核：cat .claude/gate/audit.log
+[round_cost] 工作項目「icresultpaging-b1-review-r1」尚無歷史輪次（本輪為第 1 輪）
+[committee_run] === open debt round_id=2ed434a1-95b3-483a-9f67-3516e4856373 session=20260909-icresultpaging-b1-review-r1 ===
+[committee_run] 開債完成 round_id=2ed434a1-95b3-483a-9f67-3516e4856373
+[committee_run] → 派 codex(out=handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-codex.md)
+[committee_run] → 派 composer(out=handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-composer.md)
+[committee_run] → 派 grok(out=handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-grok.md)
+[committee_run] ✅ codex 完成 → handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-codex.md
+[committee_run] ✅ composer 完成 → handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-composer.md
+[committee_run] ✅ grok 完成 → handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-grok.md
+[committee_run] 票 B-50：工作區有變動但**無污染跡象**（形態②③ 皆未命中；status 共 135 筆）。
+[committee_run] ✅ 3 家全數完成。接著:bash scripts/reconcile_build.sh <session> handoffs/20260909-ICRESULTPAGING-B1-REVIEW-R1-*.md
+[committee_run] round_id=2ed434a1-95b3-483a-9f67-3516e4856373 session=20260909-icresultpaging-b1-review-r1
+committee_rc=0

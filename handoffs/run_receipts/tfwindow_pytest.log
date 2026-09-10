@@ -1,0 +1,470 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 62 items
+
+tests/api/test_tfwindow.py::test_engine_set_timeframe_adjusts_windows_and_discloses 
+-------------------------------- live log call ---------------------------------
+00:43:36 [WARNING] Invalid timeframe for rolling windows: bad
+PASSED                                                                   [  1%]
+tests/api/test_tfwindow.py::test_12h_fixture_windows_unchanged_and_applied 
+-------------------------------- live log call ---------------------------------
+00:43:36 [INFO] IC config loaded
+00:43:36 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:43:36 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+00:43:36 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:43:36 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:43:37 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:43:37 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:43:37 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:43:37 [INFO] IC autocorr persistent: count=14
+00:43:37 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:43:37 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+00:43:43 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+00:43:46 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+00:43:46 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx__km96r8_/features/ETHUSDT_12h_filtered.h5
+00:43:46 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx__km96r8_/reports/ic_report_ic_gatekeeper.json
+00:43:46 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx__km96r8_/reports/ic_survivors_ic_gatekeeper.json
+00:43:46 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx__km96r8_/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [  3%]
+tests/api/test_tfwindow.py::test_1h_fixture_window_keys_scaled_by_12 
+-------------------------------- live log setup --------------------------------
+00:43:46 [INFO] IC config loaded
+00:43:46 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:43:46 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+00:43:46 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:43:46 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:43:46 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+00:43:46 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+00:43:46 [INFO] Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+00:43:46 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+00:43:46 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:43:47 [INFO] IC autocorr persistent: count=15
+00:43:47 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+00:43:48 [INFO] Decay: 15/15 fit warnings summarized (insufficient_points=15)
+00:43:48 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:42 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+00:44:43 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_tsxnlvvv/reports/ic_report_ic_gatekeeper.json
+00:44:43 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_tsxnlvvv/reports/ic_survivors_ic_gatekeeper.json
+00:44:43 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_tsxnlvvv/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [  4%]
+tests/api/test_tfwindow.py::test_1h_golden_rolling_keys_values PASSED    [  6%]
+tests/api/test_tfwindow.py::test_missing_timeframe_is_loud_and_unadjusted 
+-------------------------------- live log call ---------------------------------
+00:44:43 [INFO] IC config loaded
+00:44:43 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+FAILED                                                                   [  8%]
+tests/api/test_tfwindow.py::test_invalid_timeframe_is_loud_and_unadjusted 
+-------------------------------- live log call ---------------------------------
+00:44:43 [INFO] IC config loaded
+00:44:43 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:44:43 [WARNING] Dataset BTCUSDT/bad not available in storage or legacy cache
+00:44:43 [WARNING] Invalid timeframe for rolling windows: bad
+FAILED                                                                   [  9%]
+tests/api/test_evtwarmup.py::test_precheck_predicates_two_stage 
+-------------------------------- live log call ---------------------------------
+00:44:43 [INFO] IC config loaded
+00:44:43 [INFO] IC config loaded
+PASSED                                                                   [ 11%]
+tests/api/test_evtwarmup.py::test_precheck_event_conditional_skips_bar_warmup_but_global_keeps_it 
+-------------------------------- live log call ---------------------------------
+00:44:43 [INFO] IC config loaded
+PASSED                                                                   [ 12%]
+tests/api/test_evtwarmup.py::test_precheck_mainline_keeps_bar_rows_even_with_timestamps 
+-------------------------------- live log call ---------------------------------
+00:44:43 [INFO] IC config loaded
+PASSED                                                                   [ 14%]
+tests/api/test_evtwarmup.py::test_refilter_uses_same_scores_helper_as_analyze 
+-------------------------------- live log call ---------------------------------
+00:44:43 [INFO] IC config loaded
+PASSED                                                                   [ 16%]
+tests/api/test_evtwarmup.py::test_min_test_events_floor_keeps_holdout_and_flags_reason 
+-------------------------------- live log setup --------------------------------
+00:44:43 [INFO] IC config loaded
+00:44:43 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:44:43 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:43 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:43 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:43 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:44:43 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:43 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:43 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:43 [WARNING] IC holdout kept but test-segment events insufficient: test_events=13 min_test_events=30 (oos_guarantees=false; no full-sample rerun)
+00:44:43 [INFO] IC autocorr persistent: count=11
+00:44:43 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:44 [INFO] Decay: 12/14 fit warnings summarized (low_r2=12)
+00:44:44 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+00:44:44 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_report_ic_gatekeeper.json
+00:44:44 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_survivors_ic_gatekeeper.json
+00:44:44 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_report_ic_gatekeeper.json
+FAILED                                                                   [ 17%]
+tests/api/test_evtwarmup.py::test_min_test_events_floor_disabled_gives_oos 
+-------------------------------- live log call ---------------------------------
+00:44:44 [INFO] IC config loaded
+00:44:44 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:44 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:44 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:44 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:44 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:44 [INFO] IC autocorr persistent: count=11
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:44 [INFO] Decay: 12/14 fit warnings summarized (low_r2=12)
+00:44:44 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+00:44:44 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_lvglcu83/reports/ic_report_ic_gatekeeper.json
+00:44:44 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_lvglcu83/reports/ic_survivors_ic_gatekeeper.json
+00:44:44 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_lvglcu83/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 19%]
+tests/api/test_evtwarmup.py::test_event_path_without_split_still_discloses_window_and_icir_role 
+-------------------------------- live log call ---------------------------------
+00:44:44 [INFO] IC config loaded
+00:44:44 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:44 [INFO] Data preprocessing complete: columns=14 fit_mode=pit_expanding oos_guarantees=True
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:44 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:44 [INFO] Decay: 14/14 fit warnings summarized (insufficient_points=14)
+00:44:44 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:44 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_6hwq3rnr/reports/ic_report_ic_gatekeeper.json
+00:44:44 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_6hwq3rnr/reports/ic_survivors_ic_gatekeeper.json
+00:44:44 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_6hwq3rnr/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 20%]
+tests/api/test_evtwarmup.py::test_abandoned_conditional_path_is_not_flagged_insufficient_test_events 
+-------------------------------- live log call ---------------------------------
+00:44:44 [INFO] IC config loaded
+00:44:44 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:44 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:44 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:44 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:44 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:44 [WARNING] Insufficient events: n=20
+00:44:44 [INFO] IC autocorr persistent: count=14
+00:44:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:45 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+00:44:51 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+00:44:54 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+00:44:54 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/features/ETHUSDT_12h_filtered.h5
+00:44:54 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_report_ic_gatekeeper.json
+00:44:54 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_survivors_ic_gatekeeper.json
+00:44:54 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_report_ic_gatekeeper.json
+FAILED                                                                   [ 22%]
+tests/api/test_evtwarmup.py::test_icir_not_a_gate_on_event_path_but_still_gate_on_global 
+-------------------------------- live log call ---------------------------------
+00:44:54 [INFO] IC config loaded
+PASSED                                                                   [ 24%]
+tests/api/test_evtwarmup.py::test_finite_or_neg_inf_and_top_features_sort_none_safe 
+-------------------------------- live log call ---------------------------------
+00:44:54 [INFO] IC config loaded
+00:44:54 [INFO] IC config loaded
+PASSED                                                                   [ 25%]
+tests/api/test_evtwarmup.py::test_serialization_entries_have_no_nan_literal 
+-------------------------------- live log call ---------------------------------
+00:44:54 [INFO] IC config loaded
+00:44:54 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-733/test_serialization_entries_hav0/ic_report_evtwarmup.json
+PASSED                                                                   [ 27%]
+tests/api/test_evtwarmup.py::test_sanitize_converts_nonfinite_icir_and_ic_mean_to_null 
+-------------------------------- live log call ---------------------------------
+00:44:54 [INFO] IC config loaded
+PASSED                                                                   [ 29%]
+tests/api/test_evtwarmup.py::test_global_run_unchanged_vs_golden 
+-------------------------------- live log call ---------------------------------
+00:44:54 [INFO] IC config loaded
+00:44:54 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:44:54 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:44:54 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:54 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:54 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:44:54 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:54 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:44:54 [INFO] IC autocorr persistent: count=14
+00:44:54 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:44:54 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+00:45:00 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+00:45:04 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+00:45:04 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_f_2nwdfn/features/ETHUSDT_12h_filtered.h5
+00:45:04 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_f_2nwdfn/reports/ic_report_ic_gatekeeper.json
+00:45:04 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_f_2nwdfn/reports/ic_survivors_ic_gatekeeper.json
+00:45:04 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_f_2nwdfn/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 30%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_has_exactly_three_write_sites_with_precedence PASSED [ 32%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_carries_the_four_numbers_from_details 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=82 test_rows=30 min_test_rows=131 fit_mode=full_sample
+PASSED                                                                   [ 33%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_unchanged_by_this_task PASSED [ 35%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[oos_false] PASSED [ 37%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[full_sample] PASSED [ 38%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[split_applied] PASSED [ 40%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[oos_true] PASSED [ 41%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_never_initialised_as_empty_dict PASSED [ 43%]
+tests/api/test_gap3_oos_downgrade.py::test_frontend_reads_metadata_not_task_status PASSED [ 45%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_actually_writes_oos_downgrade_into_metadata 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=82 test_rows=30 min_test_rows=131 fit_mode=full_sample
+PASSED                                                                   [ 46%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_are_null_when_details_incomplete 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=some_other_reason train_rows=None test_rows=None min_test_rows=None fit_mode=full_sample
+PASSED                                                                   [ 48%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details0-expected0] 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=82 test_rows=30 min_test_rows=131 fit_mode=full_sample
+PASSED                                                                   [ 50%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details1-expected1] 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=82 test_rows=None min_test_rows=None fit_mode=full_sample
+PASSED                                                                   [ 51%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details2-expected2] 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=None test_rows=None min_test_rows=None fit_mode=full_sample
+PASSED                                                                   [ 53%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details3-expected3] 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=None test_rows=None min_test_rows=None fit_mode=full_sample
+PASSED                                                                   [ 54%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details4-expected4] 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=0 test_rows=0 min_test_rows=131 fit_mode=full_sample
+PASSED                                                                   [ 56%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[oos_false] PASSED [ 58%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[full_sample] PASSED [ 59%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[event_fallback] PASSED [ 61%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_not_applied] PASSED [ 62%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_oos_false] PASSED [ 64%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[empty] PASSED [ 66%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_ok] PASSED [ 67%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[oos_true] PASSED [ 69%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_is_thin_wrapper_of_single_judgment PASSED [ 70%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_backfills_downgrade_for_non_fallback_paths PASSED [ 72%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_does_not_overwrite_fallback_rich_version PASSED [ 74%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_writes_nothing_when_ok_oos PASSED [ 75%]
+tests/api/test_gap3_oos_downgrade.py::test_one_shot_guard_reads_in_fallback_rerun_not_suppress_persist PASSED [ 77%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta0-rolling_warmup_insufficient] PASSED [ 79%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta1-event_filter_fallback] PASSED [ 80%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta2-fit_mode_full_sample] PASSED [ 82%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta3-split_not_applied] PASSED [ 83%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta4-meta_oos_guarantees_false] PASSED [ 85%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta0] PASSED [ 87%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta1] PASSED [ 88%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta2] PASSED [ 90%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta3] PASSED [ 91%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta4] PASSED [ 93%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta0-fit_mode_full_sample_forced] PASSED [ 95%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta1-fit_mode_full_sample] PASSED [ 96%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta2-fit_mode_full_sample_forced] PASSED [ 98%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_stamps_fit_mode_source 
+-------------------------------- live log call ---------------------------------
+00:45:04 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=80 test_rows=12 min_test_rows=131 fit_mode=full_sample
+PASSED                                                                   [100%]
+
+=================================== FAILURES ===================================
+________________ test_missing_timeframe_is_loud_and_unadjusted _________________
+tests/api/test_tfwindow.py:101: in test_missing_timeframe_is_loud_and_unadjusted
+    rep = run_analyze(None, h5_glob=H5_1H, meta_override={"timeframe": None})
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1100: in analyze
+    expected_freq = _resolve_expected_freq(metadata)
+momentum/Analysis/ic_filter_orchestrator.py:164: in _resolve_expected_freq
+    raise ValueError(f"Unsupported or missing timeframe for IC split: {timeframe!r}")
+E   ValueError: Unsupported or missing timeframe for IC split: None
+----------------------------- Captured stderr call -----------------------------
+[2026-09-09 00:44:43,350] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 00:44:43,350 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 00:44:43,351 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+------------------------------ Captured log call -------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+________________ test_invalid_timeframe_is_loud_and_unadjusted _________________
+tests/api/test_tfwindow.py:108: in test_invalid_timeframe_is_loud_and_unadjusted
+    rep = run_analyze(None, h5_glob=H5_1H, meta_override={"timeframe": "bad"})
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1100: in analyze
+    expected_freq = _resolve_expected_freq(metadata)
+momentum/Analysis/ic_filter_orchestrator.py:164: in _resolve_expected_freq
+    raise ValueError(f"Unsupported or missing timeframe for IC split: {timeframe!r}")
+E   ValueError: Unsupported or missing timeframe for IC split: 'bad'
+----------------------------- Captured stderr call -----------------------------
+[2026-09-09 00:44:43,677] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 00:44:43,677 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 00:44:43,678 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 00:44:43,681 - momentum.DataExtraction.kline_storage - DEBUG - Legacy cache not found for BTCUSDT/bad in data_cache
+2026-09-09 00:44:43,681 - momentum.DataExtraction.kline_storage - WARNING - Dataset BTCUSDT/bad not available in storage or legacy cache
+[2026-09-09 00:44:43,682] WARNING momentum.Analysis.ic_engine: Invalid timeframe for rolling windows: bad
+2026-09-09 00:44:43,682 - momentum.Analysis.ic_engine - WARNING - Invalid timeframe for rolling windows: bad
+------------------------------ Captured log call -------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:438 Legacy cache not found for BTCUSDT/bad in data_cache
+WARNING  momentum.DataExtraction.kline_storage:kline_storage.py:415 Dataset BTCUSDT/bad not available in storage or legacy cache
+WARNING  momentum.Analysis.ic_engine:ic_engine.py:91 Invalid timeframe for rolling windows: bad
+__________ test_min_test_events_floor_keeps_holdout_and_flags_reason ___________
+tests/api/test_evtwarmup.py:146: in test_min_test_events_floor_keeps_holdout_and_flags_reason
+    assert m["ic_window_disclosure"] == {"window_unit": "bars_unadjusted", "timeframe_adjustment": "not_applied", "icir_role": "diagnostic"}
+E   AssertionError: assert {'adjusted_wi...': '12h', ...} == {'icir_role':...s_unadjusted'}
+E     
+E     Omitting 1 identical items, use -vv to show
+E     Differing items:
+E     {'timeframe_adjustment': 'applied'} != {'timeframe_adjustment': 'not_applied'}
+E     {'window_unit': 'bars'} != {'window_unit': 'bars_unadjusted'}
+E     Left contains 3 more items:
+E     {'adjusted_windows': [21, 63, 126], 'reference_tf': '12h', 'timeframe': '12h'}...
+E     
+E     ...Full output truncated (18 lines hidden), use '-vv' to show
+---------------------------- Captured stderr setup -----------------------------
+[2026-09-09 00:44:43,864] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 00:44:43,864 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 00:44:43,864 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 00:44:43,870 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:44:43,870 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 00:44:43,871] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:44:43,871 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:44:43,871] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:44:43,871 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:44:43,896] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 00:44:43,896 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 00:44:43,899 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:44:43,899 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 00:44:43,900] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:44:43,900 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:44:43,906 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:44:43,906 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 00:44:43,911] WARNING momentum.Analysis.ic_filter_orchestrator: IC holdout kept but test-segment events insufficient: test_events=13 min_test_events=30 (oos_guarantees=false; no full-sample rerun)
+2026-09-09 00:44:43,911 - momentum.Analysis.ic_filter_orchestrator - WARNING - IC holdout kept but test-segment events insufficient: test_events=13 min_test_events=30 (oos_guarantees=false; no full-sample rerun)
+[2026-09-09 00:44:43,918] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=11
+2026-09-09 00:44:43,918 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=11
+2026-09-09 00:44:43,920 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:44:43,920 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 00:44:44,031] INFO momentum.Analysis.ic_engine: Decay: 12/14 fit warnings summarized (low_r2=12)
+2026-09-09 00:44:44,031 - momentum.Analysis.ic_engine - INFO - Decay: 12/14 fit warnings summarized (low_r2=12)
+[2026-09-09 00:44:44,067] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+2026-09-09 00:44:44,067 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+[2026-09-09 00:44:44,072] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:44:44,072 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 00:44:44,077] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 00:44:44,077 - momentum.Analysis.ic_reporter - INFO - IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 00:44:44,081] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:44:44,081 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_report_ic_gatekeeper.json
+------------------------------ Captured log setup ------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.003s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.003s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.003s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:1260 IC holdout kept but test-segment events insufficient: test_events=13 min_test_events=30 (oos_guarantees=false; no full-sample rerun)
+INFO     momentum.Analysis.ic_engine:ic_engine.py:492 IC autocorr persistent: count=11
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.003s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:401 Decay: 12/14 fit warnings summarized (low_r2=12)
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:4622 IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_report_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:893 IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_survivors_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_jh3g9kv0/reports/ic_report_ic_gatekeeper.json
+___ test_abandoned_conditional_path_is_not_flagged_insufficient_test_events ____
+tests/api/test_evtwarmup.py:191: in test_abandoned_conditional_path_is_not_flagged_insufficient_test_events
+    assert "ic_window_disclosure" not in m and "tiebreaker_effective" not in m
+E   AssertionError: assert ('ic_window_disclosure' not in {'alpha_source': 'threshold_default', 'baseline_subset': {'actual_default_N': 218410, 'config_hash': 'e53e22906c35363757f4cd49d27f973e', 'cut_method': 'timestamp_tail_sort_index', 'final_attempt': 0, ...}, 'close_12h_cycle_HT-PHASOR-Quadrature_Std_W34': {'category': 'unknown', 'layer': 1, 'name': 'close_12h_cycle_HT-PHASOR-Quadrature_Std_W34'}, 'close_12h_cycle_HT-SINE-LeadSine_Range_W3': {'category': 'unknown', 'layer': 1, 'name': 'close_12h_cycle_HT-SINE-LeadSine_Range_W3'}, ...})
+----------------------------- Captured stderr call -----------------------------
+[2026-09-09 00:44:44,766] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 00:44:44,766 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 00:44:44,767 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 00:44:44,770 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:44:44,771 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+[2026-09-09 00:44:44,771] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:44:44,771 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:44:44,771] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:44:44,771 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:44:44,794] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 00:44:44,794 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 00:44:44,796 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:44:44,796 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+[2026-09-09 00:44:44,797] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:44:44,797 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:44:44,802 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:44:44,802 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+[2026-09-09 00:44:44,802] WARNING momentum.Analysis.event_filter: Insufficient events: n=20
+2026-09-09 00:44:44,802 - momentum.Analysis.event_filter - WARNING - Insufficient events: n=20
+[2026-09-09 00:44:44,949] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=14
+2026-09-09 00:44:44,949 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=14
+2026-09-09 00:44:44,951 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 00:44:44,951 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+[2026-09-09 00:44:45,085] INFO momentum.Analysis.ic_engine: Decay: 4/14 fit warnings summarized (low_r2=4)
+2026-09-09 00:44:45,085 - momentum.Analysis.ic_engine - INFO - Decay: 4/14 fit warnings summarized (low_r2=4)
+[2026-09-09 00:44:51,244] INFO momentum.Analysis.redundancy_filter: Redundancy filter completed: method=greedy input=2 output=2
+2026-09-09 00:44:51,244 - momentum.Analysis.redundancy_filter - INFO - Redundancy filter completed: method=greedy input=2 output=2
+[2026-09-09 00:44:54,328] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+2026-09-09 00:44:54,328 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+[2026-09-09 00:44:54,334] INFO momentum.Analysis.ic_reporter: Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/features/ETHUSDT_12h_filtered.h5
+2026-09-09 00:44:54,334 - momentum.Analysis.ic_reporter - INFO - Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/features/ETHUSDT_12h_filtered.h5
+[2026-09-09 00:44:54,373] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:44:54,373 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 00:44:54,377] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 00:44:54,377 - momentum.Analysis.ic_reporter - INFO - IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 00:44:54,415] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:44:54,415 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_report_ic_gatekeeper.json
+------------------------------ Captured log call -------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.002s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.002s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.002s
+WARNING  momentum.Analysis.event_filter:event_filter.py:154 Insufficient events: n=20
+INFO     momentum.Analysis.ic_engine:ic_engine.py:492 IC autocorr persistent: count=14
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.002s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:401 Decay: 4/14 fit warnings summarized (low_r2=4)
+INFO     momentum.Analysis.redundancy_filter:redundancy_filter.py:144 Redundancy filter completed: method=greedy input=2 output=2
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:4622 IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:829 Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/features/ETHUSDT_12h_filtered.h5
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_report_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:893 IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_survivors_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_vwcnwx2t/reports/ic_report_ic_gatekeeper.json
+=============================== warnings summary ===============================
+tests/api/test_tfwindow.py::test_invalid_timeframe_is_loud_and_unadjusted
+  /Users/louis/Desktop/quantitative_trading_system/momentum/DataExtraction/kline_storage.py:411: DeprecationWarning: _import_from_legacy_cache() is deprecated and will be removed in a future release. Please migrate data access to kline_cache.h5 directly.
+    imported = self._import_from_legacy_cache(symbol, timeframe)
+
+tests/api/test_evtwarmup.py::test_event_path_without_split_still_discloses_window_and_icir_role
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2889: RuntimeWarning: Degrees of freedom <= 0 for slice
+    c = cov(x, y, rowvar, dtype=dtype)
+
+tests/api/test_evtwarmup.py::test_event_path_without_split_still_discloses_window_and_icir_role
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2748: RuntimeWarning: divide by zero encountered in divide
+    c *= np.true_divide(1, fact)
+
+tests/api/test_evtwarmup.py::test_event_path_without_split_still_discloses_window_and_icir_role
+  /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/numpy/lib/function_base.py:2748: RuntimeWarning: invalid value encountered in multiply
+    c *= np.true_divide(1, fact)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/api/test_tfwindow.py::test_missing_timeframe_is_loud_and_unadjusted
+FAILED tests/api/test_tfwindow.py::test_invalid_timeframe_is_loud_and_unadjusted
+FAILED tests/api/test_evtwarmup.py::test_min_test_events_floor_keeps_holdout_and_flags_reason
+FAILED tests/api/test_evtwarmup.py::test_abandoned_conditional_path_is_not_flagged_insufficient_test_events
+============= 4 failed, 58 passed, 4 warnings in 87.87s (0:01:27) ==============

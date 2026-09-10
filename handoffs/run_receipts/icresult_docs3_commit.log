@@ -1,0 +1,18 @@
+[plain_docs_sync] ✗ (staged) 白話說明/GAP-3事件型討論.md 未一併更新
+    本次 staged 命中其 WATCHED（docs/IC_QUANT_GAP_REGISTRY.md handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md handoffs/20260819-gap3-recon-BRIEF.md），但該說明檔不在 staged 內。
+[plain_docs_sync] ✗ (staged) 白話說明/IC健檢偵察結果.md 未一併更新
+    本次 staged 命中其 WATCHED（docs/IC_QUANT_GAP_REGISTRY.md），但該說明檔不在 staged 內。
+  ⇒ 現在更新該說明檔並 git add 最省事；否則 push 時會被硬擋。
+  出處：使用者 2026-08-05「想辦法能確保自己更新白話說明的文檔」。
+
+  🔴 **本層是提醒，不擋 commit**（刻意設計）：若說明檔這次確實無需更動，
+     硬擋會逼人養成用逃生口的習慣，反而使機制失效。
+     真正的強制在 pre-push（gov_check 4/4）——**時序判準，繞不過去**：
+     說明檔的最後更新不得早於其 WATCHED 的最後改動。
+Baseline dead links (HEAD): 6
+Current repo dead links: 6
+Delta: +0
+Changed Markdown files checked: 2
+New dead links: 0
+[plain_docs_render] ✓ CHECK PASS: 26 檔與來源一致、0 死連結
+WARN: 疑似極性詞 '測試綠' 未收錄 — docs/IC_QUANT_GAP_REGISTRY.md:178

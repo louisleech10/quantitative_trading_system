@@ -1,0 +1,104 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+00:50:42 [INFO] Loaded feature registry with 15 entries
+collected 13 items / 11 deselected / 2 selected
+
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_toggles_path 
+-------------------------------- live log call ---------------------------------
+00:50:42 [INFO] Data preprocessing complete: columns=2 fit_mode=pit_expanding oos_guarantees=True
+00:50:42 [INFO] Resolved label horizon from labels_df column
+00:50:42 [INFO] Resolved label horizon from labels_df column
+00:50:42 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=144 test_rows=31 min_test_rows=131 fit_mode=full_sample
+00:50:42 [INFO] Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+00:50:42 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+FAILED                                                                   [ 50%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_applied_true_when_sufficient 
+-------------------------------- live log setup --------------------------------
+00:50:43 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+00:50:43 [INFO] Registered adapter: crypto_spot
+00:50:43 [INFO] Loaded feature registry with 15 entries
+00:50:43 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+00:50:44 [INFO] Restored 15 persisted feature task(s) from disk
+00:50:44 [INFO] 所有中間件已設置完成
+00:50:44 [INFO] 異常處理器設置完成
+00:50:44 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+00:50:44 [INFO] Loaded 60/60 cases from JSON
+00:50:44 [INFO] Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+00:50:44 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+00:50:44 [INFO] Created global CaseStorageManager instance
+00:50:44 [INFO] CaseImportService initialized
+00:50:44 [INFO] Created global CaseImportService instance with shared storage
+00:50:44 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+00:50:44 [INFO] KlineDownloadService initialized
+00:50:44 [INFO] Rate limiter initialized: 1000 req/min
+00:50:44 [INFO] BinanceProvider initialized
+00:50:44 [INFO] Registered provider: binance (rate_limit=1000/min)
+00:50:44 [INFO] Registered BinanceProvider to KlineDownloadService
+00:50:44 [INFO] BatchDownloadService initialized
+00:50:44 [INFO] Created global BatchDownloadService instance with shared storage
+00:50:44 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+00:50:44 [INFO] KlineDownloadService initialized
+00:50:44 [INFO] Rate limiter initialized: 1000 req/min
+00:50:44 [INFO] BinanceProvider initialized
+00:50:44 [INFO] Registered provider: binance (rate_limit=1000/min)
+00:50:44 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+00:50:44 [INFO] IndicatorEngine initialized
+00:50:44 [INFO] ChartDataService initialized with IndicatorEngine
+00:50:44 [INFO] OptimizationTaskService initialized
+00:50:44 [INFO] Loaded feature registry with 15 entries
+00:50:44 [INFO] Loaded feature registry with 15 entries
+00:50:44 [INFO] Loaded feature registry with 15 entries
+00:50:44 [INFO] Loaded feature registry with 15 entries
+00:50:44 [INFO] WebSocketConnectionManager initialized
+00:50:44 [INFO] All API routes registered successfully
+-------------------------------- live log call ---------------------------------
+00:50:44 [INFO] Resolved label horizon from labels_df column
+00:50:44 [INFO] Resolved label horizon from labels_df column
+00:50:44 [INFO] Data preprocessing complete: columns=2 fit_mode=train_mask oos_guarantees=True
+00:50:45 [INFO] IC autocorr persistent: count=2
+00:50:45 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+00:50:48 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+00:50:48 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-736/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+00:50:48 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-736/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+00:50:48 [INFO] IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-736/ic_redirect0/reports/ic_survivors_ic_gatekeeper.json
+00:50:48 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-736/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [100%]
+
+=================================== FAILURES ===================================
+____________________________ test_flag_toggles_path ____________________________
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py:413: in test_flag_toggles_path
+    assert on_report["metadata"]["ic_train_test_split"]["applied"] is True
+E   assert False is True
+----------------------------- Captured stderr call -----------------------------
+2026-09-09 00:50:42,965 - h5py._conv - DEBUG - Creating converter from 5 to 3
+2026-09-09 00:50:42,967 - h5py._conv - DEBUG - Creating converter from 3 to 5
+[2026-09-09 00:50:42,983] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=2 fit_mode=pit_expanding oos_guarantees=True
+2026-09-09 00:50:42,983 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=2 fit_mode=pit_expanding oos_guarantees=True
+[2026-09-09 00:50:42,987] INFO momentum.Analysis.ic_filter_orchestrator: Resolved label horizon from labels_df column
+2026-09-09 00:50:42,987 - momentum.Analysis.ic_filter_orchestrator - INFO - Resolved label horizon from labels_df column
+[2026-09-09 00:50:42,987] INFO momentum.Analysis.ic_filter_orchestrator: Resolved label horizon from labels_df column
+2026-09-09 00:50:42,987 - momentum.Analysis.ic_filter_orchestrator - INFO - Resolved label horizon from labels_df column
+[2026-09-09 00:50:42,988] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=144 test_rows=31 min_test_rows=131 fit_mode=full_sample
+2026-09-09 00:50:42,988 - momentum.Analysis.ic_filter_orchestrator - WARNING - IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=144 test_rows=31 min_test_rows=131 fit_mode=full_sample
+[2026-09-09 00:50:42,993] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+2026-09-09 00:50:42,993 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+[2026-09-09 00:50:42,995] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+2026-09-09 00:50:42,995 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+------------------------------ Captured log call -------------------------------
+DEBUG    h5py._conv:dataset.py:178 Creating converter from 5 to 3
+DEBUG    h5py._conv:dataset.py:903 Creating converter from 3 to 5
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=2 fit_mode=pit_expanding oos_guarantees=True
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:394 Resolved label horizon from labels_df column
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:394 Resolved label horizon from labels_df column
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:1393 IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=144 test_rows=31 min_test_rows=131 fit_mode=full_sample
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:4610 IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+=========================== short test summary info ============================
+FAILED tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_toggles_path
+================== 1 failed, 1 passed, 11 deselected in 5.62s ==================

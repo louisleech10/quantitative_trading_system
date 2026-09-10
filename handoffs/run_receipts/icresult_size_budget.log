@@ -1,6 +1,2 @@
-SIZE_GATE=PASS
-SIZE_REASON=measured
-light_bytes=28681
-summary50_bytes=18184
-feature_first_bytes=2553
-feature_biggest_bytes=2567
+SIZE_GATE=BLOCKED
+SIZE_REASON=setup failed (RuntimeError: forced setup failure (test))

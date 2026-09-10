@@ -1,0 +1,8 @@
+PASS T1-timeframe-injection-removed rc=1（期望 紅）— 注入拿掉 ⇒ 1h 視窗鍵仍 [21,63,126] ⇒ 主 gate 紅（引擎層測試仍綠）
+PASS T2-missing-timeframe-fake-applied rc=1（期望 紅）— 缺 timeframe 假換算 ⇒ 引擎層揭露測試紅（analyze 層缺 tf 於切分先 fail-closed）
+PASS C1-comment-only-control-phase3 rc=0（期望 綠）— 對照組：只改註解 ⇒ 全綠
+
+RESTORED clean=True []
+SUMMARY pass=3 fail=0 skip=0 / 3
+UNCOVERED=0
+mut_rc=0

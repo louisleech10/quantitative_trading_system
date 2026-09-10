@@ -1,0 +1,509 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+21:15:50 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+21:15:50 [INFO] Registered adapter: crypto_spot
+21:15:50 [INFO] Loaded feature registry with 16 entries
+21:15:50 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+21:15:51 [INFO] Restored 16 persisted feature task(s) from disk
+21:15:51 [INFO] 所有中間件已設置完成
+21:15:51 [INFO] 異常處理器設置完成
+21:15:51 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+21:15:51 [INFO] Loaded feature registry with 16 entries
+21:15:51 [INFO] Loaded 60/60 cases from JSON
+21:15:51 [INFO] Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+21:15:51 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+21:15:51 [INFO] Created global CaseStorageManager instance
+21:15:51 [INFO] CaseImportService initialized
+21:15:51 [INFO] Created global CaseImportService instance with shared storage
+21:15:51 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+21:15:51 [INFO] KlineDownloadService initialized
+21:15:51 [INFO] Rate limiter initialized: 1000 req/min
+21:15:51 [INFO] BinanceProvider initialized
+21:15:51 [INFO] Registered provider: binance (rate_limit=1000/min)
+21:15:51 [INFO] Registered BinanceProvider to KlineDownloadService
+21:15:51 [INFO] BatchDownloadService initialized
+21:15:51 [INFO] Created global BatchDownloadService instance with shared storage
+21:15:51 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+21:15:51 [INFO] KlineDownloadService initialized
+21:15:51 [INFO] Rate limiter initialized: 1000 req/min
+21:15:51 [INFO] BinanceProvider initialized
+21:15:51 [INFO] Registered provider: binance (rate_limit=1000/min)
+21:15:51 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+21:15:51 [INFO] IndicatorEngine initialized
+21:15:51 [INFO] ChartDataService initialized with IndicatorEngine
+21:15:51 [INFO] OptimizationTaskService initialized
+21:15:51 [INFO] Loaded feature registry with 16 entries
+21:15:51 [INFO] Loaded feature registry with 16 entries
+21:15:51 [INFO] Loaded feature registry with 16 entries
+21:15:51 [INFO] Loaded feature registry with 16 entries
+21:15:52 [INFO] WebSocketConnectionManager initialized
+21:15:52 [INFO] All API routes registered successfully
+collected 98 items
+
+tests/momentum/Analysis/test_gap2_golden.py::test_g1_golden_unchanged 
+-------------------------------- live log setup --------------------------------
+21:15:52 [INFO] IC config loaded
+21:15:52 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:15:52 [INFO] Read 1696 klines from ETHUSDT/12h in 0.021s
+21:15:52 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:15:52 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:15:52 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+21:15:52 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+21:15:52 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:15:53 [INFO] IC autocorr persistent: count=14
+21:15:53 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+21:15:53 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+ERROR                                                                    [  1%]
+tests/momentum/Analysis/test_gap2_golden.py::test_g2_section_and_survivor_file_deterministic ERROR [  2%]
+tests/momentum/Analysis/test_gap2_golden.py::test_budget_bench_receipt PASSED [  3%]
+tests/momentum/Analysis/test_gap2_golden.py::test_mutation_scrub_extra_key_breaks_canonical_sha ERROR [  4%]
+tests/momentum/Analysis/test_gap2_golden.py::test_mutation_counter_without_fit_call_breaks_spy PASSED [  5%]
+tests/api/test_tfwindow.py::test_engine_set_timeframe_adjusts_windows_and_discloses 
+-------------------------------- live log call ---------------------------------
+21:18:23 [WARNING] Invalid timeframe for rolling windows: bad
+PASSED                                                                   [  6%]
+tests/api/test_tfwindow.py::test_12h_fixture_windows_unchanged_and_applied 
+-------------------------------- live log call ---------------------------------
+21:18:23 [INFO] IC config loaded
+21:18:23 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:18:23 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+21:18:23 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:18:23 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:18:23 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+21:18:23 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+21:18:23 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:18:23 [INFO] IC autocorr persistent: count=14
+21:18:23 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+21:18:23 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+FAILED                                                                   [  7%]
+tests/api/test_tfwindow.py::test_1h_fixture_window_keys_scaled_by_12 
+-------------------------------- live log setup --------------------------------
+21:18:30 [INFO] IC config loaded
+21:18:30 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:18:30 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+21:18:30 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:18:30 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:18:30 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+21:18:30 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+21:18:30 [INFO] Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+21:18:30 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+21:18:30 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:18:31 [INFO] IC autocorr persistent: count=15
+21:18:31 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+21:18:32 [INFO] Decay: 15/15 fit warnings summarized (insufficient_points=15)
+21:18:32 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+ERROR                                                                    [  8%]
+tests/api/test_tfwindow.py::test_1h_golden_rolling_keys_values ERROR     [  9%]
+tests/api/test_tfwindow.py::test_missing_timeframe_fails_closed_before_stage4 
+-------------------------------- live log call ---------------------------------
+21:19:27 [INFO] IC config loaded
+21:19:27 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+PASSED                                                                   [ 10%]
+tests/api/test_tfwindow.py::test_invalid_timeframe_fails_closed_before_stage4 
+-------------------------------- live log call ---------------------------------
+21:19:27 [INFO] IC config loaded
+21:19:27 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:19:27 [WARNING] Dataset BTCUSDT/bad not available in storage or legacy cache
+21:19:27 [WARNING] Invalid timeframe for rolling windows: bad
+PASSED                                                                   [ 11%]
+tests/api/test_tfwindow.py::test_1h_golden_locks_fallback_and_features ERROR [ 12%]
+tests/api/test_tfwindow.py::test_engine_rejects_semantic_invalid_timeframes 
+-------------------------------- live log call ---------------------------------
+21:19:28 [WARNING] Invalid timeframe for rolling windows: 0h
+21:19:28 [WARNING] Invalid timeframe for rolling windows: -1h
+21:19:28 [WARNING] Invalid timeframe for rolling windows: infh
+21:19:28 [WARNING] Invalid timeframe for rolling windows: nanh
+21:19:28 [WARNING] Invalid timeframe for rolling windows: 0d
+21:19:28 [WARNING] Invalid reference_tf for rolling windows: bad
+21:19:28 [WARNING] Invalid reference_tf for rolling windows: 0h
+PASSED                                                                   [ 13%]
+tests/api/test_tfwindow.py::test_config_override_reference_tf_reaches_engine 
+-------------------------------- live log call ---------------------------------
+21:19:28 [INFO] IC config loaded
+21:19:28 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+21:19:28 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+21:19:28 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:19:28 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:19:28 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+21:19:28 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+21:19:28 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+21:19:28 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+21:19:28 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+FAILED                                                                   [ 14%]
+tests/api/test_icresult_paging.py::test_contract_is_single_source_and_well_formed PASSED [ 15%]
+tests/api/test_icresult_paging.py::test_metadata_keep_keys_cover_consumers_and_exclude_feature_names PASSED [ 16%]
+tests/api/test_icresult_paging.py::test_golden_matches_live_default_result_and_projection_reference 
+-------------------------------- live log call ---------------------------------
+21:19:34 [INFO] 正在啟動 Case Search API...
+PASSED                                                                   [ 17%]
+tests/api/test_icresult_paging.py::test_sort_golden_semantics PASSED     [ 18%]
+tests/api/test_icresult_paging.py::test_funnel_shape_fixture_matches_expected PASSED [ 19%]
+tests/api/test_icresult_paging.py::test_collections_to_counts_does_not_mutate_source PASSED [ 20%]
+tests/api/test_icresult_paging.py::test_phase_gate_parser[SIZE_GATE=PASS\nSIZE_REASON=measured\n-0-0] PASSED [ 21%]
+tests/api/test_icresult_paging.py::test_phase_gate_parser[SIZE_GATE=BLOCKED\nSIZE_REASON=artifact missing\n-0-0] PASSED [ 22%]
+tests/api/test_icresult_paging.py::test_phase_gate_parser[SIZE_GATE=BLOCKED\n-1-1] PASSED [ 23%]
+tests/api/test_icresult_paging.py::test_phase_gate_parser[SIZE_GATE=FAIL\n-0-1] PASSED [ 24%]
+tests/api/test_icresult_paging.py::test_phase_gate_parser[SIZE_REASON=x\n-0-1] PASSED [ 25%]
+tests/api/test_icresult_paging.py::test_phase_gate_parser[SIZE_GATE=PASS\nSIZE_GATE=PASS\n-0-1] PASSED [ 26%]
+tests/api/test_icresult_paging.py::test_phase_gate_parser[SIZE_GATE=MAYBE\n-0-1] PASSED [ 27%]
+tests/api/test_icresult_paging.py::test_size_probe_emits_single_token_line PASSED [ 28%]
+tests/api/test_icresult_paging.py::test_default_unchanged_raw_body_sha PASSED [ 29%]
+tests/api/test_icresult_paging.py::test_to_json_compatible_is_idempotent_on_normalized_tree PASSED [ 30%]
+tests/api/test_icresult_paging.py::test_task_status_has_result_revision PASSED [ 31%]
+tests/api/test_icresult_paging.py::test_ast_guard_single_result_write_site PASSED [ 32%]
+tests/api/test_icresult_paging.py::test_set_result_guard_raise_does_not_write PASSED [ 33%]
+tests/api/test_icresult_paging.py::test_refilter_guard_fail_422_keeps_old_result PASSED [ 34%]
+tests/api/test_icresult_paging.py::test_summary_page_g2a_pages_reassemble_full_table PASSED [ 35%]
+tests/api/test_icresult_paging.py::test_summary_page_g2b_filtered_equals_single_materialize PASSED [ 36%]
+tests/api/test_icresult_paging.py::test_summary_page_edges PASSED        [ 37%]
+tests/api/test_icresult_paging.py::test_sort_by_whitelist_rejects_400 PASSED [ 38%]
+tests/api/test_icresult_paging.py::test_sort_golden_endpoint_g6 PASSED   [ 39%]
+tests/api/test_icresult_paging.py::test_feature_detail_g3_matches_golden_every_feature PASSED [ 40%]
+tests/api/test_icresult_paging.py::test_light_view_g4 PASSED             [ 41%]
+tests/api/test_icresult_paging.py::test_light_view_v2_matrix PASSED      [ 42%]
+tests/api/test_icresult_paging.py::test_light_view_snapshot_immutable PASSED [ 43%]
+tests/api/test_icresult_paging.py::test_no_full_tree_on_projection PASSED [ 44%]
+tests/api/test_icresult_paging.py::test_funnel_g8_shape_fixture_via_light PASSED [ 45%]
+tests/api/test_icresult_paging.py::test_revision_g7a_and_g7c_refilter_handshake PASSED [ 46%]
+tests/api/test_icresult_paging.py::test_revision_mid_projection_uses_old_snapshot_g7b PASSED [ 47%]
+tests/api/test_icresult_paging.py::test_cache_hit_and_revision_invalidation PASSED [ 48%]
+tests/api/test_icresult_paging.py::test_cache_capacity_process_wide PASSED [ 50%]
+tests/api/test_icresult_paging.py::test_cache_key_includes_revision PASSED [ 51%]
+tests/api/test_icresult_paging.py::test_sort_golden_feature_name_desc_is_reverse_string_order PASSED [ 52%]
+tests/api/test_icresult_paging.py::test_set_result_does_not_hold_lock_during_normalize PASSED [ 53%]
+tests/api/test_icresult_paging.py::test_cache_key_distinguishes_none_and_empty_string PASSED [ 54%]
+tests/api/test_icresult_paging.py::test_size_probe_blocked_on_setup_failure PASSED [ 55%]
+tests/api/test_icresult_paging.py::test_feature_detail_grouped_ic_three_level_projection PASSED [ 56%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_has_exactly_three_write_sites_with_precedence PASSED [ 57%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_carries_the_four_numbers_from_details PASSED [ 58%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_unchanged_by_this_task PASSED [ 59%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[oos_false] PASSED [ 60%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[full_sample] PASSED [ 61%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[split_applied] PASSED [ 62%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_behaviour_is_baseline[oos_true] PASSED [ 63%]
+tests/api/test_gap3_oos_downgrade.py::test_oos_downgrade_never_initialised_as_empty_dict PASSED [ 64%]
+tests/api/test_gap3_oos_downgrade.py::test_frontend_reads_metadata_not_task_status PASSED [ 65%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_actually_writes_oos_downgrade_into_metadata PASSED [ 66%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_are_null_when_details_incomplete PASSED [ 67%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details0-expected0] PASSED [ 68%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details1-expected1] PASSED [ 69%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details2-expected2] PASSED [ 70%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details3-expected3] PASSED [ 71%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_downgrade_row_counts_truthful[details4-expected4] PASSED [ 72%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[oos_false] PASSED [ 73%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[full_sample] PASSED [ 74%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[event_fallback] PASSED [ 75%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_not_applied] PASSED [ 76%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_oos_false] PASSED [ 77%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[empty] PASSED [ 78%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[split_ok] PASSED [ 79%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_branch_covers_every_path[oos_true] PASSED [ 80%]
+tests/api/test_gap3_oos_downgrade.py::test_resolve_root_status_is_thin_wrapper_of_single_judgment PASSED [ 81%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_backfills_downgrade_for_non_fallback_paths PASSED [ 82%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_does_not_overwrite_fallback_rich_version PASSED [ 83%]
+tests/api/test_gap3_oos_downgrade.py::test_annotate_writes_nothing_when_ok_oos PASSED [ 84%]
+tests/api/test_gap3_oos_downgrade.py::test_one_shot_guard_reads_in_fallback_rerun_not_suppress_persist PASSED [ 85%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta0-rolling_warmup_insufficient] PASSED [ 86%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta1-event_filter_fallback] PASSED [ 87%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta2-fit_mode_full_sample] PASSED [ 88%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta3-split_not_applied] PASSED [ 89%]
+tests/api/test_gap3_oos_downgrade.py::test_downgrade_reason_prefers_specific_over_circular[meta4-meta_oos_guarantees_false] PASSED [ 90%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta0] PASSED [ 91%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta1] PASSED [ 92%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta2] PASSED [ 93%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta3] PASSED [ 94%]
+tests/api/test_gap3_oos_downgrade.py::test_reason_refinement_never_relaxes_the_verdict[meta4] PASSED [ 95%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta0-fit_mode_full_sample_forced] PASSED [ 96%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta1-fit_mode_full_sample] PASSED [ 97%]
+tests/api/test_gap3_oos_downgrade.py::test_forced_full_sample_is_distinguished_from_requested[meta2-fit_mode_full_sample_forced] PASSED [ 98%]
+tests/api/test_gap3_oos_downgrade.py::test_fallback_stamps_fit_mode_source PASSED [100%]
+
+==================================== ERRORS ====================================
+__________________ ERROR at setup of test_g1_golden_unchanged __________________
+tests/momentum/Analysis/test_gap2_golden.py:43: in live_two_runs
+    ra = run_analyze(sidefx_dir=a_dir)
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1326: in analyze
+    stage5_results = self._stage5_statistical_validation(
+momentum/Analysis/ic_filter_orchestrator.py:3884: in _stage5_statistical_validation
+    summary_table = self._build_summary_table(
+momentum/Analysis/ic_filter_orchestrator.py:4352: in _build_summary_table
+    self._ic_cache["ic_mean_source"] = source_counts
+E   TypeError: 'NoneType' object does not support item assignment
+---------------------------- Captured stderr setup -----------------------------
+[2026-09-09 21:15:52,449] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 21:15:52,449 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 21:15:52,450 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 21:15:52,488 - h5py._conv - DEBUG - Creating converter from 3 to 5
+2026-09-09 21:15:52,517 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:15:52,517 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.021s
+[2026-09-09 21:15:52,530] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:15:52,530 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:15:52,530] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:15:52,530 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:15:52,571] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 21:15:52,571 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 21:15:52,575 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:15:52,575 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.004s
+[2026-09-09 21:15:52,576] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:15:52,576 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:15:53,005] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=14
+2026-09-09 21:15:53,005 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=14
+2026-09-09 21:15:53,009 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:15:53,009 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.004s
+[2026-09-09 21:15:53,173] INFO momentum.Analysis.ic_engine: Decay: 4/14 fit warnings summarized (low_r2=4)
+2026-09-09 21:15:53,173 - momentum.Analysis.ic_engine - INFO - Decay: 4/14 fit warnings summarized (low_r2=4)
+------------------------------ Captured log setup ------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+DEBUG    h5py._conv:dataset.py:903 Creating converter from 3 to 5
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.021s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.004s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.ic_engine:ic_engine.py:506 IC autocorr persistent: count=14
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.004s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:415 Decay: 4/14 fit warnings summarized (low_r2=4)
+______ ERROR at setup of test_g2_section_and_survivor_file_deterministic _______
+tests/momentum/Analysis/test_gap2_golden.py:43: in live_two_runs
+    ra = run_analyze(sidefx_dir=a_dir)
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1326: in analyze
+    stage5_results = self._stage5_statistical_validation(
+momentum/Analysis/ic_filter_orchestrator.py:3884: in _stage5_statistical_validation
+    summary_table = self._build_summary_table(
+momentum/Analysis/ic_filter_orchestrator.py:4352: in _build_summary_table
+    self._ic_cache["ic_mean_source"] = source_counts
+E   TypeError: 'NoneType' object does not support item assignment
+_____ ERROR at setup of test_mutation_scrub_extra_key_breaks_canonical_sha _____
+tests/momentum/Analysis/test_gap2_golden.py:43: in live_two_runs
+    ra = run_analyze(sidefx_dir=a_dir)
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1326: in analyze
+    stage5_results = self._stage5_statistical_validation(
+momentum/Analysis/ic_filter_orchestrator.py:3884: in _stage5_statistical_validation
+    summary_table = self._build_summary_table(
+momentum/Analysis/ic_filter_orchestrator.py:4352: in _build_summary_table
+    self._ic_cache["ic_mean_source"] = source_counts
+E   TypeError: 'NoneType' object does not support item assignment
+__________ ERROR at setup of test_1h_fixture_window_keys_scaled_by_12 __________
+tests/api/test_tfwindow.py:64: in report_1h
+    return run_analyze(None, h5_glob=H5_1H)
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1169: in analyze
+    return self._run_full_sample_fallback(
+momentum/Analysis/ic_filter_orchestrator.py:1446: in _run_full_sample_fallback
+    report = self.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1326: in analyze
+    stage5_results = self._stage5_statistical_validation(
+momentum/Analysis/ic_filter_orchestrator.py:3884: in _stage5_statistical_validation
+    summary_table = self._build_summary_table(
+momentum/Analysis/ic_filter_orchestrator.py:4352: in _build_summary_table
+    self._ic_cache["ic_mean_source"] = source_counts
+E   TypeError: 'NoneType' object does not support item assignment
+---------------------------- Captured stderr setup -----------------------------
+[2026-09-09 21:18:30,720] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 21:18:30,720 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 21:18:30,721 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 21:18:30,732 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 21:18:30,732 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.008s
+[2026-09-09 21:18:30,733] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:18:30,733 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:18:30,734] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:18:30,734 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:18:30,740] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 21:18:30,740 - momentum.Analysis.ic_filter_orchestrator - WARNING - IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 21:18:30,747 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 21:18:30,747 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.006s
+[2026-09-09 21:18:30,763] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+2026-09-09 21:18:30,763 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+2026-09-09 21:18:30,770 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 21:18:30,770 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.007s
+[2026-09-09 21:18:30,771] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:18:30,771 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:18:31,662] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=15
+2026-09-09 21:18:31,662 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=15
+2026-09-09 21:18:31,669 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 21:18:31,669 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.006s
+[2026-09-09 21:18:32,592] INFO momentum.Analysis.ic_engine: Decay: 15/15 fit warnings summarized (insufficient_points=15)
+2026-09-09 21:18:32,592 - momentum.Analysis.ic_engine - INFO - Decay: 15/15 fit warnings summarized (insufficient_points=15)
+[2026-09-09 21:18:32,652] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:18:32,652 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+------------------------------ Captured log setup ------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.008s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:1414 IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.006s
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.007s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.ic_engine:ic_engine.py:506 IC autocorr persistent: count=15
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 20352 klines from BTCUSDT/1h in 0.006s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:415 Decay: 15/15 fit warnings summarized (insufficient_points=15)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+_____________ ERROR at setup of test_1h_golden_rolling_keys_values _____________
+tests/api/test_tfwindow.py:64: in report_1h
+    return run_analyze(None, h5_glob=H5_1H)
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1169: in analyze
+    return self._run_full_sample_fallback(
+momentum/Analysis/ic_filter_orchestrator.py:1446: in _run_full_sample_fallback
+    report = self.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1326: in analyze
+    stage5_results = self._stage5_statistical_validation(
+momentum/Analysis/ic_filter_orchestrator.py:3884: in _stage5_statistical_validation
+    summary_table = self._build_summary_table(
+momentum/Analysis/ic_filter_orchestrator.py:4352: in _build_summary_table
+    self._ic_cache["ic_mean_source"] = source_counts
+E   TypeError: 'NoneType' object does not support item assignment
+_________ ERROR at setup of test_1h_golden_locks_fallback_and_features _________
+tests/api/test_tfwindow.py:64: in report_1h
+    return run_analyze(None, h5_glob=H5_1H)
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1169: in analyze
+    return self._run_full_sample_fallback(
+momentum/Analysis/ic_filter_orchestrator.py:1446: in _run_full_sample_fallback
+    report = self.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1326: in analyze
+    stage5_results = self._stage5_statistical_validation(
+momentum/Analysis/ic_filter_orchestrator.py:3884: in _stage5_statistical_validation
+    summary_table = self._build_summary_table(
+momentum/Analysis/ic_filter_orchestrator.py:4352: in _build_summary_table
+    self._ic_cache["ic_mean_source"] = source_counts
+E   TypeError: 'NoneType' object does not support item assignment
+=================================== FAILURES ===================================
+________________ test_12h_fixture_windows_unchanged_and_applied ________________
+tests/api/test_tfwindow.py:55: in test_12h_fixture_windows_unchanged_and_applied
+    rep = run_analyze(None)
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1326: in analyze
+    stage5_results = self._stage5_statistical_validation(
+momentum/Analysis/ic_filter_orchestrator.py:3884: in _stage5_statistical_validation
+    summary_table = self._build_summary_table(
+momentum/Analysis/ic_filter_orchestrator.py:4352: in _build_summary_table
+    self._ic_cache["ic_mean_source"] = source_counts
+E   TypeError: 'NoneType' object does not support item assignment
+----------------------------- Captured stderr call -----------------------------
+[2026-09-09 21:18:23,477] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 21:18:23,477 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 21:18:23,478 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 21:18:23,486 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:18:23,486 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.004s
+[2026-09-09 21:18:23,487] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:18:23,487 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:18:23,487] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:18:23,487 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:18:23,517] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 21:18:23,517 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 21:18:23,520 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:18:23,520 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 21:18:23,521] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:18:23,521 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:18:23,744] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=14
+2026-09-09 21:18:23,744 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=14
+2026-09-09 21:18:23,747 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:18:23,747 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 21:18:23,880] INFO momentum.Analysis.ic_engine: Decay: 4/14 fit warnings summarized (low_r2=4)
+2026-09-09 21:18:23,880 - momentum.Analysis.ic_engine - INFO - Decay: 4/14 fit warnings summarized (low_r2=4)
+------------------------------ Captured log call -------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.004s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.003s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.ic_engine:ic_engine.py:506 IC autocorr persistent: count=14
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.003s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:415 Decay: 4/14 fit warnings summarized (low_r2=4)
+_______________ test_config_override_reference_tf_reaches_engine _______________
+tests/api/test_tfwindow.py:148: in test_config_override_reference_tf_reaches_engine
+    rep = run_analyze({"ic_calculation": {"icir": {"reference_tf": "1h"}}})
+tests/momentum/helpers/ichc_run.py:72: in run_analyze
+    return orchestrator.analyze(
+momentum/Analysis/ic_filter_orchestrator.py:1326: in analyze
+    stage5_results = self._stage5_statistical_validation(
+momentum/Analysis/ic_filter_orchestrator.py:3884: in _stage5_statistical_validation
+    summary_table = self._build_summary_table(
+momentum/Analysis/ic_filter_orchestrator.py:4352: in _build_summary_table
+    self._ic_cache["ic_mean_source"] = source_counts
+E   TypeError: 'NoneType' object does not support item assignment
+----------------------------- Captured stderr call -----------------------------
+[2026-09-09 21:19:28,088] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 21:19:28,088 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 21:19:28,089 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 21:19:28,095 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:19:28,095 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.003s
+[2026-09-09 21:19:28,096] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:19:28,096 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:19:28,096] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:19:28,096 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 21:19:28,118] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 21:19:28,118 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+2026-09-09 21:19:28,120 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:19:28,120 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+[2026-09-09 21:19:28,121] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:19:28,121 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 21:19:28,174 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+2026-09-09 21:19:28,174 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from ETHUSDT/12h in 0.002s
+[2026-09-09 21:19:28,300] INFO momentum.Analysis.ic_engine: Decay: 4/14 fit warnings summarized (low_r2=4)
+2026-09-09 21:19:28,300 - momentum.Analysis.ic_engine - INFO - Decay: 4/14 fit warnings summarized (low_r2=4)
+------------------------------ Captured log call -------------------------------
+INFO     momentum.Analysis.ic_config_schema:ic_config_schema.py:502 IC config loaded
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.003s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.002s
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+DEBUG    momentum.DataExtraction.kline_storage:kline_storage.py:1046 Continuity check passed for ETHUSDT/12h: 1696 bars are continuous
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:1118 Read 1696 klines from ETHUSDT/12h in 0.002s
+INFO     momentum.Analysis.ic_engine:ic_engine.py:415 Decay: 4/14 fit warnings summarized (low_r2=4)
+=============================== warnings summary ===============================
+tests/api/test_tfwindow.py::test_invalid_timeframe_fails_closed_before_stage4
+  /Users/louis/Desktop/quantitative_trading_system/momentum/DataExtraction/kline_storage.py:411: DeprecationWarning: _import_from_legacy_cache() is deprecated and will be removed in a future release. Please migrate data access to kline_cache.h5 directly.
+    imported = self._import_from_legacy_cache(symbol, timeframe)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/api/test_tfwindow.py::test_12h_fixture_windows_unchanged_and_applied
+FAILED tests/api/test_tfwindow.py::test_config_override_reference_tf_reaches_engine
+ERROR tests/momentum/Analysis/test_gap2_golden.py::test_g1_golden_unchanged
+ERROR tests/momentum/Analysis/test_gap2_golden.py::test_g2_section_and_survivor_file_deterministic
+ERROR tests/momentum/Analysis/test_gap2_golden.py::test_mutation_scrub_extra_key_breaks_canonical_sha
+ERROR tests/api/test_tfwindow.py::test_1h_fixture_window_keys_scaled_by_12 - ...
+ERROR tests/api/test_tfwindow.py::test_1h_golden_rolling_keys_values - TypeEr...
+ERROR tests/api/test_tfwindow.py::test_1h_golden_locks_fallback_and_features
+======== 2 failed, 90 passed, 1 warning, 6 errors in 233.26s (0:03:53) =========

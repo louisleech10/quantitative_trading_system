@@ -1,0 +1,269 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+00:50:31 [INFO] Loaded feature registry with 15 entries
+collected 13 items / 11 deselected / 2 selected
+
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_toggles_path 
+-------------------------------- live log call ---------------------------------
+00:50:31 [INFO] Data preprocessing complete: columns=2 fit_mode=pit_expanding oos_guarantees=True
+00:50:31 [INFO] Resolved label horizon from labels_df column
+00:50:31 [INFO] Resolved label horizon from labels_df column
+00:50:31 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=144 test_rows=31 min_test_rows=1517 fit_mode=full_sample
+00:50:31 [INFO] Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+00:50:31 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+FAILED                                                                   [ 50%]
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_applied_true_when_sufficient 
+-------------------------------- live log setup --------------------------------
+00:50:31 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+00:50:31 [INFO] Registered adapter: crypto_spot
+00:50:31 [INFO] Loaded feature registry with 15 entries
+00:50:31 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+00:50:32 [INFO] Restored 15 persisted feature task(s) from disk
+00:50:32 [INFO] 所有中間件已設置完成
+00:50:32 [INFO] 異常處理器設置完成
+00:50:32 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+00:50:32 [INFO] Loaded 60/60 cases from JSON
+00:50:32 [INFO] Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+00:50:32 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+00:50:32 [INFO] Created global CaseStorageManager instance
+00:50:32 [INFO] CaseImportService initialized
+00:50:32 [INFO] Created global CaseImportService instance with shared storage
+00:50:32 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+00:50:32 [INFO] KlineDownloadService initialized
+00:50:32 [INFO] Rate limiter initialized: 1000 req/min
+00:50:32 [INFO] BinanceProvider initialized
+00:50:32 [INFO] Registered provider: binance (rate_limit=1000/min)
+00:50:32 [INFO] Registered BinanceProvider to KlineDownloadService
+00:50:32 [INFO] BatchDownloadService initialized
+00:50:32 [INFO] Created global BatchDownloadService instance with shared storage
+00:50:32 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+00:50:32 [INFO] KlineDownloadService initialized
+00:50:32 [INFO] Rate limiter initialized: 1000 req/min
+00:50:32 [INFO] BinanceProvider initialized
+00:50:32 [INFO] Registered provider: binance (rate_limit=1000/min)
+00:50:32 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+00:50:32 [INFO] IndicatorEngine initialized
+00:50:32 [INFO] ChartDataService initialized with IndicatorEngine
+00:50:32 [INFO] OptimizationTaskService initialized
+00:50:32 [INFO] Loaded feature registry with 15 entries
+00:50:32 [INFO] Loaded feature registry with 15 entries
+00:50:33 [INFO] Loaded feature registry with 15 entries
+00:50:33 [INFO] Loaded feature registry with 15 entries
+00:50:33 [INFO] WebSocketConnectionManager initialized
+00:50:33 [INFO] All API routes registered successfully
+-------------------------------- live log call ---------------------------------
+00:50:33 [INFO] Resolved label horizon from labels_df column
+00:50:33 [INFO] Resolved label horizon from labels_df column
+00:50:33 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=608 test_rows=147 min_test_rows=1517 fit_mode=full_sample
+00:50:33 [INFO] Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+00:50:33 [INFO] IC autocorr persistent: count=2
+00:50:33 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:50:35 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+00:50:39 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=full_sample
+00:50:39 [INFO] Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+00:50:39 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+00:50:39 [INFO] IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_survivors_ic_gatekeeper.json
+00:50:39 [INFO] IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+FAILED                                                                   [100%]
+
+=================================== FAILURES ===================================
+____________________________ test_flag_toggles_path ____________________________
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py:413: in test_flag_toggles_path
+    assert on_report["metadata"]["ic_train_test_split"]["applied"] is True
+E   assert False is True
+----------------------------- Captured stderr call -----------------------------
+2026-09-09 00:50:31,228 - h5py._conv - DEBUG - Creating converter from 5 to 3
+2026-09-09 00:50:31,230 - h5py._conv - DEBUG - Creating converter from 3 to 5
+[2026-09-09 00:50:31,245] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=2 fit_mode=pit_expanding oos_guarantees=True
+2026-09-09 00:50:31,245 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=2 fit_mode=pit_expanding oos_guarantees=True
+[2026-09-09 00:50:31,249] INFO momentum.Analysis.ic_filter_orchestrator: Resolved label horizon from labels_df column
+2026-09-09 00:50:31,249 - momentum.Analysis.ic_filter_orchestrator - INFO - Resolved label horizon from labels_df column
+[2026-09-09 00:50:31,249] INFO momentum.Analysis.ic_filter_orchestrator: Resolved label horizon from labels_df column
+2026-09-09 00:50:31,249 - momentum.Analysis.ic_filter_orchestrator - INFO - Resolved label horizon from labels_df column
+[2026-09-09 00:50:31,251] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=144 test_rows=31 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 00:50:31,251 - momentum.Analysis.ic_filter_orchestrator - WARNING - IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=144 test_rows=31 min_test_rows=1517 fit_mode=full_sample
+[2026-09-09 00:50:31,256] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+2026-09-09 00:50:31,256 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+[2026-09-09 00:50:31,257] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+2026-09-09 00:50:31,257 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+------------------------------ Captured log call -------------------------------
+DEBUG    h5py._conv:dataset.py:178 Creating converter from 5 to 3
+DEBUG    h5py._conv:dataset.py:903 Creating converter from 3 to 5
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=2 fit_mode=pit_expanding oos_guarantees=True
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:394 Resolved label horizon from labels_df column
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:394 Resolved label horizon from labels_df column
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:1405 IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=144 test_rows=31 min_test_rows=1517 fit_mode=full_sample
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:4622 IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+____________________ test_oos_applied_true_when_sufficient _____________________
+tests/momentum/Analysis/test_ic_1a_cut1_oos.py:478: in test_oos_applied_true_when_sufficient
+    assert split_meta["applied"] is True
+E   assert False is True
+---------------------------- Captured stderr setup -----------------------------
+2026-09-09 00:50:31,568 - matplotlib - DEBUG - matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+2026-09-09 00:50:31,572 - matplotlib - DEBUG - CONFIGDIR=/Users/louis/.matplotlib
+2026-09-09 00:50:31,572 - matplotlib - DEBUG - interactive is False
+2026-09-09 00:50:31,573 - matplotlib - DEBUG - platform is darwin
+2026-09-09 00:50:31,803 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-09 00:50:31,806 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+[2026-09-09 00:50:31,807] INFO momentum.FeatureEngineering.adapters.adapter_registry: Registered adapter: crypto_spot
+2026-09-09 00:50:31,807 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Registered adapter: crypto_spot
+[2026-09-09 00:50:31,807] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 00:50:31,807 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+2026-09-09 00:50:31,872 - api.feature_factory_service - INFO - CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+2026-09-09 00:50:32,105 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 00:50:32,204 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 00:50:32,257 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BCHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 00:50:32,264 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_cfg_batch_ret: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/cfg_batch_ret/feature_manifest.json
+2026-09-09 00:50:32,389 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 00:50:32,482 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 00:50:32,534 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_BTCUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 00:50:32,541 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_cfg_batch_ret: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/cfg_batch_ret/feature_manifest.json
+2026-09-09 00:50:32,686 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+2026-09-09 00:50:32,765 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+2026-09-09 00:50:32,773 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_be993398916ee054e0b681732961caff: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/be993398916ee054e0b681732961caff/feature_manifest.json
+2026-09-09 00:50:32,821 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+2026-09-09 00:50:32,826 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_abc9b9fecb7a4f42cb8e03099285b67b: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/abc9b9fecb7a4f42cb8e03099285b67b/feature_manifest.json
+2026-09-09 00:50:32,826 - api.feature_factory_service - DEBUG - Auto-registered manifest as browse task browse_ETHUSDT_12h_1ab3fe2f34732cc9adf693a36b2ddf8d: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/1ab3fe2f34732cc9adf693a36b2ddf8d/feature_manifest.json
+2026-09-09 00:50:32,826 - api.feature_factory_service - INFO - Restored 15 persisted feature task(s) from disk
+2026-09-09 00:50:32,827 - api.middleware - INFO - 所有中間件已設置完成
+2026-09-09 00:50:32,827 - api.exception_handler - INFO - 異常處理器設置完成
+2026-09-09 00:50:32,855 - api.standalone_search_service - INFO - StandaloneSearchService initialized - momentum modules will be loaded on demand
+2026-09-09 00:50:32,883 - api.case_storage - INFO - Loaded 60/60 cases from JSON
+2026-09-09 00:50:32,883 - api.case_storage - INFO - Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+2026-09-09 00:50:32,883 - api.case_storage - INFO - CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+2026-09-09 00:50:32,883 - api.case_storage - INFO - Created global CaseStorageManager instance
+2026-09-09 00:50:32,884 - api.case_import_service - INFO - CaseImportService initialized
+2026-09-09 00:50:32,884 - api.case_import_service - INFO - Created global CaseImportService instance with shared storage
+2026-09-09 00:50:32,884 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+2026-09-09 00:50:32,884 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-09 00:50:32,884 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-09 00:50:32,884 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-09 00:50:32,884 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-09 00:50:32,884 - api.batch_download_service - INFO - Registered BinanceProvider to KlineDownloadService
+2026-09-09 00:50:32,884 - api.batch_download_service - INFO - BatchDownloadService initialized
+2026-09-09 00:50:32,884 - api.batch_download_service - INFO - Created global BatchDownloadService instance with shared storage
+2026-09-09 00:50:32,895 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-09-09 00:50:32,895 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-09 00:50:32,895 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-09 00:50:32,895 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-09 00:50:32,895 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-09 00:50:32,895 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/kline_cache.h5
+2026-09-09 00:50:32,895 - momentum.Indicators.indicator_engine - INFO - IndicatorEngine initialized
+2026-09-09 00:50:32,895 - api.chart_data_service - INFO - ChartDataService initialized with IndicatorEngine
+2026-09-09 00:50:32,909 - api.optimization_task_service - INFO - OptimizationTaskService initialized
+[2026-09-09 00:50:32,964] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 00:50:32,964 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 00:50:32,966] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 00:50:32,966 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 00:50:33,019] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 00:50:33,019 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+[2026-09-09 00:50:33,123] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 15 entries
+2026-09-09 00:50:33,123 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 15 entries
+2026-09-09 00:50:33,133 - api.websocket_manager - INFO - WebSocketConnectionManager initialized
+2026-09-09 00:50:33,213 - api.routes - INFO - All API routes registered successfully
+------------------------------ Captured log setup ------------------------------
+DEBUG    matplotlib:__init__.py:341 matplotlib data path: /Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/matplotlib/mpl-data
+DEBUG    matplotlib:__init__.py:341 CONFIGDIR=/Users/louis/.matplotlib
+DEBUG    matplotlib:__init__.py:1512 interactive is False
+DEBUG    matplotlib:__init__.py:1513 platform is darwin
+DEBUG    asyncio:selector_events.py:59 Using selector: KqueueSelector
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+INFO     momentum.FeatureEngineering.adapters.adapter_registry:adapter_registry.py:21 Registered adapter: crypto_spot
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 15 entries
+INFO     api.feature_factory_service:feature_factory_service.py:144 CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_BCHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_BCHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_BCHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BCHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_BTCUSDT_1h_cfg_batch_ret: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/cfg_batch_ret/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_BTCUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_BTCUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_BTCUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/BTCUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_ETHUSDT_1h_cfg_batch_ret: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/cfg_batch_ret/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_ETHUSDT_1h_4a8a0b3726cc906ab3534994605e77f5: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_ETHUSDT_12h_e53e22906c35363757f4cd49d27f973e: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/e53e22906c35363757f4cd49d27f973e/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_ETHUSDT_12h_be993398916ee054e0b681732961caff: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/be993398916ee054e0b681732961caff/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_ETHUSDT_12h_f754aad4cc8fe5ccc1532296d6e279ec: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/f754aad4cc8fe5ccc1532296d6e279ec/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_ETHUSDT_12h_abc9b9fecb7a4f42cb8e03099285b67b: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/abc9b9fecb7a4f42cb8e03099285b67b/feature_manifest.json
+DEBUG    api.feature_factory_service:feature_factory_service.py:4460 Auto-registered manifest as browse task browse_ETHUSDT_12h_1ab3fe2f34732cc9adf693a36b2ddf8d: /Users/louis/Desktop/quantitative_trading_system/data_cache/features/ETHUSDT/12h/1ab3fe2f34732cc9adf693a36b2ddf8d/feature_manifest.json
+INFO     api.feature_factory_service:feature_factory_service.py:4465 Restored 15 persisted feature task(s) from disk
+INFO     api.middleware:middleware.py:226 所有中間件已設置完成
+INFO     api.exception_handler:exceptions.py:219 異常處理器設置完成
+INFO     api.standalone_search_service:standalone_search_service.py:177 StandaloneSearchService initialized - momentum modules will be loaded on demand
+INFO     api.case_storage:case_storage.py:398 Loaded 60/60 cases from JSON
+INFO     api.case_storage:case_storage.py:67 Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+INFO     api.case_storage:case_storage.py:69 CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+INFO     api.case_storage:case_storage.py:421 Created global CaseStorageManager instance
+INFO     api.case_import_service:case_import_service.py:51 CaseImportService initialized
+INFO     api.case_import_service:case_import_service.py:580 Created global CaseImportService instance with shared storage
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+INFO     momentum.DataExtraction.kline_download_service.KlineDownloadService:kline_download_service.py:196 KlineDownloadService initialized
+INFO     momentum.DataExtraction.providers.binance_provider.RateLimiter:binance_provider.py:81 Rate limiter initialized: 1000 req/min
+INFO     momentum.DataExtraction.kline_provider_base.Binance:binance_provider.py:219 BinanceProvider initialized
+INFO     momentum.DataExtraction.kline_download_service.ProviderRegistry:kline_download_service.py:82 Registered provider: binance (rate_limit=1000/min)
+INFO     api.batch_download_service:batch_download_service.py:138 Registered BinanceProvider to KlineDownloadService
+INFO     api.batch_download_service:batch_download_service.py:146 BatchDownloadService initialized
+INFO     api.batch_download_service:batch_download_service.py:1025 Created global BatchDownloadService instance with shared storage
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/kline_cache.h5
+INFO     momentum.DataExtraction.kline_download_service.KlineDownloadService:kline_download_service.py:196 KlineDownloadService initialized
+INFO     momentum.DataExtraction.providers.binance_provider.RateLimiter:binance_provider.py:81 Rate limiter initialized: 1000 req/min
+INFO     momentum.DataExtraction.kline_provider_base.Binance:binance_provider.py:219 BinanceProvider initialized
+INFO     momentum.DataExtraction.kline_download_service.ProviderRegistry:kline_download_service.py:82 Registered provider: binance (rate_limit=1000/min)
+INFO     momentum.DataExtraction.kline_storage:kline_storage.py:256 KlineStorageManager initialized: data_cache/kline_cache.h5
+INFO     momentum.Indicators.indicator_engine:indicator_engine.py:95 IndicatorEngine initialized
+INFO     api.chart_data_service:chart_data_service.py:81 ChartDataService initialized with IndicatorEngine
+INFO     api.optimization_task_service:optimization_task_service.py:175 OptimizationTaskService initialized
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 15 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 15 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 15 entries
+INFO     momentum.FeatureEngineering.feature_registry:feature_registry.py:68 Loaded feature registry with 15 entries
+INFO     api.websocket_manager:optimization_ws.py:58 WebSocketConnectionManager initialized
+INFO     api.routes:main.py:385 All API routes registered successfully
+----------------------------- Captured stderr call -----------------------------
+[2026-09-09 00:50:33,223] INFO momentum.Analysis.ic_filter_orchestrator: Resolved label horizon from labels_df column
+2026-09-09 00:50:33,223 - momentum.Analysis.ic_filter_orchestrator - INFO - Resolved label horizon from labels_df column
+[2026-09-09 00:50:33,223] INFO momentum.Analysis.ic_filter_orchestrator: Resolved label horizon from labels_df column
+2026-09-09 00:50:33,223 - momentum.Analysis.ic_filter_orchestrator - INFO - Resolved label horizon from labels_df column
+[2026-09-09 00:50:33,226] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=608 test_rows=147 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 00:50:33,226 - momentum.Analysis.ic_filter_orchestrator - WARNING - IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=608 test_rows=147 min_test_rows=1517 fit_mode=full_sample
+[2026-09-09 00:50:33,232] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+2026-09-09 00:50:33,232 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+[2026-09-09 00:50:33,349] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=2
+2026-09-09 00:50:33,349 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=2
+[2026-09-09 00:50:33,349] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:50:33,349 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:50:35,607] INFO momentum.Analysis.redundancy_filter: Redundancy filter completed: method=greedy input=2 output=2
+2026-09-09 00:50:35,607 - momentum.Analysis.redundancy_filter - INFO - Redundancy filter completed: method=greedy input=2 output=2
+[2026-09-09 00:50:39,027] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=full_sample
+2026-09-09 00:50:39,027 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=full_sample
+[2026-09-09 00:50:39,032] INFO momentum.Analysis.ic_reporter: Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+2026-09-09 00:50:39,032 - momentum.Analysis.ic_reporter - INFO - Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+[2026-09-09 00:50:39,042] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:50:39,042 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 00:50:39,045] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 00:50:39,045 - momentum.Analysis.ic_reporter - INFO - IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 00:50:39,053] INFO momentum.Analysis.ic_reporter: IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:50:39,053 - momentum.Analysis.ic_reporter - INFO - IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+------------------------------ Captured log call -------------------------------
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:394 Resolved label horizon from labels_df column
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:394 Resolved label horizon from labels_df column
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:1405 IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=608 test_rows=147 min_test_rows=1517 fit_mode=full_sample
+INFO     momentum.Analysis.data_preprocessor:data_preprocessor.py:209 Data preprocessing complete: columns=2 fit_mode=full_sample oos_guarantees=False
+INFO     momentum.Analysis.ic_engine:ic_engine.py:492 IC autocorr persistent: count=2
+WARNING  momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:412 No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+INFO     momentum.Analysis.redundancy_filter:redundancy_filter.py:144 Redundancy filter completed: method=greedy input=2 output=2
+INFO     momentum.Analysis.ic_filter_orchestrator:ic_filter_orchestrator.py:4622 IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=full_sample
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:829 Filtered features saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/features/BTCUSDT_1h_filtered.h5
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:893 IC survivor output saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_survivors_ic_gatekeeper.json
+INFO     momentum.Analysis.ic_reporter:ic_reporter.py:864 IC report saved: /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-735/ic_redirect0/reports/ic_report_ic_gatekeeper.json
+=========================== short test summary info ============================
+FAILED tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_flag_toggles_path
+FAILED tests/momentum/Analysis/test_ic_1a_cut1_oos.py::test_oos_applied_true_when_sufficient
+======================= 2 failed, 11 deselected in 8.18s =======================

@@ -1,0 +1,69 @@
+[reconcile_build] session=/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r1  roster=codex,composer,grok  sources=3 round_id=unbound mode=discovery
+OK: wrote /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r1/sources.lock (3 sources, roster=['codex', 'composer', 'grok'], mode=discovery)
+[reconcile_build] synth.md 已建；每檔抽到 findings：
+    20260909-ICRESULTPAGING-X-REVIEW-R1-codex.md: 7
+    20260909-ICRESULTPAGING-X-REVIEW-R1-composer.md: 5
+    20260909-ICRESULTPAGING-X-REVIEW-R1-grok.md: 6
+[reconcile_build] === completeness_check ===
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r1/sources/20260909-ICRESULTPAGING-X-REVIEW-R1-codex.md — 7/7 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r1/sources/20260909-ICRESULTPAGING-X-REVIEW-R1-composer.md — 5/5 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r1/sources/20260909-ICRESULTPAGING-X-REVIEW-R1-grok.md — 6/6 個 ID 全在綜合檔。
+COMPLETENESS PASS(dropped-ID+schema+lock+body-hash 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。
+[reconcile_build] completeness rc=0
+[reconcile_build] === 群集歸戶自檢（提示，不擋）===
+── CODEX-R1-P1-01
+   附錄斷言: 以目前 §G-4 的保留語意，`view=light` 不可能同時滿足 2 MiB 的 G-5 尺寸上限。
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P1-02
+   附錄斷言: Task 0.1 以單一 fixture 生成 `metadata_keep_keys`，可能把事件／降級／隔離／期間對齊等實際 run 的
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P1-03
+   附錄斷言: 分頁請求沒有 report 版本／snapshot 契約，refilter 在請求中途替換 `task_info["result"]` 時，
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P1-04
+   附錄斷言: SPEC 宣稱的排序語意與現行前端並非同序，而且 G-1 使用 canonical SHA 不能證明「位元組級」不變。
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P1-05
+   附錄斷言: Task 2.3 將既有格式匯出改成前端逐頁抓 summary，會重做已存在的後端匯出契約，並可能改變非 summary 匯出內容。
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P2-01
+   附錄斷言: G-5 尺寸測試在實機報告缺席時 `pytest.skip`，可以讓 CI rc=0 卻沒有測到尺寸；200 特徵抽樣也不足以證明 39,3
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P2-02
+   附錄斷言: B2 將 hook/store、表格、匯出與所有圖表一次切換不是必要的風險最小化策略；表格可先以 summary endpoint 驗證，且
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R1-P0-01
+   附錄斷言: G-4 要求 light 保留 `filter_log`／完整 `grouped_ic`／`metadata` 非描述子鍵（含 `selec
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R1-P1-01
+   附錄斷言: 後端 `paginate_summary` 次鍵 `feature_name` 與前端 `ICSummaryTable` `getSortV
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R1-P1-02
+   附錄斷言: G-2 未定義 `q`／`pass_class` 下「逐頁串接==全量」的基線集合；refilter 替換 `task_info["resu
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R1-P1-03
+   附錄斷言: Task 2.3 要求 `ExportButtons` 以 `summary?limit=limit_max` 逐頁串接匯出，但現行 JSO
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R1-P2-01
+   附錄斷言: TODO §B B2 稱 2.1+2.2+2.3 必須一次切換，但 2.3 匯出與後端 export 重疊，可延後；真正中間態風險僅「lig
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R1-P0-01
+   附錄斷言: SPEC §G G-4（light 保留全量 `filter_log`／`grouped_ic` 摘要並與全量逐鍵相等）與 G-5（39k 
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R1-P1-01
+   附錄斷言: TODO Task 0.1 以「值為 `{category,layer,name}` 描述子以外皆保留」建 `metadata_keep_k
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R1-P1-02
+   附錄斷言: TODO Task 2.3 規定 `ExportButtons` 改以 `fetchSummaryPage` 逐頁串接匯出，與現行已可用的後
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R1-P1-03
+   附錄斷言: Task 1.1 排序加 `feature_name` 次鍵後，與現行前端 `getSortValue`（並列 return 0）及 `ge
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R1-P2-01
+   附錄斷言: SPEC／TODO 未定義 refilter 置換 result 時分頁／G-2 串接的世代語意，存在跨頁混代競態。
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R1-P2-02
+   附錄斷言: Task 1.3／G-4 所稱 `grouped_ic`「摘要（非 per-feature 部分）」未定義可機檢形狀，而實機 `groupe
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r1/synth.md
+[reconcile_build] ✅ 完成。接著：手填 /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r1/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。

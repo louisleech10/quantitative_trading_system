@@ -1,0 +1,401 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 88 items
+
+tests/momentum/Analysis/test_survivor_contract.py::test_load_top_level_keys_exact PASSED [  1%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_capability_status_ref_matches_report_contract PASSED [  2%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_independent_oos_validation_allowed_is_false_only PASSED [  3%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_oos_semantics_single_value_and_reasons_nonempty PASSED [  4%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_every_keys_schema_has_type_required_nullable PASSED [  5%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_sample_scope_kind_values_subset_of_row_mask_plan_source PASSED [  6%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_missing_file_raises PASSED [  7%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_broken_json_raises PASSED [  9%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_extra_top_key_raises PASSED [ 10%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_allowed_not_false_raises PASSED [ 11%]
+tests/momentum/Analysis/test_survivor_contract.py::test_mutation_missing_top_key_raises PASSED [ 12%]
+tests/momentum/Analysis/test_survivor_contract.py::test_load_returns_copy_not_shared_singleton PASSED [ 13%]
+tests/momentum/Analysis/test_survivor_contract.py::test_roundtrip_build_then_validate PASSED [ 14%]
+tests/momentum/Analysis/test_survivor_contract.py::test_missing_required_key_raises[path0] PASSED [ 15%]
+tests/momentum/Analysis/test_survivor_contract.py::test_missing_required_key_raises[path1] PASSED [ 17%]
+tests/momentum/Analysis/test_survivor_contract.py::test_missing_required_key_raises[path2] PASSED [ 18%]
+tests/momentum/Analysis/test_survivor_contract.py::test_missing_required_key_raises[path3] PASSED [ 19%]
+tests/momentum/Analysis/test_survivor_contract.py::test_missing_required_key_raises[path4] PASSED [ 20%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path0] PASSED [ 21%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path1] PASSED [ 22%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path2] PASSED [ 23%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path3] PASSED [ 25%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path4] PASSED [ 26%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path5] PASSED [ 27%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path6] PASSED [ 28%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path7] PASSED [ 29%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_key_raises[path8] PASSED [ 30%]
+tests/momentum/Analysis/test_survivor_contract.py::test_kind_enum_and_event_null_raise PASSED [ 31%]
+tests/momentum/Analysis/test_survivor_contract.py::test_oos_four_field_consistency PASSED [ 32%]
+tests/momentum/Analysis/test_survivor_contract.py::test_resolve_ref_and_capability_status PASSED [ 34%]
+tests/momentum/Analysis/test_survivor_contract.py::test_section_key_sets_match_dataclasses PASSED [ 35%]
+tests/momentum/Analysis/test_survivor_contract.py::test_feature_set_hash_and_survivor_sequence PASSED [ 36%]
+tests/momentum/Analysis/test_survivor_contract.py::test_checklist_subset_of_contract_keys PASSED [ 37%]
+tests/momentum/Analysis/test_survivor_contract.py::test_identity_three_fields PASSED [ 38%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_identity_serialization PASSED [ 39%]
+tests/momentum/Analysis/test_survivor_contract.py::test_view_status_object_composite_and_type_checks PASSED [ 40%]
+tests/momentum/Analysis/test_survivor_contract.py::test_mutation_validator_skips_feature_set_hash PASSED [ 42%]
+tests/momentum/Analysis/test_survivor_contract.py::test_provenance_fit_mode_raw_orchestrator_values_accepted PASSED [ 43%]
+tests/momentum/Analysis/test_survivor_contract.py::test_resolve_ref_rejects_escape PASSED [ 44%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_object_mode_invariants PASSED [ 45%]
+tests/momentum/Analysis/test_survivor_contract.py::test_fallback_requires_full_index_and_uses_real_index PASSED [ 46%]
+tests/momentum/Analysis/test_survivor_contract.py::test_unknown_root_status_raises PASSED [ 47%]
+tests/momentum/Analysis/test_survivor_contract.py::test_n_samples_total_reconciliation PASSED [ 48%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_identity_naive_string_matches_aware PASSED [ 50%]
+tests/momentum/Analysis/test_survivor_contract.py::test_v2_event_keyset_and_nulls_when_no_context PASSED [ 51%]
+tests/momentum/Analysis/test_survivor_contract.py::test_v2_event_context_filled_and_validated PASSED [ 52%]
+tests/momentum/Analysis/test_survivor_contract.py::test_v2_event_keys_fail_closed[<lambda>0] PASSED [ 53%]
+tests/momentum/Analysis/test_survivor_contract.py::test_v2_event_keys_fail_closed[<lambda>1] PASSED [ 54%]
+tests/momentum/Analysis/test_survivor_contract.py::test_v2_event_keys_fail_closed[<lambda>2] PASSED [ 55%]
+tests/momentum/Analysis/test_survivor_contract.py::test_v2_event_keys_fail_closed[<lambda>3] PASSED [ 56%]
+tests/momentum/Analysis/test_survivor_contract.py::test_v2_event_keys_fail_closed[<lambda>4] FAILED [ 57%]
+tests/momentum/Analysis/test_survivor_contract.py::test_conditional_ic_requires_event_context_fail_closed PASSED [ 59%]
+tests/momentum/Analysis/test_survivor_contract.py::test_partial_event_context_rejected_and_validator_independent_of_report_meta PASSED [ 60%]
+tests/momentum/Analysis/test_survivor_contract.py::test_v1_payload_explicitly_rejected_no_silent_coerce PASSED [ 61%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_mode_reconciles_on_filtered_masks PASSED [ 62%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_mode_allows_purge_gap_le_not_eq PASSED [ 63%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_mode_without_masks_fails_closed_when_ambiguous PASSED [ 64%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_mode_mask_length_must_equal_n_samples PASSED [ 65%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_mode_n_samples_test_no_full_axis_fallback PASSED [ 67%]
+tests/momentum/Analysis/test_survivor_contract.py::test_non_event_split_row_guard_preserved PASSED [ 68%]
+tests/momentum/Analysis/test_survivor_contract.py::test_event_mode_no_masks_no_marginal_leaves_n_samples_test_null PASSED [ 69%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_module_summary_not_skipped_and_portfolio_exposure_nonempty 
+-------------------------------- live log call ---------------------------------
+09:32:42 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:32:42 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:42 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:32:42 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:42 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:42 [INFO] Resolved label horizon from labels_df column
+09:32:42 [INFO] Resolved label horizon from labels_df column
+09:32:42 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:32:42 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:32:42 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:32:42 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:32:42 [INFO] IC autocorr persistent: count=7
+09:32:42 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:42 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:32:42 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:32:48 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:32:48 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:32:48 [INFO] Deep module completed: factor_exposure in 0.00s
+PASSED                                                                   [ 70%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_close_carrier_via_production_stage4_not_ad_hoc_ic_cache 
+-------------------------------- live log call ---------------------------------
+09:32:48 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:32:48 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:48 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:32:48 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:32:48 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:48 [INFO] Resolved label horizon from labels_df column
+09:32:48 [INFO] Resolved label horizon from labels_df column
+09:32:48 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:32:48 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:32:48 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:48 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:32:48 [INFO] IC autocorr persistent: count=7
+09:32:48 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:49 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:32:49 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:32:54 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:32:54 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:32:54 [INFO] Deep module completed: factor_exposure in 0.02s
+PASSED                                                                   [ 71%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_d9_mutation_stage4_carrier_diverges_must_fail 
+-------------------------------- live log call ---------------------------------
+09:32:54 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:32:54 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:54 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:32:54 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:32:54 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:32:54 [INFO] Resolved label horizon from labels_df column
+09:32:54 [INFO] Resolved label horizon from labels_df column
+09:32:54 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:32:54 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:32:54 [INFO] Read 1696 klines from ETHUSDT/12h in 0.010s
+09:32:55 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:32:55 [INFO] IC autocorr persistent: count=7
+09:32:55 [INFO] Read 1696 klines from ETHUSDT/12h in 0.009s
+09:32:55 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:32:55 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:02 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:33:02 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:33:02 [INFO] Deep module completed: factor_exposure in 0.00s
+PASSED                                                                   [ 72%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_d9_mutation_adhoc_ic_cache_overwrite_must_fail 
+-------------------------------- live log call ---------------------------------
+09:33:02 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:33:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.005s
+09:33:02 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:33:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:33:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.005s
+09:33:02 [INFO] Resolved label horizon from labels_df column
+09:33:02 [INFO] Resolved label horizon from labels_df column
+09:33:02 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:33:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:33:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:02 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:33:02 [INFO] IC autocorr persistent: count=7
+09:33:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:02 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:33:02 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:10 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:33:10 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:33:10 [INFO] Deep module completed: factor_exposure in 0.01s
+PASSED                                                                   [ 73%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_analyzer_real_ols_oracle_dump PASSED [ 75%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_b3_mutation_analyzer_hardcoded_alpha_must_fail PASSED [ 76%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_bug3_oracle_betas_mutation_must_fail PASSED [ 77%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_baseline_payload_module_summary_from_report_not_serializer 
+-------------------------------- live log call ---------------------------------
+09:33:10 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:33:10 [INFO] Read 1696 klines from ETHUSDT/12h in 0.006s
+09:33:10 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:33:10 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:10 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:10 [INFO] Resolved label horizon from labels_df column
+09:33:10 [INFO] Resolved label horizon from labels_df column
+09:33:10 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:33:10 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:10 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:10 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:33:10 [INFO] IC autocorr persistent: count=7
+09:33:10 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:10 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:33:10 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:17 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:33:17 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:33:17 [INFO] Deep module completed: factor_exposure in 0.01s
+PASSED                                                                   [ 78%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_b2_mutation_hardcoded_module_summary_must_fail 
+-------------------------------- live log call ---------------------------------
+09:33:17 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:33:17 [INFO] Read 1696 klines from ETHUSDT/12h in 0.016s
+09:33:17 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:33:17 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:33:17 [INFO] Read 1696 klines from ETHUSDT/12h in 0.006s
+09:33:17 [INFO] Resolved label horizon from labels_df column
+09:33:17 [INFO] Resolved label horizon from labels_df column
+09:33:17 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:33:17 [INFO] Read 1696 klines from ETHUSDT/12h in 0.029s
+09:33:17 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:17 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:33:17 [INFO] IC autocorr persistent: count=7
+09:33:17 [INFO] Read 1696 klines from ETHUSDT/12h in 0.006s
+09:33:17 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:33:17 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:24 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:33:24 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:33:24 [INFO] Deep module completed: factor_exposure in 0.01s
+PASSED                                                                   [ 79%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_payload_cache_close_finite_field_present 
+-------------------------------- live log call ---------------------------------
+09:33:24 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:33:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.007s
+09:33:24 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:33:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:24 [INFO] Resolved label horizon from labels_df column
+09:33:24 [INFO] Resolved label horizon from labels_df column
+09:33:24 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:33:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:33:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:24 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:33:24 [INFO] IC autocorr persistent: count=7
+09:33:24 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:24 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:33:24 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:32 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:33:32 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:33:32 [INFO] Deep module completed: factor_exposure in 0.02s
+PASSED                                                                   [ 80%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_provenance_sidecar_holds_volatile_fields 
+-------------------------------- live log call ---------------------------------
+09:33:32 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:33:32 [INFO] Read 1696 klines from ETHUSDT/12h in 0.026s
+09:33:32 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:33:32 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:33:32 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:33:32 [INFO] Resolved label horizon from labels_df column
+09:33:32 [INFO] Resolved label horizon from labels_df column
+09:33:32 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:33:32 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:32 [INFO] Read 1696 klines from ETHUSDT/12h in 0.005s
+09:33:32 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:33:32 [INFO] IC autocorr persistent: count=7
+09:33:32 [INFO] Read 1696 klines from ETHUSDT/12h in 0.005s
+09:33:33 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:33:33 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:39 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:33:39 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:33:39 [INFO] Deep module completed: factor_exposure in 0.00s
+PASSED                                                                   [ 81%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_deep_noop_results_mutation_must_fail 
+-------------------------------- live log call ---------------------------------
+09:33:39 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+09:33:39 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:33:39 [INFO] running production analyze (close carrier via _stage4_ic_calculation:2913-2930)
+09:33:39 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:39 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:39 [INFO] Resolved label horizon from labels_df column
+09:33:39 [INFO] Resolved label horizon from labels_df column
+09:33:39 [WARNING] IC full-sample fallback triggered: reason=insufficient_data train_rows=409 test_rows=98 min_test_rows=131 fit_mode=full_sample
+09:33:40 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:33:40 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:40 [INFO] Data preprocessing complete: columns=7 fit_mode=full_sample oos_guarantees=False
+09:33:40 [INFO] IC autocorr persistent: count=7
+09:33:40 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:40 [INFO] Decay: 7/7 fit warnings summarized (insufficient_points=7)
+09:33:40 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:46 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:33:46 [INFO] running run_deep_analysis force_modules=['factor_exposure']
+09:33:46 [INFO] Deep module completed: factor_exposure in 0.00s
+PASSED                                                                   [ 82%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_bug1_dict_vs_list_path_collision_must_report PASSED [ 84%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_bug1_mutation_list_to_dict_zero_allow_must_fail PASSED [ 85%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_bug2_dotted_key_allow_change_must_pass PASSED [ 86%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_bug2_dotted_key_allow_cli_exit0 PASSED [ 87%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_path_collision_bracket_key_vs_list_must_not_silent_pass PASSED [ 88%]
+tests/momentum/Analysis/test_ic1d_baseline.py::test_path_collision_raise_via_cli_exit1 PASSED [ 89%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_four_shapes_five_keys 
+-------------------------------- live log setup --------------------------------
+09:33:47 [INFO] IC config loaded
+09:33:47 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+09:33:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.007s
+09:33:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:47 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+09:33:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.007s
+09:33:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:33:47 [INFO] IC autocorr persistent: count=14
+09:33:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:33:48 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+09:33:56 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+09:34:01 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+09:34:01 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/features/ETHUSDT_12h_filtered.h5
+09:34:01 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/reports/ic_report_ic_gatekeeper.json
+09:34:01 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/reports/ic_survivors_ic_gatekeeper.json
+09:34:01 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/reports/ic_report_ic_gatekeeper.json
+-------------------------------- live log call ---------------------------------
+09:34:01 [ERROR] survivor output write failed: disk full
+Traceback (most recent call last):
+  File "/Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py", line 4814, in _write_survivor_output
+    path = self._reporter.save_survivor_output(payload, output_dir=output_dir, case_id=case_id)
+  File "/Users/louis/Desktop/quantitative_trading_system/tests/momentum/Analysis/test_gap2_survivor_persist.py", line 60, in boom
+    raise PermissionError("disk full")
+PermissionError: disk full
+PASSED                                                                   [ 90%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_file_exists_validates_names_and_sha PASSED [ 92%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_hermetic_no_production_write PASSED [ 93%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_event_mode_and_fallback_sample_scope 
+-------------------------------- live log call ---------------------------------
+09:34:01 [INFO] IC config loaded
+09:34:01 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+09:34:01 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:34:01 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:01 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:01 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+09:34:01 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:01 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:01 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:01 [WARNING] IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=100 test_rows=20 min_test_rows=131 fit_mode=full_sample
+09:34:01 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+09:34:01 [INFO] Data preprocessing complete: columns=14 fit_mode=full_sample oos_guarantees=False
+09:34:01 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:01 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:01 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:01 [INFO] IC autocorr persistent: count=14
+09:34:01 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:01 [INFO] Decay: 14/14 fit warnings summarized (insufficient_points=14)
+09:34:02 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:02 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+09:34:02 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_rf0toaeo/reports/ic_report_ic_gatekeeper.json
+09:34:02 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_rf0toaeo/reports/ic_survivors_ic_gatekeeper.json
+09:34:02 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_rf0toaeo/reports/ic_report_ic_gatekeeper.json
+09:34:02 [INFO] IC config loaded
+09:34:02 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+09:34:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:02 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:02 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:02 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+09:34:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:34:02 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:02 [WARNING] Insufficient events: n=3
+09:34:02 [INFO] IC autocorr persistent: count=14
+09:34:02 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:34:03 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+09:34:11 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+09:34:15 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+09:34:15 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_7eilx5by/features/ETHUSDT_12h_filtered.h5
+09:34:15 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_7eilx5by/reports/ic_report_ic_gatekeeper.json
+09:34:15 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_7eilx5by/reports/ic_survivors_ic_gatekeeper.json
+09:34:15 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_7eilx5by/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 94%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_concurrent_same_case_id_atomic 
+-------------------------------- live log call ---------------------------------
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/concurrent/ic_survivors_ic_gatekeeper.json
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/concurrent/ic_survivors_ic_gatekeeper.json
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/concurrent/ic_survivors_ic_gatekeeper.json
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/concurrent/ic_survivors_ic_gatekeeper.json
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/concurrent/ic_survivors_ic_gatekeeper.json
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/concurrent/ic_survivors_ic_gatekeeper.json
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/concurrent/ic_survivors_ic_gatekeeper.json
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/concurrent/ic_survivors_ic_gatekeeper.json
+PASSED                                                                   [ 95%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_persist_cold_call_without_ic_cache 
+-------------------------------- live log call ---------------------------------
+09:34:16 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_oi33412_/cold/ic_survivors_ic_gatekeeper.json
+PASSED                                                                   [ 96%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_mutation_persist_reads_ic_cache_breaks_cold_call PASSED [ 97%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_persisted_report_json_mirrors_survivor_output PASSED [ 98%]
+tests/momentum/Analysis/test_gap2_survivor_persist.py::test_provenance_uses_effective_config 
+-------------------------------- live log call ---------------------------------
+09:34:16 [INFO] IC config loaded
+09:34:16 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+09:34:16 [INFO] Read 1696 klines from ETHUSDT/12h in 0.004s
+09:34:16 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:16 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:16 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+09:34:16 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:16 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+09:34:16 [INFO] IC autocorr persistent: count=14
+09:34:16 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+09:34:16 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+09:34:24 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+09:34:29 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+09:34:29 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_dkw6b9we/features/ETHUSDT_12h_filtered.h5
+09:34:29 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_dkw6b9we/reports/ic_report_ic_gatekeeper.json
+09:34:29 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_dkw6b9we/reports/ic_survivors_ic_gatekeeper.json
+09:34:29 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/gap2_b4_dkw6b9we/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [100%]
+
+=================================== FAILURES ===================================
+__________________ test_v2_event_keys_fail_closed[<lambda>4] ___________________
+tests/momentum/Analysis/test_survivor_contract.py:636: in test_v2_event_keys_fail_closed
+    sc.validate_survivor_output(payload)
+E   Failed: DID NOT RAISE <class 'momentum.Analysis.ic_config_schema.ContractValidationError'>
+=============================== warnings summary ===============================
+tests/momentum/Analysis/test_ic1d_baseline.py::test_module_summary_not_skipped_and_portfolio_exposure_nonempty
+tests/momentum/Analysis/test_ic1d_baseline.py::test_close_carrier_via_production_stage4_not_ad_hoc_ic_cache
+tests/momentum/Analysis/test_ic1d_baseline.py::test_d9_mutation_adhoc_ic_cache_overwrite_must_fail
+tests/momentum/Analysis/test_ic1d_baseline.py::test_baseline_payload_module_summary_from_report_not_serializer
+tests/momentum/Analysis/test_ic1d_baseline.py::test_b2_mutation_hardcoded_module_summary_must_fail
+tests/momentum/Analysis/test_ic1d_baseline.py::test_payload_cache_close_finite_field_present
+tests/momentum/Analysis/test_ic1d_baseline.py::test_provenance_sidecar_holds_volatile_fields
+tests/momentum/Analysis/test_ic1d_baseline.py::test_deep_noop_results_mutation_must_fail
+  /Users/louis/Desktop/quantitative_trading_system/momentum/Analysis/ic_filter_orchestrator.py:2699: FutureWarning: The default fill_method='pad' in Series.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+    market_proxy = close_aligned.pct_change().shift(1)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/momentum/Analysis/test_survivor_contract.py::test_v2_event_keys_fail_closed[<lambda>4]
+============= 1 failed, 87 passed, 8 warnings in 120.94s (0:02:00) =============

@@ -1,0 +1,45 @@
+[reconcile_build] session=/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-b2-review-r1  roster=codex,composer,grok  sources=3 round_id=unbound mode=discovery
+OK: wrote /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-b2-review-r1/sources.lock (3 sources, roster=['codex', 'composer', 'grok'], mode=discovery)
+[reconcile_build] synth.md 已建；每檔抽到 findings：
+    20260909-ICRESULTPAGING-B2-REVIEW-R1-codex.md: 6
+    20260909-ICRESULTPAGING-B2-REVIEW-R1-composer.md: 2
+    20260909-ICRESULTPAGING-B2-REVIEW-R1-grok.md: 2
+[reconcile_build] === completeness_check ===
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-b2-review-r1/sources/20260909-ICRESULTPAGING-B2-REVIEW-R1-codex.md — 6/6 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-b2-review-r1/sources/20260909-ICRESULTPAGING-B2-REVIEW-R1-composer.md — 2/2 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-b2-review-r1/sources/20260909-ICRESULTPAGING-B2-REVIEW-R1-grok.md — 2/2 個 ID 全在綜合檔。
+COMPLETENESS PASS(dropped-ID+schema+lock+body-hash 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。
+[reconcile_build] completeness rc=0
+[reconcile_build] === 群集歸戶自檢（提示，不擋）===
+── CODEX-R1-P1-01
+   附錄斷言: `report===null` 且有版本錯誤。 **來源摘要**: frontend/src/hooks/useICAnalysis.ts#
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P1-02
+   附錄斷言: 伺服器分頁表頭取消全選會清掉所有頁的 Set，而規格要求全選／取消只作用於當頁並保留跨頁選取。 **碼證**: `frontend/src/
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P1-03
+   附錄斷言: `FilterFunnelChart` 對 `input=null, output=number` 以 output 回填 input 並渲
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P1-04
+   附錄斷言: feature-detail 端點回 409 時沒有依 `current_revision` 自動重拉一次，與 summary 的一次 re
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P1-05
+   附錄斷言: revision 比對把 null 當 wildcard；response `result_revision=null` 與 store 的
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R1-P2-06
+   附錄斷言: 跨頁選取的批次 Watchlist 操作只在目前頁找 row，跨頁 feature 會被靜默跳過；Auto-Suggest 也只評分目前頁且
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R1-P1-01
+   附錄斷言: `refilter` 成功回應未驗 `view:'light'` 即 `setReport`，舊後端 refilter 全量回應會把整份 `
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R1-P2-01
+   附錄斷言: URL query 還原 `search` 時只更新 `summaryParams.search`，表格搜尋框 `searchText` 本
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R1-P1-01
+   附錄斷言: `project_feature` 對實機巢狀 `grouped_ic`（`{by_*: {label: {feature: value}}
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R1-P1-02
+   附錄斷言: `refilter` 在回應缺少 `view:'light'` 時仍 `setReport(result)`，可把舊後端全量報告（含 `su
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-b2-review-r1/synth.md
+[reconcile_build] ✅ 完成。接著：手填 /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-b2-review-r1/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。

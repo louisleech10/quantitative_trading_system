@@ -1,0 +1,2 @@
+GATE PASS：已發 artifact token（有效 900s）。審計 → .claude/gate/audit.log
+使用者可稽核：cat .claude/gate/audit.log

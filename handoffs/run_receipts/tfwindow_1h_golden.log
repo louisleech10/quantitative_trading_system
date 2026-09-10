@@ -1,0 +1,39 @@
+[2026-09-09 00:42:26,791] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-09 00:42:28,874 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-09-09 00:42:29,141] INFO momentum.Analysis.ic_config_schema: IC config loaded
+2026-09-09 00:42:29,141 - momentum.Analysis.ic_config_schema - INFO - IC config loaded
+2026-09-09 00:42:29,144 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+2026-09-09 00:42:29,151 - h5py._conv - DEBUG - Creating converter from 3 to 5
+2026-09-09 00:42:29,163 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 00:42:29,163 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.010s
+[2026-09-09 00:42:29,166] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:42:29,166 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:42:29,166] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:42:29,166 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:42:29,174] WARNING momentum.Analysis.ic_filter_orchestrator: IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 00:42:29,174 - momentum.Analysis.ic_filter_orchestrator - WARNING - IC full-sample fallback triggered: reason=rolling_warmup_insufficient train_rows=1600 test_rows=395 min_test_rows=1517 fit_mode=full_sample
+2026-09-09 00:42:29,183 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 00:42:29,183 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.007s
+[2026-09-09 00:42:29,202] INFO momentum.Analysis.data_preprocessor: Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+2026-09-09 00:42:29,202 - momentum.Analysis.data_preprocessor - INFO - Data preprocessing complete: columns=15 fit_mode=full_sample oos_guarantees=False
+2026-09-09 00:42:29,209 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 00:42:29,210 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.007s
+[2026-09-09 00:42:29,211] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:42:29,211 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:42:30,349] INFO momentum.Analysis.ic_engine: IC autocorr persistent: count=15
+2026-09-09 00:42:30,349 - momentum.Analysis.ic_engine - INFO - IC autocorr persistent: count=15
+2026-09-09 00:42:30,357 - momentum.DataExtraction.kline_storage - DEBUG - Continuity check passed for BTCUSDT/1h: 20352 bars are continuous
+2026-09-09 00:42:30,357 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.007s
+[2026-09-09 00:42:31,272] INFO momentum.Analysis.ic_engine: Decay: 15/15 fit warnings summarized (insufficient_points=15)
+2026-09-09 00:42:31,272 - momentum.Analysis.ic_engine - INFO - Decay: 15/15 fit warnings summarized (insufficient_points=15)
+[2026-09-09 00:42:31,335] WARNING momentum.Analysis.ic_filter_orchestrator: No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+2026-09-09 00:42:31,335 - momentum.Analysis.ic_filter_orchestrator - WARNING - No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+[2026-09-09 00:43:25,708] INFO momentum.Analysis.ic_filter_orchestrator: IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+2026-09-09 00:43:25,708 - momentum.Analysis.ic_filter_orchestrator - INFO - IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=full_sample
+[2026-09-09 00:43:25,884] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_rhysrwux/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:43:25,884 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_rhysrwux/reports/ic_report_ic_gatekeeper.json
+[2026-09-09 00:43:25,889] INFO momentum.Analysis.ic_reporter: IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_rhysrwux/reports/ic_survivors_ic_gatekeeper.json
+2026-09-09 00:43:25,889 - momentum.Analysis.ic_reporter - INFO - IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_rhysrwux/reports/ic_survivors_ic_gatekeeper.json
+[2026-09-09 00:43:26,056] INFO momentum.Analysis.ic_reporter: IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_rhysrwux/reports/ic_report_ic_gatekeeper.json
+2026-09-09 00:43:26,056 - momentum.Analysis.ic_reporter - INFO - IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_rhysrwux/reports/ic_report_ic_gatekeeper.json
+WROTE /Users/louis/Desktop/quantitative_trading_system/tests/golden/tfwindow/rolling_keys_1h.json keys=['window_1512', 'window_252', 'window_756'] status=degraded_full_sample

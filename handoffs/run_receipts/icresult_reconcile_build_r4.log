@@ -1,0 +1,45 @@
+[reconcile_build] session=/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r4  roster=codex,composer,grok  sources=3 round_id=unbound mode=discovery
+OK: wrote /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r4/sources.lock (3 sources, roster=['codex', 'composer', 'grok'], mode=discovery)
+[reconcile_build] synth.md 已建；每檔抽到 findings：
+    20260909-ICRESULTPAGING-X-REVIEW-R4-codex.md: 6
+    20260909-ICRESULTPAGING-X-REVIEW-R4-composer.md: 2
+    20260909-ICRESULTPAGING-X-REVIEW-R4-grok.md: 2
+[reconcile_build] === completeness_check ===
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r4/sources/20260909-ICRESULTPAGING-X-REVIEW-R4-codex.md — 6/6 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r4/sources/20260909-ICRESULTPAGING-X-REVIEW-R4-composer.md — 2/2 個 ID 全在綜合檔。
+COMPLETENESS PASS: /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r4/sources/20260909-ICRESULTPAGING-X-REVIEW-R4-grok.md — 2/2 個 ID 全在綜合檔。
+COMPLETENESS PASS(dropped-ID+schema+lock+body-hash 層): 全來源 heading ID 皆在綜合且 body/digest/lock 合法。
+[reconcile_build] completeness rc=0
+[reconcile_build] === 群集歸戶自檢（提示，不擋）===
+── CODEX-R4-P1-01
+   附錄斷言: `view=light` 的 150/300 ms p95 預算，和「投影前執行既有全樹 OOS 守衛／全樹 JSON 正規化」沒有可同時滿
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R4-P1-02
+   附錄斷言: `rolling_ic_series` 被 light 刪除，但 Phase 2 的 featureDetail 接線清單沒有把它接回 Ro
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R4-P1-03
+   附錄斷言: G-9 雖新增 `LATENCY_GATE`，但沒有獨立的可重現量測規則與 fail-closed gate；G-5 的 `SIZE_GAT
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R4-P1-04
+   附錄斷言: 「每 task 8 組排序索引」不是程序記憶體上限，且現有 `_tasks` 沒有完成 task 的清理生命週期，39k 多 task 會累
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R4-P1-05
+   附錄斷言: TODO Task 2.2 的排序 callback 仍使用 `order`，與 SPEC／FF／其自身測試契約的 `sort_order`
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── CODEX-R4-P2-01
+   附錄斷言: 搜尋 debounce 的規格數值互斥：Task 2.1 寫 150 ms，§C-10 與 Task 2.2 寫 300 ms。
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R4-P2-01
+   附錄斷言: TODO Task 2.2 仍寫 `onParamsChange({sort_by, order, offset:0})`，與 §C 參數命
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── COMPOSER-R4-P2-02
+   附錄斷言: §C-10 要求「切換特徵保留舊圖＋loading 遮罩」「請求失敗可重試」「首屏 ≤3s 可互動」，但 Task 2.2／2.3 vite
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R4-P1-01
+   附錄斷言: TODO Task 2.2 檔案描述仍寫 `onParamsChange({sort_by, order, offset:0})`，與 SP
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+── GROK-R4-P2-01
+   附錄斷言: SPEC §C-10／Task 3.1 要求「切特徵時保留舊圖＋loading 遮罩」與「請求失敗可重試」，但 Task 2.2／2.3 的
+   群集引用: ⚠️ 未被任何群集引用（掉項？）
+[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r4/synth.md
+[reconcile_build] ✅ 完成。接著：手填 /Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260909-icresultpaging-x-review-r4/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。
