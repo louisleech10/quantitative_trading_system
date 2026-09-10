@@ -380,3 +380,36 @@ def test_counting_handles_datetime_index_not_just_int():
     labels = {int(ms[8]): 1, int(ms[9]): 0}
     assert count_binary_classes_in_rows(labels, idx, [8, 9]) == {"n_pos": 1, "n_neg": 1}
     assert count_binary_classes_in_rows(labels, list(ms), [8, 9]) == {"n_pos": 1, "n_neg": 1}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ⑦ Task 3.8：來源身分不得憑空編造
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_label_origin_values_are_not_faked_from_labels():
+    """🔴 `label_origin` 在匯入契約裡是**選填**。
+
+    缺席時若回退成 `label` 本身，`label_origin_values` 會變成 `["0","1"]`——
+    一份假裝是來源揭露、實際只是把答案抄一遍的資料。缺席就回空 list。
+    """
+    import inspect
+
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    src = inspect.getsource(ICAnalysisService._run_event_label_stages)
+    assert 'rec.get("label_origin", rec.get("label"))' not in src, "又用 label 當 label_origin 的替身"
+    assert 'rec.get("label_origin") is not None' in src
+
+
+def test_label_origin_is_optional_in_the_import_contract():
+    """碼證：契約確實把 `label_origin` 列在選填欄——這正是上一條存在的理由。"""
+    import json
+    from pathlib import Path
+
+    contract = json.loads(
+        (Path(__file__).resolve().parents[2] / "momentum/Analysis/contracts/event_import_contract.json")
+        .read_text(encoding="utf-8")
+    )
+    assert "label_origin" in contract["optional_fields"]
+    assert "label_origin" not in contract["required_fields"]

@@ -1012,14 +1012,18 @@ class ICAnalysisService:
             "event_binary_rows_by_id": dict(bin_rows_by_id),
             "label_mode_requested": requested_mode,
             "label_mode_hint": label_hint,
-            # Task 3.8：倖存者檔之來源身分。`label_origin_values` 取**被消費事件**之
-            # 原始標籤字面（去重排序），供下游確認 0/1 沒有被重新編碼。
+            # Task 3.8：倖存者檔之來源身分。
+            # 🔴 `label_origin` 在匯入契約裡是**選填**（`optional_fields`）。原本我在缺席時
+            #    回退成 `label` 本身，那會讓 `label_origin_values` 變成 `["0","1"]`
+            #    ——一份**假裝是來源揭露、實際只是把答案抄一遍**的資料。
+            #    缺席就回空 list（誠實表示「這批沒有揭露原始字面」），不編。
             "event_label_binary_meta": {
                 "import_id": str(request.event_import_id or ""),
                 "label_origin_values": sorted({
-                    str(rec.get("label_origin", rec.get("label")))
+                    str(rec["label_origin"])
                     for eid in sorted(consumed_event_ids)
-                    for rec in (rec_by_id.get(eid),) if rec is not None
+                    for rec in (rec_by_id.get(eid),)
+                    if rec is not None and rec.get("label_origin") is not None
                 }),
             },
             "purge_ms": int(purge_ms),
