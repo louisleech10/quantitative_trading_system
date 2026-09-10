@@ -45,7 +45,15 @@
 <li><strong>狀態</strong>：規格三家審完＋戳記完；你放行了 ①②，③等你看完殘留。程式做到第 1 段一半（已寫、測試綠、還沒 commit）。</li>
 <li><strong>大小</strong>：大。</li>
 </ul>
-<h2 id="下一張tiertoggle幽靈開關">下一張：TIERTOGGLE（幽靈開關）</h2>
+<h2 id="-已完成tiertoggle幽靈開關2026-09-10">✅ 已完成：TIERTOGGLE（幽靈開關）——2026-09-10</h2>
+<ul>
+<li><strong>修好了</strong>：選「基礎」時，IC Decay／Grouped IC／週轉率／事件過濾<strong>現在真的會關</strong>。以前前端只送 2 把鑰匙、後端也只讀那 2 把，其餘在半路被丟掉。</li>
+<li><strong>怎麼確保以後不再有幽靈</strong>：前後端各自對照同一份「開關清單」檔；清單裡每個 UI 開關都必須歸到四類之一（可改的 stage／可改的 module／後端鎖定／純前端），<strong>新增開關卻沒歸類，測試就紅</strong>。後端 12 條、前端 7 條測試。</li>
+<li><strong>可證偽</strong>：把修法改回舊行為 ⇒ 7 條測試立刻轉紅（不是綠燈裝飾）。</li>
+<li><strong>順手修好的</strong>：<code>npm run build</code> 本來是紅的（不是這次弄壞的），其中一條是真 bug——邊際 IC 表格在提早結束後才呼叫 React hook，會讓畫面狀態錯位。已修，build 轉綠。</li>
+<li><strong>順手登記的</strong>：一條既有解耦債（service 互相 import）本來沒登記，害每次改後端檔都誤報紅；已具名登記，待清。</li>
+</ul>
+<h2 id="已完成保留紀錄tiertoggle幽靈開關">（已完成，保留紀錄）TIERTOGGLE（幽靈開關）</h2>
 <ul>
 <li><strong>是什麼</strong>：IC 頁選「基礎」時畫面把 IC Decay、Grouped IC 關掉，但後端沒關，照跑。</li>
 <li><strong>為什麼要修</strong>：Decay 是 7 個 horizon 各算一次，39k 特徵時很重——很可能就是你昨天 50 分鐘跑不完的一大塊。而且「畫面關了後端沒關」本身就是說謊。</li>
