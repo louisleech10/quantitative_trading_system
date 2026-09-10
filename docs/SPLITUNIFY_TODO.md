@@ -1,6 +1,9 @@
 # SPLITUNIFY — TODO
 
-**SPEC**：`docs/SPLITUNIFY_SPEC.md`（**v3**）　**票**：`SPLITUNIFY`　**日期**：2026-09-11　**狀態**：v3，待 R3 三家審。
+**SPEC**：`docs/SPLITUNIFY_SPEC.md`（**v4**）　**票**：`SPLITUNIFY`　**日期**：2026-09-11　**狀態**：v4，待定向確認輪。
+**R3 審收斂**：`handoffs/reconcile/20260911-splitunify-x-review-r3/synth.md`（E1–E7）——
+🔴 三家分歧（composer／grok 判可進 B1、codex 判不可），依「看碼證不數人頭」採 codex：
+v3 的投影**把既有的答案窗 purge 規則弄丟了**（`event_split.py:114`），v4 以兩段式判定修復。
 **R2 審收斂**：`handoffs/reconcile/20260911-splitunify-x-review-r2/synth.md`（D1–D11；
 三家 verdict 一致「不可直接進 B1」，17 條全數採納）。
 **切法來源**：委員會 consult 共識（`handoffs/reconcile/20260910-splitunify-x-consult-r1/synth.md`，
@@ -34,6 +37,10 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
      `ic_filter_orchestrator.py:269-271` 明文 raise「looks like milliseconds, expected epoch
      seconds」。本票之時鐘一律 epoch **毫秒**，用 `pd.to_datetime(..., unit="ms")` 或
      `asi8 // 10**6` 自行歸一。
+  5. 🔴 **禁只用集合成員判定就決定 train／test**（R3 之 E1）——必須**先**驗答案窗跨界
+     （`label_end_ms` 進測試段或 source bars 缺 endpoint ⇒ purged），**再**做集合判定。
+     少了第一段等於刪掉 `event_split.py:114` 那道唯一擋標籤窗跨界洩漏的閘，
+     直接違反「不得刪除任一既有 guard」。
 - **本票之落點裁定（R2 之 D1）**：事件掃描端（`EventImportService`）**恆走** event-study-only，
   本票**不新增** universe 供給路徑（列為殘留 `R-5`）。IC 路徑才傳 canonical boundary。
 - **防假綠**：驗收讀 pytest 自己的 summary 行（非 harness rc）；
@@ -172,8 +179,14 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   → `EventSplitPlan`。🔴 `bucket_ms` 是 R2 之 D8 補上的——v2 要求投影產 `clusters`
   卻沒給桶寬參數，介面不可執行。
 - 實作要點：
-  1. 成員判定＝**集合**：`ts ∈ feature_index[train_plan.row_index]` ⇒ train；
+  1. 🔴 **兩段式判定，先後不可調（R3 之 E1）**：**先**驗答案窗——
+     `label_end_ms >= test_start_ms` 而 `feature_cutoff_ms` 仍在 train 側，或
+     `label_start_ms`／`label_end_ms` 在 source bars 上缺 endpoint ⇒ **purged**；
+     **再**做集合成員判定決定 train／test。
+  2. 成員判定＝**集合**：`feature_cutoff_ms ∈ feature_index[train_plan.row_index]` ⇒ train；
      `∈ feature_index[test_plan.row_index]` ⇒ test；否則 purged。禁 `time_bounds` 區間。
+  3. `event_keys` 以 **`event_id` 為鍵**與 manifest 對位，**禁 positional zip**（R3 之 E2）——
+     `dedupe.py:46` 會依 `(label_start_ms, event_id)` 重排 manifest。
   2. train／test 進 `assignments`（`split_label` 仍只有兩值）；purged 進**獨立**的
      `purged`，reason ＝ `interval_crosses_split_boundary`（契約既有字面）。
   3. `index_kind != "positional"` ⇒ raise；同時落兩態 ⇒ raise；
@@ -201,11 +214,11 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   既有 caller：無（B3 接）。
 - 不可做：不得讀 config；不得自算 purge／embargo；不得回退成二態；
   不得把 purged 併進 `assignments`；不得產出空 plan 冒充未切分。
-- 邊界：①`event_index` 為空 ⇒ 三態皆空（不 raise）；②事件不在 `feature_index` ⇒ purged；
+- 邊界：①`event_keys` 為空 ⇒ 三態皆空（不 raise）；②事件不在 `feature_index` ⇒ purged；
   ③全部落隔離區 ⇒ `assignments` 空而 `purged` 為全集（合法，`tables.py:201` 已明載不得誤擋）。
 - 風險緩解：mutation `M-SU-1`..`M-SU-7`、`M-SU-12`。
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py` rc=0：
-  `len(assignments) + len(purged) == len(event_index)` 且兩者 event_id 交集為空；
+  `len(assignments) + len(purged) == len(event_keys)` 且兩者 event_id 交集為空；
   `set(summary.keys()) == {12 鍵}`（逐鍵斷言）；
   `clusters` 與舊 `split_events` 之 `clusters` 逐值相同（`pd.testing.assert_frame_equal`）；
   五個邊界各一條（空 index／單事件／全 purged／未匹配時間戳／秒 vs 毫秒單位錯）。
@@ -257,6 +270,8 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   2. `pipeline.run` 簽名新增 canonical boundary 與 `feature_index`（選填）；
      給定 ⇒ 走投影；未給定 ⇒ 走 Task 3.3。
   3. `split_events` 保留為歷史路徑／G-3a 對照，生產呼叫點數釘為 **0**。
+  4. 🔴 **投影路徑呼叫前 assert `config.embargo_ms is None and config.embargo_ms_by_symbol is None`**
+     （R3 之 E5：C-5 說該檢查住呼叫端，但 v3 的 Task 3.1 要點與驗證都沒列 ⇒ 會漏做）。
 - 修改檔案：`momentum/Analysis/event_samples/pipeline.py`、
   `momentum/Analysis/ic_filter_orchestrator.py`、`momentum/core/split_preview.py`。
   既有 caller：`ic_feed.py`、`tables.py`、`baseline.py`、`pattern_bridge.py`
@@ -272,7 +287,8 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   只准變短、變長判紅；變短時依 Task 1.3 維護協議同 PR 更新清單並具名；
   (C) `venv/bin/python scripts/freeze_evtlabel_survivor_golden.py`（G-2 之 sha256 未漂移）；
   (D) `venv/bin/python -m pytest -q tests/momentum/event_samples -k split_events_production_call_count`
-  ——釘選生產路徑對 `split_events` 之呼叫次數 `== 0`（R2 之 D10：v2 只寫在本檔、SPEC 漏了，已補齊）。
+  ——釘選生產路徑對 `split_events` 之呼叫次數 `== 0`（R2 之 D10：v2 只寫在本檔、SPEC 漏了，已補齊）；
+  (E) `venv/bin/python -m pytest -q tests/momentum/event_samples -k embargo_must_be_none` rc=0（R3 之 E5）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：B4 只加 metadata 欄位，不改接線。
 
@@ -309,7 +325,7 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
      前端 `EventTablesPanel.tsx:352` 今日對 L3 顯示「train 0／test 0／purge 0」，
      正是 C-0 要禁的假 OOS 數字。
   3. 🔴 `event_forward_return_table` 之 `common` 增 `estimand_scope="full_sample_not_oos"`
-     （沿用 `tables.py:598-599` 之 `estimand_note` 模式）。理由：該表在 `split_plan=None` 時
+     （沿用 `pipeline.py:598-599` 之揭露欄位模式；欄位寫進 `tables.py:130-151` 之 `_common_constraint_block`，該區塊於 `:279` 掛上 `common`）。理由：該表在 `split_plan=None` 時
      **確實跑全 manifest 事件**（`tables.py:211-238`，無 `split_label=="test"` 過濾），
      只有 `ci` 與 `formal_pooled_inference_allowed` 被降級（R2 之 D4）。
   4. 🔴 前端事件掃描頁**必須**渲染 `capability.split` 與 `capability.reason`；
@@ -319,7 +335,7 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   5. **沿用既有分派機制**，不新造第二套。
 - 修改檔案：`api/services/case_import_service.py`、`momentum/Analysis/event_samples/pipeline.py`、
   `momentum/Analysis/event_samples/tables.py`、
-  `frontend/src/components/ic-analysis/EventTablesPanel.tsx`、`frontend/src/lib/types.ts`。
+  `frontend/src/components/ic-analysis/EventTablesPanel.tsx`、`frontend/src/components/ic-analysis/eventTablesPanelCapability.test.tsx`（**新**）、`frontend/src/lib/types.ts`。
   既有 caller：前端事件掃描頁（**本 Task 要改它**，不再是「型別不變」）。
 - 不可做：不得以 `test_fraction` 自行切分後宣稱 OOS；不得填 0 冒充；
   不得只改後端 reason 而不改畫面。
@@ -331,7 +347,7 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   `capability["reason"] == "canonical_feature_universe_unavailable"`；
   **兩條 reason 皆** `assert "n_test" not in summary`（含既有 L3 之回歸）；
   `event_forward_return_table["common"]["estimand_scope"] == "full_sample_not_oos"`；
-  `cd frontend && node_modules/.bin/vitest run src/components/ic-analysis/EventTablesPanel.test.tsx`
+  `cd frontend && node_modules/.bin/vitest run src/components/ic-analysis/eventTablesPanelCapability.test.tsx`
   rc=0（兩條 reason 各一 mock payload，斷言文案不同且無 train/test/purge 計數列）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：per-symbol 支援（R-1）不影響本分支；`R-5` 若日後實作，
@@ -375,6 +391,7 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 | `M-SU-10` | 無 universe 時仍按事件數切並宣稱 OOS | `test_splitunify_event_study_only.py` | B3 |
 | `M-SU-11` | boundary builder 之 rows 或 **ms** 任一不同源（含 `test_start_ms` 略過 purge） | `test_splitunify_boundary.py -k same_source` ＋ `-k ms_same_source` | B2a |
 | `M-SU-12` | 事件 ms 與 feature index 單位未歸一（秒／毫秒混用） | `test_splitunify_derive.py -k unit_normalize` | B2 |
+| `M-SU-13` | 拿掉第一段答案窗 purge（只留集合成員判定） | `test_splitunify_golden.py -k leakage_negative` ＋ `test_splitunify_derive.py -k answer_window` | B2b |
 | `C0` | 只改註解（對照組） | 必須仍綠 | 全批 |
 
 ---
@@ -386,6 +403,6 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 | `R-1` | per-symbol 投影（讓多標的批能跑） | needs-research | `base_universe_hash` 在多標的下之唯一性語意未定；先 fail-closed 比先算錯好 |
 | `R-2` | `baseline`／`tables`／`pattern_bridge` 之 OOS 數值變動量 | blocked-by | 待 B2 之 G-3a 遷移報告實跑才有數字 |
 | `R-3` | UAT 項目更新 | user-ruling | 使用者已裁定 UAT 一律最後 |
-| `R-4` | `extract_event_patterns` 無 caller（未接線） | blocked-by | 本票只保證其消費之 `assignments` 語意不變；接線屬另一票 |
+| `R-4` | `extract_event_patterns` 無 **production** caller（測試 caller 8 處） | blocked-by | 本票只保證其消費之 `assignments` 語意不變；接線屬另一票 |
 | `R-5` | 事件掃描端取得 post-trim feature universe | needs-research | 要新增 `features_run_id` 跨棧參數（請求模型／前端／契約／UAT 全動），且 `EventImportService` 目前完全不碰 FF run ⇒ 超出本票；R2 之 D1 裁定事件掃描端恆走 event-study-only。日後實作**不得**刪除 Task 3.3 分支 |
 | `SU-RESID-1` | attribution checker 擋不住歸屬錯置 | needs-research | 需「決議項 ↔ finding 語意對應」之機械判準，屬治理工具研究 |
