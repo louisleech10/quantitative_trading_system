@@ -263,3 +263,70 @@ def test_contract_key_drift_is_fail_closed(monkeypatch):
             feature_timeframe="1h", timeframe_seconds=TF_SECONDS,
             label_source="x", statistic_kind="y", n_events_consumed=2,
         )
+
+
+def _staged_and_report(*, label_source: str):
+    """與上方 service hook 測試同源之 fixture（165 事件、136 正／29 反）。"""
+    wins = _windows(165)
+    prepared = SimpleNamespace(
+        normalized_spec_bytes=json.dumps(SPEC_H1).encode("utf-8"), windows=wins,
+    )
+    recs = [
+        {"event_id": w.event_id, "symbol": w.symbol, "timeframe": "12h", "label": 1 if i < 136 else 0}
+        for i, w in enumerate(wins)
+    ]
+    staged = {
+        "prepared": prepared, "records": tuple(recs), "timeframe_seconds": TF_SECONDS,
+        "event_label_by_id": {w.event_id: 0.0 for w in wins},
+    }
+    statistic = "binary_discrimination" if label_source == "imported_binary_label" else "conditional_ic"
+    report = {"metadata": {"timeframe": "1h", "event_filter": {
+        "label_source": label_source, "statistic_kind": statistic}}}
+    return staged, report
+
+# ══════════════════════════════════════════════════════════════════════════
+# EVTLABEL Task 3.6：報告必須說出「主統計是哪一個」
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_binary_run_discloses_primary_statistic_and_effect_gate():
+    """🔴 summary 表同時有 `ic_mean` 與 `rank_biserial` 兩欄（報酬版留第二欄）。
+
+    不揭露主統計 ⇒ 使用者無從得知**倖存者是依哪一欄篩出來的**。
+    """
+    from api.services.ic_analysis_service import _inject_label_rule_disclosure
+
+    staged, report = _staged_and_report(label_source="imported_binary_label")
+    report["metadata"]["thresholds"] = {"rank_biserial_min": 0.10}
+    report["metadata"]["event_filter"]["permutation_receipt"] = {"seed": 7, "n_perm": 200}
+    report["metadata"]["event_filter"]["negative_control"] = {"n_observed": 3, "q95": 1}
+    _inject_label_rule_disclosure(staged, report)
+    rule = report["metadata"]["event_label_rule"]
+    assert rule["primary_statistic"] == "rank_biserial"
+    assert rule["secondary_statistic"] == "ic_mean"
+    assert rule["effect_gate"] == {"field": "abs(rank_biserial)", "min": 0.10}
+    assert rule["imported_binary_label"]["used"] is True
+    assert rule["permutation_receipt"]["n_perm"] == 200
+    assert rule["negative_control"]["q95"] == 1
+
+
+def test_return_rule_run_does_not_get_binary_disclosure():
+    """報酬版 run ⇒ 不寫這些鍵（否則報告會宣稱用了 0/1）。"""
+    from api.services.ic_analysis_service import _inject_label_rule_disclosure
+
+    staged, report = _staged_and_report(label_source="event_label_value")
+    _inject_label_rule_disclosure(staged, report)
+    rule = report["metadata"]["event_label_rule"]
+    for key in ("primary_statistic", "effect_gate", "permutation_receipt", "negative_control"):
+        assert key not in rule, f"報酬版不該有 {key}"
+    assert rule["imported_binary_label"]["used"] is False
+
+
+def test_effect_gate_min_is_not_hardcoded_when_thresholds_absent():
+    """門檻取不到 ⇒ 寫 None，**不猜**、不硬編第二份預設值。"""
+    from api.services.ic_analysis_service import _inject_label_rule_disclosure
+
+    staged, report = _staged_and_report(label_source="imported_binary_label")
+    report["metadata"].pop("thresholds", None)
+    _inject_label_rule_disclosure(staged, report)
+    assert report["metadata"]["event_label_rule"]["effect_gate"]["min"] is None

@@ -305,6 +305,34 @@ def _inject_label_rule_disclosure(staged: Dict[str, Any], report: Any) -> None:
         # R1 `CODEX-R1-P1-01`：揭露之分母＝**實際被消費**的事件（已排除非本次 run symbol 者）。
         consumed_event_ids=list((staged.get("event_label_by_id") or {}).keys()),
     )
+    # ── EVTLABEL Task 3.6：報告必須說出「這次的主統計是哪一個」──────────────
+    # 🔴 不寫的話，使用者看到 summary 表同時有 `ic_mean` 與 `rank_biserial` 兩欄，
+    #    無從得知**倖存者是依哪一欄篩出來的**。兩欄都在（報酬版留第二欄）正是要揭露的理由。
+    if str(info.get("label_source")) == "imported_binary_label":
+        rule = metadata["event_label_rule"]
+        rule["primary_statistic"] = "rank_biserial"
+        rule["secondary_statistic"] = "ic_mean"
+        rule["p_assumption"] = "iid_events"
+        rule["effect_gate"] = {"field": "abs(rank_biserial)", "min": _rank_biserial_min_of(report)}
+        binary = dict(rule.get("imported_binary_label") or {})
+        binary["used"] = True
+        rule["imported_binary_label"] = binary
+        # 置換與負對照之收據（orchestrator 寫進 event_filter；此處搬進 label 規則區塊）
+        for key in ("permutation_receipt", "negative_control"):
+            if info.get(key) is not None:
+                rule[key] = info[key]
+
+
+def _rank_biserial_min_of(report: Any) -> Optional[float]:
+    """由報告已寫的門檻揭露取效應量門檻；取不到 ⇒ None（不猜、不硬編第二份預設值）。"""
+    meta = (report or {}).get("metadata") if isinstance(report, dict) else None
+    thresholds = (meta or {}).get("thresholds") if isinstance(meta, dict) else None
+    if isinstance(thresholds, dict) and thresholds.get("rank_biserial_min") is not None:
+        try:
+            return float(thresholds["rank_biserial_min"])
+        except (TypeError, ValueError):
+            return None
+    return None
 
 
 def _inject_isolation_source(staged: Dict[str, Any], report: Any) -> None:

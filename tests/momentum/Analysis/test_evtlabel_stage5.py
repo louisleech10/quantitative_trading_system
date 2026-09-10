@@ -270,3 +270,50 @@ def test_return_rule_thresholds_unchanged_without_kwarg():
     removed = log["removed_features"]
     assert passed == ["f"]
     assert "rank_biserial" not in removed and "binary_unavailable" not in removed
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ④ 冗餘分數與揭露（Task 3.6 要點 5；B4 brief 曾具名為「未實作」，本批補上）
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_redundancy_score_uses_abs_rank_biserial_in_binary_mode():
+    """🔴 匯入標籤模式下，冗餘挑選必須用**主統計**當分數。
+
+    兩個高度相關的特徵只能留一個。若仍用報酬版 `ic_mean` 當分數，留下來的會是
+    「報酬版 IC 較高」那一個——而使用者要的是**分辨力**較強的那一個。
+    """
+    orch = _orch()
+    stage5 = {"summary_table": [
+        {"feature_name": "strong_reverse", "ic_mean": 0.001, "rank_biserial": -0.90},
+        {"feature_name": "weak_forward", "ic_mean": 0.500, "rank_biserial": 0.10},
+    ]}
+    scores, tiebreaker = orch._redundancy_scores(BINARY_INFO, stage5, {"strong_reverse": 9.9})
+    assert tiebreaker == "abs_rank_biserial"
+    assert scores["strong_reverse"] == pytest.approx(0.90)
+    assert scores["weak_forward"] == pytest.approx(0.10)
+    assert scores["strong_reverse"] > scores["weak_forward"], "強反向必須贏過弱正向"
+
+
+def test_redundancy_score_unchanged_for_return_rule_event_run():
+    """報酬版事件 run 之行為一字不變（仍用 ic_mean）。"""
+    orch = _orch()
+    stage5 = {"summary_table": [{"feature_name": "f", "ic_mean": 0.3, "rank_biserial": -0.9}]}
+    scores, tiebreaker = orch._redundancy_scores(
+        {"label_source": "event_label_value"}, stage5, {"f": 1.0})
+    assert tiebreaker == "ic_mean" and scores["f"] == 0.3
+
+
+def test_redundancy_score_unchanged_for_global_run():
+    """全域 run：原樣回 icir_scores、不寫 tiebreaker 鍵。"""
+    orch = _orch()
+    scores, tiebreaker = orch._redundancy_scores(None, {"summary_table": []}, {"f": 2.0})
+    assert scores == {"f": 2.0} and tiebreaker is None
+
+
+def test_non_finite_rank_biserial_sinks_to_bottom():
+    """算不出 rank-biserial 的欄不得在冗餘挑選裡勝出 ⇒ 沉到 -inf。"""
+    orch = _orch()
+    stage5 = {"summary_table": [{"feature_name": "dead", "ic_mean": 0.9, "rank_biserial": float("nan")}]}
+    scores, _ = orch._redundancy_scores(BINARY_INFO, stage5, {})
+    assert scores["dead"] == float("-inf")

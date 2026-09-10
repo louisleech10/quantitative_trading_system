@@ -3484,6 +3484,20 @@ class ICFilterOrchestrator:
         """
         if not is_event_label_consumed(event_info):
             return icir_scores, None
+        # 🔴 EVTLABEL Task 3.6 要點 5：匯入標籤模式之主統計是 `rank_biserial`，
+        #    冗餘挑選若仍拿報酬版 `ic_mean` 當分數，**留下來的那一個就不是分辨力最強的那一個**
+        #    ——兩個高度相關的特徵中，被保留的會是報酬版 IC 較高者，而使用者要的是分辨力。
+        #    取絕對值理由同效應量閘：負值代表反向但一樣能分。
+        if str((event_info or {}).get("label_source")) == "imported_binary_label":
+            scores = {}
+            for row in ((stage5_results or {}).get("summary_table") or []):
+                if not isinstance(row, dict):
+                    continue
+                rb = row.get("rank_biserial")
+                scores[str(row.get("feature_name"))] = (
+                    abs(float(rb)) if isinstance(rb, (int, float)) and np.isfinite(rb) else float("-inf")
+                )
+            return scores, "abs_rank_biserial"
         scores = {
             str(row.get("feature_name")): row.get("ic_mean")
             for row in ((stage5_results or {}).get("summary_table") or [])
@@ -4273,6 +4287,15 @@ class ICFilterOrchestrator:
                 config, alpha_effective=alpha_effective, fdr_method=fdr_method,
             )
             threshold_log["output_features"] = len(passed_features)
+            # 收據寫回 event_info ⇒ service 之 `_inject_label_rule_disclosure` 搬進報告。
+            # 🔴 不寫的話，使用者看不到「置換跑了幾次、區塊多長、隨機能篩出幾個」，
+            #    也就無從判斷 suppressed 是怎麼來的。
+            if self._binary_oracle_receipt:
+                receipt = dict(self._binary_oracle_receipt)
+                negative_control = receipt.pop("negative_control", None)
+                event_info["permutation_receipt"] = receipt
+                if negative_control is not None:
+                    event_info["negative_control"] = negative_control
             # 排序：主統計為 |rank_biserial|（NaN 置底）；名稱作 tiebreak 以求可重現。
             summary_table.sort(
                 key=lambda row: (
