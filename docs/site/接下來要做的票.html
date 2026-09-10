@@ -90,7 +90,7 @@ R-6 的意思：B1.4 那支現成的 AUC 函式綁在事件切分上，這票不
 </ol>
 <h3 id="裁定910r-1-照-claude-方式先區塊置換交付加權法另票插座留著r-2-歸-gap-4r-3-只影響報酬版欄主線不受影響維持r-5-修正h-掃描無意義k-掃描有意義真殘留你要時做新增-r-8非單調u-型特徵的辨別診斷spearmanauc-只看單調關係u-型特徵會被篩掉留給-ml第一版不加你發現漏了再開">裁定（9/10）：R-1 照 Claude 方式（先區塊置換交付、加權法另票、插座留著）；R-2 歸 GAP-4；R-3 只影響報酬版欄、主線不受影響（維持）；R-5 修正＝h 掃描無意義、<strong>k 掃描有意義</strong>（真殘留，你要時做）；<strong>新增 R-8</strong>＝非單調（U 型）特徵的辨別診斷——Spearman／AUC 只看單調關係，U 型特徵會被篩掉留給 ML；第一版不加，你發現漏了再開。</h3>
 <ul>
-<li>名稱：標籤版統計不叫 IC（後端 <code>statistic_kind=binary_discrimination</code>），前端表頭「辨別力（rank-biserial）」；你說名稱無所謂，照此。</li>
+<li>名稱（9/10 你更正）：<strong>不自創詞，一律用統計學標準名</strong>——表頭 <code>AUC</code>、<code>rank-biserial r</code>、<code>U</code>（Mann-Whitney）、<code>p</code>、<code>q</code>（Benjamini–Hochberg FDR）、<code>n⁺</code>／<code>n⁻</code>；「辨別力」這種自創詞不用。後端 <code>statistic_kind=binary_discrimination</code> 只是內部鍵名。</li>
 <li>FF 頁的相關性熱圖（Pearson／Spearman／Kendall）是「特徵對特徵」的冗餘圖，三種都只看單調，不是 R-8 的工具。</li>
 </ul>
 <h3 id="r-3-出場時機跟-ic-有什麼關係">R-3 出場時機跟 IC 有什麼關係？</h3>

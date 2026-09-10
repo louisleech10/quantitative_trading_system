@@ -78,6 +78,7 @@
   3. `return_formula`：`_return_formula(mode, entry) -> str`（查表；表在 `event_label_mode.json["return_formula_by_mode"]`）。
   4. `imported_binary_label = {"present": all("label" in r for r in records), "n_pos": sum(label==1), "n_neg": sum(label==0), "used": False}`；`n_events_consumed = len(staged["event_label_by_id"])`。
   5. 鍵集斷言：`set(out) == set(contract["event_label_rule_keys"])`，不等 ⇒ raise（fail-closed）。
+  5b. `uniqueness`（R-1 不重工預留）：`uniqueness_from_windows(windows)`——對每事件數「label 視窗 `[start,end)` 與之相交（含自己）」之事件數 c，`w=1/c`；回 `{mean, min, n_eff=Σw, n_overlapping_pairs}`；O(n²) 於 ≤ 數千事件可接受；windows 空 ⇒ 全 null。只揭露。
   6. 掛點：`_inject_isolation_source` 之兩個呼叫處緊接呼叫 `_inject_label_rule_disclosure(staged, report)`。
 - 修改檔案：`api/services/ic_analysis_service.py::_inject_label_rule_disclosure`（新）、呼叫處（與 `_inject_isolation_source` 同兩處）；`momentum/Analysis/contracts/event_label_mode.json`（新，本 Task 先建 `event_label_rule_keys`、`return_formula_by_mode` 兩鍵；其餘鍵 Task 3.1 補）。既有 caller：無新 caller。
 - 路徑：
@@ -300,7 +301,7 @@
 
 ### Task 3.5 — `mann_whitney_table`（`票 EVTLABEL-④`）
 - SPEC ref：Task 3.5　目標：向量化 MW／AUC／rank-biserial。
-- 輸入 / 輸出：`features: pd.DataFrame (n×p)`、`y: np.ndarray[int] (n,)`、`min_class_n:int` → `pd.DataFrame(index=feature, columns=[auc, rank_biserial, mw_u, p_value, n_pos, n_neg, n_used, status])`。
+- 輸入 / 輸出：`features: pd.DataFrame (n×p)`、`y: np.ndarray[int] (n,)`、`min_class_n:int`、`weights: Optional[np.ndarray]=None`（R-1 預留；本票一律 None；非 None ⇒ `NotImplementedError`，禁靜默忽略）→ `pd.DataFrame(index=feature, columns=[auc, rank_biserial, mw_u, p_value, n_pos, n_neg, n_used, status])`。
 - 實作要點：
   1. `Xf = np.where(np.isfinite(X), X, np.nan)`（inf 亦視為缺值並計入 `n_used` 扣除；inf 在上游已被閘，此處只防禦）；**一次**呼叫 `mannwhitneyu(Xf[y==1], Xf[y==0], alternative="two-sided", method="auto", axis=0, nan_policy="omit")`（R3 codex P1-03：**禁**逐欄 python 迴圈；scipy 1.13.1）；`n_pos_c = isfinite(Xf[y==1]).sum(0)`、`n_neg_c` 同；`min(n_pos_c,n_neg_c) < min_class_n` 之欄 ⇒ `unavailable:class_below_min`（結果值仍算但 status 非 ok）；`n_used=n_pos_c+n_neg_c`；全 NaN 欄 ⇒ `unavailable:all_nan`。
   2. `auc = U/(n_pos*n_neg)`；`rank_biserial = 2*auc-1`；常數欄 ⇒ **定案：`status="unavailable:constant"`**（scipy 對全 ties 之 p 定義依版本而異，不冒充 0.5/1.0）。
@@ -387,7 +388,7 @@
 - 輸入 / 輸出：`config.event_label_mode`、`report.summary_table[0]` 鍵、`metadata.label_mode`、`metadata.event_label_rule` → UI。
 - 實作要點：
   1. `EventBatchDisclosurePanel`：radio `ic-param-label-mode`（auto／return_rule／imported_binary），旁顯示 `正 ${n_pos}／反 ${n_neg}`（自 batch facts `label`）；`imported_binary` 選中時 scan 區停用並提示。
-  2. `ICSummaryTable`：`isBinary = 'rank_biserial' in rows[0]`；binary 欄序 `feature_name, rank_biserial, auc, mw_p_value, mw_p_value_adj, n_pos, n_neg, | ic_mean(第二欄), t_stat, p_value_adj, …`；表頭文案由 `icLabelRule.ts::binaryColumnLabels()` 單點。
+  2. `ICSummaryTable`：`isBinary = 'rank_biserial' in rows[0]`；**表頭一律用統計學標準名、不自創**（使用者 2026-09-10）：`AUC`（ROC AUC）、`rank-biserial r`（Cureton 1956）、`U`（Mann-Whitney U）、`p`（Mann-Whitney）、`q`（Benjamini–Hochberg FDR）、`n⁺`／`n⁻`；tooltip：「AUC 0.5＝分不開、1＝完美；r＝2·AUC−1，正負＝方向」；binary 欄序 `feature_name, rank_biserial, auc, mw_p_value, mw_p_value_adj, n_pos, n_neg, | ic_mean(第二欄), t_stat, p_value_adj, …`；表頭文案由 `icLabelRule.ts::binaryColumnLabels()` 單點。
   3. `icLabelRule.ts` 行 4 `used=true` 文案（Task 1.2 已留分支）。
   4. `DegradedBanner`：`metadata.label_mode.effective==='return_rule' && requested==='auto' && reason` ⇒ 顯示 `已自動改用報酬規則：${reasonText[reason]}`（reason 文案表由 JSON `label_mode_reasons` 匯出至前端常數，vitest 對證）；`survivor_output.status==='suppressed' && reason==='negative_control_failed'` ⇒ 紅色 banner「負對照失敗：本次倖存者不可餵 ML」。
   5. 新 `LabelModeBanner`（`data-testid="label-mode-banner"`，R1 C14b）：`effective==='imported_binary'` ⇒ 非 degrade 之摘要「本次 IC 對象＝你匯入的 0/1 標籤（selection 段正 n_pos_selection／反 n_neg_selection）；報酬版 IC 在第二欄」；`permutation_receipt.status==='unavailable:insufficient_blocks'` ⇒ 琥珀 banner「label 視窗太長、可置換區塊不足：無法做依賴感知放行，倖存者不可餵 ML（預期限制）」（R2 D3）；掛 `page.tsx` `DegradedBanner` 之後。
