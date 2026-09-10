@@ -44,6 +44,23 @@
 <li><strong>triple-barrier 出場</strong>（殘留 R-3；等回測層成熟）</li>
 </ul>
 <hr />
+<h2 id="討論結論910-起累積新的寫上面">討論結論（9/10 起累積；新的寫上面）</h2>
+<h3 id="r-1-事件序列的依賴業界和統計學怎麼處理">R-1 事件序列的依賴：業界和統計學怎麼處理</h3>
+<p>問題再講一次：兩個事件的答案窗重疊，等於同一段未來被算了兩次，「獨立樣本數」被高估，p 值偏小。</p>
+<p>業界／統計常見五種做法（由老到新）：</p>
+<ol>
+<li><strong>HAC／Newey-West 型修正</strong>（Hansen–Hodrick 1980）：算相關時，把「相鄰 L 根之間的自相關」加回標準誤，L＝重疊長度。IC 主線現在對全域 run 就是用這個（HAC lag＝horizon）。<strong>限制</strong>：假設樣本等距；事件不等距時 L 定不準。</li>
+<li><strong>叢集標準誤</strong>（Petersen 2009）：把「答案窗互相重疊的事件」綁成一叢，只在叢與叢之間假設獨立。事件研究最常用。<strong>限制</strong>：叢要夠多（慣例 ≥30～50 叢才穩）。</li>
+<li><strong>區塊重抽／區塊置換</strong>（Politis–Romano）：不用公式，直接把相鄰事件綁成一塊一起打亂或重抽，看統計量在「沒有訊號」時的分布。<strong>這票採的就是這個</strong>（block permutation），優點是不用假設分布；限制是塊要 ≥10 個（R-7）。</li>
+<li><strong>樣本唯一性加權</strong>（López de Prado《AFML》第 4 章）：每個事件算「它的答案窗平均和幾個別的事件重疊」（concurrency），權重＝1／重疊數；有效樣本數＝權重總和。統計量和 p 值用有效樣本數算。<strong>這是量化圈做「事件型標籤」最標準的做法</strong>，而且平台在 GAP-3 已經有算 uniqueness／cluster 權重（目前只進 manifest，沒接進統計）。</li>
+<li><strong>日曆時間組合法</strong>（Fama 1998，事件研究）：不看單一事件，把同一天所有活著的事件合成一個「組合報酬」序列，變成等距時間序列再用普通 t 檢定。適合「事件後報酬」表，不適合「特徵分不分得開」。</li>
+</ol>
+<p><strong>對這票的意思</strong>：</p>
+<ul>
+<li>第一版用 3（區塊置換）是保守且不用假設的選擇，委員三家同意。</li>
+<li>R-1 的「研究題目」其實已經有答案方向＝<strong>做法 4</strong>：把 GAP-3 已算好的 uniqueness 權重接進 Mann-Whitney／AUC（加權版 U 統計量＋有效樣本數算 p），這樣長視窗（R-7 那種塊不夠的情況）也能給 p 值，不必靠置換。這要委員會定式子＋oracle，屬另一票；先記在這裡。</li>
+<li>全域 run 用的做法 1（HAC）在事件 run 是錯的工具（不等距），所以事件型的 HAC lag 我們沒動、只揭露——這也是 R-1 寫 needs-research 的原因。</li>
+</ul>
 <h2 id="你現在要做的">你現在要做的</h2>
 <p>看 <code>EVTLABEL規格白話.md</code> 的殘留段（R-1、2、3、5、6、7 各有舉例），然後告訴我：</p>
 <ol>
