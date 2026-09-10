@@ -1,6 +1,11 @@
 # SPLITUNIFY — SPEC
 
-> **狀態（2026-09-11 凌晨）**：**v4**。R3 三家審收斂檔：
+> **狀態（2026-09-11 凌晨）**：**v5（B1 放行版）**。R4 定向確認輪收斂檔：
+> `handoffs/reconcile/20260911-splitunify-x-review-r4/synth.md`（F1–F4）——三家對「哪裡還沒
+> 寫清楚」一致，只在「是否擋 B1」分歧；主委兩者都採：**先修（codex 立場）但不再開一輪
+> （另兩家對嚴重度的判斷）**，因為 codex 已把三條的修法寫成可直接落地的式子。
+> 收斂趨勢 R1 13(3 P0) → R2 11(3 P0) → R3 7(0 P0) → R4 4(0 P0)，套用 v5 後**進 B1**。
+> R3 三家審收斂檔：
 > `handoffs/reconcile/20260911-splitunify-x-review-r3/synth.md`（**E1–E7**）。
 > 🔴 R3 三家分歧（composer／grok 判「可進 B1」、codex 判「不可」），
 > 依「看碼證不數人頭」採 codex——其 `CODEX-R3-P1-02` 指出 v3 的投影
@@ -172,12 +177,41 @@ def derive_event_split_from_plans(
 ⇒ 用位置對位會**靜默錯分**，連 G-3b 的 oracle 都可能對錯 event。
 v3 的 `event_index: pd.Index`（只有時間、無身份）不足以做這件事。
 
+🔴 **producer 具名（R4 之 F2；`CODEX-R4-P1-02`）**：`event_keys` 由 **B2b 的具名 helper**
+`build_event_keys(receipts: AlignmentReceipts, *, selected_timeframe: str) -> pd.DataFrame`
+產生——以 `receipts.event_level`（id／label／symbol／trigger context）與 `receipts.per_tf`
+（`feature_cutoff_ms` 住這裡）依 **`event_id` ＋ 明示的 selected feature timeframe** keyed join。
+**B3 只傳遞，不在接線處臨時組裝。**
+🔴 保留 `event_id` 單鍵，但**必須要求每事件恰一個 selected `per_tf` row，否則 raise**——
+`receipts.per_tf` 每個 `(event_id, sub_tf)` 可有多列；而 `manifest.table` 只 merge trigger
+`timeframe`、**沒有** cutoff（`dedupe.py:39-49,101-120`、`types.py:37-40,55-60`）
+⇒ **不能**用 manifest 的 timeframe 代替 per-TF cutoff 的 timeframe。
+多 TF 之 `(event_id, timeframe)` 複合鍵列為殘留 `SU-RESID-2`。
+
 🔴 **判定順序是兩段式，且先後不可調（R3 之 E1；`CODEX-R3-P1-02`）**：
 
 **第一段——答案窗 purge（interval-aware，優先於一切）**：
-`label_end_ms` 跨進測試段（`label_end_ms >= test_start_ms`，而該事件之 `feature_cutoff_ms`
-仍在 train 側），或其 `label_start_ms`／`label_end_ms` 在 source bars 上**缺 endpoint**
-⇒ **purged**，reason ＝ `interval_crosses_split_boundary`（契約既有字面）。
+
+```python
+train_cutoff = feature_cutoff_ms in as_ms(feature_index[train_plan.row_index])
+if test_plan.row_index.size == 0:
+    raise ValueError("missing_test_plan: …")        # 先 fail-closed，禁與 None 比較
+test_start_ms = as_ms(feature_index[test_plan.row_index[0]])
+if train_cutoff and label_end_ms >= test_start_ms:  # 🔴 `>=` 必須保留
+    purge(event_id, reason="interval_crosses_split_boundary")
+```
+
+🔴 **`purge_gap`／`embargo` 是 row 單位，且已包含在 `test_plan.row_index[0]` 這個起點裡
+（`holdout_test_row_index` ＝ `arange(split_point + purge_gap + embargo, n)`）
+⇒ 不得再以毫秒相減**。這是 v4 與既有 `event_split.py:114`
+（`label_end_ms > test_start - embargo`）的差異來源：舊式的 `test_start` 是**緩衝之前**的
+邊界所以要減 embargo；canonical 的 `test_start_ms` 是**緩衝之後**的第一根，減了會重複扣。
+（R4 之 F1；式子逐字採 `CODEX-R4-P1-01`。）
+
+**source bars endpoint 之處置**：`label_start_ms`／`label_end_ms` 在 source bars 上是否
+**缺 endpoint**，**不進投影簽名**——投影沒有 bars，硬加會逼實作端發明第三個參數。
+明定為**上游 alignment 之可證明前置條件**（`AlignmentReceipts` 已持有，
+`alignment.py:197-213`）；G-5.3 改用 receipts 驗，**投影不重做**。
 
 🔴 **為什麼這段非有不可**：現行 `event_split.py:114` 逐字就是
 `elif int(rec["label_end_ms"]) > test_start - embargo: → purge`——這是事件側
@@ -477,8 +511,13 @@ D-002 亦須寫明「投影所用 `feature_index` 為 **post-trim**（EVTALIGN �
   2. `pipeline.run` 之簽名新增 canonical boundary 與 `feature_index`（選填）；
      給定時走投影，未給定時見 Task 3.3。
   3. `split_events` 保留為**歷史路徑／G-3a 對照**，但生產呼叫點數釘為 **0**。
-  4. 🔴 **呼叫投影前 assert `config.embargo_ms is None and config.embargo_ms_by_symbol is None`**
-     （R3 之 E5：C-5 說該檢查住呼叫端，但 v3 的 Task 3.1 要點與驗證都沒列 ⇒ 會漏做）。
+  4. 🔴 **事件 pipeline caller 呼叫投影前 assert**
+     `config.split.embargo_ms is None and config.split.embargo_ms_by_symbol is None`
+     （R3 之 E5＋R4 之 F3）。🔴 欄位層級是 `config.**split**.…`——`EventPipelineConfig`
+     只有 `split: EventSplitConfig`（`pipeline.py:31-45`），兩個 embargo 欄住
+     `EventSplitConfig`（`types.py:64-83`）；v4 寫 `config.embargo_ms` 會直接 `AttributeError`。
+     **只套事件 pipeline caller**——IC orchestrator 的 `_build_holdout_split_plan` 收的是
+     `ICConfig`，不得套同一個 assert。
 - 修改檔案：`momentum/Analysis/event_samples/pipeline.py`、
   `momentum/Analysis/ic_filter_orchestrator.py`、`momentum/core/split_preview.py`。
   既有 caller：`ic_feed.py`、`tables.py`、`baseline.py`、`pattern_bridge.py`

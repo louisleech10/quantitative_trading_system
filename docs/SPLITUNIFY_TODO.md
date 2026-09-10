@@ -1,6 +1,6 @@
 # SPLITUNIFY — TODO
 
-**SPEC**：`docs/SPLITUNIFY_SPEC.md`（**v4**）　**票**：`SPLITUNIFY`　**日期**：2026-09-11　**狀態**：v4，待定向確認輪。
+**SPEC**：`docs/SPLITUNIFY_SPEC.md`（**v4**）　**票**：`SPLITUNIFY`　**日期**：2026-09-11　**狀態**：**v5（B1 放行版）**。
 **R3 審收斂**：`handoffs/reconcile/20260911-splitunify-x-review-r3/synth.md`（E1–E7）——
 🔴 三家分歧（composer／grok 判可進 B1、codex 判不可），依「看碼證不數人頭」採 codex：
 v3 的投影**把既有的答案窗 purge 規則弄丟了**（`event_split.py:114`），v4 以兩段式判定修復。
@@ -175,25 +175,35 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 ### Task 2.2 — `derive_event_split_from_plans` 純函式（`票 SPLITUNIFY`）
 - SPEC ref：C-3、C-4、C-5　目標：由 canonical 邊界導出**完整**的 `EventSplitPlan`。
 - 輸入 / 輸出：
-  `(train_plan, test_plan, event_index, feature_index, *, manifest, bucket_ms=None)`
-  → `EventSplitPlan`。🔴 `bucket_ms` 是 R2 之 D8 補上的——v2 要求投影產 `clusters`
-  卻沒給桶寬參數，介面不可執行。
+  `(train_plan, test_plan, event_keys, feature_index, *, manifest, bucket_ms=None)`
+  → `EventSplitPlan`。🔴 `event_keys` 是 **DataFrame 不是 Index**（R3 之 E2；R4 之 F4：
+  v4 的本欄仍寫 `event_index`，與 SPEC C-4 互斥 ⇒ 只讀本檔的實作端會建錯簽名）。
+  🔴 `bucket_ms` 是 R2 之 D8 補上的——v2 要求投影產 `clusters` 卻沒給桶寬參數。
 - 實作要點：
-  1. 🔴 **兩段式判定，先後不可調（R3 之 E1）**：**先**驗答案窗——
-     `label_end_ms >= test_start_ms` 而 `feature_cutoff_ms` 仍在 train 側，或
-     `label_start_ms`／`label_end_ms` 在 source bars 上缺 endpoint ⇒ **purged**；
+  1. 🔴 **兩段式判定，先後不可調（R3 之 E1；式子逐字採 R4 之 F1）**：
+     `train_cutoff = feature_cutoff_ms ∈ as_ms(feature_index[train_plan.row_index])`；
+     `test_plan.row_index` 為空 ⇒ **先 fail-closed**（`missing_test_plan`），禁與 `None` 比較；
+     `test_start_ms = as_ms(feature_index[test_plan.row_index[0]])`；
+     `train_cutoff and label_end_ms >= test_start_ms` ⇒ **purged**（`>=` 必須保留）。
+     🔴 `purge_gap`／`embargo` 是 **row 單位且已含在 test row 起點**，**不得**再以毫秒相減。
+     source bars 缺 endpoint 之檢查**不進投影**——明定為上游 alignment 之前置條件，
+     G-5.3 用 `AlignmentReceipts` 驗。
      **再**做集合成員判定決定 train／test。
   2. 成員判定＝**集合**：`feature_cutoff_ms ∈ feature_index[train_plan.row_index]` ⇒ train；
      `∈ feature_index[test_plan.row_index]` ⇒ test；否則 purged。禁 `time_bounds` 區間。
-  3. `event_keys` 以 **`event_id` 為鍵**與 manifest 對位，**禁 positional zip**（R3 之 E2）——
+  3. `event_keys` 以 **`event_id` 為鍵**對位，**禁 positional zip**（R3 之 E2）——
      `dedupe.py:46` 會依 `(label_start_ms, event_id)` 重排 manifest。
+     🔴 **producer 具名（R4 之 F2）**：B2b 之 `build_event_keys(receipts, *, selected_timeframe)`，
+     由 `receipts.event_level` ＋ `receipts.per_tf`（`feature_cutoff_ms` 住這裡）keyed join；
+     **B3 只傳遞，不臨時組裝**；每事件須恰一個 selected `per_tf` row，否則 raise
+     （`manifest.table` 只有 trigger `timeframe`、無 cutoff，不可代替）。
   2. train／test 進 `assignments`（`split_label` 仍只有兩值）；purged 進**獨立**的
      `purged`，reason ＝ `interval_crosses_split_boundary`（契約既有字面）。
   3. `index_kind != "positional"` ⇒ raise；同時落兩態 ⇒ raise；
      🔴 單位歸一**自己做**（`pd.to_datetime(..., unit="ms")` 或 `asi8 // 10**6`），
      **禁呼叫** `_normalize_ic_time_index`——它是「秒」語意，餵毫秒會 raise
      （`ic_filter_orchestrator.py:269-271`）。v2 寫「復用該 normalizer」是錯的（R2 之 D7）。
-  4. `event_index` 語意＝ feature_cutoff（`ic_feed.py:36`），非裸 `decision_at_ms`；
+  4. `event_keys.feature_cutoff_ms` 語意＝ feature_cutoff（`ic_feed.py:36`），非裸 `decision_at_ms`；
      不在 `feature_index` 集合內 ⇒ purged，**禁 nearest／asof／ffill**。
   5. `clusters` 呼叫本 Task 一併抽出的 `build_time_clusters(manifest, bucket_ms)`
      （行為 byte 級不變，**保留** `_cluster_weight` 之 M5 mutation seam）。
@@ -270,8 +280,11 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   2. `pipeline.run` 簽名新增 canonical boundary 與 `feature_index`（選填）；
      給定 ⇒ 走投影；未給定 ⇒ 走 Task 3.3。
   3. `split_events` 保留為歷史路徑／G-3a 對照，生產呼叫點數釘為 **0**。
-  4. 🔴 **投影路徑呼叫前 assert `config.embargo_ms is None and config.embargo_ms_by_symbol is None`**
-     （R3 之 E5：C-5 說該檢查住呼叫端，但 v3 的 Task 3.1 要點與驗證都沒列 ⇒ 會漏做）。
+  4. 🔴 **事件 pipeline caller 呼叫投影前 assert**
+     `config.split.embargo_ms is None and config.split.embargo_ms_by_symbol is None`
+     （R3 之 E5＋R4 之 F3）。欄位層級是 `config.**split**.…`——v4 寫 `config.embargo_ms`
+     會直接 `AttributeError`（`pipeline.py:31-45` 之 `EventPipelineConfig` 只有 `split`）。
+     **只套事件 pipeline caller**，IC orchestrator 收 `ICConfig`，不得套。
 - 修改檔案：`momentum/Analysis/event_samples/pipeline.py`、
   `momentum/Analysis/ic_filter_orchestrator.py`、`momentum/core/split_preview.py`。
   既有 caller：`ic_feed.py`、`tables.py`、`baseline.py`、`pattern_bridge.py`
@@ -405,4 +418,5 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 | `R-3` | UAT 項目更新 | user-ruling | 使用者已裁定 UAT 一律最後 |
 | `R-4` | `extract_event_patterns` 無 **production** caller（測試 caller 8 處） | blocked-by | 本票只保證其消費之 `assignments` 語意不變；接線屬另一票 |
 | `R-5` | 事件掃描端取得 post-trim feature universe | needs-research | 要新增 `features_run_id` 跨棧參數（請求模型／前端／契約／UAT 全動），且 `EventImportService` 目前完全不碰 FF run ⇒ 超出本票；R2 之 D1 裁定事件掃描端恆走 event-study-only。日後實作**不得**刪除 Task 3.3 分支 |
+| `SU-RESID-2` | 多 TF 之 `(event_id, timeframe)` 複合鍵 | needs-research | 本票以「每事件恰一個 selected per_tf row，否則 raise」fail-closed；複合鍵要連 `EventSplitPlan` 之下游一起改 |
 | `SU-RESID-1` | attribution checker 擋不住歸屬錯置 | needs-research | 需「決議項 ↔ finding 語意對應」之機械判準，屬治理工具研究 |
