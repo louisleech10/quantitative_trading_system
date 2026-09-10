@@ -132,7 +132,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "M-P3-3-binary-not-validated", "3b", ORCH,
         "label_kind=derive_label_kind(\"imported_binary_label\")",
         "label_kind=derive_label_kind(\"imported_binary_label\") if False else None",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage3.py", "-k", "shifted_binary_map"],
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage3.py", "-k", "shared_contract or missing_owner"],
         "binary 向量不過 validate_event_given ⇒ 錯位一格應 raise 之斷言紅",
     ),
     Mutation(

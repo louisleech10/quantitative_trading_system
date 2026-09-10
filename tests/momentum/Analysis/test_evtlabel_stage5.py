@@ -163,7 +163,10 @@ def test_selection_row_missing_from_validated_vector_is_caught():
     _bind(orch, feats, y)
     extra_idx = feats.index.append(pd.to_datetime([1_700_000_000_000 + 999 * MS], unit="ms"))
     wider = feats.reindex(extra_idx).fillna(0.0)
-    with pytest.raises(AlignmentViolationError, match="consumed != validated"):
+    # 🔴 `M-P3-5b`：必須由**守衛①**（index 對齊）擋下，訊息要指名「有列不在驗過的向量裡」。
+    #    只斷言「有 raise」是不夠的——守衛③（逐列子集）也會擋下同一個輸入，
+    #    於是拿掉守衛① 仍然綠。mutation 首跑正是這樣漏掉的。
+    with pytest.raises(AlignmentViolationError, match="有列不在驗過的 0/1 向量裡"):
         orch._merge_binary_statistics(
             _table(wider), wider, BINARY_INFO, orch._config,
             alpha_effective=0.05, fdr_method="fdr_bh",

@@ -210,14 +210,55 @@ def test_missing_key_for_a_selected_row_raises():
         _bind(_orch(), feats, binary)
 
 
-def test_shifted_binary_map_is_caught_by_the_shared_contract():
-    """🔴 `M-P3-3`：0/1 向量整條錯位一格 ⇒ 必須被**同一條**契約擋下。"""
+def test_binary_vector_goes_through_the_shared_contract():
+    """🔴 `M-P3-3`：0/1 向量必須**真的**走 `validate_consumed_label` 的 event_given 分派。
+
+    怎麼證明「有走」：挑一個**只有那條契約會抓**的違規——兩個被消費的列綁到同一個
+    `event_id`。值域、缺鍵、長度都正常，唯一不對的是事件綁定。
+    契約沒被呼叫（例如 `label_kind` 被改成 None）⇒ 不會 raise ⇒ 本條紅。
+
+    🔴 為什麼不用「值被掉包」當反例：`bvals` 就是從 `event_binary_labels` 建的，
+    而契約比對的 `expected_values` 也是同一份 ⇒ 那條「逐值相等」在本路徑**結構上不可達**。
+    mutation 首跑正是因為用了不可達的反例而漏掉這條。
+    """
     feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 20)
     ms = (feats.index.asi8 // 10**6).astype("int64")
-    pattern = [1] * 20 + [0] * 20
-    shifted = {int(t) + MS: int(v) for t, v in zip(ms, pattern)}   # 整體平移一根
-    with pytest.raises(AlignmentViolationError):
-        _bind(_orch(), feats, shifted)
+    dup_owners = {int(t): "same-event" for t in ms}      # 全部綁到同一個事件
+    orch = _orch()
+    with pytest.raises(AlignmentViolationError, match="more than one consumed row"):
+        orch._resolve_label_mode_and_bind_binary(
+            {"label_source": "event_label_value"},
+            filtered_features=feats,
+            event_binary_labels=binary,
+            label_mode_requested="auto",
+            label_mode_hint=None,
+            split_context=None,
+            event_label_owners=dup_owners,
+            config=orch._config,
+            label_source="event_label_value",
+        )
+
+
+def test_binary_vector_missing_owner_is_caught_by_the_contract():
+    """同一條契約的另一道：被消費的列沒有任何事件綁得上 ⇒ raise。"""
+    feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 20)
+    owners = _owners(feats)
+    owners.pop(sorted(owners)[0])
+    orch = _orch()
+    with pytest.raises(AlignmentViolationError, match="no event_id bound"):
+        orch._resolve_label_mode_and_bind_binary(
+            {"label_source": "event_label_value"},
+            filtered_features=feats,
+            event_binary_labels=binary,
+            label_mode_requested="auto",
+            label_mode_hint=None,
+            split_context=None,
+            event_label_owners=owners,
+            config=orch._config,
+            label_source="event_label_value",
+        )
 
 
 def test_return_rule_info_keys_unchanged():
