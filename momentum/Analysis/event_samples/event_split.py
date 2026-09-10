@@ -36,6 +36,36 @@ def _cluster_weight(counts: "pd.Series") -> "pd.Series":
     return 1.0 / counts
 
 
+def time_cluster_bucket_ms(manifest: EventManifest, bucket_ms: Optional[int] = None) -> int:
+    """time-cluster 桶寬之**唯一**解析點（`None` ⇒ 觸發 TF 一根；混 TF 須顯式指定）。"""
+    if bucket_ms is not None:
+        return int(bucket_ms)
+    tfs = sorted(set(manifest.table["timeframe"]))
+    if len(tfs) != 1:
+        raise ValueError(
+            f"split_events: 批內多 TF {tfs}，bucket_ms 須顯式指定（預設＝觸發 TF 一根僅單 TF 適用）"
+        )
+    return TIMEFRAME_SECONDS[tfs[0]] * 1000
+
+
+def build_time_clusters(manifest: EventManifest, bucket_ms: Optional[int] = None) -> "pd.DataFrame":
+    """跨標的 time-cluster（SPLITUNIFY B2b 抽出；`split_events` 與投影**共用同一實作**）。
+
+    🔴 clusters **與切分邊界無關**——只依 `manifest.table["decision_at_ms"]` 與桶寬
+    （`CLAUDE-R1-P1-04`／`GROK-R1-P2-02`）。抽出來是為了讓投影重算它而**不必抄舊 plan**，
+    同時避免兩份算術。`_cluster_weight` 是既有 mutation seam（M5），沿用不重寫。
+    """
+    t = manifest.table
+    bucket = time_cluster_bucket_ms(manifest, bucket_ms)
+    tc = (t["decision_at_ms"].astype("int64") // bucket).rename("time_cluster_id")
+    counts = tc.map(tc.value_counts())
+    return pd.DataFrame({
+        "event_id": t["event_id"],
+        "time_cluster_id": tc.astype("int64"),
+        "cluster_weight": _cluster_weight(counts.astype(float)),  # primary（R1 X9）；bootstrap over clusters＝敏感度
+    })
+
+
 def split_events(
     manifest: EventManifest,
     split_config: EventSplitConfig,
@@ -124,20 +154,11 @@ def split_events(
     purged = pd.DataFrame(purge_rows, columns=["event_id", "reason"])
 
     # ---- 跨標的 time-cluster（bucket 預設＝觸發 TF 一根；混 TF 須顯式 bucket_ms）----
-    if split_config.bucket_ms is not None:
-        bucket = int(split_config.bucket_ms)
-    else:
-        tfs = sorted(set(t["timeframe"]))
-        if len(tfs) != 1:
-            raise ValueError(f"split_events: 批內多 TF {tfs}，bucket_ms 須顯式指定（預設＝觸發 TF 一根僅單 TF 適用）")
-        bucket = TIMEFRAME_SECONDS[tfs[0]] * 1000
-    tc = (t["decision_at_ms"].astype("int64") // bucket).rename("time_cluster_id")
-    counts = tc.map(tc.value_counts())
-    clusters = pd.DataFrame({
-        "event_id": t["event_id"],
-        "time_cluster_id": tc.astype("int64"),
-        "cluster_weight": _cluster_weight(counts.astype(float)),  # primary（R1 X9）；bootstrap over clusters＝敏感度
-    })
+    # 🔴 SPLITUNIFY B2b：本段已抽成 `time_cluster_bucket_ms` ＋ `build_time_clusters`，
+    #    由本函式與 `split_projection.derive_event_split_from_plans` **共同呼叫**——
+    #    複製一份會變成「兩份算術」，正是本票要消滅的形態。行為 byte 級不變。
+    bucket = time_cluster_bucket_ms(manifest, split_config.bucket_ms)
+    clusters = build_time_clusters(manifest, split_config.bucket_ms)
 
     n_symbols = len(per_symbol_n)
     degraded: List[str] = _degraded_flags(n_symbols, cluster_adjusted=True)
