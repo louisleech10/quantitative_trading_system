@@ -106,6 +106,11 @@ _watched_for() {
     #   盯 TODO 與延伸檔——批次或 Task 一動，看板必須跟著重生，否則使用者看到的是過期批次。
     #   另盯事件樣本模組與測試：實作開跑後每個 Task 之狀態改變都源自那裡。
     "GAP-3施工看板.md")              echo "docs/GAP3_EVENT_UX_TODO.md docs/GAP3_EVENT_UX_TODO.D-001.md momentum/Analysis/event_samples/ tests/momentum/event_samples/" ;;
+    # 🔴 SPLITUNIFY（2026-09-11 補登；本票之白話兩檔自建檔起即落在 catch-all ⇒ **從未受監看**）：
+    #   施工進度盯本票所有實作落點＋`scripts/`（含 `freeze_splitunify_golden.py`，golden 也是進度）
+    #   ＋施工清單 TODO；規格白話只盯 SPEC 本體（規格一改，白話解釋必須跟著改）。
+    "SPLITUNIFY施工進度.md")         echo "momentum/Analysis/event_samples/ momentum/core/split_preview.py momentum/Analysis/contracts/split_unify.json tests/momentum/Analysis/ tests/golden/splitunify/ scripts/ docs/SPLITUNIFY_TODO.md" ;;
+    "SPLITUNIFY規格白話.md")         echo "docs/SPLITUNIFY_SPEC.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。

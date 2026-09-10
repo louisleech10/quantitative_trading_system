@@ -167,13 +167,44 @@ def _build_actual() -> Dict[str, Any]:
         # G-5①
         "g5_row_fingerprint_sha256": _sha(fingerprint_rows),
         "g5_row_fingerprint_n": len(fingerprint_rows),
-        # G-5③ answer-window 完整性：test 段事件之 label 兩端是否都落在 universe 內
-        "g5_answer_window_complete": sorted(
-            rec["event_id"] for rec in keys.to_dict("records")
-            if rec["event_id"] in set(a.loc[a["split_label"] == "test", "event_id"])
-            and int(rec["label_start_ms"]) in set(ms.tolist())
-        ),
+        # 🔴 B2c review `CODEX-R1-P1-02`：只凍 hash ⇒ **錯的 fingerprint 也會被自凍結**，
+        #    測試只驗「是 64 位 hex」等於沒驗。⇒ 一併凍**明文** positions 與首尾時間戳，
+        #    測試端據此**獨立重算** sha256 並逐值比對；失敗時指名第一個 mismatch 的 position。
+        "g5_row_fingerprint_positions": [int(p) for p in test_rows],
+        "g5_row_fingerprint_first_ms": int(ms[test_rows[0]]),
+        "g5_row_fingerprint_last_ms": int(ms[test_rows[-1]]),
+        # G-5③ answer-window 完整性：**兩端** endpoint 都須落在 source bars（＝ universe）內。
+        # 🔴 B2c review：我原本只驗 `label_start_ms`，三家獨立命中「弱於 SPEC §G」——
+        #    off-bar 的**終點**仍可留在 test assignments，而 SPEC 要求缺 endpoint 必 purge。
+        "g5_answer_window": _answer_window_report(keys, a, plan.purged, set(ms.tolist())),
         "purge_reasons": sorted(set(plan.purged["reason"])),
+    }
+
+
+def _answer_window_report(
+    keys: pd.DataFrame, assignments: pd.DataFrame, purged: pd.DataFrame, universe: set
+) -> Dict[str, list]:
+    """G-5③：逐事件驗 answer-window 之 **兩端** endpoint 是否都落在 source bars 上。
+
+    🔴 **這裡驗的是「前置條件」，不是「投影有沒有 purge 它」**——兩者不同，別搞混：
+    SPEC 之 R4／F1 明訂 endpoint 檢查**不進投影簽名**（投影沒有 bars，硬加會逼實作端發明
+    第三個參數），改為「上游 alignment 之可證明前置條件」，G-5③ 用 golden 驗它。
+    我第一版寫成「缺 endpoint **必 purge**」，與該裁定**互相矛盾**——投影根本不做這件事，
+    那個斷言永遠只會在資料變髒時把矛頭指向投影。已改為驗前置條件本身。
+
+    回三個集合：`both_endpoints_on_bar`、`missing_endpoint`、
+    `precondition_breaches`（＝`missing_endpoint`，明示語意：上游該擋而沒擋）。
+    """
+    _ = (assignments, purged)  # 前置條件與歸屬無關；保留簽名供未來 R-5 支援時擴充
+    both, missing = [], []
+    for rec in keys.to_dict("records"):
+        eid = rec["event_id"]
+        on_bar = (int(rec["label_start_ms"]) in universe) and (int(rec["label_end_ms"]) in universe)
+        (both if on_bar else missing).append(eid)
+    return {
+        "both_endpoints_on_bar": sorted(both),
+        "missing_endpoint": sorted(missing),
+        "precondition_breaches": sorted(missing),
     }
 
 
@@ -225,9 +256,28 @@ def _migration_report() -> Dict[str, Any]:
     }
 
 
+def _fingerprint_diff(expected: Dict[str, Any], actual: Dict[str, Any]) -> List[str]:
+    """G-5① 專用：hash 不等時**指名第一個 mismatch 的 position**（SPEC §G 逐字要求）。
+
+    🔴 B2c review `GROK-R1-P2-02`：只回「sha256 不等」會把定位成本丟回給下一個人。
+    """
+    exp_pos = expected.get("g5_row_fingerprint_positions")
+    got_pos = actual.get("g5_row_fingerprint_positions")
+    if exp_pos is None or got_pos is None or exp_pos == got_pos:
+        return []
+    for i, (e, g) in enumerate(zip(exp_pos, got_pos)):
+        if e != g:
+            return [f"g5_row_fingerprint: 第一個 mismatch 在 index {i}（golden position={e} 實際={g}）"]
+    longer = "實際" if len(got_pos) > len(exp_pos) else "golden"
+    return [
+        f"g5_row_fingerprint: 前 {min(len(exp_pos), len(got_pos))} 個 position 相同，"
+        f"但 {longer} 多出 {abs(len(got_pos) - len(exp_pos))} 個"
+    ]
+
+
 def _diff_report(expected: Dict[str, Any], actual: Dict[str, Any]) -> List[str]:
     """逐鍵比對；**指名差在哪一筆**，不只回布林。"""
-    problems: List[str] = []
+    problems: List[str] = list(_fingerprint_diff(expected, actual))
     for key in sorted(set(expected) | set(actual)):
         if key.startswith("_"):
             continue
@@ -274,6 +324,18 @@ def main() -> int:
     print("  ✓ G-3b：投影與獨立 oracle 集合相等")
 
     # G-5④ leakage negative case（**每次都驗**）
+    aw = actual["g5_answer_window"]
+    if aw["precondition_breaches"]:
+        print(
+            "  ✗ G-5③（前置條件）：answer-window 兩端不都在 bar 上的事件 "
+            f"{aw['precondition_breaches']}——上游 alignment 應已擋下（SPEC R4 之 F1）"
+        )
+        return 1
+    print(
+        f"  ✓ G-5③（前置條件）：{len(aw['both_endpoints_on_bar'])} 筆事件之 answer-window "
+        "兩端皆在 bar 上"
+    )
+
     neg = _leakage_negative_case()
     if neg != "ok":
         print(f"  ✗ G-5④ leakage negative case: {neg}")
@@ -298,7 +360,16 @@ def main() -> int:
     if not golden_path.exists():
         print(f"GOLDEN MISSING: {golden_path.relative_to(REPO)}——首次請用 --write")
         return 1
-    expected = json.loads(golden_path.read_text(encoding="utf-8"))
+    try:
+        expected = json.loads(golden_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        # 🔴 B2c review `GROK-R1-P3-03`：原本讓裸 traceback 冒出來，
+        #    與 `GOLDEN MISSING`／`GOLDEN MISMATCH` 不同級，看不出是 golden 壞了還是程式壞了。
+        print(f"GOLDEN CORRUPT: {golden_path.relative_to(REPO)} 不是合法 JSON — {exc}")
+        return 1
+    if not isinstance(expected, dict) or not expected:
+        print(f"GOLDEN CORRUPT: {golden_path.relative_to(REPO)} 為空或非物件")
+        return 1
     problems = _diff_report(expected, actual)
     if problems:
         for line in problems:

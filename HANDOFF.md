@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-11 凌晨｜票：`SPLITUNIFY`（大；RISK a,b,c,d）｜狀態：SPEC/TODO **v5**；四輪規格審＋五輪戳記全收斂。**B1／B2a／B2b 皆已完工**，B1+B2a 一輪審碼、B2b **兩輪**審碼，全部修補完成。下一步＝B2b 定向確認 → B2c（golden 五組）。**
+**更新：2026-09-11 凌晨｜票：`SPLITUNIFY`（大；RISK a,b,c,d）｜狀態：SPEC/TODO **v5**；四輪規格審＋五輪戳記全收斂。**B1／B2a／B2b／B2c 全部完工並經審碼**（B1+B2a 一輪、B2b **三輪**、B2c 一輪），全部修補完成、債已清。下一步＝**B3（接線）**。**
 
 ## 使用者離線授權（2026-09-10 深夜，逐字）
 > 「我要睡了，你繼續做完，有問題找委員會討論共識，做完前不要停下來」
@@ -44,24 +44,39 @@
 - **B1**（`9607430d`＋`1be5be3f`）：`D-002` 延伸檔、`GAP3_EVENT_SPEC_AMENDMENTS.md`、
   `split_unify.json`＋8 條契約測試、既有紅 **19 條** nodeid 基準＋receipt（含 `pytest_rc=1`）。
 - **B2a**（`a58754d6`＋`1be5be3f`）：`split_preview.holdout_boundary`＋測試。
-- **B2b**（`864efeb9`→`e2e4314c`→`a8474406`）：`split_projection.py`
+- **B2b**（`864efeb9`→`e2e4314c`→`a8474406`→`bc561c7d`）：`split_projection.py`
   （兩段式判定＋`build_event_keys`＋`_assert_event_keys_wellformed`）、
   `event_split.py` 抽出 `build_time_clusters`／`time_cluster_bucket_ms` 共用、
   `split_preview` 新增 `assert_epoch_ms_array`／`assert_positional_rows` 兩支共用 validator。
-- **審碼**：B1+B2a 一輪（8 群集 G1–G8）、B2b **兩輪**（H0–H7 八群集、I0–I6 七群集），全數修補完成。
+- **B2c**（`be2f0735`＋K1–K5 修補）：`scripts/freeze_splitunify_golden.py`、
+  `tests/golden/splitunify/splitunify_golden.json`、`test_splitunify_golden.py`（**9 條**）。
+- **審碼**：B1+B2a 一輪（G1–G8）、B2b **三輪**（H0–H7／I0–I6／J 三條 P1）、
+  B2c 一輪（**K1–K5**），全數修補完成；`debt_clear` 已清
+  （round `64f80baa…`，session `20260911-splitunify-b3-review-r1`）。
+
+## B2c 審碼收斂（K1–K5，`handoffs/reconcile/20260911-splitunify-b3-review-r1/synth.md`）
+- **K1**（三家獨立命中）G-5③ 只驗 `label_start_ms` ⇒ **修法與三家提的不同**：前半照修（驗**兩端**），
+  後半「缺 endpoint 必 purge」**不能照做**（R4／F1 明訂 endpoint 檢查不進投影）⇒ 改驗**前置條件** `precondition_breaches`。
+- **K2** fingerprint 只凍 hash ⇒ **錯的也會被自凍結**；改為一併凍**明文** positions，測試端獨立重算 sha256。
+- **K3**（最深）oracle 與 actual 共用 fixture／邊界 ⇒ 新增**手推錨點**（由 fixture 常數手算
+  `split_point=140`、test `144..199` 共 56 列），不經邊界函式也不經投影。
+  **實跑證明關鍵方向**：把 `holdout_boundary` 改壞後 `--write` 重凍，`-k hand_derived` 仍 FAILED。
+- **K4** 失敗未指名首個 mismatch ⇒ `_fingerprint_diff`。**K5** 壞 JSON 裸 traceback ⇒ `GOLDEN CORRUPT` 分級。
 
 ## 現況數字（皆主委實跑）
-- `tests/momentum/Analysis/test_splitunify_derive.py` **43 passed**。
-- mutation `handoffs/20260911-splitunify-b2b-mutate.py` **UNCOVERED=0**，**21 條**全紅、C0 綠。
-- 負向注入 `handoffs/20260911-probe-splitunify-negative-injection.py` **9/9 全擋**
-  （receipt `20260910T191355Z-splitunify-negative-injection-r2`）。
-- 回歸 core＋event_samples＋splitunify＋evtlabel_staging → **711 passed**。
+- `test_splitunify_derive.py` **47 passed**｜`test_splitunify_golden.py` **9 passed**｜
+  `test_splitunify_contract.py` **8 passed**。
+- `freeze_splitunify_golden.py` → `GOLDEN OK` rc=0；可證偽兩方向：篡改 golden ⇒ rc=1 指名 `te2`；
+  改壞生產碼（拿掉答案窗 purge）⇒ **3 failed**。
+- mutation `handoffs/20260911-splitunify-b2b-mutate.py` **UNCOVERED=0**（**24 條**）。
+- 負向注入 `handoffs/20260911-probe-splitunify-negative-injection.py` **9/9 全擋**。
+- 回歸 core＋event_samples＋三支 splitunify → **684 passed**。
 - 解耦逐值等於 `scripts/decouple_baseline.txt`（R2=1 R3=17 R4=3）。
 
 ## 下一步（順序）
-1. B2b **定向確認輪**（I1–I6 是否閉合），或依收斂斷路器直接進 B2c。
-2. **B2c**：golden 五組（G-1／G-3a／G-3b／G-4／G-5）＋`freeze_splitunify_golden.py`。
-3. B3（接線＋多 symbol fail-closed＋event-study-only 分派）→ B4（報告與畫面）。
+1. **B3（接線）**：orchestrator／pipeline 共用 `holdout_boundary`、`split_events` 呼叫點釘 0、
+   多 symbol fail-closed、event-study-only 分派＋`estimand_scope`＋前端 capability 揭露。
+2. **B4**：報告與畫面只暴露**一個**驗證段。
 
 ## 🔴 既有紅盤點（非本票造成，建議另立 `REDSWEEP`）
 🔴 以 B1 凍結之 receipt 為準：`tests/momentum/Analysis` **19 failed / 1103 passed / 15 skipped**（清單 `tests/baselines/analysis_known_failures.nodeids`）；舊記的「20 failed / 1615 passed」是不同收集面的舊量測，不再引用：①8 條單獨跑會綠（測試間污染）
@@ -97,6 +112,10 @@
   全部是這個形態（身份對帳、symbol 相等、索引遞增、唯一性、finite、整數、正數、區間有序）。
 - 🔴 **code review 的必答必須明確要求「主動餵壞資料」**：只寫「請審查」時，三家會做正向
   對照而漏掉這一整類；R2 brief 加了負向注入清單後，R1 零意見的那一家找到兩條。
+- 🔴 **委員為證明「golden 不存在會紅」而移走 golden，收尾只還原了一份**：B2c R1 後
+  `tests/golden/splitunify/clusters_oracle.json` 留在委員自建的 `splitunify_hidden/` 裡，
+  主線兩條 cluster oracle 測試 `FileNotFoundError` 紅了一整輪。⇒ **審碼收尾必查
+  `git status tests/golden/`**；brief 的「請用暫存複本」要改成「暫存複本放 repo 外」。
 - 🔴 session 命名：`kind ∈ {impl, review, stamp, consult, fix}`、`batch` 須為 `b<數字>` 或 `x`
   （`b2b` 不合規，用 `b2`）；且 `--task-id` 必須與 session 名**同步大寫對應**。
 
