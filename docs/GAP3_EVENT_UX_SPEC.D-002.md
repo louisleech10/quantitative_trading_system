@@ -9,7 +9,8 @@ PREDECESSOR: docs/GAP3_EVENT_UX_SPEC.D-001.md
 
 ## 觸及面宣告
 新增: 無新增原檔 heading；本檔只覆寫既有條文之切分權威語意。
-覆寫: **B1.3 事件切分**（`split_events` 之「每 symbol 各自按時間切＋緩衝 ≥ 答案窗」不再是邊界來源；改由 canonical K 線 holdout 投影而得）；**事件掃描報告之 `summary.split`／`n_train`／`n_test`／`n_purged`**（拿不到 canonical feature universe 時三鍵**移除**、`capability.split="unavailable"`，不再填 0）。
+覆寫: **Phase 1 — 使用者自篩 CSV 匯入（依賴：無）　【#0(b) ＋ #5】**（該節之 `capability_unavailable_reasons` 值集增一值 `canonical_feature_universe_unavailable`；事件掃描報告之 `summary` 於該 reason 下**移除** `n_train`／`n_test`／`n_purged` 三鍵，不再填 0）。
+🔴 **B1.3 事件切分之邊界來源變更不在本檔**——`Task B1.3` 的真文住在**兄弟檔** `docs/GAP3_EVENT_SPEC.md:168`，而該檔檔頭逐字指定修訂走 `docs/GAP3_EVENT_SPEC_AMENDMENTS.md`（非 D-00N 慣例）⇒ 該條寫在那裡。本更正出自 B1 review `CODEX-R1-P1-01`＋`GROK-R1-P2-01`：初版把兩份不同的凍結文件搞混，宣告了一個 BASE 內根本不存在的 heading。
 依賴: `momentum/core/split_preview.py`（canonical boundary builder 之落點）；`momentum/Analysis/event_samples/split_projection.py`（新，投影純函式）；`momentum/Analysis/contracts/split_unify.json`（權威值集與 fail-closed reason 之單一真相源）；`momentum/Analysis/contracts/event_import_contract.json` 之 `split_purge_reasons`（purge reason 沿用，不另造）。
 
 ## 內容

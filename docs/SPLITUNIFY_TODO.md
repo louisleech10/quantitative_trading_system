@@ -111,13 +111,18 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 - 邊界：①JSON 缺鍵 ⇒ raise；②值集為空 ⇒ raise。
 - 風險緩解：⊘
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_contract.py` rc=0：
-  `set(json["fail_closed_reasons"])` 與 Python 常數 `==`；刪一鍵 ⇒ raise（可證偽）；
+  值集與**第二來源**逐值相等；刪一鍵 ⇒ 該測試紅（可證偽）；
+  🔴 B1 之第二來源是 **SPEC 文件字面**（B1 不動生產碼，`split_projection.py` 尚未存在）——
+  這是**弱形式**對證（同一人同一批寫成，共同模式失效風險真實）；
+  B2b 建模組後才補「JSON ↔ Python 常數集合相等」（測試檔尾已具名 `TODO(B2b)`）。
   `assert "assignment_states" not in json`。
 - **存活至**：全票完工後保留（前端亦讀）。
 - **覆蓋風險**：B3 若發現新 fail-closed 情形會**追加** reason 值，不改既有值。
 
 ### Task 1.3 — 既有紅基準清單（`票 SPLITUNIFY`）
 - SPEC ref：Task 1.3／R1 之 C3　目標：讓 B3 驗收逐條可證偽，取代聚合期望數。
+  🔴 基準以 B1 凍結之 receipt 為準＝**19 條 / 1103 passed**；`HANDOFF.md` 舊記的「20 條 / 1615 passed」
+  是**不同收集面**的舊量測（grok 以 passed 基數 1615 vs 1103 證明那不是漏抓，`GROK-R1-P3-01`），**不再引用**。
 - 輸入 / 輸出：實跑 pytest → `tests/baselines/analysis_known_failures.nodeids`
   ＋ `handoffs/run_receipts/splitunify-analysis-baseline.stdout`。
 - 實作要點：一次實跑產出，**不得手抄湊數**；🔴 **須捕獲 pytest 自己的 rc**（R2 之 D9）——
@@ -144,14 +149,18 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 - **驗證**：`venv/bin/python -m pytest -q --collect-only $(cat tests/baselines/analysis_known_failures.nodeids)`
   rc=0（清單內有不存在的 nodeid ⇒ rc≠0，可證偽）；
   `grep -c '^pytest_rc=' handoffs/run_receipts/splitunify-analysis-baseline.stdout` == 1；
-  清單行數 == receipt 內 `^FAILED ` 行數。
+  清單行數 == receipt 內 `^FAILED ` **且含 `::`** 的行數
+  （🔴 B1 review `CODEX-R1-P1-02`：不加 `::` 過濾就是 19 ≠ 30，條件永遠不成立——
+  我在補萃取過濾時沒同步改驗證條件，是「改裁決必同步所有引用」那條的形態）。
 - **存活至**：`REDSWEEP` 票收案後刪除。
 - **覆蓋風險**：`REDSWEEP` 會逐條清空；兩票之間以「只准變短」為不變式。
 
 ### Task 2.1 — canonical boundary builder（`票 SPLITUNIFY`）
 - SPEC ref：C-0　目標：兩端共用之**唯一**邊界算術。
 - 輸入 / 輸出：`holdout_boundary(feature_index, *, oos_test_size, purge_gap, embargo)`
-  → `(train_row_index, test_row_index, train_end_ms, test_start_ms)`。
+  → `Dict[str, Any]`，鍵為 `train_row_index`／`test_row_index`／`train_end_ms`／`test_start_ms`
+  （B1 review `GROK-R1-P3-02`：v5 原寫元組、實作回 dict；回 dict 是為了讓 B3 呼叫端
+  不必記順序，較不易錯 ⇒ 改文件對齊實作）。
 - 實作要點：
   1. **以既有函式定義自身**：`holdout_split_point` ＋ `holdout_test_row_index`
      ⇒ 不引入第二份算術（否則 `M-SU-11` 會紅）。

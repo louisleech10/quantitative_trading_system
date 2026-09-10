@@ -46,16 +46,39 @@ def holdout_split_point(n_rows: int, *, oos_test_size: float) -> int:
     return int(np.floor((1.0 - float(oos_test_size)) * int(n_rows)))
 
 
+#: int64 index 之「看起來是秒」判定門檻。2001-09-09 之後的 epoch **毫秒**皆 > 1e12，
+#: 而 epoch **秒** 在 2286 年前都 < 1e10 ⇒ 1e11 是一個兩邊都留了一個數量級餘裕的界。
+_MS_MAGNITUDE_FLOOR = 1e11
+
+
 def _as_ms(index: Any, position: int) -> int:
     """取 `index[position]` 並正規化為 **epoch 毫秒 int**。
 
     🔴 SPLITUNIFY 之時鐘一律 epoch **毫秒**，與 `ic_filter_orchestrator._normalize_ic_time_index`
     （那支是**「秒」語意**，餵毫秒會 raise）**不同源，不得混用**——見 SPEC C-4（R2 之 D7）。
+
+    🔴 **int64 輸入必須是毫秒，是秒就 raise**（B1 review `GROK-R1-P2-02`）：
+    `data_cache/features/**/timestamps.parquet` 存的正是 epoch **秒**，直通就會得到
+    year=1970 的「邊界」而**不拋任何例外**，B2b／B3 複用後答案窗比較會靜默錯 1000 倍。
+    本守衛與 `_normalize_ic_time_index` 的「looks like milliseconds」互為反向對稱。
+    （主委寫探針時已踩過這個坑一次，卻沒在本函式設防——所以補成機械閘，不靠記得。）
+
+    **時區**：`pd.Timestamp(value).value` 回的是 **UTC 納秒**，故 tz 換算正確——
+    naive 與 UTC 逐值相同、非 UTC 時區會依實際絕對時刻位移（主委實跑：Asia/Tokyo 差 9 小時）。
+    ⇒ 本函式不會弄錯時區，但**要求同一票內的 `feature_index` 時區慣例一致**；
+    一端 naive、一端非 UTC tz-aware 會得到不同邊界（SPEC C-0「必須共用同一個 universe」
+    在時區維度上的延伸）。
     """
     value = pd.Index(index)[position]
     if isinstance(value, (pd.Timestamp, np.datetime64)):
         return int(pd.Timestamp(value).value // 10 ** 6)
-    return int(value)
+    as_int = int(value)
+    if as_int and abs(as_int) < _MS_MAGNITUDE_FLOOR:
+        raise ValueError(
+            f"_as_ms: index[{position}]={as_int} looks like epoch seconds, expected milliseconds"
+            "（SPLITUNIFY 時鐘一律毫秒；FF run 的 timestamps.parquet 是秒，餵進來前先 ×1000）"
+        )
+    return as_int
 
 
 def holdout_boundary(

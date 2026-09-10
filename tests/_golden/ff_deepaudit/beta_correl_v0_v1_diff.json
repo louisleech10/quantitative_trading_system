@@ -1,0 +1,31 @@
+{
+  "migration": {
+    "old_column_pattern": "close-volume_{tf}_statistics_BETA_{p}",
+    "new_standard_pattern": "hl_{tf}_statistics_BETA_{p}",
+    "new_legacy_pattern": "close-volume_{tf}_statistics_Beta-CloseVolume_{p}"
+  },
+  "BTCUSDT_12h_period_5": {
+    "old_beta_vs_new_hl_beta": {
+      "max_abs_diff": 481.59459476347143,
+      "semantic_change": true
+    },
+    "old_correl_vs_new_hl_correl": {
+      "max_abs_diff": 1.9540311196701432,
+      "semantic_change": true
+    },
+    "old_beta_vs_beta_close_volume": {
+      "max_abs_diff": 0.0,
+      "preserved_legacy_semantics": true
+    },
+    "old_correl_vs_correl_close_volume": {
+      "max_abs_diff": 0.0,
+      "preserved_legacy_semantics": true
+    }
+  },
+  "ic_semantic_drift_smoke": {
+    "note": "IC on statistics_BETA family will change;\u4e09\u65b9\u7c3d\u6838\u5f85 Claude \u63a5\u56de",
+    "old_feature_ic_basis": "close-volume BETA (mislabeled)",
+    "new_standard_ic_basis": "hl BETA (TA-Lib canonical)",
+    "legacy_alias_ic_basis": "Beta-CloseVolume (explicit non-standard)"
+  }
+}

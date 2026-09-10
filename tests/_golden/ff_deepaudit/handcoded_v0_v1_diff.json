@@ -1,0 +1,23 @@
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "12h",
+  "migration": "simplified_v0_to_canonical_v1_round3",
+  "indicators": {
+    "ForceIndex": {
+      "n": 1683,
+      "max_abs_diff": 560368051.0299436,
+      "corr": 0.5163413648716243
+    },
+    "Klinger": {
+      "n": 1642,
+      "max_abs_diff": 679918.2481789697,
+      "corr": 0.7303158139152782
+    },
+    "EOM": {
+      "n": 1682,
+      "max_abs_diff": 349.68687245953066,
+      "corr": 0.9999999999994976
+    }
+  },
+  "note": "ForceIndex/Klinger upgraded to Stock.Indicators canonical (round3: Klinger abs fix); EOM unchanged (scale-only vs 1e8 ref)"
+}

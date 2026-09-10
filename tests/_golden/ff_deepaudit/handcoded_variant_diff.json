@@ -1,0 +1,23 @@
+{
+  "symbol": "BTCUSDT",
+  "timeframe": "12h",
+  "variant": "canonical_v1_round3",
+  "indicators": {
+    "ForceIndex": {
+      "n": 1683,
+      "max_abs_diff": 0.0,
+      "corr": 1.0
+    },
+    "Klinger_round2_to_round3": {
+      "n": 1642,
+      "max_abs_diff": 862969.1722874879,
+      "corr": -0.8045368540270721
+    },
+    "EOM": {
+      "n": 1682,
+      "max_abs_diff": 349.68687245953066,
+      "corr": 0.9999999999994976
+    }
+  },
+  "note": "round2 Klinger lacked abs(wrong parens); round3 fixes to Stock.Indicators; corr round2 vs round3 ~ -0.82 on BTCUSDT/12h"
+}

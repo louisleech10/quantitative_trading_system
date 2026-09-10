@@ -1,0 +1,312 @@
+{
+  "None_12h_microstructure_roll_spread_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_microstructure_roll_spread_13_55_Cross"
+  },
+  "None_12h_microstructure_roll_spread_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_microstructure_roll_spread_13_55_Ratio"
+  },
+  "None_12h_tail_risk_gpr_21_100_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_gpr_21_100_Cross"
+  },
+  "None_12h_tail_risk_gpr_21_100_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_gpr_21_100_Ratio"
+  },
+  "None_12h_tail_risk_max_drawdown_21_100_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_max_drawdown_21_100_Cross"
+  },
+  "None_12h_tail_risk_max_drawdown_21_100_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_max_drawdown_21_100_Ratio"
+  },
+  "None_12h_tail_risk_rsj_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_rsj_13_55_Cross"
+  },
+  "None_12h_tail_risk_rsj_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_rsj_13_55_Ratio"
+  },
+  "None_12h_tail_risk_rv_down_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_rv_down_13_55_Cross"
+  },
+  "None_12h_tail_risk_rv_down_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_rv_down_13_55_Ratio"
+  },
+  "None_12h_tail_risk_rv_up_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_rv_up_13_55_Cross"
+  },
+  "None_12h_tail_risk_rv_up_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_rv_up_13_55_Ratio"
+  },
+  "None_12h_tail_risk_ud_vol_ratio_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_ud_vol_ratio_13_55_Cross"
+  },
+  "None_12h_tail_risk_ud_vol_ratio_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_12h_tail_risk_ud_vol_ratio_13_55_Ratio"
+  },
+  "None_1h_microstructure_roll_spread_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_microstructure_roll_spread_13_55_Cross"
+  },
+  "None_1h_microstructure_roll_spread_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_microstructure_roll_spread_13_55_Ratio"
+  },
+  "None_1h_tail_risk_gpr_21_100_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_gpr_21_100_Cross"
+  },
+  "None_1h_tail_risk_gpr_21_100_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_gpr_21_100_Ratio"
+  },
+  "None_1h_tail_risk_max_drawdown_21_100_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_max_drawdown_21_100_Cross"
+  },
+  "None_1h_tail_risk_max_drawdown_21_100_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_max_drawdown_21_100_Ratio"
+  },
+  "None_1h_tail_risk_rsj_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_rsj_13_55_Cross"
+  },
+  "None_1h_tail_risk_rsj_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_rsj_13_55_Ratio"
+  },
+  "None_1h_tail_risk_rv_down_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_rv_down_13_55_Cross"
+  },
+  "None_1h_tail_risk_rv_down_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_rv_down_13_55_Ratio"
+  },
+  "None_1h_tail_risk_rv_up_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_rv_up_13_55_Cross"
+  },
+  "None_1h_tail_risk_rv_up_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_rv_up_13_55_Ratio"
+  },
+  "None_1h_tail_risk_ud_vol_ratio_13_55_Cross": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_ud_vol_ratio_13_55_Cross"
+  },
+  "None_1h_tail_risk_ud_vol_ratio_13_55_Ratio": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "None_1h_tail_risk_ud_vol_ratio_13_55_Ratio"
+  },
+  "avg-price_12h_Lag_1": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_12h_Lag_1"
+  },
+  "avg-price_12h_Lag_13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_12h_Lag_13"
+  },
+  "avg-price_12h_Lag_2": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_12h_Lag_2"
+  },
+  "avg-price_12h_Lag_21": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_12h_Lag_21"
+  },
+  "avg-price_12h_Lag_3": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_12h_Lag_3"
+  },
+  "avg-price_12h_Lag_34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_12h_Lag_34"
+  },
+  "avg-price_12h_Lag_5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_12h_Lag_5"
+  },
+  "avg-price_12h_Lag_8": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_12h_Lag_8"
+  },
+  "avg-price_1h_Lag_1": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_1"
+  },
+  "avg-price_1h_Lag_13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_13"
+  },
+  "avg-price_1h_Lag_2": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_2"
+  },
+  "avg-price_1h_Lag_21": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_21"
+  },
+  "avg-price_1h_Lag_3": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_3"
+  },
+  "avg-price_1h_Lag_34": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_34"
+  },
+  "avg-price_1h_Lag_5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_5"
+  },
+  "avg-price_1h_Lag_8": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "avg-price_1h_Lag_8"
+  },
+  "baseline_subset": {
+    "max_features": 50,
+    "selected_features": [
+      "None_12h_microstructure_roll_spread_13_55_Cross",
+      "None_12h_microstructure_roll_spread_13_55_Ratio",
+      "None_12h_tail_risk_gpr_21_100_Cross",
+      "None_12h_tail_risk_gpr_21_100_Ratio",
+      "None_12h_tail_risk_max_drawdown_21_100_Cross",
+      "None_12h_tail_risk_max_drawdown_21_100_Ratio",
+      "None_12h_tail_risk_rsj_13_55_Cross",
+      "None_12h_tail_risk_rsj_13_55_Ratio",
+      "None_12h_tail_risk_rv_down_13_55_Cross",
+      "None_12h_tail_risk_rv_down_13_55_Ratio",
+      "None_12h_tail_risk_rv_up_13_55_Cross",
+      "None_12h_tail_risk_rv_up_13_55_Ratio",
+      "None_12h_tail_risk_ud_vol_ratio_13_55_Cross",
+      "None_12h_tail_risk_ud_vol_ratio_13_55_Ratio",
+      "None_1h_microstructure_roll_spread_13_55_Cross",
+      "None_1h_microstructure_roll_spread_13_55_Ratio",
+      "None_1h_tail_risk_gpr_21_100_Cross",
+      "None_1h_tail_risk_gpr_21_100_Ratio",
+      "None_1h_tail_risk_max_drawdown_21_100_Cross",
+      "None_1h_tail_risk_max_drawdown_21_100_Ratio",
+      "None_1h_tail_risk_rsj_13_55_Cross",
+      "None_1h_tail_risk_rsj_13_55_Ratio",
+      "None_1h_tail_risk_rv_down_13_55_Cross",
+      "None_1h_tail_risk_rv_down_13_55_Ratio",
+      "None_1h_tail_risk_rv_up_13_55_Cross",
+      "None_1h_tail_risk_rv_up_13_55_Ratio",
+      "None_1h_tail_risk_ud_vol_ratio_13_55_Cross",
+      "None_1h_tail_risk_ud_vol_ratio_13_55_Ratio",
+      "avg-price_12h_Lag_1",
+      "avg-price_12h_Lag_13",
+      "avg-price_12h_Lag_2",
+      "avg-price_12h_Lag_21",
+      "avg-price_12h_Lag_3",
+      "avg-price_12h_Lag_34",
+      "avg-price_12h_Lag_5",
+      "avg-price_12h_Lag_8",
+      "avg-price_1h_Lag_1",
+      "avg-price_1h_Lag_13",
+      "avg-price_1h_Lag_2",
+      "avg-price_1h_Lag_21",
+      "avg-price_1h_Lag_3",
+      "avg-price_1h_Lag_34",
+      "avg-price_1h_Lag_5",
+      "avg-price_1h_Lag_8",
+      "close-volume_12h_volume_OBV",
+      "close-volume_12h_volume_OBV_Abs",
+      "close-volume_12h_volume_OBV_Clip",
+      "close-volume_12h_volume_OBV_DecayLinear_W13",
+      "close-volume_12h_volume_OBV_DecayLinear_W21",
+      "close-volume_12h_volume_OBV_DecayLinear_W5"
+    ],
+    "selection": "sorted(feature_names)[:max_features]",
+    "source_feature_count": 90857
+  },
+  "close-volume_12h_volume_OBV": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV"
+  },
+  "close-volume_12h_volume_OBV_Abs": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_Abs"
+  },
+  "close-volume_12h_volume_OBV_Clip": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_Clip"
+  },
+  "close-volume_12h_volume_OBV_DecayLinear_W13": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_DecayLinear_W13"
+  },
+  "close-volume_12h_volume_OBV_DecayLinear_W21": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_DecayLinear_W21"
+  },
+  "close-volume_12h_volume_OBV_DecayLinear_W5": {
+    "category": "unknown",
+    "layer": 1,
+    "name": "close-volume_12h_volume_OBV_DecayLinear_W5"
+  },
+  "config_hash": "a384e6d22ca15fc639757cb3162e7cb3",
+  "symbol": "BTCUSDT",
+  "timeframe": "1h"
+}

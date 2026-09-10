@@ -56530,3 +56530,61 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T17:37:41Z"}
+=== 2026-09-11 01:37:41 | dispatch ===
+  ts=2026-09-11 01:37:41
+  kind=dispatch
+  intent=SPLITUNIFY B1＋B2a code review
+  risk=low
+  facts_asked=boundary builder 有無第二份算術/空 test 段回 None 的分工/B1 契約測試是否真兩端對證/既有紅 19 vs 20/D-002 覆寫欄是否對應原檔/索引行是否合規/可否進 B2b
+  review_role=adversarial code reviewer, 禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T17:37:47Z"}
+=== 2026-09-11 01:37:47 | dispatch ===
+  ts=2026-09-11 01:37:47
+  kind=dispatch
+  intent=SPLITUNIFY B1＋B2a code review
+  risk=low
+  facts_asked=boundary builder 有無第二份算術/空 test 段回 None 的分工/B1 契約測試是否真兩端對證/既有紅 19 vs 20/D-002 覆寫欄是否對應原檔/索引行是否合規/可否進 B2b
+  review_role=adversarial code reviewer, 禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260911-SPLITUNIFY-B1-B2A-REVIEW-BRIEF.md", "brief_sha256": "fd0a5b7762b987e7c28e877171402cb4581c9d5ec78705d081f5e9d7ca16e090", "brief_sha256_norm": "fd0a5b7762b987e7c28e877171402cb4581c9d5ec78705d081f5e9d7ca16e090", "event": "committee_round_open", "event_id": "33e8f855-8221-4c37-ac20-1ca0480fe52f", "expected_outputs": {"codex": "handoffs/20260911-splitunify-b1-review-r1-codex.md", "composer": "handoffs/20260911-splitunify-b1-review-r1-composer.md", "grok": "handoffs/20260911-splitunify-b1-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "33da59b5-04d8-485b-9b1f-d4bffd3caa5f", "schema_version": 1, "sequence": 3401, "session_name": "20260911-splitunify-b1-review-r1", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T17:37:53Z"}
+{"actor": "cx_run", "attempt_id": "57c09fb9-1920-4500-afc5-883171d05290", "cli_rc": "0", "event": "committee_family_result", "event_id": "f38adbec-08b0-43e4-b2fe-0f135d3d6056", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-splitunify-b1-review-r1-composer.md", "output_sha256": "22294dafd59f9abb3f36c5f3d05c7e87d5d1c2262e4fab2f664151dca7d97c8b", "producer": "audit_append.sh", "result_state": "success", "round_id": "33da59b5-04d8-485b-9b1f-d4bffd3caa5f", "schema_version": 1, "sequence": 3402, "ts": "2026-09-10T17:40:39Z"}
+{"actor": "cx_run", "attempt_id": "ffce52af-58b6-47af-8ea8-1051a981cd30", "cli_rc": "0", "event": "committee_family_result", "event_id": "64d3b764-aaa0-4ec0-8066-2c2b36e5f2ff", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-splitunify-b1-review-r1-grok.md", "output_sha256": "90786f66f59547c37800575bcdf1c6c347fcd754f950ac47ce3d71aee72bddf9", "producer": "audit_append.sh", "result_state": "success", "round_id": "33da59b5-04d8-485b-9b1f-d4bffd3caa5f", "schema_version": 1, "sequence": 3403, "ts": "2026-09-10T17:44:45Z"}
+{"actor": "cx_run", "attempt_id": "83d5158a-87c8-4b69-be72-04eb4a92427a", "cli_rc": "0", "event": "committee_family_result", "event_id": "95190bdb-96de-4e19-a2ee-87ddbaeb2e79", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-splitunify-b1-review-r1-codex.md", "output_sha256": "97f57276e0edb35712b1e95bbdbb8146292e1274f7b5164dcc663ee093ac529e", "producer": "audit_append.sh", "result_state": "success", "round_id": "33da59b5-04d8-485b-9b1f-d4bffd3caa5f", "schema_version": 1, "sequence": 3404, "ts": "2026-09-10T17:52:32Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "292075b6-a3fc-4052-a072-00e1fd7fddf7", "lock_sha256": "ce81484393d619021ad94ff9e1ad8bfc3982ee1696e313006cdae5964968bfee", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "33da59b5-04d8-485b-9b1f-d4bffd3caa5f", "schema_version": 1, "sequence": 3405, "session_id": "20260911-splitunify-b1-review-r1", "synth_sha256": "5ca2200bebffb5c5e16a96e277ed8e375aa0beb71a3a675b4eb3548539638d5e", "ts": "2026-09-10T17:54:40Z"}
+=== 2026-09-11 01:56:04 | artifact ===
+  ts=2026-09-11 01:56:04
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/GAP3_EVENT_SPEC_AMENDMENTS.md
+  template_opened=docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md
+  sections=本檔為 GAP3_EVENT_SPEC.md 檔頭逐字指定之修訂路徑（非 D-00N）；首條修訂＝SPLITUNIFY 對 Task B1.3 之邊界來源覆寫=filled
+  spec=
+  todo=
+  manifest=
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b1-review-r1-codex.md", "output_sha256": "97f57276e0edb35712b1e95bbdbb8146292e1274f7b5164dcc663ee093ac529e", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T18:01:45Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b1-review-r1-composer.md", "output_sha256": "22294dafd59f9abb3f36c5f3d05c7e87d5d1c2262e4fab2f664151dca7d97c8b", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T18:01:46Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b1-review-r1-grok.md", "output_sha256": "90786f66f59547c37800575bcdf1c6c347fcd754f950ac47ce3d71aee72bddf9", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T18:01:46Z"}

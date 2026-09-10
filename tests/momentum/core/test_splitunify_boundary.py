@@ -105,6 +105,31 @@ def test_unit_year_in_sane_range() -> None:
         assert 2015 <= year <= 2035, f"{key} 之年份 {year} 不合理——單位判定錯了"
 
 
+def test_unit_seconds_rejected() -> None:
+    """🔴 int64 index 是 epoch **秒** 時必須 raise，不得直通（B1 review `GROK-R1-P2-02`）。
+
+    `data_cache/features/**/timestamps.parquet` 存的正是秒；直通會得到 year=1970 的邊界
+    而**不拋任何例外**，B2b／B3 複用後答案窗比較會靜默錯 1000 倍。
+    """
+    seconds = pd.Index(_ms_index() // 1000)  # 同一批時間，但單位是秒
+    with pytest.raises(ValueError, match="looks like epoch seconds"):
+        _boundary(seconds)
+
+
+def test_unit_tz_naive_and_utc_agree() -> None:
+    """naive 與 UTC 逐值相同；非 UTC 時區依實際絕對時刻位移（行為正確，非 bug）。"""
+    naive = _dt_index(500)
+    utc = naive.tz_localize("UTC")
+    tokyo = naive.tz_localize("Asia/Tokyo")
+    a = holdout_boundary(naive, oos_test_size=OOS, purge_gap=2, embargo=2)
+    b = holdout_boundary(utc, oos_test_size=OOS, purge_gap=2, embargo=2)
+    c = holdout_boundary(tokyo, oos_test_size=OOS, purge_gap=2, embargo=2)
+    assert a["test_start_ms"] == b["test_start_ms"]
+    assert c["test_start_ms"] != a["test_start_ms"], (
+        "非 UTC tz-aware 應對應不同的絕對時刻——相同才表示時區被吃掉了"
+    )
+
+
 def test_empty_index_raises() -> None:
     """無 universe 即無邊界——回空計畫會讓下游把「沒切」誤讀成「切了但都空」。"""
     with pytest.raises(ValueError, match="feature_index 為空"):

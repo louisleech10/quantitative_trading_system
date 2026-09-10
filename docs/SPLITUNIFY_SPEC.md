@@ -375,7 +375,9 @@ D-002 亦須寫明「投影所用 `feature_index` 為 **post-trim**（EVTALIGN �
 - **覆蓋風險**：B3 若發現新的 fail-closed 情形，**追加** reason 值，不改既有值。
 
 **Task 1.3 — 既有紅基準清單（取代 v1 之「failed <= 20」聚合期望數）**
-- 目標：把 `HANDOFF.md`「既有紅盤點」之 20 條落成**逐條 nodeid 清單**，
+- 目標：把既有紅落成**逐條 nodeid 清單**（🔴 以 B1 凍結之 receipt 為準＝**19 條 / 1103 passed**；
+  `HANDOFF.md` 舊記的「20 條 / 1615 passed」是**不同收集面**的舊量測——grok 以 passed 基數
+  1615 vs 1103 證明那不是漏抓，B1 review `GROK-R1-P3-01`——**不再引用**），
   使 B3 驗收可證偽（R1 之 C3 群集；grok 與 composer 各標 P0）。
 - 輸入 / 輸出：實跑 pytest → `tests/baselines/analysis_known_failures.nodeids`。
 - 實作要點：一次實跑產出，**不得手抄湊數**；🔴 **須捕獲 pytest 自己的 rc**
@@ -406,7 +408,7 @@ D-002 亦須寫明「投影所用 `feature_index` 為 **post-trim**（EVTALIGN �
   ②清單中任一條變綠 ⇒ 依維護協議移出。
 - 風險緩解：⊘
 - **驗證**：`grep -c '^pytest_rc=' handoffs/run_receipts/splitunify-analysis-baseline.stdout` == 1；
-  清單行數 == receipt 內 `^FAILED ` 行數；
+  清單行數 == receipt 內 `^FAILED ` **且含 `::`** 的行數（B1 review `CODEX-R1-P1-02`：不加過濾是 19 ≠ 30）；
   `venv/bin/python -m pytest -q --collect-only $(cat tests/baselines/analysis_known_failures.nodeids)`
   rc=0（清單內有不存在的 nodeid ⇒ rc≠0，可證偽）。
 - **存活至**：`REDSWEEP` 票收案後刪除。
@@ -415,7 +417,9 @@ D-002 亦須寫明「投影所用 `feature_index` 為 **post-trim**（EVTALIGN �
 **Task 2.1 — canonical boundary builder（C-0）**
 - 目標：兩端共用之**唯一**邊界算術，住 core。
 - 輸入 / 輸出：`holdout_boundary(feature_index, *, oos_test_size, purge_gap, embargo)`
-  → `(train_row_index, test_row_index, train_end_ms, test_start_ms)`。
+  → `Dict[str, Any]`，鍵為 `train_row_index`／`test_row_index`／`train_end_ms`／`test_start_ms`
+  （B1 review `GROK-R1-P3-02`：v5 原寫元組、實作回 dict；回 dict 是為了讓 B3 呼叫端
+  不必記順序，較不易錯 ⇒ 改文件對齊實作）。
 - 實作要點：
   1. **以既有函式定義自身**：`split_point = holdout_split_point(...)`、
      `test_rows = holdout_test_row_index(...)` ⇒ 不引入第二份算術。

@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-11 凌晨｜票：`SPLITUNIFY`（大；RISK a,b,c,d）｜狀態：SPEC/TODO 已到 **v4**；四輪審查（R1 13 群集／R2 11／R3 7／R4 進行中）＋五輪戳記全數收斂；尚未進第一批實作。**
+**更新：2026-09-11 凌晨｜票：`SPLITUNIFY`（大；RISK a,b,c,d）｜狀態：SPEC/TODO 已到 **v5**；四輪規格審（13／11／7／4 群集）＋五輪戳記全數收斂；**B1 與 B2a 已完工並經三家 code review**，修補完 G1–G5 後進 B2b。**
 
 ## 使用者離線授權（2026-09-10 深夜，逐字）
 > 「我要睡了，你繼續做完，有問題找委員會討論共識，做完前不要停下來」
@@ -28,26 +28,33 @@
    20352 列，EVTALIGN 裁頭尾後邊界位移 5 根→2h、24 根→10h、168 根→67h。
 
 ## 檔案
-- SPEC `docs/SPLITUNIFY_SPEC.md`（**v4**，sha256 `384aa22961d0…`）／
-  TODO `docs/SPLITUNIFY_TODO.md`（**v4**，sha256 `cd95ee642a9e…`）
+- SPEC `docs/SPLITUNIFY_SPEC.md`（**v5**）／TODO `docs/SPLITUNIFY_TODO.md`（**v5**）
+- GAP-3 兩條凍結鏈（**不同慣例，別搞混**）：`docs/GAP3_EVENT_UX_SPEC.D-002.md`（D-00N 慣例）
+  與 `docs/GAP3_EVENT_SPEC_AMENDMENTS.md`（該檔檔頭逐字指定的路徑，**非** D-00N）
 - consult 收斂 `handoffs/reconcile/20260910-splitunify-x-consult-r1/synth.md`
   （D1–D8；body-hash `120b4d042d38…`；三家 APPROVED）
-- 審查收斂 `handoffs/reconcile/20260911-splitunify-x-review-r{1,2,3}/synth.md`（C1–C13／D1–D11／E1–E7）
+- 規格審收斂 `handoffs/reconcile/20260911-splitunify-x-review-r{1,2,3,4}/synth.md`（C1–C13／D1–D11／E1–E7／F1–F4）
+- B1＋B2a code review 收斂 `handoffs/reconcile/20260911-splitunify-b1-review-r1/synth.md`（G1–G8）
 - 主委自產審查 `handoffs/20260911-splitunify-claude-selfreview{,-r2,-r3}.md`
 - 探針 `handoffs/20260911-probe-splitunify-universe-gap.py`
   ＋ receipt `handoffs/run_receipts/20260910T154323Z-splitunify-universe-gap.log`
 - 白話 `白話說明/SPLITUNIFY規格白話.md`、`白話說明/SPLITUNIFY施工進度.md`
 
+## 已完工
+- **B1**（`9607430d`）：`D-002` 延伸檔、`split_unify.json`＋8 條契約測試（mutation 自證）、
+  既有紅 19 條 nodeid 基準＋receipt（含 `pytest_rc=1`）。
+- **B2a**（`a58754d6`）：`momentum/core/split_preview.py::holdout_boundary`＋11 條測試，
+  `M-SU-11` 兩個方向皆自證紅。
+- **B1＋B2a code review**：三家（codex 不可進／composer 可進／grok 可進），依碼證採 codex；
+  G1–G8 八群集全採納，修補已套用。
+
 ## 下一步（順序）
-1. **R4 定向確認輪**（`20260911-splitunify-x-review-r4`，進行中）——只問 E1／E2 是否閉合。
-   🔴 其必答 1 是主委自己也沒把握的一條：v4 寫 `label_end_ms >= test_start_ms`，
-   既有實作是 `label_end_ms > test_start - embargo`，兩者不等價；正確條件式待三家給。
-2. R4 收斂 → 若無 P0/P1 即**進第一批**（B1：`D-002` 延伸檔、`split_unify.json`、既有紅 nodeid 清單；
-   **不動生產碼**）。
-3. B2a（boundary builder）→ B2b（投影）→ B2c（golden）→ B3（接線）→ B4（報告與畫面）。
+1. B1／B2a 之 G1–G5 修補**重審**（同一 session 的 `-r2`），或依收斂斷路器直接進 B2b。
+2. **B2b**：`derive_event_split_from_plans` 投影純函式（兩段式判定＋`build_event_keys` helper）。
+3. B2c（golden 五組）→ B3（接線＋fail-closed＋event-study-only）→ B4（報告與畫面）。
 
 ## 🔴 既有紅盤點（非本票造成，建議另立 `REDSWEEP`）
-`tests/momentum/Analysis` 全跑 **20 failed / 1615 passed**：①8 條單獨跑會綠（測試間污染）
+🔴 以 B1 凍結之 receipt 為準：`tests/momentum/Analysis` **19 failed / 1103 passed / 15 skipped**（清單 `tests/baselines/analysis_known_failures.nodeids`）；舊記的「20 failed / 1615 passed」是不同收集面的舊量測，不再引用：①8 條單獨跑會綠（測試間污染）
 ②golden digest 3 條 ③inventory／contract sync 漂移。B1 之 Task 1.3 會把它們凍成逐條 nodeid 清單，
 驗收改「只准變短」的方向性判準（不再用聚合計數）。
 
@@ -68,6 +75,11 @@
   `reconcile_build.sh <session> --mode review --rebuild`（**不可**再帶委員檔）。
 - 🔴 **grep 加 `head -N` 會讓我做出錯誤結論**：v3 曾據截斷輸出宣稱
   `extract_event_patterns` 無任何 caller，實際有 8 處測試 caller（`CODEX-R3-P2-04` 抓出）。
+- 🔴 **GAP-3 有兩份凍結 SPEC，修訂慣例不同**：`GAP3_EVENT_UX_SPEC.md` 走 `D-00N`；
+  `GAP3_EVENT_SPEC.md` 走 `GAP3_EVENT_SPEC_AMENDMENTS.md`。B1 曾在 D-002 宣告一個
+  在其 BASE 內根本不存在的 heading（`Task B1.3` 住在兄弟檔），由 `CODEX-R1-P1-01` 抓出。
+- 🔴 **pytest `-q` 的進度條殘片會混進 `^FAILED`**：30 行中只有 19 行是真 nodeid，
+  萃取必須 `grep '::'`；且**加了過濾就要同步改驗證條件**（我漏了，`CODEX-R1-P1-02` 抓出）。
 
 ## 殘留
 `EA-RESID-1..6`；`EVTLABEL R-1..R-9`；stage6b `role="diagnostic"`；`REDSWEEP` 約 17 條；
