@@ -56651,3 +56651,38 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b2-review-r1-codex.md", "output_sha256": "50f36c98990ad879314d9bfef8e8fa3bb14a6e91ad750311da149c423e585a9f", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R1", "ts": "2026-09-10T18:51:53Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b2-review-r1-composer.md", "output_sha256": "f04baa8bdc69eeba28b8b30142af905d8e5909fa11f26a43626a1e7b4a1f4009", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R1", "ts": "2026-09-10T18:51:53Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b2-review-r1-grok.md", "output_sha256": "43ffe4bb5c8d2c072fa893675bd0ab62ca3c332827b5e4332dada3b47dac6806", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R1", "ts": "2026-09-10T18:51:53Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R2", "ts": "2026-09-10T18:54:10Z"}
+=== 2026-09-11 02:54:10 | dispatch ===
+  ts=2026-09-11 02:54:10
+  kind=dispatch
+  intent=SPLITUNIFY B2b 定向重審（H1-H5 是否閉合＋負向注入掃描）
+  risk=low
+  facts_asked=H1-H5 逐條是否閉合/負向注入七類是否已擋/刪 len(symbols)>1 是否正確/獨立 oracle 是否夠獨立/可否進 B2c
+  review_role=adversarial code reviewer, 禁改碼, 必須做負向注入
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R2", "ts": "2026-09-10T18:54:16Z"}
+=== 2026-09-11 02:54:16 | dispatch ===
+  ts=2026-09-11 02:54:16
+  kind=dispatch
+  intent=SPLITUNIFY B2b 定向重審（H1-H5 是否閉合＋負向注入掃描）
+  risk=low
+  facts_asked=H1-H5 逐條是否閉合/負向注入七類是否已擋/刪 len(symbols)>1 是否正確/獨立 oracle 是否夠獨立/可否進 B2c
+  review_role=adversarial code reviewer, 禁改碼, 必須做負向注入
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260911-SPLITUNIFY-B2-REVIEW-R2-BRIEF.md", "brief_sha256": "1e2d736510c031d2b4046d9b38112581dbccb6daeff30aeb573cea52afe9424d", "brief_sha256_norm": "1e2d736510c031d2b4046d9b38112581dbccb6daeff30aeb573cea52afe9424d", "event": "committee_round_open", "event_id": "ab2b1150-a8ea-47fa-9c26-67343c0e58bf", "expected_outputs": {"codex": "handoffs/20260911-splitunify-b2-review-r2-codex.md", "composer": "handoffs/20260911-splitunify-b2-review-r2-composer.md", "grok": "handoffs/20260911-splitunify-b2-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "53040a62-5538-471f-b53c-344b3d38782c", "schema_version": 1, "sequence": 3411, "session_name": "20260911-splitunify-b2-review-r2", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R2", "ts": "2026-09-10T18:54:22Z"}

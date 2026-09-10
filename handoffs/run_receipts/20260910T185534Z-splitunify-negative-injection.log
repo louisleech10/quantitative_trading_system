@@ -1,0 +1,13 @@
+  ✓ ① feature_index 含 NaT: 已擋 ValueError: split_projection: feature_index 含 NaT（fail-closed）
+  ✓ ② event_keys 缺 label_end_ms 欄: 已擋 ValueError: derive_event_split_from_plans: event_keys 缺欄 ['label_end_ms']
+  ✓ ③ row_index 為 float（0.5..4.5）: **未擋** （無例外）
+  ✓ ④ manifest 缺 decision_at_ms: 已擋 KeyError: 'decision_at_ms'
+  ✓ ⑤ bucket_ms = 0: 已擋 IntCastingNaNError: Cannot convert non-finite values (NA or inf) to integer
+  ✗ ⑥ bucket_ms = -1: **未擋** （無例外）
+  ✗ ⑦ label_end_ms < label_start_ms: **未擋** （無例外）
+  ✗ ⑧ feature_index 反序: **未擋** （無例外）
+  ✗ ⑨ feature_index 有重複時間戳: **未擋** （無例外）
+
+未如預期者 = 4 / 9
+[2026-09-11 02:55:32,410] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-11 02:55:34,212 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
