@@ -10,6 +10,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -239,6 +242,7 @@ def test_unmatched_timestamp_is_purged_not_train() -> None:
 
 # ── fail-closed（M-SU-2／M-SU-3／M-SU-6）─────────────────────────────────
 def test_multi_symbol_is_fail_closed() -> None:
+    """事件批含兩個 symbol ⇒ 與單一 plan symbol 不相等 ⇒ 擋下（SPEC C-2）。"""
     index, train, test, _, _, _ = _basic_case()
     keys = _event_keys(
         [("e1", index[0], int(index[0]) + H1), ("e2", index[1], int(index[1]) + H1, "BTCUSDT")]
@@ -247,6 +251,14 @@ def test_multi_symbol_is_fail_closed() -> None:
         derive_event_split_from_plans(
             train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
         )
+
+
+def test_plan_symbols_differ_is_fail_closed() -> None:
+    """train 與 test plan 的 symbol 不同 ⇒ 邊界本身就跨批，必須擋。"""
+    index, train, _, keys, man, _ = _basic_case()
+    _, btc_test, _ = _plans(index, symbol="BTCUSDT")
+    with pytest.raises(ValueError, match="plan 之 symbol 不同"):
+        derive_event_split_from_plans(train, btc_test, keys, index, manifest=man, bucket_ms=H1)
 
 
 def test_single_symbol_batch_unaffected() -> None:
@@ -315,31 +327,56 @@ def test_unit_normalize_accepts_datetime_index() -> None:
 
 
 # ── clusters 與 summary（M-SU-7／C-5）────────────────────────────────────
-def test_clusters_byte_identical_to_legacy_split_events() -> None:
-    """`build_time_clusters` 是自 `split_events` **原樣抽出**——同一 manifest 須逐值相同。
+def test_clusters_match_independent_frozen_oracle() -> None:
+    """🔴 clusters 對**獨立** oracle（凍結 JSON）逐值相等，**不拿 `split_events` 當 oracle**。
 
-    🔴 fixture 必須讓**至少兩個事件落在同一個桶**（`M-SU-4`／`M-SU-7` 的教訓）：
-    每個事件各自成簇時 `cluster_weight` 恆為 `1/1 == 1.0`，把權重公式改成寫死 `1.0`
-    也測不出來。這裡刻意讓 `c2`／`c3` 共用同一桶 ⇒ 權重應為 **0.5**。
+    出生理由（B2b review `CODEX-R1-P2-05`）：我把分簇抽成共用函式之後，
+    `split_events` 自己就呼叫 `build_time_clusters` ⇒ 拿它當 oracle 是**同義反覆**，
+    原本那條「逐值相等」測試在重構那一刻就變成空的（而且它還是綠的）。
+    ⇒ oracle 改成依 `w = 1/n` 之定義**手推**並凍結的 JSON，與被測程式無因果關係。
+
+    🔴 fixture 必須含**共桶**事件（`c2`／`c3` 權重 0.5）——每事件各自成簇時權重恆 1.0，
+    把公式改寫死成 `1.0` 也測不出來。
     """
-    index, _, _, _, _, _ = _basic_case()
-    t0 = int(index[0])
+    oracle_path = (
+        Path(__file__).resolve().parents[3] / "tests" / "golden" / "splitunify"
+        / "clusters_oracle.json"
+    )
+    oracle = json.loads(oracle_path.read_text(encoding="utf-8"))
     keys = _event_keys(
-        [
-            ("c1", t0, t0 + H1),
-            ("c2", t0 + H1, t0 + 2 * H1),
-            ("c3", t0 + H1, t0 + 2 * H1),  # 與 c2 同桶 ⇒ 權重 0.5
-        ]
+        [(r["event_id"], r["decision_at_ms"], r["decision_at_ms"] + H1) for r in oracle["fixture"]]
+    )
+    got = build_time_clusters(_manifest(keys), int(oracle["bucket_ms"]))
+    expected = pd.DataFrame(oracle["expected_clusters"])
+    expected["time_cluster_id"] = expected["time_cluster_id"].astype("int64")
+    pd.testing.assert_frame_equal(
+        got.reset_index(drop=True), expected.reset_index(drop=True), check_like=False
+    )
+    assert set(got["cluster_weight"]) == {1.0, 0.5}, (
+        "fixture 必須含共桶事件，否則權重恆 1.0、公式被改寫死也測不出來"
+    )
+
+
+def test_clusters_still_agree_with_split_events_shape() -> None:
+    """輔助（**不是** oracle）：`split_events` 的 clusters 與共用實作同形。
+
+    抽出後兩者本來就是同一支，本測試只擋「有人把 `split_events` 改回自己算」，
+    不能當正確性 oracle——那是上一條的職責。
+    """
+    oracle = json.loads(
+        (
+            Path(__file__).resolve().parents[3] / "tests" / "golden" / "splitunify"
+            / "clusters_oracle.json"
+        ).read_text(encoding="utf-8")
+    )
+    keys = _event_keys(
+        [(r["event_id"], r["decision_at_ms"], r["decision_at_ms"] + H1) for r in oracle["fixture"]]
     )
     man = _manifest(keys)
-    mine = build_time_clusters(man, H1)
     legacy = split_events(
         man, EventSplitConfig(test_fraction=0.4, bucket_ms=H1, tier_min_test_events=0)
     )
-    assert set(mine["cluster_weight"]) == {1.0, 0.5}, (
-        "fixture 必須含共桶事件，否則權重恆 1.0、公式被改寫死也測不出來"
-    )
-    pd.testing.assert_frame_equal(mine, legacy.clusters)
+    pd.testing.assert_frame_equal(build_time_clusters(man, H1), legacy.clusters)
 
 
 def test_summary_has_all_twelve_keys() -> None:
@@ -368,12 +405,138 @@ def test_summary_has_all_twelve_keys() -> None:
 
 # ── 邊界 ─────────────────────────────────────────────────────────────────
 def test_empty_event_keys_gives_empty_three_states() -> None:
+    """空批 ⇒ 三態皆空（不 raise）。manifest 也必須是**同一批**（即同樣為空）。"""
     index, train, test, _, _, _ = _basic_case()
-    keys = _event_keys([])
     keys = pd.DataFrame(columns=list(_event_keys([("x", 0, 0)]).columns))
-    man = _manifest(_event_keys([("x", int(index[0]), int(index[0]))]))
+    man = _manifest(keys)
     plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
     assert plan.assignments.empty and plan.purged.empty
+
+
+# ── 身份對帳（H1／H2；B2b review 之 CODEX-R1-P1-01／P1-02）──────────────
+def test_manifest_id_mismatch_is_fail_closed() -> None:
+    """🔴 餵**另一批** manifest 必須 raise，不得產出「看起來成功」的 assignment。"""
+    index, train, test, keys, _, _ = _basic_case()
+    foreign = _manifest(_event_keys([("foreign", int(index[0]), int(index[0]) + H1)]))
+    with pytest.raises(ValueError, match="event_id 集合不相等"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=foreign, bucket_ms=H1)
+
+
+def test_manifest_superset_is_also_rejected() -> None:
+    """**不接受 subset**——要子集就由呼叫端先裁好 manifest，別讓函式猜。"""
+    index, train, test, keys, _, _ = _basic_case()
+    extra = pd.concat(
+        [keys, _event_keys([("extra", int(index[0]), int(index[0]) + H1)])], ignore_index=True
+    )
+    with pytest.raises(ValueError, match="不接受 subset"):
+        derive_event_split_from_plans(
+            train, test, keys, index, manifest=_manifest(extra), bucket_ms=H1
+        )
+
+
+def test_plan_symbol_mismatch_is_fail_closed() -> None:
+    """🔴 單一 ETH 事件配單一 **BTC** plan 必須 raise——只看基數擋不住錯誤邊界歸屬。"""
+    index, _, _, keys, man, _ = _basic_case()
+    btc_train, btc_test, _ = _plans(index, symbol="BTCUSDT")
+    with pytest.raises(ValueError, match="與 plan symbol"):
+        derive_event_split_from_plans(
+            btc_train, btc_test, keys, index, manifest=man, bucket_ms=H1
+        )
+
+
+def test_plan_without_symbol_is_fail_closed() -> None:
+    """plan 沒有 symbol ⇒ 無法證明邊界屬於本批。"""
+    index, train, test, keys, man, _ = _basic_case()
+    anon = SplitPlan(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.asarray(train.row_index, dtype=int),
+        time_bounds=train.time_bounds,
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="deadbeef",
+        symbol=None,
+    )
+    anon_test = SplitPlan(
+        split_label="test",
+        index_kind="positional",
+        row_index=np.asarray(test.row_index, dtype=int),
+        time_bounds=test.time_bounds,
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="deadbeef",
+        symbol=None,
+    )
+    with pytest.raises(ValueError, match="plan 未帶 symbol"):
+        derive_event_split_from_plans(anon, anon_test, keys, index, manifest=man, bucket_ms=H1)
+
+
+# ── malformed feature index（H3；CODEX-R1-P1-03）─────────────────────────
+def test_mixed_unit_index_is_fail_closed() -> None:
+    """🔴 **混合**單位（部分秒、部分毫秒）必須 raise——`np.all(...)` 會直接放行。"""
+    index, train, test, keys, man, _ = _basic_case()
+    mixed = np.asarray(index, dtype="int64").copy()
+    mixed[5] = mixed[5] // 1000  # 只有一格是秒
+    with pytest.raises(ValueError, match="混合"):
+        derive_event_split_from_plans(
+            train, test, keys, pd.Index(mixed), manifest=man, bucket_ms=H1
+        )
+
+
+def test_negative_row_index_is_fail_closed() -> None:
+    """🔴 負 positional index 必須 raise——numpy 會回捲成尾端列，靜默給錯歸屬。"""
+    index, train, test, keys, man, _ = _basic_case()
+    bad = SplitPlan(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.asarray([-3, -2, -1], dtype=int),
+        time_bounds=train.time_bounds,
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="deadbeef",
+        symbol=SYM,
+    )
+    with pytest.raises(ValueError, match="含負值"):
+        derive_event_split_from_plans(bad, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_row_index_out_of_range_is_fail_closed() -> None:
+    index, train, test, keys, man, _ = _basic_case()
+    bad = SplitPlan(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.asarray([0, 1, N_BARS + 5], dtype=int),
+        time_bounds=train.time_bounds,
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="deadbeef",
+        symbol=SYM,
+    )
+    with pytest.raises(ValueError, match="超出 universe 長度"):
+        derive_event_split_from_plans(bad, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_answer_window_one_ms_before_test_start_is_purged() -> None:
+    """🔴 `label_end` 落在 canonical test start **前 1ms** 的 train 事件——不該 purge。
+
+    出生理由（`CODEX-R1-P2-05`／`GROK-R1-P2-02`）：現有 fixture 用 `exact-equal`
+    （`label_end == test_start`），所以「把條件改成 `>= test_start - 1`」或「誤減 embargo」
+    這兩種 mutation 在 H1 對齊的 fixture 上**仍然全綠**＝假綠。
+    本測試釘住**邊界的另一側**：差 1 毫秒就不該被 purge。
+    """
+    index, train, test, _, _, test_start = _basic_case()
+    keys = _event_keys([("e_near", index[0], test_start - 1)])
+    plan = derive_event_split_from_plans(
+        train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+    )
+    assert list(plan.assignments["split_label"]) == ["train"], (
+        "差 1 毫秒就被 purge ⇒ 條件式比契約嚴（多減了緩衝）"
+    )
+    assert plan.purged.empty
 
 
 def test_all_purged_is_legal_output() -> None:
@@ -439,6 +602,23 @@ def test_build_event_keys_rejects_duplicate_per_tf_rows() -> None:
         {"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 2000},
     ]
     with pytest.raises(ValueError, match="多列 per_tf"):
+        build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
+
+
+def test_build_event_keys_rejects_duplicate_event_level_rows() -> None:
+    """🔴 `event_level` 本身有重複 `event_id` ⇒ merge 之 `validate="1:1"` 必須擋。
+
+    出生理由（B2b review `CODEX-R1-P2-05` 之 `M-SU-15`）：我原本只擋 `per_tf` 的重複，
+    `event_level` 的重複沒有任何測試——拿掉 `validate="1:1"` 也不會紅。
+    """
+    ev = [
+        {"event_id": "a", "symbol": SYM, "timeframe": "1h",
+         "label_start_ms": 10, "label_end_ms": 20},
+        {"event_id": "a", "symbol": SYM, "timeframe": "1h",
+         "label_start_ms": 11, "label_end_ms": 21},  # 重複 event_id
+    ]
+    per_tf = [{"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000}]
+    with pytest.raises(Exception):  # pandas MergeError（validate="1:1"）
         build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
 
 

@@ -1,0 +1,35 @@
+{
+  "_doc": "SPLITUNIFY B2b：build_time_clusters 之**獨立** oracle。值由 w=1/n 之定義逐筆手推，**不是**呼叫 split_events 產生的——B2b review CODEX-R1-P2-05 指出：抽出共用函式之後，拿 split_events 當 oracle 會變成同義反覆（它自己就呼叫 build_time_clusters）。",
+  "bucket_ms": 3600000,
+  "fixture": [
+    {
+      "event_id": "c1",
+      "decision_at_ms": 1700000000000
+    },
+    {
+      "event_id": "c2",
+      "decision_at_ms": 1700003600000
+    },
+    {
+      "event_id": "c3",
+      "decision_at_ms": 1700003600000
+    }
+  ],
+  "expected_clusters": [
+    {
+      "event_id": "c1",
+      "time_cluster_id": 472222,
+      "cluster_weight": 1.0
+    },
+    {
+      "event_id": "c2",
+      "time_cluster_id": 472223,
+      "cluster_weight": 0.5
+    },
+    {
+      "event_id": "c3",
+      "time_cluster_id": 472223,
+      "cluster_weight": 0.5
+    }
+  ]
+}

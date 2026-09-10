@@ -25,6 +25,7 @@ from momentum.Analysis.event_samples.event_split import (
     time_cluster_bucket_ms,
 )
 from momentum.Analysis.event_samples.types import AlignmentReceipts, EventManifest, EventSplitPlan
+from momentum.core.split_preview import assert_epoch_ms_array, assert_positional_rows
 
 _CONTRACT_PATH = Path(__file__).resolve().parents[1] / "contracts" / "split_unify.json"
 _EVENT_IMPORT_CONTRACT = (
@@ -78,18 +79,16 @@ def _index_as_ms(index: Any) -> np.ndarray:
 
     🔴 SPLITUNIFY 之時鐘一律毫秒；**不呼叫** `_normalize_ic_time_index`——那支是
     「秒」語意，餵毫秒會 raise（`ic_filter_orchestrator.py:269-271`；SPEC C-4／R2 之 D7）。
-    int64 輸入若量級像**秒**則 raise，與 `split_preview._as_ms` 之守衛同源。
+    🔴 單位政策**共用** `split_preview.assert_epoch_ms_array`（B2b review：codex／grok／主委
+    三方獨立命中我原本在此手寫 `1e11` ＝ 第二份 policy），且該支是**逐元素**檢查——
+    原本的 `np.all(...)` 對**混合**單位會直接放行。
     """
     idx = pd.Index(index)
     if isinstance(idx, pd.DatetimeIndex):
+        if idx.hasnans:
+            raise ValueError("split_projection: feature_index 含 NaT（fail-closed）")
         return (idx.asi8 // 10 ** 6).astype("int64")
-    values = np.asarray(idx, dtype="int64")
-    if values.size and np.all(np.abs(values) < 1e11):
-        raise ValueError(
-            "split_projection: index looks like epoch seconds, expected milliseconds"
-            "（FF run 的 timestamps.parquet 是秒；餵進來前先 ×1000）"
-        )
-    return values
+    return assert_epoch_ms_array(np.asarray(idx), role="split_projection: feature_index")
 
 
 def build_event_keys(
@@ -189,15 +188,49 @@ def derive_event_split_from_plans(
         str(getattr(p, "symbol")) for p in (train_plan, test_plan)
         if getattr(p, "symbol", None) is not None
     }
-    if len(symbols) > 1 or len(plan_symbols) > 1:
+    # 🔴 三道，順序有意義（SPEC C-2；B2b review `CODEX-R1-P1-02`）：
+    #    ① plan 必須帶 symbol——沒有身份就無法證明邊界屬於本批；
+    #    ② train/test 兩 plan 之 symbol 必須一致（否則邊界本身就跨批）；
+    #    ③ 事件之 symbol 集合必須與 plan **相等**。
+    #    🔴 ③ 同時涵蓋了「事件批含多個 symbol」——原本另寫的
+    #    `len(symbols) > 1` 在 ③ 存在後是**冗餘**（任何多 symbol 事件批都不可能等於
+    #    單一 plan symbol），留著只會變成殺不掉的 mutant／死碼，故刪除。
+    if not plan_symbols:
         raise ValueError(
-            f"{_REASON_MULTI_SYMBOL}: 批內 symbol {sorted(symbols | plan_symbols)}"
-            "——per-symbol 投影未支援前一律擋下（禁以第一個 symbol 冒充整批）"
+            f"{_REASON_MULTI_SYMBOL}: plan 未帶 symbol——無法證明邊界屬於本批（fail-closed）"
+        )
+    if len(plan_symbols) > 1:
+        raise ValueError(
+            f"{_REASON_MULTI_SYMBOL}: train/test plan 之 symbol 不同 {sorted(plan_symbols)}"
+            "——邊界本身就跨批（fail-closed）"
+        )
+    if symbols and symbols != plan_symbols:
+        raise ValueError(
+            f"{_REASON_MULTI_SYMBOL}: 事件 symbol {sorted(symbols)} 與 plan symbol "
+            f"{sorted(plan_symbols)} 不一致——per-symbol 投影未支援前一律擋下"
+            "（禁以第一個 symbol 冒充整批，亦禁沿用不屬於本批的邊界）"
+        )
+
+    # 🔴 兩個輸入必須是**同一批**（B2b review `CODEX-R1-P1-01`）：原本只有 clusters 用到
+    #    manifest，餵另一批 manifest 也會產出看起來成功的 assignment。
+    #    **不接受 subset**——要子集就由呼叫端先裁好 manifest，別讓本函式猜。
+    key_ids = set(event_keys["event_id"])
+    man_ids = set(manifest.table["event_id"])
+    if key_ids != man_ids:
+        only_keys, only_man = sorted(key_ids - man_ids)[:3], sorted(man_ids - key_ids)[:3]
+        raise ValueError(
+            "derive_event_split_from_plans: event_keys 與 manifest 之 event_id 集合不相等"
+            f"（只在 event_keys：{only_keys}；只在 manifest：{only_man}）"
+            "——兩者必須是同一批，不接受 subset（fail-closed）"
         )
 
     index_ms = _index_as_ms(feature_index)
-    train_rows = np.asarray(train_plan.row_index, dtype=int)
-    test_rows = np.asarray(test_plan.row_index, dtype=int)
+    train_rows = assert_positional_rows(
+        train_plan.row_index, n=index_ms.size, role="derive: train_plan"
+    )
+    test_rows = assert_positional_rows(
+        test_plan.row_index, n=index_ms.size, role="derive: test_plan"
+    )
     if test_rows.size == 0:
         # 🔴 先 fail-closed，禁與 None 比較（R4 之 F1）。
         raise ValueError(f"{_REASON_MISSING_TEST}: test_plan.row_index 為空（fail-closed）")

@@ -46,9 +46,67 @@ def holdout_split_point(n_rows: int, *, oos_test_size: float) -> int:
     return int(np.floor((1.0 - float(oos_test_size)) * int(n_rows)))
 
 
-#: int64 index 之「看起來是秒」判定門檻。2001-09-09 之後的 epoch **毫秒**皆 > 1e12，
+#: int64 時間戳之「看起來是秒」判定門檻。2001-09-09 之後的 epoch **毫秒**皆 > 1e12，
 #: 而 epoch **秒** 在 2286 年前都 < 1e10 ⇒ 1e11 是一個兩邊都留了一個數量級餘裕的界。
-_MS_MAGNITUDE_FLOOR = 1e11
+#: 🔴 **本常數是單位政策的唯一真相源**——`split_projection` 亦 import 它，
+#: 不得任一端手寫字面量（B2b review：codex／grok／主委**三方獨立**命中該重複）。
+MS_MAGNITUDE_FLOOR = 1e11
+#: 舊名保留給既有 caller（本檔內部用）。
+_MS_MAGNITUDE_FLOOR = MS_MAGNITUDE_FLOOR
+
+
+def assert_epoch_ms_array(values: Any, *, role: str) -> np.ndarray:
+    """把整數時間戳陣列驗成 **epoch 毫秒**，逐元素檢查；不合規即 raise。
+
+    🔴 **逐元素**而非 `np.all`（B2b review `CODEX-R1-P1-03`）：原本寫成
+    `np.all(np.abs(values) < FLOOR)` ⇒ **混合**單位（部分秒、部分毫秒）時 `all` 為 False，
+    直接**放行**。混合單位不是「其中一種」，是資料壞掉，必須擋。
+
+    與 `_as_ms`（scalar 版）共用 `MS_MAGNITUDE_FLOOR`——單位政策只有一份。
+    """
+    arr = np.asarray(values)
+    if arr.size == 0:
+        return arr.astype("int64")
+    if not np.issubdtype(arr.dtype, np.integer):
+        arr = np.asarray(arr, dtype="int64")
+    nonzero = arr[arr != 0]
+    if nonzero.size:
+        looks_seconds = np.abs(nonzero) < MS_MAGNITUDE_FLOOR
+        if looks_seconds.any():
+            n_bad = int(looks_seconds.sum())
+            if n_bad == nonzero.size:
+                raise ValueError(
+                    f"{role}: looks like epoch seconds, expected milliseconds"
+                    "（FF run 的 timestamps.parquet 是秒；餵進來前先 ×1000）"
+                )
+            raise ValueError(
+                f"{role}: **混合**時間單位——{n_bad}/{nonzero.size} 個值看起來是秒、"
+                "其餘看起來是毫秒。混合不是『其中一種』，是資料壞掉（fail-closed）"
+            )
+    return arr.astype("int64")
+
+
+def assert_positional_rows(rows: Any, *, n: int, role: str) -> np.ndarray:
+    """把 positional row index 驗成 `0 <= i < n` 且無重複；不合規即 raise。
+
+    🔴 出生理由（B2b review `CODEX-R1-P1-03`）：numpy 對**負索引**會回捲，
+    `index[-3]` 會靜默取到尾端第三列 ⇒ 錯誤的 train／test 歸屬而**不拋任何例外**。
+    """
+    arr = np.asarray(rows, dtype=int)
+    if arr.size == 0:
+        return arr
+    if arr.min() < 0:
+        raise ValueError(
+            f"{role}: row_index 含負值 {int(arr.min())}——numpy 會回捲成尾端列，"
+            "靜默給出錯誤歸屬（fail-closed）"
+        )
+    if arr.max() >= int(n):
+        raise ValueError(
+            f"{role}: row_index 最大值 {int(arr.max())} 超出 universe 長度 {int(n)}（fail-closed）"
+        )
+    if np.unique(arr).size != arr.size:
+        raise ValueError(f"{role}: row_index 有重複位置（fail-closed）")
+    return arr
 
 
 def _as_ms(index: Any, position: int) -> int:
