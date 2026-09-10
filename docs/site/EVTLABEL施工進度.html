@@ -44,7 +44,7 @@
 </tr>
 <tr>
 <td><strong>EVTLABEL 第 1 段（揭露）</strong></td>
-<td>✅ <strong>程式完成，待三家 code review</strong></td>
+<td>✅ <strong>完成</strong>（三家 code review 8 條，2 條真問題已當場修掉）</td>
 <td>9/10</td>
 </tr>
 <tr>
@@ -103,8 +103,16 @@
 <li><strong>測試</strong>：後端 25 條、前端 30 檔 255 條、build 綠、既有 golden 18 條不受影響。</li>
 </ul>
 <hr />
+<h3 id="5-第-1-段的三家審碼8-條-已收斂">5. 第 1 段的三家審碼（8 條）— 已收斂</h3>
+<p>兩家說可以過、一家（Codex）擋下兩條。<strong>我採 Codex</strong>，因為它指出的其中一條是我真的寫錯：</p>
+<ul>
+<li><strong>報告的分母算錯</strong>：如果你的 CSV 同時有 ETH 和 BTC，而這次只分析 ETH，報告的「正 136／反 29」和重疊度<strong>會把 BTC 那些也算進去</strong>——報告自己跟自己打架。已改成只算真正被分析的那些。寫測試時又發現一個延伸問題（對不上時會<strong>靜默變空</strong>），已改成直接報錯。</li>
+<li><strong>重疊度算太慢</strong>：三家都指出，1 萬筆事件光算這個就要 5 秒以上。已改用更快的演算法（意思完全一樣），並釘住「1 萬筆要在 2 秒內」，變慢就紅。<strong>沒有</strong>用「限制事件數量」蒙混過去。</li>
+<li><strong>計時沒歸零</strong>：同一個分析器跑第二次會把上一次的秒數疊上去，已修。</li>
+<li>另兩條登記為「已具名、之後再處理」：7 個純前端開關（按了不會影響後端，但已寫明、不是偷藏）；混週期批次的一個保守值（畫面已自動改口，不會誤導）。</li>
+</ul>
 <h2 id="進行中">進行中</h2>
-<p><strong>EVTLABEL 第 1 段的三家 code review</strong>（規矩：實作者不自審）。收斂後才進第 2 段。</p>
+<p><strong>第 2 段（purge 依 label 視窗換算）</strong> 準備動工。</p>
 <h2 id="還沒做">還沒做</h2>
 <ol>
 <li>第 2 段：purge 改成跟你的 h 走（12 根），embargo 只承載 look-ahead 深度（144 根）。</li>
