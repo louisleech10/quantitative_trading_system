@@ -280,3 +280,61 @@ def test_suppressed_not_consumable_when_random_matches_observed():
     nc = receipt["negative_control"]
     assert nc["n_observed"] <= nc["q95"], f"fixture 未觸發：observed={nc['n_observed']} q95={nc['q95']}"
     assert orch._survivor_suppressed_reason == "negative_control_failed"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ④ permutation-major（B4 自跑 benchmark 之修正）
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_vectorized_permutation_matches_per_feature_oracle():
+    """🔴 承重條：向量化版與逐特徵版對**同一組置換**必須給出同一個判定。
+
+    改成一次算全部欄是為了速度（K=2000 由 123 秒降到 3.9 秒）；
+    速度不得換來不同的答案。
+    """
+    from momentum.Analysis.binary_discrimination import block_permutation_table
+
+    n = 120
+    _, block_ids, _, _, y = _sparse_setup(n)
+    planted = y * 10.0 + np.arange(n) * 1e-6
+    noise = np.random.default_rng(0).standard_normal(n)
+    feats = _frame(n, {"planted": planted, "noise": noise})
+
+    batch = block_permutation_table(feats, y, block_ids, seed=1, n_perm=200)
+    for name, values in (("planted", planted), ("noise", noise)):
+        single = block_permutation_oracle(values, y, block_ids, rank_biserial_stat,
+                                          seed=1, n_perm=200)
+        row = batch["table"].loc[name]
+        assert bool(row["in_band"]) == bool(single["in_band"]), f"{name} 判定不一致"
+        assert float(row["observed"]) == pytest.approx(single["observed"], rel=1e-12)
+        assert float(row["p_value"]) == pytest.approx(single["p_value"], rel=1e-12)
+
+
+def test_vectorized_permutation_insufficient_blocks_marks_all_unavailable():
+    """區塊太少 ⇒ 整體 unavailable，**不得**只讓部分欄通過。"""
+    from momentum.Analysis.binary_discrimination import block_permutation_table
+
+    ms = np.array([BASE + i * HOUR for i in range(40)])
+    block_ids, _, n_blocks = block_ids_for_events(ms, 156, HOUR)
+    assert n_blocks < 10
+    y = np.array([1] * 20 + [0] * 20)
+    feats = _frame(40, {"a": y * 1.0, "b": np.arange(40, dtype=float)})
+    out = block_permutation_table(feats, y, block_ids, seed=1, n_perm=50)
+    assert out["status"] == "unavailable:insufficient_blocks" and out["table"] is None
+
+
+def test_insufficient_blocks_removes_every_candidate():
+    """接線層：區塊太少時每一個候選都進 `permutation_unavailable`，倖存者為空。"""
+    n = 40
+    y = np.array([1] * 20 + [0] * 20, dtype=int)
+    feats = _frame(n, {"a": y * 10.0 + np.arange(n) * 1e-6, "b": np.arange(n, dtype=float)})
+    orch = _orch()
+    _bind(orch, feats, y, window_bars=156)          # 長答案窗 ⇒ 區塊不足
+    removed: dict = {}
+    survivors, receipt = orch._run_binary_permutation_and_negative_control(
+        ["a", "b"], removed, feats, orch._config, alpha_effective=0.05, fdr_method="fdr_bh",
+    )
+    assert survivors == []
+    assert set(removed["permutation_unavailable"]) == {"a", "b"}
+    assert receipt["negative_control"] == {"status": "skipped:no_survivors"}

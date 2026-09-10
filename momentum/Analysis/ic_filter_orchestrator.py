@@ -33,6 +33,7 @@ from momentum.Analysis.binary_discrimination import (
     _permute_blocks,
     block_ids_for_events,
     block_permutation_oracle,
+    block_permutation_table,
     mann_whitney_table,
     rank_biserial_stat,
 )
@@ -4781,21 +4782,29 @@ class ICFilterOrchestrator:
         removed.setdefault("permutation_unavailable", [])
 
         survivors: list = []
-        for name in list(passed):
-            values = features_for_stats[name].to_numpy(dtype="float64")
-            out = block_permutation_oracle(
-                values, y, block_ids, rank_biserial_stat,
+        if passed:
+            # 🔴 **permutation-major**（B4 自跑 benchmark 之修正）：每產生一個置換就對**全部候選欄**
+            #    算一次，而不是逐特徵各跑 n_perm 次。實測 K=2000／n_perm=200 由 **123 秒降到 3.9 秒**
+            #    （`handoffs/20260910-probe-oracle-bench.py`；120 秒門檻原本是超的）。
+            #    同一組置換共用於所有特徵是標準做法；每欄的帶與 p 仍各自獨立。
+            out = block_permutation_table(
+                features_for_stats[list(passed)], y, block_ids,
                 seed=int(cfg_ev.oracle_seed), n_perm=int(n_perm),
             )
             if out.get("status") != BINARY_STATUS_OK:
-                removed["permutation_unavailable"].append(name)
-                continue
-            if receipt["first_permutation_digest"] is None:
+                # 區塊太少 ⇒ **全部**候選都標 unavailable（不得成為可消費倖存者）
+                removed["permutation_unavailable"].extend(list(passed))
+            else:
                 receipt["first_permutation_digest"] = out["receipt"]["first_permutation_digest"]
-            if out.get("in_band"):
-                removed["permutation_oracle_disagree"].append(name)
-                continue
-            survivors.append(name)
+                tbl_perm = out["table"]
+                for name in list(passed):
+                    row = tbl_perm.loc[name]
+                    if str(row["status"]) != BINARY_STATUS_OK:
+                        removed["permutation_unavailable"].append(name)
+                    elif bool(row["in_band"]):
+                        removed["permutation_oracle_disagree"].append(name)
+                    else:
+                        survivors.append(name)
 
         n_observed = len(survivors)
         if n_observed == 0:

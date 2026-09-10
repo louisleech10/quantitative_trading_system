@@ -33,6 +33,7 @@ __all__ = [
     "BINARY_STATUS_OK",
     "block_ids_for_events",
     "block_permutation_oracle",
+    "block_permutation_table",
     "rank_biserial_stat",
 ]
 
@@ -301,3 +302,82 @@ def rank_biserial_stat(values: np.ndarray, y: np.ndarray) -> float:
         return float("nan")
     u = float(stats.mannwhitneyu(pos, neg, alternative="two-sided").statistic)
     return 2.0 * (u / (len(pos) * len(neg))) - 1.0
+
+
+def block_permutation_table(
+    features: pd.DataFrame,
+    y: np.ndarray,
+    block_ids: np.ndarray,
+    *,
+    seed: int,
+    n_perm: int,
+    q_low: float = 0.025,
+    q_high: float = 0.975,
+    min_blocks: int = 10,
+) -> dict:
+    """對**多個特徵一次**做區塊置換檢定；回 `{"status":…, "table": DataFrame, "receipt": …}`。
+
+    🔴 出生理由（B4 自跑 benchmark，`handoffs/20260910-probe-oracle-bench.py`）：
+    原本逐特徵各跑 `n_perm` 次，K=2000／n_perm=200 實測 **123 秒**，超過 120 秒門檻。
+    改成 **permutation-major**：每產生一個置換就對**全部候選欄**算一次
+    （`mann_whitney_table` 本來就是向量化的）⇒ 呼叫次數由 K×n_perm 降為 n_perm。
+    同一組置換共用於所有特徵是標準做法（也是 max-statistic 類校正的前提），
+    每個特徵的帶與 p 仍各自獨立計算。
+
+    三道硬檢（沿用既有 oracle）：分布非退化、非恆等置換、經驗分位；
+    `n_blocks < min_blocks` ⇒ 整體 `unavailable:insufficient_blocks`。
+    """
+    import hashlib
+
+    n_blocks = int(len(np.unique(block_ids)))
+    if n_blocks < int(min_blocks):
+        return {"status": "unavailable:insufficient_blocks", "n_blocks": n_blocks, "table": None}
+
+    names = list(features.columns)
+    observed = mann_whitney_table(features, y, min_class_n=1)["rank_biserial"].to_numpy(dtype="float64")
+
+    rng = np.random.default_rng(int(seed))
+    perm_stats = np.empty((int(n_perm), len(names)), dtype="float64")
+    any_non_identity = False
+    first_digest = None
+    for i in range(int(n_perm)):
+        yp = _permute_blocks(rng, y, block_ids)
+        if first_digest is None:
+            first_digest = hashlib.sha256(np.asarray(yp).tobytes()).hexdigest()
+        if not np.array_equal(yp, y):
+            any_non_identity = True
+        perm_stats[i, :] = mann_whitney_table(
+            features, yp, min_class_n=1
+        )["rank_biserial"].to_numpy(dtype="float64")
+
+    # 硬檢 (i)：**逐欄**分布非退化——只看整體會被某一欄的變異掩蓋其他欄全為常數。
+    with np.errstate(invalid="ignore"):
+        col_var = np.nanvar(perm_stats, axis=0)
+    degenerate = ~(col_var > 0.0)
+    if bool(np.all(degenerate)):
+        raise ValueError("block permutation oracle degenerate: 全部欄之置換分布皆退化（硬檢 i）")
+    # 硬檢 (ii)：非恆等
+    if not any_non_identity:
+        raise ValueError("block permutation oracle identity-only permutations（硬檢 ii）")
+
+    with np.errstate(invalid="ignore"):
+        lo = np.nanquantile(perm_stats, q_low, axis=0)      # 硬檢 (iii)：經驗分位
+        hi = np.nanquantile(perm_stats, q_high, axis=0)
+        ge = np.sum(perm_stats >= observed[None, :], axis=0)
+        le = np.sum(perm_stats <= observed[None, :], axis=0)
+    n = int(n_perm)
+    p = np.minimum(1.0, 2.0 * np.minimum((1 + ge) / (n + 1), (1 + le) / (n + 1)))
+
+    in_band = (observed >= lo) & (observed <= hi)
+    status = np.where(degenerate, "unavailable:degenerate_permutation_distribution", BINARY_STATUS_OK)
+    table = pd.DataFrame(
+        {"observed": observed, "band_low": lo, "band_high": hi,
+         "in_band": in_band, "p_value": p, "status": status},
+        index=pd.Index(names, name="feature"),
+    )
+    return {
+        "status": BINARY_STATUS_OK,
+        "n_blocks": n_blocks,
+        "table": table,
+        "receipt": {"seed": int(seed), "n_perm": n, "first_permutation_digest": first_digest},
+    }
