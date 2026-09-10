@@ -1,5 +1,7 @@
 # GAP-3 事件型規格：還差什麼才算「完整凍結」
 
+> 📌 2026-09-11：`SPLITUNIFY` 票新增規格延伸 `docs/GAP3_EVENT_UX_SPEC.D-002.md`——事件切分**不再自己決定邊界**，改由 K 線的訓練／驗證邊界投影而來；拿不到特徵表的匯入流程明講「未執行切分」，不再顯示 train 0／test 0／purge 0 這種假數字。白話見 [SPLITUNIFY規格白話.md](SPLITUNIFY規格白話.md)、進度見 [SPLITUNIFY施工進度.md](SPLITUNIFY施工進度.md)。本檔其餘內容為之前批次之狀態。
+
 > 📌 2026-09-03：`G3-D2` 灰色項目之規格延伸 `docs/GAP3_EVENT_UX_SPEC.D-001.md` 與施工清單延伸 `docs/GAP3_EVENT_UX_TODO.D-006.md` 已凍結（三家戳記）；白話與範例見 [G3-D2灰色項目說明.md](G3-D2灰色項目說明.md)。本檔其餘內容為之前批次之狀態。
 
 **這張表回答一件事：現在到底卡在哪、還要多久、有沒有在前進。**

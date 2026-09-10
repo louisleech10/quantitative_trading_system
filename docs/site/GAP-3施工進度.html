@@ -11,6 +11,9 @@
 <main>
 <h1 id="量化主線gap-3-事件型施工看板">量化主線：GAP-3 事件型施工看板</h1>
 <blockquote>
+<p>📌 2026-09-11：<code>SPLITUNIFY</code> 票新增規格延伸 <code>docs/GAP3_EVENT_UX_SPEC.D-002.md</code>——事件切分<strong>不再自己決定邊界</strong>，改由 K 線的訓練／驗證邊界投影而來；拿不到特徵表的匯入流程明講「未執行切分」，不再顯示 train 0／test 0／purge 0 這種假數字。白話見 <a href="SPLITUNIFY規格白話.html">SPLITUNIFY規格白話.md</a>、進度見 <a href="SPLITUNIFY施工進度.html">SPLITUNIFY施工進度.md</a>。本檔其餘內容為之前批次之狀態。</p>
+</blockquote>
+<blockquote>
 <p>📌 <strong>2026-09-05（晚）第 4 段（B-D4）✅ 收工</strong>：實作 <code>37fa0910</code>＋接線 <code>7904c0dd</code>＋R1 閉合 <code>d34228e1</code>／<code>90aad087</code>＋R2 閉合 <code>bc8c5e1e</code>。
 兩輪三家審碼：R1 <strong>10 findings／P1=4</strong>（三家獨立命中同一條 P1：WS 主路徑不回填揭露欄）→ R2 <strong>4 findings／P1=0</strong>、三家一致「可進 B-D5」。
 交付：①支援矩陣由 4 對擴為 <strong>13 對</strong>（5 進場語意 × 3 報酬算法 減 2 個幾何零窗對），
