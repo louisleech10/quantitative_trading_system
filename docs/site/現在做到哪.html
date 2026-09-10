@@ -28,7 +28,7 @@
 <tbody>
 <tr>
 <td><strong>在做哪一票</strong></td>
-<td>你 UAT 事件型時抓到三個問題：報告沒寫用了哪個 h／k（實際 h=1＝12h 一根）、purge 沒換算成事件週期、你 CSV 的 0／1 正反標籤根本沒被用（IC 對的是重算的報酬）。裁定：先修揭露＋UI 單位（小）→ purge 換算（中）→「匯入標籤模式」讓 IC 直接對你的正反例算（大）→ <strong>全部做完才重驗 B26–B34</strong>。票名 EVTLABEL。<strong>規格書（SPEC）與施工清單（TODO）三輪三家找碴已收斂（27＋16＋11＝54 條全採納）、三家蓋章 APPROVED，你已放行動工（<code>0dbe40ff</code>）。第 1、2 段完工，第 3 段進行中。<strong>第 1 輪抓到的最重要三件：①「分辨力」門檻原本會把「反向但很強」的特徵殺掉（已改看絕對值、獨立門檻）②自動判定要不要用你的 0/1，原本看整批，但統計其實只在切分後的驗證段算——已改在切分後看驗證段每類夠不夠 ③負對照（把標籤打亂再跑）若還篩得出特徵，原本只警告——已改為</strong>不交付倖存者</strong>。你的主目標原話已逐字寫進規格書第一段；任何委員要把「對你的 0/1 標籤算」往後延，我都會彈窗問你，不會自己吞</td>
+<td>🔴 <strong>現在是 SPLITUNIFY</strong>（把「兩套切分」統一成一套；切法你授權交委員會定共識，已收斂五條）。規格書與施工清單都寫完並過格式機檢，正在派三家找碴；審完就開工第 1 批。細節 → <a href="SPLITUNIFY規格白話.html">SPLITUNIFY規格白話.md</a>；進度 → <a href="SPLITUNIFY施工進度.html">SPLITUNIFY施工進度.md</a>。<br>（上一票 EVTLABEL 已收工，紀錄留著供對照：）你 UAT 事件型時抓到三個問題：報告沒寫用了哪個 h／k（實際 h=1＝12h 一根）、purge 沒換算成事件週期、你 CSV 的 0／1 正反標籤根本沒被用（IC 對的是重算的報酬）。裁定：先修揭露＋UI 單位（小）→ purge 換算（中）→「匯入標籤模式」讓 IC 直接對你的正反例算（大）→ <strong>全部做完才重驗 B26–B34</strong>。票名 EVTLABEL。<strong>規格書（SPEC）與施工清單（TODO）三輪三家找碴已收斂（27＋16＋11＝54 條全採納）、三家蓋章 APPROVED，你已放行動工（<code>0dbe40ff</code>）。第 1、2 段完工，第 3 段進行中。<strong>第 1 輪抓到的最重要三件：①「分辨力」門檻原本會把「反向但很強」的特徵殺掉（已改看絕對值、獨立門檻）②自動判定要不要用你的 0/1，原本看整批，但統計其實只在切分後的驗證段算——已改在切分後看驗證段每類夠不夠 ③負對照（把標籤打亂再跑）若還篩得出特徵，原本只警告——已改為</strong>不交付倖存者</strong>。你的主目標原話已逐字寫進規格書第一段；任何委員要把「對你的 0/1 標籤算」往後延，我都會彈窗問你，不會自己吞</td>
 </tr>
 <tr>
 <td><strong>在做第幾段</strong></td>
@@ -36,7 +36,7 @@
 </tr>
 <tr>
 <td><strong>需要你決定嗎</strong></td>
-<td><strong>快了。</strong> EVTLABEL 三段已全部完工。還剩兩張票（SPLITUNIFY 切法統一、GLOBALH 多 horizon）才輪到你 UAT。SPLITUNIFY 的切法要交委員會定共識，定完我會把結論用白話寫給你看。<br>（已結）規格書三輪三家找碴收斂、三家戳記全部 APPROVED（<code>0dbe40ff</code>），兩題你都已回覆。B26～B34 驗收依你裁定<strong>等 EVTLABEL 三段全做完再一次驗</strong>，做完前我不會叫你驗收。<br>（舊）B26～B31 清單在 <code>GAP-3驗收清單.md</code> 最下面六項。9/8 晚間你實機跑出四件事我已修：①前端兩個 dev server 互蓋（不是碼的問題）②進度那行沒經 WebSocket 推到畫面 ③Ctrl+C 後分析不停、洗版 ④「為何又跑一次 preprocessing」——現在切分不足會<strong>在預處理前</strong>就判定並即時顯示原因，另加了「取消分析」按鈕</td>
+<td><strong>不用。</strong> SPLITUNIFY 的切法委員會已定共識（結論寫在 <a href="SPLITUNIFY規格白話.html">SPLITUNIFY規格白話.md</a>，你醒來看就好）。你離線前授權「有問題找委員會討論共識，做完前不要停下來」，我照辦。還剩 SPLITUNIFY、GLOBALH 兩票才輪到你 UAT。<br>（已結）規格書三輪三家找碴收斂、三家戳記全部 APPROVED（<code>0dbe40ff</code>），兩題你都已回覆。B26～B34 驗收依你裁定<strong>等 EVTLABEL 三段全做完再一次驗</strong>，做完前我不會叫你驗收。<br>（舊）B26～B31 清單在 <code>GAP-3驗收清單.md</code> 最下面六項。9/8 晚間你實機跑出四件事我已修：①前端兩個 dev server 互蓋（不是碼的問題）②進度那行沒經 WebSocket 推到畫面 ③Ctrl+C 後分析不停、洗版 ④「為何又跑一次 preprocessing」——現在切分不足會<strong>在預處理前</strong>就判定並即時顯示原因，另加了「取消分析」按鈕</td>
 </tr>
 <tr>
 <td><strong>卡住嗎</strong></td>
