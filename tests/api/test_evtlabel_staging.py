@@ -276,11 +276,25 @@ def test_all_fallback_callsites_forward_binary_kwargs():
     src = (Path(__file__).resolve().parents[2] / "momentum/Analysis/ic_filter_orchestrator.py").read_text(
         encoding="utf-8"
     )
-    n_callsites = src.count("self._run_full_sample_fallback(")
-    assert src.count("event_binary_labels=event_binary_labels,") == n_callsites + 1, (
-        f"{n_callsites} 個 fallback 呼叫點＋1 個內層 analyze 透傳，實際 "
-        f"{src.count('event_binary_labels=event_binary_labels,')}"
-    )
+    # 🔴 用 AST 逐個呼叫點檢查，不數字串總數：Task 3.4 起 stage3 也收同名 kwarg，
+    #    「總數 == 呼叫點數 + 1」這種算法會隨無關改動而假紅／假綠。
+    import ast
+
+    tree = ast.parse(src)
+    checked = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        name = getattr(node.func, "attr", "")
+        if name not in ("_run_full_sample_fallback", "analyze"):
+            continue
+        kwargs = {kw.arg for kw in node.keywords if kw.arg}
+        if "event_label_owners" not in kwargs:      # 只看事件語意透傳的那些呼叫
+            continue
+        checked += 1
+        for required in ("event_binary_labels", "label_mode_requested", "label_mode_hint"):
+            assert required in kwargs, f"{name} 之某呼叫點漏傳 {required}（該路徑會靜默變報酬版）"
+    assert checked >= 4, f"應至少涵蓋 3 個 fallback 呼叫點＋1 個內層 analyze，實得 {checked}"
 
 
 def test_scan_cell_never_sends_binary_labels():
@@ -351,3 +365,18 @@ def test_scan_cell_summary_still_returns_none_for_non_dict():
     from api.services.ic_analysis_service import ICAnalysisService
 
     assert ICAnalysisService._scan_cell_summary(None) is None
+
+
+def test_counting_handles_datetime_index_not_just_int():
+    """🔴 出生事故（Task 3.4 的 selection-scope 測試抓到）：0/1 的鍵是 **epoch 毫秒整數**，
+    而特徵索引通常是 `DatetimeIndex`（內部 ns）。不換算就永遠對不上 ⇒ 計數恆為 0
+    ⇒ 明示模式恆 raise、auto 恆退回報酬版，而且**不拋任何例外**。
+    兩種索引型別必須給出同一個答案。
+    """
+    import pandas as pd
+
+    idx = pd.to_datetime([1_700_000_000_000 + i * 3_600_000 for i in range(10)], unit="ms")
+    ms = (idx.asi8 // 10**6).astype("int64")
+    labels = {int(ms[8]): 1, int(ms[9]): 0}
+    assert count_binary_classes_in_rows(labels, idx, [8, 9]) == {"n_pos": 1, "n_neg": 1}
+    assert count_binary_classes_in_rows(labels, list(ms), [8, 9]) == {"n_pos": 1, "n_neg": 1}

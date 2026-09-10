@@ -69,7 +69,14 @@ def count_binary_classes_in_rows(
     rows = np.asarray(row_index, dtype=int)
     if len(rows) == 0:
         return {"n_pos": 0, "n_neg": 0}
-    selected = set(np.asarray(index[rows]).tolist())
+    selected_index = index[rows]
+    # 🔴 `binary_labels` 之鍵是 **epoch 毫秒整數**，而特徵索引通常是 `DatetimeIndex`
+    #    （內部 ns）。不換算就永遠對不上 ⇒ 計數恆為 0 ⇒ 明示模式恆 raise、auto 恆退回報酬版，
+    #    而且**不會拋任何例外**。本 bug 由 Task 3.4 的 selection-scope 測試抓出來。
+    if isinstance(selected_index, pd.DatetimeIndex):
+        selected = set((selected_index.asi8 // 10**6).astype("int64").tolist())
+    else:
+        selected = set(np.asarray(selected_index).tolist())
     n_pos = sum(1 for key, lab in binary_labels.items() if int(lab) == 1 and key in selected)
     n_neg = sum(1 for key, lab in binary_labels.items() if int(lab) == 0 and key in selected)
     return {"n_pos": int(n_pos), "n_neg": int(n_neg)}

@@ -1153,6 +1153,12 @@ def validate_event_given(
             f"expected {expected[bad]}, got {got[bad]}"
         )
     consumed: Dict[str, float] = {}
+    # EVTLABEL Task 3.4：同一迴圈另外記下**帶時間戳**的三元組。
+    # 🔴 為什麼要多這一份：`consumed_event_labels` 只有 {event_id: 值}，
+    #    當多個事件共用同一個值（受理批 165 個事件裡 136 個是 1）時，
+    #    「把兩個同值事件的時間戳對調」在那份 dict 裡**完全看不出來**。
+    #    additive：報酬路徑之既有回傳鍵一字未動。
+    consumed_rows: Dict[str, tuple] = {}
     if event_owners is not None:
         for t, v in zip(idx_ms, got):
             eid = event_owners.get(int(t))
@@ -1161,10 +1167,12 @@ def validate_event_given(
             if str(eid) in consumed:
                 raise AlignmentViolationError(f"event_id {eid!r} bound to more than one consumed row")
             consumed[str(eid)] = float(v)
+            consumed_rows[str(eid)] = (int(t), float(v))
     return {
         "label_kind": LABEL_KIND_EVENT_GIVEN,
         "checked_samples": int(len(got)),
         "consumed_event_labels": consumed,
+        "consumed_event_rows": consumed_rows,
     }
 
 

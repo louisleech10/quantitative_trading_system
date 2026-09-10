@@ -1,11 +1,231 @@
-"""EVTLABEL Task 3.4。
+"""EVTLABEL Task 3.4：stage3 之 effective mode 決策與 0/1 綁定驗證。
 
 SPEC：`docs/EVTLABEL_SPEC.md` Task 3.4　TODO：Task 3.4
 
-## 🔴 scaffold 狀態（Task 0.1）
-placeholder：`pytest.skip`。**skip 不是綠**——`scripts/evtlabel_phase_gate.sh` 會因此 rc≠0。
+## 這批測試在防什麼
+
+三件事，每一件錯了都不會拋例外：
+
+1. **分母用錯**：整批 136 正／29 反看起來很夠，但統計是在**驗證段**上做的。
+   驗證段可能只剩 2 個反例——用整批當分母就會放行一個做不出統計的 run。
+2. **靜默降級**：使用者明講要用 0/1，卻拿到一份報酬版報告而報告上看不出來。
+3. **驗過的那一份被換掉**：stage3 驗完 0/1，stage5 拿到的是另一份。
+
+mutation（`--phase 3b`）：`M-P3-3`（binary 不過 validate_event_given）⇒ 錯位測試紅。
 """
 
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
 import pytest
 
-pytest.skip("EVTLABEL Task 3.4 尚未實作（scaffold placeholder；skip 不是綠）", allow_module_level=True)
+from momentum.Analysis.ic_config_schema import ICConfig
+from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+from momentum.core.contracts import AlignmentViolationError
+
+MS = 3_600_000
+
+
+def _orch(min_per_class: int = 10) -> ICFilterOrchestrator:
+    return ICFilterOrchestrator(
+        ICConfig.model_validate({"event_filter": {"min_events_per_class": min_per_class}})
+    )
+
+
+def _features(n: int) -> pd.DataFrame:
+    idx = pd.to_datetime([1_700_000_000_000 + i * MS for i in range(n)], unit="ms")
+    return pd.DataFrame({"f1": np.linspace(0.0, 1.0, n)}, index=idx)
+
+
+def _labels(feats: pd.DataFrame, pattern) -> dict:
+    """{feature_cutoff_ms: 0/1}，與 features index 同鍵。"""
+    ms = (feats.index.asi8 // 10**6).astype("int64")
+    return {int(t): int(v) for t, v in zip(ms, pattern)}
+
+
+def _owners(feats: pd.DataFrame) -> dict:
+    ms = (feats.index.asi8 // 10**6).astype("int64")
+    return {int(t): f"e{i}" for i, t in enumerate(ms)}
+
+
+def _bind(orch, feats, binary, *, requested="auto", test_mask=None, hint=None, info=None):
+    return orch._resolve_label_mode_and_bind_binary(
+        dict(info or {"label_source": "event_label_value"}),
+        filtered_features=feats,
+        event_binary_labels=binary,
+        label_mode_requested=requested,
+        label_mode_hint=hint,
+        split_context=None if test_mask is None else {"test_mask": test_mask},
+        event_label_owners=_owners(feats),
+        config=orch._config,
+        label_source="event_label_value",
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ① selection scope：分母是驗證段，不是整批
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_denominator_is_the_test_segment_not_the_whole_batch():
+    """🔴 承重條：整批很夠但驗證段不夠 ⇒ 必須退回報酬版。
+
+    整批 30 正／30 反（遠超門檻 10），但驗證段（最後 12 列）只有 2 個反例。
+    統計是在驗證段上做的，分母就必須是驗證段。
+    """
+    feats = _features(60)
+    pattern = [1] * 30 + [0] * 30
+    binary = _labels(feats, pattern)
+    test_mask = np.zeros(60, dtype=bool)
+    test_mask[48:] = True                      # 最後 12 列：48-59 ⇒ 全部是 0？
+    # 讓驗證段呈 10 正 / 2 反
+    pattern2 = [1] * 30 + [0] * 18 + [1] * 10 + [0] * 2
+    binary2 = _labels(feats, pattern2)
+
+    out = _bind(_orch(), feats, binary2, test_mask=test_mask)
+    lm = out["label_mode"]
+    assert lm["selection_scope"] == "test"
+    assert (lm["n_pos_selection"], lm["n_neg_selection"]) == (10, 2)
+    assert lm["n_pos_batch"] == 40 and lm["n_neg_batch"] == 20, "整批計數仍要揭露供對照"
+    assert lm["effective"] == "return_rule" and lm["reason"] == "class_below_min_selection"
+    assert len(binary) == 60  # 未被就地改動
+
+
+def test_no_split_falls_back_to_full_sample_scope():
+    """無切分（fallback）⇒ scope=full_sample，並據此判定（不是直接放棄）。"""
+    feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 20)
+    out = _bind(_orch(), feats, binary, test_mask=None)
+    lm = out["label_mode"]
+    assert lm["selection_scope"] == "full_sample"
+    assert (lm["n_pos_selection"], lm["n_neg_selection"]) == (20, 20)
+    assert lm["effective"] == "imported_binary"
+
+
+def test_one_class_in_selection_gets_its_own_reason():
+    """驗證段單類 ⇒ `one_class`（與「有兩類但太少」是不同的原因）。"""
+    feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 8 + [1] * 12)
+    test_mask = np.zeros(40, dtype=bool)
+    test_mask[28:] = True                      # 最後 12 列全是 1
+    out = _bind(_orch(), feats, binary, test_mask=test_mask)
+    assert out["label_mode"]["effective"] == "return_rule"
+    assert out["label_mode"]["reason"] == "one_class"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ② 明示模式不得靜默降級
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_explicit_mode_raises_instead_of_downgrading():
+    """🔴 明示 `imported_binary` 遇不足 ⇒ raise；訊息要說出實際數字與門檻。"""
+    feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 8 + [1] * 10 + [0] * 2)
+    test_mask = np.zeros(40, dtype=bool)
+    test_mask[28:] = True
+    with pytest.raises(ValueError, match="class_below_min_selection"):
+        _bind(_orch(), feats, binary, requested="imported_binary", test_mask=test_mask)
+
+
+def test_auto_records_hint_when_no_binary_available():
+    """`auto` 且這批根本沒有 0/1 ⇒ 退回報酬版，reason 用 staging 給的 hint。"""
+    feats = _features(20)
+    out = _bind(_orch(), feats, None, hint="label_invalid_domain")
+    assert out["label_mode"]["effective"] == "return_rule"
+    assert out["label_mode"]["reason"] == "label_invalid_domain"
+
+
+def test_return_rule_request_never_binds_binary():
+    """使用者明講只用報酬版 ⇒ 即使 0/1 充足也不綁。"""
+    feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 20)
+    orch = _orch()
+    out = _bind(orch, feats, binary, requested="return_rule")
+    assert out["label_mode"]["effective"] == "return_rule"
+    assert out["label_mode"]["reason"] is None
+    assert orch._ic_cache["event_binary_label"] is None
+
+
+def test_abandoned_conditional_ic_marks_unavailable():
+    """事件不足已棄條件 IC ⇒ 標 `binary_discrimination_unavailable`，不假裝可用。"""
+    feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 20)
+    out = _bind(_orch(), feats, binary,
+                info={"label_source": "event_label_value", "conditional_ic_abandoned": True})
+    assert out["label_mode"]["effective"] == "return_rule"
+    assert out["label_mode"]["reason"] == "conditional_ic_abandoned"
+    assert out["statistic_kind"] == "binary_discrimination_unavailable"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ③ 綁定：過同一條契約、封成不可變、留下可回綁的三元組
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_binding_writes_source_kind_and_digest():
+    feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 20)
+    orch = _orch()
+    out = _bind(orch, feats, binary)
+    assert out["label_source"] == "imported_binary_label"
+    assert out["statistic_kind"] == "binary_discrimination"
+    assert out["secondary_statistic"] == "conditional_ic", "報酬版 IC 留第二欄"
+    assert len(out["binary_label_digest"]) == 64
+    vb = orch._ic_cache["event_binary_label"]
+    assert vb.n_pos == 20 and vb.n_neg == 20
+    assert vb.digest == out["binary_label_digest"]
+    assert len(vb.rows_frozenset) == 40
+
+
+def test_bound_series_is_immutable():
+    """🔴 驗過的那一份不得被就地改：stage5 若 `iloc[...]=` 會 ValueError。"""
+    feats = _features(40)
+    orch = _orch()
+    _bind(orch, feats, _labels(feats, [1] * 20 + [0] * 20))
+    vb = orch._ic_cache["event_binary_label"]
+    with pytest.raises(ValueError):
+        vb.series.iloc[0] = 999.0
+
+
+def test_consumed_rows_carry_timestamp_not_just_value():
+    """🔴 回綁必須含時間戳——多個事件共用同一個值時，只有值比不出對調。"""
+    feats = _features(40)
+    orch = _orch()
+    out = _bind(orch, feats, _labels(feats, [1] * 20 + [0] * 20))
+    rows = out["consumed_event_binary_rows"]
+    assert len(rows) == 40
+    ms0 = int(feats.index[0].value // 10**6)
+    assert rows["e0"] == (ms0, 1)
+    assert all(isinstance(v, tuple) and len(v) == 2 for v in rows.values())
+
+
+def test_missing_key_for_a_selected_row_raises():
+    """邊界②：被選中的列在 0/1 map 裡查不到 ⇒ raise（不得以 NaN 補）。"""
+    feats = _features(40)
+    binary = _labels(feats, [1] * 20 + [0] * 20)
+    binary.pop(sorted(binary)[5])
+    with pytest.raises(AlignmentViolationError, match="missing"):
+        _bind(_orch(), feats, binary)
+
+
+def test_shifted_binary_map_is_caught_by_the_shared_contract():
+    """🔴 `M-P3-3`：0/1 向量整條錯位一格 ⇒ 必須被**同一條**契約擋下。"""
+    feats = _features(40)
+    ms = (feats.index.asi8 // 10**6).astype("int64")
+    pattern = [1] * 20 + [0] * 20
+    shifted = {int(t) + MS: int(v) for t, v in zip(ms, pattern)}   # 整體平移一根
+    with pytest.raises(AlignmentViolationError):
+        _bind(_orch(), feats, shifted)
+
+
+def test_return_rule_info_keys_unchanged():
+    """報酬版路徑之既有鍵一字不動（只多 `label_mode` 揭露）。"""
+    feats = _features(40)
+    before = {"label_source": "event_label_value", "statistic_kind": "conditional_ic",
+              "consumed_event_labels": {"e0": 0.05}}
+    out = _bind(_orch(), feats, None, requested="return_rule", info=before)
+    for key, value in before.items():
+        assert out[key] == value, f"{key} 被改動"
+    assert set(out) - set(before) == {"label_mode"}

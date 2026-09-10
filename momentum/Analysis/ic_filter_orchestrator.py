@@ -66,6 +66,8 @@ from momentum.core.contracts import (
     SelectionScope,
     SplitPlan,
     TimestampDiscontinuityError,
+    ValidatedBinaryLabel,
+    binary_label_digest,
     deny_factor_in_ok_oos,
     is_event_label_consumed,
     _coerce_timestamp_array,
@@ -1350,7 +1352,16 @@ class ICFilterOrchestrator:
             event_timestamps=event_timestamps,
             event_label_values=event_label_values,
             event_label_owners=event_label_owners,
+            # EVTLABEL Task 3.4：effective mode 之決策點。`split_context` 必須傳——
+            # 「能不能用 0/1」取決於**切分後驗證段**每類還剩幾個，而不是整批的正反比例。
+            event_binary_labels=event_binary_labels,
+            label_mode_requested=label_mode_requested,
+            label_mode_hint=label_mode_hint,
+            split_context=split_context,
         )
+        if event_info.get("label_mode"):
+            metadata = dict(metadata)
+            metadata["label_mode"] = dict(event_info["label_mode"])
         if event_info.get("conditional_ic_abandoned"):
             # CODEX-R2-P1-04（GROK-R1-P1-01 方案②之下游消費）：事件不足 ⇒ 條件 IC 明確 unavailable，
             # 後續 stage 之數值為主線 return_N 全樣本 IC，報告 metadata 機械標示、禁當條件 IC 消費。
@@ -3538,6 +3549,11 @@ class ICFilterOrchestrator:
         event_timestamps: Optional[list] = None,
         event_label_values: Optional[dict] = None,
         event_label_owners: Optional[dict] = None,
+        # ── EVTLABEL Task 3.4：匯入標籤模式之決策輸入 ──────────────────────────
+        event_binary_labels: Optional[dict] = None,
+        label_mode_requested: str = "auto",
+        label_mode_hint: Optional[str] = None,
+        split_context: Optional[dict] = None,
     ) -> tuple[pd.DataFrame, pd.Series, dict]:
         event_cfg = config.event_filter
         # GAP-2 Task 4.1：事件身分於 pop timestamps **之前**以 request 原始輸入計算（不可變；refilter 沿用）
@@ -3664,7 +3680,148 @@ class ICFilterOrchestrator:
             # {event_id: label_value}——只有 producer 傳 owners 時才綁得出；service 端再對自己的
             # 逐事件 label 來源逐筆比對（三元組 (event_id, timestamp, label_value) 之最後一腿）。
             info["consumed_event_labels"] = dict(consumed["consumed_event_labels"])
+        # ── EVTLABEL Task 3.4：effective mode 決策 ＋ 0/1 綁定與驗證 ────────────
+        info = self._resolve_label_mode_and_bind_binary(
+            info,
+            filtered_features=filtered_features,
+            event_binary_labels=event_binary_labels,
+            label_mode_requested=label_mode_requested,
+            label_mode_hint=label_mode_hint,
+            split_context=split_context,
+            event_label_owners=event_label_owners,
+            config=config,
+            label_source=label_source,
+        )
         return filtered_features, filtered_label, info
+
+    def _set_ic_cache(self, key: str, value: Any) -> None:
+        """寫 `_ic_cache`；尚未建立時**先建**（stage3 可能在 analyze 之外被單獨呼叫／測試）。
+
+        🔴 不用 `self._ic_cache[key] = value` 直寫：`_ic_cache` 預設是 `None`
+        （`__init__`），直寫會 TypeError；而更糟的是——若改成 `if isinstance(dict)` 就靜默略過，
+        驗過的 0/1 就會**無聲消失**，stage5 拿不到卻沒有任何訊號。建立而非略過。
+        """
+        if not isinstance(self._ic_cache, dict):
+            self._ic_cache = {}
+        self._ic_cache[key] = value
+
+    def _resolve_label_mode_and_bind_binary(
+        self,
+        info: dict,
+        *,
+        filtered_features: pd.DataFrame,
+        event_binary_labels: Optional[dict],
+        label_mode_requested: str,
+        label_mode_hint: Optional[str],
+        split_context: Optional[dict],
+        event_label_owners: Optional[dict],
+        config: ICConfig,
+        label_source: str,
+    ) -> dict:
+        """EVTLABEL Task 3.4：決定 `label_mode_effective`，並在 imported_binary 下綁定 0/1 向量。
+
+        🔴 **決策點只有這裡**（R1 C2）。route 與 service 一律只透傳 `requested`——
+        「能不能用 0/1」取決於**切分後驗證段**每類還剩幾個，那是切分之後才知道的事；
+        在更早的地方判就得重建一份切分，那正是 B3 review 打掉的東西。
+
+        🔴 **selection scope**（R1 C2）：計數的分母是**驗證段**（`split_context["test_mask"]`），
+        不是整批。整批 136 正 / 29 反看起來很夠，但驗證段可能只剩 2 個反例——
+        統計是在驗證段上做的，分母就必須是驗證段。無切分（fallback）⇒ 退回全樣本。
+
+        明示 `imported_binary` 遇任何不足 ⇒ raise（non-retryable）；`auto` ⇒ 退回報酬版並記 reason。
+        """
+        requested = str(label_mode_requested or "auto")
+        info = dict(info)
+        # 事件不足已棄條件 IC ⇒ 0/1 更不可能可用；標 unavailable 而非假裝可用。
+        abandoned = bool(info.get("conditional_ic_abandoned")) or label_source != "event_label_value"
+
+        n_pos_batch = int(sum(1 for v in (event_binary_labels or {}).values() if int(v) == 1))
+        n_neg_batch = int(sum(1 for v in (event_binary_labels or {}).values() if int(v) == 0))
+
+        if split_context is not None and split_context.get("test_mask") is not None:
+            sel_idx = filtered_features.index[np.asarray(split_context["test_mask"], dtype=bool)]
+            selection_scope = "test"
+        else:
+            sel_idx = filtered_features.index
+            selection_scope = "full_sample"
+        sel_counts = _count_binary_classes_in_rows(
+            event_binary_labels, sel_idx, np.arange(len(sel_idx), dtype=int)
+        ) or {"n_pos": 0, "n_neg": 0}
+
+        floor = int(config.event_filter.min_events_per_class)
+        reason: Optional[str] = None
+        if abandoned:
+            effective, reason = "return_rule", "conditional_ic_abandoned"
+        elif requested == "return_rule":
+            effective = "return_rule"
+        elif event_binary_labels is None:
+            effective, reason = "return_rule", (label_mode_hint or "no_label_column")
+        elif min(sel_counts["n_pos"], sel_counts["n_neg"]) == 0:
+            effective, reason = "return_rule", "one_class"
+        elif min(sel_counts["n_pos"], sel_counts["n_neg"]) < floor:
+            effective, reason = "return_rule", "class_below_min_selection"
+        else:
+            effective = "imported_binary"
+
+        if requested == "imported_binary" and effective != "imported_binary":
+            raise ValueError(
+                f"{reason}: 明示 imported_binary 模式無法套用（驗證段正例 {sel_counts['n_pos']}／"
+                f"反例 {sel_counts['n_neg']}，每類最少 {floor}；scope={selection_scope}）"
+                "——不接受靜默降級（改用 auto 會退回報酬版並在報告寫明原因）"
+            )
+
+        info["label_mode"] = {
+            "requested": requested,
+            "effective": effective,
+            "reason": reason,
+            "n_pos_batch": n_pos_batch,
+            "n_neg_batch": n_neg_batch,
+            "n_pos_selection": int(sel_counts["n_pos"]),
+            "n_neg_selection": int(sel_counts["n_neg"]),
+            "selection_scope": selection_scope,
+        }
+        if abandoned and label_source == "event_label_value":
+            info["statistic_kind"] = "binary_discrimination_unavailable"
+        if effective != "imported_binary":
+            self._set_ic_cache("event_binary_label", None)
+            return info
+
+        # ── 綁定：0/1 向量必須過與報酬 label **同一條**契約，再封成 immutable ──
+        idx_ms = (filtered_features.index.asi8 // 10**6).astype("int64")
+        missing = [int(t) for t in idx_ms if int(t) not in event_binary_labels]
+        if missing:
+            raise AlignmentViolationError(
+                f"event_binary_labels missing for {len(missing)} selected timestamps (first={missing[:3]})"
+            )
+        bseries = pd.Series(
+            [float(event_binary_labels[int(t)]) for t in idx_ms],
+            index=filtered_features.index, name="imported_binary_label",
+        )
+        bres = validate_consumed_label(
+            filtered_features, bseries,
+            label_kind=derive_label_kind("imported_binary_label"),
+            expected_values={int(k): float(v) for k, v in event_binary_labels.items()},
+            event_owners=event_label_owners,
+        )
+        rows = frozenset(
+            (str(eid), int(ts), int(val)) for eid, (ts, val) in bres["consumed_event_rows"].items()
+        )
+        digest = binary_label_digest(rows)
+        frozen = bseries.copy()
+        # 🔴 之後任何 `iloc[...] = ` 會 ValueError ⇒ stage5 不可能就地改掉被驗過的那一份。
+        frozen.to_numpy().flags.writeable = False
+        self._set_ic_cache("event_binary_label", ValidatedBinaryLabel(
+            series=frozen, digest=digest, rows_frozenset=rows,
+            n_pos=int((bseries == 1.0).sum()), n_neg=int((bseries == 0.0).sum()),
+        ))
+        info["label_source"] = "imported_binary_label"
+        info["statistic_kind"] = "binary_discrimination"
+        info["secondary_statistic"] = "conditional_ic"
+        info["binary_label_digest"] = digest
+        info["consumed_event_binary_rows"] = {
+            str(eid): (int(ts), int(val)) for eid, (ts, val) in bres["consumed_event_rows"].items()
+        }
+        return info
 
     def _apply_feature_filter(
         self,
