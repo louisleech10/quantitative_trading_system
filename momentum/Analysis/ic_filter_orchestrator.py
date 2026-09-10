@@ -28,7 +28,14 @@ from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.ic_reporter import ICReporter, _finite_or_neg_inf
 from momentum.Analysis.marginal_ic import MarginalICParams, compute_marginal_ic
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
-from momentum.Analysis.binary_discrimination import BINARY_STATUS_OK, mann_whitney_table
+from momentum.Analysis.binary_discrimination import (
+    BINARY_STATUS_OK,
+    _permute_blocks,
+    block_ids_for_events,
+    block_permutation_oracle,
+    mann_whitney_table,
+    rank_biserial_stat,
+)
 from momentum.Analysis.pit_stats import PIT_STATS_VERSION
 from momentum.Analysis.redundancy_filter import RedundancyFilter
 from scipy import stats as scipy_stats
@@ -1049,6 +1056,13 @@ class ICFilterOrchestrator:
 
     def __init__(self, config: ICConfig):
         self._config = config
+        # ── EVTLABEL Task 3.7：匯入標籤模式之置換自檢與負對照之產物 ──────────────
+        #: 負對照失敗時為 `"negative_control_failed"`（Task 3.8 之倖存者輸出據此標 suppressed）。
+        self._survivor_suppressed_reason: Optional[str] = None
+        #: 置換收據（seed／n_perm／block_len／n_blocks／budget_floor_hit／negative_control）。
+        self._binary_oracle_receipt: Optional[dict] = None
+        #: label 視窗有幾根特徵 K 線（由 service 之 `event_isolation` 設定；決定區塊長度）。
+        self._binary_label_window_bars: int = 0
         self._preprocessor = DataPreprocessor(config.preprocessing.model_dump())
         self._ic_engine = ICEngine(config.ic_calculation.model_dump())
         self._stat_validator = StatisticalValidator(config.thresholds.model_dump())
@@ -1195,6 +1209,9 @@ class ICFilterOrchestrator:
             #    12 根的答案窗被塞在 embargo 裡 ⇒ 不洩漏但標籤貼錯位置。
             #    取 max 是因為兩者都必須被擋住：主線 label 的 5 根、事件 label 的 12 根。
             event_window_rows = int(event_isolation.label_window_rows) if event_isolation else 0
+            # EVTLABEL Task 3.7：答案窗有幾根 ⇒ 決定區塊置換之區塊長度（視窗跨過幾個事件，
+            # 那幾個就得綁在一起洗）。與 purge 用的是**同一個**數字，不另建第二份。
+            self._binary_label_window_bars = int(event_window_rows)
             effective_purge_gap = max(effective_horizon, event_window_rows)
             split_result = _build_holdout_split_plan(
                 features_df,
@@ -4250,6 +4267,11 @@ class ICFilterOrchestrator:
             binary_mode=binary_mode,
         )
         if binary_mode:
+            passed_features, self._binary_oracle_receipt = self._run_binary_permutation_and_negative_control(
+                passed_features, threshold_log["removed_features"], features_for_stats,
+                config, alpha_effective=alpha_effective, fdr_method=fdr_method,
+            )
+            threshold_log["output_features"] = len(passed_features)
             # 排序：主統計為 |rank_biserial|（NaN 置底）；名稱作 tiebreak 以求可重現。
             summary_table.sort(
                 key=lambda row: (
@@ -4710,6 +4732,127 @@ class ICFilterOrchestrator:
                 row.pop("turnover_rate", None)
         self._ic_mean_source = source_counts  # 不放 _ic_cache（部分路徑為 None）
         return table
+
+    def _run_binary_permutation_and_negative_control(
+        self,
+        passed: list,
+        removed: dict,
+        features_for_stats: "pd.DataFrame",
+        config: ICConfig,
+        *,
+        alpha_effective: float,
+        fdr_method: str,
+    ) -> tuple:
+        """EVTLABEL Task 3.7：倖存者逐一區塊置換重驗 ＋ 整批負對照。回 `(passed, receipt)`。
+
+        兩道是**不同層級**的問題：
+
+        (C) **逐特徵**：這個特徵的分辨力，會不會只是因為事件彼此重疊而看起來很強？
+            把標籤以區塊為單位洗掉再算一次；觀測值落在置換帶內（跟隨機沒兩樣）⇒ 移出倖存者。
+            這是特徵級 fail-closed。
+
+        (B) **整批**：把標籤整批洗掉、重跑一次完整篩選，看**還能篩出幾個**。
+            如果隨機也能篩出跟實測差不多的數量，那整批結果就與雜訊無法區分 ⇒
+            倖存者標 suppressed（診斷表仍保留，但不當可消費的結論交出去）。
+
+        🔴 `n_observed == 0` ⇒ **不跑負對照**（沒有倖存者就沒有「是不是雜訊」的問題），
+        status 記 `skipped:no_survivors`——與「跑了而且失敗」是兩件事，不得混為同一個紅燈。
+        """
+        vb = (self._ic_cache or {}).get("event_binary_label")
+        if vb is None:
+            return passed, None
+        sel_ms = (pd.Index(features_for_stats.index).asi8 // 10**6).astype("int64")
+        bar_ms = self._binary_feature_bar_ms(sel_ms)
+        window_bars = int(getattr(self, "_binary_label_window_bars", 0) or 0)
+        block_ids, block_len, n_blocks = block_ids_for_events(sel_ms, window_bars, bar_ms)
+        y = vb.series.reindex(features_for_stats.index).to_numpy(dtype="int64")
+
+        cfg_ev = config.event_filter
+        k = max(1, len(passed))
+        n_perm = min(1000, max(200, int(cfg_ev.perm_budget_total) // k))
+        budget_floor_hit = bool(int(cfg_ev.perm_budget_total) < 200 * len(passed))
+
+        receipt = {
+            "seed": int(cfg_ev.oracle_seed), "n_perm": int(n_perm),
+            "block_len": int(block_len), "n_blocks": int(n_blocks),
+            "budget_floor_hit": budget_floor_hit, "first_permutation_digest": None,
+        }
+        removed.setdefault("permutation_oracle_disagree", [])
+        removed.setdefault("permutation_unavailable", [])
+
+        survivors: list = []
+        for name in list(passed):
+            values = features_for_stats[name].to_numpy(dtype="float64")
+            out = block_permutation_oracle(
+                values, y, block_ids, rank_biserial_stat,
+                seed=int(cfg_ev.oracle_seed), n_perm=int(n_perm),
+            )
+            if out.get("status") != BINARY_STATUS_OK:
+                removed["permutation_unavailable"].append(name)
+                continue
+            if receipt["first_permutation_digest"] is None:
+                receipt["first_permutation_digest"] = out["receipt"]["first_permutation_digest"]
+            if out.get("in_band"):
+                removed["permutation_oracle_disagree"].append(name)
+                continue
+            survivors.append(name)
+
+        n_observed = len(survivors)
+        if n_observed == 0:
+            receipt["negative_control"] = {"status": "skipped:no_survivors"}
+            self._survivor_suppressed_reason = None
+            return survivors, receipt
+
+        counts: list = []
+        for i in range(int(cfg_ev.negative_control_n)):
+            rng = np.random.default_rng(int(cfg_ev.oracle_seed) + i)
+            y_sh = _permute_blocks(rng, y, block_ids)
+            tbl_sh = mann_whitney_table(
+                features_for_stats, y_sh, min_class_n=int(cfg_ev.min_events_per_class)
+            )
+            q_sh, _ = apply_fdr(
+                {n: float(tbl_sh.loc[n, "p_value"]) for n in tbl_sh.index},
+                alpha_effective, method=fdr_method,
+            )
+            hits = 0
+            for n in tbl_sh.index:
+                rb = float(tbl_sh.loc[n, "rank_biserial"])
+                q = float(q_sh.get(n, np.nan))
+                if (
+                    str(tbl_sh.loc[n, "status"]) == BINARY_STATUS_OK
+                    and np.isfinite(rb) and np.isfinite(q)
+                    and q <= alpha_effective
+                    and abs(rb) >= float(config.thresholds.rank_biserial_min)
+                ):
+                    hits += 1
+            counts.append(int(hits))
+
+        # 整數 order statistic（`method="higher"`），**禁插值**：計數是離散的，
+        # 插出來的 12.4 不對應任何一次實驗。
+        q95 = int(np.quantile(counts, 0.95, method="higher")) if counts else 0
+        receipt["negative_control"] = {
+            "n_observed": int(n_observed), "shuffled_counts": counts,
+            "q95": int(q95), "seed_base": int(cfg_ev.oracle_seed), "block_len": int(block_len),
+        }
+        if n_observed <= q95:
+            # 隨機也能篩出這麼多 ⇒ 與雜訊無法區分。診斷表保留，但不當結論交出去。
+            self._survivor_suppressed_reason = "negative_control_failed"
+        else:
+            self._survivor_suppressed_reason = None
+        return survivors, receipt
+
+    @staticmethod
+    def _binary_feature_bar_ms(sel_ms: "np.ndarray") -> int:
+        """由被選中列之時間戳推特徵 K 線長度（毫秒）：取相鄰間距之**最小正值**。
+
+        事件是稀疏的，所以間距是「幾根」的整數倍；最小正間距即一根。只有一列 ⇒ 回 1。
+        """
+        arr = np.asarray(sorted(int(v) for v in np.asarray(sel_ms).tolist()), dtype="int64")
+        if len(arr) < 2:
+            return 1
+        gaps = np.diff(arr)
+        gaps = gaps[gaps > 0]
+        return int(np.min(gaps)) if len(gaps) else 1
 
     def _merge_binary_statistics(
         self,

@@ -137,9 +137,9 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     Mutation(
         "M-P3-4-permute-identity", "3b", BINDISC,
-        "return _permute_blocks_impl(rng, y, block_ids)",
-        "return y.copy()",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_oracle.py", "-k", "identity"],
+        "    out = np.empty_like(y)\n    cursor = 0",
+        "    return y.copy()\n    out = np.empty_like(y)\n    cursor = 0",
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_oracle.py", "-k", "planted_feature_is_outside or permutation_keeps_block"],
         "置換恆等 ⇒ 硬檢 (ii) raise 之斷言紅",
     ),
     Mutation(
