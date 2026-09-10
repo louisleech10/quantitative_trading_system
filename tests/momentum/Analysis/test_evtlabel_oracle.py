@@ -338,7 +338,8 @@ def test_insufficient_blocks_removes_every_candidate():
     )
     assert survivors == []
     assert set(removed["permutation_unavailable"]) == {"a", "b"}
-    assert receipt["negative_control"] == {"status": "skipped:no_survivors"}
+    # 區塊不足 ⇒ 負對照也沒有意義（用的是同一套區塊結構）⇒ 誠實跳過，不是「沒有倖存者」
+    assert receipt["negative_control"]["status"] == "unavailable:insufficient_blocks"
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -405,3 +406,85 @@ def test_unknown_feature_bar_fails_closed():
     )
     assert survivors == []
     assert receipt["negative_control"]["status"] == "unavailable:unknown_feature_bar"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ⑥ B4 review R1：負對照必須與置亂端**同一程序**；預算降階必須揭露
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_negative_control_compares_like_with_like():
+    """🔴 `COMPOSER-R1-P1-03`／`P1-04`、`GROK-R1-P1-02`（三條、兩家）。
+
+    `shuffled_counts` 是「MW＋BH＋效應量閘」的命中數。若 `n_observed` 取**置換自檢後**的
+    倖存數，兩者就不是同一個篩選程序 ⇒ `n_observed <= q95` 失去校準意義（拿蘋果比橘子）。
+    現在 `n_observed` ＝門檻通過數（置換前），置換後的數另外揭露為 `n_consumable`。
+    """
+    n = 120
+    y = np.array(([1] * 10 + [0] * 10) * 6, dtype=int)
+    rng = np.random.default_rng(11)
+    cols = {"planted": y * 10.0 + rng.standard_normal(n) * 0.01,
+            "noise": rng.standard_normal(n)}
+    feats = _frame(n, cols)
+    orch = _orch()
+    _bind(orch, feats, y)
+    removed: dict = {}
+    survivors, receipt = orch._run_binary_permutation_and_negative_control(
+        ["planted", "noise"], removed, feats, orch._config,
+        alpha_effective=0.05, fdr_method="fdr_bh",
+    )
+    nc = receipt["negative_control"]
+    assert nc["comparand"] == "threshold_passed_pre_permutation"
+    assert nc["n_observed"] == 2, "觀測量＝門檻通過數（置換前），與置亂端同一程序"
+    # 🔴 本條釘的是**語意**：兩個數字各自對應哪一道閘。
+    #    「noise 會不會被移出」取決於這一組亂數，不在本條範圍
+    #    （由 `test_noise_only_survivor_is_removed_by_the_oracle` 負責）。
+    assert nc["n_consumable"] == len(survivors), "n_consumable ＝置換後之倖存數"
+    assert nc["n_consumable"] <= nc["n_observed"], "置換只會減少、不會增加"
+
+
+def test_negative_control_respects_the_fdr_flag():
+    """🔴 主路徑 `fdr_enabled=False` 時讀 raw p，負對照也必須讀 raw p，否則兩邊不可比。"""
+    import inspect
+
+    src = inspect.getsource(ICFilterOrchestrator._run_binary_permutation_and_negative_control)
+    assert "if fdr_enabled:" in src and "q_sh = {n: float(tbl_sh.loc[n, \"p_value\"])" in src
+
+
+def test_budget_degradation_is_disclosed_not_silent():
+    """🔴 `GROK-R1-P1-03`：10% NaN 時 50 次負對照實測約 200s（門檻 120）。
+
+    修法不是硬砍次數，是**量一次再決定**；而次數變少會讓 q95 解析度變粗，
+    使用者必須看得到 ⇒ `n_planned`／`n_effective`／`degraded_by_budget` 都要寫出來。
+    """
+    n = 120
+    y = np.array(([1] * 10 + [0] * 10) * 6, dtype=int)
+    rng = np.random.default_rng(5)
+    feats = _frame(n, {f"f{i}": rng.standard_normal(n) for i in range(8)})
+    orch = ICFilterOrchestrator(ICConfig.model_validate({
+        "event_filter": {"min_events_per_class": 5, "negative_control_n": 50,
+                         "oracle_seed": 7, "negative_control_budget_seconds": 0.0},
+    }))
+    _bind(orch, feats, y)
+    _, receipt = orch._run_binary_permutation_and_negative_control(
+        ["f0"], {}, feats, orch._config, alpha_effective=0.05, fdr_method="fdr_bh",
+    )
+    nc = receipt["negative_control"]
+    assert nc["n_planned"] == 50
+    assert nc["n_effective"] == 5, "預算為 0 仍至少跑 5 次（少於 5 次談不上分布）"
+    assert nc["degraded_by_budget"] is True
+    assert len(nc["shuffled_counts"]) == nc["n_effective"]
+
+
+def test_full_budget_is_not_marked_degraded():
+    """預算充足 ⇒ 跑滿且不標降階（避免把正常情況也標成打折）。"""
+    n = 120
+    y = np.array(([1] * 10 + [0] * 10) * 6, dtype=int)
+    feats = _frame(n, {"f0": np.random.default_rng(5).standard_normal(n)})
+    orch = _orch(n_control=6)
+    _bind(orch, feats, y)
+    _, receipt = orch._run_binary_permutation_and_negative_control(
+        ["f0"], {}, feats, orch._config, alpha_effective=0.05, fdr_method="fdr_bh",
+    )
+    nc = receipt["negative_control"]
+    assert nc["n_effective"] == 6 and nc["degraded_by_budget"] is False

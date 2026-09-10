@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from momentum.Analysis.factor_return_analyzer import FactorTimingReturnSeries
 
 import h5py
+import time as _time
+
 import numpy as np
 import pandas as pd
 
@@ -4319,6 +4321,7 @@ class ICFilterOrchestrator:
             passed_features, self._binary_oracle_receipt = self._run_binary_permutation_and_negative_control(
                 passed_features, threshold_log["removed_features"], features_for_stats,
                 config, alpha_effective=alpha_effective, fdr_method=fdr_method,
+                fdr_enabled=fdr_enabled,
             )
             threshold_log["output_features"] = len(passed_features)
             # 收據寫回 event_info ⇒ service 之 `_inject_label_rule_disclosure` 搬進報告。
@@ -4800,6 +4803,7 @@ class ICFilterOrchestrator:
         *,
         alpha_effective: float,
         fdr_method: str,
+        fdr_enabled: bool = True,
     ) -> tuple:
         """EVTLABEL Task 3.7：倖存者逐一區塊置換重驗 ＋ 整批負對照。回 `(passed, receipt)`。
 
@@ -4868,23 +4872,58 @@ class ICFilterOrchestrator:
                     else:
                         survivors.append(name)
 
-        n_observed = len(survivors)
-        if n_observed == 0:
+        # 🔴 `COMPOSER-R1-P1-03`／`P1-04`、`GROK-R1-P1-02`（三條、兩家）：
+        #    `n_observed` 原本取**置換自檢後**的 survivors，而 `shuffled_counts` 只重跑
+        #    MW＋BH＋效應量閘 ⇒ 兩者不是同一個篩選程序，`n_observed <= q95` 就失去
+        #    「隨機標籤也能篩出同樣多」的校準意義（拿蘋果比橘子）。
+        #    修法：負對照之觀測量改為**與置亂端同一程序**的數量——門檻通過數（置換**前**）。
+        #    置換自檢是**特徵級**的另一道閘，其結果另外揭露為 `n_consumable`，不混進校準。
+        n_threshold_passed = len(passed)
+        if n_threshold_passed == 0:
             receipt["negative_control"] = {"status": "skipped:no_survivors"}
             self._survivor_suppressed_reason = None
             return survivors, receipt
+        if n_blocks < 10:
+            # 區塊不足時，置亂本身就沒有意義（負對照用的是同一套區塊結構）⇒ 誠實跳過。
+            receipt["negative_control"] = {"status": "unavailable:insufficient_blocks",
+                                           "n_blocks": int(n_blocks)}
+            self._survivor_suppressed_reason = None
+            return survivors, receipt
 
+        # 🔴 `GROK-R1-P1-03`（實測 207s，超過 SPEC 之 120s 驗證閘）：整批負對照要跑
+        #    `negative_control_n` 次**全表** Mann-Whitney。乾淨資料 0.5s/次（50 次＝26s，過關），
+        #    但 10% NaN 時 ~4s/次 ⇒ 50 次約 200s。我原本的 benchmark 只跑乾淨資料，
+        #    所以沒看到。修法**不是**硬砍次數：先量一次實際成本，據此決定跑得完幾次，
+        #    **降階必須揭露**（`n_planned`／`n_effective`／`budget_seconds`），
+        #    次數變少 ⇒ q95 之解析度變粗，使用者要看得到這件事。
+        budget_seconds = float(getattr(cfg_ev, "negative_control_budget_seconds", 60.0))
         counts: list = []
-        for i in range(int(cfg_ev.negative_control_n)):
+        n_planned = int(cfg_ev.negative_control_n)
+        n_effective = n_planned
+        elapsed = 0.0
+        for i in range(n_planned):
+            if i == 1 and elapsed > 0.0:
+                # 以第一次的實測成本外推；跑不完就縮，但至少跑 5 次（少於 5 次談不上分布）
+                affordable = max(5, int(budget_seconds // elapsed))
+                if affordable < n_planned:
+                    n_effective = affordable
+            if i >= n_effective:
+                break
+            _t0 = _time.perf_counter()
             rng = np.random.default_rng(int(cfg_ev.oracle_seed) + i)
             y_sh = _permute_blocks(rng, y, block_ids)
             tbl_sh = mann_whitney_table(
                 features_for_stats, y_sh, min_class_n=int(cfg_ev.min_events_per_class)
             )
-            q_sh, _ = apply_fdr(
-                {n: float(tbl_sh.loc[n, "p_value"]) for n in tbl_sh.index},
-                alpha_effective, method=fdr_method,
-            )
+            # 🔴 `COMPOSER-R1-P1-03`：p 閘之旗標必須與主路徑一致——主路徑 `fdr_enabled=False`
+            #    時讀 raw p，負對照卻恆讀 q，兩邊的通過集合就不可比。
+            if fdr_enabled:
+                q_sh, _ = apply_fdr(
+                    {n: float(tbl_sh.loc[n, "p_value"]) for n in tbl_sh.index},
+                    alpha_effective, method=fdr_method,
+                )
+            else:
+                q_sh = {n: float(tbl_sh.loc[n, "p_value"]) for n in tbl_sh.index}
             hits = 0
             for n in tbl_sh.index:
                 rb = float(tbl_sh.loc[n, "rank_biserial"])
@@ -4897,15 +4936,24 @@ class ICFilterOrchestrator:
                 ):
                     hits += 1
             counts.append(int(hits))
+            if i == 0:
+                elapsed = _time.perf_counter() - _t0
 
         # 整數 order statistic（`method="higher"`），**禁插值**：計數是離散的，
         # 插出來的 12.4 不對應任何一次實驗。
         q95 = int(np.quantile(counts, 0.95, method="higher")) if counts else 0
         receipt["negative_control"] = {
-            "n_observed": int(n_observed), "shuffled_counts": counts,
+            "n_observed": int(n_threshold_passed),      # 與 shuffled 同一程序（門檻通過數）
+            "n_consumable": len(survivors),             # 再過置換自檢後之可消費數（另一道閘）
+            "shuffled_counts": counts,
             "q95": int(q95), "seed_base": int(cfg_ev.oracle_seed), "block_len": int(block_len),
+            "comparand": "threshold_passed_pre_permutation",
+            "n_planned": int(n_planned),
+            "n_effective": int(len(counts)),
+            "budget_seconds": budget_seconds,
+            "degraded_by_budget": bool(len(counts) < n_planned),
         }
-        if n_observed <= q95:
+        if n_threshold_passed <= q95:
             # 隨機也能篩出這麼多 ⇒ 與雜訊無法區分。診斷表保留，但不當結論交出去。
             self._survivor_suppressed_reason = "negative_control_failed"
         else:
@@ -4979,7 +5027,14 @@ class ICFilterOrchestrator:
         for row in summary_table:
             name = str(row.get("feature_name", ""))
             if name not in tbl.index:
-                continue
+                # 🔴 `COMPOSER-R1-P2-01`／`GROK-R1-P2-01`（兩家同提）：原本 `continue`，
+                #    把「summary 表與統計表欄名對不上」降級成「缺欄 ⇒ binary_unavailable」，
+                #    與前三守衛的 fail-loud 精神矛盾。對不上代表兩份表不是同一份特徵集合，
+                #    那是接線壞了，不是某個特徵算不出來。
+                raise AlignmentViolationError(
+                    f"summary_table 之特徵 {name!r} 不在 binary 統計表內"
+                    "——兩份表非同一特徵集合（接線錯誤，非單一特徵不可用）"
+                )
             rec = tbl.loc[name]
             row["auc"] = float(rec["auc"])
             row["rank_biserial"] = float(rec["rank_biserial"])

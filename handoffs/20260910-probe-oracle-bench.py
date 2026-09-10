@@ -77,6 +77,23 @@ def main() -> int:
         print(f"(b) OVER LIMIT: {total_b:.0f}s > {LIMIT}s ⇒ 需降階或改設計")
         rc = 1
 
+    # (c) 🔴 `GROK-R1-P1-03` 之情境：10% NaN（我首跑只測乾淨資料，所以沒看到 207s）
+    rng = np.random.default_rng(1)
+    x_nan = feats.to_numpy(copy=True)
+    x_nan[rng.random(x_nan.shape) < 0.10] = np.nan
+    feats_nan = pd.DataFrame(x_nan, index=feats.index, columns=feats.columns)
+    t0 = time.time()
+    mann_whitney_table(feats_nan, y, min_class_n=10)
+    one_nan = time.time() - t0
+    print(f"(c) 10%NaN 單次全表: {one_nan:.2f}s  ×50(名目) ⇒ {one_nan * 50:.0f}s")
+    budget = 60.0
+    affordable = max(5, int(budget // one_nan))
+    print(f"(c) 預算 {budget:.0f}s ⇒ 實際跑 {min(affordable, 50)} 次 ⇒ "
+          f"{min(affordable, 50) * one_nan:.0f}s（降階已揭露）")
+    if min(affordable, 50) * one_nan > LIMIT:
+        print("(c) OVER LIMIT")
+        rc = 1
+
     print(f"TOTAL≈{total_a + total_b:.0f}s  limit(each)={LIMIT}s  rc={rc}")
     return rc
 

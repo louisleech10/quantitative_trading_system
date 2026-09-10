@@ -1,0 +1,8 @@
+fixture: 165×39373  block_len=12  n_blocks=14
+(a) permutation-major K=2000 n_perm=200: 3.9s  status=ok
+(b) 單次全表置亂: 0.52s  ×50 ⇒ 26s  status_ok=39373
+(c) 10%NaN 單次全表: 4.26s  ×50(名目) ⇒ 213s
+(c) 預算 60s ⇒ 實際跑 14 次 ⇒ 60s（降階已揭露）
+TOTAL≈30s  limit(each)=120.0s  rc=0
+[2026-09-10 21:44:08,500] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-10 21:44:10,192 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator

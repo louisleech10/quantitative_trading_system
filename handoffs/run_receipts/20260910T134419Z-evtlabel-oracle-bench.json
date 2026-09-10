@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260910T134419Z-evtlabel-oracle-bench",
+  "claim_id": "evtlabel-oracle-bench",
+  "command": [
+    "venv/bin/python",
+    "handoffs/20260910-probe-oracle-bench.py"
+  ],
+  "command_sha256": "17488b65be0e3a35af2d675815b865fb783d6339933333444cf1258c1822d9ba",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "51fde8d34ff6fcf20574a45d80933183ceb6a7ce",
+  "tree_dirty": true,
+  "started_at": "2026-09-10T13:44:07Z",
+  "ended_at": "2026-09-10T13:44:19Z",
+  "duration_seconds": 11.669216,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "1c492730f7e378cc22af7a9b5ffe205afde1a8a16e6f1e4819c61662ae663147",
+  "stderr_sha256": "196e5aa59ec099b43d010582bc3c0e5b4c885ade7da0b5a7ba65837360fc01e9",
+  "log_sha256": "b0fddf122bd3a5679468e3e91de6951e9bf922b946ec787526abafdc98b33c72",
+  "log_path": "handoffs/run_receipts/20260910T134419Z-evtlabel-oracle-bench.log",
+  "tail_excerpt": [
+    "fixture: 165×39373  block_len=12  n_blocks=14",
+    "(a) permutation-major K=2000 n_perm=200: 3.9s  status=ok",
+    "(b) 單次全表置亂: 0.52s  ×50 ⇒ 26s  status_ok=39373",
+    "(c) 10%NaN 單次全表: 4.26s  ×50(名目) ⇒ 213s",
+    "(c) 預算 60s ⇒ 實際跑 14 次 ⇒ 60s（降階已揭露）",
+    "TOTAL≈30s  limit(each)=120.0s  rc=0",
+    "[2026-09-10 21:44:08,500] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor",
+    "2026-09-10 21:44:10,192 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator"
+  ]
+}
