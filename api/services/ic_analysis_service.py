@@ -1012,6 +1012,16 @@ class ICAnalysisService:
             "event_binary_rows_by_id": dict(bin_rows_by_id),
             "label_mode_requested": requested_mode,
             "label_mode_hint": label_hint,
+            # Task 3.8：倖存者檔之來源身分。`label_origin_values` 取**被消費事件**之
+            # 原始標籤字面（去重排序），供下游確認 0/1 沒有被重新編碼。
+            "event_label_binary_meta": {
+                "import_id": str(request.event_import_id or ""),
+                "label_origin_values": sorted({
+                    str(rec.get("label_origin", rec.get("label")))
+                    for eid in sorted(consumed_event_ids)
+                    for rec in (rec_by_id.get(eid),) if rec is not None
+                }),
+            },
             "purge_ms": int(purge_ms),
             "purge_rows": int(purge_rows),
             "label_window_rows": int(isolation_rows.label_window_rows),
@@ -1623,6 +1633,7 @@ class ICAnalysisService:
             event_binary_labels=None,
             label_mode_requested="return_rule",
             label_mode_hint=staged.get("label_mode_hint"),
+            event_label_binary_meta=None,        # 掃描格恆報酬版 ⇒ 不綁 0/1、不需來源身分
         )
         _assert_event_triple_bound(staged, report)
         _inject_period_alignment(staged, report)
@@ -1944,6 +1955,7 @@ class ICAnalysisService:
                     event_binary_labels=(staged.get("event_binary_labels") or None),
                     label_mode_requested=staged.get("label_mode_requested") or "auto",
                     label_mode_hint=staged.get("label_mode_hint"),
+                    event_label_binary_meta=staged.get("event_label_binary_meta"),
                 )
                 if request.event_import_id:
                     _assert_event_triple_bound(staged, report)

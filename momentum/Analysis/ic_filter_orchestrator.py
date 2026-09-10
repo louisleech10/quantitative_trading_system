@@ -1138,6 +1138,9 @@ class ICFilterOrchestrator:
         label_mode_requested: str = "auto",
         #: staging 已看出「用不了 0/1」的原因（no_label_column／label_invalid_domain）；供報告揭露。
         label_mode_hint: Optional[str] = None,
+        #: 0/1 之來源身分（`{import_id, label_origin_values}`）。Task 3.8：倖存者檔要寫明
+        #  「這批是用哪一次匯入的 0/1 篩出來的」，否則下游拿到檔案無從追溯。
+        event_label_binary_meta: Optional[dict] = None,
     ) -> dict:
         """主入口：執行完整八階段流水線。
 
@@ -1278,6 +1281,7 @@ class ICFilterOrchestrator:
                     event_binary_labels=event_binary_labels,
                     label_mode_requested=label_mode_requested,
                     label_mode_hint=label_mode_hint,
+                    event_label_binary_meta=event_label_binary_meta,
                     )
             train_plan, test_plan = split_result
             train_mask, test_mask = _derive_stage_masks(
@@ -1377,6 +1381,7 @@ class ICFilterOrchestrator:
                     event_binary_labels=event_binary_labels,
                     label_mode_requested=label_mode_requested,
                     label_mode_hint=label_mode_hint,
+                    event_label_binary_meta=event_label_binary_meta,
                     )
 
         self._report_progress(1, "preprocessing", 0.12, "preprocessing features")
@@ -1419,6 +1424,7 @@ class ICFilterOrchestrator:
             label_mode_requested=label_mode_requested,
             label_mode_hint=label_mode_hint,
             split_context=split_context,
+            event_label_binary_meta=event_label_binary_meta,
         )
         if event_info.get("label_mode"):
             metadata = dict(metadata)
@@ -1530,6 +1536,7 @@ class ICFilterOrchestrator:
                 event_binary_labels=event_binary_labels,
                 label_mode_requested=label_mode_requested,
                 label_mode_hint=label_mode_hint,
+                event_label_binary_meta=event_label_binary_meta,
             )
 
         self._report_progress(
@@ -1628,6 +1635,9 @@ class ICFilterOrchestrator:
         label_mode_requested: str = "auto",
         #: staging 已看出「用不了 0/1」的原因（no_label_column／label_invalid_domain）；供報告揭露。
         label_mode_hint: Optional[str] = None,
+        #: 0/1 之來源身分（`{import_id, label_origin_values}`）。Task 3.8：倖存者檔要寫明
+        #  「這批是用哪一次匯入的 0/1 篩出來的」，否則下游拿到檔案無從追溯。
+        event_label_binary_meta: Optional[dict] = None,
     ) -> dict:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
 
@@ -1697,6 +1707,7 @@ class ICFilterOrchestrator:
                 event_binary_labels=event_binary_labels,
                 label_mode_requested=label_mode_requested,
                 label_mode_hint=label_mode_hint,
+                event_label_binary_meta=event_label_binary_meta,
             )
         finally:
             self._suppress_persist = prev_suppress
@@ -3629,6 +3640,7 @@ class ICFilterOrchestrator:
         label_mode_requested: str = "auto",
         label_mode_hint: Optional[str] = None,
         split_context: Optional[dict] = None,
+        event_label_binary_meta: Optional[dict] = None,
     ) -> tuple[pd.DataFrame, pd.Series, dict]:
         event_cfg = config.event_filter
         # GAP-2 Task 4.1：事件身分於 pop timestamps **之前**以 request 原始輸入計算（不可變；refilter 沿用）
@@ -3766,6 +3778,7 @@ class ICFilterOrchestrator:
             event_label_owners=event_label_owners,
             config=config,
             label_source=label_source,
+            event_label_binary_meta=event_label_binary_meta,
         )
         return filtered_features, filtered_label, info
 
@@ -3792,6 +3805,7 @@ class ICFilterOrchestrator:
         event_label_owners: Optional[dict],
         config: ICConfig,
         label_source: str,
+        event_label_binary_meta: Optional[dict] = None,
     ) -> dict:
         """EVTLABEL Task 3.4：決定 `label_mode_effective`，並在 imported_binary 下綁定 0/1 向量。
 
@@ -3896,6 +3910,20 @@ class ICFilterOrchestrator:
         info["statistic_kind"] = "binary_discrimination"
         info["secondary_statistic"] = "conditional_ic"
         info["binary_label_digest"] = digest
+        # Task 3.8：倖存者檔之來源身分。缺 import_id ⇒ fail-closed——
+        # 下游拿到一份「不知道是哪次匯入」的倖存者檔，等於無法追溯。
+        meta = dict(event_label_binary_meta or {})
+        if not meta.get("import_id"):
+            raise AlignmentViolationError(
+                "imported_binary 綁定成功但缺 event_label_binary_meta.import_id"
+                "——倖存者檔無從追溯是哪一次匯入的 0/1"
+            )
+        info["label_binary"] = {
+            "import_id": str(meta["import_id"]),
+            "n_pos": int((bseries == 1.0).sum()),
+            "n_neg": int((bseries == 0.0).sum()),
+            "label_origin_values": sorted(str(v) for v in (meta.get("label_origin_values") or [])),
+        }
         info["consumed_event_binary_rows"] = {
             str(eid): (int(ts), int(val)) for eid, (ts, val) in bres["consumed_event_rows"].items()
         }
@@ -5518,6 +5546,25 @@ class ICFilterOrchestrator:
         - 寫檔 IO 例外 ⇒ computation_failed:write_failed（A1-6：reason 字面封閉，例外只進 log），報告照存。
         """
         case_id = self._resolve_case_id(metadata)
+        # 🔴 EVTLABEL Task 3.8（R1 C3）：負對照失敗 ⇒ **不落檔**。
+        #    隨機標籤也能篩出同樣多 ⇒ 這批倖存者與雜訊無法區分；診斷表仍留在報告裡，
+        #    但**不得**產出一份看起來可以直接餵 ML 的檔案。狀態 loud，不是靜默不寫。
+        if self._survivor_suppressed_reason:
+            # 🔴 **與 SPEC 字面之偏離（具名）**：SPEC Task 3.8 寫 `status="suppressed"`，
+            #    但 `survivor_output.status` 之契約是 `∈ capability_status`
+            #    （`ic_report_contract.json`：ok／not_applicable／not_computed／
+            #    computation_failed／disabled／unavailable）——`suppressed` 不在其中。
+            #    為一個 reason 去撐開一個跨報告共用的封閉枚舉，代價大於收益
+            #    ⇒ 採既有值 `unavailable` ＋ `reason="negative_control_failed"`，
+            #    語意完全一致（可消費的倖存者輸出不可用，原因是負對照失敗），
+            #    且枚舉維持封閉。前端以 **reason** 判紅色 banner，不靠 status 字面。
+            return {
+                "status": "unavailable",
+                "reason": self._survivor_reason(self._survivor_suppressed_reason),
+                "path": None,
+                "sha256": None,
+                "case_id": case_id,
+            }
         symbol = metadata.get("symbol") if isinstance(metadata, dict) else None
         timeframe = metadata.get("timeframe") if isinstance(metadata, dict) else None
         if not symbol or not timeframe:

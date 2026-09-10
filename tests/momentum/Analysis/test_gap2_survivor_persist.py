@@ -220,3 +220,47 @@ def test_provenance_uses_effective_config():
     payload = json.loads(Path(report["metadata"]["survivor_output"]["path"]).read_text(encoding="utf-8"))
     assert payload["provenance"]["ic_method"] == "kendall"
     assert payload["provenance"]["label_return_type"] == "log"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# EVTLABEL Task 3.8：負對照失敗 ⇒ 不落檔
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_negative_control_failure_suppresses_the_file():
+    """🔴 R1 C3：隨機標籤也能篩出同樣多 ⇒ 這批倖存者與雜訊無法區分。
+
+    診斷表仍留在報告裡，但**不得**產出一份看起來可以直接餵 ML 的檔案。
+    狀態要 loud（`unavailable` ＋ `negative_control_failed`），不是靜默不寫。
+    """
+    from momentum.Analysis.ic_config_schema import ICConfig
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    orch = ICFilterOrchestrator(ICConfig())
+    orch._survivor_suppressed_reason = "negative_control_failed"
+    out = orch._write_survivor_output(
+        report={"summary_table": []}, report_meta={}, metadata={"symbol": "ETHUSDT", "timeframe": "12h"},
+        filtered_df=None, features_df=pd.DataFrame(), report_json_path=None,
+        stage6b_results=None, event_identity=None, features_path=None,
+        label_series=None, split_context=None,
+    )
+    assert out["status"] == "unavailable"
+    assert out["reason"] == "negative_control_failed"
+    assert out["path"] is None and out["sha256"] is None, "不得落檔"
+
+
+def test_status_stays_inside_the_closed_capability_enum():
+    """🔴 與 SPEC 字面之偏離（具名）：SPEC 寫 `status="suppressed"`，但該欄之契約是
+    `∈ capability_status`，而 `suppressed` 不在那個封閉枚舉裡。
+
+    採 `unavailable` ＋ reason，語意一致且枚舉維持封閉。前端以 **reason** 判紅色 banner。
+    本條釘住「不得為了一個 reason 去撐開跨報告共用的枚舉」。
+    """
+    import json
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[3]
+    enum = json.loads((repo / "momentum/Analysis/contracts/ic_report_contract.json")
+                      .read_text(encoding="utf-8"))["capability_status"]
+    assert "suppressed" not in enum
+    assert "unavailable" in enum

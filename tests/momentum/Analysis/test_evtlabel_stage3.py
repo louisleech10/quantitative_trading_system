@@ -68,6 +68,7 @@ def _bind(orch, feats, binary, *, requested="auto", test_rows=None, hint=None, i
         event_label_owners=_owners(feats),
         config=orch._config,
         label_source="event_label_value",
+        event_label_binary_meta={"import_id": "imp-1", "label_origin_values": ["0", "1"]},
     )
 
 
@@ -299,6 +300,7 @@ def test_sparse_event_subset_with_full_frame_test_segment():
                             enumerate((events.index.asi8 // 10**6).astype("int64"))},
         config=orch._config,
         label_source="event_label_value",
+        event_label_binary_meta={"import_id": "imp-1", "label_origin_values": ["0", "1"]},
     )
     lm = out["label_mode"]
     assert lm["selection_scope"] == "test"
@@ -321,7 +323,47 @@ def test_events_outside_the_test_segment_are_not_counted():
         event_label_owners={int(t): f"e{i}" for i, t in
                             enumerate((events.index.asi8 // 10**6).astype("int64"))},
         config=orch._config, label_source="event_label_value",
+        event_label_binary_meta={"import_id": "imp-1", "label_origin_values": ["0", "1"]},
     )
     lm = out["label_mode"]
     assert (lm["n_pos_selection"], lm["n_neg_selection"]) == (1, 0)
     assert lm["reason"] == "one_class"
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ④ Task 3.8：倖存者檔之來源身分
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_binding_records_import_provenance():
+    """倖存者檔要寫明「這批是用哪一次匯入的 0/1 篩出來的」，正反各幾個。"""
+    feats = _features(40)
+    orch = _orch()
+    out = _bind(orch, feats, _labels(feats, [1] * 20 + [0] * 20))
+    lb = out["label_binary"]
+    assert lb["import_id"] == "imp-1"
+    assert (lb["n_pos"], lb["n_neg"]) == (20, 20)
+    assert lb["label_origin_values"] == ["0", "1"]
+
+
+def test_missing_import_id_fails_closed():
+    """🔴 缺 `import_id` ⇒ raise：下游拿到一份無從追溯的倖存者檔，比沒有更糟。"""
+    feats = _features(40)
+    orch = _orch()
+    with pytest.raises(AlignmentViolationError, match="import_id"):
+        orch._resolve_label_mode_and_bind_binary(
+            {"label_source": "event_label_value"},
+            filtered_features=feats,
+            event_binary_labels=_labels(feats, [1] * 20 + [0] * 20),
+            label_mode_requested="auto", label_mode_hint=None, split_context=None,
+            event_label_owners=_owners(feats), config=orch._config,
+            label_source="event_label_value",
+            event_label_binary_meta={},          # 沒有 import_id
+        )
+
+
+def test_return_rule_does_not_get_label_binary():
+    """報酬版不得帶 `label_binary`（契約：非 binary 一鍵不加）。"""
+    feats = _features(40)
+    out = _bind(_orch(), feats, _labels(feats, [1] * 20 + [0] * 20), requested="return_rule")
+    assert "label_binary" not in out
