@@ -1092,6 +1092,15 @@ class ICFilterOrchestrator:
         event_label_owners: Optional[dict] = None,
         event_context: Optional[dict] = None,
         event_isolation: Optional[EventIsolationRows] = None,
+        # ── EVTLABEL Task 3.3：匯入標籤模式之入口 kwargs（皆顯式，禁走 config_override）──
+        #: 與 `event_label_values` **同鍵**（feature_cutoff_ms）之 0/1 向量；None ⇒ 這批沒有可用 0/1。
+        event_binary_labels: Optional[dict] = None,
+        #: 使用者**請求**的模式（auto／return_rule／imported_binary）。effective mode 在 stage3 決定。
+        label_mode_requested: str = "auto",
+        #: staging 已看出「用不了 0/1」的原因（no_label_column／label_invalid_domain）；供報告揭露。
+        label_mode_hint: Optional[str] = None,
+        #: service 端以同一支 `holdout_test_row_index` 算出的驗證段每類計數；stage3 重算並逐值回比。
+        selection_preview: Optional[dict] = None,
     ) -> dict:
         """主入口：執行完整八階段流水線。
 
@@ -1206,6 +1215,11 @@ class ICFilterOrchestrator:
                     event_label_owners=event_label_owners,
                     event_context=event_context,
                     event_isolation=event_isolation,
+                    # EVTLABEL Task 3.3：三個 fallback 呼叫點皆須透傳（漏一個＝該路徑靜默變報酬版）
+                    event_binary_labels=event_binary_labels,
+                    label_mode_requested=label_mode_requested,
+                    label_mode_hint=label_mode_hint,
+                    selection_preview=selection_preview,
                 )
             train_plan, test_plan = split_result
             train_mask, test_mask = _derive_stage_masks(
@@ -1271,6 +1285,11 @@ class ICFilterOrchestrator:
                     event_label_owners=event_label_owners,
                     event_context=event_context,
                     event_isolation=event_isolation,
+                    # EVTLABEL Task 3.3：三個 fallback 呼叫點皆須透傳（漏一個＝該路徑靜默變報酬版）
+                    event_binary_labels=event_binary_labels,
+                    label_mode_requested=label_mode_requested,
+                    label_mode_hint=label_mode_hint,
+                    selection_preview=selection_preview,
                 )
 
         self._report_progress(1, "preprocessing", 0.12, "preprocessing features")
@@ -1411,6 +1430,11 @@ class ICFilterOrchestrator:
                 event_label_owners=event_label_owners,
                 event_context=event_context,
                 event_isolation=event_isolation,
+                # EVTLABEL Task 3.3：三個 fallback 呼叫點皆須透傳（漏一個＝該路徑靜默變報酬版）
+                event_binary_labels=event_binary_labels,
+                label_mode_requested=label_mode_requested,
+                label_mode_hint=label_mode_hint,
+                selection_preview=selection_preview,
             )
 
         self._report_progress(
@@ -1502,6 +1526,15 @@ class ICFilterOrchestrator:
         event_label_owners: Optional[dict] = None,
         event_context: Optional[dict] = None,
         event_isolation: Optional[EventIsolationRows] = None,
+        # ── EVTLABEL Task 3.3：匯入標籤模式之入口 kwargs（皆顯式，禁走 config_override）──
+        #: 與 `event_label_values` **同鍵**（feature_cutoff_ms）之 0/1 向量；None ⇒ 這批沒有可用 0/1。
+        event_binary_labels: Optional[dict] = None,
+        #: 使用者**請求**的模式（auto／return_rule／imported_binary）。effective mode 在 stage3 決定。
+        label_mode_requested: str = "auto",
+        #: staging 已看出「用不了 0/1」的原因（no_label_column／label_invalid_domain）；供報告揭露。
+        label_mode_hint: Optional[str] = None,
+        #: service 端以同一支 `holdout_test_row_index` 算出的驗證段每類計數；stage3 重算並逐值回比。
+        selection_preview: Optional[dict] = None,
     ) -> dict:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
 
@@ -1565,6 +1598,13 @@ class ICFilterOrchestrator:
                 event_label_owners=event_label_owners,
                 event_context=event_context,
                 event_isolation=event_isolation,  # 對稱透傳；full-sample 無切分 ⇒ 不影響結果
+                # 🔴 EVTLABEL Task 3.3：0/1 與請求模式**必須**跟著透傳。
+                #    退回全樣本改變的是「用哪些列」，不是「用哪一種 label」——
+                #    在此丟掉 0/1 會讓 fallback 靜默變成報酬版，而報告仍寫著使用者選了匯入標籤。
+                event_binary_labels=event_binary_labels,
+                label_mode_requested=label_mode_requested,
+                label_mode_hint=label_mode_hint,
+                selection_preview=selection_preview,
             )
         finally:
             self._suppress_persist = prev_suppress

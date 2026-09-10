@@ -38,7 +38,7 @@ BINDISC = "momentum/Analysis/binary_discrimination.py"
 @dataclass(frozen=True)
 class Mutation:
     mid: str
-    phase: int
+    phase: str   # "2"／"3a"／"3b"／"3c"：批次粒度（B3 與 B4 之自證不得互相冒充）
     path: str
     old: str
     new: str
@@ -50,99 +50,121 @@ class Mutation:
 MUTATIONS: Tuple[Mutation, ...] = (
     # ── Phase 2 ─────────────────────────────────────────────────────────
     Mutation(
-        "M-P2-1-purge-ignores-label-window", 2, ORCH,
+        "M-P2-1-purge-ignores-label-window", "2", ORCH,
         "            effective_purge_gap = max(effective_horizon, event_window_rows)\n",
         "            effective_purge_gap = effective_horizon\n",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_isolation_channel.py", "-k", "analyze_wires"],
         "purge 改回只吃主線 horizon ⇒ 受理批 12 變 5 ⇒ 紅（須從 analyze 入口測，否則假綠）",
     ),
     Mutation(
-        "M-P2-1b-purge-plan-ignores-arg", 2, ORCH,
+        "M-P2-1b-purge-plan-ignores-arg", "2", ORCH,
         "    effective_purge = max(int(purge_gap), effective_horizon, 0)\n",
         "    effective_purge = max(effective_horizon, 0)\n",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_isolation_channel.py", "-k", "purge"],
         "切分忽略傳入之 purge_gap ⇒ 答案窗抬升失效 ⇒ 紅",
     ),
     Mutation(
-        "M-P2-2-embargo-back-to-max-depth-window", 2, SERVICE,
+        "M-P2-2-embargo-back-to-max-depth-window", "2", SERVICE,
         "    purge_source = split.get(\"purge_gap_source\") or \"global_default_horizon\"\n",
         "    purge_source = \"global_default_horizon\"\n",
         [*PYTEST, "tests/api/test_isolation_disclosure.py", "-k", "purge_source"],
         "purge 來源寫死不抄 orchestrator ⇒ 揭露與實際不符 ⇒ 紅",
     ),
     Mutation(
-        "M-P2-2b-embargo-source-uses-purge-rows", 2, SERVICE,
+        "M-P2-2b-embargo-source-uses-purge-rows", "2", SERVICE,
         "            \"source\": \"event_lookahead_depth\" if depth_rows > before else \"config_embargo\",\n",
         "            \"source\": \"event_lookahead\" if purge_rows > before else \"config_embargo\",\n",
         [*PYTEST, "tests/api/test_isolation_disclosure.py", "-k", "source_reflects or no_longer_credits"],
         "embargo 來源改回用 max(深度,窗) 判 ⇒ 答案窗被誤記為 look-ahead ⇒ 紅",
     ),
     Mutation(
-        "M-P2-3-isolation-via-config-override", 2, ORCH,
+        "M-P2-3-isolation-via-config-override", "2", ORCH,
         "    hit = sorted(_ISOLATION_CONTROL_KEYS.intersection(config_override))\n",
         "    hit = []\n",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_isolation_channel.py", "-k", "config_override"],
         "入口 fail-closed 拿掉 ⇒ 走錯通道之 raise 斷言紅",
     ),
     Mutation(
-        "M-P2-4-split-plan-duplicated-arithmetic", 2, ORCH,
+        "M-P2-4-split-plan-duplicated-arithmetic", "2", ORCH,
         "    test_rows = holdout_test_row_index(\n",
         "    test_rows = np.arange(split_point + effective_purge + effective_embargo, n_rows, dtype=int) or holdout_test_row_index(\n",
         [*PYTEST, "tests/momentum/core/test_holdout_test_row_index.py", "-k", "orchestrator_uses"],
         "切分把算術複製回去 ⇒ 單一實作守衛紅",
     ),
-    # ── Phase 3 ─────────────────────────────────────────────────────────
+    # ── Phase 3 / B3（Task 3.1–3.3：契約＋請求＋staging；尚無統計）─────────
     Mutation(
-        "M-P3-1-auc-flipped", 3, BINDISC,
+        "M-P3a-1-domain-gate-accepts-non-binary", "3a", SERVICE,
+        "        if not math.isfinite(val) or not val.is_integer() or int(val) not in (0, 1):\n",
+        "        if not math.isfinite(val):\n",
+        [*PYTEST, "tests/api/test_evtlabel_staging.py", "-k", "invalid_domain"],
+        "值域閘只擋 NaN／inf ⇒ 2／−1／0.5 被放行（int() 會無聲截斷）⇒ 紅",
+    ),
+    Mutation(
+        "M-P3a-2-binary-rows-compare-label-only", "3a", SERVICE,
+        "        if got_ms != int(src_ms) or got_lab != int(src_lab):\n",
+        "        if got_lab != int(src_lab):\n",
+        [*PYTEST, "tests/api/test_evtlabel_staging.py", "-k", "swapped_timestamps"],
+        "三元組只比 label 不比 ms ⇒ 兩個同值事件對調時間戳察覺不到 ⇒ 紅",
+    ),
+    Mutation(
+        "M-P3a-3-predicate-drops-imported-binary", "3a", CONTRACTS,
+        '_EVENT_GIVEN_LABEL_SOURCES = frozenset({"event_label_value", "imported_binary_label"})',
+        '_EVENT_GIVEN_LABEL_SOURCES = frozenset({"event_label_value"})',
+        [*PYTEST, "tests/momentum/Analysis/test_event_label_mode_contract.py", "-k", "predicate_accepts"],
+        "判準漏掉 binary ⇒ 匯入標籤 run 被當全域路徑跑（門檻／冗餘／隔離全走錯分支）⇒ 紅",
+    ),
+    # ── Phase 3 / B4 起（Task 3.4–3.7：orchestrator 核心與統計）───────────
+    Mutation(
+        "M-P3-1-auc-flipped", "3b", BINDISC,
         "rank_biserial = 2.0 * auc - 1.0",
         "rank_biserial = 1.0 - 2.0 * auc",
         [*PYTEST, "tests/momentum/Analysis/test_binary_discrimination.py", "-k", "planted"],
         "auc 方向翻轉 ⇒ 植入 oracle auc==1.0 紅",
     ),
     Mutation(
-        "M-P3-2-p-gate-reads-return-q", 3, ORCH,
+        "M-P3-2-p-gate-reads-return-q", "3b", ORCH,
         "p_field = \"mw_p_value_adj\" if binary_mode else",
         "p_field = \"p_value_adj\" if binary_mode else",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "threshold_reads"],
         "p 閘仍讀報酬 q ⇒ threshold_reads_* 斷言紅",
     ),
     Mutation(
-        "M-P3-3-binary-not-validated", 3, ORCH,
+        "M-P3-3-binary-not-validated", "3b", ORCH,
         "label_kind=derive_label_kind(\"imported_binary_label\")",
         "label_kind=derive_label_kind(\"imported_binary_label\") if False else None",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage3.py", "-k", "misaligned"],
         "binary 向量不過 validate_event_given ⇒ 錯位一格應 raise 之斷言紅",
     ),
     Mutation(
-        "M-P3-4-permute-identity", 3, BINDISC,
+        "M-P3-4-permute-identity", "3b", BINDISC,
         "return _permute_blocks_impl(rng, y, block_ids)",
         "return y.copy()",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_oracle.py", "-k", "identity"],
         "置換恆等 ⇒ 硬檢 (ii) raise 之斷言紅",
     ),
     Mutation(
-        "M-P3-5-validated-cache-swapped-not-caught", 3, ORCH,
+        "M-P3-5-validated-cache-swapped-not-caught", "3b", ORCH,
         "if not all((owner[int(ts)], int(ts), int(y_i)) in vb.rows_frozenset",
         "if False and not all((owner[int(ts)], int(ts), int(y_i)) in vb.rows_frozenset",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "validated_is_used"],
         "rows_frozenset 守衛拿掉 ⇒ 換 cache 應 raise 之斷言紅",
     ),
     Mutation(
-        "M-P3-5b-index-guard-removed", 3, ORCH,
+        "M-P3-5b-index-guard-removed", "3b", ORCH,
         "if not X.index.equals(pd.Index(sel_idx))",
         "if False and not X.index.equals(pd.Index(sel_idx))",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "permute_x"],
         "index 對齊守衛拿掉 ⇒ X.iloc[perm] 應 raise 之斷言紅",
     ),
     Mutation(
-        "M-P3-6-negative-control-warning-only", 3, ORCH,
+        "M-P3-6-negative-control-warning-only", "3b", ORCH,
         "self._survivor_suppressed_reason = \"negative_control_failed\"",
         "self._survivor_suppressed_reason = None  # mutated: warning-only",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_oracle.py", "-k", "suppressed_not_consumable"],
         "負對照 suppressed 路徑改 warning-only ⇒ 斷言紅",
     ),
     Mutation(
-        "M-P3-7-effect-gate-signed", 3, ORCH,
+        "M-P3-7-effect-gate-signed", "3b", ORCH,
         "abs(row[\"rank_biserial\"]) >= thresholds.rank_biserial_min",
         "row[\"rank_biserial\"] >= thresholds.rank_biserial_min",
         [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "negative_planted"],
@@ -150,7 +172,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     # ── 對照組 ───────────────────────────────────────────────────────────
     Mutation(
-        "C0-comment-only", 0, ORCH,
+        "C0-comment-only", "*", ORCH,
         "from momentum.Analysis.pit_stats import PIT_STATS_VERSION\n",
         "from momentum.Analysis.pit_stats import PIT_STATS_VERSION  # mutate-control\n",
         [PY, "-c", "import momentum.Analysis.ic_filter_orchestrator"],
@@ -178,8 +200,8 @@ def main() -> int:
         return 0
     phase = None
     if "--phase" in args:
-        phase = int(args[args.index("--phase") + 1])
-    muts = [m for m in MUTATIONS if phase is None or m.phase == phase or m.expect_green]
+        phase = str(args[args.index("--phase") + 1])
+    muts = [m for m in MUTATIONS if phase is None or m.phase == phase or m.phase == "*" or m.expect_green]
     paths = sorted({m.path for m in muts})
     dirty = _dirty(paths)
     if dirty:

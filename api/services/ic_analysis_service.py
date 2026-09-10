@@ -114,6 +114,137 @@ def _find_event_filter_info(node: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _binary_label_domain(records: Any) -> tuple:
+    """EVTLABEL Task 3.3（R1 C14c）：匯入 0/1 標籤之**值域閘**。
+
+    回 `(ok, reason)`：
+    - `(True, None)`：每一筆 `label` 都存在、有限、且整數值 ∈ {0, 1}。
+    - `(False, "no_label_column")`：整批都沒有 `label` 欄（legacy 匯入）。
+    - `(False, "label_invalid_domain")`：有 `label` 但至少一筆不是 0/1（含 None／NaN／2／−1／0.5）。
+
+    🔴 為什麼要**先擋**而不是事後轉型：`int(0.5)==0`、`bool(2)==True`、`float("nan")` 進了
+    Mann-Whitney 會被 `nan_policy="omit"` 默默丟掉。任何一種都會讓「使用者標的 2」
+    悄悄變成「反例」，而報告上看不出來。值域不對就不得靜默降級——
+    `imported_binary` 明示模式由呼叫端 raise（route 422），`auto` 只記 hint 並改走報酬版。
+    `reason` 字面出自 `event_label_mode.json::label_mode_reasons`。
+    """
+    import math
+
+    seen_any = False
+    for rec in records or ():
+        if "label" not in rec:
+            continue
+        seen_any = True
+        raw = rec.get("label")
+        # 🔴 型別先擋、值再擋。`event_import_contract.json` 已宣告 `label: int, enum [0,1]`
+        #    ⇒ 到這裡還是字串就代表上游少做了一次轉型，`float("1")` 會把它**靜默補上**，
+        #    那道漏洞往後只會擴大（下一個是 "yes"／"true"）。bool 是 int 的子類，放行。
+        if not isinstance(raw, (int, float)) or isinstance(raw, complex):
+            return (False, "label_invalid_domain")
+        val = float(raw)
+        if not math.isfinite(val) or not val.is_integer() or int(val) not in (0, 1):
+            return (False, "label_invalid_domain")
+    if not seen_any:
+        return (False, "no_label_column")
+    return (True, None)
+
+
+def prevalidate_imported_binary_selection_classes(
+    binary_labels: Dict[int, int],
+    feature_index: Any,
+    *,
+    oos_test_size: float,
+    purge_gap: int,
+    embargo: int,
+) -> tuple:
+    """EVTLABEL Task 3.3（R2 D4）：**進 preprocessing 之前**先算「驗證段裡正／反例各幾個」。
+
+    回 `(n_pos, n_neg)`。
+
+    🔴 為什麼要預檢：39k 特徵的預處理是分鐘級。等跑完才發現「驗證段只有 2 個反例、
+    統計做不了」，使用者已經等了十分鐘——這正是 2026-09-08 UAT 那句「為何要跑完才知道不足」。
+
+    🔴 為什麼**必須**與 orchestrator 共用 `holdout_test_row_index`：兩端若各寫一份算術，
+    預檢說「夠」而 stage3 說「不夠」（或反之）就會出現無法解釋的行為。R3 三家一致拒絕
+    「事後以 preview_mismatch 欄位容忍分歧」——同函式同輸入卻不一致＝bug，不是可揭露的差異。
+    stage3 會以同函式同輸入重算並逐值回比，不一致即 raise。
+    """
+    import numpy as np
+    import pandas as pd
+
+    from momentum.core.split_preview import holdout_test_row_index
+
+    index = pd.Index(feature_index)
+    rows = holdout_test_row_index(
+        len(index), oos_test_size=float(oos_test_size), purge_gap=int(purge_gap), embargo=int(embargo)
+    )
+    if len(rows) == 0:
+        return (0, 0)
+    test_stamps = set(np.asarray(index[rows]).tolist())
+    n_pos = sum(1 for key, lab in binary_labels.items() if int(lab) == 1 and key in test_stamps)
+    n_neg = sum(1 for key, lab in binary_labels.items() if int(lab) == 0 and key in test_stamps)
+    return (int(n_pos), int(n_neg))
+
+
+def _feature_index_for_preview(features_path: Optional[str]) -> Any:
+    """只為預檢取特徵列之時間戳索引；取不到 ⇒ 回 None（呼叫端據此略過預檢，不 raise）。
+
+    🔴 刻意**不**讀整張 39k 欄的表：`columns=[]` 對 pandas `table` 格式只取索引。
+    `fixed` 格式不支援該參數 ⇒ 回 None，讓預檢降級成「不預檢」——預檢是**提前**告知，
+    不是正確性守衛（正確性由 stage3 的 fail-closed 負責），取不到就晚一點才知道，不該擋分析。
+    """
+    if not features_path or not str(features_path).endswith((".h5", ".hdf5")):
+        return None
+    try:
+        import pandas as pd
+
+        return pd.read_hdf(features_path, columns=[]).index
+    except Exception as exc:  # noqa: BLE001
+        logger.info("匯入標籤模式之選樣預檢略過（索引讀取失敗：%s）——正確性仍由 stage3 守衛負責", exc)
+        return None
+
+
+def _assert_binary_rows_bound(staged: Dict[str, Any], info: Dict[str, Any]) -> None:
+    """EVTLABEL Task 3.3：0/1 標籤那一腿的回綁，fail-closed。
+
+    orchestrator 回報 `consumed_event_binary_rows = {event_id: [ms, label]}`；本函式拿它對
+    service 自 records **獨立快照**建的 `event_binary_rows_by_id` 逐筆比三項（id、ms、0/1），
+    並要求**鍵集相等**。
+
+    🔴 為什麼要比 `ms` 而不只比 label：165 個事件裡有 136 個正例，光比 label 值時
+    「把兩個正例的時間戳對調」是察覺不到的——而那正是最難查的錯（統計還是會跑出數字）。
+    """
+    produced = staged.get("event_binary_rows_by_id")
+    if not isinstance(produced, dict) or not produced:
+        raise ValueError(
+            "imported_binary_label run 但 service 端沒有 event_binary_rows_by_id 快照"
+            "——無法回綁 (event_id, ms, 0/1)，fail-closed"
+        )
+    consumed = info.get("consumed_event_binary_rows")
+    if not isinstance(consumed, dict) or not consumed:
+        raise ValueError(
+            "imported_binary_label run 之報告缺 consumed_event_binary_rows"
+            "——orchestrator 必須回報實際消費的 0/1 三元組"
+        )
+    missing = sorted(set(produced) - set(consumed))
+    extra = sorted(set(consumed) - set(produced))
+    if missing or extra:
+        raise ValueError(
+            f"0/1 標籤之事件鍵集不一致：未被消費={missing[:5]} 多出來={extra[:5]}"
+        )
+    for eid, pair in consumed.items():
+        src_ms, src_lab = produced[str(eid)]
+        try:
+            got_ms, got_lab = int(pair[0]), int(pair[1])
+        except (TypeError, ValueError, IndexError) as exc:
+            raise ValueError(f"事件 {eid!r} 之 consumed_event_binary_rows 形狀非 (ms, label)：{pair!r}") from exc
+        if got_ms != int(src_ms) or got_lab != int(src_lab):
+            raise ValueError(
+                f"事件 {eid!r} 之 0/1 三元組不符：消費 (ms={got_ms}, label={got_lab})"
+                f" != 產生 (ms={int(src_ms)}, label={int(src_lab)})"
+            )
+
+
 def _assert_event_triple_bound(staged: Dict[str, Any], report: Any) -> None:
     """EVTALIGN Task 2.1（D）：`(event_id, timestamp, label_value)` 三元組之**最後一腿**，fail-closed。
 
@@ -130,7 +261,14 @@ def _assert_event_triple_bound(staged: Dict[str, Any], report: Any) -> None:
     info = _find_event_filter_info(report.get("metadata"))
     if info is None:
         raise ValueError("event-mode report lacks metadata.event_filter; cannot bind event triple")
-    if info.get("label_source") != "event_label_value":
+    # 🔴 EVTLABEL Task 3.3（R1 C5）：依 `label_source` 分派。
+    #    `imported_binary_label` 走**兩腿**——報酬那一腿照舊（報酬版 IC 仍算，留第二欄），
+    #    再加 0/1 那一腿逐筆回比 `(event_id, ms, 0/1)` 三項。少了第二腿，
+    #    orchestrator 把 0/1 換成另一份而報酬沒動時，這裡會全綠。
+    label_source = info.get("label_source")
+    if label_source == "imported_binary_label":
+        _assert_binary_rows_bound(staged, info)
+    elif label_source != "event_label_value":
         return
     consumed = info.get("consumed_event_labels")
     if not isinstance(consumed, dict) or not consumed:
@@ -764,6 +902,14 @@ class ICAnalysisService:
         ts_map: Dict[int, float] = {}
         owner: Dict[int, str] = {}
         by_id: Dict[str, float] = {}  # EVTALIGN Task 2.1：逐事件 label 來源，供 analyze 後三元組回綁
+        # ── EVTLABEL Task 3.3：匯入 0/1 標籤之向量（與 ts_map **同鍵**：feature_cutoff_ms）──
+        # 🔴 `bin_rows_by_id` 由 records **獨立快照**建，不是從 bin_map 反推——它的用途是
+        #    analyze 之後回比「orchestrator 消費的那份，還是我送出去的那份嗎」。
+        #    若兩者同源，回比就是拿自己比自己（假綠）。
+        label_ok, label_hint = _binary_label_domain(records)
+        rec_by_id = {str(r.get("event_id")): r for r in records}
+        bin_map: Dict[int, int] = {}
+        bin_rows_by_id: Dict[str, tuple] = {}
         for w in prepared1.windows:
             if run_symbol is not None and str(w.symbol) != run_symbol:
                 excluded_by_symbol[str(w.symbol)] = excluded_by_symbol.get(str(w.symbol), 0) + 1
@@ -790,6 +936,19 @@ class ICAnalysisService:
             owner[key] = w.event_id
             ts_map[key] = float(value)
             by_id[str(w.event_id)] = float(value)
+            # EVTLABEL Task 3.3：值域過關才建 0/1 向量；不過關 ⇒ 整個不建（由 hint 揭露原因）。
+            if label_ok:
+                rec = rec_by_id.get(str(w.event_id))
+                if rec is None or "label" not in rec:
+                    # 值域閘掃的是整批 records；被消費的事件卻查不到自己那一筆 ⇒ 兩份資料對不上，
+                    # 不得靜默略過（略過會讓 bin_map 比 ts_map 短，兩者分母不同即統計失真）。
+                    raise ValueError(
+                        f"事件 {w.event_id} 有 label_value 卻在 records 找不到對應 label 欄——"
+                        "兩份資料對不上，禁靜默略過"
+                    )
+                lab = int(float(rec["label"]))
+                bin_map[key] = lab
+                bin_rows_by_id[str(w.event_id)] = (key, lab)
         if excluded_by_symbol:
             logger.warning(
                 "事件批 %s：%d 筆事件之 symbol 不是本次 run 的 %s，已排除（%s）——跨 symbol 合併分析屬 Pooled/Panel IC 票，本路徑不做",
@@ -800,6 +959,22 @@ class ICAnalysisService:
                 f"事件批 {request.event_import_id!r} 沒有任何 symbol == {run_symbol!r} 且有 label_value 的事件可餵進 IC"
                 f"（排除之 symbol：{excluded_by_symbol or '無'}）——請選同 symbol 的 feature run 或拆批"
             )
+
+        # ── EVTLABEL Task 3.3：明示 `imported_binary` 之 fail-closed（`auto` 一律不 raise）──
+        # 🔴 明示與 auto 的差別就是「說不行的時候會不會出聲」：使用者明講要用 0/1，
+        #    卻因值域壞掉／沒有 label 欄而拿到一份報酬版報告，是最糟的靜默降級。
+        requested_mode = str(event_batch.get("event_label_mode") or "auto")
+        if requested_mode == "imported_binary":
+            if not label_ok:
+                raise ValueError(
+                    f"{label_hint}: 事件批 {request.event_import_id!r} 的 label 欄"
+                    "不是每一筆都為 0 或 1（明示 imported_binary 模式不接受靜默降級）"
+                )
+            if event_batch.get("event_label_scan"):
+                raise ValueError(
+                    "scan_not_applicable_in_imported_binary_mode：掃描是對 k×h 逐格重算報酬，"
+                    "匯入標籤模式不用 h 算 label，每一格會得到同一份 0/1"
+                )
 
         # 階段 4 之**實際套用**：各 symbol 下界一致（上面已 fail-closed 擋掉不一致），
         # 換算成 IC 切分器要的**列數**（無條件進位——不足一列也要整列擋住）。
@@ -824,7 +999,42 @@ class ICAnalysisService:
             timeframe_seconds=timeframe_seconds,
             feature_timeframe=tf,
         )
+        # ── EVTLABEL Task 3.3：明示模式之選樣預檢（`auto` **不呼叫**）──────────────
+        # `auto` 不預檢是刻意的：auto 本來就允許退回報酬版，提前算一次只是白花 I/O；
+        # 真正的決策仍在 stage3（Task 3.4），那裡看得到切分後的實際列。
+        selection_preview = None
+        if requested_mode == "imported_binary" and bin_map:
+            # 🔴 解耦 R3：config 經 factory 取（`create_ic_analyzer` 內部 `load_ic_config`），
+            #    **不**直接 `from momentum.Analysis.ic_config_schema import ICConfig`
+            #    ——那條會被 `check_decoupling_imports.py` 當新違規擋下（實測 rc=1）。
+            #    順帶好處：拿到的是與 analyze 同一套解析結果，不是另一份預設值。
+            cfg = create_ic_analyzer(None)._config
+            feature_index = _feature_index_for_preview(features_path)
+            if feature_index is not None:
+                n_pos, n_neg = prevalidate_imported_binary_selection_classes(
+                    bin_map, feature_index,
+                    oos_test_size=float(cfg.oos_test_size),
+                    purge_gap=max(int(isolation_rows.label_window_rows), 0),
+                    embargo=int(isolation_rows.lookahead_depth_rows),
+                )
+                selection_preview = {"n_pos": int(n_pos), "n_neg": int(n_neg)}
+                floor = int(cfg.event_filter.min_events_per_class)
+                if min(n_pos, n_neg) < floor:
+                    raise ValueError(
+                        f"class_below_min_selection_preview: 驗證段內正例 {n_pos}／反例 {n_neg}，"
+                        f"未達每類最少 {floor} 個——明示 imported_binary 模式不接受靜默降級"
+                        "（改用 auto 會退回報酬版並在報告寫明原因）"
+                    )
         return {
+            # ── EVTLABEL Task 3.3：匯入標籤模式之 staging 產物 ──────────────────
+            # `event_binary_labels` 與 `event_label_values` **同鍵**（feature_cutoff_ms）；
+            # `event_binary_rows_by_id` 是 records 之獨立快照，供 analyze 後回比。
+            # 三者皆恆存在（值可為空 dict／None），不是「有才寫」——下游硬取，缺鍵即 KeyError。
+            "event_binary_labels": dict(bin_map),
+            "event_binary_rows_by_id": dict(bin_rows_by_id),
+            "label_mode_requested": requested_mode,
+            "label_mode_hint": label_hint,
+            "selection_preview": selection_preview,
             "purge_ms": int(purge_ms),
             "purge_rows": int(purge_rows),
             "label_window_rows": int(isolation_rows.label_window_rows),
@@ -1420,6 +1630,15 @@ class ICAnalysisService:
             event_context=staged["event_context"],
             # EVTLABEL Task 2.2：purge 由答案窗抬（顯式 kwarg；禁走 config_override）
             event_isolation=staged.get("event_isolation"),
+            # 🔴 EVTLABEL Task 3.3：掃描格**恆為報酬版**，不送 0/1。
+            #    掃描的整個意義是「k×h 換一組就換一組報酬」；匯入的 0/1 與 k、h 無關，
+            #    每一格會得到同一份標籤、同一組統計 ⇒ 整張網格是假的變化。
+            #    明示 `imported_binary` ＋ 掃描已在請求層與 staging 各擋一次；
+            #    這裡處理的是 `auto` ＋ 掃描——**不讓 auto 在掃描格裡解析成 binary**。
+            event_binary_labels=None,
+            label_mode_requested="return_rule",
+            label_mode_hint=staged.get("label_mode_hint"),
+            selection_preview=None,
         )
         _assert_event_triple_bound(staged, report)
         _inject_period_alignment(staged, report)
@@ -1735,6 +1954,13 @@ class ICAnalysisService:
                     event_context=event_context,
                     # EVTLABEL Task 2.2：主路徑同樣以顯式 kwarg 傳隔離區列數（非事件 run ⇒ None）
                     event_isolation=staged.get("event_isolation"),
+                    # EVTLABEL Task 3.3：匯入 0/1 標籤與**請求**模式，皆以顯式 kwarg 傳。
+                    #    空 map ⇒ None（orchestrator 據此知道「這批根本沒有 0/1 可用」，
+                    #    與「有但被判不可用」是兩件事，reason 不同）。
+                    event_binary_labels=(staged.get("event_binary_labels") or None),
+                    label_mode_requested=staged.get("label_mode_requested") or "auto",
+                    label_mode_hint=staged.get("label_mode_hint"),
+                    selection_preview=staged.get("selection_preview"),
                 )
                 if request.event_import_id:
                     _assert_event_triple_bound(staged, report)

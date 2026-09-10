@@ -26,9 +26,12 @@ case "${phase}" in
   *) echo "GATE FAIL: 未知 phase=${phase}（新 Phase 須先登記於本腳本）" >&2; exit 2 ;;
 esac
 
-# mutation phase 映射（3a/3b/3c 皆屬 Phase 3）
+# mutation phase 映射
+# 🔴 2026-09-10 修正：原本 3a/3b/3c 一律映射成 "3"，意思是「B3 收案時要對 B4／B5 才會寫的
+#    程式做自證」——那些檔案當下還不存在 ⇒ 全部 SKIP ⇒ UNCOVERED=999 ⇒ 關卡恆紅，
+#    而且是**無法在該批解決**的紅。自證必須與批次同粒度，各批只證自己那一批的程式。
 case "${phase}" in
-  3a|3b|3c) mphase="3" ;;
+  3a|3b|3c) mphase="${phase}" ;;
   *) mphase="${phase}" ;;
 esac
 
