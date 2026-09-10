@@ -1,0 +1,4 @@
+合併列數=80　全域切法之測試段=12　per-symbol 切法之測試段=8
+只在全域=4　只在 per-symbol=0
+DISPROVED：兩種切法在多 symbol 批上**不等價** ⇒ 統一必須明確處理 per-symbol
+  例：只在 per-symbol 的前三個 ts=[]

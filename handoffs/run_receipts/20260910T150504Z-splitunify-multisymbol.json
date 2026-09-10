@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260910T150504Z-splitunify-multisymbol",
+  "claim_id": "splitunify-multisymbol",
+  "command": [
+    "venv/bin/python",
+    "handoffs/20260910-probe-splitunify-multisymbol.py"
+  ],
+  "command_sha256": "59a3286ac920a7e9bd94ffa7a2b2d20077384177c9d49aee229fd32d65ab71dc",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "bcea2c6a040289ee0342d11329d81479461415e1",
+  "tree_dirty": true,
+  "started_at": "2026-09-10T15:05:03Z",
+  "ended_at": "2026-09-10T15:05:04Z",
+  "duration_seconds": 0.715801,
+  "exit_code": 1,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "5ea20a64bd77d054c6b8a1db241695657bef227a2bab766447c6137d32f6b180",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "5ea20a64bd77d054c6b8a1db241695657bef227a2bab766447c6137d32f6b180",
+  "log_path": "handoffs/run_receipts/20260910T150504Z-splitunify-multisymbol.log",
+  "tail_excerpt": [
+    "合併列數=80　全域切法之測試段=12　per-symbol 切法之測試段=8",
+    "只在全域=4　只在 per-symbol=0",
+    "DISPROVED：兩種切法在多 symbol 批上**不等價** ⇒ 統一必須明確處理 per-symbol",
+    "  例：只在 per-symbol 的前三個 ts=[]"
+  ]
+}
