@@ -34,7 +34,10 @@
 | FU-1 exposure `fillna` fail-closed | 未做 | 碰到再處理 | 本檔下節 |
 | FU-2 cache close carrier index 對齊 | 未做 | **票 A／B 的硬前置** | 本檔下節 |
 | **EVTLABEL 事件型 label 三缺陷＋匯入標籤模式**（2026-09-09 使用者裁定） | SPEC/TODO v4（`24e011dc`）三輪三家對抗審 27→16→11 全採納；R1/R2/R3 reconcile 三家 RECONCILE-STAMP APPROVED（`0dbe40ff`）；**P1／P2 使用者 9/10 放行凍結、P3（匯入標籤）待使用者看完白話再放行** | B0 scaffold → B1（P1 揭露）→ B2（P2 purge）；每批三家 code review；P3 放行後 B3–B6 | `docs/EVTLABEL_SPEC.md`／`白話說明/EVTLABEL規格白話.md`；殘留 R-1..R-7（SPEC §N） |
-| **GLOBALH 全域模式主線 horizon 靜默取清單第一個**（小票；2026-09-10 使用者裁定另開） | 未開票 | 全域 run 若 `horizons` 不含 `default_horizon`，`_resolve_effective_label_horizon` 靜默取第一個並以之為 purge，UI 無揭露；修＝報告與 IC 頁揭露「主線 horizon＝X（來源）」或由使用者指定；不插隊 EVTLABEL | `ic_filter_orchestrator.py:376-417` |
+| **GLOBALH 多 horizon 全算＋逐列標 h／k＋可篩**（**中票**；2026-09-10 使用者由「小票只標示」升級） | 未開票；排 EVTLABEL 後、不插隊 | 使用者原則：「有算的 IC 就要標它是哪個 horizon 算的，不能算了不標」。範圍：①summary 表加 `mode`／`h`／`k` 欄（全域 k 空）②全域每個勾選 horizon **完整跑** stage5（現況只主線 5-或-第一個跑完整、其他只進衰減圖）、purge 改 max(勾選 horizon)（命中 (a)，SPEC＋三家審）③事件型 (k,h) 立方體攤平成同一張長表 ④前端按 mode／h／k 篩 ⑤倖存者檔逐列帶 h（k）⑥主線 horizon 由使用者指定，清單無 5 不再靜默取第一個 ⑦頁面註明「多 horizon 時間約 ×N」（加速歸 GAP-6）。前置＝報告逐 stage 耗時揭露（見 FU-3） | `ic_filter_orchestrator.py:376-417`、`:3596-3700`；`docs/EVTLABEL_SPEC.md` 之 `event_label_rule` 為事件端配套 |
+| **TIERTOGGLE 幽靈開關：具名 preset 之 IC Decay／Grouped IC 關不掉**（小票；2026-09-10 讀碼確認） | 未開票；**建議先於 EVTLABEL B1 修**（使用者裁定順序） | UI foundation preset `ic_decay:false, grouped_ic:false`（`icAnalysisStore.ts:110-135`），後端具名 preset 分支只映射 `fdr_correction`／`marginal_ic`（`ic_filter_orchestrator.py:5053-5065`），`ic_decay`／`grouped_ic` 只在 custom 分支被讀 ⇒ config 預設 True 照跑。證據：9/9 受理 run 報告 `ic_decay` 5,909 特徵×7 horizon、`grouped_ic` 皆有。修＝具名 preset 分支對 `STAGE_OVERRIDE_PATHS` 全部映射＋測試「foundation ⇒ 報告無 ic_decay／grouped_ic 節」；很可能是 39k 跑 50 分鐘跑不完的一大塊 | `ic_filter_orchestrator.py:5025-5065` |
+| **FU-3 報告逐 stage 耗時揭露**（小；GLOBALH 前置） | 未開票；建議併入 EVTLABEL P1（同「報告要老實講」原則） | 報告 metadata 寫每 stage 秒數（預處理／stage3／4／5／6／6b）；現況無任何分段計時 receipt，「多 horizon ×N」與加速決策無數據可依 | orchestrator 各 `_stage*_checkpoint` |
+| **FU-4 IC 頁說明框：報酬版 vs 標籤版用法差異**（P3 配套） | 併 EVTLABEL Task 3.9 | 文案＝`白話說明/EVTLABEL規格白話.md`「報酬版 IC vs 標籤版 IC」對照表 | — |
 
 🔴 **優先序（2026-08-14 使用者明示「現在開始就是要回去做量化主線」）**：
 量化主線 **優先於** 治理。此句覆蓋兩條舊裁決——P0 之「完成後才回 IC」（2026-07-05）、
