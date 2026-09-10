@@ -39,13 +39,21 @@ def _cluster_weight(counts: "pd.Series") -> "pd.Series":
 def time_cluster_bucket_ms(manifest: EventManifest, bucket_ms: Optional[int] = None) -> int:
     """time-cluster 桶寬之**唯一**解析點（`None` ⇒ 觸發 TF 一根；混 TF 須顯式指定）。"""
     if bucket_ms is not None:
-        return int(bucket_ms)
-    tfs = sorted(set(manifest.table["timeframe"]))
-    if len(tfs) != 1:
-        raise ValueError(
-            f"split_events: 批內多 TF {tfs}，bucket_ms 須顯式指定（預設＝觸發 TF 一根僅單 TF 適用）"
-        )
-    return TIMEFRAME_SECONDS[tfs[0]] * 1000
+        bucket = int(bucket_ms)
+    else:
+        tfs = sorted(set(manifest.table["timeframe"]))
+        if len(tfs) != 1:
+            raise ValueError(
+                f"split_events: 批內多 TF {tfs}，bucket_ms 須顯式指定（預設＝觸發 TF 一根僅單 TF 適用）"
+            )
+        bucket = TIMEFRAME_SECONDS[tfs[0]] * 1000
+    # 🔴 正值檢查（SPLITUNIFY B2b R2 之 I6；codex／grok／主委三方獨立命中）：
+    #    負值會產出方向相反的 cluster id；`0` 目前「有擋」是**巧合**——靠 pandas 之
+    #    `IntCastingNaNError`（除以零產生 inf）。拿上游函式庫的例外當閘門，
+    #    哪天它換行為就靜默失效。
+    if bucket <= 0:
+        raise ValueError(f"time_cluster_bucket_ms: bucket_ms 須為正整數，實得 {bucket}（fail-closed）")
+    return bucket
 
 
 def build_time_clusters(manifest: EventManifest, bucket_ms: Optional[int] = None) -> "pd.DataFrame":

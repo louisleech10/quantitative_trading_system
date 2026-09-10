@@ -520,6 +520,98 @@ def test_row_index_out_of_range_is_fail_closed() -> None:
         derive_event_split_from_plans(bad, test, keys, index, manifest=man, bucket_ms=H1)
 
 
+# ── 輸入不變式（B2b R2 之 I1–I6）─────────────────────────────────────────
+def test_unsorted_feature_index_is_fail_closed() -> None:
+    """🔴 `feature_index` 非嚴格遞增 ⇒ raise（I1；grok／codex／主委三方獨立收斂）。
+
+    下游以 `test_rows[0]` 取「測試段最早時刻」；反序時那個值不是最早的
+    ⇒ 答案窗比較用到錯的邊界，且**完全靜默**。
+    """
+    index, train, test, keys, man, _ = _basic_case()
+    reversed_index = pd.Index(np.asarray(index, dtype="int64")[::-1])
+    with pytest.raises(ValueError, match="非嚴格遞增"):
+        derive_event_split_from_plans(
+            train, test, keys, reversed_index, manifest=man, bucket_ms=H1
+        )
+
+
+def test_duplicate_feature_index_timestamps_is_fail_closed() -> None:
+    """重複時間戳讓集合成員判定失去唯一性 ⇒ raise（I1 之另一半）。"""
+    index, train, test, keys, man, _ = _basic_case()
+    dup = np.asarray(index, dtype="int64").copy()
+    dup[10] = dup[9]
+    with pytest.raises(ValueError, match="重複"):
+        derive_event_split_from_plans(train, test, keys, pd.Index(dup), manifest=man, bucket_ms=H1)
+
+
+def test_nan_in_numeric_index_is_fail_closed() -> None:
+    """🔴 數值型索引含 NaN ⇒ raise（I2）：`astype(int64)` 會把 NaN 變成 0 而不報錯。"""
+    index, train, test, keys, man, _ = _basic_case()
+    with_nan = np.asarray(index, dtype="float64").copy()
+    with_nan[3] = np.nan
+    with pytest.raises(ValueError, match="NaN／inf"):
+        derive_event_split_from_plans(
+            train, test, keys, pd.Index(with_nan), manifest=man, bucket_ms=H1
+        )
+
+
+def test_duplicate_event_id_is_fail_closed() -> None:
+    """🔴 `event_keys.event_id` 重複 ⇒ raise（I3）：集合相等會**吃掉重複**。"""
+    index, train, test, keys, _, _ = _basic_case()
+    dup = pd.concat([keys, keys.iloc[[0]]], ignore_index=True)
+    with pytest.raises(ValueError, match="event_id 重複"):
+        derive_event_split_from_plans(
+            train, test, dup, index, manifest=_manifest(dup.drop_duplicates("event_id")),
+            bucket_ms=H1,
+        )
+
+
+def test_float_row_index_is_fail_closed() -> None:
+    """🔴 非整數 `row_index` ⇒ raise（I4）：`dtype=int` 截斷（0.5→0）是**靜默改變歸屬**。"""
+    index, train, test, keys, man, _ = _basic_case()
+    bad = SplitPlan(
+        split_label="train", index_kind="positional",
+        row_index=np.asarray([0.5, 1.5, 2.5, 3.5, 4.5]),
+        time_bounds=train.time_bounds, purge_gap=PURGE, embargo=EMBARGO,
+        purge_semantic="rows", base_universe_hash="deadbeef", symbol=SYM,
+    )
+    with pytest.raises(ValueError, match="非整數值"):
+        derive_event_split_from_plans(bad, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_inverted_answer_window_is_fail_closed() -> None:
+    """🔴 `label_start_ms > label_end_ms` ⇒ raise（I5）：反轉的窗不是『比較短』，是壞掉。"""
+    index, train, test, _, _, _ = _basic_case()
+    inverted = _event_keys([("e_inv", index[0], int(index[0]) - H1)])
+    with pytest.raises(ValueError, match="答案窗反轉"):
+        derive_event_split_from_plans(
+            train, test, inverted, index, manifest=_manifest(inverted), bucket_ms=H1
+        )
+
+
+def test_event_keys_may_share_timestamps() -> None:
+    """🔴 反向保護：事件欄**可以**重複（兩事件同一根 bar 是正常的），不得被單調性誤擋。
+
+    出生理由：我第一版把嚴格遞增套到事件欄上，當場誤擋合法輸入。
+    """
+    index, train, test, _, _, _ = _basic_case()
+    same = _event_keys(
+        [("e1", index[0], int(index[0]) + H1), ("e2", index[0], int(index[0]) + H1)]
+    )
+    plan = derive_event_split_from_plans(
+        train, test, same, index, manifest=_manifest(same), bucket_ms=H1
+    )
+    assert len(plan.assignments) + len(plan.purged) == 2
+
+
+def test_non_positive_bucket_ms_is_fail_closed() -> None:
+    """🔴 `bucket_ms <= 0` ⇒ raise（I6）：`0` 原本只是靠 pandas 例外**巧合**擋住。"""
+    index, _, _, keys, man, _ = _basic_case()
+    for bad_bucket in (0, -1):
+        with pytest.raises(ValueError, match="須為正整數"):
+            build_time_clusters(man, bad_bucket)
+
+
 def test_answer_window_one_ms_before_test_start_is_purged() -> None:
     """🔴 `label_end` 落在 canonical test start **前 1ms** 的 train 事件——不該 purge。
 

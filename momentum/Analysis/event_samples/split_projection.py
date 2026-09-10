@@ -88,7 +88,9 @@ def _index_as_ms(index: Any) -> np.ndarray:
         if idx.hasnans:
             raise ValueError("split_projection: feature_index 含 NaT（fail-closed）")
         return (idx.asi8 // 10 ** 6).astype("int64")
-    return assert_epoch_ms_array(np.asarray(idx), role="split_projection: feature_index")
+    return assert_epoch_ms_array(
+        np.asarray(idx), role="split_projection: feature_index", strictly_increasing=True
+    )  # 🔴 feature_index **必須**嚴格遞增：下游以 row_index[0] 取「最早時刻」
 
 
 def build_event_keys(
@@ -141,6 +143,31 @@ def build_event_keys(
     return out.reset_index(drop=True)
 
 
+def _assert_event_keys_wellformed(event_keys: pd.DataFrame) -> None:
+    """驗 `event_keys` 之**不變式**（B2b R2 之 I5；codex／grok／主委）。
+
+    🔴 上游 `alignment.py:192` 已有 `decision_at <= label_start < label_end` 之閘，
+    但本函式是**公開純函式**——B3 以外的 caller（測試、未來的 per-symbol 版）不受那道閘保護。
+    ⇒ 三個時間欄各自須為 finite 整數毫秒，且 `label_start_ms <= label_end_ms`。
+    """
+    if event_keys.empty:
+        return
+    for col in ("feature_cutoff_ms", "label_start_ms", "label_end_ms"):
+        assert_epoch_ms_array(
+            np.asarray(event_keys[col]),
+            role=f"derive_event_split_from_plans: event_keys.{col}",
+        )  # 🔴 不加 strictly_increasing：事件欄可以重複（兩事件同一根 bar 是正常的）
+    starts = np.asarray(event_keys["label_start_ms"], dtype="int64")
+    ends = np.asarray(event_keys["label_end_ms"], dtype="int64")
+    inverted = starts > ends
+    if inverted.any():
+        bad = event_keys.loc[inverted, "event_id"].tolist()
+        raise ValueError(
+            f"derive_event_split_from_plans: 答案窗反轉（label_start > label_end）於 "
+            f"{sorted(bad)[:5]}——反轉的窗不是『比較短』，是資料壞掉（fail-closed）"
+        )
+
+
 def derive_event_split_from_plans(
     train_plan: Any,
     test_plan: Any,
@@ -170,6 +197,7 @@ def derive_event_split_from_plans(
     missing_cols = [c for c in EVENT_KEY_COLUMNS if c not in event_keys.columns]
     if missing_cols:
         raise ValueError(f"derive_event_split_from_plans: event_keys 缺欄 {missing_cols}")
+    _assert_event_keys_wellformed(event_keys)
 
     if train_plan is None or getattr(train_plan, "row_index", None) is None:
         raise ValueError(f"{_REASON_MISSING_TRAIN}: 缺 train plan（fail-closed）")
@@ -214,6 +242,15 @@ def derive_event_split_from_plans(
     # 🔴 兩個輸入必須是**同一批**（B2b review `CODEX-R1-P1-01`）：原本只有 clusters 用到
     #    manifest，餵另一批 manifest 也會產出看起來成功的 assignment。
     #    **不接受 subset**——要子集就由呼叫端先裁好 manifest，別讓本函式猜。
+    # 🔴 唯一性必須先驗（B2b R2 之 I3）：集合相等會**吃掉重複**——同一個 event_id 出現
+    #    兩次仍與 manifest 集合相等，然後被重複計數／重複輸出 assignment。
+    for frame, name in ((event_keys, "event_keys"), (manifest.table, "manifest.table")):
+        dupes = frame["event_id"][frame["event_id"].duplicated()].unique().tolist()
+        if len(dupes):
+            raise ValueError(
+                f"derive_event_split_from_plans: {name} 之 event_id 重複 {sorted(dupes)[:5]}"
+                "——集合相等吃不掉重複，會重複計數（fail-closed）"
+            )
     key_ids = set(event_keys["event_id"])
     man_ids = set(manifest.table["event_id"])
     if key_ids != man_ids:

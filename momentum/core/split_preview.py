@@ -55,7 +55,9 @@ MS_MAGNITUDE_FLOOR = 1e11
 _MS_MAGNITUDE_FLOOR = MS_MAGNITUDE_FLOOR
 
 
-def assert_epoch_ms_array(values: Any, *, role: str) -> np.ndarray:
+def assert_epoch_ms_array(
+    values: Any, *, role: str, strictly_increasing: bool = False
+) -> np.ndarray:
     """把整數時間戳陣列驗成 **epoch 毫秒**，逐元素檢查；不合規即 raise。
 
     🔴 **逐元素**而非 `np.all`（B2b review `CODEX-R1-P1-03`）：原本寫成
@@ -63,12 +65,28 @@ def assert_epoch_ms_array(values: Any, *, role: str) -> np.ndarray:
     直接**放行**。混合單位不是「其中一種」，是資料壞掉，必須擋。
 
     與 `_as_ms`（scalar 版）共用 `MS_MAGNITUDE_FLOOR`——單位政策只有一份。
+
+    `strictly_increasing`：**只有 `feature_index` 需要**（下游以 `row_index[0]` 取「最早時刻」）。
+    事件欄（`feature_cutoff_ms` 等）**本來就可以重複**——兩個事件落在同一根 bar 是正常的——
+    故預設 `False`。把單調性套到事件欄上會誤擋合法輸入（主委實作時當場踩到）。
     """
     arr = np.asarray(values)
     if arr.size == 0:
         return arr.astype("int64")
     if not np.issubdtype(arr.dtype, np.integer):
-        arr = np.asarray(arr, dtype="int64")
+        # 🔴 **cast 之前**驗 finite（B2b R2 之 I2；grok／composer）：
+        #    `astype("int64")` 會把 NaN 變成 0（或未定義值）⇒ `feature_cutoff_ms == 0`
+        #    的事件可能被誤判成 train，且**完全靜默**。
+        as_float = np.asarray(arr, dtype="float64")
+        if not np.isfinite(as_float).all():
+            n_bad = int((~np.isfinite(as_float)).sum())
+            raise ValueError(
+                f"{role}: 含 {n_bad} 個 NaN／inf——`astype(int64)` 會把它們變成 0 而不報錯"
+                "（fail-closed）"
+            )
+        if not np.all(as_float == np.floor(as_float)):
+            raise ValueError(f"{role}: 含非整數值——時間戳必須是整數毫秒（fail-closed）")
+        arr = as_float.astype("int64")
     nonzero = arr[arr != 0]
     if nonzero.size:
         looks_seconds = np.abs(nonzero) < MS_MAGNITUDE_FLOOR
@@ -83,6 +101,20 @@ def assert_epoch_ms_array(values: Any, *, role: str) -> np.ndarray:
                 f"{role}: **混合**時間單位——{n_bad}/{nonzero.size} 個值看起來是秒、"
                 "其餘看起來是毫秒。混合不是『其中一種』，是資料壞掉（fail-closed）"
             )
+    # 🔴 **嚴格遞增**（B2b R2 之 I1；grok／codex／主委三方獨立收斂）：
+    #    下游以 `index[test_rows[0]]` 當「測試段最早時刻」；索引若非遞增，那個值就不是最早的
+    #    ⇒ 答案窗比較用到錯的邊界，且**不拋任何例外**。`diff > 0` 一併涵蓋重複時間戳
+    #    （重複會讓集合成員判定失去唯一性）。
+    if strictly_increasing and arr.size > 1:
+        diffs = np.diff(arr)
+        if not np.all(diffs > 0):
+            n_bad = int((diffs <= 0).sum())
+            first = int(np.argmax(diffs <= 0))
+            kind = "重複" if int(diffs[first]) == 0 else "逆序"
+            raise ValueError(
+                f"{role}: 時間戳非嚴格遞增——第 {first + 1} 個位置{kind}"
+                f"（共 {n_bad} 處）。下游以 row_index[0] 取『最早時刻』，非遞增即算錯（fail-closed）"
+            )
     return arr.astype("int64")
 
 
@@ -92,9 +124,22 @@ def assert_positional_rows(rows: Any, *, n: int, role: str) -> np.ndarray:
     🔴 出生理由（B2b review `CODEX-R1-P1-03`）：numpy 對**負索引**會回捲，
     `index[-3]` 會靜默取到尾端第三列 ⇒ 錯誤的 train／test 歸屬而**不拋任何例外**。
     """
-    arr = np.asarray(rows, dtype=int)
-    if arr.size == 0:
-        return arr
+    raw = np.asarray(rows)
+    if raw.size == 0:
+        return raw.astype(int)
+    # 🔴 **cast 之前**驗整數性（B2b R2 之 I4；codex／composer）：
+    #    `np.asarray(..., dtype=int)` 對 0.5 會截斷成 0 ⇒ **靜默改變歸屬**，
+    #    那不是型別噪音，是錯的答案。（主委原判「維持現狀」，依較嚴版推翻。）
+    if not np.issubdtype(raw.dtype, np.integer):
+        as_float = np.asarray(raw, dtype="float64")
+        if not np.isfinite(as_float).all():
+            raise ValueError(f"{role}: row_index 含 NaN／inf（fail-closed）")
+        if not np.all(as_float == np.floor(as_float)):
+            raise ValueError(
+                f"{role}: row_index 含非整數值——`dtype=int` 會截斷（0.5→0）而靜默改變歸屬"
+                "（fail-closed）"
+            )
+    arr = np.asarray(raw, dtype=int)
     if arr.min() < 0:
         raise ValueError(
             f"{role}: row_index 含負值 {int(arr.min())}——numpy 會回捲成尾端列，"
@@ -174,6 +219,11 @@ def holdout_boundary(
     `max(effective_horizon, label_window_rows)`，本函式**不猜、不查 config**。
     """
     index = pd.Index(feature_index)
+    if not isinstance(index, pd.DatetimeIndex) and index.size:
+        # 邊界 builder 與投影共用同一組不變式（B2b R2 之 I1/I2）。
+        assert_epoch_ms_array(
+            np.asarray(index), role="holdout_boundary: feature_index", strictly_increasing=True
+        )
     n = int(len(index))
     if n == 0:
         # 無 universe 即無邊界；回空計畫會讓下游把「沒切」誤讀成「切了但都空」。

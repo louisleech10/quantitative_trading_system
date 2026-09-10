@@ -17,6 +17,10 @@ REPO = Path(__file__).resolve().parents[1]
 TARGET = REPO / "momentum" / "Analysis" / "event_samples" / "split_projection.py"
 #: M-SU-7 之錨點在共用實作那一側（B2b 把 clusters 真抽出到 event_split.py，不再複製）。
 CLUSTER_TARGET = REPO / "momentum" / "Analysis" / "event_samples" / "event_split.py"
+#: 共用 validator 之錨點住 core（B2b R2 之 I1/I2/I4）。
+PREVIEW_TARGET = REPO / "momentum" / "core" / "split_preview.py"
+PREVIEW_MUTANTS = {"M-SU-21", "M-SU-22", "M-SU-24"}
+CLUSTER_MUTANTS = {"M-SU-7", "M-SU-26"}
 TESTS = REPO / "tests" / "momentum" / "Analysis" / "test_splitunify_derive.py"
 
 #: (id, 說明, old, new, 期望紅的 -k 選擇器)；M-SU-7 改在 CLUSTER_TARGET 上動刀
@@ -107,10 +111,10 @@ MUTANTS = [
     ),
     (
         "M-SU-18",
-        "混合單位不再擋（逐元素改回 np.all）",
-        "    return assert_epoch_ms_array(np.asarray(idx), role=\"split_projection: feature_index\")",
-        "    return np.asarray(idx, dtype=\"int64\")",
-        "mixed_unit",
+        "混合單位不再擋（跳過共用 validator，直接 cast）",
+        '    return assert_epoch_ms_array(\n        np.asarray(idx), role="split_projection: feature_index", strictly_increasing=True\n    )',
+        '    return np.asarray(idx, dtype="int64")',
+        "mixed_unit or unsorted_feature_index",
     ),
     (
         "M-SU-19",
@@ -125,6 +129,48 @@ MUTANTS = [
         '        if in_train and int(rec["label_end_ms"]) >= test_start_ms:',
         '        if in_train and int(rec["label_end_ms"]) > test_start_ms:',
         "answer_window",
+    ),
+    (
+        "M-SU-21",
+        "feature_index 嚴格遞增檢查拿掉（反序／重複不再擋）",
+        "    if strictly_increasing and arr.size > 1:",
+        "    if False:",
+        "unsorted_feature_index or duplicate_feature_index",
+    ),
+    (
+        "M-SU-22",
+        "數值型索引之 NaN 檢查拿掉（astype 會把 NaN 變 0）",
+        "        if not np.isfinite(as_float).all():\n            n_bad = int((~np.isfinite(as_float)).sum())",
+        "        if False:\n            n_bad = int((~np.isfinite(as_float)).sum())",
+        "nan_in_numeric_index",
+    ),
+    (
+        "M-SU-23",
+        "event_id 唯一性檢查拿掉（集合相等吃掉重複）",
+        "        if len(dupes):",
+        "        if False:",
+        "duplicate_event_id",
+    ),
+    (
+        "M-SU-24",
+        "row_index 整數性檢查拿掉（0.5 靜默截斷成 0）",
+        "        if not np.all(as_float == np.floor(as_float)):\n            raise ValueError(\n                f\"{role}: row_index 含非整數值",
+        "        if False:\n            raise ValueError(\n                f\"{role}: row_index 含非整數值",
+        "float_row_index",
+    ),
+    (
+        "M-SU-25",
+        "答案窗反轉檢查拿掉",
+        "    if inverted.any():",
+        "    if False:",
+        "inverted_answer_window",
+    ),
+    (
+        "M-SU-26",
+        "bucket_ms 正值檢查拿掉（負值產出負向 cluster id）",
+        "    if bucket <= 0:",
+        "    if False:",
+        "non_positive_bucket",
     ),
     (
         "C0",
@@ -146,19 +192,28 @@ def _run(selector: str | None) -> int:
 def main() -> int:
     original = TARGET.read_text(encoding="utf-8")
     cluster_original = CLUSTER_TARGET.read_text(encoding="utf-8")
+    preview_original = PREVIEW_TARGET.read_text(encoding="utf-8")
     backup = Path(tempfile.mkdtemp()) / "split_projection.py.bak"
     backup.write_text(original, encoding="utf-8")
 
     uncovered: list[str] = []
     try:
         for mid, desc, old, new, selector in MUTANTS:
-            src_check = cluster_original if mid == "M-SU-7" else original
+            src_check = (
+                preview_original if mid in PREVIEW_MUTANTS
+                else cluster_original if mid in CLUSTER_MUTANTS
+                else original
+            )
             if old not in src_check:
                 print(f"  ✗ {mid}: **錨點不存在**——mutation 從未套用（假綠）：{desc}")
                 uncovered.append(mid)
                 continue
-            tgt = CLUSTER_TARGET if mid == "M-SU-7" else TARGET
-            src = cluster_original if mid == "M-SU-7" else original
+            if mid in PREVIEW_MUTANTS:
+                tgt, src = PREVIEW_TARGET, preview_original
+            elif mid in CLUSTER_MUTANTS:
+                tgt, src = CLUSTER_TARGET, cluster_original
+            else:
+                tgt, src = TARGET, original
             tgt.write_text(src.replace(old, new, 1), encoding="utf-8")
             rc = _run(selector)
             tgt.write_text(src, encoding="utf-8")
@@ -175,6 +230,7 @@ def main() -> int:
     finally:
         TARGET.write_text(backup.read_text(encoding="utf-8"), encoding="utf-8")
         CLUSTER_TARGET.write_text(cluster_original, encoding="utf-8")
+        PREVIEW_TARGET.write_text(preview_original, encoding="utf-8")
         shutil.rmtree(backup.parent, ignore_errors=True)
 
     print(f"\nUNCOVERED={len(uncovered)}" + (f" → {uncovered}" if uncovered else ""))

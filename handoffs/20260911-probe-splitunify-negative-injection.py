@@ -111,7 +111,7 @@ def main() -> int:
     ok.append(_run("③ row_index 為 float（0.5..4.5）",
                    lambda: derive_event_split_from_plans(
                        bad, test, keys, index, manifest=man, bucket_ms=H1),
-                   expect_block=False))  # 主委預期：numpy 截斷成 int，**不擋**——待裁定
+                   expect_block=True))  # R2 之 I4：三家有兩家判該擋，依較嚴版推翻主委原裁定
 
     # ④ manifest 缺 decision_at_ms
     man_bad = EventManifest(table=man.table.drop(columns=["decision_at_ms"]),

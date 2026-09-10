@@ -1,0 +1,13 @@
+  ✓ ① feature_index 含 NaT: 已擋 ValueError: split_projection: feature_index 含 NaT（fail-closed）
+  ✓ ② event_keys 缺 label_end_ms 欄: 已擋 ValueError: derive_event_split_from_plans: event_keys 缺欄 ['label_end_ms']
+  ✓ ③ row_index 為 float（0.5..4.5）: 已擋 ValueError: derive: train_plan: row_index 含非整數值——`dtype=int` 會截斷（0.5→0）而靜默改變歸屬（fail-closed）
+  ✓ ④ manifest 缺 decision_at_ms: 已擋 KeyError: 'decision_at_ms'
+  ✓ ⑤ bucket_ms = 0: 已擋 ValueError: time_cluster_bucket_ms: bucket_ms 須為正整數，實得 0（fail-closed）
+  ✓ ⑥ bucket_ms = -1: 已擋 ValueError: time_cluster_bucket_ms: bucket_ms 須為正整數，實得 -1（fail-closed）
+  ✓ ⑦ label_end_ms < label_start_ms: 已擋 ValueError: derive_event_split_from_plans: 答案窗反轉（label_start > label_end）於 ['a']——反轉的窗不是『比較短』，是資料壞掉（fa
+  ✓ ⑧ feature_index 反序: 已擋 ValueError: split_projection: feature_index: 時間戳非嚴格遞增——第 1 個位置逆序（共 99 處）。下游以 row_index[0] 取『最早時刻』，非遞增即
+  ✓ ⑨ feature_index 有重複時間戳: 已擋 ValueError: split_projection: feature_index: 時間戳非嚴格遞增——第 10 個位置重複（共 1 處）。下游以 row_index[0] 取『最早時刻』，非遞增即
+
+未如預期者 = 0 / 9
+[2026-09-11 03:13:53,312] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-11 03:13:55,254 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
