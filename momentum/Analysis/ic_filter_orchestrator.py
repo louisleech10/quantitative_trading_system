@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import hashlib
 import math
@@ -115,6 +116,35 @@ STAGE_OVERRIDE_PATHS: dict[str, tuple[str, ...]] = {
     "fdr_correction": ("significance", "fdr", "enabled"),
     "marginal_ic": ("marginal_ic", "enabled"),  # GAP-2 Task 4.1（B5 toggle／wiring R1b）
 }
+
+
+def _timed_stage(name: str):
+    """FU-3（使用者 2026-09-10 併入 EVTLABEL P1）：逐 stage 計時，寫 `metadata.stage_timings`。
+
+    出生理由：報告**完全沒有**分段耗時，導致「多 horizon 會多久」「哪一段該加速」只能用猜的
+    ——主委 2026-09-10 就因此把事件 run 成本估錯一個量級（估幾分鐘、實際 39k 特徵跑不完）。
+    🔴 秒數**本質非決定性** ⇒ `tests/momentum/helpers/ichc_run.canonical_sha` 之
+    `_CLOCK_KEYS` 已納入 `stage_timings`（與 `generated_at` 同類），golden 不受影響。
+    同名 stage 多次呼叫（fallback 路徑會重跑 stage5/6）⇒ **累加**，非覆蓋。
+    """
+
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(self, *args, **kwargs):
+            started = time.perf_counter()
+            try:
+                return fn(self, *args, **kwargs)
+            finally:
+                elapsed = time.perf_counter() - started
+                timings = getattr(self, "_stage_timings", None)
+                if timings is None:
+                    timings = {}
+                    self._stage_timings = timings
+                timings[name] = round(timings.get(name, 0.0) + elapsed, 3)
+
+        return wrapper
+
+    return deco
 
 
 def _set_nested_bool(data: dict, path: tuple[str, ...], value: bool) -> None:
@@ -1379,9 +1409,19 @@ class ICFilterOrchestrator:
             stage6b_results=stage6b_results,
         )
 
+        self._attach_stage_timings(report)
         self._report_progress(7, "report", 1.0, "completed")
         self._report = report
         return report
+
+    def _attach_stage_timings(self, report: Any) -> None:
+        """FU-3：把逐 stage 耗時（秒）寫進 `metadata.stage_timings`；空則不寫（不留空殼鍵）。"""
+        timings = getattr(self, "_stage_timings", None)
+        if not timings or not isinstance(report, dict):
+            return
+        metadata = report.get("metadata")
+        if isinstance(metadata, dict):
+            metadata["stage_timings"] = dict(sorted(timings.items()))
 
     def _run_full_sample_fallback(
         self,
@@ -2231,6 +2271,7 @@ class ICFilterOrchestrator:
             stage6b_results=stage6b_results,
         )
 
+        self._attach_stage_timings(report)
         self._report = report
         return report
 
@@ -2990,6 +3031,7 @@ class ICFilterOrchestrator:
 
         return self._report or {}
 
+    @_timed_stage("stage0_ingestion")
     def _stage0_ingestion(
         self,
         features_path: str,
@@ -3105,6 +3147,7 @@ class ICFilterOrchestrator:
         self._active_fit_mode = "pit_expanding"
         return "pit_expanding", None
 
+    @_timed_stage("stage1_preprocessing")
     def _stage1_preprocessing(
         self,
         features_df: pd.DataFrame,
@@ -3153,6 +3196,7 @@ class ICFilterOrchestrator:
             f"preprocessing {sub.get('sub_step')} {done}/{total}（ETA {eta_txt}）", extra=extra,
         )
 
+    @_timed_stage("stage2_label_generation")
     def _stage2_label_generation(
         self,
         labels_df: Optional[pd.DataFrame],
@@ -3345,6 +3389,7 @@ class ICFilterOrchestrator:
         if info is not None:
             info["scaffold_alignment_deferred"] = str(pending)
 
+    @_timed_stage("stage3_event_filter")
     def _stage3_event_filter(
         self,
         features_df: pd.DataFrame,
@@ -3588,6 +3633,7 @@ class ICFilterOrchestrator:
                 filtered[key] = value
         return filtered
 
+    @_timed_stage("stage4_ic_calculation")
     def _stage4_ic_calculation(
         self,
         features_df: pd.DataFrame,
@@ -3755,6 +3801,7 @@ class ICFilterOrchestrator:
             "refusing fabricated identity"
         )
 
+    @_timed_stage("stage5_statistical_validation")
     def _stage5_statistical_validation(
         self,
         features_df: pd.DataFrame,
@@ -4009,6 +4056,7 @@ class ICFilterOrchestrator:
             )
         return raw
 
+    @_timed_stage("stage6_redundancy")
     def _stage6_redundancy(
         self,
         features_df: pd.DataFrame,
@@ -4064,6 +4112,7 @@ class ICFilterOrchestrator:
             **({"scope": "test"} if split_context is not None else {}),
         }
 
+    @_timed_stage("stage7_report")
     def _stage7_report(
         self,
         features_df: pd.DataFrame,
@@ -4585,6 +4634,7 @@ class ICFilterOrchestrator:
         if isinstance(comp, dict) and "oos_guarantees" in comp:
             comp["oos_guarantees"] = bool(oos_guarantees)
 
+    @_timed_stage("stage6b_marginal_ic")
     def _stage6b_marginal_ic(
         self,
         features_df: pd.DataFrame,

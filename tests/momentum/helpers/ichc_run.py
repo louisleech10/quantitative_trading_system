@@ -122,7 +122,9 @@ def canonical_sha(report: dict) -> str:
     🔴 **以路徑限定排除，不是排除所有叫 `sha256` 的鍵**——後者會把真正該比的
     內容雜湊一起吃掉（本 epic 反覆犯的「比對範圍過寬」）。
     """
-    _CLOCK_KEYS = frozenset({"generated_at", "filtered_generated_at"})
+    # 🔴 2026-09-10 新增 `stage_timings`（FU-3 逐 stage 耗時揭露）：秒數**本質非決定性**，
+    #    與 `generated_at` 同屬時鐘族，不納入 golden 比對範圍；不是「第三個排除語意」。
+    _CLOCK_KEYS = frozenset({"generated_at", "filtered_generated_at", "stage_timings"})
     # (父路徑, 鍵) 之封閉集合；父路徑以 "." 串接，root 為 ""。
     _CLOCK_MIRROR_PATHS = frozenset({("metadata.survivor_output", "sha256")})
 

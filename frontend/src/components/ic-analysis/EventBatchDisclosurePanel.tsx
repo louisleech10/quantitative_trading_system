@@ -25,6 +25,7 @@ import {
 } from '@/lib/randomControlSpec';
 import { EVENT_PARAM_DOCS } from '@/lib/eventParamDocs';
 import { EVENT_CONTRACT_DOCS } from '@/lib/eventContractDocs';
+import { barsPerEventBar, hHintCaption, kHintCaption, unitCaption } from '@/lib/icLabelRule';
 import ScanCubeBrowser from './ScanCubeBrowser';
 import {
   EVENT_FIELD_FORMATTERS,
@@ -61,6 +62,11 @@ export const IC_ANALYSIS_INITIAL_HORIZON_BARS = 1;
  */
 interface Props {
   importId?: string;
+  /**
+   * EVTLABEL Task 1.3（使用者 2026-09-10）：本次分析的**特徵週期**，用來把 h／k 的單位講清楚
+   * （「1 根事件週期＝幾根特徵週期」）。沒給 ⇒ 單位說明退化為不帶換算的句子，不猜數字。
+   */
+  featureTimeframe?: string | null;
   labelSpec: ICAnalysisConfig['event_label_spec'];
   onChangeLabelSpec: (next: NonNullable<ICAnalysisConfig['event_label_spec']>) => void;
   /** 測試注入；不給則依 `importId` 自行查 detail。 */
@@ -166,6 +172,7 @@ function ContractDoc({ field }: { field: keyof typeof EVENT_CONTRACT_DOCS }) {
 export default function EventBatchDisclosurePanel({
   importId, labelSpec, onChangeLabelSpec, detail: injected,
   labelScan = null, onChangeLabelScan, disclosure = null, taskId,
+  featureTimeframe = null,
 }: Props) {
   const [detail, setDetail] = useState<EventImportDetail | null>(injected ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +182,10 @@ export default function EventBatchDisclosurePanel({
   const [rcParams, setRcParams] = useState<RandomControlParams>({
     nRequested: 100, seed: 20260905, neighborhoodBars: 2, embargoBars: 6, threshold: 0.02,
   });
+  // EVTLABEL Task 1.3：批內事件週期（唯一才算換算；mixed ⇒ null）與「1 根事件週期＝幾根特徵週期」。
+  const batchTimeframes = detail?.summary?.timeframes ?? [];
+  const batchEventTf = batchTimeframes.length === 1 ? batchTimeframes[0] : null;
+  const eventBarRatio = barsPerEventBar(batchEventTf, featureTimeframe);
   const [rcBusy, setRcBusy] = useState(false);
   const [rcError, setRcError] = useState<string | null>(null);
   const [rcResult, setRcResult] = useState<EventImportResponse | null>(null);
@@ -351,6 +362,11 @@ export default function EventBatchDisclosurePanel({
             className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 disabled:opacity-50"
           />
         </label>
+        {/* EVTLABEL Task 1.3（使用者 2026-09-10）：h／k 的單位是**事件週期的根數**，畫面必須寫死講清楚。
+            批內事件週期不唯一（mixed）或特徵週期未知 ⇒ 退化成不帶換算的句子，**不猜數字**。 */}
+        <span className="mt-1 block text-[11px] text-slate-400" data-testid="ic-param-h-unit">
+          {unitCaption(batchEventTf, featureTimeframe, eventBarRatio)}；{hHintCaption(batchEventTf)}
+        </span>
         <ParamDoc paramKey="horizon_bars" />
 
         {/* ── `G3-D2` D1.7：報酬量法三選項（取代原本兩個枚舉 select）────────────────
@@ -480,6 +496,9 @@ export default function EventBatchDisclosurePanel({
             })}
             className="w-full rounded border border-slate-700 bg-slate-900/70 px-2 py-1 text-xs text-slate-100 disabled:opacity-50"
           />
+          <span className="mt-1 block text-[11px] text-slate-400" data-testid="ic-param-k-unit">
+            {unitCaption(batchEventTf, featureTimeframe, eventBarRatio)}；{kHintCaption(featureTimeframe)}
+          </span>
           <ParamDoc paramKey="decision_offset_bars_analysis" />
           {/* 並排「批次記錄 k／本次分析 k」——同名不同義，分開講 */}
           <span className="mt-1 block text-[11px] text-slate-400" data-testid="ic-param-k-dual">

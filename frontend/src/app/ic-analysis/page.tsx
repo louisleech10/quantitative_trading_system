@@ -714,6 +714,8 @@ function ICAnalysisPageContent() {
             {config.mode === 'event' && config.event_import_id && (
               <EventBatchDisclosurePanel
                 importId={config.event_import_id}
+                /* EVTLABEL Task 1.3：把本次分析的特徵週期傳下去，h／k 才能講「1 根＝幾根」。 */
+                featureTimeframe={config.timeframe ?? null}
                 labelSpec={config.event_label_spec}
                 onChangeLabelSpec={(next) => setConfig({ ...config, event_label_spec: next })}
                 /* 🔴 `G3-D2` D4.3：掃描網格與揭露欄必須**接到頁面**才算交付——

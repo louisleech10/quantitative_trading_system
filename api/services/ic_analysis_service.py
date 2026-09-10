@@ -184,6 +184,39 @@ def _ws_stage_progress_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {k: payload[k] for k in _WS_STAGE_PROGRESS_KEYS if k in payload}
 
 
+def _inject_label_rule_disclosure(staged: Dict[str, Any], report: Any) -> None:
+    """EVTLABEL Task 1.1：事件 run 之報告寫入本次**實際消費**之 label 規則 → `report.metadata.event_label_rule`。
+
+    spec 由 `staged["prepared"].normalized_spec_bytes` 解析（**不讀 request**——route 可能 seed 過）；
+    視窗由對齊收據 `windows` 取；`label_source`／`statistic_kind` 抄 orchestrator 已寫之 `event_filter`。
+    只在事件路徑（有 staged）呼叫；非事件 run 不寫此鍵 ⇒ G-1 全域 golden 逐位元組不變。
+    切分未套用仍寫（邊界③：label 規則與切分無關）。計算在 `momentum/Analysis/event_label_mode.py`（純函式）。
+    """
+    if not isinstance(report, dict):
+        return
+    metadata = report.get("metadata")
+    if not isinstance(metadata, dict):
+        return
+    prepared = staged.get("prepared")
+    if prepared is None:
+        return
+    from momentum.factories import create_event_sample_pipeline  # R3：經 factory，不直接 import momentum.Analysis
+
+    pipeline = create_event_sample_pipeline()
+    spec = json.loads(bytes(prepared.normalized_spec_bytes).decode("utf-8"))
+    info = _find_event_filter_info(report) or {}
+    metadata["event_label_rule"] = pipeline.build_event_label_rule(
+        normalized_spec=spec,
+        windows=prepared.windows,
+        records=staged.get("records") or (),
+        feature_timeframe=metadata.get("timeframe"),
+        timeframe_seconds=staged.get("timeframe_seconds") or {},
+        label_source=info.get("label_source"),
+        statistic_kind=info.get("statistic_kind"),
+        n_events_consumed=len(staged.get("event_label_by_id") or {}),
+    )
+
+
 def _inject_isolation_source(staged: Dict[str, Any], report: Any) -> None:
     """EVTALIGN Task 5.1：事件分析之隔離區兩塊來源分開揭露 → `report.metadata.isolation`。
 
@@ -197,6 +230,8 @@ def _inject_isolation_source(staged: Dict[str, Any], report: Any) -> None:
     """
     if not isinstance(report, dict):
         return
+    # EVTLABEL Task 1.1：label 規則揭露與切分無關 ⇒ 先寫（邊界③：切分未套用仍寫），再處理 isolation。
+    _inject_label_rule_disclosure(staged, report)
     metadata = report.get("metadata")
     split = metadata.get("ic_train_test_split") if isinstance(metadata, dict) else None
     if not isinstance(split, dict) or not split.get("applied"):
@@ -769,6 +804,9 @@ class ICAnalysisService:
             "event_context": event_context,
             "events_excluded_by_symbol": dict(excluded_by_symbol),
             "prepared": prepared1,
+            # EVTLABEL Task 1.1：label 規則揭露需要原始 records（0/1 標籤存在與否）與同一份 timeframe_seconds。
+            "records": tuple(records),
+            "timeframe_seconds": timeframe_seconds,
             "purge": purge,
             "analysis_alignment_receipt_hash": prepared1.analysis_alignment_receipt_hash,
             "prepared_token": prepared1.prepared_token,

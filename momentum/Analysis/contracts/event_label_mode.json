@@ -1,0 +1,33 @@
+{
+  "_doc": "EVTLABEL 單一真相源（docs/EVTLABEL_SPEC.md §C）：label_mode／label_source／statistic_kind／summary 新欄／unavailable reason／event_label_rule 鍵集皆由本檔定義；Python 端以常數＋契約測試對證，SPEC 只 pointer。P1（Task 1.1）先建 event_label_rule_keys 與 return_formula_by_mode；其餘鍵於 Task 3.1 補齊。",
+  "schema_version": 1,
+  "event_label_rule_keys": [
+    "label_source",
+    "statistic_kind",
+    "horizon_bars",
+    "decision_offset_bars",
+    "entry_price_semantic",
+    "label_return_mode",
+    "h_unit",
+    "event_timeframe",
+    "feature_timeframe",
+    "feature_bars_per_event_bar",
+    "ratio_integral",
+    "label_window_feature_bars",
+    "return_formula",
+    "imported_binary_label",
+    "n_events_consumed",
+    "uniqueness"
+  ],
+  "uniqueness_keys": ["mean", "min", "n_eff", "n_overlapping_pairs"],
+  "_uniqueness_doc": "R-1 不重工預留（使用者 2026-09-10）：每事件 w=1/(與其 label 視窗 [start,end) 相交之事件數，含自己)，同 dedupe.py 定義；n_eff=Σw；只揭露不參與計算。",
+  "imported_binary_label_keys": ["present", "n_pos", "n_neg", "used"],
+  "h_unit_value": "event_timeframe_bars",
+  "event_timeframe_mixed_value": "mixed",
+  "return_formula_by_mode": {
+    "_doc": "由 label_return_mode 與 entry_price_semantic 機械組字串；{entry} 由 entry_price_semantic 代入。基準價語意見 label_value_from_case.py（close_to_close 基準＝t0 close，與 entry 無關＝D1-5）。",
+    "close_to_close": "close[t0+h] / close[t0] - 1 × direction_sign",
+    "open_to_horizon_close": "close[t0+h] / price[{entry}] - 1 × direction_sign",
+    "open_to_close": "close[t0] / price[{entry}] - 1 × direction_sign"
+  }
+}
