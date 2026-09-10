@@ -48,10 +48,28 @@ def test_invalid_domain_values_are_rejected(bad):
     assert ok is False and reason == "label_invalid_domain"
 
 
-def test_bool_labels_are_accepted_as_zero_one():
-    """Python `True/False` 之 float 值恰為 1.0／0.0 ⇒ 合法（CSV 解析常見）。"""
-    ok, reason = _binary_label_domain([{"label": True}, {"label": False}])
-    assert ok is True and reason is None
+def test_bool_labels_are_rejected_to_match_the_import_validator():
+    """🔴 B3 review R1（三家同提）：`bool` 必須**拒收**，與匯入端 `_is_int` 對齊。
+
+    `True` 之 float 值恰為 1.0，我原本因此放行。但 `import_contract._is_int` 寫的是
+    `isinstance(v, Integral) and not isinstance(v, bool)`——兩份不同的「什麼算 int」會讓
+    維護者以為上游可以送 bool。合法落檔路徑不會產生 bool，故這不是現行漏洞；
+    採嚴的那一份是為了讓兩層政策只有一個答案。
+    """
+    assert _binary_label_domain([{"label": True}, {"label": False}]) == (False, "label_invalid_domain")
+    assert _binary_label_domain([{"label": 1}, {"label": 0}]) == (True, None)
+
+
+def test_domain_gate_bool_policy_matches_import_contract():
+    """碼證：兩層對 bool 的判定一致——任一邊改了政策，本條就紅。"""
+    from momentum.Analysis.event_samples.import_contract import _is_int
+
+    for value in (True, False):
+        assert _is_int(value) is False
+        assert _binary_label_domain([{"label": value}])[0] is False
+    for value in (0, 1):
+        assert _is_int(value) is True
+        assert _binary_label_domain([{"label": value}])[0] is True
 
 
 def test_single_bad_row_poisons_the_whole_batch():

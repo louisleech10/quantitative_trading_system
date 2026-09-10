@@ -138,8 +138,13 @@ def _binary_label_domain(records: Any) -> tuple:
         raw = rec.get("label")
         # 🔴 型別先擋、值再擋。`event_import_contract.json` 已宣告 `label: int, enum [0,1]`
         #    ⇒ 到這裡還是字串就代表上游少做了一次轉型，`float("1")` 會把它**靜默補上**，
-        #    那道漏洞往後只會擴大（下一個是 "yes"／"true"）。bool 是 int 的子類，放行。
-        if not isinstance(raw, (int, float)) or isinstance(raw, complex):
+        #    那道漏洞往後只會擴大（下一個是 "yes"／"true"）。
+        # 🔴 B3 review R1（`CODEX-R1-P2-05`／`COMPOSER-R1-P2-02`／`GROK-R1-P3-01`，三家同提）：
+        #    `bool` 原本被放行（`True` 之 float 值恰為 1.0）。但匯入端 `import_contract._is_int`
+        #    **明確拒 bool**（`isinstance(v, Integral) and not isinstance(v, bool)`）⇒ 兩層政策
+        #    不一致。合法落檔路徑不會產生 bool，所以這不是現行漏洞；但兩份不同的「什麼算 int」
+        #    會讓維護者以為上游可以送 bool。**以嚴的那一份為準**，與匯入端對齊。
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)) or isinstance(raw, complex):
             return (False, "label_invalid_domain")
         val = float(raw)
         if not math.isfinite(val) or not val.is_integer() or int(val) not in (0, 1):
