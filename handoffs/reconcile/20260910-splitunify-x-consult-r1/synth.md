@@ -275,3 +275,7 @@
 
 ---
 
+
+## 戳記
+
+（本區之下由各家族 append 一行 `RECONCILE-STAMP: <family> APPROVED <date> sha256:<body-hash> task:<task-id>`；本區標題以上為本體，body-hash 由 `scripts/reconcile_body_hash.sh` 計算。）

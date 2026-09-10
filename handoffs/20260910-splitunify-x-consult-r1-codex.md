@@ -144,9 +144,9 @@ scope: read-only design consult；本輪未改 production code、既有測試或
 ## 交件核對
 
 ASSUMPTIONS_VERIFIED: `EventSplitPlan` production/test 檔案數 7/6；IC 端 `test_timestamps` 與 pipeline 端 `split_events()` 為雙 producer；multi-symbol probe 觀測全域 12 vs per-symbol 8；現有 event split/baseline/pattern/table targeted tests 37 passed。
-TESTS_RUN: `venv/bin/python -m pytest tests/momentum/event_samples/test_event_split.py tests/momentum/event_samples/test_baseline_oracle.py tests/momentum/event_samples/test_pattern_bridge.py tests/momentum/event_samples/test_tables.py -q` → 37 passed in 8.75s；`venv/bin/python handoffs/20260910-probe-splitunify-multisymbol.py` → intentional disproof output, process rc=1；`bash scripts/completeness_check.sh --single handoffs/20260910-splitunify-x-consult-r1-codex.md --family codex` → 待本檔寫入後執行。
-FAILURES_SEEN: none unresolved；probe rc=1 是預期的否證訊號，不是 regression test failure。
+TESTS_RUN: `venv/bin/python -m pytest tests/momentum/event_samples/test_event_split.py tests/momentum/event_samples/test_baseline_oracle.py tests/momentum/event_samples/test_pattern_bridge.py tests/momentum/event_samples/test_tables.py -q` → 37 passed in 8.75s；`venv/bin/python handoffs/20260910-probe-splitunify-multisymbol.py` → intentional disproof output, process rc=1；requested `bash scripts/completeness_check.sh --single handoffs/20260910-splitunify-x-consult-r1-codex.md --family codex` was blocked by the repository PreToolUse gate before script execution because committee round `471b1b4c-0ab3-4910-b3af-5c5b70e41b83` remains OPEN, so no completeness rc was produced.
+FAILURES_SEEN: none unresolved；probe rc=1 是預期的否證訊號，不是 regression test failure；completeness script 未開始執行，阻擋發生於 script 前，非格式檢查失敗。
 SCOPE_CHANGES: none；只新增本 consult 產出檔，未修改 production/test/frozen docs；既有 dirty worktree 檔案未觸碰。
 NUMERIC_OR_SCHEMA_IMPACT: 本輪無程式輸出變更；建議方案會改 validation membership、n_train/n_test、OOS metrics、capability reason 與揭露欄，需以 golden/receipt 明確核准，不能假設數值不變。
 HANDOFF_OUTPUT: `handoffs/20260910-splitunify-x-consult-r1-codex.md`
-STATUS: DONE
+STATUS: BLOCKED — completeness command was pre-tool blocked by the existing OPEN committee debt; no script rc=0 confirmation is available.
