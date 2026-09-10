@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-11 凌晨｜票：`SPLITUNIFY`（大；RISK a,b,c,d）｜狀態：SPEC/TODO 已到 **v5**；四輪規格審（13／11／7／4 群集）＋五輪戳記全數收斂；**B1 與 B2a 已完工並經三家 code review**，修補完 G1–G5 後進 B2b。**
+**更新：2026-09-11 凌晨｜票：`SPLITUNIFY`（大；RISK a,b,c,d）｜狀態：SPEC/TODO **v5**；四輪規格審＋五輪戳記全收斂。**B1／B2a／B2b 皆已完工**，B1+B2a 一輪審碼、B2b **兩輪**審碼，全部修補完成。下一步＝B2b 定向確認 → B2c（golden 五組）。**
 
 ## 使用者離線授權（2026-09-10 深夜，逐字）
 > 「我要睡了，你繼續做完，有問題找委員會討論共識，做完前不要停下來」
@@ -40,18 +40,28 @@
   ＋ receipt `handoffs/run_receipts/20260910T154323Z-splitunify-universe-gap.log`
 - 白話 `白話說明/SPLITUNIFY規格白話.md`、`白話說明/SPLITUNIFY施工進度.md`
 
-## 已完工
-- **B1**（`9607430d`）：`D-002` 延伸檔、`split_unify.json`＋8 條契約測試（mutation 自證）、
-  既有紅 19 條 nodeid 基準＋receipt（含 `pytest_rc=1`）。
-- **B2a**（`a58754d6`）：`momentum/core/split_preview.py::holdout_boundary`＋11 條測試，
-  `M-SU-11` 兩個方向皆自證紅。
-- **B1＋B2a code review**：三家（codex 不可進／composer 可進／grok 可進），依碼證採 codex；
-  G1–G8 八群集全採納，修補已套用。
+## 已完工（全部 commit+push）
+- **B1**（`9607430d`＋`1be5be3f`）：`D-002` 延伸檔、`GAP3_EVENT_SPEC_AMENDMENTS.md`、
+  `split_unify.json`＋8 條契約測試、既有紅 **19 條** nodeid 基準＋receipt（含 `pytest_rc=1`）。
+- **B2a**（`a58754d6`＋`1be5be3f`）：`split_preview.holdout_boundary`＋測試。
+- **B2b**（`864efeb9`→`e2e4314c`→`a8474406`）：`split_projection.py`
+  （兩段式判定＋`build_event_keys`＋`_assert_event_keys_wellformed`）、
+  `event_split.py` 抽出 `build_time_clusters`／`time_cluster_bucket_ms` 共用、
+  `split_preview` 新增 `assert_epoch_ms_array`／`assert_positional_rows` 兩支共用 validator。
+- **審碼**：B1+B2a 一輪（8 群集 G1–G8）、B2b **兩輪**（H0–H7 八群集、I0–I6 七群集），全數修補完成。
+
+## 現況數字（皆主委實跑）
+- `tests/momentum/Analysis/test_splitunify_derive.py` **43 passed**。
+- mutation `handoffs/20260911-splitunify-b2b-mutate.py` **UNCOVERED=0**，**21 條**全紅、C0 綠。
+- 負向注入 `handoffs/20260911-probe-splitunify-negative-injection.py` **9/9 全擋**
+  （receipt `20260910T191355Z-splitunify-negative-injection-r2`）。
+- 回歸 core＋event_samples＋splitunify＋evtlabel_staging → **711 passed**。
+- 解耦逐值等於 `scripts/decouple_baseline.txt`（R2=1 R3=17 R4=3）。
 
 ## 下一步（順序）
-1. B1／B2a 之 G1–G5 修補**重審**（同一 session 的 `-r2`），或依收斂斷路器直接進 B2b。
-2. **B2b**：`derive_event_split_from_plans` 投影純函式（兩段式判定＋`build_event_keys` helper）。
-3. B2c（golden 五組）→ B3（接線＋fail-closed＋event-study-only）→ B4（報告與畫面）。
+1. B2b **定向確認輪**（I1–I6 是否閉合），或依收斂斷路器直接進 B2c。
+2. **B2c**：golden 五組（G-1／G-3a／G-3b／G-4／G-5）＋`freeze_splitunify_golden.py`。
+3. B3（接線＋多 symbol fail-closed＋event-study-only 分派）→ B4（報告與畫面）。
 
 ## 🔴 既有紅盤點（非本票造成，建議另立 `REDSWEEP`）
 🔴 以 B1 凍結之 receipt 為準：`tests/momentum/Analysis` **19 failed / 1103 passed / 15 skipped**（清單 `tests/baselines/analysis_known_failures.nodeids`）；舊記的「20 failed / 1615 passed」是不同收集面的舊量測，不再引用：①8 條單獨跑會綠（測試間污染）
@@ -80,7 +90,18 @@
   在其 BASE 內根本不存在的 heading（`Task B1.3` 住在兄弟檔），由 `CODEX-R1-P1-01` 抓出。
 - 🔴 **pytest `-q` 的進度條殘片會混進 `^FAILED`**：30 行中只有 19 行是真 nodeid，
   萃取必須 `grep '::'`；且**加了過濾就要同步改驗證條件**（我漏了，`CODEX-R1-P1-02` 抓出）。
+- 🔴 **抽出共用函式會讓「新 vs 舊」的回歸測試變成同義反覆**：抽出後舊實作自己就呼叫新函式，
+  該測試永遠綠。B2b 犯過一次（567 passed 掩蓋了它）。⇒ 抽出時必須同步把 oracle 換成
+  **獨立凍結**的期望值（`tests/golden/splitunify/clusters_oracle.json`）。
+- 🔴 **fail-closed 要寫在「不變式」上，不是「有沒有給」上**：B2b 兩輪審碼共九條 P1，
+  全部是這個形態（身份對帳、symbol 相等、索引遞增、唯一性、finite、整數、正數、區間有序）。
+- 🔴 **code review 的必答必須明確要求「主動餵壞資料」**：只寫「請審查」時，三家會做正向
+  對照而漏掉這一整類；R2 brief 加了負向注入清單後，R1 零意見的那一家找到兩條。
+- 🔴 session 命名：`kind ∈ {impl, review, stamp, consult, fix}`、`batch` 須為 `b<數字>` 或 `x`
+  （`b2b` 不合規，用 `b2`）；且 `--task-id` 必須與 session 名**同步大寫對應**。
 
 ## 殘留
 `EA-RESID-1..6`；`EVTLABEL R-1..R-9`；stage6b `role="diagnostic"`；`REDSWEEP` 約 17 條；
-`SPLITUNIFY R-1..R-5` 與 `SU-RESID-1`（見 SPEC §N）。
+`SPLITUNIFY R-1..R-5`、`SU-RESID-1`、`SU-RESID-2`（見 SPEC §N）；
+另有一批**早於本票**的白話說明過期（`GAP-3事件型討論`／`GAP-3施工看板`／`GAP-3驗收清單`／
+`IC健檢偵察結果`／`README`，來自 EVTLABEL 期間的 commit），依「面向未來不溯及既往」記錄不追。
