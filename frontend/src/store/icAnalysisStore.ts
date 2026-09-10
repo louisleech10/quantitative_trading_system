@@ -107,6 +107,34 @@ interface ICAnalysisState {
   resetReport: () => void;
 }
 
+/**
+ * 票 TIERTOGGLE：送給後端的開關鍵集（單一真相源＝`momentum/Analysis/contracts/ui_stage_toggles.json`）。
+ * stage → 後端 `STAGE_OVERRIDE_PATHS`；module → 後端 `MODULE_ENABLED_PATHS`。
+ * 新增／刪除鍵時**必須**同步契約檔，否則 `icAnalysisStore.toggles.test.ts` 與 pytest 皆紅。
+ */
+export const STAGE_TOGGLE_KEYS = [
+  'ic_decay',
+  'grouped_ic',
+  'turnover_analysis',
+  'event_filtering',
+  'ai_summary',
+  'fdr_correction',
+  'marginal_ic',
+] as const;
+
+export const MODULE_TOGGLE_KEYS = [
+  'factor_return',
+  'factor_centrality',
+  'trend_analysis',
+  'parameter_sensitivity',
+  'rolling_oos',
+  'factor_orthogonalization',
+  'factor_exposure',
+  'long_short_analysis',
+  'feature_quality_diagnostics',
+  'net_ic_analysis',
+] as const;
+
 const PRESET_TOGGLES: Record<'foundation' | 'intermediate' | 'advanced', Record<string, boolean>> = {
   foundation: {
     ic_calculation: true,
@@ -406,33 +434,18 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
     }),
   getEffectiveConfig: () => {
     const state = get();
-    const stageOverrides: Record<string, boolean> = {
-      ic_decay: Boolean(state.featureToggles.ic_decay),
-      grouped_ic: Boolean(state.featureToggles.grouped_ic),
-      turnover_analysis: Boolean(state.featureToggles.turnover_analysis),
-      event_filtering: Boolean(state.featureToggles.event_filtering),
-      ai_summary: Boolean(state.featureToggles.ai_summary),
-      // UI 邊界唯一轉名點 → 後端 significance.fdr.enabled（D-G / Task 4.2）
-      fdr_correction: Boolean(state.featureToggles.fdr_correction),
-      // GAP-2 Task 5.1：邊際 IC／多因子組合（後端 STAGE_OVERRIDE_PATHS.marginal_ic → marginal_ic.enabled；預設開）
-      marginal_ic: Boolean(state.featureToggles.marginal_ic),
-    };
+    const pick = (keys: readonly string[]): Record<string, boolean> =>
+      Object.fromEntries(keys.map((k) => [k, Boolean((state.featureToggles as Record<string, unknown>)[k])]));
+    const stageOverrides = pick(STAGE_TOGGLE_KEYS);
+    const moduleOverrides = pick(MODULE_TOGGLE_KEYS);
 
-    const moduleOverrides: Record<string, boolean> = {
-      factor_return: Boolean(state.featureToggles.factor_return),
-      factor_centrality: Boolean(state.featureToggles.factor_centrality),
-      trend_analysis: Boolean(state.featureToggles.trend_analysis),
-      parameter_sensitivity: Boolean(state.featureToggles.parameter_sensitivity),
-      rolling_oos: Boolean(state.featureToggles.rolling_oos),
-      factor_orthogonalization: Boolean(state.featureToggles.factor_orthogonalization),
-      factor_exposure: Boolean(state.featureToggles.factor_exposure),
-      long_short_analysis: Boolean(state.featureToggles.long_short_analysis),
-      feature_quality_diagnostics: Boolean(state.featureToggles.feature_quality_diagnostics),
-      net_ic_analysis: Boolean(state.featureToggles.net_ic_analysis),
-    };
-
-    // 具名 preset 也必須送出 fdr_correction，否則 UI preset ON 會在後端靜默丟失
-    // （backend 具名 preset 分支會映射 fdr_correction→significance.fdr.enabled）
+    // 🔴 票 TIERTOGGLE（使用者 2026-09-10）：**具名 preset 也送出全部 stage 開關**。
+    //    舊版只送 fdr_correction／marginal_ic 兩鍵 ⇒ 「基礎」preset 的 ic_decay:false／
+    //    grouped_ic:false 根本沒離開瀏覽器，後端照 config 預設跑＝幽靈開關。
+    //    鍵集之單一真相源＝`momentum/Analysis/contracts/ui_stage_toggles.json`
+    //    （icAnalysisStore.toggles.test.ts 機械對證；後端同檔 pytest 對證）。
+    //    module 開關具名 preset 不送：後端由 schema presets 之 deep_analysis／disabled_modules 決定
+    //    （foundation deep_analysis=false ⇒ 深度模組全關），custom 才走 module_overrides。
     if (state.featureTier === 'custom') {
       return {
         feature_tiers: {
@@ -448,13 +461,7 @@ export const useICAnalysisStore = create<ICAnalysisState>((set, get) => ({
     return {
       feature_tiers: {
         active_preset: state.featureTier,
-        custom_overrides: {
-          stage_overrides: {
-            fdr_correction: Boolean(state.featureToggles.fdr_correction),
-            // GAP-2 Task 5.1：具名 preset 亦送出 marginal_ic（比照 fdr；後端具名分支消費）
-            marginal_ic: Boolean(state.featureToggles.marginal_ic),
-          },
-        },
+        custom_overrides: { stage_overrides: stageOverrides },
       },
     };
   },

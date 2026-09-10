@@ -1,0 +1,46 @@
+{
+  "_doc": "票 TIERTOGGLE（使用者 2026-09-10 裁定：『前後端務必同步，不能再有幽靈狀態』）之單一真相源。UI 的每一個開關必須對到後端一條旗標路徑；本檔是兩端共同的鍵集，pytest 與 vitest 各自機械對證，任一端多鍵／少鍵即紅。出生事故：UI『基礎』preset 之 ic_decay:false／grouped_ic:false 被後端具名 preset 分支丟掉、照跑（2026-09-09 事件 run 實測仍產 ic_decay 5,909 特徵×7 horizon）。",
+  "schema_version": 1,
+  "_stage_doc": "stage 開關：對應 ic_filter_orchestrator.STAGE_OVERRIDE_PATHS；前端 icAnalysisStore.getEffectiveConfig 之 stageOverrides 鍵集須與本清單完全相同（custom 與具名 preset 皆全量送出）。",
+  "stage_keys": [
+    "ic_decay",
+    "grouped_ic",
+    "turnover_analysis",
+    "event_filtering",
+    "ai_summary",
+    "fdr_correction",
+    "marginal_ic"
+  ],
+  "_module_doc": "module 開關：對應 ic_filter_orchestrator.MODULE_ENABLED_PATHS；前端 moduleOverrides 鍵集須與本清單完全相同。具名 preset 之模組由 schema presets 之 deep_analysis／disabled_modules 決定（foundation deep_analysis=false ⇒ 全關），非幽靈。",
+  "module_keys": [
+    "factor_return",
+    "factor_centrality",
+    "trend_analysis",
+    "parameter_sensitivity",
+    "rolling_oos",
+    "factor_orthogonalization",
+    "factor_exposure",
+    "long_short_analysis",
+    "feature_quality_diagnostics",
+    "net_ic_analysis"
+  ],
+  "_locked_doc": "鎖定鍵：即使出現在 stage_overrides 也不得改動（兩個分支皆跳過）。ai_summary 同時在 stage_keys 與此 ⇒ UI 可送、後端一律忽略（既有行為，具名於此不再是幽靈）。",
+  "locked_stage_keys": [
+    "ic_calculation",
+    "preprocessing",
+    "statistical_validation",
+    "redundancy_filter",
+    "report_generation",
+    "ai_summary"
+  ],
+  "_ui_only_doc": "UI 專用、後端無對應旗標之鍵（具名殘留，非幽靈）：它們只影響前端呈現或屬未接線能力；新增這類鍵時必須同時在此列名，否則 vitest 紅。",
+  "ui_only_keys": [
+    "ic_method_selection",
+    "winsorization_method",
+    "monotonicity_test",
+    "return_type_selection",
+    "ic_autocorrelation",
+    "redundancy_method_selection",
+    "vif_filter"
+  ]
+}

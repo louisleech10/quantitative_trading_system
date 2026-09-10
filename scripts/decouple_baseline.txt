@@ -17,6 +17,7 @@ api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.normal
 api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.normalize_analysis_status|#2
 api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.normalize_analysis_status|#3
 api/services/ic_analysis_service.py|R3|from|momentum.Analysis.ic_reporter.normalize_analysis_status|#4
+api/services/ic_analysis_service.py|R4|from|api.services.ic_result_projection|#1
 api/services/model_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.apply_service_matrix_scopes|#1
 api/services/model_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.build_service_oot_bundle|#1
 api/services/model_task_service.py|R3|from|momentum.Analysis.eval_scope_utils.performance_to_scoped_dict|#1

@@ -5049,21 +5049,26 @@ class ICFilterOrchestrator:
                     if isinstance(data.get(section), dict):
                         data[section][field] = False
 
-            # 具名 preset 同樣映射 fdr_correction→significance.fdr.enabled
-            # （UI 三 preset 皆 fdr_correction=true；缺 stage_overrides 時強制 ON）
+            # 🔴 TIERTOGGLE（使用者 2026-09-10 裁定；票 TIERTOGGLE）：具名 preset 分支
+            #    **全量**消費 `stage_overrides`，與 custom 分支同一迴圈語意。
+            #    舊版只逐鍵映射 `fdr_correction`／`marginal_ic` 兩把鑰匙 ⇒ UI「基礎」preset 之
+            #    `ic_decay:false`／`grouped_ic:false`／`turnover_analysis`／`event_filtering`
+            #    在後端**被靜默丟掉**、照原 config 預設（True）跑＝幽靈開關（畫面關了、後端沒關）。
+            #    實機證據：2026-09-09 事件 run 選「基礎」仍產出 `ic_decay`（5,909 特徵×7 horizon）
+            #    與 `grouped_ic`，且 decay 逐 horizon 各算一次是該 run 跑不完的主要成本之一。
+            #    前後端鍵集之機械對證見 `momentum/Analysis/contracts/ui_stage_toggles.json`
+            #    （pytest `tests/momentum/test_tier_toggle_sync.py` ＋ vitest `icAnalysisStore.toggles.test.ts`）。
             stage_overrides = custom.get("stage_overrides") or {}
-            fdr_path = STAGE_OVERRIDE_PATHS["fdr_correction"]
-            if "fdr_correction" in stage_overrides:
-                _set_nested_bool(
-                    data, fdr_path, bool(stage_overrides["fdr_correction"])
-                )
-            else:
-                _set_nested_bool(data, fdr_path, True)
-            # GAP-2 Task 4.1／5.1：具名 preset 分支同樣消費 marginal_ic（純 mapping；缺則沿 config 預設開）
-            if "marginal_ic" in stage_overrides:
-                _set_nested_bool(
-                    data, STAGE_OVERRIDE_PATHS["marginal_ic"], bool(stage_overrides["marginal_ic"])
-                )
+            for key, enabled in stage_overrides.items():
+                if key in LOCKED_STAGE_KEYS:
+                    continue
+                path = STAGE_OVERRIDE_PATHS.get(key)
+                if path is None:
+                    continue
+                _set_nested_bool(data, path, bool(enabled))
+            # 缺 `fdr_correction` ⇒ 強制 ON（UI 三 preset 皆 true；非 UI 客戶端沿舊行為，不得因本次改動變 OFF）
+            if "fdr_correction" not in stage_overrides:
+                _set_nested_bool(data, STAGE_OVERRIDE_PATHS["fdr_correction"], True)
 
         return ICConfig.model_validate(data)
 
