@@ -85,6 +85,33 @@ def full_sample_estimand_scope() -> str:
     return _ESTIMAND_FULL_SAMPLE
 
 
+def _strict_count(value: Any, *, role: str) -> int:
+    """計數欄之型別／值域閘（B4 review R1：codex／composer／grok 三家獨立命中）。
+
+    🔴 原本只寫 `int(value)`，於是：`-1` 原樣寫進報告、`3.7` **被截成 3**、
+    `True` 被當成 1。三者都會在畫面上變成一個看起來正常的「驗證段事件數」，
+    而使用者分不出「算過」與「壞資料」——那正是本票要消滅的假數字。
+
+    規則（**不做**任何寬容轉換）：
+      · `bool` 一律拒（`True` 是 1 但語意不是計數）；
+      · 只接受 Python `int` 與 `np.integer`（`np.integer` 轉成 Python int 是正規化，不是猜測）；
+      · **拒收 float**，即使是 `3.0`——能給 float 的呼叫端也能給 `3.7`，
+        而截斷是靜默改答案（同 B2b 對 `row_index` 為 float 之裁定）；
+      · 負數拒收（計數沒有負的）。
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"build_split_unify_disclosure: {role} 為 bool（{value!r}）——計數不是布林（fail-closed）")
+    if not isinstance(value, (int, np.integer)):
+        raise ValueError(
+            f"build_split_unify_disclosure: {role} 型別為 {type(value).__name__}（{value!r}）"
+            "——只接受整數；float 會被截斷＝靜默改答案（fail-closed）"
+        )
+    out = int(value)
+    if out < 0:
+        raise ValueError(f"build_split_unify_disclosure: {role}={out} 為負——計數沒有負的（fail-closed）")
+    return out
+
+
 def build_split_unify_disclosure(
     *,
     n_test: Optional[int],
@@ -120,15 +147,25 @@ def build_split_unify_disclosure(
             "build_split_unify_disclosure: 沒有 reason 卻也沒有 n_test"
             "——「算不出來」必須指名原因（fail-closed）"
         )
-    counts = {str(k): int(v) for k, v in (per_symbol_counts or {}).items()}
-    total = sum(counts.values())
-    if counts and total != int(n_test):
+    n = _strict_count(n_test, role="n_test")
+    counts = {str(k): _strict_count(v, role=f"per_symbol_counts[{k!r}]")
+              for k, v in (per_symbol_counts or {}).items()}
+    # 🔴 B4 review R1（三家獨立命中）：原本寫 `if counts and total != n_test` ⇒
+    #    **空的 counts 直接跳過整條對帳**（codex 實測 `empty_counts_n_test=3 ACCEPTED`）。
+    #    `n_test > 0` 卻沒有任何 symbol 的分佈，等於宣稱「有 3 個事件，但不屬於任何標的」。
+    if n > 0 and not counts:
         raise ValueError(
-            f"build_split_unify_disclosure: per_symbol_counts 合計 {total} != n_test {int(n_test)}"
+            f"build_split_unify_disclosure: n_test={n} 卻沒有 per_symbol_counts"
+            "——有事件就必然屬於某個標的（fail-closed，不接受無歸屬的數字）"
+        )
+    total = sum(counts.values())
+    if counts and total != n:
+        raise ValueError(
+            f"build_split_unify_disclosure: per_symbol_counts 合計 {total} != n_test {n}"
             "——兩個數字在同一份揭露裡互相矛盾（fail-closed）"
         )
     return {
-        "n_test": int(n_test),
+        "n_test": n,
         "split_authority": authority,
         "boundary_hash": _boundary_hash(test_timestamps_ms),
         "per_symbol_counts": counts,

@@ -277,11 +277,32 @@ def boundary_hash(test_timestamps_ms: Any) -> str:
       · 無空白 JSON ⇒ 序列化風格不影響值。
 
     🔴 空測試段回**空陣列的雜湊**而不是空字串——空字串會與「沒算」混淆。
+
+    🔴 **兩道 fail-closed（B4 review R1：codex／grok 各自實跑命中）**：
+      ①**拒收 datetime-like 輸入**——`DatetimeIndex` 進來會以**奈秒**入雜湊，
+        於是「同一組時刻」的 ms 陣列與 DatetimeIndex 得到**不同**雜湊
+        （codex 實測 `same_instants_same_hash False`）。同一段兩個雜湊＝這個雜湊沒有意義。
+        呼叫端請自己轉成 epoch 毫秒 int64（型別驅動，不猜單位）。
+      ②**拒收重複時刻**——`sorted` 之後重複值會留在 payload 裡，
+        於是「同一個集合」因為來源重複與否得到不同雜湊（codex 實測 `duplicate_accepted`）。
+        測試段的時刻本來就該唯一；重複代表上游把某一列算了兩次。
     """
-    values = assert_epoch_ms_array(
-        np.asarray(test_timestamps_ms), role="boundary_hash: test_timestamps_ms"
-    )
-    payload = json.dumps(sorted(int(v) for v in values.tolist()), separators=(",", ":"))
+    raw = np.asarray(test_timestamps_ms)
+    if raw.dtype.kind in ("M", "m"):
+        raise ValueError(
+            "boundary_hash: 收到 datetime-like 輸入（dtype="
+            f"{raw.dtype}）——會以奈秒入雜湊，同一組時刻會得到兩個不同的雜湊。"
+            "請由呼叫端轉成 epoch 毫秒 int64 再傳（fail-closed，不代為換算）"
+        )
+    values = assert_epoch_ms_array(raw, role="boundary_hash: test_timestamps_ms")
+    ints = [int(v) for v in values.tolist()]
+    if len(set(ints)) != len(ints):
+        dupes = sorted({v for v in ints if ints.count(v) > 1})[:5]
+        raise ValueError(
+            f"boundary_hash: 測試段時刻有重複 {dupes}——同一個集合會因為來源重複與否"
+            "得到不同雜湊，且重複代表上游把某一列算了兩次（fail-closed）"
+        )
+    payload = json.dumps(sorted(ints), separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

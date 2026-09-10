@@ -33,7 +33,7 @@ describe('splitAuthority — 值集與契約對證', () => {
   });
 
   it('契約之 canonical 鍵恰一個，且就是 split_unify.n_test', () => {
-    expect(CONTRACT.test_segment_count_keys.canonical).toBe('split_unify.n_test');
+    expect(CONTRACT.test_segment_count_keys.canonical).toBe('metadata.split_unify.n_test');
   });
 
   it('未知權威值照原字面顯示（不吞成「其他」）', () => {
@@ -66,8 +66,18 @@ describe('splitUnifyView — 顯示規則', () => {
     expect(v.countText).toBe('0');
   });
 
-  it('缺整塊（全域 run／舊報告）⇒ 回 null，呼叫端不渲染', () => {
+  it('缺整塊且連切分 metadata 都沒有（舊／不完整 artifact）⇒ 回 null，呼叫端不渲染', () => {
     expect(splitUnifyView(undefined)).toBeNull();
     expect(splitUnifyView(null)).toBeNull();
+    expect(splitUnifyView(undefined, { hasSplitMetadata: false })).toBeNull();
+  });
+
+  it('🔴 已知的全域 run（有切分 metadata、沒有 split_unify）⇒ 明說「不適用」', () => {
+    const v = splitUnifyView(undefined, { hasSplitMetadata: true })!;
+    expect(v.notApplicable).toBe(true);
+    expect(v.countText).toBe('不適用');
+    expect(v.countText).not.toBe('0');
+    expect(v.hasCount).toBe(false);
+    // 出生理由（CODEX-R1-P2-04）：直接不渲染會讓使用者分不出「這頁本來就沒這個數字」與「後端漏了」
   });
 });

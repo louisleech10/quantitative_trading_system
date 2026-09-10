@@ -42,18 +42,35 @@ export interface SplitUnifyView {
   authorityText: string;
   /** fail-closed 時的原因字面（原樣帶出，供搜尋） */
   reason: string | null;
+  /** 已知的全域 run（設計上就不寫這塊）⇒ 顯示「不適用」，與「算不出來」是兩件事 */
+  notApplicable?: boolean;
 }
 
 /**
  * 由 `metadata.split_unify` 導出畫面該顯示什麼。
  *
- * 缺整塊（全域 run、或舊 artifact）⇒ 回 `null`，呼叫端不渲染——
- * **不要**在缺鍵時顯示「0」或「無」，那會讓「這條路不寫這個鍵」看起來像「算出來是零」。
+ * 🔴 缺整塊有**兩種**情形，B4 review R1（`CODEX-R1-P2-04`）指出不能混為一談：
+ *   ①**已知的全域 run**（報告有 `ic_train_test_split` 但沒有 `split_unify`）
+ *     ⇒ 明說「全域 run：不適用」——這是設計上就不寫，不是遺漏；
+ *   ②**舊／不完整 artifact**（連 `ic_train_test_split` 都沒有）⇒ 回 `null`，呼叫端不渲染。
+ * 兩者都**不得**顯示 0：0 讀起來是「算過，結果是零個」。
  */
 export function splitUnifyView(
   disclosure: SplitUnifyDisclosure | undefined | null,
+  options?: { hasSplitMetadata?: boolean },
 ): SplitUnifyView | null {
-  if (!disclosure) return null;
+  if (!disclosure) {
+    if (options?.hasSplitMetadata) {
+      return {
+        hasCount: false,
+        countText: '不適用',
+        authorityText: splitAuthorityLabel('kline_holdout'),
+        reason: null,
+        notApplicable: true,
+      };
+    }
+    return null;
+  }
   const n = disclosure.n_test;
   const hasCount = typeof n === 'number' && Number.isFinite(n);
   return {

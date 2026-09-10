@@ -17,7 +17,11 @@ import { splitUnifyView, type SplitUnifyDisclosure } from '@/lib/splitAuthority'
 export default function SplitUnifyBadge() {
   const report = useICAnalysisStore((s) => s.report);
   const disclosure = report?.metadata?.split_unify as SplitUnifyDisclosure | undefined;
-  const view = splitUnifyView(disclosure);
+  // 🔴 B4 review R1（`CODEX-R1-P2-04`）：缺鍵有兩種——「全域 run 設計上不寫」與
+  //    「舊／不完整 artifact」。前者要明說「不適用」，後者才是不渲染。
+  //    判準用**報告本身有沒有切分 metadata**，不猜。
+  const hasSplitMetadata = report?.metadata?.ic_train_test_split !== undefined;
+  const view = splitUnifyView(disclosure, { hasSplitMetadata });
   if (!view) return null;
 
   return (
@@ -39,6 +43,11 @@ export default function SplitUnifyBadge() {
       {view.reason ? (
         <span data-testid="split-unify-reason" className="text-amber-300/90">
           （未能計算：{view.reason}）
+        </span>
+      ) : null}
+      {view.notApplicable ? (
+        <span data-testid="split-unify-not-applicable" className="text-slate-500">
+          （全域分析：本次不是事件批，沒有「事件」可數）
         </span>
       ) : null}
     </div>

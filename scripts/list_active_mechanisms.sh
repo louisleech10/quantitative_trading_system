@@ -129,7 +129,8 @@ case "${1:-}" in
     #   是個掛著卻恆綠的空心格。體例改為與 factkey_write_guard.sh 一致：argv 優先、否則讀 stdin。
     p="${2:-}"
     if [ -z "${p}" ] && [ ! -t 0 ]; then
-      p="$(python3 -c 'import json,sys
+      p="$(python3 -c 'import json,signal,sys
+signal.alarm(5)   # hook stdin 逾時：永不關閉的管道曾讓本 hook 掛住 8 小時
 try:
     d = json.load(sys.stdin)
 except Exception:

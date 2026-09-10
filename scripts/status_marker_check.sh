@@ -16,9 +16,12 @@
 #   寫【停住】一律放行（保守方向不擋）。
 set -u
 
-payload="$(cat)"
+payload="$(python3 -c 'import signal,sys
+signal.alarm(5)   # 同上：bare cat 對永不關閉的管道會無限等
+sys.stdout.write(sys.stdin.read())' 2>/dev/null || true)"
 tp="$(printf '%s' "${payload}" | python3 -c '
-import json, sys
+import json, signal, sys
+signal.alarm(5)   # hook stdin 逾時：永不關閉的管道曾讓本 hook 掛住 8 小時
 try:
     d = json.load(sys.stdin)
 except Exception:

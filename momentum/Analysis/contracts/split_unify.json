@@ -16,16 +16,32 @@
     "canonical_feature_universe_unavailable"
   ],
 
-  "_test_segment_count_keys_doc": "SPLITUNIFY Task 4.1／SPEC C-6：報告中帶「驗證段列數」語意之鍵的**封閉登記**（dotted path，相對於 report metadata）。canonical 恰一個；其餘為**診斷用**，只在對應的降級 reason 出現時才寫，且其值**必須等於** canonical——C-6 禁的是「同時暴露兩個**不同**數字」（實測症狀 31 vs 33），不是禁止降級說明附上同一個數字。本登記是機械判準的唯一來源，禁在測試或散文裡另列第二份。",
+  "_test_segment_count_keys_doc": "SPLITUNIFY Task 4.1／SPEC C-6：**整份 report**（不只 metadata）中鍵名含 `test` 且值為整數之鍵的**封閉登記**，dotted path 自 report 根起算（list 索引與 per-feature 名一律正規化為 `*`）。判準是 **deny-by-default**：掃到的每一個都必須落在下面四個桶之一，否則測試紅——新鍵必須先進本登記才寫得出去。🔴 B4 review R1 三家獨立命中：原版只掃 metadata 且只做正向計數，codex 實測注入 `summary_table[0].verification_test_event_count` 與 `validation.test_event_count` 皆**未被抓到**。🔴 同輪另一發現（grok）：事件路徑上 `oos_downgrade.test_rows` 其實是**事件數**（與 canonical 同值 13），原本被誤登記為列語意 ⇒ 已改列入 must_equal_canonical。C-6 之文字是「恰一個」，本實作採**更強且可機械化**的等價形式：canonical 恰一個，其餘同語意鍵**必須逐值等於** canonical——真正要禁的是「同一個問題兩個**不同**答案」（實測症狀 31 vs 33），而報告中同一個數字在多個 section 出現是既有事實（實測 7 處），逐一刪除會波及本票以外的消費者。此偏離已在 B4 review R2 具名送審。",
   "test_segment_count_keys": {
-    "canonical": "split_unify.n_test",
-    "diagnostic_only": [
-      "ic_train_test_split.test_events",
-      "oos_downgrade.test_events"
+    "canonical": "metadata.split_unify.n_test",
+    "must_equal_canonical_on_event_path": [
+      "metadata.ic_train_test_split.test_events",
+      "metadata.oos_downgrade.test_events",
+      "metadata.oos_downgrade.test_rows",
+      "metadata.event_filter.split_mask.test_rows",
+      "filter_log.stage3_event_filter.split_mask.test_rows",
+      "marginal_ic.n_test"
     ],
     "row_semantics_not_event_count": [
-      "ic_train_test_split.test_rows",
-      "oos_downgrade.test_rows"
+      "metadata.ic_train_test_split.test_rows"
+    ],
+    "_not_a_segment_count_doc": "鍵名含 test 但**語意完全不同**者：n_tests＝多重檢定的檢定次數（14）；n_used_test＝marginal IC 實際用到的列數；min_test_*＝門檻不是計數。列在這裡是為了讓 deny-by-default 掃描有明確歸屬，不是豁免。",
+    "not_a_segment_count": [
+      "metadata.selection_scope.n_tests",
+      "metadata.significance.n_tests",
+      "filter_log.stage5_thresholds.n_tests",
+      "metadata.ic_train_test_split.min_test_events",
+      "metadata.oos_downgrade.min_test_events",
+      "metadata.oos_downgrade.min_test_rows",
+      "marginal_ic.n_used_test",
+      "marginal_ic.composite.n_used_test",
+      "marginal_ic.per_feature.*.n_used_test",
+      "marginal_ic.sequential[*].n_used_test"
     ]
   },
 

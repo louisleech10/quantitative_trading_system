@@ -50,6 +50,39 @@
 </tbody>
 </table></div>
 <hr />
+<h2 id="2026-09-11splitunify-b4-期間五支-hook-會無聲掛死一掛就是-8-小時">2026-09-11（SPLITUNIFY B4 期間）：<strong>五支 hook 會無聲掛死，一掛就是 8 小時</strong></h2>
+<p><strong>類別：B（漏擋）＋ D（量測不可靠）。是你先看到的，不是機制喊的。</strong></p>
+<p>你問「我怎麼看到有些跑了 7 小時多的任務？」——查下去是兩個 <code>factkey_write_guard.sh</code>
+從 9/10 22:45／22:51 掛到隔天 07:00，狀態睡眠、CPU 0%。砍掉才看見它們的真實身分：
+<strong>是前一個 session 的兩個背景任務</strong>（「Commit HANDOFF and boards」與
+「Update HANDOFF for Phase 3 completion」）。也就是說那兩個 commit
+<strong>8 小時沒有完成，而且完全沒有任何訊號</strong>。</p>
+<p><strong>根因（五支腳本共有）</strong>：<code>status_marker_check</code>／<code>doc_format_precheck</code>／<code>factkey_write_guard</code>／
+<code>list_active_mechanisms</code>／<code>narrow_check_router</code> 都用 <code>[ -t 0 ]</code> 決定要不要讀 stdin。
+這個判斷分得出「終端機 vs 非終端機」，<strong>分不出「等一下會有資料的管道」與
+「永遠不會有資料、也永遠不關閉的管道」</strong>——後者一出現就是無限等。</p>
+<p><strong>修法</strong>：讀 stdin 之處加 5 秒逾時（<code>signal.alarm</code>；macOS 沒有 <code>timeout(1)</code>，不能靠它）。
+逾時走各腳本<strong>既有的</strong>「取不到目標就放行」分支，語意不變。
+兩個方向都實跑驗過：①餵永不關閉的管道 ⇒ 五支全在 5.0 秒結束（原本無限）；
+②餵真的 payload ⇒ rc 與 stdout <strong>與修補前逐字相同</strong>。第二條是刻意加的——
+只加逾時卻把正常路徑弄壞，等於用更糟的洞換掉一個洞。</p>
+<p><strong>這次真正的教訓不是那個 bug，是「沒有人會喊」</strong>：</p>
+<ul>
+<li>背景任務掛住 8 小時，<strong>harness 不會超時</strong>、hook 不會超時、我也沒去看。</li>
+<li>我這一輪跑了十幾次背景任務，<strong>從來沒有回頭確認舊的有沒有結束</strong>。</li>
+<li>對照組：委員派工那條路<strong>有</strong>防線（<code>cx_run.sh:437</code> watchdog，硬上限 5400 秒 ⇒ rc=124）。
+同一個 repo 裡，派給別人的工作有逾時，自己的 hook 沒有。</li>
+</ul>
+<p><strong>修補當下又撞到第二件事，同一形態</strong>：兩支腳本各多一行，<code>scripts/fact_keys.json</code> 裡
+<strong>五處行號引用全部位移</strong>。產出端 hook 只抓到 <code>factkey_write_guard.sh:116</code>
+（因為它剛好掉到註解上），<strong>四個 <code>doc_format_precheck.sh</code> 的引用一個都沒抓到</strong>——
+位移之後<strong>剛好也落在可執行碼上</strong>，於是機檢覺得沒事，但引用的已經是<strong>別行</strong>了。
+⇒ <strong>機械檢查驗的是「形狀」（是不是註解），不是「內容」（是不是原本那行）</strong>。
+已逐一 +1 修正並重跑 <code>gen_fact_key_blocks.sh --write</code>／<code>--check</code> rc=0。</p>
+<p>⇒ 具名殘留：<strong>背景任務沒有「太久了」的巡檢</strong>。這次靠使用者肉眼發現。
+要治本得有一個「列出所有超過 N 分鐘還在跑的自家行程」的檢查，但那又是新治理工具
+（CLAUDE.md:138 目前凍結擴建）⇒ 先記在這裡，不偷偷加工具。</p>
+<hr />
 <h2 id="2026-08-2829gap-3-第十批-b10-後半段task-7176">2026-08-28／29（GAP-3 第十批 B10 後半段：Task 7.1–7.6）</h2>
 <div class="table-wrap"><table>
 <thead>
