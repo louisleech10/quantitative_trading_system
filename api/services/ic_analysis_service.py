@@ -149,61 +149,6 @@ def _binary_label_domain(records: Any) -> tuple:
     return (True, None)
 
 
-def prevalidate_imported_binary_selection_classes(
-    binary_labels: Dict[int, int],
-    feature_index: Any,
-    *,
-    oos_test_size: float,
-    purge_gap: int,
-    embargo: int,
-) -> tuple:
-    """EVTLABEL Task 3.3（R2 D4）：**進 preprocessing 之前**先算「驗證段裡正／反例各幾個」。
-
-    回 `(n_pos, n_neg)`。
-
-    🔴 為什麼要預檢：39k 特徵的預處理是分鐘級。等跑完才發現「驗證段只有 2 個反例、
-    統計做不了」，使用者已經等了十分鐘——這正是 2026-09-08 UAT 那句「為何要跑完才知道不足」。
-
-    🔴 為什麼**必須**與 orchestrator 共用 `holdout_test_row_index`：兩端若各寫一份算術，
-    預檢說「夠」而 stage3 說「不夠」（或反之）就會出現無法解釋的行為。R3 三家一致拒絕
-    「事後以 preview_mismatch 欄位容忍分歧」——同函式同輸入卻不一致＝bug，不是可揭露的差異。
-    stage3 會以同函式同輸入重算並逐值回比，不一致即 raise。
-    """
-    import numpy as np
-    import pandas as pd
-
-    from momentum.core.split_preview import holdout_test_row_index
-
-    index = pd.Index(feature_index)
-    rows = holdout_test_row_index(
-        len(index), oos_test_size=float(oos_test_size), purge_gap=int(purge_gap), embargo=int(embargo)
-    )
-    if len(rows) == 0:
-        return (0, 0)
-    test_stamps = set(np.asarray(index[rows]).tolist())
-    n_pos = sum(1 for key, lab in binary_labels.items() if int(lab) == 1 and key in test_stamps)
-    n_neg = sum(1 for key, lab in binary_labels.items() if int(lab) == 0 and key in test_stamps)
-    return (int(n_pos), int(n_neg))
-
-
-def _feature_index_for_preview(features_path: Optional[str]) -> Any:
-    """只為預檢取特徵列之時間戳索引；取不到 ⇒ 回 None（呼叫端據此略過預檢，不 raise）。
-
-    🔴 刻意**不**讀整張 39k 欄的表：`columns=[]` 對 pandas `table` 格式只取索引。
-    `fixed` 格式不支援該參數 ⇒ 回 None，讓預檢降級成「不預檢」——預檢是**提前**告知，
-    不是正確性守衛（正確性由 stage3 的 fail-closed 負責），取不到就晚一點才知道，不該擋分析。
-    """
-    if not features_path or not str(features_path).endswith((".h5", ".hdf5")):
-        return None
-    try:
-        import pandas as pd
-
-        return pd.read_hdf(features_path, columns=[]).index
-    except Exception as exc:  # noqa: BLE001
-        logger.info("匯入標籤模式之選樣預檢略過（索引讀取失敗：%s）——正確性仍由 stage3 守衛負責", exc)
-        return None
-
-
 def _assert_binary_rows_bound(staged: Dict[str, Any], info: Dict[str, Any]) -> None:
     """EVTLABEL Task 3.3：0/1 標籤那一腿的回綁，fail-closed。
 
@@ -906,8 +851,22 @@ class ICAnalysisService:
         # 🔴 `bin_rows_by_id` 由 records **獨立快照**建，不是從 bin_map 反推——它的用途是
         #    analyze 之後回比「orchestrator 消費的那份，還是我送出去的那份嗎」。
         #    若兩者同源，回比就是拿自己比自己（假綠）。
-        label_ok, label_hint = _binary_label_domain(records)
+        # 🔴 B3 review R1（`COMPOSER-R1-P1-02`／`GROK-R1-P1-04`，兩家獨立同判）：
+        #    值域閘原本掃**全批** records，但 IC 只消費 `symbol == run_symbol` 的事件
+        #    ⇒ 混 symbol 批裡「另一個 symbol 的事件 label 壞掉」會擋掉本次 run。
+        #    這正是 B1 review 抓過的**同一個錯**（分母用全批），我在 brief 必答 4 自己列為
+        #    可疑處、兩家實跑反例確認成立（recs=[ETH 0/1 + BTC label=2] ⇒ 誤判 invalid）。
+        #    修法同 B1：先算出**本次真正會被消費**的事件集合，值域閘只掃那些。
+        consumed_event_ids = {
+            str(w.event_id)
+            for w in prepared1.windows
+            if (run_symbol is None or str(w.symbol) == run_symbol)
+            and result.label_values.get(w.event_id) is not None
+        }
         rec_by_id = {str(r.get("event_id")): r for r in records}
+        label_ok, label_hint = _binary_label_domain(
+            [rec_by_id[eid] for eid in sorted(consumed_event_ids) if eid in rec_by_id]
+        )
         bin_map: Dict[int, int] = {}
         bin_rows_by_id: Dict[str, tuple] = {}
         for w in prepared1.windows:
@@ -1002,29 +961,15 @@ class ICAnalysisService:
         # ── EVTLABEL Task 3.3：明示模式之選樣預檢（`auto` **不呼叫**）──────────────
         # `auto` 不預檢是刻意的：auto 本來就允許退回報酬版，提前算一次只是白花 I/O；
         # 真正的決策仍在 stage3（Task 3.4），那裡看得到切分後的實際列。
-        selection_preview = None
-        if requested_mode == "imported_binary" and bin_map:
-            # 🔴 解耦 R3：config 經 factory 取（`create_ic_analyzer` 內部 `load_ic_config`），
-            #    **不**直接 `from momentum.Analysis.ic_config_schema import ICConfig`
-            #    ——那條會被 `check_decoupling_imports.py` 當新違規擋下（實測 rc=1）。
-            #    順帶好處：拿到的是與 analyze 同一套解析結果，不是另一份預設值。
-            cfg = create_ic_analyzer(None)._config
-            feature_index = _feature_index_for_preview(features_path)
-            if feature_index is not None:
-                n_pos, n_neg = prevalidate_imported_binary_selection_classes(
-                    bin_map, feature_index,
-                    oos_test_size=float(cfg.oos_test_size),
-                    purge_gap=max(int(isolation_rows.label_window_rows), 0),
-                    embargo=int(isolation_rows.lookahead_depth_rows),
-                )
-                selection_preview = {"n_pos": int(n_pos), "n_neg": int(n_neg)}
-                floor = int(cfg.event_filter.min_events_per_class)
-                if min(n_pos, n_neg) < floor:
-                    raise ValueError(
-                        f"class_below_min_selection_preview: 驗證段內正例 {n_pos}／反例 {n_neg}，"
-                        f"未達每類最少 {floor} 個——明示 imported_binary 模式不接受靜默降級"
-                        "（改用 auto 會退回報酬版並在報告寫明原因）"
-                    )
+        # 🔴 B3 review R1：選樣預檢**已搬進 orchestrator**（切分計畫做完的那一刻），
+        #    service 端不再重建一份「測試段」。三家（codex P1-01／P1-02、composer P1-01、
+        #    grok P1-01／P1-02／P1-03）實測證明 service 端的重建必然分歧：
+        #    ①`create_ic_analyzer(None)` 拿不到本次 `config_override`
+        #    ②`purge=label_window_rows` 而 orchestrator 用 `max(H, W)`；embargo 同理
+        #    ③`read_hdf(columns=[])` 對本專案真實 h5（h5py CArray，非 pandas table）**恆失敗**
+        #      ⇒ 這段預檢從未真正執行過（grok 對 14 個真實路徑抽樣驗證）。
+        #    orchestrator 那裡有 `test_plan.row_index`＝實際測試段，沒有第二份算術可漂，
+        #    而且一樣在 preprocessing 之前 ⇒「不必跑完才知道不足」的目的照樣達成。
         return {
             # ── EVTLABEL Task 3.3：匯入標籤模式之 staging 產物 ──────────────────
             # `event_binary_labels` 與 `event_label_values` **同鍵**（feature_cutoff_ms）；
@@ -1034,7 +979,6 @@ class ICAnalysisService:
             "event_binary_rows_by_id": dict(bin_rows_by_id),
             "label_mode_requested": requested_mode,
             "label_mode_hint": label_hint,
-            "selection_preview": selection_preview,
             "purge_ms": int(purge_ms),
             "purge_rows": int(purge_rows),
             "label_window_rows": int(isolation_rows.label_window_rows),
@@ -1389,6 +1333,14 @@ class ICAnalysisService:
                 out[key] = report[key]
             elif key in meta:
                 out[key] = meta[key]
+        # 🔴 B3 review R1 `CODEX-R1-P1-03`：掃描格**恆為報酬版**（0/1 與 k、h 無關，
+        #    每格會得到同一份標籤 ⇒ 整張網格是假的變化），但這個決定原本只寫在註解裡，
+        #    格子、payload、前端都看不到。使用者選了 `auto` 跑掃描時，會以為結果是用他的
+        #    0/1 算的。⇒ 每一格都揭露 effective mode，不靠使用者自己推。
+        info = _find_event_filter_info(meta)
+        if isinstance(info, dict) and info.get("label_source"):
+            out["label_source"] = info["label_source"]
+        out["label_mode_effective"] = "return_rule"
         return out or None
 
     async def _run_scan_grid(
@@ -1638,7 +1590,6 @@ class ICAnalysisService:
             event_binary_labels=None,
             label_mode_requested="return_rule",
             label_mode_hint=staged.get("label_mode_hint"),
-            selection_preview=None,
         )
         _assert_event_triple_bound(staged, report)
         _inject_period_alignment(staged, report)
@@ -1960,7 +1911,6 @@ class ICAnalysisService:
                     event_binary_labels=(staged.get("event_binary_labels") or None),
                     label_mode_requested=staged.get("label_mode_requested") or "auto",
                     label_mode_hint=staged.get("label_mode_hint"),
-                    selection_preview=staged.get("selection_preview"),
                 )
                 if request.event_import_id:
                     _assert_event_triple_bound(staged, report)

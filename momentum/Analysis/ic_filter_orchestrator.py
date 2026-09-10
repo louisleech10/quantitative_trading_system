@@ -79,7 +79,11 @@ from momentum.core.contracts import (
     validate_consumed_label,
 )
 from momentum.core.protocols import IKlineReader
-from momentum.core.split_preview import holdout_split_point, holdout_test_row_index
+from momentum.core.split_preview import (
+    count_binary_classes_in_rows as _count_binary_classes_in_rows,
+    holdout_split_point,
+    holdout_test_row_index,
+)
 from momentum.factories import create_label_generator
 from momentum.Analysis.ic_split_adapter import ICSplitAdapter
 
@@ -1099,8 +1103,6 @@ class ICFilterOrchestrator:
         label_mode_requested: str = "auto",
         #: staging 已看出「用不了 0/1」的原因（no_label_column／label_invalid_domain）；供報告揭露。
         label_mode_hint: Optional[str] = None,
-        #: service 端以同一支 `holdout_test_row_index` 算出的驗證段每類計數；stage3 重算並逐值回比。
-        selection_preview: Optional[dict] = None,
     ) -> dict:
         """主入口：執行完整八階段流水線。
 
@@ -1219,8 +1221,7 @@ class ICFilterOrchestrator:
                     event_binary_labels=event_binary_labels,
                     label_mode_requested=label_mode_requested,
                     label_mode_hint=label_mode_hint,
-                    selection_preview=selection_preview,
-                )
+                    )
             train_plan, test_plan = split_result
             train_mask, test_mask = _derive_stage_masks(
                 train_plan, test_plan, features_df.index
@@ -1234,6 +1235,30 @@ class ICFilterOrchestrator:
                 "expected_freq": str(expected_freq),
                 "allowed_symbols": sorted(allowed_symbols),
             }
+            # 🔴 B3 review R1（`CODEX-R1-P1-01`／`P1-02`、`COMPOSER-R1-P1-01`、`GROK-R1-P1-01`／
+            #    `P1-02`／`P1-03`——五條 finding、三家全員命中同一處）：選樣預檢原本住在
+            #    **service**，用 `create_ic_analyzer(None)._config` 與自行組的 purge/embargo
+            #    重建一份「測試段」。三家實測指出那份重建**必然**與這裡分歧
+            #    （config_override 未套用；`purge=label_window_rows` 而非 `max(H, W)`；
+            #    `embargo=depth` 而非 `max(config_embargo, depth)`），且 `read_hdf(columns=[])`
+            #    對本專案真實 h5（h5py CArray，非 pandas table）恆失敗 ⇒ 預檢從未真正跑過。
+            #    ⇒ 改在**這裡**判：`test_plan.row_index` 就是實際測試段，沒有第二份算術可漂。
+            #    仍在 preprocessing **之前**，所以「不必跑完才知道不足」的目的照樣達成。
+            selection_counts = _count_binary_classes_in_rows(
+                event_binary_labels, features_df.index, test_plan.row_index
+            )
+            if selection_counts is not None:
+                split_context["selection_preview"] = dict(selection_counts)
+                floor = int(config.event_filter.min_events_per_class)
+                if str(label_mode_requested) == "imported_binary" and min(
+                    selection_counts["n_pos"], selection_counts["n_neg"]
+                ) < floor:
+                    raise ValueError(
+                        "class_below_min_selection: 驗證段內正例 "
+                        f"{selection_counts['n_pos']}／反例 {selection_counts['n_neg']}，"
+                        f"未達每類最少 {floor} 個——明示 imported_binary 模式不接受靜默降級"
+                        "（改用 auto 會退回報酬版並在報告寫明原因）"
+                    )
             metadata = dict(metadata)
             metadata["ic_train_test_split"] = {
                 "requested": True,
@@ -1289,8 +1314,7 @@ class ICFilterOrchestrator:
                     event_binary_labels=event_binary_labels,
                     label_mode_requested=label_mode_requested,
                     label_mode_hint=label_mode_hint,
-                    selection_preview=selection_preview,
-                )
+                    )
 
         self._report_progress(1, "preprocessing", 0.12, "preprocessing features")
         fit_mode, fit_mask = self._resolve_stage1_fit(
@@ -1434,7 +1458,6 @@ class ICFilterOrchestrator:
                 event_binary_labels=event_binary_labels,
                 label_mode_requested=label_mode_requested,
                 label_mode_hint=label_mode_hint,
-                selection_preview=selection_preview,
             )
 
         self._report_progress(
@@ -1533,8 +1556,6 @@ class ICFilterOrchestrator:
         label_mode_requested: str = "auto",
         #: staging 已看出「用不了 0/1」的原因（no_label_column／label_invalid_domain）；供報告揭露。
         label_mode_hint: Optional[str] = None,
-        #: service 端以同一支 `holdout_test_row_index` 算出的驗證段每類計數；stage3 重算並逐值回比。
-        selection_preview: Optional[dict] = None,
     ) -> dict:
         """以 flag-off 重跑 full-sample，並只追加 fallback metadata。
 
@@ -1604,7 +1625,6 @@ class ICFilterOrchestrator:
                 event_binary_labels=event_binary_labels,
                 label_mode_requested=label_mode_requested,
                 label_mode_hint=label_mode_hint,
-                selection_preview=selection_preview,
             )
         finally:
             self._suppress_persist = prev_suppress

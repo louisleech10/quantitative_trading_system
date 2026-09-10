@@ -10,7 +10,10 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Mapping, Optional
+
 import numpy as np
+import pandas as pd
 
 
 def holdout_test_row_index(
@@ -41,3 +44,32 @@ def holdout_test_row_index(
 def holdout_split_point(n_rows: int, *, oos_test_size: float) -> int:
     """train／test 的分界位置（供預檢與診斷；與上式同源）。"""
     return int(np.floor((1.0 - float(oos_test_size)) * int(n_rows)))
+
+
+def count_binary_classes_in_rows(
+    binary_labels: Optional[Mapping[int, int]],
+    feature_index: Any,
+    row_index: Any,
+) -> Optional[Dict[str, int]]:
+    """數「落在 `row_index` 這些列上的 0/1 標籤」各有幾個；`binary_labels` 為 None ⇒ 回 None。
+
+    EVTLABEL Task 3.3（B3 review R1 修補）：本函式是**唯一**的計數實作。
+
+    🔴 出生理由：原版把「測試段是哪幾列」在 service 端重算一次（自組 purge/embargo、
+    自取 config），三家實測證明那份重建**必然**與 orchestrator 分歧。改為由呼叫端交出
+    **已經算好的** `row_index`（orchestrator 的 `test_plan.row_index`），本函式只做計數 ——
+    沒有第二份切分算術，就沒有可漂的東西。
+
+    `binary_labels` 之鍵＝特徵列時間戳（feature_cutoff_ms），與 `feature_index` 同單位。
+    不在 `feature_index` 上的鍵（期間對齊時已被剔除的事件）不計入，也不 raise。
+    """
+    if binary_labels is None:
+        return None
+    index = pd.Index(feature_index)
+    rows = np.asarray(row_index, dtype=int)
+    if len(rows) == 0:
+        return {"n_pos": 0, "n_neg": 0}
+    selected = set(np.asarray(index[rows]).tolist())
+    n_pos = sum(1 for key, lab in binary_labels.items() if int(lab) == 1 and key in selected)
+    n_neg = sum(1 for key, lab in binary_labels.items() if int(lab) == 0 and key in selected)
+    return {"n_pos": int(n_pos), "n_neg": int(n_neg)}

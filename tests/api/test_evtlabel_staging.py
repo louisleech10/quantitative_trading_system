@@ -18,11 +18,8 @@ from __future__ import annotations
 
 import pytest
 
-from api.services.ic_analysis_service import (
-    _assert_binary_rows_bound,
-    _binary_label_domain,
-    prevalidate_imported_binary_selection_classes,
-)
+from api.services.ic_analysis_service import _assert_binary_rows_bound, _binary_label_domain
+from momentum.core.split_preview import count_binary_classes_in_rows
 
 # ══════════════════════════════════════════════════════════════════════════
 # ① 值域閘：0/1 以外一律不放行
@@ -64,51 +61,65 @@ def test_single_bad_row_poisons_the_whole_batch():
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# ② 選樣預檢：與切分器共用同一支算術
+# ② 選樣計數：唯一實作，由 orchestrator 交出已算好的測試段列
+#
+# 🔴 B3 review R1：原本 service 端自己重建一份「測試段」（自組 purge/embargo、自取 config、
+#    自讀 h5 索引），三家實測證明那份重建必然與 orchestrator 分歧、且索引讀取對真實 h5
+#    恆失敗（＝預檢從未跑過）。改為 orchestrator 交出 `test_plan.row_index`，本函式只計數。
 # ══════════════════════════════════════════════════════════════════════════
 
 
-def test_selection_preview_counts_only_rows_inside_test_segment():
-    """預檢只數落在**驗證段**的事件；訓練段與隔離區的不算。"""
+def test_counts_only_rows_handed_in():
+    """只數交進來的那些列；訓練段與隔離區的不算——因為它們根本不在 row_index 裡。"""
     index = list(range(100))
-    # oos_test_size=0.2 ⇒ split_point=80；purge 2 + embargo 3 ⇒ 測試段自 85 起
     labels = {80: 1, 84: 0, 85: 1, 90: 1, 95: 0}
-    n_pos, n_neg = prevalidate_imported_binary_selection_classes(
-        labels, index, oos_test_size=0.2, purge_gap=2, embargo=3
-    )
-    assert (n_pos, n_neg) == (2, 1), "只有 85／90（正）與 95（反）在測試段內"
+    out = count_binary_classes_in_rows(labels, index, list(range(85, 100)))
+    assert out == {"n_pos": 2, "n_neg": 1}
 
 
-def test_selection_preview_uses_the_same_function_as_the_splitter():
-    """🔴 與 orchestrator 共用 `holdout_test_row_index`：兩端各寫一份算術就會漂。
+def test_counting_has_no_split_arithmetic_of_its_own():
+    """🔴 承重條：本函式**不得**自己算切分——沒有第二份算術，就沒有可漂的東西。
 
-    這裡直接以該函式算出的起點回推，證明預檢沒有自己另算一套。
+    以 AST 確認它的**程式碼**（非 docstring）不呼叫切分算術、也不讀切分參數。
     """
-    from momentum.core.split_preview import holdout_test_row_index
+    import ast
+    import inspect
+    import textwrap
 
-    index = list(range(1000))
-    rows = holdout_test_row_index(1000, oos_test_size=0.2, purge_gap=12, embargo=144)
-    start = int(rows[0])
-    labels = {start - 1: 1, start: 1, start + 1: 0}
-    n_pos, n_neg = prevalidate_imported_binary_selection_classes(
-        labels, index, oos_test_size=0.2, purge_gap=12, embargo=144
+    tree = ast.parse(textwrap.dedent(inspect.getsource(count_binary_classes_in_rows)))
+    called = {
+        node.func.id if isinstance(node.func, ast.Name) else getattr(node.func, "attr", "")
+        for node in ast.walk(tree) if isinstance(node, ast.Call)
+    }
+    assert "holdout_test_row_index" not in called and "holdout_split_point" not in called
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    assert not ({"oos_test_size", "purge_gap", "embargo"} & names), (
+        f"計數函式不得碰切分參數，實際碰到 {sorted({'oos_test_size', 'purge_gap', 'embargo'} & names)}"
     )
-    assert (n_pos, n_neg) == (1, 1), f"測試段起點 {start}：前一列不得算進去"
 
 
-def test_selection_preview_empty_test_segment_returns_zeros():
-    """隔離區吃掉整段 ⇒ (0, 0)，不是例外（由呼叫端據門檻決定要不要擋）。"""
-    assert prevalidate_imported_binary_selection_classes(
-        {5: 1}, list(range(10)), oos_test_size=0.2, purge_gap=50, embargo=50
-    ) == (0, 0)
+def test_counting_returns_none_when_no_binary_labels():
+    """沒有 0/1 ⇒ None（與「有 0/1 但一個都沒落在測試段」＝(0,0) 是兩件事）。"""
+    assert count_binary_classes_in_rows(None, list(range(10)), [1, 2]) is None
+    assert count_binary_classes_in_rows({}, list(range(10)), [1, 2]) == {"n_pos": 0, "n_neg": 0}
 
 
-def test_selection_preview_ignores_labels_not_on_the_feature_index():
-    """事件時間戳若不在特徵索引上（期間對齊已剔除）⇒ 不計入，也不 raise。"""
-    n_pos, n_neg = prevalidate_imported_binary_selection_classes(
-        {999999: 1, 90: 0}, list(range(100)), oos_test_size=0.2, purge_gap=0, embargo=0
-    )
-    assert (n_pos, n_neg) == (0, 1)
+def test_counting_empty_row_index_returns_zeros():
+    assert count_binary_classes_in_rows({5: 1}, list(range(10)), []) == {"n_pos": 0, "n_neg": 0}
+
+
+def test_counting_ignores_labels_not_on_the_feature_index():
+    """事件時間戳若已被期間對齊剔除 ⇒ 不計入，也不 raise。"""
+    out = count_binary_classes_in_rows({999999: 1, 90: 0}, list(range(100)), list(range(80, 100)))
+    assert out == {"n_pos": 0, "n_neg": 1}
+
+
+def test_service_no_longer_reconstructs_the_test_segment():
+    """🔴 防復發：service 不得再出現自建測試段的那兩個函式。"""
+    import api.services.ic_analysis_service as svc
+
+    assert not hasattr(svc, "prevalidate_imported_binary_selection_classes")
+    assert not hasattr(svc, "_feature_index_for_preview")
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -233,8 +244,11 @@ def test_orchestrator_analyze_accepts_binary_kwargs_explicitly():
 
     for fn in (ICFilterOrchestrator.analyze, ICFilterOrchestrator._run_full_sample_fallback):
         params = inspect.signature(fn).parameters
-        for name in ("event_binary_labels", "label_mode_requested", "label_mode_hint", "selection_preview"):
+        for name in ("event_binary_labels", "label_mode_requested", "label_mode_hint"):
             assert name in params, f"{fn.__name__} 缺 kwarg {name}"
+        # B3 review R1：`selection_preview` 已**移除**——選樣計數改由 orchestrator 於
+        # 切分計畫做完當下自算（`test_plan.row_index` 就是答案），service 不再交一份重建值。
+        assert "selection_preview" not in params, f"{fn.__name__} 不該再收 selection_preview"
 
 
 def test_all_fallback_callsites_forward_binary_kwargs():
@@ -260,3 +274,62 @@ def test_scan_cell_never_sends_binary_labels():
     src = inspect.getsource(ICAnalysisService._run_scan_cell)
     assert "event_binary_labels=None" in src
     assert 'label_mode_requested="return_rule"' in src
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ⑥ B3 review R1 修補：值域閘只看**被消費**的事件；掃描格揭露 effective mode
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_domain_gate_scans_only_consumed_events_not_whole_batch():
+    """🔴 `COMPOSER-R1-P1-02`／`GROK-R1-P1-04`（兩家獨立命中，且我在 brief 自列為可疑）。
+
+    混 symbol 批：本次只分析 ETH，而 BTC 某筆 label=2。舊版掃全批 ⇒ 整批被判 invalid、
+    本次 run 拿不到 0/1。這是 B1 review 抓過的「分母用全批」同型錯。
+
+    本條以**函式介面**釘住修法：值域閘收到的必須是**已篩選**的清單，
+    餵全批與餵被消費子集會得到不同結論——這正是為什麼呼叫端必須先篩。
+    """
+    eth_ok = [{"event_id": "e1", "label": 1}, {"event_id": "e2", "label": 0}]
+    btc_bad = [{"event_id": "b1", "label": 2}]
+    assert _binary_label_domain(eth_ok) == (True, None)
+    assert _binary_label_domain(eth_ok + btc_bad) == (False, "label_invalid_domain")
+
+
+def test_staging_filters_by_run_symbol_before_domain_gate():
+    """🔴 防復發（碼證）：`_binary_label_domain` 的引數必須是 `consumed_event_ids` 篩過的清單。
+
+    直接把 `records` 整包餵進去 ⇒ 本條紅並指名。
+    """
+    import inspect
+
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    src = inspect.getsource(ICAnalysisService._run_event_label_stages)
+    assert "_binary_label_domain(records)" not in src, "值域閘又餵了全批 records"
+    assert "consumed_event_ids" in src
+    # 篩選條件必須含 run_symbol，否則「被消費」的定義又回到全批
+    idx = src.index("consumed_event_ids")
+    assert "run_symbol" in src[idx: idx + 400]
+
+
+def test_scan_cell_summary_discloses_effective_mode():
+    """🔴 `CODEX-R1-P1-03`：掃描格恆為報酬版，這件事必須**寫出來**。
+
+    使用者選 `auto` ＋ 掃描時，若不揭露就會以為每一格是用他的 0/1 算的。
+    """
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    out = ICAnalysisService._scan_cell_summary({
+        "analysis_status": "ok_oos",
+        "metadata": {"n_samples": 42, "event_filter": {"label_source": "event_label_value"}},
+    })
+    assert out["label_mode_effective"] == "return_rule"
+    assert out["label_source"] == "event_label_value"
+
+
+def test_scan_cell_summary_still_returns_none_for_non_dict():
+    """不得因為新增揭露鍵而讓「沒有報告」也生出一個 dict。"""
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    assert ICAnalysisService._scan_cell_summary(None) is None
