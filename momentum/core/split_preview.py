@@ -46,6 +46,72 @@ def holdout_split_point(n_rows: int, *, oos_test_size: float) -> int:
     return int(np.floor((1.0 - float(oos_test_size)) * int(n_rows)))
 
 
+def _as_ms(index: Any, position: int) -> int:
+    """取 `index[position]` 並正規化為 **epoch 毫秒 int**。
+
+    🔴 SPLITUNIFY 之時鐘一律 epoch **毫秒**，與 `ic_filter_orchestrator._normalize_ic_time_index`
+    （那支是**「秒」語意**，餵毫秒會 raise）**不同源，不得混用**——見 SPEC C-4（R2 之 D7）。
+    """
+    value = pd.Index(index)[position]
+    if isinstance(value, (pd.Timestamp, np.datetime64)):
+        return int(pd.Timestamp(value).value // 10 ** 6)
+    return int(value)
+
+
+def holdout_boundary(
+    feature_index: Any,
+    *,
+    oos_test_size: float,
+    purge_gap: int,
+    embargo: int,
+) -> Dict[str, Any]:
+    """canonical 邊界之**唯一**產生點（SPLITUNIFY Task 2.1／SPEC C-0）。
+
+    回 `{"train_row_index", "test_row_index", "train_end_ms", "test_start_ms"}`。
+
+    出生理由：事件路徑與 IC 路徑若各自算一次邊界，**即使公式相同也會分歧**——
+    因為兩端的 universe 不同。實測（`handoffs/20260911-probe-splitunify-universe-gap.py`、
+    receipt `handoffs/run_receipts/20260910T154323Z-splitunify-universe-gap.log`）：
+    真實 ETHUSDT 1h 20352 列，未裁切時 features 與 bars 逐值相同；EVTALIGN 裁頭尾後
+    邊界位移 5 根→2h、24 根→10h、168 根→67h。⇒ **必須共用同一個 universe 與同一支函式**。
+
+    🔴 **本函式以既有兩支定義自身**（`holdout_split_point` ＋ `holdout_test_row_index`），
+    不引入第二份切分算術；`M-SU-11` 之 mutation 即針對此。
+
+    🔴 **ms 只供揭露與 `boundary_hash`，禁回流做成員（∈）判定**——成員判定一律走
+    `feature_index[row_index]` 的**集合**語意（SPEC C-4）。ms 之導出寫死為
+    `train_end_ms = as_ms(feature_index[train_rows[-1]])`、
+    `test_start_ms = as_ms(feature_index[test_rows[0]])`（R2 之 D6：v2 只寫「回傳 ms」
+    沒寫怎麼導出，實作端寫成 `feature_index[split_point]`（略過 purge／embargo）也能過
+    原本的同源自證）。
+
+    🔴 `purge_gap`／`embargo` 是 **row 單位且已包含在 `test_row_index[0]` 這個起點裡**
+    （`holdout_test_row_index` ＝ `arange(split_point + purge_gap + embargo, n)`）
+    ⇒ 下游做答案窗判定時**不得**再以毫秒相減（SPEC C-4 第一段；R4 之 F1）。
+
+    參數皆為呼叫端算好的最終值——`purge_gap` 須是
+    `max(effective_horizon, label_window_rows)`，本函式**不猜、不查 config**。
+    """
+    index = pd.Index(feature_index)
+    n = int(len(index))
+    if n == 0:
+        # 無 universe 即無邊界；回空計畫會讓下游把「沒切」誤讀成「切了但都空」。
+        raise ValueError("holdout_boundary: feature_index 為空——無 universe 即無 canonical 邊界")
+
+    split_point = holdout_split_point(n, oos_test_size=oos_test_size)
+    train_rows = np.arange(0, split_point, dtype=int)
+    test_rows = holdout_test_row_index(
+        n, oos_test_size=oos_test_size, purge_gap=purge_gap, embargo=embargo
+    )
+    return {
+        "train_row_index": train_rows,
+        "test_row_index": test_rows,
+        # 空段回 None，**不得**回 -1 或 0——那會被下游當成「1970 年」或「有值」。
+        "train_end_ms": _as_ms(index, int(train_rows[-1])) if train_rows.size else None,
+        "test_start_ms": _as_ms(index, int(test_rows[0])) if test_rows.size else None,
+    }
+
+
 def count_binary_classes_in_rows(
     binary_labels: Optional[Mapping[int, int]],
     feature_index: Any,
