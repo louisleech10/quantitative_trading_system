@@ -1,5 +1,7 @@
 # GAP-3 事件型 UAT — 施工進度看板
 
+> 📌 2026-09-11：`SPLITUNIFY` 第 2 批 b 動到 `momentum/Analysis/event_samples/`——新增投影函式 `split_projection.py`，並把「分簇」從 `event_split.py` 抽成兩邊共用的函式（行為逐值不變）。事件切分本身的邊界來源改由 K 線切分決定，細節見 [SPLITUNIFY施工進度.md](SPLITUNIFY施工進度.md)。
+
 > 📌 **2026-09-05（晚）**：`G3-D2` **第 4 段（全矩陣＋k／h 掃描）✅ 收工並上 GitHub**——
 > 兩輪三家審碼（R1 10 findings/4 P1 → R2 4 findings/0 P1，三家一致「可進 B-D5」）。
 > 交付：進場語意由 4 種開到 **13 種**（減掉 2 種幾何上不可能的組合）；
