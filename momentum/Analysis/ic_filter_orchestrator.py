@@ -5549,6 +5549,19 @@ class ICFilterOrchestrator:
         - 寫檔 IO 例外 ⇒ computation_failed:write_failed（A1-6：reason 字面封閉，例外只進 log），報告照存。
         """
         case_id = self._resolve_case_id(metadata)
+        symbol = metadata.get("symbol") if isinstance(metadata, dict) else None
+        timeframe = metadata.get("timeframe") if isinstance(metadata, dict) else None
+        # 🔴 `CODEX-R1-P1-03`（B5 review）：**結構性**失敗優先於統計性失敗。
+        #    兩者同時發生時，若先回負對照失敗，使用者會以為「統計沒過」，
+        #    實際上是 symbol／timeframe 根本沒解出來——那是接線壞了，兩種修法完全不同。
+        if not symbol or not timeframe:
+            return {
+                "status": "computation_failed",
+                "reason": self._survivor_reason("identity_missing"),
+                "path": None,
+                "sha256": None,
+                "case_id": case_id,
+            }
         # 🔴 EVTLABEL Task 3.8（R1 C3）：負對照失敗 ⇒ **不落檔**。
         #    隨機標籤也能篩出同樣多 ⇒ 這批倖存者與雜訊無法區分；診斷表仍留在報告裡，
         #    但**不得**產出一份看起來可以直接餵 ML 的檔案。狀態 loud，不是靜默不寫。
@@ -5567,16 +5580,6 @@ class ICFilterOrchestrator:
             return {
                 "status": "unavailable",
                 "reason": self._survivor_reason(self._survivor_suppressed_reason),
-                "path": None,
-                "sha256": None,
-                "case_id": case_id,
-            }
-        symbol = metadata.get("symbol") if isinstance(metadata, dict) else None
-        timeframe = metadata.get("timeframe") if isinstance(metadata, dict) else None
-        if not symbol or not timeframe:
-            return {
-                "status": "computation_failed",
-                "reason": self._survivor_reason("identity_missing"),
                 "path": None,
                 "sha256": None,
                 "case_id": case_id,

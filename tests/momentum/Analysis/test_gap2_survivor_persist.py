@@ -264,3 +264,24 @@ def test_status_stays_inside_the_closed_capability_enum():
                       .read_text(encoding="utf-8"))["capability_status"]
     assert "suppressed" not in enum
     assert "unavailable" in enum
+
+
+def test_identity_missing_wins_over_negative_control():
+    """🔴 `CODEX-R1-P1-03`（B5 review）：**結構性**失敗優先於統計性失敗。
+
+    兩者同時發生時若先回負對照失敗，使用者會以為「統計沒過」，實際上是
+    symbol／timeframe 根本沒解出來——那是接線壞了，兩種修法完全不同。
+    """
+    from momentum.Analysis.ic_config_schema import ICConfig
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    orch = ICFilterOrchestrator(ICConfig())
+    orch._survivor_suppressed_reason = "negative_control_failed"
+    out = orch._write_survivor_output(
+        report={"summary_table": []}, report_meta={}, metadata={},   # 無 symbol／timeframe
+        filtered_df=None, features_df=pd.DataFrame(), report_json_path=None,
+        stage6b_results=None, event_identity=None, features_path=None,
+        label_series=None, split_context=None,
+    )
+    assert out["status"] == "computation_failed"
+    assert out["reason"] == "identity_missing", "結構性失敗被統計性失敗蓋掉了"

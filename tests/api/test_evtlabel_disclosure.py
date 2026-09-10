@@ -330,3 +330,24 @@ def test_effect_gate_min_is_not_hardcoded_when_thresholds_absent():
     report["metadata"].pop("thresholds", None)
     _inject_label_rule_disclosure(staged, report)
     assert report["metadata"]["event_label_rule"]["effect_gate"]["min"] is None
+
+
+def test_light_view_keeps_label_mode_and_rule():
+    """🔴 `CODEX-R1-P1-04`（B5 review）：前端固定請求 `view=light`。
+
+    `label_mode`（模式 banner）與 `event_label_rule`（規則揭露）若不在 light 白名單裡，
+    **正常回應中這兩塊會整個消失**——後端寫了、前端也接了，但中間被投影掉。
+    這正是本 epic 反覆出現的「兩端都有、但沒接上」。
+    """
+    import json
+    from pathlib import Path
+
+    keep = json.loads(
+        (Path(__file__).resolve().parents[2]
+         / "momentum/Analysis/contracts/ic_result_paging_contract.json").read_text(encoding="utf-8")
+    )["metadata_keep_keys"]
+    assert "label_mode" in keep, "light 視圖會吃掉模式 banner 的資料來源"
+    assert "event_label_rule" in keep, "light 視圖會吃掉 label 規則揭露"
+    # 既有鍵不得被我擠掉
+    for existing in ("event_filter", "isolation", "survivor_output", "period_alignment"):
+        assert existing in keep
