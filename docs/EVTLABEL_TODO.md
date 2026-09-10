@@ -121,7 +121,7 @@
 - 實作要點：
   1. `EventBatchDisclosurePanel` 新 prop `featureTimeframe?: string`；`page.tsx:714-737` 傳 `config.timeframe`。
   2. `eventTf = summary.timeframes.length===1 ? summary.timeframes[0] : null`；`ratio = TIMEFRAME_SECONDS[eventTf]/TIMEFRAME_SECONDS[featureTf]`（前端既有 tf 秒表；若無則加到 `icLabelRule.ts`，與後端 `momentum/Analysis/event_samples/label_value_from_case.py::TIMEFRAME_SECONDS` 值一致並以 vitest 對證 JSON 匯出）。
-  3. caption：`單位：事件週期（${eventTf}）的根數；1 根＝${featureTf} 特徵的 ${ratio} 根`；ratio 非整數或任一 tf 缺 ⇒ `單位：事件週期的根數`。掛 `data-testid="ic-param-h-unit"`／`"ic-param-k-unit"`。
+  3. caption：`單位：事件週期（${eventTf}）的根數；1 根＝${featureTf} 特徵的 ${ratio} 根`；ratio 非整數或任一 tf 缺 ⇒ `單位：事件週期的根數`。掛 `data-testid="ic-param-h-unit"`／`"ic-param-k-unit"`。k 旁第二句（使用者 9/10）：`k=0 即在 t₀ 決策、特徵取到 t₀ 前最後一根 ${featureTf}；t₀ 前幾小時的細節在 ${featureTf} 特徵的 Lag／Momentum 欄，不需調 k`；h 旁第二句：`答案窗＝h 根 ${eventTf}（open 起算模式為 h+1 根）`。文案由 `icLabelRule.ts::unitCaption` 單點產生（vitest 對證字面）。
 - 修改檔案：`frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx`（`:320-354` h 輸入、`:469-495` k 輸入）、`frontend/src/app/ic-analysis/page.tsx:714-737`、`frontend/src/lib/icLabelRule.ts::unitCaption`。既有 caller：`icEventBatchDisclosure.test.tsx` 既有 render 不傳新 prop ⇒ 退化文案，不紅。
 - 路徑：
   - frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx

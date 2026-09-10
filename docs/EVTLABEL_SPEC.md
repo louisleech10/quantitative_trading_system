@@ -120,7 +120,7 @@ P1（小）①報告＋隔離區揭露實際 label 規則（h／k／進場價／
 - 目標：`ic-param-horizon-bars`／`ic-param-decision-offset-bars` 旁顯示單位說明。
 - 檔案：`frontend/src/components/ic-analysis/EventBatchDisclosurePanel.tsx`（`:320-354`、`:469-495` 兩輸入旁加 `data-testid="ic-param-h-unit"`／`"ic-param-k-unit"`）；`frontend/src/lib/icLabelRule.ts::unitCaption(eventTf, featureTf)`。
 - 既有 caller/影響面：`page.tsx:714-737` 需多傳 `featureTimeframe`（自 `config.timeframe`）；批次事件週期取 `detail.summary.timeframes`（單一值才算）。
-- 改法：文案 `單位：事件週期（<eventTf>）的根數；1 根＝<featureTf> 特徵的 <ratio> 根`；ratio 非整數或任一 tf 缺 ⇒ `單位：事件週期的根數`。
+- 改法：文案 `單位：事件週期（<eventTf>）的根數；1 根＝<featureTf> 特徵的 <ratio> 根`；ratio 非整數或任一 tf 缺 ⇒ `單位：事件週期的根數`。k 旁再加一句（使用者 2026-09-10）：`k=0 即在 t₀ 決策、特徵取到 t₀ 前最後一根 <featureTf>；t₀ 前幾小時的細節在 <featureTf> 特徵的 Lag／Momentum 欄，不需調 k`。h 旁加：`h 決定答案窗＝h 根 <eventTf>（open 起算模式為 h+1 根）`。
 - **驗證**：`cd frontend && npx vitest run src/components/ic-analysis/icEventBatchDisclosure.test.tsx -t unit` rc=0：12h 事件×1h 特徵 ⇒ 含 `12 根`；4h 事件×1h ⇒ `4 根`；1h×4h ⇒ 退化文案。
 - **邊界**：①mixed tf 批 ⇒ 退化文案；②feature run 未選 ⇒ 退化文案。
 - **存活至**：全票完工後保留。
