@@ -1,0 +1,23 @@
+{
+  "_doc": "SPLITUNIFY Task 1.2（SPEC C-8）：切分權威值集與 fail-closed reason 之**唯一真相源**。Python 端（momentum/Analysis/event_samples/split_projection.py）與前端各自讀本檔並對證，禁任一端手打第二份。🔴 本檔**刻意不含** assignment_states——三態＝兩容器（EventSplitPlan.assignments 帶 train/test ＋ 獨立的 purged），不是三值枚舉（SPEC C-3）；purge reason 亦不住這裡，沿用 momentum/Analysis/contracts/event_import_contract.json 之 split_purge_reasons（字面 interval_crosses_split_boundary）。",
+
+  "schema_version": 1,
+
+  "_split_authority_doc": "canonical 切分權威之封閉值集。kline_holdout ＝ K 線 chronological holdout（SplitPlan，含 purge/embargo）為唯一邊界來源（SPEC C-1）。新增值須同步 SPEC §C 與前端對證測試。",
+  "split_authority_values": [
+    "kline_holdout"
+  ],
+
+  "_fail_closed_reasons_doc": "投影與其接線端之 fail-closed 原因封閉集合（SPEC C-0/C-2）。字面由 Python 與前端共用，禁散文複列。multi_symbol_projection_unsupported＝per-symbol 投影未支援前的多標的批（SPEC C-2）；missing_train_plan／missing_test_plan＝缺任一側切分計畫（含 test_plan.row_index 為空，SPEC C-4 第一段之先決 fail-closed）；canonical_feature_universe_unavailable＝呼叫端拿不到 post-trim feature universe，須明示 event-study-only 而非按事件數另切（SPEC C-0 決議③）。",
+  "fail_closed_reasons": [
+    "multi_symbol_projection_unsupported",
+    "missing_train_plan",
+    "missing_test_plan",
+    "canonical_feature_universe_unavailable"
+  ],
+
+  "_estimand_scope_doc": "event-study-only 路徑之估計量範圍標記（SPEC C-0 決議③(b)）。event_forward_return_table 在 split_plan=None 時跑全 manifest 事件（tables.py:211-238 無 test 過濾），必須以本字面標明它不是 OOS。",
+  "estimand_scope_values": [
+    "full_sample_not_oos"
+  ]
+}

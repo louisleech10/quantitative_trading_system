@@ -387,8 +387,11 @@ D-002 亦須寫明「投影所用 `feature_index` 為 **post-trim**（EVTALIGN �
     > handoffs/run_receipts/splitunify-analysis-baseline.stdout 2>&1
   echo "pytest_rc=$?" >> handoffs/run_receipts/splitunify-analysis-baseline.stdout
   awk '/^FAILED /{print $2}' handoffs/run_receipts/splitunify-analysis-baseline.stdout \
-    | sort -u > tests/baselines/analysis_known_failures.nodeids
+    | grep '::' | sort -u > tests/baselines/analysis_known_failures.nodeids
   ```
+     🔴 **`grep '::'` 不可省**（B1 實跑抓到）：`-q` 模式下 pytest 的進度條殘片會讓
+     `^FAILED ` 多命中 11 行，`$2` 取出 `[`、`[100%]` 這種非 nodeid；不過濾就會把它們
+     凍進基準，`--deselect` 時直接壞掉。實測 30 行 `^FAILED ` 中只有 19 行是真 nodeid。
 - 🔴 **維護協議（R2 之 D9，三家＋主委四方一致）**：清單在 B1 凍結、B3 才用。
   B3 驗收 (B) 判準為**方向性**：實際 FAILED **⊆** 清單（只准變短）為綠、變長為紅。
   變短時允許**同一 PR** 更新清單與 receipt，commit 訊息須標 `splitunify-baseline-sync`

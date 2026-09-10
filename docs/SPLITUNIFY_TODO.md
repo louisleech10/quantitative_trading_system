@@ -124,7 +124,11 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   管線經 `tee`／`awk` 會把 rc 吃掉，collection failure 會偽裝成空基準
   （即 `CLAUDE.md` Gotchas 的「`cmd | tail; echo rc=$?` 讀到的是 tail 的 rc」）：
   先 `pytest … > <receipt> 2>&1`、把 `pytest_rc=$?` 追寫進 receipt，
-  再 `awk '/^FAILED /{print $2}' <receipt> | sort -u > <清單>`。
+  再 `awk '/^FAILED /{print $2}' <receipt> | grep '::' | sort -u > <清單>`。
+  🔴 **`grep '::'` 不可省**（B1 實跑抓到）：`-q` 模式下 pytest 的進度條殘片會讓
+  `^FAILED ` 多命中 11 行，`$2` 取出 `[`、`[100%]` 這種非 nodeid；不過濾就會把它們
+  凍進基準，`--deselect` 時直接壞掉。實測 30 行 `^FAILED ` 中只有 19 行是真 nodeid。
+
 - 🔴 **維護協議（R2 之 D9，四方一致）**：清單在 B1 凍結、B3 才用。
   B3 驗收 (B) 為**方向性**：實際 FAILED **⊆** 清單（只准變短）為綠、變長判紅。
   變短時允許**同一 PR** 更新清單與 receipt，commit 訊息標 `splitunify-baseline-sync`
