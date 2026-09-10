@@ -1,8 +1,8 @@
 # SPLITUNIFY consult synth 戳記輪（修正後重審；序列化，每家一次派工）
 
 brief-kind: stamp
-task-id: 20260911-SPLITUNIFY-X-STAMP-R2
-findings-round: R2
+task-id: 20260911-SPLITUNIFY-X-STAMP-R4
+findings-round: R4
 stamp-target: handoffs/reconcile/20260910-splitunify-x-consult-r1/synth.md
 
 （序列化：composer＝`-STAMP-R2`、grok＝`-STAMP-R3`、codex 重審＝`-STAMP-R4`；

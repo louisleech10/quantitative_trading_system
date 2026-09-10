@@ -10,13 +10,29 @@
 **這是設計 consult，不是 code review。** 使用者 2026-09-10 裁定「切法由 Claude 與委員會定共識」，
 並於今晚離線時指示「有問題找委員會討論共識」⇒ 本結論**直接進 SPEC**，不再等使用者點頭。
 
-19 條 findings 群集為五個決議項。三家在**方向**上一致、在**做法**上一致否決我 brief 的字面提案。
+19 條 findings 群集為**八個**決議項。三家在**方向**上一致、在**做法**上一致否決我 brief 的字面提案。
 
-### D1 — 統一方向：時間切分為 canonical 權威（三家一致，與我的提案同向）
+🔴 **修訂紀錄（2026-09-10，由 `20260911-SPLITUNIFY-X-STAMP-R1` 之 codex REJECTED 觸發）**：
+初版收斂有三處錯誤，皆為主委之收斂失誤，非委員產出問題——
+① D1 的理由誤寫成「三家共同」，實為 `CODEX-R1-P1-02` 明確反駁之說法（codex 抓出）；
+② `CODEX-R1-P1-04`（接線缺口）被誤併進 D4 而實質丟失 ⇒ 現補為 **D6**（主委回頭逐條核對時發現）；
+③ `CODEX-R1-P1-03`／`CODEX-R1-P1-05` **完全未被任何群集引用** ⇒ 現補為 **D7**／**D8**。
+⇒ 這正是戳記閘存在的理由：主委產 reconcile、實作端直接信，中間本無人核對忠實性。
+
+### D1 — 統一方向：時間切分為 canonical 權威（**方向**三家一致；**理由**非三家共同，見下）
 - findings：`CODEX-R1-P1-02`、`COMPOSER-R1-P1-01`、`GROK-R1-P1-01`
 - **決議**：K 線 holdout（`SplitPlan`，含 purge／embargo）為**唯一邊界來源**；
   `EventSplitPlan` 降為**投影容器**，不再自行決定邊界。
-- 理由（三家共同）：隔離語意（purge／embargo）住在時間切分那一側；事件側只有緩衝 bars，較弱。
+- 理由（**依 `CODEX-R1-P1-02` 修正後之版本**）：**所有 row／event projection 共用同一
+  canonical boundary**——單一邊界來源本身就是目的，不需要也不能靠「哪一套隔離比較強」來論證。
+- 🔴 **明確不採用**的理由：「時間切分之 purge／embargo 嚴格強於事件側緩衝 bars」。
+  `CODEX-R1-P1-02` 正面反駁：兩套隔離**不是同一個集合**（`event_split.py:82-115` 以 per-symbol
+  毫秒 `embargo` 判事件 purge；`contracts.py:602-612` 以 symbol-local ordinal 對 row range 套
+  `purge_gap`／`embargo`），**containment 未被證明**，不得在 SPEC 宣稱其中一套必然涵蓋另一套。
+- 由此附帶之約束（`CODEX-R1-P1-02` 之 §G 要求，一併採納）：
+  ① 未證明 containment 前**不得刪除任一既有 guard**；
+  ② §G 須同時 golden：逐 row test fingerprint、逐 event `assignments`／`purged` IDs、
+     answer-window 完整性、leakage negative case。
 
 ### D2 — 🔴 但**否決**我 brief 的字面做法：不得以全域 scalar `test_timestamps` 交集取代
 - findings：`CODEX-R1-P0-01`、`COMPOSER-R1-P0-01`（**兩家各自標 P0**）、`GROK-R1-P1-02`
@@ -36,24 +52,78 @@
   落在隔離區（purged）的事件既不屬訓練也不屬驗證，二態會把它們錯誤地歸進其中一邊。
 
 ### D4 — GAP-3 走延伸檔，不解凍原檔（三家一致）
-- findings：`CODEX-R1-P1-04`、`COMPOSER-R1-P1-03`、`GROK-R1-P2-02`
+- findings：`CODEX-R1-P2-06`、`COMPOSER-R1-P1-03`、`GROK-R1-P2-02`
 - **決議**：新增 `docs/SPLITUNIFY_SPEC.md`＋`docs/GAP3_EVENT_UX_SPEC.D-002.md`（切分權威／投影契約／§G）。
+- 🔴 `CODEX-R1-P2-06` 另指出：frozen primary 與 UX extension convention 的**路徑字面不一致**，
+  不先寫清楚會讓派工時選錯規格入口。D-002 須明寫入口路徑。
+- 🔴 **更正紀錄**：本項原誤列 `CODEX-R1-P1-04`（那條講的是接線缺口，非 frozen 文件），
+  已改列正確的 `CODEX-R1-P2-06`；P1-04 之實質移至新增之 **D6**。
 
 ### D5 — 票大小與批次（三家一致「大」；批數 3–4，取較保守之 4）
-- findings：`CODEX-R1-P2-06`、`COMPOSER-R1-P2-02`、`GROK-R1-P2-04`
+- findings：`COMPOSER-R1-P2-02`、`GROK-R1-P2-04`
 - **決議**：**大票**（命中 (a) 數值／洩漏、(b) 跨模組、(c) 多 phase、(d) 切分正確性）。
   四批：① SPEC＋D-002＋本 reconcile ② derive 純函式＋golden ③ pipeline／orchestrator 接線
   ④ API／前端單一驗證段揭露＋UAT 項。每批三家 review。
 - 報告只暴露 canonical 之 `n_test`，並附 `split_authority`、boundary hash、per-symbol counts
   與 fail-closed reason（codex）。
 
+### 🔴 D6 — 接線缺口：事件 pipeline 沒有 IC 的 feature row universe（**原收斂漏掉，2026-09-10 補回**）
+- findings：`CODEX-R1-P1-04`
+- **codex 原話（逐字要點）**：「只修改 IC orchestrator 不會消除雙驗證段；事件 pipeline 有獨立
+  split producer，而且它目前**沒有 IC feature row universe**，不能自行重算一份『看似相同』的邊界。」
+  碼證：`pipeline.py:683-705` 之 `run()` 無條件在 `:691` 呼叫 `split_events()`；
+  `ic_filter_orchestrator.py:1290-1298` 只建立 IC 端 `test_timestamps`；
+  `ic_feed.py:6-18` 明載匯入表格鏈不是 IC 分析鏈。
+- **決議（採 codex 之落地建議）**：
+  ① 單一來源＝core 的 **pure temporal-boundary builder**（沿用並擴充
+     `momentum/core/split_preview.py` 之「同一算術、無副作用」定位），由 orchestrator 與
+     pipeline **共同呼叫**；
+  ② pipeline **必須接收**該 boundary／feature universe；
+  ③ 🔴 **沒有 canonical feature universe 的獨立匯入流程，只能明示 `event-study-only`，
+     不得按事件數另切並宣稱 OOS**——現行 `pipeline.run_event_study_only()`
+     與 `case_import_service.py:1618-1619` 之 `capability={"split":"unavailable"}` 即此形態，
+     本票沿用，不新造。
+- **這是接線缺口，不能靠 consumer 讀同一個型別解決。**
+- 🔴 **收斂錯誤紀錄**：本條在原收斂被誤併進 D4（GAP-3 延伸檔）而實質被丟掉，
+  導致 `docs/SPLITUNIFY_SPEC.md` v1 寫出一個**沒有落點**的投影。主委在 R1 自產審查
+  以 `CLAUDE-R1-P0-01` 重新獨立發現同一問題（見
+  `handoffs/20260911-splitunify-claude-selfreview.md`），並經探針
+  `20260911-probe-splitunify-universe-gap.py` 證明「兩端各自算同一公式」不成立
+  （特徵裁切後邊界位移最大 67 小時，receipt `20260910T154323Z-splitunify-universe-gap.log`）。
+  ⇒ 探針結果與 codex 之決議③一致：**沒有共同 universe 就不得宣稱 OOS**。
+
+### D7 — `EventSplitPlan` 之語意欄位必須由 canonical boundary **重新導出**，不是型別 alias（原收斂漏列）
+- findings：`CODEX-R1-P1-03`
+- **決議**：`assignments`／`purged`／`clusters`／`summary.degraded` 皆為下游仍在消費的事件語意
+  （`baseline.py:105-110`、`pattern_bridge.py:114-175`、`tables.py:305-367`、`tables.py:130-150`
+  之 `formal_pooled_inference_allowed`）。最小落地**不是刪除 `EventSplitPlan`**，而是新增一個
+  pure projection：輸入 canonical boundary、每 symbol test timestamps、事件 feature-cutoff 對映
+  與答案窗；輸出**完整**的 `EventSplitPlan`。clusters／weights 仍由事件列重算；
+  summary 的 degraded／LOSO 狀態仍要明確揭露；**空 plan 不得冒充未切分**。
+
+### D8 — 統一**會改變數值**，不是純重構（原收斂漏列）
+- findings：`CODEX-R1-P1-05`
+- **決議**：至少影響 `baseline.py:118-161`（`n_test`、prevalence、AUC／PR-AUC、permutation band、
+  BH-FDR）、`tables.py:305-370`（OOS metrics、macro／micro AUC、cluster CI）、
+  `pattern_bridge.py:122-218`（fit rows、rules、scores、lift、receipt hash）、
+  `ic_filter_orchestrator.py:3830-3863`（test intersection 改 `n_pos`／`n_neg` ⇒ 改 `label_mode`）。
+  ⇒ 驗收**必須**對改前後做逐 event ID 集合、逐列 train／test fingerprint、報告 numeric keys
+  與 capability reason 的 exact／tolerance diff；**不得**以「型別不變」宣稱數值不變。
+
 ### 我方前提之驗證結果
-- `assumed`「時間切分之隔離嚴格強於事件緩衝」：三家未反駁，方向被採納。
+- `assumed`「時間切分之隔離嚴格強於事件緩衝」：🔴 **被 `CODEX-R1-P1-02` 正面反駁**
+  （containment 未證明；兩套隔離不是同一個集合）。**方向（D1）仍採納，但理由已改寫**
+  為「共用同一 canonical boundary」——見 D1。原本寫成「三家未反駁」是我的收斂錯誤，
+  由 `20260911-SPLITUNIFY-X-STAMP-R1` 之 codex REJECTED 抓出（`CODEX-R1-P1-07`），已更正。
 - `assumed`「統一後多 symbol 數值不變」：**被我自己的探針推翻**（見 D2），且兩家各自標 P0。
 
 **Verdict**: 需修補後派工——方向（D1）採納，但**我 brief 的字面做法被否決**（D2／D3）：
 邊界須 per-symbol、投影須三態、多 symbol 未支援前 fail-closed。
 四批走完、每批三家 review；GAP-3 走 D-002 延伸檔，不解凍原檔。
+🔴 **另加（修訂版）**：D6 接線缺口為本票之**先決條件**——單一 boundary builder 住
+`momentum/core/split_preview.py`，orchestrator 與 pipeline 共同呼叫；無 canonical feature
+universe 之獨立匯入流程只能明示 `event-study-only`，不得按事件數另切並宣稱 OOS。
+D7 要求投影產出**完整** `EventSplitPlan`（含 clusters／summary），D8 要求驗收做逐項數值 diff。
 
 ---
 
@@ -279,3 +349,9 @@
 ## 戳記
 
 （本區之下由各家族 append 一行 `RECONCILE-STAMP: <family> APPROVED <date> sha256:<body-hash> task:<task-id>`；本區標題以上為本體，body-hash 由 `scripts/reconcile_body_hash.sh` 計算。）
+RECONCILE-STAMP: codex REJECTED 2026-09-10 sha256:ca475ed187f0e2d44c770e093030c5ef78fa16516385edd9095d9523ff23ca70 task:20260911-SPLITUNIFY-X-STAMP-R1 — D1 與我方 P1-02 對 containment 未證明的立場不一致
+
+（🔴 上一行之 REJECTED 針對 body-hash `ca475ed187f0…` 之版本；其指出之收斂錯誤已於 2026-09-10 修正
+（D1 理由改寫為「共用同一 canonical boundary」、前提驗證段更正為「被 CODEX-R1-P1-02 正面反駁」），
+本體 hash 已變為 `6d84745faa08…`。該 REJECTED 行**保留為稽核軌跡**，不刪；codex 之重新蓋章走
+`20260911-SPLITUNIFY-X-STAMP-R4`。）

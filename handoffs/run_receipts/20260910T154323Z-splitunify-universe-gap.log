@@ -1,0 +1,24 @@
+[2026-09-10 23:43:03,680] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-10 23:43:05,713 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[features] n=20352 split_point=14246 test_rows=5950 train_end_ms=1755349200000 test_start_ms=1755914400000
+[features] train_end=2025-08-16 13:00:00 test_start=2025-08-23 02:00:00
+[bars] n=20352 split_point=14246 test_rows=5950 train_end_ms=1755349200000 test_start_ms=1755914400000
+[bars] train_end=2025-08-16 13:00:00 test_start=2025-08-23 02:00:00
+
+universe 列數差：features=20352 bars=20352 delta=0
+只在 features=0　只在 bars=0
+
+① 未裁切情境：兩個 universe 給出**相同**邊界。
+
+② 裁切情境（特徵頭尾各被裁 N 根，K 線 universe 不變）：
+   裁切N  features_n    train_end 位移(h)    test_start 位移(h)
+     1       20350               0.00                0.00
+     5       20342              -2.00               -2.00
+    24       20304             -10.00              -10.00
+   168       20016             -67.00              -67.00
+
+DISPROVED（裁切情境）：只要特徵被裁過，邊界最大位移 67.00 小時。
+  ⇒ 候選方案 2（兩端各自以自己的 universe 算 canonical 邊界）**不成立**：
+     它仍是兩份算術，只是名字改了；EVTALIGN 一裁就分歧。
+  ⇒ C10 須改採方案 1（投影上移到 IC 側、事件掃描端不再自產驗證段數字）
+     或方案 3（事件掃描端載入同一 post-trim feature universe）。

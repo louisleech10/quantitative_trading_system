@@ -53,8 +53,37 @@ C10 尚無方案。三個候選，須委員會擇一並給碼證判準：
    邊界仍可能分歧，該分歧須由 G-3a 量出來。
 3. **事件掃描端載入同一 feature universe**：代價最大，且 `EventImportService` 目前不碰 FF run。
 
-主委傾向 **2**（最小改動且保留兩端可用），但**必須**先量出「features vs bars universe 的邊界差」——
-沒量之前選 2 就是把 C-2 禁止的「第二份算術」換個名字留下來。R2 brief 須帶這條實測要求。
+主委原傾向 **2**（最小改動且保留兩端可用），並先去量了「features vs bars universe 的邊界差」。
+
+**🔴 實測結果：方案 2 被我自己的探針否證。**
+探針 `handoffs/20260911-probe-splitunify-universe-gap.py`、
+receipt `handoffs/run_receipts/20260910T154323Z-splitunify-universe-gap.log`（rc=1）：
+
+- 真實 ETHUSDT 1h（FF run `4a8a0b3726cc906ab3534994605e77f5`，20352 列）**未裁切**時，
+  features 與 bars 兩個 universe 逐值相同（只在 features=0、只在 bars=0），邊界亦相同。
+- 但 EVTALIGN 之期間對齊會裁頭尾。裁切後邊界位移實測：
+
+  | 頭尾各裁 N 根 | features 列數 | train_end 位移 | test_start 位移 |
+  |---|---|---|---|
+  | 1 | 20350 | 0 h | 0 h |
+  | 5 | 20342 | −2 h | −2 h |
+  | 24 | 20304 | −10 h | −10 h |
+  | 168 | 20016 | −67 h | −67 h |
+
+⇒ 只要特徵被裁過，兩端各自算的「canonical 邊界」就分歧（本組最大 67 小時）。
+方案 2 仍是兩份算術，只是改了名字，**違反 C-2**。**方案 2 出局。**
+
+（附帶：寫這支探針時我**自己又踩了一次單位坑**——FF run 的 `timestamps.parquet` 是 epoch
+**秒**，首版當毫秒用，日期跑到 1970。已在探針內加年份斷言。這正是 C2／CLAUDE-R1-P1-05
+要求「單位歸一寫進 SPEC」的現場證據。）
+
+**R2 唯一必答改為**：在方案 1、方案 3、以及主委新提的方案 4 之間擇一並給判準——
+
+4. **不合併，改為消歧義＋揭露**：承認兩個 endpoint 切的是**不同母體**
+   （IC 切特徵列、事件掃描切事件），故不存在單一邊界。做法＝只有 IC 報告的數字叫
+   「驗證段」；事件掃描端的數字改名為「事件掃描內部訓練／評分切分」並標
+   `split_authority: "event_local_non_canonical"`。使用者不再看到兩個同名數字。
+   代價＝C-1「邊界唯一」降級為「命名唯一＋權威唯一」，consult D1 需部分改寫。
 
 ---
 

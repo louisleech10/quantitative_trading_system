@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "session_id": "20260911-splitunify-x-stamp-r1",
+  "expected_roster": [
+    "codex"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-splitunify-x-stamp-r1/sources/20260911-splitunify-x-stamp-r1-codex.md",
+      "sha256": "3c6815dda3897da2773a4cbe9726583d7453586a394b0c552a1f4c6381d9eb61",
+      "family": "codex"
+    }
+  ],
+  "freeze_ts": "2026-09-10T15:50:32Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "851d529c-1cf9-4d6d-8cdc-5fc9c7c9ba21"
+}
