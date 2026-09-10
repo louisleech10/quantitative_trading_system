@@ -612,6 +612,51 @@ def test_non_positive_bucket_ms_is_fail_closed() -> None:
             build_time_clusters(man, bad_bucket)
 
 
+def test_datetime_index_unsorted_is_fail_closed() -> None:
+    """🔴 `DatetimeIndex` **也要**過遞增檢查（J1）——R2 只修了數值分支，這支繞過去了。"""
+    index, train, test, keys, man, _ = _basic_case()
+    dt_desc = pd.to_datetime(np.asarray(index, dtype="int64")[::-1], unit="ms")
+    with pytest.raises(ValueError, match="非嚴格遞增"):
+        derive_event_split_from_plans(train, test, keys, dt_desc, manifest=man, bucket_ms=H1)
+
+
+def test_unsorted_row_index_is_fail_closed() -> None:
+    """🔴 `row_index` **反序** ⇒ raise（J2）：範圍與唯一性都對，但 `row_index[0]` 不是最早的列。"""
+    index, train, test, keys, man, _ = _basic_case()
+    rev = SplitPlan(
+        split_label="test", index_kind="positional",
+        row_index=np.asarray(test.row_index, dtype=int)[::-1],
+        time_bounds=test.time_bounds, purge_gap=PURGE, embargo=EMBARGO,
+        purge_semantic="rows", base_universe_hash="deadbeef", symbol=SYM,
+    )
+    with pytest.raises(ValueError, match="row_index 非嚴格遞增"):
+        derive_event_split_from_plans(train, rev, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_none_symbol_is_fail_closed() -> None:
+    """🔴 `event_keys.symbol` 全為 `None` ⇒ raise（J3；三家獨立命中）。
+
+    原本先 `if s is not None` 濾掉 ⇒ 空集合 ⇒ 後面的 `if symbols and ...` 整條被跳過
+    ＝ **fail-open**，還會輸出 `symbol=None` 的 assignment。
+    """
+    index, train, test, _, _, _ = _basic_case()
+    keys = _event_keys([("e", index[0], int(index[0]) + H1, None)])
+    with pytest.raises(ValueError, match="含 None／空字串"):
+        derive_event_split_from_plans(
+            train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+        )
+
+
+def test_blank_symbol_is_fail_closed() -> None:
+    """空字串 symbol 同樣擋——`str(s)` 會把它變成合法值，但它不是身份。"""
+    index, train, test, _, _, _ = _basic_case()
+    keys = _event_keys([("e", index[0], int(index[0]) + H1, "  ")])
+    with pytest.raises(ValueError, match="含 None／空字串"):
+        derive_event_split_from_plans(
+            train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+        )
+
+
 def test_answer_window_one_ms_before_test_start_is_purged() -> None:
     """🔴 `label_end` 落在 canonical test start **前 1ms** 的 train 事件——不該 purge。
 

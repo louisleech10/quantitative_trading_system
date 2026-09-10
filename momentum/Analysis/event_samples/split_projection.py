@@ -87,7 +87,13 @@ def _index_as_ms(index: Any) -> np.ndarray:
     if isinstance(idx, pd.DatetimeIndex):
         if idx.hasnans:
             raise ValueError("split_projection: feature_index 含 NaT（fail-closed）")
-        return (idx.asi8 // 10 ** 6).astype("int64")
+        # 🔴 DatetimeIndex **也要**過同一組不變式（B2b R3 之 J1）——R2 我只補了數值分支，
+        #    這一支直接 return 就繞過了嚴格遞增檢查，等於只修了一半。
+        return assert_epoch_ms_array(
+            (idx.asi8 // 10 ** 6).astype("int64"),
+            role="split_projection: feature_index",
+            strictly_increasing=True,
+        )
     return assert_epoch_ms_array(
         np.asarray(idx), role="split_projection: feature_index", strictly_increasing=True
     )  # 🔴 feature_index **必須**嚴格遞增：下游以 row_index[0] 取「最早時刻」
@@ -211,7 +217,16 @@ def derive_event_split_from_plans(
             )
 
     # 🔴 多 symbol fail-closed（SPEC C-2）：實測全域 12 列 vs per-symbol 8 列，兩者不等價。
-    symbols = {str(s) for s in event_keys["symbol"].unique() if s is not None}
+    # 🔴 **不得先把 None 濾掉**（B2b R3 之 J3；codex／composer／grok 三家獨立命中）：
+    #    原本寫 `if s is not None` ⇒ 全為 None 時 `symbols` 為空集合 ⇒ 後面的
+    #    `if symbols and ...` 整條被跳過 ＝ **fail-open**，還會輸出 `symbol=None` 的 assignment。
+    raw_symbols = list(event_keys["symbol"].unique())
+    if any(s is None or (isinstance(s, str) and not s.strip()) for s in raw_symbols):
+        raise ValueError(
+            f"{_REASON_MULTI_SYMBOL}: event_keys.symbol 含 None／空字串"
+            "——沒有身份就無法證明邊界屬於本批（fail-closed，不得跳過守衛）"
+        )
+    symbols = {str(s) for s in raw_symbols}
     plan_symbols = {
         str(getattr(p, "symbol")) for p in (train_plan, test_plan)
         if getattr(p, "symbol", None) is not None

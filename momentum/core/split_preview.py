@@ -118,7 +118,9 @@ def assert_epoch_ms_array(
     return arr.astype("int64")
 
 
-def assert_positional_rows(rows: Any, *, n: int, role: str) -> np.ndarray:
+def assert_positional_rows(
+    rows: Any, *, n: int, role: str, require_sorted: bool = True
+) -> np.ndarray:
     """把 positional row index 驗成 `0 <= i < n` 且無重複；不合規即 raise。
 
     🔴 出生理由（B2b review `CODEX-R1-P1-03`）：numpy 對**負索引**會回捲，
@@ -151,6 +153,14 @@ def assert_positional_rows(rows: Any, *, n: int, role: str) -> np.ndarray:
         )
     if np.unique(arr).size != arr.size:
         raise ValueError(f"{role}: row_index 有重複位置（fail-closed）")
+    # 🔴 **順序**也要驗（B2b R3 之 `CODEX-R3-P1-02`）：範圍與唯一性都對、但**反序**時
+    #    `row_index[0]` 就不是「最早的那一列」⇒ `test_start_ms` 取到最晚的 test row，
+    #    跨進實際 test 首根的 train 事件會留在 train。與 index 反序是同一個洞的另一半。
+    if require_sorted and arr.size > 1 and not np.all(np.diff(arr) > 0):
+        raise ValueError(
+            f"{role}: row_index 非嚴格遞增——下游以 row_index[0] 取『最早的列』，"
+            "反序即算錯（fail-closed）"
+        )
     return arr
 
 
@@ -219,11 +229,23 @@ def holdout_boundary(
     `max(effective_horizon, label_window_rows)`，本函式**不猜、不查 config**。
     """
     index = pd.Index(feature_index)
-    if not isinstance(index, pd.DatetimeIndex) and index.size:
-        # 邊界 builder 與投影共用同一組不變式（B2b R2 之 I1/I2）。
-        assert_epoch_ms_array(
-            np.asarray(index), role="holdout_boundary: feature_index", strictly_increasing=True
-        )
+    if index.size:
+        # 邊界 builder 與投影共用同一組不變式（B2b R2 之 I1/I2、R3 之 J1）。
+        # 🔴 `DatetimeIndex` **也要驗**——R2 我只補了數值分支，Datetime 分支直接繞過，
+        #    等於只修了一半（`CODEX-R3-P1-01`／`GROK-R3-P1-01` 兩家獨立命中）。
+        if isinstance(index, pd.DatetimeIndex):
+            if index.hasnans:
+                raise ValueError("holdout_boundary: feature_index 含 NaT（fail-closed）")
+            assert_epoch_ms_array(
+                (index.asi8 // 10 ** 6).astype("int64"),
+                role="holdout_boundary: feature_index",
+                strictly_increasing=True,
+            )
+        else:
+            assert_epoch_ms_array(
+                np.asarray(index), role="holdout_boundary: feature_index",
+                strictly_increasing=True,
+            )
     n = int(len(index))
     if n == 0:
         # 無 universe 即無邊界；回空計畫會讓下游把「沒切」誤讀成「切了但都空」。

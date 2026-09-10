@@ -19,7 +19,7 @@ TARGET = REPO / "momentum" / "Analysis" / "event_samples" / "split_projection.py
 CLUSTER_TARGET = REPO / "momentum" / "Analysis" / "event_samples" / "event_split.py"
 #: 共用 validator 之錨點住 core（B2b R2 之 I1/I2/I4）。
 PREVIEW_TARGET = REPO / "momentum" / "core" / "split_preview.py"
-PREVIEW_MUTANTS = {"M-SU-21", "M-SU-22", "M-SU-24"}
+PREVIEW_MUTANTS = {"M-SU-21", "M-SU-22", "M-SU-24", "M-SU-28"}
 CLUSTER_MUTANTS = {"M-SU-7", "M-SU-26"}
 TESTS = REPO / "tests" / "momentum" / "Analysis" / "test_splitunify_derive.py"
 
@@ -171,6 +171,27 @@ MUTANTS = [
         "    if bucket <= 0:",
         "    if False:",
         "non_positive_bucket",
+    ),
+    (
+        "M-SU-27",
+        "DatetimeIndex 分支繞過遞增檢查（只修一半的洞）",
+        '        return assert_epoch_ms_array(\n            (idx.asi8 // 10 ** 6).astype("int64"),\n            role="split_projection: feature_index",\n            strictly_increasing=True,\n        )',
+        '        return (idx.asi8 // 10 ** 6).astype("int64")',
+        "datetime_index_unsorted",
+    ),
+    (
+        "M-SU-28",
+        "row_index 順序檢查拿掉（反序時 row_index[0] 不是最早的列）",
+        "    if require_sorted and arr.size > 1 and not np.all(np.diff(arr) > 0):",
+        "    if False:",
+        "unsorted_row_index",
+    ),
+    (
+        "M-SU-29",
+        "symbol 先濾掉 None（守衛被整條跳過＝fail-open）",
+        "    if any(s is None or (isinstance(s, str) and not s.strip()) for s in raw_symbols):",
+        "    if False:",
+        "none_symbol or blank_symbol",
     ),
     (
         "C0",
