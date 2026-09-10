@@ -350,3 +350,20 @@ def test_third_guard_verifies_the_full_triple_including_owner():
     )
     with pytest.raises(AlignmentViolationError, match="事件"):
         _merge(orch, feats, y)
+
+
+def test_every_row_gets_binary_keys_even_when_unavailable():
+    """🔴 前端以「第一列有無 `rank_biserial`」判是不是 binary 模式。
+
+    若 `binary_status != ok` 的欄不寫該鍵，而它剛好排第一列，整張表就會退回報酬版版面
+    ——使用者會看不到主統計。故**每一列都要有這幾個鍵**，不分 status。
+    （B5 review brief 必答 5 之自我驗證。）
+    """
+    orch = _orch(min_per_class=999)          # 逼出 class_below_min ⇒ 全部 unavailable
+    feats, y = _fixture()
+    _bind(orch, feats, y)
+    table, _ = _merge(orch, feats, y)
+    assert all(str(r["binary_status"]) != "ok" for r in table), "fixture 應全部不可用"
+    for row in table:
+        assert "rank_biserial" in row, f"{row['feature_name']} 不可用但仍須有主統計鍵"
+        assert "auc" in row and "mw_p_value_adj" in row
