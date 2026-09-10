@@ -19,8 +19,18 @@
 ③ `CODEX-R1-P1-03`／`CODEX-R1-P1-05` **完全未被任何群集引用** ⇒ 現補為 **D7**／**D8**。
 ⇒ 這正是戳記閘存在的理由：主委產 reconcile、實作端直接信，中間本無人核對忠實性。
 
+🔴 **第二次修訂（同日，由 `20260911-SPLITUNIFY-X-STAMP-R2` 之 composer APPROVED 但附註觸發）**：
+composer 雖核可（立場未被丟失或改寫），仍指出四條 finding **ID 歸屬行**寫錯或缺漏。
+主委據此把 **19 條 findings 逐條重對**，結果：**11 條歸屬錯誤或缺漏**——
+grok 的 7 條**全部**掛錯（例如 `GROK-R1-P1-01` 講的是「隔離帶事件被標成 train」＝D3，
+卻被掛在 D1；`GROK-R1-P2-02` 講 clusters／summary＝D7，卻被掛在 D4）。
+現已全部更正，並確認 D5（票大小與批次）**沒有任何 finding 支撐**——它出自三家的
+**必答 6** 回答，故該行改為明寫「無」，不虛掛。
+19 條之最終歸屬：D1×4、D2×3、D3×1、D4×3、D5×0、D6×2、D7×3、D8×3 ＝ 19。
+⇒ 此次修訂使 composer 之 `9eebe063…` 戳記失效，三家皆須重蓋（R3／R4／R5）。
+
 ### D1 — 統一方向：時間切分為 canonical 權威（**方向**三家一致；**理由**非三家共同，見下）
-- findings：`CODEX-R1-P1-02`、`COMPOSER-R1-P1-01`、`GROK-R1-P1-01`
+- findings：`CODEX-R1-P1-02`、`COMPOSER-R1-P1-01`、`GROK-R1-P1-02`、`GROK-R1-P2-03`
 - **決議**：K 線 holdout（`SplitPlan`，含 purge／embargo）為**唯一邊界來源**；
   `EventSplitPlan` 降為**投影容器**，不再自行決定邊界。
 - 理由（**依 `CODEX-R1-P1-02` 修正後之版本**）：**所有 row／event projection 共用同一
@@ -35,7 +45,7 @@
      answer-window 完整性、leakage negative case。
 
 ### D2 — 🔴 但**否決**我 brief 的字面做法：不得以全域 scalar `test_timestamps` 交集取代
-- findings：`CODEX-R1-P0-01`、`COMPOSER-R1-P0-01`（**兩家各自標 P0**）、`GROK-R1-P1-02`
+- findings：`CODEX-R1-P0-01`、`COMPOSER-R1-P0-01`（**兩家各自標 P0**）、`GROK-R1-P1-03`
 - 兩家獨立指出：全批 scalar 交集會**改變驗證段成員**，並可能以第一個 symbol 的 holdout
   冒充整批邊界（`next(iter(allowed_symbols))`）——這是資料品質／OOS 語意問題，不是型別重構。
 - 🔴 **我自己實跑證實了這一點**（`handoffs/20260910-probe-splitunify-multisymbol.py`，
@@ -46,13 +56,13 @@
   投影完成前 **fail-closed**（grok），不得以 scalar 冒充。
 
 ### D3 — 投影是**三態**不是二態（grok 提出，另兩家不反對）
-- findings：`GROK-R1-P1-02`、`GROK-R1-P2-01`
+- findings：`GROK-R1-P1-01`
 - 我原本只講「與 `test_timestamps` 交集」＝二態（在／不在測試段）。
 - **決議**：投影須用 train 與 test **兩個 plan** 導出 **train／purged／test 三態**——
   落在隔離區（purged）的事件既不屬訓練也不屬驗證，二態會把它們錯誤地歸進其中一邊。
 
 ### D4 — GAP-3 走延伸檔，不解凍原檔（三家一致）
-- findings：`CODEX-R1-P2-06`、`COMPOSER-R1-P1-03`、`GROK-R1-P2-02`
+- findings：`CODEX-R1-P2-06`、`COMPOSER-R1-P2-01`、`GROK-R1-P2-04`
 - **決議**：新增 `docs/SPLITUNIFY_SPEC.md`＋`docs/GAP3_EVENT_UX_SPEC.D-002.md`（切分權威／投影契約／§G）。
 - 🔴 `CODEX-R1-P2-06` 另指出：frozen primary 與 UX extension convention 的**路徑字面不一致**，
   不先寫清楚會讓派工時選錯規格入口。D-002 須明寫入口路徑。
@@ -60,7 +70,7 @@
   已改列正確的 `CODEX-R1-P2-06`；P1-04 之實質移至新增之 **D6**。
 
 ### D5 — 票大小與批次（三家一致「大」；批數 3–4，取較保守之 4）
-- findings：`COMPOSER-R1-P2-02`、`GROK-R1-P2-04`
+- findings：（無——D5 出自三家**必答 6**之回答，不是 findings；此處刻意留空以免虛掛）
 - **決議**：**大票**（命中 (a) 數值／洩漏、(b) 跨模組、(c) 多 phase、(d) 切分正確性）。
   四批：① SPEC＋D-002＋本 reconcile ② derive 純函式＋golden ③ pipeline／orchestrator 接線
   ④ API／前端單一驗證段揭露＋UAT 項。每批三家 review。
@@ -68,7 +78,7 @@
   與 fail-closed reason（codex）。
 
 ### 🔴 D6 — 接線缺口：事件 pipeline 沒有 IC 的 feature row universe（**原收斂漏掉，2026-09-10 補回**）
-- findings：`CODEX-R1-P1-04`
+- findings：`CODEX-R1-P1-04`、`COMPOSER-R1-P2-02`
 - **codex 原話（逐字要點）**：「只修改 IC orchestrator 不會消除雙驗證段；事件 pipeline 有獨立
   split producer，而且它目前**沒有 IC feature row universe**，不能自行重算一份『看似相同』的邊界。」
   碼證：`pipeline.py:683-705` 之 `run()` 無條件在 `:691` 呼叫 `split_events()`；
@@ -93,7 +103,7 @@
   ⇒ 探針結果與 codex 之決議③一致：**沒有共同 universe 就不得宣稱 OOS**。
 
 ### D7 — `EventSplitPlan` 之語意欄位必須由 canonical boundary **重新導出**，不是型別 alias（原收斂漏列）
-- findings：`CODEX-R1-P1-03`
+- findings：`CODEX-R1-P1-03`、`COMPOSER-R1-P1-02`、`GROK-R1-P2-02`
 - **決議**：`assignments`／`purged`／`clusters`／`summary.degraded` 皆為下游仍在消費的事件語意
   （`baseline.py:105-110`、`pattern_bridge.py:114-175`、`tables.py:305-367`、`tables.py:130-150`
   之 `formal_pooled_inference_allowed`）。最小落地**不是刪除 `EventSplitPlan`**，而是新增一個
@@ -102,7 +112,7 @@
   summary 的 degraded／LOSO 狀態仍要明確揭露；**空 plan 不得冒充未切分**。
 
 ### D8 — 統一**會改變數值**，不是純重構（原收斂漏列）
-- findings：`CODEX-R1-P1-05`
+- findings：`CODEX-R1-P1-05`、`COMPOSER-R1-P1-03`、`GROK-R1-P2-01`
 - **決議**：至少影響 `baseline.py:118-161`（`n_test`、prevalence、AUC／PR-AUC、permutation band、
   BH-FDR）、`tables.py:305-370`（OOS metrics、macro／micro AUC、cluster CI）、
   `pattern_bridge.py:122-218`（fit rows、rules、scores、lift、receipt hash）、
@@ -355,3 +365,8 @@ RECONCILE-STAMP: codex REJECTED 2026-09-10 sha256:ca475ed187f0e2d44c770e093030c5
 （D1 理由改寫為「共用同一 canonical boundary」、前提驗證段更正為「被 CODEX-R1-P1-02 正面反駁」），
 本體 hash 已變為 `6d84745faa08…`。該 REJECTED 行**保留為稽核軌跡**，不刪；codex 之重新蓋章走
 `20260911-SPLITUNIFY-X-STAMP-R4`。）
+RECONCILE-STAMP: composer APPROVED 2026-09-11 sha256:9eebe0637707d9747f24a90a0c07857154f5d54d08eaa709701f130e676003c1 task:20260911-SPLITUNIFY-X-STAMP-R2
+
+（🔴 上方 composer APPROVED 針對 body-hash `9eebe063…`；主委隨後依 composer 附註把 19 條 findings
+之 ID 歸屬全部重對並更正 11 條，本體 hash 再變。該 APPROVED 行**保留為稽核軌跡**，
+三家重蓋走 `20260911-SPLITUNIFY-X-STAMP-R3`（grok）／`-R4`（codex）／`-R5`（composer）。）

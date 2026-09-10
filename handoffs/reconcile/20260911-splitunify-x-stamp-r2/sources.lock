@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "session_id": "20260911-splitunify-x-stamp-r2",
+  "expected_roster": [
+    "composer"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-splitunify-x-stamp-r2/sources/20260911-splitunify-x-stamp-r2-composer.md",
+      "sha256": "033d85784ad3c37625a815797427be32531196795b001514adb067c55e2082a1",
+      "family": "composer"
+    }
+  ],
+  "freeze_ts": "2026-09-10T15:55:30Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "0de0cb58-6b41-4c67-b241-77716f39c446"
+}

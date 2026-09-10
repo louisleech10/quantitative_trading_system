@@ -5,7 +5,7 @@ task-id: 20260911-SPLITUNIFY-X-STAMP-R2
 findings-round: R2
 stamp-target: handoffs/reconcile/20260910-splitunify-x-consult-r1/synth.md
 
-（序列化：composer＝`-STAMP-R2`、grok＝`-STAMP-R3`、codex 重審＝`-STAMP-R4`；
+（序列化重蓋：grok＝`-STAMP-R3`、codex＝`-STAMP-R4`、composer＝`-STAMP-R5`；
 戳記行之 `task:` 寫**你被派的 task-id**。）
 
 ## 為什麼有這一輪，以及 synth 已經被改過什麼
@@ -20,7 +20,14 @@ stamp-target: handoffs/reconcile/20260910-splitunify-x-consult-r1/synth.md
 - `CODEX-R1-P2-06` 原被誤列在 D5 ⇒ 移正至 D4。
 
 ⇒ synth 的**本體已改**（決議項由 5 個增為 8 個），body-hash 已變。
-第一輪那行 REJECTED 帶的是舊 hash，**刻意保留為稽核軌跡**，其下有一段說明註記。
+
+🔴 **第二次修訂（同日）**：composer 於 `-STAMP-R2` 核可，但附註指出四條 finding **ID 歸屬行**
+寫錯或缺漏。主委據此把 **19 條 findings 逐條重對**，發現 **11 條歸屬錯誤或缺漏**——
+**grok 的 7 條全部掛錯**；且 D5（票大小與批次）根本沒有任何 finding 支撐（出自必答 6），
+原本卻掛了兩條不相干的 ID，現改為明寫「無」。最終歸屬：
+D1×4、D2×3、D3×1、D4×3、D5×0、D6×2、D7×3、D8×3 ＝ 19。
+此修訂使 composer 之 `9eebe063…` 戳記失效 ⇒ **三家全部重蓋**（R3 grok／R4 codex／R5 composer）。
+檔內兩行舊戳記（codex REJECTED、composer APPROVED）**刻意保留為稽核軌跡**，各自下方有註記。
 **你這一輪要蓋的是新的 body-hash**，自己算，不要抄任何文件裡出現過的雜湊。
 
 ## 🔴 交件形態（缺這段整輪會銷不了帳）
