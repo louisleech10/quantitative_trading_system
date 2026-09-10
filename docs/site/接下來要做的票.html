@@ -32,6 +32,12 @@
 <li><strong>代價</strong>：全域時間約 ×horizon 數，頁面會註明；加速是 GAP-6 的事。purge 要改成取勾選 horizon 的最大值（正確性改動，要規格＋三家審）。</li>
 <li><strong>大小</strong>：中。排 EVTLABEL 後面。</li>
 </ul>
+<h2 id="evtlabel-之後uat-之前splitunify兩套切分統一">EVTLABEL 之後、UAT 之前：SPLITUNIFY（兩套切分統一）</h2>
+<ul>
+<li><strong>是什麼</strong>：事件切分（GAP-3）與 IC 時間切分現在各切各的，同一批事件會有兩個驗證段（31 vs 33）。統一成一套，一個批次只有一條驗證邊界。</li>
+<li><strong>裁定（9/10）</strong>：你選 B——EVTLABEL 三段做完 → SPLITUNIFY → 才 UAT（UAT 一定最後）。<strong>切法由我跟委員會 consult 定共識</strong>（我的提案＝以時間切分為準、事件切分導出；委員可推翻），不問你。</li>
+<li><strong>大小</strong>：中～大（11 個生產檔、13 個測試檔在用事件切分；動到 GAP-3 凍結規格 ⇒ 走延伸檔＋三家審）。</li>
+</ul>
 <h2 id="兩件小配套不另開票併進-evtlabel">兩件小配套（不另開票，併進 EVTLABEL）</h2>
 <ul>
 <li><strong>FU-3 報告寫每段花幾秒</strong>：現在報告沒有任何分段計時，所以「多 horizon 會多久」「哪段該加速」都沒數字。併進 EVTLABEL 第 1 段（同一個「報告要老實講」原則）。</li>
@@ -42,7 +48,7 @@
 <li><strong>GAP-4 跨 symbol 合併</strong>（EVTLABEL 殘留 R-2 的去處）</li>
 <li><strong>GAP-6 加速</strong>（多 horizon、39k 特徵的時間問題歸這裡）</li>
 <li><strong>triple-barrier 出場</strong>（殘留 R-3；等回測層成熟）</li>
-<li><strong>SPLITUNIFY 兩套切分統一</strong>（殘留 R-6 的根治：一個事件批次只有一個驗證段；事件切分與 IC 時間切分二擇一或合併）</li>
+<li>（SPLITUNIFY 已提前到「EVTLABEL 之後、UAT 之前」，見上）</li>
 </ul>
 <hr />
 <h2 id="討論結論910-起累積新的寫上面">討論結論（9/10 起累積；新的寫上面）</h2>
