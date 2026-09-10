@@ -56588,3 +56588,56 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b1-review-r1-codex.md", "output_sha256": "97f57276e0edb35712b1e95bbdbb8146292e1274f7b5164dcc663ee093ac529e", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T18:01:45Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b1-review-r1-composer.md", "output_sha256": "22294dafd59f9abb3f36c5f3d05c7e87d5d1c2262e4fab2f664151dca7d97c8b", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T18:01:46Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-splitunify-b1-review-r1-grok.md", "output_sha256": "90786f66f59547c37800575bcdf1c6c347fcd754f950ac47ce3d71aee72bddf9", "task_id": "20260911-SPLITUNIFY-B1-REVIEW-R1", "ts": "2026-09-10T18:01:46Z"}
+{"event":"gate_deny","ts":"2026-09-10T18:16:34Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"482cc50478b79ae67608cd2b55d6de102d4c202cc96d58af1effde1f29f69b70","cmd_head":"bash scripts/doc_format_precheck.sh handoffs/20260911-SPLITUNIFY-B2B-REVIEW-BRIEF.md; echo \"rc=$?\" && bash scripts/gate.sh dispatch --intent \"SPLITUNIFY B2b code review\" --risk low --facts-asked \"兩段式是否忠實/有無第二份算術/keyed join 是否擋得住錯位/summary 12 鍵語意/event_split 抽出是否改到行為/mutation 是否夠/可否進 B2c\" --review-role \"adversarial code reviewer, 禁改碼\" --template \"n/a: 用 brief\" --task-id \"20260911-SPLITUNIFY-B2B-REVIEW-R1\" --brief handoffs/202"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B2B-REVIEW-R1", "ts": "2026-09-10T18:16:39Z"}
+=== 2026-09-11 02:16:39 | dispatch ===
+  ts=2026-09-11 02:16:39
+  kind=dispatch
+  intent=SPLITUNIFY B2b code review
+  risk=low
+  facts_asked=兩段式是否忠實/有無第二份算術/keyed join 是否擋得住錯位/summary 12 鍵語意/event_split 抽出是否改到行為/mutation 是否夠/可否進 B2c
+  review_role=adversarial code reviewer, 禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R1", "ts": "2026-09-10T18:17:41Z"}
+=== 2026-09-11 02:17:41 | dispatch ===
+  ts=2026-09-11 02:17:41
+  kind=dispatch
+  intent=SPLITUNIFY B2b code review
+  risk=low
+  facts_asked=兩段式是否忠實/有無第二份算術/keyed join 是否擋得住錯位/summary 12 鍵語意/event_split 抽出是否改到行為/mutation 是否夠/可否進 B2c
+  review_role=adversarial code reviewer, 禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R1", "ts": "2026-09-10T18:17:49Z"}
+=== 2026-09-11 02:17:49 | dispatch ===
+  ts=2026-09-11 02:17:49
+  kind=dispatch
+  intent=SPLITUNIFY B2b code review
+  risk=low
+  facts_asked=兩段式是否忠實/有無第二份算術/keyed join 是否擋得住錯位/summary 12 鍵語意/event_split 抽出是否改到行為/mutation 是否夠/可否進 B2c
+  review_role=adversarial code reviewer, 禁改碼
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260911-SPLITUNIFY-B2B-REVIEW-BRIEF.md", "brief_sha256": "5b7539e563ccc6efe889e5bbdbc02340097f902a7409d56dc3c03c1cc0e16a45", "brief_sha256_norm": "5b7539e563ccc6efe889e5bbdbc02340097f902a7409d56dc3c03c1cc0e16a45", "event": "committee_round_open", "event_id": "8aa92038-7f61-42f6-9896-ccf8f5b5c950", "expected_outputs": {"codex": "handoffs/20260911-splitunify-b2-review-r1-codex.md", "composer": "handoffs/20260911-splitunify-b2-review-r1-composer.md", "grok": "handoffs/20260911-splitunify-b2-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "65aa1909-0444-4b47-9390-343f488ea3b6", "schema_version": 1, "sequence": 3406, "session_name": "20260911-splitunify-b2-review-r1", "task_id": "20260911-SPLITUNIFY-B2-REVIEW-R1", "ts": "2026-09-10T18:17:55Z"}

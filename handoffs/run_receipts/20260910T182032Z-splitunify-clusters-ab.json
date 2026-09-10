@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260910T182032Z-splitunify-clusters-ab",
+  "claim_id": "splitunify-clusters-ab",
+  "command": [
+    "venv/bin/python",
+    "handoffs/20260911-probe-splitunify-clusters-ab.py"
+  ],
+  "command_sha256": "40c561b8937602296a951822dab3c93124ce929454b062e636b2c3aafceb8066",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "323cb9b62b1866baae1f75aac3386fdc8d46387a",
+  "tree_dirty": true,
+  "started_at": "2026-09-10T18:20:29Z",
+  "ended_at": "2026-09-10T18:20:32Z",
+  "duration_seconds": 2.740472,
+  "exit_code": 0,
+  "runtime_class": "static_only",
+  "requested_class": null,
+  "pytest_summary": null,
+  "selected_node_ids": [],
+  "markers": [],
+  "passed": 0,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "634a14392625deaefe7ae86d68c1f0079a7a332948651afc2ac9aba6cefdcfa7",
+  "stderr_sha256": "64b6e2c1714d39c73d082773bda3421adfc85ba5d1ed6e748567ccd521582b16",
+  "log_sha256": "515cd6e00eb566197c6252257ca39f01d437273614c1f795ffa93220eb1bd282",
+  "log_path": "handoffs/run_receipts/20260910T182032Z-splitunify-clusters-ab.log",
+  "tail_excerpt": [
+    "  ✓ 單 TF 各自成簇: 前後逐值相等（權重 [1.0]）",
+    "  ✓ 共桶（權重 0.5）: 前後逐值相等（權重 [0.5]）",
+    "  ✓ 三筆同時刻（權重 1/3）: 前後逐值相等（權重 [0.3333333333333333]）",
+    "  ✓ 跨標的同桶: 前後逐值相等（權重 [0.5]）",
+    "  ✓ 混 TF：raise ValueError，訊息關鍵字相符",
+    "",
+    "A/B FAILURES=0",
+    "[2026-09-11 02:20:30,307] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor",
+    "2026-09-11 02:20:32,028 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator"
+  ]
+}
