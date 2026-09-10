@@ -214,6 +214,8 @@ def _inject_label_rule_disclosure(staged: Dict[str, Any], report: Any) -> None:
         label_source=info.get("label_source"),
         statistic_kind=info.get("statistic_kind"),
         n_events_consumed=len(staged.get("event_label_by_id") or {}),
+        # R1 `CODEX-R1-P1-01`：揭露之分母＝**實際被消費**的事件（已排除非本次 run symbol 者）。
+        consumed_event_ids=list((staged.get("event_label_by_id") or {}).keys()),
     )
 
 

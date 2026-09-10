@@ -78,6 +78,23 @@ def test_all_nine_stages_are_instrumented():
         assert getattr(fn, "__wrapped__", None) is not None, f"{name} 未掛 @_timed_stage"
 
 
+def test_analyze_resets_timings_per_run():
+    """R1 `CODEX-R1-P2-03`：計時是 analyze-scoped——重用 analyzer 不得把上一次的秒數疊進來。
+
+    以 `analyze` 原始碼之「入口重置」為對象：重置語句必須在任何 stage 之前執行。
+    """
+    import inspect
+
+    src = inspect.getsource(ICFilterOrchestrator.analyze)
+    reset_at = src.find("self._stage_timings = {}")
+    first_stage_at = min(
+        (pos for pos in (src.find("self._stage0_ingestion("), src.find("self._stage1_preprocessing(")) if pos != -1),
+        default=-1,
+    )
+    assert reset_at != -1, "analyze 入口未重置 _stage_timings"
+    assert first_stage_at != -1 and reset_at < first_stage_at, "重置必須在第一個 stage 之前"
+
+
 def test_stage_timings_excluded_from_golden_sha():
     """耗時非決定性 ⇒ 不得進 golden 比對範圍（否則每跑一次 golden 就紅）。"""
     base = {"metadata": {"a": 1}, "summary_table": []}

@@ -326,7 +326,7 @@ class EventSamplePipeline:
         return _impl(prepared, allowed_event_ids)
 
     @staticmethod
-    def build_event_label_rule(**kwargs) -> Dict[str, Any]:
+    def build_event_label_rule(**kwargs: Any) -> Dict[str, Any]:
         """EVTLABEL Task 1.1：`metadata.event_label_rule` 之**唯一**產生出口（純函式委派；api 層經 factory 取本 pipeline 呼叫，守 R3）。"""
         from momentum.Analysis.event_label_mode import build_event_label_rule
 

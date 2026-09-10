@@ -1079,6 +1079,10 @@ class ICFilterOrchestrator:
 
         config = self._apply_tier_config(self._apply_config_override(config_override))
         self._progress_callback = progress_callback
+        # FU-3（R1 `CODEX-R1-P2-03`）：計時是 **analyze-scoped**。不在入口清空的話，重用同一個
+        # analyzer 跑第二次（掃描格逐格重用、UI 連續分析）會把上一次的秒數疊進來 ⇒ 揭露變成假的。
+        # 同一次 analyze 內 fallback 重跑 stage5/6 之累加是**刻意**的，兩者不衝突。
+        self._stage_timings = {}
         self._clear_deep_analysis_cache()
         # GAP-2 Task 4.1：入口存路徑（供 refilter／persist provenance）＋當次 config hash
         self._features_path = str(features_path) if features_path else None

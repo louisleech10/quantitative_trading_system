@@ -128,6 +128,92 @@ def test_uniqueness_disclosure_matches_overlap_definition():
     assert rule["uniqueness"]["n_eff"] == 165 and rule["uniqueness"]["n_overlapping_pairs"] == 0
 
 
+def test_disclosure_scoped_to_consumed_events_only():
+    """R1 `CODEX-R1-P1-01`：混 symbol 批中，揭露分母必須＝實際被消費的事件（非本次 symbol 者要排除）。"""
+    wins = _windows(3) + [
+        _Win("BTCUSDT:12h:900", "BTCUSDT", "12h", 900, 900, 900, 900 + H12),
+        _Win("BTCUSDT:12h:901", "BTCUSDT", "12h", 901, 901, 901, 901 + H12),
+    ]
+    recs = [
+        {"event_id": w.event_id, "symbol": w.symbol, "timeframe": "12h", "label": 1 if w.symbol == "ETHUSDT" else 0}
+        for w in wins
+    ]
+    consumed = [w.event_id for w in wins if w.symbol == "ETHUSDT"]
+    rule = build_event_label_rule(
+        normalized_spec=SPEC_H1, windows=wins, records=recs,
+        feature_timeframe="1h", timeframe_seconds=TF_SECONDS,
+        label_source="event_label_value", statistic_kind="conditional_ic",
+        n_events_consumed=len(consumed), consumed_event_ids=consumed,
+    )
+    # 被排除的 BTC 兩筆（label=0）不得計入
+    assert rule["imported_binary_label"] == {"present": True, "n_pos": 3, "n_neg": 0, "used": False}
+    assert rule["n_events_consumed"] == 3
+    assert rule["uniqueness"]["n_eff"] == 3  # 只算 ETH 三筆，且彼此不重疊
+
+    # 不給 consumed_event_ids ⇒ 沿用全批（單 symbol 批等價；此處證明差異真的存在）
+    all_rule = build_event_label_rule(
+        normalized_spec=SPEC_H1, windows=wins, records=recs,
+        feature_timeframe="1h", timeframe_seconds=TF_SECONDS,
+        label_source="event_label_value", statistic_kind="conditional_ic", n_events_consumed=5,
+    )
+    assert all_rule["imported_binary_label"]["n_neg"] == 2
+
+
+def test_consumed_ids_mismatch_is_loud():
+    """id 不同源 ⇒ 必須 raise，不得靜默產出空揭露（報告顯示 0 事件卻宣稱成功）。"""
+    with pytest.raises(ValueError, match="無交集"):
+        build_event_label_rule(
+            normalized_spec=SPEC_H1, windows=_windows(3), records=_records(2, 1),
+            feature_timeframe="1h", timeframe_seconds=TF_SECONDS,
+            label_source="event_label_value", statistic_kind="conditional_ic",
+            n_events_consumed=3, consumed_event_ids=["不存在的 id"],
+        )
+
+
+def test_uniqueness_matches_bruteforce_and_scales():
+    """R1 `CODEX-R1-P1-02` 三家同判：改 O(n log n) 後語意必須逐筆等同暴力法，且萬級不阻塞。"""
+    import random
+    import time as _time
+
+    from momentum.Analysis.event_label_mode import uniqueness_from_windows
+
+    def brute(win_list):
+        n = len(win_list)
+        counts = []
+        pairs = 0
+        for i, (s_i, e_i) in enumerate(win_list):
+            c = 0
+            for j, (s_j, e_j) in enumerate(win_list):
+                if s_i < e_j and s_j < e_i:
+                    c += 1
+                    if j > i:
+                        pairs += 1
+            counts.append(max(1, c))
+        w = [1.0 / c for c in counts]
+        return {"mean": sum(w) / n, "min": min(w), "n_eff": sum(w), "n_overlapping_pairs": pairs}
+
+    rng = random.Random(20260910)
+    for _ in range(20):  # 隨機重疊形態（含巢狀、同端點、完全重合）
+        raw = []
+        for _k in range(rng.randint(2, 25)):
+            start = rng.randrange(0, 50) * 10
+            raw.append((start, start + rng.choice([10, 20, 50, 100])))
+        wins = [_Win(f"e{i}", "S", "12h", s, s, s, e) for i, (s, e) in enumerate(raw)]
+        got = uniqueness_from_windows(wins)
+        exp = brute(raw)
+        assert got["n_overlapping_pairs"] == exp["n_overlapping_pairs"]
+        assert got["n_eff"] == pytest.approx(exp["n_eff"])
+        assert got["min"] == pytest.approx(exp["min"])
+
+    # 規模：10,000 事件（匯入 50MiB 檔頂之同階）之揭露不得成為阻塞
+    big = [_Win(f"b{i}", "S", "12h", i * H12, i * H12, i * H12, i * H12 + 3 * H12) for i in range(10_000)]
+    t0 = _time.perf_counter()
+    out = uniqueness_from_windows(big)
+    elapsed = _time.perf_counter() - t0
+    assert elapsed < 2.0, f"10k 事件之 uniqueness 揭露耗時 {elapsed:.2f}s（O(n²) 回歸）"
+    assert out["n_eff"] > 0
+
+
 def test_unknown_mode_formula_is_none_not_blank():
     assert return_formula("weird_mode", "trigger_close") is None
     assert return_formula(None, None) is None
@@ -136,15 +222,22 @@ def test_unknown_mode_formula_is_none_not_blank():
 def test_service_hook_writes_key_only_on_event_path_and_without_split():
     from api.services.ic_analysis_service import _inject_isolation_source, _inject_label_rule_disclosure
 
+    wins = _windows(165)
     prepared = SimpleNamespace(
         normalized_spec_bytes=json.dumps(SPEC_H1).encode("utf-8"),
-        windows=_windows(165),
+        windows=wins,
     )
+    # 🔴 id 必須與 windows 同源（service 之 `event_label_by_id` 就是由 windows 逐筆建的）；
+    #    不同源時 `build_event_label_rule` 會 fail-closed（見 test_consumed_ids_mismatch_is_loud）。
+    recs = [
+        {"event_id": w.event_id, "symbol": w.symbol, "timeframe": "12h", "label": 1 if i < 136 else 0}
+        for i, w in enumerate(wins)
+    ]
     staged = {
         "prepared": prepared,
-        "records": tuple(_records(136, 29)),
+        "records": tuple(recs),
         "timeframe_seconds": TF_SECONDS,
-        "event_label_by_id": {f"e{i}": 0.0 for i in range(165)},
+        "event_label_by_id": {w.event_id: 0.0 for w in wins},
     }
     report = {"metadata": {"timeframe": "1h", "event_filter": {"label_source": "event_label_value", "statistic_kind": "conditional_ic"}}}
     _inject_isolation_source(staged, report)  # 切分未套用（無 ic_train_test_split）⇒ isolation 不寫、label 規則仍寫
