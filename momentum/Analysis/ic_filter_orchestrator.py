@@ -1286,6 +1286,12 @@ class ICFilterOrchestrator:
             split_context = {
                 "train_plan": train_plan,
                 "test_plan": test_plan,
+                # 🔴 `CODEX-R1-P1-02`：`test_mask` 之長度是**全表**，而 stage3 拿到的
+                #    `filtered_features` 是事件篩選後的**稀疏子集** ⇒ 直接套 mask 會
+                #    `IndexError: Boolean index has wrong length`（codex 實跑 10 vs 3）。
+                #    改為帶 canonical 測試段**時間戳**，下游一律以「交集」取 selection，
+                #    不用位置遮罩跨物件。
+                "test_timestamps": pd.Index(features_df.index[test_plan.row_index]),
                 "train_mask": train_mask,
                 "test_mask": test_mask,
                 "effective_horizon": effective_horizon,
@@ -3807,11 +3813,14 @@ class ICFilterOrchestrator:
         n_pos_batch = int(sum(1 for v in (event_binary_labels or {}).values() if int(v) == 1))
         n_neg_batch = int(sum(1 for v in (event_binary_labels or {}).values() if int(v) == 0))
 
-        if split_context is not None and split_context.get("test_mask") is not None:
-            sel_idx = filtered_features.index[np.asarray(split_context["test_mask"], dtype=bool)]
+        test_stamps = (split_context or {}).get("test_timestamps")
+        if test_stamps is not None:
+            # 交集：`filtered_features` 是事件子集，`test_timestamps` 是全表之測試段。
+            # 兩者都以時間戳表達 ⇒ 交集即「落在測試段裡的事件列」，長度不匹配的問題不存在。
+            sel_idx = pd.Index(filtered_features.index).intersection(pd.Index(test_stamps))
             selection_scope = "test"
         else:
-            sel_idx = filtered_features.index
+            sel_idx = pd.Index(filtered_features.index)
             selection_scope = "full_sample"
         sel_counts = _count_binary_classes_in_rows(
             event_binary_labels, sel_idx, np.arange(len(sel_idx), dtype=int)
@@ -5006,16 +5015,22 @@ class ICFilterOrchestrator:
                 f"binary label consumed != validated: 長度 {len(y)} != {len(features_for_stats)}"
             )
         # ③ 逐列在驗過的三元組集合內
-        owners = {str(eid): (int(ts), int(val)) for eid, (ts, val) in
-                  ((e, (t, v)) for e, t, v in vb.rows_frozenset)}
-        by_row = {(int(ts), int(val)) for _, ts, val in vb.rows_frozenset}
+        # 🔴 `CODEX-R1-P2-01`：原本只比 `(ts, label)`，`owners` 建了卻沒用
+        #    ⇒ 事件 id 換掉但 (ts, label) 還對得上時仍會過。改為比**完整三元組**：
+        #    以 ts 反查該列屬於哪個 event，三項全等才算同一份。
+        by_ts = {int(ts): (str(eid), int(val)) for eid, ts, val in vb.rows_frozenset}
         sel_ms = (pd.Index(sel_idx).asi8 // 10**6).astype("int64")
         for ts, y_i in zip(sel_ms, y):
-            if (int(ts), int(y_i)) not in by_row:
+            entry = by_ts.get(int(ts))
+            if entry is None:
                 raise AlignmentViolationError(
-                    f"binary label consumed != validated: 列 {int(ts)} 之值 {int(y_i)} 不在驗過的集合內"
+                    f"binary label consumed != validated: 列 {int(ts)} 不在驗過的集合內"
                 )
-        assert owners is not None  # 保留 owners 供未來逐 event 診斷；不參與判定
+            if int(entry[1]) != int(y_i):
+                raise AlignmentViolationError(
+                    f"binary label consumed != validated: 列 {int(ts)} 之值 {int(y_i)}"
+                    f" != 驗過的 {int(entry[1])}（事件 {entry[0]!r}）"
+                )
 
         tbl = mann_whitney_table(
             features_for_stats, y, min_class_n=int(config.event_filter.min_events_per_class)

@@ -317,3 +317,29 @@ def test_non_finite_rank_biserial_sinks_to_bottom():
     stage5 = {"summary_table": [{"feature_name": "dead", "ic_mean": 0.9, "rank_biserial": float("nan")}]}
     scores, _ = orch._redundancy_scores(BINARY_INFO, stage5, {})
     assert scores["dead"] == float("-inf")
+
+
+def test_third_guard_verifies_the_full_triple_including_owner():
+    """🔴 `CODEX-R1-P2-01`：第三道守衛原本只比 `(ts, label)`，`owners` 建了卻沒用。
+
+    事件 id 被換掉但 (ts, label) 還對得上時，舊版仍會放行。現在以 ts 反查所屬事件，
+    三項全等才算同一份；訊息要指名是哪個事件。
+    """
+    import inspect
+
+    src = inspect.getsource(ICFilterOrchestrator._merge_binary_statistics)
+    assert "by_ts" in src and "entry[0]" in src, "守衛未使用 event id"
+    assert "assert owners is not None" not in src, "不得再留沒用到的 owners"
+
+    orch = _orch()
+    feats, y = _fixture()
+    _bind(orch, feats, y)
+    vb = orch._ic_cache["event_binary_label"]
+    # 值被翻轉但時間戳仍在集合裡 ⇒ 必須被抓到，且訊息指名事件
+    flipped = frozenset((eid, ts, 1 - val) for eid, ts, val in vb.rows_frozenset)
+    orch._ic_cache["event_binary_label"] = ValidatedBinaryLabel(
+        series=vb.series, digest=vb.digest, rows_frozenset=flipped,
+        n_pos=vb.n_pos, n_neg=vb.n_neg,
+    )
+    with pytest.raises(AlignmentViolationError, match="事件"):
+        _merge(orch, feats, y)

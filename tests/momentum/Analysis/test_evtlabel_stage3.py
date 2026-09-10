@@ -49,14 +49,22 @@ def _owners(feats: pd.DataFrame) -> dict:
     return {int(t): f"e{i}" for i, t in enumerate(ms)}
 
 
-def _bind(orch, feats, binary, *, requested="auto", test_mask=None, hint=None, info=None):
+def _bind(orch, feats, binary, *, requested="auto", test_rows=None, hint=None, info=None,
+          test_timestamps=None):
+    """`test_rows`＝要當作測試段的**位置**（相對本 fixture）；轉成時間戳交給實作。
+
+    🔴 `CODEX-R1-P1-02`：實作已改吃 canonical 測試段**時間戳**，不再吃位置遮罩——
+    因為 `filtered_features` 是事件子集，而遮罩長度是全表，直接套會 IndexError。
+    """
+    if test_timestamps is None and test_rows is not None:
+        test_timestamps = feats.index[np.asarray(test_rows)]
     return orch._resolve_label_mode_and_bind_binary(
         dict(info or {"label_source": "event_label_value"}),
         filtered_features=feats,
         event_binary_labels=binary,
         label_mode_requested=requested,
         label_mode_hint=hint,
-        split_context=None if test_mask is None else {"test_mask": test_mask},
+        split_context=None if test_timestamps is None else {"test_timestamps": test_timestamps},
         event_label_owners=_owners(feats),
         config=orch._config,
         label_source="event_label_value",
@@ -77,13 +85,12 @@ def test_denominator_is_the_test_segment_not_the_whole_batch():
     feats = _features(60)
     pattern = [1] * 30 + [0] * 30
     binary = _labels(feats, pattern)
-    test_mask = np.zeros(60, dtype=bool)
-    test_mask[48:] = True                      # 最後 12 列：48-59 ⇒ 全部是 0？
+    test_rows = np.arange(48, 60)              # 最後 12 列
     # 讓驗證段呈 10 正 / 2 反
     pattern2 = [1] * 30 + [0] * 18 + [1] * 10 + [0] * 2
     binary2 = _labels(feats, pattern2)
 
-    out = _bind(_orch(), feats, binary2, test_mask=test_mask)
+    out = _bind(_orch(), feats, binary2, test_rows=test_rows)
     lm = out["label_mode"]
     assert lm["selection_scope"] == "test"
     assert (lm["n_pos_selection"], lm["n_neg_selection"]) == (10, 2)
@@ -96,7 +103,7 @@ def test_no_split_falls_back_to_full_sample_scope():
     """無切分（fallback）⇒ scope=full_sample，並據此判定（不是直接放棄）。"""
     feats = _features(40)
     binary = _labels(feats, [1] * 20 + [0] * 20)
-    out = _bind(_orch(), feats, binary, test_mask=None)
+    out = _bind(_orch(), feats, binary, test_rows=None)
     lm = out["label_mode"]
     assert lm["selection_scope"] == "full_sample"
     assert (lm["n_pos_selection"], lm["n_neg_selection"]) == (20, 20)
@@ -107,9 +114,7 @@ def test_one_class_in_selection_gets_its_own_reason():
     """驗證段單類 ⇒ `one_class`（與「有兩類但太少」是不同的原因）。"""
     feats = _features(40)
     binary = _labels(feats, [1] * 20 + [0] * 8 + [1] * 12)
-    test_mask = np.zeros(40, dtype=bool)
-    test_mask[28:] = True                      # 最後 12 列全是 1
-    out = _bind(_orch(), feats, binary, test_mask=test_mask)
+    out = _bind(_orch(), feats, binary, test_rows=np.arange(28, 40))   # 最後 12 列全是 1
     assert out["label_mode"]["effective"] == "return_rule"
     assert out["label_mode"]["reason"] == "one_class"
 
@@ -123,10 +128,8 @@ def test_explicit_mode_raises_instead_of_downgrading():
     """🔴 明示 `imported_binary` 遇不足 ⇒ raise；訊息要說出實際數字與門檻。"""
     feats = _features(40)
     binary = _labels(feats, [1] * 20 + [0] * 8 + [1] * 10 + [0] * 2)
-    test_mask = np.zeros(40, dtype=bool)
-    test_mask[28:] = True
     with pytest.raises(ValueError, match="class_below_min_selection"):
-        _bind(_orch(), feats, binary, requested="imported_binary", test_mask=test_mask)
+        _bind(_orch(), feats, binary, requested="imported_binary", test_rows=np.arange(28, 40))
 
 
 def test_auto_records_hint_when_no_binary_available():
@@ -270,3 +273,55 @@ def test_return_rule_info_keys_unchanged():
     for key, value in before.items():
         assert out[key] == value, f"{key} 被改動"
     assert set(out) - set(before) == {"label_mode"}
+
+
+def test_sparse_event_subset_with_full_frame_test_segment():
+    """🔴 `CODEX-R1-P1-02`：事件子集只有 3 列，而全表測試段有 10 列。
+
+    舊實作把**全表長度**的布林遮罩套在稀疏子集上 ⇒
+    `IndexError: Boolean index has wrong length`（codex 實跑 10 vs 3）。
+    現在兩邊都以時間戳表達、取交集，長度不匹配的問題結構上不存在。
+    """
+    full = _features(40)                       # 全表 40 列
+    events = full.iloc[[30, 34, 38]]           # 事件只有 3 列，全都落在測試段內
+    binary = {int(t): int(v) for t, v in
+              zip((events.index.asi8 // 10**6).astype("int64"), [1, 0, 1])}
+    test_timestamps = full.index[30:40]        # 全表測試段 10 列
+    orch = _orch(min_per_class=1)
+    out = orch._resolve_label_mode_and_bind_binary(
+        {"label_source": "event_label_value"},
+        filtered_features=events,
+        event_binary_labels=binary,
+        label_mode_requested="auto",
+        label_mode_hint=None,
+        split_context={"test_timestamps": test_timestamps},
+        event_label_owners={int(t): f"e{i}" for i, t in
+                            enumerate((events.index.asi8 // 10**6).astype("int64"))},
+        config=orch._config,
+        label_source="event_label_value",
+    )
+    lm = out["label_mode"]
+    assert lm["selection_scope"] == "test"
+    assert (lm["n_pos_selection"], lm["n_neg_selection"]) == (2, 1)
+    assert lm["effective"] == "imported_binary"
+
+
+def test_events_outside_the_test_segment_are_not_counted():
+    """事件落在訓練段 ⇒ 不算進 selection（交集語意的另一面）。"""
+    full = _features(40)
+    events = full.iloc[[2, 5, 34]]             # 前兩個在訓練段，只有一個在測試段
+    binary = {int(t): int(v) for t, v in
+              zip((events.index.asi8 // 10**6).astype("int64"), [1, 0, 1])}
+    orch = _orch(min_per_class=1)
+    out = orch._resolve_label_mode_and_bind_binary(
+        {"label_source": "event_label_value"},
+        filtered_features=events, event_binary_labels=binary,
+        label_mode_requested="auto", label_mode_hint=None,
+        split_context={"test_timestamps": full.index[30:40]},
+        event_label_owners={int(t): f"e{i}" for i, t in
+                            enumerate((events.index.asi8 // 10**6).astype("int64"))},
+        config=orch._config, label_source="event_label_value",
+    )
+    lm = out["label_mode"]
+    assert (lm["n_pos_selection"], lm["n_neg_selection"]) == (1, 0)
+    assert lm["reason"] == "one_class"
