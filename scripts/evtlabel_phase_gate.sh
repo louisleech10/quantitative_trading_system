@@ -39,7 +39,8 @@ fail=0
 
 # ── 0：artifact 必須存在（Task 0.1）──────────────────────────────────
 for p in scripts/evtlabel_phase_gate.sh handoffs/20260910-evtlabel-mutate.py \
-         handoffs/20260910-probe-label-rule.py handoffs/20260910-probe-mw-bench.py tests/golden/evtlabel; do
+         handoffs/20260910-probe-label-rule.py handoffs/20260910-probe-mw-bench.py \
+         handoffs/20260910-probe-oracle-bench.py tests/golden/evtlabel; do
   if [ ! -e "${p}" ]; then echo "GATE FAIL: 缺 artifact ${p}"; fail=1; fi
 done
 
@@ -54,6 +55,19 @@ if [ -n "${tests}" ]; then
     if [ "${nskip}" -gt 0 ]; then echo "GATE FAIL: ${t} 仍有 ${nskip} 條 skip（skip 不是綠）"; fail=1; fi
   done
 fi
+
+# ── ①b：真實規模 benchmark（Task 3.7 驗證 (a)/(b)；`COMPOSER-R1-P2-02` 要求持久 gate）──
+#    🔴 一次性 receipt 擋不住「未來欄數膨脹時重犯」——本關卡讓它每批都跑一次。
+#    探針自身在超過門檻時回 rc≠0（含 10% NaN 路徑，`GROK-R1-P1-03` 實測情境）。
+case "${phase}" in
+  3b|3c)
+    if ! "${PY}" handoffs/20260910-probe-oracle-bench.py > /tmp/evtlabel_oracle_bench.out 2>&1; then
+      echo "GATE FAIL: oracle benchmark 超出門檻（見 /tmp/evtlabel_oracle_bench.out）"
+      grep -E '^\(a\)|^\(b\)|^\(c\)|OVER LIMIT' /tmp/evtlabel_oracle_bench.out || true
+      fail=1
+    fi
+    ;;
+esac
 
 # ── ②：golden glob 非空（Phase≥2；G-2 事件切分 golden 沿 evtalign，G-6 survivor golden 於 B4 前凍結）──
 case "${phase}" in
