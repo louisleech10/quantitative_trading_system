@@ -1,6 +1,8 @@
 # 量化主線：GAP-3 事件型施工看板
 
 > 📌 2026-09-11：`SPLITUNIFY` 第 2 批 b 動到 `momentum/Analysis/event_samples/`——新增投影函式 `split_projection.py`，並把「分簇」從 `event_split.py` 抽成兩邊共用的函式（行為逐值不變）。事件切分本身的邊界來源改由 K 線切分決定，細節見 [SPLITUNIFY施工進度.md](SPLITUNIFY施工進度.md)。
+>
+> 📌 2026-09-11（第 3 批）：接線完成。事件掃描路徑**恆走「只做事件研究」**並明講原因；報酬表新增一欄標明「這是全樣本，不是 OOS」。匯入／對齊／去重／出表行為不變。
 
 > 📌 2026-09-11：`SPLITUNIFY` 票新增規格延伸 `docs/GAP3_EVENT_UX_SPEC.D-002.md`——事件切分**不再自己決定邊界**，改由 K 線的訓練／驗證邊界投影而來；拿不到特徵表的匯入流程明講「未執行切分」，不再顯示 train 0／test 0／purge 0 這種假數字。白話見 [SPLITUNIFY規格白話.md](SPLITUNIFY規格白話.md)、進度見 [SPLITUNIFY施工進度.md](SPLITUNIFY施工進度.md)。本檔其餘內容為之前批次之狀態。
 

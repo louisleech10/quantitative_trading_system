@@ -15,6 +15,9 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, confusion_matrix, roc_auc_score
 
 from momentum.Analysis.event_samples.baseline import permutation_oracle
+from momentum.Analysis.event_samples.split_projection import (
+    full_sample_estimand_scope as _full_sample_estimand_scope,
+)
 from momentum.Analysis.event_samples.types import AlignmentReceipts, EventManifest, EventSplitPlan, OracleConfig
 from momentum.Analysis.ic_config_schema import load_report_contract
 
@@ -148,6 +151,11 @@ def _common_constraint_block(event_split_plan: Optional[EventSplitPlan], manifes
         "formal_pooled_inference_allowed": allowed,
         "reason": None if event_split_plan is not None else "no_event_split_plan",
         "dedupe_policy": manifest.policy if manifest is not None else None,
+        # 🔴 SPLITUNIFY Task 3.3 ③（SPEC C-0 決議③(b)；R2 之 D4）：`split_plan=None` 時本表
+        #    **確實跑全 manifest 事件**（下方逐列組表無 `split_label=="test"` 過濾），
+        #    只有 `ci` 與 `formal_pooled_inference_allowed` 被降級 ⇒ 必須明說估計量範圍不是 OOS。
+        #    有 plan 時為 `None`（不是省略鍵）——鍵恆在，讀的人才不必分辨「沒這欄」與「沒算」。
+        "estimand_scope": None if event_split_plan is not None else _full_sample_estimand_scope(),
     }
 
 

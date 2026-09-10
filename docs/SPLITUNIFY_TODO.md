@@ -420,6 +420,22 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 | `M-SU-13` | 拿掉第一段答案窗 purge（只留集合成員判定） | `test_splitunify_golden.py -k leakage_negative` ＋ `test_splitunify_derive.py -k answer_window` | B2b |
 | `C0` | 只改註解（對照組） | 必須仍綠 | 全批 |
 
+🔴 **B3 追加九條（接線之錯法不是「算錯」而是「接到別的地方去了」）**——腳本
+`handoffs/20260911-splitunify-b3-mutate.py`，判定同上（紅只認 rc=1；`C0` 必綠）：
+
+| ID | 改壞什麼 | 應紅之測試 |
+|---|---|---|
+| `M-SU-B3-1` | 給齊 canonical 邊界時仍走歷史 `split_events` | `test_splitunify_wiring.py -k canonical_boundary` |
+| `M-SU-B3-2` | 只給一半邊界參數時不再擋（靜默退回歷史切分） | `test_splitunify_wiring.py -k partial_boundary` |
+| `M-SU-B3-3` | 投影路徑不再檢查毫秒 embargo | `test_splitunify_wiring.py -k embargo_must_be_none` |
+| `M-SU-B3-5` | service 走回 `run_with_params`（無 universe 仍切） | `test_splitunify_event_study_only.py -k production_call_count` |
+| `M-SU-B3-6` | 兩條 capability reason 合一 | `test_splitunify_event_study_only.py -k capability_reason_is_no_universe` |
+| `M-SU-B3-7` | `estimand_scope` 不再揭露 | `test_splitunify_event_study_only.py -k full_sample_estimand` |
+| `M-SU-B3-8` | orchestrator 不走 canonical boundary builder | `test_holdout_test_row_index.py -k orchestrator_uses_this_function` |
+| `M-SU-B3-9` | 畫面在 unavailable 時仍印 train／test／purge | vitest `eventTablesPanelCapability.test.tsx` |
+
+（`M-SU-10` 之錨點落在 `pipeline.run_event_study_only` 的 summary 上，一併由該腳本跑。）
+
 ---
 
 ## §E 具名殘留（每條帶「為何現在不做」，只准 blocked-by／user-ruling／needs-research）
@@ -433,3 +449,4 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 | `R-5` | 事件掃描端取得 post-trim feature universe | needs-research | 要新增 `features_run_id` 跨棧參數（請求模型／前端／契約／UAT 全動），且 `EventImportService` 目前完全不碰 FF run ⇒ 超出本票；R2 之 D1 裁定事件掃描端恆走 event-study-only。日後實作**不得**刪除 Task 3.3 分支 |
 | `SU-RESID-2` | 多 TF 之 `(event_id, timeframe)` 複合鍵 | needs-research | 本票以「每事件恰一個 selected per_tf row，否則 raise」fail-closed；複合鍵要連 `EventSplitPlan` 之下游一起改 |
 | `SU-RESID-1` | attribution checker 擋不住歸屬錯置 | needs-research | 需「決議項 ↔ finding 語意對應」之機械判準，屬治理工具研究 |
+| `SU-RESID-3` | 投影未對證「plan 之 universe ＝ 傳入之 `feature_index`」 | needs-research | B3 自查發現。已補的是**兩 plan 之間**的 `base_universe_hash` 必須相同；與 `feature_index` 對證需兩側共用同一種 hash 表示法，而現行 `base_universe_hash` 是**秒**語意（`contracts._coerce_timestamp_array` 對數字一律 `unit="s"`）、事件側時鐘是毫秒 ⇒ 改 hash 輸入會移動既有 IC golden digest。該新 fail-closed 情形**刻意未登記**進 `split_unify.json`（登記會動到已戳記 SPEC 之封閉值集與前端枚舉面），改以明文 `ValueError` 擋；是否升格為具名 reason 交 B3 code review 裁定 |

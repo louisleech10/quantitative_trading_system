@@ -261,6 +261,29 @@ def test_plan_symbols_differ_is_fail_closed() -> None:
         derive_event_split_from_plans(train, btc_test, keys, index, manifest=man, bucket_ms=H1)
 
 
+def test_plan_universes_differ_is_fail_closed() -> None:
+    """🔴 symbol 相同**不代表** universe 相同（B3 自查）。
+
+    同一個 ETHUSDT 可以有裁切前／裁切後兩份特徵索引（實測 EVTALIGN 裁頭尾後邊界位移 67 小時）。
+    兩 plan 各自建在不同 universe 上時，`row_index` 的同一個數字指的是不同的時刻 ⇒ 靜默錯分。
+    `base_universe_hash` 是 `SplitPlan` 已經帶著的身份欄，投影原本完全沒看它。
+    """
+    index, train, test, keys, man, _ = _basic_case()
+    other_universe = SplitPlan(
+        split_label="test",
+        index_kind="positional",
+        row_index=np.asarray(test.row_index, dtype=int),
+        time_bounds=test.time_bounds,
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="a-different-universe",   # ← 唯一的差別
+        symbol=SYM,
+    )
+    with pytest.raises(ValueError, match="base_universe_hash 不同"):
+        derive_event_split_from_plans(train, other_universe, keys, index, manifest=man, bucket_ms=H1)
+
+
 def test_single_symbol_batch_unaffected() -> None:
     index, train, test, keys, man, _ = _basic_case()
     derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)

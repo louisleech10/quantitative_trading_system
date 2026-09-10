@@ -237,4 +237,8 @@ def test_return_table_by_label_13_g2_golden_byte_frozen(bars):
 
 #: 由本檔之固定 fixture（`IDXS`／`LABELS`／`CFG`）產生；數值面由 `_12_independent_hand_oracle` 獨立驗證。
 #: 更新時須在 commit message 說明改了什麼、為什麼（§G G-2）。
-G2_GOLDEN_SHA256 = "2652b94a082e56dd15a9f4939e907a0b4993573c692357b3d379f4d41c14b00b"
+#: 🔴 2026-09-11 SPLITUNIFY Task 3.3 ③：`common` 新增 `estimand_scope`（本 fixture 有 split_plan
+#:    ⇒ 值為 `None`）。**變更範圍已逐項對證**：把新鍵拿掉後重算之 sha256 逐字等於舊凍結值
+#:    `2652b94a082e56dd15a9f4939e907a0b4993573c692357b3d379f4d41c14b00b`
+#:    ⇒ 這次唯一的差異就是新增那個鍵，沒有任何數值變動（`_12_independent_hand_oracle` 亦仍綠）。
+G2_GOLDEN_SHA256 = "facc98d4b4ec63dccfaeba801970779f2be36fda9c6ab488c8c34b810ad0c4db"

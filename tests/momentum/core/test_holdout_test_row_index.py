@@ -62,11 +62,24 @@ def test_degenerate_sizes(n_rows: int):
 
 
 def test_orchestrator_uses_this_function():
-    """防「有人把算術複製回去」：orchestrator 之 split 建構必須呼叫本函式。"""
+    """防「有人把算術複製回去」：orchestrator 之 split 建構必須走共用純函式。
+
+    🔴 SPLITUNIFY Task 3.1 起改為**兩段**斷言：orchestrator 呼叫 `holdout_boundary`，
+    而 `holdout_boundary` **本身**以 `holdout_test_row_index` 定義。
+    只斷言其中一段都會留下漏洞：只驗前段 ⇒ 有人把 boundary 內部改成自己的算術也照樣綠；
+    只驗後段 ⇒ 接線改回就地算術時，字串仍可能出現在別處。整條鏈釘住才等於原本的保護。
+    """
     import inspect
 
     from momentum.Analysis import ic_filter_orchestrator as orch
+    from momentum.core import split_preview
 
     src = inspect.getsource(orch._build_holdout_split_plan)
-    assert "holdout_test_row_index(" in src, "切分未使用共用純函式（第二份算術會漂）"
+    assert "holdout_boundary(" in src, "切分未經 canonical boundary builder（兩端會漂）"
     assert "np.arange(split_point" not in src, "殘留舊的就地算術"
+
+    boundary_src = inspect.getsource(split_preview.holdout_boundary)
+    assert "holdout_test_row_index(" in boundary_src, (
+        "holdout_boundary 未以共用純函式定義自身（第二份算術會漂）"
+    )
+    assert "holdout_split_point(" in boundary_src, "同上：split point 也必須來自共用純函式"

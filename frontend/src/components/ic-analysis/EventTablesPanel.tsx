@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { EventImportRejectedError, analyzeEventImport } from '@/lib/api';
 import { recordImportReference } from '@/lib/eventBatchReferences';
 import { metricTooltip } from '@/lib/eventMetricsGlossary';
+import { splitCapabilityView } from '@/lib/splitCapability';
 import type { EventAnalyzeResponse, EventTableStatus } from '@/lib/types';
 
 interface EventTablesPanelProps {
@@ -344,13 +345,29 @@ export default function EventTablesPanel({ importId, horizons, data }: EventTabl
   }
   if (!resp) return null;
   const s = resp.summary as Record<string, unknown>;
+  const cap = splitCapabilityView(resp.capability);
   return (
     <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-4" data-testid="event-tables-panel">
       <div>
         <p className="text-sm text-slate-300">事件型兩表（批 {resp.import_id}）</p>
         <p className="text-[11px] text-slate-500">
-          匯入 {fmt(s.n_input, 0)}／對齊 {fmt(s.n_aligned, 0)}／對齊失敗 {fmt(s.n_align_failures, 0)}／train {fmt(s.n_train, 0)}／test {fmt(s.n_test, 0)}／purge {fmt(s.n_purged, 0)}
+          匯入 {fmt(s.n_input, 0)}／對齊 {fmt(s.n_aligned, 0)}／對齊失敗 {fmt(s.n_align_failures, 0)}
+          {/* 🔴 SPLITUNIFY Task 3.3 ④：`split === 'unavailable'` 時**禁再顯示**切分計數。
+              原本無條件印 `train 0／test 0／purge 0`——沒有切分卻給計數，讀的人分不出
+              「切了但都空」與「根本沒切」，那是 C-0 要禁的假 OOS 數字。 */}
+          {cap.hasSplit
+            ? `／train ${fmt(s.n_train, 0)}／test ${fmt(s.n_test, 0)}／purge ${fmt(s.n_purged, 0)}`
+            : ''}
         </p>
+        {!cap.hasSplit && (
+          <p
+            className="mt-1 text-[11px] text-amber-300/90"
+            data-testid="event-split-capability"
+            data-split-reason={resp.capability?.reason ?? ''}
+          >
+            {cap.text}
+          </p>
+        )}
       </div>
       <div>
         <p className="text-xs font-semibold text-slate-200 mb-1">事件後報酬表</p>

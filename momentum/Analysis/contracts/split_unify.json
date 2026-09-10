@@ -8,7 +8,7 @@
     "kline_holdout"
   ],
 
-  "_fail_closed_reasons_doc": "投影與其接線端之 fail-closed 原因封閉集合（SPEC C-0/C-2）。字面由 Python 與前端共用，禁散文複列。multi_symbol_projection_unsupported＝per-symbol 投影未支援前的多標的批（SPEC C-2）；missing_train_plan／missing_test_plan＝缺任一側切分計畫（含 test_plan.row_index 為空，SPEC C-4 第一段之先決 fail-closed）；canonical_feature_universe_unavailable＝呼叫端拿不到 post-trim feature universe，須明示 event-study-only 而非按事件數另切（SPEC C-0 決議③）。",
+  "_fail_closed_reasons_doc": "投影與其接線端之 fail-closed 原因封閉集合（SPEC C-0/C-2）。字面由 Python 與前端共用，禁散文複列。multi_symbol_projection_unsupported＝per-symbol 投影未支援前的多標的批（SPEC C-2）；missing_train_plan／missing_test_plan＝缺任一側切分計畫（含 test_plan.row_index 為空，SPEC C-4 第一段之先決 fail-closed）；canonical_feature_universe_unavailable＝呼叫端拿不到 post-trim feature universe，須明示 event-study-only 而非按事件數另切（SPEC C-0 決議③）。🔴 B3 自查發現的第五種情形（train/test 兩 plan 之 base_universe_hash 不同）**刻意不在此登記**：登記會動到已戳記之 SPEC 的封閉值集與前端枚舉面，而該守衛的保護力不依賴字面——它在 split_projection.py 以明文 ValueError 擋下，是否要升格為具名 reason 交 B3 code review 裁定。",
   "fail_closed_reasons": [
     "multi_symbol_projection_unsupported",
     "missing_train_plan",

@@ -94,8 +94,7 @@ from momentum.core.contracts import (
 from momentum.core.protocols import IKlineReader
 from momentum.core.split_preview import (
     count_binary_classes_in_rows as _count_binary_classes_in_rows,
-    holdout_split_point,
-    holdout_test_row_index,
+    holdout_boundary,
 )
 from momentum.factories import create_label_generator
 from momentum.Analysis.ic_split_adapter import ICSplitAdapter
@@ -572,19 +571,36 @@ def _build_holdout_split_plan(
         raise ValueError("purge_gap must be >= effective label horizon")
     n_rows = len(features_df)
     _validate_expected_frequency(features_df.index, expected_freq)
-    split_point = holdout_split_point(n_rows, oos_test_size=float(config.oos_test_size))
     effective_purge = max(int(purge_gap), effective_horizon, 0)
     effective_embargo = int(config.embargo)
-    train_rows = np.arange(0, split_point, dtype=int)
-    # EVTLABEL Task 2.2（R3 `CODEX-R1-P1-04`）：test 段列計畫改由 `momentum/core/split_preview` 之
-    # **單一純函式**產生——service 的顯式模式 fast-fail 預檢呼叫同一支，兩端不可能漂。
-    test_rows = holdout_test_row_index(
-        n_rows,
+    min_rows = int(config.min_test_rows)
+    if n_rows == 0:
+        # 空 universe 走既有的 INSUFFICIENT_DATA 分支——`holdout_boundary` 對空索引是
+        # fail-closed（raise），這裡若先呼叫它會把「資料不足」升級成例外（行為變更）。
+        return SkippedResult(
+            "ic_train_test_split",
+            "train/test rows below min_test_rows",
+            "INSUFFICIENT_DATA",
+            {"train_rows": 0, "test_rows": 0, "min_test_rows": min_rows},
+        )
+    # SPLITUNIFY Task 3.1（SPEC C-0）：列計畫改由 canonical boundary builder 產生——
+    # 事件側投影呼叫**同一支**，兩端不可能漂。`holdout_boundary` 自身以
+    # `holdout_split_point` ＋ `holdout_test_row_index` 定義（不是第二份切分算術），
+    # 故本處逐值等同改動前；差別只在多了 index 之不變式檢查與 ms 揭露值。
+    # EVTLABEL Task 2.2（R3 `CODEX-R1-P1-04`）之「單一純函式」約束由本呼叫繼承。
+    # 🔴 單位：IC 主線索引是 DatetimeIndex **或 epoch 秒**（`_normalize_ic_time_index` 之語意），
+    #    而 `holdout_boundary` 的單位政策是毫秒 ⇒ 先用本模組既有的 canonical 正規化器
+    #    轉成 DatetimeIndex，**不新造第二套換算**（實測：直接餵秒會被
+    #    `assert_epoch_ms_array` 擋下並指名「looks like epoch seconds」）。
+    #    `base_universe_hash`／`time_bounds` 仍用**原始**索引——改用正規化後的會動到既有指紋。
+    boundary = holdout_boundary(
+        _normalize_ic_time_index(features_df.index, "features_df"),
         oos_test_size=float(config.oos_test_size),
         purge_gap=effective_purge,
         embargo=effective_embargo,
     )
-    min_rows = int(config.min_test_rows)
+    train_rows = boundary["train_row_index"]
+    test_rows = boundary["test_row_index"]
     if train_rows.size < min_rows or test_rows.size < min_rows:
         return SkippedResult(
             "ic_train_test_split",

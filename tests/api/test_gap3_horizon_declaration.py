@@ -175,11 +175,21 @@ def test_gap3_horizon_declaration_06_multi_timeframe_keys_are_per_tf():
 
 
 # ── R1（CODEX-R1-P1-03）：宣告的下界必須**真的接到 split**，不能只是收據上的數字 ──
-def test_gap3_horizon_declaration_07_declared_depth_reaches_split_embargo(monkeypatch):
-    """`label_return_mode="open_to_close"` 之 label 窗**不隨 horizon 變**。
+def test_gap3_horizon_declaration_07_declared_depth_is_disclosed_not_silently_dropped(monkeypatch):
+    """🔴 **2026-09-11 SPLITUNIFY Task 3.3 改寫**：本條原本斷言「宣告深度真的送進 `split_events`」。
 
-    若 analyze 把 `embargo_ms=None` 直傳，`split_events` 會退回「label 窗最大值」＝1 根，
-    宣告 20 根卻只隔 1 根＝洩漏。本條以執行期探針攔截真正送進 split 的 embargo。
+    改寫理由是**前提被裁定消滅**，不是放寬標準：事件掃描端拿不到 canonical feature
+    universe（本 service 完全不碰 FF run）⇒ 依 SPEC C-0 決議③恆走 event-study-only，
+    這條路徑上**根本沒有切分**，也就沒有「送進切分的 embargo」可言。原斷言若留著，
+    只會逼未來的人把切分接回來以求綠燈——那正是本票要消滅的第二套切分。
+
+    改寫後守的是同一件事的現行形態：**宣告的深度不得靜默消失**。
+      ①`split_events` 一次都沒被呼叫（執行期事實）；
+      ②`embargo.applied_ms` 為 `None` 且 `source` 明說原因（不是填 0 或沿用請求值）；
+      ③宣告投影出的下界仍**看得到**（落在 `lookahead_declaration` 上），數字沒有被丟掉；
+      ④capability 講明為什麼沒有驗證段。
+    切分路徑本身的 embargo 保證改由 `tests/momentum/event_samples/test_splitunify_wiring.py`
+    之 `-k embargo_must_be_none` 與 `split_events` 自身的既有測試守。
     """
     from momentum.Analysis.event_samples import pipeline as pipeline_mod
     from momentum.core.constants import TIMEFRAME_SECONDS as TFS
@@ -207,9 +217,16 @@ def test_gap3_horizon_declaration_07_declared_depth_reaches_split_embargo(monkey
     monkeypatch.setattr(pipeline_mod, "split_events", spy)
     a = client.post(f"/api/v1/case/events/{import_id}/analyze", json={"horizons": [1]})
     assert a.status_code == 200, a.text
-    assert seen and seen[0] is not None, "analyze 沒把任何 embargo 下界送進 split"
-    assert seen[0] >= declared_ms, f"送進 split 的 embargo {seen[0]} 低於宣告深度 {declared_ms}（purge 不足＝洩漏）"
-    assert a.json()["embargo"]["applied_ms"] >= declared_ms
+    payload = a.json()
+
+    assert seen == [], "事件掃描端呼叫了切分——本路徑無 canonical universe，不得自己切一份"
+    assert payload["embargo"] == {"applied_ms": None, "source": "not_applicable_event_study_only"}, (
+        "未切分卻報出一個 embargo 數字 ⇒ 讀的人會以為隔離有生效"
+    )
+    # 宣告的下界仍看得見（沒有被丟掉），只是這條路徑上沒有東西會去套用它
+    assert payload["lookahead_declaration"]["embargo_ms_by_symbol"] == {"ETHUSDT": declared_ms}
+    assert payload["capability"]["split"] == "unavailable"
+    assert payload["capability"]["reason"] == "canonical_feature_universe_unavailable"
 
 
 # ── R2（CODEX-R2-P1-01）：不同 scope 的下界不得被折成全批 scalar ────────────

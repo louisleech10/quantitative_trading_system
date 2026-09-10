@@ -21,6 +21,10 @@ from momentum.Analysis.event_samples.event_split import split_events
 from momentum.Analysis.event_samples.feature_materialization import materialize_features_at_decision
 from momentum.Analysis.event_samples.import_contract import ContractValidationError, validate_event_import
 from momentum.Analysis.event_samples.lookahead_gate import LookaheadGate, assert_split_allowed
+from momentum.Analysis.event_samples.split_projection import (
+    build_event_keys,
+    derive_event_split_from_plans,
+)
 from momentum.Analysis.event_samples.types import (
     AlignmentConfig, AlignmentReceipts, DedupePolicyConfig, EventManifest, EventSplitConfig, EventSplitPlan,
 )
@@ -206,6 +210,21 @@ class EventSamplePipeline:
         from momentum.Analysis.event_samples.lookahead_gate import split_blocked_reason
 
         return split_blocked_reason()
+
+    @staticmethod
+    def canonical_universe_unavailable_reason() -> str:
+        """SPLITUNIFY Task 3.3 ①：無 canonical feature universe 之 capability reason 字面。
+
+        🔴 字面自 `split_unify.json` 讀，**不手打**——前端讀同一份檔對證（SPEC C-8）。
+        與 L3 之 `split_blocked_capability_reason()` 是**兩條不同 reason**（字面皆住契約）：
+        前者是「拿不到 universe」，後者是「深度不可證」；兩者都會走 event-study-only，
+        但畫面必須分得出來（R2 之 D5）。
+        """
+        from momentum.Analysis.event_samples.split_projection import (
+            canonical_universe_unavailable_reason as _reason,
+        )
+
+        return _reason()
 
     @staticmethod
     def validate_receipt_values(namespace: str, values: Mapping[str, Any], *,
@@ -679,16 +698,57 @@ class EventSamplePipeline:
         *,
         source_bytes: Optional[bytes] = None,
         lookahead_gate: Optional[LookaheadGate] = None,
+        train_plan: Optional[Any] = None,
+        test_plan: Optional[Any] = None,
+        feature_index: Optional[Any] = None,
+        selected_timeframe: Optional[str] = None,
     ) -> EventPipelineResult:
         """全鏈（含切分）；匯入不合規 ⇒ raise ContractValidationError（fail-closed，不半套）。
 
         🔴 Task 1.12：`lookahead_gate` 判定封鎖時本方法**直接 raise**——切分是本路徑的固有步驟，
         不得以「警告後放行」降級。需要出表請改呼叫 `run_event_study_only()`。
+
+        🔴 **SPLITUNIFY Task 3.1（SPEC C-0／C-1）**：給定 canonical 邊界
+        （`train_plan`＋`test_plan`＋`feature_index`＋`selected_timeframe`，**四者同時**）
+        ⇒ 走**投影**；四者皆未給 ⇒ 走既有 `split_events`（歷史路徑）。
+        **給一半是 fail-closed**——「有些給了、有些沒給」在舊寫法下會靜默走回歷史路徑，
+        而呼叫端以為自己用的是統一後的邊界，那正是本票要消滅的「兩套切分」。
+
+        canonical 邊界之唯一產生點是 `momentum.core.split_preview.holdout_boundary`；
+        本方法**不自行算邊界**，只傳遞。
         """
         assert_split_allowed(lookahead_gate, where="EventSamplePipeline.run")
         events, aligned, receipts, failures, manifest = self._prepare(
             records, bars_by_tf, config, source_bytes=source_bytes, where="EventSamplePipeline.run")
-        plan = split_events(manifest, config.split, lookahead_gate=lookahead_gate)
+        projection_args = {
+            "train_plan": train_plan, "test_plan": test_plan,
+            "feature_index": feature_index, "selected_timeframe": selected_timeframe,
+        }
+        given = [k for k, v in projection_args.items() if v is not None]
+        if given and len(given) != len(projection_args):
+            raise ValueError(
+                "EventSamplePipeline.run: canonical 邊界參數必須同時給齊"
+                f"（已給 {sorted(given)}，缺 {sorted(set(projection_args) - set(given))}）"
+                "——給一半會靜默走回歷史切分（fail-closed）"
+            )
+        if given:
+            # 🔴 Task 3.1 要點 4（R3 之 E5＋R4 之 F3）：投影的隔離語意來自 canonical 邊界之
+            #    row 單位 purge／embargo；事件側若同時帶著自己的毫秒 embargo，等於兩套隔離
+            #    同時生效而沒有人知道哪一套贏。欄位層級是 `config.split.…`（`EventPipelineConfig`
+            #    本身沒有 `embargo_ms`，寫 `config.embargo_ms` 會直接 AttributeError）。
+            if config.split.embargo_ms is not None or config.split.embargo_ms_by_symbol is not None:
+                raise ValueError(
+                    "EventSamplePipeline.run: 走 canonical 投影時 config.split.embargo_ms／"
+                    "embargo_ms_by_symbol 必須為 None——隔離已含在 test_plan.row_index[0] 的起點裡，"
+                    "再疊一層毫秒 embargo 會變成兩套隔離（fail-closed）"
+                )
+            plan = derive_event_split_from_plans(
+                train_plan, test_plan,
+                build_event_keys(receipts, selected_timeframe=str(selected_timeframe)),
+                feature_index, manifest=manifest, bucket_ms=config.split.bucket_ms,
+            )
+        else:
+            plan = split_events(manifest, config.split, lookahead_gate=lookahead_gate)
         features, fhash, ffail = self._materialize(config, receipts, bars_by_tf, aligned)
 
         summary = self._base_summary(events, receipts, failures, manifest, features, fhash, ffail)
@@ -725,11 +785,12 @@ class EventSamplePipeline:
         features, fhash, ffail = self._materialize(config, receipts, bars_by_tf, aligned)
 
         summary = self._base_summary(events, receipts, failures, manifest, features, fhash, ffail)
+        # 🔴 SPLITUNIFY Task 3.3 要點 2（R2 之 D2）：**刪除**寫死的 `n_train`／`n_test`／`n_purged`。
+        #    原本三鍵恆為 0，前端 `EventTablesPanel.tsx` 照著顯示「train 0／test 0／purge 0」——
+        #    那是 C-0 要禁的**假 OOS 數字**：沒有切分卻給出切分計數，讀的人分不出
+        #    「切了但都空」與「根本沒切」。未切分即**不得出現這三鍵**（不是填 0）。
         summary.update({
             "split": None,
-            "n_train": 0,
-            "n_test": 0,
-            "n_purged": 0,
             "execution_mode": "event_study_only",
         })
         if not summary["accounting_ok"]:

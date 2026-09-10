@@ -1589,35 +1589,39 @@ class EventImportService:
         # 🔴 Task 1.12（L3）：深度不可證之批**不進切分**，改走 event-study-only executor。
         #    分派在此發生 ⇒ `split_events` 對該批**根本不會被呼叫**（非「呼叫後再擋」）。
         split_blocked = self._pipeline.lookahead_split_blocked(declaration)
-        if split_blocked:
-            res = self._pipeline.run_event_study_only_with_params(records, bars)
-            embargo_applied: Optional[int] = None
-            embargo_source = "not_applicable_event_study_only"
-        else:
-            # 🔴 R1（`CODEX-R1-P1-03`）：宣告值必須**真的接到 split**，否則 `embargo_ms_by_symbol`
-            #    只是沒人用的數字。原版把 `req.embargo_ms`（預設 None）直傳 ⇒ `split_events` 退回
-            #    `label 窗最大值`；而 `label_return_mode="open_to_close"` 之 label 窗**不隨 horizon 變**
-            #    ⇒ 宣告 20 根、實際只隔 1 根＝洩漏。此處把宣告投影當**下界**套上去。
-            #    保守方向（往上調）永遠允許，故取 max 而非拒收。
-            # 🔴 R2：此處之 `max` 只在**各 symbol 下界皆相同**時才會執行到——
-            #    不同值已由 `_assert_scope_embargo_expressible` 在上方擋掉，故不是「全批 max 冒充 per-scope」。
-            declared_lb = max((int(v) for v in (declaration or {}).get("embargo_ms_by_symbol", {}).values()), default=0)
-            requested = int(req.embargo_ms) if req.embargo_ms is not None else 0
-            embargo_applied = max(requested, declared_lb) or None
-            embargo_source = ("lookahead_declaration_lower_bound"
-                              if declared_lb and declared_lb > requested else
-                              "request" if requested else "label_window_max")
-            res = self._pipeline.run_with_params(
-                records, bars, test_fraction=float(req.test_fraction), embargo_ms=embargo_applied,
-                tier_min_test_events=int(req.tier_min_test_events),
-            )
+        # 🔴 SPLITUNIFY Task 3.3 ①（SPEC C-0 決議③；R2 之 D1 裁定）：**事件掃描端恆走
+        #    event-study-only**。理由是碼證而非偏好——本 service 手上只有匯入的事件與 K 線，
+        #    **完全不碰 FF run**，拿不到 canonical feature universe（＝IC 主線切分所依據的
+        #    post-trim 特徵索引）。沒有 universe 就沒有 canonical 邊界；此時若按事件數自己切
+        #    （舊 `run_with_params` 路徑）並把結果叫做 OOS，就是本票要消滅的**第二套切分**。
+        #    實測（`handoffs/20260911-probe-splitunify-universe-gap.py`）：EVTALIGN 裁頭尾後
+        #    兩端邊界位移可達 67 小時 ⇒ 兩套數字必然不一致。
+        #    ⇒ 兩條 reason 都走同一個 executor，但**字面不同**，畫面要分得出來（R2 之 D5）：
+        #      L3 深度不可證 → `split_blocked_capability_reason()`（字面住契約，本檔禁複寫）
+        #      無 universe   → `canonical_feature_universe_unavailable`
+        #    日後補上 `features_run_id` 跨棧參數時**不得刪除本分支**（殘留 R-5）。
+        #    🔴 **原 `run_with_params` 分支整段移除**，不留 `if False:` 的死碼——死分支會讓
+        #    下一個人以為那條路還會走到，而 `split_events` 的歷史路徑仍完整活在
+        #    `EventSamplePipeline.run()` 裡（G-3a 對照用），沒有東西被刪掉。
+        #    連帶不再使用 `req.test_fraction`／`req.embargo_ms`／`req.tier_min_test_events`：
+        #    未切分卻收切分參數，只會讓呼叫端以為切分仍在進行（同 `run_event_study_only_with_params`
+        #    「不吃 split 參數」之既有裁定）。請求模型欄位本身不動（前端相容），改由 capability 揭露。
+        res = self._pipeline.run_event_study_only_with_params(records, bars)
+        embargo_applied: Optional[int] = None
+        embargo_source = "not_applicable_event_study_only"
         tables = self._pipeline.analyze_tables(res, bars, horizons=tuple(int(h) for h in req.horizons),
                                                seed=int(req.seed), n_boot=int(req.n_boot))
         payload = {
             "import_id": import_id,
             "lookahead_declaration": declaration,
-            "capability": ({"split": "unavailable", "reason": self._pipeline.split_blocked_capability_reason()}
-                           if split_blocked else {"split": "ok"}),
+            # 🔴 Task 3.3 ①：兩條 reason 都是 `unavailable`，**沒有 `"ok"` 分支**——
+            #    事件掃描端在本票中恆無 canonical universe。留一個永遠走不到的 `"ok"`
+            #    會讓前端以為「有時候是有切分的」而繼續顯示切分計數。
+            "capability": {
+                "split": "unavailable",
+                "reason": (self._pipeline.split_blocked_capability_reason() if split_blocked
+                           else self._pipeline.canonical_universe_unavailable_reason()),
+            },
             "embargo": {"applied_ms": embargo_applied, "source": embargo_source},
             "summary": res.summary,
             "align_failures": res.align_failures.to_dict("records") if not res.align_failures.empty else [],

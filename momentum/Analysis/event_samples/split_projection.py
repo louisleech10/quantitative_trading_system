@@ -55,9 +55,33 @@ PURGE_REASONS = _load_closed_set(_EVENT_IMPORT_CONTRACT, "split_purge_reasons")
 _REASON_MULTI_SYMBOL = "multi_symbol_projection_unsupported"
 _REASON_MISSING_TRAIN = "missing_train_plan"
 _REASON_MISSING_TEST = "missing_test_plan"
+#: Task 3.3：呼叫端拿不到 post-trim feature universe ⇒ 明示 event-study-only（SPEC C-0 決議③）。
+_REASON_NO_UNIVERSE = "canonical_feature_universe_unavailable"
+#: B3 自查發現之第五種 fail-closed 情形：train/test 兩 plan 建在不同 universe 上
+#: ⇒ 同一個 row_index 指到不同時刻。
+#: 🔴 **刻意不進 `split_unify.json` 的封閉值集**：登記會動到已戳記之 SPEC 的值集與前端枚舉面，
+#:    而守衛的保護力不依賴字面（下方以明文 ValueError 擋）。是否升格為具名 reason 交 B3 review 裁定。
+_UNREGISTERED_UNIVERSE_MISMATCH = "train/test plan 之 base_universe_hash 不同"
 _PURGE_REASON = "interval_crosses_split_boundary"
+#: event-study-only 之估計量範圍標記（SPEC C-0 決議③(b)）；字面唯一住 `split_unify.json`。
+ESTIMAND_SCOPE_VALUES = _load_closed_set(_CONTRACT_PATH, "estimand_scope_values")
+_ESTIMAND_FULL_SAMPLE = "full_sample_not_oos"
 
-for _r in (_REASON_MULTI_SYMBOL, _REASON_MISSING_TRAIN, _REASON_MISSING_TEST):
+if _ESTIMAND_FULL_SAMPLE not in ESTIMAND_SCOPE_VALUES:  # pragma: no cover - import 期契約自證
+    raise ValueError(f"split_unify.json 缺 estimand_scope {_ESTIMAND_FULL_SAMPLE!r}")
+
+
+def canonical_universe_unavailable_reason() -> str:
+    """Task 3.3：capability reason 字面之**唯一** Python 出口（自契約讀，禁手打）。"""
+    return _REASON_NO_UNIVERSE
+
+
+def full_sample_estimand_scope() -> str:
+    """Task 3.3 ③：`estimand_scope` 字面之**唯一** Python 出口（自契約讀，禁手打）。"""
+    return _ESTIMAND_FULL_SAMPLE
+
+
+for _r in (_REASON_MULTI_SYMBOL, _REASON_MISSING_TRAIN, _REASON_MISSING_TEST, _REASON_NO_UNIVERSE):
     if _r not in FAIL_CLOSED_REASONS:  # pragma: no cover - import 期契約自證
         raise ValueError(f"split_unify.json 缺 fail-closed reason {_r!r}")
 if _PURGE_REASON not in PURGE_REASONS:  # pragma: no cover - import 期契約自證
@@ -246,6 +270,21 @@ def derive_event_split_from_plans(
         raise ValueError(
             f"{_REASON_MULTI_SYMBOL}: train/test plan 之 symbol 不同 {sorted(plan_symbols)}"
             "——邊界本身就跨批（fail-closed）"
+        )
+    # 🔴 第四道（B3 自查補上）：兩 plan 必須來自**同一個 universe**。
+    #    symbol 相同**不代表** universe 相同——同一個 ETHUSDT 可以有裁切前／裁切後兩份特徵索引
+    #    （實測：EVTALIGN 裁頭尾後邊界位移可達 67 小時）。兩 plan 各自建在不同 universe 上時，
+    #    `row_index` 的同一個數字指的是不同的時刻，投影會**靜默錯分**。
+    #    🔴 本檢查**不涵蓋**「plan 之 universe 與傳入的 `feature_index` 是否同源」——
+    #    那需要兩側共用同一種 hash 表示法，而現行 `base_universe_hash` 是**秒**語意
+    #    （`contracts._coerce_timestamp_array` 對數字一律 `unit="s"`），事件側時鐘是毫秒；
+    #    改動 hash 輸入會移動既有 IC golden digest ⇒ 具名殘留 `SU-RESID-3`（needs-research）。
+    plan_universes = {str(getattr(p, "base_universe_hash", "")) for p in (train_plan, test_plan)}
+    if len(plan_universes) > 1:
+        raise ValueError(
+            f"derive_event_split_from_plans: {_UNREGISTERED_UNIVERSE_MISMATCH} "
+            f"{sorted(plan_universes)}——同一個 symbol 也可能有兩份特徵索引，"
+            "row_index 的同一個數字會指到不同時刻（fail-closed）"
         )
     if symbols and symbols != plan_symbols:
         raise ValueError(

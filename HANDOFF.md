@@ -73,9 +73,43 @@
 - 回歸 core＋event_samples＋三支 splitunify → **684 passed**。
 - 解耦逐值等於 `scripts/decouple_baseline.txt`（R2=1 R3=17 R4=3）。
 
+## B3（接線）— 實作完成，待三家審碼
+- **Task 3.1**：`_build_holdout_split_plan` 改走 `holdout_boundary`（🔴 IC 主線索引是
+  DatetimeIndex **或 epoch 秒** ⇒ 呼叫前套本模組既有的 `_normalize_ic_time_index`；
+  `base_universe_hash`／`time_bounds` 仍用**原始**索引，避免動到既有指紋）；
+  `pipeline.run` 新增 `train_plan`／`test_plan`／`feature_index`／`selected_timeframe`
+  **四者同時給才走投影、給一半 fail-closed**；投影路徑禁帶 `config.split.embargo_ms(_by_symbol)`。
+- **Task 3.2**：多 symbol fail-closed 沿用 B2b；**自查補第四道**——兩 plan 之
+  `base_universe_hash` 必須相同（symbol 相同不代表 universe 相同）。
+- **Task 3.3**：`case_import_service.analyze` **恆走** event-study-only（`run_with_params`
+  分支整段移除，不留死碼）；`run_event_study_only` 之 summary **刪掉** `n_train`／`n_test`／
+  `n_purged`（不是填 0）；`tables._common_constraint_block` 新增 `estimand_scope`；
+  前端 `splitCapability.ts`＋`EventTablesPanel` 揭露兩條可分辨的 reason 並隱藏切分計數。
+- **實跑**：B3 mutation `handoffs/20260911-splitunify-b3-mutate.py` **UNCOVERED=0**（9 紅＋C0 綠）｜
+  `tests/momentum/event_samples` 616 passed（含新 `test_splitunify_wiring.py` 8 條）｜
+  `tests/api/test_splitunify_event_study_only.py` 7 passed｜前端 vitest **713 passed/92 files**｜
+  `npm run build` rc=0｜解耦 R2=1 R3=17 R4=3。
+- **`tests/api` 逐檔對照**（先 `git stash` 跑 HEAD、再跑本批）：HEAD 8 failed → 本批 9 failed，
+  **唯一新增**是 `test_gap3_horizon_declaration_07`（前提被 Task 3.3 消滅 ⇒ 已改寫為
+  「宣告的數字不得靜默消失」，該檔 10 passed）。其餘 8 條為既有紅。
+- **G-2 byte golden 更新**：`common` 新增鍵 ⇒ `test_return_table_by_label` 之 sha 換值；
+  **變更範圍已逐項對證**（拿掉新鍵後重算逐字等於舊值）。
+- 殘留新增 `SU-RESID-3`（投影未對證 plan universe ＝ 傳入之 `feature_index`；
+  現行 hash 是秒語意、事件側是毫秒，改 hash 輸入會移動既有 IC golden digest）。
+- **`tests/momentum/Analysis` 全套（16 分 41 秒）：20 failed / 1166 passed / 15 skipped**。
+  對照 B1 凍結之 19 條清單：**沒有一條變短**，多出**一條**
+  `test_gap2_survivor_persist.py::test_hermetic_no_production_write`。
+  🔴 **已證明非本批造成**：`git stash` 掉 B3 全部改動後在 HEAD 上**同樣 FAILED**。
+  真因是該測試的「fresh」判準＝`mtime >= 輸出檔 mtime − 3600`，等於**過去一小時內**
+  有人寫過 `data_cache/reports/ic_survivors_*.json` 就判紅——而 `tests/api` 全套
+  （本 session 04:38–04:47 跑過）確實會寫那兩個檔。⇒ 兩件事各自成立：
+  ①這條測試對「同一小時內跑過別的套件」不 hermetic（時間窗判準）；
+  ②**真的有測試在寫生產路徑** `data_cache/reports/`。兩者皆早於本票，列入 `REDSWEEP`。
+  **刻意不把它加進凍結清單**——那是把新紅合法化（測試遊戲化），不是修好。
+
 ## 下一步（順序）
-1. **B3（接線）**：orchestrator／pipeline 共用 `holdout_boundary`、`split_events` 呼叫點釘 0、
-   多 symbol fail-closed、event-study-only 分派＋`estimand_scope`＋前端 capability 揭露。
+1. **B3 三家審碼**：brief `handoffs/20260911-SPLITUNIFY-B3-REVIEW-BRIEF.md`
+   （task-id `20260911-SPLITUNIFY-B4-REVIEW-R1`——`batch` 只准 `b<數字>`，審查對象仍是 B3）。
 2. **B4**：報告與畫面只暴露**一個**驗證段。
 
 ## 🔴 既有紅盤點（非本票造成，建議另立 `REDSWEEP`）
