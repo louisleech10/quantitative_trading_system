@@ -745,6 +745,60 @@ def purge_lower_bound_rows(
     )
 
 
+def isolation_terms_rows(
+    windows: Sequence[WindowRow],
+    *,
+    lookahead_bars_declared: Mapping[str, int],
+    timeframe_seconds: Mapping[str, int],
+    feature_timeframe: str,
+) -> "EventIsolationRows":
+    """EVTLABEL Task 2.1：把隔離區兩項**分開**換算成特徵週期列數。
+
+    ```
+    label_window_rows   = max over e of ceil((label_end_ms − label_start_ms) / feature_bar_ms)
+    lookahead_depth_rows= max over e of ceil(lookahead_bars_declared[tf] * tf_ms / feature_bar_ms)
+    ```
+
+    🔴 與 `purge_lower_bound_rows` 的差別**就是本 Task 的重點**：那支把兩者取 `max` 後合成
+    **一個**下界（給事件切分之 embargo 用），因此「答案窗」的身分在下游消失了——EVTLABEL 之前
+    `purge_gap` 用的是主線 `default_horizon`（受理 run＝5），與使用者設的 h 無關，而 12 根的
+    答案窗被塞在 embargo 裡。**現況不洩漏**（purge+embargo ≥ max(窗, 深度) 恆成立），但標籤貼錯位置。
+    本函式把兩者分開回傳，讓 purge 真的由答案窗決定、embargo 只承載深度。
+
+    🔴 `timeframe_seconds` 為**注入之 map**（同 `purge_lower_bound_rows`），禁在此直讀 module 常數。
+    `feature_timeframe` 不在 map ⇒ fail-closed；windows 空 ⇒ (0, 0)（無事件可隔離，非錯誤）。
+    """
+    from momentum.core.contracts import EventIsolationRows
+
+    if feature_timeframe not in timeframe_seconds:
+        raise LabelProducerError(
+            f"timeframe_seconds 缺分析用 timeframe {feature_timeframe!r}"
+            f"（{sorted(timeframe_seconds)}）——無法換算隔離區列數（fail-closed）"
+        )
+    feature_bar_ms = int(timeframe_seconds[feature_timeframe]) * 1000
+    if feature_bar_ms <= 0:
+        raise LabelProducerError(f"feature timeframe {feature_timeframe!r} 之秒數非正（fail-closed）")
+
+    window_rows = 0
+    depth_rows = 0
+    for w in windows:
+        tf = w.timeframe
+        if tf not in lookahead_bars_declared:
+            raise LabelProducerError(
+                f"lookahead_bars_declared 缺 timeframe {tf!r}（fail-closed；深度宣告是批次層屬性）"
+            )
+        if tf not in timeframe_seconds:
+            raise LabelProducerError(
+                f"timeframe_seconds 缺 timeframe {tf!r}（fail-closed；禁在此直讀 module 常數補上）"
+            )
+        window_ms = int(w.label_end_ms) - int(w.label_start_ms)
+        depth_ms = int(lookahead_bars_declared[tf]) * int(timeframe_seconds[tf]) * 1000
+        # 無條件進位：不足一列也要整列擋住（與 `ic_analysis_service` 之 purge_rows 同紀律）
+        window_rows = max(window_rows, -(-window_ms // feature_bar_ms) if window_ms > 0 else 0)
+        depth_rows = max(depth_rows, -(-depth_ms // feature_bar_ms) if depth_ms > 0 else 0)
+    return EventIsolationRows(label_window_rows=int(window_rows), lookahead_depth_rows=int(depth_rows))
+
+
 def project_purge(rows: Sequence[SymbolPurgeRow]) -> Mapping[str, int]:
     """`tuple[SymbolPurgeRow, ...]` → `EventSplitConfig.embargo_ms_by_symbol` 之 Mapping。
 

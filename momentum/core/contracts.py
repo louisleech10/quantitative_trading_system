@@ -359,6 +359,22 @@ class SkippedResult:
 
 
 @dataclass(frozen=True)
+class EventIsolationRows:
+    """EVTLABEL Task 2.1／2.2：事件路徑之隔離區兩項，**已換算成特徵週期列數**。
+
+    - `label_window_rows`：本批 label 答案窗之最大長度（`label_end_ms − label_start_ms` ⇒ 特徵列數）。
+      ⇒ 決定 **purge**（跨越 train／test 邊界的答案窗要挖掉幾列）。
+    - `lookahead_depth_rows`：批次宣告之 look-ahead 深度（挑樣本時已看多遠）⇒ 決定 **embargo**。
+
+    🔴 **為何是顯式 kwarg 而非 `config_override`**（R1 C8；三家實跑）：`ICConfig` 對未知鍵是
+    **靜默忽略**（Pydantic 預設 `extra="ignore"`），走 config 通道等於「傳了但不會生效且不報錯」。
+    """
+
+    label_window_rows: int
+    lookahead_depth_rows: int
+
+
+@dataclass(frozen=True)
 class SplitPlan:
     """IC 切分列歸屬契約，記錄單一 split 的 canonical row identity。"""
 

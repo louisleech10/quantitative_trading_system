@@ -56,6 +56,7 @@ from momentum.core.exceptions import (
 )
 from momentum.core.logging import get_logger
 from momentum.core.contracts import (
+    EventIsolationRows,
     ORACLE_RETURN_KINDS,
     AlignmentSpec,
     AlignmentViolationError,
@@ -77,6 +78,7 @@ from momentum.core.contracts import (
     validate_consumed_label,
 )
 from momentum.core.protocols import IKlineReader
+from momentum.core.split_preview import holdout_split_point, holdout_test_row_index
 from momentum.factories import create_label_generator
 from momentum.Analysis.ic_split_adapter import ICSplitAdapter
 
@@ -116,6 +118,24 @@ STAGE_OVERRIDE_PATHS: dict[str, tuple[str, ...]] = {
     "fdr_correction": ("significance", "fdr", "enabled"),
     "marginal_ic": ("marginal_ic", "enabled"),  # GAP-2 Task 4.1（B5 toggle／wiring R1b）
 }
+
+
+#: EVTLABEL Task 2.2：這些鍵**不得**經 `config_override` 傳（`ICConfig` 會靜默吞掉）。
+_ISOLATION_CONTROL_KEYS: frozenset[str] = frozenset(
+    {"event_isolation", "event_purge_rows", "label_window_rows", "lookahead_depth_rows"}
+)
+
+
+def _reject_isolation_in_config_override(config_override: Optional[dict]) -> None:
+    """走錯通道 ⇒ 當場失敗（而不是靜默不生效）。"""
+    if not isinstance(config_override, dict):
+        return
+    hit = sorted(_ISOLATION_CONTROL_KEYS.intersection(config_override))
+    if hit:
+        raise ValueError(
+            f"event isolation must be passed as the `event_isolation` kwarg, not config_override（誤用鍵：{hit}）"
+            "——ICConfig 對未知鍵是靜默忽略，走 config 通道會傳了不生效也不報錯"
+        )
 
 
 def _timed_stage(name: str):
@@ -519,11 +539,18 @@ def _build_holdout_split_plan(
         raise ValueError("purge_gap must be >= effective label horizon")
     n_rows = len(features_df)
     _validate_expected_frequency(features_df.index, expected_freq)
-    split_point = int(np.floor((1.0 - float(config.oos_test_size)) * n_rows))
+    split_point = holdout_split_point(n_rows, oos_test_size=float(config.oos_test_size))
     effective_purge = max(int(purge_gap), effective_horizon, 0)
     effective_embargo = int(config.embargo)
     train_rows = np.arange(0, split_point, dtype=int)
-    test_rows = np.arange(split_point + effective_purge + effective_embargo, n_rows, dtype=int)
+    # EVTLABEL Task 2.2（R3 `CODEX-R1-P1-04`）：test 段列計畫改由 `momentum/core/split_preview` 之
+    # **單一純函式**產生——service 的顯式模式 fast-fail 預檢呼叫同一支，兩端不可能漂。
+    test_rows = holdout_test_row_index(
+        n_rows,
+        oos_test_size=float(config.oos_test_size),
+        purge_gap=effective_purge,
+        embargo=effective_embargo,
+    )
     min_rows = int(config.min_test_rows)
     if train_rows.size < min_rows or test_rows.size < min_rows:
         return SkippedResult(
@@ -1063,8 +1090,13 @@ class ICFilterOrchestrator:
         event_label_values: Optional[dict] = None,
         event_label_owners: Optional[dict] = None,
         event_context: Optional[dict] = None,
+        event_isolation: Optional[EventIsolationRows] = None,
     ) -> dict:
         """主入口：執行完整八階段流水線。
+
+        event_isolation（EVTLABEL Task 2.2）：事件路徑之隔離區兩項（已換算成特徵列數）。
+        `label_window_rows` 抬 **purge**、`lookahead_depth_rows` 由 service 抬 **embargo**。
+        🔴 **只走這個顯式 kwarg**：`config_override` 對未知鍵是靜默忽略，走那條等於沒生效也不報錯。
 
         event_label_values（GAP-3 Task B2.3）：{epoch_ms: label_value} 事件連續 label；
         提供時條件 IC 只吃此 label（D1-3，禁以 decision 列 join 主線 return_N），
@@ -1079,6 +1111,10 @@ class ICFilterOrchestrator:
 
         config = self._apply_tier_config(self._apply_config_override(config_override))
         self._progress_callback = progress_callback
+        # EVTLABEL Task 2.2：隔離區列數**只走顯式 kwarg**。若有人把它塞進 config_override，
+        # `ICConfig` 會靜默吞掉（Pydantic extra=ignore）⇒ 傳了不生效也不報錯，是最難查的一種錯。
+        # 故在入口 fail-closed，把「走錯通道」變成當場失敗。
+        _reject_isolation_in_config_override(config_override)
         # FU-3（R1 `CODEX-R1-P2-03`）：計時是 **analyze-scoped**。不在入口清空的話，重用同一個
         # analyzer 跑第二次（掃描格逐格重用、UI 連續分析）會把上一次的秒數疊進來 ⇒ 揭露變成假的。
         # 同一次 analyze 內 fallback 重跑 stage5/6 之累加是**刻意**的，兩者不衝突。
@@ -1139,12 +1175,18 @@ class ICFilterOrchestrator:
             allowed_symbols = _resolve_metadata_symbol_allowlist(metadata)
             symbol = next(iter(allowed_symbols))
             effective_horizon = _resolve_effective_label_horizon(config, labels_df)
+            # 🔴 EVTLABEL Task 2.2：purge 由**答案窗**決定，不再只吃主線 horizon。
+            #    受理 run（12h 事件 h=1 配 1h 特徵）之前是 purge=5（主線 default_horizon，與 h 無關），
+            #    12 根的答案窗被塞在 embargo 裡 ⇒ 不洩漏但標籤貼錯位置。
+            #    取 max 是因為兩者都必須被擋住：主線 label 的 5 根、事件 label 的 12 根。
+            event_window_rows = int(event_isolation.label_window_rows) if event_isolation else 0
+            effective_purge_gap = max(effective_horizon, event_window_rows)
             split_result = _build_holdout_split_plan(
                 features_df,
                 config,
                 symbol,
                 expected_freq,
-                purge_gap=effective_horizon,
+                purge_gap=effective_purge_gap,
                 labels_df=labels_df,
             )
             if isinstance(split_result, SkippedResult):
@@ -1192,6 +1234,19 @@ class ICFilterOrchestrator:
                 "test_time_bounds": [str(value) for value in test_plan.time_bounds],
                 "index_kind": train_plan.index_kind,
             }
+            if event_isolation is not None:
+                # EVTLABEL Task 2.2：**只在事件路徑寫**這三鍵 ⇒ 全域報告逐位元組不變（G-1）。
+                # `embargo_source` **不在此寫**（R1 C7 定死唯一寫入點＝service 之 `metadata.isolation`）：
+                # orchestrator 看不到「service 抬高前的原 config embargo」，在此判會是第二份推論。
+                metadata["ic_train_test_split"].update(
+                    {
+                        "purge_gap_source": (
+                            "event_label_window" if event_window_rows > effective_horizon else "mainline_horizon"
+                        ),
+                        "event_label_window_rows": int(event_window_rows),
+                        "lookahead_depth_rows": int(event_isolation.lookahead_depth_rows),
+                    }
+                )
             # UAT 2026-09-08（使用者：「為何要跑完才知道不足，要重跑第二次?」）：stage4 之 rolling warmup 檢查
             # 只依賴「測試段列數／視窗／horizon」，切分計畫做完就全部已知 ⇒ 在預處理**之前**先判，
             # 不足直接走全樣本，不再白跑一輪 39k 特徵的預處理。stage4 那條檢查保留為安全網（規則同一份）。

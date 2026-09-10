@@ -11,6 +11,11 @@ export interface ICIsolation {
 }
 
 const SOURCE_TEXT: Record<string, string> = {
+  // EVTLABEL Task 2.3 之新來源（舊鍵保留：舊報告仍讀得到）
+  event_label_window: '由你設的 label 答案窗（h×事件週期）換算成特徵根數',
+  mainline_horizon: '由主線 horizon 決定（你的 label 答案窗沒有比它長）',
+  event_lookahead_depth: '由這批宣告的 look-ahead 深度（挑樣本時看了多遠）換算成特徵根數',
+  // 舊鍵（EVTALIGN 時代）：僅供舊報告顯示，新報告不再產生
   global_default_horizon: '由全域 default_horizon 決定（與你在事件 label 設的 h 無關）',
   event_lookahead: '由事件的 look-ahead（答案窗長度）換算成列數',
   config_embargo: '沿用設定檔的 embargo（事件換算值沒有比它大）',

@@ -35,13 +35,60 @@ def test_isolation_total_equals_sum_and_sources_nonempty():
 
 
 def test_isolation_source_reflects_event_lookahead_or_config():
+    """🔴 EVTLABEL Task 2.3 語意更新（非放寬）：embargo 之來源改由**深度**判定。
+
+    改前用 `purge_rows`（＝max(深度, 答案窗)）判，答案窗比深度長時會把 embargo 誤標成
+    「事件 look-ahead 抬的」——實際上抬它的是答案窗，而答案窗現在歸 purge 管（Task 2.2）。
+    """
     report = _report(embargo=12)
-    _inject_isolation_source({"purge_rows": 12, "embargo_before_event": 3}, report)
+    _inject_isolation_source(
+        {"lookahead_depth_rows": 12, "label_window_rows": 4, "purge_rows": 12, "embargo_before_event": 3}, report
+    )
     e = report["metadata"]["isolation"]["embargo"]
-    assert e["source"] == "event_lookahead" and e["event_purge_rows"] == 12 and e["config_embargo"] == 3
+    assert e["source"] == "event_lookahead_depth"
+    assert e["lookahead_depth_rows"] == 12 and e["config_embargo"] == 3
+    assert e["event_purge_rows"] == 12  # 舊欄保留供對照
+
     report = _report(embargo=20)
-    _inject_isolation_source({"purge_rows": 12, "embargo_before_event": 20}, report)
+    _inject_isolation_source(
+        {"lookahead_depth_rows": 12, "label_window_rows": 4, "purge_rows": 12, "embargo_before_event": 20}, report
+    )
     assert report["metadata"]["isolation"]["embargo"]["source"] == "config_embargo"
+
+
+def test_embargo_source_no_longer_credits_label_window():
+    """答案窗 156 > 深度 144：embargo 只由深度抬 ⇒ 深度未超過 config 時仍標 config_embargo。"""
+    report = _report(embargo=200)
+    _inject_isolation_source(
+        {"lookahead_depth_rows": 144, "label_window_rows": 156, "purge_rows": 156, "embargo_before_event": 200},
+        report,
+    )
+    assert report["metadata"]["isolation"]["embargo"]["source"] == "config_embargo"
+
+
+def test_purge_source_copied_from_orchestrator_not_recomputed():
+    """purge 之來源**抄** orchestrator 寫的 `purge_gap_source`（唯一判定點），service 不重判。"""
+    report = _report(purge=12, horizon=5)
+    report["metadata"]["ic_train_test_split"]["purge_gap_source"] = "event_label_window"
+    _inject_isolation_source(
+        {"lookahead_depth_rows": 144, "label_window_rows": 12, "embargo_before_event": 0}, report
+    )
+    p = report["metadata"]["isolation"]["purge"]
+    assert p["source"] == "event_label_window" and p["event_label_window_rows"] == 12
+    assert "答案窗" in p["note"] and "12" in p["note"]
+
+    report2 = _report(purge=5, horizon=5)
+    report2["metadata"]["ic_train_test_split"]["purge_gap_source"] = "mainline_horizon"
+    _inject_isolation_source(
+        {"lookahead_depth_rows": 144, "label_window_rows": 3, "embargo_before_event": 0}, report2
+    )
+    assert report2["metadata"]["isolation"]["purge"]["source"] == "mainline_horizon"
+
+
+def test_legacy_report_without_new_key_falls_back():
+    """舊報告（無 `purge_gap_source`）⇒ 沿用舊字串，前端仍有對應文案。"""
+    report = _report()
+    _inject_isolation_source({"purge_rows": 12, "embargo_before_event": 0}, report)
     assert report["metadata"]["isolation"]["purge"]["source"] == "global_default_horizon"
 
 

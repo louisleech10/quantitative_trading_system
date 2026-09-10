@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest';
 
+describe('EVTLABEL Task 2.3：新來源字串都有白話文案', () => {
+  it('三個新 source 都不會退化成裸字串', async () => {
+    const { isolationLines } = await import('./icIsolation');
+    const cases: Array<[string, string, string]> = [
+      ['event_label_window', 'event_lookahead_depth', '答案窗'],
+      ['mainline_horizon', 'config_embargo', '主線 horizon'],
+    ];
+    for (const [purgeSrc, embargoSrc, expectText] of cases) {
+      const lines = isolationLines({
+        purge: { bars: 12, source: purgeSrc },
+        embargo: { bars: 144, source: embargoSrc },
+        total_bars: 156,
+      })!;
+      expect(lines[0]).toContain(expectText);
+      expect(lines[0]).not.toContain(purgeSrc); // 有文案就不該露出鍵名
+      expect(lines[1]).not.toContain(embargoSrc);
+      expect(lines[2]).toContain('156');
+    }
+  });
+});
+
 import { isolationLines, readIsolation } from './icIsolation';
 
 describe('isolation 揭露（EVTALIGN Task 5.1）', () => {

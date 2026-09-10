@@ -241,18 +241,30 @@ def _inject_isolation_source(staged: Dict[str, Any], report: Any) -> None:
     purge_bars = int(split.get("purge_gap") or 0)
     embargo_bars = int(split.get("embargo") or 0)
     purge_rows = int(staged.get("purge_rows") or 0)
+    depth_rows = int(staged.get("lookahead_depth_rows") or 0)
+    window_rows = int(staged.get("label_window_rows") or 0)
     before = int(staged.get("embargo_before_event") or 0)
+    effective_horizon = split.get("effective_horizon")
+    # 🔴 EVTLABEL Task 2.3：purge 之來源改抄 orchestrator 寫的 `purge_gap_source`（唯一判定點），
+    #    embargo 之來源仍由**本函式**判（R1 C7：只有 service 知道「抬高前的原 config embargo」）。
+    purge_source = split.get("purge_gap_source") or "global_default_horizon"
+    if purge_source == "event_label_window":
+        purge_note = f"由你設的 label 答案窗換算：max(主線 horizon {effective_horizon}, 答案窗 {window_rows} 根)"
+    else:
+        purge_note = f"由主線 horizon 決定（{effective_horizon} 根）；label 答案窗（{window_rows} 根）沒有比它長"
     metadata["isolation"] = {
         "purge": {
             "bars": purge_bars,
-            "source": "global_default_horizon",
-            "effective_horizon": split.get("effective_horizon"),
-            "note": "由全域 default_horizon 決定，與事件 label 之 h 無關",
+            "source": purge_source,
+            "effective_horizon": effective_horizon,
+            "event_label_window_rows": window_rows,
+            "note": purge_note,
         },
         "embargo": {
             "bars": embargo_bars,
-            "source": "event_lookahead" if purge_rows > before else "config_embargo",
-            "event_purge_rows": purge_rows,
+            "source": "event_lookahead_depth" if depth_rows > before else "config_embargo",
+            "lookahead_depth_rows": depth_rows,
+            "event_purge_rows": purge_rows,  # 舊欄保留供對照（＝max(深度, 窗)）
             "config_embargo": before,
         },
         "total_bars": purge_bars + embargo_bars,
@@ -791,9 +803,20 @@ class ICAnalysisService:
         #    B10 五階段路徑繞過 `ic_feed.build_event_ic_inputs` 也繞掉了它的 event_context ⇒ 補由同一模組之
         #    `event_context_from_windows`（經 pipeline 出口）產生，不在 service 自寫 hash。
         event_context = pipeline.event_context_for_analysis(prepared1, records)
+        # 🔴 EVTLABEL Task 2.1：把隔離區兩項**分開**換算成特徵列數。
+        #    `purge_rows`（＝max(深度, 窗)）保留供對照與既有揭露欄，但不再是 embargo 的唯一來源。
+        isolation_rows = pipeline.isolation_terms_rows(
+            prepared1.windows,
+            lookahead_bars_declared=event_batch.get("lookahead_bars_declared") or {},
+            timeframe_seconds=timeframe_seconds,
+            feature_timeframe=tf,
+        )
         return {
             "purge_ms": int(purge_ms),
             "purge_rows": int(purge_rows),
+            "label_window_rows": int(isolation_rows.label_window_rows),
+            "lookahead_depth_rows": int(isolation_rows.lookahead_depth_rows),
+            "event_isolation": isolation_rows,
             "event_timestamps": sorted(ts_map),
             "event_label_values": ts_map,
             # EVTALIGN Task 2.1（D）：(event_id, timestamp, label_value) 三元組之產生者側資料。
@@ -1337,8 +1360,11 @@ class ICAnalysisService:
         )
         cell_override = dict(config_override or {})
         staged["embargo_before_event"] = int(cell_override.get("embargo") or 0)  # EVTALIGN Task 5.1：揭露來源用
+        # 🔴 EVTLABEL Task 2.1：embargo 只承載**批次宣告之 look-ahead 深度**（挑樣本時看了多遠），
+        #    答案窗改由 `event_isolation.label_window_rows` 抬 purge。舊版用 `purge_rows`
+        #    （＝max(深度, 窗)）抬 embargo ⇒ 答案窗的身分在下游消失。
         cell_override["embargo"] = max(
-            int(cell_override.get("embargo") or 0), int(staged["purge_rows"]),
+            int(cell_override.get("embargo") or 0), int(staged["lookahead_depth_rows"]),
         )
         analyzer = analyzer_factory(cell_override)
         # 🔴 `SCANCUBE` Task 1.1：掃描格是**研究掃描**，不是決策產物 ⇒ 不寫 survivor artifact。
@@ -1363,6 +1389,8 @@ class ICAnalysisService:
             event_label_values=staged["event_label_values"],
             event_label_owners=staged["event_label_owners"],
             event_context=staged["event_context"],
+            # EVTLABEL Task 2.2：purge 由答案窗抬（顯式 kwarg；禁走 config_override）
+            event_isolation=staged.get("event_isolation"),
         )
         _assert_event_triple_bound(staged, report)
         _inject_period_alignment(staged, report)
@@ -1599,6 +1627,9 @@ class ICAnalysisService:
                 event_label_owners = None
                 event_context = None
                 event_timestamps = request.event_timestamps or None
+                # EVTLABEL Task 2.2：非事件 run 不進下方分支 ⇒ 先給空 dict，
+                # 讓後面 `staged.get("event_isolation")` 在全域路徑安全回 None（不是 NameError）。
+                staged: Dict[str, Any] = {}
                 if request.event_import_id:
                     if event_batch is None:
                         raise ValueError(
@@ -1619,8 +1650,10 @@ class ICAnalysisService:
                     #    只在**現行值較小**時提高——不得因為事件分析而放寬既有設定。
                     config_override = dict(config_override or {})
                     staged["embargo_before_event"] = int(config_override.get("embargo") or 0)  # EVTALIGN Task 5.1
+                    # 🔴 EVTLABEL Task 2.1（同掃描格路徑）：embargo 只承載 look-ahead 深度；
+                    #    答案窗改由 `event_isolation.label_window_rows` 抬 purge（Task 2.2）。
                     config_override["embargo"] = max(
-                        int(config_override.get("embargo") or 0), int(staged["purge_rows"]),
+                        int(config_override.get("embargo") or 0), int(staged["lookahead_depth_rows"]),
                     )
                     # 🔴 `G3-D2` **D4.2／D4.3**：k 之雙值揭露 ＋ 兩個條件上界。
                     #    兩者都是**給 UI 看的事實**，不是輸入鎖；缺任一欄 ⇒ capability
@@ -1667,6 +1700,8 @@ class ICAnalysisService:
                     event_label_values=event_label_values,
                     event_label_owners=event_label_owners,
                     event_context=event_context,
+                    # EVTLABEL Task 2.2：主路徑同樣以顯式 kwarg 傳隔離區列數（非事件 run ⇒ None）
+                    event_isolation=staged.get("event_isolation"),
                 )
                 if request.event_import_id:
                     _assert_event_triple_bound(staged, report)
