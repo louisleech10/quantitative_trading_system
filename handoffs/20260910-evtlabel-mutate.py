@@ -116,8 +116,8 @@ MUTATIONS: Tuple[Mutation, ...] = (
     # ── Phase 3 / B4 起（Task 3.4–3.7：orchestrator 核心與統計）───────────
     Mutation(
         "M-P3-1-auc-flipped", "3b", BINDISC,
-        "rank_biserial = 2.0 * auc - 1.0",
-        "rank_biserial = 1.0 - 2.0 * auc",
+        "rank_biserial[computable] = 2.0 * (u_c / denom) - 1.0",
+        "rank_biserial[computable] = 1.0 - 2.0 * (u_c / denom)",
         [*PYTEST, "tests/momentum/Analysis/test_binary_discrimination.py", "-k", "planted"],
         "auc 方向翻轉 ⇒ 植入 oracle auc==1.0 紅",
     ),
