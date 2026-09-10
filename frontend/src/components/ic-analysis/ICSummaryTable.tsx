@@ -18,6 +18,11 @@ import { ArrowUpDown } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { useWatchlistStore } from '@/store/watchlistStore';
+import {
+  BINARY_COLUMN_ORDER,
+  binaryColumnLabels,
+  binaryColumnTooltips,
+} from '@/lib/icLabelRule';
 
 interface ICSummaryTableProps {
   /** legacy：直接給列（不分頁、不本地排序——後端序即顯示序）。 */
@@ -49,6 +54,19 @@ type SortField =
   | 'p_value'
   | 'p_value_adj'
   | 'monotonicity_score';
+
+// EVTLABEL Task 3.9：表頭文案單點自 `icLabelRule`（禁在此再寫一份，兩份會分歧）。
+const BINARY_LABELS = binaryColumnLabels();
+const BINARY_TOOLTIPS = binaryColumnTooltips();
+
+/** binary 欄之顯示：計數用整數、狀態用原字串、其餘用固定小數；非有限值 ⇒ `—`（不補 0）。 */
+function formatBinaryCell(key: string, value: unknown): string {
+  if (key === 'binary_status') return typeof value === 'string' ? value : '—';
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  if (key.startsWith('n_')) return String(value);
+  if (key === 'mw_u') return value.toFixed(0);
+  return value.toFixed(4);
+}
 
 const AUTO_SUGGEST_LIMIT = 12;
 const PAGE_SIZES = [50, 100, 200] as const;
@@ -85,6 +103,10 @@ export default function ICSummaryTable({
   taskId = null,
 }: ICSummaryTableProps) {
   const serverMode = page !== null && page !== undefined;
+  // EVTLABEL Task 3.9：由**資料本身**判是不是匯入標籤模式（第一列有無主統計欄），
+  // 不另外拉一個 prop——多一個真相源就會有兩者不一致的一天。
+  const firstRow = (page?.rows ?? data ?? [])[0];
+  const isBinaryMode = firstRow?.rank_biserial !== undefined;
   const sortField = (params?.sort_by ?? page?.sort_by ?? 'icir') as SortField;
   const sortDirection = params?.sort_order ?? page?.sort_order ?? 'desc';
   // 翻頁時保留舊列到新列到達（不閃白）；skeleton 以 overlay 呈現
@@ -384,6 +406,19 @@ export default function ICSummaryTable({
                   )}
                   <TableHead className="w-[70px]">排名</TableHead>
                   <TableHead>特徵</TableHead>
+                  {/* EVTLABEL Task 3.9：匯入標籤模式 ⇒ 主統計欄排在報酬版**之前**。
+                      表頭一律統計學標準名（使用者 2026-09-10），文案單點自 icLabelRule。 */}
+                  {isBinaryMode &&
+                    BINARY_COLUMN_ORDER.map((key) => (
+                      <TableHead
+                        key={key}
+                        className="w-[110px]"
+                        title={BINARY_TOOLTIPS[key]}
+                        data-testid={`ic-summary-binary-${key}`}
+                      >
+                        {BINARY_LABELS[key]}
+                      </TableHead>
+                    ))}
                   <TableHead className="w-[120px]" title="描述性 rolling 均值,非檢定量">
                     <SortButton field="ic_mean" label="IC Mean" />
                   </TableHead>
@@ -446,6 +481,16 @@ export default function ICSummaryTable({
                       <TableCell className="font-medium text-slate-100">
                         {item.feature_name}
                       </TableCell>
+                      {isBinaryMode &&
+                        BINARY_COLUMN_ORDER.map((key) => (
+                          <TableCell
+                            key={key}
+                            className="font-mono text-xs text-sky-200"
+                            data-testid={`ic-summary-binary-cell-${key}`}
+                          >
+                            {formatBinaryCell(key, item[key as keyof ICFeatureInfo])}
+                          </TableCell>
+                        ))}
                       <TableCell
                         className="font-mono text-xs text-slate-200"
                         title="描述性 rolling 均值,非檢定量"

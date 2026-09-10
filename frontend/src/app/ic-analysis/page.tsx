@@ -32,6 +32,8 @@ import CrossSectionalICHeatmap from '@/components/ic-analysis/CrossSectionalICHe
 import CrossSymbolValidationPanel from '@/components/ic-analysis/CrossSymbolValidationPanel';
 import PartialFailureBanner from '@/components/ic-analysis/PartialFailureBanner';
 import DegradedBanner from '@/components/ic-analysis/DegradedBanner';
+import LabelModeBanner from '@/components/ic-analysis/LabelModeBanner';
+import { readLabelRule } from '@/lib/icLabelRule';
 import PeriodAlignmentBanner from '@/components/ic-analysis/PeriodAlignmentBanner';
 import IsolationNote from '@/components/ic-analysis/IsolationNote';
 import ChartErrorBoundary from '@/components/ic-analysis/ChartErrorBoundary';
@@ -703,6 +705,13 @@ function ICAnalysisPageContent() {
             </div>
 
             <DegradedBanner />
+            {/* EVTLABEL Task 3.9（R1 C14b）：本次用了哪一種 label；負對照失敗時為紅色警示。
+                掛在 DegradedBanner 之後——降級訊息先講，label 模式再補充。 */}
+            <LabelModeBanner
+              labelMode={report?.metadata?.label_mode ?? null}
+              survivorReason={report?.metadata?.survivor_output?.reason ?? null}
+              permutationStatus={readLabelRule(report?.metadata)?.permutation_receipt?.status ?? null}
+            />
             {/* EVTALIGN Task 3.1：期間自動對齊揭露（只在真裁／真丟時後端才寫鍵） */}
             <PeriodAlignmentBanner />
             {/* EVTALIGN Task 5.1：隔離區兩塊來源（事件分析且切分已套用時後端才寫鍵） */}
@@ -725,6 +734,14 @@ function ICAnalysisPageContent() {
                 onChangeLabelScan={(next) => setConfig({
                   ...config,
                   ...(next ? { event_label_scan: next } : { event_label_scan: undefined }),
+                })}
+                /* EVTLABEL Task 3.9：label 取用模式三選。選「只用匯入的 0/1」時
+                   一併清掉掃描網格——兩者互斥（後端亦擋，此處是不讓使用者送出必被拒的請求）。 */
+                labelMode={config.event_label_mode ?? 'auto'}
+                onChangeLabelMode={(next) => setConfig({
+                  ...config,
+                  event_label_mode: next,
+                  ...(next === 'imported_binary' ? { event_label_scan: undefined } : {}),
                 })}
                 disclosure={eventScanDisclosure}
                 /* 🔴 `SCANCUBE` Task 4.1：`taskId` 之來源＝store。

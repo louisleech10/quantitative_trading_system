@@ -19,14 +19,32 @@
     "n_events_consumed",
     "uniqueness"
   ],
-  "uniqueness_keys": ["mean", "min", "n_eff", "n_overlapping_pairs"],
+  "uniqueness_keys": [
+    "mean",
+    "min",
+    "n_eff",
+    "n_overlapping_pairs"
+  ],
   "_uniqueness_doc": "R-1 不重工預留（使用者 2026-09-10）：每事件 w=1/(與其 label 視窗 [start,end) 相交之事件數，含自己)，同 dedupe.py 定義；n_eff=Σw；只揭露不參與計算。",
-  "imported_binary_label_keys": ["present", "n_pos", "n_neg", "used"],
+  "imported_binary_label_keys": [
+    "present",
+    "n_pos",
+    "n_neg",
+    "used"
+  ],
   "h_unit_value": "event_timeframe_bars",
   "event_timeframe_mixed_value": "mixed",
-  "label_modes": ["auto", "return_rule", "imported_binary"],
+  "label_modes": [
+    "auto",
+    "return_rule",
+    "imported_binary"
+  ],
   "_label_modes_doc": "使用者請求之模式（Task 3.2）。effective mode 由 orchestrator stage3 決定（Task 3.4），route/service 只透傳 requested。",
-  "label_sources": ["mainline_return_N", "event_label_value", "imported_binary_label"],
+  "label_sources": [
+    "mainline_return_N",
+    "event_label_value",
+    "imported_binary_label"
+  ],
   "statistic_kinds": [
     "spearman_ic",
     "binary_discrimination",
@@ -47,9 +65,13 @@
     "mw_p_value_adj",
     "n_pos_selection",
     "n_neg_selection",
+    "n_used_binary",
     "binary_status"
   ],
-  "binary_status_values": ["ok", "unavailable"],
+  "binary_status_values": [
+    "ok",
+    "unavailable"
+  ],
   "threshold_skip_keys_binary": [
     "ic_mean",
     "icir",
@@ -65,9 +87,16 @@
     "permutation_oracle_disagree",
     "permutation_unavailable"
   ],
-  "survivor_suppressed_reasons": ["negative_control_failed"],
+  "survivor_suppressed_reasons": [
+    "negative_control_failed"
+  ],
   "min_events_per_class_default": 10,
-  "survivor_label_binary_keys": ["import_id", "n_pos", "n_neg", "label_origin_values"],
+  "survivor_label_binary_keys": [
+    "import_id",
+    "n_pos",
+    "n_neg",
+    "label_origin_values"
+  ],
   "return_formula_by_mode": {
     "_doc": "由 label_return_mode 與 entry_price_semantic 機械組字串；{entry} 由 entry_price_semantic 代入。基準價語意見 label_value_from_case.py（close_to_close 基準＝t0 close，與 entry 無關＝D1-5）。",
     "close_to_close": "close[t0+h] / close[t0] - 1 × direction_sign",

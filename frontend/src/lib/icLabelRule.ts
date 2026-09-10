@@ -36,6 +36,36 @@ export interface ICEventLabelRule {
     n_eff?: number | null;
     n_overlapping_pairs?: number | null;
   } | null;
+  /** EVTLABEL Task 3.6：本次主統計是哪一個（兩欄並存時，使用者要知道倖存者依哪一欄篩）。 */
+  primary_statistic?: string | null;
+  secondary_statistic?: string | null;
+  p_assumption?: string | null;
+  effect_gate?: { field?: string; min?: number | null } | null;
+  /** EVTLABEL Task 3.7：置換收據；`status` 為 `unavailable:…` 時前端顯示琥珀警示。 */
+  permutation_receipt?: {
+    seed?: number;
+    n_perm?: number;
+    block_len?: number | null;
+    n_blocks?: number | null;
+    budget_floor_hit?: boolean;
+    first_permutation_digest?: string | null;
+    status?: string | null;
+  } | null;
+  /** EVTLABEL Task 3.7：整批負對照。`n_observed <= q95` ⇒ 倖存者不可餵 ML。 */
+  negative_control?: {
+    status?: string;
+    n_observed?: number;
+    n_consumable?: number;
+    shuffled_counts?: number[];
+    q95?: number;
+    seed_base?: number;
+    block_len?: number;
+    comparand?: string;
+    n_planned?: number;
+    n_effective?: number;
+    budget_seconds?: number;
+    degraded_by_budget?: boolean;
+  } | null;
 }
 
 export function readLabelRule(
@@ -145,4 +175,105 @@ export function labelRuleLines(rule: ICEventLabelRule | null | undefined): strin
     );
   }
   return lines;
+}
+
+/**
+ * EVTLABEL Task 3.9：匯入標籤模式之表頭文案（**單一來源**）。
+ *
+ * 🔴 表頭一律用**統計學標準名、不自創**（使用者 2026-09-10）：
+ * - `AUC`：area under the ROC curve。0.5＝分不開、1＝完美分開。
+ * - `rank-biserial r`：rank-biserial correlation（Cureton 1956）＝2·AUC−1。
+ *   **正負代表方向**，絕對值才是強度——所以門檻看的是絕對值。
+ * - `U`：Mann-Whitney U 統計量。
+ * - `p`：Mann-Whitney 雙尾 p 值。
+ * - `q`：Benjamini–Hochberg FDR 校正後之 q 值。
+ * - `n⁺`／`n⁻`：驗證段內實際用到的正／反例數。
+ */
+export function binaryColumnLabels(): Record<string, string> {
+  return {
+    rank_biserial: 'rank-biserial r',
+    auc: 'AUC',
+    mw_u: 'U',
+    mw_p_value: 'p',
+    mw_p_value_adj: 'q',
+    n_pos_selection: 'n⁺',
+    n_neg_selection: 'n⁻',
+    n_used_binary: 'n 使用',
+    binary_status: '狀態',
+  };
+}
+
+/** 表頭 tooltip（與 `binaryColumnLabels` 同一來源，避免兩處各寫一份）。 */
+export function binaryColumnTooltips(): Record<string, string> {
+  return {
+    auc: 'AUC 0.5＝分不開、1＝完美分開',
+    rank_biserial: 'r＝2·AUC−1；正負＝方向，門檻看絕對值',
+    mw_u: 'Mann-Whitney U 統計量',
+    mw_p_value: 'Mann-Whitney 雙尾 p 值（未校正）',
+    mw_p_value_adj: 'Benjamini–Hochberg FDR 校正後之 q 值',
+    n_pos_selection: '驗證段內的正例數',
+    n_neg_selection: '驗證段內的反例數',
+    n_used_binary: '該欄扣除缺值後實際用到的筆數',
+  };
+}
+
+/** binary 模式之欄序：主統計在前，報酬版 IC 退為第二欄（供對照）。 */
+export const BINARY_COLUMN_ORDER = [
+  'rank_biserial',
+  'auc',
+  'mw_u',
+  'mw_p_value',
+  'mw_p_value_adj',
+  'n_pos_selection',
+  'n_neg_selection',
+  'n_used_binary',
+  'binary_status',
+] as const;
+
+/** 退回報酬版之原因文案（值集＝契約 `label_mode_reasons`，由 vitest 對證）。 */
+export const LABEL_MODE_REASON_TEXT: Record<string, string> = {
+  no_label_column: '這批事件沒有 0/1 標籤欄',
+  label_invalid_domain: '標籤欄有非 0/1 的值',
+  one_class: '驗證段裡只剩一類（正例或反例其中一種是 0 個）',
+  class_below_min_selection: '驗證段裡某一類的數量太少，做不出統計',
+  conditional_ic_abandoned: '事件數不足，條件 IC 已停用',
+};
+
+/**
+ * EVTLABEL Task 3.9：本次分析用了哪一種 label 之摘要文案。
+ *
+ * 回 `{ kind, text }`；`kind` 供呼叫端決定顏色（info／warn／danger），不在此決定樣式。
+ */
+export function labelModeBannerText(
+  labelMode: { effective?: string; requested?: string; reason?: string | null;
+               n_pos_selection?: number; n_neg_selection?: number } | null | undefined,
+  survivorReason?: string | null,
+  permutationStatus?: string | null,
+): { kind: 'info' | 'warn' | 'danger'; text: string } | null {
+  if (survivorReason === 'negative_control_failed') {
+    return {
+      kind: 'danger',
+      text: '負對照失敗：把標籤打亂後也能篩出同樣多的特徵，本次倖存者與雜訊無法區分，不可餵 ML。',
+    };
+  }
+  if (permutationStatus === 'unavailable:insufficient_blocks') {
+    return {
+      kind: 'warn',
+      text: 'label 視窗太長、可置換的區塊不足：無法做依賴感知的放行檢查，本次倖存者不可餵 ML（預期限制，非錯誤）。',
+    };
+  }
+  if (!labelMode?.effective) return null;
+  if (labelMode.effective === 'imported_binary') {
+    const pos = labelMode.n_pos_selection ?? '—';
+    const neg = labelMode.n_neg_selection ?? '—';
+    return {
+      kind: 'info',
+      text: `本次 IC 對象＝你匯入的 0/1 標籤（驗證段正 ${pos}／反 ${neg}）；報酬版 IC 在第二欄供對照。`,
+    };
+  }
+  if (labelMode.requested === 'auto' && labelMode.reason) {
+    const why = LABEL_MODE_REASON_TEXT[labelMode.reason] ?? labelMode.reason;
+    return { kind: 'warn', text: `已自動改用報酬規則：${why}` };
+  }
+  return null;
 }

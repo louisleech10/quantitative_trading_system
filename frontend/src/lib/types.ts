@@ -2052,6 +2052,23 @@ export interface ICFeatureInfo {
   feature_name: string;
   ic_mean: number;
   ic_std?: number;
+  /**
+   * EVTLABEL Task 3.9：匯入標籤模式之分辨力欄（欄集＝契約 `summary_columns_binary`）。
+   *
+   * 🔴 只在該模式下存在——`rank_biserial` 是否為 `undefined` 即「本次是不是 binary 模式」
+   * 之判準（表格據此決定要不要渲染這幾欄），所以**不得**補預設值。
+   * 名稱一律統計學標準名：`auc`（ROC AUC）、`rank_biserial`（rank-biserial r＝2·AUC−1）、
+   * `mw_u`（Mann-Whitney U）、`mw_p_value`（雙尾 p）、`mw_p_value_adj`（BH-FDR q）。
+   */
+  rank_biserial?: number;
+  auc?: number;
+  mw_u?: number;
+  mw_p_value?: number;
+  mw_p_value_adj?: number;
+  n_pos_selection?: number;
+  n_neg_selection?: number;
+  n_used_binary?: number;
+  binary_status?: string;
   /** EVTWARMUP：事件路徑 rolling 視窗 > 事件數時為 null（診斷欄，不進門檻）；UI 顯示 `--`。 */
   icir: number | null;
   /** HAC raw p；舊 report / 不可用時可為 null（CODEX-6） */

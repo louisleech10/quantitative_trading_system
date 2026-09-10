@@ -46,6 +46,7 @@ import type {
   EventImportDetail,
   EventImportResponse,
   ICAnalysisConfig,
+  ICEventLabelMode,
   ICEventLabelScan,
   ICEventScanDisclosure,
   RandomControlCompareResult,
@@ -88,6 +89,14 @@ interface Props {
    *    `undefined` ⇒ 瀏覽器區塊不顯示（與「沒有掃描」同一分支）。
    */
   taskId?: string;
+  /**
+   * EVTLABEL Task 3.9：label 取用模式（三選）。
+   *
+   * 🔴 這是**請求**不是結論——實際用哪一種由後端切分後決定（驗證段每類夠不夠）。
+   * 未給 `onChangeLabelMode` ⇒ 不渲染選項（例如 legacy 非事件批路徑）。
+   */
+  labelMode?: ICEventLabelMode;
+  onChangeLabelMode?: (next: ICEventLabelMode) => void;
 }
 
 /** 由批次事實欄產生該欄之白話字串；欄集之外的欄一律不顯示（各頁只選自己的欄集）。 */
@@ -169,12 +178,26 @@ function ContractDoc({ field }: { field: keyof typeof EVENT_CONTRACT_DOCS }) {
   );
 }
 
+/** EVTLABEL Task 3.9：三選之文案（值集＝契約 `label_modes`，由 vitest 對證）。 */
+const LABEL_MODE_CHOICES: { value: ICEventLabelMode; label: string; hint: string }[] = [
+  { value: 'auto', label: '自動', hint: '有可用的 0/1 就用；不能用時退回報酬版並寫明原因' },
+  { value: 'imported_binary', label: '只用匯入的 0/1', hint: '直接對你標的正反例算分辨力；條件不足會直接報錯，不會偷偷降級' },
+  { value: 'return_rule', label: '只用報酬版', hint: '一律用規則重算的報酬，不看 0/1' },
+];
+
 export default function EventBatchDisclosurePanel({
   importId, labelSpec, onChangeLabelSpec, detail: injected,
   labelScan = null, onChangeLabelScan, disclosure = null, taskId,
   featureTimeframe = null,
+  labelMode = 'auto', onChangeLabelMode,
 }: Props) {
   const [detail, setDetail] = useState<EventImportDetail | null>(injected ?? null);
+  // 批內正反數取自批次事實欄；缺欄 ⇒ 不顯示（不猜數字）。
+  const labelFact = detail?.batch_facts?.label as { pos?: number; neg?: number } | undefined;
+  const batchBinaryCounts =
+    typeof labelFact?.pos === 'number' && typeof labelFact?.neg === 'number'
+      ? { pos: labelFact.pos, neg: labelFact.neg }
+      : null;
   const [error, setError] = useState<string | null>(null);
   // `G3-D2` D5.3：隨機對照組之使用者參數與送出狀態。
   // 🔴 預設值皆為**保守的舉例值**（非裁定值）：`neighborhood`／`embargo` 給 0／答案窗長度
@@ -515,8 +538,44 @@ export default function EventBatchDisclosurePanel({
           )}
         </label>
 
+        {/* EVTLABEL Task 3.9：label 取用模式三選。
+            🔴 這是**請求**不是結論——實際用哪一種由後端切分後決定（驗證段每類夠不夠）。 */}
+        {onChangeLabelMode && (
+          <div className="mt-3 space-y-1" data-testid="ic-param-label-mode">
+            <span className="block text-xs font-medium text-slate-200">
+              label 要用哪一種
+            </span>
+            {LABEL_MODE_CHOICES.map((choice) => (
+              <label key={choice.value} className="flex items-start gap-2 text-xs text-slate-300">
+                <input
+                  type="radio"
+                  name="ic-param-label-mode"
+                  value={choice.value}
+                  checked={labelMode === choice.value}
+                  onChange={() => onChangeLabelMode(choice.value)}
+                  data-testid={`ic-param-label-mode-${choice.value}`}
+                />
+                <span>
+                  <span className="text-slate-200">{choice.label}</span>
+                  <span className="block text-[11px] text-slate-400">{choice.hint}</span>
+                </span>
+              </label>
+            ))}
+            {batchBinaryCounts && (
+              <p className="text-[11px] text-slate-400" data-testid="ic-param-label-mode-counts">
+                這批的 0/1：正 {batchBinaryCounts.pos}／反 {batchBinaryCounts.neg}
+              </p>
+            )}
+            {labelMode === 'imported_binary' && (
+              <p className="text-[11px] text-amber-200/80" data-testid="ic-param-label-mode-scan-off">
+                匯入標籤模式**不能**同時跑 k／h 掃描：0/1 與 k、h 無關，每一格會得到同一份標籤。
+              </p>
+            )}
+          </div>
+        )}
+
         {/* k／h 之「單值／掃到 m」切換（裁定③：填 m 就掃 0～m；h 自 1 起） */}
-        {onChangeLabelScan && (
+        {onChangeLabelScan && labelMode !== 'imported_binary' && (
           <div className="mt-2 space-y-2" data-testid="ic-param-scan">
             <label className="flex items-center gap-2 text-xs text-slate-200">
               <input

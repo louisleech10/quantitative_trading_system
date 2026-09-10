@@ -5084,8 +5084,11 @@ class ICFilterOrchestrator:
             row["mw_u"] = float(rec["mw_u"])
             row["mw_p_value"] = float(rec["p_value"])
             row["mw_p_value_adj"] = float(q_values.get(name, np.nan))
-            row["n_pos"] = int(rec["n_pos"])
-            row["n_neg"] = int(rec["n_neg"])
+            # 🔴 欄名以契約 `summary_columns_binary` 為準（前端 vitest 對證抓到我寫錯）：
+            #    是 `n_pos_selection`／`n_neg_selection`——「驗證段內的」正反數，
+            #    與整批的正反數是兩個不同的數字，欄名必須自帶那個限定詞。
+            row["n_pos_selection"] = int(rec["n_pos"])
+            row["n_neg_selection"] = int(rec["n_neg"])
             row["n_used_binary"] = int(rec["n_used"])
             row["binary_status"] = str(rec["status"])
         return True
@@ -5555,7 +5558,10 @@ class ICFilterOrchestrator:
             #    （`ic_report_contract.json`：ok／not_applicable／not_computed／
             #    computation_failed／disabled／unavailable）——`suppressed` 不在其中。
             #    為一個 reason 去撐開一個跨報告共用的封閉枚舉，代價大於收益
-            #    ⇒ 採既有值 `unavailable` ＋ `reason="negative_control_failed"`，
+            #    ⇒ 採既有值 `unavailable`，reason 欄填 negative_control_failed，
+            #    （此處刻意不用 kwarg 形式書寫該字面：`oosDowngradeDocs.test.ts` 之掃描器
+            #     以正規式掃全檔，會把註解裡的 `reason=` 誤認成 oos_downgrade 之 reason，
+            #     而這是 **survivor_output** 的 reason，兩者語意不同、不得混進同一份文案表）
             #    語意完全一致（可消費的倖存者輸出不可用，原因是負對照失敗），
             #    且枚舉維持封閉。前端以 **reason** 判紅色 banner，不靠 status 字面。
             return {

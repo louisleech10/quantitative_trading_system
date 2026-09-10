@@ -88,8 +88,15 @@ def test_binary_columns_are_added_with_standard_names():
     table, is_binary = _merge(orch, feats, y)
     assert is_binary is True
     good = next(r for r in table if r["feature_name"] == "good")
-    for col in ("auc", "rank_biserial", "mw_u", "mw_p_value", "mw_p_value_adj",
-                "n_pos", "n_neg", "n_used_binary", "binary_status"):
+    # 🔴 欄名以契約 `summary_columns_binary` 為準（前端 vitest 抓到我原本寫成 n_pos／n_neg）
+    import json
+    from pathlib import Path as _P
+
+    contract = json.loads(
+        (_P(__file__).resolve().parents[3] / "momentum/Analysis/contracts/event_label_mode.json")
+        .read_text(encoding="utf-8")
+    )
+    for col in contract["summary_columns_binary"]:
         assert col in good, f"缺欄 {col}"
     assert good["auc"] == pytest.approx(1.0, abs=1e-12)
     assert good["rank_biserial"] == pytest.approx(1.0, abs=1e-12)
