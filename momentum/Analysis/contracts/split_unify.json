@@ -16,6 +16,28 @@
     "canonical_feature_universe_unavailable"
   ],
 
+  "_test_segment_count_keys_doc": "SPLITUNIFY Task 4.1／SPEC C-6：報告中帶「驗證段列數」語意之鍵的**封閉登記**（dotted path，相對於 report metadata）。canonical 恰一個；其餘為**診斷用**，只在對應的降級 reason 出現時才寫，且其值**必須等於** canonical——C-6 禁的是「同時暴露兩個**不同**數字」（實測症狀 31 vs 33），不是禁止降級說明附上同一個數字。本登記是機械判準的唯一來源，禁在測試或散文裡另列第二份。",
+  "test_segment_count_keys": {
+    "canonical": "split_unify.n_test",
+    "diagnostic_only": [
+      "ic_train_test_split.test_events",
+      "oos_downgrade.test_events"
+    ],
+    "row_semantics_not_event_count": [
+      "ic_train_test_split.test_rows",
+      "oos_downgrade.test_rows"
+    ]
+  },
+
+  "_split_unify_keys_doc": "metadata.split_unify 之必填鍵（SPEC C-6）。fail-closed 時 n_test 為 null 而非 0；reason 取自 fail_closed_reasons。",
+  "split_unify_keys": [
+    "n_test",
+    "split_authority",
+    "boundary_hash",
+    "per_symbol_counts",
+    "reason"
+  ],
+
   "_estimand_scope_doc": "event-study-only 路徑之估計量範圍標記（SPEC C-0 決議③(b)）。event_forward_return_table 在 split_plan=None 時跑全 manifest 事件（tables.py:211-238 無 test 過濾），必須以本字面標明它不是 OOS。",
   "estimand_scope_values": [
     "full_sample_not_oos"

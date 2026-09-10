@@ -436,6 +436,26 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 
 （`M-SU-10` 之錨點落在 `pipeline.run_event_study_only` 的 summary 上，一併由該腳本跑。）
 
+🔴 **B4 追加九條（揭露之錯法是「講錯」：同一個問題兩個答案，或把「沒得算」講成「算出來是零」）**——
+腳本 `handoffs/20260911-splitunify-b4-mutate.py`：
+
+| ID | 改壞什麼 | 應紅之測試 |
+|---|---|---|
+| `M-SU-9` | 同時暴露兩個驗證段事件數 | `test_splitunify_disclosure.py -k exactly_one_test_count_key` |
+| `M-SU-B4-2` | fail-closed 時 `n_test` 填 0 而非 null | `-k fail_closed_is_null_not_zero` |
+| `M-SU-B4-3` | `per_symbol_counts` 與 `n_test` 矛盾不再擋 | `-k contradicting_per_symbol_counts` |
+| `M-SU-B4-4` | reason 不再對證契約封閉集合 | `-k unregistered_reason` |
+| `M-SU-B4-5` | `boundary_hash` 不再排序 | `-k boundary_hash_is_order_insensitive` |
+| `M-SU-B4-6` | `boundary_hash` 只吃筆數不吃時刻 | `-k boundary_hash_changes_with_membership` |
+| `M-SU-B4-7` | 全域 run 也寫 `split_unify`（破 G-2） | `-k absent_on_global_run` |
+| `M-SU-B4-8` | 前端把 null 顯示成 0 | vitest `splitAuthority.test.ts` |
+| `M-SU-B4-9` | 前端值集改成手打第二份 | vitest `splitAuthority.test.ts` |
+
+🔴 **實測記錄（Task 4.1 的關鍵事實）**：同一個 canonical 測試段裡 `ic_train_test_split.test_rows=335`、
+`split_unify.n_test=13`——335 根 K 線、其中 13 根上有事件。**兩個數字都對，但只有一個是
+「驗證段事件數」**。⇒ `test_segment_count_keys` 把它們分成兩種語意，測試釘的是
+`0 < n_test <= test_rows`（事件是列的子集），**不是**硬要兩者相等。
+
 ---
 
 ## §E 具名殘留（每條帶「為何現在不做」，只准 blocked-by／user-ruling／needs-research）

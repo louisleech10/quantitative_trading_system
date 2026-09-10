@@ -32,6 +32,7 @@ import CrossSectionalICHeatmap from '@/components/ic-analysis/CrossSectionalICHe
 import CrossSymbolValidationPanel from '@/components/ic-analysis/CrossSymbolValidationPanel';
 import PartialFailureBanner from '@/components/ic-analysis/PartialFailureBanner';
 import DegradedBanner from '@/components/ic-analysis/DegradedBanner';
+import SplitUnifyBadge from '@/components/ic-analysis/SplitUnifyBadge';
 import LabelModeBanner from '@/components/ic-analysis/LabelModeBanner';
 import { readLabelRule } from '@/lib/icLabelRule';
 import PeriodAlignmentBanner from '@/components/ic-analysis/PeriodAlignmentBanner';
@@ -705,6 +706,10 @@ function ICAnalysisPageContent() {
             </div>
 
             <DegradedBanner />
+            {/* 🔴 SPLITUNIFY Task 4.1（SPEC C-6）：**唯一**的驗證段數字＋來源標籤。
+                掛在降級訊息之後——「這份能不能當 OOS 看」先講，「驗證段有幾個事件」再講。
+                後端沒寫這塊（全域 run／舊報告）時本元件不渲染。 */}
+            <SplitUnifyBadge />
             {/* EVTLABEL Task 3.9（R1 C14b）：本次用了哪一種 label；負對照失敗時為紅色警示。
                 掛在 DegradedBanner 之後——降級訊息先講，label 模式再補充。 */}
             <LabelModeBanner

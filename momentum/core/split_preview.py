@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Any, Dict, Mapping, Optional
 
 import numpy as np
@@ -263,6 +265,24 @@ def holdout_boundary(
         "train_end_ms": _as_ms(index, int(train_rows[-1])) if train_rows.size else None,
         "test_start_ms": _as_ms(index, int(test_rows[0])) if test_rows.size else None,
     }
+
+
+def boundary_hash(test_timestamps_ms: Any) -> str:
+    """canonical 測試段之 `boundary_hash`（SPLITUNIFY Task 4.1 要點 1）。
+
+    定義逐字：**sorted、int64 毫秒、無空白 JSON** 之 sha256。
+    三個約束各有理由，缺一個就不是同一個雜湊：
+      · sorted ⇒ 兩端若以不同順序枚舉同一段，雜湊仍相同（比的是**集合**，不是列舉順序）；
+      · int64 毫秒 ⇒ 秒／毫秒混用會得到不同雜湊（單位政策共用 `assert_epoch_ms_array`）；
+      · 無空白 JSON ⇒ 序列化風格不影響值。
+
+    🔴 空測試段回**空陣列的雜湊**而不是空字串——空字串會與「沒算」混淆。
+    """
+    values = assert_epoch_ms_array(
+        np.asarray(test_timestamps_ms), role="boundary_hash: test_timestamps_ms"
+    )
+    payload = json.dumps(sorted(int(v) for v in values.tolist()), separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def count_binary_classes_in_rows(

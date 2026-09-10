@@ -12,6 +12,10 @@
 <h1 id="gap-3-驗收清單-照著做就好">GAP-3 驗收清單 — 照著做就好</h1>
 <blockquote>
 <p><strong>這份是給你照著操作的。</strong> 每一項都有三欄：<strong>你做什麼</strong> → <strong>你應該看到什麼</strong> → <strong>如果不是這樣代表什麼</strong>。</p>
+<h2 id="-2026-09-11ic-分析頁多了一行splitunify-第-4-批">🔴 2026-09-11：IC 分析頁多了一行（<code>SPLITUNIFY</code> 第 4 批）</h2>
+<p>降級訊息底下多一行：<strong>驗證段事件數 N · 來源：K 線時間切分（holdout）</strong>。
+這是<strong>全平台唯一</strong>的驗證段數字——以前同一批事件可能看到兩個不一樣的數字（你 UAT 看到的 31 vs 33）。
+算不出來時顯示**「無」**並附原因，<strong>不會顯示 0</strong>。全域（非事件）分析不會有這一行。</p>
 <h2 id="-2026-09-11畫面有一處會與本清單不同splitunify-第-3-批">🔴 2026-09-11：畫面有一處<strong>會與本清單不同</strong>（<code>SPLITUNIFY</code> 第 3 批）</h2>
 <p>事件型兩表那一頁，原本在批次資訊列印「train N／test N／purge N」。
 現在事件掃描這條路徑<strong>不做切分</strong>（它拿不到 K 線切分所依據的特徵表），

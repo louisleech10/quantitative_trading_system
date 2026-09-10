@@ -346,6 +346,8 @@ export default function EventTablesPanel({ importId, horizons, data }: EventTabl
   if (!resp) return null;
   const s = resp.summary as Record<string, unknown>;
   const cap = splitCapabilityView(resp.capability);
+  const estimandScope = (resp.tables?.event_forward_return_table as { common?: { estimand_scope?: string | null } } | undefined)
+    ?.common?.estimand_scope ?? null;
   return (
     <div className="glass-panel rounded-2xl border border-white/10 p-5 space-y-4" data-testid="event-tables-panel">
       <div>
@@ -364,8 +366,16 @@ export default function EventTablesPanel({ importId, horizons, data }: EventTabl
             className="mt-1 text-[11px] text-amber-300/90"
             data-testid="event-split-capability"
             data-split-reason={resp.capability?.reason ?? ''}
+            data-execution-mode={String(s.execution_mode ?? '')}
+            data-estimand-scope={String(estimandScope ?? '')}
           >
             {cap.text}
+            {/* 🔴 B3 review R1 之 L5（三家皆提）：只說「沒切分」會讓人以為**什麼都沒算**。
+                後端已有 `execution_mode` 與 `estimand_scope` 兩個鍵，這裡把它們講成一句話：
+                表是算了的，只是估計量的範圍是全樣本。 */}
+            {estimandScope === 'full_sample_not_oos'
+              ? '　下面三張表**已經算好**，但估計量範圍是全樣本（不是 OOS）。'
+              : ''}
           </p>
         )}
       </div>

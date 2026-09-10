@@ -96,6 +96,10 @@ from momentum.core.split_preview import (
     count_binary_classes_in_rows as _count_binary_classes_in_rows,
     holdout_boundary,
 )
+# SPLITUNIFY Task 4.1：`metadata.split_unify` 之產生點住 `split_projection`（契約檔就在它隔壁），
+# 本模組只呼叫、不自組——同一份揭露有兩個組裝點就會漂（本票要消滅的正是這件事）。
+# 方向安全：`event_samples/*` 沒有任何模組 import 本檔（只有註解提及），不成環。
+from momentum.Analysis.event_samples.split_projection import build_split_unify_disclosure
 from momentum.factories import create_label_generator
 from momentum.Analysis.ic_split_adapter import ICSplitAdapter
 
@@ -1473,6 +1477,21 @@ class ICFilterOrchestrator:
                 # stage3 後 features_df 只剩實際被消費之事件列 ⇒ 測試段事件數＝test_mask 命中數
                 test_events = int(test_mask.sum())
                 split_context["test_events"] = test_events
+                # 🔴 SPLITUNIFY Task 4.1（SPEC C-6）：**canonical 驗證段數字之唯一揭露點**。
+                #    只在事件路徑寫（全域 run 不寫這些鍵 ⇒ 全域報告逐位元組不變，G-2）。
+                #    `n_test` 的語意是「落在 canonical 測試段裡的事件數」——與
+                #    `ic_train_test_split.test_rows`（K 線列數語意）**不是同一件事**，
+                #    兩者之關係由 `split_unify.json` 之 `test_segment_count_keys` 封閉登記。
+                metadata = dict(metadata)
+                test_index_ms = (
+                    _normalize_ic_time_index(features_df.index, "features_df")[test_mask]
+                    .asi8 // 10 ** 6
+                ).astype("int64")
+                metadata["split_unify"] = build_split_unify_disclosure(
+                    n_test=test_events,
+                    test_timestamps_ms=test_index_ms,
+                    per_symbol_counts={_normalize_symbol_value(metadata["symbol"]): test_events},
+                )
                 min_test_events = int(config.event_filter.min_test_events)
                 if test_events < min_test_events:
                     metadata = dict(metadata)

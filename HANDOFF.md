@@ -129,8 +129,28 @@
 - `SU-RESID-3` **收窄**：現在只剩「首尾相同、中間間距不同」的對抗性網格（plan 身上只有兩個
   端點可比）；要關掉需 producer 隨 plan 傳完整時刻指紋（動 IC 契約），屬 R-5／B4 之後。
 
+## B4（報告與畫面只暴露一個驗證段）— 實作完成，待三家審碼
+- **canonical 揭露**：`metadata.split_unify = {n_test, split_authority, boundary_hash,
+  per_symbol_counts, reason}`，唯一產生點 `split_projection.build_split_unify_disclosure`；
+  只在事件路徑寫（全域 run 不寫 ⇒ 全域報告逐位元組不變，G-2）。
+- **`boundary_hash`**：sorted＋int64 毫秒＋無空白 JSON 之 sha256（`split_preview.boundary_hash`）；
+  三個約束各配一條可證偽測試（換順序同雜湊／換時刻不同雜湊／餵秒被擋）。
+- **「恰一個」怎麼判**：`split_unify.json` 新增 `test_segment_count_keys` **封閉登記**
+  （`canonical` 恰一個、`diagnostic_only`、`row_semantics_not_event_count`）——散文判準會漂。
+- 🔴 **實測關鍵事實**：`test_rows=335`、`n_test=13`——335 根 K 線、其中 13 根上有事件。
+  **兩個數字都對，但只有一個是「驗證段事件數」**；測試釘 `0 < n_test <= test_rows`，
+  **不是**硬要相等（我第一版寫成相等，被實跑打掉）。
+- **fail-closed**：`n_test` 為 `null` 不是 `0`，且 hash／counts 一併清空（留半套數字更糟）。
+- **前端**：`SplitUnifyBadge`（單一數字＋來源標籤，缺鍵不渲染）＋`splitAuthority.ts`
+  （值集自契約讀）；L5 併做——事件掃描頁加「表已算好，但估計量範圍是全樣本」。
+- **實跑**：`tests/api/test_splitunify_disclosure.py` **12 passed**｜B4 mutation（9＋C0）
+  **UNCOVERED=0**｜前端 **721 passed / 93 files**、`npm run build` rc=0｜
+  事件路徑＋event_samples＋core **676 passed**｜`tests/momentum/Analysis` **19 failed /
+  1172 passed**＝**逐條等於**既有紅清單（無新增、無變短）｜解耦 R2=1 R3=17 R4=3｜
+  survivor golden rc=0、splitunify golden `GOLDEN OK`。
+
 ## 下一步（順序）
-1. **B4**：報告與畫面只暴露**一個**驗證段（併做 L5；遵守 L4 之三元組約束）。
+1. **B4 三家審碼** → 收斂 → 收票。
 2. `GLOBALH`（中票）→ **使用者 UAT B26–B34**。
 
 ## 🔴 既有紅盤點（非本票造成，建議另立 `REDSWEEP`）

@@ -12,6 +12,7 @@
 <h1 id="gap-3-事件型-uat-施工進度看板">GAP-3 事件型 UAT — 施工進度看板</h1>
 <blockquote>
 <p>📌 2026-09-11：<code>SPLITUNIFY</code> 第 2 批 b 動到 <code>momentum/Analysis/event_samples/</code>——新增投影函式 <code>split_projection.py</code>，並把「分簇」從 <code>event_split.py</code> 抽成兩邊共用的函式（行為逐值不變）。事件切分本身的邊界來源改由 K 線切分決定，細節見 <a href="SPLITUNIFY施工進度.html">SPLITUNIFY施工進度.md</a>。</p>
+<p>📌 2026-09-11（第 4 批）：報告與畫面現在只會出現<strong>一個</strong>「驗證段事件數」，旁邊寫著它是誰算的（K 線時間切分）；算不出來時顯示「無」不顯示 0。事件掃描頁的「未執行切分」那句話後面補了「下面三張表已經算好，只是估計量範圍是全樣本」。GAP-3 的匯入／對齊／去重／出表<strong>行為仍然不變</strong>。</p>
 <p>📌 2026-09-11（第 3 批審碼收斂）：三家審碼在 <code>split_projection.py</code> 補了一道「兩份切分計畫與傳進來的 K 線網格必須同源」的檢查（原本只比一段字串，帶著相同字串卻建在另一份網格上不會報錯）。GAP-3 的匯入／對齊／去重／出表<strong>行為仍然不變</strong>。</p>
 <p>📌 2026-09-11（第 3 批）：<strong>事件掃描這條路已接線完成</strong>——它手上只有 K 線、拿不到特徵表，所以一律走「只做事件研究」並<strong>明講原因</strong>；後端不再回 <code>train 0／test 0／purge 0</code>（整組鍵拿掉，不是填 0），畫面改顯示一句話說明為什麼沒有驗證段。GAP-3 既有的匯入／對齊／去重／出表<strong>行為不變</strong>，變的只有「切分」這一段與它在畫面上的呈現。</p>
 </blockquote>

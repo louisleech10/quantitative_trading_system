@@ -80,6 +80,14 @@ describe('EventTablesPanel — 切分 capability', () => {
     expect(banner.textContent ?? '').toContain('未執行切分');
   });
 
+  it('🔴 L5：不得只說「沒切分」——要講明「表算了，但估計量是全樣本」', () => {
+    render(<EventTablesPanel importId="imp-nosplit" data={response(REASON_NO_UNIVERSE)} />);
+    const banner = screen.getByTestId('event-split-capability');
+    expect(banner.getAttribute('data-execution-mode')).toBe('event_study_only');
+    expect(banner.getAttribute('data-estimand-scope')).toBe('full_sample_not_oos');
+    expect(banner.textContent ?? '').toContain('全樣本');
+  });
+
   it('未知 reason ⇒ 照原字面顯示（不吞成「其他原因」）', () => {
     const view = splitCapabilityView({ split: 'unavailable', reason: 'some_future_reason' });
     expect(view.hasSplit).toBe(false);

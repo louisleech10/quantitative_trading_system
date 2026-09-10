@@ -25,7 +25,11 @@ from momentum.Analysis.event_samples.event_split import (
     time_cluster_bucket_ms,
 )
 from momentum.Analysis.event_samples.types import AlignmentReceipts, EventManifest, EventSplitPlan
-from momentum.core.split_preview import assert_epoch_ms_array, assert_positional_rows
+from momentum.core.split_preview import (
+    assert_epoch_ms_array,
+    assert_positional_rows,
+    boundary_hash as _boundary_hash,
+)
 
 _CONTRACT_PATH = Path(__file__).resolve().parents[1] / "contracts" / "split_unify.json"
 _EVENT_IMPORT_CONTRACT = (
@@ -79,6 +83,57 @@ def canonical_universe_unavailable_reason() -> str:
 def full_sample_estimand_scope() -> str:
     """Task 3.3 ③：`estimand_scope` 字面之**唯一** Python 出口（自契約讀，禁手打）。"""
     return _ESTIMAND_FULL_SAMPLE
+
+
+def build_split_unify_disclosure(
+    *,
+    n_test: Optional[int],
+    test_timestamps_ms: Any,
+    per_symbol_counts: Optional[Dict[str, int]] = None,
+    reason: Optional[str] = None,
+) -> Dict[str, Any]:
+    """`metadata.split_unify` 之**唯一**產生點（Task 4.1／SPEC C-6）。
+
+    🔴 **fail-closed 時 `n_test` 為 `None` 而非 `0`**：0 讀起來是「算過，結果是零個」，
+    None 才是「沒得算」。這兩件事在報告上長得一樣就是本票要消滅的假數字。
+    `reason` 非空 ⇒ 視為 fail-closed，`n_test`／`boundary_hash`／`per_symbol_counts`
+    一律清成 `None`／`{}`——留半套數字比不給更糟（讀的人不知道哪一半可信）。
+
+    `reason` 必須在 `split_unify.json` 之封閉集合內；`split_authority` 亦自契約讀，禁手打。
+    """
+    if reason is not None and reason not in FAIL_CLOSED_REASONS:
+        raise ValueError(
+            f"build_split_unify_disclosure: reason={reason!r} 不在契約封閉集合內"
+            f"（{sorted(FAIL_CLOSED_REASONS)}；fail-closed，不接受自造字面）"
+        )
+    authority = SPLIT_AUTHORITY_VALUES[0]
+    if reason is not None:
+        return {
+            "n_test": None,
+            "split_authority": authority,
+            "boundary_hash": None,
+            "per_symbol_counts": {},
+            "reason": reason,
+        }
+    if n_test is None:
+        raise ValueError(
+            "build_split_unify_disclosure: 沒有 reason 卻也沒有 n_test"
+            "——「算不出來」必須指名原因（fail-closed）"
+        )
+    counts = {str(k): int(v) for k, v in (per_symbol_counts or {}).items()}
+    total = sum(counts.values())
+    if counts and total != int(n_test):
+        raise ValueError(
+            f"build_split_unify_disclosure: per_symbol_counts 合計 {total} != n_test {int(n_test)}"
+            "——兩個數字在同一份揭露裡互相矛盾（fail-closed）"
+        )
+    return {
+        "n_test": int(n_test),
+        "split_authority": authority,
+        "boundary_hash": _boundary_hash(test_timestamps_ms),
+        "per_symbol_counts": counts,
+        "reason": None,
+    }
 
 
 for _r in (_REASON_MULTI_SYMBOL, _REASON_MISSING_TRAIN, _REASON_MISSING_TEST, _REASON_NO_UNIVERSE):
