@@ -1,0 +1,58 @@
+{
+  "_doc": "SPLITUNIFY B2c golden（SPEC §G）。改動須經 review。",
+  "g1_membership": {
+    "train": [
+      "tr0",
+      "tr1",
+      "tr2",
+      "tr3"
+    ],
+    "test": [
+      "te0",
+      "te1",
+      "te2",
+      "te3",
+      "te4"
+    ],
+    "purged": [
+      "gap1",
+      "gap2",
+      "tr_leak"
+    ]
+  },
+  "g3b_oracle": {
+    "train": [
+      "tr0",
+      "tr1",
+      "tr2",
+      "tr3"
+    ],
+    "test": [
+      "te0",
+      "te1",
+      "te2",
+      "te3",
+      "te4"
+    ],
+    "purged": [
+      "gap1",
+      "gap2",
+      "tr_leak"
+    ]
+  },
+  "g4_per_symbol_n": {
+    "ETHUSDT": 12
+  },
+  "g5_row_fingerprint_sha256": "d73993fe87732e38d651851a9bde6dce76fb5632ec97cd2b1db55b4cb412a530",
+  "g5_row_fingerprint_n": 56,
+  "g5_answer_window_complete": [
+    "te0",
+    "te1",
+    "te2",
+    "te3",
+    "te4"
+  ],
+  "purge_reasons": [
+    "interval_crosses_split_boundary"
+  ]
+}

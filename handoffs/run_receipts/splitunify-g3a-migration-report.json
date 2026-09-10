@@ -1,0 +1,9 @@
+{
+  "_doc": "G-3a 一次性遷移報告：舊 split_events 與新投影**預期不等價**（SPEC C-2）。本檔記錄『差在哪』，**不進**預設比對綠徑——凍結一份預期有差的 golden 會把已知錯誤合法化（B2b review GROK-R1-P1-03／COMPOSER-R1-P1-03）。",
+  "only_in_new_test": [
+    "te0"
+  ],
+  "only_in_old_test": [],
+  "diff_event_ids_sha256": "d7021d3e7a591a11b0eaa8439467b884512d51122d342c587b090786bd4ea239",
+  "diff_cardinality": 1
+}
