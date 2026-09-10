@@ -211,6 +211,18 @@ class ICAnalyzeRequest(BaseModel):
             "給定時對 k∈[0, mk] × h∈[1, mh] 逐格各跑一次五階段，回 `scan_results`"
         ),
     )
+    # 🔴 EVTLABEL Task 3.2：匯入標籤模式之**請求**欄。route／service 只透傳 `requested`，
+    #    **effective mode 由 orchestrator stage3 決定**（Task 3.4；R1 C2／R2 D5）——
+    #    能不能用 0/1 取決於「切分後的驗證段裡每一類還剩幾個」，那是切分之後才知道的事。
+    event_label_mode: Literal["auto", "return_rule", "imported_binary"] = Field(
+        "auto",
+        description=(
+            "事件 label 之取用模式："
+            "`imported_binary`＝直接對匯入的 0/1 正反標籤算分辨力（AUC／rank-biserial）；"
+            "`return_rule`＝一律用規則重算的報酬；"
+            "`auto`＝有可用的 0/1 就用，否則退回報酬版並在報告寫明原因"
+        ),
+    )
     feature_filter: Optional[FeatureFilterConfig] = Field(None, description="Feature pre-filter config")
     deep_analysis: bool = Field(False, description="Enable deep analysis after main IC workflow")
     deep_analysis_config: Optional[DeepAnalysisRequest] = Field(
@@ -263,6 +275,22 @@ class ICAnalyzeRequest(BaseModel):
             raise ValueError(
                 "cross_sectional 模式本批不支援事件批（event_import_id）"
                 "——橫截面分支不跑 GAP-3 之五階段編排與 feature-run 涵蓋閘"
+            )
+        # 🔴 EVTLABEL Task 3.2 之兩條 transport 不變式。
+        # ① 指定非 auto 的模式卻沒說「對哪一批」⇒ 400。同 `event_label_spec` 的理由：
+        #    0/1 標籤住在事件批裡，沒有批就沒有標籤可用，放行只會靜默退回報酬版。
+        if self.event_label_mode != "auto" and self.event_import_id is None:
+            raise ValueError(
+                "event_label_mode 需搭配 event_import_id（EVTLABEL Task 3.2）"
+                "——0/1 標籤住在事件批裡，沒有批就沒有標籤可用"
+            )
+        # ② 掃描網格與匯入標籤模式互斥 ⇒ 400。掃描是對 k×h 逐格重算**報酬**，
+        #    而匯入標籤模式根本不用 h 算 label ⇒ 每一格會得到同一份 0/1，整張網格沒有意義。
+        #    （`auto` 解析成 binary 而帶掃描之情形擋在服務端，Task 3.3。）
+        if self.event_label_scan is not None and self.event_label_mode == "imported_binary":
+            raise ValueError(
+                "scan_not_applicable_in_imported_binary_mode（EVTLABEL Task 3.2）"
+                "——掃描是對 k×h 逐格重算報酬，匯入標籤模式不用 h 算 label，每格會得到同一份 0/1"
             )
         return self
 

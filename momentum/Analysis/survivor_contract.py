@@ -36,6 +36,8 @@ SURVIVOR_CONTRACT_TOP_KEYS = frozenset(
         "sample_scope_keys",
         "sample_scope_kind_values",
         "event_definition_keys",
+        # EVTLABEL Task 3.1：sample_scope.event.label_binary 之子鍵 schema。
+        "event_label_binary_keys",
         "event_identity_keys",
         "split_keys",
         "row_identity_keys",
@@ -211,6 +213,42 @@ def feature_set_hash(feature_names: Sequence[str]) -> str:
     return _hashlib.sha256(json.dumps(list(feature_names), separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
+_EVENT_LABEL_MODE_CONTRACT = Path(__file__).resolve().parent / "contracts" / "event_label_mode.json"
+
+
+def _load_label_sources() -> tuple:
+    """`label_source` 之合法值集，單一真相源＝`event_label_mode.json::label_sources`。
+
+    EVTLABEL Task 3.1：舊版把三個字面手打在兩個地方（validator 與 `_check_event_object`），
+    加第三個來源時必然漏改一處 ⇒ 收斂到契約檔。缺鍵 ⇒ raise（fail-closed，不預設）。
+    """
+    data = json.loads(_EVENT_LABEL_MODE_CONTRACT.read_text(encoding="utf-8"))
+    sources = data.get("label_sources")
+    if not isinstance(sources, list) or not sources:
+        raise ContractValidationError("event_label_mode.json: label_sources missing or empty")
+    return tuple(sources)
+
+
+def _check_label_binary(ev: Dict[str, Any], c: Dict[str, Any], label: str) -> None:
+    """EVTLABEL Task 3.1：`label_binary` 之存在性與 `label_source` **綁定**。
+
+    - `label_source == "imported_binary_label"` ⇒ 必為 dict 且四子鍵齊（`event_label_binary_keys`）。
+    - 其他 `label_source`（含 None）⇒ 必為 None。禁止留殘值：模式切回報酬版卻留著上一次的
+      正反例計數，下游會拿它當「這次用了 0/1」的證據。
+    """
+    lb = ev.get("label_binary")
+    if ev.get("label_source") == "imported_binary_label":
+        if not isinstance(lb, dict):
+            raise ContractValidationError(f"{label}.label_binary: imported_binary_label requires object, got {type(lb).__name__}")
+        _check_object(lb, c["event_label_binary_keys"], f"{label}.label_binary")
+        if not (isinstance(lb["n_pos"], int) and isinstance(lb["n_neg"], int)):
+            raise ContractValidationError(f"{label}.label_binary: n_pos/n_neg must be int")
+        if lb["n_pos"] < 0 or lb["n_neg"] < 0:
+            raise ContractValidationError(f"{label}.label_binary: n_pos/n_neg must be >= 0")
+    elif lb is not None:
+        raise ContractValidationError(f"{label}.label_binary must be null when label_source={ev.get('label_source')!r}")
+
+
 def _check_object(obj: Any, schema: Dict[str, Any], label: str) -> None:
     """依 ``{additional_properties:false, keys:{k:{type,required,nullable}}}`` 驗一物件層（不遞迴）。"""
     if not isinstance(obj, dict):
@@ -289,12 +327,14 @@ def validate_survivor_output(payload: Dict[str, Any], *, report_meta: Optional[D
         _check_event_object(scope["event"], c, "sample_scope.event")
         # CODEX-R1-P1-03／R2-P1-03：conditional IC 由 payload 自述 `event.label_source` 判定（不依賴 report_meta）
         ls = scope["event"].get("label_source")
-        if ls not in (None, "event_label_value", "mainline_return_N"):
+        if ls not in (None, *_load_label_sources()):
             raise ContractValidationError(f"sample_scope.event.label_source {ls!r} invalid")
         ef = report_meta.get("event_filter") if isinstance(report_meta, dict) else None
         if isinstance(ef, dict) and ef.get("label_source") and ef.get("label_source") != ls:
             raise ContractValidationError("sample_scope.event.label_source != report_meta.event_filter.label_source")
-        if ls == "event_label_value":
+        # EVTLABEL Task 3.1：匯入標籤模式同樣是「事件樣本」⇒ v2 六鍵一樣必須齊（否則下游
+        # 無從知道這批倖存者綁的是哪一份事件定義）。
+        if ls in ("event_label_value", "imported_binary_label"):
             nulls = [k for k in ("event_manifest_hash", "label_definition_hash", "decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind") if scope["event"].get(k) is None]
             if nulls:
                 raise ContractValidationError(f"sample_scope.event: conditional_ic requires v2 keys non-null, got null {nulls}")
@@ -367,8 +407,10 @@ def _check_event_object(ev: Dict[str, Any], c: Dict[str, Any], label: str) -> No
     # GAP-3 Task B2.4（v2 六鍵）：全 null（GAP-2 序列型／query）或全非 null（GAP-3 事件樣本）；半套 ⇒ 拒
     v2_keys = ("event_manifest_hash", "label_definition_hash", "decision_time_rule", "feature_cutoff_rule", "label_window_rule", "control_kind")
     present = [k for k in v2_keys if ev.get(k) is not None]
-    if ev.get("label_source") not in (None, "event_label_value", "mainline_return_N"):
+    # EVTLABEL Task 3.1：允許值集改抄契約檔（`label_sources`），不再在此手列第二份。
+    if ev.get("label_source") not in (None, *_load_label_sources()):
         raise ContractValidationError(f"{label}.label_source {ev.get('label_source')!r} invalid")
+    _check_label_binary(ev, c, label)
     if present and len(present) != len(v2_keys):
         raise ContractValidationError(f"{label}: v2 event keys must be all-null or all-set (got {present})")
     if present:
@@ -484,8 +526,16 @@ def build_survivor_output(
                 event_obj[k] = event_context[k]
         # payload 自述 label 來源（第七鍵）：取自 report_meta.event_filter.label_source（無 ⇒ null）
         event_obj["label_source"] = ef.get("label_source") if isinstance(ef, dict) else None
+        # EVTLABEL Task 3.1：第八／九鍵同樣**抄產生者**（orchestrator 之 event_filter），
+        # 不在此推導——推導＝第二份判準，兩份遲早分歧。非匯入標籤模式 ⇒ label_binary 恆 null。
+        event_obj["statistic_kind"] = ef.get("statistic_kind") if isinstance(ef, dict) else None
+        event_obj["label_binary"] = (
+            copy.deepcopy(ef.get("label_binary"))
+            if isinstance(ef, dict) and event_obj["label_source"] == "imported_binary_label"
+            else None
+        )
         # CODEX-R1-P1-03：conditional IC 卻無 event_context ⇒ build 期 fail-closed（不產全 null 的事件倖存者）
-        if event_obj["label_source"] == "event_label_value" and not event_context:
+        if event_obj["label_source"] in ("event_label_value", "imported_binary_label") and not event_context:
             raise ContractValidationError("build_survivor_output: conditional_ic run requires event_context (v2 six keys)")
     n_total = report_meta.get("n_samples") if isinstance(report_meta, dict) else None
     if n_total is None and marg is not None and marg.get("n_train") is not None and marg.get("n_test") is not None:

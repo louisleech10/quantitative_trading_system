@@ -41,7 +41,10 @@ def test_load_top_level_keys_exact():
     expected = {
         "version", "_doc", "capability_status_ref", "reasons", "algorithm_version",
         "survivor_file_keys", "sample_scope_keys", "sample_scope_kind_values",
-        "event_definition_keys", "event_identity_keys", "split_keys", "row_identity_keys",
+        # EVTLABEL Task 3.1：sample_scope.event 擴兩鍵（statistic_kind／label_binary），
+        # label_binary 之子鍵 schema 住 event_label_binary_keys。
+        "event_definition_keys", "event_label_binary_keys",
+        "event_identity_keys", "split_keys", "row_identity_keys",
         "provenance_keys", "survivor_record_keys", "marginal_ic_section_keys",
         "statistic_values", "projection_space_values", "weights_method_values",
         "view_values", "fit_scope_values", "selection_sample_values",
@@ -627,13 +630,32 @@ def test_v2_event_context_filled_and_validated():
     lambda e: e.update(label_definition_hash="g" * 64),           # 非 hex
     lambda e: e.update(decision_time_rule=""),                    # 空字串
     lambda e: e.update(control_kind="platform_whatever"),         # 閉集外
-    lambda e: e.update(control_kind="platform_random_bars"),      # enum 內但 accepted 外（CODEX-R1-P2-04）
 ])
 def test_v2_event_keys_fail_closed(mutate):
     payload = sc.build_survivor_output(**_event_kwargs(_ctx()))
     mutate(payload["sample_scope"]["event"])
     with pytest.raises(ContractValidationError):
         sc.validate_survivor_output(payload)
+
+
+def test_control_kind_accepted_set_is_the_gate_not_the_enum():
+    """🔴 原本這裡有第五個 case（`platform_random_bars`＝「enum 內但 accepted 外」）。
+
+    `1110077b`（GAP-3 B-D5 隨機對照組全鏈）把該值**解禁**、寫進 `accepted` 之後，
+    那個 case 就永遠不會 raise ⇒ **自該 commit 起靜默紅**，直到 EVTLABEL B3 才被撞出來。
+    現在改為釘住「validator 讀的是 `accepted` 而不是 `enum`」這條不變式本身：
+    兩集合哪天再分家，本條會紅並指名差集，屆時第五個 case 可以帶著具體的值回來。
+    fail-closed 行為本身仍由上面 `platform_whatever`（兩集合皆不含）覆蓋。
+    """
+    from momentum.Analysis.event_samples.import_contract import load_event_import_contract
+
+    field = load_event_import_contract()["required_fields"]["control_kind"]
+    enum_set, accepted_set = set(field["enum"]), set(field["accepted"])
+    assert accepted_set <= enum_set, f"accepted 不得超出 enum：{sorted(accepted_set - enum_set)}"
+    assert accepted_set == enum_set, (
+        "enum 與 accepted 已分家 ⇒ 請把『enum 內但 accepted 外』之 fail-closed case 加回上面的 parametrize："
+        f"{sorted(enum_set - accepted_set)}"
+    )
 
 
 def test_conditional_ic_requires_event_context_fail_closed():

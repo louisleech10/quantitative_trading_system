@@ -67,6 +67,7 @@ from momentum.core.contracts import (
     SplitPlan,
     TimestampDiscontinuityError,
     deny_factor_in_ok_oos,
+    is_event_label_consumed,
     _coerce_timestamp_array,
     _normalize_symbol_value,
     split_per_symbol,
@@ -1331,7 +1332,7 @@ class ICFilterOrchestrator:
                 "test_rows": int(test_mask.sum()),
             }
             # ── EVTWARMUP Task 1.2：min_test_events 統計地板（只在 stage3 之後、只認產生者標記；R2 GROK-R2-P0-01）
-            if self._is_event_conditional_consumed(event_info):
+            if is_event_label_consumed(event_info):
                 # stage3 後 features_df 只剩實際被消費之事件列 ⇒ 測試段事件數＝test_mask 命中數
                 test_events = int(test_mask.sum())
                 split_context["test_events"] = test_events
@@ -1358,7 +1359,7 @@ class ICFilterOrchestrator:
                     )
         # 事件路徑視窗尺度揭露——與切分無關（R4 CODEX-R4-P2-03：ic_train_test_split=False 亦須揭露）；
         # 只事件路徑寫；全域待 TFWINDOW 重凍 golden 時一併進
-        if self._is_event_conditional_consumed(event_info):
+        if is_event_label_consumed(event_info):
             metadata = dict(metadata)
             metadata["ic_window_disclosure"] = {
                 **dict(metadata.get("ic_window_disclosure") or {}),
@@ -3374,8 +3375,14 @@ class ICFilterOrchestrator:
 
     @staticmethod
     def _is_event_conditional_consumed(event_info: Optional[dict]) -> bool:
-        """stage3 之後：只認產生者標記 `label_source == "event_label_value"`（事件不足棄條件後為 mainline ⇒ False）。"""
-        return bool(event_info) and event_info.get("label_source") == "event_label_value"
+        """🔴 已淘汰（EVTLABEL Task 3.1）：判準搬到 `momentum/core/contracts.py::is_event_label_consumed`。
+
+        原本只認 `event_label_value`，加了 `imported_binary_label` 之後那個判準會把匯入標籤模式的 run
+        誤判成全域路徑（門檻／冗餘分數／隔離都走錯分支）⇒ 集合定義收斂到 contracts 一處。
+        本方法保留為薄包裝只為擋住外部殘留呼叫；orchestrator 內呼叫點應為 0
+        （`tests/momentum/Analysis/test_evtlabel_label_predicate.py` 機械對證）。
+        """
+        return is_event_label_consumed(event_info)
 
     def _redundancy_scores(
         self, event_info: Optional[dict], stage5_results: dict, icir_scores: dict
@@ -3385,7 +3392,7 @@ class ICFilterOrchestrator:
         事件條件 IC 路徑：ICIR 多為非有限（`redundancy_filter._score_value` 會給 -inf）⇒ 改吃 stage5 summary 之 `ic_mean`，
         回 `("ic_mean")` 供 `metadata.tiebreaker_effective`；全域路徑：原樣 `icir_scores`、回 None（不寫鍵）。
         """
-        if not self._is_event_conditional_consumed(event_info):
+        if not is_event_label_consumed(event_info):
             return icir_scores, None
         scores = {
             str(row.get("feature_name")): row.get("ic_mean")
@@ -3726,7 +3733,7 @@ class ICFilterOrchestrator:
         )
 
         # EVTWARMUP Task 1.1：事件條件 IC（產生者標記 label_source=event_label_value）不以 bar-rolling warmup 擋
-        if split_context is not None and not self._is_event_conditional_consumed(event_info):
+        if split_context is not None and not is_event_label_consumed(event_info):
             min_required = self._rolling_warmup_min_rows(config, int(split_context.get("effective_horizon", 0)))
             if len(features_for_ic) < min_required:
                 return {
@@ -4015,7 +4022,7 @@ class ICFilterOrchestrator:
             alpha_effective,
             fdr_enabled=fdr_enabled,
             # EVTWARMUP Task 2.1：事件路徑 ICIR 為診斷欄，不作硬門檻（全域 icir_gate=True 一字不改）
-            icir_gate=not self._is_event_conditional_consumed(event_info),
+            icir_gate=not is_event_label_consumed(event_info),
         )
         threshold_log = {
             **threshold_log,

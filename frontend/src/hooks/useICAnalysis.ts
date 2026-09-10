@@ -659,6 +659,13 @@ export function useICAnalysis() {
               //    未掃描 ⇒ 整個鍵省略——送 `{}` 在後端仍代表「有掃描」（`is not None`），
               //    會讓「沒開掃描」變成「掃一個一格的網格」。
               ...(config.event_label_scan ? { event_label_scan: config.event_label_scan } : {}),
+              // 🔴 EVTLABEL Task 3.2：匯入標籤模式只在**事件批**分支送。
+              //    legacy 分支（只帶 `event_timestamps`）不得送——後端不變式要求
+              //    非 auto 必須搭配 `event_import_id`，送了就是 400。
+              //    `auto` 是後端預設 ⇒ 省略鍵，不佔請求體、也不會讓 golden 請求變形。
+              ...(config.event_label_mode && config.event_label_mode !== 'auto'
+                ? { event_label_mode: config.event_label_mode }
+                : {}),
             }
           : {
               // legacy 非事件批路徑（例如只用 `event_query` 篩）行為不變。

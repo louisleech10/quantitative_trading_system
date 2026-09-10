@@ -544,6 +544,7 @@ def test_event_analysis_horizon_purge_r2_declaration_from_batch_receipt(monkeypa
         event_import_id = "imp-1"
         event_label_spec = None
         event_label_scan = None      # `G3-D2` D4.3：請求頂層 sibling（未掃 ⇒ None）
+        event_label_mode = "auto"    # EVTLABEL Task 3.2：route 亦讀本欄（透傳，不解析）
 
     # ① 批次 receipt 有值 ⇒ 取得到
     monkeypatch.setattr(cis, "get_event_import_service",

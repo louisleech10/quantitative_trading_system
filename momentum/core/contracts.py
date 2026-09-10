@@ -1045,7 +1045,52 @@ LABEL_KIND_EVENT_GIVEN = "event_given"
 LABEL_KIND_BY_SOURCE: Dict[str, str] = {
     "mainline_return_N": LABEL_KIND_FORWARD_RETURN,
     "event_label_value": LABEL_KIND_EVENT_GIVEN,
+    # EVTLABEL Task 3.1：匯入標籤模式。0/1 也是「產生者逐事件給定」⇒ 同 event_given 契約
+    #    （天生 tail_nans=0，套 forward_return 契約會誤判）。
+    "imported_binary_label": LABEL_KIND_EVENT_GIVEN,
 }
+
+# EVTLABEL Task 3.1：「這次 IC 消費的是事件給定 label 嗎」之**唯一**判準。
+# 舊 `_is_event_conditional_consumed` 只認 `event_label_value`，加了 binary 之後那個判準
+# 會把 imported_binary 的 run 誤判成全域路徑（門檻／冗餘分數／隔離都會走錯分支）。
+# 這裡是唯一的集合定義，orchestrator 之呼叫點一律改呼叫本函式。
+_EVENT_GIVEN_LABEL_SOURCES = frozenset({"event_label_value", "imported_binary_label"})
+
+
+def is_event_label_consumed(event_info: Optional[Mapping[str, Any]]) -> bool:
+    """stage3 之後：產生者寫的 `label_source` 屬事件給定類 ⇒ True（事件不足棄條件後為 mainline ⇒ False）。"""
+    if not event_info:
+        return False
+    return str(event_info.get("label_source")) in _EVENT_GIVEN_LABEL_SOURCES
+
+
+def binary_label_digest(rows: Iterable[tuple[str, int, int]]) -> str:
+    """0/1 標籤三元組之指紋：sha256 over sorted `(event_id, ts_ms, label)`。
+
+    用途＝stage3 驗過的向量與 stage5 實際消費的向量必須是同一份（R2 D1）。
+    排序後才 hash ⇒ 與 dict 迭代順序無關；欄位以 `\\x1f` 分隔避免 `("a1", 2)` 與 `("a", 12)` 相撞。
+    """
+    hasher = hashlib.sha256()
+    for event_id, ts_ms, label in sorted(rows):
+        hasher.update(f"{event_id}\x1f{int(ts_ms)}\x1f{int(label)}\x1e".encode("utf-8"))
+    return hasher.hexdigest()
+
+
+@dataclass(frozen=True)
+class ValidatedBinaryLabel:
+    """stage3 驗過的 0/1 標籤向量；stage5 只准消費本物件（EVTLABEL Task 3.1／R2 D1）。
+
+    - `series`：index＝特徵列時間戳（與 IC 用的 X 同 index），值∈{0,1}。
+    - `digest`：`binary_label_digest(rows)`，供 stage5 對證「還是同一份」。
+    - `rows_frozenset`：`(event_id, ts_ms, label)` 三元組集合。**必填**——stage5 之消費守衛
+      以「被消費列 ⊆ 本集合」判，只有 digest 無法定位是哪幾列被換掉。
+    """
+
+    series: "pd.Series"
+    digest: str
+    rows_frozenset: frozenset
+    n_pos: int
+    n_neg: int
 
 
 def derive_label_kind(label_source: Optional[str]) -> str:

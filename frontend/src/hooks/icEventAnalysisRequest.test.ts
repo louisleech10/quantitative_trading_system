@@ -112,3 +112,37 @@ describe('Task 7.0b ⑫ — 選批後之 /analyze payload', () => {
     expect(body.event_label_spec).toBeUndefined();
   });
 });
+
+describe('EVTLABEL Task 3.2 — event_label_mode 只在事件批分支送', () => {
+  it('① 預設 `auto` ⇒ **不送**該鍵（後端同為預設，送了只是讓請求體變形）', async () => {
+    const body = await startWith(baseConfig({ event_import_id: 'imp-1' }));
+    expect(body.event_import_id).toBe('imp-1');
+    expect('event_label_mode' in body).toBe(false);
+  });
+
+  it('② `imported_binary` ⇒ payload 真的帶該鍵（攔 HTTP body，不是原始碼形狀）', async () => {
+    const body = await startWith(
+      baseConfig({ event_import_id: 'imp-1', event_label_mode: 'imported_binary' }),
+    );
+    expect(body.event_label_mode).toBe('imported_binary');
+  });
+
+  it('③ `return_rule` 亦送出（三值都要能表達，否則使用者無法強制走報酬版）', async () => {
+    const body = await startWith(
+      baseConfig({ event_import_id: 'imp-1', event_label_mode: 'return_rule' }),
+    );
+    expect(body.event_label_mode).toBe('return_rule');
+  });
+
+  it('④ 🔴 legacy 分支（只有 event_timestamps、無事件批）**不得**送——後端不變式①會 400', async () => {
+    const body = await startWith(
+      baseConfig({
+        event_import_id: undefined,
+        event_timestamps: [1, 2, 3],
+        event_label_mode: 'imported_binary',
+      }),
+    );
+    expect(body.event_import_id).toBeUndefined();
+    expect('event_label_mode' in body).toBe(false);
+  });
+});

@@ -70,6 +70,18 @@ class EventFilterConfig(BaseModel):
     #  不足 ⇒ holdout 仍套用、點 IC 照算，但 oos_guarantees=false、reason=insufficient_test_events。0 ⇒ 停用（逃生口）。
     min_test_events: int = 30
 
+    # ── EVTLABEL Task 3.1：匯入標籤模式（imported_binary）之參數 ────────────────────
+    #: 驗證段內每一類（正例／反例）至少幾個事件才給 binary 統計。不足 ⇒ auto 退回報酬版、
+    #  explicit imported_binary raise（route 422）。預設值之單一真相源＝
+    #  `momentum/Analysis/contracts/event_label_mode.json::min_events_per_class_default`。
+    min_events_per_class: int = 10
+    #: 置換自檢（Task 3.7）之全批置換次數上限；超過 ⇒ 依特徵數降階並在報告揭露。
+    perm_budget_total: int = 200000
+    #: 整批負對照（Task 3.7）之置亂重跑次數；q95 以整數 order statistic 取（不插值）。
+    negative_control_n: int = 50
+    #: 置換／置亂之 seed 基數；固定值使同一份資料之結果可重現。
+    oracle_seed: int = 20260910
+
     class SampleSizeTiers(BaseModel):
         sufficient: int = 200
         marginal: int = 100
@@ -124,6 +136,10 @@ class ThresholdsConfig(BaseModel):
     ic_hit_rate_min: float = 0.55
     monotonicity_score_min: float = 0.6
     coverage_min: float = 0.5
+    # 🔴 EVTLABEL Task 3.1（R1 推翻共用 `ic_mean_min`）：分辨力效應量之**獨立**門檻。
+    #    比較的是 `|rank_biserial|`——rank-biserial r ＝ 2·AUC−1，負值代表「反向但一樣能分」，
+    #    共用 ic_mean_min 且不取絕對值會把強反向特徵誤殺。
+    rank_biserial_min: float = 0.10
 
     class LongShortConfig(BaseModel):
         enabled: bool = False

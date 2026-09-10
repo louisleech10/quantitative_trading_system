@@ -253,6 +253,9 @@ const defaultConfig: ICAnalysisConfig = {
   mode: 'global',
   cross_sectional_symbols: [],
   event_query: '',
+  // EVTLABEL Task 3.2：預設 `auto`——有可用的 0/1 就用，否則後端退回報酬版並寫明原因。
+  // 送出時 `auto` 會被省略（後端同為預設值），故不影響非事件請求。
+  event_label_mode: 'auto',
   horizons: [1, 2, 3, 5, 8, 13, 21],
   thresholds: {
     ic_mean_min: 0.02,

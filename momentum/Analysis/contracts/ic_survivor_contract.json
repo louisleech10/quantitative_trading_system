@@ -24,7 +24,8 @@
     "survivor_output": [
       "identity_missing",
       "write_failed",
-      "persist_suppressed"
+      "persist_suppressed",
+      "negative_control_failed"
     ]
   },
   "algorithm_version": "gap2_marginal_ic_v1",
@@ -316,6 +317,42 @@
         "type": "str",
         "required": true,
         "nullable": true
+      },
+      "statistic_kind": {
+        "type": "str",
+        "required": true,
+        "nullable": true
+      },
+      "label_binary": {
+        "type": "object",
+        "required": true,
+        "nullable": true
+      }
+    }
+  },
+  "event_label_binary_keys": {
+    "_doc": "EVTLABEL Task 3.1：sample_scope.event.label_binary 物件。label_source==imported_binary_label ⇒ 非 null 且四子鍵齊；其他 label_source ⇒ 必為 null（禁留殘值）。label_origin_values＝匯入檔原始標籤字面（去重排序），供下游確認 0/1 沒有被重新編碼。",
+    "additional_properties": false,
+    "keys": {
+      "import_id": {
+        "type": "str",
+        "required": true,
+        "nullable": false
+      },
+      "n_pos": {
+        "type": "int",
+        "required": true,
+        "nullable": false
+      },
+      "n_neg": {
+        "type": "int",
+        "required": true,
+        "nullable": false
+      },
+      "label_origin_values": {
+        "type": "list",
+        "required": true,
+        "nullable": false
       }
     }
   },

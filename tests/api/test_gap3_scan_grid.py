@@ -51,6 +51,8 @@ class _Req:
     timeframe = TF
     symbol = SYMBOL
     event_label_scan = None
+    # EVTLABEL Task 3.2：route 亦讀本欄（透傳，不解析）。double 少一欄 ⇒ AttributeError。
+    event_label_mode = "auto"
 
 
 class _FakeAnalyzer:
@@ -73,10 +75,32 @@ class _FakeAnalyzer:
         self.calls.append(kwargs)
         if self.sink is not None:
             self.sink.append(id(self))
+        # 🔴 `efb16e4c`（EVTALIGN B1）起 `_run_scan_cell` 於 analyze 之後必跑
+        #    `_assert_event_triple_bound`，它 fail-closed 要求 `metadata.event_filter`。
+        #    本替身少了它 ⇒ 每一格都被吞成 `capability=unavailable`，三條測試自該 commit
+        #    起**靜默紅**（EVTLABEL B3 才撞出來；同批另有 `test_scan_cube.py` 同型）。
+        #    修法是讓替身回**真實**形狀，不是把守衛放寬——守衛正是在擋「事件對不上」。
+        consumed = {
+            str(eid): float(val)
+            for eid, val in (kwargs.get("event_label_values") or {}).items()
+        }
+        owners = kwargs.get("event_label_owners") or {}
+        by_event = {str(owners[key]): float(val)
+                    for key, val in (kwargs.get("event_label_values") or {}).items()
+                    if key in owners}
         return {
             "analysis_status": "ok_oos",
             "oos_guarantees": True,
-            "metadata": {"n_samples": 42, "total_features_evaluated": 7},
+            "metadata": {
+                "n_samples": 42,
+                "total_features_evaluated": 7,
+                "event_filter": {
+                    "applied": True,
+                    "label_source": "event_label_value",
+                    # 三元組回綁之對象＝**逐事件** id → 被消費的 label
+                    "consumed_event_labels": by_event or consumed,
+                },
+            },
         }
 
 

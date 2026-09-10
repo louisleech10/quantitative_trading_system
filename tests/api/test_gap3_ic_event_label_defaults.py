@@ -30,17 +30,19 @@ def _isolated_storage(tmp_path, monkeypatch):
 
 
 class _Req:
-    """`_resolve_event_batch` 只讀這三個欄位。
+    """`_resolve_event_batch` 只讀這四個欄位（EVTLABEL Task 3.2 起含 `event_label_mode`）。
 
     🔴 `G3-D2` D4.3：`event_label_spec` 已 typed（`EventLabelSpecModel`），route 走
     `.model_dump(exclude_none=True)` ⇒ 本 double 亦須交出 typed 物件，不能再遞 raw dict
     （遞 dict 會讓測試走一條**生產不存在**的路徑，那正是假綠的來源）。
     """
 
-    def __init__(self, import_id: str, spec=None, scan=None):
+    def __init__(self, import_id: str, spec=None, scan=None, label_mode: str = "auto"):
         self.event_import_id = import_id
         self.event_label_spec = None if spec is None else EventLabelSpecModel(**spec)
         self.event_label_scan = None if scan is None else EventLabelScanModel(**scan)
+        # EVTLABEL Task 3.2：route 亦讀本欄（透傳，不解析）。double 少一欄 ⇒ AttributeError。
+        self.event_label_mode = label_mode
 
 
 def _store(svc, records, declared):
@@ -513,3 +515,38 @@ def test_r5_closure_unknown_field_domain_is_fail_closed():
 
     with pytest.raises(KeyError):
         create_event_sample_pipeline().int_field_domain("no_such_field_in_contract")
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# EVTLABEL Task 3.2 — route 只**透傳**模式，不解析 auto
+# ══════════════════════════════════════════════════════════════════════════
+
+@pytest.mark.parametrize("mode", ["auto", "return_rule", "imported_binary"])
+def test_event_label_mode_is_passed_through_verbatim(_isolated_storage, mode):
+    """三個值都必須原樣出現在 event_batch 裡。
+
+    🔴 route **不得**在此解析 `auto`：能不能用 0/1 取決於「切分後的驗證段裡每一類還剩幾個」，
+    那是切分之後才知道的事（決策點在 orchestrator stage3，Task 3.4）。
+    route 若自作主張把 auto 解析掉，stage3 就再也看不到使用者的原始請求。
+    """
+    recs = [
+        make_event(i, label=i % 2, timeframe="12h", lookahead_bars_declared={"12h": 1},
+                   label_definition={
+                       "rule_id": "rule-x", "canonical_digest": "c" * 64,
+                       "window": {"horizon_bars": 7}, "label_return_mode": "close_to_close",
+                   })
+        for i in range(2)
+    ]
+    import_id = _store(_isolated_storage, recs, {"12h": 1})
+    out = _resolve_event_batch(_Req(import_id, label_mode=mode))
+    assert out["event_label_mode"] == mode
+
+
+def test_event_label_mode_key_always_present_in_event_batch(_isolated_storage):
+    """鍵必須**恆存在**（值為 auto），不是「非預設才寫」。
+
+    下游 `staged` 以 `event_batch["event_label_mode"]` 硬取；只在非預設時寫，
+    走預設路徑的 run 就會 KeyError——正是本票 B2 才剛踩過的同一種洞。
+    """
+    out = _batch(_isolated_storage, tfs=["12h", "12h"], declared={"12h": 1})
+    assert "event_label_mode" in out and out["event_label_mode"] == "auto"

@@ -2005,6 +2005,17 @@ export interface ICAnalysisConfig {
    * 未掃描 ⇒ 整個鍵**省略**（送空物件在後端仍代表「有掃描」）。
    */
   event_label_scan?: ICEventLabelScan;
+  /**
+   * EVTLABEL Task 3.2：事件 label 之取用模式。
+   *
+   * - `imported_binary`：直接對匯入的 0/1 正反標籤算分辨力（AUC／rank-biserial）。
+   * - `return_rule`：一律用規則重算的報酬。
+   * - `auto`（預設）：有可用的 0/1 就用，否則退回報酬版並在報告寫明原因。
+   *
+   * 🔴 只在**事件批**分支（帶 `event_import_id`）送；非 auto 而缺批 ⇒ 後端 400。
+   * 實際採用哪一種由後端切分後決定，前端送的是**請求**不是結論。
+   */
+  event_label_mode?: ICEventLabelMode;
   horizons: number[];
   thresholds: {
     ic_mean_min: number;
@@ -2998,6 +3009,14 @@ export interface RandomControlCompareResult {
   n_requested: number | null;
   n_drawn: number | null;
 }
+
+/**
+ * EVTLABEL Task 3.2：事件 label 之取用模式（請求值，非結論）。
+ *
+ * 值集之單一真相源＝`momentum/Analysis/contracts/event_label_mode.json::label_modes`，
+ * 由 `icLabelMode.test.ts` 對證，兩端不得各自手打。
+ */
+export type ICEventLabelMode = 'auto' | 'return_rule' | 'imported_binary';
 
 /** `G3-D2` D4.3：k／h 掃描網格之請求上界（請求**頂層 sibling**，不在 `event_label_spec` 內）。 */
 export interface ICEventLabelScan {

@@ -288,6 +288,9 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
             request.event_label_scan.model_dump(exclude_none=True)
             if request.event_label_scan is not None else None
         ),
+        # 🔴 EVTLABEL Task 3.2：只**透傳**使用者請求的模式，route 不解析 `auto`。
+        #    能不能用 0/1 要看切分後驗證段每類剩幾個 ⇒ 決策點在 orchestrator stage3（Task 3.4）。
+        "event_label_mode": request.event_label_mode,
     }
 
 

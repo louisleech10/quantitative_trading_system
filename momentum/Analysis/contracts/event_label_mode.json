@@ -24,6 +24,50 @@
   "imported_binary_label_keys": ["present", "n_pos", "n_neg", "used"],
   "h_unit_value": "event_timeframe_bars",
   "event_timeframe_mixed_value": "mixed",
+  "label_modes": ["auto", "return_rule", "imported_binary"],
+  "_label_modes_doc": "使用者請求之模式（Task 3.2）。effective mode 由 orchestrator stage3 決定（Task 3.4），route/service 只透傳 requested。",
+  "label_sources": ["mainline_return_N", "event_label_value", "imported_binary_label"],
+  "statistic_kinds": [
+    "spearman_ic",
+    "binary_discrimination",
+    "binary_discrimination_unavailable"
+  ],
+  "label_mode_reasons": [
+    "no_label_column",
+    "label_invalid_domain",
+    "one_class",
+    "class_below_min_selection"
+  ],
+  "_label_mode_reasons_doc": "auto 未解析為 imported_binary 之原因；explicit imported_binary 遇同樣情形 ⇒ raise（route 422），不靜默降級。",
+  "summary_columns_binary": [
+    "auc",
+    "rank_biserial",
+    "mw_u",
+    "mw_p_value",
+    "mw_p_value_adj",
+    "n_pos_selection",
+    "n_neg_selection",
+    "binary_status"
+  ],
+  "binary_status_values": ["ok", "unavailable"],
+  "threshold_skip_keys_binary": [
+    "ic_mean",
+    "icir",
+    "ic_hit_rate",
+    "monotonicity",
+    "coverage",
+    "long_short_spread"
+  ],
+  "_threshold_skip_keys_binary_doc": "imported_binary 模式下這些報酬版門檻不適用 ⇒ 不套用、不寫進 removed（報酬版 IC 仍算，留第二欄供對照）。",
+  "removed_keys_binary": [
+    "rank_biserial",
+    "binary_unavailable",
+    "permutation_oracle_disagree",
+    "permutation_unavailable"
+  ],
+  "survivor_suppressed_reasons": ["negative_control_failed"],
+  "min_events_per_class_default": 10,
+  "survivor_label_binary_keys": ["import_id", "n_pos", "n_neg", "label_origin_values"],
   "return_formula_by_mode": {
     "_doc": "由 label_return_mode 與 entry_price_semantic 機械組字串；{entry} 由 entry_price_semantic 代入。基準價語意見 label_value_from_case.py（close_to_close 基準＝t0 close，與 entry 無關＝D1-5）。",
     "close_to_close": "close[t0+h] / close[t0] - 1 × direction_sign",
