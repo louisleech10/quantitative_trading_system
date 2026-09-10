@@ -98,6 +98,100 @@ def test_long_window_shrinks_test_segment_consistently():
     assert len(long[1].row_index) == len(short[1].row_index) - 151
 
 
+def _write_ic_inputs(tmp_path, features_df: pd.DataFrame, labels_df: pd.DataFrame):
+    """最小 IC 輸入（沿 `test_ic_1a_cut1_split.py` 之形狀；BTCUSDT/1h）。"""
+    import json
+
+    import h5py
+
+    features_path = tmp_path / "features.h5"
+    labels_path = tmp_path / "labels.h5"
+    meta_path = tmp_path / "meta.json"
+    str_dtype = h5py.string_dtype(encoding="utf-8")
+    with h5py.File(features_path, "w") as file:
+        group = file.create_group("BTCUSDT/1h")
+        group.create_dataset("features", data=features_df.to_numpy(dtype=np.float32))
+        group.create_dataset("timestamps", data=features_df.index.to_numpy(dtype=np.int64))
+        group.create_dataset(
+            "feature_names", data=np.array(features_df.columns.tolist(), dtype=object), dtype=str_dtype
+        )
+    with h5py.File(labels_path, "w") as file:
+        group = file.create_group("BTCUSDT/1h")
+        group.create_dataset("labels", data=labels_df.to_numpy(dtype=np.float32))
+        group.create_dataset("timestamps", data=labels_df.index.to_numpy(dtype=np.int64))
+        group.create_dataset(
+            "label_names", data=np.array(labels_df.columns.tolist(), dtype=object), dtype=str_dtype
+        )
+    meta = {name: {"name": name, "category": "price", "layer": 1} for name in features_df.columns}
+    meta.update({"symbol": "BTCUSDT", "timeframe": "1h"})
+    meta_path.write_text(json.dumps(meta), encoding="utf-8")
+    return str(features_path), str(labels_path), str(meta_path)
+
+
+def _analyze_with_isolation(tmp_path, isolation, *, n: int = 600, horizon: int = 5) -> dict:
+    """跑到寫出 `ic_train_test_split` 為止；重量級 stage 以 stub 取代（本測試只驗切分與揭露）。"""
+    # 🔴 index 為 **epoch 秒**（contracts 之守衛會擋毫秒）
+    ts = pd.date_range("2025-01-01", periods=n, freq="1h").astype("int64") // 10**9
+    close = pd.Series(np.linspace(100.0, 200.0, n), index=ts)
+    features_df = pd.DataFrame({"close": close, "volume": close * 2}, index=ts)
+    labels_df = pd.DataFrame(
+        {f"return_{horizon}": close.pct_change(horizon).shift(-horizon).astype("float64")}, index=ts
+    )
+    fp, lp, mp = _write_ic_inputs(tmp_path, features_df, labels_df)
+
+    # 🔴 rolling 視窗須縮小：預設 [252,756,1512] 會讓 stage4 之 warmup 預檢要求 test 段 ≥1517 列，
+    #    小資料集必走 full-sample fallback（那條路徑不建 holdout，測不到本 Task 的接線）。
+    orch = ICFilterOrchestrator(
+        ICConfig.model_validate({"min_test_rows": 20, "ic_calculation": {"rolling_windows": [5]}})
+    )
+    orch._stage1_preprocessing = lambda features, metadata, fit_mask=None, fit_mode=None: (features, {})
+    orch._stage4_ic_calculation = lambda *a, **k: {
+        "label_series": labels_df.iloc[:, 0], "icir": {}, "rolling_ic": {}, "ic_series": {},
+    }
+    orch._stage5_statistical_validation = lambda *a, **k: {
+        "summary_table": [], "passed_features": [], "removed": {}, "filter_log": {},
+    }
+    orch._stage6_redundancy = lambda *a, **k: {"kept": [], "removed": [], "filter_log": {}}
+    orch._stage6b_marginal_ic = lambda *a, **k: {"status": "not_run"}
+    captured: dict = {}
+
+    def stage7(features, metadata, *a, **k):
+        captured["metadata"] = metadata
+        return {"metadata": metadata, "summary_table": []}
+
+    orch._stage7_report = stage7
+    orch.analyze(fp, lp, mp, event_isolation=isolation)
+    return captured["metadata"]["ic_train_test_split"]
+
+
+def test_analyze_wires_label_window_into_purge(tmp_path):
+    """🔴 端到端接線：`analyze(event_isolation=…)` ⇒ metadata 之 purge_gap 真的變 12。
+
+    先前只測 `_build_holdout_split_plan`（把算好的 purge 傳進去）⇒ mutation 把
+    orchestrator 那行 `max(effective_horizon, event_window_rows)` 改回 `effective_horizon`
+    時測試仍綠（假綠）。本測試從 `analyze` 入口進，才真的守住那行。
+    """
+    split = _analyze_with_isolation(tmp_path, EventIsolationRows(label_window_rows=12, lookahead_depth_rows=144))
+    assert split["purge_gap"] == 12
+    assert split["purge_gap_source"] == "event_label_window"
+    assert split["event_label_window_rows"] == 12
+    assert split["lookahead_depth_rows"] == 144
+    assert split["effective_horizon"] == 5
+
+
+def test_analyze_keeps_mainline_purge_when_window_shorter(tmp_path):
+    split = _analyze_with_isolation(tmp_path, EventIsolationRows(label_window_rows=3, lookahead_depth_rows=10))
+    assert split["purge_gap"] == 5 and split["purge_gap_source"] == "mainline_horizon"
+
+
+def test_analyze_without_isolation_writes_no_new_keys(tmp_path):
+    """非事件 run：三鍵不得出現（全域報告逐位元組不變之依據）。"""
+    split = _analyze_with_isolation(tmp_path, None)
+    assert split["purge_gap"] == 5
+    for key in ("purge_gap_source", "event_label_window_rows", "lookahead_depth_rows"):
+        assert key not in split
+
+
 def test_event_isolation_dataclass_is_frozen():
     iso = EventIsolationRows(label_window_rows=12, lookahead_depth_rows=144)
     with pytest.raises(Exception):

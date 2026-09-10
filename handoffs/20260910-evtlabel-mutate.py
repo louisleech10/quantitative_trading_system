@@ -53,8 +53,8 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "M-P2-1-purge-ignores-label-window", 2, ORCH,
         "            effective_purge_gap = max(effective_horizon, event_window_rows)\n",
         "            effective_purge_gap = effective_horizon\n",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_isolation_channel.py", "-k", "purge"],
-        "purge 改回只吃主線 horizon ⇒ 受理批 12 變 5 ⇒ 紅",
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_isolation_channel.py", "-k", "analyze_wires"],
+        "purge 改回只吃主線 horizon ⇒ 受理批 12 變 5 ⇒ 紅（須從 analyze 入口測，否則假綠）",
     ),
     Mutation(
         "M-P2-1b-purge-plan-ignores-arg", 2, ORCH,
@@ -65,8 +65,8 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     Mutation(
         "M-P2-2-embargo-back-to-max-depth-window", 2, SERVICE,
-        "        purge_source = split.get(\"purge_gap_source\") or \"global_default_horizon\"\n",
-        "        purge_source = \"global_default_horizon\"\n",
+        "    purge_source = split.get(\"purge_gap_source\") or \"global_default_horizon\"\n",
+        "    purge_source = \"global_default_horizon\"\n",
         [*PYTEST, "tests/api/test_isolation_disclosure.py", "-k", "purge_source"],
         "purge 來源寫死不抄 orchestrator ⇒ 揭露與實際不符 ⇒ 紅",
     ),
@@ -74,7 +74,7 @@ MUTATIONS: Tuple[Mutation, ...] = (
         "M-P2-2b-embargo-source-uses-purge-rows", 2, SERVICE,
         "            \"source\": \"event_lookahead_depth\" if depth_rows > before else \"config_embargo\",\n",
         "            \"source\": \"event_lookahead\" if purge_rows > before else \"config_embargo\",\n",
-        [*PYTEST, "tests/api/test_isolation_disclosure.py", "-k", "embargo"],
+        [*PYTEST, "tests/api/test_isolation_disclosure.py", "-k", "source_reflects or no_longer_credits"],
         "embargo 來源改回用 max(深度,窗) 判 ⇒ 答案窗被誤記為 look-ahead ⇒ 紅",
     ),
     Mutation(
