@@ -236,10 +236,18 @@ def test_mask_survives_event_filter() -> None:
 
 
 def test_pipeline_order_split_before_preprocessing(tmp_path: Path) -> None:
-    features_df = _real_btc_1h_features()
+    # 真實 BTC 1h kline，只是多取一些列（禁合成 fixture）：預檢要求測試段 ≥ max(換算後視窗)+horizon。
+    features_df = _real_btc_1h_features(limit=1000)
     labels_df = _labels_from_close(features_df)
     features_path, labels_path, meta_path = _write_ic_inputs(tmp_path, features_df, labels_df)
-    orchestrator = ICFilterOrchestrator(ICConfig(min_test_rows=20))
+    # 🔴 2026-09-08 UAT 修補（`rolling warmup` 預檢前移到預處理**之前**）之後，本 fixture 的
+    #    預設 rolling 視窗 [252, 756, 1512] 會要求測試段 ≥1517 列，而本 fixture 只有 55 列
+    #    ⇒ 切分直接被判不足、退回全樣本，stage1 拿不到 fit_mask（本測試自 9/8 起紅）。
+    #    本測試要驗的是**管線順序**（切分先於預處理），不是 warmup 政策 ⇒ 把視窗縮到 fixture
+    #    撐得起的大小（同 `test_evtlabel_isolation_channel.py:145` 之作法），順序斷言原樣保留。
+    orchestrator = ICFilterOrchestrator(
+        ICConfig.model_validate({"min_test_rows": 20, "ic_calculation": {"rolling_windows": [5]}})
+    )
     calls: list[str] = []
 
     def stage1(

@@ -38,6 +38,31 @@ def _load_report_sections() -> tuple:
 
 
 REPORT_SECTIONS = _load_report_sections()
+
+TOGGLE_CONTRACT = Path(
+    _args.get("--toggle-contract", REPO / "momentum/Analysis/contracts/ui_stage_toggles.json")
+)
+
+
+def _load_toggle_contract() -> tuple:
+    """票 TIERTOGGLE：UI 開關鍵集之單一真相源（stage／module 兩集合）。
+
+    讀不到或缺鍵 ⇒ 回空集合，讓上游的 store↔契約對證條件不成立而**維持舊行為**
+    （舊 regex 抓不到 ⇒ R1a 照報），不會因為契約檔壞掉就靜默放行。
+    """
+    try:
+        data = json.loads(TOGGLE_CONTRACT.read_text(encoding="utf-8"))
+        return frozenset(data["stage_keys"]), frozenset(data["module_keys"])
+    except Exception:  # noqa: BLE001
+        return frozenset(), frozenset()
+
+
+def _ts_string_array(src: str, name: str):
+    """抓 `export const <name> = [ 'a', 'b' ] as const;` 之字串字面集合；抓不到回 None。"""
+    block = re.search(rf"const {re.escape(name)}\s*=\s*\[([\s\S]*?)\]\s*as const;", src)
+    if not block:
+        return None
+    return frozenset(re.findall(r"'([\w]+)'", block.group(1)))
 # UI 邊界顯式轉名（store 註記「唯一轉名點」）：前端鍵 → 後端 override 路徑存在即視為已消費
 EXPLICIT_RENAMES = {"fdr_correction": "significance.fdr.enabled"}
 
@@ -80,6 +105,25 @@ def main() -> None:
     consumed_keys = set(re.findall(r"(\w+): Boolean\(state\.featureToggles\.(\w+)\)", eff_block.group(0)))
     consumed_frontend = {src for _, src in consumed_keys}
     mapped_backend = {dst for dst, _ in consumed_keys}
+    # 🔴 票 TIERTOGGLE（2026-09-10）：`getEffectiveConfig` 已改為**依契約鍵集迴圈**取值
+    #    （`pick(STAGE_TOGGLE_KEYS)` / `pick(MODULE_TOGGLE_KEYS)`），不再逐鍵手寫
+    #    `x: Boolean(state.featureToggles.x)` ⇒ 上面那條 regex 一個也抓不到，
+    #    整組 toggle 會被誤報成 R1a 幽靈（本檢查因此自 `e8903c28` 起紅）。
+    #    修法**不是**放寬：改成讀 store 實際迴圈的那兩個陣列，並要求它們與契約檔
+    #    `ui_stage_toggles.json` 逐值相同——store 私自加鍵而契約沒登記 ⇒ 仍然紅。
+    contract_stage, contract_module = _load_toggle_contract()
+    store_stage = _ts_string_array(store_src, "STAGE_TOGGLE_KEYS")
+    store_module = _ts_string_array(store_src, "MODULE_TOGGLE_KEYS")
+    if store_stage is not None and store_module is not None:
+        if store_stage != contract_stage:
+            die(1, f"STAGE_TOGGLE_KEYS 與契約檔不符：store−契約={sorted(store_stage - contract_stage)} 契約−store={sorted(contract_stage - store_stage)}")
+        if store_module != contract_module:
+            die(1, f"MODULE_TOGGLE_KEYS 與契約檔不符：store−契約={sorted(store_module - contract_module)} 契約−store={sorted(contract_module - store_module)}")
+        # 迴圈取值＝鍵名兩端相同（無轉名）⇒ 前端消費集與後端映射集皆為該鍵集。
+        looped = store_stage | store_module
+        if "pick(STAGE_TOGGLE_KEYS)" in eff_block.group(0) and "pick(MODULE_TOGGLE_KEYS)" in eff_block.group(0):
+            consumed_frontend |= looped
+            mapped_backend |= looped
 
     # 後端可消費集：STAGE_OVERRIDE_PATHS ∪ MODULE_ENABLED_PATHS 鍵 ∪ deep module 名
     stage_block = re.search(r"STAGE_OVERRIDE_PATHS[\s\S]*?\n\}", orch_src)

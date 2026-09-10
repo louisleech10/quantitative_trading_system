@@ -1,6 +1,6 @@
 # EVTLABEL — TODO
 
-**SPEC**：`docs/EVTLABEL_SPEC.md`　**票**：`EVTLABEL`　**日期**：2026-09-10　**狀態**：v4；R1/R2/R3 三家戳記 APPROVED（`0dbe40ff`）。**Phase 0–2（B0–B2）FROZEN，可動工**（使用者 9/10 放行 purge 部分）；**Phase 3（B3–B6）Internal Frozen，待使用者放行**。
+**SPEC**：`docs/EVTLABEL_SPEC.md`　**票**：`EVTLABEL`　**日期**：2026-09-10　**狀態**：v4；R1/R2/R3 三家戳記 APPROVED（`0dbe40ff`）。**Phase 0–2（B0–B2）FROZEN 且已實作完成**（使用者 9/10 放行 purge 部分；B1／B2 各批三家 code review 收斂、gate PASS）；**Phase 3（B3–B6）FROZEN，使用者 9/10 已放行**（逐字：「第 3 段 ok」）⇒ B3 起可動工。
 **實作端**：Claude 主委自任（`scripts/governance_roles.json` implementer=claude）；review＝codex＋composer＋grok。
 
 ---

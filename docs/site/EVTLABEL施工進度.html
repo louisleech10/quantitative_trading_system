@@ -11,7 +11,7 @@
 <main>
 <h1 id="evtlabel-批次施工進度工作進度表">EVTLABEL 批次施工進度（工作進度表）</h1>
 <blockquote>
-<p>更新：2026-09-10 15:55｜這份只講「做完什麼／在做什麼／還沒做」。
+<p>更新：2026-09-10 晚｜這份只講「做完什麼／在做什麼／還沒做」。
 範圍＝EVTLABEL 三段＋其前後的 TIERTOGGLE／SPLITUNIFY／GLOBALH／UAT。
 （其他 epic 的進度各有自己的檔：<code>GAP-3施工進度.md</code>、<code>GAP-1施工進度.md</code>、<code>IC健檢施工進度.md</code>）
 想看每張票在幹嘛 → <a href="接下來要做的票.html">接下來要做的票.md</a>；想看 EVTLABEL 規格細節 → <a href="EVTLABEL規格白話.html">EVTLABEL規格白話.md</a></p>
@@ -49,12 +49,12 @@
 </tr>
 <tr>
 <td><strong>EVTLABEL 第 2 段（purge 換算）</strong></td>
-<td>✅ <strong>程式完成，待三家 code review</strong></td>
+<td>✅ <strong>完成</strong>（三家 code review 4 條全修，一致判可進第 3 段）</td>
 <td>9/10</td>
 </tr>
 <tr>
-<td>EVTLABEL 第 3 段（匯入標籤模式）</td>
-<td>⬜ 你已放行，排第 2 段之後</td>
+<td><strong>EVTLABEL 第 3 段（匯入標籤模式）</strong></td>
+<td>🔨 <strong>進行中</strong>（你的主目標）</td>
 <td>—</td>
 </tr>
 <tr>
@@ -165,7 +165,7 @@
 <li><strong>計時沒歸零</strong>：同一個分析器跑第二次會把上一次的秒數疊上去，已修。</li>
 <li>另兩條登記為「已具名、之後再處理」：7 個純前端開關（按了不會影響後端，但已寫明、不是偷藏）；混週期批次的一個保守值（畫面已自動改口，不會誤導）。</li>
 </ul>
-<h3 id="6-第-2-段purge-依答案窗換算-程式完成">6. 第 2 段（purge 依答案窗換算）— 程式完成</h3>
+<h3 id="6-第-2-段purge-依答案窗換算-完工">6. 第 2 段（purge 依答案窗換算）— 完工</h3>
 <ul>
 <li><strong>改了什麼</strong>：以前報告寫「purge 5 根」，那個 5 是主線設定的數字、跟你設的 h 完全無關；真正擋住你答案窗的是 embargo 那 144 根。現在 <strong>purge 跟著你的答案窗走</strong>（你那批＝12 根），embargo 只負責「你挑樣本時偷看了多遠」（144 根）。總隔離 149 → 156，更保守。</li>
 <li><strong>不是修洩漏</strong>：改之前也沒有洩漏（兩個加起來一直都夠），修的是「標籤貼錯位置」——報告說的跟實際擋住的不是同一件事。</li>
@@ -175,12 +175,19 @@
 <li>🔴 <strong>自己抓到一個假綠</strong>：我原本的測試自己先算好 purge 再傳進去，等於沒驗到真正的接線——把那行改壞測試竟然還是綠的。已改成從入口整條跑，破壞性測試才真的轉紅。</li>
 <li>🔴 <strong>發現一條既有紅</strong>（不是這次弄壞的，兩種方法各驗一次）：<code>test_pipeline_order_split_before_preprocessing</code>。原因是 9/8 加的「預處理前先判切分夠不夠」那道檢查，讓小資料集直接走全樣本路徑，而那條舊測試沒跟著更新。已具名，會在下批處理。</li>
 </ul>
+<h3 id="7-第-2-段的三家審碼4-條-已收斂第-2-段完工">7. 第 2 段的三家審碼（4 條）— 已收斂，第 2 段完工</h3>
+<p>三家（Codex／Composer／Grok）<strong>一致判可以進第 3 段</strong>，沒有一條是擋路的。四條都修了：</p>
+<ul>
+<li><strong>一條是真的講錯話</strong>（Codex 抓到）：你在 IC 頁跑「參數掃描」時，每一格會去讀 embargo 的來源標籤。但那個數字在進格子之前<strong>已經被外層抬高過</strong>了，所以每一格都會標成「這是你自己設的」——實際上是系統為了安全自動抬的。已改成把<strong>抬高前的原始值</strong>用專用參數一路傳進去。（刻意不塞設定檔：那條路正是這張票剛擋掉的。）</li>
+<li><strong>兩條是簽名對稱</strong>：退回全樣本模式的那條路不需要隔離區參數，但簽名少一個會讓下一個改這裡的人誤以為「全樣本也套了隔離」。收下不用，只為看得懂。</li>
+<li><strong>一條是文字</strong>：三家都說 h 和答案窗<strong>相等</strong>時，畫面寫「答案窗沒有比 horizon 長」會讓人以為答案窗被忽略了。已改成「兩者相等，都已經算進去」。</li>
+</ul>
+<p>🔴 <strong>順手抓到一條已經紅了兩天的測試</strong>：掃描格那條測試用的是手寫替身資料，9/8 有人在正式流程加了新欄位、替身沒跟上，測試就一直紅、沒人發現（我這批加第二個欄位才撞出來）。修法有兩種，我選了嚴格的那種：<strong>不讓程式在缺欄位時自動填 0</strong>——那會讓隔離區默默變小，正是這張票要擋的事。改成替身補齊，另外加一道<strong>自動守衛</strong>：以後正式流程每加一個必要欄位，替身沒跟上就會<strong>先紅並指名缺哪個</strong>，不會再靜默壞掉。守衛本身也驗過「拿掉一個欄位就會紅」。</p>
+<p><strong>第 2 段收工數字</strong>：九個測試檔 <strong>111 條全過</strong>；6 條破壞性測試全紅、對照組綠（改壞一定會被抓到）；關卡 PASS；架構解耦與基準線逐值相同，沒有新增違規。</p>
 <h2 id="進行中">進行中</h2>
-<p><strong>第 2 段的三家 code review</strong>（實作者不自審）。收斂後進第 3 段。</p>
+<p><strong>第 3 段（匯入標籤模式）</strong>——就是你的主目標：你在外面標好正反例匯入，平台找出 t₀ 之前哪些特徵能把正反例分開。</p>
 <h2 id="還沒做">還沒做</h2>
 <ol>
-<li>第 2 段：purge 改成跟你的 h 走（12 根），embargo 只承載 look-ahead 深度（144 根）。</li>
-<li>第 3 段：IC 直接對你的 0/1 算（AUC／rank-biserial／Mann-Whitney＋FDR＋區塊置換）。</li>
 <li>SPLITUNIFY：把「事件切分」和「時間切分」統一成一套（否則你 UAT 會看到 31 和 33 兩個驗證段）。</li>
 <li>GLOBALH：每個 horizon 都完整算、每列標 h／k、可篩選；頁面註明時間 ×N。</li>
 <li>你的 UAT。</li>

@@ -47,3 +47,5 @@
 | B2 基準比對 | 攤平前後數值 exact 相同（golden 6/6） |
 
 > **2026-08-19 追記（GAP-2 B4 波及）**：`scripts/ic_wiring_check.py` 之 R3「報告節不得裸空」的節鍵清單改為**直接讀 `ic_report_contract.json` 的 report_sections**（原寫死五節），GAP-2 新增的 `marginal_ic` 節自動被涵蓋（現 7 節）；R1a／R1b／R2 規則不變。
+
+> **2026-09-10 追記（EVTLABEL TIERTOGGLE 波及）**：`scripts/ic_wiring_check.py` 的 R1a 規則本來是用「逐鍵字面」去認前端有沒有把某個開關送給後端。TIERTOGGLE 那批把前端改成**照契約清單迴圈**送（就是為了根治幽靈開關），結果這支檢查一個也認不出來，反而把 25 個開關全報成幽靈——**檢查本身自 `e8903c28` 起就一直是紅的，沒人發現**。現已改成讀前端實際迴圈的那兩份清單，並要求它們與 `ui_stage_toggles.json` 逐值相同：前端偷加一個契約沒登記的開關**仍然會紅**（已實測驗證，不是放寬）。R1b／R2／R3 規則不變。
