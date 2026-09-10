@@ -1,9 +1,13 @@
 # SPLITUNIFY — SPEC
 
-> **狀態（2026-09-10 深夜）**：v1 草案。切法已由**委員會 consult 定共識**
+> **狀態（2026-09-11 凌晨）**：**v2**。切法已由**委員會 consult 定共識**
 > （使用者 2026-09-10 裁定「切法由你跟委員討論共識」，並於離線時再次指示
 > 「有問題找委員會討論共識」）⇒ 本 SPEC 直接依共識撰寫，**不再回頭問使用者**。
-> consult 收斂檔：`handoffs/reconcile/20260910-splitunify-x-consult-r1/synth.md`（commit `9f75e4a7`）。
+> consult 收斂檔：`handoffs/reconcile/20260910-splitunify-x-consult-r1/synth.md`
+> （**D1–D8**；body-hash `120b4d042d38…`；**三家 RECONCILE-STAMP 全數 APPROVED**，
+> `scripts/reconcile_stamps_check.sh` rc=0）。
+> R1 三家審收斂檔：`handoffs/reconcile/20260911-splitunify-x-review-r1/synth.md`（C1–C13）。
+> 主委自產審查：`handoffs/20260911-splitunify-claude-selfreview.md`（`CLAUDE-R1-*` 8 條）。
 > 前置票 `EVTLABEL` 已收（三 Phase、17 Task、四批三家審全收斂、四個 gate 全 PASS）。
 
 ## §A 假設與待使用者確認
@@ -13,210 +17,486 @@
 2. 「SPLITUNIFY 排 EVTLABEL 之後、UAT 之前」（使用者選 B）。
 3. 「我要睡了，你繼續做完，有問題找委員會討論共識，做完前不要停下來」（2026-09-10 深夜離線授權）。
 
-**待使用者確認：無。** 本票之唯一設計決策（切法）已由使用者明示授權委員會定案，
-共識已收斂於 `handoffs/reconcile/20260910-splitunify-x-consult-r1/synth.md`。
+**待使用者確認：無。** 本票之唯一設計決策（切法）已由使用者明示授權委員會定案。
 UAT 項目之最終確認屬 B4，且使用者已裁定 UAT 一律最後。
 
 ## §A2 目標與問題
 
-**問題**：平台現在有**兩套切分**，同一批事件會得到**兩個不同的驗證段**（實測 31 vs 33）。
+問題：平台現在有**兩個入口各自產切分**，同一批事件會得到**兩個互相矛盾的驗證段數字**。
 
-| | 事件切分（GAP-3） | 時間切分（IC 主線） |
+| | 事件掃描入口 | IC 分析入口 |
 |---|---|---|
-| 切什麼 | **事件**分訓練／驗證（每 symbol 各自按時間切，緩衝 ≥ 答案窗） | **K 線列**分訓練／驗證 |
-| 隔離 | 緩衝 bars | `purge` ＋ `embargo`（EVTLABEL Task 2.2 後 purge 吃答案窗） |
-| 型別 | `EventSplitPlan`（`momentum/Analysis/event_samples/types.py:87`） | `SplitPlan`（`momentum/core/contracts.py:378`） |
-| 產生者 | `event_samples/event_split.py::split_events` | `ic_filter_orchestrator._build_holdout_split_plan` |
+| service | `EventImportService`（`api/services/case_import_service.py:1610`） | `ICAnalysisService` → `ic_filter_orchestrator.analyze` |
+| 切什麼 | **事件**（每 symbol 各自按時間切，緩衝 ≥ 答案窗） | **特徵列**（chronological holdout） |
+| 隔離 | 毫秒 `embargo`（`event_split.py:104-117`） | `purge` ＋ `embargo` 列數（EVTLABEL Task 2.2 後 purge 吃答案窗） |
+| 型別 | `EventSplitPlan`（`momentum/Analysis/event_samples/types.py`） | `SplitPlan`（`momentum/core/contracts.py:378`） |
+| 產生者 | `event_split.py::split_events`（唯一呼叫點 `pipeline.py:691`） | `_build_holdout_split_plan`（`ic_filter_orchestrator.py:561`，呼叫點 `:1256`） |
+| 使用者看到的數字 | `summary.split` 之 `n_train`／`n_test`／`n_purged`（`pipeline.py:696-699`） | `split_context["test_events"]`（`ic_filter_orchestrator.py:3594`） |
 
-為什麼非統一不可：使用者 UAT 時會在同一份報告看到兩個 OOS 段數字，無法判斷哪一個
-才是結論的依據；下游（倖存者檔、`pattern_bridge`）也可能各自綁到不同那一套。
+🔴 兩者**不存在單一合併點**——分屬兩個 service、兩個 endpoint。
+所以問題的精確描述是：**同一批事件、同一次 UAT 會看到兩個互相矛盾的驗證段數字**，
+而不是「同一份報告裡有兩個欄位」（`CLAUDE-R1-P2-08`）。
 （`template_check` 之空殼偵測把行首 `**` 當 bullet ⇒ 本段刻意不以粗體起首。）
 
-目標：**一個批次只有一條 OOS 邊界**，報告只暴露那一個數字，並揭露它的來源與 sha256。
+目標：**一個批次只有一條 canonical OOS 邊界**；報告只暴露一個「驗證段」數字，
+並揭露它的來源與 sha256；拿不到 canonical 邊界的路徑**明示 `event-study-only`**，不給假數字。
 
 ## §RISK 風險分級
 
 RISK-HIT: a,b,c,d
 
 **大票**，命中四項高風險原則（三家一致）：
-(a) 數值／資料品質——切分邊界直接決定 OOS 數字；
-(b) 跨模組／共用路徑——7 個生產檔＋6 個測試檔在用 `EventSplitPlan`；
+(a) 數值／資料品質——切分邊界直接決定 OOS 數字，且 D8 已證數值**必變**；
+(b) 跨模組／共用路徑——7 個生產檔＋6 個測試檔在用 `EventSplitPlan`，跨兩個 service；
 (c) 多 phase／難回退——動到 GAP-3 已 FROZEN 之規格（走延伸檔）；
 (d) 切分正確性——本票的全部內容就是切分。
 
-## §C 約束（委員會共識，逐條可追溯到 consult finding）
+## §C 約束（逐條可追溯到 consult 之 D 項或 R1 審之 C 群集）
 
-### C-1 canonical 權威＝時間切分（D1；三家一致）
+### C-0 🔴 接線落點：單一 boundary builder，拿不到 universe 就不得宣稱 OOS（D6）
+
+來源：`CODEX-R1-P1-04`＋`COMPOSER-R1-P2-02`＋主委自產之 `CLAUDE-R1-P0-01`。
+這是本票的**先決條件**。v1 把投影寫在一個拿不到 `SplitPlan` 的地方，等於沒有落點。
+
+碼證：`split_events` 唯一呼叫點 `pipeline.py:691`，輸入只有 `EventManifest`＋`EventSplitConfig`
+（`types.py`），兩者皆無 `SplitPlan` 欄；唯一生產 caller `case_import_service.py:1610` 之
+`run_with_params` 參數只有 `test_fraction`／`embargo_ms`／`tier_min_test_events`
+（`pipeline.py:507-517`），且不帶 `feature_config` ⇒ `_materialize` 回 `None`（`pipeline.py:654-657`）。
+IC 側 `SplitPlan` 在另一個 service 建立，R1／R4 解耦規則擋住直接傳遞。
+
+決議：
+1. canonical 邊界由 **core 之 pure temporal-boundary builder** 產生，住
+   `momentum/core/split_preview.py`（該檔已有 `holdout_split_point`／`holdout_test_row_index`
+   兩支被兩端共用之先例，且檔頭已載明「同一算術、無副作用」之定位）。
+2. `orchestrator` 與 `pipeline` **共同呼叫**它；`pipeline` **必須接收**該 boundary 與
+   其所依之 feature universe，**不得自行重算**。
+3. 🔴 **沒有 canonical feature universe 的獨立匯入流程，只能明示 `event-study-only`，
+   不得按事件數另切並宣稱 OOS**。現行 `pipeline.run_event_study_only()` 與
+   `case_import_service.py:1618-1619` 之 `capability={"split":"unavailable", "reason": …}`
+   即此形態，本票**沿用既有機制，不新造**。
+
+實測支撐（否證了「兩端各自用同一公式算」這條看似合理的捷徑）：
+探針 `handoffs/20260911-probe-splitunify-universe-gap.py`、
+receipt `handoffs/run_receipts/20260910T154323Z-splitunify-universe-gap.log`（rc=1）——
+真實 ETHUSDT 1h（FF run `4a8a0b3726cc906ab3534994605e77f5`，20352 列）未裁切時
+features 與 bars 兩 universe 逐值相同；EVTALIGN 裁頭尾後邊界位移：
+5 根 → 2 小時、24 根 → 10 小時、168 根 → 67 小時。⇒ 必須共用 universe，不是共用公式。
+
+### C-1 canonical 權威＝時間切分（D1）
 K 線 holdout（`SplitPlan`，含 purge／embargo）為**唯一邊界來源**；
 `EventSplitPlan` 降為**投影容器**，其 `assignments`／`purged`／`clusters`／`summary`
 一律由 canonical 邊界衍生，**不再自行決定邊界**。
 
-理由：隔離語意（purge／embargo）住在時間切分那一側；事件側只有「緩衝 bars」，較弱。
+理由：**所有 row／event projection 共用同一 canonical boundary**——單一邊界來源本身就是目的。
+
+🔴 **明確不採用**的理由：「時間切分之 purge／embargo 嚴格強於事件側緩衝 bars」。
+`CODEX-R1-P1-02` 正面反駁：兩套隔離**不是同一個集合**，**containment 未被證明**。
+附帶約束：① 未證明 containment 前**不得刪除任一既有 guard**；
+② §G 須同時 golden 四項（見 G-5）。
+
+「兩套都保留但標主從」已由 `GROK-R1-P2-03` 判為**反模式**，明文否決：
+標主從不刪除第二份算術，兩個數字仍會分歧。
 
 ### C-2 🔴 邊界必須 per-symbol，禁全域 scalar 冒充（D2；codex 與 composer **各自標 P0**）
 **不得**以全域 scalar `SplitPlan.test_timestamps` 交集取代事件計畫。
 
-**實測證據**（`handoffs/20260910-probe-splitunify-multisymbol.py`，
+實測證據（`handoffs/20260910-probe-splitunify-multisymbol.py`，
 receipt `20260910T150504Z-splitunify-multisymbol`）：兩 symbol 交錯之 80 列批次，
-全域切法測試段 **12 列**、per-symbol 切法 **8 列**，**4 列只在全域**
-⇒ 兩者**不等價**。這是我在 consult brief 自列為 `assumed`／「沒跑」的假設，
-派審後自跑即被推翻。
+全域切法測試段 **12 列**、per-symbol 切法 **8 列**，**4 列只在全域** ⇒ 兩者**不等價**。
 
-⇒ 邊界以 `split_per_symbol`（`momentum/core/contracts.py` 既有）逐標的產生；
-多 symbol 批在 per-symbol 投影完成前**一律 fail-closed**（grok），
-**禁**以第一個 symbol 之 holdout（`next(iter(allowed_symbols))`）冒充整批。
+⇒ 邊界以 `split_per_symbol`（`momentum/core/contracts.py:625` 既有）逐標的產生；
+多 symbol 批在 per-symbol 投影完成前**一律 fail-closed**，
+**禁**以第一個 symbol 之 holdout（`ic_filter_orchestrator.py:1248` 之
+`next(iter(allowed_symbols))`）冒充整批。
 
-### C-3 投影是**三態**不是二態（D3；grok）
-投影須用 **train 與 test 兩個 plan** 導出 **train／purged／test 三態**。
+### C-3 三態＝**兩個容器**，不是三值枚舉（D3；`CLAUDE-R1-P0-02`）
+投影須用 **train 與 test 兩個 plan** 導出 **train／purged／test 三態**：
+落在隔離區的事件**既不屬訓練也不屬驗證**，二態會把它們錯誤地歸進其中一邊。
 
-理由：落在隔離區（purged）的事件**既不屬訓練也不屬驗證**；二態（在／不在測試段）
-會把它們錯誤地歸進其中一邊，等於把被隔離的樣本偷偷放回訓練集。
+🔴 但三態**已經是既有結構**，不是本票新引入的：`EventSplitPlan` 之
+`assignments`（`split_label` ∈ `{train, test}`）＋**獨立**的 `purged`（`event_id`, `reason`）。
+只認兩值的消費者：`pipeline.py:697-698`、`baseline.py:106`、`tables.py:305`、
+`pattern_bridge.py:115,125-127`——多出第三值時這些位置**不報錯，只靜默少算**。
 
-### C-4 投影是純函式、單一實作
-`derive_event_split_from_plans(train_plan, test_plan, event_index) -> EventSplitPlan`
-為**唯一**實作；純函式、無 I/O、不讀 config。**禁**任何第二份切分算術
-（EVTLABEL B3 review 之教訓：兩份算術必漂）。
+⇒ 投影**必須維持既有容器形狀**：train／test 進 `assignments`，被隔離者進 `purged`，
+reason 沿用契約既有字面 `interval_crosses_split_boundary`
+（`momentum/Analysis/contracts/event_import_contract.json:465-467` 之 `split_purge_reasons`），
+**不得**在 `split_unify.json` 另造 purge reason。
 
-### C-5 報告只暴露一個驗證段數字（D5；codex）
+### C-4 投影是純函式、單一實作；簽名須帶 `feature_index` 與 `manifest`
+來源：R1 之 C2／C5 群集（grok 與 composer 各自給出同形簽名）。
+
+```python
+def derive_event_split_from_plans(
+    train_plan: SplitPlan,
+    test_plan: SplitPlan,
+    event_index: pd.Index,      # 事件之 feature_cutoff 時鐘；int64 ms 或 DatetimeIndex
+    feature_index: pd.Index,    # SplitPlan.row_index 所索引之同一 universe（post-trim）
+    *,
+    manifest: EventManifest,    # clusters／summary 之來源（decision_at_ms、timeframe）
+) -> EventSplitPlan
+```
+
+- **成員判定＝集合語意**：`ts ∈ feature_index[train_plan.row_index]` ⇒ train；
+  `∈ feature_index[test_plan.row_index]` ⇒ test；否則 purged。
+  🔴 **禁**以 `time_bounds` 閉區間取代集合（與 `ic_filter_orchestrator.py:3594`
+  ／`split_preview.count_binary_classes_in_rows` 之集合語意分歧）。
+- `index_kind != "positional"` ⇒ **fail-closed**（`SplitPlan.row_index` 在生產 holdout 為
+  positional，見 `ic_filter_orchestrator.py:602`）。
+- **單位歸一**：復用 `_normalize_ic_time_index`（`ic_filter_orchestrator.py:259`）＋ `asi8`，
+  **不得另寫第二套**。未歸一 ⇒ raise，**不得**靜默 0 命中
+  （`split_preview.py:63-79` 已明載此坑：binary 鍵是 epoch ms、特徵索引常為 DatetimeIndex，
+  不換算則計數恆 0 且不拋例外）。
+- `event_index` 語意＝與 IC 相同之 **feature_cutoff**（`ic_feed.py:36` 之
+  `FEATURE_CUTOFF_RULE = "max_close_ms_le_decision_at"`），**不是**裸 `decision_at_ms`。
+- 事件時間戳**不在** `feature_index` 集合內（被 EVTALIGN 裁掉、或落在兩根 bar 之間）
+  ⇒ **purged**；🔴 **禁 nearest／asof／ffill**。
+- 純函式：無 log、無 I/O、不讀 config、不改輸入。
+- 同時落在 train 與 test（不應發生）⇒ raise，不靜默取一。
+
+### C-5 投影須產出**完整**的 `EventSplitPlan`（D7）
+來源：`CODEX-R1-P1-03`＋`COMPOSER-R1-P1-02`＋`GROK-R1-P2-02`。
+最小落地**不是刪除** `EventSplitPlan`。`assignments`／`purged`／`clusters`／`summary` 皆為
+下游仍在消費的事件語意（`baseline.py:105-110`、`pattern_bridge.py:114-175`、
+`tables.py:305-367`、`tables.py:130-150` 之 `formal_pooled_inference_allowed`）。
+
+- `summary` 之 **12 個必填鍵**（`event_split.py:141-155`，經 `pipeline.py:696` 整包轉出）：
+  `n_symbols`／`per_symbol_n`／`n_time_clusters`／`avg_cluster_size`／`degraded`／
+  `loso_status`／`insufficient_events_in_test`／`stats_modes`／`n_events_raw`／
+  `n_events_effective`／`n_purged`／`bucket_ms`。少一鍵即報告靜默丟欄。
+- `clusters` **與切分無關**（`event_split.py:129-140` 只依 `manifest.table["decision_at_ms"]`
+  與 `bucket_ms`）⇒ 抽成獨立純函式 `build_time_clusters(manifest, bucket_ms)`，
+  行為不變（改前後 byte 級一致），並**保留** `_cluster_weight` 這個既有 mutation seam
+  （`event_split.py:36-39` 註明 M5）。
+- **空 plan 不得冒充未切分**。
+- 投影路徑下 `EventSplitConfig.embargo_ms` 與 `embargo_ms_by_symbol` **必須為 `None`，
+  否則 raise**；靜默忽略會讓上游 `case_import_service.py:1606` 算出的 `embargo_applied`
+  退化成沒人用的數字（EVTLABEL `CODEX-R1-P1-02` 已踩過一次的形態）。
+
+### C-6 報告只暴露一個驗證段數字（D5；codex）
 `metadata` 只寫 canonical 之 `n_test`，並附：
 `split_authority`（固定 `"kline_holdout"`）、`boundary_hash`、`per_symbol_counts`、
 以及 fail-closed 時的 `reason`。**禁**同時暴露兩個數字。
+fail-closed 時 `n_test` 為 `null` 而非 `0`（不顯示假數字）。
 
-### C-6 GAP-3 走延伸檔，不解凍原檔（D4；三家一致）
+### C-7 GAP-3 走延伸檔，不解凍原檔（D4）
 新增 `docs/GAP3_EVENT_UX_SPEC.D-002.md` 記錄切分權威之變更與投影契約。
+🔴 `CODEX-R1-P2-06` 另指出：frozen primary 與 UX extension convention 的**路徑字面不一致**，
+D-002 須明寫正確的規格入口路徑，否則派工會選錯入口。
+D-002 亦須寫明「投影所用 `feature_index` 為 **post-trim**（EVTALIGN 裁頭尾之後）之 universe」
+（`COMPOSER-R1-P2-01`）。
 
-### C-7 新資料結構走 JSON 單一真相源
-投影之三態值集、`split_authority` 值集、fail-closed reason 枚舉集中於
+### C-8 新資料結構走 JSON 單一真相源
+`split_authority` 值集、fail-closed reason 枚舉集中於
 `momentum/Analysis/contracts/split_unify.json`；Python 與前端各自對證，禁散文複列。
+🔴 **不含** purge reason——那沿用 `event_import_contract.json`（見 C-3）。
+
+### C-9 統一**會改變數值**，不是純重構（D8；三家一致）
+至少影響：`baseline.py:118-161`（`n_test`、prevalence、AUC／PR-AUC、permutation band、BH-FDR）、
+`tables.py:305-370`（OOS metrics、macro／micro AUC、cluster CI）、
+`pattern_bridge.py:122-218`（fit rows、rules、scores、lift、receipt hash）、
+`ic_filter_orchestrator.py:3830-3863`（test intersection 改 `n_pos`／`n_neg` ⇒ 改 `label_mode`）。
+
+⇒ 驗收**必須**對改前後做逐 event ID 集合、逐列 train／test fingerprint、
+報告 numeric keys 與 capability reason 的 exact／tolerance diff；
+**不得**以「型別不變」宣稱數值不變，也不得以舊 golden 擋投影（`GROK-R1-P2-01`）。
 
 ## §G Golden / Baseline
 
-- **G-1 成員集合 golden**：改前／改後之 `assignments` 成員集合逐一凍結。
-  🔴 **預期會變**（C-2 已證不等價）⇒ 改後不同時**必須明示接受**並記錄差異來源，
-  不得靜默覆蓋（grok 要求）。
+- **G-1 成員集合 golden**：改前／改後之 `assignments`／`purged` 成員集合逐一凍結。
+  🔴 **預期會變**（C-2／C-9）⇒ 改後不同時**必須明示接受**並記錄差異來源，不得靜默覆蓋。
 - **G-2 全域路徑逐位元組不變**：非事件 run 之報告 canonical bytes 之 **sha256** 不得改變
   （比對方式同 `scripts/freeze_evtlabel_survivor_golden.py`：去 `generated_at` 後 `sha256`）。
-- **G-3 雙 producer golden**：同一批分別走「舊事件切分」與「新投影」，
-  逐欄比對並記錄差集（codex 要求）。
+- **G-3a 一次性遷移報告**（取代 v1 之「雙 producer golden」）：同一批分別走舊 `split_events`
+  與新投影，差集寫入 `handoffs/run_receipts/`，附 `diff_event_ids` 之 sha256 與基數；
+  🔴 **不進**預設比對綠徑——凍結一份「預期有差」的 golden 會把已知錯誤合法化
+  （`GROK-R1-P1-03`＋`COMPOSER-R1-P1-03`）。
+- **G-3b 長期 golden**：新投影 vs **獨立 oracle**——直接由
+  `feature_index[train_plan.row_index]`／`[test_plan.row_index]` 投影出的 event_id 集合，
+  要求**集合相等**。舊 producer 退出生產後**不得**再當正確性參考。
 - **G-4 per-symbol counts golden**：多 symbol 批之逐標的計數（整數逐值相等，非 atol 比較）。
-- **數值比較規約**：計數類一律**整數逐值相等**；若未來出現浮點欄位，
-  以 `atol=1e-12`／`rtol=1e-9` 比較（同 `test_binary_discrimination.py` 之既有規約）。
+- **G-5 containment 四項 golden**（`CODEX-R1-P1-02` 之要求）：逐 row test fingerprint、
+  逐 event `assignments`／`purged` IDs、answer-window 完整性、leakage negative case。
+- **數值比較規約**：計數類一律**整數逐值相等**；浮點欄位以 `atol=1e-12`／`rtol=1e-9` 比較
+  （同 `test_binary_discrimination.py` 之既有規約）。
 
 ## §P Phase 與依賴（四批；三家一致「大」，批數取較保守者）
 
 | 批 | Task | 依賴 | 產出 |
 |---|---|---|---|
-| **B1** | Task 1.1、1.2 | consult 收斂 | 文件與枚舉 SoT；**不動生產碼** |
-| **B2** | Task 2.1、2.2 | B1 | 純函式與 golden；**仍不接線** |
-| **B3** | Task 3.1、3.2 | B2 | 邊界唯一化 |
+| **B1** | Task 1.1、1.2、1.3 | consult 三家戳記 rc=0 | 文件、枚舉 SoT、既有紅基準清單；**不動生產碼** |
+| **B2** | Task 2.1、2.2、2.3 | B1 | boundary builder＋投影純函式＋golden；**仍不接線** |
+| **B3** | Task 3.1、3.2、3.3 | B2 | 邊界唯一化、多 symbol fail-closed、event-study-only 分派 |
 | **B4** | Task 4.1 | B3 | 報告與畫面 |
 
 每批三家 code review、commit+push、更新白話看板。
 
 **Task 1.1 — GAP-3 延伸檔 `D-002`**
-- 目標：記錄切分權威之變更與投影契約；**不解凍** GAP-3 原檔（C-6）。
+- 目標：記錄切分權威之變更與投影契約；**不解凍** GAP-3 原檔（C-7）。
 - 修改檔案：`docs/GAP3_EVENT_UX_SPEC.D-002.md`（新）。既有 caller：無。
-- 不可做：不動 `docs/GAP3_EVENT_UX_SPEC.D-001.md`。
-- **驗證**：`bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_SPEC.D-002.md` rc=0；
-  延伸檔須含 `split_authority == "kline_holdout"` 之字面與本 SPEC 之 C-1／C-2／C-3 交叉引用。
+- 不可做：不動 `docs/GAP3_EVENT_UX_SPEC.D-001.md`；不改 GAP-3 原 SPEC。
 - 邊界：①原檔已 FROZEN ⇒ 只新增延伸檔；②延伸檔本身亦須過 `doc_format_precheck`。
+- 風險緩解：⊘
+- **驗證**：`bash scripts/doc_format_precheck.sh docs/GAP3_EVENT_UX_SPEC.D-002.md` rc=0；
+  `grep -c 'kline_holdout' docs/GAP3_EVENT_UX_SPEC.D-002.md` >= 1；
+  該檔須含「post-trim」字面與正確之規格入口路徑，並交叉引用本 SPEC 之 C-0／C-1／C-2／C-4。
 - **存活至**：全票完工後保留（GAP-3 之規格鏈）。
 - **覆蓋風險**：B4 之 UAT 項會**追加**條目至本延伸檔，不刪既有段。
 
 **Task 1.2 — 枚舉單一真相源 `split_unify.json`**
-- 目標：三態值集、`split_authority` 值集、fail-closed reason 枚舉一檔定義（C-7）。
-- 輸出：`momentum/Analysis/contracts/split_unify.json`：
-  `assignment_states=["train","purged","test"]`、`split_authority_values=["kline_holdout"]`、
-  `fail_closed_reasons=["multi_symbol_projection_unsupported","missing_train_plan","missing_test_plan"]`。
+- 目標：`split_authority` 值集與 fail-closed reason 枚舉一檔定義（C-8）。
+- 輸入 / 輸出：無 → `momentum/Analysis/contracts/split_unify.json`：
+  `split_authority_values=["kline_holdout"]`、
+  `fail_closed_reasons=["multi_symbol_projection_unsupported","missing_train_plan",
+  "missing_test_plan","canonical_feature_universe_unavailable"]`。
+- 實作要點：🔴 **不含** `assignment_states`——三態＝兩容器（C-3），不是三值枚舉；
+  purge reason 沿用 `event_import_contract.json:465-467`。
 - 修改檔案：`momentum/Analysis/contracts/split_unify.json`（新）；
-  `tests/momentum/Analysis/test_splitunify_contract.py`（新）。
+  `tests/momentum/Analysis/test_splitunify_contract.py`（新）。既有 caller：無。
+- 不可做：不在 Python 端手打第二份值集；不加 `assignment_states`。
+- 邊界：①JSON 缺鍵 ⇒ import 期 raise；②值集為空 ⇒ raise。
+- 風險緩解：⊘
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_contract.py` rc=0：
-  JSON 之 `assignment_states` 與 Python 常數集合逐值相等（`==`）；缺鍵 ⇒ raise。
-- 不可做：不在 Python 端手打第二份值集；不加第四種 assignment 狀態。
-- 邊界：①JSON 缺鍵 ⇒ import 期 raise；②Python 端不得手打第二份值集。
+  JSON 之值集與 Python 常數集合逐值相等（`==`）；刪一鍵 ⇒ raise（可證偽）；
+  另斷言 `assignment_states` **不存在**於本檔（防退回三值枚舉）。
 - **存活至**：全票完工後保留（下游前端亦讀）。
-- **覆蓋風險**：B3 若發現新的 fail-closed 情形，會**追加** reason 值，不改既有值。
+- **覆蓋風險**：B3 若發現新的 fail-closed 情形，**追加** reason 值，不改既有值。
 
-**Task 2.1 — `derive_event_split_from_plans` 純函式**
-- 目標：由 train／test 兩 plan 導出三態投影（C-3、C-4）。
-- 輸入 / 輸出：`(train_plan: SplitPlan, test_plan: SplitPlan, event_index: pd.Index)`
-  → `EventSplitPlan`（`assignments`／`purged`／`clusters`／`summary` 皆由邊界衍生）。
-- 實作要點：事件時間戳 ∈ train 之列 ⇒ `train`；∈ test ⇒ `test`；兩者皆不在 ⇒ `purged`。
-  三態**互斥且涵蓋全集**。純函式、無 I/O、不讀 config。
-- 修改檔案：`momentum/Analysis/event_samples/split_projection.py`（新）。既有 caller：無（B3 接）。
-- 不可做：不得在此讀 config、不得自算 purge／embargo。
+**Task 1.3 — 既有紅基準清單（取代 v1 之「failed <= 20」聚合期望數）**
+- 目標：把 `HANDOFF.md`「既有紅盤點」之 20 條落成**逐條 nodeid 清單**，
+  使 B3 驗收可證偽（R1 之 C3 群集；grok 與 composer 各標 P0）。
+- 輸入 / 輸出：實跑 pytest → `tests/baselines/analysis_known_failures.nodeids`。
+- 實作要點：一次實跑產出，**不得手抄湊數**：
+  ```bash
+  venv/bin/python -m pytest tests/momentum/Analysis --tb=no -q 2>&1 \
+    | tee handoffs/run_receipts/splitunify-analysis-baseline.stdout \
+    | awk '/^FAILED /{print $2}' | sort -u \
+    > tests/baselines/analysis_known_failures.nodeids
+  ```
+- 修改檔案：`tests/baselines/analysis_known_failures.nodeids`（新）；
+  `handoffs/run_receipts/splitunify-analysis-baseline.stdout`（新）。既有 caller：無。
+- 不可做：不得手寫 nodeid；不得把本票新增之測試放進清單。
+- 邊界：①清單為空 ⇒ 表示既有紅已清，B3 驗收改為直接 rc=0；
+  ②清單中任一條之後變綠 ⇒ **必須主動移出**（B3 驗收會因集合不等而紅）。
+- 風險緩解：⊘
+- **驗證**：`test -s tests/baselines/analysis_known_failures.nodeids` 且行數 == 實跑 FAILED 行數；
+  每行皆能被 `pytest --collect-only` 收集到（不存在的 nodeid ⇒ rc=1）。
+- **存活至**：`REDSWEEP` 票收案後刪除。
+- **覆蓋風險**：`REDSWEEP` 會逐條清空本清單；兩票之間以「只准變短」為不變式。
+
+**Task 2.1 — canonical boundary builder（C-0）**
+- 目標：兩端共用之**唯一**邊界算術，住 core。
+- 輸入 / 輸出：`holdout_boundary(feature_index, *, oos_test_size, purge_gap, embargo)`
+  → `(train_row_index, test_row_index, train_end_ms, test_start_ms)`。
+- 實作要點：
+  1. **以既有函式定義自身**：`split_point = holdout_split_point(...)`、
+     `test_rows = holdout_test_row_index(...)` ⇒ 不引入第二份算術。
+  2. 輸入輸出之時間一律 **epoch ms**；`feature_index` 為 DatetimeIndex 時以
+     `asi8 // 10**6` 換算（同 `split_preview.py:77-78`）。
+  3. 純算術、無副作用、不 import `api`。
+- 修改檔案：`momentum/core/split_preview.py`（既有檔新增函式）。
+  既有 caller：`ic_filter_orchestrator`（B3 接）、`pipeline`（B3 接）。
+- 不可做：不得在此讀 config；不得回傳 datetime（統一 ms）。
+- 邊界：①`feature_index` 為空 ⇒ raise（無 universe 即無邊界）；
+  ②`test_rows` 為空 ⇒ `test_start_ms` 回 `None`，**不得**回 `-1` 或 `0`；
+  ③`purge_gap`／`embargo` 為呼叫端算好的最終值，本函式不猜、不查 config。
+- 風險緩解：mutation `M-SU-11`。
+- **驗證**：`venv/bin/python -m pytest -q tests/momentum/core/test_splitunify_boundary.py` rc=0：
+  與 `holdout_test_row_index` 逐值相同（同源自證）；空 index ⇒ raise；
+  單位斷言（回傳 ms 之年份 ∈ [2015, 2035]，防 1970 坑）。
+- **存活至**：全票完工後保留（唯一邊界實作）。
+- **覆蓋風險**：B3 只增加 caller，不改簽名。
+
+**Task 2.2 — `derive_event_split_from_plans` 純函式（C-3、C-4、C-5）**
+- 目標：由 canonical 邊界導出**完整**的 `EventSplitPlan`。
+- 輸入 / 輸出：見 C-4 之簽名 → `EventSplitPlan`（四欄齊全）。
+- 實作要點：
+  1. 成員判定用**集合**（`feature_index[row_index]`），禁 `time_bounds` 區間。
+  2. train／test 進 `assignments`；purged 進 `purged` 並帶
+     `interval_crosses_split_boundary`（契約既有字面）。
+  3. `clusters` 呼叫 `build_time_clusters(manifest, bucket_ms)`（本 Task 一併抽出，
+     行為 byte 級不變，保留 `_cluster_weight` seam）。
+  4. `summary` 12 鍵齊全；`insufficient_events_in_test` 改看**投影後**的 test 數；
+     `degraded` 之 `cluster_adjusted` 與 `loso_status="not_evaluated"` 語意寫進 docstring。
+  5. `index_kind != "positional"`、單位未歸一、同時落兩態 ⇒ 皆 raise。
+  6. 純函式：無 log、無 I/O、不讀 config、不改輸入。
+- 修改檔案：`momentum/Analysis/event_samples/split_projection.py`（新）；
+  `momentum/Analysis/event_samples/event_split.py`（抽出 `build_time_clusters`）。
+  既有 caller：無（B3 接）。
+- 不可做：不得在此讀 config；不得自算 purge／embargo；不得回退成二態；
+  不得把 purged 併進 `assignments`。
+- 邊界：①`event_index` 為空 ⇒ 三態皆空（不 raise）；②事件不在 `feature_index` ⇒ purged
+  （禁 nearest）；③全部落在隔離區 ⇒ `assignments` 空而 `purged` 為全集（合法產出，
+  `tables.py:201` 已明載不得誤擋）。
+- 風險緩解：mutation `M-SU-1`..`M-SU-7`、`M-SU-12`。
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py` rc=0：
-  三態集合之交集為空且聯集 == `len(event_index)`；purged 事件不出現在 train／test；
-  空 plan ⇒ 全部 `purged`；單事件與全部落隔離區兩個邊界各一條。
-- 邊界：①`event_index` 為空 ⇒ 回三態皆空之 `EventSplitPlan`（不 raise）；
-  ②事件時間戳同時落在 train 與 test（不應發生）⇒ raise（fail-closed，不靜默取一）；
-  ③`clusters` 於三態下之定義沿用既有 `event_split.py` 之連通分量，只換輸入。
+  三態互斥且 `len(assignments)+len(purged) == len(event_index)`；
+  purged 事件不出現在 `assignments`；`summary` 12 鍵齊全（逐鍵斷言）；
+  `clusters` 與舊 `split_events` 之 clusters 逐值相同（byte 級）；
+  空 index／單事件／全 purged／未匹配時間戳／單位錯（秒 vs 毫秒）五個邊界各一條。
 - **存活至**：全票完工後保留（唯一投影實作）。
-- **覆蓋風險**：B3 只增加 caller，不改本函式簽名。
+- **覆蓋風險**：B3 只增加 caller，不改簽名。
 
-**Task 2.2 — golden 凍結（G-1／G-3／G-4）**
-- 目標：改前／改後成員集合、雙 producer 差集、per-symbol counts 三份 golden。
+**Task 2.3 — golden 凍結（G-1／G-3a／G-3b／G-4／G-5）**
+- 目標：成員集合、遷移報告、獨立 oracle、per-symbol counts、containment 四項。
+- 輸入 / 輸出：既有事件批 → `tests/golden/splitunify/*.json` 與
+  `handoffs/run_receipts/` 之遷移報告。
+- 實作要點：
+  1. `--write` 凍結、預設比對；比對失敗 rc=1 並**指名差集之 event_id**。
+  2. G-3a 之遷移報告寫 `handoffs/run_receipts/`，**不**進比對綠徑。
+  3. G-3b 之 oracle 直接由 `feature_index[row_index]` 投影，與被測函式**獨立**。
 - 修改檔案：`tests/golden/splitunify/*.json`（新）；`scripts/freeze_splitunify_golden.py`（新）。
-- **驗證**：`venv/bin/python scripts/freeze_splitunify_golden.py` rc=0（比對模式）；
-  改一個成員 ⇒ rc=1 並指名差集（可證偽自證）。
-- 不可做：不得在比對失敗時自動 `--write` 覆蓋（那等於沒有 golden）。
-- 邊界：①golden 不存在（首次凍結）⇒ `--write` 模式建立；②比對模式下缺檔 ⇒ rc=1。
+  既有 caller：無。
+- 不可做：比對失敗時**不得**自動 `--write` 覆蓋（那等於沒有 golden）。
+- 邊界：①首次凍結（檔不存在）⇒ 只有 `--write` 可建；②比對模式缺檔 ⇒ rc=1。
+- 風險緩解：mutation `M-SU-8`。
+- **驗證**：`venv/bin/python scripts/freeze_splitunify_golden.py` rc=0；
+  手改 golden 內一個成員 ⇒ rc=1 且輸出含該成員名（可證偽自證，
+  同 `scripts/freeze_evtlabel_survivor_golden.py` 之作法）。
 - **存活至**：全票完工後保留。
-- **覆蓋風險**：B3 接線後 G-1 之值**預期改變**（C-2 已證不等價）⇒ 屆時以 `--write` 重凍並在
-  commit 訊息逐項記錄差異來源；不得靜默覆蓋。
+- **覆蓋風險**：B3 接線後 G-1 之值**預期改變** ⇒ 以 `--write` 重凍並在 commit 訊息
+  逐項記錄差異來源；不得靜默覆蓋。
 
-**Task 3.1 — 接線：邊界唯一化**
-- 目標：`pipeline`／`orchestrator` 改用投影，`split_events` 不再決定邊界（C-1）。
+**Task 3.1 — 接線：邊界唯一化（C-0、C-1）**
+- 目標：`orchestrator` 與 `pipeline` 共同呼叫 boundary builder；`split_events` 退出生產呼叫圖。
+- 輸入 / 輸出：canonical boundary＋`feature_index` → `EventSplitPlan`（投影）。
+- 實作要點：
+  1. `orchestrator._build_holdout_split_plan` 改由 `holdout_boundary` 取得列計畫。
+  2. `pipeline.run` 之簽名新增 canonical boundary 與 `feature_index`（選填）；
+     給定時走投影，未給定時見 Task 3.3。
+  3. `split_events` 保留為**歷史路徑／G-3a 對照**，但生產呼叫點數釘為 **0**。
 - 修改檔案：`momentum/Analysis/event_samples/pipeline.py`、
-  `momentum/Analysis/ic_filter_orchestrator.py`。既有 caller：`ic_feed.py`、`tables.py`、`baseline.py`。
-- **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis tests/momentum/event_samples` 之
-  既有紅**不增加**（基準見 `HANDOFF.md`「既有紅盤點」20 條）；G-2 全域 golden 逐位元組不變。
-- 不可做：不改 `derive_event_split_from_plans` 之簽名；不在 caller 端補算切分。
+  `momentum/Analysis/ic_filter_orchestrator.py`、`momentum/core/split_preview.py`。
+  既有 caller：`ic_feed.py`、`tables.py`、`baseline.py`、`pattern_bridge.py`
+  （皆為**成員消費者**，型別不變）。
+- 不可做：不改 `derive_event_split_from_plans` 之簽名；不在 caller 端補算切分；
+  不刪任何既有 guard（C-1 附帶約束①）。
 - 邊界：①非事件 run 不走投影（G-2 逐位元組不變）；②缺 train 或 test plan ⇒ fail-closed。
+- 風險緩解：G-2、G-5、mutation `M-SU-9`。
+- **驗證**：三條命令皆 rc=0——(A) `pytest tests/momentum/Analysis tests/momentum/event_samples`
+  逐條 `--deselect` 既有紅後 rc=0；(B) 既有紅之 FAILED nodeid 集合與
+  `tests/baselines/analysis_known_failures.nodeids` **集合相等**（`==`，多或少皆 rc=1）；
+  (C) `venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0（G-2 之 sha256 未漂移）。
+  ```bash
+  # A) 扣除既有紅後必須全綠（逐條 deselect，不是「failed <= N」）
+  venv/bin/python -m pytest -q tests/momentum/Analysis tests/momentum/event_samples \
+    $(awk '{printf "--deselect %s ", $0}' tests/baselines/analysis_known_failures.nodeids)
+  # 期望 rc=0
+  # B) 既有紅集合不得默默變動（集合相等，不是計數）
+  venv/bin/python -m pytest -q --tb=no $(cat tests/baselines/analysis_known_failures.nodeids)
+  # 解析 FAILED nodeid 集合 == 清單集合；多或少皆 rc=1
+  # C) G-2 未漂移
+  venv/bin/python scripts/freeze_evtlabel_survivor_golden.py    # rc=0
+  ```
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：B4 只加 metadata 欄位，不改接線。
 
-**Task 3.2 — 多 symbol fail-closed**
-- 目標：per-symbol 投影未支援前，多 symbol 批一律 raise（C-2）。
-- 實作要點：`len({p.symbol for p in plans}) > 1` 且未走 per-symbol ⇒
-  `raise ValueError("multi_symbol_projection_unsupported: …")`（reason 字面出自 Task 1.2 之 JSON）。
-- **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py -k multi_symbol`
-  rc=0：兩 symbol 批 ⇒ raise 且訊息含 `multi_symbol_projection_unsupported`。
+**Task 3.2 — 多 symbol fail-closed（C-2）**
+- 目標：per-symbol 投影未支援前，多 symbol 批一律 raise。
+- 輸入 / 輸出：多 symbol 批 → `ValueError`。
+- 實作要點：批內 symbol 數 > 1 ⇒
+  `raise ValueError("multi_symbol_projection_unsupported: …")`；reason 字面自
+  `split_unify.json` 讀，不手打。
+- 修改檔案：`momentum/Analysis/event_samples/split_projection.py`、
+  `tests/momentum/Analysis/test_splitunify_derive.py`。既有 caller：無。
 - 不可做：不得以警告放行（fail-open）；不得以第一個 symbol 之 plan 冒充整批。
-- 邊界：①單 symbol 批不受影響；②`symbol` 欄為 None 之 plan 視為單標的（既有語意）。
+- 邊界：①單 symbol 批不受影響；②`symbol` 為 None ⇒ 視為單標的（既有語意）。
+- 風險緩解：mutation `M-SU-2`、`M-SU-3`。
+- **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py -k multi_symbol`
+  rc=0：兩 symbol 批 ⇒ raise 且訊息含 `multi_symbol_projection_unsupported`；
+  單 symbol 批 ⇒ 不 raise。
 - **存活至**：per-symbol 投影實作後**改寫**為支援分支（見 §N R-1）。
 - **覆蓋風險**：本 Task 之 raise 分支預期被未來的 per-symbol 支援取代——屆時須連同測試一起改，
   不得只刪 raise。
 
-**Task 4.1 — 報告與前端只暴露一個驗證段**
+**Task 3.3 — 無 canonical universe ⇒ 明示 event-study-only（C-0 決議③）**
+- 目標：拿不到 canonical feature universe 的匯入流程，**不得**按事件數另切並宣稱 OOS。
+- 輸入 / 輸出：無 universe 之批 → `capability={"split":"unavailable","reason":…}`。
+- 實作要點：
+  1. `case_import_service` 在無 feature universe 時走既有
+     `run_event_study_only_with_params`，reason 為
+     `canonical_feature_universe_unavailable`（字面自 `split_unify.json`）。
+  2. `summary` 不得出現 `n_train`／`n_test`／`n_purged`（避免使用者看到假 OOS 數字）。
+  3. **沿用既有機制**（`pipeline.run_event_study_only`、
+     `case_import_service.py:1618-1619` 之 capability 形態），不新造第二套。
+- 修改檔案：`api/services/case_import_service.py`、`momentum/Analysis/event_samples/pipeline.py`。
+  既有 caller：前端事件掃描頁（只讀 `capability`，型別不變）。
+- 不可做：不得以 `test_fraction` 自行切分後宣稱 OOS；不得填 0 冒充。
+- 邊界：①既有的 `lookahead_split_blocked` 分派路徑不變（兩條 unavailable 原因並存，
+  reason 不同）；②有 canonical universe 時行為不變。
+- 風險緩解：mutation `M-SU-10`。
+- **驗證**：`venv/bin/python -m pytest -q tests/api/test_splitunify_event_study_only.py` rc=0：
+  無 universe 之批 ⇒ `capability.split == "unavailable"` 且 reason 字面相符；
+  `summary` 不含 `n_test` 鍵（`assert "n_test" not in summary`）。
+- **存活至**：全票完工後保留。
+- **覆蓋風險**：per-symbol 支援（R-1）不影響本分支。
+
+**Task 4.1 — 報告與前端只暴露一個驗證段（C-6）**
 - 目標：`metadata` 只寫 canonical `n_test`＋`split_authority`＋`boundary_hash`＋
-  `per_symbol_counts`＋fail-closed `reason`（C-5）。
-- 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py`（metadata 寫入）、
-  `frontend/src/components/ic-analysis/`（顯示）、`frontend/src/lib/types.ts`。
-- **驗證**：`venv/bin/python -m pytest -q tests/api/test_splitunify_disclosure.py` rc=0：
-  報告中「驗證段列數」之鍵**恰一個**；`split_authority == "kline_holdout"`；
-  `cd frontend && npx vitest run src/lib/splitAuthority.test.ts` rc=0。
+  `per_symbol_counts`＋fail-closed `reason`。
+- 輸入 / 輸出：投影結果 → `metadata.split_unify`。
+- 實作要點：`boundary_hash` ＝ canonical 測試段時間戳之 `sha256`
+  （sorted、int64 ms、無空白 JSON）；前端顯示單一數字＋來源標籤。
+- 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py`、
+  `frontend/src/lib/types.ts`、`frontend/src/components/ic-analysis/`。
+  既有 caller：前端 IC 分析頁。
 - 不可做：不同時暴露兩個驗證段數字；fail-closed 時不填 0 冒充。
-- 邊界：①fail-closed 時 `n_test` 為 null 而非 0（不顯示假數字）；②全域 run 不寫這些鍵。
+- 邊界：①fail-closed 時 `n_test` 為 null；②全域 run 不寫這些鍵（G-2）。
+- 風險緩解：mutation `M-SU-9`。
+- **驗證**：`venv/bin/python -m pytest -q tests/api/test_splitunify_disclosure.py` rc=0：
+  報告中含「驗證段列數」語意之鍵**恰 1 個**；`split_authority == "kline_holdout"`；
+  `cd frontend && node_modules/.bin/vitest run src/lib/splitAuthority.test.ts` rc=0。
 - **存活至**：全票完工後保留（UAT 交付物）。
 - **覆蓋風險**：無後續 Phase。
 
 ## §V 驗證策略與邊界測試目錄
 
+- `tests/momentum/core/test_splitunify_boundary.py`（B2）：邊界 builder 與既有函式同源；
+  空 index raise；單位年份斷言。
 - `tests/momentum/Analysis/test_splitunify_derive.py`（B2）：三態互斥且涵蓋全集；
-  purged 事件不得出現在 train 或 test；空 plan／單事件／全部落在隔離區三個邊界。
-- **mutation**：①投影改成二態（purged 併入 train）⇒ 必紅
-  ②多 symbol 之 fail-closed 拿掉 ⇒ 必紅 ③以第一個 symbol 冒充整批 ⇒ 必紅。
-- **benchmark**：投影為 O(n log n) 以內；10k 事件 < 2 秒。
+  purged 不出現在 `assignments`；`summary` 12 鍵；`clusters` byte 級相同；
+  五個邊界（空／單事件／全 purged／未匹配／單位錯）。
+- `tests/api/test_splitunify_event_study_only.py`（B3）：無 universe ⇒ unavailable 且無 `n_test`。
+- `tests/api/test_splitunify_disclosure.py`（B4）：驗證段鍵恰 1 個。
+
+mutation 對照表（12 條；每批收案前跑，紅只認 rc=1）：
+
+| ID | 改壞什麼 | 應紅之測試 |
+|---|---|---|
+| `M-SU-1` | 投影二態化（purged 併入 `assignments`） | `test_splitunify_derive.py -k three_state` |
+| `M-SU-2` | 多 symbol fail-closed 拿掉 | `test_splitunify_derive.py -k multi_symbol` |
+| `M-SU-3` | 以第一個 symbol 之 plan 冒充整批 | `test_splitunify_derive.py -k multi_symbol` |
+| `M-SU-4` | 成員改用 `time_bounds` 閉區間而非集合 | `test_splitunify_derive.py -k membership_set` |
+| `M-SU-5` | 未匹配時間戳預設歸 `train`（非 purged） | `test_splitunify_derive.py -k unmatched_timestamp` |
+| `M-SU-6` | 同時落兩態時靜默取 train | `test_splitunify_derive.py -k dual_membership` |
+| `M-SU-7` | `clusters` 抄舊 plan 而非由 manifest 重算 | `test_splitunify_derive.py -k clusters` ＋ `test_tables.py` cluster CI |
+| `M-SU-8` | `freeze_splitunify_golden.py` 比對失敗自動 `--write` | freeze 腳本自證（改一員仍須 rc=1） |
+| `M-SU-9` | metadata 同時寫舊事件 `n_test` 與 canonical `n_test` | `test_splitunify_disclosure.py` |
+| `M-SU-10` | 無 universe 時仍按事件數切並宣稱 OOS | `test_splitunify_event_study_only.py` |
+| `M-SU-11` | boundary builder 改用自己的算術（不呼叫既有兩支） | `test_splitunify_boundary.py -k same_source` |
+| `M-SU-12` | 事件 ms 與 feature index 單位未歸一（秒／毫秒混用） | `test_splitunify_derive.py -k unit_normalize` |
+| `C0` | 只改註解（對照組） | 必須仍綠 |
+
+benchmark：投影為 O(n log n) 以內；門檻**先量一次再定**，不寫死未量過的數字
+（EVTLABEL B4 之教訓：首跑 benchmark 只測乾淨資料，10% NaN 路徑實測 200s 遠超上限）。
 
 ## §R 回退
 
-投影函式與接線分屬 B2／B3 兩批 ⇒ B3 回退即可回到雙軌狀態（B2 之純函式無 caller、無副作用）。
+boundary builder／投影（B2）與接線（B3）分屬兩批 ⇒ B3 回退即可回到雙軌狀態
+（B2 之純函式無 caller、無副作用）。B1 之文件與枚舉不需回退。
 
 ## §N N/A 登記與殘留
 
 - **R-1（needs-research）**：per-symbol `SplitPlan` 之 `base_universe_hash` 語意在多標的下
-  是否仍唯一——本票先 fail-closed，不在此解。
-- **R-2（blocked-by）**：`baseline.py` 之 OOS AUC 是否因投影而改變數值——
-  待 B2 之 G-3 雙 producer golden 實跑後才有答案，屆時若變則登記為預期差異。
+  是否仍唯一——本票先 fail-closed（Task 3.2），不在此解。
+- **R-2（blocked-by）**：`baseline.py`／`pattern_bridge.py`／`tables.py` 之 OOS 數值**必變**
+  （C-9 已定），改變量待 B2 之 G-3a 遷移報告實跑後才有數字，屆時逐項登記為預期差異。
 - **R-3（user-ruling）**：UAT 項目之更新等 B4；使用者已裁定 UAT 一律最後。
+- **R-4（blocked-by）**：`momentum/Analysis/event_samples/pattern_bridge.py::extract_event_patterns`
+  **目前無任何 caller**（`grep -rn extract_event_patterns momentum api tests` 只命中自身與 `__all__`）
+  ⇒ 又一個「兩端都有、但沒接上」。本票不接線它，只確保其消費之 `assignments` 語意不變。
+- **SU-RESID-1（needs-research）**：`scripts/reconcile_cluster_attribution_check.sh` 只驗
+  「finding ID 字串是否出現在檔內」，**不驗是否被正確的決議項引用** ⇒ 本票之 consult 收斂
+  兩類失誤（處置段改寫委員立場、finding ID 歸屬錯置）它**都回 rc=0**。
+  真正攔下來的是委員逐條對照。修法需要一個「決議項 ↔ finding 語意對應」的機械判準，
+  屬治理工具研究，不在本票範圍。

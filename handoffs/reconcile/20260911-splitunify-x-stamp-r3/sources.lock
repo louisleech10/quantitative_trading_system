@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "session_id": "20260911-splitunify-x-stamp-r3",
+  "expected_roster": [
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-splitunify-x-stamp-r3/sources/20260911-splitunify-x-stamp-r3-grok.md",
+      "sha256": "d5c08dbe3574ee669b3362c66e12974b1c1fe39ce25664b3ae274958d0da5a32",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-09-10T15:58:52Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "6fd15437-ed8d-4205-8f6d-db7119533011"
+}
