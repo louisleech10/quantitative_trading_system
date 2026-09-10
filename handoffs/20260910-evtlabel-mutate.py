@@ -123,16 +123,16 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     Mutation(
         "M-P3-2-p-gate-reads-return-q", "3b", ORCH,
-        "p_field = \"mw_p_value_adj\" if binary_mode else",
-        "p_field = \"p_value_adj\" if binary_mode else",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "threshold_reads"],
+        "p_field = \"mw_p_value_adj\" if fdr_enabled else \"mw_p_value\"",
+        "p_field = \"p_value_adj\" if fdr_enabled else \"p_value\"",
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "p_gate_reads"],
         "p 閘仍讀報酬 q ⇒ threshold_reads_* 斷言紅",
     ),
     Mutation(
         "M-P3-3-binary-not-validated", "3b", ORCH,
         "label_kind=derive_label_kind(\"imported_binary_label\")",
         "label_kind=derive_label_kind(\"imported_binary_label\") if False else None",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage3.py", "-k", "misaligned"],
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage3.py", "-k", "shifted_binary_map"],
         "binary 向量不過 validate_event_given ⇒ 錯位一格應 raise 之斷言紅",
     ),
     Mutation(
@@ -144,16 +144,16 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     Mutation(
         "M-P3-5-validated-cache-swapped-not-caught", "3b", ORCH,
-        "if not all((owner[int(ts)], int(ts), int(y_i)) in vb.rows_frozenset",
-        "if False and not all((owner[int(ts)], int(ts), int(y_i)) in vb.rows_frozenset",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "validated_is_used"],
+        "            if (int(ts), int(y_i)) not in by_row:",
+        "            if False and (int(ts), int(y_i)) not in by_row:",
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "row_not_in_validated"],
         "rows_frozenset 守衛拿掉 ⇒ 換 cache 應 raise 之斷言紅",
     ),
     Mutation(
         "M-P3-5b-index-guard-removed", "3b", ORCH,
-        "if not X.index.equals(pd.Index(sel_idx))",
-        "if False and not X.index.equals(pd.Index(sel_idx))",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "permute_x"],
+        "            if y_series.isna().any():",
+        "            if False and y_series.isna().any():",
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "selection_row_missing"],
         "index 對齊守衛拿掉 ⇒ X.iloc[perm] 應 raise 之斷言紅",
     ),
     Mutation(
@@ -165,9 +165,9 @@ MUTATIONS: Tuple[Mutation, ...] = (
     ),
     Mutation(
         "M-P3-7-effect-gate-signed", "3b", ORCH,
-        "abs(row[\"rank_biserial\"]) >= thresholds.rank_biserial_min",
-        "row[\"rank_biserial\"] >= thresholds.rank_biserial_min",
-        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "negative_planted"],
+        "and abs(row[\"rank_biserial\"]) >= thresholds.rank_biserial_min",
+        "and row[\"rank_biserial\"] >= thresholds.rank_biserial_min",
+        [*PYTEST, "tests/momentum/Analysis/test_evtlabel_stage5.py", "-k", "absolute_rank_biserial"],
         "效應量閘去 abs ⇒ 負向植入 passed 斷言紅",
     ),
     # ── 對照組 ───────────────────────────────────────────────────────────

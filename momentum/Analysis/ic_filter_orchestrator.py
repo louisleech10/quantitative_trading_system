@@ -28,6 +28,7 @@ from momentum.Analysis.ic_engine import ICEngine
 from momentum.Analysis.ic_reporter import ICReporter, _finite_or_neg_inf
 from momentum.Analysis.marginal_ic import MarginalICParams, compute_marginal_ic
 from momentum.Analysis.monotonicity_tester import MonotonicityTester
+from momentum.Analysis.binary_discrimination import BINARY_STATUS_OK, mann_whitney_table
 from momentum.Analysis.pit_stats import PIT_STATS_VERSION
 from momentum.Analysis.redundancy_filter import RedundancyFilter
 from scipy import stats as scipy_stats
@@ -4233,6 +4234,12 @@ class ICFilterOrchestrator:
             point_ic=ic_results.get("ic_values") or {},
         )
 
+        # ── EVTLABEL Task 3.6：匯入標籤模式之主統計進表 ────────────────────────
+        binary_mode = self._merge_binary_statistics(
+            summary_table, features_for_stats, event_info, config,
+            alpha_effective=alpha_effective, fdr_method=fdr_method,
+        )
+
         passed_features, threshold_log = self._apply_thresholds(
             summary_table,
             config.thresholds,
@@ -4240,7 +4247,16 @@ class ICFilterOrchestrator:
             fdr_enabled=fdr_enabled,
             # EVTWARMUP Task 2.1：事件路徑 ICIR 為診斷欄，不作硬門檻（全域 icir_gate=True 一字不改）
             icir_gate=not is_event_label_consumed(event_info),
+            binary_mode=binary_mode,
         )
+        if binary_mode:
+            # 排序：主統計為 |rank_biserial|（NaN 置底）；名稱作 tiebreak 以求可重現。
+            summary_table.sort(
+                key=lambda row: (
+                    -abs(row["rank_biserial"]) if np.isfinite(row.get("rank_biserial", np.nan)) else np.inf,
+                    str(row.get("feature_name", "")),
+                )
+            )
         threshold_log = {
             **threshold_log,
             "alpha_effective": float(alpha_effective),
@@ -4695,6 +4711,86 @@ class ICFilterOrchestrator:
         self._ic_mean_source = source_counts  # 不放 _ic_cache（部分路徑為 None）
         return table
 
+    def _merge_binary_statistics(
+        self,
+        summary_table: list[dict],
+        features_for_stats: pd.DataFrame,
+        event_info: dict,
+        config: ICConfig,
+        *,
+        alpha_effective: float,
+        fdr_method: str,
+    ) -> bool:
+        """EVTLABEL Task 3.6：把 0/1 分辨力統計併進 summary_table；回傳「本次是否 binary 模式」。
+
+        🔴 **消費前三守衛**（R2 D1；**刻意沒有** digest 相等比對）：
+        ① `X.index` 與 selection index 逐值相等 ② `len(y) == len(X)`
+        ③ 每一個 `(event_id, ts_ms, 0/1)` 都在 stage3 驗過的 `rows_frozenset` 裡。
+        任一不成立 ⇒ raise。為什麼不用 digest 相等：digest 只能說「整份一樣或不一樣」，
+        說不出**是哪幾列**被換掉；子集檢查會直接指出那一列。
+
+        🔴 對證之後**直接**把 `X, y` 餵進 `mann_whitney_table`，中間不得重排、不得 `.iloc[perm]`
+        ——中間任何重排都會讓「驗過的」與「用掉的」再度分家。
+        """
+        if str((event_info or {}).get("label_source")) != "imported_binary_label":
+            return False
+        vb = (self._ic_cache or {}).get("event_binary_label")
+        if vb is None:
+            raise AlignmentViolationError(
+                "label_source=imported_binary_label 但 stage3 沒有交付 ValidatedBinaryLabel"
+            )
+
+        sel_idx = features_for_stats.index
+        # ① index 對齊
+        if not vb.series.index.equals(pd.Index(features_for_stats.index)):
+            y_series = vb.series.reindex(sel_idx)
+            if y_series.isna().any():
+                raise AlignmentViolationError(
+                    "binary label consumed != validated: selection 有列不在驗過的 0/1 向量裡"
+                )
+        else:
+            y_series = vb.series
+        y = y_series.to_numpy(dtype="int64")
+        # ② 長度
+        if len(y) != len(features_for_stats):
+            raise AlignmentViolationError(
+                f"binary label consumed != validated: 長度 {len(y)} != {len(features_for_stats)}"
+            )
+        # ③ 逐列在驗過的三元組集合內
+        owners = {str(eid): (int(ts), int(val)) for eid, (ts, val) in
+                  ((e, (t, v)) for e, t, v in vb.rows_frozenset)}
+        by_row = {(int(ts), int(val)) for _, ts, val in vb.rows_frozenset}
+        sel_ms = (pd.Index(sel_idx).asi8 // 10**6).astype("int64")
+        for ts, y_i in zip(sel_ms, y):
+            if (int(ts), int(y_i)) not in by_row:
+                raise AlignmentViolationError(
+                    f"binary label consumed != validated: 列 {int(ts)} 之值 {int(y_i)} 不在驗過的集合內"
+                )
+        assert owners is not None  # 保留 owners 供未來逐 event 診斷；不參與判定
+
+        tbl = mann_whitney_table(
+            features_for_stats, y, min_class_n=int(config.event_filter.min_events_per_class)
+        )
+        q_values, _ = apply_fdr(
+            {name: float(tbl.loc[name, "p_value"]) for name in tbl.index},
+            alpha_effective, method=fdr_method,
+        )
+        for row in summary_table:
+            name = str(row.get("feature_name", ""))
+            if name not in tbl.index:
+                continue
+            rec = tbl.loc[name]
+            row["auc"] = float(rec["auc"])
+            row["rank_biserial"] = float(rec["rank_biserial"])
+            row["mw_u"] = float(rec["mw_u"])
+            row["mw_p_value"] = float(rec["p_value"])
+            row["mw_p_value_adj"] = float(q_values.get(name, np.nan))
+            row["n_pos"] = int(rec["n_pos"])
+            row["n_neg"] = int(rec["n_neg"])
+            row["n_used_binary"] = int(rec["n_used"])
+            row["binary_status"] = str(rec["status"])
+        return True
+
     def _apply_thresholds(
         self,
         summary_table: list[dict],
@@ -4703,6 +4799,7 @@ class ICFilterOrchestrator:
         *,
         fdr_enabled: bool = True,
         icir_gate: bool = True,
+        binary_mode: bool = False,
     ) -> tuple[list[str], dict]:
         """門檻過濾；p 閘消費 p_value_adj（FDR on）或 p_value（FDR off）。
 
@@ -4722,9 +4819,40 @@ class ICFilterOrchestrator:
         if not icir_gate:
             removed["icir_skipped_event_path"] = []   # 事件路徑必有此鍵（診斷欄；即使無人走到 ICIR 檢查）
 
+        if binary_mode:
+            # 🔴 EVTLABEL Task 3.6：匯入標籤模式之門檻**與報酬版分開**。
+            #    報酬版那幾道（ic_mean／icir／ic_hit_rate／monotonicity／coverage／long_short_spread）
+            #    在這裡不適用 ⇒ 一律記錄到 `*_skipped_binary_mode` 而**不剔除**
+            #    （報酬版 IC 仍算、留第二欄供對照）。
+            for gate in ("ic_mean", "icir", "ic_hit_rate", "monotonicity", "coverage", "long_short_spread"):
+                removed[f"{gate}_skipped_binary_mode"] = []
+            removed["rank_biserial"] = []
+            removed["binary_unavailable"] = []
+
         for row in summary_table:
             name = row.get("feature_name")
             if name is None:
+                continue
+
+            if binary_mode:
+                if str(row.get("binary_status")) != BINARY_STATUS_OK:
+                    removed["binary_unavailable"].append(name)
+                    continue
+                for gate in ("ic_mean", "icir", "ic_hit_rate", "monotonicity", "coverage", "long_short_spread"):
+                    removed[f"{gate}_skipped_binary_mode"].append(name)
+                # 🔴 效應量閘取**絕對值**且用**獨立門檻**（R1 C1 推翻共用 ic_mean_min）：
+                #    rank-biserial 為負代表「反向但一樣能分」，不取絕對值會把強反向特徵誤殺。
+                rb = row.get("rank_biserial")
+                if not (isinstance(rb, (int, float)) and np.isfinite(rb)
+                        and abs(row["rank_biserial"]) >= thresholds.rank_biserial_min):
+                    removed["rank_biserial"].append(name)
+                    continue
+                # p 閘讀 **Mann-Whitney 的 q**，不是報酬版的 q。
+                p_field = "mw_p_value_adj" if fdr_enabled else "mw_p_value"
+                if not self._passes_threshold(row.get(p_field), alpha_effective, inverse=True):
+                    removed["p_value"].append(name)
+                    continue
+                passed.append(name)
                 continue
 
             if not self._passes_threshold(row.get("ic_mean"), thresholds.ic_mean_min):
