@@ -19,7 +19,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import EventDimensionFields, { type EventDimensionValues } from '@/components/case/EventDimensionFields';
 import {

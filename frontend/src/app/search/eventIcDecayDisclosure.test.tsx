@@ -8,7 +8,7 @@
  */
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { declareFromPreview, previewOf } from '@/test/lookaheadDeclarationTestUtils';
+import { previewOf } from '@/test/lookaheadDeclarationTestUtils';
 import SearchPage from '@/app/search/page';
 import { useSearchStore } from '@/store/searchStore';
 import { EVENT_IC_DECAY_DISCLOSURE } from '@/lib/eventFieldFormatters';

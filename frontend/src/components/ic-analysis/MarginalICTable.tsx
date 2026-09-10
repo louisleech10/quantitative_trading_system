@@ -32,6 +32,10 @@ export default function MarginalICTable({
 }: {
   section?: MarginalICSection | SectionStatusObject | null;
 }) {
+  // 🔴 hooks 必須在任何提早 return **之前**呼叫（react-hooks/rules-of-hooks）。
+  //    原本這行寫在兩個 early return 之後 ⇒ 同一元件在不同 render 的 hook 數量不一致，
+  //    React 會把 hook 狀態對錯位（畫面時好時壞、且 `npm run build` 直接紅）。票 FEBUILD。
+  const downgradeReason = (useICAnalysisStore((s) => s.report)?.metadata?.oos_downgrade as ICOosDowngrade | undefined)?.reason;
   if (!section) return null;
   if (section.status !== 'ok' || !isMarginalICSection(section)) {
     return (
@@ -48,7 +52,7 @@ export default function MarginalICTable({
   const composite = section.composite;
   const degraded = section.oos_guarantees === false;
   // EVTWARMUP Task 1.2（R2 CODEX-R2-P1-04）：降級主句依 reason——事件不足是 holdout 已套用，不是 full-sample
-  const downgradeReason = (useICAnalysisStore((s) => s.report)?.metadata?.oos_downgrade as ICOosDowngrade | undefined)?.reason;
+  //（`downgradeReason` 已於函式頂端取得，見該處註解）
   const degradedText = downgradeReason === 'insufficient_test_events'
     ? '⚠ 測試段事件不足（holdout 仍套用、無 OOS 保證）'
     : '⚠ Full-sample research-only（非 OOS 保證）';
