@@ -162,6 +162,7 @@ def _bind(orch, feats, y, window_bars: int = 2):
         n_pos=int((y == 1).sum()), n_neg=int((y == 0).sum()),
     )}
     orch._binary_label_window_bars = window_bars
+    orch._binary_feature_bar_ms = HOUR
 
 
 def _frame(n: int, cols: dict) -> pd.DataFrame:
@@ -338,3 +339,69 @@ def test_insufficient_blocks_removes_every_candidate():
     assert survivors == []
     assert set(removed["permutation_unavailable"]) == {"a", "b"}
     assert receipt["negative_control"] == {"status": "skipped:no_survivors"}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# ⑤ B4 review R1：instance 狀態不得跨 run 殘留；一根多長由 timeframe 決定
+# ══════════════════════════════════════════════════════════════════════════
+
+
+def test_window_bars_and_bar_ms_are_reset_at_analyze_entry():
+    """🔴 `GROK-R1-P0-01`（P0）：這幾項是 analyze-scoped，入口必須歸零。
+
+    否則「先跑一次有切分的 W=12，再跑一次無切分的 binary」會沿用 12；
+    從未寫入時則是 0 ⇒ `block_len=1` ⇒ **區塊依賴保護整個關閉**、置換自檢過度樂觀。
+    """
+    import inspect
+
+    src = inspect.getsource(ICFilterOrchestrator.analyze)
+    head = src[: src.index("split_context")]
+    for name in ("_binary_label_window_bars", "_binary_feature_bar_ms",
+                 "_survivor_suppressed_reason", "_binary_oracle_receipt"):
+        assert f"self.{name} = " in head, f"{name} 未在入口歸零 ⇒ 會跨 run 殘留"
+
+
+def test_window_bars_is_set_outside_the_split_branch():
+    """碼證：寫入點必須在 `if config.ic_train_test_split:` **之前**（全樣本起跑也要有值）。"""
+    import inspect
+
+    src = inspect.getsource(ICFilterOrchestrator.analyze)
+    set_at = src.index("self._binary_label_window_bars = (")
+    split_at = src.index("if config.ic_train_test_split:")
+    assert set_at < split_at, "寫入點仍在切分分支內 ⇒ 全樣本路徑會拿到 0"
+
+
+def test_feature_bar_ms_comes_from_timeframe_not_event_spacing():
+    """🔴 `GROK-R1-P1-01`：一根多長是 **timeframe 的性質**，與事件排得多密無關。
+
+    grok 實跑反例：事件每 3 根、W=12 ⇒ 舊啟發式算出 L=12／n_blocks=1（保護過頭），
+    真值是 L=4／n_blocks=3。
+    """
+    from momentum.Analysis.ic_filter_orchestrator import _feature_bar_ms_of
+
+    assert _feature_bar_ms_of({"timeframe": "1h"}) == HOUR
+    assert _feature_bar_ms_of({"timeframe": "12h"}) == 12 * HOUR
+    assert _feature_bar_ms_of({}) == 0, "推不出來要回 0，不得猜"
+
+    # 事件每 3 根 × 1h、W=12：用真 bar 得 L=4／n_blocks=3
+    ms = np.array([BASE + i * 3 * HOUR for i in range(12)])
+    _, block_len, n_blocks = block_ids_for_events(ms, 12, HOUR)
+    assert (block_len, n_blocks) == (4, 3)
+    # 用「最小間距當一根」的舊啟發式（bar=3h）則會得到 L=12／n_blocks=1
+    _, wrong_len, wrong_blocks = block_ids_for_events(ms, 12, 3 * HOUR)
+    assert (wrong_len, wrong_blocks) == (12, 1), "反例本身要成立，否則本條不算證明"
+
+
+def test_unknown_feature_bar_fails_closed():
+    """一根多長推不出來 ⇒ 整批 unavailable，**不給**假的置換帶。"""
+    n = 40
+    y = np.array([1] * 20 + [0] * 20, dtype=int)
+    feats = _frame(n, {"a": y * 10.0 + np.arange(n) * 1e-6})
+    orch = _orch()
+    _bind(orch, feats, y)
+    orch._binary_feature_bar_ms = 0            # timeframe 推不出來
+    survivors, receipt = orch._run_binary_permutation_and_negative_control(
+        ["a"], {}, feats, orch._config, alpha_effective=0.05, fdr_method="fdr_bh",
+    )
+    assert survivors == []
+    assert receipt["negative_control"]["status"] == "unavailable:unknown_feature_bar"

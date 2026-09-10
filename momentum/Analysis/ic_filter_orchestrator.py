@@ -223,6 +223,21 @@ TESTED_ESTIMATOR_BAR_LEVEL = "bar_level_spearman"
 TESTED_ESTIMATOR_XSEC_PERIOD_IC = "cross_sectional_period_ic"
 
 
+def _feature_bar_ms_of(metadata: Optional[dict]) -> int:
+    """由 `metadata.timeframe` 取「一根特徵 K 線幾毫秒」；推不出來 ⇒ 0（呼叫端據此 fail-closed）。
+
+    🔴 `GROK-R1-P1-01`：原本由「事件最小正間距」推，事件稀疏時會把 3 根當成 1 根 ⇒
+    區塊長度高估三倍。一根多長是 **timeframe 的性質**，與事件排得多密無關。
+    """
+    timeframe = (metadata or {}).get("timeframe") if isinstance(metadata, dict) else None
+    if not timeframe:
+        return 0
+    freq = EXPECTED_FREQ_BY_TIMEFRAME.get(str(timeframe))
+    if freq is None:
+        return 0
+    return int(pd.Timedelta(freq).total_seconds() * 1000)
+
+
 def _resolve_expected_freq(metadata: Optional[dict]) -> pd.Timedelta:
     """由 metadata 的 timeframe 推導 rows purge 需要的固定頻率。"""
     timeframe = (metadata or {}).get("timeframe")
@@ -1149,6 +1164,16 @@ class ICFilterOrchestrator:
         # analyzer 跑第二次（掃描格逐格重用、UI 連續分析）會把上一次的秒數疊進來 ⇒ 揭露變成假的。
         # 同一次 analyze 內 fallback 重跑 stage5/6 之累加是**刻意**的，兩者不衝突。
         self._stage_timings = {}
+        # 🔴 `GROK-R1-P0-01`（B4 review R1，P0）：以下三項與 `_stage_timings` 同一類——
+        #    **analyze-scoped 的 instance 狀態，不在入口歸零就會跨 run 殘留**。
+        #    最嚴重的是 `_binary_label_window_bars`：它原本只在 `ic_train_test_split=True`
+        #    分支寫入，於是「先跑一次有切分的 W=12，再跑一次無切分的 binary」會沿用 12；
+        #    反過來若從未寫入則是 0 ⇒ `block_len=1` ⇒ **區塊依賴保護整個關閉**、
+        #    置換自檢過度樂觀 ⇒ 假倖存者可進 consumable。這正好打中主目標。
+        self._binary_label_window_bars = 0
+        self._binary_feature_bar_ms = 0
+        self._survivor_suppressed_reason = None
+        self._binary_oracle_receipt = None
         self._clear_deep_analysis_cache()
         # GAP-2 Task 4.1：入口存路徑（供 refilter／persist provenance）＋當次 config hash
         self._features_path = str(features_path) if features_path else None
@@ -1199,6 +1224,18 @@ class ICFilterOrchestrator:
             "icir_role": "threshold",
         }
 
+        # ── EVTLABEL Task 3.7（`GROK-R1-P0-01` 修補）：區塊置換所需的兩個尺度，
+        #    在**切分分支之外**、事件語意已知時就寫定。原本只在 `ic_train_test_split=True`
+        #    分支內寫 ⇒ 全樣本起跑或跨 run 重用同一 orchestrator 時會拿到殘值或 0。
+        # 🔴 `_binary_feature_bar_ms` 改由 **timeframe** 決定（`GROK-R1-P1-01`）：
+        #    原本用「事件最小正間距」當一根 K 線，事件稀疏時會**高估**區塊長度。
+        #    grok 實跑反例：事件每 3 根、W=12 ⇒ 我算出 L=12／n_blocks=1（保護過頭、
+        #    整批直接 insufficient_blocks），真值是 L=4／n_blocks=3。啟發式已刪。
+        self._binary_label_window_bars = (
+            int(event_isolation.label_window_rows) if event_isolation is not None else 0
+        )
+        self._binary_feature_bar_ms = _feature_bar_ms_of(metadata)
+
         split_context: Optional[dict] = None
         if config.ic_train_test_split:
             expected_freq = _resolve_expected_freq(metadata)
@@ -1210,9 +1247,6 @@ class ICFilterOrchestrator:
             #    12 根的答案窗被塞在 embargo 裡 ⇒ 不洩漏但標籤貼錯位置。
             #    取 max 是因為兩者都必須被擋住：主線 label 的 5 根、事件 label 的 12 根。
             event_window_rows = int(event_isolation.label_window_rows) if event_isolation else 0
-            # EVTLABEL Task 3.7：答案窗有幾根 ⇒ 決定區塊置換之區塊長度（視窗跨過幾個事件，
-            # 那幾個就得綁在一起洗）。與 purge 用的是**同一個**數字，不另建第二份。
-            self._binary_label_window_bars = int(event_window_rows)
             effective_purge_gap = max(effective_horizon, event_window_rows)
             split_result = _build_holdout_split_plan(
                 features_df,
@@ -4786,7 +4820,12 @@ class ICFilterOrchestrator:
         if vb is None:
             return passed, None
         sel_ms = (pd.Index(features_for_stats.index).asi8 // 10**6).astype("int64")
-        bar_ms = self._binary_feature_bar_ms(sel_ms)
+        bar_ms = int(getattr(self, "_binary_feature_bar_ms", 0) or 0)
+        if bar_ms <= 0:
+            # timeframe 推不出一根多長 ⇒ **不猜**。區塊綁不出來就等於沒有依賴保護，
+            # 寧可整批標 unavailable（下游會把每個候選移出 consumable），也不給一個假的帶。
+            return [], {"negative_control": {"status": "unavailable:unknown_feature_bar"},
+                        "block_len": None, "n_blocks": None}
         window_bars = int(getattr(self, "_binary_label_window_bars", 0) or 0)
         block_ids, block_len, n_blocks = block_ids_for_events(sel_ms, window_bars, bar_ms)
         y = vb.series.reindex(features_for_stats.index).to_numpy(dtype="int64")
@@ -4872,19 +4911,6 @@ class ICFilterOrchestrator:
         else:
             self._survivor_suppressed_reason = None
         return survivors, receipt
-
-    @staticmethod
-    def _binary_feature_bar_ms(sel_ms: "np.ndarray") -> int:
-        """由被選中列之時間戳推特徵 K 線長度（毫秒）：取相鄰間距之**最小正值**。
-
-        事件是稀疏的，所以間距是「幾根」的整數倍；最小正間距即一根。只有一列 ⇒ 回 1。
-        """
-        arr = np.asarray(sorted(int(v) for v in np.asarray(sel_ms).tolist()), dtype="int64")
-        if len(arr) < 2:
-            return 1
-        gaps = np.diff(arr)
-        gaps = gaps[gaps > 0]
-        return int(np.min(gaps)) if len(gaps) else 1
 
     def _merge_binary_statistics(
         self,
