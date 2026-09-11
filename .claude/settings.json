@@ -207,6 +207,10 @@
           {
             "type": "command",
             "command": "bash scripts/spec_xref_hook.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/synth_attribution_hook.sh"
           }
         ]
       }
