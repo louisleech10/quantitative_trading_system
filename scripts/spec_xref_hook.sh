@@ -33,9 +33,10 @@ print(p if isinstance(p, str) else "")' 2>/dev/null || true)"
 fi
 [ -n "$target" ] || exit 0
 case "$target" in /*) rel="${target#"$ROOT"/}" ;; *) rel="$target" ;; esac
-# 觸發集合（使用者 2026-09-11：不限 SPEC/TODO）：docs/ 下 SPEC|TODO|PLAN|RECON 命名者，
-# 或**任何**被某份 synth 宣告為修訂標的之 docs/ 檔（consult 層的收斂標的）。
-case "$rel" in docs/*.md) : ;; *) exit 0 ;; esac
+# 觸發集合（使用者 2026-09-11：不限 SPEC/TODO；偵察／討論與審 SPEC 同等）：
+#   docs/ 下 SPEC|TODO|PLAN|RECON 命名者，或**任何目錄**下被某份 synth 宣告為修訂標的之 .md
+#   （consult 層的標的常是主委偵察稿 handoffs/*-RECON-claude.md）。
+case "$rel" in *.md) : ;; *) exit 0 ;; esac
 [ -f "$rel" ] || exit 0
 declared="$(grep -l -m1 -E "^\*\*修訂標的\*\*：${rel}\$" handoffs/reconcile/*/synth.md 2>/dev/null | head -1)"
 case "$rel" in docs/*SPEC*.md|docs/*TODO*.md|docs/*PLAN*.md|docs/*RECON*.md) : ;; *) [ -n "$declared" ] || exit 0 ;; esac

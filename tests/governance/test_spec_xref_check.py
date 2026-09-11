@@ -129,6 +129,41 @@ def test_synth_skips_evidence_commands_memory_names_and_line_refs(tmp_path: Path
     assert r.returncode == 0, r.stdout
 
 
+HOOK = ROOT / "scripts" / "spec_xref_hook.sh"
+
+
+def test_hook_fires_on_handoffs_file_declared_as_target(tmp_path: Path) -> None:
+    """偵察稿在 handoffs/ 而非 docs/——只要某份 synth 宣告它為修訂標的，寫它就要驗。"""
+    import os
+    rd = ROOT / "handoffs" / "reconcile" / "zz-xreftest-x-consult-r1"
+    rd.mkdir(parents=True, exist_ok=True)
+    recon = ROOT / "handoffs" / "zz-xreftest-RECON-claude.md"
+    try:
+        (rd / "synth.md").write_text(
+            "## 群集 / 處置\n\n**修訂標的**：handoffs/zz-xreftest-RECON-claude.md\n\n"
+            "| 群集 | 嚴重度 | 來源 ID | 處置 |\n|---|---|---|---|\n"
+            "| V1 | P1 | GROK-R1-P1-01 | 採納，改成 `concept_only_in_synth` |\n\n## 附錄\n\n## GROK-R1-P1-01\n**斷言**: x\n",
+            encoding="utf-8")
+        recon.write_text("# recon\n\n- 沒有那個概念。\n", encoding="utf-8")
+        env = dict(os.environ, GOVERNANCE_TEST_HARNESS="1", SPEC_XREF_HOOK_TARGET="handoffs/zz-xreftest-RECON-claude.md")
+        r = subprocess.run(["bash", str(HOOK)], cwd=ROOT, env=env, capture_output=True, text=True, check=False)
+        assert r.returncode == 2 and "concept_only_in_synth" in r.stdout, r.stdout + r.stderr
+        recon.write_text("# recon\n\n- 改讀 `concept_only_in_synth`。\n", encoding="utf-8")
+        r = subprocess.run(["bash", str(HOOK)], cwd=ROOT, env=env, capture_output=True, text=True, check=False)
+        assert r.returncode == 0, r.stdout + r.stderr
+    finally:
+        recon.unlink(missing_ok=True)
+        (rd / "synth.md").unlink(missing_ok=True)
+        rd.rmdir()
+
+
+def test_hook_noop_on_undeclared_handoffs_file() -> None:
+    import os
+    env = dict(os.environ, GOVERNANCE_TEST_HARNESS="1", SPEC_XREF_HOOK_TARGET="HANDOFF.md")
+    r = subprocess.run(["bash", str(HOOK)], cwd=ROOT, env=env, capture_output=True, text=True, check=False)
+    assert r.returncode == 0 and r.stdout == ""
+
+
 @pytest.mark.parametrize("args", [["--bogus"], ["--files", "only_one"], ["--synth", "a"]])
 def test_usage_error_rc2(args: list[str]) -> None:
     r = subprocess.run(["bash", str(SCRIPT), *args], cwd=ROOT, capture_output=True, text=True, check=False)
