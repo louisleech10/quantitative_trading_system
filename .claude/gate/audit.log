@@ -57723,3 +57723,38 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "gate", "blocked_by": [], "closed": ["CODEX-R1-P0-01"], "event": "committee_output", "event_id": "7c4d8ca7-9880-4829-afd3-434fdbad5ec8", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260911-verdictgate-b1-review-r2-codex.md", "output_sha256": "59dd1aa26b13e0b1517840bbc6cc979cd50fab968550ceb55dd832de001ab407", "producer": "audit_append.sh", "round_id": "a01e3d89-1ae5-40ca-9808-cc6da4aea463", "schema_version": 1, "sequence": 3520, "task_id": "20260911-VERDICTGATE-B1-REVIEW-R2", "ts": "2026-09-11T12:38:59Z", "verdict": "proceed"}
 {"event":"gate_deny","ts":"2026-09-11T12:39:51Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"2a370adc5e18ca96b91826552f1de21d853120aac82a3d5530f7242a06ecacc3","cmd_head":"grep -n 'review_quorum_check\\|_rq_prev\\|_rq_cand\\|_rq_p=' scripts/gate.sh | head -12 | cut -c1-130; echo \"== committee_run mint round 附近\"; grep -n 'mint\\|_open_debt \"\\|round_id=\"$(' scripts/committee_run.sh | head -6 | cut -c1-120"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "23dd67fc-f1f8-430f-a0f8-ad5f4d766a90", "lock_sha256": "9c745127cc28f3218338cb3005870dfe4bea6b2cbd39920a6e613afd4912c645", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex"], "round_id": "a01e3d89-1ae5-40ca-9808-cc6da4aea463", "schema_version": 1, "sequence": 3521, "session_id": "20260911-verdictgate-b1-review-r2", "synth_sha256": "973c22bc172c40f411722f09e9b499b4e92d1028bd643c583dc8a771eb039ccb", "ts": "2026-09-11T12:40:06Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-B2-REVIEW-R1", "ts": "2026-09-11T12:53:38Z"}
+=== 2026-09-11 20:53:38 | dispatch ===
+  ts=2026-09-11 20:53:38
+  kind=dispatch
+  intent=VERDICTGATE B2 三家審碼 R1（開輪閘實戰首輪）
+  risk=high
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=三家全員 adversary；實作者主委不自審
+  template=n/a:code review 派工
+  adversarial=waived:code review 輪本身即 adversarial
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-B2-REVIEW-R1", "ts": "2026-09-11T12:53:50Z"}
+=== 2026-09-11 20:53:50 | dispatch ===
+  ts=2026-09-11 20:53:50
+  kind=dispatch
+  intent=VERDICTGATE B2 三家審碼 R1（開輪閘實戰首輪）
+  risk=high
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=三家全員 adversary；實作者主委不自審
+  template=n/a:code review 派工
+  adversarial=waived:code review 輪本身即 adversarial
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260911-VERDICTGATE-B2-REVIEW-R1-BRIEF.md", "brief_sha256": "bbaad0650fecf75e8f943cf628f3e06d8d3dc8dc362881636643d58d1606dc0c", "brief_sha256_norm": "bbaad0650fecf75e8f943cf628f3e06d8d3dc8dc362881636643d58d1606dc0c", "event": "committee_round_open", "event_id": "eb6f9ddf-f71a-49d0-b616-77e3744e1c8b", "expected_outputs": {"codex": "handoffs/20260911-verdictgate-b2-review-r1-codex.md", "composer": "handoffs/20260911-verdictgate-b2-review-r1-composer.md", "grok": "handoffs/20260911-verdictgate-b2-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "7497a6df-096d-4901-b45a-4a8691ed8ff3", "schema_version": 1, "sequence": 3522, "session_name": "20260911-verdictgate-b2-review-r1", "task_id": "20260911-VERDICTGATE-B2-REVIEW-R1", "ts": "2026-09-11T12:53:56Z"}
