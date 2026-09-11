@@ -22,6 +22,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -165,6 +167,56 @@ def test_splitunify_disclosure_no_unregistered_test_count_key(fixture_name, requ
         f"報告出現未登記的『含 test 之整數鍵』：{unregistered}——"
         "請先到 momentum/Analysis/contracts/split_unify.json 的 test_segment_count_keys 歸類語意"
     )
+
+
+# ── ①-b 🔴 名稱無關的 deny-by-default：整數葉鍵集**逐一凍結** ────────────────
+def test_splitunify_disclosure_report_int_keys_match_frozen_inventory():
+    """報告的整數葉鍵集必須逐一等於凍結清單——**新鍵一律紅，不管它叫什麼名字**。
+
+    出生理由（B4 review R2：codex／composer／grok **三家獨立打穿**上一版）：
+    上一版用「鍵名含 `test`」當候選判準，三家各自實跑證明 `n_oos_events`／`holdout_hits`／
+    `validation_segment_n` **改個名字就完全逃掉**（grok `ESCAPE_COUNT=9`、
+    composer `7/7 escape keys evaded scanner`、codex `ESCAPED=True`）。
+    加寬正則只是抬高逃逸門檻——叫 `foo` 就又過了。**名稱與值都推不出語意**，
+    唯一可證偽的做法是把現況凍住、由人在 diff 上判語意。
+
+    🔴 本檔**不重寫**掃描邏輯：`scripts/freeze_splitunify_report_keys.py` 是唯一實作，
+    這裡只把它接進 pytest（重寫一份就又是「兩份算術」）。
+    """
+    result = subprocess.run(
+        [sys.executable, "scripts/freeze_splitunify_report_keys.py"],
+        cwd=REPO, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, (
+        "報告的整數鍵集漂了——新鍵必須先登記語意再重凍：\n" + result.stderr[-2000:]
+    )
+
+
+def test_splitunify_disclosure_frozen_inventory_catches_renamed_escape(event_report):
+    """🔴 可證偽：三家用來打穿上一版的**改名逃逸**，凍結清單必須全部抓到。
+
+    沒有這條，「凍結清單沒漂」可能只是因為沒有人試著逃。
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "_freeze_report_keys", REPO / "scripts" / "freeze_splitunify_report_keys.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    frozen = set(json.loads(
+        (REPO / "tests" / "golden" / "splitunify" / "report_int_keys.json").read_text(encoding="utf-8")
+    )["runs"]["event"])
+    escaped = {
+        **event_report,
+        "metadata": {**event_report["metadata"], "n_oos_events": 31, "holdout_hits": 33},
+        "summary_table": [{"validation_segment_n": 99}],
+    }
+    caught = sorted(module.int_leaf_paths(escaped) - frozen)
+    for name in ("metadata.n_oos_events", "metadata.holdout_hits",
+                 "summary_table[*].validation_segment_n"):
+        assert name in caught, f"改名逃逸未被抓到：{name}（抓到的是 {caught}）"
 
 
 def test_splitunify_disclosure_denylist_catches_injected_key(event_report):

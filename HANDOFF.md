@@ -149,8 +149,25 @@
   1172 passed**＝**逐條等於**既有紅清單（無新增、無變短）｜解耦 R2=1 R3=17 R4=3｜
   survivor golden rc=0、splitunify golden `GOLDEN OK`。
 
+## B4 三家審碼（R1→R2）
+- **R1**：三家一致「不可收票」，收斂 N1–N5 全部當輪修完（`3bf54ab6`）。
+- **R2**：N2／N3／N5 三家一致**已閉合**；唯一未閉合是 **N1**——三家各自實跑證明
+  我的 deny-by-default 判準「鍵名含 `test`」**改個名字就逃掉**
+  （grok `ESCAPE_COUNT=9`、composer `7/7 evaded`、codex `ESCAPED=True`）。
+- 🔴 **修法與三家提的不同**：他們建議加寬正則（`events|hits|count|_n$`），我判那只是抬高門檻
+  ——叫 `foo` 就又過了（本專案明訂「黑名單永遠列不完」）。**名稱與值都推不出語意** ⇒
+  改成**凍結整數葉鍵集**（`scripts/freeze_splitunify_report_keys.py` ＋
+  `tests/golden/splitunify/report_int_keys.json`，三種 run 共 **283 條** path），
+  新增／刪除任一鍵都紅並逐條指名，由人在 diff 上判語意——**名稱無關**。
+- **C-6 字面偏離**：三家**無人**要求照字面刪鍵（會波及 `marginal_ic`／`filter_log`／
+  `DegradedBanner` 等本票外消費者）⇒ 維持「canonical 恰一個 ＋ 同語意鍵逐值等於 ＋
+  未登記者一律紅」。`boundary_hash` 消費者與 hook 逾時 fail-open 兩條維持原判。
+- **實跑**：disclosure **28 passed**｜B4 mutation **18 條＋C0 UNCOVERED=0**（新增
+  `M-SU-B4-17/18` 直接釘住三家的攻擊）｜相關 pytest **732 passed**｜解耦 R2=1 R3=17 R4=3｜
+  debt round `e5447770` 已清。
+
 ## 下一步（順序）
-1. **B4 三家審碼** → 收斂 → 收票。
+1. **B4 R3 定向確認**（只問 O1 是否閉合）→ 收票。
 2. `GLOBALH`（中票）→ **使用者 UAT B26–B34**。
 
 ## 🔴 既有紅盤點（非本票造成，建議另立 `REDSWEEP`）
