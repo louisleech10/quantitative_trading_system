@@ -1,6 +1,7 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：SPEC v9 **停輪**（R1–R8 共 48 條全採納；R8 兩家 proceed、三家同意凍結 small 視窗）→ 使用者同意白話「四段全做」→ TODO DRAFT（`71cfafdd`）→ **TODO adversarial R1 進行中**（session `20260911-verdictgate-x-todoreview-r1`；codex 一併對 R8 四條寫 CLOSED）｜`SPLITUNIFY` 暫停**
+**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：SPEC v9 **停輪**（R1–R8 共 48 條全採納；R8 兩家 proceed、三家同意凍結 small 視窗）→ 使用者同意白話「四段全做」→ TODO v2（`1f90069d`；R9 五群集 Q1–Q5 全採納；SPEC 三家全部 CLOSED）→ **TODO 閉合確認 R10 進行中**（session `20260911-verdictgate-x-review-r10`；TODO 審查沿用本票 R 計數——命名規約 batch 只准 b<N>|x）｜`SPLITUNIFY` 暫停**
+- R9 揭露：本票 scripts-only ⇒ Task 3.2 trailer 閘不觸發，治理腳本 commit 不受 Phase 3 保護 ⇒ TODO §E E-7（user-ruling 停輪、下張治理票再議）。R9 synth 首版簡寫簽名被 `spec_xref_hook` 當場擋下（閘實戰首例）。
 - 本日新上線三支產出端閘（使用者質問「為何不每次都做全文掃描／輪級才擋等於沒用／reconcile 也要」）：`spec_xref_hook.sh`（寫 SPEC/TODO/任何被 synth 宣告之修訂標的時：殘留掃描＋synth 處置對證）、`synth_attribution_hook.sh`（寫 synth 時：ID 全在表＋-x- 層必宣告 `**修訂標的**：`）、`spec_xref_check.sh --staged/--synth`（pre-commit／debt_clear 後備）。22 測試含 mutation。🔴 hook 阻塞理由必走 stderr。
 - 殘留動作：`handoffs/reconcile/zz-live-x-review-r1/` 實測檔，rm／git clean 被使用者拒兩次，待使用者處置（untracked、無害）。
 - 🔴 使用者 2026-09-11 裁定（逐字）：「若是有地方是你跟委員判定無法收斂或無限窮舉或實作或落地後對整個流程的運作成本和時間成本太高，這就不要鑽下去，該適時停止」⇒ small 視窗規則凍結於 v7、登記 §N；R8 後若只剩文字同步類 ⇒ 主委修完直接進白話審閱閘（AskUserQuestion 阻塞），不派 R9。記憶 `feedback_stop_when_nonconvergent`。
