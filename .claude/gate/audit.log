@@ -57681,3 +57681,38 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "gate", "blocked_by": ["CODEX-R1-P0-01"], "closed": [], "event": "committee_output", "event_id": "2686ab10-5d35-47be-b829-0f203909ac59", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260911-verdictgate-b1-review-r1-codex.md", "output_sha256": "43d30d74edb693a384c7635f588205774fce5de2afb2fe77f6ac1f6a0ff48980", "producer": "audit_append.sh", "schema_version": 1, "sequence": 3516, "task_id": "20260911-VERDICTGATE-B1-REVIEW-R1", "ts": "2026-09-11T12:24:37Z", "verdict": "blocked"}
 {"event":"gate_deny","ts":"2026-09-11T12:26:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"8cc66b49f78ff3dc434f5e97a2725f56ff8c649dc7da1c554b2805de0891c258","cmd_head":"bash -n scripts/gate.sh && bash -n scripts/cx_run.sh && echo syntax_ok; bash scripts/debt_ledger.sh --has-open >/dev/null 2>&1; echo has_open_rc=$?; S=/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/7972ea91-868b-4287-ae64-ee6737a31e77/scratchpad; venv/bin/python -m pytest tests/governance/test_verdictgate_p1.py tests/governance/test_registry_v2_shape.py tests/governance/test_debt_ledger.py -q > $S/pt_p1c.log 2>&1; rc=$?; echo pytest_rc=$rc; tail -1 $S/pt_p1c.log; grep -E '^FAILED' "}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "4b1848d9-f77a-4f8e-ac40-81d5259ef4b1", "lock_sha256": "58b193ce6f009e22e5b17b15d0ae0069b85548468dd019d81f4c90a021e66df0", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "f48a2446-35ca-4c71-b7ce-0f00ebe39b7f", "schema_version": 1, "sequence": 3517, "session_id": "20260911-verdictgate-b1-review-r1", "synth_sha256": "be9b736f532a4fefe17ca834cebc1b6a1d1278d1a299879f80f2e9d6098d590b", "ts": "2026-09-11T12:28:13Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-B1-REVIEW-R2", "ts": "2026-09-11T12:28:55Z"}
+=== 2026-09-11 20:28:55 | dispatch ===
+  ts=2026-09-11 20:28:55
+  kind=dispatch
+  intent=VERDICTGATE B1 閉合確認（codex 重驗 CODEX-R1-P0-01）
+  risk=low
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=single-executor:n/a（原提出方閉合）
+  template=n/a:closure 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-B1-REVIEW-R2", "ts": "2026-09-11T12:29:10Z"}
+=== 2026-09-11 20:29:10 | dispatch ===
+  ts=2026-09-11 20:29:10
+  kind=dispatch
+  intent=VERDICTGATE B1 閉合確認（codex 重驗 CODEX-R1-P0-01）
+  risk=low
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=single-executor:n/a（原提出方閉合）
+  template=n/a:closure 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "closure", "brief_path": "handoffs/20260911-VERDICTGATE-B1-CLOSURE-R2-BRIEF.md", "brief_sha256": "6ee71efa38be5cd0c0a309b2e283fd6c09b5c80ac872df79d82a0b4a1be4d48e", "brief_sha256_norm": "6ee71efa38be5cd0c0a309b2e283fd6c09b5c80ac872df79d82a0b4a1be4d48e", "event": "committee_round_open", "event_id": "6a8416e7-b330-447a-a75e-3fe8f2e6f701", "expected_outputs": {"codex": "handoffs/20260911-verdictgate-b1-review-r2-codex.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex"], "producer": "audit_append.sh", "quorum_eligible": ["codex"], "round_id": "a01e3d89-1ae5-40ca-9808-cc6da4aea463", "schema_version": 1, "sequence": 3518, "session_name": "20260911-verdictgate-b1-review-r2", "task_id": "20260911-VERDICTGATE-B1-REVIEW-R2", "ts": "2026-09-11T12:29:16Z"}
