@@ -1,6 +1,6 @@
 # VERDICTGATE — TODO
 
-**SPEC**：`docs/VERDICTGATE_SPEC.md`（**v9**，審查停輪：R1–R8 共 48 條全採納；R8 兩家 `proceed`、三家同意 §N small 視窗凍結）　**票**：`VERDICTGATE`　**日期**：2026-09-11　**狀態**：**v3（R10 composer／grok `proceed`；codex 3 條精確度修正 P1–P3 全採納，於戳記輪 `CLOSED:`）→ 進 RECONCILE-STAMP 戳記輪，三家 APPROVED 後 FROZEN**。R9／R10 收斂：`handoffs/reconcile/20260911-verdictgate-x-review-r{9,10}/synth.md`。
+**SPEC**：`docs/VERDICTGATE_SPEC.md`（**v9**，審查停輪：R1–R8 共 48 條全採納；R8 兩家 `proceed`、三家同意 §N small 視窗凍結）　**票**：`VERDICTGATE`　**日期**：2026-09-11　**狀態**：**FROZEN（v3；2026-09-11 三家 RECONCILE-STAMP APPROVED 於 `handoffs/reconcile/20260911-verdictgate-x-review-r10/synth.md`，body sha256 `7883342f1483dff6…`；codex R11 對 R10 三條 `CLOSED:`）**。R9／R10 收斂：`handoffs/reconcile/20260911-verdictgate-x-review-r{9,10}/synth.md`。
 **使用者裁定（逐字）**：「為了文檔品質，先把治理票做完，再開始量化主線項目」；「不論哪家執行都要觸發」；「若是有地方是你跟委員判定無法收斂或無限窮舉或實作或落地後對整個流程的運作成本和時間成本太高，這就不要鑽下去，該適時停止」；白話規格方向已同意「四段全做」。
 **實作端**：Claude 主委自任；review＝codex＋composer＋grok 三家全員（ORCH §1 現行分工行）。
 **產出端已先行上線（不在本 TODO 重做）**：`scripts/spec_xref_hook.sh`（SPEC/TODO/修訂標的寫入當下殘留＋synth 處置對證）、`scripts/synth_attribution_hook.sh`（synth 寫入當下 ID 全在表＋`-x-` 層必宣告修訂標的）——Task 4.1 在此之上擴成引用 20 字＋處置 token，**不重寫**這兩支。

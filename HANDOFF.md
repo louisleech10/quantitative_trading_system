@@ -1,6 +1,7 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：SPEC v9 **停輪**（R1–R8 共 48 條全採納；R8 兩家 proceed、三家同意凍結 small 視窗）→ 使用者同意白話「四段全做」→ TODO v2（`1f90069d`；R9 五群集 Q1–Q5 全採納；SPEC 三家全部 CLOSED）→ **TODO 閉合確認 R10 進行中**（session `20260911-verdictgate-x-review-r10`；TODO 審查沿用本票 R 計數——命名規約 batch 只准 b<N>|x）｜`SPLITUNIFY` 暫停**
+**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：SPEC v9 **停輪**（R1–R8 共 48 條全採納；R8 兩家 proceed、三家同意凍結 small 視窗）→ 使用者同意白話「四段全做」→ TODO v3 **FROZEN**（R9／R10 收斂；戳記 R11 codex／R12 composer／R13 grok 皆 APPROVED，stamp-target＝R10 synth，body `7883342f…`）→ **實作第一批（Task 1.1＋1.2）開工**，主委自任；每批三家審碼＋原提出方閉合｜`SPLITUNIFY` 暫停**
+- B1 做法：`scripts/governance_verdicts.json`（新）、`scripts/audit_events.json`（三事件＋`committee_output` 移出 legacy＋`brief_kind`＋origin allowlist）、三範本末段機械塊＋`template_check` 雙格式判定、`scripts/verdict_parse.sh`（新）、`gate.sh register-output`（family 由尾碼＋roster＋expected_outputs 對證；`--kind stamp --family`）、`cx_run.sh` review／closure 自動註冊＋`verdict_rejected`、`committee_run.sh` round_open 寫 `brief_kind`；測試 `tests/governance/test_verdictgate_p1.py`；mutation `handoffs/20260911-verdictgate-mutate-b1.py`。本票 commit 只帶 `Governance-Scope`（scripts-only，TODO §0）。
 - R9 揭露：本票 scripts-only ⇒ Task 3.2 trailer 閘不觸發，治理腳本 commit 不受 Phase 3 保護 ⇒ TODO §E E-7（user-ruling 停輪、下張治理票再議）。R9 synth 首版簡寫簽名被 `spec_xref_hook` 當場擋下（閘實戰首例）。
 - 本日新上線三支產出端閘（使用者質問「為何不每次都做全文掃描／輪級才擋等於沒用／reconcile 也要」）：`spec_xref_hook.sh`（寫 SPEC/TODO/任何被 synth 宣告之修訂標的時：殘留掃描＋synth 處置對證）、`synth_attribution_hook.sh`（寫 synth 時：ID 全在表＋-x- 層必宣告 `**修訂標的**：`）、`spec_xref_check.sh --staged/--synth`（pre-commit／debt_clear 後備）。22 測試含 mutation。🔴 hook 阻塞理由必走 stderr。
 - 殘留動作：`handoffs/reconcile/zz-live-x-review-r1/` 實測檔，rm／git clean 被使用者拒兩次，待使用者處置（untracked、無害）。
