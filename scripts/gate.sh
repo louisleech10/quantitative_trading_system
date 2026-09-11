@@ -907,20 +907,39 @@ if [ "${kind}" = "dispatch" ]; then
       _rq_root="${_rq_rest%-impl-*}"
       _rq_n="${_rq_bN#b}"
       if printf '%s' "${_rq_n}" | grep -qE '^[0-9]+$' && [ "${_rq_n}" -ge 1 ]; then
-        # 往下找真正的前一批:descoped 批次(audit 無該 batch review 派工)跳過,避免誤擋(如 FR/B5 descope→B6 的前批實為 B4)
-        _rq_p=$(( _rq_n - 1 )); _rq_prev=""
-        while [ "${_rq_p}" -ge 0 ]; do
-          _rq_cand="${_rq_root}-b${_rq_p}"
-          if grep -q "\"task_id\": \"${_rq_cand}-review" "${AUDIT}" 2>/dev/null; then _rq_prev="${_rq_cand}"; break; fi
-          _rq_p=$(( _rq_p - 1 ))
-        done
+        # VERDICTGATE Task 2.2（GROK-R7-P1-02／CODEX-R6-P1-02）：前批定位由 prev_review_resolve.sh 取代
+        #   舊 `grep "-review"` 字面回溯（會漏 P16-B5-TASK31-REV 型 round 使 _rq_prev 為空而跳過閘）；
+        #   呼叫點不變、實作＝helper；descoped 批次由 helper 回溯。
+        _rq_prev="$(bash "${SCRIPT_DIR}/prev_review_resolve.sh" "${_rq_root}" "${_rq_n}")" || { echo "GATE 拒發 token — prev_review_resolve 失敗"; exit 1; }
         if [ -n "${_rq_prev}" ]; then
-          bash "${SCRIPT_DIR}/review_quorum_check.sh" "${_rq_prev}" "${_rq_fam}" \
-            || { echo "GATE 拒發 token — 前一批 ${_rq_prev} 未達 ≥2 非實作者家族 review quorum(codex/composer/grok 任二);見上,補派第二家後再派本批。"; exit 1; }
+          # review_quorum_check 吃 `<root>-b<K>`（task_id 前綴，不含 -review）；helper 回傳含 -REVIEW 之真前綴 ⇒ 取到 -b<K> 為止
+          _rq_prev_q="$(printf '%s' "${_rq_prev}" | sed -E 's/^(.*-[bB][0-9]+)-.*$/\1/')"
+          bash "${SCRIPT_DIR}/review_quorum_check.sh" "${_rq_prev_q}" "${_rq_fam}" \
+            || { echo "GATE 拒發 token — 前一批 ${_rq_prev_q} 未達 ≥2 非實作者家族 review quorum(codex/composer/grok 任二);見上,補派第二家後再派本批。"; exit 1; }
+        else
+          echo "[gate] 無前批 review，跳過 quorum／verdictgate"
         fi
       fi
       ;;
   esac
+  # VERDICTGATE Task 2.2：開下一批之輪前讀委員裁決（C-3／C-4／C-9）。
+  #   觸發＝task_id 含 `-b<N>-`（N≥1；review／impl 皆算；`x` 層不算）且 brief 非 closure（邊界①：閉合輪自身不受擋）。
+  #   前批由同一 helper 算出；checker 第三參數必填（空＝前批不存在 ⇒ rc=0）。
+  _vg_root=""; _vg_n=""
+  _vg_parsed="$(printf '%s' "${task_id}" | "${VENV_PY}" -c 'import re,sys
+t=sys.stdin.read().strip()
+m=re.match(r"^(?P<root>.+?)(?:-impl)?-b(?P<n>\d+)-", t, re.I)
+print((m.group("root")+" "+m.group("n")) if m else "")')"
+  if [ -n "${_vg_parsed}" ]; then
+    _vg_root="${_vg_parsed% *}"; _vg_n="${_vg_parsed##* }"
+    _vg_bk=""
+    [ -n "${brief}" ] && [ -f "${brief}" ] && _vg_bk="$(grep -m1 -E '^brief-kind:' "${brief}" | sed -E 's/^brief-kind:[[:space:]]*//')"
+    if [ "${_vg_bk}" != "closure" ] && [ "${_vg_n}" -ge 1 ]; then
+      _vg_prev="$(bash "${SCRIPT_DIR}/prev_review_resolve.sh" "${_vg_root}" "${_vg_n}")" || { echo "GATE 拒發 token — prev_review_resolve 失敗"; exit 1; }
+      bash "${SCRIPT_DIR}/verdictgate_check.sh" "${_vg_root}" "${_vg_n}" "${_vg_prev}" \
+        || { echo "GATE 拒發 token — 前批裁決未閉合或缺機械裁決（verdictgate，見上）"; exit 1; }
+    fi
+  fi
   # 範本錨點機檢（提供即驗，不合規拒發 token）—— 把「有沒有照範本」變機器可驗
   if [ -n "${spec}" ]; then
     # D 延伸檔（docs/<basename>.D-<NNN>.md）走 dext kind，不走 spec（GOV-DEXT-TEMPLATE-KIND）。

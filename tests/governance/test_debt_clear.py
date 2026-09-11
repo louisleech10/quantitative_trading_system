@@ -253,8 +253,13 @@ def _happy_path_prep(
     mode: str = "review",
     roster: list[str] | None = None,
     sentinel: bool = False,
+    with_results: bool = True,
 ) -> tuple[str, Path]:
     """建一輪 happy path 的 fixture。
+
+    `with_results=False`：不寫 committee_family_result（模擬委員真缺席）。
+    VERDICTGATE B2（SPEC C-9 解鎖②收窄）：`--abandon --kind collection-failed` 只准用於無任何
+    family_result 之 round；需要「先 abandon 再 ×」情境的測試必須用這個變體。
 
     🔴 `sentinel=True` 產出**零-findings sentinel**（`-P3-00`）而非實質 finding。
     給「預期零 findings」那類測試用——票 B-48 的守衛會拒絕
@@ -269,7 +274,8 @@ def _happy_path_prep(
         body = _finding(f"{fam.upper()}-R1-P3-00" if sentinel else f"{fam.upper()}-R1-P0-01")
         p, sha = _write_output(root, session, fam, body)
         rel = str(p.relative_to(root))
-        _result(root, audit, round_id=rid, family=fam, out_path=rel, out_sha=sha)
+        if with_results:
+            _result(root, audit, round_id=rid, family=fam, out_path=rel, out_sha=sha)
     lock = _build_session(
         root,
         session=session,
@@ -636,7 +642,8 @@ def test_clear_lock_session_mismatch(tmp_path: Path) -> None:
 def test_abandoned_then_clear_rejected(tmp_path: Path) -> None:
     """ABANDONED 後再銷 → rc≠0。"""
     root, audit = _setup(tmp_path)
-    rid, lock = _happy_path_prep(root, audit, session="ab-then-clear", families=["codex"])
+    # C-9：collection-failed 只准用於無 family_result 之 round ⇒ 以真缺席變體建輪
+    rid, lock = _happy_path_prep(root, audit, session="ab-then-clear", families=["codex"], with_results=False)
     r1 = _clear(
         root,
         audit,
@@ -738,8 +745,8 @@ def test_mutation_open_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     new = '_assert_round_is_OPEN() {\n  return 0\n  local rid="$1"'
     assert old in original
 
-    # baseline: abandon first then clear → 紅 + ABANDONED
-    rid, lock = _happy_path_prep(root, audit, session="mut-open", families=["codex"])
+    # baseline: abandon first then clear → 紅 + ABANDONED（C-9：abandon 須用無 family_result 之輪）
+    rid, lock = _happy_path_prep(root, audit, session="mut-open", families=["codex"], with_results=False)
     ab = helper.run_debt_clear(
         "--abandon",
         "--round-id",
@@ -770,13 +777,15 @@ def test_mutation_open_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     script.write_text(original.replace(old, new, 1), encoding="utf-8")
     script.chmod(0o755)
     audit.write_text("", encoding="utf-8")
-    rid2, lock2 = _happy_path_prep(root, audit, session="mut-open2", families=["codex"])
+    # mutant 段需要「有 family_result 且 ABANDONED」的輪才觀察得到假銷；C-9 下 collection-failed
+    # 不准 abandon 有結果之輪 ⇒ 改用 sentinel 產出＋no-findings-expected（票 B-48 守衛對 sentinel 放行）
+    rid2, lock2 = _happy_path_prep(root, audit, session="mut-open2", families=["codex"], sentinel=True)
     ab2 = helper.run_debt_clear(
         "--abandon",
         "--round-id",
         rid2,
         "--kind",
-        "collection-failed",
+        "no-findings-expected",
         "--reason",
         "z" * 25,
         "--approver",
@@ -800,7 +809,7 @@ def test_mutation_open_guard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     script.write_text(original, encoding="utf-8")
     script.chmod(0o755)
     audit.write_text("", encoding="utf-8")
-    rid3, lock3 = _happy_path_prep(root, audit, session="mut-open3", families=["codex"])
+    rid3, lock3 = _happy_path_prep(root, audit, session="mut-open3", families=["codex"], with_results=False)
     ab3 = helper.run_debt_clear(
         "--abandon",
         "--round-id",

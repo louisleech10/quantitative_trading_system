@@ -52,7 +52,7 @@
 | `g7_trailer_precheck.sh` | 常態檢查 | commit-msg  |
 | `gap3ux_count_check.sh` | 常態檢查 | narrow_check_router  |
 | `gap3ux_header_round_check.sh` | 常態檢查 | 未掛 |
-| `gate_check.sh` | 常態檢查 | PreToolUse  |
+| `gate_check.sh` | 常態檢查 | PreToolUse gate committee_run  |
 | `gen_fact_key_blocks.sh` | 常態檢查 | gov_check  |
 | `golden_staleness_check.sh` | 常態檢查 | 未掛 |
 | `gov_check.sh` | 常態檢查 | pre-push  |
@@ -85,6 +85,7 @@
 | `ticket_universe.sh` | 常態檢查 | 未掛 |
 | `todo_spec_crosscheck.sh` | 常態檢查 | 未掛 |
 | `verdict_filled_check.sh` | 常態檢查 | gate  |
+| `verdictgate_check.sh` | 常態檢查 | gate committee_run  |
 | `verify_b1_independent.sh` | 一次性驗證 | 未掛 |
 | `verify_b1fix_independent.sh` | 一次性驗證 | 未掛 |
 | `verify_b2_independent.sh` | 一次性驗證 | 未掛 |

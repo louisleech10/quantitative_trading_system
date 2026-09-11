@@ -581,6 +581,32 @@ _cmd_abandon() {
 
   _assert_kind_in_enum "${kind}" || return 1
 
+  # VERDICTGATE Task 2.2（SPEC C-9 解鎖②收窄，CODEX-R3-P1-03）：collection-failed **只准**用於該輪
+  #   無任何 committee_family_result（真缺席）；有結果卻 abandon ⇒ 拒（有結果者走修檔再 register-output 解鎖）。
+  if [ "${kind}" = "collection-failed" ]; then
+    local _ap
+    _ap="$(_resolve_audit_path)" || return 1
+    if [ -f "${_ap}" ] && DEBT_CLEAR_AUDIT="${_ap}" DEBT_CLEAR_RID="${rid}" python3 - <<'PY'
+import json, os, sys
+rid = os.environ["DEBT_CLEAR_RID"]
+for raw in open(os.environ["DEBT_CLEAR_AUDIT"], encoding="utf-8").read().splitlines():
+    s = raw.strip()
+    if not s.startswith("{"):
+        continue
+    try:
+        r = json.loads(s)
+    except json.JSONDecodeError:
+        continue
+    if r.get("event") == "committee_family_result" and r.get("round_id") == rid:
+        print(f"ERROR: --abandon --kind collection-failed 拒：round {rid} 已有 committee_family_result（family={r.get('family')} state={r.get('result_state')}）——有結果者須修檔後 register-output 解鎖，不得 abandon（C-9）", file=sys.stderr)
+        sys.exit(0)
+sys.exit(1)
+PY
+    then
+      return 1
+    fi
+  fi
+
   # 該輪存在：走 _round_exists_single（不跑全域序號連續性；
   # 但 duplicate-open 語意 fail-closed 仍須擋——只豁免序號連續性）
   _round_exists_single "${rid}"

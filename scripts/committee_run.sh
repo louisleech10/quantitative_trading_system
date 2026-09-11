@@ -424,6 +424,20 @@ _report_workspace_drift() {
 # Task 1.3 (e)：EXPECTED-DELTA 閘輸入 — 強制把 session brief 傳入 gate
 # （無此接線則 --brief 掛點空轉；票 B-29 / GROK-R13-P1-03）
 gate_args+=(--brief "${brief}")
+# VERDICTGATE Task 2.2：開輪前讀前批裁決（與 gate.sh 同一 helper＋同一 checker；閉合輪不擋）。
+# gate.sh dispatch 亦會跑同一判定——這裡先跑是為了失敗時 audit 真正零新增（不留 gate_deny 之外的任何事件）。
+_vg_parsed="$(printf '%s' "${task_id}" | python3 -c 'import re,sys
+t=sys.stdin.read().strip()
+m=re.match(r"^(?P<root>.+?)(?:-impl)?-b(?P<n>\d+)-", t, re.I)
+print((m.group("root")+" "+m.group("n")) if m else "")')"
+if [ -n "${_vg_parsed}" ] && [ "${_cr_brief_kind}" != "closure" ]; then
+  _vg_root="${_vg_parsed% *}"; _vg_n="${_vg_parsed##* }"
+  if [ "${_vg_n}" -ge 1 ]; then
+    _vg_prev="$(bash "${SCRIPT_DIR}/prev_review_resolve.sh" "${_vg_root}" "${_vg_n}")" || exit 1
+    bash "${SCRIPT_DIR}/verdictgate_check.sh" "${_vg_root}" "${_vg_n}" "${_vg_prev}" \
+      || { echo "ERROR: 前批裁決未閉合或缺機械裁決（verdictgate）→ 不開債、不派工(fail-closed)" >&2; exit 1; }
+  fi
+fi
 echo "[committee_run] === gate.sh dispatch ==="
 bash "${SCRIPT_DIR}/gate.sh" dispatch "${gate_args[@]}" || {
   echo "ERROR: gate 未放行 → 不開債、不派工(fail-closed)" >&2; exit 1; }
