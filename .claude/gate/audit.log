@@ -57389,3 +57389,19 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r8-composer.md", "output_sha256": "ed545c6fe984b6236df111525ac1ba78d89bc77afbcfa23288bd77a802005968", "task_id": "20260911-VERDICTGATE-X-REVIEW-R8", "ts": "2026-09-11T08:36:54Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r8-grok.md", "output_sha256": "951c27508a8a0665e8962bbe5e16488521df7392692be4079ad5fc007bd8d2c2", "task_id": "20260911-VERDICTGATE-X-REVIEW-R8", "ts": "2026-09-11T08:36:55Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "864c3491-e7b9-491d-a458-2be4a5542e82", "lock_sha256": "e057bb91923814ee96843f2e2caaa243395db728594328c348aacf7a57c27437", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "4c27e5d9-a862-4282-a9db-a79cdaae686d", "schema_version": 1, "sequence": 3490, "session_id": "20260911-verdictgate-x-review-r8", "synth_sha256": "afb3fced117ebce9806c8a43e59bbe2ab7a2902232e58b95ef95b1a0a9fa09dc", "ts": "2026-09-11T08:38:25Z"}
+=== 2026-09-11 17:54:36 | artifact ===
+  ts=2026-09-11 17:54:36
+  kind=artifact
+  intent=依 SPEC v9 生成 VERDICTGATE TODO（TODO_GENERATION_PROMPT V13）
+  risk=high
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=三家全員 adversarial（下一步派）
+  template=templates/TODO_GENERATION_PROMPT.md 跟過
+  adversarial=
+  reconcile=
+  file=docs/VERDICTGATE_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=filled; §B=filled; §C Task 1.1–4.1=filled(每 Task 含驗證/邊界/存活至/覆蓋風險/不可做); §D mutation=filled; §E 殘留=filled(四項承 SPEC §N); §T 追溯=filled
+  spec=docs/VERDICTGATE_SPEC.md
+  todo=
+  manifest=
