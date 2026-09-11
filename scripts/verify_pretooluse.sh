@@ -5,7 +5,17 @@
 # 退出碼：0=放行；2=擋下（fail-closed）；工具缺失=2。
 set -u
 
-INPUT="$(cat)"
+# 🔴 stdin 逾時（2026-09-11 事故）：payload 若沒送到、管道又不關，`cat` 會無限等 ⇒
+#    harness 只看到「hook 沒回應」，Edit/Write 整個停擺且查不出原因（本檔是 PreToolUse
+#    對 Edit|Write 的唯一專屬 hook，所以症狀剛好只打在這兩個工具上）。
+#    逾時走本腳本既有的「取不到 tool_name ⇒ exit 0」語意，並在 stderr 留一行診斷。
+INPUT="$(python3 -c 'import signal,sys
+signal.alarm(5)
+sys.stdout.write(sys.stdin.read())' 2>/dev/null || true)"
+[ -n "$INPUT" ] || {
+  echo "[VERIFY-PRETOOLUSE] 5 秒內沒收到 hook payload ⇒ 放行（與 tool_name 取不到時同語意）" >&2
+  exit 0
+}
 command -v jq >/dev/null 2>&1 || {
   echo "[VERIFY-PRETOOLUSE] jq 缺失，fail-closed" >&2
   exit 2

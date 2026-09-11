@@ -60,7 +60,12 @@ now_ms="$(python3 -c 'import time;print(int(time.time()*1000))' 2>/dev/null || e
 now_hms="$(python3 -c 'import datetime;print(datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3])' 2>/dev/null \
           || date '+%H:%M:%S' 2>/dev/null || echo '')"
 
-payload="$(cat 2>/dev/null || true)"
+# 🔴 stdin 逾時（同上）：本支掛在 Bash|Edit|Write，是 Edit 與 Write **共同**的
+#    PreToolUse hook ⇒ 它一掛就同時打爛這兩個工具。本支只取標籤、不做判斷，
+#    逾時後 payload 為空即可（既有行為就容許空 payload）。
+payload="$(python3 -c 'import signal,sys
+signal.alarm(5)
+sys.stdout.write(sys.stdin.read())' 2>/dev/null || true)"
 full_cmd="$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null | tr '\n' ' ' || true)"
 snippet="$(printf '%s' "$full_cmd" | head -c 60 || true)"
 

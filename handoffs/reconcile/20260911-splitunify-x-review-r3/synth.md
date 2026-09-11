@@ -104,7 +104,7 @@ P0 已清零、P1 集中在**同一個設計缺口**（投影的輸入不足以�
 ### 必答回覆
 
 1. 可否進 B1：不可以；未閉合 `CODEX-R3-P1-01`、`CODEX-R3-P1-02`。
-2. D1：可接受，是針對主目標「同次 UAT 不再出現兩個矛盾驗證段數字」的 95% 解法，不是偷偷把事件掃描結果冒稱 OOS；IC 報告保留 canonical 驗證段，事件掃描明示 `event-study-only`，R-5 誠實具名殘留。
+2. D1：可接受，是針對主目標「同次 UAT 不再出現兩個矛盾驗證段數字」的範圍裁定（🔴 2026-09-11 更正：原文寫「95% 解法」，那是治理票原則，量化主線禁用；本項之所以成立是因為**三家逐輪複查後一致無異議**，不是因為「差不多」），不是偷偷把事件掃描結果冒稱 OOS；IC 報告保留 canonical 驗證段，事件掃描明示 `event-study-only`，R-5 誠實具名殘留。
 3. D2：既有 L3 回歸 `venv/bin/python -m pytest tests/momentum/event_samples/test_gap3_split_blocked.py -q --tb=short` → 9 passed，沒有斷言 run-only 的三鍵；但現有 `EventTablesPanel.tsx:352` 無條件讀三鍵，刪鍵後必須靠 Task 3.3 UI 修改隱藏，且指定 vitest 檔目前不存在。
 4. G-5：①不夠（未定 IC 輸出 key／對位來源，受 P1-01 影響）；②結構上夠；③不夠（無 source-bars 輸入／路徑與 purge precedence）；④不夠（P1-02，僅改 `label_end_ms` 不影響目前 membership）。
 5. 介面掃描：`index_kind`、dual membership、毫秒歸一、`bucket_ms` 都有輸入或可檢查；D7 禁用秒 normalizer、D8 把 embargo 檢查移呼叫端已閉合。仍有 P1-01 的 event identity/provenance 與 P1-02 的 answer-window 檢查不在可執行簽名上。

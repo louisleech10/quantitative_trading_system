@@ -37,10 +37,14 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}" || exit 0
 
 # ── 適用範圍：量化主線 ────────────────────────────────────────────────
-# 治理路徑刻意排除（見邊界 3）。以**前綴**列舉，新增量化 epic 時加一行。
+# 🔴 2026-09-11 使用者定死：**整個專案（含治理）都不接受「95% 就收」** ⇒
+#    由「逐票列舉的量化白名單」改為**全專案掃描**。原白名單的三個洞（皆實測）：
+#      ①逐票列舉 ⇒ 新票（如 docs/SPLITUNIFY_*.md）預設看不見＝fail-open；
+#      ②刻意不掃 handoffs/ ⇒ 放水語寫在**派工單**裡時抓不到（那是最糟的位置：先框住委員）；
+#      ③治理路徑整批跳過 ⇒ 使用者已裁定治理同樣不接受。
 _QUANT_GLOBS=(
-  "docs/GAP1_*.md" "docs/GAP2_*.md" "docs/GAP3_*.md"
-  "docs/IC_*.md" "docs/TEST_DESIGN_CHARTER.md" "docs/ML_APPROACH_TAXONOMY.md"
+  "docs/*.md" "handoffs/*.md" "白話說明/*.md"
+  "CLAUDE.md" "AGENTS.md" "templates/*.md"
 )
 # 🔴 **刻意不掃 `handoffs/`**（首版掃了，160 命中中大量來自歷史 handoff）：
 #    handoffs 是**歷史紀錄**，記載當時說過什麼；追溯性地把歷史文件判違規既無意義
@@ -92,29 +96,41 @@ fi
 
 [ "${#_files[@]}" -gt 0 ] || exit 0
 
+_BASELINE="${_BASELINE:-scripts/quant_standard_baseline.txt}"
+# --freeze：把當下全部命中寫進基準（只在使用者裁定後執行一次）
+_FREEZE=0
+case " $* " in *" --freeze "*) _FREEZE=1; _BASELINE_TMP="$(mktemp)" ;; esac
 _hits=0
 _report=""
-for f in "${_files[@]}"; do
-  # 治理路徑一律跳過（邊界 3）
-  case "${f}" in
-    docs/GOV*|docs/P16_*|scripts/*|*govb*|*GOVB*) continue ;;
+# 🔴 單次 grep（2026-09-11）：原本是「檔 × 模式」巢狀迴圈，全專案化後實測 >600 秒逾時
+#    ——跑不完的閘等於沒有閘。改成把所有模式併成一條 ERE、一次掃完。
+_ALL_PAT="$(printf '%s|' "${_LEAK_PATTERNS[@]}" | sed 's/|$//')"
+while IFS= read -r hit; do
+  [ -n "${hit}" ] || continue
+  _f="${hit%%:*}"
+  _rest="${hit#*:}"
+  _lineno="${_rest%%:*}"
+  _text="${_rest#*:}"
+  case "${_f}" in
+    scripts/quant_standard_check.sh|scripts/quant_standard_baseline.txt|docs/Archived/*) continue ;;
   esac
-  for pat in "${_LEAK_PATTERNS[@]}"; do
-    while IFS= read -r line; do
-      [ -n "${line}" ] || continue
-      # 統計語境豁免
-      if printf '%s' "${line}" | grep -Eq "${_STAT_CONTEXT}"; then continue; fi
-      # 否定語境豁免（該行是在禁止放水，不是主張放水）
-      if printf '%s' "${line}" | grep -Eq "${_NEGATION_CONTEXT}"; then continue; fi
-      # 引用語境豁免：markdown 引用行（`> `）＝逐字引述使用者原話或委員 finding，
-      # 屬**紀錄**而非**主張**。§C0 須逐字引用使用者定死之原話才有效力，不得因此被自己的閘擋住。
-      if printf '%s' "${line}" | grep -Eq '^[0-9]+:[[:space:]]*>'; then continue; fi
-      _hits=$((_hits + 1))
-      _report="${_report}  · ${f}:${line}
+  printf '%s' "${_text}" | grep -Eq "${_STAT_CONTEXT}" && continue
+  printf '%s' "${_text}" | grep -Eq "${_NEGATION_CONTEXT}" && continue
+  printf '%s' "${_text}" | grep -Eq '^[[:space:]]*>' && continue
+  _key="${_f}:${_lineno}"
+  if [ "${_FREEZE}" = "1" ]; then echo "${_key}" >> "${_BASELINE_TMP}"; continue; fi
+  if [ -f "${_BASELINE}" ] && grep -Fqx "${_key}" "${_BASELINE}"; then continue; fi
+  _hits=$((_hits + 1))
+  _report="${_report}  · ${_f}:${_lineno}:${_text}
 "
-    done < <(grep -nE "${pat}" "${f}" 2>/dev/null | head -5)
-  done
-done
+done < <(grep -rnE "${_ALL_PAT}" --include="*.md" docs handoffs 白話說明 templates CLAUDE.md AGENTS.md 2>/dev/null)
+
+if [ "${_FREEZE}" = "1" ]; then
+  sort -u "${_BASELINE_TMP}" > "${_BASELINE}"
+  echo "[quant_standard_check] 已凍結 $(wc -l < "${_BASELINE}" | tr -d " ") 條歷史命中 → ${_BASELINE}"
+  echo "  🔴 基準只准**變短**：新增任何一條都會紅。"
+  rm -f "${_BASELINE_TMP}"; exit 0
+fi
 
 if [ "${_hits}" -eq 0 ]; then
   exit 0
@@ -125,7 +141,7 @@ fi
   printf '%s' "${_report}"
   echo
   echo "  使用者 2026-08-22 定死：量化主線 **100% 正確，只能更嚴不能放水**；"
-  echo "  「95% 解法就收」只適用治理 epic 之散文問題，量化路徑一律不受理。"
+  echo "  🔴 2026-09-11 使用者再裁定：**整個專案（含治理）都不接受「95% 就收」**。"
   echo "  修：刪除該表述，或改寫為具體的、可證偽的驗收條件。"
   echo "  若確為誤擋（例如統計用語），請在 _STAT_CONTEXT 增白名單並於 commit 說明理由。"
 } >&2

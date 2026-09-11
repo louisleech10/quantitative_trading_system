@@ -18,7 +18,7 @@ B2b 已審兩輪：R1 八群集（H0–H7，3 條 P1）、R2 七群集（I0–I6
 **全部修補完成**。收斂檔：`handoffs/reconcile/20260911-splitunify-b2-review-r{1,2}/synth.md`。
 
 ⇒ 本輪請優先判定「可否進 B2c」。P2／P3 照列但**明確標為不擋 B2c**。
-主委依 `feedback_95_percent_then_record`：95% 解法就收，殘留具名記錄，不當阻擋。
+🔴 **本行於 2026-09-11 作廢**（使用者當面定死：「95% 就收」是治理票原則，**量化主線絕對禁止**）。本票之停輪判準以 `CLAUDE.md` 三方簽核鐵律為準：**任一方有疑就不通過**；殘留仍須符合 `feedback_residual_not_laziness` 三值理由。
 
 ## R2 → 現況（I1–I6 之修法）
 

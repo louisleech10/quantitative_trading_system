@@ -148,7 +148,14 @@ _gate_check_recheck_debt() {
   esac
 }
 
-INPUT="$(cat)"
+# 🔴 stdin 逾時（2026-09-11 事故）：payload 沒送到又不關管道時，`cat` 會無限等，
+#    harness 只看到「hook 沒回應」⇒ 該工具呼叫整個不執行且查不出原因。
+#    逾時後 INPUT 為空，走本腳本既有的「解析不出 tool/intent ⇒ 放行」路徑。
+#    誠實邊界：這是「掛住 vs 放行」的取捨——掛住時該呼叫本來就永遠不會完成，
+#    且 gate 的第二層強制在 commit／push 仍在。
+INPUT="$(python3 -c 'import signal,sys
+signal.alarm(5)
+sys.stdout.write(sys.stdin.read())' 2>/dev/null || true)"
 command -v jq >/dev/null 2>&1 || exit 0   # 無 jq → fail-open，不鎖死
 
 tool_name="$(jq -r '.tool_name // empty' <<<"$INPUT" 2>/dev/null)" || exit 0

@@ -11,7 +11,8 @@ R3 的 11 條**大多是主委自身的漏改與計數漂移**（收斂裁決未
 非新機制缺口 ⇒ **scope accretion 已中止**，`E-SCOPE` 生效（codex 明確標示四項為 `OUT-OF-SCOPE`，未再列 BLOCKING）。
 R1 收斂＝`handoffs/reconcile/20260804-govb0-spec-r1/synth.md`（三家戳記 APPROVED，body sha `25e1241f…`）。
 R2 收斂＝`handoffs/reconcile/20260805-govb0-spec-r2/synth.md`（17 findings，`completeness --lock` rc=0）。
-🔴 **R3 起本 SPEC 帶「明確不受理範圍」**（見 §N 末段），依使用者定死「95% 解法就收、殘留具名記錄」，
+🔴 **R3 起本 SPEC 帶「明確不受理範圍」**（見 §N 末段）。🔴 **2026-09-11 使用者定死：全專案（含治理）一律不接受「95% 就收」**——停輪只能因「findings 全部閉合且可證偽」。
+
 以中止 R1→R2 觀察到的 scope-accretion（P0 數未下降）。
 
 **涵蓋票**：`B-15`（gate 判定：2 個誤擋機制 ＋ 2 個 fail-open）／`B-14`（委員不退出）／`B-30`（委員覆蓋自己產出）／`B-32`（stamp prompt 無條件注入）／`B-24`**僅紀律面**。
@@ -575,7 +576,7 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
 - **§G Golden / Baseline：N/A** — 本批不碰數值正確性、特徵計算、ML 或回測路徑。RISK-HIT 為 `b,c`，不含 (a)／(d)。
   **替代保證**＝Phase 0 的判定行為不變證明（`(rc, kind)` 序列逐項相等）＋ Task 2.5 綁 sha256 的 immutable corpus 差集報表——兩者共同扮演本批的 baseline。
 - **§A 待使用者確認：無** — 使用者 2026-08-04 明示技術取捨交委員裁決。三項 `OPEN` 已由 R1 審查裁定，裁定內容與條件已寫入 §A。
-- 🔴 **本批明確不受理範圍（R3 新增；依使用者定死「沒 100% 解就做 95% 那版現在收，殘留具名記錄不當阻塞」）**
+- 🔴 **本批明確不受理範圍（R3 新增；理由逐條寫在各條之後，不以「差不多」為由）**
   收斂趨勢警訊：R1 19 條（5 P0）→ R2 17 條（7 P0），**P0 未下降**，命中 `docs/SCAR_LEDGER.md` 記載的
   P16 scope-accretion 失敗模式（每輪修訂新增機制，審查者在新機制上再找缺口，八輪卡在 20-25 findings）。
   故本批**逐項宣告不受理**，並各自具名殘留：
@@ -607,7 +608,7 @@ immutable corpus ─────► Task 2.5        （語料檔須先進版控�
 
   🔴 **R7 具名殘留（兩家獨立提出同兩條，皆判 named-residual、非 deliverable-invalidating）**
 
-  R7 為 P0-1／P0-2 的**最後一輪**（依「95% 解法就收・殘留先記錄」定死終止條件）。
+  R7 為 P0-1／P0-2 的**最後一輪**（終止條件＝該兩條之 findings 全部閉合且可證偽）。
   兩家 `FINDINGS_COUNT: 2`、deliverable-invalidating **0**、一致判**可進 TODO 生成**。
 
   | 殘留 | 來源 finding | 方向 | 處置 |

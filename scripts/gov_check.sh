@@ -48,7 +48,7 @@ rc_all=0
 #   🔴 **禁在任何字串中寫死分母**（tests/governance/test_govb1_factkey_hook.py 機械釘住）。
 # 未登記的段號 ⇒ fail-closed：新增一段而忘了登記，會當場炸而不是靜默印出錯的分母。
 # ---------------------------------------------------------------------------
-_GC_SEG_IDS='1 1b 2 3 4 5 6'
+_GC_SEG_IDS='1 1a 1b 2 3 4 5 6'
 _gc_total() {
   # shellcheck disable=SC2086
   printf '%s\n' ${_GC_SEG_IDS} \
@@ -201,6 +201,22 @@ if [ "${_bad}" -ne 0 ]; then
   echo "[gov_check] ✗ shell 語法未過" >&2
   _gc_fail 1 "shell 語法錯（具名檔案見上方 ✗ 行；跑 bash -n <檔> 重現）"
 else echo "[gov_check] ✓ shell 語法 OK"; fi
+
+# --- 1a) 「95% 就收」放水語（全專案；使用者 2026-09-11 定死含治理也不接受）---
+# 為何在 --fast 段：實測 16 秒，且這是**寫下來就生效**的違規——留到收 epic 前才掃，
+#   中間所有派工單都已經帶著放水語發出去了（2026-09-11 事故：五處全在委員看得到的文件裡）。
+# 判準＝凍結基準只准變短（scripts/quant_standard_baseline.txt）；新增一條即紅。
+_gc_seg 1a "「95% 就收」放水語（全專案，基準只准變短）…"
+if [ -x scripts/quant_standard_check.sh ] || [ -f scripts/quant_standard_check.sh ]; then
+  if bash scripts/quant_standard_check.sh >/tmp/_gc_quant.out 2>&1; then
+    echo "[gov_check] ✓ 無新增放水語"
+  else
+    cat /tmp/_gc_quant.out >&2
+    _gc_fail 1a "偵測到**新增**的「95% 就收」放水語（見上方逐條；基準只准變短）"
+  fi
+else
+  _gc_fail 1a "scripts/quant_standard_check.sh 缺失 → fail-closed"
+fi
 
 # --- 1b) 治理文件格式全庫掃描（GOV-DOC-CHECK-AT-WRITE / CODEX-R1-P1-03）---
 # 為何除了 PostToolUse hook 還要這道：hook 的 matcher 只有 `Edit|Write`，

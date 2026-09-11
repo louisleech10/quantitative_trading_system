@@ -644,7 +644,7 @@ def _scan_swallowed_rejections(source: str) -> list:
 
     因此：**發現新的靜態旁路寫法 ⇒ 加進 `_BYPASS_FORMS`／`_ALIAS_BYPASS_SOURCES` 並修，
     但不視為阻斷收案的缺陷**（除非 production 現行碼真的踩中）。
-    依據＝使用者定死之「95% 解法就收、殘留具名記錄不當阻塞」，
+    依據＝該情形已定義在其他 Phase（🔴 原引之「95% 解法就收」條款已於 2026-09-11 全專案廢止），
     以及 P1-6 的教訓：對抗審在「防蓄意」框架下是無限迴圈。
 
     已封形態（v5）：tuple／bare／dynamic／`BaseException`／`RuntimeError`／共吞 tuple／

@@ -3,7 +3,8 @@
 > 對應 SPEC：`docs/GOV_B49_PATH_GRANT_SPEC.md`（r6 定案，5 條 `[MUST-BEFORE-IMPL]` 已修畢）
 > | 日期：2026-08-12 | 實作端：主委自任（`implementer=claude`）
 >
-> 🔴 **SPEC 不再開審查輪**（依使用者「95% 解法就收」與 epic 斷路器）。
+> 🔴 **SPEC 不再開審查輪**（依 epic 斷路器）。
+> 🔴 **2026-09-11 使用者定死：全專案（含治理）一律不接受「95% 就收」**——停輪只能因「findings 全部閉合且可證偽」。
 > 本 TODO 之正確性由**施工後的兩個非實作者家族 code review** 承接。
 
 ## §0 全域規則與約束
