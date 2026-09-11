@@ -52,14 +52,14 @@ outs_by_prefix = {}
 for r in rows:
     if r.get("event") == "committee_output":
         outs_by_prefix.setdefault(prefix_of(r.get("task_id")).lower(), []).append(r)
-cleared_roots = set()
-for r in rows:
-    if r.get("event") == "committee_debt_clear":
-        pass  # 收票由 root 層級無獨立事件；以「最新批 review 各家皆 has_verdict」為活票判準之反面
+# 「活」判準（B2 審碼 CODEX-R1-P2-03／GROK-R1-P2-01）：最新批之 review round 任一尚未 committee_debt_clear
+#   亦未 debt_abandon ⇒ 該 root 仍活；全部已清／已棄 ⇒ 不列 live_roots_unwatched（仍可列 legacy_open_by_root）。
+closed_rids = {r.get("round_id") for r in rows if r.get("event") in ("committee_debt_clear", "debt_abandon")}
 unknown_total = 0
 latest_by_root = {}
 lines = []
 for (root, batch, pl), st in rounds.items():
+    st["live"] = any(o.get("round_id") not in closed_rids for o in st["opens"])
     outs = outs_by_prefix.get(pl, [])
     cls = {}
     for fam in sorted(st["roster"]):
@@ -73,10 +73,10 @@ for (root, batch, pl), st in rounds.items():
         else:
             cls[fam] = "unknown"; unknown_total += 1
     lines.append(f"{st['prefix']} rounds={len(st['opens'])} " + " ".join(f"{k}={v}" for k, v in cls.items()))
-    if batch >= latest_by_root.get(root, (-1, None))[0]:
-        latest_by_root[root] = (batch, cls)
-live_unwatched = sorted(r for r, (b, cls) in latest_by_root.items() if cls and all(v in ("unknown", "no_output") for v in cls.values()))
-legacy_open = sorted(f"{r}:b{b}" for r, (b, cls) in latest_by_root.items() if cls and any(v in ("unknown", "no_output") for v in cls.values()))
+    if batch >= latest_by_root.get(root, (-1, None, False))[0]:
+        latest_by_root[root] = (batch, cls, st["live"])
+live_unwatched = sorted(r for r, (b, cls, live) in latest_by_root.items() if live and cls and all(v in ("unknown", "no_output") for v in cls.values()))
+legacy_open = sorted(f"{r}:b{b}" for r, (b, cls, live) in latest_by_root.items() if cls and any(v in ("unknown", "no_output") for v in cls.values()))
 for l in lines:
     print(l)
 print(f"unknown={unknown_total}")

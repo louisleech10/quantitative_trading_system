@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS = (
     "prev_review_resolve.sh", "verdictgate_check.sh", "verdictgate_baseline.sh", "audit_append.sh", "audit_events.json",
     "governance_families.sh", "governance_families.json", "debt_ledger.sh", "_debt_ledger_core.py", "debt_clear.sh",
-    "completeness_check.sh", "reconcile_body_hash.sh",
+    "completeness_check.sh", "reconcile_body_hash.sh", "review_quorum_check.sh",
 )
 FAMS = ["codex", "composer", "grok"]
 
@@ -239,12 +239,105 @@ def test_check_stamp_closed_does_not_release(tmp_path: Path) -> None:
 
 
 def test_check_helper_and_checker_agree_on_descoped(tmp_path: Path) -> None:
-    """caller 傳 helper 輸出（B1）而非字面 N-1（B2 不存在）。"""
+    """caller 傳 helper 輸出（B1）而非字面 N-1（B2 不存在）——B1 未閉合時，經 helper 的呼叫必擋。
+    （B2 審碼 GROK-R1-P2-02／CODEX-R1-P2-04：舊版第二斷言「字面 B2 ⇒ rc=0」是在證明洞存在，非擋洞，已刪。）"""
     h = _h(tmp_path); _open(h, R1, "rid1")
+    _out(h, R1, "codex", "blocked", blocked=["CODEX-R1-P1-01"], rid="rid1")
+    _out(h, R1, "composer", "proceed", rid="rid1"); _out(h, R1, "grok", "proceed", rid="rid1")
+    prev = _run(h, "scripts/prev_review_resolve.sh", "ROOT", "3").stdout.strip()
+    assert prev == "ROOT-B1-REVIEW"
+    assert _check(h, "ROOT", 3, prev).returncode == 1
+
+
+def test_helper_returns_all_prefixes_of_same_batch_and_checker_checks_each(tmp_path: Path) -> None:
+    """CODEX-R1-P1-02／GROK-R1-P1-02：同批兩個 review prefix，先開者 proceed、後開者 blocked 未閉 ⇒ 仍擋。"""
+    h = _h(tmp_path)
+    _open(h, "P16-B5-BOOTSTRAP-R1", "rid1", brief_kind=None)
+    for f in FAMS:
+        _out(h, "P16-B5-BOOTSTRAP-R1", f, "proceed", rid="rid1")
+    _open(h, "P16-B5-TASK31-REV-R1", "rid2", brief_kind=None)
+    _out(h, "P16-B5-TASK31-REV-R1", "codex", "blocked", blocked=["CODEX-R1-P1-01"], rid="rid2")
+    _out(h, "P16-B5-TASK31-REV-R1", "composer", "proceed", rid="rid2"); _out(h, "P16-B5-TASK31-REV-R1", "grok", "proceed", rid="rid2")
+    prev = _run(h, "scripts/prev_review_resolve.sh", "P16", "6").stdout.strip()
+    assert prev == "P16-B5-BOOTSTRAP,P16-B5-TASK31-REV"
+    r = _check(h, "P16", 6, prev)
+    assert r.returncode == 1 and "P16-B5-TASK31-REV" in r.stderr
+
+
+def test_quorum_counts_committee_output_families_case_insensitive(tmp_path: Path) -> None:
+    """CODEX-R1-P1-01／GROK-R1-P1-01：committee_run 派出的輪 task_id 為 `<ROOT>-B1-REVIEW-R1`（無家族尾碼），
+    quorum 須由 committee_output.family 計數（大小寫不敏感），否則 --impl-self 永遠拿不到 token。"""
+    h = _h(tmp_path); _open(h, R1, "rid1")
+    _out(h, R1, "codex", "proceed", rid="rid1"); _out(h, R1, "grok", "proceed", rid="rid1")
+    r = _run(h, "scripts/review_quorum_check.sh", "ROOT-B1", "claude")
+    assert r.returncode == 0 and "2 個" in r.stdout
+    r2 = _run(h, "scripts/review_quorum_check.sh", "ROOT-B1", "grok")   # 實作者 grok 排除 ⇒ 1 家
+    assert r2.returncode == 1
+
+
+def test_report_cleared_root_not_live(tmp_path: Path) -> None:
+    """CODEX-R1-P2-03／GROK-R1-P2-01：最新批 round 已 debt_clear ⇒ 不列 live_roots_unwatched。"""
+    h = _h(tmp_path); _open(h, R1, "rid1", brief_kind=None)
+    _raw(h, event="committee_debt_clear", round_id="rid1", session_id="s", lock_sha256="x", synth_sha256="y", roster="codex", completeness_rc="0", ts="2026-09-02T00:00:00Z")
+    r = _run(h, "scripts/verdictgate_baseline.sh", "--report")
+    assert "live_roots_unwatched=\n" in r.stdout and "legacy_open_by_root=root:b1" in r.stdout
+
+
+# ───────────── committee_run 端到端（SPEC Task 2.2 兩條 committee_run ASSERT；B2 審碼 CODEX-R1-P2-04／GROK-R1-P2-03） ─────────────
+
+_CR_SCRIPTS = ("committee_run.sh", "cx_run.sh", "gate.sh", "gate_check.sh", "_gate_lex.sh", "brief_conformance_check.sh",
+               "_role_gate.sh", "governance_roles.json", "governance_verdicts.json", "verdict_parse.sh", "verdict_filled_check.sh",
+               "stampable_artifacts.txt", "round_cost.sh")
+
+
+def _cr_h(tmp_path: Path) -> dict:
+    h = _h(tmp_path)
+    (h["root"] / "handoffs").mkdir(exist_ok=True)
+    for n in _CR_SCRIPTS:
+        src = REPO_ROOT / "scripts" / n
+        if src.is_file():
+            shutil.copy2(src, h["root"] / "scripts" / n)
+            if n.endswith(".sh"):
+                (h["root"] / "scripts" / n).chmod(0o755)
+    # committee_run 之 gate.sh dispatch 以 always-pass stub 取代（與 test_stamp_taskid_inject 同法）——
+    # 本測試只驗 committee_run 自身之 verdictgate 前置與 round_open 欄位，不驗 gate 全套。
+    gp = h["root"] / "scripts" / "gate_pass.sh"
+    gp.write_text("#!/usr/bin/env bash\necho GATE PASS stub\nexit 0\n", encoding="utf-8"); gp.chmod(0o755)
+    cr = h["root"] / "scripts" / "committee_run.sh"
+    txt = cr.read_text(encoding="utf-8")
+    old = 'bash "${SCRIPT_DIR}/gate.sh" dispatch "${gate_args[@]}"'
+    assert old in txt
+    cr.write_text(txt.replace(old, 'bash "${SCRIPT_DIR}/gate_pass.sh" dispatch "${gate_args[@]}"', 1), encoding="utf-8")
+    brief = h["root"] / "handoffs" / "brief.md"
+    brief.write_text("brief-kind: review\n\ntemplates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md 全文照做\nfact-verified: unit-test → harness\nassumed: isolated env\n\nstub\n", encoding="utf-8")
+    h["env"]["CX_STUB_MODE"] = "success"
+    return h
+
+
+def _run_cr(h: dict, task: str, session: str) -> subprocess.CompletedProcess[str]:
+    return _run(h, "scripts/committee_run.sh", "--session", session, "handoffs/brief.md", "handoffs/out", "codex", "--",
+                "--intent", "t", "--risk", "low", "--facts-asked", "none-needed:unit", "--review-role", "advisory",
+                "--template", "n/a:stub", "--task-id", task)
+
+
+def test_committee_run_round_open_records_brief_kind(tmp_path: Path) -> None:
+    h = _cr_h(tmp_path); _open(h, R1, "rid1")
     for f in FAMS:
         _out(h, R1, f, "proceed", rid="rid1")
-    assert _check(h, "ROOT", 3).returncode == 0
-    assert _check(h, "ROOT", 3, "ROOT-B2-REVIEW").returncode == 0   # 字面 B2 不存在 ⇒ 跳過（這正是 v4 的洞；caller 不得這樣傳）
+    r = _run_cr(h, "20260911-ROOT-B2-REVIEW-R1", "20260911-root-b2-review-r1")
+    assert r.returncode == 0, r.stdout + r.stderr
+    opens = [json.loads(l) for l in h["audit"].read_text(encoding="utf-8").splitlines() if l.startswith("{") and '"committee_round_open"' in l]
+    assert opens[-1]["task_id"] == "20260911-ROOT-B2-REVIEW-R1" and opens[-1]["brief_kind"] == "review"
+
+
+def test_committee_run_verdictgate_fail_rc_nonzero_zero_audit(tmp_path: Path) -> None:
+    h = _cr_h(tmp_path); _open(h, "20260911-ROOT-B1-REVIEW-R1", "rid1")
+    _out(h, "20260911-ROOT-B1-REVIEW-R1", "codex", "blocked", blocked=["CODEX-R1-P1-01"], rid="rid1")
+    _out(h, "20260911-ROOT-B1-REVIEW-R1", "composer", "proceed", rid="rid1"); _out(h, "20260911-ROOT-B1-REVIEW-R1", "grok", "proceed", rid="rid1")
+    before = h["audit"].read_text(encoding="utf-8")
+    r = _run_cr(h, "20260911-ROOT-B2-REVIEW-R1", "20260911-root-b2-review-r1")
+    assert r.returncode != 0 and "verdictgate" in (r.stdout + r.stderr)
+    assert h["audit"].read_text(encoding="utf-8") == before      # 失敗零新增 audit
 
 
 # ───────────── report ─────────────

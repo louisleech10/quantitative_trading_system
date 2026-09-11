@@ -32,7 +32,13 @@ if [ -z "${prev}" ]; then
   echo "[verdictgate] ${root} b${n}：前批不存在，跳過"; exit 0
 fi
 [ -f "${AUDIT}" ] || { echo "[verdictgate] audit 不存在，跳過"; exit 0; }
-python3 - "${AUDIT}" "${root}" "${n}" "${prev}" <<'PY'
+# 第三參數可為逗號分隔之多個 prefix（helper 對同一 K 多個 review prefix 全部回傳）；逐一判定，任一擋即擋。
+_vg_rc=0
+_vg_old_ifs="${IFS}"; IFS=','
+for _one in ${prev}; do
+  IFS="${_vg_old_ifs}"
+  [ -n "${_one}" ] || continue
+  python3 - "${AUDIT}" "${root}" "${n}" "${_one}" <<'PY' || _vg_rc=1
 import json, re, sys
 audit, root, n, prev = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
 EXCL = re.compile(r"-(CONSULT|STAMP|CLOSURE|IMPL|RECON)(-|[0-9]*$)", re.I)
@@ -105,3 +111,7 @@ if errs:
     sys.exit(1)
 print(f"[verdictgate] ✓ {root} b{n}：前批 {prev} roster={sorted(roster)} 皆有裁決、blocked 全數閉合")
 PY
+  IFS=','
+done
+IFS="${_vg_old_ifs}"
+exit "${_vg_rc}"

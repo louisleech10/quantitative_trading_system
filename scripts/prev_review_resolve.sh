@@ -3,7 +3,9 @@
 #
 # 用法：bash scripts/prev_review_resolve.sh <root> <N>
 #   stdout＝命中之 round 的 task_id 去掉輪次尾碼 `-r<M>`（大小寫保留，例 `20260911-SPLITUNIFY-B1-REVIEW`、
-#   `P16-B5-TASK31-REV`——即與該輪 committee_output.task_id 可對上的真前綴）；無 ⇒ 空字串。rc=0；用法錯 rc=2。
+#   `P16-B5-TASK31-REV`——即與該輪 committee_output.task_id 可對上的真前綴）；同一 K 有多個 review prefix
+#   ⇒ **全部**回傳、逗號分隔、append 序（B2 審碼 CODEX-R1-P1-02：只回最早者會讓 checker 檢查錯輪 under-block）；
+#   無 ⇒ 空字串。rc=0；用法錯 rc=2。
 #
 # 契約（封閉）：
 #   候選＝audit `committee_round_open` 中 task_id **大小寫不敏感**命中 `^<root>-b<K>-`（K<N，由大到小；
@@ -28,7 +30,7 @@ python3 - "${AUDIT}" "${root}" "${n}" <<'PY'
 import json, re, sys
 audit, root, n = sys.argv[1], sys.argv[2], int(sys.argv[3])
 EXCL = re.compile(r"-(CONSULT|STAMP|CLOSURE|IMPL|RECON)(-|[0-9]*$)", re.I)
-best = {}  # K -> task_prefix（同 K 取 append 序最早者即可；prefix 相同）
+best = {}  # K -> [task_prefix,…]（同 K 可有多個 prefix——CODEX-R1-P1-02／GROK-R1-P1-02：只留最早者會漏掉後開之 blocked review ⇒ 全部回傳，逗號分隔、append 序）
 for raw in open(audit, encoding="utf-8").read().splitlines():
     s = raw.strip()
     if not s.startswith("{"):
@@ -51,6 +53,8 @@ for raw in open(audit, encoding="utf-8").read().splitlines():
     if not is_review:
         continue
     prefix = re.sub(r"-r\d+$", "", t, flags=re.I)
-    best.setdefault(k, prefix)
-print(best[max(best)] if best else "")
+    lst = best.setdefault(k, [])
+    if prefix not in lst:
+        lst.append(prefix)
+print(",".join(best[max(best)]) if best else "")
 PY
