@@ -32,6 +32,26 @@ if [ -z "${prev}" ]; then
   echo "[verdictgate] ${root} b${n}：前批不存在，跳過"; exit 0
 fi
 [ -f "${AUDIT}" ] || { echo "[verdictgate] audit 不存在，跳過"; exit 0; }
+# B4 收票前主委自查（真 audit 實跑）：C-4 只擋「進入新批」。若 b<N> 在 audit 已有任何 committee_round_open
+#   （即 b<N> 已被進入：其審碼 R1 開輪時已驗過 b<N-1>），則本批之閉合輪／補裁決輪／修補後重領 token 不再重驗前批——
+#   否則 SPLITUNIFY B4 補裁決輪（§E E-4）會被 B3 無裁決擋住、連鎖回溯至 B1，違反使用者 2026-08-05「不溯及既往」。
+if python3 - "${AUDIT}" "${root}" "${n}" <<'PY'
+import json, sys
+audit, root, n = sys.argv[1], sys.argv[2].lower(), sys.argv[3]
+pfx = f"{root}-b{n}-"
+for raw in open(audit, encoding="utf-8").read().splitlines():
+    s = raw.strip()
+    if not s.startswith("{"):
+        continue
+    try: r = json.loads(s)
+    except json.JSONDecodeError: continue
+    if r.get("event") == "committee_round_open" and (r.get("task_id") or "").lower().startswith(pfx):
+        sys.exit(0)
+sys.exit(1)
+PY
+then
+  echo "[verdictgate] ℹ ${root} b${n}：本批已有審查輪（非新進批次；閉合／補裁決／修補輪）⇒ 不重驗前批（C-4 只擋進入新批）"; exit 0
+fi
 # 第三參數可為逗號分隔之多個 prefix（helper 對同一 K 多個 review prefix 全部回傳）；逐一判定，任一擋即擋。
 _vg_rc=0
 _vg_old_ifs="${IFS}"; IFS=','

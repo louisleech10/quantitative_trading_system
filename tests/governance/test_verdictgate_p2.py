@@ -146,6 +146,18 @@ def test_check_blocked_without_closed_blocks(tmp_path: Path) -> None:
     assert r.returncode == 1 and "CODEX-R1-P1-01" in r.stderr
 
 
+def test_check_batch_already_entered_skips_prev_verdicts(tmp_path: Path) -> None:
+    """C-4 只擋進入新批：b2 已有審查輪 ⇒ 對 b2 之閉合／補裁決／修補輪不重驗 b1（否則補裁決輪連鎖回溯）。"""
+    h = _h(tmp_path)
+    _open(h, "ROOT-B1-REVIEW-R1", "rid1")
+    _out(h, "ROOT-B1-REVIEW-R1", "codex", "blocked", blocked=["CODEX-R1-P1-01"], rid="rid1")
+    assert _check(h, "ROOT", 2, "ROOT-B1-REVIEW").returncode != 0          # 尚未進入 b2 ⇒ 擋
+    _open(h, "ROOT-B2-REVIEW-R1", "rid2")
+    r = _check(h, "ROOT", 2, "ROOT-B1-REVIEW")
+    assert r.returncode == 0 and "非新進批次" in r.stdout
+    assert _check(h, "ROOT", 3, "ROOT-B2-REVIEW").returncode != 0          # b3 仍是新批 ⇒ 依 b2 裁決（無 output）擋
+
+
 def test_check_blocked_then_closed_passes(tmp_path: Path) -> None:
     h = _h(tmp_path); _open(h, R1, "rid1")
     _out(h, R1, "codex", "blocked", blocked=["CODEX-R1-P1-01"], rid="rid1")
