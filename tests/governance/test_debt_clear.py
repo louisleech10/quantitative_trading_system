@@ -441,6 +441,50 @@ def test_clear_output_tampered_sha(tmp_path: Path) -> None:
     assert "sha" in (r.stderr or "").lower() or "改動" in (r.stderr or "")
 
 
+def _committee_output(root: Path, audit: Path, *, round_id: str, family: str, out_path: str, out_sha: str) -> None:
+    _append(
+        root, audit, "--event", "committee_output",
+        "--field", "task_id=20260911-ROOT-B1-REVIEW-R1", "--field", f"family={family}",
+        "--field", f"output_path={out_path}", "--field", f"output_sha256={out_sha}",
+        "--field", "verdict=proceed", "--field", "blocked_by=@[]", "--field", "closed=@[]",
+        "--field", f"round_id={round_id}", "--field", "actor=gate", "--field", "origin_script=gate.sh",
+    )
+
+
+def test_clear_verdict_rejected_then_reregistered_ok(tmp_path: Path) -> None:
+    """VERDICTGATE B3 審碼 R1 實戰：cx_run 拒收（verdict_rejected）→ 主委修檔 → register-output 寫 committee_output（新 sha）
+    ⇒ 銷帳以其後之 committee_output 為交件憑據（sha 對證改用它）。"""
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="rej", families=["codex"])
+    out = root / "handoffs" / "rej-codex.md"
+    _result(root, audit, round_id=rid, family="codex", out_path="handoffs/rej-codex.md", out_sha=_sha256_file(out), state="verdict_rejected")
+    out.write_text(out.read_text(encoding="utf-8") + "\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\n", encoding="utf-8")
+    _committee_output(root, audit, round_id=rid, family="codex", out_path="handoffs/rej-codex.md", out_sha=_sha256_file(out))
+    r = _clear(root, audit, "--round-id", rid, "--session", "rej", "--lock", str(lock))
+    assert r.returncode == 0, r.stderr
+    assert "已重新 register-output" in (r.stdout or "")
+
+
+def test_clear_verdict_rejected_without_reregister_blocked(tmp_path: Path) -> None:
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="rej2", families=["codex"])
+    out = root / "handoffs" / "rej2-codex.md"
+    _result(root, audit, round_id=rid, family="codex", out_path="handoffs/rej2-codex.md", out_sha=_sha256_file(out), state="verdict_rejected")
+    r = _clear(root, audit, "--round-id", rid, "--session", "rej2", "--lock", str(lock))
+    assert r.returncode != 0 and "verdict_rejected" in (r.stderr or "")
+
+
+def test_clear_verdict_rejected_earlier_output_does_not_count(tmp_path: Path) -> None:
+    """拒收**之前**的 committee_output 不算解鎖（序須在拒收之後）。"""
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="rej3", families=["codex"])
+    out = root / "handoffs" / "rej3-codex.md"
+    _committee_output(root, audit, round_id=rid, family="codex", out_path="handoffs/rej3-codex.md", out_sha=_sha256_file(out))
+    _result(root, audit, round_id=rid, family="codex", out_path="handoffs/rej3-codex.md", out_sha=_sha256_file(out), state="verdict_rejected")
+    r = _clear(root, audit, "--round-id", rid, "--session", "rej3", "--lock", str(lock))
+    assert r.returncode != 0 and "verdict_rejected" in (r.stderr or "")
+
+
 def test_clear_idempotent_noop(tmp_path: Path) -> None:
     """重複銷帳 → 冪等 no-op。"""
     root, audit = _setup(tmp_path)

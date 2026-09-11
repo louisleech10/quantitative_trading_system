@@ -25,9 +25,15 @@ if [ -n "${DEBT_AUDIT_OVERRIDE:-}" ]; then
 fi
 PROD_RE='^(momentum|api|frontend/src)/'
 SPECIAL_RE='(^|/)(factories\.py|protocols\.py|config\.py)$'
+# B3 R1 CODEX-R1-P2-03：`<root>/b<N>` 以錨定 regex 驗（shell glob `*/b[0-9]*` 會收 `ROOT/b2oops`）
+BATCH_RE='^[A-Za-z0-9._-]+/b[1-9][0-9]*$'
+# B3 R1 CODEX-R1-P1-01：生產檔判定含刪除（D）——刪 production code 也是 production change
+DIFF_FILTER='ACDMR'
 TOKEN_TTL=900
+ZERO40='0000000000000000000000000000000000000000'
 
 _mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1"; }
+_batch_ok() { printf '%s' "$1" | grep -Eq "${BATCH_RE}"; }
 _token_fresh() {   # $1=root $2=batch → true|false
   local t="${GATE_DIR}/impl.$1-b$2.token"
   [ -f "$t" ] || { echo false; return; }
@@ -43,7 +49,7 @@ case "${1:-}" in
   --msg)
     f="${2:-}"; [ -f "$f" ] || { echo "用法: --msg <msgfile>" >&2; exit 2; }
     [ -f "$(git rev-parse --git-dir 2>/dev/null)/MERGE_HEAD" ] && exit 0      # merge commit 豁免（邊界②）
-    prod="$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null | _prod_of)"
+    prod="$(git diff --cached --name-only --diff-filter="${DIFF_FILTER}" 2>/dev/null | _prod_of)"
     [ -n "${prod}" ] || exit 0                                                   # docs-only ⇒ 不管
     trailer="$(_parse_trailer < "$f")"
     n="$(printf '%s\n' "${prod}" | grep -c .)"
@@ -57,20 +63,22 @@ case "${1:-}" in
       printf '%s\n' "${prod}" | grep -qE "${SPECIAL_RE}" && { echo "commit-msg: 🔴 small 不得碰 factories.py|protocols.py|config.py（膨脹訊號）⇒ 改領 --impl-self" >&2; exit 2; }
       exit 0
     fi
-    case "${trailer}" in
-      */b[0-9]*) root="${trailer%/b*}"; batch="${trailer##*/b}"
-        [ "$(_token_fresh "${root}" "${batch}")" = "true" ] || { echo "commit-msg: 🔴 Ticket-Batch: ${trailer} 但 token 不存在或已過期（900s）⇒ bash scripts/gate.sh dispatch --impl-self --task-id ${root}-impl-b${batch}-claude 重領" >&2; exit 2; }
-        exit 0 ;;
-      *) echo "commit-msg: 🔴 Ticket-Batch 值不合法: '${trailer}'（只准 <root>/b<N> 或 small）" >&2; exit 2 ;;
-    esac ;;
+    _batch_ok "${trailer}" || { echo "commit-msg: 🔴 Ticket-Batch 值不合法: '${trailer}'（只准 <root>/b<N>（N 為正整數）或 small）" >&2; exit 2; }
+    root="${trailer%/b*}"; batch="${trailer##*/b}"
+    [ "$(_token_fresh "${root}" "${batch}")" = "true" ] || { echo "commit-msg: 🔴 Ticket-Batch: ${trailer} 但 token 不存在或已過期（900s）⇒ bash scripts/gate.sh dispatch --impl-self --task-id ${root}-impl-b${batch}-claude 重領" >&2; exit 2; }
+    exit 0 ;;
 
   --emit-event)
     sha="${2:-HEAD}"; sha="$(git rev-parse "${sha}" 2>/dev/null)" || exit 0
     trailer="$(git log -1 --format='%B' "${sha}" | _parse_trailer)"
     [ -n "${trailer}" ] || exit 0
-    prod_json="$(git show --name-only --format= --diff-filter=ACMR "${sha}" | _prod_of | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')"
+    prod_json="$(git show --name-only --format= --diff-filter="${DIFF_FILTER}" "${sha}" | _prod_of | python3 -c 'import json,sys; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))')"
     if [ "${trailer}" = "small" ]; then root="small"; batch="0"; fresh="null"
-    else root="${trailer%/b*}"; batch="${trailer##*/b}"; fresh="$(_token_fresh "${root}" "${batch}")"; fi
+    elif _batch_ok "${trailer}"; then root="${trailer%/b*}"; batch="${trailer##*/b}"; fresh="$(_token_fresh "${root}" "${batch}")"
+    else
+      # 不合法 trailer（只可能來自 --no-verify）⇒ 不寫事件；push 時 1c 以「trailer 不合法」擋（fail-closed）
+      echo "post-commit: ⚠ Ticket-Batch 值不合法 '${trailer}'，不寫 ticket_commit（push 時 1c 會擋）" >&2; exit 0
+    fi
     bash "${SCRIPT_DIR}/audit_append.sh" --event ticket_commit --field "sha=${sha}" --field "trailer=${trailer}" \
       --field "root=${root}" --field "batch=${batch}" --field "prod_files=@${prod_json}" --field "token_fresh=${fresh}" \
       --field "actor=post-commit" --field "origin_script=git_hooks/post-commit" \
@@ -84,14 +92,23 @@ case "${1:-}" in
     [ -n "${range}" ] || { echo "用法: --push-range <range> --local-sha <sha>[,<sha>]" >&2; exit 2; }
     [ -n "${local_shas}" ] || local_shas="$(git rev-parse HEAD)"
     rc=0
-    # ① range 內每個生產 commit：trailer 必在；<root>/b<N> ⇒ 須有 ticket_commit.token_fresh=true；有 trailer 卻無事件 ⇒ 拒
-    for c in $(git rev-list "${range}" 2>/dev/null); do
-      prod="$(git show --name-only --format= --diff-filter=ACMR "${c}" | _prod_of)"
+    # B3 R1（主委自查 CLAUDE-R1-P1-01）：SPEC 字面 `--range 0000000..<sha>`（首次 push）之 rev-list rc=128 曾被 2>/dev/null
+    #   吞掉 ⇒ 迴圈空 ⇒ rc=0 fail-open。全零前綴 ⇒ 正規化為 `<sha>`（全部可達）；其餘 rev-list 失敗 ⇒ fail-closed。
+    case "${range}" in
+      "${ZERO40}"..*|0000000..*) range="${range#*..}" ;;
+    esac
+    commits="$(git rev-list "${range}" 2>/dev/null)" || { echo "1c: 🔴 range '${range}' 無法解析（git rev-list 失敗）⇒ 待驗範圍不明，fail-closed" >&2; exit 1; }
+    # ① range 內每個生產 commit：trailer 必在且合法；<root>/b<N> ⇒ 須有 ticket_commit.token_fresh=true；有 trailer 卻無事件 ⇒ 拒
+    for c in ${commits}; do
+      prod="$(git show --name-only --format= --diff-filter="${DIFF_FILTER}" "${c}" | _prod_of)"
       trailer="$(git log -1 --format='%B' "${c}" | _parse_trailer)"
       if [ -n "${prod}" ] && [ -z "${trailer}" ]; then
         echo "1c: 🔴 ${c:0:8} 含生產碼但無 Ticket-Batch trailer（--no-verify 繞過 commit-msg？）" >&2; rc=1; continue
       fi
       [ -n "${trailer}" ] || continue
+      if [ "${trailer}" != "small" ] && ! _batch_ok "${trailer}"; then
+        echo "1c: 🔴 ${c:0:8} Ticket-Batch 值不合法 '${trailer}'（只准 <root>/b<N> 或 small）" >&2; rc=1; continue
+      fi
       ev="$(grep '"event": "ticket_commit"' "${AUDIT}" 2>/dev/null | grep "\"sha\": \"${c}\"" | tail -1)"
       if [ -z "${ev}" ]; then
         echo "1c: 🔴 ${c:0:8} 有 Ticket-Batch: ${trailer} 卻無 audit ticket_commit 事件（post-commit 未跑或寫入失敗）" >&2; rc=1; continue

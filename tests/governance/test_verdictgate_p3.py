@@ -48,6 +48,7 @@ def _h(tmp_path: Path) -> dict:
     assert _git(h, "init", "-q", "-b", "main").returncode == 0
     assert _git(h, "config", "core.hooksPath", "scripts/git_hooks").returncode == 0
     (root / "README.md").write_text("base\n", encoding="utf-8")
+    (root / ".gitignore").write_text(".claude/\n.fake-origin\n", encoding="utf-8")   # audit.log 不得進 fixture 歷史（checkout 會被擋）
     assert _git(h, "add", "-A").returncode == 0
     r = _git(h, "commit", "-q", "-m", "base")
     assert r.returncode == 0, r.stderr
@@ -84,10 +85,35 @@ def _issue_token_event(h: dict, root: str, batch: int) -> None:
     assert r.returncode == 0, r.stderr
 
 
-def _push_range(h: dict, rng: str) -> subprocess.CompletedProcess[str]:
-    head = _git(h, "rev-parse", "HEAD").stdout.strip()
+def _push_range(h: dict, rng: str, local: str = "") -> subprocess.CompletedProcess[str]:
+    head = local or _git(h, "rev-parse", "HEAD").stdout.strip()
     return subprocess.run(["bash", "scripts/ticket_batch_check.sh", "--push-range", rng, "--local-sha", head],
                           cwd=h["root"], env=h["env"], capture_output=True, text=True, check=False)
+
+
+def _with_upstream(h: dict) -> None:
+    """給 fixture 一個 origin 與 @{u}（refs/remotes/origin/main=HEAD），不真的 push。"""
+    assert _git(h, "remote", "add", "origin", str(h["root"] / ".fake-origin")).returncode == 0
+    assert _git(h, "update-ref", "refs/remotes/origin/main", "HEAD").returncode == 0
+    assert _git(h, "config", "branch.main.remote", "origin").returncode == 0
+    assert _git(h, "config", "branch.main.merge", "refs/heads/main").returncode == 0
+    assert _git(h, "rev-parse", "--abbrev-ref", "@{u}").returncode == 0
+
+
+def _with_real_gov_check(h: dict) -> None:
+    """A16／A18 走真 gov_check.sh（非 stub）；其餘段在 fixture 可能紅，斷言只看 1c 訊息。"""
+    for n in ("gov_check.sh", "quant_standard_check.sh", "quant_standard_baseline.txt", "doc_format_precheck.sh"):
+        src = REPO_ROOT / "scripts" / n
+        if src.is_file():
+            shutil.copy2(src, h["root"] / "scripts" / n)
+
+
+def _pre_push(h: dict, stdin: str, env_overlay: dict | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(["bash", "scripts/git_hooks/pre-push", "origin", "x"], cwd=h["root"], env={**h["env"], **(env_overlay or {})},
+                          capture_output=True, text=True, check=False, input=stdin)
+
+
+_STUB_PRINT_ENV = "#!/usr/bin/env bash\necho \"RANGES=${VG_PUSH_RANGES:-} LOCALS=${VG_PUSH_LOCALS:-} ALLDEL=${VG_PUSH_ALL_DELETE:-}\"\nexit 0\n"
 
 
 # ───────────── Task 3.2：commit-msg ─────────────
@@ -374,3 +400,168 @@ def test_31_impl_self_b2_quorum_short_rejected(tmp_path: Path) -> None:
     _out(h, "ROOT-B1-REVIEW-R1", "codex", "proceed", rid="rid1"); _clear(h, "rid1")
     r = _dispatch(h, "ROOT-impl-b2-claude")
     assert r.returncode != 0 and "quorum" in (r.stdout + r.stderr).lower()
+
+
+def test_31_impl_self_descoped_b3_uses_b1_review(tmp_path: Path) -> None:
+    """SPEC 3.3 A6（CODEX-R5-P1-01）：b2 無 review ⇒ --impl-self b3 之 verdictgate 前批＝b1 review。"""
+    h = _h(tmp_path); _open_round(h, "ROOT-B1-REVIEW-R1", "rid1")
+    for f in ("codex", "composer", "grok"):
+        _out(h, "ROOT-B1-REVIEW-R1", f, "proceed", rid="rid1")
+    _clear(h, "rid1")
+    r = _dispatch(h, "ROOT-impl-b3-claude")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert "前批 ROOT-B1-REVIEW" in r.stdout
+
+
+# ───────────── B3 審碼 R1 收斂新增（CODEX-R1-P1-01／P1-02／P2-03／P2-04＋主委自查）─────────────
+
+def test_32_prod_deletion_without_trailer_rejected(tmp_path: Path) -> None:
+    """CODEX-R1-P1-01：刪生產檔也是生產變更 ⇒ 無 trailer 拒 commit。"""
+    h = _h(tmp_path); _small(h, "momentum/x.py")
+    assert _git(h, "rm", "-q", "momentum/x.py").returncode == 0
+    r = _commit(h, "chore: rm")
+    assert r.returncode != 0 and "Ticket-Batch" in r.stderr
+
+
+def test_33_deletion_only_prod_commit_in_range_rejected(tmp_path: Path) -> None:
+    """CODEX-R1-P1-01（push 端）：--no-verify 刪生產檔 ⇒ 1c 擋。"""
+    h = _h(tmp_path); _small(h, "momentum/x.py"); base = _git(h, "rev-parse", "HEAD").stdout.strip()
+    assert _git(h, "rm", "-q", "momentum/x.py").returncode == 0
+    assert _commit(h, "chore: rm", "--no-verify").returncode == 0
+    r = _push_range(h, f"{base}..HEAD")
+    assert r.returncode != 0 and "無 Ticket-Batch" in r.stderr
+
+
+def test_32_small_deletion_counts_toward_union(tmp_path: Path) -> None:
+    """CODEX-R1-P1-01：small 刪檔 prod_files 亦記入事件（供視窗聯集）。"""
+    h = _h(tmp_path); _small(h, "momentum/x.py")
+    assert _git(h, "rm", "-q", "momentum/x.py").returncode == 0
+    assert _commit(h, "chore: rm\n\nTicket-Batch: small").returncode == 0
+    assert _events(h, "ticket_commit")[-1]["prod_files"] == ["momentum/x.py"]
+
+
+def test_33_pre_push_all_delete_with_upstream_no_fallback(tmp_path: Path) -> None:
+    """CODEX-R1-P1-02：全 delete 行（非零行）且有上游 ⇒ 不回退 @{u}..HEAD，標 ALL_DELETE。"""
+    h = _h(tmp_path); _with_upstream(h)
+    stub = h["root"] / "scripts" / "gov_check.sh"; stub.write_text(_STUB_PRINT_ENV, encoding="utf-8"); stub.chmod(0o755)
+    r = _pre_push(h, f"refs/heads/gone {ZERO} refs/heads/gone abc\n")
+    assert r.returncode == 0, r.stderr
+    assert "RANGES= LOCALS= ALLDEL=1" in r.stdout
+
+
+def test_33_pre_push_zero_lines_with_upstream_falls_back(tmp_path: Path) -> None:
+    """對照：真正零行 ⇒ 回退 @{u}..HEAD。"""
+    h = _h(tmp_path); _with_upstream(h)
+    stub = h["root"] / "scripts" / "gov_check.sh"; stub.write_text(_STUB_PRINT_ENV, encoding="utf-8"); stub.chmod(0o755)
+    r = _pre_push(h, "")
+    assert r.returncode == 0 and "RANGES=@{u}..HEAD" in r.stdout and "ALLDEL=0" in r.stdout
+
+
+def test_33_gov_check_all_delete_skips_1c_even_with_unpushed_bad_commit(tmp_path: Path) -> None:
+    """CODEX-R1-P1-02 端到端（真 gov_check）：HEAD 有未推之無 trailer 生產 commit，但 push 全為 delete ⇒ 1c 不擋。"""
+    h = _h(tmp_path); _with_upstream(h); _with_real_gov_check(h)
+    _stage(h, "momentum/x.py"); assert _commit(h, "feat: x", "--no-verify").returncode == 0
+    r = _pre_push(h, f"refs/heads/gone {ZERO} refs/heads/gone abc\n")
+    out = r.stdout + r.stderr
+    assert "全為 ref 刪除" in out and "1c: 🔴" not in out
+
+
+def test_32_malformed_batch_trailer_rejected(tmp_path: Path) -> None:
+    """CODEX-R1-P2-03：`ROOT/b2oops` 不合 <root>/b<N>，即使同名 token 存在亦拒。"""
+    h = _h(tmp_path); _stage(h, "momentum/x.py")
+    (h["gate_dir"] / "impl.ROOT-b2oops.token").write_text("x\n", encoding="utf-8")
+    r = _commit(h, "feat: x\n\nTicket-Batch: ROOT/b2oops")
+    assert r.returncode != 0 and "不合法" in r.stderr
+
+
+def test_33_malformed_trailer_via_no_verify_rejected_at_push(tmp_path: Path) -> None:
+    """CODEX-R1-P2-03（push 端）：--no-verify 帶不合法 trailer ⇒ post-commit 不寫事件、1c 擋。"""
+    h = _h(tmp_path); base = _git(h, "rev-parse", "HEAD").stdout.strip(); _stage(h, "momentum/x.py")
+    assert _commit(h, "feat: x\n\nTicket-Batch: ROOT/b2oops", "--no-verify").returncode == 0
+    assert _events(h, "ticket_commit") == []
+    r = _push_range(h, f"{base}..HEAD")
+    assert r.returncode != 0 and "不合法" in r.stderr
+
+
+def test_33_first_push_zero_range_checks_all_commits(tmp_path: Path) -> None:
+    """SPEC 3.3 A14（CODEX-R6-P1-03）：`--range 0000000..<sha>` 兩個初始生產 commit、較早者無 trailer ⇒ rc≠0。
+    主委自查：原實作 rev-list rc=128 被吞 ⇒ 迴圈空 ⇒ fail-open。"""
+    h = _h(tmp_path); _stage(h, "momentum/a.py")
+    assert _commit(h, "feat: a", "--no-verify").returncode == 0
+    _small(h, "momentum/b.py")
+    head = _git(h, "rev-parse", "HEAD").stdout.strip()
+    r = _push_range(h, f"{ZERO}..{head}")
+    assert r.returncode != 0 and "無 Ticket-Batch" in r.stderr
+
+
+def test_33_unresolvable_range_fails_closed(tmp_path: Path) -> None:
+    h = _h(tmp_path)
+    r = _push_range(h, "deadbeef..HEAD")
+    assert r.returncode != 0 and "fail-closed" in r.stderr
+
+
+def test_33_fork_remote_contains_commit_still_checked(tmp_path: Path) -> None:
+    """SPEC 3.3 A15（COMPOSER-R7-P1-01）：另一 remote 已含該 commit、origin 未含 ⇒ 仍驗。"""
+    h = _h(tmp_path); base = _git(h, "rev-parse", "HEAD").stdout.strip(); _stage(h, "momentum/x.py")
+    assert _commit(h, "feat: x", "--no-verify").returncode == 0
+    assert _git(h, "update-ref", "refs/remotes/fork/main", "HEAD").returncode == 0
+    r = _push_range(h, f"{base}..HEAD")
+    assert r.returncode != 0 and "無 Ticket-Batch" in r.stderr
+
+
+def test_33_gov_check_no_range_no_upstream_fails_closed(tmp_path: Path) -> None:
+    """SPEC 3.3 A16：有 remote、無上游、無 --range ⇒ 1c fail-closed 印 usage（真 gov_check）。"""
+    h = _h(tmp_path); _with_real_gov_check(h)
+    assert _git(h, "remote", "add", "origin", str(h["root"] / ".fake-origin")).returncode == 0
+    r = subprocess.run(["bash", "scripts/gov_check.sh", "--fast"], cwd=h["root"], env=h["env"], capture_output=True, text=True, check=False)
+    out = r.stdout + r.stderr
+    assert r.returncode != 0 and "無 --range 且無上游" in out
+
+
+def test_33_gov_check_no_remote_skips_1c(tmp_path: Path) -> None:
+    """對照（主委加、SPEC 未寫、三家核可）：無任何 remote ⇒ 1c 略過並印明。"""
+    h = _h(tmp_path); _with_real_gov_check(h)
+    r = subprocess.run(["bash", "scripts/gov_check.sh", "--fast"], cwd=h["root"], env=h["env"], capture_output=True, text=True, check=False)
+    assert "無 remote ⇒ 1c 無 push 範圍可驗" in (r.stdout + r.stderr)
+
+
+def test_33_pre_push_mixed_delete_and_feature_rejected(tmp_path: Path) -> None:
+    """SPEC 3.3 A18：stdin 兩行（一 delete、一 feature 含無 trailer 生產 commit）⇒ rc≠0（真 gov_check）。"""
+    h = _h(tmp_path); _with_real_gov_check(h)
+    assert _git(h, "checkout", "-q", "-b", "feature").returncode == 0
+    _stage(h, "momentum/x.py"); assert _commit(h, "feat: x", "--no-verify").returncode == 0
+    feat = _git(h, "rev-parse", "HEAD").stdout.strip()
+    r = _pre_push(h, f"refs/heads/gone {ZERO} refs/heads/gone abc\nrefs/heads/feature {feat} refs/heads/feature {ZERO}\n")
+    out = r.stdout + r.stderr
+    assert r.returncode != 0 and "1c: 🔴" in out and "無 Ticket-Batch" in out
+
+
+def test_33_single_anchor_five_steps_rejected(tmp_path: Path) -> None:
+    """SPEC 3.3 A8（GROK-R3-P1-01）：token→small×3→batch commit→small×3→push ⇒ 錨仍是 token ⇒ 6 檔 ⇒ 擋。"""
+    h = _h(tmp_path); base = _git(h, "rev-parse", "HEAD").stdout.strip()
+    _issue_token_event(h, "ROOT", 2); _token(h, "ROOT", 2)
+    _small(h, "momentum/a.py", "momentum/b.py", "momentum/c.py")
+    _stage(h, "momentum/impl.py"); assert _commit(h, "feat: impl\n\nTicket-Batch: ROOT/b2").returncode == 0
+    _small(h, "momentum/d.py", "momentum/e.py", "momentum/f.py")
+    r = _push_range(h, f"{base}..HEAD")
+    assert r.returncode != 0 and "累計生產檔 6" in r.stderr
+
+
+def test_33_feature_branch_small_counted_when_checkout_main(tmp_path: Path) -> None:
+    """SPEC 3.3 A19（CODEX-R8-P1-01）：checkout=main、push feature ⇒ feature 上 small 以 local sha 可達計入。"""
+    h = _h(tmp_path); base = _git(h, "rev-parse", "HEAD").stdout.strip()
+    assert _git(h, "checkout", "-q", "-b", "feature").returncode == 0
+    _small(h, "momentum/a.py", "momentum/b.py"); _small(h, "momentum/c.py", "momentum/d.py")
+    feat = _git(h, "rev-parse", "HEAD").stdout.strip()
+    assert _git(h, "checkout", "-q", "main").returncode == 0
+    r = _push_range(h, f"{base}..{feat}", local=feat)
+    assert r.returncode != 0 and "累計生產檔 4" in r.stderr
+    r2 = _push_range(h, f"{base}..{feat}")          # 對照：以 HEAD(main) 為可達目標 ⇒ feature small 全成幽靈 ⇒ 放行（即 v8 漏洞）
+    assert r2.returncode == 0 and "已濾 2" in r2.stdout
+
+
+def test_32_post_commit_expired_token_records_false(tmp_path: Path) -> None:
+    """SPEC 3.3 A21：token 過期（--no-verify 才能 commit）⇒ post-commit token_fresh=false。"""
+    h = _h(tmp_path); _stage(h, "momentum/x.py"); _token(h, "ROOT", 2, age=1000)
+    assert _commit(h, "feat: x\n\nTicket-Batch: ROOT/b2", "--no-verify").returncode == 0
+    assert _events(h, "ticket_commit")[0]["token_fresh"] == "false"

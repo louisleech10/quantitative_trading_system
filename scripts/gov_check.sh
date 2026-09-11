@@ -290,7 +290,10 @@ fi
 _gc_seg 1c "Ticket-Batch（push range 生產 commit trailer／token；small 累計視窗）…"
 if [ -f scripts/ticket_batch_check.sh ]; then
   if [ -z "${_gc_range}" ]; then
-    if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+    if [ "${VG_PUSH_ALL_DELETE:-0}" = "1" ]; then
+      # pre-push 已讀到 stdin 且全為 ref 刪除（B3 R1 CODEX-R1-P1-02）⇒ 無待驗 commit；不得回退 @{u}..HEAD
+      echo "[gov_check] ℹ 本次 push 全為 ref 刪除 ⇒ 1c 無待驗範圍，略過"
+    elif git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
       _gc_range='@{u}..HEAD'; _gc_local="$(git rev-parse HEAD)"
     elif [ -z "$(git remote 2>/dev/null)" ]; then
       # 無任何 remote（測試 fixture／本機草稿 repo）⇒ 沒有東西可 push，本段無待驗範圍；印明不擋。

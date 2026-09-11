@@ -357,7 +357,9 @@ _assert_all_families_success_and_sha_match() {
     echo "ERROR: 讀帳本失敗（family result 檢查）" >&2
     return 1
   }
-  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" REPO_ROOT="${REPO}" python3 <<'PY'
+  local _ap5
+  _ap5="$(_resolve_audit_path 2>/dev/null || true)"
+  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap5}" REPO_ROOT="${REPO}" python3 <<'PY'
 import hashlib
 import json
 import os
@@ -366,6 +368,32 @@ from pathlib import Path
 
 dump = json.loads(os.environ["DEBT_CLEAR_DUMP"])
 rid = os.environ["DEBT_CLEAR_RID"]
+audit_path = os.environ.get("DEBT_CLEAR_AUDIT") or ""
+
+
+def reregistered_output(fam, after_seq):
+    """VERDICTGATE B3 審碼 R1 實戰：cx_run 拒收裁決塊 ⇒ family_result=verdict_rejected；主委修檔後
+    `gate.sh register-output` 只寫 committee_output（registry 綁 family_result 單一 origin=cx_run.sh，
+    gate 不得補寫）。與 verdictgate_check 同語意：拒收後**其後**同 round 同家之 committee_output 即視為已交件；
+    其 output_path／output_sha256 取代拒收列做 sha 對證。"""
+    if not audit_path or not Path(audit_path).is_file():
+        return None
+    best = None
+    for raw in Path(audit_path).read_text(encoding="utf-8").splitlines():
+        s = raw.strip()
+        if not s.startswith("{"):
+            continue
+        try:
+            r = json.loads(s)
+        except json.JSONDecodeError:
+            continue
+        if r.get("event") != "committee_output" or r.get("round_id") != rid or r.get("family") != fam:
+            continue
+        seq = r.get("sequence")
+        if after_seq is not None and (seq is None or seq <= after_seq):
+            continue
+        best = r
+    return best
 repo = Path(os.environ["REPO_ROOT"])
 info = (dump.get("rounds") or {}).get(rid)
 if not info:
@@ -396,7 +424,18 @@ for fam in participants:
     if not rec:
         print(f"ERROR: 家族 {fam} 無 committee_family_result", file=sys.stderr)
         sys.exit(1)
-    if rec.get("result_state") != "success":
+    if rec.get("result_state") == "verdict_rejected":
+        rr = reregistered_output(fam, rec.get("sequence"))
+        if not rr:
+            print(
+                f"ERROR: 家族 {fam} 最新 result_state='verdict_rejected' 且其後無同 round 之 committee_output"
+                f"（主委須修檔後 bash scripts/gate.sh register-output <task> <檔> 解鎖）",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        print(f"[debt_clear] 家族 {fam} verdict_rejected 之後已重新 register-output（seq {rr.get('sequence')}）⇒ 視為已交件")
+        rec = {"output_path": rr.get("output_path"), "output_sha256": rr.get("output_sha256")}
+    elif rec.get("result_state") != "success":
         print(
             f"ERROR: 家族 {fam} 最新 result_state={rec.get('result_state')!r}（須 success）",
             file=sys.stderr,

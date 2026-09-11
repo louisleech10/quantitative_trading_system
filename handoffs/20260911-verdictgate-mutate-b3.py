@@ -17,7 +17,7 @@ MUTATIONS = [
      f"{TEST}::test_32_small_five_files_rejected"),
     ("M9b 生產檔判定關掉（staged 生產碼視同 docs-only）", TB, '[ -n "${prod}" ] || exit 0', 'exit 0 || exit 0',
      f"{TEST}::test_32_prod_without_trailer_rejected"),
-    ("M10 post-commit token_fresh 恆 true", TB, 'fresh="$(_token_fresh "${root}" "${batch}")"; fi', 'fresh="true"; fi',
+    ("M10 post-commit token_fresh 恆 true", TB, 'fresh="$(_token_fresh "${root}" "${batch}")"\n    else', 'fresh="true"\n    else',
      f"{TEST}::test_33_no_verify_then_token_not_ratified"),
     ("M11 任一 token 即錨（不要求消費）", TB, "    if consumed:\n        anchor = i", "    if True:\n        anchor = i",
      f"{TEST}::test_33_unconsumed_token_not_anchor"),
@@ -31,6 +31,24 @@ MUTATIONS = [
      f"{TEST}::test_33_trailer_without_event_rejected"),
     ("M15 range 內無 trailer 生產 commit 不擋", TB, 'if [ -n "${prod}" ] && [ -z "${trailer}" ]; then', 'if false; then',
      f"{TEST}::test_33_prod_commit_without_trailer_in_range_rejected"),
+    # ── B3 審碼 R1 收斂新增 ──
+    ("M16 生產檔判定不含刪除（CODEX-R1-P1-01）", TB, "DIFF_FILTER='ACDMR'", "DIFF_FILTER='ACMR'",
+     f"{TEST}::test_32_prod_deletion_without_trailer_rejected"),
+    ("M16b push 端刪除不擋", TB, "DIFF_FILTER='ACDMR'", "DIFF_FILTER='ACMR'",
+     f"{TEST}::test_33_deletion_only_prod_commit_in_range_rejected"),
+    ("M17 全 delete 當零行回退 @{u}..HEAD（CODEX-R1-P1-02）", "scripts/git_hooks/pre-push",
+     'if [ "${_pp_seen}" -eq 0 ]; then', 'if [ -z "${_pp_ranges}" ]; then',
+     f"{TEST}::test_33_pre_push_all_delete_with_upstream_no_fallback"),
+    ("M17b gov_check 不認 ALL_DELETE", "scripts/gov_check.sh", 'if [ "${VG_PUSH_ALL_DELETE:-0}" = "1" ]; then', 'if false; then',
+     f"{TEST}::test_33_gov_check_all_delete_skips_1c_even_with_unpushed_bad_commit"),
+    ("M18 trailer 格式放寬回 glob（CODEX-R1-P2-03）", TB, "BATCH_RE='^[A-Za-z0-9._-]+/b[1-9][0-9]*$'", "BATCH_RE='/b[0-9]'",
+     f"{TEST}::test_32_malformed_batch_trailer_rejected"),
+    ("M19 全零 range 不正規化（主委自查；→ fail-closed 而非驗全部）", TB,
+     '"${ZERO40}"..*|0000000..*) range="${range#*..}" ;;', '"") : ;;',
+     f"{TEST}::test_33_first_push_zero_range_checks_all_commits"),
+    ("M19b rev-list 失敗吞掉（原 fail-open）", TB,
+     'commits="$(git rev-list "${range}" 2>/dev/null)" || {', 'commits="$(git rev-list "${range}" 2>/dev/null)" || true; false && {',
+     f"{TEST}::test_33_unresolvable_range_fails_closed"),
 ]
 
 

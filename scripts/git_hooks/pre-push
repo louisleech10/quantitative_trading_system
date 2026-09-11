@@ -26,17 +26,22 @@ fi
 #   remote sha 全零（新 ref）⇒ range＝<local sha>（全部可達）；local sha 全零（--delete）⇒ 該行跳過；
 #   多行逐行驗；零行（某些客戶端）⇒ 回退 @{u}..HEAD；小 commit 視窗之幽靈過濾以本次全部 local sha 為可達目標。
 #   v7 之 `HEAD --not --remotes` 在第二 remote 已含本地 commit 時待驗集合變空（COMPOSER-R7-P1-01）⇒ 改讀 stdin。
-_pp_ranges=""; _pp_locals=""; _pp_zero='0000000000000000000000000000000000000000'
+#   B3 R1 CODEX-R1-P1-02：「全為 delete 行」≠「零行」——前者無待驗範圍（直接放行 1c），只有**真正零行**才回退 @{u}..HEAD；
+#   否則 `git push --delete feature` 在有上游且 HEAD 有未推 commit 時會被無關的 current-branch range 擋住。
+_pp_ranges=""; _pp_locals=""; _pp_zero='0000000000000000000000000000000000000000'; _pp_seen=0; _pp_all_delete=0
 while read -r _lref _lsha _rref _rsha; do
   [ -n "${_lsha:-}" ] || continue
+  _pp_seen=1
   [ "${_lsha}" = "${_pp_zero}" ] && continue
   if [ "${_rsha:-}" = "${_pp_zero}" ] || [ -z "${_rsha:-}" ]; then _r="${_lsha}"; else _r="${_rsha}..${_lsha}"; fi
   _pp_ranges="${_pp_ranges}${_pp_ranges:+ }${_r}"; _pp_locals="${_pp_locals}${_pp_locals:+,}${_lsha}"
 done
-if [ -z "${_pp_ranges}" ]; then
+if [ "${_pp_seen}" -eq 0 ]; then
   if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then _pp_ranges='@{u}..HEAD'; _pp_locals="$(git rev-parse HEAD)"; fi
+elif [ -z "${_pp_ranges}" ]; then
+  _pp_all_delete=1
 fi
-export VG_PUSH_RANGES="${_pp_ranges}" VG_PUSH_LOCALS="${_pp_locals}"
+export VG_PUSH_RANGES="${_pp_ranges}" VG_PUSH_LOCALS="${_pp_locals}" VG_PUSH_ALL_DELETE="${_pp_all_delete}"
 
 [ -f scripts/gov_check.sh ] || {
   echo "pre-push: scripts/gov_check.sh 缺失 → fail-closed 拒 push" >&2; exit 1; }
