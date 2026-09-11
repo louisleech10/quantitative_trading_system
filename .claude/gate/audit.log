@@ -57635,3 +57635,49 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260911-verdictgate-x-review-r10/synth.md", "output_sha256": "0e881536bc39f35dc4b085fd66908f3cf2d532d75ae00d76760066140acd3973", "task_id": "20260911-VERDICTGATE-X-STAMP-R13", "ts": "2026-09-11T10:47:27Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-stamp-r13-grok.md", "output_sha256": "c7ee106c1d0405f16e7ac0a4d122adbca70ac9026a7402f6f26183ddf96ea9c5", "task_id": "20260911-VERDICTGATE-X-STAMP-R13", "ts": "2026-09-11T10:47:37Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "1a0002cd-b149-4668-a249-36c1f1e5b7c8", "lock_sha256": "9bc27438ff4ccca5c01849b0bd6ce002fff6a2057b1c222d945dbc3c3e867efc", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["grok"], "round_id": "d6618d2a-3806-48f1-b36a-928c07a49bde", "schema_version": 1, "sequence": 3509, "session_id": "20260911-verdictgate-x-stamp-r13", "synth_sha256": "5156900f2fbba55307693e57256227910ceaafc34adbb7d6a0324fa43dbd221a", "ts": "2026-09-11T10:48:26Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-B1-REVIEW-R1", "ts": "2026-09-11T12:08:14Z"}
+=== 2026-09-11 20:08:14 | dispatch ===
+  ts=2026-09-11 20:08:14
+  kind=dispatch
+  intent=VERDICTGATE B1 三家審碼 R1（本輪產出即吃 Task 1.2 自動註冊）
+  risk=high
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=三家全員 adversary；實作者主委不自審
+  template=n/a:code review 派工
+  adversarial=waived:code review 輪本身即 adversarial，brief 檔頭明寫
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-B1-REVIEW-R1", "ts": "2026-09-11T12:08:24Z"}
+=== 2026-09-11 20:08:24 | dispatch ===
+  ts=2026-09-11 20:08:24
+  kind=dispatch
+  intent=VERDICTGATE B1 三家審碼 R1（本輪產出即吃 Task 1.2 自動註冊）
+  risk=high
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=三家全員 adversary；實作者主委不自審
+  template=n/a:code review 派工
+  adversarial=waived:code review 輪本身即 adversarial，brief 檔頭明寫
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260911-VERDICTGATE-B1-REVIEW-R1-BRIEF.md", "brief_sha256": "d418d43a6e54284a0c74b4cafe71bff03d7a64fc41d042441fa2fbdcdfff1fcc", "brief_sha256_norm": "d418d43a6e54284a0c74b4cafe71bff03d7a64fc41d042441fa2fbdcdfff1fcc", "event": "committee_round_open", "event_id": "07e8d71e-0972-4637-a807-b82fdf049ea5", "expected_outputs": {"codex": "handoffs/20260911-verdictgate-b1-review-r1-codex.md", "composer": "handoffs/20260911-verdictgate-b1-review-r1-composer.md", "grok": "handoffs/20260911-verdictgate-b1-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "f48a2446-35ca-4c71-b7ce-0f00ebe39b7f", "schema_version": 1, "sequence": 3510, "session_name": "20260911-verdictgate-b1-review-r1", "task_id": "20260911-VERDICTGATE-B1-REVIEW-R1", "ts": "2026-09-11T12:08:30Z"}
+{"actor": "cx_run", "attempt_id": "57d5b3ca-fb27-473b-8e69-5e2bd3d144d0", "cli_rc": "0", "event": "committee_family_result", "event_id": "ee1b4537-f6d8-4696-b116-c6204ba04329", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-verdictgate-b1-review-r1-composer.md", "output_sha256": "2391566d425333b50231b8b256c7e7bf48da31e82224454aa6244bf57620654a", "producer": "audit_append.sh", "result_state": "success", "round_id": "f48a2446-35ca-4c71-b7ce-0f00ebe39b7f", "schema_version": 1, "sequence": 3511, "ts": "2026-09-11T12:11:51Z"}
+{"actor": "gate", "blocked_by": [], "closed": [], "event": "committee_output", "event_id": "2226838a-8657-4a63-94bc-97e9d1f5117c", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260911-verdictgate-b1-review-r1-composer.md", "output_sha256": "2391566d425333b50231b8b256c7e7bf48da31e82224454aa6244bf57620654a", "producer": "audit_append.sh", "schema_version": 1, "sequence": 3512, "task_id": "20260911-VERDICTGATE-B1-REVIEW-R1", "ts": "2026-09-11T12:11:52Z", "verdict": "proceed"}
+{"actor": "cx_run", "attempt_id": "73451838-9694-4675-8fc9-38e0f738d5ae", "cli_rc": "0", "event": "committee_family_result", "event_id": "bdfc027e-dea2-40be-8ca5-e12cea01d2d5", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-verdictgate-b1-review-r1-grok.md", "output_sha256": "eeda650758fc2f266b97d7ee4b37a2830893b84950ace58d09624b946e32e816", "producer": "audit_append.sh", "result_state": "success", "round_id": "f48a2446-35ca-4c71-b7ce-0f00ebe39b7f", "schema_version": 1, "sequence": 3513, "ts": "2026-09-11T12:15:07Z"}
+{"actor": "gate", "blocked_by": [], "closed": [], "event": "committee_output", "event_id": "e25e8190-5ec0-49b1-b123-0bb8f1cf29ab", "family": "grok", "origin_script": "gate.sh", "output_path": "handoffs/20260911-verdictgate-b1-review-r1-grok.md", "output_sha256": "eeda650758fc2f266b97d7ee4b37a2830893b84950ace58d09624b946e32e816", "producer": "audit_append.sh", "schema_version": 1, "sequence": 3514, "task_id": "20260911-VERDICTGATE-B1-REVIEW-R1", "ts": "2026-09-11T12:15:08Z", "verdict": "proceed"}
+{"event":"gate_deny","ts":"2026-09-11T12:15:13Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"9336c5d5441b527af95d5cbff62af9d387cff94a07ba393819ff8723ac777eac","cmd_head":"AUDIT_TMP=$(mktemp -d /tmp/verdictgate-b1-audit.XXXXXX); cp .claude/gate/audit.log \"${AUDIT_TMP}/audit.log\"; GOV_TMP=\"${AUDIT_TMP}/audit.log\" GOVERNANCE_TEST_HARNESS=1 DEBT_AUDIT_OVERRIDE=\"${GOV_TMP}\" bash scripts/audit_append.sh --event ticket_commit --field sha=review-probe --field trailer=small --field root=small --field batch=0 --field 'prod_files=@[\"docs/review-probe.md\"]' --field token_fresh=null --field actor=codex --field origin_script=git_hooks/post-commit >/tmp/verdictgate-b1-audit-append.out 2>/t"}
+{"event":"gate_deny","ts":"2026-09-11T12:20:08Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"9f27e2ee55559cef482f77a6e2a01a075248202a304268067712bd22da40b3c0","cmd_head":"env -u GOVERNANCE_TEST_HARNESS CX_STUB_MODE=success CX_STUB_TAIL=verdict bash scripts/cx_run.sh codex handoffs/20260911-VERDICTGATE-B1-REVIEW-R1-BRIEF.md /tmp/verdictgate-b1-cx-guard-output.md"}
+{"event":"gate_deny","ts":"2026-09-11T12:20:25Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"636cb2ea54360dced77b42bff4222760634dd31bc861a78aac58b49a5c9bd91f","cmd_head":"sed -n '535,545p' scripts/cx_run.sh && bash -n scripts/cx_run.sh"}
+{"actor": "cx_run", "attempt_id": "d0c66e39-aca3-42f4-a551-ed7ce3f8a7fd", "cli_rc": "0", "event": "committee_family_result", "event_id": "e50c7236-8358-4da2-a5ba-6b3563df658e", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-verdictgate-b1-review-r1-codex.md", "output_sha256": "43d30d74edb693a384c7635f588205774fce5de2afb2fe77f6ac1f6a0ff48980", "producer": "audit_append.sh", "result_state": "success", "round_id": "f48a2446-35ca-4c71-b7ce-0f00ebe39b7f", "schema_version": 1, "sequence": 3515, "ts": "2026-09-11T12:24:04Z"}
+{"actor": "gate", "blocked_by": ["CODEX-R1-P0-01"], "closed": [], "event": "committee_output", "event_id": "2686ab10-5d35-47be-b829-0f203909ac59", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260911-verdictgate-b1-review-r1-codex.md", "output_sha256": "43d30d74edb693a384c7635f588205774fce5de2afb2fe77f6ac1f6a0ff48980", "producer": "audit_append.sh", "schema_version": 1, "sequence": 3516, "task_id": "20260911-VERDICTGATE-B1-REVIEW-R1", "ts": "2026-09-11T12:24:37Z", "verdict": "blocked"}
+{"event":"gate_deny","ts":"2026-09-11T12:26:29Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"8cc66b49f78ff3dc434f5e97a2725f56ff8c649dc7da1c554b2805de0891c258","cmd_head":"bash -n scripts/gate.sh && bash -n scripts/cx_run.sh && echo syntax_ok; bash scripts/debt_ledger.sh --has-open >/dev/null 2>&1; echo has_open_rc=$?; S=/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/7972ea91-868b-4287-ae64-ee6737a31e77/scratchpad; venv/bin/python -m pytest tests/governance/test_verdictgate_p1.py tests/governance/test_registry_v2_shape.py tests/governance/test_debt_ledger.py -q > $S/pt_p1c.log 2>&1; rc=$?; echo pytest_rc=$rc; tail -1 $S/pt_p1c.log; grep -E '^FAILED' "}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "4b1848d9-f77a-4f8e-ac40-81d5259ef4b1", "lock_sha256": "58b193ce6f009e22e5b17b15d0ae0069b85548468dd019d81f4c90a021e66df0", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "f48a2446-35ca-4c71-b7ce-0f00ebe39b7f", "schema_version": 1, "sequence": 3517, "session_id": "20260911-verdictgate-b1-review-r1", "synth_sha256": "be9b736f532a4fefe17ca834cebc1b6a1d1278d1a299879f80f2e9d6098d590b", "ts": "2026-09-11T12:28:13Z"}

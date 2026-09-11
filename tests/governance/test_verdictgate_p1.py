@@ -321,6 +321,21 @@ def test_12_ledger_rejects_post_v3_committee_output_without_sequence(tmp_path: P
     assert r.returncode == 2 and "缺 sequence" in r.stderr
 
 
+def test_12_ledger_tolerates_round_unscoped_events_and_output_carries_round_id(tmp_path: Path) -> None:
+    """CODEX-R1-P0-01（B1 審碼實戰）：cutoff 後 committee_output 有 sequence 但帳本無條件要 round_id ⇒ 拒發。
+    registry round_scoped:false ⇒ build_rounds 跳過；且 register-output 會帶上該輪 round_id。"""
+    h = _h(tmp_path); _seed_dispatch(h); _open_round(h, ["codex"])
+    _write_out(h, "handoffs/x-codex.md", "CODEX", "VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\n")
+    assert _reg(h, "handoffs/x-codex.md").returncode == 0
+    r = _run(h, "scripts/audit_append.sh", "--event", "ticket_commit", "--field", "sha=abc", "--field", "trailer=small",
+             "--field", "root=small", "--field", "batch=0", "--field", 'prod_files=@["momentum/x.py"]',
+             "--field", "token_fresh=null", "--field", "actor=t", "--field", "origin_script=git_hooks/post-commit")
+    assert r.returncode == 0, r.stderr
+    r = _run(h, "scripts/debt_ledger.sh", "--has-open")
+    assert r.returncode in (0, 1), r.stdout + r.stderr          # 不再 rc=2「缺 round_id」
+    assert _events(h, "committee_output")[0].get("round_id") == ROUND
+
+
 # ───────────────── cx_run 接線 ─────────────────
 
 def _write_brief(h: dict, kind: str) -> str:
@@ -356,6 +371,16 @@ def test_12_cx_run_review_done_without_verdict_marks_rejected_rc_unchanged(tmp_p
     states = [e["result_state"] for e in _events(h, "committee_family_result")]
     assert states[-1] == "verdict_rejected" and "success" in states
     assert _events(h, "committee_output") == []
+
+
+def test_12_cx_run_review_verdict_without_status_done_still_registers(tmp_path: Path) -> None:
+    """B1 審碼實戰：codex 交件檔有 VERDICT 塊但漏 STATUS: DONE ⇒ 舊條件靜默跳過；現以 VERDICT 行為足夠訊號。"""
+    h = _h(tmp_path); _seed_dispatch(h)
+    brief = _write_brief(h, "review")
+    _open_round(h, ["codex"], prefix="handoffs/out")
+    r = _run_cx(h, "codex", brief, "handoffs/out-codex.md", "verdict_nodone")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert len(_events(h, "committee_output")) == 1
 
 
 def test_12_cx_run_review_without_status_done_does_not_register(tmp_path: Path) -> None:

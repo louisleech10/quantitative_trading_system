@@ -604,7 +604,11 @@ _maybe_register_review_output() {
   if [ "${cli_rc}" -ne 0 ] 2>/dev/null || [ ! -s "${out}" ]; then
     return 0
   fi
-  grep -qE '^STATUS: DONE' "${out}" || return 0
+  # 觸發條件：有 `STATUS: DONE` **或**有 `VERDICT:` 行即嘗試（B1 審碼實戰：codex 交件檔漏寫 STATUS: DONE
+  #   但有裁決塊 ⇒ 舊條件靜默跳過、零留痕；裁決塊本身即「已完成」之更強訊號）。兩者皆無 ⇒ 不嘗試。
+  if ! grep -qE '^STATUS: DONE' "${out}" && ! grep -qE '^VERDICT:' "${out}"; then
+    return 0
+  fi
   if bash "${SCRIPT_DIR}/gate.sh" register-output "${task_id}" "${out}"; then
     return 0
   fi
@@ -642,8 +646,9 @@ _write_stub_success_output() {
         # VERDICTGATE Task 1.2 測試尾段（harness-only；CX_STUB_TAIL 已綁 CX_STUB_MODE 之 harness 守衛）：
         #   verdict ⇒ 合法機械裁決塊＋STATUS: DONE（走自動註冊）；done ⇒ 只有 STATUS: DONE（觸發拒收）
         case "${CX_STUB_TAIL:-}" in
-          verdict) printf '\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n' ;;
-          done)    printf '\nSTATUS: DONE\n' ;;
+          verdict)        printf '\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n' ;;
+          verdict_nodone) printf '\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\n' ;;
+          done)           printf '\nSTATUS: DONE\n' ;;
         esac
       } > "${out}"
       ;;

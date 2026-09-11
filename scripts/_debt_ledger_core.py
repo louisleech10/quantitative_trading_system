@@ -173,6 +173,11 @@ def build_rounds(recs):
 
     for rec in recs:
         ev = rec.get("event")
+        # VERDICTGATE B1（CODEX-R1-P0-01）：registry `round_scoped: false` 之事件（committee_output／
+        # impl_token_issued／ticket_commit／governance_bypass）不屬任何 round 之債務數學——
+        # 跳過，不要求 round_id（仍已在上游計入序號連續性）。
+        if (reg.get("debt_events") or {}).get(ev, {}).get("round_scoped", True) is False:
+            continue
         rid = rec.get("round_id")
         if not isinstance(rid, str) or not rid:
             # open/result/clear/abandon 皆需 round_id；缺則 fail-closed

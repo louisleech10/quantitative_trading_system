@@ -217,9 +217,26 @@ if [ "${kind}" = "register-output" ]; then
       *) echo "ERROR: register-output 未知參數: $3"; exit 1 ;;
     esac
   done
-  _reg_verdict="null"; _reg_blocked='[]'; _reg_closed='[]'
+  _reg_verdict="null"; _reg_blocked='[]'; _reg_closed='[]'; _reg_round=""
   if [ "${_reg_kind}" = "stamp" ]; then
     [ -n "${_reg_family}" ] || { echo "ERROR: --kind stamp 須帶 --family <fam>"; exit 1; }
+    _reg_round="$("${VENV_PY}" - "${AUDIT}" "${task_id}" <<'PY'
+import json, sys
+audit, task_id = sys.argv[1:3]
+rid = ""
+for raw in open(audit, encoding="utf-8").read().splitlines():
+    s = raw.strip()
+    if not s.startswith("{"):
+        continue
+    try:
+        r = json.loads(s)
+    except json.JSONDecodeError:
+        continue
+    if r.get("event") == "committee_round_open" and r.get("task_id") == task_id:
+        rid = r.get("round_id") or ""
+print(rid)
+PY
+)"
   elif [ "${_reg_kind}" = "review" ]; then
     _reg_family="$("${VENV_PY}" - "${out_rel}" "${REPO_ROOT}/scripts/governance_families.json" <<'PY'
 import json, re, sys
@@ -251,6 +268,7 @@ if not opens:
     print(f"ERROR: register-output 找不到 task {task_id} 之 committee_round_open（非 committee_run 派出的輪不得註冊 review 產出）", file=sys.stderr)
     sys.exit(1)
 ro = opens[-1]
+open(corpus_out + ".round", "w", encoding="utf-8").write(str(ro.get("round_id") or ""))
 roster = ro.get("quorum_eligible") or ro.get("participants") or []
 if family not in roster:
     print(f"ERROR: register-output 家族 {family} 不在該輪 quorum_eligible {roster}", file=sys.stderr)
@@ -276,9 +294,10 @@ for r in rows:
         paths.append(p)
 open(corpus_out, "w", encoding="utf-8").write("\n".join(dict.fromkeys(paths)) + "\n")
 PY
-    then rm -f "${_reg_tmp}"; exit 1; fi
-    _reg_json="$(bash "${REPO_ROOT}/scripts/verdict_parse.sh" "${output_path}" "${_reg_family}" --closed-corpus "${_reg_tmp}")" || { rm -f "${_reg_tmp}"; echo "ERROR: register-output 拒收——裁決塊不合契約（見上）:${out_rel}"; exit 1; }
-    rm -f "${_reg_tmp}"
+    then rm -f "${_reg_tmp}" "${_reg_tmp}.round"; exit 1; fi
+    _reg_round="$(cat "${_reg_tmp}.round" 2>/dev/null || true)"
+    _reg_json="$(bash "${REPO_ROOT}/scripts/verdict_parse.sh" "${output_path}" "${_reg_family}" --closed-corpus "${_reg_tmp}")" || { rm -f "${_reg_tmp}" "${_reg_tmp}.round"; echo "ERROR: register-output 拒收——裁決塊不合契約（見上）:${out_rel}"; exit 1; }
+    rm -f "${_reg_tmp}" "${_reg_tmp}.round"
     _reg_verdict="$(printf '%s' "${_reg_json}" | "${VENV_PY}" -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')"
     _reg_blocked="$(printf '%s' "${_reg_json}" | "${VENV_PY}" -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["blocked_by"], ensure_ascii=False))')"
     _reg_closed="$(printf '%s' "${_reg_json}" | "${VENV_PY}" -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["closed"], ensure_ascii=False))')"
@@ -294,6 +313,7 @@ PY
       --field "verdict=${_reg_verdict}" \
       --field "blocked_by=@${_reg_blocked}" \
       --field "closed=@${_reg_closed}" \
+      ${_reg_round:+--field "round_id=${_reg_round}"} \
       --field "actor=gate" \
       --field "origin_script=gate.sh"; then
     echo "ERROR: register-output 寫 audit 失敗（audit_append 拒寫，見上）"; exit 1
