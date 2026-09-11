@@ -203,6 +203,16 @@ def test_41_defer_single_target_only(tmp_path: Path) -> None:
     assert _gate(_write(tmp_path, _synth(row4="延後→E-4 理由")), "--todo", str(todo)).returncode == 1
 
 
+def test_41_defer_explanation_must_be_closed_paren_without_second_arrow(tmp_path: Path) -> None:
+    """B4 R2 CODEX-R2-P1-01：`延後→E-4（理由`（未閉合）、`延後→E-4（理由）延後→E-9`、`延後→E-4（理由 延後→E-9）` 皆 ④。"""
+    todo = _todo(tmp_path)
+    for bad in ("延後→E-4（理由", "延後→E-4（理由）延後→E-9", "延後→E-4（理由 延後→E-9）", "延後→E-4(reason"):
+        r = _gate(_write(tmp_path, _synth(row4=bad)), "--todo", str(todo))
+        assert r.returncode == 1 and "④" in r.stderr, bad
+    for ok in ("延後→E-4（理由）", "延後→E-4 (reason)", "延後→E-4（一）（二）"):
+        assert _gate(_write(tmp_path, _synth(row4=ok)), "--todo", str(todo)).returncode == 0, ok
+
+
 def test_41_defer_existence_is_whole_word(tmp_path: Path) -> None:
     """`E-4` 不得被 `E-40`／`SE-4` 冒充存在。"""
     r = _gate(_write(tmp_path, _synth(row4="延後→E-4")), "--todo", str(_todo(tmp_path, "| E-40 | x |\n| SE-4 | y |\n")))

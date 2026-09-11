@@ -102,8 +102,10 @@ def parse_defer_targets(cell: str):
             continue
         tgt = sm.group(1)
         tail = rest[sm.end():].strip()
-        if tail and not tail.startswith(("（", "(")):
-            out.append((None, f"`延後→{tgt}` 之後接 `{tail[:10]}`——只准單一目標；說明須以（）括起"))
+        # B4 R2 CODEX-R2-P1-01：說明必須是**完整成對**括號（可多組），括號內外皆不得再含延後箭號；
+        #   未閉合 `（理由` 或 `（理由）延後→E-9` 皆錯。
+        if tail and (DEFER_TOKEN in tail or not re.fullmatch(r"(?:（[^（）]*）|\([^()]*\))(?:\s*(?:（[^（）]*）|\([^()]*\)))*", tail)):
+            out.append((None, f"`延後→{tgt}` 之後接 `{tail[:10]}`——只准單一目標；說明須為完整成對（）且不得再含延後箭號"))
             continue
         out.append((tgt, None))
     return out
