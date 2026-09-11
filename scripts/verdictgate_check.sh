@@ -35,22 +35,36 @@ fi
 # B4 收票前主委自查（真 audit 實跑）：C-4 只擋「進入新批」。若 b<N> 在 audit 已有任何 committee_round_open
 #   （即 b<N> 已被進入：其審碼 R1 開輪時已驗過 b<N-1>），則本批之閉合輪／補裁決輪／修補後重領 token 不再重驗前批——
 #   否則 SPLITUNIFY B4 補裁決輪（§E E-4）會被 B3 無裁決擋住、連鎖回溯至 B1，違反使用者 2026-08-05「不溯及既往」。
+#   收票審 R11（三家同題 CODEX/COMPOSER/GROK-R11-P1-01）：「已進入」只認本批之 **review** 輪（brief_kind=review，或上線前
+#   無 brief_kind 且 task_id 不含 CONSULT/STAMP/CLOSURE/IMPL/RECON 者視同 review）且該輪未 debt_abandon；
+#   closure／consult／stamp 輪不算進入——否則「先開 closure 輪」即可越過前批 blocked（三家實跑反例）。
 if python3 - "${AUDIT}" "${root}" "${n}" <<'PY'
-import json, sys
+import json, re, sys
 audit, root, n = sys.argv[1], sys.argv[2].lower(), sys.argv[3]
 pfx = f"{root}-b{n}-"
+EXCL = re.compile(r"-(CONSULT|STAMP|CLOSURE|IMPL|RECON)(-|[0-9]*$)", re.I)
+rows = []
 for raw in open(audit, encoding="utf-8").read().splitlines():
     s = raw.strip()
     if not s.startswith("{"):
         continue
-    try: r = json.loads(s)
+    try: rows.append(json.loads(s))
     except json.JSONDecodeError: continue
-    if r.get("event") == "committee_round_open" and (r.get("task_id") or "").lower().startswith(pfx):
+abandoned = {r.get("round_id") for r in rows if r.get("event") == "debt_abandon"}
+for r in rows:
+    if r.get("event") != "committee_round_open":
+        continue
+    t = r.get("task_id") or ""
+    if not t.lower().startswith(pfx) or r.get("round_id") in abandoned:
+        continue
+    bk = r.get("brief_kind")
+    is_review = (bk == "review") if bk else (not EXCL.search(t))
+    if is_review:
         sys.exit(0)
 sys.exit(1)
 PY
 then
-  echo "[verdictgate] ℹ ${root} b${n}：本批已有審查輪（非新進批次；閉合／補裁決／修補輪）⇒ 不重驗前批（C-4 只擋進入新批）"; exit 0
+  echo "[verdictgate] ℹ ${root} b${n}：本批已有 review 輪（非新進批次；閉合／補裁決／修補輪不重驗前批——C-4 只擋進入新批）"; exit 0
 fi
 # 第三參數可為逗號分隔之多個 prefix（helper 對同一 K 多個 review prefix 全部回傳）；逐一判定，任一擋即擋。
 _vg_rc=0

@@ -158,6 +158,24 @@ def test_check_batch_already_entered_skips_prev_verdicts(tmp_path: Path) -> None
     assert _check(h, "ROOT", 3, "ROOT-B2-REVIEW").returncode != 0          # b3 仍是新批 ⇒ 依 b2 裁決（無 output）擋
 
 
+def test_check_sole_closure_round_does_not_count_as_entered(tmp_path: Path) -> None:
+    """收票審 R11 三家同題：b2 只有 closure／consult 輪（closure-first）⇒ 不算進入 ⇒ 仍依 b1 裁決擋；
+    abandon 掉的 review 輪亦不算；legacy 無 brief_kind 之 review-like 輪算。"""
+    h = _h(tmp_path)
+    _open(h, "ROOT-B1-REVIEW-R1", "rid1")
+    _out(h, "ROOT-B1-REVIEW-R1", "codex", "blocked", blocked=["CODEX-R1-P1-01"], rid="rid1")
+    _open(h, "ROOT-B2-CLOSURE-R1", "rid2c", brief_kind="closure")
+    assert _check(h, "ROOT", 2, "ROOT-B1-REVIEW").returncode != 0
+    _open(h, "ROOT-B2-CONSULT-R1", "rid2k", brief_kind="consult")
+    assert _check(h, "ROOT", 2, "ROOT-B1-REVIEW").returncode != 0
+    _open(h, "ROOT-B2-REVIEW-R1", "rid2r")
+    _raw(h, event="debt_abandon", round_id="rid2r", kind="collection-failed", actor="t", origin_script="debt_clear.sh")
+    assert _check(h, "ROOT", 2, "ROOT-B1-REVIEW").returncode != 0        # 被 abandon 之 review 輪不算
+    _open(h, "ROOT-B2-REVIEW-R2", "rid2r2", brief_kind=None)              # legacy：無 brief_kind、task_id 不含排除字 ⇒ 視同 review
+    r = _check(h, "ROOT", 2, "ROOT-B1-REVIEW")
+    assert r.returncode == 0 and "review 輪" in r.stdout
+
+
 def test_check_blocked_then_closed_passes(tmp_path: Path) -> None:
     h = _h(tmp_path); _open(h, R1, "rid1")
     _out(h, R1, "codex", "blocked", blocked=["CODEX-R1-P1-01"], rid="rid1")
