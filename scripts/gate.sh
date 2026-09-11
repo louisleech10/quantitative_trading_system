@@ -282,17 +282,25 @@ if expected != out_rel:
 m = re.match(r"^(.*?)-(b\d+|x)-", task_id, re.I)
 root = (m.group(1) if m else task_id).lower()
 paths = []
+def same_root(t: str) -> bool:
+    mm = re.match(r"^(.*?)-(b\d+|x)-", t or "", re.I)
+    return ((mm.group(1) if mm else (t or "")).lower()) == root
 for r in rows:
-    if r.get("event") != "committee_output":
-        continue
+    ev = r.get("event")
     t = r.get("task_id") or ""
-    mm = re.match(r"^(.*?)-(b\d+|x)-", t, re.I)
-    if ((mm.group(1) if mm else t).lower()) != root:
+    if not same_root(t):
         continue
-    fam_r = r.get("family")
-    p = r.get("output_path") or ""
-    if fam_r == family or (fam_r in (None, "unknown") and p.endswith(f"-{family}.md")):
-        paths.append(p)
+    if ev == "committee_output":
+        fam_r = r.get("family")
+        p = r.get("output_path") or ""
+        if fam_r == family or (fam_r in (None, "unknown") and p.endswith(f"-{family}.md")):
+            paths.append(p)
+    elif ev == "committee_round_open":
+        # 收票前主委自查（SPLITUNIFY 補裁決輪實戰）：B1 上線前之輪沒有 committee_output 列 ⇒ 語料缺舊產出 ⇒
+        #   補裁決輪（§E E-4 之目的）永遠關不了舊 ID。round_open.expected_outputs[family] 舊輪也有，一併納入。
+        p = (r.get("expected_outputs") or {}).get(family)
+        if p:
+            paths.append(p)
 open(corpus_out, "w", encoding="utf-8").write("\n".join(dict.fromkeys(paths)) + "\n")
 PY
     then rm -f "${_reg_tmp}" "${_reg_tmp}.round"; exit 1; fi

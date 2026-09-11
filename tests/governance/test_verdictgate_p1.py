@@ -218,6 +218,28 @@ def test_12_closed_id_in_same_root_history_accepted(tmp_path: Path) -> None:
     assert _events(h, "committee_output")[-1]["closed"] == ["CODEX-R1-P1-01"]
 
 
+def test_12_closed_id_in_legacy_round_expected_output_accepted(tmp_path: Path) -> None:
+    """收票前自查（SPLITUNIFY 補裁決輪實戰）：B1 上線前之輪只有 committee_round_open（無 committee_output）⇒
+    其 expected_outputs[family] 之檔亦屬同家歷史語料，CLOSED 其中 ID 須放行；否則補裁決輪永遠關不了舊 ID。"""
+    h = _h(tmp_path); _seed_dispatch(h); _open_round(h, ["codex"])
+    legacy = h["root"] / "handoffs" / "legacy-codex.md"
+    legacy.write_text("## CODEX-R1-P1-07\n\n**斷言**: z\n", encoding="utf-8")
+    with h["audit"].open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"event": "committee_round_open", "task_id": "20260911-ROOT-B1-REVIEW-R1", "round_id": "legacy-rid",
+                            "participants": ["codex"], "expected_outputs": {"codex": "handoffs/legacy-codex.md"}, "ts": "t"}) + "\n")
+    _write_out(h, "handoffs/x-codex.md", "CODEX", "VERDICT: proceed\nBLOCKED-BY:\nCLOSED: CODEX-R1-P1-07\n")
+    r = _reg(h, "handoffs/x-codex.md")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _events(h, "committee_output")[-1]["closed"] == ["CODEX-R1-P1-07"]
+    # 對照：他 root 之 round_open expected_outputs 不算
+    other = h["root"] / "handoffs" / "legacy2-codex.md"; other.write_text("## CODEX-R1-P1-08\n\n**斷言**: z\n", encoding="utf-8")
+    with h["audit"].open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"event": "committee_round_open", "task_id": "20260901-OTHERROOT-B1-REVIEW-R1", "round_id": "legacy-rid2",
+                            "participants": ["codex"], "expected_outputs": {"codex": "handoffs/legacy2-codex.md"}, "ts": "t"}) + "\n")
+    _write_out(h, "handoffs/x-codex.md", "CODEX", "VERDICT: proceed\nBLOCKED-BY:\nCLOSED: CODEX-R1-P1-08\n")
+    assert _reg(h, "handoffs/x-codex.md").returncode != 0
+
+
 def test_12_family_from_suffix_grok(tmp_path: Path) -> None:
     h = _h(tmp_path); _seed_dispatch(h); _open_round(h, ["codex", "grok"])
     _write_out(h, "handoffs/x-grok.md", "GROK", "VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\n")
