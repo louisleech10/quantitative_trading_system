@@ -21,7 +21,11 @@ export default function SplitUnifyBadge() {
   //    「舊／不完整 artifact」。前者要明說「不適用」，後者才是不渲染。
   //    判準用**報告本身有沒有切分 metadata**，不猜。
   const hasSplitMetadata = report?.metadata?.ic_train_test_split !== undefined;
-  const view = splitUnifyView(disclosure, { hasSplitMetadata });
+  // 🔴 閉合確認輪 `COMPOSER-R2-P2-02`：事件批缺揭露＝後端漏寫，不是「全域不適用」。
+  //    判準與後端寫 `split_unify` 的條件相同（`is_event_label_consumed` ⇔ label_source 為事件標籤）。
+  const eventFilter = report?.metadata?.event_filter as { label_source?: string } | undefined;
+  const isEventRun = eventFilter?.label_source === 'event_label_value';
+  const view = splitUnifyView(disclosure, { hasSplitMetadata, isEventRun });
   if (!view) return null;
 
   return (
@@ -43,6 +47,11 @@ export default function SplitUnifyBadge() {
       {view.reason ? (
         <span data-testid="split-unify-reason" className="text-amber-300/90">
           （未能計算：{view.reason}）
+        </span>
+      ) : null}
+      {view.missingOnEventRun ? (
+        <span data-testid="split-unify-missing-on-event-run" className="text-amber-300">
+          （⚠️ 事件批應有此揭露，後端未寫入——這不是設計如此，請回報）
         </span>
       ) : null}
       {view.notApplicable ? (

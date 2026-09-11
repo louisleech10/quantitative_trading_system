@@ -72,6 +72,17 @@ describe('splitUnifyView — 顯示規則', () => {
     expect(splitUnifyView(undefined, { hasSplitMetadata: false })).toBeNull();
   });
 
+  it('🔴 事件批卻缺 split_unify ⇒ 後端漏寫警示，**不得**顯示成「不適用」（COMPOSER-R2-P2-02）', () => {
+    const v = splitUnifyView(undefined, { hasSplitMetadata: true, isEventRun: true })!;
+    expect(v.missingOnEventRun).toBe(true);
+    expect(v.notApplicable).toBeFalsy();
+    expect(v.countText).toBe('未揭露');
+    expect(v.countText).not.toBe('不適用');
+    expect(v.countText).not.toBe('0');
+    // 出生理由：閉合確認輪 composer 以提出者身分挑戰——N5 只分了「全域 vs 舊報告」，
+    // 事件批的後端回歸會被顯示成「全域分析：不適用」，把 bug 掩蓋成設計如此。
+  });
+
   it('🔴 已知的全域 run（有切分 metadata、沒有 split_unify）⇒ 明說「不適用」', () => {
     const v = splitUnifyView(undefined, { hasSplitMetadata: true })!;
     expect(v.notApplicable).toBe(true);

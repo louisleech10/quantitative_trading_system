@@ -44,6 +44,8 @@ export interface SplitUnifyView {
   reason: string | null;
   /** 已知的全域 run（設計上就不寫這塊）⇒ 顯示「不適用」，與「算不出來」是兩件事 */
   notApplicable?: boolean;
+  /** 🔴 事件批**應該**有這塊卻沒有 ⇒ 後端漏寫（回歸），不得顯示成「不適用」 */
+  missingOnEventRun?: boolean;
 }
 
 /**
@@ -54,12 +56,26 @@ export interface SplitUnifyView {
  *     ⇒ 明說「全域 run：不適用」——這是設計上就不寫，不是遺漏；
  *   ②**舊／不完整 artifact**（連 `ic_train_test_split` 都沒有）⇒ 回 `null`，呼叫端不渲染。
  * 兩者都**不得**顯示 0：0 讀起來是「算過，結果是零個」。
+ *
+ * 🔴 **第三種**（閉合確認輪 `COMPOSER-R2-P2-02`；我在 N5 宣稱已處理、其實只做一半）：
+ *   ③**事件批卻缺這塊**（`event_filter.label_source === 'event_label_value'`——正是後端寫
+ *     `split_unify` 的同一條件）⇒ 那是**後端漏寫**，顯示琥珀警示「後端未揭露」。
+ *     原本會落進①顯示「全域分析：不適用」，把後端回歸掩蓋成「設計如此」。
  */
 export function splitUnifyView(
   disclosure: SplitUnifyDisclosure | undefined | null,
-  options?: { hasSplitMetadata?: boolean },
+  options?: { hasSplitMetadata?: boolean; isEventRun?: boolean },
 ): SplitUnifyView | null {
   if (!disclosure) {
+    if (options?.isEventRun) {
+      return {
+        hasCount: false,
+        countText: '未揭露',
+        authorityText: splitAuthorityLabel('kline_holdout'),
+        reason: '事件批應有 split_unify 揭露，後端未寫入（回歸）',
+        missingOnEventRun: true,
+      };
+    }
     if (options?.hasSplitMetadata) {
       return {
         hasCount: false,
