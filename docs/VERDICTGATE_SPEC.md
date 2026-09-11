@@ -1,7 +1,8 @@
 # VERDICTGATE — 批次閘改讀委員裁決、且不論誰實作皆觸發 — SPEC
 
 > 來源 PLAN/診斷：`handoffs/20260911-VERDICTGATE-RECON-claude.md`（主委版）＋ `handoffs/reconcile/20260911-verdictgate-x-consult-r1/synth.md`（三家偵察收斂 V1–V6）　|　日期：2026-09-11　|　對應 TODO：`docs/VERDICTGATE_TODO.md`（本 SPEC 定案後生成）
-> **版本：v3（R2 後修訂，待 R3 閉合確認）**——R2：三家皆 `VERDICT: blocked`（codex 5、grok 4、composer 2；11 條群集 X1–X6 全採納、X6 之(c)駁回）：**X1** small 聯集改讀 audit 持續視窗（分兩次 push 不再繞過）；**X2** 六處 baseline 殘文全刪；**X3** `--impl-self` 走既有 dispatch 同一條路、b1 沿用 `_rq_prev` 空即跳過；**X4** 透明度報表加 `live_roots_unwatched`、SPLITUNIFY 以補登記處置；**X5** `cx_run.sh` review／closure 自動 `register-output`＋audit 事件 schema＋`no_output` fail-closed；**X6** roster＝該批有 `committee_family_result` 之家族、`CLOSED:` 只查同 root。收斂檔 `handoffs/reconcile/20260911-verdictgate-x-review-r2/synth.md`。
+> **版本：v4（R3 後修訂，待 R4 閉合確認）**——R3：composer `proceed`（七條全 CLOSED）、grok／codex `blocked`（R2 各閉 5/5、4/5；新 8 條群集 Y1–Y6 全採納）：**Y1** small 視窗唯一錨＝`impl_token_issued`（batch-commit 子句為死錨，刪）；**Y2** `small_commit` 改 post-commit 寫入＋讀取端 `merge-base --is-ancestor` 過濾幽靈 sha；**Y3** roster 改讀 `committee_round_open.quorum_eligible`；**Y4** `verdict_rejected` 之解鎖＝同 task 後續 `committee_output`；**Y5**（採較嚴版）前批存在 review round 但無機械裁決 ⇒ blocked、要求補裁決輪；**Y6** 事件 schema 登記在既有 `scripts/audit_events.json`。收斂檔 `handoffs/reconcile/20260911-verdictgate-x-review-r3/synth.md`。
+> v3（R2 後修訂）——R2：三家皆 `VERDICT: blocked`（codex 5、grok 4、composer 2；11 條群集 X1–X6 全採納、X6 之(c)駁回）：**X1** small 聯集改讀 audit 持續視窗（分兩次 push 不再繞過）；**X2** 六處 baseline 殘文全刪；**X3** `--impl-self` 走既有 dispatch 同一條路、b1 沿用 `_rq_prev` 空即跳過；**X4** 透明度報表加 `live_roots_unwatched`、SPLITUNIFY 以補登記處置；**X5** `cx_run.sh` review／closure 自動 `register-output`＋audit 事件 schema＋`no_output` fail-closed；**X6** roster＝該批有 `committee_family_result` 之家族、`CLOSED:` 只查同 root。收斂檔 `handoffs/reconcile/20260911-verdictgate-x-review-r2/synth.md`。
 > v2（R1 後修訂）——R1：composer／grok 皆 `VERDICT: blocked`（5 條全採納：Task 2.1 字面表雙向誤判 ⇒ 改為舊產出一律 `unknown` 不判；Task 2.2 改讀**該批全部輪之 blocked 聯集**、`proceed` 不解除 ID；Task 3.2 補 `--amend -m` 丟 trailer 與 small 連鎖拆分 ⇒ Task 3.3 push 時聯集判）；codex 誤依 AGENTS.md Rule 12 判「reconcile 未核可不動工」交空檔——**審查不是動工**，R2 brief 明寫。收斂檔 `handoffs/reconcile/20260911-verdictgate-x-review-r1/synth.md`。
 > 使用者裁定（2026-09-11 逐字）：「為了文檔品質，先把治理票做完，再開始量化主線項目」；「不論哪家執行都要觸發」；「整個專案都不接受 95% 就收」。
 
@@ -28,6 +29,9 @@
   - FACT-RECEIPT: grok 於暫存 bare repo 實跑 two-push：push1（3 生產檔 `Ticket-Batch: small`）後 `git rev-list --count origin/main..HEAD`＝`0`；再 commit 3 檔 ⇒ 同 range 只含 `f4–f6`、union=3 ⇒ 依 v2 Task 3.3 放行；累計 6 檔從未同窗（grok 實跑 2026-09-11，`GROK-R2-P0-01`；codex／composer 各給獨立構造）。
   - FACT-RECEIPT: `sed -n '2p;56p' scripts/review_quorum_check.sh` → 現行 quorum＝「≥2 個非實作者家族」、家族由 task_id 尾碼解析、不讀 audit（主委 實跑 2026-09-11）⇒ 只派兩家即滿足 quorum，X6 之 roster 綁定須另做。
   - FACT-RECEIPT: R2 brief 之 assumed「舊產出 unknown 不會漏管現行票」被三家一致否證：SPLITUNIFY B4 review 為上線前登記 ⇒ B5 開輪時閘無輸入而放行（三家各自推演，`CODEX-R2-P1-01`／`GROK-R2-P2-01`／composer 必答 2）⇒ Task 2.1 加 `live_roots_unwatched`，§N 第三條加處置。
+  - FACT-RECEIPT: `sed -n '16p' scripts/audit_append.sh` → `REGISTRY="${SCRIPT_DIR}/audit_events.json"`；`ls scripts/governance_verdicts.json` → 不存在（主委 實跑 2026-09-11，`CODEX-R3-P1-06`）⇒ 事件 schema 只能登記在 `audit_events.json`。
+  - FACT-RECEIPT: `sed -n '219,233p' scripts/committee_run.sh` → 開輪事件已組 `participants`／`quorum_eligible`（排除 advisory）／`expected_outputs` 三欄（主委 實跑 2026-09-11，`CODEX-R3-P1-01`）⇒ C-9 roster 讀 `quorum_eligible`。
+  - FACT-RECEIPT: grok 暫存 repo：commit → `--amend` → `reflog expire`＋`prune` 後舊 sha `git cat-file -e` rc=1；事件序模擬「取較晚錨」下 token→small×3→batch commit→small×3→push 之 union=3 放行、單錨 token 下 union=6 擋（grok 實跑 2026-09-11，`GROK-R3-P1-01`／`GROK-R3-P2-01`）。
   - FACT-RECEIPT: `grep '"event": "committee_output"' .claude/gate/audit.log | grep -o '"task_id"…' | sort | uniq -c | awk '$1>3'` → 印出同一 task 最多 `6` 次 `committee_output`；該事件**只有 `ts`（秒級）、無 seq 欄**（主委 實跑 2026-09-11）⇒ Task 2.2 之「最新輪」**必須以 audit 檔內出現順序（append 序）為準，不得以 `ts` 排序**（同秒碰撞）。
 - **待使用者確認**：`待確認：無`（本票之三條設計約束皆為使用者 2026-09-11 逐字裁定，見檔頭）。
 - **已確認結果**：`2026-09-11 使用者「不論哪家執行都要觸發」；「先把治理票做完」；「整個專案都不接受 95% 就收」；「能當下做的就要做掉…除非已定義在其他 Phase 或現階段完全不可能做」`。
@@ -37,11 +41,11 @@
 - **C-1 單一真相源**：裁決值集、處置 token 值集、家族名冊一律住 JSON（`scripts/governance_verdicts.json`、既有 `scripts/governance_families.json`），SPEC 只 pointer；**本 SPEC 不在散文列舉值集**。
 - **C-2 不動 G-7 之 warn-only**：使用者 2026-09-05 裁定 G-7 不擋；本票新增之 commit-msg 檢查與 G-7 為**兩條獨立呼叫、不共用回傳**（`CODEX-R1-P0-01`／`GROK-R1-P0-01`）。
 - **C-3 只計「無後續 closed 的 blocked」**：閘之判定必須排除「R2 不可進 → R3 closed → 進下一批」的合法序列（`GROK-R1-P2-01`）。
-- **C-4 舊產出不推導、不進判定**（v2 改寫）：閘只讀 Phase 1 上線後經 `register-output` 寫入 audit 之機械裁決；本票前 621 份無 `VERDICT:` 之產出一律 `unknown`，只列透明度報表（Task 2.1）。v1 之「字面表推導＋凍結基準」被三家實跑證明雙向誤判（under-block ≥63、over-block 10）而取消。
+- **C-4 舊產出不推導；缺機械裁決即缺輸入 ⇒ fail-closed**（v4 改寫，`CODEX-R3-P1-05`）：閘只讀 Phase 1 上線後經 `register-output` 寫入 audit 之機械裁決，**不對任何 markdown 做字面推導**（v1 字面表被三家實跑證明雙向誤判而取消）。前批若在 audit 有 `committee_round_open` 但 `quorum_eligible` 任一家無同家含 `verdict` 之 `committee_output` ⇒ **blocked**，訊息指名「派補裁決輪（`brief-kind: closure`）」；前批**完全不存在** round ⇒ 不擋。舊產出仍一律 `unknown` 列透明度報表（Task 2.1）。v3 之「unknown 不進判定 ⇒ 放行」被 codex 證明使 SPLITUNIFY B5 可先於補裁決開輪 ⇒ 改為與 C-9 同一原則。
 - **C-5 委員執行端相容**：委員經 `cx_run.sh` 不 commit（FACT），故 commit-msg 閘不影響委員交件；`register-output` 之 fail-closed 只作用於本票上線後之新產出。
 - **C-6 主委路徑與委員路徑走同一道判定**：主委開新批須 `gate.sh dispatch --impl-self`（task_id `<root>-impl-b<N>-claude`），走與委員派工**同一條** dispatch 路徑（debt／brief／reconcile-stamp／quorum descoped 回溯／template_check 全部沿用）＋本票新閘；不得另寫主委專用分支，**含 b1 之特例**（`GROK-R2-P1-01`／`CODEX-R2-P1-04`／`COMPOSER-R2-P2-02`）。
-- **C-8 audit 事件 schema 為契約**（v3 新增，`CODEX-R2-P0-01`）：本票新增事件 `impl_token_issued {task_id, root, batch, family, ts}`、`small_commit {sha, prod_files[]}`、`governance_bypass {hook, reason}`，以及 `committee_output` 新增欄 `verdict, blocked_by[], closed[]`；`committee_family_result` 新增 `verdict_rejected` 狀態。欄名住 `scripts/governance_verdicts.json`（`audit_events`），SPEC 只 pointer。
-- **C-9 fail-closed 之 `no_output`**（v3 新增，`CODEX-R2-P0-01`／`CODEX-R2-P1-02`）：判定 roster＝該批 audit 中有 `committee_family_result` 之家族；任一家有 `family_result` 而無同家 `committee_output`（含 `verdict_rejected`）⇒ 視為 blocked，除非該 round 已 `debt_clear --abandon --kind collection-failed`（既有機制即「合法 DEGRADE」，不新增核准流程）。
+- **C-8 audit 事件 schema 為契約**（v3 新增，`CODEX-R2-P0-01`；v4 依 `CODEX-R3-P1-06` 改 SSOT）：本票新增事件 `impl_token_issued {task_id, root, batch, family, ts}`、`small_commit {sha, prod_files[], producer=post-commit}`、`governance_bypass {hook, reason}`，以及 `committee_output` 新增欄 `verdict, blocked_by[], closed[]`；`committee_family_result` 新增 `verdict_rejected` 狀態。事件名與必填欄**登記在既有 `scripts/audit_events.json`**（`audit_append.sh:16` 唯一寫入點固定讀此檔，FACT §A）；`scripts/governance_verdicts.json` 只放 `verdict_values`／`disposition_values`。SPEC 只 pointer。
+- **C-9 fail-closed 之 `no_output`**（v3 新增；v4 依 `CODEX-R3-P1-01`／`CODEX-R3-P1-03` 改寫）：判定 roster＝該批 `committee_round_open` 事件之 `quorum_eligible[]`（advisory 已排除；`committee_run.sh:219-233` 既有欄位）——**不讀** `committee_family_result` 決定 roster（掛死／被砍之家族無 `family_result` 會從 roster 消失）。任一 roster 家族無同家含 `verdict` 之 `committee_output`（`family_result` 狀態為 `verdict_rejected` 亦屬無 output）⇒ blocked。**解鎖**只有兩條：①同 task_id 同家後續 `committee_output`（append 序在後；主委修檔後再 `register-output`）；②該 round `debt_clear --abandon --kind collection-failed`——**只准**用於該家族無任何 `family_result`（真缺席），有 `family_result` 卻 abandon ⇒ `debt_clear` 拒。不新增 DEGRADE 核准流程。
 - **C-7 逃生口留痕**：`GOVERNANCE_SKIP_PREPUSH=1` 與 commit-msg 之逃生口一律寫 audit（`event=governance_bypass`），現行為靜默。
 - 既有 caller／共用路徑：`gate.sh`（dispatch／register-output）、`committee_run.sh`（開輪）、`debt_clear.sh`、`reconcile_build.sh`、`completeness_check.sh`、`reconcile_cluster_attribution_check.sh`、`scripts/git_hooks/commit-msg`、`gov_check.sh --fast`、`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`、`templates/COMMITTEE_FINDING_TEMPLATE.md`。
 
@@ -53,7 +57,7 @@
 
 ### Phase 1 — 裁決契約（依賴：無）
 **Task 1.1 — `scripts/governance_verdicts.json`＋範本改格式**
-- 目標：委員產出之裁決成為機械可讀。　檔案：`scripts/governance_verdicts.json`（新）、`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`、`templates/COMMITTEE_FINDING_TEMPLATE.md`、`templates/BRIEF_REVIEW_TEMPLATE.md`　既有 caller：`new_brief.sh`（讀範本）。
+- 目標：委員產出之裁決成為機械可讀。　檔案：`scripts/governance_verdicts.json`（新；只放 `verdict_values`／`disposition_values`）、`scripts/audit_events.json`（既有事件 SSOT；登記 C-8 三個新事件與新欄——v4 `CODEX-R3-P1-06`）、`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`、`templates/COMMITTEE_FINDING_TEMPLATE.md`、`templates/BRIEF_REVIEW_TEMPLATE.md`　既有 caller：`new_brief.sh`（讀範本）。
 - 改法：JSON 定義兩層契約——輸出級 `VERDICT: <verdict_values 之一>`；finding 級 `BLOCKED-BY: <ID,…>`（verdict 為 blocked 時必填）與 `CLOSED: <ID,…>`（閉合輪必填）。範本原有之 `## Verdict：` 三值散文段改為上述三行機械塊，放在檔案**末段**。
 - **驗證**：`python -c 'import json;json.load(open("scripts/governance_verdicts.json"))'` rc=0；`grep -c '^VERDICT: ' templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` ≥ 1；`bash scripts/template_check.sh` 對三份範本 rc=0。
 - **邊界**：①JSON 缺 `verdict_values` 鍵 ⇒ 下游 parser import 期 raise；②範本仍留舊 `## Verdict：` 行 ⇒ `template_check` 紅（雙格式並存＝兩份真相源）。
@@ -79,21 +83,24 @@
 ### Phase 2 — 開輪閘（依賴：Phase 1）
 **Task 2.1 — 全庫透明度報表（不凍結、不判定）**
 - 目標：把「哪些輪有機械裁決、哪些是 `unknown`、哪些現行票的下一個跨批邊界閘看不到」印給人讀。　檔案：新 `scripts/verdictgate_baseline.sh`（**只有** `--report`；無 `--freeze`、無基準檔——v3 依 `GROK-R2-P0-02`／`COMPOSER-R2-P1-01`／`COMPOSER-R2-P2-01` 清掉 v1 殘文）。
-- 改法（**v2 改寫**——v1 之 legacy 字面表被三家實跑打穿：`COMPOSER-R1-P1-01` 全庫 ≥63 份「需修補後派工／條件式可進」被判 proceed（under-block）、`COMPOSER-R1-P1-02` 10 份閉合輪因同區塊含歷史「不可進」被判 blocked（over-block）、`GROK-R1-P1-01` 金標跨批檔反被判 proceed；`COMPOSER-R1-P2-01` 掃描範圍未定義）：**不對舊產出做任何字面推導**。舊產出（無 `VERDICT:` 行）一律 `verdict=unknown`，**不進閘判定**——依使用者 2026-08-05「面向未來不溯及既往」。本 Task 只產出**透明度清單**：`verdictgate_baseline.sh --report` 列出每個 `<root>-b<N>-review-r<M>` 各家是否有機械裁決（`has_verdict|unknown`）與 `unknown` 總數，供人讀，**不作為判定輸入**。
+- 改法（**v2 改寫**——v1 之 legacy 字面表被三家實跑打穿：`COMPOSER-R1-P1-01` 全庫 ≥63 份「需修補後派工／條件式可進」被判 proceed（under-block）、`COMPOSER-R1-P1-02` 10 份閉合輪因同區塊含歷史「不可進」被判 blocked（over-block）、`GROK-R1-P1-01` 金標跨批檔反被判 proceed；`COMPOSER-R1-P2-01` 掃描範圍未定義）：**不對舊產出做任何字面推導**。舊產出（無 `VERDICT:` 行）一律 `verdict=unknown`——**不推導其內容**（使用者 2026-08-05「面向未來不溯及既往」）；判定面依 C-4：`unknown`＝缺輸入 ⇒ 活票開下一批時 fail-closed、要求補裁決輪（v4）。本 Task 只產出**透明度清單**：`verdictgate_baseline.sh --report` 列出每個 `<root>-b<N>-review-r<M>` 各家是否有機械裁決（`has_verdict|unknown`）與 `unknown` 總數，供人讀，**不作為判定輸入**。
 - **驗證**：`bash scripts/verdictgate_baseline.sh --report` rc=0；輸出含 `unknown=<n>` 行且 n ≥ 621（FACT：本票前 review 產出 621 份皆無 `VERDICT:`）；對本票 R1／R2 已登記之產出印 `has_verdict`；**v3 新增兩行**（`GROK-R2-P2-01`／`CODEX-R2-P1-01`）：`live_roots_unwatched=<root,…>`（audit 中有 `committee_round_open` 但無對應 `debt_clear` 收票之 root，且其最新批 review 各家皆 `unknown`）與 `legacy_open_by_root=<root:b<N>,…>`。
-  `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_round_outputs=legacy_unknown THEN rc=0`（舊產出不擋）。
+  `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_round_open=present prev_round_outputs=legacy_unknown THEN rc!=0 且 stderr 含 補裁決輪`（v4 反轉：缺機械裁決＝缺輸入，C-4）；
+  `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_round_open=absent THEN rc=0`（對照組：前批不存在不擋）。
   `ASSERT bash scripts/verdictgate_baseline.sh --report WHEN audit=人造(ROOT-b1 review 無 verdict, ROOT 未收票) THEN stdout 含 live_roots_unwatched=ROOT`
-- **邊界**：①`unknown` 之計數**必印**（不靜默）；②audit 缺 `committee_output` 之輪 ⇒ 列 `no_output` 並印（判定面之 `no_output` 行為由 C-9 定）；③本 Task **不寫任何基準檔**（沒有字面推導就沒有東西要凍）；④`live_roots_unwatched` **不是**閘輸入——處置寫在 §N 第三條。
+- **邊界**：①`unknown` 之計數**必印**（不靜默）；②audit 缺 `committee_output` 之輪 ⇒ 列 `no_output` 並印（判定面之 `no_output` 行為由 C-9 定）；③本 Task **不寫任何基準檔**（沒有字面推導就沒有東西要凍）；④`live_roots_unwatched` 為報表欄——閘之判定由 C-4 自行讀 audit（`round_open` 有而 `verdict` 無 ⇒ 擋），不依賴本報表。
 - **存活至**：報表工具保留。　**覆蓋風險**：無。
 - 不可做：不改寫任何歷史 handoff。
 
 **Task 2.2 — `committee_run.sh` 開輪＋`gate.sh dispatch` 派 review 時讀裁決**
 - 目標：任一家 `blocked` 且該家對同一 ID 無後續 `closed` ⇒ 不得開下一批之輪。　檔案：`scripts/committee_run.sh`（`:426` mint round 之前）、`scripts/gate.sh`（dispatch 分支，`:783` 既有 `_rq_*` 回溯邏輯旁）、新 `scripts/verdictgate_check.sh`（單一判定實作）。
-- 改法：`verdictgate_check.sh <root> <N>` 找 `<root>-b<N-1>`（沿用 `gate.sh:791-798` 既有 descoped 回溯），取該批**全部** review 輪（不只最新輪）各家 `committee_output` 之 `blocked_by`，**聯集**成待閉合集合 `{(family, ID)}`；每個 `(family, ID)` 必須在**同家**之任一後續產出（append 序在其後；任何輪、含閉合輪）的 `closed` 中出現，否則視為未閉合 ⇒ rc=1 並逐條指名。🔴 **`verdict: proceed` 本身不解除任何 ID**——同家下一輪改寫 `proceed` 而不寫 `CLOSED:` 仍擋（`GROK-R1-P0-01`：v1 只讀最新輪，等於讓「下一輪閉嘴」等同閉合）。「後續」之序＝audit 檔內 append 序，**不以 `ts` 排序**（`committee_output` 只有秒級 `ts`、同秒碰撞實測存在，見 §A）。`committee_run.sh` 與 `gate.sh dispatch` 皆在開輪前呼叫。**本閘只對 Phase 1 上線後 `register-output` 寫入 audit 之裁決生效**；無 `verdict` 欄之舊產出一律 `unknown`、不進判定（見 Task 2.1）。
+- 改法：`verdictgate_check.sh <root> <N>` 找 `<root>-b<N-1>`（沿用 `gate.sh:791-798` 既有 descoped 回溯），取該批**全部** review 輪（不只最新輪）各家 `committee_output` 之 `blocked_by`，**聯集**成待閉合集合 `{(family, ID)}`；每個 `(family, ID)` 必須在**同家**之任一後續產出（append 序在其後；任何輪、含閉合輪）的 `closed` 中出現，否則視為未閉合 ⇒ rc=1 並逐條指名。🔴 **`verdict: proceed` 本身不解除任何 ID**——同家下一輪改寫 `proceed` 而不寫 `CLOSED:` 仍擋（`GROK-R1-P0-01`：v1 只讀最新輪，等於讓「下一輪閉嘴」等同閉合）。「後續」之序＝audit 檔內 append 序，**不以 `ts` 排序**（`committee_output` 只有秒級 `ts`、同秒碰撞實測存在，見 §A）。`committee_run.sh` 與 `gate.sh dispatch` 皆在開輪前呼叫。**本閘只對 Phase 1 上線後 `register-output` 寫入 audit 之裁決生效**；無 `verdict` 欄之舊產出一律 `unknown`——不推導、但依 C-4 視為缺輸入而擋（v4；見 Task 2.1）。
 - **驗證**：`pytest tests/governance/test_verdictgate_*.py` rc=0，一條 ASSERT 對應一個 test；固定文法斷言如下：
   `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_verdict=blocked closed=absent THEN rc!=0`
-  `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_family_result=present prev_committee_output=absent round_abandoned=false THEN rc!=0`（C-9 no_output fail-closed）
-  `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_family_result=present prev_committee_output=absent round_abandoned=true THEN rc=0`（對照組）
+  `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_quorum_eligible=codex,composer,grok prev_committee_output=codex,composer round_abandoned=false THEN rc!=0 且指名 grok`（C-9 no_output；roster 來自 `round_open`，grok 無 `family_result` 亦擋——`CODEX-R3-P1-01`）
+  `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_quorum_eligible=codex,composer,grok prev_committee_output=codex,composer grok_family_result=absent round_abandoned=true THEN rc=0`（對照組：真缺席可 abandon）
+  `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN grok_family_result=verdict_rejected grok_committee_output_after=present THEN rc=0`（C-9 解鎖①，`CODEX-R3-P1-03`）
+  `ASSERT bash scripts/debt_clear.sh --abandon --kind collection-failed WHEN any_family_result=present THEN rc!=0`（C-9 解鎖② 之反面）
   `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_verdict=blocked closed=present THEN rc=0`
   `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_r1_verdict=blocked prev_r2_verdict=proceed closed=absent THEN rc!=0`
   `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_verdict=blocked closed_by_family=other THEN rc!=0`
@@ -118,7 +125,7 @@
 - 不可做：不另寫主委專用判定（C-6）。
 
 **Task 3.2 — commit-msg 閘：`Ticket-Batch` trailer（fail-closed，與 G-7 分離）**
-- 目標：任何含生產碼之 commit 皆須宣告所屬批次並持有效 token；小任務走 `small`。　檔案：`scripts/git_hooks/commit-msg`（`exec` 之前，獨立於 `g7_trailer_precheck.sh || true`）、新 `scripts/ticket_batch_check.sh`。
+- 目標：任何含生產碼之 commit 皆須宣告所屬批次並持有效 token；小任務走 `small`。　檔案：`scripts/git_hooks/commit-msg`（`exec` 之前，獨立於 `g7_trailer_precheck.sh || true`）、新 `scripts/git_hooks/post-commit`（寫 `small_commit`；v4）、新 `scripts/ticket_batch_check.sh`。
 - 改法：staged 含 `momentum/|api/|frontend/src/` ⇒ 訊息**最末段**須有 `Ticket-Batch: <root>/b<N>` 或 `Ticket-Batch: small`。`<root>/b<N>` ⇒ `.claude/gate/impl.<root>-b<N>.token` 存在且 mtime 在 900s 內；`small` ⇒ staged 檔數 ≤ 3 且不含 `factories.py|protocols.py|config.py`（CLAUDE.md 膨脹訊號）。皆無 ⇒ rc=2 拒 commit。
 - **驗證**：`pytest tests/governance/test_verdictgate_*.py` rc=0，一條 ASSERT 對應一個 test；固定文法斷言如下：
   `ASSERT git commit WHEN staged=momentum/x.py trailer=absent THEN rc!=0`
@@ -128,21 +135,24 @@
   `ASSERT git commit WHEN staged=momentum/x.py trailer=Ticket-Batch:ROOT/b2 token=fresh THEN rc=0`
   `ASSERT git commit WHEN staged=docs/x.md trailer=absent THEN rc=0`
   另：`Governance-Scope:` 與 `Ticket-Batch:` 同段 ⇒ `git interpret-trailers --parse` 兩鍵皆出（FACT）。
-- **邊界**：①`--amend --no-edit` 沿用原訊息之 trailer（FACT，§A）；**`--amend -m` 會丟 trailer**（`GROK-R1-P2-01`）⇒ 視同新訊息，須重帶，否則擋；②merge commit 豁免；③`GOVERNANCE_SKIP_COMMITMSG=1` 逃生口 ⇒ 放行**但**寫 audit `governance_bypass`（C-7）；④🔴 **`small` 之連鎖拆分**（`GROK-R1-P1-02`：連續多個 ≤3 檔 small commit 可把整批生產碼改動全程不領權限）——單 commit 層無法判；commit-msg 階段對每個 `Ticket-Batch: small` 寫 audit `small_commit {sha, prod_files[]}`（C-8），由 Task 3.3 於 push 時讀 audit **持續視窗**取聯集（v3：v2 之 `origin/main..HEAD` 窗每次 push 後重置，分兩次 push 各 ≤3 檔即繞過——`GROK-R2-P0-01`／`CODEX-R2-P1-03`／`COMPOSER-R2-P1-02`）。
+- **邊界**：①`--amend --no-edit` 沿用原訊息之 trailer（FACT，§A）；**`--amend -m` 會丟 trailer**（`GROK-R1-P2-01`）⇒ 視同新訊息，須重帶，否則擋；②merge commit 豁免；③`GOVERNANCE_SKIP_COMMITMSG=1` 逃生口 ⇒ 放行**但**寫 audit `governance_bypass`（C-7）；④🔴 **`small` 之連鎖拆分**（`GROK-R1-P1-02`：連續多個 ≤3 檔 small commit 可把整批生產碼改動全程不領權限）——單 commit 層無法判；**`post-commit` hook**（v4：commit-msg 階段 sha 尚未定案——`CODEX-R3-P1-04`）對每個 `Ticket-Batch: small` 寫 audit `small_commit {sha, prod_files[], producer=post-commit}`（C-8），由 Task 3.3 於 push 時讀 audit **持續視窗**取聯集（v3：v2 之 `origin/main..HEAD` 窗每次 push 後重置，分兩次 push 各 ≤3 檔即繞過——`GROK-R2-P0-01`／`CODEX-R2-P1-03`／`COMPOSER-R2-P1-02`）。
 - **存活至**：保留。　**覆蓋風險**：無。
 - 不可做：不動 G-7 之 `|| true`；不把本檢查併進 `g7_trailer_precheck.sh`。
 
 **Task 3.3 — `gov_check --fast` 補 `--no-verify` 那條＋逃生口留痕**
 - 目標：`git commit --no-verify` 繞過 Task 3.2 者在 push 前被抓。　檔案：`scripts/gov_check.sh`（新段 `1c`，登記 `_GC_SEG_IDS`）、`scripts/git_hooks/pre-push`（逃生口寫 audit）。
-- 改法：`1c`：對 `origin/main..HEAD` 每個 commit 跑 `ticket_batch_check.sh --commit <sha>`（只驗 trailer 與 token **曾存在**——token 已過期屬正常，改驗 audit 有 `impl_token_issued` 事件）；**small 聯集之視窗（v3）**：讀 audit 自**最近一筆 `impl_token_issued`（或最近一個 `Ticket-Batch: <root>/b<N>` commit 之 `small_commit` 之後）以來**全部 `small_commit` 事件之 `prod_files` 取聯集——push 成功**不清零**；聯集 > 3 檔或含 `factories.py|protocols.py|config.py` ⇒ 拒 push 並指名累計檔案與起算事件（Task 3.2 邊界④，`GROK-R1-P1-02`→`GROK-R2-P0-01`）；`pre-push` 之 `GOVERNANCE_SKIP_PREPUSH=1` 分支加 `audit_append.sh --event governance_bypass`。
+- 改法：`1c`：對 `origin/main..HEAD` 每個 commit 跑 `ticket_batch_check.sh --commit <sha>`（只驗 trailer 與 token **曾存在**——token 已過期屬正常，改驗 audit 有 `impl_token_issued` 事件）；**small 聯集之視窗（v4）**：讀 audit 自**最近一筆 `impl_token_issued`（audit append 序；**唯一**重置錨——v3 之「或 batch commit」子句為死錨且可被 token→small×3→batch commit→small×3→一次 push 繞過，`GROK-R3-P1-01`／`CODEX-R3-P1-02`）以來**全部 `small_commit` 事件，**先以 `git merge-base --is-ancestor <sha> HEAD` 過濾不可達 sha**（amend／reset 幽靈，`CODEX-R3-P1-04`／`GROK-R3-P2-01`），再對 `prod_files` 取聯集——push 成功**不清零**；視窗為**全 repo 全域**（`small` 無 root，不做 root／branch 過濾——這正是「small 不得連鎖」之語意）；聯集 > 3 檔或含 `factories.py|protocols.py|config.py` ⇒ 拒 push 並指名累計檔案與起算事件（Task 3.2 邊界④，`GROK-R1-P1-02`→`GROK-R2-P0-01`）；`pre-push` 之 `GOVERNANCE_SKIP_PREPUSH=1` 分支加 `audit_append.sh --event governance_bypass`。
   追加固定文法：`ASSERT bash scripts/gov_check.sh --fast WHEN small_commits=3 prod_files_union=5 THEN rc!=0`；`ASSERT bash scripts/gov_check.sh --fast WHEN small_commits=2 prod_files_union=3 THEN rc=0`；
   `ASSERT bash scripts/gov_check.sh --fast WHEN push1(small 3 檔) rc=0 THEN push2(另 small 3 檔, 無 impl_token_issued 介於其間) rc!=0`（two-push，`GROK-R2-P0-01`）；
-  `ASSERT bash scripts/gov_check.sh --fast WHEN push1(small 3 檔) rc=0 impl_token_issued THEN push2(small 3 檔) rc=0`（對照組：領權限後視窗重置）。
+  `ASSERT bash scripts/gov_check.sh --fast WHEN push1(small 3 檔) rc=0 impl_token_issued THEN push2(small 3 檔) rc=0`（對照組：領權限後視窗重置）；
+  `ASSERT bash scripts/gov_check.sh --fast WHEN 序列=impl_token_issued,small{a,b,c},batch_commit(Ticket-Batch:ROOT/b2),small{d,e,f},push THEN rc!=0`（單錨，`GROK-R3-P1-01` 五步）；
+  `ASSERT bash scripts/gov_check.sh --fast WHEN audit 含 small_commit{sha=不可達,prod_files=x,y,z} 及 small_commit{sha=可達,prod_files=a} THEN union=1 rc=0`（幽靈過濾，`GROK-R3-P2-01`）；
+  `ASSERT bash scripts/audit_append.sh --event impl_token_issued WHEN 缺 root 欄 THEN rc!=0`（C-8 SSOT 在 `audit_events.json`，`CODEX-R3-P1-06`）。
 - **驗證**：`pytest tests/governance/test_verdictgate_*.py` rc=0，一條 ASSERT 對應一個 test；固定文法斷言如下：
   `ASSERT bash scripts/gov_check.sh --fast WHEN head_commit_trailer=absent staged_prod=true THEN rc!=0`
   `ASSERT bash scripts/gov_check.sh --fast WHEN head_commit_trailer=Ticket-Batch:small THEN rc=0`
   `ASSERT GOVERNANCE_SKIP_PREPUSH=1 bash scripts/git_hooks/pre-push WHEN any THEN rc=0`；且 `grep -c governance_bypass .claude/gate/audit.log` 增 1。
-- **邊界**：①`origin/main` 不存在（首次 push）⇒ trailer 只驗 HEAD，small 聯集仍讀 audit；②commit 全為 docs ⇒ 跳過 trailer 驗；③audit 無任何 `small_commit`／`impl_token_issued` ⇒ 聯集為空 ⇒ 放行（上線前歷史不溯及）。
+- **邊界**：①`origin/main` 不存在（首次 push）⇒ trailer 只驗 HEAD，small 聯集仍讀 audit；②commit 全為 docs ⇒ 跳過 trailer 驗；③audit 無任何 `impl_token_issued` ⇒ 視窗自 audit 首筆 `small_commit` 起算；連 `small_commit` 也無 ⇒ 聯集為空 ⇒ 放行（上線前歷史不溯及）；④`post-commit` hook 寫 audit 失敗 ⇒ 印 ERROR 但不擋 commit（commit 已成立），由 Task 3.3 於 push 時以 `origin/main..HEAD` 中含 `Ticket-Batch: small` 卻無對應 `small_commit` 事件之 commit ⇒ 拒 push（補洞：寫入失敗不得成為繞過）。
 - **存活至**：保留。　**覆蓋風險**：無。
 - 不可做：不新增 CI（使用者 2026-08-13 裁定刪除；見 §N）。
 
@@ -176,4 +186,4 @@
 - **殘留**（依使用者 2026-09-11 規則，只准兩種）：
   - `git push --no-verify` 之客戶端繞過 — `為何現在不做: user-ruling:2026-08-13 使用者裁定刪除 CI（唯一能在伺服端擋的機制）`；觸發：使用者恢復任何遠端檢查時；登記處：本檔。
   - 「決議內容是否真的處理了 finding」之語意驗證 — `為何現在不做: needs-research:需自然語言蘊涵判定，三家 consult 一致判現階段無機械判準（CODEX-R1-P2-04／COMPOSER-R1-P2-02／GROK-R1-P1-04）`；觸發：出現可證偽之語意判準時；登記處：本檔。
-  - 舊產出（本票前 621 份 review）不回溯要求 `VERDICT:` — `為何現在不做: user-ruling:2026-08-05「面向未來不溯及既往」`；以 Task 2.1 `--report` 列 `unknown` 與 `live_roots_unwatched`（不進閘判定、不凍基準）。**處置（v3，`CODEX-R2-P1-01`／`GROK-R2-P2-01`）**：現行暫停票 SPLITUNIFY 於 B5 開輪前，主委派一輪 **補裁決輪**（`brief-kind: closure`，三家只需對 B4 閉合確認輪各自的 findings 依 Task 1.1 契約寫 `VERDICT:`／`BLOCKED-BY:`／`CLOSED:` 機械塊），產出經 Phase 1 自動註冊——用新契約補登記，**不用字面推導**（FACT：`grep -ln '^VERDICT:' handoffs/2026091*-splitunify-*.md` 只命中一份 stamp 檔，B4 閉合輪三份**皆無** `VERDICT:`，主委實跑 2026-09-11）；已收票（EVTLABEL 等）不補。
+  - 舊產出（本票前 621 份 review）不回溯要求 `VERDICT:` — `為何現在不做: user-ruling:2026-08-05「面向未來不溯及既往」`；以 Task 2.1 `--report` 列 `unknown` 與 `live_roots_unwatched`（報表不凍基準；判定面由 C-4 直接讀 audit）。**處置（v4 改為機械，`CODEX-R3-P1-05`）**：C-4 對「前批有 round 而無機械裁決」fail-closed ⇒ 現行暫停票 SPLITUNIFY 開 B5 時閘會擋並指名；主委須先派一輪 **補裁決輪**（`brief-kind: closure`，三家只需對 B4 閉合確認輪各自的 findings 依 Task 1.1 契約寫 `VERDICT:`／`BLOCKED-BY:`／`CLOSED:` 機械塊），產出經 Phase 1 自動註冊——用新契約補登記，**不用字面推導**（FACT：`grep -ln '^VERDICT:' handoffs/2026091*-splitunify-*.md` 只命中一份 stamp 檔，B4 閉合輪三份**皆無** `VERDICT:`，主委實跑 2026-09-11）；已收票（EVTLABEL 等）不補。

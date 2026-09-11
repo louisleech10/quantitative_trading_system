@@ -57118,3 +57118,48 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r2-composer.md", "output_sha256": "7d52ab72a9b780cf4765b504e95f3395d7400c607b5614bceb67a987e4b8f9a6", "task_id": "20260911-VERDICTGATE-X-REVIEW-R2", "ts": "2026-09-11T06:38:44Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r2-grok.md", "output_sha256": "1cf75b9029078aa96a9b841cd4f7a7c40722225887c8c3a2b618164b82e8f727", "task_id": "20260911-VERDICTGATE-X-REVIEW-R2", "ts": "2026-09-11T06:38:44Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "ca769aff-9a29-4254-814a-155b10347926", "lock_sha256": "b79f3d16e3974faa451221a77b7c3fcc6d553797ca92f2f589a7d3cdcf926015", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "d2ccf23a-d97d-4c73-b00a-08817a3cc0ff", "schema_version": 1, "sequence": 3460, "session_id": "20260911-verdictgate-x-review-r2", "synth_sha256": "b0073855938b21842964e1f97ec46a695416901957eb654f4ab72865428471be", "ts": "2026-09-11T06:39:05Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-X-REVIEW-R3", "ts": "2026-09-11T06:44:02Z"}
+=== 2026-09-11 14:44:02 | dispatch ===
+  ts=2026-09-11 14:44:02
+  kind=dispatch
+  intent=SPEC v3 三家閉合確認＋adversarial R3
+  risk=low
+  facts_asked=yes
+  review_role=reviewer
+  template=n/a:
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-X-REVIEW-R3", "ts": "2026-09-11T06:44:59Z"}
+=== 2026-09-11 14:44:59 | dispatch ===
+  ts=2026-09-11 14:44:59
+  kind=dispatch
+  intent=VERDICTGATE SPEC v3 三家閉合確認＋adversarial review（R3）
+  risk=low
+  facts_asked=none-needed:設計約束皆使用者 2026-09-11 逐字裁定，見 SPEC 檔頭
+  review_role=三家全員 adversary，各自對 R2 自己的 ID 重驗閉合
+  template=n/a:review 派工非 SPEC 起草
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260911-VERDICTGATE-SPEC-REVIEW-R3-BRIEF.md", "brief_sha256": "552d615232dc427eed15fc1935cac216ae25f58dc37f1b17100783771564116d", "brief_sha256_norm": "552d615232dc427eed15fc1935cac216ae25f58dc37f1b17100783771564116d", "event": "committee_round_open", "event_id": "c3495083-5466-4ab5-ae82-7ec8d1c21675", "expected_outputs": {"codex": "handoffs/20260911-verdictgate-x-review-r3-codex.md", "composer": "handoffs/20260911-verdictgate-x-review-r3-composer.md", "grok": "handoffs/20260911-verdictgate-x-review-r3-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "7fdcc5ff-f51d-41c1-b411-ffecf4b87858", "schema_version": 1, "sequence": 3461, "session_name": "20260911-verdictgate-x-review-r3", "task_id": "20260911-VERDICTGATE-X-REVIEW-R3", "ts": "2026-09-11T06:45:04Z"}
+{"actor": "cx_run", "attempt_id": "6670fd08-2b37-4bd8-82f8-20f091eb3c33", "cli_rc": "0", "event": "committee_family_result", "event_id": "ab648b0e-9566-4751-a4b8-519b944947b3", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-verdictgate-x-review-r3-composer.md", "output_sha256": "49755bc78be594aac856955095d248101ceb71ea75834ed47271ccde116b2711", "producer": "audit_append.sh", "result_state": "success", "round_id": "7fdcc5ff-f51d-41c1-b411-ffecf4b87858", "schema_version": 1, "sequence": 3462, "ts": "2026-09-11T06:47:56Z"}
+{"actor": "cx_run", "attempt_id": "1e366507-4f93-48bc-a6f7-6e682b12dcbf", "cli_rc": "0", "event": "committee_family_result", "event_id": "59f6c367-860b-4a18-82b9-1e3e771f2603", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-verdictgate-x-review-r3-grok.md", "output_sha256": "d21426e0e575b48a2d6a1994d0710ef60cf19c0c0d845444f00da4490d21e750", "producer": "audit_append.sh", "result_state": "success", "round_id": "7fdcc5ff-f51d-41c1-b411-ffecf4b87858", "schema_version": 1, "sequence": 3463, "ts": "2026-09-11T06:51:21Z"}
+{"event":"gate_deny","ts":"2026-09-11T06:54:06Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"a3cad6647d8f8e57df23cf489ab375bb5a6b68482676a65c9b9306cf71e74287","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260911-verdictgate-x-review-r3-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"event":"gate_deny","ts":"2026-09-11T06:55:25Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"23d60cfe247d229dce09c96c8fd6c42b2de74da0d6111e004edbef46c046fa82","cmd_head":"./scripts/completeness_check.sh --single handoffs/20260911-verdictgate-x-review-r3-codex.md --family codex; rc=$?; echo EQUIVALENT_COMPLETENESS_RC=$rc; exit $rc"}
+{"event":"gate_deny","ts":"2026-09-11T06:55:54Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"dcc981fa7b656d68d2c041aee17fa97cd4829ed4b1f0c5b1d723da5e57ca1bfe","cmd_head":"FAMILY=codex; bash scripts/completeness_check.sh --single handoffs/20260911-verdictgate-x-review-r3-codex.md --family \"$FAMILY\"; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"actor": "cx_run", "attempt_id": "7f9fd1cf-5047-49fe-8a8b-1bb7a14c15e9", "cli_rc": "0", "event": "committee_family_result", "event_id": "aa82b21f-f1be-4915-bf6a-37ed8c042dd6", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-verdictgate-x-review-r3-codex.md", "output_sha256": "4ce0014f96cac0540a4c9333969f596e167db9c395645eb75e641caad983b5e2", "producer": "audit_append.sh", "result_state": "success", "round_id": "7fdcc5ff-f51d-41c1-b411-ffecf4b87858", "schema_version": 1, "sequence": 3464, "ts": "2026-09-11T07:02:14Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r3-codex.md", "output_sha256": "4ce0014f96cac0540a4c9333969f596e167db9c395645eb75e641caad983b5e2", "task_id": "20260911-VERDICTGATE-X-REVIEW-R3", "ts": "2026-09-11T07:05:18Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r3-composer.md", "output_sha256": "49755bc78be594aac856955095d248101ceb71ea75834ed47271ccde116b2711", "task_id": "20260911-VERDICTGATE-X-REVIEW-R3", "ts": "2026-09-11T07:05:19Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r3-grok.md", "output_sha256": "d21426e0e575b48a2d6a1994d0710ef60cf19c0c0d845444f00da4490d21e750", "task_id": "20260911-VERDICTGATE-X-REVIEW-R3", "ts": "2026-09-11T07:05:19Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "e9d892c0-2cc1-4698-b681-a575a1c7f19c", "lock_sha256": "2c1c815f1cde504a7cc189a8e4848d7b840786c7ce3b53eba05bf566db0b6cb8", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "7fdcc5ff-f51d-41c1-b411-ffecf4b87858", "schema_version": 1, "sequence": 3465, "session_id": "20260911-verdictgate-x-review-r3", "synth_sha256": "514c522d6e58333bd0615a527d13ce41e3e49bcd7c7c087801fc5f2ad3b0db84", "ts": "2026-09-11T07:05:42Z"}

@@ -1,9 +1,9 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：SPEC v2（R1 五條全採納）→ **三家 adversarial R2 進行中**（session `20260911-verdictgate-x-review-r2`，task-id `20260911-VERDICTGATE-X-REVIEW-R2`，背景 `bbp3jy1os`）｜`SPLITUNIFY` 暫停**
-- R1：composer／grok 皆 `VERDICT: blocked`（5 條）；codex 誤依 AGENTS.md Rule 12 交空檔 ⇒ round `65dfe9d9` 以 `collection-failed` 廢止；R1 synth W1–W4 在 `handoffs/reconcile/20260911-verdictgate-x-review-r1/synth.md`。R2 brief 檔頭明寫 Rule 12 不適用。
-- 未 push 的 commit：`71821203`、`aa6bdc87`（push 被白話時序閘擋；須先補 README／治理進度日誌／接下來要做什麼／流程摩擦記錄／現在做到哪 註記後 render 再 push）。白話 `VERDICTGATE施工進度.md` 已寫。
-- R2 回來後：`reconcile_build` → synth（含處置 token）→ attr 驗 → `register-output`×3 → `--rebuild` → `debt_clear` → SPEC v3（若需再派 R3）→ 白話 `VERDICTGATE規格白話.md` 給使用者審閱（**阻塞閘**）→ TODO（TODO_GENERATION_PROMPT）→ TODO adversarial → 戳記輪 → 實作 B1（裁決契約）。
+**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：SPEC v3（R2 11 條 X1–X6 全採納，commit `104b14ff` 已 push）→ **三家閉合確認 R3 進行中**（session `20260911-verdictgate-x-review-r3`，task-id `20260911-VERDICTGATE-X-REVIEW-R3`，背景 `bkyh2ebvl`）｜`SPLITUNIFY` 暫停**
+- R2 synth：`handoffs/reconcile/20260911-verdictgate-x-review-r2/synth.md`（round `d2ccf23a` 債已清）。X1 small 聯集改 audit 持續視窗；X2 baseline 六處殘文清光；X3 `--impl-self` 同一條 dispatch 路；X4 `live_roots_unwatched`；X5 `cx_run` review 自動 `register-output`＋C-8 事件 schema＋C-9 no_output fail-closed；X6 roster／同 root 綁定（(c) 駁回）。
+- 🔴 `committee_run.sh` 的 `--` 後須帶 gate 全部必填（`--intent --risk --facts-asked --review-role --template --task-id`），只給 task-id 會 gate 拒發（本日踩一次）。`handoffs/` 大多 gitignored，brief 要 `git add -f`。
+- 白話 `VERDICTGATE規格白話.md`（審閱閘用）與 `VERDICTGATE施工進度.md` 已寫；R3 若三家 proceed ⇒ 用 AskUserQuestion 阻塞給使用者審白話 → TODO（TODO_GENERATION_PROMPT）→ TODO adversarial → 戳記輪 → 實作 B1。若 blocked ⇒ SPEC v4 再派 R4。
 - 使用者裁定（逐字）：「為了文檔品質，先把治理票做完，再開始量化主線項目」；「我切換模型用Fable5.1做治理了，繼續執行」。
 - 使用者待裁：SPLITUNIFY R-1（per-symbol 投影，推翻 SPEC C-2）做不做。
 
