@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "session_id": "20260911-verdictgate-b3-review-r3",
+  "expected_roster": [
+    "codex"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-verdictgate-b3-review-r3/sources/20260911-verdictgate-b3-review-r3-codex.md",
+      "sha256": "61d615f4f119e0c548d9d6d9213b7bc67a2800a83eeea1567d2607738232678a",
+      "family": "codex"
+    }
+  ],
+  "freeze_ts": "2026-09-11T15:00:31Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "9eb7420e-d32d-4a08-a934-90d34fc3c573"
+}
