@@ -57514,3 +57514,41 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r10-composer.md", "output_sha256": "c85734095d43de2af12a974fdab5fcfee01aa1c10c7973f17238ff99f64eb07f", "task_id": "20260911-VERDICTGATE-X-REVIEW-R10", "ts": "2026-09-11T10:29:54Z"}
 {"event": "committee_output", "family": "unknown", "output_path": "handoffs/20260911-verdictgate-x-review-r10-grok.md", "output_sha256": "5e4b6b4a1d3f1f570266d7b0e23cb94069e9d6bc6052d3853e12c313fb4a6781", "task_id": "20260911-VERDICTGATE-X-REVIEW-R10", "ts": "2026-09-11T10:29:54Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "e408cff2-2f23-4804-ad50-5f2358f61ae7", "lock_sha256": "d107c42b2febbf8b2f81aff1d265bb49802046a525fca5ce5f08b394cc1d0c11", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "8e12917e-8fc6-4d28-b473-26def1a96bb2", "schema_version": 1, "sequence": 3500, "session_id": "20260911-verdictgate-x-review-r10", "synth_sha256": "c3ca0353ab1a624a8ad111e79b59c76b8620aa1c351b0ae874f21863cb5ad486", "ts": "2026-09-11T10:31:44Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-X-STAMP-R11", "ts": "2026-09-11T10:33:23Z"}
+=== 2026-09-11 18:33:23 | dispatch ===
+  ts=2026-09-11 18:33:23
+  kind=dispatch
+  intent=VERDICTGATE TODO 收斂戳記輪 R11（codex）
+  risk=low
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=single-executor:n/a（序列化戳記，一家一輪）
+  template=n/a:stamp
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-VERDICTGATE-X-STAMP-R11", "ts": "2026-09-11T10:33:35Z"}
+=== 2026-09-11 18:33:35 | dispatch ===
+  ts=2026-09-11 18:33:35
+  kind=dispatch
+  intent=VERDICTGATE TODO 收斂戳記輪 R11（codex；含 R10 三條 CLOSED）
+  risk=low
+  facts_asked=none-needed:SPEC §A 已載全部 FACT
+  review_role=single-executor:n/a（序列化戳記）
+  template=n/a:stamp 派工
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_path": "handoffs/20260911-VERDICTGATE-X-STAMP-R11-BRIEF.md", "brief_sha256": "10e8a508d2b796d3e51a91824abd670c762fb2750043e1ea9c242fe6e45190a9", "brief_sha256_norm": "10e8a508d2b796d3e51a91824abd670c762fb2750043e1ea9c242fe6e45190a9", "event": "committee_round_open", "event_id": "df5103bc-9021-4bce-8a93-4b0fb7b8c2b6", "expected_outputs": {"codex": "handoffs/20260911-verdictgate-x-stamp-r11-codex.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex"], "producer": "audit_append.sh", "quorum_eligible": ["codex"], "round_id": "041466a6-f1ae-4b3d-81d8-28af46dca1e9", "schema_version": 1, "sequence": 3501, "session_name": "20260911-verdictgate-x-stamp-r11", "task_id": "20260911-VERDICTGATE-X-STAMP-R11", "ts": "2026-09-11T10:33:40Z"}
+{"event":"gate_deny","ts":"2026-09-11T10:36:06Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"c5302f2a85048657ece0b36a79f8455069e60bec831e0f6e6b76e4d2a22b5380","cmd_head":"sed -n '150,210p' scripts/gate.sh && printf '%s\\n' '--- prior current-style stamp provenance ---' && rg -n -C 2 '20260911-.*STAMP|RECONCILE-STAMP: (codex|composer|grok) APPROVED' handoffs .claude/gate/audit.log | tail -120"}
+{"actor": "cx_run", "attempt_id": "8591cdda-c882-4ce2-9fc6-8cb0c9524314", "cli_rc": "0", "event": "committee_family_result", "event_id": "744af84b-a7db-4f97-af91-c09479f8a6f2", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-verdictgate-x-stamp-r11-codex.md", "output_sha256": "7d22c413ff1f1e153414762d923e833fc4b025c7a476924111fe9a5ef5b3600b", "producer": "audit_append.sh", "result_state": "success", "round_id": "041466a6-f1ae-4b3d-81d8-28af46dca1e9", "schema_version": 1, "sequence": 3502, "ts": "2026-09-11T10:41:18Z"}
+{"event": "committee_output", "family": "unknown", "output_path": "handoffs/reconcile/20260911-verdictgate-x-review-r10/synth.md", "output_sha256": "1217b81add33444583c67be52be5dc147d4e2e7742410057c46e4f72c635f9e3", "task_id": "20260911-VERDICTGATE-X-STAMP-R11", "ts": "2026-09-11T10:41:18Z"}
