@@ -250,6 +250,25 @@ _run_completeness() {
   return 0
 }
 
+# ②b 群集歸戶閘（VERDICTGATE Task 4.1；SPEC C-1）：附錄每個 ID 必列於群集表＋逐字引用斷言前 20 字＋處置 token；
+#    `延後→X` 之 X 須存在於同票 TODO（`docs/<EPIC>_TODO.md`，EPIC＝session 第二段大寫；缺檔則不傳 --todo ⇒ 有延後即拒）。
+#    與 synth_attribution_hook.sh 同一模組（scripts/_synth_attr.py）；本處為全量模式。
+_run_attribution() {
+  local lock="$1" synth epic todo_arg=""
+  synth="$(dirname "${lock}")/synth.md"
+  [ -f "${synth}" ] || { echo "ERROR: synth.md 缺失: ${synth}" >&2; return 1; }
+  epic="$(printf '%s' "${SESSION}" | awk -F- '{print toupper($2)}')"
+  [ -n "${epic}" ] && [ -f "docs/${epic}_TODO.md" ] && todo_arg="docs/${epic}_TODO.md"
+  if [ -n "${todo_arg}" ]; then
+    bash "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" "${synth}" --todo "${todo_arg}"
+  else
+    bash "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" "${synth}"
+  fi
+  local rc=$?
+  [ "${rc}" -eq 0 ] || { echo "ERROR: 群集歸戶閘 rc=${rc}（ID 未列／引用不逐字／無處置 token／延後目標不存在；拒銷）" >&2; return 1; }
+  return 0
+}
+
 # ③b synth 處置欄概念須見於修訂標的（只對 -x-review- 層）
 _run_synth_xref() {
   local lock="$1" synth target
@@ -560,6 +579,9 @@ _cmd_clear() {
 
   # ② completeness（rc 直接取）
   _run_completeness "${lock}" || return 1
+
+  # ②b 群集歸戶閘（Task 4.1：completeness 之後、synth_xref 之前）
+  _run_attribution "${lock}" || return 1
 
   # ③ mode=review
   _assert_lock_mode_is_review "${lock}" || return 1

@@ -328,6 +328,9 @@ header = (
     # 修訂標的行：debt_clear ③b 對 -x-review- 層以 spec_xref_check --synth 驗「處置欄概念皆見於標的」
     # （使用者 2026-09-11「每個要整理委員產出時候都會要用到」）。程式碼審查層可刪此行。
     "**修訂標的**：docs/<填 SPEC 或 TODO 檔名>.md\n\n"
+    # Task 4.1 群集表表頭提示：第 4 欄須含處置 token（governance_verdicts.json.disposition_values）；
+    #   每列須逐字引用該 finding 斷言前 20 字；`延後→` 後接同票 TODO §E 殘留 ID 或 Task N.N。
+    "<!-- 群集表格式（Task 4.1 閘）：| 群集（含斷言前 20 字逐字） | 嚴重度 | 來源 ID | 處置（採納｜部分採納｜駁回｜延後→ID） | -->\n\n"
     # ⚠️ Verdict 行是**機器解析**的:gate.sh 的 D-1 檢查以 `grep -qE 'Verdict[[:space:]]*[:：]'`
     #    驗 --adversarial 檔。兩次事故:
     #    ①2026-07-29 主委手寫成「Verdict（綜合）：…」→ Verdict 與冒號間插了字 → 正則不中
@@ -376,13 +379,12 @@ fi
 #   **對「歸到哪一群」完全無感**——主委本 session 因此 ID 錯位 9 次，
 #   每次都要靠委員語意複核抓，一次一輪。
 # 本檢查把「群集表引用的 ID」對回「附錄的斷言首句」，讓錯位與掉項在建檔當下可見。
-# 誠實邊界：**目前只印不擋**。升為硬閘併入 `票 B-26`（ID 空間配置閘）一起做，
-#   不另立票（使用者 2026-08-06：「票永遠開不完，除非有一勞永逸的解決方式」）。
+# VERDICTGATE Task 4.1（2026-09-11）：該腳本已是**閘**（debt_clear 前置；synth 寫入當下另有 hook）。
+#   建檔當下群集段尚未手填 ⇒ 必紅，此處只印報告不擋（`--report`、rc 丟棄）。
 if [ -x "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" ]; then
-  echo "[reconcile_build] === 群集歸戶自檢（提示，不擋）==="
-  bash "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" "${SESS}/synth.md" 2>/dev/null \
-    | grep -B2 "未被任何群集引用" || echo "  （建檔當下群集段尚未手填，填完請自行重跑本檢查）"
-  echo "[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh ${SESS}/synth.md"
+  echo "[reconcile_build] === 群集歸戶（建檔當下必未填；正式判定在 synth 寫入 hook 與 debt_clear）==="
+  bash "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" "${SESS}/synth.md" --report 2>/dev/null | grep -A2 '^──' || true
+  echo "[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh ${SESS}/synth.md [--todo docs/<EPIC>_TODO.md]"
 fi
 
 echo "[reconcile_build] ✅ 完成。接著：手填 ${SESS}/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。"

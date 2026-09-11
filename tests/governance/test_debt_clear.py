@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import uuid
@@ -64,6 +65,10 @@ def _setup(tmp_path: Path) -> tuple[Path, Path]:
         "audit_events.json",
         "completeness_check.sh",
         "governance_families.json",
+        # VERDICTGATE Task 4.1：debt_clear 前置群集歸戶閘（同一模組供 hook 與閘）
+        "reconcile_cluster_attribution_check.sh",
+        "_synth_attr.py",
+        "governance_verdicts.json",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():
@@ -206,11 +211,17 @@ def _build_session(
                 "family": fam,
             }
         )
-    # synth 含全部 finding
+    # synth 含全部 finding；Task 4.1 起群集段須列每個 ID＋逐字引用斷言前 20 字＋處置 token
     synth_parts = []
+    table = ["## 群集 / 處置", "", "| 群集 | 嚴重度 | 來源 ID | 處置 |", "|---|---|---|---|"]
     for fam in families:
-        synth_parts.append((bodies or {}).get(fam) or _finding(f"{fam.upper()}-R1-P0-01"))
-    (sess / "synth.md").write_text("\n".join(synth_parts), encoding="utf-8")
+        body = (bodies or {}).get(fam) or _finding(f"{fam.upper()}-R1-P0-01")
+        synth_parts.append(body)
+        for m in re.finditer(r"^## ([A-Z]+-R\d+-P[0-3]-\d{2,})\s*$", body, re.M):
+            am = re.search(r"\*\*斷言\*\*\s*[:：]\s*(.*)", body[m.end():])
+            quote = (am.group(1).strip() if am else "")[:40]
+            table.append(f"| 「{quote}」 | P1 | {m.group(1)} | 採納 |")
+    (sess / "synth.md").write_text("\n".join(table) + "\n\n## 附錄\n\n" + "\n".join(synth_parts), encoding="utf-8")
     lock = {
         "version": 1,
         "session_id": session,
@@ -483,6 +494,33 @@ def test_clear_verdict_rejected_earlier_output_does_not_count(tmp_path: Path) ->
     _result(root, audit, round_id=rid, family="codex", out_path="handoffs/rej3-codex.md", out_sha=_sha256_file(out), state="verdict_rejected")
     r = _clear(root, audit, "--round-id", rid, "--session", "rej3", "--lock", str(lock))
     assert r.returncode != 0 and "verdict_rejected" in (r.stderr or "")
+
+
+def test_clear_attribution_gate_blocks_bad_synth(tmp_path: Path) -> None:
+    """VERDICTGATE Task 4.1：synth 群集列缺處置 token ⇒ debt_clear 前置群集歸戶閘拒銷（completeness 仍 PASS）。"""
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="attr", families=["codex"])
+    synth = lock.parent / "synth.md"
+    synth.write_text(synth.read_text(encoding="utf-8").replace("| 採納 |", "| 已看過 |"), encoding="utf-8")
+    r = _clear(root, audit, "--round-id", rid, "--session", "attr", "--lock", str(lock))
+    assert r.returncode != 0 and "群集歸戶閘" in (r.stderr or "")
+    assert _ledger(root, audit, "--has-open").returncode == 1        # 仍 OPEN
+
+
+def test_clear_attribution_gate_defer_target_uses_epic_todo(tmp_path: Path) -> None:
+    """`延後→X`：debt_clear 以 session 第二段推 docs/<EPIC>_TODO.md；X 不在其中 ⇒ 拒；在 ⇒ 過。"""
+    root, audit = _setup(tmp_path)
+    (root / "docs").mkdir(exist_ok=True)
+    (root / "docs" / "T_TODO.md").write_text("| E-4 | x |\n", encoding="utf-8")
+    rid, lock = _happy_path_prep(root, audit, session="20260911-t-b1-review-r1", families=["codex"])
+    synth = lock.parent / "synth.md"
+    base = synth.read_text(encoding="utf-8")
+    synth.write_text(base.replace("| 採納 |", "| 延後→E-9 |"), encoding="utf-8")
+    r = _clear(root, audit, "--round-id", rid, "--session", "20260911-t-b1-review-r1", "--lock", str(lock))
+    assert r.returncode != 0 and "E-9" in (r.stderr or "")
+    synth.write_text(base.replace("| 採納 |", "| 延後→E-4 |"), encoding="utf-8")
+    r = _clear(root, audit, "--round-id", rid, "--session", "20260911-t-b1-review-r1", "--lock", str(lock))
+    assert r.returncode == 0, r.stderr
 
 
 def test_clear_idempotent_noop(tmp_path: Path) -> None:
