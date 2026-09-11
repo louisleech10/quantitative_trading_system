@@ -15,6 +15,7 @@ import pandas as pd
 from sklearn.metrics import average_precision_score, confusion_matrix, roc_auc_score
 
 from momentum.Analysis.event_samples.baseline import permutation_oracle
+from momentum.Analysis.event_samples.event_split import _degraded_flags
 from momentum.Analysis.event_samples.split_projection import (
     full_sample_estimand_scope as _full_sample_estimand_scope,
 )
@@ -137,7 +138,19 @@ def _common_constraint_block(event_split_plan: Optional[EventSplitPlan], manifes
     CODEX/COMPOSER/GROK B2-R1 共同 finding）；缺 manifest ⇒ raw/effective n 為 null。
     """
     s = event_split_plan.summary if event_split_plan is not None else {}
-    degraded = list(s.get("degraded", []))
+    if event_split_plan is not None:
+        n_symbols = int(s.get("n_symbols", 0))
+        degraded = list(s.get("degraded", []))
+    else:
+        # 🔴 SPLITUNIFY C-9 驗收（原殘留 R-2）實跑挖出的**假數字**：沒有切分計畫時，
+        #    原本從空的 split summary 取 `n_symbols` ⇒ 預設 0，於是**單標的批的報告寫「0 個標的」**。
+        #    B3 之後事件掃描端全部走這條路 ⇒ **每一份掃描報告**都帶著這個錯的數字。
+        #    ⇒ 標的數改由 manifest（實際進表的事件）算；manifest 也沒有時是 `None`（未知），不是 0。
+        #    `degraded` 同理：原本回空清單＝讀起來「沒有任何降級」，但此時 `cluster_adjusted` 為
+        #    False——兩個欄位互相矛盾。改由**同一支**旗標產生器（`_degraded_flags`）依實況導出。
+        n_symbols = (int(manifest.table["symbol"].nunique())
+                     if manifest is not None and "symbol" in manifest.table.columns else None)
+        degraded = _degraded_flags(n_symbols, cluster_adjusted=False) if n_symbols is not None else []
     allowed = bool(event_split_plan is not None and not degraded and s.get("loso_status") not in (None, "not_evaluated"))
     return {
         "stats_modes": s.get("stats_modes", {"primary": "macro", "sensitivity": "micro"}),
@@ -145,7 +158,7 @@ def _common_constraint_block(event_split_plan: Optional[EventSplitPlan], manifes
         "n_events_effective": manifest.summary["n_events_effective"] if manifest is not None else None,
         "degraded": degraded,
         "loso_status": s.get("loso_status", "not_evaluated"),
-        "n_symbols": int(s.get("n_symbols", 0)),
+        "n_symbols": n_symbols,
         "insufficient_events_in_test": list(s.get("insufficient_events_in_test", [])),
         "cluster_adjusted": event_split_plan is not None and "no_cluster_adjustment" not in degraded,
         "formal_pooled_inference_allowed": allowed,

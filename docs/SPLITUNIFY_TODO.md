@@ -463,7 +463,7 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
 | ID | 項目 | 理由類別 | 為何現在不做 |
 |---|---|---|---|
 | `R-1` | per-symbol 投影（讓多標的批能跑） | needs-research | `base_universe_hash` 在多標的下之唯一性語意未定；先 fail-closed 比先算錯好 |
-| `R-2` | `baseline`／`tables`／`pattern_bridge` 之 OOS 數值變動量 | blocked-by | 待 B2 之 G-3a 遷移報告實跑才有數字 |
+| ~~`R-2`~~ **已關閉（2026-09-11）** | `baseline`／`tables`／`pattern_bridge` 之 OOS 數值變動量 | — | 🔴 **原本就不該是殘留**：SPEC C-9 把「改前後逐項差異」列為**驗收條件**，而阻塞它的 G-3a 遷移報告在 B2c 就已跑出（`only_in_new_test=['te0']`）。⇒ 以 `scripts/splitunify_c9_diff.py` 實跑，receipt `handoffs/run_receipts/splitunify-c9-diff.json`：**IC 端**四組參數（含真實規模 20352 列）列計畫**逐列相同**；**事件掃描端**差異全部是預期的降級揭露（`cluster_adjusted` 轉 False、`estimand_scope` 標全樣本、`reason` 標沒切分、CI 收斂為 `"unavailable"`）。🔴 **實跑同時挖出一個假數字並當場修掉**：沒切分時 `common.n_symbols` 從空 summary 取 ⇒ 單標的批寫成「**0 個標的**」，且 `degraded=[]` 與 `cluster_adjusted=False` 互相矛盾；改由 manifest 導出並共用 `_degraded_flags`，mutation `M-SU-B3-11`／`-12` 覆蓋 |
 | `R-3` | UAT 項目更新 | user-ruling | 使用者已裁定 UAT 一律最後 |
 | `R-4` | `extract_event_patterns` 無 **production** caller（測試 caller 8 處） | blocked-by | 本票只保證其消費之 `assignments` 語意不變；接線屬另一票 |
 | `R-5` | 事件掃描端取得 post-trim feature universe | needs-research | 要新增 `features_run_id` 跨棧參數（請求模型／前端／契約／UAT 全動），且 `EventImportService` 目前完全不碰 FF run ⇒ 超出本票；R2 之 D1 裁定事件掃描端恆走 event-study-only。日後實作**不得**刪除 Task 3.3 分支 |

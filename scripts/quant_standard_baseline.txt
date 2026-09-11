@@ -1,102 +1,96 @@
-docs/GOVB0_FRICTION_SPEC.md:597
-docs/GOV_B49_ASBUILT_DELTA.md:59
-handoffs/20260727-p16-v20adv-codex.md:78
-handoffs/20260801-GOV-AMEND-BACKLOG.md:2212
-handoffs/20260801-GOV-AMEND-BACKLOG.md:2518
-handoffs/20260802-FAILOPEN-GUARD-CONSULT-BRIEF.md:65
-handoffs/20260802-LINEC-AUDIT-SPLIT-SPEC-DRAFT.md:109
-handoffs/20260802-P16-D001-CODEREVIEW-BRIEF.md:70
-handoffs/20260802-P16-D001-TODO-STAMP2-BRIEF.md:19
-handoffs/20260802-T1-DOCCHECK-R3-BRIEF.md:55
-handoffs/20260803-GOVFLOW-TODO-R1-STAMP5-BRIEF.md:58
-handoffs/20260803-govflow-todo-r1-stamp5-composer.md:29
-handoffs/20260803-govflow-todo-r2-stamp-grok.md:81
-handoffs/20260804-GOVFLOW-B4-REVIEW3-BRIEF.md:118
-handoffs/20260804-GOVFLOW-B4-REVIEW4-BRIEF.md:117
-handoffs/20260805-GOVB0-R2-STAMP-BRIEF.md:22
-handoffs/20260805-GOVB0-SPEC-R3-BRIEF.md:11
-handoffs/20260805-GOVB0-SPEC-R7-BRIEF.md:23
-handoffs/20260805-GOVB0-TODO-R9-BRIEF.md:28
-handoffs/20260807-GOVB1-G7-STAMP-R20-BRIEF.md:47
-handoffs/20260807-GOVB1-REDESIGN-BRIEF.md:107
-handoffs/20260807-GOVB1-REORDER-B6-BRIEF.md:88
-handoffs/20260807-GOVB1-RUNNER-STAMP-R8-BRIEF.md:51
-handoffs/20260807-GOVB1-TODO-S64-R6-BRIEF.md:66
-handoffs/20260807-govb1-b1-closure-r4-brief.md:24
-handoffs/20260807-govb1-g7stamp10-composer.md:34
-handoffs/20260807-govb1-g7stamp10-composer.md:49
-handoffs/20260807-govb1-todos64-grok.md:202
-handoffs/20260807-govb1-todos64-grok.md:62
-handoffs/20260808-govb1-b3-stamp-r3-brief.md:26
-handoffs/20260808-govb1-b3-stamp-r3-composer.md:34
-handoffs/20260808-govb1-b3-stamp-r3-grok.md:42
-handoffs/20260809-govb1-b3-stamp-r3-brief.md:65
-handoffs/20260809-govb1-b3-stamp-r3-composer.md:69
-handoffs/20260811-govb49-review-r6-brief.md:12
-handoffs/20260812-govb49-todo-review-r1-brief.md:18
-handoffs/20260812-govb49-x-review-r5-brief.md:27
-handoffs/20260812-govgatechain-x-review-r1-brief.md:21
-handoffs/20260812-govgatechain-x-review-r1-grok.md:194
-handoffs/20260817-gap1-specadv-r5-BRIEF.md:22
-handoffs/20260817-gap1-specadv-r6-BRIEF.md:16
-handoffs/20260822-GAP3UX-X-CONSULT-R1.md:5
-handoffs/20260822-gap3ux-x-consult-r1-codex.md:24
-handoffs/20260822-gap3ux-x-consult-r1-codex.md:27
-handoffs/20260822-gap3ux-x-consult-r1-composer.md:67
-handoffs/20260822-gap3ux-x-consult-r1-grok.md:104
-handoffs/20260822-gap3ux-x-consult-r1-grok.md:96
-handoffs/20260822-searchfix-x-review-r6-brief.md:24
-handoffs/20260822-searchfix-x-review-r6-composer.md:60
-handoffs/20260822-searchfix-x-review-r6-grok.md:35
-handoffs/20260911-splitunify-x-review-r3-grok.md:64
-handoffs/reconcile/20260802-t1-doccheck-recheck/synth.md:56
-handoffs/reconcile/20260803-govflow-todo-r1/synth.md:207
-handoffs/reconcile/20260804-govb0-spec-r1/synth.md:47
-handoffs/reconcile/20260805-govb0-spec-r2/synth.md:16
-handoffs/reconcile/20260805-govb0-spec-r7/synth.md:10
-handoffs/reconcile/20260805-govb0-todo-r9/synth.md:16
-handoffs/reconcile/20260807-govb1-b1-review-r5/synth.md:31
-handoffs/reconcile/20260807-govb1-x-consult-r1/synth.md:67
-handoffs/reconcile/20260807-govb1-x-consult-r6/sources/20260807-govb1-todos64-grok.md:202
-handoffs/reconcile/20260807-govb1-x-consult-r6/sources/20260807-govb1-todos64-grok.md:62
-handoffs/reconcile/20260807-govb1-x-consult-r6/synth.md:328
-handoffs/reconcile/20260807-govb1-x-stamp-r20/sources/20260807-govb1-g7stamp10-composer.md:34
-handoffs/reconcile/20260807-govb1-x-stamp-r20/sources/20260807-govb1-g7stamp10-composer.md:49
-handoffs/reconcile/20260807-govb1-x-stamp-r20/synth.md:126
-handoffs/reconcile/20260807-govb1-x-stamp-r20/synth.md:18
-handoffs/reconcile/20260807-govb1-x-stamp-r8/synth.md:22
-handoffs/reconcile/20260808-govb1-b3-review-r2/synth.md:22
-handoffs/reconcile/20260811-govb49-x-review-r5/synth.md:24
-handoffs/reconcile/20260812-govb49-x-review-r5/synth.md:26
-handoffs/reconcile/20260812-govgatechain-x-review-r1/sources/20260812-govgatechain-x-review-r1-grok.md:194
-handoffs/reconcile/20260813-govsot-x-consult-r2/synth.md:95
-handoffs/reconcile/20260813-govsot-x-consult-r4/synth.md:11
-handoffs/reconcile/20260813-govsot-x-consult-r4/synth.md:32
-handoffs/reconcile/20260817-gap1-x-review-r4/synth.md:82
-handoffs/reconcile/20260817-gap1-x-review-r5/synth.md:74
-handoffs/reconcile/20260817-gap1-x-review-r6/synth.md:71
-handoffs/reconcile/20260817-gap1-x-review-r9/synth.md:83
-handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md:8
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-codex.md:24
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-codex.md:27
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-composer.md:67
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-grok.md:104
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-grok.md:96
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:106
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:136
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:139
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:184
-handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:55
-handoffs/reconcile/20260822-searchfix-x-review-r5/synth.md:93
-handoffs/reconcile/20260822-searchfix-x-review-r6/sources/20260822-searchfix-x-review-r6-composer.md:60
-handoffs/reconcile/20260822-searchfix-x-review-r6/sources/20260822-searchfix-x-review-r6-grok.md:35
-handoffs/reconcile/20260824-gap3uxb1-x-review-r4/synth.md:89
-handoffs/reconcile/20260911-splitunify-x-review-r3/sources/20260911-splitunify-x-review-r3-grok.md:64
-handoffs/reconcile/20260911-splitunify-x-review-r4/synth.md:28
-handoffs/reconcile/p16-v20adv-r1/sources/20260727-p16-v20adv-codex.md:78
-handoffs/reconcile/p16-v20adv-r1/synth.md:144
-白話說明/SPLITUNIFY施工進度.md:73
-白話說明/SPLITUNIFY施工進度.md:75
-白話說明/治理進度日誌.md:1432
-白話說明/治理進度日誌.md:224
-白話說明/流程摩擦記錄.md:1566
+docs/GOVB0_FRICTION_SPEC.md:⇒ **「ID 錯位」目前無任何機械防線**，屬本批**具名接受的殘留**，須隨 `B-36` 併入 `B-13` 時一併記載。
+handoffs/20260727-p16-v20adv-codex.md:[MAJOR] 信心度=High；在無 jq 或 malformed hook input 的環境，動作在 ledger recheck 前直接 rc=0；在 jq 存在時，同一 fresh dispatch token 仍可被不同 task/intent 共用，固定檔名也允許另一 session 覆蓋。這比「一個 TOCTOU race」更廣，但不要求把舊版 epoch 機制整套加回；至少要修正 §A 邊界與驗收所宣稱的覆蓋範圍，並明定 fail-open 是否仍是使用者接受的殘留。
+handoffs/20260801-GOV-AMEND-BACKLOG.md:**主委裁：SPLIT**（依據＝使用者定死「95% 解法就收」＋膨脹升級 5 訊號）。
+handoffs/20260801-GOV-AMEND-BACKLOG.md:依「95% 解法就收・殘留具名記錄」，部分泛化亦為合格交付。
+handoffs/20260802-FAILOPEN-GUARD-CONSULT-BRIEF.md:6. **本輪範圍**：這個結構性修法應該併入 `GOV-DOC-CHECK-AT-WRITE` 一起 commit，還是另立獨立票？考量點＝已跑三輪、使用者定有「95% 就收、殘留具名記錄」紀律。
+handoffs/20260802-LINEC-AUDIT-SPLIT-SPEC-DRAFT.md:⇒ **B′ 屬 cleanup，不屬 fix。** 依使用者「95% 解法就收、殘留具名記錄」的紀律，
+handoffs/20260802-P16-D001-CODEREVIEW-BRIEF.md:**請實跑確認**兩支既有檢查器是否真的順序無關。若是，判斷這是可接受的殘留（具名記錄）
+handoffs/20260802-P16-D001-TODO-STAMP2-BRIEF.md:主委已具名記錄此矛盾並開票 `GOV-DOCS-STAMP-PROVENANCE`（依使用者「95% 解法就收、殘留具名記錄」紀律，本輪不解決）。
+handoffs/20260802-T1-DOCCHECK-R3-BRIEF.md:- 「隔離 repo 腳本清單散在 4 份 fixture」＝ 已具名開票 `GOV-TESTHARNESS-SCRIPTLIST-SSOT` 排入 T7，**本票不修**（依「95% 就收、殘留具名記錄」）
+handoffs/20260803-GOVFLOW-TODO-R1-STAMP5-BRIEF.md:**裁定依據**（使用者定死條款）：「**95% 解法就收、殘留具名記錄不當阻塞**」；
+handoffs/20260803-govflow-todo-r1-stamp5-composer.md:- **不阻塞理由**：三條可操作（scope 限四缺陷／必留 diff 軌跡／抗蓄意無收斂終點），對齊使用者「95% 就收」條款。
+handoffs/20260803-govflow-todo-r2-stamp-grok.md:- §0 第 10 條擋「寫規則時未對現行文件自驗」；**群 8 同構**（只改消費端未補生產端）仍靠 checklist／審核，非同一機械守衛——可接受（95% 就收）。
+handoffs/20260804-GOVFLOW-B4-REVIEW3-BRIEF.md:## 已具名接受的殘留（**不必再提**）
+handoffs/20260804-GOVFLOW-B4-REVIEW4-BRIEF.md:## 已具名接受的殘留（**不必再提**）
+handoffs/20260805-GOVB0-R2-STAMP-BRIEF.md:裁決依據＝使用者定死「沒 100% 解就做 95% 那版現在收，殘留具名記錄不當阻塞」＋
+handoffs/20260805-GOVB0-SPEC-R3-BRIEF.md:依使用者定死「**沒 100% 解就做 95% 那版現在收，殘留具名記錄不當阻塞**」與
+handoffs/20260805-GOVB0-SPEC-R7-BRIEF.md:依使用者定死的「**95% 解法就收・殘留先記錄**」與「兩輪斷路器」：
+handoffs/20260805-GOVB0-TODO-R9-BRIEF.md:依使用者定死的「**95% 解法就收・殘留先記錄**」與「兩輪斷路器」：
+handoffs/20260807-GOVB1-G7-STAMP-R20-BRIEF.md:**請裁**：此殘留可具名接受（依「95% 解法就收」）？或**必須**在本批做完整解？
+handoffs/20260807-GOVB1-REDESIGN-BRIEF.md:依使用者定死的「**95% 解法就收・殘留具名記錄**」：
+handoffs/20260807-GOVB1-REORDER-B6-BRIEF.md:2. **可把已被接受的殘留升級為機械閉合。** §0.1b 目前靠 pointer 紀律
+handoffs/20260807-GOVB1-RUNNER-STAMP-R8-BRIEF.md:若漏，**是否應接受為具名殘留**（依「95% 解法就收」），還是仍屬 BLOCKING？
+handoffs/20260807-GOVB1-TODO-S64-R6-BRIEF.md:（若判殘留，請說明為何符合「95% 解法就收」而非紀律型旁路）。
+handoffs/20260807-govb1-b1-closure-r4-brief.md:主委依使用者 2026-08-01 定死之「95% 解法就收、殘留具名記錄」判定：
+handoffs/20260807-govb1-g7stamp10-composer.md:[NON-BLOCKING] 信心度=High。採納 brief「95% 解法就收」；完整解留後續票。
+handoffs/20260807-govb1-g7stamp10-composer.md:| 1 | 正向斷言 guard 殘留可否具名接受？ | **可**。`govb1_single_source_check.sh` 已機械化「消費點須含 §0.1b pointer」；誠實邊界（擋不住 pointer 旁互斥判準）已寫入腳本頭。完整解＝資料檔＋generated block（`票 B-25` 同型）**屬後續票**；依「95% 解法就收」**具名接受殘留**。 |
+handoffs/20260807-govb1-todos64-grok.md:**判 MAJOR 具名殘留、非 BLOCKING 重寫**，理由見 P1-05（符合「95% 解法就收」的條件與必須硬的底線）。
+handoffs/20260807-govb1-todos64-grok.md:**為何不是 BLOCKING／符合「95% 解法就收」**：
+handoffs/20260808-govb1-b3-stamp-r3-brief.md:依據＝使用者定死之「95% 解法就收・殘留具名記錄」＋「文字問題用白名單機械卡，禁再耗回合列舉」，
+handoffs/20260808-govb1-b3-stamp-r3-composer.md:本輪四項邊界繞過均有明確 fail-closed 修法與 RECHECK（三種 mutation、missing/empty/malformed TODO、duplicate/third-line、unpaired/nested/crossline）。**尚未**進入「列舉變體無底洞」——群集 4 已採關閉類別而非黑名單。若本輪即收案，會把可機械閉合之邊界留成具名殘留，與使用者「95% 解法就收」矛盾（本輪修法仍屬可收之 95% 範圍）。
+handoffs/20260808-govb1-b3-stamp-r3-grok.md:四項皆有明確 fail-closed 修法；其中兩項為 **P0**（receipt 內容假綠、exporter TODO 跳過序列／receipt／M）。本輪即收案會把可機械閉合之 P0 留成殘留，違反「95% 解法就收」（本輪修法仍屬可收之 95%）。停損保留 r3 一輪邊界複驗後再關，合理。
+handoffs/20260809-govb1-b3-stamp-r3-brief.md:(c) 其他。若選 (b)，請說明它與「95% 解法就收、殘留具名記錄」如何相容。
+handoffs/20260809-govb1-b3-stamp-r3-composer.md:- 與「95% 解法就收、殘留具名記錄」相容：落地的是已達標子集；未達標項具名進 commit + backlog，**不是**假綠。
+handoffs/20260811-govb49-review-r6-brief.md:依使用者定死之「epic 收斂斷路器」與「95% 解法就收・殘留先記錄」，主委已裁定：
+handoffs/20260812-govb49-todo-review-r1-brief.md:（主委依使用者「95% 解法就收」與 epic 斷路器裁定；三家 r6 方向 BLOCKING ＝ 0）。
+handoffs/20260812-govb49-x-review-r5-brief.md:以及「95% 解法就收」：沒有 100% 解就做 95/99% 那版**現在收**，殘留具名記錄、**不當阻塞**。
+handoffs/20260812-govgatechain-x-review-r1-brief.md:依使用者「95% 解法就收」取當時版本、殘留具名記錄，**不再開第三輪**。
+handoffs/20260812-govgatechain-x-review-r1-grok.md:照修這三條後，方向可派工；P2 作具名殘留即可，不必再開輪（對齊 brief 斷路器：最多兩輪、95% 解法就收）。
+handoffs/20260817-gap1-specadv-r5-BRIEF.md:（主委依「95% 解法就收・殘留先記錄」需要這個判斷；請給 yes/no ＋理由，勿只說「必須先修」。）
+handoffs/20260817-gap1-specadv-r6-BRIEF.md:依「95% 解法就收・殘留先記錄」與「epic 收斂斷路器」：**本輪之後不再開 SPEC 修訂輪**。
+handoffs/20260822-GAP3UX-X-CONSULT-R1.md:- **Findings**：5（P0-01 歸因不全；P1-01 同步系統債；P1-02 brief 誘導＋定版輪誤標；P1-03 §C0 漏洞／一輪定版＝放水；P1-04 相對 GAP2 品質較差）
+handoffs/20260822-gap3ux-x-consult-r1-codex.md:**斷言**: §C0 是政策宣告，不足以機械阻止治理式「95% 就收」被日後 brief、TODO、review 或 reconcile 以同義語援引。
+handoffs/20260822-gap3ux-x-consult-r1-codex.md:[MAJOR/P1] 信心度=High；Q4 判定：三份文件的窄掃描結論已獨立驗證，但不能推出未定義範圍的「全 repo 量化主線零命中」；C0 尚不能擋 euphemism、衍生文件與 scope 漂移。若當時仍有數值/洩漏 P0/P1 未閉，建議「一輪定版、不再加機制」就是放水；只有所有正確性 gate 已閉時才是排程判斷。
+handoffs/20260822-gap3ux-x-consult-r1-composer.md:**MAJOR** 信心度=High。失敗模式：Agent 在 quant SPEC 看 §C0，在治理 epic 仍讀 CONVERGENCE 舊句 ⇒ 規則打架；主委 R3「一輪定版」建議與 §C0 精神衝突卻無機械攔截。修法：§C0 加「量化票 review brief 禁出現 95% 收斂語」＋`scripts/plain_docs_sync_check` 擴充 quant-epic 否決詞；或治理句加 `blocked-by: quant-mainline §C0`。
+handoffs/20260822-gap3ux-x-consult-r1-grok.md:### Q4 — 標準位階／§C0／95%／一輪定版
+handoffs/20260822-gap3ux-x-consult-r1-grok.md:③ **「一輪定版、不再加新機制」在當時＝功能性放水，不只是排程。**
+handoffs/20260822-searchfix-x-review-r6-brief.md:依據＝使用者定死之「95% 解法就收、殘留具名記錄不當阻塞」＋ P1-6 教訓（防蓄意框架＝無限迴圈）。
+handoffs/20260822-searchfix-x-review-r6-composer.md:2. **四條行為測試構成真正防線**——直接驅動 `_search_single_symbol`／`_search_batch`／`_process_chunk_worker`／收集迴圈同形分支，斷言 `IncompleteDownloadError` 會拋出；與 handler 語法（別名、tuple、換型別 raise）無關，行為錯就紅。守衛 docstring（`:631-648`）已碼內宣告 lint 邊界，符合使用者「95% 解法就收」裁決。
+handoffs/20260822-searchfix-x-review-r6-grok.md:**同意。** 靜態分析對「這段 try 會不會吞掉某個 runtime 型別」本質上不可判定（動態 handler、跨模組別名、`exec`、猴補丁、C 擴充）；五版守衛全被打穿正是 P1-6「防蓄意＝無限迴圈」形態。把守衛標成 **lint 非證明**、新靜態旁路「加語料不阻收案（除非 production 踩中）」、真正防線放行為測——與使用者「95% 解法就收、殘留具名記錄」一致。
+handoffs/20260911-splitunify-x-review-r3-grok.md:**是「95% 解法就收」，不是把主目標偷偷降級。**
+handoffs/reconcile/20260802-t1-doccheck-recheck/synth.md:⇒ **不在本票內修**（會使 T1 無限膨脹，違反「95% 就收、殘留具名記錄」）。
+handoffs/reconcile/20260803-govflow-todo-r1/synth.md:**依據使用者定死之「95% 解法就收、殘留具名記錄不當阻塞」**：
+handoffs/reconcile/20260804-govb0-spec-r1/synth.md:**裁：SPLIT。** 依據＝使用者定死「95% 解法就收」＋膨脹升級 5 訊號（本 SPEC 已達 5 票／11 Task，Phase 4 又新增 checker＋grandfather SoT＋owner 制度）。
+handoffs/reconcile/20260805-govb0-spec-r2/synth.md:⇒ 依使用者定死「**沒 100% 解就做 95% 那版現在收，殘留具名記錄不當阻塞**」與
+handoffs/reconcile/20260805-govb0-spec-r7/synth.md:🔴 **R7 是 P0-1／P0-2 的最後一輪**（brief 明文宣告終止條件，依使用者定死「95% 解法就收・殘留先記錄」）。
+handoffs/reconcile/20260805-govb0-todo-r9/synth.md:🔴 **R9 是 TODO 的最後一輪**（brief 明文終止條件，依使用者定死「95% 解法就收・殘留先記錄」）。
+handoffs/reconcile/20260807-govb1-b1-review-r5/synth.md:使用者 2026-08-01 定死之**「95% 解法就收、殘留具名記錄」**正是為此
+handoffs/reconcile/20260807-govb1-x-consult-r1/synth.md:〔依「95% 解法就收・殘留具名記錄」；直接改判在本輪無可驗收路徑〕
+handoffs/reconcile/20260807-govb1-x-consult-r6/sources/20260807-govb1-todos64-grok.md:**判 MAJOR 具名殘留、非 BLOCKING 重寫**，理由見 P1-05（符合「95% 解法就收」的條件與必須硬的底線）。
+handoffs/reconcile/20260807-govb1-x-consult-r6/sources/20260807-govb1-todos64-grok.md:**為何不是 BLOCKING／符合「95% 解法就收」**：
+handoffs/reconcile/20260807-govb1-x-consult-r6/synth.md:**為何不是 BLOCKING／符合「95% 解法就收」**：
+handoffs/reconcile/20260807-govb1-x-stamp-r20/sources/20260807-govb1-g7stamp10-composer.md:[NON-BLOCKING] 信心度=High。採納 brief「95% 解法就收」；完整解留後續票。
+handoffs/reconcile/20260807-govb1-x-stamp-r20/sources/20260807-govb1-g7stamp10-composer.md:| 1 | 正向斷言 guard 殘留可否具名接受？ | **可**。`govb1_single_source_check.sh` 已機械化「消費點須含 §0.1b pointer」；誠實邊界（擋不住 pointer 旁互斥判準）已寫入腳本頭。完整解＝資料檔＋generated block（`票 B-25` 同型）**屬後續票**；依「95% 解法就收」**具名接受殘留**。 |
+handoffs/reconcile/20260807-govb1-x-stamp-r20/synth.md:[NON-BLOCKING] 信心度=High。採納 brief「95% 解法就收」；完整解留後續票。
+handoffs/reconcile/20260807-govb1-x-stamp-r20/synth.md:此殘留可否依「95% 解法就收」具名接受，或**必須**在本批做資料檔完整解。
+handoffs/reconcile/20260807-govb1-x-stamp-r8/synth.md:即依「95% 解法就收・殘留具名記錄」接受為殘留。
+handoffs/reconcile/20260808-govb1-b3-review-r2/synth.md:🔴 **停損條件（依使用者定死之「95% 解法就收・殘留具名記錄」與「文字問題用白名單機械卡」）**：
+handoffs/reconcile/20260811-govb49-x-review-r5/synth.md:🔴 **主委裁定（依使用者「95% 解法就收・殘留先記錄」）：r6 是 SPEC 的最後一輪。**
+handoffs/reconcile/20260812-govb49-x-review-r5/synth.md:與「95% 解法就收」：**停止列舉，寫入具名殘留，不作為 push 阻塞。**
+handoffs/reconcile/20260812-govgatechain-x-review-r1/sources/20260812-govgatechain-x-review-r1-grok.md:照修這三條後，方向可派工；P2 作具名殘留即可，不必再開輪（對齊 brief 斷路器：最多兩輪、95% 解法就收）。
+handoffs/reconcile/20260813-govsot-x-consult-r2/synth.md:「95% 解法就收・殘留先記錄」，**主委裁定：停止繼續加機制，改走簡化路線**。
+handoffs/reconcile/20260813-govsot-x-consult-r4/synth.md:**不派第三輪**（兩輪斷路器已達；依「95% 解法就收」，剩餘不確定改為具名記錄而非續審）。
+handoffs/reconcile/20260813-govsot-x-consult-r4/synth.md:② 使用者定死之「95% 解法就收，殘留具名記錄」
+handoffs/reconcile/20260817-gap1-x-review-r4/synth.md:主委將依「95% 解法就收」把剩餘項具名為殘留後進 TODO，不再無限迴圈。
+handoffs/reconcile/20260817-gap1-x-review-r5/synth.md:主委將依「95% 解法就收・殘留先記錄」具名殘留後進 TODO。
+handoffs/reconcile/20260817-gap1-x-review-r6/synth.md:該輪通過即進 TODO；若 codex 於受限輪再產同型新項，主委依「95% 解法就收」具名殘留後進 TODO。
+handoffs/reconcile/20260817-gap1-x-review-r9/synth.md:依據＝「95% 解法就收＋殘留具名」與「精確≠便宜」：此處不是免審，是把驗證放進**必跑的**戳記關卡。
+handoffs/reconcile/20260819-gap3-x-consult-r1/synth.md:**Composer 缺席（DEGRADE，collection-failed）**：首派與同 round 單家補跑皆於 Cursor 端 `RetriableError: [resource_exhausted]` 三次重連失敗（`handoffs/20260819-gap3-recon-composer.runlog`；scratchpad `gap3_rerun.log`），非 brief／環境問題；consult 為 SPEC **輸入**非簽核閘，依「95% 解法就收、殘留具名記錄」以 codex＋grok＋主委收斂；Composer 視角於 SPEC adversarial（三家全員）補到。
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-codex.md:**斷言**: §C0 是政策宣告，不足以機械阻止治理式「95% 就收」被日後 brief、TODO、review 或 reconcile 以同義語援引。
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-codex.md:[MAJOR/P1] 信心度=High；Q4 判定：三份文件的窄掃描結論已獨立驗證，但不能推出未定義範圍的「全 repo 量化主線零命中」；C0 尚不能擋 euphemism、衍生文件與 scope 漂移。若當時仍有數值/洩漏 P0/P1 未閉，建議「一輪定版、不再加機制」就是放水；只有所有正確性 gate 已閉時才是排程判斷。
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-composer.md:**MAJOR** 信心度=High。失敗模式：Agent 在 quant SPEC 看 §C0，在治理 epic 仍讀 CONVERGENCE 舊句 ⇒ 規則打架；主委 R3「一輪定版」建議與 §C0 精神衝突卻無機械攔截。修法：§C0 加「量化票 review brief 禁出現 95% 收斂語」＋`scripts/plain_docs_sync_check` 擴充 quant-epic 否決詞；或治理句加 `blocked-by: quant-mainline §C0`。
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-grok.md:### Q4 — 標準位階／§C0／95%／一輪定版
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/sources/20260822-gap3ux-x-consult-r1-grok.md:③ **「一輪定版、不再加新機制」在當時＝功能性放水，不只是排程。**
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:**MAJOR** 信心度=High。失敗模式：Agent 在 quant SPEC 看 §C0，在治理 epic 仍讀 CONVERGENCE 舊句 ⇒ 規則打架；主委 R3「一輪定版」建議與 §C0 精神衝突卻無機械攔截。修法：§C0 加「量化票 review brief 禁出現 95% 收斂語」＋`scripts/plain_docs_sync_check` 擴充 quant-epic 否決詞；或治理句加 `blocked-by: quant-mainline §C0`。
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:**斷言**: §C0 是政策宣告，不足以機械阻止治理式「95% 就收」被日後 brief、TODO、review 或 reconcile 以同義語援引。
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:3. **我在 R3 建議「一輪定版」時，主觀認為是防無限迴圈**；
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:[MAJOR/P1] 信心度=High；Q4 判定：三份文件的窄掃描結論已獨立驗證，但不能推出未定義範圍的「全 repo 量化主線零命中」；C0 尚不能擋 euphemism、衍生文件與 scope 漂移。若當時仍有數值/洩漏 P0/P1 未閉，建議「一輪定版、不再加機制」就是放水；只有所有正確性 gate 已閉時才是排程判斷。
+handoffs/reconcile/20260822-gap3ux-x-consult-r1/synth.md:grok 補充：主委在正確性洞仍 OPEN 時建議「一輪定版、不再加新機制」，
+handoffs/reconcile/20260822-searchfix-x-review-r5/synth.md:依據＝使用者定死之「95% 解法就收、殘留具名記錄不當阻塞」（`feedback_95_percent_then_record`）。
+handoffs/reconcile/20260822-searchfix-x-review-r6/sources/20260822-searchfix-x-review-r6-composer.md:2. **四條行為測試構成真正防線**——直接驅動 `_search_single_symbol`／`_search_batch`／`_process_chunk_worker`／收集迴圈同形分支，斷言 `IncompleteDownloadError` 會拋出；與 handler 語法（別名、tuple、換型別 raise）無關，行為錯就紅。守衛 docstring（`:631-648`）已碼內宣告 lint 邊界，符合使用者「95% 解法就收」裁決。
+handoffs/reconcile/20260822-searchfix-x-review-r6/sources/20260822-searchfix-x-review-r6-grok.md:**同意。** 靜態分析對「這段 try 會不會吞掉某個 runtime 型別」本質上不可判定（動態 handler、跨模組別名、`exec`、猴補丁、C 擴充）；五版守衛全被打穿正是 P1-6「防蓄意＝無限迴圈」形態。把守衛標成 **lint 非證明**、新靜態旁路「加語料不阻收案（除非 production 踩中）」、真正防線放行為測——與使用者「95% 解法就收、殘留具名記錄」一致。
+handoffs/reconcile/20260824-gap3uxb1-x-review-r4/synth.md:（c）本專案有明文之「95% 解法就收・殘留具名記錄」與「兩輪斷路器」。
+handoffs/reconcile/20260911-splitunify-x-review-r3/sources/20260911-splitunify-x-review-r3-grok.md:**是「95% 解法就收」，不是把主目標偷偷降級。**
+handoffs/reconcile/20260911-splitunify-x-review-r4/synth.md:`feedback_95_percent_then_record`（95% 解法就收、殘留具名記錄、不當阻擋）：
+handoffs/reconcile/p16-v20adv-r1/sources/20260727-p16-v20adv-codex.md:[MAJOR] 信心度=High；在無 jq 或 malformed hook input 的環境，動作在 ledger recheck 前直接 rc=0；在 jq 存在時，同一 fresh dispatch token 仍可被不同 task/intent 共用，固定檔名也允許另一 session 覆蓋。這比「一個 TOCTOU race」更廣，但不要求把舊版 epoch 機制整套加回；至少要修正 §A 邊界與驗收所宣稱的覆蓋範圍，並明定 fail-open 是否仍是使用者接受的殘留。
+handoffs/reconcile/p16-v20adv-r1/synth.md:[MAJOR] 信心度=High；在無 jq 或 malformed hook input 的環境，動作在 ledger recheck 前直接 rc=0；在 jq 存在時，同一 fresh dispatch token 仍可被不同 task/intent 共用，固定檔名也允許另一 session 覆蓋。這比「一個 TOCTOU race」更廣，但不要求把舊版 epoch 機制整套加回；至少要修正 §A 邊界與驗收所宣稱的覆蓋範圍，並明定 fail-open 是否仍是使用者接受的殘留。

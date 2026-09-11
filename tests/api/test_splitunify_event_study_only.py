@@ -145,6 +145,27 @@ def test_splitunify_event_study_only_table_declares_full_sample_estimand(spy_spl
     assert common["reason"] == "no_event_split_plan"
 
 
+# ── ③-b 🔴 沒切分時，共同約束欄不得出現假數字（C-9 驗收實跑挖出） ──────────────
+def test_splitunify_event_study_only_common_block_has_no_fake_numbers(spy_split):
+    """原本 `n_symbols` 從**空的** split summary 取 ⇒ 單標的批的報告寫「**0 個標的**」。
+
+    B3 之後事件掃描端全部走 event-study-only ⇒ **每一份掃描報告**都帶著這個錯的數字。
+    由 SPEC C-9 之改前改後逐鍵比對（`scripts/splitunify_c9_diff.py`）挖出：
+    `event_forward_return_table.common.n_symbols : 1 → 0`。
+
+    同時 `degraded` 原本回空清單（讀起來「沒有降級」）卻與 `cluster_adjusted=False` 矛盾。
+    """
+    payload = _analyze(_import(declaration={"declared_window_bars": {"12h": 1}}))
+    for table in ("event_forward_return_table", "all_bars_evaluation"):
+        common = payload["tables"][table]["common"]
+        assert common["n_symbols"] == 1, f"{table}：單標的批卻寫 n_symbols={common['n_symbols']}"
+        assert common["cluster_adjusted"] is False
+        assert "no_cluster_adjustment" in common["degraded"], (
+            f"{table}：cluster_adjusted=False 但 degraded 沒有 no_cluster_adjustment（兩欄互相矛盾）"
+        )
+        assert "single_symbol" in common["degraded"]
+
+
 # ── ④ 生產路徑對 `split_events` 之呼叫次數釘 0（執行期事實，非原始碼形狀） ────
 def test_splitunify_split_events_production_call_count_is_zero(spy_split):
     """🔴 `split_events` 保留為歷史路徑／G-3a 對照，但**生產呼叫點數＝0**（Task 3.1 ③）。

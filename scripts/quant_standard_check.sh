@@ -81,7 +81,7 @@ _STAT_CONTEXT='binomial|允收帶|信賴區間|CI\)|Fisher|z[[:space:]]*\+|置�
 #    誤報率過高的閘會被忽略或繞過 —— **比沒有更糟**。故加否定語境偵測。
 #    判準：同一行若出現「禁止／不得／不適用／駁回／違規／援引錯誤」等**反對該語**之詞，
 #    則該行是在**禁止**放水而非**主張**放水 ⇒ 豁免。
-_NEGATION_CONTEXT='不適用|不得|禁(止|用)|一律不|不接受|駁回|違規|錯誤|不受理|未動用|不動用|全採較嚴|反制|防止|擋住|拒絕|撤回'
+_NEGATION_CONTEXT='不適用|不得|禁(止|用)|一律不|不接受|駁回|違規|錯誤|不受理|未動用|不動用|全採較嚴|反制|防止|擋住|拒絕|撤回|廢止|作廢|犯了規'
 
 _files=()
 if [ "$#" -gt 0 ]; then
@@ -117,7 +117,9 @@ while IFS= read -r hit; do
   printf '%s' "${_text}" | grep -Eq "${_STAT_CONTEXT}" && continue
   printf '%s' "${_text}" | grep -Eq "${_NEGATION_CONTEXT}" && continue
   printf '%s' "${_text}" | grep -Eq '^[[:space:]]*>' && continue
-  _key="${_f}:${_lineno}"
+  # 🔴 鍵＝「檔案＋去頭尾空白後的內容」，不用行號（2026-09-11 實測：在檔頭插一行註記，
+  #    下面所有歷史命中的行號都位移 ⇒ 全部從基準掉出來變成「新增」，閘就誤紅）。
+  _key="${_f}:$(printf '%s' "${_text}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
   if [ "${_FREEZE}" = "1" ]; then echo "${_key}" >> "${_BASELINE_TMP}"; continue; fi
   if [ -f "${_BASELINE}" ] && grep -Fqx "${_key}" "${_BASELINE}"; then continue; fi
   _hits=$((_hits + 1))

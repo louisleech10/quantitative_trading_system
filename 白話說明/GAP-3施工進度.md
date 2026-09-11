@@ -1,5 +1,7 @@
 # 量化主線：GAP-3 事件型施工看板
 
+> 📌 2026-09-11（SPLITUNIFY 殘留 R-2）：沒做切分時，報酬表的「標的數」原本寫 0，已改成照實際事件算。
+
 > 📌 2026-09-11：`SPLITUNIFY` 第 2 批 b 動到 `momentum/Analysis/event_samples/`——新增投影函式 `split_projection.py`，並把「分簇」從 `event_split.py` 抽成兩邊共用的函式（行為逐值不變）。事件切分本身的邊界來源改由 K 線切分決定，細節見 [SPLITUNIFY施工進度.md](SPLITUNIFY施工進度.md)。
 >
 > 📌 2026-09-11（第 4 批）：報告只留**一個**「驗證段事件數」＋來源標籤；算不出來顯示「無」不填 0。GAP-3 既有行為不變。
