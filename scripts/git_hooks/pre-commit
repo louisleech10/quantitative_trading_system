@@ -169,4 +169,18 @@ if [ -f scripts/plain_docs_render.sh ] && [ -f scripts/plain_docs_render.py ]; t
   fi
 fi
 
+# ── SPEC/TODO 改一處漏一處（scripts/spec_xref_check.sh；使用者 2026-09-11 定）────────────
+# 病根：VERDICTGATE SPEC 審八輪，四輪的 finding 是主委改了一段、同一概念別處引用沒同步；
+#   記憶裡的紀律規則（feedback_cross_reference_sync）從 07 月起再犯六次 ⇒ 機械化。
+# 判準封閉：被拿掉的反引號概念若仍被引用，該行必須帶版本標記（v<N>），否則擋。
+# 成本：只在 docs/*SPEC*.md｜docs/*TODO*.md 進 staged 時跑，單檔 <1 秒；無 ⇒ 零成本。無逃生口。
+if [ -f scripts/spec_xref_check.sh ]; then
+  bash scripts/spec_xref_check.sh --staged
+  _sx_rc=$?          # 🔴 rc 直接取，禁經 pipe
+  if [ "${_sx_rc}" -ne 0 ]; then
+    echo "pre-commit: 🔴 SPEC/TODO 有被改掉的概念仍在別處被引用且未標版本——同步改掉或標 v<N> 後再 commit" >&2
+    exit 1
+  fi
+fi
+
 exec "$py" "$checker" --staged
