@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "session_id": "20260911-splitunify-x-review-r5",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-splitunify-x-review-r5/sources/20260911-splitunify-x-review-r5-codex.md",
+      "sha256": "5bc5c7a2cab1d20587eccc553efeb8e30b43b6307b0fda6dcb7f0f369026f475",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-splitunify-x-review-r5/sources/20260911-splitunify-x-review-r5-composer.md",
+      "sha256": "3e11c31222dacdae231364589e12983bd8675a6ca69273469519d5304dbe8b6a",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-splitunify-x-review-r5/sources/20260911-splitunify-x-review-r5-grok.md",
+      "sha256": "114a854bf62f10b9d7546ffe6a9edfb3b1888244212c9273ba7e0dd216b624ba",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-09-11T23:29:54Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "fbe19e56-a93c-43a2-b519-f75f92c34a83"
+}
