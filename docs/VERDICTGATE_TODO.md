@@ -1,6 +1,6 @@
 # VERDICTGATE — TODO
 
-**SPEC**：`docs/VERDICTGATE_SPEC.md`（**v9**，審查停輪：R1–R8 共 48 條全採納；R8 兩家 `proceed`、三家同意 §N small 視窗凍結）　**票**：`VERDICTGATE`　**日期**：2026-09-11　**狀態**：**DRAFT（待三家 adversarial；codex 須對 `CODEX-R8-P1-01`／`P1-02`／`P2-03`／`P2-04` 寫 `CLOSED:`）**。
+**SPEC**：`docs/VERDICTGATE_SPEC.md`（**v9**，審查停輪：R1–R8 共 48 條全採納；R8 兩家 `proceed`、三家同意 §N small 視窗凍結）　**票**：`VERDICTGATE`　**日期**：2026-09-11　**狀態**：**v2（R9 三家 8 條分五群集 Q1–Q5 全採納；SPEC v9 三家 R1–R8 全部 ID 已 `CLOSED:`；待 R10 閉合確認後 FROZEN）**。R9 收斂：`handoffs/reconcile/20260911-verdictgate-x-review-r9/synth.md`。
 **使用者裁定（逐字）**：「為了文檔品質，先把治理票做完，再開始量化主線項目」；「不論哪家執行都要觸發」；「若是有地方是你跟委員判定無法收斂或無限窮舉或實作或落地後對整個流程的運作成本和時間成本太高，這就不要鑽下去，該適時停止」；白話規格方向已同意「四段全做」。
 **實作端**：Claude 主委自任；review＝codex＋composer＋grok 三家全員（ORCH §1 現行分工行）。
 **產出端已先行上線（不在本 TODO 重做）**：`scripts/spec_xref_hook.sh`（SPEC/TODO/修訂標的寫入當下殘留＋synth 處置對證）、`scripts/synth_attribution_hook.sh`（synth 寫入當下 ID 全在表＋`-x-` 層必宣告修訂標的）——Task 4.1 在此之上擴成引用 20 字＋處置 token，**不重寫**這兩支。
@@ -20,7 +20,7 @@
 - **mutation**（SPEC §V）：每批收案前跑 `handoffs/<date>-verdictgate-mutate-b<N>.py`，UNCOVERED 須為 0；紅只認 rc≠0。
 - **防假綠**：不得放寬既有測試斷言；改動 `gate.sh`／`cx_run.sh`／`committee_run.sh`／`debt_clear.sh` 後跑其既有測試檔（`tests/governance/test_gate*.py` 等，只跑相關檔）。
 - **Python 一律 UTF-8、`from __future__ import annotations`、type hints、docstring 正體中文**；shell 用 `set -u`，rc 直接取。
-- **commit 訊息**：`Ticket-Batch: VERDICTGATE/b<N>`（Phase 3 上線前本票自身之 commit 以 `small` 或 `Governance-Scope` trailer 過渡；Phase 3 上線後之 B4 commit 須先 `--impl-self` 領 token——**本票吃自己的閘**）。
+- **commit 訊息**（v2 依 `GROK-R9-P2-01`／`CODEX-R9-P1-03`／`COMPOSER-R9-P1-01` 改寫）：本票全部改動皆在 `scripts/`／`templates/`／`tests/`／`.claude/`，**不是** Task 3.2 之生產路徑（`momentum|api|frontend/src`）⇒ `Ticket-Batch:` **不適用**本票自身 commit，只帶 `Governance-Scope: out-of-epic …`（G-7）。**沒有** small 過渡（small ≤3 檔本就裝不下 B3）。`core.hooksPath` 已是 `scripts/git_hooks`，新增 `post-commit` 檔即刻生效——它對非生產路徑 commit 只會寫 `ticket_commit`（若有 trailer）而不擋。B4 前之 `--impl-self` 實跑是**自證**（證明閘對本票自己也跑得通），不是 commit 前置。⇒ 治理腳本 commit 不受 Phase 3 保護，登記 §E E-7。
 
 ## §B 批次執行策略（依賴拓撲 → 四批，每批＝一次派工 prompt；每批三家審碼＋原提出方閉合）
 
@@ -29,12 +29,12 @@
 | **B1** | 1.1、1.2 | 無 | 裁決契約＋寫入 audit 是所有閘的唯一輸入；同一 JSON／同一 parser | 中 |
 | **B2** | 2.1、2.2 | B1 | 報表與開輪閘共用 audit 讀取與 `prev_review_resolve.sh` | 中 |
 | **B3** | 3.1、3.2、3.3 | B2 | 三者共用 token 檔、`ticket_commit` 事件與 `ticket_batch_check.sh`；拆開會有前向依賴 | 大 |
-| **B4** | 4.1 | B1（`disposition_values`） | 單一腳本重寫＋掛 debt_clear；與 B2／B3 無檔案交集 | 小 |
+| **B4** | 4.1 | **B2**（`disposition_values` 來自 B1；`debt_clear.sh` 之 `_abandon` 收窄由 2.2 先改，4.1 之 `_run_attribution` 插在其後——v2 依 `CODEX-R9-P1-02`／`GROK-R9-P1-01`／`COMPOSER-R9-P2-01`） | 單一腳本重寫＋掛 debt_clear；與 B3 無檔案交集、與 B2 共 `debt_clear.sh` | 小 |
 
 **批次間 Gate**（每批收案條件；B3 起本票自身之閘生效）：
 - B1 → B2：`pytest tests/governance/test_verdictgate_p1.py` rc=0；`bash handoffs/<date>-verdictgate-mutate-b1.py` UNCOVERED=0；三家審碼 `VERDICT: proceed` 或所有 `BLOCKED-BY` 由原提出方 `CLOSED:`；**B1 上線後本票 R9 起之審碼產出即經 `cx_run` 自動 `register-output`**。
 - B2 → B3：同上＋`bash scripts/verdictgate_baseline.sh --report` rc=0 且 `unknown=` ≥621；`bash scripts/verdictgate_check.sh VERDICTGATE 3 "$(bash scripts/prev_review_resolve.sh VERDICTGATE 3)"` rc=0（B2 審碼三家皆已 `CLOSED:`）。
-- B3 → B4：同上＋主委開 B4 前 **`bash scripts/gate.sh dispatch --impl-self --task-id VERDICTGATE-impl-b4-claude`** 必須 rc=0（本票第一次吃自己的閘）；B4 之 commit 帶 `Ticket-Batch: VERDICTGATE/b4`。
+- B3 → B4：同上＋主委開 B4 前 **`bash scripts/gate.sh dispatch --impl-self --task-id VERDICTGATE-impl-b4-claude`** 實跑 rc=0 作為**自證**（閘對本票自己跑得通：B3 review 三家皆 `CLOSED:` ⇒ verdictgate 放行）；B4 commit 仍只帶 `Governance-Scope`（§0，非生產路徑）。
 - B4 → 收票：`reconcile_cluster_attribution_check.sh` 對本票 R2–R8 八份 synth 逐份印出（歷史不改）；`docs/GOV_ENFORCEMENT_REGISTRY.md` 登記本票四個掛載點；`gen_fact_key_blocks.sh --check` rc=0；SPLITUNIFY 補裁決輪派出（§N 第四項處置）。
 
 **派工 prompt（每批可直接複製）**：
@@ -102,7 +102,7 @@
 - SPEC ref：Task 2.1、C-4　目標：印出每輪各家 `has_verdict|unknown|stamp`、`unknown` 總數、`live_roots_unwatched`、`legacy_open_by_root`；**不凍結、不作判定輸入**。
 - 輸入／輸出：輸入＝`.claude/gate/audit.log`（JSONL 行）；輸出＝stdout 報表（固定行 `unknown=<n>`、`live_roots_unwatched=<root,…>`、`legacy_open_by_root=<root:b<N>,…>`），rc=0。
 - 實作要點：
-  1. `scripts/verdictgate_baseline.sh --report`（bash 包 Python）：只讀 `committee_round_open`／`committee_output`／`debt_clear` 三類事件；以 `task_id` 正規化 `<root>-b<N>-review-r<M>`（大小寫不敏感）分組。
+  1. `scripts/verdictgate_baseline.sh --report`（bash 包 Python；v2 依 `CODEX-R9-P1-01` 補介面）：`load_events(path: str) -> list[dict]`（只取 `^\{` JSONL 行；只留 `committee_round_open`／`committee_output`／`debt_clear`）；`group_rounds(events) -> dict[RoundKey, RoundState]`，`RoundKey=(root:str, batch:int, round:int)` 由 `task_id` 以 `re.I` 匹配 `^(?P<root>.+?)-b(?P<batch>\d+)-review-r(?P<round>\d+)$`；`RoundState={quorum_eligible:set[str], outputs:dict[family, verdict|None], abandoned:bool}`；`classify(state) -> dict[family, "has_verdict"|"unknown"|"stamp"|"no_output"]`；`build_report(rounds, cleared_roots:set[str]) -> Report{lines:list[str], unknown_total:int, live_roots_unwatched:list[str], legacy_open_by_root:list[str]}`；`main()` 印 `Report.lines` 後固定三行 `unknown=`／`live_roots_unwatched=`／`legacy_open_by_root=`。偽碼：`for k,st in rounds: for fam in st.quorum_eligible: cls[fam] = "has_verdict" if st.outputs.get(fam) in VERDICT_VALUES else "stamp" if fam in st.outputs and st.outputs[fam] is None else "no_output" if fam not in st.outputs else "unknown"`。
   2. 每輪每家：有含 `verdict∈{proceed,blocked}` 之 `committee_output` ⇒ `has_verdict`；`verdict=null` ⇒ `stamp`（不計 unknown）；無 ⇒ `unknown`；round 有 `round_open` 但該家無任何 `committee_output` ⇒ `no_output`（印，計入 unknown）。
   3. `live_roots_unwatched`＝有 `round_open` 而無對應 `debt_clear` 收票之 root，且其最新批 review 各家皆 unknown。
   4. 無 `--freeze`、無 `*.txt`；任何寫檔動作 ⇒ 違反 SPEC Task 2.1 邊界③。
@@ -150,7 +150,7 @@
 - SPEC ref：Task 3.1、C-6　目標：主委領實作權限走與委員派工同一條 dispatch 路徑；通過後寫 token 檔＋audit `impl_token_issued`。
 - 輸入／輸出：輸入＝`--impl-self --task-id <root>-impl-b<N>-claude`＋既有 dispatch 必填；輸出＝`.claude/gate/impl.<root>-b<N>.token`（內容：ts／task_id／root／batch）＋audit `impl_token_issued {task_id, root, batch, family=claude, ts}`。
 - 實作要點：
-  1. parser（`:207-225`）加 `--impl-self` 旗標；task_id 不符 `^(.+)-impl-b([0-9]+)-claude$` ⇒ rc=1。
+  1. parser（`:207-225`）加 `--impl-self` 旗標（shell 變數 `impl_self=1`）；task_id 不符 `^(.+)-impl-b([0-9]+)-claude$` ⇒ rc=1（v2 依 `CODEX-R9-P1-01` 補介面）：新函式 `_impl_self_parse_task <task_id>` → stdout 兩行 `root`／`n`，rc=1 表不符；`_impl_self_issue_token <root> <n>` → 寫 `.claude/gate/impl.<root>-b<n>.token`（內容 `ts=…\ntask_id=…\nroot=…\nbatch=…`，`chmod 600`）＋`audit_append.sh --event impl_token_issued --origin gate.sh --field task_id=… --field root=… --field batch=… --field family=claude`，rc 直接取。偽碼：`if [ "$impl_self" = 1 ]; then read -r root n < <(_impl_self_parse_task "$task_id") || exit 1; fi … (既有 gates) … prev=$(bash scripts/prev_review_resolve.sh "$root" "$n"); if [ -n "$prev" ]; then review_quorum_check.sh "$prev" claude && verdictgate_check.sh "$root" "$n" "$prev" || exit 1; fi; _impl_self_issue_token "$root" "$n"`。
   2. **不新開分支**：照跑 debt gate（`:574`）、brief gate（`:625`）、reconcile-stamp（`:673`）、template_check（`:807`）；`_rq_prev=$(prev_review_resolve.sh root N)`；非空 ⇒ `review_quorum_check.sh "$_rq_prev" claude` 與 `verdictgate_check.sh root N "$_rq_prev"`；空 ⇒ 印 `[gate] 無前批 review，跳過 quorum／verdictgate`。
   3. 通過 ⇒ 寫 token 檔（mode 0600）＋`audit_append.sh --event impl_token_issued --origin gate.sh …`；token 檔與既有 `dispatch.token` 分開（避免 `GATE-TOKEN-BINDING` 跨 session 延長坑）。
 - 修改檔案：`scripts/gate.sh::參數 parser（:207-225）、dispatch 分支 quorum 塊（:783-803）、token 寫出（:862）`。既有 caller：`gate_check.sh`（PreToolUse，讀 dispatch.token；不動）。
@@ -215,11 +215,11 @@
 - SPEC ref：Task 4.1、C-1　目標：對 synth 附錄每個 `## <ID>`：在群集表列＋該列含斷言前 20 Unicode 字逐字＋處置 token ∈ `disposition_values`；`延後→<目標>` 之目標須存在於同票 TODO。
 - 輸入／輸出：`reconcile_cluster_attribution_check.sh <synth.md> [--todo <TODO.md>]` → rc=0／rc=1 逐條指名。
 - 實作要點：
-  1. 重寫為 bash 包 Python UTF-8（現行 `cut -c` 對中文壞）；ID／表列判定沿用 `synth_attribution_hook.sh` 之邏輯（**呼叫共用 Python 模組 `scripts/_synth_attr.py`**，hook 與本閘同一實作）。
+  1. 重寫為 bash 包 Python UTF-8（現行 `cut -c` 對中文壞）；ID／表列判定沿用 `synth_attribution_hook.sh` 之邏輯（**呼叫共用 Python 模組 `scripts/_synth_attr.py`**，hook 與本閘同一實作）。模組介面（v2 依 `CODEX-R9-P1-01`）：`@dataclass Finding{id:str, assertion:str}`；`@dataclass Row{line_no:int, cells:list[str], placeholder:bool}`（`placeholder`＝含 `（待填）` 或第 4 欄空）；`@dataclass SynthDoc{target:str|None, rows:list[Row], findings:list[Finding], session_dir:str}`；`parse_synth(text:str, rel_path:str) -> SynthDoc`；`check_ids(doc) -> list[str]`（附錄 ID 不在任一 row.cells 者）；`check_quote20(doc) -> list[str]`（對每 finding：`q=nfc_strip(assertion)[:20]`，須 `q in nfc_strip(" ".join(row.cells))` 於某含該 ID 之非佔位 row）；`check_disposition(doc, values:list[str], todo_text:str|None) -> list[str]`（含該 ID 之非佔位 row 第 4 欄須含 values 之一；`延後→X` 之 X 須 `in todo_text`，`todo_text is None` 而有延後 ⇒ 錯）；`check_target(doc) -> list[str]`（`-x-` 層必有且檔案存在）；`nfc_strip(s)=unicodedata.normalize("NFC", s)` 去所有 `\s`。回傳皆為錯誤訊息列表（空＝通過）。
   2. 引用 20 字：取該 finding `**斷言**:` 後首 20 個 Unicode 字（NFC、去空白、不寬容標點），該列（NFC、去空白）須含之；不足 20 字 ⇒ 全文。
   3. 處置 token：該列須含 `disposition_values` 之一（讀 `governance_verdicts.json`）；`延後→<目標>`：目標 ∈ TODO §E 殘留 ID 或 `Task N.N`，且字串存在於 `--todo` 檔（缺 `--todo` 而有延後 ⇒ rc=1）。
   4. `debt_clear.sh`：在 `_run_completeness` 之後、`_run_synth_xref` 之前呼叫，rc≠0 拒清債；synth 骨架（`reconcile_build.sh`）群集表表頭加「處置（採納｜部分採納｜駁回｜延後→ID）」提示。
-  5. `synth_attribution_hook.sh` 改為呼叫同一模組之「寫入時子集」（ID 在表＋修訂標的），引用 20 字與處置 token 只在 debt_clear 驗（填寫中不擋）。
+  5. `synth_attribution_hook.sh` 改為呼叫同一模組之「寫入時子集」：`check_ids`＋`check_target`＋**對非佔位列**跑 `check_quote20`／`check_disposition(todo_text=None 時跳過 延後→ 目標查核)`（v2 依 `CODEX-R9-P1-04`／`GROK-R9-P1-02`——填錯引用或漏處置 token 要在寫入當下紅，不得等到 debt_clear；佔位列 `（待填）` 不擋，避免填寫中誤擋）；debt_clear 跑全量（含 `延後→` 目標對 `--todo`）。hook 與閘對同一 fixture 之四類判定結果逐字相同（測試）。
 - 修改檔案：`scripts/reconcile_cluster_attribution_check.sh`（重寫）；`scripts/_synth_attr.py`（新，共用）；`scripts/synth_attribution_hook.sh::改呼叫模組`；`scripts/debt_clear.sh::_run_attribution（新）`；`scripts/reconcile_build.sh::表頭字串`。既有 caller：`reconcile_build.sh:381`（提示呼叫，改為同一腳本）。
 - 路徑：
   scripts/reconcile_cluster_attribution_check.sh
@@ -265,10 +265,11 @@
 |---|---|---|---|
 | E-1 | `git push --no-verify` 客戶端繞過 | user-ruling:2026-08-13 使用者裁定刪除 CI | 使用者恢復任何遠端檢查時 |
 | E-2 | `small` 視窗規則之進一步繞法（先取得經完整 `--impl-self` 判定之 token 並真的在該批 commit 生產檔之後再拆 small） | user-ruling:2026-09-11「無法收斂…適時停止」；凍結於 v7 語意，繞過成本＝合規成本，與 E-1／`touch` token 同族 | 出現非蓄意之新構造 |
-| E-3 | 「決議是否真的處理了 finding」語意驗證 | needs-research:三家 consult 一致無機械判準 | 出現可證偽之語意判準 |
+| E-3 | 「決議是否真的處理了 finding」語意驗證 | needs-research:**研究問題**＝「finding 斷言 → 處置文字」之蘊涵能否降為封閉判準（例：處置須引用斷言中至少一個反引號 token 且含動詞集合之一）；**完成判準**＝對本票 R2–R9 十份 synth（86 條 finding）回放，人工標記之「未處理」樣本召回率 ≥90%、誤擋 ≤1 條／份（v2 依 `CODEX-R9-P2-05` 補） | 上述研究產出判準並過三家 consult |
 | E-4 | 舊產出 621 份不回溯要 `VERDICT:`；SPLITUNIFY B5 前須派補裁決輪 | user-ruling:2026-08-05 不溯及既往；C-4 機械擋，處置＝`brief-kind: closure` 補裁決輪（B4 上線後、SPLITUNIFY 復工前派） | SPLITUNIFY 開 B5 時 |
-| E-5 | audit append 序（`impl_token_issued` 先於 `ticket_commit` 且 ts 差 ≤900s）作 `token_fresh` 第二層 | needs-research:mtime 已閉合主洞；append 序判定與 amend by-design 之交互未定義（composer R5） | Task 3.2 上線後首次出現 mtime 與 append 序不一致之實例 |
-| E-6 | synth 與 SPEC 之語意等價（`spec_xref_check --synth` 只驗存在） | needs-research:同 E-3 | 同 E-3 |
+| E-5 | audit append 序（`impl_token_issued` 先於 `ticket_commit` 且 ts 差 ≤900s）作 `token_fresh` 第二層 | needs-research:**研究問題**＝「amend 重觸 post-commit 後新 sha 之 `ticket_commit` append 序必在 token 之後——是否存在**合法**流程（非蓄意）使 append 序 < token 序或 ts 差 >900s」；**完成判準**＝暫存 repo 對 `--amend -m`／`--amend --no-edit`／`rebase -i` 三序列各實跑一次，列表無合法反例 ⇒ 升為 Task 3.3 ASSERT；有 ⇒ 寫明為何 mtime 足夠 | 研究表完成（B3 收案後、B4 前） |
+| E-6 | synth 與 SPEC 之語意等價（`spec_xref_check --synth` 只驗存在） | needs-research:**研究問題**＝「synth 處置欄與修訂標的段落之等價能否降為『反引號 token 集合相等』或『處置欄每個 token 在標的同一段落（同 `**Task N.N`／`C-n` 標題下）出現』」；**完成判準**＝對本票十份 synth 回放，誤擋 ≤1 條／份且抓到 R7 U1 那類「synth 寫 A、SPEC 寫 A′」之已知案例 ≥1 | 研究表完成 |
+| E-7 | 治理腳本（`scripts/`／`templates/`／`.claude/`）之 commit 不在 Phase 3 `Ticket-Batch` 保護範圍（Task 3.2 只對 `momentum\|api\|frontend/src` 觸發）——本票自身 commit 即為實例 | user-ruling:2026-09-11 SPEC 停輪裁定（擴 scope 須重開 SPEC 審查）；且 CLAUDE.md RISK (b) 已把共用控制流列高風險，擴 scope 之代價（每個治理小修都要領票）未評估（v2 依 `GROK-R9-P2-01`／`CODEX-R9-P1-03` 具名） | 下一張治理票起草時決定是否擴 scope |
 
 ## §T 追溯表（階段 1；SPEC ID → TODO 位置；合計數須與 SPEC 一致）
 
@@ -286,7 +287,7 @@
 | ASSERT | Task 1.1×0（3 條驗證命令，非 ASSERT 文法）、1.2×12、2.1×3、2.2×19、3.1×5、3.2×6、3.3×22（含 post-commit 2 條）、4.1×5（合計 **72**；主委 `grep -o 'ASSERT bash\|ASSERT git\|ASSERT GOVERNANCE'` 實數） | 各 Task「驗證」欄；每條一 test |
 | §RISK | b、c | §0 測試規則；各 Task 風險緩解 |
 | Phase 依賴 | P1→P2→P3；P4 依 P1 | §B |
-| §N 殘留 | 4 項 | §E E-1～E-4（＋E-5、E-6 為 TODO 層新增） |
+| §N 殘留 | 4 項 | §E E-1～E-4（＋E-5、E-6、E-7 為 TODO 層新增，各附研究問題／完成判準或 user-ruling） |
 | §V | mutation 每閘一條；每 Task 一測試檔；對照組；邊界目錄 10 項；by-design 1 項 | §D；§0；各 Phase 測試；E-5 |
 | §R | 每 Phase 獨立 commit；P1 回退連帶 | §B 批次＝Phase；commit trailer 規則 |
 | 環境變數／flag | `GOVERNANCE_SKIP_PREPUSH`、`GOVERNANCE_SKIP_COMMITMSG`、`GOVERNANCE_TEST_HARNESS`、`--impl-self`、`--kind stamp --family`、`--range`、`--report` | Task 3.3／3.2／§0／3.1／1.2／3.3／2.1 |
