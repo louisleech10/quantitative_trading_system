@@ -56,10 +56,11 @@ if "-x-" in session_dir:
 if not errs and ids and "（待填）" in head:
     errs.append("③ 群集段仍是骨架佔位「（待填）」")
 if errs:
-    print(f"[synth_attribution_hook] 🔴 {rel}")
+    # 🔴 阻塞理由一律 stderr：PostToolUse harness 只把 stderr 回灌給主委（實測 2026-09-11：印 stdout 會顯示「No stderr output」）
+    print(f"[synth_attribution_hook] 🔴 {rel}", file=sys.stderr)
     for e in errs:
-        print("   " + e)
-    print(f"   findings={len(ids)}；修好再繼續（這是 VERDICTGATE Task 4.1 之產出端最小版）")
+        print("   " + e, file=sys.stderr)
+    print(f"   findings={len(ids)}；修好再繼續（這是 VERDICTGATE Task 4.1 之產出端最小版）", file=sys.stderr)
     sys.exit(2)
 print(f"[synth_attribution_hook] ✓ {rel} findings={len(ids)} 全在群集表")
 PY

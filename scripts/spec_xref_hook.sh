@@ -45,13 +45,13 @@ rc=0
 # ① 殘留掃描 vs HEAD
 if git cat-file -e "HEAD:${rel}" 2>/dev/null; then
   tmp_old="$(mktemp)"; git show "HEAD:${rel}" > "$tmp_old"
-  bash "$CHECK" --files "$tmp_old" "$rel"; r=$?; rm -f "$tmp_old"
+  bash "$CHECK" --files "$tmp_old" "$rel" >&2; r=$?; rm -f "$tmp_old"   # 理由走 stderr（harness 只回灌 stderr）
   [ "$r" -eq 0 ] || rc=2
 fi
 # ② 最新宣告本檔為修訂標的之 synth
 synth="$(grep -l -m1 -E "^\*\*修訂標的\*\*：${rel}\$" handoffs/reconcile/*/synth.md 2>/dev/null | xargs -I{} ls -t {} 2>/dev/null | head -1)"
 if [ -n "$synth" ]; then
-  bash "$CHECK" --synth "$synth" "$rel"; r=$?
+  bash "$CHECK" --synth "$synth" "$rel" >&2; r=$?
   [ "$r" -eq 0 ] || rc=2
 fi
 if [ "$rc" -ne 0 ]; then
