@@ -12,11 +12,31 @@ set -u
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 1
 cd "$ROOT" || exit 1
 
-# 逃生口(明示且留痕;緊急時用)
+# 逃生口(明示且留痕;緊急時用)——VERDICTGATE C-7：一律寫 audit governance_bypass（現行為靜默 ⇒ 改留痕）
 if [ "${GOVERNANCE_SKIP_PREPUSH:-}" = "1" ]; then
-  echo "pre-push: GOVERNANCE_SKIP_PREPUSH=1 → 略過治理檢查(緊急逃生口;請自行確認 CI)" >&2
+  [ -f scripts/audit_append.sh ] && bash scripts/audit_append.sh --event governance_bypass --field hook=pre-push \
+    --field "reason=GOVERNANCE_SKIP_PREPUSH=1 by $(git config user.name 2>/dev/null || echo unknown)" \
+    --field actor=pre-push --field origin_script=git_hooks/pre-push >/dev/null 2>&1 \
+    || echo "pre-push: ⚠ 逃生口留痕失敗（audit_append）" >&2
+  echo "pre-push: GOVERNANCE_SKIP_PREPUSH=1 → 略過治理檢查(緊急逃生口;已寫 audit governance_bypass)" >&2
   exit 0
 fi
+
+# ── VERDICTGATE Task 3.3：由 pre-push stdin 取 push range（每行 <local ref> <local sha> <remote ref> <remote sha>）──
+#   remote sha 全零（新 ref）⇒ range＝<local sha>（全部可達）；local sha 全零（--delete）⇒ 該行跳過；
+#   多行逐行驗；零行（某些客戶端）⇒ 回退 @{u}..HEAD；小 commit 視窗之幽靈過濾以本次全部 local sha 為可達目標。
+#   v7 之 `HEAD --not --remotes` 在第二 remote 已含本地 commit 時待驗集合變空（COMPOSER-R7-P1-01）⇒ 改讀 stdin。
+_pp_ranges=""; _pp_locals=""; _pp_zero='0000000000000000000000000000000000000000'
+while read -r _lref _lsha _rref _rsha; do
+  [ -n "${_lsha:-}" ] || continue
+  [ "${_lsha}" = "${_pp_zero}" ] && continue
+  if [ "${_rsha:-}" = "${_pp_zero}" ] || [ -z "${_rsha:-}" ]; then _r="${_lsha}"; else _r="${_rsha}..${_lsha}"; fi
+  _pp_ranges="${_pp_ranges}${_pp_ranges:+ }${_r}"; _pp_locals="${_pp_locals}${_pp_locals:+,}${_lsha}"
+done
+if [ -z "${_pp_ranges}" ]; then
+  if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then _pp_ranges='@{u}..HEAD'; _pp_locals="$(git rev-parse HEAD)"; fi
+fi
+export VG_PUSH_RANGES="${_pp_ranges}" VG_PUSH_LOCALS="${_pp_locals}"
 
 [ -f scripts/gov_check.sh ] || {
   echo "pre-push: scripts/gov_check.sh 缺失 → fail-closed 拒 push" >&2; exit 1; }

@@ -26,4 +26,24 @@ if [ -f scripts/g7_trailer_precheck.sh ]; then
   bash scripts/g7_trailer_precheck.sh "$msg_file" || true
 fi
 
+# ── VERDICTGATE Task 3.2：Ticket-Batch trailer 閘（fail-closed；與 G-7 為兩條獨立呼叫、不共用回傳，SPEC C-2）──
+#   staged 含生產碼（momentum|api|frontend/src）⇒ 訊息最末段須有 `Ticket-Batch: <root>/b<N>`（token 900s 內有效）
+#   或 `Ticket-Batch: small`（≤3 檔且不含 factories/protocols/config）。逃生口 GOVERNANCE_SKIP_COMMITMSG=1
+#   放行**但**寫 audit governance_bypass（C-7）。本檢查在 exec 之前。
+if [ -f scripts/ticket_batch_check.sh ]; then
+  if [ "${GOVERNANCE_SKIP_COMMITMSG:-}" = "1" ]; then
+    bash scripts/audit_append.sh --event governance_bypass --field hook=commit-msg \
+      --field "reason=GOVERNANCE_SKIP_COMMITMSG=1 by $(git config user.name 2>/dev/null || echo unknown)" \
+      --field actor=commit-msg --field origin_script=git_hooks/commit-msg >/dev/null 2>&1 \
+      || echo "commit-msg: ⚠ 逃生口留痕失敗（audit_append）" >&2
+    echo "commit-msg: GOVERNANCE_SKIP_COMMITMSG=1 → 略過 Ticket-Batch 閘（已寫 audit governance_bypass）" >&2
+  else
+    bash scripts/ticket_batch_check.sh --msg "$msg_file"
+    _tb_rc=$?          # 🔴 rc 直接取，禁經 pipe
+    if [ "${_tb_rc}" -ne 0 ]; then
+      exit 2
+    fi
+  fi
+fi
+
 exec "$py" "$checker" --commit-msg "$msg_file"

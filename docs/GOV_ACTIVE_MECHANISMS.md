@@ -82,6 +82,7 @@
 | `strategy_wiring_check.sh` | 常態檢查 | 未掛 |
 | `template_check.sh` | 常態檢查 | gate gov_check  |
 | `test_template_check.sh` | 一次性驗證 | 未掛 |
+| `ticket_batch_check.sh` | 常態檢查 | commit-msg gov_check  |
 | `ticket_universe.sh` | 常態檢查 | 未掛 |
 | `todo_spec_crosscheck.sh` | 常態檢查 | 未掛 |
 | `verdict_filled_check.sh` | 常態檢查 | gate  |

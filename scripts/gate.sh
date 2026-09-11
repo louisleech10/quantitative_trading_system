@@ -76,6 +76,7 @@ file=""; template_opened=""; sections=""; spec=""; todo=""; manifest=""
 # `--spec` 出現次數〔`CODEX-R1-P1-01`〕：只看值非空不夠，須知道旗標**有沒有被給**。
 spec_count=0
 brief=""
+impl_self=0   # VERDICTGATE Task 3.1
 
 _norm_output_path() {
   "${VENV_PY}" - "$1" <<'PY'
@@ -340,9 +341,20 @@ while [ $# -gt 0 ]; do
     --todo)            todo="${2:-}"; shift 2 ;;
     --manifest)        manifest="${2:-}"; shift 2 ;;
     --brief)           brief="${2:-}"; shift 2 ;;
+    --impl-self)       impl_self=1; shift ;;   # VERDICTGATE Task 3.1：主委自任實作領權限（走同一條 dispatch 路徑，C-6）
     *) echo "ERROR: 未預期參數 $1"; exit 1 ;;
   esac
 done
+# VERDICTGATE Task 3.1：--impl-self 只准 task_id `<root>-impl-b<N>-claude`（family 尾碼非 claude ⇒ 拒）
+_impl_root=""; _impl_n=""
+if [ "${impl_self:-0}" = "1" ]; then
+  _impl_parsed="$(printf '%s' "${task_id}" | "${VENV_PY}" -c 'import re,sys
+t=sys.stdin.read().strip()
+m=re.match(r"^(?P<root>.+)-impl-b(?P<n>\d+)-claude$", t)
+print((m.group("root")+" "+m.group("n")) if m else "")')"
+  [ -n "${_impl_parsed}" ] || { echo "GATE 拒發 token — --impl-self 之 task_id 須為 <root>-impl-b<N>-claude（family 尾碼 claude）:${task_id}"; exit 1; }
+  _impl_root="${_impl_parsed% *}"; _impl_n="${_impl_parsed##* }"
+fi
 
 missing=""
 miss() { missing="${missing}  · --$1: $2\n"; }
@@ -1006,6 +1018,21 @@ token="${GATE_DIR}/${kind}.token"; ts="$(date '+%Y-%m-%d %H:%M:%S')"
   echo "spec=${spec}"; echo "todo=${todo}"; echo "manifest=${manifest}"
 } > "${token}"
 cat "${token}" | sed 's/^/  /' | { echo "=== ${ts} | ${kind} ==="; cat; } >> "${AUDIT}"
+
+# VERDICTGATE Task 3.1：--impl-self 通過同一條判定後，另寫 impl token（供 commit-msg 之 Ticket-Batch: <root>/b<N> 驗
+#   900s 新鮮度）＋audit impl_token_issued（C-8；small 視窗之唯一重置錨——須被同批 ticket_commit 消費才算）。
+#   與既有 dispatch.token 分檔，避免 GATE-TOKEN-BINDING 之跨 session 延長坑。
+if [ "${impl_self:-0}" = "1" ]; then
+  _impl_tok="${GATE_DIR}/impl.${_impl_root}-b${_impl_n}.token"
+  { echo "ts=${ts}"; echo "task_id=${task_id}"; echo "root=${_impl_root}"; echo "batch=${_impl_n}"; } > "${_impl_tok}"
+  chmod 600 "${_impl_tok}" 2>/dev/null || true
+  if ! bash "${REPO_ROOT}/scripts/audit_append.sh" --event impl_token_issued --field "task_id=${task_id}" \
+        --field "root=${_impl_root}" --field "batch=${_impl_n}" --field "family=claude" \
+        --field "actor=gate" --field "origin_script=gate.sh"; then
+    rm -f "${_impl_tok}"; echo "GATE 拒發 token — impl_token_issued 寫 audit 失敗（token 已撤回）"; exit 1
+  fi
+  echo "GATE PASS：已發 impl token ${_impl_tok}（有效 900s；commit 訊息末段帶 Ticket-Batch: ${_impl_root}/b${_impl_n}）"
+fi
 
 echo "GATE PASS：已發 ${kind} token（有效 900s）。審計 → ${AUDIT}"
 echo "使用者可稽核：cat ${AUDIT}"

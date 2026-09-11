@@ -30,12 +30,17 @@ set -u
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || echo .)" || exit 2
 fast=0; no_probe=0
-case "${1:-}" in
-  --fast)     fast=1 ;;
-  --no-probe) no_probe=1 ;;   # pre-push 用:略過探針健檢(慢變項,不必每次 push 跑)
-  "")         : ;;
-  *) echo "用法: bash scripts/gov_check.sh [--fast|--no-probe]" >&2; exit 2 ;;
-esac
+# VERDICTGATE Task 3.3：--range／--local-sha 由 pre-push 傳入（stdin 解析），手動呼叫可省略 ⇒ 回退 @{u}..HEAD
+_gc_range="${VG_PUSH_RANGES:-}"; _gc_local="${VG_PUSH_LOCALS:-}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --fast)      fast=1; shift ;;
+    --no-probe)  no_probe=1; shift ;;   # pre-push 用:略過探針健檢(慢變項,不必每次 push 跑)
+    --range)     _gc_range="${2:-}"; shift 2 ;;
+    --local-sha) _gc_local="${2:-}"; shift 2 ;;
+    *) echo "用法: bash scripts/gov_check.sh [--fast|--no-probe] [--range <r>] [--local-sha <sha,…>]" >&2; exit 2 ;;
+  esac
+done
 
 rc_all=0
 
@@ -48,7 +53,7 @@ rc_all=0
 #   🔴 **禁在任何字串中寫死分母**（tests/governance/test_govb1_factkey_hook.py 機械釘住）。
 # 未登記的段號 ⇒ fail-closed：新增一段而忘了登記，會當場炸而不是靜默印出錯的分母。
 # ---------------------------------------------------------------------------
-_GC_SEG_IDS='1 1a 1b 2 3 4 5 6'
+_GC_SEG_IDS='1 1a 1b 1c 2 3 4 5 6'
 _gc_total() {
   # shellcheck disable=SC2086
   printf '%s\n' ${_GC_SEG_IDS} \
@@ -279,8 +284,36 @@ fi
 #   擺在便宜段中間 ⇒ 每次都得先付這 75 秒，才知道 0 秒的 fact-key 閘紅了沒。
 #   規則：不擋門的東西不得排在擋門的東西前面。搬移處見檔案最末「legacy backlog」節。
 
+# --- 1c) Ticket-Batch：push range 內生產 commit 之 trailer／token_fresh＋small 持續視窗（VERDICTGATE Task 3.3）---
+# 薄包裝：唯一實作在 scripts/ticket_batch_check.sh --push-range（可單獨測）。
+# range：pre-push stdin（VG_PUSH_RANGES）或 --range；皆無 ⇒ @{u}..HEAD；無上游 ⇒ fail-closed 印 usage。
+_gc_seg 1c "Ticket-Batch（push range 生產 commit trailer／token；small 累計視窗）…"
+if [ -f scripts/ticket_batch_check.sh ]; then
+  if [ -z "${_gc_range}" ]; then
+    if git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+      _gc_range='@{u}..HEAD'; _gc_local="$(git rev-parse HEAD)"
+    elif [ -z "$(git remote 2>/dev/null)" ]; then
+      # 無任何 remote（測試 fixture／本機草稿 repo）⇒ 沒有東西可 push，本段無待驗範圍；印明不擋。
+      # 有 remote 卻無上游 ⇒ 仍 fail-closed（SPEC Task 3.3：待驗範圍不明不得放行）。
+      echo "[gov_check] ℹ 本 repo 無 remote ⇒ 1c 無 push 範圍可驗，略過（有 remote 時無上游會 fail-closed）"
+    else
+      _gc_fail 1c "無 --range 且無上游分支（@{u}）⇒ 待驗範圍不明，fail-closed；用法: gov_check.sh --fast --range <r> --local-sha <sha>"
+    fi
+  fi
+  if [ -n "${_gc_range}" ]; then
+    _tb_bad=0
+    for _r in ${_gc_range}; do
+      bash scripts/ticket_batch_check.sh --push-range "${_r}" --local-sha "${_gc_local:-$(git rev-parse HEAD)}" || _tb_bad=1
+    done
+    if [ "${_tb_bad}" -eq 0 ]; then echo "[gov_check] ✓ Ticket-Batch OK（range: ${_gc_range}）"
+    else _gc_fail 1c "Ticket-Batch 未過（見上方 1c 🔴 行：無 trailer／token 當下無效／small 累計 >3）"; fi
+  fi
+else
+  _gc_fail 1c "scripts/ticket_batch_check.sh 缺失 → fail-closed"
+fi
+
 if [ "${fast}" -eq 1 ]; then
-  _gc_summary "--fast 完成(契約＝語法+格式;刻意不含第 2–4 段,理由見檔頭)"
+  _gc_summary "--fast 完成(契約＝語法+格式+Ticket-Batch;刻意不含第 2–4 段,理由見檔頭)"
   exit "${rc_all}"
 fi
 

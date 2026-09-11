@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# post-commit — VERDICTGATE Task 3.2：對含 Ticket-Batch trailer 之 commit 寫 audit ticket_commit
+#   （sha 於此已定案；commit-msg 階段 sha 未定——CODEX-R3-P1-04）。`--amend`／`--no-verify` 皆會再觸發本 hook。
+# 寫入失敗只印 ERROR、不擋（commit 已成立）；由 pre-push 1c 以「有 trailer 卻無事件」擋（Task 3.3 邊界④）。
+set -u
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+cd "$ROOT" || exit 0
+[ -f scripts/ticket_batch_check.sh ] || exit 0
+bash scripts/ticket_batch_check.sh --emit-event HEAD || true
+exit 0
