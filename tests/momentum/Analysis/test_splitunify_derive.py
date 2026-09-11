@@ -123,6 +123,52 @@ def _basic_case():
     return index, train, test, keys, _manifest(keys), test_start
 
 
+# ── 🔴 2026-09-11 歸屬回溯稽核撈回的三條（當輪被我漏掉，兩道檢查都沒響）──────────
+def test_answer_window_one_ms_before_test_start_stays_in_train() -> None:
+    """`GROK-R1-P2-02`（B2b R1）：比較式差 1 毫秒的改壞（`>= test_start_ms - 1`）原本測不到。
+
+    答案窗結束在測試段起點**前 1 毫秒** ⇒ 沒有跨界 ⇒ 必須留在 train。
+    既有 fixture 只測「恰好觸到」（`== test_start` ⇒ purge），於是把比較式挪 1 毫秒的 mutant 全綠。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    test_start = int(index[b["test_row_index"][0]])
+    keys = _event_keys([
+        ("e_one_ms_short", index[b["train_row_index"][-1]], test_start - 1),
+        ("e_test", index[b["test_row_index"][0]], test_start + H1),
+    ])
+    plan = derive_event_split_from_plans(train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1)
+    labels = dict(zip(plan.assignments["event_id"], plan.assignments["split_label"]))
+    assert labels.get("e_one_ms_short") == "train", (
+        "答案窗在測試段起點前 1 毫秒結束 ⇒ 沒跨界，卻被 purge（比較式被挪了）"
+    )
+    assert "e_one_ms_short" not in set(plan.purged["event_id"])
+
+
+def test_manifest_summary_missing_key_is_named_not_bare_keyerror() -> None:
+    """`CODEX-R3-P3-04`（B2b R3）：manifest 缺欄時原本丟出**沒有語意的裸 KeyError**。"""
+    index, train, test, keys, man, _ = _basic_case()
+    broken = EventManifest(table=man.table, summary={"n_events_effective": 4}, policy={})
+    with pytest.raises(ValueError, match="manifest.summary 缺"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=broken, bucket_ms=H1)
+
+
+def test_tier_min_test_events_is_honored_not_silently_one() -> None:
+    """B2b R1 之 H6：投影路徑原本把使用者設定的測試段事件數下限**靜默換成 1**。
+
+    `_basic_case` 的 test 段只有 1 筆事件：下限 1 ⇒ 不足清單為空；下限 5 ⇒ 必須列出。
+    """
+    index, train, test, keys, man, _ = _basic_case()
+    default = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert default.summary["insufficient_events_in_test"] == []
+    strict = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1, tier_min_test_events=5,
+    )
+    assert strict.summary["insufficient_events_in_test"] == [SYM], (
+        "下限設 5、測試段只有 1 筆，卻沒有列為不足（設定被靜默忽略）"
+    )
+
+
 # ── 三態與容器形狀（M-SU-1／C-3）──────────────────────────────────────────
 def test_three_state_two_containers_cover_all_events() -> None:
     index, train, test, keys, man, _ = _basic_case()

@@ -128,6 +128,23 @@ def test_splitunify_wiring_embargo_must_be_none_on_projection_path(records, bars
     assert spy_split == []
 
 
+# ── B2b R1 之 H6：使用者設定的測試段事件數下限必須真的傳到投影 ──────────────
+def test_splitunify_wiring_tier_min_test_events_reaches_projection(records, bars, spy_split):
+    """原本 `pipeline.run` 走投影時**沒傳** `tier_min_test_events` ⇒ 設定被靜默換成 1。
+
+    （該條在 B2b R1 被我寫成「列入 B3 Task 3.1」延後，之後就消失了；2026-09-11 回溯稽核撈回。）
+    """
+    train, test, index = _canonical(records, bars)
+    cfg = EventPipelineConfig(timeframes=(TF,), split=EventSplitConfig(tier_min_test_events=1000))
+    res = EventSamplePipeline().run(
+        records, bars, cfg,
+        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+    )
+    assert res.split_plan.summary["insufficient_events_in_test"] == [SYM], (
+        "下限設 1000 卻沒被判為不足 ⇒ 設定沒傳到投影"
+    )
+
+
 # ── 一個都不給 ⇒ 歷史路徑仍然活著（`split_events` 保留為 G-3a 對照） ────────
 def test_splitunify_wiring_legacy_path_still_calls_split_events(records, bars, spy_split):
     res = EventSamplePipeline().run(records, bars, EventPipelineConfig(timeframes=(TF,)))

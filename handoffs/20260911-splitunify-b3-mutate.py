@@ -118,6 +118,14 @@ MUTANTS = [
         ("pytest", "tests/momentum/Analysis/test_splitunify_derive.py", "same_source"),
     ),
     (
+        "M-SU-B3-13",
+        "pipeline.run 走投影時不傳 tier_min_test_events（H6：設定被靜默換成 1）",
+        PIPELINE,
+        "                tier_min_test_events=config.split.tier_min_test_events,\n",
+        "",
+        ("pytest", PYTEST_WIRING, "tier_min_test_events_reaches_projection"),
+    ),
+    (
         "M-SU-B3-11",
         "沒切分時 n_symbols 退回從空 summary 取（單標的批寫成「0 個標的」）",
         TABLES,

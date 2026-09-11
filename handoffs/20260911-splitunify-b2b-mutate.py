@@ -193,6 +193,28 @@ MUTANTS = [
         "    if False:",
         "none_symbol or blank_symbol",
     ),
+    # ── 2026-09-11 歸屬回溯稽核撈回的三條（當輪被主委漏掉；兩道檢查都沒響）─────────
+    (
+        "M-SU-30",
+        "答案窗比較式挪 1 毫秒（GROK-R1-P2-02：原本全綠）",
+        '        if in_train and int(rec["label_end_ms"]) >= test_start_ms:',
+        '        if in_train and int(rec["label_end_ms"]) >= test_start_ms - 1:',
+        "one_ms_before",
+    ),
+    (
+        "M-SU-31",
+        "manifest.summary 缺欄檢查拿掉（CODEX-R3-P3-04：退回裸 KeyError）",
+        "    if missing:\n        raise ValueError(\n            f\"derive_event_split_from_plans: manifest.summary 缺 {missing}\"",
+        "    if False:\n        raise ValueError(\n            f\"derive_event_split_from_plans: manifest.summary 缺 {missing}\"",
+        "missing_key_is_named",
+    ),
+    (
+        "M-SU-32",
+        "tier_min_test_events 不再傳給摘要（H6：設定被靜默換成 1）",
+        '        tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),\n',
+        "",
+        "tier_min_test_events_is_honored",
+    ),
     (
         "C0",
         "對照組：只改註解",

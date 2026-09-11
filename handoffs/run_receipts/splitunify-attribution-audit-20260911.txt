@@ -1,0 +1,196 @@
+
+######## b1-review-r1（finding 8 條）
+── CODEX-R1-P1-01
+   原文：D-002「覆寫」兩個 touchset 錨點不是 BASE 實際存在的 heading，違反 frozen D 程序，故無法作為可機檢的原檔覆寫。
+   決議：**G1 D-002 之「覆寫」錨點不是 BASE 的真實 heading**
+── CODEX-R1-P1-02
+   原文：Task 1.3 驗證條件「清單行數等於 receipt 的 `^FAILED ` 行數」對 frozen receipt 不成立：19 ≠ 30。
+   決議：**G2 Task 1.3 驗證條件自相矛盾（19 ≠ 30）**
+── CODEX-R1-P2-03
+   原文：B1 contract test 的「兩端對證」只有 JSON↔SPEC 字面 substring 檢查，不是獨立的 JSON↔Python 語意證明。
+   決議：**G6 B1 的「兩端對證」是弱形式**
+── COMPOSER-R1-P3-00
+   原文：本輪逐項核對 brief 必答 1–7、B1/B2a 審查對象與主委驗收項後無 P0/P1/P2 finding；可進 B2b（投影純函式）。
+   決議：⚠️ 未被任何決議引用
+── GROK-R1-P2-01
+   原文：D-002「覆寫」欄宣告的 `B1.3 事件切分` 不是其 BASE（`docs/GAP3_EVENT_UX_SPEC.md`）內任何 heading；真文住在兄弟檔 `docs/GAP3_EVENT_SPEC.md` Task B1.3——凍結 D 延伸的觸及面錨點規則被架空，後續讀者／機檢無法對讀原檔。
+   決議：**G1 D-002 之「覆寫」錨點不是 BASE 的真實 heading**
+── GROK-R1-P2-02
+   原文：B2a `_as_ms` 對 int64 假設「已是 epoch ms」直通、對非 UTC tz-aware 會平移絕對 ms，且無測試鎖這兩條；與 FF `timestamps.parquet`（秒）及 orchestrator 秒語意同形的輸入會得到 year=1970 的「邊界」，B2b／B3 若複用會讓答案窗比
+   決議：**G3 `_as_ms` 對 int64 假設「已是毫秒」直通，無測試鎖**
+── GROK-R1-P3-01
+   原文：Task 1.3 目標句／HANDOFF 仍寫「20 條」既有紅，與 B1 凍結的 receipt／nodeids **19** 條不一致；passed 基數 1615 vs 1103 證明「20」不是本 receipt 的漏抓。
+   決議：**G5 「20 條」既有紅與凍結的 19 條不一致**
+── GROK-R1-P3-02
+   原文：SPEC／TODO Task 2.1 輸入輸出仍寫元組形 `(train_row_index, …)`，B2a 實作回 `Dict[str, Any]`；Task 1.2 驗證欄仍寫「與 Python 常數集合相等」，B1 實測是 SPEC 字面對證——文件驗收句與交付不一致，B3 呼叫端可能按 tuple unpac
+   決議：**G4 SPEC/TODO 之 Task 2.1 回傳型別與實作不一致**
+
+######## b2-review-r1（finding 8 條）
+── CODEX-R1-P1-01
+   原文：`derive_event_split_from_plans` 未強制 `event_keys.event_id` 與 `manifest.table.event_id` 完全 keyed 對齊，會對另一批 manifest 產生看似成功的 assignment。
+   決議：**H1 `event_keys` 與 `manifest` 未強制 ID 對齊**
+── CODEX-R1-P1-02
+   原文：multi-symbol guard 只檢查各自 symbol 集合的 cardinality，未檢查 plan symbol 與 event symbol 相等；錯誤 plan symbol 可靜默通過。
+   決議：**H2 多 symbol guard 只看基數、不看相等**
+── CODEX-R1-P1-03
+   原文：projection 對兩類 malformed feature index 未 fail-closed：混合 seconds/ms index 及負 positional row index 都可被接受並產生錯誤 assignment。
+   決議：**H3 malformed feature index 未 fail-closed**
+── CODEX-R1-P2-04
+   原文：`_index_as_ms` 複製 `_as_ms` 的 `1e11` unit policy，形成第二份 arithmetic/policy seam；目前未見合法 homogeneous input 的數值差異，但日後門檻漂移可使投影與 boundary normalization 分歧。
+   決議：**H4 秒守衛門檻是第二份 policy**
+── CODEX-R1-P2-04
+   原文：`_index_as_ms` 複製 `_as_ms` 的 `1e11` unit policy，形成第二份 arithmetic/policy seam；目前未見合法 homogeneous input 的數值差異，但日後門檻漂移可使投影與 boundary normalization 分歧。
+   決議：**H6 `tier_min_test_events` 責任邊界未定**
+── CODEX-R1-P2-05
+   原文：mutation harness 尚未覆蓋關鍵 near-boundary、keyed-input 與獨立 oracle，現有 cluster regression 還與被抽取 helper 循環相依。
+   決議：**H5 mutation 覆蓋不足＋cluster oracle 循環相依**
+── COMPOSER-R1-P3-00
+   原文：本輪逐項核對 brief 必答 1–7、主委兩項自查與 A-2 code fence 後無 P0/P1/P2 finding；可進 B2c（golden 五組）。
+   決議：**H0 composer 判可進、無 finding**
+── GROK-R1-P2-01
+   原文：`split_projection._index_as_ms` 與 `split_preview._as_ms` 是兩份獨立的秒級門檻守衛（前者手寫 `1e11`、後者用 `_MS_MAGNITUDE_FLOOR`），且零值／混合量級語意已分歧；改其一不會令另一側測試變紅。
+   決議：**H4 秒守衛門檻是第二份 policy**
+── GROK-R1-P2-02
+   原文：現有答案窗 mutation／fixture 擋得住「整段刪除第一段」（M-SU-13）與「`>=`→`>`」（單元測），但擋不住「`>= test_start_ms - 1`」與「改讀已同步的 `time_bounds[0]`」——這兩類在 H1 對齊 fixture 上維持全綠，卻會在毫秒級或 bounds 漂移的
+   決議：**H5 mutation 覆蓋不足＋cluster oracle 循環相依**
+
+######## b2-review-r2（finding 11 條）
+── CODEX-R2-P1-01
+   原文：H1 未閉合：exact ID set 對帳未拒絕重複 `event_keys.event_id`，會重複計數/輸出 assignment。
+   決議：**I3 `event_keys.event_id` 重複未擋**
+── CODEX-R2-P1-02
+   原文：H3 未閉合：`assert_positional_rows` 先 `dtype=int` 靜默截斷非整數 float，且 feature index 未驗 sorted/unique。
+   決議：**I1 `feature_index` 不變式未驗（未排序／重複）**
+── CODEX-R2-P1-02
+   原文：H3 未閉合：`assert_positional_rows` 先 `dtype=int` 靜默截斷非整數 float，且 feature index 未驗 sorted/unique。
+   決議：**I4 `row_index` 非整數 float 被靜默截斷**
+── CODEX-R2-P1-03
+   原文：event-key timestamp/interval 完整性未 fail-closed；test-side 的 NaT 與 `label_end_ms < label_start_ms` 可產生 assignment。
+   決議：**I5 事件時間戳／答案窗完整性未驗**
+── CODEX-R2-P2-04
+   原文：`bucket_ms` 負值未拒絕，cluster 可產生負 ID；此為不擋 B2c 的 P2。
+   決議：**I6 `bucket_ms <= 0` 未擋**
+── COMPOSER-R2-P2-01
+   原文：`assert_epoch_ms_array` 對含 `NaN` 的 float64 時間戳陣列不 fail-closed，cast 後帶 `RuntimeWarning` 仍放行，derive 可產出 assignment。
+   決議：**I2 NaN 在數值型索引被靜默轉成 0**
+── COMPOSER-R2-P2-02
+   原文：`assert_positional_rows` 接受 float `row_index`（`dtype=int` 截斷），derive 不 raise。
+   決議：**I4 `row_index` 非整數 float 被靜默截斷**
+── GROK-R2-P1-01
+   原文：`feature_index` 非時間遞增時，`test_start_ms = index_ms[test_rows[0]]` 與集合成員所用時間戳一併錯位，答案窗／train·test 歸屬會靜默算錯且不 raise。
+   決議：**I1 `feature_index` 不變式未驗（未排序／重複）**
+── GROK-R2-P1-02
+   原文：數值型 `feature_index` 含 NaN 時不被 fail-closed；`assert_epoch_ms_array` 以 `astype("int64")` 把 NaN 變成 **0**，可使 `feature_cutoff_ms=0` 的事件被誤判為 train。
+   決議：**I2 NaN 在數值型索引被靜默轉成 0**
+── GROK-R2-P2-03
+   原文：`bucket_ms < 0` 時 `build_time_clusters` 不擋，會產出負向 `time_cluster_id`；`bucket_ms == 0` 僅靠 pandas `IntCastingNaNError` 巧合擋住。
+   決議：**I6 `bucket_ms <= 0` 未擋**
+── GROK-R2-P2-04
+   原文：`label_end_ms < label_start_ms` 的反轉答案窗不被投影擋下，會當正常事件進入 assignments／purged 邏輯。
+   決議：**I5 事件時間戳／答案窗完整性未驗**
+── GROK-R2-P3-05
+   原文：`row_index` 為 float 時 `assert_positional_rows` 經 `dtype=int` 截斷（0.5→0）後當合法列使用，不 raise。
+   決議：⚠️ 未被任何決議引用
+
+######## b2-review-r3（finding 7 條）
+── CODEX-R3-P1-01
+   原文：`DatetimeIndex` 型 `feature_index` 未經嚴格遞增／去重驗證；反序時投影會靜默錯分，且 canonical `holdout_boundary` 同樣跳過此閘。
+   決議：**J1 `DatetimeIndex` 分支繞過遞增檢查**
+── CODEX-R3-P1-02
+   原文：`assert_positional_rows` 只驗範圍／唯一性、不驗順序；reversed `test_plan.row_index` 會以最新 test row 當 `test_start_ms`，讓跨入實際 test 首根的 train event 留在 train。
+   決議：**J2 `row_index` 未驗順序**
+── CODEX-R3-P2-03
+   原文：`event_keys.symbol=None` 時 symbol 守衛被跳過，投影輸出 `symbol=None` 且 summary 的 symbol 計數為空，未 fail-closed。
+   決議：**J3 `symbol=None` 讓三道守衛整條被跳過**
+── CODEX-R3-P3-04
+   原文：`manifest.summary` 缺 `n_events_raw` 時雖會擋下，但 `_build_summary` 直接索引造成使用者看到無語意的裸 `KeyError`。
+   決議：⚠️ 未被任何決議引用
+── COMPOSER-R3-P2-01
+   原文：`event_keys.symbol=None` 时第三道 symbol 守卫被跳过（`None` 被 filter 掉），derive 可产出 `assignments.symbol=None` 且 `summary.n_symbols=0`，fail-open 而非 fail-closed。
+   決議：**J3 `symbol=None` 讓三道守衛整條被跳過**
+── GROK-R3-P1-01
+   原文：I1 未閉合：`DatetimeIndex` 的 `feature_index`（以及 `holdout_boundary` 的 Datetime 入口）跳過嚴格遞增／去重檢查，反序時會靜默錯分 train／test，與 R2 數值反序洞同一機制。
+   決議：**J1 `DatetimeIndex` 分支繞過遞增檢查**
+── GROK-R3-P2-02
+   原文：`event_keys.symbol` 全為 `None` 時，symbol 三道守衛因 `if s is not None`／`if symbols and …` 被跳過，投影 `NO_RAISE` 並輸出 `symbol=None` 的 train assignment。
+   決議：**J3 `symbol=None` 讓三道守衛整條被跳過**
+
+######## b3-review-r1（finding 8 條）
+── CODEX-R1-P1-01
+   原文：G-5③ 未驗 source bars 上 `label_start_ms`／`label_end_ms` 兩端，實作只檢查 start 在 feature_index。
+   決議：**K1 G-5③ 弱於 SPEC**
+── CODEX-R1-P1-02
+   原文：G-5① 沒有與 IC orchestrator 或外部期望 hash 逐值對證；測試只驗 hash 非空，錯誤 fingerprint 可自凍結。
+   決議：**K2 G-5① fingerprint 無外部對證**
+── CODEX-R1-P1-03
+   原文：oracle 雖未呼叫投影，但與 actual 共用同一 fixture/boundary，golden 又由 actual 產生；缺少獨立 fixture 身份/基數使共同錯誤可綠。
+   決議：**K3 oracle 與 actual 共用 fixture／邊界**
+── COMPOSER-R1-P1-01
+   原文：G-5③ 實作只驗 test 事件 `label_start_ms ∈ feature_index`，未驗 `label_end_ms` 在 source bars，也未斷言缺 endpoint 必 purge；與 SPEC §G:319-321 不符，off-bar 終點仍可留在 test assignments。
+   決議：**K1 G-5③ 弱於 SPEC**
+── COMPOSER-R1-P2-01
+   原文：golden 空檔或 JSON 語法錯時 `main()` 未 catch `JSONDecodeError`，以 Python traceback 退出而非 `GOLDEN MISMATCH` 式指名 diff，運維可讀性差。
+   決議：**K5 壞 JSON 以裸 traceback 結束**
+── GROK-R1-P1-01
+   原文：G-5③ 未實作 SPEC 要求的「兩端 endpoint ∈ source bars」；現行只驗 `label_start_ms`，且 pytest 只斷言 complete ⊆ test，使不完整答案窗的 test 事件可通過 golden 並留在 assignments。
+   決議：**K1 G-5③ 弱於 SPEC**
+── GROK-R1-P2-02
+   原文：G-5① 比對失敗只報 sha256 不等，未依 SPEC 指名第一個 mismatch 的 `position`，定位成本退回重算整條 fingerprint。
+   決議：**K4 G-5① 失敗未指名第一個 mismatch position**
+── GROK-R1-P3-03
+   原文：freeze 腳本對空檔／壞 JSON 以未捕捉 `JSONDecodeError` 結束（rc=1），沒有與 `GOLDEN MISSING`／`GOLDEN MISMATCH` 同級的指名訊息。
+   決議：**K5 壞 JSON 以裸 traceback 結束**
+
+######## b4-review-r1（finding 3 條）
+── CODEX-R1-P1-01
+   原文：`derive_event_split_from_plans` 只驗證 train/test plan 彼此的 `base_universe_hash`，不驗證傳入 `feature_index` 與該 plan 同源，因此不同 universe 仍能產出 assignments。
+   決議：**L1 投影未對證 plan 與 `feature_index` 同源**
+── CODEX-R1-P1-01
+   原文：`derive_event_split_from_plans` 只驗證 train/test plan 彼此的 `base_universe_hash`，不驗證傳入 `feature_index` 與該 plan 同源，因此不同 universe 仍能產出 assignments。
+   決議：**L2 brief 前提過寬：「事件端永遠拿不到 FF run」**
+── COMPOSER-R1-P1-01
+   原文：`derive_event_split_from_plans` 只要求 train/test 之 `base_universe_hash` 相同，未验证 `feature_index` 与 plan 所建 universe 同源；当 plans 在较短 bar 网格上构建、却传入更长 `feature_index` 时
+   決議：**L1 投影未對證 plan 與 `feature_index` 同源**
+── GROK-R1-P2-01
+   原文：兩 plan 之 `base_universe_hash` 字面相同且 `row_index` 長度落在傳入 `feature_index` 內時，投影**不驗證** plan 與 `feature_index` 同源；同長度平移網格可把 control 的 test 事件改標成 train 且不 raise。
+   決議：**L1 投影未對證 plan 與 `feature_index` 同源**
+
+######## b5-review-r1（finding 9 條）
+── CODEX-R1-P1-01
+   原文：metadata-only 的 closed registry 可被報告其他區段新增的事件計數語義鍵繞過，故未封閉整份 report schema。
+   決議：**N1 封閉登記可被繞過（只掃 metadata、只做正向計數）**
+── CODEX-R1-P1-02
+   原文：build_split_unify_disclosure／boundary_hash 對負數、浮點截斷、空 attribution、重複時間及 DatetimeIndex 未一致 fail-closed，可能產生看似合法的錯誤驗證段。
+   決議：**N3 唯一產生點的型別／值域全部放行**
+── CODEX-R1-P2-03
+   原文：boundary_hash 目前只有 producer/type/test，沒有 runtime consumer 比對，屬未被執行的 audit liability。
+   決議：**N4 `boundary_hash` 目前沒有消費者**
+── CODEX-R1-P2-04
+   原文：badge 對缺少 split_unify disclosure 直接 return null，未區分已知 global run 與舊/不完整 artifact，造成使用者無法判斷「不適用」或「遺漏」。
+   決議：**N5 badge 缺鍵時的兩種情形混為一談**
+── COMPOSER-R1-P1-01
+   原文：`test_segment_count_keys` 的機械判準只做登記鍵之正向計數，未對 `metadata` 做 deny-by-default 掃描；新增未登記之「驗證段事件數」鍵不會讓 `test_splitunify_disclosure_exactly_one_test_count_key` 失敗。
+   決議：**N1 封閉登記可被繞過（只掃 metadata、只做正向計數）**
+── COMPOSER-R1-P1-02
+   原文：`build_split_unify_disclosure` 對成功路徑的 `n_test` 只做 `int(n_test)`，不拒負數、不拒非整數 float，可寫入 `metadata.split_unify.n_test=-1` 或把 `3.5` 截成 `3`。
+   決議：**N3 唯一產生點的型別／值域全部放行**
+── GROK-R1-P1-01
+   原文：事件路徑寫入的 `oos_downgrade.test_rows` 實際是事件數（與 `split_unify.n_test`／`oos_downgrade.test_events` 同值），卻被 `split_unify.json` 的 `test_segment_count_keys.row_semantics_n
+   決議：**N2 我的語意分類有一條是錯的**
+── GROK-R1-P1-02
+   原文：`build_split_unify_disclosure`（metadata.split_unify 唯一產生點）接受負數與非整數 `n_test`，fail-closed 宣稱未覆蓋值域／型別；前端 `splitUnifyView` 會把有限數字（含負數）原樣顯示成「驗證段事件數」。
+   決議：**N3 唯一產生點的型別／值域全部放行**
+── GROK-R1-P2-03
+   原文：「恰一個」測試只掃登記清單的 presence，未登記孿生鍵與 `DatetimeIndex` 餵入 `boundary_hash`（靜默改用 ns）皆可通過現有綠徑。
+   決議：**N1 封閉登記可被繞過（只掃 metadata、只做正向計數）**
+
+######## b6-review-r1（finding 3 條）
+── CODEX-R2-P1-01
+   原文：N1 未閉合（P1）。scanner 只把鍵名含 `test` 且為整數者納入候選；帶驗證段事件數語意但命名為 `n_oos_events`、`validation_segment_n`、`holdout_hits` 的鍵可直接漏過。
+   決議：**O1 掃描判準可被改名逃逸**
+── COMPOSER-R2-P1-01
+   原文：deny-by-default 掃描僅匹配鍵名含 `test` 的整數鍵；不含 `test` 但具驗證段事件數語意的鍵（如 `holdout_hits`、`n_oos_events`）可注入報告而測試仍綠。
+   決議：**O1 掃描判準可被改名逃逸**
+── GROK-R2-P1-01
+   原文：deny-by-default 掃描之候選謂詞是「鍵名含 `test` 且值為整數」，因此帶驗證段事件數語意但不含 `test` 字樣的鍵（如 `n_oos_events`／`holdout_hits`／`validation_segment_n`）可寫進整份 report 且既有登記測試仍綠。
+   決議：**O1 掃描判準可被改名逃逸**

@@ -335,8 +335,14 @@ def derive_event_split_from_plans(
     *,
     manifest: EventManifest,
     bucket_ms: Optional[int] = None,
+    tier_min_test_events: int = 1,
 ) -> EventSplitPlan:
     """由 canonical 邊界投影出**完整**的 `EventSplitPlan`（SPEC C-3／C-4／C-5）。
+
+    🔴 `tier_min_test_events`（B2b R1 之 H6；**當輪我寫「列入 B3 Task 3.1」延後，之後就消失了**，
+    2026-09-11 歸屬回溯稽核才撈回）：原本只有內部 `_build_summary` 有這個參數、預設 1，
+    對外沒開放 ⇒ 投影路徑上使用者設定的「測試段事件數下限」被**靜默換成 1**，
+    而舊的 `split_events` 路徑是照設定走的——兩條路對同一個設定給出不同的判定。
 
     🔴 **兩段式判定，先後不可調**（R3 之 E1；式子逐字採 `CODEX-R4-P1-01`）：
 
@@ -523,6 +529,7 @@ def derive_event_split_from_plans(
         n_purged=int(len(purged)),
         n_test=n_test,
         bucket=int(time_cluster_bucket_ms(manifest, bucket_ms)),
+        tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),
     )
     return EventSplitPlan(
         assignments=assignments, purged=purged, clusters=clusters, summary=summary
@@ -549,6 +556,15 @@ def _build_summary(
     連帶使 `tables.py:138` 之 `formal_pooled_inference_allowed` 恆 `False`——方向保守，
     **不得**為了讓它變 `True` 而清空 `degraded`（SPEC Task 2.2 要點 6／R2 之 D11）。
     """
+    # 🔴 `CODEX-R3-P3-04`（B2b R3；**當輪被我漏掉、2026-09-11 歸屬回溯稽核才撈回**）：
+    #    原本直接 `manifest.summary["n_events_raw"]` ⇒ 缺鍵時丟出**沒有語意的裸 KeyError**，
+    #    使用者看不出是 manifest 壞了還是程式壞了。改為先驗、缺就指名缺什麼（fail-closed）。
+    missing = [k for k in ("n_events_raw", "n_events_effective") if k not in (manifest.summary or {})]
+    if missing:
+        raise ValueError(
+            f"derive_event_split_from_plans: manifest.summary 缺 {missing}"
+            "——manifest 不完整（應由 build_event_manifest 產生），無法產出切分摘要（fail-closed）"
+        )
     n_symbols = len(per_symbol_n)
     insufficient = [s for s in per_symbol_n if n_test < int(tier_min_test_events)]
     n_clusters = int(clusters["time_cluster_id"].nunique()) if not clusters.empty else 0

@@ -746,6 +746,9 @@ class EventSamplePipeline:
                 train_plan, test_plan,
                 build_event_keys(receipts, selected_timeframe=str(selected_timeframe)),
                 feature_index, manifest=manifest, bucket_ms=config.split.bucket_ms,
+                # 🔴 B2b R1 之 H6（2026-09-11 回溯稽核撈回）：原本沒傳 ⇒ 投影路徑把使用者設定的
+                #    測試段事件數下限靜默換成 1，與 split_events 路徑判定不一致。
+                tier_min_test_events=config.split.tier_min_test_events,
             )
         else:
             plan = split_events(manifest, config.split, lookahead_gate=lookahead_gate)
