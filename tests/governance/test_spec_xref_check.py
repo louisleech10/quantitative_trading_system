@@ -85,7 +85,51 @@ def test_mutation_disabling_check_turns_red(tmp_path: Path) -> None:
     assert r.returncode == 0, "mutation 後仍擋 ⇒ 測試沒在測判準"
 
 
-@pytest.mark.parametrize("args", [["--bogus"], ["--files", "only_one"]])
+SYNTH = (
+    "# Reconcile — s\n\n## 群集 / 處置\n\n"
+    "| 群集 | 嚴重度 | 來源 ID | 處置 |\n|---|---|---|---|\n"
+    "| **X1 `old_window_range` 可被繞** | P1 | GROK-R2-P0-01 | **採納**。改讀 `audit_persistent_window`；見 `GROK-R2-P0-01`。 |\n\n"
+    "## 附錄：findings 逐字保留\n\n## GROK-R2-P0-01\n**斷言**: `never_in_spec_token` 之類。\n"
+)
+
+
+def _run_synth(synth: str, target: str, tmp_path: Path) -> subprocess.CompletedProcess[str]:
+    s = tmp_path / "synth.md"; t = tmp_path / "SPEC.md"
+    s.write_text(synth, encoding="utf-8"); t.write_text(target, encoding="utf-8")
+    return subprocess.run(["bash", str(SCRIPT), "--synth", str(s), str(t)], cwd=ROOT,
+                          capture_output=True, text=True, check=False)
+
+
+def test_synth_disposition_token_missing_in_target_fails(tmp_path: Path) -> None:
+    """synth 處置欄說改成 `audit_persistent_window`，SPEC 沒有 ⇒ rc=1 並指名。"""
+    r = _run_synth(SYNTH, "- 改法：視窗用 `origin/main..HEAD`。\n", tmp_path)
+    assert r.returncode == 1, r.stdout
+    assert "`audit_persistent_window`" in r.stdout
+
+
+def test_synth_disposition_token_present_passes(tmp_path: Path) -> None:
+    r = _run_synth(SYNTH, "- 改法：視窗讀 `audit_persistent_window`。\n", tmp_path)
+    assert r.returncode == 0, r.stdout
+
+
+def test_synth_ignores_finding_ids_and_cluster_column_and_appendix(tmp_path: Path) -> None:
+    """群集欄的 `old_window_range`、附錄的 `never_in_spec_token`、ID 都不是處置概念 ⇒ 不要求在 SPEC。"""
+    r = _run_synth(SYNTH, "- 改法：視窗讀 `audit_persistent_window`。\n", tmp_path)
+    assert r.returncode == 0
+    assert "old_window_range" not in r.stdout and "never_in_spec_token" not in r.stdout
+
+
+def test_synth_skips_evidence_commands_memory_names_and_line_refs(tmp_path: Path) -> None:
+    """處置欄裡的實跑指令／記憶檔名／行號引用不是概念 ⇒ 不要求在 SPEC。"""
+    synth = SYNTH.replace(
+        "見 `GROK-R2-P0-01`。",
+        "見 `GROK-R2-P0-01`；主委實跑 `git remote | wc -l`、`sed -n '202p' x.sh`；記憶 `feedback_cross_reference_sync`；碼證 `gate.sh:791-798`。",
+    )
+    r = _run_synth(synth, "- 改法：視窗讀 `audit_persistent_window`。\n", tmp_path)
+    assert r.returncode == 0, r.stdout
+
+
+@pytest.mark.parametrize("args", [["--bogus"], ["--files", "only_one"], ["--synth", "a"]])
 def test_usage_error_rc2(args: list[str]) -> None:
     r = subprocess.run(["bash", str(SCRIPT), *args], cwd=ROOT, capture_output=True, text=True, check=False)
     assert r.returncode == 2

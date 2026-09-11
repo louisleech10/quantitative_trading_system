@@ -325,6 +325,9 @@ header = (
     "<!-- ④b 判斷（Claude 手填）：把下方 findings 群集成修訂項、逐條標處置與對應 ID。\n"
     "     此段不含 ## <ID> heading，不影響 body-hash。填完刪本註解。 -->\n\n"
     "## 群集 / 處置（待 Claude 填）\n\n"
+    # 修訂標的行：debt_clear ③b 對 -x-review- 層以 spec_xref_check --synth 驗「處置欄概念皆見於標的」
+    # （使用者 2026-09-11「每個要整理委員產出時候都會要用到」）。程式碼審查層可刪此行。
+    "**修訂標的**：docs/<填 SPEC 或 TODO 檔名>.md\n\n"
     # ⚠️ Verdict 行是**機器解析**的:gate.sh 的 D-1 檢查以 `grep -qE 'Verdict[[:space:]]*[:：]'`
     #    驗 --adversarial 檔。兩次事故:
     #    ①2026-07-29 主委手寫成「Verdict（綜合）：…」→ Verdict 與冒號間插了字 → 正則不中

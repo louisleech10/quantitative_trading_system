@@ -250,6 +250,24 @@ _run_completeness() {
   return 0
 }
 
+# ③b synth 處置欄概念須見於修訂標的（只對 -x-review- 層）
+_run_synth_xref() {
+  local lock="$1" synth target
+  synth="$(dirname "${lock}")/synth.md"
+  case "${SESSION}" in *-x-review-*) : ;; *) return 0 ;; esac
+  [ -f "${synth}" ] || { echo "ERROR: synth.md 缺失: ${synth}" >&2; return 1; }
+  target="$(grep -m1 -oE '^\*\*修訂標的\*\*：[^ ]+' "${synth}" | sed 's/^\*\*修訂標的\*\*：//')"
+  if [ -z "${target}" ]; then
+    echo "ERROR: ${synth} 未宣告修訂標的（在群集段加一行：**修訂標的**：docs/<X>_SPEC.md）" >&2
+    return 1
+  fi
+  [ -f "${target}" ] || { echo "ERROR: 修訂標的不存在: ${target}" >&2; return 1; }
+  bash "${SCRIPT_DIR}/spec_xref_check.sh" --synth "${synth}" "${target}"
+  local rc=$?
+  [ "${rc}" -eq 0 ] || { echo "ERROR: synth 處置欄概念未見於 ${target}（拒銷）" >&2; return 1; }
+  return 0
+}
+
 # ③ lock.mode 必須是 review
 _assert_lock_mode_is_review() {
   local lock="$1"
@@ -506,6 +524,12 @@ _cmd_clear() {
 
   # ③ mode=review
   _assert_lock_mode_is_review "${lock}" || return 1
+
+  # ③b synth 處置欄 vs 修訂標的（spec_xref_check --synth；使用者 2026-09-11：
+  #    「每個要整理委員產出時候都會要用到」）。只對 SPEC/TODO 審查層（session 含 -x-review-）
+  #    fail-closed：synth 須宣告 `**修訂標的**：<docs/...md>`，且處置欄概念皆見於該檔。
+  #    程式碼審查層（-b<N>-review-）修的是碼不是文件，不套。
+  _run_synth_xref "${lock}" || return 1
 
   # ④ identity binding
   _assert_identity_binding "${lock}" "${rid}" || return 1
