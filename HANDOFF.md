@@ -1,6 +1,8 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：SPEC v8（R1–R7 共 44 條全採納；最新 commit `6f8054cb` 已 push）→ **R8＝最後一輪找碴進行中**（session `20260911-verdictgate-x-review-r8`）｜`SPLITUNIFY` 暫停**
+**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：SPEC v9 **停輪**（R1–R8 共 48 條全採納；R8 兩家 proceed、三家同意凍結 small 視窗）→ 使用者同意白話「四段全做」→ TODO DRAFT（`71cfafdd`）→ **TODO adversarial R1 進行中**（session `20260911-verdictgate-x-todoreview-r1`；codex 一併對 R8 四條寫 CLOSED）｜`SPLITUNIFY` 暫停**
+- 本日新上線三支產出端閘（使用者質問「為何不每次都做全文掃描／輪級才擋等於沒用／reconcile 也要」）：`spec_xref_hook.sh`（寫 SPEC/TODO/任何被 synth 宣告之修訂標的時：殘留掃描＋synth 處置對證）、`synth_attribution_hook.sh`（寫 synth 時：ID 全在表＋-x- 層必宣告 `**修訂標的**：`）、`spec_xref_check.sh --staged/--synth`（pre-commit／debt_clear 後備）。22 測試含 mutation。🔴 hook 阻塞理由必走 stderr。
+- 殘留動作：`handoffs/reconcile/zz-live-x-review-r1/` 實測檔，rm／git clean 被使用者拒兩次，待使用者處置（untracked、無害）。
 - 🔴 使用者 2026-09-11 裁定（逐字）：「若是有地方是你跟委員判定無法收斂或無限窮舉或實作或落地後對整個流程的運作成本和時間成本太高，這就不要鑽下去，該適時停止」⇒ small 視窗規則凍結於 v7、登記 §N；R8 後若只剩文字同步類 ⇒ 主委修完直接進白話審閱閘（AskUserQuestion 阻塞），不派 R9。記憶 `feedback_stop_when_nonconvergent`。
 - 收斂檔：`handoffs/reconcile/20260911-verdictgate-x-review-r{2..6}/synth.md`（債皆已清）。R2 X、R3 Y、R4 Z、R5 W、R6 V。composer 自 R3 起每輪 `proceed`；codex 每輪再挖 3–6 條、碼證皆實，多為「改一處漏一處」；R6 grok 抓到 R4 synth Z4 寫錯（錨前 small 不在窗內）。
 - v5 關鍵語意：small 視窗錨＝**被消費的** token；`ticket_commit.token_fresh` 由 post-commit 寫；C-4 對「前批有 review round 但無機械裁決」fail-closed（SPLITUNIFY 復工前須補裁決輪）；roster 讀 `round_open.quorum_eligible`；`register-output` family 由檔名尾碼對 roster。
