@@ -147,7 +147,7 @@ def test_hook_fires_on_handoffs_file_declared_as_target(tmp_path: Path) -> None:
         recon.write_text("# recon\n\n- 沒有那個概念。\n", encoding="utf-8")
         env = dict(os.environ, GOVERNANCE_TEST_HARNESS="1", SPEC_XREF_HOOK_TARGET="handoffs/zz-xreftest-RECON-claude.md")
         r = subprocess.run(["bash", str(HOOK)], cwd=ROOT, env=env, capture_output=True, text=True, check=False)
-        assert r.returncode == 2 and "concept_only_in_synth" in r.stdout, r.stdout + r.stderr
+        assert r.returncode == 2 and "concept_only_in_synth" in r.stderr, r.stdout + r.stderr  # hook 理由走 stderr
         recon.write_text("# recon\n\n- 改讀 `concept_only_in_synth`。\n", encoding="utf-8")
         r = subprocess.run(["bash", str(HOOK)], cwd=ROOT, env=env, capture_output=True, text=True, check=False)
         assert r.returncode == 0, r.stdout + r.stderr

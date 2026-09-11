@@ -42,14 +42,14 @@ def test_missing_id_in_table_blocks(tmp_path: Path) -> None:
     body = SYNTH_OK.replace("、CODEX-R2-P1-03", "")
     r = _run(body, "20260911-t-x-review-r1", tmp_path)
     assert r.returncode == 2
-    assert "CODEX-R2-P1-03" in r.stdout
+    assert "CODEX-R2-P1-03" in r.stderr  # 阻塞理由走 stderr（harness 只回灌 stderr）
 
 
 def test_x_layer_without_target_blocks(tmp_path: Path) -> None:
     body = SYNTH_OK.replace("**修訂標的**：docs/VERDICTGATE_SPEC.md\n\n", "")
     r = _run(body, "20260911-t-x-consult-r1", tmp_path)
     assert r.returncode == 2
-    assert "修訂標的" in r.stdout
+    assert "修訂標的" in r.stderr
 
 
 def test_b_layer_without_target_passes(tmp_path: Path) -> None:
@@ -63,7 +63,7 @@ def test_skeleton_placeholder_with_ids_blocks(tmp_path: Path) -> None:
     body = SYNTH_OK.replace("| X1 | P1 | GROK-R2-P0-01、CODEX-R2-P1-03 | 採納 |", "（待填）\n| X1 | P1 | GROK-R2-P0-01、CODEX-R2-P1-03 | 採納 |")
     r = _run(body, "20260911-t-x-review-r1", tmp_path)
     assert r.returncode == 2
-    assert "待填" in r.stdout
+    assert "待填" in r.stderr
 
 
 def test_non_synth_path_is_noop() -> None:
