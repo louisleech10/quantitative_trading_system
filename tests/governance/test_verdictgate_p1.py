@@ -298,6 +298,29 @@ def test_12_audit_append_impl_token_issued_missing_root_rejected(tmp_path: Path)
     assert r.returncode != 0 and "root" in r.stderr
 
 
+# ───────────────── 舊列相容（sequence_since） ─────────────────
+
+def test_12_ledger_grandfathers_pre_v3_committee_output_rows(tmp_path: Path) -> None:
+    """B1 上線事故（2026-09-11）：舊 writer 直寫之 committee_output 無 sequence ⇒ 帳本判不可信、gate 拒發。
+    registry `sequence_since` 前之無 sequence 列須被視為唯讀 legacy，帳本 rc≠2。"""
+    h = _h(tmp_path)
+    with h["audit"].open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"event": "committee_output", "task_id": "OLD-X-REVIEW-R1", "family": "unknown",
+                            "output_path": "handoffs/o-codex.md", "output_sha256": "x", "ts": "2026-09-01T00:00:00Z"}) + "\n")
+    r = _run(h, "scripts/debt_ledger.sh", "--has-open")
+    assert r.returncode in (0, 1), r.stdout + r.stderr
+
+
+def test_12_ledger_rejects_post_v3_committee_output_without_sequence(tmp_path: Path) -> None:
+    """對照組：sequence_since 之後仍無 sequence 的列＝壞寫入 ⇒ 帳本 fail-closed rc=2。"""
+    h = _h(tmp_path)
+    with h["audit"].open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"event": "committee_output", "task_id": "NEW-X-REVIEW-R1", "family": "codex",
+                            "output_path": "handoffs/n-codex.md", "output_sha256": "x", "ts": "2026-12-01T00:00:00Z"}) + "\n")
+    r = _run(h, "scripts/debt_ledger.sh", "--has-open")
+    assert r.returncode == 2 and "缺 sequence" in r.stderr
+
+
 # ───────────────── cx_run 接線 ─────────────────
 
 def _write_brief(h: dict, kind: str) -> str:

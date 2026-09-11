@@ -113,6 +113,18 @@ try:
             if ev not in debt_events:
                 # 非白名單 debt／legacy：略過（未知 p16 命名空間由 append 端擋）
                 continue
+            # VERDICTGATE B1：事件自 legacy 移入 debt_events 時，registry 以 `sequence_since` 標記
+            # 「此 ts 起才由 audit_append 帶 sequence 寫入」；此前舊 writer 直寫之無 sequence 列
+            # 為唯讀 legacy 資料——不進序號連續性、不進債務判定（否則帳本整個判不可信、gate 拒發）。
+            # 只豁免「無 sequence 且 ts 早於 sequence_since」的列；有 sequence 者一律照驗。
+            ss_raw = (reg.get("debt_events") or {}).get(ev, {}).get("sequence_since")
+            if ss_raw and rec.get("sequence") is None:
+                ss_dt = parse_ts(ss_raw)
+                ts_pre = parse_ts(rec.get("ts") if isinstance(rec.get("ts"), str) else "")
+                if ss_dt is None:
+                    die(f"registry debt_events.{ev}.sequence_since 無法解析: {ss_raw!r}")
+                if ts_pre is not None and ts_pre < ss_dt:
+                    continue
             all_debt_for_seq.append(rec)
             ts = parse_ts(rec.get("ts") if isinstance(rec.get("ts"), str) else "")
             if ts is None:

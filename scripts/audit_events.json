@@ -20,6 +20,7 @@
     "spec_non_event_tokens": "SPEC 會提及但不是事件名的 P16 token。",
     "event_object_allowed_keys": "debt event 物件只允許此白名單中的鍵。",
     "required_fields_per_event": "每事件的必要欄位；fields 必須是其超集。",
+    "sequence_since": "（VERDICTGATE B1）該事件自此 ts 起才由 audit_append 寫入（帶 sequence）；此前由舊 writer 直寫之無 sequence 列為唯讀 legacy 資料，不進帳本序號連續性、不進債務判定。面向未來不回填（使用者 2026-08-05）。",
     "family_field_name_patterns": "用於檢查新增 family 欄位是否登記到 family_valued_fields。",
     "audit_log_path": "audit append-only log 的 repo 相對路徑。",
     "fragment_scan_prefixes": "命名空間片段掃描前綴。",
@@ -101,6 +102,7 @@
       "in_debt_epoch": true,
       "closes_debt": false,
       "terminal": false,
+      "sequence_since": "2026-09-11T11:00:00Z",
       "fields": [
         "task_id",
         "family",
