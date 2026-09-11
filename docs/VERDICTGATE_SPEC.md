@@ -21,6 +21,8 @@
   - FACT-RECEIPT: `grep 'git commit' scripts/cx_run.sh` → 印出空（委員執行端不 commit；grok 實跑，`GROK-R1-P2-02`）
   - FACT-RECEIPT: `git interpret-trailers --parse` 對含 `Ticket-Batch:` 與 `Governance-Scope:` 同段之訊息 → 兩鍵皆印出（grok 實跑，`GROK-R1-P2-02`）
   - FACT-RECEIPT: `grep EVTLABEL-B[1234] .claude/gate/audit.log` → B3 grok「不可直接進 Task 3.4–3.7」後 B4 `committee_round_open 13:28:41Z`；GAP-3 `GAP3D2-B3` codex「不可進 B-D4」→ `debt_clear` seq 3121 → B4 開輪 seq 3167（composer／grok 各自實跑）
+  - FACT-RECEIPT: `venv/bin/python scratchpad/probe_amend_trailer.py`（暫存 repo 內 `git commit -F - ; git commit --amend --no-edit ; git interpret-trailers --parse`）→ 印出 `AMEND_KEEPS_TRAILERS = True`、`Ticket-Batch: R/b2`（主委 實跑 2026-09-11）⇒ Task 3.2 邊界①成立。
+  - FACT-RECEIPT: `grep '"event": "committee_output"' .claude/gate/audit.log | grep -o '"task_id"…' | sort | uniq -c | awk '$1>3'` → 印出同一 task 最多 `6` 次 `committee_output`；該事件**只有 `ts`（秒級）、無 seq 欄**（主委 實跑 2026-09-11）⇒ Task 2.2 之「最新輪」**必須以 audit 檔內出現順序（append 序）為準，不得以 `ts` 排序**（同秒碰撞）。
 - **待使用者確認**：`待確認：無`（本票之三條設計約束皆為使用者 2026-09-11 逐字裁定，見檔頭）。
 - **已確認結果**：`2026-09-11 使用者「不論哪家執行都要觸發」；「先把治理票做完」；「整個專案都不接受 95% 就收」；「能當下做的就要做掉…除非已定義在其他 Phase 或現階段完全不可能做」`。
 
@@ -74,7 +76,7 @@
 
 **Task 2.2 — `committee_run.sh` 開輪＋`gate.sh dispatch` 派 review 時讀裁決**
 - 目標：任一家 `blocked` 且該家對同一 ID 無後續 `closed` ⇒ 不得開下一批之輪。　檔案：`scripts/committee_run.sh`（`:426` mint round 之前）、`scripts/gate.sh`（dispatch 分支，`:783` 既有 `_rq_*` 回溯邏輯旁）、新 `scripts/verdictgate_check.sh`（單一判定實作）。
-- 改法：`verdictgate_check.sh <root> <N>` 找 `<root>-b<N-1>`（沿用 `gate.sh:791-798` 既有 descoped 回溯），讀其**最新 review 輪**各家 `verdict`；對每個 `blocked_by` ID 查同家後續產出（任何輪、含閉合輪）是否 `closed` 含該 ID；未閉合者若不在基準 ⇒ rc=1 並逐條指名 `<family>:<ID>`。`committee_run.sh` 與 `gate.sh dispatch` 皆在開輪前呼叫。
+- 改法：`verdictgate_check.sh <root> <N>` 找 `<root>-b<N-1>`（沿用 `gate.sh:791-798` 既有 descoped 回溯），讀其**最新 review 輪**各家 `verdict`（「最新」＝audit 檔內 append 序最後一筆，**不以 `ts` 排序**——`committee_output` 只有秒級 `ts`、同秒碰撞實測存在，見 §A）；對每個 `blocked_by` ID 查同家後續產出（任何輪、含閉合輪）是否 `closed` 含該 ID；未閉合者若不在基準 ⇒ rc=1 並逐條指名 `<family>:<ID>`。`committee_run.sh` 與 `gate.sh dispatch` 皆在開輪前呼叫。
 - **驗證**：`pytest tests/governance/test_verdictgate_*.py` rc=0，一條 ASSERT 對應一個 test；固定文法斷言如下：
   `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_verdict=blocked closed=absent baseline=absent THEN rc!=0`
   `ASSERT bash scripts/verdictgate_check.sh ROOT 2 WHEN prev_verdict=blocked closed=present THEN rc=0`

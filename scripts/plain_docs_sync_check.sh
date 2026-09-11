@@ -111,6 +111,10 @@ _watched_for() {
     #   ＋施工清單 TODO；規格白話只盯 SPEC 本體（規格一改，白話解釋必須跟著改）。
     "SPLITUNIFY施工進度.md")         echo "momentum/Analysis/event_samples/ momentum/core/split_preview.py momentum/Analysis/contracts/split_unify.json tests/momentum/Analysis/ tests/golden/splitunify/ scripts/ docs/SPLITUNIFY_TODO.md" ;;
     "SPLITUNIFY規格白話.md")         echo "docs/SPLITUNIFY_SPEC.md" ;;
+    # VERDICTGATE（2026-09-11 開票即登記，不再等到事後補——SPLITUNIFY 那兩檔就是建檔後落在 catch-all 從未受監看）：
+    #   施工進度盯本票要動的共用控制流＋TODO；規格白話只盯 SPEC。
+    "VERDICTGATE施工進度.md")        echo "scripts/gate.sh scripts/committee_run.sh scripts/debt_clear.sh scripts/gov_check.sh scripts/git_hooks/commit-msg scripts/git_hooks/pre-push scripts/reconcile_cluster_attribution_check.sh scripts/completeness_check.sh scripts/governance_verdicts.json templates/ docs/VERDICTGATE_TODO.md" ;;
+    "VERDICTGATE規格白話.md")        echo "docs/VERDICTGATE_SPEC.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。

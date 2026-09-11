@@ -1,6 +1,8 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：開票、偵察中｜`SPLITUNIFY` 暫停**
+**更新：2026-09-11｜現行票：`VERDICTGATE`（治理，大；RISK b,c）｜狀態：偵察收斂（V1–V6，債已清）→ SPEC v1 起草並過 template_check → **三家 adversarial R1 進行中**（session `20260911-verdictgate-x-review-r1`）｜`SPLITUNIFY` 暫停**
+🔴 偵察推翻主委三處：Verdict 不是「不可解析」而是**開放詞彙＋從未入 audit**；G-3 落點須在 **commit-msg**（pre-commit 拿不到訊息）且與 warn-only 的 G-7 分離；跨批漏洞第三條主路＝`debt_clear`→開輪，GAP-3／EVTLABEL 同型。
+派工命名：batch 只准 `b<N>` 或 `x`——`spec-review` 被拒一次，改 `x-review-r1`。
 使用者 2026-09-11 裁定（逐字）：「為了文檔品質，先把治理票做完，再開始量化主線項目」。
 
 ## VERDICTGATE 要解什麼（全部有實證，見 `handoffs/20260911-VERDICTGATE-RECON-claude.md`）

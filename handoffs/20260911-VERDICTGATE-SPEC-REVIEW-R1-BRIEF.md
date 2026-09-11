@@ -1,7 +1,7 @@
 # VERDICTGATE SPEC v1 adversarial review（R1）
 
 brief-kind: review
-task-id: 20260911-VERDICTGATE-SPEC-REVIEW-R1
+task-id: 20260911-VERDICTGATE-X-REVIEW-R1
 findings-round: R1
 
 ## 範本
