@@ -240,6 +240,18 @@ def test_12_closed_id_in_legacy_round_expected_output_accepted(tmp_path: Path) -
     assert _reg(h, "handoffs/x-codex.md").returncode != 0
 
 
+def test_12_closed_id_same_epic_different_date_prefix_accepted(tmp_path: Path) -> None:
+    """收票審 R12 實戰：同票跨日（20260911-ROOT vs 20260912-ROOT）語料須互認；他 epic 仍拒。"""
+    h = _h(tmp_path); _seed_dispatch(h); _open_round(h, ["codex"])
+    prev = h["root"] / "handoffs" / "d-codex.md"; prev.write_text("## CODEX-R1-P1-09\n\n**斷言**: z\n", encoding="utf-8")
+    with h["audit"].open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"event": "committee_output", "task_id": "20260912-ROOT-X-REVIEW-R11", "family": "codex",
+                            "output_path": "handoffs/d-codex.md", "output_sha256": "x", "ts": "t"}) + "\n")
+    _write_out(h, "handoffs/x-codex.md", "CODEX", "VERDICT: proceed\nBLOCKED-BY:\nCLOSED: CODEX-R1-P1-09\n")
+    r = _reg(h, "handoffs/x-codex.md")
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
 def test_12_family_from_suffix_grok(tmp_path: Path) -> None:
     h = _h(tmp_path); _seed_dispatch(h); _open_round(h, ["codex", "grok"])
     _write_out(h, "handoffs/x-grok.md", "GROK", "VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\n")

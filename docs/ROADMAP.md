@@ -39,6 +39,7 @@
 | **SPLITUNIFY 事件切分與 IC 時間切分統一**（中～大；2026-09-10 使用者裁定 B：EVTLABEL 三段完成後、UAT 之前做） | 未開票 | 同一事件批次只有一條驗證邊界。切法由委員會 consult 定共識（主委提案＝以時間切分為準、事件屬驗證段＝取特徵列在驗證段內且答案窗整個在內；事件後報酬表／辨別表／型態橋改為導出）；動 GAP-3 凍結規格 ⇒ 延伸檔＋三家審；影響面 11 生產檔＋13 測試檔（`split_events`／`EventSplitPlan` 消費者） | `momentum/Analysis/event_samples/event_split.py`；EVTLABEL 殘留 R-6 之根治 |
 | **FU-3 報告逐 stage 耗時揭露**（小；GLOBALH 前置） | 未開票；建議併入 EVTLABEL P1（同「報告要老實講」原則） | 報告 metadata 寫每 stage 秒數（預處理／stage3／4／5／6／6b）；現況無任何分段計時 receipt，「多 horizon ×N」與加速決策無數據可依 | orchestrator 各 `_stage*_checkpoint` |
 | **FU-4 IC 頁說明框：報酬版 vs 標籤版用法差異**（P3 配套） | 併 EVTLABEL Task 3.9 | 文案＝`白話說明/EVTLABEL規格白話.md`「報酬版 IC vs 標籤版 IC」對照表 | — |
+| **VERDICTGATE 批次間閘讀裁決＋不論誰實作皆觸發＋收斂檔不掉意見**（治理票 B-62；使用者 2026-09-11「先把治理票做完」） | 🏁 **收案（2026-09-12）**：SPEC 8 輪停輪＋TODO 三家戳記；B1–B4 各三家審碼＋原提出方 CLOSED；收票審兩輪三家 proceed；四閘皆在本票實戰擋過（拒收委員裁決行×4、擋主委 synth×1、揭露閘自身洞×3 已修） | 回量化主線：SPLITUNIFY 復工（b8 閘 ✓；R-1 待使用者）；SPEC C-4 字面修訂與 §E E-7／E-8 併入下張治理票 | `docs/GOV_ENFORCEMENT_REGISTRY.md` E-022～E-025；`docs/VERDICTGATE_SPEC.md`／`_TODO.md` §E |
 
 🔴 **優先序（2026-08-14 使用者明示「現在開始就是要回去做量化主線」）**：
 量化主線 **優先於** 治理。此句覆蓋兩條舊裁決——P0 之「完成後才回 IC」（2026-07-05）、

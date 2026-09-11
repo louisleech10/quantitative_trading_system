@@ -279,12 +279,16 @@ if expected != out_rel:
     print(f"ERROR: register-output 路徑 {out_rel} ≠ 該輪 expected_outputs[{family}]={expected!r}（同家任意 handoff 不得冒充該輪輸出）", file=sys.stderr)
     sys.exit(1)
 # 同 root 同家歷史產出（CLOSED 只在此集合查）；root＝task_id 去 -B<N>-／-X- 後之尾碼（大小寫不敏感）
-m = re.match(r"^(.*?)-(b\d+|x)-", task_id, re.I)
-root = (m.group(1) if m else task_id).lower()
+def root_of(t: str) -> str:
+    mm = re.match(r"^(.*?)-(b\d+|x)-", t or "", re.I)
+    r = (mm.group(1) if mm else (t or "")).lower()
+    # 收票審 R12 實戰：同票跨日 task-id 日期前綴不同（20260911-／20260912-）⇒ 語料互不相認、CLOSED 全拒。
+    #   語料之「同 root」去前導 YYYYMMDD-（epic 名相同即同票）；其餘 root 語意（helper／checker／token 名）不動。
+    return re.sub(r"^\d{8}-", "", r)
+root = root_of(task_id)
 paths = []
 def same_root(t: str) -> bool:
-    mm = re.match(r"^(.*?)-(b\d+|x)-", t or "", re.I)
-    return ((mm.group(1) if mm else (t or "")).lower()) == root
+    return root_of(t) == root
 for r in rows:
     ev = r.get("event")
     t = r.get("task_id") or ""
