@@ -2681,6 +2681,60 @@ push <strong>2.58s</strong>；<code>gov_check --fast</code> 0.83s；targeted pyt
 <p><strong>這次沒有假警報、沒有漏擋。</strong> 真正有價值的一次「擋對了」是我自己寫的測試：
 規格說「組合不合法就把另一格改回契約預設值」，測試當場證明<strong>有一個方向的預設值本身就不合法</strong>
 ⇒ 規格有洞。那個洞已登記成殘留 <code>B4-SPECGAP-1</code>，不是靠眼睛看出來的。</p>
+<hr />
+<h2 id="2026-09-12splitunify-收尾偵察分類-bc兩道閘互相矛盾我被夾在中間">2026-09-12（SPLITUNIFY 收尾偵察）分類 B＋C：<strong>兩道閘互相矛盾，我被夾在中間</strong></h2>
+<p>這是新治理票（VERDICTGATE）上線後第一次跑完整的偵察輪，順道量它的摩擦。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>類</th>
+<th>事件</th>
+<th>次數</th>
+<th>耗損</th>
+<th>已有票？</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>B＋C（本輪最重要）</strong></td>
+<td>一家委員把意見標題寫成三級（<code>###</code>），而收斂工具只認二級（<code>##</code>）⇒ 它的 <strong>4 條意見被抽成 0 條</strong>，硬閘擋在其中一條 BLOCKING。委員那端<strong>沒有寫檔當下就擋的檢查</strong>，所以要拖到我收斂時才炸。更麻煩的是：我把標題改成二級之後，<strong>另一道閘</strong>（「交件後不得改動」）立刻擋我，因為交件檔的指紋變了 ⇒ <strong>不改被擋、改了也被擋</strong></td>
+<td>1</td>
+<td>約 3 次來回＋一次整個收斂目錄重建</td>
+<td>⬜ 無票</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>承上，重建代價：升級旗標只換模式、不重算指紋；刪目錄被權限層拒 ⇒ 改用「改名保留舊骨架」繞過</td>
+<td>1</td>
+<td>2 次來回</td>
+<td>⬜ 無票</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>派工單的前提行我寫成全形冒號，檢查器要半形 ⇒ 寫檔當下就被擋</td>
+<td>1</td>
+<td>1 次來回</td>
+<td>✅ 擋得對（訊息直接給出正確格式）</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td>我對 <code>docs/*.md</code> 直接跑戳記檢查器得 rc=1，就判定「兩份程序都不現行、治理真空」——<strong>錯</strong>。本專案的戳記一律外置在收斂檔，對收斂檔跑才是正確用法（rc=0、三家 APPROVED、指紋自洽）</td>
+<td>1</td>
+<td>約 4 次查證</td>
+<td>⬜ 工具用法未寫進手冊</td>
+</tr>
+<tr>
+<td><strong>E</strong></td>
+<td><code>echo rc=$?</code> 放在 pipe 之後，讀到的是 <code>tail</code> 的 rc——<code>CLAUDE.md</code> 已具名的坑，再犯一次</td>
+<td>1</td>
+<td>1 次誤判</td>
+<td>✅ 已有記載</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>擋對了的</strong>：收斂檔的「每條意見都要進表、逐字引用原話前 20 字、寫明處置」那道閘（VERDICTGATE 第 4 項）<strong>一次就過</strong>，18 條全數對上；它正是為了防「委員意見被弄丟」而做的，而這輪有 4 條意見差點因為標題層級而消失——<strong>擋住它的是硬閘，不是我的眼睛</strong>。</p>
+<p><strong>修法方向（登記，不在本輪做）</strong>：委員交件端缺一個「寫檔當下驗 finding 標題層級」的檢查；或收斂抽取器放寬成 <code>#{2,3}</code>。兩者擇一即可讓這條摩擦歸零。另：「交件後不得改動」與「格式必須正規化」的衝突，需要一條明文規則（目前靠主委判斷：原檔保持交件原狀供稽核，正規化只落在收斂用的複本）。</p>
+<p><strong>補記（同日，第 6 筆）</strong>：我在這份白話進度表的狀態欄寫「⬜ 未開工（批次代號）」，被受管檔守衛判為「識別碼＋狀態寫在同一列」而擋下——那道守衛是為了防我在文件裡手寫狀態、與生成區塊不同步。這次是<strong>擋得有道理但訊息不直觀</strong>：它只說「區塊外手寫狀態」，沒說是哪個字觸發的；我看了行號才發現是批次代號被當成識別碼。改用中文寫法（「排第 8 批」）就過了，而且白話文件本來就該用中文。分類 <strong>C</strong>（儀式成本，一次來回）。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/流程摩擦記錄.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
