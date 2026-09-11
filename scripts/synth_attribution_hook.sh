@@ -32,7 +32,9 @@ fi
 case "$target" in /*) rel="${target#"$ROOT"/}" ;; *) rel="$target" ;; esac
 case "$rel" in handoffs/reconcile/*/synth.md) : ;; *) exit 0 ;; esac
 [ -f "$rel" ] || exit 0
-MOD="${SYNTH_ATTR_MODULE:-scripts/_synth_attr.py}"
+# B4 R1 CODEX-R1-P1-01：模組路徑覆寫只在測試 harness 生效；正式路徑固定模組（否則設環境變數即可旁路產出端閘）
+MOD="scripts/_synth_attr.py"
+if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ] && [ -n "${SYNTH_ATTR_MODULE:-}" ]; then MOD="${SYNTH_ATTR_MODULE}"; fi
 [ -f "${MOD}" ] || exit 0
 
 python3 "${MOD}" "${rel}" --mode hook

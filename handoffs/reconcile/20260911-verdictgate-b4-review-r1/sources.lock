@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "session_id": "20260911-verdictgate-b4-review-r1",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-verdictgate-b4-review-r1/sources/20260911-verdictgate-b4-review-r1-codex.md",
+      "sha256": "f7fd69db8851ff4b4ae2ecae0edea48334c8d17a49695bd9eb889e2ce2702d20",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-verdictgate-b4-review-r1/sources/20260911-verdictgate-b4-review-r1-composer.md",
+      "sha256": "bc5c6afe322e39588e0907bc6d4019ea8526dcfa0abde0d4a8a9b9cdd767b3e6",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-verdictgate-b4-review-r1/sources/20260911-verdictgate-b4-review-r1-grok.md",
+      "sha256": "0095a2fb9a7f4d6f8bf3b0bb9fa1b86cb54bad5f372704edd530b91f5c6b0e02",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-09-11T15:32:35Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "f35f9655-72f9-4e10-a5c1-c030c183c450"
+}

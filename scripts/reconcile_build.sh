@@ -330,7 +330,7 @@ header = (
     "**修訂標的**：docs/<填 SPEC 或 TODO 檔名>.md\n\n"
     # Task 4.1 群集表表頭提示：第 4 欄須含處置 token（governance_verdicts.json.disposition_values）；
     #   每列須逐字引用該 finding 斷言前 20 字；`延後→` 後接同票 TODO §E 殘留 ID 或 Task N.N。
-    "<!-- 群集表格式（Task 4.1 閘）：| 群集（含斷言前 20 字逐字） | 嚴重度 | 來源 ID | 處置（採納｜部分採納｜駁回｜延後→ID） | -->\n\n"
+    "<!-- 群集表格式（Task 4.1 閘）：| 群集（含斷言前 20 字逐字） | 嚴重度 | 來源 ID | 處置（採納｜部分採納｜駁回｜延後→E-n 或 Task N.N，單一目標，說明以（）括起；token 須整詞：`不採納` 不算） | -->\n\n"
     # ⚠️ Verdict 行是**機器解析**的:gate.sh 的 D-1 檢查以 `grep -qE 'Verdict[[:space:]]*[:：]'`
     #    驗 --adversarial 檔。兩次事故:
     #    ①2026-07-29 主委手寫成「Verdict（綜合）：…」→ Verdict 與冒號間插了字 → 正則不中

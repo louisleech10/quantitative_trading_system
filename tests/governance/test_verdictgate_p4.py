@@ -149,15 +149,85 @@ def test_41_x_layer_target_required_b_layer_not(tmp_path: Path) -> None:
 
 # ───────── hook（寫入時子集）與閘同一模組 ─────────
 
-def test_41_hook_and_gate_agree_on_ids_target_quote(tmp_path: Path) -> None:
-    """hook 與閘對同一 fixture 之 check_ids／check_target／check_quote20 結果逐字相同。"""
-    for body in (_synth(), _synth().replace("| CODEX-R2-P1-03 |", "| （無） |"), _synth(quote1="改掉的引用"), _synth(target="")):
-        doc = sa.parse_synth(body, "handoffs/reconcile/20260911-t-x-review-r1/synth.md")
-        assert sa.check_ids(doc) == sa.check_ids(doc)
-        hook_q = sa.check_quote20(doc, values=VALUES, completed_only=True)
-        gate_q = sa.check_quote20(doc, values=VALUES, completed_only=False)
-        assert hook_q == gate_q                      # 全部列皆已完成時兩模式必相同
-        assert sa.check_target(doc) == sa.check_target(doc)
+def _err_lines(text: str) -> list[str]:
+    return sorted(l.strip() for l in text.splitlines() if l.strip()[:1] in "①②③④⑤⑥")
+
+
+def test_41_hook_and_gate_wrappers_agree_on_complete_fixture(tmp_path: Path) -> None:
+    """B4 R1 CODEX-R1-P2-03／GROK-R1-P2-01：真的驅動兩支 bash 包裝，比對錯誤行集合（非同函式自比）。
+    完整列 fixture（全部列已完成）：hook 與 gate 之 ①②⑤ 錯誤行**逐字相同**。"""
+    body = _synth(quote1="改掉的引用", target="").replace("| CODEX-R2-P1-03 |", "| （無） |")
+    session = "20260911-t-x-review-r1"
+    h = _hook(body, session)
+    g = _gate(_write(tmp_path, body, session))
+    assert h.returncode == 2 and g.returncode == 1
+    he, ge = _err_lines(h.stderr), _err_lines(g.stderr)
+    assert he and he == ge, f"hook={he}\ngate={ge}"
+    assert any(l.startswith("①") for l in he) and any(l.startswith("②") for l in he) and any(l.startswith("⑤") for l in he)
+
+
+def test_41_hook_and_gate_wrappers_differ_only_on_draft_rows(tmp_path: Path) -> None:
+    """草稿列（第 4 欄有字無 token）：gate 報 ②＋③；hook 只報 ③（不驗草稿列引用）。"""
+    body = _synth(quote1="草稿引用", row4="草稿中")
+    session = "20260911-t-x-review-r1"
+    h = _hook(body, session)
+    g = _gate(_write(tmp_path, body, session))
+    he, ge = _err_lines(h.stderr), _err_lines(g.stderr)
+    assert not any(l.startswith("②") for l in he) and any(l.startswith("③") for l in he)
+    assert any(l.startswith("②") for l in ge) and any(l.startswith("③") for l in ge)
+
+
+def test_41_disposition_token_must_be_whole_word(tmp_path: Path) -> None:
+    """CODEX-R1-P1-02：`不採納` 不含整詞 `採納` ⇒ ③；`採納（紀錄）` 可。"""
+    r = _gate(_write(tmp_path, _synth(row4="不採納")))
+    assert r.returncode == 1 and "③" in r.stderr
+    assert _gate(_write(tmp_path, _synth(row4="採納（紀錄）"))).returncode == 0
+    assert _gate(_write(tmp_path, _synth(row4="部分採納"))).returncode == 0
+
+
+def test_41_defer_target_shape_closed(tmp_path: Path) -> None:
+    """GROK-R1-P1-01／CODEX-R1-P1-02：目標須合形狀；`延後→Task`／`延後→備忘`／`延後→E` 皆 ④，即使 TODO 含該子字串。"""
+    todo = _todo(tmp_path, "### Task 4.1\n| E-4 | 備忘 |\n")
+    for bad in ("延後→Task", "延後→備忘", "延後→E", "延後→4.1", "延後→Task 4"):
+        r = _gate(_write(tmp_path, _synth(row4=bad)), "--todo", str(todo))
+        assert r.returncode == 1 and "④" in r.stderr and "不合形狀" in r.stderr, bad
+        assert _hook(_synth(row4=bad), "20260911-t-x-review-r1").returncode == 2   # 形狀在 hook 亦擋
+
+
+def test_41_defer_single_target_only(tmp_path: Path) -> None:
+    """`延後→E-4、E-9`（TODO 只含 E-4）⇒ ④；`延後→E-4（理由）` ⇒ 過；`延後→E-4 理由` ⇒ ④。"""
+    todo = _todo(tmp_path)
+    r = _gate(_write(tmp_path, _synth(row4="延後→E-4、E-9")), "--todo", str(todo))
+    assert r.returncode == 1 and "單一目標" in r.stderr
+    assert _gate(_write(tmp_path, _synth(row4="延後→E-4（理由）")), "--todo", str(todo)).returncode == 0
+    assert _gate(_write(tmp_path, _synth(row4="延後→E-4 理由")), "--todo", str(todo)).returncode == 1
+
+
+def test_41_defer_existence_is_whole_word(tmp_path: Path) -> None:
+    """`E-4` 不得被 `E-40`／`SE-4` 冒充存在。"""
+    r = _gate(_write(tmp_path, _synth(row4="延後→E-4")), "--todo", str(_todo(tmp_path, "| E-40 | x |\n| SE-4 | y |\n")))
+    assert r.returncode == 1 and "不存在" in r.stderr
+
+
+def test_41_id_trailing_letter_not_matched(tmp_path: Path) -> None:
+    assert not sa._id_in("| CODEX-R2-P1-03X |", "CODEX-R2-P1-03")
+    assert not sa._id_in("| CODEX-R2-P1-030 |", "CODEX-R2-P1-03")
+    assert sa._id_in("| CODEX-R2-P1-03、GROK-R2-P0-01 |", "CODEX-R2-P1-03")
+
+
+def test_41_hook_module_override_ignored_without_harness(tmp_path: Path) -> None:
+    """CODEX-R1-P1-01：正式路徑忽略 SYNTH_ATTR_MODULE（無 GOVERNANCE_TEST_HARNESS=1 ⇒ 固定模組）。"""
+    body = _synth().replace("| CODEX-R2-P1-03 |", "| （無） |")
+    real = ROOT / "handoffs" / "reconcile" / "zz-p4hook-override-x-review-r1"; real.mkdir(parents=True, exist_ok=True)
+    (real / "synth.md").write_text(body, encoding="utf-8")
+    try:
+        env = {k: v for k, v in os.environ.items() if k != "GOVERNANCE_TEST_HARNESS"}
+        env["SYNTH_ATTR_MODULE"] = str(tmp_path / "no_such.py")
+        payload = '{"tool_input": {"file_path": "handoffs/reconcile/zz-p4hook-override-x-review-r1/synth.md"}}'
+        r = subprocess.run(["bash", str(HOOK)], cwd=ROOT, env=env, capture_output=True, text=True, check=False, input=payload)
+    finally:
+        (real / "synth.md").unlink(missing_ok=True); real.rmdir()
+    assert r.returncode == 2 and "CODEX-R2-P1-03" in r.stderr
 
 
 def test_41_hook_draft_row_without_token_not_quote_checked_but_gate_is(tmp_path: Path) -> None:

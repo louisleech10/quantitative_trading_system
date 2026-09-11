@@ -68,7 +68,45 @@ class SynthDoc:
 
 
 def _id_in(text: str, fid: str) -> bool:
-    return re.search(r"(?<![A-Z0-9-])" + re.escape(fid) + r"(?![0-9])", text) is not None
+    # B4 R1 composer：尾隨字母（`…-01X`）亦不得誤中
+    return re.search(r"(?<![A-Za-z0-9-])" + re.escape(fid) + r"(?![A-Za-z0-9])", text) is not None
+
+
+# ── 處置 token／延後目標之封閉文法（B4 R1 CODEX-R1-P1-02／GROK-R1-P1-01：子字串比對 fail-open）──
+#   token 須為「整詞」：前後不得緊接 CJK／字母／數字（`不採納`≠`採納`；`採納（紀錄）` 可）。
+#   `延後→` 後只准**單一**目標，形狀 ∈ {`Task N.N`, 殘留 ID `E-n`／`SU-RESID-n` 等 `[A-Z][A-Z0-9]*(-[A-Z0-9]+)*-\d+`}；
+#   目標之後只准空、或以 `（`／`(` 起之說明；`、，；` 接第二目標 ⇒ 錯。存在性＝整詞出現在 TODO 文字。
+_CJK = r"一-鿿"
+DEFER_TOKEN = "延後→"
+DEFER_TARGET_RE = re.compile(r"^(Task \d+\.\d+|[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d+)")
+
+
+def _token_whole(cell: str, tok: str) -> bool:
+    if tok == DEFER_TOKEN:
+        return DEFER_TOKEN in cell
+    return re.search(r"(?<![A-Za-z0-9" + _CJK + r"])" + re.escape(tok) + r"(?![A-Za-z0-9" + _CJK + r"])", cell) is not None
+
+
+def _target_in_todo(tgt: str, todo_text: str) -> bool:
+    return re.search(r"(?<![A-Za-z0-9.\-])" + re.escape(tgt) + r"(?![A-Za-z0-9.])", todo_text) is not None
+
+
+def parse_defer_targets(cell: str):
+    """回傳 [(target|None, err|None), …]，每個 `延後→` 一項。"""
+    out = []
+    for m in re.finditer(re.escape(DEFER_TOKEN) + r"\s*([^|]*)", cell):
+        rest = m.group(1)
+        sm = DEFER_TARGET_RE.match(rest)
+        if not sm:
+            out.append((None, f"`延後→{rest.strip()[:20]}` 目標不合形狀（只准 `Task N.N` 或殘留 ID 如 `E-4`）"))
+            continue
+        tgt = sm.group(1)
+        tail = rest[sm.end():].strip()
+        if tail and not tail.startswith(("（", "(")):
+            out.append((None, f"`延後→{tgt}` 之後接 `{tail[:10]}`——只准單一目標；說明須以（）括起"))
+            continue
+        out.append((tgt, None))
+    return out
 
 
 def parse_synth(text: str, rel_path: str) -> SynthDoc:
@@ -114,7 +152,7 @@ def check_ids(doc: SynthDoc) -> List[str]:
 def _row_done(row: Row, values: List[str]) -> bool:
     if row.placeholder or len(row.cells) < 4:
         return False
-    return any(v in row.cells[3] for v in values)
+    return any(_token_whole(row.cells[3], v) for v in values)
 
 
 def check_quote20(doc: SynthDoc, *, values: Optional[List[str]] = None, completed_only: bool = False) -> List[str]:
@@ -143,18 +181,15 @@ def check_disposition(doc: SynthDoc, values: List[str], todo_text: Optional[str]
             errs.append(f"③ {f.id} 之群集列第 4 欄無處置 token（{' | '.join(values)}）（列 {', '.join(str(r.line_no) for r in rows)}）")
             continue
         for r in done:
-            cell = r.cells[3]
-            # 目標可含空白（`Task 4.1`）：擷取到儲存格結尾／中文標點為止再去頭尾空白。
-            #   B4 主委自查：原 regex 以 \s 截斷 ⇒ `延後→Task 9.9` 只驗 "Task" ⇒ 恆真（fail-open），已修。
-            for m in re.finditer(r"延後→([^|，。；、）)]*)", cell):
-                tgt = m.group(1).strip()
-                if not tgt:
-                    errs.append(f"④ {f.id} 列 {r.line_no}：`延後→` 缺目標（須為同票 TODO §E 殘留 ID 或 Task N.N）")
+            # 形狀與單一性兩模式皆驗（hook 也擋）；存在性只在 strict_defer（debt_clear）驗。
+            for tgt, err in parse_defer_targets(r.cells[3]):
+                if err:
+                    errs.append(f"④ {f.id} 列 {r.line_no}：{err}")
                 elif strict_defer:
                     if todo_text is None:
                         errs.append(f"④ {f.id} 列 {r.line_no}：`延後→{tgt}` 但未提供 --todo，無法驗目標存在")
-                    elif tgt not in todo_text:
-                        errs.append(f"④ {f.id} 列 {r.line_no}：`延後→{tgt}` 之目標不存在於 TODO 檔")
+                    elif not _target_in_todo(tgt, todo_text):
+                        errs.append(f"④ {f.id} 列 {r.line_no}：`延後→{tgt}` 之目標不存在於 TODO 檔（整詞比對）")
     return errs
 
 
