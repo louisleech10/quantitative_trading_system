@@ -154,6 +154,16 @@ findings heading 一律 canonical：`## <FAMILY>-R<數字>-P<0-3>-<NN>`。
 
 ---
 
+## §8b 交件末段機械裁決塊（review／closure brief 必寫入 brief；VERDICTGATE Task 1.1）
+
+brief 須逐字要求委員在交件檔**末段**寫：
+```text
+VERDICT: proceed|blocked
+BLOCKED-BY: <ID,ID>        （blocked 時必填；只列你自己的 P0/P1）
+CLOSED: <ID,ID>            （你先前提過、本輪重驗已閉合者；只列你自己的）
+```
+值集唯一真相源＝`scripts/governance_verdicts.json`；缺塊或不合 ⇒ `register-output` 拒收（`verdict_rejected`），該家視為無產出，開下一批之閘會擋。
+
 ## §9 具名殘留
 
 | 代號 | 內容 | 三值理由 |

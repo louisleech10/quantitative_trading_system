@@ -1,5 +1,5 @@
 {
-  "registry_version": 2,
+  "registry_version": 3,
   "schema_version": 1,
   "cutoff_ts": "2026-07-23T00:00:00Z",
   "docs": {
@@ -28,7 +28,11 @@
   "allowed_origin_scripts": [
     "committee_run.sh",
     "cx_run.sh",
-    "debt_clear.sh"
+    "debt_clear.sh",
+    "gate.sh",
+    "git_hooks/commit-msg",
+    "git_hooks/post-commit",
+    "git_hooks/pre-push"
   ],
   "p16_namespace_prefixes": [
     "committee_round_",
@@ -71,7 +75,8 @@
         "participants",
         "quorum_eligible",
         "expected_outputs",
-        "session_name"
+        "session_name",
+        "brief_kind"
       ]
     },
     "committee_family_result": {
@@ -88,6 +93,60 @@
         "output_path",
         "output_sha256",
         "result_state"
+      ]
+    },
+    "committee_output": {
+      "origin_script": "gate.sh",
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "fields": [
+        "task_id",
+        "family",
+        "output_path",
+        "output_sha256",
+        "verdict",
+        "blocked_by",
+        "closed"
+      ]
+    },
+    "impl_token_issued": {
+      "origin_script": "gate.sh",
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "fields": [
+        "task_id",
+        "root",
+        "batch",
+        "family"
+      ]
+    },
+    "ticket_commit": {
+      "origin_script": "git_hooks/post-commit",
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "fields": [
+        "sha",
+        "trailer",
+        "root",
+        "batch",
+        "prod_files",
+        "token_fresh"
+      ]
+    },
+    "governance_bypass": {
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "fields": [
+        "hook",
+        "reason"
       ]
     },
     "committee_debt_clear": {
@@ -121,7 +180,6 @@
   },
   "non_debt_legacy_events": [
     "committee_dispatch",
-    "committee_output",
     "gate_deny"
   ],
   "hardcode_scan_exemptions": {
@@ -157,7 +215,13 @@
     "result_state": [
       "success",
       "failed",
-      "format-failed"
+      "format-failed",
+      "verdict_rejected"
+    ],
+    "verdict": [
+      "proceed",
+      "blocked",
+      "null"
     ],
     "round_state": [
       "OPEN",
@@ -241,6 +305,33 @@
       "output_path",
       "output_sha256",
       "result_state"
+    ],
+    "committee_output": [
+      "task_id",
+      "family",
+      "output_path",
+      "output_sha256",
+      "verdict",
+      "blocked_by",
+      "closed"
+    ],
+    "impl_token_issued": [
+      "task_id",
+      "root",
+      "batch",
+      "family"
+    ],
+    "ticket_commit": [
+      "sha",
+      "trailer",
+      "root",
+      "batch",
+      "prod_files",
+      "token_fresh"
+    ],
+    "governance_bypass": [
+      "hook",
+      "reason"
     ],
     "committee_debt_clear": [
       "round_id",

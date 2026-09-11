@@ -115,7 +115,12 @@ mkdir -p "${_cr_outdir}" 2>/dev/null || true
 # 修法＝在此呼叫**同一個** checker 做**完整**檢查，且仍在 gate.sh dispatch 之前 → 失敗時 audit 真正零新增。
 # 本處只需「通過/不通過」，不需解析值（舊 parser 的 _cr_bk/_cr_st 後續從未被使用），
 # 故不傳 --emit：少一個暫存檔、少一個 EXIT trap（trap 是覆寫非疊加，多一個就是坑）。
-bash "${SCRIPT_DIR}/brief_conformance_check.sh" "${brief}" || exit $?
+# VERDICTGATE Task 1.2（CODEX-R4-P1-05）：round_open 須持久化 brief_kind，C-4／C-9 只納 review round。
+# 值仍由同一 checker 之 --emit 取得（第 1 行＝brief-kind），不另寫 parser。
+_cr_bk_kv="$(mktemp)"
+bash "${SCRIPT_DIR}/brief_conformance_check.sh" "${brief}" --emit "${_cr_bk_kv}" || { _rc=$?; rm -f "${_cr_bk_kv}"; exit "${_rc}"; }
+_cr_brief_kind="$(sed -n '1p' "${_cr_bk_kv}")"; rm -f "${_cr_bk_kv}"
+[ -n "${_cr_brief_kind}" ] || { echo "ERROR: brief_conformance_check 未回傳 brief-kind（fail-closed）" >&2; exit 2; }
 
 # task_id 從透傳 gate argv 解析 --task-id（不另發明同名旗標）
 task_id=""
@@ -268,6 +273,7 @@ _open_debt() {
     --field "quorum_eligible=@${quorum_json}" \
     --field "expected_outputs=@${outputs_json}" \
     --field "session_name=${session}" \
+    --field "brief_kind=${_cr_brief_kind}" \
     --field "actor=committee_run" \
     --field "origin_script=committee_run.sh"
 }

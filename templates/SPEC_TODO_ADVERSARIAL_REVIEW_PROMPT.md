@@ -70,8 +70,6 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 - **DEGRADE**（合法缺席，不進 union）：`## DEGRADE-<FAMILY>-<NN>`（見範本）
 
 ```
-## Verdict：{{可派工 / 需修補後派工 / 有根本缺陷需重作}}
-
 ## CODEX-R1-P0-01
 
 **斷言**: <可證偽主張>
@@ -84,8 +82,17 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 
 （無問題的類別標「無」。挑戰前提的 finding 放最前。）
 ## 被當成事實的未驗證假設（§0，逐一列；無則「無」）
+
+VERDICT: blocked
+BLOCKED-BY: CODEX-R1-P0-01
+CLOSED:
 STATUS: DONE
 ```
+
+**機械裁決塊**（VERDICTGATE Task 1.1；值集唯一真相源＝`scripts/governance_verdicts.json`，本範本不重列）：
+產出**末段**三行、行首、半形冒號，`gate.sh register-output` 機械解析、不合即拒收：
+`VERDICT: <verdict_values 之一>`；`BLOCKED-BY: <ID,…>`（blocked 時必填，只列本家 P0/P1，且須在本檔 `## <ID>` 集合）；
+`CLOSED: <ID,…>`（本家先前提出、本輪重驗已閉合者；閉合輪必填）。舊「三值散文 Verdict 標題段」**已廢止**，不得並存（`template_check.sh template` 會擋）。
 不要重新生成 SPEC/TODO，只輸出 findings。不得提出違反 §3 的修補。
 
 ## Prompt 結束

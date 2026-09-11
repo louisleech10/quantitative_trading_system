@@ -104,6 +104,21 @@ source_digest: a1b2c3d4e5f6
           三版對照探針 9/9 OK。
 ```
 
+## 機械裁決塊（末段必填；VERDICTGATE Task 1.1）
+
+值集唯一真相源＝`scripts/governance_verdicts.json`（本範本不重列）。交件檔**末段**三行、行首、半形冒號：
+
+```text
+VERDICT: proceed
+BLOCKED-BY:
+CLOSED: CODEX-R2-P1-01,CODEX-R2-P1-03
+```
+
+- `VERDICT` 全檔恰一行；`blocked` ⇒ `BLOCKED-BY` 必填且每個 ID 在本檔 `## <ID>` 集合；
+- `CLOSED` 只列**本家**先前輪次之 ID（他家 ID ⇒ 拒收；同 root 歷史產出查無 ⇒ 拒收）；
+- 全形冒號 `VERDICT：` ⇒ 拒收並指名；零 findings sentinel 亦須此三行（`VERDICT: proceed`）。
+- `register-output` 拒收 ⇒ `committee_family_result.result_state=verdict_rejected`，主委修檔後可重新註冊。
+
 ## 與派工的銜接
 
 - 對抗審查輸出格式見 `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（canonical 四欄段）

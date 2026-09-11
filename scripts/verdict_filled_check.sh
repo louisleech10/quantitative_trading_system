@@ -39,6 +39,9 @@ awk '
         sub(/^[0-9]+[.)][[:space:]]+/, "", line)  # 有序清單：N. / N) + 空白
         sub(/^\*+/, "", line)                     # emphasis：**Verdict** 之類
       } while (line != before)
+      # VERDICTGATE Task 1.1：機械裁決塊 `VERDICT: proceed|blocked`（行首、半形冒號）亦視為已填實。
+      # 值集之唯一真相源在 scripts/governance_verdicts.json；此處字面與其 verdict_line_regex 同步。
+      if (line ~ /^VERDICT: (proceed|blocked)$/) { found = 1; exit }
       if (line !~ /^Verdict/) next
       if (match(line, /[:：]/) == 0) next
       prefix = substr(line, 1, RSTART - 1)

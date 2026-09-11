@@ -583,10 +583,45 @@ _maybe_register_stamp_output() {
   fi
 
   # 條件③：家族名取 ${fam}（$1 直取），已用上方 ${fam}
-  if ! bash "${SCRIPT_DIR}/gate.sh" register-output "${task_id}" "${stamp_target}"; then
+  # VERDICTGATE Task 1.2（CODEX-R7-P1-02）：stamp 走 --kind stamp --family 分流（不解析裁決、verdict=null）
+  if ! bash "${SCRIPT_DIR}/gate.sh" register-output "${task_id}" "${stamp_target}" --kind stamp --family "${fam}"; then
     # 註冊失敗（與合法 no-op 機械可分）：可辨識錯誤字串、rc 不變、不回捲 family_result
     echo "ERROR: register-output 失敗（待人工補記）task=${task_id} path=${stamp_target}" >&2
   fi
+  return 0
+}
+
+# VERDICTGATE Task 1.2 接線（CODEX-R2-P0-01：v2 前 review／closure 產出**沒有任何自動註冊路徑**，
+#   閘讀 audit、audit 是空的 ⇒ 永遠放行）。brief-kind ∈ {review, closure} 且 CLI 成功、產出非空、
+#   含 `STATUS: DONE` ⇒ 自動 register-output（family 由 gate.sh 依檔名尾碼＋roster 對證）。
+# 拒收 ⇒ 印 ERROR 並追加一筆 committee_family_result(result_state=verdict_rejected)——
+#   不靜默 no-op、不改 cx_run rc（C-9：該家視為無 output；主委修檔後手動 register-output 解鎖）。
+# 順序契約：在 _emit_family_result 之後呼叫（verdict_rejected 之 append 序須在 success 之後）。
+_maybe_register_review_output() {
+  local cli_rc="$1"
+  case "${_bk}" in review|closure) : ;; *) return 0 ;; esac
+  [ -n "${task_id}" ] || return 0
+  if [ "${cli_rc}" -ne 0 ] 2>/dev/null || [ ! -s "${out}" ]; then
+    return 0
+  fi
+  grep -qE '^STATUS: DONE' "${out}" || return 0
+  if bash "${SCRIPT_DIR}/gate.sh" register-output "${task_id}" "${out}"; then
+    return 0
+  fi
+  echo "ERROR: verdict 拒收——${fam} 產出之機械裁決塊不合契約（見上）；audit 記 verdict_rejected，主委修檔後可重新 register-output：${out}" >&2
+  local attempt_id
+  attempt_id="$(python3 -c 'import uuid; print(uuid.uuid4())')" || return 0
+  bash "${SCRIPT_DIR}/audit_append.sh" \
+    --event committee_family_result \
+    --field "round_id=${ROUND_ID}" \
+    --field "family=${fam}" \
+    --field "attempt_id=${attempt_id}" \
+    --field "cli_rc=${cli_rc}" \
+    --field "output_path=${out}" \
+    --field "output_sha256=$(_compute_output_sha "${out}")" \
+    --field "result_state=verdict_rejected" \
+    --field "actor=cx_run" \
+    --field "origin_script=cx_run.sh" || true
   return 0
 }
 
@@ -604,6 +639,12 @@ _write_stub_success_output() {
         printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\n\n'
         printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\n\n' "${fam}"
         printf 'stub harness body\n'
+        # VERDICTGATE Task 1.2 測試尾段（harness-only；CX_STUB_TAIL 已綁 CX_STUB_MODE 之 harness 守衛）：
+        #   verdict ⇒ 合法機械裁決塊＋STATUS: DONE（走自動註冊）；done ⇒ 只有 STATUS: DONE（觸發拒收）
+        case "${CX_STUB_TAIL:-}" in
+          verdict) printf '\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n' ;;
+          done)    printf '\nSTATUS: DONE\n' ;;
+        esac
       } > "${out}"
       ;;
     *)
@@ -802,6 +843,8 @@ _run_cli_and_emit() {
   # 改法⑨：emit 之後才嘗試 register-output（不回捲 family_result）
   # stamp kind 不跑格式檢查；format-failed 不會出現在 stamp 路徑
   _maybe_register_stamp_output "${cli_rc}"
+  # VERDICTGATE Task 1.2：review／closure 產出自動註冊（格式不合規者 _fmt_rc≠0 仍嘗試——拒收會留 verdict_rejected 痕）
+  _maybe_register_review_output "${cli_rc}"
 
   if [ "${_fmt_rc}" -ne 0 ]; then
     echo "[cx_run] ⚠️ ${fam} 產出**格式不合規**（見上）：${out}" >&2

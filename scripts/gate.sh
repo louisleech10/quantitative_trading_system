@@ -199,8 +199,106 @@ if [ "${kind}" = "register-output" ]; then
   esac
   _task_has_dispatch "${task_id}" || { echo "ERROR: register-output 找不到先行 committee_dispatch task:${task_id}"; exit 1; }
   output_sha256="$(_sha256_file "${output_path}")"
-  _append_committee_json_event "committee_output" "${task_id}" "unknown" "${out_rel}" "${output_sha256}"
-  echo "GATE PASS：已註冊 committee output task:${task_id} path:${out_rel} sha256:${output_sha256}。審計 → ${AUDIT}"
+
+  # ── VERDICTGATE Task 1.2：裁決解析＋family／roster／expected path 對證（fail-closed）──
+  # v5 之前本處固定寫 family=unknown（CODEX-R4-P1-01）⇒ C-9 同家匹配永遠落空。
+  # 現行：非 stamp ⇒ family 由檔名尾碼 `-<family>.md` 解析、須在該 task 最近一筆
+  #   committee_round_open.quorum_eligible、且 out_rel == expected_outputs[family]（CODEX-R6-P1-04）；
+  #   呼叫 verdict_parse.sh（唯一 parser）；CLOSED 之 ID 只在同 root 同家歷史產出查（CODEX-R2-P1-02）。
+  # `--kind stamp --family <fam>`（CODEX-R7-P1-02）：stamp 目標是 reconcile synth.md，不是 expected
+  #   output、無 VERDICT: ⇒ 不做尾碼／expected 對證、不呼叫 parser、verdict=null；
+  #   此類事件不進 C-9 roster 判定、其 CLOSED 不解除任何 ID（Task 2.2 只認 review/closure round）。
+  # 寫入一律經 audit_append.sh（C-8 唯一鎖內 writer；committee_output 已自 legacy 移入必填欄事件）。
+  _reg_kind="review"; _reg_family=""
+  while [ $# -gt 2 ]; do
+    case "$3" in
+      --kind)   _reg_kind="${4:-}"; set -- "$1" "$2" "${@:5}" ;;
+      --family) _reg_family="${4:-}"; set -- "$1" "$2" "${@:5}" ;;
+      *) echo "ERROR: register-output 未知參數: $3"; exit 1 ;;
+    esac
+  done
+  _reg_verdict="null"; _reg_blocked='[]'; _reg_closed='[]'
+  if [ "${_reg_kind}" = "stamp" ]; then
+    [ -n "${_reg_family}" ] || { echo "ERROR: --kind stamp 須帶 --family <fam>"; exit 1; }
+  elif [ "${_reg_kind}" = "review" ]; then
+    _reg_family="$("${VENV_PY}" - "${out_rel}" "${REPO_ROOT}/scripts/governance_families.json" <<'PY'
+import json, re, sys
+rel, fam_path = sys.argv[1], sys.argv[2]
+fams = json.load(open(fam_path, encoding="utf-8"))["families"]
+m = re.search(r"-([a-z]+)\.md$", rel)
+if not m or m.group(1) not in fams:
+    print("")
+else:
+    print(m.group(1))
+PY
+)"
+    [ -n "${_reg_family}" ] || { echo "ERROR: register-output 無法由檔名尾碼解析家族（須為 -<family>.md，family ∈ governance_families.json）:${out_rel}"; exit 1; }
+    _reg_tmp="$(mktemp)"
+    if ! "${VENV_PY}" - "${AUDIT}" "${task_id}" "${_reg_family}" "${out_rel}" "${_reg_tmp}" <<'PY'
+import json, re, sys
+audit, task_id, family, out_rel, corpus_out = sys.argv[1:6]
+rows = []
+for raw in open(audit, encoding="utf-8").read().splitlines():
+    s = raw.strip()
+    if not s.startswith("{"):
+        continue
+    try:
+        rows.append(json.loads(s))
+    except json.JSONDecodeError:
+        continue
+opens = [r for r in rows if r.get("event") == "committee_round_open" and r.get("task_id") == task_id]
+if not opens:
+    print(f"ERROR: register-output 找不到 task {task_id} 之 committee_round_open（非 committee_run 派出的輪不得註冊 review 產出）", file=sys.stderr)
+    sys.exit(1)
+ro = opens[-1]
+roster = ro.get("quorum_eligible") or ro.get("participants") or []
+if family not in roster:
+    print(f"ERROR: register-output 家族 {family} 不在該輪 quorum_eligible {roster}", file=sys.stderr)
+    sys.exit(1)
+expected = (ro.get("expected_outputs") or {}).get(family)
+if expected != out_rel:
+    print(f"ERROR: register-output 路徑 {out_rel} ≠ 該輪 expected_outputs[{family}]={expected!r}（同家任意 handoff 不得冒充該輪輸出）", file=sys.stderr)
+    sys.exit(1)
+# 同 root 同家歷史產出（CLOSED 只在此集合查）；root＝task_id 去 -B<N>-／-X- 後之尾碼（大小寫不敏感）
+m = re.match(r"^(.*?)-(b\d+|x)-", task_id, re.I)
+root = (m.group(1) if m else task_id).lower()
+paths = []
+for r in rows:
+    if r.get("event") != "committee_output":
+        continue
+    t = r.get("task_id") or ""
+    mm = re.match(r"^(.*?)-(b\d+|x)-", t, re.I)
+    if ((mm.group(1) if mm else t).lower()) != root:
+        continue
+    fam_r = r.get("family")
+    p = r.get("output_path") or ""
+    if fam_r == family or (fam_r in (None, "unknown") and p.endswith(f"-{family}.md")):
+        paths.append(p)
+open(corpus_out, "w", encoding="utf-8").write("\n".join(dict.fromkeys(paths)) + "\n")
+PY
+    then rm -f "${_reg_tmp}"; exit 1; fi
+    _reg_json="$(bash "${REPO_ROOT}/scripts/verdict_parse.sh" "${output_path}" "${_reg_family}" --closed-corpus "${_reg_tmp}")" || { rm -f "${_reg_tmp}"; echo "ERROR: register-output 拒收——裁決塊不合契約（見上）:${out_rel}"; exit 1; }
+    rm -f "${_reg_tmp}"
+    _reg_verdict="$(printf '%s' "${_reg_json}" | "${VENV_PY}" -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')"
+    _reg_blocked="$(printf '%s' "${_reg_json}" | "${VENV_PY}" -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["blocked_by"], ensure_ascii=False))')"
+    _reg_closed="$(printf '%s' "${_reg_json}" | "${VENV_PY}" -c 'import json,sys; print(json.dumps(json.load(sys.stdin)["closed"], ensure_ascii=False))')"
+  else
+    echo "ERROR: register-output --kind 只准 review|stamp:${_reg_kind}"; exit 1
+  fi
+  if ! bash "${REPO_ROOT}/scripts/audit_append.sh" \
+      --event committee_output \
+      --field "task_id=${task_id}" \
+      --field "family=${_reg_family}" \
+      --field "output_path=${out_rel}" \
+      --field "output_sha256=${output_sha256}" \
+      --field "verdict=${_reg_verdict}" \
+      --field "blocked_by=@${_reg_blocked}" \
+      --field "closed=@${_reg_closed}" \
+      --field "actor=gate" \
+      --field "origin_script=gate.sh"; then
+    echo "ERROR: register-output 寫 audit 失敗（audit_append 拒寫，見上）"; exit 1
+  fi
+  echo "GATE PASS：已註冊 committee output task:${task_id} family:${_reg_family} verdict:${_reg_verdict} path:${out_rel} sha256:${output_sha256}。審計 → ${AUDIT}"
   exit 0
 fi
 

@@ -18,7 +18,7 @@ _lc_repo_rel() {
   case "${_p}" in "${REPO_ROOT}/"*) printf '%s' "${_p#${REPO_ROOT}/}" ;; *) printf '%s' "${_p}" ;; esac
 }
 kind="${1:-}"; file="${2:-}"
-[ -n "${kind}" ] && [ -n "${file}" ] || { echo "用法: template_check.sh spec|todo|result|dext <file>"; exit 1; }
+[ -n "${kind}" ] && [ -n "${file}" ] || { echo "用法: template_check.sh spec|todo|result|dext|template <file>"; exit 1; }
 [ -f "${file}" ] || { echo "ERROR: 檔不存在: ${file}"; exit 1; }
 
 missing=""
@@ -321,6 +321,16 @@ EOF
       missing="${missing}${task_missing}"
     fi
     ;;
+  template)
+    # 委員產出範本（VERDICTGATE Task 1.1）：末段機械裁決塊必在、舊三值散文 Verdict 段不得並存
+    # （雙格式並存＝兩份真相源）。值集不在此重列——只驗字面 `VERDICT: ` 行存在。
+    need "VERDICT: " "機械裁決塊（值集見 scripts/governance_verdicts.json）"
+    need "BLOCKED-BY:" "機械裁決塊第二行"
+    need "CLOSED:" "機械裁決塊第三行"
+    if grep -qE '^## Verdict[:：]' "${file}"; then
+      missing="${missing}  · 範本仍含已廢止之「## Verdict：」三值散文段（與機械裁決塊並存＝兩份真相源）\n"
+    fi
+    ;;
   dext)
     # 凍結文件「D 延伸」檔（docs/<原檔 basename>.D-<NNN>.md）。
     # 錨點逐字取自 docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md §2.2「延伸檔必填」——
@@ -356,7 +366,7 @@ EOF
       missing="${missing}  · BASE 缺 commit-sha（§2：git rev-parse HEAD 取，須寫下當時的值；格式 <原檔路徑> @ <sha>）\n"
     fi
     ;;
-  *) echo "ERROR: kind 必須是 spec|todo|result|dext"; exit 1 ;;
+  *) echo "ERROR: kind 必須是 spec|todo|result|dext|template"; exit 1 ;;
 esac
 
 # ---- 反空殼掃描（grep 錨點驗不到「標題在但內容空」；這層抓使用者遇過的「只寫表頭/驗證字樣、內容空」）----
@@ -748,6 +758,8 @@ $(_tc_live_lines "${file}" | grep -E '^[[:blank:]]*函式：')
 EOF
 fi
 
+# template kind（VERDICTGATE Task 1.1）：範本本身就含 {{}} 佔位，反空殼掃描對它無意義，只驗錨點與雙格式並存。
+[ "${kind}" = "template" ] && hollow=""
 if [ -n "${missing}" ] || [ -n "${hollow}" ]; then
   echo "TEMPLATE FAIL (${kind}): ${file}"
   [ -n "${missing}" ] && { echo "【缺必填錨點】"; printf "%b" "${missing}"; }
