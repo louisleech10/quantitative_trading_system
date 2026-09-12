@@ -161,6 +161,12 @@
 
 🔴 **第八次修訂之兩項事實已備（主委實跑）**：①**時間域判準可行**——`split_projection.py:524-526` 現有 `train_ms`／`test_ms`／`test_start_ms`，**無** `train_last_ms`；但 `train_rows` 就在作用域，新增 `train_last_ms = int(index_ms[train_rows[-1]])` 為**一行**且與既有 `test_start_ms` 取法對稱 ⇒ grok 之「以 `train_last_ms < decision_at_ms < test_start_ms` 定義隔離帶」可直接落地，不必依賴 `∈ index_ms`。②**mutation 04–11 有七條方向相反，非僅數條**：`04`（「不改 `groupby` 折疊」＝缺陷）與「物化維持橫向合併」互斥；`06`／`07`／`08`／`09`／`10`（`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe` 之「退回單鍵／退回事件級粒度」＝缺陷）與 `(5.1)` **甲類維持事件級**全部互斥；`11`（Map 鍵退回 `event_id`＝缺陷）與 `Task 9.5` 排除遷移互斥。**唯一方向仍成立的是 `05`**（`pattern_bridge` 退回單鍵）——它屬 **(丙)**，確實需要改。⇒ 第八次修訂須把 `04`／`06`–`11` 改為**反向 mutation**（誤改成複合鍵才紅）或刪除，並同步條數與 ID 連續性。
 
+🔴 **R8 composer 已交，三條主委已複驗、全部成立——「改一處漏一處」第四次，且這次漏的是我自己承諾的動作**：
+- **`P1-03`（最難堪）**：§N 現有六條殘留，**沒有任何一條**是 9.1 終端揭露。我在 `Task 9.1` 白紙黑字寫「**登記於 §N**」，**然後沒去登記**。它對 `blocked-by` 的質疑也成立：§N 既有之 `R-4` 用 `blocked-by` 時指名了「屬 GAP-3」這張**具體的票**，而我只寫「零呼叫點」＝**能力缺口**，無可追的阻塞對象 ⇒ 類別應改 `needs-research`（投影接線設計未定），或先開一張具名的 projection-wiring 票再以其票號 `blocked-by`。
+- **`P2-02`**：`(6.2)` L92 仍逐字「`baseline` 之 `n_test`…**不得**改判為事件數」，而 L205 我剛改成「**仍為事件數**」——同檔兩處**正面衝突**。
+- **`P2-03`**：`M-SU-D2-02`／`03` 仍是「不傳到 API 回應」「前端不顯示」，而 §V 已作廢那兩層 ⇒ 實作者**寫測試違殘留、不寫違 mutation**，兩邊都錯。
+- 另 `P1-01`／`P1-02` 是對我兩個取捨的正面攻擊（G-4a 不可機械驗證、9A 對終端零揭露且 `metadata.split_unify` 在生產路徑不可達），須在第九次修訂正面回應——它給了具體替代（雙跑 cutoff vs decision 產 `allowed_side_diff_events.json`；或保留 cutoff-anchor 平行鍵一個 Phase）。
+
 🔴 **R8 brief 之 assumed「dedupe 廣播不改權重」已由主委自驗成立（不必等委員）**：`dedupe.py:98-99` 逐字 `overlap_count = [len(s) for s in overlap_sets]`、`weights = [1.0 / c for c in overlap_count]` ⇒ `w=1/n` 之分母是**標籤窗重疊的事件數**（`overlap_sets` 建在事件級 table 上），**與 feature TF 無關**；`:141-142` 之 `eff_primary` 要嘛是 `in_primary` 的**事件列**計數（`cluster_first`）、要嘛是 `sum(weights)`，兩者皆事件級。⇒ 保留集仍在事件級決定、再把保留之 `event_id` 廣播到 per-TF 列，`w=1/n` 與 effective count **逐值不變**；反之若照 v7 舊指示改複合鍵粒度，`overlap_sets` 被迫展開成多列、分母 `c` 膨脹而權重被稀釋——正是 R7 兩家警告的語意破壞。**此條可在 R8 收斂時標為主委自驗、不需委員再答**。
 
 🔴 **第八次修訂進行中，我又一次只改一處、漏改六條（這次靠自查抓到，不是委員）**：J1 的處置是「mutation 與 `(5.1)` 分類同步」，我卻只改了 `M-SU-D2-11`，`04`／`06`–`10` 六條仍是舊方向（「退回單鍵＝缺陷」）——與甲類「維持事件級」全部互斥。**這是同型錯誤第三次**（第 51、52 筆各記過一次）：改了結論，沒回頭改所有依賴那個結論的條目。差別是這次我在跑閘前自查表格內容抓到，沒等 R8。六條已全部改為**反向 mutation**（誤改為複合鍵才紅）。⇒ **判準補充**：凡改動一條「分類／定案」，**必須把該檔內所有引用它的條目列成清單逐條核對**，不能只改當下那一段——這一步現在沒有任何機械閘能代勞（同檔互斥，見摩擦第 51 筆）。
