@@ -133,6 +133,12 @@
 
 （以下為前十處之逐條碼證）⇒ **十處已逐處讀完之結論**：**七處誤列**（`ic_feed`、`tables` 兩處、`counterexample_classifier`、`candidate_ledger`、前端 Map、`clusters_oracle`＋`report_int_keys`）、**一處派工過度**（`feature_materialization`）、**一處真缺陷但改法錯**（`pattern_bridge`，應為「去重取唯一側、不唯一 fail-closed」）、**一處確需改**（`g1_membership`）。第七次修訂須**逐處重新分類**：事件級（維持）／複合鍵（改）／事件級但需去重取唯一值（三類），`D-002-C5` 之 16 處清單同步更正。此為主委自產，須於 R6 收斂檔標明非委員意見。🔴 **根因**：我列該清單時以「有無 `set_index("event_id")` 之形狀」為判準，**未逐處問「這張表的一列代表什麼」**——而 `Task 9.3` 正文我自己寫著「不得用凡看到某索引一律改這種形狀規則」。
 
+🔴 **R6 兩家已交（codex 未交），三條主委已獨立複驗、全部成立**：
+- **我第六次修訂的不等式判準自己引入新缺陷**（composer／grok 獨立撞題）：`split_preview.py:313-316` 之 `train_rows = arange(0, split_point)`、`test_rows = holdout_test_row_index(..., purge_gap, embargo)` ⇒ `purge_gap+embargo > 0` 時中間數列**兩邊皆不屬**。我寫的 `decision_at_ms < test_start_ms` 會把隔離帶事件收成 **train**，而現行集合成員語意是 **purged** ⇒ **切分成員集漂移**。我為修 A（網格不一致）引入了 B。第七次修訂須把 gap 處置**寫死為三者擇一**（建議 fail-closed，與 `outside_both_bounds` 一致，且不把隔離帶收成 train），並配成對斷言與一條 mutation。
+- **`tier_min_test_events` 被 TF 維度膨脹繞過**（grok；命中高風險 (d)）：`split_projection.py:562` `n_test = int((assignments["split_label"]=="test").sum())` → `:569` `per_symbol_test_n` → `:716-719` 比門檻。複合鍵後 1 事件 × 2 TF 使 `n_test=2 ≥ tier_min=2` 而真實事件數為 1 ⇒ **靜默繞過測試段樣本下限**。`Task 9.4` 檔案清單未含此路徑。
+- **物化記帳不變式會直接炸**（grok）：`feature_materialization.py:138-140` `n_input = per_tf["event_id"].nunique()`；若照 `Task 9.3` 改 MultiIndex，`len(features)` 成列數而 `n_input` 仍事件數 ⇒ `AssertionError`，或誘使實作者保留事件級 groupby 假綠。**與主委自產之「該處應維持事件級」互相印證**。
+- composer 另開兩條：`(3.2)` 檢查漏「同事件一列 purged、一列 assignments」之混態（只驗 `split_label` 唯一抓不到，因 purged 列無該欄）；`Task 9.1` 二擇一**規格自己沒擇**，兩選項皆無具名 route／fixture ⇒ 9A 仍寫不出驗收命令。
+
 **R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
 
 （以下為 R5 派出時之記載）**R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
