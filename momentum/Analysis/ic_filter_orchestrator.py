@@ -77,6 +77,7 @@ from momentum.core.contracts import (
     SelectionScope,
     SplitPlan,
     TimestampDiscontinuityError,
+    attest_row_index_local,
     ValidatedBinaryLabel,
     binary_label_digest,
     deny_factor_in_ok_oos,
@@ -93,7 +94,9 @@ from momentum.core.contracts import (
 )
 from momentum.core.protocols import IKlineReader
 from momentum.core.split_preview import (
+    build_row_time_fingerprint,
     count_binary_classes_in_rows as _count_binary_classes_in_rows,
+    epoch_ms_from_index,
     holdout_boundary,
 )
 # SPLITUNIFY Task 4.1：`metadata.split_unify` 之產生點住 `split_projection`（契約檔就在它隔壁），
@@ -628,18 +631,51 @@ def _build_holdout_split_plan(
         "base_universe_hash": universe_hash,
         "symbol": normalized_symbol,
     }
+    # 🔴 SPLITUNIFY D-001 (4.4)：本路徑之 frame 為**單標的**，`train_rows`／`test_rows` 已是
+    #    該標的自己的索引位置 ⇒ `row_index_local` 逐值等於 `row_index`（D-001 Task 8.2 之斷言）。
+    _train_local = np.asarray(train_rows, dtype=int)
+    _test_local = np.asarray(test_rows, dtype=int)
+    _ms_train = epoch_ms_from_index(
+        features_df.index[_train_local], role="ic_holdout: train feature_ts"
+    )
+    _ms_test = epoch_ms_from_index(
+        features_df.index[_test_local], role="ic_holdout: test feature_ts"
+    )
     train_plan = SplitPlan(
         split_label="train",
         row_index=train_rows,
         time_bounds=_time_bounds_for_rows(features_df.index, train_rows),
+        row_index_local=_train_local,
+        row_time_fingerprint=build_row_time_fingerprint(
+            positions=_train_local,
+            feature_ts_ms=_ms_train,
+            symbol=normalized_symbol,
+            base_universe_hash=universe_hash,
+        ),
         **plan_kwargs,
     )
     test_plan = SplitPlan(
         split_label="test",
         row_index=test_rows,
         time_bounds=_time_bounds_for_rows(features_df.index, test_rows),
+        row_index_local=_test_local,
+        row_time_fingerprint=build_row_time_fingerprint(
+            positions=_test_local,
+            feature_ts_ms=_ms_test,
+            symbol=normalized_symbol,
+            base_universe_hash=universe_hash,
+        ),
         **plan_kwargs,
     )
+    # 🔴 D-001 (4.5)–(4.9)：單標的下排序位置即 `arange(n_rows)`，往返須恆等。
+    _sorted_positions = np.arange(int(n_rows), dtype=int)
+    for _plan, _loc in ((train_plan, _train_local), (test_plan, _test_local)):
+        attest_row_index_local(
+            row_index=_plan.row_index,
+            row_index_local=_loc,
+            sorted_positions=_sorted_positions,
+            role=f"ic_holdout attest[{normalized_symbol}/{_plan.split_label}]",
+        )
     symbols = np.asarray([normalized_symbol] * n_rows, dtype=object)
     validate_split_pair_integrity(
         train_plan,

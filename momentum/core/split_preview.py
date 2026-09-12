@@ -120,6 +120,62 @@ def assert_epoch_ms_array(
     return arr.astype("int64")
 
 
+def epoch_ms_from_index(index: Any, *, role: str, strictly_increasing: bool = True) -> np.ndarray:
+    """把索引正規化為 **epoch 毫秒 int64**（SPLITUNIFY 之唯一時鐘正規化器）。
+
+    🔴 **單位政策只有一份**：投影側之 `_index_as_ms` 與 producer 端寫入指紋時**共用本函式**。
+    規格 D-001-C2 第 3 點要求「正規化函式點名、不得換別支」——若 producer 自寫一套換算，
+    兩端就會在混合單位或 `DatetimeIndex` 精度上各自解讀，指紋永遠對不上。
+
+    🔴 **明文排除** `contracts._coerce_timestamp_array`：它對純數字預設 `unit="s"`。
+    """
+    idx = pd.Index(index)
+    if isinstance(idx, pd.DatetimeIndex):
+        if idx.hasnans:
+            raise ValueError(f"{role}: 索引含 NaT（fail-closed）")
+        return assert_epoch_ms_array(
+            (idx.asi8 // 10 ** 6).astype("int64"),
+            role=role,
+            strictly_increasing=strictly_increasing,
+        )
+    return assert_epoch_ms_array(
+        np.asarray(idx), role=role, strictly_increasing=strictly_increasing
+    )
+
+
+def build_row_time_fingerprint(
+    *,
+    positions: Any,
+    feature_ts_ms: Any,
+    symbol: str,
+    base_universe_hash: str,
+) -> str:
+    """SPLITUNIFY D-001-C2 第 1 點：逐列時刻指紋（producer 寫入、投影入口重算比對）。
+
+    `rows` 為 **`list[list]`**，每列元素順序固定為
+    `[int(position), int(feature_ts_ms), str(symbol), str(base_universe_hash)]`，
+    依 `position` 遞增排序後 `json.dumps(rows, sort_keys=True, separators=(",",":"))` 取 `sha256`。
+    🔴 **禁**改用 `list[dict]`——實跑證實兩形之 `sha256` 不同。空序號 ⇒ `sha256("[]")`。
+
+    🔴 `position` 與 `feature_ts_ms` 必須是 Python `int(...)`：`numpy.int64` 會使 `json.dumps`
+    丟 `TypeError`，兩端若一端轉一端不轉即永遠不一致。
+    🔴 **本函式對排列不敏感**（先依序號排序再雜湊）＝明示邊界：同集合之重排指紋相同，
+    擋重排者為 `assert_positional_rows` 之嚴格遞增要求；兩者為**合取**，缺一不可。
+    🔴 時刻須由呼叫端以 `epoch_ms_from_index` 先正規化後傳入，本函式不另做時間換算。
+    """
+    pos = np.asarray(positions)
+    ms = np.asarray(feature_ts_ms)
+    if pos.shape[0] != ms.shape[0]:
+        raise ValueError(
+            f"build_row_time_fingerprint: positions 長度 {pos.shape[0]} 與 feature_ts_ms 長度"
+            f" {ms.shape[0]} 不等（fail-closed）"
+        )
+    order = np.argsort(pos, kind="mergesort")
+    rows = [[int(pos[i]), int(ms[i]), str(symbol), str(base_universe_hash)] for i in order]
+    payload = json.dumps(rows, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def assert_positional_rows(
     rows: Any, *, n: int, role: str, require_sorted: bool = True
 ) -> np.ndarray:

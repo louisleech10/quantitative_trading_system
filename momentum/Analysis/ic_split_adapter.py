@@ -12,6 +12,7 @@ import pandas as pd
 
 from momentum.core.contracts import (
     SplitPlan,
+    attest_row_index_local,
     _coerce_timestamp_array,
     _normalize_symbol_array,
     _normalize_symbol_value,
@@ -19,6 +20,7 @@ from momentum.core.contracts import (
     validate_split_pair_integrity,
 )
 from momentum.core.logging import get_logger
+from momentum.core.split_preview import build_row_time_fingerprint, epoch_ms_from_index
 
 logger = get_logger(__name__)
 
@@ -227,8 +229,19 @@ class ICSplitAdapter:
         allowed_symbols: Optional[set[str]],
     ) -> SplitPlanPair:
         """建立 train/test SplitPlan 並套用契約校驗。"""
-        train_rows = positions[train_local]
-        test_rows = positions[test_local]
+        # 🔴 SPLITUNIFY D-001 (4.4)：直接取用已有之標的內序號；`positions` 由呼叫端依時刻
+        #    排序後取得，故 `train_local`／`test_local` 即 (4.3) 之 `row_index_local`。
+        train_local_arr = np.asarray(train_local, dtype=int)
+        test_local_arr = np.asarray(test_local, dtype=int)
+        train_rows = positions[train_local_arr]
+        test_rows = positions[test_local_arr]
+        _ts_idx = pd.Index(ts)
+        _ms_train = epoch_ms_from_index(
+            _ts_idx[train_rows], role="ic_split_adapter: train feature_ts"
+        )
+        _ms_test = epoch_ms_from_index(
+            _ts_idx[test_rows], role="ic_split_adapter: test feature_ts"
+        )
         train_plan = SplitPlan(
             split_label="train",
             index_kind="positional",
@@ -239,6 +252,13 @@ class ICSplitAdapter:
             expected_freq=self.expected_freq,
             base_universe_hash=base_universe_hash,
             symbol=symbol,
+            row_index_local=train_local_arr,
+            row_time_fingerprint=build_row_time_fingerprint(
+                positions=train_local_arr,
+                feature_ts_ms=_ms_train,
+                symbol=symbol,
+                base_universe_hash=base_universe_hash,
+            ),
         )
         test_plan = SplitPlan(
             split_label="test",
@@ -250,7 +270,22 @@ class ICSplitAdapter:
             expected_freq=self.expected_freq,
             base_universe_hash=base_universe_hash,
             symbol=symbol,
+            row_index_local=test_local_arr,
+            row_time_fingerprint=build_row_time_fingerprint(
+                positions=test_local_arr,
+                feature_ts_ms=_ms_test,
+                symbol=symbol,
+                base_universe_hash=base_universe_hash,
+            ),
         )
+        # 🔴 D-001 (4.5)–(4.9)：producer 端 attest（時間序往返＋前置合法性閘）。
+        for _plan, _loc in ((train_plan, train_local_arr), (test_plan, test_local_arr)):
+            attest_row_index_local(
+                row_index=_plan.row_index,
+                row_index_local=_loc,
+                sorted_positions=positions,
+                role=f"ic_split_adapter attest[{symbol}/{_plan.split_label}]",
+            )
         validate_split_pair_integrity(
             train_plan,
             test_plan,

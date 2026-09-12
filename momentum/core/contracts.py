@@ -19,6 +19,13 @@ import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+# 🔴 SPLITUNIFY D-001-C2：指紋與時鐘正規化**只有一份實作**，住在 `split_preview`
+#    （該模組不匯入任何專案模組，故 producer 端與投影端可共用而無循環匯入）。
+from momentum.core.split_preview import (
+    build_row_time_fingerprint,
+    epoch_ms_from_index,
+)
+
 # ── Lazy re-exports from domain modules ─────────────────────────────────────
 # Pure data types that api/ needs without coupling to domain internals.
 # Uses lazy imports to avoid circular dependency via __init__.py files.
@@ -388,6 +395,11 @@ class SplitPlan:
     expected_freq: Optional[str] = None
     base_universe_hash: str = ""
     symbol: Optional[str] = None
+    # 🔴 SPLITUNIFY D-001 (4.3)：該 plan 之列在**該 symbol 自己的 post-trim universe** 內之序號，
+    #    遞增且與 `row_index` 逐位對應。相容 default 給非 derive 呼叫點；derive 入口缺欄仍 fail-closed。
+    row_index_local: Optional[np.ndarray] = None
+    # 🔴 SPLITUNIFY D-001-C2：逐列時刻指紋（producer-attested）。同上相容 default。
+    row_time_fingerprint: str = ""
 
     def __post_init__(self) -> None:
         """驗證切分契約的必要 discriminator 與 purge 邊界。"""
@@ -401,6 +413,19 @@ class SplitPlan:
             raise ValueError("base_universe_hash is required")
         if len(self.row_index) > 0 and self.purge_gap >= len(self.row_index):
             raise ValueError("purge_gap must be smaller than non-empty row_index length")
+        # 🔴 SPLITUNIFY D-001 (4.15) 縱深防禦：兩個 row 欄各自**複製一份**（消除呼叫端別名）
+        #    並以**不可變 buffer** 為底設為唯讀（擋直接寫入，亦擋 `setflags(write=True)` 翻回）。
+        #    誠實邊界：`pickle`／`deepcopy` 往返仍會還原成可寫，故此層只降低意外竄改、
+        #    **不構成保證**；權威守衛是投影入口之指紋重驗（D-001 (4.13)）。
+        for _field in ("row_index", "row_index_local"):
+            _arr = getattr(self, _field, None)
+            if _arr is None:
+                continue
+            _src = np.ascontiguousarray(_arr)
+            _frozen = np.frombuffer(_src.tobytes(), dtype=_src.dtype)
+            if _src.ndim != 1:
+                _frozen = _frozen.reshape(_src.shape)
+            object.__setattr__(self, _field, _frozen)
 
 
 class CrossSymbolLeakageError(ValueError):
@@ -517,6 +542,65 @@ def _local_ordinals_for_symbol(
     ):
         raise CrossSymbolLeakageError("row_index contains rows outside declared symbol")
     return local_ordinals.astype(int)
+
+
+def attest_row_index_local(
+    *,
+    row_index: Any,
+    row_index_local: Any,
+    sorted_positions: Any,
+    role: str = "producer attest",
+) -> None:
+    """SPLITUNIFY D-001 (4.5)–(4.9)：producer 端 attest `row_index_local`。
+
+    判準＝**時間序往返**：`sorted_positions[row_index_local]` 與 `row_index` 逐值相等。
+    `sorted_positions` 為該 symbol 之列**依時刻排序後**的全框位置。
+
+    🔴 **不得**改以 `_local_ordinals_for_symbol` 之結果逐值相等當判準——該 helper 以
+    `np.flatnonzero(symbol_arr == symbol)` 取 **frame 序**，而 `row_index_local` 之語意是
+    **時間序**內之序號；兩者僅在「該 symbol 之 frame 序恰等於時間序」時相等，亂序輸入會被誤擋。
+
+    前置合法性閘（先於往返比對）：整數型、長度相等、值落在範圍內、無重複、嚴格遞增。
+    負索引會回捲使往返誤判相等，故範圍檢查不可省；長度不等一律用 `np.array_equal` 判定，
+    **禁**以 `zip` 逐對比較（`zip` 會截斷，空或過短之序號可空轉或對齊前綴而誤放行）。
+    """
+    ri = np.asarray(row_index)
+    loc = np.asarray(row_index_local)
+    pos = np.asarray(sorted_positions)
+
+    if not np.issubdtype(loc.dtype, np.integer):
+        raise ValueError(
+            f"{role}: row_index_local 之 dtype 為 {loc.dtype}，須為 numpy 整數型"
+            "——整數值之浮點／布林／物件型數字會被靜默轉型放行（fail-closed，不得靠轉型救）"
+        )
+    if loc.shape[0] != ri.shape[0]:
+        raise ValueError(
+            f"{role}: row_index_local 長度 {loc.shape[0]} 與 row_index 長度 {ri.shape[0]} 不等"
+            "（等長為往返比對之前置條件；禁以 zip 截斷）"
+        )
+    if loc.size == 0:
+        return
+    if loc.min() < 0:
+        raise ValueError(
+            f"{role}: row_index_local 含負值 {int(loc.min())}"
+            "——Python 負索引會回捲，會使往返比對誤判相等（fail-closed）"
+        )
+    if loc.max() >= pos.shape[0]:
+        raise ValueError(
+            f"{role}: row_index_local 最大值 {int(loc.max())} 超出該 symbol 列數 {pos.shape[0]}（fail-closed）"
+        )
+    if np.unique(loc).size != loc.size:
+        raise ValueError(f"{role}: row_index_local 有重複序號（fail-closed）")
+    if loc.size > 1 and not np.all(np.diff(loc) > 0):
+        raise ValueError(
+            f"{role}: row_index_local 非嚴格遞增"
+            "——下游以首列取最早時刻，重排即算錯；指紋對同集合重排不敏感，擋它的正是本條（fail-closed）"
+        )
+    if not np.array_equal(pos[loc], ri.astype(int)):
+        raise CrossSymbolLeakageError(
+            f"{role}: 時間序往返不成立——sorted_positions[row_index_local] 與 row_index 不逐值相等"
+            "（row_index_local 寫錯、或該列不屬於此 symbol；fail-closed）"
+        )
 
 
 def validate_split_integrity(
@@ -657,8 +741,20 @@ def split_per_symbol(
         positions = group_sorted["_split_row_pos"].to_numpy(dtype=int)
         group_for_splitter = group_sorted.drop(columns=["_split_row_pos"])
         for train_local, test_local in splitter(group_for_splitter):
-            train_rows = positions[np.asarray(train_local, dtype=int)]
-            test_rows = positions[np.asarray(test_local, dtype=int)]
+            # 🔴 SPLITUNIFY D-001 (4.4)：直接取用**已有**之標的內序號，不得在此反推。
+            #    `positions` 為該 symbol 之列**依時刻排序後**的全框位置（上方已 sort_values），
+            #    故 `train_local`／`test_local` 即為 (4.3) 所定義之 `row_index_local`。
+            train_local_arr = np.asarray(train_local, dtype=int)
+            test_local_arr = np.asarray(test_local, dtype=int)
+            train_rows = positions[train_local_arr]
+            test_rows = positions[test_local_arr]
+            _ts_idx = pd.Index(ts)
+            _ms_train = epoch_ms_from_index(
+                _ts_idx[train_rows], role="split_per_symbol: train feature_ts"
+            )
+            _ms_test = epoch_ms_from_index(
+                _ts_idx[test_rows], role="split_per_symbol: test feature_ts"
+            )
             train_plan = SplitPlan(
                 split_label="train",
                 index_kind="positional",
@@ -670,6 +766,13 @@ def split_per_symbol(
                 expected_freq=expected_freq,
                 base_universe_hash=base_universe_hash,
                 symbol=symbol,
+                row_index_local=train_local_arr,
+                row_time_fingerprint=build_row_time_fingerprint(
+                    positions=train_local_arr,
+                    feature_ts_ms=_ms_train,
+                    symbol=symbol,
+                    base_universe_hash=base_universe_hash,
+                ),
             )
             test_plan = SplitPlan(
                 split_label="test",
@@ -682,7 +785,22 @@ def split_per_symbol(
                 expected_freq=expected_freq,
                 base_universe_hash=base_universe_hash,
                 symbol=symbol,
+                row_index_local=test_local_arr,
+                row_time_fingerprint=build_row_time_fingerprint(
+                    positions=test_local_arr,
+                    feature_ts_ms=_ms_test,
+                    symbol=symbol,
+                    base_universe_hash=base_universe_hash,
+                ),
             )
+            # 🔴 D-001 (4.5)–(4.9)：producer 端 attest（時間序往返＋前置合法性閘）。
+            for _plan, _loc in ((train_plan, train_local_arr), (test_plan, test_local_arr)):
+                attest_row_index_local(
+                    row_index=_plan.row_index,
+                    row_index_local=_loc,
+                    sorted_positions=positions,
+                    role=f"split_per_symbol attest[{symbol}/{_plan.split_label}]",
+                )
             validate_split_pair_integrity(
                 train_plan,
                 test_plan,

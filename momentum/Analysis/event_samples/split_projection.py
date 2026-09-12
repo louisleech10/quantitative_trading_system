@@ -29,6 +29,8 @@ from momentum.core.split_preview import (
     assert_epoch_ms_array,
     assert_positional_rows,
     boundary_hash as _boundary_hash,
+    build_row_time_fingerprint,
+    epoch_ms_from_index,
 )
 
 _CONTRACT_PATH = Path(__file__).resolve().parents[1] / "contracts" / "split_unify.json"
@@ -199,20 +201,13 @@ def _index_as_ms(index: Any) -> np.ndarray:
     三方獨立命中我原本在此手寫 `1e11` ＝ 第二份 policy），且該支是**逐元素**檢查——
     原本的 `np.all(...)` 對**混合**單位會直接放行。
     """
-    idx = pd.Index(index)
-    if isinstance(idx, pd.DatetimeIndex):
-        if idx.hasnans:
-            raise ValueError("split_projection: feature_index 含 NaT（fail-closed）")
-        # 🔴 DatetimeIndex **也要**過同一組不變式（B2b R3 之 J1）——R2 我只補了數值分支，
-        #    這一支直接 return 就繞過了嚴格遞增檢查，等於只修了一半。
-        return assert_epoch_ms_array(
-            (idx.asi8 // 10 ** 6).astype("int64"),
-            role="split_projection: feature_index",
-            strictly_increasing=True,
-        )
-    return assert_epoch_ms_array(
-        np.asarray(idx), role="split_projection: feature_index", strictly_increasing=True
-    )  # 🔴 feature_index **必須**嚴格遞增：下游以 row_index[0] 取「最早時刻」
+    # 🔴 SPLITUNIFY D-001-C2 第 3 點：**委派**給 `split_preview.epoch_ms_from_index`，
+    #    使 producer 端寫入指紋與投影端重算比對共用**同一支**正規化器；本處不得自寫第二套。
+    #    原地實作之 DatetimeIndex／數值兩分支已整支搬入該函式（含 NaT 與嚴格遞增檢查）。
+    #    🔴 feature_index **必須**嚴格遞增：下游以首列取「最早時刻」。
+    return epoch_ms_from_index(
+        index, role="split_projection: feature_index", strictly_increasing=True
+    )
 
 
 def _plan_bounds_as_ms(plan: Any, *, label: str) -> tuple:
