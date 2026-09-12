@@ -161,6 +161,8 @@
 
 🔴 **第八次修訂之兩項事實已備（主委實跑）**：①**時間域判準可行**——`split_projection.py:524-526` 現有 `train_ms`／`test_ms`／`test_start_ms`，**無** `train_last_ms`；但 `train_rows` 就在作用域，新增 `train_last_ms = int(index_ms[train_rows[-1]])` 為**一行**且與既有 `test_start_ms` 取法對稱 ⇒ grok 之「以 `train_last_ms < decision_at_ms < test_start_ms` 定義隔離帶」可直接落地，不必依賴 `∈ index_ms`。②**mutation 04–11 有七條方向相反，非僅數條**：`04`（「不改 `groupby` 折疊」＝缺陷）與「物化維持橫向合併」互斥；`06`／`07`／`08`／`09`／`10`（`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe` 之「退回單鍵／退回事件級粒度」＝缺陷）與 `(5.1)` **甲類維持事件級**全部互斥；`11`（Map 鍵退回 `event_id`＝缺陷）與 `Task 9.5` 排除遷移互斥。**唯一方向仍成立的是 `05`**（`pattern_bridge` 退回單鍵）——它屬 **(丙)**，確實需要改。⇒ 第八次修訂須把 `04`／`06`–`11` 改為**反向 mutation**（誤改成複合鍵才紅）或刪除，並同步條數與 ID 連續性。
 
+🔴 **composer `P1-01`（G-4a 不可機械驗證）有成本極低的解法——主委查到現成骨架**：`scripts/freeze_splitunify_golden.py:346-352` **已經有**雙路徑比對 `if actual["g1_membership"] != actual["g3b_oracle"]`，註解逐字「G-3b：新投影 vs 獨立 oracle，集合相等（**每次都驗**，不只在凍結時）」，而 `_oracle_membership()` 是**依公式手推、與投影無因果關係**的獨立 oracle。⇒ 第九次修訂只要要求「`Task 9.2b` 落地時**同步**把該 oracle 改為 decision-anchor」，G-3b 即自動成為區分閘：**因換錨而改側的事件會在兩邊同時改，實作寫錯則只有投影那邊改**，`g1_membership != g3b_oracle` 直接紅。**不必**新造 `allowed_side_diff_events.json`、也不必保留 cutoff-anchor 平行鍵。🔴 **但須明文寫死**「oracle 與投影**不得由同一段程式碼產生**」（B2b 曾踩過：抽共用函式後 oracle 變成同義反覆，見 `clusters_oracle.json` 檔頭註解），否則這個閘會空心化。
+
 🔴 **R8 composer 已交，三條主委已複驗、全部成立——「改一處漏一處」第四次，且這次漏的是我自己承諾的動作**：
 - **`P1-03`（最難堪）**：§N 現有六條殘留，**沒有任何一條**是 9.1 終端揭露。我在 `Task 9.1` 白紙黑字寫「**登記於 §N**」，**然後沒去登記**。它對 `blocked-by` 的質疑也成立：§N 既有之 `R-4` 用 `blocked-by` 時指名了「屬 GAP-3」這張**具體的票**，而我只寫「零呼叫點」＝**能力缺口**，無可追的阻塞對象 ⇒ 類別應改 `needs-research`（投影接線設計未定），或先開一張具名的 projection-wiring 票再以其票號 `blocked-by`。
 - **`P2-02`**：`(6.2)` L92 仍逐字「`baseline` 之 `n_test`…**不得**改判為事件數」，而 L205 我剛改成「**仍為事件數**」——同檔兩處**正面衝突**。
