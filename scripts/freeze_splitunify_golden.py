@@ -44,7 +44,10 @@ from momentum.Analysis.event_samples.types import (  # noqa: E402
     EventSplitConfig,
 )
 from momentum.core.contracts import SplitPlan  # noqa: E402
-from momentum.core.split_preview import holdout_boundary  # noqa: E402
+from momentum.core.split_preview import (  # noqa: E402
+    build_row_time_fingerprint,
+    holdout_boundary,
+)
 
 GOLDEN_DIR = REPO / "tests" / "golden" / "splitunify"
 RECEIPT_DIR = REPO / "handoffs" / "run_receipts"
@@ -149,7 +152,9 @@ def _build_actual() -> Dict[str, Any]:
     ms = np.asarray(index, dtype="int64")
     test_rows = np.asarray(b["test_row_index"], dtype=int)
 
-    # G-5① 逐 row test fingerprint：canonical (position, ts_ms, symbol, universe_hash)
+    # G-5① 逐 row test fingerprint：canonical (position, feature_ts_ms, symbol, universe_hash)
+    # 🔴 SPLITUNIFY D-001-C2：欄名以 `feature_ts_ms` 為準（舊稱 `ts_ms`／`row_pos` 一律不得再用，
+    #    含變數名與註解）；序列化規則與 `split_preview.build_row_time_fingerprint` **逐字同形**。
     fingerprint_rows = [
         [int(p), int(ms[p]), SYM, "splitunify-golden"] for p in test_rows
     ]
@@ -165,7 +170,15 @@ def _build_actual() -> Dict[str, Any]:
         # G-4 per-symbol counts（整數逐值相等）
         "g4_per_symbol_n": {k: int(v) for k, v in plan.summary["per_symbol_n"].items()},
         # G-5①
-        "g5_row_fingerprint_sha256": _sha(fingerprint_rows),
+        # 🔴 SPLITUNIFY D-001-C2 第 7 點：獨立 oracle 與 producer 必須**同一支**序列化器，
+        #    否則兩邊各凍一份、永遠不等。實測本呼叫與原本的 `_sha(fingerprint_rows)`
+        #    逐位元同值（ascending positions 下 argsort 為恆等），故 golden 摘要不位移。
+        "g5_row_fingerprint_sha256": build_row_time_fingerprint(
+            positions=test_rows,
+            feature_ts_ms=ms[test_rows],
+            symbol=SYM,
+            base_universe_hash="splitunify-golden",
+        ),
         "g5_row_fingerprint_n": len(fingerprint_rows),
         # 🔴 B2c review `CODEX-R1-P1-02`：只凍 hash ⇒ **錯的 fingerprint 也會被自凍結**，
         #    測試只驗「是 64 位 hex」等於沒驗。⇒ 一併凍**明文** positions 與首尾時間戳，
