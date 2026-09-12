@@ -12,6 +12,7 @@
 - **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
 - **技術決策，走委員會不問使用者**：①未 commit 生產碼保留或回退 ②補 `docs/SPLITUNIFY_TODO.md` 之 `Task 9.1`–`9.5` ＋派 stamp 輪補戳記。
 - **進行中（主委執行，依 R2 三家共同結論之執行優先序）**：E3 審查輸入隔離**已完成**（樣板／`new_brief.sh`／`brief_conformance_check.sh` 骨架佔位硬擋，`tests/governance/test_docrot_e3_brief_placeholder.py` 6 passed）；窄 F2「共 N 條」**已完成**（`spec_count_audit.py`，4 passed）；**F1 活文收縮已到收斂點**——D-002 活文考古行 35→**4**（剩餘四行之「作廢」字樣皆出現在現行契約句內，非考古，刻意不改）、字元 84,739→**74,770**（−11.8%），條數字面收斂為 register 表標題唯一一處；每批後四道檢查（`doc_format`／`obligation_block`／`xref --synth`／`xref --files` 對 HEAD）皆 rc=0。未動：掛載三層、遷移序、F3 降級具名殘留。
+- 🔴 **治理測試既有紅基準（2026-09-13 實測，沒有這個基準會把既有紅誤判成自己弄壞的）**：19 個涉及 `brief_conformance_check` 的治理測試檔跑出 **30 failed／523 passed／3 skipped**；同樣檔在乾淨 HEAD worktree 為 **35 failed／512 passed**，逐檔失敗數相同（`test_result_state_format_failed` 9、`test_debt_emit` 7、`test_rolegate_predispatch` 5、`test_gov_check_cheap_first` 5、`test_stamp_taskid_inject` 4）。根因＝隔離 repo 之依賴複製清單缺 `scripts/quant_standard_check.sh` 與 `scripts/ticket_batch_check.sh`，`gov_check` fail-closed；**與 DOCROT 無關，屬另一個既有缺陷**。另 `test_govb1_contract_matrix.py::test_r6_u1u2u4_g7_worktree_space_quote_paths` 會建 git worktree 而**掛住**（實測跑逾 20 分鐘無進展），跑治理回歸時須排除。
 
 ## 坑
 - impl token 900 秒過期須重領；task-id／session 日期前綴一律沿用 `20260911-SPLITUNIFY`（跨日不得改）；`Ticket-Batch` 與 `Co-Authored-By` 須在訊息**同一最末段**。
