@@ -33,7 +33,9 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 **(0.4) 複合鍵之維度**：`SU-RESID-2` 之複合鍵為 `(event_id, feature_timeframe)`，**不是** `(event_id, trigger_timeframe)`——後者不存在多列問題（trigger TF 已編進 `event_id`）。
 
-**(0.5) 用語適用範圍**：凡本延伸提及「多 TF」「同簇」「同側」「per_tf 多列」，一律指 **feature TF**。實作新增之欄位名須逐字採用 (0.2)／(0.3) 之名稱，禁用裸 `timeframe` 當新欄名。
+**(0.5) 用語適用範圍**：凡本延伸提及「多 TF」「同簇」「同側」「per_tf 多列」，一律指 **feature TF**。
+
+**(0.6) 既有欄位保留、新增欄位分名**：**既有** wire 欄位（含 `per_tf.timeframe`、契約檔既有鍵）**一律原樣保留**，不改名、不加 alias——改名會動到已凍結之契約與 golden。**新增**之欄位／summary 鍵／API 欄名則須逐字採用 (0.2)／(0.3) 之名稱，禁用裸 `timeframe`。兩者界線以「本延伸是否新建該欄」判定。
 
 <!-- OBLIGATIONS-END -->
 
@@ -41,9 +43,9 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 <!-- OBLIGATIONS-BEGIN id=D-002-C3 -->
 
-**(3.1) 同側要求**：同一 `event_id` 之**所有** feature TF 列，必須全部落在**同一** split 側（同為 train 或同為 test）。
+**(3.1) 可比時點之前提**：🔴 本條之同側判定**須先定義何謂同一事件之可比時點**。現行資料契約只要求各 feature TF 之 `feature_cutoff_ms <= decision_at_ms`，**未**要求不同 feature TF 之 cutoff 相同或錨定同一時刻 ⇒ 合法事件**可能天然落在不同側**。實作不得在未定義可比時點前逕行判定異側；在該定義成立之下，同一 `event_id` 之**所有** feature TF 列**應**落在**同一** split 側（同為 train 或同為 test）。
 
-**(3.2) 異側之處置**：若某事件之不同 feature TF 被判到不同側（例如 1h→train、4h→test），**整個事件之所有列一律 purged**，purge 理由須為具名字面，不得靜默取一側。
+**(3.2) 異側之處置**：若某事件之不同 feature TF 在 (3.1) 前提下仍被判到不同側，**整個事件之所有列一律 purged**；🔴 **不得**靜默取一側，亦**不得**在未達成 (3.1) 前就套用本條（否則會誤殺合法事件）。purge 理由之字面**沿用既有** `interval_crosses_split_boundary`，其單一真相源為事件匯入契約之 `split_purge_reasons`——本延伸**不新增** reason 字面，以免動到已戳記之封閉值集與前端枚舉面。
 
 **(3.3) 同簇不等於同側**：🔴 **不得以「同簇」代替本條**——同簇只保證它們在統計上被視為相關，**不保證同側**。異側時，仍以事件為單位聚合的下游消費者（`baseline`／`pattern_bridge`／IC feed）會把 train 側的特徵與 test 側的標籤組在一起，**組成非法 OOS 樣本**——這正是本 epic 從頭要擋的洩漏形態，且**完全靜默**。
 
@@ -87,7 +89,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 **(6.1) 三個量之定義**：複合鍵落地後，以下三個量**各自定義、不得互相代用**：`n_events`＝去重後之 `event_id` 數；`n_event_tf_rows`＝`(event_id, feature_timeframe)` 列數；既有之 `n_train`／`n_test`／`n_purged`。
 
-**(6.2) 三量之粒度**：`n_train`／`n_test`／`n_purged` **一律定義為事件數**（`n_events` 粒度），因為它們的既有消費者（報告分母、前端顯示、既有測試斷言）全部以事件為單位。列數另以 `n_event_tf_rows_train` 等新名承載。
+**(6.2) 三量之粒度逐消費者定義**：🔴 **不得一刀切**。`split_projection` 之 `summary` 與報告分母、前端顯示、既有 wiring 斷言之 `n_train`／`n_test`／`n_purged` 維持**事件數**（`n_events` 粒度）語意；但 `baseline` 之 `n_test` 語意為**實際模型輸入樣本數**（複合鍵後即 `(event_id, feature_timeframe)` 列數），**不得**改判為事件數。實作須逐消費者標明其粒度，列數另以 `n_event_tf_rows_train` 等新名承載。
 
 **(6.3) 派工義務**：任一消費面把列數當事件數顯示或斷言即為缺陷；`Task 9.4` 須逐處指派修改，**不得**只在本節寫義務而不派工。
 
@@ -133,16 +135,23 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 - **返回形狀**（契約，缺一不可）：`build_event_keys` 回傳之 keyed 事件表外，另回傳
   `discarded: Dict[str, int]`——鍵為被丟棄之 `feature_timeframe`、值為列數；無丟棄時為 `{}`（**不得**省略或回 `None`）。
 - **跨邊界傳遞**：`_derive_single_symbol` 與 per-symbol 分派器須將其原樣寫入
-  `EventSplitPlan.summary["discarded_per_tf_rows_by_timeframe"]`；多 symbol 時逐 symbol 相加。
+  `EventSplitPlan.summary["discarded_rows_by_feature_tf"]`（🔴 依 `D-002-C0` (0.6)，新增鍵名不得含裸 `timeframe`）；多 symbol 時逐 symbol 相加。
 - **API 與前端揭露落點**：API 事件切分回應須帶該欄；前端事件批面板須顯示「本次分析只用了 `<selected>`，丟棄 `<tf>: <n>` 列」。**缺任一層即視為 9A 未完成**。
 - **獨立回退之判準**：移除上述三層後系統行為須與 9A 前逐值相同（無其他消費者依賴該欄）——此為可證偽斷言，須有測試。
 - 不可做：不得以揭露取代複合鍵；不得在丟棄時 raise（會擋掉目前合法的單 feature TF 用法）。
 
 #### Phase 9B — 複合鍵主體（依賴：Phase 9A）
 
-**Task 9.2 — schema 加 `feature_timeframe`**
-- 檔案：`split_projection` 之 `assignments`／`purged`；`event_split.build_time_clusters` 之 `clusters`。
-- 改法：三表各加 `feature_timeframe` 欄（逐字採 `D-002-C0` (0.3) 之名）；`receipts.per_tf` **不改形狀**。
+**Task 9.2 — producer 停止單選，輸出全量 keyed rows**
+- 🔴 **本 Task 是第 9 批的核心；沒有它，下游全部改完 `SU-RESID-2` 仍不會被解決**（只加欄位而 producer 照舊單選，丟棄行為原封不動）。
+- 檔案：`split_projection.build_event_keys`。
+- 改法：移除 `selected_timeframe` 單選過濾，改為輸出**全量** `(event_id, feature_timeframe)` keyed rows；`selected_timeframe` 僅在呼叫端明示「只要這一個 TF」時作為**可選**過濾器，且過濾掉的列數仍須依 `Task 9.1` 揭露。
+- 不可做：不得保留「預設只取一個 TF」之行為；不得在 producer 內靜默丟列。
+
+**Task 9.2a — schema 加 `feature_timeframe`**
+- 檔案：`split_projection` 之 `assignments`／`purged`。
+- 改法：兩表各加 `feature_timeframe` 欄（逐字採 `D-002-C0` (0.3) 之名）；`receipts.per_tf` **不改形狀**。
+- 🔴 **`event_split.build_time_clusters` 之 `clusters` 不加該欄、維持事件級粒度**（定案，二選一取此）：簇由 `label_start_ms`／`label_end_ms` 之 interval 決定，與 feature TF 無關；若把簇複製成多列，`w=1/n` 權重、簇計數與 golden 語意全部失去定義。同事件多 feature TF 之簇歸屬**共用同一列**。
 - summary 依 `D-002-C6` 同時提供 `n_events` 與 `n_event_tf_rows`。
 
 **Task 9.3 — 16 處消費面逐處列名改法**
@@ -164,22 +173,36 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 ### §V 驗證策略與邊界測試目錄
 
-- `Task 9.1`：`ASSERT build_event_keys WHEN per_tf 含 1h 與 4h 而 selected=1h THEN discarded == {"4h": 2}`；`ASSERT WHEN 單一 feature TF THEN discarded == {}`；`ASSERT summary／API 回應／前端型別三層皆帶該欄`；`ASSERT 移除該欄後行為與 9A 前逐值相同`（獨立回退之可證偽斷言）。
+- `Task 9.1`：`ASSERT build_event_keys WHEN per_tf 含 1h 與 4h 而 selected=1h THEN discarded == {"4h": 2}`（summary 鍵為 `discarded_rows_by_feature_tf`）；`ASSERT WHEN 單一 feature TF THEN discarded == {}`；`ASSERT summary／API 回應／前端型別三層皆帶該欄`；`ASSERT 移除該欄後行為與 9A 前逐值相同`（獨立回退之可證偽斷言）。
 - `Task 9.2`：`ASSERT assignments THEN 欄含 feature_timeframe 且 (event_id, feature_timeframe) 唯一`。
 - `D-002-C3`：`ASSERT WHEN 某 event 之 1h 判 train、4h 判 test THEN 該 event 全部列 purged 且 reason 為具名字面`；`ASSERT WHEN 同 event 所有 feature TF 同側 THEN 不得誤 purge`（成對，缺一即無鑑別力）。
 - `D-002-C6`：`ASSERT summary THEN n_events 與 n_event_tf_rows 並存`；`ASSERT n_train+n_test+n_purged == n_events`（事件數守恆，非列數）。
 - `Task 9.3`：**逐處**各一條「改壞就要變紅」測試；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。
 - `Task 9.5`：`ASSERT golden WHEN 單 TF fixture THEN 舊值逐值不變`；`ASSERT 交錯平行組之 g5 與單標的組不同且各自穩定`。
-- **mutation**（前綴 `M-SU-D2-`；🔴 逐處對應，不得以單一 generic mutant 冒充）：
-  `01` 9A 之 discarded 不寫入 summary｜`02` discarded 寫入 summary 但不傳到 API｜`03` 前端不顯示｜
-  `04` `feature_materialization` 只改 `set_index` 不改 `groupby` 折疊｜`05` `pattern_bridge` lookup 退回單鍵｜
-  `06` `tables` lookup 退回單鍵｜`07` `ic_feed` lookup 退回單鍵｜`08` `counterexample_classifier` 退回單鍵｜
-  `09` `candidate_ledger` 退回單鍵｜`10` `dedupe` 保留集退回 `dedupe_cluster_id` 粒度｜
-  `11` 前端 `byEventId` Map 鍵退回 `event_id`｜`12` wiring 測試 `dict(zip(...))` 保持單鍵｜
-  `13` `n_train` 改取列數｜`14` `D-002-C3` 同側檢查移除（異側放行）｜`15` 同側檢查改為「取第一側」而非整事件 purge｜
-  `16` golden 仍以 `event_id` 清單比對｜`17` 交錯平行組未新增而直接覆蓋單標的 g5｜
-  `18` event-level 表被一併改為複合鍵（過度涵蓋之反向 mutation）。
-  每條須指名應紅之測試。
+**mutation 目錄**（🔴 逐處對應，不得以單一 generic mutant 冒充；每列皆須有**完整 ID** 與**應紅之測試**）
+
+| ID | 改壞什麼 | 應紅之測試 |
+|---|---|---|
+| `M-SU-D2-01` | 9A 之 `discarded` 不寫入 summary | `Task 9.1` 之 summary 鍵斷言 |
+| `M-SU-D2-02` | `discarded` 寫入 summary 但不傳到 API 回應 | API 事件切分回應契約測試 |
+| `M-SU-D2-03` | API 帶了但前端不顯示 | 前端事件批面板揭露測試 |
+| `M-SU-D2-04` | `feature_materialization` 只改 `set_index` 輸出索引、不改 `groupby` 折疊 | 多 feature TF 物化**值**斷言（非「有無報錯」） |
+| `M-SU-D2-05` | `pattern_bridge` lookup 退回單鍵 | `pattern_bridge` 之 split_label 值斷言 |
+| `M-SU-D2-06` | `tables` lookup 退回單鍵 | `tables` 之簇 lookup 值斷言 |
+| `M-SU-D2-07` | `ic_feed` lookup 退回單鍵 | `ic_feed` 之逐列值斷言 |
+| `M-SU-D2-08` | `counterexample_classifier` 退回單鍵 | 分類結果與 receipt 列之綁定測試 |
+| `M-SU-D2-09` | `candidate_ledger` 退回單鍵 | 帳本列綁定測試 |
+| `M-SU-D2-10` | `dedupe` 保留集退回 `dedupe_cluster_id` 粒度 | `dedupe` 保留集粒度測試 |
+| `M-SU-D2-11` | 前端 `byEventId` Map 鍵退回 `event_id` | 前端同鍵覆蓋測試 |
+| `M-SU-D2-12` | wiring 測試之 `dict(zip(...))` 保持單鍵 | `test_splitunify_wiring.py` 多 feature TF 案例 |
+| `M-SU-D2-13` | `n_train` 改取列數 | `D-002-C6` 之事件數守恆斷言 |
+| `M-SU-D2-14` | `D-002-C3` 同側檢查整個移除（異側放行） | 異側事件之 purge 斷言 |
+| `M-SU-D2-15` | 同側檢查改為「取第一側」而非整事件 purge | 同上（須指名 purge，不得取一側） |
+| `M-SU-D2-16` | golden 仍以 `event_id` 清單比對 | golden 多 feature TF 平行組 |
+| `M-SU-D2-17` | 交錯平行組未新增而直接覆蓋單標的 g5 | golden 單標的回歸錨逐值不變 |
+| `M-SU-D2-18` | event-level 表被一併改為複合鍵（過度涵蓋之反向 mutation） | event-level 粒度不變測試 |
+| `M-SU-D2-19` | `ic_feed.event_context_from_windows` 之 survivor 六鍵雜湊未隨複合鍵調整 | survivor 雜湊測試 |
+| `M-SU-D2-20` | producer 保留 `selected_timeframe` 之預設單選 | `Task 9.2` 全量 keyed rows 測試 |
 
 ### §R 回退
 
@@ -199,6 +222,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 <!-- HISTORY-BEGIN -->
 - 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-consult-r1/synth.md`（四家偵察 18 條／六群）建立本延伸。
 - 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-review-r1/synth.md`（三家找碴 15 條／七群，三家全數 blocked）修訂為本版——新增 `D-002-C0`（timeframe 雙語意分名）、`D-002-C3`（同側約束）、`D-002-C6`（量詞分離）、`Task 9.4`；觸及面由 15 處增為 16 處；Task 9.3 改為逐處列名；§G 拆解 (G-1)(G-2)(G-3)；mutation 由 6 條增為 18 條。
+- 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-review-r2/synth.md`（三家閉合輪 11 條／九群，codex 與 grok 仍 blocked）第三次修訂——新增 `Task 9.2`（producer 停止 `selected_timeframe` 單選、輸出全量 keyed rows，為本批核心）與 (0.6)（既有欄位保留、新增欄位分名）；(3.1) 補「可比時點」前提使同側判定不再誤殺；(3.2) purge 字面定為沿用既有 `interval_crosses_split_boundary` 不新增值集；(6.2) 量詞改逐消費者定義（`baseline` 之 `n_test` 維持樣本數語意）；`clusters` 定案不加 `feature_timeframe`、維持事件級；summary 新鍵由 `discarded_per_tf_rows_by_timeframe` 改名為 `discarded_rows_by_feature_tf`（原名含裸 `timeframe`，與 (0.6) 互斥）；mutation 由 18 條改為**表格**共 20 條，每列具完整 ID 與應紅之測試。本輪另修正前一版之義務項行型與觸及面宣告——該缺陷由 `scripts/obligation_block_check.sh` 檢出，前一版僅跑格式與 xref 未跑該閘。
 <!-- HISTORY-END -->
 
 ## 戳記
