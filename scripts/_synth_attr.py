@@ -40,7 +40,12 @@ QUOTE_N = 20
 
 
 def nfc_strip(s: str) -> str:
-    return re.sub(r"\s+", "", unicodedata.normalize("NFC", s or ""))
+    # 🔴 2026-09-12：markdown 表格內管線須跳脫為 `\|`，而委員斷言原文（附錄、非表格）
+    #    多為裸 `|`；兩者語意相同。比對前統一正規化，否則「斷言前 20 字含管線」之 finding
+    #    永遠無法歸戶——q 取自原文含管線，而群集列的管線會被切欄吃掉，②恆為假。
+    #    實例：DOCROT R2 之 CODEX-R2-P0-02（q 第 20 字為裸 `|`）與 GROK-R2-P2-02（q 含 `\|`）。
+    t = unicodedata.normalize("NFC", s or "").replace("\\|", "|")
+    return re.sub(r"\s+", "", t)
 
 
 @dataclass
@@ -118,7 +123,14 @@ def parse_synth(text: str, rel_path: str) -> SynthDoc:
         s = line.strip()
         if not s.startswith("|"):
             continue
-        cells = [c.strip() for c in s.strip("|").split("|")]
+        # 🔴 2026-09-12：`\|` 是 markdown 表格中的**跳脫管線**，不是欄位分隔符。
+        #    原本直接 split("|") 會把它當分隔符而多切一欄，使處置欄位移（`cells[3]` 判定失準）。
+        #    先保護再還原為裸 `|`，與 `nfc_strip` 之正規化一致。
+        _esc = "\x00ESCPIPE\x00"
+        cells = [
+            c.strip().replace(_esc, "|")
+            for c in s.replace("\\|", _esc).strip("|").split("|")
+        ]
         if all(re.fullmatch(r":?-{2,}:?", c or "") for c in cells):
             continue                                   # 表頭分隔列
         placeholder = (PLACEHOLDER in s) or (len(cells) < 4) or (cells[3] == "")
