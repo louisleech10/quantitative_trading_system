@@ -73,7 +73,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 **(5.1) 清單效力**：本清單取代 D-001 第 189 行之六處。來源＝四家偵察合併盤點 ＋ 三家找碴補列。實作前須再掃一次並更新本表（見 §N 誠實邊界）。
 
-**(5.2) 第一層｜producer 與投影本體**：🔴 本項描述的是**本延伸落地後**之契約（改前形狀見 `D-002-C4` 與各 Task 之「現況碼證」，不在此重述）：`split_projection.build_event_keys` 預設輸出全量、以 `(event_id, feature_timeframe)` 唯一（`merge validate="1:1"` 之判準隨之改為複合鍵，見 `Task 9.2a`）；`split_projection` 之 `assignments`／`purged` 兩表**皆含** `feature_timeframe` 欄；`event_split.build_time_clusters` **維持事件級**（一 manifest 列對一 `event_id` 列，同事件各 feature TF 共用該列，定案見 `Task 9.2a`）；側別判定以事件級 `decision_at_ms` 為錨（見 `Task 9.2b`）。
+**(5.2) 第一層｜producer 與投影本體**：🔴 本項描述的是**本延伸落地後**之契約（改前形狀見 `D-002-C4` 與各 Task 之「現況碼證」，不在此重述）：`split_projection.build_event_keys` 預設輸出全量、以 `(event_id, feature_timeframe)` 唯一（`merge validate="1:1"` 之判準與輸出欄改法見 `Task 9.2`，具體落點 `split_projection.py:291-303`）；`split_projection` 之 `assignments`／`purged` 兩表**皆含** `feature_timeframe` 欄；`event_split.build_time_clusters` **維持事件級**（一 manifest 列對一 `event_id` 列，同事件各 feature TF 共用該列，定案見 `Task 9.2a`）；側別判定以事件級 `decision_at_ms` 為錨（見 `Task 9.2b`）。
 
 **(5.3) 第二層｜表格鏈（D-001 原列六處）**：`feature_materialization` 之 `merge validate="many_to_one"`（**會報錯**）與 `groupby("event_id")+row_vals.update` 折疊（🔴 **靜默**，真正的折疊點）與輸出 `set_index("event_id")`（**靜默**只留最後一列）；`baseline`（繼承上游唯一索引）；`pattern_bridge` 之 `set_index("event_id")["split_label"]`（**靜默**取到 Series）；`tables` 兩處 `set_index`（**靜默**）；`ic_feed` 兩處 `set_index` ＋ `.loc[keep["event_id"]]`（**靜默**）；`dedupe` 之 `merge validate="one_to_one"`（**會報錯**）與 `cluster_first` 保留集（**靜默**折掉 TF）。
 
@@ -140,6 +140,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
   - **route**：`api/routes/case.py:487` `POST /case/events/{import_id}/analyze`；**service**：`api/services/case_import_service.py`（`get_event_import_service()`）。
   - **response field**：`api/models/event_import_models.py:306-308` 之 `EventAnalyzeResponse.summary`。🔴 其型別為 `Dict[str, Any]`（前端對應 `frontend/src/lib/types.ts:3176` 之 `Record<string, unknown>`）⇒ **新鍵會自動穿過、不會被型別擋下，也因此完全沒有型別保證**：驗收**不得**依賴 pydantic 或 TS 型別，須在 route 層寫**明列鍵名**之契約測試。
   - **前端顯示**：`frontend/src/components/ic-analysis/EventTablesPanel.tsx:347` 取 `resp.summary`、`:361` 為現行 `train／test／purge` 顯示行；丟棄列數須顯示於此，文案「本次分析只用了 `<selected>`，丟棄 `<tf>: <n>` 列」。
+  - 🔴 **先解生產可達性，否則本 Task 無法驗收**：上列 route 之 service 現行**永遠走 `run_event_study_only`**（`case_import_service.py:1592-1626`），拿不到 canonical universe，也就**沒有** `build_event_keys` 的 `discarded` 來源；面板在 `unavailable` 時亦不顯示 split 列。⇒ 本 Task 須**先**明定二者擇一並寫入改法：(a) 該 route 改走可取得 universe 之 producer（並說明 universe 從何而來）；或 (b) 把終端揭露自事件掃描端**移出**、改掛在確實走投影的消費者上。**指名落點不等於該落點走得到**——此為前一版之缺口。
 - **獨立回退之判準**：移除上述三層後系統行為須與 9A 前逐值相同（無其他消費者依賴該欄）——此為可證偽斷言，須有測試。
 - 不可做：不得以揭露取代複合鍵；不得在丟棄時 raise（會擋掉目前合法的單 feature TF 用法）。
 
@@ -151,6 +152,8 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 - 🔴 **投影入口之四參數閘同屬本 Task 範圍**：`pipeline.py:723-732` 以 `given = [k for k, v in projection_args.items() if v is not None]` 要求 `train_plan`／`test_plan`／`feature_index`／`selected_timeframe` **四者同時非 `None`**，否則 raise；`pipeline.py:711-715` 之 docstring 亦逐字寫「四者同時」。⇒ **只把 caller 改成傳 `None` 會在抵達 `build_event_keys` 之前就 fail-closed**。改法：投影門檻改為 `train_plan`／`test_plan`／`feature_index` **三者同時**，`selected_timeframe` 移出必填集合（`None`＝全量、字串＝可選單選過濾），docstring 同步改寫。
 - 🔴 **只改被呼叫端不算完成**：本 Task 的驗收是**端到端**——經 `EventSamplePipeline.run` 實際產出全量列才算；只要 caller 仍必傳 `selected_timeframe`、或四參數閘仍擋 `None`，生產路徑的靜默丟棄就原封不動。
 - 改法：`build_event_keys` 之 `selected_timeframe` 由**必填改為可選**（預設 `None` ＝ 全量），輸出**全量** `(event_id, feature_timeframe)` keyed rows；caller 改為不傳（或明示傳 `None`），🔴 並**一併移除 `str()` 強制轉型**——留著它會把 `None` 轉成字面 `"None"`，被下游當成一個叫 `None` 的 feature TF，產出空表而非全量（改了 producer 卻沒改這裡＝本 Task 白做）；`selected_timeframe` 僅在呼叫端明確要求單一 TF 時作為**可選**過濾器，且過濾掉的列數仍須依 `Task 9.1` 揭露。
+- 🔴 **producer 內部之 merge 與輸出欄同屬本 Task 範圍（第四層；三家 R5 獨立撞題）**：`split_projection.py:291-303` 現行為 `event_level.merge(selected[["event_id","feature_cutoff_ms"]], on="event_id", how="inner", validate="1:1")`，且輸出欄 `timeframe` **取自 `event_level`**（即**觸發** TF，`alignment.py:216`），merge 只帶 `feature_cutoff_ms` 過來。⇒ 只改四參數閘與 caller，全量多 feature TF 會**在此 `MergeError`**；縱使把 `validate` 放寬，兩列也會得到**相同**的 `timeframe` 值而讓複合鍵碰撞。改法：(a) 改以 `per_tf` 為**行粒度**與 `event_level` 接合，`validate` 判準改為複合鍵；(b) **新建**輸出欄 `feature_timeframe` 取自 `per_tf.timeframe`（逐字採 `D-002-C0` (0.3)），**不得**以 `event_level.timeframe` 冒充；(c) 單選過濾路徑仍每事件一列時，可續用 `1:1`。
+- 🔴 **`split_projection.py:271` 之 docstring 舊語意須一併改**：現逐字寫「每個事件在 `selected_timeframe` 下必須**恰有一列** `per_tf`」，與本 Task 之全量複合鍵互斥；不改則實作者讀 docstring 會照舊語意寫。
 - 不可做：不得保留「預設只取一個 TF」之行為；不得在 producer 內靜默丟列。
 
 **Task 9.2a — schema 加 `feature_timeframe`**
@@ -167,6 +170,8 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 - 🔴 **本 Task 是 `(3.1)` 的唯一落地處；沒有它，(3.1) 只是規格層的宣告，行為不變**。現況碼證：`split_projection.py` 全檔 `decision_at_ms` 命中數為 **0**；`split_projection.py:530-553` 逐列取 `cutoff = int(rec["feature_cutoff_ms"])` 後以 `cutoff in train_ms`／`cutoff in test_ms` 定側。
 - 檔案：`split_projection._derive_single_symbol` 之集合成員判定迴圈（`:530-553`）。
 - 改法：以 `manifest.table` 之 `decision_at_ms`（該欄已存在，`event_split.py:68` 已在使用；`manifest` 已在 `_derive_single_symbol` 作用域內）**每事件判一次側**，再廣播到該 `event_id` 之所有 feature TF 列；`feature_cutoff_ms` 僅供物化與 PIT，**不參與** `split_label`。答案窗 purge（`interval_crosses_split_boundary`）改按**事件側**判定，不再逐列用 `in_train`。
+- 🔴 **側別判準須寫死，不得僅依集合成員**：`decision_at_ms` 與 `feature_index` 未必落在同一網格——當 `feature_index` 之網格**粗於**觸發 TF 時（例：觸發 1h、特徵 4h），`decision_at_ms` 大量不在 `index_ms` 集合中（R5 實證 1h open 非 4h open 者 15,264／20,352）。改法：以**不等式**定側（`decision_at_ms < test_start_ms` ⇒ train，`>=` ⇒ test），並對「`decision_at_ms` 落在 `train_plan`／`test_plan` 之時間界外」明確 **fail-closed**，不得靜默 purge。（主委探針二只覆蓋「特徵網格為觸發 TF 之整數倍」之情形，不足以支撐集合成員判定之一般性。）
+- 🔴 **`D-002-C3` (3.2) 之 fail-closed 檢查在此落地（其唯一施工落點）**：於複合鍵唯一 guard **之後**、寫入 `assignments` **之前**，按 `event_id` 分組檢查 `split_label` 唯一；異側即 `raise AlignmentViolationError`，訊息須含該 `event_id`。函式為 `_derive_single_symbol`（與判側迴圈同檔同函式）。沒有本條，`M-SU-D2-14`／`15` 與 §V 之反例**無碼可紅**，檢查可被整段省略而無人察覺。
 - 不可做：不得保留任何以 `feature_cutoff_ms` 決定 `split_label` 的分支；不得在 `(3.2)` 之 fail-closed 上線前保留 per-cutoff 判側（否則合法多 TF 輸入會開始 raise）。
 
 **Task 9.3 — 16 處消費面逐處列名改法**
@@ -181,6 +186,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 **Task 9.4 — 記帳與報告鏈**（`D-002-C6`；三家全中之缺口）
 - 檔案：`pipeline` 之 count 產出、對應 API 模型、前端事件批面板、既有 wiring 測試之 `dict(zip(...))` 映射。
 - 改法：依 (6.2) 將 `n_train`／`n_test`／`n_purged` 明確定為事件數；新增列數欄；`dict(zip(...))` 改為複合鍵映射。
+- 🔴 **`baseline` 為明列例外**：`baseline` 之 `n_test` 語意為**實際模型輸入樣本數**（`baseline.py:105-120` 以 test 事件 ID 與 features 交集後寫入），複合鍵落地後即 `(event_id, feature_timeframe)` 列數，**不得**被本 Task 一併改判為事件數。驗收須配「一事件兩列」之 fixture，斷言 `baseline` 之 `n_test` 為 2 而報告分母之 `n_test` 為 1。
 
 **Task 9.5 — golden 與前端**
 - 檔案：`tests/golden/splitunify/*`；**平行組之生成入口＝`scripts/freeze_splitunify_golden.py`**（具體為 `_plans()`／`_event_keys()`／`_build_actual()` 三處 fixture 構造函式，寫檔在 `main()`）；`frontend/src/lib/types.ts`；`frontend/src/app/search/page.tsx`。
@@ -189,7 +195,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 ### §V 驗證策略與邊界測試目錄
 
 - `Task 9.1`：`ASSERT build_event_keys WHEN per_tf 含 1h 與 4h 而 selected=1h THEN discarded == {"4h": 2}`（summary 鍵為 `discarded_rows_by_feature_tf`）；`ASSERT WHEN 單一 feature TF THEN discarded == {}`；`ASSERT summary／API 回應／前端型別三層皆帶該欄`；`ASSERT 移除該欄後行為與 9A 前逐值相同`（獨立回退之可證偽斷言）。
-- `Task 9.2`（🔴 **端到端，不得以 schema 斷言代替**）：`ASSERT WHEN per_tf 含 1h 與 4h 且經 EventSamplePipeline.run（不傳 selected_timeframe）THEN 產出列數 == per_tf 列數 且 兩個 feature TF 皆在`；`ASSERT WHEN 四參數閘收到 selected_timeframe=None THEN 不 raise 且走投影路徑`（否則核心目標不可達）。
+- `Task 9.2`（🔴 **端到端，不得以 schema 斷言代替**；**斷言標的逐字指定為 `split_plan.assignments`**，不是 `features`）：`ASSERT WHEN per_tf 含 1h 與 4h 且經 EventSamplePipeline.run（不傳 selected_timeframe）THEN assignments 列數 == per_tf 列數 且 兩個 feature TF 皆在`；`ASSERT WHEN 四參數閘收到 selected_timeframe=None THEN 不 raise 且走投影路徑`；`ASSERT build_event_keys 輸出之 feature_timeframe 逐列取自 per_tf 而非 event_level`（否則兩列同值、複合鍵碰撞）。🔴 **既有 `test_splitunify_wiring.py` 之 partial-boundary 參數化案例（現把 `selected_timeframe=None` 視為必須 raise）須\*\*替換\*\***——不得只新增一條而留著舊的與新行為互斥。
 - `Task 9.2a`：`ASSERT assignments THEN 欄含 feature_timeframe 且 (event_id, feature_timeframe) 唯一`。
 - `Task 9.2b`：`ASSERT WHEN 同 event 之 1h cutoff 落 train 區、4h cutoff 落 test 區 且 decision_at_ms 落 test 區 THEN 兩列 split_label 皆為 test`（事件級錨定之直接反例；現行碼在此案例會給出 1h=test／4h=purged）。
 - `D-002-C3`（成對，缺一即無鑑別力）：`ASSERT WHEN 同 event 之 1h 與 4h 之 feature_cutoff_ms 不同且皆 <= decision_at_ms THEN 兩列同側且皆不 purged`（(3.1) 結構性保證之正例）；`ASSERT WHEN 直接構造 assignments 使同一 event_id 之兩列異側 THEN raise AlignmentViolationError`（(3.2) 之反例；須一併驗其**不是**靜默取一側、**不是**改判 purged）。
@@ -197,7 +203,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 - `D-002-C6`：`ASSERT summary THEN n_events 與 n_event_tf_rows 並存`；`ASSERT n_train+n_test+n_purged == n_events`（事件數守恆，非列數）。
 - `Task 9.3`：**逐處**各一條「改壞就要變紅」測試；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。
 - `Task 9.5`：`ASSERT golden WHEN 單 TF fixture THEN 舊值逐值不變`；`ASSERT 交錯平行組之 g5 與單標的組不同且各自穩定`。
-**mutation 目錄**（🔴 逐處對應，不得以單一 generic mutant 冒充；每列皆須有**完整 ID** 與**應紅之測試**；共 23 條）
+**mutation 目錄**（🔴 逐處對應，不得以單一 generic mutant 冒充；每列皆須有**完整 ID** 與**應紅之測試**；共 **25** 條，🔴 本數字須與表列實數相符——前一版寫 23 而實列 22，由 R5 三家中兩家以計數抓出）
 
 | ID | 改壞什麼 | 應紅之測試 |
 |---|---|---|
@@ -223,6 +229,9 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 | `M-SU-D2-20` | producer 保留 `selected_timeframe` 之預設單選 | `Task 9.2` 之**端到端**全量列數斷言（經 `EventSamplePipeline.run`；schema 斷言抓不到） |
 | `M-SU-D2-21` | `pipeline.py:723-732` 四參數閘未改，仍要求 `selected_timeframe` 非 `None` | `Task 9.2` 之「`selected_timeframe=None` 不 raise 且走投影路徑」斷言 |
 | `M-SU-D2-22` | `Task 9.2b` 改完後又把 `split_label` 判定改回 `feature_cutoff_ms` | `Task 9.2b` 之事件級錨定反例（1h／4h cutoff 異側而 `decision_at_ms` 定側） |
+| `M-SU-D2-23` | `build_event_keys` 保留 `merge validate="1:1"`，或輸出欄不寫 `feature_timeframe`（以 `event_level.timeframe` 冒充） | `Task 9.2` 之端到端全量列數斷言 ＋ `feature_timeframe` **值**斷言（兩列須為不同 TF） |
+| `M-SU-D2-24` | 答案窗 purge 仍用**逐列** `in_train`（未改按事件側） | `Task 9.2b` 之 purge 反例（同事件一列 purged、另一列 test 即為缺陷） |
+| `M-SU-D2-25` | `D-002-C3` 同側檢查被移到複合鍵唯一 guard **之前** | `Task 9.2a` 之 guard 先後斷言（鍵重複時錯誤訊息須指鍵重複，不得誤報異側） |
 
 ### §R 回退
 
@@ -245,6 +254,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 - 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-review-r2/synth.md`（三家閉合輪 11 條／九群，codex 與 grok 仍 blocked）第三次修訂——新增 `Task 9.2`（producer 停止 `selected_timeframe` 單選、輸出全量 keyed rows，為本批核心）與 (0.6)（既有欄位保留、新增欄位分名）；(3.1) 補「可比時點」前提使同側判定不再誤殺；(3.2) purge 字面定為沿用既有 `interval_crosses_split_boundary` 不新增值集；(6.2) 量詞改逐消費者定義（`baseline` 之 `n_test` 維持樣本數語意）；`clusters` 定案不加 `feature_timeframe`、維持事件級；summary 新鍵由 `discarded_per_tf_rows_by_timeframe` 改名為 `discarded_rows_by_feature_tf`（原名含裸 `timeframe`，與 (0.6) 互斥）；mutation 由 18 條改為**表格**共 20 條，每列具完整 ID 與應紅之測試。本輪另修正前一版之義務項行型與觸及面宣告——該缺陷由 `scripts/obligation_block_check.sh` 檢出，前一版僅跑格式與 xref 未跑該閘。
 - 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-review-r3/synth.md`（三家 15 條／七群，全採納零駁回）第四次修訂——①`Task 9.2` 範圍納入唯一生產 caller `momentum/Analysis/event_samples/pipeline.py` 並標明「只改被呼叫端不算完成」（前兩次修訂都沒補到核心目標）；②`(3.1)` 由「須先定義可比時點」改為**直接給出可操作定義**：split 側一律由事件級 `decision_at_ms` 決定，各 feature TF 之 cutoff 只用於取特徵、不參與判側 ⇒ 同事件各 feature TF **恆**同側為結構性保證；③**連帶修訂 R2 裁決**——(3.2) 之異側處置由「整事件 purged」改為 **fail-closed `AlignmentViolationError`**（(3.1) 消除「異側屬合法」之前提後，異側即為實作缺陷，purge 會把缺陷偽裝成樣本流失），既有 `interval_crosses_split_boundary` 維持原義不動；④`Task 9.2a` 定案兩道既有重複 guard 改為**複合鍵唯一**判準，並定其須在 `D-002-C3` 同側檢查**之前**執行；⑤§V 補 purged 複合鍵唯一與 `n_event_tf_rows_purged` 斷言、`D-002-C3` 成對斷言改寫為正例（不誤 purge）＋反例（raise）；⑥`Task 9.1` 逐處指名 route `api/routes/case.py:487`／service `case_import_service`／response field `EventAnalyzeResponse.summary`（為 `Dict[str, Any]` ⇒ 新鍵自動穿過但**零型別保證**，驗收須明列鍵名之契約測試）／前端 `EventTablesPanel.tsx:347,361`；⑦`Task 9.5` 指名平行組生成入口 `scripts/freeze_splitunify_golden.py` 之 `_plans()`／`_event_keys()`／`_build_actual()`，`main()` 只增鍵不覆蓋舊錨；⑧`M-SU-D2-19` 改為反向 mutation（survivor 六鍵**被改成含 feature TF** 才是缺陷）、`M-SU-D2-14`／`15` 之應紅測試隨 (3.2) 改為 raise；⑨§N 補 `docs/SPLITUNIFY_TODO.md` §E 之狀態同步時點（三家戳記後、`Task 9.1` 動工前）。
 - 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-review-r4/synth.md`（8 條歸五群；7 條採納、1 條駁回）第五次修訂——①🔴 **核心目標第三種不可達形態**：`Task 9.2` 範圍再加 `pipeline.py:723-732` 之四參數閘與 `:711-715` docstring，投影門檻改為 `train_plan`／`test_plan`／`feature_index` 三者同時、`selected_timeframe` 降為可選（原文「四者同時」會讓傳 `None` 在抵達 `build_event_keys` **之前**就 fail-closed），驗收改為**端到端**經 `EventSamplePipeline.run`；②🔴 新增 **`Task 9.2b`**——`(3.1)` 的事件級錨定原本**沒有任何施工落點**（`split_projection.py` 全檔 `decision_at_ms` 命中數為 0，`:530-553` 仍逐列以 `feature_cutoff_ms` 定側），現指名改以 `manifest.table` 之 `decision_at_ms` 每事件定側並廣播，答案窗 purge 改按事件側判定；③§V 之 `Task 9.2` 斷言改為端到端全量列數＋`selected_timeframe=None` 不 raise，原 schema 句改掛 `Task 9.2a`，新增 `Task 9.2b` 之錨定反例；④`(5.2)` 由改前形狀改寫為**落地後契約**（全量複合鍵 producer、兩表含 `feature_timeframe`、`clusters` 維持事件級、側別以 `decision_at_ms` 為錨）；⑤mutation 20 → **23 條**（新增 `M-SU-D2-21` 四參數閘未改、`M-SU-D2-22` 判側改回 `feature_cutoff_ms`；`M-SU-D2-20` 應紅測試改指端到端斷言）；⑥觸及面宣告補列 `Task 9.2b`。**駁回一條**：codex 以「上游收斂檔未蓋章」為由拒審，`AGENTS.md` 第 12 條逐字為「動工前…不動工」而本輪為唯讀審查，且本批 R1／R2／R3 收斂檔之 `RECONCILE-STAMP` 數皆為 0、該家在那三輪分別交付 6／8／11 條實質 finding——同情境前後不一致；該家本輪零實質審查，欠一輪，併入下一輪。
+- 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-review-r5/synth.md`（11 條歸八群，**全部採納**）第六次修訂——①🔴 **核心目標第四種不可達形態（三家獨立撞題）**：`Task 9.2` 增逐行指名 `split_projection.py:291-303`——現行 `event_level.merge(..., validate="1:1")` 在全量多 feature TF 必 `MergeError`，且輸出欄 `timeframe` 取自 `event_level`（**觸發** TF），縱放寬 `validate` 兩列也會同值而使複合鍵碰撞；改法＝以 `per_tf` 為行粒度接合、`validate` 改複合鍵判準、**新建** `feature_timeframe` 取自 `per_tf`；另指名 `split_projection.py:271` 之 docstring 舊語意（「恰有一列」）須一併改。②`(5.2)` 之 merge 交叉引用由 `Task 9.2a` 改指 `Task 9.2`（原為懸空引用，9.2a 全文未提該 merge）。③🔴 **`(3.2)` 之 fail-closed 原本同樣「有義務無落點」**——`AlignmentViolationError` 只見於義務／§V／mutation，無任一 Task 改法行；現定於 `Task 9.2b`：複合鍵唯一 guard 之後、寫入 `assignments` 之前，按 `event_id` 分組檢查 `split_label` 唯一，異側即 raise 且訊息含 event_id。④`Task 9.2b` 之側別判準改為**不等式**（`decision_at_ms < test_start_ms`）並對界外 fail-closed——集合成員判定只在特徵網格細於或等於觸發 TF 時成立（R5 實證 1h open 非 4h open 者 15,264／20,352）。⑤mutation 修正條數宣稱並補三條：實列 22 而正文寫 23（沿革「20→23（新增 21、22）」本身即 20+2 之算術錯誤），現為 **25 條**，新增 `M-SU-D2-23`（保留 `1:1` merge 或不寫 `feature_timeframe`）、`M-SU-D2-24`（答案窗仍用逐列 `in_train`）、`M-SU-D2-25`（同側檢查被移到複合鍵 guard 之前）。⑥`Task 9.4` 明列 `baseline` 為例外（其 `n_test` 為樣本數，不得改判事件數），配一事件兩列 fixture。⑦🔴 `Task 9.1` 增生產可達性前置——該 route 之 service 現行永遠走 `run_event_study_only`（`case_import_service.py:1592-1626`），拿不到 canonical universe 也就沒有 `discarded` 來源；須先二擇一（改走可取得 universe 之 producer，或把終端揭露移出事件掃描端）。**指名落點不等於該落點走得到**，此為第四次修訂之缺口。⑧§V 之 `Task 9.2` 斷言標的逐字指定為 `split_plan.assignments`（非 `features`），並要求**替換**既有 `test_splitunify_wiring.py` 之 partial-boundary 參數化案例（現把 `selected_timeframe=None` 視為必須 raise，與新行為互斥），不得只新增而留著舊的。
 <!-- HISTORY-END -->
 
 ## 戳記
