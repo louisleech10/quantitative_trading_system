@@ -266,6 +266,12 @@ if [ -f scripts/doc_format_precheck.sh ] && [ -n "${_base}" ]; then
       echo "  ✗ 格式未過: ${f}（詳情跑 bash scripts/doc_format_precheck.sh ${f}）" >&2
       _docbad=$((_docbad + 1))
     }
+    # 🔴 warn-only（2026-09-13 DOCROT R2 第 3 項掛載；第 4 項遷移序定「第一期只 warn」）：
+    #   同一計數字面出現在多行 ⇒ 同一個數字有兩個真相源，改一處漏一處。
+    #   刻意**不進 _docbad**：閾值與誤擋面未經校準，先只提示；要升成擋門須先有基線。
+    [ -f scripts/spec_count_audit.py ] && {
+      python3 scripts/spec_count_audit.py --dupes "${f}" >/dev/null || true
+    }
   done <<EOF
 $( { git diff --name-only "${_base}" -- docs 2>/dev/null
      git diff --name-only --cached -- docs 2>/dev/null

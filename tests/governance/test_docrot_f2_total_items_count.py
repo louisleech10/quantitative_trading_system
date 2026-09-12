@@ -89,3 +89,67 @@ def test_real_d002_form_is_no_longer_blind() -> None:
     assert "共 29 條" in proc.stdout, (
         "D-002 之 register 總數字面未被收入 ⇒ F2 對真實文件仍失明\n" + proc.stdout
     )
+
+
+# ── --dupes：同一計數字面出現在多行（R2 第 3 項掛載之 warn-only 形態）─────────
+
+
+def test_dupes_flags_same_literal_on_two_lines(tmp_path: Path) -> None:
+    """ASSERT 同一「共 N 條」寫在兩行 → 被指出，且逐行號列出。
+
+    這正是 `--list`／`--check` 看不見的形態（集合比對會去重）。
+    """
+    p = _spec(
+        tmp_path,
+        "dup.md",
+        "### 節標題（register 共 29 條）\n\n內文敘述。\n\n#### 表標題（共 29 條）\n",
+    )
+    proc = _run(["--dupes", str(p)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr  # warn-only，不擋
+    assert "共 29 條" in proc.stderr, proc.stderr
+    assert "1,5" in proc.stderr, "應逐行號列出兩處落點：" + proc.stderr
+
+
+def test_dupes_silent_when_single_source(tmp_path: Path) -> None:
+    """ASSERT 只寫一處 → 不出聲（mutation 自證：證明不是恆叫）。"""
+    p = _spec(
+        tmp_path,
+        "single.md",
+        "### 節標題（register 見 (5.6)）\n\n#### 表標題（共 29 條）\n",
+    )
+    proc = _run(["--dupes", str(p)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "共 29 條" not in proc.stderr, "單一真相源不該被指出：" + proc.stderr
+
+
+def test_dupes_ignores_history_section(tmp_path: Path) -> None:
+    """ASSERT 沿革段內的舊字面不算第二個真相源。
+
+    F1 活文收縮的做法就是把考古逐字搬進 HISTORY；若沿革也計入，每搬一次就永久
+    多一條誤報，閘會變成自己製造噪音的來源。實測 `D-002` 收斂後仍被指出
+    「共 29 條 @ 行 90,365」，其中 365 正是我搬進沿革的引文——本條防的就是它。
+    """
+    p = _spec(
+        tmp_path,
+        "hist.md",
+        "#### 表標題（共 29 條）\n\n"
+        "## 沿革與追溯索引\n\n"
+        "<!-- HISTORY-BEGIN -->\n"
+        "- 原寫「共 29 條」，已改為指向 register。\n"
+        "<!-- HISTORY-END -->\n",
+    )
+    proc = _run(["--dupes", str(p)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "共 29 條" not in proc.stderr, (
+        "沿革引文被當成重複真相源 ⇒ 每次活文收縮都會留永久誤報\n" + proc.stderr
+    )
+
+
+def test_dupes_is_warn_only_never_blocks(tmp_path: Path) -> None:
+    """ASSERT 即使命中也 rc=0——第一期只 warn，不得擋門。
+
+    若日後要升成擋門，本條會轉紅，逼迫改動者先處理「閾值與誤擋面未校準」那筆殘留。
+    """
+    p = _spec(tmp_path, "many.md", "共 3 條\n共 3 條\n共 3 條\n")
+    proc = _run(["--dupes", str(p)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr

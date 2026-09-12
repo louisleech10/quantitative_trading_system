@@ -99,8 +99,35 @@ def extract(path):
     return sorted(out)
 
 
+def dupes(path):
+    """回傳 [(字面, [行號…])]：同一計數字面出現在**兩行以上**者。
+
+    🔴 2026-09-13 DOCROT R2 第 3 項（掛載）之 warn-only 形態：
+    `--list`／`--check` 是**集合**比對，同一字面寫在兩處會去重成一筆 ⇒ 看不見
+    「同一個數字兩個真相源」。而那正是病根本身：`docs/SPLITUNIFY_SPEC.D-002.md`
+    曾把 register 條數同時寫在節標題、表標題、§RISK、§R 回退句與 (5.6) 內文五處，
+    改三處漏兩處。本模式不需基準檔、不需維護，只回答「這份文件裡有沒有同一個
+    計數字面出現在多行」。
+    """
+    seen = {}
+    for i, line in enumerate(io.open(path, encoding="utf-8", errors="replace"), 1):
+        # 🔴 沿革段以下不計：append-only 的歷史**本來就要**逐字保存舊字面
+        #   （「原寫 25 條」「v12 補為 29 條」），那是它的職責，不是第二個真相源。
+        #   不停在這裡的話，每做一次活文收縮就會永久多一條誤報 ⇒ 閘自己製造噪音。
+        if "HISTORY-BEGIN" in line or line.startswith("## 沿革"):
+            break
+        probe = _NOISE.sub("", line.rstrip("\n"))
+        for rx in (_RE_NUM_UNIT, _RE_COUNT_ASSERT, _RE_TOTAL_ITEMS):
+            for m in rx.finditer(probe):
+                lit = re.sub(r"\s+", " ", m.group(0))
+                seen.setdefault(lit, [])
+                if i not in seen[lit]:
+                    seen[lit].append(i)
+    return sorted((k, v) for k, v in seen.items() if len(v) > 1)
+
+
 def main(argv):
-    if len(argv) < 3 or argv[1] not in ("--list", "--check"):
+    if len(argv) < 3 or argv[1] not in ("--list", "--check", "--dupes"):
         print(__doc__.rsplit("用法", 1)[-1], file=sys.stderr)
         return 0
     mode = argv[1]
@@ -127,6 +154,24 @@ def main(argv):
     cur = sorted(set(cur))
     if mode == "--list":
         print("\n".join(cur))
+        return 0
+    if mode == "--dupes":
+        # warn-only：一律 rc=0（R2 第 4 項之遷移序——先收縮活文，第一期只 warn）。
+        n = 0
+        for f in files:
+            for lit, lines in dupes(f):
+                n += 1
+                print(
+                    "[spec_count_audit] ⚠ 同一計數字面在多處：%s 之 %r @ 行 %s"
+                    % (f, lit, ",".join(str(x) for x in lines)),
+                    file=sys.stderr,
+                )
+        if n:
+            print(
+                "  同一個數字寫在兩個地方 ⇒ 改一處漏一處。"
+                "正解：留一處當唯一來源，其餘寫指標。（warn-only，不擋）",
+                file=sys.stderr,
+            )
         return 0
     if not baseline:
         print("ERROR: --check 需要 --baseline <基準檔>", file=sys.stderr)
