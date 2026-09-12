@@ -38,4 +38,11 @@
 
 **`docs/SPLITUNIFY_SPEC.D-002.md` 已建立**（BASE `1be5be3f`、PREDECESSOR D-001；`doc_format_precheck` rc=0）。範圍策略已定：**揭露先行（Phase 9A）＋ 複合鍵主體（Phase 9B）**，同一份 SPEC 分兩階段——揭露成本極低且立刻消除「靜默丟棄」的誠實性缺陷，不必等 15 處全改完。D-002 首要義務是**更正 D-001 第 11／189 行**那兩處與實況不符的陳述（義務區塊 `D-002-CORRECT` (1.1)–(1.4)），並把觸及面由六處重寫為 15 處（分三層、逐處附碼證與「會報錯 vs 靜默錯」分類）。另順道處置 `M-SU-D1-23`：本延伸既必然動 golden，fixture 改兩標的交錯使該 mutation 可觸發。
 
-下一步：派三家對 D-002 找碴（adversarial；中／大任務必要管線，不得跳）→ 收斂 → 三家戳記 → 才進 Task 9.1 實作。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
+**D-002 找碴 R1 已收**（session `20260911-splitunify-b9-review-r1`、`round_id=86e88917`）：🔴 **三家全數 `blocked`**（codex 5 條 P1、composer 2 條 P1、grok 3 條 P1；共 15 條）。收斂為七群、**全部採納、零駁回**，收斂檔 `handoffs/reconcile/20260911-splitunify-b9-review-r1/synth.md`（歸戶與 completeness 皆 PASS）。
+
+🔴 **其中兩條是主委完全未想到的**：
+① **`timeframe` 雙語意**（`CODEX-R1-P1-03`）——`canonical_event_id(symbol, timeframe, t0)` 用**觸發** TF，而 `per_tf.timeframe` 是 **feature** TF；同名不同義，複合鍵／purge 換算／同簇規則全建立其上，不先命名分離則整份 SPEC 無法驗收。
+② **同事件多 TF 未規定同側**（`GROK-R1-P1-03`，本輪最嚴重）——D-002 只寫「同簇」，但**同簇不等於同側**：1h 進 train、4h 進 test 時，仍偏事件級的消費者會靜默組成**非法 OOS 樣本**。須明定「同事件所有 TF 必須同側，否則整事件 purge」並配可證偽測試。
+另有一條屬 SPEC 內部不自洽：我在 §C 寫了「事件數與列數不得混用」，卻**沒有**在 Task 9.3 指派對應修改（三家全中）。
+
+下一步：依七群修訂 D-002 → 派 R2 重審 → 三家戳記 → 才進 Task 9.1 實作。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
