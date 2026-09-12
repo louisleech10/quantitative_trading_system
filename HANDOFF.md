@@ -111,6 +111,14 @@
 
 🔴 **主委自產（R6 等待期自驗）：第五層存在，但方向與前四輪相反——是我的 `Task 9.3` 派工過度，不是漏派**。碼證：`feature_materialization.py:93-131` 之 `groupby("event_id")` ＋ `row_vals.update(...)` 是**設計上的橫向合併**（同事件各 feature TF 的特徵欄拼成**一個**特徵向量）；`_combined_columns:22-32` 逐字為「多 TF 特徵欄名合併；**衝突 ⇒ loud 拒**」——欄名**不帶 TF 前綴**，而是要求各 TF 欄名互斥。⇒ `Task 9.3` 現文要求改為 `groupby(["event_id","feature_timeframe"])` ＋ MultiIndex，會把「一事件一個完整特徵向量」變成「一事件多列、每列只有自己 TF 的欄、其餘 NaN」，**破壞既有設計並讓 ML 輸入充滿 NaN**。**根因是範圍誤判**：切分歸屬層要複合鍵（`SU-RESID-2`），特徵物化層要**維持**一事件一列——我把兩層一起派工了。第七次修訂須改寫 `Task 9.3` 對 `feature_materialization` 之改法（改為「維持事件級橫向合併**不動**，僅在 `merge validate` 與 `set_index` 之粒度斷言上確保不因多列而靜默覆蓋」），並於 R6 收斂檔以**主委自產條**提出、標明非委員意見。
 
+🔴 **主委自產（續）：`Task 9.3` 的 16 處清單把「事件級表」與「複合鍵表」混在一起派工，至少四處判定錯誤**（皆已取碼證）：
+- `feature_materialization:93-131`＋`_combined_columns:22-32` — **橫向合併是設計**（一事件一列，各 feature TF 欄名互斥、衝突即 loud 拒）。派工要求改 `groupby(["event_id","feature_timeframe"])`＋MultiIndex ⇒ **破壞特徵矩陣語意**，ML 輸入變多列＋大量 NaN。**應改為維持事件級**。
+- `dedupe:122-129` — `cluster_first` 以 `dedupe_cluster_id` 分組取 `observation_interval_start_ms` 最早者，是**事件級去重**（每重疊簇留一個事件）。派工要求改 `(event_id, feature_timeframe)` 粒度 ⇒ 同事件多 TF 各自被保留，**破壞去重語意**。**應維持事件級**。
+- `ic_feed:83,109` — `timeframe` 是函式**必填參數**，`per_tf[per_tf["timeframe"] == timeframe]` **先過濾單一 TF 再** `set_index` ⇒ 索引本就唯一。**單一 TF 是設計、非缺陷**，`D-002-C5` 將其列為待改消費面屬**誤列**。
+- `tables.py:214,229,234,257` — `ev` 為 `event_level`、`cl` 為 `clusters`（已定案維持事件級）⇒ 這些 `.loc[eid]` 本就對事件級表操作，**不受複合鍵影響**，同屬誤列。
+- **真缺陷但改法錯**：`pattern_bridge:125-127` — `lab_by_id[e] == "train"` 是事件級消費（`X_all` 亦為事件級），複合鍵後 `set_index("event_id")` 索引重複、`lab_by_id[e]` 回傳 Series，`== "train"` **靜默變成 Series** ⇒ 確為缺陷；但正確改法是「**去重取唯一側、不唯一則 fail-closed**」（依 (3.1) 同事件恆同側），**不是**改成複合鍵索引。
+⇒ 第七次修訂須**逐處重新分類**：哪些表是事件級（維持）、哪些是複合鍵（改）、哪些是「事件級但需去重取唯一值」。`D-002-C5` 之 16 處清單同步更正。此為主委自產，須於 R6 收斂檔標明非委員意見。
+
 **R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
 
 （以下為 R5 派出時之記載）**R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
