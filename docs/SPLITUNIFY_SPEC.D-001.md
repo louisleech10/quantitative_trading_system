@@ -18,7 +18,7 @@ PREDECESSOR: none
 不觸: `### C-0 🔴 接線落點：單一 boundary builder，拿不到 universe 就不得宣稱 OOS（D6）`；`### C-1 canonical 權威＝時間切分（D1）`
 
 > 🔴 **C-4 覆寫範圍之限定（R6 `GROK-R6-P2-02`）**：本延伸**只覆寫 C-4 的函式簽名段**（單一 plan／單一 index → per-symbol Mapping）。**BASE C-4 其餘段落全部原文仍有效**——包含 `event_keys` 之 keyed 輸入契約、禁 positional zip、兩段式判定（答案窗 purge 先、集合成員判定後）、`build_event_keys` 具名為 producer 等。**未在本延伸重述 ≠ 已廢止**；實作與後續 refactor 不得以「延伸檔沒寫」為由刪除該節任一既有義務。
-> 🔴 **唯一例外：座標語彙（R12 `CODEX-R12-P1-01`）**。BASE 檔（`docs/SPLITUNIFY_SPEC.md`，見其 `:165`／`:224-225`／`:307`）仍以 `feature_index[row_index]` 描述成員判定，那是 D-001-C2 第 4 點定案**之前**的寫法。凡 BASE 中以全框 `row_index` 索引該 symbol `feature_index` 之句子，**一律由本延伸之 `row_index_local` 取代**；其餘義務（keyed 輸入契約、禁 positional zip、兩段式判定、`build_event_keys` 具名）不受影響。b8 實作以本延伸之座標語彙為準。
+> 🔴 **唯一例外：座標語彙（R12 `CODEX-R12-P1-01`）**。BASE 檔（`docs/SPLITUNIFY_SPEC.md`）仍以 `feature_index[row_index]` 之形式描述成員判定，那是 D-001-C2 第 4 點定案**之前**的寫法。🔴 **本條刻意不寫行號**：行號會漂（R13 已實測，原先所列三處有一處不存在、且實際落點多達十餘處），寫死等於製造下一個過期引用。判準改為**可 grep 之形狀**——凡 BASE 中形如 `feature_index[…row_index…]` 之索引句，一律適用本例外。凡 BASE 中以全框 `row_index` 索引該 symbol `feature_index` 之句子，**一律由本延伸之 `row_index_local` 取代**；其餘義務（keyed 輸入契約、禁 positional zip、兩段式判定、`build_event_keys` 具名）不受影響。b8 實作以本延伸之座標語彙為準。
 
 ## 內容
 
@@ -70,6 +70,7 @@ def derive_event_split_from_plans(
    **本點取代之輪次裁決索引（僅供追溯，非義務）**：`CODEX-R6-P1-01`、`CODEX-R8-P1-01`、`CODEX-R9-P1-01`、`CODEX-R10-P1-01`、`CODEX-R10-P1-02`、`CODEX-R11-P2-02`、`CODEX-R12-P1-01`、`CODEX-R12-P2-02`、`GROK-R11-P1-01`、`GROK-R12-P1-01`、`GROK-R12-P1-02`、`GROK-R12-P2-03`、`GROK-R12-P2-04`。
    **本點涉及之具名落點索引（僅供追溯，非義務）**：producer 三處＝`momentum/core/contracts.py::split_per_symbol`（`:659-661`、`:690`）、`momentum/Analysis/ic_split_adapter.py::_build_plan_pair`（`:230-231`、`:258`）、`momentum/Analysis/ic_filter_orchestrator.py` holdout（`:631-643`、`:643-648`）；三者皆已把 `symbols`／`symbol_arr` 傳給 `validate_split_pair_integrity`，故 attest 可在 producer 端就地為之。`split_per_symbol` 於呼叫 splitter 前先 `sort_values`（故 `train_local`／`test_local` 為時間序），而 `_local_ordinals_for_symbol` 以 `np.flatnonzero` 取 `symbol_positions`（frame 序）。亂序輸入之直呼叫路徑＝`analyze_cross_sectional` → `_build_cross_sectional_global_split`（`purge_semantic="timedelta"`）；正常汲取路徑於 `momentum/FeatureEngineering/feature_factory.py:796` 已排序。不可變性之三組對照＝`np.asarray` 加 `setflags`、`np.frombuffer`、`pickle`／`deepcopy`。
 
+<!-- OBLIGATIONS-BEGIN id=D-001-C2-4 -->
    **(4.1) 座標語意**：本延伸之 `position` 一律為**該 symbol 之 post-trim `feature_index` 內的序號**（symbol-local ordinal），取數亦必從該 index。
    **(4.2) 不動既有欄**：**不改 `SplitPlan.row_index` 既有語意**（它被 IC 主線之全框驗證與既有 golden 依賴）。
    **(4.3) 新欄**：`SplitPlan` 新增 `row_index_local`，型別同 `row_index`，內容為該 plan 之列在該 symbol **自己的 post-trim universe** 內之序號，遞增且與 `row_index` 逐位對應。
@@ -88,6 +89,7 @@ def derive_event_split_from_plans(
    **(4.16) 竄改 `row_index` 之殘留**：投影端不讀 `row_index`，不影響本批；既有全框消費端（`momentum/Analysis/ic_filter_orchestrator.py:1318`／`:1335`／`:1359-1360`）會讀到被改值，登記為 `SU-RESID-5`。
    **(4.17) 面板順序之立場**：一律以寫入 `train_local` 為準（它對齊投影端所用之時間序 `feature_index`）；**不得**為湊過 attest 而改寫 `train_local`。本版**無**「frame 序非時間序即 fail-closed」之條款（該條款會誤擋亂序輸入之直呼叫與舊呼叫端）。
    **(4.18) 交錯多標的 fixture 為必測**：兩 symbol 之列在全框交錯時，各自之 `row_index_local` 仍須為連續遞增。
+<!-- OBLIGATIONS-END -->
 5. **邊界定義**：重複 `position` ⇒ fail-closed；`NaT` ⇒ fail-closed；空 `row_index`（train 可為空）⇒ 指紋定義為 `sha256("[]")`，**不得**以缺欄代替。
 6. **比對點**：投影端對傳入之 `feature_index_by_symbol[symbol]` 以同一規則重算，與 plan 攜帶之指紋逐值比對；不符 ⇒ fail-closed，訊息須指名「plan 指紋 vs 重算指紋」兩值之前 12 字元。
 7. **誠實邊界（明示接受）**：本改動會使既有 IC golden digest 位移。依原檔 §G 之規矩，golden 變動須經 review；b8 收案前須把受影響的 golden 以「改前／改後逐值對照」重凍，**不得**只更新 hash。另加**獨立 oracle**：由同一 fixture 的 `row_index_local` 與該 symbol 之 universe 依本節規則重算 `sha256`（🔴 R12：原寫 `row_index`，屬舊座標語彙；oracle 與 producer 必須同座標，否則兩邊永遠不等），與 **producer 實際寫入 plan 的指紋欄**逐值相等（🔴 R6 `CODEX-R6-P1-02`：oracle 不得只算 fixture 自己的值而不對證 producer 寫入值）。
@@ -165,7 +167,7 @@ def derive_event_split_from_plans(
 | `M-SU-D1-04` | 指紋比對只比首尾（退回現況） | `test_splitunify_derive.py -k fingerprint` |
 | `M-SU-D1-05` | 缺指紋欄時放行 | `test_splitunify_derive.py -k fingerprint` |
 | `M-SU-D1-06` | 門檻判定退回整批 `n_test` | `test_splitunify_derive.py -k insufficient` |
-| `M-SU-D1-07` | 跨 symbol 混用 `feature_index`（以 A 之 index 解 B 之 `row_index`） | `test_splitunify_derive.py -k per_symbol` |
+| `M-SU-D1-07` | 跨 symbol 混用 `feature_index`（以 A 之 index 解 B 之 `row_index_local`） | `test_splitunify_derive.py -k per_symbol` |
 | `M-SU-D1-08` | 指紋列改用 `list[dict]`（形狀漂移） | `test_splitunify_golden.py` 與 `-k fingerprint` |
 | `M-SU-D1-09` | 無損轉換改為「映不到就丟棄」 | `-k fingerprint`（交錯 fixture） |
 | `M-SU-D1-10` | 成員判定改回以全框 `row_index` 直接索引該 symbol 之 `feature_index` | `test_splitunify_derive.py -k per_symbol`（交錯 fixture） |
