@@ -73,7 +73,17 @@
 
 **D-002 第四次修訂已完成**（commit `3973d124`；三道閘 `obligation_block_check`／`doc_format_precheck`／`spec_xref_check --synth`（r1/r2/r3）**皆 rc=0**）。七群落點：①`Task 9.2` 納入 `pipeline.py:747` 並逐字寫出現行呼叫，另要求**移除 `str()`**（留著會把 `None` 變字面 `"None"`，等於白改）②`(3.1)` 改為**直接給定義**＝事件級錨定（split 側一律由 `decision_at_ms` 決定，各 feature TF 之 cutoff 只用於取特徵、不參與判側 ⇒ 同事件恆同側為**結構性保證**）③🔴 **連帶修訂 R2 裁決**：`(3.2)` 異側處置由「整事件 purged」改為 **fail-closed `AlignmentViolationError`**——R2 該裁決的前提是「異側屬合法」，(3.1) 消除該前提後異側即實作缺陷，purge 會把缺陷偽裝成樣本流失；既有 `interval_crosses_split_boundary` 維持原義不動 ④`Task 9.2a` 定案兩道既有重複 guard 改**複合鍵唯一**判準且**先於** C3 同側檢查 ⑤§V 補 purged 複合鍵唯一與 `n_event_tf_rows_purged`、C3 斷言改正例＋反例成對 ⑥`Task 9.1` 逐處指名 `api/routes/case.py:487`／`case_import_service`／`EventAnalyzeResponse.summary`（`Dict[str, Any]` ⇒ 新鍵自動穿過但**零型別保證**，須寫明列鍵名的契約測試）／`EventTablesPanel.tsx:347,361`；`Task 9.5` 指名 `freeze_splitunify_golden.py` 之 `_plans()`／`_event_keys()`／`_build_actual()` ⑦`M-SU-D2-19` 改反向 mutation、`14`／`15` 應紅測試隨 (3.2) 改為 raise ⑧§N 補 TODO §E 狀態同步時點。
 
-**R4 閉合輪已派出**（session `20260911-splitunify-b9-review-r4`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R4-BRIEF.md`，commit `e017bb9f`）。brief 已把「本輪動到 R2 裁決」明列為最該被攻的一處，並要求委員**自己 grep caller**、不要只信 brief 寫的「唯一生產 caller」。
+**R4 已收**（`round_id=492855fb`，債已清）：**codex 拒審零實質**（駁回，見下）、**composer 3 條 P1**、**grok 4 條 P1 並閉合自家 R3 三條**。8 條歸五群、**7 條採納 1 條駁回**，收斂檔 `handoffs/reconcile/20260911-splitunify-b9-review-r4/synth.md`（歸戶、completeness、xref 皆 rc=0；xref 對本輪處置欄驗到 21 個概念）。
+
+🔴 **G1 是 grok 獨得、我與 composer 都沒看到的一條**：`pipeline.py:723-732` 的 `given = [k for k, v in projection_args.items() if v is not None]` 要求四參數同時非 `None` ⇒ **就算照 `Task 9.2` 移除 `str()` 並傳 `None`，也會在抵達 `build_event_keys` 之前 fail-closed**。這是同一個核心目標**第三次**以不同形態沒補到（R3：沒改 caller → R4：四參數閘先擋死）。
+
+🔴 **G2 兩家撞題**：`(3.1)` 定死以 `decision_at_ms` 判側，卻**沒有任何 Task 指向真正在判側的碼**——`split_projection.py` 全檔 `decision_at_ms` 命中數為 **0**，`:530-553` 仍逐列取 `feature_cutoff_ms`。**義務寫進規格 ≠ 施工單派到落點**，與 G1 同型。
+
+**駁回 `CODEX-R4-P1-01`**（以上游收斂檔未戳記為由拒審）：`AGENTS.md:40` 逐字為「**動工前**…**不動工**」而本輪 brief 明列禁改碼禁改 SPEC；且本批 R1／R2／R3 收斂檔之 `RECONCILE-STAMP` 數**皆為 0**，該家在那三輪分別交付 **6／8／11** 條實質 finding ⇒ 同情境前後不一致。該讀法會使戳記與審查互為前置、流程無法啟動。該家本輪**欠一輪**，併入 R5。
+
+**D-002 第五次修訂已完成**（commit `d073ce7f`；obligation／format rc=0，xref 對 r1–r4 四份 synth 皆 rc=0）：`Task 9.2` 範圍再加四參數閘與其 docstring、驗收改**端到端**經 `EventSamplePipeline.run`；**新增 `Task 9.2b`**（指名 `split_projection.py:530-553` 改以 `manifest.table` 之 `decision_at_ms` 每事件定側並廣播，答案窗 purge 改按事件側）；§V 增端到端全量斷言與 `selected_timeframe=None` 不 raise，原 schema 句改掛 `Task 9.2a`；`(5.2)` 改寫為落地後契約；mutation 20 → **23 條**；觸及面補列 `Task 9.2b`。
+
+**R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
 
 其後：三家放行 → 戳記 → 才進 `Task 9.1` 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`。
 
