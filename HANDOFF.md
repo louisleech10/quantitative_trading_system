@@ -85,6 +85,8 @@
 
 🔴 **`Task 9.2b` 之可行性已由主委自驗（不是照抄委員的話）**：①`_derive_single_symbol` 簽名第 337 行逐字 `manifest: EventManifest`，**確在作用域**；②`dedupe.py:107` 逐字 `"decision_at_ms": ev["decision_at_ms"].astype("int64").to_numpy()`——`manifest.table` 之該欄是**顯式建構且固定 int64**（非 pass-through 僥倖），與 `train_ms`／`test_ms` 比較無型別落差；③`_manifest_subset`（`split_projection.py:671-681`）只濾列不砍欄，逐 symbol 切片後該欄仍在。**誠實邊界**：`build_event_manifest` 只對 `label_start_ms`／`label_end_ms` 做缺欄 fail-closed，**未**對 `decision_at_ms` 設防；且 `_EVENT_COLS`（`alignment.py:31`）這個常數**沒有任何地方拿它驗欄**（grep 零命中）⇒ `Task 9.2b` 仍應配一條「取不到 `decision_at_ms` 即 fail-closed」的前置斷言，不得假設欄位必在。
 
+🔴 **G1「不改切分數學」亦由主委自驗**：`selected_timeframe` 在生產碼**只有兩個去處**——`pipeline.py:725`（四參數閘）與 `pipeline.py:747`（傳給 `build_event_keys`）；`split_projection.py` 內全部集中於 `:259-297` 之過濾與三道 fail-closed，**無任何記帳／物化／統計路徑讀它** ⇒ 降為可選不會有連鎖影響，該宣稱成立。**順帶撈到一條四輪四家都沒提的殘留**：`split_projection.py:271` 之 docstring 逐字寫「每個事件在 `selected_timeframe` 下必須**恰有一列** `per_tf`」，與 `Task 9.2` 之全量複合鍵**直接互斥**——與 `(5.2)` 同型的舊語意，但住在**程式碼註解**裡；`Task 9.2` 須把它列入必改（否則實作者讀 docstring 會照舊語意寫）。
+
 **R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
 
 其後：三家放行 → 戳記 → 才進 `Task 9.1` 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`。
