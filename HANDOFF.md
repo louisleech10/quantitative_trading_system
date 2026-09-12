@@ -207,6 +207,11 @@
 
 **D-002 第九次修訂已完成**（commit 見下；obligation／format rc=0，xref 對 **r1–r8 八份** synth 皆 rc=0；mutation 表列 26／ID 01–26 連續；`SU-RESID-9A-UI` 已真的入 §N，`grep -c` ＝ 3）。**本輪兩處是我自己的缺陷**：K5（我在 R7 才把判準改成時間域，**改完四條規則彼此重疊**——`decision=50` 同時命中 train 與界外，codex 獨得）與 K2（**寫了「登記於 §N」卻沒登記**，三家獨立抓到）。另 K3 我**駁回** composer 前提並更正自己先前「採較嚴版」的套用錯誤（範本 `reason_code` 閉集為四值、`R-BRIEF-1` 以架構為 `blocked-by` 對象）。
 
+🔴 **R9 composer 已交；主委複驗三條，全部成立——其中一條是我引錯權威，須自我推翻 K3 的駁回**：
+- **`P2-01` 成立（最嚴重）**：§N 殘留之 canonical 規則在 **`templates/SPEC_TEMPLATE.md:106-109`**，逐字「值**只允許三種**：`blocked-by:<具體依賴（檔/層/前置票）>`／`user-ruling:<日期＋裁決內容>`／`needs-research:<研究題目>`」——**明文要求「具體依賴（檔/層/前置票）」**。我在 K3 引的 `templates/BRIEF_REVIEW_TEMPLATE.md:71` 是 brief 內「**沒查的那句話**」六欄表之 `reason_code`（四值閉集），**服務的是另一件事**。⇒ **我駁回 composer 是錯的，它原本的主張才對**；grok 判「成立」亦基於我引的同一份錯範本。我先前「閉集是四值、我記成三值」之更正**本身就是引錯造成的**——真正的 §N 規則就是**三值**。**第十次修訂**：`SU-RESID-9A-UI` 改依 `SPEC_TEMPLATE`，`blocked-by:` 後接**具名依賴**（例「投影生產接線 Task（待開）」）或改 `needs-research:<生產投影接線設計>`；收斂檔須記明我兩度更正之經過。
+- **`P2-02` 成立**：`Task 9.1` 目標句仍逐字「必須讓**終端使用者**看得到」，與下方 v9「只交付 producer 層」並存——K2 我宣稱四處同批改完，實際漏了目標句本身。
+- **`P1-01` 成立且我認**：其構造（`decision = cutoff = train_last = 200`，投影與 oracle **同步**把 `<=` 誤寫成 `<`）使兩邊同錯、G-3b 仍綠，且該事件**不在** `decision != cutoff` fixture 覆蓋內 ⇒ **(G-4c) 擋不住 correlated error**，我的「同步改寫 oracle 可取代 allowlist」判斷錯誤。第十次修訂須**保留 G-4c 作 regression，另加** allowlist 或 cutoff-anchor 平行鍵（回到 R8 三家原案）。
+
 🔴 **R9 brief 兩條 assumed 已由主委自驗（不必等委員）**：①**`SU-RESID-9A-UI` 之觸發條件可機械判定**——現行 `api/` 對 `EventSamplePipeline().run(`／`create_event_sample_pipeline().run(` 命中數為 **0**，故「該數 > 0」是**封閉可導出**判準，可寫成一行 grep 斷言掛進閘，**不會變成永遠沉睡的殘留**；第十次修訂應把此判準逐字寫進 §N 該條之觸發欄。②**`D-002-C6` 內仍有一處潛在不一致**：`(6.1)` 標題與內文仍為「事件數與列數是**兩個量**」「三個量各自定義、**不得互相代用**」，而 `(6.2)` 已把 baseline 之樣本數與事件數判為**等價**；兩者字面可並存（baseline 只是其中一個消費者），但 `(6.3)` 之「任一消費面把列數當事件數顯示或斷言即為缺陷」會讓實作者對 baseline 產生疑義 ⇒ 第十次修訂須在 `(6.3)` **明列 baseline 為已定案之等價例外**。
 
 **R9 已派出**（session `20260911-splitunify-b9-review-r9`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R9-BRIEF.md`）。brief 列三處必攻：(G-4c) 以同步改寫 oracle 取代 allowlist 是否等效（含「兩邊同錯而 G-3b 仍綠」之構造）、K3 駁回依據是否適用 SPEC §N、K4「成本超標時改交付範圍」是否又是**自己沒擇的二擇一**。
