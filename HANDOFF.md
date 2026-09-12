@@ -11,7 +11,7 @@
 ## 🔴 待辦分流（先前誤把四件全列為「待使用者裁定」，其中三件不該問）
 - **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
 - **技術決策，走委員會不問使用者**：①未 commit 生產碼保留或回退 ②補 `docs/SPLITUNIFY_TODO.md` 之 `Task 9.1`–`9.5` ＋派 stamp 輪補戳記。
-- **進行中（主委執行，依 R2 三家共同結論之執行優先序）**：E3 審查輸入隔離**已完成**（樣板／`new_brief.sh`／`brief_conformance_check.sh` 骨架佔位硬擋，`tests/governance/test_docrot_e3_brief_placeholder.py` 6 passed）；窄 F2「共 N 條」**已完成**（`spec_count_audit.py`，4 passed）；**F1 活文收縮進行中**——D-002 活文考古行 35→16、字元 84,739→77,161，條數字面收斂為 register 表標題唯一一處；每批後四道檢查（`doc_format`／`obligation_block`／`xref --synth`／`xref --files` 對 HEAD）皆 rc=0。未動：掛載三層、遷移序、F3 降級具名殘留。
+- **進行中（主委執行，依 R2 三家共同結論之執行優先序）**：E3 審查輸入隔離**已完成**（樣板／`new_brief.sh`／`brief_conformance_check.sh` 骨架佔位硬擋，`tests/governance/test_docrot_e3_brief_placeholder.py` 6 passed）；窄 F2「共 N 條」**已完成**（`spec_count_audit.py`，4 passed）；**F1 活文收縮已到收斂點**——D-002 活文考古行 35→**4**（剩餘四行之「作廢」字樣皆出現在現行契約句內，非考古，刻意不改）、字元 84,739→**74,770**（−11.8%），條數字面收斂為 register 表標題唯一一處；每批後四道檢查（`doc_format`／`obligation_block`／`xref --synth`／`xref --files` 對 HEAD）皆 rc=0。未動：掛載三層、遷移序、F3 降級具名殘留。
 
 ## 坑
 - impl token 900 秒過期須重領；task-id／session 日期前綴一律沿用 `20260911-SPLITUNIFY`（跨日不得改）；`Ticket-Batch` 與 `Co-Authored-By` 須在訊息**同一最末段**。
