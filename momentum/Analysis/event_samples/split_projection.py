@@ -68,6 +68,12 @@ _REASON_NO_UNIVERSE = "canonical_feature_universe_unavailable"
 #: 🔴 **刻意不進 `split_unify.json` 的封閉值集**：登記會動到已戳記之 SPEC 的值集與前端枚舉面，
 #:    而守衛的保護力不依賴字面（下方以明文 ValueError 擋）。是否升格為具名 reason 交 B3 review 裁定。
 _UNREGISTERED_UNIVERSE_MISMATCH = "train/test plan 之 base_universe_hash 不同"
+#: D-001-C1 第 3 點（symbol 三角相等）：`plans` 之鍵、`plan.symbol`、事件 symbol 三者須相等。
+#: 🔴 **不得**復用 `_REASON_MULTI_SYMBOL`——那個字面專指「未提供 Mapping 結構」；
+#:    多標的既已支援，再用它會把「你漏給了一個標的」誤導成「本功能不支援多標的」。
+#: 🔴 同 `_UNREGISTERED_UNIVERSE_MISMATCH`：刻意不進 `split_unify.json` 之封閉值集
+#:    （登記會動到已戳記 SPEC 的值集與前端枚舉面），守衛以明文 ValueError 承擔。
+_SYMBOL_SET_MISMATCH = "plans 之鍵與事件 symbol 不一致"
 _PURGE_REASON = "interval_crosses_split_boundary"
 #: event-study-only 之估計量範圍標記（SPEC C-0 決議③(b)）；字面唯一住 `split_unify.json`。
 ESTIMAND_SCOPE_VALUES = _load_closed_set(_CONTRACT_PATH, "estimand_scope_values")
@@ -608,7 +614,7 @@ def derive_event_split_from_plans(
     plan_keys = {str(k) for k in plans}
     if event_symbols != plan_keys:
         raise ValueError(
-            f"{_REASON_MULTI_SYMBOL}: 事件 symbol {sorted(event_symbols)} 與 plans 之鍵 "
+            f"{_SYMBOL_SET_MISMATCH}: 事件 symbol {sorted(event_symbols)} 與 plans 之鍵 "
             f"{sorted(plan_keys)} 不一致——禁以第一個 symbol 冒充整批（fail-closed）"
         )
 

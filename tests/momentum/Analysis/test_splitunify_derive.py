@@ -991,3 +991,300 @@ def test_purity_does_not_mutate_inputs() -> None:
     derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
     pd.testing.assert_frame_equal(keys, keys_before)
     pd.testing.assert_frame_equal(man.table, table_before)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# D-001 Task 8.1／8.3：per-symbol 投影與逐標的門檻
+#
+# 🔴 本節測試名刻意含 `per_symbol`／`insufficient`：SPEC 的驗收命令是
+#    `-k per_symbol`／`-k insufficient`。2026-09-12 實測本檔這兩個關鍵字
+#    **各收到 0 條**（`56 deselected / 0 selected`）——驗收命令 rc=0 但零覆蓋。
+#    命名對不上驗收命令，等於沒有驗收。
+# ══════════════════════════════════════════════════════════════════════════════
+
+SYM_B = "BTCUSDT"
+
+
+def _plan_pair_for(symbol: str, short_index: pd.Index, positions: np.ndarray):
+    """以該標的**自己的短索引**建 plan 對。
+
+    `row_index`＝全框位置、`row_index_local`＝標的內序號、指紋以短索引之時刻計算——
+    這正是 D-001 (4.3)／(4.4) 對 producer 的要求。
+    """
+    b = holdout_boundary(short_index, oos_test_size=OOS, purge_gap=PURGE, embargo=EMBARGO)
+    ms = np.asarray(short_index, dtype="int64")
+    kw = dict(index_kind="positional", purge_gap=PURGE, embargo=EMBARGO,
+              purge_semantic="rows", base_universe_hash="deadbeef", symbol=symbol)
+
+    def _mk(label: str, local) -> SplitPlan:
+        loc = np.asarray(local, dtype=int)
+        return SplitPlan(
+            split_label=label,
+            row_index=np.asarray(positions[loc], dtype=int),
+            time_bounds=(int(ms[loc[0]]), int(ms[loc[-1]])),
+            row_index_local=loc,
+            row_time_fingerprint=build_row_time_fingerprint(
+                positions=loc, feature_ts_ms=ms[loc],
+                symbol=symbol, base_universe_hash="deadbeef",
+            ),
+            **kw,
+        )
+
+    return _mk("train", b["train_row_index"]), _mk("test", b["test_row_index"]), b
+
+
+def _interleaved_case(*, n_test_events=(1, 3)):
+    """兩標的於**全框交錯**：偶數列屬 A（ETHUSDT）、奇數列屬 B（BTCUSDT）。
+
+    每個標的的短索引長 50，而其全框 `row_index` 最大值是 98／99 ⇒ 投影端若拿全框列號
+    去索引該標的的短索引就必定越界。交錯正是 D-001 (4.18) 指定必測的形態，
+    因為「等長且不交錯」的 fixture 會讓 `row_index` 與 `row_index_local` 剛好相等，
+    把該擋的錯誤藏起來。
+    """
+    full = _feature_index()
+    pos = {SYM: np.arange(0, N_BARS, 2, dtype=int), SYM_B: np.arange(1, N_BARS, 2, dtype=int)}
+    idx = {s: pd.Index([int(full[p]) for p in pos[s]], dtype="int64") for s in pos}
+    plans, bounds, rows = {}, {}, []
+    for s, n_test in zip((SYM, SYM_B), n_test_events):
+        tr, te, b = _plan_pair_for(s, idx[s], pos[s])
+        plans[s], bounds[s] = (tr, te), b
+        ms = np.asarray(idx[s], dtype="int64")
+        t0 = int(ms[b["train_row_index"][0]])
+        rows.append((f"{s}_train", t0, t0 + H1, s))
+        for k in range(n_test):
+            tk = int(ms[b["test_row_index"][k]])
+            rows.append((f"{s}_test{k}", tk, tk + H1, s))
+    keys = _event_keys(rows)
+    return plans, idx, keys, _manifest(keys), bounds
+
+
+def test_per_symbol_projection_assigns_both_symbols() -> None:
+    """兩標的皆進 assignments（Task 8.1 斷言 1）。"""
+    plans, idx, keys, man, _ = _interleaved_case()
+    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    assert set(res.assignments["symbol"]) == {SYM, SYM_B}
+    assert res.summary["n_symbols"] == 2
+
+
+def test_per_symbol_plans_mapping_without_index_mapping_is_fail_closed() -> None:
+    """給了 plans Mapping 卻沒給對應的索引 Mapping ⇒ 擋（Task 8.1 斷言 2）。"""
+    plans, idx, keys, man, _ = _interleaved_case()
+    with pytest.raises(ValueError, match="multi_symbol_projection_unsupported"):
+        derive_event_split_from_plans(plans, keys, idx[SYM], manifest=man, bucket_ms=H1)
+
+
+def test_per_symbol_event_symbol_missing_from_plans_is_fail_closed() -> None:
+    """事件有 B 而 plans 只有 A ⇒ 須**指名不一致**，且不得再用「不支援多標的」那個字面。
+
+    🔴 Task 8.1 斷言 3 明文要求訊息**不得**含 `multi_symbol_projection_unsupported`：
+    多標的現在已經支援了，再用那個字面會把「你漏給了一個標的」誤導成「本功能不支援」。
+    """
+    plans, idx, keys, man, _ = _interleaved_case()
+    with pytest.raises(ValueError) as ei:
+        derive_event_split_from_plans(
+            {SYM: plans[SYM]}, keys, {SYM: idx[SYM]}, manifest=man, bucket_ms=H1
+        )
+    msg = str(ei.value)
+    assert "不一致" in msg
+    assert "multi_symbol_projection_unsupported" not in msg
+
+
+def test_per_symbol_shared_universe_hash_is_allowed() -> None:
+    """跨 symbol **共用**同一個 `base_universe_hash` 字面是合法的（整框 joint hash）。
+
+    D-001 定案：禁把「跨 symbol 必互異」寫成閘——現行 IC 多標的計畫正是共用一份。
+    """
+    plans, idx, keys, man, _ = _interleaved_case()
+    assert plans[SYM][0].base_universe_hash == plans[SYM_B][0].base_universe_hash
+    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    assert res.summary["n_symbols"] == 2
+
+
+def test_per_symbol_crossed_feature_index_is_fail_closed() -> None:
+    """以 A 的索引去解釋 B 的 `row_index_local` ⇒ 擋（Task 8.1 斷言 5）。"""
+    plans, idx, keys, man, _ = _interleaved_case()
+    crossed = {SYM: idx[SYM], SYM_B: idx[SYM]}
+    with pytest.raises(ValueError):
+        derive_event_split_from_plans(plans, keys, crossed, manifest=man, bucket_ms=H1)
+
+
+def test_per_symbol_interleaved_never_indexes_full_frame() -> None:
+    """B 的全框列號超出自己短索引長度 ⇒ 投影仍須成功且不得 IndexError（斷言 6）。"""
+    plans, idx, keys, man, _ = _interleaved_case()
+    assert int(np.asarray(plans[SYM_B][1].row_index).max()) >= len(idx[SYM_B])
+    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    assert not res.assignments.empty
+
+
+def test_per_symbol_interleaved_matches_single_symbol_run() -> None:
+    """B 的歸屬在「兩標的一起跑」與「只跑 B」之下必須逐筆相同（斷言 7）。"""
+    plans, idx, keys, man, _ = _interleaved_case()
+    both = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    b_keys = keys[keys["symbol"] == SYM_B].reset_index(drop=True)
+    solo = derive_event_split_from_plans(
+        {SYM_B: plans[SYM_B]}, b_keys, {SYM_B: idx[SYM_B]},
+        manifest=_manifest(b_keys), bucket_ms=H1,
+    )
+    got = dict(zip(both.assignments["event_id"], both.assignments["split_label"]))
+    want = dict(zip(solo.assignments["event_id"], solo.assignments["split_label"]))
+    assert want, "只跑 B 卻沒有任何歸屬 ⇒ 這條比較是空洞的"
+    assert {k: v for k, v in got.items() if str(k).startswith(SYM_B)} == want
+
+
+def test_per_symbol_degraded_clears_with_two_symbols() -> None:
+    """`n_symbols == 2` ⇒ `single_symbol` 不得亮（斷言 8）。"""
+    plans, idx, keys, man, _ = _interleaved_case()
+    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    assert "single_symbol" not in res.summary["degraded"]
+
+
+def test_per_symbol_degraded_set_with_one_symbol() -> None:
+    """`n_symbols == 1` ⇒ `single_symbol` 必須亮（斷言 9；解除條件不得放寬）。"""
+    plans, idx, keys, man, _ = _interleaved_case()
+    a_keys = keys[keys["symbol"] == SYM].reset_index(drop=True)
+    res = derive_event_split_from_plans(
+        {SYM: plans[SYM]}, a_keys, {SYM: idx[SYM]},
+        manifest=_manifest(a_keys), bucket_ms=H1,
+    )
+    assert res.summary["n_symbols"] == 1
+    assert "single_symbol" in res.summary["degraded"]
+
+
+def test_insufficient_events_in_test_is_per_symbol_not_batch() -> None:
+    """A 只有 1 筆 test、B 有 3 筆，門檻 2 ⇒ **只**標 A（Task 8.3 斷言 1）。
+
+    退回整批 `n_test`（1+3=4 ≥ 2）就會變成一個都不標，這條即紅。
+    """
+    plans, idx, keys, man, _ = _interleaved_case(n_test_events=(1, 3))
+    res = derive_event_split_from_plans(
+        plans, keys, idx, manifest=man, bucket_ms=H1, tier_min_test_events=2,
+    )
+    assert sorted(res.summary["insufficient_events_in_test"]) == [SYM]
+
+
+def test_insufficient_events_in_test_empty_when_all_above_threshold() -> None:
+    """兩標的都達標 ⇒ 清單為空（Task 8.3 斷言 2）。"""
+    plans, idx, keys, man, _ = _interleaved_case(n_test_events=(3, 3))
+    res = derive_event_split_from_plans(
+        plans, keys, idx, manifest=man, bucket_ms=H1, tier_min_test_events=2,
+    )
+    assert res.summary["insufficient_events_in_test"] == []
+
+
+def test_per_symbol_mapping_key_not_matching_plan_symbol_is_fail_closed() -> None:
+    """三角相等的**第三邊**：Mapping 的 key 與該 plan 自己的 `plan.symbol` 不一致 ⇒ 擋。
+
+    分派器只比對「事件 symbol 集合 vs plans 之鍵」兩邊；第三邊靠逐 symbol 進入單標的
+    路徑後的 `plan.symbol` 對證承擔。這條把它釘住——兩邊相等但 plan 裝錯不得放行。
+    """
+    plans, idx, keys, man, _ = _interleaved_case()
+    swapped = {SYM: plans[SYM_B], SYM_B: plans[SYM]}   # 鍵與 plan.symbol 對調
+    with pytest.raises(ValueError):
+        derive_event_split_from_plans(swapped, keys, idx, manifest=man, bucket_ms=H1)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# D-001 Task 8.2：逐列時刻同源對證（`-k fingerprint`）
+#
+# 🔴 同上：`-k fingerprint` 在 2026-09-12 實測亦為 0 selected。
+# 🔴 指紋與遞增閘是**合取**：指紋先依序號排序再雜湊 ⇒ 對同集合重排**無感**，
+#    擋重排的是遞增閘；兩者各有一條測試，缺一不可。
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_fingerprint_mid_row_shift_caught_though_endpoints_match() -> None:
+    """首尾時刻相同、只有**中間一列**不同 ⇒ 必須擋（SU-RESID-3 的整條理由）。
+
+    `time_bounds` 同源閘只看首尾，這個形態它看不出來；擋下它的是逐列指紋。
+    """
+    index, train, test, keys, man, _ = _basic_case()
+    vals = [int(v) for v in index]
+    mid = len(vals) // 2
+    vals[mid] += 1                      # 仍嚴格遞增、首尾不變
+    tampered = pd.Index(vals, dtype="int64")
+    with pytest.raises(ValueError, match="指紋不符"):
+        derive_event_split_from_plans(train, test, keys, tampered, manifest=man, bucket_ms=H1)
+
+
+def test_fingerprint_passes_when_index_is_identical() -> None:
+    """逐列相同 ⇒ 放行（避免上面那條是靠「什麼都擋」通過的）。"""
+    index, train, test, keys, man, _ = _basic_case()
+    res = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert not res.assignments.empty
+
+
+def test_fingerprint_is_deterministic_across_recomputation() -> None:
+    """同一組輸入重算兩次 ⇒ 值相同（否則入口重驗會隨機失敗）。"""
+    index, _, _, _, _, _ = _basic_case()
+    rows = np.arange(10, dtype=int)
+    ms = np.asarray(index, dtype="int64")
+    kw = dict(symbol=SYM, base_universe_hash="deadbeef")
+    first = build_row_time_fingerprint(positions=rows, feature_ts_ms=ms[rows], **kw)
+    second = build_row_time_fingerprint(positions=rows, feature_ts_ms=ms[rows], **kw)
+    assert first == second
+
+
+def test_fingerprint_of_empty_rows_is_sha256_of_empty_list() -> None:
+    """空 `row_index` ⇒ 指紋 == `sha256("[]")`（釘住空集合的字面，不得改成空字串）。"""
+    import hashlib
+
+    got = build_row_time_fingerprint(
+        positions=np.asarray([], dtype=int),
+        feature_ts_ms=np.asarray([], dtype="int64"),
+        symbol=SYM,
+        base_universe_hash="deadbeef",
+    )
+    assert got == hashlib.sha256("[]".encode("utf-8")).hexdigest()
+
+
+def test_fingerprint_missing_column_is_fail_closed() -> None:
+    """缺 `row_time_fingerprint` ⇒ 擋，且訊息須指名缺的是哪一欄。"""
+    index, train, test, keys, man, _ = _basic_case()
+    object.__setattr__(train, "row_time_fingerprint", "")
+    with pytest.raises(ValueError, match="row_time_fingerprint"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_fingerprint_missing_row_index_local_is_fail_closed() -> None:
+    """缺 `row_index_local` ⇒ 擋，且**不得**以 `row_index` 回退（回退正是越界之來源）。"""
+    index, train, test, keys, man, _ = _basic_case()
+    object.__setattr__(train, "row_index_local", None)
+    with pytest.raises(ValueError, match="row_index_local"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_fingerprint_independent_oracle_matches_producer_value() -> None:
+    """由 fixture 重算之值 == producer 寫入 plan 的那一份（兩端同一支序列化器）。"""
+    index, train, _, _, _, _ = _basic_case()
+    ms = np.asarray(index, dtype="int64")
+    loc = np.asarray(train.row_index_local, dtype=int)
+    oracle = build_row_time_fingerprint(
+        positions=loc, feature_ts_ms=ms[loc], symbol=SYM, base_universe_hash="deadbeef",
+    )
+    assert oracle == train.row_time_fingerprint
+
+
+def test_fingerprint_reordered_rows_are_caught_by_monotonic_gate() -> None:
+    """同集合**重排** ⇒ 指紋不變（排序後雜湊），必須由遞增閘擋下。
+
+    這條若紅而 `-k fingerprint` 其餘皆綠，代表有人把遞增閘關掉了（`M-SU-D1-19`／`20`）。
+    """
+    index, train, test, keys, man, _ = _basic_case()
+    loc = np.asarray(train.row_index_local, dtype=int).copy()
+    loc[0], loc[1] = loc[1], loc[0]
+    object.__setattr__(train, "row_index_local", loc)
+    with pytest.raises(ValueError):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_fingerprint_tampered_rows_are_caught_at_entry() -> None:
+    """建構後竄改序號（改變成員集合）⇒ 入口重驗擋下，訊息含兩個指紋的前 12 字元。"""
+    import re
+
+    index, train, test, keys, man, _ = _basic_case()
+    loc = np.asarray(train.row_index_local, dtype=int).copy()
+    loc[-1] = int(loc[-1]) + 1
+    object.__setattr__(train, "row_index_local", loc)
+    with pytest.raises(ValueError, match="指紋不符") as ei:
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert re.search(r"[0-9a-f]{12}", str(ei.value)), "訊息未帶可比對的指紋前綴"
