@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import numpy as np
 import pandas as pd
@@ -322,7 +322,7 @@ def _assert_event_keys_wellformed(event_keys: pd.DataFrame) -> None:
         )
 
 
-def derive_event_split_from_plans(
+def _derive_single_symbol(
     train_plan: Any,
     test_plan: Any,
     event_keys: pd.DataFrame,
@@ -522,7 +522,8 @@ def derive_event_split_from_plans(
         clusters=clusters,
         per_symbol_n=per_symbol_n,
         n_purged=int(len(purged)),
-        n_test=n_test,
+        # 🔴 單標的路徑：本批只有一個 symbol，逐 symbol 門檻即整批門檻（Task 8.3 同一判定）。
+        per_symbol_test_n={s: n_test for s in per_symbol_n},
         bucket=int(time_cluster_bucket_ms(manifest, bucket_ms)),
         tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),
     )
@@ -531,13 +532,119 @@ def derive_event_split_from_plans(
     )
 
 
+def derive_event_split_from_plans(
+    plans: Any,
+    event_keys: pd.DataFrame,
+    feature_index_by_symbol: Any = None,
+    *args: Any,
+    **kwargs: Any,
+) -> EventSplitPlan:
+    """由 canonical 邊界投影出 `EventSplitPlan`；支援 per-symbol 批（D-001-C1 第 1 點）。
+
+    **新式**：`plans` 為 `Mapping[symbol, (train_plan, test_plan)]`、
+    `feature_index_by_symbol` 為 `Mapping[symbol, pd.Index]`（**該 symbol 自己的 post-trim 索引**，
+    短索引；不是全框 universe）。逐 symbol 走同一條單標的路徑後**縱向合併**。
+
+    **舊式（單標的）**：`(train_plan, test_plan, event_keys, feature_index, …)` 保留為**薄 wrapper**，
+    內部包成單鍵 Mapping 後轉呼；🔴 wrapper **不得**含第二份判定邏輯——purge／成員判定／
+    指紋比對一律只有 `_derive_single_symbol` 一份。
+
+    呼叫端既未給 Mapping、也未走 wrapper ⇒ 維持 `multi_symbol_projection_unsupported`。
+    """
+    if not isinstance(plans, Mapping):
+        # 薄 wrapper：舊式位置參數 (train_plan, test_plan, event_keys, feature_index, …)
+        return _derive_single_symbol(plans, event_keys, feature_index_by_symbol, *args, **kwargs)
+
+    if not isinstance(feature_index_by_symbol, Mapping):
+        raise ValueError(
+            f"{_REASON_MULTI_SYMBOL}: 給了 plans Mapping 卻沒給 feature_index_by_symbol Mapping"
+            "——per-symbol 投影需要每個 symbol 自己的 post-trim 索引（fail-closed）"
+        )
+    manifest = kwargs.pop("manifest")
+    bucket_ms = kwargs.pop("bucket_ms", None)
+    tier_min_test_events = kwargs.pop("tier_min_test_events", 1)
+    if kwargs:
+        raise TypeError(f"derive_event_split_from_plans: 未知參數 {sorted(kwargs)}")
+
+    missing_cols = [c for c in EVENT_KEY_COLUMNS if c not in event_keys.columns]
+    if missing_cols:
+        raise ValueError(f"derive_event_split_from_plans: event_keys 缺欄 {missing_cols}")
+    event_symbols = {str(s) for s in event_keys["symbol"].unique()}
+    plan_keys = {str(k) for k in plans}
+    if event_symbols != plan_keys:
+        raise ValueError(
+            f"{_REASON_MULTI_SYMBOL}: 事件 symbol {sorted(event_symbols)} 與 plans 之鍵 "
+            f"{sorted(plan_keys)} 不一致——禁以第一個 symbol 冒充整批（fail-closed）"
+        )
+
+    assign_parts: List[pd.DataFrame] = []
+    purge_parts: List[pd.DataFrame] = []
+    per_symbol_test_n: Dict[str, int] = {}
+    for sym in sorted(plan_keys):
+        if sym not in feature_index_by_symbol:
+            raise ValueError(
+                f"{_REASON_MULTI_SYMBOL}: feature_index_by_symbol 缺 symbol {sym!r}（fail-closed）"
+            )
+        tr, te = plans[sym]
+        sub_keys = event_keys[event_keys["symbol"].astype(str) == sym].reset_index(drop=True)
+        sub_manifest = _manifest_subset(manifest, set(sub_keys["event_id"]))
+        part = _derive_single_symbol(
+            tr, te, sub_keys, feature_index_by_symbol[sym],
+            manifest=sub_manifest, bucket_ms=bucket_ms,
+            tier_min_test_events=tier_min_test_events,
+        )
+        assign_parts.append(part.assignments)
+        purge_parts.append(part.purged)
+        per_symbol_test_n[sym] = int(
+            (part.assignments["split_label"] == "test").sum()
+        ) if not part.assignments.empty else 0
+
+    assignments = (
+        pd.concat(assign_parts, ignore_index=True) if assign_parts
+        else pd.DataFrame(columns=["event_id", "symbol", "split_label"])
+    )
+    purged = (
+        pd.concat(purge_parts, ignore_index=True) if purge_parts
+        else pd.DataFrame(columns=["event_id", "reason"])
+    )
+    clusters = build_time_clusters(manifest, bucket_ms)
+    per_symbol_n = {
+        str(sym): int(n) for sym, n in event_keys["symbol"].value_counts().items()
+    }
+    summary = _build_summary(
+        manifest=manifest,
+        clusters=clusters,
+        per_symbol_n=per_symbol_n,
+        n_purged=int(len(purged)),
+        per_symbol_test_n=per_symbol_test_n,
+        bucket=int(time_cluster_bucket_ms(manifest, bucket_ms)),
+        tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),
+    )
+    return EventSplitPlan(
+        assignments=assignments, purged=purged, clusters=clusters, summary=summary
+    )
+
+
+def _manifest_subset(manifest: EventManifest, keep_ids: set) -> EventManifest:
+    """取 manifest 中屬於某 symbol 之子集（逐 symbol 投影用）。
+
+    🔴 單標的路徑要求 `event_keys` 與 `manifest.table` 之 event_id 集合**相等**；
+    逐 symbol 切片時必須連帶把 manifest 切成同一批，否則會誤報「不是同一批」。
+    """
+    table = manifest.table[manifest.table["event_id"].isin(keep_ids)].reset_index(drop=True)
+    summary = dict(manifest.summary or {})
+    summary["n_events_raw"] = int(len(table))
+    summary["n_events_effective"] = int(len(table))
+    return EventManifest(table=table, summary=summary, policy=getattr(manifest, "policy", {}))
+
+
 def _build_summary(
     *,
     manifest: EventManifest,
     clusters: pd.DataFrame,
     per_symbol_n: Dict[str, int],
     n_purged: int,
-    n_test: int,
+    per_symbol_test_n: Dict[str, int],
     bucket: int,
     tier_min_test_events: int = 1,
 ) -> Dict[str, Any]:
@@ -561,7 +668,12 @@ def _build_summary(
             "——manifest 不完整（應由 build_event_manifest 產生），無法產出切分摘要（fail-closed）"
         )
     n_symbols = len(per_symbol_n)
-    insufficient = [s for s in per_symbol_n if n_test < int(tier_min_test_events)]
+    # 🔴 SPLITUNIFY D-001 Task 8.3：**逐 symbol** 判定。原式 `n_test < 門檻` 之條件與迴圈變數
+    #    `s` 無關，用的是**整批** test 數 ⇒ 多標的一接通就變成「要嘛全部標不足、要嘛全部不標」。
+    insufficient = [
+        s for s in per_symbol_n
+        if int(per_symbol_test_n.get(s, 0)) < int(tier_min_test_events)
+    ]
     n_clusters = int(clusters["time_cluster_id"].nunique()) if not clusters.empty else 0
     return {
         "n_symbols": n_symbols,
