@@ -207,6 +207,8 @@
 
 **D-002 第九次修訂已完成**（commit 見下；obligation／format rc=0，xref 對 **r1–r8 八份** synth 皆 rc=0；mutation 表列 26／ID 01–26 連續；`SU-RESID-9A-UI` 已真的入 §N，`grep -c` ＝ 3）。**本輪兩處是我自己的缺陷**：K5（我在 R7 才把判準改成時間域，**改完四條規則彼此重疊**——`decision=50` 同時命中 train 與界外，codex 獨得）與 K2（**寫了「登記於 §N」卻沒登記**，三家獨立抓到）。另 K3 我**駁回** composer 前提並更正自己先前「採較嚴版」的套用錯誤（範本 `reason_code` 閉集為四值、`R-BRIEF-1` 以架構為 `blocked-by` 對象）。
 
+🔴 **K4 二擇一已由主委擇定＝grok 之方案（鎖定三層、刪逃逸句），依據為契約原文且兩家都只說對一半**：`momentum/Analysis/contracts/split_unify.json` 之 `_doc` 逐字「切分權威值集與 fail-closed reason 之**唯一真相源**…Python 端與前端**各自讀本檔並對證**，禁任一端手打第二份」；其 `test_segment_count_keys` 為 **deny-by-default 封閉登記**（「新鍵必須**先進本登記**才寫得出去」）。**關鍵**：`discarded_rows_by_feature_tf` 之值為 **`Dict[str, int]`**，非整數計數鍵 ⇒ **不落入**該登記之掃描範圍（其判準為「鍵名含 `test` 且值為整數」）⇒ **加此鍵不需動 deny-by-default 登記**，成本低於 codex `P1-03` 所估的五處；實際須改者為 `build_split_unify_disclosure` 之五鍵回傳、`tests/api/test_splitunify_disclosure.py` 之 exact-key 斷言、前端型別（**三處**）。⇒ 擇 **三層**：成本已可界定，且兩層方案會讓「唯一真相源」缺少本延伸產出的揭露欄，反而製造第二份真相源的誘因。第十次修訂須**刪除 L149 逃逸句**並把三處逐一寫進 `Task 9.1`。
+
 🔴 **grok 自標「未升 P1」的那條缺口，主委推導後確認不必補（但須具名引用不變量）**：grok 稱「`train_last >= test_start` 時規則 1＋2 仍可同時命中」。推導：位置上 `train` 末位＝`split_point-1`、`test` 首位＝`split_point+purge_gap+embargo`，差＝`purge_gap+embargo+1 ≥ 1` ⇒ **`train_last` 位置恆小於 `test_start` 位置**；時刻上 `split_projection.py:213` 逐字「🔴 `feature_index` **必須**嚴格遞增」且 `:472` 註明「此處之嚴格遞增**不得**關閉」⇒ 位置序即時刻序 ⇒ **`train_last_ms < test_start_ms` 是既有不變量**。⇒ 步驟 0 之後三條規則**互斥且窮盡**成立，**不需**新增條款；但第十次修訂應在 `Task 9.2b` **具名引用該不變量**（`feature_index` 嚴格遞增，`split_projection.py:213`），否則讀者無從得知此前提從何而來。
 
 🔴 **收斂性判斷（主委實跑計數，供 R9 收斂決策用）**：各輪 findings 數 **R1–R8＝15／11／15／8／11／16／15／14**——**九輪無下降趨勢**。但依「停在無法收斂處」之判準，關鍵不是數量而是**性質**：每輪皆為**具體可閉合、有碼證、且多條三家獨立撞題**之條目，非各說各話或無限窮舉 ⇒ **不符合「無法收斂」之停輪條件**。真正的訊號是**近三輪有四項屬我「寫了要做卻沒做」或「引錯依據」**（K2 §N 未登記、(G-4d) 未進 §V、K3 引錯範本、L137 目標句漏改）——那不是規格複雜度問題，是**我的修訂紀律問題**。⇒ **判斷：續修，但第十次修訂必須改做法**——每一項改完**立即逐條 grep 自證它落在該落的段落**（§V 驗行號區間、§N 驗強制欄 `為何現在不做:`、mutation 驗表列與 ID 連續），**自證通過才算完成**，不得寫完即宣稱。此判斷須在 R9 收斂檔具名記載，並在 R10 brief 請委員檢驗「自證步驟是否真的執行」。
@@ -225,7 +227,15 @@
 
 🔴 **R9 brief 兩條 assumed 已由主委自驗（不必等委員）**：①**`SU-RESID-9A-UI` 之觸發條件可機械判定**——現行 `api/` 對 `EventSamplePipeline().run(`／`create_event_sample_pipeline().run(` 命中數為 **0**，故「該數 > 0」是**封閉可導出**判準，可寫成一行 grep 斷言掛進閘，**不會變成永遠沉睡的殘留**；第十次修訂應把此判準逐字寫進 §N 該條之觸發欄。②**`D-002-C6` 內仍有一處潛在不一致**：`(6.1)` 標題與內文仍為「事件數與列數是**兩個量**」「三個量各自定義、**不得互相代用**」，而 `(6.2)` 已把 baseline 之樣本數與事件數判為**等價**；兩者字面可並存（baseline 只是其中一個消費者），但 `(6.3)` 之「任一消費面把列數當事件數顯示或斷言即為缺陷」會讓實作者對 baseline 產生疑義 ⇒ 第十次修訂須在 `(6.3)` **明列 baseline 為已定案之等價例外**。
 
-**R9 已派出**（session `20260911-splitunify-b9-review-r9`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R9-BRIEF.md`）。brief 列三處必攻：(G-4c) 以同步改寫 oracle 取代 allowlist 是否等效（含「兩邊同錯而 G-3b 仍綠」之構造）、K3 駁回依據是否適用 SPEC §N、K4「成本超標時改交付範圍」是否又是**自己沒擇的二擇一**。
+**R9 已收並收斂完畢**（`round_id=d790ce59`，債已清）：三家皆 `blocked`，共 **21 條歸十一群**（十群採納、一群部分採納），**五群為三家獨立撞題**。收斂檔 `handoffs/reconcile/20260911-splitunify-b9-review-r9/synth.md`（歸戶 rc=0、completeness rc=0、xref 處置欄 **44 個概念**全對上）。
+
+**D-002 第十次修訂已完成**（commit `2cc3dd76`；obligation／format rc=0，xref 對 **r1–r9 九份** synth 皆 rc=0；mutation 26 → **31 條**、ID 01–31 連續、正文與表列一致）。**本輪四項是我自己的缺陷**：L1（誤判「同步改寫 oracle」可取代 allowlist）、L4（**引錯權威**：拿治理 brief 的範本去駁 SPEC §N 的規則，還據此改壞原本正確的記憶）、L8（v9 更正過頭，把 baseline 兩量當恆等）、L2／L3（「寫了要做卻沒做」第五、六次）。
+
+🔴 **自證步驟首次執行即付股息**：R9 收斂時我承諾「每項改完立即逐條 grep 自證落點」，本輪執行後**當場抓到兩處我以為改完其實沒改**（目標句在括號裡又寫了一次舊句、mutation 表列 31 而正文仍寫 26），**都在跑閘前自己修掉**——這是九輪以來第一次由我而非委員抓到此類缺陷。
+
+**R10 已派出**（session `20260911-splitunify-b9-review-r10`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R10-BRIEF.md`）。brief 設了一個**本輪特有的必答**：請委員**檢驗我的自證步驟是否真的執行**，逐項指出十一項落點、列出我漏掉的。
+
+（以下為 R9 派出時之記載）**R9 已派出**（session `20260911-splitunify-b9-review-r9`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R9-BRIEF.md`）。brief 列三處必攻：(G-4c) 以同步改寫 oracle 取代 allowlist 是否等效（含「兩邊同錯而 G-3b 仍綠」之構造）、K3 駁回依據是否適用 SPEC §N、K4「成本超標時改交付範圍」是否又是**自己沒擇的二擇一**。
 
 （以下為 R8 派出時之記載）**R8 已派出**（session `20260911-splitunify-b9-review-r8`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R8-BRIEF.md`）。brief 把上述兩個取捨列為**必須被攻的決策**，並要求逐條驗「七條反向 mutation 誤改後是否真能紅」。
 
