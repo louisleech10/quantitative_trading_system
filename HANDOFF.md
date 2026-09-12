@@ -207,6 +207,8 @@
 
 **D-002 第九次修訂已完成**（commit 見下；obligation／format rc=0，xref 對 **r1–r8 八份** synth 皆 rc=0；mutation 表列 26／ID 01–26 連續；`SU-RESID-9A-UI` 已真的入 §N，`grep -c` ＝ 3）。**本輪兩處是我自己的缺陷**：K5（我在 R7 才把判準改成時間域，**改完四條規則彼此重疊**——`decision=50` 同時命中 train 與界外，codex 獨得）與 K2（**寫了「登記於 §N」卻沒登記**，三家獨立抓到）。另 K3 我**駁回** composer 前提並更正自己先前「採較嚴版」的套用錯誤（範本 `reason_code` 閉集為四值、`R-BRIEF-1` 以架構為 `blocked-by` 對象）。
 
+🔴 **R9 brief 兩條 assumed 已由主委自驗（不必等委員）**：①**`SU-RESID-9A-UI` 之觸發條件可機械判定**——現行 `api/` 對 `EventSamplePipeline().run(`／`create_event_sample_pipeline().run(` 命中數為 **0**，故「該數 > 0」是**封閉可導出**判準，可寫成一行 grep 斷言掛進閘，**不會變成永遠沉睡的殘留**；第十次修訂應把此判準逐字寫進 §N 該條之觸發欄。②**`D-002-C6` 內仍有一處潛在不一致**：`(6.1)` 標題與內文仍為「事件數與列數是**兩個量**」「三個量各自定義、**不得互相代用**」，而 `(6.2)` 已把 baseline 之樣本數與事件數判為**等價**；兩者字面可並存（baseline 只是其中一個消費者），但 `(6.3)` 之「任一消費面把列數當事件數顯示或斷言即為缺陷」會讓實作者對 baseline 產生疑義 ⇒ 第十次修訂須在 `(6.3)` **明列 baseline 為已定案之等價例外**。
+
 **R9 已派出**（session `20260911-splitunify-b9-review-r9`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R9-BRIEF.md`）。brief 列三處必攻：(G-4c) 以同步改寫 oracle 取代 allowlist 是否等效（含「兩邊同錯而 G-3b 仍綠」之構造）、K3 駁回依據是否適用 SPEC §N、K4「成本超標時改交付範圍」是否又是**自己沒擇的二擇一**。
 
 （以下為 R8 派出時之記載）**R8 已派出**（session `20260911-splitunify-b9-review-r8`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R8-BRIEF.md`）。brief 把上述兩個取捨列為**必須被攻的決策**，並要求逐條驗「七條反向 mutation 誤改後是否真能紅」。
