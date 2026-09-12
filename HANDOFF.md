@@ -174,7 +174,15 @@
 - §V `Task 9.1` L207 仍寫「`ASSERT summary／API 回應／前端型別三層皆帶該欄`」，而那三層落點已被我在 `Task 9.1` 標為作廢。
 🔴 **根因**：這正是我自己在摩擦記錄第 23 筆寫過的「同一份文件內部兩句話互斥，交叉引用閘看不到」——閘只比對**跨檔案**同步（synth 處置欄 ↔ SPEC），對**同檔內部**互斥完全無能為力；而 `(5.1)` 那段我還特地寫了「不得用形狀規則」。第八次修訂必須**逐段回頭掃**，不能只改新寫的那一段。
 
-**R7 已派出**（session `20260911-splitunify-b9-review-r7`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R7-BRIEF.md`）。brief 首次要求**雙向攻擊**：既問「還有沒有漏派的關卡」，也要求委員**挑戰我新做的三分類**——特別是被我判為「(甲) 事件級維持」的那些，若其實該改，複合鍵上線後會靜默取到錯的列。
+**R7 已收並收斂完畢**（`round_id=9ec83c83`，債已清）：三家皆 `blocked`，共 **15 條歸八群、全部採納**（codex 6、composer 6、grok 3）。收斂檔 `handoffs/reconcile/20260911-splitunify-b9-review-r7/synth.md`（歸戶 rc=0、completeness rc=0、xref 處置欄 **31 個概念**全對上）。**三群為三家獨立撞題**：J1 分類改了施工單沒改、J3 `Task 9.1` dataflow 未封、J4／J5 判準與 golden。
+
+🔴 **codex 揭出一層我與另兩家都沒想到的（J5 後半）**：`alignment.py:87-93` 允許 `cutoff < decision` ⇒ **換錨本身**就會讓邊界事件改側（`test_start=1000, decision=1000, cutoff=900` ⇒ 舊 train、新 test），與 §G「單 TF 逐值不變」**本質互斥**，不是補 fixture 能解決。
+
+**D-002 第八次修訂已完成**（commit `2dd245a4`；obligation／format rc=0，xref 對 **r1–r7 七份** synth 皆 rc=0；mutation 表列 26／ID 01–26 連續，主委自數）。八群逐條落地，其中**兩個是在互斥選項中挑邊**：**§G (G-4a)**（承認事件級錨定為正確語意，單 TF golden 落地後重凍一次、僅允許「因換錨而改側」這一種差異）與 **`Task 9.1` 終端可見性具名殘留**（`blocked-by`，碼證＝`api/` 零 `EventSamplePipeline.run` 呼叫點）。
+
+**R8 已派出**（session `20260911-splitunify-b9-review-r8`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R8-BRIEF.md`）。brief 把上述兩個取捨列為**必須被攻的決策**，並要求逐條驗「七條反向 mutation 誤改後是否真能紅」。
+
+（以下為 R7 派出時之記載）**R7 已派出**（session `20260911-splitunify-b9-review-r7`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R7-BRIEF.md`）。brief 首次要求**雙向攻擊**：既問「還有沒有漏派的關卡」，也要求委員**挑戰我新做的三分類**——特別是被我判為「(甲) 事件級維持」的那些，若其實該改，複合鍵上線後會靜默取到錯的列。
 
 （以下為 R6 派出時之記載）**R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
 
