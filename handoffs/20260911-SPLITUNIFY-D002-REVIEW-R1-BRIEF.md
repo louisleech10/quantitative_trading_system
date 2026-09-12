@@ -1,7 +1,7 @@
 # SPLITUNIFY D-002 延伸檔找碴 R1
 
 brief-kind: review
-task-id: 20260911-SPLITUNIFY-D002-REVIEW-R1
+task-id: 20260911-SPLITUNIFY-B9-REVIEW-R1
 findings-round: R1
 
 ## 範本
