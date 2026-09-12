@@ -117,7 +117,14 @@
 - `ic_feed:83,109` — `timeframe` 是函式**必填參數**，`per_tf[per_tf["timeframe"] == timeframe]` **先過濾單一 TF 再** `set_index` ⇒ 索引本就唯一。**單一 TF 是設計、非缺陷**，`D-002-C5` 將其列為待改消費面屬**誤列**。
 - `tables.py:214,229,234,257` — `ev` 為 `event_level`、`cl` 為 `clusters`（已定案維持事件級）⇒ 這些 `.loc[eid]` 本就對事件級表操作，**不受複合鍵影響**，同屬誤列。
 - **真缺陷但改法錯**：`pattern_bridge:125-127` — `lab_by_id[e] == "train"` 是事件級消費（`X_all` 亦為事件級），複合鍵後 `set_index("event_id")` 索引重複、`lab_by_id[e]` 回傳 Series，`== "train"` **靜默變成 Series** ⇒ 確為缺陷；但正確改法是「**去重取唯一側、不唯一則 fail-closed**」（依 (3.1) 同事件恆同側），**不是**改成複合鍵索引。
-⇒ 第七次修訂須**逐處重新分類**：哪些表是事件級（維持）、哪些是複合鍵（改）、哪些是「事件級但需去重取唯一值」。`D-002-C5` 之 16 處清單同步更正。此為主委自產，須於 R6 收斂檔標明非委員意見。
+**續驗（同批，碼證齊）**：
+- `baseline.py:105-109` — `test_ids` 取自 `assignments`（複合鍵後同事件兩列），但下一行 `features_at_decision.index.intersection(pd.Index(test_ids))` 之 `intersection` **對 Index 會去重** ⇒ `X`／`y` 仍事件級、**行為不會壞**；其 `n_test` 語意問題屬 `Task 9.4`（H4 已處理），**不需**改複合鍵。
+- `counterexample_classifier:52-62` — 迴圈為 `for rec in events.to_dict("records")`（**事件級匯入表**），`ev_receipt` 亦事件級 ⇒ **誤列**。
+- `candidate_ledger:139-161` — 迴圈為 `for eid in sorted(signaled)`，`signaled` 是 `set(...)`（**集合本身去重**），`rec`／`ev` 皆事件級 ⇒ **誤列**。
+- 前端 `search/page.tsx:825-835` — Map 鍵為 `canonicalEventId(symbol, timeframe, t0)`，來源是使用者上傳 CSV 之**原始列**，`timeframe` 取 `row.timeframe || searchParams.timeframe`＝**觸發** TF；一事件在原始檔只有一列 ⇒ **誤列**（(5.4) 所述「後者覆蓋前者」是「同一 CSV 有重複列」之情形，與多 feature TF 無關）。
+- golden — `splitunify_golden.json` 之 `g1_membership` 為 train/test/purged 之 **event_id 清單**（複合鍵後同事件兩列會被清單去重而看不出差異）⇒ **確需擴維**；`clusters_oracle.json` 以 `event_id` 為 fixture 鍵（簇已定案事件級）、`report_int_keys.json` 為報告整數葉鍵集（與事件無關）⇒ **兩者不動**。
+
+⇒ **十處已逐處讀完之結論**：**七處誤列**（`ic_feed`、`tables` 兩處、`counterexample_classifier`、`candidate_ledger`、前端 Map、`clusters_oracle`＋`report_int_keys`）、**一處派工過度**（`feature_materialization`）、**一處真缺陷但改法錯**（`pattern_bridge`，應為「去重取唯一側、不唯一 fail-closed」）、**一處確需改**（`g1_membership`）。第七次修訂須**逐處重新分類**：事件級（維持）／複合鍵（改）／事件級但需去重取唯一值（三類），`D-002-C5` 之 16 處清單同步更正。此為主委自產，須於 R6 收斂檔標明非委員意見。🔴 **根因**：我列該清單時以「有無 `set_index("event_id")` 之形狀」為判準，**未逐處問「這張表的一列代表什麼」**——而 `Task 9.3` 正文我自己寫著「不得用凡看到某索引一律改這種形狀規則」。
 
 **R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
 
