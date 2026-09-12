@@ -87,6 +87,12 @@
 
 🔴 **G1「不改切分數學」亦由主委自驗**：`selected_timeframe` 在生產碼**只有兩個去處**——`pipeline.py:725`（四參數閘）與 `pipeline.py:747`（傳給 `build_event_keys`）；`split_projection.py` 內全部集中於 `:259-297` 之過濾與三道 fail-closed，**無任何記帳／物化／統計路徑讀它** ⇒ 降為可選不會有連鎖影響，該宣稱成立。**順帶撈到一條四輪四家都沒提的殘留**：`split_projection.py:271` 之 docstring 逐字寫「每個事件在 `selected_timeframe` 下必須**恰有一列** `per_tf`」，與 `Task 9.2` 之全量複合鍵**直接互斥**——與 `(5.2)` 同型的舊語意，但住在**程式碼註解**裡；`Task 9.2` 須把它列入必改（否則實作者讀 docstring 會照舊語意寫）。
 
+🔴 **主委在 R5 等待期自驗時抓到的一條（四家四輪都沒提）**：`_PURGE_REASON`（`interval_crosses_split_boundary`）在 `split_projection.py` **兩處共用**——`:541` 是答案窗跨界（`in_train and label_end_ms >= test_start_ms`），`:553` 是 else 分支「cutoff 既不在 train 也不在 test」。後者**不是**跨界，語意完全不同。⇒ `D-002` `(3.2)` 寫「既有 `interval_crosses_split_boundary` 維持原義（標籤區間跨越 split 邊界）」與**現況不符**：該字面現在就已承載兩種語意，第六次修訂須處理（要嘛承認雙語意並分別定義，要嘛在 `Task 9.2b` 一併分流）。
+
+🔴 **時鐘刻度：`Task 9.2b` 改法尚未定案（主委自驗中，待探針）**：`alignment.py:206` 之 `cutoff = int(sub_ct[idx])` 取自 **`close_time_ms`** ⇒ `feature_cutoff_ms` 是 bar **close**；`alignment.py:157` 之 `decision_at = int(ot[decision_idx])` 取自 **`open_time_ms`** ⇒ 是 bar **open**。兩者**不同刻度**，而現行判側是 `cutoff in train_ms`（集合成員）。⇒ `Task 9.2b` 若直接把它換成 `decision_at_ms in train_ms` 有**系統性落空或位移一根**的風險。`tests/momentum/event_samples/test_splitunify_wiring.py` 之 `_canonical()` 用 `open_time_ms` 當 `feature_index` 而斷言 `cut in train_ms` 卻通過 ⇒ 只能實測解釋。探針已入版：`handoffs/20260912-splitunify-b9-probe-clock-alignment.py`。**第六次修訂前必須先跑它**。
+
+🔴 **主委在這段自驗裡連犯兩次同型查法錯誤（記著防再犯）**：①`grep -rn "run(" … | grep "train_plan"` 要求**同一行**，而實際呼叫跨多行 ⇒ 得出「零命中」並當成事實（import 那條同理，`pipeline.py:25` 就是多行括號 import）；②`grep -rl … | head -12` **截斷**清單，tests 的檔案被切掉 ⇒ 又得出一個假的「矛盾」。**兩次都是用不可靠的查法得出「零命中」就下結論**——與記憶裡「驗 scanner 勿 tail 截斷」同型。判準：凡結論是「某物不存在」，查法必須先自證完備（不截斷、不要求同一行、必要時列檔案而非列行）。
+
 **R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
 
 其後：三家放行 → 戳記 → 才進 `Task 9.1` 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`。
