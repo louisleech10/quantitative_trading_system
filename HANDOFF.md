@@ -45,4 +45,8 @@
 ② **同事件多 TF 未規定同側**（`GROK-R1-P1-03`，本輪最嚴重）——D-002 只寫「同簇」，但**同簇不等於同側**：1h 進 train、4h 進 test 時，仍偏事件級的消費者會靜默組成**非法 OOS 樣本**。須明定「同事件所有 TF 必須同側，否則整事件 purge」並配可證偽測試。
 另有一條屬 SPEC 內部不自洽：我在 §C 寫了「事件數與列數不得混用」，卻**沒有**在 Task 9.3 指派對應修改（三家全中）。
 
-下一步：依七群修訂 D-002 → 派 R2 重審 → 三家戳記 → 才進 Task 9.1 實作。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
+**D-002 已依七群修訂**（commit `d69b471b`；`doc_format_precheck` 與 `spec_xref_check --synth` 皆 rc=0）：新增 `D-002-C0`（`trigger_timeframe`／`feature_timeframe` 分名，複合鍵明定為 `(event_id, feature_timeframe)`）、`D-002-C3`（同事件所有 feature TF **必須同側**，異側則整事件 purged，檢查落在投影端）、`D-002-C6`（`n_train`／`n_test`／`n_purged` 定為**事件數**，列數另立新名）、`Task 9.4`（記帳與報告鏈專責）；觸及面 15 → **16 處**（新增第四層記帳／報告鏈）；`Task 9.3` 由形狀規則改為**逐處列名**（明寫 `feature_materialization` 折疊點在 `groupby+update`、event-level 表粒度不變）；§G 拆為 (G-1)(G-2)(G-3)；mutation 6 → **18 條**逐處對應。
+
+**R2 閉合輪已派出**（session `20260911-splitunify-b9-review-r2`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R2-BRIEF.md`）：依章程 §B8 由**原提出方**逐群複驗是否真關閉，並攻修訂本身引入的新問題（同側約束是否過嚴而誤殺、量詞分離是否誤判、術語分名是否仍有歧義）。brief 已逐家列出各自待閉合的 ID，並提醒 R1 有一家 `STATUS` 未逐字寫 `DONE`。
+
+其後：三家放行 → 戳記 → 才進 Task 9.1 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
