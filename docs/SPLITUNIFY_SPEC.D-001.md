@@ -69,7 +69,9 @@ def derive_event_split_from_plans(
    - 🔴 **producer 端之 attest 為必做**：建 plan 之處 `symbol_arr` **皆可得**（`contracts.py:690`、`ic_split_adapter.py:258`、`ic_filter_orchestrator.py:643-648` 皆已把 `symbols` 傳給 `validate_split_pair_integrity`），故 producer 必須以**同一支具名 helper** `_local_ordinals_for_symbol` 重算並與寫入之 `row_index_local` **逐值相等**；不等 ⇒ fail-closed。這就是「唯一、可驗證」之落點：**轉換只發生在 producer 一處，投影端不再轉換**。
    - 🔴 **投影端只消費 `row_index_local`**：`derive_event_split_from_plans` 內部**一律不得**索引 `row_index`。
    - 🔴 **缺欄即 fail-closed**：`derive` 入口收到之 plan 缺 `row_index_local` ⇒ 明確報錯並指名欄位，**不得**以 `row_index` 回退（回退正是交錯標的越界之來源）。非 `derive` 之呼叫點給相容 default。
-   - 🔴 **受此轉換覆蓋之消費點為封閉清單**（`momentum/Analysis/event_samples/split_projection.py`；行號為 R7 抽驗時之現況，實作時以函式內實際位置為準）：①長度閘 `assert_positional_rows(..., n=index_ms.size)`（`:453-458`）②首尾同源對證之 `index_ms[rows[0]]` 與 `index_ms[rows[-1]]`（`:473-484`）③**成員判定**之 train／test 時刻集合 `index_ms[train_rows]`／`index_ms[test_rows]`（`:486-487`）④測試段起點 `test_start_ms`（`:488`）⑤本節之指紋計算與比對。🔴 R6 版文字只涵蓋⑤，①～④漏網——**交錯標的正是在①越界、在②③④取到錯時刻**，不得再遺漏；新增任何消費 `row_index` 之處，一律先轉換再使用。🔴 **連帶（文件面亦屬消費點）**：`derive_event_split_from_plans` 之 docstring 現寫「集合成員判定——`feature_cutoff_ms ∈ feature_index[plan.row_index]` 決定 train／test」（`:351-353`），該句述的是舊座標語意，b8 須同步改寫為「以入口轉換後之 symbol-local ordinal 索引該 symbol 之 `feature_index`」，不得留下與本節互斥之契約敘述。
+   - 🔴 **兩欄之深層不可變性（R9 `CODEX-R9-P1-01`；主委實跑另加抓一面）**：`@dataclass(frozen=True)` 只擋「整欄改綁」，**擋不住 numpy 陣列原地改寫**——實跑 `p.row_index[0] = 99` 成功、讀回 `[99 2]`、`flags.writeable` 為 `True`；且建構時**無 defensive copy**，呼叫端持有之來源陣列其後之改動會滲入已建好的 plan（實跑：改來源後 plan 讀回 `[77 6]`）。⇒ `SplitPlan.__post_init__` 必須對 `row_index` 與 `row_index_local` **各自複製一份**並 `setflags(write=False)`。不這麼做，attest 只在建構當下成立：其後任一方被改，投影端讀 local 欄、而既有全框消費端（`momentum/Analysis/ic_filter_orchestrator.py:1318`、`:1335`、`:1359-1360`）讀 `row_index`，兩側**靜默分歧**。
+   - 🔴 **attest 之前提條件（R9 第二家必答二；主委抽驗為生產可達，非理論形狀）**：producer 端「寫入 `train_local`」與「以 helper 重算並逐值相等」兩項，僅在**該標的之 frame 序等同時間序**時相容。`momentum/core/contracts.py:562-568` 之「標的內時刻嚴格遞增」保證**只在 `purge_semantic == "rows"` 分支內**；而 `momentum/Analysis/ic_filter_orchestrator.py:930` 之路徑以 `purge_semantic="timedelta"` 建 plan ⇒ 該形狀下 helper（frame 序）與 splitter 之 `train_local`（時間序）可分歧。**處置**：一律以「寫入 `train_local`」為準（它對齊投影端所用之時間序 `feature_index`）；attest 遇 frame 序非時間序**不得靜默跳過**，須 fail-closed 並指名 `purge_semantic` 與該標的，交由上游修正排序。🔴 **不得**為湊過 attest 而改寫 `train_local`。
+   - 🔴 **受此規則覆蓋之消費點為封閉清單**（`momentum/Analysis/event_samples/split_projection.py`；行號為 R7 抽驗時之現況，實作時以函式內實際位置為準）：①長度閘 `assert_positional_rows(..., n=index_ms.size)`（`:453-458`）②首尾同源對證之 `index_ms[rows[0]]` 與 `index_ms[rows[-1]]`（`:473-484`）③**成員判定**之 train／test 時刻集合 `index_ms[train_rows]`／`index_ms[test_rows]`（`:486-487`）④測試段起點 `test_start_ms`（`:488`）⑤本節之指紋計算與比對。🔴 R6 版文字只涵蓋⑤，①～④漏網——**交錯標的正是在①越界、在②③④取到錯時刻**，不得再遺漏；新增任何消費 `row_index` 之處，一律先轉換再使用。🔴 **連帶（文件面亦屬消費點）**：`derive_event_split_from_plans` 之 docstring 現寫「集合成員判定——`feature_cutoff_ms ∈ feature_index[plan.row_index]` 決定 train／test」（`:351-353`），該句述的是舊座標語意，b8 須同步改寫為「以入口轉換後之 symbol-local ordinal 索引該 symbol 之 `feature_index`」，不得留下與本節互斥之契約敘述。
    - 規則：`row_index_local` 以該 symbol 之 post-trim universe 為序；producer attest 時映不到（該全框位置不屬於此 symbol）⇒ **fail-closed**，不得丟棄或近似。
    - 往返測試為必做：在 producer 端驗 `symbol_positions[row_index_local] == row_index` 逐值成立。
    - 🔴 交錯多標的 fixture 為必測：兩 symbol 之列在全框交錯時，各自之 `row_index_local` 仍須為連續遞增。
@@ -90,7 +92,7 @@ def derive_event_split_from_plans(
   `ASSERT derive_event_split_from_plans WHEN 已提供 Mapping 但事件 symbol=B 而 plans 僅含 A THEN rc!=0 且訊息指名 symbol 不一致（且不得含 multi_symbol_projection_unsupported）`
   `ASSERT derive_event_split_from_plans WHEN plans={A,B} 且 A.train.base_universe_hash==B.train.base_universe_hash THEN rc=0`
   `ASSERT derive_event_split_from_plans WHEN 以 A 之 feature_index 解釋 B 之 row_index THEN rc!=0`
-  `ASSERT derive_event_split_from_plans WHEN A 與 B 之列於全框交錯且 B 之全框 row_index 最大值 >= len(idxB) THEN rc=0 且不得 IndexError（入口轉換已把全框列號換為 B 之 symbol-local ordinal）`
+  `ASSERT derive_event_split_from_plans WHEN A 與 B 之列於全框交錯且 B 之全框 row_index 最大值 >= len(idxB) THEN rc=0 且不得 IndexError（投影只讀 `row_index_local`，從不索引全框列號）`
   `ASSERT derive_event_split_from_plans WHEN 交錯 fixture 之 B 事件 cutoff 恰為 B 自己第 k 列之時刻 THEN 該事件之 train/test 歸屬 == 單獨只跑 B 之結果`
   `ASSERT summary WHEN n_symbols==2 THEN "single_symbol" not in summary["degraded"]`
   `ASSERT summary WHEN n_symbols==1 THEN "single_symbol" in summary["degraded"]`
@@ -100,7 +102,7 @@ def derive_event_split_from_plans(
 
 - 目標：關掉「首尾相同、中間間距不同」之錯分面。
 - 檔案（🔴 producer 寫入點與既有綠徑面皆須列入，R5／R6 三條 P1）：
-  - `momentum/core/contracts.py`（`SplitPlan` 新增 `row_time_fingerprint` 與 `row_index_local` 兩欄；後者由 producer attest，見 C2 第 4 點）
+  - `momentum/core/contracts.py`（`SplitPlan` 新增 `row_time_fingerprint` 與 `row_index_local` 兩欄；後者由 producer attest；`__post_init__` 對兩個 row 陣列做 defensive copy 並 `setflags(write=False)`，見 C2 第 4 點）
   - `momentum/core/contracts.py::split_per_symbol`（建 plan 時寫入指紋）
   - `momentum/Analysis/ic_split_adapter.py::_build_plan_pair`（同上）
   - `momentum/Analysis/ic_filter_orchestrator.py`（holdout 路徑建 plan 處，同上）
@@ -120,6 +122,9 @@ def derive_event_split_from_plans(
   `ASSERT producer attest WHEN 兩 symbol 於全框交錯 THEN 各自 row_index_local 連續遞增`
   `ASSERT derive_event_split_from_plans WHEN plan 缺 row_index_local 欄 THEN rc!=0 且訊息指名缺欄名（不得以 row_index 回退）`
   `ASSERT derive_event_split_from_plans WHEN 單標的 frame（orchestrator 路徑）THEN row_index_local 逐值 == row_index`
+  `ASSERT SplitPlan WHEN 建構後對 row_index 或 row_index_local 原地寫入 THEN 丟出例外（兩欄皆唯讀）`
+  `ASSERT SplitPlan WHEN 建構後改動呼叫端持有之來源陣列 THEN plan 內兩欄皆不變（已 defensive copy）`
+  `ASSERT producer attest WHEN purge_semantic=timedelta 且該標的 frame 序非時間序 THEN rc!=0 且訊息指名 purge_semantic 與該標的`
 
 ### Task 8.3 — per-symbol 測試段門檻修正
 
@@ -145,6 +150,9 @@ def derive_event_split_from_plans(
 | `M-SU-D1-10` | 成員判定改回以全框 `row_index` 直接索引該 symbol 之 `feature_index` | `test_splitunify_derive.py -k per_symbol`（交錯 fixture） |
 | `M-SU-D1-11` | producer 之 attest 改為「不等就以寫入值為準」（不 fail-closed） | `test_splitunify_derive.py -k per_symbol` 與 producer 契約測試 |
 | `M-SU-D1-12` | `derive` 缺 `row_index_local` 時回退用 `row_index` | `test_splitunify_derive.py -k per_symbol`（交錯 fixture） |
+| `M-SU-D1-13` | 建構時不複製 row 陣列（保留呼叫端別名） | producer 契約測試（改來源陣列後 plan 應不變） |
+| `M-SU-D1-14` | 不設 `setflags(write=False)`（允許原地改寫） | producer 契約測試（原地寫入應丟例外） |
+| `M-SU-D1-15` | frame 序非時間序時 attest 靜默跳過 | producer 契約測試（應 fail-closed 並指名 `purge_semantic`） |
 
 ### 殘留（承原檔 §N；本延伸覆寫其中一列之狀態，另一列住 TODO §E）
 
