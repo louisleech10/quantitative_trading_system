@@ -36,4 +36,6 @@
 ① **D-001 第 189 行所列「六個下游單鍵面」是不完整清單**——四家合併盤點後約 15 處（另含 `counterexample_classifier`／`candidate_ledger`／`event_split.build_time_clusters`／`ic_feed` survivor 六鍵／`frontend/src/lib/types.ts`／`frontend/src/app/search/page.tsx:825-835` 的 event_id Map／`tests/golden/splitunify/{splitunify_golden,clusters_oracle}.json`）。SPEC 觸及面**不得沿用那六處**。
 ② **D-001 第 11／189 行「未完成前多 TF 同批維持 fail-closed」與實況不符**——主委探針與 codex Probe A 逐值一致（4 列輸入、2 列輸出、`UNSELECTED_ROWS_DROPPED 2`）：現行只擋「同一 TF 下事件重複」與「選定 TF 下缺 cutoff」，**多 TF 同批不擋，未選中的列靜默丟棄且不揭露**。該句須於 SPEC 更正。
 
-下一步：依收斂六群起草第 9 批 SPEC（需 `gate.sh artifact` token）；範圍決策「一次改完全部消費面 vs 先做揭露、後做複合鍵」待定。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
+**`docs/SPLITUNIFY_SPEC.D-002.md` 已建立**（BASE `1be5be3f`、PREDECESSOR D-001；`doc_format_precheck` rc=0）。範圍策略已定：**揭露先行（Phase 9A）＋ 複合鍵主體（Phase 9B）**，同一份 SPEC 分兩階段——揭露成本極低且立刻消除「靜默丟棄」的誠實性缺陷，不必等 15 處全改完。D-002 首要義務是**更正 D-001 第 11／189 行**那兩處與實況不符的陳述（義務區塊 `D-002-CORRECT` (1.1)–(1.4)），並把觸及面由六處重寫為 15 處（分三層、逐處附碼證與「會報錯 vs 靜默錯」分類）。另順道處置 `M-SU-D1-23`：本延伸既必然動 golden，fixture 改兩標的交錯使該 mutation 可觸發。
+
+下一步：派三家對 D-002 找碴（adversarial；中／大任務必要管線，不得跳）→ 收斂 → 三家戳記 → 才進 Task 9.1 實作。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
