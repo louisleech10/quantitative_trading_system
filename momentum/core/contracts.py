@@ -729,6 +729,7 @@ def split_per_symbol(
     frame["_split_row_pos"] = np.arange(len(frame), dtype=int)
     frame[symbol_col] = _normalize_symbol_array(frame[symbol_col].to_numpy())
     ts = frame[ts_col].to_numpy()
+    _ts_dt_index = pd.DatetimeIndex(_coerce_timestamp_array(ts))
     symbols = frame[symbol_col].to_numpy()
     normalized_allowed = _normalize_allowed_symbols(allowed_symbols)
     plans: List[Tuple[SplitPlan, SplitPlan]] = []
@@ -748,7 +749,12 @@ def split_per_symbol(
             test_local_arr = np.asarray(test_local, dtype=int)
             train_rows = positions[train_local_arr]
             test_rows = positions[test_local_arr]
-            _ts_idx = pd.Index(ts)
+            # 🔴 指紋之時鐘＝**plan 自己 `time_bounds` 的時鐘**（`_coerce_timestamp_array`），
+            #    不在此新造第二套換算。本模組既有約定為「純數字＝epoch 秒」，把秒直接餵給
+            #    毫秒正規化器會被 `assert_epoch_ms_array` 指名擋下
+            #    （`tests/golden/ic_phase1_contract` 之 `test_split_per_symbol_golden` 實測）。
+            #    兩欄若各用一套時鐘，同一個 plan 會自我矛盾——那正是本 epic 要消滅的東西。
+            _ts_idx = _ts_dt_index
             _ms_train = epoch_ms_from_index(
                 _ts_idx[train_rows], role="split_per_symbol: train feature_ts"
             )

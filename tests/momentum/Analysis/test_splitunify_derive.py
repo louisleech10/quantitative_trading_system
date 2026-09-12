@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from momentum.core.split_preview import build_row_time_fingerprint
+
 from momentum.Analysis.event_samples.event_split import split_events
 from momentum.Analysis.event_samples.split_projection import (
     EVENT_KEY_COLUMNS,
@@ -54,19 +56,61 @@ def _plans(index: pd.Index, *, symbol: str = SYM):
         base_universe_hash="deadbeef",
         symbol=symbol,
     )
+    # 🔴 SPLITUNIFY D-001 (4.3)：fixture 之 index 即該 symbol 自己的 post-trim 索引，
+    #    故 `row_index_local` 逐值等於 `row_index`；指紋由共用序列化器產生（與 producer 同一支）。
+    ms = np.asarray(index, dtype="int64")
+
+    def _fp(rows):
+        return build_row_time_fingerprint(
+            positions=np.asarray(rows, dtype=int),
+            feature_ts_ms=ms[np.asarray(rows, dtype=int)],
+            symbol=symbol,
+            base_universe_hash="deadbeef",
+        )
+
     train = SplitPlan(
         split_label="train",
         row_index=b["train_row_index"],
         time_bounds=(int(index[0]), int(index[b["train_row_index"][-1]])),
+        row_index_local=np.asarray(b["train_row_index"], dtype=int),
+        row_time_fingerprint=_fp(b["train_row_index"]),
         **kw,
     )
     test = SplitPlan(
         split_label="test",
         row_index=b["test_row_index"],
         time_bounds=(int(index[b["test_row_index"][0]]), int(index[-1])),
+        row_index_local=np.asarray(b["test_row_index"], dtype=int),
+        row_time_fingerprint=_fp(b["test_row_index"]),
         **kw,
     )
     return train, test, b
+
+
+def _sp(**kw) -> SplitPlan:
+    """測試用 `SplitPlan` 工廠：補上 D-001 (4.3) 之 `row_index_local` 與逐列指紋。
+
+    🔴 投影端**只消費** `row_index_local`（D-001 (4.10)），故「壞形狀」測試一律把壞值
+    **同時**放進兩欄，原本要驗的那道守衛才會照舊觸發（而不是被缺欄檢查搶先）。
+    指紋算不出來時給非空佔位字串——形狀閘在指紋比對**之前**，不影響該類測試的斷言。
+    """
+    idx = kw.pop("_index", None)
+    if idx is None:
+        idx = _feature_index()
+    kw.setdefault("row_index_local", np.asarray(kw["row_index"]))
+    if "row_time_fingerprint" not in kw:
+        try:
+            loc = np.asarray(kw["row_index_local"], dtype=int)
+            ms = np.asarray(idx, dtype="int64")
+            kw["row_time_fingerprint"] = build_row_time_fingerprint(
+                positions=loc,
+                feature_ts_ms=ms[loc],
+                symbol=str(kw.get("symbol") or ""),
+                base_universe_hash=str(kw.get("base_universe_hash") or ""),
+            )
+        except Exception:
+            kw["row_time_fingerprint"] = "0" * 64
+    return SplitPlan(**kw)
 
 
 def _event_keys(rows) -> pd.DataFrame:
@@ -256,7 +300,7 @@ def test_dual_membership_raises_not_silent_pick() -> None:
     """
     index, train, _, _, _, _ = _basic_case()
     tr = np.asarray(train.row_index, dtype=int)
-    overlapping_test = SplitPlan(
+    overlapping_test = _sp(
         split_label="test",
         index_kind="positional",
         row_index=tr,  # 與 train 完全重疊
@@ -315,7 +359,7 @@ def test_plan_universes_differ_is_fail_closed() -> None:
     `base_universe_hash` 是 `SplitPlan` 已經帶著的身份欄，投影原本完全沒看它。
     """
     index, train, test, keys, man, _ = _basic_case()
-    other_universe = SplitPlan(
+    other_universe = _sp(
         split_label="test",
         index_kind="positional",
         row_index=np.asarray(test.row_index, dtype=int),
@@ -336,10 +380,15 @@ def test_same_source_shifted_feature_index_is_fail_closed() -> None:
     grok 的反例逐字：control `ev3=test`，把 index 整體 +50 根後 `ev3` 變 `train`、
     `labels_equal=False`，而全程 `NO_RAISE`。`base_universe_hash` 只是**字面**，
     plan 帶著相同字面卻建在另一份網格上時，同一個 row number 指到不同時刻。
+
+    🔴 D-001 (4.13) 上線後，這個反例改由**更前面**的入口重驗（逐列時刻指紋）擋下：
+       平移後 `index_ms[rows]` 逐值不同 ⇒ 重算指紋 ≠ plan 攜帶值。斷言字面跟著改到
+       實際擋下它的那道閘，**不是**放寬成「有 raise 就算過」。原本那道 `time_bounds`
+       同源閘仍有自己的覆蓋，見 `-k time_bounds_inconsistent`。
     """
     index, train, test, keys, man, _ = _basic_case()
     shifted = pd.Index([int(v) + 50 * H1 for v in index], dtype="int64")
-    with pytest.raises(ValueError, match="不同源"):
+    with pytest.raises(ValueError, match="指紋不符"):
         derive_event_split_from_plans(train, test, keys, shifted, manifest=man, bucket_ms=H1)
 
 
@@ -349,12 +398,38 @@ def test_same_source_plans_from_shorter_grid_is_fail_closed() -> None:
     row_index 落在長 index 的長度內 ⇒ 既有的長度閘放行，但同一個 row number 指到不同時刻，
     投影**靜默成功**（composer 實跑 `RESULT: succeeded`；codex 實跑
     `RETURNED {'assignments': 2, 'purged': 2}`）。
+
+    🔴 同上：D-001 (4.13) 之入口重驗排在 `time_bounds` 同源閘**之前**，兩份網格之
+       逐列時刻不同 ⇒ 指紋先不符。
     """
     index, _, _, keys, man, _ = _basic_case()
     short = pd.Index([int(index[0]) + i * H1 * 2 for i in range(len(index))], dtype="int64")
     short_train, short_test, _ = _plans(short)          # 同 symbol、同 hash 字面，網格不同
-    with pytest.raises(ValueError, match="不同源"):
+    with pytest.raises(ValueError, match="指紋不符"):
         derive_event_split_from_plans(short_train, short_test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_plan_time_bounds_inconsistent_with_own_rows_is_fail_closed() -> None:
+    """🔴 `time_bounds` 同源閘之**專屬**覆蓋（`-k time_bounds_inconsistent`）。
+
+    指紋閘上線後，上面兩條 B3 反例改由指紋擋下；若不另立本條，這道閘會變成
+    **沒有任何測試會因它被刪掉而變紅**的死碼。本條讓指紋**成立**（同一份網格、同一批
+    列）而只把 plan 自己攜帶的 `time_bounds` 寫錯 ⇒ 只剩這道閘能擋。
+    """
+    index, train, test, keys, man, _ = _basic_case()
+    bad_bounds = _sp(
+        split_label="test",
+        index_kind="positional",
+        row_index=np.asarray(test.row_index, dtype=int),
+        time_bounds=(int(index[0]), int(index[1])),      # ← 唯一的差別：與自己的列不一致
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="deadbeef",
+        symbol=SYM,
+    )
+    with pytest.raises(ValueError, match="不同源"):
+        derive_event_split_from_plans(train, bad_bounds, keys, index, manifest=man, bucket_ms=H1)
 
 
 def test_same_source_accepts_datetime_time_bounds() -> None:
@@ -364,7 +439,7 @@ def test_same_source_accepts_datetime_time_bounds() -> None:
     單位分派是**型別驅動**：datetime-like 轉毫秒；整數必須本來就是毫秒（餵秒會被擋）。
     """
     index, train, test, keys, man, _ = _basic_case()
-    ts_train = SplitPlan(
+    ts_train = _sp(
         split_label="train",
         index_kind="positional",
         row_index=np.asarray(train.row_index, dtype=int),
@@ -383,7 +458,7 @@ def test_same_source_accepts_datetime_time_bounds() -> None:
 def test_same_source_rejects_second_unit_time_bounds() -> None:
     """整數 `time_bounds` 只接受**毫秒**：餵秒必須被指名擋下（不得靜默 ×1000）。"""
     index, train, test, keys, man, _ = _basic_case()
-    seconds = SplitPlan(
+    seconds = _sp(
         split_label="train",
         index_kind="positional",
         row_index=np.asarray(train.row_index, dtype=int),
@@ -405,7 +480,7 @@ def test_single_symbol_batch_unaffected() -> None:
 
 def test_non_positional_index_kind_is_fail_closed() -> None:
     index, train, test, keys, man, _ = _basic_case()
-    bad = SplitPlan(
+    bad = _sp(
         split_label="test",
         index_kind="row_id",
         row_index=np.asarray(test.row_index, dtype=int),
@@ -423,7 +498,7 @@ def test_non_positional_index_kind_is_fail_closed() -> None:
 def test_empty_test_rows_is_fail_closed_not_none_compare() -> None:
     """test 段為空 ⇒ 先 fail-closed，禁與 `None` 比較（R4 之 F1）。"""
     index, train, _, keys, man, _ = _basic_case()
-    empty_test = SplitPlan(
+    empty_test = _sp(
         split_label="test",
         index_kind="positional",
         row_index=np.asarray([], dtype=int),
@@ -584,7 +659,7 @@ def test_plan_symbol_mismatch_is_fail_closed() -> None:
 def test_plan_without_symbol_is_fail_closed() -> None:
     """plan 沒有 symbol ⇒ 無法證明邊界屬於本批。"""
     index, train, test, keys, man, _ = _basic_case()
-    anon = SplitPlan(
+    anon = _sp(
         split_label="train",
         index_kind="positional",
         row_index=np.asarray(train.row_index, dtype=int),
@@ -595,7 +670,7 @@ def test_plan_without_symbol_is_fail_closed() -> None:
         base_universe_hash="deadbeef",
         symbol=None,
     )
-    anon_test = SplitPlan(
+    anon_test = _sp(
         split_label="test",
         index_kind="positional",
         row_index=np.asarray(test.row_index, dtype=int),
@@ -625,7 +700,7 @@ def test_mixed_unit_index_is_fail_closed() -> None:
 def test_negative_row_index_is_fail_closed() -> None:
     """🔴 負 positional index 必須 raise——numpy 會回捲成尾端列，靜默給錯歸屬。"""
     index, train, test, keys, man, _ = _basic_case()
-    bad = SplitPlan(
+    bad = _sp(
         split_label="train",
         index_kind="positional",
         row_index=np.asarray([-3, -2, -1], dtype=int),
@@ -642,7 +717,7 @@ def test_negative_row_index_is_fail_closed() -> None:
 
 def test_row_index_out_of_range_is_fail_closed() -> None:
     index, train, test, keys, man, _ = _basic_case()
-    bad = SplitPlan(
+    bad = _sp(
         split_label="train",
         index_kind="positional",
         row_index=np.asarray([0, 1, N_BARS + 5], dtype=int),
@@ -706,7 +781,7 @@ def test_duplicate_event_id_is_fail_closed() -> None:
 def test_float_row_index_is_fail_closed() -> None:
     """🔴 非整數 `row_index` ⇒ raise（I4）：`dtype=int` 截斷（0.5→0）是**靜默改變歸屬**。"""
     index, train, test, keys, man, _ = _basic_case()
-    bad = SplitPlan(
+    bad = _sp(
         split_label="train", index_kind="positional",
         row_index=np.asarray([0.5, 1.5, 2.5, 3.5, 4.5]),
         time_bounds=train.time_bounds, purge_gap=PURGE, embargo=EMBARGO,
@@ -760,7 +835,7 @@ def test_datetime_index_unsorted_is_fail_closed() -> None:
 def test_unsorted_row_index_is_fail_closed() -> None:
     """🔴 `row_index` **反序** ⇒ raise（J2）：範圍與唯一性都對，但 `row_index[0]` 不是最早的列。"""
     index, train, test, keys, man, _ = _basic_case()
-    rev = SplitPlan(
+    rev = _sp(
         split_label="test", index_kind="positional",
         row_index=np.asarray(test.row_index, dtype=int)[::-1],
         time_bounds=test.time_bounds, purge_gap=PURGE, embargo=EMBARGO,

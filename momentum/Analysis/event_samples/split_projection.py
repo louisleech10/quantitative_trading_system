@@ -345,7 +345,8 @@ def _derive_single_symbol(
        `train_cutoff and label_end_ms >= test_start_ms` ⇒ purged。
        `purge_gap`／`embargo` 是 **row 單位且已含在 `test_plan.row_index[0]` 這個起點裡**，
        **不得**再以毫秒相減（舊式的 `test_start` 在緩衝**之前**，canonical 的在**之後**）。
-    2. **集合成員判定**——`feature_cutoff_ms ∈ feature_index[plan.row_index]` 決定 train／test；
+    2. **集合成員判定**——以 `row_index_local` 索引該 symbol 之 `feature_index`，
+       `feature_cutoff_ms ∈ feature_index[plan.row_index_local]` 決定 train／test；
        皆不在 ⇒ purged。**禁**以 `time_bounds` 閉區間取代集合、**禁** nearest／asof／ffill。
 
     少了第一段就是把事件側唯一擋標籤窗跨界洩漏的閘刪掉——`SPLITUNIFY` v3 犯過一次，
@@ -446,12 +447,46 @@ def _derive_single_symbol(
         )
 
     index_ms = _index_as_ms(feature_index)
+    # 🔴 D-001 (4.12)：缺欄即 fail-closed，且**不得**以 `row_index` 回退
+    #    （回退正是交錯標的越界之來源）。非 derive 之呼叫點才給相容 default。
+    for _plan, _label in ((train_plan, "train"), (test_plan, "test")):
+        if getattr(_plan, "row_index_local", None) is None:
+            raise ValueError(
+                f"derive_event_split_from_plans: {_label}_plan 缺 row_index_local 欄"
+                "——投影端只消費標的內序號，禁以 row_index 回退（fail-closed）"
+            )
+        if not str(getattr(_plan, "row_time_fingerprint", "")):
+            raise ValueError(
+                f"derive_event_split_from_plans: {_label}_plan 缺 row_time_fingerprint 欄"
+                "——入口重驗是權威守衛，缺指紋即無法證明列未被竄改（fail-closed）"
+            )
+    # 🔴 D-001 (4.10)：投影端**一律只讀** `row_index_local`，內部不得索引 `row_index`。
+    #    🔴 (4.14)：此處之嚴格遞增**不得**關閉——指紋先依序號排序再雜湊，對同集合**重排不敏感**，
+    #    擋重排者正是本閘；指紋與遞增閘為**合取**，缺一不可。
     train_rows = assert_positional_rows(
-        train_plan.row_index, n=index_ms.size, role="derive: train_plan"
+        train_plan.row_index_local, n=index_ms.size, role="derive: train_plan"
     )
     test_rows = assert_positional_rows(
-        test_plan.row_index, n=index_ms.size, role="derive: test_plan"
+        test_plan.row_index_local, n=index_ms.size, role="derive: test_plan"
     )
+    # 🔴 D-001 (4.13) 權威守衛＝入口重驗：以**傳入的** feature_index 重算指紋並與 plan 攜帶值
+    #    逐值比對。建構後竄改序號若改變成員集合，必在此擋下（改順序則由上方遞增閘擋）。
+    for _plan, _rows, _label in (
+        (train_plan, train_rows, "train"), (test_plan, test_rows, "test")
+    ):
+        _recomputed = build_row_time_fingerprint(
+            positions=_rows,
+            feature_ts_ms=index_ms[_rows],
+            symbol=str(getattr(_plan, "symbol", "")),
+            base_universe_hash=str(getattr(_plan, "base_universe_hash", "")),
+        )
+        if _recomputed != str(_plan.row_time_fingerprint):
+            raise ValueError(
+                f"derive_event_split_from_plans: {_label}_plan 逐列時刻指紋不符——"
+                f"plan 指紋 {str(_plan.row_time_fingerprint)[:12]} vs "
+                f"重算指紋 {_recomputed[:12]}"
+                "（列被竄改，或 feature_index 與 plan 非同源；fail-closed）"
+            )
     if test_rows.size == 0:
         # 🔴 先 fail-closed，禁與 None 比較（R4 之 F1）。
         raise ValueError(f"{_REASON_MISSING_TEST}: test_plan.row_index 為空（fail-closed）")

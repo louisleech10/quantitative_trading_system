@@ -22,7 +22,7 @@ from momentum.Analysis.event_samples import pipeline as pipeline_mod
 from momentum.Analysis.event_samples.pipeline import EventPipelineConfig, EventSamplePipeline
 from momentum.Analysis.event_samples.types import EventSplitConfig
 from momentum.core.contracts import SplitPlan
-from momentum.core.split_preview import holdout_boundary
+from momentum.core.split_preview import build_row_time_fingerprint, holdout_boundary
 from tests.momentum.event_samples.helpers import load_bars, make_event
 
 TF = "12h"
@@ -65,10 +65,24 @@ def _canonical(records, bars):
     b = holdout_boundary(index, oos_test_size=OOS, purge_gap=PURGE, embargo=EMBARGO)
     kw = dict(index_kind="positional", purge_gap=PURGE, embargo=EMBARGO,
               purge_semantic="rows", base_universe_hash="deadbeef", symbol=SYM)
+    # 🔴 SPLITUNIFY D-001 (4.3)：本 fixture 之 index 即該 symbol 自己的索引，
+    #    故 row_index_local 逐值等於 row_index；指紋用共用序列化器（與 producer 同一支）。
+    _ms = np.asarray(index, dtype="int64")
+
+    def _fp(rows):
+        _loc = np.asarray(rows, dtype=int)
+        return build_row_time_fingerprint(
+            positions=_loc, feature_ts_ms=_ms[_loc], symbol=SYM, base_universe_hash="deadbeef"
+        )
+
     train = SplitPlan(split_label="train", row_index=b["train_row_index"],
-                      time_bounds=(int(index[0]), int(index[b["train_row_index"][-1]])), **kw)
+                      time_bounds=(int(index[0]), int(index[b["train_row_index"][-1]])),
+                      row_index_local=np.asarray(b["train_row_index"], dtype=int),
+                      row_time_fingerprint=_fp(b["train_row_index"]), **kw)
     test = SplitPlan(split_label="test", row_index=b["test_row_index"],
-                     time_bounds=(int(index[b["test_row_index"][0]]), int(index[-1])), **kw)
+                     time_bounds=(int(index[b["test_row_index"][0]]), int(index[-1])),
+                     row_index_local=np.asarray(b["test_row_index"], dtype=int),
+                     row_time_fingerprint=_fp(b["test_row_index"]), **kw)
     return train, test, index
 
 

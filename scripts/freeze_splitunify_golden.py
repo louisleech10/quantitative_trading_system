@@ -68,10 +68,25 @@ def _plans(index: pd.Index):
     b = holdout_boundary(index, oos_test_size=OOS, purge_gap=PURGE, embargo=EMBARGO)
     kw = dict(index_kind="positional", purge_gap=PURGE, embargo=EMBARGO,
               purge_semantic="rows", base_universe_hash="splitunify-golden", symbol=SYM)
+    # 🔴 SPLITUNIFY D-001 (4.3)：本 fixture 之 index 即該 symbol 自己的索引（單標的）⇒
+    #    `row_index_local` 逐值等於 `row_index`；指紋走**與 producer 同一支**序列化器。
+    ms = np.asarray(index, dtype="int64")
+
+    def _fp(rows: Any) -> str:
+        loc = np.asarray(rows, dtype=int)
+        return build_row_time_fingerprint(
+            positions=loc, feature_ts_ms=ms[loc],
+            symbol=SYM, base_universe_hash="splitunify-golden",
+        )
+
     train = SplitPlan(split_label="train", row_index=b["train_row_index"],
-                      time_bounds=(int(index[0]), int(index[b["train_row_index"][-1]])), **kw)
+                      time_bounds=(int(index[0]), int(index[b["train_row_index"][-1]])),
+                      row_index_local=np.asarray(b["train_row_index"], dtype=int),
+                      row_time_fingerprint=_fp(b["train_row_index"]), **kw)
     test = SplitPlan(split_label="test", row_index=b["test_row_index"],
-                     time_bounds=(int(index[b["test_row_index"][0]]), int(index[-1])), **kw)
+                     time_bounds=(int(index[b["test_row_index"][0]]), int(index[-1])),
+                     row_index_local=np.asarray(b["test_row_index"], dtype=int),
+                     row_time_fingerprint=_fp(b["test_row_index"]), **kw)
     return train, test, b
 
 

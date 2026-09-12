@@ -600,8 +600,9 @@ def _build_holdout_split_plan(
     #    轉成 DatetimeIndex，**不新造第二套換算**（實測：直接餵秒會被
     #    `assert_epoch_ms_array` 擋下並指名「looks like epoch seconds」）。
     #    `base_universe_hash`／`time_bounds` 仍用**原始**索引——改用正規化後的會動到既有指紋。
+    _feature_dt_index = _normalize_ic_time_index(features_df.index, "features_df")
     boundary = holdout_boundary(
-        _normalize_ic_time_index(features_df.index, "features_df"),
+        _feature_dt_index,
         oos_test_size=float(config.oos_test_size),
         purge_gap=effective_purge,
         embargo=effective_embargo,
@@ -635,11 +636,14 @@ def _build_holdout_split_plan(
     #    該標的自己的索引位置 ⇒ `row_index_local` 逐值等於 `row_index`（D-001 Task 8.2 之斷言）。
     _train_local = np.asarray(train_rows, dtype=int)
     _test_local = np.asarray(test_rows, dtype=int)
+    # 🔴 指紋之時鐘＝本函式**已經**用來切邊界的那一支（`_normalize_ic_time_index`，見上方
+    #    註解「不新造第二套換算」）。本路徑之 `features_df.index` 是 epoch **秒**，直接餵給
+    #    毫秒正規化器會被擋（`tests/api/test_splitunify_disclosure.py` 實測）。
     _ms_train = epoch_ms_from_index(
-        features_df.index[_train_local], role="ic_holdout: train feature_ts"
+        _feature_dt_index[_train_local], role="ic_holdout: train feature_ts"
     )
     _ms_test = epoch_ms_from_index(
-        features_df.index[_test_local], role="ic_holdout: test feature_ts"
+        _feature_dt_index[_test_local], role="ic_holdout: test feature_ts"
     )
     train_plan = SplitPlan(
         split_label="train",
