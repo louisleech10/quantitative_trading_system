@@ -14,40 +14,40 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 ## 觸及面宣告
 
-新增: `D-002-C0`（術語）、`D-002-C1`（複合鍵語意）、`D-002-C2`（揭露義務）、`D-002-C3`（同側約束）、`Task 9.1`～`Task 9.5`
+新增: `D-002-C0`（術語）、`D-002-C3`（同側約束）、`D-002-C4`（對 D-001 之更正）、`D-002-C5`（單鍵消費面）、`D-002-C6`（量詞分離）、`Task 9.1`～`Task 9.5`
 覆寫: D-001 第 11 行與第 189 行之 `SU-RESID-2` 相關句（見 `D-002-C4`）
 依賴: `## §V 驗證策略與邊界測試目錄`；`## §G Golden / Baseline`
 不觸: D-001 之 `D-001-C1`／`D-001-C2`／`Task 8.1`～`8.3`
 
 ## 內容
 
-### D-002-C0 術語：兩種 timeframe 必須分名（`CODEX-R1-P1-03`）
+### D-002-C0 術語：兩種 timeframe 必須分名
 
 <!-- OBLIGATIONS-BEGIN id=D-002-C0 -->
 
-**(0.1)** 本 epic 既有的 `timeframe` 一詞承載**兩種不同語意**，本延伸起**一律分名**，全檔與實作不得再用裸 `timeframe`：
+**(0.1) 分名義務**：本 epic 既有的 `timeframe` 一詞承載**兩種不同語意**，本延伸起**一律分名**，全檔與實作不得再用裸 `timeframe`：
 
-**(0.2)** `trigger_timeframe`＝**事件觸發**所在的 TF。它是 `canonical_event_id(symbol, timeframe, t0)` 的第二個引數，決定 `event_id` 本身；同一時刻在不同 trigger TF 下是**不同事件**。
+**(0.2) 觸發 TF 之定義**：`trigger_timeframe`＝**事件觸發**所在的 TF。它是 `canonical_event_id(symbol, timeframe, t0)` 的第二個引數，決定 `event_id` 本身；同一時刻在不同 trigger TF 下是**不同事件**。
 
-**(0.3)** `feature_timeframe`＝**分析特徵**所在的 TF，即 `per_tf.timeframe`（`receipts.per_tf` 之 `timeframe` 欄）與 `selected_timeframe` 所指者。同一事件可有多個 feature TF，這正是 `SU-RESID-2` 要支援的維度。
+**(0.3) 特徵 TF 之定義**：`feature_timeframe`＝**分析特徵**所在的 TF，即 `per_tf.timeframe`（`receipts.per_tf` 之 `timeframe` 欄）與 `selected_timeframe` 所指者。同一事件可有多個 feature TF，這正是 `SU-RESID-2` 要支援的維度。
 
-**(0.4)** `SU-RESID-2` 之複合鍵為 `(event_id, feature_timeframe)`，**不是** `(event_id, trigger_timeframe)`——後者不存在多列問題（trigger TF 已編進 `event_id`）。
+**(0.4) 複合鍵之維度**：`SU-RESID-2` 之複合鍵為 `(event_id, feature_timeframe)`，**不是** `(event_id, trigger_timeframe)`——後者不存在多列問題（trigger TF 已編進 `event_id`）。
 
-**(0.5)** 凡本延伸提及「多 TF」「同簇」「同側」「per_tf 多列」，一律指 **feature TF**。實作新增之欄位名須逐字採用 (0.2)／(0.3) 之名稱，禁用裸 `timeframe` 當新欄名。
+**(0.5) 用語適用範圍**：凡本延伸提及「多 TF」「同簇」「同側」「per_tf 多列」，一律指 **feature TF**。實作新增之欄位名須逐字採用 (0.2)／(0.3) 之名稱，禁用裸 `timeframe` 當新欄名。
 
 <!-- OBLIGATIONS-END -->
 
-### D-002-C3 同事件多 feature TF 必須落在同一 split 側（`GROK-R1-P1-03`）
+### D-002-C3 同事件多 feature TF 必須落在同一 split 側
 
 <!-- OBLIGATIONS-BEGIN id=D-002-C3 -->
 
-**(3.1)** 同一 `event_id` 之**所有** feature TF 列，必須全部落在**同一** split 側（同為 train 或同為 test）。
+**(3.1) 同側要求**：同一 `event_id` 之**所有** feature TF 列，必須全部落在**同一** split 側（同為 train 或同為 test）。
 
-**(3.2)** 若某事件之不同 feature TF 被判到不同側（例如 1h→train、4h→test），**整個事件之所有列一律 purged**，purge 理由須為具名字面，不得靜默取一側。
+**(3.2) 異側之處置**：若某事件之不同 feature TF 被判到不同側（例如 1h→train、4h→test），**整個事件之所有列一律 purged**，purge 理由須為具名字面，不得靜默取一側。
 
-**(3.3)** 🔴 **理由（不得以「同簇」代替）**：同簇只保證它們在統計上被視為相關，**不保證同側**。異側時，仍以事件為單位聚合的下游消費者（`baseline`／`pattern_bridge`／IC feed）會把 train 側的特徵與 test 側的標籤組在一起，**組成非法 OOS 樣本**——這正是本 epic 從頭要擋的洩漏形態，且**完全靜默**。
+**(3.3) 同簇不等於同側**：🔴 **不得以「同簇」代替本條**——同簇只保證它們在統計上被視為相關，**不保證同側**。異側時，仍以事件為單位聚合的下游消費者（`baseline`／`pattern_bridge`／IC feed）會把 train 側的特徵與 test 側的標籤組在一起，**組成非法 OOS 樣本**——這正是本 epic 從頭要擋的洩漏形態，且**完全靜默**。
 
-**(3.4)** (3.1)–(3.3) 之檢查必須在**投影端**（`derive_event_split_from_plans`）完成，不得下放給各消費端自行判斷。
+**(3.4) 檢查落點**：(3.1)–(3.3) 之檢查必須在**投影端**（`derive_event_split_from_plans`）完成，不得下放給各消費端自行判斷。
 
 <!-- OBLIGATIONS-END -->
 
@@ -55,13 +55,13 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 <!-- OBLIGATIONS-BEGIN id=D-002-C4 -->
 
-**(4.1)** D-001 第 11 行與第 189 行之句「未完成前多 TF 同批維持 fail-closed」**與實況不符**，以 (4.2) 取代。
+**(4.1) 應更正之句**：D-001 第 11 行與第 189 行之句「未完成前多 TF 同批維持 fail-closed」**與實況不符**，以 (4.2) 取代。
 
-**(4.2)** 現行 `build_event_keys` 擋下的是**兩種**情形：①選定 feature TF 下同一事件有多列 `per_tf`；②選定 feature TF 下事件缺 `feature_cutoff_ms`。它**不擋**「同一批含多個 feature TF」——未被 `selected_timeframe` 選中的列被**靜默丟棄**，無例外、無警告、report 亦不記。
+**(4.2) 現行實況**：現行 `build_event_keys` 擋下的是**兩種**情形：①選定 feature TF 下同一事件有多列 `per_tf`；②選定 feature TF 下事件缺 `feature_cutoff_ms`。它**不擋**「同一批含多個 feature TF」——未被 `selected_timeframe` 選中的列被**靜默丟棄**，無例外、無警告、report 亦不記。
 
-**(4.3)** D-001 第 189 行所列之「下游單鍵面六處」**不是完整清單**；觸及面以本檔 (5.x) 為準。
+**(4.3) 清單不完整**：D-001 第 189 行所列之「下游單鍵面六處」**不是完整清單**；觸及面以本檔 (5.x) 為準。
 
-**(4.4)** (4.1)–(4.3) **不改變** D-001 其餘任何義務；D-001 之 (4.1)–(4.18) 與 `M-SU-D1-01`～`23` 全部繼續有效。
+**(4.4) 更正範圍**：(4.1)–(4.3) **不改變** D-001 其餘任何義務；D-001 之 (4.1)–(4.18) 與 `M-SU-D1-01`～`23` 全部繼續有效。
 
 <!-- OBLIGATIONS-END -->
 
@@ -69,15 +69,15 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 <!-- OBLIGATIONS-BEGIN id=D-002-C5 -->
 
-**(5.1)** 本清單取代 D-001 第 189 行之六處。來源＝四家偵察合併盤點 ＋ 三家找碴補列。實作前須再掃一次並更新本表（見 §N 誠實邊界）。
+**(5.1) 清單效力**：本清單取代 D-001 第 189 行之六處。來源＝四家偵察合併盤點 ＋ 三家找碴補列。實作前須再掃一次並更新本表（見 §N 誠實邊界）。
 
-**(5.2)** **第一層｜producer／投影本體**：`split_projection.build_event_keys`（選定 feature TF 後要求 `event_id` 唯一、`merge validate="1:1"`）；`split_projection` 之 `assignments`／`purged` 組裝（僅以 `event_id` 標識）；`event_split.build_time_clusters`（一 manifest 列對一 `event_id` 列）。
+**(5.2) 第一層｜producer 與投影本體**：`split_projection.build_event_keys`（選定 feature TF 後要求 `event_id` 唯一、`merge validate="1:1"`）；`split_projection` 之 `assignments`／`purged` 組裝（僅以 `event_id` 標識）；`event_split.build_time_clusters`（一 manifest 列對一 `event_id` 列）。
 
-**(5.3)** **第二層｜表格鏈（D-001 原列六處）**：`feature_materialization` 之 `merge validate="many_to_one"`（**會報錯**）與 `groupby("event_id")+row_vals.update` 折疊（🔴 **靜默**，真正的折疊點）與輸出 `set_index("event_id")`（**靜默**只留最後一列）；`baseline`（繼承上游唯一索引）；`pattern_bridge` 之 `set_index("event_id")["split_label"]`（**靜默**取到 Series）；`tables` 兩處 `set_index`（**靜默**）；`ic_feed` 兩處 `set_index` ＋ `.loc[keep["event_id"]]`（**靜默**）；`dedupe` 之 `merge validate="one_to_one"`（**會報錯**）與 `cluster_first` 保留集（**靜默**折掉 TF）。
+**(5.3) 第二層｜表格鏈（D-001 原列六處）**：`feature_materialization` 之 `merge validate="many_to_one"`（**會報錯**）與 `groupby("event_id")+row_vals.update` 折疊（🔴 **靜默**，真正的折疊點）與輸出 `set_index("event_id")`（**靜默**只留最後一列）；`baseline`（繼承上游唯一索引）；`pattern_bridge` 之 `set_index("event_id")["split_label"]`（**靜默**取到 Series）；`tables` 兩處 `set_index`（**靜默**）；`ic_feed` 兩處 `set_index` ＋ `.loc[keep["event_id"]]`（**靜默**）；`dedupe` 之 `merge validate="one_to_one"`（**會報錯**）與 `cluster_first` 保留集（**靜默**折掉 TF）。
 
-**(5.4)** **第三層｜偵察補列**：`counterexample_classifier` 之 `.loc[eid]`（**靜默**綁錯 receipt 列）；`candidate_ledger` 雙 `set_index` ＋ `.loc[eid]`（**靜默**）；`ic_feed.event_context_from_windows` survivor 六鍵（以排序後 `event_id` 列雜湊）；`frontend/src/lib/types.ts` batch_facts ／ `frontend/src/app/search/page.tsx` 之 `byEventId` Map（**靜默**後者覆蓋前者）；`tests/golden/splitunify/{splitunify_golden,clusters_oracle}.json`（以 `event_id` 清單比對，多 TF 因 set 去重而看不出差異）。
+**(5.4) 第三層｜偵察補列**：`counterexample_classifier` 之 `.loc[eid]`（**靜默**綁錯 receipt 列）；`candidate_ledger` 雙 `set_index` ＋ `.loc[eid]`（**靜默**）；`ic_feed.event_context_from_windows` survivor 六鍵（以排序後 `event_id` 列雜湊）；`frontend/src/lib/types.ts` batch_facts ／ `frontend/src/app/search/page.tsx` 之 `byEventId` Map（**靜默**後者覆蓋前者）；`tests/golden/splitunify/{splitunify_golden,clusters_oracle}.json`（以 `event_id` 清單比對，多 TF 因 set 去重而看不出差異）。
 
-**(5.5)** 🔴 **第四層｜記帳與報告鏈（找碴補列；三家全中）**：凡直接讀取或顯示 split count 者——`pipeline` 產出之 `n_train`／`n_test`／`n_purged`、其 API 模型、前端事件批面板、以及既有 wiring 測試中以 `dict(zip(event_id, …))` 建映射之處——具體為 `test_splitunify_wiring.py:103-104`（同 `event_id` 多 feature TF 時**後者覆蓋前者**）。
+**(5.5) 第四層｜記帳與報告鏈**：🔴 凡直接讀取或顯示 split count 者——`pipeline` 產出之 `n_train`／`n_test`／`n_purged`、其 API 模型、前端事件批面板、以及既有 wiring 測試中以 `dict(zip(event_id, …))` 建映射之處——具體為 `test_splitunify_wiring.py:103-104`（同 `event_id` 多 feature TF 時**後者覆蓋前者**）。
 
 <!-- OBLIGATIONS-END -->
 
@@ -85,11 +85,11 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 <!-- OBLIGATIONS-BEGIN id=D-002-C6 -->
 
-**(6.1)** 複合鍵落地後，以下三個量**各自定義、不得互相代用**：`n_events`＝去重後之 `event_id` 數；`n_event_tf_rows`＝`(event_id, feature_timeframe)` 列數；既有之 `n_train`／`n_test`／`n_purged`。
+**(6.1) 三個量之定義**：複合鍵落地後，以下三個量**各自定義、不得互相代用**：`n_events`＝去重後之 `event_id` 數；`n_event_tf_rows`＝`(event_id, feature_timeframe)` 列數；既有之 `n_train`／`n_test`／`n_purged`。
 
-**(6.2)** `n_train`／`n_test`／`n_purged` **一律定義為事件數**（`n_events` 粒度），因為它們的既有消費者（報告分母、前端顯示、既有測試斷言）全部以事件為單位。列數另以 `n_event_tf_rows_train` 等新名承載。
+**(6.2) 三量之粒度**：`n_train`／`n_test`／`n_purged` **一律定義為事件數**（`n_events` 粒度），因為它們的既有消費者（報告分母、前端顯示、既有測試斷言）全部以事件為單位。列數另以 `n_event_tf_rows_train` 等新名承載。
 
-**(6.3)** 任一消費面把列數當事件數顯示或斷言即為缺陷；`Task 9.4` 須逐處指派修改，不得只在本節寫義務而不派工（🔴 本條即 R1 找碴指出之 SPEC 內部不自洽）。
+**(6.3) 派工義務**：任一消費面把列數當事件數顯示或斷言即為缺陷；`Task 9.4` 須逐處指派修改，**不得**只在本節寫義務而不派工。
 
 <!-- OBLIGATIONS-END -->
 
@@ -118,7 +118,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 - **必填理由**：命中 (a)(d)。
 - **凍結時機**：Task 9.1 動工前，以現行單 TF fixture 重跑 `scripts/freeze_splitunify_golden.py` 取得 baseline（`GOLDEN OK` 為前置條件）。
-- 🔴 **兩件事必須分開敘明（`CODEX-R1-P2-05`／`GROK-R1-P2-02`）**：
+- 🔴 **兩件事必須分開敘明**：
   - **(G-1)** 「複合鍵本身不改指紋 payload」為真——`build_row_time_fingerprint` 之 payload 為 `[position, feature_ts_ms, symbol, base_universe_hash]`，不含任何 TF 欄，故 `g5` **不因複合鍵而位移**。
   - **(G-2)** 但「把 fixture 改為兩標的交錯」（順道處置 `M-SU-D1-23`）**會**移動 `g5` 的 positions／feature_ts_ms／sha——那是 **fixture 變更**造成的，與 (G-1) 不衝突。⇒ 交錯 fixture 須**新增為平行組**並重凍其 `g5`，**單標的舊值保留為回歸錨、不得刪除**。
 - **(G-3)** 多 TF 平行組中，`feature_timeframe` 為**parent key**（分組鍵），**不進** `g5` 之 fingerprint payload；`g1_membership`／`g3b_oracle` 須擴維為 `(event_id, feature_timeframe)` 或新增 `*_multi_tf` 平行組。
@@ -128,7 +128,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 
 #### Phase 9A — 揭露先行（依賴：無）
 
-**Task 9.1 — 丟棄列數之完整資料流契約**（`CODEX-R1-P1-02`／`COMPOSER-R1-P2-01`／`GROK-R1-P2-03`）
+**Task 9.1 — 丟棄列數之完整資料流契約**
 - 目標：在複合鍵落地**之前**，先消除「靜默丟棄」之誠實性缺陷，且必須讓**終端使用者**看得到。
 - **返回形狀**（契約，缺一不可）：`build_event_keys` 回傳之 keyed 事件表外，另回傳
   `discarded: Dict[str, int]`——鍵為被丟棄之 `feature_timeframe`、值為列數；無丟棄時為 `{}`（**不得**省略或回 `None`）。
@@ -145,7 +145,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 - 改法：三表各加 `feature_timeframe` 欄（逐字採 `D-002-C0` (0.3) 之名）；`receipts.per_tf` **不改形狀**。
 - summary 依 `D-002-C6` 同時提供 `n_events` 與 `n_event_tf_rows`。
 
-**Task 9.3 — 16 處消費面逐處列名改法**（`CODEX-R1-P1-04`／`GROK-R1-P1-02`）
+**Task 9.3 — 16 處消費面逐處列名改法**
 - 🔴 **不得**用「凡 `set_index("event_id")` 一律改」這種形狀規則——那既會誤改本就一事件一列的 event-level 表，又會漏掉真正折疊資料的 `groupby(...)+update`。**逐處列名，每處註明粒度與改法**：
   - `feature_materialization`：折疊點在 `groupby("event_id")+row_vals.update`，改為 `groupby(["event_id","feature_timeframe"])`；輸出索引改 MultiIndex 並**斷言索引唯一**；`merge validate` 隨粒度調整。
   - `pattern_bridge`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`：`.loc[eid]` 之 scalar lookup 改為複合鍵 lookup，**保留** event-level 表原粒度不動。
