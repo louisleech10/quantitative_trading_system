@@ -8,7 +8,7 @@
 - `contracts.attest_row_index_local`：前置合法性閘（整數型／等長／範圍／無重複／嚴格遞增）＋時間序往返。三個 producer 全數接上。
 - `derive_event_split_from_plans` 改分派器＋`_derive_single_symbol`；per-symbol 迴圈與 `_manifest_subset`；Task 8.3 逐標的門檻。
 - 投影端只讀 `row_index_local`、缺欄 fail-closed 不回退、入口指紋重驗。
-- 🔴 **2026-09-12 修掉上一批的自傷缺陷（producer 端指紋時鐘）**：`split_per_symbol` 的 `ts` 與 `ic_filter_orchestrator` 的 `features_df.index` 皆為 **epoch 秒**，上一批卻直接餵給毫秒正規化器 ⇒ `test_split_per_symbol_golden` 與 `tests/api/test_splitunify_disclosure` 全紅，**IC 實跑路徑亦會被自己的守衛擋死**。修法＝指紋時鐘取該 producer **自己 `time_bounds` 已在用的那一支**（`_coerce_timestamp_array`／`_normalize_ic_time_index`），不新造第二套換算；`ic_split_adapter` 之 `ts` 本為 `datetime64`，維持原樣。
+- 🔴 **2026-09-12 修掉上一批的自傷缺陷（producer 端指紋時鐘）**：`split_per_symbol` 的 `ts` 與 `ic_filter_orchestrator` 的 `features_df.index` 皆為 **epoch 秒**，上一批卻直接餵給毫秒正規化器 ⇒ `test_split_per_symbol_golden` 與 `tests/api/test_splitunify_disclosure` 全紅，**IC 實跑路徑亦會被自己的守衛擋死**。修法＝指紋時鐘取該 producer **模組內既有的那一支**，不新造第二套換算：`split_per_symbol` 與其 `time_bounds` 共用 `_coerce_timestamp_array`；`ic_filter_orchestrator` 之 `time_bounds` 走 `_coerce_timestamp_array`、指紋走該檔切邊界時**已經在用**的 `_normalize_ic_time_index`——🔴 **兩者是不同函式**（grok R1 指正我先前「同一支」的措辭不精確），但對 epoch 秒皆以 `unit="s"` 解讀，端點實測相等（`ms0 == tb0_ms`）；`ic_split_adapter` 之 `ts` 本為 `datetime64`，維持原樣。
 - 測試：目標測試面 **738 passed**；`freeze_splitunify_golden.py` 回報 **GOLDEN OK**（digest 未位移）。新增 `-k time_bounds_inconsistent`，使 `time_bounds` 同源閘不因指紋閘上線而變成沒有測試會紅的死碼。
 
 ## b8 未完成
