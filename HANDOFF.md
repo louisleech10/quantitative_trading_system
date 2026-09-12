@@ -83,6 +83,8 @@
 
 **D-002 第五次修訂已完成**（commit `d073ce7f`；obligation／format rc=0，xref 對 r1–r4 四份 synth 皆 rc=0）：`Task 9.2` 範圍再加四參數閘與其 docstring、驗收改**端到端**經 `EventSamplePipeline.run`；**新增 `Task 9.2b`**（指名 `split_projection.py:530-553` 改以 `manifest.table` 之 `decision_at_ms` 每事件定側並廣播，答案窗 purge 改按事件側）；§V 增端到端全量斷言與 `selected_timeframe=None` 不 raise，原 schema 句改掛 `Task 9.2a`；`(5.2)` 改寫為落地後契約；mutation 20 → **23 條**；觸及面補列 `Task 9.2b`。
 
+🔴 **`Task 9.2b` 之可行性已由主委自驗（不是照抄委員的話）**：①`_derive_single_symbol` 簽名第 337 行逐字 `manifest: EventManifest`，**確在作用域**；②`dedupe.py:107` 逐字 `"decision_at_ms": ev["decision_at_ms"].astype("int64").to_numpy()`——`manifest.table` 之該欄是**顯式建構且固定 int64**（非 pass-through 僥倖），與 `train_ms`／`test_ms` 比較無型別落差；③`_manifest_subset`（`split_projection.py:671-681`）只濾列不砍欄，逐 symbol 切片後該欄仍在。**誠實邊界**：`build_event_manifest` 只對 `label_start_ms`／`label_end_ms` 做缺欄 fail-closed，**未**對 `decision_at_ms` 設防；且 `_EVENT_COLS`（`alignment.py:31`）這個常數**沒有任何地方拿它驗欄**（grep 零命中）⇒ `Task 9.2b` 仍應配一條「取不到 `decision_at_ms` 即 fail-closed」的前置斷言，不得假設欄位必在。
+
 **R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
 
 其後：三家放行 → 戳記 → 才進 `Task 9.1` 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`。
