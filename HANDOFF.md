@@ -207,6 +207,11 @@
 
 **D-002 第九次修訂已完成**（commit 見下；obligation／format rc=0，xref 對 **r1–r8 八份** synth 皆 rc=0；mutation 表列 26／ID 01–26 連續；`SU-RESID-9A-UI` 已真的入 §N，`grep -c` ＝ 3）。**本輪兩處是我自己的缺陷**：K5（我在 R7 才把判準改成時間域，**改完四條規則彼此重疊**——`decision=50` 同時命中 train 與界外，codex 獨得）與 K2（**寫了「登記於 §N」卻沒登記**，三家獨立抓到）。另 K3 我**駁回** composer 前提並更正自己先前「採較嚴版」的套用錯誤（範本 `reason_code` 閉集為四值、`R-BRIEF-1` 以架構為 `blocked-by` 對象）。
 
+🔴 **R9 grok 已交，與 composer 四條全部撞題；主委複驗其兩條關鍵事實，成立且比它說的更嚴重**：
+- **現行 golden fixture 全部事件 `decision == cutoff`**：`scripts/freeze_splitunify_golden.py:117` 逐字 `"decision_at_ms": keys["feature_cutoff_ms"].astype("int64")` ⇒ 12 筆事件無一例外。**後果**：整份換錨的行為差異**在現行 golden 上一筆都測不到**——`(G-4d)②` 之「零位移」斷言雖會通過，卻是**空心通過**（沒有 `decision != cutoff` 樣本）；`(G-4d)③` 要求的邊界 fixture **根本還不存在**。⇒ 第十次修訂須把「**freeze fixture 新增 `decision != cutoff` 事件**」列為 `Task 9.2b` 的前置工作，否則 G-4 整組驗收是空的。
+- **`SU-RESID-9A-UI` 缺 `SPEC_TEMPLATE` 強制欄**：`grep` 該條目之 `為何現在不做:` 命中數 **0** ⇒ 我寫的殘留**不符強制格式**（`SPEC_TEMPLATE.md:107-112` 要求每條殘留必須帶該欄）。
+- **`gapX` 構造確認 (G-4c) 擋不住 correlated error**：`decision=950`／`cutoff=900`／`train_last=900`／`test_start=1000`，正解為隔離帶 `purged`；兩邊同寫 R6 不等式 ⇒ 皆判 train、G-3b **綠**；且因 `decision != cutoff`，`(G-4d)②` 不適用。⇒ 必須加 grok 提的**第三份判準**（以三段式含步驟 0 從 fixture 純函式算期望側，與投影／oracle **雙邊**比對；可內嵌測試不必新檔）。
+
 🔴 **`P1-02` 亦複驗成立——「寫了要做卻沒做」第五次**：`decision != cutoff`／`零位移`／`v8 baseline` 三個字面**只出現在 `:129`（§G (G-4d)）與 `:282-283`（沿革）**，而 §V 範圍是 `:216-257` ⇒ **(G-4d) 三項硬性附帶完全沒進 §V，也沒進 mutation 表**。我在 (G-4d) 逐字寫著「**須進 §V 與 mutation**，不得只寫在 §G 散文」，然後**自己沒去做**。與 K2（寫「登記於 §N」卻沒登記）同型——**同一天第五次**。第十次修訂須：§V 增三條（`decision == cutoff` 零位移對 v8 舊鍵、`decision != cutoff` 單 TF 邊界、界外 early／late raise），mutation 增對應項，並**改完後逐條 grep 自證落在 §V 行號區間內**。
 
 🔴 **R9 composer 已交；主委複驗三條，全部成立——其中一條是我引錯權威，須自我推翻 K3 的駁回**：
