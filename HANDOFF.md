@@ -161,6 +161,11 @@
 
 🔴 **第八次修訂之兩項事實已備（主委實跑）**：①**時間域判準可行**——`split_projection.py:524-526` 現有 `train_ms`／`test_ms`／`test_start_ms`，**無** `train_last_ms`；但 `train_rows` 就在作用域，新增 `train_last_ms = int(index_ms[train_rows[-1]])` 為**一行**且與既有 `test_start_ms` 取法對稱 ⇒ grok 之「以 `train_last_ms < decision_at_ms < test_start_ms` 定義隔離帶」可直接落地，不必依賴 `∈ index_ms`。②**mutation 04–11 有七條方向相反，非僅數條**：`04`（「不改 `groupby` 折疊」＝缺陷）與「物化維持橫向合併」互斥；`06`／`07`／`08`／`09`／`10`（`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe` 之「退回單鍵／退回事件級粒度」＝缺陷）與 `(5.1)` **甲類維持事件級**全部互斥；`11`（Map 鍵退回 `event_id`＝缺陷）與 `Task 9.5` 排除遷移互斥。**唯一方向仍成立的是 `05`**（`pattern_bridge` 退回單鍵）——它屬 **(丙)**，確實需要改。⇒ 第八次修訂須把 `04`／`06`–`11` 改為**反向 mutation**（誤改成複合鍵才紅）或刪除，並同步條數與 ID 連續性。
 
+🔴 **R8 grok 已交，與 composer 四條高度重疊（兩家獨立撞題）**：G-4a 不可機械驗證、`Task 9.1` 殘留**沒落地**、`(6.2)` 與 `Task 9.4` 互斥、反向 mutation 現行不紅（除 `04` 可依 `n_input` 不變式紅）。兩點差異須在收斂記明：
+- 🔴 **`blocked-by` 類別兩家判定相反**：composer 判**不成立**（該類別須指名具體阻塞票，「零呼叫點」是能力缺口）；grok 判**成立**（零呼叫點＝依賴投影生產接線，確為被擋）。依「分歧採較嚴版」**採 composer**：改標 `needs-research`，或先開一張具名 projection-wiring 票再以其票號 `blocked-by`；收斂檔須記明分歧與採納理由。
+- **grok 補了兩處我與 composer 都沒列到的殘留落地缺口**：`Task 9.1` 標題句「**缺任一層即視為 9A 未完成**」仍含 API／前端；`Task 9.4` L204 仍寫「**同批必須補**該旗標之終端揭露」——兩處與具名殘留直接互斥，第九次修訂須一併改。
+- grok **未否證**我自驗的「`dedupe` 廣播不改 `w=1/n`」，並給出同向碼證（`event_split._cluster_weight` 亦建在事件級）⇒ 該條可標為**主委自驗＋一家附議**，不需再問。
+
 🔴 **composer `P1-01`（G-4a 不可機械驗證）有成本極低的解法——主委查到現成骨架**：`scripts/freeze_splitunify_golden.py:346-352` **已經有**雙路徑比對 `if actual["g1_membership"] != actual["g3b_oracle"]`，註解逐字「G-3b：新投影 vs 獨立 oracle，集合相等（**每次都驗**，不只在凍結時）」，而 `_oracle_membership()` 是**依公式手推、與投影無因果關係**的獨立 oracle。⇒ 第九次修訂只要要求「`Task 9.2b` 落地時**同步**把該 oracle 改為 decision-anchor」，G-3b 即自動成為區分閘：**因換錨而改側的事件會在兩邊同時改，實作寫錯則只有投影那邊改**，`g1_membership != g3b_oracle` 直接紅。**不必**新造 `allowed_side_diff_events.json`、也不必保留 cutoff-anchor 平行鍵。🔴 **但須明文寫死**「oracle 與投影**不得由同一段程式碼產生**」（B2b 曾踩過：抽共用函式後 oracle 變成同義反覆，見 `clusters_oracle.json` 檔頭註解），否則這個閘會空心化。
 
 🔴 **R8 composer 已交，三條主委已複驗、全部成立——「改一處漏一處」第四次，且這次漏的是我自己承諾的動作**：
