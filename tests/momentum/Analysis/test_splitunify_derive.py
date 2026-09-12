@@ -1268,13 +1268,30 @@ def test_fingerprint_reordered_rows_are_caught_by_monotonic_gate() -> None:
     """同集合**重排** ⇒ 指紋不變（排序後雜湊），必須由遞增閘擋下。
 
     這條若紅而 `-k fingerprint` 其餘皆綠，代表有人把遞增閘關掉了（`M-SU-D1-19`／`20`）。
+
+    🔴 斷言**必須指名遞增閘**。原本只寫 `pytest.raises(ValueError)`，而重排會讓首列時刻
+    跟著變、被 `time_bounds` 同源閘先擋下並丟出同一種例外 ⇒ 把遞增閘整個拿掉
+    （`M-SU-D1-19`／`20`）這條照樣通過。那是廉價綠燈，2026-09-12 的 mutation 自證撈出來的。
     """
     index, train, test, keys, man, _ = _basic_case()
     loc = np.asarray(train.row_index_local, dtype=int).copy()
     loc[0], loc[1] = loc[1], loc[0]
     object.__setattr__(train, "row_index_local", loc)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="非嚴格遞增"):
         derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_per_symbol_missing_feature_index_entry_is_fail_closed() -> None:
+    """`plans` 有 B 但 `feature_index_by_symbol` 缺 B ⇒ 擋，**不得**丟棄該 symbol。
+
+    🔴 這條是 `M-SU-D1-09` 自證時撈出來的缺口：把該處的 raise 改成 `continue`
+    （映不到就丟棄），原本整批測試**一條都不會紅**——等於整個 symbol 的事件
+    可以靜默消失。
+    """
+    plans, idx, keys, man, _ = _interleaved_case()
+    partial = {SYM: idx[SYM]}                       # 故意缺 SYM_B
+    with pytest.raises(ValueError, match="feature_index_by_symbol"):
+        derive_event_split_from_plans(plans, keys, partial, manifest=man, bucket_ms=H1)
 
 
 def test_fingerprint_tampered_rows_are_caught_at_entry() -> None:
