@@ -1,0 +1,13 @@
+=== 情形 A：第三份判準獨立實作（用 decision-anchor）===
+composer decision=250  proj=train   oracle=train   expected=purged  correct=purged  g3b_pass=True  g4e_pass=False 成員集正確=False
+grok gapX decision=950 proj=train   oracle=train   expected=purged  correct=purged  g3b_pass=True  g4e_pass=False 成員集正確=False
+
+=== 情形 B：三份同錯（第三份也複製 cutoff 邏輯）===
+composer decision=250  proj=train   oracle=train   expected=train   correct=purged  g3b_pass=True  g4e_pass=True  成員集正確=False
+grok gapX decision=950 proj=train   oracle=train   expected=train   correct=purged  g3b_pass=True  g4e_pass=True  成員集正確=False
+
+判定：
+  情形 A 全部『G-3b 放行但第三份攔下』：True
+  情形 B 全部『三份皆綠而成員集錯』  ：True
+  ⇒ composer 之結論**成立**：(G-4e) 只在第三份獨立實作時有效；
+    三份同錯仍會放行 ⇒ §G 須把此列為**殘餘誠實邊界**，並明禁共用實作／同 PR 複製。

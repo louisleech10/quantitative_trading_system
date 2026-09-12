@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "receipt_id": "20260912T111826Z-splitunify-b9-g4e-triple",
+  "claim_id": "splitunify-b9-g4e-triple",
+  "command": [
+    "venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py",
+    "-q"
+  ],
+  "command_sha256": "03eb324537096b85c1ead8cbcda295803196ef18448a273cc25fec654e4f61b2",
+  "cwd": "/Users/louis/Desktop/quantitative_trading_system",
+  "git_head": "e9c0cb4e4d28f3881aa040f8048a78d4b7c46221",
+  "tree_dirty": true,
+  "started_at": "2026-09-12T11:18:23Z",
+  "ended_at": "2026-09-12T11:18:26Z",
+  "duration_seconds": 3.337476,
+  "exit_code": 0,
+  "runtime_class": "helper_smoke",
+  "requested_class": null,
+  "pytest_summary": "============================== 4 passed in 0.04s ===============================",
+  "selected_node_ids": [
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_independent_third_judgment_catches_correlated_pair[composer-decision-250]",
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_independent_third_judgment_catches_correlated_pair[grok-gapX-decision-950]",
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_three_way_same_error_still_passes[composer-decision-250]",
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_three_way_same_error_still_passes[grok-gapX-decision-950]"
+  ],
+  "markers": [
+    "pytest"
+  ],
+  "passed": 4,
+  "failed": 0,
+  "skipped": 0,
+  "stdout_sha256": "1305513ac4873e971450cb2f970b6ddeab147e2279e988ef6fc1652ae47a1933",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "log_sha256": "1305513ac4873e971450cb2f970b6ddeab147e2279e988ef6fc1652ae47a1933",
+  "log_path": "handoffs/run_receipts/20260912T111826Z-splitunify-b9-g4e-triple.log",
+  "tail_excerpt": [
+    "============================= test session starts ==============================",
+    "platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0",
+    "rootdir: /Users/louis/Desktop/quantitative_trading_system",
+    "configfile: pytest.ini",
+    "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+    "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+    "collected 4 items",
+    "",
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_independent_third_judgment_catches_correlated_pair[composer-decision-250] PASSED [ 25%]",
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_independent_third_judgment_catches_correlated_pair[grok-gapX-decision-950] PASSED [ 50%]",
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_three_way_same_error_still_passes[composer-decision-250] PASSED [ 75%]",
+    "tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_three_way_same_error_still_passes[grok-gapX-decision-950] PASSED [100%]",
+    "",
+    "============================== 4 passed in 0.04s ==============================="
+  ]
+}
