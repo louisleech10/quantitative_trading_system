@@ -155,6 +155,13 @@
 
 🔴 **`Task 9.1` 採 (b) 之落點已由主委查到（第八次修訂須寫死，不得再泛稱「IC 主線」）**：`ic_filter_orchestrator.py:1530` 呼叫 `build_split_unify_disclosure(...)` 寫入 `metadata["split_unify"]`，而該函式（`split_projection.py:123-143`）docstring 逐字為「`metadata.split_unify` 之**唯一**產生點（Task 4.1／SPEC C-6）」。⇒ **(b) 的具名落點＝`metadata.split_unify`**。🔴 **同時帶出新約束**：該揭露之 `reason` 必須落在 `split_unify.json` 之**封閉集合**（`FAIL_CLOSED_REASONS`，非法字面即 raise），且 `n_test=None` 專指「沒得算」而非 0 ⇒ 要承載 `discarded_rows_by_feature_tf` 必須**擴充該函式的回傳結構**，**不得**改動 reason 封閉值集（那會動到已戳記之契約與前端枚舉面）。**誠實邊界**：`pipeline.run` 之四參數投影分支在生產碼中**仍無呼叫端**（帶 `train_plan=` 的生產命中皆屬 ML 校準與 IC 自身 adapter，非事件投影），故 `discarded` 的**產生**仍需 `Task 9.2` 完成後才會真的有值——`Task 9.1` 之揭露落點與「誰產生它」是兩件事，須分開寫明。
 
+🔴 **R7 composer 已交（另兩家未交），四條主委已複驗、全部成立——同一個病第三次發作**：我第七次修訂**只改了新寫的 `(5.1)` 三分類段，沒回頭同步 `Task 9.3`／mutation 表／§V 裡第六次修訂留下的舊條目**，導致同一份文件內部互斥：
+- `Task 9.3` 第三 bullet 逐字仍為「`pattern_bridge`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`：`.loc[eid]` 之 scalar lookup **改為複合鍵 lookup**」，而 `(5.1)` 已把後四者列為 **(甲) 事件級維持**。
+- 次一 bullet 逐字「`dedupe`：`cluster_first` 保留集改 `(event_id, feature_timeframe)` 粒度」，而 `(5.1)` 把它列為 (甲)。
+- `M-SU-D2-11` 仍以「前端 `byEventId` Map 鍵**退回** `event_id`」為缺陷，而 `Task 9.5` 已改判該 Map **排除於遷移之外**、正確實作正是維持 `event_id` ⇒ 實作者為通過該 mutation 會把它改回複合鍵，重現匯出 miss。
+- §V `Task 9.1` L207 仍寫「`ASSERT summary／API 回應／前端型別三層皆帶該欄`」，而那三層落點已被我在 `Task 9.1` 標為作廢。
+🔴 **根因**：這正是我自己在摩擦記錄第 23 筆寫過的「同一份文件內部兩句話互斥，交叉引用閘看不到」——閘只比對**跨檔案**同步（synth 處置欄 ↔ SPEC），對**同檔內部**互斥完全無能為力；而 `(5.1)` 那段我還特地寫了「不得用形狀規則」。第八次修訂必須**逐段回頭掃**，不能只改新寫的那一段。
+
 **R7 已派出**（session `20260911-splitunify-b9-review-r7`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R7-BRIEF.md`）。brief 首次要求**雙向攻擊**：既問「還有沒有漏派的關卡」，也要求委員**挑戰我新做的三分類**——特別是被我判為「(甲) 事件級維持」的那些，若其實該改，複合鍵上線後會靜默取到錯的列。
 
 （以下為 R6 派出時之記載）**R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
