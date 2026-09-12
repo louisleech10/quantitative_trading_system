@@ -92,6 +92,6 @@ R1 closure：`CODEX-R1-P1-01` CLOSED（D-002-C5 (5.5)、C6、Task 9.4）；`CODE
 Verdict：仍需修補後再審。主動攻擊面包括：合法異側 cutoff、reason 封閉集合、baseline sample denominator、producer selected-only、cluster 粒度/權重、18 mutation 逐處覆蓋、legacy timeframe wire name、治理閘與 touchpoint declaration；未發現新增 OOM、cache 或 quant 計算式問題。
 
 VERDICT: blocked
-BLOCKED-BY: CODEX-R1-P1-06,CODEX-R2-P1-01,CODEX-R2-P1-02,CODEX-R2-P1-03,CODEX-R2-P1-04,CODEX-R2-P1-05,CODEX-R2-P1-06,CODEX-R2-P1-08
+BLOCKED-BY: CODEX-R2-P1-01,CODEX-R2-P1-02,CODEX-R2-P1-03,CODEX-R2-P1-04,CODEX-R2-P1-05,CODEX-R2-P1-06,CODEX-R2-P1-08
 CLOSED: CODEX-R1-P1-01,CODEX-R1-P1-02,CODEX-R1-P1-03,CODEX-R1-P1-04,CODEX-R1-P2-05
 STATUS: DONE
