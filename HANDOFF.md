@@ -57,6 +57,10 @@
 
 🔴 **主委自評**：`obligation_block_check.sh` 是我自己建的閘，這次修訂我只跑了格式與 xref **沒跑它**，結果 21 條義務項行型全部不合白名單、5 處裁決編號寫在正文（違反我自己定的「項目中只留最新版本」）。已全數修畢，該閘現為 rc=0。
 
-下一步：依九群做**第三次修訂** → 派 R3 → 三家戳記 → 才進 Task 9.1 實作。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`。
+**D-002 第三次修訂已完成**（commit `7bd865ff`；三道閘 `obligation_block_check`／`doc_format_precheck`／`spec_xref_check --synth` **皆 rc=0**）：新增 **`Task 9.2`（producer 停止 `selected_timeframe` 單選、輸出全量 keyed rows）並標為本批核心**（原 schema 工作降為 `Task 9.2a`）；`(3.1)` 加「可比時點」前提使同側判定不再誤殺；`(3.2)` purge 字面定為沿用既有 `interval_crosses_split_boundary`、不新增值集；`(6.2)` 量詞改逐消費者（`baseline` 之 `n_test` 維持樣本數語意）；`clusters` 定案**不加** `feature_timeframe`、維持事件級；新增 `(0.6)` 既有欄位保留／新增欄位分名，summary 新鍵改名 `discarded_rows_by_feature_tf`；mutation 改表格共 **20 條**，每列具完整 ID 與應紅之測試。
+
+**R3 閉合輪已派出**（session `20260911-splitunify-b9-review-r3`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R3-BRIEF.md`）。brief 已補明 R1／R2 各踩過一次的裁決欄規則：**`BLOCKED-BY` 與 `CLOSED` 都只列本檔本家族 ID，跨輪未閉條目須以新 ID 重開**。
+
+下一步：R3 三家放行 → 戳記 → 才進 Task 9.1 實作。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`。
 
 其後：三家放行 → 戳記 → 才進 Task 9.1 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
