@@ -314,6 +314,43 @@ fi
 # 🔴 解析改為呼叫**本檔唯一 parser** `_resolve_kind_into_bk`（見上）——
 #    與 --only 路徑共用同一實作，杜絕「兩份 kind parser 判準不一致」〔群集 1〕。
 _resolve_kind_into_bk || exit 2
+# ---------------------------------------------------------------------------
+# 骨架佔位未填即拒派(2026-09-12 DOCROT consult R2 之 E3「審查輸入隔離」產出端硬擋)
+#   兩個病根,同一形態:
+#   (a) 下面 review 臂的 ② 只**數** 'assumed:' 行數 ⇒ 未填的骨架行
+#       `assumed: (我的假設,可能是錯的)` 照樣過閘,委員收到的是空殼前提。
+#   (b) new_brief.sh 的「## 審查標的」若原樣派出,審查輸入實際等於「整份檔」,
+#       三家 R2 判定之病根(重審已作廢主張、把上一輪修法再審一次)原地復現。
+#       碼證:D-002 之 R11 十二條、R12 十三條**全部**針對前版修法。
+#   封閉字面集,不做語意判斷(feedback_mechanize_dont_police_prose):
+#   只逐字比對 new_brief.sh 自己會吐出的佔位 ⇒ 對手寫 brief 零誤擋。
+#   置於 case **之前**:impl/stamp 骨架同樣會被原樣派出,收窄到 review 臂是錯的。
+#   🔴 誠實邊界:本條只擋「骨架原樣派出」,擋不住手寫 brief 把審查標的寫成「整份檔」。
+# ---------------------------------------------------------------------------
+_ph_hits=""
+while IFS= read -r _ph; do
+  [ -n "${_ph}" ] || continue
+  if grep -qF -- "${_ph}" "${brief}"; then
+    _ph_hits="${_ph_hits}
+  · ${_ph}"
+  fi
+done <<'PLACEHOLDERS'
+（填標題）
+（標的檔／真實 diff 指令）
+（檔:起訖行 或 節名
+（可執行指令，例
+（已查證的事實）
+（我的假設，可能是錯的）
+（問題一）
+（照 <TODO/規格路徑> 實作
+PLACEHOLDERS
+if [ -n "${_ph_hits}" ]; then
+  echo "ERROR: brief 仍含 new_brief.sh 之**未填骨架佔位**,拒派:${_ph_hits}"
+  echo "  逐條改成本輪的真實內容再派。"
+  echo "  『## 審查標的』須列 current block(檔:起訖行／節名)＋本輪 diff 指令;修訂沿革不入審查範圍。"
+  echo "  依據:2026-09-12 DOCROT consult R2 三家一致之 E3 ＋ CODEX-R1-P1-02。"
+  exit 2
+fi
 # 行為分支：findings 前置 + mutation 錨點（* 臂）。JSON SSOT 在 case 後對「命中 known arm」再驗。
 _case_known=0
 case "${_bk}" in

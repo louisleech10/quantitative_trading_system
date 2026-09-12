@@ -38,7 +38,8 @@ TODO 生成 Prompt V13 — Compliance-First（取代 V12 的 1030 行版）
 - 憲法與 SPEC 衝突 → 以憲法為準並在階段 2 標 `⚠️ 矛盾`。
 
 ### 階段 1：SPEC 索引 + 100% 覆蓋追溯（交付物 #1，防漏核心）
-完整讀 `{{SPEC_FILE}}`，輸出索引表（**每個 ID 附 SPEC 原文 ≤30 字節錄**，可 Ctrl+F 比對）：
+完整讀 `{{SPEC_FILE}}` 之**現行契約**，輸出索引表（**每個 ID 附 SPEC 原文 ≤30 字節錄**，可 Ctrl+F 比對）：
+- 🔴 **排除修訂沿革**（`HISTORY-BEGIN`～`HISTORY-END` 之間、「沿革與追溯索引」節）：那裡的 ID 與數字多為**已作廢版本**，列進索引會生出對應不到現行條文的 Task（2026-09-12 DOCROT R2，依 `CODEX-R1-P1-02`「normative 文件只留 current contract」）。沿革只在「某 ID 在現行段落找不到」時用來追溯，不作為覆蓋基準。
 - Task IDs / Test·驗證項 / §G Golden 項 / §RISK 命中原則 / Phase 依賴 / 環境變數·flag。每類附**合計數**。
 - 禁「等／以此類推」。這份是後續驗證唯一基準。
 

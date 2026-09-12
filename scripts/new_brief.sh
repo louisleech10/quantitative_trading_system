@@ -56,8 +56,14 @@ case "${out}" in handoffs/*) : ;; *) echo "ERROR: brief 建議放 handoffs/: ${o
     echo "## ⚠️ 前置說明（勿誤 block）"
     echo "- \`handoffs/reconcile/*/synth.md\` 等是**無戳記診斷/輸入檔**，非 gating 檔；勿 STAMP-BLOCK、勿對它們跑 \`reconcile_stamps_check.sh\`。"
     echo ""
-    echo "## 審查標的"
-    echo "- （標的檔／真實 diff 指令）"
+    # 🔴 2026-09-12 DOCROT R2（三家一致列為首要，逐字依 CODEX-R1-P1-02）：
+    #   審查輸入若是「整份檔」，審查者會重新審已作廢的主張、把上一輪修法再審一次
+    #   （D-002 之 R11 十二條／R12 十三條全部針對前版修法，十二輪 findings 數無下降）。
+    #   骨架在此強制列出 current block 與 diff；空白佔位＝靠主委每次記得，那是紀律不是機制。
+    echo "## 審查標的（🔴 輸入邊界：只餵 current block ＋ 本輪 diff）"
+    echo "- **current block**：（檔:起訖行 或 節名——**只列本輪要審的現行段落**，不得寫「整份檔」）"
+    echo "- **本輪 diff**：（可執行指令，例 \`git diff <上輪 commit>..HEAD -- <檔>\`）"
+    echo "- 🔴 **不在審查範圍**：修訂沿革（\`HISTORY-BEGIN\`～\`HISTORY-END\`、「沿革與追溯索引」節）與逐字標記「作廢／前版／舊敘述／原寫」之字面。**finding 之 source anchor 落在歷史段者不受理**，請改指其對應之現行條文。"
     echo ""
     echo "## 本 brief 前提（逐條標；請優先攻 assumed）"
     echo "fact-verified: （已查證的事實） → （查證方式/實跑結果）"

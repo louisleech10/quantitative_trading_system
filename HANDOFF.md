@@ -8,11 +8,10 @@
 - **DOCROT consult 兩輪完成並清債**：R1 `c0bd1479`、R2 `b84261eb`。文檔病的主因／次因／**執行優先序**＝`handoffs/reconcile/20260912-docrot-x-consult-r2/synth.md`（唯一權威）。🔴 R2 起：凡主委產出非任一家原文之折衷，**自動開一輪 consult，不得單方生效**（第二版折衷經三家全 P0 判不可行）。
 - **`scripts/_synth_attr.py` 已修**（使用者裁定「改」後才動）：切欄先保護跳脫管線再還原。原本「斷言前 20 字含 `|`」之 finding 結構上永遠無法歸戶；改動邏輯上單調放寬。
 
-## 🔴 四件待使用者裁定（未回覆前不推進實作）
-1. 未 commit 的生產碼：保留待補戳記，或全部回退。
-2. 補 `docs/SPLITUNIFY_TODO.md` 之 `Task 9.1`–`9.5` ＋派 stamp 輪補戳記。
-3. `白話說明/` 22 份是否整理（GAP-3 佔 8 份、5404 行）。
-4. SPEC 結構收縮（依 R2 執行優先序）。
+## 🔴 待辦分流（先前誤把四件全列為「待使用者裁定」，其中三件不該問）
+- **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
+- **技術決策，走委員會不問使用者**：①未 commit 生產碼保留或回退 ②補 `docs/SPLITUNIFY_TODO.md` 之 `Task 9.1`–`9.5` ＋派 stamp 輪補戳記。
+- **進行中（主委執行，依 R2 三家共同結論之執行優先序）**：E3 審查輸入隔離**已完成**（樣板／`new_brief.sh`／`brief_conformance_check.sh` 骨架佔位硬擋，`tests/governance/test_docrot_e3_brief_placeholder.py` 6 passed）；窄 F2「共 N 條」**已完成**（`spec_count_audit.py`，4 passed）；**F1 活文收縮進行中**——D-002 活文考古行 35→16、字元 84,739→77,161，條數字面收斂為 register 表標題唯一一處；每批後四道檢查（`doc_format`／`obligation_block`／`xref --synth`／`xref --files` 對 HEAD）皆 rc=0。未動：掛載三層、遷移序、F3 降級具名殘留。
 
 ## 坑
 - impl token 900 秒過期須重領；task-id／session 日期前綴一律沿用 `20260911-SPLITUNIFY`（跨日不得改）；`Ticket-Batch` 與 `Co-Authored-By` 須在訊息**同一最末段**。

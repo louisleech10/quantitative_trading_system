@@ -48,13 +48,21 @@ import re
 import sys
 
 # 量詞封閉集合：指涉 SPEC 內可列舉之物者。
-# 🔴 刻意排除「家」（委員家數，屬敘事非斷言）與「條」（測試條目數，本就常動且已有 ≥N 語義）。
+# 🔴 刻意排除「家」（委員家數，屬敘事非斷言）與裸「條」（測試條目數，本就常動且已有 ≥N 語義）。
 _UNITS = r"(?:個鍵|支閘|支機械閘|支|個維度|維度|筆|個值|個頂層鍵|個 reason|條 reason)"
 _NUMERALS = r"[一二三四五六七八九十兩0-9]+"
 _COUNT_WORD = r"(?:筆數|長度|個數|數量|元素數|鍵數)"
 
 _RE_NUM_UNIT = re.compile(_NUMERALS + _UNITS)
 _RE_COUNT_ASSERT = re.compile(_COUNT_WORD + r"[^0-9\n]{0,12}[=＝]{1,3}\s*[0-9]+")
+
+# 🔴 2026-09-12 DOCROT consult R2 之 F2（三家一致，**只收窄版**）：
+#   裸「條」仍排除，但「共 N 條」是**宣告總數**的固定語型，與它所列之物必須一致。
+#   碼證（本閘原本看不到）：`docs/SPLITUNIFY_SPEC.D-002.md:70` 寫「register 共 29 條」、
+#   `:90` 的 register 表標題也寫「共 29 條」——同一個數字兩個真相源，改一處漏一處即漂移；
+#   本檔原第 51 行「刻意排除『條』」使該形態零命中（實跑 `--list` 對 D-002 輸出為空）。
+#   收窄理由：只綁「共…條」三字語型，不碰「22 條 mutation」「十三條」等敘事用法 ⇒ 誤擋面最小。
+_RE_TOTAL_ITEMS = re.compile(r"共\s*" + _NUMERALS + r"\s*條")
 
 # 非計數之「一」：任一／每一／唯一／任一維度…
 _NOISE = re.compile(r"任一|每一|唯一|同一|其一")
@@ -86,6 +94,8 @@ def extract(path):
             out.add("%s|%s\t%s" % (short, ctx, m3.group(0)))
         for m4 in _RE_COUNT_ASSERT.finditer(probe):
             out.add("%s|%s\t%s" % (short, ctx, re.sub(r"\s+", " ", m4.group(0))))
+        for m5 in _RE_TOTAL_ITEMS.finditer(probe):
+            out.add("%s|%s\t%s" % (short, ctx, re.sub(r"\s+", " ", m5.group(0))))
     return sorted(out)
 
 
