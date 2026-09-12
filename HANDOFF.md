@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）｜規格已定案（R13 兩家 proceed 零 finding、三家戳記全數 APPROVED，收斂檔 body sha `e3f2847d7fae…`）｜**b8 實作：程式面已收斂，剩 mutation 自證與三家審碼****
+**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）｜**b8 已結案**（三輪三家審碼、零回歸）｜**現在：b9 規格 `D-002` 第四次修訂完成（commit `3973d124`），R4 閉合輪已派出****
 
 ## b8 交付內容（皆已 commit＋push；最新 `29582d96`）
 - `SplitPlan` 新增 `row_index_local`／`row_time_fingerprint`（相容 default）；`__post_init__` 對兩個 row 欄 defensive copy ＋ `np.frombuffer(bytes)` 唯讀。誠實邊界：`pickle`／`deepcopy` 還原仍可寫。
@@ -71,6 +71,10 @@
 
 🔴 **收斂性判斷**（為何不引用「停在無法收斂處」）：三輪 findings 有明確收斂方向且家族間有交集（codex 與 grok 獨立指向同一組：核心目標、可比時點、Task 9.2 範圍），非各說各話或無限窮舉；R3 九條 P1 中四條是「R2 未閉」，成因是**主委修訂不徹底**而非委員擴張要求 ⇒ 續修。
 
-下一步：依七群做**第四次修訂**（重點：真的定義「可比時點」而非再寫一次「須先定義」；`Task 9.2` 範圍納入 `pipeline.py` caller；重複 guard 與 C3 的先後定案；`M-SU-D2-19` 方向改正；§V 補 purged 複合鍵與接線落點；TODO 狀態同步時點寫進 §N）→ 派 R4。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`。
+**D-002 第四次修訂已完成**（commit `3973d124`；三道閘 `obligation_block_check`／`doc_format_precheck`／`spec_xref_check --synth`（r1/r2/r3）**皆 rc=0**）。七群落點：①`Task 9.2` 納入 `pipeline.py:747` 並逐字寫出現行呼叫，另要求**移除 `str()`**（留著會把 `None` 變字面 `"None"`，等於白改）②`(3.1)` 改為**直接給定義**＝事件級錨定（split 側一律由 `decision_at_ms` 決定，各 feature TF 之 cutoff 只用於取特徵、不參與判側 ⇒ 同事件恆同側為**結構性保證**）③🔴 **連帶修訂 R2 裁決**：`(3.2)` 異側處置由「整事件 purged」改為 **fail-closed `AlignmentViolationError`**——R2 該裁決的前提是「異側屬合法」，(3.1) 消除該前提後異側即實作缺陷，purge 會把缺陷偽裝成樣本流失；既有 `interval_crosses_split_boundary` 維持原義不動 ④`Task 9.2a` 定案兩道既有重複 guard 改**複合鍵唯一**判準且**先於** C3 同側檢查 ⑤§V 補 purged 複合鍵唯一與 `n_event_tf_rows_purged`、C3 斷言改正例＋反例成對 ⑥`Task 9.1` 逐處指名 `api/routes/case.py:487`／`case_import_service`／`EventAnalyzeResponse.summary`（`Dict[str, Any]` ⇒ 新鍵自動穿過但**零型別保證**，須寫明列鍵名的契約測試）／`EventTablesPanel.tsx:347,361`；`Task 9.5` 指名 `freeze_splitunify_golden.py` 之 `_plans()`／`_event_keys()`／`_build_actual()` ⑦`M-SU-D2-19` 改反向 mutation、`14`／`15` 應紅測試隨 (3.2) 改為 raise ⑧§N 補 TODO §E 狀態同步時點。
+
+**R4 閉合輪已派出**（session `20260911-splitunify-b9-review-r4`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R4-BRIEF.md`，commit `e017bb9f`）。brief 已把「本輪動到 R2 裁決」明列為最該被攻的一處，並要求委員**自己 grep caller**、不要只信 brief 寫的「唯一生產 caller」。
+
+其後：三家放行 → 戳記 → 才進 `Task 9.1` 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`。
 
 其後：三家放行 → 戳記 → 才進 Task 9.1 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
