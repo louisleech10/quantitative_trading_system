@@ -124,7 +124,14 @@
 - 前端 `search/page.tsx:825-835` — Map 鍵為 `canonicalEventId(symbol, timeframe, t0)`，來源是使用者上傳 CSV 之**原始列**，`timeframe` 取 `row.timeframe || searchParams.timeframe`＝**觸發** TF；一事件在原始檔只有一列 ⇒ **誤列**（(5.4) 所述「後者覆蓋前者」是「同一 CSV 有重複列」之情形，與多 feature TF 無關）。
 - golden — `splitunify_golden.json` 之 `g1_membership` 為 train/test/purged 之 **event_id 清單**（複合鍵後同事件兩列會被清單去重而看不出差異）⇒ **確需擴維**；`clusters_oracle.json` 以 `event_id` 為 fixture 鍵（簇已定案事件級）、`report_int_keys.json` 為報告整數葉鍵集（與事件無關）⇒ **兩者不動**。
 
-⇒ **十處已逐處讀完之結論**：**七處誤列**（`ic_feed`、`tables` 兩處、`counterexample_classifier`、`candidate_ledger`、前端 Map、`clusters_oracle`＋`report_int_keys`）、**一處派工過度**（`feature_materialization`）、**一處真缺陷但改法錯**（`pattern_bridge`，應為「去重取唯一側、不唯一 fail-closed」）、**一處確需改**（`g1_membership`）。第七次修訂須**逐處重新分類**：事件級（維持）／複合鍵（改）／事件級但需去重取唯一值（三類），`D-002-C5` 之 16 處清單同步更正。此為主委自產，須於 R6 收斂檔標明非委員意見。🔴 **根因**：我列該清單時以「有無 `set_index("event_id")` 之形狀」為判準，**未逐處問「這張表的一列代表什麼」**——而 `Task 9.3` 正文我自己寫著「不得用凡看到某索引一律改這種形狀規則」。
+**末三處（16 處至此全部讀完）**：
+- `ic_feed.event_context_from_windows:56-60` — `rows` 取 `event_id`／`label_start_ms`／`label_end_ms` 三欄按 `event_id` 排序後雜湊，**不含任何 TF 欄**，是事件集合之身分 ⇒ 列為待改消費面屬**誤列**；`M-SU-D2-19` 定為反向 mutation 正確。🔴 **但另有前置條件**：複合鍵後若把同事件多列 `WindowRow` 全餵進來，`rows` 會出現重複三元組而改變雜湊 ⇒ **餵入端須先去重**（與「不得改成含 TF」是兩件事，須分開寫）。
+- 前端 `types.ts:2951` `batch_facts: EventBatchFacts` — **批次級**事實（`control_kind_values`、`decision_offset_bars_record_values` 等批內彙總），與事件粒度無關 ⇒ **誤列**。
+- `test_splitunify_wiring.py:103-104` — `dict(zip(per_tf["event_id"], per_tf["feature_cutoff_ms"]))` 與 `dict(zip(assignments["event_id"], ...))`，複合鍵後同事件多列**後者覆蓋前者**，且會讓「歸屬與邊界對證」那條斷言只驗到其中一個 TF ⇒ **真缺陷，須改複合鍵映射並逐列驗**。
+
+⇒ **16 處全部逐處讀完之最終分類**：**九處誤列**；**一處派工過度**（`feature_materialization`，應維持事件級橫向合併）；**一處真缺陷但原改法錯**（`pattern_bridge`，應為去重取唯一側＋不唯一 fail-closed）；**三處確需改**（`assignments`／`purged` 組裝、golden `g1_membership`、wiring `dict(zip)`）；**一處需分開寫**（`ic_feed` survivor：不得含 TF ＋ 餵入端須去重）；**一處屬 `Task 9.4`**（`pipeline` 記帳）。
+
+（以下為前十處之逐條碼證）⇒ **十處已逐處讀完之結論**：**七處誤列**（`ic_feed`、`tables` 兩處、`counterexample_classifier`、`candidate_ledger`、前端 Map、`clusters_oracle`＋`report_int_keys`）、**一處派工過度**（`feature_materialization`）、**一處真缺陷但改法錯**（`pattern_bridge`，應為「去重取唯一側、不唯一 fail-closed」）、**一處確需改**（`g1_membership`）。第七次修訂須**逐處重新分類**：事件級（維持）／複合鍵（改）／事件級但需去重取唯一值（三類），`D-002-C5` 之 16 處清單同步更正。此為主委自產，須於 R6 收斂檔標明非委員意見。🔴 **根因**：我列該清單時以「有無 `set_index("event_id")` 之形狀」為判準，**未逐處問「這張表的一列代表什麼」**——而 `Task 9.3` 正文我自己寫著「不得用凡看到某索引一律改這種形狀規則」。
 
 **R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
 
