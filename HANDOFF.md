@@ -233,6 +233,12 @@
 
 🔴 **自證步驟首次執行即付股息**：R9 收斂時我承諾「每項改完立即逐條 grep 自證落點」，本輪執行後**當場抓到兩處我以為改完其實沒改**（目標句在括號裡又寫了一次舊句、mutation 表列 31 而正文仍寫 26），**都在跑閘前自己修掉**——這是九輪以來第一次由我而非委員抓到此類缺陷。
 
+🔴 **第十一次修訂要改的三句原文已取（免得又字串失配）**：
+- `(6.2)` L92 待改片段逐字＝「故其 `n_test`＝**樣本數＝事件數**，兩者在本延伸落地後**等價**」⇒ 改為「`baseline` **必須同時輸出** `n_test_events` 與 `n_test_samples`；物化失敗時兩量**可不相等**，**不得**宣稱恆等」。
+- `Task 9.4` L208 逐字＝「- 改法：依 (6.2) 將 `n_train`／`n_test`／`n_purged` 明確定為事件數；新增列數欄；`dict(zip(...))` 改為複合鍵映射。」⇒ 改為「summary／報告鏈之 `n_train`／`n_test`／`n_purged` 為事件數；**`baseline` 另見本 Task 之雙量條款**，不再以單一 `n_test` 充當兩者」。
+- §V L220 待改片段逐字＝「`ASSERT metadata.split_unify 帶該鍵且其 reason 封閉值集未被改動`」⇒ 升級為**值相等**：`ASSERT metadata.split_unify["discarded_rows_by_feature_tf"] == EventSplitPlan.summary[…] == producer.discarded`（與同句之 summary 斷言對稱）。
+- 另須寫死**舊鍵 `n_test` 在 baseline 回傳中的命運**（刪除／或僅作 `n_test_samples` 別名並限期移除，擇一），以及 `(G-4e)` 第三份改為 **fixture 字面 `expected_side`** ＋ 明禁與投影／oracle 共用實作。
+
 🔴 **grok 多抓的第三處互斥已複驗成立**：`Task 9.4` L208 逐字仍為「改法：依 (6.2) 將 `n_train`／`n_test`／`n_purged` 明確定為**事件數**；新增列數欄…」，與同 Task 之 L211（雙量、不得宣稱恆等）**互相拉扯** ⇒ 第十一次修訂須 **L92／L208／L211 三處同改**。§V L220 亦複驗：`summary` 句已含「值與 producer 回傳相同」，而 `metadata` 句僅「帶該鍵」——**兩句不對稱**成立。
 
 🔴 **R10 grok 已交，與 composer 三條完全撞題，並多給一個我沒想到的正解方向**：
