@@ -13,7 +13,7 @@
 
 ## b8 未完成
 - mutation 自證做完：22 條執行、22 條皆被測試抓到；`M-SU-D1-23` 在單標的 golden fixture 下**不可觸發**（該 fixture 之 `row_index_local` 與 `row_index` 逐值相同），已具名為 `needs-research`，交審碼三家裁定是否值得為它把 golden 改成兩標的交錯重凍。收據：`handoffs/run_receipts/20260912-splitunify-b8-mutation-selfcheck.md`。過程撈出兩個**真實測試缺口**並已補：①`feature_index_by_symbol` 缺 symbol 時改成丟棄，原本一條測試都不會紅 ②重排那條只寫 `pytest.raises(ValueError)`，被 `time_bounds` 閘先擋而失去鑑別力，已改為指名「非嚴格遞增」。
-- 收案前派三家審碼（實作者不自審）。
+- 三家審碼**已派出**（2026-09-12；session `20260911-splitunify-b8-review-r1`、`round_id=67fe8449-5d2f-4343-be9d-5ca8a50c5c41`、brief `handoffs/20260911-SPLITUNIFY-B8-REVIEW-R1-BRIEF.md`）。產出落點：`handoffs/20260911-splitunify-b8-review-r1-{codex,composer,grok}.md`。回來後逐條閉合，並由**原提出方**重跑同一反例複驗，不憑「已修」信任。
 - **回歸判定：本批回歸為零**。`tests/momentum`＋`tests/api` 跑到約 2,200 條時收窄（FDR 模擬單條數十分鐘），對浮現的 10 筆紅做**對照實驗**：把 b8 動過的六個生產檔整組 `git checkout 0190c918`（b8 前一筆）後重跑，10 筆**全數同樣紅**，還原前後各以 `grep -c row_index_local` 驗證 checkout 真的生效。10 筆分屬 1c-FR allowlist、IC cut1 golden、persist redirect、ichc contract／golden、Optuna，皆為既有紅。
 
 ## 坑（沿用＋本日新增）
