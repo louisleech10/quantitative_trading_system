@@ -54,6 +54,16 @@ if [ -n "$synth" ]; then
   bash "$CHECK" --synth "$synth" "$rel" >&2; r=$?
   [ "$r" -eq 0 ] || rc=2
 fi
+# ③ warn-only：同一計數字面出現在多行（2026-09-13 DOCROT R2 第 3 項之產出端警告層）
+#   🔴 刻意**不改 rc**——R2 第 4 項遷移序定「第一期只 warn」；閾值與誤擋面未校準前
+#   不得擋門。要升成擋門須先有基線，屆時 tests 的 warn-only 斷言會轉紅提醒。
+#   🔴 為何併進本 hook 而非在 settings.json 新增條目：本 hook 已有觸發集合
+#   （docs 之 SPEC／TODO／PLAN／RECON，或被某份 synth 宣告為修訂標的者），
+#   一般寫檔完全不付成本。codex R2 實測既有八支 PostToolUse 鏈每次寫檔 4.39–4.97 秒，
+#   不該為一個 warn-only 訊號再往熱路徑加一支。
+if [ -f scripts/spec_count_audit.py ]; then
+  python3 scripts/spec_count_audit.py --dupes "$rel" >/dev/null || true
+fi
 if [ "$rc" -ne 0 ]; then
   echo "[spec_xref_hook] 🔴 ${rel}：改一處漏一處——上列殘留或 synth 處置未同步，修掉再繼續" >&2
 fi

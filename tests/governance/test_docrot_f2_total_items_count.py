@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -143,6 +144,47 @@ def test_dupes_ignores_history_section(tmp_path: Path) -> None:
     assert "共 29 條" not in proc.stderr, (
         "沿革引文被當成重複真相源 ⇒ 每次活文收縮都會留永久誤報\n" + proc.stderr
     )
+
+
+def test_hook_emits_dupes_warning_without_blocking() -> None:
+    """ASSERT 產出端 hook 會出重複計數的警告，且**不因此擋門**。
+
+    R2 第 3 項要求掛三層，第 4 項要求第一期只 warn。本條同時釘住兩件事：
+    警告真的出得來（不是掛了沒效），以及它不改 hook 的 rc（不是偷偷升成擋門）。
+    走 hook 自帶的 GOVERNANCE_TEST_HARNESS 模式，不偽造 stdin。
+    """
+    hook = REPO / "scripts" / "spec_xref_hook.sh"
+    # 檔名須落在 hook 的觸發集合（docs/*SPEC*.md）；HEAD 無此檔 ⇒ 殘留掃描跳過，
+    # 亦無 synth 宣告它 ⇒ 兩道硬檢查都不跑，rc 只可能來自本次新增的警告層。
+    probe = REPO / "docs" / ".tmp-docrot-dupes-probe_SPEC.md"
+    probe.write_text(
+        "### 節標題（register 共 41 條）\n\n#### 表標題（共 41 條）\n",
+        encoding="utf-8",
+    )
+    try:
+        proc = subprocess.run(
+            ["bash", str(hook)],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=str(REPO),
+            env={
+                **os.environ,
+                "GOVERNANCE_TEST_HARNESS": "1",
+                "SPEC_XREF_HOOK_TARGET": str(probe),
+            },
+        )
+        assert "共 41 條" in proc.stderr, (
+            "產出端警告層沒有出聲 ⇒ 掛了等於沒掛\n" + proc.stdout + proc.stderr
+        )
+        assert proc.returncode == 0, (
+            "warn-only 層竟然改了 hook 的 rc ⇒ 第一期只 warn 的約定被破壞\n"
+            + proc.stdout
+            + proc.stderr
+        )
+    finally:
+        if probe.exists():
+            probe.unlink()
 
 
 def test_dupes_is_warn_only_never_blocks(tmp_path: Path) -> None:
