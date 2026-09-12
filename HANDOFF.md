@@ -1,30 +1,28 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）——用已結案之四閘治理票全程跑並記錄摩擦（使用者 2026-09-12 指示）｜規格階段：consult 18 條 → D-001 → R5 11 條 → R6 6 條 → R7 2 → R8 1 → R9 2 → R10 3 → R11 3 → R12 6 → **C2 第 4 點整節重寫為單一現行態**（沿革移出至各輪 synth）→ R13 兩家皆 proceed、零 finding → **三家戳記全數 APPROVED（規格定案，body sha `e3f2847d7fae…`）** → 下一步＝b8 實作**
+**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）｜規格已定案（R13 兩家 proceed 零 finding、三家戳記全數 APPROVED，收斂檔 body sha `e3f2847d7fae…`）｜**b8 實作：程式面已收斂，剩 mutation 自證與三家審碼****
 
-## 已完成（皆已 push）
-- **D-001 延伸檔** `docs/SPLITUNIFY_SPEC.D-001.md`：`c6b99d5a` 初版、`091b1e97` R5 版、`90835929` R6 版、`df91e459` **R7 版（現行）**。落實 §N `R-1`＋TODO §E `SU-RESID-3`＋per-symbol 門檻修正。類別＝**D 延伸**（原檔 Task 3.2 自寫「存活至 per-symbol 投影實作後改寫」）。
-- **四輪收斂全部清債**：consult R2（18）／R5（11）／R6（6）／R7（2），`debt_clear` 皆 rc=0，收斂檔在 `handoffs/reconcile/20260911-splitunify-x-{consult-r2,review-r5,review-r6,review-r7}/synth.md`。
+## b8 交付內容（皆已 commit＋push；最新 `29582d96`）
+- `SplitPlan` 新增 `row_index_local`／`row_time_fingerprint`（相容 default）；`__post_init__` 對兩個 row 欄 defensive copy ＋ `np.frombuffer(bytes)` 唯讀。誠實邊界：`pickle`／`deepcopy` 還原仍可寫。
+- 共用助手 `split_preview.epoch_ms_from_index`／`build_row_time_fingerprint`（該模組不匯入專案模組，無循環）；`split_projection._index_as_ms` 委派之。
+- `contracts.attest_row_index_local`：前置合法性閘（整數型／等長／範圍／無重複／嚴格遞增）＋時間序往返。三個 producer 全數接上。
+- `derive_event_split_from_plans` 改分派器＋`_derive_single_symbol`；per-symbol 迴圈與 `_manifest_subset`；Task 8.3 逐標的門檻。
+- 投影端只讀 `row_index_local`、缺欄 fail-closed 不回退、入口指紋重驗。
+- 🔴 **2026-09-12 修掉上一批的自傷缺陷（producer 端指紋時鐘）**：`split_per_symbol` 的 `ts` 與 `ic_filter_orchestrator` 的 `features_df.index` 皆為 **epoch 秒**，上一批卻直接餵給毫秒正規化器 ⇒ `test_split_per_symbol_golden` 與 `tests/api/test_splitunify_disclosure` 全紅，**IC 實跑路徑亦會被自己的守衛擋死**。修法＝指紋時鐘取該 producer **自己 `time_bounds` 已在用的那一支**（`_coerce_timestamp_array`／`_normalize_ic_time_index`），不新造第二套換算；`ic_split_adapter` 之 `ts` 本為 `datetime64`，維持原樣。
+- 測試：目標測試面 **738 passed**；`freeze_splitunify_golden.py` 回報 **GOLDEN OK**（digest 未位移）。新增 `-k time_bounds_inconsistent`，使 `time_bounds` 同源閘不因指紋閘上線而變成沒有測試會紅的死碼。
 
-## 🔴 R7／R8 閉合輪之裁決（b8 實作依此）
-- **座標由 producer attest，投影端不轉換**（R8 推翻 R7 之「入口轉換」：既有 helper 需全框 `symbol_arr`，而簽名與 `SplitPlan` 皆無該向量 ⇒ 不可執行）。`SplitPlan` 新增 `row_index_local`，三個 producer 直接寫入其已有之標的內序號、並以**時間序往返** attest（`sorted_positions[row_index_local]` 逐值等於 `row_index`；🔴 R10：**不得**改用 `_local_ordinals_for_symbol` 之 frame 序結果，會誤擋亂序輸入之直呼叫端；🔴 R11：往返比對**之前**須先跑前置合法性閘（整數、範圍內、無重複、嚴格遞增，複用 `assert_positional_rows` 且不得關 `require_sorted`）——負索引會回捲使往返誤判相等）；`derive` 只消費該欄，缺欄 fail-closed 且**不得回退** `row_index`。🔴 **R10 核心轉向**：不可變性無法保證（唯讀旗標可翻回、`pickle`／`deepcopy` 還原又可寫）⇒ 權威守衛＝投影入口之指紋重驗（指紋是字串欄、凍結擋得住改綁），不可變性僅為縱深防禦；竄改 `row_index` 只影響全框消費端，登記 `SU-RESID-5`。消費全框值者僅五處（`split_projection.py:453-458`／`:473-484`／`:486-487`／`:488`＋指紋），R8 獨立覆核**無第六處**；docstring `:351-353` 須同步改寫。
-- **`feature_index_by_symbol` ＝該標的自己的 post-trim 短索引**，不可被全框 `row_index` 直接索引。R7 兩家讀法相反（另一家讀為「須是能被全框列號索引之同一 universe」）⇒ 證明原句有歧義，已在 C1 第 1 點釘死並明記不採之理由（與 C2 第 4 點 `position`＝symbol-local ordinal 互斥）。
-- 指定**複用** `momentum/core/contracts.py::_local_ordinals_for_symbol`（`:504-519`）做 producer 端 attest，不得另寫等價函式。🔴 `row_index` 之座標語意在三個 producer 間**本來就不一致**（`contracts.py:659-661` 與 `ic_split_adapter.py:230-231` 為全框；`ic_filter_orchestrator.py:631-643` 因單標的而本即標的內）。
+## b8 未完成
+- `M-SU-D1-01`～`23` mutation 逐條自證；Task 8.1／8.2／8.3 之固定文法斷言。
+- 收案前派三家審碼（實作者不自審）。
+- 全庫 `tests/momentum`＋`tests/api` 背景跑中，待確認完整失敗清單。已知 `test_factor_return_consumer_allowlist` 為**既有紅**（指向 `momentum/factories.py:474`，該檔在 HEAD 未被本批改動），屬 1c-FR 線，與本批無關。
 
-## 定案（b8 實作依此，不得再自行改動）
-- **批次序**：**b8＝R-1＋SU-RESID-3** → **b9＝SU-RESID-2＋下游單鍵** → **`D1` 走 R 重開重戳** → **b10＝R-5**。R-5 不得與未完成之 D1 同批上線。
-- **hash 不變式**：同 symbol 之 train/test hash 一致；**跨 symbol 允許共用整框 joint hash**（`ic_split_adapter.py:189-199` → `ic_filter_orchestrator.py:907` 現行已如此），🔴 禁把「必互異」寫成閘。身分由「Mapping key／`plan.symbol`／事件 symbol」三角相等承擔。
-- **指紋**：`rows` 為 `list[list]`，元素順序 `[int(position), int(feature_ts_ms), str(symbol), str(base_universe_hash)]`，與 `freeze_splitunify_golden.py` 逐字同形；禁 `list[dict]`（實跑 sha 不同）；禁舊欄名 `row_pos`／`ts_ms`。正規化只走 `_index_as_ms`／`assert_epoch_ms_array`，**明文排除** `contracts._coerce_timestamp_array`（秒預設）。空 `row_index` ⇒ `sha256("[]")`。
-- 🔴 **producer 三處必須一起改**：`contracts::split_per_symbol`、`ic_split_adapter::_build_plan_pair`、`ic_filter_orchestrator` holdout 路徑。只改比對端會讓生產 plan 全面缺欄。新欄對非 derive 呼叫點給相容 default，**derive 入口缺欄仍 fail-closed**。
-- **b8 連動必修**：`split_projection.py:569` 之 `insufficient` 條件與迴圈變數無關（用整批 `n_test`）⇒ 改逐 symbol；`test_splitunify_derive.py:537` 之「`single_symbol` 恆亮」在 R-1 後成假前提，解除條件寫死「僅 `n_symbols > 1`」。
-- **mutation**：`M-SU-D1-01`～`23`（15＝attest 判準退回 frame 序、16＝入口略過指紋重算、18＝略過前置合法性閘、19＝關掉 `require_sorted`、20＝只留指紋而移除遞增閘、21＝往返改用 `zip`、22＝接受非整數型序號、23＝oracle 用 `row_index` 重算）。🔴 **指紋與遞增閘是合取**：指紋先依序號排序再雜湊 ⇒ 對同集合**重排無感**，擋重排的是遞增閘；規格不得只寫其一。
+## 坑（沿用＋本日新增）
+- impl token 900 秒過期即須重領；生產碼 commit 必帶 `Ticket-Batch: 20260911-SPLITUNIFY/b8`；task-id／session 日期前綴一律沿用 `20260911-SPLITUNIFY`（跨日不得改）。
+- 🔴 **G-7 是 warn-only**（2026-09-05 使用者裁定，理由逐字寫在 `scripts/git_hooks/commit-msg:20-24`）——commit 後看到它的提示**不必**補 `Governance-Scope` trailer。本日我誤判為「空心閘」並據此 amend，白繞三趟。
+- 產品碼一律用**限定路徑**提交（`git commit -F msg -- <路徑…>`）：不限定會把還在暫存區的 brief 一起帶進宣稱檢查而被擋。目前 `handoffs/20260912-SPLITUNIFY-D001-CLOSURE-R11-BRIEF.md` 仍在暫存區且第 51 行缺 VERIFY 背書。
+- `handoffs/*` 已被 `.git/info/exclude` 排除，新交件檔須 `git add -f` 才入版。
+- 戳記外置於 reconcile synth ⇒ 對 `docs/*.md` 直接跑 `reconcile_stamps_check.sh` 必 rc=1，不是治理真空。
 
-## 🔴 交件格式三紅線（本票已四度回頭正規化，派工 brief 必須逐字寫出）
-findings 用 `## <FAMILY>-R<n>-P<x>-<nn>` **二級**標題；`CLOSED:` 無內容**留空**、不得寫 `none`；完成訊號**逐字** `STATUS: DONE`（裁決 blocked 也一樣）。
-
-## 待辦（R8 回來後）
-**b8 實作**（`M-SU-D1-01`～`23` 全數為驗收條件；規格已定案、三家戳記已核可，不再有規格側阻塞）。🔴 C2 第 4 點已加義務區塊界標，區塊內只准編號義務項、且**不得引用裁決編號**（`obligation_block_check.sh` 於寫檔當下擋）。
-🔴 兩個坑：①戳記外置於 reconcile synth，對 `docs/*.md` 直接跑 `reconcile_stamps_check.sh` 必 rc=1，不是治理真空 ②`handoffs/*` 已被 `.git/info/exclude` 排除，新交件檔須 `git add -f` 才入版（前幾輪 synth 與 sources.lock 已入版，比照辦理）。
-
-## 開工前固定動作
-`bash scripts/agent_preflight.sh`；b8 開工前 `bash scripts/gate.sh dispatch --impl-self --task-id 20260911-SPLITUNIFY-impl-b8-claude …` 自證；生產路徑 commit 必帶 `Ticket-Batch: 20260911-SPLITUNIFY/b8`。🔴 task-id／session 之日期前綴屬 root：一律沿用 `20260911-SPLITUNIFY`（跨日不得改前綴，否則語料對不上、`CLOSED` 被拒）。
+## 下一步
+b8：mutation 測試 → 三家審碼 → 驗收。
+其後批次序：b9＝SU-RESID-2＋下游單鍵；D1 走 R 重開重戳；b10＝R-5（不得與未完成之 D1 同批上線）。
