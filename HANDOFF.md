@@ -109,6 +109,8 @@
 
 **D-002 第六次修訂已完成**（commit `0b4d905a`；obligation／format rc=0，xref 對 **r1–r5 五份** synth 皆 rc=0）：八群逐條落地；mutation 22 → **25 條**（前一版宣稱 23 而實列 22，沿革「20→23（新增 21、22）」本身即算術錯誤；本版主委**自數**表列 25、ID 01–25 連續後才宣稱）。
 
+🔴 **主委自產（R6 等待期自驗）：第五層存在，但方向與前四輪相反——是我的 `Task 9.3` 派工過度，不是漏派**。碼證：`feature_materialization.py:93-131` 之 `groupby("event_id")` ＋ `row_vals.update(...)` 是**設計上的橫向合併**（同事件各 feature TF 的特徵欄拼成**一個**特徵向量）；`_combined_columns:22-32` 逐字為「多 TF 特徵欄名合併；**衝突 ⇒ loud 拒**」——欄名**不帶 TF 前綴**，而是要求各 TF 欄名互斥。⇒ `Task 9.3` 現文要求改為 `groupby(["event_id","feature_timeframe"])` ＋ MultiIndex，會把「一事件一個完整特徵向量」變成「一事件多列、每列只有自己 TF 的欄、其餘 NaN」，**破壞既有設計並讓 ML 輸入充滿 NaN**。**根因是範圍誤判**：切分歸屬層要複合鍵（`SU-RESID-2`），特徵物化層要**維持**一事件一列——我把兩層一起派工了。第七次修訂須改寫 `Task 9.3` 對 `feature_materialization` 之改法（改為「維持事件級橫向合併**不動**，僅在 `merge validate` 與 `set_index` 之粒度斷言上確保不因多列而靜默覆蓋」），並於 R6 收斂檔以**主委自產條**提出、標明非委員意見。
+
 **R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
 
 （以下為 R5 派出時之記載）**R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
