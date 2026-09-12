@@ -97,7 +97,21 @@
 
 🔴 **主委在這段自驗裡連犯兩次同型查法錯誤（記著防再犯）**：①`grep -rn "run(" … | grep "train_plan"` 要求**同一行**，而實際呼叫跨多行 ⇒ 得出「零命中」並當成事實（import 那條同理，`pipeline.py:25` 就是多行括號 import）；②`grep -rl … | head -12` **截斷**清單，tests 的檔案被切掉 ⇒ 又得出一個假的「矛盾」。**兩次都是用不可靠的查法得出「零命中」就下結論**——與記憶裡「驗 scanner 勿 tail 截斷」同型。判準：凡結論是「某物不存在」，查法必須先自證完備（不截斷、不要求同一行、必要時列檔案而非列行）。
 
-**R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
+**R5 已收並收斂完畢**（`round_id=ee68cb30`，債已清）：三家皆 `blocked`，**codex 補完了 R4 欠的完整審查**（5 條 P1＋1 條 P2，並逐條交代 R3／R4 閉合）；composer 2 條 P1（R4 三條全閉）、grok 3 條 P1（R4 四條全閉）。11 條歸八群、**全部採納**。收斂檔 `handoffs/reconcile/20260911-splitunify-b9-review-r5/synth.md`（歸戶 rc=0、completeness rc=0、xref 處置欄 23 個概念全對上）。
+
+🔴 **核心目標第四次以不同形態沒補到（三家獨立撞題）**：`build_event_keys` 內部 `split_projection.py:291-303` 之 `event_level.merge(..., validate="1:1")` 在全量多 feature TF 必 `MergeError`；且輸出欄 `timeframe` **取自 `event_level`**（觸發 TF），merge 只帶 `feature_cutoff_ms` ⇒ 縱使放寬 `validate`，兩列也會得到**相同** TF 值而使複合鍵碰撞。四次形態：只加欄位 → 沒改 caller → caller 前的四參數閘 → **閘後 producer 內部的 merge 與輸出欄**。
+
+🔴 **`(3.2)` 也是「有義務無落點」**（與 R4 的 `(3.1)` 同型）：`AlignmentViolationError` 在本 SPEC 只出現於義務 L48／§V／mutation，**任一 Task 改法均未指名**在何處插入同側檢查 ⇒ 實作者可做完廣播而永不寫 fail-closed，`M-SU-D2-14`／`15` 無碼可紅。
+
+🔴 **我的探針結論被 codex 正確限縮**：探針二只覆蓋「特徵網格為觸發 TF 之整數倍」（12h 觸發配 12h／4h），故 `decision_at_ms` 必命中；codex 給出反例——1h open 非 4h open 者 **15,264／20,352** ⇒ 特徵網格**粗於**觸發 TF 時集合成員判定會大量落空。`Task 9.2b` 已改為**不等式**判準＋界外 fail-closed。
+
+🔴 **`Task 9.1` 的落點是「查了行號沒查可達性」**：指名的 route 之 service 現行**永遠走 `run_event_study_only`**（`case_import_service.py:1592-1626`），拿不到 canonical universe 也就沒有 `discarded` 來源。**指名落點 ≠ 該落點走得到**。
+
+**D-002 第六次修訂已完成**（commit `0b4d905a`；obligation／format rc=0，xref 對 **r1–r5 五份** synth 皆 rc=0）：八群逐條落地；mutation 22 → **25 條**（前一版宣稱 23 而實列 22，沿革「20→23（新增 21、22）」本身即算術錯誤；本版主委**自數**表列 25、ID 01–25 連續後才宣稱）。
+
+**R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
+
+（以下為 R5 派出時之記載）**R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
 
 其後：三家放行 → 戳記 → 才進 `Task 9.1` 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`。
 
