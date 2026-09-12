@@ -194,6 +194,10 @@
           },
           {
             "type": "command",
+            "command": "bash scripts/plain_docs_order_check.sh"
+          },
+          {
+            "type": "command",
             "command": "bash scripts/factkey_write_guard.sh"
           },
           {

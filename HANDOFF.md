@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）——用已結案之四閘治理票全程跑並記錄摩擦（使用者 2026-09-12 指示）｜規格階段：consult 18 條 → D-001 → R5 11 條 → R6 6 條 → R7 2 → R8 1 → R9 2 → R10 3 → R11 3 → R12 已派兩家閉合（session `20260911-splitunify-x-review-r12`）**
+**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）——用已結案之四閘治理票全程跑並記錄摩擦（使用者 2026-09-12 指示）｜規格階段：consult 18 條 → D-001 → R5 11 條 → R6 6 條 → R7 2 → R8 1 → R9 2 → R10 3 → R11 3 → R12 6 → **C2 第 4 點整節重寫為單一現行態**（沿革移出至各輪 synth）→ R13 已派兩家（session `20260911-splitunify-x-review-r13`）**
 
 ## 已完成（皆已 push）
 - **D-001 延伸檔** `docs/SPLITUNIFY_SPEC.D-001.md`：`c6b99d5a` 初版、`091b1e97` R5 版、`90835929` R6 版、`df91e459` **R7 版（現行）**。落實 §N `R-1`＋TODO §E `SU-RESID-3`＋per-symbol 門檻修正。類別＝**D 延伸**（原檔 Task 3.2 自寫「存活至 per-symbol 投影實作後改寫」）。
