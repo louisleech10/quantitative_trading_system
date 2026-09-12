@@ -23,6 +23,7 @@
 - `handoffs/*` 已被 `.git/info/exclude` 排除，新交件檔須 `git add -f` 才入版。
 - 🔴 **zsh 預設不對未加引號的變數做分詞**：`FILES="a b c"; git checkout <sha> -- $FILES` 會把整串當成**單一路徑**，git 報 pathspec 不符而**什麼都沒還原**——我據此跑完 150 秒對照實驗才發現是空的。批次路徑一律逐一列出，或加 sanity 檢查確認狀態真的變了。
 - commit 訊息含「全綠／綠燈／已驗／真紅」等宣稱用語會被 `verification_claim_check.py` 擋，且 commit **零豁免**（不能用 `VERIFY-EXEMPT`）。
+- 🔴 **orchestrator 的 float 秒地雷**（grok R1 實跑）：`features_df.index` 若為 **float** 秒，`_normalize_ic_time_index` 解成 1970、`_coerce_timestamp_array` 解成 2023，兩路**值分叉**；目前不構成存活缺陷，因為 `holdout_boundary` 會先 raise「looks like epoch seconds」而不產出 plan。日後若放寬該前置閘，這條會立刻變成真缺陷。
 - 戳記外置於 reconcile synth ⇒ 對 `docs/*.md` 直接跑 `reconcile_stamps_check.sh` 必 rc=1，不是治理真空。
 
 ## 下一步
