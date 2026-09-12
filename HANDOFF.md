@@ -1,28 +1,30 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）——用已結案之 `VERDICTGATE` 四閘全程跑並記錄摩擦（使用者 2026-09-12 指示）｜**規格階段：偵察 consult 收斂 → 延伸檔 D-001 → 對抗審 R5 收斂修訂 → R6 三家重審進行中**（session `20260911-splitunify-x-review-r6`）｜前一張治理票 `VERDICTGATE` 已結案（票號與狀態見 `docs/GOV_TICKET_SOT.md`）**
+**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）——用已結案之四閘治理票全程跑並記錄摩擦（使用者 2026-09-12 指示）｜規格階段：consult 18 條 → D-001 → R5 11 條 → R6 6 條 → R7 閉合 2 條 → R8 已派原提出方閉合（session `20260911-splitunify-x-review-r8`）**
 
 ## 已完成（皆已 push）
-- **consult 收斂**（`b095cc75`）：三家 18 條＝15 採納／1 部分採納／2 駁回。收斂檔 `handoffs/reconcile/20260911-splitunify-x-consult-r2/synth.md`。
-- **延伸檔** `docs/SPLITUNIFY_SPEC.D-001.md`（`c6b99d5a` 初版、`091b1e97` R5 修訂版）：落實 §N 之 `R-1`（per-symbol 投影）與 TODO §E 之 `SU-RESID-3`（逐列時刻指紋），並修 per-symbol 門檻失效。類別＝**D 延伸**（原檔 Task 3.2 自寫「存活至 per-symbol 投影實作後改寫」「不得只刪 raise」；R5 兩家覆核成立）。
-- **對抗審 R5 收斂**（`091b1e97`）：三家 11 條＝10 實質全採納、1 程序性 P0 駁回。收斂檔 `handoffs/reconcile/20260911-splitunify-x-review-r5/synth.md`。
-- R6 brief `fde8bc41`。
+- **D-001 延伸檔** `docs/SPLITUNIFY_SPEC.D-001.md`：`c6b99d5a` 初版、`091b1e97` R5 版、`90835929` R6 版、`df91e459` **R7 版（現行）**。落實 §N `R-1`＋TODO §E `SU-RESID-3`＋per-symbol 門檻修正。類別＝**D 延伸**（原檔 Task 3.2 自寫「存活至 per-symbol 投影實作後改寫」）。
+- **四輪收斂全部清債**：consult R2（18）／R5（11）／R6（6）／R7（2），`debt_clear` 皆 rc=0，收斂檔在 `handoffs/reconcile/20260911-splitunify-x-{consult-r2,review-r5,review-r6,review-r7}/synth.md`。
+
+## 🔴 R7 閉合輪的兩條裁決（b8 實作依此）
+- **座標轉換邊界＝投影入口**（非 R6 寫的「指紋計算與比對兩處」）。實際消費全框 `row_index` 者有**五處**：長度閘 `split_projection.py:453-458`、首尾同源對證 `:473-484`、成員判定時刻集合 `:486-487`、測試段起點 `:488`、指紋計算與比對。R6 版只涵蓋最後一處，前四處漏網 ⇒ 交錯多標的會越界或取到錯時刻。改為入口一次轉換、其後內部只用 symbol-local ordinal；docstring `:351-353` 之舊座標敘述須同步改寫。
+- **`feature_index_by_symbol` ＝該標的自己的 post-trim 短索引**，不可被全框 `row_index` 直接索引。R7 兩家讀法相反（另一家讀為「須是能被全框列號索引之同一 universe」）⇒ 證明原句有歧義，已在 C1 第 1 點釘死並明記不採之理由（與 C2 第 4 點 `position`＝symbol-local ordinal 互斥）。
+- 指定**複用** `momentum/core/contracts.py::_local_ordinals_for_symbol`（`:505-519`），不得另寫等價函式。
 
 ## 定案（b8 實作依此，不得再自行改動）
-- **批次序**：**b8＝R-1＋SU-RESID-3**（識別基礎）→ **b9＝SU-RESID-2＋下游單鍵** → **`D1` 走 R 重開重戳** → **b10＝R-5**。R-5 不得與未完成之 D1 同批上線。
-- **hash 不變式**：同 symbol 之 train/test hash 一致；**跨 symbol 允許共用整框 joint hash**（`ic_split_adapter.py:189-199` → `ic_filter_orchestrator.py:907` 現行已如此），🔴 禁把「必互異」寫成閘（會拒收現行 IC 多標的計畫）。symbol 身分由「Mapping key／`plan.symbol`／事件 symbol」三角相等承擔，不由 hash 或指紋承擔。
-- **指紋**：payload 對齊 §G G-5① 四元組 `(position, feature_ts_ms, symbol, base_universe_hash)`（禁用舊欄名）；元素強制 `int(...)`；正規化只走 `_index_as_ms`／`assert_epoch_ms_array`，**明文排除** `contracts._coerce_timestamp_array`（秒預設）；取數必從該 symbol 之 post-trim `feature_index`；重複 `position`／NaT ⇒ fail-closed；空 `row_index` ⇒ `sha256("[]")`。
-- 🔴 **producer 寫入點必須一起改**（R5 兩家 P1）：`momentum/core/contracts.py::split_per_symbol`、`momentum/Analysis/ic_split_adapter.py::_build_plan_pair`、`momentum/Analysis/ic_filter_orchestrator.py` holdout 路徑。只改比對端會讓生產 plan 全面缺欄、單標的綠徑全滅。新欄對非 derive 呼叫點給相容 default，**derive 入口缺欄仍 fail-closed**。
-- **C-4 已列入覆寫**（非依賴）：投影簽名改 `Mapping[symbol,(train,test)]`＋`feature_index_by_symbol`；單標的舊式保留為**薄 wrapper**（不得含第二份判定邏輯）；`pipeline.py` 呼叫要一併改。
-- **b8 連動必修**：`split_projection.py:569` 之 `insufficient` 條件與迴圈變數無關（用整批 `n_test`）⇒ 改逐 symbol，配「一標的低於門檻但總數高於門檻」負例；`test_splitunify_derive.py:537` 之「`single_symbol` 恆亮是預期的」在 R-1 後成假前提，解除條件寫死「僅 `n_symbols > 1`」並配 mutation。
-- **mutation**：`M-SU-D1-01`～`07`（07＝跨 symbol 混用 `feature_index`）。
+- **批次序**：**b8＝R-1＋SU-RESID-3** → **b9＝SU-RESID-2＋下游單鍵** → **`D1` 走 R 重開重戳** → **b10＝R-5**。R-5 不得與未完成之 D1 同批上線。
+- **hash 不變式**：同 symbol 之 train/test hash 一致；**跨 symbol 允許共用整框 joint hash**（`ic_split_adapter.py:189-199` → `ic_filter_orchestrator.py:907` 現行已如此），🔴 禁把「必互異」寫成閘。身分由「Mapping key／`plan.symbol`／事件 symbol」三角相等承擔。
+- **指紋**：`rows` 為 `list[list]`，元素順序 `[int(position), int(feature_ts_ms), str(symbol), str(base_universe_hash)]`，與 `freeze_splitunify_golden.py` 逐字同形；禁 `list[dict]`（實跑 sha 不同）；禁舊欄名 `row_pos`／`ts_ms`。正規化只走 `_index_as_ms`／`assert_epoch_ms_array`，**明文排除** `contracts._coerce_timestamp_array`（秒預設）。空 `row_index` ⇒ `sha256("[]")`。
+- 🔴 **producer 三處必須一起改**：`contracts::split_per_symbol`、`ic_split_adapter::_build_plan_pair`、`ic_filter_orchestrator` holdout 路徑。只改比對端會讓生產 plan 全面缺欄。新欄對非 derive 呼叫點給相容 default，**derive 入口缺欄仍 fail-closed**。
+- **b8 連動必修**：`split_projection.py:569` 之 `insufficient` 條件與迴圈變數無關（用整批 `n_test`）⇒ 改逐 symbol；`test_splitunify_derive.py:537` 之「`single_symbol` 恆亮」在 R-1 後成假前提，解除條件寫死「僅 `n_symbols > 1`」。
+- **mutation**：`M-SU-D1-01`～`10`（10＝成員判定跳過入口轉換）。
 
-## 🔴 交件格式三紅線（本票已三度回頭正規化，派工 brief 必須逐字寫出）
+## 🔴 交件格式三紅線（本票已四度回頭正規化，派工 brief 必須逐字寫出）
 findings 用 `## <FAMILY>-R<n>-P<x>-<nn>` **二級**標題；`CLOSED:` 無內容**留空**、不得寫 `none`；完成訊號**逐字** `STATUS: DONE`（裁決 blocked 也一樣）。
 
-## 摩擦（使用者要求檢驗；已記 11 筆於 `白話說明/流程摩擦記錄.md`）
-最重一筆＝**兩道閘互斥**：委員交件格式錯，不改則 completeness 硬閘擋（掉項）、改了則 `debt_clear` 之「交件後不得改動」擋。**處置慣例：`handoffs/` 原檔保持交件原狀供稽核，格式正規化只落在 `handoffs/reconcile/<session>/sources/` 複本**（lock 記複本 sha、completeness 驗複本、debt_clear 驗原檔）；若該輪尚未註冊，則正規化後 `register-output`，以 `committee_output.output_sha256` 為權威。另 3 筆是主委自己的判讀錯誤（戳記檢查器用錯對象、`rc` 讀成 pipe 尾端、委員名進指令列被派工閘誤判）。
+## 待辦（R8 回來後）
+①收斂 R8 → ②若 proceed 則派三家戳記輪（R7 兩家戳記因規格續改已失效，須重簽）→ ③b8 實作。
+🔴 兩個坑：①戳記外置於 reconcile synth，對 `docs/*.md` 直接跑 `reconcile_stamps_check.sh` 必 rc=1，不是治理真空 ②`handoffs/*` 已被 `.git/info/exclude` 排除，新交件檔須 `git add -f` 才入版（前幾輪 synth 與 sources.lock 已入版，比照辦理）。
 
 ## 開工前固定動作
-`bash scripts/agent_preflight.sh`；b8 開工前 `bash scripts/gate.sh dispatch --impl-self --task-id 20260911-SPLITUNIFY-impl-b8-claude …` 自證；生產路徑 commit 必帶 `Ticket-Batch: 20260911-SPLITUNIFY/b8`。
-🔴 task-id／session 之日期前綴屬 root：本票一律沿用 `20260911-SPLITUNIFY`（跨日不得改前綴，否則語料對不上、`CLOSED` 被拒）。
+`bash scripts/agent_preflight.sh`；b8 開工前 `bash scripts/gate.sh dispatch --impl-self --task-id 20260911-SPLITUNIFY-impl-b8-claude …` 自證；生產路徑 commit 必帶 `Ticket-Batch: 20260911-SPLITUNIFY/b8`。🔴 task-id／session 之日期前綴屬 root：一律沿用 `20260911-SPLITUNIFY`（跨日不得改前綴，否則語料對不上、`CLOSED` 被拒）。
