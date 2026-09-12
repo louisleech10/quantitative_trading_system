@@ -233,6 +233,8 @@
 
 🔴 **自證步驟首次執行即付股息**：R9 收斂時我承諾「每項改完立即逐條 grep 自證落點」，本輪執行後**當場抓到兩處我以為改完其實沒改**（目標句在括號裡又寫了一次舊句、mutation 表列 31 而正文仍寫 26），**都在跑閘前自己修掉**——這是九輪以來第一次由我而非委員抓到此類缺陷。
 
+🔴 **`Task 9.2b` 之 Rule 4 確認冗餘，處置＝刪除（grok 建議、主委實讀原文確認）**：步驟 0 之 ④ 已寫「先驗 `index_ms[0] <= decision_at_ms <= index_ms[-1]`，不滿足即 fail-closed raise」，而 Rule 4 又寫「早於 `index_ms[0]` 或晚於末列 ⇒ fail-closed raise」——**同一件事寫兩次**；且前言宣稱「通過前置後，下列三條互斥且窮盡」卻列了四條，**語意自相矛盾**（通過步驟 0 後結構上不可能再命中 Rule 4）。⇒ 第十一次修訂**刪除 Rule 4**，並於規則列前言加一句「界外情形已由步驟 0④ 攔下，故以下三條即窮盡」。
+
 🔴 **第十一次修訂之 mutation 新增列已備稿（格式已取自現行表末三列：三欄 `ID｜改壞什麼｜應紅之測試`）**：新增 `M-SU-D2-32`｜`baseline` **保留舊 `n_test` 鍵**（未移除或僅改名為別名）｜`Task 9.4` 之「舊鍵不得殘留」斷言（回傳 dict 僅含 `n_test_events`／`n_test_samples`）。⇒ 表列將由 **31 → 32**，正文條數須同步改（此為 R5 被抓過之同型，**自證清單第三條**：條數與表列一致）。
 
 🔴 **舊鍵 `n_test` 之命運已由主委擇定＝「刪除、改雙量」（R10 兩家要求寫死，三項碼證）**：①`baseline.py:120` 為 `n_test` 在生產碼之**唯一寫入點**，`momentum`／`api` 內**無其他生產消費者**；②前端命中全屬**別的** `n_test`——`EventTablesPanel.tsx:215,361` 讀事件表 `summary.n_test`、`MarginalICTable` 讀 `marginal_ic.n_test`，**無一處讀 baseline 之鍵**；③`split_unify.json` 之 canonical 為 `metadata.split_unify.n_test`，`marginal_ic.n_test` 已在 `must_equal_canonical_on_event_path` 桶內，而 **baseline 之 `n_test` 根本不在該登記中** ⇒ 刪除不動 deny-by-default。**留別名反而讓一個「不在任何登記、語意又與 canonical 不同」的鍵繼續漂著**。⇒ 第十一次修訂寫死：`baseline` 改輸出 `n_test_events` 與 `n_test_samples`、**移除舊 `n_test` 鍵**，§V 加「舊鍵不得殘留」斷言，並掛一條 mutation（保留舊鍵即紅）。
