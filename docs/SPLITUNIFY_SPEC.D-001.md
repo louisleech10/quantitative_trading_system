@@ -66,7 +66,9 @@ def derive_event_split_from_plans(
    **但現行三個 producer 寫入 `SplitPlan.row_index` 的座標本來就不一致**（R8 抽驗）：`momentum/core/contracts.py::split_per_symbol`（`:659-661`）與 `momentum/Analysis/ic_split_adapter.py::_build_plan_pair`（`:230-231`）以 `positions[local]` 寫入**全框** row position；而 `momentum/Analysis/ic_filter_orchestrator.py` 之 holdout 路徑（`:631-642`）其 frame 本身即單標的（`symbols` 全為同一值，`:643`），寫入的 `row_index` **本來就已經是 symbol-local**。🔴 **本延伸不改 `row_index` 既有語意**（它同時被 IC 主線之全框驗證與既有 golden 依賴，改動範圍遠超本批），改為**由 producer 直接 attest 一份 symbol-local 座標**：
    - 🔴 **`SplitPlan` 新增欄 `row_index_local`（R8 `CODEX-R8-P1-01`）**：型別同 `row_index`，內容為該 plan 之列在**該 symbol 自己的 post-trim universe** 內之序號，遞增且與 `row_index` **逐位對應**。三個 producer 皆**直接取用其已有之 local ordinal**（`split_per_symbol` 之 `train_local`／`test_local`、`_build_plan_pair` 之 `train_local`／`test_local`、orchestrator 路徑因單標的而等同 `row_index`），**不得**在 producer 端重新反推。
    - 🔴 **為何不採「把全框 symbol 向量傳進投影」**：R8 指出既有 helper `_local_ordinals_for_symbol(row_index, symbol_arr, symbol)`（`contracts.py:504-519`）需要全框 `symbol_arr`，而新簽名與 `SplitPlan`（`:377-390`）皆**無**此向量 ⇒ R7 版所寫之「入口整批轉換」在契約上**不可執行**。若改為把 `symbol_arr` 傳進 `derive`，則等於在 C1 第 1 點剛釘死「投影只收 per-symbol 短索引」之後又送回一份全框輸入，R7 的歧義會復發。改由 producer attest 可同時消除「不可執行」與「歧義復發」。
-   - 🔴 **producer 端之 attest 為必做**：建 plan 之處 `symbol_arr` **皆可得**（`contracts.py:690`、`ic_split_adapter.py:258`、`ic_filter_orchestrator.py:643-648` 皆已把 `symbols` 傳給 `validate_split_pair_integrity`），故 producer 必須 attest 寫入之 `row_index_local`。🔴 **attest 之判準＝時間序往返（R10 `CODEX-R10-P1-02` 與主委自產條）**：取該 symbol 之列、**依時刻排序**後得 `sorted_positions`，驗 `sorted_positions[row_index_local]` 逐值等於 `row_index`；不等 ⇒ fail-closed。**不得**改以 `_local_ordinals_for_symbol` 之結果逐值相等當判準——該 helper 以 `np.flatnonzero(symbol_arr == symbol)` 取 **frame 序**，而 `row_index_local` 之語意是**時間序**內之序號（`split_per_symbol:657` 先 `sort_values(ts_col)` 才呼叫 splitter）。兩者僅在「該標的之 frame 序恰等於時間序」時相等，今日碰巧成立不代表判準正確；改用往返後，亂序輸入**不再被誤擋**而仍驗得出真正的寫入錯誤。這就是「唯一、可驗證」之落點：**轉換只發生在 producer 一處，投影端不再轉換**。
+   - 🔴 **producer 端之 attest 為必做**：建 plan 之處 `symbol_arr` **皆可得**（`contracts.py:690`、`ic_split_adapter.py:258`、`ic_filter_orchestrator.py:643-648` 皆已把 `symbols` 傳給 `validate_split_pair_integrity`），故 producer 必須 attest 寫入之 `row_index_local`。🔴 **attest 之判準＝時間序往返（R10 `CODEX-R10-P1-02` 與主委自產條）**：取該 symbol 之列、**依時刻排序**後得 `sorted_positions`，驗 `sorted_positions[row_index_local]` 逐值等於 `row_index`；不等 ⇒ fail-closed。
+     🔴 **前置合法性閘為必做（R11 `CODEX-R11-P2-02`）**：往返比對**之前**必須先驗 `row_index_local` 為整數、`0 <= 值 < len(sorted_positions)`、無重複、且**嚴格遞增**；任一不合 ⇒ fail-closed。理由：Python 之負索引會回捲，實跑證實 `sorted_positions` 為 `[10,20,30]`、`row_index` 為 `[30]` 時，序號寫 `-1` 取回 `[30]` 會使往返判定為**相等而誤放行**；寫 `1` 取回 `[20]` 才正確判不等。🔴 **不得**自寫該閘，須複用 `momentum/core/split_preview.py` 之 `assert_positional_rows`（它已驗整數性、負值、上界、重複與嚴格遞增），且**不得**關閉其 `require_sorted`。
+     🔴 **指紋對排列不敏感屬明示邊界（R11 主委自產條；第二家必答二獨立同結論）**：本節第 1 點之指紋**先依序號遞增排序再雜湊**，故同集合之**重排**指紋完全相同（實跑：`[0,2,4]` 與 `[4,2,0]` 同指紋）。⇒ 指紋**單獨**擋不住重排；擋住它的是上述**嚴格遞增**要求。兩者為**合取**關係：改集合由指紋擋、改順序由遞增閘擋，同集合且遞增之排列**只有恆等**。🔴 規格**不得**只寫「指紋重驗為權威守衛」而略去遞增閘；投影入口之 `assert_positional_rows` 亦**不得**改為 `require_sorted=False`（R10 放寬亂序立場指的是**面板**順序，**不是** `row_index_local` 之順序，兩者不得混淆）。**不得**改以 `_local_ordinals_for_symbol` 之結果逐值相等當判準——該 helper 以 `np.flatnonzero(symbol_arr == symbol)` 取 **frame 序**，而 `row_index_local` 之語意是**時間序**內之序號（`split_per_symbol:657` 先 `sort_values(ts_col)` 才呼叫 splitter）。兩者僅在「該標的之 frame 序恰等於時間序」時相等，今日碰巧成立不代表判準正確；改用往返後，亂序輸入**不再被誤擋**而仍驗得出真正的寫入錯誤。這就是「唯一、可驗證」之落點：**轉換只發生在 producer 一處，投影端不再轉換**。
    - 🔴 **投影端只消費 `row_index_local`**：`derive_event_split_from_plans` 內部**一律不得**索引 `row_index`。
    - 🔴 **缺欄即 fail-closed**：`derive` 入口收到之 plan 缺 `row_index_local` ⇒ 明確報錯並指名欄位，**不得**以 `row_index` 回退（回退正是交錯標的越界之來源）。非 `derive` 之呼叫點給相容 default。
    - 🔴 **兩欄之深層不可變性（R9 `CODEX-R9-P1-01`；主委實跑另加抓一面）**：`@dataclass(frozen=True)` 只擋「整欄改綁」，**擋不住 numpy 陣列原地改寫**——實跑 `p.row_index[0] = 99` 成功、讀回 `[99 2]`、`flags.writeable` 為 `True`；且建構時**無 defensive copy**，呼叫端持有之來源陣列其後之改動會滲入已建好的 plan（實跑：改來源後 plan 讀回 `[77 6]`）。🔴 **R10 `CODEX-R10-P1-01` 再進一步：沒有任何 numpy 層做法能完整封住**（主委實跑複驗）：`np.asarray` 對唯讀陣列回傳**同一物件**，`setflags(write=True)` **成功**、寫入後原陣列讀回 `[99 2]`；改以 `np.frombuffer(bytes)` 為底者雖擋得住翻回（訊息為 cannot set WRITEABLE flag to True），但 `pickle` 與 `deepcopy` 還原後 `writeable` 仍為真。
@@ -120,8 +122,7 @@ def derive_event_split_from_plans(
   `ASSERT row_time_fingerprint WHEN 空 row_index THEN sha256 值 == sha256("[]")`
   `ASSERT derive_event_split_from_plans WHEN plan 缺 row_time_fingerprint 欄 THEN rc!=0 且訊息指名缺欄名`
   `ASSERT 獨立 oracle WHEN 由 fixture 重算 THEN 值 == producer 寫入 plan 之 row_time_fingerprint`
-  `ASSERT producer attest WHEN 建 plan THEN _local_ordinals_for_symbol(row_index, symbol_arr, symbol) 逐值 == row_index_local`
-  `ASSERT producer attest WHEN row_index 含不屬於該 symbol 之全框位置 THEN rc!=0`
+  `ASSERT producer attest WHEN row_index 含不屬於該 symbol 之列 THEN rc!=0（往返必不等）`
   `ASSERT producer attest WHEN 兩 symbol 於全框交錯 THEN 各自 row_index_local 連續遞增`
   `ASSERT derive_event_split_from_plans WHEN plan 缺 row_index_local 欄 THEN rc!=0 且訊息指名缺欄名（不得以 row_index 回退）`
   `ASSERT derive_event_split_from_plans WHEN 單標的 frame（orchestrator 路徑）THEN row_index_local 逐值 == row_index`
@@ -129,6 +130,9 @@ def derive_event_split_from_plans(
   `ASSERT SplitPlan WHEN 建構後改動呼叫端持有之來源陣列 THEN plan 內兩欄皆不變（已 defensive copy）`
   `ASSERT SplitPlan WHEN 對兩欄呼叫 setflags(write=True) THEN 丟出例外（底層 buffer 不可變）`
   `ASSERT producer attest WHEN sorted_positions[row_index_local] 與 row_index 有任一值不等 THEN rc!=0`
+  `ASSERT producer attest WHEN row_index_local 含負值 THEN rc!=0（前置合法性閘先於往返比對）`
+  `ASSERT producer attest WHEN row_index_local 含重複值或非嚴格遞增 THEN rc!=0`
+  `ASSERT derive_event_split_from_plans WHEN row_index_local 被重排（同集合） THEN rc!=0（指紋相同，由遞增閘擋下）`
   `ASSERT producer attest WHEN 該標的 frame 序非時間序但 row_index_local 正確 THEN rc=0（不得誤擋亂序輸入）`
   `ASSERT derive_event_split_from_plans WHEN 建構後竄改 row_index_local THEN rc!=0 且訊息指名指紋兩值之前 12 字元（入口重驗擋下）`
 
@@ -161,6 +165,9 @@ def derive_event_split_from_plans(
 | `M-SU-D1-15` | attest 判準改回 `_local_ordinals_for_symbol` 逐值相等（frame 序） | producer 契約測試（亂序輸入不得被誤擋） |
 | `M-SU-D1-16` | 投影入口略過指紋重算比對（改信 plan 攜帶值） | `test_splitunify_derive.py -k fingerprint`（竄改 `row_index_local` 後應紅） |
 | `M-SU-D1-17` | 以 `setflags(write=False)` 取代不可變 buffer 為底 | producer 契約測試（`setflags(write=True)` 應丟例外） |
+| `M-SU-D1-18` | attest 略過前置合法性閘（直接往返比對） | producer 契約測試（負索引序號應紅） |
+| `M-SU-D1-19` | 投影入口把 `assert_positional_rows` 改為 `require_sorted=False` | `test_splitunify_derive.py -k per_symbol`（重排 `row_index_local` 應紅） |
+| `M-SU-D1-20` | 只留指紋比對、移除遞增閘 | `test_splitunify_derive.py -k fingerprint`（同集合重排應紅） |
 
 ### 殘留（承原檔 §N；本延伸覆寫其中一列之狀態，另一列住 TODO §E）
 
