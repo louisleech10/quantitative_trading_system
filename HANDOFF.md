@@ -233,6 +233,8 @@
 
 🔴 **自證步驟首次執行即付股息**：R9 收斂時我承諾「每項改完立即逐條 grep 自證落點」，本輪執行後**當場抓到兩處我以為改完其實沒改**（目標句在括號裡又寫了一次舊句、mutation 表列 31 而正文仍寫 26），**都在跑閘前自己修掉**——這是九輪以來第一次由我而非委員抓到此類缺陷。
 
+🔴 **第十一次修訂之 mutation 新增列已備稿（格式已取自現行表末三列：三欄 `ID｜改壞什麼｜應紅之測試`）**：新增 `M-SU-D2-32`｜`baseline` **保留舊 `n_test` 鍵**（未移除或僅改名為別名）｜`Task 9.4` 之「舊鍵不得殘留」斷言（回傳 dict 僅含 `n_test_events`／`n_test_samples`）。⇒ 表列將由 **31 → 32**，正文條數須同步改（此為 R5 被抓過之同型，**自證清單第三條**：條數與表列一致）。
+
 🔴 **舊鍵 `n_test` 之命運已由主委擇定＝「刪除、改雙量」（R10 兩家要求寫死，三項碼證）**：①`baseline.py:120` 為 `n_test` 在生產碼之**唯一寫入點**，`momentum`／`api` 內**無其他生產消費者**；②前端命中全屬**別的** `n_test`——`EventTablesPanel.tsx:215,361` 讀事件表 `summary.n_test`、`MarginalICTable` 讀 `marginal_ic.n_test`，**無一處讀 baseline 之鍵**；③`split_unify.json` 之 canonical 為 `metadata.split_unify.n_test`，`marginal_ic.n_test` 已在 `must_equal_canonical_on_event_path` 桶內，而 **baseline 之 `n_test` 根本不在該登記中** ⇒ 刪除不動 deny-by-default。**留別名反而讓一個「不在任何登記、語意又與 canonical 不同」的鍵繼續漂著**。⇒ 第十一次修訂寫死：`baseline` 改輸出 `n_test_events` 與 `n_test_samples`、**移除舊 `n_test` 鍵**，§V 加「舊鍵不得殘留」斷言，並掛一條 mutation（保留舊鍵即紅）。
 
 🔴 **`(G-4e)` 改用 fixture 字面 `expected_side` 之可行性已自驗（主委實讀 `freeze_splitunify_golden.py:93-110`）**：`_event_keys()` 以**逐 row dict** 構造（`{"event_id": e, "feature_cutoff_ms": c, "label_start_ms": c, …}`），加一欄只需在 dict 多一個 key、`rows` 由三元組改四元組；**四個迴圈各須逐筆填值，這件事本身即委員要的「與公式編碼獨立」**——人手依三段式想清楚每個事件的正確側，而非再寫一份公式（再寫公式正是三份同錯的成因）。比對點：`g1_membership` 於 `:178` 產生、`:347` 與 `g3b_oracle` 比對 ⇒ 第三份比對可並列加在同處。⇒ **成本為一欄＋一次人工填值＋一行比對**，第十一次修訂可照委員修法寫死，並同時明禁「第三份與投影／oracle 共用函式或 import」。
