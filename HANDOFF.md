@@ -237,7 +237,7 @@
 - **`P1-01` 成立**：`(6.2)` L92 仍逐字保留 v9 之「baseline 例外句」，而 `Task 9.4` L211 已於 v10 改為「兩量**不**恆等、須雙輸出」⇒ **同檔互斥**，實作者依義務塊可合法跳過 `n_test_events`。
 - **`P1-02` 成立**：「整鏈」全檔命中 2，**皆在 `Task 9.1` 段落**，§V 無 ⇒ 與 R9 之 (G-4d) 同型，**「寫了要做卻沒進 §V」第七次**。
 - **`P2-01` 成立**：§V 之 Task 斷言列僅 `9.1`／`9.2`／`9.2a`／`9.2b`／`9.3`／`9.5`，**無 `Task 9.4`**，而 `M-SU-D2-31` 之應紅測試正指向它 ⇒ mutation 與驗收目錄脫鉤。
-- **`(G-4e)` 之殘餘邊界**：composer 交件檔自陳其雙探針結果為「獨立實作時 `g4e_pass=False`、三份同錯時 `g4e_pass=True`」（**主委未自跑，僅引用其交件**，`handoffs/20260911-splitunify-b9-review-r10-composer.md` 必答 3）⇒ 若成立，§G 須誠實標為殘餘並明禁第三份判準與 `_oracle_membership` 共用實作或同 PR 機械複製；**主委須在第十一次修訂前自行複跑該探針**再定稿。
+- **`(G-4e)` 之殘餘邊界——主委已自跑複驗，composer 結論成立**（探針入版 `handoffs/20260912-splitunify-b9-probe-g4e-triple.py`，兩組反例 `decision=250/cutoff=200` 與 `decision=950/cutoff=900` 各跑兩情形）：**情形 A（第三份獨立實作）** `proj=train`／`oracle=train`／`expected=purged` ⇒ `g3b_pass=True` 但 `g4e_pass=False`（G-3b 放行、第三份攔下）；**情形 B（三份同錯）** 三者皆 `train` 而正解 `purged` ⇒ `g3b_pass=True` 且 `g4e_pass=True`（三份皆綠，錯誤成員集會被凍結）。⇒ **`(G-4e)` 之有效性完全取決於第三份是否真的獨立實作**，而這與 `_oracle_membership` 之「逐行重寫」同屬**散文紀律、非機械保證**。第十一次修訂須在 §G **明列為殘餘誠實邊界**，並明禁第三份判準與 `_oracle_membership` 共用實作或同 PR 機械複製。
 🔴 **我的自證步驟這次漏了兩類**：只驗「新增內容是否落在該落的段落」，未驗「**被取代的舊內容是否同步改掉**」（`(6.2)`），也未驗「**mutation 之應紅測試是否有 §V 母斷言**」。⇒ 自證清單須補這兩條，第十一次修訂執行。**它也顯示自證步驟本身有效**：composer 逐項複驗十一群，九項確認落點正確，只抓出我漏的兩項。
 
 **R10 已派出**（session `20260911-splitunify-b9-review-r10`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R10-BRIEF.md`）。brief 設了一個**本輪特有的必答**：請委員**檢驗我的自證步驟是否真的執行**，逐項指出十一項落點、列出我漏掉的。
