@@ -26,5 +26,7 @@ ASSUMPTIONS_VERIFIED: R13 reconcile stamp 三家皆 APPROVED；Q2/Q4 probes 已�
 TESTS_RUN: `venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py -k per_symbol`→12 passed；`-k fingerprint`→9；`-k insufficient`→2；wiring→9；producer attest→19；golden→9；`venv/bin/python scripts/freeze_splitunify_golden.py`→GOLDEN OK。
 FAILURES_SEEN: 初次 probe 使用錯誤 import／舊 SplitPlan kwarg，已修正命令；/tmp cleanup 被 gate 拒絕（本任務 round OPEN），未修改程式碼。
 SCOPE_CHANGES: none；唯讀審查，僅新增本交接檔。 NUMERIC_OR_SCHEMA_IMPACT: none made；OUTPUT: handoffs/20260911-splitunify-b8-review-r1-codex.md
-VERDICT: blocked; BLOCKED-BY: CODEX-R1-P1-01, CODEX-R1-P1-02; CLOSED:
+VERDICT: blocked
+BLOCKED-BY: CODEX-R1-P1-01, CODEX-R1-P1-02
+CLOSED:
 STATUS: DONE
