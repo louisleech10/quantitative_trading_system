@@ -30,5 +30,10 @@
 - 戳記外置於 reconcile synth ⇒ 對 `docs/*.md` 直接跑 `reconcile_stamps_check.sh` 必 rc=1，不是治理真空。
 
 ## 下一步
-b8：mutation 測試 → 三家審碼 → 驗收。
-其後批次序：b9＝SU-RESID-2＋下游單鍵；D1 走 R 重開重戳；b10＝R-5（不得與未完成之 D1 同批上線）。
+第 8 批已結案（三輪三家審碼收斂）。**第 9 批偵察已完成並清債**（session `20260911-splitunify-b9-consult-r1`、`round_id=3b6109c8`；三家委員＋主委自產共 18 條，收斂為六群、17 條入 roster）。
+
+🔴 **偵察兩項關鍵結論，直接改寫第 9 批的前提**：
+① **D-001 第 189 行所列「六個下游單鍵面」是不完整清單**——四家合併盤點後約 15 處（另含 `counterexample_classifier`／`candidate_ledger`／`event_split.build_time_clusters`／`ic_feed` survivor 六鍵／`frontend/src/lib/types.ts`／`frontend/src/app/search/page.tsx:825-835` 的 event_id Map／`tests/golden/splitunify/{splitunify_golden,clusters_oracle}.json`）。SPEC 觸及面**不得沿用那六處**。
+② **D-001 第 11／189 行「未完成前多 TF 同批維持 fail-closed」與實況不符**——主委探針與 codex Probe A 逐值一致（4 列輸入、2 列輸出、`UNSELECTED_ROWS_DROPPED 2`）：現行只擋「同一 TF 下事件重複」與「選定 TF 下缺 cutoff」，**多 TF 同批不擋，未選中的列靜默丟棄且不揭露**。該句須於 SPEC 更正。
+
+下一步：依收斂六群起草第 9 批 SPEC（需 `gate.sh artifact` token）；範圍決策「一次改完全部消費面 vs 先做揭露、後做複合鍵」待定。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
