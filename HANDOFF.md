@@ -139,6 +139,8 @@
 - **物化記帳不變式會直接炸**（grok）：`feature_materialization.py:138-140` `n_input = per_tf["event_id"].nunique()`；若照 `Task 9.3` 改 MultiIndex，`len(features)` 成列數而 `n_input` 仍事件數 ⇒ `AssertionError`，或誘使實作者保留事件級 groupby 假綠。**與主委自產之「該處應維持事件級」互相印證**。
 - composer 另開兩條：`(3.2)` 檢查漏「同事件一列 purged、一列 assignments」之混態（只驗 `split_label` 唯一抓不到，因 purged 列無該欄）；`Task 9.1` 二擇一**規格自己沒擇**，兩選項皆無具名 route／fixture ⇒ 9A 仍寫不出驗收命令。
 
+🔴 **`tier_min` 繞過之嚴重度已定案（比 R6 所述更精確）**：`insufficient_events_in_test` **不擋任何分析**——它只被 `tables.py:162` 原樣放進報告供人看；且 `grep` 確認**前端完全未顯示**（前端命中的 `warmup_insufficient` 屬 Feature Factory，是不同的東西）。⇒ TF 膨脹繞過 `tier_min` 的後果**不是**「擋下的閘被繞過」，而是**「測試段事件數不足」這個警告靜默消失，而使用者本來就看不到它**。仍命中高風險 (d)（樣本不足卻無人知情），但第七次修訂須把它與「該旗標無終端揭露」**一起**處理——只改計數而不補揭露，修了也沒人看得到。此判定與 `Task 9.1` 之終端揭露缺口同源。
+
 🔴 **第七次修訂之兩項寫法已可定案（主委先取事實，免得又寫成模糊指示）**：
 - **gap 可精確定義，不必用模糊的「兩個 `time_bounds` 之外」**：`split_preview.holdout_test_row_index:41-43` 逐字為 `split_point = floor((1-oos_test_size)*n)`、`start = split_point + purge_gap + embargo`、`test = arange(start, n)`；train 為 `arange(0, split_point)` ⇒ **gap 恰為位置半開區間 `[split_point, split_point+purge_gap+embargo)`**。`Task 9.2b` 應寫成「`decision_at_ms` 映射之位置落在該區間 ⇒ fail-closed」，並明示**不得**收成 train。
 - **跨表檢查只能用集合交集**：`purged` 僅兩欄 `["event_id","reason"]`（`split_projection.py:556`）、**無 `split_label`** ⇒ composer 之「只驗 `split_label` 唯一抓不到 purged 混態」**結構上成立**；`(3.2)` 之補充檢查須寫成 `set(purged["event_id"]) ∩ set(assignments["event_id"]) == ∅`，而非擴充 `split_label` 值域（後者會動到已戳記之封閉值集）。
