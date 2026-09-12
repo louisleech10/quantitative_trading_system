@@ -147,7 +147,15 @@
 - **gap 可精確定義，不必用模糊的「兩個 `time_bounds` 之外」**：`split_preview.holdout_test_row_index:41-43` 逐字為 `split_point = floor((1-oos_test_size)*n)`、`start = split_point + purge_gap + embargo`、`test = arange(start, n)`；train 為 `arange(0, split_point)` ⇒ **gap 恰為位置半開區間 `[split_point, split_point+purge_gap+embargo)`**。`Task 9.2b` 應寫成「`decision_at_ms` 映射之位置落在該區間 ⇒ fail-closed」，並明示**不得**收成 train。
 - **跨表檢查只能用集合交集**：`purged` 僅兩欄 `["event_id","reason"]`（`split_projection.py:556`）、**無 `split_label`** ⇒ composer 之「只驗 `split_label` 唯一抓不到 purged 混態」**結構上成立**；`(3.2)` 之補充檢查須寫成 `set(purged["event_id"]) ∩ set(assignments["event_id"]) == ∅`，而非擴充 `split_label` 值域（後者會動到已戳記之封閉值集）。
 
-**R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
+**R6 已收並收斂完畢**（`round_id=ad644930`，債已清）：三家皆 `blocked`，共 **16 條歸八群、全部採納**（codex 7、grok 5、composer 4）。收斂檔 `handoffs/reconcile/20260911-splitunify-b9-review-r6/synth.md`（歸戶 rc=0、completeness rc=0、xref 處置欄 **32 個概念**全對上）。**三群是三家獨立撞題**：I1 不等式在隔離帶不等價、I2 `(3.2)` 抓不到 purged∩assignments、I5 `Task 9.1` 未擇一。
+
+🔴 **本輪方向反轉**：八群中**四群是我派工過度或派錯**（I3 物化層本該維持事件級、I4 16 處清單用形狀判準誤列、I5 `Task 9.1` 指的 route 永遠走不到、I6 前端匯出 Map 改鍵會弄壞使用者 CSV），而非「又漏了一層」。前六輪都在追「還有沒有第 N 層」，R6 起要**雙向**攻。
+
+**D-002 第七次修訂已完成**（commit `fa2620c9`；obligation／format rc=0，xref 對 **r1–r6 六份** synth 皆 rc=0；mutation 25 → **26 條**，主委**自數**表列 26、ID 01–26 連續後才宣稱）。八群逐條落地，其中 `Task 9.2b` 側別判準改為**三段式且順序不得調換**、`D-002-C5` 之 16 處**全面重新分類為三類**、`Task 9.1` 原指名之四個落點**全部作廢**（字面保留供追溯）。
+
+**R7 已派出**（session `20260911-splitunify-b9-review-r7`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R7-BRIEF.md`）。brief 首次要求**雙向攻擊**：既問「還有沒有漏派的關卡」，也要求委員**挑戰我新做的三分類**——特別是被我判為「(甲) 事件級維持」的那些，若其實該改，複合鍵上線後會靜默取到錯的列。
+
+（以下為 R6 派出時之記載）**R6 已派出**（session `20260911-splitunify-b9-review-r6`）。brief 把「此主張已被推翻四次」逐輪列出，必答 2 擴大到 **`feature_materialization`**——前四輪的推翻都停在 `assignments` 之前，這次要求走到物化產出。
 
 （以下為 R5 派出時之記載）**R5 已派出**（session `20260911-splitunify-b9-review-r5`、brief commit 見 `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R5-BRIEF.md`）。brief 開頭**直接寫死**「唯讀審查不適用 STAMP-BLOCKED」並附碼證，把 R4 那條誤讀擋在委員讀 brief 的當下；必答 2 要求委員**自己從 `EventSamplePipeline.run` 入口走到 `assignments`**，假設還有第四層我沒看到。
 
