@@ -41,7 +41,7 @@ def derive_event_split_from_plans(
 
    單標的舊呼叫式（`train_plan: SplitPlan`、`test_plan: SplitPlan`、`feature_index: pd.Index`）保留為**薄 wrapper**，內部包成單鍵 Mapping 後轉呼；wrapper **不得**含第二份判定邏輯（不得有 purge／成員判定／指紋比對之獨立分支）。呼叫端既未給 Mapping、也未走 wrapper ⇒ 維持 `multi_symbol_projection_unsupported`（字面續住 `split_unify.json`，不新增值）。
 
-   🔴 **`feature_index_by_symbol` 之數字空間限定（R7 `CODEX-R7-P1-01`；R7 兩家對本句讀法相反 ⇒ 證明本句原有歧義，此處釘死）**：`feature_index_by_symbol[symbol]` 一律是**該 symbol 自己的 post-trim 索引**，長度＝該 symbol 之列數；它**不是**全框 universe，因此**不可**被 `SplitPlan.row_index`（全框列號）直接索引——兩者屬不同數字空間。R7 中一家讀為「須是能被全框 `row_index` 合法索引之同一 universe」，該讀法與本延伸 D-001-C2 第 4 點「`position` ＝ symbol-local ordinal」互斥，**不採**。所有全框→symbol-local 之換算一律走 C2 第 4 點之具名 helper；**禁**以傳入全框索引冒充 per-symbol 索引來繞過換算（那會使 `position` 實際變成全框序號，並使指紋在單標的與多標的兩條路徑下不一致）。
+   🔴 **`feature_index_by_symbol` 之數字空間限定（R7 `CODEX-R7-P1-01`；R7 兩家對本句讀法相反 ⇒ 證明本句原有歧義，此處釘死）**：`feature_index_by_symbol[symbol]` 一律是**該 symbol 自己的 post-trim 索引**，長度＝該 symbol 之列數；它**不是**全框 universe，因此**不可**被 `SplitPlan.row_index`（全框列號）直接索引——兩者屬不同數字空間。R7 中一家讀為「須是能被全框 `row_index` 合法索引之同一 universe」，該讀法與本延伸 D-001-C2 第 4 點「`position` ＝ symbol-local ordinal」互斥，**不採**。🔴 **本簽名不收任何全框輸入**（R8 `CODEX-R8-P1-01`）：symbol-local 座標改由 plan 自帶之 `row_index_local` 提供（見 C2 第 4 點），**不**另傳全框 symbol 向量——傳全框向量等於在剛釘死本段之後又送回一份全框輸入，歧義會復發。**禁**以傳入全框索引冒充 per-symbol 索引（那會使 `position` 實際變成全框序號，並使指紋在單標的與多標的兩條路徑下不一致）。
 
 2. 🔴 **hash 不變式**：
    - 同一 symbol 之 `train_plan.base_universe_hash == test_plan.base_universe_hash`（既有 `validate_split_pair_integrity` 已驗，不放寬）。
@@ -63,13 +63,16 @@ def derive_event_split_from_plans(
 2. 🔴 **型別強制**：`position` 與 `feature_ts_ms` 必須是 Python `int(...)`——`numpy.int64` 會使 `json.dumps` 丟 `TypeError`（R5 實跑），兩端若一端轉一端不轉即永遠不一致。
 3. 🔴 **正規化函式點名（不得換別支）**：時刻一律走投影側之 `_index_as_ms` ／ `assert_epoch_ms_array`（epoch 毫秒、逐元素、嚴格遞增）；**明文排除** `contracts._coerce_timestamp_array`——它對純數字預設 `unit="s"`。
 4. 🔴 **`position` 之語意與無損轉換層（R6 `CODEX-R6-P1-01`）**：本延伸之 `position` 一律為**該 symbol 之 post-trim `feature_index` 內的序號**（symbol-local ordinal），取數亦必從該 index。
-   **但現行 producer 寫入 `SplitPlan.row_index` 的是全框 row position**（`momentum/core/contracts.py::split_per_symbol` 以 `positions[local]` 寫入；`momentum/Analysis/ic_split_adapter.py::_build_plan_pair` 同）。🔴 **本延伸不改 `row_index` 既有語意**（它同時被 IC 主線之全框驗證與既有 golden 依賴，改動範圍遠超本批），改為明定**唯一、可驗證的無損轉換層**：
-   - 🔴 **轉換邊界＝投影入口（R7 `CODEX-R7-P1-01`，修正 R6 版「只在指紋計算與比對兩處」之不足）**：取得該 symbol 之 `feature_index` 後**立即**將該 symbol 兩個 plan 的 `row_index` **整批**轉為 symbol-local ordinal；**其後投影函式內部一律只使用 symbol-local ordinal**，不得再出現全框值。
+   **但現行三個 producer 寫入 `SplitPlan.row_index` 的座標本來就不一致**（R8 抽驗）：`momentum/core/contracts.py::split_per_symbol`（`:659-661`）與 `momentum/Analysis/ic_split_adapter.py::_build_plan_pair`（`:230-231`）以 `positions[local]` 寫入**全框** row position；而 `momentum/Analysis/ic_filter_orchestrator.py` 之 holdout 路徑（`:631-642`）其 frame 本身即單標的（`symbols` 全為同一值，`:643`），寫入的 `row_index` **本來就已經是 symbol-local**。🔴 **本延伸不改 `row_index` 既有語意**（它同時被 IC 主線之全框驗證與既有 golden 依賴，改動範圍遠超本批），改為**由 producer 直接 attest 一份 symbol-local 座標**：
+   - 🔴 **`SplitPlan` 新增欄 `row_index_local`（R8 `CODEX-R8-P1-01`）**：型別同 `row_index`，內容為該 plan 之列在**該 symbol 自己的 post-trim universe** 內之序號，遞增且與 `row_index` **逐位對應**。三個 producer 皆**直接取用其已有之 local ordinal**（`split_per_symbol` 之 `train_local`／`test_local`、`_build_plan_pair` 之 `train_local`／`test_local`、orchestrator 路徑因單標的而等同 `row_index`），**不得**在 producer 端重新反推。
+   - 🔴 **為何不採「把全框 symbol 向量傳進投影」**：R8 指出既有 helper `_local_ordinals_for_symbol(row_index, symbol_arr, symbol)`（`contracts.py:504-519`）需要全框 `symbol_arr`，而新簽名與 `SplitPlan`（`:377-390`）皆**無**此向量 ⇒ R7 版所寫之「入口整批轉換」在契約上**不可執行**。若改為把 `symbol_arr` 傳進 `derive`，則等於在 C1 第 1 點剛釘死「投影只收 per-symbol 短索引」之後又送回一份全框輸入，R7 的歧義會復發。改由 producer attest 可同時消除「不可執行」與「歧義復發」。
+   - 🔴 **producer 端之 attest 為必做**：建 plan 之處 `symbol_arr` **皆可得**（`contracts.py:690`、`ic_split_adapter.py:258`、`ic_filter_orchestrator.py:643-648` 皆已把 `symbols` 傳給 `validate_split_pair_integrity`），故 producer 必須以**同一支具名 helper** `_local_ordinals_for_symbol` 重算並與寫入之 `row_index_local` **逐值相等**；不等 ⇒ fail-closed。這就是「唯一、可驗證」之落點：**轉換只發生在 producer 一處，投影端不再轉換**。
+   - 🔴 **投影端只消費 `row_index_local`**：`derive_event_split_from_plans` 內部**一律不得**索引 `row_index`。
+   - 🔴 **缺欄即 fail-closed**：`derive` 入口收到之 plan 缺 `row_index_local` ⇒ 明確報錯並指名欄位，**不得**以 `row_index` 回退（回退正是交錯標的越界之來源）。非 `derive` 之呼叫點給相容 default。
    - 🔴 **受此轉換覆蓋之消費點為封閉清單**（`momentum/Analysis/event_samples/split_projection.py`；行號為 R7 抽驗時之現況，實作時以函式內實際位置為準）：①長度閘 `assert_positional_rows(..., n=index_ms.size)`（`:453-458`）②首尾同源對證之 `index_ms[rows[0]]` 與 `index_ms[rows[-1]]`（`:473-484`）③**成員判定**之 train／test 時刻集合 `index_ms[train_rows]`／`index_ms[test_rows]`（`:486-487`）④測試段起點 `test_start_ms`（`:488`）⑤本節之指紋計算與比對。🔴 R6 版文字只涵蓋⑤，①～④漏網——**交錯標的正是在①越界、在②③④取到錯時刻**，不得再遺漏；新增任何消費 `row_index` 之處，一律先轉換再使用。🔴 **連帶（文件面亦屬消費點）**：`derive_event_split_from_plans` 之 docstring 現寫「集合成員判定——`feature_cutoff_ms ∈ feature_index[plan.row_index]` 決定 train／test」（`:351-353`），該句述的是舊座標語意，b8 須同步改寫為「以入口轉換後之 symbol-local ordinal 索引該 symbol 之 `feature_index`」，不得留下與本節互斥之契約敘述。
-   - 由**同一支具名 helper** 實作，不得各寫一份；既有 `momentum/core/contracts.py::_local_ordinals_for_symbol`（`:505-519`）已具全框→symbol-local 能力且映不到即丟例外，b8 應**提升複用**而非另寫等價函式。
-   - 規則：以該 symbol 之 `feature_index` 為序，將全框 `row_index` 映為 symbol-local ordinal；映不到（該全框位置不屬於此 symbol 的 index）⇒ **fail-closed**，不得丟棄或近似；
-   - 轉換須可逆並附往返測試（local → global → local 恆等）；
-   - 🔴 交錯多標的 fixture 為必測：兩 symbol 之列在全框交錯時，local ordinal 必須仍為各自連續遞增。
+   - 規則：`row_index_local` 以該 symbol 之 post-trim universe 為序；producer attest 時映不到（該全框位置不屬於此 symbol）⇒ **fail-closed**，不得丟棄或近似。
+   - 往返測試為必做：在 producer 端驗 `symbol_positions[row_index_local] == row_index` 逐值成立。
+   - 🔴 交錯多標的 fixture 為必測：兩 symbol 之列在全框交錯時，各自之 `row_index_local` 仍須為連續遞增。
 5. **邊界定義**：重複 `position` ⇒ fail-closed；`NaT` ⇒ fail-closed；空 `row_index`（train 可為空）⇒ 指紋定義為 `sha256("[]")`，**不得**以缺欄代替。
 6. **比對點**：投影端對傳入之 `feature_index_by_symbol[symbol]` 以同一規則重算，與 plan 攜帶之指紋逐值比對；不符 ⇒ fail-closed，訊息須指名「plan 指紋 vs 重算指紋」兩值之前 12 字元。
 7. **誠實邊界（明示接受）**：本改動會使既有 IC golden digest 位移。依原檔 §G 之規矩，golden 變動須經 review；b8 收案前須把受影響的 golden 以「改前／改後逐值對照」重凍，**不得**只更新 hash。另加**獨立 oracle**：由同一 fixture 的 `row_index` 與 universe 依本節規則重算 `sha256`，與 **producer 實際寫入 plan 的指紋欄**逐值相等（🔴 R6 `CODEX-R6-P1-02`：oracle 不得只算 fixture 自己的值而不對證 producer 寫入值）。
@@ -97,7 +100,7 @@ def derive_event_split_from_plans(
 
 - 目標：關掉「首尾相同、中間間距不同」之錯分面。
 - 檔案（🔴 producer 寫入點與既有綠徑面皆須列入，R5／R6 三條 P1）：
-  - `momentum/core/contracts.py`（`SplitPlan` 新增 `row_time_fingerprint` 欄）
+  - `momentum/core/contracts.py`（`SplitPlan` 新增 `row_time_fingerprint` 與 `row_index_local` 兩欄；後者由 producer attest，見 C2 第 4 點）
   - `momentum/core/contracts.py::split_per_symbol`（建 plan 時寫入指紋）
   - `momentum/Analysis/ic_split_adapter.py::_build_plan_pair`（同上）
   - `momentum/Analysis/ic_filter_orchestrator.py`（holdout 路徑建 plan 處，同上）
@@ -112,9 +115,11 @@ def derive_event_split_from_plans(
   `ASSERT row_time_fingerprint WHEN 空 row_index THEN sha256 值 == sha256("[]")`
   `ASSERT derive_event_split_from_plans WHEN plan 缺 row_time_fingerprint 欄 THEN rc!=0 且訊息指名缺欄名`
   `ASSERT 獨立 oracle WHEN 由 fixture 重算 THEN 值 == producer 寫入 plan 之 row_time_fingerprint`
-  `ASSERT 無損轉換 helper WHEN local→global→local THEN 結果 == 原 local 序列`
-  `ASSERT 無損轉換 helper WHEN 全框位置不屬於該 symbol 之 index THEN rc!=0`
-  `ASSERT 無損轉換 helper WHEN 兩 symbol 於全框交錯 THEN 各自 local ordinal 連續遞增`
+  `ASSERT producer attest WHEN 建 plan THEN _local_ordinals_for_symbol(row_index, symbol_arr, symbol) 逐值 == row_index_local`
+  `ASSERT producer attest WHEN row_index 含不屬於該 symbol 之全框位置 THEN rc!=0`
+  `ASSERT producer attest WHEN 兩 symbol 於全框交錯 THEN 各自 row_index_local 連續遞增`
+  `ASSERT derive_event_split_from_plans WHEN plan 缺 row_index_local 欄 THEN rc!=0 且訊息指名缺欄名（不得以 row_index 回退）`
+  `ASSERT derive_event_split_from_plans WHEN 單標的 frame（orchestrator 路徑）THEN row_index_local 逐值 == row_index`
 
 ### Task 8.3 — per-symbol 測試段門檻修正
 
@@ -137,7 +142,9 @@ def derive_event_split_from_plans(
 | `M-SU-D1-07` | 跨 symbol 混用 `feature_index`（以 A 之 index 解 B 之 `row_index`） | `test_splitunify_derive.py -k per_symbol` |
 | `M-SU-D1-08` | 指紋列改用 `list[dict]`（形狀漂移） | `test_splitunify_golden.py` 與 `-k fingerprint` |
 | `M-SU-D1-09` | 無損轉換改為「映不到就丟棄」 | `-k fingerprint`（交錯 fixture） |
-| `M-SU-D1-10` | 成員判定跳過入口轉換，改回以全框 `row_index` 直接索引該 symbol 之 `feature_index` | `test_splitunify_derive.py -k per_symbol`（交錯 fixture） |
+| `M-SU-D1-10` | 成員判定改回以全框 `row_index` 直接索引該 symbol 之 `feature_index` | `test_splitunify_derive.py -k per_symbol`（交錯 fixture） |
+| `M-SU-D1-11` | producer 之 attest 改為「不等就以寫入值為準」（不 fail-closed） | `test_splitunify_derive.py -k per_symbol` 與 producer 契約測試 |
+| `M-SU-D1-12` | `derive` 缺 `row_index_local` 時回退用 `row_index` | `test_splitunify_derive.py -k per_symbol`（交錯 fixture） |
 
 ### 殘留（承原檔 §N；本延伸覆寫其中一列之狀態，另一列住 TODO §E）
 
@@ -146,7 +153,7 @@ def derive_event_split_from_plans(
 - `SU-RESID-2`（多 TF 複合鍵）— **不在本延伸**；下游單鍵面（`feature_materialization`／`baseline`／`pattern_bridge`／`tables`／`ic_feed`／`dedupe` 之 cluster 折疊）須一併處理。未完成前，多 TF 同批維持 fail-closed。
 - `R-5`／`D1` — **不在本延伸**；`D1` 須走 R 重開，`R-5` 待其完成後另行處理。
 - `R-3`（UAT 最後，user-ruling）、`R-4`（屬 GAP-3，blocked-by）— 不動。
-- 🔴 **新登記 `SU-RESID-4`（needs-research）**：`SplitPlan.row_index` 之全框語意與 per-symbol 投影所需之 local ordinal 並存，本延伸以無損轉換層橋接（C2 第 4 點）。**研究問題**＝「是否應把 `row_index` 本身改為 symbol-local，並同步遷移 IC 主線之全框驗證與既有 golden」；**完成判準**＝列出所有依賴全框語意之消費端並給出可證偽之遷移測試。觸發：下一次動 IC 切分契約時。
+- 🔴 **新登記 `SU-RESID-4`（needs-research）**：`SplitPlan.row_index` 之全框語意與 per-symbol 投影所需之 local ordinal 並存，本延伸以 producer attest 之並存欄 `row_index_local` 橋接（C2 第 4 點），而非改動 `row_index` 本身。**研究問題**＝「是否應把 `row_index` 本身改為 symbol-local，並同步遷移 IC 主線之全框驗證與既有 golden」；**完成判準**＝列出所有依賴全框語意之消費端並給出可證偽之遷移測試。觸發：下一次動 IC 切分契約時。
 
 ## 戳記
 
