@@ -544,6 +544,21 @@ def _local_ordinals_for_symbol(
     return local_ordinals.astype(int)
 
 
+def _assert_integer_ordinals(values: Any, *, role: str) -> None:
+    """對 splitter／boundary 回傳之**原始**序號驗整數 dtype（D-001 (4.8)）。
+
+    🔴 `CODEX-R1-P1-01`（實跑複驗）：producer 原本先 `np.asarray(..., dtype=int)` 再 attest，
+    `attest_row_index_local` 的 dtype 閘就**永遠看不到**原始型別——float64 `[0.,1.,2.]`
+    會被靜默救活成 `int64 [0,1,2]` 並產出 plan。閘必須擋在 cast **之前**。
+    """
+    arr = np.asarray(values)
+    if not np.issubdtype(arr.dtype, np.integer):
+        raise ValueError(
+            f"{role}: splitter 回傳之序號 dtype 為 {arr.dtype}，須為 numpy 整數型"
+            "——整數值之浮點／布林／物件型會被 `astype(int)` 靜默救活或截斷（fail-closed）"
+        )
+
+
 def attest_row_index_local(
     *,
     row_index: Any,
@@ -730,6 +745,14 @@ def split_per_symbol(
     frame[symbol_col] = _normalize_symbol_array(frame[symbol_col].to_numpy())
     ts = frame[ts_col].to_numpy()
     _ts_dt_index = pd.DatetimeIndex(_coerce_timestamp_array(ts))
+    # 🔴 CODEX-R1-P1-02（實跑複驗）：只對**被選中的列**做時刻正規化時，未選列的 `NaT`
+    #    不會被任何閘擋下 ⇒ 含缺時刻的 universe 可被當成 rows-purge 的有效資料。
+    #    檢查必須涵蓋**整條** canonical 時間軸（orchestrator 路徑早已如此）。
+    if _ts_dt_index.hasnans:
+        raise ValueError(
+            f"split_per_symbol: 時間軸含 {int(_ts_dt_index.isna().sum())} 個 NaT"
+            "——purge／embargo 以列為單位，缺時刻的列會讓隔離區的語意失去定義（fail-closed）"
+        )
     symbols = frame[symbol_col].to_numpy()
     normalized_allowed = _normalize_allowed_symbols(allowed_symbols)
     plans: List[Tuple[SplitPlan, SplitPlan]] = []
@@ -745,6 +768,9 @@ def split_per_symbol(
             # 🔴 SPLITUNIFY D-001 (4.4)：直接取用**已有**之標的內序號，不得在此反推。
             #    `positions` 為該 symbol 之列**依時刻排序後**的全框位置（上方已 sort_values），
             #    故 `train_local`／`test_local` 即為 (4.3) 所定義之 `row_index_local`。
+            # 🔴 CODEX-R1-P1-01：dtype 閘必須看**原始**回傳值，擋在 cast 之前。
+            _assert_integer_ordinals(train_local, role="split_per_symbol: train row_index_local")
+            _assert_integer_ordinals(test_local, role="split_per_symbol: test row_index_local")
             train_local_arr = np.asarray(train_local, dtype=int)
             test_local_arr = np.asarray(test_local, dtype=int)
             train_rows = positions[train_local_arr]

@@ -349,7 +349,9 @@ def _derive_single_symbol(
 
     1. **答案窗 purge**（保留 `event_split.py:114` 之既有 guard）——
        `train_cutoff and label_end_ms >= test_start_ms` ⇒ purged。
-       `purge_gap`／`embargo` 是 **row 單位且已含在 `test_plan.row_index[0]` 這個起點裡**，
+       `purge_gap`／`embargo` 是 **row 單位且已含在 `test_plan.row_index_local[0]` 這個起點裡**
+       （🔴 `CODEX-R1-P2-03`：D-001 (4.10)–(4.11) 要求投影端之文件與實作**一律用標的內座標**；
+       此處原寫全框 `row_index[0]`，會誘導後人把全框列號當成標的內序號），
        **不得**再以毫秒相減（舊式的 `test_start` 在緩衝**之前**，canonical 的在**之後**）。
     2. **集合成員判定**——以 `row_index_local` 索引該 symbol 之 `feature_index`，
        `feature_cutoff_ms ∈ feature_index[plan.row_index_local]` 決定 train／test；

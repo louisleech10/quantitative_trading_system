@@ -13,6 +13,7 @@ import pandas as pd
 from momentum.core.contracts import (
     SplitPlan,
     attest_row_index_local,
+    _assert_integer_ordinals,
     _coerce_timestamp_array,
     _normalize_symbol_array,
     _normalize_symbol_value,
@@ -65,6 +66,9 @@ class ICSplitAdapter:
             positions = group_sorted["_split_row_pos"].to_numpy(dtype=int)
             X = self._feature_frame(group_sorted, symbol_col, ts_col, feature_cols)
             for fold_index, (train_local, test_local) in enumerate(cpcv.split(X)):
+                # 🔴 CODEX-R1-P1-01：dtype 閘必須看**原始**回傳值，擋在 cast 之前。
+                _assert_integer_ordinals(train_local, role="ic_split_adapter: train row_index_local")
+                _assert_integer_ordinals(test_local, role="ic_split_adapter: test row_index_local")
                 train_local_arr = np.asarray(train_local, dtype=int)
                 test_local_arr = np.asarray(test_local, dtype=int)
                 if self.strict_embargo:
@@ -184,6 +188,14 @@ class ICSplitAdapter:
         frame = data.copy()
         frame["_split_row_pos"] = np.arange(len(frame), dtype=int)
         frame[ts_col] = _coerce_timestamp_array(frame[ts_col].to_numpy())
+        # 🔴 CODEX-R1-P1-02：NaT 檢查須涵蓋**整條**時間軸，不能只驗被選中的列——
+        #    未選列的缺時刻不會被任何閘擋下，卻仍參與 rows 單位的 purge／embargo 計數。
+        _nat_n = int(pd.isna(frame[ts_col]).sum())
+        if _nat_n:
+            raise AlignmentViolationError(
+                f"ic_split_adapter: 時間軸含 {_nat_n} 個 NaT"
+                "——缺時刻的列會讓隔離區的列數語意失去定義（fail-closed）"
+            )
         frame[symbol_col] = _normalize_symbol_array(frame[symbol_col].to_numpy())
         return frame
 
@@ -231,6 +243,9 @@ class ICSplitAdapter:
         """建立 train/test SplitPlan 並套用契約校驗。"""
         # 🔴 SPLITUNIFY D-001 (4.4)：直接取用已有之標的內序號；`positions` 由呼叫端依時刻
         #    排序後取得，故 `train_local`／`test_local` 即 (4.3) 之 `row_index_local`。
+        # 🔴 CODEX-R1-P1-01：dtype 閘必須看**原始**回傳值，擋在 cast 之前。
+        _assert_integer_ordinals(train_local, role="ic_split_adapter: train row_index_local")
+        _assert_integer_ordinals(test_local, role="ic_split_adapter: test row_index_local")
         train_local_arr = np.asarray(train_local, dtype=int)
         test_local_arr = np.asarray(test_local, dtype=int)
         train_rows = positions[train_local_arr]

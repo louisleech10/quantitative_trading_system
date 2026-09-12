@@ -278,3 +278,62 @@ def test_plan_row_arrays_reject_setflags_write_true() -> None:
     for field in ("row_index", "row_index_local"):
         with pytest.raises(ValueError):
             getattr(plan, field).setflags(write=True)
+
+
+# ── 🔴 b8 審碼 R1：codex 兩條 P1 的回歸測試（主委已獨立複驗成立）─────────────
+#    這兩條攻的是 **producer 路徑**，不是 attest 函式本身——上面那些測試直接呼叫 attest，
+#    所以 dtype 閘看得到原始型別；但 producer 先 `astype(int)` 再 attest 時，閘被繞過。
+#    `M-SU-D1-22` 抓不到它，正是因為它測的是函式而非路徑。
+
+
+def test_producer_rejects_float_ordinals_before_cast() -> None:
+    """`CODEX-R1-P1-01`：dtype 閘必須擋在 `astype(int)` **之前**。
+
+    修正前實跑：`float64 [0.,1.,2.]` 靜默救活成 `int64 [0,1,2]` 並產出 plan。
+    """
+    def splitter(group: pd.DataFrame):
+        yield (np.array([0.0, 1.0, 2.0], dtype="float64"),
+               np.array([5.0, 6.0], dtype="float64"))
+
+    with pytest.raises(ValueError, match="dtype"):
+        split_per_symbol(
+            _interleaved_frame(), splitter, "symbol", "timestamp",
+            expected_freq="1h", base_universe_hash="u", allowed_symbols={SYM_A, SYM_B},
+        )
+
+
+def test_producer_rejects_bool_ordinals_by_dtype_gate_not_by_luck() -> None:
+    """bool 序號必須由 **dtype 閘**擋下，而不是碰巧被別的閘攔到。
+
+    🔴 修正前它也會 raise，但訊息是「時間戳非嚴格遞增」——bool 當索引取到逆序時刻而已。
+    斷言限定 `dtype` 才分得出是哪一道閘擋的；不限定就會變成沒有鑑別力的測試
+    （與本檔開頭那條紀律同源）。
+    """
+    def splitter(group: pd.DataFrame):
+        yield np.array([True, False, True]), np.array([5, 6], dtype=int)
+
+    with pytest.raises(ValueError, match="dtype"):
+        split_per_symbol(
+            _interleaved_frame(), splitter, "symbol", "timestamp",
+            expected_freq="1h", base_universe_hash="u", allowed_symbols={SYM_A, SYM_B},
+        )
+
+
+def test_producer_rejects_nat_anywhere_on_the_time_axis() -> None:
+    """`CODEX-R1-P1-02`：`NaT` 只要在時間軸上就要擋，**不限**被選中的列。
+
+    修正前只對被選列做時刻正規化 ⇒ 未選列的缺時刻無人擋，卻仍參與 rows 單位的
+    purge／embargo 計數，等於拿「不知道何時」的列當隔離區的刻度。
+    """
+    ts = [pd.Timestamp(BASE_S + i * 3600, unit="s") for i in range(N_EACH)]
+    ts[8] = pd.NaT                      # 第 8 列不在 train(0-2)、也不在 test(5-6)
+    frame = pd.DataFrame({"symbol": [SYM_A] * N_EACH, "timestamp": ts})
+
+    def splitter(group: pd.DataFrame):
+        yield np.arange(0, 3, dtype=int), np.arange(5, 7, dtype=int)
+
+    with pytest.raises(ValueError, match="NaT"):
+        split_per_symbol(
+            frame, splitter, "symbol", "timestamp",
+            expected_freq="1h", base_universe_hash="u", allowed_symbols={SYM_A},
+        )
