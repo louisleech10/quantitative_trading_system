@@ -337,3 +337,35 @@ def test_producer_rejects_nat_anywhere_on_the_time_axis() -> None:
             frame, splitter, "symbol", "timestamp",
             expected_freq="1h", base_universe_hash="u", allowed_symbols={SYM_A},
         )
+
+
+def test_adapter_path_nat_raises_the_contract_exception_not_nameerror() -> None:
+    """🔴 b8 審碼 R2 三家一致：adapter 的 NaT 閘引用了**未匯入**的 `AlignmentViolationError`。
+
+    這是主委修 `CODEX-R1-P1-02` 時**自己引入**的缺陷：該閘觸發時拋 `NameError`，
+    而 `NameError` 不在 `ValueError` 階層，會穿透呼叫端既有的
+    `except ValueError`／`except AlignmentViolationError` ⇒ 契約例外形同未交付。
+
+    上一條測試只覆蓋 `split_per_symbol` 路徑，所以缺 import 全綠漏網——
+    **同一道閘在兩條 producer 路徑上各需一條測試**。
+    """
+    from momentum.core.contracts import AlignmentViolationError
+    from momentum.Analysis.ic_split_adapter import ICSplitAdapter
+
+    ts = [pd.Timestamp(BASE_S + i * 3600, unit="s") for i in range(N_EACH)]
+    ts[8] = pd.NaT
+    frame = pd.DataFrame({"symbol": [SYM_A] * N_EACH, "timestamp": ts})
+
+    with pytest.raises(AlignmentViolationError, match="NaT"):
+        ICSplitAdapter._with_row_positions(frame, "symbol", "timestamp")
+
+
+def test_adapter_path_accepts_a_clean_time_axis() -> None:
+    """正例：時間軸乾淨時 adapter 路徑不得誤擋（否則上面那條可能是靠「什麼都擋」通過的）。"""
+    from momentum.Analysis.ic_split_adapter import ICSplitAdapter
+
+    ts = [pd.Timestamp(BASE_S + i * 3600, unit="s") for i in range(N_EACH)]
+    frame = pd.DataFrame({"symbol": [SYM_A] * N_EACH, "timestamp": ts})
+    out = ICSplitAdapter._with_row_positions(frame, "symbol", "timestamp")
+    assert len(out) == N_EACH
+    assert "_split_row_pos" in out.columns

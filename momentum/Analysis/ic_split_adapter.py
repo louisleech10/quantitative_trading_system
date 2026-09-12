@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.contracts import (
+    AlignmentViolationError,
     SplitPlan,
     attest_row_index_local,
     _assert_integer_ordinals,
