@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）——用已結案之四閘治理票全程跑並記錄摩擦（使用者 2026-09-12 指示）｜規格階段：consult 18 條 → D-001 → R5 11 條 → R6 6 條 → R7 2 → R8 1 → R9 2 → R10 3 → R11 3 → R12 6 → **C2 第 4 點整節重寫為單一現行態**（沿革移出至各輪 synth）→ **R13 兩家皆 proceed、零 finding（規格階段收斂）** → 下一步＝三家戳記輪**
+**更新：2026-09-12｜現行票：`SPLITUNIFY 收尾`（大；RISK a,b,c）——用已結案之四閘治理票全程跑並記錄摩擦（使用者 2026-09-12 指示）｜規格階段：consult 18 條 → D-001 → R5 11 條 → R6 6 條 → R7 2 → R8 1 → R9 2 → R10 3 → R11 3 → R12 6 → **C2 第 4 點整節重寫為單一現行態**（沿革移出至各輪 synth）→ R13 兩家皆 proceed、零 finding → **三家戳記全數 APPROVED（規格定案，body sha `e3f2847d7fae…`）** → 下一步＝b8 實作**
 
 ## 已完成（皆已 push）
 - **D-001 延伸檔** `docs/SPLITUNIFY_SPEC.D-001.md`：`c6b99d5a` 初版、`091b1e97` R5 版、`90835929` R6 版、`df91e459` **R7 版（現行）**。落實 §N `R-1`＋TODO §E `SU-RESID-3`＋per-symbol 門檻修正。類別＝**D 延伸**（原檔 Task 3.2 自寫「存活至 per-symbol 投影實作後改寫」）。
@@ -23,7 +23,7 @@
 findings 用 `## <FAMILY>-R<n>-P<x>-<nn>` **二級**標題；`CLOSED:` 無內容**留空**、不得寫 `none`；完成訊號**逐字** `STATUS: DONE`（裁決 blocked 也一樣）。
 
 ## 待辦（R8 回來後）
-①**三家戳記輪**（對 R13 收斂檔之現行 body hash 重簽；歷輪戳記因規格續改皆已失效）→ ②b8 實作（`M-SU-D1-01`～`23` 全數為驗收條件）。🔴 C2 第 4 點已加義務區塊界標，區塊內只准編號義務項、且**不得引用裁決編號**（`obligation_block_check.sh` 於寫檔當下擋）。
+**b8 實作**（`M-SU-D1-01`～`23` 全數為驗收條件；規格已定案、三家戳記已核可，不再有規格側阻塞）。🔴 C2 第 4 點已加義務區塊界標，區塊內只准編號義務項、且**不得引用裁決編號**（`obligation_block_check.sh` 於寫檔當下擋）。
 🔴 兩個坑：①戳記外置於 reconcile synth，對 `docs/*.md` 直接跑 `reconcile_stamps_check.sh` 必 rc=1，不是治理真空 ②`handoffs/*` 已被 `.git/info/exclude` 排除，新交件檔須 `git add -f` 才入版（前幾輪 synth 與 sources.lock 已入版，比照辦理）。
 
 ## 開工前固定動作

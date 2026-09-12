@@ -30,6 +30,13 @@
 # 🔴 **刻意不設項數上限**（同日使用者否決前一版）：委員一次舉出十餘條真缺陷是正常的，
 #   上限會擋住正當成長。「義務很多」與「層層疊加」是兩件事，本閘只管後者。
 #
+# R5 **歷史專區**（2026-09-12 使用者定）：「如果要寫歷史或日誌，那就要有一個專區專放，
+#   不要穿插在項目中間，項目中都只能有最新版本。」⇒ 於**含義務區塊之檔案**內，
+#   任何帶裁決編號之行**只准**出現在歷史專區界標之內：
+#     <!-- HISTORY-BEGIN -->  …沿革、取代索引、輪次裁決…  <!-- HISTORY-END -->
+#   專區外出現編號即違規。R3 管的是義務區塊內，R5 把同一條紀律推到**整份文件**：
+#   歷史有地方放（不是刪掉），但只有那一個地方。
+#
 # 🔴 **誠實邊界**：本閘擋的是「結構上的疊加」。兩個編號項**語意互斥**它抓不到，
 #   那仍然只有委員通讀才行（R7～R12 六輪的擋項多屬此類）。不得宣稱本閘解決全部。
 #
@@ -49,6 +56,9 @@ rc=0; blocks=0
 for f in "${files[@]}"; do
   [ -f "$f" ] || continue
   in_block=0; bid=""; bmax=0; expect=0; major=""; start_line=0
+  in_hist=0
+  has_ob=$(grep -c 'OBLIGATIONS-BEGIN' "$f" 2>/dev/null || true)
+  [ -z "$has_ob" ] && has_ob=0
   lineno=0
   while IFS= read -r line; do
     lineno=$((lineno + 1))
@@ -59,7 +69,18 @@ for f in "${files[@]}"; do
         continue ;;
       *OBLIGATIONS-END*)
         in_block=0; continue ;;
+      *HISTORY-BEGIN*) in_hist=1; continue ;;
+      *HISTORY-END*)   in_hist=0; continue ;;
     esac
+    # R5：含義務區塊之檔案，帶裁決編號之行只准出現在歷史專區內
+    if [ "$has_ob" -gt 0 ] && [ "$in_hist" -eq 0 ] && [ "$in_block" -eq 0 ] \
+       && printf '%s' "$line" | grep -qE '[A-Z]{3,}-R[0-9]+-P[0-3]-[0-9]{2,}'; then
+      echo "[obligation_block] 🔴 ${f}:${lineno} 裁決編號出現在歷史專區之外"
+      echo "    → $(printf '%s' "$line" | grep -oE '[A-Z]{3,}-R[0-9]+-P[0-3]-[0-9]{2,}' | tr '\n' ' ')"
+      echo "    修法：歷史與日誌只能放在專區 <!-- HISTORY-BEGIN --> … <!-- HISTORY-END --> 之內；"
+      echo "          項目與正文只留最新版本，不得穿插沿革。"
+      rc=1
+    fi
     [ "$in_block" -eq 1 ] || continue
     [ -z "${line//[[:space:]]/}" ] && continue
     if ! printf '%s' "$line" | grep -qE '^[[:space:]]*\*\*\([0-9]+\.[0-9]+\)[[:space:]]'; then

@@ -17,8 +17,8 @@ PREDECESSOR: none
 依賴: `## §V 驗證策略與邊界測試目錄`；`## §G Golden / Baseline`
 不觸: `### C-0 🔴 接線落點：單一 boundary builder，拿不到 universe 就不得宣稱 OOS（D6）`；`### C-1 canonical 權威＝時間切分（D1）`
 
-> 🔴 **C-4 覆寫範圍之限定（R6 `GROK-R6-P2-02`）**：本延伸**只覆寫 C-4 的函式簽名段**（單一 plan／單一 index → per-symbol Mapping）。**BASE C-4 其餘段落全部原文仍有效**——包含 `event_keys` 之 keyed 輸入契約、禁 positional zip、兩段式判定（答案窗 purge 先、集合成員判定後）、`build_event_keys` 具名為 producer 等。**未在本延伸重述 ≠ 已廢止**；實作與後續 refactor 不得以「延伸檔沒寫」為由刪除該節任一既有義務。
-> 🔴 **唯一例外：座標語彙（R12 `CODEX-R12-P1-01`）**。BASE 檔（`docs/SPLITUNIFY_SPEC.md`）仍以 `feature_index[row_index]` 之形式描述成員判定，那是 D-001-C2 第 4 點定案**之前**的寫法。🔴 **本條刻意不寫行號**：行號會漂（R13 已實測，原先所列三處有一處不存在、且實際落點多達十餘處），寫死等於製造下一個過期引用。判準改為**可 grep 之形狀**——凡 BASE 中形如 `feature_index[…row_index…]` 之索引句，一律適用本例外。凡 BASE 中以全框 `row_index` 索引該 symbol `feature_index` 之句子，**一律由本延伸之 `row_index_local` 取代**；其餘義務（keyed 輸入契約、禁 positional zip、兩段式判定、`build_event_keys` 具名）不受影響。b8 實作以本延伸之座標語彙為準。
+> 🔴 **C-4 覆寫範圍之限定**：本延伸**只覆寫 C-4 的函式簽名段**（單一 plan／單一 index → per-symbol Mapping）。**BASE C-4 其餘段落全部原文仍有效**——包含 `event_keys` 之 keyed 輸入契約、禁 positional zip、兩段式判定（答案窗 purge 先、集合成員判定後）、`build_event_keys` 具名為 producer 等。**未在本延伸重述 ≠ 已廢止**；實作與後續 refactor 不得以「延伸檔沒寫」為由刪除該節任一既有義務。
+> 🔴 **唯一例外：座標語彙**。BASE 檔（`docs/SPLITUNIFY_SPEC.md`）仍以 `feature_index[row_index]` 之形式描述成員判定，那是 D-001-C2 第 4 點定案**之前**的寫法。🔴 **本條刻意不寫行號**：行號會漂（R13 已實測，原先所列三處有一處不存在、且實際落點多達十餘處），寫死等於製造下一個過期引用。判準改為**可 grep 之形狀**——凡 BASE 中形如 `feature_index[…row_index…]` 之索引句，一律適用本例外。凡 BASE 中以全框 `row_index` 索引該 symbol `feature_index` 之句子，**一律由本延伸之 `row_index_local` 取代**；其餘義務（keyed 輸入契約、禁 positional zip、兩段式判定、`build_event_keys` 具名）不受影響。b8 實作以本延伸之座標語彙為準。
 
 ## 內容
 
@@ -42,13 +42,13 @@ def derive_event_split_from_plans(
 
    單標的舊呼叫式（`train_plan: SplitPlan`、`test_plan: SplitPlan`、`feature_index: pd.Index`）保留為**薄 wrapper**，內部包成單鍵 Mapping 後轉呼；wrapper **不得**含第二份判定邏輯（不得有 purge／成員判定／指紋比對之獨立分支）。呼叫端既未給 Mapping、也未走 wrapper ⇒ 維持 `multi_symbol_projection_unsupported`（字面續住 `split_unify.json`，不新增值）。
 
-   🔴 **`feature_index_by_symbol` 之數字空間限定（R7 `CODEX-R7-P1-01`；R7 兩家對本句讀法相反 ⇒ 證明本句原有歧義，此處釘死）**：`feature_index_by_symbol[symbol]` 一律是**該 symbol 自己的 post-trim 索引**，長度＝該 symbol 之列數；它**不是**全框 universe，因此**不可**被 `SplitPlan.row_index`（全框列號）直接索引——兩者屬不同數字空間。R7 中一家讀為「須是能被全框 `row_index` 合法索引之同一 universe」，該讀法與本延伸 D-001-C2 第 4 點「`position` ＝ symbol-local ordinal」互斥，**不採**。🔴 **本簽名不收任何全框輸入**（R8 `CODEX-R8-P1-01`）：symbol-local 座標改由 plan 自帶之 `row_index_local` 提供（見 C2 第 4 點），**不**另傳全框 symbol 向量——傳全框向量等於在剛釘死本段之後又送回一份全框輸入，歧義會復發。**禁**以傳入全框索引冒充 per-symbol 索引（那會使 `position` 實際變成全框序號，並使指紋在單標的與多標的兩條路徑下不一致）。
+   🔴 **`feature_index_by_symbol` 之數字空間限定**：`feature_index_by_symbol[symbol]` 一律是**該 symbol 自己的 post-trim 索引**，長度＝該 symbol 之列數；它**不是**全框 universe，因此**不可**被 `SplitPlan.row_index`（全框列號）直接索引——兩者屬不同數字空間。🔴 **本簽名不收任何全框輸入**：symbol-local 座標改由 plan 自帶之 `row_index_local` 提供（見 C2 第 4 點），**不**另傳全框 symbol 向量——傳全框向量等於在剛釘死本段之後又送回一份全框輸入，歧義會復發。**禁**以傳入全框索引冒充 per-symbol 索引（那會使 `position` 實際變成全框序號，並使指紋在單標的與多標的兩條路徑下不一致）。
 
 2. 🔴 **hash 不變式**：
    - 同一 symbol 之 `train_plan.base_universe_hash == test_plan.base_universe_hash`（既有 `validate_split_pair_integrity` 已驗，不放寬）。
    - **跨 symbol 允許共用同一字面 hash**——`ICSplitAdapter._base_universe_hash(frame, …)` 對整框算一份 joint hash 並打進每個 symbol 的 plan，是**合法且現行已發生**的 hash scope（`momentum/Analysis/ic_split_adapter.py:189-199`；`momentum/Analysis/ic_filter_orchestrator.py:907`）。
    - 🔴 **禁**把「跨 symbol hash 必互異」寫成閘——那會拒收現行 IC 多標的計畫。
-   - 🔴 **身分保證之分工（R6 `GROK-R6-P2-01` 修正 R5 之殘留敘述）**：D-001-C2 之指紋**已含 `symbol` 欄**，故可區分列所屬標的；但本節第 3 點之三角相等仍是**獨立必查**，不得只靠指紋——指紋證的是「這些列屬於這個 universe 且未被動過」，三角相等證的是「這批事件確實屬於這個 plan」。兩者目的不同，缺一不可。
+   - 🔴 **身分保證之分工**：D-001-C2 之指紋**已含 `symbol` 欄**，故可區分列所屬標的；但本節第 3 點之三角相等仍是**獨立必查**，不得只靠指紋——指紋證的是「這些列屬於這個 universe 且未被動過」，三角相等證的是「這批事件確實屬於這個 plan」。兩者目的不同，缺一不可。
 3. **symbol 三角相等**：`plans` 的 Mapping key、該 plan 的 `plan.symbol`、以及事件集合之 symbol，三者必須相等；任一不等 ⇒ fail-closed，訊息**須指名是哪一組不一致**。🔴 **不得**復用 `multi_symbol_projection_unsupported` 字面（那是「未提供 Mapping」專用）。
 4. **跨 symbol 禁共用 row_index 數字空間**：每個 symbol 各自以自己的 `feature_index` 解釋**該 symbol 之 `row_index_local`**；合併僅發生在 `assignments`／`purged`／`clusters` 的**縱向串接**，不得跨 symbol 比較 row 位置。
 
@@ -56,7 +56,7 @@ def derive_event_split_from_plans(
 
 現行同源對證只比每段**首尾**兩列，殘留＝「首尾相同、中間間距不同」仍會被放行。本延伸改為 producer-attested 的**完整有序**指紋：
 
-1. 🔴 **指紋 payload 之精確形狀（R6 `GROK-R6-P1-01`：形狀未釘死會使 plan 指紋、§G G-5 與獨立 oracle 各凍一份）**：`rows` 為 **`list[list]`**，每列元素**順序固定**為
+1. 🔴 **指紋 payload 之精確形狀（形狀未釘死會使 plan 指紋、§G G-5 與獨立 oracle 各凍一份）**：`rows` 為 **`list[list]`**，每列元素**順序固定**為
    `[int(position), int(feature_ts_ms), str(symbol), str(base_universe_hash)]`，
    與 `scripts/freeze_splitunify_golden.py` 現行 G-5① 之寫法**逐字同形**。序列化＝依 `position` 遞增排序後 `json.dumps(rows, sort_keys=True, separators=(",",":"))`，取 `sha256`。
    🔴 四個欄位之**文件稱呼**即 §G G-5① 之四元組 `(position, feature_ts_ms, symbol, base_universe_hash)`；該稱呼**僅供閱讀、不進 JSON**（清單形沒有鍵）。**禁**改用 `list[dict]`——實跑證實兩形之 `sha256` 不同。舊稱 `row_pos`／`ts_ms` 一律不得再用（含變數名與註解）。
@@ -65,10 +65,7 @@ def derive_event_split_from_plans(
 3. 🔴 **正規化函式點名（不得換別支）**：時刻一律走投影側之 `_index_as_ms` ／ `assert_epoch_ms_array`（epoch 毫秒、逐元素、嚴格遞增）；**明文排除** `contracts._coerce_timestamp_array`——它對純數字預設 `unit="s"`。
 4. 🔴 **`position` 之語意與 producer attest**
 
-   🔴 **本點為 R12 後之重寫版（2026-09-12）**：R6～R12 之決策沿革（某輪曾如何、為何不採某方案）**一律不在本檔重述**，見 `handoffs/reconcile/20260911-splitunify-x-review-r6/synth.md` 至 `…-r12/synth.md`。本檔只留**現行態義務**，逐條編號以便機械比對是否遺漏。
-
-   **本點取代之輪次裁決索引（僅供追溯，非義務）**：`CODEX-R6-P1-01`、`CODEX-R8-P1-01`、`CODEX-R9-P1-01`、`CODEX-R10-P1-01`、`CODEX-R10-P1-02`、`CODEX-R11-P2-02`、`CODEX-R12-P1-01`、`CODEX-R12-P2-02`、`GROK-R11-P1-01`、`GROK-R12-P1-01`、`GROK-R12-P1-02`、`GROK-R12-P2-03`、`GROK-R12-P2-04`。
-   **本點涉及之具名落點索引（僅供追溯，非義務）**：producer 三處＝`momentum/core/contracts.py::split_per_symbol`（`:659-661`、`:690`）、`momentum/Analysis/ic_split_adapter.py::_build_plan_pair`（`:230-231`、`:258`）、`momentum/Analysis/ic_filter_orchestrator.py` holdout（`:631-643`、`:643-648`）；三者皆已把 `symbols`／`symbol_arr` 傳給 `validate_split_pair_integrity`，故 attest 可在 producer 端就地為之。`split_per_symbol` 於呼叫 splitter 前先 `sort_values`（故 `train_local`／`test_local` 為時間序），而 `_local_ordinals_for_symbol` 以 `np.flatnonzero` 取 `symbol_positions`（frame 序）。亂序輸入之直呼叫路徑＝`analyze_cross_sectional` → `_build_cross_sectional_global_split`（`purge_semantic="timedelta"`）；正常汲取路徑於 `momentum/FeatureEngineering/feature_factory.py:796` 已排序。不可變性之三組對照＝`np.asarray` 加 `setflags`、`np.frombuffer`、`pickle`／`deepcopy`。
+   本點只列**現行態義務**，逐條編號以便機械比對；沿革與追溯索引見本檔末之「沿革與追溯索引」專區。
 
 <!-- OBLIGATIONS-BEGIN id=D-001-C2-4 -->
    **(4.1) 座標語意**：本延伸之 `position` 一律為**該 symbol 之 post-trim `feature_index` 內的序號**（symbol-local ordinal），取數亦必從該 index。
@@ -92,7 +89,7 @@ def derive_event_split_from_plans(
 <!-- OBLIGATIONS-END -->
 5. **邊界定義**：重複 `position` ⇒ fail-closed；`NaT` ⇒ fail-closed；空 `row_index`（train 可為空）⇒ 指紋定義為 `sha256("[]")`，**不得**以缺欄代替。
 6. **比對點**：投影端對傳入之 `feature_index_by_symbol[symbol]` 以同一規則重算，與 plan 攜帶之指紋逐值比對；不符 ⇒ fail-closed，訊息須指名「plan 指紋 vs 重算指紋」兩值之前 12 字元。
-7. **誠實邊界（明示接受）**：本改動會使既有 IC golden digest 位移。依原檔 §G 之規矩，golden 變動須經 review；b8 收案前須把受影響的 golden 以「改前／改後逐值對照」重凍，**不得**只更新 hash。另加**獨立 oracle**：由同一 fixture 的 `row_index_local` 與該 symbol 之 universe 依本節規則重算 `sha256`（🔴 R12：原寫 `row_index`，屬舊座標語彙；oracle 與 producer 必須同座標，否則兩邊永遠不等），與 **producer 實際寫入 plan 的指紋欄**逐值相等（🔴 R6 `CODEX-R6-P1-02`：oracle 不得只算 fixture 自己的值而不對證 producer 寫入值）。
+7. **誠實邊界（明示接受）**：本改動會使既有 IC golden digest 位移。依原檔 §G 之規矩，golden 變動須經 review；b8 收案前須把受影響的 golden 以「改前／改後逐值對照」重凍，**不得**只更新 hash。另加**獨立 oracle**：由同一 fixture 的 `row_index_local` 與該 symbol 之 universe 依本節規則重算 `sha256`（oracle 與 producer 必須同座標，否則兩邊永遠不等），與 **producer 實際寫入 plan 的指紋欄**逐值相等（oracle 不得只算 fixture 自己的值而不對證 producer 寫入值）。
 8. **首尾對證不刪**：完整指紋為**新增**層，既有首尾對證保留（承 C-1 附帶約束①「不得刪除任一既有 guard」）。
 
 ### Task 8.1 — per-symbol 投影（覆寫 Task 3.2、覆寫 C-4 簽名段）
@@ -194,6 +191,18 @@ def derive_event_split_from_plans(
 - `R-3`（UAT 最後，user-ruling）、`R-4`（屬 GAP-3，blocked-by）— 不動。
 - 🔴 **新登記 `SU-RESID-4`（needs-research）**：`SplitPlan.row_index` 之全框語意與 per-symbol 投影所需之 local ordinal 並存，本延伸以 producer attest 之並存欄 `row_index_local` 橋接（C2 第 4 點），而非改動 `row_index` 本身。**研究問題**＝「是否應把 `row_index` 本身改為 symbol-local，並同步遷移 IC 主線之全框驗證與既有 golden」；**完成判準**＝列出所有依賴全框語意之消費端並給出可證偽之遷移測試。觸發：下一次動 IC 切分契約時。
 - 🔴 **新登記 `SU-RESID-5`（needs-research）**：`SplitPlan` 之 numpy 欄在建構後仍可經序列化往返（`pickle`／`deepcopy`）還原為可寫，故**無法在 numpy 層給出不可變保證**（R10 實跑三組對照）。投影端已由入口指紋重驗覆蓋，但**全框消費端**（`momentum/Analysis/ic_filter_orchestrator.py:1318`／`:1335`／`:1359-1360`）讀 `row_index` 時無對應重驗。**研究問題**＝「IC 全框消費端是否需要等價之入口重驗，或改以不可變容器承載 row 身分」；**完成判準**＝給出可證偽之竄改測試並確認不影響既有 golden。觸發：下一次動 `SplitPlan` 欄位契約時。本批不做，理由＝竄改屬既有性質、非本批引入，且投影端已被覆蓋。
+
+## 沿革與追溯索引
+
+> 🔴 **本節是本檔唯一允許出現歷史敘述與裁決編號的地方**（2026-09-12 使用者定：「如果要寫歷史或日誌，那就要有一個專區專放，不要穿插在項目中間，項目中都只能有最新版本」）。正文與義務項只留現行態；機械檢查為 `scripts/obligation_block_check.sh`。
+
+<!-- HISTORY-BEGIN -->
+**D-001-C2 第 4 點之重寫**：本點於 R12 後整節重寫為單一現行態；R6～R12 之決策沿革（某輪曾如何、為何不採某方案）一律不在本檔重述，見 `handoffs/reconcile/20260911-splitunify-x-review-r6/synth.md` 至 `…-r12/synth.md`。
+
+**本點取代之輪次裁決索引（僅供追溯，非義務）**：`CODEX-R6-P1-01`、`CODEX-R8-P1-01`、`CODEX-R9-P1-01`、`CODEX-R10-P1-01`、`CODEX-R10-P1-02`、`CODEX-R11-P2-02`、`CODEX-R12-P1-01`、`CODEX-R12-P2-02`、`GROK-R11-P1-01`、`GROK-R12-P1-01`、`GROK-R12-P1-02`、`GROK-R12-P2-03`、`GROK-R12-P2-04`。
+
+**本點涉及之具名落點索引（僅供追溯，非義務）**：producer 三處＝`momentum/core/contracts.py::split_per_symbol`（`:659-661`、`:690`）、`momentum/Analysis/ic_split_adapter.py::_build_plan_pair`（`:230-231`、`:258`）、`momentum/Analysis/ic_filter_orchestrator.py` holdout（`:631-643`、`:643-648`）；三者皆已把 `symbols`／`symbol_arr` 傳給 `validate_split_pair_integrity`，故 attest 可在 producer 端就地為之。`split_per_symbol` 於呼叫 splitter 前先 `sort_values`（故 `train_local`／`test_local` 為時間序），而 `_local_ordinals_for_symbol` 以 `np.flatnonzero` 取 `symbol_positions`（frame 序）。亂序輸入之直呼叫路徑＝`analyze_cross_sectional` → `_build_cross_sectional_global_split`（`purge_semantic="timedelta"`）；正常汲取路徑於 `momentum/FeatureEngineering/feature_factory.py:796` 已排序。不可變性之三組對照＝`np.asarray` 加 `setflags`、`np.frombuffer`、`pickle`／`deepcopy`。
+<!-- HISTORY-END -->
 
 ## 戳記
 
