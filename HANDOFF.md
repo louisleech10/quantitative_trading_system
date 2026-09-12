@@ -207,6 +207,8 @@
 
 **D-002 第九次修訂已完成**（commit 見下；obligation／format rc=0，xref 對 **r1–r8 八份** synth 皆 rc=0；mutation 表列 26／ID 01–26 連續；`SU-RESID-9A-UI` 已真的入 §N，`grep -c` ＝ 3）。**本輪兩處是我自己的缺陷**：K5（我在 R7 才把判準改成時間域，**改完四條規則彼此重疊**——`decision=50` 同時命中 train 與界外，codex 獨得）與 K2（**寫了「登記於 §N」卻沒登記**，三家獨立抓到）。另 K3 我**駁回** composer 前提並更正自己先前「採較嚴版」的套用錯誤（範本 `reason_code` 閉集為四值、`R-BRIEF-1` 以架構為 `blocked-by` 對象）。
 
+🔴 **`P1-02` 亦複驗成立——「寫了要做卻沒做」第五次**：`decision != cutoff`／`零位移`／`v8 baseline` 三個字面**只出現在 `:129`（§G (G-4d)）與 `:282-283`（沿革）**，而 §V 範圍是 `:216-257` ⇒ **(G-4d) 三項硬性附帶完全沒進 §V，也沒進 mutation 表**。我在 (G-4d) 逐字寫著「**須進 §V 與 mutation**，不得只寫在 §G 散文」，然後**自己沒去做**。與 K2（寫「登記於 §N」卻沒登記）同型——**同一天第五次**。第十次修訂須：§V 增三條（`decision == cutoff` 零位移對 v8 舊鍵、`decision != cutoff` 單 TF 邊界、界外 early／late raise），mutation 增對應項，並**改完後逐條 grep 自證落在 §V 行號區間內**。
+
 🔴 **R9 composer 已交；主委複驗三條，全部成立——其中一條是我引錯權威，須自我推翻 K3 的駁回**：
 - **`P2-01` 成立（最嚴重）**：§N 殘留之 canonical 規則在 **`templates/SPEC_TEMPLATE.md:106-109`**，逐字「值**只允許三種**：`blocked-by:<具體依賴（檔/層/前置票）>`／`user-ruling:<日期＋裁決內容>`／`needs-research:<研究題目>`」——**明文要求「具體依賴（檔/層/前置票）」**。我在 K3 引的 `templates/BRIEF_REVIEW_TEMPLATE.md:71` 是 brief 內「**沒查的那句話**」六欄表之 `reason_code`（四值閉集），**服務的是另一件事**。⇒ **我駁回 composer 是錯的，它原本的主張才對**；grok 判「成立」亦基於我引的同一份錯範本。我先前「閉集是四值、我記成三值」之更正**本身就是引錯造成的**——真正的 §N 規則就是**三值**。**第十次修訂**：`SU-RESID-9A-UI` 改依 `SPEC_TEMPLATE`，`blocked-by:` 後接**具名依賴**（例「投影生產接線 Task（待開）」）或改 `needs-research:<生產投影接線設計>`；收斂檔須記明我兩度更正之經過。
 - **`P2-02` 成立**：`Task 9.1` 目標句仍逐字「必須讓**終端使用者**看得到」，與下方 v9「只交付 producer 層」並存——K2 我宣稱四處同批改完，實際漏了目標句本身。
