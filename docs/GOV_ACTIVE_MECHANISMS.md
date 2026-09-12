@@ -65,6 +65,7 @@
 | `mutation_probe_check.sh` | 工具 | gov_check  |
 | `narrow_check_router.sh` | 常態檢查 | PostToolUse  |
 | `no_append_only_check.sh` | 常態檢查 | pre-commit  |
+| `obligation_block_check.sh` | 常態檢查 | PostToolUse  |
 | `plain_docs_guard_selftest.sh` | 一次性驗證 | 未掛 |
 | `plain_docs_order_check.sh` | 常態檢查 | PostToolUse  |
 | `plain_docs_render.sh` | 常態檢查 | pre-commit  |
