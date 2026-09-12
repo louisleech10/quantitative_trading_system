@@ -47,6 +47,16 @@
 
 **D-002 已依七群修訂**（commit `d69b471b`；`doc_format_precheck` 與 `spec_xref_check --synth` 皆 rc=0）：新增 `D-002-C0`（`trigger_timeframe`／`feature_timeframe` 分名，複合鍵明定為 `(event_id, feature_timeframe)`）、`D-002-C3`（同事件所有 feature TF **必須同側**，異側則整事件 purged，檢查落在投影端）、`D-002-C6`（`n_train`／`n_test`／`n_purged` 定為**事件數**，列數另立新名）、`Task 9.4`（記帳與報告鏈專責）；觸及面 15 → **16 處**（新增第四層記帳／報告鏈）；`Task 9.3` 由形狀規則改為**逐處列名**（明寫 `feature_materialization` 折疊點在 `groupby+update`、event-level 表粒度不變）；§G 拆為 (G-1)(G-2)(G-3)；mutation 6 → **18 條**逐處對應。
 
-**R2 閉合輪已派出**（session `20260911-splitunify-b9-review-r2`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R2-BRIEF.md`）：依章程 §B8 由**原提出方**逐群複驗是否真關閉，並攻修訂本身引入的新問題（同側約束是否過嚴而誤殺、量詞分離是否誤判、術語分名是否仍有歧義）。brief 已逐家列出各自待閉合的 ID，並提醒 R1 有一家 `STATUS` 未逐字寫 `DONE`。
+**R2 閉合輪已收**（`round_id=052ad9bc`，債已清）：**composer `proceed`**（R1 三條全閉）；**grok 六條全閉但新開 2 條 P1**；**codex 閉合五條、`R1-P1-06` 未閉並新開 8 條**。新開 11 條收斂為**九群、全部採納零駁回**，收斂檔 `handoffs/reconcile/20260911-splitunify-b9-review-r2/synth.md`（歸戶與 completeness 皆 PASS）。
+
+🔴 **九群中的關鍵四條**：
+① **核心目標漏寫**（`CODEX-R2-P1-04`，最嚴重）——9B 只加 schema 欄位與下游改法，**沒要求 producer 停止 `selected_timeframe` 單選**並輸出全量 keyed rows ⇒ 整批做完 `SU-RESID-2` 的丟棄行為原封不動。
+② **同側約束被攻破**（`CODEX-R2-P1-01`）——資料契約只要求各 cutoff `<= decision_at_ms`，**未**要求不同 feature TF 之 cutoff 對齊，故合法事件可能天然異側；C3 一律 purge 會誤殺。須先定義「可比時點」或改為以 trigger TF 之側為準並揭露。
+③ **三條自相矛盾**——(0.5) 禁裸 `timeframe` 卻自己定了 `discarded_per_tf_rows_by_timeframe`；要 `clusters` 加欄又要它維持事件級；觸及面列出已刪除的 `D-002-C1`／`C2`（已修）。
+④ **量詞一刀切不成立**（`CODEX-R2-P1-03`）——`baseline` 的 `n_test` 是實際模型輸入樣本數，不能與事件數混為一談。
+
+🔴 **主委自評**：`obligation_block_check.sh` 是我自己建的閘，這次修訂我只跑了格式與 xref **沒跑它**，結果 21 條義務項行型全部不合白名單、5 處裁決編號寫在正文（違反我自己定的「項目中只留最新版本」）。已全數修畢，該閘現為 rc=0。
+
+下一步：依九群做**第三次修訂** → 派 R3 → 三家戳記 → 才進 Task 9.1 實作。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`。
 
 其後：三家放行 → 戳記 → 才進 Task 9.1 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
