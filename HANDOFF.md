@@ -61,6 +61,16 @@
 
 **R3 閉合輪已派出**（session `20260911-splitunify-b9-review-r3`、brief `handoffs/20260911-SPLITUNIFY-B9-REVIEW-R3-BRIEF.md`）。brief 已補明 R1／R2 各踩過一次的裁決欄規則：**`BLOCKED-BY` 與 `CLOSED` 都只列本檔本家族 ID，跨輪未閉條目須以新 ID 重開**。
 
-下一步：R3 三家放行 → 戳記 → 才進 Task 9.1 實作。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`。
+**R3 已收**（`round_id=d414d8c3`）：**composer `proceed`**；**grok `blocked`**（R2 兩條全閉、新開 3 條 P1）；**codex `blocked`**（零條閉合、9 條 P1＋2 條 P2，其中四條明指「R2 某條未閉」）。15 條收斂為**七群、全部採納零駁回**。
+
+🔴 **主委已逐條自驗四項可機械查證之指控，全部成立**：
+① `probe_b9_multitf.py` **不在 repo**（`git ls-files` 追蹤數 0）⇒ §A 的 FACT-RECEIPT 不可重跑，直接違反驗證保真度鐵律。**已修**：探針移入 `handoffs/20260911-splitunify-b9-probe-multitf.py`（commit `d9196037`）並實跑確認四組輸出與記載一致。
+② `docs/SPLITUNIFY_TODO.md:470` 仍標 `needs-research`，狀態 SoT 未同步。
+③ 🔴 **核心目標仍未達成**：`pipeline.py:747` 為 `build_event_keys(receipts, selected_timeframe=str(selected_timeframe))`、**必傳**——我上一輪自以為補上的 `Task 9.2` 只改了被呼叫端，唯一生產 caller 沒動，生產路徑的靜默丟棄**原封不動**。
+④ `split_projection.py:441-424` 之 `event_id` 重複 fail-closed guard 排在同側判定**之前**，使 C3 的兩條測試不可執行（順序問題，我完全沒想到）。
+
+🔴 **收斂性判斷**（為何不引用「停在無法收斂處」）：三輪 findings 有明確收斂方向且家族間有交集（codex 與 grok 獨立指向同一組：核心目標、可比時點、Task 9.2 範圍），非各說各話或無限窮舉；R3 九條 P1 中四條是「R2 未閉」，成因是**主委修訂不徹底**而非委員擴張要求 ⇒ 續修。
+
+下一步：依七群做**第四次修訂**（重點：真的定義「可比時點」而非再寫一次「須先定義」；`Task 9.2` 範圍納入 `pipeline.py` caller；重複 guard 與 C3 的先後定案；`M-SU-D2-19` 方向改正；§V 補 purged 複合鍵與接線落點；TODO 狀態同步時點寫進 §N）→ 派 R4。其後：`D1` 走 R 重開重戳 → 最後一批 `R-5`。
 
 其後：三家放行 → 戳記 → 才進 Task 9.1 實作；再後 `D1` 走 R 重開重戳 → 最後一批 `R-5`（不得與未完成之 `D1` 同批上線）。
