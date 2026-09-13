@@ -2317,6 +2317,10 @@ def _b3_harness(tmp_path: Path) -> dict:
         "brief_conformance_check.sh",
         # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT
         "_role_gate.sh",
+        # 2026-09-13：cx_run 對 stamp 輪亦跑 completeness --single（fail-closed，缺檔即 127）。
+        #   缺它 ⇒ 本 harness 三條 stamp success 斷言紅在「檢查沒跑」而非測試本意；
+        #   同 test_stamp_taskid_inject 之註解：缺工具＝檢查沒跑，補進清單而非放寬。
+        "completeness_check.sh",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():

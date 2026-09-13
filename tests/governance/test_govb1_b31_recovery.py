@@ -667,8 +667,12 @@ def test_destination_check_does_not_false_positive(tmp_path: Path) -> None:
     沒有這一條，上一條可能只是「stamp 輪永遠 rc=3」的假看守。
     """
     h = _harness(tmp_path, kind="stamp")
+    # 2026-09-13：stamp 輪自此亦跑 completeness --single ⇒ 對照組內容須為最小合法 sentinel
+    #   （純散文交件會以「格式不合規」紅，那是格式閘、不是本條要測的落點閘）。
     proc, latest = _deliver(
-        h, name="destok", content="stamp round output\n", family="codex", stub="preserve",
+        h, name="destok",
+        content="## CODEX-R1-P3-00\n\n**斷言**: 零 findings sentinel。\n\n**碼證**: 對照組。\n\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n",
+        family="codex", stub="preserve",
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert latest.get("result_state") == "success", latest

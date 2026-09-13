@@ -652,6 +652,18 @@ _write_stub_success_output() {
         esac
       } > "${out}"
       ;;
+    stamp)
+      # 2026-09-13：stamp 輪自此亦跑 --single ⇒ stub 須寫最小合法零 findings sentinel
+      #   （P3-00：斷言＋碼證即可，無需 digest）；impl 維持 stub-ok。
+      local fam_s
+      fam_s="$(printf '%s' "${fam}" | tr '[:lower:]' '[:upper:]')"
+      {
+        printf '## %s-R1-P3-00\n\n' "${fam_s}"
+        printf '**斷言**: CX_STUB_MODE=success harness stamp sentinel（零 findings）\n\n'
+        printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success（stamp）\n\n'
+        printf 'VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n'
+      } > "${out}"
+      ;;
     *)
       printf 'stub-ok family=%s\n' "${fam}" > "${out}"
       ;;
@@ -713,6 +725,20 @@ _run_format_check_if_needed() {
       fi
       ;;
   esac
+  # ── 2026-09-13 DOCROT stamp-r3 死鎖之根因修補（使用者裁定；凍結錨點**外側**）──────────
+  # 病根：stamp 輪從未跑 --single 即記 success；reconcile_build／debt_clear 對同檔**會**跑，
+  #   而 success 檔不得改、C-9 不得 abandon、cx_run 拒重派 ⇒ 空殼交件（codex 寫 `**核對**`）無出路。
+  #   兩端用同一支 checker 才是單一真相源；stamp 輪也走 fail-closed（checker 缺即 127）。
+  #   stub 模式對 stamp 改寫最小合法 sentinel（見 _write_stub_success_output），不放寬本檢查。
+  if [ "${_bk}" = "stamp" ] && [ "${_cli}" -eq 0 ] 2>/dev/null && [ -s "${out}" ]; then
+    local _cc_stamp="${SCRIPT_DIR}/completeness_check.sh"
+    if [ ! -f "${_cc_stamp}" ] || [ ! -r "${_cc_stamp}" ]; then
+      echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（stamp 輪亦不得記 success）" >&2
+      _rc=127
+    else
+      bash "${_cc_stamp}" --single "${out}" --family "${fam}" >&2 || _rc=$?
+    fi
+  fi
   # ── 以下為 Task 4.3 新增（一律在凍結錨點**外側**）──────────────────────────
   # 格式不合規時，補一份**逐條可修補清單**。為保留上方錨點行的字面，
   # 這裡在失敗時**再跑一次** checker 並收集 stderr（只在失敗路徑付出，成功路徑零成本）。

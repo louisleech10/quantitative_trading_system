@@ -413,6 +413,21 @@ def reregistered_output(fam, after_seq):
             continue
         best = r
     return best
+def round_brief_kind(rid_):
+    """該 round 之 committee_round_open.brief_kind；讀不到 ⇒ 空字串（fail-closed：不走 stamp 解鎖）。"""
+    if not audit_path or not Path(audit_path).is_file():
+        return ""
+    for raw in Path(audit_path).read_text(encoding="utf-8").splitlines():
+        s = raw.strip()
+        if not s.startswith("{"):
+            continue
+        try:
+            r = json.loads(s)
+        except json.JSONDecodeError:
+            continue
+        if r.get("event") == "committee_round_open" and r.get("round_id") == rid_:
+            return str(r.get("brief_kind") or "")
+    return ""
 repo = Path(os.environ["REPO_ROOT"])
 info = (dump.get("rounds") or {}).get(rid)
 if not info:
@@ -471,6 +486,26 @@ for fam in participants:
         print(f"ERROR: 讀取產出檔失敗 ({fam}: {op}): {exc}", file=sys.stderr)
         sys.exit(1)
     if actual != expect:
+        # 2026-09-13 DOCROT stamp-r3 死鎖（使用者裁定「修根因」）：cx_run 對 stamp 輪**從未跑**
+        #   completeness --single 即記 success（見 cx_run _run_format_check_if_needed 之 kind 限定），
+        #   而本檢查要求 success 檔不得改、C-9 不得 abandon、cx_run 拒重派 ⇒ 空殼交件無任何出路。
+        #   收窄解鎖：**只限 stamp 輪**，且其後同 round 同家有主委顯式 register-output（committee_output，
+        #   本身經 verdict 解析＋family 綁定）且該登記 sha == 檔案當前 sha ⇒ 視為已交件（留審計）。
+        #   非 stamp 輪維持原判（success 檔不得改）。cx_run 已同步改為 stamp 輪也跑 --single，
+        #   故此路徑對**新** stamp 輪只在「主委顯式重登」時才走得到。
+        if round_brief_kind(rid) == "stamp":
+            rr = reregistered_output(fam, rec.get("sequence"))
+            if rr and rr.get("output_path") and rr.get("output_sha256"):
+                try:
+                    rr_actual = file_sha(rr["output_path"])
+                except Exception:
+                    rr_actual = ""
+                if rr_actual == rr["output_sha256"]:
+                    print(
+                        f"[debt_clear] 家族 {fam}：stamp 輪 success 檔 sha 不符，但其後已顯式 register-output"
+                        f"（seq {rr.get('sequence')}，sha 相符）⇒ 視為已交件（cx_run 舊版對 stamp 輪未跑格式檢查之解鎖路徑）"
+                    )
+                    continue
         print(
             f"ERROR: 家族 {fam} 產出檔 sha 不符（交件後被改動）: "
             f"audit={expect[:12]}… file={actual[:12]}…",
