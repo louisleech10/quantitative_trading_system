@@ -37,7 +37,8 @@
 9. **絕不（實體紅線，Claude 用 `scripts/agent_preflight.sh`/`agent_postflight.sh` 前後快照比對驗 data_cache）**：刪除 / 修改 `data_cache/`、改 git 歷史、force push、改 `.git/`、跳過 Pre-Commit Checklist。`--force` / `--dangerously-skip-permissions` 是為了非互動執行，**不是安全模式**——上述紅線仍適用。
 10. **留痕義務**：派工 prompt 帶 task-id 者，產出檔寫進 `handoffs/` 後由 Claude `register-output` 入帳；收尾報告須列出產出檔路徑，不得只寫在 log。
 11. **VERIFY claim 義務**：收尾報告/交接檔中任何「已驗/passed/確認正確」聲明須附**實跑命令**+輸出摘要，否則標「未驗證」；空稱視為捏造（2026-07-01 事故,出處見 `docs/SCAR_LEDGER.md`）。
-12. **STAMP-BLOCKED**：動工前若所依 reconcile/SPEC 的 `RECONCILE-STAMP` 未全數 APPROVED → 輸出 `STATUS: BLOCKED — reconcile 未核可`,不動工。
+12. **STAMP-BLOCKED（適用範圍以 `brief-kind` 判,不靠語意解讀）**：**僅當 `brief-kind: impl`** 時,若所依 reconcile/SPEC 的 `RECONCILE-STAMP` 未全數 APPROVED → 輸出 `STATUS: BLOCKED — reconcile 未核可`,不動工。
+    🔴 **`brief-kind` ∈ `review`／`consult`／`closure`／`stamp` 者本條一律不適用**,即使 `reconcile_stamps_check` rc=1 也**必須照常完成審查與必答**。理由是結構性的:重簽輪的**前提**就是舊戳記已因改動失效(rc=1),把本條套上去會使「委員要求改 SPEC → 戳記失效 → 沒人能重簽」成為永久死鎖。2026-09-14 review-r23 codex 以本條拒審,為同型第二次(首次見 b9 規格審查輪),故改為以 `brief-kind` 這個**封閉集合欄位**判別(白名單見 `scripts/brief_conformance_check.sh:191`),不再靠逐輪口頭駁回。
 
 ---
 

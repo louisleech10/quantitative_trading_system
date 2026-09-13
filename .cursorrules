@@ -24,7 +24,7 @@
 9. **絕不（實體紅線，Claude 用 `scripts/agent_preflight.sh`/`agent_postflight.sh` 前後快照比對驗 data_cache）**：刪/改 `data_cache/`、改 git 歷史、force push、改 `.git/`、跳過 Pre-Commit Checklist。`--force`/`--yolo` 是非互動用，**不是安全模式**。
 10. **留痕義務**：派工 prompt 帶 task-id 者，產出檔寫進 `handoffs/` 後由 Claude `register-output` 入帳；收尾報告須列出產出檔路徑，不得只寫在 log。
 11. **VERIFY claim 義務**：收尾報告/交接檔中「已驗/passed/確認正確」須附**實跑命令**+輸出摘要，否則標「未驗證」；空稱視為捏造（出處見 `docs/SCAR_LEDGER.md`）。
-12. **STAMP-BLOCKED**：動工前若 reconcile/SPEC 的 `RECONCILE-STAMP` 未全數 APPROVED → `STATUS: BLOCKED — reconcile 未核可`,不動工。
+12. **STAMP-BLOCKED（適用範圍以 `brief-kind` 判）**：**僅當 `brief-kind: impl`** 時,若 reconcile/SPEC 的 `RECONCILE-STAMP` 未全數 APPROVED → `STATUS: BLOCKED — reconcile 未核可`,不動工。`review`／`consult`／`closure`／`stamp` 之唯讀輪**不適用**,即使 `reconcile_stamps_check` rc=1 也須照常完成審查(重簽輪的前提就是舊戳記已失效;套上本條即永久死鎖)。逐字理由見 `AGENTS.md:40`。
 
 ---
 

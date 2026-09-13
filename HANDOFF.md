@@ -49,7 +49,13 @@
   - 回歸 **706 passed、1 xfailed**；completeness／cluster-attribution／`spec_xref --synth` 皆 rc=0，`debt_clear` rc=0。
 - 🔴 **本輪三條全部是主委在 brief 自標的疑慮（assumed ×2 ＋ 攻擊面 ×1）被逐一證實，且已連續第三輪如此（R18／R21／R22）** ⇒ 把沒把握的面寫進 brief 交出去攻，命中率極高，維持此做法。
 - 🔴 **新增機制**：契約面改動之後，**下一輪 brief 必須明列「請掃 SPEC 與 TODO 的其他舊段」為必答**，不靠主委自己記得。
-- **下一步**：派 `review-r23` 做 F1–F3 閉合再驗證 ＋ 對 v19 新 body 重簽；三家確認後進 `Task 9.2b`（批次 **B9C**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
+㉑**review-r23 完成（`handoffs/reconcile/20260911-splitunify-b9-review-r23/synth.md`）：composer／grok 零 finding proceed ＋ 對 v19 body APPROVED 並 append 戳記（provenance 已由主委 `register-output --kind stamp --family <fam>` 補記）；🔴 codex 以 `AGENTS.md` Rule 12 拒審整輪，主委具名駁回**：
+  - **三項駁回依據**：①Rule 12 逐字管的是「**動工**」，本輪 `brief-kind: review`、產出段明文禁改碼與禁改 SPEC 正文，不是動工；②該讀法是**死鎖且由該家自己觸發**——body 由 `76006a76…` 變成 `1b0890e3…` 正是主委採納該家 r22 之 `CODEX-R22-P1-03` 並照其修法改 SPEC 所致，若「戳記失效即不得審查／重簽」成立，則「委員要求改 SPEC → 戳記必然失效 → 無人能重簽」成閉環；③**同型第二次**，且該家在 stamp-r2／stamp-r4 面對同一情境皆正常審並 APPROVED（戳記區兩行可查）。該家碼證第二半（「composer/grok provenance 仍 pending」）亦已因補記而失效。
+  - 🔴 **修法不是口頭駁回**（紀律型不被接受）：`AGENTS.md:40` 與 `.cursorrules:27` 之 Rule 12 改為以 **`brief-kind` 封閉集合欄位**判適用範圍——**僅 `impl` 適用**，`review`／`consult`／`closure`／`stamp` 一律不適用，即使 `reconcile_stamps_check` rc=1 也須照常審。白名單由 `scripts/brief_conformance_check.sh:191` 機械驗證。
+  - **兩家一致實質結論（主委採納）**：`SU-RESID-2` 阻擋者＝**兩項**（`Task 9.2b`＋`Task 9.3`），非四項；`Task 2.3` 之「單 TF 下仍成立」註記**不需**改條件式；其餘舊 Task 段掃描**無**新 B9B 互斥。
+  - 🔴 **r22 三條不標 CLOSED**：章程 §B8 要求由**原提出方**重跑反例，codex 未回驗 ⇒ 留待 r24。
+- 🔴 **新坑**：`cx_run` 把 **brief sha256 綁在開債記錄**上，**同輪重派若換 brief 會被拒**（逐字 `ERROR: brief_sha256 與開債記錄不符（換 brief 掛既有 round 已拒）`）⇒ 要把駁回依據送達該家只能**另開新輪**。
+- **下一步**：派 `review-r24`（**單派 codex**）＝ r22 三條之原提出方閉合再驗證 ＋ v19 重簽；齊備後進 `Task 9.2b`（批次 **B9C**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v19，body sha256 `1b0890e367ab0609bddcb7a04ce11eef0ca680912f269b22b8ca78f3433203e7`，🔴 現為「待重簽」**（v18 之三家戳記已因 F3 改動失效）。
@@ -61,7 +67,7 @@
 
 ## 待辦分流
 - **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
-- **下一步（技術，不問使用者）**：`review-r23`（F1–F3 閉合再驗證 ＋ v19 重簽）→ 收斂＋`debt_clear` → 領 impl token 進 `Task 9.2b`（B9C）。
+- **下一步（技術，不問使用者）**：`review-r24`（單派 codex：r22 三條原提出方閉合再驗證 ＋ v19 重簽）→ 收斂＋`debt_clear` → 領 impl token 進 `Task 9.2b`（B9C）。
 
 - 🔴 **新發現的系統性缺口（具名殘留，`blocked-by`，**未**開新 epic）**：`docs/` 底下帶 `RECONCILE-STAMP` 的檔**沒有任何一份**能通過 `reconcile_stamps_check`——`gate.sh register-output` 原只收 `handoffs/`，而 provenance 要求審計中有指向被戳記檔**自身**的事件。本輪只把 `docs/SPLITUNIFY_SPEC.D-002.md` 加進既有封閉白名單 `scripts/stampable_artifacts.txt`（該檔正是為此型缺口而建）；`GAP3_EVENT_UX_SPEC.D-001.md`、`GAP3_EVENT_UX_TODO.D-001`..`D-006` **未一併加入**，因其戳記是否對應現行 body hash 未經查證，盲加＝把未驗證的背書寫成既成事實。另 `handoffs/reconcile/20260911-splitunify-x-review-r13/synth.md`（D-001 定案檔）之戳記 hash 與 HEAD body hash **不符**（戳記 `9e1ef3d1` vs 實際 `e3f2847d`），亦即「D-001 三家戳記定案」目前機械上是紅的。
 
