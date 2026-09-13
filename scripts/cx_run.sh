@@ -638,7 +638,7 @@ _maybe_register_review_output() {
 
 _write_stub_success_output() {
   # CX_STUB_MODE=success：findings-kind 寫最小合法四欄 finding（裁定採①）；
-  # impl/stamp 維持 stub-ok（不誤觸 format 檢查）。
+  # impl 維持 stub-ok（不跑 format 檢查）；stamp 自 2026-09-13 起寫合法 sentinel（亦跑 format 檢查）。
   # 禁止 GOVERNANCE_TEST_HARNESS=1 時跳過格式檢查（SPEC 硬約束）。
   case "${_bk}" in
     review|consult|closure)
