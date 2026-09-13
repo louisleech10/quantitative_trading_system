@@ -970,6 +970,12 @@ _prepare_and_run() {
     review|consult|closure)
       prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
       ;;
+    stamp)
+      # CXSTAMP 2026-09-13：stamp 輪自此亦跑同一支 --single（見 _run_format_check_if_needed 之 stamp 分支）
+      #   ⇒ 提示必須同步告知，否則委員照舊只寫戳記行＋散文即 format-failed（stamp-r2 codex 實踩兩次：
+      #   `**碼證**:` 標籤行留空、內容放下一行條列 ⇒ 空殼）。🔴 欄位內容須與標籤**同一行**（檢查器逐行判）。
+      prompt="${prompt} 交件檔須至少含一條 canonical heading（無問題→## <你的家族大寫>-R<本輪輪次>-P3-00 sentinel），其 **斷言**：與 **碼證**：兩欄的內容必須寫在**與標籤同一行**（標籤行留空、內容放下一行條列會被判空殼而擋下）；尾段 VERDICT: proceed|blocked、CLOSED: 空值或 ID 清單。寫完請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0 再結束。"
+      ;;
   esac
   _run_cli_and_emit
 }
