@@ -1,0 +1,32 @@
+[session_name] ✓ 20260913-cxstamp-x-stamp-r2 / 20260913-CXSTAMP-X-STAMP-R2
+[committee_run] === role gate preflight (before gate.sh dispatch) ===
+[committee_run] session=20260913-cxstamp-x-stamp-r2 brief=handoffs/20260913-CXSTAMP-X-STAMP2-BRIEF.md  families=codex,composer,grok(3 家)  out=handoffs/20260913-cxstamp-x-stamp-r2-<family>.md
+[committee_run] === gate.sh dispatch ===
+GATE PASS：已發 dispatch token（有效 900s）。審計 → .claude/gate/audit.log
+使用者可稽核：cat .claude/gate/audit.log
+[round_cost] 工作項目「cxstamp」累計 3 輪：真 findings 4 個｜空輪 1｜無產出 0｜銷帳 3
+[committee_run] === open debt round_id=0ef6c659-8c73-46e8-bf52-0d5643f904c2 session=20260913-cxstamp-x-stamp-r2 ===
+[committee_run] 開債完成 round_id=0ef6c659-8c73-46e8-bf52-0d5643f904c2
+[committee_run] → 派 codex(out=handoffs/20260913-cxstamp-x-stamp-r2-codex.md)
+[committee_run] → 派 composer(out=handoffs/20260913-cxstamp-x-stamp-r2-composer.md)
+[committee_run] → 派 grok(out=handoffs/20260913-cxstamp-x-stamp-r2-grok.md)
+[committee_run] ❌ codex 失敗(見下 log tail)
+    - 無可辨識的 `/tmp` workdir；已保留 `/tmp/claude-501`。
+    - 未修改程式碼；pytest 依 brief 未執行。
+    
+    STATUS: DONE
+    COMPLETENESS FAIL: empty-shell finding (缺 **斷言**/**碼證**): CODEX-R2-P3-00 (file=handoffs/20260913-cxstamp-x-stamp-r2-codex.md)
+    COMPLETENESS FAIL(single): handoffs/20260913-cxstamp-x-stamp-r2-codex.md 格式不合規（見上）。
+      這是**交件當下**的檢查：現在修比等到 reconcile 收集時才發現省一整輪。
+    [cx_run] ── 可修補清單（逐條）──
+      handoffs/20260913-cxstamp-x-stamp-r2-codex.md:7	empty-shell finding	見 templates/COMMITTEE_FINDING_TEMPLATE.md（零 findings 契約：sentinel 形態／必填欄非空／落點）
+    [cx_run] ── 清單結束；修完可**同輪重派**，不必整份重跑 ──
+    [cx_run] stamp 交件格式不合規（_fmt_rc=1）⇒ 不登記 stamp-target 之 committee_output
+    [cx_run] ⚠️ codex 產出**格式不合規**（見上）：handoffs/20260913-cxstamp-x-stamp-r2-codex.md
+    [cx_run]    audit 已記 result_state=format-failed（可同輪重派；debt_clear 仍拒銷帳）。
+    [cx_run]    請於此時修正或重派，勿等到收集節點才發現。
+    [cx_run] codex done rc=0 out=handoffs/20260913-cxstamp-x-stamp-r2-codex.md（格式不合規 → exit 3）
+[committee_run] ✅ composer 完成 → handoffs/20260913-cxstamp-x-stamp-r2-composer.md
+[committee_run] ✅ grok 完成 → handoffs/20260913-cxstamp-x-stamp-r2-grok.md
+[committee_run] 票 B-50：工作區有變動但**無污染跡象**（形態②③ 皆未命中；status 共 57 筆）。
+[committee_run] ⚠️ 有家族未正常完成 — 勿當作已收齊(見上) round_id=0ef6c659-8c73-46e8-bf52-0d5643f904c2
