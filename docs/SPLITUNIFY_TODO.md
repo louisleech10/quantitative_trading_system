@@ -270,8 +270,14 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   既有 caller：無（B3 接）。
 - 不可做：不得讀 config；不得自算 purge／embargo；不得回退成二態；
   不得把 purged 併進 `assignments`；不得產出空 plan 冒充未切分。
-- 邊界：①`event_keys` 為空 ⇒ 三態皆空（不 raise）；②事件不在 `feature_index` ⇒ purged；
-  ③全部落隔離區 ⇒ `assignments` 空而 `purged` 為全集（合法，`tables.py:201` 已明載不得誤擋）。
+- 邊界（🔴 **② 已 SUPERSEDED BY `Task 9.2b`（B9C）；R28 `CODEX-R28-P1-04` 抓出本列仍為 live**，
+  為「契約改後舊段未同步」之**第八次**發作；逐字採該家修法）：
+  ①`event_keys` 為空 ⇒ 三態皆空（不 raise）；
+  ②~~事件不在 `feature_index` ⇒ purged~~ ⇒ **現行**：`manifest.table.decision_at_ms` 落在
+  `[index_ms[0], index_ms[-1]]` **之外** ⇒ **fail-closed raise**（訊息含 `event_id`），**不是** purged；
+  `feature_cutoff_ms` **不參與** `split_label`（照舊文實作會把已修正的 fail-closed 回退成分類分支）；
+  ③`train_last_ms < decision_at_ms < test_start_ms`（隔離帶）⇒ `assignments` 空而 `purged` 為全集
+  （合法且預期，`tables.py:201` 已明載不得誤擋）。
 - 風險緩解：mutation `M-SU-1`..`M-SU-7`、`M-SU-12`。
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py` rc=0：
   `len(assignments) + len(purged) == len(event_keys)` 且兩者 event_id 交集為空；

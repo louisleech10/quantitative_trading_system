@@ -88,10 +88,17 @@
 - 🔴 **三家對主委四條 assumed 之判定：A1／A3 成立、A2／A4 不成立——被推翻的兩條正是主委自己最沒把握的那兩條**（三道 `AlignmentViolationError` 之公開入口可達性、`label_end_ms.max()` 之靜默吞噬）⇒ 連續第五輪（R18／R21／R22／R25／R27）自標疑慮被證實或被具體否證，做法維持。
 - 🔴 **新增機制（同型第七次後）**：`Task 9.3` 動工前之 register 重掃 receipt，須**一併**列出「本批改過的契約在 SPEC 與 TODO 的全部落點」，不再只掃 register。
 - 🔴 **坑**：收斂檔之「附錄：findings 逐字保留」是 **byte-faithful** 區，任何全檔字串取代（例如為了過 `spec_xref` 而去反引號）都會打破 body-hash 而使 `completeness_check` 整批紅。去反引號只能**限定在群集／處置段**。
-- **下一步**：派 `review-r28` 做 M1–M9 閉合再驗證 ＋ 對 v22 新 body 三家重簽；齊備後進 `Task 9.3`（批次 **B9D**）。
+㉘**review-r28 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r28/synth.md` ＝唯一權威）：**composer／grok 零 finding 並對 v22 APPROVED；codex 四條 P1 全採納並修完**——
+  - **N1**：r27 之「頂層鍵超集」護欄只擋**丟鍵**、不擋**改值**（該家實跑把 `g4_per_symbol_n` 改 `999` ⇒ `--write` 直接接受）⇒ 改逐值閘，要改須 `--accept-value-changes` **逐一具名**。
+  - **N2**：外部錨被 r27 寫成 **helper 常數**，而 SPEC §V 早在 v13 之 O2 定死「錨在已提交文件、helper 只讀」⇒ 錨點移入 §V 逐字行、helper 只讀；v8 與旁檔改 `O_CREAT|O_EXCL` **write-once**。
+  - **N3**：r27 之 (G-4e) 只人手填**側別**，**時刻**仍與投影共因 ⇒ 該家把 `decision_at_ms` 整批 **+1 毫秒**、側別不變，golden 仍過；已加第二欄人手判準 `expected_decision_at_ms`（由 fixture 常數逐筆手算），三方側別相等**之前**先做逐筆時刻對帳。
+  - **N4🔴 同型第八次**：TODO 邊界②仍為 live「界外 ⇒ purged」，與 9.2b 之「界外一律 raise」互斥 ⇒ 逐字採該家修法改寫。
+  - **SPEC 進 v23**，body sha256 `52efba2e077a973d6facb3264bf0daf83c8b36542dcb36097d5145a64c03595d`。回歸六路 **732 passed、0 failed、0 xfailed**。四個探針主委皆實跑複驗會擋。
+- 🔴 **本輪最重要的程序教訓**：主委在 r27 對兩處具名偏離委員修法時自稱「**等效**」，本輪**兩處都被實跑探針證明不等效**（N1、N3）⇒ **自稱等效不算數；偏離委員修法一律須由下一輪覆核**。本輪 N1 又有一處偏離（以「顯式具名」取代「一律禁止改值」，理由是後者會讓正當重凍不可能），已具名交 **r29 覆核**，不得再自我認定。
+- **下一步**：派 `review-r29` 做 N1–N4 閉合再驗證 ＋ 對 v23 新 body 三家重簽；齊備後進 `Task 9.3`（批次 **B9D**）。
 
 ## 現況
-- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v22，body sha256 `dece985e17e9b8459a8df35387f0e3926f3f355f16557d4965fa134c7aa0e132`，🔴 現為「待重簽」**（v21 之三家戳記已因 R27 之修補失效）。
+- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v23，body sha256 `52efba2e077a973d6facb3264bf0daf83c8b36542dcb36097d5145a64c03595d`，🔴 現為「待重簽」**。
 - **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **已做**（stamp-r1..r4）④領 impl token 後才動生產碼 **已做**（B9A／B9B 各憑 token）。
 - **Phase 9 依賴序（四方一致）**：`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
 - 🔴 **主委具名不採納委員原文兩處**（理由見 synth）：grok `Task 9.4` 之**無路徑** `pytest -k`（會收全套、小時級）；composer `Task 9.2b` 之 `bash scripts/freeze_splitunify_golden.py`（檔是 `.py`，且 golden 重凍屬 `9.5`）。
@@ -100,7 +107,7 @@
 
 ## 待辦分流
 - **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
-- **下一步（技術，不問使用者）**：`review-r28`（M1–M9 閉合再驗證 ＋ v22 重簽）→ 收斂＋`debt_clear` → 進 `Task 9.3`（B9D）。
+- **下一步（技術，不問使用者）**：`review-r29`（N1–N4 閉合再驗證 ＋ v23 重簽）→ 收斂＋`debt_clear` → 進 `Task 9.3`（B9D）。
 
 - 🔴 **新發現的系統性缺口（具名殘留，`blocked-by`，**未**開新 epic）**：`docs/` 底下帶 `RECONCILE-STAMP` 的檔**沒有任何一份**能通過 `reconcile_stamps_check`——`gate.sh register-output` 原只收 `handoffs/`，而 provenance 要求審計中有指向被戳記檔**自身**的事件。本輪只把 `docs/SPLITUNIFY_SPEC.D-002.md` 加進既有封閉白名單 `scripts/stampable_artifacts.txt`（該檔正是為此型缺口而建）；`GAP3_EVENT_UX_SPEC.D-001.md`、`GAP3_EVENT_UX_TODO.D-001`..`D-006` **未一併加入**，因其戳記是否對應現行 body hash 未經查證，盲加＝把未驗證的背書寫成既成事實。另 `handoffs/reconcile/20260911-splitunify-x-review-r13/synth.md`（D-001 定案檔）之戳記 hash 與 HEAD body hash **不符**（戳記 `9e1ef3d1` vs 實際 `e3f2847d`），亦即「D-001 三家戳記定案」目前機械上是紅的。
 

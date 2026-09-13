@@ -175,24 +175,23 @@ def test_purge_reason_literal_is_contract_value(golden: dict) -> None:
 
 
 def test_v8_baseline_has_external_anchor_in_code(golden: dict) -> None:
-    """🔴 v8 不可變基準之驗證須有**碼內外部錨**，不得只比「檔案 vs 旁檔」。
+    """🔴 v8 不可變基準之驗證須有**外部錨**，不得只比「檔案 vs 旁檔」。
 
-    出生理由：原本只驗檔案與其旁檔，**同步改寫兩者**即可悄悄換掉 9B 前的錨點——
-    該家實跑 `NORMAL_MODE_RC 0`／`MATCHING_SIDECAR_ACCEPTED True`。外部錨寫在被 review
-    的程式碼裡（與 golden 目錄不同介質），改它一定會出現在 diff 上。
+    出生理由：原本只驗檔案與其旁檔，**同步改寫兩者**即可悄悄換掉 9B 前的錨點
+    （`CODEX-R27-P1-02` 實跑 `NORMAL_MODE_RC 0`）。
+    🔴 **`CODEX-R28-P1-02` 再更正錨點的「位置」**：r27 把它寫成 helper 的 Python 常數，
+    但 SPEC §V 早在 v13 之 O2 定死「錨在**已提交文件**、helper 只讀」——寫在 helper 裡
+    就又是第二份真相。本測試據此改為驗 **SPEC §V 的逐字錨點行**（node id 保留供追溯）。
     """
     import hashlib
     from pathlib import Path
-    import importlib.util
 
-    repo = Path(__file__).resolve().parents[3]
-    spec = importlib.util.spec_from_file_location(
-        "_fz", repo / "scripts" / "freeze_splitunify_golden.py"
+    m = _fz_module()
+    anchor = m._read_v8_anchor_from_spec()
+    assert anchor is not None and len(anchor) == 64, (
+        "SPEC §V 缺（或有多於一個）逐字 `V8_BASELINE_SHA256=<64-hex>` 錨點行"
     )
-    fz = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(fz)
-    anchor = getattr(fz, "V8_BASELINE_SHA256", "")
-    assert len(anchor) == 64, "外部錨不存在或不是 sha256（P1-02 的繞法會復活）"
+    repo = Path(__file__).resolve().parents[3]
     v8 = repo / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.json"
     sidecar = repo / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.sha256"
     assert v8.exists() and sidecar.exists(), "v8 基準或旁檔缺席"
@@ -223,3 +222,83 @@ def test_versioned_v9_keys_present(golden: dict) -> None:
     for key in ("g1_membership_v9", "g3b_oracle_v9"):
         assert key in golden, f"缺版本化鍵 {key}"
         assert set(golden[key]) == {"train", "test", "purged"}
+
+
+# ── 🔴 review-r28 之四道加強（`CODEX-R28-P1-01`..`P1-04`）────────────────────
+
+
+def _fz_module():
+    import importlib.util
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[3]
+    spec = importlib.util.spec_from_file_location(
+        "_fz_r28", repo / "scripts" / "freeze_splitunify_golden.py"
+    )
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_v8_anchor_lives_in_spec_not_in_helper() -> None:
+    """🔴 v8 外部錨之**唯一權威**是 SPEC §V 的逐字行，helper 只讀（`CODEX-R28-P1-02`）。
+
+    出生理由：r27 把 digest 寫成 helper 的 Python 常數，但 SPEC §V 早在 v13 之 O2 就定死
+    「錨在已提交文件、**helper 只讀**」。寫在 helper 裡就又是第二份真相，而且
+    「改碼與改 golden 是同一個人、同一個 commit」這個攻擊面完全沒縮小。
+    """
+    m = _fz_module()
+    assert not hasattr(m, "V8_BASELINE_SHA256"), (
+        "helper 不得自帶 digest 常數——那是第二份真相（SPEC §V 才是唯一權威）"
+    )
+    anchor = m._read_v8_anchor_from_spec()
+    assert anchor is not None and len(anchor) == 64, "SPEC §V 缺唯一的 V8_BASELINE_SHA256 錨點行"
+    import hashlib
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[3]
+    v8 = repo / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.json"
+    assert hashlib.sha256(v8.read_bytes()).hexdigest() == anchor
+
+
+def test_v8_baseline_creation_is_write_once() -> None:
+    """🔴 v8 基準為 write-once：已存在時再次建立**須拒絕**（`CODEX-R28-P1-02`）。
+
+    出生理由：只驗 digest 擋不住「刪掉重建一份新的 v8」。用 `O_CREAT|O_EXCL` 讓第二次
+    建立在**作業系統層**失敗，才不是靠「記得不要覆寫」這種紀律。
+    """
+    m = _fz_module()
+    assert m.create_v8_baseline_write_once(b"{}") == 1, (
+        "v8 已存在卻允許再次建立 ⇒ write-once 沒生效"
+    )
+
+
+def test_golden_carries_hand_decision_timestamps(golden: dict) -> None:
+    """🔴 (G-4e) 第二欄人手判準：`expected_decision_at_ms` 逐筆對帳（`CODEX-R28-P1-03`）。
+
+    出生理由：r27 只人手填了**側別**，事件**時刻**仍與投影共用 `_plans`／`holdout_boundary`
+    ⇒ 該家把每列 `decision_at_ms` **加 1 毫秒**、側別不變，golden 仍 `GOLDEN OK`。
+    錨點時刻現改由 `BASE`／`H1` 兩個 fixture 常數手算，任何整批位移都會現形。
+    """
+    hand = golden["g4e_hand_decision_at_ms"]
+    got = golden["g4e_actual_decision_at_ms"]
+    assert hand and set(hand) == set(got), "兩份錨點時刻之事件集合須相同"
+    assert hand == got, "人手錨點時刻與 fixture 實際值不符（整批位移）"
+    assert len(set(hand.values())) > 1, "全部同值會讓本對帳失去鑑別力"
+
+
+def test_write_refuses_silent_value_change_of_existing_keys() -> None:
+    """🔴 `--write` 不得**靜默改掉**既有頂層鍵的值（`CODEX-R28-P1-01`）。
+
+    出生理由：r27 的護欄只擋「丟鍵」，該家把 `g4_per_symbol_n` 改成 `{"ETHUSDT": 999}`
+    後 `--write` 直接接受（`changed-existing-value RC 0`）。現改為**顯式具名**：
+    要動哪個既有鍵就得在 `--accept-value-changes` 逐一列出——把「悄悄改」變成「必須寫下來」。
+    """
+    import inspect
+
+    m = _fz_module()
+    src = inspect.getsource(m.main)
+    assert "--accept-value-changes" in src or "accept_value_changes" in src, (
+        "缺既有鍵逐值閘之授權旗標 ⇒ 改值仍可靜默通過"
+    )
+    assert "_unauthorised" in src, "缺未授權改值之 fail-closed 分支"

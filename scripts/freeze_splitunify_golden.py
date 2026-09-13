@@ -25,9 +25,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
@@ -134,10 +136,25 @@ def _event_keys(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
     #    `event_id`；擴維為多 feature TF 平行組屬 `Task 9.5`。
     # 🔴 `label_start_ms` 綁 `decision_at_ms`（事件級），**不再**綁逐列 cutoff——
     #    兩值解耦後再綁 cutoff 會造出「答案窗早於決策時刻」的假資料。
+    # 🔴 **(G-4e) 第二欄人手判準：`expected_decision_at_ms`（`CODEX-R28-P1-03`）**。
+    #    r27 只人手填了**側別**，事件**時刻**仍由 `_plans`／`holdout_boundary`／`index` 推導
+    #    ⇒ 三方仍有共因：該家把每列 `decision_at_ms` **加 1 毫秒**、側別不變，
+    #    實跑 `M3_SAME_SIDE_OUTPUT_ACCEPTED True` 且 golden 仍 `GOLDEN OK`。
+    #    ⇒ 錨點時刻改由 `BASE`／`H1` 兩個 fixture 常數**逐筆手算**（不讀 `index`、不經邊界函式），
+    #    任何時刻位移都會在 `main()` 的逐筆對帳上現形。
+    _hand_decision = {
+        "tr0": BASE + 0 * H1, "tr1": BASE + 1 * H1, "tr2": BASE + 2 * H1, "tr3": BASE + 3 * H1,
+        "tr_leak": BASE + 139 * H1,
+        "gap1": BASE + 140 * H1, "gap2": BASE + 141 * H1,
+        "te0": BASE + 144 * H1, "te1": BASE + 145 * H1, "te2": BASE + 146 * H1,
+        "te3": BASE + 147 * H1, "te4": BASE + 148 * H1,
+        "bnd_shift": BASE + 0 * H1,
+    }
     return pd.DataFrame([
         {"event_id": e, "feature_cutoff_ms": c, "label_start_ms": d,
          "label_end_ms": le, "symbol": SYM, "timeframe": "1h", "feature_timeframe": "1h",
-         "decision_at_ms": d, "expected_side": side}
+         "decision_at_ms": d, "expected_side": side,
+         "expected_decision_at_ms": int(_hand_decision[e])}
         for e, c, le, d, side in rows
     ])
 
@@ -239,6 +256,17 @@ def _build_actual() -> Dict[str, Any]:
         "g1_membership": _membership,
         # 🔴 **(G-4e) 第三份判準**（`CODEX-R27-P1-03`）：人手填入之 `expected_side` 攤平。
         "g4e_hand_expected_membership": _hand_expected_membership(keys),
+        # 🔴 **(G-4e) 錨點時刻對帳（`CODEX-R28-P1-03`）**：人手常數 vs fixture 實際產生值。
+        "g4e_hand_decision_at_ms": {
+            str(e): int(v) for e, v in
+            keys[["event_id", "expected_decision_at_ms"]].drop_duplicates()
+            .itertuples(index=False, name=None)
+        },
+        "g4e_actual_decision_at_ms": {
+            str(e): int(v) for e, v in
+            keys[["event_id", "decision_at_ms"]].drop_duplicates()
+            .itertuples(index=False, name=None)
+        },
         # 🔴 **(G-4d)① 版本化新鍵**（`Task 9.2b`）：9B 之後的成員集合與 v8 不同批
         #    （fixture 多了 `bnd_shift`、判側改事件級錨定）⇒ 用**新鍵**承載，
         #    `splitunify_golden.v8.json` 保持不可覆寫之 9B 前錨點。
@@ -399,16 +427,56 @@ def _diff_report(expected: Dict[str, Any], actual: Dict[str, Any]) -> List[str]:
     return problems
 
 
-#: 🔴 **v8 不可變基準之外部錨**（`CODEX-R27-P1-02`）。
-#  它**刻意**寫在被 review 的程式碼裡、而不是 golden 目錄的旁檔——只驗「檔案 vs 旁檔」時，
-#  同時改寫兩者就能悄悄換掉 9B 前的錨點，而那正是「換錨是刻意的」這個論證的唯一支撐。
-V8_BASELINE_SHA256 = "f270e007ca9843a88eff9ca40987b2110646646f52df6a63a3508c9a8dab1217"
+#: SPEC §V 之錨點行（唯一權威）。🔴 **v23 更正（`CODEX-R28-P1-02`）**：r27 把 digest 寫成本檔
+#  的 Python 常數，但 SPEC §V 早已明定「錨在已提交文件、**helper 只讀**」（v13 之 O2）——
+#  寫在 helper 裡就又是**第二份真相**，且「改碼與改 golden 是同一個人、同一個 commit」
+#  這個攻擊面完全沒被縮小。現改為**只讀 SPEC**。
+_SPEC_PATH = REPO / "docs" / "SPLITUNIFY_SPEC.D-002.md"
+_V8_ANCHOR_RE = re.compile(r"^\s*`?V8_BASELINE_SHA256=([0-9a-f]{64})`?\s*$", re.M)
+
+
+def _read_v8_anchor_from_spec() -> Optional[str]:
+    """由 SPEC §V 讀出 `V8_BASELINE_SHA256=<64-hex>` 錨點；缺或多於一個即 None。"""
+    if not _SPEC_PATH.exists():
+        return None
+    hits = _V8_ANCHOR_RE.findall(_SPEC_PATH.read_text(encoding="utf-8"))
+    return hits[0] if len(hits) == 1 else None
+
+
+def create_v8_baseline_write_once(payload: bytes) -> int:
+    """首次建立 v8 基準與旁檔；**已存在即拒絕**（`O_CREAT|O_EXCL`；`CODEX-R28-P1-02`）。
+
+    🔴 write-once 不是靠「記得不要覆寫」——那是紀律。用 `O_EXCL` 讓第二次建立在
+    **作業系統層**失敗，才擋得住「刪掉重建一份新的 v8」這條繞法。
+    """
+    v8 = GOLDEN_DIR / "splitunify_golden.v8.json"
+    sidecar = GOLDEN_DIR / "splitunify_golden.v8.sha256"
+    for path, data in ((v8, payload),
+                       (sidecar, (hashlib.sha256(payload).hexdigest() + "\n").encode())):
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            print(
+                f"GOLDEN V8 REFUSE: {path.name} 已存在——v8 基準是 write-once，"
+                "不得重建（刪掉重建等同換掉 9B 前的錨點；fail-closed）"
+            )
+            return 1
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(data)
+    return 0
 
 
 def _assert_v8_baseline_intact() -> int:
     """驗 `splitunify_golden.v8.json` 之不可變性（三層；兩種模式都跑）。"""
     v8 = GOLDEN_DIR / "splitunify_golden.v8.json"
     sidecar = GOLDEN_DIR / "splitunify_golden.v8.sha256"
+    anchor = _read_v8_anchor_from_spec()
+    if anchor is None:
+        print(
+            "GOLDEN V8 ANCHOR MISSING: SPEC §V 缺（或有多於一個）逐字 "
+            "`V8_BASELINE_SHA256=<64-hex>` 錨點行——外部錨那條斷言無標的可比（fail-closed）"
+        )
+        return 1
     if not v8.exists() or not sidecar.exists():
         print(
             "GOLDEN V8 MISSING: splitunify_golden.v8.json 或其 .v8.sha256 不存在"
@@ -417,16 +485,16 @@ def _assert_v8_baseline_intact() -> int:
         return 1
     digest = hashlib.sha256(v8.read_bytes()).hexdigest()
     declared = sidecar.read_text(encoding="utf-8").strip()
-    if declared != V8_BASELINE_SHA256:
+    if declared != anchor:
         print(
-            f"GOLDEN V8 TAMPERED: 旁檔宣告 {declared[:12]}… 與碼內外部錨 "
-            f"{V8_BASELINE_SHA256[:12]}… 不符——同步改寫檔案與旁檔之繞法在此擋下"
+            f"GOLDEN V8 TAMPERED: 旁檔宣告 {declared[:12]}… 與 SPEC §V 之外部錨 "
+            f"{anchor[:12]}… 不符——同步改寫檔案與旁檔之繞法在此擋下"
         )
         return 1
-    if digest != V8_BASELINE_SHA256:
+    if digest != anchor:
         print(
-            f"GOLDEN V8 TAMPERED: 檔案實際 {digest[:12]}… 與外部錨 "
-            f"{V8_BASELINE_SHA256[:12]}… 不符——v8 基準被改過（fail-closed）"
+            f"GOLDEN V8 TAMPERED: 檔案實際 {digest[:12]}… 與 SPEC §V 之外部錨 "
+            f"{anchor[:12]}… 不符——v8 基準被改過（fail-closed）"
         )
         return 1
     return 0
@@ -435,6 +503,13 @@ def _assert_v8_baseline_intact() -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true", help="凍結／重凍（比對失敗時**不得**自動用）")
+    ap.add_argument(
+        "--accept-value-changes", default="",
+        help=(
+            "逗號分隔之既有頂層鍵清單；只有在此**逐一具名**的鍵才允許被 --write 改值。"
+            "未具名即 fail-closed（CODEX-R28-P1-01：只擋丟鍵擋不住改值）。"
+        ),
+    )
     args = ap.parse_args()
 
     GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
@@ -460,6 +535,21 @@ def main() -> int:
     # 🔴 **G-4e 三方相等（`CODEX-R27-P1-03`）**：投影／oracle **兩份**不夠——
     #    同一次錯誤解讀寫進兩邊仍會通過 G-3b（該家實跑證實）。第三份是 fixture 內**人手填**
     #    的 `expected_side`，不經任何推導，故與前兩份無共因。
+    # 🔴 **錨點時刻逐筆對帳（`CODEX-R28-P1-03`）**：側別相等擋不住「整批時刻位移」——
+    #    該家以 +1 ms 探針實證。人手常數由 BASE／H1 手算，與 `_plans`／`holdout_boundary` 無共因。
+    _hand_ms = actual["g4e_hand_decision_at_ms"]
+    _actual_ms = actual["g4e_actual_decision_at_ms"]
+    _ms_bad = sorted(
+        f"{e}: 人手={_hand_ms.get(e)} 實際={_actual_ms.get(e)}"
+        for e in set(_hand_ms) | set(_actual_ms) if _hand_ms.get(e) != _actual_ms.get(e)
+    )
+    if _ms_bad:
+        for line in _ms_bad:
+            print(f"  ✗ G-4e（錨點時刻對帳）: {line}")
+        print("G-4e FAIL：人手錨點時刻與 fixture 實際值不符（整批位移在此擋下）")
+        return 1
+    print(f"  ✓ G-4e：{len(_hand_ms)} 筆錨點時刻與人手常數逐筆相符")
+
     _hand = actual["g4e_hand_expected_membership"]
     for _name, _other in (("投影", actual["g1_membership"]), ("oracle", actual["g3b_oracle"])):
         if _hand != _other:
@@ -514,6 +604,31 @@ def main() -> int:
                 print(
                     f"GOLDEN REFUSE: --write 會讓既有頂層鍵 {_lost} 從主檔消失"
                     "——整檔覆寫不得靜默丟鍵（fail-closed）；要移除鍵請先經 review 明示"
+                )
+                return 1
+            # 🔴 **既有鍵之「逐值」閘（`CODEX-R28-P1-01`）**：r27 只擋丟鍵，**不擋改值**——
+            #    該家實跑把 `g4_per_symbol_n` 改成 `{"ETHUSDT": 999}`，`--write` 直接接受
+            #    （`changed-existing-value RC 0`）。SPEC §V 第 6 條要求「既有 11 個頂層鍵
+            #    逐值不變、新成員集只落在 `g1_membership_v9`／`g3b_oracle_v9`」。
+            #    🔴 **但「永遠不得改」會讓正當重凍（例如本批新增 `bnd_shift`）也無法進行** ⇒
+            #    改為**顯式具名**：要動哪個既有鍵，就得在命令列逐一列出。
+            #    這把「悄悄改掉」變成「必須寫下你要改哪一個」，是機械閘而非紀律。
+            _allowed = {k.strip() for k in (args.accept_value_changes or "").split(",") if k.strip()}
+            _changed = sorted(k for k in (_prev_keys & _new_keys) if _prev.get(k) != actual.get(k))
+            _unauthorised = [k for k in _changed if k not in _allowed]
+            if _unauthorised:
+                print(
+                    f"GOLDEN REFUSE: --write 會改動既有頂層鍵之**值**：{_unauthorised}"
+                    "——golden 的值不得靜默改寫（fail-closed）。確認要改請逐一具名："
+                    f"`--accept-value-changes {','.join(_unauthorised)}`，"
+                    "並在 commit 訊息寫明理由與依據"
+                )
+                return 1
+            _stale_allow = sorted(_allowed - set(_changed))
+            if _stale_allow:
+                print(
+                    f"GOLDEN REFUSE: --accept-value-changes 列了未實際改變的鍵 {_stale_allow}"
+                    "——寬鬆授權不得留著給下次用（fail-closed）"
                 )
                 return 1
         golden_path.write_text(
