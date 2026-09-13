@@ -42,11 +42,18 @@
   - **E1**：xfail 錨點測試原寫 `pytest.raises(Exception, match=...)` **太寬**——①任何例外都算 xfail 過（連 fixture 自己壞掉）②`Task 9.2b` 落地時錯誤型別仍可被誤收。已收緊為 `AlignmentViolationError`（`momentum/core/contracts.py:933`，已存在）＋ match `e_x`。⇒ 9.2b 若用別型別或不帶 `event_id`，本測試**繼續紅**而非變 XPASS。**這正是主委在 brief assumed 自問的那條，該家判「是」並補出第二個理由。**
   - **E2🔴 「文件舊段落落後於新實作」第三次發作**（R19 兩次在 SPEC、本次在 TODO）：`Task 2.2` 仍寫單選／每事件一列／12 鍵，後續實作者依舊段會**回退已完成行為**。三處已標 SUPERSEDED 並保留原字面。**主委同型自查另補一處該家沒點名的**：§E 之 `SU-RESID-2` 描述的正是 B9B 剛解掉的東西 ⇒ 已標**已關閉（2026-09-14，批次 B9B）**。
 - 🔴 **教訓（三次同形）**：凡改動契約面（簽章／預設值／鍵集／唯一性判準），須**全檔掃該契約的舊描述**並逐處標 superseded，不能只改當前 Task 段。
-- **下一步**：派 `review-r22` 做 E1／E2 閉合再驗證；三家確認後進 `Task 9.2b`（批次 **B9C**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
+⑳**review-r22 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r22/synth.md` ＝唯一權威）：r21 之 E1／E2 由原提出方 CLOSED；composer／grok 零 finding proceed；codex 三條新 P1 **全採納並修完**：
+  - **F1**：`SU-RESID-2` 只能標「**部分關閉**」——producer／schema 面確由 B9B 關閉，但該殘留原文寫的是「複合鍵要連 `EventSplitPlan` 之**下游**一起改」，下游＝`Task 9.3` 九處消費面與 `Task 9.2b` 側別錨定，**皆未實作** ⇒ 只完成一半。TODO §E 與 SPEC §N 同名條目已改為部分關閉、理由類別回 `blocked-by`。🔴 **⑲ 那句「已關閉」是主委自己多寫的，本輪被打回。**
+  - **F2**：`Task 2.3` 之 golden「只比 `event_id` 集合」未標 superseded——`Task 9.2a` 後行粒度已升為複合鍵，只比 `event_id` 會**吃掉多 feature TF 維度**（mutation `M-SU-D2-16` 正是在打這句）。已標 SUPERSEDED 指向 `Task 9.5`，並註明 B9B 刻意未動 golden、凍結腳本維持單一 feature TF，故該句**在單 TF 下仍成立**（跨批過渡，非現行缺陷）。
+  - **F3🔴 「改了新段落、沒回頭標舊段落」第四次發作，且在 SPEC**：①`§P Task 9.1` 之「本延伸交付」bullet 仍含「於 `metadata.split_unify` 擴充回傳結構」，與**同一 Task** 已於 v18 改成「producer → summary **兩層**」的目標句互斥（v18 改了目標句與跨邊界句，唯獨漏這一句）；②§N 之 `SU-RESID-2` 仍寫「TODO 該列仍為 `needs-research`…須於 `Task 9.1` 動工前同步」，該同步早於 B9B 完成。兩處已改、字面保留供追溯。**SPEC 進 v19**，新 body sha256 `1b0890e367ab0609bddcb7a04ce11eef0ca680912f269b22b8ca78f3433203e7`，**v18 三家戳記失效須重簽**。
+  - 回歸 **706 passed、1 xfailed**；completeness／cluster-attribution／`spec_xref --synth` 皆 rc=0，`debt_clear` rc=0。
+- 🔴 **本輪三條全部是主委在 brief 自標的疑慮（assumed ×2 ＋ 攻擊面 ×1）被逐一證實，且已連續第三輪如此（R18／R21／R22）** ⇒ 把沒把握的面寫進 brief 交出去攻，命中率極高，維持此做法。
+- 🔴 **新增機制**：契約面改動之後，**下一輪 brief 必須明列「請掃 SPEC 與 TODO 的其他舊段」為必答**，不靠主委自己記得。
+- **下一步**：派 `review-r23` 做 F1–F3 閉合再驗證 ＋ 對 v19 新 body 重簽；三家確認後進 `Task 9.2b`（批次 **B9C**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
 
 ## 現況
-- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v13，body sha256 `06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77`，仍為零戳記**。停輪依據＝`handoffs/reconcile/20260911-splitunify-b9-review-r12/synth.md`（唯一權威，本檔不複述）。
-- **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **進行中** ④領 impl token 後才動生產碼 **未做**。
+- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v19，body sha256 `1b0890e367ab0609bddcb7a04ce11eef0ca680912f269b22b8ca78f3433203e7`，🔴 現為「待重簽」**（v18 之三家戳記已因 F3 改動失效）。
+- **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **已做**（stamp-r1..r4）④領 impl token 後才動生產碼 **已做**（B9A／B9B 各憑 token）。
 - **Phase 9 依賴序（四方一致）**：`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
 - 🔴 **主委具名不採納委員原文兩處**（理由見 synth）：grok `Task 9.4` 之**無路徑** `pytest -k`（會收全套、小時級）；composer `Task 9.2b` 之 `bash scripts/freeze_splitunify_golden.py`（檔是 `.py`，且 golden 重凍屬 `9.5`）。
 - 🔴 **「雙家族」字面已更正為指標**（`CLAUDE.md:30`、ORCH `:41`／`:195`）——唯一權威＝ORCH §1 現行分工行＋`scripts/governance_roles.json`，現行＝**三家全員**。CLAUDE.md 自己已明令「本檔不得自寫家數」，這是同型漂移第二次。
@@ -54,7 +61,7 @@
 
 ## 待辦分流
 - **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
-- **下一步（技術，不問使用者）**：stamp-r1 三家回報 → 收斂＋`debt_clear` → 若 APPROVED 則領 impl token 進 `Task 9.1`；若 REJECTED 則依阻擋條一次修訂後重派。
+- **下一步（技術，不問使用者）**：`review-r23`（F1–F3 閉合再驗證 ＋ v19 重簽）→ 收斂＋`debt_clear` → 領 impl token 進 `Task 9.2b`（B9C）。
 
 - 🔴 **新發現的系統性缺口（具名殘留，`blocked-by`，**未**開新 epic）**：`docs/` 底下帶 `RECONCILE-STAMP` 的檔**沒有任何一份**能通過 `reconcile_stamps_check`——`gate.sh register-output` 原只收 `handoffs/`，而 provenance 要求審計中有指向被戳記檔**自身**的事件。本輪只把 `docs/SPLITUNIFY_SPEC.D-002.md` 加進既有封閉白名單 `scripts/stampable_artifacts.txt`（該檔正是為此型缺口而建）；`GAP3_EVENT_UX_SPEC.D-001.md`、`GAP3_EVENT_UX_TODO.D-001`..`D-006` **未一併加入**，因其戳記是否對應現行 body hash 未經查證，盲加＝把未驗證的背書寫成既成事實。另 `handoffs/reconcile/20260911-splitunify-x-review-r13/synth.md`（D-001 定案檔）之戳記 hash 與 HEAD body hash **不符**（戳記 `9e1ef3d1` vs 實際 `e3f2847d`），亦即「D-001 三家戳記定案」目前機械上是紅的。
 
