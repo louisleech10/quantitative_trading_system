@@ -57,6 +57,20 @@ def test_stamp_stub_success_output_passes_own_gate(tmp_path: Path) -> None:
     assert "## CODEX-R1-P3-00" in out and "**碼證**" in out, out
 
 
+def test_stamp_register_guarded_by_format_rc() -> None:
+    """〔CODEX-R1-P2-02〕ASSERT `_maybe_register_stamp_output` 在 `_fmt_rc≠0` 時不登記 stamp-target。
+
+    誠實邊界：端到端需 gate.sh＋reconcile_body_hash 全套 harness（本檔沿用之 b31 harness 未複製），
+    故此處為**源碼結構**斷言＋codex 於閉合輪重跑其 interaction 探針（COMMITTEE_OUTPUT_COUNT 1→0）。
+    mutation：刪該 guard ⇒ 本條紅。
+    """
+    src = (Path(__file__).resolve().parents[2] / "scripts" / "cx_run.sh").read_text(encoding="utf-8")
+    fn = src[src.index("_maybe_register_stamp_output() {"):]
+    fn = fn[: fn.index("\n}\n")]
+    assert '[ "${_fmt_rc:-0}" -ne 0 ]' in fn, "stamp register 缺 _fmt_rc 守衛"
+    assert fn.index('[ "${_fmt_rc:-0}" -ne 0 ]') < fn.index("reconcile_body_hash.sh"), "守衛須在 body_hash／register 之前"
+
+
 def test_stamp_missing_checker_is_fail_closed(tmp_path: Path) -> None:
     """ASSERT checker 缺檔 ⇒ 非 success（缺工具＝檢查沒跑，不得記 success）。"""
     h = _harness(tmp_path, kind="stamp")

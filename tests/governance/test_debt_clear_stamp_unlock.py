@@ -113,6 +113,23 @@ def test_stamp_round_reregistered_with_stale_sha_blocked(tmp_path: Path) -> None
     assert "sha 不符" in (r.stderr or "")
 
 
+def test_stamp_round_reregister_of_other_path_does_not_unlock(tmp_path: Path) -> None:
+    """〔CODEX-R1-P1-01／GROK-R1-P1-01〕ASSERT 其後 committee_output 指向**異路徑**（例：cx_run 自動登記之
+    stamp-target、或任意 handoff）⇒ 不得解鎖，rc≠0；解鎖只認同一份交件檔之重登。
+
+    mutation：拿掉 `_norm(rr["output_path"]) == _norm(op)` ⇒ 本條紅。
+    """
+    root, audit, rid, lock, out = _prep(tmp_path, session="st4", brief_kind="stamp")
+    _tamper(out)
+    other = root / "handoffs" / "st4-stamp-target.md"
+    other.write_text("## 戳記\n\nRECONCILE-STAMP: codex APPROVED 2026-09-13 sha256:deadbeef task:t-stamp\n", encoding="utf-8")
+    _committee_output(root, audit, round_id=rid, family="codex",
+                      out_path="handoffs/st4-stamp-target.md", out_sha=_sha256_file(other))
+    r = _clear(root, audit, "--round-id", rid, "--session", "st4", "--lock", str(lock))
+    assert r.returncode != 0, r.stdout + r.stderr
+    assert "sha 不符" in (r.stderr or "")
+
+
 def test_stamp_round_edited_without_reregister_blocked(tmp_path: Path) -> None:
     """ASSERT stamp 輪：改檔但**無**其後 committee_output ⇒ rc≠0（解鎖須主委顯式登記、留審計）。"""
     root, audit, rid, lock, out = _prep(tmp_path, session="st3", brief_kind="stamp")

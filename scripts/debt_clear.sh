@@ -495,7 +495,13 @@ for fam in participants:
         #   故此路徑對**新** stamp 輪只在「主委顯式重登」時才走得到。
         if round_brief_kind(rid) == "stamp":
             rr = reregistered_output(fam, rec.get("sequence"))
-            if rr and rr.get("output_path") and rr.get("output_sha256"):
+            # 〔CODEX-R1-P1-01／GROK-R1-P1-01，CXSTAMP review-r1〕path 綁定：重登之 committee_output
+            #   必須是**同一份交件檔**（正規化路徑相等）。否則 cx_run 對 stamp-target 之自動登記、
+            #   或任意異路徑之登記，都能讓被竄改的交件銷帳（兩家實跑 rc=0 反例）。
+            def _norm(p):
+                q = Path(p)
+                return str((q if q.is_absolute() else repo / q).resolve())
+            if rr and rr.get("output_path") and rr.get("output_sha256") and _norm(rr["output_path"]) == _norm(op):
                 try:
                     rr_actual = file_sha(rr["output_path"])
                 except Exception:

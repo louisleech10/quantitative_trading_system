@@ -559,6 +559,13 @@ _maybe_register_stamp_output() {
   if [ "${cli_rc}" -ne 0 ] 2>/dev/null || [ ! -s "${out}" ]; then
     return 0
   fi
+  # 〔CODEX-R1-P2-02，CXSTAMP review-r1〕stamp 輪自 2026-09-13 起亦跑格式檢查：format-failed
+  #   之交件不得再對 stamp-target 留 committee_output side effect（失敗交件與登記不一致）。
+  #   讀 caller `_run_cli_and_emit` 之 `_fmt_rc`（bash 動態作用域；不改呼叫點簽名，凍結錨點不動）。
+  if [ "${_fmt_rc:-0}" -ne 0 ] 2>/dev/null; then
+    echo "[cx_run] stamp 交件格式不合規（_fmt_rc=${_fmt_rc}）⇒ 不登記 stamp-target 之 committee_output" >&2
+    return 0
+  fi
 
   # 條件②：單行同時含 fam / APPROVED / 日期 / task:<task_id> / sha256:<body_hash>
   # reconcile_body_hash.sh rc≠0（缺 ## 戳記 等）→ 條件②不成立 → 合法 no-op
