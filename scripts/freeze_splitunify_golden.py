@@ -557,8 +557,10 @@ def main() -> int:
     ap.add_argument(
         "--accept-value-changes", default="",
         help=(
-            "逗號分隔之既有頂層鍵清單；只有在此**逐一具名**的鍵才允許被 --write 改值。"
-            "未具名即 fail-closed（CODEX-R28-P1-01：只擋丟鍵擋不住改值）。"
+            "逗號分隔之授權清單，每項逐字為 `<key>=<old8>:<new8>`；"
+            "old8／new8 各取該值 canonical JSON 之 sha256 **前 8 碼**。"
+            "🔴 **只列鍵名不算授權**（R29 CODEX-R29-P1-01：只驗鍵名時，具名後任意新值都寫得進去）；"
+            "digest 不符、或列了未實際改變的鍵，皆 fail-closed。"
         ),
     )
     args = ap.parse_args()

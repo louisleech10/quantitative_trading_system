@@ -376,3 +376,41 @@ def test_v8_first_create_path_exists_and_is_transactional() -> None:
     assert "existing" in create_src and "unlink" in create_src, (
         "首次建立非交易式 ⇒ 中途失敗會留半套狀態"
     )
+
+
+# 🔴 **R30 `CODEX-R30-P1-01`：第三份獨立副本（本檔）**。
+#    r29 把人手時刻改成不可變字面，切斷了**事後**平移 `BASE` 的共因；
+#    但該家實跑證明：把 `BASE` **與** fixture 裡的字面**同步**平移 17 毫秒，兩欄仍相等
+#    （`BASE_SHIFT_AND_HAND_SHIFT_G4E_EQUAL True`）——因為那些字面當初是主委**用同一組常數算出來再貼上去的**。
+#    ⇒ 在**另一個檔**（本測試檔）再放一份字面，並與 golden 凍結值逐筆對帳；
+#    要繞過就得**同時**改 fixture、golden 與本檔三處。這不是絕對防護（同 commit 改三處仍可），
+#    但把「改一個常數就靠到」拉升到「必須審過三個檔」，且與 `SU-RESID-V8-ATTEST` 同一誠實邊界。
+_INDEP_DECISION_MS = {
+    "tr0": 1700000000000,
+    "tr1": 1700003600000,
+    "tr2": 1700007200000,
+    "tr3": 1700010800000,
+    "tr_leak": 1700500400000,
+    "gap1": 1700504000000,
+    "gap2": 1700507600000,
+    "te0": 1700518400000,
+    "te1": 1700522000000,
+    "te2": 1700525600000,
+    "te3": 1700529200000,
+    "te4": 1700532800000,
+    "bnd_shift": 1700000000000,
+}
+
+
+def test_hand_decision_timestamps_have_independent_third_copy(golden: dict) -> None:
+    """🔴 錨點時刻須有**第三份獨立副本**（`CODEX-R30-P1-01`）。
+
+    出生理由：r29 的「不可變字面」只切斷了**事後**平移；該家把 `BASE` 與字面同步
+    平移後兩欄仍相等，因為字面當初是由同一組常數算出來的。本測試把第三份
+    放在**另一個檔**，三者任一不同即紅。
+    """
+    hand = golden["g4e_hand_decision_at_ms"]
+    got = golden["g4e_actual_decision_at_ms"]
+    assert set(_INDEP_DECISION_MS) == set(hand) == set(got), "三份之事件集合須相同"
+    assert _INDEP_DECISION_MS == hand, "本檔獨立副本 ≠ fixture 人手字面"
+    assert _INDEP_DECISION_MS == got, "本檔獨立副本 ≠ fixture 實際值"

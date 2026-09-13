@@ -104,10 +104,18 @@
   - **SPEC 進 v24**，body sha256 `bc4a2b3ea78fbb09a7989cbb4b36ce6e421ec9abe155d086ece8d21461b4457c`。回歸六路 **736 passed、0 failed、0 xfailed**；四個探針主委皆實跑複驗會擋。
 - 🔴 **本輪之程序定論（最重要）**：主委在 r27／r28 兩輪共三處自稱「偏離委員修法但等效」，**三處全被實跑探針否證** ⇒ 本輪 O1／O3 改為**逐字採委員修法、不再自創形狀**；「等效」自此不得由主委自我認定。
 - 🔴 **具名殘留 `SU-RESID-V8-ATTEST`（不得讀作已解決）**：v8 錨點只防意外與單點竄改，**不防蓄意的整批同 commit 替換**；該論證的信任根實際是 **code review 與 git 歷史**。觸發條件：專案導入 commit 簽章或受保護分支。
-- **下一步**：派 `review-r30` 做 O1–O5 閉合再驗證 ＋ 對 v24 新 body 三家重簽；齊備後進 `Task 9.3`（批次 **B9D**）。
+㉚**review-r30 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r30/synth.md`）：grok 零 finding 並對 v24 APPROVED；codex 兩條 P1 ＋ composer 一條 P2，**全數採納修完**；**r29 五條中四條 CLOSED**，餘一條之「同 commit 改四檔」那半維持殘留且該家明示**非 blocking**。
+  - **P1**：🔴 **主委 r29 之 assumed「不可變字面已消除共因」被實跑否證**——把 `BASE` **與**字面**同步**平移，兩欄仍相等（那些字面當初是用同一組常數算出來再貼的）⇒ 已加**第三份獨立副本**於測試檔；主委實跑複驗**完整攻擊路徑**（連 golden 凍結值一起改）⇒ 轉紅並指名。
+  - **P2🔴 同型第十次**：§P `Task 9.2` 六個 bullet 仍為 **live 舊碼態**（必傳、`str()`、四參數閘、每事件恰一列），該家實跑證明照舊段做會讓兩條 wiring 測試轉紅 ⇒ 已標 SUPERSEDED。
+  - **P3／P4**：`--help` 舊語法已改；§V `:265`「fixture 常數逐筆手算」已標 v25 更正——🔴 **同型第十一次，且是主委 v23 寫的字面、v24 改了做法卻沒回頭同步自己的句子**。
+  - **SPEC 進 v25**，body sha256 `29149ae8bd8bbdd77b84dc1d979f2ac4c1cb8e37f2feee8416f93fd3fb0b7b71`。回歸六路 **737 passed、0 failed、0 xfailed**；`GOLDEN OK`。
+- 🔴 **`SU-RESID-V8-ATTEST` 之 `user-ruling` 歸類經該家獨立查證成立**（非主委自認）：`run_with_receipt.py:4-5` 明載 receipt 與 audit 同一可寫主體、非防惡意偽造；`verify_audit_chain.py:72-74` 純報告永遠 rc=0；`git config --get commit.gpgsign` 無輸出 ⇒ 既有倉內層都不能成獨立信任根。
+- 🔴 **`Task 9.3` 動工前置之重掃分析已做完（唯讀）**：29 列逐列查證、**分類零變動**；`Task 9.3` 實際負責 **15 列**，其中僅 **3 列要改碼**（`C5-24` `pattern_bridge`、`C5-25` `ic_feed` 餵入端、`C5-29` `tables.py:372`）；殘留 `SU-RESID-C5-TARGETS` 兩條升級觸發**皆未成立**。實跑碼證：兩處在複合鍵下皆**大聲報錯**（`truth value of a Series is ambiguous`／`cannot reindex on an axis with duplicate labels`），不是靜默取錯值。
+- 🔴 **重掃另查出兩個真問題（待 B9D 審碼輪）**：①**四處 register 行號語意失準**（`C5-19`／`C5-21`／`C5-26`／`C5-27`）——全都**通過**「行號 ≤ 總行數」那道機械檢查卻指向註解，**那是弱閘**；實際位置 `:360`／`:808`／`pipeline.py:825`／`:811`。②**驗收第 1 點指向不存在的落點**：要求 `COMMIT:` 等於 audit.log 中該 impl task-id 之 round-start HEAD，但 `impl_token_issued` 事件 schema **根本沒有 HEAD 欄**。兩條皆不自行認定替代讀法，列為 B9D brief 之 assumed。
+- **下一步**：派 `review-r31` 做 P1–P4 閉合再驗證 ＋ 對 v25 新 body 三家重簽；齊備後進 `Task 9.3`（批次 **B9D**）。
 
 ## 現況
-- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v24，body sha256 `bc4a2b3ea78fbb09a7989cbb4b36ce6e421ec9abe155d086ece8d21461b4457c`，🔴 現為「待重簽」**。
+- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v25，body sha256 `29149ae8bd8bbdd77b84dc1d979f2ac4c1cb8e37f2feee8416f93fd3fb0b7b71`，🔴 現為「待重簽」**。
 - **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **已做**（stamp-r1..r4）④領 impl token 後才動生產碼 **已做**（B9A／B9B 各憑 token）。
 - **Phase 9 依賴序（四方一致）**：`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
 - 🔴 **批次狀態之唯一權威＝`docs/SPLITUNIFY_TODO.md` §B 之「狀態」欄**（2026-09-14 使用者質問「你為何又跳過 TODO」後定）。**出生事故**：主委實作完 B9A／B9B／B9C 三批，卻**一次都沒回去標 TODO**——狀態只記在本檔與白話看板，於是同一件事有**三份**而 TODO 是過期的那一份；**這就是委員已抓九次的同一個病**，只是漏的是 TODO 自己的進度、犯的人是主委。⇒ **本檔與 `白話說明/` 一律不再自寫批次狀態清單**，只指向 §B；每批收尾固定動作新增一項：**回去標 TODO §B 與該 Task 標題**。
@@ -117,7 +125,7 @@
 
 ## 待辦分流
 - **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
-- **下一步（技術，不問使用者）**：`review-r30`（O1–O5 閉合再驗證 ＋ v24 重簽）→ 收斂＋`debt_clear` → 進 `Task 9.3`（B9D）。
+- **下一步（技術，不問使用者）**：`review-r31`（P1–P4 閉合再驗證 ＋ v25 重簽）→ 收斂＋`debt_clear` → 進 `Task 9.3`（B9D）。
 
 - 🔴 **新發現的系統性缺口（具名殘留，`blocked-by`，**未**開新 epic）**：`docs/` 底下帶 `RECONCILE-STAMP` 的檔**沒有任何一份**能通過 `reconcile_stamps_check`——`gate.sh register-output` 原只收 `handoffs/`，而 provenance 要求審計中有指向被戳記檔**自身**的事件。本輪只把 `docs/SPLITUNIFY_SPEC.D-002.md` 加進既有封閉白名單 `scripts/stampable_artifacts.txt`（該檔正是為此型缺口而建）；`GAP3_EVENT_UX_SPEC.D-001.md`、`GAP3_EVENT_UX_TODO.D-001`..`D-006` **未一併加入**，因其戳記是否對應現行 body hash 未經查證，盲加＝把未驗證的背書寫成既成事實。另 `handoffs/reconcile/20260911-splitunify-x-review-r13/synth.md`（D-001 定案檔）之戳記 hash 與 HEAD body hash **不符**（戳記 `9e1ef3d1` vs 實際 `e3f2847d`），亦即「D-001 三家戳記定案」目前機械上是紅的。
 
