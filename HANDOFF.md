@@ -38,7 +38,11 @@
   - **D2（三家 P2）**：多 symbol 分支三計數無具名測試，省略 kwargs 後 summary 會靜默變 0 ⇒ 新增 `test_multi_symbol_branch_summary_counts_are_named`（逐值＋**明文擋 0 值**）。
   - 三家另否證主委兩條 assumed：golden 11 頂層鍵 `cmp` **逐位元組未變**；NaN 全欄 fail-closed **為預期**（不修）；cutoff 不同之多 TF **確會混態**但**屬 `Task 9.2b`**、本批不加第二份判側邏輯。
 - 🔴 **根因值得記（同一病第二次）**：`Task 9.1` 的 A4（探針檔沒跟著改）與本輪 D1（xfail 錨點沒補回）**是同一根因的兩次發作**——consult-r2 的「整批 REVERT」把東西一起還原了，而前進時**沒有逐項檢查「回退掉的哪些需要重建」**。⇒ 日後凡整批回退，須同時產出「回退清單 vs 需重建清單」對照。本輪已順手補掉 codex 掃出的第三個同型漏網（`handoffs/20260911-probe-splitunify-negative-injection.py`），不留第三次。
-- **下一步**：派 `review-r21` 做 D1／D2 閉合再驗證；三家確認後進 `Task 9.2b`（批次 **B9C**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
+⑲**review-r21 完成**：**r20 六條全數由原提出方 CLOSED**；composer／grok 零 finding proceed；codex 兩條新 P1 **全採納並修完**（`handoffs/reconcile/20260911-splitunify-b9-review-r21/synth.md`）：
+  - **E1**：xfail 錨點測試原寫 `pytest.raises(Exception, match=...)` **太寬**——①任何例外都算 xfail 過（連 fixture 自己壞掉）②`Task 9.2b` 落地時錯誤型別仍可被誤收。已收緊為 `AlignmentViolationError`（`momentum/core/contracts.py:933`，已存在）＋ match `e_x`。⇒ 9.2b 若用別型別或不帶 `event_id`，本測試**繼續紅**而非變 XPASS。**這正是主委在 brief assumed 自問的那條，該家判「是」並補出第二個理由。**
+  - **E2🔴 「文件舊段落落後於新實作」第三次發作**（R19 兩次在 SPEC、本次在 TODO）：`Task 2.2` 仍寫單選／每事件一列／12 鍵，後續實作者依舊段會**回退已完成行為**。三處已標 SUPERSEDED 並保留原字面。**主委同型自查另補一處該家沒點名的**：§E 之 `SU-RESID-2` 描述的正是 B9B 剛解掉的東西 ⇒ 已標**已關閉（2026-09-14，批次 B9B）**。
+- 🔴 **教訓（三次同形）**：凡改動契約面（簽章／預設值／鍵集／唯一性判準），須**全檔掃該契約的舊描述**並逐處標 superseded，不能只改當前 Task 段。
+- **下一步**：派 `review-r22` 做 E1／E2 閉合再驗證；三家確認後進 `Task 9.2b`（批次 **B9C**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v13，body sha256 `06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77`，仍為零戳記**。停輪依據＝`handoffs/reconcile/20260911-splitunify-b9-review-r12/synth.md`（唯一權威，本檔不複述）。

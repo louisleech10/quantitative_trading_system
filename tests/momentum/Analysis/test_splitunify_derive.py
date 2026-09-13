@@ -31,7 +31,7 @@ from momentum.Analysis.event_samples.types import (
     EventManifest,
     EventSplitConfig,
 )
-from momentum.core.contracts import SplitPlan
+from momentum.core.contracts import AlignmentViolationError, SplitPlan
 from momentum.core.split_preview import holdout_boundary
 
 H1 = 3_600_000
@@ -1632,7 +1632,13 @@ def test_multi_feature_tf_opposite_sides_must_fail_closed() -> None:
     ])
     # 🔴 manifest 維持**事件級**（一列一事件）——Task 9.2a 已修之 fixture 缺陷。
     man = _manifest(keys.drop_duplicates("event_id"))
-    with pytest.raises(Exception, match="同一事件|異側|同側|AlignmentViolation"):
+    # 🔴 R21 `CODEX-R21-P1-01` 收緊（原寫 `pytest.raises(Exception, match="同一事件|異側|同側|AlignmentViolation")`）：
+    #    ①`Exception` 太寬——任何例外都會讓它 xfail，連「fixture 自己壞掉」都算過；
+    #    ②寬 regex 使 `Task 9.2b` 落地時**錯誤型別仍可被誤收**。
+    #    改為釘死 `AlignmentViolationError`（`momentum/core/contracts.py:933`，`ValueError` 子類）
+    #    ＋訊息須含該 `event_id`（`D-002-C3` (3.2) 明定「訊息須含該 event_id」）。
+    #    ⇒ 9.2b 若用別的型別或不帶 event_id，本測試**不會**變成 XPASS，而是繼續紅——那是對的。
+    with pytest.raises(AlignmentViolationError, match="e_x"):
         derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
 
 
