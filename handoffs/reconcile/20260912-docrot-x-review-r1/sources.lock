@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "session_id": "20260912-docrot-x-review-r1",
+  "expected_roster": [
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260912-docrot-x-review-r1/sources/20260912-docrot-x-review-r1-composer.md",
+      "sha256": "9f00403e56259702c31ba60f0f924ec8cbab256a2308288a2f765ccbdb9059ef",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260912-docrot-x-review-r1/sources/20260912-docrot-x-review-r1-grok.md",
+      "sha256": "2b6705799a24f35d13c9436883d8f4ec31993c2aebff5c133caf942cef73af74",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-09-13T02:05:56Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "f672aa67-c73a-4e17-a8e7-566a05ef00f0"
+}
