@@ -142,13 +142,25 @@ def _event_keys(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
     #    實跑 `M3_SAME_SIDE_OUTPUT_ACCEPTED True` 且 golden 仍 `GOLDEN OK`。
     #    ⇒ 錨點時刻改由 `BASE`／`H1` 兩個 fixture 常數**逐筆手算**（不讀 `index`、不經邊界函式），
     #    任何時刻位移都會在 `main()` 的逐筆對帳上現形。
+    #    🔴 **v24 更正（R29 `CODEX-R29-P1-03`）：值改為不可變字面，不得由 `BASE`／`H1` 推導**。
+    #    r28 寫成 `BASE + n * H1`，而 `_feature_index()` 用的是**同兩個常數** ⇒ 仍有共因：
+    #    該家把 `BASE` 平移 17 毫秒，人手值與實際值**一起移動**，對帳照樣相等
+    #    （實跑 `N3_BASE_SHIFT_AFTER_EQUAL True`、delta `[17]`）。
+    #    寫死字面之後，動 `BASE`／`H1` 就會讓對帳立刻轉紅——那正是本欄存在的理由。
     _hand_decision = {
-        "tr0": BASE + 0 * H1, "tr1": BASE + 1 * H1, "tr2": BASE + 2 * H1, "tr3": BASE + 3 * H1,
-        "tr_leak": BASE + 139 * H1,
-        "gap1": BASE + 140 * H1, "gap2": BASE + 141 * H1,
-        "te0": BASE + 144 * H1, "te1": BASE + 145 * H1, "te2": BASE + 146 * H1,
-        "te3": BASE + 147 * H1, "te4": BASE + 148 * H1,
-        "bnd_shift": BASE + 0 * H1,
+        "tr0": 1700000000000,
+        "tr1": 1700003600000,
+        "tr2": 1700007200000,
+        "tr3": 1700010800000,
+        "tr_leak": 1700500400000,
+        "gap1": 1700504000000,
+        "gap2": 1700507600000,
+        "te0": 1700518400000,
+        "te1": 1700522000000,
+        "te2": 1700525600000,
+        "te3": 1700529200000,
+        "te4": 1700532800000,
+        "bnd_shift": 1700000000000,
     }
     return pd.DataFrame([
         {"event_id": e, "feature_cutoff_ms": c, "label_start_ms": d,
@@ -436,10 +448,29 @@ _V8_ANCHOR_RE = re.compile(r"^\s*`?V8_BASELINE_SHA256=([0-9a-f]{64})`?\s*$", re.
 
 
 def _read_v8_anchor_from_spec() -> Optional[str]:
-    """由 SPEC §V 讀出 `V8_BASELINE_SHA256=<64-hex>` 錨點；缺或多於一個即 None。"""
+    """由 SPEC **§V 區段內**讀出 `V8_BASELINE_SHA256=<64-hex>` 錨點；缺或多於一個即 None。
+
+    🔴 **v24 收窄（R29 `CODEX-R29-P1-02`）**：r28 的 regex 接受 SPEC **任意位置**，
+    於是在 `HISTORY` 區塞一行新錨點、再同步換掉 v8 與旁檔就能繞過
+    （該家實跑 `N2_SAME_COMMIT_REPLACED_SPEC_RC 0`）。現在只掃 §V 區段，
+    且**明文排除** `HISTORY-BEGIN..END` 與「## 沿革與追溯索引」節。
+    🔴 **誠實邊界（具名殘留 `SU-RESID-V8-ATTEST`）**：這只縮小了「塞在哪裡」，
+    **擋不住**「同一個 commit 同時改 §V 錨、v8、旁檔與本檔」——那需要受保護簽章或
+    不可變 ancestor attestation，屬**新建治理工具**（2026-09-12 使用者裁定不再擴建）。
+    該半留為具名殘留，不得讀作已關閉。
+    """
     if not _SPEC_PATH.exists():
         return None
-    hits = _V8_ANCHOR_RE.findall(_SPEC_PATH.read_text(encoding="utf-8"))
+    text = _SPEC_PATH.read_text(encoding="utf-8")
+    # 只取 §V 區段（到下一個「## 」標題或 HISTORY 為止）
+    start = text.find("§V")
+    if start < 0:
+        return None
+    for marker in ("<!-- HISTORY-BEGIN -->", "## 沿革與追溯索引"):
+        pos = text.find(marker)
+        if 0 <= pos:
+            text = text[:pos]
+    hits = _V8_ANCHOR_RE.findall(text[start:])
     return hits[0] if len(hits) == 1 else None
 
 
@@ -451,18 +482,34 @@ def create_v8_baseline_write_once(payload: bytes) -> int:
     """
     v8 = GOLDEN_DIR / "splitunify_golden.v8.json"
     sidecar = GOLDEN_DIR / "splitunify_golden.v8.sha256"
-    for path, data in ((v8, payload),
-                       (sidecar, (hashlib.sha256(payload).hexdigest() + "\n").encode())):
-        try:
+    # 🔴 **v24 更正（R29 `CODEX-R29-P1-04`）：兩檔要嘛都建、要嘛都不建**。
+    #    r28 逐一 `O_EXCL`：若旁檔先存在而主檔不存在，會留下**半套狀態**
+    #    （該家實跑 `V8_EXISTS True` 而 rc=1）。⇒ 先驗兩檔**皆不存在**，
+    #    再逐一建立；中途失敗則把已建的收回。
+    existing = [q.name for q in (v8, sidecar) if q.exists()]
+    if existing:
+        print(
+            f"GOLDEN V8 REFUSE: {existing} 已存在——v8 基準是 write-once，"
+            "不得重建（刪掉重建等同換掉 9B 前的錨點；fail-closed）。"
+            "🔴 兩檔須**同時**不存在才視為首次建立，避免半套狀態"
+        )
+        return 1
+    created: List[Path] = []
+    try:
+        for path, data in ((v8, payload),
+                           (sidecar, (hashlib.sha256(payload).hexdigest() + "\n").encode())):
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-        except FileExistsError:
-            print(
-                f"GOLDEN V8 REFUSE: {path.name} 已存在——v8 基準是 write-once，"
-                "不得重建（刪掉重建等同換掉 9B 前的錨點；fail-closed）"
-            )
-            return 1
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(data)
+            created.append(path)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+    except OSError as exc:
+        for q in created:            # 交易式回收：不留半套
+            try:
+                q.unlink()
+            except OSError:
+                pass
+        print(f"GOLDEN V8 REFUSE: 首次建立失敗並已回收（{exc}）")
+        return 1
     return 0
 
 
@@ -504,6 +551,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true", help="凍結／重凍（比對失敗時**不得**自動用）")
     ap.add_argument(
+        "--init-v8", action="store_true",
+        help="首次建立 v8 不可變基準與旁檔（兩檔皆不存在時才允許；write-once）",
+    )
+    ap.add_argument(
         "--accept-value-changes", default="",
         help=(
             "逗號分隔之既有頂層鍵清單；只有在此**逐一具名**的鍵才允許被 --write 改值。"
@@ -519,6 +570,26 @@ def main() -> int:
     #    （該家實跑 `NORMAL_MODE_RC 0`／`MATCHING_SIDECAR_ACCEPTED True`）。
     #    ⇒ 改為三層：①外部錨（本檔內之常數，與 golden 目錄**不同介質**，改它要動被 review 的碼）
     #    ②旁檔須與外部錨一致 ③檔案內容須與外部錨一致。三者任一不符即 fail-closed。
+    # 🔴 **v24 新增（R29 `CODEX-R29-P1-04`）：首次建立分支接進 `main()`**。
+    #    r28 只提供了 helper，`main()` 在 v8 缺席時一律 rc=1 ⇒ 「首建成功」這一半
+    #    **從來沒有可執行路徑**（該家實跑 `V8_CREATED False`）。
+    #    只有在**兩檔皆不存在**且明示 `--init-v8` 時才建立；平時缺檔仍 fail-closed。
+    _v8_path = GOLDEN_DIR / "splitunify_golden.v8.json"
+    _sc_path = GOLDEN_DIR / "splitunify_golden.v8.sha256"
+    if args.init_v8:
+        if _v8_path.exists() or _sc_path.exists():
+            print("GOLDEN V8 REFUSE: --init-v8 只用於首次建立，兩檔任一已存在即拒（write-once）")
+            return 1
+        if not golden_path.exists():
+            print("GOLDEN V8 REFUSE: --init-v8 需要既有主檔作為 9B 前之快照來源")
+            return 1
+        rc_init = create_v8_baseline_write_once(golden_path.read_bytes())
+        if rc_init:
+            return rc_init
+        print(
+            f"  ✓ 已建立 v8 不可變基準（{_v8_path.name} ＋ {_sc_path.name}）"
+            f"；🔴 請把其 sha256 逐字寫入 SPEC §V 之 `V8_BASELINE_SHA256=` 錨點行"
+        )
     rc = _assert_v8_baseline_intact()
     if rc:
         return rc
@@ -613,18 +684,47 @@ def main() -> int:
             #    🔴 **但「永遠不得改」會讓正當重凍（例如本批新增 `bnd_shift`）也無法進行** ⇒
             #    改為**顯式具名**：要動哪個既有鍵，就得在命令列逐一列出。
             #    這把「悄悄改掉」變成「必須寫下你要改哪一個」，是機械閘而非紀律。
-            _allowed = {k.strip() for k in (args.accept_value_changes or "").split(",") if k.strip()}
+            # 🔴 **v24 更正（R29 `CODEX-R29-P1-01`）：授權須帶 old→new digest，不得只列鍵名**。
+            #    r28 只驗鍵名 ⇒ 一旦具名，該鍵**任意**新值都能寫進去（該家實跑
+            #    `--accept-value-changes g4_per_symbol_n` 後把 13 改成 999，rc=0）。
+            #    也就是說「習慣性把所有鍵列上去」就等於沒有閘。
+            #    現行格式：`<key>=<old8>:<new8>`（各取該值 canonical JSON 之 sha256 前 8 碼）。
+            #    要授權就必須**先看過兩個值**並把 digest 貼進命令列——CLI 自己編不出來。
             _changed = sorted(k for k in (_prev_keys & _new_keys) if _prev.get(k) != actual.get(k))
+            _spec_items = [s.strip() for s in (args.accept_value_changes or "").split(",") if s.strip()]
+            _allowed: Dict[str, tuple] = {}
+            for _item in _spec_items:
+                if "=" not in _item or ":" not in _item.split("=", 1)[1]:
+                    print(
+                        f"GOLDEN REFUSE: --accept-value-changes 之項目 {_item!r} 格式不合"
+                        "——須為 `<key>=<old8>:<new8>`（只列鍵名不算授權；fail-closed）"
+                    )
+                    return 1
+                _k, _digs = _item.split("=", 1)
+                _o, _n = _digs.split(":", 1)
+                _allowed[_k] = (_o, _n)
             _unauthorised = [k for k in _changed if k not in _allowed]
             if _unauthorised:
+                _hint = ",".join(
+                    f"{k}={_sha(_prev.get(k))[:8]}:{_sha(actual.get(k))[:8]}" for k in _unauthorised
+                )
                 print(
                     f"GOLDEN REFUSE: --write 會改動既有頂層鍵之**值**：{_unauthorised}"
-                    "——golden 的值不得靜默改寫（fail-closed）。確認要改請逐一具名："
-                    f"`--accept-value-changes {','.join(_unauthorised)}`，"
-                    "並在 commit 訊息寫明理由與依據"
+                    "——golden 的值不得靜默改寫（fail-closed）。確認要改請帶 old→new digest："
+                    f"`--accept-value-changes {_hint}`，並在 commit 訊息寫明理由與依據"
                 )
                 return 1
-            _stale_allow = sorted(_allowed - set(_changed))
+            _digest_bad = [
+                k for k in _changed
+                if _allowed[k] != (_sha(_prev.get(k))[:8], _sha(actual.get(k))[:8])
+            ]
+            if _digest_bad:
+                print(
+                    f"GOLDEN REFUSE: --accept-value-changes 之 digest 與實際不符：{_digest_bad}"
+                    "——授權綁的是**那一次**的新舊值，不是那個鍵（fail-closed）"
+                )
+                return 1
+            _stale_allow = sorted(set(_allowed) - set(_changed))
             if _stale_allow:
                 print(
                     f"GOLDEN REFUSE: --accept-value-changes 列了未實際改變的鍵 {_stale_allow}"

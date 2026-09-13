@@ -568,11 +568,14 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
     ②`(3.2)` 異側 `AlignmentViolationError` 碼上不存在（屬 `Task 9.2b`）；
     ③判側仍 `feature_cutoff_ms`（屬 `Task 9.2b`）。
     ⇒ 本 Task **只**修 ①，該測試在 `Task 9.2b` 完成前**預期仍紅**，須以 `xfail(strict=True)` 明示、
+    （🔴 **SUPERSEDED BY `Task 9.2b`（B9C）；R29 `CODEX-R29-P1-05`**：9.2b 已落地，該 xfail **已解除**，
+    現行輸出為 `1 passed`。下方所有要求 `xfailed` 的字面僅適用於 **9.2b 之前**，不得據以驗收。）
     不得 `--deselect` 藏起來。
     🔴 **機械驗收（缺此則刪掉該測試也不會紅）**：node id 逐字為
     `tests/momentum/Analysis/test_splitunify_derive.py::test_multi_feature_tf_opposite_sides_must_fail_closed`；
-    驗收命令須**逐字指定該 node id**（見下方 §驗證第 6 條），且輸出須為 `xfailed`——
-    `passed`（＝XPASS，`strict=True` 下會轉 fail）與 `no tests ran`（＝被刪或被改名）皆判**不通過**。
+    驗收命令須**逐字指定該 node id**（見下方 §驗證第 6 條）；~~且輸出須為 `xfailed`——
+    `passed`（＝XPASS，`strict=True` 下會轉 fail）~~ 與 `no tests ran`（＝被刪或被改名）皆判**不通過**。
+    （🔴 **v24 更正（R29 `CODEX-R29-P1-05`）**：9.2b 落地後現行判準為 `1 passed`；`xfailed` 字面僅適用 9.2b 之前。）
 - 不可做：不得把 `clusters` 複製成多列（`w=1/n` 權重、簇計數與 golden 語意會失去定義）；
   不得為了統一而改兩道 guard 之**錯誤型別**（前端與既有測試有依賴）；
   不得把 `test_multi_feature_tf_opposite_sides_must_fail_closed` 用 `--deselect` 藏起來換綠。
@@ -587,7 +590,9 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   - `test_clusters_remain_event_level_when_multi_feature_tf`
   - 🔴 第 6 條（xfail 機械驗收，**逐字**）：
     `venv/bin/python -m pytest -rxX "tests/momentum/Analysis/test_splitunify_derive.py::test_multi_feature_tf_opposite_sides_must_fail_closed"`
-    ⇒ 輸出須含 `1 xfailed`；出現 `1 passed`（XPASS）或 `no tests ran`（被刪／改名）即**不通過**。
+    ⇒ ~~輸出須含 `1 xfailed`；出現 `1 passed`（XPASS）…即**不通過**~~ 🔴 **v24 更正（R29 `CODEX-R29-P1-05`）**：
+    `Task 9.2b` 完成後之現行判準為**輸出須含 `1 passed`**；`no tests ran`（被刪／改名）仍**不通過**
+    （node id 是逐字錨點）。舊字面僅適用於 9.2b 之前。
   - 🔴 **R20 三家撞題補一條**：`test_multi_symbol_branch_summary_counts_are_named`——多 symbol
     （Mapping）分支之 `n_events`／`n_event_tf_rows`／`n_event_tf_rows_purged` 逐值斷言，
     並**明文擋 0 值**（0 正是「三個 kwargs 被省略」時的樣子）。缺此條時省略那三個 kwargs
@@ -908,6 +913,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 | `R-4` | `extract_event_patterns` 無 **production** caller（測試 caller 8 處） | blocked-by | 本票只保證其消費之 `assignments` 語意不變；接線屬另一票 |
 | `R-5` | 事件掃描端取得 post-trim feature universe | needs-research | 要新增 `features_run_id` 跨棧參數（請求模型／前端／契約／UAT 全動），且 `EventImportService` 目前完全不碰 FF run ⇒ 超出本票；R2 之 D1 裁定事件掃描端恆走 event-study-only。日後實作**不得**刪除 Task 3.3 分支 |
 | `SU-RESID-2` **部分關閉（2026-09-14，批次 B9B）** | 多 TF 之 `(event_id, feature_timeframe)` 複合鍵 | blocked-by | 🔴 **producer／schema 面已關**：`Task 9.2`＋`9.2a` 使 producer 停止單選、輸出全量複合鍵列；`assignments`／`purged` 加 `feature_timeframe` 欄；兩道 guard 判準改複合鍵唯一。🔴 **側別錨定（`Task 9.2b`）亦已於批次 B9C 關閉**（R27 `GROK-R27-P1-02`：帳面未隨批次前進）——事件級 `decision_at_ms` 三段式已落地、`feature_cutoff_ms` 退出 `split_label`、(3.2) 異側與跨表混態皆 fail-closed。🔴 **尚未關閉者＝下游消費面**（`Task 9.3` 之九處逐處處置）；~~與側別錨定（`Task 9.2b`）~~ ⇒ 原文「複合鍵要連 `EventSplitPlan` 之下游一起改」現只剩消費面那一半。**為何現在不做**：`blocked-by:Task 9.3 尚未實作`——依賴序明定 `9.2a → 9.2b → 9.3`，不得跳。🔴 **本列狀態自 R22 `CODEX-R22-P1-01` 更正**：主委於 R21 依 `CODEX-R21-P1-02` 之同型掃描曾標「已關閉」（那次只點名 `Task 2.2`），R22 該家實查指出下游仍在 `Task 9.3` ⇒ 只能部分關閉 |
+| `SU-RESID-V8-ATTEST` | v8 不可變基準擋不住「同一 commit 同時改錨、改基準、改 helper」 | user-ruling | **已關閉的半**：錨點只認 §V 區段（`HISTORY`／沿革區塞入無效）、旁檔與檔案內容三層比對、`O_EXCL` write-once、首次建立交易式——五個攻擊面皆有實跑探針證明會擋。**未關閉的半**：具 repo 寫入權者在**單一 commit** 內同步替換四個檔，任何**倉內**機制都擋不住；要擋需受保護簽章或不可變 ancestor attestation。**為何現在不做**：`user-ruling:2026-09-12 使用者裁定「不再擴建治理工具；同型缺陷降級為具名殘留」`——且繞過成本（改四個檔）**低於**合規成本（導入並維護簽章鏈），依「繞過成本 ≥ 合規成本即收」歸**蓄意等價**。**觸發條件（可執行）**：專案導入 commit 簽章或受保護分支（`git config --get commit.gpgsign` 為 true，或 repo 有 branch protection）。**owner**：SPLITUNIFY epic 主委。🔴 **誠實邊界**：關閉前，「換錨是刻意的」之信任根實際是 **code review 與 git 歷史**，不是這幾道機械閘。詳見 `docs/SPLITUNIFY_SPEC.D-002.md` §N 同名條目 |
 | `SU-RESID-9A-UI` | 丟棄列數之**終端可見性**（API 回應欄位與前端顯示） | blocked-by | **為何現在不做**：`blocked-by:投影路徑無 EventSamplePipeline.run 生產接線（api/ 呼叫點=0）`——`D-002` Phase 9A 交付至 producer 層（`build_event_keys` 回傳 ＋ `EventSplitPlan.summary` 鍵；🔴 **v21 更正（R25，三家撞題）**：原寫「~~producer 回傳 → `EventSplitPlan.summary` → `metadata.split_unify`~~」，與 SPEC §N 同名條目之 v20 兩層交付、以及**本殘留自身**「metadata 層延後」之定義自相矛盾——R24 修了 SPEC §N 六處，**沒改本檔同名條目**），終端可見性須待投影路徑有生產接線後另票。**觸發條件（可執行）**：`grep -rc "EventSamplePipeline()\.run(\|create_event_sample_pipeline()\.run(" api --include='*.py'` 之命中數 **> 0**（現為 0）——🔴 **v11 作廢為唯一判準（R10 codex：該 regex 只匹配 inline constructor，漏掉 `pipeline = create_event_sample_pipeline(); pipeline.run(...)` 這種兩段式呼叫，真接上線也不會報；字面保留供追溯）**。**觸發條件（v11 可執行）**：以 AST 走訪 `api/` 全部 `.py`（排除 `tests/`）之 `Call` 節點，命中「method 名為 `run` 且 receiver 可追溯至 `EventSamplePipeline` 或 `create_event_sample_pipeline`、且實參含 canonical 邊界 `train_plan`／`test_plan`／`feature_index`」者，命中數 **> 0**。**recheck 命令**：`grep -rn "\.run(" api --include='*.py'`（廣掃全部 `.run(` 呼叫點為 AST 之超集，再逐筆判讀 receiver 與實參；**不得**用窄 regex 的零命中當「不存在」之證據）；**owner**：SPLITUNIFY epic 主委。🔴 **誠實邊界**：在本殘留解除前，「靜默丟棄」對終端使用者**仍然看不見**，`Task 9.1` 驗收不得宣稱該缺陷已消除。詳見 `docs/SPLITUNIFY_SPEC.D-002.md` §N 同名條目 |
 | `SU-RESID-1` | attribution checker 擋不住歸屬錯置 | 🔴 **2026-09-11 重判：不合格，現在做** | 原理由「需語意對應、屬研究」只對一半——**完整語意比對**做不到，但「收尾模式有未引用編號就擋」與「決議須逐字引用 finding 斷言」**做得到**。🔴 **回溯稽核實證其必要性**（`handoffs/run_receipts/splitunify-attribution-audit-20260911.txt`，本票 8 輪程式碼審查、57 條意見）：**3 條委員意見實質被主委弄丟，兩道檢查都沒響**——①`CODEX-R3-P3-04`（裸 KeyError）沒被任何決議引用、從沒修；②`GROK-R1-P2-02`（答案窗差 1 毫秒的 mutation 缺口）掛對決議但從沒補；③B2b R1 之 H6（`tier_min_test_events`）寫「列入 B3 Task 3.1」延後、之後消失——**投影路徑把使用者設定靜默換成 1**。三條已於同日修掉並各配 mutation（`M-SU-30`／`31`／`32`、`M-SU-B3-13`）。另查出兩個工具缺陷：`reconcile_cluster_attribution_check.sh` 在中文上 `cut -c` 截斷壞掉（大量「附錄斷言：（找不到）」）；`completeness_check` 只驗編號是否在收斂檔，而附錄本來就逐字保留全部原文 ⇒ **永遠不會失敗**。GROK-R1-P2-02 之另一半（改讀 `time_bounds[0]`）已被 B3 之同源對證變成**等價 mutant**（兩者被強制相等），不另加 |
 | `SU-RESID-3`（**B3 review R1 後大幅收窄**） | 同源對證只比**每段的首尾**時刻，不比中間每一列 | needs-research | 🔴 三家實跑證明的兩種攻擊（plan 建在較短網格＋長 index、index 同長度平移）**已於 B3 收斂時擋下**：以 `plan.time_bounds` 與傳入 `feature_index` 在該 plan 首尾列上逐值對證（型別驅動的單位分派，不猜；mutation `M-SU-B3-10`）。**殘留的是**：兩份網格若首尾時刻相同、僅中間間距不同，仍會通過——plan 身上只有 `time_bounds` 兩個端點，沒有逐列時刻可比。要關掉它需要 producer 隨 plan 傳完整時刻指紋（新欄位，動 IC 契約），屬 R-5／B4 之後 |

@@ -302,3 +302,77 @@ def test_write_refuses_silent_value_change_of_existing_keys() -> None:
         "缺既有鍵逐值閘之授權旗標 ⇒ 改值仍可靜默通過"
     )
     assert "_unauthorised" in src, "缺未授權改值之 fail-closed 分支"
+
+
+# ── 🔴 review-r29 之五條加強（`CODEX-R29-P1-01`..`P1-05`）────────────────────
+
+
+def test_value_change_authorisation_requires_old_new_digest() -> None:
+    """🔴 `--accept-value-changes` 須帶 `old8:new8`，只列鍵名不算授權（`CODEX-R29-P1-01`）。
+
+    出生理由：r28 只驗鍵名 ⇒ 一旦具名，該鍵**任意**新值都能寫進去（該家實跑把 13 改成 999
+    且 rc=0）。也就是說「習慣性把所有鍵都列上去」等於沒有閘。
+    🔴 這是主委**第三次**宣稱「偏離委員修法但等效」，三次都被實跑否證 ⇒ 本測試釘住格式。
+    """
+    import inspect
+
+    m = _fz_module()
+    src = inspect.getsource(m.main)
+    assert "<old8>:<new8>" in src or "_digest_bad" in src, (
+        "授權未綁 old→new digest ⇒ 具名即可任意改值"
+    )
+    assert "_digest_bad" in src, "缺 digest 不符之 fail-closed 分支"
+
+
+def test_v8_anchor_must_live_in_spec_section_v_not_history() -> None:
+    """🔴 錨點只認 **§V 區段內**，`HISTORY` 區塞一行不算（`CODEX-R29-P1-02`）。
+
+    出生理由：r28 的 regex 接受 SPEC **任意位置** ⇒ 在 `HISTORY` 塞新錨點、再同步換掉
+    v8 與旁檔即可繞過（該家實跑 `N2_SAME_COMMIT_REPLACED_SPEC_RC 0`）。
+    🔴 **誠實邊界**：本測試只證明「塞在哪裡」被收窄；**擋不住**「同一 commit 同時改
+    §V 錨、v8、旁檔與 helper」——那需要受保護簽章或不可變 ancestor attestation，
+    屬新建治理工具，已登記為具名殘留 `SU-RESID-V8-ATTEST`，**不得讀作已關閉**。
+    """
+    import inspect
+
+    m = _fz_module()
+    src = inspect.getsource(m._read_v8_anchor_from_spec)
+    assert "HISTORY-BEGIN" in src and "沿革" in src, (
+        "錨點掃描未排除 HISTORY／沿革區 ⇒ 塞在那裡也會被採信"
+    )
+    assert m._read_v8_anchor_from_spec() is not None
+
+
+def test_hand_decision_timestamps_are_immutable_literals() -> None:
+    """🔴 人手錨點時刻須為**不可變字面**，不得由 `BASE`／`H1` 推導（`CODEX-R29-P1-03`）。
+
+    出生理由：r28 寫成 `BASE + n * H1`，而 fixture 的實際時刻用的是**同兩個常數** ⇒
+    該家把 `BASE` 平移 17 毫秒，人手值與實際值**一起移動**、對帳照樣相等
+    （實跑 `N3_BASE_SHIFT_AFTER_EQUAL True`）。
+    """
+    import inspect
+
+    m = _fz_module()
+    src = inspect.getsource(m._event_keys)
+    seg = src[src.index("_hand_decision"):src.index("return pd.DataFrame")]
+    assert "BASE" not in seg and "H1" not in seg, (
+        "人手錨點時刻仍由 BASE／H1 推導 ⇒ 與 fixture 實際值共因，整批位移測不到"
+    )
+
+
+def test_v8_first_create_path_exists_and_is_transactional() -> None:
+    """🔴 首次建立須**接進 `main()`** 且兩檔為交易式（`CODEX-R29-P1-04`）。
+
+    出生理由：r28 只提供 helper，`main()` 在 v8 缺席時一律 rc=1 ⇒「首建成功」那一半
+    **從來沒有可執行路徑**（該家實跑 `V8_CREATED False`）；且逐一 `O_EXCL` 在旁檔先存在時
+    會留下**半套狀態**。
+    """
+    import inspect
+
+    m = _fz_module()
+    main_src = inspect.getsource(m.main)
+    assert "--init-v8" in main_src or "init_v8" in main_src, "首次建立未接進 main()"
+    create_src = inspect.getsource(m.create_v8_baseline_write_once)
+    assert "existing" in create_src and "unlink" in create_src, (
+        "首次建立非交易式 ⇒ 中途失敗會留半套狀態"
+    )
