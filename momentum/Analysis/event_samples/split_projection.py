@@ -25,6 +25,10 @@ from momentum.Analysis.event_samples.event_split import (
     time_cluster_bucket_ms,
 )
 from momentum.Analysis.event_samples.types import AlignmentReceipts, EventManifest, EventSplitPlan
+# 🔴 D-002 `Task 9.2b` (3.2)：異側／混態之 fail-closed 一律用 `AlignmentViolationError`
+#    （`ValueError` 子類）——不得沿用裸 `ValueError`，否則呼叫端分不出「資料壞掉」與
+#    「實作退回了各 feature TF 自行判側」這兩件事（R21 `CODEX-R21-P1-01` 把錨點測試釘死在此型別）。
+from momentum.core.contracts import AlignmentViolationError
 from momentum.core.split_preview import (
     assert_epoch_ms_array,
     assert_positional_rows,
@@ -385,6 +389,47 @@ def _assert_event_keys_wellformed(event_keys: pd.DataFrame) -> None:
         )
 
 
+def _assert_event_level_side_consistency(
+    assign_rows: List[dict], purge_rows: List[dict]
+) -> None:
+    """`D-002-C3` (3.2)：同一事件恆同側，否則 `AlignmentViolationError`（SPEC `§P Task 9.2b`）。
+
+    🔴 **兩道分離的檢查，缺一不可**：
+      1. `assignments` 內按 `event_id` 分組，`split_label` 須唯一——擋「一列 train、一列 test」。
+      2. **跨表互斥**：`set(purged.event_id) ∩ set(assignments.event_id) == ∅`——擋「一列進
+         `purged`、另一列進 `assignments`」。🔴 這一道不能省：`purged` **沒有** `split_label`
+         欄，第 1 道結構上抓不到這種混態（R6 三家獨立撞題）。
+      🔴 **不得**以擴充 `split_label` 值域（新增 `PURGED` 之類）替代——那會動到已戳記之封閉
+      值集與前端枚舉面。
+
+    🔴 **獨立函式而非 inline**：SPEC §V `:270` 之 (3.2) 反例逐字為「**直接構造 `assignments`**
+    使同一 `event_id` 之兩列異側 THEN raise」——測試要能直接構造那個狀態，檢查就必須有
+    可單獨呼叫的入口。inline 在迴圈裡則該反例**無碼可打**。
+
+    🔴 訊息**須含該 `event_id`**（`D-002-C3` (3.2) 明定）；且**不得**靜默取一側、
+    **不得**改判 purged（purge 會把實作缺陷偽裝成正常的樣本流失）。
+    """
+    sides_by_event: Dict[Any, set] = {}
+    for row in assign_rows:
+        sides_by_event.setdefault(row["event_id"], set()).add(row["split_label"])
+    mixed = sorted(eid for eid, labels in sides_by_event.items() if len(labels) > 1)
+    if mixed:
+        raise AlignmentViolationError(
+            f"derive_event_split_from_plans: 事件 {mixed[:5]} 之 feature TF 列被判到**異側**"
+            "——(3.1) 事件級錨定落地後這不可能由合法資料產生，代表實作退回了"
+            "「各 feature TF 自行判側」；不靜默取一側、不改判 purged（fail-closed）"
+        )
+    assigned_ids = {row["event_id"] for row in assign_rows}
+    purged_ids = {row["event_id"] for row in purge_rows}
+    straddling = sorted(assigned_ids & purged_ids)
+    if straddling:
+        raise AlignmentViolationError(
+            f"derive_event_split_from_plans: 事件 {straddling[:5]} 同時出現在 assignments 與 "
+            "purged——同一事件的不同 feature TF 列落到不同容器即為混態；`purged` 無 "
+            "`split_label`，分組檢查抓不到這一種，故須本跨表互斥閘（fail-closed）"
+        )
+
+
 def _derive_single_symbol(
     train_plan: Any,
     test_plan: Any,
@@ -585,9 +630,17 @@ def _derive_single_symbol(
     #    ⇒ 以 plan 自己帶的 `time_bounds` 與**傳入的** `feature_index` 在該 plan 之
     #    首尾列上逐值對證。三家提的修法都是這個形狀，且**不動** `base_universe_hash` 的輸入
     #    （改它會移動既有 IC golden digest）。
+    # 🔴 D-002 `Task 9.2b` 步驟 0（stamp-r5 三家一致裁定）：**兩段皆非空**。
+    #    原本此處對空段 `continue`（註解寫「train 可為空（極端切分）」）是 9.2b 前的遺留——
+    #    事件級錨定要讀 `train_last_ms = index_ms[train_rows[-1]]`，空 train 會 IndexError；
+    #    三家一致裁定**不得**定義哨兵或 fallback，而是在此 fail-closed
+    #    （`EventSamplePipeline.run` 之 `validate_split_pair_integrity` 是第一道，本處是投影端第二道）。
+    if train_rows.size == 0:
+        raise ValueError(
+            f"{_REASON_MISSING_TRAIN}: train_plan.row_index 為空"
+            "——事件級錨定需要 train 段末刻度，空段無 `train_last_ms` 可定義（fail-closed）"
+        )
     for plan, rows, label in ((train_plan, train_rows, "train"), (test_plan, test_rows, "test")):
-        if rows.size == 0:
-            continue  # train 可為空（極端切分）；空段沒有首尾可對，交由上面的長度閘
         lo, hi = _plan_bounds_as_ms(plan, label=label)
         actual_lo, actual_hi = int(index_ms[rows[0]]), int(index_ms[rows[-1]])
         if (lo, hi) != (actual_lo, actual_hi):
@@ -598,46 +651,113 @@ def _derive_single_symbol(
                 "（fail-closed；`base_universe_hash` 只是字面，擋不住這件事）"
             )
 
-    train_ms = set(index_ms[train_rows].tolist())
-    test_ms = set(index_ms[test_rows].tolist())
+    # 🔴 D-002 `Task 9.2b`（(3.1) 之唯一落地處）：側別改由**事件級** `decision_at_ms` 錨定。
+    #    `train_last_ms` 為新增；`test_start_ms` 沿用。兩者皆取自傳入的 `feature_index`
+    #    ——與 plan 同源已由上方指紋閘與 `time_bounds` 對證保證。
+    train_last_ms = int(index_ms[train_rows[-1]])
     test_start_ms = int(index_ms[test_rows[0]])
+    index_lo_ms, index_hi_ms = int(index_ms[0]), int(index_ms[-1])
+    # 🔴 步驟 0 之「row set 不重疊」在投影端的**時間面**體現：三段式判準以 `train_last_ms`
+    #    與 `test_start_ms` 為兩個閉端點，若 `test_start_ms <= train_last_ms`，第一、二條
+    #    分支會**同時成立**，順序便成了靜默的 tie-breaker（先判 train 就全進 train）。
+    #    ⇒ 兩段重疊必須在這裡 fail-closed，不得靠分支順序吃掉。
+    #    （`EventSamplePipeline.run` 之 `validate_split_pair_integrity` 是第一道；本處是
+    #    投影端第二道，涵蓋直接呼叫 `derive_event_split_from_plans` 的路徑。）
+    if test_start_ms <= train_last_ms:
+        raise ValueError(
+            "derive_event_split_from_plans: train 段末刻度 "
+            f"{train_last_ms} 不早於 test 段起點 {test_start_ms}——兩段在時間上重疊，"
+            "三段式判準之前兩條會同時成立而由分支順序靜默決定側別（fail-closed）"
+        )
+
+    # 🔴 錨定來源＝`manifest.table`（事件級、欄已存在），**不是** `event_keys`
+    #    （stamp-r5 三家一致：`decision_at_ms` 不得加入 `EVENT_KEY_COLUMNS`、不得改
+    #    `build_event_keys` 之 merge——主委原本的假設被 SPEC §P `Task 9.2b` 原文否證）。
+    #    `manifest.table` 之 `event_id` 唯一已由上方 `man_dupes` 閘保證，故此處是 1:1 lookup。
+    if "decision_at_ms" not in manifest.table.columns:
+        raise ValueError(
+            "derive_event_split_from_plans: manifest.table 缺 decision_at_ms 欄"
+            "——事件級錨定沒有它就退化回 per-cutoff 判側（fail-closed）"
+        )
+    _anchor_tbl = manifest.table[["event_id", "decision_at_ms"]]
+    assert_epoch_ms_array(
+        np.asarray(_anchor_tbl["decision_at_ms"]),
+        role="derive_event_split_from_plans: manifest.table.decision_at_ms",
+    )
+    # 🔴 防禦閘（stamp-r5 三家一致之③）：同一 `event_id` 之 `decision_at_ms` 去重數 > 1 ⇒
+    #    錨點本身不唯一，側別無定義。正規路徑結構上不可達（manifest 已唯一），但若日後有人
+    #    把該欄帶上 per-TF 列再合流，這裡是唯一能擋住的地方。**不得**靜默取首列或改判 purged。
+    _anchor_nuniq = _anchor_tbl.groupby("event_id")["decision_at_ms"].nunique()
+    _bad_anchor = sorted(_anchor_nuniq[_anchor_nuniq > 1].index.tolist())
+    if _bad_anchor:
+        raise AlignmentViolationError(
+            "derive_event_split_from_plans: 事件 "
+            f"{_bad_anchor[:5]} 之 decision_at_ms 不唯一——事件級錨點必須單值，"
+            "取首列會讓同事件的不同 feature TF 落到不同側（fail-closed）"
+        )
+    anchor_by_event: Dict[Any, int] = {
+        eid: int(v) for eid, v in
+        _anchor_tbl.drop_duplicates("event_id").itertuples(index=False, name=None)
+    }
+
+    # 🔴 步驟 0 之界外閘：`index_ms[0] <= decision_at_ms <= index_ms[-1]`，任一不滿足即 raise
+    #    （訊息含 `event_id`）。**不得**寫成第四條分類分支——寫成分支就等於恢復重疊，
+    #    越界事件會被合法分到 train／test（TODO `Task 9.2b` 不可做第二條）。
+    _out_of_range = sorted(
+        eid for eid, d in anchor_by_event.items() if not (index_lo_ms <= d <= index_hi_ms)
+    )
+    if _out_of_range:
+        raise ValueError(
+            f"derive_event_split_from_plans: 事件 {_out_of_range[:5]} 之 decision_at_ms 落在 "
+            f"feature_index 之外（[{index_lo_ms}, {index_hi_ms}]）"
+            "——界外不是一種側別，不得分類（fail-closed）"
+        )
+
+    # 🔴 三段式判準，順序不得調換（TODO `Task 9.2b` 實作要點 2）：
+    #    `<= train_last_ms` ⇒ train；`>= test_start_ms` ⇒ test；介於兩者之間 ⇒ purged。
+    #    邊界取**閉區間**：`== train_last_ms` ⇒ train、`== test_start_ms` ⇒ test。
+    #    🔴 `feature_cutoff_ms` **不參與** `split_label`（不可做第一條）。
+    def _side_of(decision_ms: int) -> str:
+        if decision_ms <= train_last_ms:
+            return "train"
+        if decision_ms >= test_start_ms:
+            return "test"
+        return "purged"  # 隔離帶：合法且預期，不得 raise（邊界①）
+
+    # 🔴 答案窗 purge 按**事件側**一次決定並廣播（實作要點 4）——不再逐列 `in_train`。
+    #    逐列觸發正是混態（同事件一列進 purged、另一列進 assignments）的來源。
+    event_state: Dict[Any, str] = {}
+    for eid, decision_ms in anchor_by_event.items():
+        side = _side_of(decision_ms)
+        if side == "train":
+            # 答案窗跨進 test 段起點 ⇒ 整個事件 purged（保留 `event_split.py:114` 之既有語意）。
+            label_end = int(event_keys.loc[event_keys["event_id"] == eid, "label_end_ms"].max())
+            if label_end >= test_start_ms:
+                side = "purged"
+        event_state[eid] = side
 
     assign_rows: List[dict] = []
     purge_rows: List[dict] = []
     for rec in event_keys.to_dict("records"):
-        cutoff = int(rec["feature_cutoff_ms"])
-        in_train = cutoff in train_ms
-        in_test = cutoff in test_ms
-        if in_train and in_test:
-            raise ValueError(
-                f"derive_event_split_from_plans: 事件 {rec['event_id']!r} 同時落在 train 與 test"
-                "——不應發生，fail-closed 不靜默取一"
-            )
-        # ── 第一段：答案窗 purge（優先於一切）──
-        if in_train and int(rec["label_end_ms"]) >= test_start_ms:
+        # 🔴 廣播：側別由事件決定，該 `event_id` 之**所有** feature TF 列同進同一容器
+        #    （實作要點 3）。
+        side = event_state[rec["event_id"]]
+        if side == "purged":
             # 🔴 D-002 `Task 9.2a`：purge 側同樣是複合鍵粒度；缺此欄則同事件多 feature TF
-            #    在 `purged` 裡無法區分，且 `Task 9.2b` 之跨表互斥檢查會抓不到混態。
+            #    在 `purged` 裡無法區分，且下方跨表互斥檢查會抓不到混態。
             purge_rows.append({
                 "event_id": rec["event_id"], "reason": _PURGE_REASON,
                 "feature_timeframe": rec["feature_timeframe"],
             })
-            continue
-        # ── 第二段：集合成員判定 ──
-        if in_test:
-            assign_rows.append(
-                {"event_id": rec["event_id"], "symbol": rec["symbol"], "split_label": "test",
-                 "feature_timeframe": rec["feature_timeframe"]}
-            )
-        elif in_train:
-            assign_rows.append(
-                {"event_id": rec["event_id"], "symbol": rec["symbol"], "split_label": "train",
-                 "feature_timeframe": rec["feature_timeframe"]}
-            )
         else:
-            purge_rows.append({
-                "event_id": rec["event_id"], "reason": _PURGE_REASON,
-                "feature_timeframe": rec["feature_timeframe"],
-            })
+            assign_rows.append(
+                {"event_id": rec["event_id"], "symbol": rec["symbol"], "split_label": side,
+                 "feature_timeframe": rec["feature_timeframe"]}
+            )
+
+    # 🔴 `D-002-C3` (3.2) 之 fail-closed（實作要點 5＋6）：在寫入兩容器**之前**檢查。
+    #    兩道分離、缺一不可——`purged` 無 `split_label`，只靠分組檢查結構上抓不到跨表混態。
+    _assert_event_level_side_consistency(assign_rows, purge_rows)
 
     # 🔴 D-002 `Task 9.2a`：兩表皆升為複合鍵粒度，欄含 `feature_timeframe`。
     assignments = pd.DataFrame(

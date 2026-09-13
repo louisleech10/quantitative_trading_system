@@ -91,24 +91,44 @@ def _plans(index: pd.Index):
 
 
 def _event_keys(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
-    """固定 12 筆：train 段 5（其中 1 筆答案窗跨界）、隔離區 2、test 段 5。"""
+    """固定 13 筆：train 段 5（其中 1 筆答案窗跨界）、隔離區 2、test 段 5、**邊界 1**。
+
+    🔴 **D-002 `Task 9.2b` 前置工作（(G-4d)③）**：第 13 筆 `bnd_shift` 之
+    `decision_at_ms` **刻意不等於** `feature_cutoff_ms`。沒有它，(G-4d)②③ 是**空心通過**
+    ——前 12 筆的兩值恆等，於是「換錨會不會位移」這件事在 golden 上**一筆都測不到**
+    （R9 兩家撞題指出的正是這個）。
+    `bnd_shift` 的 cutoff 落在 **test 段**、decision 落在 **train 段**：
+    9.2b 前（per-cutoff）判 test、9.2b 後（事件級錨定）判 train ⇒ 換錨的行為差異在此**現形**。
+    """
     tr, te = b["train_row_index"], b["test_row_index"]
     test_start = int(index[te[0]])
-    rows: List[dict] = []
+    rows: List[tuple] = []
     for i, pos in enumerate(tr[:4]):
-        rows.append((f"tr{i}", int(index[pos]), int(index[pos]) + H1))
-    rows.append(("tr_leak", int(index[tr[-1]]), test_start))          # 答案窗恰好觸到 ⇒ purge
+        rows.append((f"tr{i}", int(index[pos]), int(index[pos]) + H1, int(index[pos])))
+    # 答案窗恰好觸到 ⇒ purge
+    rows.append(("tr_leak", int(index[tr[-1]]), test_start, int(index[tr[-1]])))
     for i in (1, 2):                                                   # 隔離區
-        rows.append((f"gap{i}", int(index[tr[-1]]) + i * H1, int(index[tr[-1]]) + (i + 2) * H1))
+        _c = int(index[tr[-1]]) + i * H1
+        rows.append((f"gap{i}", _c, int(index[tr[-1]]) + (i + 2) * H1, _c))
     for i, pos in enumerate(te[:5]):
-        rows.append((f"te{i}", int(index[pos]), int(index[pos]) + H1))
+        rows.append((f"te{i}", int(index[pos]), int(index[pos]) + H1, int(index[pos])))
+    # 🔴 (G-4d)③ 之邊界事件：cutoff 在 test 段、decision 在 train 段（兩值**不等**）。
+    rows.append((
+        "bnd_shift",
+        int(index[te[1]]),              # feature_cutoff_ms（test 段）
+        int(index[tr[0]]) + H1,         # label_end_ms（不跨進 test 段，避免與答案窗 purge 糾纏）
+        int(index[tr[0]]),              # decision_at_ms（train 段）
+    ))
     # 🔴 D-002 `Task 9.2`：`event_keys` 行粒度已改為 `(event_id, feature_timeframe)`，
     #    本 fixture 補上該欄。**本批刻意維持單一 feature TF**（`1h`）⇒ 複合鍵退化為
-    #    `event_id`、golden 之既有值**逐值不變**；擴維為多 feature TF 平行組屬 `Task 9.5`。
+    #    `event_id`；擴維為多 feature TF 平行組屬 `Task 9.5`。
+    # 🔴 `label_start_ms` 綁 `decision_at_ms`（事件級），**不再**綁逐列 cutoff——
+    #    兩值解耦後再綁 cutoff 會造出「答案窗早於決策時刻」的假資料。
     return pd.DataFrame([
-        {"event_id": e, "feature_cutoff_ms": c, "label_start_ms": c,
-         "label_end_ms": le, "symbol": SYM, "timeframe": "1h", "feature_timeframe": "1h"}
-        for e, c, le in rows
+        {"event_id": e, "feature_cutoff_ms": c, "label_start_ms": d,
+         "label_end_ms": le, "symbol": SYM, "timeframe": "1h", "feature_timeframe": "1h",
+         "decision_at_ms": d}
+        for e, c, le, d in rows
     ])
 
 
@@ -117,7 +137,9 @@ def _manifest(keys: pd.DataFrame) -> EventManifest:
         table=pd.DataFrame({
             "event_id": keys["event_id"], "symbol": keys["symbol"],
             "timeframe": keys["timeframe"],
-            "decision_at_ms": keys["feature_cutoff_ms"].astype("int64"),
+            # 🔴 `Task 9.2b`：錨點**獨立於** `feature_cutoff_ms`（原本兩者同值，
+            #    使「換錨」在 golden 上不可觀測）。
+            "decision_at_ms": keys["decision_at_ms"].astype("int64"),
             "label_start_ms": keys["label_start_ms"].astype("int64"),
             "label_end_ms": keys["label_end_ms"].astype("int64"),
         }),
@@ -136,25 +158,33 @@ def _sha(payload: Any) -> str:
 def _oracle_membership(index: pd.Index, b: Dict[str, Any], keys: pd.DataFrame) -> Dict[str, list]:
     """直接由 `feature_index[row_index]` 投影出成員集合——與被測函式無因果關係。
 
-    🔴 刻意**逐行重寫**兩段式規則（不 import 投影）：oracle 的價值就在於它是**第二份推導**，
+    🔴 刻意**逐行重寫**規則（不 import 投影）：oracle 的價值就在於它是**第二份推導**，
     共用實作就退化成同義反覆（B2b review `CODEX-R1-P2-05` 之教訓）。
+
+    🔴 **`Task 9.2b` 同步以 decision-anchor 逐行重寫**（SPEC (G-4c)）：本 oracle 原本走
+    per-cutoff 集合成員；9.2b 之後投影端改事件級三段式，若 oracle 不跟著改，`main()` 每次
+    都驗的 **G-3b** 會恆紅而失去「換錨 vs 寫錯」的鑑別力。改寫後它自動成為那道區分閘：
+    照 9.2b 規則重推 ⇒ 與投影一致；有人把 cutoff 判側加回去 ⇒ 立刻不一致。
     """
     ms = np.asarray(index, dtype="int64")
-    train_ms = set(ms[np.asarray(b["train_row_index"], dtype=int)].tolist())
-    test_ms = set(ms[np.asarray(b["test_row_index"], dtype=int)].tolist())
-    test_start = int(ms[int(np.asarray(b["test_row_index"], dtype=int)[0])])
+    tr_rows = np.asarray(b["train_row_index"], dtype=int)
+    te_rows = np.asarray(b["test_row_index"], dtype=int)
+    train_last = int(ms[int(tr_rows[-1])])
+    test_start = int(ms[int(te_rows[0])])
     train, test, purged = [], [], []
     for rec in keys.to_dict("records"):
-        cut, end = int(rec["feature_cutoff_ms"]), int(rec["label_end_ms"])
-        in_train, in_test = cut in train_ms, cut in test_ms
-        if in_train and end >= test_start:
-            purged.append(rec["event_id"])
-        elif in_test:
-            test.append(rec["event_id"])
-        elif in_train:
-            train.append(rec["event_id"])
+        decision, end = int(rec["decision_at_ms"]), int(rec["label_end_ms"])
+        # 三段式（逐行重寫，順序與投影端條文一致）
+        if decision <= train_last:
+            side = "train"
+        elif decision >= test_start:
+            side = "test"
         else:
-            purged.append(rec["event_id"])
+            side = "purged"
+        # 答案窗 purge：僅對 train 側事件；跨進 test 段起點即整事件 purged
+        if side == "train" and end >= test_start:
+            side = "purged"
+        {"train": train, "test": test, "purged": purged}[side].append(rec["event_id"])
     return {"train": sorted(train), "test": sorted(test), "purged": sorted(purged)}
 
 
@@ -176,15 +206,23 @@ def _build_actual() -> Dict[str, Any]:
     fingerprint_rows = [
         [int(p), int(ms[p]), SYM, "splitunify-golden"] for p in test_rows
     ]
+    _membership = {
+        "train": sorted(a.loc[a["split_label"] == "train", "event_id"]),
+        "test": sorted(a.loc[a["split_label"] == "test", "event_id"]),
+        "purged": sorted(plan.purged["event_id"]),
+    }
+    _oracle = _oracle_membership(index, b, keys)
     return {
         # G-1
-        "g1_membership": {
-            "train": sorted(a.loc[a["split_label"] == "train", "event_id"]),
-            "test": sorted(a.loc[a["split_label"] == "test", "event_id"]),
-            "purged": sorted(plan.purged["event_id"]),
-        },
+        "g1_membership": _membership,
+        # 🔴 **(G-4d)① 版本化新鍵**（`Task 9.2b`）：9B 之後的成員集合與 v8 不同批
+        #    （fixture 多了 `bnd_shift`、判側改事件級錨定）⇒ 用**新鍵**承載，
+        #    `splitunify_golden.v8.json` 保持不可覆寫之 9B 前錨點。
+        #    兩鍵並存的用途：`M-SU-D2-27`／`M-SU-D2-28` 改壞判準時**兩者同時轉紅**。
+        "g1_membership_v9": _membership,
+        "g3b_oracle_v9": _oracle,
         # G-3b oracle（獨立推導）
-        "g3b_oracle": _oracle_membership(index, b, keys),
+        "g3b_oracle": _oracle,
         # G-4 per-symbol counts（整數逐值相等）
         "g4_per_symbol_n": {k: int(v) for k, v in plan.summary["per_symbol_n"].items()},
         # G-5①
@@ -374,6 +412,22 @@ def main() -> int:
     print("  ✓ G-5④：注入跨界之 train 事件確實進 purged")
 
     if args.write:
+        # 🔴 **(G-4d)① `--write` 對 v8 基準一律拒寫**（`Task 9.2b`）：`splitunify_golden.v8.json`
+        #    是 9B **之前**的不可變錨點，用來證明「換錨」的行為差異是刻意的而不是寫壞的。
+        #    它一旦能被重凍，那個證明就消失了 ⇒ 在此 fail-closed，且不提供旗標繞過。
+        _v8 = GOLDEN_DIR / "splitunify_golden.v8.json"
+        _v8_sha = GOLDEN_DIR / "splitunify_golden.v8.sha256"
+        if golden_path.resolve() == _v8.resolve():
+            print("GOLDEN REFUSE: splitunify_golden.v8.json 為不可變基準，禁止 --write 覆寫")
+            return 1
+        if _v8.exists() and _v8_sha.exists():
+            _cur = hashlib.sha256(_v8.read_bytes()).hexdigest()
+            if _cur != _v8_sha.read_text(encoding="utf-8").strip():
+                print(
+                    "GOLDEN CORRUPT: splitunify_golden.v8.json 之 sha256 與 .v8.sha256 不符"
+                    "——不可變基準被改過，換錨證明失效（fail-closed）"
+                )
+                return 1
         golden_path.write_text(
             json.dumps({"_doc": "SPLITUNIFY B2c golden（SPEC §G）。改動須經 review。",
                         **actual}, ensure_ascii=False, indent=2) + "\n",

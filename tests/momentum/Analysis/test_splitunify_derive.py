@@ -25,6 +25,9 @@ from momentum.Analysis.event_samples.split_projection import (
     build_event_keys,
     build_time_clusters,
     derive_event_split_from_plans,
+    # 🔴 D-002 `Task 9.2b`：SPEC §V 之 (3.2) 反例逐字為「**直接構造 `assignments`**
+    #    使同一 `event_id` 之兩列異側 THEN raise」⇒ 該檢查必須有可單獨呼叫的入口。
+    _assert_event_level_side_consistency,
 )
 from momentum.Analysis.event_samples.types import (
     AlignmentReceipts,
@@ -298,13 +301,16 @@ def test_answer_window_not_applied_to_test_side_events() -> None:
 
 # ── 第二段：集合成員判定（M-SU-4／M-SU-5）────────────────────────────────
 def test_membership_set_not_interval() -> None:
-    """🔴 成員判定必須是**集合**，不是 `time_bounds` 閉區間（`M-SU-4`）。
+    """🔴 **D-002 `Task 9.2b` 起：落在 post-trim 洞裡的事件判 `train`，不再 purged。**
 
-    設計理由（第一版沒抓到 mutation 的教訓）：train rows 是**連續**的，所以在**無洞**的
-    feature_index 上「區間」與「集合」等價，怎麼測都分不出來。真正能分辨的是
-    **post-trim 之後 index 有洞**的情形——那正是本票的實際場景（EVTALIGN 會裁掉列）。
-    這裡刻意做一個中間缺了一段的 index：事件時間戳落在**洞裡**（仍在 train 的
-    `time_bounds` 之內）⇒ 集合語意判 purged、區間語意會誤判成 train。
+    本測試原名之語意（「成員判定必須是集合，不是 `time_bounds` 閉區間」，`M-SU-4`）
+    **已被 9.2b 取代**：側別改由事件級 `decision_at_ms` 與 `train_last_ms`／`test_start_ms`
+    做**三段式比較**，`feature_cutoff_ms` 不再參與 `split_label`（TODO `Task 9.2b`
+    不可做第一條）。集合成員語意連同「洞裡 ⇒ purged」一起移除。
+
+    🔴 **保留本測試而非刪除**（R20 之 D1 教訓：刪測換綠）：斷言**反轉並具名**，
+    它現在守的是**新契約**——洞裡的事件因 `decision_at_ms <= train_last_ms` 而進 train。
+    若日後有人把集合成員判定加回去，本測試會立刻轉紅。
     """
     full = _feature_index()
     hole = list(range(30, 40))  # 挖掉 train 段中間 10 根
@@ -318,17 +324,27 @@ def test_membership_set_not_interval() -> None:
     plan = derive_event_split_from_plans(
         train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
     )
-    assert list(plan.purged["event_id"]) == ["e_hole"], (
-        "落在 post-trim 洞裡的事件必須 purged——判成 train 表示實作用了區間而非集合"
+    assert plan.purged.empty, (
+        "9.2b 後不得再以「cutoff 不在集合中」判 purged——purged 只剩隔離帶與答案窗跨界兩種"
     )
-    assert plan.assignments.empty
+    assert list(plan.assignments["event_id"]) == ["e_hole"]
+    assert list(plan.assignments["split_label"]) == ["train"], (
+        "decision_at_ms <= train_last_ms ⇒ train；判成別的表示三段式判準被改壞"
+    )
 
 
 def test_dual_membership_raises_not_silent_pick() -> None:
-    """🔴 同時落在 train 與 test ⇒ raise，不靜默取一（`M-SU-6`）。
+    """🔴 train／test 兩段重疊 ⇒ raise，不由分支順序靜默決定側別（`M-SU-6`）。
 
     設計理由：正常 plan 的 train/test 列集互斥，那道 raise 在正常輸入下**永遠走不到**，
     所以第一版測不出來。本測試餵**刻意重疊**的 plan——那是防禦性分支存在的唯一理由。
+
+    🔴 **D-002 `Task 9.2b` 改寫**（原斷言 `match="同時落在 train 與 test"`）：舊版擋的是
+    「同一個 `feature_cutoff_ms` 同時是 train 與 test 的成員」，而 9.2b 已**移除**以
+    `feature_cutoff_ms` 決定 `split_label` 的分支（TODO `Task 9.2b` 不可做第一條）。
+    同一個缺陷在新契約下的形態是**時間面重疊**：`test_start_ms <= train_last_ms` 會讓
+    三段式的前兩條同時成立，於是「先判 train」變成靜默的 tie-breaker。
+    本測試改打那道新閘——**防禦意圖不變，斷言隨契約遷移**（不是刪測換綠）。
     """
     index, train, _, _, _, _ = _basic_case()
     tr = np.asarray(train.row_index, dtype=int)
@@ -344,22 +360,33 @@ def test_dual_membership_raises_not_silent_pick() -> None:
         symbol=SYM,
     )
     keys = _event_keys([("e_dual", index[tr[0]], int(index[tr[0]]) + H1)])
-    with pytest.raises(ValueError, match="同時落在 train 與 test"):
+    with pytest.raises(ValueError, match="兩段在時間上重疊"):
         derive_event_split_from_plans(
             train, overlapping_test, keys, index, manifest=_manifest(keys), bucket_ms=H1
         )
 
 
 def test_unmatched_timestamp_is_purged_not_train() -> None:
-    """完全不在 `feature_index` 上的事件（被裁掉、或落在兩根 bar 之間）⇒ purged，禁 nearest。"""
+    """🔴 **D-002 `Task 9.2b` 起：落在兩根 bar 之間的事件依三段式比較歸側，不再 purged。**
+
+    原語意（「不在 `feature_index` 上 ⇒ purged，禁 nearest」）隨集合成員判定一併移除：
+    9.2b 用的是**比較**（`decision_at_ms` vs `train_last_ms`／`test_start_ms`），本來就
+    不做查表，也就沒有 nearest／asof 的空間。界外仍會 raise（見
+    `test_decision_before_index_start_raises`／`..._after_index_end_raises`），
+    界**內**的非網格點則是合法的、有明確側別。
+
+    🔴 **保留本測試而非刪除**（R20 之 D1 教訓）：斷言反轉並具名，守的是新契約。
+    """
     index, train, test, _, _, _ = _basic_case()
-    off_grid = int(index[0]) + H1 // 3  # 兩根之間
+    off_grid = int(index[0]) + H1 // 3  # 兩根之間，但仍在 index 範圍內
     keys = _event_keys([("e_off", off_grid, off_grid + H1)])
     plan = derive_event_split_from_plans(
         train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
     )
-    assert list(plan.purged["event_id"]) == ["e_off"]
-    assert plan.assignments.empty
+    assert plan.purged.empty, "界內非網格點不是 purge 的理由（9.2b 起）"
+    assert list(plan.assignments["split_label"]) == ["train"], (
+        "off_grid 落在 train 段內 ⇒ train；仍判 purged 表示集合成員判定被加回去了"
+    )
 
 
 # ── fail-closed（M-SU-2／M-SU-3／M-SU-6）─────────────────────────────────
@@ -1603,16 +1630,11 @@ def test_clusters_remain_event_level_when_multi_feature_tf() -> None:
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "D-002 (3.2) 之異側 fail-closed 屬 Task 9.2b，尚未實作。"
-        "🔴 consult-r2 裁定本測試為**三重問題**：①fixture 把兩列同 event_id 寫進事件級 "
-        "manifest（Task 9.2a 已修，改用事件級 manifest）②(3.2) 之 AlignmentViolationError "
-        "碼上不存在（9.2b）③判側仍用 feature_cutoff_ms（9.2b）。"
-        "本測試在 9.2b 完成前**預期紅**，以 strict xfail 明示而非 --deselect 藏起來。"
-    ),
-)
+# 🔴 **`xfail(strict=True)` 已於 `Task 9.2b`（批次 B9C）解除**（TODO `Task 9.2b` 驗證欄逐字要求）。
+#    原 reason 保留於此供追溯：「D-002 (3.2) 之異側 fail-closed 屬 Task 9.2b，尚未實作。
+#    consult-r2 裁定本測試為三重問題：①fixture 把兩列同 event_id 寫進事件級 manifest
+#    （Task 9.2a 已修）②(3.2) 之 AlignmentViolationError 碼上不存在（9.2b）
+#    ③判側仍用 feature_cutoff_ms（9.2b）。」三者於本批全部落地 ⇒ 轉為常規通過測試。
 def test_multi_feature_tf_opposite_sides_must_fail_closed() -> None:
     """同一事件之兩個 feature TF 若被判到**異側** ⇒ 須 fail-closed raise，不得靜默取一側。
 
@@ -1622,24 +1644,27 @@ def test_multi_feature_tf_opposite_sides_must_fail_closed() -> None:
     刪掉或改名都會讓該條驗收得到 `no tests ran` 而判不通過（R20 三家撞題：
     它原本整段缺席，等同「刪測換綠」，且使 `Task 9.2b` 失去可解除之 xfail 標的）。
     """
-    index = _feature_index()
-    train, test, b = _plans(index)
-    train_rows, test_rows = b["train_row_index"], b["test_row_index"]
-    # 同一事件、兩個 feature TF，cutoff **刻意分落 train 段與 test 段** ⇒ 現行逐列判側會給異側。
-    keys = _event_keys([
-        ("e_x", index[train_rows[0]], int(index[train_rows[0]]) + H1, SYM, "1h"),
-        ("e_x", index[test_rows[0]], int(index[test_rows[0]]) + H1, SYM, "4h"),
-    ])
-    # 🔴 manifest 維持**事件級**（一列一事件）——Task 9.2a 已修之 fixture 缺陷。
-    man = _manifest(keys.drop_duplicates("event_id"))
     # 🔴 R21 `CODEX-R21-P1-01` 收緊（原寫 `pytest.raises(Exception, match="同一事件|異側|同側|AlignmentViolation")`）：
     #    ①`Exception` 太寬——任何例外都會讓它 xfail，連「fixture 自己壞掉」都算過；
     #    ②寬 regex 使 `Task 9.2b` 落地時**錯誤型別仍可被誤收**。
     #    改為釘死 `AlignmentViolationError`（`momentum/core/contracts.py:933`，`ValueError` 子類）
     #    ＋訊息須含該 `event_id`（`D-002-C3` (3.2) 明定「訊息須含該 event_id」）。
-    #    ⇒ 9.2b 若用別的型別或不帶 event_id，本測試**不會**變成 XPASS，而是繼續紅——那是對的。
+    #
+    # 🔴 **`Task 9.2b` 落地時之 fixture 遷移（node id 不變，形狀改變）**：
+    #    9.2b 前本測試餵「同事件兩列 cutoff 分落 train／test 段」給
+    #    `derive_event_split_from_plans`，靠**逐列判側**產生異側。9.2b 之後側別由事件級
+    #    `decision_at_ms` 判一次再廣播 ⇒ 同一批輸入必得**同側**，該路徑**結構上再也造不出
+    #    異側**。SPEC §V 之 (3.2) 反例逐字即為「**直接構造 `assignments`** 使同一 `event_id`
+    #    之兩列異側 THEN raise」——故本測試改打可單獨呼叫的檢查入口。
+    #    🔴 node id **一字未改**（它是 `Task 9.2a` 機械驗收第 6 條之逐字錨點），
+    #    xfail 依 `Task 9.2b` 驗證欄解除；原輸入形狀之保證改由
+    #    `test_event_level_anchor_broadcasts_side_to_all_feature_tf` 正面覆蓋。
+    rows = [
+        {"event_id": "e_x", "symbol": SYM, "split_label": "train", "feature_timeframe": "1h"},
+        {"event_id": "e_x", "symbol": SYM, "split_label": "test", "feature_timeframe": "4h"},
+    ]
     with pytest.raises(AlignmentViolationError, match="e_x"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        _assert_event_level_side_consistency(rows, [])
 
 
 def test_multi_symbol_branch_summary_counts_are_named() -> None:
@@ -1656,3 +1681,305 @@ def test_multi_symbol_branch_summary_counts_are_named() -> None:
     assert res.summary["n_event_tf_rows_purged"] == len(res.purged)
     # 🔴 值不得為 0——0 正是「三個 kwargs 被省略」時的樣子。
     assert res.summary["n_events"] > 0 and res.summary["n_event_tf_rows"] > 0
+
+
+# ── 🔴 D-002 `Task 9.2b`（批次 B9C）：側別判定改為事件級 `decision_at_ms` 錨定 ──────────
+#
+# 本節八條為 TODO `Task 9.2b` 之**驗證**欄逐字指定者。共同前提：
+#   · `manifest.table["decision_at_ms"]` 是**唯一**錨點（事件級），`feature_cutoff_ms`
+#     **不參與** `split_label`；
+#   · 三段式判準順序不得調換：`<= train_last_ms` ⇒ train；`>= test_start_ms` ⇒ test；
+#     介於兩者之間 ⇒ purged（隔離帶，合法且預期，不 raise）；
+#   · 界外（`decision_at_ms` 不在 `feature_index` 範圍內）⇒ raise，**不是**第四條分類分支。
+
+
+def _anchor_case(*, anchor_by_event: dict, feature_tfs=("1h", "4h")):
+    """造一批「同事件多 feature TF、cutoff 各不相同」的鍵，並把錨點**獨立**指定。
+
+    🔴 這是 9.2b 之後才可能的 fixture：`feature_cutoff_ms` 與 `decision_at_ms` **解耦**
+    （`_multi_feature_tf_case` 當初刻意讓兩 TF 的 cutoff 相同，正是因為 9.2b 未實作）。
+    這裡反過來讓 cutoff 逐 TF 不同，用來證明側別**只**由錨點決定。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    train_rows, test_rows = b["train_row_index"], b["test_row_index"]
+    rows = []
+    for eid, _anchor in anchor_by_event.items():
+        for i, tf in enumerate(feature_tfs):
+            # cutoff 刻意分落 train 段與 test 段——舊的 per-cutoff 判側會給異側。
+            cut = int(index[train_rows[0]]) if i == 0 else int(index[test_rows[0]])
+            rows.append((eid, cut, cut + H1, SYM, tf))
+    keys = _event_keys(rows)
+    # 🔴 `label_start_ms`／`label_end_ms` 是**事件級**欄（來自 `receipts.event_level`）⇒
+    #    同事件各 feature TF 列必須**同值**，且與錨點同源。`_event_keys` 預設把它們綁在
+    #    逐列 `feature_cutoff_ms` 上（9.2b 前 cutoff 就是判側依據，綁一起才合理），
+    #    本 fixture 既然刻意讓 cutoff 逐列不同，就必須把這兩欄解綁回事件級——否則造出來的
+    #    是「事件級欄逐列不同」的假資料，正是 9.2b 要擋的那一類缺陷。
+    keys["label_start_ms"] = keys["event_id"].map(anchor_by_event).astype("int64")
+    keys["label_end_ms"] = keys["label_start_ms"] + H1
+    man = _manifest(keys.drop_duplicates("event_id"))
+    man.table["decision_at_ms"] = man.table["event_id"].map(anchor_by_event).astype("int64")
+    return index, train, test, keys, man, b
+
+
+def test_event_level_anchor_broadcasts_side_to_all_feature_tf() -> None:
+    """🔴 側別由事件級 `decision_at_ms` 判一次，**廣播**到該事件所有 feature TF 列。
+
+    鑑別力：兩列的 `feature_cutoff_ms` **刻意**分落 train 段與 test 段。9.2b 之前逐列判側
+    會給出異側（一列 train、一列 test）；9.2b 之後兩列必須**同側**，且該側由錨點決定。
+    ⇒ 若有人把 `feature_cutoff_ms` 判側加回去，本測試立刻轉紅（`M-SU-D2-14`）。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    train_rows = b["train_row_index"]
+    anchor = int(index[train_rows[0]])  # 錨點落在 train 段
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_bc": anchor})
+    plan = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1
+    )
+    assert plan.purged.empty
+    got = plan.assignments[plan.assignments["event_id"] == "e_bc"]
+    assert len(got) == 2, "兩個 feature TF 列都要在（廣播，不得折疊成一列）"
+    assert set(got["feature_timeframe"]) == {"1h", "4h"}
+    assert set(got["split_label"]) == {"train"}, (
+        "兩列必須同側且＝錨點所在側；出現 test 表示 feature_cutoff_ms 又在判側了"
+    )
+
+
+def test_gap_band_event_is_purged_not_train() -> None:
+    """🔴 錨點落在隔離帶（`train_last_ms < decision < test_start_ms`）⇒ `purged`，**不 raise**。
+
+    邊界①：落在隔離帶是**合法且預期**的樣本流失，不是缺陷。
+    鑑別力：若三段式被寫成「`<= train_last` ⇒ train、否則 test」（少了中間那段），
+    本事件會被誤判成 test 而污染 OOS。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    train_rows, test_rows = b["train_row_index"], b["test_row_index"]
+    train_last, test_start = int(index[train_rows[-1]]), int(index[test_rows[0]])
+    gap_anchor = train_last + H1  # 隔離帶內
+    assert train_last < gap_anchor < test_start, "fixture 沒造出隔離帶就測不到本條"
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_gap_band": gap_anchor})
+    plan = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1
+    )
+    assert plan.assignments.empty
+    assert list(plan.purged["event_id"]) == ["e_gap_band"] * 2, "兩個 feature TF 列須同進 purged"
+    assert set(plan.purged["feature_timeframe"]) == {"1h", "4h"}
+
+
+def test_decision_before_index_start_raises() -> None:
+    """🔴 錨點早於 `feature_index[0]` ⇒ raise（訊息含 `event_id`），不得當成一種側別。"""
+    index = _feature_index()
+    train, test, _ = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_early": int(index[0]) - H1})
+    with pytest.raises(ValueError, match="e_early"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_decision_after_index_end_raises() -> None:
+    """🔴 錨點晚於 `feature_index[-1]` ⇒ raise（訊息含 `event_id`）。
+
+    🔴 與上一條成對：只測一側會讓「只檢查下界」的實作全綠。
+    """
+    index = _feature_index()
+    train, test, _ = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_late": int(index[-1]) + H1})
+    with pytest.raises(ValueError, match="e_late"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_out_of_range_is_not_a_fourth_classification_branch() -> None:
+    """🔴 界外**不得**被寫成第四條分類分支（TODO `Task 9.2b` 不可做第二條）。
+
+    寫成分支即恢復重疊：越界事件會被「合法地」分到 train／test 或 purged。
+    本測試斷言它**不出現在任何容器裡**——因為根本走不到建表那一步。
+    """
+    index = _feature_index()
+    train, test, _ = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_oob": int(index[-1]) + 5 * H1})
+    with pytest.raises(ValueError) as ei:
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert "e_oob" in str(ei.value)
+    assert not isinstance(ei.value, AlignmentViolationError), (
+        "界外是輸入超出定義域，不是 (3.2) 之異側缺陷——兩者混用會讓呼叫端分不出病因"
+    )
+
+
+def test_opposite_sides_raise_alignment_violation() -> None:
+    """🔴 `D-002-C3` (3.2)：同一 `event_id` 之兩列異側 ⇒ `AlignmentViolationError`。
+
+    🔴 **直接構造 `assignments`**（SPEC §V `:270` 之反例逐字形狀）：事件級錨定落地後，
+    異側**不可能由合法資料產生**，所以反例只能直接餵那個狀態給檢查本身。
+    🔴 須一併驗其**不是**靜默取一側、**不是**改判 purged——故斷言型別與訊息，
+    且不接受「回傳一個被清乾淨的結果」。
+    """
+    rows = [
+        {"event_id": "e_mix", "symbol": SYM, "split_label": "train", "feature_timeframe": "1h"},
+        {"event_id": "e_mix", "symbol": SYM, "split_label": "test", "feature_timeframe": "4h"},
+    ]
+    with pytest.raises(AlignmentViolationError, match="e_mix") as ei:
+        _assert_event_level_side_consistency(rows, [])
+    msg = str(ei.value)
+    assert "不靜默取一側" in msg and "不改判 purged" in msg, (
+        "訊息須明示這兩件事都不做——否則後人會以為可以擇一"
+    )
+
+
+def test_purged_and_assignments_event_id_disjoint() -> None:
+    """🔴 跨表互斥：同一 `event_id` 不得同時出現在 `assignments` 與 `purged`。
+
+    🔴 這一道**不能**由 `split_label` 分組檢查代替：`purged` 沒有 `split_label` 欄，
+    「一列進 purged、另一列進 assignments」在分組檢查下結構上看不見（R6 三家撞題）。
+    """
+    assign = [
+        {"event_id": "e_straddle", "symbol": SYM, "split_label": "train", "feature_timeframe": "1h"}
+    ]
+    purge = [{"event_id": "e_straddle", "reason": "x", "feature_timeframe": "4h"}]
+    with pytest.raises(AlignmentViolationError, match="e_straddle"):
+        _assert_event_level_side_consistency(assign, purge)
+    # 正例：兩表不相交時不得誤報
+    _assert_event_level_side_consistency(
+        assign, [{"event_id": "e_other", "reason": "x", "feature_timeframe": "1h"}]
+    )
+
+
+def test_real_derive_never_produces_straddling_event() -> None:
+    """🔴 走**真實**投影路徑時，跨表混態結構上不可能發生（廣播之結構性保證）。
+
+    與上一條成對：上一條證明閘會抓，本條證明正常路徑不會誤觸發。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    train_rows, test_rows = b["train_row_index"], b["test_row_index"]
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={
+        "e_a": int(index[train_rows[0]]),
+        "e_b": int(index[test_rows[0]]),
+        "e_c": int(index[train_rows[-1]]) + H1,
+    })
+    plan = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1
+    )
+    assert set(plan.assignments["event_id"]) & set(plan.purged["event_id"]) == set()
+    assert len(plan.assignments) + len(plan.purged) == len(keys), "不得有列憑空消失"
+
+
+def test_derive_never_indexes_row_index() -> None:
+    """🔴 投影端**只讀** `row_index_local`，不得索引 `row_index`（`D-001-C2` (4.10)）。
+
+    做法＝對 `_derive_single_symbol` 之原始碼做 AST 掃描：任何
+    `<expr>.row_index[...]`／`np.asarray(<expr>.row_index)` 形式即 FAIL。
+    🔴 用 AST 而非 grep：字串比對會被註解與說明文字誤報（本檔註解大量提到 `row_index`）。
+    """
+    import ast
+    import inspect
+    import textwrap
+
+    from momentum.Analysis.event_samples import split_projection as _sp_mod
+
+    src = textwrap.dedent(inspect.getsource(_sp_mod._derive_single_symbol))
+    tree = ast.parse(src)
+    offenders = []
+    for node in ast.walk(tree):
+        # 形態一：`X.row_index[...]`
+        if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute):
+            if node.value.attr == "row_index":
+                offenders.append(f"subscript on .row_index (line {node.lineno})")
+        # 形態二：把 `.row_index` 餵進 np.asarray／list 之類再索引
+        if isinstance(node, ast.Call):
+            for arg in node.args:
+                if isinstance(arg, ast.Attribute) and arg.attr == "row_index":
+                    offenders.append(f"{ast.dump(node.func)[:40]}(.row_index) (line {node.lineno})")
+    assert offenders == [], (
+        f"`_derive_single_symbol` 索引了全框 row_index：{offenders}"
+        "——交錯多標的下全框列號會越界到別的標的（D-001 (4.10)）"
+    )
+
+
+def test_side_consistency_check_is_wired_into_derive(monkeypatch) -> None:
+    """🔴 **接線測試**：`derive_event_split_from_plans` 必須**真的呼叫**同側／跨表互斥檢查。
+
+    出生理由（本批 mutation 自證當場抓到）：`M-SU-D2-14`（把 `_assert_event_level_side_consistency`
+    的**呼叫**整行刪掉）跑出來是 **104 passed**——因為上面那幾條反例都**直接呼叫 helper**，
+    呼叫點被刪掉它們照樣綠。這與 R18 之 `A1` 完全同型（「四條測試全掛在內部函式上，
+    生產接線省略則全綠」），差別只在這次是主委自己在 mutation 階段抓到而不是委員。
+
+    ⇒ 本測試把 helper 換成記錄器，斷言它**被呼叫過**且**收到組好的兩個容器**。
+    刪掉呼叫行 ⇒ 立刻紅。
+    """
+    from momentum.Analysis.event_samples import split_projection as _mod
+
+    seen = {}
+
+    def _spy(assign_rows, purge_rows):
+        seen["assign"] = list(assign_rows)
+        seen["purge"] = list(purge_rows)
+
+    monkeypatch.setattr(_mod, "_assert_event_level_side_consistency", _spy)
+    index = _feature_index()
+    train, test, b = _plans(index)
+    train_rows, test_rows = b["train_row_index"], b["test_row_index"]
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={
+        "e_w1": int(index[train_rows[0]]),
+        "e_w2": int(index[test_rows[0]]),
+    })
+    derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert "assign" in seen, (
+        "`derive_event_split_from_plans` 沒有呼叫同側／跨表互斥檢查"
+        "——(3.2) 的閘等於不存在（`M-SU-D2-14`）"
+    )
+    assert len(seen["assign"]) == len(keys), "須把**組好的全部**列交給檢查，不得只抽驗一部分"
+    assert {r["event_id"] for r in seen["assign"]} == {"e_w1", "e_w2"}
+
+
+def test_side_consistency_check_runs_before_dataframes_are_built(monkeypatch) -> None:
+    """🔴 檢查須在**寫入兩容器之前**（SPEC `§P Task 9.2b`：「寫入 `assignments` 之前」）。
+
+    與上一條成對：只證明「有呼叫」不夠——擺在 `DataFrame` 建好之後就變成事後補救，
+    呼叫端已經可能拿到半成品。本測試讓 spy 直接 raise，斷言**不會**有結果被回傳。
+    """
+    from momentum.Analysis.event_samples import split_projection as _mod
+
+    def _boom(assign_rows, purge_rows):
+        raise AlignmentViolationError("SPY-BOOM")
+
+    monkeypatch.setattr(_mod, "_assert_event_level_side_consistency", _boom)
+    index = _feature_index()
+    train, test, b = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(
+        anchor_by_event={"e_order": int(index[b["train_row_index"][0]])}
+    )
+    with pytest.raises(AlignmentViolationError, match="SPY-BOOM"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_empty_train_rows_is_fail_closed_not_skipped() -> None:
+    """🔴 空 `train_rows` ⇒ fail-closed，**不得**以 `continue` 跳過（`M-SU-D2-30`）。
+
+    出生理由（本批 mutation 自證當場抓到）：`M-SU-D2-30b`（把那道 raise 換成 `pass`）
+    跑出來是 **106 passed**——空 train 這一面**完全沒有應紅測試**。
+    9.2b 之前那裡本來就寫著 `continue`（註解「train 可為空（極端切分）」），
+    9.2b 之後事件級錨定要讀 `train_last_ms = index_ms[train_rows[-1]]`，
+    空段會 `IndexError`；stamp-r5 三家一致裁定**不得定義哨兵或 fallback**，而是 raise。
+    ⇒ 本測試釘住那道 raise：改回 `continue`／給哨兵值都會紅。
+    """
+    index = _feature_index()
+    _, test, b = _plans(index)
+    empty_train = _sp(
+        split_label="train",
+        index_kind="positional",
+        row_index=np.asarray([], dtype=int),
+        time_bounds=(int(index[0]), int(index[0])),
+        purge_gap=PURGE,
+        embargo=EMBARGO,
+        purge_semantic="rows",
+        base_universe_hash="deadbeef",
+        symbol=SYM,
+    )
+    _, _, _, keys, man, _ = _anchor_case(
+        anchor_by_event={"e_empty_tr": int(index[b["train_row_index"][0]])}
+    )
+    with pytest.raises(ValueError, match="train_plan.row_index 為空"):
+        derive_event_split_from_plans(
+            empty_train, test, keys, index, manifest=man, bucket_ms=H1
+        )

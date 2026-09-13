@@ -14,7 +14,10 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
+from momentum.core.contracts import validate_split_pair_integrity
 from momentum.core.logging import get_logger
+# 🔴 與投影端 `_index_as_ms` **共用同一支**正規化器（不新造第二套單位政策）。
+from momentum.core.split_preview import epoch_ms_from_index
 from momentum.Analysis.event_samples.alignment import align_events, n_dropped_by_reason
 from momentum.Analysis.event_samples.dedupe import build_event_manifest
 from momentum.Analysis.event_samples.event_split import split_events
@@ -753,6 +756,37 @@ class EventSamplePipeline:
             # 🔴 D-002 `Task 9.2`：**不得** `str()` 強制轉型——`None` 會變成字面 `"None"`，
             #    被下游當成一個叫 `None` 的 feature TF，產出空表而非全量
             #    （改了 producer 卻沒改這裡＝本 Task 白做；R3 抓出的「改了等於沒改」）。
+            # 🔴 D-002 `Task 9.2b` 步驟 0（具名在此，**不是**泛稱「producer／adapter 層」）：
+            #    在呼叫 `derive_event_split_from_plans` **之前**做整段對驗。
+            #    ①`ts` ＝ `feature_index` 之時刻序列；②`symbols` ＝ `train_plan.symbol` 廣播成
+            #    等長陣列（單標的；多標的由呼叫端提供 full `symbols`）。
+            #    🔴 **不得**放進 `derive_*` 內部——那支只讀標的內座標 `row_index_local`，而本
+            #    validator 吃全域 `row_index`，座標系不符（`D-001-C2` (4.10)；R10 之 M5 實跑
+            #    `IndexError: plan.row_index contains positions outside base universe`）。
+            #    缺驗即 fail-closed：空 train／test 與 purge/embargo 踩線都在這裡先擋下。
+            #    🔴 **單位必須顯式轉，不得餵原始整數**：`validate_split_integrity` 之
+            #    `_coerce_timestamp_array`（`momentum/core/contracts.py:450-451`）把**數值**
+            #    一律當 **epoch 秒**，而 SPLITUNIFY 之時鐘是**毫秒** ⇒ 直接餵會被解讀成
+            #    西元五萬年而 `OutOfBoundsDatetime`。用共用正規化器取毫秒後顯式建 datetime，
+            #    **不做** magnitude 猜測（本票在別處禁掉的就是那種猜法）。
+            _ts = pd.to_datetime(
+                epoch_ms_from_index(
+                    feature_index,
+                    role="EventSamplePipeline.run: validate_split_pair_integrity ts",
+                    strictly_increasing=True,
+                ),
+                unit="ms",
+            )
+            # 🔴 **不得帶 tz**（`utc=True`）：`_coerce_timestamp_array` 對 tz-aware 會回
+            #    object dtype 之 `Timestamp` 陣列，`np.diff` 產出的是 `Timedelta` 物件，
+            #    而 `validate_split_integrity:657` 拿它與 `np.timedelta64` 比 ⇒ `TypeError`。
+            #    naive `datetime64[ns]` 才走得進那條向量化比較。
+            validate_split_pair_integrity(
+                train_plan,
+                test_plan,
+                _ts,
+                np.full(len(_ts), str(getattr(train_plan, "symbol", "")), dtype=object),
+            )
             event_keys, discarded_rows = build_event_keys(
                 receipts,
                 selected_timeframe=None if selected_timeframe is None else str(selected_timeframe),

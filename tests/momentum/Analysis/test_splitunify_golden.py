@@ -116,7 +116,14 @@ def test_answer_window_precondition_has_no_breach(golden: dict) -> None:
 #          test rows   = 140+2+2 = 144 .. 199  ⇒ 共 200-144 = **56** 列
 #    事件（12 筆）：tr0..tr3 取 train 前四列、tr_leak 取 train 末列（答案窗恰觸 test 起點）、
 #          gap1/gap2 落在隔離區、te0..te4 取 test 前五列。
-_HAND_TRAIN = ["tr0", "tr1", "tr2", "tr3"]
+# 🔴 D-002 `Task 9.2b`（(G-4d)③）：fixture 新增邊界事件 `bnd_shift`——它的
+#    `feature_cutoff_ms` 在 **test 段**、`decision_at_ms` 在 **train 段**（兩值刻意不等）。
+#    9.2b 前之 per-cutoff 判側會把它歸 **test**；9.2b 之事件級錨定歸 **train**。
+#    ⇒ 本常數由 `train` 多出 `bnd_shift` **就是換錨的行為差異在手推錨點上的現形**；
+#    沒有這一筆，(G-4d)②③ 在 golden 上一筆都測不到（R9 兩家撞題指出的空心通過）。
+#    🔴 9B 前之錨點另存於不可變的 `tests/golden/splitunify/splitunify_golden.v8.json`
+#    （`--write` 對它一律拒寫），兩份並存才能證明差異是刻意的而非寫壞的。
+_HAND_TRAIN = ["bnd_shift", "tr0", "tr1", "tr2", "tr3"]
 _HAND_TEST = ["te0", "te1", "te2", "te3", "te4"]
 _HAND_PURGED = ["gap1", "gap2", "tr_leak"]
 _HAND_TEST_ROW_FIRST = 144

@@ -77,3 +77,13 @@ doc-literal-only；信心度=High。J1 兩處 v21 更正與 §N／§V 同向；`
 
 ---
 
+
+## 戳記
+
+> 三家 RECONCILE-STAMP；body sha256 = 「## 戳記」前全部內容。
+> 本收斂檔為 SPLITUNIFY b9 進入 `Task 9.2b`（批次 B9C）實作之授權依據（`gate.sh dispatch --risk high` 之 `--adversarial` 標的）。
+
+RECONCILE-STAMP: composer APPROVED 2026-09-14 sha256:72cabe12861dfa0c2bb6bbd2f07dedb20054d8bc2bd37c8d960e959a9c93fa6f task:20260911-SPLITUNIFY-B9-STAMP-R5
+
+RECONCILE-STAMP: codex APPROVED 2026-09-14 sha256:72cabe12861dfa0c2bb6bbd2f07dedb20054d8bc2bd37c8d960e959a9c93fa6f task:20260911-SPLITUNIFY-B9-STAMP-R5
+RECONCILE-STAMP: grok APPROVED 2026-09-14 sha256:72cabe12861dfa0c2bb6bbd2f07dedb20054d8bc2bd37c8d960e959a9c93fa6f task:20260911-SPLITUNIFY-B9-STAMP-R5

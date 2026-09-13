@@ -63,8 +63,15 @@ def _canonical(records, bars):
     """
     index = pd.Index(bars[SYM][TF]["open_time_ms"].to_numpy(dtype=np.int64), dtype="int64")
     b = holdout_boundary(index, oos_test_size=OOS, purge_gap=PURGE, embargo=EMBARGO)
+    # 🔴 D-002 `Task 9.2b` 步驟 0 揭出的既有 fixture 缺陷：本 fixture 宣告
+    #    `purge_semantic="rows"` 卻沒給 `expected_freq`，而 `validate_split_integrity`
+    #    （`momentum/core/contracts.py:632-635`）對這組合直接 `TimestampDiscontinuityError`。
+    #    生產端（`ic_filter_orchestrator.py:631`）本來就有帶 ⇒ 這是**測試替身落後於生產**，
+    #    不是新閘過嚴。值取本 TF 之真實 bar 間距（與 `holdout_boundary` 用的同一組刻度）。
+    _freq = str(pd.Timedelta(milliseconds=int(np.diff(np.asarray(index, dtype="int64"))[0])))
     kw = dict(index_kind="positional", purge_gap=PURGE, embargo=EMBARGO,
-              purge_semantic="rows", base_universe_hash="deadbeef", symbol=SYM)
+              purge_semantic="rows", expected_freq=_freq,
+              base_universe_hash="deadbeef", symbol=SYM)
     # 🔴 SPLITUNIFY D-001 (4.3)：本 fixture 之 index 即該 symbol 自己的索引，
     #    故 row_index_local 逐值等於 row_index；指紋用共用序列化器（與 producer 同一支）。
     _ms = np.asarray(index, dtype="int64")
@@ -250,3 +257,77 @@ def test_run_without_selected_timeframe_emits_all_feature_tf_rows(records, bars_
     # 事件數與列數是兩個量（D-002-C6），且全量下列數嚴格大於事件數。
     s = res.split_plan.summary
     assert s["n_event_tf_rows"] > s["n_events"]
+
+
+# ── 🔴 D-002 `Task 9.2b` 步驟 0：`validate_split_pair_integrity` 之**接線** ──────────
+
+
+def test_validate_split_pair_integrity_is_called_before_derive(monkeypatch, records, bars) -> None:
+    """🔴 `EventSamplePipeline.run` 必須在呼叫 `derive_event_split_from_plans` **之前**
+    呼叫 `validate_split_pair_integrity`（TODO `Task 9.2b` 實作要點 1；`M-SU-D2-30`）。
+
+    出生理由（本批 mutation 自證當場抓到）：`M-SU-D2-30a`（把那行呼叫刪掉）跑出來是
+    **11 passed**——步驟 0 完全沒有接線保護。與 `M-SU-D2-14` 同型（R18 之 `A1` 第三次）。
+    ⇒ 本測試同時斷言**有呼叫**與**順序在前**，兩者缺一都會讓缺陷溜過。
+    """
+    from momentum.Analysis.event_samples import pipeline as _pl
+
+    order = []
+    _real_validate = _pl.validate_split_pair_integrity
+    _real_derive = _pl.derive_event_split_from_plans
+
+    def _v(*a, **kw):
+        order.append("validate")
+        return _real_validate(*a, **kw)
+
+    def _d(*a, **kw):
+        order.append("derive")
+        return _real_derive(*a, **kw)
+
+    monkeypatch.setattr(_pl, "validate_split_pair_integrity", _v)
+    monkeypatch.setattr(_pl, "derive_event_split_from_plans", _d)
+    train, test, index = _canonical(records, bars)
+    cfg = EventPipelineConfig(timeframes=(TF,), split=EventSplitConfig())
+    EventSamplePipeline().run(
+        records, bars, cfg,
+        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+    )
+    assert "validate" in order, (
+        "步驟 0 之 validate_split_pair_integrity 沒被呼叫——空段與 purge/embargo 踩線全無人擋"
+    )
+    assert order.index("validate") < order.index("derive"), (
+        f"順序錯：{order}——驗在 derive 之後等於事後補救，derive 已用髒 plan 算完了"
+    )
+
+
+def test_validate_receives_millisecond_clock_not_raw_ints(monkeypatch, records, bars) -> None:
+    """🔴 餵給 validator 的 `ts` 必須是**已轉好的 datetime**，不得是原始 epoch 毫秒整數。
+
+    `_coerce_timestamp_array`（`momentum/core/contracts.py:450-451`）把**數值**一律當
+    **epoch 秒** ⇒ 直接餵毫秒會被解讀成西元五萬年而 `OutOfBoundsDatetime`。
+    本測試釘住這個單位邊界（本批實際踩到過一次）。
+    """
+    from momentum.Analysis.event_samples import pipeline as _pl
+
+    seen = {}
+    _real = _pl.validate_split_pair_integrity
+
+    def _v(train_plan, test_plan, ts, symbols, **kw):
+        seen["ts"] = ts
+        return _real(train_plan, test_plan, ts, symbols, **kw)
+
+    monkeypatch.setattr(_pl, "validate_split_pair_integrity", _v)
+    train, test, index = _canonical(records, bars)
+    cfg = EventPipelineConfig(timeframes=(TF,), split=EventSplitConfig())
+    EventSamplePipeline().run(
+        records, bars, cfg,
+        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+    )
+    ts = seen["ts"]
+    assert np.issubdtype(np.asarray(ts).dtype, np.datetime64), (
+        f"ts 必須是 datetime64（實得 dtype={np.asarray(ts).dtype}）——餵原始整數會被當成秒"
+    )
+    assert getattr(ts, "tz", None) is None, (
+        "不得帶 tz：tz-aware 會讓 _coerce_timestamp_array 回 object dtype，"
+        "validate_split_integrity:657 之 np.timedelta64 比較會 TypeError"
+    )
