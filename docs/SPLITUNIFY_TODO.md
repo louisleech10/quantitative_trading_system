@@ -614,8 +614,8 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 | 消費面 | 處置 | 應紅之 mutation | 測試檔 |
 |---|---|---|---|
 | `feature_materialization` | **維持事件級橫向合併**（不得改複合鍵） | `M-SU-D2-04` | `tests/momentum/event_samples/test_feature_materialization.py` |
-| `tables` | 維持事件級 `.loc[eid]`（`:214`／`:229`／`:373`）；🔴 另 **`:372` 之 `assignments.set_index("event_id")["symbol"].reindex(idx)` 要改**——複合鍵後索引重複會靜默取錯 symbol ⇒ 先去重取唯一值、不唯一即 fail-closed | `M-SU-D2-06`（維持面）＋`M-SU-D2-40`（`:372` 略過去重） | `tests/momentum/event_samples/test_tables.py` |
-| `ic_feed` | 維持六鍵事件級（不加 TF 欄）；🔴 另 **survivor 餵入端要先 `drop_duplicates(event_id)`**——否則多 TF 下重複三元組使雜湊漂移，而六鍵不含 TF 故既有 mutation 不會紅 | `M-SU-D2-07`、`M-SU-D2-19`（維持面）＋`M-SU-D2-38`（餵入未去重） | `tests/momentum/event_samples/test_gap3_conditional_ic.py`（`ic_feed` 無專屬測試檔） |
+| `tables` | 維持事件級 `.loc[eid]`（`:214`／`:229`／`:373`）；🔴 另 **`tables.py:372` 之 `assignments.set_index("event_id")["symbol"].reindex(idx)` 要改**——🔴 **v16 更正（實跑 pandas）**：重複索引下 `reindex` 會直接 `ValueError: cannot reindex on an axis with duplicate labels`，**不是**靜默取錯值（v15 原文寫「靜默取錯 symbol」是錯的）⇒ 須加顯式去重 reducer：同 `event_id` 之 `symbol` 相同則取該值、衝突則 fail-closed raise | `M-SU-D2-06`（維持面）＋`M-SU-D2-40`（移除 `:372` 之去重 reducer） | `tests/momentum/event_samples/test_tables.py`，須**成對**兩條：同值去重成功取到正確值／衝突值 fail-closed raise |
+| `ic_feed` | 維持六鍵事件級（不加 TF 欄）；🔴 另 **`event_context_from_windows` 之餵入須先按 `event_id` 去重**——🔴 **v16 更正（實讀 `ic_feed.py:109`）**：v15 原寫「多 TF 下重複三元組」**不可達**（該處以 `per_tf["timeframe"] == timeframe` 單一 TF 過濾，且 `WindowRow` 只有事件級欄位）⇒ 可達 seam 是 `event_context_from_windows` **本身**：餵入含重複 `event_id` 之 windows 會使 `event_manifest_hash` 漂移 | `M-SU-D2-07`、`M-SU-D2-19`（維持面）＋`M-SU-D2-38`（餵入未去重） | `tests/momentum/event_samples/test_gap3_conditional_ic.py`（`ic_feed` 無專屬測試檔）；測試須**直接呼叫** `event_context_from_windows` 驗雜湊不變性 |
 | `counterexample_classifier` | 維持事件級 | `M-SU-D2-08` | `tests/momentum/event_samples/test_counterexample_classifier.py` |
 | `candidate_ledger` | 維持事件級 | `M-SU-D2-09` | `tests/momentum/event_samples/test_candidate_ledger.py` |
 | `dedupe` | 保留集事件級決定 ＋ 廣播到該事件所有 per-TF 列 | `M-SU-D2-10` | `tests/momentum/event_samples/test_dedupe.py` |
@@ -648,7 +648,12 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
      - **改前分類須與 SPEC 現況相符**：逐列取該 `C5-NN` 在 `docs/SPLITUNIFY_SPEC.D-002.md` register 表中的第 3 欄，
        須**逐字等於** receipt 的 `<改前分類>`。任一列不符即 FAIL（這一條直接殺掉「全填同一值」）。
      - **碼證須指向真實存在的行**：逐列把 `<碼證 path:line>` 拆成檔與行號，該檔須存在、且行號須 ≤ 該檔總行數。
-       任一列指向不存在的檔或超出範圍的行即 FAIL（這一條殺掉 `fake:1`／`nowhere:0` 這類占位）。
+       任一列指向不存在的檔或超出範圍的行即 FAIL（這一條殺掉占位路徑）。
+     - 🔴 **v16 再強化（R15 `CODEX-R15-P1-01`：上一條只驗「存在」，所以每列都填同一個真實行——例如
+       `docs/SPLITUNIFY_SPEC.D-002.md:1`——仍可全過）**：碼證須**逐列 keyed 對證**——第 `C5-NN` 列之
+       `<碼證 path:line>` 的**檔路徑**須與 SPEC register 中同一 `C5-NN` 列所載之落點檔**相同**
+       （行號允許落在該列所列的行範圍內）。任一列對不上即 FAIL。
+       理由：register 本來就逐列寫了落點 `path:line`，這道對證不需新資料、只是把已有的兩邊接起來。
 - 🔴 **在上表測試實際存在之前，不得宣稱 mutation 網已閉**（§V 逐字）。
 - **存活至**：全票完工後保留（九處之防誤改回歸測試是唯一擋「未來有人用形狀規則批改」的東西）。
 - **覆蓋風險**：`Task 9.4` 會改 `split_projection` 之計數段與 `baseline`，與本 Task 之消費面不同檔；
@@ -695,7 +700,10 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   - `test_baseline_splits_n_test_into_events_and_samples`（**物化失敗 fixture**：test 含 `e1` 且物化
     `failures` 含 `e1` ⇒ `n_test_events=1` AND `n_test_samples=0`）
   - `test_baseline_dict_has_no_legacy_n_test_key`
-  - `test_tier_min_test_events_counts_unique_event_ids`（1 事件 × 2 TF、`tier_min=2` ⇒ 仍判樣本不足）
+  - `test_tier_min_test_events_counts_unique_event_ids`（1 事件 × 2 TF、`tier_min=2` ⇒ 仍判樣本不足）。
+    🔴 **v16 補足（R15 `CODEX-R15-P1-03`）**：該測試須**另**斷言 `summary["per_symbol_n"]` 與
+    `summary["per_symbol_test_n"]` 皆等於各自之 `event_id` 去重計數——只驗門檻的話，
+    「只把 `per_symbol_n` 弄錯而保持門檻去重」仍會綠，`M-SU-D2-39` 等於半條無鑑別力。
   - `test_event_count_conservation`（`n_train+n_test+n_purged == n_events`，事件數非列數）
   前端 `cd frontend && npm run build` rc=0（型別改動同批驗）。
   mutation 自證：`M-SU-D2-13`、`M-SU-D2-31`、`M-SU-D2-32`、`M-SU-D2-12`、
