@@ -63,6 +63,9 @@
 <li>銷帳工具要求收斂檔處置欄裡<strong>每個反引號字面</strong>都出現在交接檔，我把測試名、探針檔名都用反引號包，連退三次；把非權威字面的反引號拿掉就過。規則本意是「處置概念要進交接」，代價是反引號成了禁用符號。</li>
 <li>委員交件尾段的裁決塊寫 <code>CLOSED: none</code>／<code>VERDICT: APPROVED</code>／<code>**核對**</code> 這類「意思對、字面不對」的值，登記與收斂都拒收；我逐次做<strong>最小字面正規化</strong>（只改那一個 token）並寫進 commit 與收斂。這是三家範本沒把封閉值寫死在骨架裡的後果，屬 DOCROT 同型病（字面多落點），未擴建、登記於此。</li>
 </ol>
+<h2 id="2026-09-13docrot-stamp-r3蓋章輪的空殼交件把整條線鎖死四路全封">2026-09-13（DOCROT stamp-r3）：<strong>蓋章輪的空殼交件把整條線鎖死，四路全封</strong></h2>
+<p><strong>類別：B（漏擋）＋ C（儀式成本）。是我先撞到的，工具沒有喊。</strong></p>
+<p>交件工具（<code>cx_run</code>）對 review／consult／closure 三種輪會跑格式檢查，<strong>對蓋章輪跳過</strong>，所以 codex 把 <code>**碼證**</code> 寫成 <code>**核對**</code> 也記「成功」；銷帳工具對同一份檔<strong>會</strong>跑同一支檢查 ⇒ 紅。而規則說：成功的檔不能改（改了 sha 不符）、有結果不能放棄（C-9）、最新已成功不能重派（連你在 terminal 跑都被擋）、主控端補派被當派工擋。四條路互相守門，沒有一條開著。<strong>根因＝同一件事（什麼算合格交件）在交件端和銷帳端不是同一支檢查</strong>——就是 DOCROT 在治的病，長在治它的工具上。你裁定修根因：兩端改用同一支；銷帳端只對蓋章輪、且有明確重新登記留痕才放行。這次因為債擋住派工，先改後審，寫在 commit 和 HANDOFF。</p>
 <hr />
 <h2 id="2026-09-11splitunify-b4-期間五支-hook-會無聲掛死一掛就是-8-小時">2026-09-11（SPLITUNIFY B4 期間）：<strong>五支 hook 會無聲掛死，一掛就是 8 小時</strong></h2>
 <p><strong>類別：B（漏擋）＋ D（量測不可靠）。是你先看到的，不是機制喊的。</strong></p>

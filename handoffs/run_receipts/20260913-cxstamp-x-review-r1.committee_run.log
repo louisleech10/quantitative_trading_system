@@ -1,0 +1,12 @@
+[session_name] ✓ 20260913-cxstamp-x-review-r1 / 20260913-CXSTAMP-X-REVIEW-R1
+[committee_run] === role gate preflight (before gate.sh dispatch) ===
+[committee_run] session=20260913-cxstamp-x-review-r1 brief=handoffs/20260913-CXSTAMP-X-REVIEW-R1-BRIEF.md  families=codex,composer,grok(3 家)  out=handoffs/20260913-cxstamp-x-review-r1-<family>.md
+[committee_run] === gate.sh dispatch ===
+GATE PASS：已發 dispatch token（有效 900s）。審計 → .claude/gate/audit.log
+使用者可稽核：cat .claude/gate/audit.log
+[round_cost] 工作項目「cxstamp」尚無歷史輪次（本輪為第 1 輪）
+[committee_run] === open debt round_id=dee36d9b-7c2f-42a5-8f51-081d2762b725 session=20260913-cxstamp-x-review-r1 ===
+[committee_run] 開債完成 round_id=dee36d9b-7c2f-42a5-8f51-081d2762b725
+[committee_run] → 派 codex(out=handoffs/20260913-cxstamp-x-review-r1-codex.md)
+[committee_run] → 派 composer(out=handoffs/20260913-cxstamp-x-review-r1-composer.md)
+[committee_run] → 派 grok(out=handoffs/20260913-cxstamp-x-review-r1-grok.md)
