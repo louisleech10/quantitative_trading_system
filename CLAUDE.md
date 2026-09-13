@@ -27,7 +27,7 @@ All code must support this evolution via clean decoupling.
 | 維度 | 小 | 中 | 大 |
 |------|----|----|-----|
 | **判準** | 改 1 函式/test/局部 bug；不命中 a-d；可本地 pytest 驗 | 單一 module、動既有 caller；不命中 a-d | 命中任一 a-d（模組會變、原則不變；不看檔案數） |
-| **管線** | Claude 自己做 + 自跑測試，不派工（省 token） | 完整管線：**SPEC + TODO + adversarial**，**不得跳步/不跳**（D-1） | 同左 + 白話簡述/manifest + **雙家族** adversarial reconcile |
+| **管線** | Claude 自己做 + 自跑測試，不派工（省 token） | 完整管線：**SPEC + TODO + adversarial**，**不得跳步/不跳**（D-1） | 同左 + 白話簡述/manifest + adversarial reconcile（**家數與家族＝`docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行**，本檔不寫數字） |
 | **執行端** | — | 見 `docs/MULTI_AGENT_ORCHESTRATION.md` §1 **現行分工行**；動態，以使用者當下指示為準 | 同左 |
 | **code review** | — | **家數與家族＝`ORCH §1 現行分工行`（唯一來源，本檔不重述）**；實作者不自審 | 同左 |
 | **SMALL_INLINE** | scope + 驗收命令 + 允許檔 + 禁止事項 | — | — |

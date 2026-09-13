@@ -61,6 +61,18 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B2c** | 2.3 | B2b | golden 五組；**仍不接線** | 中 |
 | **B3** | 3.1, 3.2, 3.3 | B2c | 接線／fail-closed／event-study-only 分派同批（分開會有一段時間邊界不唯一） | 大 |
 | **B4** | 4.1 | B3 | 報告與畫面（欄名待 B3 定案後才穩定） | 中 |
+| **B9A** | 9.1 | B4 ＋ `D-002` 三家 `RECONCILE-STAMP` rc=0 | 揭露先行；只動 producer 回傳形狀與 summary 一鍵，可獨立回退 | 中 |
+| **B9B** | 9.2, 9.2a | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
+| **B9C** | 9.2b | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
+| **B9D** | 9.3 | B9C | 六個下游消費面逐處處置（多為**防誤改**回歸測試，非改碼） | 中 |
+| **B9E** | 9.4 | B9C | 記帳鏈與 `baseline` 拆鍵 | 中 |
+| **B9F** | 9.5 | B9D ＋ B9E | golden 換錨與前端；須在所有行為面定案後才凍結 | 大 |
+
+🔴 **Phase 9 依賴序（`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md` 裁定；三家＋主委獨立版四方一致）**：
+`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`。
+`9.3` 與 `9.4` 可並行（前者動消費面、後者動計數與 `baseline`），惟 `9.4` 之 `per_symbol_n`／`tier_min` 去重
+與 `9.2a` 同檔 ⇒ 並行時須先 rebase 再跑各自驗收。
+`9.5` **必須最後**——golden 重凍會把未定側別寫死。
 
 🔴 **R2 之 D11（codex Q8）**：v2 把 B2 標「大」卻只有批末一個 gate，
 等於把三個**可獨立證偽**的產出綁成一次審查 ⇒ 拆為 B2a／B2b／B2c，各自 gate 與 review。
@@ -398,6 +410,317 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   `cd frontend && node_modules/.bin/vitest run src/lib/splitAuthority.test.ts` rc=0。
 - **存活至**：全票完工後保留（UAT 交付物）。
 - **覆蓋風險**：無後續 Phase。
+
+---
+
+## §C-9 Phase 9 Task 細目（`D-002` 延伸）
+
+**裁定來源**：`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md`（三家 consult，本節 Task 9.1–9.5
+之依賴序與驗收命令出自其裁定段；該收斂之「修訂標的」逐字即本檔 `docs/SPLITUNIFY_TODO.md`）。
+SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
+**本節不複述 SPEC 條文**，只寫施工面與驗收命令。
+
+🔴 **動工前置（缺任一即不得領 impl token）**：
+1. `bash scripts/reconcile_stamps_check.sh docs/SPLITUNIFY_SPEC.D-002.md` rc=0（三家 `RECONCILE-STAMP` APPROVED）。
+2. 前批未 commit 生產碼已依裁定 `REVERT`——四檔 ＋ `handoffs/20260911-splitunify-b9-probe-multitf.py:47`
+   之 tuple unpack 皆已還原至 HEAD（2026-09-13 已執行，驗收＝兩測試檔重跑無 failed）。
+3. 🔴 **程序先例**：`AGENTS.md:40`（Rule 12「動工前若所依 reconcile/SPEC 的 `RECONCILE-STAMP` 未全數
+   APPROVED → 不動工」）**適用於動工、不適用於唯讀審查輪**——同情境之既有裁定見
+   `handoffs/reconcile/20260911-splitunify-b9-review-r4/synth.md` 之駁回段。本節動工受其約束。
+
+🔴 **驗收命令之三條紀律**（本節逐 Task 遵守）：
+- **逐檔明列路徑**，禁無路徑之 `pytest -k`（`-k` 只過濾執行、**不減少收集** ⇒ 會從 rootdir 收全套，小時級）。
+- **禁聚合期望數**（不得寫「應 N passed」「failed <= N」）；寫**具名測試函式名**與 mutation 轉紅判準。
+- 既有紅**逐條** `--deselect`（`tests/baselines/analysis_known_failures.nodeids`）。
+
+---
+
+### Task 9.1 — 丟棄列數之完整資料流契約（`票 SPLITUNIFY`）
+- SPEC ref：§P Phase 9A `Task 9.1`；§V `Task 9.1`；`D-002-C0` (0.6)
+- 目標：消除「靜默丟棄」之誠實性缺陷，**交付至 producer → `EventSplitPlan.summary` 兩層**。
+- 輸入 / 輸出：`build_event_keys(receipts, *, selected_timeframe=None)`
+  → `(keyed: pd.DataFrame, discarded: Dict[str, int])`。
+  🔴 `discarded` 無丟棄時為 `{}`，**不得**省略、不得回 `None`。
+- 實作要點：
+  1. `build_event_keys` 改為回傳 tuple；`discarded` 鍵＝被丟棄之 **feature** TF 字面、值＝列數。
+  2. `_derive_single_symbol` 新增 keyword-only 參數 `discarded_rows_by_feature_tf`，**原樣**寫入
+     `EventSplitPlan.summary["discarded_rows_by_feature_tf"]`（🔴 鍵名依 `D-002-C0` (0.6) 不得含裸 `timeframe`）。
+     多 symbol 分派器逐 symbol **相加**（同鍵值相加，非後者覆蓋前者）。
+  3. 🔴 **`metadata.split_unify` 層不在本 Task 交付面**——依 v13 之 O1 已整段移入 §N `SU-RESID-9A-UI`。
+     **不得**在本 Task 改 `build_split_unify_disclosure` 五鍵、`momentum/Analysis/contracts/split_unify.json`
+     之 `split_unify_keys`、或 `tests/api/test_splitunify_disclosure.py` 之 exact-key 斷言。
+  4. 獨立回退：移除 (1)(2) 後行為須與 9A 前**逐值**相同 ⇒ 須有一條可證偽測試，不是註解宣稱。
+- 修改檔案：`momentum/Analysis/event_samples/split_projection.py`；
+  既有 caller `momentum/Analysis/event_samples/pipeline.py`（簽章改 tuple 後**必須**同批改，否則 unpack 失敗）。
+- 不可做：不得以揭露取代複合鍵；不得在丟棄時 raise（會擋掉目前合法的單 feature TF 用法）；
+  不得為了讓 9A 有終端揭露面而新增 API。
+- 邊界：①`per_tf` 只有一個 TF 且 `selected_timeframe=None` ⇒ `discarded == {}`；
+  ②`selected_timeframe` 指定之 TF 不存在 ⇒ 維持現行 `ValueError`（不得改成回空表）。
+- 風險緩解：mutation `M-SU-D2-01`、`M-SU-D2-02`。🔴 `M-SU-D2-03` 屬 metadata 層、**隨殘留延後**，
+  本 Task **不得**宣稱其已閉。
+- **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py tests/momentum/event_samples/test_splitunify_wiring.py` rc=0，且須含下列具名測試皆 pass：
+  - `test_build_event_keys_discarded_counts_dropped_feature_tf`（`per_tf` 含兩個 feature TF、`selected` 取其一
+    ⇒ `discarded` 之值等於 fixture 中另一 TF 之**實際列數**，由 fixture 逐筆算出，**不得寫死常數**）
+  - `test_build_event_keys_discarded_empty_when_single_feature_tf`
+  - `test_summary_carries_discarded_rows_by_feature_tf_equal_to_producer`（**值相等**，非只驗鍵存在）
+  - `test_discarded_layer_is_independently_revertible`（移除該欄後 summary 其餘鍵逐值不變）
+  mutation 自證（實跑並貼 rc）：
+  - `M-SU-D2-01`：刪掉寫入 summary 那行 ⇒ 第 3 條轉紅
+  - `M-SU-D2-02`：producer 回傳 `discarded` 但 `_derive_single_symbol` 改傳 `{}` ⇒ 第 3 條轉紅
+- **存活至**：全票完工後保留。
+- **覆蓋風險**：`Task 9.2` 會再改 `selected_timeframe` 之預設值；本 Task 只改回傳形狀，兩者不衝突。
+
+---
+
+### Task 9.2 — producer 停止單選，輸出全量 keyed rows（`票 SPLITUNIFY`）
+- SPEC ref：§P Phase 9B `Task 9.2`；§V `Task 9.2`
+- 🔴 **本 Task 是第 9 批核心**；沒有它，下游全改完 `SU-RESID-2` 仍不會解決。
+- 實作要點（四層，缺任一層本 Task 白做）：
+  1. **producer**：`selected_timeframe` 由必填改為 `Optional[str] = None`；`None` ⇒ 全量。
+  2. **caller**：`pipeline.py` 之 `build_event_keys(receipts, selected_timeframe=str(selected_timeframe))`
+     🔴 **一併移除 `str()` 強制轉型**——留著會把 `None` 變字面 `"None"`，產空表而非全量。
+  3. **投影門檻**：`projection_args` 由四鍵改三鍵（`train_plan`／`test_plan`／`feature_index`），
+     `selected_timeframe` 移出必填集合；`pipeline.py` docstring 之「四者同時」同步改寫。
+  4. **merge 與輸出欄**：改以 `per_tf` 為行粒度與 `event_level` 接合，`validate` 由 `1:1` 改為複合鍵語意；
+     🔴 **新建**輸出欄 `feature_timeframe` 取自 `per_tf.timeframe`，**不得**以 `event_level.timeframe`（觸發 TF）冒充。
+  5. `split_projection.py` 之 `build_event_keys` docstring 舊語意「每事件恰一列」須一併改寫。
+- 修改檔案：`momentum/Analysis/event_samples/split_projection.py`、`momentum/Analysis/event_samples/pipeline.py`。
+- 不可做：不得保留「預設只取一個 TF」之行為；不得在 producer 內靜默丟列。
+- 邊界：①`per_tf` 只有一個 feature TF ⇒ 全量輸出與單選輸出列數相同（非退化，須有測試釘住）；
+  ②`selected_timeframe` 給字串且該 TF 不存在 ⇒ 維持 `ValueError`；
+  ③`event_level` 自身 `event_id` 重複 ⇒ `many_to_one` 仍須擋下（放寬 `validate` 不得順手放掉這一面）。
+- **驗證**：`venv/bin/python -m pytest -q tests/momentum/event_samples/test_splitunify_wiring.py tests/momentum/Analysis/test_splitunify_derive.py` rc=0（🔴 **端到端，schema 斷言不算**；斷言標的逐字為 `split_plan.assignments`，不是 `features`），須含：
+  - `test_run_without_selected_timeframe_emits_all_feature_tf_rows`（經 `EventSamplePipeline.run` 不傳
+    `selected_timeframe` ⇒ `len(assignments) == len(per_tf)` 且兩個 feature TF 皆在）
+  - `test_partial_boundary_gate_accepts_none_selected_timeframe`
+    （🔴 **替換**既有把 `selected_timeframe=None` 視為必 raise 之參數化案例，**不得**只新增而留著舊的）
+  - `test_feature_timeframe_column_sourced_from_per_tf_not_event_level`（同事件兩列須為**不同** TF 值）
+  mutation 自證：`M-SU-D2-20`（保留預設單選 ⇒ 第 1 條紅）、`M-SU-D2-21`（門檻改回四鍵 ⇒ 第 2 條紅）、
+  `M-SU-D2-23`（`validate="1:1"` ⇒ 第 1 條紅，`MergeError`）、`M-SU-D2-26`（冒充 ⇒ 第 3 條紅）。
+- **存活至**：全票完工後保留（唯一 producer 實作）。
+- **覆蓋風險**：`Task 9.2a` 會在同一函式再加 `feature_timeframe` 之唯一性 guard、`Task 9.2b` 會改其下游判側；
+  兩者**只增不改**本 Task 之簽章與門檻，若日後有人把門檻改回四鍵即 `M-SU-D2-21` 轉紅。
+
+---
+
+### Task 9.2a — schema 加 `feature_timeframe`（`票 SPLITUNIFY`）
+- SPEC ref：§P Phase 9B `Task 9.2a`；§V `Task 9.2a`、`D-002-C3` purge 面
+- 實作要點：
+  1. `assignments`／`purged` 兩表各加 `feature_timeframe` 欄；`receipts.per_tf` **不改形狀**。
+  2. 🔴 `build_time_clusters` 之 `clusters` **不加該欄、維持事件級**（簇由 `label_start_ms`／`label_end_ms` 決定）。
+  3. 兩道既有 guard 之判準改為 `(event_id, feature_timeframe)` 複合鍵唯一；**錯誤型別維持現狀**。
+  4. 🔴 **先後**：複合鍵唯一 guard 必須在 `D-002-C3` 同側檢查**之前**執行。
+  5. `summary` 依 `D-002-C6` 同時提供 `n_events` 與 `n_event_tf_rows`；purge 面另提供 `n_event_tf_rows_purged`。
+- 🔴 **既有兩條紅測試之處置（consult-r2 已裁定，直接照做，不得再自行改判）**：
+  - `test_duplicate_event_id_is_fail_closed`＝**測試過時**。行為仍 fail-closed，只是訊息由「event_id 重複」
+    改為「複合鍵重複」；授權＝§V／`Task 9.2a` 現行條文。改法＝更新該測試之 `match=` 字面，**不得**改實作。
+  - `test_multi_feature_tf_opposite_sides_must_fail_closed`＝**三重問題**，非二選一：
+    ①`_manifest(keys)` 把兩列同 `event_id` 寫進事件級 `manifest.table`（fixture 錯，本 Task 修）；
+    ②`(3.2)` 異側 `AlignmentViolationError` 碼上不存在（屬 `Task 9.2b`）；
+    ③判側仍 `feature_cutoff_ms`（屬 `Task 9.2b`）。
+    ⇒ 本 Task **只**修 ①，該測試在 `Task 9.2b` 完成前**預期仍紅**，須以 `xfail(strict=True)` 明示、
+    不得 `--deselect` 藏起來。
+    🔴 **機械驗收（缺此則刪掉該測試也不會紅）**：node id 逐字為
+    `tests/momentum/Analysis/test_splitunify_derive.py::test_multi_feature_tf_opposite_sides_must_fail_closed`；
+    驗收命令須**逐字指定該 node id**（見下方 §驗證第 6 條），且輸出須為 `xfailed`——
+    `passed`（＝XPASS，`strict=True` 下會轉 fail）與 `no tests ran`（＝被刪或被改名）皆判**不通過**。
+- 不可做：不得把 `clusters` 複製成多列（`w=1/n` 權重、簇計數與 golden 語意會失去定義）；
+  不得為了統一而改兩道 guard 之**錯誤型別**（前端與既有測試有依賴）；
+  不得把 `test_multi_feature_tf_opposite_sides_must_fail_closed` 用 `--deselect` 藏起來換綠。
+- 邊界：①單 feature TF 時複合鍵退化為 `event_id`，兩道 guard 行為須與改前**逐值相同**；
+  ②`assignments` 為空時 `duplicated(subset=...)` 不得拋錯；
+  ③`purged` 為空時 `n_event_tf_rows_purged == 0`（不是缺鍵）。
+- **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py` rc=0，須含：
+  - `test_assignments_composite_key_unique`
+  - `test_purged_composite_key_unique`
+  - `test_summary_has_n_events_and_n_event_tf_rows`
+  - `test_duplicate_composite_key_error_message_names_key_not_side`（鍵重複時訊息須指鍵重複，**不得**誤報異側）
+  - `test_clusters_remain_event_level_when_multi_feature_tf`
+  - 🔴 第 6 條（xfail 機械驗收，**逐字**）：
+    `venv/bin/python -m pytest -rxX "tests/momentum/Analysis/test_splitunify_derive.py::test_multi_feature_tf_opposite_sides_must_fail_closed"`
+    ⇒ 輸出須含 `1 xfailed`；出現 `1 passed`（XPASS）或 `no tests ran`（被刪／改名）即**不通過**。
+  mutation 自證：`M-SU-D2-25`（同側檢查移到複合鍵 guard 之前 ⇒ 第 4 條紅）。
+- **存活至**：全票完工後保留（複合鍵 schema 為 Phase 9 之最終形態）。
+- **覆蓋風險**：`Task 9.2b` 會在本 Task 之 guard **之後**插入同側檢查與跨表互斥；插入位置若被調到 guard 之前
+  即 `M-SU-D2-25` 轉紅。`Task 9.4` 會讀本 Task 新增之 `n_event_tf_rows*`，不改其定義。
+
+---
+
+### Task 9.2b — 側別判定改為事件級錨定（`票 SPLITUNIFY`）
+- SPEC ref：§P Phase 9B `Task 9.2b`；§V `Task 9.2b` 及其前置；`D-002-C3` (3.1)(3.2)
+- 實作要點：
+  1. **前置（步驟 0）**：`train_rows`／`test_rows` 皆非空、row set 不重疊；
+     🔴 `validate_split_pair_integrity` 由 **`EventSamplePipeline.run`**（具名，非泛稱「producer／adapter 層」）
+     在呼叫 `derive_event_split_from_plans` **之前**呼叫：以 `feature_index` 時刻序列作 `ts`、
+     `train_plan.symbol` 廣播成等長陣列作 `symbols`（單標的）；多標的由呼叫端提供 full `symbols`。缺驗即 fail-closed。
+     投影端維持**只讀** `row_index_local`，**不得**索引 `row_index`（`D-001-C2` (4.10)）。
+     `index_ms[0] <= decision_at_ms <= index_ms[-1]`，任一不滿足即 raise（訊息含 `event_id`）。
+  2. **三段式判準**（順序不得調換，且**不得**寫成第四條界外分支）：
+     `decision_at_ms <= train_last_ms` ⇒ train；`>= test_start_ms` ⇒ test；介於兩者之間 ⇒ `purged`。
+     `train_last_ms = int(index_ms[train_rows[-1]])`（新增）、`test_start_ms = int(index_ms[test_rows[0]])`（現有）。
+  3. 側別判完**廣播**到該 `event_id` 之所有 feature TF 列；`feature_cutoff_ms` **不參與** `split_label`。
+  4. 答案窗 purge 按**事件側**一次決定並廣播（不再逐列 `in_train`）。
+  5. `(3.2)` fail-closed：複合鍵唯一 guard **之後**、寫入 `assignments` **之前**，按 `event_id` 分組檢查
+     `split_label` 唯一 ⇒ 異側即 `raise AlignmentViolationError`（訊息含 `event_id`）。
+  6. 🔴 **跨表互斥**：`purged` 無 `split_label` ⇒ 分組檢查結構上抓不到混態。須另斷言
+     `set(purged["event_id"]) & set(assignments["event_id"]) == ∅`，違反即 `AlignmentViolationError`。
+     **不得**以擴充 `split_label` 值域替代。
+- 前置工作：`scripts/freeze_splitunify_golden.py` 之 fixture 須**先**新增
+  `decision_at_ms != feature_cutoff_ms` 之單 TF 邊界事件（否則 (G-4d)②③ 為空心通過）。
+- 不可做：不得保留任何以 `feature_cutoff_ms` 決定 `split_label` 的分支；
+  不得把界外 raise 寫成第四條分類分支（寫成分支即恢復重疊，越界事件可被合法分到 train／test）；
+  不得在 `(3.2)` fail-closed 上線前保留 per-cutoff 判側（否則合法多 TF 輸入會開始 raise）；
+  不得在 `derive_event_split_from_plans` 內呼叫 `validate_split_pair_integrity`（座標系不符，見 `D-001-C2` (4.10)）。
+- 邊界：①事件落在隔離帶 ⇒ `purged`，**合法且預期**，不得 raise
+  （`scripts/freeze_splitunify_golden.py` 之 `gap1`／`gap2` 在 golden 之 `g1_membership.purged` 中）；
+  ②`decision_at_ms == train_last_ms` ⇒ train（邊界取閉區間）；`== test_start_ms` ⇒ test；
+  ③單 feature TF 時廣播退化為一列，行為須與改前逐值相同。
+- **驗證**：`venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py tests/momentum/Analysis/test_splitunify_golden.py` rc=0，須含：
+  - `test_event_level_anchor_broadcasts_side_to_all_feature_tf`
+  - `test_gap_band_event_is_purged_not_train`
+  - `test_decision_before_index_start_raises` ／ `test_decision_after_index_end_raises`
+  - `test_opposite_sides_raise_alignment_violation`（須一併驗**不是**靜默取一側、**不是**改判 purged）
+  - `test_purged_and_assignments_event_id_disjoint`
+  - `test_coordinate_truth_table_four_cases`（全域+全域 不 raise／全域+局部 `IndexError`／
+    局部+局部 不 raise／局部+全域 `CrossSymbolLeakageError`）
+  - `test_derive_never_indexes_row_index`（對 `derive_event_split_from_plans` 原始碼做 AST／字面掃描）
+  - `test_multi_feature_tf_opposite_sides_must_fail_closed` 之 `xfail(strict=True)` **於本 Task 解除**
+  mutation 自證：`M-SU-D2-14`／`M-SU-D2-15`／`M-SU-D2-22`／`M-SU-D2-24`／`M-SU-D2-30`。
+- **存活至**：全票完工後保留（事件級錨定為 `(3.1)` 之唯一落地處）。
+- **覆蓋風險**：`Task 9.5` 會以 golden 把本 Task 之側別結果凍結；若本 Task 之判準日後被改，
+  golden 之 `g1_membership_v9`／`g3b_oracle_v9` 會同時轉紅（`M-SU-D2-27`／`M-SU-D2-28` 即覆蓋此面）。
+
+---
+
+### Task 9.3 — 消費面逐處列名改法（`票 SPLITUNIFY`）
+- SPEC ref：§P Phase 9B `Task 9.3`；`D-002-C5` (5.1)(5.6) register
+- 🔴 **動工前置（consult-r2 之 A6；stamp-r1 codex 要求機械化）**：先重掃 `D-002-C5` register，逐條複驗
+  `C5-01`..`C5-29` 因 `feature_timeframe` 欄而是否改變分類（甲／乙／丙）。
+  **產出物為必要條件，不是筆記**：重掃結果須寫成
+  `handoffs/run_receipts/<UTC時戳>-splitunify-task-9.3-register-rescan.txt`，內容逐條為
+  `C5-NN <改前分類> -> <改後分類> <碼證 path:line>`，且**檔案存在**列入下方驗收；
+  缺檔即本 Task 不得宣告完成（沒有這一條，省略重掃在現行檔案級 rc=0 下完全看不出來）。
+- 🔴 **不得**用「凡 `set_index("event_id")` 一律改」這種形狀規則。逐處處置如下，
+  **多數是「維持現狀 ＋ 加防誤改回歸測試」，不是改碼**：
+
+| 消費面 | 處置 | 應紅之 mutation | 測試檔 |
+|---|---|---|---|
+| `feature_materialization` | **維持事件級橫向合併**（不得改複合鍵） | `M-SU-D2-04` | `tests/momentum/event_samples/test_feature_materialization.py` |
+| `tables` | 維持事件級 `.loc[eid]` | `M-SU-D2-06` | `tests/momentum/event_samples/test_tables.py` |
+| `ic_feed` | 維持（已先過濾單一 TF，索引本就唯一） | `M-SU-D2-07`、`M-SU-D2-19` | `tests/momentum/event_samples/test_gap3_conditional_ic.py`（`ic_feed` 無專屬測試檔） |
+| `counterexample_classifier` | 維持事件級 | `M-SU-D2-08` | `tests/momentum/event_samples/test_counterexample_classifier.py` |
+| `candidate_ledger` | 維持事件級 | `M-SU-D2-09` | `tests/momentum/event_samples/test_candidate_ledger.py` |
+| `dedupe` | 保留集事件級決定 ＋ 廣播到該事件所有 per-TF 列 | `M-SU-D2-10` | `tests/momentum/event_samples/test_dedupe.py` |
+| `pattern_bridge` | **丙類，要改**：`assign.set_index("event_id")` 先去重取唯一側，不唯一即 fail-closed | `M-SU-D2-05` | `tests/momentum/event_samples/test_pattern_bridge.py` |
+| event-level 表／manifest | 粒度不變 | `M-SU-D2-18` | `tests/momentum/Analysis/test_splitunify_derive.py` |
+| 前端 `byEventId` | 維持 `canonicalEventId` 鍵 | `M-SU-D2-11` | 🔴 **須新建** `frontend/src/app/search/eventExportByEventId.test.tsx`（同目錄已有四支 `eventExport*.test.tsx` 可循） |
+
+- 不可做：不得用形狀規則（凡 `set_index("event_id")` 一律改）批次套用；
+  不得把 event-level 表複製成多列以「配合」複合鍵；
+  不得把 `M-SU-D2-11` 之前端面以「等 UAT 再做」延後——它是本 Task 的交付面之一。
+- 邊界：①單 feature TF 批下，上表九處行為須與改前**逐值相同**；
+  ②`pattern_bridge` 去重後若同一 `event_id` 出現兩個不同 `split_label` ⇒ fail-closed raise，
+  不得靜默取第一個；③前端 `byEventId` 在 `feature_timeframe` 存在時仍以 `canonicalEventId` 建鍵，
+  匯出附帶欄位不得變空。
+- **驗證**：`venv/bin/python -m pytest -q tests/momentum/event_samples/test_feature_materialization.py tests/momentum/event_samples/test_tables.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/momentum/event_samples/test_counterexample_classifier.py tests/momentum/event_samples/test_candidate_ledger.py tests/momentum/event_samples/test_dedupe.py tests/momentum/event_samples/test_pattern_bridge.py tests/momentum/Analysis/test_splitunify_derive.py` rc=0；
+  前端 `cd frontend && node_modules/.bin/vitest run src/app/search/eventExportByEventId.test.tsx` rc=0。
+  上表每列各一條「改壞就變紅」測試；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。
+  🔴 **register 重掃 receipt 之機械驗收（逐字）**：
+  `ls handoffs/run_receipts/*-splitunify-task-9.3-register-rescan.txt` rc=0，且該檔
+  `grep -cE '^C5-[0-9]+ ' <該檔>` 之值 **等於** `grep -cE '^\| \`C5-[0-9]+\`' docs/SPLITUNIFY_SPEC.D-002.md`
+  （逐條都掃過，不是抽樣）。
+- 🔴 **在上表測試實際存在之前，不得宣稱 mutation 網已閉**（§V 逐字）。
+- **存活至**：全票完工後保留（九處之防誤改回歸測試是唯一擋「未來有人用形狀規則批改」的東西）。
+- **覆蓋風險**：`Task 9.4` 會改 `split_projection` 之計數段與 `baseline`，與本 Task 之消費面不同檔；
+  兩者並行時須先 rebase。`Task 9.5` 之 golden 會覆蓋 `dedupe`／`clusters` 的期望值。
+
+---
+
+### Task 9.4 — 記帳與報告鏈（`票 SPLITUNIFY`）
+- SPEC ref：§P Phase 9B `Task 9.4`；§V `Task 9.4`；`D-002-C6`
+- 實作要點：
+  1. `n_train`／`n_test`／`n_purged` 明確定為**事件數**；新增列數欄（`n_event_tf_rows*`）。
+  2. 🔴 **事件數門檻路徑**：`split_projection.py` 之 `n_test`／`per_symbol_test_n`／`per_symbol_n`
+     皆改以 `event_id` **去重**計數——否則 1 事件 × 2 TF 使 `n_test=2 ≥ tier_min=2` 而**靜默繞過**
+     測試段事件數下限（命中 §RISK (d)）。
+  3. `dict(zip(...))` 之單鍵映射改複合鍵映射。
+  4. 🔴 **`baseline` 拆鍵**：舊鍵 `n_test` **刪除**（不得保留、不得當 alias），改輸出
+     `n_test_events`（`unique(test_ids)`）與 `n_test_samples`（`len(idx)`）；回傳 dict 鍵集為 **exact 契約**。
+  5. 🔴 `insufficient_events_in_test` **只修正計數**；終端可見性屬 `SU-RESID-9A-UI` 殘留，
+     **不列入本批完成條件**。驗收時不得宣稱「樣本不足已能被使用者看到」。
+- 修改檔案（🔴 已具名到檔:行）：
+  - `momentum/Analysis/event_samples/split_projection.py`（計數段）
+  - `momentum/Analysis/event_samples/baseline.py`（`n_test` 拆鍵）
+  - 🔴 **前端型別：事件路徑現在沒有 typed `n_train` 欄，本 Task 不動 `frontend/src/lib/types.ts` 之既有介面。**
+    碼證（stamp-r1 codex／grok 兩家撞題、主委複驗）：`types.ts:1582` 屬 `CPCVPathResult`、`:2257` 屬
+    `MarginalICSection`，**兩者與事件批無關**；事件批之 `EventAnalyzeResponse`（`types.ts:3174`）之
+    `summary` 為 `Record<string, unknown>`，**沒有欄位可改**。⇒ 若本 Task 決定要 typed 面，須**新增**
+    事件摘要型別並在此具名；在那之前**不得**去改 `CPCVPathResult`／`MarginalICSection`（改了就是動錯介面）。
+  - 前端顯示 `frontend/src/components/ic-analysis/EventTablesPanel.tsx:361`
+  - 既有前端測試（改欄名即紅，須同批改）：`eventTableTooltips.test.tsx:27`、
+    `eventTableTooltips.failclosed.test.tsx:30`、`eventTablesPanelByLabel.test.tsx:28`、
+    `eventTablesPanelCapability.test.tsx:29,101`、`eventTablesHorizonWiring.test.tsx:24`、
+    `gap3_event_tables.test.tsx:14`
+  - `tests/momentum/event_samples/test_splitunify_wiring.py`（`dict(zip(...))` 映射）
+  - 🔴 **API 端無獨立 model**：`grep -rn "n_train" api/ --include='*.py'` 對事件批 summary **零命中**
+    （命中之 `lstm_task_service.py` 之 `n_train_samples` 屬 LSTM 路徑）⇒ summary 為 dict 直通、無 pydantic 欄位要改。
+    **此為實查結論，非「未查」。**
+- 不可做：不得保留 `baseline` 舊鍵 `n_test`、不得把它當任一新鍵之 alias；
+  不得為了湊複合鍵列數而把特徵向量複製成多列（會產生重複或稀疏向量）；
+  不得宣稱 `n_test_events` 與 `n_test_samples` 恆等（物化失敗 fixture 即反例）。
+- 邊界：①無物化失敗時 `n_test_events == n_test_samples`，但仍須**兩鍵並存**；
+  ②`tier_min_test_events` 之比較在去重後進行，1 事件 × 2 TF 不得被當成 2；
+  ③前端收到舊回應（無新欄）時不得崩潰——顯示端須容忍缺鍵。
+- **驗證**：`venv/bin/python -m pytest -q tests/momentum/event_samples/test_baseline_oracle.py tests/momentum/event_samples/test_metrics_glossary.py tests/momentum/event_samples/test_splitunify_wiring.py tests/momentum/Analysis/test_splitunify_derive.py` rc=0，須含：
+  - `test_baseline_splits_n_test_into_events_and_samples`（**物化失敗 fixture**：test 含 `e1` 且物化
+    `failures` 含 `e1` ⇒ `n_test_events=1` AND `n_test_samples=0`）
+  - `test_baseline_dict_has_no_legacy_n_test_key`
+  - `test_tier_min_test_events_counts_unique_event_ids`（1 事件 × 2 TF、`tier_min=2` ⇒ 仍判樣本不足）
+  - `test_event_count_conservation`（`n_train+n_test+n_purged == n_events`，事件數非列數）
+  前端 `cd frontend && npm run build` rc=0（型別改動同批驗）。
+  mutation 自證：`M-SU-D2-13`、`M-SU-D2-31`、`M-SU-D2-32`、`M-SU-D2-12`。
+- **存活至**：全票完工後保留（`n_test_events`／`n_test_samples` 兩量分離為最終契約）。
+- **覆蓋風險**：`SU-RESID-9A-UI` 殘留解除時會再加終端揭露欄，屬**只增不改**；
+  本 Task 之鍵名與語意不得在那時被改寫。
+
+---
+
+### Task 9.5 — golden 與前端（`票 SPLITUNIFY`）
+- SPEC ref：§P Phase 9B `Task 9.5`；§V `Task 9.5` 及第 6 條；§G (G-4d)(G-4e)
+- 實作要點：
+  1. `scripts/freeze_splitunify_golden.py` 之 `_plans()`／`_event_keys()`／`_build_actual()` 擴維，
+     新增**交錯平行組**；`main()` 寫檔**只增鍵不覆蓋**（舊鍵＝§G 回歸錨）。
+  2. 🔴 **(G-4e) 第三份判準**：`_event_keys()` 內**人手逐筆填入**字面 `expected_side` 欄，
+     且**不得** import／呼叫投影、`_oracle_membership` 或兩者之共用 helper。
+  3. 🔴 **v8 baseline 換錨（write-once ＋ 外部錨）**：
+     - `tests/golden/splitunify/splitunify_golden.v8.json` 以 `O_EXCL` **write-once** 建立；已存在即 raise。
+     - 同批寫 `splitunify_golden.v8.sha256`；`--write` 指向 `.v8.json` 即 raise。
+     - 🔴 **同一次變更**必須把該檔 `sha256` 之 **64-hex 字面**寫入 `docs/SPLITUNIFY_SPEC.D-002.md` §V 第 6 條
+       之逐字錨點行 `V8_BASELINE_SHA256=<64-hex>`，且該行**不得**由 `freeze_splitunify_golden.py` 改寫。
+     - 主檔 `splitunify_golden.json` 既有 **11 個頂層鍵逐值不變**；新成員集只落在 `g1_membership_v9`／`g3b_oracle_v9`。
+  4. 前端 `byEventId` Map **排除於複合鍵遷移之外**（見 `Task 9.3` 表末列）。
+- 不可做：不得覆蓋 `splitunify_golden.json` 既有 11 個頂層鍵任一值；
+  不得讓 `freeze_splitunify_golden.py` 產生或改寫 SPEC §V 之 `V8_BASELINE_SHA256=` 錨點行（helper 只讀）；
+  不得以「比對後更新」取代 `O_EXCL` write-once；
+  不得讓 (G-4e) 第三份判準 import／呼叫投影或 `_oracle_membership`（同一次錯誤解讀寫進三份會全綠）。
+- 邊界：①`splitunify_golden.v8.json` 不存在時首次建立成功、其後任何一次再建即 raise；
+  ②golden 比對失敗**不得**自動覆蓋（§0 全域規則）；
+  ③交錯平行組與單標的組之 `g5` 各自穩定、互不影響。
+- **驗證**：`venv/bin/python scripts/freeze_splitunify_golden.py` rc=0，再
+  `venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_golden.py` rc=0，須含：
+  - `test_single_tf_golden_values_unchanged`
+  - `test_interleaved_parallel_group_g5_differs_and_is_stable`
+  - `test_v8_baseline_is_write_once`
+  - `test_freeze_write_flag_refuses_v8_target`
+  - `test_v8_sha256_matches_spec_anchor_line`（**外部錨**；🔴 只比旁檔 `.v8.sha256` 會綠，故此條不可省）
+  - `test_spec_anchor_line_exists_and_is_64hex`
+  - `test_freeze_script_does_not_write_spec_anchor`
+  - `test_main_json_eleven_top_keys_unchanged`
+  mutation 自證：`M-SU-D2-16`／`M-SU-D2-17`／`M-SU-D2-27`／`M-SU-D2-28`／`M-SU-D2-29`／`M-SU-D2-33`／`M-SU-D2-34`。
+- 🔴 **錨點字面寫入前**，(G-4d)①(vi) 之外部錨 ASSERT 標為「凍結當下才生效」，**不得宣稱已閉合**。
+- **存活至**：全票完工後保留（`splitunify_golden.v8.json` 與 §V 之 `V8_BASELINE_SHA256=` 錨點是回歸錨本體）。
+- **覆蓋風險**：本 Task 是 Phase 9 最後一步，無後續 Phase 覆蓋；風險反向——
+  任何日後改動 `Task 9.2b` 判準者都會使本 Task 之 golden 轉紅，那是**設計意圖**，不得以重凍 golden 消音。
 
 ---
 

@@ -56,7 +56,7 @@
 使用者：定義需求 + 最終否決權
 Claude(編排/主委)：判任務大小、起草 SPEC、規劃與驗收、code review 把關
 執行端(Codex / Grok / Composer,動態選層)：實作 + debug（被派工,守合約）
-品質保證：中/大任務走完整管線(SPEC+TODO+雙家族 adversarial+三方簽核+gate)
+品質保證：中/大任務走完整管線(SPEC+TODO+adversarial+簽核+gate;家數與家族名見 ORCH §1 現行分工行,本檔不寫數字)
 ```
 > 完整分工與派工協議見 `CLAUDE.md`(任務分派規則)與 `docs/MULTI_AGENT_ORCHESTRATION.md`;
 > 舊「人工定義+Claude 單獨實作+人工驗證」工作流已被上述多 agent/三方簽核取代。

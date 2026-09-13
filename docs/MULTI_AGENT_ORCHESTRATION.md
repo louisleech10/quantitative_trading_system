@@ -38,7 +38,7 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 ##### code review 實習（agy Gemini 3.6 Flash High；2026-07-22 三家評測後定）
 **背景**：agy 3.6 三家評測 35–38.5/50——**獵漏 9–9.5/10**（1d B0 抓到 3 個 Claude+Codex+Composer 雙審+閉合全漏的真 bug），但 **BLOCKING 紀律 5/10**（不對照 SPEC/凍結合約意圖，把 SPEC 明允許的 int/float 容差、已凍結另票的 all-NaN carrier 誤升 BLOCKING）。∴ 取其獵漏、隔離其誤升級。
 **護欄（定死）**：
-- **不算雙家族 quorum**：`review_quorum_check.sh` 仍要 2 個正式非實作者家族（Codex+Composer/Grok）；agy 是**額外第三隻眼**。
+- **不算 quorum**：`review_quorum_check.sh` 仍要**§1 現行分工行所列之全部正式非實作者家族**（機器版＝`scripts/governance_roles.json` 之 `reviewers`）；agy 是**額外一隻眼**，不計入。🔴 本行**不寫家數**——舊版寫「2 個」而 §1 為三家全員，屬同型漂移（2026-09-13 更正）。
 - **findings 不直接 gate/否決**：agy 的 BLOCKING 一律先由 Claude 或正式委員**對照 SPEC/凍結合約三分**（真 BLOCKING／另票／SPEC 意圖內）後才生效；未三分的 agy finding 不得阻塞 merge 或派工。
 - **唯讀**：不派實作/寫 code（延續 [[feedback_gemini_research_only]]）。
 - **調用**：`agy -p "..." --model gemini-3.6-flash-high --effort high`（agy 自身 settings 需 `read_file(*)`/`command(*)`；`.claude/settings.json` `autoMode.allow` 需放行；禁 `--dangerously-skip-permissions`）。
@@ -190,9 +190,10 @@ ASSERT <命令> WHEN <key>=<value> ... THEN rc=<n>|rc!=<n>
    **使用者讀這 2 頁確認範圍**（不是讀 3000 行）；機器用 `coverage_check.sh` 逐 ID 驗。
 3. **逐 Phase 展開**：Opus 一次只展開一個 Phase（遠低於指令預算 → 結構上不可能掉別的 Phase），拼成 SPEC。缺項時 coverage 列出 → **只補缺項，不重生成整份**。
 4. **機器把關**：`template_check`（錨點+反空殼）+ `coverage_check`（manifest 全覆蓋）。皆綠才往下。
-5. **adversarial 稽核 = GPT-5.5 + Composer 2.5 兩家族都跑**（買保險、各自獨立輸出、`-o` 只讀結論）：查語義/跨 Phase 銜接/空殼/挑戰前提。Claude 綜合「收斂 vs 分歧」給使用者。
-   **誠實界定**：兩家族保「推理/結構/空殼漏看」（C1/C2 實證有效）；**不保「共享錯前提+缺使用者事實」**（C3 全滅）→ 靠前置鐵律 + 挑戰前提 + 使用者驗 scope + Golden/執行閘。
-6. **TODO 預設 Opus 寫**（深度只能 Opus；GPT-5.5/Composer 廣度深度不足）；**交執行端生成僅 Opus 額度吃緊時 fallback，且須配 Opus adversarial 抓淺**。機器把關（template+coverage+反空殼）+ 雙家族 adversarial 同 SPEC。
+5. **adversarial 稽核 = §1 現行分工行所列之全部審查家族都跑**（本行**不寫家數也不寫家族名**；機器版＝`scripts/governance_roles.json` 之 `reviewers`）（買保險、各自獨立輸出、`-o` 只讀結論）：查語義/跨 Phase 銜接/空殼/挑戰前提。Claude 綜合「收斂 vs 分歧」給使用者。
+   **誠實界定**：多家族保「推理/結構/空殼漏看」（C1/C2 實證有效）；**不保「共享錯前提+缺使用者事實」**（C3 全滅）→ 靠前置鐵律 + 挑戰前提 + 使用者驗 scope + Golden/執行閘。
+   🔴 本行原寫「GPT-5.5 + Composer 2.5 **兩家族**都跑」，與 §1 之三家全員衝突（2026-09-13 由 stamp-r1 codex 抓出；主委當天的自證 grep 只掃「雙家族」而漏掉此處字面為「兩家族」——自證的排除條件濾掉了待抓目標）。
+6. **TODO 預設 Opus 寫**（深度只能 Opus；GPT-5.5/Composer 廣度深度不足）；**交執行端生成僅 Opus 額度吃緊時 fallback，且須配 Opus adversarial 抓淺**。機器把關（template+coverage+反空殼）+ adversarial 同 SPEC（**家數見 §1 現行分工行**，本行不寫數字）。
 
 ### 信任分工（解「使用者看不懂 3000 行程式/量化」）
 | 誰 | 驗什麼 |
