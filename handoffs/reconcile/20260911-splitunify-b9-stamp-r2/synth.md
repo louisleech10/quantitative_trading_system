@@ -34,3 +34,13 @@ Verdict：可合併
 **來源摘要**: `docs/SPLITUNIFY_TODO.md#0c76ece1efac`
 修法：將殘留段的 20 改為 19；可行性為單一字面同步。本 P2 不阻擋本輪 body 重簽。
 
+
+## 戳記
+
+> 三家 RECONCILE-STAMP；body sha256 = 「## 戳記」前全部內容。
+> 本收斂檔為 SPLITUNIFY b9 進入 `Task 9.1` 實作之授權依據（`gate.sh dispatch --risk high` 之 `--adversarial` 標的）。
+
+RECONCILE-STAMP: composer APPROVED 2026-09-13 sha256:3f3d0d7936256c9b71ebce51cf286310c55fb432a760eb68bcb60602e0f3dacb task:20260911-SPLITUNIFY-B9-STAMP-R3
+RECONCILE-STAMP: codex APPROVED 2026-09-13 sha256:3f3d0d7936256c9b71ebce51cf286310c55fb432a760eb68bcb60602e0f3dacb task:20260911-SPLITUNIFY-B9-STAMP-R3
+
+RECONCILE-STAMP: grok APPROVED 2026-09-13 sha256:3f3d0d7936256c9b71ebce51cf286310c55fb432a760eb68bcb60602e0f3dacb task:20260911-SPLITUNIFY-B9-STAMP-R3

@@ -742,10 +742,16 @@ class EventSamplePipeline:
                     "embargo_ms_by_symbol 必須為 None——隔離已含在 test_plan.row_index[0] 的起點裡，"
                     "再疊一層毫秒 embargo 會變成兩套隔離（fail-closed）"
                 )
+            # 🔴 D-002 Task 9.1（Phase 9A）：producer 改回傳 `(keyed, discarded)`；
+            #    `discarded` 須**原樣**沿 summary 帶出，在此丟掉就等於回到靜默丟棄。
+            event_keys, discarded_rows = build_event_keys(
+                receipts, selected_timeframe=str(selected_timeframe)
+            )
             plan = derive_event_split_from_plans(
                 train_plan, test_plan,
-                build_event_keys(receipts, selected_timeframe=str(selected_timeframe)),
+                event_keys,
                 feature_index, manifest=manifest, bucket_ms=config.split.bucket_ms,
+                discarded_rows_by_feature_tf=discarded_rows,
                 # 🔴 B2b R1 之 H6（2026-09-11 回溯稽核撈回）：原本沒傳 ⇒ 投影路徑把使用者設定的
                 #    測試段事件數下限靜默換成 1，與 split_events 路徑判定不一致。
                 tier_min_test_events=config.split.tier_min_test_events,

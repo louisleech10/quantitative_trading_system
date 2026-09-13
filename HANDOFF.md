@@ -5,7 +5,16 @@
 - **r17 另抓三條，三家撞題，全採納並修完**：**X1** 收窄後的 basename 判準對 **15 列**仍不可執行（三家各自算出同一組，與主委機械掃描逐字一致）⇒ `Task 9.3` 驗收第 5 點改**三段式、29 列互斥窮盡**：(甲) 10 列精確 keyed／(乙) 4 列 basename／(丙) **15 列明文排除**（`C5-01`..`C5-12`／`C5-20`／`C5-22`／`C5-24`，碼證欄填 `NO-ANCHOR`）；**X2** 殘留觸發條件無機械觀測（無判定人／無命令）⇒ 改兩條客觀事件＋owner＋時機；**X3** 「9 列／20 列」字面在同輪補 `C5-25` 錨後已過期 ⇒ 同步為 10／4／15。🔴 X3 正是本檔一路在打的「改 A 沒同步 B」，這次是主委在同一輪內自己造成的。
 - 🔴 **具名殘留 `SU-RESID-C5-TARGETS`（不得讀作已解決）**：(丙) 那 15 列之 receipt **碼證欄不受機械對證保護**，只靠分類欄對證 SPEC 現況；理由類別 `blocked-by`，觸發條件與 owner 見 TODO `Task 9.3` 該段。
 ⑪**stamp-r2（codex 單家閉合＋重簽）完成 ⇒ 🏁 `bash scripts/reconcile_stamps_check.sh docs/SPLITUNIFY_SPEC.D-002.md` **rc=0，三家全數 APPROVED 且雜湊相符**（body `d42b3f14c4e33f51ca4fb04e66526db245b7f2cb080198afcd989c0d9c3730a0`）。本檔自 R1 起十七輪，至此首次取得完整且有效之三家戳記**。codex 之 `CODEX-R17-P1-01`／`P1-02` 由原提出方 CLOSED；另提一條 P2 亦已修——`SU-RESID-C5-TARGETS` 殘留段仍寫「20 列」（`C5-25` 補錨後應為 **19**），並給出 (乙) 4 列之逐字 ID `C5-15`／`C5-16`／`C5-17`／`C5-18`（主委機械複驗四列皆「有檔名、無行號」屬實）。🔴 **同一個「改 A 沒同步 B」第三次**：`C5-25` 補錨這**一個動作**先後打翻驗收第 5 點的「9／20」（r17 X3）與殘留段的「20」（本條），兩次落在不同行。
-- **下一步（無阻塞）**：`§C-9` 動工前置三條已全數滿足 ⇒ **領 impl token 進 `Task 9.1`**（第 9 批產品實作正式開工）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`；批次 `B9A`–`B9F`，本次做 **B9A ＝ Task 9.1**。
+⑫**stamp-r3 三家零 finding APPROVED** ⇒ stamp-r2 收斂檔取得三家戳記（body `3f3d0d79…`、`reconcile_stamps_check` rc=0），作為 impl token 之 `--adversarial` 授權依據。三家並各自確認 `Task 9.1` 施工條文可直接開工、無未解歧義，亦無一家主張授權依據應改指 r17 收斂檔。
+⑬🔴 **`Task 9.1`（B9A）已實作完成**（impl token `20260911-SPLITUNIFY-B9-IMPL-T91`）：
+  - `build_event_keys` 回傳改為 `(keyed, discarded)`；`discarded` 之鍵為被單選濾掉之 feature TF 字面、值為列數，無丟棄時為 `{}`。**單選行為與 `selected_timeframe` 必填性皆未動**（改可選全量是 `Task 9.2`）。
+  - `_derive_single_symbol`／多 symbol 分派器新增 keyword-only `discarded_rows_by_feature_tf`，**原樣**寫入 `EventSplitPlan.summary["discarded_rows_by_feature_tf"]`；`_build_summary` 由 12 鍵增為 **13 鍵**。
+  - `pipeline.py` caller 同批改為 unpack 兩值並沿用傳遞。
+  - 測試：四條具名測試全補（`test_build_event_keys_discarded_counts_dropped_feature_tf`／`..._empty_when_single_feature_tf`／`test_summary_carries_discarded_rows_by_feature_tf_equal_to_producer`／`test_discarded_layer_is_independently_revertible`）；既有 `test_summary_has_all_twelve_keys` 依 13 鍵更名並改斷言。
+  - **實跑**：`tests/momentum/Analysis/test_splitunify_derive.py` ＋ `tests/momentum/event_samples/` ＋ golden ＋ contract ＋ `tests/api/test_splitunify_disclosure.py` ＋ `..._event_study_only.py` 合計 **692 passed、0 failed**。
+  - **mutation 自證（實跑）**：`M-SU-D2-01`（刪 summary 寫入行）⇒ **3 failed**；`M-SU-D2-02`（`_derive_single_symbol` 改傳 `{}`）⇒ **1 failed**（由**值相等**斷言抓到；只驗鍵存在會漏）。兩者皆已還原。
+- 🔴 **與 TODO 條文之具名偏離（交審碼輪裁）**：TODO `Task 9.1` 實作要點 2 寫「多 symbol 分派器逐 symbol **相加**」，但實際呼叫圖中 `build_event_keys` 是**對整批 `receipts.per_tf` 呼叫一次**（`pipeline.py` 單一呼叫點），`discarded` 為批次級、不存在逐 symbol 分量 ⇒ 實作採**原樣傳遞**，若照字面相加會**重複計數**。已於碼中具名註記。
+- **下一步**：派 `Task 9.1` 之三家審碼輪（`review-r18`）。之後依序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（本次完成 **B9A**）。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v13，body sha256 `06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77`，仍為零戳記**。停輪依據＝`handoffs/reconcile/20260911-splitunify-b9-review-r12/synth.md`（唯一權威，本檔不複述）。

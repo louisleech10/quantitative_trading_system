@@ -591,7 +591,7 @@ def test_clusters_still_agree_with_split_events_shape() -> None:
     pd.testing.assert_frame_equal(build_time_clusters(man, H1), legacy.clusters)
 
 
-def test_summary_has_all_twelve_keys() -> None:
+def test_summary_has_all_thirteen_keys() -> None:
     index, train, test, keys, man, _ = _basic_case()
     plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
     assert set(plan.summary) == {
@@ -607,6 +607,9 @@ def test_summary_has_all_twelve_keys() -> None:
         "n_events_effective",
         "n_purged",
         "bucket_ms",
+        # 🔴 D-002 Task 9.1（Phase 9A）：第 13 鍵。exact-set 斷言刻意不放寬為「包含」——
+        #    多一鍵少一鍵都要當場紅，否則 Task 9.4 之後有人加鍵就沒人擋。
+        "discarded_rows_by_feature_tf",
     }
     assert plan.summary["n_purged"] == len(plan.purged)
     assert "single_symbol" in plan.summary["degraded"], (
@@ -924,10 +927,12 @@ def test_build_event_keys_joins_by_event_id_not_position() -> None:
         {"event_id": "b", "timeframe": "1h", "feature_cutoff_ms": 3000},
         {"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000},
     ]
-    keys = build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
+    keys, discarded = build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
     got = dict(zip(keys["event_id"], keys["feature_cutoff_ms"]))
     assert got == {"a": 1000, "b": 3000}
     assert list(keys.columns) == list(EVENT_KEY_COLUMNS)
+    # 🔴 D-002 Task 9.1：`per_tf` 只有 1h 這一個 feature TF ⇒ 沒有任何列被丟棄。
+    assert discarded == {}
 
 
 def test_build_event_keys_picks_selected_timeframe_only() -> None:
@@ -938,8 +943,15 @@ def test_build_event_keys_picks_selected_timeframe_only() -> None:
         {"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000},
         {"event_id": "a", "timeframe": "12h", "feature_cutoff_ms": 9000},
     ]
-    keys = build_event_keys(_receipts(ev, per_tf), selected_timeframe="12h")
+    keys, discarded = build_event_keys(_receipts(ev, per_tf), selected_timeframe="12h")
     assert list(keys["feature_cutoff_ms"]) == [9000]
+    # 🔴 D-002 Task 9.1：被單選濾掉的那一列（1h）須誠實記帳，不得靜默消失。
+    #    期望值由 fixture 逐筆算出，不寫死常數。
+    expected_dropped = {
+        tf: sum(1 for r in per_tf if r["timeframe"] == tf)
+        for tf in {r["timeframe"] for r in per_tf if r["timeframe"] != "12h"}
+    }
+    assert discarded == expected_dropped
 
 
 def test_build_event_keys_rejects_duplicate_per_tf_rows() -> None:
@@ -1305,3 +1317,88 @@ def test_fingerprint_tampered_rows_are_caught_at_entry() -> None:
     with pytest.raises(ValueError, match="指紋不符") as ei:
         derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
     assert re.search(r"[0-9a-f]{12}", str(ei.value)), "訊息未帶可比對的指紋前綴"
+
+
+# ── D-002 Task 9.1（Phase 9A）：丟棄列數之完整資料流契約 ────────────────────────
+# 🔴 這四條是 `docs/SPLITUNIFY_TODO.md` §C-9 Task 9.1 之驗收具名測試。
+#    契約＝producer 回傳 `(keyed, discarded)` → `_derive_single_symbol` **原樣**寫入
+#    `EventSplitPlan.summary["discarded_rows_by_feature_tf"]`。
+#    存在理由：單選 `selected_timeframe` 會把其餘 feature TF 的 per_tf 列靜默丟掉，
+#    呼叫端與使用者看不到丟了多少——那正是 Phase 9A 要消滅的誠實性缺陷。
+
+
+def _receipts_multi_tf():
+    """一個事件、兩個 feature TF（1h 兩列、4h 三列）——列數刻意不等，避免對稱巧合。"""
+    ev = [
+        {"event_id": "a", "symbol": SYM, "timeframe": "1h",
+         "label_start_ms": 10, "label_end_ms": 20},
+        {"event_id": "b", "symbol": SYM, "timeframe": "1h",
+         "label_start_ms": 30, "label_end_ms": 40},
+    ]
+    per_tf = [
+        {"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000},
+        {"event_id": "b", "timeframe": "1h", "feature_cutoff_ms": 3000},
+        {"event_id": "a", "timeframe": "4h", "feature_cutoff_ms": 1100},
+        {"event_id": "b", "timeframe": "4h", "feature_cutoff_ms": 3100},
+        {"event_id": "a", "timeframe": "12h", "feature_cutoff_ms": 1200},
+    ]
+    return ev, per_tf
+
+
+def test_build_event_keys_discarded_counts_dropped_feature_tf() -> None:
+    """選 1h ⇒ 4h／12h 之列數逐 TF 記帳；期望值由 fixture 逐筆算出，**不寫死常數**。"""
+    ev, per_tf = _receipts_multi_tf()
+    keys, discarded = build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
+
+    expected = {}
+    for row in per_tf:
+        if row["timeframe"] != "1h":
+            expected[row["timeframe"]] = expected.get(row["timeframe"], 0) + 1
+    assert discarded == expected
+    # 記帳不得改變被選中那一側的內容（本 Task 只加記帳、不動單選行為）。
+    assert len(keys) == sum(1 for r in per_tf if r["timeframe"] == "1h")
+
+
+def test_build_event_keys_discarded_empty_when_single_feature_tf() -> None:
+    """只有一個 feature TF ⇒ `discarded` 為 `{}`——不得省略、不得回 `None`。"""
+    ev = [{"event_id": "a", "symbol": SYM, "timeframe": "1h",
+           "label_start_ms": 10, "label_end_ms": 20}]
+    per_tf = [{"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000}]
+    _keys, discarded = build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
+    assert discarded == {}
+    assert discarded is not None
+
+
+def test_summary_carries_discarded_rows_by_feature_tf_equal_to_producer() -> None:
+    """🔴 **值相等**，不是只驗鍵存在——孤立單測手塞空 dict 也能通過「鍵存在」。"""
+    index, train, test, keys, man, _ = _basic_case()
+    producer_discarded = {"4h": 3, "12h": 1}
+    plan = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1,
+        discarded_rows_by_feature_tf=producer_discarded,
+    )
+    assert plan.summary["discarded_rows_by_feature_tf"] == producer_discarded
+    # 未給時須為 `{}`（缺鍵或 None 皆不合契約）。
+    plan_none = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1,
+    )
+    assert plan_none.summary["discarded_rows_by_feature_tf"] == {}
+
+
+def test_discarded_layer_is_independently_revertible() -> None:
+    """獨立回退之可證偽斷言：拿掉該鍵後，summary 其餘鍵**逐值**與 9A 前相同。"""
+    index, train, test, keys, man, _ = _basic_case()
+    plan_with = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1,
+        discarded_rows_by_feature_tf={"4h": 2},
+    )
+    plan_without = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1,
+    )
+    stripped_with = {k: v for k, v in plan_with.summary.items()
+                     if k != "discarded_rows_by_feature_tf"}
+    stripped_without = {k: v for k, v in plan_without.summary.items()
+                        if k != "discarded_rows_by_feature_tf"}
+    assert stripped_with == stripped_without
+    # 且兩者確實只差這一鍵（防「其實還動了別的欄但被上面的過濾遮掉」）。
+    assert set(plan_with.summary) - set(stripped_with) == {"discarded_rows_by_feature_tf"}

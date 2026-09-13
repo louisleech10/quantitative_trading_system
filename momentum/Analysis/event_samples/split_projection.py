@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -257,7 +257,7 @@ def build_event_keys(
     receipts: AlignmentReceipts,
     *,
     selected_timeframe: str,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, Dict[str, int]]:
     """由對齊收據組出投影所需的 **keyed** 事件表（SPEC C-4；R4 之 F2）。
 
     🔴 **producer 具名在此，B3 只傳遞、不臨時組裝**。理由（`CODEX-R3-P1-01`／`R4-P1-02`）：
@@ -270,17 +270,31 @@ def build_event_keys(
 
     每個事件在 `selected_timeframe` 下必須**恰有一列** `per_tf`；否則 raise
     （多 TF 之 `(event_id, timeframe)` 複合鍵為殘留 `SU-RESID-2`，本票不解）。
+
+    🔴 **D-002 `Task 9.1`（Phase 9A）：回傳 `(keyed, discarded)` 兩值**。
+    `discarded` 之鍵為**被單選濾掉之 feature TF 字面**、值為其列數；無丟棄時為 `{}`
+    （**不得**省略、不得回 `None`）。存在理由：單選 `selected_timeframe` 會把其餘 feature TF
+    的 `per_tf` 列**靜默丟掉**，呼叫端與使用者完全看不到丟了多少——那正是本 Phase 要消滅的
+    誠實性缺陷。🔴 本 Task **只做記帳**：`selected_timeframe` 仍為**必填**、單選行為**不變**
+    （改為可選全量是 `Task 9.2`）；丟棄時**不得** raise（會擋掉目前合法的單 feature TF 用法）。
     """
     per_tf = receipts.per_tf
     event_level = receipts.event_level
     if per_tf is None or event_level is None:
         raise ValueError("build_event_keys: receipts 缺 per_tf 或 event_level（fail-closed）")
 
-    selected = per_tf.loc[per_tf["timeframe"] == str(selected_timeframe)]
+    want = str(selected_timeframe)
+    selected = per_tf.loc[per_tf["timeframe"].astype(str) == want]
     if selected.empty:
         raise ValueError(
             f"build_event_keys: per_tf 無 timeframe={selected_timeframe!r} 之列（fail-closed）"
         )
+    # 🔴 D-002 Task 9.1：被單選濾掉之列須逐 feature TF 記帳，不得靜默消失。
+    #    以 `value_counts` 取代逐 TF 掃描——同一個 TF 的列數只算一次，且對空集合回 {}。
+    dropped_tf = per_tf.loc[per_tf["timeframe"].astype(str) != want, "timeframe"].astype(str)
+    discarded: Dict[str, int] = {
+        str(tf): int(n) for tf, n in dropped_tf.value_counts().items()
+    }
     dupes = selected["event_id"][selected["event_id"].duplicated()].unique().tolist()
     if dupes:
         raise ValueError(
@@ -300,7 +314,7 @@ def build_event_keys(
     out = merged[
         ["event_id", "feature_cutoff_ms", "label_start_ms", "label_end_ms", "symbol", "timeframe"]
     ].copy()
-    return out.reset_index(drop=True)
+    return out.reset_index(drop=True), discarded
 
 
 def _assert_event_keys_wellformed(event_keys: pd.DataFrame) -> None:
@@ -337,6 +351,10 @@ def _derive_single_symbol(
     manifest: EventManifest,
     bucket_ms: Optional[int] = None,
     tier_min_test_events: int = 1,
+    # 🔴 D-002 Task 9.1：producer 之 `discarded` **原樣**帶進 summary（跨邊界傳遞，不重算）。
+    #    預設 `None` 而非 `{}`：`None` 代表「呼叫端沒給」⇒ 寫入空 dict；給了就原樣寫。
+    #    不可變預設值之所以不寫 `{}`，是避免共用可變預設物件。
+    discarded_rows_by_feature_tf: Optional[Dict[str, int]] = None,
 ) -> EventSplitPlan:
     """由 canonical 邊界投影出**完整**的 `EventSplitPlan`（SPEC C-3／C-4／C-5）。
 
@@ -569,6 +587,7 @@ def _derive_single_symbol(
         per_symbol_test_n={s: n_test for s in per_symbol_n},
         bucket=int(time_cluster_bucket_ms(manifest, bucket_ms)),
         tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),
+        discarded_rows_by_feature_tf=discarded_rows_by_feature_tf,
     )
     return EventSplitPlan(
         assignments=assignments, purged=purged, clusters=clusters, summary=summary
@@ -606,6 +625,7 @@ def derive_event_split_from_plans(
     manifest = kwargs.pop("manifest")
     bucket_ms = kwargs.pop("bucket_ms", None)
     tier_min_test_events = kwargs.pop("tier_min_test_events", 1)
+    discarded_rows_by_feature_tf = kwargs.pop("discarded_rows_by_feature_tf", None)
     if kwargs:
         raise TypeError(f"derive_event_split_from_plans: 未知參數 {sorted(kwargs)}")
 
@@ -662,6 +682,10 @@ def derive_event_split_from_plans(
         per_symbol_test_n=per_symbol_test_n,
         bucket=int(time_cluster_bucket_ms(manifest, bucket_ms)),
         tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),
+        # 🔴 D-002 Task 9.1：`discarded` 是 **producer 層**（`build_event_keys`）對整批
+        #    `receipts.per_tf` 一次算出的，不是逐 symbol 各算一份 ⇒ 多 symbol 路徑
+        #    **原樣傳遞**即可，不得在此對各 symbol 的結果再相加（會重複計數）。
+        discarded_rows_by_feature_tf=discarded_rows_by_feature_tf,
     )
     return EventSplitPlan(
         assignments=assignments, purged=purged, clusters=clusters, summary=summary
@@ -690,6 +714,7 @@ def _build_summary(
     per_symbol_test_n: Dict[str, int],
     bucket: int,
     tier_min_test_events: int = 1,
+    discarded_rows_by_feature_tf: Optional[Dict[str, int]] = None,
 ) -> Dict[str, Any]:
     """`EventSplitPlan.summary` 之 **12 個必填鍵**（SPEC C-5）。
 
@@ -731,6 +756,12 @@ def _build_summary(
         "n_events_effective": manifest.summary["n_events_effective"],
         "n_purged": int(n_purged),
         "bucket_ms": int(bucket),
+        # 🔴 D-002 Task 9.1（Phase 9A）：producer 之丟棄記帳**原樣**落在此鍵。
+        #    鍵名依 `D-002-C0` (0.6) 不得含裸 `timeframe`，故用 `feature_tf`。
+        #    值為 `{feature TF 字面: 列數}`；無丟棄時為 `{}`（不得缺鍵、不得為 None）。
+        "discarded_rows_by_feature_tf": {
+            str(k): int(v) for k, v in (discarded_rows_by_feature_tf or {}).items()
+        },
     }
 
 
