@@ -297,6 +297,61 @@ def test_anchor_in_history_section_rejected(tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
+def test_code_file_comment_marker_is_not_history(tmp_path: Path) -> None:
+    """〔CODEX-R2-P1-01〕ASSERT 程式檔註解含 `HISTORY-BEGIN` 字面 ⇒ 不算歷史區；anchor 指其後程式行 rc=0。
+
+    碼證：codex 構造 anchor 指 `scripts/completeness_check.sh:413`（scanner 程式行，其上方註解含該字面）
+    ⇒ 前版 rc=1 誤拒。歷史區只存在於 .md 且 marker 為 `<!-- HISTORY-BEGIN -->` 註解形態。
+    mutation：把 `case "${path}" in *.md)` 拿掉或 marker 正則放回裸字面 ⇒ 本條紅。
+    """
+    sh = tmp_path / "scanner.sh"
+    sh.write_text(
+        "#!/usr/bin/env bash\n# 遇 HISTORY-BEGIN 設狀態\n# 遇 HISTORY-END 清零\nawk 'NR==1' \"$1\"\n",
+        encoding="utf-8",
+    )
+    p = _finding(
+        tmp_path, "code_anchor.md", sev="P0",
+        evidence=f"CODE-ANCHOR: {sh}:4\nMUTATION: 刪掉判定會紅。",
+    )
+    proc = _single(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_bare_marker_literal_in_md_prose_is_not_history(tmp_path: Path) -> None:
+    """〔CODEX-R2-P1-01〕ASSERT .md 正文提到 `HISTORY-BEGIN` 字面（非 `<!-- -->` 註解）⇒ 不算歷史區。"""
+    t = tmp_path / "PROSE_SPEC.md"
+    t.write_text("## 本文\n本節說明 HISTORY-BEGIN 標記的用法。\n活文第 3 行\n", encoding="utf-8")
+    p = _finding(
+        tmp_path, "prose_anchor.md", sev="P0",
+        evidence=f"CODE-ANCHOR: {t}:3\nMUTATION: 刪掉判定會紅。",
+    )
+    proc = _single(p)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_range_anchor_spanning_history_rejected(tmp_path: Path) -> None:
+    """〔CODEX-R2-P1-02〕ASSERT `path:A-B` 範圍任一行落歷史 ⇒ rc≠0（不得截成起點偽裝現行）。
+
+    碼證：codex 構造 `hist_sandwich.md:1-3`（第 1 行活文、第 3 行 HISTORY）⇒ 前版 rc=0。
+    mutation：把 `(-[0-9]+)?` 拿掉或 `NR >= want && NR <= want_end` 改回 `NR == want` ⇒ 本條紅。
+    """
+    t = tmp_path / "SANDWICH_SPEC.md"
+    t.write_text("活文 1\n<!-- HISTORY-BEGIN -->\n舊 3\n<!-- HISTORY-END -->\n活文 5\n", encoding="utf-8")
+    bad = _finding(
+        tmp_path, "range_bad.md", sev="P0",
+        evidence=f"CODE-ANCHOR: {t}:1-3\nMUTATION: 刪掉判定會紅。",
+    )
+    proc = _single(bad)
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "anchor 落在歷史段" in proc.stderr and ":1-3" in proc.stderr, proc.stderr
+    ok = _finding(
+        tmp_path, "range_ok.md", sev="P0",
+        evidence=f"CODE-ANCHOR: {t}:5-5\nMUTATION: 刪掉判定會紅。",
+    )
+    proc = _single(ok)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
 def test_p3_sentinel_not_subject_to_token_rule(tmp_path: Path) -> None:
     """Task 1.6 ASSERT P2／P3（含零 findings sentinel）不套 token 必填。"""
     p = _finding(tmp_path, "p3.md", sev="P3", evidence="本輪無 finding。")

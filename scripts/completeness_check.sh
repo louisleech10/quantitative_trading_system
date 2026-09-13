@@ -388,17 +388,23 @@ _validate_anchors() {
             fi ;;
         esac ;;
       ANCHOR)
-        path="${sev}"; line="${ha}"
+        path="${sev}"; line="${ha}"; line_end="${hm}"
         [ -f "${path}" ] || continue
-        hist="$(LC_ALL=C awk -v want="${line}" '
+        # 〔CODEX-R2-P1-01〕歷史區只存在於 Markdown 文件，且 marker 是 HTML 註解形態
+        #   `<!-- HISTORY-BEGIN -->`；程式檔註解裡的字面（本檔就有）不是歷史區 ⇒ 只對 .md 判定、
+        #   只認註解形態 marker。
+        case "${path}" in *.md) : ;; *) continue ;; esac
+        # 〔CODEX-R2-P1-02〕`path:A-B` 範圍：任一行落歷史即 FAIL，不得截成起點。
+        [ -n "${line_end}" ] && [ "${line_end}" != "0" ] || line_end="${line}"
+        hist="$(LC_ALL=C awk -v want="${line}" -v want_end="${line_end}" '
           BEGIN { m=0; s=0; hit=0 }
-          /HISTORY-BEGIN/ { m=1 }
-          /HISTORY-END/   { m=0 }
+          /<!--[[:space:]]*HISTORY-BEGIN[[:space:]]*-->/ { m=1 }
+          /<!--[[:space:]]*HISTORY-END[[:space:]]*-->/   { m=0 }
           /^## / { s = ($0 ~ /^## 沿革/) ? 1 : 0 }
-          NR == want { hit = (m || s) ? 1 : 0 }
+          NR >= want && NR <= want_end { if (m || s) hit = 1 }
           END { print hit }' "${path}")"
         if [ "${hist}" = "1" ]; then
-          echo "COMPLETENESS FAIL: anchor 落在歷史段（HISTORY-BEGIN..END／## 沿革）: ${id} → ${path}:${line} (file=${file})" >&2
+          echo "COMPLETENESS FAIL: anchor 落在歷史段（HISTORY-BEGIN..END／## 沿革）: ${id} → ${path}:${line}$( [ "${line_end}" != "${line}" ] && printf -- '-%s' "${line_end}" ) (file=${file})" >&2
           echo "  → 改指其對應之現行條文，或不列為 finding（DOCROT Task 1.4：輸入隔離之機械牙）" >&2
           bad=1
         fi ;;
@@ -409,14 +415,17 @@ $(LC_ALL=C awk '
     if (id == "") return
     printf "TOKENS\t%s\t%s\t%d\t%d\n", id, sev, ha, hm
   }
-  function emit_anchors(s,   re, m, tok, p, ln) {
-    re = "[A-Za-z0-9_./-]+\\.(md|py|sh|json|ts|tsx|yaml|yml|txt):[0-9]+"
+  function emit_anchors(s,   re, m, tok, p, ln, ln_end) {
+    # 〔CODEX-R2-P1-02〕吃整段 `path:A` 或 `path:A-B`；range 之終點另欄回傳，禁截成起點。
+    re = "[A-Za-z0-9_./-]+\\.(md|py|sh|json|ts|tsx|yaml|yml|txt):[0-9]+(-[0-9]+)?"
     while (match(s, re)) {
       tok = substr(s, RSTART, RLENGTH)
       s = substr(s, RSTART + RLENGTH)
-      p = tok; sub(/:[0-9]+$/, "", p)
+      p = tok; sub(/:[0-9]+(-[0-9]+)?$/, "", p)
       ln = tok; sub(/^.*:/, "", ln)
-      printf "ANCHOR\t%s\t%s\t%s\t0\n", id, p, ln
+      ln_end = ln
+      if (ln ~ /-/) { ln_end = ln; sub(/^[0-9]+-/, "", ln_end); sub(/-[0-9]+$/, "", ln) }
+      printf "ANCHOR\t%s\t%s\t%s\t%s\n", id, p, ln, ln_end
     }
   }
   BEGIN { id=""; sev=""; ha=0; hm=0; in_fence=0 }
