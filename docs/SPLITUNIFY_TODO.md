@@ -555,9 +555,14 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   - 🔴 第 6 條（xfail 機械驗收，**逐字**）：
     `venv/bin/python -m pytest -rxX "tests/momentum/Analysis/test_splitunify_derive.py::test_multi_feature_tf_opposite_sides_must_fail_closed"`
     ⇒ 輸出須含 `1 xfailed`；出現 `1 passed`（XPASS）或 `no tests ran`（被刪／改名）即**不通過**。
+  - 🔴 **R20 三家撞題補一條**：`test_multi_symbol_branch_summary_counts_are_named`——多 symbol
+    （Mapping）分支之 `n_events`／`n_event_tf_rows`／`n_event_tf_rows_purged` 逐值斷言，
+    並**明文擋 0 值**（0 正是「三個 kwargs 被省略」時的樣子）。缺此條時省略那三個 kwargs
+    會讓 summary 靜默變 0 而 scoped 回歸仍全綠。
   mutation 自證：`M-SU-D2-25`（同側檢查移到複合鍵 guard 之前 ⇒ 第 4 條紅）；
   `M-SU-D2-35`（`assignments` 組裝不寫 `feature_timeframe` 欄）；
-  `M-SU-D2-36`（`purged` 組裝不寫該欄）。
+  `M-SU-D2-36`（`purged` 組裝不寫該欄）；
+  **多 symbol 三計數**：分派器省略該三 kwargs ⇒ `test_multi_symbol_branch_summary_counts_are_named` 轉紅。
   🔴 **v15 強化（R14 codex／grok 撞題）**：上列兩條之應紅測試**不得**只靠 `duplicated(subset=[...])` 的 `KeyError`——
   實作者若寫成 `if "feature_timeframe" in df.columns` 軟包，欄缺就靜默略過而不紅。
   兩個測試各須**先** `assert "feature_timeframe" in <表>.columns`、**再**做複合鍵唯一性斷言；

@@ -47,8 +47,13 @@ def _plans(index, symbol=SYM):
 
 def _keys(rows):
     return pd.DataFrame([
+        # 🔴 D-002 `Task 9.2`：`event_keys` 行粒度已升為 `(event_id, feature_timeframe)`，
+        #    本探針補上該欄（單一 feature TF ⇒ 行為與改前相同）。
+        #    R20 codex 掃出本檔漏欄並判非阻擋；仍一併補齊——`Task 9.1` 之 A4（探針沒跟著改）
+        #    與 R20 之 D1（xfail 錨點沒補回）已是同一根因的兩次發作，不留第三次。
         {"event_id": e, "feature_cutoff_ms": int(c), "label_start_ms": int(c),
-         "label_end_ms": int(le), "symbol": SYM, "timeframe": "1h"}
+         "label_end_ms": int(le), "symbol": SYM, "timeframe": "1h",
+         "feature_timeframe": "1h"}
         for e, c, le in rows
     ])
 

@@ -1601,3 +1601,52 @@ def test_clusters_remain_event_level_when_multi_feature_tf() -> None:
     assert len(plan.clusters) == keys["event_id"].nunique(), (
         "簇被複製成多列 ⇒ w=1/n 權重與簇計數會失去定義"
     )
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "D-002 (3.2) 之異側 fail-closed 屬 Task 9.2b，尚未實作。"
+        "🔴 consult-r2 裁定本測試為**三重問題**：①fixture 把兩列同 event_id 寫進事件級 "
+        "manifest（Task 9.2a 已修，改用事件級 manifest）②(3.2) 之 AlignmentViolationError "
+        "碼上不存在（9.2b）③判側仍用 feature_cutoff_ms（9.2b）。"
+        "本測試在 9.2b 完成前**預期紅**，以 strict xfail 明示而非 --deselect 藏起來。"
+    ),
+)
+def test_multi_feature_tf_opposite_sides_must_fail_closed() -> None:
+    """同一事件之兩個 feature TF 若被判到**異側** ⇒ 須 fail-closed raise，不得靜默取一側。
+
+    🔴 `D-002-C3` (3.2)：同事件恆同側是**結構性保證**；一旦兩列異側就是 OOS 被污染，
+    靜默取一側或改判 purged 都會讓污染看不見。
+    🔴 本測試之 node id 是 `Task 9.2a` 機械驗收第 6 條的**逐字錨點**——
+    刪掉或改名都會讓該條驗收得到 `no tests ran` 而判不通過（R20 三家撞題：
+    它原本整段缺席，等同「刪測換綠」，且使 `Task 9.2b` 失去可解除之 xfail 標的）。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    train_rows, test_rows = b["train_row_index"], b["test_row_index"]
+    # 同一事件、兩個 feature TF，cutoff **刻意分落 train 段與 test 段** ⇒ 現行逐列判側會給異側。
+    keys = _event_keys([
+        ("e_x", index[train_rows[0]], int(index[train_rows[0]]) + H1, SYM, "1h"),
+        ("e_x", index[test_rows[0]], int(index[test_rows[0]]) + H1, SYM, "4h"),
+    ])
+    # 🔴 manifest 維持**事件級**（一列一事件）——Task 9.2a 已修之 fixture 缺陷。
+    man = _manifest(keys.drop_duplicates("event_id"))
+    with pytest.raises(Exception, match="同一事件|異側|同側|AlignmentViolation"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_multi_symbol_branch_summary_counts_are_named() -> None:
+    """多 symbol（Mapping）分支之三個計數須有具名斷言（R20 三家撞題）。
+
+    🔴 該分支之 `n_events`／`n_event_tf_rows`／`n_event_tf_rows_purged` 原本**無任何具名測試**，
+    省略那三個 kwargs 後 summary 會靜默變 0 而 705 條仍全綠。
+    """
+    plans, idx, keys, man, _ = _interleaved_case()
+    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    assert res.summary["n_symbols"] == 2, "fixture 不是多標的 ⇒ 沒測到該分支"
+    assert res.summary["n_events"] == keys["event_id"].nunique()
+    assert res.summary["n_event_tf_rows"] == len(keys)
+    assert res.summary["n_event_tf_rows_purged"] == len(res.purged)
+    # 🔴 值不得為 0——0 正是「三個 kwargs 被省略」時的樣子。
+    assert res.summary["n_events"] > 0 and res.summary["n_event_tf_rows"] > 0

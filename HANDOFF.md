@@ -33,7 +33,12 @@
   - **三條 TODO 明文指定之既有測試處置**：`test_summary_has_all_thirteen_keys`→`..._sixteen_keys`；`test_duplicate_event_id_is_fail_closed` 之 `match=` 改「複合鍵重複」（裁定＝測試過時，不得改實作）；`test_splitunify_wiring_partial_boundary_is_fail_closed` 之 `selected_timeframe` 參數化案例**替換**為 `test_partial_boundary_gate_accepts_none_selected_timeframe`（不得只新增而留舊的）。
   - **`scripts/freeze_splitunify_golden.py`** 之 fixture 補 `feature_timeframe`（**刻意維持單 feature TF** ⇒ golden 既有值逐值不變；擴維屬 `Task 9.5`）。
   - **mutation 自證（實跑後皆還原）**：`M-SU-D2-20`（producer 保留預設單選）⇒ 紅；`M-SU-D2-21`（門檻改回四鍵）⇒ 2 紅；`M-SU-D2-23`（`validate` 改回 `1:1`）⇒ 2 紅；`M-SU-D2-26`（以 `event_level.timeframe` 冒充）⇒ 紅；`M-SU-D2-36`（`purged` 不寫該欄）⇒ 紅。
-- **下一步**：派 `review-r20` 三家審碼（B9B）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
+⑱**review-r20（B9B 審碼）完成，三家全 blocked、撞同兩題，全採納並修完**——逐群內容、回歸筆數與破壞驗鑑別力紀錄，**唯一權威＝`handoffs/reconcile/20260911-splitunify-b9-review-r20/synth.md`**（本檔不複述數字）：
+  - **D1（三家 P1）🔴 主委真漏**：`Task 9.2a` 機械驗收第 6 條之逐字錨點測試 `test_multi_feature_tf_opposite_sides_must_fail_closed` **整段缺席**——它在 consult-r2 裁定「整批 REVERT」時隨偷跑碼一起消失，而 `Task 9.2a` 實作時沒補回，**等同刪測換綠**，且使 `Task 9.2b` 失去可解除之 xfail 標的。已依 consult-r2 之三重問題裁定重建（fixture 改事件級 manifest、以 `xfail(strict=True)` 明示）。
+  - **D2（三家 P2）**：多 symbol 分支三計數無具名測試，省略 kwargs 後 summary 會靜默變 0 ⇒ 新增 `test_multi_symbol_branch_summary_counts_are_named`（逐值＋**明文擋 0 值**）。
+  - 三家另否證主委兩條 assumed：golden 11 頂層鍵 `cmp` **逐位元組未變**；NaN 全欄 fail-closed **為預期**（不修）；cutoff 不同之多 TF **確會混態**但**屬 `Task 9.2b`**、本批不加第二份判側邏輯。
+- 🔴 **根因值得記（同一病第二次）**：`Task 9.1` 的 A4（探針檔沒跟著改）與本輪 D1（xfail 錨點沒補回）**是同一根因的兩次發作**——consult-r2 的「整批 REVERT」把東西一起還原了，而前進時**沒有逐項檢查「回退掉的哪些需要重建」**。⇒ 日後凡整批回退，須同時產出「回退清單 vs 需重建清單」對照。本輪已順手補掉 codex 掃出的第三個同型漏網（`handoffs/20260911-probe-splitunify-negative-injection.py`），不留第三次。
+- **下一步**：派 `review-r21` 做 D1／D2 閉合再驗證；三家確認後進 `Task 9.2b`（批次 **B9C**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v13，body sha256 `06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77`，仍為零戳記**。停輪依據＝`handoffs/reconcile/20260911-splitunify-b9-review-r12/synth.md`（唯一權威，本檔不複述）。
