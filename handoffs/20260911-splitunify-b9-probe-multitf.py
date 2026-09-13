@@ -44,12 +44,15 @@ def _per_tf(rows):
 def case(name, event_level, per_tf, selected):
     receipts = AlignmentReceipts(event_level=event_level, per_tf=per_tf)
     try:
-        out = build_event_keys(receipts, selected_timeframe=selected)
+        # 🔴 D-002 Task 9.1 起 `build_event_keys` 回傳 `(keyed, discarded)` 兩值。
+        #    R18 三家撞題指出本探針仍以單值接收 ⇒ case A 直接 TypeError、§A 之
+        #    FACT-RECEIPT 不可複驗。此處同步為兩值並一併印出記帳結果。
+        out, discarded = build_event_keys(receipts, selected_timeframe=selected)
     except Exception as exc:  # noqa: BLE001
         print("%-4s RAISED  %s: %s" % (name, type(exc).__name__, str(exc)[:95]))
         return "raised"
-    print("%-4s NO_RAISE 產出 %d 列；event_id=%s"
-          % (name, len(out), sorted(out["event_id"].tolist())))
+    print("%-4s NO_RAISE 產出 %d 列；event_id=%s；discarded=%s"
+          % (name, len(out), sorted(out["event_id"].tolist()), discarded))
     return "passed"
 
 

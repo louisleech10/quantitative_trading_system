@@ -164,3 +164,41 @@ def test_splitunify_wiring_legacy_path_still_calls_split_events(records, bars, s
     res = EventSamplePipeline().run(records, bars, EventPipelineConfig(timeframes=(TF,)))
     assert len(spy_split) == 1, "歷史路徑被刪掉了——G-3a 遷移對照會失去對照組"
     assert res.split_plan is not None
+
+
+# ── D-002 Task 9.1（B9A）：生產接線之丟棄記帳 ────────────────────────────────
+# 🔴 R18 `CODEX-R18-P1-01`：Task 9.1 的四條具名測試全在 `derive_*` 層，
+#    唯一**生產**呼叫點（`pipeline.py` 之投影分支）若忘了把 `discarded_rows_by_feature_tf`
+#    傳下去，那四條與既有 wiring 測試**全部仍綠**——記帳可在生產路徑靜默失效。
+#    本測試把斷言掛在 `EventSamplePipeline.run` 上，補掉那個缺口。
+
+
+@pytest.fixture(scope="module")
+def bars_multi_tf():
+    """兩個 feature TF 的真實 kline——單 TF 之下 `discarded` 恆為 {}，無鑑別力。"""
+    return load_bars(SYM, ("4h", TF))
+
+
+def test_splitunify_wiring_discarded_rows_reaches_summary(records, bars_multi_tf):
+    """選 `12h` ⇒ 被丟掉的 `4h` 列數須沿 summary 帶出（值不得為空）。
+
+    🔴 本測試之鑑別力來源：`pipeline.py` 若省略
+    `discarded_rows_by_feature_tf=discarded_rows`，summary 會退回 `{}` ⇒ 本測試轉紅。
+    """
+    train, test, index = _canonical(records, bars_multi_tf)
+    cfg = EventPipelineConfig(timeframes=("4h", TF), split=EventSplitConfig())
+    res = EventSamplePipeline().run(
+        records, bars_multi_tf, cfg,
+        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+    )
+    summary = res.split_plan.summary
+    assert "discarded_rows_by_feature_tf" in summary, "生產路徑之 summary 缺記帳鍵"
+    discarded = summary["discarded_rows_by_feature_tf"]
+    # 🔴 值不得為空——空 dict 正是「caller 忘了傳」時的樣子。
+    assert discarded, (
+        "選 12h 卻沒記到任何被丟棄的 4h 列 ⇒ 生產呼叫點沒把 discarded 傳下去"
+    )
+    assert set(discarded) == {"4h"}, f"只該記到被丟掉的 4h，實得 {sorted(discarded)}"
+    assert all(isinstance(v, int) and v > 0 for v in discarded.values()), (
+        f"列數須為正整數，實得 {discarded}"
+    )

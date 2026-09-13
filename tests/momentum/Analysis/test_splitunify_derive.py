@@ -1402,3 +1402,45 @@ def test_discarded_layer_is_independently_revertible() -> None:
     assert stripped_with == stripped_without
     # 且兩者確實只差這一鍵（防「其實還動了別的欄但被上面的過濾遮掉」）。
     assert set(plan_with.summary) - set(stripped_with) == {"discarded_rows_by_feature_tf"}
+
+
+def test_multi_symbol_branch_carries_discarded_rows_verbatim() -> None:
+    """多 symbol（Mapping）分支同樣須把 `discarded` **原樣**帶到 summary。
+
+    🔴 R18 三家撞題（`COMPOSER-R18-P2-01`／`GROK-R18-P2-01`／`CODEX-R18-P2-01` 同題）：
+    Task 9.1 原本只有單標的路徑有值相等測試，把多 symbol 分支之傳遞改成 `{}` 時
+    **692 條全綠** ⇒ 該分支的記帳可靜默失效。
+
+    🔴 **原樣傳遞、不逐 symbol 相加**：`build_event_keys` 對整批 `receipts.per_tf`
+    只呼叫一次，`discarded` 是**批次級**字典、不存在逐 symbol 分量；照「相加」實作
+    會把同一批計數按 symbol 重複放大（R18 `CODEX-R18-P2-01` 實證同題）。
+    """
+    plans, idx, keys, man, _ = _interleaved_case()
+    producer_discarded = {"4h": 7, "12h": 2}
+    res = derive_event_split_from_plans(
+        plans, keys, idx, manifest=man, bucket_ms=H1,
+        discarded_rows_by_feature_tf=producer_discarded,
+    )
+    assert res.summary["n_symbols"] == 2, "fixture 不是多標的 ⇒ 本測試沒測到該分支"
+    # 逐值相等：不是「有這個鍵」，也不是「總和相等」。
+    assert res.summary["discarded_rows_by_feature_tf"] == producer_discarded
+    # 🔴 防「逐 symbol 相加」之退化：兩個 symbol 若各加一次，值會變成兩倍。
+    assert res.summary["discarded_rows_by_feature_tf"]["4h"] == 7, (
+        "值被放大 ⇒ 分派器把批次級計數按 symbol 重複累加了"
+    )
+
+
+def test_build_event_keys_rejects_nan_timeframe_in_dropped_rows() -> None:
+    """被丟棄之列的 `timeframe` 若為缺值 ⇒ fail-closed，不得記成名為 'nan' 的假 TF。
+
+    🔴 R18 `CODEX-R18-P1-03`／`GROK-R18-P1-01` 撞題：`astype(str)` 會把 `NaN` 變成
+    字面 `"nan"`，於是 `discarded` 長出一個**看起來合法、實際不是 TF** 的鍵。
+    """
+    ev = [{"event_id": "a", "symbol": SYM, "timeframe": "1h",
+           "label_start_ms": 10, "label_end_ms": 20}]
+    per_tf = [
+        {"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000},
+        {"event_id": "a", "timeframe": None, "feature_cutoff_ms": 1100},
+    ]
+    with pytest.raises(ValueError, match="缺值"):
+        build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")

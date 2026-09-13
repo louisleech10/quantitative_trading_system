@@ -445,7 +445,13 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   1. `build_event_keys` 改為回傳 tuple；`discarded` 鍵＝被丟棄之 **feature** TF 字面、值＝列數。
   2. `_derive_single_symbol` 新增 keyword-only 參數 `discarded_rows_by_feature_tf`，**原樣**寫入
      `EventSplitPlan.summary["discarded_rows_by_feature_tf"]`（🔴 鍵名依 `D-002-C0` (0.6) 不得含裸 `timeframe`）。
-     多 symbol 分派器逐 symbol **相加**（同鍵值相加，非後者覆蓋前者）。
+     🔴 **多 symbol 分派器：原樣傳遞，不得相加**（R18 `CODEX-R18-P2-01` 裁定；三家撞題）。
+     原條文寫「逐 symbol **相加**（同鍵值相加，非後者覆蓋前者）」，與實際呼叫圖**互斥**——
+     `build_event_keys` 對整批 `receipts.per_tf` **只呼叫一次**（`pipeline.py` 單一呼叫點），
+     `discarded` 是**批次級**字典、**不存在逐 symbol 分量**；照字面相加會把同一批計數
+     按 symbol **重複放大**（兩 symbol 即兩倍）。⇒ 分派器**原樣傳遞**，並以
+     `test_multi_symbol_branch_carries_discarded_rows_verbatim` 之值相等斷言鎖住
+     （該測試另含防放大斷言：值被乘倍即紅）。
   3. 🔴 **`metadata.split_unify` 層不在本 Task 交付面**——依 v13 之 O1 已整段移入 §N `SU-RESID-9A-UI`。
      **不得**在本 Task 改 `build_split_unify_disclosure` 五鍵、`momentum/Analysis/contracts/split_unify.json`
      之 `split_unify_keys`、或 `tests/api/test_splitunify_disclosure.py` 之 exact-key 斷言。
@@ -464,9 +470,19 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   - `test_build_event_keys_discarded_empty_when_single_feature_tf`
   - `test_summary_carries_discarded_rows_by_feature_tf_equal_to_producer`（**值相等**，非只驗鍵存在）
   - `test_discarded_layer_is_independently_revertible`（移除該欄後 summary 其餘鍵逐值不變）
+  - 🔴 **R18 補三條（缺任一條即有可靜默失效的面）**：
+    - `tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_discarded_rows_reaches_summary`
+      ——掛在 `EventSamplePipeline.run` 之**生產**呼叫點；上列四條全在 `derive_*` 層，
+      caller 若省略 `discarded_rows_by_feature_tf=` 它們**全部仍綠**（`CODEX-R18-P1-01`）。
+    - `test_multi_symbol_branch_carries_discarded_rows_verbatim`——多 symbol（Mapping）分支之
+      值相等＋防放大（`COMPOSER-R18-P2-01`／`GROK-R18-P2-01`）。
+    - `test_build_event_keys_rejects_nan_timeframe_in_dropped_rows`——被丟棄列之 `timeframe`
+      為缺值時 fail-closed，不得記成名為 `nan` 的假 TF（`CODEX-R18-P1-03`／`GROK-R18-P1-01`）。
   mutation 自證（實跑並貼 rc）：
   - `M-SU-D2-01`：刪掉寫入 summary 那行 ⇒ 第 3 條轉紅
   - `M-SU-D2-02`：producer 回傳 `discarded` 但 `_derive_single_symbol` 改傳 `{}` ⇒ 第 3 條轉紅
+  - **生產接線**：`pipeline.py` 省略 `discarded_rows_by_feature_tf=` ⇒ wiring 那條轉紅
+  - **多 symbol 分支**：分派器改傳 `{}` ⇒ 多 symbol 那條轉紅
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`Task 9.2` 會再改 `selected_timeframe` 之預設值；本 Task 只改回傳形狀，兩者不衝突。
 

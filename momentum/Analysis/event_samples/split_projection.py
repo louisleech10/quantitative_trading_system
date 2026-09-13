@@ -291,9 +291,17 @@ def build_event_keys(
         )
     # 🔴 D-002 Task 9.1：被單選濾掉之列須逐 feature TF 記帳，不得靜默消失。
     #    以 `value_counts` 取代逐 TF 掃描——同一個 TF 的列數只算一次，且對空集合回 {}。
-    dropped_tf = per_tf.loc[per_tf["timeframe"].astype(str) != want, "timeframe"].astype(str)
+    dropped = per_tf.loc[per_tf["timeframe"].astype(str) != want, "timeframe"]
+    # 🔴 R18 codex `CODEX-R18-P1-03`／grok `GROK-R18-P1-01` 撞題：`astype(str)` 會把
+    #    `NaN`／`pd.NA` 變成字面 `"nan"`／`"<NA>"`，於是 `discarded` 長出一個**看起來合法、
+    #    實際不是 TF** 的鍵，呼叫端無從分辨。缺 TF 是**壞資料**，不是一種 TF ⇒ fail-closed。
+    if bool(dropped.isna().any()):
+        raise ValueError(
+            "build_event_keys: per_tf 之 timeframe 欄有缺值（NaN／NA）"
+            "——記帳會把它變成名為 'nan' 的假 feature TF；缺就是缺，不補預設（fail-closed）"
+        )
     discarded: Dict[str, int] = {
-        str(tf): int(n) for tf, n in dropped_tf.value_counts().items()
+        str(tf): int(n) for tf, n in dropped.astype(str).value_counts().items()
     }
     dupes = selected["event_id"][selected["event_id"].duplicated()].unique().tolist()
     if dupes:
@@ -716,9 +724,14 @@ def _build_summary(
     tier_min_test_events: int = 1,
     discarded_rows_by_feature_tf: Optional[Dict[str, int]] = None,
 ) -> Dict[str, Any]:
-    """`EventSplitPlan.summary` 之 **12 個必填鍵**（SPEC C-5）。
+    """`EventSplitPlan.summary` 之 **13 個必填鍵**（SPEC C-5 ＋ `D-002` Task 9.1 之第 13 鍵）。
 
-    少一鍵，`pipeline.py:696` 會靜默丟欄、報告整段消失——與 EVTLABEL B5 那條
+    🔴 **v/R18 更正（grok `GROK-R18-P3-01`／codex `CODEX-R18-P3-02` 撞題）**：本 docstring
+    原寫「12 個必填鍵」且引用 `pipeline.py:696`——前者在 Task 9.1 加入
+    `discarded_rows_by_feature_tf` 後已漂移，後者之行號早已不存在。鍵數之權威是
+    `test_summary_has_all_thirteen_keys` 之 exact-set 斷言，不是這段散文。
+
+    少一鍵，pipeline 之 summary 轉寫會靜默丟欄、報告整段消失——與 EVTLABEL B5 那條
     「light 視圖漏 `metadata_keep_keys`」同形態。
 
     🔴 `insufficient_events_in_test` 改看**投影後**的 test 數；

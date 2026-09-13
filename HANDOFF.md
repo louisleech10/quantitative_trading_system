@@ -14,7 +14,15 @@
   - **實跑**：`tests/momentum/Analysis/test_splitunify_derive.py` ＋ `tests/momentum/event_samples/` ＋ golden ＋ contract ＋ `tests/api/test_splitunify_disclosure.py` ＋ `..._event_study_only.py` 合計 **692 passed、0 failed**。
   - **mutation 自證（實跑）**：`M-SU-D2-01`（刪 summary 寫入行）⇒ **3 failed**；`M-SU-D2-02`（`_derive_single_symbol` 改傳 `{}`）⇒ **1 failed**（由**值相等**斷言抓到；只驗鍵存在會漏）。兩者皆已還原。
 - 🔴 **與 TODO 條文之具名偏離（交審碼輪裁）**：TODO `Task 9.1` 實作要點 2 寫「多 symbol 分派器逐 symbol **相加**」，但實際呼叫圖中 `build_event_keys` 是**對整批 `receipts.per_tf` 呼叫一次**（`pipeline.py` 單一呼叫點），`discarded` 為批次級、不存在逐 symbol 分量 ⇒ 實作採**原樣傳遞**，若照字面相加會**重複計數**。已於碼中具名註記。
-- **下一步**：派 `Task 9.1` 之三家審碼輪（`review-r18`）。之後依序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（本次完成 **B9A**）。
+⑭**review-r18（首輪審「程式碼」）完成，六群全採納並修完**——逐群內容、回歸命令與筆數、每條新測試之破壞驗鑑別力紀錄，**唯一權威＝`handoffs/reconcile/20260911-splitunify-b9-review-r18/synth.md`**（本檔不複述數字）：
+  - **A1（grok，P1）生產接線可靜默失效**——四條具名測試全在 `derive_*` 層，`pipeline.py` 省略 `discarded_rows_by_feature_tf=` 則全部仍綠 ⇒ 新增掛在 `EventSamplePipeline.run` 上的 wiring 測試。
+  - **A2（三家）多 symbol 分支無具名測試** ⇒ 新增值相等＋**防放大**測試。
+  - **A3（兩家，P1）`timeframe` 缺值會被記成假 TF `nan`** ⇒ 計數前 `isna` fail-closed。
+  - **A4（三家，P1）探針檔未隨二值回傳更新**——🔴 **根因是主委自己造成**：consult-r2 REVERT 時把該探針一併還原到單值形態，Task 9.1 改簽章後就壞了，**回退與前進之間漏了這一步**。
+  - **A5（兩家）TODO「逐 symbol 相加」與資料流互斥** ⇒ 兩家一致判「實作對、條文錯」，TODO 改「原樣傳遞、不得相加」。
+  - **A6（兩家）`_build_summary` docstring 仍寫 12 鍵且引用不存在行號** ⇒ 改 13 鍵並明寫鍵數權威是 exact-set 斷言。
+- 🔴 **本輪最值得記的一件事**：主委在 brief 自標的兩條 assumed（多 symbol 相加、`value_counts` 之 dtype 陷阱）**兩條都被證實為真問題**，A1 之「第三種破壞」也是主委自己問出來的 ⇒ **把沒把握的面寫進 brief 交出去攻，比自己再讀一遍有效**。
+- **下一步**：派 `review-r19` 做 A1–A6 閉合再驗證；三家確認後進 `Task 9.2`（批次 **B9B**＝`9.2`＋`9.2a`，**不得拆批**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A 已完成**）。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v13，body sha256 `06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77`，仍為零戳記**。停輪依據＝`handoffs/reconcile/20260911-splitunify-b9-review-r12/synth.md`（唯一權威，本檔不複述）。
