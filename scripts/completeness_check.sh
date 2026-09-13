@@ -359,6 +359,88 @@ _validate_finding_body() {
   ' "${file}"
 }
 
+# ---------------------------------------------------------------------------
+# _validate_anchors — DOCROT consult-r3 Task 1.4 ＋ consult-r4 Task 1.6（三家定案 2026-09-13）
+#   只由 `--single`（交件當下）呼叫；`--lock`／synth 路徑不變（G-1 三入口矩陣）。
+#   (a) HISTORY anchor 拒收：finding 之 **碼證**／**來源摘要**／`CODE-ANCHOR:` 行內任一
+#       `path:line`，若 path 存在且 line 落在該檔 `HISTORY-BEGIN`～`HISTORY-END` 之間或
+#       `## 沿革…` 節內 ⇒ FAIL。碼證：D-002 之 R11 十二條、R12 十三條全部針對前版修法
+#       （審查者把已作廢主張當現行再審）；E3 輸入隔離若無此牙只是紀律。
+#   (b) P0／P1 必附兩行封閉字面 `CODE-ANCHOR: <repo-relative-path>:<line>` 與
+#       `MUTATION: <可執行破壞>`（fence 外），缺任一 ⇒ FAIL。P2／P3（含 `P3-00` sentinel）不套。
+#       碼證：純散文 P0（只寫「見某章節用詞差異」）現行 `--single` rc=0（grok R4 實跑）。
+#   純字面／區間判定，不做語意；path 不存在時 (a) 不觸發（非本 repo 之引用不擋）。
+#   forward-only：只對落地後的新交件生效，r1～r3 附錄 byte-faithful 不回溯。
+# ---------------------------------------------------------------------------
+_validate_anchors() {
+  local file="$1"
+  local bad=0 rec kind id sev ha hm path line hist
+  while IFS=$'\t' read -r kind id sev ha hm; do
+    [ -n "${kind}" ] || continue
+    case "${kind}" in
+      TOKENS)
+        case "${sev}" in
+          P0|P1)
+            if [ "${ha}" != "1" ] || [ "${hm}" != "1" ]; then
+              echo "COMPLETENESS FAIL: P0/P1 finding 缺 CODE-ANCHOR:/MUTATION:（has_anchor=${ha} has_mutation=${hm}）: ${id} (file=${file})" >&2
+              echo "  → **碼證** 須含兩行封閉字面：CODE-ANCHOR: <repo-relative-path>:<line> 與 MUTATION: <可執行破壞>（DOCROT Task 1.6）" >&2
+              bad=1
+            fi ;;
+        esac ;;
+      ANCHOR)
+        path="${sev}"; line="${ha}"
+        [ -f "${path}" ] || continue
+        hist="$(LC_ALL=C awk -v want="${line}" '
+          BEGIN { m=0; s=0; hit=0 }
+          /HISTORY-BEGIN/ { m=1 }
+          /HISTORY-END/   { m=0 }
+          /^## / { s = ($0 ~ /^## 沿革/) ? 1 : 0 }
+          NR == want { hit = (m || s) ? 1 : 0 }
+          END { print hit }' "${path}")"
+        if [ "${hist}" = "1" ]; then
+          echo "COMPLETENESS FAIL: anchor 落在歷史段（HISTORY-BEGIN..END／## 沿革）: ${id} → ${path}:${line} (file=${file})" >&2
+          echo "  → 改指其對應之現行條文，或不列為 finding（DOCROT Task 1.4：輸入隔離之機械牙）" >&2
+          bad=1
+        fi ;;
+    esac
+  done <<EOF
+$(LC_ALL=C awk '
+  function flush() {
+    if (id == "") return
+    printf "TOKENS\t%s\t%s\t%d\t%d\n", id, sev, ha, hm
+  }
+  function emit_anchors(s,   re, m, tok, p, ln) {
+    re = "[A-Za-z0-9_./-]+\\.(md|py|sh|json|ts|tsx|yaml|yml|txt):[0-9]+"
+    while (match(s, re)) {
+      tok = substr(s, RSTART, RLENGTH)
+      s = substr(s, RSTART + RLENGTH)
+      p = tok; sub(/:[0-9]+$/, "", p)
+      ln = tok; sub(/^.*:/, "", ln)
+      printf "ANCHOR\t%s\t%s\t%s\t0\n", id, p, ln
+    }
+  }
+  BEGIN { id=""; sev=""; ha=0; hm=0; in_fence=0 }
+  /^[[:space:]]*(```|~~~)/ { in_fence = !in_fence; next }
+  /^[[:space:]]*#{2,6}[[:space:]]/ {
+    line=$0; sub(/^[[:space:]]*#{2,6}[[:space:]]+/, "", line)
+    n=split(line, parts, /[[:space:]]+/); tok=(n>=1?parts[1]:"")
+    sub(/[^A-Za-z0-9_-].*$/, "", tok)
+    if (tok ~ /^[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}$/) {
+      flush(); id=tok; split(tok, segs, "-"); sev=segs[3]; ha=0; hm=0; next
+    }
+    if (id != "") { flush(); id=""; sev=""; ha=0; hm=0 }
+    next
+  }
+  id != "" && !in_fence {
+    if ($0 ~ /CODE-ANCHOR:[[:space:]]*[A-Za-z0-9_.\/-]+:[0-9]+/) ha=1
+    if ($0 ~ /MUTATION:[[:space:]]*[^[:space:]]/) hm=1
+    if ($0 ~ /\*\*碼證\*\*|\*\*來源摘要\*\*|CODE-ANCHOR:/) emit_anchors($0)
+  }
+  END { flush() }' "${file}")
+EOF
+  return "${bad}"
+}
+
 _check_same_file_dups() {
   local file="$1"
   local ids="$2"
@@ -1569,6 +1651,10 @@ if [ -n "${SINGLE_ARG}" ]; then
   # ③ 空殼 finding（缺 **斷言**/**碼證**）+ P0/P1 來源摘要 digest
   # GOVB1 Task 4.2：交件路徑啟用 hollow body 非空判定（三入口矩陣中唯一許可翻轉的一格）
   _validate_finding_body "${SINGLE_ARG}" 1 || _single_rc=1
+  # ④ DOCROT consult-r3 Task 1.4／consult-r4 Task 1.6（三家定案；只在 --single 交件路徑）：
+  #   (a) 碼證／來源摘要／CODE-ANCHOR 之 `path:line` 落在該檔 HISTORY 區 ⇒ FAIL
+  #   (b) P0/P1 缺 `CODE-ANCHOR:` 或 `MUTATION:` ⇒ FAIL（forward-only：只對新交件生效）
+  _validate_anchors "${SINGLE_ARG}" || _single_rc=1
   if [ "${_single_rc}" -ne 0 ]; then
     echo "COMPLETENESS FAIL(single): ${SINGLE_ARG} 格式不合規（見上）。" >&2
     echo "  這是**交件當下**的檢查：現在修比等到 reconcile 收集時才發現省一整輪。" >&2

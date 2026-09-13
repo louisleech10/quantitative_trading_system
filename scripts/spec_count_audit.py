@@ -108,21 +108,36 @@ def dupes(path):
     曾把 register 條數同時寫在節標題、表標題、§RISK、§R 回退句與 (5.6) 內文五處，
     改三處漏兩處。本模式不需基準檔、不需維護，只回答「這份文件裡有沒有同一個
     計數字面出現在多行」。
+
+    🔴 DOCROT consult-r3 Task 1.1／1.2（三家定案，2026-09-13）：
+    - **區間 skip、禁 break**：沿革只排除 `HISTORY-BEGIN`～`HISTORY-END` 之間
+      （以及 `## 沿革` 節到下一個 `## ` 標題之間）；marker 之後的活文**必須繼續掃**。
+      前版在第一個 marker 直接 `break`，grok 構造反例：活文＋HISTORY＋活文雙「共 7 條」
+      ⇒ stderr 空（漏掃）。
+    - **只掃 `_RE_TOTAL_ITEMS`**（「共 N 條」形態）：三 regex 聯集對 `GAP3_EVENT_UX_SPEC.md`
+      誤報「五維度」等非計數句 19+ 行；誤報多了警告就被當不存在，升擋門前必須收窄。
     """
     seen = {}
+    in_marker = 0   # HISTORY-BEGIN … HISTORY-END
+    in_section = 0  # `## 沿革…` 節 … 下一個 `## ` 標題
     for i, line in enumerate(io.open(path, encoding="utf-8", errors="replace"), 1):
-        # 🔴 沿革段以下不計：append-only 的歷史**本來就要**逐字保存舊字面
-        #   （「原寫 25 條」「v12 補為 29 條」），那是它的職責，不是第二個真相源。
-        #   不停在這裡的話，每做一次活文收縮就會永久多一條誤報 ⇒ 閘自己製造噪音。
-        if "HISTORY-BEGIN" in line or line.startswith("## 沿革"):
-            break
+        if "HISTORY-BEGIN" in line:
+            in_marker = 1
+            continue
+        if "HISTORY-END" in line:
+            in_marker = 0
+            continue
+        if line.startswith("## "):
+            in_section = 1 if line.startswith("## 沿革") else 0
+            continue
+        if in_marker or in_section:
+            continue
         probe = _NOISE.sub("", line.rstrip("\n"))
-        for rx in (_RE_NUM_UNIT, _RE_COUNT_ASSERT, _RE_TOTAL_ITEMS):
-            for m in rx.finditer(probe):
-                lit = re.sub(r"\s+", " ", m.group(0))
-                seen.setdefault(lit, [])
-                if i not in seen[lit]:
-                    seen[lit].append(i)
+        for m in _RE_TOTAL_ITEMS.finditer(probe):
+            lit = re.sub(r"\s+", " ", m.group(0))
+            seen.setdefault(lit, [])
+            if i not in seen[lit]:
+                seen[lit].append(i)
     return sorted((k, v) for k, v in seen.items() if len(v) > 1)
 
 

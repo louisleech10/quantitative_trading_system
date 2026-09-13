@@ -191,7 +191,137 @@ def test_dupes_is_warn_only_never_blocks(tmp_path: Path) -> None:
     """ASSERT 即使命中也 rc=0——第一期只 warn，不得擋門。
 
     若日後要升成擋門，本條會轉紅，逼迫改動者先處理「閾值與誤擋面未校準」那筆殘留。
+
+    🔴 DOCROT consult-r3 Task 1.3 之後：CLI 本身仍 warn-only（本條不變）；**擋門在
+    `gov_check.sh` 段 1b**（見下方 `test_gov_check_1b_fails_closed_on_dupes`），
+    兩者分層，勿混為一談（grok R3 表原文）。
     """
     p = _spec(tmp_path, "many.md", "共 3 條\n共 3 條\n共 3 條\n")
     proc = _run(["--dupes", str(p)])
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# ── DOCROT consult-r3 Task 1.1／1.2／1.3（三家定案 2026-09-13）────────────────
+
+
+def test_dupes_interval_skip_still_scans_after_history(tmp_path: Path) -> None:
+    """Task 1.1 ASSERT 沿革只是**區間** skip：HISTORY-END 之後的活文仍被掃。
+
+    grok R3 構造反例：活文 L1「共 7 條」＋HISTORY 內舊字面＋活文 L7「共 7 條」——
+    前版在第一個 `HISTORY-BEGIN` 直接 `break` ⇒ stderr 空（漏掃）。
+    mutation：把區間 skip 改回 `break` ⇒ 本條紅（找不到 `1,7`）。
+    """
+    p = _spec(
+        tmp_path,
+        "interval.md",
+        "活文 共 7 條\n"
+        "<!-- HISTORY-BEGIN -->\n"
+        "舊 共 7 條\n"
+        "舊 共 7 條\n"
+        "<!-- HISTORY-END -->\n"
+        "中間\n"
+        "活文再 共 7 條\n",
+    )
+    proc = _run(["--dupes", str(p)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "1,7" in proc.stderr, "HISTORY-END 之後的活文被漏掃：" + proc.stderr
+    assert "3,4" not in proc.stderr and ",3" not in proc.stderr, (
+        "HISTORY 內的行號不該被計入：" + proc.stderr
+    )
+
+
+def test_dupes_history_section_heading_is_interval_not_break(tmp_path: Path) -> None:
+    """Task 1.1 ASSERT `## 沿革` 節只到下一個 `## ` 標題為止，之後的活文仍掃。"""
+    p = _spec(
+        tmp_path,
+        "section.md",
+        "## 本文\n共 5 條\n## 沿革與追溯索引\n共 5 條\n## 附錄\n共 5 條\n",
+    )
+    proc = _run(["--dupes", str(p)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "2,6" in proc.stderr, "`## 沿革` 之後的 `## 附錄` 活文被漏掃：" + proc.stderr
+
+
+def test_dupes_narrowed_to_total_items_only(tmp_path: Path) -> None:
+    """Task 1.2 ASSERT `--dupes` 只掃「共 N 條」；其他數字＋單位／計數斷言多行**不報**。
+
+    碼證：composer R3 實跑 `--dupes docs/GAP3_EVENT_UX_SPEC.md` 報「五維度」等 19+ 行非計數句。
+    mutation：把 `for m in _RE_TOTAL_ITEMS` 改回三 regex 聯集 ⇒ 本條紅。
+    """
+    p = _spec(
+        tmp_path,
+        "narrow.md",
+        "五維度\n五維度\n特徵 12 個\n特徵 12 個\n共 9 條\n共 9 條\n",
+    )
+    proc = _run(["--dupes", str(p)])
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "共 9 條" in proc.stderr, proc.stderr
+    assert "五維度" not in proc.stderr, "非「共 N 條」形態被報 ⇒ 未收窄：" + proc.stderr
+    assert "12 個" not in proc.stderr, "非「共 N 條」形態被報 ⇒ 未收窄：" + proc.stderr
+
+
+def _mk_gov_repo(tmp_path: Path) -> Path:
+    """最小 git repo：整包複製 `scripts/`（gov_check 之依賴一律 fail-closed，缺一即紅在無關原因）。"""
+    import shutil
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    shutil.copytree(REPO / "scripts", root / "scripts")
+    (root / "docs").mkdir()
+    (root / "scripts" / "fact_keys.json").write_text("{}\n", encoding="utf-8")
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.com",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.com",
+    }
+    for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "init"]):
+        subprocess.run(["git", *args], cwd=str(root), check=True, env=env, capture_output=True)
+    return root
+
+
+def _run_gov_fast(root: Path) -> subprocess.CompletedProcess[str]:
+    env = {**os.environ}
+    env.pop("GOVB1_FACTKEY_ROOT", None)
+    return subprocess.run(
+        ["bash", "scripts/gov_check.sh", "--fast"],
+        cwd=str(root), env=env, capture_output=True, text=True, timeout=300,
+    )
+
+
+_DUP_MARK = "計數字面多落點"
+_SEG_1B_FAIL = "GOV-CHECK-FAILED: [段 1b]"
+
+
+def test_gov_check_1b_fails_closed_on_dupes(tmp_path: Path) -> None:
+    """Task 1.3 ASSERT 本次改動之 docs/*.md 含活文雙「共 N 條」⇒ **段 1b 判紅**（rc≠0＋段 1b 失敗行＋具名原因）。
+
+    review-r1 三家：warn 對主委無效（示範了看到警告仍繼續）⇒ 最小擋門＝1b 計入 `_docbad`。
+    檔名刻意用型別判不出的 `docs/demo_note.md`：doc_format_precheck 對其靜默放行，
+    段 1b 若紅**只能**來自計數字面 ⇒ 本條對「不進 `_docbad`」可證偽。
+    mutation：把 `_docbad+=1` 拿掉（只印警告）⇒ 段 1b 失敗行消失，本條紅。
+    """
+    root = _mk_gov_repo(tmp_path)
+    (root / "docs" / "demo_note.md").write_text(
+        "# DEMO\n\n### 節標題（register 共 29 條）\n\n#### 表標題（共 29 條）\n",
+        encoding="utf-8",
+    )
+    r = _run_gov_fast(root)
+    out = r.stdout + r.stderr
+    assert r.returncode != 0, "雙「共 29 條」竟然放行：\n" + out
+    assert _DUP_MARK in out, "1b 未以具名原因擋下計數字面多落點：\n" + out
+    assert _SEG_1B_FAIL in out, "計數字面多落點只被警告、未計入段 1b 失敗（_docbad）：\n" + out
+
+
+def test_gov_check_1b_single_source_not_flagged_for_dupes(tmp_path: Path) -> None:
+    """Task 1.3 對照組 ASSERT 只寫一處 ⇒ 段 1b 不判紅（證明擋門非恆紅、且非 precheck 誤紅）。"""
+    root = _mk_gov_repo(tmp_path)
+    (root / "docs" / "demo_note.md").write_text(
+        "# DEMO\n\n### 節標題（register 見 (5.6)）\n\n#### 表標題（共 29 條）\n",
+        encoding="utf-8",
+    )
+    r = _run_gov_fast(root)
+    out = r.stdout + r.stderr
+    assert _DUP_MARK not in out, "單一真相源被當成多落點 ⇒ 擋門恆紅：\n" + out
+    assert _SEG_1B_FAIL not in out, "對照組段 1b 竟然紅 ⇒ 紅在無關原因，本測試不可信：\n" + out

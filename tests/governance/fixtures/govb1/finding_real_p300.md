@@ -5,6 +5,8 @@
 **斷言**: hollow body 判準必須擋下只有空白的四欄 finding。
 
 **碼證**: tests/governance/fixtures/govb1/finding_hollow_p300.md 與 completeness_check --single 對照。
+CODE-ANCHOR: tests/governance/fixtures/govb1/finding_hollow_p300.md:3
+MUTATION: 把 hollow fixture 的四欄填入實質內容 ⇒ `--single` 對它由 rc≠0 轉 rc=0。
 
 **來源摘要**: tests/governance/fixtures/govb1/finding_real_p300.md#cafebabecafebabe
 

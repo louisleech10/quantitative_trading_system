@@ -214,13 +214,19 @@ def test_mut_drop_substantive_check_regresses(tmp_path: Path) -> None:
     src = COMPLETENESS.read_text(encoding="utf-8")
     anchor = 'if ($0 ~ /\\*\\*斷言\\*\\*/ && (!strict || substantive(field_body($0, "斷言")))) seen_assert=1'
     assert anchor in src, "mutation 錨點漂移：斷言非空判定"
+    # 🔴 DOCROT consult-r4 Task 1.6（2026-09-13）：`--single` 另有獨立的 P0/P1 token 閘
+    #   （`_validate_anchors`：缺 CODE-ANCHOR:/MUTATION: 即 FAIL）。hollow fixture 之碼證為空
+    #   ⇒ 該閘亦會擋它。本條量的是「非空判定」是否承重，故 held-out 時把 token 閘一併移除，
+    #   否則量到的是兩閘之聯集、非空判定即使失效也不會現形（假承重）。
+    anchor_tokens = '  _validate_anchors "${SINGLE_ARG}" || _single_rc=1\n'
+    assert anchor_tokens in src, "mutation 錨點漂移：P0/P1 token 閘（_validate_anchors）"
     mut = tmp_path / "mut_completeness.sh"
     mut.write_text(
         src.replace(anchor, 'if ($0 ~ /\\*\\*斷言\\*\\*/) seen_assert=1', 1).replace(
             'if ($0 ~ /\\*\\*碼證\\*\\*/ && (!strict || substantive(field_body($0, "碼證")))) seen_code=1',
             'if ($0 ~ /\\*\\*碼證\\*\\*/) seen_code=1',
             1,
-        ),
+        ).replace(anchor_tokens, "", 1),
         encoding="utf-8",
     )
     base = subprocess.run(

@@ -1981,6 +1981,93 @@ def check_stdin_operational(source_file: str, content: str) -> list[Violation]:
     return violations
 
 
+# DOCROT consult-r3 Task 1.5（grok 原文，三家定案 2026-09-13）：
+#   封閉字面（不做語意）。命中時 commit 訊息須帶 task-id，且 audit.log 中該 task-id 之
+#   `committee_family_result`／`committee_output` 涵蓋家數 ≥ review roster（governance_families.json），
+#   否則 rc=1。允許既有 `VERIFY-EXEMPT:` 類別。
+#   碼證：`3e009126` 以「落地三家共同結論」為題背書未經任何委員審之實作，現行閘 rc=0（三家 R3 實跑）。
+CONSENSUS_CLAIM_RE = re.compile(r"三家共同結論|三家一致落地")
+_CONSENSUS_TASK_ID_RE = re.compile(r"\b(\d{8}-[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-R\d+)\b")
+_CONSENSUS_BACKING_EVENTS = frozenset({"committee_family_result", "committee_output"})
+
+
+def _review_roster() -> set[str]:
+    """review 家族名冊（SoT：scripts/governance_families.json）；讀不到 ⇒ fail-closed 回空集合。"""
+    p = Path(__file__).resolve().parent / "governance_families.json"
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+        fams = data.get("review_families") or []
+        return {str(f) for f in fams}
+    except Exception:  # noqa: BLE001 — 名冊讀不到＝無法證明背書，視同零家
+        return set()
+
+
+def _committee_families_for_task(task_id: str) -> set[str]:
+    audit_log = _committee_audit_path()
+    if not audit_log.is_file():
+        return set()
+    fams: set[str] = set()
+    for raw in audit_log.read_text(encoding="utf-8", errors="replace").splitlines():
+        raw = raw.strip()
+        if not raw.startswith("{"):
+            continue
+        try:
+            ev = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if ev.get("event") not in _CONSENSUS_BACKING_EVENTS:
+            continue
+        if str(ev.get("task_id", "")) != task_id:
+            continue
+        fam = str(ev.get("family", ""))
+        if fam:
+            fams.add(fam)
+    return fams
+
+
+def _consensus_backing_violations(commit_msg: str) -> list[Violation]:
+    if not CONSENSUS_CLAIM_RE.search(commit_msg):
+        return []
+    if EXEMPT_RE.search(commit_msg):
+        return []
+    roster = _review_roster()
+    task_ids = sorted(set(_CONSENSUS_TASK_ID_RE.findall(commit_msg)))
+    if not roster:
+        return [
+            Violation(
+                file="COMMIT_MSG",
+                line=1,
+                message="「三家共同結論」類背書語：讀不到 review 名冊（governance_families.json）⇒ 無法證明背書，fail-closed",
+                unit_text=commit_msg.strip(),
+            )
+        ]
+    if not task_ids:
+        return [
+            Violation(
+                file="COMMIT_MSG",
+                line=1,
+                message="「三家共同結論」類背書語須附 task-id（<YYYYMMDD>-<EPIC>-…-R<n>），且該 task 在 audit.log 有三家 committee_family_result/committee_output",
+                unit_text=commit_msg.strip(),
+            )
+        ]
+    for tid in task_ids:
+        fams = _committee_families_for_task(tid)
+        if roster <= fams:
+            return []
+    return [
+        Violation(
+            file="COMMIT_MSG",
+            line=1,
+            message=(
+                "「三家共同結論」類背書語無 audit 佐證：task "
+                + ",".join(task_ids)
+                + f" 之 committee 家數不足 roster {sorted(roster)}"
+            ),
+            unit_text=commit_msg.strip(),
+        )
+    ]
+
+
 def _print_violation(v: Violation) -> None:
     """印出違規行；缺 backing 的 operational claim 追加可貼修法提示。"""
     print(f"{v.file}:{v.line}: {v.message}", file=sys.stderr)
@@ -2050,6 +2137,13 @@ def main(argv: list[str] | None = None) -> int:
             paths.append(msg_path)
             # commit-msg 以單一 operational 單位掃描
             content = msg_path.read_text(encoding="utf-8")
+            # DOCROT consult-r3 Task 1.5（三家定案 2026-09-13）：「三家共同結論」類背書語
+            #   須有同 task-id 之委員 audit 佐證，否則 rc=1（見 _consensus_backing_violations）。
+            consensus_violations = _consensus_backing_violations(content)
+            if consensus_violations:
+                for v in consensus_violations:
+                    _print_violation(v)
+                return 1
             unit = Unit(
                 text=content,
                 source_file="COMMIT_MSG",

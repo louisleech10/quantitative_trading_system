@@ -70,6 +70,7 @@ case "${out}" in handoffs/*) : ;; *) echo "ERROR: brief 建議放 handoffs/: ${o
     echo "assumed: （我的假設，可能是錯的） ← 請直接攻這條"
     echo ""
     echo "## 必答（逐條 verdict）"
+    echo "（至少一題須指向 path:函式或驗收命令，不得全為用詞差異；P0/P1 的 **碼證** 必含 CODE-ANCHOR: 與 MUTATION:（缺則 completeness --single 拒））"
     echo "1. （問題一）"
     echo "2. 可以進下一步嗎，還是有 BLOCKING 必須先修？"
     echo ""

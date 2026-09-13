@@ -266,12 +266,26 @@ if [ -f scripts/doc_format_precheck.sh ] && [ -n "${_base}" ]; then
       echo "  ✗ 格式未過: ${f}（詳情跑 bash scripts/doc_format_precheck.sh ${f}）" >&2
       _docbad=$((_docbad + 1))
     }
-    # 🔴 warn-only（2026-09-13 DOCROT R2 第 3 項掛載；第 4 項遷移序定「第一期只 warn」）：
-    #   同一計數字面出現在多行 ⇒ 同一個數字有兩個真相源，改一處漏一處。
-    #   刻意**不進 _docbad**：閾值與誤擋面未經校準，先只提示；要升成擋門須先有基線。
-    [ -f scripts/spec_count_audit.py ] && {
-      python3 scripts/spec_count_audit.py --dupes "${f}" >/dev/null || true
-    }
+    # 🔴 fail-closed（DOCROT consult-r3 Task 1.3，三家定案 2026-09-13；覆寫前版 warn-only）：
+    #   同一「共 N 條」字面出現在活文多行 ⇒ 同一個數字有兩個真相源，改一處漏一處（主因 D1）。
+    #   review-r1 三家已證 warn 對主委無效（示範了看到警告仍繼續）⇒ 最小擋門＝本段對
+    #   **本次 diff 之 docs/*.md** 計入 `_docbad`；hook 層（spec_xref_hook ③）維持 warn。
+    #   `--dupes` CLI 本身仍 rc=0（warn-only 契約由既有測試釘住）；擋門判準＝其 stderr
+    #   含命中行。缺 checker 或執行錯誤亦 fail-closed（不得靜默放行）。
+    if [ -f scripts/spec_count_audit.py ]; then
+      _dup_out="$(python3 scripts/spec_count_audit.py --dupes "${f}" 2>&1 >/dev/null)"; _dup_rc=$?
+      if [ "${_dup_rc}" -ne 0 ]; then
+        echo "  ✗ 計數字面檢查執行失敗（rc=${_dup_rc}）: ${f}" >&2
+        _docbad=$((_docbad + 1))
+      elif printf '%s' "${_dup_out}" | grep -q '同一計數字面在多處'; then
+        printf '%s\n' "${_dup_out}" >&2
+        echo "  ✗ 計數字面多落點: ${f}（同一「共 N 條」寫在活文多行；留一處當唯一來源，其餘寫指標）" >&2
+        _docbad=$((_docbad + 1))
+      fi
+    else
+      echo "  ✗ 缺依賴 scripts/spec_count_audit.py → fail-closed: ${f}" >&2
+      _docbad=$((_docbad + 1))
+    fi
   done <<EOF
 $( { git diff --name-only "${_base}" -- docs 2>/dev/null
      git diff --name-only --cached -- docs 2>/dev/null

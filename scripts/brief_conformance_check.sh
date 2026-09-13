@@ -327,28 +327,48 @@ _resolve_kind_into_bk || exit 2
 #   置於 case **之前**:impl/stamp 骨架同樣會被原樣派出,收窄到 review 臂是錯的。
 #   🔴 誠實邊界:本條只擋「骨架原樣派出」,擋不住手寫 brief 把審查標的寫成「整份檔」。
 # ---------------------------------------------------------------------------
-_ph_hits=""
-while IFS= read -r _ph; do
-  [ -n "${_ph}" ] || continue
-  if grep -qF -- "${_ph}" "${brief}"; then
-    _ph_hits="${_ph_hits}
-  · ${_ph}"
-  fi
-done <<'PLACEHOLDERS'
-（填標題）
-（標的檔／真實 diff 指令）
-（檔:起訖行 或 節名
-（可執行指令，例
-（已查證的事實）
-（我的假設，可能是錯的）
-（問題一）
-（照 <TODO/規格路徑> 實作
-PLACEHOLDERS
+# 🔴 DOCROT consult-r4 Task 1.8（codex 機械版，三家定案 2026-09-13；覆寫前版全文 `grep -qF`）：
+#   前版對整份 brief 做 substring 比對 ⇒ 正文合法引用骨架字面（例：fenced 範例、blockquote 引述）
+#   會被誤拒，而誤拒後「請主委改寫引用」＝靠人，使用者裁定不接受紀律當解法。
+#   改為 **line-oriented exact-line scanner**（封閉語法，不做語意）：
+#   · 佔位集合＝`new_brief.sh` 實際吐出的**完整欄位行**（trim 首尾空白後逐字相等才算命中）
+#   · 成對 fence（行首可有空白之 ``` 或 ~~~）內的行不算；fence **未閉合** ⇒ fail-closed rc=2
+#   · 行首第一個非空白字元為 `>` 之 blockquote 行不算
+#   · 其餘 active 行只做 exact-line，不做 substring、不猜語意
+#   誠實邊界（保留前版宣稱之收窄）：只擋骨架原樣派出，**不涵蓋手寫 brief** 把審查標的寫成「整份檔」。
+_ph_hits="$(LC_ALL=C awk '
+  BEGIN {
+    n = 0
+    ph[++n] = "# （填標題）"
+    ph[++n] = "（照 <TODO/規格路徑> 實作 …；逐 Task 照做）"
+    ph[++n] = "- **current block**：（檔:起訖行 或 節名——**只列本輪要審的現行段落**，不得寫「整份檔」）"
+    ph[++n] = "- **本輪 diff**：（可執行指令，例 `git diff <上輪 commit>..HEAD -- <檔>`）"
+    ph[++n] = "fact-verified: （已查證的事實） → （查證方式/實跑結果）"
+    ph[++n] = "assumed: （我的假設，可能是錯的） ← 請直接攻這條"
+    ph[++n] = "1. （問題一）"
+    in_fence = 0
+  }
+  /^[[:space:]]*(```|~~~)/ { in_fence = !in_fence; next }
+  in_fence { next }
+  /^[[:space:]]*>/ { next }
+  {
+    s = $0; sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s)
+    for (i = 1; i <= n; i++) if (s == ph[i]) { print "  · " s; break }
+  }
+  END { if (in_fence) print "  · <UNCLOSED-FENCE>" }
+' "${brief}")"
 if [ -n "${_ph_hits}" ]; then
-  echo "ERROR: brief 仍含 new_brief.sh 之**未填骨架佔位**,拒派:${_ph_hits}"
-  echo "  逐條改成本輪的真實內容再派。"
+  case "${_ph_hits}" in
+    *"<UNCLOSED-FENCE>"*)
+      echo "ERROR: brief 之程式碼 fence 未閉合（fail-closed，無法判定佔位是否在 fence 內）,拒派。"
+      exit 2 ;;
+  esac
+  echo "ERROR: brief 仍含 new_brief.sh 之**未填骨架佔位**,拒派:"
+  printf '%s\n' "${_ph_hits}"
+  echo "  逐條改成本輪的真實內容再派。fenced／blockquote 內引用骨架字面不算佔位。"
   echo "  『## 審查標的』須列 current block(檔:起訖行／節名)＋本輪 diff 指令;修訂沿革不入審查範圍。"
-  echo "  依據:2026-09-12 DOCROT consult R2 三家一致之 E3 ＋ CODEX-R1-P1-02。"
+  echo "  誠實邊界:只擋骨架原樣派出,不涵蓋手寫 brief 的整份檔語意（E3 之機械牙在 completeness_check --single）。"
+  echo "  依據:DOCROT consult-r4 Task 1.8（codex 機械版）＋ consult R2 E3 ＋ CODEX-R1-P1-02。"
   exit 2
 fi
 # 行為分支：findings 前置 + mutation 錨點（* 臂）。JSON SSOT 在 case 後對「命中 known arm」再驗。
