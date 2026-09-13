@@ -1,0 +1,27 @@
+[session_name] ✓ 20260913-cxstamp-x-stamp-r1 / 20260913-CXSTAMP-X-STAMP-R1
+[committee_run] === role gate preflight (before gate.sh dispatch) ===
+[committee_run] session=20260913-cxstamp-x-stamp-r1 brief=handoffs/20260913-CXSTAMP-X-STAMP-BRIEF.md  families=codex,composer,grok(3 家)  out=handoffs/20260913-cxstamp-x-stamp-r1-<family>.md
+[committee_run] === gate.sh dispatch ===
+GATE PASS：已發 dispatch token（有效 900s）。審計 → .claude/gate/audit.log
+使用者可稽核：cat .claude/gate/audit.log
+[round_cost] 工作項目「cxstamp」累計 2 輪：真 findings 3 個｜空輪 1｜無產出 0｜銷帳 2
+[committee_run] === open debt round_id=133237b2-4157-4ccd-9822-e8a36976a668 session=20260913-cxstamp-x-stamp-r1 ===
+[committee_run] 開債完成 round_id=133237b2-4157-4ccd-9822-e8a36976a668
+[committee_run] → 派 codex(out=handoffs/20260913-cxstamp-x-stamp-r1-codex.md)
+[committee_run] → 派 composer(out=handoffs/20260913-cxstamp-x-stamp-r1-composer.md)
+[committee_run] → 派 grok(out=handoffs/20260913-cxstamp-x-stamp-r1-grok.md)
+[committee_run] ✅ codex 完成 → handoffs/20260913-cxstamp-x-stamp-r1-codex.md
+[committee_run] ✅ composer 完成 → handoffs/20260913-cxstamp-x-stamp-r1-composer.md
+[committee_run] ✅ grok 完成 → handoffs/20260913-cxstamp-x-stamp-r1-grok.md
+[committee_run] ── 🔴 票 B-50：偵測到疑似**執行端污染**（只回報、不擋、不改 rc）──
+[committee_run] 🔴 形態②：下列 ambient 修改**消失**（疑似被還原成 HEAD）：
+      HANDOFF.md
+      handoffs/run_receipts/20260913-cxstamp-x-review-r1.committee_run.log
+      ⇒ 執行端合約（AGENTS.md／.cursorrules）**明文禁止**對 tracked 檔 git checkout／git stash。
+      ⇒ 收斂前請先還原，否則該檔與其 .sha256／產生器會三者不一致。
+[committee_run] ⚠️ 本輪期間新增/變更的工作區項目（**含合法交付、亦含主控端改動**，不判違規）：
+      M  handoffs/20260913-cxstamp-x-review-r2-codex.md
+      M  handoffs/reconcile/20260913-cxstamp-x-review-r2/sources/20260913-cxstamp-x-review-r2-codex.md
+      MM handoffs/reconcile/20260913-cxstamp-x-review-r2/synth.md
+[committee_run] ✅ 3 家全數完成。接著:bash scripts/reconcile_build.sh <session> handoffs/20260913-cxstamp-x-stamp-r1-*.md
+[committee_run] round_id=133237b2-4157-4ccd-9822-e8a36976a668 session=20260913-cxstamp-x-stamp-r1

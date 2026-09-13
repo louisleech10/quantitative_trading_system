@@ -869,8 +869,8 @@ _run_cli_and_emit() {
   #   audit append-only ⇒ success 不可變 ⇒ 守衛⑥永久拒重派 ⇒ 只能 abandon。
   # 本 session 主委實踩三次（B0 review／B1 review／R6 grok）。
   #
-  # 只對「產 findings 的 brief-kind」檢查（review／consult／closure）。
-  # impl／stamp 產出依契約無 canonical finding ID，判準與行為皆不變。
+  # review／consult／closure 於凍結區塊內檢查；**stamp 自 2026-09-13（CXSTAMP）起亦於凍結區塊外側檢查**
+  #   （零 findings sentinel 亦須 **斷言**＋**碼證**）。impl 產出依契約無 canonical finding ID，不檢查。
   # 禁止 GOVERNANCE_TEST_HARNESS=1 時跳過格式檢查。
   # ---------------------------------------------------------------------------
   _fmt_rc="$(_run_format_check_if_needed "${cli_rc}")"
@@ -879,7 +879,7 @@ _run_cli_and_emit() {
     exit 1
   }
   # 改法⑨：emit 之後才嘗試 register-output（不回捲 family_result）
-  # stamp kind 不跑格式檢查；format-failed 不會出現在 stamp 路徑
+  # stamp kind 亦跑格式檢查（CXSTAMP 2026-09-13）；format-failed 時 _maybe_register_stamp_output 讀 _fmt_rc 自行 no-op
   _maybe_register_stamp_output "${cli_rc}"
   # VERDICTGATE Task 1.2：review／closure 產出自動註冊（格式不合規者 _fmt_rc≠0 仍嘗試——拒收會留 verdict_rejected 痕）
   _maybe_register_review_output "${cli_rc}"

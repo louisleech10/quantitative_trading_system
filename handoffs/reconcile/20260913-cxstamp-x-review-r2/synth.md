@@ -12,6 +12,10 @@
 |---|---|---|---|
 | **Y1 修補閉合、無新缺口、三家零 finding**——「本輪逐項核對後無 finding。」（CODEX）「本輪逐項核對後無 finding——R1 修」（COMPOSER）「本輪逐項核對後無 finding——R1 `」（GROK） | P3 | CODEX-R2-P3-00, COMPOSER-R2-P3-00, GROK-R2-P3-00 | 採納（審碼兩輪收斂：r1 兩 P1 一 P2 → r2 閉合；進 stamp 輪，三家 APPROVED 後 CXSTAMP 結票；程序例外「先改先銷債再審」已由三家事後審補齊） |
 
+**具名殘留與接受風險（stamp-r1 codex REJECTED 指出收斂漏登，補記；皆非阻擋、非本輪新 finding）**：
+- doc-literal（r1 grok、r2 composer、r2 grok 三處明列）：cx_run.sh 兩處註解仍寫「stamp 不跑格式檢查／stamp 維持 stub-ok」與現行行為矛盾——已於本補記同 commit 改正註解字面（不動機制）。
+- 治理信任邊界（r1 composer）：解鎖路徑 B 之「主委顯式 register-output」若主委**刻意**登記劣質內容，機械上放行；屬 accepted risk（register-output 經 verdict 解析＋family 綁定＋audit 留痕，可稽核不可防蓄意），與既有 zero-findings 守衛「不宣稱防蓄意」同一邊界。
+
 Verdict：可合併
 
 ---
@@ -93,3 +97,8 @@ STATUS: DONE
 
 ## 戳記
 
+RECONCILE-STAMP: grok APPROVED 2026-09-13 sha256:990ad2ca0fbc2a5e23926d64cc306a87d6c0ef95f7ecba6a6fefb70d4068728e task:20260913-CXSTAMP-X-STAMP-R1
+
+RECONCILE-STAMP: composer APPROVED 2026-09-13 sha256:990ad2ca0fbc2a5e23926d64cc306a87d6c0ef95f7ecba6a6fefb70d4068728e task:20260913-CXSTAMP-X-STAMP-R1
+
+RECONCILE-STAMP: codex REJECTED 2026-09-13 sha256:990ad2ca0fbc2a5e23926d64cc306a87d6c0ef95f7ecba6a6fefb70d4068728e task:20260913-CXSTAMP-X-STAMP-R1 — r2 synth 遺漏 r1/r2 原文明列的非阻擋 doc-literal 限制（scripts/cx_run.sh:882 註解與 :740-747 行為漂移）
