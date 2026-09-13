@@ -6,7 +6,7 @@
 
 **修訂標的**：HANDOFF.md
 
-本輪性質：三家審**主委自實作**的 DOCROT R2 五項落地。codex 之交件由使用者在自己 terminal 補跑（主委曾誤停 `committee_run`，見 HANDOFF 死鎖紀錄）。22 條全數處置如下，並作為 consult-r3 之輸入；codex 五條無新面向，各落既有群。
+本輪性質：三家審**主委自實作**的 DOCROT R2 五項落地。codex 與 grok 之交件皆由使用者在自己 terminal 補跑（前任主委曾誤停 `committee_run`，grok 首次交件的結果事件因此未寫；見 HANDOFF 死鎖紀錄）。22 條全數處置如下，並作為 consult-r3 之輸入；codex 五條無新面向，各落既有群。
 
 | 群集（含斷言前 20 字逐字） | 嚴重度 | 來源 ID | 處置 |
 |---|---|---|---|
@@ -147,11 +147,11 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 **斷言**: 本輪至少五項實作機制屬「非任一家原文之折衷」，主委未開 consult 即落地，直接違反 R2 已接受之程序修正。
 
-**碼證**: R2 synth L31 程序修正逐字「凡主委產出『非任一家原文』之折衷，自動開一輪 consult」。對照：(1) 佔位封閉集＝`brief_conformance_check.sh` L337-346，R2 E3 原文要的是 completeness 歷史 anchor 檢查（synth L17）；(2) `--dupes`＝`spec_count_audit.py` L102-126，超出「只數共 N 條」（synth L26）；(3) HISTORY break＝L117-118；(4) 併入 `spec_xref_hook.sh` L58-66 為主委成本拍板（commit `68a70342` 自白）；(5) F1 單檔收斂＝只改 `docs/SPLITUNIFY_SPEC.D-002.md`（`git diff --stat 44bbd8d3..HEAD -- docs/*.md`）。`handoffs/reconcile/` 無對這五項的後續 consult synth。RECHECK：重讀 synth L17-31；`git log --oneline 44bbd8d3..HEAD`；`grep -n PLACEHOLDERS\|def dupes\|HISTORY-BEGIN\|warn-only scripts/brief_conformance_check.sh scripts/spec_count_audit.py scripts/spec_xref_hook.sh`。
+**碼證**: R2 synth L31 程序修正逐字「凡主委產出『非任一家原文』之折衷，自動開一輪 consult」。對照：(1) 佔位封閉集＝`brief_conformance_check.sh` PLACEHOLDERS 段（約 L337-346），R2 E3 原文要的是 completeness 歷史 anchor 檢查（synth L17）；(2) `--dupes`＝`spec_count_audit.py` `dupes()`（約 L102-126），超出「只數共 N 條」（synth L26）；(3) HISTORY break＝L117-118；(4) 併入 `spec_xref_hook.sh` 約 L58-66 為主委成本拍板（commit `68a70342` 自白）；(5) F1 單檔收斂＝只改 `docs/SPLITUNIFY_SPEC.D-002.md`（`git diff --stat 44bbd8d3..HEAD -- docs/*.md`）。`handoffs/20260912-DOCROT-X-CONSULT-R3-BRIEF.md` 已寫但**尚未**跑出對這五項的 consult synth／APPROVED。RECHECK：重讀 synth L17-31；`git log --oneline 44bbd8d3..HEAD -- scripts/ templates/ tests/governance/ docs/SPLITUNIFY_SPEC.D-002.md`；`grep -n PLACEHOLDERS\|def dupes\|HISTORY-BEGIN\|warn-only scripts/brief_conformance_check.sh scripts/spec_count_audit.py scripts/spec_xref_hook.sh`。
 
 **來源摘要**: handoffs/reconcile/20260912-docrot-x-consult-r2/synth.md#955ac9458ed7;scripts/brief_conformance_check.sh#55d4b8162804;scripts/spec_count_audit.py#0a36491036cd;scripts/spec_xref_hook.sh#c1fecd2ccd96
 
-[BLOCKING] 信心度=High。會怎麼失敗：機制細節以「三家共同結論」對外流通，下輪委員／使用者以為已審；異議被「已落地」話術封口。**修法**：對五項開一輪 consult（可合併）；未 APPROVED 前 HANDOFF／commit 不得用「三家共同結論」涵蓋這五項機制，改標「主委試點、待追認」。**可行性**：consult 管線與 brief-kind 已存在；本 brief 即補審入口。
+[BLOCKING] 信心度=High。會怎麼失敗：機制細節以「三家共同結論」對外流通，下輪委員／使用者以為已審；異議被「已落地」話術封口。**修法**：對五項開一輪 consult（可合併為既有 r3 brief）；未 APPROVED 前 HANDOFF／commit 不得用「三家共同結論」涵蓋這五項機制，改標「主委試點、待追認」。**可行性**：consult 管線與 brief-kind 已存在；本 brief 即補審入口；r3 brief 路徑已在 repo。
 
 ---
 
@@ -159,11 +159,11 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 **斷言**: R2 E3／E8 Phase A 指定的「completeness 拒收落在歷史區之 finding anchor」未實作；現況以骨架佔位字面硬擋替代，E3 只完成輸入契約的一半。
 
-**碼證**: synth L17「只改派工契約與 completeness 之 anchor 檢查」；L22 E8A「completeness 拒收 anchor 落在歷史區之 finding」。本輪：`grep -c 'HISTORY\|歷史段\|沿革' scripts/completeness_check.sh` → **0**。已做：`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` 輸入邊界、`new_brief.sh` current block／diff、`brief_conformance_check.sh` L318-352 佔位集。佔位測 6 passed；completeness 歷史 anchor 測不存在。RECHECK：重跑上列 grep；讀 synth L17／L22；確認無新 completeness 測試指向 HISTORY。
+**碼證**: synth L17「只改派工契約與 completeness 之 anchor 檢查」；L22 E8A「completeness 拒收 anchor 落在歷史區之 finding」。本輪：`grep -cE 'HISTORY|歷史段|沿革' scripts/completeness_check.sh` → **0**（本輪重跑確認無命中）。已做：`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` 輸入邊界、`new_brief.sh` current block／diff、`brief_conformance_check.sh` 佔位集。佔位測 6 passed；completeness 歷史 anchor 測不存在。RECHECK：重跑上列 grep；讀 synth L17／L22；確認無新 completeness 測試指向 HISTORY。
 
-**來源摘要**: handoffs/reconcile/20260912-docrot-x-consult-r2/synth.md#955ac9458ed7;scripts/brief_conformance_check.sh#55d4b8162804;templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md#976f11c084b2
+**來源摘要**: handoffs/reconcile/20260912-docrot-x-consult-r2/synth.md#955ac9458ed7;scripts/brief_conformance_check.sh#55d4b8162804;templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md#976f11c084b2;scripts/completeness_check.sh#c76692e041da
 
-[BLOCKING] 信心度=High。會怎麼失敗：手寫 brief 寫「整份檔」或委員仍把 source anchor 指進 HISTORY ⇒ 考古再審复發；佔位閘自以為已做完 E3。**修法**：在既有 `completeness_check.sh` 對 finding 的路徑:行／章節做 HISTORY-BEGIN..END 區間判定，命中 ⇒ FAIL；佔位集降為輔助。**可行性**：E8A 自述零新腳本；區間標記在 D-002 已存在（L329）。
+[BLOCKING] 信心度=High。會怎麼失敗：手寫 brief 寫「整份檔」或委員仍把 source anchor 指進 HISTORY ⇒ 考古再審复發；佔位閘自以為已做完 E3。**修法**：在既有 `completeness_check.sh` 對 finding 的路徑:行／章節做 HISTORY-BEGIN..END 區間判定，命中 ⇒ FAIL；佔位集降為輔助。**可行性**：E8A 自述零新腳本；區間標記在 D-002 已存在（`HISTORY-BEGIN`@L329、`HISTORY-END`@L367）。
 
 ---
 
@@ -171,7 +171,7 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 **斷言**: `dupes()` 在首個 `HISTORY-BEGIN`（或 `## 沿革`）處 `break`，會漏掉標記之後的活文多落點；「沿革略過無害」已被構造反例否證。
 
-**碼證**: `spec_count_audit.py` L117-118。構造 A（HISTORY 後兩處 `共 29 條`）→ `--dupes` stderr **空**；構造 C（HISTORY 前兩處）→ 報 `1,2` 形落點。D-002 現把 HISTORY 放檔末故倖免；規則卻是「此後永遠不掃」。RECHECK：重跑 `/tmp` Case A／C 或本審查附錄等價 fixture。
+**碼證**: `spec_count_audit.py` L117-118。本輪構造 Case A（行1 `共 5 條` → HISTORY → 行後再 `共 5 條`）→ `--dupes` stderr **空**、rc=0；Case B（HISTORY 前兩處）→ 報 `@ 行 2,3`。D-002 現把 HISTORY 放檔末（L329）故倖免；規則卻是「此後永遠不掃」。RECHECK：重跑 `/tmp` Case A／B 等價 fixture。
 
 **來源摘要**: scripts/spec_count_audit.py#0a36491036cd;handoffs/20260912-DOCROT-X-REVIEW-R1-BRIEF.md#554fd32867f1
 
@@ -183,7 +183,7 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 **斷言**: 主因 D1 的寫入時硬擋覆蓋率為 0%；「第一期只 warn」對主委自身已否證，不能再當 D1 防線。
 
-**碼證**: `gov_check.sh` L269-273／`spec_xref_hook.sh` L65-66 皆 `|| true` 且不改 rc。`python3 scripts/spec_count_audit.py --dupes docs/GAP3_EVENT_UX_SPEC.md` → 警告含 `共 8 條 @ 117,3591` 等，rc=0。佔位硬擋只掛 `cx_run` 派工路徑（`cx_run.sh` 呼叫 brief_conformance），與「多落點寫入」正交。RECHECK：對 GAP3 重跑 `--dupes`；對一段含雙「共 N 條」的 docs 改動跑 `gov_check` 看 `_docbad` 是否仍 0。
+**碼證**: `gov_check.sh` L269-273／`spec_xref_hook.sh` L65-66 皆 `|| true` 且不改 rc、不進 `_docbad`。`python3 scripts/spec_count_audit.py --dupes docs/GAP3_EVENT_UX_SPEC.md` → 警告含 `共 8 條 @ 117,3591` 等，**rc=0**。佔位硬擋只掛 `cx_run` 派工路徑，與「多落點寫入」正交。RECHECK：對 GAP3 重跑 `--dupes`；對一段含雙「共 N 條」的 docs 改動跑 `gov_check` 看 `_docbad` 是否仍 0。
 
 **來源摘要**: scripts/gov_check.sh#4b333ce050ff;scripts/spec_xref_hook.sh#c1fecd2ccd96;docs/GAP3_EVENT_UX_SPEC.md#30bb5ab0aa28
 
@@ -195,9 +195,9 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 **斷言**: F1 活文收縮只落在 `SPLITUNIFY_SPEC.D-002.md` 卻被寫成 DOCROT 收斂點；若下一張中大票非 D-002 系列，本輪 F1 成效判準測不到。
 
-**碼證**: `git diff --stat 44bbd8d3..HEAD -- docs/*.md` → 實質收縮僅 D-002（另 ROADMAP 2 行）。`docs/` 內含「共 N 條」之檔 ≥10；GAP3 活文仍雙落點（上條）。HANDOFF 表述「F1 活文收縮已到收斂點」。RECHECK：重跑 diff --stat；對非 D-002 SPEC 跑考古行／`--dupes`。
+**碼證**: `git diff --stat 44bbd8d3..HEAD -- docs/*.md` → 實質收縮僅 D-002。D-002 活文區 `共 29 條` 現僅表標題一處（L90）；但 `GAP3_EVENT_UX_SPEC.md` 仍雙落點；70 份 `docs/*SPEC*.md` 中 **13** 份本輪 `--dupes` 有警告。HANDOFF 表述「F1 活文收縮已到收斂點」。RECHECK：重跑 diff --stat；對非 D-002 SPEC 跑 `--dupes`。
 
-**來源摘要**: docs/GAP3_EVENT_UX_SPEC.md#30bb5ab0aa28;handoffs/20260912-DOCROT-X-REVIEW-R1-BRIEF.md#554fd32867f1
+**來源摘要**: docs/GAP3_EVENT_UX_SPEC.md#30bb5ab0aa28;docs/SPLITUNIFY_SPEC.D-002.md#bd2cbf221f9f;handoffs/20260912-DOCROT-X-REVIEW-R1-BRIEF.md#554fd32867f1
 
 [MAJOR] 信心度=High。會怎麼失敗：下一票審 GAP／GOV SPEC 時考古再審與雙計數依舊，卻以為 F1 已驗收。**修法**：對外改標「D-002 試點」；成效判準改為「下一張中大票目標 SPEC 的活文多落點／考古行相對基線下降」，或在該票開場先做同型收縮。**可行性**：只改表述／驗收句，不需新工具。
 
@@ -207,11 +207,11 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 **斷言**: 以「三家共同結論」為 commit 主旨背書未經委員審之實作細節，屬 verification_claim 同型的不實歸屬；現行 `--commit-msg` 路徑抓不到。
 
-**碼證**: `git log -1 --format=%B 3e009126` 首行「落地三家共同結論前兩項」，內文含佔位偵測等自創機制。`venv/bin/python scripts/verification_claim_check.py --commit-msg <該 body 檔>` → **rc=0**。本輪無委員 stamp／review 產出覆蓋 `44bbd8d3..HEAD` 之 scripts／templates diff。RECHECK：重跑上列 claim-check；查 audit 有無對應 committee_output。
+**碼證**: `git log -1 --format=%B 3e009126` 首行「落地三家共同結論前兩項」，內文含「brief_conformance_check.sh 新增骨架佔位偵測」等自創機制。`venv/bin/python scripts/verification_claim_check.py --commit-msg <該 body 檔>` → **rc=0**（本輪重跑確認）。本輪實作四筆 commit 無委員 stamp／review 產出覆蓋其 scripts／templates diff。RECHECK：重跑上列 claim-check；查 audit 有無對應 committee_output。
 
 **來源摘要**: handoffs/20260912-DOCROT-X-REVIEW-R1-BRIEF.md#554fd32867f1;handoffs/reconcile/20260912-docrot-x-consult-r2/synth.md#955ac9458ed7
 
-[MAJOR] 信心度=High。會怎麼失敗：git 史上留下「委員已審」假 provenance，後人／閘都當真。**修法**：改既有 `verification_claim_check.py` commit_msg 路徑——背書語需 audit 佐證或 EXEMPT；並回寫後續 commit 訊息勿再籠統掛「三家共同結論」於未審機制。**可行性**：檔案已有 `commit_msg` source_context（約 L795）；擴 regex＋audit 查詢即可。
+[MAJOR] 信心度=High。會怎麼失敗：git 史上留下「委員已審」假 provenance，後人／閘都當真。**修法**：改既有 `verification_claim_check.py` commit_msg 路徑——背書語需 audit 佐證或 EXEMPT；並回寫後續 commit 訊息勿再籠統掛「三家共同結論」於未審機制。**可行性**：檔案已有 `commit_msg` source_context 與 committee audit 白名單；擴 regex＋audit 查詢即可，不新腳本。
 
 ---
 
@@ -219,11 +219,11 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 **斷言**: 「併進既有 hook 故一般寫檔零成本」在新增 `--dupes` 路徑上事前未實測；本輪測得觸發路徑仍付可見延遲。
 
-**碼證**: brief assumed 自白只有 codex R2 對既有八支 4.39–4.97s。本輪：`python3 scripts/spec_count_audit.py --dupes docs/SPLITUNIFY_SPEC.D-002.md`×10 → median **34.7ms**；`GOVERNANCE_TEST_HARNESS=1 SPEC_XREF_HOOK_TARGET=docs/SPLITUNIFY_SPEC.D-002.md bash scripts/spec_xref_hook.sh`×5 → median **315.1ms**。非觸發名之 `.md` 在 case 過濾前仍付既有 `grep -l` synth 成本（預存），但**不**跑 `--dupes`。RECHECK：重跑上列 timing。
+**碼證**: brief assumed 自白只有 codex R2 對既有八支 4.39–4.97s。本輪：`python3 scripts/spec_count_audit.py --dupes docs/SPLITUNIFY_SPEC.D-002.md`×10 → real 皆 **0.03s**；`GOVERNANCE_TEST_HARNESS=1 SPEC_XREF_HOOK_TARGET=docs/SPLITUNIFY_SPEC.D-002.md bash scripts/spec_xref_hook.sh`×5 → real **0.49/0.30/0.31/0.35/0.31**（median≈**0.31s**）。非觸發名之檔案不跑 `--dupes`（case 過濾後）。RECHECK：重跑上列 timing。
 
 **來源摘要**: scripts/spec_xref_hook.sh#c1fecd2ccd96;scripts/spec_count_audit.py#0a36491036cd
 
-[MINOR] 信心度=High。相對既有 ~5s 鏈，+35ms 不大，但「零成本」事前無數據＝過程病。**修法**：宣稱成本必附新增路徑 receipt；表述改「非觸發路徑不加 `--dupes`；觸發路徑 +~35ms」。
+[MINOR] 信心度=High。相對既有 ~5s 鏈，+30ms 量級不大，但「零成本」事前無數據＝過程病。**修法**：宣稱成本必附新增路徑 receipt；表述改「非觸發路徑不加 `--dupes`；觸發路徑 hook e2e median≈0.31s（含既有 xref），其中 `--dupes`≈0.03s」。
 
 ---
 
@@ -231,7 +231,7 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 **斷言**: 「骨架佔位對手寫 brief 零誤擋」事前未做 corpus replay；事後 replay 顯示歷史 BRIEF 字面 FP＝0，但手寫「整份檔」繞過仍在，不能代替 E3 的 completeness 半邊。
 
-**碼證**: `find handoffs -maxdepth 1 -name '*BRIEF*.md'` → 652；對封閉八字面 `grep -qF` → **hit_any_placeholder=0**。腳本 L328 自白「擋不住手寫 brief 把審查標的寫成整份檔」。RECHECK：重跑字面掃描；抽一手寫「整份檔」brief 確認佔位閘 rc=0。
+**碼證**: `find handoffs -name '*BRIEF*.md'` → **653**；對封閉八字面 `grep -qF` → **hit_any_placeholder=0**。腳本約 L328 自白「擋不住手寫 brief 把審查標的寫成整份檔」。RECHECK：重跑字面掃描；抽一手寫「整份檔」brief 確認佔位閘 rc=0。
 
 **來源摘要**: scripts/brief_conformance_check.sh#55d4b8162804;tests/governance/test_docrot_e3_brief_placeholder.py#2c350f092373
 

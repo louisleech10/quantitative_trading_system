@@ -19,11 +19,11 @@
     },
     {
       "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260912-docrot-x-review-r1/sources/20260912-docrot-x-review-r1-grok.md",
-      "sha256": "2b6705799a24f35d13c9436883d8f4ec31993c2aebff5c133caf942cef73af74",
+      "sha256": "250cf5048d51cae79fa229083f8edc58f41185a266311ae5221814d1b606e252",
       "family": "grok"
     }
   ],
-  "freeze_ts": "2026-09-13T02:40:02Z",
+  "freeze_ts": "2026-09-13T02:55:37Z",
   "closure_state": "FROZEN",
   "mode": "review",
   "round_id": "f672aa67-c73a-4e17-a8e7-566a05ef00f0"
