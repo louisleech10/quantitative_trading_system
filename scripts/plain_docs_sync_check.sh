@@ -115,6 +115,8 @@ _watched_for() {
     #   施工進度盯本票要動的共用控制流＋TODO；規格白話只盯 SPEC。
     "VERDICTGATE施工進度.md")        echo "scripts/gate.sh scripts/committee_run.sh scripts/debt_clear.sh scripts/gov_check.sh scripts/git_hooks/commit-msg scripts/git_hooks/pre-push scripts/reconcile_cluster_attribution_check.sh scripts/completeness_check.sh scripts/governance_verdicts.json templates/ docs/VERDICTGATE_TODO.md" ;;
     "VERDICTGATE規格白話.md")        echo "docs/VERDICTGATE_SPEC.md" ;;
+    # DOCROT（2026-09-13 開票即登記）：看板盯本票 TODO 要動的既有腳本／範本／測試＋兩份定案收斂檔。
+    "DOCROT施工進度.md")             echo "scripts/spec_count_audit.py scripts/gov_check.sh scripts/completeness_check.sh scripts/verification_claim_check.py scripts/brief_conformance_check.sh scripts/new_brief.sh templates/ tests/governance/test_docrot_f2_total_items_count.py tests/governance/test_docrot_e3_brief_placeholder.py handoffs/reconcile/20260912-docrot-x-consult-r3/synth.md handoffs/reconcile/20260912-docrot-x-consult-r4/synth.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。

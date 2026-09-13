@@ -1,6 +1,6 @@
 # HANDOFF — 當前任務狀態
 
-**更新：2026-09-13｜現行 topic：DOCROT（文檔多輪根因）→ 下一步派 `docrot-x-consult-r3`｜`SPLITUNIFY` 暫停（b9 `D-002` v13 停輪；未 commit 生產碼無 token 無戳記，待 DOCROT 結束後再處理）｜無 OPEN 債**
+**更新：2026-09-13｜現行 topic：DOCROT → consult-r3 **已定案且三家戳記 APPROVED**（`handoffs/reconcile/20260912-docrot-x-consult-r3/synth.md`＝唯一權威；TODO 本體＝grok 必答 2 表 Task 1.1–1.8；stamp-r1 三家零 finding、債清）→ 🔴 使用者 2026-09-13 逐字「不接受用紀律和記憶當解法和修正」⇒ C7 Task 1.6／C9 Task 1.8 為紀律型，`docrot-x-consult-r4` **已收斂、債清**（`handoffs/reconcile/20260912-docrot-x-consult-r4/synth.md` 覆寫 r3 之 C7／C9：Task 1.6 採 grok 兩 token 版 `CODE-ANCHOR`＋`MUTATION` 進 `completeness --single` fail-closed；Task 1.8 採 codex exact-line＋fence／blockquote 版；forward-only；紀律型殘留 0），stamp-r2 已派（log `handoffs/run_receipts/20260912-docrot-x-stamp-r2.committee_run.log`）→ 三家 APPROVED → 白話審閱閘 → 才動碼。🔴 坑：committee_run session 名須 `<日期>-<epic>-<b?|x>-<kind>-r<N>`（`...-consult-r3-stamp-r1` 被 fail-closed 擋，改 `docrot-x-stamp-r1`）｜`SPLITUNIFY` 暫停（b9 `D-002` v13 停輪；未 commit 生產碼無 token 無戳記，待 DOCROT 結束後再處理）｜無 OPEN 債**
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v13**：mutation 34 條、register 29 條，ID 連續。停輪依據＝R12 十三條無一新面向，見 `handoffs/reconcile/20260911-splitunify-b9-review-r12/synth.md`（唯一權威，本檔不複述逐條）。

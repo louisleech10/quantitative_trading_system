@@ -1,0 +1,5 @@
+ERROR: session 不符命名規約: 20260912-docrot-x-consult-r3-stamp-r1
+  應為 <YYYYMMDD>-<epic>-<batch>-<kind>-r<N>
+  kind ∈ {impl, review, stamp, consult, fix}；batch 為 b<數字> 或 x；r<N> 必填
+  例: 20260806-govb0-b35-review-r1
+ERROR: 命名規約未過 → 不發 token、不開債、不派工(fail-closed)

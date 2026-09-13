@@ -23,7 +23,7 @@ findings 用 canonical ID：`## <FAMILY>-R3-P<0-3>-<NN>`（見 `templates/COMMIT
 ## 已定案、本輪不重議的事實
 - R1（`handoffs/reconcile/20260912-docrot-x-consult-r1/synth.md`）：主因 D1＝一個決定手寫進多個無索引落點；次因 D2＝修訂考古寫進活義務；另 D3 三閘 rc=0 不代表無語意互斥、D4 停輪判準應機械化、D5 狀態複寫跨檔、D6 收斂檔不屬病灶。
 - R2（`.../20260912-docrot-x-consult-r2/synth.md`）：主委第二版折衷被三家全 P0 否決；執行優先序五項；程序修正「凡主委產出非任一家原文之折衷，自動開一輪 consult」。
-- review-r1（`.../20260912-docrot-x-review-r1/synth.md`，composer＋grok；codex 因主委誤停未產出，已 collection-failed 銷帳）：主委自實作五項**未開 consult**即 commit（兩家 P0）；以「三家共同結論」為 commit 標題背書未審實作（兩家）；E3 只做一半（completeness 未拒收 HISTORY 區 anchor，grok P0）；`dupes()` 在 `HISTORY-BEGIN` break 會漏掃其後活文（grok P1，有構造反例）；warn-only 對主委無效，最小擋門＝`gov_check` 段 1b 對 dupes 命中 fail-closed（兩家）；F1 只做 D-002 一份、成效判準不可觀測（兩家）。
+- review-r1（`.../20260912-docrot-x-review-r1/synth.md`，codex＋composer＋grok 三家齊，22 條歸十群、歸戶 22/22）：主委自實作五項**未開 consult**即 commit（兩家 P0）；以「三家共同結論」為 commit 標題背書未審實作（三家）；E3 只做一半（completeness 未拒收 HISTORY 區 anchor，grok P0）；`dupes()` 在 `HISTORY-BEGIN` break 會漏掃其後活文（三家，有構造反例）；warn-only 對主委無效，最小擋門＝`gov_check` 段 1b 對 dupes 命中 fail-closed（三家）；F1 只做 D-002 一份、成效判準不可觀測（三家）。
 
 ## 主委自創五項 vs 三家原文（review-r1 G1；請逐項裁定：採納／改寫／撤回）
 | # | 主委做了什麼 | 三家原文是什麼 |
@@ -40,7 +40,7 @@ findings 用 canonical ID：`## <FAMILY>-R3-P<0-3>-<NN>`（見 `templates/COMMIT
 - 🔴 **不在範圍**：`docs/SPLITUNIFY_SPEC.D-002.md` 之 `HISTORY-BEGIN`～`HISTORY-END`；finding anchor 落在歷史段者不受理。
 
 ## 本 brief 前提（逐條標；請優先攻 assumed）
-fact-verified: review-r1 十群全為 composer＋grok 原文之處置，主委未加入任何新機制 → 歸戶檢查 17/17、completeness PASS（`handoffs/reconcile/20260912-docrot-x-review-r1/`）。
+fact-verified: review-r1 十群全為 codex＋composer＋grok 原文之處置，主委未加入任何新機制 → 歸戶檢查 22/22、completeness PASS、`debt_clear` rc=0（`handoffs/reconcile/20260912-docrot-x-review-r1/`）。
 fact-verified: 目前 D1 之寫入時硬擋覆蓋率為 0%——兩處 `--dupes` 皆 `|| true` 不改 rc → `scripts/gov_check.sh` 段 1b、`scripts/spec_xref_hook.sh` ③ 段實讀。
 fact-verified: `docs/` 200 個 `.md` 中 132 個命中 `spec_xref_hook` 觸發集合，68 個不命中 → `ls docs/ | grep -cE 'SPEC|TODO|PLAN|RECON'`。
 fact-verified: `docs/` 下**不存在**任何 DOCROT 的 SPEC 或 TODO；主委從決議直接進碼，未宣告任務大小 → `ls docs/ | grep -i docrot` 為空。

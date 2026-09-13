@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "session_id": "20260912-docrot-x-stamp-r2",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260912-docrot-x-stamp-r2/sources/20260912-docrot-x-stamp-r2-codex.md",
+      "sha256": "2c22321a09f369a326a103faa18df6b71b225e05086584a13fce4b9c76c72987",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260912-docrot-x-stamp-r2/sources/20260912-docrot-x-stamp-r2-composer.md",
+      "sha256": "d73bc0ee8a85facb568a4ded463b29d0f6064e2833fb4fb5112c99a3e9ee2c77",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260912-docrot-x-stamp-r2/sources/20260912-docrot-x-stamp-r2-grok.md",
+      "sha256": "c752722a3bc2045da6d95fff4104689dc2119d314a85ffafa81e9de614067197",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-09-13T07:05:37Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "7492375e-34a7-4d04-80d1-16f5fb3cfa4b"
+}
