@@ -22,7 +22,10 @@
   - **A5（兩家）TODO「逐 symbol 相加」與資料流互斥** ⇒ 兩家一致判「實作對、條文錯」，TODO 改「原樣傳遞、不得相加」。
   - **A6（兩家）`_build_summary` docstring 仍寫 12 鍵且引用不存在行號** ⇒ 改 13 鍵並明寫鍵數權威是 exact-set 斷言。
 - 🔴 **本輪最值得記的一件事**：主委在 brief 自標的兩條 assumed（多 symbol 相加、`value_counts` 之 dtype 陷阱）**兩條都被證實為真問題**，A1 之「第三種破壞」也是主委自己問出來的 ⇒ **把沒把握的面寫進 brief 交出去攻，比自己再讀一遍有效**。
-- **下一步**：派 `review-r19` 做 A1–A6 閉合再驗證；三家確認後進 `Task 9.2`（批次 **B9B**＝`9.2`＋`9.2a`，**不得拆批**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A 已完成**）。
+⑮**review-r19 完成**：**r18 之十三條 finding 全數由原提出方 CLOSED**（codex 五／composer 三／grok 五）；composer／grok 零 finding proceed。主委自標的兩條 assumed 皆由 codex 實跑**否證為無問題**——`Categorical`／`StringDtype` 下不會混入值為 0 之偽項；**無第二條生產路徑**（全 repo 掃 `build_event_keys` 只有 `pipeline.py` 一處，另三處在 `scripts/freeze_splitunify_golden.py` 屬 golden 工具）。
+  - 🔴 **codex 一條新 P1（`CODEX-R19-P1-01`）已修**：**SPEC 之 `§P Task 9.1` 落後於自己的 §V 與實作**，兩處互斥字面——①仍寫「producer → summary → `metadata.split_unify` **三層**」（v13 之 O1 已把 metadata 移入 §N 殘留、§V 已同步，**只有 §P 沒改**）；②仍寫「多 symbol **逐 symbol 相加**」（R18 已定案原樣傳遞）。**SPEC 是權威**，下一輪實作者依 §P 會引入 double-count。兩處已同步、SPEC 進 **v18**。
+  - 🔴 **教訓**：v13 改 §V 沒改 §P，與本檔一路在打的「一個決定散在多區段而漏同步」**完全同型**，隔了五輪、直到實作完成才被逼出來 ⇒ **文件層自證掃不到「§P 與 §V 互斥」這種跨區段矛盾，實作才掃得到**；反證 r12 停輪判準「殘餘規格缺陷交由實作期暴露」是對的。
+- **下一步**：對 SPEC 新 body sha256 `76006a764a8c1d12437cc71c8ed38bbdaddbc65637a523cd52792d2ee3ef9433` 取三家重簽（v17 戳記已失效）；`reconcile_stamps_check` rc=0 後進 `Task 9.2`（批次 **B9B**＝`9.2`＋`9.2a`，**不得拆批**）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A 已完成**）。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v13，body sha256 `06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77`，仍為零戳記**。停輪依據＝`handoffs/reconcile/20260911-splitunify-b9-review-r12/synth.md`（唯一權威，本檔不複述）。
