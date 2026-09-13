@@ -117,7 +117,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 | `C5-22` | golden 之 `g1_membership` | 乙 | 擴維為 `(event_id, feature_timeframe)` 或新增平行組 | `Task 9.5` | `M-SU-D2-16`／`M-SU-D2-17` |
 | `C5-23` | `test_splitunify_wiring.py:103-104` 之 `dict(zip(...))` 映射 | 乙 | 改複合鍵映射 | `Task 9.4` | `M-SU-D2-12` |
 | `C5-24` | `pattern_bridge` 之 `assign.set_index("event_id")["split_label"]`（`:125-127`） | 丙 | 去重取唯一側，不唯一即 fail-closed；**不得**改複合鍵索引 | `Task 9.3` | `M-SU-D2-05`／`M-SU-D2-37`（🔴 v15：本列處置有**兩個**可壞面——`M-SU-D2-05` 覆蓋「改成複合鍵索引」那半，`M-SU-D2-37` 覆蓋「略過唯一側去重／不 fail-closed」那半；v14 以前只掛 `M-SU-D2-05`，後者無處可紅） |
-| `C5-25` | `ic_feed` survivor **餵入端** | 丙 | 先去重再算雜湊，否則重複三元組改變雜湊 | `Task 9.3` | `M-SU-D2-38`（🔴 v15：原指 `M-SU-D2-19`，但該條破壞的是「survivor 六鍵雜湊被改成含 feature TF」，屬 `C5-10`；本列之「餵入端略過去重」無處可紅 ⇒ 新增 `M-SU-D2-38`。三家 R14 撞題） |
+| `C5-25` | `ic_feed` survivor 餵入端——🔴 **v17 具名（R16 `CODEX-R16-P1-01`／必答 3a：v16 以前只寫「餵入端」三字，無行號且與 mutation 之破壞點不是同一行碼）**：雜湊 seam ＝ `momentum/Analysis/event_samples/ic_feed.py:56-65`（`event_context_from_windows` 之 `rows` 組裝）；其現行呼叫端 ＝ `momentum/Analysis/event_samples/pipeline.py:406-408` | 丙 | 先去重再算雜湊，否則重複三元組改變雜湊。**去重須發生在 seam（`ic_feed.py:56-65`）內**，使任一呼叫端都受保護；不得只在呼叫端去重 | `Task 9.3` | `M-SU-D2-38`（🔴 v15：原指 `M-SU-D2-19`，但該條破壞的是「survivor 六鍵雜湊被改成含 feature TF」，屬 `C5-10`；本列之「餵入端略過去重」無處可紅 ⇒ 新增 `M-SU-D2-38`。三家 R14 撞題） |
 | `C5-26` | `pipeline.py:760-762` 之 summary counts（`n_train`／`n_test`／`n_purged` 由 `assignments[...].sum()` 算出） | 丙 | 改以 `event_id` 去重計數；列數另立新名 | `Task 9.4` | `M-SU-D2-13` |
 | `C5-27` | `split_projection.py:559-569` 之 `per_symbol_n`／`per_symbol_test_n` 與 `:716-719` 之 `tier_min_test_events` 門檻比較 | 丙 | 改以 `event_id` 去重計數（複合鍵後 1 事件×2 TF 會膨脹成 2，靜默繞過門檻） | `Task 9.4` | `M-SU-D2-39`（🔴 v15：原指 `M-SU-D2-13`，但該條破壞的是「`n_train` 改取列數」，屬 `C5-26`；本列之「per-symbol 門檻未去重」無處可紅 ⇒ 新增 `M-SU-D2-39`） |
 | `C5-28` | 前端 `frontend/src/components/ic-analysis/EventTablesPanel.tsx:361` 之 `train／test／purge` 計數顯示 | 丙 | 顯示值須為事件數；隨 `Task 9.1` 之 `SU-RESID-9A-UI` 殘留，本延伸不交付終端可見性 | `Task 9.4` | —（🔴 v15 具名：**刻意無 mutation**，理由類別 `blocked-by`——本列之交付面整段隨 `SU-RESID-9A-UI` 殘留延後，本延伸不產出該行為 ⇒ 無碼可壞、寫 mutation 即空殼。殘留解除時須連同本列一併補） |
@@ -389,3 +389,7 @@ RECONCILE-STAMP: grok REJECTED 2026-09-13 — C5-29/C5-25 mutation 錯配（GROK
 RECONCILE-STAMP: codex REJECTED 2026-09-13 sha256:c674086e5f66985ed4bb3107483803425eaec27731acc49f173ed89efe4b8bf0 task:20260911-SPLITUNIFY-B9-REVIEW-R15 — BLOCKED-BY: CODEX-R15-P1-01,CODEX-R15-P1-02,CODEX-R15-P1-03,CODEX-R15-P1-04
 RECONCILE-STAMP: composer APPROVED 2026-09-13 sha256:c674086e5f66985ed4bb3107483803425eaec27731acc49f173ed89efe4b8bf0 task:20260911-SPLITUNIFY-B9-REVIEW-R15
 RECONCILE-STAMP: grok APPROVED 2026-09-13 sha256:c674086e5f66985ed4bb3107483803425eaec27731acc49f173ed89efe4b8bf0 task:20260911-SPLITUNIFY-B9-REVIEW-R15
+
+RECONCILE-STAMP: codex REJECTED 2026-09-13 sha256:8607f2b770fb39f967c7c75686a90f4c1bc39a7d1536cc70bca1909e838021a0 task:20260911-SPLITUNIFY-B9-REVIEW-R16 — BLOCKED-BY: CODEX-R16-P1-01
+RECONCILE-STAMP: composer APPROVED 2026-09-13 sha256:8607f2b770fb39f967c7c75686a90f4c1bc39a7d1536cc70bca1909e838021a0 task:20260911-SPLITUNIFY-B9-REVIEW-R16
+RECONCILE-STAMP: grok APPROVED 2026-09-13 sha256:8607f2b770fb39f967c7c75686a90f4c1bc39a7d1536cc70bca1909e838021a0 task:20260911-SPLITUNIFY-B9-REVIEW-R16
