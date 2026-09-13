@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPLITUNIFY 第 9 批：五個小任務各在做什麼、怎麼做</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">SPLITUNIFY第9批任務白話.md</span></nav>
+<main>
+<h1 id="splitunify-第-9-批五個小任務各在做什麼怎麼做">SPLITUNIFY 第 9 批：五個小任務各在做什麼、怎麼做</h1>
+<blockquote>
+<p>這份是<strong>給你看的</strong>，用例子講。技術條文在 <code>docs/SPLITUNIFY_TODO.md</code> 的 <code>Task 9.1</code>–<code>9.5</code>，
+兩邊如果不一致，以那份為準（這份只解釋，不定規矩）。
+進度看 <a href="SPLITUNIFY施工進度.html">SPLITUNIFY施工進度.md</a>。</p>
+</blockquote>
+<hr />
+<h2 id="先講清楚整批在解什麼問題">先講清楚：整批在解什麼問題</h2>
+<p>你篩出一批事件（例如「RSI 超賣」觸發了 165 次）。系統要為每個事件算特徵，
+而特徵可以來自<strong>不同的 K 線週期</strong>——同一個事件，可以有 <code>1h</code> 的特徵、也可以有 <code>4h</code> 的特徵。</p>
+<p><strong>原本的系統只留一個週期，其餘整批丟掉，而且不告訴你丟了多少。</strong></p>
+<p>更糟的是：決定「這個事件算訓練組還是測試組」時，用的是<strong>該週期的取數時點</strong>。
+<code>1h</code> 和 <code>4h</code> 的取數時點不一樣 ⇒ <strong>同一個事件的兩個週期可能被分到兩邊</strong>。
+一邊進訓練、一邊進測試，等於<strong>答案漏進了訓練資料</strong>，而且全程沒有任何錯誤訊息。</p>
+<p>這一批（第 9 批）就是把這兩件事修掉。五個小任務是一條依賴鏈，<strong>不能跳</strong>：</p>
+<pre><code>9.1（誠實記帳） → 9.2＋9.2a（全部留下來） → 9.2b（判邊改事件級）
+                                              → 9.3（下游九處）∥ 9.4（顯示）
+                                                          → 9.5（基準檔）
+</code></pre>
+<hr />
+<h2 id="task-91-先誠實記帳-已完成"><code>Task 9.1</code> — 先誠實記帳（✅ 已完成）</h2>
+<p><strong>在做什麼</strong>：<strong>不改</strong>「只留一個週期」這個行為，但<strong>要說出丟了哪些、各丟幾列</strong>。</p>
+<p><strong>為什麼先做這個</strong>：如果一次把「記帳」和「不要再丟」一起做，出問題時分不出是哪一個弄壞的。
+所以先做只加不減的那一半。</p>
+<p><strong>怎麼做</strong>：</p>
+<ul>
+<li>產生資料的那支函式，回傳值從「一張表」改成「一張表 ＋ 一份丟棄清單」。
+清單長這樣：<code>{&quot;4h&quot;: 2}</code> ＝ 被丟掉的 <code>4h</code> 有 2 列；<strong>沒丟東西時是空的 <code>{}</code>，不是 null、也不是沒這個欄位</strong>。</li>
+<li>這份清單<strong>原樣</strong>一路帶到報告的 summary 裡，中間不加工、不重算。</li>
+</ul>
+<p><strong>舉例</strong>：一批事件有 <code>1h</code> 和 <code>4h</code> 兩種特徵週期，你選了 <code>1h</code>。
+以前：報告只寫「投影完成」。現在：報告多一行 <code>discarded_rows_by_feature_tf = {&quot;4h&quot;: 2}</code>。</p>
+<p><strong>踩到的坑</strong>：</p>
+<ul>
+<li>週期欄位如果是<strong>空值</strong>，字串化之後會變成一個叫 <code>nan</code> 的<strong>假週期</strong>混進清單。已改成直接報錯——缺資料就是缺資料，不是一種週期。</li>
+<li>多標的時文件寫「逐標的相加」，但實際上那支函式是<strong>整批算一次</strong>的，照字面相加會<strong>重複計數</strong>。實作採原樣傳遞，文件改掉。</li>
+</ul>
+<hr />
+<h2 id="task-92-92a-停止只挑一個-已完成整批的核心"><code>Task 9.2</code> ＋ <code>9.2a</code> — 停止只挑一個（✅ 已完成；整批的核心）</h2>
+<p><strong>在做什麼</strong>：全部週期都留下來。同一個事件可以同時有 <code>1h</code> 和 <code>4h</code> 兩列，各自帶自己的週期標記。</p>
+<p><strong>為什麼四層要一起改</strong>（少改一層等於沒改）：</p>
+<ol>
+<li>產生資料的函式：從「必須指定一個週期」改成「<strong>不指定就給全部</strong>」</li>
+<li>呼叫它的那一行：把強制轉字串拿掉——不拿掉的話「不指定」會變成字面的 <code>&quot;None&quot;</code>，
+被當成一個叫 <code>None</code> 的假週期，產出<strong>空表</strong></li>
+<li>流程入口的檢查：從「四個參數都要給」改成「三個」——不改這裡，<strong>連走到那支函式都走不到</strong></li>
+<li>資料合併方式：改成以週期為行粒度，並<strong>新建</strong>一個「特徵週期」欄位</li>
+</ol>
+<p><strong>第 4 點的關鍵</strong>：這個新欄位<strong>不能</strong>拿現成的「觸發週期」欄冒充。
+「觸發週期」是事件在哪個週期上被偵測到的，「特徵週期」是特徵從哪個週期算出來的——
+<strong>兩件事</strong>。拿前者冒充，同一事件的兩列會同值，複合鍵直接撞在一起。</p>
+<p><strong><code>9.2a</code> 做的是配套</strong>：兩張輸出表各加「特徵週期」欄；唯一性的判準從「每個事件一列」
+改成「<strong>（事件, 特徵週期）這個組合</strong>唯一」；報告的欄位數從 12 個增為 16 個
+（多了「事件數」「事件×週期列數」「被丟棄的列數」等，因為<strong>事件數和列數從此是兩個不同的量</strong>）。</p>
+<p><strong>舉例</strong>：3 個事件 × 2 個週期 ⇒ 以前輸出 3 列，現在輸出 6 列；
+報告會同時寫「事件數 3」和「列數 6」，不會再用同一個數字代表兩件事。</p>
+<p><strong>刻意沒動的</strong>：基準檔（golden）維持單一週期 ⇒ 既有數值<strong>一個都沒變</strong>。
+這樣萬一之後出問題，可以確定不是這批弄的。擴成多週期是 <code>9.5</code>。</p>
+<hr />
+<h2 id="task-92b-判邊改成看事件自己-程式完成審碼中"><code>Task 9.2b</code> — 判邊改成看事件自己（✅ 程式完成，審碼中）</h2>
+<p><strong>在做什麼</strong>：決定「訓練還是測試」時，<strong>不再看該週期的取數時點</strong>，改看<strong>事件自己的決策時刻</strong>，
+判一次之後<strong>廣播</strong>給該事件的所有週期列。</p>
+<p><strong>為什麼</strong>：這正是本批要消滅的洩漏。<code>1h</code> 的取數時點和 <code>4h</code> 的不一樣，
+逐列判就可能一列進訓練、一列進測試——<strong>同一個事件的答案漏進訓練組</strong>。
+改成看事件自己的決策時刻，<strong>結構上就不可能分兩邊</strong>。</p>
+<p><strong>怎麼判</strong>（三段式，順序不能換）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>決策時刻落在哪</th>
+<th>判成</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>早於等於<strong>訓練段最後一根</strong>的時刻</td>
+<td>訓練</td>
+</tr>
+<tr>
+<td>晚於等於<strong>測試段第一根</strong>的時刻</td>
+<td>測試</td>
+</tr>
+<tr>
+<td>夾在兩者中間（隔離帶）</td>
+<td>丟棄（合法且預期，<strong>不報錯</strong>）</td>
+</tr>
+<tr>
+<td>落在整段 K 線<strong>範圍外</strong></td>
+<td><strong>直接報錯</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 最後一列是重點：界外<strong>不是第四種分類</strong>。寫成第四種分支就等於恢復重疊，
+越界的事件會被「合法地」分到某一邊。</p>
+<p><strong>兩道 fail-closed</strong>（缺一不可）：</p>
+<ul>
+<li>同一事件的列若出現異側 ⇒ 報錯</li>
+<li>同一事件若同時出現在「分配表」和「丟棄表」⇒ 報錯
+（後面這道不能省：丟棄表<strong>沒有側別欄</strong>，第一道結構上看不到這種混態）</li>
+</ul>
+<p><strong>舉例</strong>：事件 <code>e_x</code> 有 <code>1h</code>（取數時點在訓練段）和 <code>4h</code>（取數時點在測試段）兩列。</p>
+<ul>
+<li>9.2b 之前：<code>1h</code> 判訓練、<code>4h</code> 判測試 ⇒ <strong>兩邊都有它，沒人報錯</strong></li>
+<li>9.2b 之後：看 <code>e_x</code> 自己的決策時刻（假設在訓練段）⇒ <strong>兩列都是訓練</strong></li>
+</ul>
+<p><strong>還做了</strong>：流程入口在做投影<strong>之前</strong>先驗證訓練／測試兩段的完整性（空段、隔離帶踩線都在這裡先擋）。</p>
+<hr />
+<h2 id="task-93-下游九處消費面-下一個做"><code>Task 9.3</code> — 下游九處消費面（⬜ 下一個做）</h2>
+<p><strong>在做什麼</strong>：資料表的行粒度變了（一個事件可能多列），
+<strong>讀這張表的地方</strong>要逐處確認會不會出錯。</p>
+<p>🔴 <strong>重點是「逐處判斷」，不是「全部改成複合鍵」</strong>。九處裡<strong>多數是維持原樣 ＋ 補防誤改測試</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>消費面</th>
+<th>處置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>特徵物化</td>
+<td><strong>維持事件級</strong>（同事件各週期的特徵欄拼成<strong>一個</strong>向量，改成多列會破壞 ML 輸入語意）</td>
+</tr>
+<tr>
+<td>報表</td>
+<td>多數維持；但有一處用「事件編號」當索引去取標的名稱，重複索引下 pandas 會<strong>直接報錯</strong> ⇒ 要加去重，且衝突時 fail-closed</td>
+</tr>
+<tr>
+<td>IC 餵入</td>
+<td>維持六個事件級欄位；但餵進去之前要先依事件去重，否則雜湊值會漂</td>
+</tr>
+<tr>
+<td>反例分類、候選帳本</td>
+<td>維持事件級</td>
+</tr>
+<tr>
+<td>去重</td>
+<td>保留集仍以事件決定，再<strong>廣播</strong>到該事件所有週期列</td>
+</tr>
+<tr>
+<td>型態橋接</td>
+<td><strong>要改</strong>：取側別時先去重，不唯一就 fail-closed</td>
+</tr>
+<tr>
+<td>事件級表／manifest</td>
+<td>粒度不變</td>
+</tr>
+<tr>
+<td>前端匯出</td>
+<td>維持既有鍵，<strong>但要新建一支測試</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>開工前置</strong>：要先產出一份「重掃收據」，逐條寫下 29 個消費點改前改後的分類與程式位置，
+<strong>檔案不存在就不算完成</strong>——沒有這一條，省略重掃在現行檢查下完全看不出來。</p>
+<hr />
+<h2 id="task-94-讓你看得見-未開工"><code>Task 9.4</code> — 讓你看得見（⬜ 未開工）</h2>
+<p><strong>在做什麼</strong>：現在「測試段事件數不足」這個警告<strong>只存在於報告資料裡，畫面一個字都沒印</strong>。
+而且那個數字是用<strong>列數</strong>算的——同一事件有兩個週期就會讓 1 個事件冒充 2 個，<strong>靜靜通過門檻</strong>。</p>
+<p><strong>怎麼做</strong>：計數改成依事件去重；並把顯示補上。
+🔴 <strong>兩件要綁在一起做</strong>——只改計數等於修了也沒人看得到。</p>
+<hr />
+<h2 id="task-95-基準檔擴成多週期-最後"><code>Task 9.5</code> — 基準檔擴成多週期（⬜ 最後）</h2>
+<p><strong>在做什麼</strong>：把 golden 基準檔從「單一週期」擴成「多週期平行組」，
+並把比對從「只比事件編號清單」改成「比（事件, 週期）的組合」。</p>
+<p><strong>為什麼非做不可</strong>：現在一個事件有多列，只比事件編號會<strong>把週期這個維度整個吃掉</strong>——
+新增或漏掉一個週期，比對照樣綠燈。</p>
+<p><strong>為什麼排最後</strong>：它會把前面所有任務的結果<strong>凍結</strong>下來。
+前面還在動的時候凍，等於凍一份半成品。</p>
+<hr />
+<h2 id="附為什麼審了這麼多輪">附：為什麼審了這麼多輪</h2>
+<p><code>review-rN</code> 是<strong>整批的連號計數器</strong>，不是規格的版次。實際分段：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>輪次</th>
+<th>在審什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>r1–r12</td>
+<td><strong>規格本身</strong></td>
+</tr>
+<tr>
+<td>r13–r17</td>
+<td>規格／逐列校對 ＋ 共識決</td>
+</tr>
+<tr>
+<td>r18–r19</td>
+<td><code>Task 9.1</code> 的<strong>程式碼</strong></td>
+</tr>
+<tr>
+<td>r20–r22</td>
+<td><code>Task 9.2</code>＋<code>9.2a</code> 的<strong>程式碼</strong></td>
+</tr>
+<tr>
+<td>r23–r26</td>
+<td>閉合再驗證 ＋ 重新蓋章</td>
+</tr>
+<tr>
+<td>r27–r29</td>
+<td><code>Task 9.2b</code> 的<strong>程式碼</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>規格的審查在 <strong>r12 就結束</strong>了，之後拿過兩次有效的三家蓋章。
+r18 以後全部是審程式碼。這個命名會誤導，從下一批起改成每批重新計數。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/SPLITUNIFY第9批任務白話.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
