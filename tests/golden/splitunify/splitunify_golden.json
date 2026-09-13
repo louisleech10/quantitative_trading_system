@@ -21,6 +21,27 @@
       "tr_leak"
     ]
   },
+  "g4e_hand_expected_membership": {
+    "train": [
+      "bnd_shift",
+      "tr0",
+      "tr1",
+      "tr2",
+      "tr3"
+    ],
+    "test": [
+      "te0",
+      "te1",
+      "te2",
+      "te3",
+      "te4"
+    ],
+    "purged": [
+      "gap1",
+      "gap2",
+      "tr_leak"
+    ]
+  },
   "g1_membership_v9": {
     "train": [
       "bnd_shift",

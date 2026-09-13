@@ -205,8 +205,17 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
   v4 的本欄仍寫 `event_index`，與 SPEC C-4 互斥 ⇒ 只讀本檔的實作端會建錯簽名）。
   🔴 `bucket_ms` 是 R2 之 D8 補上的——v2 要求投影產 `clusters` 卻沒給桶寬參數。
 - 實作要點：
-  1. 🔴 **兩段式判定，先後不可調（R3 之 E1；式子逐字採 R4 之 F1）**：
-     `train_cutoff = feature_cutoff_ms ∈ as_ms(feature_index[train_plan.row_index])`；
+  🔴 **SUPERSEDED BY `Task 9.2b`（B9C；R27 `GROK-R27-P1-01` 與 `CODEX-R27-P2-07` 兩家撞題抓出本段未標示）**：
+  下方要點 1／2 之「以 `feature_cutoff_ms` 集合成員決定 train／test」與要點 4 之「不在 `feature_index`
+  集合內 ⇒ purged」**皆已作廢**。現行投影：步驟 0 先驗 train／test 兩段非空且 row set 不重疊；
+  事件側**只**由 `manifest.table.decision_at_ms` 依三段式決定——`decision <= train_last_ms` ⇒ train、
+  `>= test_start_ms` ⇒ test、介於兩者 ⇒ purged；`decision_at_ms` 落在 `feature_index` 範圍**外**一律
+  **raise**（不是 purged、更不是第四條分類分支）；`feature_cutoff_ms` **不參與** `split_label`。
+  答案窗 purge 改按**事件側**一次決定並廣播到該事件所有 feature TF 列。
+  🔴 刪節線與下方原字面保留供追溯，**不得**據以實作——依本段舊文會把事件級錨定**回退**成
+  逐列判側，該回退實測會使 `test_event_level_anchor_broadcasts_side_to_all_feature_tf` 轉紅。
+  1. ~~🔴 **兩段式判定，先後不可調（R3 之 E1；式子逐字採 R4 之 F1）**：
+     `train_cutoff = feature_cutoff_ms ∈ as_ms(feature_index[train_plan.row_index])`；~~
      `test_plan.row_index` 為空 ⇒ **先 fail-closed**（`missing_test_plan`），禁與 `None` 比較；
      `test_start_ms = as_ms(feature_index[test_plan.row_index[0]])`；
      `train_cutoff and label_end_ms >= test_start_ms` ⇒ **purged**（`>=` 必須保留）。
@@ -214,8 +223,9 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
      source bars 缺 endpoint 之檢查**不進投影**——明定為上游 alignment 之前置條件，
      G-5.3 用 `AlignmentReceipts` 驗。
      **再**做集合成員判定決定 train／test。
-  2. 成員判定＝**集合**：`feature_cutoff_ms ∈ feature_index[train_plan.row_index]` ⇒ train；
-     `∈ feature_index[test_plan.row_index]` ⇒ test；否則 purged。禁 `time_bounds` 區間。
+  2. ~~成員判定＝**集合**：`feature_cutoff_ms ∈ feature_index[train_plan.row_index]` ⇒ train；
+     `∈ feature_index[test_plan.row_index]` ⇒ test；否則 purged。禁 `time_bounds` 區間。~~
+     （🔴 **SUPERSEDED BY `Task 9.2b`**，見本段開頭；現行為事件級 `decision_at_ms` 三段式比較。）
   3. `event_keys` 以 **`event_id` 為鍵**對位，**禁 positional zip**（R3 之 E2）——
      `dedupe.py:46` 會依 `(label_start_ms, event_id)` 重排 manifest。
      🔴 **producer 具名（R4 之 F2）**：B2b 之 `build_event_keys(receipts, *, selected_timeframe)`，
@@ -233,7 +243,10 @@ Gate：每批該批測試 rc=0 且 skip 數為 0；每批三家 code review 收�
      **禁呼叫** `_normalize_ic_time_index`——它是「秒」語意，餵毫秒會 raise
      （`ic_filter_orchestrator.py:269-271`）。v2 寫「復用該 normalizer」是錯的（R2 之 D7）。
   4. `event_keys.feature_cutoff_ms` 語意＝ feature_cutoff（`ic_feed.py:36`），非裸 `decision_at_ms`；
-     不在 `feature_index` 集合內 ⇒ purged，**禁 nearest／asof／ffill**。
+     ~~不在 `feature_index` 集合內 ⇒ purged，**禁 nearest／asof／ffill**。~~
+     （🔴 **SUPERSEDED BY `Task 9.2b`**：`feature_cutoff_ms` 已不參與 `split_label`；
+     界**外**之 `decision_at_ms` 一律 raise 而非 purged。禁 nearest／asof／ffill 之精神仍在——
+     9.2b 用的是**比較**而非查表，本就沒有近似匹配的空間。）
   5. `clusters` 呼叫本 Task 一併抽出的 `build_time_clusters(manifest, bucket_ms)`
      （行為 byte 級不變，**保留** `_cluster_weight` 之 M5 mutation seam）。
   6. `summary` **12 鍵**齊全：`n_symbols`／`per_symbol_n`／`n_time_clusters`／
@@ -888,7 +901,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 | `R-3` | UAT 項目更新 | user-ruling | 使用者已裁定 UAT 一律最後 |
 | `R-4` | `extract_event_patterns` 無 **production** caller（測試 caller 8 處） | blocked-by | 本票只保證其消費之 `assignments` 語意不變；接線屬另一票 |
 | `R-5` | 事件掃描端取得 post-trim feature universe | needs-research | 要新增 `features_run_id` 跨棧參數（請求模型／前端／契約／UAT 全動），且 `EventImportService` 目前完全不碰 FF run ⇒ 超出本票；R2 之 D1 裁定事件掃描端恆走 event-study-only。日後實作**不得**刪除 Task 3.3 分支 |
-| `SU-RESID-2` **部分關閉（2026-09-14，批次 B9B）** | 多 TF 之 `(event_id, feature_timeframe)` 複合鍵 | blocked-by | 🔴 **producer／schema 面已關**：`Task 9.2`＋`9.2a` 使 producer 停止單選、輸出全量複合鍵列；`assignments`／`purged` 加 `feature_timeframe` 欄；兩道 guard 判準改複合鍵唯一。🔴 **尚未關閉者**＝下游消費面（`Task 9.3` 之九處逐處處置）與側別錨定（`Task 9.2b`）⇒ 原文「複合鍵要連 `EventSplitPlan` 之下游一起改」**只完成了一半**。**為何現在不做**：`blocked-by:Task 9.2b／9.3 尚未實作`——依賴序明定 `9.2a → 9.2b → 9.3`，不得跳。🔴 **本列狀態自 R22 `CODEX-R22-P1-01` 更正**：主委於 R21 依 `CODEX-R21-P1-02` 之同型掃描曾標「已關閉」（那次只點名 `Task 2.2`），R22 該家實查指出下游仍在 `Task 9.3` ⇒ 只能部分關閉 |
+| `SU-RESID-2` **部分關閉（2026-09-14，批次 B9B）** | 多 TF 之 `(event_id, feature_timeframe)` 複合鍵 | blocked-by | 🔴 **producer／schema 面已關**：`Task 9.2`＋`9.2a` 使 producer 停止單選、輸出全量複合鍵列；`assignments`／`purged` 加 `feature_timeframe` 欄；兩道 guard 判準改複合鍵唯一。🔴 **側別錨定（`Task 9.2b`）亦已於批次 B9C 關閉**（R27 `GROK-R27-P1-02`：帳面未隨批次前進）——事件級 `decision_at_ms` 三段式已落地、`feature_cutoff_ms` 退出 `split_label`、(3.2) 異側與跨表混態皆 fail-closed。🔴 **尚未關閉者＝下游消費面**（`Task 9.3` 之九處逐處處置）；~~與側別錨定（`Task 9.2b`）~~ ⇒ 原文「複合鍵要連 `EventSplitPlan` 之下游一起改」現只剩消費面那一半。**為何現在不做**：`blocked-by:Task 9.3 尚未實作`——依賴序明定 `9.2a → 9.2b → 9.3`，不得跳。🔴 **本列狀態自 R22 `CODEX-R22-P1-01` 更正**：主委於 R21 依 `CODEX-R21-P1-02` 之同型掃描曾標「已關閉」（那次只點名 `Task 2.2`），R22 該家實查指出下游仍在 `Task 9.3` ⇒ 只能部分關閉 |
 | `SU-RESID-9A-UI` | 丟棄列數之**終端可見性**（API 回應欄位與前端顯示） | blocked-by | **為何現在不做**：`blocked-by:投影路徑無 EventSamplePipeline.run 生產接線（api/ 呼叫點=0）`——`D-002` Phase 9A 交付至 producer 層（`build_event_keys` 回傳 ＋ `EventSplitPlan.summary` 鍵；🔴 **v21 更正（R25，三家撞題）**：原寫「~~producer 回傳 → `EventSplitPlan.summary` → `metadata.split_unify`~~」，與 SPEC §N 同名條目之 v20 兩層交付、以及**本殘留自身**「metadata 層延後」之定義自相矛盾——R24 修了 SPEC §N 六處，**沒改本檔同名條目**），終端可見性須待投影路徑有生產接線後另票。**觸發條件（可執行）**：`grep -rc "EventSamplePipeline()\.run(\|create_event_sample_pipeline()\.run(" api --include='*.py'` 之命中數 **> 0**（現為 0）——🔴 **v11 作廢為唯一判準（R10 codex：該 regex 只匹配 inline constructor，漏掉 `pipeline = create_event_sample_pipeline(); pipeline.run(...)` 這種兩段式呼叫，真接上線也不會報；字面保留供追溯）**。**觸發條件（v11 可執行）**：以 AST 走訪 `api/` 全部 `.py`（排除 `tests/`）之 `Call` 節點，命中「method 名為 `run` 且 receiver 可追溯至 `EventSamplePipeline` 或 `create_event_sample_pipeline`、且實參含 canonical 邊界 `train_plan`／`test_plan`／`feature_index`」者，命中數 **> 0**。**recheck 命令**：`grep -rn "\.run(" api --include='*.py'`（廣掃全部 `.run(` 呼叫點為 AST 之超集，再逐筆判讀 receiver 與實參；**不得**用窄 regex 的零命中當「不存在」之證據）；**owner**：SPLITUNIFY epic 主委。🔴 **誠實邊界**：在本殘留解除前，「靜默丟棄」對終端使用者**仍然看不見**，`Task 9.1` 驗收不得宣稱該缺陷已消除。詳見 `docs/SPLITUNIFY_SPEC.D-002.md` §N 同名條目 |
 | `SU-RESID-1` | attribution checker 擋不住歸屬錯置 | 🔴 **2026-09-11 重判：不合格，現在做** | 原理由「需語意對應、屬研究」只對一半——**完整語意比對**做不到，但「收尾模式有未引用編號就擋」與「決議須逐字引用 finding 斷言」**做得到**。🔴 **回溯稽核實證其必要性**（`handoffs/run_receipts/splitunify-attribution-audit-20260911.txt`，本票 8 輪程式碼審查、57 條意見）：**3 條委員意見實質被主委弄丟，兩道檢查都沒響**——①`CODEX-R3-P3-04`（裸 KeyError）沒被任何決議引用、從沒修；②`GROK-R1-P2-02`（答案窗差 1 毫秒的 mutation 缺口）掛對決議但從沒補；③B2b R1 之 H6（`tier_min_test_events`）寫「列入 B3 Task 3.1」延後、之後消失——**投影路徑把使用者設定靜默換成 1**。三條已於同日修掉並各配 mutation（`M-SU-30`／`31`／`32`、`M-SU-B3-13`）。另查出兩個工具缺陷：`reconcile_cluster_attribution_check.sh` 在中文上 `cut -c` 截斷壞掉（大量「附錄斷言：（找不到）」）；`completeness_check` 只驗編號是否在收斂檔，而附錄本來就逐字保留全部原文 ⇒ **永遠不會失敗**。GROK-R1-P2-02 之另一半（改讀 `time_bounds[0]`）已被 B3 之同源對證變成**等價 mutant**（兩者被強制相等），不另加 |
 | `SU-RESID-3`（**B3 review R1 後大幅收窄**） | 同源對證只比**每段的首尾**時刻，不比中間每一列 | needs-research | 🔴 三家實跑證明的兩種攻擊（plan 建在較短網格＋長 index、index 同長度平移）**已於 B3 收斂時擋下**：以 `plan.time_bounds` 與傳入 `feature_index` 在該 plan 首尾列上逐值對證（型別驅動的單位分派，不猜；mutation `M-SU-B3-10`）。**殘留的是**：兩份網格若首尾時刻相同、僅中間間距不同，仍會通過——plan 身上只有 `time_bounds` 兩個端點，沒有逐列時刻可比。要關掉它需要 producer 隨 plan 傳完整時刻指紋（新欄位，動 IC 契約），屬 R-5／B4 之後 |

@@ -451,7 +451,21 @@ def _derive_single_symbol(
     對外沒開放 ⇒ 投影路徑上使用者設定的「測試段事件數下限」被**靜默換成 1**，
     而舊的 `split_events` 路徑是照設定走的——兩條路對同一個設定給出不同的判定。
 
-    🔴 **兩段式判定，先後不可調**（R3 之 E1；式子逐字採 `CODEX-R4-P1-01`）：
+    🔴 **D-002 `Task 9.2b`（B9C）起：判側改為事件級 `decision_at_ms` 錨定＋三段式**
+    （R27 `GROK-R27-P2-01` 指出本 docstring 仍寫 9.2b 前的兩段式集合成員）：
+      0. **步驟 0**：`train_rows`／`test_rows` 皆非空、`train_last_ms < test_start_ms`；
+         `index_ms[0] <= decision_at_ms <= index_ms[-1]`，界外 raise（**不是**第四條分支）。
+      1. **三段式**（順序不可調）：`decision <= train_last_ms` ⇒ train；`>= test_start_ms` ⇒ test；
+         介於兩者 ⇒ purged（隔離帶，合法且預期）。錨點取自 `manifest.table["decision_at_ms"]`。
+      2. **答案窗 purge 按事件側一次決定並廣播**：train 側事件若 `label_end_ms >= test_start_ms`
+         ⇒ 整事件 purged（`>=` 必須保留）。
+      3. **廣播**：側別判完套用到該 `event_id` 之**所有** feature TF 列；
+         `feature_cutoff_ms` **完全不參與** `split_label`。
+      4. `(3.2)` fail-closed：寫入兩容器**之前**呼叫 `_assert_event_level_side_consistency`。
+
+    以下為 **9.2b 前**之舊描述，保留供追溯，**不得**據以實作：
+
+    ~~🔴 **兩段式判定，先後不可調**（R3 之 E1；式子逐字採 `CODEX-R4-P1-01`）：~~
 
     1. **答案窗 purge**（保留 `event_split.py:114` 之既有 guard）——
        `train_cutoff and label_end_ms >= test_start_ms` ⇒ purged。
@@ -560,6 +574,22 @@ def _derive_single_symbol(
             "derive_event_split_from_plans: event_keys 之 (event_id, feature_timeframe) "
             f"複合鍵重複 {bad[:5]}——集合相等吃不掉重複，會重複計數（fail-closed）"
         )
+    # 🔴 **R27 `CODEX-R27-P2-06`：錨點唯一性閘必須排在 `man_dupes` 之前，否則不可達**。
+    #    原本它寫在下方判側段，而 `manifest.table` 之 `event_id` 重複在此已先被裸 `ValueError`
+    #    擋掉 ⇒ 帶著**不同錨點**的重複 manifest 得到的是「重複」這個病名，而不是「錨點不唯一」。
+    #    該家實跑 `DUPLICATE_ANCHOR_EXCEPTION ValueError`／`ANCHOR_GUARD_REACHED False`。
+    #    ⇒ 先判錨點：同一 `event_id` 之 `decision_at_ms` 去重數 > 1 即 `AlignmentViolationError`
+    #    （錨點衝突是側別缺陷，語意上比「manifest 有重複列」更精確）；純重複而錨點一致者
+    #    仍落到下方既有之 `ValueError`（錯誤型別契約不變）。
+    if "decision_at_ms" in manifest.table.columns:
+        _anchor_nuniq = manifest.table.groupby("event_id")["decision_at_ms"].nunique()
+        _bad_anchor = sorted(_anchor_nuniq[_anchor_nuniq > 1].index.tolist())
+        if _bad_anchor:
+            raise AlignmentViolationError(
+                "derive_event_split_from_plans: 事件 "
+                f"{_bad_anchor[:5]} 之 decision_at_ms 不唯一——事件級錨點必須單值，"
+                "取首列會讓同事件的不同 feature TF 落到不同側（fail-closed）"
+            )
     man_dupes = manifest.table["event_id"][manifest.table["event_id"].duplicated()].unique().tolist()
     if len(man_dupes):
         raise ValueError(
@@ -684,17 +714,8 @@ def _derive_single_symbol(
         np.asarray(_anchor_tbl["decision_at_ms"]),
         role="derive_event_split_from_plans: manifest.table.decision_at_ms",
     )
-    # 🔴 防禦閘（stamp-r5 三家一致之③）：同一 `event_id` 之 `decision_at_ms` 去重數 > 1 ⇒
-    #    錨點本身不唯一，側別無定義。正規路徑結構上不可達（manifest 已唯一），但若日後有人
-    #    把該欄帶上 per-TF 列再合流，這裡是唯一能擋住的地方。**不得**靜默取首列或改判 purged。
-    _anchor_nuniq = _anchor_tbl.groupby("event_id")["decision_at_ms"].nunique()
-    _bad_anchor = sorted(_anchor_nuniq[_anchor_nuniq > 1].index.tolist())
-    if _bad_anchor:
-        raise AlignmentViolationError(
-            "derive_event_split_from_plans: 事件 "
-            f"{_bad_anchor[:5]} 之 decision_at_ms 不唯一——事件級錨點必須單值，"
-            "取首列會讓同事件的不同 feature TF 落到不同側（fail-closed）"
-        )
+    # 🔴 錨點唯一性已於上方（`man_dupes` **之前**）判過——見 `CODEX-R27-P2-06`。
+    #    此處不重複判，否則會出現兩份同語意的閘而其中一份永遠不可達。
     anchor_by_event: Dict[Any, int] = {
         eid: int(v) for eid, v in
         _anchor_tbl.drop_duplicates("event_id").itertuples(index=False, name=None)
@@ -726,12 +747,33 @@ def _derive_single_symbol(
 
     # 🔴 答案窗 purge 按**事件側**一次決定並廣播（實作要點 4）——不再逐列 `in_train`。
     #    逐列觸發正是混態（同事件一列進 purged、另一列進 assignments）的來源。
+    # 🔴 **R27 `CODEX-R27-P2-05`**：事件級欄位一致性閘——`label_end_ms` 同事件須唯一。
+    #    判準與 `decision_at_ms` 之錨點唯一性同源：事件級欄逐列不同即為上游壞掉，
+    #    不得以 `max`／`first` 之類的聚合靜默吞掉。
+    _le_nuniq = event_keys.groupby("event_id")["label_end_ms"].nunique()
+    _bad_le = sorted(_le_nuniq[_le_nuniq > 1].index.tolist())
+    if _bad_le:
+        raise AlignmentViolationError(
+            f"derive_event_split_from_plans: 事件 {_bad_le[:5]} 之 label_end_ms 不唯一"
+            "——該欄為事件級，同事件各 feature TF 列必須同值；取 max 會靜默改用較大的"
+            "答案窗而把跨界隱形（fail-closed）"
+        )
+    _label_end_by_event: Dict[Any, int] = {
+        eid: int(v) for eid, v in
+        event_keys.drop_duplicates("event_id")[["event_id", "label_end_ms"]]
+        .itertuples(index=False, name=None)
+    }
+
     event_state: Dict[Any, str] = {}
     for eid, decision_ms in anchor_by_event.items():
         side = _side_of(decision_ms)
         if side == "train":
             # 答案窗跨進 test 段起點 ⇒ 整個事件 purged（保留 `event_split.py:114` 之既有語意）。
-            label_end = int(event_keys.loc[event_keys["event_id"] == eid, "label_end_ms"].max())
+            # 🔴 **R27 `CODEX-R27-P2-05`**：原本這裡直接取 `.max()`，而 `label_end_ms` 是**事件級**欄
+            #    （來自 `receipts.event_level`）⇒ 同事件各 feature TF 列本應同值。取 `max` 在不一致時
+            #    會**靜默**改用較大的答案窗（該家實跑 `LABEL_END_MISMATCH_ACCEPTED True`）。
+            #    不一致代表上游事件級欄位壞了，與 `decision_at_ms` 不唯一同型 ⇒ 一律 fail-closed。
+            label_end = int(_label_end_by_event[eid])
             if label_end >= test_start_ms:
                 side = "purged"
         event_state[eid] = side

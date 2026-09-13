@@ -102,22 +102,32 @@ def _event_keys(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
     """
     tr, te = b["train_row_index"], b["test_row_index"]
     test_start = int(index[te[0]])
+    # 🔴 **(G-4e) 第三份判準（`CODEX-R27-P1-03`）**：每列末欄之 `expected_side` 為**人手逐筆填入**
+    #    的字面，**不 import／不呼叫**投影、`_oracle_membership` 或兩者之共用 helper。
+    #    存在理由：G-3b 只比「投影 vs oracle」**兩份**，同一次錯誤解讀寫進兩邊仍會綠
+    #    （該家實跑：把兩者同時改成 `{'train':['WRONG']}` ⇒ `SAME_WRONG…PASSES_G3B True`）。
+    #    🔴 **誠實邊界**：三份人手同錯仍會一致——這是散文紀律而非機械保證，具名留在此。
     rows: List[tuple] = []
     for i, pos in enumerate(tr[:4]):
-        rows.append((f"tr{i}", int(index[pos]), int(index[pos]) + H1, int(index[pos])))
-    # 答案窗恰好觸到 ⇒ purge
-    rows.append(("tr_leak", int(index[tr[-1]]), test_start, int(index[tr[-1]])))
+        # decision 在 train 段、答案窗不跨界 ⇒ train
+        rows.append((f"tr{i}", int(index[pos]), int(index[pos]) + H1, int(index[pos]), "train"))
+    # 答案窗恰好觸到 test 段起點 ⇒ purge（`>=` 而非 `>`）
+    rows.append(("tr_leak", int(index[tr[-1]]), test_start, int(index[tr[-1]]), "purged"))
     for i in (1, 2):                                                   # 隔離區
         _c = int(index[tr[-1]]) + i * H1
-        rows.append((f"gap{i}", _c, int(index[tr[-1]]) + (i + 2) * H1, _c))
+        # decision 落在 train 段末刻與 test 段起點之間 ⇒ purged
+        rows.append((f"gap{i}", _c, int(index[tr[-1]]) + (i + 2) * H1, _c, "purged"))
     for i, pos in enumerate(te[:5]):
-        rows.append((f"te{i}", int(index[pos]), int(index[pos]) + H1, int(index[pos])))
+        # decision 在 test 段 ⇒ test（答案窗不對 test 側套用）
+        rows.append((f"te{i}", int(index[pos]), int(index[pos]) + H1, int(index[pos]), "test"))
     # 🔴 (G-4d)③ 之邊界事件：cutoff 在 test 段、decision 在 train 段（兩值**不等**）。
+    #    人手判：側別只看 decision ⇒ **train**（9.2b 前之 per-cutoff 判側會給 test，差異在此現形）。
     rows.append((
         "bnd_shift",
         int(index[te[1]]),              # feature_cutoff_ms（test 段）
         int(index[tr[0]]) + H1,         # label_end_ms（不跨進 test 段，避免與答案窗 purge 糾纏）
         int(index[tr[0]]),              # decision_at_ms（train 段）
+        "train",
     ))
     # 🔴 D-002 `Task 9.2`：`event_keys` 行粒度已改為 `(event_id, feature_timeframe)`，
     #    本 fixture 補上該欄。**本批刻意維持單一 feature TF**（`1h`）⇒ 複合鍵退化為
@@ -127,9 +137,21 @@ def _event_keys(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame([
         {"event_id": e, "feature_cutoff_ms": c, "label_start_ms": d,
          "label_end_ms": le, "symbol": SYM, "timeframe": "1h", "feature_timeframe": "1h",
-         "decision_at_ms": d}
-        for e, c, le, d in rows
+         "decision_at_ms": d, "expected_side": side}
+        for e, c, le, d, side in rows
     ])
+
+
+def _hand_expected_membership(keys: pd.DataFrame) -> Dict[str, list]:
+    """把 `_event_keys` 之人手 `expected_side` 欄攤成與 G-1／G-3b 同形的三態集合。
+
+    🔴 **本函式不得含任何判準**——它只是把人手填的欄位重新排列。一旦這裡出現 `if`／比較，
+    它就變成第三份**推導**而非第三份**判準**，(G-4e) 要擋的相關錯誤又會回來。
+    """
+    out: Dict[str, list] = {"train": [], "test": [], "purged": []}
+    for eid, side in keys[["event_id", "expected_side"]].itertuples(index=False, name=None):
+        out[str(side)].append(str(eid))
+    return {k: sorted(v) for k, v in out.items()}
 
 
 def _manifest(keys: pd.DataFrame) -> EventManifest:
@@ -215,6 +237,8 @@ def _build_actual() -> Dict[str, Any]:
     return {
         # G-1
         "g1_membership": _membership,
+        # 🔴 **(G-4e) 第三份判準**（`CODEX-R27-P1-03`）：人手填入之 `expected_side` 攤平。
+        "g4e_hand_expected_membership": _hand_expected_membership(keys),
         # 🔴 **(G-4d)① 版本化新鍵**（`Task 9.2b`）：9B 之後的成員集合與 v8 不同批
         #    （fixture 多了 `bnd_shift`、判側改事件級錨定）⇒ 用**新鍵**承載，
         #    `splitunify_golden.v8.json` 保持不可覆寫之 9B 前錨點。
@@ -375,6 +399,39 @@ def _diff_report(expected: Dict[str, Any], actual: Dict[str, Any]) -> List[str]:
     return problems
 
 
+#: 🔴 **v8 不可變基準之外部錨**（`CODEX-R27-P1-02`）。
+#  它**刻意**寫在被 review 的程式碼裡、而不是 golden 目錄的旁檔——只驗「檔案 vs 旁檔」時，
+#  同時改寫兩者就能悄悄換掉 9B 前的錨點，而那正是「換錨是刻意的」這個論證的唯一支撐。
+V8_BASELINE_SHA256 = "f270e007ca9843a88eff9ca40987b2110646646f52df6a63a3508c9a8dab1217"
+
+
+def _assert_v8_baseline_intact() -> int:
+    """驗 `splitunify_golden.v8.json` 之不可變性（三層；兩種模式都跑）。"""
+    v8 = GOLDEN_DIR / "splitunify_golden.v8.json"
+    sidecar = GOLDEN_DIR / "splitunify_golden.v8.sha256"
+    if not v8.exists() or not sidecar.exists():
+        print(
+            "GOLDEN V8 MISSING: splitunify_golden.v8.json 或其 .v8.sha256 不存在"
+            "——9B 前之不可變錨點缺席，「換錨是刻意的」就無從證明（fail-closed）"
+        )
+        return 1
+    digest = hashlib.sha256(v8.read_bytes()).hexdigest()
+    declared = sidecar.read_text(encoding="utf-8").strip()
+    if declared != V8_BASELINE_SHA256:
+        print(
+            f"GOLDEN V8 TAMPERED: 旁檔宣告 {declared[:12]}… 與碼內外部錨 "
+            f"{V8_BASELINE_SHA256[:12]}… 不符——同步改寫檔案與旁檔之繞法在此擋下"
+        )
+        return 1
+    if digest != V8_BASELINE_SHA256:
+        print(
+            f"GOLDEN V8 TAMPERED: 檔案實際 {digest[:12]}… 與外部錨 "
+            f"{V8_BASELINE_SHA256[:12]}… 不符——v8 基準被改過（fail-closed）"
+        )
+        return 1
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true", help="凍結／重凍（比對失敗時**不得**自動用）")
@@ -382,6 +439,14 @@ def main() -> int:
 
     GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
     golden_path = GOLDEN_DIR / "splitunify_golden.json"
+    # 🔴 **v8 不可變基準之驗證提前到 `main()` 開頭、兩種模式都跑**（`CODEX-R27-P1-02`）。
+    #    原本只在 `if args.write` 內驗，且只比「檔案 vs 旁檔」——同步改寫兩者即可繞過
+    #    （該家實跑 `NORMAL_MODE_RC 0`／`MATCHING_SIDECAR_ACCEPTED True`）。
+    #    ⇒ 改為三層：①外部錨（本檔內之常數，與 golden 目錄**不同介質**，改它要動被 review 的碼）
+    #    ②旁檔須與外部錨一致 ③檔案內容須與外部錨一致。三者任一不符即 fail-closed。
+    rc = _assert_v8_baseline_intact()
+    if rc:
+        return rc
     actual = _build_actual()
 
     # G-3b：新投影 vs 獨立 oracle，集合相等（**每次都驗**，不只在凍結時）
@@ -391,6 +456,18 @@ def main() -> int:
         print("G-3b FAIL：投影與獨立 oracle 不一致")
         return 1
     print("  ✓ G-3b：投影與獨立 oracle 集合相等")
+
+    # 🔴 **G-4e 三方相等（`CODEX-R27-P1-03`）**：投影／oracle **兩份**不夠——
+    #    同一次錯誤解讀寫進兩邊仍會通過 G-3b（該家實跑證實）。第三份是 fixture 內**人手填**
+    #    的 `expected_side`，不經任何推導，故與前兩份無共因。
+    _hand = actual["g4e_hand_expected_membership"]
+    for _name, _other in (("投影", actual["g1_membership"]), ("oracle", actual["g3b_oracle"])):
+        if _hand != _other:
+            for line in _diff_report(_hand, _other):
+                print(f"  ✗ G-4e（人手 expected_side vs {_name}）: {line}")
+            print("G-4e FAIL：人手判準與" + _name + "不一致")
+            return 1
+    print("  ✓ G-4e：人手 expected_side 與投影、oracle 三方相等")
 
     # G-5④ leakage negative case（**每次都驗**）
     aw = actual["g5_answer_window"]
@@ -416,16 +493,27 @@ def main() -> int:
         #    是 9B **之前**的不可變錨點，用來證明「換錨」的行為差異是刻意的而不是寫壞的。
         #    它一旦能被重凍，那個證明就消失了 ⇒ 在此 fail-closed，且不提供旗標繞過。
         _v8 = GOLDEN_DIR / "splitunify_golden.v8.json"
-        _v8_sha = GOLDEN_DIR / "splitunify_golden.v8.sha256"
         if golden_path.resolve() == _v8.resolve():
             print("GOLDEN REFUSE: splitunify_golden.v8.json 為不可變基準，禁止 --write 覆寫")
             return 1
-        if _v8.exists() and _v8_sha.exists():
-            _cur = hashlib.sha256(_v8.read_bytes()).hexdigest()
-            if _cur != _v8_sha.read_text(encoding="utf-8").strip():
+        # （v8 三層完整性已於 `main()` 開頭 `_assert_v8_baseline_intact()` 驗過，兩種模式皆跑。）
+        # 🔴 **主檔頂層鍵護欄（`CODEX-R27-P1-01`）**：原本直接 `{_doc, **actual}` 整檔覆寫，
+        #    既有鍵若不在 `actual` 裡就**靜默消失**（該家實跑：先塞 sentinel ⇒ `--write` 後
+        #    `LEGACY_PRESENT False`）。⇒ 新 payload 之頂層鍵集合須為既有者之**超集**；
+        #    任何一個既有鍵會不見即拒寫。值本身**允許**改變（那是重凍的正當用途，
+        #    且改變會先被上方 `GOLDEN MISMATCH` 攔下並要求人看過）。
+        if golden_path.exists():
+            try:
+                _prev = json.loads(golden_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                _prev = {}
+            _prev_keys = {k for k in _prev if not k.startswith("_")}
+            _new_keys = {k for k in actual if not k.startswith("_")}
+            _lost = sorted(_prev_keys - _new_keys)
+            if _lost:
                 print(
-                    "GOLDEN CORRUPT: splitunify_golden.v8.json 之 sha256 與 .v8.sha256 不符"
-                    "——不可變基準被改過，換錨證明失效（fail-closed）"
+                    f"GOLDEN REFUSE: --write 會讓既有頂層鍵 {_lost} 從主檔消失"
+                    "——整檔覆寫不得靜默丟鍵（fail-closed）；要移除鍵請先經 review 明示"
                 )
                 return 1
         golden_path.write_text(

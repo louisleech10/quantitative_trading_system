@@ -331,3 +331,26 @@ def test_validate_receives_millisecond_clock_not_raw_ints(monkeypatch, records, 
         "不得帶 tz：tz-aware 會讓 _coerce_timestamp_array 回 object dtype，"
         "validate_split_integrity:657 之 np.timedelta64 比較會 TypeError"
     )
+
+
+def test_mapping_plans_are_rejected_with_named_error(records, bars) -> None:
+    """🔴 把多標的 Mapping 塞進本入口 ⇒ **具名** fail-closed，不得是裸 `AttributeError`
+    （`CODEX-R27-P1-04`）。
+
+    出生理由：步驟 0 上線後，Mapping 會先被餵給單標的 validator，該家實跑得到
+    `AttributeError: 'dict' object has no attribute 'row_index'`——**沒有病名**的錯誤，
+    呼叫端分不出「本入口不支援」與「壞掉了」。
+    🔴 多標的**本來就到不了**這條路（`derive_event_split_from_plans` 之 Mapping 形式是
+    `(plans, event_keys, feature_index_by_symbol)`，與本入口的位置參數對不上），
+    所以正確處置是具名拒絕，不是在此造第二份多標的邏輯。
+    """
+    train, test, index = _canonical(records, bars)
+    cfg = EventPipelineConfig(timeframes=(TF,), split=EventSplitConfig())
+    with pytest.raises(ValueError, match="只支援單標的") as ei:
+        EventSamplePipeline().run(
+            records, bars, cfg,
+            train_plan={SYM: (train, test)}, test_plan={SYM: (train, test)},
+            feature_index=index, selected_timeframe=TF,
+        )
+    assert not isinstance(ei.value, AttributeError)
+    assert "train_plan" in str(ei.value), "訊息須指名是哪一個參數不合格"

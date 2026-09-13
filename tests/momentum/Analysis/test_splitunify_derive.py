@@ -1983,3 +1983,63 @@ def test_empty_train_rows_is_fail_closed_not_skipped() -> None:
         derive_event_split_from_plans(
             empty_train, test, keys, index, manifest=man, bucket_ms=H1
         )
+
+
+# ── 🔴 review-r27 之修補所配的應紅測試 ────────────────────────────────────────
+
+
+def test_inconsistent_label_end_ms_is_fail_closed(monkeypatch) -> None:
+    """🔴 同事件之 `label_end_ms` 不唯一 ⇒ `AlignmentViolationError`（`CODEX-R27-P2-05`）。
+
+    出生理由：原本這裡取 `label_end_ms.max()`。`label_end_ms` 是**事件級**欄，不一致代表
+    上游壞了；取 `max` 會**靜默**改用較大的答案窗，把跨界隱形。該家實跑
+    `LABEL_END_MISMATCH_ACCEPTED True`／`PURGED_IDS ['e_train']` 證明它被接受了。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(
+        anchor_by_event={"e_le": int(index[b["train_row_index"][0]])}
+    )
+    # 只改其中一列的事件級欄 ⇒ 同事件兩值不同
+    keys.loc[keys.index[0], "label_end_ms"] = int(keys["label_end_ms"].iloc[0]) + 10 * H1
+    with pytest.raises(AlignmentViolationError, match="e_le"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_anchor_uniqueness_guard_is_reachable_before_duplicate_id_guard() -> None:
+    """🔴 錨點不唯一須得到**錨點**的病名，不得被「manifest 有重複列」搶先（`CODEX-R27-P2-06`）。
+
+    出生理由：該閘原本寫在判側段，而 `manifest.table` 之 `event_id` 重複在更早處已被裸
+    `ValueError` 擋掉 ⇒ 帶著**不同錨點**的重複 manifest 實跑得到 `ValueError`、
+    `ANCHOR_GUARD_REACHED False`，該分支**不可達**。已把錨點閘移到重複閘之前。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(
+        anchor_by_event={"e_dup_anchor": int(index[b["train_row_index"][0]])}
+    )
+    # 造出「同一 event_id 兩列、錨點不同」的 manifest
+    row = man.table.iloc[[0]].copy()
+    row["decision_at_ms"] = int(row["decision_at_ms"].iloc[0]) + H1
+    man.table.loc[len(man.table)] = row.iloc[0]
+    with pytest.raises(AlignmentViolationError, match="e_dup_anchor"):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+
+
+def test_duplicate_manifest_with_same_anchor_still_raises_value_error() -> None:
+    """🔴 與上一條成對：**純重複**（錨點一致）仍須是既有的裸 `ValueError`，錯誤型別契約不變。
+
+    少了這一條，把錨點閘前移就可能順手把「重複列」也改成 `AlignmentViolationError`，
+    而前端與既有測試依賴的是 `ValueError`。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(
+        anchor_by_event={"e_plain_dup": int(index[b["train_row_index"][0]])}
+    )
+    man.table.loc[len(man.table)] = man.table.iloc[0]  # 逐欄相同之重複列
+    with pytest.raises(ValueError, match="event_id 重複") as ei:
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert not isinstance(ei.value, AlignmentViolationError), (
+        "純重複不是側別缺陷——改成 AlignmentViolationError 會動到既有錯誤型別契約"
+    )

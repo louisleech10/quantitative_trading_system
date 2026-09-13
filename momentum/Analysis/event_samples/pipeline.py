@@ -769,6 +769,21 @@ class EventSamplePipeline:
             #    一律當 **epoch 秒**，而 SPLITUNIFY 之時鐘是**毫秒** ⇒ 直接餵會被解讀成
             #    西元五萬年而 `OutOfBoundsDatetime`。用共用正規化器取毫秒後顯式建 datetime，
             #    **不做** magnitude 猜測（本票在別處禁掉的就是那種猜法）。
+            #    🔴 **R27 `CODEX-R27-P1-04`**：本入口之 `train_plan`／`test_plan` 只接受**單標的**
+            #    `SplitPlan`。多標的走的是 `derive_event_split_from_plans` 之 Mapping 形式
+            #    （`plans, event_keys, feature_index_by_symbol`），位置參數與本入口對不上 ⇒
+            #    經 `run` 本來就到不了那條路。但若有人把 Mapping 塞進來，步驟 0 會先把它餵給
+            #    單標的 validator 而得到裸 `AttributeError: 'dict' object has no attribute
+            #    'row_index'`——那是**沒有病名**的錯誤，呼叫端分不出「不支援」與「壞掉」。
+            #    ⇒ 在此具名 fail-closed（codex 逐字修法之最小版本）。
+            for _p, _lbl in ((train_plan, "train_plan"), (test_plan, "test_plan")):
+                if getattr(_p, "row_index", None) is None:
+                    raise ValueError(
+                        f"EventSamplePipeline.run: {_lbl} 不是單標的 SplitPlan（實得 "
+                        f"{type(_p).__name__}）——本入口只支援單標的；多標的須改走 "
+                        "`derive_event_split_from_plans` 之 Mapping 形式並由呼叫端提供 "
+                        "full `symbols`（fail-closed）"
+                    )
             _ts = pd.to_datetime(
                 epoch_ms_from_index(
                     feature_index,

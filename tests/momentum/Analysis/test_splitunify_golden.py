@@ -169,3 +169,57 @@ def test_per_symbol_counts_are_integers(golden: dict) -> None:
 def test_purge_reason_literal_is_contract_value(golden: dict) -> None:
     """purge reason 沿用既有契約字面，不得另造（SPEC C-3）。"""
     assert golden["purge_reasons"] == ["interval_crosses_split_boundary"]
+
+
+# ── 🔴 review-r27 之三道 golden 防護（`CODEX-R27-P1-01`／`P1-02`／`P1-03`）────────
+
+
+def test_v8_baseline_has_external_anchor_in_code(golden: dict) -> None:
+    """🔴 v8 不可變基準之驗證須有**碼內外部錨**，不得只比「檔案 vs 旁檔」。
+
+    出生理由：原本只驗檔案與其旁檔，**同步改寫兩者**即可悄悄換掉 9B 前的錨點——
+    該家實跑 `NORMAL_MODE_RC 0`／`MATCHING_SIDECAR_ACCEPTED True`。外部錨寫在被 review
+    的程式碼裡（與 golden 目錄不同介質），改它一定會出現在 diff 上。
+    """
+    import hashlib
+    from pathlib import Path
+    import importlib.util
+
+    repo = Path(__file__).resolve().parents[3]
+    spec = importlib.util.spec_from_file_location(
+        "_fz", repo / "scripts" / "freeze_splitunify_golden.py"
+    )
+    fz = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fz)
+    anchor = getattr(fz, "V8_BASELINE_SHA256", "")
+    assert len(anchor) == 64, "外部錨不存在或不是 sha256（P1-02 的繞法會復活）"
+    v8 = repo / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.json"
+    sidecar = repo / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.sha256"
+    assert v8.exists() and sidecar.exists(), "v8 基準或旁檔缺席"
+    assert hashlib.sha256(v8.read_bytes()).hexdigest() == anchor
+    assert sidecar.read_text(encoding="utf-8").strip() == anchor
+
+
+def test_golden_carries_hand_expected_side_third_judge(golden: dict) -> None:
+    """🔴 (G-4e)：golden 須帶**人手** `expected_side` 攤平出來的第三份判準。
+
+    出生理由：只比「投影 vs oracle」兩份時，同一次錯誤解讀寫進兩邊仍會通過 G-3b——
+    該家實跑 `SAME_WRONG_PROJECTION_ORACLE_PASSES_G3B True`。
+    🔴 本測試只驗**存在且三方相等**；三份人手同錯仍會一致，那是已具名的誠實邊界。
+    """
+    hand = golden["g4e_hand_expected_membership"]
+    assert set(hand) == {"train", "test", "purged"}
+    assert hand == golden["g1_membership"], "人手判準與投影不一致"
+    assert hand == golden["g3b_oracle"], "人手判準與 oracle 不一致"
+    total = sum(len(v) for v in hand.values())
+    assert total == sum(len(golden["g1_membership"][k]) for k in hand), "三態筆數不守恆"
+    assert "bnd_shift" in hand["train"], (
+        "換錨邊界事件須由人手判在 train——它正是 (G-4d)③ 的存在理由"
+    )
+
+
+def test_versioned_v9_keys_present(golden: dict) -> None:
+    """🔴 (G-4d)①：v9 版本化鍵須與主鍵並存，供日後與 v8 對照。"""
+    for key in ("g1_membership_v9", "g3b_oracle_v9"):
+        assert key in golden, f"缺版本化鍵 {key}"
+        assert set(golden[key]) == {"train", "test", "purged"}
