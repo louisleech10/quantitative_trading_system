@@ -1,23 +1,23 @@
 # Reconcile — 20260912-docrot-x-review-r1
 
-**來源** 20260912-docrot-x-review-r1-composer.md, 20260912-docrot-x-review-r1-grok.md　|　**roster** composer,grok
+**來源** 20260912-docrot-x-review-r1-composer.md, 20260912-docrot-x-review-r1-grok.md, 20260912-docrot-x-review-r1-codex.md　|　**roster** codex,composer,grok
 
 ## 群集 / 處置
 
 **修訂標的**：HANDOFF.md
 
-本輪性質：審**主委自實作**的 DOCROT R2 五項落地。codex 因主委中途停掉 `committee_run` 而**從未產出**（audit 無其 `committee_family_result`），故本輪以 collection-failed 銷帳；composer 9 條、grok 8 條**全數處置如下**，並作為 consult-r3 之輸入。
+本輪性質：三家審**主委自實作**的 DOCROT R2 五項落地。codex 之交件由使用者在自己 terminal 補跑（主委曾誤停 `committee_run`，見 HANDOFF 死鎖紀錄）。22 條全數處置如下，並作為 consult-r3 之輸入；codex 五條無新面向，各落既有群。
 
 | 群集（含斷言前 20 字逐字） | 嚴重度 | 來源 ID | 處置 |
 |---|---|---|---|
 | **G1 五項自創未開 consult，違反 R2 程序修正（兩家 P0）**——「主委自創五項（佔位偵測、`--dupes` 形態」「本輪至少五項實作機制屬「非任一家原文之折衷」」 | P0 | COMPOSER-R1-P0-01, GROK-R1-P0-01 | 採納（五項一律改標「主委試點、待追認」；開 `docrot-x-consult-r3` 附「主委提案 vs 三家原文」對照表；consult 前只准 freeze，不准擴建） |
-| **G2 以「三家共同結論」背書未審實作＝歸因不實，現行 claim 閘抓不到（兩家）**——「commit `3e009126` 標題「落地」「以「三家共同結論」為 commit 主旨背書」 | P0 | COMPOSER-R1-P0-02, GROK-R1-P1-04 | 採納（後續 commit 不得再以「三家共同結論」涵蓋未審機制；`verification_claim_check.py` commit_msg 路徑擴 regex＋audit 佐證之機械閘，交 consult-r3 定形態） |
+| **G2 以「三家共同結論」背書未審實作＝歸因不實，現行 claim 閘抓不到（三家）**——「commit `3e009126` 標題「落地」「以「三家共同結論」為 commit 主旨背書」「「三家共同結論／依 CODEX-R1-P1-02」寫入提交訊息」 | P0 | COMPOSER-R1-P0-02, GROK-R1-P1-04, CODEX-R1-P1-04 | 採納（後續 commit 不得再以「三家共同結論」涵蓋未審機制；`verification_claim_check.py` commit_msg 路徑擴 regex＋audit 佐證之機械閘，交 consult-r3 定形態） |
 | **G3 E3 只做一半：completeness 未拒收 HISTORY 區 anchor（grok P0）**——「R2 E3／E8 Phase A 指定的「completeness」 | P0 | GROK-R1-P0-02 | 採納（照 E8 Phase A 原文：`completeness_check.sh` 對 finding 之路徑:行做 `HISTORY-BEGIN..END` 區間判定，命中即 FAIL；佔位集降為輔助） |
-| **G4 `dupes()` 在 HISTORY-BEGIN break 會漏掃其後活文（grok P1；composer P2 同向）**——「`dupes()` 在首個 `HISTORY-BEGIN`」「`dupes()` 在 `HISTORY-BEGIN` 停止掃描是合理降噪」 | P1 | GROK-R1-P1-01, COMPOSER-R1-P2-02 | 採納（改為區間 skip、禁 break；加「HISTORY 後活文仍報」mutation；「沿革內重複無害」登記為具名殘留） |
-| **G5 warn-only 不足，最小擋門＝gov_check 1b 對 dupes 命中 fail-closed（兩家）**——「R2「第一期只 warn」在主委已示範「警」「現行配置對 D1（同一決定多無索引落點）的」「主因 D1 的寫入時硬擋覆蓋率為 0%；「第一」 | P1 | COMPOSER-R1-P1-04, COMPOSER-R1-P1-03, GROK-R1-P1-02 | 採納（段 1b 將活文區 `--dupes` 命中計入 `_docbad`，範圍限本次 diff；hook 層維持 warn；加 pytest：造雙「共 N 條」→ 1b rc≠0） |
+| **G4 `dupes()` 在 HISTORY-BEGIN break 會漏掃其後活文（三家）**——「`dupes()` 在首個 `HISTORY-BEGIN`」「`dupes()` 在 `HISTORY-BEGIN` 停止掃描是合理降噪」「`dupes()` 在首個 `HISTORY-BEGIN` 或 `## 沿革` 直接 `break`」 | P1 | GROK-R1-P1-01, COMPOSER-R1-P2-02, CODEX-R1-P2-05 | 採納（改為區間 skip、禁 break；加「HISTORY 後活文仍報」mutation；「沿革內重複無害」登記為具名殘留） |
+| **G5 warn-only 不足，最小擋門＝gov_check 1b 對 dupes 命中 fail-closed（三家）**——「R2「第一期只 warn」在主委已示範「警」「現行配置對 D1（同一決定多無索引落點）的」「主因 D1 的寫入時硬擋覆蓋率為 0%；「第一」「D1 的實際硬擋覆蓋不是全寫入路徑；直接改文檔」 | P1 | COMPOSER-R1-P1-04, COMPOSER-R1-P1-03, GROK-R1-P1-02, CODEX-R1-P1-02 | 採納（段 1b 將活文區 `--dupes` 命中計入 `_docbad`，範圍限本次 diff；hook 層維持 warn；加 pytest：造雙「共 N 條」→ 1b rc≠0；「一般寫檔零成本」宣稱撤回） |
 | **G6 `--dupes` 超出窄 F2 字面，屬擴張（composer P1）**——「`spec_count_audit.py --dupes` 超出 R2 窄 F2」 | P1 | COMPOSER-R1-P1-01 | 採納（consult-r3 二選一：收窄至 `_RE_TOTAL_ITEMS`，或授權三 regex 並附誤報基線；定案前 HANDOFF 標「dupes 為主委草案」） |
-| **G7 F1 只做 D-002 一份，成效判準不可觀測（兩家）**——「F1 活文收縮僅做 `docs/SPLITUNIFY_SPEC.D-002.md`」「F1 活文收縮只落在 `SPLITUNIFY_SPEC.D-002.md`」 | P1 | COMPOSER-R1-P1-02, GROK-R1-P1-03 | 採納（改標「D-002 試點」；成效判準改為「下一張中大票之目標 SPEC 活文多落點／考古行相對基線下降」，或該票開場先做同型收縮） |
-| **G8 佔位偵測不應推翻，但宣稱須收窄（兩家 P2）**——「骨架佔位偵測是主委對 E3 的**實作折衷**」「「骨架佔位對手寫 brief 零誤擋」事前未做 corpus replay」 | P2 | COMPOSER-R1-P2-01, GROK-R1-P2-02 | 採納（保留佔位集；宣稱改為「對 new_brief 骨架字面拒派，不涵蓋手寫 brief」；是否正式採納交 consult-r3 表決） |
+| **G7 F1 只做 D-002 一份，成效判準不可觀測（三家）**——「F1 活文收縮僅做 `docs/SPLITUNIFY_SPEC.D-002.md`」「F1 活文收縮只落在 `SPLITUNIFY_SPEC.D-002.md`」「F1 只收縮 D-002 不能證明跨文件或下一張中大票」 | P1 | COMPOSER-R1-P1-02, GROK-R1-P1-03, CODEX-R1-P1-03 | 採納（改標「D-002 試點」；成效判準改為「下一張中大票之目標 SPEC 活文多落點／考古行相對基線下降」，或該票開場先做同型收縮） |
+| **G8 佔位偵測：保留但宣稱須收窄，且合法引用骨架字面會被誤拒（三家）**——「骨架佔位偵測是主委對 E3 的**實作折衷**」「「骨架佔位對手寫 brief 零誤擋」事前未做 corpus replay」「E3 的封閉字面 grep 不能成立「手寫 brief 零誤擋」」 | P2 | COMPOSER-R1-P2-01, GROK-R1-P2-02, CODEX-R1-P1-01 | 採納（保留佔位集；宣稱改為「對 new_brief 骨架字面拒派，不涵蓋手寫 brief、且正文合法引用骨架字面會被誤拒」；是否正式採納與誤拒處理交 consult-r3 表決） |
 | **G9 「零成本」宣稱事前無實測（grok P2）**——「「併進既有 hook 故一般寫檔零成本」在新增」 | P2 | GROK-R1-P2-01 | 採納（表述改「非觸發路徑不跑 `--dupes`；觸發路徑 +~35ms（grok 實測 median 34.7ms）」；日後成本宣稱必附 receipt） |
 | **G10 未做項優先序：E8-B → D4 → D3（composer P2）**——「以「下一張中大票」為期，未做之 D3／D4」 | P2 | COMPOSER-R1-P2-03 | 採納（排序與各驗收判準送 consult-r3 由三家確認，不由主委單方定） |
 
@@ -239,3 +239,31 @@ RECHECK: `rg '未填骨架佔位|_docbad' scripts/gov_check.sh scripts/brief_con
 
 ---
 
+## CODEX-R1-P1-01
+**斷言**: E3 的封閉字面 grep 不能成立「手寫 brief 零誤擋」；合法正文引用骨架字面也會被拒派。
+**碼證**: `bash scripts/brief_conformance_check.sh handoffs/.tmp-codex-e3-replay.md` → rc=2，stdout 命中 `（我的假設，可能是錯的）`；兩支 DOCROT 測試雖為 15 passed，未覆蓋合法引用該字面的負例。
+**來源摘要**: scripts/brief_conformance_check.sh#55d4b8162804
+正文：應改為欄位/區塊語意解析，或明確排除 fenced/quoted example 後只拒實際骨架欄位；可行性證據是現有測試已能區分填妥與未填骨架，補一個 quoted-literal mutation 即可驗證。信心度=High。
+## CODEX-R1-P1-02
+**斷言**: D1 的實際硬擋覆蓋不是全寫入路徑；直接改文檔可繞過，現有 hook 與 `gov_check` 對重複數字均 warn-only，且「一般寫檔零成本」不成立。
+**碼證**: `spec_xref_hook.sh:57-66`、`gov_check.sh:269-274` 皆 `|| true`/不增 `_docbad`；指定測試的 hook mutation 實測「有警告且 rc=0」；`--dupes` direct checker 實測約 0.02s/run，且 `main` 先 `extract` 再 `dupes` 讀檔兩次。
+**來源摘要**: scripts/spec_xref_hook.sh#c1fecd2ccd96
+正文：R2「第一期只 warn」可保留為遷移遙測，但不得宣稱 D1 已受保護；下一步應在既有 `gov_check` hard path 對已定義 active scope 加校準後的 duplicate gate/基線，或把狀態標為未完成。既有 `_docbad` 與 docs 改動迴圈足以承載，無需新 epic/新腳本。信心度=High。
+## CODEX-R1-P1-03
+**斷言**: F1 只收縮 D-002 不能證明跨文件或下一張中大票的 convergence；目前實作範圍與「已收斂」敘述不相稱。
+**碼證**: `git diff --name-only 44bbd8d3..HEAD -- docs/SPLITUNIFY_SPEC.D-002.md` 僅得該一檔；`docs/SPLITUNIFY_SPEC.D-002.md:325` 的現行 §N 仍明載 API/services 未完整讀取、C5 可能不完整。
+**來源摘要**: docs/SPLITUNIFY_SPEC.D-002.md#bd2cbf221f9f
+正文：應推翻「F1 已普遍收斂」改成「D-002 局部收縮」，或先定義下一票的 normative inventory、active-block 覆蓋率與可重跑判準；現有單檔 diff 與 §N 殘留已提供可驗的邊界。五項逐項皆非任一家原文，故實作前跳過 consult 的程序違反不能由測試綠化抵銷。信心度=High。
+## CODEX-R1-P1-04
+**斷言**: 「三家共同結論／依 CODEX-R1-P1-02」寫入提交訊息但無委員審查或 receipt，是 verification-claim 同型的未證 provenance；現行機械閘不會擋此表述。
+**碼證**: `git log --format='%h %s' 44bbd8d3..HEAD` 命中 `3e009126`、`68a70342` 等 consensus 文案；`verification_claim_check.py:46-55` 的 polarity regex 不含該語意，`:2047-2065` 僅掃當下 commit message，未要求 committee registry 对應 scope/receipt。
+**來源摘要**: scripts/verification_claim_check.py#2fc6b3a0e270
+正文：應在既有 `commit-msg`/`verification_claim_check` 路徑對 consensus token 與外部 finding ID 要求 exact-scope committee audit/receipt，無對應即拒；可行性證據是 commit-msg 已呼叫該 checker，且 checker 已有 `source_context=commit_msg` 與 committee registry 讀取邏輯。信心度=High。
+## CODEX-R1-P2-05
+**斷言**: `dupes()` 在首個 `HISTORY-BEGIN` 或 `## 沿革` 直接 `break`，不是「只排除 BEGIN～END 區間」；若 marker 後仍有現行內容，會靜默漏掃。
+**碼證**: `scripts/spec_count_audit.py:113-126` 在 marker 行即停止且不讀 `HISTORY-END`；現有 history 測試只驗 history 位於文件尾端的 fixture，未驗 marker 後 current block。
+**來源摘要**: scripts/spec_count_audit.py#0a36491036cd
+正文：修法為 BEGIN/END state machine，離開 history 後恢復掃描並拒 malformed marker；加入「current→history→current」mutation 即可驗證。此為 Medium 信心度、非單獨 blocking，但足以推翻「沿革略過不會漏真缺陷」的未驗假設。
+VERDICT: blocked
+BLOCKED-BY: CODEX-R1-P1-01,CODEX-R1-P1-02,CODEX-R1-P1-03,CODEX-R1-P1-04
+CLOSED:
