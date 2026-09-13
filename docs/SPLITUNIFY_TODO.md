@@ -53,20 +53,22 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 
 ## §B 批次執行策略
 
-| Batch | 含 Task | 依賴 | 合併理由 | 規模 |
-|---|---|---|---|---|
-| **B1** | 1.1, 1.2, 1.3 | consult 三家戳記 rc=0（**已達成**） | 文件、枚舉 SoT、既有紅基準；**不動生產碼**（可獨立審） | 小 |
-| **B2a** | 2.1 | B1 | boundary builder 可獨立證偽（同源自證＋ms 同源） | 中 |
-| **B2b** | 2.2 | B2a | 投影純函式＋`build_time_clusters` 抽出 | 大 |
-| **B2c** | 2.3 | B2b | golden 五組；**仍不接線** | 中 |
-| **B3** | 3.1, 3.2, 3.3 | B2c | 接線／fail-closed／event-study-only 分派同批（分開會有一段時間邊界不唯一） | 大 |
-| **B4** | 4.1 | B3 | 報告與畫面（欄名待 B3 定案後才穩定） | 中 |
-| **B9A** | 9.1 | B4 ＋ `D-002` 三家 `RECONCILE-STAMP` rc=0 | 揭露先行；只動 producer 回傳形狀與 summary 一鍵，可獨立回退 | 中 |
-| **B9B** | 9.2, 9.2a | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
-| **B9C** | 9.2b | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
-| **B9D** | 9.3 | B9C | `Task 9.3` 表列**九處**逐處處置（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
-| **B9E** | 9.4 | B9C | 記帳鏈與 `baseline` 拆鍵 | 中 |
-| **B9F** | 9.5 | B9D ＋ B9E | golden 換錨與前端；須在所有行為面定案後才凍結 | 大 |
+🔴 **本表之「狀態」欄＝批次進度之**唯一權威**（2026-09-14 新增）**。出生事故：主委實作完 B9A／B9B／B9C 三批，卻**一次都沒回來標本表**——狀態只記在 `HANDOFF.md` 與白話看板，於是同一件事有**三份**而本檔是過期的那一份。這正是委員已抓九次的「一個決定多落點、改一處漏一處」，只是這次漏的是 TODO 自己的進度。✅ `HANDOFF.md` 與 `白話說明/` 之批次狀態一律**指向本表**，不得自寫第二份。
+
+| Batch | 含 Task | **狀態** | 依賴 | 合併理由 | 規模 |
+|---|---|---|---|---|---|
+| **B1** | 1.1, 1.2, 1.3 | ✅ 完成 | consult 三家戳記 rc=0（**已達成**） | 文件、枚舉 SoT、既有紅基準；**不動生產碼**（可獨立審） | 小 |
+| **B2a** | 2.1 | ✅ 完成 | B1 | boundary builder 可獨立證偽（同源自證＋ms 同源） | 中 |
+| **B2b** | 2.2 | ✅ 完成 | B2a | 投影純函式＋`build_time_clusters` 抽出 | 大 |
+| **B2c** | 2.3 | ✅ 完成 | B2b | golden 五組；**仍不接線** | 中 |
+| **B3** | 3.1, 3.2, 3.3 | ✅ 完成 | B2c | 接線／fail-closed／event-study-only 分派同批（分開會有一段時間邊界不唯一） | 大 |
+| **B4** | 4.1 | ✅ 完成 | B3 | 報告與畫面（欄名待 B3 定案後才穩定） | 中 |
+| **B9A** | 9.1 | ✅ **完成**（impl `c98acf26`；審碼 r18、閉合 r19） | B4 ＋ `D-002` 三家 `RECONCILE-STAMP` rc=0 | 揭露先行；只動 producer 回傳形狀與 summary 一鍵，可獨立回退 | 中 |
+| **B9B** | 9.2, 9.2a | ✅ **完成**（impl `9e87386f`；審碼 r20、閉合 r21／r22） | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
+| **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27、閉合 r28／r29，共 20 條全修完；待 r30 回驗＋v24 重簽） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
+| **B9D** | 9.3 | ⬜ **未開工**（下一個） | B9C | `Task 9.3` 表列**九處**逐處處置（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
+| **B9E** | 9.4 | ⬜ 未開工 | B9C | 記帳鏈與 `baseline` 拆鍵 | 中 |
+| **B9F** | 9.5 | ⬜ 未開工（排最後） | B9D ＋ B9E | golden 換錨與前端；須在所有行為面定案後才凍結 | 大 |
 
 🔴 **Phase 9 依賴序（`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md` 裁定；三家＋主委獨立版四方一致）**：
 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`。
@@ -468,7 +470,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.1 — 丟棄列數之完整資料流契約（`票 SPLITUNIFY`）
+### Task 9.1 ✅ **已完成（B9A）** —— 丟棄列數之完整資料流契約（`票 SPLITUNIFY`）
 - SPEC ref：§P Phase 9A `Task 9.1`；§V `Task 9.1`；`D-002-C0` (0.6)
 - 目標：消除「靜默丟棄」之誠實性缺陷，**交付至 producer → `EventSplitPlan.summary` 兩層**。
 - 輸入 / 輸出：`build_event_keys(receipts, *, selected_timeframe=None)`
@@ -521,7 +523,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.2 — producer 停止單選，輸出全量 keyed rows（`票 SPLITUNIFY`）
+### Task 9.2 ✅ **已完成（B9B）** —— producer 停止單選，輸出全量 keyed rows（`票 SPLITUNIFY`）
 - SPEC ref：§P Phase 9B `Task 9.2`；§V `Task 9.2`
 - 🔴 **本 Task 是第 9 批核心**；沒有它，下游全改完 `SU-RESID-2` 仍不會解決。
 - 實作要點（四層，缺任一層本 Task 白做）：
@@ -552,7 +554,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.2a — schema 加 `feature_timeframe`（`票 SPLITUNIFY`）
+### Task 9.2a ✅ **已完成（B9B）** —— schema 加 `feature_timeframe`（`票 SPLITUNIFY`）
 - SPEC ref：§P Phase 9B `Task 9.2a`；§V `Task 9.2a`、`D-002-C3` purge 面
 - 實作要點：
   1. `assignments`／`purged` 兩表各加 `feature_timeframe` 欄；`receipts.per_tf` **不改形狀**。
@@ -613,7 +615,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.2b — 側別判定改為事件級錨定（`票 SPLITUNIFY`）
+### Task 9.2b ✅ **已完成（B9C，待 r30 回驗）** —— 側別判定改為事件級錨定（`票 SPLITUNIFY`）
 - SPEC ref：§P Phase 9B `Task 9.2b`；§V `Task 9.2b` 及其前置；`D-002-C3` (3.1)(3.2)
 - 實作要點：
   1. **前置（步驟 0）**：`train_rows`／`test_rows` 皆非空、row set 不重疊；
