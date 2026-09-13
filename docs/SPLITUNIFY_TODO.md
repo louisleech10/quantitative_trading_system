@@ -64,7 +64,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B9A** | 9.1 | B4 ＋ `D-002` 三家 `RECONCILE-STAMP` rc=0 | 揭露先行；只動 producer 回傳形狀與 summary 一鍵，可獨立回退 | 中 |
 | **B9B** | 9.2, 9.2a | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
 | **B9C** | 9.2b | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
-| **B9D** | 9.3 | B9C | 六個下游消費面逐處處置（多為**防誤改**回歸測試，非改碼） | 中 |
+| **B9D** | 9.3 | B9C | `Task 9.3` 表列**九處**逐處處置（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
 | **B9E** | 9.4 | B9C | 記帳鏈與 `baseline` 拆鍵 | 中 |
 | **B9F** | 9.5 | B9D ＋ B9E | golden 換錨與前端；須在所有行為面定案後才凍結 | 大 |
 
@@ -539,7 +539,11 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   - 🔴 第 6 條（xfail 機械驗收，**逐字**）：
     `venv/bin/python -m pytest -rxX "tests/momentum/Analysis/test_splitunify_derive.py::test_multi_feature_tf_opposite_sides_must_fail_closed"`
     ⇒ 輸出須含 `1 xfailed`；出現 `1 passed`（XPASS）或 `no tests ran`（被刪／改名）即**不通過**。
-  mutation 自證：`M-SU-D2-25`（同側檢查移到複合鍵 guard 之前 ⇒ 第 4 條紅）。
+  mutation 自證：`M-SU-D2-25`（同側檢查移到複合鍵 guard 之前 ⇒ 第 4 條紅）；
+  `M-SU-D2-35`（`assignments` 組裝不寫 `feature_timeframe` 欄 ⇒ 第 1 條 `KeyError` 轉紅）；
+  `M-SU-D2-36`（`purged` 組裝不寫該欄 ⇒ 第 2 條 `KeyError` 轉紅）。
+  🔴 兩者為 v14 新增——`C5-20`／`C5-21` 原本分別指向 `M-SU-D2-20`／`M-SU-D2-24`，而那兩條破壞的是
+  producer 預設與答案窗判定，**不是欄位本身**（R13 `CODEX-R13-P1-01` 提 `C5-20`，`C5-21` 由主委同型自查補上）。
 - **存活至**：全票完工後保留（複合鍵 schema 為 Phase 9 之最終形態）。
 - **覆蓋風險**：`Task 9.2b` 會在本 Task 之 guard **之後**插入同側檢查與跨表互斥；插入位置若被調到 guard 之前
   即 `M-SU-D2-25` 轉紅。`Task 9.4` 會讀本 Task 新增之 `n_event_tf_rows*`，不改其定義。
@@ -625,10 +629,15 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/event_samples/test_feature_materialization.py tests/momentum/event_samples/test_tables.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/momentum/event_samples/test_counterexample_classifier.py tests/momentum/event_samples/test_candidate_ledger.py tests/momentum/event_samples/test_dedupe.py tests/momentum/event_samples/test_pattern_bridge.py tests/momentum/Analysis/test_splitunify_derive.py` rc=0；
   前端 `cd frontend && node_modules/.bin/vitest run src/app/search/eventExportByEventId.test.tsx` rc=0。
   上表每列各一條「改壞就變紅」測試；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。
-  🔴 **register 重掃 receipt 之機械驗收（逐字）**：
-  `ls handoffs/run_receipts/*-splitunify-task-9.3-register-rescan.txt` rc=0，且該檔
-  `grep -cE '^C5-[0-9]+ ' <該檔>` 之值 **等於** `grep -cE '^\| \`C5-[0-9]+\`' docs/SPLITUNIFY_SPEC.D-002.md`
-  （逐條都掃過，不是抽樣）。
+  🔴 **register 重掃 receipt 之機械驗收（逐字；R13 `CODEX-R13-P1-02` 指出「只比行數」可被「同一 ID 重複 29 次」繞過，故改為 exact ID set ＋ 當輪綁定）**：
+  1. **唯一且當輪**：receipt 檔名須為 `handoffs/run_receipts/<UTC時戳>-splitunify-task-9.3-register-rescan.txt`，
+     且其**首行**逐字為 `TASK: <本 Task 之 impl task-id>`、**次行**逐字為 `COMMIT: <本 Task 開工時的 HEAD sha>`；
+     驗收時比對該 task-id 與 `.claude/gate/audit.log` 當輪一致（防「拿舊 receipt 充數」）。
+  2. **exact ID set，不是計數**：
+     `sed -n '3,$p' <receipt> | grep -oE '^C5-[0-9]+' | sort -u` 之輸出，須**逐字等於**
+     `grep -oE '^\| .C5-[0-9]+.' docs/SPLITUNIFY_SPEC.D-002.md | grep -oE 'C5-[0-9]+' | sort -u`
+     （`diff <(…) <(…)` rc=0）。🔴 **不得**改用 `wc -l` 比數量——同一 ID 重複 29 次也會過。
+  3. 每列格式逐字為 `C5-NN <改前分類> -> <改後分類> <碼證 path:line>`；分類值域封閉為 `甲|乙|丙`。
 - 🔴 **在上表測試實際存在之前，不得宣稱 mutation 網已閉**（§V 逐字）。
 - **存活至**：全票完工後保留（九處之防誤改回歸測試是唯一擋「未來有人用形狀規則批改」的東西）。
 - **覆蓋風險**：`Task 9.4` 會改 `split_projection` 之計數段與 `baseline`，與本 Task 之消費面不同檔；
