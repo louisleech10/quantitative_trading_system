@@ -116,12 +116,12 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 | `C5-21` | `split_projection` 之 `purged` 組裝（`split_projection.py:556`） | 乙 | 加 `feature_timeframe` 欄；並受跨表互斥斷言約束 | `Task 9.2a` | `M-SU-D2-36` |
 | `C5-22` | golden 之 `g1_membership` | 乙 | 擴維為 `(event_id, feature_timeframe)` 或新增平行組 | `Task 9.5` | `M-SU-D2-16`／`M-SU-D2-17` |
 | `C5-23` | `test_splitunify_wiring.py:103-104` 之 `dict(zip(...))` 映射 | 乙 | 改複合鍵映射 | `Task 9.4` | `M-SU-D2-12` |
-| `C5-24` | `pattern_bridge` 之 `assign.set_index("event_id")["split_label"]`（`:125-127`） | 丙 | 去重取唯一側，不唯一即 fail-closed；**不得**改複合鍵索引 | `Task 9.3` | `M-SU-D2-05` |
-| `C5-25` | `ic_feed` survivor **餵入端** | 丙 | 先去重再算雜湊，否則重複三元組改變雜湊 | `Task 9.3` | `M-SU-D2-19` |
+| `C5-24` | `pattern_bridge` 之 `assign.set_index("event_id")["split_label"]`（`:125-127`） | 丙 | 去重取唯一側，不唯一即 fail-closed；**不得**改複合鍵索引 | `Task 9.3` | `M-SU-D2-05`／`M-SU-D2-37`（🔴 v15：本列處置有**兩個**可壞面——`M-SU-D2-05` 覆蓋「改成複合鍵索引」那半，`M-SU-D2-37` 覆蓋「略過唯一側去重／不 fail-closed」那半；v14 以前只掛 `M-SU-D2-05`，後者無處可紅） |
+| `C5-25` | `ic_feed` survivor **餵入端** | 丙 | 先去重再算雜湊，否則重複三元組改變雜湊 | `Task 9.3` | `M-SU-D2-38`（🔴 v15：原指 `M-SU-D2-19`，但該條破壞的是「survivor 六鍵雜湊被改成含 feature TF」，屬 `C5-10`；本列之「餵入端略過去重」無處可紅 ⇒ 新增 `M-SU-D2-38`。三家 R14 撞題） |
 | `C5-26` | `pipeline.py:760-762` 之 summary counts（`n_train`／`n_test`／`n_purged` 由 `assignments[...].sum()` 算出） | 丙 | 改以 `event_id` 去重計數；列數另立新名 | `Task 9.4` | `M-SU-D2-13` |
-| `C5-27` | `split_projection.py:559-569` 之 `per_symbol_n`／`per_symbol_test_n` 與 `:716-719` 之 `tier_min_test_events` 門檻比較 | 丙 | 改以 `event_id` 去重計數（複合鍵後 1 事件×2 TF 會膨脹成 2，靜默繞過門檻） | `Task 9.4` | `M-SU-D2-13` |
-| `C5-28` | 前端 `frontend/src/components/ic-analysis/EventTablesPanel.tsx:361` 之 `train／test／purge` 計數顯示 | 丙 | 顯示值須為事件數；隨 `Task 9.1` 之 `SU-RESID-9A-UI` 殘留，本延伸不交付終端可見性 | `Task 9.4` | — |
-| `C5-29` | `tables.py:372` 之 `assignments.set_index("event_id")["symbol"].reindex(idx)` | 丙 | 複合鍵後索引重複、`reindex` 會取錯列 ⇒ 須先去重取唯一值，不唯一即 fail-closed | `Task 9.3` | `M-SU-D2-06` |
+| `C5-27` | `split_projection.py:559-569` 之 `per_symbol_n`／`per_symbol_test_n` 與 `:716-719` 之 `tier_min_test_events` 門檻比較 | 丙 | 改以 `event_id` 去重計數（複合鍵後 1 事件×2 TF 會膨脹成 2，靜默繞過門檻） | `Task 9.4` | `M-SU-D2-39`（🔴 v15：原指 `M-SU-D2-13`，但該條破壞的是「`n_train` 改取列數」，屬 `C5-26`；本列之「per-symbol 門檻未去重」無處可紅 ⇒ 新增 `M-SU-D2-39`） |
+| `C5-28` | 前端 `frontend/src/components/ic-analysis/EventTablesPanel.tsx:361` 之 `train／test／purge` 計數顯示 | 丙 | 顯示值須為事件數；隨 `Task 9.1` 之 `SU-RESID-9A-UI` 殘留，本延伸不交付終端可見性 | `Task 9.4` | —（🔴 v15 具名：**刻意無 mutation**，理由類別 `blocked-by`——本列之交付面整段隨 `SU-RESID-9A-UI` 殘留延後，本延伸不產出該行為 ⇒ 無碼可壞、寫 mutation 即空殼。殘留解除時須連同本列一併補） |
+| `C5-29` | `tables.py:372` 之 `assignments.set_index("event_id")["symbol"].reindex(idx)` | 丙 | 複合鍵後索引重複、`reindex` 會取錯列 ⇒ 須先去重取唯一值，不唯一即 fail-closed | `Task 9.3` | `M-SU-D2-40`（🔴 v15：原指 `M-SU-D2-06`，但該條破壞的是「`tables` 之 `.loc[eid]` 被誤改為複合鍵」且應紅於 `receipts`／`clusters`，屬 `C5-13`；本列之「`:372` 略過去重／不 fail-closed」無處可紅 ⇒ 新增 `M-SU-D2-40`。codex 與 grok R14 撞題） |
 ### D-002-C6 事件數與列數是兩個量
 
 <!-- OBLIGATIONS-BEGIN id=D-002-C6 -->
@@ -271,7 +271,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 - 🔴 `Task 9.4`（母斷言，對應 `M-SU-D2-31`）：`ASSERT WHEN test 含 e1 且物化 failures 含 e1 THEN n_test_events=1 AND n_test_samples=0`（物化失敗 fixture；證明兩量**不**恆等；現況碼證落點 `baseline.py:120` 之 `len(idx)`）；`ASSERT baseline 回傳 dict 不含舊鍵 n_test`（舊鍵不得殘留）；`ASSERT per_symbol_n 與 tier_min 路徑之計數皆以 event_id 去重`。
 - `Task 9.3`：**逐處**各一條「改壞就要變紅」測試；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。🔴 **七條反向 mutation 之應紅測試須落在具名檔**——`M-SU-D2-04`→`tests/momentum/event_samples/test_feature_materialization.py`；`06`→`test_tables.py`；`08`→`test_counterexample_classifier.py`；`09`→`test_candidate_ledger.py`；`10`→`test_dedupe.py`；`02`／`03`→`tests/momentum/Analysis/test_splitunify_derive.py`（`03` 另加 `tests/api/test_splitunify_disclosure.py`）；`07`（`ic_feed`）**無專屬測試檔**，須擇 `tests/momentum/event_samples/test_gap3_conditional_ic.py` 或新建；`11`（前端 `byEventId`）**無對應 vitest**，須新建。🔴 **在上列測試實際存在之前，不得宣稱 mutation 網已閉**。
 - `Task 9.5`：`ASSERT golden WHEN 單 TF fixture THEN 舊值逐值不變`；`ASSERT 交錯平行組之 g5 與單標的組不同且各自穩定`。
-**mutation 目錄**（🔴 逐處對應，不得以單一 generic mutant 冒充；每列皆須有**完整 ID** 與**應紅之測試**；共 **36** 條，🔴 本數字須與表列實數相符——前一版寫 23 而實列 22，由 R5 兩家以計數抓出；🔴 **一 mutation 一 defect**：R6 指出 `M-SU-D2-23` 曾以 OR 合併兩個獨立缺陷，已拆為 `23`／`26` 各配自己的應紅測試）
+**mutation 目錄**（🔴 逐處對應，不得以單一 generic mutant 冒充；每列皆須有**完整 ID** 與**應紅之測試**；共 **40** 條，🔴 本數字須與表列實數相符——前一版寫 23 而實列 22，由 R5 兩家以計數抓出；🔴 **一 mutation 一 defect**：R6 指出 `M-SU-D2-23` 曾以 OR 合併兩個獨立缺陷，已拆為 `23`／`26` 各配自己的應紅測試）
 
 | ID | 改壞什麼 | 應紅之測試 |
 |---|---|---|
@@ -309,8 +309,12 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 | `M-SU-D2-34` | 🔴 v13 新增（O2）：`Task 9.5` 首次建立 `splitunify_golden.v8.json` 時**未**把其 `sha256` 64-hex 字面寫入 §V 錨點行，或該錨點行被 `freeze_splitunify_golden.py` 自動改寫 | §V 第 6 條之「錨點行存在且為 64-hex、且非 helper 產生」斷言（缺字面時外部錨 ASSERT 無標的，只比旁檔會綠） |
 | `M-SU-D2-24` | 答案窗 purge 仍用**逐列** `in_train`（未改按事件側） | `Task 9.2b` 之 purge 反例（同事件一列 purged、另一列 test 即為缺陷） |
 | `M-SU-D2-25` | `D-002-C3` 同側檢查被移到複合鍵唯一 guard **之前** | `Task 9.2a` 之 guard 先後斷言（鍵重複時錯誤訊息須指鍵重複，不得誤報異側） |
-| `M-SU-D2-35` | 🔴 v14 新增（R13 codex `CODEX-R13-P1-01`）：`assignments` 組裝時**不寫** `feature_timeframe` 欄（producer 仍全量、其餘行為不變）——`C5-20` 原指向 `M-SU-D2-20`，但 `M-SU-D2-20` 破壞的是 producer 之 `selected_timeframe` 預設，**不是**這個欄位，該欄因此無專屬 mutation | `Task 9.2a` 之 `test_assignments_composite_key_unique`（欄缺時 `duplicated(subset=["event_id","feature_timeframe"])` 即 `KeyError`） |
-| `M-SU-D2-36` | 🔴 v14 新增（主委自產，與 `M-SU-D2-35` 同型；R13 codex 只提 `C5-20`，`C5-21` 有**完全相同**的錯配——原指向 `M-SU-D2-24`，而該條破壞的是答案窗 purge 之逐列判定，不是欄位）：`purged` 組裝時**不寫** `feature_timeframe` 欄 | `Task 9.2a` 之 `test_purged_composite_key_unique`（同上，欄缺即 `KeyError`） |
+| `M-SU-D2-35` | 🔴 v14 新增（R13 codex `CODEX-R13-P1-01`）：`assignments` 組裝時**不寫** `feature_timeframe` 欄（producer 仍全量、其餘行為不變）——`C5-20` 原指向 `M-SU-D2-20`，但 `M-SU-D2-20` 破壞的是 producer 之 `selected_timeframe` 預設，**不是**這個欄位，該欄因此無專屬 mutation | `Task 9.2a` 之 `test_assignments_composite_key_unique`，且該測試須**先** `ASSERT "feature_timeframe" in assignments.columns`、**再** `ASSERT not duplicated(subset=["event_id","feature_timeframe"]).any()`。🔴 **v15 強化（codex `CODEX-R14-P1-01`／grok `GROK-R14-P2-03` 撞題）**：v14 只寫「欄缺時 `KeyError`」，而實作者若把 guard 寫成 `if "feature_timeframe" in df.columns` 軟包，欄缺就**靜默略過而不紅** ⇒ 明定：**刪欄**或**以 `in df.columns` 條件包住 guard**，兩者皆須 FAIL；且 fixture 須為多 feature TF |
+| `M-SU-D2-36` | 🔴 v14 新增（主委自產，與 `M-SU-D2-35` 同型；R13 codex 只提 `C5-20`，`C5-21` 有**完全相同**的錯配——原指向 `M-SU-D2-24`，而該條破壞的是答案窗 purge 之逐列判定，不是欄位）：`purged` 組裝時**不寫** `feature_timeframe` 欄 | `Task 9.2a` 之 `test_purged_composite_key_unique`，欄位存在斷言與軟包禁令逐字同 `M-SU-D2-35`（v15 強化） |
+| `M-SU-D2-37` | 🔴 v15 新增（R14 codex `CODEX-R14-P1-03`）：`pattern_bridge`（`:125-127`）**略過**唯一側去重、或不唯一時**不** fail-closed 而靜默取一側 | `Task 9.3` 之 `tests/momentum/event_samples/test_pattern_bridge.py` 具名「唯一側去重＋不唯一即 raise」測試（須驗**值**與**例外型別**，不得只驗不報錯） |
+| `M-SU-D2-38` | 🔴 v15 新增（R14 三家撞題）：`ic_feed` survivor **餵入端**未先 `drop_duplicates(event_id)` 即算雜湊——多 TF 下重複三元組使雜湊漂移，而六鍵本身仍不含 TF（故 `M-SU-D2-19` 不會紅） | `Task 9.3` 之 `tests/momentum/event_samples/test_gap3_conditional_ic.py` 具名「餵入去重後 survivor 雜湊對多 TF 輸入穩定」測試 |
+| `M-SU-D2-39` | 🔴 v15 新增（R14 codex `CODEX-R14-P1-03`）：`per_symbol_n`／`per_symbol_test_n` 與 `tier_min_test_events` 門檻比較**未**以 `event_id` 去重（1 事件×2 TF 膨脹成 2，靜默繞過門檻） | `Task 9.4` 之 `test_tier_min_test_events_counts_unique_event_ids` |
+| `M-SU-D2-40` | 🔴 v15 新增（R14 codex／grok 撞題）：`tables.py:372` 之 `assignments.set_index("event_id")["symbol"].reindex(idx)` **略過**去重／不 fail-closed——多 TF 下索引重複會靜默取錯 symbol | `Task 9.3` 之 `tests/momentum/event_samples/test_tables.py` 具名「assignments 消費去重」測試（須驗取到的 `symbol` **值**正確，不得只驗不報錯） |
 
 ### §R 回退
 
@@ -329,6 +333,7 @@ PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 ## 沿革與追溯索引
 
 <!-- HISTORY-BEGIN -->
+- 2026-09-13：依 `handoffs/reconcile/20260911-splitunify-b9-review-r14/synth.md` 第十五次修訂（**v15**；v14 之戳記——composer APPROVED、codex／grok REJECTED——因本次修訂失效）——🔴 **本輪證實 v14 的 `C5-20`／`C5-21` 只是冰山一角：register 之 mutation 欄有一整類錯配**。R14 依 brief 之要求做**逐列窮舉**（`C5-01`..`C5-29` 全查），三家合計再找出**五列**：①`C5-24`（原只掛 `M-SU-D2-05`，缺「略過唯一側去重」那半）⇒ 改掛 `M-SU-D2-05`／`M-SU-D2-37` 兩條；②`C5-25`（原掛 `M-SU-D2-19`，該條屬 `C5-10`）⇒ 新增 `M-SU-D2-38`；③`C5-27`（原掛 `M-SU-D2-13`，該條屬 `C5-26`）⇒ 新增 `M-SU-D2-39`；④`C5-29`（原掛 `M-SU-D2-06`，該條屬 `C5-13`）⇒ 新增 `M-SU-D2-40`；⑤`C5-28` 之 `—` **確認為刻意**（交付面隨 `SU-RESID-9A-UI` 殘留延後、無碼可壞），已於該列具名理由類別 `blocked-by`。⑥`M-SU-D2-35`／`36` 之應紅欄強化：v14 只寫「欄缺時 `KeyError`」，而 `if "feature_timeframe" in df.columns` 軟包可短路 ⇒ 明定欄位存在斷言在前、軟包亦須 FAIL、fixture 須多 TF。⑦條數 36 → **40**，ID 01–40 連續。🔴 **本輪之教訓已入 §V／TODO**：`C5-01`..`C5-29` 之逐列核對**已窮舉完成**（`C5-01`..`23`／`C5-26` 無誤），此類錯配不應再出現；若再出現，代表是新增列時漏掛，而非既有存量。
 - 2026-09-13：依 `handoffs/reconcile/20260911-splitunify-b9-review-r13/synth.md` 第十四次修訂（**v14**；本檔於 v13 曾取得三家 APPROVED，本次修訂使該組戳記失效，須重簽）——①`CODEX-R13-P1-01`：`C5-20` 之 mutation 欄原指 `M-SU-D2-20`，但該條破壞的是 producer 之 `selected_timeframe` 預設、**不是** `assignments` 的 `feature_timeframe` 欄 ⇒ 該欄**無專屬 mutation**，改指新增之 `M-SU-D2-35`。②**主委自產**：`C5-21` 有**完全相同**的錯配（原指 `M-SU-D2-24`，而該條破壞的是答案窗 purge 之逐列判定）⇒ 改指新增之 `M-SU-D2-36`；R13 codex 只提 `C5-20`，此條是主委依同型自查補上，**不等下一輪再抓**。③mutation 條數 34 → **36**。
 - 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-consult-r1/synth.md`（四家偵察 18 條／六群）建立本延伸。
 - 2026-09-12：依 `handoffs/reconcile/20260911-splitunify-b9-review-r1/synth.md`（三家找碴 15 條／七群，三家全數 blocked）修訂為本版——新增 `D-002-C0`（timeframe 雙語意分名）、`D-002-C3`（同側約束）、`D-002-C6`（量詞分離）、`Task 9.4`；觸及面由 15 處增為 16 處；Task 9.3 改為逐處列名；§G 拆解 (G-1)(G-2)(G-3)；mutation 由 6 條增為 18 條。
@@ -377,3 +382,6 @@ RECONCILE-STAMP: composer APPROVED 2026-09-13 sha256:06b2d4cb5f6b24ea311bce08539
 
 RECONCILE-STAMP: codex APPROVED 2026-09-13 sha256:06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77 task:20260911-SPLITUNIFY-B9-STAMP-R1
 RECONCILE-STAMP: grok APPROVED 2026-09-13 sha256:06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77 task:20260911-SPLITUNIFY-B9-STAMP-R1
+RECONCILE-STAMP: codex REJECTED 2026-09-13 sha256:7455b305c6f3c013de84d1941c4d69bc731fb5fa90f6e91d447e14382f0b10e2 task:20260911-SPLITUNIFY-B9-REVIEW-R14 — BLOCKED-BY: CODEX-R14-P1-01,CODEX-R14-P1-02,CODEX-R14-P1-03
+RECONCILE-STAMP: composer APPROVED 2026-09-13 sha256:7455b305c6f3c013de84d1941c4d69bc731fb5fa90f6e91d447e14382f0b10e2 task:20260911-SPLITUNIFY-B9-REVIEW-R14
+RECONCILE-STAMP: grok REJECTED 2026-09-13 — C5-29/C5-25 mutation 錯配（GROK-R14-P1-01/P1-02）；一次修訂可關

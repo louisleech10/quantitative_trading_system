@@ -540,8 +540,12 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
     `venv/bin/python -m pytest -rxX "tests/momentum/Analysis/test_splitunify_derive.py::test_multi_feature_tf_opposite_sides_must_fail_closed"`
     ⇒ 輸出須含 `1 xfailed`；出現 `1 passed`（XPASS）或 `no tests ran`（被刪／改名）即**不通過**。
   mutation 自證：`M-SU-D2-25`（同側檢查移到複合鍵 guard 之前 ⇒ 第 4 條紅）；
-  `M-SU-D2-35`（`assignments` 組裝不寫 `feature_timeframe` 欄 ⇒ 第 1 條 `KeyError` 轉紅）；
-  `M-SU-D2-36`（`purged` 組裝不寫該欄 ⇒ 第 2 條 `KeyError` 轉紅）。
+  `M-SU-D2-35`（`assignments` 組裝不寫 `feature_timeframe` 欄）；
+  `M-SU-D2-36`（`purged` 組裝不寫該欄）。
+  🔴 **v15 強化（R14 codex／grok 撞題）**：上列兩條之應紅測試**不得**只靠 `duplicated(subset=[...])` 的 `KeyError`——
+  實作者若寫成 `if "feature_timeframe" in df.columns` 軟包，欄缺就靜默略過而不紅。
+  兩個測試各須**先** `assert "feature_timeframe" in <表>.columns`、**再**做複合鍵唯一性斷言；
+  且 fixture 須為**多 feature TF**。驗收時「刪欄」與「以 `in df.columns` 包住 guard」**兩種破壞都要實跑轉紅**。
   🔴 兩者為 v14 新增——`C5-20`／`C5-21` 原本分別指向 `M-SU-D2-20`／`M-SU-D2-24`，而那兩條破壞的是
   producer 預設與答案窗判定，**不是欄位本身**（R13 `CODEX-R13-P1-01` 提 `C5-20`，`C5-21` 由主委同型自查補上）。
 - **存活至**：全票完工後保留（複合鍵 schema 為 Phase 9 之最終形態）。
@@ -610,12 +614,12 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 | 消費面 | 處置 | 應紅之 mutation | 測試檔 |
 |---|---|---|---|
 | `feature_materialization` | **維持事件級橫向合併**（不得改複合鍵） | `M-SU-D2-04` | `tests/momentum/event_samples/test_feature_materialization.py` |
-| `tables` | 維持事件級 `.loc[eid]` | `M-SU-D2-06` | `tests/momentum/event_samples/test_tables.py` |
-| `ic_feed` | 維持（已先過濾單一 TF，索引本就唯一） | `M-SU-D2-07`、`M-SU-D2-19` | `tests/momentum/event_samples/test_gap3_conditional_ic.py`（`ic_feed` 無專屬測試檔） |
+| `tables` | 維持事件級 `.loc[eid]`（`:214`／`:229`／`:373`）；🔴 另 **`:372` 之 `assignments.set_index("event_id")["symbol"].reindex(idx)` 要改**——複合鍵後索引重複會靜默取錯 symbol ⇒ 先去重取唯一值、不唯一即 fail-closed | `M-SU-D2-06`（維持面）＋`M-SU-D2-40`（`:372` 略過去重） | `tests/momentum/event_samples/test_tables.py` |
+| `ic_feed` | 維持六鍵事件級（不加 TF 欄）；🔴 另 **survivor 餵入端要先 `drop_duplicates(event_id)`**——否則多 TF 下重複三元組使雜湊漂移，而六鍵不含 TF 故既有 mutation 不會紅 | `M-SU-D2-07`、`M-SU-D2-19`（維持面）＋`M-SU-D2-38`（餵入未去重） | `tests/momentum/event_samples/test_gap3_conditional_ic.py`（`ic_feed` 無專屬測試檔） |
 | `counterexample_classifier` | 維持事件級 | `M-SU-D2-08` | `tests/momentum/event_samples/test_counterexample_classifier.py` |
 | `candidate_ledger` | 維持事件級 | `M-SU-D2-09` | `tests/momentum/event_samples/test_candidate_ledger.py` |
 | `dedupe` | 保留集事件級決定 ＋ 廣播到該事件所有 per-TF 列 | `M-SU-D2-10` | `tests/momentum/event_samples/test_dedupe.py` |
-| `pattern_bridge` | **丙類，要改**：`assign.set_index("event_id")` 先去重取唯一側，不唯一即 fail-closed | `M-SU-D2-05` | `tests/momentum/event_samples/test_pattern_bridge.py` |
+| `pattern_bridge` | **丙類，要改**：`assign.set_index("event_id")` 先去重取唯一側，不唯一即 fail-closed | `M-SU-D2-05`（改複合鍵索引）＋`M-SU-D2-37`（略過去重／不 fail-closed） | `tests/momentum/event_samples/test_pattern_bridge.py` |
 | event-level 表／manifest | 粒度不變 | `M-SU-D2-18` | `tests/momentum/Analysis/test_splitunify_derive.py` |
 | 前端 `byEventId` | 維持 `canonicalEventId` 鍵 | `M-SU-D2-11` | 🔴 **須新建** `frontend/src/app/search/eventExportByEventId.test.tsx`（同目錄已有四支 `eventExport*.test.tsx` 可循） |
 
@@ -631,13 +635,20 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   上表每列各一條「改壞就變紅」測試；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。
   🔴 **register 重掃 receipt 之機械驗收（逐字；R13 `CODEX-R13-P1-02` 指出「只比行數」可被「同一 ID 重複 29 次」繞過，故改為 exact ID set ＋ 當輪綁定）**：
   1. **唯一且當輪**：receipt 檔名須為 `handoffs/run_receipts/<UTC時戳>-splitunify-task-9.3-register-rescan.txt`，
-     且其**首行**逐字為 `TASK: <本 Task 之 impl task-id>`、**次行**逐字為 `COMMIT: <本 Task 開工時的 HEAD sha>`；
-     驗收時比對該 task-id 與 `.claude/gate/audit.log` 當輪一致（防「拿舊 receipt 充數」）。
+     且其**首行**逐字為 `TASK: <本 Task 之 impl task-id>`、**次行**逐字為 `COMMIT: <本 Task 開工時的 HEAD sha>`。
+     🔴 **v15 強化（R14 三家撞題：`COMMIT: deadbeef` 也能過）**：`COMMIT:` 之值須**等於**該 impl task-id 之
+     `committee_dispatch`／impl token 事件在 `.claude/gate/audit.log` 中所記的 round-start HEAD；
+     驗收命令須實際取出該欄比對，不得只檢查「有這一行」。
   2. **exact ID set，不是計數**：
      `sed -n '3,$p' <receipt> | grep -oE '^C5-[0-9]+' | sort -u` 之輸出，須**逐字等於**
      `grep -oE '^\| .C5-[0-9]+.' docs/SPLITUNIFY_SPEC.D-002.md | grep -oE 'C5-[0-9]+' | sort -u`
      （`diff <(…) <(…)` rc=0）。🔴 **不得**改用 `wc -l` 比數量——同一 ID 重複 29 次也會過。
   3. 每列格式逐字為 `C5-NN <改前分類> -> <改後分類> <碼證 path:line>`；分類值域封閉為 `甲|乙|丙`。
+  4. 🔴 **v15 強化（R14 三家撞題：ID 集合正確但分類全填 `甲 -> 甲`、碼證填占位路徑也能過）**——再加兩條內容對證：
+     - **改前分類須與 SPEC 現況相符**：逐列取該 `C5-NN` 在 `docs/SPLITUNIFY_SPEC.D-002.md` register 表中的第 3 欄，
+       須**逐字等於** receipt 的 `<改前分類>`。任一列不符即 FAIL（這一條直接殺掉「全填同一值」）。
+     - **碼證須指向真實存在的行**：逐列把 `<碼證 path:line>` 拆成檔與行號，該檔須存在、且行號須 ≤ 該檔總行數。
+       任一列指向不存在的檔或超出範圍的行即 FAIL（這一條殺掉 `fake:1`／`nowhere:0` 這類占位）。
 - 🔴 **在上表測試實際存在之前，不得宣稱 mutation 網已閉**（§V 逐字）。
 - **存活至**：全票完工後保留（九處之防誤改回歸測試是唯一擋「未來有人用形狀規則批改」的東西）。
 - **覆蓋風險**：`Task 9.4` 會改 `split_projection` 之計數段與 `baseline`，與本 Task 之消費面不同檔；
@@ -687,7 +698,9 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   - `test_tier_min_test_events_counts_unique_event_ids`（1 事件 × 2 TF、`tier_min=2` ⇒ 仍判樣本不足）
   - `test_event_count_conservation`（`n_train+n_test+n_purged == n_events`，事件數非列數）
   前端 `cd frontend && npm run build` rc=0（型別改動同批驗）。
-  mutation 自證：`M-SU-D2-13`、`M-SU-D2-31`、`M-SU-D2-32`、`M-SU-D2-12`。
+  mutation 自證：`M-SU-D2-13`、`M-SU-D2-31`、`M-SU-D2-32`、`M-SU-D2-12`、
+  `M-SU-D2-39`（v15 新增：`per_symbol_n`／`tier_min_test_events` 未以 `event_id` 去重
+  ⇒ `test_tier_min_test_events_counts_unique_event_ids` 轉紅）。
 - **存活至**：全票完工後保留（`n_test_events`／`n_test_samples` 兩量分離為最終契約）。
 - **覆蓋風險**：`SU-RESID-9A-UI` 殘留解除時會再加終端揭露欄，屬**只增不改**；
   本 Task 之鍵名與語意不得在那時被改寫。
