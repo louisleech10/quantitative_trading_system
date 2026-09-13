@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "session_id": "20260911-splitunify-b9-review-r24",
+  "expected_roster": [
+    "codex"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260911-splitunify-b9-review-r24/sources/20260911-splitunify-b9-review-r24-codex.md",
+      "sha256": "4d6e2e83a8ed98d8c0d12c49ff68f5b521562105637e48b59b7b9c11225152a3",
+      "family": "codex"
+    }
+  ],
+  "freeze_ts": "2026-09-13T18:54:33Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "b571834d-831d-4c28-8b4d-5955e79a3d0c"
+}

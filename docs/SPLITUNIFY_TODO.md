@@ -707,7 +707,9 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
        補 `TARGETS: <repo-relative-path>:<start>-<end>` 欄位（🔴 v18 更正：原寫「那 20 列」，
        係 `C5-25` 補錨前之舊值，由 `CODEX-R2-P2-01` 抓出）
        （codex 於 `CODEX-R16-P1-01` 給出逐字修法，並指出 `C5-25` 至少應錨
-       `momentum/Analysis/event_samples/ic_feed.py:56-65`）。**現在不做的理由**：那要動 20 列已戳記
+       `momentum/Analysis/event_samples/ic_feed.py:56-65`）。**現在不做的理由**：那要動 **19** 列已戳記
+       （🔴 **v20 更正（R24 `CODEX-R24-P2-02`）**：原寫「~~20 列~~」，與本殘留上方已更正之 19 列**同段不一致**；
+       `C5-25` 補錨這一個動作至此第三度打翻同一個數字——前兩次在驗收第 5 點與殘留首句）
        之 register 並再走一輪三家重簽，屬「為驗收收據的閘再補一層腳手架」，而 `Task 9.1`
        之產品實作尚未開始；依 2026-09-12「不再擴建治理工具、同型缺陷降級為具名殘留」裁定，
        **降級為本殘留**。
