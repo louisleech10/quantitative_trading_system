@@ -709,8 +709,9 @@ class EventSamplePipeline:
         不得以「警告後放行」降級。需要出表請改呼叫 `run_event_study_only()`。
 
         🔴 **SPLITUNIFY Task 3.1（SPEC C-0／C-1）**：給定 canonical 邊界
-        （`train_plan`＋`test_plan`＋`feature_index`＋`selected_timeframe`，**四者同時**）
-        ⇒ 走**投影**；四者皆未給 ⇒ 走既有 `split_events`（歷史路徑）。
+        （`train_plan`＋`test_plan`＋`feature_index`，🔴 **`D-002` `Task 9.2` 起為三者同時**；
+        `selected_timeframe` 已降為**可選**——`None`＝全量多 feature TF，字串＝單選過濾）
+        ⇒ 走**投影**；三者皆未給 ⇒ 走既有 `split_events`（歷史路徑）。
         **給一半是 fail-closed**——「有些給了、有些沒給」在舊寫法下會靜默走回歷史路徑，
         而呼叫端以為自己用的是統一後的邊界，那正是本票要消滅的「兩套切分」。
 
@@ -720,9 +721,14 @@ class EventSamplePipeline:
         assert_split_allowed(lookahead_gate, where="EventSamplePipeline.run")
         events, aligned, receipts, failures, manifest = self._prepare(
             records, bars_by_tf, config, source_bytes=source_bytes, where="EventSamplePipeline.run")
+        # 🔴 D-002 `Task 9.2`：投影門檻由**四者同時**改為 `train_plan`／`test_plan`／
+        #    `feature_index` **三者同時**；`selected_timeframe` 降為**可選**
+        #    （`None`＝全量多 feature TF，字串＝單選過濾）。
+        #    理由（R4 grok 獨得）：舊寫法要求四者皆非 `None`，只把 caller 改成傳 `None`
+        #    會**在抵達 `build_event_keys` 之前**就 fail-closed，核心目標等於沒改。
         projection_args = {
             "train_plan": train_plan, "test_plan": test_plan,
-            "feature_index": feature_index, "selected_timeframe": selected_timeframe,
+            "feature_index": feature_index,
         }
         given = [k for k, v in projection_args.items() if v is not None]
         if given and len(given) != len(projection_args):
@@ -744,8 +750,12 @@ class EventSamplePipeline:
                 )
             # 🔴 D-002 Task 9.1（Phase 9A）：producer 改回傳 `(keyed, discarded)`；
             #    `discarded` 須**原樣**沿 summary 帶出，在此丟掉就等於回到靜默丟棄。
+            # 🔴 D-002 `Task 9.2`：**不得** `str()` 強制轉型——`None` 會變成字面 `"None"`，
+            #    被下游當成一個叫 `None` 的 feature TF，產出空表而非全量
+            #    （改了 producer 卻沒改這裡＝本 Task 白做；R3 抓出的「改了等於沒改」）。
             event_keys, discarded_rows = build_event_keys(
-                receipts, selected_timeframe=str(selected_timeframe)
+                receipts,
+                selected_timeframe=None if selected_timeframe is None else str(selected_timeframe),
             )
             plan = derive_event_split_from_plans(
                 train_plan, test_plan,

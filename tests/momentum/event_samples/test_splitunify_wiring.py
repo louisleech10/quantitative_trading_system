@@ -115,14 +115,34 @@ def test_splitunify_wiring_canonical_boundary_uses_projection(records, bars, spy
 
 
 # ── 只給一半 ⇒ fail-closed（最容易靜默退回歷史切分的形態） ──────────────────
-@pytest.mark.parametrize("drop", ["train_plan", "test_plan", "feature_index", "selected_timeframe"])
+@pytest.mark.parametrize("drop", ["train_plan", "test_plan", "feature_index"])
 def test_splitunify_wiring_partial_boundary_is_fail_closed(records, bars, spy_split, drop):
+    """🔴 **D-002 `Task 9.2` 起 `selected_timeframe` 已移出必填集合**，故該參數化案例
+    由本檔之 `test_partial_boundary_gate_accepts_none_selected_timeframe` **取代**
+    （TODO 明文：**替換**，不得只新增而留著舊的——留著會與新行為互斥）。
+    """
     train, test, index = _canonical(records, bars)
     kwargs = {"train_plan": train, "test_plan": test, "feature_index": index, "selected_timeframe": TF}
     kwargs[drop] = None
     with pytest.raises(ValueError, match="必須同時給齊"):
         EventSamplePipeline().run(records, bars, EventPipelineConfig(timeframes=(TF,)), **kwargs)
     assert spy_split == [], "缺參數時退回歷史切分＝呼叫端以為自己用的是統一後的邊界"
+
+
+def test_partial_boundary_gate_accepts_none_selected_timeframe(records, bars, spy_split):
+    """`selected_timeframe=None` 不再 raise，且**仍走投影**（不得退回歷史切分）。
+
+    🔴 這是 `Task 9.2` 之「四參數閘改三」的直接驗收：只把 caller 改成傳 `None`
+    而不動這道閘，會**在抵達 `build_event_keys` 之前**就 fail-closed，核心目標等於沒改。
+    """
+    train, test, index = _canonical(records, bars)
+    res = EventSamplePipeline().run(
+        records, bars, EventPipelineConfig(timeframes=(TF,)),
+        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=None,
+    )
+    assert spy_split == [], "selected_timeframe=None 竟退回歷史切分 ⇒ 三參數閘沒生效"
+    assert res.split_plan is not None
+    assert "feature_timeframe" in res.split_plan.assignments.columns
 
 
 # ── 投影路徑不得同時帶毫秒 embargo（Task 3.1 要點 4） ───────────────────────
@@ -202,3 +222,31 @@ def test_splitunify_wiring_discarded_rows_reaches_summary(records, bars_multi_tf
     assert all(isinstance(v, int) and v > 0 for v in discarded.values()), (
         f"列數須為正整數，實得 {discarded}"
     )
+
+
+def test_run_without_selected_timeframe_emits_all_feature_tf_rows(records, bars_multi_tf, spy_split):
+    """🔴 `Task 9.2` 之**端到端**驗收（schema 斷言不算）：斷言標的逐字為 `split_plan.assignments`。
+
+    經 `EventSamplePipeline.run` **不傳** `selected_timeframe` ⇒ 兩個 feature TF 皆須在
+    `assignments` 裡，且列數等於 `per_tf` 列數（沒有任何一列被靜默丟掉）。
+    🔴 只要 caller 仍必傳、或門檻仍擋 `None`、或 merge 仍是 `1:1`，本測試就會紅——
+    這三層是 `Task 9.2` 的實質內容，schema 層的斷言抓不到其中任何一層。
+    """
+    train, test, index = _canonical(records, bars_multi_tf)
+    cfg = EventPipelineConfig(timeframes=("4h", TF), split=EventSplitConfig())
+    res = EventSamplePipeline().run(
+        records, bars_multi_tf, cfg,
+        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=None,
+    )
+    assert spy_split == [], "全量模式竟退回歷史切分"
+    assign = res.split_plan.assignments
+    purged = res.split_plan.purged
+    n_rows = len(assign) + len(purged)
+    assert n_rows == len(res.receipts.per_tf), (
+        f"全量列數 {n_rows} != per_tf 列數 {len(res.receipts.per_tf)} ⇒ 仍有列被靜默丟掉"
+    )
+    seen = set(assign["feature_timeframe"]) | set(purged["feature_timeframe"])
+    assert seen == {"4h", TF}, f"兩個 feature TF 須皆在，實得 {sorted(seen)}"
+    # 事件數與列數是兩個量（D-002-C6），且全量下列數嚴格大於事件數。
+    s = res.split_plan.summary
+    assert s["n_event_tf_rows"] > s["n_events"]

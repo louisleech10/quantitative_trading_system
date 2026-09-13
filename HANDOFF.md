@@ -27,7 +27,13 @@
   - 🔴 **教訓**：v13 改 §V 沒改 §P，與本檔一路在打的「一個決定散在多區段而漏同步」**完全同型**，隔了五輪、直到實作完成才被逼出來 ⇒ **文件層自證掃不到「§P 與 §V 互斥」這種跨區段矛盾，實作才掃得到**；反證 r12 停輪判準「殘餘規格缺陷交由實作期暴露」是對的。
 ⑯**stamp-r4 三家零 finding APPROVED** ⇒ `reconcile_stamps_check.sh docs/SPLITUNIFY_SPEC.D-002.md` **rc=0**（v18，body `76006a76…`）。三家並各自回答主委自標之兩條 assumed：`§P Task 9.1` 與 `§V Task 9.1` 逐句對讀**無第三處互斥**；`Task 9.2`–`9.5` **無條文引用被改掉的舊字面**。
 🏁 **`Task 9.1`（批次 `B9A`）完整收束**：實作 → 首輪審碼 6 群修補 → 閉合再驗證 13 條全關 → SPEC 同步 → 重簽 rc=0。
-- **下一步**：領 impl token 進 **`Task 9.2` ＋ `Task 9.2a`（批次 B9B，🔴 不得拆批）**。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A 已完成**）。
+⑰🔴 **`Task 9.2` ＋ `Task 9.2a`（批次 B9B）已實作**——本批是**第 9 批核心**（沒有它，下游全改完 `SU-RESID-2` 仍不解決）。回歸與 mutation 實跑結果見 `handoffs/reconcile/20260911-splitunify-b9-review-r20/synth.md`（待建），receipt `20260913T165740Z-splitunify-b9b-task92-92a`。
+  - **`Task 9.2`（四層，缺一層即白做）**：①producer `selected_timeframe` 改 `Optional[str] = None`、`None`＝全量；②caller 移除 `str()` 強制轉型（留著會把 `None` 變字面 `"None"`）；③`pipeline.py` 投影門檻由**四鍵改三鍵**（`selected_timeframe` 移出必填集合）＋docstring 同步；④merge 改以 `per_tf` 為行粒度、`validate` 由 `1:1` 改 `many_to_one`，**新建** `feature_timeframe` 欄取自 `per_tf`（不得以 `event_level.timeframe` 冒充）。
+  - **`Task 9.2a`**：`assignments`／`purged` 兩表加 `feature_timeframe` 欄（含**空批欄集一致**）；兩道 guard 判準改 `(event_id, feature_timeframe)` 複合鍵唯一、**錯誤型別維持 `ValueError`**；`manifest.table` 維持事件級唯一；`clusters` **不加該欄**；summary 增 `n_events`／`n_event_tf_rows`／`n_event_tf_rows_purged` 三鍵（12→**16** 鍵）。
+  - **三條 TODO 明文指定之既有測試處置**：`test_summary_has_all_thirteen_keys`→`..._sixteen_keys`；`test_duplicate_event_id_is_fail_closed` 之 `match=` 改「複合鍵重複」（裁定＝測試過時，不得改實作）；`test_splitunify_wiring_partial_boundary_is_fail_closed` 之 `selected_timeframe` 參數化案例**替換**為 `test_partial_boundary_gate_accepts_none_selected_timeframe`（不得只新增而留舊的）。
+  - **`scripts/freeze_splitunify_golden.py`** 之 fixture 補 `feature_timeframe`（**刻意維持單 feature TF** ⇒ golden 既有值逐值不變；擴維屬 `Task 9.5`）。
+  - **mutation 自證（實跑後皆還原）**：`M-SU-D2-20`（producer 保留預設單選）⇒ 紅；`M-SU-D2-21`（門檻改回四鍵）⇒ 2 紅；`M-SU-D2-23`（`validate` 改回 `1:1`）⇒ 2 紅；`M-SU-D2-26`（以 `event_level.timeframe` 冒充）⇒ 紅；`M-SU-D2-36`（`purged` 不寫該欄）⇒ 紅。
+- **下一步**：派 `review-r20` 三家審碼（B9B）。依賴序 `9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`，批次 `B9A`–`B9F`（**B9A／B9B 已完成**）。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v13，body sha256 `06b2d4cb5f6b24ea311bce0853912e101b56572cd34bc50f6c044a4a53508b77`，仍為零戳記**。停輪依據＝`handoffs/reconcile/20260911-splitunify-b9-review-r12/synth.md`（唯一權威，本檔不複述）。

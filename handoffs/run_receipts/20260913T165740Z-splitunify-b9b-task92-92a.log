@@ -1,0 +1,1536 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+
+----------------------------- live log collection ------------------------------
+00:56:33 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/feature_klines/kline_cache.h5
+00:56:33 [INFO] Registered adapter: crypto_spot
+00:56:33 [INFO] Loaded feature registry with 19 entries
+00:56:34 [INFO] CGSA stats (tier=8gb): sync_cap=200 q_sample=1500 warmup_workers=2
+00:56:34 [INFO] Restored 16 persisted feature task(s) from disk
+00:56:34 [INFO] 所有中間件已設置完成
+00:56:34 [INFO] 異常處理器設置完成
+00:56:35 [INFO] StandaloneSearchService initialized - momentum modules will be loaded on demand
+00:56:35 [INFO] Loaded feature registry with 19 entries
+00:56:35 [INFO] Loaded 60/60 cases from JSON
+00:56:35 [INFO] Loaded 60 cases from /Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json
+00:56:35 [INFO] CaseStorageManager initialized (persistent=True, json_path=/Users/louis/Desktop/quantitative_trading_system/data_cache/cases.json, cases=60)
+00:56:35 [INFO] Created global CaseStorageManager instance
+00:56:35 [INFO] CaseImportService initialized
+00:56:35 [INFO] Created global CaseImportService instance with shared storage
+00:56:35 [INFO] KlineStorageManager initialized: /Users/louis/Desktop/quantitative_trading_system/data_cache/kline_cache.h5
+00:56:35 [INFO] KlineDownloadService initialized
+00:56:35 [INFO] Rate limiter initialized: 1000 req/min
+00:56:35 [INFO] BinanceProvider initialized
+00:56:35 [INFO] Registered provider: binance (rate_limit=1000/min)
+00:56:35 [INFO] Registered BinanceProvider to KlineDownloadService
+00:56:35 [INFO] BatchDownloadService initialized
+00:56:35 [INFO] Created global BatchDownloadService instance with shared storage
+00:56:35 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+00:56:35 [INFO] KlineDownloadService initialized
+00:56:35 [INFO] Rate limiter initialized: 1000 req/min
+00:56:35 [INFO] BinanceProvider initialized
+00:56:35 [INFO] Registered provider: binance (rate_limit=1000/min)
+00:56:35 [INFO] KlineStorageManager initialized: data_cache/kline_cache.h5
+00:56:35 [INFO] IndicatorEngine initialized
+00:56:35 [INFO] ChartDataService initialized with IndicatorEngine
+00:56:35 [INFO] OptimizationTaskService initialized
+00:56:35 [INFO] Loaded feature registry with 19 entries
+00:56:35 [INFO] Loaded feature registry with 19 entries
+00:56:35 [INFO] Loaded feature registry with 19 entries
+00:56:35 [INFO] Loaded feature registry with 19 entries
+00:56:35 [INFO] WebSocketConnectionManager initialized
+00:56:35 [INFO] All API routes registered successfully
+collected 705 items
+
+tests/momentum/Analysis/test_splitunify_derive.py::test_answer_window_one_ms_before_test_start_stays_in_train PASSED [  0%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_manifest_summary_missing_key_is_named_not_bare_keyerror PASSED [  0%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_tier_min_test_events_is_honored_not_silently_one PASSED [  0%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_three_state_two_containers_cover_all_events PASSED [  0%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_purge_reason_uses_existing_contract_literal PASSED [  0%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_answer_window_crossing_train_event_is_purged PASSED [  0%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_answer_window_boundary_is_ge_not_gt PASSED [  0%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_answer_window_not_applied_to_test_side_events PASSED [  1%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_membership_set_not_interval PASSED [  1%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_dual_membership_raises_not_silent_pick PASSED [  1%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_unmatched_timestamp_is_purged_not_train PASSED [  1%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_multi_symbol_is_fail_closed PASSED [  1%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_plan_symbols_differ_is_fail_closed PASSED [  1%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_plan_universes_differ_is_fail_closed PASSED [  1%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_same_source_shifted_feature_index_is_fail_closed PASSED [  2%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_same_source_plans_from_shorter_grid_is_fail_closed PASSED [  2%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_plan_time_bounds_inconsistent_with_own_rows_is_fail_closed PASSED [  2%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_same_source_accepts_datetime_time_bounds PASSED [  2%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_same_source_rejects_second_unit_time_bounds PASSED [  2%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_single_symbol_batch_unaffected PASSED [  2%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_non_positional_index_kind_is_fail_closed PASSED [  2%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_empty_test_rows_is_fail_closed_not_none_compare PASSED [  3%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_missing_train_plan_is_fail_closed PASSED [  3%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_unit_normalize_rejects_seconds_index PASSED [  3%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_unit_normalize_accepts_datetime_index PASSED [  3%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_clusters_match_independent_frozen_oracle PASSED [  3%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_clusters_still_agree_with_split_events_shape PASSED [  3%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_summary_has_all_sixteen_keys PASSED [  3%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_empty_event_keys_gives_empty_three_states PASSED [  4%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_manifest_id_mismatch_is_fail_closed PASSED [  4%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_manifest_superset_is_also_rejected PASSED [  4%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_plan_symbol_mismatch_is_fail_closed PASSED [  4%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_plan_without_symbol_is_fail_closed PASSED [  4%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_mixed_unit_index_is_fail_closed PASSED [  4%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_negative_row_index_is_fail_closed PASSED [  4%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_row_index_out_of_range_is_fail_closed PASSED [  5%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_unsorted_feature_index_is_fail_closed PASSED [  5%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_duplicate_feature_index_timestamps_is_fail_closed PASSED [  5%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_nan_in_numeric_index_is_fail_closed PASSED [  5%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_duplicate_event_id_is_fail_closed PASSED [  5%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_float_row_index_is_fail_closed PASSED [  5%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_inverted_answer_window_is_fail_closed PASSED [  5%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_event_keys_may_share_timestamps PASSED [  6%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_non_positive_bucket_ms_is_fail_closed PASSED [  6%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_datetime_index_unsorted_is_fail_closed PASSED [  6%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_unsorted_row_index_is_fail_closed PASSED [  6%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_none_symbol_is_fail_closed PASSED [  6%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_blank_symbol_is_fail_closed PASSED [  6%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_answer_window_one_ms_before_test_start_is_purged PASSED [  6%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_all_purged_is_legal_output PASSED [  7%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_joins_by_event_id_not_position PASSED [  7%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_picks_selected_timeframe_only PASSED [  7%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_rejects_duplicate_per_tf_rows PASSED [  7%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_rejects_duplicate_event_level_rows PASSED [  7%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_rejects_missing_cutoff PASSED [  7%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_purity_does_not_mutate_inputs PASSED [  7%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_projection_assigns_both_symbols PASSED [  8%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_plans_mapping_without_index_mapping_is_fail_closed PASSED [  8%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_event_symbol_missing_from_plans_is_fail_closed PASSED [  8%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_shared_universe_hash_is_allowed PASSED [  8%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_crossed_feature_index_is_fail_closed PASSED [  8%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_interleaved_never_indexes_full_frame PASSED [  8%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_interleaved_matches_single_symbol_run PASSED [  8%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_degraded_clears_with_two_symbols PASSED [  9%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_degraded_set_with_one_symbol PASSED [  9%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_insufficient_events_in_test_is_per_symbol_not_batch PASSED [  9%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_insufficient_events_in_test_empty_when_all_above_threshold PASSED [  9%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_mapping_key_not_matching_plan_symbol_is_fail_closed PASSED [  9%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_mid_row_shift_caught_though_endpoints_match PASSED [  9%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_passes_when_index_is_identical PASSED [  9%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_is_deterministic_across_recomputation PASSED [ 10%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_of_empty_rows_is_sha256_of_empty_list PASSED [ 10%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_missing_column_is_fail_closed PASSED [ 10%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_missing_row_index_local_is_fail_closed PASSED [ 10%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_independent_oracle_matches_producer_value PASSED [ 10%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_reordered_rows_are_caught_by_monotonic_gate PASSED [ 10%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_per_symbol_missing_feature_index_entry_is_fail_closed PASSED [ 10%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_fingerprint_tampered_rows_are_caught_at_entry PASSED [ 11%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_discarded_counts_dropped_feature_tf PASSED [ 11%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_discarded_empty_when_single_feature_tf PASSED [ 11%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_summary_carries_discarded_rows_by_feature_tf_equal_to_producer PASSED [ 11%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_discarded_layer_is_independently_revertible PASSED [ 11%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_multi_symbol_branch_carries_discarded_rows_verbatim PASSED [ 11%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_rejects_nan_timeframe_in_dropped_rows PASSED [ 11%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_feature_timeframe_column_sourced_from_per_tf_not_event_level PASSED [ 12%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_build_event_keys_full_scan_is_default PASSED [ 12%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_single_feature_tf_full_scan_matches_selected PASSED [ 12%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_event_level_duplicate_event_id_still_blocked_after_validate_relaxed PASSED [ 12%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_assignments_composite_key_unique PASSED [ 12%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_purged_composite_key_unique PASSED [ 12%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_summary_has_n_events_and_n_event_tf_rows PASSED [ 12%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_duplicate_composite_key_error_message_names_key_not_side PASSED [ 13%]
+tests/momentum/Analysis/test_splitunify_derive.py::test_clusters_remain_event_level_when_multi_feature_tf PASSED [ 13%]
+tests/momentum/event_samples/test_alignment.py::test_g2_k0_integer_exact PASSED [ 13%]
+tests/momentum/event_samples/test_alignment.py::test_g2_k1_offset_exact PASSED [ 13%]
+tests/momentum/event_samples/test_alignment.py::test_g2_nonboundary_1h_anchor_asof PASSED [ 13%]
+tests/momentum/event_samples/test_alignment.py::test_g2_data_end_label_window_incomplete PASSED [ 13%]
+tests/momentum/event_samples/test_alignment.py::test_next_open_close_to_close_two_number_disclosure PASSED [ 13%]
+tests/momentum/event_samples/test_alignment.py::test_label_modes_exact PASSED [ 14%]
+tests/momentum/event_samples/test_alignment.py::test_accounting_conservation_m1 PASSED [ 14%]
+tests/momentum/event_samples/test_alignment.py::test_warmup_insufficient_before_data_start PASSED [ 14%]
+tests/momentum/event_samples/test_alignment.py::test_missing_tf_and_corrupt_bars PASSED [ 14%]
+tests/momentum/event_samples/test_alignment.py::test_corrupt_close_time_rejected PASSED [ 14%]
+tests/momentum/event_samples/test_alignment.py::test_uint64_descending_bars_rejected PASSED [ 14%]
+tests/momentum/event_samples/test_alignment.py::test_w11_decision_gt_t0_guard_falsifiable PASSED [ 14%]
+tests/momentum/event_samples/test_alignment.py::test_assert_cutoff_shift_one_bar_mutation_red PASSED [ 15%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_denominator_hand_exact_real_kline PASSED [ 15%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_decision_offset_shrinks_eligible PASSED [ 15%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_missing_scores_counted_not_dropped PASSED [ 15%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_assert_mutation_ineligible_in_denominator_red PASSED [ 15%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_missing_prevalence_disclosure_unavailable PASSED [ 15%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_multiple_label_ids_not_overwritten PASSED [ 15%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_common_constraint_block_present PASSED [ 16%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_grid_gap_counted_as_missing_bar PASSED [ 16%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_entry_semantic_next_open_hold_return_exact PASSED [ 16%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_required_entry_semantic_timeframe_and_duplicate_bar_fail_closed PASSED [ 16%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_common_has_actual_macro_micro_cluster_ci PASSED [ 16%]
+tests/momentum/event_samples/test_all_bars_eval.py::test_rule_callable_and_kind_strata PASSED [ 16%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_shuffled_labels_all_in_band PASSED [ 16%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_informative_out_of_band_noise_in_band PASSED [ 17%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_deterministic_same_seed PASSED [ 17%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_one_class_unavailable PASSED [ 17%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_all_nan_feature_loud PASSED [ 17%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_partial_nonfinite_loud_no_silent_drop PASSED [ 17%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_feature_manifest_hash_in_receipts_and_required PASSED [ 17%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_one_class_with_nonfinite_is_loud_not_unavailable PASSED [ 17%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_m8_identity_permutation_hard_check PASSED [ 18%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_pit_shift_kills_signal PASSED [ 18%]
+tests/momentum/event_samples/test_baseline_oracle.py::test_conditional_ic_core_reuse PASSED [ 18%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_to_return_series_hand_exact_each_entry_semantic[trigger_open-0] PASSED [ 18%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_to_return_series_hand_exact_each_entry_semantic[trigger_close-0] PASSED [ 18%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_to_return_series_hand_exact_each_entry_semantic[next_open-0] PASSED [ 18%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_to_return_series_hand_exact_each_entry_semantic[decision_bar_open-1] PASSED [ 18%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_to_return_series_hand_exact_each_entry_semantic[decision_bar_close-1] PASSED [ 19%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_to_return_series_short_sign_and_threshold PASSED [ 19%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_to_return_series_w8_mismatch_rejected PASSED [ 19%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_ledger_empty_unavailable PASSED [ 19%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_record_then_n_from_ledger_dsr_pbo_eligibility 
+-------------------------------- live log call ---------------------------------
+00:56:39 [WARNING] run_dsr_pbo: return series 跨度 2.000 年不足 MinBTL 上界 8.789 年（N=3）
+PASSED                                                                   [ 19%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_auc_fed_to_dsr_rejected_mechanically PASSED [ 19%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_min_btl_shortfall_loud 
+-------------------------------- live log call ---------------------------------
+00:56:39 [WARNING] run_dsr_pbo: return series 跨度 0.050 年不足 MinBTL 上界 5.545 年（N=2）
+PASSED                                                                   [ 19%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_single_candidate_pbo_unavailable_and_obs_below_blocks PASSED [ 20%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_record_guards_and_ledger_mismatch_unverifiable PASSED [ 20%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_disguised_score_series_rejected PASSED [ 20%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_unlogged_candidate_cannot_be_champion PASSED [ 20%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_pbo_observation_axis_by_entry_time_not_lexicographic 
+-------------------------------- live log call ---------------------------------
+00:56:39 [WARNING] run_dsr_pbo: return series 跨度 2.000 年不足 MinBTL 上界 2.197 年（N=3）
+PASSED                                                                   [ 20%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_stale_receipt_after_copy_mutation_rejected PASSED [ 20%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_sidecar_first_and_ledger_without_provenance_unavailable 
+-------------------------------- live log call ---------------------------------
+00:56:39 [WARNING] run_dsr_pbo: return series 跨度 2.000 年不足 MinBTL 上界 2.197 年（N=3）
+PASSED                                                                   [ 20%]
+tests/momentum/event_samples/test_candidate_ledger.py::test_record_requires_command_and_expected_before_any_write PASSED [ 20%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_01_bytes_equal_golden PASSED [ 21%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_02_separators_change_hash PASSED [ 21%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_03_trailing_newline_changes_hash PASSED [ 21%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_04_ensure_ascii_changes_hash PASSED [ 21%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_05_unnormalized_nan_raises PASSED [ 21%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_06_negative_zero_preserved PASSED [ 21%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_07_duplicate_horizon_raises PASSED [ 21%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_08_type_whitelist_fail_closed PASSED [ 22%]
+tests/momentum/event_samples/test_canonical_serialize.py::test_canonical_serialize_09_absent_key_and_key_order PASSED [ 22%]
+tests/momentum/event_samples/test_condition_engine.py::test_feature_role_rejects_future_column PASSED [ 22%]
+tests/momentum/event_samples/test_condition_engine.py::test_selection_predicate_accepts_future_column_and_records_role PASSED [ 22%]
+tests/momentum/event_samples/test_condition_engine.py::test_feature_role_rejects_trigger_outcome_and_future_prefix_backstop PASSED [ 22%]
+tests/momentum/event_samples/test_condition_engine.py::test_label_role_requires_outcome_column PASSED [ 22%]
+tests/momentum/event_samples/test_condition_engine.py::test_label_role_rejects_mixed_feature_and_outcome PASSED [ 22%]
+tests/momentum/event_samples/test_condition_engine.py::test_future_prefix_backstop_is_case_insensitive PASSED [ 23%]
+tests/momentum/event_samples/test_condition_engine.py::test_logical_tautology_rejected[True or rsi_14 > 0] PASSED [ 23%]
+tests/momentum/event_samples/test_condition_engine.py::test_logical_tautology_rejected[rsi_14 > 0 or True] PASSED [ 23%]
+tests/momentum/event_samples/test_condition_engine.py::test_logical_tautology_rejected[False and rsi_14 > 0] PASSED [ 23%]
+tests/momentum/event_samples/test_condition_engine.py::test_logical_tautology_rejected[rsi_14 > 0 or not rsi_14 > 0] PASSED [ 23%]
+tests/momentum/event_samples/test_condition_engine.py::test_logical_tautology_rejected[rsi_14 > 0 and not (rsi_14 > 0)] PASSED [ 23%]
+tests/momentum/event_samples/test_condition_engine.py::test_logical_tautology_rejected[not (rsi_14 > 0 or not rsi_14 > 0)] PASSED [ 23%]
+tests/momentum/event_samples/test_condition_engine.py::test_logical_tautology_rejected[(1 < 2 or rsi_14 > 0) and ema_gap > 0 or True] PASSED [ 24%]
+tests/momentum/event_samples/test_condition_engine.py::test_logical_tautology_rejected[rsi_14 <= rsi_14 and ema_gap > 0 or 3 > 2] PASSED [ 24%]
+tests/momentum/event_samples/test_condition_engine.py::test_non_tautology_with_constant_subterm_accepted PASSED [ 24%]
+tests/momentum/event_samples/test_condition_engine.py::test_contract_cache_immutable PASSED [ 24%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[-empty_expression] PASSED [ 24%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[   -empty_expression] PASSED [ 24%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[rsi_14 <-syntax_error] PASSED [ 24%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[rsi_14 + 1 > 0-disallowed_node] PASSED [ 25%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[__import__('os')-disallowed_function] PASSED [ 25%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[rsi_14.mean() > 0-disallowed_function] PASSED [ 25%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[foo > 1-unregistered_column] PASSED [ 25%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[1 < 2-constant_expression] PASSED [ 25%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[True-constant_expression] PASSED [ 25%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[rsi_14 == rsi_14-constant_expression] PASSED [ 25%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[lag(rsi_14, -1) > 0-invalid_lag] PASSED [ 26%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[lag(rsi_14, 0) > 0-invalid_lag] PASSED [ 26%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[lag(1, 2) > 0-invalid_lag] PASSED [ 26%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[sqrt(rsi_14) > 0-disallowed_function] PASSED [ 26%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[rsi_14 in [1, 2]-disallowed_node] PASSED [ 26%]
+tests/momentum/event_samples/test_condition_engine.py::test_rejects_outside_safe_subset[rsi_14 if True else 0-disallowed_node] PASSED [ 26%]
+tests/momentum/event_samples/test_condition_engine.py::test_unknown_column_role_and_unknown_expression_role PASSED [ 26%]
+tests/momentum/event_samples/test_condition_engine.py::test_failure_reasons_all_in_contract PASSED [ 27%]
+tests/momentum/event_samples/test_condition_engine.py::test_digest_invariant_to_whitespace_and_operand_order PASSED [ 27%]
+tests/momentum/event_samples/test_condition_engine.py::test_digest_chained_interval_equals_explicit_and PASSED [ 27%]
+tests/momentum/event_samples/test_condition_engine.py::test_digest_independent_of_role_and_and_or_distinct PASSED [ 27%]
+tests/momentum/event_samples/test_condition_engine.py::test_max_lookback_from_lag PASSED [ 27%]
+tests/momentum/event_samples/test_condition_engine.py::test_evaluate_hand_exact_with_nan_and_interval PASSED [ 27%]
+tests/momentum/event_samples/test_condition_engine.py::test_evaluate_lag_only_looks_back PASSED [ 27%]
+tests/momentum/event_samples/test_condition_engine.py::test_evaluate_missing_column_loud PASSED [ 28%]
+tests/momentum/event_samples/test_condition_engine.py::test_assert_no_outcome_columns PASSED [ 28%]
+tests/momentum/event_samples/test_condition_engine.py::test_allowed_filtering_params_from_contract PASSED [ 28%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.05--0.01-a_trigger_no_follow] PASSED [ 28%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.050000001--0.01-a_trigger_no_follow] PASSED [ 28%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.049999999--0.01-unclassifiable] PASSED [ 28%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.06-0.0-a_trigger_no_follow] PASSED [ 28%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.06-1e-09-unclassifiable] PASSED [ 29%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.06--1e-09-a_trigger_no_follow] PASSED [ 29%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.01-0.05-b_range] PASSED [ 29%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.010000001-0.05-unclassifiable] PASSED [ 29%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[0.009999999-0.05-b_range] PASSED [ 29%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[-0.05-0.0-c_drop] PASSED [ 29%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[-0.049999999-0.0-unclassifiable] PASSED [ 29%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_boundary_fixture_exact[-0.050000001-0.0-c_drop] PASSED [ 30%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_multi_hit_unclassifiable_not_guess PASSED [ 30%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_real_kline_auto_classification PASSED [ 30%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_user_label_kept_with_conflict_trace PASSED [ 30%]
+tests/momentum/event_samples/test_counterexample_classifier.py::test_window_incomplete_unclassifiable PASSED [ 30%]
+tests/momentum/event_samples/test_dedupe.py::test_scenario_c_policy_primary_cluster_first_representative PASSED [ 30%]
+tests/momentum/event_samples/test_dedupe.py::test_uniqueness_weights_exact_hand_example PASSED [ 30%]
+tests/momentum/event_samples/test_dedupe.py::test_single_event_weight_one_own_cluster PASSED [ 31%]
+tests/momentum/event_samples/test_dedupe.py::test_extreme_all_same_interval_effective_one PASSED [ 31%]
+tests/momentum/event_samples/test_dedupe.py::test_missing_interval_fail_closed PASSED [ 31%]
+tests/momentum/event_samples/test_dedupe.py::test_transitive_overlap_union_find_composer_counterexample PASSED [ 31%]
+tests/momentum/event_samples/test_dedupe.py::test_transitive_overlap_union_find_codex_counterexample PASSED [ 31%]
+tests/momentum/event_samples/test_dedupe.py::test_events_context_join PASSED [ 31%]
+tests/momentum/event_samples/test_event_split.py::test_boundary_purge_exact_hand_example PASSED [ 31%]
+tests/momentum/event_samples/test_event_split.py::test_no_positional_index_row_order_invariant PASSED [ 32%]
+tests/momentum/event_samples/test_event_split.py::test_macro_micro_both_output_and_labeled PASSED [ 32%]
+tests/momentum/event_samples/test_event_split.py::test_time_cluster_weight_sums_to_one PASSED [ 32%]
+tests/momentum/event_samples/test_event_split.py::test_single_symbol_degraded PASSED [ 32%]
+tests/momentum/event_samples/test_event_split.py::test_tier_insufficient_loud_no_fallback PASSED [ 32%]
+tests/momentum/event_samples/test_event_split.py::test_extreme_all_symbols_same_instant_single_cluster PASSED [ 32%]
+tests/momentum/event_samples/test_event_split.py::test_mixed_tf_requires_explicit_bucket PASSED [ 32%]
+tests/momentum/event_samples/test_event_split.py::test_embargo_smaller_than_window_rejected PASSED [ 33%]
+tests/momentum/event_samples/test_feature_materialization.py::test_long_segment_equals_full_history 
+-------------------------------- live log call ---------------------------------
+00:56:39 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:39 [INFO] Registered adapter: crypto_spot
+00:56:39 [INFO] Loaded feature registry with 19 entries
+00:56:39 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_abc9b9fe
+00:56:39 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:39 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:56:39 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:39 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:39 [INFO] Layer 1 starting, rss=626MB
+00:56:39 [INFO] Loaded 134 TA-Lib indicators
+00:56:39 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:39 [INFO] Layer 1 done: 8 cols, status=ok, rss=627MB
+00:56:39 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:39 [INFO] Layer 2 starting, rss=627MB
+00:56:39 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:39 [INFO] [L2] Completed: 0 cols in 0.03s
+00:56:39 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:39 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=635MB
+00:56:39 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:39 [INFO] Layer 3 starting, rss=635MB
+00:56:39 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:39 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:39 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=635MB
+00:56:39 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:39 [INFO] Layer 4 starting, rss=635MB
+00:56:39 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:39 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=635MB
+00:56:39 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:39 [INFO] Layer 5 starting, rss=635MB
+00:56:39 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:39 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=635MB
+00:56:39 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:39 [INFO] Layer 6 starting, rss=635MB
+00:56:39 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:39 [INFO] Layer 6 done: 9 cols, status=ok, rss=635MB
+00:56:39 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(1696, 9)
+00:56:39 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:39 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8721, non_nan=25145/28832
+00:56:39 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:39 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:40 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:40 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:40 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=640MB)
+00:56:40 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=28.37/s, ETA=0s, rss=608MB, last=12h_L6_meta (full)
+00:56:40 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=18.29/s, ETA=0s, rss=609MB, last=12h_L1_trend_EMA (full)
+00:56:40 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.2s, rate=17.07/s, ETA=0s, rss=609MB, last=12h_L1_trend_SMA (full)
+00:56:40 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=16.14/s, ETA=0s, rss=609MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:40 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=15.84/s, ETA=0s, rss=609MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:40 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.4s, rate=15.63/s, ETA=0s, rss=609MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:40 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.5s, rate=15.49/s, ETA=0s, rss=609MB, last=12h_L1_momentum_RSI (full)
+00:56:40 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.51s rss=609MB
+00:56:40 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:40 [INFO] [Layer B Sanitize][CGSA] nulled 3687 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:40 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=mixed
+00:56:40 [INFO] Loaded feature registry with 19 entries
+00:56:40 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:40 [INFO] Registered adapter: crypto_spot
+00:56:40 [INFO] Loaded feature registry with 19 entries
+00:56:40 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_1ab3fe2f
+00:56:40 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:40 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:40 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:40 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:40 [INFO] Layer 1 starting, rss=620MB
+00:56:40 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:40 [INFO] Layer 1 done: 8 cols, status=ok, rss=620MB
+00:56:40 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:40 [INFO] Layer 2 starting, rss=620MB
+00:56:40 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:40 [INFO] [L2] Completed: 0 cols in 0.00s
+00:56:40 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:40 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=620MB
+00:56:40 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:40 [INFO] Layer 3 starting, rss=620MB
+00:56:40 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:40 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:40 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=620MB
+00:56:40 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:40 [INFO] Layer 4 starting, rss=620MB
+00:56:40 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:40 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=620MB
+00:56:40 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:40 [INFO] Layer 5 starting, rss=620MB
+00:56:40 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:40 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=620MB
+00:56:40 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:40 [INFO] Layer 6 starting, rss=620MB
+00:56:40 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:40 [INFO] Layer 6 done: 9 cols, status=ok, rss=620MB
+00:56:40 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(1454, 9)
+00:56:40 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:41 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8704, non_nan=21515/24718
+00:56:41 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:41 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:41 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:41 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:41 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=620MB)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=92.35/s, ETA=0s, rss=620MB, last=12h_L6_meta (full)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=24.90/s, ETA=0s, rss=620MB, last=12h_L1_trend_EMA (full)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.1s, rate=20.06/s, ETA=0s, rss=620MB, last=12h_L1_trend_SMA (full)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=17.82/s, ETA=0s, rss=620MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=17.03/s, ETA=0s, rss=620MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.4s, rate=16.67/s, ETA=0s, rss=620MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.4s, rate=16.34/s, ETA=0s, rss=620MB, last=12h_L1_momentum_RSI (full)
+00:56:41 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.49s rss=620MB
+00:56:41 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:41 [INFO] [Layer B Sanitize][CGSA] nulled 3203 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:41 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=mixed
+00:56:41 [INFO] Loaded feature registry with 19 entries
+PASSED                                                                   [ 33%]
+tests/momentum/event_samples/test_feature_materialization.py::test_causal_invariant_truncate_future 
+-------------------------------- live log call ---------------------------------
+00:56:41 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:41 [INFO] Registered adapter: crypto_spot
+00:56:41 [INFO] Loaded feature registry with 19 entries
+00:56:41 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_abc9b9fe
+00:56:41 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:41 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:41 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:41 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:41 [INFO] Layer 1 starting, rss=621MB
+00:56:41 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:41 [INFO] Layer 1 done: 8 cols, status=ok, rss=621MB
+00:56:41 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:41 [INFO] Layer 2 starting, rss=621MB
+00:56:41 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:41 [INFO] [L2] Completed: 0 cols in 0.00s
+00:56:41 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:41 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=621MB
+00:56:41 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:41 [INFO] Layer 3 starting, rss=621MB
+00:56:41 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:41 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:41 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=621MB
+00:56:41 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:41 [INFO] Layer 4 starting, rss=621MB
+00:56:41 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:41 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=621MB
+00:56:41 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:41 [INFO] Layer 5 starting, rss=621MB
+00:56:41 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:41 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=621MB
+00:56:41 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:41 [INFO] Layer 6 starting, rss=621MB
+00:56:41 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:41 [INFO] Layer 6 done: 9 cols, status=ok, rss=621MB
+00:56:41 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(1696, 9)
+00:56:41 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:41 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8721, non_nan=25145/28832
+00:56:41 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:41 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:41 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:41 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:41 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=621MB)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=86.74/s, ETA=0s, rss=621MB, last=12h_L6_meta (full)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=24.80/s, ETA=0s, rss=621MB, last=12h_L1_trend_EMA (full)
+00:56:41 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.1s, rate=20.18/s, ETA=0s, rss=621MB, last=12h_L1_trend_SMA (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=18.59/s, ETA=0s, rss=621MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=17.67/s, ETA=0s, rss=621MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.4s, rate=17.12/s, ETA=0s, rss=621MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.4s, rate=16.76/s, ETA=0s, rss=621MB, last=12h_L1_momentum_RSI (full)
+00:56:42 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.48s rss=621MB
+00:56:42 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:42 [INFO] [Layer B Sanitize][CGSA] nulled 3687 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:42 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=mixed
+00:56:42 [INFO] Loaded feature registry with 19 entries
+00:56:42 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:42 [INFO] Registered adapter: crypto_spot
+00:56:42 [INFO] Loaded feature registry with 19 entries
+00:56:42 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_be993398
+00:56:42 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:42 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:42 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:42 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:42 [INFO] Layer 1 starting, rss=622MB
+00:56:42 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:42 [INFO] Layer 1 done: 8 cols, status=ok, rss=622MB
+00:56:42 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:42 [INFO] Layer 2 starting, rss=622MB
+00:56:42 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:42 [INFO] [L2] Completed: 0 cols in 0.00s
+00:56:42 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:42 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:42 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:42 [INFO] Layer 3 starting, rss=622MB
+00:56:42 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:42 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:42 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=622MB
+00:56:42 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:42 [INFO] Layer 4 starting, rss=622MB
+00:56:42 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:42 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:42 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:42 [INFO] Layer 5 starting, rss=622MB
+00:56:42 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:42 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=622MB
+00:56:42 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:42 [INFO] Layer 6 starting, rss=622MB
+00:56:42 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:42 [INFO] Layer 6 done: 9 cols, status=ok, rss=622MB
+00:56:42 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(353, 9)
+00:56:42 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:42 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8332, non_nan=5000/6001
+00:56:42 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:42 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:42 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:42 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:42 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=622MB)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=137.32/s, ETA=0s, rss=622MB, last=12h_L6_meta (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=26.18/s, ETA=0s, rss=622MB, last=12h_L1_trend_EMA (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.1s, rate=20.99/s, ETA=0s, rss=622MB, last=12h_L1_trend_SMA (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=18.96/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=18.00/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.3s, rate=17.40/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:42 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.4s, rate=16.92/s, ETA=0s, rss=622MB, last=12h_L1_momentum_RSI (full)
+00:56:43 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.48s rss=621MB
+00:56:43 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:43 [INFO] [Layer B Sanitize][CGSA] nulled 1001 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:43 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=float16
+00:56:43 [INFO] Loaded feature registry with 19 entries
+PASSED                                                                   [ 33%]
+tests/momentum/event_samples/test_feature_materialization.py::test_manifest_hash_deterministic 
+-------------------------------- live log call ---------------------------------
+00:56:43 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:43 [INFO] Registered adapter: crypto_spot
+00:56:43 [INFO] Loaded feature registry with 19 entries
+00:56:43 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_abc9b9fe
+00:56:43 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:43 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:43 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:43 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:43 [INFO] Layer 1 starting, rss=621MB
+00:56:43 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:43 [INFO] Layer 1 done: 8 cols, status=ok, rss=621MB
+00:56:43 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:43 [INFO] Layer 2 starting, rss=621MB
+00:56:43 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:43 [INFO] [L2] Completed: 0 cols in 0.00s
+00:56:43 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:43 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=621MB
+00:56:43 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:43 [INFO] Layer 3 starting, rss=621MB
+00:56:43 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:43 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:43 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=621MB
+00:56:43 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:43 [INFO] Layer 4 starting, rss=621MB
+00:56:43 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:43 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=621MB
+00:56:43 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:43 [INFO] Layer 5 starting, rss=621MB
+00:56:43 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:43 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=621MB
+00:56:43 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:43 [INFO] Layer 6 starting, rss=621MB
+00:56:43 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:43 [INFO] Layer 6 done: 9 cols, status=ok, rss=621MB
+00:56:43 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(1696, 9)
+00:56:43 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:43 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8721, non_nan=25145/28832
+00:56:43 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:43 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:43 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:43 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:43 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=621MB)
+00:56:43 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=84.58/s, ETA=0s, rss=621MB, last=12h_L6_meta (full)
+00:56:43 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=24.21/s, ETA=0s, rss=621MB, last=12h_L1_trend_EMA (full)
+00:56:43 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.1s, rate=20.05/s, ETA=0s, rss=621MB, last=12h_L1_trend_SMA (full)
+00:56:43 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=18.44/s, ETA=0s, rss=621MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:43 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=17.58/s, ETA=0s, rss=621MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:43 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.4s, rate=17.01/s, ETA=0s, rss=621MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:43 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.4s, rate=16.67/s, ETA=0s, rss=621MB, last=12h_L1_momentum_RSI (full)
+00:56:43 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.48s rss=621MB
+00:56:43 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:43 [INFO] [Layer B Sanitize][CGSA] nulled 3687 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:43 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=mixed
+00:56:43 [INFO] Loaded feature registry with 19 entries
+00:56:43 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:43 [INFO] Registered adapter: crypto_spot
+00:56:43 [INFO] Loaded feature registry with 19 entries
+00:56:43 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_abc9b9fe
+00:56:43 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:43 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:43 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:43 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:43 [INFO] Layer 1 starting, rss=622MB
+00:56:43 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:43 [INFO] Layer 1 done: 8 cols, status=ok, rss=622MB
+00:56:43 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:43 [INFO] Layer 2 starting, rss=622MB
+00:56:43 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:43 [INFO] [L2] Completed: 0 cols in 0.00s
+00:56:43 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:43 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:43 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:43 [INFO] Layer 3 starting, rss=622MB
+00:56:44 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:44 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:44 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=622MB
+00:56:44 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:44 [INFO] Layer 4 starting, rss=622MB
+00:56:44 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:44 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:44 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:44 [INFO] Layer 5 starting, rss=622MB
+00:56:44 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:44 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=622MB
+00:56:44 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:44 [INFO] Layer 6 starting, rss=622MB
+00:56:44 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:44 [INFO] Layer 6 done: 9 cols, status=ok, rss=622MB
+00:56:44 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(1696, 9)
+00:56:44 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:44 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8721, non_nan=25145/28832
+00:56:44 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:44 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:44 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:44 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:44 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=622MB)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=88.18/s, ETA=0s, rss=622MB, last=12h_L6_meta (full)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=25.09/s, ETA=0s, rss=622MB, last=12h_L1_trend_EMA (full)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.1s, rate=20.24/s, ETA=0s, rss=622MB, last=12h_L1_trend_SMA (full)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=18.50/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=17.46/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.4s, rate=17.00/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.4s, rate=16.62/s, ETA=0s, rss=622MB, last=12h_L1_momentum_RSI (full)
+00:56:44 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.48s rss=622MB
+00:56:44 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:44 [INFO] [Layer B Sanitize][CGSA] nulled 3687 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:44 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=mixed
+00:56:44 [INFO] Loaded feature registry with 19 entries
+PASSED                                                                   [ 33%]
+tests/momentum/event_samples/test_feature_materialization.py::test_warmup_event_goes_to_failures_not_nan 
+-------------------------------- live log call ---------------------------------
+00:56:44 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:44 [INFO] Registered adapter: crypto_spot
+00:56:44 [INFO] Loaded feature registry with 19 entries
+00:56:44 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_abc9b9fe
+00:56:44 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:44 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:44 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:44 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:44 [INFO] Layer 1 starting, rss=622MB
+00:56:44 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:44 [INFO] Layer 1 done: 8 cols, status=ok, rss=622MB
+00:56:44 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:44 [INFO] Layer 2 starting, rss=622MB
+00:56:44 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:44 [INFO] [L2] Completed: 0 cols in 0.00s
+00:56:44 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:44 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:44 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:44 [INFO] Layer 3 starting, rss=622MB
+00:56:44 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:44 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:44 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=622MB
+00:56:44 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:44 [INFO] Layer 4 starting, rss=622MB
+00:56:44 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:44 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:44 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:44 [INFO] Layer 5 starting, rss=622MB
+00:56:44 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:44 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=622MB
+00:56:44 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:44 [INFO] Layer 6 starting, rss=622MB
+00:56:44 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:44 [INFO] Layer 6 done: 9 cols, status=ok, rss=622MB
+00:56:44 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(1696, 9)
+00:56:44 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:44 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8721, non_nan=25145/28832
+00:56:44 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:44 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:44 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:44 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:44 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=622MB)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=86.24/s, ETA=0s, rss=622MB, last=12h_L6_meta (full)
+00:56:44 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=24.79/s, ETA=0s, rss=622MB, last=12h_L1_trend_EMA (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.1s, rate=20.23/s, ETA=0s, rss=622MB, last=12h_L1_trend_SMA (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=18.37/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=17.51/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.4s, rate=16.97/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.4s, rate=16.65/s, ETA=0s, rss=622MB, last=12h_L1_momentum_RSI (full)
+00:56:45 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.49s rss=622MB
+00:56:45 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:45 [INFO] [Layer B Sanitize][CGSA] nulled 3687 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:45 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=mixed
+00:56:45 [INFO] Loaded feature registry with 19 entries
+PASSED                                                                   [ 33%]
+tests/momentum/event_samples/test_feature_materialization.py::test_corrupt_row_id_rejected_in_full_mode 
+-------------------------------- live log call ---------------------------------
+00:56:45 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:45 [INFO] Registered adapter: crypto_spot
+00:56:45 [INFO] Loaded feature registry with 19 entries
+00:56:45 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_abc9b9fe
+00:56:45 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:45 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:45 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:45 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:45 [INFO] Layer 1 starting, rss=622MB
+00:56:45 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:45 [INFO] Layer 1 done: 8 cols, status=ok, rss=622MB
+00:56:45 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:45 [INFO] Layer 2 starting, rss=622MB
+00:56:45 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:45 [INFO] [L2] Completed: 0 cols in 0.00s
+00:56:45 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:45 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:45 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:45 [INFO] Layer 3 starting, rss=622MB
+00:56:45 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:45 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:45 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=622MB
+00:56:45 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:45 [INFO] Layer 4 starting, rss=622MB
+00:56:45 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:45 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:45 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:45 [INFO] Layer 5 starting, rss=622MB
+00:56:45 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:45 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=622MB
+00:56:45 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:45 [INFO] Layer 6 starting, rss=622MB
+00:56:45 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:45 [INFO] Layer 6 done: 9 cols, status=ok, rss=622MB
+00:56:45 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(1696, 9)
+00:56:45 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:45 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8721, non_nan=25145/28832
+00:56:45 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:45 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:45 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:45 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:45 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=622MB)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=91.21/s, ETA=0s, rss=622MB, last=12h_L6_meta (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=23.53/s, ETA=0s, rss=622MB, last=12h_L1_trend_EMA (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.2s, rate=18.66/s, ETA=0s, rss=622MB, last=12h_L1_trend_SMA (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=17.35/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:45 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=16.76/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.4s, rate=16.41/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.4s, rate=16.10/s, ETA=0s, rss=622MB, last=12h_L1_momentum_RSI (full)
+00:56:46 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.50s rss=622MB
+00:56:46 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:46 [INFO] [Layer B Sanitize][CGSA] nulled 3687 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:46 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=mixed
+00:56:46 [INFO] Loaded feature registry with 19 entries
+00:56:46 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:46 [INFO] Registered adapter: crypto_spot
+00:56:46 [INFO] Loaded feature registry with 19 entries
+00:56:46 [INFO] [CGSA] Resuming from manifest at /Users/louis/Desktop/quantitative_trading_system/data_cache/cgsa_work/ETHUSDT_12h_abc9b9fe
+00:56:46 [INFO] Fetching spot data: ETHUSDT/12h
+00:56:46 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:56:46 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 9 columns
+00:56:46 [INFO] [Layer 1] 0% - Starting Layer 1...
+00:56:46 [INFO] Layer 1 starting, rss=622MB
+00:56:46 [INFO] [Layer 1] 100% - Layer 1 completed: 8 features
+00:56:46 [INFO] Layer 1 done: 8 cols, status=ok, rss=622MB
+00:56:46 [INFO] [Layer 2] 0% - Starting Layer 2...
+00:56:46 [INFO] Layer 2 starting, rss=622MB
+00:56:46 [INFO] [L2] Starting derived features: 8 L1 cols
+00:56:46 [INFO] [L2] Completed: 0 cols in 0.00s
+00:56:46 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+00:56:46 [INFO] Layer 2 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:46 [INFO] [Layer 3] 0% - Starting Layer 3...
+00:56:46 [INFO] Layer 3 starting, rss=622MB
+00:56:46 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+00:56:46 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+00:56:46 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=622MB
+00:56:46 [INFO] [Layer 4] 0% - Starting Layer 4...
+00:56:46 [INFO] Layer 4 starting, rss=622MB
+00:56:46 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+00:56:46 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=622MB
+00:56:46 [INFO] [Layer 5] 0% - Starting Layer 5...
+00:56:46 [INFO] Layer 5 starting, rss=622MB
+00:56:46 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+00:56:46 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=622MB
+00:56:46 [INFO] [Layer 6] 0% - Starting Layer 6...
+00:56:46 [INFO] Layer 6 starting, rss=622MB
+00:56:46 [INFO] [Layer 6] 100% - Layer 6 completed: 9 features
+00:56:46 [INFO] Layer 6 done: 9 cols, status=ok, rss=622MB
+00:56:46 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=ETHUSDT tf=12h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=36.96 GiB shape=(1696, 9)
+00:56:46 [INFO] [CGSA] Persisted L6_meta: 9 cols → 1 groups (tf=12h)
+00:56:46 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.8721, non_nan=25145/28832
+00:56:46 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L6_meta, reserve_floor=2.00 GiB, free=36.96 GiB, groups=7
+00:56:46 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+00:56:46 [INFO] [L6.5] numba rolling_rank JIT warmup done
+00:56:46 [INFO] [L6.5] Registry raw-sink config: groups=7 requested_workers=2 effective_workers=1 mode=replace use_fast=True can_use_numba_fast=True winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+00:56:46 [INFO] [L6.5] Raw-sink start: 7 full groups (fast=7, slow=0) + 0 big-group splits → 7 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=0, max_group_cols=9, schedule=largest_first, rss=622MB)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 1/7 (14.3%), groups 1/7, elapsed=0.0s, rate=84.98/s, ETA=0s, rss=622MB, last=12h_L6_meta (full)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 2/7 (28.6%), groups 2/7, elapsed=0.1s, rate=24.50/s, ETA=0s, rss=622MB, last=12h_L1_trend_EMA (full)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 3/7 (42.9%), groups 3/7, elapsed=0.1s, rate=20.05/s, ETA=0s, rss=622MB, last=12h_L1_trend_SMA (full)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 4/7 (57.1%), groups 4/7, elapsed=0.2s, rate=18.39/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Hist_12-26-9 (full)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 5/7 (71.4%), groups 5/7, elapsed=0.3s, rate=17.62/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Line_12-26-9 (full)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 6/7 (85.7%), groups 6/7, elapsed=0.4s, rate=17.04/s, ETA=0s, rss=622MB, last=12h_L1_momentum_MACD-Signal_12-26-9 (full)
+00:56:46 [INFO] [L6.5] raw-sink heartbeat: tasks 7/7 (100.0%), groups 7/7, elapsed=0.4s, rate=16.67/s, ETA=0s, rss=622MB, last=12h_L1_momentum_RSI (full)
+00:56:46 [INFO] [L6.5] raw-sink complete: 7/7 groups in 0.48s rss=622MB
+00:56:46 [INFO] [L7 Dead Drop][CGSA] dropped 2 cols across 1 groups (min_valid=100); final features=15
+00:56:46 [INFO] [Layer B Sanitize][CGSA] nulled 3687 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+00:56:46 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=7 features=15 npy_freed=0.00 GiB dtype=mixed
+00:56:46 [INFO] Loaded feature registry with 19 entries
+PASSED                                                                   [ 33%]
+tests/momentum/event_samples/test_feature_materialization.py::test_column_collision_loud PASSED [ 33%]
+tests/momentum/event_samples/test_feature_materialization.py::test_missing_events_context_fail_closed PASSED [ 34%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_01_long_exact PASSED [ 34%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_02_short_is_exact_negation PASSED [ 34%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_03_next_open_supported_since_d42 PASSED [ 34%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_04_k3_supported_and_decision_before_t0 PASSED [ 34%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_05_open_to_close_unsupported PASSED [ 34%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_06_h3_vs_h7 PASSED [ 34%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_07_tail_insufficient_absent_not_zero PASSED [ 35%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_sign_in_hash PASSED [ 35%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_mixed_direction_rejected PASSED [ 35%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_bad_values_rejected[None] PASSED [ 35%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_bad_values_rejected[Long] PASSED [ 35%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_bad_values_rejected[LONG] PASSED [ 35%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_bad_values_rejected[] PASSED [ 35%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_bad_values_rejected[buy] PASSED [ 36%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_bad_values_rejected[1] PASSED [ 36%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_good_values_accepted[long-1] PASSED [ 36%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_a023_direction_good_values_accepted[short--1] PASSED [ 36%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_spec_binding_h7_prepare_h3_resolve PASSED [ 36%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_coverage_replace_keeps_identity PASSED [ 36%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_gap_bar_open_to_close_exact PASSED [ 36%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_decision_bar_open_to_horizon_close_k2 PASSED [ 37%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_field_swapped_changes_value PASSED [ 37%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_refs_dropped_is_none PASSED [ 37%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_value_changed_changes_hash PASSED [ 37%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_distinguishes_entry_semantics PASSED [ 37%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_close_to_close_values_unchanged_by_entry_price_ref PASSED [ 37%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_refs_same_order_and_length PASSED [ 37%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_open_to_star_mismatched_label_start_raises PASSED [ 38%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_price_at_lookup PASSED [ 38%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_close__open_to_horizon_close__k0__long__12h__h3] PASSED [ 38%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_close__open_to_horizon_close__k0__short__12h__h3] PASSED [ 38%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_close__open_to_horizon_close__k2__long__12h__h3] PASSED [ 38%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_close__open_to_horizon_close__k2__short__12h__h3] PASSED [ 38%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_close__k0__long__12h__h1] PASSED [ 38%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_close__k0__short__12h__h1] PASSED [ 39%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_close__k2__long__12h__h1] PASSED [ 39%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_close__k2__short__12h__h1] PASSED [ 39%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_horizon_close__k0__long__12h__h3] PASSED [ 39%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_horizon_close__k0__short__12h__h3] PASSED [ 39%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_horizon_close__k2__long__12h__h1] PASSED [ 39%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_horizon_close__k2__long__12h__h3] PASSED [ 39%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_horizon_close__k2__long__1h__h3] PASSED [ 40%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[decision_bar_open__open_to_horizon_close__k2__short__12h__h3] PASSED [ 40%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__close_to_close__k0__long__12h__h1] PASSED [ 40%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__open_to_close__k0__long__12h__h1] PASSED [ 40%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__open_to_close__k0__short__12h__h1] PASSED [ 40%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__open_to_close__k2__long__12h__h1] PASSED [ 40%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__open_to_close__k2__short__12h__h1] PASSED [ 40%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__open_to_horizon_close__k0__long__12h__h3] PASSED [ 40%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__open_to_horizon_close__k0__short__12h__h3] PASSED [ 41%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__open_to_horizon_close__k2__long__12h__h3] PASSED [ 41%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[next_open__open_to_horizon_close__k2__short__12h__h3] PASSED [ 41%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_close__close_to_close__k0__long__12h__h1] PASSED [ 41%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_close__close_to_close__k0__long__12h__h3] PASSED [ 41%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_close__close_to_close__k0__long__12h__h5] PASSED [ 41%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_close__close_to_close__k0__short__12h__h1] PASSED [ 41%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_close__close_to_close__k0__short__12h__h3] PASSED [ 42%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__close_to_close__k0__long__12h__h1] PASSED [ 42%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__close_to_close__k0__long__12h__h3] PASSED [ 42%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__close_to_close__k0__short__12h__h1] PASSED [ 42%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__close_to_close__k0__short__12h__h3] PASSED [ 42%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_close__k0__long__12h__h1] PASSED [ 42%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_close__k0__long__12h__h3] PASSED [ 42%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_close__k0__long__1h__h1] PASSED [ 43%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_close__k0__short__12h__h1] PASSED [ 43%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_close__k0__short__12h__h3] PASSED [ 43%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_close__k0__short__1h__h1] PASSED [ 43%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_close__k2__long__12h__h1] PASSED [ 43%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_close__k2__short__12h__h1] PASSED [ 43%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_horizon_close__k0__long__12h__h1] PASSED [ 43%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_horizon_close__k0__long__12h__h3] PASSED [ 44%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_horizon_close__k0__short__12h__h1] PASSED [ 44%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_horizon_close__k0__short__12h__h3] PASSED [ 44%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_horizon_close__k2__long__12h__h3] PASSED [ 44%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden[trigger_open__open_to_horizon_close__k2__short__12h__h3] PASSED [ 44%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d0_entry_price_ref_golden_set_nonempty PASSED [ 44%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d13_trigger_open_close_to_close_equals_trigger_close PASSED [ 44%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d13_trigger_open_entry_at_and_hash_differ PASSED [ 45%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d42_matrix_membership_under_and_over PASSED [ 45%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d42_reasons_registered_in_contract PASSED [ 45%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d42_rejected_pairs_matches_contract PASSED [ 45%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d14_open_to_close_value_invariant_to_h PASSED [ 45%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d14_golden_covers_required_boundary_cases PASSED [ 45%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_analysis_label_producer_d14_next_open_receipt_entry_after_label_start PASSED [ 45%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_alignment_event_known_at_decision_is_false_for_k0_and_k2 PASSED [ 46%]
+tests/momentum/event_samples/test_gap3_analysis_label_producer.py::test_alignment_event_known_at_decision_column_registered_in_contract PASSED [ 46%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_accepts_declared_and_future_columns PASSED [ 46%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_bad_declared_map[bool] PASSED [ 46%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_bad_declared_map[bool_value] PASSED [ 46%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_bad_declared_map[negative] PASSED [ 46%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_bad_declared_map[non_str_key] PASSED [ 46%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_bad_declared_map[float_value] PASSED [ 47%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_bad_declared_map[str] PASSED [ 47%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_non_float_future_column PASSED [ 47%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_non_finite_future_column[nan] PASSED [ 47%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_non_finite_future_column[inf] PASSED [ 47%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_non_finite_future_column[-inf] PASSED [ 47%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_no_double_registration PASSED [ 47%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_receipt_batch_key_preserved PASSED [ 48%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_batch_inconsistent_declared PASSED [ 48%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_rejects_partially_present_declared PASSED [ 48%]
+tests/momentum/event_samples/test_gap3_attached_columns_contract.py::test_gap3_attached_columns_contract_future_columns_never_reach_ic_feed PASSED [ 48%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py::test_conditional_ic_feed_missing_label_value_unavailable PASSED [ 48%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py::test_conditional_ic_feed_timestamps_are_cutoff_bars_and_anchor_fixed PASSED [ 48%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py::test_conditional_ic_feed_mismatch_flag_and_duplicate_loud PASSED [ 48%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py::test_conditional_ic_feed_emits_event_context PASSED [ 49%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py::test_conditional_ic_orchestrator_label_override_wiring_and_survivor_v2 
+-------------------------------- live log call ---------------------------------
+00:56:47 [INFO] IC config loaded
+00:56:47 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] IC holdout kept but test-segment events insufficient: test_events=13 min_test_events=30 (oos_guarantees=false; no full-sample rerun)
+00:56:47 [INFO] IC autocorr persistent: count=6
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [INFO] Decay: 12/14 fit warnings summarized (low_r2=12)
+00:56:47 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+00:56:47 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_xc6wtiw_/reports/ic_report_ic_gatekeeper.json
+00:56:47 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_xc6wtiw_/reports/ic_survivors_ic_gatekeeper.json
+00:56:47 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_xc6wtiw_/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 49%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py::test_conditional_ic_orchestrator_nonfinite_label_loud 
+-------------------------------- live log call ---------------------------------
+00:56:47 [INFO] IC config loaded
+00:56:47 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+PASSED                                                                   [ 49%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py::test_conditional_ic_orchestrator_missing_label_loud 
+-------------------------------- live log call ---------------------------------
+00:56:47 [INFO] IC config loaded
+00:56:47 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+PASSED                                                                   [ 49%]
+tests/momentum/event_samples/test_gap3_conditional_ic.py::test_conditional_ic_orchestrator_aprime_fallback_passthrough 
+-------------------------------- live log call ---------------------------------
+00:56:47 [INFO] IC config loaded
+00:56:47 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:56:47 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:47 [WARNING] Insufficient events: n=3
+00:56:48 [INFO] IC autocorr persistent: count=14
+00:56:48 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:56:48 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+00:56:54 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+00:56:57 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+00:56:57 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_irq3litw/features/ETHUSDT_12h_filtered.h5
+00:56:57 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_irq3litw/reports/ic_report_ic_gatekeeper.json
+00:56:57 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_irq3litw/reports/ic_survivors_ic_gatekeeper.json
+00:56:57 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_irq3litw/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 49%]
+tests/momentum/event_samples/test_gap3_horizon_curve.py::test_gap3_horizon_curve_row_count_equals_len_horizons PASSED [ 49%]
+tests/momentum/event_samples/test_gap3_horizon_curve.py::test_gap3_horizon_curve_per_horizon_values_do_not_depend_on_the_set PASSED [ 49%]
+tests/momentum/event_samples/test_gap3_horizon_curve.py::test_gap3_horizon_curve_n_eff_definition_is_not_row_count PASSED [ 50%]
+tests/momentum/event_samples/test_gap3_horizon_curve.py::test_gap3_horizon_curve_rejects_empty_and_nonpositive_and_duplicate PASSED [ 50%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_is_pure_closed_form PASSED [ 50%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_k_and_h_are_coupled_for_decision_bar_horizon PASSED [ 50%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_entry_and_end_index_tables_match_alignment PASSED [ 50%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_matches_hand_computation[trigger_close-close_to_close] PASSED [ 50%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_matches_hand_computation[trigger_open-open_to_horizon_close] PASSED [ 50%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_matches_hand_computation[decision_bar_open-open_to_horizon_close] PASSED [ 51%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_matches_hand_computation[decision_bar_close-open_to_horizon_close] PASSED [ 51%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_matches_hand_computation[next_open-close_to_close] PASSED [ 51%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_open_to_close_h_is_inert PASSED [ 51%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_no_feasible_k_when_tail_event_blocks PASSED [ 51%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_mutation_end_index_shifts_both_bounds PASSED [ 51%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_k_max_plus_one_puts_event_in_failures PASSED [ 51%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_honest_boundary_not_a_success_guarantee PASSED [ 52%]
+tests/momentum/event_samples/test_gap3_label_feasible_bounds.py::test_feasible_bounds_survives_prepare_without_realignment PASSED [ 52%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-decision_bar_close-close_to_close] PASSED [ 52%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-decision_bar_close-open_to_horizon_close] PASSED [ 52%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-decision_bar_open-close_to_close] PASSED [ 52%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-decision_bar_open-open_to_close] PASSED [ 52%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-decision_bar_open-open_to_horizon_close] PASSED [ 52%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-next_open-close_to_close] PASSED [ 53%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-next_open-open_to_close] PASSED [ 53%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-next_open-open_to_horizon_close] PASSED [ 53%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-trigger_close-close_to_close] PASSED [ 53%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-trigger_close-open_to_horizon_close] PASSED [ 53%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-trigger_open-close_to_close] PASSED [ 53%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-trigger_open-open_to_close] PASSED [ 53%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[long-trigger_open-open_to_horizon_close] PASSED [ 54%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-decision_bar_close-close_to_close] PASSED [ 54%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-decision_bar_close-open_to_horizon_close] PASSED [ 54%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-decision_bar_open-close_to_close] PASSED [ 54%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-decision_bar_open-open_to_close] PASSED [ 54%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-decision_bar_open-open_to_horizon_close] PASSED [ 54%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-next_open-close_to_close] PASSED [ 54%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-next_open-open_to_close] PASSED [ 55%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-next_open-open_to_horizon_close] PASSED [ 55%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-trigger_close-close_to_close] PASSED [ 55%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-trigger_close-open_to_horizon_close] PASSED [ 55%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-trigger_open-close_to_close] PASSED [ 55%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-trigger_open-open_to_close] PASSED [ 55%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_matches_producer[short-trigger_open-open_to_horizon_close] PASSED [ 55%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_rejected_pairs_produce_no_window PASSED [ 56%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_rawbar_oracle_expected_table_is_falsifiable PASSED [ 56%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_label_differential_grid_is_the_declared_size PASSED [ 56%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_label_differential_grid PASSED [ 56%]
+tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py::test_label_differential_grid_mutation_end_bar_shift PASSED [ 56%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_01_event_study_only_never_calls_split_events PASSED [ 56%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_01b_run_raises_before_calling_split_events PASSED [ 56%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_02_conditional_ic_capability_unavailable PASSED [ 57%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_03_event_study_table_still_produced PASSED [ 57%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_03b_ci_unavailable_when_no_split_plan PASSED [ 57%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_03c_fake_empty_split_plan_raises PASSED [ 57%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_03c2_fake_plan_without_any_assignment_raises PASSED [ 57%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_03c3_all_purged_plan_is_still_accepted PASSED [ 57%]
+tests/momentum/event_samples/test_gap3_split_blocked.py::test_gap3_split_blocked_04_reason_literal_lives_only_in_contract PASSED [ 57%]
+tests/momentum/event_samples/test_gap3_two_stage_path.py::test_d31_state1_direct_import_of_unlabeled_export_is_rejected PASSED [ 58%]
+tests/momentum/event_samples/test_gap3_two_stage_path.py::test_d31_state2_label_filled_but_origin_still_unlabeled_is_rejected PASSED [ 58%]
+tests/momentum/event_samples/test_gap3_two_stage_path.py::test_d31_state3_label_filled_and_origin_user_csv_passes PASSED [ 58%]
+tests/momentum/event_samples/test_gap3_two_stage_path.py::test_d31_state3_over_direction_scenario_still_two_stage PASSED [ 58%]
+tests/momentum/event_samples/test_gap3_two_stage_path.py::test_d31_depth_zero_two_stage_is_rejected PASSED [ 58%]
+tests/momentum/event_samples/test_gap3_two_stage_path.py::test_d31_depth_one_two_stage_is_accepted PASSED [ 58%]
+tests/momentum/event_samples/test_gap3_two_stage_path.py::test_d31_two_stage_dedupe_policy_is_all_with_uniqueness PASSED [ 58%]
+tests/momentum/event_samples/test_gap3_two_stage_path.py::test_d31_dedupe_policy_over_direction_c_is_cluster_first PASSED [ 59%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G1_cat1_price_drop_trigger_outcome PASSED [ 59%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G1_cat2_ma_cross_pit_feature PASSED [ 59%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G1_cat3_volatility_state PASSED [ 59%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G1_cat10_combination_with_future_column PASSED [ 59%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G2_multi_label_manifest_and_hand_exact_labels PASSED [ 59%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G2_default_scenario_C_dedupes_per_label_id PASSED [ 59%]
+tests/momentum/event_samples/test_generator_adapters.py::test_control_kind_not_overridable PASSED [ 60%]
+tests/momentum/event_samples/test_generator_adapters.py::test_short_with_raw_outcome_selection_flagged PASSED [ 60%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G3_auto_fields PASSED [ 60%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G4_dedupe_reports_raw_and_after PASSED [ 60%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G5_output_passes_same_validator_and_control_kind PASSED [ 60%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G5_one_class_fail_closed PASSED [ 60%]
+tests/momentum/event_samples/test_generator_adapters.py::test_empty_hits_loud_non_error PASSED [ 60%]
+tests/momentum/event_samples/test_generator_adapters.py::test_always_true_flagged 
+-------------------------------- live log call ---------------------------------
+00:57:00 [WARNING] generate_events: 條件恆真（400 列全命中）
+PASSED                                                                   [ 60%]
+tests/momentum/event_samples/test_generator_adapters.py::test_input_guards PASSED [ 61%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G6_calls_evaluate_all_bars_not_parallel PASSED [ 61%]
+tests/momentum/event_samples/test_generator_adapters.py::test_G6_offset_shift_consistent PASSED [ 61%]
+tests/momentum/event_samples/test_generator_adapters.py::test_event_filter_legacy_query_path_unchanged PASSED [ 61%]
+tests/momentum/event_samples/test_generator_adapters.py::test_event_filter_condition_spec_feature_role PASSED [ 61%]
+tests/momentum/event_samples/test_generator_adapters.py::test_event_filter_rejects_selection_predicate_and_mixed PASSED [ 61%]
+tests/momentum/event_samples/test_generator_adapters.py::test_allowed_filtering_params_contractized PASSED [ 61%]
+tests/momentum/event_samples/test_generator_adapters.py::test_provenance_label_rule_single_rule_filled PASSED [ 62%]
+tests/momentum/event_samples/test_generator_adapters.py::test_provenance_label_rule_multi_rule_is_none PASSED [ 62%]
+tests/momentum/event_samples/test_import_contract.py::test_valid_batch_passes_and_normalizes PASSED [ 62%]
+tests/momentum/event_samples/test_import_contract.py::test_top_level_keyset_equals_contract_enumeration PASSED [ 62%]
+tests/momentum/event_samples/test_import_contract.py::test_unknown_key_rejected PASSED [ 62%]
+tests/momentum/event_samples/test_import_contract.py::test_missing_required_rejected PASSED [ 62%]
+tests/momentum/event_samples/test_import_contract.py::test_enum_closed_sets[entry_price_semantic-open] PASSED [ 62%]
+tests/momentum/event_samples/test_import_contract.py::test_enum_closed_sets[direction-both] PASSED [ 63%]
+tests/momentum/event_samples/test_import_contract.py::test_enum_closed_sets[scenario-D] PASSED [ 63%]
+tests/momentum/event_samples/test_import_contract.py::test_enum_closed_sets[control_kind-user_x] PASSED [ 63%]
+tests/momentum/event_samples/test_import_contract.py::test_enum_closed_sets[counterexample_kind-d_other] PASSED [ 63%]
+tests/momentum/event_samples/test_import_contract.py::test_enum_closed_sets[kind_source-guess] PASSED [ 63%]
+tests/momentum/event_samples/test_import_contract.py::test_label_return_mode_enum_and_default PASSED [ 63%]
+tests/momentum/event_samples/test_import_contract.py::test_single_class_missing_control_group PASSED [ 63%]
+tests/momentum/event_samples/test_import_contract.py::test_ms_magnitude_gate PASSED [ 64%]
+tests/momentum/event_samples/test_import_contract.py::test_digest_tamper_negative_fixture PASSED [ 64%]
+tests/momentum/event_samples/test_import_contract.py::test_direction_single_value_per_batch PASSED [ 64%]
+tests/momentum/event_samples/test_import_contract.py::test_platform_random_bars_requires_batch_level_spec PASSED [ 64%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_kind_mixed_without_spec_is_still_rejected PASSED [ 64%]
+tests/momentum/event_samples/test_import_contract.py::test_label_origin_platform_random_on_trigger_batch_is_mixed PASSED [ 64%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_spec_on_trigger_batch_is_mixed PASSED [ 64%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_spec_missing_label_rule PASSED [ 65%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_spec_typed_leaf_paths[universe_symbol] PASSED [ 65%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_spec_typed_leaf_paths[label_rule_threshold] PASSED [ 65%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_spec_typed_leaf_paths[label_rule_int_threshold] PASSED [ 65%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_spec_typed_leaf_paths[period_start] PASSED [ 65%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_spec_typed_leaf_paths[per_stratum_elem] PASSED [ 65%]
+tests/momentum/event_samples/test_import_contract.py::test_random_control_spec_unknown_and_missing_leaf PASSED [ 65%]
+tests/momentum/event_samples/test_import_contract.py::test_validate_event_import_exposes_random_control_spec_keyword PASSED [ 66%]
+tests/momentum/event_samples/test_import_contract.py::test_unclassifiable_not_importable PASSED [ 66%]
+tests/momentum/event_samples/test_import_contract.py::test_empty_import_loud PASSED [ 66%]
+tests/momentum/event_samples/test_import_contract.py::test_duplicate_event_id_rejected PASSED [ 66%]
+tests/momentum/event_samples/test_import_contract.py::test_label_value_type_error_but_absent_ok PASSED [ 66%]
+tests/momentum/event_samples/test_import_contract.py::test_t9_availability_gate PASSED [ 66%]
+tests/momentum/event_samples/test_import_contract.py::test_t8_reference_symbols_all_fields_required PASSED [ 66%]
+tests/momentum/event_samples/test_import_contract.py::test_nested_conditional_types_fail_closed[<lambda>0] PASSED [ 67%]
+tests/momentum/event_samples/test_import_contract.py::test_nested_conditional_types_fail_closed[<lambda>1] PASSED [ 67%]
+tests/momentum/event_samples/test_import_contract.py::test_nested_conditional_types_fail_closed[<lambda>2] PASSED [ 67%]
+tests/momentum/event_samples/test_import_contract.py::test_nested_conditional_types_fail_closed[<lambda>3] PASSED [ 67%]
+tests/momentum/event_samples/test_import_contract.py::test_nested_conditional_types_fail_closed[<lambda>4] PASSED [ 67%]
+tests/momentum/event_samples/test_import_contract.py::test_t10_interval_trigger PASSED [ 67%]
+tests/momentum/event_samples/test_import_contract.py::test_scenario_depth_inconsistent_when_A_declares_zero_depth PASSED [ 67%]
+tests/momentum/event_samples/test_import_contract.py::test_scenario_depth_inconsistent_applies_to_two_stage_as_well PASSED [ 68%]
+tests/momentum/event_samples/test_import_contract.py::test_scenario_depth_ok_when_A_declares_positive_depth PASSED [ 68%]
+tests/momentum/event_samples/test_import_contract.py::test_scenario_depth_allows_zero_for_B PASSED [ 68%]
+tests/momentum/event_samples/test_import_contract.py::test_scenario_depth_rule_skipped_when_declaration_absent PASSED [ 68%]
+tests/momentum/event_samples/test_import_contract.py::test_label_origin_conditional_required_for_predictive_scenarios[A] PASSED [ 68%]
+tests/momentum/event_samples/test_import_contract.py::test_label_origin_conditional_required_for_predictive_scenarios[B] PASSED [ 68%]
+tests/momentum/event_samples/test_import_contract.py::test_label_origin_conditional_required_for_predictive_scenarios[two_stage] PASSED [ 68%]
+tests/momentum/event_samples/test_import_contract.py::test_label_origin_not_required_for_scenario_C_legacy_batches PASSED [ 69%]
+tests/momentum/event_samples/test_import_contract.py::test_label_origin_search_unlabeled_not_importable PASSED [ 69%]
+tests/momentum/event_samples/test_import_contract.py::test_label_origin_enum_violation_for_unknown_value PASSED [ 69%]
+tests/momentum/event_samples/test_import_contract.py::test_label_origin_importable_values_all_accepted PASSED [ 69%]
+tests/momentum/event_samples/test_import_contract.py::test_entry_default_declared_in_contract_but_not_used_by_validator PASSED [ 69%]
+tests/momentum/event_samples/test_import_contract.py::test_mixed_scenario_batch_does_not_add_new_reasons PASSED [ 69%]
+tests/momentum/event_samples/test_import_contract.py::test_r2_closure_label_origin_mixed_batch_rejected PASSED [ 69%]
+tests/momentum/event_samples/test_import_contract.py::test_r2_closure_label_origin_partial_declaration_rejected PASSED [ 70%]
+tests/momentum/event_samples/test_import_contract.py::test_r2_closure_label_origin_all_absent_still_accepted PASSED [ 70%]
+tests/momentum/event_samples/test_import_contract.py::test_r2_closure_label_origin_uniform_accepted PASSED [ 70%]
+tests/momentum/event_samples/test_import_contract.py::test_r2_closure_new_rules_apply_when_homogeneity_not_enforced PASSED [ 70%]
+tests/momentum/event_samples/test_import_contract.py::test_r2_closure_mixed_scenario_still_deferred_when_homogeneity_enforced PASSED [ 70%]
+tests/momentum/event_samples/test_isolation_terms.py::test_receipt_batch_shape_h1_close_to_close PASSED [ 70%]
+tests/momentum/event_samples/test_isolation_terms.py::test_open_to_horizon_close_window_is_h_plus_one_bars PASSED [ 70%]
+tests/momentum/event_samples/test_isolation_terms.py::test_4h_events_on_1h_features PASSED [ 71%]
+tests/momentum/event_samples/test_isolation_terms.py::test_zero_depth_declaration PASSED [ 71%]
+tests/momentum/event_samples/test_isolation_terms.py::test_empty_windows_is_zero_not_error PASSED [ 71%]
+tests/momentum/event_samples/test_isolation_terms.py::test_finer_event_than_feature_rounds_up_to_one_row PASSED [ 71%]
+tests/momentum/event_samples/test_isolation_terms.py::test_missing_timeframe_is_fail_closed PASSED [ 71%]
+tests/momentum/event_samples/test_isolation_terms.py::test_max_of_two_terms_equals_legacy_purge_rows[43200000-12] PASSED [ 71%]
+tests/momentum/event_samples/test_isolation_terms.py::test_max_of_two_terms_equals_legacy_purge_rows[561600000-12] PASSED [ 71%]
+tests/momentum/event_samples/test_isolation_terms.py::test_max_of_two_terms_equals_legacy_purge_rows[43200000-0] PASSED [ 72%]
+tests/momentum/event_samples/test_isolation_terms.py::test_max_of_two_terms_equals_legacy_purge_rows[129600000-1] PASSED [ 72%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_01_no_unregistered_future_columns PASSED [ 72%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_01b_detector_catches_unregistered[future_999bar_return] PASSED [ 72%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_01b_detector_catches_unregistered[future_999bar_max_drawdown] PASSED [ 72%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_01b_detector_catches_unregistered[future999_close_return] PASSED [ 72%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_01b_detector_catches_unregistered[futureXYZ] PASSED [ 72%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_01b_detector_catches_unregistered[Future_999Bar_Return_%] PASSED [ 73%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_01c_filter_covers_no_underscore_forms PASSED [ 73%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_01d_non_future_columns_ignored PASSED [ 73%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_02_units_and_conversion PASSED [ 73%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_03_bar_named_depth_equals_n PASSED [ 73%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Return-1] PASSED [ 73%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Return-2] PASSED [ 73%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Return-3] PASSED [ 74%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Return-4] PASSED [ 74%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Return-7] PASSED [ 74%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Return-11] PASSED [ 74%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Return-12] PASSED [ 74%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Drawdown-1] PASSED [ 74%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Drawdown-2] PASSED [ 74%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Drawdown-3] PASSED [ 75%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Drawdown-4] PASSED [ 75%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Drawdown-7] PASSED [ 75%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Drawdown-11] PASSED [ 75%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_04_header_forms[Drawdown-12] PASSED [ 75%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_05_registry_content_correct PASSED [ 75%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_05b_producer_oracle_covers_every_non_bar_column PASSED [ 75%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_05c_shift_named_columns_are_bar_kind PASSED [ 76%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_06_legacy_columns_marked_unknown[future_max_return] PASSED [ 76%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_06_legacy_columns_marked_unknown[future_max_drawdown] PASSED [ 76%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_07_hours_to_bars_is_ceil PASSED [ 76%]
+tests/momentum/event_samples/test_lookahead_registry.py::test_lookahead_registry_complete_08_unknown_timeframe_fail_closed PASSED [ 76%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_covers_spec_keys PASSED [ 76%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_loader_covers_spec_keys PASSED [ 76%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_entries_are_text_only PASSED [ 77%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_loader_fail_closed_on_missing_definition PASSED [ 77%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_n_eff_claim_binds_to_equal_weight_micro PASSED [ 77%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_prevalence_full_denominator_is_labeled_not_total PASSED [ 77%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_eligibility_terms_match_manifest PASSED [ 77%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_duplicate_bars_reject_batch_not_counted_in_unknown PASSED [ 77%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_purge_removes_train_side_only PASSED [ 77%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_horizon_counts_from_entry_bar PASSED [ 78%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_macro_uses_primary_retained_set PASSED [ 78%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_n_test_is_three_way_intersection PASSED [ 78%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_formula_ref_paths_exist PASSED [ 78%]
+tests/momentum/event_samples/test_metrics_glossary.py::test_gap3_metrics_glossary_loader_returns_deep_copy PASSED [ 78%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M1_failure_accounting_swallow_detected PASSED [ 78%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M2_pit_shift_next_bar_detected PASSED [ 78%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M3_ms_gate_removed_lets_seconds_pass PASSED [ 79%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M5_cluster_weight_all_one_detected PASSED [ 79%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M8_identity_permutation_hard_check PASSED [ 79%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M9_offset_k_minus_one_detected PASSED [ 79%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M10_multi_hit_precedence_guess_detected PASSED [ 79%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M4_denominator_tamper_detected PASSED [ 79%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M7_prevalence_disclosure_removed_detected PASSED [ 79%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M11_degraded_flag_removed_detected PASSED [ 80%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M12_t9_availability_removed_accepts PASSED [ 80%]
+tests/momentum/event_samples/test_mutation_guard.py::test_M6_role_isolation_removed_detected PASSED [ 80%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_happy_path_rules_and_test_score 
+-------------------------------- live log call ---------------------------------
+00:57:00 [INFO] 開始提取決策規則 - train_n=280 top_n=5 plan_hash=39f3a6a83791…
+00:57:00 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3089
+PASSED                                                                   [ 80%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_split_missing_fail_closed_no_fallback PASSED [ 80%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_train_test_isolation_fit_sees_only_train_rows 
+-------------------------------- live log call ---------------------------------
+00:57:01 [INFO] 開始提取決策規則 - train_n=280 top_n=5 plan_hash=39f3a6a83791…
+00:57:01 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3089
+PASSED                                                                   [ 80%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_shuffled_labels_auc_in_permutation_band 
+-------------------------------- live log call ---------------------------------
+00:57:01 [INFO] 開始提取決策規則 - train_n=280 top_n=5 plan_hash=39f3a6a83791…
+00:57:01 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3034
+PASSED                                                                   [ 80%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_test_one_class_unavailable 
+-------------------------------- live log call ---------------------------------
+00:57:01 [INFO] 開始提取決策規則 - train_n=280 top_n=5 plan_hash=39f3a6a83791…
+00:57:01 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3089
+PASSED                                                                   [ 80%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_j8_ic_prescreen_train_only 
+-------------------------------- live log call ---------------------------------
+00:57:01 [INFO] 開始提取決策規則 - train_n=140 top_n=5 plan_hash=43c1728f97d8…
+00:57:01 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3286
+00:57:02 [INFO] 開始提取決策規則 - train_n=140 top_n=5 plan_hash=43c1728f97d8…
+00:57:02 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3286
+PASSED                                                                   [ 81%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_survivor_v2_restricts_features_and_v1_rejected 
+-------------------------------- live log call ---------------------------------
+00:57:02 [WARNING] extract_event_patterns: survivor 特徵不在特徵表 ['ghost']
+00:57:02 [INFO] 開始提取決策規則 - train_n=280 top_n=5 plan_hash=39f3a6a83791…
+00:57:02 [INFO] 提取完成 - 共 3 條規則, 平均 confidence: 0.3422
+PASSED                                                                   [ 81%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_labels_and_inputs_guards PASSED [ 81%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_receipt_deterministic 
+-------------------------------- live log call ---------------------------------
+00:57:02 [INFO] 開始提取決策規則 - train_n=280 top_n=5 plan_hash=39f3a6a83791…
+00:57:02 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3089
+00:57:03 [INFO] 開始提取決策規則 - train_n=280 top_n=5 plan_hash=39f3a6a83791…
+00:57:03 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3089
+PASSED                                                                   [ 81%]
+tests/momentum/event_samples/test_pattern_bridge.py::test_manifest_required_fail_closed_and_common_n 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] 開始提取決策規則 - train_n=280 top_n=5 plan_hash=39f3a6a83791…
+00:57:03 [INFO] 提取完成 - 共 5 條規則, 平均 confidence: 0.3089
+PASSED                                                                   [ 81%]
+tests/momentum/event_samples/test_pipeline.py::test_factories_single_outlet_and_contract_readonly PASSED [ 81%]
+tests/momentum/event_samples/test_pipeline.py::test_analyze_tables_includes_all_bars_event_membership PASSED [ 81%]
+tests/momentum/event_samples/test_pipeline.py::test_validate_returns_failures_without_raise PASSED [ 82%]
+tests/momentum/event_samples/test_pipeline.py::test_run_full_chain_accounting PASSED [ 82%]
+tests/momentum/event_samples/test_pipeline.py::test_run_loud_on_invalid_mixed_scenario_and_all_failed PASSED [ 82%]
+tests/momentum/event_samples/test_pipeline.py::test_all_bars_signal_indexed_at_decision_bar_and_mixed_k_rejected PASSED [ 82%]
+tests/momentum/event_samples/test_random_control.py::test_i_same_seed_same_digest 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 82%]
+tests/momentum/event_samples/test_random_control.py::test_ii_seed_changed_digest_differs 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 1）
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 2）
+PASSED                                                                   [ 82%]
+tests/momentum/event_samples/test_random_control.py::test_iii_drawn_bars_outside_every_exclusion_window 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 82%]
+tests/momentum/event_samples/test_random_control.py::test_iii_counterexample_zero_neighborhood_still_excludes_post_window 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 138、抽出 138（分層 3、seed 20260905）
+PASSED                                                                   [ 83%]
+tests/momentum/event_samples/test_random_control.py::test_iv_allocate_pure_function_three_to_one PASSED [ 83%]
+tests/momentum/event_samples/test_random_control.py::test_iv_per_stratum_invariants_on_real_bars 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 83%]
+tests/momentum/event_samples/test_random_control.py::test_v_period_disjoint_raises PASSED [ 83%]
+tests/momentum/event_samples/test_random_control.py::test_vi_records_pass_same_validator 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 83%]
+tests/momentum/event_samples/test_random_control.py::test_vii_embargo_changed_digest_differs 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 696、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 83%]
+tests/momentum/event_samples/test_random_control.py::test_vii_neighborhood_changed_digest_differs 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 774、抽出 40（分層 14、seed 20260905）
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 699、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 83%]
+tests/momentum/event_samples/test_random_control.py::test_label_path_is_label_from_rule_only 
+-------------------------------- live log call ---------------------------------
+00:57:03 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 84%]
+tests/momentum/event_samples/test_random_control.py::test_horizon_change_changes_labels 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 84%]
+tests/momentum/event_samples/test_random_control.py::test_short_direction_flips_sign 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 84%]
+tests/momentum/event_samples/test_random_control.py::test_label_rule_missing_reason PASSED [ 84%]
+tests/momentum/event_samples/test_random_control.py::test_label_rule_param_conflicting_with_spec_is_rejected PASSED [ 84%]
+tests/momentum/event_samples/test_random_control.py::test_label_rule_shape_fail_closed[int_threshold] PASSED [ 84%]
+tests/momentum/event_samples/test_random_control.py::test_label_rule_shape_fail_closed[zero_horizon] PASSED [ 84%]
+tests/momentum/event_samples/test_random_control.py::test_label_rule_shape_fail_closed[missing_leaf] PASSED [ 85%]
+tests/momentum/event_samples/test_random_control.py::test_zero_candidates_yields_empty_batch 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 0、抽出 0（分層 0、seed 20260905）
+PASSED                                                                   [ 85%]
+tests/momentum/event_samples/test_random_control.py::test_cross_symbol_universe_rejected PASSED [ 85%]
+tests/momentum/event_samples/test_random_control.py::test_trigger_receipt_missing_key_rejected PASSED [ 85%]
+tests/momentum/event_samples/test_random_control.py::test_receipt_shape_matches_contract_schema 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 85%]
+tests/momentum/event_samples/test_random_control.py::test_scenario_is_keyword_only_without_default PASSED [ 85%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_files_registered_and_nonempty PASSED [ 85%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_check_passes[20260905__12h.json] 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 86%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_check_passes[7__12h.json] 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 7）
+PASSED                                                                   [ 86%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_negative_mutations_are_detected[neighborhood] 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 654、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 86%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_negative_mutations_are_detected[embargo] 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 606、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 86%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_negative_mutations_are_detected[seed] 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 123456）
+PASSED                                                                   [ 86%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_negative_mutations_are_detected[horizon] 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 86%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_period_mismatch_raises PASSED [ 86%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_loader_fail_closed_on_missing_key PASSED [ 87%]
+tests/momentum/event_samples/test_random_control.py::test_candidates_go_through_the_same_eligibility 
+-------------------------------- live log call ---------------------------------
+00:57:04 [INFO] sample_random_bars: ETHUSDT/12h 候選 768、抽出 40（分層 14、seed 20260905）
+PASSED                                                                   [ 87%]
+tests/momentum/event_samples/test_random_control.py::test_d54_golden_cli_detects_registry_drift PASSED [ 87%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_01_top_level_still_eight_keys PASSED [ 87%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_02_group_keys_exact PASSED [ 87%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_03_row_counts_equal_horizons PASSED [ 87%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_04_same_trigger_all_computable_and_n_adds_up PASSED [ 87%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_05_platform_same_trigger_rule_is_computable PASSED [ 88%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_06_user_labeled_other_not_computed PASSED [ 88%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_07_mixed_control_kind_not_majority PASSED [ 88%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_08_control_kind_in_manifest_columns PASSED [ 88%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_09_contract_registers_reasons PASSED [ 88%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_10_pos_neg_byte_identical_across_control_kinds PASSED [ 88%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_11_manifest_column_does_not_leak_into_output PASSED [ 88%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_12_independent_hand_oracle PASSED [ 89%]
+tests/momentum/event_samples/test_return_table_by_label.py::test_return_table_by_label_13_g2_golden_byte_frozen PASSED [ 89%]
+tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_independent_third_judgment_catches_correlated_pair[composer-decision-250] PASSED [ 89%]
+tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_independent_third_judgment_catches_correlated_pair[grok-gapX-decision-950] PASSED [ 89%]
+tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_three_way_same_error_still_passes[composer-decision-250] PASSED [ 89%]
+tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py::test_g4e_three_way_same_error_still_passes[grok-gapX-decision-950] PASSED [ 89%]
+tests/momentum/event_samples/test_splitunify_m5_coords_probe.py::test_m5_coordinate_truth_table PASSED [ 89%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_canonical_boundary_uses_projection PASSED [ 90%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_partial_boundary_is_fail_closed[train_plan] PASSED [ 90%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_partial_boundary_is_fail_closed[test_plan] PASSED [ 90%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_partial_boundary_is_fail_closed[feature_index] PASSED [ 90%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_partial_boundary_gate_accepts_none_selected_timeframe PASSED [ 90%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_embargo_must_be_none_on_projection_path[scalar] PASSED [ 90%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_embargo_must_be_none_on_projection_path[by_symbol] PASSED [ 90%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_tier_min_test_events_reaches_projection PASSED [ 91%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_legacy_path_still_calls_split_events PASSED [ 91%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_splitunify_wiring_discarded_rows_reaches_summary PASSED [ 91%]
+tests/momentum/event_samples/test_splitunify_wiring.py::test_run_without_selected_timeframe_emits_all_feature_tf_rows PASSED [ 91%]
+tests/momentum/event_samples/test_tables.py::test_forward_return_hand_example_exact PASSED [ 91%]
+tests/momentum/event_samples/test_tables.py::test_forward_return_ci_deterministic_and_horizon_excluded PASSED [ 91%]
+tests/momentum/event_samples/test_tables.py::test_forward_return_single_event_ci_unavailable PASSED [ 91%]
+tests/momentum/event_samples/test_tables.py::test_forward_return_bad_horizons_rejected PASSED [ 92%]
+tests/momentum/event_samples/test_tables.py::test_discrimination_oos_only_and_kind_strata PASSED [ 92%]
+tests/momentum/event_samples/test_tables.py::test_discrimination_shuffled_in_band_and_one_class PASSED [ 92%]
+tests/momentum/event_samples/test_tables.py::test_discrimination_kind_layer_zero_unavailable_not_empty PASSED [ 92%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_golden_compare_is_clean PASSED [ 92%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_independent_oracle_agrees PASSED [ 92%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_leakage_negative_case_blocks PASSED [ 92%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_row_fingerprint_recomputes_from_frozen_plaintext PASSED [ 93%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_answer_window_precondition_has_no_breach PASSED [ 93%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_hand_derived_anchors_match_golden PASSED [ 93%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_event_ids_three_states_are_disjoint_and_total PASSED [ 93%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_per_symbol_counts_are_integers PASSED [ 93%]
+tests/momentum/Analysis/test_splitunify_golden.py::test_purge_reason_literal_is_contract_value PASSED [ 93%]
+tests/momentum/Analysis/test_splitunify_contract.py::test_required_keys_present PASSED [ 93%]
+tests/momentum/Analysis/test_splitunify_contract.py::test_value_sets_are_non_empty_closed_sets PASSED [ 94%]
+tests/momentum/Analysis/test_splitunify_contract.py::test_split_authority_is_kline_holdout PASSED [ 94%]
+tests/momentum/Analysis/test_splitunify_contract.py::test_fail_closed_reasons_exact_set PASSED [ 94%]
+tests/momentum/Analysis/test_splitunify_contract.py::test_estimand_scope_exact_set PASSED [ 94%]
+tests/momentum/Analysis/test_splitunify_contract.py::test_assignment_states_must_not_exist PASSED [ 94%]
+tests/momentum/Analysis/test_splitunify_contract.py::test_purge_reason_stays_in_event_import_contract PASSED [ 94%]
+tests/momentum/Analysis/test_splitunify_contract.py::test_every_reason_appears_verbatim_in_spec PASSED [ 94%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_contract_registry_is_wellformed PASSED [ 95%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_no_unregistered_test_count_key[event_report] 
+-------------------------------- live log call ---------------------------------
+00:57:13 [INFO] IC config loaded
+00:57:13 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:57:13 [INFO] Read 1696 klines from ETHUSDT/12h in 0.003s
+00:57:13 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:13 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:13 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:57:13 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:13 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:13 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:13 [INFO] IC autocorr persistent: count=9
+00:57:13 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:14 [INFO] Decay: 12/14 fit warnings summarized (low_r2=12)
+00:57:14 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+00:57:14 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_8dgdzruq/reports/ic_report_ic_gatekeeper.json
+00:57:14 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_8dgdzruq/reports/ic_survivors_ic_gatekeeper.json
+00:57:14 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_8dgdzruq/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 95%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_no_unregistered_test_count_key[degraded_report] 
+-------------------------------- live log call ---------------------------------
+00:57:14 [INFO] IC config loaded
+00:57:14 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:57:14 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:14 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:14 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:14 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:57:14 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:14 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:14 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:14 [WARNING] IC holdout kept but test-segment events insufficient: test_events=13 min_test_events=10000 (oos_guarantees=false; no full-sample rerun)
+00:57:14 [INFO] IC autocorr persistent: count=9
+00:57:14 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:14 [INFO] Decay: 12/14 fit warnings summarized (low_r2=12)
+00:57:14 [INFO] IC stage6b marginal_ic: status=not_applicable reason=no_survivors survivors=0 removed=0 n_regressions=0 fit_scope=train
+00:57:14 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n8243xfa/reports/ic_report_ic_gatekeeper.json
+00:57:14 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n8243xfa/reports/ic_survivors_ic_gatekeeper.json
+00:57:14 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_n8243xfa/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 95%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_no_unregistered_test_count_key[global_report] 
+-------------------------------- live log call ---------------------------------
+00:57:14 [INFO] IC config loaded
+00:57:14 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+00:57:14 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:14 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:14 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:14 [INFO] Data preprocessing complete: columns=14 fit_mode=train_mask oos_guarantees=True
+00:57:14 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:14 [WARNING] No preloaded label file (labels_df=None): mainline label will be generated from kline with configured horizon (normal path, not an error)
+00:57:14 [INFO] IC autocorr persistent: count=14
+00:57:14 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+00:57:14 [INFO] Decay: 4/14 fit warnings summarized (low_r2=4)
+00:57:20 [INFO] Redundancy filter completed: method=greedy input=2 output=2
+00:57:23 [INFO] IC stage6b marginal_ic: status=ok reason=None survivors=2 removed=0 n_regressions=4 fit_scope=train
+00:57:23 [INFO] Filtered features saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_tlcmwbcv/features/ETHUSDT_12h_filtered.h5
+00:57:23 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_tlcmwbcv/reports/ic_report_ic_gatekeeper.json
+00:57:23 [INFO] IC survivor output saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_tlcmwbcv/reports/ic_survivors_ic_gatekeeper.json
+00:57:23 [INFO] IC report saved: /var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/ichc_b4_sidefx_tlcmwbcv/reports/ic_report_ic_gatekeeper.json
+PASSED                                                                   [ 95%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_report_int_keys_match_frozen_inventory PASSED [ 95%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_frozen_inventory_catches_renamed_escape PASSED [ 95%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_denylist_catches_injected_key PASSED [ 95%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_exactly_one_test_count_key[event_report] PASSED [ 96%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_exactly_one_test_count_key[degraded_report] PASSED [ 96%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_degraded_path_actually_writes_the_twins PASSED [ 96%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_canonical_block_shape PASSED [ 96%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_row_semantics_keys_are_a_different_quantity PASSED [ 96%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_absent_on_global_run PASSED [ 96%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_fail_closed_is_null_not_zero PASSED [ 96%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_rejects_unregistered_reason PASSED [ 97%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_rejects_contradicting_per_symbol_counts PASSED [ 97%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_rejects_bad_n_test[negative] PASSED [ 97%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_rejects_bad_n_test[float_fraction] PASSED [ 97%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_rejects_bad_n_test[float_whole] PASSED [ 97%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_rejects_bad_n_test[bool] PASSED [ 97%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_accepts_numpy_integer PASSED [ 97%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_rejects_empty_counts_with_positive_n_test PASSED [ 98%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_boundary_hash_rejects_duplicates PASSED [ 98%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_boundary_hash_rejects_datetime_like PASSED [ 98%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_requires_reason_when_n_test_missing PASSED [ 98%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_boundary_hash_is_order_insensitive PASSED [ 98%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_boundary_hash_changes_with_membership PASSED [ 98%]
+tests/api/test_splitunify_disclosure.py::test_splitunify_disclosure_boundary_hash_rejects_seconds PASSED [ 98%]
+tests/api/test_splitunify_event_study_only.py::test_splitunify_event_study_only_capability_reason_is_no_universe 
+-------------------------------- live log call ---------------------------------
+00:57:36 [INFO] [f5230102] POST /api/v1/case/import-events/csv - 200 - 0.013s
+00:57:36 [INFO] HTTP Request: POST http://testserver/api/v1/case/import-events/csv "HTTP/1.1 200 OK"
+00:57:37 [INFO] [f29ca9f3] POST /api/v1/case/events/20260913T165736Z-256953a1/analyze - 200 - 0.363s
+00:57:37 [INFO] HTTP Request: POST http://testserver/api/v1/case/events/20260913T165736Z-256953a1/analyze "HTTP/1.1 200 OK"
+PASSED                                                                   [ 99%]
+tests/api/test_splitunify_event_study_only.py::test_splitunify_event_study_only_summary_has_no_split_counts[n_train] 
+-------------------------------- live log call ---------------------------------
+00:57:37 [INFO] [7dd06ee4] POST /api/v1/case/import-events/csv - 200 - 0.005s
+00:57:37 [INFO] HTTP Request: POST http://testserver/api/v1/case/import-events/csv "HTTP/1.1 200 OK"
+00:57:37 [INFO] [df54d838] POST /api/v1/case/events/20260913T165737Z-4517fcf5/analyze - 200 - 0.356s
+00:57:37 [INFO] HTTP Request: POST http://testserver/api/v1/case/events/20260913T165737Z-4517fcf5/analyze "HTTP/1.1 200 OK"
+PASSED                                                                   [ 99%]
+tests/api/test_splitunify_event_study_only.py::test_splitunify_event_study_only_summary_has_no_split_counts[n_test] 
+-------------------------------- live log call ---------------------------------
+00:57:37 [INFO] [7ec589a0] POST /api/v1/case/import-events/csv - 200 - 0.005s
+00:57:37 [INFO] HTTP Request: POST http://testserver/api/v1/case/import-events/csv "HTTP/1.1 200 OK"
+00:57:37 [INFO] [1a4aadb9] POST /api/v1/case/events/20260913T165737Z-0c13ce68/analyze - 200 - 0.357s
+00:57:37 [INFO] HTTP Request: POST http://testserver/api/v1/case/events/20260913T165737Z-0c13ce68/analyze "HTTP/1.1 200 OK"
+PASSED                                                                   [ 99%]
+tests/api/test_splitunify_event_study_only.py::test_splitunify_event_study_only_summary_has_no_split_counts[n_purged] 
+-------------------------------- live log call ---------------------------------
+00:57:37 [INFO] [d2b51e9d] POST /api/v1/case/import-events/csv - 200 - 0.005s
+00:57:37 [INFO] HTTP Request: POST http://testserver/api/v1/case/import-events/csv "HTTP/1.1 200 OK"
+00:57:38 [INFO] [92576369] POST /api/v1/case/events/20260913T165737Z-32fdf41d/analyze - 200 - 0.358s
+00:57:38 [INFO] HTTP Request: POST http://testserver/api/v1/case/events/20260913T165737Z-32fdf41d/analyze "HTTP/1.1 200 OK"
+PASSED                                                                   [ 99%]
+tests/api/test_splitunify_event_study_only.py::test_splitunify_event_study_only_lookahead_blocked_shares_the_same_shape 
+-------------------------------- live log call ---------------------------------
+00:57:38 [INFO] [a89eea71] POST /api/v1/case/import-events/csv - 200 - 0.005s
+00:57:38 [INFO] HTTP Request: POST http://testserver/api/v1/case/import-events/csv "HTTP/1.1 200 OK"
+00:57:38 [INFO] [71d3bf5a] POST /api/v1/case/events/20260913T165738Z-63a5dc03/analyze - 200 - 0.356s
+00:57:38 [INFO] HTTP Request: POST http://testserver/api/v1/case/events/20260913T165738Z-63a5dc03/analyze "HTTP/1.1 200 OK"
+PASSED                                                                   [ 99%]
+tests/api/test_splitunify_event_study_only.py::test_splitunify_event_study_only_table_declares_full_sample_estimand 
+-------------------------------- live log call ---------------------------------
+00:57:38 [INFO] [1a51b8bc] POST /api/v1/case/import-events/csv - 200 - 0.005s
+00:57:38 [INFO] HTTP Request: POST http://testserver/api/v1/case/import-events/csv "HTTP/1.1 200 OK"
+00:57:38 [INFO] [3d7eb591] POST /api/v1/case/events/20260913T165738Z-00cf977e/analyze - 200 - 0.358s
+00:57:38 [INFO] HTTP Request: POST http://testserver/api/v1/case/events/20260913T165738Z-00cf977e/analyze "HTTP/1.1 200 OK"
+PASSED                                                                   [ 99%]
+tests/api/test_splitunify_event_study_only.py::test_splitunify_event_study_only_common_block_has_no_fake_numbers 
+-------------------------------- live log call ---------------------------------
+00:57:38 [INFO] [b9844911] POST /api/v1/case/import-events/csv - 200 - 0.005s
+00:57:38 [INFO] HTTP Request: POST http://testserver/api/v1/case/import-events/csv "HTTP/1.1 200 OK"
+00:57:39 [INFO] [8440428c] POST /api/v1/case/events/20260913T165738Z-7b447777/analyze - 200 - 0.356s
+00:57:39 [INFO] HTTP Request: POST http://testserver/api/v1/case/events/20260913T165738Z-7b447777/analyze "HTTP/1.1 200 OK"
+PASSED                                                                   [ 99%]
+tests/api/test_splitunify_event_study_only.py::test_splitunify_split_events_production_call_count_is_zero 
+-------------------------------- live log call ---------------------------------
+00:57:39 [INFO] [aadaa5f7] POST /api/v1/case/import-events/csv - 200 - 0.005s
+00:57:39 [INFO] HTTP Request: POST http://testserver/api/v1/case/import-events/csv "HTTP/1.1 200 OK"
+00:57:39 [INFO] [393a9562] POST /api/v1/case/events/20260913T165739Z-54172cf9/analyze - 200 - 0.357s
+00:57:39 [INFO] HTTP Request: POST http://testserver/api/v1/case/events/20260913T165739Z-54172cf9/analyze "HTTP/1.1 200 OK"
+PASSED                                                                   [100%]
+
+======================== 705 passed in 66.25s (0:01:06) ========================

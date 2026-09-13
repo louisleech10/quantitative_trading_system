@@ -114,11 +114,18 @@ def _sp(**kw) -> SplitPlan:
 
 
 def _event_keys(rows) -> pd.DataFrame:
-    """rows: iterable of (event_id, cutoff_ms, label_end_ms[, symbol])。"""
+    """rows: iterable of (event_id, cutoff_ms, label_end_ms[, symbol[, feature_tf]])。
+
+    🔴 D-002 `Task 9.2`：`event_keys` 之行粒度已改為 `(event_id, feature_timeframe)`，
+    故本 helper 多一個**可選**第 5 欄；不給時預設 `"1h"`（單 feature TF，行為與改前相同）。
+    `timeframe`（**觸發** TF）與 `feature_timeframe`（**特徵** TF）是兩個語意（`D-002-C0`），
+    刻意各自獨立給值——測試若把兩者混用，複合鍵碰撞就抓不到了。
+    """
     recs = []
     for r in rows:
         eid, cutoff, label_end = r[0], r[1], r[2]
         sym = r[3] if len(r) > 3 else SYM
+        feature_tf = r[4] if len(r) > 4 else "1h"
         recs.append(
             {
                 "event_id": eid,
@@ -127,6 +134,7 @@ def _event_keys(rows) -> pd.DataFrame:
                 "label_end_ms": int(label_end),
                 "symbol": sym,
                 "timeframe": "1h",
+                "feature_timeframe": feature_tf,
             }
         )
     return pd.DataFrame(recs)
@@ -165,6 +173,30 @@ def _basic_case():
         ]
     )
     return index, train, test, keys, _manifest(keys), test_start
+
+
+def _multi_feature_tf_case():
+    """同一批事件，每個事件各有 `1h`／`4h` **兩個 feature TF** 之列（`Task 9.2` 後之常態）。
+
+    🔴 `manifest.table` 仍是**事件級**（一列一事件）——`Task 9.2a` 明定兩表粒度不同：
+    `event_keys` 走複合鍵、`manifest` 維持事件級。故此處 manifest 以去重後的鍵建立。
+    🔴 兩個 feature TF 之 `feature_cutoff_ms` 刻意**相同**：本 fixture 要驗的是 schema 與
+    計數（`9.2a`），不是側別判定（那是 `9.2b`）；cutoff 不同會提前撞上尚未實作的錨定邏輯。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    train_rows, test_rows = b["train_row_index"], b["test_row_index"]
+    test_start = int(index[test_rows[0]])
+    base = [
+        ("e_train_ok", index[train_rows[0]], int(index[train_rows[0]]) + H1),
+        ("e_train_leak", index[train_rows[-1]], test_start),
+        ("e_test", index[test_rows[0]], int(index[test_rows[0]]) + H1),
+        ("e_gap", index[train_rows[-1]] + H1, int(index[train_rows[-1]]) + 2 * H1),
+    ]
+    rows = [(e, c, l, SYM, tf) for (e, c, l) in base for tf in ("1h", "4h")]
+    keys = _event_keys(rows)
+    man_keys = _event_keys([(e, c, l) for (e, c, l) in base])
+    return index, train, test, keys, _manifest(man_keys), test_start
 
 
 # ── 🔴 2026-09-11 歸屬回溯稽核撈回的三條（當輪被我漏掉，兩道檢查都沒響）──────────
@@ -591,7 +623,7 @@ def test_clusters_still_agree_with_split_events_shape() -> None:
     pd.testing.assert_frame_equal(build_time_clusters(man, H1), legacy.clusters)
 
 
-def test_summary_has_all_thirteen_keys() -> None:
+def test_summary_has_all_sixteen_keys() -> None:
     index, train, test, keys, man, _ = _basic_case()
     plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
     assert set(plan.summary) == {
@@ -610,6 +642,11 @@ def test_summary_has_all_thirteen_keys() -> None:
         # 🔴 D-002 Task 9.1（Phase 9A）：第 13 鍵。exact-set 斷言刻意不放寬為「包含」——
         #    多一鍵少一鍵都要當場紅，否則 Task 9.4 之後有人加鍵就沒人擋。
         "discarded_rows_by_feature_tf",
+        # 🔴 D-002 Task 9.2a ＋ D-002-C6：事件數與列數是兩個量，必須並存、不得互相代用。
+        #    單 feature TF 時三者之間會有相等關係，但**相等不是省略其一的理由**。
+        "n_events",
+        "n_event_tf_rows",
+        "n_event_tf_rows_purged",
     }
     assert plan.summary["n_purged"] == len(plan.purged)
     assert "single_symbol" in plan.summary["degraded"], (
@@ -771,10 +808,17 @@ def test_nan_in_numeric_index_is_fail_closed() -> None:
 
 
 def test_duplicate_event_id_is_fail_closed() -> None:
-    """🔴 `event_keys.event_id` 重複 ⇒ raise（I3）：集合相等會**吃掉重複**。"""
+    """🔴 `event_keys` 之**複合鍵**重複 ⇒ raise（I3）：集合相等會**吃掉重複**。
+
+    🔴 **D-002 `Task 9.2a` 起判準改為 `(event_id, feature_timeframe)`**（consult-r2 裁定
+    本測試屬「**測試過時**」：行為仍 fail-closed，只是訊息由「event_id 重複」改為
+    「複合鍵重複」⇒ 只更新 `match=` 字面，**不得**改實作）。
+    本 fixture 之重複列連 `feature_timeframe` 都相同（皆預設 `1h`），故仍應被擋下；
+    同事件**不同** feature TF 才是 `Task 9.2` 要放行的合法形態。
+    """
     index, train, test, keys, _, _ = _basic_case()
     dup = pd.concat([keys, keys.iloc[[0]]], ignore_index=True)
-    with pytest.raises(ValueError, match="event_id 重複"):
+    with pytest.raises(ValueError, match="複合鍵重複"):
         derive_event_split_from_plans(
             train, test, dup, index, manifest=_manifest(dup.drop_duplicates("event_id")),
             bucket_ms=H1,
@@ -1444,3 +1488,116 @@ def test_build_event_keys_rejects_nan_timeframe_in_dropped_rows() -> None:
     ]
     with pytest.raises(ValueError, match="缺值"):
         build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
+
+
+# ── D-002 Task 9.2 / 9.2a（批次 B9B）：producer 全量 ＋ 複合鍵 schema ──────────
+# 🔴 本批核心：producer 不再單選 feature TF。沒有它，下游全改完 `SU-RESID-2` 仍不會解決。
+
+
+def test_feature_timeframe_column_sourced_from_per_tf_not_event_level() -> None:
+    """`feature_timeframe` 須逐列取自 `per_tf`，**不得**以 `event_level.timeframe` 冒充。
+
+    🔴 冒充時同事件兩列會拿到**相同**的觸發 TF ⇒ 複合鍵碰撞、`Task 9.2a` 的唯一性
+    guard 會把合法的多 TF 批誤擋（`D-002-C0`；R5 三家獨立撞題）。
+    """
+    ev = [{"event_id": "a", "symbol": SYM, "timeframe": "12h",
+           "label_start_ms": 10, "label_end_ms": 20}]
+    per_tf = [
+        {"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000},
+        {"event_id": "a", "timeframe": "4h", "feature_cutoff_ms": 1100},
+    ]
+    keys, discarded = build_event_keys(_receipts(ev, per_tf))  # 不傳 ⇒ 全量
+    assert discarded == {}, "全量模式不丟棄任何列"
+    assert len(keys) == len(per_tf), "全量模式須逐 per_tf 列輸出"
+    # 觸發 TF 兩列同值（來自 event_level），feature TF 兩列**不同**（來自 per_tf）。
+    assert set(keys["timeframe"]) == {"12h"}
+    assert set(keys["feature_timeframe"]) == {"1h", "4h"}
+
+
+def test_build_event_keys_full_scan_is_default() -> None:
+    """不傳 `selected_timeframe` ＝ 全量；傳字串才單選（相容既有呼叫端）。"""
+    ev = [{"event_id": "a", "symbol": SYM, "timeframe": "1h",
+           "label_start_ms": 10, "label_end_ms": 20}]
+    per_tf = [
+        {"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000},
+        {"event_id": "a", "timeframe": "4h", "feature_cutoff_ms": 1100},
+    ]
+    full, full_discarded = build_event_keys(_receipts(ev, per_tf))
+    one, one_discarded = build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
+    assert len(full) == 2 and full_discarded == {}
+    assert len(one) == 1 and one_discarded == {"4h": 1}
+
+
+def test_single_feature_tf_full_scan_matches_selected(  ) -> None:
+    """邊界①：只有一個 feature TF 時，全量與單選之列數相同（**非退化**，須釘住）。"""
+    ev = [{"event_id": "a", "symbol": SYM, "timeframe": "1h",
+           "label_start_ms": 10, "label_end_ms": 20}]
+    per_tf = [{"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000}]
+    full, _ = build_event_keys(_receipts(ev, per_tf))
+    one, _ = build_event_keys(_receipts(ev, per_tf), selected_timeframe="1h")
+    assert len(full) == len(one) == 1
+    assert list(full["feature_timeframe"]) == list(one["feature_timeframe"]) == ["1h"]
+
+
+def test_event_level_duplicate_event_id_still_blocked_after_validate_relaxed() -> None:
+    """邊界③：`validate` 由 `1:1` 放寬為 `many_to_one` **不得**順手放掉 event_level 自身重複。"""
+    ev = [
+        {"event_id": "a", "symbol": SYM, "timeframe": "1h", "label_start_ms": 10, "label_end_ms": 20},
+        {"event_id": "a", "symbol": SYM, "timeframe": "1h", "label_start_ms": 30, "label_end_ms": 40},
+    ]
+    per_tf = [{"event_id": "a", "timeframe": "1h", "feature_cutoff_ms": 1000}]
+    with pytest.raises(Exception):
+        build_event_keys(_receipts(ev, per_tf))
+
+
+def test_assignments_composite_key_unique() -> None:
+    """`assignments` 須含 `feature_timeframe` 欄，且 `(event_id, feature_timeframe)` 唯一。
+
+    🔴 先斷言**欄位存在**再驗唯一性——只靠 `duplicated(subset=...)` 的 `KeyError` 會被
+    `if "feature_timeframe" in df.columns` 軟包短路（R18 兩家撞題）。
+    """
+    index, train, test, keys, man, _ = _multi_feature_tf_case()
+    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert "feature_timeframe" in plan.assignments.columns
+    assert not plan.assignments.duplicated(subset=["event_id", "feature_timeframe"]).any()
+
+
+def test_purged_composite_key_unique() -> None:
+    """`purged` 同樣須含該欄且複合鍵唯一（purge 路徑不得折疊列）。"""
+    index, train, test, keys, man, _ = _multi_feature_tf_case()
+    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert "feature_timeframe" in plan.purged.columns
+    assert not plan.purged.duplicated(subset=["event_id", "feature_timeframe"]).any()
+
+
+def test_summary_has_n_events_and_n_event_tf_rows() -> None:
+    """`D-002-C6`：事件數與列數**並存**且語意不同（多 feature TF 時列數 > 事件數）。"""
+    index, train, test, keys, man, _ = _multi_feature_tf_case()
+    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    s = plan.summary
+    assert s["n_events"] == keys["event_id"].nunique()
+    assert s["n_event_tf_rows"] == len(keys)
+    assert s["n_event_tf_rows"] > s["n_events"], "多 feature TF 下列數必須大於事件數"
+    assert s["n_event_tf_rows_purged"] == len(plan.purged)
+
+
+def test_duplicate_composite_key_error_message_names_key_not_side() -> None:
+    """鍵重複時訊息須指**鍵重複**，不得誤報異側（guard 先後之可觀測證據）。"""
+    index, train, test, keys, _, _ = _basic_case()
+    dup = pd.concat([keys, keys.iloc[[0]]], ignore_index=True)
+    with pytest.raises(ValueError, match="複合鍵重複") as ei:
+        derive_event_split_from_plans(
+            train, test, dup, index, manifest=_manifest(dup.drop_duplicates("event_id")),
+            bucket_ms=H1,
+        )
+    assert "異側" not in str(ei.value), "鍵尚不唯一時談「同側」無從定義，不得先跑同側檢查"
+
+
+def test_clusters_remain_event_level_when_multi_feature_tf() -> None:
+    """`clusters` **不加** `feature_timeframe`、維持事件級——簇由 label 區間決定，與 feature TF 無關。"""
+    index, train, test, keys, man, _ = _multi_feature_tf_case()
+    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    assert "feature_timeframe" not in plan.clusters.columns
+    assert len(plan.clusters) == keys["event_id"].nunique(), (
+        "簇被複製成多列 ⇒ w=1/n 權重與簇計數會失去定義"
+    )

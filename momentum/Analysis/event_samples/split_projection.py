@@ -195,6 +195,9 @@ EVENT_KEY_COLUMNS = (
     "label_end_ms",
     "symbol",
     "timeframe",
+    # 🔴 D-002 `Task 9.2`：**feature** TF（取自 `per_tf`），與上面的 `timeframe`（**觸發** TF）
+    #    是兩個語意（`D-002-C0`）。複合鍵為 `(event_id, feature_timeframe)`。
+    "feature_timeframe",
 )
 
 
@@ -256,7 +259,7 @@ def _plan_bounds_as_ms(plan: Any, *, label: str) -> tuple:
 def build_event_keys(
     receipts: AlignmentReceipts,
     *,
-    selected_timeframe: str,
+    selected_timeframe: Optional[str] = None,
 ) -> Tuple[pd.DataFrame, Dict[str, int]]:
     """由對齊收據組出投影所需的 **keyed** 事件表（SPEC C-4；R4 之 F2）。
 
@@ -268,59 +271,91 @@ def build_event_keys(
     🔴 `manifest.table` 只 merge trigger `timeframe`、**沒有** `feature_cutoff_ms`
     ⇒ 不能用它代替 per-TF cutoff。
 
-    每個事件在 `selected_timeframe` 下必須**恰有一列** `per_tf`；否則 raise
-    （多 TF 之 `(event_id, timeframe)` 複合鍵為殘留 `SU-RESID-2`，本票不解）。
+    🔴 **D-002 `Task 9.2`（Phase 9B，本批核心）：producer 不再單選 feature TF**。
+    `selected_timeframe=None`（預設）⇒ **輸出全量**，行粒度為 `(event_id, feature_timeframe)`；
+    給字串 ⇒ 只取該 feature TF 並把其餘列數記進 `discarded`（相容既有呼叫端）。
+    v9.1 以前之「每個事件在 `selected_timeframe` 下必須**恰有一列** `per_tf`」語意**已作廢**
+    ——那正是 `SU-RESID-2` 的成因（其餘 feature TF 被靜默丟棄）。
+
+    🔴 **`feature_timeframe` 為新建欄，取自 `per_tf`；不得用 `event_level.timeframe` 冒充**
+    （`D-002-C0`：後者是**觸發** TF，同事件兩列會同值而使複合鍵碰撞）。
 
     🔴 **D-002 `Task 9.1`（Phase 9A）：回傳 `(keyed, discarded)` 兩值**。
     `discarded` 之鍵為**被單選濾掉之 feature TF 字面**、值為其列數；無丟棄時為 `{}`
     （**不得**省略、不得回 `None`）。存在理由：單選 `selected_timeframe` 會把其餘 feature TF
     的 `per_tf` 列**靜默丟掉**，呼叫端與使用者完全看不到丟了多少——那正是本 Phase 要消滅的
-    誠實性缺陷。🔴 本 Task **只做記帳**：`selected_timeframe` 仍為**必填**、單選行為**不變**
-    （改為可選全量是 `Task 9.2`）；丟棄時**不得** raise（會擋掉目前合法的單 feature TF 用法）。
+    誠實性缺陷。丟棄時**不得** raise（會擋掉目前合法的單 feature TF 用法）。
+    全量模式（`selected_timeframe=None`）下沒有任何列被丟棄 ⇒ `discarded` 恆為 `{}`。
     """
     per_tf = receipts.per_tf
     event_level = receipts.event_level
     if per_tf is None or event_level is None:
         raise ValueError("build_event_keys: receipts 缺 per_tf 或 event_level（fail-closed）")
 
-    want = str(selected_timeframe)
-    selected = per_tf.loc[per_tf["timeframe"].astype(str) == want]
-    if selected.empty:
-        raise ValueError(
-            f"build_event_keys: per_tf 無 timeframe={selected_timeframe!r} 之列（fail-closed）"
-        )
-    # 🔴 D-002 Task 9.1：被單選濾掉之列須逐 feature TF 記帳，不得靜默消失。
-    #    以 `value_counts` 取代逐 TF 掃描——同一個 TF 的列數只算一次，且對空集合回 {}。
-    dropped = per_tf.loc[per_tf["timeframe"].astype(str) != want, "timeframe"]
-    # 🔴 R18 codex `CODEX-R18-P1-03`／grok `GROK-R18-P1-01` 撞題：`astype(str)` 會把
-    #    `NaN`／`pd.NA` 變成字面 `"nan"`／`"<NA>"`，於是 `discarded` 長出一個**看起來合法、
-    #    實際不是 TF** 的鍵，呼叫端無從分辨。缺 TF 是**壞資料**，不是一種 TF ⇒ fail-closed。
-    if bool(dropped.isna().any()):
+    # 🔴 R18 codex `CODEX-R18-P1-03`／grok `GROK-R18-P1-01` 撞題：字串化會把 `NaN`／`pd.NA`
+    #    變成字面 `"nan"`／`"<NA>"`，於是 `discarded` 長出一個**看起來合法、實際不是 TF** 的鍵，
+    #    呼叫端無從分辨。缺 TF 是**壞資料**、不是一種 TF ⇒ fail-closed。
+    #    🔴 `Task 9.2` 起此檢查提前到**全欄**（不再只看被丟棄側）——全量模式沒有「被丟棄側」，
+    #    但缺值同樣會讓 `feature_timeframe` 欄長出假值，形態相同。
+    if bool(per_tf["timeframe"].isna().any()):
         raise ValueError(
             "build_event_keys: per_tf 之 timeframe 欄有缺值（NaN／NA）"
-            "——記帳會把它變成名為 'nan' 的假 feature TF；缺就是缺，不補預設（fail-closed）"
-        )
-    discarded: Dict[str, int] = {
-        str(tf): int(n) for tf, n in dropped.astype(str).value_counts().items()
-    }
-    dupes = selected["event_id"][selected["event_id"].duplicated()].unique().tolist()
-    if dupes:
-        raise ValueError(
-            f"build_event_keys: timeframe={selected_timeframe!r} 下事件有多列 per_tf："
-            f"{sorted(dupes)[:5]}——本票要求每事件恰一列（殘留 SU-RESID-2）"
+            "——會變成名為 'nan' 的假 feature TF；缺就是缺，不補預設（fail-closed）"
         )
 
-    merged = event_level.merge(
-        selected[["event_id", "feature_cutoff_ms"]], on="event_id", how="inner", validate="1:1"
+    if selected_timeframe is None:
+        # 全量：不丟棄任何 feature TF ⇒ `discarded` 恆為空。
+        selected = per_tf
+        discarded: Dict[str, int] = {}
+    else:
+        want = str(selected_timeframe)
+        selected = per_tf.loc[per_tf["timeframe"].astype(str) == want]
+        if selected.empty:
+            raise ValueError(
+                f"build_event_keys: per_tf 無 timeframe={selected_timeframe!r} 之列（fail-closed）"
+            )
+        # 🔴 D-002 Task 9.1：被單選濾掉之列須逐 feature TF 記帳，不得靜默消失。
+        dropped = per_tf.loc[per_tf["timeframe"].astype(str) != want, "timeframe"]
+        discarded = {str(tf): int(n) for tf, n in dropped.astype(str).value_counts().items()}
+
+    # 🔴 `Task 9.2` (b)：**新建**輸出欄 `feature_timeframe` 取自 `per_tf.timeframe`。
+    #    不得以 `event_level.timeframe`（**觸發** TF）冒充——同事件兩列會同值而使複合鍵碰撞
+    #    （`D-002-C0`；R5 三家獨立撞題）。
+    keyed = selected[["event_id", "timeframe", "feature_cutoff_ms"]].rename(
+        columns={"timeframe": "feature_timeframe"}
+    )
+    # 🔴 `Task 9.2a`：唯一性判準由「每事件一列」改為 **`(event_id, feature_timeframe)` 複合鍵唯一**。
+    #    同事件不同 feature TF 為**合法**，不得再以 `event_id` 重複為由擋下。
+    dup_mask = keyed.duplicated(subset=["event_id", "feature_timeframe"], keep=False)
+    if bool(dup_mask.any()):
+        dupes = sorted(
+            f"{e}/{tf}" for e, tf in
+            keyed.loc[dup_mask, ["event_id", "feature_timeframe"]]
+            .astype(str).drop_duplicates().itertuples(index=False, name=None)
+        )
+        raise ValueError(
+            "build_event_keys: (event_id, feature_timeframe) 複合鍵重複："
+            f"{dupes[:5]}——同一事件之同一 feature TF 不得有多列 per_tf（fail-closed）"
+        )
+
+    # 🔴 `Task 9.2` (a)：舊寫法 `event_level.merge(selected, validate="1:1")` 在全量多 feature TF
+    #    **必** `MergeError`。改為**以 `per_tf` 為行粒度**接合，`validate` 改 `many_to_one`
+    #    ——多列 per_tf 對一列 event_level；🔴 `event_level` 自身 `event_id` 重複仍會被擋下
+    #    （放寬 `validate` 不得順手放掉這一面，見 `Task 9.2` 邊界③）。
+    merged = keyed.merge(
+        event_level[["event_id", "label_start_ms", "label_end_ms", "symbol", "timeframe"]],
+        on="event_id", how="inner", validate="many_to_one",
     )
     missing = set(event_level["event_id"]) - set(merged["event_id"])
     if missing:
+        scope = "全量" if selected_timeframe is None else f"timeframe={selected_timeframe!r} 下"
         raise ValueError(
-            f"build_event_keys: {len(missing)} 個事件在 timeframe={selected_timeframe!r} 下缺 cutoff"
+            f"build_event_keys: {len(missing)} 個事件在{scope}缺 cutoff"
             f"（例：{sorted(missing)[:3]}）——缺就是缺，不補預設"
         )
     out = merged[
-        ["event_id", "feature_cutoff_ms", "label_start_ms", "label_end_ms", "symbol", "timeframe"]
+        ["event_id", "feature_cutoff_ms", "label_start_ms", "label_end_ms", "symbol",
+         "timeframe", "feature_timeframe"]
     ].copy()
     return out.reset_index(drop=True), discarded
 
@@ -463,13 +498,29 @@ def _derive_single_symbol(
     #    **不接受 subset**——要子集就由呼叫端先裁好 manifest，別讓本函式猜。
     # 🔴 唯一性必須先驗（B2b R2 之 I3）：集合相等會**吃掉重複**——同一個 event_id 出現
     #    兩次仍與 manifest 集合相等，然後被重複計數／重複輸出 assignment。
-    for frame, name in ((event_keys, "event_keys"), (manifest.table, "manifest.table")):
-        dupes = frame["event_id"][frame["event_id"].duplicated()].unique().tolist()
-        if len(dupes):
-            raise ValueError(
-                f"derive_event_split_from_plans: {name} 之 event_id 重複 {sorted(dupes)[:5]}"
-                "——集合相等吃不掉重複，會重複計數（fail-closed）"
-            )
+    # 🔴 D-002 `Task 9.2a`：唯一性判準**分兩種粒度**——
+    #    `event_keys` 複合鍵後一事件可有多列（每 feature TF 一列）⇒ 判準改為
+    #    `(event_id, feature_timeframe)` 唯一；沿用舊的「event_id 不得重複」會把
+    #    **合法的多 feature TF 批整批擋死**（本批核心目標之不可達形態）。
+    #    `manifest.table` 仍是事件級（一列一事件）⇒ 維持 event_id 唯一。
+    #    🔴 **錯誤型別維持 `ValueError`**（前端與既有測試有依賴，不得為統一而改）。
+    ek_dup = event_keys.duplicated(subset=["event_id", "feature_timeframe"], keep=False)
+    if bool(ek_dup.any()):
+        bad = sorted(
+            f"{e}/{tf}" for e, tf in
+            event_keys.loc[ek_dup, ["event_id", "feature_timeframe"]]
+            .astype(str).drop_duplicates().itertuples(index=False, name=None)
+        )
+        raise ValueError(
+            "derive_event_split_from_plans: event_keys 之 (event_id, feature_timeframe) "
+            f"複合鍵重複 {bad[:5]}——集合相等吃不掉重複，會重複計數（fail-closed）"
+        )
+    man_dupes = manifest.table["event_id"][manifest.table["event_id"].duplicated()].unique().tolist()
+    if len(man_dupes):
+        raise ValueError(
+            f"derive_event_split_from_plans: manifest.table 之 event_id 重複 {sorted(man_dupes)[:5]}"
+            "——集合相等吃不掉重複，會重複計數（fail-closed）"
+        )
     key_ids = set(event_keys["event_id"])
     man_ids = set(manifest.table["event_id"])
     if key_ids != man_ids:
@@ -564,22 +615,35 @@ def _derive_single_symbol(
             )
         # ── 第一段：答案窗 purge（優先於一切）──
         if in_train and int(rec["label_end_ms"]) >= test_start_ms:
-            purge_rows.append({"event_id": rec["event_id"], "reason": _PURGE_REASON})
+            # 🔴 D-002 `Task 9.2a`：purge 側同樣是複合鍵粒度；缺此欄則同事件多 feature TF
+            #    在 `purged` 裡無法區分，且 `Task 9.2b` 之跨表互斥檢查會抓不到混態。
+            purge_rows.append({
+                "event_id": rec["event_id"], "reason": _PURGE_REASON,
+                "feature_timeframe": rec["feature_timeframe"],
+            })
             continue
         # ── 第二段：集合成員判定 ──
         if in_test:
             assign_rows.append(
-                {"event_id": rec["event_id"], "symbol": rec["symbol"], "split_label": "test"}
+                {"event_id": rec["event_id"], "symbol": rec["symbol"], "split_label": "test",
+                 "feature_timeframe": rec["feature_timeframe"]}
             )
         elif in_train:
             assign_rows.append(
-                {"event_id": rec["event_id"], "symbol": rec["symbol"], "split_label": "train"}
+                {"event_id": rec["event_id"], "symbol": rec["symbol"], "split_label": "train",
+                 "feature_timeframe": rec["feature_timeframe"]}
             )
         else:
-            purge_rows.append({"event_id": rec["event_id"], "reason": _PURGE_REASON})
+            purge_rows.append({
+                "event_id": rec["event_id"], "reason": _PURGE_REASON,
+                "feature_timeframe": rec["feature_timeframe"],
+            })
 
-    assignments = pd.DataFrame(assign_rows, columns=["event_id", "symbol", "split_label"])
-    purged = pd.DataFrame(purge_rows, columns=["event_id", "reason"])
+    # 🔴 D-002 `Task 9.2a`：兩表皆升為複合鍵粒度，欄含 `feature_timeframe`。
+    assignments = pd.DataFrame(
+        assign_rows, columns=["event_id", "symbol", "split_label", "feature_timeframe"]
+    )
+    purged = pd.DataFrame(purge_rows, columns=["event_id", "reason", "feature_timeframe"])
     clusters = build_time_clusters(manifest, bucket_ms)
 
     per_symbol_n: Dict[str, int] = {
@@ -596,6 +660,10 @@ def _derive_single_symbol(
         bucket=int(time_cluster_bucket_ms(manifest, bucket_ms)),
         tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),
         discarded_rows_by_feature_tf=discarded_rows_by_feature_tf,
+        # 🔴 `Task 9.2a`／`D-002-C6`：事件數以 `event_id` **去重**、列數為複合鍵列數。
+        n_events=int(event_keys["event_id"].nunique()),
+        n_event_tf_rows=int(len(event_keys)),
+        n_event_tf_rows_purged=int(len(purged)),
     )
     return EventSplitPlan(
         assignments=assignments, purged=purged, clusters=clusters, summary=summary
@@ -670,13 +738,15 @@ def derive_event_split_from_plans(
             (part.assignments["split_label"] == "test").sum()
         ) if not part.assignments.empty else 0
 
+    # 🔴 `Task 9.2a`：空批之欄集須與非空批**逐字一致**，否則下游 `duplicated(subset=...)`
+    #    在空批上會 `KeyError`（同一個「欄缺」形態，只是發生在空集合）。
     assignments = (
         pd.concat(assign_parts, ignore_index=True) if assign_parts
-        else pd.DataFrame(columns=["event_id", "symbol", "split_label"])
+        else pd.DataFrame(columns=["event_id", "symbol", "split_label", "feature_timeframe"])
     )
     purged = (
         pd.concat(purge_parts, ignore_index=True) if purge_parts
-        else pd.DataFrame(columns=["event_id", "reason"])
+        else pd.DataFrame(columns=["event_id", "reason", "feature_timeframe"])
     )
     clusters = build_time_clusters(manifest, bucket_ms)
     per_symbol_n = {
@@ -694,6 +764,10 @@ def derive_event_split_from_plans(
         #    `receipts.per_tf` 一次算出的，不是逐 symbol 各算一份 ⇒ 多 symbol 路徑
         #    **原樣傳遞**即可，不得在此對各 symbol 的結果再相加（會重複計數）。
         discarded_rows_by_feature_tf=discarded_rows_by_feature_tf,
+        # 🔴 `Task 9.2a`／`D-002-C6`：多標的同樣以整批 `event_keys` 算——事件數去重、列數為列數。
+        n_events=int(event_keys["event_id"].nunique()),
+        n_event_tf_rows=int(len(event_keys)),
+        n_event_tf_rows_purged=int(len(purged)),
     )
     return EventSplitPlan(
         assignments=assignments, purged=purged, clusters=clusters, summary=summary
@@ -723,13 +797,18 @@ def _build_summary(
     bucket: int,
     tier_min_test_events: int = 1,
     discarded_rows_by_feature_tf: Optional[Dict[str, int]] = None,
+    # 🔴 D-002 `Task 9.2a` ＋ `D-002-C6`：**事件數與列數是兩個量**，必須並存、不得互相代用。
+    n_events: Optional[int] = None,
+    n_event_tf_rows: Optional[int] = None,
+    n_event_tf_rows_purged: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """`EventSplitPlan.summary` 之 **13 個必填鍵**（SPEC C-5 ＋ `D-002` Task 9.1 之第 13 鍵）。
+    """`EventSplitPlan.summary` 之 **16 個必填鍵**（SPEC C-5 ＋ `D-002` `Task 9.1` 之丟棄記帳
+    ＋ `Task 9.2a`／`D-002-C6` 之事件數與列數三鍵）。
 
     🔴 **v/R18 更正（grok `GROK-R18-P3-01`／codex `CODEX-R18-P3-02` 撞題）**：本 docstring
     原寫「12 個必填鍵」且引用 `pipeline.py:696`——前者在 Task 9.1 加入
     `discarded_rows_by_feature_tf` 後已漂移，後者之行號早已不存在。鍵數之權威是
-    `test_summary_has_all_thirteen_keys` 之 exact-set 斷言，不是這段散文。
+    `test_summary_has_all_sixteen_keys` 之 exact-set 斷言，不是這段散文。
 
     少一鍵，pipeline 之 summary 轉寫會靜默丟欄、報告整段消失——與 EVTLABEL B5 那條
     「light 視圖漏 `metadata_keep_keys`」同形態。
@@ -775,6 +854,12 @@ def _build_summary(
         "discarded_rows_by_feature_tf": {
             str(k): int(v) for k, v in (discarded_rows_by_feature_tf or {}).items()
         },
+        # 🔴 D-002 `Task 9.2a` ＋ `D-002-C6`：事件數與列數並存。
+        #    `n_events`＝去重後之事件數；`n_event_tf_rows`＝複合鍵列數（＝事件×feature TF）。
+        #    單 feature TF 時兩者相等，但**仍須並存**——相等不是可以省略其一的理由。
+        "n_events": int(n_events or 0),
+        "n_event_tf_rows": int(n_event_tf_rows or 0),
+        "n_event_tf_rows_purged": int(n_event_tf_rows_purged or 0),
     }
 
 

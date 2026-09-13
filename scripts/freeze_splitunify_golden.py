@@ -102,9 +102,12 @@ def _event_keys(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
         rows.append((f"gap{i}", int(index[tr[-1]]) + i * H1, int(index[tr[-1]]) + (i + 2) * H1))
     for i, pos in enumerate(te[:5]):
         rows.append((f"te{i}", int(index[pos]), int(index[pos]) + H1))
+    # 🔴 D-002 `Task 9.2`：`event_keys` 行粒度已改為 `(event_id, feature_timeframe)`，
+    #    本 fixture 補上該欄。**本批刻意維持單一 feature TF**（`1h`）⇒ 複合鍵退化為
+    #    `event_id`、golden 之既有值**逐值不變**；擴維為多 feature TF 平行組屬 `Task 9.5`。
     return pd.DataFrame([
         {"event_id": e, "feature_cutoff_ms": c, "label_start_ms": c,
-         "label_end_ms": le, "symbol": SYM, "timeframe": "1h"}
+         "label_end_ms": le, "symbol": SYM, "timeframe": "1h", "feature_timeframe": "1h"}
         for e, c, le in rows
     ])
 
