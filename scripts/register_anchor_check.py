@@ -1,31 +1,36 @@
 # -*- coding: utf-8 -*-
 """SPLITUNIFY `D-002-C5` register 之碼證錨點閘（可重跑、非一次性）。
 
-**為什麼存在**（R32 `CODEX-R32-P1-01`）：register 每列所載的 `path:line` 是 `Task 9.3`
-施工與 receipt 對證的唯一依據。歷來三道閘依序被打穿：
+**為什麼存在**：register 每列所載的 `path:line` 是 `Task 9.3` 施工與 receipt 對證的唯一依據。
+這道閘**連續四代被打穿**，每一代都曾被當成已閉合，逐條寫明是因為下一代只會更隱蔽：
 
-1. v15「行號 ≤ 該檔總行數」——`C5-19`／`C5-21`／`C5-26`／`C5-27` 四列全指註解卻照樣綠（R31 三家撞題）。
-2. R31 委員修法「statement／AST overlap」——主委實跑量測，只殺掉四處中的**兩處**；
-   指向「真實但錯誤的碼」的三處照樣綠。
-3. 主委加的「行範圍 ＋ 單一 token 子字串」——R32 codex 實跑打穿：
-   `split_projection.py:341`（錯誤訊息**字串**裡的 `feature_timeframe`）與
-   `:566`（另一道重複閘）都能命中同一個 token。
+1. v15「行號 ≤ 該檔總行數」——四列全指註解卻照樣綠（R31 三家撞題）。
+2. R31 委員修法「statement／AST overlap」——主委實跑量測，只殺掉四處中的**兩處**。
+3. v26 主委的「行**範圍** ＋ 單一 token **子字串**」——R32 codex 實跑打穿：
+   `split_projection.py:341`（`raise` 的**訊息字串**）與 `:566` 都命中同一 token。
+4. v27 主委的「單一行 ＋ token **子序列**（可跳過）」——R33 codex 三條實跑打穿：
+   ①子序列可跳 token ⇒ `columns = ["timeframe"]; emit("feature_timeframe")` 這種
+   **語義替身**也會綠；②`_ordered_subsequence_count` 的貪婪不重疊計數漏算重疊命中
+   （`hay=abab a`／`needle=aba` 應為 2 卻回 1）⇒「恰好一次」不對所有序列成立；
+   ③`.tsx` 只在指定行數 literal、不驗檔內唯一性 ⇒ 同 literal 的 decoy 行可冒充。
 
-⇒ 現行判準（逐字採 `CODEX-R32-P1-01` 修法）：
+⇒ **現行判準（v28；逐字採 `CODEX-R33-P1-01`／`P1-02`／`P1-03` 修法）**：
 
-* 每個錨點是**單一精確行**，不是行範圍。
-* `.py`：該行以 `tokenize` 取出 token 串後，register 所載之 **token 序列**須在其中
-  **依序出現且恰好一次**；並以 AST 確認該行落在可執行 statement 上（純 docstring 不算）。
-* `.tsx`／`.ts`：無 AST，改以**精確 literal** 在該行出現且恰好一次（具名誠實邊界）。
-* **0 次或多次命中皆拒絕**。
+* 每個錨點是**單一精確行**。
+* `.py`：該行之**正規化完整 token 序列**須與 register 所載序列**逐一相等**（不是子序列、
+  不是子字串）；且該序列在**整個檔案**中須恰好出現在**一行**上；並以 AST 確認該行落在
+  非純字串常數之 statement 上。
+* `.tsx`／`.ts`：無 AST ⇒ 以**正規化完整行文字**相等，且該正規化行在**整檔恰好一次**。
+* 任何「0 次或多於 1 次」皆拒絕。
 
 🔴 本檔**不是**新的治理機制，是 SPLITUNIFY epic 之 `Task 9.3` 驗收器；
-   由 `tests/momentum/Analysis/test_splitunify_register_anchors.py` 每次回歸跑一次，
-   所以 register 行號日後再漂會**當場轉紅**，不再是「驗收當下跑一次」。
+   由 `tests/momentum/Analysis/test_splitunify_contract.py` 每次回歸跑一次，
+   所以 register 行號日後再漂、或本閘被放寬回任何一代舊形狀，都會**當場轉紅**。
 """
 from __future__ import annotations
 
 import ast
+import hashlib
 import io
 import re
 import sys
@@ -37,13 +42,22 @@ from typing import List, NamedTuple, Sequence, Tuple
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SPEC_PATH = REPO_ROOT / "docs" / "SPLITUNIFY_SPEC.D-002.md"
 
-# register 列之機器可讀錨點子句。逐字格式（反引號為分隔符，勿加空白以外的字元）：
+# register 列之機器可讀錨點子句。逐字格式（反引號為分隔符）：
 #   ANCHOR `<path>:<line>` TOKENS `<t1>` `<t2>` ...
-_ANCHOR_RE = re.compile(
-    r"ANCHOR\s+`([^`]+):(\d+)`\s+TOKENS((?:\s+`[^`]+`)+)"
-)
+# 🔴 TOKENS 須為該行之**完整**正規化 token 序列（`.tsx` 為完整正規化行文字，單一項）。
+_ANCHOR_RE = re.compile(r"ANCHOR\s+`([^`]+):(\d+)`\s+TOKENS((?:\s+`[^`]+`)+)")
+# 🔴 `.tsx` 的行本身含反引號（template literal），無法塞進反引號分隔的 TOKENS ⇒
+#    改用正規化整行之 sha256。仍是「整行相等 ＋ 整檔恰好一次」，不是子字串。
+_ANCHOR_SHA_RE = re.compile(r"ANCHOR\s+`([^`]+):(\d+)`\s+LINESHA256\s+`([0-9a-f]{64})`")
 _TOKEN_RE = re.compile(r"`([^`]+)`")
 _ROW_ID_RE = re.compile(r"^\|\s*`(C5-\d+)`\s*\|")
+_SHA_PREFIX = "sha256:"
+
+_SKIP_TOK = {
+    token_mod.COMMENT, token_mod.NL, token_mod.NEWLINE,
+    token_mod.INDENT, token_mod.DEDENT, token_mod.ENCODING,
+    token_mod.ENDMARKER,
+}
 
 
 class Anchor(NamedTuple):
@@ -61,26 +75,38 @@ def parse_anchors(spec_text: str) -> List[Anchor]:
         if not m_id:
             continue
         row_id = m_id.group(1)
+        for m in _ANCHOR_SHA_RE.finditer(raw):
+            out.append(
+                Anchor(row_id, m.group(1), int(m.group(2)), (_SHA_PREFIX + m.group(3),))
+            )
         for m in _ANCHOR_RE.finditer(raw):
             toks = tuple(_TOKEN_RE.findall(m.group(3)))
             out.append(Anchor(row_id, m.group(1), int(m.group(2)), toks))
     return out
 
 
-def _py_line_tokens(src: str, line: int) -> List[str]:
-    """該行之 token 字面串（不含註解、換行、縮排等結構 token）。"""
-    skip = {
-        token_mod.COMMENT, token_mod.NL, token_mod.NEWLINE,
-        token_mod.INDENT, token_mod.DEDENT, token_mod.ENCODING,
-        token_mod.ENDMARKER,
-    }
+def py_line_token_seq(src: str, line: int) -> Tuple[str, ...]:
+    """該行之正規化完整 token 序列（丟掉註解與排版 token，保留字面含引號）。"""
     vals: List[str] = []
     for tk in tokenize.generate_tokens(io.StringIO(src).readline):
-        if tk.type in skip:
+        if tk.type in _SKIP_TOK:
             continue
         if tk.start[0] <= line <= tk.end[0]:
             vals.append(tk.string)
-    return vals
+    return tuple(vals)
+
+
+def _py_all_line_seqs(src: str) -> List[Tuple[str, ...]]:
+    """逐行之正規化 token 序列（1-based；index 0 為佔位）。"""
+    n = len(src.splitlines())
+    per_line: List[List[str]] = [[] for _ in range(n + 1)]
+    for tk in tokenize.generate_tokens(io.StringIO(src).readline):
+        if tk.type in _SKIP_TOK:
+            continue
+        for ln in range(tk.start[0], tk.end[0] + 1):
+            if 1 <= ln <= n:
+                per_line[ln].append(tk.string)
+    return [tuple(x) for x in per_line]
 
 
 def _py_line_is_executable(src: str, line: int) -> bool:
@@ -97,31 +123,14 @@ def _py_line_is_executable(src: str, line: int) -> bool:
     if line in doc_lines:
         return False
     for n in ast.walk(tree):
-        if isinstance(n, ast.stmt):
-            if n.lineno <= line <= getattr(n, "end_lineno", n.lineno):
-                return True
+        if isinstance(n, ast.stmt) and n.lineno <= line <= getattr(n, "end_lineno", n.lineno):
+            return True
     return False
 
 
-def _ordered_subsequence_count(hay: Sequence[str], needle: Sequence[str]) -> int:
-    """`needle` 以**依序（可不相鄰）**方式出現在 `hay` 的次數（貪婪不重疊計數）。"""
-    if not needle:
-        return 0
-    count = 0
-    i = 0
-    while i < len(hay):
-        j = 0
-        k = i
-        while k < len(hay) and j < len(needle):
-            if hay[k] == needle[j]:
-                j += 1
-            k += 1
-        if j == len(needle):
-            count += 1
-            i = k
-        else:
-            break
-    return count
+def _normalize_text_line(s: str) -> str:
+    """`.tsx`／`.ts` 用：壓掉前後與連續空白，其餘逐字保留。"""
+    return re.sub(r"\s+", " ", s).strip()
 
 
 def check_anchor(anchor: Anchor) -> Tuple[bool, str]:
@@ -136,23 +145,44 @@ def check_anchor(anchor: Anchor) -> Tuple[bool, str]:
     if p.suffix == ".py":
         if not _py_line_is_executable(src, anchor.line):
             return False, f"{anchor.line} 不在可執行 statement 上（註解／空行／docstring）"
-        vals = _py_line_tokens(src, anchor.line)
-        n = _ordered_subsequence_count(vals, anchor.tokens)
-        if n == 0:
-            return False, f"token 序列未在 {anchor.line} 出現：{list(anchor.tokens)}"
-        if n > 1:
-            return False, f"token 序列在 {anchor.line} 出現 {n} 次（多重命中即拒）"
-        return True, f"{anchor.line} tokens={list(anchor.tokens)}"
+        actual = py_line_token_seq(src, anchor.line)
+        if actual != anchor.tokens:
+            return False, (
+                "token 序列不相等（須逐一相等，非子序列）\n"
+                f"      register: {list(anchor.tokens)}\n"
+                f"      實際:     {list(actual)}"
+            )
+        hits = [i for i, s in enumerate(_py_all_line_seqs(src)) if i >= 1 and s == actual]
+        if len(hits) != 1:
+            return False, f"該 token 序列在本檔出現 {len(hits)} 次（行 {hits}）——須恰好一次"
+        return True, f"{anchor.line} n_tokens={len(actual)}"
 
-    # .tsx／.ts：無 AST，精確 literal（具名誠實邊界，見模組 docstring）
-    text = lines[anchor.line - 1]
-    for t in anchor.tokens:
-        c = text.count(t)
-        if c == 0:
-            return False, f"literal 未在 {anchor.line} 出現：{t!r}"
-        if c > 1:
-            return False, f"literal 在 {anchor.line} 出現 {c} 次（多重命中即拒）：{t!r}"
-    return True, f"{anchor.line} literal={list(anchor.tokens)}"
+    # .tsx／.ts：無 AST ⇒ 正規化**完整行**相等 ＋ 整檔恰好一次（具名誠實邊界）
+    if len(anchor.tokens) != 1:
+        return False, "非 .py 之錨點須恰好一項（LINESHA256 或正規化完整行文字）"
+    spec_item = anchor.tokens[0]
+    got_norm = _normalize_text_line(lines[anchor.line - 1])
+    if spec_item.startswith(_SHA_PREFIX):
+        want_sha = spec_item[len(_SHA_PREFIX):]
+        got_sha = hashlib.sha256(got_norm.encode("utf-8")).hexdigest()
+        if got_sha != want_sha:
+            return False, (
+                "正規化整行之 sha256 不相等\n"
+                f"      register: {want_sha}\n"
+                f"      實際:     {got_sha}  ← 該行現為 {got_norm!r}"
+            )
+        hits = [
+            i + 1 for i, ln in enumerate(lines)
+            if hashlib.sha256(_normalize_text_line(ln).encode("utf-8")).hexdigest() == want_sha
+        ]
+    else:
+        want = _normalize_text_line(spec_item)
+        if got_norm != want:
+            return False, f"正規化行文字不相等\n      register: {want!r}\n      實際:     {got_norm!r}"
+        hits = [i + 1 for i, ln in enumerate(lines) if _normalize_text_line(ln) == want]
+    if len(hits) != 1:
+        return False, f"該正規化行在本檔出現 {len(hits)} 次（行 {hits}）——須恰好一次"
+    return True, f"{anchor.line} whole-line"
 
 
 def main(argv: List[str]) -> int:
@@ -162,6 +192,17 @@ def main(argv: List[str]) -> int:
         ok, why = check_anchor(a)
         print(f"{a.path}:{a.line} -> {'ANCHOR_OK' if ok else 'ANCHOR_FAIL'} {why}")
         return 0 if ok else 1
+    if len(argv) == 3 and argv[1] == "--emit":
+        # 產生某行之 register 子句內容，供貼回 SPEC（避免手抄）
+        path, line = argv[2].rsplit(":", 1)
+        p = REPO_ROOT / path
+        if p.suffix == ".py":
+            seq = py_line_token_seq(p.read_text(encoding="utf-8"), int(line))
+            print(" ".join("`%s`" % t for t in seq))
+        else:
+            norm = _normalize_text_line(p.read_text(encoding="utf-8").splitlines()[int(line) - 1])
+            print(hashlib.sha256(norm.encode("utf-8")).hexdigest())
+        return 0
 
     anchors = parse_anchors(SPEC_PATH.read_text(encoding="utf-8"))
     if not anchors:

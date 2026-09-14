@@ -128,10 +128,17 @@
   - **「沒有 persisted recheck」那半已關**：兩條新測試進 `tests/momentum/Analysis/test_splitunify_contract.py`（該檔在六路回歸內）⇒ register 行號日後再漂、或閘被放寬回子字串，**當場轉紅**。must-fail 清單逐字＝`:341`／`:566`／`:556`／`pipeline.py:760`。破壞性自證兩案皆轉紅。
   - **三條 assumed 全數成立**（codex 逐條複跑）：`SU-RESID-V8-ATTEST` 併入面 b 為誠實登記；`round_start_head` 實跑 `MATCH=1`、空倉 `rev-parse` rc=128 故拒發 token 為預期、production emitter 僅 `scripts/gate.sh` 一處；C4／C5 **無第十三處** live 互斥。
   - **SPEC 進 v27**，body sha256 `5dc53606d1fe4679861e1ccaf9919e6fbb274871f1ac87d2a69adae49f24b7b1` ⇒ v26 戳記失效須重簽。六路回歸 **739 passed、0 failed、0 xfailed**（+2＝新錨點測試）；`GOLDEN OK`。
-- **下一步**：派 `review-r33`（本條閉合再驗證＋v27 重簽）→ 收斂＋`debt_clear` → 領 B9D impl token 進 `Task 9.3`。🔴 **B9D 起審查輪編號改為每批重新起算**（`…-b9d-review-r1`）。
+㉝**review-r33：composer／grok 連兩輪零 finding 並 proceed；codex 三條 P1＋一條 P2**。
+  - 🔴 **三條 P1 逐一對應主委在 r33 brief 自標之 assumed 1 的三個「我沒查」子項**——①token 比對是**可跳 token 的子序列** ⇒ `columns = ["timeframe"]; emit("feature_timeframe")` 這種**語義替身**也綠；②`_ordered_subsequence_count` 貪婪不重疊計數**漏算重疊命中**（`a b a b a` 找 `a b a` 應 2 回 1）⇒「恰好一次」不成立；③`.tsx` 只比指定行、**不驗檔內唯一性** ⇒ 同 literal 之 decoy 行可冒充。
+  - 🔴 **這道閘連續第四代被打穿**（v15 行號≤總行數 → R31 委員 AST overlap → v26 範圍＋子字串 → v27 單行＋子序列），四代都曾被當成已閉合。
+  - **逐字採三條修法**：`.py` 改**正規化完整 token 序列逐一相等** ＋ 該序列**整檔恰好一行** ＋ 保留 AST statement 閘，`_ordered_subsequence_count` **整個移除**；`.tsx` 改**正規化整行 sha256 相等** ＋ 整檔恰好一次。16 個 ANCHOR 全改寫為完整序列並實跑通過；四個反例全 `ANCHOR_FAIL` 並逐條進 must-fail 回歸。
+  - **另補反向測試** `test_d002_register_anchor_gate_accepts_the_real_lines`（真實落點必須通過，否則 must-fail 三條可靠「閘永遠回 False」全過）＋ checker 檔缺席即 assert 失敗。
+  - **SPEC 進 v28**，body sha256 `5b73e5fa65007112df5c407761b7477dfc11046b41c581b7cf645e33c49c82a4` ⇒ v27 戳記失效須重簽。六路回歸 **741 passed、0 failed、0 xfailed**（+2＝R33 decoy 與反向測試）；`GOLDEN OK`；錨點閘 16/16 rc=0。
+  - 🔴 **程序定論（兩條，方向相反）**：①「把沒把握的面逐條寫進 brief 交出去攻」**第六輪被證實有效**（R18／R21／R22／R25／R27／R33）。②**但主委自創判準時的自證深度不足**——v27 那版只回測「上一代的 must-fail 樣本」，沒針對**新判準自身的結構選擇**（子序列、計數方式、檔內唯一性）各構造反例。⇒ 新規則：**凡自創判準，須對該判準自身的每一個結構選擇各構造一個反例**。
+- **下一步**：派 `review-r34`（r33 四條閉合再驗證＋v28 重簽）→ 收斂＋`debt_clear` → 領 B9D impl token 進 `Task 9.3`。🔴 **B9D 起審查輪編號改為每批重新起算**（`…-b9d-review-r1`）。
 
 ## 現況
-- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v27，body sha256 `5dc53606d1fe4679861e1ccaf9919e6fbb274871f1ac87d2a69adae49f24b7b1`，🔴 現為「待重簽」**。
+- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v28，body sha256 `5b73e5fa65007112df5c407761b7477dfc11046b41c581b7cf645e33c49c82a4`，🔴 現為「待重簽」**。
 - **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **已做**（stamp-r1..r4）④領 impl token 後才動生產碼 **已做**（B9A／B9B 各憑 token）。
 - **Phase 9 依賴序（四方一致）**：`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
 - 🔴 **批次狀態之唯一權威＝`docs/SPLITUNIFY_TODO.md` §B 之「狀態」欄**（2026-09-14 使用者質問「你為何又跳過 TODO」後定）。**出生事故**：主委實作完 B9A／B9B／B9C 三批，卻**一次都沒回去標 TODO**——狀態只記在本檔與白話看板，於是同一件事有**三份**而 TODO 是過期的那一份；**這就是委員已抓九次的同一個病**，只是漏的是 TODO 自己的進度、犯的人是主委。⇒ **本檔與 `白話說明/` 一律不再自寫批次狀態清單**，只指向 §B；每批收尾固定動作新增一項：**回去標 TODO §B 與該 Task 標題**。

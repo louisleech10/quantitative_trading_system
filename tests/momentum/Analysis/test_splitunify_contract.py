@@ -12,6 +12,7 @@ C-0 決議③(b)（`estimand_scope`）。
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -129,6 +130,11 @@ _ANCHOR_CHECKER = REPO / "scripts" / "register_anchor_check.py"
 
 
 def _load_anchor_checker():
+    # 🔴 R33 `CODEX-R33-P1-02` 之 assumed ②：checker 被刪／改名時，這裡必須是**明確的紅**，
+    #    不是靜默 collect error。
+    assert _ANCHOR_CHECKER.is_file(), (
+        f"錨點閘不見了：{_ANCHOR_CHECKER}——register 落點就此無人驗證"
+    )
     spec = _importlib_util.spec_from_file_location(
         "register_anchor_check", _ANCHOR_CHECKER
     )
@@ -152,19 +158,19 @@ def test_d002_register_anchors_all_valid():
 
 
 def test_d002_register_anchor_gate_rejects_known_false_greens():
-    """must-fail 回歸：歷來三道閘各自放行過的落點，現行閘必須全部拒絕。
+    """must-fail 回歸：歷來**四代**閘各自放行過的落點，現行閘必須全部拒絕。
 
-    - `:341` 是 `raise ValueError` 的**訊息字串**，v26 前的「行範圍＋子字串」會綠
-      （R32 codex 實跑打穿）。
-    - `:566` 是另一道重複閘，同樣含 `feature_timeframe` 字面。
-    - `:556`／`pipeline.py:760` 是**純註解行**，v15 的「行號 ≤ 總行數」會綠。
+    - `:341` 是 `raise ValueError` 的**訊息字串**；`:566` 是另一道重複閘——
+      v26 的「行範圍＋子字串」對兩者皆綠（R32 `CODEX-R32-P1-01` 實跑）。
+    - `:556`／`pipeline.py:760` 是**純註解行**——v15 的「行號 ≤ 總行數」對兩者皆綠。
     """
     mod = _load_anchor_checker()
     sp = "momentum/Analysis/event_samples/split_projection.py"
+    c519 = ("columns", "=", "{", '"timeframe"', ":", '"feature_timeframe"', "}")
     must_fail = [
-        (sp, 341, ("columns", '"timeframe"', '"feature_timeframe"')),
+        (sp, 341, c519),
         (sp, 341, ("feature_timeframe",)),
-        (sp, 566, ("columns", '"timeframe"', '"feature_timeframe"')),
+        (sp, 566, c519),
         (sp, 566, ("feature_timeframe",)),
         (sp, 556, ("purged",)),
         ("momentum/Analysis/event_samples/pipeline.py", 760, ('"n_purged"',)),
@@ -175,3 +181,66 @@ def test_d002_register_anchor_gate_rejects_known_false_greens():
         if ok:
             leaked.append(f"{path}:{line} {list(toks)} — 竟然通過：{why}")
     assert not leaked, "錨點閘又變成弱閘了：\n" + "\n".join(leaked)
+
+
+def test_d002_register_anchor_gate_rejects_r33_decoys(tmp_path):
+    """must-fail 回歸（R33 三條 finding 之逐條反例；全部由委員實跑構造）。
+
+    `CODEX-R33-P1-01`：token **子序列**可跳過 token ⇒ 語義替身冒充真實落點。
+    `CODEX-R33-P1-02`：貪婪不重疊計數漏算重疊命中 ⇒「恰好一次」不成立。
+    `CODEX-R33-P1-03`：`.tsx` 只比指定行、不驗檔內唯一性 ⇒ 同 literal 的 decoy 行可冒充。
+    """
+    mod = _load_anchor_checker()
+    c519 = ("columns", "=", "{", '"timeframe"', ":", '"feature_timeframe"', "}")
+    tsx_line = (
+        "            ? `／train ${fmt(s.n_train, 0)}／test ${fmt(s.n_test, 0)}"
+        "／purge ${fmt(s.n_purged, 0)}`"
+    )
+    tsx_sha = mod._SHA_PREFIX + hashlib.sha256(
+        mod._normalize_text_line(tsx_line).encode("utf-8")
+    ).hexdigest()
+
+    cases = []
+    p1 = tmp_path / "decoy_semantic.py"
+    p1.write_text(
+        'def f():\n    columns = ["timeframe"]; emit("feature_timeframe")\n',
+        encoding="utf-8",
+    )
+    cases.append(("P1-01 語義替身", str(p1), 2, c519))
+
+    p2 = tmp_path / "decoy_dup_seq.py"
+    p2.write_text(
+        'def f():\n'
+        '    columns = {"timeframe": "feature_timeframe"}\n'
+        '    columns = {"timeframe": "feature_timeframe"}\n',
+        encoding="utf-8",
+    )
+    cases.append(("P1-02 同序列出現兩行", str(p2), 2, c519))
+
+    p3 = tmp_path / "decoy_dup_line.tsx"
+    p3.write_text("const a = 1;\n" + tsx_line + "\n" + tsx_line + "\n", encoding="utf-8")
+    cases.append(("P1-03 同正規化行兩處", str(p3), 2, (tsx_sha,)))
+
+    p4 = tmp_path / "decoy_shadow.tsx"
+    p4.write_text(
+        "const decoy = `／train ${fmt(s.n_train, 0)}`;\n" + tsx_line + "\n",
+        encoding="utf-8",
+    )
+    cases.append(("P1-03b 指定行是 decoy", str(p4), 1, (tsx_sha,)))
+
+    leaked = []
+    for label, path, line, toks in cases:
+        ok, why = mod.check_anchor(mod.Anchor("(r33)", path, line, toks))
+        if ok:
+            leaked.append(f"{label}: {path}:{line} 竟然通過 — {why}")
+    assert not leaked, "R33 反例又被放行：\n" + "\n".join(leaked)
+
+
+def test_d002_register_anchor_gate_accepts_the_real_lines(tmp_path):
+    """可證偽之另一半：**正確**的錨點必須通過，否則上面兩條可以靠「永遠回 False」作弊。"""
+    mod = _load_anchor_checker()
+    p = tmp_path / "real.py"
+    p.write_text('def f():\n    columns = {"timeframe": "feature_timeframe"}\n', encoding="utf-8")
+    c519 = ("columns", "=", "{", '"timeframe"', ":", '"feature_timeframe"', "}")
+    ok, why = mod.check_anchor(mod.Anchor("(real)", str(p), 2, c519))
+    assert ok, f"真實落點竟被拒（閘壞成永遠 False）：{why}"
