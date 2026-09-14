@@ -20,7 +20,8 @@
 * `.py`：該行之**正規化完整 token 序列**須與 register 所載序列**逐一相等**（不是子序列、
   不是子字串）；且該序列在**整個檔案**中須恰好出現在**一行**上；並以 AST 確認該行落在
   非純字串常數之 statement 上。
-* `.tsx`／`.ts`：無 AST ⇒ 以**正規化完整行文字**相等，且該正規化行在**整檔恰好一次**。
+* `.tsx`／`.ts`：無 AST ⇒ 以**正規化完整行文字**相等，且該正規化行在
+  **全 repo 之 `.ts`／`.tsx`** 中恰好一次（R34 起由單檔擴到全域；跳過建置產物目錄，見 `_TS_SKIP_DIRS`）。
 * 任何「0 次或多於 1 次」皆拒絕。
 
 🔴 本檔**不是**新的治理機制，是 SPLITUNIFY epic 之 `Task 9.3` 驗收器；
@@ -47,7 +48,7 @@ SPEC_PATH = REPO_ROOT / "docs" / "SPLITUNIFY_SPEC.D-002.md"
 # 🔴 TOKENS 須為該行之**完整**正規化 token 序列（`.tsx` 為完整正規化行文字，單一項）。
 _ANCHOR_RE = re.compile(r"ANCHOR\s+`([^`]+):(\d+)`\s+TOKENS((?:\s+`[^`]+`)+)")
 # 🔴 `.tsx` 的行本身含反引號（template literal），無法塞進反引號分隔的 TOKENS ⇒
-#    改用正規化整行之 sha256。仍是「整行相等 ＋ 整檔恰好一次」，不是子字串。
+#    改用正規化整行之 sha256。仍是「整行相等 ＋ 全 repo 之 .ts／.tsx 恰好一次」，不是子字串。
 _ANCHOR_SHA_RE = re.compile(r"ANCHOR\s+`([^`]+):(\d+)`\s+LINESHA256\s+`([0-9a-f]{64})`")
 _TOKEN_RE = re.compile(r"`([^`]+)`")
 _ROW_ID_RE = re.compile(r"^\|\s*`(C5-\d+)`\s*\|")
@@ -188,29 +189,40 @@ def check_anchor(anchor: Anchor) -> Tuple[bool, str]:
         return False, why
     if not p.is_file():
         return False, f"檔不存在：{anchor.path}"
-    src = p.read_text(encoding="utf-8")
+    # 🔴 R35 `CODEX-R35-P2-01`：非 UTF-8／語法壞掉的標的檔，舊版會直接把例外往外丟
+    #   （整支 checker crash），而不是回一則乾淨的 ANCHOR_FAIL。載入邊界統一捕捉。
+    try:
+        src = p.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        return False, f"標的檔讀不進來（{type(exc).__name__}）：{exc}"
     lines = src.splitlines()
     if not (1 <= anchor.line <= len(lines)):
         return False, f"行號超出範圍：{anchor.line} > {len(lines)}"
 
     if p.suffix == ".py":
-        if py_line_spans_multiline_token(src, anchor.line):
+        try:
+            spans = py_line_spans_multiline_token(src, anchor.line)
+            executable = _py_line_is_executable(src, anchor.line)
+            actual = py_line_token_seq(src, anchor.line)
+            all_seqs = _py_all_line_seqs(src)
+        except (SyntaxError, IndentationError, tokenize.TokenError, ValueError) as exc:
+            return False, f"標的檔無法 tokenize／parse（{type(exc).__name__}）：{exc}"
+        if spans:
             return False, f"{anchor.line} 落在**跨行 token**（多行字串等）之內——fail-closed"
-        if not _py_line_is_executable(src, anchor.line):
+        if not executable:
             return False, f"{anchor.line} 不在可執行 statement 上（註解／空行／docstring）"
-        actual = py_line_token_seq(src, anchor.line)
         if actual != anchor.tokens:
             return False, (
                 "token 序列不相等（須逐一相等，非子序列）\n"
                 f"      register: {list(anchor.tokens)}\n"
                 f"      實際:     {list(actual)}"
             )
-        hits = [i for i, s in enumerate(_py_all_line_seqs(src)) if i >= 1 and s == actual]
+        hits = [i for i, s in enumerate(all_seqs) if i >= 1 and s == actual]
         if len(hits) != 1:
             return False, f"該 token 序列在本檔出現 {len(hits)} 次（行 {hits}）——須恰好一次"
         return True, f"{anchor.line} n_tokens={len(actual)}"
 
-    # .tsx／.ts：無 AST ⇒ 正規化**完整行**相等 ＋ 整檔恰好一次（具名誠實邊界）
+    # .tsx／.ts：無 AST ⇒ 正規化**完整行**相等 ＋ 先驗同檔唯一、再驗**全 repo** 唯一（具名誠實邊界）
     if len(anchor.tokens) != 1:
         return False, "非 .py 之錨點須恰好一項（LINESHA256 或正規化完整行文字）"
     spec_item = anchor.tokens[0]

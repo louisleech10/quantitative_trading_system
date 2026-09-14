@@ -298,3 +298,26 @@ def test_d002_register_anchor_gate_accepts_the_real_lines(tmp_path):
     with _rooted_at(mod, tmp_path):
         ok, why = mod.check_anchor(mod.Anchor("(real)", "real.py", 2, c519))
     assert ok, f"真實落點竟被拒（閘壞成永遠 False）：{why}"
+
+
+def test_d002_register_anchor_gate_fails_cleanly_on_malformed_targets(tmp_path):
+    """must-fail 回歸（R35 `CODEX-R35-P2-01`）：壞掉的標的檔要**乾淨地紅**，不是整支 crash。
+
+    非 UTF-8、語法錯誤、未閉合多行字串——三者舊版都會把例外往外丟，
+    使 `register_anchor_check.py` 在該情境下是 crash 而非 `ANCHOR_FAIL`。
+    """
+    mod = _load_anchor_checker()
+    (tmp_path / "bad_syntax.py").write_text("def f(:\n    x = 1\n", encoding="utf-8")
+    (tmp_path / "bad_utf8.py").write_bytes(b"x = 1\n\xff\xfe\x00bad\n")
+    (tmp_path / "unterminated.py").write_text('s = """abc\n', encoding="utf-8")
+    problems = []
+    with _rooted_at(mod, tmp_path):
+        for name in ("bad_syntax.py", "bad_utf8.py", "unterminated.py"):
+            try:
+                ok, why = mod.check_anchor(mod.Anchor("(malformed)", name, 1, ("x",)))
+            except Exception as exc:  # noqa: BLE001 — 這裡就是要抓「不該冒出來的例外」
+                problems.append(f"{name}: 竟然 crash — {type(exc).__name__}: {exc}")
+                continue
+            if ok:
+                problems.append(f"{name}: 竟然通過 — {why}")
+    assert not problems, "壞檔未被乾淨拒絕：\n" + "\n".join(problems)

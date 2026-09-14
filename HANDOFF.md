@@ -141,10 +141,16 @@
   - 🔴 **r33 定下的新規則本輪已照做且有效**：四個結構選擇各跑一個破壞性自證、全數轉紅；補錨時另由閘自己抓出 `split_projection.py:812` 與 `:915` token 序列相同（改用 `:811`，此偏離具名交 r35）。**但它仍不足以事先發現「涵蓋不足」**——那不是判準自身的形狀問題 ⇒ 必答 4 之「判涵蓋充分性而非只判指對」保留為固定必答。
   - **SPEC 進 v29**，body sha256 `d0d9006985ba8f4152bb5489ea13a30bede64bcb7b69929effbcf0b75f90dca5` ⇒ v28 戳記失效須重簽。六路回歸 **741 passed、0 failed、0 xfailed**；`GOLDEN OK`；錨點閘 **22/22** rc=0。
   - 🔴 **又踩了一次 HANDOFF 已記的坑**：用腳本全檔取代反引號 token，連**byte-faithful 附錄**一起改到，`completeness_check` 會紅。已只還原附錄三處。**取代一律只限群集區（附錄標頭之前）**。
-- **下一步**：派 `review-r35`（r34 五條閉合再驗證＋v29 重簽）→ 收斂＋`debt_clear` → 領 B9D impl token 進 `Task 9.3`。🔴 **B9D 起審查輪編號改為每批重新起算**（`…-b9d-review-r1`）。
+㉟**review-r35：🎉 三家全數 `proceed`，且三家皆對 v29 蓋 `APPROVED`——自 v21 以來首次乾淨三家戳記**。codex 之 r34 四條全 `CLOSED`、grok 之 r34 一條 `CLOSED`。
+  - **只剩兩條 P2，兩家皆明示非 blocking，均已即修不留殘留**：①`CODEX-R35-P2-01` 錨點閘遇 malformed／非 UTF-8 標的檔會**整支 crash 而非乾淨 `ANCHOR_FAIL`** ⇒ 載入邊界統一捕捉六種例外，三種壞檔實跑皆乾淨轉紅並進六路回歸；②`GROK-R35-P2-01` R34 已把 `.tsx` 唯一性擴到全 repo，但 SPEC `C5-28` 腳註與 checker 註解**三處仍寫「整檔恰好一次」** ⇒ 四處已改。
+  - 🔴 **②是「改 A 沒同步 B」同型第十三次，且又是主委上一輪改了行為卻沒回頭同步自己的敘述**（與 v25 那次完全同型）。
+  - 🔴 **值得記的轉折**：兩條 P2 都不是「閘被繞過」，而是**閘的邊界行為**與**閘的自我描述**。前五代打的是正確性，第六代開始打的是**可維護性**——通常代表核心判準已經穩了。
+  - **SPEC 進 v30**，body sha256 `e0cff27f6b4695d384283af146e8521b332bec9df4d20bafe96c3d7bcb3a6e76` ⇒ v29 之三家戳記失效，須以 **stamp 輪**重簽（非全審輪；兩條 P2 皆為委員自己要求之修補）。六路回歸 **742 passed、0 failed、0 xfailed**；`GOLDEN OK`；錨點閘 22/22 rc=0。
+  - 🔴 **stamp-r6 要同時蓋兩份**：`docs/SPLITUNIFY_SPEC.D-002.md`（v30 body 上列）**與** `handoffs/reconcile/20260911-splitunify-b9-review-r35/synth.md`（body `acf0b77ca2f05cab8481c82d7aa894f8219e0ff509212c3ab187d3a392f4655c`）——後者是 B9D impl token 之 `--adversarial` 標的，`gate.sh` 機器強制要求它已獲全數戳記。
+- **下一步**：派 `stamp-r6` 對 v30 三家重簽 → `reconcile_stamps_check` 全 APPROVED → 領 B9D impl token 進 `Task 9.3`。🔴 **B9D 起審查輪編號改為每批重新起算**（`…-b9d-review-r1`）。
 
 ## 現況
-- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v29，body sha256 `d0d9006985ba8f4152bb5489ea13a30bede64bcb7b69929effbcf0b75f90dca5`，🔴 現為「待重簽」**。
+- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v30，body sha256 `e0cff27f6b4695d384283af146e8521b332bec9df4d20bafe96c3d7bcb3a6e76`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED，因本次兩條 P2 修補失效）**。
 - **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **已做**（stamp-r1..r4）④領 impl token 後才動生產碼 **已做**（B9A／B9B 各憑 token）。
 - **Phase 9 依賴序（四方一致）**：`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
 - 🔴 **批次狀態之唯一權威＝`docs/SPLITUNIFY_TODO.md` §B 之「狀態」欄**（2026-09-14 使用者質問「你為何又跳過 TODO」後定）。**出生事故**：主委實作完 B9A／B9B／B9C 三批，卻**一次都沒回去標 TODO**——狀態只記在本檔與白話看板，於是同一件事有**三份**而 TODO 是過期的那一份；**這就是委員已抓九次的同一個病**，只是漏的是 TODO 自己的進度、犯的人是主委。⇒ **本檔與 `白話說明/` 一律不再自寫批次狀態清單**，只指向 §B；每批收尾固定動作新增一項：**回去標 TODO §B 與該 Task 標題**。
