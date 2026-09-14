@@ -66,7 +66,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B9A** | 9.1 | ✅ **完成**（impl `c98acf26`；審碼 r18、閉合 r19） | B4 ＋ `D-002` 三家 `RECONCILE-STAMP` rc=0 | 揭露先行；只動 producer 回傳形狀與 summary 一鍵，可獨立回退 | 中 |
 | **B9B** | 9.2, 9.2a | ✅ **完成**（impl `9e87386f`；審碼 r20、閉合 r21／r22） | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
 | **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27，閉合 r28–r35 共九輪＋stamp-r6＋consult-r3/r4/r5；🔴 **consult-r4/r5 三家一致判定方向反轉**（見 `Task 9.3`）；**現待 review 覆核 v32＋重簽**） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
-| **B9D** | 9.3 | 🔶 **實作完成、待審碼**（v39 經 r43–r47 兩家 APPROVED 後施工；Tier 0 同一 commit；SPEC 隨之 v40 重出錨點；下一步 `review-r48` 兩家審碼） | B9C | 🔴 **v35 更正（v32 方向反轉後 §B 未同步）**：現行＝**把 `assignments`／`purged` 退回事件級＋同步計數**（具名 seam；Tier 0 同 commit）；下游表已改為追溯用、多數維持現狀；前端 `byEventId` owner 移 `Task 9.5`。以下原文保留供追溯：~~`Task 9.3` 表列**九處**逐處處置~~（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
+| **B9D** | 9.3 | ✅ **完成**（impl `4dcae642`；審碼 r48 兩家 APPROVED v40、stamp-r7 覆核補測並戳記授權依據；Tier 0 同一 commit） | B9C | 🔴 **v35 更正（v32 方向反轉後 §B 未同步）**：現行＝**把 `assignments`／`purged` 退回事件級＋同步計數**（具名 seam；Tier 0 同 commit）；下游表已改為追溯用、多數維持現狀；前端 `byEventId` owner 移 `Task 9.5`。以下原文保留供追溯：~~`Task 9.3` 表列**九處**逐處處置~~（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
 | **B9E** | 9.4 | ⬜ 未開工 | B9C ＋ 🔴 **B9D**（v36，`CODEX-R39-P1-05`：報告／baseline 驗收依賴事件級輸出與計數完成） | 記帳鏈與 `baseline` 拆鍵（投影計數已移 `Task 9.3`） | 中 |
 | **B9F** | 9.5 | ⬜ 未開工（排最後） | B9D ＋ B9E | golden 多 TF／交錯平行組與前端 `byEventId`；🔴 v36 澄清：decision-anchor 換錨已於 B9C 完成，本批不重做側別換錨；整合後比對舊單 TF 值、依既定允許面凍結新組 | 大 |
 
@@ -661,7 +661,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.3 🔶 **實作完成、待審碼（B9D）** —— 🔴 **v32 全面改寫：切分歸屬表退回事件級（`票 SPLITUNIFY`）**
+### Task 9.3 ✅ **已完成（B9D，impl `4dcae642`）** —— 🔴 **v32 全面改寫：切分歸屬表退回事件級（`票 SPLITUNIFY`）**
 
 🔴 **本 Task 之目標於 v32 反轉**。原目標「把下游改成能消費複合鍵表」已**作廢**；現目標是**把 `assignments`／`purged` 退回一事件一列**，下游因此多半不必改。
 
