@@ -12,6 +12,8 @@
 <h1 id="gap-3-驗收清單-照著做就好">GAP-3 驗收清單 — 照著做就好</h1>
 <blockquote>
 <p><strong>這份是給你照著操作的。</strong> 每一項都有三欄：<strong>你做什麼</strong> → <strong>你應該看到什麼</strong> → <strong>如果不是這樣代表什麼</strong>。</p>
+<h2 id="ℹ-2026-09-15搜尋頁匯出沒有任何畫面或行為改變splitunify-第-9-批-95">ℹ️ 2026-09-15：搜尋頁匯出<strong>沒有任何畫面或行為改變</strong>（<code>SPLITUNIFY</code> 第 9 批 9.5）</h2>
+<p>只新增一條自動測試：確認「匯出 CSV」時，每一列帶出的附帶欄位（例如 <code>meta.price_change</code>）確實是<strong>那一列自己的值</strong>，即使來源資料帶有特徵週期欄也不會變空。本清單既有項目照舊，不需多做任何驗收。</p>
 <h2 id="-2026-09-11ic-分析頁多了一行splitunify-第-4-批">🔴 2026-09-11：IC 分析頁多了一行（<code>SPLITUNIFY</code> 第 4 批）</h2>
 <p>降級訊息底下多一行：<strong>驗證段事件數 N · 來源：K 線時間切分（holdout）</strong>。
 這是<strong>全平台唯一</strong>的驗證段數字——以前同一批事件可能看到兩個不一樣的數字（你 UAT 看到的 31 vs 33）。
