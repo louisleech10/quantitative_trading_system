@@ -28,6 +28,9 @@ from momentum.Analysis.event_samples.split_projection import (
     # 🔴 D-002 `Task 9.2b`：SPEC §V 之 (3.2) 反例逐字為「**直接構造 `assignments`**
     #    使同一 `event_id` 之兩列異側 THEN raise」⇒ 該檢查必須有可單獨呼叫的入口。
     _assert_event_level_side_consistency,
+    # 🔴 D-002 `Task 9.3`：聚合 seam 與串接唯一性 helper 之應紅測試**直接呼叫**（不得宣稱由上游 guard 間接覆蓋）。
+    _aggregate_event_level_split_rows,
+    _assert_concat_event_level_unique,
 )
 from momentum.Analysis.event_samples.types import (
     AlignmentReceipts,
@@ -1578,38 +1581,66 @@ def test_event_level_duplicate_event_id_still_blocked_after_validate_relaxed() -
 
 
 def test_assignments_composite_key_unique() -> None:
-    """`assignments` 須含 `feature_timeframe` 欄，且 `(event_id, feature_timeframe)` 唯一。
+    """🔴 D-002 `Task 9.3`（`M-SU-D2-41`）：`assignments` **退回事件級**——合法兩 feature TF 批下一事件恰一列。
 
-    🔴 先斷言**欄位存在**再驗唯一性——只靠 `duplicated(subset=...)` 的 `KeyError` 會被
-    `if "feature_timeframe" in df.columns` 軟包短路（R18 兩家撞題）。
+    node id 沿用（TODO `Task 9.3` 指名改寫）；斷言由 v29 之「含 `feature_timeframe` 欄且複合鍵唯一」
+    **反轉**為「`event_id` 唯一、欄集＝事件級、無 `feature_timeframe` 欄」。
+    聚合改回「每個 `event_keys` 列各 append 一筆」⇒ 同事件兩列 ⇒ 本條轉紅。
     """
     index, train, test, keys, man, _ = _multi_feature_tf_case()
+    assert len(keys) == 2 * keys["event_id"].nunique(), "fixture 前提變了：須為每事件兩個 feature TF"
     plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
-    assert "feature_timeframe" in plan.assignments.columns
-    assert not plan.assignments.duplicated(subset=["event_id", "feature_timeframe"]).any()
+    assert list(plan.assignments.columns) == ["event_id", "symbol", "split_label"]
+    assert "feature_timeframe" not in plan.assignments.columns
+    assert plan.assignments["event_id"].is_unique, "一事件恰一列"
+    assert plan.assignments["event_id"].tolist() == ["e_train_ok", "e_test"]
+    assert plan.assignments["split_label"].tolist() == ["train", "test"]
 
 
 def test_purged_composite_key_unique() -> None:
-    """`purged` 同樣須含該欄且複合鍵唯一（purge 路徑不得折疊列）。"""
+    """🔴 D-002 `Task 9.3`（`M-SU-D2-41`）：`purged` 同樣退回事件級——一事件恰一列、無 `feature_timeframe` 欄。"""
     index, train, test, keys, man, _ = _multi_feature_tf_case()
     plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
-    assert "feature_timeframe" in plan.purged.columns
-    assert not plan.purged.duplicated(subset=["event_id", "feature_timeframe"]).any()
+    assert list(plan.purged.columns) == ["event_id", "reason"]
+    assert "feature_timeframe" not in plan.purged.columns
+    assert plan.purged["event_id"].is_unique, "一事件恰一列"
+    assert plan.purged["event_id"].tolist() == ["e_train_leak", "e_gap"]
 
 
 def test_summary_has_n_events_and_n_event_tf_rows() -> None:
-    """`D-002-C6`：事件數與列數**並存**且語意不同（多 feature TF 時列數 > 事件數）。"""
+    """`D-002-C6`：事件數與列數**並存**且語意不同（多 feature TF 時列數 > 事件數）。
+
+    🔴 D-002 `Task 9.3`（`M-SU-D2-44`）：退回後 `len(purged)` 是**事件數**，
+    `n_event_tf_rows_purged` 須改對 `event_keys` 中 purged 側之**列數**；`n_purged` 仍為事件數。
+    一個 purged 事件帶兩個 feature TF ⇒ 前者 2、後者 1；改回 `len(purged)` 即得 1 而轉紅。
+    """
     index, train, test, keys, man, _ = _multi_feature_tf_case()
     plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
     s = plan.summary
     assert s["n_events"] == keys["event_id"].nunique()
     assert s["n_event_tf_rows"] == len(keys)
     assert s["n_event_tf_rows"] > s["n_events"], "多 feature TF 下列數必須大於事件數"
-    assert s["n_event_tf_rows_purged"] == len(plan.purged)
+    assert s["n_purged"] == 2, "e_train_leak／e_gap 兩個事件"
+    assert s["n_event_tf_rows_purged"] == 4, "兩個 purged 事件 × 兩個 feature TF"
+
+    gap_index = _feature_index()
+    g_train, g_test, g_b = _plans(gap_index)
+    gap_anchor = int(gap_index[g_b["train_row_index"][-1]]) + H1  # 隔離帶內 ⇒ purged
+    _, _, _, g_keys, g_man, _ = _anchor_case(anchor_by_event={"e_one_purged": gap_anchor})
+    g_plan = derive_event_split_from_plans(
+        g_train, g_test, g_keys, gap_index, manifest=g_man, bucket_ms=H1
+    )
+    assert len(g_keys) == 2 and g_keys["event_id"].nunique() == 1, "fixture 前提變了：一事件×兩 TF"
+    assert g_plan.summary["n_purged"] == 1
+    assert g_plan.summary["n_event_tf_rows_purged"] == 2
 
 
 def test_duplicate_composite_key_error_message_names_key_not_side() -> None:
-    """鍵重複時訊息須指**鍵重複**，不得誤報異側（guard 先後之可觀測證據）。"""
+    """鍵重複時訊息須指 **`event_keys` 之複合鍵重複**，不得誤報異側（guard 先後之可觀測證據）。
+
+    🔴 D-002 `Task 9.3`：複合鍵只屬 `event_keys` 稽核層（`assignments` 已退回事件級）⇒
+    本條所驗之鍵重複訊息須指名 `event_keys` 與 `(event_id, feature_timeframe)`，不得指向 `assignments`。
+    """
     index, train, test, keys, _, _ = _basic_case()
     dup = pd.concat([keys, keys.iloc[[0]]], ignore_index=True)
     with pytest.raises(ValueError, match="複合鍵重複") as ei:
@@ -1617,7 +1648,10 @@ def test_duplicate_composite_key_error_message_names_key_not_side() -> None:
             train, test, dup, index, manifest=_manifest(dup.drop_duplicates("event_id")),
             bucket_ms=H1,
         )
-    assert "異側" not in str(ei.value), "鍵尚不唯一時談「同側」無從定義，不得先跑同側檢查"
+    msg = str(ei.value)
+    assert "event_keys" in msg and "(event_id, feature_timeframe)" in msg, msg
+    assert "assignments" not in msg, "鍵重複是稽核層輸入之病，不是切分輸出表之病"
+    assert "異側" not in msg, "鍵尚不唯一時談「同側」無從定義，不得先跑同側檢查"
 
 
 def test_clusters_remain_event_level_when_multi_feature_tf() -> None:
@@ -1678,9 +1712,51 @@ def test_multi_symbol_branch_summary_counts_are_named() -> None:
     assert res.summary["n_symbols"] == 2, "fixture 不是多標的 ⇒ 沒測到該分支"
     assert res.summary["n_events"] == keys["event_id"].nunique()
     assert res.summary["n_event_tf_rows"] == len(keys)
-    assert res.summary["n_event_tf_rows_purged"] == len(res.purged)
+    # 🔴 D-002 `Task 9.3`：`n_event_tf_rows_purged` 改對 `event_keys` 中 purged 側列數（非 `len(purged)`）。
+    assert res.summary["n_event_tf_rows_purged"] == int(
+        keys["event_id"].isin(set(res.purged["event_id"])).sum()
+    )
     # 🔴 值不得為 0——0 正是「三個 kwargs 被省略」時的樣子。
     assert res.summary["n_events"] > 0 and res.summary["n_event_tf_rows"] > 0
+
+    # 🔴 D-002 `Task 9.3`（v32 補 `CODEX-R36-P1-03`：原只覆蓋單標的主路徑）：多標的 × 兩 feature TF ×
+    #    含 purged 事件 ⇒ 多標的分支之事件級輸出、去重計數與 purge 稽核計數皆須有鑑別力。
+    mt_plans, mt_idx, mt_keys, mt_man = _interleaved_multi_tf_case()
+    mt = derive_event_split_from_plans(mt_plans, mt_keys, mt_idx, manifest=mt_man, bucket_ms=H1)
+    assert mt.summary["n_symbols"] == 2
+    assert len(mt_keys) == 2 * mt_keys["event_id"].nunique(), "fixture 前提變了：須每事件兩 TF"
+    assert mt.assignments["event_id"].is_unique and mt.purged["event_id"].is_unique
+    assert "feature_timeframe" not in mt.assignments.columns and "feature_timeframe" not in mt.purged.columns
+    assert sorted(mt.purged["event_id"]) == [f"{SYM_B}_leak", f"{SYM}_leak"]
+    assert mt.summary["n_purged"] == 2
+    assert mt.summary["n_event_tf_rows_purged"] == 4, "兩個 purged 事件 × 兩個 feature TF"
+    assert mt.summary["per_symbol_n"] == {SYM: 3, SYM_B: 5}, "每 symbol 之事件數（非列數 6／10）"
+    assert mt.summary["n_events"] == 8 and mt.summary["n_event_tf_rows"] == 16
+
+
+def _interleaved_multi_tf_case():
+    """`_interleaved_case` 之兩 feature TF 版，每標的另加一個答案窗跨界（⇒ purged）之事件。
+
+    A（ETHUSDT）：train／leak／test0 ＝ 3 事件；B（BTCUSDT）：train／leak／test0..2 ＝ 5 事件；
+    每事件 `1h`／`4h` 兩列 ⇒ 16 列。`manifest` 維持事件級（以去重前之第一個 TF 列建立）。
+    """
+    full = _feature_index()
+    pos = {SYM: np.arange(0, N_BARS, 2, dtype=int), SYM_B: np.arange(1, N_BARS, 2, dtype=int)}
+    idx = {s: pd.Index([int(full[p]) for p in pos[s]], dtype="int64") for s in pos}
+    plans, base = {}, []
+    for s, n_test in zip((SYM, SYM_B), (1, 3)):
+        tr, te, b = _plan_pair_for(s, idx[s], pos[s])
+        plans[s] = (tr, te)
+        ms = np.asarray(idx[s], dtype="int64")
+        t0 = int(ms[b["train_row_index"][0]])
+        test_start = int(ms[b["test_row_index"][0]])
+        base.append((f"{s}_train", t0, t0 + H1, s))
+        base.append((f"{s}_leak", int(ms[b["train_row_index"][-1]]), test_start, s))
+        for k in range(n_test):
+            tk = int(ms[b["test_row_index"][k]])
+            base.append((f"{s}_test{k}", tk, tk + H1, s))
+    keys = _event_keys([(*r, tf) for r in base for tf in ("1h", "4h")])
+    return plans, idx, keys, _manifest(_event_keys(base))
 
 
 # ── 🔴 D-002 `Task 9.2b`（批次 B9C）：側別判定改為事件級 `decision_at_ms` 錨定 ──────────
@@ -1739,11 +1815,15 @@ def test_event_level_anchor_broadcasts_side_to_all_feature_tf() -> None:
     )
     assert plan.purged.empty
     got = plan.assignments[plan.assignments["event_id"] == "e_bc"]
-    assert len(got) == 2, "兩個 feature TF 列都要在（廣播，不得折疊成一列）"
-    assert set(got["feature_timeframe"]) == {"1h", "4h"}
-    assert set(got["split_label"]) == {"train"}, (
-        "兩列必須同側且＝錨點所在側；出現 test 表示 feature_cutoff_ms 又在判側了"
+    # 🔴 D-002 `Task 9.3`：輸出退回事件級 ⇒ `assignments` 端改驗「**恰一列且側別正確**」
+    #    （不得只刪、也不得只改 `len==1`——會失去 `M-SU-D2-14` 防 cutoff 判側回歸之鑑別力）。
+    assert len(got) == 1, "事件級輸出：一事件恰一列"
+    assert got["split_label"].tolist() == ["train"], (
+        "側別須＝錨點所在側；出現 test 表示 feature_cutoff_ms 又在判側了"
     )
+    # 🔴 稽核層：兩個 feature TF 仍在 `event_keys`（廣播之對象仍是全部 TF 列，per-TF 稽核不得退掉）。
+    assert set(keys.loc[keys["event_id"] == "e_bc", "feature_timeframe"]) == {"1h", "4h"}
+    assert plan.summary["n_event_tf_rows"] == 2 and plan.summary["n_events"] == 1
 
 
 def test_gap_band_event_is_purged_not_train() -> None:
@@ -1764,8 +1844,12 @@ def test_gap_band_event_is_purged_not_train() -> None:
         train, test, keys, index, manifest=man, bucket_ms=H1
     )
     assert plan.assignments.empty
-    assert list(plan.purged["event_id"]) == ["e_gap_band"] * 2, "兩個 feature TF 列須同進 purged"
-    assert set(plan.purged["feature_timeframe"]) == {"1h", "4h"}
+    # 🔴 D-002 `Task 9.3`（v38 `CODEX-R41-P1-01`）：`purged` 恰一列且無 `feature_timeframe` 欄；
+    #    兩個 TF 仍在稽核層（`event_keys` 與 purge 稽核列數）。
+    assert list(plan.purged["event_id"]) == ["e_gap_band"], "事件級輸出：一事件恰一列"
+    assert "feature_timeframe" not in plan.purged.columns
+    assert set(keys.loc[keys["event_id"] == "e_gap_band", "feature_timeframe"]) == {"1h", "4h"}
+    assert plan.summary["n_event_tf_rows_purged"] == 2, "兩個 feature TF 列皆屬 purged 側"
 
 
 def test_decision_before_index_start_raises() -> None:
@@ -1861,7 +1945,120 @@ def test_real_derive_never_produces_straddling_event() -> None:
         train, test, keys, index, manifest=man, bucket_ms=H1
     )
     assert set(plan.assignments["event_id"]) & set(plan.purged["event_id"]) == set()
-    assert len(plan.assignments) + len(plan.purged) == len(keys), "不得有列憑空消失"
+    # 🔴 D-002 `Task 9.3`（v38）：兩表列數合計＝**事件數**（不是 `len(keys)`——退回後 keys 列數＝事件×TF）。
+    assert len(plan.assignments) + len(plan.purged) == keys["event_id"].nunique(), "不得有事件憑空消失"
+
+
+# ── 🔴 D-002 `Task 9.3`（批次 B9D）：切分表退回事件級之具名 seam、串接唯一性與去重門檻 ────────
+
+
+def _two_tf_keys(eid, *, symbols=(SYM, SYM)):
+    """同 `event_id`、兩列 `feature_timeframe` 不同之稽核層輸入（`symbols` 可造衝突）。"""
+    index = _feature_index()
+    cut = int(index[10])
+    return _event_keys([(eid, cut, cut + H1, symbols[0], "1h"), (eid, cut, cut + H1, symbols[1], "4h")])
+
+
+@pytest.mark.parametrize("side", ["test", "purged"])
+def test_event_level_aggregation_rejects_conflicting_values(side) -> None:
+    """`M-SU-D2-42`：同事件兩 TF 列之 **`symbol` 衝突** ⇒ seam 須 `AlignmentViolationError`（訊息含 `event_id`）。
+
+    assigned／purged 兩路各一；reducer 若以 `drop_duplicates`／`set`／take-first 吞掉衝突即轉紅。
+    🔴 `split_label` 取自單值 `event_state`，此 seam 無從表達異側——異側由 `_assert_event_level_side_consistency`
+    之直接 rows 反例驗，**不得**在 `event_keys` 塞假 `split_label` 欄。
+    """
+    keys = _two_tf_keys("e_conflict", symbols=(SYM, SYM_B))
+    with pytest.raises(AlignmentViolationError, match="e_conflict"):
+        _aggregate_event_level_split_rows(keys, {"e_conflict": side})
+    # 對照：symbol 一致時同一輸入形狀須產出**恰一列**（證明上面不是「兩列一律 raise」）。
+    assign_rows, purge_rows = _aggregate_event_level_split_rows(
+        _two_tf_keys("e_ok"), {"e_ok": side}
+    )
+    rows = assign_rows if side == "test" else purge_rows
+    other = purge_rows if side == "test" else assign_rows
+    assert [r["event_id"] for r in rows] == ["e_ok"] and other == []
+    assert "feature_timeframe" not in rows[0]
+
+
+def test_event_level_aggregation_rejects_non_string_event_id() -> None:
+    """v39（`CODEX-R42-P1-03`）：`event_id` 非非空字串 ⇒ seam 入口 raise；判定為**值級**，非 dtype。"""
+    for bad in (7, np.int64(7), ""):
+        keys = _two_tf_keys("placeholder")
+        keys["event_id"] = [bad, bad]
+        with pytest.raises(AlignmentViolationError):
+            _aggregate_event_level_split_rows(keys, {bad: "test"})
+    # 值級判定之對照：`np.str_` 與 pandas `StringDtype` 之元素皆為合法字串，不得誤擋。
+    for good in (pd.Series([np.str_("e_np"), np.str_("e_np")]), pd.Series(["e_sd", "e_sd"], dtype="string")):
+        keys = _two_tf_keys("placeholder")
+        keys["event_id"] = good.values
+        eid = str(good.iloc[0])
+        assign_rows, _ = _aggregate_event_level_split_rows(keys, {eid: "train"})
+        assert [r["event_id"] for r in assign_rows] == [eid]
+
+
+def test_assert_concat_event_level_unique_rejects_collisions() -> None:
+    """v38（`CODEX-R41-P2-04`）：串接後之唯一與互斥——**直接呼叫 helper** 餵碰撞之兩表。"""
+    a_ok = pd.DataFrame([{"event_id": "e1", "symbol": SYM, "split_label": "train"}])
+    p_ok = pd.DataFrame([{"event_id": "e2", "reason": "x"}])
+    _assert_concat_event_level_unique(a_ok, p_ok)  # 正例不得誤報
+    a_dup = pd.concat([a_ok, a_ok.assign(symbol=SYM_B)], ignore_index=True)
+    with pytest.raises(AlignmentViolationError, match="e1"):
+        _assert_concat_event_level_unique(a_dup, p_ok)
+    with pytest.raises(AlignmentViolationError, match="e2"):
+        _assert_concat_event_level_unique(a_ok, pd.concat([p_ok, p_ok], ignore_index=True))
+    with pytest.raises(AlignmentViolationError, match="e1"):
+        _assert_concat_event_level_unique(a_ok, pd.DataFrame([{"event_id": "e1", "reason": "x"}]))
+
+
+def test_multi_symbol_concat_rejects_cross_symbol_event_id_collision() -> None:
+    """🔴 多標的「串接後再驗一次」之**接線**：公開 Mapping 入口確實可送達該呼叫點，拔掉呼叫即靜默輸出重複列。
+
+    出生理由（`review-r48` 兩家否證主委 assumed「經公開入口一律不可達」）：合法資料下跨 symbol 碰撞會先被
+    錨點唯一性閘或 `manifest.table` 重複閘擋下，但**兩標的共用同一 feature index、`event_id` 同名、manifest 去重成一列**
+    時兩道既有閘都不觸發——各 symbol 各自聚合皆合法，碰撞只在串接後看得到。只有直接呼叫 helper 之測試
+    （`test_assert_concat_event_level_unique_rejects_collisions`）時，刪掉多標的分支之呼叫點無任何測試轉紅。
+    """
+    index = _feature_index()
+    plans = {SYM: _plans(index, symbol=SYM)[:2], SYM_B: _plans(index, symbol=SYM_B)[:2]}
+    _, _, b = _plans(index)
+    cut = int(index[b["train_row_index"][0]])
+    keys = _event_keys([("SHARED", cut, cut + H1, SYM), ("SHARED", cut, cut + H1, SYM_B)])
+    man = _manifest(keys.iloc[[0]].reset_index(drop=True))
+    with pytest.raises(AlignmentViolationError, match=r"assignments 之 event_id 重複 \['SHARED'\]"):
+        derive_event_split_from_plans(plans, keys, {SYM: index, SYM_B: index}, manifest=man, bucket_ms=H1)
+
+
+def test_tier_min_test_events_counts_unique_event_ids() -> None:
+    """`M-SU-D2-43`（本 Task 為唯一 owner；`Task 9.4` 只重跑）：1 事件×2 TF 之 test 批、`tier_min_test_events=2`
+    ⇒ public `insufficient_events_in_test` 含該 symbol，且 `summary["per_symbol_n"]` 為 unique event 數。
+
+    以列數計則門檻輸入得 2 ≥ 2 而放行（門檻失效）、`per_symbol_n` 得 2——兩者分別破壞皆須紅。
+    🔴 `per_symbol_test_n` 是內部門檻參數、**不是** summary 鍵：不斷言它、不為它新增鍵。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    anchor = int(index[b["test_row_index"][0]])
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_t": anchor})
+    assert len(keys) == 2 and keys["event_id"].nunique() == 1, "fixture 前提變了：一事件×兩 TF"
+    plan = derive_event_split_from_plans(
+        train, test, keys, index, manifest=man, bucket_ms=H1, tier_min_test_events=2,
+    )
+    assert plan.assignments["split_label"].tolist() == ["test"], "fixture 前提變了：該事件須在 test"
+    assert plan.summary["insufficient_events_in_test"] == [SYM], (
+        "測試段只有 1 個事件卻未列為不足 ⇒ 門檻輸入以 TF 列數計（被膨脹繞過）"
+    )
+    assert plan.summary["per_symbol_n"] == {SYM: 1}, "per_symbol_n 須為事件數，非列數"
+
+
+def test_tier_min_test_events_counts_unique_event_ids_multi_symbol_branch() -> None:
+    """同上，走多標的（Mapping）分支——該分支之門檻輸入與 `per_symbol_n` 各有一份計數碼。"""
+    mt_plans, mt_idx, mt_keys, mt_man = _interleaved_multi_tf_case()
+    res = derive_event_split_from_plans(
+        mt_plans, mt_keys, mt_idx, manifest=mt_man, bucket_ms=H1, tier_min_test_events=2,
+    )
+    # A 之 test 事件 1 個（2 列）⇒ 不足；B 之 test 事件 3 個（6 列）⇒ 足夠。
+    assert res.summary["insufficient_events_in_test"] == [SYM]
+    assert res.summary["per_symbol_n"] == {SYM: 3, SYM_B: 5}
 
 
 def test_derive_never_indexes_row_index() -> None:
@@ -1928,7 +2125,10 @@ def test_side_consistency_check_is_wired_into_derive(monkeypatch) -> None:
         "`derive_event_split_from_plans` 沒有呼叫同側／跨表互斥檢查"
         "——(3.2) 的閘等於不存在（`M-SU-D2-14`）"
     )
-    assert len(seen["assign"]) == len(keys), "須把**組好的全部**列交給檢查，不得只抽驗一部分"
+    # 🔴 D-002 `Task 9.3`（v38 主委反向搜尋補）：交給檢查之列退回事件級 ⇒ 兩容器合計＝事件數。
+    assert len(seen["assign"]) + len(seen["purge"]) == keys["event_id"].nunique(), (
+        "須把**組好的全部**列交給檢查，不得只抽驗一部分"
+    )
     assert {r["event_id"] for r in seen["assign"]} == {"e_w1", "e_w2"}
 
 

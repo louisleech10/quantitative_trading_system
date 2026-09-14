@@ -430,6 +430,89 @@ def _assert_event_level_side_consistency(
         )
 
 
+# 🔴 D-002 `Task 9.3`：`assignments`／`purged` 之事件級 schema——單標的與多標的**共用同一份**，不得分歧。
+#    （v32 判 `Task 9.2a` 之「兩表加 `feature_timeframe` 欄」為做過頭：側別由事件判定後廣播，
+#    該欄不承載判定資訊且無消費者；複合鍵只屬 `event_keys`／`receipts.per_tf` 之稽核層。）
+_ASSIGNMENT_COLUMNS = ("event_id", "symbol", "split_label")
+_PURGED_COLUMNS = ("event_id", "reason")
+
+
+def _aggregate_event_level_split_rows(
+    event_keys: pd.DataFrame, event_state: Mapping[Any, str]
+) -> tuple[list[dict], list[dict]]:
+    """D-002 `Task 9.3` 之具名聚合 seam：稽核層複合列（一事件×一 feature TF 一列）⇒ **每事件恰一列**。
+
+    按 `event_id` 分組，逐欄驗值後輸出兩個事件級列表（`assignments` 列、`purged` 列）：
+      - 入口先驗 `event_id` 每值皆為**非空 `str`**（值級 `isinstance(x, str) and len(x) > 0`）。
+        🔴 不得以 dtype 判定、不得先 `astype(str)` 再驗（後者會把整數轉成字串而放行）；
+        型別混用時下游 purge 稽核計數之 `isin` 會**靜默得 0**（`CODEX-R42-P1-03`）。
+      - 同事件之 `symbol` 非單值 ⇒ `AlignmentViolationError`（訊息含 `event_id`）。
+      - `split_label` 一律取自 `event_state[eid]`（輸入無該欄；`event_state` 每事件單值）。
+        異側／跨表混態由既有 `_assert_event_level_side_consistency` 承接。
+
+    🔴 **明禁** `drop_duplicates`／`set`／take-first 去重——那會把「同事件欄值衝突」這種實作缺陷
+    靜默吞掉（本 epic 一路在打的形態）。輸出順序＝各 `event_id` 在 `event_keys` 中首次出現之順序。
+    """
+    bad_ids = [x for x in event_keys["event_id"].tolist() if not (isinstance(x, str) and len(x) > 0)]
+    if bad_ids:
+        raise AlignmentViolationError(
+            f"derive_event_split_from_plans: event_id 須為非空字串，違規值 {bad_ids[:5]!r}"
+            "——型別混用時 purge 稽核計數之 isin 會靜默得 0（fail-closed）"
+        )
+    symbols_by_event: Dict[str, list] = {}
+    for eid, sym in zip(event_keys["event_id"].tolist(), event_keys["symbol"].tolist()):
+        symbols_by_event.setdefault(eid, []).append(sym)
+    assign_rows: List[dict] = []
+    purge_rows: List[dict] = []
+    for eid, syms in symbols_by_event.items():
+        conflicting = [s for s in syms if s != syms[0]]
+        if conflicting:
+            raise AlignmentViolationError(
+                f"derive_event_split_from_plans: 事件 {eid!r} 之 feature TF 列 symbol 不唯一 "
+                f"{[syms[0], *conflicting][:5]!r}——同事件各列必須同標的；"
+                "不以去重或取首列吞掉衝突（fail-closed）"
+            )
+        side = event_state[eid]
+        if side == "purged":
+            purge_rows.append({"event_id": eid, "reason": _PURGE_REASON})
+        else:
+            assign_rows.append({"event_id": eid, "symbol": syms[0], "split_label": side})
+    return assign_rows, purge_rows
+
+
+def _assert_concat_event_level_unique(assignments: pd.DataFrame, purged: pd.DataFrame) -> None:
+    """D-002 `Task 9.3`：事件級輸出之唯一與互斥——`assignments`／`purged` 各自 `event_id` 唯一、兩表不相交。
+
+    🔴 多標的路徑是**各 symbol 各自聚合後串接**，跨 symbol 之 `event_id` 碰撞只有串接完才看得到；
+    單標的路徑亦於建表後呼叫，作為輸出表 `event_id` 唯一之 pre-check（聚合被繞過、逐列 append
+    回來時在此 fail-closed）。任一違反即 `AlignmentViolationError`，訊息含碰撞之 `event_id`。
+    """
+    for name, table in (("assignments", assignments), ("purged", purged)):
+        ids = table["event_id"]
+        if not ids.is_unique:
+            dup = sorted({str(x) for x in ids[ids.duplicated(keep=False)].tolist()})
+            raise AlignmentViolationError(
+                f"derive_event_split_from_plans: {name} 之 event_id 重複 {dup[:5]}"
+                "——事件級輸出一事件恰一列；重複代表聚合被繞過或跨 symbol 串接碰撞（fail-closed）"
+            )
+    overlap = sorted({str(x) for x in set(assignments["event_id"]) & set(purged["event_id"])})
+    if overlap:
+        raise AlignmentViolationError(
+            f"derive_event_split_from_plans: 事件 {overlap[:5]} 同時出現在 assignments 與 purged"
+            "——串接後兩表必須不相交（fail-closed）"
+        )
+
+
+def _unique_events_per_symbol(event_keys: pd.DataFrame) -> "pd.Series[int]":
+    """D-002 `Task 9.3`（`M-SU-D2-43`）：每 symbol 之 `event_id` **去重**數（非列數）。
+
+    排序沿用舊 `value_counts()` 之語意（數量遞減、同數依首次出現），`insufficient_events_in_test`
+    之列出順序因此不變。
+    """
+    counts = event_keys.groupby("symbol", sort=False)["event_id"].nunique()
+    return counts.sort_values(ascending=False, kind="stable")
+
+
 def _derive_single_symbol(
     train_plan: Any,
     test_plan: Any,
@@ -778,54 +861,43 @@ def _derive_single_symbol(
                 side = "purged"
         event_state[eid] = side
 
-    assign_rows: List[dict] = []
-    purge_rows: List[dict] = []
-    for rec in event_keys.to_dict("records"):
-        # 🔴 廣播：側別由事件決定，該 `event_id` 之**所有** feature TF 列同進同一容器
-        #    （實作要點 3）。
-        side = event_state[rec["event_id"]]
-        if side == "purged":
-            # 🔴 D-002 `Task 9.2a`：purge 側同樣是複合鍵粒度；缺此欄則同事件多 feature TF
-            #    在 `purged` 裡無法區分，且下方跨表互斥檢查會抓不到混態。
-            purge_rows.append({
-                "event_id": rec["event_id"], "reason": _PURGE_REASON,
-                "feature_timeframe": rec["feature_timeframe"],
-            })
-        else:
-            assign_rows.append(
-                {"event_id": rec["event_id"], "symbol": rec["symbol"], "split_label": side,
-                 "feature_timeframe": rec["feature_timeframe"]}
-            )
+    # 🔴 側別仍由事件決定並廣播到該事件所有 feature TF 列（`Task 9.2b` 實作要點 3）；
+    #    D-002 `Task 9.3`：**輸出**退回事件級——經具名 seam 逐事件聚合並驗欄值，每事件恰一列。
+    #    明禁以 `drop_duplicates`／`set`／take-first 代替（會把同事件欄值衝突靜默吞掉）。
+    assign_rows, purge_rows = _aggregate_event_level_split_rows(event_keys, event_state)
 
     # 🔴 `D-002-C3` (3.2) 之 fail-closed（實作要點 5＋6）：在寫入兩容器**之前**檢查。
     #    兩道分離、缺一不可——`purged` 無 `split_label`，只靠分組檢查結構上抓不到跨表混態。
     _assert_event_level_side_consistency(assign_rows, purge_rows)
 
-    # 🔴 D-002 `Task 9.2a`：兩表皆升為複合鍵粒度，欄含 `feature_timeframe`。
-    assignments = pd.DataFrame(
-        assign_rows, columns=["event_id", "symbol", "split_label", "feature_timeframe"]
-    )
-    purged = pd.DataFrame(purge_rows, columns=["event_id", "reason", "feature_timeframe"])
+    # 🔴 D-002 `Task 9.3`：兩表回到事件級 schema（無 `feature_timeframe` 欄）；建表後驗 `event_id` 唯一與互斥。
+    assignments = pd.DataFrame(assign_rows, columns=list(_ASSIGNMENT_COLUMNS))
+    purged = pd.DataFrame(purge_rows, columns=list(_PURGED_COLUMNS))
+    _assert_concat_event_level_unique(assignments, purged)
     clusters = build_time_clusters(manifest, bucket_ms)
 
+    # 🔴 D-002 `Task 9.3`（`M-SU-D2-43`；不得半退）：`per_symbol_n` 與 tier 門檻輸入一律以 `event_id`
+    #    **去重**計數——以列數計，1 事件×N feature TF 會膨脹成 N，靜默繞過 `tier_min_test_events`（門檻失效）。
     per_symbol_n: Dict[str, int] = {
-        str(sym): int(n) for sym, n in event_keys["symbol"].value_counts().items()
+        str(sym): int(n) for sym, n in _unique_events_per_symbol(event_keys).items()
     }
-    n_test = int((assignments["split_label"] == "test").sum()) if not assignments.empty else 0
+    n_test = int(assignments.loc[assignments["split_label"] == "test", "event_id"].nunique())
+    # 🔴 `M-SU-D2-44`：purge 稽核計數＝`event_keys` 中 purged 側之**列數**（退回後 `len(purged)` 是事件數，名實不符）。
+    purged_event_ids = set(purged["event_id"])
     summary = _build_summary(
         manifest=manifest,
         clusters=clusters,
         per_symbol_n=per_symbol_n,
-        n_purged=int(len(purged)),
+        n_purged=int(purged["event_id"].nunique()),
         # 🔴 單標的路徑：本批只有一個 symbol，逐 symbol 門檻即整批門檻（Task 8.3 同一判定）。
         per_symbol_test_n={s: n_test for s in per_symbol_n},
         bucket=int(time_cluster_bucket_ms(manifest, bucket_ms)),
         tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),
         discarded_rows_by_feature_tf=discarded_rows_by_feature_tf,
-        # 🔴 `Task 9.2a`／`D-002-C6`：事件數以 `event_id` **去重**、列數為複合鍵列數。
+        # 🔴 `D-002-C6`：事件數以 `event_id` **去重**、列數為稽核層複合鍵列數。
         n_events=int(event_keys["event_id"].nunique()),
         n_event_tf_rows=int(len(event_keys)),
-        n_event_tf_rows_purged=int(len(purged)),
+        n_event_tf_rows_purged=int(event_keys["event_id"].isin(purged_event_ids).sum()),
     )
     return EventSplitPlan(
         assignments=assignments, purged=purged, clusters=clusters, summary=summary
@@ -894,31 +966,39 @@ def derive_event_split_from_plans(
             manifest=sub_manifest, bucket_ms=bucket_ms,
             tier_min_test_events=tier_min_test_events,
         )
+        # 🔴 D-002 `Task 9.3`：每個 symbol 各自經 `_derive_single_symbol` 內之聚合 seam（各用自己的
+        #    `event_state`）產出事件級兩表，本迴圈只**串接**；不得先合併各 symbol 之 `event_state` 再聚合
+        #    ——`event_id` 已含 symbol 語意，合併只會遮蔽跨 symbol 之鍵碰撞。
         assign_parts.append(part.assignments)
         purge_parts.append(part.purged)
+        # 🔴 `M-SU-D2-43`：多標的之門檻輸入同樣以 `event_id` 去重計數（v32 補 `CODEX-R36-P1-03`）。
         per_symbol_test_n[sym] = int(
-            (part.assignments["split_label"] == "test").sum()
-        ) if not part.assignments.empty else 0
+            part.assignments.loc[part.assignments["split_label"] == "test", "event_id"].nunique()
+        )
 
-    # 🔴 `Task 9.2a`：空批之欄集須與非空批**逐字一致**，否則下游 `duplicated(subset=...)`
-    #    在空批上會 `KeyError`（同一個「欄缺」形態，只是發生在空集合）。
+    # 🔴 空批之欄集須與非空批**逐字一致**（共用 `_ASSIGNMENT_COLUMNS`／`_PURGED_COLUMNS`），
+    #    否則下游在空批上會 `KeyError`（同一個「欄缺」形態，只是發生在空集合）。
     assignments = (
         pd.concat(assign_parts, ignore_index=True) if assign_parts
-        else pd.DataFrame(columns=["event_id", "symbol", "split_label", "feature_timeframe"])
+        else pd.DataFrame(columns=list(_ASSIGNMENT_COLUMNS))
     )
     purged = (
         pd.concat(purge_parts, ignore_index=True) if purge_parts
-        else pd.DataFrame(columns=["event_id", "reason", "feature_timeframe"])
+        else pd.DataFrame(columns=list(_PURGED_COLUMNS))
     )
+    # 🔴 D-002 `Task 9.3`：串接完成後**再驗一次**唯一與互斥（跨 symbol 之碰撞只在串接後看得到）。
+    _assert_concat_event_level_unique(assignments, purged)
     clusters = build_time_clusters(manifest, bucket_ms)
     per_symbol_n = {
-        str(sym): int(n) for sym, n in event_keys["symbol"].value_counts().items()
+        str(sym): int(n) for sym, n in _unique_events_per_symbol(event_keys).items()
     }
+    # 🔴 `M-SU-D2-44`：與單標的共用同一公式（`purged_event_ids` 取自聚合後之 `purged` 表）。
+    purged_event_ids = set(purged["event_id"])
     summary = _build_summary(
         manifest=manifest,
         clusters=clusters,
         per_symbol_n=per_symbol_n,
-        n_purged=int(len(purged)),
+        n_purged=int(purged["event_id"].nunique()),
         per_symbol_test_n=per_symbol_test_n,
         bucket=int(time_cluster_bucket_ms(manifest, bucket_ms)),
         tier_min_test_events=_strict_count(tier_min_test_events, role="tier_min_test_events"),
@@ -929,7 +1009,7 @@ def derive_event_split_from_plans(
         # 🔴 `Task 9.2a`／`D-002-C6`：多標的同樣以整批 `event_keys` 算——事件數去重、列數為列數。
         n_events=int(event_keys["event_id"].nunique()),
         n_event_tf_rows=int(len(event_keys)),
-        n_event_tf_rows_purged=int(len(purged)),
+        n_event_tf_rows_purged=int(event_keys["event_id"].isin(purged_event_ids).sum()),
     )
     return EventSplitPlan(
         assignments=assignments, purged=purged, clusters=clusters, summary=summary

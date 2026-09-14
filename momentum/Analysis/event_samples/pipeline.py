@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 
-from momentum.core.contracts import validate_split_pair_integrity
+from momentum.core.contracts import AlignmentViolationError, validate_split_pair_integrity
 from momentum.core.logging import get_logger
 # 🔴 與投影端 `_index_as_ms` **共用同一支**正規化器（不新造第二套單位政策）。
 from momentum.core.split_preview import epoch_ms_from_index
@@ -826,6 +826,14 @@ class EventSamplePipeline:
             "n_test": int((plan.assignments["split_label"] == "test").sum()) if not plan.assignments.empty else 0,
             "n_purged": int(len(plan.purged)),
         })
+        # 🔴 D-002 `Task 9.3`：上方三個計數以列數計，唯有兩表**一事件恰一列**時才等於事件數
+        #    ⇒ 去重斷言防回歸（切分表若又長回複合鍵粒度，n_train／n_test／n_purged 會靜默膨脹成列數）。
+        for _tbl_name, _tbl in (("assignments", plan.assignments), ("purged", plan.purged)):
+            if not _tbl["event_id"].is_unique:
+                raise AlignmentViolationError(
+                    f"EventSamplePipeline.run: split_plan.{_tbl_name} 之 event_id 不唯一"
+                    "——n_train／n_test／n_purged 會被列數膨脹（fail-closed）"
+                )
         if not summary["accounting_ok"]:
             raise RuntimeError("EventSamplePipeline.run: 對齊記帳守恆失敗")
         return EventPipelineResult(

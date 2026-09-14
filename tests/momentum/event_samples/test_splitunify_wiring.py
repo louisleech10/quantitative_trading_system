@@ -21,7 +21,7 @@ import pytest
 from momentum.Analysis.event_samples import pipeline as pipeline_mod
 from momentum.Analysis.event_samples.pipeline import EventPipelineConfig, EventSamplePipeline
 from momentum.Analysis.event_samples.types import EventSplitConfig
-from momentum.core.contracts import SplitPlan
+from momentum.core.contracts import AlignmentViolationError, SplitPlan
 from momentum.core.split_preview import build_row_time_fingerprint, holdout_boundary
 from tests.momentum.event_samples.helpers import load_bars, make_event
 
@@ -149,7 +149,36 @@ def test_partial_boundary_gate_accepts_none_selected_timeframe(records, bars, sp
     )
     assert spy_split == [], "selected_timeframe=None 竟退回歷史切分 ⇒ 三參數閘沒生效"
     assert res.split_plan is not None
-    assert "feature_timeframe" in res.split_plan.assignments.columns
+    # 🔴 D-002 `Task 9.3`：原斷言「`feature_timeframe` 在 assignments 欄內」已隨退回刪除——
+    #    切分表回到事件級（一事件恰一列、無該欄），複合鍵只留在 `receipts.per_tf` 稽核層。
+    assert res.split_plan.assignments["event_id"].is_unique
+
+
+# ── 🔴 D-002 `Task 9.3`：pipeline 計數之事件級前提（去重斷言之接線） ─────────────
+def test_pipeline_rejects_split_plan_that_is_not_event_level(monkeypatch, records, bars, spy_split):
+    """`EventSamplePipeline.run` 之 `n_train`／`n_test`／`n_purged` 以列數計——唯有切分表一事件恰一列時才等於事件數。
+
+    🔴 投影端已保證事件級輸出（合法路徑上本閘不可達），故以 spy 讓投影回傳「`assignments` 同事件兩列」之計畫，
+    斷言 pipeline 之去重斷言 fail-closed；拔掉該斷言 ⇒ 計數靜默膨脹成列數、本條轉紅。
+    """
+    real = pipeline_mod.derive_event_split_from_plans
+
+    def _dup_rows(*args, **kwargs):
+        plan = real(*args, **kwargs)
+        assert not plan.assignments.empty, "fixture 前提變了：須有 assignments 才造得出重複列"
+        # 🔴 不新增 import 行：本檔 `:110-111` 是 register `C5-23` 之 ANCHOR，檔頭增行會使其位移。
+        return type(plan)(
+            assignments=pd.concat([plan.assignments, plan.assignments], ignore_index=True),
+            purged=plan.purged, clusters=plan.clusters, summary=plan.summary,
+        )
+
+    monkeypatch.setattr(pipeline_mod, "derive_event_split_from_plans", _dup_rows)
+    train, test, index = _canonical(records, bars)
+    with pytest.raises(AlignmentViolationError, match="assignments"):
+        EventSamplePipeline().run(
+            records, bars, EventPipelineConfig(timeframes=(TF,)),
+            train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+        )
 
 
 # ── 投影路徑不得同時帶毫秒 embargo（Task 3.1 要點 4） ───────────────────────
@@ -248,14 +277,20 @@ def test_run_without_selected_timeframe_emits_all_feature_tf_rows(records, bars_
     assert spy_split == [], "全量模式竟退回歷史切分"
     assign = res.split_plan.assignments
     purged = res.split_plan.purged
-    n_rows = len(assign) + len(purged)
-    assert n_rows == len(res.receipts.per_tf), (
-        f"全量列數 {n_rows} != per_tf 列數 {len(res.receipts.per_tf)} ⇒ 仍有列被靜默丟掉"
-    )
-    seen = set(assign["feature_timeframe"]) | set(purged["feature_timeframe"])
-    assert seen == {"4h", TF}, f"兩個 feature TF 須皆在，實得 {sorted(seen)}"
-    # 事件數與列數是兩個量（D-002-C6），且全量下列數嚴格大於事件數。
     s = res.split_plan.summary
+    # 🔴 D-002 `Task 9.3`：切分表退回事件級 ⇒ 兩表列數合計＝**事件數**（不再是 per_tf 列數）。
+    n_events = int(res.receipts.per_tf["event_id"].nunique())
+    assert len(assign) + len(purged) == n_events, (
+        f"切分表列數 {len(assign) + len(purged)} != 事件數 {n_events} ⇒ 未退回一事件一列或有事件被丟掉"
+    )
+    # 全量保留改由**稽核層**證明：兩個 feature TF 皆在 per_tf，且稽核列數＝per_tf 列數（沒有列被靜默丟掉）。
+    seen = set(res.receipts.per_tf["timeframe"])
+    assert seen == {"4h", TF}, f"兩個 feature TF 須皆在稽核層，實得 {sorted(seen)}"
+    assert s["n_event_tf_rows"] == len(res.receipts.per_tf), (
+        f"稽核列數 {s['n_event_tf_rows']} != per_tf 列數 {len(res.receipts.per_tf)} ⇒ 仍有列被靜默丟掉"
+    )
+    # 事件數與列數是兩個量（D-002-C6），且全量下列數嚴格大於事件數。
+    assert s["n_events"] == n_events
     assert s["n_event_tf_rows"] > s["n_events"]
 
 
