@@ -236,6 +236,8 @@
   - 🔴 **自查抓到空心斷言**：新測試初版斷言「無 `committee_output`」——harness 未複製 `gate.sh` ⇒ 該事件**恆空**、改壞也綠。改以「恰一列」觀測（誤觸登記會因 `gate.sh` 缺席追加 `verdict_rejected` 列），假 CLI 先寫含裁決塊之合法產出；r43 之 T2-S1 同型空心一併改，且其舊檔補裁決塊（否則登記觸發條件不成立，S-M5 不紅）。清理之 `_reap_cli_groups` 只對 CLI leader killpg、成員 kill。
   - **自證**：S-M1 刪 emit 接線 ⇒ T2-S5 兩參數紅；S-M2 拿掉 trap ⇒ 四參數紅；S-M3 TERM 記 130 ⇒ 兩檔 TERM 紅、INT 綠；S-M4 setup 失敗 ⇒ 新清理無殘留、舊清理殘留 1 個 `sleep 300`；S-M5 拿掉登記之 `cli_rc≠0` 守衛 ⇒ T2-S1＋T2-S5 兩參數紅。11 檔回歸 26 failed／306 passed，失敗集合同基準。
   - **下一步**：`review-r47`（兩家）覆核測試修補＋codex 重簽 v39 → 過了領 impl token 施工 `Task 9.3`。
+㊾**review-r47 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r47/synth.md`；`debt_clear` rc=0）：**兩家皆零 finding、皆 APPROVED v39（body `8b0e2fad…`）、皆判可領 impl token**，戳記已 append SPEC。codex 以其 r46 反例重跑關閉 `CODEX-R46-P1-01`／`P2-01`／`P2-02`（S-M1 兩參數紅、S-M3 TERM 紅 INT 綠、S-M4 紅且無殘留）；composer 逐項核對新測試無假綠。`committee_run` 之 B-50 污染偵測「MUTATION 標記」＝審計紀錄中本輪 `review_role` 字面，非 mutation 未還原。codex 實際 `gpt-5.6-luna`／`max`。
+  - **下一步**：施工 `Task 9.3`（Tier 0 同一 commit；impl task-id `20260911-SPLITUNIFY-impl-b9-claude`；receipt `COMMIT:` 綁發 token 當下 HEAD）→ 兩家審碼。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
