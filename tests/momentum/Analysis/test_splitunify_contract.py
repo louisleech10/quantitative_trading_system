@@ -12,6 +12,8 @@ C-0 決議③(b)（`estimand_scope`）。
 
 from __future__ import annotations
 
+import collections
+import contextlib
 import hashlib
 import json
 from pathlib import Path
@@ -148,7 +150,22 @@ def test_d002_register_anchors_all_valid():
     """register 每個 ANCHOR 子句都必須指到它所述之碼（單一精確行＋token 序列恰一次）。"""
     mod = _load_anchor_checker()
     anchors = mod.parse_anchors(mod.SPEC_PATH.read_text(encoding="utf-8"))
-    assert len(anchors) >= 16, f"register ANCHOR 子句數異常：{len(anchors)}"
+    # 🔴 R34 `CODEX-R34-P1-03` ＝ `GROK-R34-P2-01`（兩家撞題）：舊版只寫 `len >= 16`，
+    #    把某列的 ANCHOR 整個剝掉、再從別列複製一條補回總數，該測仍綠。
+    #    ⇒ 改為**逐列精確計數**：哪一列該有幾個錨點寫死，少一個、多一個、跑錯列都紅。
+    expected_per_row = {
+        "C5-13": 3, "C5-14": 1, "C5-19": 3, "C5-21": 2, "C5-23": 2,
+        "C5-25": 3, "C5-26": 3, "C5-27": 3, "C5-28": 1, "C5-29": 1,
+    }
+    actual_per_row = collections.Counter(a.row_id for a in anchors)
+    assert dict(actual_per_row) == expected_per_row, (
+        "register 之 (甲) 列錨點分佈不符：\n"
+        f"      期望: {expected_per_row}\n"
+        f"      實際: {dict(actual_per_row)}"
+    )
+    assert len(anchors) == sum(expected_per_row.values()), (
+        f"ANCHOR 子句總數 {len(anchors)} ≠ 逐列期望合計 {sum(expected_per_row.values())}"
+    )
     bad = []
     for a in anchors:
         ok, why = mod.check_anchor(a)
@@ -183,12 +200,30 @@ def test_d002_register_anchor_gate_rejects_known_false_greens():
     assert not leaked, "錨點閘又變成弱閘了：\n" + "\n".join(leaked)
 
 
-def test_d002_register_anchor_gate_rejects_r33_decoys(tmp_path):
-    """must-fail 回歸（R33 三條 finding 之逐條反例；全部由委員實跑構造）。
+@contextlib.contextmanager
+def _rooted_at(mod, root):
+    """把 checker 的 repo 根暫時指到 fixture 目錄。
+
+    🔴 R34 `CODEX-R34-P1-02` 修法後，`check_anchor` 拒絕絕對路徑與 repo 外路徑
+    ⇒ decoy fixture 必須以「換 root ＋ repo 相對路徑」餵入，不能再丟 `tmp_path` 絕對路徑。
+    """
+    old = mod.REPO_ROOT
+    mod.REPO_ROOT = root
+    try:
+        yield
+    finally:
+        mod.REPO_ROOT = old
+
+
+def test_d002_register_anchor_gate_rejects_r33_r34_decoys(tmp_path):
+    """must-fail 回歸（R33 三條 ＋ R34 三條 finding 之逐條反例；全部由委員實跑構造）。
 
     `CODEX-R33-P1-01`：token **子序列**可跳過 token ⇒ 語義替身冒充真實落點。
     `CODEX-R33-P1-02`：貪婪不重疊計數漏算重疊命中 ⇒「恰好一次」不成立。
-    `CODEX-R33-P1-03`：`.tsx` 只比指定行、不驗檔內唯一性 ⇒ 同 literal 的 decoy 行可冒充。
+    `CODEX-R33-P1-03`：`.tsx` 只比指定行、不驗檔內唯一性。
+    `CODEX-R34-P1-01`a：**跨行 token**（多行字串）的中間行拿到整個字串 token。
+    `CODEX-R34-P1-01`b：`.tsx` 只驗單檔 ⇒ 整行搬到另一個檔即看不出來。
+    `CODEX-R34-P1-02`：`REPO_ROOT / <絕對路徑>` 會丟掉前綴 ⇒ 錨可指 repo 外。
     """
     mod = _load_anchor_checker()
     c519 = ("columns", "=", "{", '"timeframe"', ":", '"feature_timeframe"', "}")
@@ -200,47 +235,66 @@ def test_d002_register_anchor_gate_rejects_r33_decoys(tmp_path):
         mod._normalize_text_line(tsx_line).encode("utf-8")
     ).hexdigest()
 
-    cases = []
-    p1 = tmp_path / "decoy_semantic.py"
-    p1.write_text(
-        'def f():\n    columns = ["timeframe"]; emit("feature_timeframe")\n',
-        encoding="utf-8",
+    (tmp_path / "decoy_semantic.py").write_text(
+        'def f():\n    columns = ["timeframe"]; emit("feature_timeframe")\n', encoding="utf-8"
     )
-    cases.append(("P1-01 語義替身", str(p1), 2, c519))
-
-    p2 = tmp_path / "decoy_dup_seq.py"
-    p2.write_text(
+    (tmp_path / "decoy_dup_seq.py").write_text(
         'def f():\n'
         '    columns = {"timeframe": "feature_timeframe"}\n'
         '    columns = {"timeframe": "feature_timeframe"}\n',
         encoding="utf-8",
     )
-    cases.append(("P1-02 同序列出現兩行", str(p2), 2, c519))
-
-    p3 = tmp_path / "decoy_dup_line.tsx"
-    p3.write_text("const a = 1;\n" + tsx_line + "\n" + tsx_line + "\n", encoding="utf-8")
-    cases.append(("P1-03 同正規化行兩處", str(p3), 2, (tsx_sha,)))
-
-    p4 = tmp_path / "decoy_shadow.tsx"
-    p4.write_text(
-        "const decoy = `／train ${fmt(s.n_train, 0)}`;\n" + tsx_line + "\n",
+    # R34-P1-01a：多行字串的中間行——舊版會拿到整個 STRING token
+    (tmp_path / "decoy_multiline.py").write_text(
+        'def f():\n'
+        '    s = """\n'
+        '    columns = {"timeframe": "feature_timeframe"}\n'
+        '    """\n',
         encoding="utf-8",
     )
-    cases.append(("P1-03b 指定行是 decoy", str(p4), 1, (tsx_sha,)))
+    (tmp_path / "decoy_dup_line.tsx").write_text(
+        "const a = 1;\n" + tsx_line + "\n" + tsx_line + "\n", encoding="utf-8"
+    )
+    (tmp_path / "decoy_shadow.tsx").write_text(
+        "const decoy = `／train ${fmt(s.n_train, 0)}`;\n" + tsx_line + "\n", encoding="utf-8"
+    )
+    # R34-P1-01b：同一行搬到另一個檔——單檔唯一性看不出來
+    (tmp_path / "old.tsx").write_text("const a = 1;\n" + tsx_line + "\n", encoding="utf-8")
+    (tmp_path / "new.tsx").write_text("const b = 2;\n" + tsx_line + "\n", encoding="utf-8")
 
+    cases = [
+        ("R33-P1-01 語義替身", "decoy_semantic.py", 2, c519),
+        ("R33-P1-02 同序列出現兩行", "decoy_dup_seq.py", 2, c519),
+        ("R33-P1-03 同正規化行兩處", "decoy_dup_line.tsx", 2, (tsx_sha,)),
+        ("R33-P1-03b 指定行是 decoy", "decoy_shadow.tsx", 1, (tsx_sha,)),
+        ("R34-P1-01a 多行字串中間行", "decoy_multiline.py", 3, c519),
+        ("R34-P1-01b 同行搬到另一個檔", "old.tsx", 2, (tsx_sha,)),
+    ]
     leaked = []
-    for label, path, line, toks in cases:
-        ok, why = mod.check_anchor(mod.Anchor("(r33)", path, line, toks))
+    with _rooted_at(mod, tmp_path):
+        for label, rel, line, toks in cases:
+            ok, why = mod.check_anchor(mod.Anchor("(decoy)", rel, line, toks))
+            if ok:
+                leaked.append(f"{label}: {rel}:{line} 竟然通過 — {why}")
+
+    # R34-P1-02：絕對路徑／`..` 必須在**真實 repo root** 下被拒
+    outside = tmp_path / "outside.py"
+    outside.write_text('def f():\n    columns = {"timeframe": "feature_timeframe"}\n', encoding="utf-8")
+    for rel in (str(outside), "../outside.py"):
+        ok, why = mod.check_anchor(mod.Anchor("(decoy)", rel, 2, c519))
         if ok:
-            leaked.append(f"{label}: {path}:{line} 竟然通過 — {why}")
-    assert not leaked, "R33 反例又被放行：\n" + "\n".join(leaked)
+            leaked.append(f"R34-P1-02 repo 外路徑: {rel} 竟然通過 — {why}")
+
+    assert not leaked, "錨點閘又變成弱閘了：\n" + "\n".join(leaked)
 
 
 def test_d002_register_anchor_gate_accepts_the_real_lines(tmp_path):
-    """可證偽之另一半：**正確**的錨點必須通過，否則上面兩條可以靠「永遠回 False」作弊。"""
+    """可證偽之另一半：**正確**的錨點必須通過，否則上面的 must-fail 可以靠「永遠回 False」作弊。"""
     mod = _load_anchor_checker()
-    p = tmp_path / "real.py"
-    p.write_text('def f():\n    columns = {"timeframe": "feature_timeframe"}\n', encoding="utf-8")
+    (tmp_path / "real.py").write_text(
+        'def f():\n    columns = {"timeframe": "feature_timeframe"}\n', encoding="utf-8"
+    )
     c519 = ("columns", "=", "{", '"timeframe"', ":", '"feature_timeframe"', "}")
-    ok, why = mod.check_anchor(mod.Anchor("(real)", str(p), 2, c519))
+    with _rooted_at(mod, tmp_path):
+        ok, why = mod.check_anchor(mod.Anchor("(real)", "real.py", 2, c519))
     assert ok, f"真實落點竟被拒（閘壞成永遠 False）：{why}"

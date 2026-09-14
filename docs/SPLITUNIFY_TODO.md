@@ -65,7 +65,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B4** | 4.1 | ✅ 完成 | B3 | 報告與畫面（欄名待 B3 定案後才穩定） | 中 |
 | **B9A** | 9.1 | ✅ **完成**（impl `c98acf26`；審碼 r18、閉合 r19） | B4 ＋ `D-002` 三家 `RECONCILE-STAMP` rc=0 | 揭露先行；只動 producer 回傳形狀與 summary 一鍵，可獨立回退 | 中 |
 | **B9B** | 9.2, 9.2a | ✅ **完成**（impl `9e87386f`；審碼 r20、閉合 r21／r22） | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
-| **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27，閉合 r28–r33 共七輪、34 條全修完；r32 中 composer／grok 已零 finding 並 proceed；**現待 r34 回驗＋v28 重簽**） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
+| **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27，閉合 r28–r34 共八輪、39 條全修完；r34 中 composer／grok 已零 finding 並 proceed；**現待 r35 回驗＋v29 重簽**） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
 | **B9D** | 9.3 | ⬜ **未開工**（下一個） | B9C | `Task 9.3` 表列**九處**逐處處置（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
 | **B9E** | 9.4 | ⬜ 未開工 | B9C | 記帳鏈與 `baseline` 拆鍵 | 中 |
 | **B9F** | 9.5 | ⬜ 未開工（排最後） | B9D ＋ B9E | golden 換錨與前端；須在所有行為面定案後才凍結 | 大 |
@@ -615,7 +615,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.2b ✅ **已完成（B9C；碼面自 r27 起未再變動，其後各輪修的都是 SPEC／TODO 與驗收閘；現待 r34 回驗＋v28 重簽）** —— 側別判定改為事件級錨定（`票 SPLITUNIFY`）
+### Task 9.2b ✅ **已完成（B9C；碼面自 r27 起未再變動，其後各輪修的都是 SPEC／TODO 與驗收閘；現待 r35 回驗＋v29 重簽）** —— 側別判定改為事件級錨定（`票 SPLITUNIFY`）
 - SPEC ref：§P Phase 9B `Task 9.2b`；§V `Task 9.2b` 及其前置；`D-002-C3` (3.1)(3.2)
 - 實作要點：
   1. **前置（步驟 0）**：`train_rows`／`test_rows` 皆非空、row set 不重疊；
@@ -730,21 +730,25 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
        須**逐字等於** receipt 的 `<改前分類>`。任一列不符即 FAIL（這一條直接殺掉「全填同一值」）。
      - **碼證須指向真實存在的行**：逐列把 `<碼證 path:line>` 拆成檔與行號，該檔須存在、且行號須 ≤ 該檔總行數。
        任一列指向不存在的檔或超出範圍的行即 FAIL（這一條殺掉占位路徑）。
-     - 🔴 **v28 現行：碼證錨點閘＝`scripts/register_anchor_check.py`（單一精確行 ＋ **整行**相等 ＋ 整檔恰好一次；逐字採 `CODEX-R33-P1-01`／`P1-02`／`P1-03` 修法）**
-       **本閘的四代沿革就是「弱閘會被打穿」的完整紀錄，逐條寫明是因為每一代都曾被當成已閉合**：
+     - 🔴 **v29 現行：碼證錨點閘＝`scripts/register_anchor_check.py`**
+       （單一精確行 ＋ **整行**相等 ＋ **唯一性** ＋ **路徑不得越界**；逐字採 R33／R34 共七條修法）
+       **本閘的五代沿革就是「弱閘會被打穿」的完整紀錄，逐條寫明是因為每一代都曾被當成已閉合**：
        ① v15「行號 ≤ 該檔總行數」→ 四列全指註解仍綠（R31 三家撞題）。
        ② R31 委員修法「statement／AST overlap」→ 主委實跑量測，只殺掉四處中的**兩處**。
-       ③ v26 主委加的「行**範圍** ＋ 單一 token **子字串**」→ R32 codex 打穿：
-       `split_projection.py:341`（`raise` 的**訊息字串**）與 `:566` 都命中。
-       ④ v27 主委改的「單一行 ＋ token **子序列**」→ R33 codex 三條打穿：子序列可跳 token
-       （`columns = ["timeframe"]; emit("feature_timeframe")` 這種**語義替身**也綠）、
-       貪婪不重疊計數漏算重疊命中（`hay=a b a b a`／`needle=a b a` 應為 2 卻回 1）、
-       `.tsx` 只比指定行不驗檔內唯一性。
-       **現行判準**：每個錨點是**單一精確行**（非範圍）。
-       `.py`：該行之**正規化完整 token 序列**須與 register 所載**逐一相等**（不是子序列、不是子字串），
-       且該序列在**整個檔案**中恰好出現在**一行**上，並以 AST 確認該行落在非純字串常數之 statement 上。
-       `.tsx`／`.ts`：無 AST ⇒ **正規化整行之 sha256 相等** ＋ 該行在**整檔恰好一次**。
-       任何「0 次或多於 1 次」皆拒絕。
+       ③ v26「行**範圍** ＋ 單一 token **子字串**」→ R32 打穿（`:341` 是 `raise` 的訊息字串）。
+       ④ v27「單一行 ＋ token **子序列**」→ R33 三條打穿（子序列可跳 token 之語義替身、
+       重疊命中計數錯誤、`.tsx` 不驗檔內唯一性）。
+       ⑤ v28「整行 token 序列相等 ＋ 單檔唯一」→ R34 三條打穿（**跨行 token** 中間行、
+       `.tsx` **只驗單檔**故整行搬檔即看不出、`REPO_ROOT / <絕對路徑>` 丟掉前綴故錨可指 repo 外）。
+       **現行判準（五項，全為合取）**：
+       1. 每個錨點是**單一精確行**（非範圍）。
+       2. **路徑守衛**：register 所載路徑須為 repo 相對、不得含 `..`，`resolve()` 後須仍在 repo 內。
+       3. `.py`：該行不得被**跨行 token**（多行字串等）覆蓋——覆蓋即 fail-closed；
+          其**正規化完整 token 序列**（只收起訖都在該行的 token）須與 register 所載**逐一相等**；
+          該序列在**整個檔案**中須恰好出現在**一行**上；並以 AST 確認該行落在非純字串常數之 statement 上。
+       4. `.tsx`／`.ts`：無 AST ⇒ **正規化整行之 sha256 相等**，且該行在**全 repo 之 `.ts`／`.tsx`**
+          中恰好出現一次（不是只驗同檔——整行搬到另一個檔也要抓得到）。
+       5. 任何「0 次或多於 1 次」皆拒絕。
        **register 側之機器可讀語法**（寫在該列消費面欄，可多個）：
        `〔ANCHOR` + 反引號包住的 `<path>:<line>` + `TOKENS` + 該行**全部** token（各以反引號包住）+ `〕`；
        非 `.py` 改用 `LINESHA256` + 反引號包住的 64-hex（因該行含 template-literal 反引號，塞不進 TOKENS）。
@@ -754,26 +758,33 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
        ./venv/bin/python scripts/register_anchor_check.py <path> <line> <tok...>   # 單點複核
        ./venv/bin/python scripts/register_anchor_check.py --emit <path>:<line>     # 產生子句內容，禁手抄
        ```
-       🔴 **不是一次性驗收**（codex 在 R32 明指前一版「沒有獨立可重跑的 persisted checker」）：
-       `tests/momentum/Analysis/test_splitunify_contract.py` 已把它接進**六路回歸**，四條測試逐條對應一種壞法——
-       `test_d002_register_anchors_all_valid`（行號漂掉即紅）、
-       `test_d002_register_anchor_gate_rejects_known_false_greens`（v15／v26 兩代之 must-fail：`:341`／`:566` 各兩種形狀、`:556`、`pipeline.py:760`）、
-       `test_d002_register_anchor_gate_rejects_r33_decoys`（v27 之四個 decoy：語義替身、同序列兩行、同正規化行兩處、指定行是 decoy）、
-       `test_d002_register_anchor_gate_accepts_the_real_lines`（**反向**：閘若被改成永遠回 False 也會紅，
-       所以上面三條不能靠作弊全過）。另 `_load_anchor_checker` 對 checker 檔缺席會直接 assert 失敗，不是靜默 collect error。
-       🔴 **具名誠實邊界（兩條）**：①`C5-28` 之落點是 `.tsx`，AST 不適用，只比正規化整行之 sha256
-       （代價＝人讀 SPEC 看不出該行內容，須用 `--emit` 重算；換得的是不可用子字串繞過）；
-       ②本閘保證「那一行的碼逐字就是 register 所載的那一行，且全檔只有一行長這樣」，
-       **不**保證「那行就是語意上對的設計點」——後者仍靠 register 同列描述與審碼輪。
-       🔴 **v26／v27 之舊敘述已整段刪除**，不留半截——它們各自被 R32／R33 實跑打穿，
-       留著就是下一個「照舊段做」的陷阱；沿革見 SPEC v27／v28 條目。
+       🔴 **不是一次性驗收**：`tests/momentum/Analysis/test_splitunify_contract.py` 已把它接進**六路回歸**，
+       四條測試逐條對應一種壞法——
+       `test_d002_register_anchors_all_valid`（🔴 **v29 起改為逐列精確計數**
+       `{C5-13:3, C5-14:1, C5-19:3, C5-21:2, C5-23:2, C5-25:3, C5-26:3, C5-27:3, C5-28:1, C5-29:1}`，
+       R34 兩家撞題證明舊的 `len >= 16` 可被「剝掉某列再從別列複製補回總數」繞過）、
+       `test_d002_register_anchor_gate_rejects_known_false_greens`（v15／v26 兩代之 must-fail）、
+       `test_d002_register_anchor_gate_rejects_r33_r34_decoys`（v27／v28 兩代之六個 decoy
+       ＋ 絕對路徑與 `..` 路徑）、
+       `test_d002_register_anchor_gate_accepts_the_real_lines`（**反向**：閘若被改成永遠回 False 也會紅）。
+       另 `_load_anchor_checker` 對 checker 檔缺席會直接 assert 失敗，不是靜默 collect error。
+       🔴 **具名誠實邊界（三條）**：
+       ①`C5-28` 之落點是 `.tsx`，AST 不適用，只比正規化整行之 sha256
+       （代價＝人讀 SPEC 看不出該行內容，須用 `--emit` 重算；換得的是不可用子字串或片段繞過）；
+       ②`.ts`／`.tsx` 之全域唯一性掃描**跳過** `node_modules`／`.next`／`dist`／`build`／`coverage`
+       ——把 decoy 藏進建置產物目錄，本閘看不到（那些目錄不是本專案原始碼，不納入）；
+       ③本閘保證「那一行的碼逐字就是 register 所載的那一行，且在其語言範圍內唯一」，
+       **不**保證「那行就是語意上對的設計點」，也**不**保證「該列的錨點涵蓋已經完整」——
+       後兩者仍靠 register 同列描述與審碼輪（R34 `CODEX-R34-P1-04` 即為涵蓋不足之實例，已補七個錨點）。
+       🔴 **v26／v27／v28 之舊敘述皆已整段刪除**，不留半截——它們各自被 R32／R33／R34 實跑打穿，
+       留著就是下一個「照舊段做」的陷阱；沿革見 SPEC v27／v28／v29 條目。
      - 🔴 **v16 之 keyed 對證已於 v17 收窄（R16 `CODEX-R16-P1-01`；主委實測確認其碼證成立）**：
        v16 寫「碼證檔路徑須與 register 同列所載之落點檔相同」，但**實測 29 列中有 20 列的消費面欄
        根本沒有 `path:line`**（`C5-01`..`08`／`09`..`12`／`15`..`18`／`20`／`22`／`24`／`25`）
        ⇒ 該檢查在 **69% 的列上不可執行**，屬**假閘**（寫了跑不動，比沒有更糟）。
        **現行（可執行）判準——三段式，29 列逐列歸屬且互斥窮盡（r17 三家獨立算出之 15 列與主委機械掃描完全一致）**：
        - **(甲) 有 `path:line` 之 10 列**（`C5-13`／`14`／`19`／`21`／`23`／`25`／`26`／`27`／`28`／`29`）：
-         🔴 **v28 現行**：碼證之 `path:line` 須**逐字等於**該列某個 ANCHOR 子句之 `<path>:<line>`
+         🔴 **v29 現行**：碼證之 `path:line` 須**逐字等於**該列某個 ANCHOR 子句之 `<path>:<line>`
          （單一精確行；`scripts/register_anchor_check.py` 為唯一判準）。
          ~~碼證之檔路徑須與該列所載落點檔**相同**、行號須落在該列所列範圍內。~~（範圍式判準已於 v27 作廢——它正是被 R32 打穿的那個形狀）
        - **(乙) 有檔名但無行號之 4 列**——逐字為 `C5-15`／`C5-16`／`C5-17`／`C5-18`（🔴 v18 具名，

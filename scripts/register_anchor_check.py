@@ -85,27 +85,41 @@ def parse_anchors(spec_text: str) -> List[Anchor]:
     return out
 
 
+def py_line_spans_multiline_token(src: str, line: int) -> bool:
+    """該行是否被某個**跨行 token**（多行字串等）覆蓋。
+
+    🔴 R34 `CODEX-R34-P1-01`：舊版以 `start[0] <= line <= end[0]` 收 token，
+    多行字串的**中間行**會拿到整個字串 token ⇒ 兩個相鄰行得到相同序列、
+    或某行的序列含不屬於它的 token。跨行 token 覆蓋者一律 fail-closed。
+    """
+    for tk in tokenize.generate_tokens(io.StringIO(src).readline):
+        if tk.type in _SKIP_TOK:
+            continue
+        if tk.start[0] != tk.end[0] and tk.start[0] <= line <= tk.end[0]:
+            return True
+    return False
+
+
 def py_line_token_seq(src: str, line: int) -> Tuple[str, ...]:
-    """該行之正規化完整 token 序列（丟掉註解與排版 token，保留字面含引號）。"""
+    """該行之正規化完整 token 序列（只收**起訖都在該行**的 token）。"""
     vals: List[str] = []
     for tk in tokenize.generate_tokens(io.StringIO(src).readline):
         if tk.type in _SKIP_TOK:
             continue
-        if tk.start[0] <= line <= tk.end[0]:
+        if tk.start[0] == tk.end[0] == line:
             vals.append(tk.string)
     return tuple(vals)
 
 
 def _py_all_line_seqs(src: str) -> List[Tuple[str, ...]]:
-    """逐行之正規化 token 序列（1-based；index 0 為佔位）。"""
+    """逐行之正規化 token 序列（1-based；index 0 為佔位）。只收單行 token。"""
     n = len(src.splitlines())
     per_line: List[List[str]] = [[] for _ in range(n + 1)]
     for tk in tokenize.generate_tokens(io.StringIO(src).readline):
         if tk.type in _SKIP_TOK:
             continue
-        for ln in range(tk.start[0], tk.end[0] + 1):
-            if 1 <= ln <= n:
-                per_line[ln].append(tk.string)
+        if tk.start[0] == tk.end[0] and 1 <= tk.start[0] <= n:
+            per_line[tk.start[0]].append(tk.string)
     return [tuple(x) for x in per_line]
 
 
@@ -128,13 +142,50 @@ def _py_line_is_executable(src: str, line: int) -> bool:
     return False
 
 
+_TS_SKIP_DIRS = {"node_modules", ".next", "dist", "build", ".git", "coverage"}
+
+
+def _repo_ts_files() -> List[Path]:
+    """repo 內全部 `.ts`／`.tsx`（跳過建置產物目錄）。"""
+    root = REPO_ROOT.resolve()
+    out: List[Path] = []
+    for suffix in ("*.ts", "*.tsx"):
+        for f in root.rglob(suffix):
+            if _TS_SKIP_DIRS & set(f.relative_to(root).parts):
+                continue
+            out.append(f)
+    return out
+
+
 def _normalize_text_line(s: str) -> str:
     """`.tsx`／`.ts` 用：壓掉前後與連續空白，其餘逐字保留。"""
     return re.sub(r"\s+", " ", s).strip()
 
 
+def _resolve_in_repo(rel: str) -> Tuple[Path, str]:
+    """把 register 所載路徑解析成 repo 內之實檔；越界一律 fail-closed。
+
+    🔴 R34 `CODEX-R34-P1-02`：舊版直接 `REPO_ROOT / anchor.path`，而 `Path / 絕對路徑`
+    會**丟掉前綴** ⇒ 錨點可指向 repo 外任何可讀檔。現行拒絕絕對路徑與 `..`，
+    並以 `resolve()` 後確認仍在 `REPO_ROOT` 之下。
+    """
+    if rel.startswith("/") or Path(rel).is_absolute():
+        return Path(rel), "路徑須為 repo 相對路徑（拒絕絕對路徑）"
+    if ".." in Path(rel).parts:
+        return Path(rel), "路徑不得含 `..`"
+    root = REPO_ROOT.resolve()
+    p = (root / rel).resolve()
+    try:
+        p.relative_to(root)
+    except ValueError:
+        return p, f"路徑解析後落在 repo 之外：{p}"
+    return p, ""
+
+
 def check_anchor(anchor: Anchor) -> Tuple[bool, str]:
-    p = REPO_ROOT / anchor.path
+    p, why = _resolve_in_repo(anchor.path)
+    if why:
+        return False, why
     if not p.is_file():
         return False, f"檔不存在：{anchor.path}"
     src = p.read_text(encoding="utf-8")
@@ -143,6 +194,8 @@ def check_anchor(anchor: Anchor) -> Tuple[bool, str]:
         return False, f"行號超出範圍：{anchor.line} > {len(lines)}"
 
     if p.suffix == ".py":
+        if py_line_spans_multiline_token(src, anchor.line):
+            return False, f"{anchor.line} 落在**跨行 token**（多行字串等）之內——fail-closed"
         if not _py_line_is_executable(src, anchor.line):
             return False, f"{anchor.line} 不在可執行 statement 上（註解／空行／docstring）"
         actual = py_line_token_seq(src, anchor.line)
@@ -182,7 +235,27 @@ def check_anchor(anchor: Anchor) -> Tuple[bool, str]:
         hits = [i + 1 for i, ln in enumerate(lines) if _normalize_text_line(ln) == want]
     if len(hits) != 1:
         return False, f"該正規化行在本檔出現 {len(hits)} 次（行 {hits}）——須恰好一次"
-    return True, f"{anchor.line} whole-line"
+    # 🔴 R34 `CODEX-R34-P1-01`：只驗單檔唯一性 ⇒ 把整行搬到 `old.tsx`／`new.tsx` 兩個檔、
+    #   register 指舊檔，本閘看不出來。⇒ 唯一性擴到**全 repo 之 .ts／.tsx**。
+    want_sha = (
+        spec_item[len(_SHA_PREFIX):] if spec_item.startswith(_SHA_PREFIX)
+        else hashlib.sha256(_normalize_text_line(spec_item).encode("utf-8")).hexdigest()
+    )
+    global_hits: List[str] = []
+    for other in sorted(_repo_ts_files()):
+        try:
+            other_lines = other.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            continue
+        for i, ln in enumerate(other_lines):
+            if hashlib.sha256(_normalize_text_line(ln).encode("utf-8")).hexdigest() == want_sha:
+                global_hits.append(f"{other.relative_to(REPO_ROOT.resolve())}:{i + 1}")
+    if len(global_hits) != 1:
+        return False, (
+            f"該正規化行在全 repo 之 .ts／.tsx 出現 {len(global_hits)} 次"
+            f"（{global_hits[:5]}）——須恰好一次"
+        )
+    return True, f"{anchor.line} whole-line（repo 內唯一）"
 
 
 def main(argv: List[str]) -> int:
