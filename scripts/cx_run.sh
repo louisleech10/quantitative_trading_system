@@ -837,7 +837,10 @@ _run_cli_and_emit() {
           echo "ERROR: codex 不存在: ${CODEX}" >&2
           cli_rc=2
         else
-          _run_cli_watched "${out}" -- "${CODEX}" exec -s workspace-write -m gpt-5.6-luna -c model_reasoning_effort="${effort}" "${prompt}" </dev/null
+          # 🔴 2026-09-14 使用者抓：此處原寫死 `-m gpt-5.6-luna`（2026-07-18 起），命令列參數蓋掉
+          #   ~/.codex/config.toml 之 model ⇒ 使用者切到 gpt-6-astra，委員輪卻一直跑 Luna。
+          #   型號改由使用者在 CLI 設定檔決定（唯一來源），本腳本不指定。
+          _run_cli_watched "${out}" -- "${CODEX}" exec -s workspace-write -c model_reasoning_effort="${effort}" "${prompt}" </dev/null
           cli_rc=$?
         fi
         ;;
@@ -855,7 +858,9 @@ _run_cli_and_emit() {
           echo "ERROR: cursor-agent 不存在（composer CLI）" >&2
           cli_rc=2
         else
-          _run_cli_watched "${out}" -- cursor-agent -p --force --output-format text --model composer-2.5 "${prompt}"
+          # 🔴 同上（2026-09-14）：原寫死 `--model composer-2.5`，蓋掉 ~/.cursor/cli-config.json 之 modelId
+          #   ⇒ 使用者把 Cursor 切到 Grok 不生效。型號改由 Cursor 設定決定。
+          _run_cli_watched "${out}" -- cursor-agent -p --force --output-format text "${prompt}"
           cli_rc=$?
         fi
         ;;

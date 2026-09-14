@@ -191,6 +191,12 @@
   - **實效**：r37 之債已用修好的路徑清掉（`家族 grok failed 之後已重新 register-output 且單檔格式檢查 rc=0 ⇒ 視為已交件`），**未再動用使用者 terminal**。
   - **通則入 `docs/SCAR_LEDGER.md`**：🔴 **凡「解除既有阻塞」的路徑，本身不得再被同一族的閘擋住**——那不是防護，是死結。
 - **下一步**：`review-r38`（依新做法**先請審查方出完整落點清單**）→ 領 impl token 執行退回。
+㊵**review-r38 完成（兩家收斂）**（`handoffs/reconcile/20260911-splitunify-b9-review-r38/synth.md` ＝唯一權威）：
+  - 🔴 **grok 未產出**：CLI 回 `402 Payment Required: Grok Build usage balance exhausted`。🔴 **使用者 2026-09-14 逐字：「我已經將Cursor的模型切換到Grok, 在我通知你變回三家全員前，委員就剩兩家Codex+Cursor。」** ⇒ `scripts/governance_families.json` 之 `active_stampers` 改 `["codex","composer"]`（`review_families` 名冊不動）；ORCH §1 加暫調行。**恢復＝使用者通知後把 grok 加回該行。**
+  - codex／composer 皆 `blocked`、7 條逐條重疊（TODO 下游表 `tables`／`pattern_bridge` 兩列仍 live、`SU-RESID-2` 兩檔仍寫加欄已關、`Task 9.2a` 自證段）＋ Tier 0 補 `C5-21` ANCHOR 重出 ＋ `M-SU-D2-42`／`43` 測試建立順序。**首次「委員先出落點清單、主委照單改」**，全數修完 ⇒ **SPEC 進 v35**，body sha256 `7d51f96fb84b5da516822b863734fd62cc72a75ef0b772bb50cde1cfba096511`。
+  - 🔴 **銷帳又撞死結（r37 同型）**：grok 無產出 ⇒ 全員 success 擋、abandon 被 C-9 擋、grok 無額度不能重派。依使用者授權修 `scripts/debt_clear.sh` 之 `_paused_absent_families`：**不在 `active_stampers`＋該輪 failed＋`output_sha256` 空＋其後無重登**四條件全成立才不要求交件，且扣除後須剩 ≥2 家。`test_debt_clear.py` **40 passed**（+4 反例）；mutation 自證見 synth。r38 已以此路徑 `debt_clear` rc=0。
+  - 🔴 **使用者抓出：委員型號被派工腳本寫死**——`cx_run.sh` 對 codex 寫 `-m gpt-5.6-luna`、對 cursor 寫 `--model composer-2.5`（2026-07-18 起），**蓋掉使用者 CLI 設定**（`~/.codex/config.toml` 為 `gpt-6-astra`；`~/.cursor/cli-config.json` 已切 `grok-4.6`）⇒ 已拿掉寫死，型號一律照 CLI 設定。grok 分支之 `-m grok-4.5` 未動（該家暫停中）。
+  - **下一步**：`review-r39`（兩家：v35 ＋ 暫停缺席出口 ＋ 拿掉型號）→ 過了才領 impl token 執行退回。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
@@ -203,7 +209,7 @@
 
 ## 待辦分流
 - **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
-- **下一步（技術，不問使用者）**：修 r31 十條 → SPEC v26 → `review-r32` 閉合再驗證＋重簽 → 收斂＋`debt_clear` → 進 `Task 9.3`（B9D）。
+- **下一步（技術，不問使用者）**：`review-r39`（兩家）→ 過了才領 impl token 執行 `Task 9.3` 退回（見 ㊵ 末條）。~~修 r31 十條 → SPEC v26 → `review-r32` 閉合再驗證＋重簽~~（v27 已走完）。
 
 - 🔴 **新發現的系統性缺口（具名殘留，`blocked-by`，**未**開新 epic）**：`docs/` 底下帶 `RECONCILE-STAMP` 的檔**沒有任何一份**能通過 `reconcile_stamps_check`——`gate.sh register-output` 原只收 `handoffs/`，而 provenance 要求審計中有指向被戳記檔**自身**的事件。本輪只把 `docs/SPLITUNIFY_SPEC.D-002.md` 加進既有封閉白名單 `scripts/stampable_artifacts.txt`（該檔正是為此型缺口而建）；`GAP3_EVENT_UX_SPEC.D-001.md`、`GAP3_EVENT_UX_TODO.D-001`..`D-006` **未一併加入**，因其戳記是否對應現行 body hash 未經查證，盲加＝把未驗證的背書寫成既成事實。另 `handoffs/reconcile/20260911-splitunify-x-review-r13/synth.md`（D-001 定案檔）之戳記 hash 與 HEAD body hash **不符**（戳記 `9e1ef3d1` vs 實際 `e3f2847d`），亦即「D-001 三家戳記定案」目前機械上是紅的。
 

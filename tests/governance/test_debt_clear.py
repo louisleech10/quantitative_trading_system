@@ -1424,3 +1424,90 @@ def test_result_state_enum_is_closed_and_escape_covers_all_failure_states() -> N
     assert '"verdict_rejected", "format-failed", "failed"' in dc, (
         "debt_clear 之出口允許集合字面變了；三個失敗狀態都必須有出口"
     )
+
+
+# ---------------------------------------------------------------------------
+# SPLITUNIFY b9 review-r38 實戰（2026-09-14）：暫停委員之真缺席
+#
+# 🔴 背景：r38 派三家，grok 帳戶餘額耗盡（402）一個字都沒產出；使用者隨即把委員暫停成兩家。
+#    銷帳要求每個 participant 皆 success ⇒ 擋；abandon 又因「已有其他家結果」被 C-9 擋；
+#    grok 無額度不能重派 ⇒ 死結（與 r37 同型）。出口四條件：不在 active_stampers、failed、
+#    output_sha256 空、其後無重登；且扣除後剩餘 ≥2 家。以下四條各釘一個條件（mutation 自證）。
+# ---------------------------------------------------------------------------
+
+
+def _set_active_stampers(root: Path, active: list[str]) -> None:
+    p = root / "scripts" / "governance_families.json"
+    d = json.loads(p.read_text(encoding="utf-8"))
+    d["active_stampers"] = active
+    p.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _paused_prep(
+    root: Path,
+    audit: Path,
+    *,
+    session: str,
+    participants: list[str],
+    present: list[str],
+    absent_sha: str = "",
+) -> tuple[str, Path]:
+    """以 participants 開輪；present 各家 success 交件；其餘家記 failed（output_sha256=absent_sha）。
+
+    lock 之 expected_roster＝present（reconcile 時只收得到有交件的家）。
+    """
+    rid = str(uuid.uuid4())
+    _open_round(root, audit, round_id=rid, session=session, participants=participants)
+    for fam in present:
+        p, sha = _write_output(root, session, fam, _finding(f"{fam.upper()}-R1-P0-01"))
+        _result(root, audit, round_id=rid, family=fam, out_path=str(p.relative_to(root)), out_sha=sha)
+    for fam in participants:
+        if fam not in present:
+            _result(root, audit, round_id=rid, family=fam, out_path=f"handoffs/{session}-{fam}.md",
+                    out_sha=absent_sha, state="failed")
+    lock = _build_session(root, session=session, round_id=rid, families=present)
+    return rid, lock
+
+
+def test_clear_paused_family_without_output_excused(tmp_path: Path) -> None:
+    """暫停中（不在 active_stampers）且該輪 failed、無產出 ⇒ 不要求交件，其餘兩家銷帳放行。"""
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, ["codex", "composer"])
+    rid, lock = _paused_prep(root, audit, session="pa1",
+                             participants=["codex", "composer", "grok"], present=["codex", "composer"])
+    r = _clear(root, audit, "--round-id", rid, "--session", "pa1", "--lock", str(lock))
+    assert r.returncode == 0, r.stderr
+    assert "不要求交件" in (r.stdout or "")
+
+
+def test_clear_absent_family_still_active_blocked(tmp_path: Path) -> None:
+    """條件①：該家仍在 active_stampers（使用者沒暫停它）⇒ 缺席照擋——主委不得自判誰可缺席。"""
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, ["codex", "composer", "grok"])
+    rid, lock = _paused_prep(root, audit, session="pa2",
+                             participants=["codex", "composer", "grok"], present=["codex", "composer"])
+    r = _clear(root, audit, "--round-id", rid, "--session", "pa2", "--lock", str(lock))
+    assert r.returncode != 0
+    assert "roster 集合不相等" in (r.stderr or "")
+
+
+def test_clear_paused_family_with_output_not_excused(tmp_path: Path) -> None:
+    """條件③：暫停中但該輪**有產出**（output_sha256 非空）⇒ 不得以暫停為由略過——擋「躲 findings」。"""
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, ["codex", "composer"])
+    rid, lock = _paused_prep(root, audit, session="pa3",
+                             participants=["codex", "composer", "grok"], present=["codex", "composer"],
+                             absent_sha="a" * 64)
+    r = _clear(root, audit, "--round-id", rid, "--session", "pa3", "--lock", str(lock))
+    assert r.returncode != 0
+    assert "roster 集合不相等" in (r.stderr or "")
+
+
+def test_clear_paused_absent_leaving_one_family_blocked(tmp_path: Path) -> None:
+    """扣除暫停缺席後只剩一家 ⇒ 不足兩家 review，拒銷（出口不得把 review 降成單家）。"""
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, ["codex", "composer"])
+    rid, lock = _paused_prep(root, audit, session="pa4", participants=["codex", "grok"], present=["codex"])
+    r = _clear(root, audit, "--round-id", rid, "--session", "pa4", "--lock", str(lock))
+    assert r.returncode != 0
+    assert "（<2）" in (r.stderr or "")

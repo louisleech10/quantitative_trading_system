@@ -328,6 +328,90 @@ print(v if isinstance(v, str) else "")
 }
 
 # ④附加: lock.expected_roster 集合 == open.participants 集合
+# ④前置 暫停委員之真缺席（SPLITUNIFY b9 review-r38 實戰，2026-09-14）
+#   病：r38 派出時三家；grok 因帳戶餘額耗盡（402）**一個字都沒產出**（result_state=failed、
+#   output_sha256 空），使用者隨即把委員暫停成兩家。此時：銷帳要求每個 participant 皆 success ⇒ 擋；
+#   `--abandon --kind collection-failed` 又因「該輪已有其他家結果」被 C-9 收窄擋；grok 無額度不能重派
+#   ⇒ 死結。與 r37 那次（format-failed 無出口）同型：解除阻塞的路徑本身被閘擋住
+#   （docs/SCAR_LEDGER.md「銷帳路徑不得設閘」）。
+#   收窄解鎖——四條件**全部**成立才把該家視為缺席、不要求交件：
+#     ① 不在 governance_families.json 之 active_stampers（暫停＝使用者之名冊決定，非主委自判）
+#     ② 最新 result_state == failed
+#     ③ output_sha256 為空（真的沒產出；**有產出者一律不得以暫停為由略過**——擋「躲 findings」）
+#     ④ 其後無同 round 同家之 committee_output（有重登者走既有出口）
+#   另：扣掉缺席者後剩餘 participant 須 ≥2（兩家 review 下限，與 review_quorum_check 一致）。
+#   active_stampers 缺 key ⇒ 無暫停者（與 families_active_stampers 三態一致）；壞值 ⇒ fail-closed。
+#   stdout：逗號分隔之缺席家族（可為空）。
+_paused_absent_families() {
+  local rid="$1"
+  local dump
+  dump="$(_ledger_core dump_json)" || {
+    echo "ERROR: 讀帳本失敗（暫停缺席判定）" >&2
+    return 1
+  }
+  local _ap6
+  _ap6="$(_resolve_audit_path 2>/dev/null || true)"
+  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap6}" \
+    DEBT_CLEAR_FAMILIES_JSON="${SCRIPT_DIR}/governance_families.json" python3 <<'PY'
+import json, os, sys
+from pathlib import Path
+
+dump = json.loads(os.environ["DEBT_CLEAR_DUMP"])
+rid = os.environ["DEBT_CLEAR_RID"]
+info = (dump.get("rounds") or {}).get(rid) or {}
+participants = info.get("participants") or []
+latest = info.get("latest_results") or {}
+
+try:
+    fams = json.loads(Path(os.environ["DEBT_CLEAR_FAMILIES_JSON"]).read_text(encoding="utf-8"))
+except Exception as exc:
+    print(f"ERROR: 讀 governance_families.json 失敗（暫停缺席判定 fail-closed）: {exc}", file=sys.stderr)
+    sys.exit(1)
+if "active_stampers" not in fams:
+    sys.exit(0)
+act = fams.get("active_stampers")
+if not isinstance(act, list) or not act or not all(isinstance(x, str) and x.strip() for x in act):
+    print(f"ERROR: active_stampers 不合法（暫停缺席判定 fail-closed）: {act!r}", file=sys.stderr)
+    sys.exit(1)
+active = {x.strip() for x in act}
+
+audit_path = os.environ.get("DEBT_CLEAR_AUDIT") or ""
+outputs = []
+if audit_path and Path(audit_path).is_file():
+    for raw in Path(audit_path).read_text(encoding="utf-8").splitlines():
+        s = raw.strip()
+        if not s.startswith("{"):
+            continue
+        try:
+            r = json.loads(s)
+        except json.JSONDecodeError:
+            continue
+        if r.get("event") == "committee_output" and r.get("round_id") == rid:
+            outputs.append(r)
+
+absent = []
+for fam in participants:
+    if fam in active:
+        continue
+    rec = latest.get(fam) or {}
+    if rec.get("result_state") != "failed" or (rec.get("output_sha256") or "") != "":
+        continue
+    seq = rec.get("sequence")
+    if any(o.get("family") == fam and (seq is None or (o.get("sequence") or 0) > seq) for o in outputs):
+        continue
+    absent.append(fam)
+
+remaining = [f for f in participants if f not in absent]
+if absent and len(remaining) < 2:
+    print(
+        f"ERROR: 暫停缺席 {absent} 扣除後剩餘 participant 僅 {remaining}（<2）⇒ 不足兩家 review，拒銷",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+print(",".join(absent))
+PY
+}
+
 _assert_roster_equals() {
   local lock="$1"
   local rid="$2"
@@ -336,7 +420,8 @@ _assert_roster_equals() {
     echo "ERROR: 讀帳本失敗（roster 檢查）" >&2
     return 1
   }
-  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_LOCK="${lock}" python3 <<'PY'
+  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_LOCK="${lock}" \
+    DEBT_CLEAR_PAUSED_ABSENT="${PAUSED_ABSENT:-}" python3 <<'PY'
 import json, os, sys
 
 dump = json.loads(os.environ["DEBT_CLEAR_DUMP"])
@@ -357,7 +442,10 @@ if not isinstance(lock_roster, list):
     sys.exit(1)
 lock_set = set(x for x in lock_roster if isinstance(x, str))
 
-if open_set != lock_set:
+paused = {x for x in os.environ.get("DEBT_CLEAR_PAUSED_ABSENT", "").split(",") if x}
+if paused and lock_set == open_set - paused:
+    print(f"[debt_clear] roster：lock 不含暫停缺席 {sorted(paused)}（見 _paused_absent_families）⇒ 視為相等")
+elif open_set != lock_set:
     print(
         f"ERROR: roster 集合不相等: open.participants={sorted(open_set)} "
         f"lock.expected_roster={sorted(lock_set)}",
@@ -378,7 +466,8 @@ _assert_all_families_success_and_sha_match() {
   }
   local _ap5
   _ap5="$(_resolve_audit_path 2>/dev/null || true)"
-  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap5}" REPO_ROOT="${REPO}" python3 <<'PY'
+  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap5}" REPO_ROOT="${REPO}" \
+    DEBT_CLEAR_PAUSED_ABSENT="${PAUSED_ABSENT:-}" python3 <<'PY'
 import hashlib
 import json
 import os
@@ -454,7 +543,11 @@ def file_sha(path_str: str) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+paused = {x for x in os.environ.get("DEBT_CLEAR_PAUSED_ABSENT", "").split(",") if x}
 for fam in participants:
+    if fam in paused:
+        print(f"[debt_clear] 家族 {fam}：暫停中且該輪未產出（failed、output_sha256 空）⇒ 不要求交件")
+        continue
     rec = latest.get(fam)
     if not rec:
         print(f"ERROR: 家族 {fam} 無 committee_family_result", file=sys.stderr)
@@ -682,6 +775,9 @@ _cmd_clear() {
 
   # ④ identity binding
   _assert_identity_binding "${lock}" "${rid}" || return 1
+
+  # ④前置 暫停委員之真缺席（見 _paused_absent_families）
+  PAUSED_ABSENT="$(_paused_absent_families "${rid}")" || return 1
 
   # ④附加 roster 集合相等
   _assert_roster_equals "${lock}" "${rid}" || return 1
