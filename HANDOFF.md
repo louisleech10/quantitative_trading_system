@@ -207,6 +207,12 @@
   - **委員型號實證**：codex 本輪實際 `gpt-5.6-luna`／`xhigh`（本機 Codex 執行紀錄；該家自報無從得知）；composer 自報 Grok 4.6。
   - 🔴 **自掃教訓（composer 指出主委詞表漏抓原因）**：舊句以反引號把兩欄切開、且關鍵詞折到下一行 ⇒ 單行字面詞表匹配不到。本輪起自掃另跑「整段併行後再比對」形態（v37 已跑，零命中）。
   - **下一步**：`review-r41`（兩家）→ 過了才領 impl token 執行 `Task 9.3` 退回。
+㊸**review-r41 半完成（🔴 OPEN，等 codex 額度）**：round_id `1a153828-44db-4577-9c3f-948d6dcda270`，session `20260911-splitunify-b9-review-r41`。
+  - **composer**：零 finding（`COMPOSER-R41-P3-00`）、對 v37 body `c4be184f…` **APPROVED**、`VERDICT: proceed`；可施工性總檢判 TODO `Task 9.3` 可直接施工，Tier 0 測試名與行號逐一對上現行測試檔。
+  - **codex**：`failed`、無產出檔——CLI 回 `You've hit your usage limit ... try again at Sep 15th, 2026 12:21 AM`（5 小時窗 100%、週 38%）。
+  - 🔴 **卡點**：codex 在 active_stampers 內 ⇒ 暫停缺席出口不適用；abandon 被 C-9 擋（composer 已有結果）；同輪重派 gate 見 OPEN 債即拒發 token ⇒ **須使用者 00:21 後在 terminal 跑**：`ROUND_ID=1a153828-44db-4577-9c3f-948d6dcda270 bash scripts/cx_run.sh codex handoffs/20260911-SPLITUNIFY-B9-REVIEW-R41-BRIEF.md handoffs/20260911-splitunify-b9-review-r41-codex.md`，之後主委 `reconcile_build`（兩檔）→ 收斂 → `debt_clear`。
+  - ✅ **已解**：使用者 reset 額度後於 terminal 重跑，codex 交件（實際 `gpt-5.6-luna`／`xhigh`）。**兩家分歧採 codex**（`blocked` 3 P1＋2 P2；composer 零 finding）：①Tier 0 漏列兩條仍斷言列級形狀之既有測試（`test_gap_band_event_is_purged_not_train` `:1767-1768`、`test_real_derive_never_produces_straddling_event` `:1864`，主委實讀屬實；🔴 composer「零缺口」與主委 brief 皆漏——抽驗只核清單上的測試，沒反向搜尋全部列級斷言）②purge 稽核計數公式改取自聚合後 `purged` 表（多標的無 `event_state`）③兩條殘留觸發條件改為既有 schema 可機械檢查④多標的串接後唯一性釘成具名 helper `_assert_concat_event_level_unique`。全修完，`debt_clear` rc=0（`handoffs/reconcile/20260911-splitunify-b9-review-r41/synth.md`）。**SPEC 進 v38**。
+  - **下一步**：`review-r42`（兩家）→ 過了才領 impl token 施工 `Task 9.3`。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
