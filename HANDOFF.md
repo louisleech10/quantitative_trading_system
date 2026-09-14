@@ -147,10 +147,18 @@
   - 🔴 **值得記的轉折**：兩條 P2 都不是「閘被繞過」，而是**閘的邊界行為**與**閘的自我描述**。前五代打的是正確性，第六代開始打的是**可維護性**——通常代表核心判準已經穩了。
   - **SPEC 進 v30**，body sha256 `e0cff27f6b4695d384283af146e8521b332bec9df4d20bafe96c3d7bcb3a6e76` ⇒ v29 之三家戳記失效，須以 **stamp 輪**重簽（非全審輪；兩條 P2 皆為委員自己要求之修補）。六路回歸 **742 passed、0 failed、0 xfailed**；`GOLDEN OK`；錨點閘 22/22 rc=0。
   - 🔴 **stamp-r6 要同時蓋兩份**：`docs/SPLITUNIFY_SPEC.D-002.md`（v30 body 上列）**與** `handoffs/reconcile/20260911-splitunify-b9-review-r35/synth.md`（body `acf0b77ca2f05cab8481c82d7aa894f8219e0ff509212c3ab187d3a392f4655c`）——後者是 B9D impl token 之 `--adversarial` 標的，`gate.sh` 機器強制要求它已獲全數戳記。
-- **下一步**：派 `stamp-r6` 對 v30 三家重簽 → `reconcile_stamps_check` 全 APPROVED → 領 B9D impl token 進 `Task 9.3`。🔴 **B9D 起審查輪編號改為每批重新起算**（`…-b9d-review-r1`）。
+㊱**stamp-r6：composer／grok 零 finding 並蓋章；codex 三條 P1 並 REJECTED——其中一條正是主委在 brief 自標之「本輪唯一真正的決策點」**。
+  - 🔴 **`CODEX-R6-P1-01`：`review-r35` 收斂檔不足以當 `Task 9.3` 之 impl 授權依據**——它那三條 finding **全是關於錨點閘**，與施工語意（`C5-24`／`C5-25`／`C5-29`）無逐條對應。該家碼證可執行：**讓任一 consumer 不去重，錨點閘仍回 22/22** ⇒ 它證明的是「驗收機制可用」，不是「施工設計已審過」。
+  - 🔴 **三家分歧，依 2026-09-11 裁定「看碼證不數人頭、不決採較嚴版」取 codex**。另兩家（尤其 grok 逐字寫「gate 不要求施工面逐條對應」）講的是**閘的最低門檻**，codex 講的是**該不該審**——不是同一命題。⇒ **另開 `Task 9.3` 設計 consult 輪**，`--adversarial` 改指其新 synth。
+  - **`CODEX-R6-P1-02`**：邊界②只寫「fail-closed raise」**未釘死例外型別** ⇒ 已釘死 `AlignmentViolationError`＋訊息含 `event_id`＋測試禁以 `Exception`／`ValueError` 寬比（後者是父類，寬比會放過契約漂移）。TODO 與 §V 同步。
+  - **`CODEX-R6-P1-03`**：該家實跑證明**去重與否會改變** `event_manifest_hash` ⇒ 補「既有單 TF 且 ID 唯一輸入之雜湊必須逐字不變、只比對不得自動 `--write`、digest 一變即停止並轉 `Task 9.5`」，並補 `(丙)` 列分類變動之 `TARGETS` 補錄流程。
+  - **(4a) 例外捕捉範圍**：三家一致判不形成假綠（結果仍為 `ANCHOR_FAIL`），不開 finding。
+  - **SPEC 進 v31**，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`。六路回歸 **742 passed、0 failed、0 xfailed**；錨點閘 22/22 rc=0。
+  - 🔴 **程序定論**：主委把這個問題寫成 brief 裡唯一的決策點交出去攻，**結果正是它被否證**——若自行認定「三家都 proceed 就夠」，B9D 會在**沒有任何一輪審過施工設計**的情況下開工。這是主委自標 assumed 被證實的**第七輪**。
+- **下一步**：派 `task93-consult-r1`（三家，`Task 9.3` 施工設計專審）→ 其 synth 取得三家戳記 → `--adversarial` 指該檔領 B9D impl token 進 `Task 9.3`。🔴 **B9D 起審查輪編號改為每批重新起算**（`…-b9d-review-r1`）。
 
 ## 現況
-- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v30，body sha256 `e0cff27f6b4695d384283af146e8521b332bec9df4d20bafe96c3d7bcb3a6e76`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED，因本次兩條 P2 修補失效）**。
+- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
 - **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **已做**（stamp-r1..r4）④領 impl token 後才動生產碼 **已做**（B9A／B9B 各憑 token）。
 - **Phase 9 依賴序（四方一致）**：`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
 - 🔴 **批次狀態之唯一權威＝`docs/SPLITUNIFY_TODO.md` §B 之「狀態」欄**（2026-09-14 使用者質問「你為何又跳過 TODO」後定）。**出生事故**：主委實作完 B9A／B9B／B9C 三批，卻**一次都沒回去標 TODO**——狀態只記在本檔與白話看板，於是同一件事有**三份**而 TODO 是過期的那一份；**這就是委員已抓九次的同一個病**，只是漏的是 TODO 自己的進度、犯的人是主委。⇒ **本檔與 `白話說明/` 一律不再自寫批次狀態清單**，只指向 §B；每批收尾固定動作新增一項：**回去標 TODO §B 與該 Task 標題**。

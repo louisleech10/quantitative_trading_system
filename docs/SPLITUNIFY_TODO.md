@@ -691,6 +691,22 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   ②`pattern_bridge` 去重後若同一 `event_id` 出現兩個不同 `split_label` ⇒ fail-closed raise，
   不得靜默取第一個；③前端 `byEventId` 在 `feature_timeframe` 存在時仍以 `canonicalEventId` 建鍵，
   匯出附帶欄位不得變空。
+- 🔴 **v31 新增：fail-closed 之錯誤型別釘死（逐字採 `CODEX-R6-P1-02`）**——
+  邊界②原只寫「fail-closed raise」而**未釘死例外型別**，實作者可用裸 `ValueError` 或把測試放寬成
+  `pytest.raises(Exception)`，alignment 契約漂移就抓不到。**現行**：
+  「`C5-24` 與 `C5-29` 之 reducer，遇同一 `event_id` 的欄值不唯一或衝突時，一律 raise
+  `momentum.core.contracts.AlignmentViolationError`，訊息含 `event_id`；同值多列只取唯一值；
+  測試一律 `pytest.raises(AlignmentViolationError, match=...)`，不得以 `Exception`／`ValueError` 寬比。」
+  （該型別已存在且為 `ValueError` 子類，`Task 9.2b` 之 side guard 已採用，故新舊行為對既有 caller 相容。）
+- 🔴 **v31 新增：`C5-25` 去重之 hash 相容性與 golden 連動（逐字採 `CODEX-R6-P1-03`）**——
+  該家實跑證明**去重與否會改變** `event_manifest_hash`（`UNIQUE_HASH` vs `DUPLICATE_HASH` 不相等）
+  ⇒ 原條文只寫「先去重再算雜湊」而**沒寫既有 golden 會不會被連動**。**現行**：
+  「先按 `event_id` 穩定去重；同 ID 之 `label_start_ms`／`label_end_ms` 不完全相同即 raise
+  `AlignmentViolationError`，完全相同只留一列。既有單 TF 且 ID 唯一輸入之 `event_manifest_hash`
+  **必須逐字不變**；`Task 9.3` 只跑比對，**不得自動 `--write`**，任一既有 golden digest 改變
+  即停止並轉 `Task 9.5`。`(丙)` 任一列重掃分類需改動時，當輪補
+  `TARGETS: <repo-relative-path>:<start>-<end>`、更新 register 與 receipt 的分類／碼證，
+  未完成前 `Task 9.3` 必須 blocked。」
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/event_samples/test_feature_materialization.py tests/momentum/event_samples/test_tables.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/momentum/event_samples/test_counterexample_classifier.py tests/momentum/event_samples/test_candidate_ledger.py tests/momentum/event_samples/test_dedupe.py tests/momentum/event_samples/test_pattern_bridge.py tests/momentum/Analysis/test_splitunify_derive.py` rc=0；
   前端 `cd frontend && node_modules/.bin/vitest run src/app/search/eventExportByEventId.test.tsx` rc=0。
   上表每列各一條「改壞就變紅」測試；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。
