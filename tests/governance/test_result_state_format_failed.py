@@ -13,6 +13,9 @@ import hashlib
 import json
 import os
 import shutil
+import signal
+import subprocess
+import time
 import uuid
 from pathlib import Path
 
@@ -21,6 +24,7 @@ import pytest
 from tests.governance import _role_pin  # noqa: E402
 
 from tests.governance import _debt_probe_helper as _dph
+from tests.governance.test_cxrun_watchdog_stale_done import _kill_wrapper_group, _reap_cli_groups
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -902,18 +906,21 @@ def test_t2_s1_retry_without_write_does_not_reuse_stale_output(tmp_path: Path) -
     out_prefix = "handoffs/t2s1"
     out_rel = f"{out_prefix}-codex.md"
     _open_round(h, round_id=rid, session="s-s1", fams=["codex"], out_prefix=out_prefix)
-    (h["root"] / out_rel).write_text(_STALE_LEGAL, encoding="utf-8")
+    # 舊檔帶裁決塊＋STATUS: DONE（真實前次交件形態）⇒ 自動登記之觸發條件成立，下方「無登記」觀測才走得到 cli_rc 守衛
+    (h["root"] / out_rel).write_text(
+        _STALE_LEGAL + "\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n", encoding="utf-8")
     r1 = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="fail_rc",
                  extra_env={"CX_STUB_RC": "7"})
     assert r1.returncode == 7, r1.stdout + r1.stderr
     assert _events(h["audit"], "committee_family_result")[-1]["result_state"] == "failed"
-    n_out = len(_events(h["audit"], "committee_output"))
     r2 = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="preserve")
     assert r2.returncode != 0, r2.stdout + r2.stderr
     latest = _events(h["audit"], "committee_family_result")[-1]
     assert latest["result_state"] == "failed", latest
     assert latest["output_sha256"] == ""
-    assert len(_events(h["audit"], "committee_output")) == n_out, "舊檔不得被自動登記成本次交件"
+    # 舊檔不得被自動登記成本次交件：harness 無 gate.sh ⇒ 誤觸登記會追加 verdict_rejected 列（committee_output 在此恆空，不可當觀測）
+    states = [r["result_state"] for r in _events(h["audit"], "committee_family_result") if r.get("round_id") == rid]
+    assert states == ["failed", "failed"], states
     assert "未寫入產出" in r2.stderr, r2.stderr[-1500:]
 
 
@@ -974,4 +981,86 @@ def test_t2_s4_retry_rewriting_identical_bytes_is_success(tmp_path: Path) -> Non
     assert r2.returncode == 0, r2.stdout + r2.stderr
     latest = _events(h["audit"], "committee_family_result")[-1]
     assert latest["result_state"] == "success", latest
+
+
+@pytest.mark.parametrize("sig, expected_rc", [(signal.SIGINT, 130), (signal.SIGTERM, 143)],
+                         ids=["SIGINT", "SIGTERM"])
+def test_t2_s5_signal_during_cli_emits_single_failed_row(tmp_path: Path, sig, expected_rc) -> None:
+    """T2-S5（review-r46 `CODEX-R46-P1-01`）：真實 cx_run 等待 CLI 時被 Ctrl-C／TERM 中斷 ⇒ 仍須留下結果列。
+
+    走真實 `_run_cli_watched`（非 stub）：PATH 前置假 `cursor-agent`（先寫出含裁決塊與 `STATUS: DONE`
+    之合法產出，再記 pid 後 `sleep 300`），cx_run 自成群組後對該群組送訊號（模擬終端 Ctrl-C 只打前景群組）。
+    斷言：process rc＝130／143；該輪恰一列 committee_family_result，result_state=failed、cli_rc 同 rc、
+    output_sha256 空；CLI 群組已結束。只抽 `_run_cli_watched` 之看門狗測試觀察不到 caller 之 emit 接線，本條補上。
+
+    🔴 「無自動登記」以「恰一列」觀測，不以 committee_output 觀測：harness 未複製 `gate.sh` ⇒ committee_output
+       在此恆為空（斷言它＝空心）；而一旦誤觸登記，`gate.sh` 缺席使登記失敗並追加 `verdict_rejected` 列 ⇒ 列數變 2。
+       產出刻意非空且含 `STATUS: DONE`／`VERDICT:`，使 `cli_rc≠0` 之登記守衛與 emit 之 `cli_rc==0` 條件真正被走到。
+    """
+    h = _harness(tmp_path, kind="review")
+    rid = str(uuid.uuid4())
+    out_prefix = "handoffs/t2s5"
+    out_rel = f"{out_prefix}-composer.md"
+    _open_round(h, round_id=rid, session="s-s5", fams=["composer"], out_prefix=out_prefix)
+    bin_dir = tmp_path / "fakebin"
+    bin_dir.mkdir()
+    cpid_file = tmp_path / "cli.pid"
+    spid_file = tmp_path / "sleep.pid"
+    fake = bin_dir / "cursor-agent"
+    legal_out = tmp_path / "legal_out.md"
+    legal_out.write_text(_STALE_LEGAL + "\nVERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n", encoding="utf-8")
+    fake.write_text(
+        "#!/bin/bash\n"
+        "exec >/dev/null 2>&1\n"
+        f'cp "{legal_out}" "{h["root"] / out_rel}"\n'
+        f'echo $$ > "{cpid_file}"\n'
+        "sleep 300 &\n"
+        f'echo $! > "{spid_file}"\n'
+        "wait\n",
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+    env = dict(h["env"])
+    env.pop("CX_STUB_MODE", None)
+    env["ROUND_ID"] = rid
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
+    env["CX_DONE_GRACE_SEC"] = "300"
+    env["CX_MAX_SEC"] = "600"
+    proc = subprocess.Popen(
+        ["bash", str(h["scripts"] / "cx_run.sh"), "composer", h["brief_rel"], out_rel],
+        cwd=h["root"], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        start_new_session=True,
+    )
+    try:
+        deadline = time.monotonic() + 60
+        while not spid_file.exists() and proc.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.2)
+        if not spid_file.exists():
+            _kill_wrapper_group(proc)
+            pytest.fail(f"fixture 前提變了：假 CLI 未啟動（cx_run rc={proc.returncode}）")
+        time.sleep(1)
+        pids = [int(f.read_text(encoding="utf-8").strip()) for f in (cpid_file, spid_file)]
+        os.killpg(proc.pid, sig)
+        out, err = proc.communicate(timeout=60)
+        assert proc.returncode == expected_rc, out + err[-2000:]
+        rows = [r for r in _events(h["audit"], "committee_family_result") if r.get("round_id") == rid]
+        assert len(rows) == 1, rows
+        row = rows[0]
+        assert row["family"] == "composer", row
+        assert row["result_state"] == "failed", row
+        assert str(row["cli_rc"]) == str(expected_rc), row
+        assert row["output_sha256"] == "", row
+        assert (h["root"] / out_rel).stat().st_size > 0, "fixture 前提變了：產出須非空才走得到 emit／登記之 cli_rc 條件"
+        time.sleep(1)
+        alive = []
+        for pid in pids:
+            try:
+                os.kill(pid, 0)
+                alive.append(pid)
+            except ProcessLookupError:
+                pass
+        assert not alive, f"cx_run 收到 {sig.name} 後 CLI 群組仍存活：{alive}"
+    finally:
+        _kill_wrapper_group(proc)
+        _reap_cli_groups((cpid_file, spid_file))
 

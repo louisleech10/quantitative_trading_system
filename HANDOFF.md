@@ -231,6 +231,11 @@
   - **測試**：`test_cxrun_watchdog_stale_done.py` 抽出 `_write_watchdog_script`、新增 `test_sigint_to_wrapper_group_terminates_detached_cli_group`（wrapper 自成群組、對群組送 SIGINT ⇒ 回 130 且 CLI 群組結束），5 passed；mutation W-M1..W-M5 各自轉紅後還原、無殘留行程。相關 11 檔治理回歸 **26 failed／303 passed**，失敗集合與乾淨 HEAD worktree 逐條相同 ⇒ 無新增紅。
   - codex 本輪實際 `gpt-5.6-luna`／effort `max`。`fact_keys.json` E-008／E-015／E-022 行號隨位移修正並重生成。
   - **下一步**：`review-r46`（兩家）覆核訊號轉發修補＋codex 對 v39 重簽 → 過了領 impl token 施工 `Task 9.3`。
+㊽**review-r46 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r46/synth.md`）：`CODEX-R45-P1-01` 由原提出方以 pty 反例重跑關閉（`\x03` ⇒ wrapper rc=130、CLI 無存活；TERM rc=143）。composer 零 finding、第四度 APPROVED v39；codex `blocked` 1 P1＋2 P2——**全是測試缺口，生產行為該家實跑正確**：`CODEX-R46-P1-01` 訊號返回後之 failed 結果列只有抽出函式之測試、刪 caller emit 接線照樣綠；P2-01 TERM 無常駐測試；P2-02 測試 setup 失敗時遺留 detached `sleep 300`。composer 判不需另測 ⇒ 採較嚴之 codex 版。
+  - **修補（只動測試；`cx_run.sh`、SPEC body 皆未改，fact_keys 行號不動）**：`test_result_state_format_failed.py` 新增 `test_t2_s5_signal_during_cli_emits_single_failed_row[SIGINT|SIGTERM]`（PATH 前置假 `cursor-agent`、真實 cx_run 自成群組後送訊號 ⇒ rc 130／143、該輪恰一列 failed、cli_rc 同、空 sha、無 `committee_output`、CLI 群組已死）；看門狗訊號測試改 INT／TERM 參數化；清理改 `_reap_cli_groups`（讀任何已寫 pid 檔整組 SIGKILL）＋`_kill_wrapper_group`。
+  - 🔴 **自查抓到空心斷言**：新測試初版斷言「無 `committee_output`」——harness 未複製 `gate.sh` ⇒ 該事件**恆空**、改壞也綠。改以「恰一列」觀測（誤觸登記會因 `gate.sh` 缺席追加 `verdict_rejected` 列），假 CLI 先寫含裁決塊之合法產出；r43 之 T2-S1 同型空心一併改，且其舊檔補裁決塊（否則登記觸發條件不成立，S-M5 不紅）。清理之 `_reap_cli_groups` 只對 CLI leader killpg、成員 kill。
+  - **自證**：S-M1 刪 emit 接線 ⇒ T2-S5 兩參數紅；S-M2 拿掉 trap ⇒ 四參數紅；S-M3 TERM 記 130 ⇒ 兩檔 TERM 紅、INT 綠；S-M4 setup 失敗 ⇒ 新清理無殘留、舊清理殘留 1 個 `sleep 300`；S-M5 拿掉登記之 `cli_rc≠0` 守衛 ⇒ T2-S1＋T2-S5 兩參數紅。11 檔回歸 26 failed／306 passed，失敗集合同基準。
+  - **下一步**：`review-r47`（兩家）覆核測試修補＋codex 重簽 v39 → 過了領 impl token 施工 `Task 9.3`。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。

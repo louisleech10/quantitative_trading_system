@@ -18,6 +18,8 @@ import subprocess
 import time
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CX_RUN = REPO_ROOT / "scripts" / "cx_run.sh"
 _FUNCS = ("_compute_output_sha", "_output_write_sig", "_kill_tree", "_terminate_cli_group", "_run_cli_watched")
@@ -133,12 +135,50 @@ def test_watchdog_kills_whole_process_group_including_orphaned_grandchild(tmp_pa
                 pass
 
 
-def test_sigint_to_wrapper_group_terminates_detached_cli_group(tmp_path: Path) -> None:
+def _reap_cli_groups(pid_files) -> None:
+    """測試清理：`pid_files[0]` 為 CLI（已 setsid ⇒ 其 pid 即群組 id）⇒ 整組 SIGKILL；其餘為群組成員 ⇒ 逐一 SIGKILL。
+
+    🔴 review-r46 `CODEX-R46-P2-02`：setup 在 pid 檔寫齊前失敗時，只 `proc.kill()` 殺 wrapper，
+       detached CLI 群組（`sleep 300`）會遺留。故清理只讀「已寫出」之 pid 檔，不依賴 pid 清單已建好。
+       成員 pid 不當群組 id 用（它不是群組 leader）。
+    """
+    for i, f in enumerate(pid_files):
+        try:
+            pid = int(f.read_text(encoding="utf-8").strip())
+        except (OSError, ValueError):
+            continue
+        kills = [lambda p: os.kill(p, signal.SIGKILL)]
+        if i == 0:
+            kills.insert(0, lambda p: os.killpg(p, signal.SIGKILL))
+        for kill in kills:
+            try:
+                kill(pid)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+
+def _kill_wrapper_group(proc: "subprocess.Popen") -> None:
+    if proc.poll() is None:
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    try:
+        proc.communicate(timeout=10)
+    except subprocess.TimeoutExpired:
+        pass
+
+
+@pytest.mark.parametrize("sig, expected_rc", [(signal.SIGINT, 130), (signal.SIGTERM, 143)],
+                         ids=["SIGINT", "SIGTERM"])
+def test_signal_to_wrapper_group_terminates_detached_cli_group(tmp_path: Path, sig, expected_rc) -> None:
     """🔴 review-r45 `CODEX-R45-P1-01`：終端 Ctrl-C 之 SIGINT 只送到前景群組（wrapper），CLI 已 setsid 脫離。
 
-    wrapper 須攔 INT、把終止轉發給 CLI 群組，並以 130 返回（由 caller 照常寫 failed 結果列）。
-    本測以 `start_new_session=True` 讓 wrapper 自成群組，再對該群組送 SIGINT，模擬終端 Ctrl-C；
+    wrapper 須攔 INT／TERM、把終止轉發給 CLI 群組，並以 130／143 返回（caller 端之 failed 結果列由
+    `test_result_state_format_failed.py::test_t2_s5_*` 以真實 cx_run 驗）。
+    本測以 `start_new_session=True` 讓 wrapper 自成群組，再對該群組送訊號，模擬終端 Ctrl-C／kill；
     看門狗 grace／上限刻意設大，確保終止只可能來自訊號轉發。
+    🔴 review-r46 `CODEX-R46-P2-01`：INT 與 TERM 是兩條獨立 trap／返回碼，須各自覆蓋。
     """
     cpid_file = tmp_path / "cli.pid"
     spid_file = tmp_path / "sleep.pid"
@@ -153,7 +193,6 @@ def test_sigint_to_wrapper_group_terminates_detached_cli_group(tmp_path: Path) -
                                     grace=300, max_sec=600)
     proc = subprocess.Popen(["bash", str(script)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             text=True, start_new_session=True)
-    pids: list = []
     try:
         deadline = time.monotonic() + 15
         while not spid_file.exists() and time.monotonic() < deadline:
@@ -161,9 +200,9 @@ def test_sigint_to_wrapper_group_terminates_detached_cli_group(tmp_path: Path) -
         assert spid_file.exists(), "fixture 前提變了：CLI 未啟動"
         time.sleep(1)
         pids = [int(f.read_text(encoding="utf-8").strip()) for f in (cpid_file, spid_file)]
-        os.killpg(proc.pid, signal.SIGINT)
+        os.killpg(proc.pid, sig)
         out, err = proc.communicate(timeout=30)
-        assert "RC=130" in out, out + err
+        assert f"RC={expected_rc}" in out, out + err
         time.sleep(1)
         alive = []
         for pid in pids:
@@ -172,12 +211,7 @@ def test_sigint_to_wrapper_group_terminates_detached_cli_group(tmp_path: Path) -
                 alive.append(pid)
             except ProcessLookupError:
                 pass
-        assert not alive, f"wrapper 收到 SIGINT 後 CLI 群組仍存活：{alive}"
+        assert not alive, f"wrapper 收到 {sig.name} 後 CLI 群組仍存活：{alive}"
     finally:
-        if proc.poll() is None:
-            proc.kill()
-        for pid in pids:
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+        _kill_wrapper_group(proc)
+        _reap_cli_groups((cpid_file, spid_file))
