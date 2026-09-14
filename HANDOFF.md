@@ -197,11 +197,17 @@
   - 🔴 **銷帳又撞死結（r37 同型）**：grok 無產出 ⇒ 全員 success 擋、abandon 被 C-9 擋、grok 無額度不能重派。依使用者授權修 `scripts/debt_clear.sh` 之 `_paused_absent_families`：**不在 `active_stampers`＋該輪 failed＋`output_sha256` 空＋其後無重登**四條件全成立才不要求交件，且扣除後須剩 ≥2 家。`test_debt_clear.py` **40 passed**（+4 反例）；mutation 自證見 synth。r38 已以此路徑 `debt_clear` rc=0。
   - 🔴 **使用者抓出：委員型號被派工腳本寫死**——`cx_run.sh` 對 codex 寫 `-m gpt-5.6-luna`、對 cursor 寫 `--model composer-2.5`（2026-07-18 起），**蓋掉使用者 CLI 設定**（`~/.codex/config.toml` 為 `gpt-6-astra`；`~/.cursor/cli-config.json` 已切 `grok-4.6`）⇒ 已拿掉寫死，型號一律照 CLI 設定。grok 分支之 `-m grok-4.5` 未動（該家暫停中）。
   - **下一步**：`review-r39`（兩家：v35 ＋ 暫停缺席出口 ＋ 拿掉型號）→ 過了才領 impl token 執行退回。
+㊶**review-r39 完成（兩家分歧，看碼證採 codex）**（`handoffs/reconcile/20260911-splitunify-b9-review-r39/synth.md` ＝唯一權威）：composer `proceed`（1 P2）；codex `blocked`（5 P1＋1 P2），全採納修完，`debt_clear` rc=0。
+  - 🔴 **主委 r38 之暫停缺席出口被 codex 實跑打穿兩處**：空 sha ≠ 沒產出（CLI 寫完報告後非零退出即此形）；自讀名冊繞過共用 getter。已改為查該輪產出路徑實體＋整輪任何時點之產出登記＋經 `families_active_stampers` 三態。`test_debt_clear.py` **48 passed**（+8）；mutation N1–N5 各自轉紅後還原。
+  - **文件三條 P1**：列級量詞改事件級（§V `Task 9.2`／`9.2b`／`D-002-C3`、TODO `Task 9.2`）；聚合 seam 衝突面收窄為 `symbol`（輸入無 `split_label`，異側改由 `_assert_event_level_side_consistency` 承接）；投影計數唯一 owner＝`Task 9.3`／`M-SU-D2-43`，`M-SU-D2-39` 併入、`Task 9.4` 不再改計數，依賴序改 `9.3 → 9.4`。**SPEC 進 v36**，body sha256 `7e34d3bd3edffb262f03f5dcb90739e214470ba745907c62e44db321b2d4694f`。
+  - 🔴 **委員型號實證（使用者追問）**：本機 `~/.codex/sessions` 顯示委員 Codex 6 月＝gpt-5.5、7/1–17 照使用者設定換到 Luna、7/18–9/14 共 954 次全為 Luna（寫死）、r39＝gpt-6-astra；委員 Grok 約 440 次全為 4.5。**使用者因 Astra 額度消耗過大（r39 一輪約 13% 週額度），已改回 gpt-5.6-luna／xhigh**（網路＋本機實測：Luna xhigh 審查一輪平均約 0.44% 週額度，品質與 Sol medium 持平）。`cx_run.sh` 另拿掉強制 effort 與 grok 之 `-m grok-4.5`，型號與 effort 全照 CLI 設定。
+  - **具名殘留**：`SU-RESID-COMMITTEE-MODEL-EVIDENCE`（needs-research：審計不記實際型號）、`SU-RESID-PAUSED-NO-RESULT`（blocked-by：一家完全無結果列時暫停出口不適用）。
+  - **下一步**：`review-r40`（兩家）→ 過了才領 impl token 執行 `Task 9.3` 退回。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
 - **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **已做**（stamp-r1..r4）④領 impl token 後才動生產碼 **已做**（B9A／B9B 各憑 token）。
-- **Phase 9 依賴序（四方一致）**：`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
+- **Phase 9 依賴序（四方一致；🔴 v36 依 `CODEX-R39-P1-05` 改序）**：~~`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`~~ ⇒ `9.1 → 9.2 → 9.2a → 9.2b → 9.3 → 9.4 → 9.5`（投影計數移 `9.3`）；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
 - 🔴 **批次狀態之唯一權威＝`docs/SPLITUNIFY_TODO.md` §B 之「狀態」欄**（2026-09-14 使用者質問「你為何又跳過 TODO」後定）。**出生事故**：主委實作完 B9A／B9B／B9C 三批，卻**一次都沒回去標 TODO**——狀態只記在本檔與白話看板，於是同一件事有**三份**而 TODO 是過期的那一份；**這就是委員已抓九次的同一個病**，只是漏的是 TODO 自己的進度、犯的人是主委。⇒ **本檔與 `白話說明/` 一律不再自寫批次狀態清單**，只指向 §B；每批收尾固定動作新增一項：**回去標 TODO §B 與該 Task 標題**。
 - 🔴 **主委具名不採納委員原文兩處**（理由見 synth）：grok `Task 9.4` 之**無路徑** `pytest -k`（會收全套、小時級）；composer `Task 9.2b` 之 `bash scripts/freeze_splitunify_golden.py`（檔是 `.py`，且 golden 重凍屬 `9.5`）。
 - 🔴 **「雙家族」字面已更正為指標**（`CLAUDE.md:30`、ORCH `:41`／`:195`）——唯一權威＝ORCH §1 現行分工行＋`scripts/governance_roles.json`，現行＝**三家全員**。CLAUDE.md 自己已明令「本檔不得自寫家數」，這是同型漂移第二次。

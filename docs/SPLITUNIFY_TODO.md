@@ -67,13 +67,13 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B9B** | 9.2, 9.2a | ✅ **完成**（impl `9e87386f`；審碼 r20、閉合 r21／r22） | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
 | **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27，閉合 r28–r35 共九輪＋stamp-r6＋consult-r3/r4/r5；🔴 **consult-r4/r5 三家一致判定方向反轉**（見 `Task 9.3`）；**現待 review 覆核 v32＋重簽**） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
 | **B9D** | 9.3 | ⬜ **未開工**（下一個） | B9C | 🔴 **v35 更正（v32 方向反轉後 §B 未同步）**：現行＝**把 `assignments`／`purged` 退回事件級＋同步計數**（具名 seam；Tier 0 同 commit）；下游表已改為追溯用、多數維持現狀；前端 `byEventId` owner 移 `Task 9.5`。以下原文保留供追溯：~~`Task 9.3` 表列**九處**逐處處置~~（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
-| **B9E** | 9.4 | ⬜ 未開工 | B9C | 記帳鏈與 `baseline` 拆鍵 | 中 |
-| **B9F** | 9.5 | ⬜ 未開工（排最後） | B9D ＋ B9E | golden 換錨與前端；須在所有行為面定案後才凍結 | 大 |
+| **B9E** | 9.4 | ⬜ 未開工 | B9C ＋ 🔴 **B9D**（v36，`CODEX-R39-P1-05`：報告／baseline 驗收依賴事件級輸出與計數完成） | 記帳鏈與 `baseline` 拆鍵（投影計數已移 `Task 9.3`） | 中 |
+| **B9F** | 9.5 | ⬜ 未開工（排最後） | B9D ＋ B9E | golden 多 TF／交錯平行組與前端 `byEventId`；🔴 v36 澄清：decision-anchor 換錨已於 B9C 完成，本批不重做側別換錨；整合後比對舊單 TF 值、依既定允許面凍結新組 | 大 |
 
 🔴 **Phase 9 依賴序（`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md` 裁定；三家＋主委獨立版四方一致）**：
-`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`。
-`9.3` 與 `9.4` 可並行（前者動消費面、後者動計數與 `baseline`），惟 `9.4` 之 `per_symbol_n`／`tier_min` 去重
-與 `9.2a` 同檔 ⇒ 並行時須先 rebase 再跑各自驗收。
+~~`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`~~ ⇒ 🔴 **v36（`CODEX-R39-P1-05`）**：`9.1 → 9.2 → 9.2a → 9.2b → 9.3 → 9.4 → 9.5`。
+~~`9.3` 與 `9.4` 可並行（前者動消費面、後者動計數與 `baseline`），惟 `9.4` 之 `per_symbol_n`／`tier_min` 去重與 `9.2a` 同檔 ⇒ 並行時須先 rebase 再跑各自驗收。~~
+投影計數已移 `9.3` ⇒ 不再以「不同檔」為可並行依據；只有不重疊之 `baseline` 工作可先行，`9.4` 整批驗收在 `9.3` 之後。
 `9.5` **必須最後**——golden 重凍會把未定側別寫死。
 
 🔴 **R2 之 D11（codex Q8）**：v2 把 B2 標「大」卻只有批末一個 gate，
@@ -541,8 +541,8 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   ②`selected_timeframe` 給字串且該 TF 不存在 ⇒ 維持 `ValueError`；
   ③`event_level` 自身 `event_id` 重複 ⇒ `many_to_one` 仍須擋下（放寬 `validate` 不得順手放掉這一面）。
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/event_samples/test_splitunify_wiring.py tests/momentum/Analysis/test_splitunify_derive.py` rc=0（🔴 **端到端，schema 斷言不算**；斷言標的逐字為 `split_plan.assignments`，不是 `features`），須含：
-  - `test_run_without_selected_timeframe_emits_all_feature_tf_rows`（經 `EventSamplePipeline.run` 不傳
-    `selected_timeframe` ⇒ `len(assignments) == len(per_tf)` 且兩個 feature TF 皆在）
+  - `test_run_without_selected_timeframe_emits_all_feature_tf_rows`（🔴 **v36 更正（`CODEX-R39-P1-03`＝`COMPOSER-R39-P2-01`；SPEC §V `Task 9.2` 已於 v32 反轉）**：~~經 `EventSamplePipeline.run` 不傳 `selected_timeframe` ⇒ `len(assignments) == len(per_tf)` 且兩個 feature TF 皆在~~ ⇒ 現行：經 `EventSamplePipeline.run` 不傳
+    `selected_timeframe` ⇒ `len(assignments)+len(purged) == per_tf.event_id.nunique()`，兩表各自 `event_id` 唯一且互斥、欄集為事件級；`event_keys` 與有效 `per_tf` 之 `(event_id, feature_timeframe)` 集合及列數相等、兩個 feature TF 皆仍在 `event_keys`。該測試之舊斷言由 `Task 9.3` 同批改寫）
   - `test_partial_boundary_gate_accepts_none_selected_timeframe`
     （🔴 **替換**既有把 `selected_timeframe=None` 視為必 raise 之參數化案例，**不得**只新增而留著舊的）
   - `test_feature_timeframe_column_sourced_from_per_tf_not_event_level`（同事件兩列須為**不同** TF 值）
@@ -712,7 +712,7 @@ _aggregate_event_level_split_rows(
     event_keys: pd.DataFrame, event_state: Mapping[Any, str]
 ) -> tuple[list[dict], list[dict]]
 ```
-按 `event_id` 分組；`symbol`／`split_label` 非單值即 raise `AlignmentViolationError`（訊息含 `event_id`）；
+按 `event_id` 分組；🔴 **v36 更正（`CODEX-R39-P1-04`）**：~~`symbol`／`split_label` 非單值即 raise~~ ⇒ `event_keys` 同事件之 `symbol` 非單值即 raise `AlignmentViolationError`（訊息含 `event_id`）；`split_label` 一律取自 `event_state[eid]`（輸入無 `split_label` 欄、`event_state` 每 eid 單值）；異側／跨表混態由既有 `_assert_event_level_side_consistency` 承接；
 輸出固定兩個事件級 schema；🔴 **明禁** `drop_duplicates`／`set`／take-first。
 
 🔴 **v34 補：seam 之定義處與呼叫面（`CODEX-R37-P1-04`：v33 只給簽名、沒說放哪、誰呼叫、多標的怎麼合併）**
@@ -745,15 +745,15 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 
 🔴 **v35 補：新 mutation 之具名測試尚未入庫（`CODEX-R38` 必答 4a／4b）**——`test_event_level_aggregation_rejects_conflicting_values`（`M-SU-D2-42`）與 `test_tier_min_test_events_counts_unique_event_ids`（`M-SU-D2-43`）實查皆**不存在** ⇒ 兩者建立前**不得宣稱** `M-SU-D2-41`..`44` 之覆蓋已閉。建立順序（與上列 Tier 0 測試同 commit）：
 1. 共用兩 TF fixture：同 `event_id`、同 `symbol`、`event_keys` 兩列之 `feature_timeframe` 不同；`event_state={eid: "test"}` 與 `{eid: "purged"}` 兩版。只造稽核層輸入，輸出期望**不含**複合欄。
-2. `M-SU-D2-42`：直接呼叫 `_aggregate_event_level_split_rows`，同 `event_id` 之 `symbol` 或 `split_label` 給兩個不同值 ⇒ 斷言 `AlignmentViolationError` 且訊息含該 `event_id`。
+2. `M-SU-D2-42`：直接呼叫 `_aggregate_event_level_split_rows`，對真實 `event_keys` 造同 `event_id` 兩 TF 列之 **`symbol` 衝突**（assigned／purged 兩路各一）⇒ 斷言 `AlignmentViolationError` 且訊息含該 `event_id`。🔴 **v36 更正（`CODEX-R39-P1-04`）**：~~symbol 或 split_label 給兩個不同值~~——`split_label` 取自單值 `event_state`，此 seam 無從表達異側；異側與跨表混態改由既有 `_assert_event_level_side_consistency` 之直接 rows 反例驗（拔掉該 guard 之異側 raise 須紅），**不得**在 `event_keys` 塞假 `split_label` 欄。
 3. `M-SU-D2-41`：改寫 `test_assignments_composite_key_unique`／`test_purged_composite_key_unique`——合法兩 TF fixture 下兩表各恰一列、`event_id` 唯一、無 `feature_timeframe` 欄。
-4. `M-SU-D2-43`：新增 `test_tier_min_test_events_counts_unique_event_ids`——同一事件×2 TF 之 test 批、`tier_min_test_events=2` 須**仍不足而擋**；另斷言 `per_symbol_n` 為 unique event 數。
+4. `M-SU-D2-43`：新增 `test_tier_min_test_events_counts_unique_event_ids`——同一事件×2 TF 之 test 批、`tier_min_test_events=2` ⇒ public `insufficient_events_in_test` 含該 symbol；另斷言 `summary["per_symbol_n"]` 為 unique event 數。🔴 **v36（`CODEX-R39-P1-05`）**：`per_symbol_test_n` 是內部門檻參數、**不是 summary 鍵**，不得斷言 `summary["per_symbol_test_n"]`、不得為此新增鍵（`test_summary_has_all_sixteen_keys` 之 exact-set 不變）；分別破壞 `per_symbol_n` 與門檻輸入計數皆須紅。本測試之唯一 owner＝本 Task，`Task 9.4` 只重跑作回歸。
 5. `M-SU-D2-44`：改寫 `test_summary_has_n_events_and_n_event_tf_rows`——一 purged 事件×2 TF ⇒ `n_event_tf_rows_purged=2`、`n_purged=1`。
 6. 最後才更新多標的、wiring 與錨點閘回歸。
 
 🔴 **`per_symbol_test_n` 是 TODO 的過時字面、不是現行 `_build_summary` 的 schema**（`CODEX-R5-P1-02` 實查）⇒ 驗收改測 **unique-event 門檻**，**不得**為了對齊文件而新增欄位。
 
-🔴 **退回後之 mutation 覆蓋缺口（具名，主委不自行補）**：`M-SU-D2-05`／`35`／`36`／`37`／`40` 已依 `CODEX-R5-P1-03` **撤下**（它們只為複合 `assignments` 服務，退回後皆空殼），但退回**自身**的可壞面——①輸出多列 ②聚合時靜默吞掉欄值衝突 ③計數被列數膨脹——**目前無 mutation 覆蓋**。🔴 **v32 已由 `CODEX-R36-P1-02` 填上，主委未自創**：新增 **`M-SU-D2-41`**（output multiplicity：聚合改回逐 `event_keys` 列 append ⇒ `assignments`／`purged` 之 `event_id` 唯一斷言轉紅）、**`M-SU-D2-42`**（reducer 以 `drop_duplicates`／`set`／take-first 吞掉衝突 ⇒ `test_event_level_aggregation_rejects_conflicting_values` 轉紅）、**`M-SU-D2-43`**（`per_symbol_n`／tier 改以 TF 列數計 ⇒ unique-event 門檻測試轉紅）、**`M-SU-D2-44`**（`n_event_tf_rows_purged` 改回 `len(purged)` ⇒ 一 purged 事件帶兩 TF 時得 1 而非 2，轉紅）。mutation 條數 40 → **44**。🔴 **可達性**：四條皆落在退回後之**合法**產出路徑上，不是 `consult-r3` 所指之結構不可達型。
+🔴 **退回後之 mutation 覆蓋缺口（具名，主委不自行補）**：`M-SU-D2-05`／`35`／`36`／`37`／`40` 已依 `CODEX-R5-P1-03` **撤下**（它們只為複合 `assignments` 服務，退回後皆空殼），但退回**自身**的可壞面——①輸出多列 ②聚合時靜默吞掉欄值衝突 ③計數被列數膨脹——**目前無 mutation 覆蓋**。🔴 **v32 已由 `CODEX-R36-P1-02` 填上，主委未自創**：新增 **`M-SU-D2-41`**（output multiplicity：聚合改回逐 `event_keys` 列 append ⇒ `assignments`／`purged` 之 `event_id` 唯一斷言轉紅）、**`M-SU-D2-42`**（reducer 以 `drop_duplicates`／`set`／take-first 吞掉 `symbol` 衝突 ⇒ `test_event_level_aggregation_rejects_conflicting_values` 轉紅；v36：衝突面限 `symbol`，見 SPEC 同條）、**`M-SU-D2-43`**（`per_symbol_n`／tier 改以 TF 列數計 ⇒ unique-event 門檻測試轉紅）、**`M-SU-D2-44`**（`n_event_tf_rows_purged` 改回 `len(purged)` ⇒ 一 purged 事件帶兩 TF 時得 1 而非 2，轉紅）。mutation 條數 40 → **44**。🔴 **可達性**：四條皆落在退回後之**合法**產出路徑上，不是 `consult-r3` 所指之結構不可達型。
 
 - 🔴 **下表為 v32 前之「下游改法」清單，多數已因退回而不必做**，保留供追溯；逐列之現行處置以上方退回清單與 SPEC register 之 v32 改判為準：
 
@@ -797,7 +797,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   未完成前 `Task 9.3` 必須 blocked。」
 - **驗證**：`venv/bin/python -m pytest -q tests/momentum/event_samples/test_feature_materialization.py tests/momentum/event_samples/test_tables.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/momentum/event_samples/test_counterexample_classifier.py tests/momentum/event_samples/test_candidate_ledger.py tests/momentum/event_samples/test_dedupe.py tests/momentum/event_samples/test_pattern_bridge.py tests/momentum/Analysis/test_splitunify_derive.py` rc=0；
   ~~前端 `cd frontend && node_modules/.bin/vitest run src/app/search/eventExportByEventId.test.tsx` rc=0~~（🔴 v35：移至 `Task 9.5` 驗證）。
-  上表每列各一條「改壞就變紅」測試；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。
+  上表 **owner＝`Task 9.3` 之後端列**各一條「改壞就變紅」測試（🔴 v36，`CODEX-R39-P2-01`：前端 `byEventId`／`M-SU-D2-11` 之測試歸 `Task 9.5`，本 Task 完成不以其預先存在為條件）；🔴 靜默面須斷言取到的**值**正確，不得只斷言「不報錯」。
   🔴 **register 重掃 receipt 之機械驗收（逐字；R13 `CODEX-R13-P1-02` 指出「只比行數」可被「同一 ID 重複 29 次」繞過，故改為 exact ID set ＋ 當輪綁定）**：
   1. **唯一且當輪**：receipt 檔名須為 `handoffs/run_receipts/<UTC時戳>-splitunify-task-9.3-register-rescan.txt`，
      且其**首行**逐字為 `TASK: <本 Task 之 impl task-id>`、**次行**逐字為 `COMMIT: <本 Task 開工時的 HEAD sha>`。
@@ -922,10 +922,9 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
           `TARGETS: <repo-relative-path>:<start>-<end>` 補進該 register 列。
        **owner**：SPLITUNIFY epic 主委。**誠實邊界**：在本殘留解除前，(丙) 那 15 列的 receipt 碼證欄
        **不受機械對證保護**，只靠分類欄對證 SPEC 現況——此為**已知且具名**之覆蓋缺口，不得宣稱已閉。
-- 🔴 **在上表測試實際存在之前，不得宣稱 mutation 網已閉**（§V 逐字）。
-- **存活至**：全票完工後保留（九處之防誤改回歸測試是唯一擋「未來有人用形狀規則批改」的東西）。
-- **覆蓋風險**：`Task 9.4` 會改 `split_projection` 之計數段與 `baseline`，與本 Task 之消費面不同檔；
-  兩者並行時須先 rebase。`Task 9.5` 之 golden 會覆蓋 `dedupe`／`clusters` 的期望值。
+- 🔴 **在上表 owner＝`Task 9.3` 之後端測試實際存在之前，不得宣稱本 Task 之 mutation 網已閉**（§V；🔴 v36 依 owner 分開，`CODEX-R39-P2-01`——`M-SU-D2-11` 歸 `Task 9.5`，整票閉網仍涵蓋兩個 owner）。
+- **存活至**：全票完工後保留（下游表之防誤改回歸測試是唯一擋「未來有人用形狀規則批改」的東西；v36：~~九處~~ 前端列 owner 已移 `Task 9.5`）。
+- **覆蓋風險**：🔴 **v36 更正（`CODEX-R39-P1-05`）**：~~`Task 9.4` 會改 `split_projection` 之計數段與 `baseline`，與本 Task 之消費面不同檔；兩者並行時須先 rebase~~ ⇒ 投影計數已由本 Task 承接，`Task 9.4` 不再改 `split_projection` 計數段；`Task 9.4` 之整批驗收在本 Task 之後。`Task 9.5` 之 golden 會覆蓋 `dedupe`／`clusters` 的期望值。
 
 ---
 
@@ -933,16 +932,14 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 - SPEC ref：§P Phase 9B `Task 9.4`；§V `Task 9.4`；`D-002-C6`
 - 實作要點：
   1. `n_train`／`n_test`／`n_purged` 明確定為**事件數**；新增列數欄（`n_event_tf_rows*`）。
-  2. 🔴 **事件數門檻路徑**：`split_projection.py` 之 `n_test`／`per_symbol_test_n`／`per_symbol_n`
-     皆改以 `event_id` **去重**計數——否則 1 事件 × 2 TF 使 `n_test=2 ≥ tier_min=2` 而**靜默繞過**
-     測試段事件數下限（命中 §RISK (d)）。
+  2. 🔴 **v36 移出（`CODEX-R39-P1-05`：同一計數修法派給兩個 batch 會互相覆寫）**：~~事件數門檻路徑：`split_projection.py` 之 `n_test`／`per_symbol_test_n`／`per_symbol_n` 皆改以 `event_id` 去重計數~~ ⇒ 投影之 unique-event 計數由 **`Task 9.3`** 同批完成（`M-SU-D2-43`）；本 Task 視其為輸入契約，只驗事件數與樣本數分離及 baseline／報告鏈，**不新增** `per_symbol_test_n` 輸出鍵。
   3. 🔴 **v34 作廢（`COMPOSER-R37-P1-03`）**：~~`dict(zip(...))` 之單鍵映射改複合鍵映射~~ ⇒ **維持單鍵映射**（`C5-23` 已改判甲類）；改為補「逐事件值比對」以擋 `M-SU-D2-12` 之新破壞面（以集合相等冒充逐列相等）。
   4. 🔴 **`baseline` 拆鍵**：舊鍵 `n_test` **刪除**（不得保留、不得當 alias），改輸出
      `n_test_events`（`unique(test_ids)`）與 `n_test_samples`（`len(idx)`）；回傳 dict 鍵集為 **exact 契約**。
   5. 🔴 `insufficient_events_in_test` **只修正計數**；終端可見性屬 `SU-RESID-9A-UI` 殘留，
      **不列入本批完成條件**。驗收時不得宣稱「樣本不足已能被使用者看到」。
 - 修改檔案（🔴 已具名到檔:行）：
-  - `momentum/Analysis/event_samples/split_projection.py`（計數段）
+  - ~~`momentum/Analysis/event_samples/split_projection.py`（計數段）~~（🔴 v36：移 `Task 9.3`）
   - `momentum/Analysis/event_samples/baseline.py`（`n_test` 拆鍵）
   - 🔴 **前端型別：事件路徑現在沒有 typed `n_train` 欄，本 Task 不動 `frontend/src/lib/types.ts` 之既有介面。**
     碼證（stamp-r1 codex／grok 兩家撞題、主委複驗）：`types.ts:1582` 屬 `CPCVPathResult`、`:2257` 屬
@@ -968,15 +965,11 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   - `test_baseline_splits_n_test_into_events_and_samples`（**物化失敗 fixture**：test 含 `e1` 且物化
     `failures` 含 `e1` ⇒ `n_test_events=1` AND `n_test_samples=0`）
   - `test_baseline_dict_has_no_legacy_n_test_key`
-  - `test_tier_min_test_events_counts_unique_event_ids`（1 事件 × 2 TF、`tier_min=2` ⇒ 仍判樣本不足）。
-    🔴 **v16 補足（R15 `CODEX-R15-P1-03`）**：該測試須**另**斷言 `summary["per_symbol_n"]` 與
-    `summary["per_symbol_test_n"]` 皆等於各自之 `event_id` 去重計數——只驗門檻的話，
-    「只把 `per_symbol_n` 弄錯而保持門檻去重」仍會綠，`M-SU-D2-39` 等於半條無鑑別力。
+  - `test_tier_min_test_events_counts_unique_event_ids`——🔴 **v36（`CODEX-R39-P1-05`）**：本測試由 **`Task 9.3` 建立**（見該 Task 建立順序第 4 步），本 Task **只重跑作回歸**；~~須另斷言 `summary["per_symbol_test_n"]`~~——該鍵不在 summary（16 鍵 exact-set），斷言之即 `KeyError`、為之新增鍵即破 exact-set。原字面（v16，僅供追溯）：1 事件 × 2 TF、`tier_min=2` ⇒ 仍判樣本不足；另斷言 `per_symbol_n` 與 `per_symbol_test_n` 皆等於各自之 `event_id` 去重計數。
   - `test_event_count_conservation`（`n_train+n_test+n_purged == n_events`，事件數非列數）
   前端 `cd frontend && npm run build` rc=0（型別改動同批驗）。
-  mutation 自證：`M-SU-D2-13`、`M-SU-D2-31`、`M-SU-D2-32`、`M-SU-D2-12`、
-  `M-SU-D2-39`（v15 新增：`per_symbol_n`／`tier_min_test_events` 未以 `event_id` 去重
-  ⇒ `test_tier_min_test_events_counts_unique_event_ids` 轉紅）。
+  mutation 自證：`M-SU-D2-13`、`M-SU-D2-31`、`M-SU-D2-32`、`M-SU-D2-12`；
+  ~~`M-SU-D2-39`（v15 新增：`per_symbol_n`／`tier_min_test_events` 未以 `event_id` 去重 ⇒ `test_tier_min_test_events_counts_unique_event_ids` 轉紅）~~（🔴 v36 併入 `M-SU-D2-43`，歸 `Task 9.3`）。
 - **存活至**：全票完工後保留（`n_test_events`／`n_test_samples` 兩量分離為最終契約）。
 - **覆蓋風險**：`SU-RESID-9A-UI` 殘留解除時會再加終端揭露欄，屬**只增不改**；
   本 Task 之鍵名與語意不得在那時被改寫。

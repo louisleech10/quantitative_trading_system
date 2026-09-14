@@ -7,7 +7,7 @@
 #   family ∈ {codex, grok, composer}
 #   brief_path : repo 內指示檔(prompt 全文放這;可自由用反引號,它被讀非 shell 插值)
 #   output_path: 委員產出寫到這(handoffs/*.md)
-#   effort     : codex only, 預設 xhigh
+#   effort     : codex only；未給則不帶（照 ~/.codex/config.toml，2026-09-14 前預設強制 xhigh）
 #   ROUND_ID   : 必填（由 committee_run.sh 開債後注入）；直呼亦須帶合法 round
 #
 # 設計:命令列給委員的 prompt 是**固定極簡模板**「讀 <brief> 照做, 家族名=X, 產出寫 <out>」——
@@ -201,7 +201,7 @@ if [ "${1:-}" = "--selfcheck" ]; then
   exit 0
 fi
 
-fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-xhigh}"
+fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-}"
 [ -n "${fam}" ] && [ -n "${brief}" ] && [ -n "${out}" ] || {
   echo "用法: bash scripts/cx_run.sh <codex|grok|composer> <brief_path> <output_path> [effort]"; exit 2; }
 [ -f "${brief}" ] || { echo "ERROR: brief 檔不存在: ${brief}"; exit 2; }
@@ -837,10 +837,12 @@ _run_cli_and_emit() {
           echo "ERROR: codex 不存在: ${CODEX}" >&2
           cli_rc=2
         else
-          # 🔴 2026-09-14 使用者抓：此處原寫死 `-m gpt-5.6-luna`（2026-07-18 起），命令列參數蓋掉
-          #   ~/.codex/config.toml 之 model ⇒ 使用者切到 gpt-6-astra，委員輪卻一直跑 Luna。
-          #   型號改由使用者在 CLI 設定檔決定（唯一來源），本腳本不指定。
-          _run_cli_watched "${out}" -- "${CODEX}" exec -s workspace-write -c model_reasoning_effort="${effort}" "${prompt}" </dev/null
+          # 🔴 2026-09-14 使用者抓：此處原寫死 `-m gpt-5.6-luna`（2026-07-18 起）與預設 effort `xhigh`，
+          #   命令列參數蓋掉 ~/.codex/config.toml 之 model／model_reasoning_effort ⇒ 使用者改設定後委員輪仍跑舊值。
+          #   型號與 effort 一律由使用者 CLI 設定決定；只有呼叫端**明示**第 4 參數時才覆寫 effort。
+          _cx_effort_args=()
+          [ -n "${effort}" ] && _cx_effort_args=(-c "model_reasoning_effort=${effort}")
+          _run_cli_watched "${out}" -- "${CODEX}" exec -s workspace-write ${_cx_effort_args[@]+"${_cx_effort_args[@]}"} "${prompt}" </dev/null
           cli_rc=$?
         fi
         ;;
@@ -849,7 +851,9 @@ _run_cli_and_emit() {
           echo "ERROR: grok 不存在: ${GROK}" >&2
           cli_rc=2
         else
-          _run_cli_watched "${out}" -- "${GROK}" -m grok-4.5 --sandbox workspace --always-approve --output-format plain -p "${prompt}"
+          # 🔴 2026-09-14：原寫死 `-m grok-4.5`（2026-07-18 起），蓋掉 Grok CLI 預設（使用者端已是 grok-4.6）
+          #   ⇒ 委員會之 Grok 一直跑 4.5。型號改由 Grok CLI 設定決定。
+          _run_cli_watched "${out}" -- "${GROK}" --sandbox workspace --always-approve --output-format plain -p "${prompt}"
           cli_rc=$?
         fi
         ;;

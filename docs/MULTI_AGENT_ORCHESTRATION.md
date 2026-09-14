@@ -80,7 +80,7 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 |------|------|------|
 | Claude (Opus) | 本體（綜合者） | Anthropic |
 | Codex | `codex exec`（或 `codex consult`） | OpenAI GPT |
-| Cursor | `cursor-agent -p --model composer-2.5` | Cursor Composer |
+| Cursor | `cursor-agent -p --force`（型號照 Cursor 設定；2026-09-14 前寫死 `--model composer-2.5`） | Cursor（模型由使用者設定） |
 | Antigravity | `agy -p`（Gemini 3.1 Pro） | Google Gemini |
 
 **委員數隨「賭注 + 不可逆性」浮動（非固定）**：

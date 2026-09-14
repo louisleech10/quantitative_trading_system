@@ -76,7 +76,8 @@ def _setup(tmp_path: Path) -> tuple[Path, Path]:
             if name.endswith(".sh"):
                 (scripts / name).chmod(0o755)
     # completeness 可能依賴其他腳本片段；複製 helpers if present
-    for extra in ("load_governance_families.sh",):
+    # review-r39：debt_clear 之暫停缺席判定經共用 getter `governance_families.sh`（CODEX-R39-P1-02）
+    for extra in ("load_governance_families.sh", "governance_families.sh"):
         src = REPO_ROOT / "scripts" / extra
         if src.is_file():
             shutil.copy2(src, scripts / extra)
@@ -1511,3 +1512,113 @@ def test_clear_paused_absent_leaving_one_family_blocked(tmp_path: Path) -> None:
     r = _clear(root, audit, "--round-id", rid, "--session", "pa4", "--lock", str(lock))
     assert r.returncode != 0
     assert "（<2）" in (r.stderr or "")
+
+
+# ---------------------------------------------------------------------------
+# review-r39 修補：codex 實跑打穿 r38 版出口（CODEX-R39-P1-01／P1-02）
+# ---------------------------------------------------------------------------
+
+
+def _drop_active_stampers(root: Path) -> None:
+    p = root / "scripts" / "governance_families.json"
+    d = json.loads(p.read_text(encoding="utf-8"))
+    d.pop("active_stampers", None)
+    p.write_text(json.dumps(d, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def test_clear_paused_family_failed_but_report_on_disk_not_excused(tmp_path: Path) -> None:
+    """`CODEX-R39-P1-01`：cx_run 對 CLI 非零退出一律記 failed＋空 sha ⇒ 空 sha 不能證明沒產出。
+
+    CLI 寫完 findings 後 timeout 即是此形；r38 版會把這份實際存在的報告銷掉（該家實跑 clear rc=0）。
+    """
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, ["codex", "composer"])
+    rid, lock = _paused_prep(root, audit, session="pb1",
+                             participants=["codex", "composer", "grok"], present=["codex", "composer"])
+    _write_output(root, "pb1", "grok", _finding("GROK-R1-P1-01"))
+    r = _clear(root, audit, "--round-id", rid, "--session", "pb1", "--lock", str(lock))
+    assert r.returncode != 0
+    assert "不要求交件" not in (r.stdout or "")
+
+
+def test_clear_paused_family_zero_byte_file_still_excused(tmp_path: Path) -> None:
+    """可證偽之另一半：產出路徑存在但 0 byte（CLI 開檔即崩）⇒ 仍屬未產出，可豁免。
+
+    沒有這一條，上一條可以靠「路徑存在就一律不豁免」通過，而把真缺席重新鎖死。
+    """
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, ["codex", "composer"])
+    rid, lock = _paused_prep(root, audit, session="pb2",
+                             participants=["codex", "composer", "grok"], present=["codex", "composer"])
+    (root / "handoffs" / "pb2-grok.md").write_text("", encoding="utf-8")
+    r = _clear(root, audit, "--round-id", rid, "--session", "pb2", "--lock", str(lock))
+    assert r.returncode == 0, r.stderr
+    assert "不要求交件" in (r.stdout or "")
+
+
+def test_clear_paused_family_output_registered_before_failure_not_excused(tmp_path: Path) -> None:
+    """`CODEX-R39-P1-01` 後半：r38 版只認「failure 之後」之 committee_output。
+
+    先登記過產出、後來才記 failed 者，不得因後來的 failed 而消失。
+    """
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, ["codex", "composer"])
+    rid = str(uuid.uuid4())
+    session = "pb3"
+    _open_round(root, audit, round_id=rid, session=session, participants=["codex", "composer", "grok"])
+    for fam in ("codex", "composer"):
+        p, sha = _write_output(root, session, fam, _finding(f"{fam.upper()}-R1-P0-01"))
+        _result(root, audit, round_id=rid, family=fam, out_path=str(p.relative_to(root)), out_sha=sha)
+    _committee_output(root, audit, round_id=rid, family="grok",
+                      out_path=f"handoffs/{session}-grok.md", out_sha="b" * 64)
+    _result(root, audit, round_id=rid, family="grok", out_path=f"handoffs/{session}-grok.md",
+            out_sha="", state="failed")
+    lock = _build_session(root, session=session, round_id=rid, families=["codex", "composer"])
+    r = _clear(root, audit, "--round-id", rid, "--session", session, "--lock", str(lock))
+    assert r.returncode != 0
+    assert "不要求交件" not in (r.stdout or "")
+
+
+@pytest.mark.parametrize("bad", [
+    ["codex", "composer", "gork"],
+    ["codex", "composer", "composer"],
+    ["codex", "composer", "agy"],
+])
+def test_clear_invalid_active_stampers_fails_closed(tmp_path: Path, bad: list) -> None:
+    """`CODEX-R39-P1-02`：打錯字／重複／不在 review_families 之名冊 ⇒ 共用 getter rc=1 ⇒ 拒銷。
+
+    r38 版自讀 JSON 只驗「非空字串」：`gork` 會使真家族 grok 落在 active 外而被判暫停、放行。
+    """
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, bad)
+    rid, lock = _paused_prep(root, audit, session="pb4",
+                             participants=["codex", "composer", "grok"], present=["codex", "composer"])
+    r = _clear(root, audit, "--round-id", rid, "--session", "pb4", "--lock", str(lock))
+    assert r.returncode != 0
+    assert "active_stampers 不合法" in (r.stderr or "")
+
+
+def test_clear_missing_active_stampers_key_grants_no_pause(tmp_path: Path) -> None:
+    """缺 key ⇒ getter rc=3 ⇒ 無暫停者：全員到齊之輪照常銷帳；有人缺席之輪不得被豁免。"""
+    root, audit = _setup(tmp_path)
+    _drop_active_stampers(root)
+    rid, lock = _happy_path_prep(root, audit, session="pb5", families=["codex", "composer"])
+    r = _clear(root, audit, "--round-id", rid, "--session", "pb5", "--lock", str(lock))
+    assert r.returncode == 0, r.stderr
+    rid2, lock2 = _paused_prep(root, audit, session="pb6",
+                               participants=["codex", "composer", "grok"], present=["codex", "composer"])
+    r2 = _clear(root, audit, "--round-id", rid2, "--session", "pb6", "--lock", str(lock2))
+    assert r2.returncode != 0
+    assert "不要求交件" not in (r2.stdout or "")
+
+
+def test_clear_without_families_getter_grants_no_pause(tmp_path: Path) -> None:
+    """共用 getter 檔缺席 ⇒ 不給任何豁免（只會更嚴，不會放行）。"""
+    root, audit = _setup(tmp_path)
+    _set_active_stampers(root, ["codex", "composer"])
+    (root / "scripts" / "governance_families.sh").unlink()
+    rid, lock = _paused_prep(root, audit, session="pb7",
+                             participants=["codex", "composer", "grok"], present=["codex", "composer"])
+    r = _clear(root, audit, "--round-id", rid, "--session", "pb7", "--lock", str(lock))
+    assert r.returncode != 0
+    assert "不要求交件" not in (r.stdout or "")

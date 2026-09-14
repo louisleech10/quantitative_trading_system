@@ -334,16 +334,36 @@ print(v if isinstance(v, str) else "")
 #   `--abandon --kind collection-failed` 又因「該輪已有其他家結果」被 C-9 收窄擋；grok 無額度不能重派
 #   ⇒ 死結。與 r37 那次（format-failed 無出口）同型：解除阻塞的路徑本身被閘擋住
 #   （docs/SCAR_LEDGER.md「銷帳路徑不得設閘」）。
-#   收窄解鎖——四條件**全部**成立才把該家視為缺席、不要求交件：
-#     ① 不在 governance_families.json 之 active_stampers（暫停＝使用者之名冊決定，非主委自判）
-#     ② 最新 result_state == failed
-#     ③ output_sha256 為空（真的沒產出；**有產出者一律不得以暫停為由略過**——擋「躲 findings」）
-#     ④ 其後無同 round 同家之 committee_output（有重登者走既有出口）
+#   收窄解鎖——下列條件**全部**成立才把該家視為缺席、不要求交件：
+#     ① 不在 active_stampers（暫停＝使用者之名冊決定，非主委自判）
+#     ② 最新 result_state == failed 且 output_sha256 為空
+#     ③ 該輪**任何時點**皆無同家之 committee_output（有登記過產出者一律不得消失）
+#     ④ 該輪登記之產出路徑（round_open.expected_outputs 與結果列 output_path）**實體不存在或為 0 byte**
 #   另：扣掉缺席者後剩餘 participant 須 ≥2（兩家 review 下限，與 review_quorum_check 一致）。
-#   active_stampers 缺 key ⇒ 無暫停者（與 families_active_stampers 三態一致）；壞值 ⇒ fail-closed。
+#   🔴 review-r39 修補（codex 實跑打穿 r38 版）：
+#     `CODEX-R39-P1-01`：cx_run 對 CLI 非零退出**一律**記 failed＋空 sha（`_emit_family_result`），
+#       ⇒ 空 sha 不能證明沒產出——CLI 寫完 findings 後 timeout 即是此形，r38 版會把它銷掉。故加 ④，
+#       且 ③ 由「failure 之後」放寬為「整輪任何時點」。路徑不合法／不可讀／無路徑可查 ⇒ 視為有產出證據。
+#     `CODEX-R39-P1-02`：active_stampers 一律經共用 getter `families_active_stampers`（三態 rc），
+#       不得自讀 JSON——自讀版不驗重複與 ⊆ review_families，打錯字之名冊會把真家族判成「暫停」而放行。
+#       rc=3（缺 key）⇒ 無暫停者；rc=1 ⇒ fail-closed。getter 檔缺席 ⇒ 不給任何豁免（只會更嚴）。
 #   stdout：逗號分隔之缺席家族（可為空）。
 _paused_absent_families() {
   local rid="$1"
+  [ -f "${SCRIPT_DIR}/governance_families.sh" ] || return 0
+  # shellcheck source=governance_families.sh
+  . "${SCRIPT_DIR}/governance_families.sh"
+  local active _as_rc
+  active="$(families_active_stampers ',')"
+  _as_rc=$?
+  case "${_as_rc}" in
+    0) : ;;
+    3) return 0 ;;
+    *)
+      echo "ERROR: active_stampers 不合法（暫停缺席判定 fail-closed；原因見上方 stderr）" >&2
+      return 1
+      ;;
+  esac
   local dump
   dump="$(_ledger_core dump_json)" || {
     echo "ERROR: 讀帳本失敗（暫停缺席判定）" >&2
@@ -352,7 +372,7 @@ _paused_absent_families() {
   local _ap6
   _ap6="$(_resolve_audit_path 2>/dev/null || true)"
   DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap6}" \
-    DEBT_CLEAR_FAMILIES_JSON="${SCRIPT_DIR}/governance_families.json" python3 <<'PY'
+    DEBT_CLEAR_ACTIVE="${active}" REPO_ROOT="${REPO}" python3 <<'PY'
 import json, os, sys
 from pathlib import Path
 
@@ -361,22 +381,12 @@ rid = os.environ["DEBT_CLEAR_RID"]
 info = (dump.get("rounds") or {}).get(rid) or {}
 participants = info.get("participants") or []
 latest = info.get("latest_results") or {}
-
-try:
-    fams = json.loads(Path(os.environ["DEBT_CLEAR_FAMILIES_JSON"]).read_text(encoding="utf-8"))
-except Exception as exc:
-    print(f"ERROR: 讀 governance_families.json 失敗（暫停缺席判定 fail-closed）: {exc}", file=sys.stderr)
-    sys.exit(1)
-if "active_stampers" not in fams:
-    sys.exit(0)
-act = fams.get("active_stampers")
-if not isinstance(act, list) or not act or not all(isinstance(x, str) and x.strip() for x in act):
-    print(f"ERROR: active_stampers 不合法（暫停缺席判定 fail-closed）: {act!r}", file=sys.stderr)
-    sys.exit(1)
-active = {x.strip() for x in act}
+active = {x for x in os.environ["DEBT_CLEAR_ACTIVE"].split(",") if x}
+repo = Path(os.environ["REPO_ROOT"]).resolve()
 
 audit_path = os.environ.get("DEBT_CLEAR_AUDIT") or ""
 outputs = []
+expected = {}
 if audit_path and Path(audit_path).is_file():
     for raw in Path(audit_path).read_text(encoding="utf-8").splitlines():
         s = raw.strip()
@@ -386,8 +396,30 @@ if audit_path and Path(audit_path).is_file():
             r = json.loads(s)
         except json.JSONDecodeError:
             continue
-        if r.get("event") == "committee_output" and r.get("round_id") == rid:
+        if r.get("round_id") != rid:
+            continue
+        if r.get("event") == "committee_output":
             outputs.append(r)
+        elif r.get("event") == "committee_round_open" and isinstance(r.get("expected_outputs"), dict):
+            expected = r["expected_outputs"]
+
+
+def has_output_evidence(fam, rec):
+    cands = [p for p in (expected.get(fam), rec.get("output_path")) if p]
+    if not cands:
+        return True
+    for p in cands:
+        q = Path(p)
+        q = q if q.is_absolute() else repo / q
+        try:
+            q = q.resolve()
+            q.relative_to(repo)
+            if q.exists() and q.stat().st_size > 0:
+                return True
+        except (ValueError, OSError):
+            return True
+    return False
+
 
 absent = []
 for fam in participants:
@@ -396,8 +428,9 @@ for fam in participants:
     rec = latest.get(fam) or {}
     if rec.get("result_state") != "failed" or (rec.get("output_sha256") or "") != "":
         continue
-    seq = rec.get("sequence")
-    if any(o.get("family") == fam and (seq is None or (o.get("sequence") or 0) > seq) for o in outputs):
+    if any(o.get("family") == fam for o in outputs):
+        continue
+    if has_output_evidence(fam, rec):
         continue
     absent.append(fam)
 
