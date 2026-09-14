@@ -166,7 +166,15 @@
   - 🔴 **具名缺口（主委不自行補）**：五條 mutation 撤下後，退回**自身**的可壞面（輸出多列／聚合靜默吞噬／計數被膨脹）**無 mutation 覆蓋**，列為下一輪 review 必答。
   - 🔴 **兩個自產錯誤（同輪內兩次）**：撤下腳本用 `split(" | ", 2)[2]` 把**第二欄原字面整欄吃掉**，而我同一句才剛寫「原字面保留供追溯」——由 `spec_xref` 抓到；改正後仍再犯一次同型（少算一欄），第二次才修對。⇒ **凡「保留原字面」之批次改寫，必須從 git HEAD 取原列、只去前綴，不得用欄位切割。**
   - **SPEC 進 v32**，body sha256 `6e2c8c82abdd82621a9eeb1cda31c5129074ec109e6611596d831352016f65f8`。
-- **下一步**：派 review 輪覆核 v32 之退回清單（含上述 mutation 覆蓋缺口）→ 三家戳記 → 領 impl token 執行退回（**組列與計數同一次 commit**）。
+㊳**review-r36：三家全 blocked、17 條——三家撞同一題，主委 v32 大改後大量 live 舊契約沒同步（同型第十四次）**。
+  - 🔴 **這次是主委在一次大改中大規模自產**：做了方向反轉，卻只改 register 與少數幾處。十餘處未同步：SPEC `(5.1)`–`(5.5)`、§P `Task 9.2a`／`9.3`、§V `Task 9.2` 列數式、§V purge 面（與同檔 `Task 9.2a` **直接互斥**）、§G `(G-3)` 擴維、`M-SU-D2-12`／`16` 破壞方向；TODO `Task 9.2a` 要點 1、`Task 9.3` 邊界 reducer、§E `SU-RESID-2`。全部已逐處標作廢並寫出現行契約。
+  - 🔴 **兩條「寫了要做卻沒說怎麼做」**：①主委只寫「具名 seam」**卻沒給名**（grok 逐字：實作者可用 inline `drop_duplicates` 自稱 seam）；②`n_event_tf_rows_purged` 取數方式沒給。**逐字採 codex 之簽名** `_aggregate_event_level_split_rows(event_keys, event_state) -> tuple[list[dict], list[dict]]` **與公式** `n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum())`（單／多標的共用）。
+  - **主委刻意留白的 mutation 缺口由委員填上**：`M-SU-D2-41`（output multiplicity）／`42`（reducer 吞 conflict）／`43`（計數被 TF 列數膨脹）／`44`（`n_event_tf_rows_purged` 改回 `len(purged)`），條數 40 → **44**。**這個「不自創、留給委員」的做法有效**。
+  - **Tier 0 表補三個漏掉的多標的落點**（`:899-901`／`:914-916`／`:917-932`）——主委原表只覆蓋單標的。
+  - 🔴 **新規則（自本輪起）**：凡**方向反轉**型修訂，**必須在同一次改動內用自立詞表把舊方向的祈使句全檔掃過一遍**，掃描結果附在該次修訂中，**不得留到下一輪由委員代掃**。
+  - 🔴 **主委已照做並自查補漏 8 處（委員沒點名的）**：`(3.2)` 落點具名化、§P `Task 9.3` `pattern_bridge`、§P `Task 9.5` 之 (G-3) 擴維；TODO 記帳守恆式 `len(assignments)+len(purged)==len(event_keys)` **退回後不成立**、`Task 9.5` 複合鍵集合比對、freeze fixture 擴維之界定、`Task 9.2a` 標題與覆蓋風險。
+  - **SPEC 進 v33**，body sha256 `d1c8f2d81a2777cb2d78841067ef186ee9e2dee19117408cf16874219a6b8f3f`。六路回歸 **742 passed**；錨點閘 22/22。
+- **下一步**：派 `review-r37` 覆核 v33 並重簽 → 領 impl token 執行退回（**組列與計數同一次 commit**）。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
