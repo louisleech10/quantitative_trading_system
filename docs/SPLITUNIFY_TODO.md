@@ -715,6 +715,17 @@ _aggregate_event_level_split_rows(
 按 `event_id` 分組；`symbol`／`split_label` 非單值即 raise `AlignmentViolationError`（訊息含 `event_id`）；
 輸出固定兩個事件級 schema；🔴 **明禁** `drop_duplicates`／`set`／take-first。
 
+🔴 **v34 補：seam 之定義處與呼叫面（`CODEX-R37-P1-04`：v33 只給簽名、沒說放哪、誰呼叫、多標的怎麼合併）**
+| 面向 | 規定 |
+|---|---|
+| 定義處 | `momentum/Analysis/event_samples/split_projection.py` 模組級私有函式（與 `_assert_event_level_side_consistency` 同層），**不得**定義在 `_derive_single_symbol` 內部 |
+| 單標的呼叫面 | `_derive_single_symbol` 於算出 `event_state` 後**唯一一次**呼叫它取得兩個列表，取代現行 `:783-798` 之逐列 append |
+| 多標的呼叫面 | **每個 symbol 各自呼叫一次**（各有自己的 `event_state`），再把回傳之兩個列表**串接**；🔴 **不得**先把各 symbol 之 `event_state` 合併成一個 dict 再呼叫——`event_id` 已含 symbol 語意，合併只會遮蔽跨 symbol 之鍵碰撞 |
+| 合併後之唯一性 | 串接完成後**再驗一次** `assignments`／`purged` 之 `event_id` 全域唯一，違反即 raise（擋跨 symbol 碰撞） |
+| 輸出 schema | 單標的與多標的**共用同兩個事件級 schema**，不得分歧 |
+
+🔴 **Tier 0 之界線（`CODEX-R37-P1-04`）**：seam 之定義與呼叫面、單／多標的輸出 schema、`per_symbol_n`／`per_symbol_test_n`／tier 門檻之去重、`n_event_tf_rows_purged` 之新公式、空批分支——**以上必須同一次 commit**；分開改必留計數錯配。
+
 🔴 **purge 稽核計數之逐字公式（同上來源；單標的與多標的共用）**：
 ```python
 purged_event_ids = {eid for eid, side in event_state.items() if side == "purged"}
@@ -754,8 +765,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   不得把 event-level 表複製成多列以「配合」複合鍵；
   不得把 `M-SU-D2-11` 之前端面以「等 UAT 再做」延後——它是本 Task 的交付面之一。
 - 邊界：①單 feature TF 批下，上表九處行為須與改前**逐值相同**；
-  ②`pattern_bridge` 去重後若同一 `event_id` 出現兩個不同 `split_label` ⇒ fail-closed raise，
-  不得靜默取第一個；③前端 `byEventId` 在 `feature_timeframe` 存在時仍以 `canonicalEventId` 建鍵，
+  ②🔴 **v34 作廢（`GROK-R37-P1-05`：v33 只改了後段 reducer 型別句，本句仍 live）**：~~`pattern_bridge` 去重後若同一 `event_id` 出現兩個不同 `split_label` ⇒ fail-closed raise，不得靜默取第一個~~ ⇒ `C5-24` 已改判甲類、**不改碼**，該 fail-closed 經 `consult-r3` 判結構不可達；**同語意之要求已移到聚合 seam**（見下）；③前端 `byEventId` 在 `feature_timeframe` 存在時仍以 `canonicalEventId` 建鍵，
   匯出附帶欄位不得變空。
 - 🔴 **v31 新增：fail-closed 之錯誤型別釘死（逐字採 `CODEX-R6-P1-02`）**——
   邊界②原只寫「fail-closed raise」而**未釘死例外型別**，實作者可用裸 `ValueError` 或把測試放寬成
@@ -918,7 +928,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   2. 🔴 **事件數門檻路徑**：`split_projection.py` 之 `n_test`／`per_symbol_test_n`／`per_symbol_n`
      皆改以 `event_id` **去重**計數——否則 1 事件 × 2 TF 使 `n_test=2 ≥ tier_min=2` 而**靜默繞過**
      測試段事件數下限（命中 §RISK (d)）。
-  3. `dict(zip(...))` 之單鍵映射改複合鍵映射。
+  3. 🔴 **v34 作廢（`COMPOSER-R37-P1-03`）**：~~`dict(zip(...))` 之單鍵映射改複合鍵映射~~ ⇒ **維持單鍵映射**（`C5-23` 已改判甲類）；改為補「逐事件值比對」以擋 `M-SU-D2-12` 之新破壞面（以集合相等冒充逐列相等）。
   4. 🔴 **`baseline` 拆鍵**：舊鍵 `n_test` **刪除**（不得保留、不得當 alias），改輸出
      `n_test_events`（`unique(test_ids)`）與 `n_test_samples`（`len(idx)`）；回傳 dict 鍵集為 **exact 契約**。
   5. 🔴 `insufficient_events_in_test` **只修正計數**；終端可見性屬 `SU-RESID-9A-UI` 殘留，

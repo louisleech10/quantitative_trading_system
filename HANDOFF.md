@@ -174,7 +174,28 @@
   - 🔴 **新規則（自本輪起）**：凡**方向反轉**型修訂，**必須在同一次改動內用自立詞表把舊方向的祈使句全檔掃過一遍**，掃描結果附在該次修訂中，**不得留到下一輪由委員代掃**。
   - 🔴 **主委已照做並自查補漏 8 處（委員沒點名的）**：`(3.2)` 落點具名化、§P `Task 9.3` `pattern_bridge`、§P `Task 9.5` 之 (G-3) 擴維；TODO 記帳守恆式 `len(assignments)+len(purged)==len(event_keys)` **退回後不成立**、`Task 9.5` 複合鍵集合比對、freeze fixture 擴維之界定、`Task 9.2a` 標題與覆蓋風險。
   - **SPEC 進 v33**，body sha256 `d1c8f2d81a2777cb2d78841067ef186ee9e2dee19117408cf16874219a6b8f3f`。六路回歸 **742 passed**；錨點閘 22/22。
-- **下一步**：派 `review-r37` 覆核 v33 並重簽 → 領 impl token 執行退回（**組列與計數同一次 commit**）。
+㊴**review-r37：三家全 blocked、13 條——主委同步不完整之第三輪連續發作，已全修完並進 v34**。
+  - **三家撞題**：`(5.2)` **整段漏列**（v33 表列了 `(5.1)`／`(5.3)`／`(5.4)` 卻漏了講 producer 本體的那一節）；`(5.3)` **同一句內自相矛盾**（前半寫改判甲類、尾句仍寫丙類真缺陷）；§P／TODO `Task 9.4` 兩處仍要求改複合鍵映射；`(5.5)` 仍寫「後者覆蓋前者」。
+  - 🔴 **最能造成假綠的一條（`GROK-R37-P1-04`）**：v33 新增了 `M-SU-D2-41`..`44`，**卻沒回填 register `C5-20`／`C5-21` 之 mutation 欄**——該欄仍寫「尚無 mutation 覆蓋」，驗收可據此宣稱「無應紅」而放行。已回填。
+  - 🔴 **主委四條 assumed 全數被否證**，含 **brief 自身把 body hash 寫成上一輪舊值**（取代腳本只涵蓋完整 64-hex，**截斷形沒被取代**）。⇒ 日後 brief 之 hash 須以**單一變數**填入、不得用字串取代。
+  - **`CODEX-R37-P1-04`**：v33 只給 seam **簽名**，沒說定義處／呼叫面／多標的 `event_state` 如何合併 ⇒ 已補四欄規定，**明禁**先合併各 symbol 之 `event_state` 再呼叫（會遮蔽跨 symbol 鍵碰撞），並要求串接後**再驗一次**全域 `event_id` 唯一。
+  - **主委以委員詞表自掃另補三處**（委員未點名）：`(6.1)` 未說明退回後三量之**來源層不同**、`Task 9.4` 門檻路徑行號為退回前值、`M-SU-D2-39` 與新增 `43` **破壞面重疊**（一 defect 兩 ID）⇒ 已劃分工。
+  - **SPEC 進 v34**，body sha256 `c8a37cbcaecb5fccf8e3d9dfd41a2e177a8b78d42b5c9f2fdce5f2c073e870d3`。
+  - 🔴 **程序定論（連續第三輪同型，做法已改）**：主委「自己掃一遍再交」三輪都沒掃乾淨，殘留集中在**同一句前後矛盾／整節漏列／新增物沒回填舊索引**三型 ⇒ **方向反轉型修訂改為：先由審查方產出完整落點清單，主委照單改，再逐條核對**；主委自掃降為補充。
+
+🔴 **現在卡住（需使用者在自己 terminal 跑一行）**
+  - **原因**：codex 之 r37 交件檔 5 條 P1 全缺 `**來源摘要**` 欄 ⇒ `completeness` 硬擋、`committee_family_result` 寫成 `format-failed`。主委已依 HANDOFF 設計路徑**只補該行**並註明為主委補入（其餘一字未動）、重新 `register-output`，單檔 `completeness_check --single` 已 **PASS**；但 `debt_clear` 另有一道「該家最新 `result_state` 須為 success」，而審計是 append-only、改不掉。
+  - **同輪重跑會被 gate 擋**（`ERROR: 存在未清委員會債（OPEN），拒發 dispatch token`）——這正是 HANDOFF 早記的死結。
+  - **使用者請在自己 terminal 執行**（brief 已還原成開債當下的位元組、sha256 已比對相符）：
+    ```
+    cd /Users/louis/Desktop/quantitative_trading_system
+    ROUND_ID=97434ad2-9668-4266-b82b-087dfbceedd5 bash scripts/cx_run.sh codex \
+      handoffs/20260911-SPLITUNIFY-B9-REVIEW-R37-BRIEF.md \
+      handoffs/20260911-splitunify-b9-review-r37-codex.md
+    ```
+  - 跑完主委即可 `reconcile_build` 重建 → `debt_clear` → 接 `review-r38`。
+  - **另一條路（未採，需使用者裁示）**：`bash scripts/debt_clear.sh --abandon --round-id 97434ad2-... --kind collection-failed --reason <理由> --approver <who>`——本輪 findings 其實已全數收斂並套用，只是收件格式失敗；但 `--approver` 不應由主委自填，故未逕行。
+- **下一步**：解開上述死結 → `review-r38`（依新做法**先請審查方出完整落點清單**）→ 領 impl token 執行退回。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
