@@ -426,6 +426,55 @@ _compute_output_sha() {
   shasum -a 256 "$1" | awk '{print $1}'
 }
 
+# 🔴 review-r43 `CODEX-R43-P1-01`（該家隔離實跑重現）：同 round 同家**重跑**時，產出檔可能是前一次
+#   attempt 留下的舊檔 ⇒ CLI 退出 0 卻沒寫任何東西，`[ -s out ]` 仍為真 ⇒ 被記 success 並取**舊** sha，
+#   且被自動登記成本次交件。修法：只在「該 (round, family) 已有 committee_family_result」時，於 CLI
+#   執行前快照產出之「寫入簽章」（sha256＋mtime_ns）；CLI 返回後若 rc=0 而簽章**兩者皆未變** ⇒ 判
+#   「本次 attempt 未寫入產出」，cli_rc 改記 `_CX_RC_STALE_OUTPUT`（下游之 emit／自動登記／退出碼因而
+#   一律走失敗路徑；CLI 原始 rc 印於 stderr）。首次派工不快照——`preserve` stub「先寫好產出再跑交件路徑」
+#   之矩陣行為不變。
+#   為何同看 mtime：只比 sha 時，重跑之 CLI 若寫出與舊檔**逐位元組相同**之內容會被誤判未寫入
+#   （`test_b3_mutation_success_block_guard` 之確定性 stub 實際撞到）；重寫必更新 mtime，故兩者皆同才算未寫。
+_CX_RC_STALE_OUTPUT=116
+
+_output_write_sig() {
+  # 產出檔之寫入簽章＝ sha256:mtime_ns（mtime 以 python 取 ns，避開 BSD／GNU stat 旗標差異）
+  local _sha _mt
+  _sha="$(_compute_output_sha "$1")" || return 1
+  _mt="$(python3 -c 'import os, sys; print(os.stat(sys.argv[1]).st_mtime_ns)' "$1")" || return 1
+  printf '%s:%s\n' "${_sha}" "${_mt}"
+}
+
+_has_prior_family_result() {
+  # rc 0＝該 (ROUND_ID, fam) 已有 committee_family_result（或無法判定 ⇒ 保守視為有）；rc 1＝確定沒有
+  local _ap
+  _ap="$(_resolve_debt_audit)" || return 0
+  ROUND_ID="${ROUND_ID}" FAMILY="${fam}" AUDIT_PATH="${_ap}" python3 - <<'PY'
+import json, os, sys
+from pathlib import Path
+
+p = Path(os.environ["AUDIT_PATH"])
+if not p.is_file():
+    sys.exit(1)
+rid, fam = os.environ["ROUND_ID"], os.environ["FAMILY"]
+try:
+    lines = p.read_text(encoding="utf-8").splitlines()
+except OSError:
+    sys.exit(0)
+for raw in lines:
+    s = raw.strip()
+    if not s.startswith("{"):
+        continue
+    try:
+        r = json.loads(s)
+    except json.JSONDecodeError:
+        continue
+    if r.get("event") == "committee_family_result" and r.get("round_id") == rid and r.get("family") == fam:
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
 # ---------------------------------------------------------------------------
 # 委員 CLI 看門狗（2026-08-18；出生事故：composer 之自建多行程探針死鎖，cursor-agent 於 00:57 已寫完
 #   產出 `STATUS: DONE` 卻 6 小時 53 分不退出 ⇒ 本腳本永遠寫不出 committee_family_result ⇒ debt_clear
@@ -461,7 +510,11 @@ _run_cli_watched() {
   while kill -0 "${_pid}" 2>/dev/null; do
     sleep 5
     _elapsed=$((_elapsed + 5))
-    if [ "${_done_since}" -lt 0 ] && [ -f "${_out}" ] && grep -q '^STATUS: DONE' "${_out}" 2>/dev/null; then
+    # 🔴 review-r43 同根漏項：重跑時舊產出檔可能早已含 `STATUS: DONE` ⇒ 若照認，grace 後會殺掉**仍在工作**之 CLI。
+    #   有重跑快照時只認寫入簽章已變者（`_pre_attempt_out_sig` 由 caller `_run_cli_and_emit` 以 local 宣告，
+    #   bash 動態作用域可見）；無快照＝首次派工，語意不變。
+    if [ "${_done_since}" -lt 0 ] && [ -f "${_out}" ] && grep -q '^STATUS: DONE' "${_out}" 2>/dev/null \
+       && { [ -z "${_pre_attempt_out_sig:-}" ] || [ "$(_output_write_sig "${_out}")" != "${_pre_attempt_out_sig}" ]; }; then
       _done_since="${_elapsed}"
     fi
     if [ "${_done_since}" -ge 0 ] && [ $((_elapsed - _done_since)) -ge "${_grace}" ]; then
@@ -784,6 +837,14 @@ _run_cli_and_emit() {
     LC_ALL=C grep -Eo '^#{2,6}[[:space:]]+[A-Z]+-R[0-9]+-P[0-3]-[0-9]{2,}' \
       "${stamp_target}" 2>/dev/null | LC_ALL=C sort -u > "${_dest_snap}" || :
   fi
+  # 🔴 review-r43：重跑時快照本次 attempt 前之產出 sha（見 `_has_prior_family_result` 上方說明）
+  local _pre_attempt_out_sig=""
+  if [ -s "${out}" ] && _has_prior_family_result; then
+    _pre_attempt_out_sig="$(_output_write_sig "${out}")" || {
+      echo "ERROR: 重跑前快照產出寫入簽章失敗 ⇒ 無法判定本次 attempt 是否寫入（fail-closed）: ${out}" >&2
+      exit 1
+    }
+  fi
   _capture_prompt_if_harness
   if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ] && [ -n "${CX_STUB_MODE:-}" ]; then
     case "${CX_STUB_MODE}" in
@@ -869,6 +930,13 @@ _run_cli_and_emit() {
         fi
         ;;
     esac
+  fi
+
+  # 🔴 review-r43 `CODEX-R43-P1-01`：重跑之 attempt 未寫入產出 ⇒ 不得沿用前次 attempt 之舊檔
+  if [ -n "${_pre_attempt_out_sig}" ] && [ "${cli_rc}" -eq 0 ] 2>/dev/null && [ -s "${out}" ] \
+     && [ "$(_output_write_sig "${out}")" = "${_pre_attempt_out_sig}" ]; then
+    echo "[cx_run] ⚠️ ${fam} 重跑之 attempt 未寫入產出（CLI 原始 rc=0，但 ${out} 之內容與修改時間皆與本次 attempt 前相同）⇒ 不得沿用前次 attempt 之舊檔記 success；cli_rc 改記 ${_CX_RC_STALE_OUTPUT}" >&2
+    cli_rc="${_CX_RC_STALE_OUTPUT}"
   fi
 
   # ---------------------------------------------------------------------------

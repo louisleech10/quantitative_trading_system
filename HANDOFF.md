@@ -215,6 +215,12 @@
   - **下一步**：`review-r42`（兩家）→ 過了才領 impl token 施工 `Task 9.3`。
 ㊹**review-r42 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r42/synth.md` ＝唯一權威；`debt_clear` rc=0）：🔴 **兩家一致判 Tier 0 測試改寫清單已完整**（各自擴檔反向搜尋，清單外會紅者 0）。composer 零 finding、APPROVED；codex `blocked` 3 P1，採 codex：①聚合 seam 入口加 `event_id` 非空 `str` 閘（型別混用時 purge 計數靜默為 0；生產端 event_id 一律字串）②型號證據殘留補關閉步驟（三欄先登記再驗；jq 須先濾 JSON 行）③🔴 **無結果列殘留之 `cli_rc` 條件：主委具名偏離 codex 修法**——不加 `cli_rc` 驗收，改把觸發條件對齊程式（`failed` 涵蓋非零退出與零退出空產出，安全性建立在無產出證據；加 `cli_rc` 反使零退出空產出之暫停家族重回死結），**交 r43 覆核**。**SPEC 進 v39**，body sha256 `8b0e2fad2ad4fc590f9d7b6414c2f4595da95c0a655a7d9ee0e70d250897875e`。codex 本輪實際 `gpt-5.6-luna`／`xhigh`。
   - **下一步**：`review-r43`（兩家）→ 過了才領 impl token 施工 `Task 9.3`。
+㊺**review-r43 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r43/synth.md`；`debt_clear` rc=0）：composer 零 finding、APPROVED v39、判 r42 偏離成立；codex 判偏離方向正確但另指出**重跑沿用前次 attempt 之舊產出**（隔離實跑重現）⇒ 採。codex 交件之裁決塊三欄寫同一行被拒收 ⇒ 主委只拆行＋註明，`register-output` 解鎖。
+  - **修補在治理碼（SPEC body 不變，仍 v39 `8b0e2fad…`）**：`scripts/cx_run.sh` 於同輪同家重跑時快照產出之寫入簽章（sha256＋mtime_ns），CLI rc=0 而簽章未變 ⇒ `cli_rc` 改記 116、走失敗路徑（不記 success、不自動登記）；看門狗重跑時只認本次寫入之 `STATUS: DONE`（**主委修補時自查之同根漏項**：舊檔已含 DONE 會在 grace 後殺掉仍在工作之 CLI）。
+  - **測試**：`test_result_state_format_failed.py` +4（T2-S1..S4）、新檔 `test_cxrun_watchdog_stale_done.py` 3 條，全過；mutation S-M1..S-M5、W-M1..W-M2 各自轉紅後還原。相關 10 檔治理回歸 **26 failed／298 passed**，失敗集合與乾淨 HEAD worktree **逐條相同**（HEAD 多一條 `test_idlike_fp_suite_is_green` 為 worktree 相對 venv 路徑之環境假紅）⇒ 無新增紅。途中「只比 sha」一版曾弄紅 `test_b3_mutation_success_block_guard`（確定性 stub 重寫相同位元組），已改同看 mtime 修正並補 T2-S4。
+  - 🔴 **既有紅清單（非本輪、已對照 HEAD）**：`test_result_state_format_failed.py` 9 條（stub 錨點漂移：`stub success findings-kind anchor missing`）、`test_stamp_taskid_inject.py` 4、`test_govb1_zeroid_no_regression.py::test_single_column_discriminates_between_inputs` 1、`test_rolegate_predispatch.py` 5 與 `test_debt_emit.py` 7（隔離 repo 缺 `prev_review_resolve.sh`）。
+  - TODO 補型別閘判定寫法（值級 `isinstance(x, str) and len(x) > 0`，TODO-only）；`fact_keys.json` 之 E-008／E-022 等 cx_run 行號隨位移修正並重生成。codex 本輪實際 `gpt-5.6-luna`／effort `max`（使用者設定改為 max）。
+  - **下一步**：`review-r44`（兩家）覆核派工腳本修補＋對 v39 重簽 → 過了領 impl token 施工 `Task 9.3`。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。

@@ -879,3 +879,99 @@ def test_mutation_t2_m38_format_failed_exit_zero(
     exit3_holds = r_mut.returncode == 3
     assert not exit3_holds, "M38: exit-3 oracle must turn red under exit-0 mutation"
 
+
+# ── T2-S：重跑不得沿用前次 attempt 之舊產出（review-r43 `CODEX-R43-P1-01`）──────────
+#
+# 🔴 背景：同 round 同家重跑時，產出檔可能是前一次 attempt 留下的舊檔；CLI 退出 0 卻沒寫任何東西，
+#    `[ -s out ]` 仍為真 ⇒ 舊版 cx_run 記 success、取舊 sha、並自動登記成本次交件（該家隔離實跑重現）。
+#    以下三條：S1 釘住「不得沿用」、S2 為可證偽之另一半（真寫新產出仍 success）、S3 釘住首次派工行為不變。
+
+_STALE_LEGAL = (
+    "## CODEX-R1-P2-01\n\n"
+    "**斷言**: CX_STUB_MODE=success harness minimal legal finding\n\n"
+    "**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\n\n"
+    "**來源摘要**: handoffs/stub-codex.md#aaaaaaaaaaaa\n\n"
+    "stub harness body\n"
+)
+
+
+def test_t2_s1_retry_without_write_does_not_reuse_stale_output(tmp_path: Path) -> None:
+    """T2-S1：前次 attempt failed 留下合法舊檔 ⇒ 重跑 rc=0 但未寫入 ⇒ 不得記 success、不得自動登記。"""
+    h = _harness(tmp_path, kind="review")
+    rid = str(uuid.uuid4())
+    out_prefix = "handoffs/t2s1"
+    out_rel = f"{out_prefix}-codex.md"
+    _open_round(h, round_id=rid, session="s-s1", fams=["codex"], out_prefix=out_prefix)
+    (h["root"] / out_rel).write_text(_STALE_LEGAL, encoding="utf-8")
+    r1 = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="fail_rc",
+                 extra_env={"CX_STUB_RC": "7"})
+    assert r1.returncode == 7, r1.stdout + r1.stderr
+    assert _events(h["audit"], "committee_family_result")[-1]["result_state"] == "failed"
+    n_out = len(_events(h["audit"], "committee_output"))
+    r2 = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="preserve")
+    assert r2.returncode != 0, r2.stdout + r2.stderr
+    latest = _events(h["audit"], "committee_family_result")[-1]
+    assert latest["result_state"] == "failed", latest
+    assert latest["output_sha256"] == ""
+    assert len(_events(h["audit"], "committee_output")) == n_out, "舊檔不得被自動登記成本次交件"
+    assert "未寫入產出" in r2.stderr, r2.stderr[-1500:]
+
+
+def test_t2_s2_retry_that_rewrites_output_is_success(tmp_path: Path) -> None:
+    """T2-S2：可證偽之另一半——重跑真的寫出新產出 ⇒ success（S1 不是靠「重跑一律失敗」通過）。"""
+    h = _harness(tmp_path, kind="review")
+    rid = str(uuid.uuid4())
+    out_prefix = "handoffs/t2s2"
+    out_rel = f"{out_prefix}-codex.md"
+    _open_round(h, round_id=rid, session="s-s2", fams=["codex"], out_prefix=out_prefix)
+    (h["root"] / out_rel).write_text(_STALE_LEGAL + "\n前次 attempt 之殘檔\n", encoding="utf-8")
+    r1 = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="fail_rc",
+                 extra_env={"CX_STUB_RC": "7"})
+    assert r1.returncode == 7, r1.stdout + r1.stderr
+    r2 = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="success")
+    assert r2.returncode == 0, r2.stdout + r2.stderr
+    latest = _events(h["audit"], "committee_family_result")[-1]
+    assert latest["result_state"] == "success", latest
+    assert latest["output_sha256"] == _sha256_file(h["root"] / out_rel)
+
+
+def test_t2_s3_first_attempt_with_preexisting_output_behavior_unchanged(tmp_path: Path) -> None:
+    """T2-S3：首次派工（該輪該家尚無結果列）不快照——`preserve` 交件矩陣之既有行為不變。"""
+    h = _harness(tmp_path, kind="review")
+    rid = str(uuid.uuid4())
+    out_prefix = "handoffs/t2s3"
+    out_rel = f"{out_prefix}-codex.md"
+    _open_round(h, round_id=rid, session="s-s3", fams=["codex"], out_prefix=out_prefix)
+    (h["root"] / out_rel).write_text(_STALE_LEGAL, encoding="utf-8")
+    r = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="preserve")
+    assert r.returncode == 0, r.stdout + r.stderr
+    latest = _events(h["audit"], "committee_family_result")[-1]
+    assert latest["result_state"] == "success", latest
+
+
+def test_t2_s4_retry_rewriting_identical_bytes_is_success(tmp_path: Path) -> None:
+    """T2-S4：重跑之 CLI 寫出與舊檔**逐位元組相同**之內容 ⇒ 仍是本次寫入，須 success。
+
+    只比 sha 會把它誤判成未寫入（`test_b3_mutation_success_block_guard` 之確定性 stub 實際撞到）；
+    本條釘住「寫入簽章同看 mtime」。
+    """
+    h = _harness(tmp_path, kind="review")
+    rid_a = str(uuid.uuid4())
+    _open_round(h, round_id=rid_a, session="s-s4a", fams=["codex"], out_prefix="handoffs/t2s4a")
+    ra = _run_cx(h, family="codex", out_rel="handoffs/t2s4a-codex.md", round_id=rid_a, stub="success")
+    assert ra.returncode == 0, ra.stdout + ra.stderr
+    stub_bytes = (h["root"] / "handoffs/t2s4a-codex.md").read_bytes()
+
+    rid = str(uuid.uuid4())
+    out_rel = "handoffs/t2s4b-codex.md"
+    _open_round(h, round_id=rid, session="s-s4b", fams=["codex"], out_prefix="handoffs/t2s4b")
+    (h["root"] / out_rel).write_bytes(stub_bytes)
+    r1 = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="fail_rc",
+                 extra_env={"CX_STUB_RC": "7"})
+    assert r1.returncode == 7, r1.stdout + r1.stderr
+    r2 = _run_cx(h, family="codex", out_rel=out_rel, round_id=rid, stub="success")
+    assert (h["root"] / out_rel).read_bytes() == stub_bytes, "fixture 前提變了：本條要的是逐位元組相同之重寫"
+    assert r2.returncode == 0, r2.stdout + r2.stderr
+    latest = _events(h["audit"], "committee_family_result")[-1]
+    assert latest["result_state"] == "success", latest
+

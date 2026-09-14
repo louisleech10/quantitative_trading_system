@@ -713,7 +713,7 @@ _aggregate_event_level_split_rows(
 ) -> tuple[list[dict], list[dict]]
 ```
 按 `event_id` 分組；🔴 **v36 更正（`CODEX-R39-P1-04`）**：~~`symbol`／`split_label` 非單值即 raise~~ ⇒ `event_keys` 同事件之 `symbol` 非單值即 raise `AlignmentViolationError`（訊息含 `event_id`）；`split_label` 一律取自 `event_state[eid]`（輸入無 `split_label` 欄、`event_state` 每 eid 單值）；異側／跨表混態由既有 `_assert_event_level_side_consistency` 承接；
-輸出固定兩個事件級 schema；🔴 **明禁** `drop_duplicates`／`set`／take-first。🔴 **v39 補（`CODEX-R42-P1-03`）**：入口先驗 `event_keys["event_id"]` 每值皆為**非空 `str`**，否則 raise `AlignmentViolationError`（訊息含違規值）——型別混用（例如一邊 `str`、一邊 `int`）時下方 purge 稽核計數之 `set`／`isin` 會**靜默得 0**；生產端 event_id 一律字串（`generator.py:224` 之 f-string、`import_contract.canonical_event_id`），此閘不誤擋合法輸入。
+輸出固定兩個事件級 schema；🔴 **明禁** `drop_duplicates`／`set`／take-first。🔴 **v39 補（`CODEX-R42-P1-03`）**：入口先驗 `event_keys["event_id"]` 每值皆為**非空 `str`**，否則 raise `AlignmentViolationError`（訊息含違規值）——型別混用（例如一邊 `str`、一邊 `int`）時下方 purge 稽核計數之 `set`／`isin` 會**靜默得 0**；生產端 event_id 一律字串（`generator.py:224` 之 f-string、`import_contract.canonical_event_id`），此閘不誤擋合法輸入。判定一律**值級** `isinstance(x, str) and len(x) > 0`（`review-r43` codex 必答 5：`np.str_`／`StringDtype`／`category` 元素皆通過、`int`／`np.int64` 皆拒），**不得**以 dtype 判定或先 `astype(str)` 再驗（後者會把整數轉成字串而放行）。
 
 🔴 **v34 補：seam 之定義處與呼叫面（`CODEX-R37-P1-04`：v33 只給簽名、沒說放哪、誰呼叫、多標的怎麼合併）**
 | 面向 | 規定 |
