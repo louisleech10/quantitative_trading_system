@@ -117,7 +117,10 @@ def single_feature_binary_baseline(
 
     report: Dict = {
         "statistic_kind": "binary_discrimination",
-        "n_test": int(len(idx)),
+        # 🔴 D-002 `Task 9.4`／(6.2)：舊鍵 `n_test` 刪除（不保留、不設 alias）。物化允許事件進 failures
+        #    而不進 features ⇒ test 指派之事件數與實際樣本數**不恆等**，兩量分離且鍵集為 exact 契約。
+        "n_test_events": int(pd.Index(test_ids).nunique()),
+        "n_test_samples": int(len(idx)),
         "prevalence": float(y.mean()) if len(y) else float("nan"),
         "receipts": {
             "seed": oracle_config.seed, "n_perm": oracle_config.n_perm,

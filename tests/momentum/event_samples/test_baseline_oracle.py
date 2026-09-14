@@ -69,6 +69,49 @@ def test_deterministic_same_seed():
     assert json.dumps(r1, sort_keys=True) == json.dumps(r2, sort_keys=True)
 
 
+_BASELINE_KEYS_OK = {"statistic_kind", "n_test_events", "n_test_samples", "prevalence", "receipts",
+                     "capability_status", "features"}
+
+
+def test_baseline_splits_n_test_into_events_and_samples():
+    """D-002 `Task 9.4`（`M-SU-D2-31`）：test 指派之事件數與實際樣本數**不恆等**——兩量分離。
+
+    §V 母斷言逐字：test 含 `e1` 且物化 failures 含 `e1`（不在 features）⇒ `n_test_events=1` 且 `n_test_samples=0`。
+    另以非退化批驗 ok 路徑：test 段 120 事件、其中 10 個物化失敗 ⇒ 120 與 110。
+    """
+    plan = EventSplitPlan(
+        assignments=pd.DataFrame({"event_id": ["e0", "e1"], "symbol": "ETHUSDT", "split_label": ["train", "test"]}),
+        purged=pd.DataFrame(columns=["event_id", "reason"]),
+        clusters=pd.DataFrame(),
+        summary={},
+    )
+    X = pd.DataFrame({"f": [0.5]}, index=["e0"])  # e1 物化失敗 ⇒ 不在 features
+    y = pd.Series([1], index=["e0"])
+    rep = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
+    assert rep["n_test_events"] == 1
+    assert rep["n_test_samples"] == 0
+
+    X2, y2, plan2 = synth()
+    test_ids = plan2.assignments.loc[plan2.assignments["split_label"] == "test", "event_id"].tolist()
+    dropped = set(test_ids[:10])
+    keep = [i for i in X2.index if i not in dropped]
+    rep2 = single_feature_binary_baseline(X2.loc[keep], y2.loc[keep], plan2, oracle_config=OC, feature_manifest_hash=H)
+    assert rep2["capability_status"] == "ok", "fixture 前提變了：須走 ok 路徑"
+    assert rep2["n_test_events"] == len(test_ids) == 120
+    assert rep2["n_test_samples"] == 110, "不得宣稱事件數＝樣本數"
+
+
+def test_baseline_dict_has_no_legacy_n_test_key():
+    """D-002 `Task 9.4`（`M-SU-D2-32`）：回傳 dict 鍵集為 **exact** 契約——舊鍵 `n_test` 不得殘留、不得為 alias。"""
+    X, y, plan = synth()
+    rep = single_feature_binary_baseline(X, y, plan, oracle_config=OC, feature_manifest_hash=H)
+    assert set(rep) == _BASELINE_KEYS_OK
+    assert "n_test" not in rep
+    one = single_feature_binary_baseline(X, pd.Series(1, index=y.index), plan, oracle_config=OC, feature_manifest_hash=H)
+    assert set(one) == _BASELINE_KEYS_OK | {"reason"}, "unavailable 分支亦為 exact 鍵集"
+    assert "n_test" not in one
+
+
 def test_one_class_unavailable():
     X, y, plan = synth()
     rep = single_feature_binary_baseline(X, pd.Series(1, index=y.index), plan, oracle_config=OC, feature_manifest_hash=H)

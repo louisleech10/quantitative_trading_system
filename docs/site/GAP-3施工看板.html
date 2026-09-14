@@ -11,6 +11,9 @@
 <main>
 <h1 id="gap-3-事件型-uat-施工進度看板">GAP-3 事件型 UAT — 施工進度看板</h1>
 <blockquote>
+<p>📌 2026-09-15（SPLITUNIFY 第 9 批 9.4）：動到 <code>momentum/Analysis/event_samples/</code>——事件型報告的 train／test／排除三個計數明確改算「事件數」（去重）；單特徵分辨表之「測試段筆數」拆成<strong>事件數</strong>與<strong>樣本數</strong>兩個欄位（有事件算特徵失敗時兩者不相等，舊的單一欄位已刪除）。畫面與 API 的既有欄位名稱不變。細節見 <a href="SPLITUNIFY施工進度.html">SPLITUNIFY施工進度.md</a>。</p>
+</blockquote>
+<blockquote>
 <p>📌 2026-09-15（SPLITUNIFY 第 9 批 9.3）：動到 <code>momentum/Analysis/event_samples/</code>——切分結果表（train／test／排除）回到「一個事件一列」，多特徵週期時不再重複列；「每個標的有幾個事件」「測試段事件夠不夠」改算事件而非列數（否則一個事件兩個週期會被算兩次，讓不足警告失效）。單一特徵週期的批次數值逐值不變（golden 基準檔比對相同）。細節見 <a href="SPLITUNIFY施工進度.html">SPLITUNIFY施工進度.md</a>。</p>
 </blockquote>
 <blockquote>

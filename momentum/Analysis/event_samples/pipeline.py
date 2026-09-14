@@ -822,12 +822,13 @@ class EventSamplePipeline:
         summary = self._base_summary(events, receipts, failures, manifest, features, fhash, ffail)
         summary.update({
             "split": {k: v for k, v in plan.summary.items() if k != "per_symbol_n"},
-            "n_train": int((plan.assignments["split_label"] == "train").sum()) if not plan.assignments.empty else 0,
-            "n_test": int((plan.assignments["split_label"] == "test").sum()) if not plan.assignments.empty else 0,
-            "n_purged": int(len(plan.purged)),
+            "n_train": int(plan.assignments.loc[plan.assignments["split_label"] == "train", "event_id"].nunique()) if not plan.assignments.empty else 0,
+            "n_test": int(plan.assignments.loc[plan.assignments["split_label"] == "test", "event_id"].nunique()) if not plan.assignments.empty else 0,
+            "n_purged": int(plan.purged["event_id"].nunique()) if not plan.purged.empty else 0,
         })
-        # 🔴 D-002 `Task 9.3`：上方三個計數以列數計，唯有兩表**一事件恰一列**時才等於事件數
-        #    ⇒ 去重斷言防回歸（切分表若又長回複合鍵粒度，n_train／n_test／n_purged 會靜默膨脹成列數）。
+        # 🔴 D-002 `Task 9.4`／(6.1)：上方三個計數明確為**事件數**（`event_id` 去重）；列數只在
+        #    `summary["split"]` 之 `n_event_tf_rows*`（稽核層），兩者不得互相代用。
+        # 🔴 D-002 `Task 9.3`：去重斷言保留為縱深防禦——切分表若又長回複合鍵粒度即 fail-closed，不靠計數吸收。
         for _tbl_name, _tbl in (("assignments", plan.assignments), ("purged", plan.purged)):
             if not _tbl["event_id"].is_unique:
                 raise AlignmentViolationError(

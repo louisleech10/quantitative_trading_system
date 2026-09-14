@@ -294,6 +294,52 @@ def test_run_without_selected_timeframe_emits_all_feature_tf_rows(records, bars_
     assert s["n_event_tf_rows"] > s["n_events"]
 
 
+def _run_multi_tf_full(records, bars_multi_tf):
+    train, test, index = _canonical(records, bars_multi_tf)
+    cfg = EventPipelineConfig(timeframes=("4h", TF), split=EventSplitConfig())
+    res = EventSamplePipeline().run(
+        records, bars_multi_tf, cfg,
+        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=None,
+    )
+    return res, train, test, index
+
+
+def test_event_count_conservation(records, bars_multi_tf, spy_split):
+    """D-002 `Task 9.4`／`D-002-C6`：`n_train+n_test+n_purged == n_events`（**事件數守恆，非列數**）。
+
+    走真實 `EventSamplePipeline.run`、兩個 feature TF（列數＞事件數時才有鑑別力）。
+    `M-SU-D2-13`：`n_train` 改取稽核層 TF 列數 ⇒ 合計超過事件數而轉紅。
+    """
+    res, _, _, _ = _run_multi_tf_full(records, bars_multi_tf)
+    assert spy_split == []
+    s, sp = res.summary, res.split_plan.summary
+    assert sp["n_event_tf_rows"] > sp["n_events"], "fixture 前提變了：須多 feature TF 使列數大於事件數"
+    assert s["n_train"] + s["n_test"] + s["n_purged"] == sp["n_events"]
+    assert s["n_train"] > 0 and s["n_test"] > 0, "fixture 前提變了：train／test 皆須有事件，否則 n_train 之膨脹測不到"
+
+
+def test_multi_feature_tf_split_labels_match_decision_anchor_per_event(records, bars_multi_tf, spy_split):
+    """D-002 `Task 9.4`（`M-SU-D2-12`）：多 feature TF 案例之**逐事件值**比對，不得以集合相等冒充逐列相等。
+
+    每個被指派之事件：`train` ⇒ 其事件級 `decision_at_ms` ≤ train 段最後一根；`test` ⇒ ≥ test 段第一根。
+    破壞面＝`event_id` 集合與 membership 集合不變、但對調兩事件之標籤——集合斷言全綠，本條逐事件轉紅。
+    """
+    res, train, test, index = _run_multi_tf_full(records, bars_multi_tf)
+    ms = np.asarray(index, dtype="int64")
+    train_last = int(ms[np.asarray(train.row_index)[-1]])
+    test_start = int(ms[np.asarray(test.row_index)[0]])
+    anchors = dict(zip(res.manifest.table["event_id"], res.manifest.table["decision_at_ms"].astype("int64")))
+    # 🔴 不寫成 `dict(zip(...assignments...))`：該整行是 register `C5-23` 之 ANCHOR（`:111`），錨點閘要求全檔唯一。
+    labels = res.split_plan.assignments.set_index("event_id")["split_label"].to_dict()
+    assert {"train", "test"} <= set(labels.values()), "fixture 前提變了：須同時有 train 與 test 事件，對調才測得到"
+    wrong = {
+        eid: (label, int(anchors[eid])) for eid, label in labels.items()
+        if (label == "train" and not int(anchors[eid]) <= train_last)
+        or (label == "test" and not int(anchors[eid]) >= test_start)
+    }
+    assert wrong == {}, f"事件之標籤與其決策錨點所在段不符（train_last={train_last}, test_start={test_start}）：{wrong}"
+
+
 # ── 🔴 D-002 `Task 9.2b` 步驟 0：`validate_split_pair_integrity` 之**接線** ──────────
 
 
