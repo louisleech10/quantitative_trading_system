@@ -32,8 +32,8 @@ def _extract_functions(src: str) -> str:
     return "\n".join(parts)
 
 
-def _run_watchdog(tmp_path: Path, *, stale_done: bool, snapshot: bool, cli: str,
-                  grace: int = 1, max_sec: int = 60):
+def _write_watchdog_script(tmp_path: Path, *, stale_done: bool, snapshot: bool, cli: str,
+                           grace: int = 1, max_sec: int = 60) -> Path:
     out = tmp_path / "o.md"
     if stale_done:
         out.write_text("## CODEX-R1-P3-00\n\n前次 attempt 之舊檔\n\nSTATUS: DONE\n", encoding="utf-8")
@@ -55,6 +55,13 @@ def _run_watchdog(tmp_path: Path, *, stale_done: bool, snapshot: bool, cli: str,
     ]
     script = tmp_path / "wd.sh"
     script.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return script
+
+
+def _run_watchdog(tmp_path: Path, *, stale_done: bool, snapshot: bool, cli: str,
+                  grace: int = 1, max_sec: int = 60):
+    script = _write_watchdog_script(tmp_path, stale_done=stale_done, snapshot=snapshot, cli=cli,
+                                    grace=grace, max_sec=max_sec)
     t0 = time.monotonic()
     r = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=120)
     return r, time.monotonic() - t0
@@ -119,6 +126,56 @@ def test_watchdog_kills_whole_process_group_including_orphaned_grandchild(tmp_pa
             alive = False
         assert not alive, f"孫行程 {gpid} 在看門狗終止後仍存活（只殺了 root 或子樹，未殺整個群組）"
     finally:
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+def test_sigint_to_wrapper_group_terminates_detached_cli_group(tmp_path: Path) -> None:
+    """🔴 review-r45 `CODEX-R45-P1-01`：終端 Ctrl-C 之 SIGINT 只送到前景群組（wrapper），CLI 已 setsid 脫離。
+
+    wrapper 須攔 INT、把終止轉發給 CLI 群組，並以 130 返回（由 caller 照常寫 failed 結果列）。
+    本測以 `start_new_session=True` 讓 wrapper 自成群組，再對該群組送 SIGINT，模擬終端 Ctrl-C；
+    看門狗 grace／上限刻意設大，確保終止只可能來自訊號轉發。
+    """
+    cpid_file = tmp_path / "cli.pid"
+    spid_file = tmp_path / "sleep.pid"
+    cli = (
+        "exec >/dev/null 2>&1\n"
+        f'echo $$ > "{cpid_file}"\n'
+        "sleep 300 &\n"
+        f'echo $! > "{spid_file}"\n'
+        "wait\n"
+    )
+    script = _write_watchdog_script(tmp_path, stale_done=False, snapshot=False, cli=cli,
+                                    grace=300, max_sec=600)
+    proc = subprocess.Popen(["bash", str(script)], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, start_new_session=True)
+    pids: list = []
+    try:
+        deadline = time.monotonic() + 15
+        while not spid_file.exists() and time.monotonic() < deadline:
+            time.sleep(0.2)
+        assert spid_file.exists(), "fixture 前提變了：CLI 未啟動"
+        time.sleep(1)
+        pids = [int(f.read_text(encoding="utf-8").strip()) for f in (cpid_file, spid_file)]
+        os.killpg(proc.pid, signal.SIGINT)
+        out, err = proc.communicate(timeout=30)
+        assert "RC=130" in out, out + err
+        time.sleep(1)
+        alive = []
+        for pid in pids:
+            try:
+                os.kill(pid, 0)
+                alive.append(pid)
+            except ProcessLookupError:
+                pass
+        assert not alive, f"wrapper 收到 SIGINT 後 CLI 群組仍存活：{alive}"
+    finally:
+        if proc.poll() is None:
+            proc.kill()
         for pid in pids:
             try:
                 os.kill(pid, signal.SIGKILL)

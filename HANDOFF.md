@@ -226,6 +226,11 @@
   - **測試**：`test_cxrun_watchdog_stale_done.py` +1 條（雙重 fork 造出 `pgrep -P` 找不到但仍在同群組之孫行程，驗證其隨群組終止），4 passed；mutation W-M1..W-M4 各自轉紅後還原。🔴 **自證抓到新測試初版假綠**：子孫繼承 stdout pipe 使 `subprocess.run` 等到孫行程自然結束才返回 ⇒「不整組殺」照樣綠；已改 CLI 輸出導 /dev/null、子孫睡 300 秒並於 finally 清除，重跑 W-M3／W-M4 轉紅。
   - codex 本輪實際 `gpt-5.6-luna`／effort `max`。`fact_keys.json` E-008／E-015／E-022 行號隨位移修正並重生成。
   - **下一步**：`review-r45`（兩家）覆核整組終止修補＋codex 對 v39 重簽 → 過了領 impl token 施工 `Task 9.3`。
+㊼**review-r45 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r45/synth.md`；`debt_clear` rc=0）：`CODEX-R44-P1-01` 由原提出方於其沙箱重跑關閉（看門狗 4 passed／57.87s；timeout 路徑 rc=124、7.05s、CLI 不存活）。composer 零 finding、第三度 APPROVED v39；codex `blocked` 1 P1＝`CODEX-R45-P1-01`——**setsid 後終端 Ctrl-C 只打到 wrapper，detached CLI 續跑續寫**（該家 pty 實跑；即主委 r45 brief 自標之 assumed 2 ②）。composer 認事實但判非 P1 ⇒ 採較嚴之 codex 版（兩家修法形狀相同）。
+  - **修補**（`scripts/cx_run.sh`；SPEC body 不變，仍 v39）：`_run_cli_watched` 啟動 CLI 後攔 INT／TERM（記 130／143 並 `_terminate_cli_group`），迴圈與結束處見旗標即 `wait` 後返回該碼（caller 照常寫 failed 結果列）；各返回路徑皆 `trap - INT TERM`。
+  - **測試**：`test_cxrun_watchdog_stale_done.py` 抽出 `_write_watchdog_script`、新增 `test_sigint_to_wrapper_group_terminates_detached_cli_group`（wrapper 自成群組、對群組送 SIGINT ⇒ 回 130 且 CLI 群組結束），5 passed；mutation W-M1..W-M5 各自轉紅後還原、無殘留行程。相關 11 檔治理回歸 **26 failed／303 passed**，失敗集合與乾淨 HEAD worktree 逐條相同 ⇒ 無新增紅。
+  - codex 本輪實際 `gpt-5.6-luna`／effort `max`。`fact_keys.json` E-008／E-015／E-022 行號隨位移修正並重生成。
+  - **下一步**：`review-r46`（兩家）覆核訊號轉發修補＋codex 對 v39 重簽 → 過了領 impl token 施工 `Task 9.3`。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。

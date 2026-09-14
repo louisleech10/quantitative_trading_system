@@ -519,11 +519,23 @@ _run_cli_watched() {
   #   setsid／exec 失敗 ⇒ 行程以非零退出 ⇒ 記 failed（fail-closed，不會在無群組下靜默執行）。
   python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' "$@" &
   local _pid=$!
+  # 🔴 review-r45 `CODEX-R45-P1-01`（該家 pty 實跑）：setsid 後終端 Ctrl-C／送給本行程之 TERM 不再到達 CLI 群組
+  #   ⇒ 手動重跑按 Ctrl-C 只中斷 wrapper，CLI 在背景續寫。本函式執行期間攔 INT／TERM：記下訊號 rc（130／143）
+  #   並整組終止 CLI；迴圈見旗標即 wait 後返回該 rc，由 caller 照常寫 failed 結果列（不留無結果列）。
+  #   所有返回路徑皆還原 trap。
+  _CX_SIG_RC=""
+  trap "_CX_SIG_RC=130; _terminate_cli_group ${_pid}" INT
+  trap "_CX_SIG_RC=143; _terminate_cli_group ${_pid}" TERM
   local _elapsed=0
   local _done_since=-1
   local _rc
   while kill -0 "${_pid}" 2>/dev/null; do
     sleep 5
+    if [ -n "${_CX_SIG_RC}" ]; then
+      wait "${_pid}" 2>/dev/null || true
+      trap - INT TERM
+      return "${_CX_SIG_RC}"
+    fi
     _elapsed=$((_elapsed + 5))
     # 🔴 review-r43 同根漏項：重跑時舊產出檔可能早已含 `STATUS: DONE` ⇒ 若照認，grace 後會殺掉**仍在工作**之 CLI。
     #   有重跑快照時只認寫入簽章已變者（`_pre_attempt_out_sig` 由 caller `_run_cli_and_emit` 以 local 宣告，
@@ -536,17 +548,25 @@ _run_cli_watched() {
       echo "[cx_run] WATCHDOG killed_after_done: 產出已 STATUS: DONE 逾 ${_grace}s 而 CLI 仍存活（pid ${_pid}）⇒ 終止子樹，cli_rc 取 0" >&2
       _terminate_cli_group "${_pid}"
       wait "${_pid}" 2>/dev/null || true
+      trap - INT TERM
       return 0
     fi
     if [ "${_elapsed}" -ge "${_max}" ]; then
       echo "[cx_run] WATCHDOG timeout: CLI 逾 ${_max}s（pid ${_pid}）⇒ 終止子樹，cli_rc=124" >&2
       _terminate_cli_group "${_pid}"
       wait "${_pid}" 2>/dev/null || true
+      trap - INT TERM
       return 124
     fi
   done
+  if [ -n "${_CX_SIG_RC}" ]; then
+    wait "${_pid}" 2>/dev/null || true
+    trap - INT TERM
+    return "${_CX_SIG_RC}"
+  fi
   wait "${_pid}"
   _rc=$?
+  trap - INT TERM
   return "${_rc}"
 }
 
