@@ -1,0 +1,177 @@
+# 2026-09-15 SU-RESID-1 前 20 字碰撞實測（唯讀；python3 scripts 同目錄 _synth_attr 解析）
+# 範圍：handoffs/reconcile/*/synth.md
+## 輸出 1（總覽）
+synth 檔總數=673；含可解析 finding 者=656；finding 總數=5978
+斷言長度（去空白字元數）：中位=108.0 p10=61 p90=203 max=1701；≤20 字者=57
+碰撞群組數=158；涉及 finding 數=358
+  實質finding／不同列／全句不同: 90
+  實質finding／同一列／全句不同: 37
+  零finding哨兵／不同列／全句不同: 16
+  實質finding／不同列／全句相同: 11
+  零finding哨兵／同一列／全句不同: 3
+  零finding哨兵／不同列／全句相同: 1
+## 輸出 2（風險分類）
+coll_group_不合規=112
+coll_group_合規=39
+empty_assert=40
+finding_不合規=4880
+finding_合規=1058
+pair_diffrow_samedisp_不合規=118
+pair_diffrow_samedisp_合規=20
+pair_identical_不合規=2
+pair_identical_合規=3
+pair_same_row_不合規=26
+pair_same_row_合規=25
+synth_不合規=494
+synth_合規=162
+區分所需最短前綴長：中位=3.0 p90=16 p99=49 max=143；>20 者=311／5910
+--- RISK 配對（不同列、處置 token 不同、全句不同）---
+## 腳本 1
+"""統計所有收斂檔中「斷言前 20 字相同」之碰撞（唯讀）。"""
+import collections
+import glob
+import re
+import statistics
+import sys
+
+sys.path.insert(0, "scripts")
+from _synth_attr import parse_synth, nfc_strip, rows_for, QUOTE_N  # noqa: E402
+
+ZERO = re.compile(r"無\s*finding|零\s*finding|無finding|no\s+finding|zero\s+finding|零 findings|無實質", re.I)
+
+files = sorted(glob.glob("handoffs/reconcile/*/synth.md"))
+n_with = 0
+lens = []
+total = 0
+coll_groups = []
+for fp in files:
+    text = open(fp, encoding="utf-8").read()
+    doc = parse_synth(text, fp)
+    if not doc.findings:
+        continue
+    n_with += 1
+    by_q = collections.defaultdict(list)
+    for f in doc.findings:
+        s = nfc_strip(f.assertion)
+        lens.append(len(s))
+        total += 1
+        by_q[s[:QUOTE_N]].append(f)
+    for q, fs in by_q.items():
+        if len(fs) < 2:
+            continue
+        fulls = {nfc_strip(f.assertion) for f in fs}
+        zero = all(ZERO.search(f.assertion) for f in fs)
+        row_sets = [set(r.line_no for r in rows_for(doc, f.id)) for f in fs]
+        same_row = bool(set.intersection(*row_sets)) if all(row_sets) else False
+        coll_groups.append({
+            "file": fp.split("/")[2], "q": q, "ids": [f.id for f in fs],
+            "identical_full": len(fulls) == 1, "zero_sentinel": zero, "same_row": same_row,
+        })
+
+print(f"synth 檔總數={len(files)}；含可解析 finding 者={n_with}；finding 總數={total}")
+if lens:
+    s = sorted(lens)
+    p = lambda x: s[min(len(s) - 1, int(len(s) * x))]
+    print(f"斷言長度（去空白字元數）：中位={statistics.median(s)} p10={p(0.10)} p90={p(0.90)} max={s[-1]}；≤20 字者={sum(1 for v in s if v <= 20)}")
+print(f"碰撞群組數={len(coll_groups)}；涉及 finding 數={sum(len(g['ids']) for g in coll_groups)}")
+cat = collections.Counter()
+for g in coll_groups:
+    key = ("零finding哨兵" if g["zero_sentinel"] else "實質finding") + "／" + ("同一列" if g["same_row"] else "不同列") + "／" + ("全句相同" if g["identical_full"] else "全句不同")
+    cat[key] += 1
+for k, v in cat.most_common():
+    print(f"  {k}: {v}")
+print("--- 實質 finding 且不同列之碰撞（全列）---")
+for g in coll_groups:
+    if not g["zero_sentinel"] and not g["same_row"]:
+        print(f"  {g['file']} | {g['q']} | {', '.join(g['ids'])} | 全句相同={g['identical_full']}")
+print("--- 實質 finding 同一列之碰撞（全列）---")
+for g in coll_groups:
+    if not g["zero_sentinel"] and g["same_row"]:
+        print(f"  {g['file']} | {g['q']} | {', '.join(g['ids'])}")
+## 腳本 2
+"""精算：前 20 字碰撞是否真的構成「可對調而不被發現」之風險（唯讀）。"""
+import collections
+import glob
+import os
+import re
+import statistics
+import sys
+
+sys.path.insert(0, "scripts")
+from _synth_attr import parse_synth, nfc_strip, rows_for, check_quote20, check_ids, load_values, _token_whole, QUOTE_N  # noqa: E402
+
+VALUES = load_values("scripts/governance_verdicts.json")
+ZERO = re.compile(r"無\s*finding|零\s*finding|no\s+finding|zero\s+finding|NO-FINDINGS|無實質", re.I)
+
+
+def disp_tokens(doc, fid):
+    toks = set()
+    for r in rows_for(doc, fid):
+        if len(r.cells) >= 4:
+            toks |= {v for v in VALUES if _token_whole(r.cells[3], v)}
+    return frozenset(toks)
+
+
+def lcp(a, b):
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n
+
+
+files = sorted(glob.glob("handoffs/reconcile/*/synth.md"))
+stats = collections.Counter()
+need_len = []          # 每個 finding 在其 synth 內要唯一所需之最短前綴長
+risky = []             # 碰撞＋不同列＋處置 token 不同＋全句不同
+for fp in files:
+    doc = parse_synth(open(fp, encoding="utf-8").read(), fp)
+    fs = [f for f in doc.findings if nfc_strip(f.assertion)]
+    stats["empty_assert"] += len(doc.findings) - len(fs)
+    if not fs:
+        continue
+    compliant = not check_ids(doc) and not check_quote20(doc)
+    tag = "合規" if compliant else "不合規"
+    stats[f"synth_{tag}"] += 1
+    stats[f"finding_{tag}"] += len(fs)
+    norm = {f.id: nfc_strip(f.assertion) for f in fs}
+    for f in fs:
+        others = [norm[g.id] for g in fs if g.id != f.id and norm[g.id] != norm[f.id]]
+        if others:
+            need_len.append(max(lcp(norm[f.id], o) for o in others) + 1)
+    by_q = collections.defaultdict(list)
+    for f in fs:
+        by_q[norm[f.id][:QUOTE_N]].append(f)
+    for q, grp in by_q.items():
+        if len(grp) < 2:
+            continue
+        stats[f"coll_group_{tag}"] += 1
+        # 兩兩配對判風險
+        for i in range(len(grp)):
+            for j in range(i + 1, len(grp)):
+                a, b = grp[i], grp[j]
+                if norm[a.id] == norm[b.id]:
+                    stats[f"pair_identical_{tag}"] += 1
+                    continue
+                ra = {r.line_no for r in rows_for(doc, a.id)}
+                rb = {r.line_no for r in rows_for(doc, b.id)}
+                if ra & rb:
+                    stats[f"pair_same_row_{tag}"] += 1
+                    continue
+                da, db = disp_tokens(doc, a.id), disp_tokens(doc, b.id)
+                if da == db:
+                    stats[f"pair_diffrow_samedisp_{tag}"] += 1
+                    continue
+                zero = bool(ZERO.search(a.assertion) and ZERO.search(b.assertion))
+                stats[f"pair_RISK_{tag}"] += 1
+                risky.append((tag, fp.split("/")[2], q, a.id, sorted(da), b.id, sorted(db), zero))
+
+for k in sorted(stats):
+    print(f"{k}={stats[k]}")
+s = sorted(need_len)
+p = lambda x: s[min(len(s) - 1, int(len(s) * x))]
+print(f"區分所需最短前綴長：中位={statistics.median(s)} p90={p(0.90)} p99={p(0.99)} max={s[-1]}；>20 者={sum(1 for v in s if v > 20)}／{len(s)}")
+print("--- RISK 配對（不同列、處置 token 不同、全句不同）---")
+for r in risky:
+    print("  ", r)

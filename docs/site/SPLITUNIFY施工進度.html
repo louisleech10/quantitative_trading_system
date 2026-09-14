@@ -114,8 +114,8 @@
 </tr>
 <tr>
 <td><strong>第 9 批：一個事件多個週期</strong></td>
-<td>🔨 <strong>正在做</strong>（規格已到第 26 版（待重蓋）；🔴 <strong>各小任務的權威狀態只看 <code>docs/SPLITUNIFY_TODO.md</code> §B 的「狀態」欄，本表不再自寫一份</strong>——同一件事寫三份、其中一份過期，正是本票被抓了十二次的那個病）</td>
-<td>9/14</td>
+<td>✅ <strong>完成</strong>（9.1–9.5 全數落地、兩家蓋章收尾；🔴 <strong>各小任務的權威狀態只看 <code>docs/SPLITUNIFY_TODO.md</code> §B 的「狀態」欄，本表不再自寫一份</strong>）</td>
+<td>9/15</td>
 </tr>
 <tr>
 <td><strong>重開一次規格審查 ＋ 最後一批（R-5）</strong></td>
@@ -131,6 +131,107 @@
 <td><strong>你的 UAT 驗收</strong></td>
 <td>⬜ <strong>最後</strong>（B26–B34＋新增項目）</td>
 <td>—</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="還剩什麼具名殘留-11-條2026-09-15-逐條對程式查證">還剩什麼：具名殘留 11 條（2026-09-15 逐條對程式查證）</h2>
+<blockquote>
+<p>🔴 施工清單的殘留表原本記錯：R-1（多標的投影）、SU-RESID-3（逐列時刻同源驗證）<strong>第 8 批就做完了</strong>卻還掛著；
+SU-RESID-4、SU-RESID-5、SU-RESID-C5-TARGETS <strong>三條沒進表</strong>。已改正，兩家委員審查核可（9/15）。</p>
+</blockquote>
+<p><strong>A. 會影響你使用的（4 條）</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>白話</th>
+<th>為何現在不做</th>
+<th>何時做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>R-5</td>
+<td>匯入事件做分析時沒接上切分，一律只做事件研究</td>
+<td>要新增跨前後端的參數，而且得先重開一次規格審查</td>
+<td>「重開規格審查＋最後一批」</td>
+</tr>
+<tr>
+<td>SU-RESID-9A-UI</td>
+<td>畫面上看不到「丟了幾列」「測試段事件不夠」</td>
+<td>卡在 R-5：正式流程沒走切分</td>
+<td>R-5 之後</td>
+</tr>
+<tr>
+<td>R-4</td>
+<td>型態萃取功能沒有正式入口</td>
+<td>屬 GAP-3 的接線，歸另一張票</td>
+<td>另票</td>
+</tr>
+<tr>
+<td>R-3</td>
+<td>UAT 驗收</td>
+<td>你定的「一律放最後」</td>
+<td>最後</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>B. 資料正確性研究題（2 條；目前沒算錯，改切分契約時才要處理）</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>白話</th>
+<th>何時做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SU-RESID-4</td>
+<td>資料列序號有「全體編號」和「單一標的內編號」兩套並存</td>
+<td>下次動 IC 切分契約時</td>
+</tr>
+<tr>
+<td>SU-RESID-5</td>
+<td>切分計畫建好後仍可被改寫，IC 主線讀取時不重驗</td>
+<td>下次動切分計畫欄位時</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>C. 治理工具的限制（5 條）</strong></p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>白話</th>
+<th>為何現在不做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SU-RESID-V8-ATTEST</td>
+<td>同一次 commit 把所有副本一起改掉，擋不住</td>
+<td>要導入 commit 簽章＝新治理工具，你定了不再擴建</td>
+</tr>
+<tr>
+<td>SU-RESID-C5-TARGETS</td>
+<td>29 列清單中有 15 列的程式位置欄沒有機器核對</td>
+<td>兩個升級條件 9/15 實跑都沒成立</td>
+</tr>
+<tr>
+<td>SU-RESID-PAUSED-NO-RESULT</td>
+<td>委員某輪完全沒結果紀錄時，不能算缺席來銷帳</td>
+<td>缺「該輪確實已結束」的可信證據</td>
+</tr>
+<tr>
+<td>SU-RESID-COMMITTEE-MODEL-EVIDENCE</td>
+<td>委員實際用的型號與 effort 沒記進審計</td>
+<td>還沒實測 CLI 能不能穩定取得這兩個值</td>
+</tr>
+<tr>
+<td>SU-RESID-1</td>
+<td>處置表的歸屬檢查</td>
+<td>機器能做的 9/11 已上線；剩「處置內容有沒有真的處理那條意見」機器判不了。9/15 實測改成整句比對沒有好處（會導致結果錯誤的對調 0 次），維持前 20 字</td>
 </tr>
 </tbody>
 </table></div>
@@ -216,7 +317,7 @@
 <td><code>Task 9.4</code>／<code>9.5</code>：顯示與基準檔</td>
 <td>9.4＝計數分清「事件數」與「樣本數」；9.5＝golden 基準檔擴成多週期、前端匯出不變</td>
 <td>✅ 9.4、9.5 皆完成（兩家審碼核可、已 commit）</td>
-<td>收尾：殘留 <code>SU-RESID-2</code> 關閉之文件同步</td>
+<td>—（<code>SU-RESID-2</code> 已於 9/15 收尾關閉）</td>
 </tr>
 </tbody>
 </table></div>
