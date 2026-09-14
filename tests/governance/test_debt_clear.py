@@ -1310,3 +1310,117 @@ def test_rebuild_1b_audit_many_rejected(tmp_path: Path) -> None:
     )
     r = _rebuild_run(reconcile, session, "--mode", "review", "--rebuild")
     assert r.returncode != 0
+
+
+# ---------------------------------------------------------------------------
+# SPLITUNIFY b9 r37 實戰（2026-09-14）：`format-failed`／`failed` 之銷帳出口
+#
+# 🔴 背景：VERDICTGATE B3（2026-09-11）補了 `verdict_rejected` 的出口，卻沒補同型的
+#    `format-failed`／`failed` ⇒ 銷帳被鎖、同輪重派又被「有 OPEN 債即拒發 token」擋住，
+#    形成死結，只能請使用者在自己 terminal 跑 cx_run。那違反本機制的原始設計原則
+#    「清帳不被擋，故非死鎖」。以下四條把補上的那半釘住。
+# ---------------------------------------------------------------------------
+
+
+def test_clear_format_failed_then_reregistered_and_format_ok(tmp_path: Path) -> None:
+    """`format-failed` → 主委修檔 → register-output，且該檔單檔格式檢查 rc=0 ⇒ 放行。"""
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="ff1", families=["codex"], sentinel=True)
+    out = root / "handoffs" / "ff1-codex.md"
+    _result(root, audit, round_id=rid, family="codex", out_path="handoffs/ff1-codex.md",
+            out_sha=_sha256_file(out), state="format-failed")
+    _committee_output(root, audit, round_id=rid, family="codex",
+                      out_path="handoffs/ff1-codex.md", out_sha=_sha256_file(out))
+    r = _clear(root, audit, "--round-id", rid, "--session", "ff1", "--lock", str(lock))
+    assert r.returncode == 0, r.stderr
+    assert "已重新 register-output 且單檔格式檢查 rc=0" in (r.stdout or "")
+
+
+def test_clear_format_failed_without_reregister_blocked(tmp_path: Path) -> None:
+    """沒有其後之 committee_output ⇒ 仍擋（出口不是無條件放行）。"""
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="ff2", families=["codex"])
+    out = root / "handoffs" / "ff2-codex.md"
+    _result(root, audit, round_id=rid, family="codex", out_path="handoffs/ff2-codex.md",
+            out_sha=_sha256_file(out), state="format-failed")
+    r = _clear(root, audit, "--round-id", rid, "--session", "ff2", "--lock", str(lock))
+    assert r.returncode != 0 and "format-failed" in (r.stderr or "")
+
+
+def test_clear_format_failed_still_malformed_blocked(tmp_path: Path) -> None:
+    """🔴 本支比 `verdict_rejected` 更嚴：重新 register 了，但檔案**格式仍不合規** ⇒ 必須擋。
+
+    否則「重新註冊」就變成繞過格式閘的萬用鑰匙——那正是 `format-failed` 要擋的東西。
+    """
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="ff3", families=["codex"])
+    out = root / "handoffs" / "ff3-codex.md"
+    out.write_text("## NOT-A-CANONICAL-ID\n沒有任何合規欄位\n", encoding="utf-8")
+    _result(root, audit, round_id=rid, family="codex", out_path="handoffs/ff3-codex.md",
+            out_sha=_sha256_file(out), state="format-failed")
+    _committee_output(root, audit, round_id=rid, family="codex",
+                      out_path="handoffs/ff3-codex.md", out_sha=_sha256_file(out))
+    r = _clear(root, audit, "--round-id", rid, "--session", "ff3", "--lock", str(lock))
+    assert r.returncode != 0
+    assert "completeness_check --single" in (r.stderr or "")
+
+
+def test_clear_failed_requires_terminal_markers(tmp_path: Path) -> None:
+    """🔴 `failed`＝CLI 自身非零退出 ⇒ 無從得知該家是否跑完。
+
+    除了格式檢查，另要求產出檔帶 `VERDICT:` 與 `STATUS: DONE` 兩個終結標記；
+    缺任一即擋（擋「CLI 中途被截斷但殘檔碰巧格式合規」）。
+    """
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="fl1", families=["codex"], sentinel=True)
+    out = root / "handoffs" / "fl1-codex.md"
+    body = out.read_text(encoding="utf-8")
+    assert "STATUS: DONE" not in body, "fixture 前提變了：本測試要的是缺終結標記的檔"
+    _result(root, audit, round_id=rid, family="codex", out_path="handoffs/fl1-codex.md",
+            out_sha=_sha256_file(out), state="failed")
+    _committee_output(root, audit, round_id=rid, family="codex",
+                      out_path="handoffs/fl1-codex.md", out_sha=_sha256_file(out))
+    r = _clear(root, audit, "--round-id", rid, "--session", "fl1", "--lock", str(lock))
+    assert r.returncode != 0
+    assert "缺終結標記" in (r.stderr or "")
+
+
+def test_clear_failed_with_terminal_markers_ok(tmp_path: Path) -> None:
+    """可證偽之另一半：`failed` 但檔案格式合規**且**帶兩個終結標記 ⇒ 放行。
+
+    沒有這一條，上面三條可以靠「永遠擋」作弊全過。
+    """
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="fl2", families=["codex"], sentinel=True)
+    out = root / "handoffs" / "fl2-codex.md"
+    out.write_text(out.read_text(encoding="utf-8") + "\nVERDICT: proceed\nSTATUS: DONE\n", encoding="utf-8")
+    _result(root, audit, round_id=rid, family="codex", out_path="handoffs/fl2-codex.md",
+            out_sha=_sha256_file(out), state="failed")
+    _committee_output(root, audit, round_id=rid, family="codex",
+                      out_path="handoffs/fl2-codex.md", out_sha=_sha256_file(out))
+    r = _clear(root, audit, "--round-id", rid, "--session", "fl2", "--lock", str(lock))
+    assert r.returncode == 0, r.stderr
+
+
+def test_result_state_enum_is_closed_and_escape_covers_all_failure_states() -> None:
+    """🔴 出口之允許集合與 registry 枚舉必須同步。
+
+    主委自跑破壞性自證時，把判斷放寬成 `!= "success"` 竟**五條全綠** ⇒ 起初以為是測試有洞。
+    實查後發現：`result_state` 在 `scripts/audit_events.json` 是**封閉枚舉**，
+    寫入端 fail-closed（`dispatch-failed` 之類根本寫不進去）⇒ 兩種寫法**語意等價**，不是洞。
+
+    真正需要釘的是**枚舉本身**：日後若新增第五個失敗狀態，必須有人明確決定
+    「它要不要走銷帳出口」，而不是預設漏掉（那會把死結原樣搬回來）。
+    本條即為此而設——枚舉一變就紅。
+    """
+    reg = json.loads((REPO_ROOT / "scripts" / "audit_events.json").read_text(encoding="utf-8"))
+    enum = reg["enums"]["result_state"]
+    assert set(enum) == {"success", "failed", "format-failed", "verdict_rejected"}, (
+        f"result_state 枚舉變了：{enum}。\n"
+        "新增失敗狀態時，請同時決定它在 debt_clear.sh 之銷帳出口中的歸屬——"
+        "漏掉就會重演 2026-09-14 的死結（銷帳被鎖 ＋ 同輪重派被 OPEN 債擋 ⇒ 只能請使用者手動跑）。"
+    )
+    dc = (REPO_ROOT / "scripts" / "debt_clear.sh").read_text(encoding="utf-8")
+    assert '"verdict_rejected", "format-failed", "failed"' in dc, (
+        "debt_clear 之出口允許集合字面變了；三個失敗狀態都必須有出口"
+    )

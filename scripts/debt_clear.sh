@@ -382,6 +382,7 @@ _assert_all_families_success_and_sha_match() {
 import hashlib
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -458,16 +459,62 @@ for fam in participants:
     if not rec:
         print(f"ERROR: 家族 {fam} 無 committee_family_result", file=sys.stderr)
         sys.exit(1)
-    if rec.get("result_state") == "verdict_rejected":
+    if rec.get("result_state") in ("verdict_rejected", "format-failed", "failed"):
+        # 🔴 SPLITUNIFY b9 r37 實戰（2026-09-14）：B3 當初只補了 `verdict_rejected` 這一支，
+        #   `format-failed` 這條**同型**路徑仍被一律擋下 ⇒ 銷帳被鎖、同輪重派又被
+        #   「有 OPEN 債即拒發 token」擋住，形成死結，只能請使用者在自己 terminal 跑 cx_run。
+        #   那違反本機制的原始設計原則「清帳不被擋，故非死鎖」（2026-07-25 使用者二次拍板）。
+        #   ⇒ 兩支統一走同一條出口。
+        # 🔴 但 `format-failed` 之出口**比 `verdict_rejected` 更嚴**：後者只要求「其後有同 round
+        #   之 committee_output」；前者是**格式**不合規，光重新 register 不代表格式已修好 ⇒
+        #   另要求該產出檔實跑 `completeness_check --single` 通過。不是放寬，是補上缺的那半。
+        state = rec.get("result_state")
         rr = reregistered_output(fam, rec.get("sequence"))
         if not rr:
             print(
-                f"ERROR: 家族 {fam} 最新 result_state='verdict_rejected' 且其後無同 round 之 committee_output"
+                f"ERROR: 家族 {fam} 最新 result_state={state!r} 且其後無同 round 之 committee_output"
                 f"（主委須修檔後 bash scripts/gate.sh register-output <task> <檔> 解鎖）",
                 file=sys.stderr,
             )
             sys.exit(1)
-        print(f"[debt_clear] 家族 {fam} verdict_rejected 之後已重新 register-output（seq {rr.get('sequence')}）⇒ 視為已交件")
+        if state in ("format-failed", "failed"):
+            out_rel = rr.get("output_path") or ""
+            out_abs = out_rel if os.path.isabs(out_rel) else str(repo / out_rel)
+            chk = subprocess.run(
+                ["bash", str(repo / "scripts" / "completeness_check.sh"),
+                 "--single", out_abs, "--family", fam],
+                capture_output=True, text=True,
+            )
+            if chk.returncode != 0:
+                print(
+                    f"ERROR: 家族 {fam} 為 {state}，其後雖已重新 register-output，"
+                    f"但該檔 completeness_check --single 仍 rc={chk.returncode}（須 0）\n"
+                    f"{(chk.stdout or '')[-800:]}{(chk.stderr or '')[-800:]}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            if state == "failed":
+                # 🔴 `failed` ＝ CLI 自身非零退出 ⇒ **無法從 rc 得知該家是否真的跑完**
+                #   （`format-failed` 至少 rc=0、只是格式不合）。故本支**再加一道**：
+                #   產出檔須帶終結標記 `VERDICT:` 與 `STATUS: DONE`，證明不是中途被截斷。
+                #   🔴 這是主委自訂之附加條件（委員未給），具名交下一輪覆核。
+                try:
+                    body = Path(out_abs).read_text(encoding="utf-8", errors="replace")
+                except OSError as exc:
+                    print(f"ERROR: 家族 {fam} 產出檔讀不進來：{exc}", file=sys.stderr)
+                    sys.exit(1)
+                missing = [tk for tk in ("VERDICT:", "STATUS: DONE")
+                           if not any(ln.startswith(tk) for ln in body.splitlines())]
+                if missing:
+                    print(
+                        f"ERROR: 家族 {fam} 為 failed（CLI 非零退出），產出檔缺終結標記 {missing}"
+                        f"——無法證明該家跑完，拒絕視為已交件",
+                        file=sys.stderr,
+                    )
+                    sys.exit(1)
+            print(f"[debt_clear] 家族 {fam} {state} 之後已重新 register-output 且單檔格式檢查 rc=0 ⇒ 視為已交件")
+        else:
+            print(f"[debt_clear] 家族 {fam} verdict_rejected 之後已重新 register-output（seq {rr.get('sequence')}）⇒ 視為已交件")
         rec = {"output_path": rr.get("output_path"), "output_sha256": rr.get("output_sha256")}
     elif rec.get("result_state") != "success":
         print(

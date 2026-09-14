@@ -183,19 +183,14 @@
   - **SPEC 進 v34**，body sha256 `c8a37cbcaecb5fccf8e3d9dfd41a2e177a8b78d42b5c9f2fdce5f2c073e870d3`。
   - 🔴 **程序定論（連續第三輪同型，做法已改）**：主委「自己掃一遍再交」三輪都沒掃乾淨，殘留集中在**同一句前後矛盾／整節漏列／新增物沒回填舊索引**三型 ⇒ **方向反轉型修訂改為：先由審查方產出完整落點清單，主委照單改，再逐條核對**；主委自掃降為補充。
 
-🔴 **現在卡住（需使用者在自己 terminal 跑一行）**
-  - **原因**：codex 之 r37 交件檔 5 條 P1 全缺 `**來源摘要**` 欄 ⇒ `completeness` 硬擋、`committee_family_result` 寫成 `format-failed`。主委已依 HANDOFF 設計路徑**只補該行**並註明為主委補入（其餘一字未動）、重新 `register-output`，單檔 `completeness_check --single` 已 **PASS**；但 `debt_clear` 另有一道「該家最新 `result_state` 須為 success」，而審計是 append-only、改不掉。
-  - **同輪重跑會被 gate 擋**（`ERROR: 存在未清委員會債（OPEN），拒發 dispatch token`）——這正是 HANDOFF 早記的死結。
-  - **使用者請在自己 terminal 執行**（brief 已還原成開債當下的位元組、sha256 已比對相符）：
-    ```
-    cd /Users/louis/Desktop/quantitative_trading_system
-    ROUND_ID=97434ad2-9668-4266-b82b-087dfbceedd5 bash scripts/cx_run.sh codex \
-      handoffs/20260911-SPLITUNIFY-B9-REVIEW-R37-BRIEF.md \
-      handoffs/20260911-splitunify-b9-review-r37-codex.md
-    ```
-  - 跑完主委即可 `reconcile_build` 重建 → `debt_clear` → 接 `review-r38`。
-  - **另一條路（未採，需使用者裁示）**：`bash scripts/debt_clear.sh --abandon --round-id 97434ad2-... --kind collection-failed --reason <理由> --approver <who>`——本輪 findings 其實已全數收斂並套用，只是收件格式失敗；但 `--approver` 不應由主委自填，故未逕行。
-- **下一步**：解開上述死結 → `review-r38`（依新做法**先請審查方出完整落點清單**）→ 領 impl token 執行退回。
+🔴 **死結已修（2026-09-14，使用者核可後施作）**
+  - **病因**：VERDICTGATE B2／B3（**2026-09-11**）把閘加到 `debt_clear` 的**銷帳路徑**上（family `result_state` 須 `success`）。B3 當時**已實戰撞到**（commit `8cbd9539` 訊息逐字：「閘實戰首次拒收委員裁決行後清債被鎖」），卻**只補了 `verdict_rejected` 一支**；`format-failed`／`failed` 照樣被擋。⇒ 銷帳被鎖 ＋ 同輪重派被「有 OPEN 債即拒發 token」擋住 ＝ **完全死結**，只能請使用者手動跑 `cx_run`。這違反 2026-07-25 拍板之原始原則逐字「**清帳不被擋故非死鎖**」。
+  - **修法**：三支統一走同一出口（其後有同 round 之 `committee_output`），並**按狀態加嚴**——`format-failed`／`failed` 另須該檔 `completeness_check --single` rc=0；`failed`（CLI 非零退出、無從得知是否跑完）再加「產出檔須帶 `VERDICT:` 與 `STATUS: DONE`」（🔴 **此加嚴為主委自訂、委員未給，具名交下一輪覆核**）。
+  - **測試六條**（`tests/governance/test_debt_clear.py`）：三條擋、兩條放行（反向可證偽，防「永遠擋」作弊）、一條**釘住 `result_state` 枚舉**——日後新增第五個失敗狀態必須明確決定其出口歸屬，否則當場轉紅。
+  - **破壞性自證兩次**：①拿掉兩道加嚴 ⇒ 三條轉紅 ✅；②放寬成 `!= "success"` ⇒ **五條全綠**，起初判為測試有洞，實查後發現 `result_state` 是 **registry 封閉枚舉**（寫入端 fail-closed），兩種寫法語意等價、**不是洞** ⇒ 改為釘枚舉本身。
+  - **實效**：r37 之債已用修好的路徑清掉（`家族 grok failed 之後已重新 register-output 且單檔格式檢查 rc=0 ⇒ 視為已交件`），**未再動用使用者 terminal**。
+  - **通則入 `docs/SCAR_LEDGER.md`**：🔴 **凡「解除既有阻塞」的路徑，本身不得再被同一族的閘擋住**——那不是防護，是死結。
+- **下一步**：`review-r38`（依新做法**先請審查方出完整落點清單**）→ 領 impl token 執行退回。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
@@ -222,6 +217,7 @@
 - `committee_run` 的 harness exit code 不可信：本輪 `committee_rc=0` 但 harness 報 failed（尾端 `tail /tmp/*.log` 因沙箱重導而找不到檔）。**讀 `committee_rc=` 那行**。
 - 🔴 `pytest` 一律逐檔明列路徑；`-k` 只過濾執行、**不減少收集**，無路徑即從 rootdir 收全套。
 - 🔴 `reconcile_build.sh` 一律帶 `--mode review`；`debt_clear` 用 `--round-id <id> --session <name> --lock <sources.lock>`（不吃位置參數）。
+- 🔴 **第三個既有紅（2026-09-14 實測，非本輪改壞；以 `git show HEAD:scripts/debt_clear.sh` 對照確認同樣紅）**：`tests/governance/test_debt_emit.py` 之 **7 條 `test_b3_*`** ——隔離 repo 之依賴複製清單缺 `scripts/prev_review_resolve.sh`（`committee_run` 開輪前置會呼叫它）⇒ `No such file or directory`。與既有那條「缺 `quant_standard_check.sh`／`ticket_batch_check.sh`」**同型同因**。
 - 🔴 **兩個與本批無關的既有紅**（2026-09-14 實測，**不是本輪改壞的**）：①`tests/governance/test_gate_deny_fields.py::test_01_corpus_a_covers_decision_branches` — 它斷言 `scripts/gate_check.sh` 內有錨點字面 `INPUT="$(cat)"`，但該檔現行為 `INPUT="$(python3 -c …`（該檔本輪未被改動，`git status` 乾淨）⇒ 錨點漂移型假紅。②`scripts/obligation_block_check.sh` 對 `docs/SPLITUNIFY_SPEC.D-002.md` **結構性 rc=1**：其 R5 規則要求「帶裁決編號之行只准在 HISTORY 專區內」，而本檔每個 SUPERSEDED 註記都逐字引用造成它的 finding ID（HEAD 基準即 35 行，v26 後 40 行）。**義務區塊內為零違規**（那是另一條規則，本輪一度違反已修）。
 - 🔴 治理測試既有紅基準（2026-09-13 實測）：19 個涉及 `brief_conformance_check` 的檔為 **30 failed／523 passed／3 skipped**；乾淨 HEAD worktree 為 **35 failed／512 passed**。根因＝隔離 repo 依賴複製清單缺 `scripts/quant_standard_check.sh`／`ticket_batch_check.sh`。`test_govb1_contract_matrix.py::test_r6_u1u2u4_g7_worktree_space_quote_paths` 會**掛住**，跑治理回歸須排除。
 - 🔴 改 SPEC／TODO 前先 `grep -n` 列出該決定的全部落點，改完再 grep 一次；grep **不得加排除條件**。
