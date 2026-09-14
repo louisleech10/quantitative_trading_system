@@ -65,7 +65,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B4** | 4.1 | ✅ 完成 | B3 | 報告與畫面（欄名待 B3 定案後才穩定） | 中 |
 | **B9A** | 9.1 | ✅ **完成**（impl `c98acf26`；審碼 r18、閉合 r19） | B4 ＋ `D-002` 三家 `RECONCILE-STAMP` rc=0 | 揭露先行；只動 producer 回傳形狀與 summary 一鍵，可獨立回退 | 中 |
 | **B9B** | 9.2, 9.2a | ✅ **完成**（impl `9e87386f`；審碼 r20、閉合 r21／r22） | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
-| **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27，閉合 r28–r34 共八輪、39 條全修完；r34 中 composer／grok 已零 finding 並 proceed；**現待 r35 回驗＋v29 重簽**） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
+| **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27，閉合 r28–r35 共九輪＋stamp-r6＋consult-r3/r4/r5；🔴 **consult-r4/r5 三家一致判定方向反轉**（見 `Task 9.3`）；**現待 review 覆核 v32＋重簽**） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
 | **B9D** | 9.3 | ⬜ **未開工**（下一個） | B9C | `Task 9.3` 表列**九處**逐處處置（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
 | **B9E** | 9.4 | ⬜ 未開工 | B9C | 記帳鏈與 `baseline` 拆鍵 | 中 |
 | **B9F** | 9.5 | ⬜ 未開工（排最後） | B9D ＋ B9E | golden 換錨與前端；須在所有行為面定案後才凍結 | 大 |
@@ -615,7 +615,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.2b ✅ **已完成（B9C；碼面自 r27 起未再變動，其後各輪修的都是 SPEC／TODO 與驗收閘；現待 r35 回驗＋v29 重簽）** —— 側別判定改為事件級錨定（`票 SPLITUNIFY`）
+### Task 9.2b ✅ **已完成（B9C；碼面自 r27 起未再變動；🔴 **其 `Task 9.2a` 之「`assignments` 加 `feature_timeframe` 欄」已由 v32 判為做過頭，將由 `Task 9.3` 退回**（不影響 9.2b 之事件級錨定））** —— 側別判定改為事件級錨定（`票 SPLITUNIFY`）
 - SPEC ref：§P Phase 9B `Task 9.2b`；§V `Task 9.2b` 及其前置；`D-002-C3` (3.1)(3.2)
 - 實作要點：
   1. **前置（步驟 0）**：`train_rows`／`test_rows` 皆非空、row set 不重疊；
@@ -661,7 +661,26 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.3 — 消費面逐處列名改法（`票 SPLITUNIFY`）
+### Task 9.3 — 🔴 **v32 全面改寫：切分歸屬表退回事件級（`票 SPLITUNIFY`）**
+
+🔴 **本 Task 之目標於 v32 反轉**。原目標「把下游改成能消費複合鍵表」已**作廢**；現目標是**把 `assignments`／`purged` 退回一事件一列**，下游因此多半不必改。
+
+**為何反轉**（`consult-r4`／`consult-r5`，**三家一致**；起因為使用者提出之設計質疑）：
+- 側別由事件級 `decision_at_ms` 判一次後**廣播**（`Task 9.2b` 已落地）⇒ `assignments` 之 `feature_timeframe` 欄**不承載任何判定資訊**，同事件各列恆同值。
+- 三家各自窮盡掃描：該欄**無任何消費者**（下游只讀 `event_id`／`split_label`／`symbol`／列數；golden JSON 無此欄；前端型別無此欄）。
+- 🔴 **R1 規格輪本就寫明**「內部邊界投影可用 `(event_id, timeframe)`；**對外之 `EventSplitPlan` 維持事件級**」⇒ 把複合鍵外推到 `assignments`／`purged` 是**實作做過頭**，本 Task 是**把實作拉回原規格**。
+- 三家判現行方案為**過度工程**、且「切分語意無增益」；最小正確修法＝**「切分走事件級 ＋ per-TF 稽核獨立保留」**。
+
+**保留不動**（不得順手退掉）：`Task 9.1` 之 `discarded_rows_by_feature_tf` 記帳；`Task 9.2` 之 `selected_timeframe=None` 預設全量；`Task 9.2b` 之事件級錨定＋廣播＋異側／跨表混態 fail-closed；`receipts.per_tf` 維持一事件×一週期一列之 PIT 稽核與 `_assert_event_keys_wellformed`；`build_event_keys` 之複合鍵中間態不動。
+
+🔴 **退回之形狀（逐字採 `CODEX-R5-P1-01`）**：
+> 內部稽核保留複合列 → **輸出前以 `event_id` 聚合並驗證欄值** → 最後**恰一列**進 `assignments` 或 `purged`。
+
+**明禁**：以 `drop_duplicates`／`set` 去重——那會把「同事件欄值衝突」這種實作缺陷**靜默吞掉**，正是本 epic 一路在打的形態。聚合點必須是**具名的 seam**並逐欄驗值。
+
+🔴 **不得半退（`CODEX-R4-P1-01`／三家撞題之 `COMPOSER-R5-P1-01`＋`GROK-R5-P1-01`＋`CODEX-R5-P1-02`）**：
+組列與**計數**必須同一次改完。只改組列而不改計數，`tier_min_test_events` **門檻仍可被 1 事件×N TF 膨脹繞過**——那是**門檻失效**（測試段事件數不足卻放行），不是帳面問題。
+
 - SPEC ref：§P Phase 9B `Task 9.3`；`D-002-C5` (5.1)(5.6) register
 - 🔴 **動工前置（consult-r2 之 A6；stamp-r1 codex 要求機械化）**：先重掃 `D-002-C5` register，逐條複驗
   `C5-01`..`C5-29` 因 `feature_timeframe` 欄而是否改變分類（甲／乙／丙）。
@@ -669,8 +688,34 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   `handoffs/run_receipts/<UTC時戳>-splitunify-task-9.3-register-rescan.txt`，內容逐條為
   `C5-NN <改前分類> -> <改後分類> <碼證 path:line>`，且**檔案存在**列入下方驗收；
   缺檔即本 Task 不得宣告完成（沒有這一條，省略重掃在現行檔案級 rc=0 下完全看不出來）。
-- 🔴 **不得**用「凡 `set_index("event_id")` 一律改」這種形狀規則。逐處處置如下，
-  **多數是「維持現狀 ＋ 加防誤改回歸測試」，不是改碼**：
+- 🔴 **v32 逐落點退回清單（逐字採 `COMPOSER-R5-P1-01` 必答 2a 表 A／B；Tier 0 者須同一次 commit）**：
+
+| 檔 | 行 | 改什麼 |
+|---|---|---|
+| `split_projection.py` | `:783-798` | 組列改為逐 `event_id` 從 `event_state` 寫**一列**；移除 `feature_timeframe` 欄 |
+| 同上 | `:804-808` | `assignments` 欄→`["event_id","symbol","split_label"]`；`purged`→`["event_id","reason"]` |
+| 同上 | `:811-813` | `per_symbol_n` 改每 symbol 之 `event_id.nunique()`（**非列數**） |
+| 同上 | `:814-821` | `n_test`／`per_symbol_test_n` 改 `assignments` 之 `event_id` 去重計數 |
+| 同上 | `:826-828` | `n_event_tf_rows` 仍 `len(event_keys)`；🔴 `n_event_tf_rows_purged` 改為 **`event_keys` 中 purged 側之列數**（不再是 `len(purged)`——退回後那是事件數，名實不符） |
+| 同上 | `:907-911` | 空批 DataFrame 欄位同步移除 `feature_timeframe` |
+| 同上 | `:392-425` | **保留** `_assert_event_level_side_consistency`；另加輸出表 `event_id` 唯一之 pre-check |
+| 同上 | `:566-576` | **保留** `event_keys` 複合鍵 guard（per_tf 稽核） |
+| 同上 | `:328-343` | **`build_event_keys` 不動**（複合鍵中間態＋`discarded` 記帳保留） |
+| `pipeline.py` | `:825-827` | 確認 `n_train`／`n_test`／`n_purged` 在事件級 `assignments` 下語意正確；須加**去重斷言**防回歸 |
+
+**測試（Tier 0，與上表同 commit）**：
+`test_assignments_composite_key_unique`／`test_purged_composite_key_unique` → 改寫為 `event_id` 唯一且**無** `feature_timeframe` 欄；
+`test_summary_has_n_events_and_n_event_tf_rows` → `n_event_tf_rows_purged` 改對 `event_keys` purged 列數；
+🔴 `test_event_level_anchor_broadcasts_side_to_all_feature_tf`（`:1742-1743`）→ **不得只刪、也不得只改成 `len==1`**（會失去 `M-SU-D2-14` 防 cutoff 判側回歸之鑑別力）⇒ `assignments` 端改驗「**恰一列且側別正確**」，並**另增**「兩 TF 仍在 `event_keys`」之稽核層斷言；
+`test_duplicate_composite_key_error_message_names_key_not_side` → 改測 `event_keys` 之複合鍵重複訊息（非 `assignments`）；
+`test_multi_symbol_branch_summary_counts_are_named` → 更新期望值；
+`test_splitunify_wiring.py:110-111` → **保留**（退回後恢復正確）；`:152` 刪 `feature_timeframe in assignments.columns`；`:234-259` 改為 `len(assign)+len(purged)==n_events`。
+
+🔴 **`per_symbol_test_n` 是 TODO 的過時字面、不是現行 `_build_summary` 的 schema**（`CODEX-R5-P1-02` 實查）⇒ 驗收改測 **unique-event 門檻**，**不得**為了對齊文件而新增欄位。
+
+🔴 **退回後之 mutation 覆蓋缺口（具名，主委不自行補）**：`M-SU-D2-05`／`35`／`36`／`37`／`40` 已依 `CODEX-R5-P1-03` **撤下**（它們只為複合 `assignments` 服務，退回後皆空殼），但退回**自身**的可壞面——①輸出多列 ②聚合時靜默吞掉欄值衝突 ③計數被列數膨脹——**目前無 mutation 覆蓋**。列為下一輪 review 之必答，由委員定該加哪幾條。
+
+- 🔴 **下表為 v32 前之「下游改法」清單，多數已因退回而不必做**，保留供追溯；逐列之現行處置以上方退回清單與 SPEC register 之 v32 改判為準：
 
 | 消費面 | 處置 | 應紅之 mutation | 測試檔 |
 |---|---|---|---|
@@ -680,11 +725,11 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 | `counterexample_classifier` | 維持事件級 | `M-SU-D2-08` | `tests/momentum/event_samples/test_counterexample_classifier.py` |
 | `candidate_ledger` | 維持事件級 | `M-SU-D2-09` | `tests/momentum/event_samples/test_candidate_ledger.py` |
 | `dedupe` | 保留集事件級決定 ＋ 廣播到該事件所有 per-TF 列 | `M-SU-D2-10` | `tests/momentum/event_samples/test_dedupe.py` |
-| `pattern_bridge` | **丙類，要改**：`assign.set_index("event_id")` 先去重取唯一側，不唯一即 fail-closed | `M-SU-D2-05`（改複合鍵索引）＋`M-SU-D2-37`（略過去重／不 fail-closed） | `tests/momentum/event_samples/test_pattern_bridge.py` |
+| `pattern_bridge` | 🔴 **v32 撤下**：~~丙類，要改：`assign.set_index("event_id")` 先去重取唯一側，不唯一即 fail-closed~~——`assignments` 退回一事件一列後索引本就唯一，該 reducer 只為複合輸出服務且其 fail-closed 已被 `consult-r3` 判結構不可達（空殼）。現行＝**維持現狀＋防誤改回歸** | `M-SU-D2-05`（改複合鍵索引）＋`M-SU-D2-37`（略過去重／不 fail-closed） | `tests/momentum/event_samples/test_pattern_bridge.py` |
 | event-level 表／manifest | 粒度不變 | `M-SU-D2-18` | `tests/momentum/Analysis/test_splitunify_derive.py` |
 | 前端 `byEventId` | 維持 `canonicalEventId` 鍵 | `M-SU-D2-11` | 🔴 **須新建** `frontend/src/app/search/eventExportByEventId.test.tsx`（同目錄已有四支 `eventExport*.test.tsx` 可循） |
 
-- 不可做：不得用形狀規則（凡 `set_index("event_id")` 一律改）批次套用；
+- 不可做（v32 仍適用）：不得用形狀規則（凡 `set_index("event_id")` 一律改）批次套用；
   不得把 event-level 表複製成多列以「配合」複合鍵；
   不得把 `M-SU-D2-11` 之前端面以「等 UAT 再做」延後——它是本 Task 的交付面之一。
 - 邊界：①單 feature TF 批下，上表九處行為須與改前**逐值相同**；
