@@ -199,6 +199,112 @@ def _manifest(keys: pd.DataFrame) -> EventManifest:
     )
 
 
+# ── 🔴 D-002 `Task 9.5`／§G (G-2)：兩標的交錯 × 兩 feature TF 之**平行組** ─────────────────────
+#    單標的舊鍵是回歸錨、**一律不動**；平行組只以 `g2_interleaved_*` **新鍵**承載（`main()` 寫檔護欄
+#    本就只允許新增鍵、既有鍵改值須 digest 授權）。「擴維」只落在本組之稽核面（`event_keys` 每事件兩個
+#    feature TF 列）與交錯 fixture；成員集**維持事件級**（`C5-22` 甲類，不擴成 event×TF）。
+SYM_B = "BTCUSDT"
+_PARALLEL_FEATURE_TFS = ("1h", "4h")
+_PARALLEL_UNIVERSE = "splitunify-golden-interleaved"
+
+
+def _interleaved_plans() -> tuple:
+    """兩標的於全框交錯（偶數列 A、奇數列 B），各以**自己的短索引**建 plan 對（D-001 (4.3)／(4.4)）。
+
+    `row_index`＝全框位置、`row_index_local`＝標的內序號；指紋以短索引時刻計算（與 producer 同一支序列化器）。
+    """
+    full = _feature_index()
+    positions = {SYM: np.arange(0, N_BARS, 2, dtype=int), SYM_B: np.arange(1, N_BARS, 2, dtype=int)}
+    short = {s: pd.Index([int(full[p]) for p in positions[s]], dtype="int64") for s in positions}
+    plans: Dict[str, tuple] = {}
+    bounds: Dict[str, Dict[str, Any]] = {}
+    for s in (SYM, SYM_B):
+        b = holdout_boundary(short[s], oos_test_size=OOS, purge_gap=PURGE, embargo=EMBARGO)
+        ms = np.asarray(short[s], dtype="int64")
+        kw = dict(index_kind="positional", purge_gap=PURGE, embargo=EMBARGO,
+                  purge_semantic="rows", base_universe_hash=_PARALLEL_UNIVERSE, symbol=s)
+
+        def _mk(label: str, local: Any, s: str = s, ms: np.ndarray = ms, kw: Dict[str, Any] = kw) -> SplitPlan:
+            loc = np.asarray(local, dtype=int)
+            return SplitPlan(
+                split_label=label, row_index=np.asarray(positions[s][loc], dtype=int),
+                time_bounds=(int(ms[loc[0]]), int(ms[loc[-1]])), row_index_local=loc,
+                row_time_fingerprint=build_row_time_fingerprint(
+                    positions=loc, feature_ts_ms=ms[loc], symbol=s, base_universe_hash=_PARALLEL_UNIVERSE,
+                ),
+                **kw,
+            )
+
+        plans[s] = (_mk("train", b["train_row_index"]), _mk("test", b["test_row_index"]))
+        bounds[s] = b
+    return plans, short, bounds, positions
+
+
+def _interleaved_event_keys(short: Dict[str, pd.Index], bounds: Dict[str, Dict[str, Any]]) -> pd.DataFrame:
+    """平行組之稽核層事件鍵：每標的 4 事件（train／答案窗跨界 purge／test ×2）× 兩個 feature TF。
+
+    同事件兩 TF 列之 `decision_at_ms`／`label_*_ms`／`symbol` 同值（事件級欄）；`feature_cutoff_ms` 取決策時刻。
+    """
+    rows: List[Dict[str, Any]] = []
+    for s in (SYM, SYM_B):
+        ms = np.asarray(short[s], dtype="int64")
+        tr, te = bounds[s]["train_row_index"], bounds[s]["test_row_index"]
+        test_start = int(ms[te[0]])
+        events = [
+            (f"{s}_tr0", int(ms[tr[0]]), int(ms[tr[0]]) + H1),
+            (f"{s}_leak", int(ms[tr[-1]]), test_start),          # 答案窗恰觸 test 段起點 ⇒ purged
+            (f"{s}_te0", int(ms[te[0]]), int(ms[te[0]]) + H1),
+            (f"{s}_te1", int(ms[te[1]]), int(ms[te[1]]) + H1),
+        ]
+        for eid, decision, label_end in events:
+            for tf in _PARALLEL_FEATURE_TFS:
+                rows.append({
+                    "event_id": eid, "feature_cutoff_ms": decision, "label_start_ms": decision,
+                    "label_end_ms": label_end, "symbol": s, "timeframe": "1h",
+                    "feature_timeframe": tf, "decision_at_ms": decision,
+                })
+    return pd.DataFrame(rows)
+
+
+def _build_interleaved_actual() -> Dict[str, Any]:
+    """(G-2) 平行組之 golden 值：事件級成員集、per-symbol 事件數、稽核列數與逐標的 test 段 g5。"""
+    plans, short, bounds, positions = _interleaved_plans()
+    keys = _interleaved_event_keys(short, bounds)
+    event_level = keys.loc[keys["feature_timeframe"] == _PARALLEL_FEATURE_TFS[0]].reset_index(drop=True)
+    plan = derive_event_split_from_plans(plans, keys, short, manifest=_manifest(event_level), bucket_ms=H1)
+    a = plan.assignments
+    fingerprints: Dict[str, str] = {}
+    fp_positions: Dict[str, List[int]] = {}
+    fp_ts_ms: Dict[str, List[int]] = {}
+    global_positions: Dict[str, List[int]] = {}
+    for s in (SYM, SYM_B):
+        ms = np.asarray(short[s], dtype="int64")
+        loc = np.asarray(bounds[s]["test_row_index"], dtype=int)
+        fingerprints[s] = build_row_time_fingerprint(
+            positions=loc, feature_ts_ms=ms[loc], symbol=s, base_universe_hash=_PARALLEL_UNIVERSE,
+        )
+        # 🔴 review-r50 `CODEX-R50-P2-01`：明文須是**同一份** fingerprint payload——SHA 以標的內序號（local）
+        #    與短索引時刻計算，故 positions 凍 local、另凍逐列 feature_ts_ms，測試據此獨立重算 SHA；
+        #    全框 `row_index` 只作「確實交錯」之證據，另以明確鍵承載，不得冒充 payload。
+        fp_positions[s] = [int(p) for p in loc]
+        fp_ts_ms[s] = [int(v) for v in ms[loc]]
+        global_positions[s] = [int(p) for p in positions[s][loc]]
+    return {
+        "g2_interleaved_membership": {
+            "train": sorted(a.loc[a["split_label"] == "train", "event_id"]),
+            "test": sorted(a.loc[a["split_label"] == "test", "event_id"]),
+            "purged": sorted(plan.purged["event_id"]),
+        },
+        "g2_interleaved_per_symbol_n": {k: int(v) for k, v in plan.summary["per_symbol_n"].items()},
+        "g2_interleaved_n_events": int(plan.summary["n_events"]),
+        "g2_interleaved_n_event_tf_rows": int(plan.summary["n_event_tf_rows"]),
+        "g2_interleaved_g5_row_fingerprint_sha256": fingerprints,
+        "g2_interleaved_g5_row_fingerprint_positions": fp_positions,
+        "g2_interleaved_g5_row_fingerprint_feature_ts_ms": fp_ts_ms,
+        "g2_interleaved_global_row_index_positions": global_positions,
+    }
+
+
 def _sha(payload: Any) -> str:
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -311,6 +417,8 @@ def _build_actual() -> Dict[str, Any]:
         #    off-bar 的**終點**仍可留在 test assignments，而 SPEC 要求缺 endpoint 必 purge。
         "g5_answer_window": _answer_window_report(keys, a, plan.purged, set(ms.tolist())),
         "purge_reasons": sorted(set(plan.purged["reason"])),
+        # 🔴 D-002 `Task 9.5`／§G (G-2)：交錯平行組**只增鍵**（`g2_interleaved_*`），不覆蓋上列單標的回歸錨。
+        **_build_interleaved_actual(),
     }
 
 

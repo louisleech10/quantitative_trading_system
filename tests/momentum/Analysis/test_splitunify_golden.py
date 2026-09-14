@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -414,3 +417,205 @@ def test_hand_decision_timestamps_have_independent_third_copy(golden: dict) -> N
     assert set(_INDEP_DECISION_MS) == set(hand) == set(got), "三份之事件集合須相同"
     assert _INDEP_DECISION_MS == hand, "本檔獨立副本 ≠ fixture 人手字面"
     assert _INDEP_DECISION_MS == got, "本檔獨立副本 ≠ fixture 實際值"
+
+
+# ── 🔴 D-002 `Task 9.5`（批次 B9F）：§V 第 6 條與 §G (G-2) 之指名測試（**行為測試**，非原始碼字串比對）──
+#
+# 既有同主題測試多以 `inspect.getsource` 檢查字串存在；本節改為**真的執行**寫檔／建立／比對路徑，
+# 並把副作用導到 `tmp_path`（`monkeypatch` 模組層 `GOLDEN_DIR`／`RECEIPT_DIR`），不動 repo 內檔案。
+
+SPEC = REPO / "docs" / "SPLITUNIFY_SPEC.D-002.md"
+V8 = REPO / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.json"
+V8_SIDECAR = REPO / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.sha256"
+_V8_TOP_KEYS = (
+    "_doc", "g1_membership", "g3b_oracle", "g4_per_symbol_n", "g5_answer_window",
+    "g5_row_fingerprint_first_ms", "g5_row_fingerprint_last_ms", "g5_row_fingerprint_n",
+    "g5_row_fingerprint_positions", "g5_row_fingerprint_sha256", "purge_reasons",
+)
+_PARALLEL_PREFIX = "g2_interleaved_"
+#: 平行組之**人手**事件級成員集（事件命名即其設計側別；不經投影、不經 oracle）。
+_HAND_INTERLEAVED_MEMBERSHIP = {
+    "train": ["BTCUSDT_tr0", "ETHUSDT_tr0"],
+    "test": ["BTCUSDT_te0", "BTCUSDT_te1", "ETHUSDT_te0", "ETHUSDT_te1"],
+    "purged": ["BTCUSDT_leak", "ETHUSDT_leak"],
+}
+
+
+def _spec_anchor_hits_outside_history() -> list:
+    """**不經 helper**：直接讀 SPEC、截掉 HISTORY／沿革區後，收集所有 `V8_BASELINE_SHA256=` 行之值。
+
+    值刻意寬鬆擷取（非 64-hex 也收），好讓「格式壞掉」被判為格式錯而不是「找不到」。
+    """
+    text = SPEC.read_text(encoding="utf-8")
+    for marker in ("<!-- HISTORY-BEGIN -->", "## 沿革與追溯索引"):
+        pos = text.find(marker)
+        if pos >= 0:
+            text = text[:pos]
+    return re.findall(r"^\s*`?V8_BASELINE_SHA256=([^\s`]*)`?\s*$", text, re.M)
+
+
+def _tmp_golden_dir(tmp_path: Path) -> Path:
+    gd = tmp_path / "golden"
+    gd.mkdir()
+    for p in (GOLDEN, V8, V8_SIDECAR):
+        shutil.copy2(p, gd / p.name)
+    return gd
+
+
+def _run_main(m, monkeypatch, tmp_path: Path, golden_dir: Path, *argv: str) -> int:
+    monkeypatch.setattr(m, "GOLDEN_DIR", golden_dir)
+    # `main()` 只以 `REPO` 印相對路徑（`_SPEC_PATH` 為匯入時已算好之常數，不受影響）；
+    # 寫檔目錄在 tmp 時須一併導過去，否則 `relative_to(REPO)` 拋 ValueError。
+    if tmp_path in golden_dir.parents:
+        monkeypatch.setattr(m, "REPO", tmp_path)
+    receipts = tmp_path / "receipts"
+    receipts.mkdir(exist_ok=True)
+    monkeypatch.setattr(m, "RECEIPT_DIR", receipts)
+    monkeypatch.setattr(sys, "argv", ["freeze_splitunify_golden.py", *argv])
+    return m.main()
+
+
+def test_spec_anchor_line_exists_and_is_64hex() -> None:
+    """§V 第 6 條（`M-SU-D2-34`）：SPEC §V 內**恰一行** `V8_BASELINE_SHA256=<64-hex>`（HISTORY 區不算）。"""
+    hits = _spec_anchor_hits_outside_history()
+    assert len(hits) == 1, f"SPEC §V 之 V8 錨點行須恰一行，實得 {len(hits)}：{hits}"
+    assert re.fullmatch(r"[0-9a-f]{64}", hits[0]), f"錨點值非 64 位小寫 hex：{hits[0]!r}"
+
+
+def test_v8_sha256_matches_spec_anchor_line() -> None:
+    """§V 第 6 條（外部錨，`M-SU-D2-33`）：v8 檔實際 sha256 ＝ SPEC 錨點行 ＝ 旁檔。
+
+    🔴 只比旁檔會綠（同步改寫兩檔即可換掉回歸錨）——故以**不經 helper** 讀出之 SPEC 字面為準。
+    """
+    hits = _spec_anchor_hits_outside_history()
+    assert len(hits) == 1
+    anchor = hits[0]
+    assert hashlib.sha256(V8.read_bytes()).hexdigest() == anchor, "v8 基準內容與 SPEC 外部錨不符"
+    assert V8_SIDECAR.read_text(encoding="utf-8").strip() == anchor, "旁檔與 SPEC 外部錨不符"
+
+
+def test_v8_baseline_is_write_once(tmp_path: Path, monkeypatch) -> None:
+    """§V 第 6 條（`M-SU-D2-33`）：首次建立成功；其後任何一次再建即拒、且不改寫已存在之內容；半套狀態不建。"""
+    m = _fz_module()
+    monkeypatch.setattr(m, "GOLDEN_DIR", tmp_path)
+    first = b'{"baseline": 1}\n'
+    assert m.create_v8_baseline_write_once(first) == 0
+    v8, sidecar = tmp_path / "splitunify_golden.v8.json", tmp_path / "splitunify_golden.v8.sha256"
+    assert v8.read_bytes() == first
+    assert sidecar.read_text(encoding="utf-8") == hashlib.sha256(first).hexdigest() + "\n"
+    assert m.create_v8_baseline_write_once(b'{"baseline": 2}\n') == 1, "v8 已存在卻允許再建"
+    assert v8.read_bytes() == first, "再建被拒後內容不得被改寫"
+    half = tmp_path / "half"
+    half.mkdir()
+    monkeypatch.setattr(m, "GOLDEN_DIR", half)
+    (half / "splitunify_golden.v8.sha256").write_text("stale\n", encoding="utf-8")
+    assert m.create_v8_baseline_write_once(first) == 1, "只有旁檔存在時仍允許建立 ⇒ 半套狀態"
+    assert not (half / "splitunify_golden.v8.json").exists()
+
+
+def test_freeze_write_flag_refuses_v8_target(tmp_path: Path, monkeypatch, capsys) -> None:
+    """§V 第 6 條（`M-SU-D2-29`）：`--write` 之寫入目標解析為 v8 基準時**必拒**，且以該專屬理由拒（非被其他閘順帶擋下）。"""
+    m = _fz_module()
+    gd = tmp_path / "golden"
+    gd.mkdir()
+    shutil.copy2(V8, gd / V8.name)
+    shutil.copy2(V8_SIDECAR, gd / V8_SIDECAR.name)
+    (gd / "splitunify_golden.json").symlink_to(gd / V8.name)
+    before = (gd / V8.name).read_bytes()
+    rc = _run_main(m, monkeypatch, tmp_path, gd, "--write")
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "為不可變基準，禁止 --write 覆寫" in out, out[-1500:]
+    assert (gd / V8.name).read_bytes() == before, "v8 基準被 --write 改寫"
+
+
+def test_freeze_script_does_not_write_spec_anchor(tmp_path: Path, monkeypatch) -> None:
+    """§V 第 6 條（`M-SU-D2-34`）：凍結腳本比對與重凍兩種模式皆**不寫** SPEC（錨點行只由人在 SPEC 維護、helper 只讀）。"""
+    m = _fz_module()
+    before = (SPEC.read_bytes(), os.stat(SPEC).st_mtime_ns)
+    assert _run_main(m, monkeypatch, tmp_path, GOLDEN.parent) == 0, "比對模式 rc≠0"
+    gd = _tmp_golden_dir(tmp_path)
+    assert _run_main(m, monkeypatch, tmp_path, gd, "--write") == 0, "tmp 重凍 rc≠0"
+    assert (SPEC.read_bytes(), os.stat(SPEC).st_mtime_ns) == before, "凍結腳本改寫（或重寫）了 SPEC"
+
+
+def test_main_json_eleven_top_keys_unchanged(tmp_path: Path, monkeypatch, capsys) -> None:
+    """§V 第 6 條（`M-SU-D2-29`）：主檔既有 11 個頂層鍵（＝v8 鍵集）於重凍後逐值不變；改其值而無 digest 授權即拒寫。"""
+    m = _fz_module()
+    v8_keys = set(json.loads(V8.read_text(encoding="utf-8")))
+    assert v8_keys == set(_V8_TOP_KEYS), "fixture 前提變了：v8 鍵集不是原始 11 鍵"
+    original = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    assert v8_keys <= set(original), "主檔丟了 v8 時代之頂層鍵"
+
+    gd = _tmp_golden_dir(tmp_path)
+    assert _run_main(m, monkeypatch, tmp_path, gd, "--write") == 0
+    rewritten = json.loads((gd / GOLDEN.name).read_text(encoding="utf-8"))
+    for k in _V8_TOP_KEYS:
+        if k.startswith("_"):
+            continue
+        assert rewritten[k] == original[k], f"重凍改動了既有頂層鍵 {k}"
+
+    real_build = m._build_actual
+
+    def _tampered():
+        out = real_build()
+        out["g4_per_symbol_n"] = {k: v + 1 for k, v in out["g4_per_symbol_n"].items()}
+        return out
+
+    monkeypatch.setattr(m, "_build_actual", _tampered)
+    snapshot = (gd / GOLDEN.name).read_bytes()
+    capsys.readouterr()
+    assert _run_main(m, monkeypatch, tmp_path, gd, "--write") == 1
+    assert "GOLDEN REFUSE" in capsys.readouterr().out
+    assert (gd / GOLDEN.name).read_bytes() == snapshot, "被拒之重凍仍改寫了主檔"
+
+
+def test_single_tf_golden_values_unchanged(golden: dict) -> None:
+    """§G／`Task 9.5`（`M-SU-D2-17`）：新增平行組後，單標的組**每個既有鍵**之現算值與 golden 逐值相同。"""
+    m = _fz_module()
+    actual = m._build_actual()
+    single_keys = [k for k in golden if not k.startswith("_") and not k.startswith(_PARALLEL_PREFIX)]
+    assert set(_V8_TOP_KEYS) - {"_doc"} <= set(single_keys)
+    diffs = [k for k in single_keys if actual.get(k) != golden[k]]
+    assert diffs == [], f"單標的回歸錨被改動：{diffs}"
+
+
+def test_interleaved_parallel_group_g5_differs_and_is_stable(golden: dict) -> None:
+    """§G (G-2)（`M-SU-D2-16`／`M-SU-D2-17`）：交錯平行組兩次建構逐值相同、與 golden 相符、g5 與單標的組不同。
+
+    成員集須**事件級**（不擴成 event×TF）且等於人手成員集；稽核列數＝事件數×2（兩個 feature TF 皆在）。
+    """
+    m = _fz_module()
+    first, second = m._build_interleaved_actual(), m._build_interleaved_actual()
+    assert first == second, "平行組不穩定（兩次建構不同）"
+    assert set(first) == {k for k in golden if k.startswith(_PARALLEL_PREFIX)}, "golden 缺平行組鍵或多出鍵"
+    for k, v in first.items():
+        assert golden[k] == v, f"平行組 {k} 與 golden 不符"
+
+    membership = first["g2_interleaved_membership"]
+    assert membership == _HAND_INTERLEAVED_MEMBERSHIP, "平行組成員集與人手判準不符（或被擴成 event×TF）"
+    flat = [e for side in membership.values() for e in side]
+    assert len(flat) == len(set(flat)) == first["g2_interleaved_n_events"]
+    assert first["g2_interleaved_n_event_tf_rows"] == 2 * first["g2_interleaved_n_events"]
+
+    fps = first["g2_interleaved_g5_row_fingerprint_sha256"]
+    assert set(fps) == {"ETHUSDT", "BTCUSDT"} and fps["ETHUSDT"] != fps["BTCUSDT"]
+    assert golden["g5_row_fingerprint_sha256"] not in fps.values(), "平行組 g5 與單標的組相同 ⇒ 疑似覆蓋"
+
+    # 🔴 review-r50 `CODEX-R50-P2-01`：由**凍結明文**（標的內序號＋逐列 feature_ts_ms）獨立重算 SHA，須等於凍結值——
+    #    明文與雜湊須為同一份 payload。算法同 `test_row_fingerprint_recomputes_from_frozen_plaintext`，資料只取自 golden。
+    local = golden["g2_interleaved_g5_row_fingerprint_positions"]
+    ts = golden["g2_interleaved_g5_row_fingerprint_feature_ts_ms"]
+    glob = golden["g2_interleaved_global_row_index_positions"]
+    for s in ("ETHUSDT", "BTCUSDT"):
+        assert local[s] == sorted(set(local[s])) and len(local[s]) == len(ts[s]) == len(glob[s]) > 0
+        rows = [[p, t, s, "splitunify-golden-interleaved"] for p, t in zip(local[s], ts[s])]
+        recomputed = hashlib.sha256(
+            json.dumps(rows, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        assert recomputed == golden["g2_interleaved_g5_row_fingerprint_sha256"][s], (
+            f"{s}：由凍結明文重算之指紋與凍結 SHA 不符 ⇒ positions 與 SHA 不是同一份 payload"
+        )
+    # 全框列號只作「確實交錯」之證據：ETH 偶數、BTC 奇數，且不得冒充 payload（與標的內序號不同）
+    assert all(p % 2 == 0 for p in glob["ETHUSDT"]) and all(p % 2 == 1 for p in glob["BTCUSDT"]), "非交錯全框位置"
+    assert glob["BTCUSDT"] != local["BTCUSDT"], "全框列號與標的內序號相同 ⇒ fixture 未交錯或兩鍵被混用"

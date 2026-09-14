@@ -68,7 +68,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27，閉合 r28–r35 共九輪＋stamp-r6＋consult-r3/r4/r5；🔴 **consult-r4/r5 三家一致判定方向反轉**（見 `Task 9.3`）；**現待 review 覆核 v32＋重簽**） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
 | **B9D** | 9.3 | ✅ **完成**（impl `4dcae642`；審碼 r48 兩家 APPROVED v40、stamp-r7 覆核補測並戳記授權依據；Tier 0 同一 commit） | B9C | 🔴 **v35 更正（v32 方向反轉後 §B 未同步）**：現行＝**把 `assignments`／`purged` 退回事件級＋同步計數**（具名 seam；Tier 0 同 commit）；下游表已改為追溯用、多數維持現狀；前端 `byEventId` owner 移 `Task 9.5`。以下原文保留供追溯：~~`Task 9.3` 表列**九處**逐處處置~~（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
 | **B9E** | 9.4 | ✅ **完成**（審碼 r49 兩家 APPROVED v41、stamp-r8 戳記授權依據；commit 前工作區審碼，SPEC 隨之 v41 重出錨點） | B9C ＋ 🔴 **B9D**（v36，`CODEX-R39-P1-05`：報告／baseline 驗收依賴事件級輸出與計數完成） | 記帳鏈與 `baseline` 拆鍵（投影計數已移 `Task 9.3`） | 中 |
-| **B9F** | 9.5 | ⬜ 未開工（排最後） | B9D ＋ B9E | golden 多 TF／交錯平行組與前端 `byEventId`；🔴 v36 澄清：decision-anchor 換錨已於 B9C 完成，本批不重做側別換錨；整合後比對舊單 TF 值、依既定允許面凍結新組 | 大 |
+| **B9F** | 9.5 | ✅ **完成**（審碼 r50 兩家 APPROVED v41，`CODEX-R50-P2-01` 當輪修掉並經 stamp-r9 由原提出方關閉；stamp-r9 戳記授權依據） | B9D ＋ B9E | golden 多 TF／交錯平行組與前端 `byEventId`；🔴 v36 澄清：decision-anchor 換錨已於 B9C 完成，本批不重做側別換錨；整合後比對舊單 TF 值、依既定允許面凍結新組 | 大 |
 
 🔴 **Phase 9 依賴序（`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md` 裁定；三家＋主委獨立版四方一致）**：
 ~~`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`~~ ⇒ 🔴 **v36（`CODEX-R39-P1-05`）**：`9.1 → 9.2 → 9.2a → 9.2b → 9.3 → 9.4 → 9.5`。
@@ -979,7 +979,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 
 ---
 
-### Task 9.5 — golden 與前端（`票 SPLITUNIFY`）
+### Task 9.5 ✅ **已完成（B9F）** —— golden 與前端（`票 SPLITUNIFY`）
 - SPEC ref：§P Phase 9B `Task 9.5`；§V `Task 9.5` 及第 6 條；§G (G-4d)(G-4e)
 - 實作要點：
   1. 🔴 **v33 界定（主委自掃補漏）**：`scripts/freeze_splitunify_golden.py` 之 `_plans()`／`_event_keys()`／`_build_actual()` 擴維，
