@@ -730,52 +730,41 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
        須**逐字等於** receipt 的 `<改前分類>`。任一列不符即 FAIL（這一條直接殺掉「全填同一值」）。
      - **碼證須指向真實存在的行**：逐列把 `<碼證 path:line>` 拆成檔與行號，該檔須存在、且行號須 ≤ 該檔總行數。
        任一列指向不存在的檔或超出範圍的行即 FAIL（這一條殺掉占位路徑）。
-     - 🔴 **v26 新增：碼證錨點閘（statement 命中 ＋ 錨 token 逐字命中，兩者須**同一行**）**
-       ——起因＝R31 三家撞題（`CODEX-R31-P1-03`／`GROK-R31-P1-02`／`COMPOSER-R31-P2-02`）：
-       `C5-19`／`C5-21`／`C5-26`／`C5-27` 四列落點全都**通過**上一條「行號 ≤ 總行數」卻指向註解或無關碼，**弱閘照樣給綠**。
-       🔴 **委員給的修法是「加 statement／AST overlap 驗證」；主委照做並實跑量測，結果是它只殺掉四處中的兩處**
-       （`split_projection.py:556`、`pipeline.py:760-762` 為純註解 ⇒ FAIL；
-       `split_projection.py:291-303`、`:559-569`、`:716-719` 指向**真實但錯誤**的碼 ⇒ 照樣 OK）。
-       ⇒ 主委**具名加強**：register 每個有 `path:line` 的列另載一個**錨 token**（見 SPEC register 各列之〔錨 token：…〕），
-       判準改為**合取**——須存在一行 `L`，同時滿足 (i) `lo ≤ L ≤ hi`、(ii) `L` 是可執行 statement 行
-       （非註解／空行／docstring，以 `tokenize` 判定）、(iii) 該行**逐字含**該列之錨 token。
-       **實跑結果（主委當輪量測，非推論）**：現行 10 列（`C5-13`／`14`／`19`／`21`／`23`／`25`／`26`／`27`／`28`／`29`）全 `ANCHOR_OK`；
-       五處已知舊落點（`:291-303`／`:556`／`pipeline.py:760-762`／`:559-569`／`:716-719`）全 `ANCHOR_FAIL`。
-       🔴 **本加強為具名偏離委員原文，須由下一輪審碼覆核，不得由主委自認等效。**
-       驗收腳本（`.py` 落點適用）：
+     - 🔴 **v27 現行：碼證錨點閘＝`scripts/register_anchor_check.py`（單一精確行 ＋ token 序列恰一次；逐字採 `CODEX-R32-P1-01` 修法）**
+       **本閘的三代沿革就是「弱閘會被打穿」的完整紀錄，逐條寫明是因為每一代都曾被當成已閉合**：
+       ① v15「行號 ≤ 該檔總行數」→ 四列全指註解仍綠（R31 三家撞題）。
+       ② R31 委員修法「statement／AST overlap」→ 主委實跑量測，只殺掉四處中的**兩處**。
+       ③ v26 主委加的「行**範圍** ＋ 單一 token **子字串**」→ R32 codex 實跑打穿：
+       `split_projection.py:341`（`raise` 的**訊息字串**裡有 `feature_timeframe`）與 `:566`（另一道重複閘）都命中。
+       **現行判準**：每個錨點是**單一精確行**（非範圍）；`.py` 以 `tokenize` 取該行 token 串，
+       register 所載之 **token 序列**須**依序出現且恰好一次**（字串 token 含引號、逐字比對，
+       故訊息字串裡的中文句子不會命中裸識別字），並以 AST 確認該行落在非純字串常數之 statement 上；
+       `.tsx` 無 AST ⇒ 改以**精確 literal 且恰好一次**；**0 次或多次命中皆拒絕**。
+       **register 側之機器可讀語法**（寫在該列消費面欄，可多個）：
+       `〔ANCHOR` + 反引號包住的 `<path>:<line>` + `TOKENS` + 一個以上反引號包住的 token + `〕`。
+       **驗收命令**：
        ```bash
-       ./venv/bin/python - "$FILE" "$LO" "$HI" "$TOKEN" <<'PY'
-       import ast, io, sys, token, tokenize
-       path, lo, hi, tok = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
-       src = open(path, encoding="utf-8").read()
-       doc = set()
-       for n in ast.walk(ast.parse(src)):
-           if isinstance(n, ast.Expr) and isinstance(getattr(n, "value", None), ast.Constant) \
-              and isinstance(n.value.value, str):
-               doc.update(range(n.lineno, getattr(n, "end_lineno", n.lineno) + 1))
-       skip = {token.COMMENT, token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
-               token.ENCODING, token.ENDMARKER}
-       live = set()
-       for tk in tokenize.generate_tokens(io.StringIO(src).readline):
-           if tk.type not in skip:
-               live.update(range(tk.start[0], tk.end[0] + 1))
-       live -= doc
-       lines = src.splitlines()
-       hit = [n for n in range(lo, hi + 1) if n in live and n <= len(lines) and tok in lines[n - 1]]
-       print(f"{path}:{lo}-{hi} " + (f"ANCHOR_OK {hit[:4]}" if hit else "ANCHOR_FAIL"))
-       sys.exit(0 if hit else 1)
-       PY
+       ./venv/bin/python scripts/register_anchor_check.py            # 全表；rc=0 才算過
+       ./venv/bin/python scripts/register_anchor_check.py <path> <line> <tok...>   # 單點複核
        ```
-       🔴 **具名誠實邊界（兩條）**：①`C5-28` 之落點是 `.tsx`，AST 閘不適用 ⇒ 該列**只**跑逐字 token 比對
-       （`sed -n '<line>p' <file> | grep -qF '<token>'`），不得謊稱已跑 AST；
-       ②本閘保證「指到了帶該 token 的可執行碼」，**不**保證「指到了語意上對的那一段」——後者仍靠 register 同列之描述與審碼輪。
+       🔴 **不是一次性驗收**（codex 在 R32 明指前一版「沒有獨立可重跑的 persisted checker」）：
+       `tests/momentum/Analysis/test_splitunify_contract.py` 之
+       `test_d002_register_anchors_all_valid` 與 `test_d002_register_anchor_gate_rejects_known_false_greens`
+       已把它接進**六路回歸**——register 行號日後再漂、或本閘被放寬回子字串，都會**當場轉紅**。
+       後者之 must-fail 清單逐字為 `:341`／`:566`（各兩種 token 形狀）／`:556`／`pipeline.py:760`。
+       🔴 **具名誠實邊界（兩條）**：①`C5-28` 之落點是 `.tsx`，AST 不適用，只跑精確 literal；
+       ②本閘保證「指到了寫著那串 token 的那一行碼」，**不**保證「那行就是語意上對的設計點」——後者仍靠 register 同列描述與審碼輪。
+       🔴 **v26 之舊敘述（行範圍＋子字串 ＋ 內嵌 heredoc）已整段刪除**，不留半截——
+       它被 R32 實跑打穿，留著就是下一個「照舊段做」的陷阱；沿革見 SPEC v27 條目。
      - 🔴 **v16 之 keyed 對證已於 v17 收窄（R16 `CODEX-R16-P1-01`；主委實測確認其碼證成立）**：
        v16 寫「碼證檔路徑須與 register 同列所載之落點檔相同」，但**實測 29 列中有 20 列的消費面欄
        根本沒有 `path:line`**（`C5-01`..`08`／`09`..`12`／`15`..`18`／`20`／`22`／`24`／`25`）
        ⇒ 該檢查在 **69% 的列上不可執行**，屬**假閘**（寫了跑不動，比沒有更糟）。
        **現行（可執行）判準——三段式，29 列逐列歸屬且互斥窮盡（r17 三家獨立算出之 15 列與主委機械掃描完全一致）**：
        - **(甲) 有 `path:line` 之 10 列**（`C5-13`／`14`／`19`／`21`／`23`／`25`／`26`／`27`／`28`／`29`）：
-         碼證之檔路徑須與該列所載落點檔**相同**、行號須落在該列所列範圍內。
+         🔴 **v27 現行**：碼證之 `path:line` 須**逐字等於**該列某個 ANCHOR 子句之 `<path>:<line>`
+         （單一精確行；`scripts/register_anchor_check.py` 為唯一判準）。
+         ~~碼證之檔路徑須與該列所載落點檔**相同**、行號須落在該列所列範圍內。~~（範圍式判準已於 v27 作廢——它正是被 R32 打穿的那個形狀）
        - **(乙) 有檔名但無行號之 4 列**——逐字為 `C5-15`／`C5-16`／`C5-17`／`C5-18`（🔴 v18 具名，
          由 `CODEX-R2-P2-01` 必答 2b 給出；原只寫「29 − 10 − 15」之算式）：`<碼證 path:line>` 之**檔名（basename）**須出現在
          該列消費面欄的文字中（封閉判準：`basename` 之字面 `grep -qF` 該列文字）。仍禁止任意真實路徑。

@@ -107,6 +107,7 @@
 | `extract_phase2_expected_flips.py` | 常態檢查 | narrow_check_router  |
 | `ic_wiring_check.py` | 常態檢查 | 未掛 |
 | `patch_locus_check.py` | 常態檢查 | 未掛 |
+| `register_anchor_check.py` | 常態檢查 | 未掛 |
 | `strategy_wiring_check.py` | 常態檢查 | 未掛 |
 | `verification_claim_check.py` | 常態檢查 | pre-commit commit-msg  |
 | `verify_audit_chain.py` | 常態檢查 | 未掛 |

@@ -113,3 +113,65 @@ def test_every_reason_appears_verbatim_in_spec(contract: dict) -> None:
 #   test_python_constants_equal_json —— `set(split_projection.FAIL_CLOSED_REASONS) ==
 #   set(contract["fail_closed_reasons"])`，並驗「刪 JSON 一鍵 ⇒ import 期 raise」。
 #   B1 之所以還沒加，是因為本批不動生產碼（SPEC §P 之 B1 定義）。
+
+
+# ---------------------------------------------------------------------------
+# D-002 `D-002-C5` register 碼證錨點（v26；R32 `CODEX-R32-P1-01`）
+#
+# 🔴 為什麼放在這個檔：六路回歸逐檔明列路徑，本檔已在其中 ⇒ 錨點每次回歸都會被驗，
+#    而不是「`Task 9.3` 驗收當下跑一次」。codex 在 R32 明指前一版的問題正是
+#    「沒有獨立可重跑的 persisted checker」。
+# ---------------------------------------------------------------------------
+
+import importlib.util as _importlib_util  # noqa: E402
+
+_ANCHOR_CHECKER = REPO / "scripts" / "register_anchor_check.py"
+
+
+def _load_anchor_checker():
+    spec = _importlib_util.spec_from_file_location(
+        "register_anchor_check", _ANCHOR_CHECKER
+    )
+    mod = _importlib_util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_d002_register_anchors_all_valid():
+    """register 每個 ANCHOR 子句都必須指到它所述之碼（單一精確行＋token 序列恰一次）。"""
+    mod = _load_anchor_checker()
+    anchors = mod.parse_anchors(mod.SPEC_PATH.read_text(encoding="utf-8"))
+    assert len(anchors) >= 16, f"register ANCHOR 子句數異常：{len(anchors)}"
+    bad = []
+    for a in anchors:
+        ok, why = mod.check_anchor(a)
+        if not ok:
+            bad.append(f"{a.row_id} {a.path}:{a.line} — {why}")
+    assert not bad, "register 錨點失準：\n" + "\n".join(bad)
+
+
+def test_d002_register_anchor_gate_rejects_known_false_greens():
+    """must-fail 回歸：歷來三道閘各自放行過的落點，現行閘必須全部拒絕。
+
+    - `:341` 是 `raise ValueError` 的**訊息字串**，v26 前的「行範圍＋子字串」會綠
+      （R32 codex 實跑打穿）。
+    - `:566` 是另一道重複閘，同樣含 `feature_timeframe` 字面。
+    - `:556`／`pipeline.py:760` 是**純註解行**，v15 的「行號 ≤ 總行數」會綠。
+    """
+    mod = _load_anchor_checker()
+    sp = "momentum/Analysis/event_samples/split_projection.py"
+    must_fail = [
+        (sp, 341, ("columns", '"timeframe"', '"feature_timeframe"')),
+        (sp, 341, ("feature_timeframe",)),
+        (sp, 566, ("columns", '"timeframe"', '"feature_timeframe"')),
+        (sp, 566, ("feature_timeframe",)),
+        (sp, 556, ("purged",)),
+        ("momentum/Analysis/event_samples/pipeline.py", 760, ('"n_purged"',)),
+    ]
+    leaked = []
+    for path, line, toks in must_fail:
+        ok, why = mod.check_anchor(mod.Anchor("(must-fail)", path, line, toks))
+        if ok:
+            leaked.append(f"{path}:{line} {list(toks)} — 竟然通過：{why}")
+    assert not leaked, "錨點閘又變成弱閘了：\n" + "\n".join(leaked)
