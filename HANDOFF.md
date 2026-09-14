@@ -221,6 +221,11 @@
   - 🔴 **既有紅清單（非本輪、已對照 HEAD）**：`test_result_state_format_failed.py` 9 條（stub 錨點漂移：`stub success findings-kind anchor missing`）、`test_stamp_taskid_inject.py` 4、`test_govb1_zeroid_no_regression.py::test_single_column_discriminates_between_inputs` 1、`test_rolegate_predispatch.py` 5 與 `test_debt_emit.py` 7（隔離 repo 缺 `prev_review_resolve.sh`）。
   - TODO 補型別閘判定寫法（值級 `isinstance(x, str) and len(x) > 0`，TODO-only）；`fact_keys.json` 之 E-008／E-022 等 cx_run 行號隨位移修正並重生成。codex 本輪實際 `gpt-5.6-luna`／effort `max`（使用者設定改為 max）。
   - **下一步**：`review-r44`（兩家）覆核派工腳本修補＋對 v39 重簽 → 過了領 impl token 施工 `Task 9.3`。
+㊻**review-r44 完成**（`handoffs/reconcile/20260911-splitunify-b9-review-r44/synth.md`；`debt_clear` rc=0）：`CODEX-R43-P1-01` 由原提出方以 T2-S1..S4 重跑關閉；兩家皆判重跑未寫入判定與 `cli_rc=116` 覆寫成立、暫停缺席出口不需另綁回條。composer 零 finding、再次 APPROVED v39；codex `blocked` 1 P1＝`CODEX-R44-P1-01`——**看門狗終止依賴 `pgrep -P`，於其沙箱 `pgrep` 失敗被 `|| true` 靜默吞掉 ⇒ 只殺 root、子孫續跑**（該家實跑看門狗兩測 elapsed 46.1s／40.0s 失敗；composer 本機綠是因 pgrep 可用）⇒ 採 codex。
+  - **修補**（`scripts/cx_run.sh`；SPEC body 不變，仍 v39）：CLI 以 `python3 -c 'os.setsid(); os.execvp(...)'` 啟動自成 process group（pgid＝pid、exit code 經 exec 原樣保留）；看門狗 `killed_after_done` 與 timeout 兩路徑改呼叫 `_terminate_cli_group`（整組 TERM → 2 秒 → 整組 KILL → `_kill_tree` 補充）。
+  - **測試**：`test_cxrun_watchdog_stale_done.py` +1 條（雙重 fork 造出 `pgrep -P` 找不到但仍在同群組之孫行程，驗證其隨群組終止），4 passed；mutation W-M1..W-M4 各自轉紅後還原。🔴 **自證抓到新測試初版假綠**：子孫繼承 stdout pipe 使 `subprocess.run` 等到孫行程自然結束才返回 ⇒「不整組殺」照樣綠；已改 CLI 輸出導 /dev/null、子孫睡 300 秒並於 finally 清除，重跑 W-M3／W-M4 轉紅。
+  - codex 本輪實際 `gpt-5.6-luna`／effort `max`。`fact_keys.json` E-008／E-015／E-022 行號隨位移修正並重生成。
+  - **下一步**：`review-r45`（兩家）覆核整組終止修補＋codex 對 v39 重簽 → 過了領 impl token 施工 `Task 9.3`。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。

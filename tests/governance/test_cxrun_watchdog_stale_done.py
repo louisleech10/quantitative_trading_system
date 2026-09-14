@@ -11,14 +11,16 @@
 """
 from __future__ import annotations
 
+import os
 import re
+import signal
 import subprocess
 import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CX_RUN = REPO_ROOT / "scripts" / "cx_run.sh"
-_FUNCS = ("_compute_output_sha", "_output_write_sig", "_kill_tree", "_run_cli_watched")
+_FUNCS = ("_compute_output_sha", "_output_write_sig", "_kill_tree", "_terminate_cli_group", "_run_cli_watched")
 
 
 def _extract_functions(src: str) -> str:
@@ -80,3 +82,45 @@ def test_first_attempt_without_snapshot_keeps_original_done_semantics(tmp_path: 
     r, elapsed = _run_watchdog(tmp_path, stale_done=True, snapshot=False, cli="sleep 40\n")
     assert "killed_after_done" in r.stderr, r.stderr
     assert elapsed < 40, f"首次派工之看門狗語意被改變（{elapsed:.1f}s）"
+
+
+def test_watchdog_kills_whole_process_group_including_orphaned_grandchild(tmp_path: Path) -> None:
+    """🔴 review-r44 `CODEX-R44-P1-01`：看門狗須終止**整個 process group**，不得依賴 `pgrep -P` 樹走訪。
+
+    該家在沙箱實跑：`pgrep` 失敗被靜默吞掉 ⇒ 只殺 root，子孫續跑。本條以雙重 fork 造一個已被
+    reparent 之孫行程（`pgrep -P` 樹走訪找不到、但仍在同一群組），CLI 寫入 STATUS: DONE 後卡住 ⇒
+    看門狗終止後，該孫行程必須也已結束。在 pgrep 可用之環境下，只靠樹走訪之實作仍會漏殺它，故本條不依賴環境。
+    """
+    # 🔴 自證時抓到本條初版是假綠：子孫繼承 stdout pipe ⇒ `subprocess.run` 被迫等到它們自然結束才返回，
+    #    屆時孫行程（當時只睡 60 秒）早已自己結束 ⇒「改成不整組殺」照樣綠。修：CLI 先把輸出導到 /dev/null
+    #    （不占 pipe），子孫睡 300 秒並記 pid，斷言在看門狗返回當下檢查，finally 一律清掉。
+    gpid_file = tmp_path / "grandchild.pid"
+    cpid_file = tmp_path / "child.pid"
+    cli = (
+        "exec >/dev/null 2>&1\n"
+        f'( sleep 300 & echo $! > "{gpid_file}" )\n'
+        'printf "%s\\n" "本次 attempt" "STATUS: DONE" > "$OUT"\n'
+        "sleep 300 &\n"
+        f'echo $! > "{cpid_file}"\n'
+        "wait\n"
+    )
+    r, elapsed = _run_watchdog(tmp_path, stale_done=False, snapshot=False, cli=cli)
+    pids = [int(f.read_text(encoding="utf-8").strip()) for f in (gpid_file, cpid_file) if f.exists()]
+    try:
+        assert "killed_after_done" in r.stderr, r.stderr
+        assert elapsed < 60, f"看門狗未在 grace 後返回（{elapsed:.1f}s）"
+        assert gpid_file.exists(), "fixture 前提變了：孫行程 pid 檔未寫出"
+        time.sleep(1)
+        gpid = int(gpid_file.read_text(encoding="utf-8").strip())
+        try:
+            os.kill(gpid, 0)
+            alive = True
+        except ProcessLookupError:
+            alive = False
+        assert not alive, f"孫行程 {gpid} 在看門狗終止後仍存活（只殺了 root 或子樹，未殺整個群組）"
+    finally:
+        for pid in pids:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass

@@ -484,8 +484,9 @@ PY
 #      ⇒ 視為「產出完成、行程卡死」：SIGTERM 整棵子樹、cli_rc 取 0（產出完整才走到這裡；沙 sha 由 emit 算），
 #      runlog 具名 `WATCHDOG killed_after_done`。
 #   ② 硬上限 CX_MAX_SEC（預設 5400）：不論產出狀態一律殺，cli_rc=124（同 GNU timeout 慣例）⇒ result failed。
-# 誠實邊界：① 只認 `STATUS: DONE` 字面（委員產出契約已要求）；② 殺樹用 pkill -P（一層子代）＋ pid，
-#   孫代若已 setsid 脫離則殺不到（本事故之 python 子行程為直接子代，可殺）。
+# 誠實邊界：① 只認 `STATUS: DONE` 字面（委員產出契約已要求）；② 🔴 review-r44 起 CLI 以 setsid 自成
+#   process group，終止一律整組送訊號（不再依賴 `pgrep -P`）；子孫若再自行 setsid 脫離群組，才由
+#   `_kill_tree` 補殺（僅 pgrep 可用時有效）。
 # ---------------------------------------------------------------------------
 _kill_tree() {
   local _pid="$1"
@@ -496,13 +497,27 @@ _kill_tree() {
   kill -TERM "${_pid}" 2>/dev/null || true
 }
 
+_terminate_cli_group() {
+  # 🔴 review-r44 `CODEX-R44-P1-01`（該家於沙箱實跑）：舊版只呼叫 `_kill_tree`，其 `pgrep -P` 在沙箱等環境
+  #   失敗（`Cannot get process list`）時被 `|| true` 靜默吞掉 ⇒ 只殺 root，子孫續跑並持有 pipe／繼續寫檔。
+  #   CLI 由 `_run_cli_watched` 以 setsid 啟動 ⇒ pgid＝pid ⇒ 整組送 TERM，等 2 秒後整組送 KILL；
+  #   `_kill_tree` 保留作補充（清已自行脫離群組之子孫，僅 pgrep 可用時有效）。
+  local _pid="$1"
+  kill -TERM -- "-${_pid}" 2>/dev/null || kill -TERM "${_pid}" 2>/dev/null || true
+  sleep 2
+  kill -KILL -- "-${_pid}" 2>/dev/null || true
+  _kill_tree "${_pid}"
+}
+
 _run_cli_watched() {
   # 用法：_run_cli_watched <out_path> -- <cmd> [args...]；回傳 CLI rc（或 0=killed_after_done／124=timeout）
   local _out="$1"; shift
   [ "${1:-}" = "--" ] && shift
   local _grace="${CX_DONE_GRACE_SEC:-300}"
   local _max="${CX_MAX_SEC:-5400}"
-  "$@" &
+  # 🔴 review-r44：以 setsid 自成 process group（pgid＝pid），供 `_terminate_cli_group` 整組終止；
+  #   setsid／exec 失敗 ⇒ 行程以非零退出 ⇒ 記 failed（fail-closed，不會在無群組下靜默執行）。
+  python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' "$@" &
   local _pid=$!
   local _elapsed=0
   local _done_since=-1
@@ -519,13 +534,13 @@ _run_cli_watched() {
     fi
     if [ "${_done_since}" -ge 0 ] && [ $((_elapsed - _done_since)) -ge "${_grace}" ]; then
       echo "[cx_run] WATCHDOG killed_after_done: 產出已 STATUS: DONE 逾 ${_grace}s 而 CLI 仍存活（pid ${_pid}）⇒ 終止子樹，cli_rc 取 0" >&2
-      _kill_tree "${_pid}"
+      _terminate_cli_group "${_pid}"
       wait "${_pid}" 2>/dev/null || true
       return 0
     fi
     if [ "${_elapsed}" -ge "${_max}" ]; then
       echo "[cx_run] WATCHDOG timeout: CLI 逾 ${_max}s（pid ${_pid}）⇒ 終止子樹，cli_rc=124" >&2
-      _kill_tree "${_pid}"
+      _terminate_cli_group "${_pid}"
       wait "${_pid}" 2>/dev/null || true
       return 124
     fi
