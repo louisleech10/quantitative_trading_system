@@ -203,6 +203,10 @@
   - 🔴 **委員型號實證（使用者追問）**：本機 `~/.codex/sessions` 顯示委員 Codex 6 月＝gpt-5.5、7/1–17 照使用者設定換到 Luna、7/18–9/14 共 954 次全為 Luna（寫死）、r39＝gpt-6-astra；委員 Grok 約 440 次全為 4.5。**使用者因 Astra 額度消耗過大（r39 一輪約 13% 週額度），已改回 gpt-5.6-luna／xhigh**（網路＋本機實測：Luna xhigh 審查一輪平均約 0.44% 週額度，品質與 Sol medium 持平）。`cx_run.sh` 另拿掉強制 effort 與 grok 之 `-m grok-4.5`，型號與 effort 全照 CLI 設定。
   - **具名殘留**：`SU-RESID-COMMITTEE-MODEL-EVIDENCE`（needs-research：審計不記實際型號）、`SU-RESID-PAUSED-NO-RESULT`（blocked-by：一家完全無結果列時暫停出口不適用）。
   - **下一步**：`review-r40`（兩家）→ 過了才領 impl token 執行 `Task 9.3` 退回。
+㊷**review-r40 完成（兩家撞同一題）**（`handoffs/reconcile/20260911-splitunify-b9-review-r40/synth.md` ＝唯一權威）：兩家皆 `blocked`——TODO `Task 9.3` 錯誤型別釘死段仍 live 寫 `symbol`／`split_label` 雙欄衝突（`CODEX-R40-P1-01`＝`COMPOSER-R40-P1-01`，v36 漏改）；codex 另要求 r39 命名之兩條殘留進權威登記（`P1-02`／`P2-01`，採；composer 認為 §N 只收切分契約殘留，採較嚴版）。全修完，`debt_clear` rc=0；**SPEC 進 v37**，body sha256 `c4be184f6a267419fffb9e6b9cfaf0877cd3cf42a6bf5934142a1f5013662f1a`。
+  - **委員型號實證**：codex 本輪實際 `gpt-5.6-luna`／`xhigh`（本機 Codex 執行紀錄；該家自報無從得知）；composer 自報 Grok 4.6。
+  - 🔴 **自掃教訓（composer 指出主委詞表漏抓原因）**：舊句以反引號把兩欄切開、且關鍵詞折到下一行 ⇒ 單行字面詞表匹配不到。本輪起自掃另跑「整段併行後再比對」形態（v37 已跑，零命中）。
+  - **下一步**：`review-r41`（兩家）→ 過了才領 impl token 執行 `Task 9.3` 退回。
 
 ## 現況
 - **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
