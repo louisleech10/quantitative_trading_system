@@ -79,8 +79,12 @@ def _events(h: dict, name: str) -> list[dict]:
 
 
 def _issue_token_event(h: dict, root: str, batch: int) -> None:
+    # 🔴 R31 CODEX-R31-P1-04：`round_start_head` 為必填（發 token 當下之 HEAD），缺欄即 fail-closed。
+    #    測試替身若不帶此欄，驗的就不是現行 schema。
+    head = _git(h, "rev-parse", "HEAD").stdout.strip()
     r = subprocess.run(["bash", "scripts/audit_append.sh", "--event", "impl_token_issued", "--field", f"task_id={root}-impl-b{batch}-claude",
                         "--field", f"root={root}", "--field", f"batch={batch}", "--field", "family=claude", "--field", "actor=t",
+                        "--field", f"round_start_head={head}",
                         "--field", "origin_script=gate.sh"], cwd=h["root"], env=h["env"], capture_output=True, text=True, check=False)
     assert r.returncode == 0, r.stderr
 

@@ -1036,10 +1036,19 @@ cat "${token}" | sed 's/^/  /' | { echo "=== ${ts} | ${kind} ==="; cat; } >> "${
 #   與既有 dispatch.token 分檔，避免 GATE-TOKEN-BINDING 之跨 session 延長坑。
 if [ "${impl_self:-0}" = "1" ]; then
   _impl_tok="${GATE_DIR}/impl.${_impl_root}-b${_impl_n}.token"
-  { echo "ts=${ts}"; echo "task_id=${task_id}"; echo "root=${_impl_root}"; echo "batch=${_impl_n}"; } > "${_impl_tok}"
+  # 🔴 R31 CODEX-R31-P1-04：發 token 當下的 HEAD 必須落到審計，否則「receipt COMMIT 須等於 round-start HEAD」
+  #   這類驗收條款是**不可執行**的（schema 沒有該欄，驗收只能退化成「有這一行就算過」）。
+  _round_start_head="$(git -C "${REPO_ROOT}" rev-parse HEAD 2>/dev/null || true)"
+  case "${_round_start_head}" in
+    *[!0-9a-f]*|"") echo "GATE 拒發 token — 取不到 round-start HEAD（git rev-parse HEAD 失敗或非 40-hex）"; exit 1 ;;
+  esac
+  [ "${#_round_start_head}" = "40" ] || { echo "GATE 拒發 token — round-start HEAD 非 40-hex：${_round_start_head}"; exit 1; }
+  { echo "ts=${ts}"; echo "task_id=${task_id}"; echo "root=${_impl_root}"; echo "batch=${_impl_n}"
+    echo "round_start_head=${_round_start_head}"; } > "${_impl_tok}"
   chmod 600 "${_impl_tok}" 2>/dev/null || true
   if ! bash "${REPO_ROOT}/scripts/audit_append.sh" --event impl_token_issued --field "task_id=${task_id}" \
         --field "root=${_impl_root}" --field "batch=${_impl_n}" --field "family=claude" \
+        --field "round_start_head=${_round_start_head}" \
         --field "actor=gate" --field "origin_script=gate.sh"; then
     rm -f "${_impl_tok}"; echo "GATE 拒發 token — impl_token_issued 寫 audit 失敗（token 已撤回）"; exit 1
   fi

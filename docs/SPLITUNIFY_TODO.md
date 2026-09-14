@@ -65,7 +65,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B4** | 4.1 | ✅ 完成 | B3 | 報告與畫面（欄名待 B3 定案後才穩定） | 中 |
 | **B9A** | 9.1 | ✅ **完成**（impl `c98acf26`；審碼 r18、閉合 r19） | B4 ＋ `D-002` 三家 `RECONCILE-STAMP` rc=0 | 揭露先行；只動 producer 回傳形狀與 summary 一鍵，可獨立回退 | 中 |
 | **B9B** | 9.2, 9.2a | ✅ **完成**（impl `9e87386f`；審碼 r20、閉合 r21／r22） | B9A | 🔴 **不得拆批**：全量列在無 `feature_timeframe` 欄時複合鍵碰撞，加欄而不改 merge 則 `MergeError` ⇒ 只改其一皆紅 | 大 |
-| **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27、閉合 r28／r29，共 20 條全修完；待 r30 回驗＋v24 重簽） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
+| **B9C** | 9.2b | ✅ **完成**（impl `a1e9680e`；審碼 r27、閉合 r28／r29／r30／r31，共 30 條全修完；r30 回驗已完成、SPEC 已進 v25；**現待 r32 回驗＋v26 重簽**） | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
 | **B9D** | 9.3 | ⬜ **未開工**（下一個） | B9C | `Task 9.3` 表列**九處**逐處處置（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
 | **B9E** | 9.4 | ⬜ 未開工 | B9C | 記帳鏈與 `baseline` 拆鍵 | 中 |
 | **B9F** | 9.5 | ⬜ 未開工（排最後） | B9D ＋ B9E | golden 換錨與前端；須在所有行為面定案後才凍結 | 大 |
@@ -519,7 +519,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   - **生產接線**：`pipeline.py` 省略 `discarded_rows_by_feature_tf=` ⇒ wiring 那條轉紅
   - **多 symbol 分支**：分派器改傳 `{}` ⇒ 多 symbol 那條轉紅
 - **存活至**：全票完工後保留。
-- **覆蓋風險**：`Task 9.2` 會再改 `selected_timeframe` 之預設值；本 Task 只改回傳形狀，兩者不衝突。
+- **覆蓋風險**：~~`Task 9.2` 會再改 `selected_timeframe` 之預設值~~（🔴 v26 更正（R31 `CODEX-R31-P2-05`）：`Task 9.2` 已於 **B9B 完成**，該預設值已改為 `None`＝全量）；本 Task 只改回傳形狀，兩者不衝突——**已實證**（B9B 落地後 `Task 9.1` 之回歸全綠）。
 
 ---
 
@@ -615,7 +615,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-### Task 9.2b ✅ **已完成（B9C，待 r30 回驗）** —— 側別判定改為事件級錨定（`票 SPLITUNIFY`）
+### Task 9.2b ✅ **已完成（B9C；r30 回驗已完成、SPEC 已進 v25；現待 r32 回驗＋v26 重簽）** —— 側別判定改為事件級錨定（`票 SPLITUNIFY`）
 - SPEC ref：§P Phase 9B `Task 9.2b`；§V `Task 9.2b` 及其前置；`D-002-C3` (3.1)(3.2)
 - 實作要點：
   1. **前置（步驟 0）**：`train_rows`／`test_rows` 皆非空、row set 不重疊；
@@ -697,9 +697,29 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
   🔴 **register 重掃 receipt 之機械驗收（逐字；R13 `CODEX-R13-P1-02` 指出「只比行數」可被「同一 ID 重複 29 次」繞過，故改為 exact ID set ＋ 當輪綁定）**：
   1. **唯一且當輪**：receipt 檔名須為 `handoffs/run_receipts/<UTC時戳>-splitunify-task-9.3-register-rescan.txt`，
      且其**首行**逐字為 `TASK: <本 Task 之 impl task-id>`、**次行**逐字為 `COMMIT: <本 Task 開工時的 HEAD sha>`。
-     🔴 **v15 強化（R14 三家撞題：`COMMIT: deadbeef` 也能過）**：`COMMIT:` 之值須**等於**該 impl task-id 之
-     `committee_dispatch`／impl token 事件在 `.claude/gate/audit.log` 中所記的 round-start HEAD；
-     驗收命令須實際取出該欄比對，不得只檢查「有這一行」。
+     🔴 **v26 更正（R31 三家撞題 `CODEX-R31-P1-04`／`COMPOSER-R31-P1-01`／`GROK-R31-P1-01`）**：v15 寫的
+     「`COMMIT:` 須等於 audit 所記之 round-start HEAD」**當時不可執行**——`impl_token_issued`／`committee_dispatch`／
+     `ticket_commit` 三種事件的 schema **都沒有 HEAD 欄**（權威＝`scripts/audit_events.json`），
+     驗收只能退化成「有這一行就算過」，正是 v15 想擋的那件事。
+     **修法＝把欄位補上，而不是改寫判準**（逐字採 `CODEX-R31-P1-04`）：`gate.sh --impl-self` 發 token 時
+     已記錄 `round_start_head=$(git rev-parse HEAD)`（`scripts/gate.sh` impl token 區塊＋`scripts/audit_events.json`
+     之 `impl_token_issued.fields` 與 `required_fields_per_event.impl_token_issued`；取不到或非 40-hex 即**拒發 token**）。
+     **現行可執行判準（任一條失敗即 FAIL；不得只檢查「有 COMMIT 行」）**：
+     ```bash
+     RECEIPT=<本列所述之 receipt 檔>; TASK_ID=<本 Task 之 impl task-id>
+     COMMIT=$(sed -n '2p' "$RECEIPT" | sed 's/^COMMIT: //')
+     test "${#COMMIT}" = "40"                                   # 全長 object name，禁短 sha
+     git cat-file -e "${COMMIT}^{commit}"                        # 須為真實 commit
+     HEAD_IN_AUDIT=$(grep -F '"event": "impl_token_issued"' .claude/gate/audit.log \
+       | grep -F "\"task_id\": \"${TASK_ID}\"" | tail -1 \
+       | sed -n 's/.*"round_start_head": "\([0-9a-f]\{40\}\)".*/\1/p')
+     test -n "$HEAD_IN_AUDIT"                                    # 缺欄即 FAIL
+     test "$COMMIT" = "$HEAD_IN_AUDIT"                           # 逐字相等
+     ```
+     🔴 **明禁替代讀法**（逐字採 `GROK-R31-P1-01`）：不得改用「該 token `ts` 之前最近一筆 `ticket_commit.sha`」——
+     `ticket_commit` 是 post-commit 事件，時序不代表開工 HEAD。
+     🔴 **誠實邊界**：本綁定擋的是「事後補寫 receipt、把 `COMMIT` 填成已含本批改動的 sha」；
+     它**不**擋「同一人在同一 commit 內同時改 receipt 與生產碼」——該面與 `SU-RESID-V8-ATTEST` 同類，不在此重複登記。
   2. **exact ID set，不是計數**：
      `sed -n '3,$p' <receipt> | grep -oE '^C5-[0-9]+' | sort -u` 之輸出，須**逐字等於**
      `grep -oE '^\| .C5-[0-9]+.' docs/SPLITUNIFY_SPEC.D-002.md | grep -oE 'C5-[0-9]+' | sort -u`
@@ -710,6 +730,45 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
        須**逐字等於** receipt 的 `<改前分類>`。任一列不符即 FAIL（這一條直接殺掉「全填同一值」）。
      - **碼證須指向真實存在的行**：逐列把 `<碼證 path:line>` 拆成檔與行號，該檔須存在、且行號須 ≤ 該檔總行數。
        任一列指向不存在的檔或超出範圍的行即 FAIL（這一條殺掉占位路徑）。
+     - 🔴 **v26 新增：碼證錨點閘（statement 命中 ＋ 錨 token 逐字命中，兩者須**同一行**）**
+       ——起因＝R31 三家撞題（`CODEX-R31-P1-03`／`GROK-R31-P1-02`／`COMPOSER-R31-P2-02`）：
+       `C5-19`／`C5-21`／`C5-26`／`C5-27` 四列落點全都**通過**上一條「行號 ≤ 總行數」卻指向註解或無關碼，**弱閘照樣給綠**。
+       🔴 **委員給的修法是「加 statement／AST overlap 驗證」；主委照做並實跑量測，結果是它只殺掉四處中的兩處**
+       （`split_projection.py:556`、`pipeline.py:760-762` 為純註解 ⇒ FAIL；
+       `split_projection.py:291-303`、`:559-569`、`:716-719` 指向**真實但錯誤**的碼 ⇒ 照樣 OK）。
+       ⇒ 主委**具名加強**：register 每個有 `path:line` 的列另載一個**錨 token**（見 SPEC register 各列之〔錨 token：…〕），
+       判準改為**合取**——須存在一行 `L`，同時滿足 (i) `lo ≤ L ≤ hi`、(ii) `L` 是可執行 statement 行
+       （非註解／空行／docstring，以 `tokenize` 判定）、(iii) 該行**逐字含**該列之錨 token。
+       **實跑結果（主委當輪量測，非推論）**：現行 10 列（`C5-13`／`14`／`19`／`21`／`23`／`25`／`26`／`27`／`28`／`29`）全 `ANCHOR_OK`；
+       五處已知舊落點（`:291-303`／`:556`／`pipeline.py:760-762`／`:559-569`／`:716-719`）全 `ANCHOR_FAIL`。
+       🔴 **本加強為具名偏離委員原文，須由下一輪審碼覆核，不得由主委自認等效。**
+       驗收腳本（`.py` 落點適用）：
+       ```bash
+       ./venv/bin/python - "$FILE" "$LO" "$HI" "$TOKEN" <<'PY'
+       import ast, io, sys, token, tokenize
+       path, lo, hi, tok = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+       src = open(path, encoding="utf-8").read()
+       doc = set()
+       for n in ast.walk(ast.parse(src)):
+           if isinstance(n, ast.Expr) and isinstance(getattr(n, "value", None), ast.Constant) \
+              and isinstance(n.value.value, str):
+               doc.update(range(n.lineno, getattr(n, "end_lineno", n.lineno) + 1))
+       skip = {token.COMMENT, token.NL, token.NEWLINE, token.INDENT, token.DEDENT,
+               token.ENCODING, token.ENDMARKER}
+       live = set()
+       for tk in tokenize.generate_tokens(io.StringIO(src).readline):
+           if tk.type not in skip:
+               live.update(range(tk.start[0], tk.end[0] + 1))
+       live -= doc
+       lines = src.splitlines()
+       hit = [n for n in range(lo, hi + 1) if n in live and n <= len(lines) and tok in lines[n - 1]]
+       print(f"{path}:{lo}-{hi} " + (f"ANCHOR_OK {hit[:4]}" if hit else "ANCHOR_FAIL"))
+       sys.exit(0 if hit else 1)
+       PY
+       ```
+       🔴 **具名誠實邊界（兩條）**：①`C5-28` 之落點是 `.tsx`，AST 閘不適用 ⇒ 該列**只**跑逐字 token 比對
+       （`sed -n '<line>p' <file> | grep -qF '<token>'`），不得謊稱已跑 AST；
+       ②本閘保證「指到了帶該 token 的可執行碼」，**不**保證「指到了語意上對的那一段」——後者仍靠 register 同列之描述與審碼輪。
      - 🔴 **v16 之 keyed 對證已於 v17 收窄（R16 `CODEX-R16-P1-01`；主委實測確認其碼證成立）**：
        v16 寫「碼證檔路徑須與 register 同列所載之落點檔相同」，但**實測 29 列中有 20 列的消費面欄
        根本沒有 `path:line`**（`C5-01`..`08`／`09`..`12`／`15`..`18`／`20`／`22`／`24`／`25`）
@@ -848,7 +907,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 
 ---
 
-## §D mutation 對照表（12 條；自證，每批收案前跑，紅只認 rc=1）
+## §D mutation 對照表（13 條；自證，每批收案前跑，紅只認 rc=1）
 
 | ID | 改壞什麼 | 應紅之測試 | 所屬批 |
 |---|---|---|---|
@@ -915,7 +974,7 @@ SPEC 權威＝`docs/SPLITUNIFY_SPEC.D-002.md` §P／§V／mutation 表，
 | `R-4` | `extract_event_patterns` 無 **production** caller（測試 caller 8 處） | blocked-by | 本票只保證其消費之 `assignments` 語意不變；接線屬另一票 |
 | `R-5` | 事件掃描端取得 post-trim feature universe | needs-research | 要新增 `features_run_id` 跨棧參數（請求模型／前端／契約／UAT 全動），且 `EventImportService` 目前完全不碰 FF run ⇒ 超出本票；R2 之 D1 裁定事件掃描端恆走 event-study-only。日後實作**不得**刪除 Task 3.3 分支 |
 | `SU-RESID-2` **部分關閉（2026-09-14，批次 B9B）** | 多 TF 之 `(event_id, feature_timeframe)` 複合鍵 | blocked-by | 🔴 **producer／schema 面已關**：`Task 9.2`＋`9.2a` 使 producer 停止單選、輸出全量複合鍵列；`assignments`／`purged` 加 `feature_timeframe` 欄；兩道 guard 判準改複合鍵唯一。🔴 **側別錨定（`Task 9.2b`）亦已於批次 B9C 關閉**（R27 `GROK-R27-P1-02`：帳面未隨批次前進）——事件級 `decision_at_ms` 三段式已落地、`feature_cutoff_ms` 退出 `split_label`、(3.2) 異側與跨表混態皆 fail-closed。🔴 **尚未關閉者＝下游消費面**（`Task 9.3` 之九處逐處處置）；~~與側別錨定（`Task 9.2b`）~~ ⇒ 原文「複合鍵要連 `EventSplitPlan` 之下游一起改」現只剩消費面那一半。**為何現在不做**：`blocked-by:Task 9.3 尚未實作`——依賴序明定 `9.2a → 9.2b → 9.3`，不得跳。🔴 **本列狀態自 R22 `CODEX-R22-P1-01` 更正**：主委於 R21 依 `CODEX-R21-P1-02` 之同型掃描曾標「已關閉」（那次只點名 `Task 2.2`），R22 該家實查指出下游仍在 `Task 9.3` ⇒ 只能部分關閉 |
-| `SU-RESID-V8-ATTEST` | v8 不可變基準擋不住「同一 commit 同時改錨、改基準、改 helper」 | user-ruling | **已關閉的半**：錨點只認 §V 區段（`HISTORY`／沿革區塞入無效）、旁檔與檔案內容三層比對、`O_EXCL` write-once、首次建立交易式——五個攻擊面皆有實跑探針證明會擋。**未關閉的半**：具 repo 寫入權者在**單一 commit** 內同步替換四個檔，任何**倉內**機制都擋不住；要擋需受保護簽章或不可變 ancestor attestation。**為何現在不做**：`user-ruling:2026-09-12 使用者裁定「不再擴建治理工具；同型缺陷降級為具名殘留」`——且繞過成本（改四個檔）**低於**合規成本（導入並維護簽章鏈），依「繞過成本 ≥ 合規成本即收」歸**蓄意等價**。**觸發條件（可執行）**：專案導入 commit 簽章或受保護分支（`git config --get commit.gpgsign` 為 true，或 repo 有 branch protection）。**owner**：SPLITUNIFY epic 主委。🔴 **誠實邊界**：關閉前，「換錨是刻意的」之信任根實際是 **code review 與 git 歷史**，不是這幾道機械閘。詳見 `docs/SPLITUNIFY_SPEC.D-002.md` §N 同名條目 |
+| `SU-RESID-V8-ATTEST` | 倉內沒有獨立信任根：同一 commit 同步替換全部副本擋不住。🔴 **v26 起涵蓋兩面**：(a) v8 不可變基準之錨／基準／helper；(b) **(G-4e) 之三份人手判準副本**（`expected_side`／`expected_decision_at_ms`／`_INDEP_DECISION_MS`，R31 `CODEX-R31-P1-01` 實跑三份同步改錯仍綠） | user-ruling | **已關閉的半**：錨點只認 §V 區段（`HISTORY`／沿革區塞入無效）、旁檔與檔案內容三層比對、`O_EXCL` write-once、首次建立交易式——五個攻擊面皆有實跑探針證明會擋。**未關閉的半（兩面共通）**：同一作者在**單一 commit** 內同步替換全部副本（面 a＝四個檔；面 b＝三份手填字面，或初始就一起填錯），任何**倉內**機制都擋不住；要擋需受保護簽章或不可變 ancestor attestation。🔴 **不再加第四層副本**：委員提的兩種再抬一級形狀皆以**人工核對**為信任根，與「不接受用紀律或記憶當解法」相斥，且只把門檻由三檔抬到四檔、不改變可閉合性。**為何現在不做**：`user-ruling:2026-09-12 使用者裁定「不再擴建治理工具；同型缺陷降級為具名殘留」`——且繞過成本（同 commit 改三到四個檔）**低於**合規成本（導入並維護簽章鏈），依「繞過成本 ≥ 合規成本即收」歸**蓄意等價**。**觸發條件（可執行）**：專案導入 commit 簽章或受保護分支（`git config --get commit.gpgsign` 為 true，或 repo 有 branch protection）。**owner**：SPLITUNIFY epic 主委。🔴 **誠實邊界**：關閉前，「換錨是刻意的」之信任根實際是 **code review 與 git 歷史**，不是這幾道機械閘。詳見 `docs/SPLITUNIFY_SPEC.D-002.md` §N 同名條目 |
 | `SU-RESID-9A-UI` | 丟棄列數之**終端可見性**（API 回應欄位與前端顯示） | blocked-by | **為何現在不做**：`blocked-by:投影路徑無 EventSamplePipeline.run 生產接線（api/ 呼叫點=0）`——`D-002` Phase 9A 交付至 producer 層（`build_event_keys` 回傳 ＋ `EventSplitPlan.summary` 鍵；🔴 **v21 更正（R25，三家撞題）**：原寫「~~producer 回傳 → `EventSplitPlan.summary` → `metadata.split_unify`~~」，與 SPEC §N 同名條目之 v20 兩層交付、以及**本殘留自身**「metadata 層延後」之定義自相矛盾——R24 修了 SPEC §N 六處，**沒改本檔同名條目**），終端可見性須待投影路徑有生產接線後另票。**觸發條件（可執行）**：`grep -rc "EventSamplePipeline()\.run(\|create_event_sample_pipeline()\.run(" api --include='*.py'` 之命中數 **> 0**（現為 0）——🔴 **v11 作廢為唯一判準（R10 codex：該 regex 只匹配 inline constructor，漏掉 `pipeline = create_event_sample_pipeline(); pipeline.run(...)` 這種兩段式呼叫，真接上線也不會報；字面保留供追溯）**。**觸發條件（v11 可執行）**：以 AST 走訪 `api/` 全部 `.py`（排除 `tests/`）之 `Call` 節點，命中「method 名為 `run` 且 receiver 可追溯至 `EventSamplePipeline` 或 `create_event_sample_pipeline`、且實參含 canonical 邊界 `train_plan`／`test_plan`／`feature_index`」者，命中數 **> 0**。**recheck 命令**：`grep -rn "\.run(" api --include='*.py'`（廣掃全部 `.run(` 呼叫點為 AST 之超集，再逐筆判讀 receiver 與實參；**不得**用窄 regex 的零命中當「不存在」之證據）；**owner**：SPLITUNIFY epic 主委。🔴 **誠實邊界**：在本殘留解除前，「靜默丟棄」對終端使用者**仍然看不見**，`Task 9.1` 驗收不得宣稱該缺陷已消除。詳見 `docs/SPLITUNIFY_SPEC.D-002.md` §N 同名條目 |
 | `SU-RESID-1` | attribution checker 擋不住歸屬錯置 | 🔴 **2026-09-11 重判：不合格，現在做** | 原理由「需語意對應、屬研究」只對一半——**完整語意比對**做不到，但「收尾模式有未引用編號就擋」與「決議須逐字引用 finding 斷言」**做得到**。🔴 **回溯稽核實證其必要性**（`handoffs/run_receipts/splitunify-attribution-audit-20260911.txt`，本票 8 輪程式碼審查、57 條意見）：**3 條委員意見實質被主委弄丟，兩道檢查都沒響**——①`CODEX-R3-P3-04`（裸 KeyError）沒被任何決議引用、從沒修；②`GROK-R1-P2-02`（答案窗差 1 毫秒的 mutation 缺口）掛對決議但從沒補；③B2b R1 之 H6（`tier_min_test_events`）寫「列入 B3 Task 3.1」延後、之後消失——**投影路徑把使用者設定靜默換成 1**。三條已於同日修掉並各配 mutation（`M-SU-30`／`31`／`32`、`M-SU-B3-13`）。另查出兩個工具缺陷：`reconcile_cluster_attribution_check.sh` 在中文上 `cut -c` 截斷壞掉（大量「附錄斷言：（找不到）」）；`completeness_check` 只驗編號是否在收斂檔，而附錄本來就逐字保留全部原文 ⇒ **永遠不會失敗**。GROK-R1-P2-02 之另一半（改讀 `time_bounds[0]`）已被 B3 之同源對證變成**等價 mutant**（兩者被強制相等），不另加 |
 | `SU-RESID-3`（**B3 review R1 後大幅收窄**） | 同源對證只比**每段的首尾**時刻，不比中間每一列 | needs-research | 🔴 三家實跑證明的兩種攻擊（plan 建在較短網格＋長 index、index 同長度平移）**已於 B3 收斂時擋下**：以 `plan.time_bounds` 與傳入 `feature_index` 在該 plan 首尾列上逐值對證（型別驅動的單位分派，不猜；mutation `M-SU-B3-10`）。**殘留的是**：兩份網格若首尾時刻相同、僅中間間距不同，仍會通過——plan 身上只有 `time_bounds` 兩個端點，沒有逐列時刻可比。要關掉它需要 producer 隨 plan 傳完整時刻指紋（新欄位，動 IC 契約），屬 R-5／B4 之後 |

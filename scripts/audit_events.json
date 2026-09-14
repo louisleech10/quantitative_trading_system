@@ -127,7 +127,8 @@
         "task_id",
         "root",
         "batch",
-        "family"
+        "family",
+        "round_start_head"
       ]
     },
     "ticket_commit": {
@@ -327,7 +328,8 @@
       "task_id",
       "root",
       "batch",
-      "family"
+      "family",
+      "round_start_head"
     ],
     "ticket_commit": [
       "sha",
