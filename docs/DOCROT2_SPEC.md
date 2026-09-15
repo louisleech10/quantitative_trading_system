@@ -1,6 +1,6 @@
 # DOCROT2 — 活文件狀態單一來源與新舊並存之產出端擋（修正 DOCROT）— SPEC
 
-> 來源 PLAN/診斷：`handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md`、`.../20260915-docrot2-x-consult-r2/synth.md`、`.../20260915-docrot2-x-review-r1/synth.md`、`.../20260915-docrot2-x-review-r2/synth.md`　|　日期：2026-09-15　|　對應 TODO：`docs/DOCROT2_TODO.md`　|　版本：v3
+> 來源 PLAN/診斷：`handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md`、`.../20260915-docrot2-x-consult-r2/synth.md`、`.../20260915-docrot2-x-review-r1/synth.md`、`.../20260915-docrot2-x-review-r2/synth.md`、`.../20260915-docrot2-x-review-r3/synth.md`　|　日期：2026-09-15　|　對應 TODO：`docs/DOCROT2_TODO.md`　|　版本：v4
 
 ## §RISK 風險分級
 - **大小**：大（全專案活文件、共用產出端 hook、多 Phase）。
@@ -48,8 +48,8 @@
 
 **Task 1.1 — 活文件類別登記**
 - 目標：封閉登記活文件、類別與各類規則，並提供單一登記交易。　檔案：新建 `scripts/live_doc_registry.json`、`scripts/live_doc_registry_check.sh`、`scripts/live_doc_registry_update.sh`。既有 caller：無。
-- 改法：JSON 含類別集合、路徑對照（exact 與 `/` 結尾 prefix，禁 wildcard）、排除路徑、各類規則旗標、考古字面集合、歷史專區指標文法、交接檔區段集合與條目標記文法、交接投影（現況與待辦各自之來源 key、狀態篩選、欄位）、日誌類移出路徑；初始值由 TODO Task 1.1 給出。清冊由單一探索函式產生：`git ls-files --cached --others --exclude-standard -z`（NUL-safe、`LC_ALL=C` 排序）→ 範圍＝`docs/` 與 `白話說明/` 下全部層級、repo 根目錄之 `.md` → 先套 HIST prefix → 其餘逐條 exact 分類（`docs/` 頂層且檔名含 SPEC、TODO、PLAN 者為 LIVE-SPEC；未落入任何類者為 OTHER-DORMANT，含巢狀路徑）。`live_doc_registry_check.sh` 之 `--path`／`--all`／`--staged` 皆用同一探索函式；未命中、同優先級命中兩類 ⇒ rc=1；`_schema.status_scope` 每項須落在登記內。新增活文件一律經 `live_doc_registry_update.sh --add <path> [--class <類別>]` 登記（未給類別時以同一分類述詞判定），寫入決定性排序之 JSON；手改登記檔之結果仍受 `--all` 判定。
-- **驗證**：`ASSERT bash scripts/live_doc_registry_check.sh --path docs/NEW_THING.md WHEN fixture=unregistered THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=path_in_two_classes THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=archived_spec_listed_as_live_spec THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=nested_doc_unclassified THEN rc=1`；`ASSERT bash scripts/live_doc_registry_update.sh --add docs/NEW_SPEC.md WHEN fixture=new_top_level_spec THEN rc=0`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=excluded_site_listed_as_live THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=one_registered_path_removed THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=current_tree THEN rc=0`。
+- 改法：JSON 含類別集合、路徑對照（exact 與 `/` 結尾 prefix，禁 wildcard）、排除路徑、各類規則旗標、考古字面集合、歷史專區指標文法、交接檔區段集合與條目標記文法、交接投影（現況與待辦各自之來源 key、狀態篩選、欄位）、日誌類移出路徑；初始值由 TODO Task 1.1 給出。清冊由單一探索函式產生：`git ls-files --cached --others --exclude-standard -z`（NUL-safe、`LC_ALL=C` 排序）→ 範圍＝`docs/`、`白話說明/`、`templates/` 下全部層級與 repo 根目錄之 `.md`（此四個範圍根以外之 `.md` 一律不登記亦不擋） → 先套 HIST prefix → 其餘逐條 exact 分類（`docs/` 頂層且檔名含 SPEC、TODO、PLAN 者為 LIVE-SPEC；未落入任何類者為 OTHER-DORMANT，含巢狀路徑）。`live_doc_registry_check.sh` 之 `--path`／`--all`／`--staged` 皆用同一探索函式；未命中、同優先級命中兩類 ⇒ rc=1；`_schema.status_scope` 每項須落在登記內。新增活文件一律經 `live_doc_registry_update.sh --add <path> [--class <類別>]` 登記（未給類別時以同一分類述詞判定），寫入決定性排序之 JSON；手改登記檔之結果仍受 `--all` 判定。
+- **驗證**：`ASSERT bash scripts/live_doc_registry_check.sh --path docs/NEW_THING.md WHEN fixture=unregistered THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=path_in_two_classes THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=archived_spec_listed_as_live_spec THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=nested_doc_unclassified THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=templates_live_doc_unregistered THEN rc=1`；`ASSERT bash scripts/live_doc_registry_update.sh --add docs/NEW_SPEC.md WHEN fixture=new_top_level_spec THEN rc=0`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=excluded_site_listed_as_live THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=one_registered_path_removed THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=current_tree THEN rc=0`。
 - **邊界**：①symlink、非 regular file、含換行之路徑 ⇒ 依 `_fk_scope_files` 同規則；②登記檔非 JSON ⇒ rc=1；③`handoffs/` 下 `.md` ⇒ 不在清冊範圍、rc=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無（Task 2.x、4.1 只消費）。
@@ -86,8 +86,8 @@
 
 **Task 2.2 — 新增行禁舊版字面；歷史專區只准指標**
 - 目標：活文件只承載現行態，修訂史只以指標指向不可變紀錄（§C 設計依據）。　檔案：`scripts/live_doc_write_guard.sh`（第二道）；字面集合、指標文法、適用類別定義於 `scripts/live_doc_registry.json`。
-- 改法：適用類別之新增行位於歷史專區外且含 `~~`、考古字面集合任一、或 canonical finding ID（形狀同 `scripts/_synth_attr.py` 之 `ID_RE`）⇒ exit 2。適用類別之新增行位於歷史專區內，須全行符合指標文法 `- <YYYY-MM-DD>：<主詞> → <目標>`：主詞為單一 token，只准 `v<N>` 或登記之狀態識別碼；目標只准以反引號包住、工作樹中實際存在之 repo 相對路徑（含 `.git/info/exclude` 排除之 `handoffs/`——不可變收斂檔之權威位置在此，故以工作樹存在性而非 git 物件驗證），或 `commit` 加反引號包住之 7–40 位十六進位且 `git cat-file -e` 成立者；主詞或目標不合、目標不存在 ⇒ exit 2。整段自正文移出（正文為刪除）不受限。
-- **驗證**：`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_adds_strikethrough_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_adds_finding_id_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_history_adds_pointer_line THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_history_adds_copied_old_text THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=history_pointer_free_text_subject THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=history_pointer_target_missing THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=todo_unrelated_edit_legacy_strikethrough_elsewhere THEN rc=0`。
+- 改法：適用類別之新增行位於歷史專區外且含 `~~`、考古字面集合任一、或 canonical finding ID（形狀同 `scripts/_synth_attr.py` 之 `ID_RE`）⇒ exit 2。適用類別之新增行位於歷史專區內，須全行符合指標文法 `- <YYYY-MM-DD>：<主詞> → <目標>`：主詞為單一 token，只准 `v<N>` 或登記之狀態識別碼；目標只准以反引號包住、工作樹中實際存在之 repo 相對路徑（含 `.git/info/exclude` 排除之 `handoffs/`——不可變收斂檔之權威位置在此，故以工作樹存在性而非 git 物件驗證），或 `commit` 加反引號包住之 7–40 位十六進位且 `git cat-file -e` 成立者；主詞或目標不合、目標不存在 ⇒ exit 2；目標存在性只判本次新增行，既有歷史行不重驗（無 `handoffs/` 之 clone 不因既有指標被擋）。整段自正文移出（正文為刪除）不受限。
+- **驗證**：`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_adds_strikethrough_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_adds_finding_id_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_history_adds_pointer_line THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_history_adds_copied_old_text THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=history_pointer_free_text_subject THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=history_pointer_target_missing THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh --staged WHEN fixture=existing_history_pointer_target_absent_unrelated_edit THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=todo_unrelated_edit_legacy_strikethrough_elsewhere THEN rc=0`。
 - **邊界**：①日誌類 ⇒ 不適用、rc=0；②刪除正文段落 ⇒ rc=0；③`templates/` 依類別旗標，fixture 各一。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
@@ -114,7 +114,7 @@
 **Task 2.5 — 既有檢查依類別適用、宣稱與規則同步、掛載**
 - 目標：消除已知摩擦、過期宣稱與互斥規則，掛上 Task 2.1–2.4。　檔案：`scripts/spec_xref_hook.sh`、`scripts/plain_docs_sync_check.sh`、`CLAUDE.md`、`.claude/settings.json`（PreToolUse、PreCompact）、`scripts/fact_keys.json` `governance-enforcement`。
 - 改法：`spec_xref_hook.sh` 之「概念被拿掉須補版本標記」只對 LIVE-SPEC 類執行；`plain_docs_sync_check.sh` 之 catch-all 改查登記、未登記 rc!=0；`CLAUDE.md:16` 與 PreCompact 訊息刪除 HANDOFF 行數上限；`governance-enforcement` 追加 DOCROT Task 1.1–1.8 與本票各閘之掛載點（由 `_fk_validate_enforcement` 對證存在），DOCROT Task 1.3 宣稱改為只擋「共 N 條」雙落點、不涵蓋交接檔；`.claude/settings.json` 新增 PreToolUse Edit|Write 掛 `scripts/live_doc_write_guard.sh`，與本 Task 同一 commit。
-- **驗證**：`ASSERT bash scripts/spec_xref_hook.sh WHEN fixture=handoff_remove_current_lines_history_keeps_concept THEN rc=0`；`ASSERT bash scripts/spec_xref_hook.sh WHEN fixture=spec_remove_concept_live_reference_remains THEN rc=2`；`ASSERT bash scripts/plain_docs_sync_check.sh WHEN fixture=new_unregistered_plain_doc THEN rc!=0`；`grep -c '30 行' CLAUDE.md` 輸出 0；`jq empty .claude/settings.json` rc=0；`bash scripts/gen_fact_key_blocks.sh --check` rc=0。
+- **驗證**：`ASSERT bash scripts/spec_xref_hook.sh WHEN fixture=handoff_remove_current_lines_history_keeps_concept THEN rc=0`；`ASSERT bash scripts/spec_xref_hook.sh WHEN fixture=spec_remove_concept_live_reference_remains THEN rc=2`；`ASSERT bash scripts/plain_docs_sync_check.sh WHEN fixture=new_unregistered_plain_doc THEN rc!=0`；`grep -c '30 行' CLAUDE.md .claude/settings.json` 兩檔皆輸出 0；`jq empty .claude/settings.json` rc=0；`bash scripts/gen_fact_key_blocks.sh --check` rc=0。
 - **邊界**：①未登記路徑之 `spec_xref_hook.sh` 行為與改前相同；②`governance-enforcement` 新列掛載點不存在 ⇒ `--check` rc!=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
@@ -177,6 +177,7 @@
 
 ## 沿革與追溯索引
 <!-- HISTORY-BEGIN -->
+- 2026-09-15：v4 → `handoffs/reconcile/20260915-docrot2-x-review-r3/synth.md`
 - 2026-09-15：v3 → `handoffs/reconcile/20260915-docrot2-x-review-r2/synth.md`
 - 2026-09-15：v2 → `handoffs/reconcile/20260915-docrot2-x-review-r1/synth.md`
 - 2026-09-15：v1 → commit `3dbc702c`

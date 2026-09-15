@@ -1,4 +1,4 @@
-# DOCROT2 TODO（DRAFT v3｜基於 `docs/DOCROT2_SPEC.md` v3｜2026-09-15）
+# DOCROT2 TODO（DRAFT v4｜基於 `docs/DOCROT2_SPEC.md` v4｜2026-09-15）
 
 ## §0 全域規則與約束（執行端讀完即可遵守，不必回讀 SPEC）
 - 產出端覆蓋鐵律：新檢查掛寫檔當下；掛不上者登記 `governance-enforcement` 並寫理由（SPEC §C）。
@@ -28,12 +28,12 @@
 - 輸入 / 輸出：輸入全樹 `.md` 清冊；輸出 `scripts/live_doc_registry.json`、`scripts/live_doc_registry_check.sh`。
 - 實作要點：
   1. 類別集合（寫入 JSON，封閉）：`LIVE-HANDOFF`、`LIVE-CONTRACT`、`LIVE-SPEC`、`LIVE-PLAIN`、`LIVE-GUIDE`、`LOG`、`HIST`、`OTHER-DORMANT`。
-  2. 路徑對照初始值（exact 或 `/` 結尾 prefix）：`LIVE-HANDOFF`＝`HANDOFF.md`；`LIVE-CONTRACT`＝`CLAUDE.md`、`AGENTS.md`、`docs/MULTI_AGENT_ORCHESTRATION.md`、`docs/SCAR_LEDGER.md`、`docs/ROADMAP.md`、`docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md`、`docs/GOVERNANCE_EXECUTION_ORDER.md`、`templates/`；`LIVE-SPEC`＝要點 7 探索函式所得、`docs/` 頂層（路徑恰兩段）且檔名含 `SPEC`、`TODO` 或 `PLAN` 之每一路徑（逐條 exact；HIST prefix 先套，故 `docs/Archived/` 不入）；`LIVE-PLAIN`＝`白話說明/`；`LOG`＝`白話說明/治理進度日誌.md`、`白話說明/流程摩擦記錄.md`、`docs/HANDOFF_ARCHIVE.md`；`LIVE-GUIDE`＝`docs/ARCHITECTURE.md`、`docs/DEVELOPMENT_GUIDE.md`、`docs/API_SPECIFICATION.md`、`docs/PRODUCT_VISION.md`；`HIST`＝`docs/Archived/`、`白話說明/Archived/`、`docs/site/`；`OTHER-DORMANT`＝要點 7 探索函式所得範圍內（`docs/` 與 `白話說明/` 全部層級、repo 根目錄 `.md`）未落入上列任一類之每一路徑（逐條 exact，含巢狀路徑如 `docs/reviews/` 下各檔）。exact 優先於 prefix（`LOG` 之 exact 覆蓋 `LIVE-PLAIN` 之 prefix）；同優先級命中兩類即錯。
+  2. 路徑對照初始值（exact 或 `/` 結尾 prefix）：`LIVE-HANDOFF`＝`HANDOFF.md`；`LIVE-CONTRACT`＝`CLAUDE.md`、`AGENTS.md`、`docs/MULTI_AGENT_ORCHESTRATION.md`、`docs/SCAR_LEDGER.md`、`docs/ROADMAP.md`、`docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md`、`docs/GOVERNANCE_EXECUTION_ORDER.md`、`templates/`；`LIVE-SPEC`＝要點 7 探索函式所得、`docs/` 頂層（路徑恰兩段）且檔名含 `SPEC`、`TODO` 或 `PLAN` 之每一路徑（逐條 exact；HIST prefix 先套，故 `docs/Archived/` 不入）；`LIVE-PLAIN`＝`白話說明/`；`LOG`＝`白話說明/治理進度日誌.md`、`白話說明/流程摩擦記錄.md`、`docs/HANDOFF_ARCHIVE.md`；`LIVE-GUIDE`＝`docs/ARCHITECTURE.md`、`docs/DEVELOPMENT_GUIDE.md`、`docs/API_SPECIFICATION.md`、`docs/PRODUCT_VISION.md`；`HIST`＝`docs/Archived/`、`白話說明/Archived/`、`docs/site/`；`OTHER-DORMANT`＝要點 7 探索函式所得範圍內（`docs/`、`白話說明/`、`templates/` 全部層級與 repo 根目錄 `.md`）未落入上列任一類之每一路徑（逐條 exact，含巢狀路徑如 `docs/reviews/` 下各檔）。exact 優先於 prefix（`LOG` 之 exact 覆蓋 `LIVE-PLAIN` 之 prefix）；同優先級命中兩類即錯。
   3. 各類規則旗標：`new_line_status_check`＝LIVE-*、OTHER-DORMANT 為 true，LOG、HIST 為 false；`archaeology_check`＝LIVE-*、OTHER-DORMANT 為 true，LOG、HIST 為 false；`concept_removal_xref`＝僅 LIVE-SPEC 為 true；`handoff_grammar`＝僅 LIVE-HANDOFF 為 true。
   4. 考古字面集合初始值：`保留供追溯`、`原寫`、`SUPERSEDED`、`作廢`、`以下為關閉前之敘述`（`~~` 另判，不入集合）。歷史專區指標文法初始值（正則）：`^- [0-9]{4}-[0-9]{2}-[0-9]{2}：(v[0-9]+|[A-Za-z0-9._-]+) → (\`[^\`]+\`|commit \`[0-9a-f]{7,40}\`)$`。
   5. 交接檔：H1 限一行、H2 區段封閉集合＝`## 現況`、`## 待辦`、`## 坑`、`## 進行中紀錄`；`## 現況`、`## 待辦` 只准生成區塊；`## 進行中紀錄` 內為 `HISTORY-BEGIN..END`，條目標記文法＝`<!-- ENTRY: <ID>(,<ID>)* -->`；完成條目移出目的地＝`docs/HANDOFF_ARCHIVE.md`；交接投影：來源 key＝`docrot2-batch-status`、`splitunify-batch-status`、`splitunify-residual-status`、`handoff-pending`；投影欄位＝`識別碼`、`狀態`、`權威路徑`、`下一步`；`## 現況`＝狀態 ∈ {`進行中`、`部分完成`} 之列；`## 待辦`＝狀態 ∈ {`未開工`、`進行中`、`部分完成`、`待審`、`停手`、`狀態未確認`} 之列（寫入 JSON 時逐值列出）；投影列「下一步」為空 ⇒ 生成與 `--check` rc!=0。
   6. `live_doc_registry_check.sh`：`--path <p>`、`--all`、`--staged` 三模式皆呼叫要點 7 之探索函式；未命中、同優先級命中兩類、`_schema.status_scope` 項不在登記 ⇒ rc=1；symlink、非 regular file ⇒ rc=1。
-  7. 單一探索函式 `discover_live_docs`：`git ls-files --cached --others --exclude-standard -z`、`LC_ALL=C` 排序、NUL-safe；範圍＝`docs/` 與 `白話說明/` 全部層級、repo 根目錄之 `.md`；先套 HIST prefix，其餘依要點 2 分類。
+  7. 單一探索函式 `discover_live_docs`：`git ls-files --cached --others --exclude-standard -z`、`LC_ALL=C` 排序、NUL-safe；範圍＝`docs/`、`白話說明/`、`templates/` 全部層級與 repo 根目錄之 `.md`（此四個範圍根以外之 `.md` 一律不登記亦不擋）；先套 HIST prefix，其餘依要點 2 分類。
   8. `scripts/live_doc_registry_update.sh --add <path> [--class <類別>]`：未給類別時以要點 2 之分類述詞判定；寫入後依類別、路徑排序輸出 JSON；同路徑已登記 ⇒ rc=1；新增規格或施工清單檔之唯一登記入口。
 - 修改檔案：新建 `scripts/live_doc_registry.json`、`scripts/live_doc_registry_check.sh::main`、`::discover_live_docs`、`scripts/live_doc_registry_update.sh::main`　既有 caller：新建無。
 - 路徑：
@@ -46,7 +46,7 @@
 - 不可做：不得 glob 登記；不得登記 `handoffs/`；不得改 hook 掛載。
 - 邊界：①含換行之路徑正確判定不切碎；②`docs/Archived/x.md` ⇒ HIST、rc=0；③`白話說明/治理進度日誌.md` ⇒ LOG（exact 優先）。
 - 風險緩解：⊘
-- 驗證：fixture `unregistered`、`path_in_two_classes`、`excluded_site_listed_as_live`、`one_registered_path_removed`、`archived_spec_listed_as_live_spec`、`nested_doc_unclassified` 各 rc=1，`current_tree`、`new_top_level_spec`（`live_doc_registry_update.sh --add`）rc=0；`venv/bin/python -m pytest tests/governance/test_docrot2_registry.py -q` 0 failed。
+- 驗證：fixture `unregistered`、`path_in_two_classes`、`excluded_site_listed_as_live`、`one_registered_path_removed`、`archived_spec_listed_as_live_spec`、`nested_doc_unclassified`、`templates_live_doc_unregistered` 各 rc=1，`current_tree`、`new_top_level_spec`（`live_doc_registry_update.sh --add`）rc=0；`venv/bin/python -m pytest tests/governance/test_docrot2_registry.py -q` 0 failed。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
@@ -83,7 +83,7 @@
   2. 讀取：值須為字串陣列；每元素產出 `[三位零補序號, 元素]`；`LC_ALL=C`；同 key 同時有 `rows` 與 `rows_source`、`file` 含 `..` 或為絕對路徑、路徑不存在、值非字串陣列 ⇒ rc!=0。
   3. 新增 `committee-roster` key：`rows_source`＝`{file: "scripts/governance_families.json", path: ["active_stampers"]}`。
   4. `_schema.fields` 新增 `rows_filter`：`{source_keys: key 陣列, status_column: 欄名, allow: 狀態值陣列}`；取各來源 key 狀態欄 ∈ `allow` 之列，依 `source_keys` 順序與 rows 原順序串接；來源 key 或欄名不存在、`allow` 含 `status_enum` 以外之值、與 `rows`／`rows_source` 並存 ⇒ rc!=0。
-  5. 交接投影之 `handoff-current`、`handoff-todo` 兩個 key 於 Task 4.1 建立（target＝`HANDOFF.md`）；本 Task 只以 fixture 驗 `rows_filter`。
+  5. 交接投影之 `handoff-current`、`handoff-todo` 兩個 key 於 Task 2.4 建立（target＝`HANDOFF.md`）；本 Task 只以 fixture 驗 `rows_filter`。
 - 修改檔案：`scripts/gen_fact_key_blocks.sh`（rows 讀取函式）、`scripts/fact_keys.json::_schema.fields`、`scripts/fact_keys.json::committee-roster`　既有 caller：`--check`／`--write` 全路徑。
 - 路徑：
   - scripts/gen_fact_key_blocks.sh
@@ -129,7 +129,7 @@
 - 輸入 / 輸出：同 Task 2.1 入口之第二道判定。
 - 實作要點：
   1. 類別旗標 `archaeology_check`＝true 者：歷史專區外新增行含 `~~`、考古字面集合任一、或 canonical finding ID（形狀同 `scripts/_synth_attr.py` 之 `ID_RE`，去除行首 `## ` 之錨定）⇒ exit 2。
-  2. 歷史專區內新增行須全行符合登記之指標文法：主詞為單一 token 且為 `v[0-9]+` 形式或登記之狀態識別碼；目標為反引號包住且工作樹存在之 repo 相對路徑（含 git 排除之 `handoffs/`），或 `commit` 加反引號包住之 7–40 位十六進位且 `git cat-file -e <sha>^{commit}` 成立；任一不合 ⇒ exit 2。
+  2. 歷史專區內新增行須全行符合登記之指標文法：主詞為單一 token 且為 `v[0-9]+` 形式或登記之狀態識別碼；目標為反引號包住且工作樹存在之 repo 相對路徑（含 git 排除之 `handoffs/`），或 `commit` 加反引號包住之 7–40 位十六進位且 `git cat-file -e <sha>^{commit}` 成立；任一不合 ⇒ exit 2。目標存在性只判本次新增行，既有歷史行不重驗。
   3. 刪除行不判。
 - 修改檔案：`scripts/live_doc_write_guard.sh::check_archaeology`、`::check_history_pointer`　既有 caller：無。
 - 路徑：
@@ -139,7 +139,7 @@
 - 不可做：不得要求既有刪除線清零；不得擴及 `handoffs/`。
 - 邊界：①LOG 類 ⇒ exit 0；②正文整段刪除 ⇒ exit 0。
 - 風險緩解：⊘
-- 驗證：fixture `spec_adds_strikethrough_outside_history` exit 2、`spec_adds_finding_id_outside_history` exit 2、`spec_history_adds_pointer_line` exit 0、`spec_history_adds_copied_old_text` exit 2、`history_pointer_free_text_subject` exit 2、`history_pointer_target_missing` exit 2、`todo_unrelated_edit_legacy_strikethrough_elsewhere` exit 0。
+- 驗證：fixture `spec_adds_strikethrough_outside_history` exit 2、`spec_adds_finding_id_outside_history` exit 2、`spec_history_adds_pointer_line` exit 0、`spec_history_adds_copied_old_text` exit 2、`history_pointer_free_text_subject` exit 2、`history_pointer_target_missing` exit 2、`existing_history_pointer_target_absent_unrelated_edit`（`--staged`）rc=0、`todo_unrelated_edit_legacy_strikethrough_elsewhere` exit 0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
@@ -195,7 +195,7 @@
 - 實作要點：
   1. `scripts/spec_xref_hook.sh`：「概念被拿掉」只對 `concept_removal_xref`＝true 之類別執行；未登記路徑行為不變。
   2. `scripts/plain_docs_sync_check.sh`：catch-all 改查登記，未登記 rc!=0。
-  3. `CLAUDE.md:16` 與 PreCompact 訊息刪除 HANDOFF 行數上限，改為指向 Task 2.4 文法之指標句。
+  3. `CLAUDE.md:16` 與 `.claude/settings.json` PreCompact 之 auto、manual 兩則訊息刪除 HANDOFF 行數上限，改為指向 Task 2.4 文法之指標句。
   4. `governance-enforcement` 追加 DOCROT Task 1.1–1.8 與本票各閘之掛載點；DOCROT Task 1.3 宣稱改為只擋「共 N 條」雙落點、不涵蓋交接檔。
   5. `.claude/settings.json` PreToolUse `Edit|Write` 掛 `bash scripts/live_doc_write_guard.sh`，與本 Task 同一 commit。
 - 修改檔案：`scripts/spec_xref_hook.sh::main`、`scripts/plain_docs_sync_check.sh::_watched`、`CLAUDE.md`、`.claude/settings.json`（hooks.PreToolUse、hooks.PreCompact）、`scripts/fact_keys.json::governance-enforcement`　既有 caller：各檔既有測試。
@@ -209,7 +209,7 @@
 - 不可做：不得改變 LIVE-SPEC 之 xref 判定寬嚴；不得刪除 DOCROT Task 1.1–1.3 掃描器。
 - 邊界：①未登記路徑之 `spec_xref_hook.sh` 行為不變；②新列掛載點不存在 ⇒ `--check` rc!=0。
 - 風險緩解：改動後 `jq empty .claude/settings.json` rc=0。
-- 驗證：fixture `handoff_remove_current_lines_history_keeps_concept` rc=0、`spec_remove_concept_live_reference_remains` rc=2、`new_unregistered_plain_doc` rc!=0；`grep -c '30 行' CLAUDE.md` 輸出 0；`bash scripts/gen_fact_key_blocks.sh --check` rc=0。
+- 驗證：fixture `handoff_remove_current_lines_history_keeps_concept` rc=0、`spec_remove_concept_live_reference_remains` rc=2、`new_unregistered_plain_doc` rc!=0；`grep -c '30 行' CLAUDE.md .claude/settings.json` 兩檔皆輸出 0；`bash scripts/gen_fact_key_blocks.sh --check` rc=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
