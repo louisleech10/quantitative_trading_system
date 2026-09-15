@@ -1,4 +1,4 @@
-# DOCROT2 TODO（DRAFT v4｜基於 `docs/DOCROT2_SPEC.md` v4｜2026-09-15）
+# DOCROT2 TODO（DRAFT v5｜基於 `docs/DOCROT2_SPEC.md` v5｜2026-09-15）
 
 ## §0 全域規則與約束（執行端讀完即可遵守，不必回讀 SPEC）
 - 產出端覆蓋鐵律：新檢查掛寫檔當下；掛不上者登記 `governance-enforcement` 並寫理由（SPEC §C）。
@@ -209,7 +209,7 @@
 - 不可做：不得改變 LIVE-SPEC 之 xref 判定寬嚴；不得刪除 DOCROT Task 1.1–1.3 掃描器。
 - 邊界：①未登記路徑之 `spec_xref_hook.sh` 行為不變；②新列掛載點不存在 ⇒ `--check` rc!=0。
 - 風險緩解：改動後 `jq empty .claude/settings.json` rc=0。
-- 驗證：fixture `handoff_remove_current_lines_history_keeps_concept` rc=0、`spec_remove_concept_live_reference_remains` rc=2、`new_unregistered_plain_doc` rc!=0；`grep -c '30 行' CLAUDE.md .claude/settings.json` 兩檔皆輸出 0；`bash scripts/gen_fact_key_blocks.sh --check` rc=0。
+- 驗證：fixture `handoff_remove_current_lines_history_keeps_concept` rc=0、`spec_remove_concept_live_reference_remains` rc=2、`new_unregistered_plain_doc` rc!=0；`test "$(grep -c '30 行' CLAUDE.md)" -eq 0 && test "$(grep -c '30 行' .claude/settings.json)" -eq 0` rc=0（`grep -c` 零命中時自身 rc=1，故以輸出值判定）；`bash scripts/gen_fact_key_blocks.sh --check` rc=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 

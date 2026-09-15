@@ -1,6 +1,6 @@
 # DOCROT2 — 活文件狀態單一來源與新舊並存之產出端擋（修正 DOCROT）— SPEC
 
-> 來源 PLAN/診斷：`handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md`、`.../20260915-docrot2-x-consult-r2/synth.md`、`.../20260915-docrot2-x-review-r1/synth.md`、`.../20260915-docrot2-x-review-r2/synth.md`、`.../20260915-docrot2-x-review-r3/synth.md`　|　日期：2026-09-15　|　對應 TODO：`docs/DOCROT2_TODO.md`　|　版本：v4
+> 來源 PLAN/診斷：`handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md`、`.../20260915-docrot2-x-consult-r2/synth.md`、`.../20260915-docrot2-x-review-r1/synth.md`、`.../20260915-docrot2-x-review-r2/synth.md`、`.../20260915-docrot2-x-review-r3/synth.md`、`.../20260915-docrot2-x-review-r4/synth.md`　|　日期：2026-09-15　|　對應 TODO：`docs/DOCROT2_TODO.md`　|　版本：v5
 
 ## §RISK 風險分級
 - **大小**：大（全專案活文件、共用產出端 hook、多 Phase）。
@@ -114,7 +114,7 @@
 **Task 2.5 — 既有檢查依類別適用、宣稱與規則同步、掛載**
 - 目標：消除已知摩擦、過期宣稱與互斥規則，掛上 Task 2.1–2.4。　檔案：`scripts/spec_xref_hook.sh`、`scripts/plain_docs_sync_check.sh`、`CLAUDE.md`、`.claude/settings.json`（PreToolUse、PreCompact）、`scripts/fact_keys.json` `governance-enforcement`。
 - 改法：`spec_xref_hook.sh` 之「概念被拿掉須補版本標記」只對 LIVE-SPEC 類執行；`plain_docs_sync_check.sh` 之 catch-all 改查登記、未登記 rc!=0；`CLAUDE.md:16` 與 PreCompact 訊息刪除 HANDOFF 行數上限；`governance-enforcement` 追加 DOCROT Task 1.1–1.8 與本票各閘之掛載點（由 `_fk_validate_enforcement` 對證存在），DOCROT Task 1.3 宣稱改為只擋「共 N 條」雙落點、不涵蓋交接檔；`.claude/settings.json` 新增 PreToolUse Edit|Write 掛 `scripts/live_doc_write_guard.sh`，與本 Task 同一 commit。
-- **驗證**：`ASSERT bash scripts/spec_xref_hook.sh WHEN fixture=handoff_remove_current_lines_history_keeps_concept THEN rc=0`；`ASSERT bash scripts/spec_xref_hook.sh WHEN fixture=spec_remove_concept_live_reference_remains THEN rc=2`；`ASSERT bash scripts/plain_docs_sync_check.sh WHEN fixture=new_unregistered_plain_doc THEN rc!=0`；`grep -c '30 行' CLAUDE.md .claude/settings.json` 兩檔皆輸出 0；`jq empty .claude/settings.json` rc=0；`bash scripts/gen_fact_key_blocks.sh --check` rc=0。
+- **驗證**：`ASSERT bash scripts/spec_xref_hook.sh WHEN fixture=handoff_remove_current_lines_history_keeps_concept THEN rc=0`；`ASSERT bash scripts/spec_xref_hook.sh WHEN fixture=spec_remove_concept_live_reference_remains THEN rc=2`；`ASSERT bash scripts/plain_docs_sync_check.sh WHEN fixture=new_unregistered_plain_doc THEN rc!=0`；`test "$(grep -c '30 行' CLAUDE.md)" -eq 0 && test "$(grep -c '30 行' .claude/settings.json)" -eq 0` rc=0（`grep -c` 零命中時自身 rc=1，故以輸出值判定）；`jq empty .claude/settings.json` rc=0；`bash scripts/gen_fact_key_blocks.sh --check` rc=0。
 - **邊界**：①未登記路徑之 `spec_xref_hook.sh` 行為與改前相同；②`governance-enforcement` 新列掛載點不存在 ⇒ `--check` rc!=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
@@ -177,6 +177,7 @@
 
 ## 沿革與追溯索引
 <!-- HISTORY-BEGIN -->
+- 2026-09-15：v5 → `handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md`
 - 2026-09-15：v4 → `handoffs/reconcile/20260915-docrot2-x-review-r3/synth.md`
 - 2026-09-15：v3 → `handoffs/reconcile/20260915-docrot2-x-review-r2/synth.md`
 - 2026-09-15：v2 → `handoffs/reconcile/20260915-docrot2-x-review-r1/synth.md`
