@@ -80,7 +80,8 @@ def _byte_key(s: str) -> bytes:
 
 
 def in_scope(path: str, scope_roots: Sequence[str]) -> bool:
-    if not path.endswith(".md"):
+    # 〔CODEX-R2-P1-01（D2B）〕副檔名不分大小寫：`.MD` 不得逃出登記範圍
+    if not path.casefold().endswith(".md"):
         return False
     if "/" not in path:
         return True

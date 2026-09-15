@@ -3,14 +3,14 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | Task 2.1–2.5 實作（寫入前守衛、歷史指標文法、pre-commit 兜底、交接檔封閉文法與遷移、掛載）→ 兩家審碼 |
+| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 第二輪審碼抓到之寫入別名旁路已修補 → 兩家第三輪閉合 → 收批進 D2C |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | Task 2.1–2.5 實作（寫入前守衛、歷史指標文法、pre-commit 兜底、交接檔封閉文法與遷移、掛載）→ 兩家審碼 |
+| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 第二輪審碼抓到之寫入別名旁路已修補 → 兩家第三輪閉合 → 收批進 D2C |
 | 01-003 | D2C | 未開工 | docs/DOCROT2_TODO.md §B | D2B 審碼閉合後開工 Task 3.1–3.2 |
 | 01-004 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | D2C 審碼閉合後開工 Task 4.1 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |

@@ -1,0 +1,16 @@
+before: _live_doc_registry.py 91fa10f67a64684fa4f5bb084c93fe4347f1c630e9321a8dcb358cd83f67684e
+before: _live_doc_write_guard.py 6df6fa45e757597a60108ff10e84b411f682daebed650500600d063118952030
+[L1 別名一律不擋（CODEX-R2-P1-01）] pytest rc=1 ============================== 14 failed in 3.38s ==============================
+[L1 別名一律不擋（CODEX-R2-P1-01）] restored sha OK=True
+[L2 repo 內 symlink 不記別名（CODEX-R2-P1-01）] pytest rc=1 ============================== 3 failed in 1.01s ===============================
+[L2 repo 內 symlink 不記別名（CODEX-R2-P1-01）] restored sha OK=True
+[L3 repo 外 symlink 帶進 repo 不記別名（CODEX-R2-P1-01）] pytest rc=1 ============================== 1 failed in 0.46s ===============================
+[L3 repo 外 symlink 帶進 repo 不記別名（CODEX-R2-P1-01）] restored sha OK=True
+[L4 拼法不同不記別名（CODEX-R2-P1-01）] pytest rc=1 ============================== 1 failed in 0.43s ===============================
+[L4 拼法不同不記別名（CODEX-R2-P1-01）] restored sha OK=True
+[L5 硬連結不記別名（CODEX-R2-P1-01）] pytest rc=1 ============================== 2 failed in 0.62s ===============================
+[L5 硬連結不記別名（CODEX-R2-P1-01）] restored sha OK=True
+[L6 in_scope 副檔名分大小寫（CODEX-R2-P1-01）] pytest rc=1 ============================== 1 failed in 0.36s ===============================
+[L6 in_scope 副檔名分大小寫（CODEX-R2-P1-01）] restored sha OK=True
+after: _live_doc_registry.py 91fa10f67a64684fa4f5bb084c93fe4347f1c630e9321a8dcb358cd83f67684e
+after: _live_doc_write_guard.py 6df6fa45e757597a60108ff10e84b411f682daebed650500600d063118952030

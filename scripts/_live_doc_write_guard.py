@@ -27,6 +27,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -400,6 +401,95 @@ def _report(rel: str, viols: Sequence[str]) -> None:
         print(f"  · {v}", file=sys.stderr)
 
 
+# ────────────────────────────────────────────────────────────── hook 寫入目標之正名
+
+ALIAS_SYMLINK = "symlink"
+ALIAS_SPELLING = "大小寫或 Unicode 拼法"
+ALIAS_HARDLINK = "硬連結"
+
+
+def _md_like(path: str) -> bool:
+    return path.casefold().endswith(".md")
+
+
+def _inside(path: str, root_real: str) -> bool:
+    return path.startswith(root_real + os.sep)
+
+
+def _true_name(parent: str, comp: str, strict: bool) -> str:
+    """parent 目錄中與 comp 指同一項之實際目錄項名；strict 時無法唯一判定即拋 GuardError。"""
+    try:
+        names = os.listdir(parent)
+    except OSError as exc:
+        if strict:
+            raise GuardError(f"讀不到目錄 {parent}：{exc}")
+        return comp
+    if comp in names:
+        return comp
+    key = unicodedata.normalize("NFC", comp).casefold()
+    hits = [n for n in names if unicodedata.normalize("NFC", n).casefold() == key]
+    if len(hits) != 1:
+        if strict:
+            raise GuardError(f"{parent} 內無法唯一判定 {comp!r} 之實際檔名（候選 {len(hits)} 個）")
+        return comp
+    return hits[0]
+
+
+def resolve_write_target(root: str, fp: str) -> Tuple[Optional[str], Optional[str]]:
+    """〔CODEX-R2-P1-01（D2B）〕把寫入目標逐段解析成「實際被寫之檔」之 repo 相對正名。
+
+    回 (rel, alias)：rel 為 None ＝實際寫入落在 repo 外；alias 非 None ＝所給路徑不是該檔之正名，
+    值為別名種類——經 symlink 進入或位於 repo 內之 symlink、大小寫或 Unicode 拼法與目錄項不同、硬連結。
+    `..` 依實體路徑解析；symlink 目標逐段重走同一套解析（不信任 realpath 之拼法）；尚不存在之尾段照所給拼法保留。
+    """
+    root_real = os.path.realpath(root)
+    raw = fp if os.path.isabs(fp) else os.path.join(os.getcwd(), fp)
+    link_end = object()  # 堆疊哨兵：某個 repo 外 symlink 之目標段已走完
+    todo: List[object] = list(reversed(raw.split(os.sep)))
+    cur = os.sep
+    alias: Optional[str] = None
+    hops = 0
+    while todo:
+        comp = todo.pop()
+        if comp is link_end:
+            # repo 外之 symlink 把路徑帶進 repo 內部（恰為 repo 根者不算，例如以連結開啟之 repo）
+            if _inside(cur, root_real):
+                alias = alias or ALIAS_SYMLINK
+            continue
+        assert isinstance(comp, str)
+        if comp in ("", "."):
+            continue
+        if comp == "..":
+            cur = os.path.dirname(cur)
+            continue
+        nxt = os.path.join(cur, comp)
+        if os.path.lexists(nxt):
+            strict = cur == root_real or _inside(cur, root_real)
+            name = _true_name(cur, comp, strict)
+            if name != comp:
+                alias = alias or ALIAS_SPELLING
+                nxt = os.path.join(cur, name)
+        if not os.path.islink(nxt):
+            cur = nxt
+            continue
+        hops += 1
+        if hops > 40:
+            raise GuardError(f"{fp}：symlink 層數逾 40")
+        target = os.readlink(nxt)
+        if _inside(nxt, root_real):
+            alias = alias or ALIAS_SYMLINK
+        else:
+            todo.append(link_end)
+        todo.extend(reversed(target.split(os.sep)))
+        if os.path.isabs(target):
+            cur = os.sep
+    if not _inside(cur, root_real):
+        return None, None
+    if alias is None and os.path.isfile(cur) and os.stat(cur).st_nlink > 1:
+        alias = ALIAS_HARDLINK
+    return os.path.relpath(cur, root_real), alias
+
+
 def hook_mode(raw: str) -> int:
     try:
         payload = json.loads(raw)
@@ -418,14 +508,23 @@ def hook_mode(raw: str) -> int:
         print("live_doc_write_guard: payload 缺 tool_input.file_path ⇒ fail-closed", file=sys.stderr)
         return 2
     root = ldr.repo_root()
-    rel = os.path.relpath(os.path.abspath(fp), root)
-    if rel.startswith("..") or os.path.isabs(rel):
+    try:
+        rel, alias = resolve_write_target(root, fp)
+    except (GuardError, OSError) as exc:
+        print(f"live_doc_write_guard: {fp}：寫入目標解析失敗（{exc}）⇒ fail-closed", file=sys.stderr)
+        return 2
+    if rel is None:
         return 0
+    # 〔CODEX-R2-P1-01（D2B）〕別名寫入：所給名或實際目標像活文件（.md 不分大小寫）即擋，與登記資料可用與否無關；
+    # 硬連結無從得知其他名稱，不論副檔名一律擋。其後判定一律用正名。
+    if alias is not None and (alias == ALIAS_HARDLINK or _md_like(rel) or _md_like(fp)):
+        print(f"live_doc_write_guard: {fp}：經{alias}別名寫入（實際目標 {rel}）⇒ 擋；請直接寫實際路徑", file=sys.stderr)
+        return 2
     try:
         ctx = Context(root)
     except (GuardError, ValueError) as exc:
-        # 登記資料不可用：可能之活文件（.md）一律擋；其餘路徑放行，以免連修復登記檔本身都被擋
-        if not rel.endswith(".md"):
+        # 登記資料不可用：可能之活文件（正名為 .md，不分大小寫）一律擋；其餘路徑放行，以免連修復登記檔本身都被擋
+        if not _md_like(rel):
             return 0
         print(f"live_doc_write_guard: {rel}：{exc} ⇒ fail-closed", file=sys.stderr)
         return 2

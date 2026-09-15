@@ -491,6 +491,92 @@ def test_pre_commit_blocks_staged_status_line_and_passes_clean(tmp_path):
     assert subprocess.run(hook, cwd=str(root), capture_output=True, text=True).returncode != 0
 
 
+# ---------------------------------------------------------------- D2B review-r2 修補之應紅測試
+
+
+def _case_insensitive_fs(d: Path) -> bool:
+    probe = d / "CaseProbe.tmp"
+    probe.write_text("x", encoding="utf-8")
+    try:
+        return (d / "caseprobe.tmp").exists()
+    finally:
+        probe.unlink()
+
+
+def _write_abs(fp: str, content: str) -> dict:
+    return {"tool_name": "Write", "tool_input": {"file_path": fp, "content": content}}
+
+
+ALIAS_KINDS = ["symlink_upper", "symlink_txt", "symlink_dir", "hardlink_txt", "case_alias",
+               "outside_link", "outside_link_wrong_case"]
+
+
+def _make_alias(tmp_path: Path, root: Path, kind: str) -> str:
+    """建立指向 docs/A_SPEC.md 之別名，回傳寫入時所給之絕對路徑。"""
+    if kind in ("case_alias", "outside_link_wrong_case") and not _case_insensitive_fs(root / "docs"):
+        pytest.skip("檔案系統分大小寫：拼法不同即另一個檔，不是別名")
+    if kind == "symlink_upper":
+        os.symlink("A_SPEC.md", root / "docs" / "alias.MD")
+        return str(root / "docs" / "alias.MD")
+    if kind == "symlink_txt":
+        os.symlink("A_SPEC.md", root / "docs" / "alias.txt")
+        return str(root / "docs" / "alias.txt")
+    if kind == "symlink_dir":
+        os.symlink("docs", root / "d")
+        return str(root / "d" / "A_SPEC.md")
+    if kind == "hardlink_txt":
+        os.link(root / "docs" / "A_SPEC.md", root / "docs" / "hard.txt")
+        return str(root / "docs" / "hard.txt")
+    if kind == "case_alias":
+        return str(root / "docs" / "a_spec.MD")
+    if kind == "outside_link":
+        os.symlink(str(root / "docs" / "A_SPEC.md"), tmp_path / "out.txt")
+        return str(tmp_path / "out.txt")
+    os.symlink(str(root).swapcase() + "/docs/A_SPEC.md", tmp_path / "out2.txt")
+    return str(tmp_path / "out2.txt")
+
+
+@pytest.mark.parametrize("registry", ["valid", "invalid"])
+@pytest.mark.parametrize("kind", ALIAS_KINDS)
+def test_alias_write_to_live_doc_exit2(tmp_path, kind, registry):
+    """〔CODEX-R2-P1-01〕以 symlink／硬連結／拼法別名寫活文件：內容乾淨亦擋，登記資料可用與否皆同。"""
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n"}, exact=[SPEC])
+    fp = _make_alias(tmp_path, root, kind)
+    if registry == "invalid":
+        (root / "scripts" / "live_doc_registry.json").write_text("{}", encoding="utf-8")
+    for content in ("# A\n乾淨新行\n", "# A\nB-63 部分完成\n"):
+        r = _hook(root, _write_abs(fp, content))
+        assert r.returncode == 2 and "別名" in r.stderr, (content, r.stderr)
+
+
+@pytest.mark.parametrize("spelled", ["docs/./A_SPEC.md", "docs/../docs/A_SPEC.md", "LINKROOT/docs/A_SPEC.md"])
+def test_canonical_spellings_judged_not_alias(tmp_path, spelled):
+    """正名解析不把 `.`／`..`、以連結開啟之 repo 根當別名，亦不使其逃過判定。"""
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n"}, exact=[SPEC])
+    os.symlink(str(root), tmp_path / "LINKROOT")
+    fp = str(tmp_path / spelled) if spelled.startswith("LINKROOT") else f"{root}/{spelled}"
+    ok = _hook(root, _write_abs(fp, "# A\n乾淨新行\n"))
+    assert ok.returncode == 0, ok.stderr
+    bad = _hook(root, _write_abs(fp, "# A\nB-63 部分完成\n"))
+    assert bad.returncode == 2 and "別名" not in bad.stderr and "B-63" in bad.stderr, bad.stderr
+
+
+def test_symlink_to_non_doc_file_exit0(tmp_path):
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n", "scripts/real.py": "x = 1\n"}, exact=[SPEC])
+    os.symlink("real.py", root / "scripts" / "link.py")
+    assert _hook(root, _write(root, "scripts/link.py", "x = 2\n")).returncode == 0
+
+
+def test_new_unregistered_uppercase_md_staged_registry_rc1(tmp_path):
+    """〔CODEX-R2-P1-01〕副檔名大小寫不得使新文件逃出登記範圍。"""
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n"}, exact=[SPEC])
+    (root / "docs" / "NEW.MD").write_text("x\n", encoding="utf-8")
+    _git(root, "add", "docs/NEW.MD")
+    r = subprocess.run(["bash", str(root / "scripts" / "live_doc_registry_check.sh"), "--staged"], cwd=str(root),
+                       capture_output=True, text=True)
+    assert r.returncode == 1 and "docs/NEW.MD" in r.stderr, r.stderr
+
+
 # ================================================================ Task 2.3 驗證欄
 
 

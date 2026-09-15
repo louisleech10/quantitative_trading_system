@@ -5,7 +5,7 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | Task 2.1–2.5 實作（寫入前守衛、歷史指標文法、pre-commit 兜底、交接檔封閉文法與遷移、掛載）→ 兩家審碼 |
+| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 第二輪審碼抓到之寫入別名旁路已修補 → 兩家第三輪閉合 → 收批進 D2C |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -14,7 +14,7 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | Task 2.1–2.5 實作（寫入前守衛、歷史指標文法、pre-commit 兜底、交接檔封閉文法與遷移、掛載）→ 兩家審碼 |
+| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 第二輪審碼抓到之寫入別名旁路已修補 → 兩家第三輪閉合 → 收批進 D2C |
 | 01-003 | D2C | 未開工 | docs/DOCROT2_TODO.md §B | D2B 審碼閉合後開工 Task 3.1–3.2 |
 | 01-004 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | D2C 審碼閉合後開工 Task 4.1 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
@@ -38,7 +38,7 @@
 - 使用者 2026-09-15 對 DOCROT2 之逐字裁定見 `docs/DOCROT2_SPEC.md` §C；委員組成之唯一權威＝`scripts/governance_families.json` 之 `active_stampers`（本檔不寫家數）。
 - 🔴 **SPEC 戳記要能過 provenance，需 `gate.sh register-output <task> <SPEC路徑> --kind stamp --family <fam>` 逐家各跑一次**（`--kind stamp` 才會跳過 verdict parser；檔名無 `-<family>.md` 尾碼時 family 必須顯式給）。且該 SPEC 路徑須先列入 `scripts/stampable_artifacts.txt`；`docs/GAP3_EVENT_UX_SPEC.D-001.md` 與 GAP3 UX TODO 各延伸檔未列入，其戳記未對證現行 body hash。
 - 🔴 **委員裁決塊不合契約時，出路是 `debt_clear.sh:394` 的設計路徑：主委修檔後 `register-output`**，不是重派；裁決行 `CLOSED:` 只准填 finding ID，填日期會被 `verdict_parse` 拒收。
-- **同輪重派仍須使用者 terminal**（gate 見本輪 OPEN 債即拒發 token）。命令形式：`ROUND_ID=<id> bash scripts/cx_run.sh <family> <brief> <out>`；主控端再 `register-output` → 移走舊收斂目錄後 `reconcile_build` 重建 → `debt_clear`。**永遠不要 kill 執行中的 `committee_run`**。
+- **同輪重派仍須使用者 terminal**（gate 見本輪 OPEN 債即拒發 token；直接跑 `cx_run.sh` 亦須 token）。委員 CLI 回「Selected model is at capacity」而無產出即屬此情形。命令形式：`ROUND_ID=<id> bash scripts/cx_run.sh <family> <brief> <out>`；主控端再 `register-output` → 移走舊收斂目錄後 `reconcile_build` 重建 → `debt_clear`。**永遠不要 kill 執行中的 `committee_run`**。
 - **session 名不得重複**（fail-closed），格式 `<YYYYMMDD>-<epic>-b<N>-<kind>-r<N>`（`scripts/session_name_check.sh`）；派前先 `bash scripts/debt_ledger.sh --list | grep <session>`。
 - **SPEC 戳記輪的 brief-kind 要用 `closure` 不是 `stamp`**：`brief_conformance_check.sh:425` 要求 `stamp-target` 須 `handoffs/` 前綴，而 SPEC 在 `docs/`。既有作法見 `handoffs/20260912-SPLITUNIFY-D001-STAMP-BRIEF.md`。
 - **synth 處置欄的反引號 token 必須逐字出現在標的檔**（`spec_xref_check --synth`），否則寫檔 hook 擋；`延後→Task N.N` 之說明**不得有巢狀全形括號**，且目標 Task 須已存在於 `--todo`。
@@ -62,4 +62,8 @@
 - 2026-09-15：B-63 → commit `80fb3cb2`
 <!-- ENTRY: D2B -->
 - 2026-09-15：D2B → `docs/DOCROT2_TODO.md`
+- 2026-09-15：D2B → commit `104585e3`
+- 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r1/synth.md`
+- 2026-09-15：D2B → commit `63b533ce`
+- 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r2/synth.md`
 <!-- HISTORY-END -->
