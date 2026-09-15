@@ -63363,3 +63363,94 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   spec=
   todo=
   manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260915-DOCROT2-X-REVIEW-R1", "ts": "2026-09-15T01:43:51Z"}
+=== 2026-09-15 09:43:51 | dispatch ===
+  ts=2026-09-15 09:43:51
+  kind=dispatch
+  intent=兩家審 DOCROT2 SPEC／TODO 草稿（兩輪 consult 裁定之落地）
+  risk=low
+  facts_asked=none-needed:使用者 2026-09-15 已逐字裁定範圍與限制，其餘事實由 repo 實跑取得
+  review_role=codex,composer 皆為 adversary：攻主委自創八項與五條 assumed
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260915-DOCROT2-X-REVIEW-R1", "ts": "2026-09-15T01:43:57Z"}
+=== 2026-09-15 09:43:57 | dispatch ===
+  ts=2026-09-15 09:43:57
+  kind=dispatch
+  intent=兩家審 DOCROT2 SPEC／TODO 草稿（兩輪 consult 裁定之落地）
+  risk=low
+  facts_asked=none-needed:使用者 2026-09-15 已逐字裁定範圍與限制，其餘事實由 repo 實跑取得
+  review_role=codex,composer 皆為 adversary：攻主委自創八項與五條 assumed
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260915-DOCROT2-X-REVIEW-R1-BRIEF.md", "brief_sha256": "22d665647ff9687560a6b3453c007249af5165866a893645b809b22aafaba595", "brief_sha256_norm": "22d665647ff9687560a6b3453c007249af5165866a893645b809b22aafaba595", "event": "committee_round_open", "event_id": "d4c9cb72-12d0-452c-b525-1ee29d628ce5", "expected_outputs": {"codex": "handoffs/20260915-docrot2-x-review-r1-codex.md", "composer": "handoffs/20260915-docrot2-x-review-r1-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "426ade3f-260c-4953-abb4-1bef97221697", "schema_version": 1, "sequence": 4493, "session_name": "20260915-docrot2-x-review-r1", "task_id": "20260915-DOCROT2-X-REVIEW-R1", "ts": "2026-09-15T01:44:03Z"}
+{"event":"gate_deny","ts":"2026-09-15T01:53:56Z","tool":"Task","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","cmd_head":""}
+{"actor": "cx_run", "attempt_id": "d4425b21-56a0-4428-b685-1802721733b4", "cli_rc": "0", "event": "committee_family_result", "event_id": "f101844c-5464-4ede-acdb-718a1d9d69db", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260915-docrot2-x-review-r1-composer.md", "output_sha256": "406f15ef230028b7e84f1cb9c341fe71a49fd1d291b79008e4b5300a4e63ff23", "producer": "audit_append.sh", "result_state": "success", "round_id": "426ade3f-260c-4953-abb4-1bef97221697", "schema_version": 1, "sequence": 4494, "ts": "2026-09-15T01:55:44Z"}
+{"actor": "gate", "blocked_by": ["COMPOSER-R1-P1-01", "COMPOSER-R1-P1-02", "COMPOSER-R1-P1-03"], "closed": [], "event": "committee_output", "event_id": "3def8f9f-9877-4fe9-b41f-628cfea6c446", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260915-docrot2-x-review-r1-composer.md", "output_sha256": "406f15ef230028b7e84f1cb9c341fe71a49fd1d291b79008e4b5300a4e63ff23", "producer": "audit_append.sh", "round_id": "426ade3f-260c-4953-abb4-1bef97221697", "schema_version": 1, "sequence": 4495, "task_id": "20260915-DOCROT2-X-REVIEW-R1", "ts": "2026-09-15T01:55:44Z", "verdict": "blocked"}
+{"event":"gate_deny","ts":"2026-09-15T02:08:30Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"84b4ac36113c64ecfb39eaff4c7b3ab5ef1ce791fe4eecc1f1e4a0bb552a0c68","cmd_head":"bash scripts/completeness_check.sh --single handoffs/20260915-docrot2-x-review-r1-codex.md --family codex; rc=$?; echo COMPLETENESS_RC=$rc; exit $rc"}
+{"actor": "cx_run", "attempt_id": "f86ccb32-984f-46ac-ba79-9bf3425583db", "cli_rc": "0", "event": "committee_family_result", "event_id": "28c4c154-3815-4675-8444-7f3b10ea7e33", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260915-docrot2-x-review-r1-codex.md", "output_sha256": "3fe0ea7c793e96acd5fea49532e52fb56bac8681f6d121c2f908e074ed34e57e", "producer": "audit_append.sh", "result_state": "success", "round_id": "426ade3f-260c-4953-abb4-1bef97221697", "schema_version": 1, "sequence": 4496, "ts": "2026-09-15T02:13:33Z"}
+{"actor": "gate", "blocked_by": ["CODEX-R1-P1-01", "CODEX-R1-P1-02", "CODEX-R1-P1-03", "CODEX-R1-P1-04", "CODEX-R1-P1-05", "CODEX-R1-P1-06", "CODEX-R1-P1-07", "CODEX-R1-P1-08", "CODEX-R1-P1-09", "CODEX-R1-P1-10"], "closed": [], "event": "committee_output", "event_id": "bc9a04df-5770-41b9-8e0b-bbc5bd573b9a", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260915-docrot2-x-review-r1-codex.md", "output_sha256": "3fe0ea7c793e96acd5fea49532e52fb56bac8681f6d121c2f908e074ed34e57e", "producer": "audit_append.sh", "round_id": "426ade3f-260c-4953-abb4-1bef97221697", "schema_version": 1, "sequence": 4497, "task_id": "20260915-DOCROT2-X-REVIEW-R1", "ts": "2026-09-15T02:13:33Z", "verdict": "blocked"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "6ab0d680-0d36-4921-87cc-2bfadae13331", "lock_sha256": "8f4dc1a0ef8adb50e1686bf409684981c63700c657288aeecb43b2bdfca818cd", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "426ade3f-260c-4953-abb4-1bef97221697", "schema_version": 1, "sequence": 4498, "session_id": "20260915-docrot2-x-review-r1", "synth_sha256": "b5eb4751b80e50f76880cfc9fec3946aa0dcfa3b1d223242b13bf934d5279dce", "ts": "2026-09-15T02:16:54Z"}
+=== 2026-09-15 10:17:02 | artifact ===
+  ts=2026-09-15 10:17:02
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DOCROT2_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§G Golden 狀態=N/A:治理文件閘，不碰數值與 ML 路徑; §RISK=filled; §A=filled; §C=filled; §P=filled; §V=filled; §R=filled; §N=filled
+  spec=
+  todo=
+  manifest=
+=== 2026-09-15 10:21:06 | artifact ===
+  ts=2026-09-15 10:21:06
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/DOCROT2_TODO.md
+  template_opened=templates/TODO_GENERATION_PROMPT.md
+  sections=§0=filled; §B=filled; Task=filled
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260915-DOCROT2-X-REVIEW-R2", "ts": "2026-09-15T02:27:22Z"}
+=== 2026-09-15 10:27:22 | dispatch ===
+  ts=2026-09-15 10:27:22
+  kind=dispatch
+  intent=兩家審 DOCROT2 SPEC／TODO v2（r1 十七條閉合＋主委新增項＋外部研究）
+  risk=low
+  facts_asked=none-needed:使用者 2026-09-15 已逐字裁定範圍與限制，其餘事實由 repo 實跑取得
+  review_role=codex,composer 皆為 adversary：攻主委新增項 a-i 與五條 assumed
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
