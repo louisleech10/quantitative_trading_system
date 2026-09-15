@@ -5,7 +5,7 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 寫入別名改整類定義已修補（第三輪兩條）→ 兩家第四輪閉合 → 收批進 D2C |
+| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 寫入別名三判準並集已修補（第四輪一條）→ 兩家第五輪閉合 → 收批進 D2C |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -14,7 +14,7 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 寫入別名改整類定義已修補（第三輪兩條）→ 兩家第四輪閉合 → 收批進 D2C |
+| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 寫入別名三判準並集已修補（第四輪一條）→ 兩家第五輪閉合 → 收批進 D2C |
 | 01-003 | D2C | 未開工 | docs/DOCROT2_TODO.md §B | D2B 審碼閉合後開工 Task 3.1–3.2 |
 | 01-004 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | D2C 審碼閉合後開工 Task 4.1 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
@@ -68,4 +68,6 @@
 - 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r2/synth.md`
 - 2026-09-15：D2B → commit `7ab3330e`
 - 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r3/synth.md`
+- 2026-09-15：D2B → commit `accad7f3`
+- 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r4/synth.md`
 <!-- HISTORY-END -->

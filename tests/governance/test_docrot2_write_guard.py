@@ -509,7 +509,7 @@ def _write_abs(fp: str, content: str) -> dict:
 
 ALIAS_KINDS = ["symlink_upper", "symlink_txt", "symlink_dir", "hardlink_txt", "case_alias",
                "outside_link", "outside_link_wrong_case", "symlink_to_hardlink_py", "parent_link",
-               "linkroot", "dotdot_through_symlink", "root_prefix_wrong_case"]
+               "linkroot", "dotdot_through_symlink", "root_prefix_wrong_case", "outside_link_dotdot"]
 
 
 def _make_alias(tmp_path: Path, root: Path, kind: str) -> str:
@@ -532,6 +532,9 @@ def _make_alias(tmp_path: Path, root: Path, kind: str) -> str:
         return f"{root}/docs/sublink/../A_SPEC.md"
     if kind == "root_prefix_wrong_case":   # repo 根拼法不同：字串比對判不出在 repo 內
         return str(tmp_path / "REPO" / "docs" / "A_SPEC.md")
+    if kind == "outside_link_dotdot":      # 〔CODEX-R4-P1-01〕repo 外 symlink 經字面 `..` 消掉後字面等於正名
+        os.symlink(str(root), tmp_path / "outside")
+        return f"{tmp_path}/outside/../repo/docs/A_SPEC.md"
     if kind == "symlink_upper":
         os.symlink("A_SPEC.md", root / "docs" / "alias.MD")
         return str(root / "docs" / "alias.MD")
@@ -591,6 +594,16 @@ def test_new_unregistered_uppercase_md_staged_registry_rc1(tmp_path):
     r = subprocess.run(["bash", str(root / "scripts" / "live_doc_registry_check.sh"), "--staged"], cwd=str(root),
                        capture_output=True, text=True)
     assert r.returncode == 1 and "docs/NEW.MD" in r.stderr, r.stderr
+
+
+def test_status_line_written_through_alias_caught_by_staged_rc1(tmp_path):
+    """〔CODEX-R4-P1-01〕繞過 hook 經別名寫入之狀態行：暫存判定以正名內容擋（暫存只判內容，不判寫入路徑）。"""
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n"}, exact=[SPEC])
+    os.symlink(str(root), tmp_path / "outside")
+    Path(f"{tmp_path}/outside/../repo/docs/A_SPEC.md").write_text("# A\nD2B 進行中\n", encoding="utf-8")
+    _git(root, "add", "docs/A_SPEC.md")
+    r = _run(root, "--staged")
+    assert r.returncode == 1 and "D2B" in r.stderr, r.stderr
 
 
 # ================================================================ Task 2.3 驗證欄

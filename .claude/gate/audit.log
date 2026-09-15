@@ -63927,3 +63927,46 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"actor": "gate", "batch": "2", "event": "impl_token_issued", "event_id": "5e2d8cde-3bc1-4d7e-81a9-f200cc0b8fd2", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260915-DOCROT2", "round_start_head": "7ab3330e7e59d64823716d4827ed8d18a169fff0", "schema_version": 1, "sequence": 4569, "task_id": "20260915-DOCROT2-impl-b2-claude", "ts": "2026-09-15T11:24:26Z"}
+{"actor": "post-commit", "batch": "2", "event": "ticket_commit", "event_id": "373e0109-854d-4668-8d31-00286de2fc99", "origin_script": "git_hooks/post-commit", "prod_files": [], "producer": "audit_append.sh", "root": "20260915-DOCROT2", "schema_version": 1, "sequence": 4570, "sha": "accad7f38cf8108b8adfa91c898a58cb25e0bb6c", "token_fresh": "true", "trailer": "20260915-DOCROT2/b2", "ts": "2026-09-15T11:24:46Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260915-DOCROT2-B2-REVIEW-R4", "ts": "2026-09-15T11:25:22Z"}
+=== 2026-09-15 19:25:22 | dispatch ===
+  ts=2026-09-15 19:25:22
+  kind=dispatch
+  intent=DOCROT2 b2（D2B）review-r4：review-r3 修補閉合
+  risk=low
+  facts_asked=none-needed:review-r3 處置見 synth；技術取捨交委員
+  review_role=codex 以原提出方閉合兩條；composer 重跑本家 r3 形態並覆核別名整類定義
+  template=n/a:D2B 審碼閉合輪（非 SPEC 派工）
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260915-DOCROT2-B2-REVIEW-R4-BRIEF.md", "brief_sha256": "8cfdbb4537e8cdb7b634a7516ee57cedd90a403fb0d8235c203eb3724ec3f447", "brief_sha256_norm": "8cfdbb4537e8cdb7b634a7516ee57cedd90a403fb0d8235c203eb3724ec3f447", "event": "committee_round_open", "event_id": "96d89fc1-7188-4ab4-8dd7-eae79f581bcc", "expected_outputs": {"codex": "handoffs/20260915-docrot2-b2-review-r4-codex.md", "composer": "handoffs/20260915-docrot2-b2-review-r4-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "502657ed-ed8b-4226-a044-0343e5516006", "schema_version": 1, "sequence": 4571, "session_name": "20260915-docrot2-b2-review-r4", "task_id": "20260915-DOCROT2-B2-REVIEW-R4", "ts": "2026-09-15T11:25:29Z"}
+{"actor": "cx_run", "attempt_id": "6e4f88f4-f480-49a5-b51b-4af151d29d75", "cli_rc": "0", "event": "committee_family_result", "event_id": "e4510004-b2f7-4397-b7e9-0586f66c8755", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260915-docrot2-b2-review-r4-composer.md", "output_sha256": "154f5f889e0085b930fceca5080e43dbc7a7238524c8667dd7038422c6f35e52", "producer": "audit_append.sh", "result_state": "success", "round_id": "502657ed-ed8b-4226-a044-0343e5516006", "schema_version": 1, "sequence": 4572, "ts": "2026-09-15T11:32:56Z"}
+{"actor": "gate", "blocked_by": [], "closed": [], "event": "committee_output", "event_id": "02d64eac-69ed-4766-bdfc-c1ac971576db", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260915-docrot2-b2-review-r4-composer.md", "output_sha256": "154f5f889e0085b930fceca5080e43dbc7a7238524c8667dd7038422c6f35e52", "producer": "audit_append.sh", "round_id": "502657ed-ed8b-4226-a044-0343e5516006", "schema_version": 1, "sequence": 4573, "task_id": "20260915-DOCROT2-B2-REVIEW-R4", "ts": "2026-09-15T11:32:56Z", "verdict": "proceed"}
+{"event":"gate_deny","ts":"2026-09-15T11:38:38Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"a11056b2c5264eb518ab3fe2be109f3a69c830cc12d0159166281cda9ba785ff","cmd_head":"nl -ba handoffs/20260915-docrot2-b2-review-r4-codex.md && printf '%s\\n' '--- line count ---' && wc -l < handoffs/20260915-docrot2-b2-review-r4-codex.md && printf '%s\\n' '--- completeness first run ---' && bash scripts/completeness_check.sh --single handoffs/20260915-docrot2-b2-review-r4-codex.md --family codex; rc=$?; printf 'COMPLETENESS_RC=%s\\n' \"$rc\"; exit \"$rc\""}
+{"actor": "cx_run", "attempt_id": "5aca231a-df9b-4a27-8bea-b5a4a0047715", "cli_rc": "0", "event": "committee_family_result", "event_id": "a427994f-d798-4a1d-96a3-983468320b0d", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260915-docrot2-b2-review-r4-codex.md", "output_sha256": "61bedb5128b7d1597a812bf7f657cc6a21845dda68b5ebea2289a4d89544d19e", "producer": "audit_append.sh", "result_state": "success", "round_id": "502657ed-ed8b-4226-a044-0343e5516006", "schema_version": 1, "sequence": 4574, "ts": "2026-09-15T11:41:22Z"}
+{"actor": "gate", "blocked_by": ["CODEX-R4-P1-01"], "closed": ["CODEX-R3-P1-01", "CODEX-R3-P1-02"], "event": "committee_output", "event_id": "1ddd86a2-0ebf-48e2-b420-123680d2265e", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260915-docrot2-b2-review-r4-codex.md", "output_sha256": "61bedb5128b7d1597a812bf7f657cc6a21845dda68b5ebea2289a4d89544d19e", "producer": "audit_append.sh", "round_id": "502657ed-ed8b-4226-a044-0343e5516006", "schema_version": 1, "sequence": 4575, "task_id": "20260915-DOCROT2-B2-REVIEW-R4", "ts": "2026-09-15T11:41:23Z", "verdict": "blocked"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "8b4d775a-111b-4d93-b875-f851595bab70", "lock_sha256": "1db34d092fcbd115f2647ec98c877108fd9ed4545701d4d8a616bb16bdf48667", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "502657ed-ed8b-4226-a044-0343e5516006", "schema_version": 1, "sequence": 4576, "session_id": "20260915-docrot2-b2-review-r4", "synth_sha256": "bce0e8a66196437ab67b9a55ef6bc781f8d83ab8b8c563bee81b8ada64ed3426", "ts": "2026-09-15T11:43:42Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md", "output_sha256": "e1766584ef2957b2c594ffd09468e889a0e95715960519ab19e0551efe941218", "task_id": "20260915-DOCROT2-impl-b2-claude", "ts": "2026-09-15T11:47:36Z"}
+=== 2026-09-15 19:47:37 | dispatch ===
+  ts=2026-09-15 19:47:37
+  kind=dispatch
+  intent=D2B review-r4 修補 commit
+  risk=high
+  facts_asked=none-needed:review-r4 一條處置見 synth
+  review_role=single-executor:主委修補，commit 後派 codex+composer review-r5 閉合
+  template=n/a:D2B 審碼修補 commit
+  adversarial=handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "gate", "batch": "2", "event": "impl_token_issued", "event_id": "d9f66b53-38b8-4ba2-babd-c6b6f7e23c86", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260915-DOCROT2", "round_start_head": "accad7f38cf8108b8adfa91c898a58cb25e0bb6c", "schema_version": 1, "sequence": 4577, "task_id": "20260915-DOCROT2-impl-b2-claude", "ts": "2026-09-15T11:47:37Z"}

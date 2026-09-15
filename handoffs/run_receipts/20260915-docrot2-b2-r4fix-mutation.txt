@@ -1,0 +1,20 @@
+before: _live_doc_registry.py 91fa10f67a64684fa4f5bb084c93fe4347f1c630e9321a8dcb358cd83f67684e
+before: _live_doc_write_guard.py ca562f5973886dddbcd9cb857452065167b691ac871c7bd904725645da1078e8
+[M1 hook 別名一律不擋] pytest rc=1 ============================== 26 failed in 5.90s ==============================
+[M1 hook 別名一律不擋] restored sha OK=True
+[M2 硬連結被其他別名蓋掉（CODEX-R3-P1-01）] pytest rc=1 ============================== 2 failed in 0.60s ===============================
+[M2 硬連結被其他別名蓋掉（CODEX-R3-P1-01）] restored sha OK=True
+[M3 所給路徑與正名不同不記別名（CODEX-R3-P1-02）] pytest rc=1 ========================= 1 failed, 3 passed in 1.16s ==========================
+[M3 所給路徑與正名不同不記別名（CODEX-R3-P1-02）] restored sha OK=True
+[M4a 經過 symlink 不記別名] pytest rc=1 ============================== 2 failed in 0.79s ===============================
+[M4a 經過 symlink 不記別名] restored sha OK=True
+[M4b 只記 repo 內 symlink（CODEX-R4-P1-01）] pytest rc=1 ============================== 2 failed in 0.60s ===============================
+[M4b 只記 repo 內 symlink（CODEX-R4-P1-01）] restored sha OK=True
+[M5 repo 內外改以字串判定] pytest rc=1 ============================== 1 failed in 0.36s ===============================
+[M5 repo 內外改以字串判定] restored sha OK=True
+[M6 正名不取實際目錄項名] pytest rc=1 ============================== 1 failed in 0.33s ===============================
+[M6 正名不取實際目錄項名] restored sha OK=True
+[M7 in_scope 副檔名分大小寫] pytest rc=1 ============================== 1 failed in 0.36s ===============================
+[M7 in_scope 副檔名分大小寫] restored sha OK=True
+after: _live_doc_registry.py 91fa10f67a64684fa4f5bb084c93fe4347f1c630e9321a8dcb358cd83f67684e
+after: _live_doc_write_guard.py ca562f5973886dddbcd9cb857452065167b691ac871c7bd904725645da1078e8

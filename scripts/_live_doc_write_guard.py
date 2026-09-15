@@ -403,7 +403,7 @@ def _report(rel: str, viols: Sequence[str]) -> None:
 
 # ────────────────────────────────────────────────────────────── hook 寫入目標之正名
 
-ALIAS_SYMLINK = "路徑經過 repo 內之 symlink"
+ALIAS_SYMLINK = "解析過程經過 symlink"
 ALIAS_NONCANONICAL = "所給路徑與正名不同（repo 外 symlink、大小寫／Unicode 拼法或其他路徑進入 repo）"
 ALIAS_HARDLINK = "目標為硬連結（無從得知其他名稱）"
 
@@ -450,18 +450,19 @@ def _repo_parts(path: str, root_real: str) -> Optional[List[str]]:
 
 
 def resolve_write_target(root: str, fp: str) -> Tuple[Optional[str], Optional[str]]:
-    """〔CODEX-R2-P1-01／CODEX-R3-P1-01／CODEX-R3-P1-02（D2B）〕寫入目標之 repo 相對正名與別名判定。
+    """〔CODEX-R2-P1-01／CODEX-R3-P1-01／CODEX-R3-P1-02／CODEX-R4-P1-01（D2B）〕寫入目標之 repo 相對正名與別名判定。
 
     ① 實體位置：自根逐段走；symlink 以 readlink 展開後重走；`..` 對已解析之實體路徑取父目錄。
     ② 是否在 repo 內：以 inode 比對 repo 根。③ 正名：repo 根以下逐段取實際目錄項名，尚不存在之尾段照所給拼法。
-    回 (rel, alias)：rel 為 None ＝實際寫入落在 repo 外。alias 非 None ＝所給路徑不是正名——路徑經過 repo 內
-    symlink，或所給路徑（僅做 `.`／`..` 字面正規化）不等於正名絕對路徑；目標為硬連結時一律記硬連結（不被其他種類蓋掉）。
+    回 (rel, alias)：rel 為 None ＝實際寫入落在 repo 外。alias 非 None ＝所給路徑不是正名，三判準之並集——
+    解析過程經過任何 symlink（不論位於 repo 內外）、所給路徑（僅做 `.`／`..` 字面正規化）不等於正名絕對路徑、
+    目標為硬連結（一律記硬連結，不被其他種類蓋掉）。
     """
     root_real = os.path.realpath(root)
     raw = fp if os.path.isabs(fp) else os.path.join(os.getcwd(), fp)
     todo: List[str] = list(reversed(raw.split(os.sep)))
     cur = os.sep
-    via_repo_symlink = False
+    via_symlink = False
     hops = 0
     while todo:
         comp = todo.pop()
@@ -477,7 +478,7 @@ def resolve_write_target(root: str, fp: str) -> Tuple[Optional[str], Optional[st
         hops += 1
         if hops > 40:
             raise GuardError(f"{fp}：symlink 層數逾 40")
-        via_repo_symlink = via_repo_symlink or _inside(nxt, root_real)
+        via_symlink = True
         target = os.readlink(nxt)
         todo.extend(reversed(target.split(os.sep)))
         if os.path.isabs(target):
@@ -491,7 +492,7 @@ def resolve_write_target(root: str, fp: str) -> Tuple[Optional[str], Optional[st
             comp = _true_name(base, comp)
         base = os.path.join(base, comp)
     alias: Optional[str] = None
-    if via_repo_symlink:
+    if via_symlink:
         alias = ALIAS_SYMLINK
     elif os.path.abspath(raw) != base:
         alias = ALIAS_NONCANONICAL
