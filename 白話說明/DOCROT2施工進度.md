@@ -16,8 +16,8 @@
 <!-- BEGIN GENERATED: docrot2-batch-status -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 010 | D2A | 進行中 | docs/DOCROT2_TODO.md §B | Task 1.1–1.3 commit → D2A 兩家審碼（含四條具名偏離） |
-| 020 | D2B | 未開工 | docs/DOCROT2_TODO.md §B | D2A 審碼閉合後開工 Task 2.1–2.5 |
+| 010 | D2A | 已完成 | docs/DOCROT2_TODO.md §B | — |
+| 020 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | Task 2.1–2.5 實作（寫入前守衛、歷史指標文法、pre-commit 兜底、交接檔封閉文法與遷移、掛載）→ 兩家審碼 |
 | 030 | D2C | 未開工 | docs/DOCROT2_TODO.md §B | D2B 審碼閉合後開工 Task 3.1–3.2 |
 | 040 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | D2C 審碼閉合後開工 Task 4.1 |
 <!-- END GENERATED: docrot2-batch-status -->
@@ -29,3 +29,4 @@
 ## 紀錄（時間序）
 
 - 2026-09-15：與兩家委員討論兩輪、審查四輪後，規格與施工清單定稿（第 5 版），開始 D2A。
+- 2026-09-15：D2A 做完並經兩輪審程式碼。第一輪 codex 抓到兩個會放行錯誤的洞：新舊兩份進度清單之間沒擋同名（SPLITUNIFY 的 B1／B3／B4 跟治理批次同名、狀態還互相矛盾，已改名 SU-B1／SU-B3／SU-B4），以及單檔檢查會放過捷徑檔；另兩個小問題一併修。第二輪兩家都確認修好 ⇒ D2A 收批，開始 D2B。
