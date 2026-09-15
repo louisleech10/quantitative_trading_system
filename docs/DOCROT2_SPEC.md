@@ -1,6 +1,6 @@
 # DOCROT2 — 活文件狀態單一來源與新舊並存之產出端擋（修正 DOCROT）— SPEC
 
-> 來源 PLAN/診斷：`handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md`、`.../20260915-docrot2-x-consult-r2/synth.md`、`.../20260915-docrot2-x-review-r1/synth.md`　|　日期：2026-09-15　|　對應 TODO：`docs/DOCROT2_TODO.md`　|　版本：v2
+> 來源 PLAN/診斷：`handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md`、`.../20260915-docrot2-x-consult-r2/synth.md`、`.../20260915-docrot2-x-review-r1/synth.md`、`.../20260915-docrot2-x-review-r2/synth.md`　|　日期：2026-09-15　|　對應 TODO：`docs/DOCROT2_TODO.md`　|　版本：v3
 
 ## §RISK 風險分級
 - **大小**：大（全專案活文件、共用產出端 hook、多 Phase）。
@@ -47,9 +47,9 @@
 ### Phase 1 — 登記與狀態切換（依賴：無）
 
 **Task 1.1 — 活文件類別登記**
-- 目標：封閉登記活文件、類別與各類規則。　檔案：新建 `scripts/live_doc_registry.json`、`scripts/live_doc_registry_check.sh`。既有 caller：無。
-- 改法：JSON 含類別集合、路徑對照（exact 與 `/` 結尾 prefix，禁 wildcard）、排除路徑、各類規則旗標、考古字面集合、歷史專區指標文法、交接檔區段集合與條目標記文法、日誌類移出路徑、交接「待辦」投影之 key 清單；初始值由 TODO Task 1.1 給出。`--path`／`--all`／`--staged` 三模式；`--all` 以 `git ls-files --cached --others --exclude-standard -z` 重建清冊（NUL-safe），`docs/`、`白話說明/`、repo 根目錄 `.md` 未命中登記且未命中排除即 rc=1，同一路徑命中兩類即 rc=1；`_schema.status_scope` 每項須落在登記內。
-- **驗證**：`ASSERT bash scripts/live_doc_registry_check.sh --path docs/NEW_THING.md WHEN fixture=unregistered THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=path_in_two_classes THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=excluded_site_listed_as_live THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=one_registered_path_removed THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=current_tree THEN rc=0`。
+- 目標：封閉登記活文件、類別與各類規則，並提供單一登記交易。　檔案：新建 `scripts/live_doc_registry.json`、`scripts/live_doc_registry_check.sh`、`scripts/live_doc_registry_update.sh`。既有 caller：無。
+- 改法：JSON 含類別集合、路徑對照（exact 與 `/` 結尾 prefix，禁 wildcard）、排除路徑、各類規則旗標、考古字面集合、歷史專區指標文法、交接檔區段集合與條目標記文法、交接投影（現況與待辦各自之來源 key、狀態篩選、欄位）、日誌類移出路徑；初始值由 TODO Task 1.1 給出。清冊由單一探索函式產生：`git ls-files --cached --others --exclude-standard -z`（NUL-safe、`LC_ALL=C` 排序）→ 範圍＝`docs/` 與 `白話說明/` 下全部層級、repo 根目錄之 `.md` → 先套 HIST prefix → 其餘逐條 exact 分類（`docs/` 頂層且檔名含 SPEC、TODO、PLAN 者為 LIVE-SPEC；未落入任何類者為 OTHER-DORMANT，含巢狀路徑）。`live_doc_registry_check.sh` 之 `--path`／`--all`／`--staged` 皆用同一探索函式；未命中、同優先級命中兩類 ⇒ rc=1；`_schema.status_scope` 每項須落在登記內。新增活文件一律經 `live_doc_registry_update.sh --add <path> [--class <類別>]` 登記（未給類別時以同一分類述詞判定），寫入決定性排序之 JSON；手改登記檔之結果仍受 `--all` 判定。
+- **驗證**：`ASSERT bash scripts/live_doc_registry_check.sh --path docs/NEW_THING.md WHEN fixture=unregistered THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=path_in_two_classes THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=archived_spec_listed_as_live_spec THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=nested_doc_unclassified THEN rc=1`；`ASSERT bash scripts/live_doc_registry_update.sh --add docs/NEW_SPEC.md WHEN fixture=new_top_level_spec THEN rc=0`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=excluded_site_listed_as_live THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=one_registered_path_removed THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --all WHEN fixture=current_tree THEN rc=0`。
 - **邊界**：①symlink、非 regular file、含換行之路徑 ⇒ 依 `_fk_scope_files` 同規則；②登記檔非 JSON ⇒ rc=1；③`handoffs/` 下 `.md` ⇒ 不在清冊範圍、rc=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無（Task 2.x、4.1 只消費）。
@@ -65,9 +65,9 @@
 - 不可做：不得擴充 `status_enum`；不得保留手寫狀態欄；不得動 `docs/SPLITUNIFY_SPEC.D-002.md`。
 
 **Task 1.3 — 委員組成投影讀機器權威**
-- 目標：委員組成之投影讀 `scripts/governance_families.json`，不複製值（規格版本種類移出本票，見 §N）。　檔案：`scripts/gen_fact_key_blocks.sh`、`scripts/fact_keys.json` `_schema.fields`。既有 caller：同 Task 1.2。
-- 改法：rows 來源欄位之封閉形式＝`{file: repo 相對 JSON 路徑, path: 字串陣列（逐層物件鍵）}`；該路徑之值須為字串陣列，每元素產出一列 `[三位零補序號, 元素]`；不接受任意查詢式。同 key 同時有靜態 rows 與來源欄位、路徑不存在、值非字串陣列、路徑含 `..` 或為絕對路徑 ⇒ rc!=0。
-- **驗證**：`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_source_string_array THEN rc=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_source_changed_without_write THEN rc!=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_source_value_is_object THEN rc!=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_source_absolute_path THEN rc!=0`；`venv/bin/python -m pytest tests/governance/test_govb1_factkey_gen.py -q` 0 failed。
+- 目標：委員組成之投影讀 `scripts/governance_families.json`，不複製值；投影可依狀態篩選列（供交接現況與待辦）。規格版本不作狀態種類——其唯一來源為該規格歷史專區最新之 `v<N>` 指標行（Task 2.2 文法）。　檔案：`scripts/gen_fact_key_blocks.sh`、`scripts/fact_keys.json` `_schema.fields`。既有 caller：同 Task 1.2。
+- 改法：rows 來源欄位之封閉形式＝`{file: repo 相對 JSON 路徑, path: 字串陣列（逐層物件鍵）}`；該路徑之值須為字串陣列，每元素產出一列 `[三位零補序號, 元素]`；不接受任意查詢式。同 key 同時有靜態 rows 與來源欄位、路徑不存在、值非字串陣列、路徑含 `..` 或為絕對路徑 ⇒ rc!=0。另新增投影篩選之封閉形式＝`{source_keys: key 陣列, status_column: 欄名, allow: 狀態值陣列}`：自各來源 key 取狀態欄 ∈ `allow` 之列，依 `source_keys` 順序與 rows 原順序串接；來源 key 不存在、欄名不存在、`allow` 含 `status_enum` 以外之值 ⇒ rc!=0。
+- **驗證**：`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_source_string_array THEN rc=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_source_changed_without_write THEN rc!=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_source_value_is_object THEN rc!=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_source_absolute_path THEN rc!=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_filter_selects_open_rows THEN rc=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=rows_filter_unknown_status_value THEN rc!=0`；`venv/bin/python -m pytest tests/governance/test_govb1_factkey_gen.py -q` 0 failed。
 - **邊界**：①空陣列 ⇒ 產出零列、rc=0；②陣列含非字串 ⇒ rc!=0；③靜態 rows 與來源並存 ⇒ rc!=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
@@ -77,8 +77,8 @@
 
 **Task 2.1 — 寫入前手寫狀態偵測（新增行模式）**
 - 目標：非權威活文件之新增行含「識別碼＋狀態值」即寫入前擋。　檔案：新建 `scripts/live_doc_write_guard.sh`；`scripts/gen_fact_key_blocks.sh`（抽出共用判定入口，既有全檔模式行為不變）。
-- 改法：寫入後全文之重建——Edit：以磁碟舊檔依 `old_string`、`new_string`、`replace_all`（true＝全部取代；false＝第一處）取代；舊檔無 `old_string` ⇒ exit 2。Write：`content` 即寫入後全文。新增行＝舊檔與寫入後全文之 diff `+` 行，位置以寫入後全文之行號計。判定沿用「識別碼 token ∩ `status_enum` 字面」；豁免＝寫入後全文中位於合法生成區塊內、`HISTORY-BEGIN..END` 內、fenced code block 內之行。**相對 consult-r2 裁定 2 之具名偏離**：不採整類引號豁免；僅豁免同行含 `git show <修訂>:` 形式之樣本句。
-- **驗證**：`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_edit_adds_id_with_status THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=same_new_string_old_string_inside_history THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=same_new_string_old_string_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=replace_all_true_two_occurrences THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=quoted_id_with_status THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=git_show_sample_line THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=edit_old_string_absent THEN rc=2`。
+- 改法：寫入後全文之重建——Edit：`replace_all` 為 true ⇒ 磁碟舊檔之全部 `old_string` 取代為 `new_string`；否則 `old_string` 於磁碟舊檔須恰出現一次再取代，出現 0 次或 2 次以上 ⇒ exit 2。Write：`content` 即寫入後全文。新增行＝舊檔與寫入後全文之 diff `+` 行，位置以寫入後全文之行號計。判定沿用「識別碼 token ∩ `status_enum` 字面」；豁免＝寫入後全文中位於合法生成區塊內、`HISTORY-BEGIN..END` 內、fenced code block 內之行。**相對 consult-r2 裁定 2 之具名偏離**：不採引號豁免，亦不設樣本句豁免（同行樣本豁免可在樣本後附加狀態字面繞過）；需引用過時樣本者置於 fenced code block。
+- **驗證**：`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_edit_adds_id_with_status THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=same_new_string_old_string_inside_history THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=same_new_string_old_string_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=replace_all_true_two_occurrences THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=quoted_id_with_status THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=git_show_decoy_status_suffix THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=stale_sample_in_fence THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=edit_old_string_absent THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=edit_old_string_nonunique THEN rc=2`。
 - **邊界**：①Write 新建檔 ⇒ 全文為新增行；②寫入後全文與舊檔相同 ⇒ rc=0；③payload 不可解析且目標為登記活文件 ⇒ rc=2；④既有行含狀態、本次新增行無 ⇒ rc=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
@@ -86,8 +86,8 @@
 
 **Task 2.2 — 新增行禁舊版字面；歷史專區只准指標**
 - 目標：活文件只承載現行態，修訂史只以指標指向不可變紀錄（§C 設計依據）。　檔案：`scripts/live_doc_write_guard.sh`（第二道）；字面集合、指標文法、適用類別定義於 `scripts/live_doc_registry.json`。
-- 改法：適用類別之新增行位於歷史專區外且含 `~~`、考古字面集合任一、或 canonical finding ID（形狀同 `scripts/_synth_attr.py` 之 `ID_RE`）⇒ exit 2。適用類別之新增行位於歷史專區內，須符合指標文法（日期、版本或事件、指向 repo 相對路徑或 commit sha 之指標；不含舊文抄錄），否則 exit 2。整段自正文移出（正文為刪除）不受限。
-- **驗證**：`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_adds_strikethrough_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_adds_finding_id_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_history_adds_pointer_line THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_history_adds_copied_old_text THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=todo_unrelated_edit_legacy_strikethrough_elsewhere THEN rc=0`。
+- 改法：適用類別之新增行位於歷史專區外且含 `~~`、考古字面集合任一、或 canonical finding ID（形狀同 `scripts/_synth_attr.py` 之 `ID_RE`）⇒ exit 2。適用類別之新增行位於歷史專區內，須全行符合指標文法 `- <YYYY-MM-DD>：<主詞> → <目標>`：主詞為單一 token，只准 `v<N>` 或登記之狀態識別碼；目標只准以反引號包住、工作樹中實際存在之 repo 相對路徑（含 `.git/info/exclude` 排除之 `handoffs/`——不可變收斂檔之權威位置在此，故以工作樹存在性而非 git 物件驗證），或 `commit` 加反引號包住之 7–40 位十六進位且 `git cat-file -e` 成立者；主詞或目標不合、目標不存在 ⇒ exit 2。整段自正文移出（正文為刪除）不受限。
+- **驗證**：`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_adds_strikethrough_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_adds_finding_id_outside_history THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_history_adds_pointer_line THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=spec_history_adds_copied_old_text THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=history_pointer_free_text_subject THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=history_pointer_target_missing THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=todo_unrelated_edit_legacy_strikethrough_elsewhere THEN rc=0`。
 - **邊界**：①日誌類 ⇒ 不適用、rc=0；②刪除正文段落 ⇒ rc=0；③`templates/` 依類別旗標，fixture 各一。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
@@ -103,12 +103,12 @@
 - 不可做：不得提供略過旗標；不得在 pre-push 重複執行。
 
 **Task 2.4 — 交接檔封閉文法與流水帳生命週期**
-- 目標：交接檔只含生成之現況與待辦、手寫教訓、以及進行中工作之紀錄。　檔案：`scripts/live_doc_write_guard.sh`（交接類全文判定）；文法定義於 `scripts/live_doc_registry.json`。既有 caller：`scripts/inject_handoff.sh`（不改）。
-- 改法：交接檔之 H2 區段須屬登記之封閉集合；「現況」「待辦」兩區除合法生成區塊外不得有任何非空行（內容型，寫入前以寫入後全文判定）；「坑」為手寫、受 Task 2.1；進行中紀錄區為 `HISTORY-BEGIN..END`，區內首個非空行起每則以條目標記開始（標記文法含一或多個登記識別碼），一則延伸至下一標記或區塊結束；區內首個標記前有非空行、標記含未登記識別碼 ⇒ 違規（內容型）；任一則所含識別碼之狀態 ∈ `enforcement_completed_statuses` ⇒ 違規（一致性型，只在 `--staged`／`--tree` 判定，理由登記於 `governance-enforcement`）。
-- **驗證**：`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_current_section_handwritten_line THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_unknown_h2_section THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_history_line_before_first_marker THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh --staged WHEN fixture=handoff_entry_any_id_completed THEN rc!=0`；`ASSERT bash scripts/live_doc_write_guard.sh --staged WHEN fixture=handoff_entry_all_ids_open THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh --staged WHEN fixture=efcafc63_handoff_status_lines_in_current_section THEN rc!=0`。
-- **邊界**：①同一 commit 內狀態轉完成且條目已移出 ⇒ rc=0；②多識別碼中一個完成 ⇒ 整則違規；③跨票教訓寫於「坑」⇒ 不受生命週期判定。
+- 目標：交接檔只含生成之現況與待辦、手寫教訓、以及進行中工作之紀錄；現行交接檔之遷移屬本 Task。　檔案：`scripts/live_doc_write_guard.sh`（交接類全文判定）、`HANDOFF.md`、`docs/HANDOFF_ARCHIVE.md`、`scripts/fact_keys.json`（交接投影兩個 key）；文法定義於 `scripts/live_doc_registry.json`。既有 caller：`scripts/inject_handoff.sh`（不改）。
+- 改法：交接檔之 H2 區段須屬登記之封閉集合；「現況」「待辦」兩區除合法生成區塊外不得有任何非空行，且各須恰含 `scripts/live_doc_registry.json` 交接投影所指之生成區塊（內容型，寫入前以寫入後全文判定）；投影每列欄位為識別碼、狀態、權威相對路徑、下一步，「下一步」為空 ⇒ 違規；現況＝投影來源 key 中狀態 ∈ {`進行中`、`部分完成`} 之列，待辦＝狀態 ∉ `enforcement_completed_statuses` 之列（由 Task 1.3 投影篩選產生，`--check` 對讀）；「坑」為手寫、受 Task 2.1；進行中紀錄區為 `HISTORY-BEGIN..END`，區內首個非空行起每則以條目標記開始（標記文法含一或多個登記識別碼），一則延伸至下一標記或區塊結束；區內首個標記前有非空行、標記含未登記識別碼 ⇒ 違規（內容型）；任一則所含識別碼之狀態 ∈ `enforcement_completed_statuses` ⇒ 違規（一致性型，只在 `--staged`／`--tree` 判定，理由登記於 `governance-enforcement`）。
+- **驗證**：`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_current_section_handwritten_line THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_unknown_h2_section THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_todo_row_missing_next_action THEN rc=2`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=handoff_todo_contains_completed_row THEN rc!=0`；`ASSERT bash scripts/gen_fact_key_blocks.sh --check WHEN fixture=handoff_current_missing_open_batch THEN rc!=0`；`ASSERT bash scripts/live_doc_write_guard.sh WHEN fixture=handoff_history_line_before_first_marker THEN rc=2`；`ASSERT bash scripts/live_doc_write_guard.sh --staged WHEN fixture=handoff_entry_any_id_completed THEN rc!=0`；`ASSERT bash scripts/live_doc_write_guard.sh --staged WHEN fixture=handoff_entry_all_ids_open THEN rc=0`；`ASSERT bash scripts/live_doc_write_guard.sh --staged WHEN fixture=efcafc63_handoff_status_lines_in_current_section THEN rc!=0`。
+- **邊界**：①同一 commit 內狀態轉完成且條目已移出 ⇒ rc=0；②多識別碼中一個完成 ⇒ 整則違規；③跨票教訓寫於「坑」⇒ 不受生命週期判定；④遷移後 `scripts/inject_handoff.sh` 注入內容含生成區塊（對讀）；⑤本 Task 之交接檔遷移與 Task 2.5 之 PreToolUse 掛載須同一 commit——掛載先於遷移則交接檔任何編輯皆因文法不合被擋。
 - **存活至**：全票完工後常設。
-- **覆蓋風險**：Task 4.1 首次把現行交接檔改為本文法。
+- **覆蓋風險**：無（交接檔遷移在本 Task 內完成，Task 4.1 不再改交接檔結構）。
 - 不可做：不得以行數判定；不得刪除進行中紀錄而不移至登記之日誌類檔。
 
 **Task 2.5 — 既有檢查依類別適用、宣稱與規則同步、掛載**
@@ -124,8 +124,8 @@
 
 **Task 3.1 — finding 類別欄雙填與適用門檻**
 - 目標：每條 finding 有可機械計算之類別；只對本規則上線後開債之輪次生效。　檔案：`scripts/governance_verdicts.json`（類別封閉集合、適用門檻序號）、`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`、`templates/COMMITTEE_FINDING_TEMPLATE.md`、`scripts/completeness_check.sh`、`scripts/_synth_attr.py`、`scripts/cx_run.sh`（傳 round id 給 `--single`）。
-- 改法：類別值初值由 TODO Task 3.1 給出。適用門檻＝本 Task 落地 commit 寫入之 audit 序號；某輪之 `committee_round_open` 事件序號大於門檻 ⇒ 該輪委員交件須有類別欄且值 ∈ 集合、收斂檔群集表須有主委類別欄；兩欄不一致之 finding 須列於「類別不一致」段並附處置 token，否則收案 rc!=0；量測分子取委員欄。`--single` 未給 round id ⇒ 視為須有類別（fail-closed）。
-- **驗證**：`ASSERT bash scripts/completeness_check.sh --single <fixture> --family codex --round-id <rid> WHEN fixture=round_after_threshold_p1_without_category THEN rc=1`；`ASSERT bash scripts/completeness_check.sh --single <fixture> --family codex --round-id <rid> WHEN fixture=round_before_threshold_p1_without_category THEN rc=0`；`ASSERT bash scripts/completeness_check.sh --single <fixture> --family codex WHEN fixture=no_round_id_p1_without_category THEN rc=1`；`ASSERT bash scripts/completeness_check.sh --single <fixture> --family codex --round-id <rid> WHEN fixture=category_outside_set THEN rc=1`；`ASSERT python3 scripts/_synth_attr.py <fixture> --mode gate WHEN fixture=category_mismatch_unlisted THEN rc=1`；`ASSERT python3 scripts/_synth_attr.py <fixture> --mode gate WHEN fixture=category_mismatch_listed_with_disposition THEN rc=0`。
+- 改法：類別值初值由 TODO Task 3.1 給出。適用門檻＝本 Task 落地 commit 寫入之 audit 序號；某輪之 `committee_round_open` 事件序號大於門檻 ⇒ 該輪委員交件須有類別欄且值 ∈ 集合、收斂檔群集表須有主委類別欄；兩欄不一致之 finding 須列於「類別不一致」段並附處置 token，否則收案 rc!=0；量測分子取委員欄。`--single` 未給 round id ⇒ 視為須有類別（fail-closed）。`scripts/cx_run.sh` 之四個 `--single` 呼叫面（selfcheck、review／consult／closure 收件、stamp 收件、格式失敗重跑）皆傳同一 round id；selfcheck 未給 round id 時照上述 fail-closed。
+- **驗證**：`ASSERT bash scripts/completeness_check.sh --single <fixture> --family codex --round-id <rid> WHEN fixture=round_after_threshold_p1_without_category THEN rc=1`；`ASSERT bash scripts/completeness_check.sh --single <fixture> --family codex --round-id <rid> WHEN fixture=round_before_threshold_p1_without_category THEN rc=0`；`ASSERT bash scripts/completeness_check.sh --single <fixture> --family codex WHEN fixture=no_round_id_p1_without_category THEN rc=1`；`ASSERT bash scripts/completeness_check.sh --single <fixture> --family codex --round-id <rid> WHEN fixture=category_outside_set THEN rc=1`；`scripts/cx_run.sh` 四個 `--single` 呼叫面逐一以門檻前 round 之無類別交件驗 rc=0、門檻後驗 rc=1；`ASSERT python3 scripts/_synth_attr.py <fixture> --mode gate WHEN fixture=category_mismatch_unlisted THEN rc=1`；`ASSERT python3 scripts/_synth_attr.py <fixture> --mode gate WHEN fixture=category_mismatch_listed_with_disposition THEN rc=0`。
 - **邊界**：①零 findings sentinel ⇒ 類別欄仍須有；②同一交件 bytes 以不同 round id 送入 ⇒ 依該 round 之開債序號判定。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
@@ -133,8 +133,8 @@
 
 **Task 3.2 — 量測契約、收案事件、擋下事件**
 - 目標：成效由機器逐輪記錄與計算。　檔案：新建 `scripts/docrot2_metric_contract.json`、`scripts/docrot2_metrics.sh`；`scripts/audit_events.json`、`scripts/debt_clear.sh`、`scripts/live_doc_write_guard.sh`、`scripts/live_doc_registry_check.sh`。
-- 改法：契約檔定義輪次選取、finding 範圍（canonical，排除 `-P3-00` 零 findings sentinel）、分子（委員類別＝文件同步類）、分母（範圍內 canonical finding 數）、零分母（占比記 0）、比較運算（第二輪 ≤ 第一輪）、交接重放命令、只動歷史區之重蓋章判定（被戳記檔兩次戳記 body 間之差異行全落在 `HISTORY-BEGIN..END` 內）。`debt_clear.sh` 收案前寫入收案量測事件（round、task、session、各類別計數、類別不一致數、委員型號與 effort 取不到記 `unavailable`），缺欄或寫入失敗 rc!=0；兩支守衛擋下時寫擋下事件，寫入失敗仍擋。`docrot2_metrics.sh` 只讀事件與契約，缺事件、重複事件、未知選取 ⇒ rc=1。
-- **驗證**：`ASSERT bash scripts/debt_clear.sh <fixture args> WHEN fixture=synth_without_category_counts THEN rc!=0`；`ASSERT bash scripts/debt_clear.sh <fixture args> WHEN fixture=valid_round THEN rc=0`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=cohort_missing_second_round_event THEN rc=1`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=both_rounds_zero_doc_sync THEN rc=0`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=history_only_restamp_in_cohort THEN rc=1`；擋下 fixture 後 audit 含對應擋下事件 1 筆（`jq` 對讀）。
+- 改法：契約檔定義：票鍵＝task-id 前兩段（`<YYYYMMDD>-<EPIC>`）；cohort＝首個「其第一個 `brief_kind=review` 之 `committee_round_open` 序號大於 `closure_sequence`」之票，取該票 `brief_kind=review` 之前兩輪（依 `committee_round_open` 序號，序號唯一故無並列）；finding 範圍（canonical，排除 `-P3-00` 零 findings sentinel）；分子（委員類別＝文件同步類）；分母（範圍內 canonical finding 數）；零分母（占比記 0）；比較（第二輪 ≤ 第一輪）；每輪 canonical ≤20；交接重放（各輪收案事件所記 commit 上跑 `bash scripts/live_doc_write_guard.sh --tree <commit> --path HANDOFF.md` 須 rc=0）；只動歷史區之重蓋章（cohort 票內每個 stamp 輪，以 `scripts/reconcile_body_hash.sh` 之本體區間——`## 戳記` 之前——比對被戳記檔前後兩次戳記之本體，差異行全落在 `HISTORY-BEGIN..END` 內者計 1，須為 0）。`scripts/audit_events.json` 之 `committee_round_open` 將 `brief_kind` 列入必填（只約束門檻後之新事件）。`debt_clear.sh` 收案前寫入收案量測事件，fields 與必填同步登記：`round_id`、`task_id`、`session_name`、`round_open_sequence`、`brief_kind`、`canonical_count`、各類別計數、`mismatch_count`、`handoff_tree_commit`（收案當下 HEAD）、各家 `model` 與 `reasoning_effort`（取不到記 `unavailable`）；stamp 輪另記 `stamp_target`、`body_sha_before`、`body_sha_after`、`history_only`；缺欄或寫入失敗 rc!=0；兩支守衛擋下時寫擋下事件，寫入失敗仍擋。`docrot2_metrics.sh` 只讀事件與契約，缺事件、重複事件、未知選取 ⇒ rc=1。
+- **驗證**：`ASSERT bash scripts/debt_clear.sh <fixture args> WHEN fixture=synth_without_category_counts THEN rc!=0`；`ASSERT bash scripts/debt_clear.sh <fixture args> WHEN fixture=valid_round THEN rc=0`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=cohort_missing_second_round_event THEN rc=1`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=both_rounds_zero_doc_sync THEN rc=0`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=history_only_restamp_in_cohort THEN rc=1`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=history_only_restamp_hidden_by_stamp_lines THEN rc=1`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=cohort_round_open_missing_brief_kind THEN rc=1`；`ASSERT bash scripts/docrot2_metrics.sh WHEN fixture=duplicate_round_metric_event THEN rc=1`；擋下 fixture 後 audit 含對應擋下事件 1 筆（`jq` 對讀）。
 - **邊界**：①audit 寫入失敗 ⇒ 收案 rc!=0；②擋下事件寫入失敗 ⇒ 仍 exit 2。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
@@ -143,17 +143,17 @@
 ### Phase 4 — 遷移（依賴：Phase 1–3 全部 Task）
 
 **Task 4.1 — 由登記導出之全專案遷移**
-- 目標：現存活文件中之手寫狀態，要麼遷移為生成區塊、要麼具名留存。　檔案：`HANDOFF.md`、`docs/ROADMAP.md`、`白話說明/` 內進度表、登記導出之其他命中檔；新建 `scripts/docrot2_migration_residuals.json`；`scripts/live_doc_registry_check.sh`（`--migration`）。
-- 改法：`--migration` 對登記之非日誌、非歷史類活文件執行全檔模式偵測（新 status key 生效後），命中之每個檔須 ∈（本 Task 遷移後無命中）∪（`docrot2_migration_residuals.json` 所列，每列含路徑、理由類別、owner、觸發條件）；兩者皆否 ⇒ rc=1。交接檔改為 Task 2.4 文法，已完成工作之紀錄移至登記之日誌類檔。
+- 目標：現存活文件（交接檔除外，已於 Task 2.4 遷移）中之手寫狀態，要麼遷移為生成區塊、要麼具名留存。　檔案：`docs/ROADMAP.md`、`白話說明/` 內進度表、登記導出之其他命中檔；新建 `scripts/docrot2_migration_residuals.json`；`scripts/live_doc_registry_check.sh`（`--migration`）。
+- 改法：`--migration` 對登記之非日誌、非歷史類活文件執行全檔模式偵測（新 status key 生效後），命中之每個檔須 ∈（本 Task 遷移後無命中）∪（`docrot2_migration_residuals.json` 所列，每列含路徑、理由類別、owner、觸發條件）；兩者皆否 ⇒ rc=1。交接檔不在本 Task 改結構，僅以 `bash scripts/live_doc_write_guard.sh --tree HEAD --path HANDOFF.md` 確認 rc=0。
 - **驗證**：`ASSERT bash scripts/live_doc_registry_check.sh --migration WHEN fixture=hit_file_neither_migrated_nor_listed THEN rc=1`；`ASSERT bash scripts/live_doc_registry_check.sh --migration WHEN fixture=current_tree_after_migration THEN rc=0`；`bash scripts/gen_fact_key_blocks.sh --check` rc=0；`bash scripts/live_doc_write_guard.sh --staged` rc=0；`bash scripts/plain_docs_render.sh --check` rc=0。
-- **邊界**：①殘留清單列之檔已無命中 ⇒ rc=1（清單過期須刪列）；②`scripts/inject_handoff.sh` 注入內容含生成區塊（對讀）。
+- **邊界**：①殘留清單列之檔已無命中 ⇒ rc=1（清單過期須刪列）；②`docs/ROADMAP.md` 生成區塊與 `scripts/fact_keys.json` rows 逐識別碼對讀。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 - 不可做：不得改 `docs/SPLITUNIFY_SPEC.D-002.md`；不得修改任何檢查判定。
 
 ## §V 驗證策略與邊界測試目錄
 - **測試落點**：`tests/governance/test_docrot2_registry.py`（Task 1.1–1.3）、`test_docrot2_write_guard.py`（Task 2.1–2.4）、`test_docrot2_class_routing.py`（Task 2.5）、`test_docrot2_metrics.py`（Task 3.1–3.2）、`test_docrot2_migration.py`（Task 4.1）；fixture 置 `tests/governance/fixtures/docrot2/`。逐檔明列執行。
-- **mutation（改壞須紅）**：①Edit 重建改為只取 `new_string` ⇒ `same_new_string_old_string_inside_history` 應紅；②加入整類引號豁免 ⇒ `quoted_id_with_status` 應紅；③未登記改 rc=0 ⇒ `new_unregistered_md_staged` 應紅；④類別門檻比較改為恆真 ⇒ `round_before_threshold_p1_without_category` 應紅；⑤收案缺值改放行 ⇒ `synth_without_category_counts` 應紅；⑥條目完成判定改為「全部識別碼完成才擋」⇒ `handoff_entry_any_id_completed` 應紅；⑦類別路由移除 ⇒ `handoff_remove_current_lines_history_keeps_concept` 應紅；⑧歷史專區指標文法移除 ⇒ `spec_history_adds_copied_old_text` 應紅；⑨遷移判定不讀殘留清單 ⇒ `current_tree_after_migration` 應紅。
+- **mutation（改壞須紅）**：①Edit 重建改為只取 `new_string` ⇒ `same_new_string_old_string_inside_history` 應紅；②加入引號或同行樣本豁免 ⇒ `quoted_id_with_status`、`git_show_decoy_status_suffix` 應紅；③未登記改 rc=0 ⇒ `new_unregistered_md_staged` 應紅；④類別門檻比較改為恆真 ⇒ `round_before_threshold_p1_without_category` 應紅；⑤收案缺值改放行 ⇒ `synth_without_category_counts` 應紅；⑥條目完成判定改為「全部識別碼完成才擋」⇒ `handoff_entry_any_id_completed` 應紅；⑦類別路由移除 ⇒ `handoff_remove_current_lines_history_keeps_concept` 應紅；⑧歷史專區指標文法移除 ⇒ `spec_history_adds_copied_old_text` 應紅；⑨遷移判定不讀殘留清單 ⇒ `current_tree_after_migration` 應紅；⑩`replace_all` 為 false 時改取第一處 ⇒ `edit_old_string_nonunique` 應紅；⑪重蓋章判定改用整檔差異 ⇒ `history_only_restamp_hidden_by_stamp_lines` 應紅；⑫投影「下一步」欄檢查移除 ⇒ `handoff_todo_row_missing_next_action` 應紅。
 - **防假綠**：§C 所列既有測試檔之斷言零刪減。
 - **成效判準**：由 `scripts/docrot2_metric_contract.json` 定義、`bash scripts/docrot2_metrics.sh` 計算；及格＝契約四條全過（每輪 canonical finding ≤20；文件同步類占比第二輪 ≤ 第一輪；兩輪收案 commit 之交接檔重放 rc=0；範圍票之只動歷史區重蓋章輪為 0）。不達標 ⇒ 回到 consult 討論「哪一類事實或哪一條寫入路徑仍漏」，不得同時開新治理 epic。
 - **邊界目錄**：空檔、只含生成區塊之檔、含換行之路徑、symlink、重新命名、刪除檔、fenced code block、HISTORY 區塊跨越 Edit 邊界、`replace_all`、payload 不可解析、index 與工作樹不同。
@@ -167,7 +167,6 @@
 - §G：N/A — 本票為治理文件閘，不碰數值、特徵、ML、回測路徑。
 
 **殘留**：
-- `DOCROT2-RESID-SPEC-VERSION` 規格版本不作狀態種類 — `為何現在不做: blocked-by:現有規格檔無機器版本行且本票不得改 docs/SPLITUNIFY_SPEC.D-002.md`；交接檔之版本號過時改由 Task 2.4「現況區只准生成區塊」結構擋；觸發：任一規格檔新增機器版本行；登記處：本 SPEC §N。
 - `DOCROT2-RESID-MEMORY-OFFREPO` 主委記憶檔不受本票閘約束 — `為何現在不做: blocked-by:hook 以 git 根目錄相對路徑運作，記憶目錄位於 repo 外`；觸發：記憶目錄移入 repo 或 hook 支援 repo 外絕對路徑白名單；登記處：本 SPEC §N。
 - `DOCROT2-RESID-D002-STRUCTURAL-RED` `docs/SPLITUNIFY_SPEC.D-002.md` 之結構性紅與既有正文狀態字面 — `為何現在不做: blocked-by:SPLITUNIFY 規格 R 重開`；觸發：SPLITUNIFY R 重開之第一個 commit；登記處：`scripts/docrot2_migration_residuals.json`。
 - `DOCROT2-RESID-SEMANTIC` 同一段現行文字內部之語意矛盾 — `為何現在不做: needs-research:兩段散文互斥之可證偽機械判準`；觸發：出現可機械判定之封閉句型；登記處：本 SPEC §N。
@@ -178,6 +177,7 @@
 
 ## 沿革與追溯索引
 <!-- HISTORY-BEGIN -->
+- 2026-09-15：v3 → `handoffs/reconcile/20260915-docrot2-x-review-r2/synth.md`
 - 2026-09-15：v2 → `handoffs/reconcile/20260915-docrot2-x-review-r1/synth.md`
 - 2026-09-15：v1 → commit `3dbc702c`
 <!-- HISTORY-END -->

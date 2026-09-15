@@ -1,4 +1,4 @@
-# DOCROT2 TODO（DRAFT v2｜基於 `docs/DOCROT2_SPEC.md` v2｜2026-09-15）
+# DOCROT2 TODO（DRAFT v3｜基於 `docs/DOCROT2_SPEC.md` v3｜2026-09-15）
 
 ## §0 全域規則與約束（執行端讀完即可遵守，不必回讀 SPEC）
 - 產出端覆蓋鐵律：新檢查掛寫檔當下；掛不上者登記 `governance-enforcement` 並寫理由（SPEC §C）。
@@ -14,7 +14,7 @@
 | Batch | 含 Task | 依賴 | 合併理由 | 規模 |
 |---|---|---|---|---|
 | D2A | Task 1.1、1.2、1.3 | 無 | 登記層與狀態切換同屬 `scripts/fact_keys.json`／新登記檔，拆開即出現雙權威中間態 | 中 |
-| D2B | Task 2.1、2.2、2.3、2.4、2.5 | D2A | 同一入口 `scripts/live_doc_write_guard.sh` 與同一次 `.claude/settings.json` 掛載 | 大 |
+| D2B | Task 2.1、2.2、2.3、2.4、2.5 | D2A | 同一入口 `scripts/live_doc_write_guard.sh` 與同一次 `.claude/settings.json` 掛載；交接檔遷移須與掛載同 commit | 大 |
 | D2C | Task 3.1、3.2 | D2B | 擋下事件由 D2B 之守衛產出，同批一次完成 | 中 |
 | D2D | Task 4.1 | D2A、D2B、D2C | 遷移須在規則全部上線後一次完成 | 中 |
 
@@ -28,22 +28,25 @@
 - 輸入 / 輸出：輸入全樹 `.md` 清冊；輸出 `scripts/live_doc_registry.json`、`scripts/live_doc_registry_check.sh`。
 - 實作要點：
   1. 類別集合（寫入 JSON，封閉）：`LIVE-HANDOFF`、`LIVE-CONTRACT`、`LIVE-SPEC`、`LIVE-PLAIN`、`LIVE-GUIDE`、`LOG`、`HIST`、`OTHER-DORMANT`。
-  2. 路徑對照初始值（exact 或 `/` 結尾 prefix）：`LIVE-HANDOFF`＝`HANDOFF.md`；`LIVE-CONTRACT`＝`CLAUDE.md`、`AGENTS.md`、`docs/MULTI_AGENT_ORCHESTRATION.md`、`docs/SCAR_LEDGER.md`、`docs/ROADMAP.md`、`docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md`、`docs/GOVERNANCE_EXECUTION_ORDER.md`、`templates/`；`LIVE-SPEC`＝`git ls-files -- 'docs/*SPEC*.md' 'docs/*TODO*.md' 'docs/*PLAN*.md'` 輸出之每一路徑（逐條 exact，`docs/Archived/` 除外）；`LIVE-PLAIN`＝`白話說明/`；`LOG`＝`白話說明/治理進度日誌.md`、`白話說明/流程摩擦記錄.md`、`docs/HANDOFF_ARCHIVE.md`；`LIVE-GUIDE`＝`docs/ARCHITECTURE.md`、`docs/DEVELOPMENT_GUIDE.md`、`docs/API_SPECIFICATION.md`、`docs/PRODUCT_VISION.md`；`HIST`＝`docs/Archived/`、`白話說明/Archived/`、`docs/site/`；`OTHER-DORMANT`＝登記當下 `git ls-files -- 'docs/*.md' '*.md'`（限 `docs/` 頂層與 repo 根目錄）未落入上列者之每一路徑（逐條 exact）。exact 優先於 prefix（`LOG` 之 exact 覆蓋 `LIVE-PLAIN` 之 prefix）；同優先級命中兩類即錯。
+  2. 路徑對照初始值（exact 或 `/` 結尾 prefix）：`LIVE-HANDOFF`＝`HANDOFF.md`；`LIVE-CONTRACT`＝`CLAUDE.md`、`AGENTS.md`、`docs/MULTI_AGENT_ORCHESTRATION.md`、`docs/SCAR_LEDGER.md`、`docs/ROADMAP.md`、`docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md`、`docs/GOVERNANCE_EXECUTION_ORDER.md`、`templates/`；`LIVE-SPEC`＝要點 7 探索函式所得、`docs/` 頂層（路徑恰兩段）且檔名含 `SPEC`、`TODO` 或 `PLAN` 之每一路徑（逐條 exact；HIST prefix 先套，故 `docs/Archived/` 不入）；`LIVE-PLAIN`＝`白話說明/`；`LOG`＝`白話說明/治理進度日誌.md`、`白話說明/流程摩擦記錄.md`、`docs/HANDOFF_ARCHIVE.md`；`LIVE-GUIDE`＝`docs/ARCHITECTURE.md`、`docs/DEVELOPMENT_GUIDE.md`、`docs/API_SPECIFICATION.md`、`docs/PRODUCT_VISION.md`；`HIST`＝`docs/Archived/`、`白話說明/Archived/`、`docs/site/`；`OTHER-DORMANT`＝要點 7 探索函式所得範圍內（`docs/` 與 `白話說明/` 全部層級、repo 根目錄 `.md`）未落入上列任一類之每一路徑（逐條 exact，含巢狀路徑如 `docs/reviews/` 下各檔）。exact 優先於 prefix（`LOG` 之 exact 覆蓋 `LIVE-PLAIN` 之 prefix）；同優先級命中兩類即錯。
   3. 各類規則旗標：`new_line_status_check`＝LIVE-*、OTHER-DORMANT 為 true，LOG、HIST 為 false；`archaeology_check`＝LIVE-*、OTHER-DORMANT 為 true，LOG、HIST 為 false；`concept_removal_xref`＝僅 LIVE-SPEC 為 true；`handoff_grammar`＝僅 LIVE-HANDOFF 為 true。
-  4. 考古字面集合初始值：`保留供追溯`、`原寫`、`SUPERSEDED`、`作廢`、`以下為關閉前之敘述`（`~~` 另判，不入集合）。歷史專區指標文法初始值（正則）：`^- [0-9]{4}-[0-9]{2}-[0-9]{2}：[^→]+ → (\`[^\`]+\`|commit \`[0-9a-f]{7,40}\`)$`。
-  5. 交接檔：H1 限一行、H2 區段封閉集合＝`## 現況`、`## 待辦`、`## 坑`、`## 進行中紀錄`；`## 現況`、`## 待辦` 只准生成區塊；`## 進行中紀錄` 內為 `HISTORY-BEGIN..END`，條目標記文法＝`<!-- ENTRY: <ID>(,<ID>)* -->`；完成條目移出目的地＝`docs/HANDOFF_ARCHIVE.md`；`## 待辦` 投影之 key 清單＝Task 1.2 新增之 SPLITUNIFY 批次、殘留 key、本票批次 key 與 `handoff-pending` key。
-  6. `live_doc_registry_check.sh`：`--path <p>`、`--all`（`git ls-files --cached --others --exclude-standard -z` 重建清冊，NUL-safe）、`--staged`；範圍＝`docs/`、`白話說明/`、repo 根目錄之 `.md`；未命中、兩類衝突、`_schema.status_scope` 項不在登記 ⇒ rc=1；symlink、非 regular file ⇒ rc=1。
-- 修改檔案：新建 `scripts/live_doc_registry.json`、`scripts/live_doc_registry_check.sh::main`　既有 caller：新建無。
+  4. 考古字面集合初始值：`保留供追溯`、`原寫`、`SUPERSEDED`、`作廢`、`以下為關閉前之敘述`（`~~` 另判，不入集合）。歷史專區指標文法初始值（正則）：`^- [0-9]{4}-[0-9]{2}-[0-9]{2}：(v[0-9]+|[A-Za-z0-9._-]+) → (\`[^\`]+\`|commit \`[0-9a-f]{7,40}\`)$`。
+  5. 交接檔：H1 限一行、H2 區段封閉集合＝`## 現況`、`## 待辦`、`## 坑`、`## 進行中紀錄`；`## 現況`、`## 待辦` 只准生成區塊；`## 進行中紀錄` 內為 `HISTORY-BEGIN..END`，條目標記文法＝`<!-- ENTRY: <ID>(,<ID>)* -->`；完成條目移出目的地＝`docs/HANDOFF_ARCHIVE.md`；交接投影：來源 key＝`docrot2-batch-status`、`splitunify-batch-status`、`splitunify-residual-status`、`handoff-pending`；投影欄位＝`識別碼`、`狀態`、`權威路徑`、`下一步`；`## 現況`＝狀態 ∈ {`進行中`、`部分完成`} 之列；`## 待辦`＝狀態 ∈ {`未開工`、`進行中`、`部分完成`、`待審`、`停手`、`狀態未確認`} 之列（寫入 JSON 時逐值列出）；投影列「下一步」為空 ⇒ 生成與 `--check` rc!=0。
+  6. `live_doc_registry_check.sh`：`--path <p>`、`--all`、`--staged` 三模式皆呼叫要點 7 之探索函式；未命中、同優先級命中兩類、`_schema.status_scope` 項不在登記 ⇒ rc=1；symlink、非 regular file ⇒ rc=1。
+  7. 單一探索函式 `discover_live_docs`：`git ls-files --cached --others --exclude-standard -z`、`LC_ALL=C` 排序、NUL-safe；範圍＝`docs/` 與 `白話說明/` 全部層級、repo 根目錄之 `.md`；先套 HIST prefix，其餘依要點 2 分類。
+  8. `scripts/live_doc_registry_update.sh --add <path> [--class <類別>]`：未給類別時以要點 2 之分類述詞判定；寫入後依類別、路徑排序輸出 JSON；同路徑已登記 ⇒ rc=1；新增規格或施工清單檔之唯一登記入口。
+- 修改檔案：新建 `scripts/live_doc_registry.json`、`scripts/live_doc_registry_check.sh::main`、`::discover_live_docs`、`scripts/live_doc_registry_update.sh::main`　既有 caller：新建無。
 - 路徑：
   - scripts/live_doc_registry.json
   - scripts/live_doc_registry_check.sh
+  - scripts/live_doc_registry_update.sh
   - docs/HANDOFF_ARCHIVE.md
   - tests/governance/test_docrot2_registry.py
   - tests/governance/fixtures/docrot2/
 - 不可做：不得 glob 登記；不得登記 `handoffs/`；不得改 hook 掛載。
 - 邊界：①含換行之路徑正確判定不切碎；②`docs/Archived/x.md` ⇒ HIST、rc=0；③`白話說明/治理進度日誌.md` ⇒ LOG（exact 優先）。
 - 風險緩解：⊘
-- 驗證：fixture `unregistered`、`path_in_two_classes`、`excluded_site_listed_as_live`、`one_registered_path_removed` 各 rc=1，`current_tree` rc=0；`venv/bin/python -m pytest tests/governance/test_docrot2_registry.py -q` 0 failed。
+- 驗證：fixture `unregistered`、`path_in_two_classes`、`excluded_site_listed_as_live`、`one_registered_path_removed`、`archived_spec_listed_as_live_spec`、`nested_doc_unclassified` 各 rc=1，`current_tree`、`new_top_level_spec`（`live_doc_registry_update.sh --add`）rc=0；`venv/bin/python -m pytest tests/governance/test_docrot2_registry.py -q` 0 failed。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
@@ -51,8 +54,8 @@
 - SPEC ref：§P Task 1.2　目標：SPLITUNIFY 批次／Task／殘留與本票狀態只存於 JSON，施工清單同 commit 改為生成區塊。
 - 輸入 / 輸出：輸入 `docs/SPLITUNIFY_TODO.md` §B、§C-9 Task 標題、§E 現行字面；輸出新 status key、切換後之施工清單、`B-63` 票列、`白話說明/DOCROT2施工進度.md`。
 - 實作要點：
-  1. 一次性遷移對照（只用於本次換算）：§B 狀態欄「✅ 完成」或「✅ **完成**（附註）」→ `已完成`（附註移入同列「合併理由」欄後段或刪除，由 git 保留）；§C-9 Task 標題含「✅ **已完成」→ `已完成`；§E 識別碼欄含刪除線且含「已關閉」→ `已完成`；§E 理由類別欄含「已關閉」且含「剩餘之半」→ `部分完成`；§E 識別碼欄無刪除線且理由類別欄 ∈ {`blocked-by`、`user-ruling`、`needs-research`} → `未開工`；§E「（原文，保留供對照）」列不登記，整列刪除並於 §E 下方歷史專區加一行指標（`- 2026-09-15：SU-RESID-3 原文列移除 → commit \`<本 commit sha 前 8 碼>\``）。對照未涵蓋之字面 ⇒ 換算 fixture rc!=0。
-  2. 新 key：`splitunify-batch-status`（B1…B9F）、`splitunify-task-status`（§C-9 之 Task 9.1、9.2、9.2a、9.2b、9.3、9.4、9.5）、`splitunify-residual-status`（§E 各識別碼）、`docrot2-batch-status`（D2A–D2D，初值 `未開工`）、`handoff-pending`（使用者待決事項，初值一列：白話說明整理）；各 key `columns` 第 2 欄為識別碼；`_schema.status_keys` 追加五個 key。
+  1. 一次性遷移對照（只用於本次換算）：§B 狀態欄「✅ 完成」或「✅ **完成**（附註）」→ `已完成`（附註移入同列「合併理由」欄後段或刪除，由 git 保留）；§C-9 Task 標題含「✅ **已完成」→ `已完成`；§E 識別碼欄含刪除線且含「已關閉」→ `已完成`；§E 理由類別欄含「已關閉」且含「剩餘之半」→ `部分完成`；§E 識別碼欄無刪除線且理由類別欄 ∈ {`blocked-by`、`user-ruling`、`needs-research`} → `未開工`；§E「（原文，保留供對照）」列不登記，整列刪除並於 §E 下方歷史專區加一行指標（`- 2026-09-15：SU-RESID-3 → commit \`<切換前 HEAD 之 sha 前 8 碼>\``；主詞為單一識別碼，符合 Task 2.2 文法）。對照未涵蓋之字面 ⇒ 換算 fixture rc!=0。
+  2. 新 key：`splitunify-batch-status`（B1…B9F）、`splitunify-task-status`（§C-9 之 Task 9.1、9.2、9.2a、9.2b、9.3、9.4、9.5）、`splitunify-residual-status`（§E 各識別碼）、`docrot2-batch-status`（D2A–D2D，初值 `未開工`）、`handoff-pending`（使用者待決事項，初值一列：白話說明整理）；各 key `columns` 第 2 欄為識別碼，並含 `權威路徑`、`下一步` 兩欄（未完成列之「下一步」不得為空）；`_schema.status_keys` 追加五個 key。
   3. `governance-ticket-sot` rows 追加 `B-63`（狀態 `部分完成`，狀態依據以「還缺：」起頭）；backlog 追加 `## B-63`。
   4. 施工清單刪除 §B 狀態欄、§C-9 Task 標題中之狀態字面、§E 識別碼欄與理由類別欄之狀態字面，改插合法生成區塊；`bash scripts/gen_fact_key_blocks.sh --write`。
   5. 新建 `白話說明/DOCROT2施工進度.md`，狀態只以生成區塊呈現。
@@ -79,6 +82,8 @@
   1. `_schema.fields` 新增 `rows_source`：物件，鍵 `file`（repo 相對 JSON 路徑）、`path`（字串陣列，逐層物件鍵）。
   2. 讀取：值須為字串陣列；每元素產出 `[三位零補序號, 元素]`；`LC_ALL=C`；同 key 同時有 `rows` 與 `rows_source`、`file` 含 `..` 或為絕對路徑、路徑不存在、值非字串陣列 ⇒ rc!=0。
   3. 新增 `committee-roster` key：`rows_source`＝`{file: "scripts/governance_families.json", path: ["active_stampers"]}`。
+  4. `_schema.fields` 新增 `rows_filter`：`{source_keys: key 陣列, status_column: 欄名, allow: 狀態值陣列}`；取各來源 key 狀態欄 ∈ `allow` 之列，依 `source_keys` 順序與 rows 原順序串接；來源 key 或欄名不存在、`allow` 含 `status_enum` 以外之值、與 `rows`／`rows_source` 並存 ⇒ rc!=0。
+  5. 交接投影之 `handoff-current`、`handoff-todo` 兩個 key 於 Task 4.1 建立（target＝`HANDOFF.md`）；本 Task 只以 fixture 驗 `rows_filter`。
 - 修改檔案：`scripts/gen_fact_key_blocks.sh`（rows 讀取函式）、`scripts/fact_keys.json::_schema.fields`、`scripts/fact_keys.json::committee-roster`　既有 caller：`--check`／`--write` 全路徑。
 - 路徑：
   - scripts/gen_fact_key_blocks.sh
@@ -88,7 +93,7 @@
 - 不可做：不得執行 shell 或任意查詢式；不得讀 repo 外檔。
 - 邊界：①空陣列 ⇒ 零列、rc=0；②陣列含數字 ⇒ rc!=0。
 - 風險緩解：`tests/governance/test_govb1_factkey_gen.py` 全檔 0 failed。
-- 驗證：fixture `rows_source_string_array` rc=0、`rows_source_changed_without_write` rc!=0、`rows_source_value_is_object` rc!=0、`rows_source_absolute_path` rc!=0。
+- 驗證：fixture `rows_source_string_array` rc=0、`rows_source_changed_without_write` rc!=0、`rows_source_value_is_object` rc!=0、`rows_source_absolute_path` rc!=0、`rows_filter_selects_open_rows` rc=0、`rows_filter_unknown_status_value` rc!=0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
@@ -103,9 +108,9 @@
 - 輸入 / 輸出：輸入 PreToolUse payload；輸出 exit 0／2。
 - 實作要點：
   1. 新建 `scripts/live_doc_write_guard.sh`；目標非登記活文件或類別旗標 `new_line_status_check`＝false ⇒ exit 0。
-  2. 重建寫入後全文：Edit＝磁碟舊檔以 `old_string`→`new_string` 取代（`replace_all` 為 true 全部、否則第一處）；舊檔無 `old_string` ⇒ exit 2。Write＝`content`。
+  2. 重建寫入後全文：Edit＝`replace_all` 為 true 時磁碟舊檔之全部 `old_string` 取代為 `new_string`；否則 `old_string` 須恰出現一次再取代為 `new_string`，出現 0 次或 2 次以上 ⇒ exit 2。Write＝`content`。
   3. 新增行＝`diff` 舊檔與寫入後全文之 `+` 行，行號以寫入後全文計；以寫入後全文掃描合法生成區塊、`HISTORY-BEGIN..END`、fenced code block 範圍，範圍內新增行豁免。
-  4. 判定：自 `scripts/gen_fact_key_blocks.sh` 抽出共用入口（例 `_fk_status_hits_in_lines <rel> <lines-file>`），既有 `_fk_reject_handwritten_status` 改呼叫同一入口；同行含 `git show <修訂>:` 形式者豁免；「」引號不豁免（具名偏離 consult-r2 裁定 2）。
+  4. 判定：自 `scripts/gen_fact_key_blocks.sh` 抽出共用入口（例 `_fk_status_hits_in_lines <rel> <lines-file>`），既有 `_fk_reject_handwritten_status` 改呼叫同一入口；不設引號豁免、不設樣本句豁免（具名偏離 consult-r2 裁定 2）；過時樣本須置於 fenced code block。
 - 修改檔案：新建 `scripts/live_doc_write_guard.sh::main`、`::rebuild_after_state`、`::added_lines`；`scripts/gen_fact_key_blocks.sh::_fk_status_hits_in_lines`（新增）、`::_fk_reject_handwritten_status`（改呼叫共用入口，行為不變）　既有 caller：`scripts/factkey_write_guard.sh`、`scripts/gov_check.sh` 段 3。
 - 路徑：
   - scripts/live_doc_write_guard.sh
@@ -115,7 +120,7 @@
 - 不可做：不得掃整檔既有行；不得以寫檔後鉤子宣稱已擋。
 - 邊界：①同一 `new_string`、`old_string` 位於歷史專區內外各一；②`replace_all` true 兩處；③Write 內容與磁碟相同 ⇒ exit 0。
 - 風險緩解：`tests/governance/test_govb1_factkey_gen.py` 全檔 0 failed（共用入口抽出之回歸）。
-- 驗證：fixture `handoff_edit_adds_id_with_status` exit 2、`same_new_string_old_string_inside_history` exit 0、`same_new_string_old_string_outside_history` exit 2、`replace_all_true_two_occurrences` exit 2、`quoted_id_with_status` exit 2、`git_show_sample_line` exit 0、`edit_old_string_absent` exit 2。
+- 驗證：fixture `handoff_edit_adds_id_with_status` exit 2、`same_new_string_old_string_inside_history` exit 0、`same_new_string_old_string_outside_history` exit 2、`replace_all_true_two_occurrences` exit 2、`quoted_id_with_status` exit 2、`git_show_decoy_status_suffix` exit 2、`stale_sample_in_fence` exit 0、`edit_old_string_absent` exit 2、`edit_old_string_nonunique` exit 2。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
@@ -124,7 +129,7 @@
 - 輸入 / 輸出：同 Task 2.1 入口之第二道判定。
 - 實作要點：
   1. 類別旗標 `archaeology_check`＝true 者：歷史專區外新增行含 `~~`、考古字面集合任一、或 canonical finding ID（形狀同 `scripts/_synth_attr.py` 之 `ID_RE`，去除行首 `## ` 之錨定）⇒ exit 2。
-  2. 歷史專區內新增行須全行符合登記之指標文法，否則 exit 2。
+  2. 歷史專區內新增行須全行符合登記之指標文法：主詞為單一 token 且為 `v[0-9]+` 形式或登記之狀態識別碼；目標為反引號包住且工作樹存在之 repo 相對路徑（含 git 排除之 `handoffs/`），或 `commit` 加反引號包住之 7–40 位十六進位且 `git cat-file -e <sha>^{commit}` 成立；任一不合 ⇒ exit 2。
   3. 刪除行不判。
 - 修改檔案：`scripts/live_doc_write_guard.sh::check_archaeology`、`::check_history_pointer`　既有 caller：無。
 - 路徑：
@@ -134,7 +139,7 @@
 - 不可做：不得要求既有刪除線清零；不得擴及 `handoffs/`。
 - 邊界：①LOG 類 ⇒ exit 0；②正文整段刪除 ⇒ exit 0。
 - 風險緩解：⊘
-- 驗證：fixture `spec_adds_strikethrough_outside_history` exit 2、`spec_adds_finding_id_outside_history` exit 2、`spec_history_adds_pointer_line` exit 0、`spec_history_adds_copied_old_text` exit 2、`todo_unrelated_edit_legacy_strikethrough_elsewhere` exit 0。
+- 驗證：fixture `spec_adds_strikethrough_outside_history` exit 2、`spec_adds_finding_id_outside_history` exit 2、`spec_history_adds_pointer_line` exit 0、`spec_history_adds_copied_old_text` exit 2、`history_pointer_free_text_subject` exit 2、`history_pointer_target_missing` exit 2、`todo_unrelated_edit_legacy_strikethrough_elsewhere` exit 0。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
@@ -163,21 +168,26 @@
 - SPEC ref：§P Task 2.4　目標：交接檔只含生成之現況與待辦、手寫教訓、進行中工作之紀錄。
 - 輸入 / 輸出：輸入交接檔寫入後全文（寫入前）或 index／commit 版（`--staged`／`--tree`）；輸出 rc。
 - 實作要點：
-  1. 內容型（寫入前與 `--staged` 皆判）：H2 不屬封閉集合、`## 現況`／`## 待辦` 有生成區塊外之非空行、進行中紀錄區首個條目標記前有非空行、標記不合文法或含未登記識別碼 ⇒ 違規。
+  1. 內容型（寫入前與 `--staged` 皆判）：H2 不屬封閉集合、`## 現況`／`## 待辦` 有生成區塊外之非空行或未恰含對應投影 key（`handoff-current`／`handoff-todo`）之生成區塊、生成區塊內任一列「下一步」為空、進行中紀錄區首個條目標記前有非空行、標記不合文法或含未登記識別碼 ⇒ 違規。
   2. 一致性型（僅 `--staged`／`--tree`）：任一條目所含識別碼之狀態（讀 `scripts/fact_keys.json` rows）∈ `enforcement_completed_statuses` ⇒ 違規。
   3. 一則＝自標記行至下一標記或 `HISTORY-END` 前一行。
   4. `governance-enforcement` 登記第 2 點為一致性型並寫理由（須跨檔讀狀態）。
-- 修改檔案：`scripts/live_doc_write_guard.sh::check_handoff_grammar`、`::check_handoff_lifecycle`　既有 caller：`scripts/inject_handoff.sh`（不改）。
+  5. 遷移（與 Task 2.5 掛載同一 commit）：建立 `handoff-current`、`handoff-todo` 兩個投影 key（`target`＝`HANDOFF.md`，`rows_filter` 依 Task 1.1 要點 5）；`HANDOFF.md` 改為本文法：現況與待辦插生成區塊；現行主線之紀錄以 `<!-- ENTRY: B-63 -->` 等標記置於進行中紀錄區；已完成工作之紀錄整段移至 `docs/HANDOFF_ARCHIVE.md`。
+  6. 掛載先於遷移會使交接檔任何編輯皆因文法不合被擋，故兩者不得分 commit。
+- 修改檔案：`scripts/live_doc_write_guard.sh::check_handoff_grammar`、`::check_handoff_lifecycle`、`HANDOFF.md`、`docs/HANDOFF_ARCHIVE.md`、`scripts/fact_keys.json`（`handoff-current`、`handoff-todo`）　既有 caller：`scripts/inject_handoff.sh`（不改）。
 - 路徑：
   - scripts/live_doc_write_guard.sh
   - scripts/live_doc_registry.json
   - tests/governance/test_docrot2_write_guard.py
+  - HANDOFF.md
+  - docs/HANDOFF_ARCHIVE.md
+  - scripts/fact_keys.json
 - 不可做：不得以行數判定；不得刪除進行中紀錄而不移至 `docs/HANDOFF_ARCHIVE.md`。
-- 邊界：①同一 commit 狀態轉完成且條目已移出 ⇒ rc=0；②一則兩識別碼一完成 ⇒ 違規；③「坑」引用已結束工作 ⇒ 不判生命週期。
+- 邊界：①同一 commit 狀態轉完成且條目已移出 ⇒ rc=0；②一則兩識別碼一完成 ⇒ 違規；③「坑」引用已結束工作 ⇒ 不判生命週期；④遷移後 `scripts/inject_handoff.sh` 注入內容含生成區塊（對讀）。
 - 風險緩解：⊘
-- 驗證：fixture `handoff_current_section_handwritten_line` exit 2、`handoff_unknown_h2_section` exit 2、`handoff_history_line_before_first_marker` exit 2、`handoff_entry_any_id_completed`（`--staged`）rc!=0、`handoff_entry_all_ids_open`（`--staged`）rc=0、`efcafc63_handoff_status_lines_in_current_section`（`--staged`）rc!=0。
+- 驗證：fixture `handoff_current_section_handwritten_line` exit 2、`handoff_unknown_h2_section` exit 2、`handoff_todo_row_missing_next_action` exit 2、`handoff_todo_contains_completed_row`（`gen_fact_key_blocks.sh --check`）rc!=0、`handoff_current_missing_open_batch`（`gen_fact_key_blocks.sh --check`）rc!=0、`handoff_history_line_before_first_marker` exit 2、`handoff_entry_any_id_completed`（`--staged`）rc!=0、`handoff_entry_all_ids_open`（`--staged`）rc=0、`efcafc63_handoff_status_lines_in_current_section`（`--staged`）rc!=0。
 - **存活至**：全票完工後常設。
-- **覆蓋風險**：Task 4.1 首次把現行交接檔改為本文法。
+- **覆蓋風險**：無（交接檔遷移在本 Task 內完成）。
 
 ### Task 2.5 — 既有檢查依類別適用、宣稱與規則同步、掛載（`票 B-63`）
 - SPEC ref：§P Task 2.5　目標：消除已知摩擦與互斥規則，掛上 Task 2.1–2.4。
@@ -215,9 +225,9 @@
 - 實作要點：
   1. `scripts/governance_verdicts.json` 新鍵 `finding_category_values`＝`code-contract`、`doc-sync`、`format-reject`、`other`；新鍵 `category_required_after_audit_sequence`＝本 Task 落地 commit 前一刻 `.claude/gate/audit.log` 之最大 `sequence`（寫入值並附於 commit 訊息）。
   2. 兩份範本 finding 格式新增 `**類別**: <值>` 一行（與標籤同行）。
-  3. `completeness_check.sh --single` 新增 `--round-id <rid>`：讀該 round 之 `committee_round_open` 事件序號；大於門檻或未給 `--round-id` ⇒ 每條 finding（含零 findings sentinel）須有合法類別，否則 rc=1。`scripts/cx_run.sh` 呼叫 `--single` 時帶 `--round-id`。
+  3. `completeness_check.sh --single` 新增 `--round-id <rid>`：讀該 round 之 `committee_round_open` 事件序號；大於門檻或未給 `--round-id` ⇒ 每條 finding（含零 findings sentinel）須有合法類別，否則 rc=1。`scripts/cx_run.sh` 四個 `--single` 呼叫面（`--selfcheck`、review／consult／closure 收件、stamp 收件、格式失敗重跑）皆帶同一 `--round-id`；`--selfcheck` 新增 `--round-id` 參數，未給則照前述 fail-closed。
   4. `scripts/_synth_attr.py` 新增 `check_category`：門檻後之收斂檔群集表第 5 欄為主委類別（封閉值）；委員欄與主委欄不一致之 finding 須列於「類別不一致」段且附處置 token，否則錯。
-- 修改檔案：`scripts/governance_verdicts.json`、`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`、`templates/COMMITTEE_FINDING_TEMPLATE.md`、`scripts/completeness_check.sh::_validate_finding_body`、`scripts/_synth_attr.py::check_category`、`scripts/cx_run.sh`（`--single` 呼叫點）　既有 caller：`scripts/synth_attribution_hook.sh`、`scripts/reconcile_cluster_attribution_check.sh`、`scripts/debt_clear.sh`。
+- 修改檔案：`scripts/governance_verdicts.json`、`templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`、`templates/COMMITTEE_FINDING_TEMPLATE.md`、`scripts/completeness_check.sh::_validate_finding_body`、`scripts/_synth_attr.py::check_category`、`scripts/cx_run.sh`（四個 `--single` 呼叫面與 `--selfcheck` 參數解析）　既有 caller：`scripts/synth_attribution_hook.sh`、`scripts/reconcile_cluster_attribution_check.sh`、`scripts/debt_clear.sh`。
 - 路徑：
   - scripts/governance_verdicts.json
   - templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
@@ -229,7 +239,7 @@
 - 不可做：不得以日期、mtime 判定適用；不得讓主委欄作分子。
 - 邊界：①同一交件 bytes 以門檻前、後兩個 round id 送入 ⇒ rc 0／1；②群集表無第 5 欄之門檻前舊收斂檔 ⇒ 不判。
 - 風險緩解：`tests/governance/test_docrot_e3_brief_placeholder.py` 與既有 completeness、synth_attr 測試逐檔 0 failed。
-- 驗證：fixture `round_after_threshold_p1_without_category` rc=1、`round_before_threshold_p1_without_category` rc=0、`no_round_id_p1_without_category` rc=1、`category_outside_set` rc=1、`category_mismatch_unlisted` rc=1、`category_mismatch_listed_with_disposition` rc=0。
+- 驗證：fixture `round_after_threshold_p1_without_category` rc=1、`round_before_threshold_p1_without_category` rc=0、`no_round_id_p1_without_category` rc=1、`category_outside_set` rc=1、`category_mismatch_unlisted` rc=1、`category_mismatch_listed_with_disposition` rc=0；`scripts/cx_run.sh` 四呼叫面逐一以門檻前 round 之無類別交件驗 rc=0、門檻後驗 rc=1。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
@@ -237,8 +247,8 @@
 - SPEC ref：§P Task 3.2　目標：成效由機器逐輪記錄與計算。
 - 輸入 / 輸出：輸入收斂檔、交件、守衛擋下；輸出 audit 事件、`scripts/docrot2_metrics.sh` 報表 rc。
 - 實作要點：
-  1. 新建 `scripts/docrot2_metric_contract.json`，鍵：`cohort`（第一張「首個 review 輪之 `committee_round_open` 序號大於本票收票序號」之票，取其 session kind 為 review 之前兩輪，依序號）、`finding_scope`（canonical finding，排除 `-P3-00`）、`numerator`（委員類別＝`doc-sync`）、`denominator`（範圍內 canonical 數）、`zero_denominator`（占比 0）、`comparator`（第二輪 ≤ 第一輪）、`max_findings_per_round`（20）、`handoff_replay`（兩輪收案 commit 各跑 `bash scripts/live_doc_write_guard.sh --tree <commit> --path HANDOFF.md` 須 rc=0）、`history_only_restamp`（範圍票內被戳記檔兩次戳記 body 之差異行全落在 `HISTORY-BEGIN..END` 內者計 1，須為 0）、`closure_sequence`（本票收票時寫入）。
-  2. `scripts/audit_events.json` 登記 `docrot2_round_metric`（round_id、task_id、session、各類別計數、類別不一致數、canonical 數、各家 model、各家 reasoning_effort，取不到記 `unavailable`）與 `docrot2_gate_block`（rule_id、path、class）。
+  1. 新建 `scripts/docrot2_metric_contract.json`，鍵：`ticket_key`（task-id 前兩段 `<YYYYMMDD>-<EPIC>`）、`cohort`（首個「其第一個 `brief_kind=review` 之 `committee_round_open` 序號大於 `closure_sequence`」之票，取該票 `brief_kind=review` 之前兩輪，依 `committee_round_open` 序號）、`finding_scope`（canonical finding，排除 `-P3-00`）、`numerator`（委員類別＝`doc-sync`）、`denominator`（範圍內 canonical 數）、`zero_denominator`（占比 0）、`comparator`（第二輪 ≤ 第一輪）、`max_findings_per_round`（20）、`handoff_replay`（兩輪收案 commit 各跑 `bash scripts/live_doc_write_guard.sh --tree <commit> --path HANDOFF.md` 須 rc=0）、`history_only_restamp`（範圍票內每個 stamp 輪，以 `scripts/reconcile_body_hash.sh` 之本體區間——`## 戳記` 之前——比對被戳記檔前後兩次戳記之本體，差異行全落在 `HISTORY-BEGIN..END` 內者計 1，須為 0）、`closure_sequence`（本票收票時寫入）。
+  2. `scripts/audit_events.json` 之 fields 與 `required_fields_per_event` 同步登記 `docrot2_round_metric`（`round_id`、`task_id`、`session_name`、`round_open_sequence`、`brief_kind`、`canonical_count`、各類別計數、`mismatch_count`、`handoff_tree_commit`、各家 `model` 與 `reasoning_effort`〔取不到記 `unavailable`〕；stamp 輪另含 `stamp_target`、`body_sha_before`、`body_sha_after`、`history_only`）與 `docrot2_gate_block`（`rule_id`、`path`、`class`）；`committee_round_open` 之 `brief_kind` 列入必填（只約束門檻後之新事件）。
   3. `scripts/debt_clear.sh` 收案前寫 `docrot2_round_metric`（僅門檻後之輪次）；缺欄或寫入失敗 rc!=0。兩支守衛擋下時寫 `docrot2_gate_block`，寫入失敗仍擋。
   4. `scripts/docrot2_metrics.sh`：只讀 audit 與契約；缺事件、重複事件、未知 cohort ⇒ rc=1；四條及格全過 ⇒ rc=0，任一不過 ⇒ rc=1。
 - 修改檔案：新建 `scripts/docrot2_metric_contract.json`、`scripts/docrot2_metrics.sh::main`；`scripts/audit_events.json`；`scripts/debt_clear.sh::main`（收案前段）；`scripts/live_doc_write_guard.sh::emit_block_event`；`scripts/live_doc_registry_check.sh::emit_block_event`　既有 caller：`scripts/audit_append.sh`（不改）。
@@ -253,7 +263,7 @@
 - 不可做：不得以 `doc_friction_ratio` 字面作分子；不得寫入推定之委員型號；報表不得解析散文。
 - 邊界：①兩輪文件同步類皆 0 ⇒ comparator 過；②只剩一輪事件 ⇒ rc=1。
 - 風險緩解：`tests/governance/test_debt_emit.py` 既有紅基準不得增加，逐條對讀。
-- 驗證：fixture `synth_without_category_counts` rc!=0、`valid_round` rc=0（audit 事件 `jq` 逐欄對讀）、`cohort_missing_second_round_event` rc=1、`both_rounds_zero_doc_sync` rc=0、`history_only_restamp_in_cohort` rc=1；擋下 fixture 後 audit 含 `docrot2_gate_block` 1 筆。
+- 驗證：fixture `synth_without_category_counts` rc!=0、`valid_round` rc=0（audit 事件 `jq` 逐欄對讀）、`cohort_missing_second_round_event` rc=1、`both_rounds_zero_doc_sync` rc=0、`history_only_restamp_in_cohort` rc=1、`history_only_restamp_hidden_by_stamp_lines` rc=1、`cohort_round_open_missing_brief_kind` rc=1、`duplicate_round_metric_event` rc=1；擋下 fixture 後 audit 含 `docrot2_gate_block` 1 筆。
 - **存活至**：全票完工後常設。
 - **覆蓋風險**：無。
 
@@ -269,12 +279,10 @@
 - 實作要點：
   1. `live_doc_registry_check.sh --migration`：對 `new_line_status_check`＝true 之類別全檔執行共用判定入口；命中檔 ∉ 殘留清單 ⇒ rc=1；殘留清單列之檔已無命中 ⇒ rc=1（清單過期）。
   2. 殘留清單每列：`path`、`reason_class`（`blocked-by`／`user-ruling`／`needs-research`）、`owner`、`trigger`；初始列至少含 `docs/SPLITUNIFY_SPEC.D-002.md`（`DOCROT2-RESID-D002-STRUCTURAL-RED`）。
-  3. `HANDOFF.md` 改為 Task 2.4 文法：現況與待辦插生成區塊；現行主線之紀錄以 `<!-- ENTRY: B-63 -->` 等標記置於進行中紀錄區；已完成工作之紀錄整段移至 `docs/HANDOFF_ARCHIVE.md`。
+  3. 交接檔已於 Task 2.4 遷移，本 Task 不改其結構；以 `bash scripts/live_doc_write_guard.sh --tree HEAD --path HANDOFF.md` 確認 rc=0。
   4. `docs/ROADMAP.md` 與白話進度表之狀態格改生成區塊；其他命中檔逐檔遷移或列入殘留清單。
-- 修改檔案：`HANDOFF.md`、`docs/HANDOFF_ARCHIVE.md`、`docs/ROADMAP.md`、`白話說明/SPLITUNIFY施工進度.md`、`白話說明/接下來要做什麼.md`、`--migration` 命中之其他檔、`scripts/docrot2_migration_residuals.json`、`scripts/live_doc_registry_check.sh::migration_mode`　既有 caller：`scripts/inject_handoff.sh`、`scripts/plain_docs_render.sh`（不改）。
+- 修改檔案：`docs/ROADMAP.md`、`白話說明/SPLITUNIFY施工進度.md`、`白話說明/接下來要做什麼.md`、`--migration` 命中之其他檔、`scripts/docrot2_migration_residuals.json`、`scripts/live_doc_registry_check.sh::migration_mode`　既有 caller：`scripts/inject_handoff.sh`、`scripts/plain_docs_render.sh`（不改）。
 - 路徑：
-  - HANDOFF.md
-  - docs/HANDOFF_ARCHIVE.md
   - docs/ROADMAP.md
   - 白話說明/SPLITUNIFY施工進度.md
   - 白話說明/接下來要做什麼.md
@@ -282,7 +290,7 @@
   - scripts/live_doc_registry_check.sh
   - tests/governance/test_docrot2_migration.py
 - 不可做：不得改 `docs/SPLITUNIFY_SPEC.D-002.md`；不得修改任何檢查判定。
-- 邊界：①`scripts/inject_handoff.sh` 注入內容含生成區塊（對讀）；②遷移前後 SPLITUNIFY 殘留識別碼集合相同（逐 ID 對讀）。
+- 邊界：①殘留清單列之檔已無命中 ⇒ `--migration` rc=1；②遷移前後 SPLITUNIFY 殘留識別碼集合相同（逐 ID 對讀）。
 - 風險緩解：遷移前後各跑 `bash scripts/gen_fact_key_blocks.sh --check` 與 `bash scripts/plain_docs_render.sh --check`。
 - 驗證：fixture `hit_file_neither_migrated_nor_listed` rc=1、`current_tree_after_migration` rc=0；`bash scripts/live_doc_write_guard.sh --staged` rc=0；`bash scripts/plain_docs_render.sh --check` rc=0；`bash scripts/live_doc_registry_check.sh --all` rc=0；`venv/bin/python -m pytest tests/governance/test_docrot2_migration.py -q` 0 failed。
 - **存活至**：全票完工後常設。
