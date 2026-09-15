@@ -5,4 +5,5 @@
 |---|---|
 | 001 | codex |
 | 002 | composer |
+| 003 | grok |
 <!-- END GENERATED: committee-roster -->

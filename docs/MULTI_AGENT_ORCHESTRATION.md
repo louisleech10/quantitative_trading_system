@@ -58,7 +58,7 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 - **不得**因效率題改變正確性 gate 的判定；與 `CLAUDE.md` 優化優先序一致（**執行速度排第 4**，前三為跨層可重現／多標的穩定／資料品質）。
 - 常態題**預設答「無」即可**通過，避免 bikeshedding 與注意力稀釋。
 
-🔴 **暫調(2026-09-14 使用者):討論/code review/adversarial/戳記暫為 Codex+Composer(Cursor) 兩家**——使用者原話「在我通知你變回三家全員前，委員就剩兩家Codex+Cursor」(grok CLI 帳戶餘額耗盡 402;Cursor 內模型已由使用者切為 Grok)。機器版=`scripts/governance_families.json` 之 `active_stampers`(暫停者=與 `review_families` 之差集);**恢復只在使用者通知後**把 grok 加回該行。委員之模型一律依使用者在各 CLI 設定檔之選擇(`cx_run.sh` 自 2026-09-14 起不再寫死型號)。下行為暫調前之常態分工。
+🔴 **恢復三家(2026-09-16 使用者通知):討論/code review/adversarial/戳記＝Codex+Composer(Cursor)+Grok**——使用者原話「Grok回來了，你可以先檢查是不是Grok4.6，然後也可以派工，改回三家委員。Cursor也回到Composer2.5」。機器版=`scripts/governance_families.json` 之 `active_stampers`(暫停者=與 `review_families` 之差集;要再暫停只改該行)。委員之模型一律依使用者在各 CLI 設定檔之選擇(`cx_run.sh` 自 2026-09-14 起不再寫死型號)。
 
 本期實際蓋章委員（由 `scripts/governance_families.json` 之 `active_stampers` 生成，勿手改；改名單只改該 JSON 後跑 `bash scripts/gen_fact_key_blocks.sh --write`）：
 
@@ -67,6 +67,7 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 |---|---|
 | 001 | codex |
 | 002 | composer |
+| 003 | grok |
 <!-- END GENERATED: committee-roster -->
 
 **現行分工(2026-08-17 使用者五調,回量化主線重申):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Claude(Fable 5/Opus)主委自任**;**討論/code review/adversarial=Codex+Grok+Composer(Cursor) 三家全員**(實作者不自審——實作端既為編排端,三家皆為合法審查者,不再有「因某家是實作者而少一家」的例外);委員會審查=三家;簽核 quorum=三家;小=Claude 自做。** 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-07-14 三調、2026-07-12 五調全文見 git log〕
