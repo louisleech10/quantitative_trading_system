@@ -62,6 +62,7 @@
 | `ic_wiring_check.sh` | 常態檢查 | 未掛 |
 | `install_verify_hooks.sh` | 工具 | 未掛 |
 | `list_active_mechanisms.sh` | 常態檢查 | PostToolUse  |
+| `live_doc_registry_check.sh` | 常態檢查 | 未掛 |
 | `mutation_probe_check.sh` | 工具 | gov_check  |
 | `narrow_check_router.sh` | 常態檢查 | PostToolUse  |
 | `no_append_only_check.sh` | 常態檢查 | pre-commit  |

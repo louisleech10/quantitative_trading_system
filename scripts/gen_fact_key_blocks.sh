@@ -48,6 +48,198 @@ _fk_preflight() {
     || _fk_die "gen_fact_key_blocks: 註冊表 ${REG} 非合法 JSON 物件 → fail-closed"
 }
 
+# 訊息顯示用之註冊表路徑。`_fk_materialize` 會把 REG 換成暫存物化檔，訊息仍須指向使用者要改的檔。
+_FK_REG_SRC="${REG}"
+
+# DOCROT2 Task 1.3（票 B-63）：rows 之兩種衍生來源，於前置階段**一次物化**成等效靜態 rows。
+#
+# 兩個封閉形式（與靜態 rows 三擇一；並存 ⇒ fail-closed）：
+#   rows_source  {file: repo 相對 JSON 路徑, path: [物件鍵, …]}
+#                該處之值須為字串陣列；每元素產出一列 [三位零補序號, 元素]（序號自 001 起）。
+#   rows_filter  {source_keys: [key, …], status_column: 欄名, allow: [狀態值, …]}
+#                自各來源 key 取狀態欄 ∈ allow 之列，依 source_keys 順序與 rows 原順序串接，
+#                再依本 key 之 columns 以欄名投影。本 key 之 columns 首欄須為 `序`，
+#                由此處填 `<兩位來源序>-<三位列序>`。
+# 🔴 為何物化而非改讀取函式：既有二十餘處以 `.[$k].rows` 直讀註冊表（投影、判準、機制、覆蓋），
+#    逐處改＝同一語意散成多份。物化後下游一律照舊讀 rows，差別只在 REG 指向暫存檔。
+# 🔴 為何需要序號：唯一排序點會以 LC_ALL=C 重排列；前導序號使重排結果等於來源順序。
+#    序號位數固定 ⇒ 超出位數 fail-closed（四位數會排在三位數之前，順序靜默錯亂）。
+# 🔴 rows_source 之 repo＝註冊表所在之 repo（`SCRIPT_DIR/..`），不隨 `GOVB1_FACTKEY_ROOT` 改變：
+#    來源 JSON 是註冊表資料的延伸，與註冊表同處；宿主根只決定去哪裡找宿主檔。
+#    （與 receipt 相對 `_fk_root()` 刻意相反——receipt 是被驗那棵樹的資產，見 WL-03 註解。）
+# 🔴 不接受任意查詢式、不執行 shell、不讀 repo 外檔：絕對路徑、`.`／`..`／空路徑段、symlink、
+#    實體路徑逃出 repo ⇒ fail-closed。
+_fk_rows_source_rows() {   # $1=key $2=repo 實體路徑 -> stdout: rows（compact JSON）
+  LC_ALL=C jq -e --arg k "$1" '.[$k] | (has("rows") | not) and (has("rows_filter") | not)' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_source 與 rows／rows_filter 並存（三者擇一）→ fail-closed" >&2
+         return 1; }
+  LC_ALL=C jq -e --arg k "$1" '
+    .[$k].rows_source
+    | type == "object" and (keys == ["file", "path"])
+      and (.file | type == "string" and length > 0 and (test("[[:cntrl:]]") | not))
+      and (.path | type == "array" and length > 0 and all(.[]; type == "string" and length > 0))
+  ' "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_source 形式不符（須恰為 {file: 非空字串, path: 非空字串陣列}）→ fail-closed" >&2
+         return 1; }
+  _fkrs_file="$(LC_ALL=C jq -r --arg k "$1" '.[$k].rows_source.file' "${REG}")" || return 1
+  case "${_fkrs_file}" in
+    /*) echo "gen_fact_key_blocks: key ${1} 之 rows_source.file 為絕對路徑（${_fkrs_file}）→ fail-closed" >&2
+        return 1 ;;
+  esac
+  case "/${_fkrs_file}/" in
+    */../*|*/./*|*//*)
+      echo "gen_fact_key_blocks: key ${1} 之 rows_source.file 含 .／.. 或空路徑段（${_fkrs_file}）→ fail-closed" >&2
+      return 1 ;;
+  esac
+  _fkrs_path="${2}/${_fkrs_file}"
+  [ ! -L "${_fkrs_path}" ] \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_source.file 為 symlink（${_fkrs_file}）→ fail-closed" >&2
+         return 1; }
+  [ -f "${_fkrs_path}" ] \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_source.file 不存在或非一般檔（${_fkrs_file}）→ fail-closed" >&2
+         return 1; }
+  _fkrs_real="$(cd -- "$(dirname -- "${_fkrs_path}")" && pwd -P)" || return 1
+  case "${_fkrs_real}/" in
+    "${2}"/*) : ;;
+    *) echo "gen_fact_key_blocks: key ${1} 之 rows_source.file 實體路徑在 repo 外（${_fkrs_file}）→ fail-closed" >&2
+       return 1 ;;
+  esac
+  LC_ALL=C jq -e -s 'length == 1' "${_fkrs_path}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_source.file 非單一合法 JSON 值（${_fkrs_file}）→ fail-closed" >&2
+         return 1; }
+  _fkrs_p="$(LC_ALL=C jq -c --arg k "$1" '.[$k].rows_source.path' "${REG}")" || return 1
+  _fkrs_val="$(LC_ALL=C jq -c --argjson p "${_fkrs_p}" '
+    reduce $p[] as $s ([.];
+      if (.[0] | type) == "object" and (.[0] | has($s)) then [.[0][$s]] else error("absent") end)
+    | .[0]
+  ' "${_fkrs_path}" 2>/dev/null)" \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_source.path ${_fkrs_p} 在 ${_fkrs_file} 中不存在 → fail-closed" >&2
+         return 1; }
+  printf '%s' "${_fkrs_val}" | LC_ALL=C jq -e 'type == "array" and all(.[]; type == "string")' >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_source 所指值非字串陣列（${_fkrs_file} ${_fkrs_p}）→ fail-closed" >&2
+         return 1; }
+  printf '%s' "${_fkrs_val}" | LC_ALL=C jq -e 'length <= 999' >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_source 元素逾 999（三位序號不足以保序）→ fail-closed" >&2
+         return 1; }
+  printf '%s' "${_fkrs_val}" | LC_ALL=C jq -c '[to_entries[] | [("00" + ((.key + 1) | tostring))[-3:], .value]]'
+}
+
+_fk_rows_filter_rows() {   # $1=key $2=rows_source 已物化之暫存註冊表 -> stdout: rows（compact JSON）
+  LC_ALL=C jq -e --arg k "$1" '.[$k] | (has("rows") | not) and (has("rows_source") | not)' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 與 rows／rows_source 並存（三者擇一）→ fail-closed" >&2
+         return 1; }
+  LC_ALL=C jq -e --arg k "$1" '
+    def names: type == "array" and length > 0
+               and all(.[]; type == "string" and length > 0) and length == (unique | length);
+    .[$k].rows_filter
+    | type == "object" and (keys == ["allow", "source_keys", "status_column"])
+      and (.source_keys | names) and (.allow | names)
+      and (.status_column | type == "string" and length > 0)
+  ' "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 形式不符（須恰為 {source_keys, status_column, allow}；陣列非空、元素非空不重複）→ fail-closed" >&2
+         return 1; }
+  _fkrf_bad="$(LC_ALL=C jq -r --arg k "$1" '
+    ._schema.status_enum as $e
+    | if ($e | type) != "array" then error("status_enum") else . end
+    | .[$k].rows_filter.allow[] | select(IN($e[]) | not)
+  ' "${REG}" 2>/dev/null)" \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter.allow 無法對照 _schema.status_enum（缺席或非陣列）→ fail-closed" >&2
+         return 1; }
+  [ -z "${_fkrf_bad}" ] \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter.allow 含 status_enum 以外之值：$(printf '%s' "${_fkrf_bad}" | tr '\n' ' ')→ fail-closed" >&2
+         return 1; }
+  LC_ALL=C jq -e --arg k "$1" '.[$k].columns | type == "array" and length >= 2 and .[0] == "序"' \
+    "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 用 rows_filter 須宣告 columns 且首欄為『序』、至少一個投影欄（唯一排序點會重排列，序號欄保存來源順序）→ fail-closed" >&2
+         return 1; }
+  _fkrf_srcs="$(LC_ALL=C jq -r --arg k "$1" '.[$k].rows_filter.source_keys[]' "${REG}")" || return 1
+  _fkrf_rc=0
+  while IFS= read -r _fkrf_s; do
+    [ -n "${_fkrf_s}" ] || continue
+    if [ "${_fkrf_s}" = "$1" ] || [ "${_fkrf_s}" = "${_FK_RESERVED}" ]; then
+      echo "gen_fact_key_blocks: key ${1} 之 rows_filter 來源 key 不得為自身或保留鍵（${_fkrf_s}）→ fail-closed" >&2
+      _fkrf_rc=1; continue
+    fi
+    LC_ALL=C jq -e --arg s "${_fkrf_s}" 'has($s) and (.[$s] | type) == "object"' "$2" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 來源 key 不存在：${_fkrf_s} → fail-closed" >&2
+           _fkrf_rc=1; continue; }
+    LC_ALL=C jq -e --arg s "${_fkrf_s}" '.[$s] | has("rows_filter") | not' "$2" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 來源 key ${_fkrf_s} 本身亦為 rows_filter（不支援串接）→ fail-closed" >&2
+           _fkrf_rc=1; continue; }
+    _fkrf_miss="$(LC_ALL=C jq -r --arg k "$1" --arg s "${_fkrf_s}" '
+      .[$k].rows_filter.status_column as $col | .[$k].columns[1:] as $need | .[$s].columns as $sc
+      | if ($sc | type) != "array" then "（來源未宣告 columns）"
+        else ([$col] + $need | unique | map(select(. as $c | $sc | index($c) == null)) | join(" ")) end
+    ' "$2")" || return 1
+    [ -z "${_fkrf_miss}" ] \
+      || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 來源 key ${_fkrf_s} 缺欄：${_fkrf_miss} → fail-closed" >&2
+           _fkrf_rc=1; continue; }
+    # 🔴 本段刻意不用 `$n` 命名欄數：WL-01 mutation 以欄數比對之字面為錨點且只換第一處，重複即打錯位置
+    LC_ALL=C jq -e --arg s "${_fkrf_s}" '
+      .[$s] | (.columns | length) as $width
+      | (.rows | type == "array") and all(.rows[]; type == "array" and length == $width)
+    ' "$2" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 來源 key ${_fkrf_s} 之 rows 缺席或列長與 columns 不符 → fail-closed" >&2
+           _fkrf_rc=1; continue; }
+  done <<EOF
+${_fkrf_srcs}
+EOF
+  [ "${_fkrf_rc}" = "0" ] || return 1
+  LC_ALL=C jq -e --arg k "$1" '
+    [.[$k].rows_filter.source_keys[] as $s | .[$s].rows | length] | length <= 99 and all(.[]; . <= 999)
+  ' "$2" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 逾序號位數（來源 key 逾 99 或單一來源逾 999 列）→ fail-closed" >&2
+         return 1; }
+  LC_ALL=C jq -c --arg k "$1" '
+    . as $r | $r[$k].rows_filter as $f | $r[$k].columns[1:] as $need
+    | [ $f.source_keys | to_entries[] | .key as $si | .value as $s
+        | $r[$s].columns as $sc | ($sc | index($f.status_column)) as $sti
+        | $r[$s].rows | to_entries[]
+        | select(.value[$sti] as $v | ($f.allow | index($v)) != null)
+        | .key as $ri | .value as $row
+        | [ ("0" + (($si + 1) | tostring))[-2:] + "-" + ("00" + (($ri + 1) | tostring))[-3:] ]
+          + [ $need[] as $c | ($sc | index($c)) as $ci | $row[$ci] ] ]
+  ' "$2"
+}
+
+_fk_materialize() {
+  _fkm_decl="$(LC_ALL=C jq -r '
+    to_entries[] | select(.key != "_schema" and (.value | type) == "object")
+    | if (.value | has("rows_source")) then "S\t" + .key
+      elif (.value | has("rows_filter")) then "F\t" + .key
+      else empty end
+  ' "${REG}")" || _fk_die "gen_fact_key_blocks: 讀取衍生 rows 宣告失敗（jq 非零）→ fail-closed"
+  [ -n "${_fkm_decl}" ] || return 0
+  _fkm_repo="$(cd -- "${SCRIPT_DIR}/.." && pwd -P)" \
+    || _fk_die "gen_fact_key_blocks: 無法解析 repo 根 → fail-closed"
+  _FK_MAT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/gen_fact_key_blocks.XXXXXX")" \
+    || _fk_die "gen_fact_key_blocks: 無法建立暫存目錄 → fail-closed"
+  trap 'rm -rf "${_FK_MAT_DIR}"' EXIT
+  _fkm_cur="${_FK_MAT_DIR}/fact_keys.json"
+  cp "${REG}" "${_fkm_cur}" || _fk_die "gen_fact_key_blocks: 無法寫暫存註冊表 → fail-closed"
+  _fkm_rc=0
+  # 兩段：先 rows_source（rows_filter 之來源可為 rows_source key），再 rows_filter
+  for _fkm_kind in S F; do
+    while IFS="$(printf '\t')" read -r _fkm_t _fkm_k; do
+      [ "${_fkm_t}" = "${_fkm_kind}" ] || continue
+      if [ "${_fkm_kind}" = "S" ]; then
+        _fkm_rows="$(_fk_rows_source_rows "${_fkm_k}" "${_fkm_repo}")" || { _fkm_rc=1; continue; }
+      else
+        _fkm_rows="$(_fk_rows_filter_rows "${_fkm_k}" "${_fkm_cur}")" || { _fkm_rc=1; continue; }
+      fi
+      LC_ALL=C jq --arg k "${_fkm_k}" --argjson rows "${_fkm_rows}" '.[$k].rows = $rows' \
+        "${_fkm_cur}" > "${_fkm_cur}.new" && mv "${_fkm_cur}.new" "${_fkm_cur}" \
+        || { echo "gen_fact_key_blocks: key ${_fkm_k} 物化寫入失敗 → fail-closed" >&2; _fkm_rc=1; }
+    done <<EOF
+${_fkm_decl}
+EOF
+  done
+  [ "${_fkm_rc}" = "0" ] || exit 1
+  REG="${_fkm_cur}"
+}
+
 # 🔴 jq 的 rc **不得丟棄**〔r2 三家皆觀察到之偶發紅，主委實驗定案根因〕：
 #   原版兩處以 `< <(_fk_raw_keys)` 讀取，process substitution 的 rc 拿不到 ⇒
 #   jq 偶發失敗（資源／fork 壓力）被靜默當成「註冊表沒有任何 fact-key」。
@@ -305,7 +497,7 @@ _fk_reject_unregistered_blocks() {
     while IFS= read -r _fkr_found; do
       [ -n "${_fkr_found}" ] || continue
       printf '%s\n' "${_fkr_keys}" | grep -qxF "${_fkr_found}" && continue
-      echo "FACTKEY UNREGISTERED BLOCK: '${_fkr_found}' in ${_fkr_tgt}（不在 ${REG}）→ fail-closed" >&2
+      echo "FACTKEY UNREGISTERED BLOCK: '${_fkr_found}' in ${_fkr_tgt}（不在 ${_FK_REG_SRC}）→ fail-closed" >&2
       _fkr_rc=1
     done <<EOF
 $(LC_ALL=C sed -n 's/^<!-- BEGIN GENERATED: \(.*\) -->$/\1/p' "${_fkr_path}")
@@ -367,6 +559,7 @@ _fk_emit_all() {
   _fk_validate_criteria || return 1
   _fk_validate_mechanism || return 1
   _fk_validate_enforcement || return 1
+  _fk_validate_docrot2_status || return 1
   _fke_rc=0
   # 🔴 不用 `< <(_fk_keys)`：process substitution 的 rc 拿不到（見 _fk_raw_keys_checked 註解）
   _fke_keys="$(_fk_keys)" || return 1
@@ -1607,7 +1800,7 @@ _fk_check() {
       _fkc_cur="$(sed -n "/^<!-- BEGIN GENERATED: ${_fkc_k} -->$/,/^<!-- END GENERATED: ${_fkc_k} -->$/p" \
                     "${_fkc_path}")"
       [ "${_fkc_cur}" = "${_fkc_want}" ] || {
-        echo "FACTKEY DRIFT: ${_fkc_k} in ${_fkc_tgt}（宿主檔與 ${REG} 不一致；跑 --write 重生成）" >&2
+        echo "FACTKEY DRIFT: ${_fkc_k} in ${_fkc_tgt}（宿主檔與 ${_FK_REG_SRC} 不一致；跑 --write 重生成）" >&2
         _fkc_rc=1; }
     done <<EOF
 ${_fkc_tgts}
@@ -1625,9 +1818,89 @@ EOF2
   # 機制表語意 ＋ opt-in 宿主之改法子樹未登記機制（WL-03）
   _fk_validate_mechanism || _fkc_rc=1
   _fk_validate_enforcement || _fkc_rc=1
+  _fk_validate_docrot2_status || _fkc_rc=1
   _fk_validate_ticket_universe || _fkc_rc=1
   _fk_reject_unregistered_mechanisms || _fkc_rc=1
   return "${_fkc_rc}"
+}
+
+# DOCROT2 Task 1.2（票 B-63）：新狀態 key（`_schema.docrot2_status_keys`）之封閉驗證。
+# 🔴 具名偏離（交 D2A 審碼輪）：TODO 寫「`_schema.status_keys` 追加五個 key」，實作改放獨立清單。
+#    理由（實跑）：status_keys 之識別碼會被 `_fk_reject_handwritten_status` 對 status_scope 全檔掃描，
+#    新識別碼（B1–B4、B9A…、Task 9.1、R-3…）在交接檔與白話說明之既有行大量與狀態字面同行 ⇒ 追加即整片紅；
+#    且 B1–B4 與 governance-batch-status 之識別碼撞號。既有行之遷移屬 Task 4.1，新行之擋屬 Task 2.1（讀本清單）。
+# 規則：清單內 key 須已註冊、不得同列 status_keys；columns 首欄『序』、第二欄『識別碼』且含『狀態』『權威路徑』
+#   『下一步』；狀態 ∈ `_schema.docrot2_status_values`（⊆ status_enum）；權威路徑與下一步非空；未完成列
+#   （狀態不在 _FK_COMPLETED_STATUSES）之下一步不得為佔位符；識別碼跨清單內全部 key 唯一（整詞相等）。
+_FK_D2_NEXT_PLACEHOLDERS='["—","-","無","n/a","N/A","TBD","待填"]'
+
+_fk_validate_docrot2_status() {
+  LC_ALL=C jq -e '._schema | has("docrot2_status_keys") or has("docrot2_status_values")' \
+    "${REG}" >/dev/null 2>&1 || return 0
+  LC_ALL=C jq -e '
+    def names: type == "array" and length > 0
+               and all(.[]; type == "string" and length > 0) and length == (unique | length);
+    (._schema.docrot2_status_keys | names) and (._schema.docrot2_status_values | names)
+  ' "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: _schema.docrot2_status_keys／docrot2_status_values 須兩者並存且為非空不重複字串陣列 → fail-closed" >&2
+         return 1; }
+  _fkd_rc=0
+  _fkd_bad="$(LC_ALL=C jq -r '
+    (._schema.status_enum // []) as $e | ._schema.docrot2_status_values[] | select(IN($e[]) | not)
+  ' "${REG}")" || return 1
+  [ -z "${_fkd_bad}" ] \
+    || { echo "gen_fact_key_blocks: _schema.docrot2_status_values 含 status_enum 以外之值：$(printf '%s' "${_fkd_bad}" | tr '\n' ' ')→ fail-closed" >&2
+         _fkd_rc=1; }
+  _fkd_done="$(printf '%s\n' ${_FK_COMPLETED_STATUSES} | LC_ALL=C jq -R . | LC_ALL=C jq -sc .)" || return 1
+  _fkd_keys="$(LC_ALL=C jq -r '._schema.docrot2_status_keys[]' "${REG}")" || return 1
+  while IFS= read -r _fkd_k; do
+    [ -n "${_fkd_k}" ] || continue
+    LC_ALL=C jq -e --arg k "${_fkd_k}" '$k != "_schema" and has($k) and (.[$k] | type) == "object"' \
+      "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: _schema.docrot2_status_keys 含未註冊 key：${_fkd_k} → fail-closed" >&2
+           _fkd_rc=1; continue; }
+    LC_ALL=C jq -e --arg k "${_fkd_k}" '(._schema.status_keys // []) | index($k) == null' \
+      "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: key ${_fkd_k} 不得同時列於 status_keys 與 docrot2_status_keys → fail-closed" >&2
+           _fkd_rc=1; continue; }
+    LC_ALL=C jq -e --arg k "${_fkd_k}" '
+      .[$k].columns as $c
+      | ($c | type) == "array" and ($c | length) >= 5 and $c[0] == "序" and $c[1] == "識別碼"
+        and ($c | index("狀態")) != null and ($c | index("權威路徑")) != null and ($c | index("下一步")) != null
+    ' "${REG}" >/dev/null 2>&1 \
+      || { echo "gen_fact_key_blocks: key ${_fkd_k} 之 columns 須首欄『序』、第二欄『識別碼』，並含『狀態』『權威路徑』『下一步』→ fail-closed" >&2
+           _fkd_rc=1; continue; }
+    _fkd_viol="$(LC_ALL=C jq -r --arg k "${_fkd_k}" --argjson done "${_fkd_done}" \
+                   --argjson ph "${_FK_D2_NEXT_PLACEHOLDERS}" '
+      ._schema.docrot2_status_values as $vals
+      | .[$k].columns as $c
+      | ($c | index("狀態")) as $si | ($c | index("權威路徑")) as $pi | ($c | index("下一步")) as $ni
+      | (.[$k].rows // [])[]
+      | if (.[$si] | IN($vals[]) | not) then "\(.[1])：狀態「\(.[$si])」不在 docrot2_status_values"
+        elif ((.[$pi] // "") | length) == 0 then "\(.[1])：權威路徑為空"
+        elif ((.[$ni] // "") | length) == 0 then "\(.[1])：下一步為空"
+        elif ((.[$si] | IN($done[]) | not) and (.[$ni] | IN($ph[]))) then "\(.[1])：未完成列之下一步為佔位符「\(.[$ni])」"
+        else empty end
+    ' "${REG}")" \
+      || { echo "gen_fact_key_blocks: key ${_fkd_k} 之列讀取失敗（jq 非零）→ fail-closed" >&2
+           _fkd_rc=1; continue; }
+    [ -z "${_fkd_viol}" ] \
+      || { printf 'gen_fact_key_blocks: key %s 之列違規 → fail-closed:\n' "${_fkd_k}" >&2
+           printf '%s\n' "${_fkd_viol}" | sed 's/^/    /' >&2
+           _fkd_rc=1; }
+  done <<EOF
+${_fkd_keys}
+EOF
+  _fkd_dup="$(LC_ALL=C jq -r '
+    . as $r
+    | [ ._schema.docrot2_status_keys[] as $k | select(($r[$k] | type) == "object") | ($r[$k].rows // [])[] | .[1] ]
+    | group_by(.) | map(select(length > 1) | .[0]) | .[]
+  ' "${REG}")" \
+    || { echo "gen_fact_key_blocks: 讀取 docrot2 狀態識別碼失敗（jq 非零）→ fail-closed" >&2; return 1; }
+  [ -z "${_fkd_dup}" ] \
+    || { echo "gen_fact_key_blocks: docrot2_status_keys 之識別碼跨 key 重複：$(printf '%s' "${_fkd_dup}" | tr '\n' ' ')→ fail-closed" >&2
+         _fkd_rc=1; }
+  return "${_fkd_rc}"
 }
 
 _fk_write() {
@@ -1636,6 +1909,7 @@ _fk_write() {
   _fk_validate_criteria || return 1
   _fk_validate_mechanism || return 1
   _fk_validate_enforcement || return 1
+  _fk_validate_docrot2_status || return 1
   # 🔴 `--write` 也跑宿主子樹掃描〔COMPOSER-R1-P2-01〕：本路徑本來就讀寫宿主檔，
   #   漏掛會讓「單跑 --write」的本地流程暫時綠。emit 刻意不掛——它是純 stdout 投影、
   #   不讀宿主檔，掛上去等於憑空要求一棵樹。此差異列為登記表殘留 8，並有測試釘住。
@@ -1692,6 +1966,11 @@ _fk_preflight
   echo "gen_fact_key_blocks: 只接受 0 或 1 個參數（收到 $#）→ fail-closed" >&2
   exit 2
 }
+
+# DOCROT2 Task 1.3：三條資料路徑（emit／--check／--write）皆先物化衍生 rows；--help 與錯誤參數不讀資料
+case "${1-}" in
+  ""|--check|--write) _fk_materialize ;;
+esac
 
 case "${1-}" in
   "")        _fk_emit_all; exit $? ;;

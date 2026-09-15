@@ -1,0 +1,11 @@
+generator sha256 before: 50d6f1711d0bcec4098f7b3ddd5ed5a4d607d522ef2887df970c7cb86a200643
+[C 序號欄改常數（保序失效）] pytest rc=1 ============================== 1 failed in 1.13s ===============================
+[C 序號欄改常數（保序失效）] restored sha OK=True
+[D 拿掉絕對路徑拒絕] pytest rc=1 ============================== 1 failed in 0.37s ===============================
+[D 拿掉絕對路徑拒絕] restored sha OK=True
+[E 拿掉 allow ⊆ status_enum] pytest rc=1 ============================== 1 failed in 0.63s ===============================
+[E 拿掉 allow ⊆ status_enum] restored sha OK=True
+[F --check 不物化] pytest rc=1 ============================== 2 failed in 1.55s ===============================
+[F --check 不物化] restored sha OK=True
+generator sha256 after: 50d6f1711d0bcec4098f7b3ddd5ed5a4d607d522ef2887df970c7cb86a200643
+mutate rc=0

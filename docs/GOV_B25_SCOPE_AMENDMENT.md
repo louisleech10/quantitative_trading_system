@@ -30,7 +30,21 @@ FACTKEY-ADDED: governance-ticket-sot
 FACTKEY-CRITERIA: governance-criteria
 FACTKEY-MECHANISM: governance-mechanism
 FACTKEY-ENFORCEMENT: governance-enforcement
+FACTKEY-DERIVED: committee-roster
+FACTKEY-DOCROT2-STATUS: splitunify-batch-status
+FACTKEY-DOCROT2-STATUS: splitunify-task-status
+FACTKEY-DOCROT2-STATUS: splitunify-residual-status
+FACTKEY-DOCROT2-STATUS: docrot2-batch-status
+FACTKEY-DOCROT2-STATUS: handoff-pending
 ```
+
+🔴 **第七種宣告 `FACTKEY-DOCROT2-STATUS`（2026-09-15，`票 B-63` DOCROT2 Task 1.2 新增）**：
+集合須**恰等於** `_schema.docrot2_status_keys`（理由同 1b）；刻意不併入 `FACTKEY-ADDED`／`status_keys`，理由見 `scripts/fact_keys.json` 之 `docrot2_status_note`。
+
+🔴 **第六種宣告 `FACTKEY-DERIVED`（2026-09-15，`票 B-63` DOCROT2 Task 1.3 新增）**：
+rows 由 `rows_source`／`rows_filter` 物化之 key（註冊表內無靜態 rows）。
+集合須**恰等於**註冊表中帶 `rows_source` 或 `rows_filter` 欄位之 key（由欄位存在導出，非自證）；
+與其他五種宣告兩兩不相交。
 
 🔴 **第三種宣告 `FACTKEY-CRITERIA`（2026-08-13，待辦清單 `WL-02` 新增）**：
 判準 key **不是**狀態 key（其第 2 欄為適用範圍而非識別碼，併入狀態偵測會大量誤擋）。

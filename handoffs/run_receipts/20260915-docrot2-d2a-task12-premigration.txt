@@ -1,0 +1,39 @@
+# DOCROT2 Task 1.2 遷移前原字面（docs/SPLITUNIFY_TODO.md @ 600c968b46735c5f06c610b340e8c5a6fa053159）
+## §B 批次｜狀態欄
+**B1** ｜ ✅ 完成
+**B2a** ｜ ✅ 完成
+**B2b** ｜ ✅ 完成
+**B2c** ｜ ✅ 完成
+**B3** ｜ ✅ 完成
+**B4** ｜ ✅ 完成
+**B9A** ｜ ✅ **完成**（impl `c98acf26`；審碼 r18、閉合 r19）
+**B9B** ｜ ✅ **完成**（impl `9e87386f`；審碼 r20、閉合 r21／r22）
+**B9C** ｜ ✅ **完成**（impl `a1e9680e`；審碼 r27，閉合 r28–r35 共九輪＋stamp-r6＋consult-r3/r4/r5；🔴 **consult-r4/r5 三家一致判定方向反轉**（見 `Task 9.3`）；~~現待 review 覆核 v32＋重簽~~ v32 之覆核與重簽已於 r36–r47 走完，方向反轉之退回由 `Task 9.3`（`4dcae642`）落地）
+**B9D** ｜ ✅ **完成**（impl `4dcae642`；審碼 r48 兩家 APPROVED v40、stamp-r7 覆核補測並戳記授權依據；Tier 0 同一 commit）
+**B9E** ｜ ✅ **完成**（審碼 r49 兩家 APPROVED v41、stamp-r8 戳記授權依據；commit 前工作區審碼，SPEC 隨之 v41 重出錨點）
+**B9F** ｜ ✅ **完成**（審碼 r50 兩家 APPROVED v41，`CODEX-R50-P2-01` 當輪修掉並經 stamp-r9 由原提出方關閉；stamp-r9 戳記授權依據）
+## §C-9 Task 標題
+### Task 9.1 ✅ **已完成（B9A）** —— 丟棄列數之完整資料流契約（`票 SPLITUNIFY`）
+### Task 9.2 ✅ **已完成（B9B）** —— producer 停止單選，輸出全量 keyed rows（`票 SPLITUNIFY`）
+### Task 9.2a ✅ **已完成（B9B）；🔴 v32 判其「兩表加欄」那一半為做過頭，由 `Task 9.3` 退回** —— schema 加 `feature_timeframe`（`票 SPLITUNIFY`）
+### Task 9.2b ✅ **已完成（B9C；碼面自 r27 起未再變動；🔴 **其 `Task 9.2a` 之「`assignments` 加 `feature_timeframe` 欄」已由 v32 判為做過頭，將由 `Task 9.3` 退回**（不影響 9.2b 之事件級錨定））** —— 側別判定改為事件級錨定（`票 SPLITUNIFY`）
+### Task 9.3 ✅ **已完成（B9D，impl `4dcae642`）** —— 🔴 **v32 全面改寫：切分歸屬表退回事件級（`票 SPLITUNIFY`）**
+### Task 9.4 ✅ **已完成（B9E）** —— 記帳與報告鏈（`票 SPLITUNIFY`）
+### Task 9.5 ✅ **已完成（B9F）** —— golden 與前端（`票 SPLITUNIFY`）
+## §E 識別碼欄｜理由類別欄
+~~`R-1`~~ ✅ **已關閉（2026-09-12，批次 B8；`docs/SPLITUNIFY_SPEC.D-001.md` 殘留節「本延伸落實」）** ｜ —
+~~`R-2`~~ **已關閉（2026-09-11）** ｜ —
+`R-3` ｜ user-ruling
+`R-4` ｜ blocked-by
+`R-5` ｜ needs-research
+~~`SU-RESID-2`~~ ✅ **已關閉（2026-09-15；`Task 9.3` 落地 `4dcae642`，review-r48 兩家 APPROVED ⇒ `assignments`／`purged` 已退回事件級並同步計數，本列自身之「未關閉者」已完成；SPEC v42 §N 同名條目同步）**。以下為關閉前之敘述，保留供追溯：**部分關閉；🔴 v32 改寫「未關閉的那一半」之定義（`COMPOSER-R36-P1-07`）——原文把「複合鍵要連 `EventSplitPlan` 下游一起改」當未竟之工，三家判定那一半本來就不該做；未關閉者改為「把 `assignments`／`purged` 退回事件級並同步計數（`Task 9.3`）」。下方為 v32 前敘述，保留供追溯** ｜ blocked-by
+`SU-RESID-V8-ATTEST` ｜ user-ruling
+`SU-RESID-PAUSED-NO-RESULT` ｜ blocked-by
+`SU-RESID-COMMITTEE-MODEL-EVIDENCE` ｜ needs-research
+`SU-RESID-9A-UI` ｜ blocked-by
+`SU-RESID-1` ｜ ✅ **可機械化之半已關閉（2026-09-11，VERDICTGATE b4 `0c4ae257`；管線跳脫修正 `44bbd8d3`）**；剩餘之半 needs-research
+~~`SU-RESID-3`~~ ✅ **已關閉（2026-09-12，批次 B8；D-001-C2 完整有序指紋＋嚴格遞增閘；`docs/SPLITUNIFY_SPEC.D-001.md` 殘留節「本延伸落實」）**（**B3 review R1 後大幅收窄**） ｜ —（原 needs-research）
+~~`SU-RESID-3`（原文，保留供對照）~~ ｜ needs-research
+`SU-RESID-4` ｜ needs-research
+`SU-RESID-5` ｜ needs-research
+`SU-RESID-C5-TARGETS` ｜ blocked-by

@@ -70,8 +70,12 @@ def _amendment_keys():
     assert AMENDMENT.is_file(), (
         f"缺延伸檔 {AMENDMENT}：凍結宣告之偏離無登記處 → fail-closed"
     )
-    frozen, added, criteria, mechanism, enforcement = [], [], [], [], []
+    frozen, added, criteria, mechanism, enforcement, derived, d2status = [], [], [], [], [], [], []
     for line in AMENDMENT.read_text(encoding="utf-8").splitlines():
+        if line.startswith("FACTKEY-DERIVED: "):
+            derived.append(line[len("FACTKEY-DERIVED: "):].strip())
+        if line.startswith("FACTKEY-DOCROT2-STATUS: "):
+            d2status.append(line[len("FACTKEY-DOCROT2-STATUS: "):].strip())
         if line.startswith("FACTKEY-FROZEN: "):
             frozen.append(line[len("FACTKEY-FROZEN: "):].strip())
         elif line.startswith("FACTKEY-ADDED: "):
@@ -88,7 +92,8 @@ def _amendment_keys():
     assert mechanism, "延伸檔缺 FACTKEY-MECHANISM 宣告 → fail-closed（WL-03 起）"
     assert enforcement, "延伸檔缺 FACTKEY-ENFORCEMENT 宣告 → fail-closed（產出端覆蓋規則起）"
     lists = (("FROZEN", frozen), ("ADDED", added), ("CRITERIA", criteria),
-             ("MECHANISM", mechanism), ("ENFORCEMENT", enforcement))
+             ("MECHANISM", mechanism), ("ENFORCEMENT", enforcement), ("DERIVED", derived),
+             ("DOCROT2-STATUS", d2status))
     for name, lst in lists:
         assert len(lst) == len(set(lst)), f"FACTKEY-{name} 含重複項: {lst}"
     sets = [set(lst) for _, lst in lists]
@@ -114,11 +119,24 @@ def test_registry_key_set_equals_amendment_declaration():
     data = json.loads(REG.read_text(encoding="utf-8"))
     assert isinstance(data, dict)
     fact_keys = {k for k in data if k != "_schema"}
-    frozen, added, criteria, mechanism, enforcement = _amendment_keys()
+    frozen, added, criteria, mechanism, enforcement, derived, d2status = _amendment_keys()
 
-    assert fact_keys == frozen | added | criteria | mechanism | enforcement, (
+    declared = frozen | added | criteria | mechanism | enforcement | derived | d2status
+    d2_keys = set(data["_schema"].get("docrot2_status_keys", []))
+    assert d2status == d2_keys, (
+        "🔴 延伸檔 DOCROT2-STATUS 與 _schema.docrot2_status_keys 不相等："
+        f"DOCROT2-STATUS={sorted(d2status)} vs docrot2_status_keys={sorted(d2_keys)}"
+    )
+    assert fact_keys == declared, (
         f"registry key 集合與延伸檔宣告不符：registry={sorted(fact_keys)} "
-        f"vs 宣告={sorted(frozen | added | criteria | mechanism | enforcement)}"
+        f"vs 宣告={sorted(declared)}"
+    )
+    # DOCROT2 Task 1.3：DERIVED＝rows 由 rows_source／rows_filter 物化之 key（由欄位存在與否導出，非自證）
+    derived_in_registry = {k for k in fact_keys
+                           if "rows_source" in data[k] or "rows_filter" in data[k]}
+    assert derived == derived_in_registry, (
+        "🔴 延伸檔 DERIVED 與註冊表中帶 rows_source／rows_filter 之 key 不相等："
+        f"DERIVED={sorted(derived)} vs registry={sorted(derived_in_registry)}"
     )
     assert KEY in frozen, f"凍結期單一 key {KEY} 未列於 FACTKEY-FROZEN"
 
@@ -150,6 +168,10 @@ def test_registry_key_set_equals_amendment_declaration():
         if isinstance(tgt, list):
             assert tgt and all(isinstance(t, str) for t in tgt)
             assert len(tgt) == len(set(tgt)), f"{k} 之 target 含重複路徑"
+        if k in derived:
+            # 衍生 key 不得同時帶靜態 rows；其形式由生成器 fail-closed 驗證（test_docrot2_registry.py）
+            assert "rows" not in data[k], f"{k} 為衍生 key 卻帶靜態 rows"
+            continue
         rows = data[k]["rows"]
         assert rows and all(
             isinstance(r, list) and all(isinstance(c, str) for c in r) for r in rows
@@ -274,6 +296,14 @@ def _sandbox(tmp_path: Path, registry: dict, *, inject_schema: bool = True) -> P
     (sdir / "fact_keys.json").write_text(
         json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+    # DOCROT2 Task 1.3：rows_source 相對註冊表所在 repo（沙箱＝tmp_path）⇒ 複製真實來源檔，
+    # 否則以真實註冊表建沙箱之測試會在物化階段即紅、測不到原本標的
+    for v in registry.values():
+        src = v.get("rows_source") if isinstance(v, dict) else None
+        if isinstance(src, dict) and isinstance(src.get("file"), str) and (REPO / src["file"]).is_file():
+            dst = tmp_path / src["file"]
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(REPO / src["file"], dst)
     return sdir
 
 

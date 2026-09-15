@@ -1,0 +1,11 @@
+generator sha256 before: 57810f7ea916b0523c2eb17d0d7bcfde2d3cb087b795e6c6d927e57b667bbe71
+[G --check 不跑 docrot2 狀態驗證] pytest rc=1 ============================== 2 failed in 0.98s ===============================
+[G --check 不跑 docrot2 狀態驗證] restored sha OK=True
+[H 識別碼跨 key 重複不擋] pytest rc=1 ============================== 1 failed in 0.72s ===============================
+[H 識別碼跨 key 重複不擋] restored sha OK=True
+[I 未完成列佔位符不擋] pytest rc=1 ========================= 1 failed, 1 passed in 1.03s ==========================
+[I 未完成列佔位符不擋] restored sha OK=True
+[J 不擋與 status_keys 並列] pytest rc=1 ============================== 1 failed in 0.58s ===============================
+[J 不擋與 status_keys 並列] restored sha OK=True
+generator sha256 after: 57810f7ea916b0523c2eb17d0d7bcfde2d3cb087b795e6c6d927e57b667bbe71
+mutate rc=0

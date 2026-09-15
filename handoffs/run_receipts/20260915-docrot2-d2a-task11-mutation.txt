@@ -1,0 +1,15 @@
+# DOCROT2 D2A Task 1.1 mutation receipt（主委實跑 2026-09-15）
+## 基線
+============================== 21 passed in 2.68s ==============================
+## mutation A：不回報未登記（check_all／check_path／check_staged）
+FAILED tests/governance/test_docrot2_registry.py::test_unregistered_path_rc1
+FAILED tests/governance/test_docrot2_registry.py::test_nested_doc_unclassified_rc1
+FAILED tests/governance/test_docrot2_registry.py::test_templates_live_doc_unregistered_rc1
+FAILED tests/governance/test_docrot2_registry.py::test_new_unregistered_md_staged_rc1
+========================= 4 failed, 17 passed in 2.77s =========================
+## mutation B：不擋 exact 落在歷史類 prefix 之下
+FAILED tests/governance/test_docrot2_registry.py::test_archived_spec_listed_as_live_spec_rc1
+FAILED tests/governance/test_docrot2_registry.py::test_excluded_site_listed_as_live_rc1
+========================= 2 failed, 19 passed in 2.76s =========================
+## 還原：sha256 一致
+9d70318aaad65d331571bce034ee117a6c4a0582528ea76e2d2b5b8d29ab709a  scripts/_live_doc_registry.py

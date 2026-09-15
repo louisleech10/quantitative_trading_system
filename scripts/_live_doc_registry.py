@@ -1,0 +1,371 @@
+#!/usr/bin/env python3
+"""_live_doc_registry.py — DOCROT2 Task 1.1：活文件類別登記之共用判定（唯一實作）。
+
+呼叫端（薄包裝，不得另寫判定）：
+  scripts/live_doc_registry_check.sh   → check --path <p> | --all | --staged
+  scripts/live_doc_registry_update.sh  → update --add <path> [--class <類別>]
+
+登記檔＝<repo>/scripts/live_doc_registry.json；類別集合、範圍根、路徑對照、規則旗標皆只定義於該檔。
+
+判定（封閉、可證偽）：
+  範圍      ＝ `_schema.scope_roots` 下全部層級之 `.md` ＋ repo 根目錄之 `.md`；範圍外一律不登記亦不擋。
+  探索      ＝ discover_live_docs：`git ls-files --cached --others --exclude-standard -z`，以 UTF-8 位元組排序（同 LC_ALL=C）。
+  分類      ＝ exact 優先；否則取最長之 prefix；皆不命中＝未登記。
+  登記檔錯誤＝類別不屬 class_enum、prefix 不以 / 結尾、exact 以 / 結尾、含 wildcard 字元、
+              同一 exact 或 prefix 重複宣告、exact 落在 HIST 類 prefix 之下、登記路徑在範圍外、class_flags 鍵集≠class_enum。
+  --all     ＝ 登記檔錯誤 ∪ 探索所得路徑未登記／非 regular file ∪ exact 登記之路徑不在探索結果
+              ∪ fact_keys.json `_schema.status_scope` 項未被登記涵蓋。
+  --staged  ＝ 暫存之新增或重新命名 `.md`（範圍內）未登記。
+rc：0＝合規或範圍外；1＝違規；2＝用法或環境錯誤。
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+from typing import List, Optional, Sequence, Tuple
+
+REGISTRY_REL = os.path.join("scripts", "live_doc_registry.json")
+FACT_KEYS_REL = os.path.join("scripts", "fact_keys.json")
+WILDCARD_CHARS = ("*", "?", "[", "]")
+
+
+def _die(msg: str, rc: int = 2) -> "NoReturn":  # type: ignore[name-defined]
+    print(f"live_doc_registry: {msg}", file=sys.stderr)
+    sys.exit(rc)
+
+
+def repo_root() -> str:
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, check=True
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        _die("非 git 工作樹 ⇒ fail-closed")
+    return out.decode("utf-8").strip()
+
+
+def load_json(path: str) -> dict:
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except OSError as exc:
+        raise ValueError(f"讀不到 {path}：{exc}")
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path} 非合法 JSON：{exc}")
+    if not isinstance(data, dict):
+        raise ValueError(f"{path} 頂層須為物件")
+    return data
+
+
+def _byte_key(s: str) -> bytes:
+    return s.encode("utf-8")
+
+
+def in_scope(path: str, scope_roots: Sequence[str]) -> bool:
+    if not path.endswith(".md"):
+        return False
+    if "/" not in path:
+        return True
+    return any(path.startswith(r) for r in scope_roots)
+
+
+def discover_live_docs(root: str, scope_roots: Sequence[str]) -> List[str]:
+    """範圍內全部 `.md`（含未追蹤、排除 ignore），UTF-8 位元組排序。"""
+    try:
+        out = subprocess.run(
+            ["git", "-C", root, "-c", "core.quotePath=false", "ls-files",
+             "--cached", "--others", "--exclude-standard", "-z"],
+            capture_output=True, check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        _die("git ls-files 失敗 ⇒ fail-closed")
+    paths = {p for p in out.decode("utf-8").split("\0") if p}
+    return sorted((p for p in paths if in_scope(p, scope_roots)), key=_byte_key)
+
+
+def _pairs(reg: dict, key: str, errs: List[str]) -> List[Tuple[str, str]]:
+    raw = reg.get(key)
+    if not isinstance(raw, list):
+        errs.append(f"`{key}` 須為 [路徑, 類別] 陣列")
+        return []
+    pairs: List[Tuple[str, str]] = []
+    for item in raw:
+        if (not isinstance(item, list) or len(item) != 2
+                or not all(isinstance(x, str) and x for x in item)):
+            errs.append(f"`{key}` 項目須為兩個非空字串：{item!r}")
+            continue
+        pairs.append((item[0], item[1]))
+    return pairs
+
+
+def validate_registry(reg: dict) -> Tuple[List[str], dict]:
+    """回傳 (錯誤列表, 正規化結構)。"""
+    errs: List[str] = []
+    schema = reg.get("_schema")
+    if not isinstance(schema, dict):
+        return (["缺 `_schema` 物件"], {})
+    class_enum = schema.get("class_enum")
+    scope_roots = schema.get("scope_roots")
+    hist_classes = schema.get("hist_classes")
+    if not (isinstance(class_enum, list) and class_enum and all(isinstance(c, str) and c for c in class_enum)):
+        errs.append("`_schema.class_enum` 須為非空字串陣列")
+        class_enum = []
+    if not (isinstance(scope_roots, list) and scope_roots
+            and all(isinstance(r, str) and r.endswith("/") for r in scope_roots)):
+        errs.append("`_schema.scope_roots` 須為以 / 結尾之字串陣列")
+        scope_roots = []
+    if not (isinstance(hist_classes, list) and all(c in class_enum for c in hist_classes)):
+        errs.append("`_schema.hist_classes` 須為 class_enum 子集")
+        hist_classes = []
+    flags = reg.get("class_flags")
+    if not isinstance(flags, dict) or set(flags) != set(class_enum):
+        errs.append("`class_flags` 之鍵集須恰等於 class_enum")
+
+    exact = _pairs(reg, "exact", errs)
+    prefix = _pairs(reg, "prefix", errs)
+
+    seen_exact: dict = {}
+    for path, cls in exact:
+        if cls not in class_enum:
+            errs.append(f"exact {path}：類別 {cls} 不屬 class_enum")
+        if path.endswith("/"):
+            errs.append(f"exact {path}：不得以 / 結尾")
+        if any(ch in path for ch in WILDCARD_CHARS):
+            errs.append(f"exact {path}：禁 wildcard")
+        if scope_roots and not in_scope(path, scope_roots):
+            errs.append(f"exact {path}：在範圍外（只准 scope_roots 下或 repo 根目錄之 .md）")
+        seen_exact.setdefault(path, []).append(cls)
+    for path, classes in seen_exact.items():
+        if len(classes) > 1:
+            errs.append(f"exact {path}：重複登記 {len(classes)} 次（{'、'.join(classes)}）")
+
+    seen_prefix: dict = {}
+    for path, cls in prefix:
+        if cls not in class_enum:
+            errs.append(f"prefix {path}：類別 {cls} 不屬 class_enum")
+        if not path.endswith("/"):
+            errs.append(f"prefix {path}：須以 / 結尾")
+        if any(ch in path for ch in WILDCARD_CHARS):
+            errs.append(f"prefix {path}：禁 wildcard")
+        if scope_roots and not any(path.startswith(r) for r in scope_roots):
+            errs.append(f"prefix {path}：在範圍外")
+        seen_prefix.setdefault(path, []).append(cls)
+    for path, classes in seen_prefix.items():
+        if len(classes) > 1:
+            errs.append(f"prefix {path}：重複登記 {len(classes)} 次（{'、'.join(classes)}）")
+
+    hist_prefixes = [p for p, c in prefix if c in hist_classes]
+    for path, cls in exact:
+        for hp in hist_prefixes:
+            if path.startswith(hp):
+                errs.append(f"exact {path}（{cls}）落在歷史類 prefix {hp} 之下")
+
+    norm = {
+        "class_enum": class_enum,
+        "scope_roots": scope_roots,
+        "exact": dict((p, c) for p, c in exact),
+        "prefix": prefix,
+        "schema": schema,
+    }
+    return errs, norm
+
+
+def classify(path: str, norm: dict) -> Optional[str]:
+    if path in norm["exact"]:
+        return norm["exact"][path]
+    best: Optional[Tuple[str, str]] = None
+    for p, c in norm["prefix"]:
+        if path.startswith(p) and (best is None or len(p) > len(best[0])):
+            best = (p, c)
+    return best[1] if best else None
+
+
+def _covered(entry: str, norm: dict) -> bool:
+    if entry.endswith("/"):
+        return any(p == entry or entry.startswith(p) for p, _ in norm["prefix"])
+    return classify(entry, norm) is not None
+
+
+def _load(root: str) -> Tuple[List[str], dict]:
+    try:
+        reg = load_json(os.path.join(root, REGISTRY_REL))
+    except ValueError as exc:
+        return [str(exc)], {}
+    return validate_registry(reg)
+
+
+def check_all(root: str) -> List[str]:
+    errs, norm = _load(root)
+    if not norm:
+        return errs
+    discovered = discover_live_docs(root, norm["scope_roots"])
+    discovered_set = set(discovered)
+    for path in discovered:
+        full = os.path.join(root, path)
+        if os.path.islink(full):
+            errs.append(f"{path}：symlink ⇒ fail-closed")
+            continue
+        if not os.path.isfile(full):
+            errs.append(f"{path}：非 regular file（已刪未暫存或非檔案）⇒ fail-closed")
+            continue
+        if classify(path, norm) is None:
+            errs.append(f"{path}：未登記（以 live_doc_registry_update.sh --add 登記）")
+    for path in norm["exact"]:
+        if path not in discovered_set:
+            errs.append(f"exact {path}：登記之路徑不存在於探索結果（檔案已刪或被 ignore）")
+    try:
+        fk = load_json(os.path.join(root, FACT_KEYS_REL))
+        status_scope = (fk.get("_schema") or {}).get("status_scope")
+    except ValueError as exc:
+        errs.append(str(exc))
+        status_scope = None
+    if not isinstance(status_scope, list):
+        errs.append("fact_keys.json `_schema.status_scope` 缺失或非陣列")
+    else:
+        for entry in status_scope:
+            if not isinstance(entry, str) or not _covered(entry, norm):
+                errs.append(f"fact_keys.json status_scope 項 {entry!r} 未被活文件登記涵蓋")
+    return errs
+
+
+def check_path(root: str, path: str) -> Tuple[List[str], str]:
+    errs, norm = _load(root)
+    if not norm:
+        return errs, ""
+    if not in_scope(path, norm["scope_roots"]):
+        return errs, f"{path}：範圍外，不登記亦不擋"
+    cls = classify(path, norm)
+    if cls is None:
+        errs.append(f"{path}：未登記（以 live_doc_registry_update.sh --add 登記）")
+        return errs, ""
+    return errs, f"{path}：{cls}"
+
+
+def _staged_new_paths(root: str) -> List[str]:
+    try:
+        out = subprocess.run(
+            ["git", "-C", root, "-c", "core.quotePath=false", "diff", "--cached",
+             "--name-status", "-z", "--diff-filter=AR"],
+            capture_output=True, check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        _die("git diff --cached 失敗 ⇒ fail-closed")
+    tokens = out.decode("utf-8").split("\0")
+    paths: List[str] = []
+    i = 0
+    while i < len(tokens) and tokens[i]:
+        status = tokens[i]
+        if status.startswith("R"):
+            if i + 2 >= len(tokens):
+                break
+            paths.append(tokens[i + 2])
+            i += 3
+        else:
+            if i + 1 >= len(tokens):
+                break
+            paths.append(tokens[i + 1])
+            i += 2
+    return paths
+
+
+def check_staged(root: str) -> List[str]:
+    errs, norm = _load(root)
+    if not norm:
+        return errs
+    for path in _staged_new_paths(root):
+        if in_scope(path, norm["scope_roots"]) and classify(path, norm) is None:
+            errs.append(f"{path}（暫存新增）：未登記（以 live_doc_registry_update.sh --add 登記）")
+    return errs
+
+
+def _default_class(path: str, schema: dict) -> str:
+    pred = schema.get("live_spec_predicate") or {}
+    parent = pred.get("parent", "docs/")
+    tokens = pred.get("name_tokens") or []
+    rest = path[len(parent):] if path.startswith(parent) else None
+    if rest is not None and "/" not in rest and any(t in rest for t in tokens):
+        return pred.get("class", "LIVE-SPEC")
+    return schema.get("default_class", "OTHER-DORMANT")
+
+
+def update_add(root: str, path: str, cls: Optional[str]) -> Tuple[int, str]:
+    reg_path = os.path.join(root, REGISTRY_REL)
+    try:
+        reg = load_json(reg_path)
+    except ValueError as exc:
+        return 1, str(exc)
+    errs, norm = validate_registry(reg)
+    if errs:
+        return 1, "登記檔本身不合規：" + "；".join(errs)
+    if not in_scope(path, norm["scope_roots"]):
+        return 1, f"{path}：在範圍外，不得登記"
+    if path in norm["exact"]:
+        return 1, f"{path}：已登記為 {norm['exact'][path]}"
+    if cls is None:
+        covering = classify(path, norm)
+        if covering is not None:
+            return 0, f"{path}：已由 prefix 涵蓋為 {covering}，不需登記"
+        cls = _default_class(path, norm["schema"])
+    if cls not in norm["class_enum"]:
+        return 1, f"類別 {cls} 不屬 class_enum"
+    exact = [list(item) for item in reg["exact"]] + [[path, cls]]
+    trial = dict(reg)
+    trial["exact"] = exact
+    terrs, _ = validate_registry(trial)
+    if terrs:
+        return 1, "登記後不合規：" + "；".join(terrs)
+    trial["exact"] = sorted(exact, key=lambda it: (_byte_key(it[1]), _byte_key(it[0])))
+    text = json.dumps(trial, ensure_ascii=False, indent=2) + "\n"
+    tmp = reg_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    os.replace(tmp, reg_path)
+    return 0, f"{path}：已登記為 {cls}"
+
+
+def main(argv: List[str]) -> int:
+    ap = argparse.ArgumentParser(prog="_live_doc_registry.py", add_help=True)
+    sub = ap.add_subparsers(dest="cmd")
+    c = sub.add_parser("check")
+    g = c.add_mutually_exclusive_group(required=True)
+    g.add_argument("--path")
+    g.add_argument("--all", action="store_true")
+    g.add_argument("--staged", action="store_true")
+    u = sub.add_parser("update")
+    u.add_argument("--add", required=True)
+    u.add_argument("--class", dest="cls")
+    try:
+        args = ap.parse_args(argv)
+    except SystemExit:
+        return 2
+    if args.cmd is None:
+        ap.print_usage(sys.stderr)
+        return 2
+    root = repo_root()
+    if args.cmd == "update":
+        rc, msg = update_add(root, args.add, args.cls)
+        print(f"live_doc_registry_update: {msg}", file=sys.stderr if rc else sys.stdout)
+        return rc
+    if args.path is not None:
+        errs, msg = check_path(root, args.path)
+    elif args.all:
+        errs, msg = check_all(root), ""
+    else:
+        errs, msg = check_staged(root), ""
+    if errs:
+        print("live_doc_registry_check: 🔴 違規", file=sys.stderr)
+        for e in errs:
+            print(f"  · {e}", file=sys.stderr)
+        return 1
+    if msg:
+        print(f"live_doc_registry_check: {msg}")
+    else:
+        print("live_doc_registry_check: ✓ 合規")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

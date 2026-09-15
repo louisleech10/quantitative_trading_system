@@ -86,8 +86,8 @@ _managed() {
   printf '%s\n' "scripts/gen_fact_key_blocks.sh"
   printf '%s\n' "scripts/factkey_write_guard.sh"
   LC_ALL=C jq -r '._schema.enforcement_settings_path? // empty' "${REG}" 2>/dev/null
-  LC_ALL=C jq -r 'to_entries[] | select(.key != "_schema")
-                  | .value.target | if type == "array" then .[] else . end' "${REG}" 2>/dev/null
+  LC_ALL=C jq -r 'to_entries[] | select(.key != "_schema") | (.value.target | if type == "array" then .[] else . end),
+                  (.value.rows_source?.file? // empty | strings)' "${REG}" 2>/dev/null   # 後半＝DOCROT2 Task 1.3 來源檔
   LC_ALL=C jq -r '._schema.mechanism_scope[]? // empty' "${REG}" 2>/dev/null
   LC_ALL=C jq -r '._schema.status_scope[]? // empty' "${REG}" 2>/dev/null
 }

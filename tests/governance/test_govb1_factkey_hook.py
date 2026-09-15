@@ -56,6 +56,7 @@ _DEPS = (
     "ticket_batch_check.sh",
     "audit_append.sh",
     "audit_events.json",
+    "governance_families.json",   # DOCROT2 Task 1.3：committee-roster 之 rows_source 來源
 )
 
 _GIT_ENV = {

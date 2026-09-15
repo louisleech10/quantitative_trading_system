@@ -257,7 +257,12 @@
 
 ## 現況
 - **現行主線＝DOCROT2（修正 DOCROT 未做好之處；使用者 2026-09-15 裁定，排在 SPLITUNIFY R-5 之前）**。使用者逐字：「持續不接受用紀律或記憶當解法，但允許擴建治理工具，就是要修正DOCROT沒做好之處，真正減少文檔問題和降低不必要的輪數，而且要全專案涵蓋，不是只有SPEC」「交接文件能交接清楚明確是最重要，所以不一定要限制行數，怕的只是把舊案或已完成或不必要的殘留在裡面」「針對修正優化DOCROT的方法，你跟委員討論共識決定，先做好DOCROT這部分」。
-  - `20260915-docrot2-x-consult-r1` 兩家交件完成（兩家皆 blocked、共 9 條 finding）；主委獨立版 `handoffs/20260915-docrot2-x-consult-r1-claude.md`；收斂檔 `handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md` → consult-r2 收斂分歧。
+  - `20260915-docrot2-x-consult-r1`／`r2` 兩輪收斂（主委獨立版 `handoffs/20260915-docrot2-x-consult-r1-claude.md`；收斂檔 `handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md` 起）；`docs/DOCROT2_SPEC.md`／`docs/DOCROT2_TODO.md` 經 review r1–r4（finding 17→14→4→1）定稿 v5（commit `600c968b`），兩家於 r4 皆 proceed。
+  - stamp-r1 兩家戳記已登記、`handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md` 之 `reconcile_stamps_check` rc=0；D2A 實作 token 已發（task-id `20260915-DOCROT2-impl-b1-claude`）。
+  - **D2A 進度**：`Task 1.1`／`1.2`／`1.3` 皆已實作；四檔回歸（`tests/governance/test_docrot2_registry.py`、`test_govb1_factkey_gen.py`、`test_factkey_write_guard.py`、`test_govb1_factkey_hook.py`）298 passed、0 failed；mutation receipt `handoffs/run_receipts/20260915-docrot2-d2a-task11-mutation.txt`／`-task12-`／`-task13-`。下一步＝D2A 單一 commit → push → 兩家審碼（批次狀態見 `docrot2-batch-status` 生成區塊）。
+  - **須交 D2A 審碼輪之具名偏離**（全文見 D2A commit 訊息）：①新狀態 key 放 `_schema.docrot2_status_keys`、不進 `_schema.status_keys`；②`rows_filter` 以首欄 `序` 保序；③fixture 於測試內建 tmp repo；④`discover_live_docs` 在 Python 模組；⑤D2A 單一 commit；⑥SPLITUNIFY §B 狀態欄改「施工紀錄」欄；⑦backlog 不追加 `## B-63`；⑧D2A 列寫實況；⑨`committee-roster` 宿主＝ORCH 與 TODO 路徑欄未列之連動檔。
+  - **DOCROT2 摩擦樣本（本輪實測）**：`spec_xref_hook.sh` 把 `ValueError`／`split_unify.json` 判為「被拿掉」，但兩者仍在同檔多處——概念移除判定以「刪除行含該概念」為準而非「檔內已無該概念」。
+  - 外部研究（ADR／立法彙編）已列 SPEC §C 設計依據；兩家判「部分支持」歷史專區只准指標之規則。
 - **SPLITUNIFY**：第 9 批完工（`Task 9.3`–`9.5` 已落地）；`docs/SPLITUNIFY_SPEC.D-002.md` 之戳記狀態以 `reconcile_stamps_check.sh` 為準、批次狀態權威＝TODO §B、殘留權威＝TODO §E（本檔不複寫狀態）。下一步＝規格 R 重開＋`R-5`，排在 DOCROT2 之後。
 - 🔴 本節 2026-09-15 前之「b9 SPEC＝v31 待重簽」「下一步 `review-r39`（含劃除之 `review-r32` 字面）」「現行＝三家全員」三句已過時而刪除（consult-r1 composer 實證）；原文見 `git show efcafc63:HANDOFF.md`，供 DOCROT2 當 must-fail 樣本。🔴 刪除當下 `spec_xref_hook.sh` 以「概念被拿掉」擋下，要求上方流水帳 21 行補版本標記——DOCROT2 摩擦樣本。
 - 🔴 **批次狀態之唯一權威＝`docs/SPLITUNIFY_TODO.md` §B 之「狀態」欄**（2026-09-14 使用者質問「你為何又跳過 TODO」後定）。**出生事故**：主委實作完 B9A／B9B／B9C 三批，卻**一次都沒回去標 TODO**——狀態只記在本檔與白話看板，於是同一件事有**三份**而 TODO 是過期的那一份；**這就是委員已抓九次的同一個病**，只是漏的是 TODO 自己的進度、犯的人是主委。⇒ **本檔與 `白話說明/` 一律不再自寫批次狀態清單**，只指向 §B；每批收尾固定動作新增一項：**回去標 TODO §B 與該 Task 標題**。
@@ -266,8 +271,15 @@
 - 🔴 **DOCROT 成效量測點的編號要對**：b9 之 `review-r1`..`r12` 全是**規格**審查輪（DOCROT 上線前），`doc_friction_ratio` 要量的是**上線後**的前兩輪 review ⇒ 實際落在 **`review-r13`／`review-r14`**（Task 9.1 實作後的審碼輪）。兩輪皆須 ≤0.30 且每輪 ≤20 條；不達＝DOCROT 失敗，回報使用者重議，**禁順手開新 epic**。
 
 ## 待辦分流
-- **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
-- **下一步（技術，不問使用者）**：DOCROT2 consult-r1 收斂 → consult-r2（兩家收斂分歧）→ 主委起草 SPEC／TODO → 戳記 → 實作 → 審碼。
+- **待使用者**（`scripts/fact_keys.json` 之 `handoff-pending` 生成；`白話說明/` 看板整理等非技術決定）：
+
+<!-- BEGIN GENERATED: handoff-pending -->
+| 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
+|---|---|---|---|---|
+| 010 | HP-PLAINDOCS | 未開工 | 白話說明/README.md | 使用者決定 白話說明/ 各份是否整理、怎麼併（GAP-3 佔 8 份） |
+<!-- END GENERATED: handoff-pending -->
+
+- **下一步（技術，不問使用者）**：DOCROT2 stamp 輪 → D2A 實作（Task 1.1–1.3）→ 審碼 → D2B → D2C → D2D；實作注意：`scripts/gen_fact_key_blocks.sh` 之 `_fk_rows_tsv` 為唯一排序點（`LC_ALL=C sort`），交接投影列序會依 TSV 字典序而非 SPEC 所寫「來源順序」，D2A 實作時須具名處理並交審碼輪。
 
 - 🔴 **新發現的系統性缺口（具名殘留，`blocked-by`，**未**開新 epic）**：`docs/` 底下帶 `RECONCILE-STAMP` 的檔**沒有任何一份**能通過 `reconcile_stamps_check`——`gate.sh register-output` 原只收 `handoffs/`，而 provenance 要求審計中有指向被戳記檔**自身**的事件。本輪只把 `docs/SPLITUNIFY_SPEC.D-002.md` 加進既有封閉白名單 `scripts/stampable_artifacts.txt`（該檔正是為此型缺口而建）；`GAP3_EVENT_UX_SPEC.D-001.md`、`GAP3_EVENT_UX_TODO.D-001`..`D-006` **未一併加入**，因其戳記是否對應現行 body hash 未經查證，盲加＝把未驗證的背書寫成既成事實。另 `handoffs/reconcile/20260911-splitunify-x-review-r13/synth.md`（D-001 定案檔）之戳記 hash 與 HEAD body hash **不符**（戳記 `9e1ef3d1` vs 實際 `e3f2847d`），亦即「D-001 三家戳記定案」目前機械上是紅的。
 
