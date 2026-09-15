@@ -23,5 +23,5 @@
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.D-001.md 殘留節 | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-001 | HP-PLAINDOCS | 未開工 | 白話說明/README.md | 使用者決定 白話說明/ 各份是否整理、怎麼併（GAP-3 佔 8 份） |
-| 04-002 | HP-REDISPATCH | 未開工 | scripts/fact_keys.json 票 B-64 | 與兩家委員共識決定修法（同輪、同家、無產出之重派不再須使用者終端機）→ SPEC／TODO 審定後實作；排在 D2C 之前 |
+| 04-002 | HP-REDISPATCH | 待審 | docs/REDISPATCH_SPEC.md | SPEC／TODO v7 已經兩家七輪審定 → 使用者白話審閱後實作批 b1；排在 D2C 之前 |
 <!-- END GENERATED: handoff-todo -->
