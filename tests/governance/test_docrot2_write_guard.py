@@ -508,13 +508,30 @@ def _write_abs(fp: str, content: str) -> dict:
 
 
 ALIAS_KINDS = ["symlink_upper", "symlink_txt", "symlink_dir", "hardlink_txt", "case_alias",
-               "outside_link", "outside_link_wrong_case"]
+               "outside_link", "outside_link_wrong_case", "symlink_to_hardlink_py", "parent_link",
+               "linkroot", "dotdot_through_symlink", "root_prefix_wrong_case"]
 
 
 def _make_alias(tmp_path: Path, root: Path, kind: str) -> str:
     """建立指向 docs/A_SPEC.md 之別名，回傳寫入時所給之絕對路徑。"""
-    if kind in ("case_alias", "outside_link_wrong_case") and not _case_insensitive_fs(root / "docs"):
+    if kind in ("case_alias", "outside_link_wrong_case", "root_prefix_wrong_case") and not _case_insensitive_fs(root / "docs"):
         pytest.skip("檔案系統分大小寫：拼法不同即另一個檔，不是別名")
+    if kind == "symlink_to_hardlink_py":   # 〔CODEX-R3-P1-01〕symlink 不得蓋掉硬連結
+        os.link(root / "docs" / "A_SPEC.md", root / "docs" / "hard.txt")
+        os.symlink("hard.txt", root / "docs" / "alias.py")
+        return str(root / "docs" / "alias.py")
+    if kind == "parent_link":              # 〔CODEX-R3-P1-02〕repo 外 symlink 指向 repo 父目錄
+        os.symlink(str(tmp_path), tmp_path / "plink")
+        return str(tmp_path / "plink" / "repo" / "docs" / "A_SPEC.md")
+    if kind == "linkroot":
+        os.symlink(str(root), tmp_path / "LINKROOT")
+        return str(tmp_path / "LINKROOT" / "docs" / "A_SPEC.md")
+    if kind == "dotdot_through_symlink":   # 字面 `..` 消掉 repo 內 symlink，實體仍經過它
+        (root / "docs" / "sub").mkdir()
+        os.symlink("sub", root / "docs" / "sublink")
+        return f"{root}/docs/sublink/../A_SPEC.md"
+    if kind == "root_prefix_wrong_case":   # repo 根拼法不同：字串比對判不出在 repo 內
+        return str(tmp_path / "REPO" / "docs" / "A_SPEC.md")
     if kind == "symlink_upper":
         os.symlink("A_SPEC.md", root / "docs" / "alias.MD")
         return str(root / "docs" / "alias.MD")
@@ -549,12 +566,11 @@ def test_alias_write_to_live_doc_exit2(tmp_path, kind, registry):
         assert r.returncode == 2 and "別名" in r.stderr, (content, r.stderr)
 
 
-@pytest.mark.parametrize("spelled", ["docs/./A_SPEC.md", "docs/../docs/A_SPEC.md", "LINKROOT/docs/A_SPEC.md"])
+@pytest.mark.parametrize("spelled", ["docs/./A_SPEC.md", "docs/../docs/A_SPEC.md"])
 def test_canonical_spellings_judged_not_alias(tmp_path, spelled):
-    """正名解析不把 `.`／`..`、以連結開啟之 repo 根當別名，亦不使其逃過判定。"""
+    """純字面 `.`／`..` 拼法不算別名，亦不使其逃過判定（以連結開啟 repo 根則屬別名，見上）。"""
     root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n"}, exact=[SPEC])
-    os.symlink(str(root), tmp_path / "LINKROOT")
-    fp = str(tmp_path / spelled) if spelled.startswith("LINKROOT") else f"{root}/{spelled}"
+    fp = f"{root}/{spelled}"
     ok = _hook(root, _write_abs(fp, "# A\n乾淨新行\n"))
     assert ok.returncode == 0, ok.stderr
     bad = _hook(root, _write_abs(fp, "# A\nB-63 部分完成\n"))

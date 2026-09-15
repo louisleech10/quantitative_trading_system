@@ -403,9 +403,9 @@ def _report(rel: str, viols: Sequence[str]) -> None:
 
 # ────────────────────────────────────────────────────────────── hook 寫入目標之正名
 
-ALIAS_SYMLINK = "symlink"
-ALIAS_SPELLING = "大小寫或 Unicode 拼法"
-ALIAS_HARDLINK = "硬連結"
+ALIAS_SYMLINK = "路徑經過 repo 內之 symlink"
+ALIAS_NONCANONICAL = "所給路徑與正名不同（repo 外 symlink、大小寫／Unicode 拼法或其他路徑進入 repo）"
+ALIAS_HARDLINK = "目標為硬連結（無從得知其他名稱）"
 
 
 def _md_like(path: str) -> bool:
@@ -416,78 +416,88 @@ def _inside(path: str, root_real: str) -> bool:
     return path.startswith(root_real + os.sep)
 
 
-def _true_name(parent: str, comp: str, strict: bool) -> str:
-    """parent 目錄中與 comp 指同一項之實際目錄項名；strict 時無法唯一判定即拋 GuardError。"""
+def _true_name(parent: str, comp: str) -> str:
+    """parent 目錄中與 comp 指同一項之實際目錄項名；讀不到目錄或無法唯一判定即拋 GuardError。"""
     try:
         names = os.listdir(parent)
     except OSError as exc:
-        if strict:
-            raise GuardError(f"讀不到目錄 {parent}：{exc}")
-        return comp
+        raise GuardError(f"讀不到目錄 {parent}：{exc}")
     if comp in names:
         return comp
     key = unicodedata.normalize("NFC", comp).casefold()
     hits = [n for n in names if unicodedata.normalize("NFC", n).casefold() == key]
     if len(hits) != 1:
-        if strict:
-            raise GuardError(f"{parent} 內無法唯一判定 {comp!r} 之實際檔名（候選 {len(hits)} 個）")
-        return comp
+        raise GuardError(f"{parent} 內無法唯一判定 {comp!r} 之實際檔名（候選 {len(hits)} 個）")
     return hits[0]
 
 
-def resolve_write_target(root: str, fp: str) -> Tuple[Optional[str], Optional[str]]:
-    """〔CODEX-R2-P1-01（D2B）〕把寫入目標逐段解析成「實際被寫之檔」之 repo 相對正名。
+def _repo_parts(path: str, root_real: str) -> Optional[List[str]]:
+    """以 (st_dev, st_ino) 判定實體路徑是否位於 repo 根之下（不受大小寫與 firmlink 拼法影響）；是則回根以下之路徑段。"""
+    try:
+        st = os.stat(root_real)
+    except OSError as exc:
+        raise GuardError(f"讀不到 repo 根：{exc}")
+    root_id = (st.st_dev, st.st_ino)
+    parts = [p for p in path.split(os.sep) if p]
+    for i in range(len(parts)):
+        try:
+            st = os.stat(os.sep + os.sep.join(parts[:i]))
+        except OSError:
+            return None
+        if (st.st_dev, st.st_ino) == root_id:
+            return parts[i:]
+    return None
 
-    回 (rel, alias)：rel 為 None ＝實際寫入落在 repo 外；alias 非 None ＝所給路徑不是該檔之正名，
-    值為別名種類——經 symlink 進入或位於 repo 內之 symlink、大小寫或 Unicode 拼法與目錄項不同、硬連結。
-    `..` 依實體路徑解析；symlink 目標逐段重走同一套解析（不信任 realpath 之拼法）；尚不存在之尾段照所給拼法保留。
+
+def resolve_write_target(root: str, fp: str) -> Tuple[Optional[str], Optional[str]]:
+    """〔CODEX-R2-P1-01／CODEX-R3-P1-01／CODEX-R3-P1-02（D2B）〕寫入目標之 repo 相對正名與別名判定。
+
+    ① 實體位置：自根逐段走；symlink 以 readlink 展開後重走；`..` 對已解析之實體路徑取父目錄。
+    ② 是否在 repo 內：以 inode 比對 repo 根。③ 正名：repo 根以下逐段取實際目錄項名，尚不存在之尾段照所給拼法。
+    回 (rel, alias)：rel 為 None ＝實際寫入落在 repo 外。alias 非 None ＝所給路徑不是正名——路徑經過 repo 內
+    symlink，或所給路徑（僅做 `.`／`..` 字面正規化）不等於正名絕對路徑；目標為硬連結時一律記硬連結（不被其他種類蓋掉）。
     """
     root_real = os.path.realpath(root)
     raw = fp if os.path.isabs(fp) else os.path.join(os.getcwd(), fp)
-    link_end = object()  # 堆疊哨兵：某個 repo 外 symlink 之目標段已走完
-    todo: List[object] = list(reversed(raw.split(os.sep)))
+    todo: List[str] = list(reversed(raw.split(os.sep)))
     cur = os.sep
-    alias: Optional[str] = None
+    via_repo_symlink = False
     hops = 0
     while todo:
         comp = todo.pop()
-        if comp is link_end:
-            # repo 外之 symlink 把路徑帶進 repo 內部（恰為 repo 根者不算，例如以連結開啟之 repo）
-            if _inside(cur, root_real):
-                alias = alias or ALIAS_SYMLINK
-            continue
-        assert isinstance(comp, str)
         if comp in ("", "."):
             continue
         if comp == "..":
             cur = os.path.dirname(cur)
             continue
         nxt = os.path.join(cur, comp)
-        if os.path.lexists(nxt):
-            strict = cur == root_real or _inside(cur, root_real)
-            name = _true_name(cur, comp, strict)
-            if name != comp:
-                alias = alias or ALIAS_SPELLING
-                nxt = os.path.join(cur, name)
         if not os.path.islink(nxt):
             cur = nxt
             continue
         hops += 1
         if hops > 40:
             raise GuardError(f"{fp}：symlink 層數逾 40")
+        via_repo_symlink = via_repo_symlink or _inside(nxt, root_real)
         target = os.readlink(nxt)
-        if _inside(nxt, root_real):
-            alias = alias or ALIAS_SYMLINK
-        else:
-            todo.append(link_end)
         todo.extend(reversed(target.split(os.sep)))
         if os.path.isabs(target):
             cur = os.sep
-    if not _inside(cur, root_real):
+    parts = _repo_parts(cur, root_real)
+    if not parts:
         return None, None
-    if alias is None and os.path.isfile(cur) and os.stat(cur).st_nlink > 1:
+    base = root_real
+    for comp in parts:
+        if os.path.lexists(os.path.join(base, comp)):
+            comp = _true_name(base, comp)
+        base = os.path.join(base, comp)
+    alias: Optional[str] = None
+    if via_repo_symlink:
+        alias = ALIAS_SYMLINK
+    elif os.path.abspath(raw) != base:
+        alias = ALIAS_NONCANONICAL
+    if os.path.isfile(base) and os.stat(base).st_nlink > 1:
         alias = ALIAS_HARDLINK
-    return os.path.relpath(cur, root_real), alias
+    return os.path.relpath(base, root_real), alias
 
 
 def hook_mode(raw: str) -> int:
@@ -518,7 +528,7 @@ def hook_mode(raw: str) -> int:
     # 〔CODEX-R2-P1-01（D2B）〕別名寫入：所給名或實際目標像活文件（.md 不分大小寫）即擋，與登記資料可用與否無關；
     # 硬連結無從得知其他名稱，不論副檔名一律擋。其後判定一律用正名。
     if alias is not None and (alias == ALIAS_HARDLINK or _md_like(rel) or _md_like(fp)):
-        print(f"live_doc_write_guard: {fp}：經{alias}別名寫入（實際目標 {rel}）⇒ 擋；請直接寫實際路徑", file=sys.stderr)
+        print(f"live_doc_write_guard: {fp}：別名寫入——{alias}（正名 {rel}）⇒ 擋；請直接寫正名絕對路徑", file=sys.stderr)
         return 2
     try:
         ctx = Context(root)
