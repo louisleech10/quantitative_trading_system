@@ -1,23 +1,23 @@
-before: _live_doc_registry.py ab374353165bf7fa64ed340c3c05ba1167e80ea74db0db5b1232276fc8fed74c
-before: _live_doc_write_guard.py 8fe91bcc22257f2a70bc5a84d84f4b2ff7bcd98b7b6d8b006ff292dbfbe3b774
+before: _live_doc_registry.py 1e47b372dfbd8a0415cfbebe4e5bff25d082695de095fd68df63142dd202c042
+before: _live_doc_write_guard.py 4301105975d2a65057c81d534a94e40ca94d98b1b5dbd6c6985bd1e7f13c2df0
 before: spec_xref_hook.sh 645e58c58d78b8bed400022a55896a7047c9e6d66efa33e6574b43258e832a7d
-[① Edit 重建只取 new_string] pytest rc=1 ============================== 1 failed in 0.34s ===============================
+[① Edit 重建只取 new_string] pytest rc=1 ============================== 1 failed in 0.39s ===============================
 [① Edit 重建只取 new_string] restored sha OK=True
-[② 加入引號／樣本豁免] pytest rc=1 ============================== 4 failed in 0.76s ===============================
+[② 加入引號／樣本豁免] pytest rc=1 ============================== 4 failed in 0.80s ===============================
 [② 加入引號／樣本豁免] restored sha OK=True
 [③ 未登記暫存改放行] pytest rc=1 ============================== 1 failed in 0.33s ===============================
 [③ 未登記暫存改放行] restored sha OK=True
 [⑥ 條目改為全部完成才擋] pytest rc=1 ============================== 1 failed in 0.38s ===============================
 [⑥ 條目改為全部完成才擋] restored sha OK=True
-[⑦ 類別路由移除] pytest rc=1 ========================= 1 failed, 1 passed in 0.67s ==========================
+[⑦ 類別路由移除] pytest rc=1 ========================= 1 failed, 1 passed in 0.70s ==========================
 [⑦ 類別路由移除] restored sha OK=True
 [⑧ 歷史專區指標文法移除] pytest rc=1 ============================== 1 failed in 0.30s ===============================
 [⑧ 歷史專區指標文法移除] restored sha OK=True
-[⑩ replace_all false 改取第一處] pytest rc=1 ============================== 1 failed in 0.29s ===============================
+[⑩ replace_all false 改取第一處] pytest rc=1 ============================== 1 failed in 0.30s ===============================
 [⑩ replace_all false 改取第一處] restored sha OK=True
-[⑫ 投影下一步欄檢查移除] pytest rc=1 ============================== 1 failed in 0.30s ===============================
+[⑫ 投影下一步欄檢查移除] pytest rc=1 ============================== 1 failed in 0.31s ===============================
 [⑫ 投影下一步欄檢查移除] restored sha OK=True
-after: _live_doc_registry.py ab374353165bf7fa64ed340c3c05ba1167e80ea74db0db5b1232276fc8fed74c
-after: _live_doc_write_guard.py 8fe91bcc22257f2a70bc5a84d84f4b2ff7bcd98b7b6d8b006ff292dbfbe3b774
+after: _live_doc_registry.py 1e47b372dfbd8a0415cfbebe4e5bff25d082695de095fd68df63142dd202c042
+after: _live_doc_write_guard.py 4301105975d2a65057c81d534a94e40ca94d98b1b5dbd6c6985bd1e7f13c2df0
 after: spec_xref_hook.sh 645e58c58d78b8bed400022a55896a7047c9e6d66efa33e6574b43258e832a7d
 mutate rc=0

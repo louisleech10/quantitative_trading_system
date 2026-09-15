@@ -31,6 +31,21 @@ REGISTRY_REL = os.path.join("scripts", "live_doc_registry.json")
 FACT_KEYS_REL = os.path.join("scripts", "fact_keys.json")
 WILDCARD_CHARS = ("*", "?", "[", "]")
 
+# 〔CODEX-R1-P1-03（D2B）〕類別旗標語意矩陣寫死於此（非由登記檔自證）：登記檔之 class_flags 須逐類逐旗標相等，
+#   否則把某類旗標改成 false 即可讓寫入前守衛對整類活文件放行。定義出處＝DOCROT2 TODO Task 1.1 要點 3。
+_ON = {"new_line_status_check": True, "archaeology_check": True, "concept_removal_xref": False, "handoff_grammar": False}
+_OFF = {"new_line_status_check": False, "archaeology_check": False, "concept_removal_xref": False, "handoff_grammar": False}
+CLASS_FLAG_MATRIX = {
+    "LIVE-HANDOFF": {**_ON, "handoff_grammar": True},
+    "LIVE-CONTRACT": dict(_ON),
+    "LIVE-SPEC": {**_ON, "concept_removal_xref": True},
+    "LIVE-PLAIN": dict(_ON),
+    "LIVE-GUIDE": dict(_ON),
+    "LOG": dict(_OFF),
+    "HIST": dict(_OFF),
+    "OTHER-DORMANT": dict(_ON),
+}
+
 
 def _die(msg: str, rc: int = 2) -> "NoReturn":  # type: ignore[name-defined]
     print(f"live_doc_registry: {msg}", file=sys.stderr)
@@ -123,6 +138,11 @@ def validate_registry(reg: dict) -> Tuple[List[str], dict]:
     flags = reg.get("class_flags")
     if not isinstance(flags, dict) or set(flags) != set(class_enum):
         errs.append("`class_flags` 之鍵集須恰等於 class_enum")
+    elif flags != CLASS_FLAG_MATRIX:
+        bad = sorted(c for c in CLASS_FLAG_MATRIX if flags.get(c) != CLASS_FLAG_MATRIX[c])
+        errs.append(f"`class_flags` 須逐類逐旗標等於寫死之語意矩陣（不符之類別：{'、'.join(bad) or '類別集合不同'}）")
+    if class_enum and set(class_enum) != set(CLASS_FLAG_MATRIX):
+        errs.append("`_schema.class_enum` 須恰等於語意矩陣之類別集合")
 
     exact = _pairs(reg, "exact", errs)
     prefix = _pairs(reg, "prefix", errs)

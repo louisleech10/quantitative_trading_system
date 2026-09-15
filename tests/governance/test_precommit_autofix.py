@@ -45,10 +45,23 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     for name in ("verification_claim_check.py", "install_verify_hooks.sh"):
         (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
+    # DOCROT2 D2B：pre-commit 之活文件兩道判定缺 helper 即 fail-closed ⇒ 迷你 repo 須備齊 helper。
+    # 本檔只測尾隨空白自動修正，故把會暫存之測試文件登記為 LOG 類（兩道判定不適用），斷言不變。
+    import json as _json
+    for name in ("live_doc_write_guard.sh", "_live_doc_write_guard.py", "live_doc_registry_check.sh", "_live_doc_registry.py"):
+        (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
+    reg = _json.loads((REPO_ROOT / "scripts" / "live_doc_registry.json").read_text(encoding="utf-8"))
+    reg["prefix"] = []
+    reg["exact"] = [[p, "LOG"] for p in ("HANDOFF.md", "README.md", "docs/note.md", "docs/bad.md", "docs/run.md")]
+    (scripts / "live_doc_registry.json").write_text(_json.dumps(reg, ensure_ascii=False), encoding="utf-8")
+    (scripts / "fact_keys.json").write_text(
+        _json.dumps({"_schema": {"enforcement_completed_statuses": ["收案", "已落地", "已完成"]}}, ensure_ascii=False),
+        encoding="utf-8")
     link_python_env(repo)
 
     (repo / "README.md").write_text("# temp\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "add", "README.md", "scripts/live_doc_registry.json", "scripts/fact_keys.json"],
+                   cwd=repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "chore: init"],
         cwd=repo,

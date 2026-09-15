@@ -680,6 +680,8 @@ _fk_status_hits_in_lines() {   # $1=行檔
     | ($r[$k].rows // [])[] | .[1]
   ' "${REG}" > "${_fksl_idf}" \
     || { rm -f "${_fksl_idf}"; echo "gen_fact_key_blocks: --status-hits 讀取識別碼失敗 → fail-closed" >&2; return 2; }
+  [ -s "${_fksl_idf}" ] \
+    || { rm -f "${_fksl_idf}"; echo "gen_fact_key_blocks: --status-hits 識別碼集合為空 → fail-closed" >&2; return 2; }
   LC_ALL=C jq -r '._schema.status_enum[]' "${REG}" > "${_fksl_ef}" \
     || { rm -f "${_fksl_idf}" "${_fksl_ef}"; echo "gen_fact_key_blocks: --status-hits 讀取 status_enum 失敗 → fail-closed" >&2; return 2; }
   LC_ALL=C awk -v idf="${_fksl_idf}" -v ef="${_fksl_ef}" "${_FK_HIT_AWK}"'
@@ -2041,6 +2043,12 @@ if [ "${1-}" = "--status-hits" ]; then
   [ "$#" -eq 2 ] && [ -f "${2}" ] || {
     echo "gen_fact_key_blocks: --status-hits 需恰一個存在之行檔 → fail-closed" >&2; exit 2; }
   _fk_materialize
+  # 〔CODEX-R1-P1-04（D2B）〕先驗狀態集合；缺失或空集合 fail-closed，不得靜默變成「無識別碼可比」
+  _fk_validate_keys || exit 2
+  _fk_validate_schema_sets || exit 2
+  LC_ALL=C jq -e '._schema.docrot2_status_keys | type == "array" and length > 0' "${REG}" >/dev/null 2>&1 \
+    || { echo "gen_fact_key_blocks: --status-hits 需 _schema.docrot2_status_keys 為非空陣列 → fail-closed" >&2; exit 2; }
+  _fk_validate_docrot2_status || exit 2
   _fk_status_hits_in_lines "${2}"; exit $?
 fi
 

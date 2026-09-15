@@ -124,8 +124,10 @@ def _run(root: Path, *args: str) -> subprocess.CompletedProcess:
 
 SPEC = ("docs/A_SPEC.md", "LIVE-SPEC")
 HANDOFF = ("HANDOFF.md", "LIVE-HANDOFF")
-NO_ARCH = {"LIVE-SPEC": {"archaeology_check": False}}      # 隔離 Task 2.1：關閉 Task 2.2 旗標
-NO_STATUS = {"LIVE-SPEC": {"new_line_status_check": False}}  # 隔離 Task 2.2
+# 合法指標行且同行含「識別碼＋狀態字面」（目標路徑名含狀態字）：歷史專區內兩道判定皆放行、專區外必被 Task 2.1 擋。
+# 類別旗標自 D2B review-r1 起為寫死矩陣，不能再以改旗標隔離 Task 2.1／2.2，故以此形態做判別。
+STATUS_PTR = "- 2026-09-15：D2B → `docs/進行中.md`"
+PTR_FILE = {"docs/進行中.md": "x\n"}
 
 
 # ================================================================ Task 2.1 驗證欄
@@ -142,41 +144,41 @@ OUTSIDE = "# A\n\nXYZ-SLOT\n\n<!-- HISTORY-BEGIN -->\n<!-- HISTORY-END -->\n"
 
 
 def test_same_new_string_old_string_inside_history_exit0(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": INSIDE}, exact=[SPEC], flags=NO_ARCH)
-    r = _hook(root, _edit(root, "docs/A_SPEC.md", "XYZ-SLOT", "D2B 進行中"))
+    root = _repo(tmp_path, {"docs/A_SPEC.md": INSIDE, **PTR_FILE}, exact=[SPEC])
+    r = _hook(root, _edit(root, "docs/A_SPEC.md", "XYZ-SLOT", STATUS_PTR))
     assert r.returncode == 0, r.stderr
 
 
 def test_same_new_string_old_string_outside_history_exit2(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": OUTSIDE}, exact=[SPEC], flags=NO_ARCH)
-    r = _hook(root, _edit(root, "docs/A_SPEC.md", "XYZ-SLOT", "D2B 進行中"))
+    root = _repo(tmp_path, {"docs/A_SPEC.md": OUTSIDE, **PTR_FILE}, exact=[SPEC])
+    r = _hook(root, _edit(root, "docs/A_SPEC.md", "XYZ-SLOT", STATUS_PTR))
     assert r.returncode == 2 and "D2B" in r.stderr, r.stderr
 
 
 def test_replace_all_true_two_occurrences_exit2(tmp_path):
     text = "# A\n\n<!-- HISTORY-BEGIN -->\nXYZ-SLOT\n<!-- HISTORY-END -->\n\nXYZ-SLOT\n"
-    root = _repo(tmp_path, {"docs/A_SPEC.md": text}, exact=[SPEC], flags=NO_ARCH)
-    r = _hook(root, _edit(root, "docs/A_SPEC.md", "XYZ-SLOT", "D2B 進行中", replace_all=True))
+    root = _repo(tmp_path, {"docs/A_SPEC.md": text, **PTR_FILE}, exact=[SPEC])
+    r = _hook(root, _edit(root, "docs/A_SPEC.md", "XYZ-SLOT", STATUS_PTR, replace_all=True))
     # 第二處（L7，歷史專區外）必報；第一處（L4，歷史專區內）必不報——只換第一處之實作兩者皆錯
     assert r.returncode == 2 and "L7" in r.stderr and "L4" not in r.stderr, r.stderr
 
 
 @pytest.mark.parametrize("line", ["「B-63 部分完成」", "\"D2B\" 進行中", "`B-63`：部分完成"])
 def test_quoted_id_with_status_exit2(tmp_path, line):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nANCHOR\n"}, exact=[SPEC], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nANCHOR\n"}, exact=[SPEC])
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "ANCHOR", f"ANCHOR\n{line}"))
     assert r.returncode == 2, r.stderr
 
 
 def test_git_show_decoy_status_suffix_exit2(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nANCHOR\n"}, exact=[SPEC], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nANCHOR\n"}, exact=[SPEC])
     line = "樣本見 `git show 600c968b:HANDOFF.md`，其中 B-63 部分完成"
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "ANCHOR", f"ANCHOR\n{line}"))
     assert r.returncode == 2 and "B-63" in r.stderr, r.stderr
 
 
 def test_stale_sample_in_fence_exit0(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nANCHOR\n"}, exact=[SPEC], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nANCHOR\n"}, exact=[SPEC])
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "ANCHOR", "ANCHOR\n```\nB-63 部分完成\n```"))
     assert r.returncode == 0, r.stderr
 
@@ -189,7 +191,7 @@ def test_edit_old_string_absent_exit2(tmp_path):
 
 def test_edit_old_string_nonunique_exit2(tmp_path):
     text = "# A\n\n<!-- HISTORY-BEGIN -->\nXYZ-SLOT\n<!-- HISTORY-END -->\n\nXYZ-SLOT\n"
-    root = _repo(tmp_path, {"docs/A_SPEC.md": text}, exact=[SPEC], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": text}, exact=[SPEC])
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "XYZ-SLOT", "一般文字"))
     assert r.returncode == 2 and "2 次" in r.stderr, r.stderr
 
@@ -198,19 +200,19 @@ def test_edit_old_string_nonunique_exit2(tmp_path):
 
 
 def test_write_new_file_all_lines_are_new_exit2(tmp_path):
-    root = _repo(tmp_path, {"docs/KEEP.md": "x\n"}, exact=[SPEC], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/KEEP.md": "x\n"}, exact=[SPEC])
     r = _hook(root, _write(root, "docs/A_SPEC.md", "# A\nD2B 進行中\n"))
     assert r.returncode == 2, r.stderr
 
 
 def test_write_same_content_exit0(tmp_path):
     text = "# A\nD2B 進行中（既有行）\n"
-    root = _repo(tmp_path, {"docs/A_SPEC.md": text}, exact=[SPEC], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": text}, exact=[SPEC])
     assert _hook(root, _write(root, "docs/A_SPEC.md", text)).returncode == 0
 
 
 def test_existing_status_line_new_line_clean_exit0(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nD2B 進行中（既有行）\nANCHOR\n"}, exact=[SPEC], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nD2B 進行中（既有行）\nANCHOR\n"}, exact=[SPEC])
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "ANCHOR", "ANCHOR\n一般新行"))
     assert r.returncode == 0, r.stderr
 
@@ -239,20 +241,20 @@ def test_log_class_exit0(tmp_path):
 
 
 def test_unclosed_generated_block_gives_no_exemption_exit2(tmp_path):
-    root = _repo(tmp_path, {"docs/st.md": "# S\nANCHOR\n"}, exact=[("docs/st.md", "LIVE-SPEC")], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/st.md": "# S\nANCHOR\n"}, exact=[("docs/st.md", "LIVE-SPEC")])
     r = _hook(root, _edit(root, "docs/st.md", "ANCHOR", "ANCHOR\n<!-- BEGIN GENERATED: st-a -->\nD2B 進行中"))
     assert r.returncode == 2, r.stderr
 
 
 def test_block_of_key_not_targeting_file_gives_no_exemption_exit2(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nANCHOR\n"}, exact=[SPEC], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\nANCHOR\n"}, exact=[SPEC])
     fake = "ANCHOR\n<!-- BEGIN GENERATED: st-a -->\nD2B 進行中\n<!-- END GENERATED: st-a -->"
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "ANCHOR", fake))
     assert r.returncode == 2, r.stderr
 
 
 def test_legal_generated_block_exempt_exit0(tmp_path):
-    root = _repo(tmp_path, {"docs/st.md": "# S\nANCHOR\n"}, exact=[("docs/st.md", "LIVE-SPEC")], flags=NO_ARCH)
+    root = _repo(tmp_path, {"docs/st.md": "# S\nANCHOR\n"}, exact=[("docs/st.md", "LIVE-SPEC")])
     blk = "ANCHOR\n<!-- BEGIN GENERATED: st-a -->\n| 010 | D2B | 進行中 | x | 做 |\n<!-- END GENERATED: st-a -->"
     assert _hook(root, _edit(root, "docs/st.md", "ANCHOR", blk)).returncode == 0
 
@@ -263,20 +265,20 @@ SPEC_HIST = "# A\n\n正文 ANCHOR\n\n<!-- HISTORY-BEGIN -->\n- 2026-09-14：v1 �
 
 
 def test_spec_adds_strikethrough_outside_history_exit2(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC], flags=NO_STATUS)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC])
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "正文 ANCHOR", "正文 ~~舊寫法~~ 新寫法"))
     assert r.returncode == 2 and "~~" in r.stderr, r.stderr
 
 
 def test_spec_adds_finding_id_outside_history_exit2(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC], flags=NO_STATUS)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC])
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "正文 ANCHOR", "正文（CODEX-R12-P1-03 修）"))
     assert r.returncode == 2 and "CODEX-R12-P1-03" in r.stderr, r.stderr
 
 
 @pytest.mark.parametrize("lit", REAL_REGISTRY["archaeology_literals"])
 def test_spec_adds_archaeology_literal_outside_history_exit2(tmp_path, lit):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC], flags=NO_STATUS)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC])
     r = _hook(root, _edit(root, "docs/A_SPEC.md", "正文 ANCHOR", f"正文 {lit}"))
     assert r.returncode == 2, r.stderr
 
@@ -287,28 +289,28 @@ def _hist_add(root: Path, line: str) -> dict:
 
 
 def test_spec_history_adds_pointer_line_exit0(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC], flags=NO_STATUS)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC])
     assert _hook(root, _hist_add(root, "- 2026-09-15：v2 → `docs/A_SPEC.md`")).returncode == 0
     sha = _git(root, "rev-parse", "HEAD").stdout.strip()
     assert _hook(root, _hist_add(root, f"- 2026-09-15：B-63 → commit `{sha[:8]}`")).returncode == 0
 
 
 def test_spec_history_adds_copied_old_text_exit2(tmp_path):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC], flags=NO_STATUS)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC])
     r = _hook(root, _hist_add(root, "v1 原本規定：每批三家審碼，現改兩家"))
     assert r.returncode == 2 and "指標文法" in r.stderr, r.stderr
 
 
 @pytest.mark.parametrize("line", ["- 2026-09-15：舊版說明 → `docs/A_SPEC.md`", "- 2026-09-15：NOT-AN-ID → `docs/A_SPEC.md`"])
 def test_history_pointer_free_text_subject_exit2(tmp_path, line):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC], flags=NO_STATUS)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC])
     assert _hook(root, _hist_add(root, line)).returncode == 2
 
 
 @pytest.mark.parametrize("line", ["- 2026-09-15：v2 → `docs/MISSING.md`", "- 2026-09-15：v2 → commit `deadbeefdeadbeef`",
                                   "- 2026-09-15：v2 → `../outside.md`"])
 def test_history_pointer_target_missing_exit2(tmp_path, line):
-    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC], flags=NO_STATUS)
+    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST}, exact=[SPEC])
     assert _hook(root, _hist_add(root, line)).returncode == 2
 
 
@@ -333,11 +335,160 @@ def test_body_paragraph_deletion_exit0(tmp_path):
     assert r.returncode == 0, r.stderr
 
 
-@pytest.mark.parametrize("flag_on, rc", [(True, 2), (False, 0)])
-def test_templates_follow_class_flag(tmp_path, flag_on, rc):
-    root = _repo(tmp_path, {"templates/T.md": "# T\nANCHOR\n"},
-                 flags={"LIVE-CONTRACT": {"archaeology_check": flag_on}})
-    assert _hook(root, _edit(root, "templates/T.md", "ANCHOR", "ANCHOR ~~舊~~")).returncode == rc
+def test_templates_follow_class_flag_exit2(tmp_path):
+    """templates/ 屬 LIVE-CONTRACT（archaeology_check 為 true）；旗標為 false 之類別見 test_log_class_exit0。"""
+    root = _repo(tmp_path, {"templates/T.md": "# T\nANCHOR\n"})
+    assert _hook(root, _edit(root, "templates/T.md", "ANCHOR", "ANCHOR ~~舊~~")).returncode == 2
+
+
+# ---------------------------------------------------------------- D2B review-r1 修補之應紅測試
+
+
+@pytest.mark.parametrize("over", [{"LIVE-SPEC": {"new_line_status_check": False}},
+                                  {"LIVE-CONTRACT": {"archaeology_check": False}}])
+def test_tampered_class_flags_fail_closed_exit2(tmp_path, over):
+    """〔CODEX-R1-P1-03〕登記檔旗標與寫死矩陣不符 ⇒ 活文件寫入一律擋；非 .md 仍放行（可修登記檔）。"""
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n", "templates/T.md": "# T\n"}, exact=[SPEC], flags=over)
+    r = _hook(root, _write(root, "docs/A_SPEC.md", "# A\nB-63 部分完成\n"))
+    assert r.returncode == 2 and "fail-closed" in r.stderr, r.stderr
+    assert _hook(root, _write(root, "scripts/live_doc_registry.json", "{}")).returncode == 0
+    chk = subprocess.run(["bash", str(root / "scripts" / "live_doc_registry_check.sh"), "--all"], cwd=str(root),
+                         capture_output=True, text=True)
+    assert chk.returncode == 1 and "語意矩陣" in chk.stderr, chk.stderr
+
+
+def test_missing_class_flag_key_fail_closed_exit2(tmp_path):
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n"}, exact=[SPEC])
+    reg = json.loads((root / "scripts" / "live_doc_registry.json").read_text(encoding="utf-8"))
+    del reg["class_flags"]["LIVE-SPEC"]["new_line_status_check"]
+    (root / "scripts" / "live_doc_registry.json").write_text(json.dumps(reg, ensure_ascii=False), encoding="utf-8")
+    assert _hook(root, _write(root, "docs/A_SPEC.md", "# A\nB-63 部分完成\n")).returncode == 2
+
+
+def test_empty_status_keys_fail_closed_exit2(tmp_path):
+    """〔CODEX-R1-P1-04〕狀態集合被清空不得靜默變成「無識別碼可比」。"""
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n"}, exact=[SPEC])
+    fk = _fact_keys()
+    fk["_schema"]["status_keys"] = []
+    (root / "scripts" / "fact_keys.json").write_text(json.dumps(fk, ensure_ascii=False), encoding="utf-8")
+    r = _hook(root, _write(root, "docs/A_SPEC.md", "# A\nD2B 進行中\n"))
+    assert r.returncode == 2 and "fail-closed" in r.stderr, r.stderr
+
+
+@pytest.mark.parametrize("mode", ["remove_end", "duplicate_end", "end_before_begin", "stray_marker"])
+def test_handoff_history_markers_malformed_exit2(tmp_path, mode):
+    """〔CODEX-R1-P1-01〕交接檔 HISTORY-BEGIN／END 各恰一個、依序、只在進行中紀錄區。"""
+    text = {
+        "remove_end": HANDOFF_OK.replace("<!-- HISTORY-END -->\n", ""),
+        "duplicate_end": HANDOFF_OK.replace("<!-- HISTORY-END -->\n", "<!-- HISTORY-END -->\n<!-- HISTORY-END -->\n"),
+        "end_before_begin": HANDOFF_OK.replace("<!-- HISTORY-BEGIN -->\n", "<!-- HISTORY-END -->\n<!-- HISTORY-BEGIN -->\n", 1),
+        "stray_marker": HANDOFF_OK.replace("- 一般教訓 ANCHOR-PIT", "- 一般教訓 ANCHOR-PIT\n<!-- HISTORY-END -->"),
+    }[mode]
+    root = _repo(tmp_path, {"HANDOFF.md": HANDOFF_OK, "docs/A_SPEC.md": "# A\n"}, exact=[HANDOFF, SPEC])
+    r = _hook(root, _write(root, "HANDOFF.md", text))
+    assert r.returncode == 2 and "HISTORY" in r.stderr, r.stderr
+
+
+def test_handoff_tree_missing_history_end_rc1(tmp_path):
+    root = _repo(tmp_path, {"HANDOFF.md": HANDOFF_OK.replace("<!-- HISTORY-END -->\n", ""), "docs/A_SPEC.md": "# A\n"},
+                 exact=[HANDOFF, SPEC])
+    assert _run(root, "--tree", "HEAD", "--path", "HANDOFF.md").returncode == 1
+
+
+@pytest.mark.parametrize("kind", ["broken", "inside_file", "outside_file", "directory"])
+def test_history_pointer_target_symlink_or_nonfile_exit2(tmp_path, kind):
+    """〔CODEX-R1-P1-02〕指標目標只收 repo 內之一般檔：symlink（含指向 repo 內一般檔者）與目錄一律擋。"""
+    root = _repo(tmp_path, {"docs/A_SPEC.md": SPEC_HIST, "docs/real.md": "x\n"}, exact=[SPEC])
+    outside = tmp_path / "outside.md"
+    outside.write_text("x\n", encoding="utf-8")
+    target = {"broken": "docs/link.md", "inside_file": "docs/link.md", "outside_file": "docs/link.md", "directory": "docs"}[kind]
+    if kind == "broken":
+        os.symlink(str(tmp_path / "nonexistent.md"), root / "docs" / "link.md")
+    elif kind == "inside_file":
+        os.symlink("real.md", root / "docs" / "link.md")
+    elif kind == "outside_file":
+        os.symlink(str(outside), root / "docs" / "link.md")
+    r = _hook(root, _hist_add(root, f"- 2026-09-15：v2 → `{target}`"))
+    assert r.returncode == 2, r.stderr
+
+
+def _commit_all(root: Path) -> None:
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "c")
+
+
+@pytest.mark.parametrize("damage", ["removed_from_index", "binary_in_index"])
+def test_staged_index_fact_keys_unavailable_rc2(tmp_path, damage):
+    """〔CODEX-R1-P1-06〕index 版 fact_keys 缺失或非文字 ⇒ fail-closed，不得退回讀工作樹。"""
+    root = _repo(tmp_path, {"HANDOFF.md": HANDOFF_OK, "docs/A_SPEC.md": "# A\n"}, exact=[HANDOFF, SPEC])
+    if damage == "removed_from_index":
+        _git(root, "rm", "-q", "--cached", "scripts/fact_keys.json")
+    else:
+        good = (root / "scripts" / "fact_keys.json").read_bytes()
+        (root / "scripts" / "fact_keys.json").write_bytes(b"\0binary\0")
+        _git(root, "add", "scripts/fact_keys.json")
+        (root / "scripts" / "fact_keys.json").write_bytes(good)
+    _stage_handoff(root, HANDOFF_OK.replace("- 一般教訓 ANCHOR-PIT", "- 一般教訓 ANCHOR-PIT 改寫"))
+    r = _run(root, "--staged")
+    assert r.returncode == 2 and "fact_keys.json" in r.stderr, r.stderr
+
+
+def test_tree_commit_without_fact_keys_rc2(tmp_path):
+    root = _repo(tmp_path, {"HANDOFF.md": HANDOFF_OK, "docs/A_SPEC.md": "# A\n"}, exact=[HANDOFF, SPEC])
+    _git(root, "rm", "-q", "--cached", "scripts/fact_keys.json")
+    _git(root, "commit", "-qm", "drop fact_keys")
+    assert _run(root, "--tree", "HEAD", "--path", "HANDOFF.md").returncode == 2
+
+
+CRLF_SPEC = SPEC_HIST.replace("\n", "\r\n")
+
+
+def test_crlf_history_copied_old_text_hook_exit2(tmp_path):
+    """〔COMPOSER-R1-P1-01〕CRLF 檔之歷史專區仍須符合指標文法。"""
+    root = _repo(tmp_path, {"docs/A_SPEC.md": CRLF_SPEC}, exact=[SPEC])
+    new = CRLF_SPEC.replace("<!-- HISTORY-END -->", "v1 原本規定：每批三家審碼\r\n<!-- HISTORY-END -->")
+    r = _hook(root, _write(root, "docs/A_SPEC.md", new))
+    assert r.returncode == 2 and "指標文法" in r.stderr, r.stderr
+
+
+def test_crlf_history_copied_old_text_staged_rc1(tmp_path):
+    root = _repo(tmp_path, {"docs/A_SPEC.md": CRLF_SPEC}, exact=[SPEC])
+    new = CRLF_SPEC.replace("<!-- HISTORY-END -->", "v1 原本規定：每批三家審碼\r\n<!-- HISTORY-END -->")
+    (root / "docs" / "A_SPEC.md").write_bytes(new.encode("utf-8"))
+    _git(root, "add", "docs/A_SPEC.md")
+    r = _run(root, "--staged")
+    assert r.returncode == 1 and "指標文法" in r.stderr, r.stderr
+
+
+def _precommit_repo(tmp_path: Path) -> Path:
+    root = _repo(tmp_path, {"docs/A_SPEC.md": "# A\n"}, exact=[SPEC])
+    (root / "scripts" / "git_hooks").mkdir()
+    shutil.copy2(REPO / "scripts" / "git_hooks" / "pre-commit", root / "scripts" / "git_hooks" / "pre-commit")
+    (root / "scripts" / "verification_claim_check.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+    _commit_all(root)
+    return root
+
+
+@pytest.mark.parametrize("missing", ["live_doc_write_guard.sh", "live_doc_registry_check.sh"])
+def test_pre_commit_missing_helper_fail_closed(tmp_path, missing):
+    """〔CODEX-R1-P1-05〕pre-commit 缺任一 helper 不得靜默略過。"""
+    root = _precommit_repo(tmp_path)
+    (root / "scripts" / missing).unlink()
+    (root / "docs" / "A_SPEC.md").write_text("# A\n一般新行\n", encoding="utf-8")
+    _git(root, "add", "docs/A_SPEC.md")
+    r = subprocess.run(["bash", str(root / "scripts" / "git_hooks" / "pre-commit")], cwd=str(root), capture_output=True, text=True)
+    assert r.returncode != 0 and missing in r.stderr, r.stdout + r.stderr
+
+
+def test_pre_commit_blocks_staged_status_line_and_passes_clean(tmp_path):
+    root = _precommit_repo(tmp_path)
+    hook = ["bash", str(root / "scripts" / "git_hooks" / "pre-commit")]
+    (root / "docs" / "A_SPEC.md").write_text("# A\n一般新行\n", encoding="utf-8")
+    _git(root, "add", "docs/A_SPEC.md")
+    assert subprocess.run(hook, cwd=str(root), capture_output=True, text=True).returncode == 0
+    (root / "docs" / "A_SPEC.md").write_text("# A\n一般新行\nD2B 進行中\n", encoding="utf-8")
+    _git(root, "add", "docs/A_SPEC.md")
+    assert subprocess.run(hook, cwd=str(root), capture_output=True, text=True).returncode != 0
 
 
 # ================================================================ Task 2.3 驗證欄
@@ -503,7 +654,7 @@ def test_real_handoff_conforms_and_inject_carries_generated_blocks():
     inj = subprocess.run(["bash", str(REPO / "scripts" / "inject_handoff.sh")], cwd=str(REPO), capture_output=True, text=True)
     msg = json.loads(inj.stdout)["systemMessage"]
     assert "BEGIN GENERATED: handoff-current" in msg and "BEGIN GENERATED: handoff-todo" in msg
-    assert r.returncode in (0, 1)       # HEAD 版於遷移 commit 前可能未合規；遷移後由 --staged 與下一條承接
+    assert r.returncode == 0, r.stderr   # 〔CODEX-R1-P2-07〕遷移已 commit，HEAD 版須合規
 
 
 def test_real_worktree_handoff_grammar_rc0():

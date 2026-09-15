@@ -1,0 +1,25 @@
+before: _live_doc_registry.py 1e47b372dfbd8a0415cfbebe4e5bff25d082695de095fd68df63142dd202c042
+before: _live_doc_write_guard.py 4301105975d2a65057c81d534a94e40ca94d98b1b5dbd6c6985bd1e7f13c2df0
+before: gen_fact_key_blocks.sh 2e1e98b5ca354771ab30554638551b382d94a2c6c35525405f152fd0691659f5
+before: pre-commit 1080efefd3b55d488b6d300f2f02e83a2250707ee3f33fbd27958b38f0314cfb
+[K1 HISTORY-END 不計數（CODEX-R1-P1-01）] pytest rc=1 ========================= 4 failed, 1 passed in 1.30s ==========================
+[K1 HISTORY-END 不計數（CODEX-R1-P1-01）] restored sha OK=True
+[K2a 指標目標不拒 symlink（CODEX-R1-P1-02）] pytest rc=1 ========================= 1 failed, 3 passed in 0.73s ==========================
+[K2a 指標目標不拒 symlink（CODEX-R1-P1-02）] restored sha OK=True
+[K2b 指標目標存在即可（CODEX-R1-P1-02）] pytest rc=1 ========================= 1 failed, 3 passed in 0.73s ==========================
+[K2b 指標目標存在即可（CODEX-R1-P1-02）] restored sha OK=True
+[K3 類別旗標不比對矩陣（CODEX-R1-P1-03）] pytest rc=1 ============================== 2 failed in 0.55s ===============================
+[K3 類別旗標不比對矩陣（CODEX-R1-P1-03）] restored sha OK=True
+[K4 --status-hits 不驗狀態集合（CODEX-R1-P1-04）] pytest rc=1 ============================== 1 failed in 0.37s ===============================
+[K4 --status-hits 不驗狀態集合（CODEX-R1-P1-04）] restored sha OK=True
+[K5 pre-commit helper 缺失即略過（CODEX-R1-P1-05）] pytest rc=1 ============================== 2 failed in 0.98s ===============================
+[K5 pre-commit helper 缺失即略過（CODEX-R1-P1-05）] restored sha OK=True
+[K6 index fact_keys 缺失退回工作樹（CODEX-R1-P1-06）] pytest rc=1 ============================== 2 failed in 0.86s ===============================
+[K6 index fact_keys 缺失退回工作樹（CODEX-R1-P1-06）] restored sha OK=True
+[K7 不正規化 CRLF（COMPOSER-R1-P1-01）] pytest rc=1 ============================== 2 failed in 0.70s ===============================
+[K7 不正規化 CRLF（COMPOSER-R1-P1-01）] restored sha OK=True
+after: _live_doc_registry.py 1e47b372dfbd8a0415cfbebe4e5bff25d082695de095fd68df63142dd202c042
+after: _live_doc_write_guard.py 4301105975d2a65057c81d534a94e40ca94d98b1b5dbd6c6985bd1e7f13c2df0
+after: gen_fact_key_blocks.sh 2e1e98b5ca354771ab30554638551b382d94a2c6c35525405f152fd0691659f5
+after: pre-commit 1080efefd3b55d488b6d300f2f02e83a2250707ee3f33fbd27958b38f0314cfb
+mutate rc=0

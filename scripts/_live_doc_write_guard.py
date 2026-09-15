@@ -115,7 +115,8 @@ class Context:
 # ────────────────────────────────────────────────────────────── 區段與新增行
 
 def split_lines(text: str) -> List[str]:
-    return text.split("\n")
+    # 〔COMPOSER-R1-P1-01（D2B）〕CRLF／CR 先正規化；否則 HISTORY 標記比對與指標文法對 CRLF 檔整體失效
+    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
 
 
 def regions(lines: Sequence[str], legal: Set[str]) -> Dict[str, List[bool]]:
@@ -222,8 +223,14 @@ def _pointer_violation(ctx: Context, line: str) -> Optional[str]:
     parts = path.split("/")
     if path.startswith("/") or ".." in parts or "" in parts:
         return f"目標路徑「{path}」須為 repo 相對路徑"
-    if not os.path.lexists(os.path.join(ctx.root, path)):
-        return f"目標路徑「{path}」於工作樹不存在"
+    full = os.path.join(ctx.root, path)
+    # 〔CODEX-R1-P1-02（D2B）〕拒 symlink（含斷鏈）、只收一般檔、實體路徑須在 repo 內
+    if os.path.islink(full):
+        return f"目標路徑「{path}」為 symlink"
+    if not os.path.isfile(full):
+        return f"目標路徑「{path}」於工作樹不存在或非一般檔"
+    if not os.path.realpath(full).startswith(os.path.realpath(ctx.root) + os.sep):
+        return f"目標路徑「{path}」實體位置在 repo 外"
     return None
 
 
@@ -323,8 +330,13 @@ def handoff_grammar(ctx: Context, lines: Sequence[str], reg: Dict[str, List[bool
     if hist_sec in spans:
         a, b = spans[hist_sec]
         begins = [i for i in range(a, b) if lines[i] == HIST_BEGIN]
-        if len(begins) != 1:
-            out.append(f"{hist_sec} 須恰含一個 HISTORY-BEGIN..END（實得 {len(begins)}）")
+        ends = [i for i in range(a, b) if lines[i] == HIST_END]
+        # 〔CODEX-R1-P1-01（D2B）〕BEGIN／END 各恰一個且 BEGIN 在前；全檔不得有區段外之歷史標記
+        if len(begins) != 1 or len(ends) != 1 or ends[0] < begins[0]:
+            out.append(f"{hist_sec} 須恰含一組依序之 HISTORY-BEGIN..END（BEGIN {len(begins)} 個、END {len(ends)} 個）")
+        stray = [i for i, ln in enumerate(lines) if ln in (HIST_BEGIN, HIST_END) and not (a <= i < b)]
+        for i in stray:
+            out.append(f"L{i + 1}：HISTORY-BEGIN／END 標記只准出現在 {hist_sec}")
         for i in range(a, b):
             if lines[i].strip() and not (reg["hist"][i] or reg["marker"][i]):
                 out.append(f"L{i + 1}：{hist_sec} 只准歷史專區內容")
@@ -411,6 +423,13 @@ def hook_mode(raw: str) -> int:
         return 0
     try:
         ctx = Context(root)
+    except (GuardError, ValueError) as exc:
+        # 登記資料不可用：可能之活文件（.md）一律擋；其餘路徑放行，以免連修復登記檔本身都被擋
+        if not rel.endswith(".md"):
+            return 0
+        print(f"live_doc_write_guard: {rel}：{exc} ⇒ fail-closed", file=sys.stderr)
+        return 2
+    try:
         cls, _ = ctx.cls_flags(rel)
         if cls is None:
             return 0
@@ -469,6 +488,10 @@ def staged_mode() -> int:
         print("live_doc_write_guard: git diff --cached 失敗 ⇒ fail-closed", file=sys.stderr)
         return 2
     fk = _decode(_git_show(root, ":" + ldr.FACT_KEYS_REL.replace(os.sep, "/")))
+    if fk is None:
+        # 〔CODEX-R1-P1-06（D2B）〕index 版缺失或非文字不得退回讀工作樹
+        print("live_doc_write_guard: index 之 scripts/fact_keys.json 缺失或非文字 ⇒ fail-closed", file=sys.stderr)
+        return 2
     try:
         ctx = Context(root, fk)
     except (GuardError, ValueError) as exc:
@@ -509,6 +532,10 @@ def tree_mode(commit: str, path: str) -> int:
         print(f"live_doc_write_guard: {commit}:{path} 不存在或非文字 ⇒ fail-closed", file=sys.stderr)
         return 2
     fk = _decode(_git_show(root, f"{commit}:" + ldr.FACT_KEYS_REL.replace(os.sep, "/")))
+    if fk is None:
+        # 〔CODEX-R1-P1-06（D2B）〕該 commit 之 fact_keys 缺失或非文字不得退回讀工作樹
+        print(f"live_doc_write_guard: {commit}:scripts/fact_keys.json 缺失或非文字 ⇒ fail-closed", file=sys.stderr)
+        return 2
     try:
         ctx = Context(root, fk)
         viols = evaluate(ctx, path, new_text, new_text, lifecycle=True, new_lines_only=False)
