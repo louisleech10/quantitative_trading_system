@@ -305,3 +305,18 @@
 - 🔴 治理測試既有紅基準（2026-09-13 實測）：19 個涉及 `brief_conformance_check` 的檔為 **30 failed／523 passed／3 skipped**；乾淨 HEAD worktree 為 **35 failed／512 passed**。根因＝隔離 repo 依賴複製清單缺 `scripts/quant_standard_check.sh`／`ticket_batch_check.sh`。`test_govb1_contract_matrix.py::test_r6_u1u2u4_g7_worktree_space_quote_paths` 會**掛住**，跑治理回歸須排除。
 - 🔴 改 SPEC／TODO 前先 `grep -n` 列出該決定的全部落點，改完再 grep 一次；grep **不得加排除條件**。
 - 🔴 **治理工具擴建**：2026-09-12「不再擴建治理工具」；2026-09-15 使用者放寬，逐字「允許擴建治理工具，就是要修正DOCROT沒做好之處」（範圍＝DOCROT2）。
+
+## 2026-09-15 交接檔進行中紀錄移出：D2B（批次收批，條目識別碼轉完成）
+
+<!-- ENTRY: D2B -->
+- 2026-09-15：D2B → `docs/DOCROT2_TODO.md`
+- 2026-09-15：D2B → commit `104585e3`
+- 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r1/synth.md`
+- 2026-09-15：D2B → commit `63b533ce`
+- 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r2/synth.md`
+- 2026-09-15：D2B → commit `7ab3330e`
+- 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r3/synth.md`
+- 2026-09-15：D2B → commit `accad7f3`
+- 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r4/synth.md`
+- 2026-09-15：D2B → commit `f42f35f4`
+- 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r5/synth.md`

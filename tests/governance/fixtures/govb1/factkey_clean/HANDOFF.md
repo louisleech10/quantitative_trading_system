@@ -3,15 +3,13 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 寫入別名三判準並集已修補（第四輪一條）→ 兩家第五輪閉合 → 收批進 D2C |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-002 | D2B | 進行中 | docs/DOCROT2_TODO.md §B | 寫入別名三判準並集已修補（第四輪一條）→ 兩家第五輪閉合 → 收批進 D2C |
-| 01-003 | D2C | 未開工 | docs/DOCROT2_TODO.md §B | D2B 審碼閉合後開工 Task 3.1–3.2 |
+| 01-003 | D2C | 未開工 | docs/DOCROT2_TODO.md §B | 票 B-64（同輪重派死結）落地後開工 Task 3.1–3.2 |
 | 01-004 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | D2C 審碼閉合後開工 Task 4.1 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
@@ -25,4 +23,5 @@
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.D-001.md 殘留節 | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-001 | HP-PLAINDOCS | 未開工 | 白話說明/README.md | 使用者決定 白話說明/ 各份是否整理、怎麼併（GAP-3 佔 8 份） |
+| 04-002 | HP-REDISPATCH | 未開工 | scripts/fact_keys.json 票 B-64 | 與兩家委員共識決定修法（同輪、同家、無產出之重派不再須使用者終端機）→ SPEC／TODO 審定後實作；排在 D2C 之前 |
 <!-- END GENERATED: handoff-todo -->
