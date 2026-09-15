@@ -256,17 +256,18 @@
   - 🔴 **commit 過程**：首次 commit 被擋——`gate.sh --impl-self` 須 `--adversarial` 為戳記有效之產物，而 TODO 規定錨點重出與退回同 commit ⇒ SPEC 已是 v40、r47 之 v39 戳記失效（r47 synth 無戳記區）。**不用不相干之舊戳記過閘、不暫時還原 SPEC**；改為 `review-r48` 於 commit **前**審工作區（`git diff HEAD`）並對 v40 戳記 → `register-output` 兩家 SPEC 戳記 → `gate.sh dispatch --impl-self --adversarial docs/SPLITUNIFY_SPEC.D-002.md` → 900 秒內 commit（訊息檔 scratchpad `commit_b9d.txt`，含 `Ticket-Batch: 20260911-SPLITUNIFY/b9`）→ 複核 receipt `COMMIT`＝`round_start_head` → push → `Task 9.4`。🔴 委員審碼期間主控端不得動 `momentum/`、`tests/`、SPEC、TODO。
 
 ## 現況
-- **b9 SPEC（`docs/SPLITUNIFY_SPEC.D-002.md`）＝v31，body sha256 `32cb622044851905e426b32a6276a3467d95efbca2315c617ba6d5d97323ff82`，🔴 現為「待重簽」（v29 曾取得三家 APPROVED；v30 因 codex 三條 P1 而 REJECTED）**。
-- **consult-r2 之四步裁定**（`.../20260911-splitunify-b9-consult-r2/synth.md` ＝唯一權威）：①REVERT **已做** ②補 TODO Task 9.1–9.5 **已做** ③派 stamp 輪 **已做**（stamp-r1..r4）④領 impl token 後才動生產碼 **已做**（B9A／B9B 各憑 token）。
-- **Phase 9 依賴序（四方一致；🔴 v36 依 `CODEX-R39-P1-05` 改序）**：~~`9.1 → 9.2 → 9.2a → 9.2b → (9.3 ∥ 9.4) → 9.5`~~ ⇒ `9.1 → 9.2 → 9.2a → 9.2b → 9.3 → 9.4 → 9.5`（投影計數移 `9.3`）；`9.2`／`9.2a` 不得拆批；`9.5` 必須最後。
+- **現行主線＝DOCROT2（修正 DOCROT 未做好之處；使用者 2026-09-15 裁定，排在 SPLITUNIFY R-5 之前）**。使用者逐字：「持續不接受用紀律或記憶當解法，但允許擴建治理工具，就是要修正DOCROT沒做好之處，真正減少文檔問題和降低不必要的輪數，而且要全專案涵蓋，不是只有SPEC」「交接文件能交接清楚明確是最重要，所以不一定要限制行數，怕的只是把舊案或已完成或不必要的殘留在裡面」「針對修正優化DOCROT的方法，你跟委員討論共識決定，先做好DOCROT這部分」。
+  - `20260915-docrot2-x-consult-r1` 兩家交件完成（兩家皆 blocked、共 9 條 finding）；主委獨立版 `handoffs/20260915-docrot2-x-consult-r1-claude.md`；收斂檔 `handoffs/reconcile/20260915-docrot2-x-consult-r1/synth.md` → consult-r2 收斂分歧。
+- **SPLITUNIFY**：第 9 批完工（`Task 9.3`–`9.5` 已落地）；`docs/SPLITUNIFY_SPEC.D-002.md` 之戳記狀態以 `reconcile_stamps_check.sh` 為準、批次狀態權威＝TODO §B、殘留權威＝TODO §E（本檔不複寫狀態）。下一步＝規格 R 重開＋`R-5`，排在 DOCROT2 之後。
+- 🔴 本節 2026-09-15 前之「b9 SPEC＝v31 待重簽」「下一步 `review-r39`（含劃除之 `review-r32` 字面）」「現行＝三家全員」三句已過時而刪除（consult-r1 composer 實證）；原文見 `git show efcafc63:HANDOFF.md`，供 DOCROT2 當 must-fail 樣本。🔴 刪除當下 `spec_xref_hook.sh` 以「概念被拿掉」擋下，要求上方流水帳 21 行補版本標記——DOCROT2 摩擦樣本。
 - 🔴 **批次狀態之唯一權威＝`docs/SPLITUNIFY_TODO.md` §B 之「狀態」欄**（2026-09-14 使用者質問「你為何又跳過 TODO」後定）。**出生事故**：主委實作完 B9A／B9B／B9C 三批，卻**一次都沒回去標 TODO**——狀態只記在本檔與白話看板，於是同一件事有**三份**而 TODO 是過期的那一份；**這就是委員已抓九次的同一個病**，只是漏的是 TODO 自己的進度、犯的人是主委。⇒ **本檔與 `白話說明/` 一律不再自寫批次狀態清單**，只指向 §B；每批收尾固定動作新增一項：**回去標 TODO §B 與該 Task 標題**。
 - 🔴 **主委具名不採納委員原文兩處**（理由見 synth）：grok `Task 9.4` 之**無路徑** `pytest -k`（會收全套、小時級）；composer `Task 9.2b` 之 `bash scripts/freeze_splitunify_golden.py`（檔是 `.py`，且 golden 重凍屬 `9.5`）。
-- 🔴 **「雙家族」字面已更正為指標**（`CLAUDE.md:30`、ORCH `:41`／`:195`）——唯一權威＝ORCH §1 現行分工行＋`scripts/governance_roles.json`，現行＝**三家全員**。CLAUDE.md 自己已明令「本檔不得自寫家數」，這是同型漂移第二次。
+- 🔴 **委員組成之唯一權威＝`scripts/governance_families.json` 之 `active_stampers`**（本檔不寫家數）。使用者 2026-09-15 逐字：「現在就是Codex+Cursor(Grok)兩家委員，等Grok回來後我會再將Cursor切成Composer回到三家委員」。
 - 🔴 **DOCROT 成效量測點的編號要對**：b9 之 `review-r1`..`r12` 全是**規格**審查輪（DOCROT 上線前），`doc_friction_ratio` 要量的是**上線後**的前兩輪 review ⇒ 實際落在 **`review-r13`／`review-r14`**（Task 9.1 實作後的審碼輪）。兩輪皆須 ≤0.30 且每輪 ≤20 條；不達＝DOCROT 失敗，回報使用者重議，**禁順手開新 epic**。
 
 ## 待辦分流
 - **待使用者**（看板偏好，非技術）：`白話說明/` 22 份是否整理、怎麼併（GAP-3 佔 8 份、5404 行）。
-- **下一步（技術，不問使用者）**：`review-r39`（兩家）→ 過了才領 impl token 執行 `Task 9.3` 退回（見 ㊵ 末條）。~~修 r31 十條 → SPEC v26 → `review-r32` 閉合再驗證＋重簽~~（v27 已走完）。
+- **下一步（技術，不問使用者）**：DOCROT2 consult-r1 收斂 → consult-r2（兩家收斂分歧）→ 主委起草 SPEC／TODO → 戳記 → 實作 → 審碼。
 
 - 🔴 **新發現的系統性缺口（具名殘留，`blocked-by`，**未**開新 epic）**：`docs/` 底下帶 `RECONCILE-STAMP` 的檔**沒有任何一份**能通過 `reconcile_stamps_check`——`gate.sh register-output` 原只收 `handoffs/`，而 provenance 要求審計中有指向被戳記檔**自身**的事件。本輪只把 `docs/SPLITUNIFY_SPEC.D-002.md` 加進既有封閉白名單 `scripts/stampable_artifacts.txt`（該檔正是為此型缺口而建）；`GAP3_EVENT_UX_SPEC.D-001.md`、`GAP3_EVENT_UX_TODO.D-001`..`D-006` **未一併加入**，因其戳記是否對應現行 body hash 未經查證，盲加＝把未驗證的背書寫成既成事實。另 `handoffs/reconcile/20260911-splitunify-x-review-r13/synth.md`（D-001 定案檔）之戳記 hash 與 HEAD body hash **不符**（戳記 `9e1ef3d1` vs 實際 `e3f2847d`），亦即「D-001 三家戳記定案」目前機械上是紅的。
 
@@ -284,4 +285,4 @@
 - 🔴 **兩個與本批無關的既有紅**（2026-09-14 實測，**不是本輪改壞的**）：①`tests/governance/test_gate_deny_fields.py::test_01_corpus_a_covers_decision_branches` — 它斷言 `scripts/gate_check.sh` 內有錨點字面 `INPUT="$(cat)"`，但該檔現行為 `INPUT="$(python3 -c …`（該檔本輪未被改動，`git status` 乾淨）⇒ 錨點漂移型假紅。②`scripts/obligation_block_check.sh` 對 `docs/SPLITUNIFY_SPEC.D-002.md` **結構性 rc=1**：其 R5 規則要求「帶裁決編號之行只准在 HISTORY 專區內」，而本檔每個 SUPERSEDED 註記都逐字引用造成它的 finding ID（HEAD 基準即 35 行，v26 後 40 行）。**義務區塊內為零違規**（那是另一條規則，本輪一度違反已修）。
 - 🔴 治理測試既有紅基準（2026-09-13 實測）：19 個涉及 `brief_conformance_check` 的檔為 **30 failed／523 passed／3 skipped**；乾淨 HEAD worktree 為 **35 failed／512 passed**。根因＝隔離 repo 依賴複製清單缺 `scripts/quant_standard_check.sh`／`ticket_batch_check.sh`。`test_govb1_contract_matrix.py::test_r6_u1u2u4_g7_worktree_space_quote_paths` 會**掛住**，跑治理回歸須排除。
 - 🔴 改 SPEC／TODO 前先 `grep -n` 列出該決定的全部落點，改完再 grep 一次；grep **不得加排除條件**。
-- 🔴 **不再擴建治理工具**（2026-09-12 定）；同型缺陷降級為具名殘留。
+- 🔴 **治理工具擴建**：2026-09-12「不再擴建治理工具」；2026-09-15 使用者放寬，逐字「允許擴建治理工具，就是要修正DOCROT沒做好之處」（範圍＝DOCROT2）。
