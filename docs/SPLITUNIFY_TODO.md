@@ -53,7 +53,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 
 ## §B 批次執行策略
 
-🔴 **批次狀態之唯一權威＝`scripts/fact_keys.json` 之 `splitunify-batch-status`**，本表下方為其生成區塊（`票 B-63` DOCROT2 Task 1.2 起；本表不再有手寫狀態欄）。出生事故（2026-09-14）：本表原設手寫「狀態」欄，主委實作完 B9A／B9B／B9C 三批卻一次都沒回來標——狀態只記在 `HANDOFF.md` 與白話看板，同一件事三份而本檔過期。`HANDOFF.md` 與 `白話說明/` 之批次狀態一律**指向該生成區塊**，不得自寫第二份。「施工紀錄」欄只記 commit 與審碼輪次。
+🔴 **批次狀態之唯一權威＝`scripts/fact_keys.json` 之 `splitunify-batch-status`**，本表下方為其生成區塊（`票 B-63` DOCROT2 Task 1.2 起；本表不再有手寫狀態欄）。生成區塊之 `SU-B1`／`SU-B3`／`SU-B4` 即本表 B1／B3／B4——與 `governance-batch-status` 同名識別碼撞號且狀態不同，故加前綴（識別碼跨全部狀態 key 唯一）。出生事故（2026-09-14）：本表原設手寫「狀態」欄，主委實作完 B9A／B9B／B9C 三批卻一次都沒回來標——狀態只記在 `HANDOFF.md` 與白話看板，同一件事三份而本檔過期。`HANDOFF.md` 與 `白話說明/` 之批次狀態一律**指向該生成區塊**，不得自寫第二份。「施工紀錄」欄只記 commit 與審碼輪次。
 
 | Batch | 含 Task | 施工紀錄 | 依賴 | 合併理由 | 規模 |
 |---|---|---|---|---|---|
@@ -73,12 +73,12 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 <!-- BEGIN GENERATED: splitunify-batch-status -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 010 | B1 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
+| 010 | SU-B1 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 020 | B2a | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 030 | B2b | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 040 | B2c | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
-| 050 | B3 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
-| 060 | B4 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
+| 050 | SU-B3 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
+| 060 | SU-B4 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 070 | B9A | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 080 | B9B | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 090 | B9C | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |

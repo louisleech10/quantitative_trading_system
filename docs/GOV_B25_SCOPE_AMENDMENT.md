@@ -61,11 +61,11 @@ rows 由 `rows_source`／`rows_filter` 物化之 key（註冊表內無靜態 row
 宿主＝`HANDOFF.md`（SessionStart 自動注入 ⇒ 接手必見）＋`白話說明/接下來要做什麼.md`。
 待辦項之狀態自此為**機械投影**，任何文件手寫該狀態即 `--check` 非零。
 
-**契約（測試強制，四條缺一即紅）**：
+**契約（測試強制，缺一即紅）**：
 1. `scripts/fact_keys.json` 之 fact-key 集合 **恰等於** `FACTKEY-FROZEN` ∪ `FACTKEY-ADDED`
-   ∪ `FACTKEY-CRITERIA` ∪ `FACTKEY-MECHANISM`。
-   （🔴 `WL-02` 起加入第三個聯集項、`WL-03` 起加入第四個；四個清單兩兩不相交，
-   亦以集合相等鎖死。）
+   ∪ `FACTKEY-CRITERIA` ∪ `FACTKEY-MECHANISM` ∪ `FACTKEY-ENFORCEMENT` ∪ `FACTKEY-DERIVED` ∪ `FACTKEY-DOCROT2-STATUS`。
+   （🔴 `WL-02` 起加入第三個聯集項、`WL-03` 起加入第四個、產出端覆蓋規則起第五個、DOCROT2 Task 1.3／1.2 起第六、第七個；
+   七個清單兩兩不相交，亦以集合相等鎖死。）
 1b. `FACTKEY-CRITERIA` 集合 **恰等於** `_schema.criteria_keys`。
 1c. `FACTKEY-MECHANISM` 集合 **恰等於** `_schema.mechanism_keys`（理由同 1b）。
 1d. `FACTKEY-ENFORCEMENT` 集合 **恰等於** `_schema.enforcement_keys`（理由同 1b）。

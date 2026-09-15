@@ -237,6 +237,15 @@ def check_path(root: str, path: str) -> Tuple[List[str], str]:
         return errs, ""
     if not in_scope(path, norm["scope_roots"]):
         return errs, f"{path}：範圍外，不登記亦不擋"
+    # 〔CODEX-R1-P1-02〕與 check_all 同一檔案系統邊界：已存在之 symlink／非 regular file ⇒ fail-closed。
+    # 尚不存在之路徑（登記先於建檔）不在此判；建檔後由 --all／--staged 判。
+    full = os.path.join(root, path)
+    if os.path.islink(full):
+        errs.append(f"{path}：symlink ⇒ fail-closed")
+        return errs, ""
+    if os.path.lexists(full) and not os.path.isfile(full):
+        errs.append(f"{path}：非 regular file ⇒ fail-closed")
+        return errs, ""
     cls = classify(path, norm)
     if cls is None:
         errs.append(f"{path}：未登記（以 live_doc_registry_update.sh --add 登記）")
@@ -271,12 +280,31 @@ def _staged_new_paths(root: str) -> List[str]:
     return paths
 
 
+def _staged_mode(root: str, path: str) -> str:
+    """暫存區中該路徑之 git 模式（100644／100755＝regular，120000＝symlink）；取不到回空字串。"""
+    try:
+        out = subprocess.run(
+            ["git", "-C", root, "ls-files", "-s", "-z", "--", f":(literal){path}"],
+            capture_output=True, check=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        _die("git ls-files -s 失敗 ⇒ fail-closed")
+    entry = out.decode("utf-8").split("\0")[0]
+    return entry.split(" ", 1)[0] if entry else ""
+
+
 def check_staged(root: str) -> List[str]:
     errs, norm = _load(root)
     if not norm:
         return errs
     for path in _staged_new_paths(root):
-        if in_scope(path, norm["scope_roots"]) and classify(path, norm) is None:
+        if not in_scope(path, norm["scope_roots"]):
+            continue
+        mode = _staged_mode(root, path)
+        if mode not in ("100644", "100755"):
+            errs.append(f"{path}（暫存新增）：暫存模式 {mode or '取不到'} 非 regular file（symlink＝120000）⇒ fail-closed")
+            continue
+        if classify(path, norm) is None:
             errs.append(f"{path}（暫存新增）：未登記（以 live_doc_registry_update.sh --add 登記）")
     return errs
 

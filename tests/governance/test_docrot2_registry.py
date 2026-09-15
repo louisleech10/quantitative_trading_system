@@ -213,6 +213,41 @@ def test_newline_in_filename_not_split(tmp_path):
     assert r.returncode == 0, r.stderr
 
 
+def test_path_mode_existing_symlink_rc1(tmp_path):
+    """〔CODEX-R1-P1-02〕--path 與 --all 同一邊界：已登記之 symlink ⇒ rc=1。"""
+    reg = _with_exact(_base_registry(), ("docs/real.md", "OTHER-DORMANT"), ("docs/link.md", "OTHER-DORMANT"))
+    root = _mk_repo(tmp_path, {"docs/real.md": "x\n"}, registry=reg, stage=False)
+    os.symlink("real.md", root / "docs" / "link.md")
+    r = _run(CHECK, "--path", "docs/link.md", cwd=root)
+    assert r.returncode == 1 and "symlink" in r.stderr, r.stderr
+
+
+def test_path_mode_existing_fifo_rc1(tmp_path):
+    reg = _with_exact(_base_registry(), ("docs/pipe.md", "OTHER-DORMANT"))
+    root = _mk_repo(tmp_path, {"docs/KEEP.md": "x\n"}, registry=reg, stage=False)
+    os.mkfifo(root / "docs" / "pipe.md")
+    r = _run(CHECK, "--path", "docs/pipe.md", cwd=root)
+    assert r.returncode == 1 and "非 regular file" in r.stderr, r.stderr
+
+
+def test_path_mode_registered_not_yet_created_rc0(tmp_path):
+    """登記先於建檔：路徑尚不存在不算檔案系統違規（建檔後由 --all／--staged 判）。"""
+    reg = _with_exact(_base_registry(), ("docs/FUTURE.md", "OTHER-DORMANT"))
+    root = _mk_repo(tmp_path, {"docs/KEEP.md": "x\n"}, registry=reg)
+    r = _run(CHECK, "--path", "docs/FUTURE.md", cwd=root)
+    assert r.returncode == 0, r.stderr
+
+
+def test_staged_symlink_rc1(tmp_path):
+    reg = _with_exact(_base_registry(), ("docs/real.md", "OTHER-DORMANT"), ("docs/link.md", "OTHER-DORMANT"))
+    root = _mk_repo(tmp_path, {"docs/real.md": "x\n"}, registry=reg)
+    subprocess.run(["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], check=True)
+    os.symlink("real.md", root / "docs" / "link.md")
+    subprocess.run(["git", "-C", str(root), "add", "docs/link.md"], check=True)
+    r = _run(CHECK, "--staged", cwd=root)
+    assert r.returncode == 1 and "120000" in r.stderr, r.stderr
+
+
 def test_new_unregistered_md_staged_rc1(tmp_path):
     root = _mk_repo(tmp_path, {"docs/KEEP.md": "x\n"}, registry=_with_exact(_base_registry(), ("docs/KEEP.md", "OTHER-DORMANT")))
     subprocess.run(["git", "-C", str(root), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], check=True)
@@ -488,7 +523,8 @@ def test_materialize_tempdir_removed(tmp_path, good):
         assert _fk(root, "--write").returncode == 0
     r = _fk(root, "--check", env_extra={"TMPDIR": str(tdir)})
     assert (r.returncode == 0) is good, r.stderr
-    assert list(tdir.iterdir()) == []
+    # 只認生成器自己的暫存命名空間〔CODEX-R1-P2-03〕：macOS 子程序會在 TMPDIR 留 xcrun_db 等無關檔
+    assert [p.name for p in tdir.iterdir() if p.name.startswith("gen_fact_key_blocks.")] == []
 
 
 def test_help_does_not_read_derived_rows(tmp_path):
@@ -576,9 +612,16 @@ def _real_reg() -> dict:
     return json.loads((REPO / "scripts" / "fact_keys.json").read_text(encoding="utf-8"))
 
 
+# 〔CODEX-R1-P1-01〕§B 批次名與 governance-batch-status 撞號者加前綴；集合由現行註冊表導出比對，非自證
+_SU_RENAME = {"B1": "SU-B1", "B3": "SU-B3", "B4": "SU-B4"}
+
+
 def test_splitunify_status_cutover_rows_equal_migration_of_pre_cutover_text():
     mapped = _migrate(_git_show(f"{PRE_CUTOVER}:docs/SPLITUNIFY_TODO.md"))
     reg = _real_reg()
+    old_ids = {r[1] for k in reg["_schema"]["status_keys"] for r in reg[k]["rows"]}
+    assert set(_SU_RENAME) == {i for i, _ in mapped["splitunify-batch-status"] if i in old_ids}
+    mapped["splitunify-batch-status"] = [(_SU_RENAME.get(i, i), s) for i, s in mapped["splitunify-batch-status"]]
     for key, pairs in mapped.items():
         assert pairs, f"{key} 遷移結果為空 ⇒ 解析錨點失準"
         assert [(r[1], r[2]) for r in reg[key]["rows"]] == pairs, key
@@ -684,6 +727,19 @@ def test_same_id_in_two_status_keys_rc1(tmp_path):
         "d2-b": _d2key("docs/db.md", ("010", "B9A", "進行中", "docs/x.md §B", "做 A"))})
     r = _fk(root, "--check")
     assert r.returncode != 0 and "重複" in r.stderr and "B9A" in r.stderr, r.stderr
+
+
+def test_same_id_across_status_keys_and_docrot2_keys_rc1(tmp_path):
+    """〔CODEX-R1-P1-01〕src-a（status_keys）已有 Z-9；docrot2 key 再登 Z-9 ⇒ rc!=0。"""
+    root = _d2_sandbox(tmp_path, {"d2-a": _d2key("docs/da.md", ("010", "Z-9", "進行中", "docs/x.md §B", "做"))})
+    r = _fk(root, "--check")
+    assert r.returncode != 0 and "重複" in r.stderr and "Z-9" in r.stderr, r.stderr
+
+
+def test_real_registry_status_ids_unique_across_both_lists():
+    reg = _real_reg()
+    ids = [r[1] for k in reg["_schema"]["status_keys"] + reg["_schema"]["docrot2_status_keys"] for r in reg[k]["rows"]]
+    assert len(ids) == len(set(ids)), sorted({i for i in ids if ids.count(i) > 1})
 
 
 @pytest.mark.parametrize("val", ["✅", "收案"])

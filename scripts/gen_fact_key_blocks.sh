@@ -1831,7 +1831,7 @@ EOF2
 #    且 B1–B4 與 governance-batch-status 之識別碼撞號。既有行之遷移屬 Task 4.1，新行之擋屬 Task 2.1（讀本清單）。
 # 規則：清單內 key 須已註冊、不得同列 status_keys；columns 首欄『序』、第二欄『識別碼』且含『狀態』『權威路徑』
 #   『下一步』；狀態 ∈ `_schema.docrot2_status_values`（⊆ status_enum）；權威路徑與下一步非空；未完成列
-#   （狀態不在 _FK_COMPLETED_STATUSES）之下一步不得為佔位符；識別碼跨清單內全部 key 唯一（整詞相等）。
+#   （狀態不在 _FK_COMPLETED_STATUSES）之下一步不得為佔位符；識別碼跨 status_keys 與本清單全部 key 唯一（整詞相等）。
 _FK_D2_NEXT_PLACEHOLDERS='["—","-","無","n/a","N/A","TBD","待填"]'
 
 _fk_validate_docrot2_status() {
@@ -1891,14 +1891,17 @@ _fk_validate_docrot2_status() {
   done <<EOF
 ${_fkd_keys}
 EOF
+  # 🔴 唯一性範圍＝status_keys ∪ docrot2_status_keys〔CODEX-R1-P1-01〕：Task 2.4 之條目標記以識別碼單獨查狀態，
+  #    跨清單同名即查回兩列且狀態可不同（實例：governance-batch-status 之 B3＝停手、SPLITUNIFY 批次 B3＝已完成）。
   _fkd_dup="$(LC_ALL=C jq -r '
     . as $r
-    | [ ._schema.docrot2_status_keys[] as $k | select(($r[$k] | type) == "object") | ($r[$k].rows // [])[] | .[1] ]
+    | [ ((._schema.status_keys // []) + ._schema.docrot2_status_keys)[] as $k
+        | select(($r[$k] | type) == "object") | ($r[$k].rows // [])[] | .[1] ]
     | group_by(.) | map(select(length > 1) | .[0]) | .[]
   ' "${REG}")" \
     || { echo "gen_fact_key_blocks: 讀取 docrot2 狀態識別碼失敗（jq 非零）→ fail-closed" >&2; return 1; }
   [ -z "${_fkd_dup}" ] \
-    || { echo "gen_fact_key_blocks: docrot2_status_keys 之識別碼跨 key 重複：$(printf '%s' "${_fkd_dup}" | tr '\n' ' ')→ fail-closed" >&2
+    || { echo "gen_fact_key_blocks: status_keys 與 docrot2_status_keys 之識別碼跨 key 重複：$(printf '%s' "${_fkd_dup}" | tr '\n' ' ')→ fail-closed" >&2
          _fkd_rc=1; }
   return "${_fkd_rc}"
 }

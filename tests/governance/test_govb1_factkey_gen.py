@@ -109,7 +109,8 @@ def test_registry_key_set_equals_amendment_declaration():
     """票 B-25 站 2.5 Task 1.4（原 TODO 實作要點 1 之延伸；偏離登記見 docs/GOV_B25_SCOPE_AMENDMENT.md）。
 
     🔴 五條**集合相等**（禁 issubset/>=/in）：
-      ① registry 全集 == FROZEN ∪ ADDED ∪ CRITERIA ∪ MECHANISM
+      ① registry 全集 == FROZEN ∪ ADDED ∪ CRITERIA ∪ MECHANISM ∪ ENFORCEMENT ∪ DERIVED ∪ DOCROT2-STATUS
+         （DERIVED 另與帶 rows_source／rows_filter 之 key 集合相等；DOCROT2-STATUS 另與 _schema.docrot2_status_keys 相等）
       ② ADDED == _schema.status_keys（r3 CODEX-R3-P1-04：破解自我循環——
          單靠①時延伸檔漏列一個 key，三方仍互相一致而無人轉紅）
       ②b CRITERIA == _schema.criteria_keys（WL-02 起；理由同②）

@@ -3,12 +3,12 @@
 <!-- BEGIN GENERATED: splitunify-batch-status -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 010 | B1 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
+| 010 | SU-B1 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 020 | B2a | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 030 | B2b | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 040 | B2c | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
-| 050 | B3 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
-| 060 | B4 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
+| 050 | SU-B3 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
+| 060 | SU-B4 | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 070 | B9A | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 080 | B9B | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 090 | B9C | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |

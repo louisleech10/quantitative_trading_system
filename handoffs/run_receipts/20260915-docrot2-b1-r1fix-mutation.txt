@@ -1,0 +1,15 @@
+before: gen_fact_key_blocks.sh ec2b7570c640f586e76661384b9c03b900c2a526ce9d12fc8bbf1337e26e9778
+before: _live_doc_registry.py 1cbc331f1e188002d560245cd68bcd1c2f2700419f9fac2c7bcf8c6332d9a219
+[K 唯一性只看 docrot2 清單] pytest rc=1 ============================== 1 failed in 0.58s ===============================
+[K 唯一性只看 docrot2 清單] restored sha OK=True
+[L --path 拿掉 symlink 邊界] pytest rc=1 ============================== 1 failed in 0.24s ===============================
+[L --path 拿掉 symlink 邊界] restored sha OK=True
+[L2 --path 拿掉非 regular file 邊界] pytest rc=1 ============================== 1 failed in 0.24s ===============================
+[L2 --path 拿掉非 regular file 邊界] restored sha OK=True
+[M --staged 拿掉暫存模式邊界] pytest rc=1 ============================== 1 failed in 0.33s ===============================
+[M --staged 拿掉暫存模式邊界] restored sha OK=True
+[N 物化暫存目錄不清] pytest rc=1 ============================== 2 failed in 1.04s ===============================
+[N 物化暫存目錄不清] restored sha OK=True
+after: gen_fact_key_blocks.sh ec2b7570c640f586e76661384b9c03b900c2a526ce9d12fc8bbf1337e26e9778
+after: _live_doc_registry.py 1cbc331f1e188002d560245cd68bcd1c2f2700419f9fac2c7bcf8c6332d9a219
+mutate rc=0
