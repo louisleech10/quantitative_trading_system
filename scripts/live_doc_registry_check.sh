@@ -6,6 +6,7 @@
 #   bash scripts/live_doc_registry_check.sh --path <repo 相對路徑>   # 單檔分類；範圍外 rc=0
 #   bash scripts/live_doc_registry_check.sh --all                    # 全樹清冊＋登記檔自身＋status_scope 涵蓋
 #   bash scripts/live_doc_registry_check.sh --staged                 # 暫存之新增／重新命名 .md 須已登記
+#   bash scripts/live_doc_registry_check.sh flag --name <旗標> --path <p>  # DOCROT2 Task 2.5：印 true｜false｜unregistered｜out-of-scope
 # rc：0＝合規或範圍外；1＝違規；2＝用法或環境錯誤（fail-closed）
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,5 +17,8 @@ fi
 if [ -z "${PY}" ]; then
   echo "live_doc_registry_check: 找不到 python3 ⇒ fail-closed" >&2
   exit 2
+fi
+if [ "${1-}" = "flag" ]; then
+  exec "${PY}" "${SCRIPT_DIR}/_live_doc_registry.py" "$@"
 fi
 exec "${PY}" "${SCRIPT_DIR}/_live_doc_registry.py" check "$@"

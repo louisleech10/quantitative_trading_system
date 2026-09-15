@@ -169,6 +169,28 @@ if [ -f scripts/plain_docs_render.sh ] && [ -f scripts/plain_docs_render.py ]; t
   fi
 fi
 
+# ── 活文件寫入兜底（DOCROT2 Task 2.3，票 B-63）────────────────────────────────────
+# Bash 轉向、生成器、委員 CLI 等非 Edit／Write 寫入不經 PreToolUse 守衛 ⇒ commit 時以同一判定擋：
+#   ① live_doc_write_guard.sh --staged：暫存之登記活文件（HEAD 版→index 版）之新增行判定＋交接檔全文判定
+#   ② live_doc_registry_check.sh --staged：暫存之新增 .md 須已登記
+# 無略過旗標；pre-push 不重複（見 DOCROT2 SPEC Task 2.3）。
+if [ -f scripts/live_doc_write_guard.sh ]; then
+  bash scripts/live_doc_write_guard.sh --staged
+  _ldw_rc=$?          # 🔴 rc 直接取，禁經 pipe
+  if [ "${_ldw_rc}" -ne 0 ]; then
+    echo "pre-commit: 🔴 活文件寫入判定未過（手寫狀態／舊版字面／歷史指標／交接檔文法）——改掉後再 commit" >&2
+    exit 1
+  fi
+fi
+if [ -f scripts/live_doc_registry_check.sh ]; then
+  bash scripts/live_doc_registry_check.sh --staged
+  _ldr_rc=$?          # 🔴 rc 直接取，禁經 pipe
+  if [ "${_ldr_rc}" -ne 0 ]; then
+    echo "pre-commit: 🔴 暫存之新增 .md 未登記——以 bash scripts/live_doc_registry_update.sh --add <路徑> 登記後再 commit" >&2
+    exit 1
+  fi
+fi
+
 # ── SPEC/TODO 改一處漏一處（scripts/spec_xref_check.sh；使用者 2026-09-11 定）────────────
 # 病根：VERDICTGATE SPEC 審八輪，四輪的 finding 是主委改了一段、同一概念別處引用沒同步；
 #   記憶裡的紀律規則（feedback_cross_reference_sync）從 07 月起再犯六次 ⇒ 機械化。

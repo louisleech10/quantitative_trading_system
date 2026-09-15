@@ -123,6 +123,15 @@
             "command": "bash scripts/ts_stamp.sh IN"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/live_doc_write_guard.sh"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -161,7 +170,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"systemMessage\": \"[SYSTEM] Context 即將自動壓縮。壓縮前請確保：(1) 用 Write 工具更新 HANDOFF.md，記錄當前任務、下一步、決策、阻塞，保持 30 行以內。(2) 若無法立即更新，請在 compaction summary 開頭寫明需更新 HANDOFF.md 的內容，讓下個 session 的 Claude 第一件事就執行更新。\"}'"
+            "command": "echo '{\"systemMessage\": \"[SYSTEM] Context 即將自動壓縮。壓縮前請確保：(1) 更新 HANDOFF.md，文法依 scripts/live_doc_registry.json 之 handoff 段（狀態與下一步改 scripts/fact_keys.json 後跑 gen_fact_key_blocks.sh --write；坑手寫；進行中紀錄只放條目標記與指標行）。(2) 若無法立即更新，請在 compaction summary 開頭寫明需更新 HANDOFF.md 的內容，讓下個 session 的 Claude 第一件事就執行更新。\"}'"
           }
         ]
       },
@@ -170,7 +179,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"systemMessage\": \"[SYSTEM] Context 即將手動壓縮。壓縮前請確保：(1) 用 Write 工具更新 HANDOFF.md，記錄當前任務、下一步、決策、阻塞，保持 30 行以內。(2) 若無法立即更新，請在 compaction summary 開頭寫明需更新 HANDOFF.md 的內容，讓下個 session 的 Claude 第一件事就執行更新。\"}'"
+            "command": "echo '{\"systemMessage\": \"[SYSTEM] Context 即將手動壓縮。壓縮前請確保：(1) 更新 HANDOFF.md，文法依 scripts/live_doc_registry.json 之 handoff 段（狀態與下一步改 scripts/fact_keys.json 後跑 gen_fact_key_blocks.sh --write；坑手寫；進行中紀錄只放條目標記與指標行）。(2) 若無法立即更新，請在 compaction summary 開頭寫明需更新 HANDOFF.md 的內容，讓下個 session 的 Claude 第一件事就執行更新。\"}'"
           }
         ]
       }

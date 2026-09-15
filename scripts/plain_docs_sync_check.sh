@@ -116,11 +116,23 @@ _watched_for() {
     "VERDICTGATE施工進度.md")        echo "scripts/gate.sh scripts/committee_run.sh scripts/debt_clear.sh scripts/gov_check.sh scripts/git_hooks/commit-msg scripts/git_hooks/pre-push scripts/reconcile_cluster_attribution_check.sh scripts/completeness_check.sh scripts/governance_verdicts.json templates/ docs/VERDICTGATE_TODO.md" ;;
     "VERDICTGATE規格白話.md")        echo "docs/VERDICTGATE_SPEC.md" ;;
     # DOCROT（2026-09-13 開票即登記）：看板盯本票 TODO 要動的既有腳本／範本／測試＋兩份定案收斂檔。
+    # DOCROT2（2026-09-15 開票即登記）：看板狀態由生成區塊呈現；盯本票施工清單、實作腳本與測試。
+    "DOCROT2施工進度.md")            echo "scripts/ docs/DOCROT2_TODO.md tests/governance/test_docrot2_registry.py tests/governance/test_docrot2_write_guard.py" ;;
     "DOCROT施工進度.md")             echo "scripts/spec_count_audit.py scripts/gov_check.sh scripts/completeness_check.sh scripts/verification_claim_check.py scripts/brief_conformance_check.sh scripts/new_brief.sh templates/ tests/governance/test_docrot_f2_total_items_count.py tests/governance/test_docrot_e3_brief_placeholder.py handoffs/reconcile/20260912-docrot-x-consult-r3/synth.md handoffs/reconcile/20260912-docrot-x-consult-r4/synth.md" ;;
     # 🔴 具名殘留：catch-all 回空字串＝**新增的說明檔預設不受監看**，會靜默過期。
     #   這與本檔上方「列舉永遠列不完」的設計哲學矛盾，但改成預設監看是行為變更，
     #   需先量誤報面（同 `票 B-23` 紀律）。在那之前，**新增說明檔須手動加進上面的樣式或列舉**。
-    *)                                echo "" ;;
+    # DOCROT2 Task 2.5（票 B-63）：catch-all 改查活文件登記——未登記 ⇒ 回標記 __UNREGISTERED__，由呼叫端 fail-closed；
+    #   已登記者行為不變（回空字串；全檔模式照舊報「無 WATCHED 定義」）。登記查詢失敗視同未登記。
+    *)
+      if [ -f scripts/live_doc_registry_check.sh ]; then
+        case "$(bash scripts/live_doc_registry_check.sh flag --name new_line_status_check --path "${DIR}/$1" 2>/dev/null)" in
+          true|false) echo "" ;;
+          *)          echo "__UNREGISTERED__" ;;
+        esac
+      else
+        echo ""
+      fi ;;
   esac
 }
 
@@ -138,9 +150,15 @@ if [ "${1:-}" = "--staged" ]; then
   [ -n "${staged}" ] || { echo "[plain_docs_sync] (staged) 無 staged 檔，略過"; exit 0; }
 
   src=0
+  unreg=0
   for name in ${MANAGED}; do
     f="${DIR}/${name}"
     watched="$(_watched_for "${name}")"
+    if [ "${watched}" = "__UNREGISTERED__" ]; then
+      echo "[plain_docs_sync] ✗ (staged) ${f} 未登記於 scripts/live_doc_registry.json" >&2
+      unreg=1
+      continue
+    fi
     [ -n "${watched}" ] || continue
 
     hit=0
@@ -160,6 +178,10 @@ if [ "${1:-}" = "--staged" ]; then
     echo "    本次 staged 命中其 WATCHED（${watched}），但該說明檔不在 staged 內。" >&2
   done
 
+  if [ "${unreg}" -ne 0 ]; then
+    echo "  ⇒ 白話說明/ 有未登記之說明檔（DOCROT2 Task 2.5）：以 bash scripts/live_doc_registry_update.sh --add <路徑> 登記" >&2
+    exit 1
+  fi
   if [ "${src}" -ne 0 ]; then
     echo "  ⇒ 現在更新該說明檔並 git add 最省事；否則 push 時會被硬擋。" >&2
     echo "  出處：使用者 2026-08-05「想辦法能確保自己更新白話說明的文檔」。" >&2
@@ -214,6 +236,11 @@ for name in ${MANAGED}; do
   fi
 
   watched="$(_watched_for "${name}")"
+  if [ "${watched}" = "__UNREGISTERED__" ]; then
+    echo "ERROR: ${f} 未登記於 scripts/live_doc_registry.json（fail-closed；以 bash scripts/live_doc_registry_update.sh --add ${f} 登記）" >&2
+    rc=2
+    continue
+  fi
   if [ -z "${watched}" ]; then
     echo "ERROR: ${name} 無 WATCHED 定義（fail-closed）" >&2
     rc=2

@@ -560,6 +560,7 @@ _fk_emit_all() {
   _fk_validate_mechanism || return 1
   _fk_validate_enforcement || return 1
   _fk_validate_docrot2_status || return 1
+  _fk_validate_handoff_projection || return 1
   _fke_rc=0
   # 🔴 不用 `< <(_fk_keys)`：process substitution 的 rc 拿不到（見 _fk_raw_keys_checked 註解）
   _fke_keys="$(_fk_keys)" || return 1
@@ -633,6 +634,68 @@ _fk_status_ids() {
     | LC_ALL=C sort -u
 }
 
+# 「識別碼 token ∩ status_enum 字面」之唯一判定碼（DOCROT2 Task 2.1 抽出，票 B-63）。
+#   全檔模式 `_fk_reject_handwritten_status` 與新增行模式 `_fk_status_hits_in_lines` 皆內嵌本段，
+#   兩條路徑判定逐字相同；呼叫端只決定「餵哪些行、用哪組識別碼」。
+#   fk_status_hit(s)：先找第一個出現之狀態字面，再找第一個整詞識別碼；命中回 1 並設 FK_HIT_I／FK_HIT_E。
+_FK_HIT_AWK='
+        # 🔴 邊界判定用「原始行 ＋ 絕對位置」，不得切片後重判
+        #    （r4 CODEX-R4-P1-01：切片會丟失左側前文，B3RB3R 誤抽）
+        function has_token(s, t,   off, rest, p, st, pre, post) {
+          off = 0; rest = s
+          while ((p = index(rest, t)) > 0) {
+            st   = off + p
+            pre  = (st == 1) ? "" : substr(s, st - 1, 1)
+            post = substr(s, st + length(t), 1)
+            if (pre !~ /[0-9A-Za-z_-]/ && post !~ /[0-9A-Za-z_-]/) return 1
+            off  = st + length(t) - 1
+            rest = substr(s, off + 1)
+          }
+          return 0
+        }
+        function fk_load_sets(idf, ef,   line) {
+          ni = 0; ne = 0
+          while ((getline line < idf) > 0) if (line != "") I[++ni] = line
+          close(idf)
+          while ((getline line < ef) > 0) if (line != "") E[++ne] = line
+          close(ef)
+        }
+        function fk_status_hit(s,   j) {
+          FK_HIT_E = ""; FK_HIT_I = ""
+          for (j = 1; j <= ne; j++) if (E[j] != "" && index(s, E[j])) { FK_HIT_E = E[j]; break }
+          if (FK_HIT_E == "") return 0
+          for (j = 1; j <= ni; j++) if (I[j] != "" && has_token(s, I[j])) { FK_HIT_I = I[j]; break }
+          return (FK_HIT_I != "")
+        }
+'
+
+# DOCROT2 Task 2.1（票 B-63）：新增行模式之判定入口，供 scripts/live_doc_write_guard.sh 呼叫。
+#   輸入檔每行「行號<TAB>內容」（呼叫端已排除豁免區）；輸出每個命中「行號<TAB>識別碼<TAB>狀態」。
+#   識別碼＝status_keys ∪ docrot2_status_keys 之 rows 第 2 欄（新增行一律涵蓋新舊兩組狀態 key）。
+#   rc：0＝判定完成（有無命中看輸出）；2＝讀註冊表失敗 fail-closed。
+_fk_status_hits_in_lines() {   # $1=行檔
+  _fksl_idf="${TMPDIR:-/tmp}/.factkey-hit-ids.$$"; _fksl_ef="${TMPDIR:-/tmp}/.factkey-hit-enum.$$"
+  LC_ALL=C jq -r '
+    . as $r | ((._schema.status_keys // []) + (._schema.docrot2_status_keys // []))[] as $k
+    | ($r[$k].rows // [])[] | .[1]
+  ' "${REG}" > "${_fksl_idf}" \
+    || { rm -f "${_fksl_idf}"; echo "gen_fact_key_blocks: --status-hits 讀取識別碼失敗 → fail-closed" >&2; return 2; }
+  LC_ALL=C jq -r '._schema.status_enum[]' "${REG}" > "${_fksl_ef}" \
+    || { rm -f "${_fksl_idf}" "${_fksl_ef}"; echo "gen_fact_key_blocks: --status-hits 讀取 status_enum 失敗 → fail-closed" >&2; return 2; }
+  LC_ALL=C awk -v idf="${_fksl_idf}" -v ef="${_fksl_ef}" "${_FK_HIT_AWK}"'
+    BEGIN { fk_load_sets(idf, ef) }
+    {
+      t = index($0, "\t"); if (t == 0) next
+      n = substr($0, 1, t - 1); s = substr($0, t + 1)
+      if (fk_status_hit(s)) printf "%s\t%s\t%s\n", n, FK_HIT_I, FK_HIT_E
+    }
+  ' "$1"
+  _fksl_rc=$?
+  rm -f "${_fksl_idf}" "${_fksl_ef}"
+  [ "${_fksl_rc}" -eq 0 ] || { echo "gen_fact_key_blocks: --status-hits 判定執行失敗 → fail-closed" >&2; return 2; }
+  return 0
+}
+
 _fk_reject_handwritten_status() {
   # 🔴 與 `_fk_validate_schema_sets` 同一語義（r5 CODEX-R5-P1-02）：
   #    無任何 fact-key ⇒ 無事可做、rc=0；既有「空註冊表 rc=0」契約不變。
@@ -681,27 +744,9 @@ EOF3
       #    傳解碼後路徑會得 `awk: newline in string`（主委 2026-08-10 第三次踩同一坑）。
       #    awk 內再轉成可讀標記 `<LF>`。
       LC_ALL=C awk -v idf="${_fkh_idf}" -v ef="${_fkh_ef}" -v rel="${_fkh_f}" \
-                   -v legal="${_fkh_legal}" '
-        # 🔴 邊界判定用「原始行 ＋ 絕對位置」，不得切片後重判
-        #    （r4 CODEX-R4-P1-01：切片會丟失左側前文，B3RB3R 誤抽）
-        function has_token(s, t,   off, rest, p, st, pre, post) {
-          off = 0; rest = s
-          while ((p = index(rest, t)) > 0) {
-            st   = off + p
-            pre  = (st == 1) ? "" : substr(s, st - 1, 1)
-            post = substr(s, st + length(t), 1)
-            if (pre !~ /[0-9A-Za-z_-]/ && post !~ /[0-9A-Za-z_-]/) return 1
-            off  = st + length(t) - 1
-            rest = substr(s, off + 1)
-          }
-          return 0
-        }
+                   -v legal="${_fkh_legal}" "${_FK_HIT_AWK}"'
         BEGIN {
-          ni = 0; ne = 0
-          while ((getline line < idf) > 0) if (line != "") I[++ni] = line
-          close(idf)
-          while ((getline line < ef) > 0) if (line != "") E[++ne] = line
-          close(ef)
+          fk_load_sets(idf, ef)
           nl = split(legal, L, " ")
           for (i = 1; i <= nl; i++) if (L[i] != "") LEGAL[L[i]] = 1
           gsub(/\001/, "<LF>", rel)
@@ -722,13 +767,8 @@ EOF3
         }
         inblk { next }
         {
-          ehit = ""
-          for (j = 1; j <= ne; j++) if (E[j] != "" && index($0, E[j])) { ehit = E[j]; break }
-          if (ehit == "") next
-          ihit = ""
-          for (j = 1; j <= ni; j++) if (I[j] != "" && has_token($0, I[j])) { ihit = I[j]; break }
-          if (ihit == "") next
-          printf "FACTKEY HANDWRITTEN STATUS: %s:%d 識別碼=%s 狀態=%s\n", rel, FNR, ihit, ehit
+          if (!fk_status_hit($0)) next
+          printf "FACTKEY HANDWRITTEN STATUS: %s:%d 識別碼=%s 狀態=%s\n", rel, FNR, FK_HIT_I, FK_HIT_E
         }
       ' "${_fkh_root}/${_fkh_real}"
     done <<EOF2
@@ -1819,6 +1859,7 @@ EOF2
   _fk_validate_mechanism || _fkc_rc=1
   _fk_validate_enforcement || _fkc_rc=1
   _fk_validate_docrot2_status || _fkc_rc=1
+  _fk_validate_handoff_projection || _fkc_rc=1
   _fk_validate_ticket_universe || _fkc_rc=1
   _fk_reject_unregistered_mechanisms || _fkc_rc=1
   return "${_fkc_rc}"
@@ -1906,6 +1947,36 @@ EOF
   return "${_fkd_rc}"
 }
 
+# DOCROT2 Task 2.4（票 B-63）：交接投影兩個 key 須與 scripts/live_doc_registry.json 之
+#   handoff_projection／handoff.section_projection_keys 逐欄相符（--check 對讀；登記檔不在同目錄 ⇒ 非主控端 repo，略過）。
+#   現況 ⇔ current_allow、待辦 ⇔ todo_allow；columns＝序＋投影欄；target＝HANDOFF.md；status_column＝狀態。
+_fk_validate_handoff_projection() {
+  _fkhp_reg="${SCRIPT_DIR}/live_doc_registry.json"
+  [ -f "${_fkhp_reg}" ] || return 0
+  LC_ALL=C jq -e 'has("handoff_projection") and ((.handoff // {}) | has("section_projection_keys"))' \
+    "${_fkhp_reg}" >/dev/null 2>&1 || return 0
+  _fkhp_out="$(LC_ALL=C jq -r --slurpfile fk "${REG}" '
+    .handoff_projection as $p | .handoff.section_projection_keys as $sk | $fk[0] as $r
+    | ([["## 現況", "current_allow"], ["## 待辦", "todo_allow"]][]) as [$sec, $ak]
+    | $sk[$sec] as $k
+    | if $k == null then "\($sec)：section_projection_keys 缺對應 key"
+      elif ($r | has($k) | not) then "\($k)：fact_keys.json 缺交接投影 key"
+      else $r[$k] as $s
+        | (if $s.target != "HANDOFF.md" then "\($k)：target 須為 HANDOFF.md" else empty end),
+          (if $s.columns != (["序"] + $p.columns) then "\($k)：columns 須為 序＋登記投影欄" else empty end),
+          (if ($s.rows_filter.source_keys // null) != $p.source_keys then "\($k)：rows_filter.source_keys 與登記不符" else empty end),
+          (if ($s.rows_filter.status_column // null) != "狀態" then "\($k)：rows_filter.status_column 須為 狀態" else empty end),
+          (if ($s.rows_filter.allow // null) != $p[$ak] then "\($k)：rows_filter.allow 與登記 \($ak) 不符" else empty end)
+      end
+  ' "${_fkhp_reg}")" \
+    || { echo "gen_fact_key_blocks: 交接投影對讀失敗（jq 非零）→ fail-closed" >&2; return 1; }
+  [ -z "${_fkhp_out}" ] || {
+    echo "gen_fact_key_blocks: 交接投影與活文件登記不符 → fail-closed:" >&2
+    printf '%s\n' "${_fkhp_out}" | sed 's/^/    /' >&2
+    return 1; }
+  return 0
+}
+
 _fk_write() {
   _fk_validate_keys || return 1
   _fk_validate_schema_sets || return 1
@@ -1913,6 +1984,7 @@ _fk_write() {
   _fk_validate_mechanism || return 1
   _fk_validate_enforcement || return 1
   _fk_validate_docrot2_status || return 1
+  _fk_validate_handoff_projection || return 1
   # 🔴 `--write` 也跑宿主子樹掃描〔COMPOSER-R1-P2-01〕：本路徑本來就讀寫宿主檔，
   #   漏掛會讓「單跑 --write」的本地流程暫時綠。emit 刻意不掛——它是純 stdout 投影、
   #   不讀宿主檔，掛上去等於憑空要求一棵樹。此差異列為登記表殘留 8，並有測試釘住。
@@ -1963,6 +2035,14 @@ EOF2
 }
 
 _fk_preflight
+
+# DOCROT2 Task 2.1：新增行判定入口（恰兩個參數：--status-hits <行檔>）
+if [ "${1-}" = "--status-hits" ]; then
+  [ "$#" -eq 2 ] && [ -f "${2}" ] || {
+    echo "gen_fact_key_blocks: --status-hits 需恰一個存在之行檔 → fail-closed" >&2; exit 2; }
+  _fk_materialize
+  _fk_status_hits_in_lines "${2}"; exit $?
+fi
 
 # 多餘參數 fail-closed：`--check --write` 這種寫法不得被靜默當成 --check
 [ "$#" -le 1 ] || {

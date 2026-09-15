@@ -42,8 +42,19 @@ declared="$(grep -l -m1 -E "^\*\*修訂標的\*\*：${rel}\$" handoffs/reconcile
 case "$rel" in docs/*SPEC*.md|docs/*TODO*.md|docs/*PLAN*.md|docs/*RECON*.md) : ;; *) [ -n "$declared" ] || exit 0 ;; esac
 
 rc=0
+# DOCROT2 Task 2.5（票 B-63）：「概念被拿掉須補版本標記」只對類別旗標 concept_removal_xref＝true 者執行
+#   （現行僅 LIVE-SPEC）。交接檔、白話等類別改寫現況本是正確形態，不應被要求在舊行補版本標記。
+#   未登記或範圍外路徑、或旗標查詢失敗 ⇒ 行為與改前相同（照常執行 ①）。② synth 處置對證不受影響。
+xref_removal=1
+if [ -f scripts/live_doc_registry_check.sh ]; then
+  _xflag="$(bash scripts/live_doc_registry_check.sh flag --name concept_removal_xref --path "$rel" 2>/dev/null)"
+  _xflag_rc=$?          # 🔴 rc 直接取，禁經 pipe
+  if [ "${_xflag_rc}" -eq 0 ] && [ "${_xflag}" = "false" ]; then
+    xref_removal=0
+  fi
+fi
 # ① 殘留掃描 vs HEAD
-if git cat-file -e "HEAD:${rel}" 2>/dev/null; then
+if [ "${xref_removal}" -eq 1 ] && git cat-file -e "HEAD:${rel}" 2>/dev/null; then
   tmp_old="$(mktemp)"; git show "HEAD:${rel}" > "$tmp_old"
   bash "$CHECK" --files "$tmp_old" "$rel" >&2; r=$?; rm -f "$tmp_old"   # 理由走 stderr（harness 只回灌 stderr）
   [ "$r" -eq 0 ] || rc=2

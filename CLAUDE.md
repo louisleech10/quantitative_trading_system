@@ -13,7 +13,7 @@ All code must support this evolution via clean decoupling.
 `HANDOFF.md`（根目錄）是所有 agent 的共同交接文件。SessionStart hook 已設定自動注入。
 
 - **每次開始工作**：HANDOFF.md 已自動注入 context，確認當前狀態。**開工前必先稽核 HANDOFF+相關文件(ROADMAP 等)vs repo 實況**(git status/測試計數/狀態聲稱抽驗)，過時先修正再開工（2026-07-11 使用者定；HANDOFF 屢有漏記，首輪稽核即抓 9 處，見 handoffs/P2DEBT-DOCSYNC-RECONCILE.md）
-- **每次結束工作**：用 Write 工具更新 HANDOFF.md（≤ 30 行）
+- **每次結束工作**：更新 HANDOFF.md——文法見 `scripts/live_doc_registry.json` 之 handoff 段（現況／待辦只放生成區塊，改 `scripts/fact_keys.json` 後跑 `bash scripts/gen_fact_key_blocks.sh --write`；坑手寫；進行中紀錄只放條目標記與指標行），寫入前由 `scripts/live_doc_write_guard.sh` 擋
 - **Context 壓縮前**：PreCompact hook 會提醒，優先更新 HANDOFF.md 再讓壓縮發生
 - **其他 agent**：Codex 讀 `AGENTS.md`，Cursor 讀 `.cursorrules`，兩者都指向 HANDOFF.md
 - **觸發句**：規則出生事故 → `docs/SCAR_LEDGER.md`；派工/委員會/選層 → `docs/MULTI_AGENT_ORCHESTRATION.md`；SPEC/TODO 範本 → `templates/`

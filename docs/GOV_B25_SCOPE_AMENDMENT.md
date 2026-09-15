@@ -31,6 +31,8 @@ FACTKEY-CRITERIA: governance-criteria
 FACTKEY-MECHANISM: governance-mechanism
 FACTKEY-ENFORCEMENT: governance-enforcement
 FACTKEY-DERIVED: committee-roster
+FACTKEY-DERIVED: handoff-current
+FACTKEY-DERIVED: handoff-todo
 FACTKEY-DOCROT2-STATUS: splitunify-batch-status
 FACTKEY-DOCROT2-STATUS: splitunify-task-status
 FACTKEY-DOCROT2-STATUS: splitunify-residual-status

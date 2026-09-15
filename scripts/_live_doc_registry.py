@@ -365,6 +365,9 @@ def main(argv: List[str]) -> int:
     u = sub.add_parser("update")
     u.add_argument("--add", required=True)
     u.add_argument("--class", dest="cls")
+    f = sub.add_parser("flag")
+    f.add_argument("--name", required=True)
+    f.add_argument("--path", required=True)
     try:
         args = ap.parse_args(argv)
     except SystemExit:
@@ -373,6 +376,25 @@ def main(argv: List[str]) -> int:
         ap.print_usage(sys.stderr)
         return 2
     root = repo_root()
+    if args.cmd == "flag":
+        # DOCROT2 Task 2.5：供既有檢查依類別旗標路由。stdout 恰一詞：true｜false｜unregistered｜out-of-scope
+        errs, norm = _load(root)
+        if errs or not norm:
+            print("live_doc_registry_check: 登記檔不合規 ⇒ fail-closed：" + "；".join(errs), file=sys.stderr)
+            return 2
+        if not in_scope(args.path, norm["scope_roots"]):
+            print("out-of-scope")
+            return 0
+        cls = classify(args.path, norm)
+        if cls is None:
+            print("unregistered")
+            return 0
+        flags = (load_json(os.path.join(root, REGISTRY_REL)).get("class_flags") or {}).get(cls) or {}
+        if args.name not in flags or not isinstance(flags[args.name], bool):
+            print(f"live_doc_registry_check: 類別 {cls} 無布林旗標 {args.name} ⇒ fail-closed", file=sys.stderr)
+            return 2
+        print("true" if flags[args.name] else "false")
+        return 0
     if args.cmd == "update":
         rc, msg = update_add(root, args.add, args.cls)
         print(f"live_doc_registry_update: {msg}", file=sys.stderr if rc else sys.stdout)

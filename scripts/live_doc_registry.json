@@ -982,6 +982,10 @@
       "## 待辦"
     ],
     "history_section": "## 進行中紀錄",
+    "section_projection_keys": {
+      "## 現況": "handoff-current",
+      "## 待辦": "handoff-todo"
+    },
     "entry_marker_regex": "^<!-- ENTRY: ([A-Za-z0-9._-]+(,[A-Za-z0-9._-]+)*) -->$",
     "archive_path": "docs/HANDOFF_ARCHIVE.md"
   },

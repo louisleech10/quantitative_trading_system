@@ -63778,3 +63778,22 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=
   manifest=
 {"actor": "gate", "batch": "1", "event": "impl_token_issued", "event_id": "9768f555-c01e-457a-93b4-0708ca7aefc9", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260915-DOCROT2", "round_start_head": "688e8c5b6e1cfb28e9640226743d4b95746936f5", "schema_version": 1, "sequence": 4542, "task_id": "20260915-DOCROT2-impl-b1-claude", "ts": "2026-09-15T06:26:04Z"}
+{"actor": "post-commit", "batch": "1", "event": "ticket_commit", "event_id": "df45995f-2db4-4d15-a81d-d44bc5950c0f", "origin_script": "git_hooks/post-commit", "prod_files": [], "producer": "audit_append.sh", "root": "20260915-DOCROT2", "schema_version": 1, "sequence": 4543, "sha": "80fb3cb2b7db760afdcd2f230c90387df8b05128", "token_fresh": "true", "trailer": "20260915-DOCROT2/b1", "ts": "2026-09-15T06:26:29Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md", "output_sha256": "e1766584ef2957b2c594ffd09468e889a0e95715960519ab19e0551efe941218", "task_id": "20260915-DOCROT2-impl-b2-claude", "ts": "2026-09-15T07:01:42Z"}
+=== 2026-09-15 15:01:43 | dispatch ===
+  ts=2026-09-15 15:01:43
+  kind=dispatch
+  intent=D2B（Task 2.1–2.5）commit：寫入前守衛、pre-commit 兜底、交接檔封閉文法與遷移、類別路由與掛載
+  risk=high
+  facts_asked=none-needed:使用者裁定記於 docs/DOCROT2_SPEC.md §C；D2A 兩輪審碼閉合
+  review_role=single-executor:主委實作，commit 後派 codex+composer D2B 審碼
+  template=n/a:D2B 實作 commit，依 docs/DOCROT2_TODO.md v5 Phase 2
+  adversarial=handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "gate", "batch": "2", "event": "impl_token_issued", "event_id": "3cf065be-5458-428f-98bc-7b61e9fd10ab", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260915-DOCROT2", "round_start_head": "80fb3cb2b7db760afdcd2f230c90387df8b05128", "schema_version": 1, "sequence": 4544, "task_id": "20260915-DOCROT2-impl-b2-claude", "ts": "2026-09-15T07:01:43Z"}

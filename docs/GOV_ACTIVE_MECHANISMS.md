@@ -53,7 +53,7 @@
 | `gap3ux_count_check.sh` | 常態檢查 | narrow_check_router  |
 | `gap3ux_header_round_check.sh` | 常態檢查 | 未掛 |
 | `gate_check.sh` | 常態檢查 | PreToolUse gate committee_run  |
-| `gen_fact_key_blocks.sh` | 常態檢查 | gov_check  |
+| `gen_fact_key_blocks.sh` | 常態檢查 | PreCompact gov_check  |
 | `golden_staleness_check.sh` | 常態檢查 | 未掛 |
 | `gov_check.sh` | 常態檢查 | pre-push  |
 | `govb1_ghostpath_check.sh` | 常態檢查 | 未掛 |
@@ -62,7 +62,8 @@
 | `ic_wiring_check.sh` | 常態檢查 | 未掛 |
 | `install_verify_hooks.sh` | 工具 | 未掛 |
 | `list_active_mechanisms.sh` | 常態檢查 | PostToolUse  |
-| `live_doc_registry_check.sh` | 常態檢查 | 未掛 |
+| `live_doc_registry_check.sh` | 常態檢查 | pre-commit  |
+| `live_doc_write_guard.sh` | 常態檢查 | PreToolUse pre-commit  |
 | `mutation_probe_check.sh` | 工具 | gov_check  |
 | `narrow_check_router.sh` | 常態檢查 | PostToolUse  |
 | `no_append_only_check.sh` | 常態檢查 | pre-commit  |
@@ -101,6 +102,7 @@
 | `verify_pretooluse.sh` | 常態檢查 | PreToolUse  |
 | `verify_role_gate.sh` | 常態檢查 | 未掛 |
 | `verify_spec_stamp_delta.sh` | 常態檢查 | 未掛 |
+| `_live_doc_write_guard.py` | 常態檢查 | 未掛 |
 | `b49_closure_static_check.py` | 常態檢查 | narrow_check_router  |
 | `build_l65_golden_baseline.py` | 常態檢查 | 未掛 |
 | `check_decoupling_imports.py` | 常態檢查 | narrow_check_router  |
