@@ -207,6 +207,10 @@ def test_sentinel_without_category_after_threshold_rc1(tmp_path):
     ("**類別**: Doc-Sync", False),
     ("**類別**: doc-sync **類別**: other", False),
     ("**類別**:", False),
+    ("**類別**: doc-sync\r", True),                         # review-r1 COMPOSER-R1-P2-01：行尾 CR
+    ("<!-- **類別**: doc-sync -->", False),                 # review-r1 CODEX-R1-P1-01：註解內不算
+    ("**類別**: doc-sync<!-- 說明 -->", True),
+    ("　**類別**: doc-sync", True),
 ])
 def test_label_grammar_same_in_awk_and_python(tmp_path, line, ok):
     """completeness_check.sh（awk）與 _finding_category.py（收斂檔／量測）對同一行之判定須一致。"""
@@ -246,11 +250,90 @@ def test_category_config_invalid_fail_closed_rc1(tmp_path):
 
 
 def test_lock_path_unchanged_by_category():
-    """G-1 三入口矩陣：類別只由 --single 開啟；_validate_finding_body 之 --lock／synth 呼叫不帶第三參數。"""
+    """G-1 三入口矩陣：類別閘只在 --single 區塊呼叫 check-single；--lock／synth 之 _validate_finding_body 不含類別判定。"""
     src = (REPO / "scripts" / "completeness_check.sh").read_text(encoding="utf-8")
-    calls = re.findall(r"_validate_finding_body \"\$\{[^}]+\}\"[^\n]*", src)
-    with_cat = [c for c in calls if "_cat_req" in c]
-    assert len(with_cat) == 1 and "SINGLE_ARG" in with_cat[0], calls
+    assert src.count("_finding_category.py\" check-single") == 2
+    single = src[src.index('if [ -n "${SINGLE_ARG}" ]; then'):src.index('if [ -n "${LOCK_ARG}" ]; then')]
+    assert single.count("_finding_category.py\" check-single") == 2
+    body = src[src.index("_validate_finding_body() {"):src.index("_validate_anchors() {")]
+    assert "類別" not in body
+
+
+# ── review-r1 CODEX-R1-P1-01：類別只有一份文法；P1 兩 token 只在碼證欄位內
+
+def _probe(h: dict, name: str, text: str) -> subprocess.CompletedProcess:
+    return _single(h, _write(h, f"handoffs/{name}-codex.md", text))
+
+
+def test_category_in_html_comment_rejected(tmp_path):
+    h = _cc_harness(tmp_path)
+    text = P1_NO_CAT.replace("**來源摘要**", "<!--\n**類別**: doc-sync\n-->\n\n**來源摘要**", 1)
+    r = _probe(h, "cmt", text)
+    assert r.returncode == 1 and "finding 缺類別" in r.stderr, r.stderr
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("fcat", REPO / "scripts" / "_finding_category.py")
+    fcat = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fcat)
+    assert fcat.single_category(text.splitlines(), CATS)[0] is None
+
+
+def test_p1_tokens_outside_code_field_rejected(tmp_path):
+    h = _cc_harness(tmp_path)
+    text = (
+        "## CODEX-R1-P1-01\n\n**斷言**: 兩 token 寫在碼證欄外之探針\n\n**碼證**: 見某章節用詞差異。\n\n"
+        "**類別**: code-contract\n\n**來源摘要**: scripts/x.sh#0123456789ab\n\n"
+        "正文。\nCODE-ANCHOR: scripts/completeness_check.sh:1\nMUTATION: 刪掉判定會紅。\n"
+    )
+    r = _probe(h, "outside", text)
+    assert r.returncode == 1 and "has_anchor=0 has_mutation=0" in r.stderr, r.stderr
+    inside = text.replace("**碼證**: 見某章節用詞差異。", "**碼證**: 見某章節用詞差異。\nCODE-ANCHOR: scripts/completeness_check.sh:1\nMUTATION: 刪掉判定會紅。")
+    assert _probe(h, "inside", inside).returncode == 0
+
+
+def test_p1_tokens_in_html_comment_rejected(tmp_path):
+    h = _cc_harness(tmp_path)
+    text = (
+        "## CODEX-R1-P1-01\n\n**斷言**: 兩 token 寫在註解內之探針\n\n**碼證**: 見下。\n"
+        "<!-- CODE-ANCHOR: scripts/completeness_check.sh:1\nMUTATION: 刪掉判定會紅。 -->\n\n"
+        "**類別**: code-contract\n\n**來源摘要**: scripts/x.sh#0123456789ab\n"
+    )
+    r = _probe(h, "tokcmt", text)
+    assert r.returncode == 1 and "has_anchor=0 has_mutation=0" in r.stderr, r.stderr
+
+
+def test_unicode_fence_parser_agreement(tmp_path):
+    """U+3000 前導之 ``` 不是 fence（與 awk LC_ALL=C 之 [[:space:]] 同）：--single 與收斂檔解析判定一致。"""
+    h = _cc_harness(tmp_path)
+    text = P1_NO_CAT.replace("**來源摘要**", "　```\n**類別**: doc-sync\n　```\n\n**來源摘要**", 1)
+    single_ok = _probe(h, "u3000", text).returncode == 0
+    synth, ctx = _synth_fixture(tmp_path, post=True, committee="doc-sync", chair="doc-sync")
+    synth_text = synth.read_text(encoding="utf-8").replace("**類別**: doc-sync", "　```\n**類別**: doc-sync\n　```")
+    synth.write_text(synth_text, encoding="utf-8")
+    synth_ok = _attr(synth, ctx).returncode == 0
+    assert single_ok is True and synth_ok is True, (single_ok, synth_ok)
+    ascii_fence = P1_NO_CAT.replace("**來源摘要**", "```\n**類別**: doc-sync\n```\n\n**來源摘要**", 1)
+    assert _probe(h, "asciifence", ascii_fence).returncode == 1
+
+
+def test_category_audit_registry_invalid_fails_closed(tmp_path):
+    """review-r1 CODEX-R1-P1-02：給了 round id 而 audit 不可讀 ⇒ FAIL（不得降級為「須類別」而放行合規檔）。"""
+    h = _cc_harness(tmp_path)
+    rid, _ = _open(h)
+    env = {**h["env"], "DEBT_AUDIT_OVERRIDE": str(h["root"] / "no-such-audit.log")}
+    f = _write(h, "handoffs/f-codex.md", _with_cat(P1_NO_CAT, "doc-sync"))
+    r = subprocess.run(["bash", str(h["scripts"] / "completeness_check.sh"), "--single", str(f), "--family", "codex",
+                        "--round-id", rid], cwd=h["root"], env=env, capture_output=True, text=True)
+    assert r.returncode == 1 and "類別判定設定不可用" in r.stderr, r.stderr
+
+
+def test_category_malformed_audit_line_fails_closed(tmp_path):
+    h = _cc_harness(tmp_path)
+    rid, _ = _open(h)
+    text = h["audit"].read_text(encoding="utf-8")
+    h["audit"].write_text("{broken json\n" + text, encoding="utf-8")
+    f = _write(h, "handoffs/f-codex.md", _with_cat(P1_NO_CAT, "doc-sync"))
+    r = _single(h, f, "--round-id", rid)
+    assert r.returncode == 1 and "JSON 無法解析" in r.stderr, r.stderr
 
 
 # ================================================================ Task 3.1：cx_run.sh 四個 --single 呼叫面
@@ -713,13 +796,15 @@ def _ev_open(seq: int, rid: str, task: str, session: str, kind: str | None = "re
 
 
 def _ev_metric(seq: int, rid: str, task: str, session: str, commit: str, *, n: int = 0, doc: int = 0,
-               stamps: list | None = None) -> dict:
+               stamps: list | None = None, kind: str = "review") -> dict:
     counts = {c: 0 for c in CATS}
     counts["doc-sync"] = doc
     counts["other"] = n - doc
     return {"event": "docrot2_round_metric", "sequence": seq, "round_id": rid, "task_id": task, "session_name": session,
-            "round_open_sequence": seq - 1, "brief_kind": "review", "canonical_count": n, "category_counts": counts,
-            "mismatch_count": 0, "handoff_tree_commit": commit, "committee_models": {}, "stamps": stamps or []}
+            "round_open_sequence": seq - 1, "brief_kind": kind, "canonical_count": n, "category_counts": counts,
+            "mismatch_count": 0, "handoff_tree_commit": commit,
+            "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}},
+            "stamps": stamps or []}
 
 
 def _write_audit(audit: Path, events: list[dict]) -> None:
@@ -831,10 +916,92 @@ def test_history_only_restamp_in_cohort_rc1(tmp_path):
     root, audit, head = _metrics_repo(tmp_path)
     stamps = [{"stamp_target": "docs/A_SPEC.md", "body_sha_before": "a" * 64, "body_sha_after": "b" * 64, "history_only": 1}]
     evs = _two_rounds(head) + [_ev_open(15, "r3", f"{TICKET}-X-STAMP-R1", "s3", kind="closure"),
-                               _ev_metric(16, "r3", f"{TICKET}-X-STAMP-R1", "s3", head, stamps=stamps)]
+                               _ev_metric(16, "r3", f"{TICKET}-X-STAMP-R1", "s3", head, stamps=stamps, kind="closure")]
     _write_audit(audit, evs)
     r = _report(root)
     assert r.returncode == 1 and "④ 只動歷史區之重蓋章 1" in r.stderr, r.stderr
+
+
+# ── review-r1 CODEX-R1-P1-02：報表對 audit／事件／契約之封閉驗證
+
+def _report_reason(root: Path) -> tuple[int, str]:
+    r = _report(root)
+    m = re.search(r"DOCROT2_METRIC_REASON=(\S+)", r.stderr)
+    return r.returncode, (m.group(1) if m else "")
+
+
+def test_report_duplicate_open_same_round_rc1(tmp_path):
+    root, audit, head = _metrics_repo(tmp_path)
+    evs = _two_rounds(head)
+    evs[2] = _ev_open(13, "r1", f"{TICKET}-B1-REVIEW-R2", "s2")          # 第二筆開債沿用 r1
+    evs[3] = _ev_metric(14, "r1", f"{TICKET}-B1-REVIEW-R2", "s2", head)
+    _write_audit(audit, evs)
+    assert _report_reason(root) == (1, "duplicate-open")
+
+
+@pytest.mark.parametrize("patch", [
+    {"stamp_target": 7},
+    {"body_sha_after": "not-a-sha"},
+    {"body_sha_before": "abc"},
+    {"history_only": True},
+    {"history_only": 2},
+])
+def test_report_invalid_stamp_rc1(tmp_path, patch):
+    root, audit, head = _metrics_repo(tmp_path)
+    stamp = {"stamp_target": "docs/A_SPEC.md", "body_sha_before": "none", "body_sha_after": "b" * 64, "history_only": 0}
+    stamp.update(patch)
+    _write_audit(audit, _two_rounds(head, stamps2=[stamp]))
+    assert _report_reason(root) == (1, "event-invalid")
+
+
+@pytest.mark.parametrize("field,value", [
+    ("task_id", None), ("session_name", "other-session"), ("round_open_sequence", 99),
+    ("brief_kind", "closure"), ("committee_models", {}),
+])
+def test_report_metric_identity_mismatch_rc1(tmp_path, field, value):
+    root, audit, head = _metrics_repo(tmp_path)
+    evs = _two_rounds(head)
+    if value is None:
+        del evs[1][field]
+    else:
+        evs[1][field] = value
+    _write_audit(audit, evs)
+    assert _report_reason(root) == (1, "event-invalid")
+
+
+def test_report_metric_orphan_rc1(tmp_path):
+    root, audit, head = _metrics_repo(tmp_path)
+    _write_audit(audit, _two_rounds(head) + [_ev_metric(30, "ghost", f"{TICKET}-B9-REVIEW-R1", "sg", head)])
+    assert _report_reason(root) == (1, "metric-orphan")
+
+
+def test_report_malformed_audit_rc1(tmp_path):
+    root, audit, head = _metrics_repo(tmp_path)
+    _write_audit(audit, _two_rounds(head))
+    audit.write_text("{not json\n" + audit.read_text(encoding="utf-8"), encoding="utf-8")
+    assert _report_reason(root) == (1, "audit-malformed")
+
+
+def test_report_string_sequence_missing_brief_rc1(tmp_path):
+    root, audit, head = _metrics_repo(tmp_path)
+    bad = _ev_open(16, "r3", "20260918-OTHER-B1-REVIEW-R1", "s3", kind=None)
+    bad["sequence"] = "16"
+    _write_audit(audit, _two_rounds(head) + [bad])
+    assert _report_reason(root) == (1, "audit-malformed")
+
+
+@pytest.mark.parametrize("patch", [
+    {"expect_rc": 1},
+    {"command": ["bash", "-c", "true", "{commit}"]},
+])
+def test_contract_replay_semantics_closed_rc1(tmp_path, patch):
+    root, audit, head = _metrics_repo(tmp_path)
+    p = root / "scripts" / "docrot2_metric_contract.json"
+    c = json.loads(p.read_text(encoding="utf-8"))
+    c["handoff_replay"].update(patch)
+    p.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
+    _write_audit(audit, _two_rounds(head))
+    assert _report_reason(root) == (1, "contract-invalid")
 
 
 # ── 只動歷史區之重蓋章：以寫入端實算（mutation ⑪：改用整檔差異 ⇒ 應轉紅）

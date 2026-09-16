@@ -224,8 +224,14 @@ def test_mut_drop_substantive_check_regresses(tmp_path: Path) -> None:
     assert anchor_tokens in src, "mutation 錨點漂移：P0/P1 token 閘（_validate_anchors）"
     # 🔴 DOCROT2 Task 3.1（2026-09-16）：`--single` 另有獨立之類別閘（hollow fixture 無 `**類別**`）
     #   ⇒ 同上理由，held-out 時一併關閉類別要求，否則量到兩閘之聯集（後加守衛遮蔽先前守衛）。
-    anchor_cat = '_validate_finding_body "${SINGLE_ARG}" 1 "${_cat_req}" "${_cat_vals}"'
-    assert anchor_cat in src, "mutation 錨點漂移：類別閘（_validate_finding_body 第三參數）"
+    anchor_cat = (
+        '  elif [ "${SINGLE_ROUND_ID_SET}" = "1" ]; then\n'
+        '    python3 "${_cc_dir}/_finding_category.py" check-single "${SINGLE_ARG}" --round-id "${SINGLE_ROUND_ID}" || _single_rc=1\n'
+        '  else\n'
+        '    python3 "${_cc_dir}/_finding_category.py" check-single "${SINGLE_ARG}" || _single_rc=1\n'
+        '  fi\n'
+    )
+    assert anchor_cat in src, "mutation 錨點漂移：類別閘（check-single 呼叫段）"
     for helper in ("_finding_category.py", "governance_verdicts.json", "audit_events.json"):
         shutil.copy2(REPO_ROOT / "scripts" / helper, tmp_path / helper)
     mut = tmp_path / "mut_completeness.sh"
@@ -234,7 +240,7 @@ def test_mut_drop_substantive_check_regresses(tmp_path: Path) -> None:
             'if ($0 ~ /\\*\\*碼證\\*\\*/ && (!strict || substantive(field_body($0, "碼證")))) seen_code=1',
             'if ($0 ~ /\\*\\*碼證\\*\\*/) seen_code=1',
             1,
-        ).replace(anchor_tokens, "", 1).replace(anchor_cat, '_validate_finding_body "${SINGLE_ARG}" 1 0 ""', 1),
+        ).replace(anchor_tokens, "", 1).replace(anchor_cat, "  fi\n", 1),
         encoding="utf-8",
     )
     base = subprocess.run(

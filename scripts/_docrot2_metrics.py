@@ -41,6 +41,8 @@ OPEN_EVENT = "committee_round_open"
 SNAPSHOT_DIR = os.path.join("handoffs", "docrot2_body_snapshots")
 STAMP_HEADING_RE = re.compile(r"^##[ \t\r\v\f]*戳記")
 UNAVAILABLE = "unavailable"
+REPLAY_COMMAND = ["bash", "scripts/live_doc_write_guard.sh", "--tree", "{commit}", "--path", "HANDOFF.md"]
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class MetricError(Exception):
@@ -77,8 +79,9 @@ def load_contract(path: str = CONTRACT) -> dict:
     need(isinstance(c.get("max_findings_per_round"), int) and not isinstance(c.get("max_findings_per_round"), bool)
          and c["max_findings_per_round"] >= 0, "max_findings_per_round 不合法")
     hr = c.get("handoff_replay") or {}
-    need(isinstance(hr.get("command"), list) and all(isinstance(x, str) for x in hr["command"])
-         and "{commit}" in hr["command"] and isinstance(hr.get("expect_rc"), int), "handoff_replay 不合法")
+    # 〔review-r1 CODEX-R1-P1-02〕重放命令與成功語意封閉：只准固定命令、expect_rc 恰為 0（否則「重放失敗」可被契約改成及格）
+    need(hr.get("command") == REPLAY_COMMAND, f"handoff_replay.command 只准 {REPLAY_COMMAND}")
+    need(hr.get("expect_rc") == 0 and not isinstance(hr.get("expect_rc"), bool), "handoff_replay.expect_rc 只准 0")
     ho = c.get("history_only_restamp") or {}
     need(isinstance(ho.get("max"), int) and not isinstance(ho.get("max"), bool) and ho["max"] >= 0
          and isinstance(ho.get("body_hash_script"), str), "history_only_restamp 不合法")
@@ -325,7 +328,26 @@ def emit_round(rid: str, session: str, lock: str, repo: str = REPO) -> int:
 
 # ────────────────────────────────────────────────────────────── report
 
-def _valid_metric(ev: dict, cats: List[str]) -> Optional[str]:
+def _valid_metric(ev: dict, cats: List[str], open_ev: Optional[dict] = None) -> Optional[str]:
+    """事件欄位型別與其開債事件之身分一致性（review-r1 CODEX-R1-P1-02：原只驗計數，缺身分欄或與開債不一致仍可及格）。"""
+    for k in ("round_id", "task_id", "session_name", "brief_kind"):
+        if not (isinstance(ev.get(k), str) and ev[k]):
+            return f"{k} 缺或非非空字串"
+    if not _int(ev.get("round_open_sequence")):
+        return "round_open_sequence 缺或非整數"
+    if open_ev is not None:
+        for k_ev, k_open in (("task_id", "task_id"), ("session_name", "session_name"),
+                             ("round_open_sequence", "sequence"), ("brief_kind", "brief_kind")):
+            if ev.get(k_ev) != open_ev.get(k_open):
+                return f"{k_ev}＝{ev.get(k_ev)!r} 與開債事件之 {k_open}＝{open_ev.get(k_open)!r} 不一致"
+    cm = ev.get("committee_models")
+    if not (isinstance(cm, dict) and all(isinstance(fam, str) and fam and isinstance(v, dict)
+                                         and set(v) == {"model", "reasoning_effort"}
+                                         and all(isinstance(x, str) and x for x in v.values())
+                                         for fam, v in cm.items())):
+        return "committee_models 須為 {家族: {model, reasoning_effort}}，值為非空字串"
+    if open_ev is not None and isinstance(open_ev.get("participants"), list) and set(cm) != set(open_ev["participants"]):
+        return "committee_models 之家族集合與開債事件 participants 不一致"
     cc = ev.get("category_counts")
     if not (isinstance(cc, dict) and set(cc) == set(cats) and all(_int(v) and v >= 0 for v in cc.values())):
         return "category_counts 鍵集須恰為類別值集且值為非負整數"
@@ -340,9 +362,19 @@ def _valid_metric(ev: dict, cats: List[str]) -> Optional[str]:
     if not isinstance(st, list):
         return "stamps 須為陣列"
     for s in st:
-        if not (isinstance(s, dict) and set(s) == {"stamp_target", "body_sha_before", "body_sha_after", "history_only"}
-                and s.get("history_only") in (0, 1) and not isinstance(s.get("history_only"), bool)):
-            return "stamps 項不合法"
+        if not (isinstance(s, dict) and set(s) == {"stamp_target", "body_sha_before", "body_sha_after", "history_only"}):
+            return "stamps 項須恰含 stamp_target／body_sha_before／body_sha_after／history_only"
+        if not (isinstance(s["stamp_target"], str) and s["stamp_target"] and not s["stamp_target"].startswith("/")
+                and ".." not in s["stamp_target"].split("/")):
+            return "stamps.stamp_target 須為 repo 相對路徑字串"
+        if not (isinstance(s["body_sha_after"], str) and SHA256_RE.match(s["body_sha_after"])):
+            return "stamps.body_sha_after 須為 64 位十六進位"
+        if not (isinstance(s["body_sha_before"], str) and (s["body_sha_before"] == "none" or SHA256_RE.match(s["body_sha_before"]))):
+            return "stamps.body_sha_before 須為 none 或 64 位十六進位"
+        if not (_int(s["history_only"]) and s["history_only"] in (0, 1)):
+            return "stamps.history_only 須為整數 0 或 1"
+        if s["history_only"] == 1 and s["body_sha_before"] == "none":
+            return "stamps.history_only=1 須有前次本體"
     return None
 
 
@@ -359,11 +391,36 @@ def report(repo: str = REPO) -> int:
         audit = fcat.resolve_audit_path()
         if not os.path.isfile(audit):
             raise MetricError("audit-missing", f"audit 不存在：{audit}")
-        events = list(fcat.iter_audit(audit))
+        try:
+            events = list(fcat.iter_audit(audit))
+        except fcat.ConfigError as exc:
+            raise MetricError("audit-malformed", str(exc))
         opens = [e for e in events if e.get("event") == OPEN_EVENT]
+        # 〔review-r1 CODEX-R1-P1-02〕開債事件之序號須為整數、round_id 須唯一；否則 cohort 可重選同一輪或跳過缺欄檢查
+        open_by_rid: Dict[str, dict] = {}
         for e in opens:
-            if _int(e.get("sequence")) and e["sequence"] > closure and not (isinstance(e.get("brief_kind"), str) and e["brief_kind"]):
-                raise MetricError("brief-kind-missing", f"round {e.get('round_id')}（序號 {e['sequence']}）缺 brief_kind ⇒ cohort 無法判定")
+            if not _int(e.get("sequence")):
+                raise MetricError("audit-malformed", f"{OPEN_EVENT}（round {e.get('round_id')!r}）之 sequence 非整數")
+            rid_ = e.get("round_id")
+            if not (isinstance(rid_, str) and rid_):
+                raise MetricError("audit-malformed", f"{OPEN_EVENT}（序號 {e['sequence']}）缺 round_id")
+            if rid_ in open_by_rid:
+                raise MetricError("duplicate-open", f"round {rid_} 有兩筆以上 {OPEN_EVENT}")
+            open_by_rid[rid_] = e
+            if e["sequence"] > closure and not (isinstance(e.get("brief_kind"), str) and e["brief_kind"]):
+                raise MetricError("brief-kind-missing", f"round {rid_}（序號 {e['sequence']}）缺 brief_kind ⇒ cohort 無法判定")
+        metrics = [e for e in events if e.get("event") == EVENT]
+        seen_metric: Dict[str, int] = {}
+        for m in metrics:
+            mrid = m.get("round_id")
+            if not (isinstance(mrid, str) and mrid in open_by_rid):
+                raise MetricError("metric-orphan", f"{EVENT}（round {mrid!r}）無對應之 {OPEN_EVENT}")
+            seen_metric[mrid] = seen_metric.get(mrid, 0) + 1
+            if seen_metric[mrid] > 1:
+                raise MetricError("duplicate-event", f"round {mrid} 有兩筆以上 {EVENT}（同輪只准一筆）")
+            bad = _valid_metric(m, cats, open_by_rid[mrid])
+            if bad:
+                raise MetricError("event-invalid", f"round {mrid} 之 {EVENT}：{bad}")
         want = contract["cohort"]["brief_kind"]
         first: Dict[str, int] = {}
         by_ticket: Dict[str, List[dict]] = {}
@@ -382,28 +439,17 @@ def report(repo: str = REPO) -> int:
         rounds = sorted(by_ticket[cohort_ticket], key=lambda e: e["sequence"])[: contract["cohort"]["rounds"]]
         if len(rounds) < contract["cohort"]["rounds"]:
             raise MetricError("cohort-incomplete", f"票 {cohort_ticket} 之 {want} 輪僅 {len(rounds)} 輪（須 {contract['cohort']['rounds']}）")
-        metrics = [e for e in events if e.get("event") == EVENT]
         ticket_round_ids = {e.get("round_id") for e in opens if ticket_key(e.get("task_id"), contract) == cohort_ticket}
         ticket_metrics: Dict[str, List[dict]] = {}
         for m in metrics:
             if m.get("round_id") in ticket_round_ids:
                 ticket_metrics.setdefault(m["round_id"], []).append(m)
-        for rid_, ms in ticket_metrics.items():
-            if len(ms) > 1:
-                raise MetricError("duplicate-event", f"round {rid_} 有 {len(ms)} 筆 {EVENT}（同輪只准一筆）")
         chosen: List[dict] = []
         for op in rounds:
             ms = ticket_metrics.get(op.get("round_id")) or []
             if not ms:
                 raise MetricError("event-missing", f"cohort 輪 {op.get('round_id')}（{op.get('session_name')}）缺 {EVENT}")
-            bad = _valid_metric(ms[0], cats)
-            if bad:
-                raise MetricError("event-invalid", f"cohort 輪 {op.get('round_id')} 之 {EVENT}：{bad}")
             chosen.append(ms[0])
-        for rid_, ms in ticket_metrics.items():
-            bad = _valid_metric(ms[0], cats)
-            if bad:
-                raise MetricError("event-invalid", f"票內輪 {rid_} 之 {EVENT}：{bad}")
     except MetricError as exc:
         print(f"[docrot2_metrics] 🔴 {exc}", file=sys.stderr)
         print(f"DOCROT2_METRIC_REASON={exc.reason}", file=sys.stderr)
