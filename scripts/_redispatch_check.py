@@ -22,6 +22,7 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -90,6 +91,38 @@ def sha256_bytes(b: bytes) -> str:
 
 def sha256_file(p: Path) -> str:
     return sha256_bytes(p.read_bytes())
+
+
+def snapshot_object(q: Path) -> Tuple[str, str]:
+    """回傳（`sha256`｜`none`, `<dev>:<ino>`｜`none`）——棄置快照之產出檔綁定值。
+
+    🔴 b1 review-r5（CODEX-R5-P1-02／03）：雜湊與物件身分須取自**同一個 fd**，
+    且以 `O_NOFOLLOW|O_NONBLOCK` 開啟——
+      · 只綁雜湊時，同 bytes 的外部 hard link／父目錄 symlink 可整個換掉物件而仍通過；
+      · 不帶 `O_NONBLOCK` 時，路徑被換成 FIFO 會使開檔無限阻塞（寫入端持鎖 ⇒ 治理停擺）。
+    讀取一律到 EOF，不以 `st_size` 為界（CODEX-R5-P1-01）。
+    """
+    try:
+        fd = os.open(str(q), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return "none", "none"
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            return "none", "none"
+        h = hashlib.sha256()
+        total = 0
+        while True:
+            chunk = os.read(fd, 1 << 20)
+            if not chunk:
+                break
+            total += len(chunk)
+            h.update(chunk)
+        return ("none" if total == 0 else h.hexdigest()), f"{st.st_dev}:{st.st_ino}"
+    except OSError:
+        return "none", "none"
+    finally:
+        os.close(fd)
 
 
 def test_hook(name: str) -> None:
@@ -695,13 +728,12 @@ def cmd_exhausted_check(argv: List[str]) -> int:
             q = repo / out_rel
             # 🔴 路徑與雜湊分兩行輸出（b1 review-r3 CODEX-R3-P1-02）：合法路徑可含 `@`，
             #    以單一 <path>@<sha> 傳遞會與路徑文法衝突而誤擋合法棄置。
-            try:
-                st = q.lstat()
-                sha = sha256_file(q) if (not q.is_symlink() and st.st_size > 0) else "none"
-            except OSError:
-                sha = "none"
+            sha, dev_ino = snapshot_object(q)
             print(f"snapshot_output_path={out_rel}")
             print(f"snapshot_output_sha={sha}")
+            # 🔴 物件身分另行輸出（b1 review-r5 CODEX-R5-P1-02）：只綁雜湊時，
+            #    同 bytes 之外部 hard link 或父目錄 symlink 可整個換掉物件而仍通過查核。
+            print(f"snapshot_output_dev_ino={dev_ino}")
             return 0
     for fam, v in per_family.items():
         for x in v:

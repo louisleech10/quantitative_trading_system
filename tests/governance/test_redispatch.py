@@ -55,13 +55,13 @@ class Repo:
         return e
 
     def run(self, args, stdin: str | None = None, env_extra: dict | None = None,
-            cwd: Path | None = None) -> subprocess.CompletedProcess:
+            cwd: Path | None = None, timeout: float | None = None) -> subprocess.CompletedProcess:
         env = self.env
         if env_extra:
             env.update(env_extra)
         return subprocess.run(
             args, capture_output=True, text=True, input=stdin,
-            cwd=str(cwd or self.root), env=env,
+            cwd=str(cwd or self.root), env=env, timeout=timeout,
         )
 
     def redispatch(self, rid: str, fam: str, reason: str = "redispatch-test-reason-000000001"):
@@ -712,11 +712,13 @@ def _exhausted_round_with_output(repo: Repo) -> tuple[str, Path]:
     return rid, out
 
 
-def _abandon(repo: Repo, rid: str, env_extra: dict | None = None) -> subprocess.CompletedProcess:
+def _abandon(repo: Repo, rid: str, env_extra: dict | None = None,
+             timeout: float | None = None) -> subprocess.CompletedProcess:
     return repo.run(["bash", str(repo.scripts / "debt_clear.sh"), "--abandon", "--round-id", rid,
                      "--kind", "collection-failed",
                      "--reason", "redispatch-test-reason-000000001",
-                     "--approver", "redispatch-test-approver"], env_extra=env_extra)
+                     "--approver", "redispatch-test-approver"],
+                    env_extra=env_extra, timeout=timeout)
 
 
 def test_abandon_exhausted_all_ended_rc0(repo: Repo) -> None:
@@ -769,6 +771,89 @@ def test_abandon_exhausted_output_symlinked_rc1(repo: Repo) -> None:
     assert repo.events("debt_abandon") == []
 
 
+def test_abandon_exhausted_output_symlink_to_same_inode_rc1(repo: Repo) -> None:
+    """查核後把產出換成「指向同一 inode」之 symlink ⇒ 仍須被拒（b1 r3 CODEX-R3-P1-01）。
+
+    🔴 目標必須是同一 inode 之硬連結：指向他物件之 symlink 已由 r5 之 dev:ino 綁定擋下，
+    用那種夾具時「不跟隨連結」這道判定無從被證偽（mutation 改壞後仍綠）。
+    """
+    rid, out = _exhausted_round_with_output(repo)
+    hard = repo.root / "handoffs" / "same-inode.md"
+    hook = f"ln {out} {hard}; rm -f {out}; ln -s {hard} {out}"
+    proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
+def test_abandon_exhausted_output_unchanged_rc0(repo: Repo) -> None:
+    """產出檔自查核後未變動（同一 inode、同 bytes）⇒ 棄置照常成立。
+
+    🔴 物件身分綁定（b1 r5 CODEX-R5-P1-02）之正向面：缺此測試時，「dev:ino 永遠不符」
+    這種改壞法不會被任何測試抓到（假防護的反面＝把合法棄置整個擋死）。
+    """
+    rid, _ = _exhausted_round_with_output(repo)
+    proc = _abandon(repo, rid)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert len(repo.events("debt_abandon")) == 1
+
+
+def test_abandon_exhausted_output_hardlink_swapped_rc1(repo: Repo) -> None:
+    """查核後把產出換成同 bytes 之另一物件（hard link，inode 已變）⇒ 棄置須被拒。
+
+    b1 r5 CODEX-R5-P1-02：`O_NOFOLLOW` 只擋最後一段是 symlink，不綁物件身分；
+    內容逐位元組相同時雜湊比對自己擋不下來，唯有 dev:ino 綁定會拒。
+    """
+    rid, out = _exhausted_round_with_output(repo)
+    other = repo.root / "handoffs" / "same-bytes-other-object.md"
+    other.parent.mkdir(parents=True, exist_ok=True)
+    other.write_bytes(out.read_bytes())
+    hook = f"rm -f {out}; ln {other} {out}"
+    proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
+def test_abandon_exhausted_output_appended_after_fstat_rc1(repo: Repo) -> None:
+    """fstat 之後、讀取之前追加內容 ⇒ 棄置須被拒（b1 r5 CODEX-R5-P1-01）。
+
+    🔴 讀取若以 fstat 當下之 `st_size` 為界，只會雜湊舊前綴而誤判相符；
+    故本測試以 harness 掛鉤在該窗口內追加，證明讀取確實到 EOF。
+    """
+    rid, out = _exhausted_round_with_output(repo)
+    proc = _abandon(repo, rid, env_extra={
+        "REDISPATCH_TEST_AFTER_FSTAT_CMD": f"printf APPENDED >> {out}"})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
+def test_abandon_exhausted_output_fifo_rc1(repo: Repo) -> None:
+    """查核後把產出換成 FIFO ⇒ 須立即拒絕，不得持鎖阻塞（b1 r5 CODEX-R5-P1-03）。"""
+    rid, out = _exhausted_round_with_output(repo)
+    hook = f"rm -f {out}; mkfifo {out}"
+    try:
+        proc = _abandon(repo, rid, timeout=60,
+                        env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
+    except subprocess.TimeoutExpired:
+        pytest.fail("棄置寫入在 FIFO 上阻塞（開檔未帶 O_NONBLOCK），審計鎖被持住")
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
+def test_audit_append_file_devino_missing_rc2(repo: Repo) -> None:
+    """檔案綁定缺 --require-file-dev-ino ⇒ rc=2（b1 r5 CODEX-R5-P1-02：物件身分為必填）。"""
+    proc = repo.run(["bash", str(repo.scripts / "audit_append.sh"),
+                     "--require-file-path", "handoffs/o-codex.md",
+                     "--require-file-sha256", "none",
+                     "--require-round-unchanged", "r1@0",
+                     "--event", "debt_abandon", "--field", "round_id=r1",
+                     "--field", "abandon_kind=collection-failed",
+                     "--field", "reason=redispatch-test-reason-000000001",
+                     "--field", "approver=redispatch-test-approver",
+                     "--field", "actor=debt_clear", "--field", "origin_script=debt_clear.sh"])
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
 def test_abandon_exhausted_path_with_at_sign_rc0(repo: Repo) -> None:
     """合法但含 `@` 之產出路徑不得被綁定參數之文法誤擋（b1 r3 CODEX-R3-P1-02）。"""
     # 唯一 OPEN 輪，其 expected_outputs 之路徑含 `@`（合法路徑文法）
@@ -800,6 +885,7 @@ def test_audit_append_file_flag_with_absent_session_rc2(repo: Repo) -> None:
     proc = repo.run(["bash", str(repo.scripts / "audit_append.sh"),
                      "--require-file-path", "handoffs/o-codex.md",
                      "--require-file-sha256", "none",
+                     "--require-file-dev-ino", "none",
                      "--require-round-unchanged", "r1@1",
                      "--require-absent-session", "s1",
                      "--event", "committee_round_open"])
@@ -808,9 +894,12 @@ def test_audit_append_file_flag_with_absent_session_rc2(repo: Repo) -> None:
 
 
 def test_audit_append_file_flag_alone_rc2(repo: Repo) -> None:
+    # 🔴 同時給 --require-file-dev-ino：否則「物件身分綁定為必填」那道守衛會先擋，
+    #    「檔案旗標須併 round 旗標」這道判定將無從被證偽（mutation M24 不轉紅）。
     proc = repo.run(["bash", str(repo.scripts / "audit_append.sh"),
                      "--require-file-path", "handoffs/o-codex.md",
                      "--require-file-sha256", "none",
+                     "--require-file-dev-ino", "none",
                      "--event", "debt_abandon", "--field", "round_id=r1",
                      "--field", "abandon_kind=collection-failed",
                      "--field", "reason=redispatch-test-reason-000000001",
@@ -825,6 +914,7 @@ def test_audit_append_file_path_illegal_rc2(repo: Repo, bad_path: str) -> None:
     proc = repo.run(["bash", str(repo.scripts / "audit_append.sh"),
                      "--require-file-path", bad_path,
                      "--require-file-sha256", "none",
+                     "--require-file-dev-ino", "none",
                      "--require-round-unchanged", "r1@0",
                      "--event", "debt_abandon", "--field", "round_id=r1",
                      "--field", "abandon_kind=collection-failed",
@@ -845,6 +935,33 @@ def test_after_check_hook_without_harness_rc2(repo: Repo) -> None:
         ["bash", str(repo.scripts / "debt_clear.sh"), "--abandon", "--round-id", rid,
          "--kind", "collection-failed", "--reason", "redispatch-test-reason-000000001",
          "--approver", "redispatch-test-approver"],
+        cwd=str(repo.root), env=env, capture_output=True, text=True,
+    )
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+
+
+def test_audit_append_fstat_hook_without_harness_rc2(repo: Repo) -> None:
+    """fstat 後掛鉤未綁 GOVERNANCE_TEST_HARNESS=1 ⇒ fail-closed rc=2（不得於正式路徑生效）。"""
+    # 🔴 不能帶 DEBT_AUDIT_OVERRIDE：該環境變數本身要求 harness=1，會在更早處先擋而使本判定不可達。
+    #    改用隔離 repo 之預設 audit 路徑（registry 之 audit_log_path 相對於該 repo），仍不碰正式檔。
+    out = repo.root / "handoffs" / "hook-probe.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("probe body\n", encoding="utf-8")
+    st = out.stat()
+    env = {k: v for k, v in repo.env.items() if k != "DEBT_AUDIT_OVERRIDE"}
+    env["GOVERNANCE_TEST_HARNESS"] = "0"
+    env["REDISPATCH_TEST_AFTER_FSTAT_CMD"] = "true"
+    proc = subprocess.run(
+        ["bash", str(repo.scripts / "audit_append.sh"),
+         "--require-file-path", "handoffs/hook-probe.md",
+         "--require-file-sha256", sha256_text("probe body\n"),
+         "--require-file-dev-ino", f"{st.st_dev}:{st.st_ino}",
+         "--require-round-unchanged", "r1@0",
+         "--event", "debt_abandon", "--field", "round_id=r1",
+         "--field", "abandon_kind=collection-failed",
+         "--field", "reason=redispatch-test-reason-000000001",
+         "--field", "approver=redispatch-test-approver",
+         "--field", "actor=debt_clear", "--field", "origin_script=debt_clear.sh"],
         cwd=str(repo.root), env=env, capture_output=True, text=True,
     )
     assert proc.returncode == 2, proc.stdout + proc.stderr

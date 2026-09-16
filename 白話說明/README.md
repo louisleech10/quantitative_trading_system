@@ -9,7 +9,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 010 | HP-PLAINDOCS | 未開工 | 白話說明/README.md | 使用者決定 白話說明/ 各份是否整理、怎麼併（GAP-3 佔 8 份） |
-| 020 | HP-REDISPATCH | 待審 | docs/REDISPATCH_SPEC.md | SPEC／TODO v12 經三家五輪審定（r12 三家 proceed、findings 全由原提出方閉合）→ 使用者白話審閱 → 實作批 b1（Task 1.1–1.8）；排在 D2C 之前 |
+| 020 | HP-REDISPATCH | 待審 | docs/REDISPATCH_SPEC.md | b1 已實作並 commit，審碼 r1–r5 收斂中（r5 之三條 P1 已修補：讀到 EOF、dev:ino 物件綁定、O_NONBLOCK）；r6 閉合後收批，再回 D2C |
 <!-- END GENERATED: handoff-pending -->
 
 > 📌 **2026-09-15**：SPLITUNIFY 第 9 批 9.3／9.4／9.5 **全部完成並推上 GitHub**（切分表回到一事件一列、計數分清事件數與樣本數、基準檔新增多標的多週期平行組）；正在做收尾的文件同步（殘留「多週期複合鍵」依規格定義關閉，需委員蓋章）。9.5 動到 `scripts/freeze_splitunify_golden.py`（產生量化測試基準檔的腳本，不是治理工具）。

@@ -63,6 +63,9 @@ REQUIRE_FILE_PATH_SET=0
 REQUIRE_FILE_PATH=""
 REQUIRE_FILE_SHA_SET=0
 REQUIRE_FILE_SHA=""
+# B-64 b1 review-r5（CODEX-R5-P1-02）：--require-file-dev-ino <dev>:<ino>|none（物件身分綁定）
+REQUIRE_FILE_DEVINO_SET=0
+REQUIRE_FILE_DEVINO=""
 # 以 RS(\x1e) 分隔的 field 鍵值（k=v / k=@json）；禁 NUL（env 傳不過）
 FIELD_RS=$'\x1e'
 FIELD_PAIRS=""
@@ -703,20 +706,28 @@ PY
 }
 
 _assert_file_unchanged_locked() {
-  # B-64 b1 review-r2／r3：持鎖重驗檔案綁定。rc=0 相符／rc=1 已變動或身分被替換／rc=2 讀取失敗。
+  # B-64 b1 review-r2／r3／r5：持鎖重驗檔案綁定。rc=0 相符／rc=1 已變動或身分被替換／rc=2 讀取失敗。
   # 🔴 不跟隨 symlink（CODEX-R3-P1-01）：`os.path.isfile` 會跟隨連結，身分替換即無從察覺。
   local path="$1"
   local want="$2"
-  AUDIT_FU_PATH="${path}" AUDIT_FU_WANT="${want}" python3 <<'PY'
-import hashlib, os, stat, sys
+  local want_devino="$3"
+  AUDIT_FU_PATH="${path}" AUDIT_FU_WANT="${want}" AUDIT_FU_DEVINO="${want_devino}" python3 <<'PY'
+import hashlib, os, stat, subprocess, sys
 p = os.environ["AUDIT_FU_PATH"]
 want = os.environ["AUDIT_FU_WANT"]
+want_devino = os.environ["AUDIT_FU_DEVINO"]
 # 🔴 b1 review-r4（CODEX-R4-P1-02）：以 O_NOFOLLOW 開檔後，一律用**同一個 fd** 做 fstat 與讀取，
 #    不得先 lstat 再以路徑 open——兩者之間可被原子換成 symlink（TOCTOU）。
+# 🔴 b1 review-r5：另加三道（CODEX-R5-P1-01／02／03）——
+#    ①讀取到 EOF，不以 fstat 當下之 st_size 為界（其後之追加不得只雜湊舊前綴）；
+#    ②比對 dev:ino，使同 bytes 之外部 hard link／父目錄 symlink 換掉物件時被拒；
+#    ③帶 O_NONBLOCK，使路徑被換成 FIFO 時立即返回而非持鎖無限阻塞。
 try:
     try:
-        fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except FileNotFoundError:
+        if want_devino != "none":
+            sys.exit(1)                      # 快照當下有物件、現已不存在 ⇒ 拒
         actual = "none"
     except OSError as exc:
         import errno
@@ -727,8 +738,26 @@ try:
         try:
             st = os.fstat(fd)
             if not stat.S_ISREG(st.st_mode):
-                sys.exit(1)                  # 非一般檔 ⇒ 拒
-            actual = "none" if st.st_size == 0 else hashlib.sha256(os.read(fd, st.st_size)).hexdigest()
+                sys.exit(1)                  # 非一般檔（含 FIFO）⇒ 拒
+            if want_devino != f"{st.st_dev}:{st.st_ino}":
+                sys.exit(1)                  # 物件已被換掉（hard link／父目錄 symlink）⇒ 拒
+            _hook = os.environ.get("REDISPATCH_TEST_AFTER_FSTAT_CMD", "")
+            if _hook:
+                # 僅測試：於 fstat 後、讀取前插入動作（驗證讀取不以 st_size 為界）
+                if os.environ.get("GOVERNANCE_TEST_HARNESS", "") != "1":
+                    print("ERROR: REDISPATCH_TEST_AFTER_FSTAT_CMD 僅允許 GOVERNANCE_TEST_HARNESS=1",
+                          file=sys.stderr)
+                    sys.exit(2)
+                subprocess.run(["bash", "-c", _hook], check=False)
+            h = hashlib.sha256()
+            total = 0
+            while True:
+                chunk = os.read(fd, 1 << 20)
+                if not chunk:
+                    break
+                total += len(chunk)
+                h.update(chunk)
+            actual = "none" if total == 0 else h.hexdigest()
         finally:
             os.close(fd)
 except OSError:
@@ -764,7 +793,7 @@ _append_with_round_unchanged_guard() {
 
   # B-64 b1 review-r2（CODEX-R2-P1-01）：同一把鎖內一併重驗產出檔雜湊綁定
   if [ "${REQUIRE_FILE_PATH_SET}" = "1" ]; then
-    _assert_file_unchanged_locked "${REQUIRE_FILE_PATH}" "${REQUIRE_FILE_SHA}"
+    _assert_file_unchanged_locked "${REQUIRE_FILE_PATH}" "${REQUIRE_FILE_SHA}" "${REQUIRE_FILE_DEVINO}"
     case $? in
       0) : ;;
       1)
@@ -847,6 +876,16 @@ while [ $# -gt 0 ]; do
       REQUIRE_FILE_SHA_SET=1
       shift 2
       ;;
+    --require-file-dev-ino)
+      # B-64 b1 review-r5（CODEX-R5-P1-02）：雜湊只綁內容，不綁物件——同 bytes 之外部
+      #   hard link 或父目錄 symlink 可整個換掉 inode 而仍通過；故另綁查核當下之 dev:ino。
+      [ $# -ge 2 ] || die "--require-file-dev-ino 需要參數"
+      printf '%s' "$2" | grep -Eq '^([0-9]+:[0-9]+|none)$' \
+        || die "--require-file-dev-ino 值須為 <dev>:<ino> 或 none"
+      REQUIRE_FILE_DEVINO="$2"
+      REQUIRE_FILE_DEVINO_SET=1
+      shift 2
+      ;;
     --require-round-unchanged)
       # B-64 Task 1.3：<round_id>@<sequence>；鎖內確認該輪自快照後無新事件才 append。
       [ $# -ge 2 ] || die "--require-round-unchanged 需要參數"
@@ -897,6 +936,16 @@ if [ "${REQUIRE_FILE_PATH_SET}" = "1" ] || [ "${REQUIRE_FILE_SHA_SET}" = "1" ]; 
     echo "ERROR: 檔案綁定旗標須與 --require-round-unchanged 併用" >&2
     exit 2
   fi
+  # 🔴 b1 review-r5（CODEX-R5-P1-02）：物件身分綁定為必填——缺它時檔案綁定只剩內容比對，
+  #    同 bytes 之外部 hard link／父目錄 symlink 即可換掉物件（舊版呼叫端亦不得靜默降級）。
+  if [ "${REQUIRE_FILE_DEVINO_SET}" != "1" ]; then
+    echo "ERROR: 檔案綁定旗標須併用 --require-file-dev-ino" >&2
+    exit 2
+  fi
+fi
+if [ "${REQUIRE_FILE_DEVINO_SET}" = "1" ] && [ "${REQUIRE_FILE_PATH_SET}" != "1" ]; then
+  echo "ERROR: --require-file-dev-ino 須與 --require-file-path 併用" >&2
+  exit 2
 fi
 
 [ -n "${EVENT_NAME}" ] || die "必須指定 --event"

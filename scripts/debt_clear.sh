@@ -747,10 +747,18 @@ _emit_abandon() {
   # B-64 b1 review-r2（CODEX-R2-P1-01）：第 6 參數＝<產出路徑>@<sha256|none>，鎖內一併重驗
   local snapshot_out="${6:-}"
   local snapshot_sha="${7:-}"
+  # B-64 b1 review-r5（CODEX-R5-P1-02）：第 8 參數＝查核當下之 <dev>:<ino>|none（物件身分綁定）
+  local snapshot_devino="${8:-}"
   local _rd_guard=()
   [ -n "${snapshot}" ] && _rd_guard=(--require-round-unchanged "${rid}@${snapshot}")
   if [ -n "${snapshot_out}" ] && [ -n "${snapshot_sha}" ]; then
-    _rd_guard+=(--require-file-path "${snapshot_out}" --require-file-sha256 "${snapshot_sha}")
+    # 🔴 fail-closed：helper 未給物件身分時不得只綁雜湊（同 bytes 換物件即可繞過）
+    if [ -z "${snapshot_devino}" ]; then
+      echo "ERROR: 快照缺 snapshot_output_dev_ino，拒絕只以雜湊綁定產出檔" >&2
+      return 1
+    fi
+    _rd_guard+=(--require-file-path "${snapshot_out}" --require-file-sha256 "${snapshot_sha}" \
+                --require-file-dev-ino "${snapshot_devino}")
   fi
   bash "${AUDIT_APPEND}" \
     ${_rd_guard[@]+"${_rd_guard[@]}"} \
@@ -914,10 +922,12 @@ _cmd_abandon() {
   if [ "${kind}" = "collection-failed" ] && [ -f "${SCRIPT_DIR}/_redispatch_check.py" ]; then
     _RD_SNAPSHOT_OUT=""
     _RD_SNAPSHOT_SHA=""
+    _RD_SNAPSHOT_DEVINO=""
     _rd_out="$(python3 "${SCRIPT_DIR}/_redispatch_check.py" exhausted-check --round-id "${rid}" 2>/dev/null)" \
       && _RD_SNAPSHOT="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_sequence=\([0-9][0-9]*\)$/\1/p')" \
       && _RD_SNAPSHOT_OUT="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_output_path=\(.*\)$/\1/p')" \
-      && _RD_SNAPSHOT_SHA="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_output_sha=\(.*\)$/\1/p')"
+      && _RD_SNAPSHOT_SHA="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_output_sha=\(.*\)$/\1/p')" \
+      && _RD_SNAPSHOT_DEVINO="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_output_dev_ino=\(.*\)$/\1/p')"
     if [ -n "${REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD:-}" ]; then
       if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ]; then
         bash -c "${REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD}" || true
@@ -991,7 +1001,7 @@ PY
   fi
 
   # B-64 Task 1.3 要點 4：耗盡例外之寫入須帶「該輪自查核快照後未變動」條件（第 5 參數）
-  _emit_abandon "${rid}" "${kind}" "${reason}" "${approver}" "${_RD_SNAPSHOT:-}" "${_RD_SNAPSHOT_OUT:-}" "${_RD_SNAPSHOT_SHA:-}" || return 1
+  _emit_abandon "${rid}" "${kind}" "${reason}" "${approver}" "${_RD_SNAPSHOT:-}" "${_RD_SNAPSHOT_OUT:-}" "${_RD_SNAPSHOT_SHA:-}" "${_RD_SNAPSHOT_DEVINO:-}" || return 1
   echo "OK: abandoned round_id=${rid} kind=${kind}"
   return 0
 }
