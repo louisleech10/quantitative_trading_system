@@ -13,8 +13,7 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-003 | D2C | 未開工 | docs/DOCROT2_TODO.md §B | 可開工（票 B-64 已收案）：Task 3.1 finding 類別、Task 3.2 成效量測 |
-| 01-004 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | D2C 審碼閉合後開工 Task 4.1 |
+| 01-004 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | 可開工（D2C 審碼 r2 三家閉合）：Task 4.1 全專案遷移 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
 | 03-005 | R-5 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 規格 R 重開後實作，排在 DOCROT2 之後 |
@@ -54,6 +53,13 @@
 - 🔴 **放水語閘會擋下派工單裡的否定用法**（為說明「為何停在這裡」而引用被禁字面亦擋）。正解＝改寫成可證偽條件，**不得替自己加白名單**。
 - 🔴 改 SPEC／TODO 前先 `grep -n` 列出該決定的全部落點，改完再 grep 一次；grep **不得加排除條件**。
 - 🔴 **治理工具擴建**：2026-09-12「不再擴建治理工具」；2026-09-15 使用者放寬，逐字「允許擴建治理工具，就是要修正DOCROT沒做好之處」（範圍＝DOCROT2）。
+- 🔴 **finding 類別（DOCROT2 Task 3.1，門檻 audit 序號 4778）**：門檻後開債之輪，委員交件每條 finding（含 `P3-00` sentinel）須一行 `**類別**: <值>`（值集與語意見 `scripts/governance_verdicts.json`），`cx_run` 交件當下擋；主委收斂檔群集表須加第 5 欄「主委類別」，兩欄不一致之 ID 須列於 `### 類別不一致` 段一行並附處置 token，否則 synth 寫入 hook 與 `debt_clear` 擋。類別行文法唯一實作＝`scripts/_finding_category.py`（HTML 註解內、fence 內不算）。
+- 🔴 **`debt_clear` 銷帳前會寫 `docrot2_round_metric`**（門檻後之輪；缺類別、缺主委欄或寫入失敗即拒銷）；成效報表 `bash scripts/docrot2_metrics.sh` 在 `scripts/docrot2_metric_contract.json` 之 `closure_sequence` 寫入前恆為 rc=1（`cohort-unknown`），於本票收票時寫入。
+- 🔴 **`committee_round_open` 之 `brief_kind` 為必填**：測試輔助碼開輪須帶（值取 brief 行首 `brief-kind:`）；要模擬上線前無 `brief_kind` 之舊輪，用 `tests/governance/_debt_probe_helper.py` 之 `legacy_round_open_registry`（只改沙箱副本登記檔）。隔離沙箱之複製清單須含 `DOCROT2_HELPER_SCRIPTS`，否則 `--single`／`debt_clear` fail-closed。
+- 🔴 **`tests/governance/conftest.py` 對每條測試設 `DEBT_AUDIT_OVERRIDE`**：測試「會寫 audit 之腳本」時必須顯式把 env 指向沙箱 audit，否則事件寫到 conftest 之暫存 audit，斷言沙箱 audit 會落空。
+- 🔴 **登記表 `<檔>:<行>` 只驗「非註解非空行」，語意漂移不會紅**：改任何被引用之腳本後，以 `git show HEAD:<檔> | sed -n <行>p` 取舊行內容、`grep -nF` 找新行號逐列更正；2026-09-16 對讀時另抓到四列原本即指錯行（`}`、他函式之 `return 0` 等）。
+- 🔴 **`gate.sh dispatch --impl-self` 與 `git commit` 必須以 `&&` 串接**：以 `;` 串接時 gate 拒發 token 而 commit 仍成立，post-commit 記 `token_fresh=false`，pre-push 段 1c 擋推送且事後領 token 不追認；未推送時之出路＝`git reset --soft HEAD~1`、先處理 gate 拒發原因（例：先銷帳）、重領 token 後重新 commit。
+- 🔴 **委員名冊變動會使舊收斂檔戳記不足**：`active_stampers` 增加家族後，`--impl-self --adversarial <收斂檔>` 要求現行全員戳記；出路＝只派缺席家族之 stamp 輪補簽（brief-kind stamp、stamp-target 指該收斂檔）。
 
 ## 進行中紀錄
 
@@ -65,4 +71,7 @@
 - 2026-09-15：B-63 → commit `80fb3cb2`
 - 2026-09-15：B-63 → `handoffs/reconcile/20260915-docrot2-b2-review-r5/synth.md`
 - 2026-09-15：B-63 → `docs/HANDOFF_ARCHIVE.md`
+- 2026-09-17：B-63 → commit `0f39b345`
+- 2026-09-17：B-63 → commit `ea54367b`
+- 2026-09-17：B-63 → `handoffs/reconcile/20260915-docrot2-b3-review-r2/synth.md`
 <!-- HISTORY-END -->
