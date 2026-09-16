@@ -771,6 +771,37 @@ def test_abandon_exhausted_output_symlinked_rc1(repo: Repo) -> None:
     assert repo.events("debt_abandon") == []
 
 
+def test_abandon_exhausted_output_appended_after_read_rc1(repo: Repo) -> None:
+    """讀到 EOF 之後、寫入審計之前追加 ⇒ 棄置須被拒（b1 r6 CODEX-R6-P1-02）。
+
+    🔴 與 `appended_after_fstat` 不同：該條落在「fstat 後、讀取前」，由讀到 EOF 擋下；
+    本條落在「讀完後」，只有讀完再驗一次長度／mtime 才擋得到。
+    """
+    rid, out = _exhausted_round_with_output(repo)
+    proc = _abandon(repo, rid, env_extra={
+        "REDISPATCH_TEST_AFTER_READ_CMD": f"printf APPENDED >> {out}"})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "RD_GUARD_REASON=size_or_mtime_changed" in proc.stderr, proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
+def test_abandon_exhausted_output_parent_swapped_after_read_rc1(repo: Repo) -> None:
+    """讀完後把父目錄換成指向同 bytes 他物件之 symlink ⇒ 棄置須被拒（b1 r6 CODEX-R6-P1-01）。
+
+    🔴 `O_NOFOLLOW` 只約束最後一段；fd 綁的是開檔當下之物件，路徑其後仍可被換掉。
+    外部檔之內容逐位元組相同，故雜湊比對擋不下來，唯有讀完重開路徑比對 dev:ino 會拒。
+    """
+    rid, out = _exhausted_round_with_output(repo)
+    ext = repo.root / "external"
+    ext.mkdir(parents=True, exist_ok=True)
+    (ext / out.name).write_bytes(out.read_bytes())
+    hook = f"mv {out.parent} {out.parent}.real; ln -s {ext} {out.parent}"
+    proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_READ_CMD": hook})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "RD_GUARD_REASON=path_object_changed" in proc.stderr, proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
 def test_abandon_exhausted_output_symlink_to_same_inode_rc1(repo: Repo) -> None:
     """查核後把產出換成「指向同一 inode」之 symlink ⇒ 仍須被拒（b1 r3 CODEX-R3-P1-01）。
 
@@ -782,6 +813,9 @@ def test_abandon_exhausted_output_symlink_to_same_inode_rc1(repo: Repo) -> None:
     hook = f"ln {out} {hard}; rm -f {out}; ln -s {hard} {out}"
     proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
     assert proc.returncode != 0, proc.stdout + proc.stderr
+    # 🔴 斷言原因＝開檔當下即判定為連結；讀後重開路徑那道對同一情境也回 rc=1，
+    #    只比 rc 時 `O_NOFOLLOW` 被拿掉仍是綠的。
+    assert "RD_GUARD_REASON=symlink" in proc.stderr, proc.stderr
     assert repo.events("debt_abandon") == []
 
 
@@ -823,6 +857,9 @@ def test_abandon_exhausted_output_appended_after_fstat_rc1(repo: Repo) -> None:
     proc = _abandon(repo, rid, env_extra={
         "REDISPATCH_TEST_AFTER_FSTAT_CMD": f"printf APPENDED >> {out}"})
     assert proc.returncode != 0, proc.stdout + proc.stderr
+    # 🔴 斷言**拒絕原因**而非只斷言被拒：讀後長度重驗會對同一情境也回 rc=1，
+    #    只比 rc 時「讀到 EOF」這道守衛被拿掉仍是綠的（mutation 失去鑑別力）。
+    assert "RD_GUARD_REASON=hash_mismatch" in proc.stderr, proc.stderr
     assert repo.events("debt_abandon") == []
 
 
@@ -954,6 +991,31 @@ def test_audit_append_fstat_hook_without_harness_rc2(repo: Repo) -> None:
     proc = subprocess.run(
         ["bash", str(repo.scripts / "audit_append.sh"),
          "--require-file-path", "handoffs/hook-probe.md",
+         "--require-file-sha256", sha256_text("probe body\n"),
+         "--require-file-dev-ino", f"{st.st_dev}:{st.st_ino}",
+         "--require-round-unchanged", "r1@0",
+         "--event", "debt_abandon", "--field", "round_id=r1",
+         "--field", "abandon_kind=collection-failed",
+         "--field", "reason=redispatch-test-reason-000000001",
+         "--field", "approver=redispatch-test-approver",
+         "--field", "actor=debt_clear", "--field", "origin_script=debt_clear.sh"],
+        cwd=str(repo.root), env=env, capture_output=True, text=True,
+    )
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+
+
+def test_audit_append_read_hook_without_harness_rc2(repo: Repo) -> None:
+    """讀取後掛鉤未綁 GOVERNANCE_TEST_HARNESS=1 ⇒ fail-closed rc=2（不得於正式路徑生效）。"""
+    out = repo.root / "handoffs" / "hook-probe2.md"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("probe body\n", encoding="utf-8")
+    st = out.stat()
+    env = {k: v for k, v in repo.env.items() if k != "DEBT_AUDIT_OVERRIDE"}
+    env["GOVERNANCE_TEST_HARNESS"] = "0"
+    env["REDISPATCH_TEST_AFTER_READ_CMD"] = "true"
+    proc = subprocess.run(
+        ["bash", str(repo.scripts / "audit_append.sh"),
+         "--require-file-path", "handoffs/hook-probe2.md",
          "--require-file-sha256", sha256_text("probe body\n"),
          "--require-file-dev-ino", f"{st.st_dev}:{st.st_ino}",
          "--require-round-unchanged", "r1@0",

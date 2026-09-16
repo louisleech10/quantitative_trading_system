@@ -716,6 +716,14 @@ import hashlib, os, stat, subprocess, sys
 p = os.environ["AUDIT_FU_PATH"]
 want = os.environ["AUDIT_FU_WANT"]
 want_devino = os.environ["AUDIT_FU_DEVINO"]
+
+
+def _deny(code):
+    # 🔴 b1 review-r6：每個 rc=1 出口印可區分之原因碼 RD_GUARD_REASON=<code>。
+    #    動機＝後加之守衛會遮蔽先前之守衛（最終 rc 相同），只斷言 rc 的測試會使
+    #    被遮蔽者之 mutation 不再轉紅＝假防護。測試一律斷言原因而非只斷言被拒。
+    print("RD_GUARD_REASON=" + code, file=sys.stderr)
+    sys.exit(1)
 # 🔴 b1 review-r4（CODEX-R4-P1-02）：以 O_NOFOLLOW 開檔後，一律用**同一個 fd** 做 fstat 與讀取，
 #    不得先 lstat 再以路徑 open——兩者之間可被原子換成 symlink（TOCTOU）。
 # 🔴 b1 review-r5：另加三道（CODEX-R5-P1-01／02／03）——
@@ -727,20 +735,22 @@ try:
         fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except FileNotFoundError:
         if want_devino != "none":
-            sys.exit(1)                      # 快照當下有物件、現已不存在 ⇒ 拒
-        actual = "none"
+            _deny("missing")                 # 快照當下有物件、現已不存在 ⇒ 拒
+        if want != "none":
+            _deny("hash_mismatch")           # 快照當下有內容、現無檔 ⇒ 拒
+        sys.exit(0)
     except OSError as exc:
         import errno
         if exc.errno in (errno.ELOOP, errno.EMLINK):
-            sys.exit(1)                      # symlink ⇒ 身分已變，直接拒
+            _deny("symlink")                 # symlink ⇒ 身分已變，直接拒
         sys.exit(2)
     else:
         try:
             st = os.fstat(fd)
             if not stat.S_ISREG(st.st_mode):
-                sys.exit(1)                  # 非一般檔（含 FIFO）⇒ 拒
+                _deny("not_regular")         # 非一般檔（含 FIFO）⇒ 拒
             if want_devino != f"{st.st_dev}:{st.st_ino}":
-                sys.exit(1)                  # 物件已被換掉（hard link／父目錄 symlink）⇒ 拒
+                _deny("object_changed")      # 物件已被換掉（hard link／父目錄 symlink）⇒ 拒
             _hook = os.environ.get("REDISPATCH_TEST_AFTER_FSTAT_CMD", "")
             if _hook:
                 # 僅測試：於 fstat 後、讀取前插入動作（驗證讀取不以 st_size 為界）
@@ -758,11 +768,40 @@ try:
                 total += len(chunk)
                 h.update(chunk)
             actual = "none" if total == 0 else h.hexdigest()
+            # 🔴 內容比對須**緊接讀取**：其後之長度／mtime 重驗對「讀取前被追加」同樣回 rc=1，
+            #    若排在它之後，本道之原因碼永遠不會出現＝「讀到 EOF」那道失去可證偽性。
+            if actual != want:
+                _deny("hash_mismatch")
+            _hook2 = os.environ.get("REDISPATCH_TEST_AFTER_READ_CMD", "")
+            if _hook2:
+                # 僅測試：於讀取完成後、寫入審計前插入動作（驗證下方兩道重驗）
+                if os.environ.get("GOVERNANCE_TEST_HARNESS", "") != "1":
+                    print("ERROR: REDISPATCH_TEST_AFTER_READ_CMD 僅允許 GOVERNANCE_TEST_HARNESS=1",
+                          file=sys.stderr)
+                    sys.exit(2)
+                subprocess.run(["bash", "-c", _hook2], check=False)
+            # 🔴 b1 review-r6（CODEX-R6-P1-02）：讀到 EOF 不代表其後不再被追加；讀完以同一 fd
+            #    重驗長度與 mtime，捕捉落在「讀完 → 寫入審計」窗口內之寫入。
+            st2 = os.fstat(fd)
+            if st2.st_size != total or st2.st_mtime_ns != st.st_mtime_ns:
+                _deny("size_or_mtime_changed")
+            # 🔴 b1 review-r6（CODEX-R6-P1-01）：fd 綁的是開檔當下之物件，父目錄其後仍可被換成
+            #    symlink 使同一路徑解析到他物件；讀完重開該路徑，dev:ino 須與 fd 相同。
+            try:
+                fd2 = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            except OSError:
+                _deny("path_reopen_failed")
+            try:
+                st3 = os.fstat(fd2)
+                if (st3.st_dev, st3.st_ino) != (st.st_dev, st.st_ino):
+                    _deny("path_object_changed")
+            finally:
+                os.close(fd2)
         finally:
             os.close(fd)
 except OSError:
     sys.exit(2)
-sys.exit(0 if actual == want else 1)
+sys.exit(0)
 PY
 }
 
