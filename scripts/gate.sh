@@ -34,6 +34,13 @@ families_get families >/dev/null || {
   exit 1
 }
 # GATE_DIR_OVERRIDE:governance 測試隔離用(token/audit 寫進 tmp,不汙染真實信任工件)
+# B-64 Task 1.1：同輪同家重派之綁定許可。**早分支**——在建立閘目錄與 dispatch 必填檢查之前，
+#   輸入驗證（UUID／家族／理由長度）由 _redispatch_check.py 於觸碰檔案系統前先做（SPEC Task 1.1 改法 2）。
+if [ "${1:-}" = "redispatch" ]; then
+  shift
+  exec python3 "${SCRIPT_DIR}/_redispatch_check.py" issue "$@"
+fi
+
 GATE_DIR="${GATE_DIR_OVERRIDE:-.claude/gate}"; AUDIT="${GATE_DIR}/audit.log"; mkdir -p "${GATE_DIR}"
 
 # ---------------------------------------------------------------------------

@@ -103,6 +103,7 @@
 | `verify_role_gate.sh` | 常態檢查 | 未掛 |
 | `verify_spec_stamp_delta.sh` | 常態檢查 | 未掛 |
 | `_live_doc_write_guard.py` | 常態檢查 | 未掛 |
+| `_redispatch_check.py` | 常態檢查 | gate cx_run  |
 | `b49_closure_static_check.py` | 常態檢查 | narrow_check_router  |
 | `build_l65_golden_baseline.py` | 常態檢查 | 未掛 |
 | `check_decoupling_imports.py` | 常態檢查 | narrow_check_router  |

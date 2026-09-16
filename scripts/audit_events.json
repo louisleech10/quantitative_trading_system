@@ -32,6 +32,7 @@
     "cx_run.sh",
     "debt_clear.sh",
     "gate.sh",
+    "gate_check.sh",
     "git_hooks/commit-msg",
     "git_hooks/post-commit",
     "git_hooks/pre-push"
@@ -94,6 +95,7 @@
         "cli_rc",
         "output_path",
         "output_sha256",
+        "partial_output_sha256",
         "result_state"
       ]
     },
@@ -114,6 +116,54 @@
         "blocked_by",
         "closed",
         "round_id"
+      ]
+    },
+    "redispatch_token_issued": {
+      "origin_script": "gate.sh",
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "round_scoped": false,
+      "fields": [
+        "round_id",
+        "family",
+        "attempt_no",
+        "brief_path",
+        "brief_sha256",
+        "output_path",
+        "reason",
+        "issue_nonce",
+        "permit_secret_sha256",
+        "prev_output_sha256",
+        "prev_output_archive"
+      ]
+    },
+    "redispatch_token_consumed": {
+      "origin_script": "gate_check.sh",
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "round_scoped": false,
+      "fields": [
+        "round_id",
+        "family",
+        "issue_nonce",
+        "command_sha256"
+      ]
+    },
+    "redispatch_token_claimed": {
+      "origin_script": "cx_run.sh",
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "round_scoped": false,
+      "fields": [
+        "round_id",
+        "family",
+        "issue_nonce"
       ]
     },
     "impl_token_issued": {
@@ -256,7 +306,11 @@
     ]
   },
   "constants": {
-    "reason_min_chars": 20
+    "reason_min_chars": 20,
+    "redispatch_max_attempts": 6,
+    "redispatch_min_interval_seconds": 600,
+    "redispatch_token_ttl_seconds": 900,
+    "redispatch_launch_grace_seconds": 120
   },
   "spec_non_event_tokens": [
     "debt_events",
@@ -323,6 +377,30 @@
       "verdict",
       "blocked_by",
       "closed"
+    ],
+    "redispatch_token_issued": [
+      "round_id",
+      "family",
+      "attempt_no",
+      "brief_path",
+      "brief_sha256",
+      "output_path",
+      "reason",
+      "issue_nonce",
+      "permit_secret_sha256",
+      "prev_output_sha256",
+      "prev_output_archive"
+    ],
+    "redispatch_token_consumed": [
+      "round_id",
+      "family",
+      "issue_nonce",
+      "command_sha256"
+    ],
+    "redispatch_token_claimed": [
+      "round_id",
+      "family",
+      "issue_nonce"
     ],
     "impl_token_issued": [
       "task_id",

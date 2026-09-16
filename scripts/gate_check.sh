@@ -169,6 +169,8 @@ case "$tool_name" in
     ;;
   Bash)
     cmd="$(jq -r '.tool_input.command // empty' <<<"$INPUT" 2>/dev/null)"
+    # B-64 Task 1.2：重派放行只認**剝 env 前之原指令**（封閉文法逐位元組比對）。
+    raw_cmd="$cmd"
     # R1／C2：剝除行首 env 前綴（VAR=value 可多個；值可為簡單字面或引號括起）再比對 executor。
     # 🔴 簡單字面仍不含 $ ` ( ) 空白——避免 out=$(codex exec x) 誤剝成 exec x)（E-3 回歸）。
     # 🔴 雙引號值若含 $ 或 ` 不剝（交給詞法 C3 遞迴）；單引號值可剝（shell 不展開）。
@@ -278,6 +280,16 @@ if ! _gate_precheck_content "$cmd"; then
 fi
 
 [ -z "$kind" ] && exit 0   # 非 gated 動作 → 放行
+
+# B-64 Task 1.2：kind=dispatch 之封閉文法同輪重派指令——與有效許可逐欄吻合者於鎖內消費後放行。
+#   helper 缺失 ⇒ return 1（回既有判定，行為與現行相同）。
+_gate_check_redispatch_allow() {
+  [ -f "${SCRIPT_DIR}/_redispatch_check.py" ] || return 1
+  printf '%s' "${1-}" | GATE_DIR_OVERRIDE="$GATE_DIR" python3 "${SCRIPT_DIR}/_redispatch_check.py" consume
+}
+if [ "$kind" = "dispatch" ] && [ "$tool_name" = "Bash" ] && _gate_check_redispatch_allow "${raw_cmd-}"; then
+  exit 0
+fi
 
 token="$GATE_DIR/${kind}.token"
 deny_reason="no_fresh_token"

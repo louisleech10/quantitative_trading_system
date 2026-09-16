@@ -54,6 +54,9 @@ EVENT_NAME=""
 # 不可用 [ -n "$值" ] 代替「旗標出現」——空字串必須 fail-closed 拒寫，不可整段跳過守衛。
 REQUIRE_ABSENT_SET=0
 REQUIRE_ABSENT_SESSION=""
+# B-64 Task 1.3：--require-round-unchanged <round_id>@<sequence>（鎖內條件寫入）
+REQUIRE_ROUND_UNCHANGED_SET=0
+REQUIRE_ROUND_UNCHANGED=""
 # 以 RS(\x1e) 分隔的 field 鍵值（k=v / k=@json）；禁 NUL（env 傳不過）
 FIELD_RS=$'\x1e'
 FIELD_PAIRS=""
@@ -657,6 +660,80 @@ _append_with_absent_guard() {
 }
 
 # ── 一般 append（自行取鎖）────────────────────────────────
+_scan_round_after_locked() {
+  # B-64 Task 1.3：持鎖掃描——該輪是否有 sequence 大於快照之事件。
+  # rc=0 有（須拒寫）／rc=1 無／rc=2 讀檔或解析失敗（fail-closed）
+  local rid="$1" seq="$2"
+  AUDIT_SCAN_RID="${rid}" AUDIT_SCAN_SEQ="${seq}" AUDIT_SCAN_PATH="${AUDIT_PATH}" python3 <<'PY'
+import json, os, sys
+rid = os.environ["AUDIT_SCAN_RID"]
+try:
+    seq = int(os.environ["AUDIT_SCAN_SEQ"])
+except ValueError:
+    sys.exit(2)
+path = os.environ["AUDIT_SCAN_PATH"]
+try:
+    lines = open(path, encoding="utf-8").read().splitlines()
+except FileNotFoundError:
+    sys.exit(1)
+except OSError:
+    sys.exit(2)
+for raw in lines:
+    s = raw.strip()
+    if not s.startswith("{"):
+        continue
+    try:
+        r = json.loads(s)
+    except json.JSONDecodeError:
+        continue
+    if r.get("round_id") == rid:
+        try:
+            if int(r.get("sequence") or 0) > seq:
+                sys.exit(0)
+        except (TypeError, ValueError):
+            sys.exit(2)
+sys.exit(1)
+PY
+}
+
+_append_with_round_unchanged_guard() {
+  # $1=<round_id>@<sequence>；比照 _append_with_absent_guard：鎖內判定後於同一鎖內 append。
+  # 🔴 本函式刻意置於 _append_with_absent_guard **之後**，且尾端變數名不同（_rc_ru）：
+  #    tests/governance/test_debt_emit.py 之 rc-swallow／shift mutation 以「第一個出現之字面」
+  #    改壞 _append_with_absent_guard；同字面若先出現於本函式，該兩條 mutation 會打錯目標。
+  local spec="$1"
+  local rid="${spec%@*}"
+  local seq="${spec##*@}"
+
+  _acquire_lock || return 2
+
+  _scan_round_after_locked "${rid}" "${seq}"
+  case $? in
+    0)
+      _release_lock
+      echo "ERROR: round 自快照後已有事件（${spec}），拒寫" >&2
+      return 1
+      ;;
+    1) : ;;
+    *)
+      _release_lock
+      return 2
+      ;;
+  esac
+
+  local next_seq_ru
+  next_seq_ru="$(_next_seq_locked)" || {
+    local _rc_seq=$?
+    _release_lock
+    return "${_rc_seq}"
+  }
+
+  _append_event_locked "${next_seq_ru}" 1
+  local _rc_ru=$?
+  _release_lock
+  return "${_rc_ru}"
+}
+
 _append_normal() {
   local is_debt="$1"
   _acquire_lock || return 2
@@ -686,6 +763,15 @@ while [ $# -gt 0 ]; do
       # event 名會落地為 JSON 的 event 欄；套用同一套控制字元驗證
       _reject_serialized_control_chars "--event" "$2"
       EVENT_NAME="$2"
+      shift 2
+      ;;
+    --require-round-unchanged)
+      # B-64 Task 1.3：<round_id>@<sequence>；鎖內確認該輪自快照後無新事件才 append。
+      [ $# -ge 2 ] || die "--require-round-unchanged 需要參數"
+      printf '%s' "$2" | grep -Eq '^[^@[:space:]]+@[0-9]+$' \
+        || die "--require-round-unchanged 值須為 <round_id>@<sequence>"
+      REQUIRE_ROUND_UNCHANGED="$2"
+      REQUIRE_ROUND_UNCHANGED_SET=1
       shift 2
       ;;
     --require-absent-session)
@@ -721,6 +807,13 @@ done
 # registry JSON 合法
 python3 -c 'import json,sys; json.load(open(sys.argv[1],encoding="utf-8"))' "${REGISTRY}" \
   || die "registry JSON 壞: ${REGISTRY}"
+
+# B-64 Task 1.3：兩個鎖內條件旗標互斥——須在任一分支執行前判定（fail-closed，rc=2）
+if [ "${REQUIRE_ROUND_UNCHANGED_SET}" = "1" ] && [ "${REQUIRE_ABSENT_SET}" = "1" ]; then
+  # rc=2（用法錯）：die 之離開碼為 1，此處刻意不沿用
+  echo "ERROR: --require-round-unchanged 不得與 --require-absent-session 併用" >&2
+  exit 2
+fi
 
 AUDIT_PATH="$(_resolve_audit_path)" || exit 1
 LOCKDIR="${AUDIT_PATH}.lock"
@@ -781,6 +874,21 @@ if [ "${REQUIRE_ABSENT_SET}" = "1" ]; then
     fi
   fi
   _append_with_absent_guard "${REQUIRE_ABSENT_SESSION}"
+  exit $?
+fi
+
+# B-64 Task 1.3：--require-round-unchanged（與 --require-absent-session 互斥；僅適用 debt 事件）
+if [ "${REQUIRE_ROUND_UNCHANGED_SET}" = "1" ]; then
+  if [ "${REQUIRE_ABSENT_SET}" = "1" ]; then
+    die "--require-round-unchanged 不得與 --require-absent-session 併用"
+  fi
+  if [ -z "${REQUIRE_ROUND_UNCHANGED}" ]; then
+    die "--require-round-unchanged 值不可為空（旗標出現即須生效）"
+  fi
+  if [ "${IS_DEBT}" != "1" ]; then
+    die "--require-round-unchanged 僅適用 debt 事件"
+  fi
+  _append_with_round_unchanged_guard "${REQUIRE_ROUND_UNCHANGED}"
   exit $?
 fi
 

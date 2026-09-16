@@ -51,6 +51,10 @@ def test_registry_is_v2_shape() -> None:
         "debt_abandon",
         # VERDICTGATE Task 1.1（SPEC C-8）：committee_output 自 legacy 移入；三個新事件
         "committee_output",
+        # B-64 Task 1.1：同輪重派之三事件（round_scoped:false）
+        "redispatch_token_issued",
+        "redispatch_token_consumed",
+        "redispatch_token_claimed",
         "impl_token_issued",
         "ticket_commit",
         "governance_bypass",

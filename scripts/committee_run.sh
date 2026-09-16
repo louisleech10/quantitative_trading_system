@@ -91,6 +91,23 @@ done
 [ -f "${brief}" ] || { echo "ERROR: brief 不存在: ${brief}" >&2; exit 2; }
 case "${out_prefix}" in handoffs/*) : ;; *) echo "ERROR: out前綴須在 handoffs/: ${out_prefix}" >&2; exit 2 ;; esac
 
+# B-64 Task 1.4：開輪前之重派放行文法檢查（內嵌 bash 版，刻意不依賴 helper——
+#   以固定清單複製 scripts 之既有隔離測試不得因缺 helper 而轉紅；
+#   語意與 scripts/_redispatch_check.py::path_token_ok 以對照測試釘住）。
+_cr_path_bad() {  # rc 0 ＝ 不符文法
+  case "$1" in ""|-*|*"'"*|*$'\n'*|*$'\r'*) return 0 ;; esac
+  return 1
+}
+_cr_paths=("${brief}")
+IFS=',' read -r -a _cr_fams <<< "${fams_csv}"
+for _cr_f in "${_cr_fams[@]}"; do _cr_paths+=("${out_prefix}-${_cr_f}.md"); done
+for _cr_p in "${_cr_paths[@]}"; do
+  if _cr_path_bad "${_cr_p}"; then
+    echo "ERROR: 路徑無法以重派放行文法表示（不開輪）: $(printf '%q' "${_cr_p}")" >&2
+    exit 2
+  fi
+done
+
 # 🔴 out 前綴之承載目錄須存在，否則三家會**各自跑到重導失敗**才發現（2026-08-14 實際踩到）：
 #   本腳本原本一個 mkdir 都沒有，`>"${log}"` 在目錄不存在時直接失敗，
 #   而失敗發生在**開完 gate token、開完委員債、派完三家之後** ⇒ 一輪派工全廢、債還留著。

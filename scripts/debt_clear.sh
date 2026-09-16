@@ -742,7 +742,12 @@ _emit_abandon() {
   local kind="$2"
   local reason="$3"
   local approver="$4"
+  # B-64 Task 1.3：第 5 參數非空 ⇒ 以「該輪自查核快照後未變動」為鎖內寫入條件（遲到結果／重複棄置皆被拒）。
+  local snapshot="${5:-}"
+  local _rd_guard=()
+  [ -n "${snapshot}" ] && _rd_guard=(--require-round-unchanged "${rid}@${snapshot}")
   bash "${AUDIT_APPEND}" \
+    ${_rd_guard[@]+"${_rd_guard[@]}"} \
     --event debt_abandon \
     --field "round_id=${rid}" \
     --field "abandon_kind=${kind}" \
@@ -770,6 +775,39 @@ PY
 }
 
 # ── 銷帳 ────────────────────────────────────────────────
+_assert_redispatch_archives_dispositioned() {
+  # B-64 Task 1.7：帶保存檔之輪，銷帳須證明保存檔未被改動、收斂檔引用其路徑且其 finding 逐條有處置列。
+  #   helper 缺失而該輪有帶保存檔之發放事件 ⇒ fail-closed（不得靜默放行）。
+  local rid="$1" lock="$2" synth
+  synth="$(dirname "${lock}")/synth.md"
+  [ -f "${synth}" ] || { echo "ERROR: synth.md 缺失: ${synth}" >&2; return 1; }
+  if [ -f "${SCRIPT_DIR}/_redispatch_check.py" ]; then
+    python3 "${SCRIPT_DIR}/_redispatch_check.py" archive-check --round-id "${rid}" --synth "${synth}" || return 1
+    return 0
+  fi
+  local _ap7
+  _ap7="$(_resolve_audit_path)" || return 1
+  [ -f "${_ap7}" ] || return 0
+  DEBT_CLEAR_AUDIT="${_ap7}" DEBT_CLEAR_RID="${rid}" python3 <<'PY' || return 1
+import json, os, sys
+rid = os.environ["DEBT_CLEAR_RID"]
+for raw in open(os.environ["DEBT_CLEAR_AUDIT"], encoding="utf-8").read().splitlines():
+    s = raw.strip()
+    if not s.startswith("{"):
+        continue
+    try:
+        r = json.loads(s)
+    except json.JSONDecodeError:
+        continue
+    if (r.get("event") == "redispatch_token_issued" and r.get("round_id") == rid
+            and (r.get("prev_output_archive") or "none") not in ("", "none")):
+        print("ERROR: _redispatch_check.py 缺失而本輪有保存檔，不得銷帳（fail-closed）", file=sys.stderr)
+        sys.exit(1)
+sys.exit(0)
+PY
+  return 0
+}
+
 _cmd_clear() {
   local rid="$1"
   local session="$2"
@@ -814,6 +852,9 @@ _cmd_clear() {
 
   # ④附加 roster 集合相等
   _assert_roster_equals "${lock}" "${rid}" || return 1
+
+  # ⑤前置 B-64 Task 1.7：保存檔未被改動、收斂檔引用其路徑且其 finding 逐條有處置列
+  _assert_redispatch_archives_dispositioned "${rid}" "${lock}" || return 1
 
   # ⑤ 每家 success + sha 相符
   _assert_all_families_success_and_sha_match "${rid}" || return 1
@@ -861,7 +902,22 @@ _cmd_abandon() {
 
   # VERDICTGATE Task 2.2（SPEC C-9 解鎖②收窄，CODEX-R3-P1-03）：collection-failed **只准**用於該輪
   #   無任何 committee_family_result（真缺席）；有結果卻 abandon ⇒ 拒（有結果者走修檔再 register-output 解鎖）。
-  if [ "${kind}" = "collection-failed" ]; then
+  # B-64 Task 1.3：重派達上限、皆已結束且最新結果仍非 success ⇒ 略過 C-9 之「已有結果即拒」，
+  #   改以「該輪自查核快照後未變動」為鎖內寫入條件（遲到結果與重複棄置皆使寫入被拒）。
+  _RD_SNAPSHOT=""
+  if [ "${kind}" = "collection-failed" ] && [ -f "${SCRIPT_DIR}/_redispatch_check.py" ]; then
+    _rd_out="$(python3 "${SCRIPT_DIR}/_redispatch_check.py" exhausted-check --round-id "${rid}" 2>/dev/null)" \
+      && _RD_SNAPSHOT="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_sequence=\([0-9][0-9]*\)$/\1/p')"
+    if [ -n "${REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD:-}" ]; then
+      if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ]; then
+        bash -c "${REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD}" || true
+      else
+        echo "ERROR: REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD 僅允許 GOVERNANCE_TEST_HARNESS=1" >&2
+        return 2
+      fi
+    fi
+  fi
+  if [ "${kind}" = "collection-failed" ] && [ -z "${_RD_SNAPSHOT}" ]; then
     local _ap
     _ap="$(_resolve_audit_path)" || return 1
     if [ -f "${_ap}" ] && DEBT_CLEAR_AUDIT="${_ap}" DEBT_CLEAR_RID="${rid}" python3 - <<'PY'

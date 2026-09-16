@@ -206,6 +206,12 @@ fam="${1:-}"; brief="${2:-}"; out="${3:-}"; effort="${4:-}"
   echo "用法: bash scripts/cx_run.sh <codex|grok|composer> <brief_path> <output_path> [effort]"; exit 2; }
 [ -f "${brief}" ] || { echo "ERROR: brief 檔不存在: ${brief}"; exit 2; }
 
+# B-64 Task 1.6：同（輪、家族）之派工器行程租約與重派認領。
+#   以 exec 重入，使租約描述子隨本行程與其委員 CLI 子行程存續；helper 缺失時略過（行為同現行）。
+if [ -n "${ROUND_ID:-}" ] && [ -z "${CX_RUN_LEASE_HELD:-}" ] && [ -f "${SCRIPT_DIR}/_redispatch_check.py" ]; then
+  exec python3 "${SCRIPT_DIR}/_redispatch_check.py" lease --round-id "${ROUND_ID}" --family "${fam}" -- bash "$0" "$@"
+fi
+
 # ---------------------------------------------------------------------------
 # brief 合規閘 + stamp-target 驗證：**實作已抽到 scripts/brief_conformance_check.sh**
 #   （GOV-DOC-CHECK-AT-WRITE，2026-08-02）。本處只呼叫，不重列邏輯。
@@ -598,6 +604,15 @@ _emit_family_result() {
 
   attempt_id="$(python3 -c 'import uuid; print(uuid.uuid4())')" || return 1
 
+  # B-64 Task 1.8：`failed` 之 output_sha256 依既有契約恆為空字串 ⇒ 刪檔／截零即無從證明有前次產出。
+  #   故 failed 且產出非空時另記 partial_output_sha256（非必填欄；其餘狀態不帶，空值不得傳旗標）。
+  local partial_sha=""
+  if [ "${result_state}" = "failed" ] && [ -s "${out}" ]; then
+    partial_sha="$(_compute_output_sha "${out}")" || partial_sha=""
+  fi
+  local _partial_flag=()
+  [ -n "${partial_sha}" ] && _partial_flag=(--field "partial_output_sha256=${partial_sha}")
+
   # 寫入在 CLI 之後；audit_append 自己取鎖——CLI 不在鎖內
   bash "${SCRIPT_DIR}/audit_append.sh" \
     --event committee_family_result \
@@ -608,6 +623,7 @@ _emit_family_result() {
     --field "output_path=${out}" \
     --field "output_sha256=${out_sha}" \
     --field "result_state=${result_state}" \
+    ${_partial_flag[@]+"${_partial_flag[@]}"} \
     --field "actor=cx_run" \
     --field "origin_script=cx_run.sh"
 }
