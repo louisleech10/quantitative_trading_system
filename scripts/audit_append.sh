@@ -780,13 +780,11 @@ try:
                           file=sys.stderr)
                     sys.exit(2)
                 subprocess.run(["bash", "-c", _hook2], check=False)
-            # 🔴 b1 review-r6（CODEX-R6-P1-02）：讀到 EOF 不代表其後不再被追加；讀完以同一 fd
-            #    重驗長度與 mtime，捕捉落在「讀完 → 寫入審計」窗口內之寫入。
-            st2 = os.fstat(fd)
-            if st2.st_size != total or st2.st_mtime_ns != st.st_mtime_ns:
-                _deny("size_or_mtime_changed")
-            # 🔴 b1 review-r6（CODEX-R6-P1-01）：fd 綁的是開檔當下之物件，父目錄其後仍可被換成
-            #    symlink 使同一路徑解析到他物件；讀完重開該路徑，dev:ino 須與 fd 相同。
+            # 🔴 b1 review-r6→r7：最終確認**只做一次、且是本函式最後一個動作**——重開該路徑取得
+            #    新 fd，在同一個 fd 上一併判定「是否仍是同一個物件」與「長度／mtime 是否改變」。
+            #    分成前後兩道（先以舊 fd 驗長度、再重開驗身分）會在兩道之間留下可用窗口：
+            #    同長度覆寫落在其間時，前一道已過、後一道只看身分，兩道都不拒（rc=0）。
+            #    合併之後，殘餘窗口只剩「本次確認之後 → append」，見 SPEC §C 誠實邊界⑧。
             try:
                 fd2 = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
             except OSError:
@@ -795,6 +793,8 @@ try:
                 st3 = os.fstat(fd2)
                 if (st3.st_dev, st3.st_ino) != (st.st_dev, st.st_ino):
                     _deny("path_object_changed")
+                if st3.st_size != total or st3.st_mtime_ns != st.st_mtime_ns:
+                    _deny("size_or_mtime_changed")
             finally:
                 os.close(fd2)
         finally:

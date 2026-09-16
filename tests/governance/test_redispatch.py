@@ -802,6 +802,22 @@ def test_abandon_exhausted_output_parent_swapped_after_read_rc1(repo: Repo) -> N
     assert repo.events("debt_abandon") == []
 
 
+def test_abandon_exhausted_output_same_length_overwrite_rc1(repo: Repo) -> None:
+    """讀完後以**同長度**覆寫內容 ⇒ 棄置須被拒（b1 r7 之縫）。
+
+    🔴 長度不變、物件身分也不變，唯一能察覺的是 mtime。此情境原本落在兩道重驗**之間**
+    （先驗長度那道已過、後驗身分那道只看 inode），兩道都不拒；故最終確認已合併為
+    單一動作並置於最後。
+    """
+    rid, out = _exhausted_round_with_output(repo)
+    n = len(out.read_bytes())
+    hook = "sleep 0.01; python3 -c \"open('" + str(out) + "','wb').write(b'X'*" + str(n) + ")\""
+    proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_READ_CMD": hook})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "RD_GUARD_REASON=size_or_mtime_changed" in proc.stderr, proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
 def test_abandon_exhausted_output_symlink_to_same_inode_rc1(repo: Repo) -> None:
     """查核後把產出換成「指向同一 inode」之 symlink ⇒ 仍須被拒（b1 r3 CODEX-R3-P1-01）。
 
