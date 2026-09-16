@@ -160,17 +160,21 @@ _emit_dest_fixup_line() {
 #   pre-push（`scripts/gov_check.sh`），**兩者皆在 Task 4.3「修改檔案」欄之外**
 #   ⇒ 依 `票 B-51` 停碼送裁，見 B10 review-r2 必答。未裁決前此缺口具名保留。
 #
-# 用法：bash scripts/cx_run.sh --selfcheck <產出檔> --family <家族名>
+# 用法：bash scripts/cx_run.sh --selfcheck <產出檔> --family <家族名> [--round-id <rid>]
 # rc：0=合規／3=格式不合規（與交件路徑 format-failed 同碼）／2=用法錯或檔不存在
+# DOCROT2 Task 3.1：`--round-id` 原樣轉給 completeness_check --single；未給 ⇒ 須 finding 類別（fail-closed）。
 # ---------------------------------------------------------------------------
 if [ "${1:-}" = "--selfcheck" ]; then
   shift
-  _sc_out=""; _sc_fam=""
+  _sc_out=""; _sc_fam=""; _sc_rid_args=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --family)
         [ "$#" -ge 2 ] || { echo "ERROR: --family 缺值" >&2; exit 2; }
         _sc_fam="$2"; shift 2 ;;
+      --round-id)
+        [ "$#" -ge 2 ] || { echo "ERROR: --round-id 缺值" >&2; exit 2; }
+        _sc_rid_args=(--round-id "$2"); shift 2 ;;
       -*)
         echo "ERROR: --selfcheck 未知選項: $1" >&2; exit 2 ;;
       *)
@@ -179,7 +183,7 @@ if [ "${1:-}" = "--selfcheck" ]; then
     esac
   done
   [ -n "${_sc_out}" ] && [ -n "${_sc_fam}" ] || {
-    echo "用法: bash scripts/cx_run.sh --selfcheck <產出檔> --family <家族名>" >&2
+    echo "用法: bash scripts/cx_run.sh --selfcheck <產出檔> --family <家族名> [--round-id <rid>]" >&2
     exit 2
   }
   [ -f "${_sc_out}" ] || { echo "ERROR: 產出檔不存在: ${_sc_out}" >&2; exit 2; }
@@ -187,7 +191,7 @@ if [ "${1:-}" = "--selfcheck" ]; then
   out="${_sc_out}"
   fam="${_sc_fam}"
   _sc_log="$(mktemp)"
-  bash "${SCRIPT_DIR}/completeness_check.sh" --single "${out}" --family "${fam}" >"${_sc_log}" 2>&1
+  bash "${SCRIPT_DIR}/completeness_check.sh" --single "${out}" --family "${fam}" ${_sc_rid_args[@]+"${_sc_rid_args[@]}"} >"${_sc_log}" 2>&1
   _sc_rc=$?
   cat "${_sc_log}" >&2
   if [ "${_sc_rc}" -ne 0 ]; then
@@ -752,6 +756,8 @@ _write_stub_success_output() {
         printf '## %s-R1-P2-01\n\n' "${fam_u}"
         printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\n\n'
         printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\n\n'
+        # DOCROT2 Task 3.1：門檻後之輪 --single 須類別 ⇒ stub 一律帶合法類別（值取封閉集之一）
+        printf '**類別**: other\n\n'
         printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\n\n' "${fam}"
         printf 'stub harness body\n'
         # VERDICTGATE Task 1.2 測試尾段（harness-only；CX_STUB_TAIL 已綁 CX_STUB_MODE 之 harness 守衛）：
@@ -772,6 +778,7 @@ _write_stub_success_output() {
         printf '## %s-R1-P3-00\n\n' "${fam_s}"
         printf '**斷言**: CX_STUB_MODE=success harness stamp sentinel（零 findings）\n\n'
         printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success（stamp）\n\n'
+        printf '**類別**: other\n\n'
         printf 'VERDICT: proceed\nBLOCKED-BY:\nCLOSED:\nSTATUS: DONE\n'
       } > "${out}"
       ;;
@@ -831,7 +838,7 @@ _run_format_check_if_needed() {
           echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2
           _rc=127
         else
-          bash "${_cc}" --single "${out}" --family "${fam}" >&2 || _rc=$?
+          bash "${_cc}" --single "${out}" --family "${fam}" --round-id "${ROUND_ID:-}" >&2 || _rc=$?
         fi
       fi
       ;;
@@ -847,7 +854,7 @@ _run_format_check_if_needed() {
       echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（stamp 輪亦不得記 success）" >&2
       _rc=127
     else
-      bash "${_cc_stamp}" --single "${out}" --family "${fam}" >&2 || _rc=$?
+      bash "${_cc_stamp}" --single "${out}" --family "${fam}" --round-id "${ROUND_ID:-}" >&2 || _rc=$?
     fi
   fi
   # ── 以下為 Task 4.3 新增（一律在凍結錨點**外側**）──────────────────────────
@@ -856,7 +863,7 @@ _run_format_check_if_needed() {
   if [ "${_rc}" -ne 0 ] && [ "${_rc}" -ne 127 ] && [ -s "${out}" ]; then
     local _log
     _log="$(mktemp)"
-    bash "${SCRIPT_DIR}/completeness_check.sh" --single "${out}" --family "${fam}" \
+    bash "${SCRIPT_DIR}/completeness_check.sh" --single "${out}" --family "${fam}" --round-id "${ROUND_ID:-}" \
       >"${_log}" 2>&1 || :
     _emit_fixup_list "${_log}"
     rm -f "${_log}"
@@ -1096,13 +1103,13 @@ _prepare_and_run() {
   #     避免與舊 P3-00 慣例並存造成三種寫法。
   case "${_bk}" in
     review|consult|closure)
-      prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
+      prompt="${prompt} 寫完產出後，請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} --round-id ${ROUND_ID:-} 並確認 rc=0；若非 0 請就地修正格式後再結束（此為交件時的同一支檢查同一組參數，先跑可免整份重跑）。每條 finding（含 sentinel）須有一行 **類別**: <值>，值與標籤同一行，值集見 scripts/governance_verdicts.json 之 finding_category_values。注意：若你的結論確實是 0 個 finding，請寫一條 sentinel：heading 用 ## <你的家族大寫>-R<本輪輪次>-P3-00，body 照常填 **斷言**／**碼證**／**來源摘要**，內容為「本輪逐項核對後無 finding」與你的核對依據。只寫散文或留空會被判空殼而擋下；寫成 sentinel 才能正常收斂。勿為了湊數而捏造實質 finding。"
       ;;
     stamp)
       # CXSTAMP 2026-09-13：stamp 輪自此亦跑同一支 --single（見 _run_format_check_if_needed 之 stamp 分支）
       #   ⇒ 提示必須同步告知，否則委員照舊只寫戳記行＋散文即 format-failed（stamp-r2 codex 實踩兩次：
       #   `**碼證**:` 標籤行留空、內容放下一行條列 ⇒ 空殼）。🔴 欄位內容須與標籤**同一行**（檢查器逐行判）。
-      prompt="${prompt} 交件檔須至少含一條 canonical heading（無問題→## <你的家族大寫>-R<本輪輪次>-P3-00 sentinel），其 **斷言**：與 **碼證**：兩欄的內容必須寫在**與標籤同一行**（標籤行留空、內容放下一行條列會被判空殼而擋下）；尾段 VERDICT: proceed|blocked、CLOSED: 空值或 ID 清單。寫完請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} 並確認 rc=0 再結束。"
+      prompt="${prompt} 交件檔須至少含一條 canonical heading（無問題→## <你的家族大寫>-R<本輪輪次>-P3-00 sentinel），其 **斷言**：與 **碼證**：兩欄的內容必須寫在**與標籤同一行**（標籤行留空、內容放下一行條列會被判空殼而擋下）；每條 finding（含 sentinel）須有一行 **類別**: <值>，值集見 scripts/governance_verdicts.json 之 finding_category_values；尾段 VERDICT: proceed|blocked、CLOSED: 空值或 ID 清單。寫完請自行執行 bash scripts/completeness_check.sh --single ${out} --family ${fam} --round-id ${ROUND_ID:-} 並確認 rc=0 再結束。"
       ;;
   esac
   _run_cli_and_emit

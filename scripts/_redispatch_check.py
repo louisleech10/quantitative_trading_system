@@ -366,7 +366,8 @@ def delivered(repo: Path, events: Sequence[dict], rounds: Dict[str, dict], rid: 
     except OSError:
         return False
     proc = subprocess.run(                        # (iii) 與銷帳出口同一命令；cwd 固定 repo、濾除逃生口旗標
-        ["bash", str(repo / "scripts" / "completeness_check.sh"), "--single", str(q), "--family", fam],
+        # DOCROT2 Task 3.1：同一命令須帶本輪 round id（門檻判定依該輪開債序號）
+        ["bash", str(repo / "scripts" / "completeness_check.sh"), "--single", str(q), "--family", fam, "--round-id", rid],
         capture_output=True, text=True, cwd=str(repo), env=_clean_env(),
     )
     return proc.returncode == 0

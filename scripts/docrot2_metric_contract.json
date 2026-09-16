@@ -1,0 +1,44 @@
+{
+  "_schema": {
+    "purpose": "DOCROT2 Task 3.2（票 B-63）：DOCROT2 成效判準之唯一機器定義。寫入端＝scripts/debt_clear.sh 收案前經 scripts/_docrot2_metrics.py emit-round 寫 docrot2_round_metric；讀取端＝scripts/docrot2_metrics.sh（只讀 audit 與本檔，不解析散文）。",
+    "ticket_key": "票鍵＝事件 task_id 以 separator 切開之前 segments 段（<YYYYMMDD>-<EPIC>）；task_id 段數不足 ⇒ 不屬任何票。",
+    "cohort": "量測對象票＝所有 committee_round_open 中 brief_kind 等於 cohort.brief_kind 者依票鍵分組，取各票最小序號；最小序號大於 closure_sequence 之票中最小序號最小者；取該票依序號排序之前 cohort.rounds 輪。序號大於 closure_sequence 之 committee_round_open 缺 brief_kind ⇒ 無法判定 ⇒ rc=1。",
+    "finding_scope": "計數範圍＝收斂檔附錄之 canonical finding，排除 ID 以 exclude_id_suffix 結尾者（零 findings sentinel）。",
+    "numerator": "分子＝範圍內委員類別（附錄區塊之 **類別**）等於 committee_category 者；主委欄不作分子。",
+    "denominator": "分母＝範圍內 canonical finding 數（事件之 canonical_count）。",
+    "zero_denominator": "分母為 0 ⇒ 該輪占比記此值。",
+    "comparator": "封閉值 second_le_first：第二輪占比 ≤ 第一輪占比（以交叉相乘比較，不經浮點）。",
+    "max_findings_per_round": "cohort 每輪 canonical_count 上限。",
+    "handoff_replay": "cohort 每輪事件之 handoff_tree_commit 上執行 command（{commit} 代入），rc 須等於 expect_rc。",
+    "history_only_restamp": "範圍票內每筆事件之 stamps 項 history_only 加總須 ≤ max。history_only＝1 ⇔ 同一 stamp_target 前一次戳記之本體（reconcile_body_hash.sh 之本體區間：`## 戳記` 之前）與本次本體有差異，且差異行於兩版皆落在 HISTORY-BEGIN..END（含標記行）內。",
+    "closure_sequence": "本票收票時寫入之 audit 最大序號；null ⇒ cohort 未定 ⇒ rc=1。"
+  },
+  "ticket_key": {
+    "source_field": "task_id",
+    "separator": "-",
+    "segments": 2
+  },
+  "cohort": {
+    "brief_kind": "review",
+    "rounds": 2
+  },
+  "finding_scope": {
+    "exclude_id_suffix": "-P3-00"
+  },
+  "numerator": {
+    "committee_category": "doc-sync"
+  },
+  "denominator": "canonical_count",
+  "zero_denominator": 0,
+  "comparator": "second_le_first",
+  "max_findings_per_round": 20,
+  "handoff_replay": {
+    "command": ["bash", "scripts/live_doc_write_guard.sh", "--tree", "{commit}", "--path", "HANDOFF.md"],
+    "expect_rc": 0
+  },
+  "history_only_restamp": {
+    "body_hash_script": "scripts/reconcile_body_hash.sh",
+    "max": 0
+  },
+  "closure_sequence": null
+}

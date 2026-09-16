@@ -58,6 +58,9 @@ def test_registry_is_v2_shape() -> None:
         "impl_token_issued",
         "ticket_commit",
         "governance_bypass",
+        # DOCROT2 Task 3.2：收案量測事件與擋下事件（round_scoped:false）
+        "docrot2_round_metric",
+        "docrot2_gate_block",
     }
     assert "committee_output" not in registry["non_debt_legacy_events"]
     assert "brief_kind" in registry["debt_events"]["committee_round_open"]["fields"]

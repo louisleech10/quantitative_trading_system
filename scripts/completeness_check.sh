@@ -243,20 +243,45 @@ _validate_finding_body() {
   #   把 `G-1` 明令「不得翻轉」的那一格翻掉。位置參數關不掉也汙染不了。
   local strict="${2:-0}"
   case "${strict}" in 0|1) : ;; *) strict=0 ;; esac
+  # DOCROT2 Task 3.1（票 B-63）：第三位置參數＝須類別（0／1），第四＝封閉值集（`|` 串接，
+  #   唯一來源 governance_verdicts.json.finding_category_values，經 scripts/_finding_category.py values 取得）。
+  #   只由 `--single` 開啟（同 strict 之理由：`--lock`／synth 路徑 rc 不變，G-1 三入口矩陣）。
+  #   開啟時每條 canonical finding（含 `P3-00` sentinel）須 fence 外恰一行 `**類別**: <值>` 且值 ∈ 值集。
+  local require_cat="${3:-0}"
+  case "${require_cat}" in 0|1) : ;; *) require_cat=1 ;; esac
+  local cat_vals="${4:-}"
+  if [ "${require_cat}" = "1" ] && [ -z "${cat_vals}" ]; then
+    echo "COMPLETENESS FAIL: 須類別但封閉值集為空（governance_verdicts.json.finding_category_values 不可用）: (file=${file})" >&2
+    return 1
+  fi
   # 🔴 LC_ALL=C：substantive() 以**位元組**判 CJK 前導範圍（\344–\351）。
   #   不加的話 awk 在 UTF-8 locale 下 substr() 是字元語意，
   #   單一位元組比較會切碎多位元組字元並吐出非法 UTF-8（實測 UnicodeDecodeError）。
   #   其餘既有判定皆為 ASCII 正則與位元組字面，改 locale 不影響。
-  LC_ALL=C awk -v lock_mode="${mode}" -v strict="${strict}" '
+  LC_ALL=C awk -v lock_mode="${mode}" -v strict="${strict}" -v require_cat="${require_cat}" -v cat_vals="${cat_vals}" '
     BEGIN {
-      id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0; bad=0
+      id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0; cat_n=0; cat_v=""; bad=0
       require_digest = (lock_mode != "discovery")
+      n_cat = split(cat_vals, cat_arr, "|")
+      for (k = 1; k <= n_cat; k++) if (cat_arr[k] != "") cat_ok[cat_arr[k]] = 1
     }
     function flush() {
       if (id == "") return
       if (!(seen_assert && seen_code)) {
         print "COMPLETENESS FAIL: empty-shell finding (缺 **斷言**/**碼證**): " id " (file=" FILENAME ")" > "/dev/stderr"
         bad=1
+      }
+      if (require_cat == 1) {
+        if (cat_n == 0) {
+          print "COMPLETENESS FAIL: finding 缺類別（**類別**: <值>，值集見 governance_verdicts.json.finding_category_values）: " id " (file=" FILENAME ")" > "/dev/stderr"
+          bad=1
+        } else if (cat_n > 1) {
+          print "COMPLETENESS FAIL: finding 類別行重複（須恰一行 **類別**）: " id " (file=" FILENAME ")" > "/dev/stderr"
+          bad=1
+        } else if (!(cat_v in cat_ok)) {
+          print "COMPLETENESS FAIL: finding 類別不在封閉值集（得「" cat_v "」）: " id " (file=" FILENAME ")" > "/dev/stderr"
+          bad=1
+        }
       }
       if (require_digest && (sev == "P0" || sev == "P1")) {
         if (!seen_digest) {
@@ -268,7 +293,7 @@ _validate_finding_body() {
     /^[[:space:]]*#{2,6}[[:space:]]/ {
       if ($0 ~ /^[[:space:]]*#{2,6}[[:space:]]+DEGRADE-[A-Z]+-[0-9]{2,}[[:space:]]*$/) {
         flush()
-        id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0
+        id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0; cat_n=0; cat_v=""
         next
       }
       line=$0
@@ -281,12 +306,12 @@ _validate_finding_body() {
         id=tok
         split(tok, segs, "-")
         sev=segs[3]
-        seen_assert=0; seen_code=0; seen_digest=0
+        seen_assert=0; seen_code=0; seen_digest=0; cat_n=0; cat_v=""
         next
       }
       if (id != "") {
         flush()
-        id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0
+        id=""; sev=""; seen_assert=0; seen_code=0; seen_digest=0; cat_n=0; cat_v=""
       }
       next
     }
@@ -343,9 +368,26 @@ _validate_finding_body() {
       sub(/^[：:]/, "", line)
       return line
     }
+    # DOCROT2 Task 3.1：類別值＝標籤後去半形空白／tab、去一個半形或全形冒號（全形為 3 位元組，LC_ALL=C 下以 substr 整段比對）、
+    #   再去頭尾半形空白／tab 與行尾 CR；同行重複標籤 ⇒ 空字串（不在值集 ⇒ FAIL）。與 scripts/_finding_category.py 同文法。
+    function category_value(line,   tag, p) {
+      tag = "**類別**"
+      if (label_count(line, "類別") > 1) return ""
+      p = index(line, tag)
+      if (p == 0) return ""
+      line = substr(line, p + length(tag))
+      sub(/\r$/, "", line)
+      sub(/^[ \t]+/, "", line)
+      if (substr(line, 1, 3) == "：") line = substr(line, 4)
+      else if (substr(line, 1, 1) == ":") line = substr(line, 2)
+      sub(/^[ \t]+/, "", line)
+      sub(/[ \t]+$/, "", line)
+      return line
+    }
     # 🔴 fence 追蹤〔CODEX-R1-P1-04〕：程式碼區塊內的字面標籤不得滿足必填欄，
     #   否則外層留白、fence 內寫 `**斷言**: x` 就能偽造成有內容。
     /^[[:space:]]*(```|~~~)/ { in_fence = !in_fence; next }
+    id != "" && !in_fence && index($0, "**類別**") > 0 { cat_n++; cat_v = category_value($0) }
     id != "" && !in_fence {
       if ($0 ~ /\*\*斷言\*\*/ && (!strict || substantive(field_body($0, "斷言")))) seen_assert=1
       if ($0 ~ /\*\*碼證\*\*/ && (!strict || substantive(field_body($0, "碼證")))) seen_code=1
@@ -1584,6 +1626,8 @@ SYNTH_ARG=""
 SELF_CHECK=0
 SINGLE_ARG=""
 SINGLE_FAMILY=""
+SINGLE_ROUND_ID=""
+SINGLE_ROUND_ID_SET=0
 POSITIONAL=()
 
 while [ "$#" -gt 0 ]; do
@@ -1623,6 +1667,15 @@ while [ "$#" -gt 0 ]; do
       SINGLE_FAMILY="$2"
       shift 2
       ;;
+    # DOCROT2 Task 3.1（票 B-63）：交件所屬輪之 round id；由該輪 committee_round_open 之 audit 序號
+    #   與 governance_verdicts.json.category_required_after_audit_sequence 比較，決定是否須 finding 類別。
+    #   未給 ⇒ 須類別（fail-closed）。只與 --single 併用。
+    --round-id)
+      [ "$#" -ge 2 ] || { echo "用法: --round-id <rid>" >&2; exit 2; }
+      SINGLE_ROUND_ID="$2"
+      SINGLE_ROUND_ID_SET=1
+      shift 2
+      ;;
     --)
       shift
       while [ "$#" -gt 0 ]; do POSITIONAL+=("$1"); shift; done
@@ -1646,6 +1699,10 @@ done
 
 # ---- 單檔格式檢查（GOV-FORMAT-SSOT 症狀 B）----
 # 只跑既有的單檔驗證函式；不碰 lock／synth／跨檔完整性。
+if [ "${SINGLE_ROUND_ID_SET}" = "1" ] && [ -z "${SINGLE_ARG}" ]; then
+  echo "COMPLETENESS FAIL: --round-id 只與 --single 併用" >&2
+  exit 2
+fi
 if [ -n "${SINGLE_ARG}" ]; then
   if [ -n "${LOCK_ARG}" ] || [ -n "${SYNTH_ARG}" ] || [ "${#POSITIONAL[@]}" -gt 0 ]; then
     echo "COMPLETENESS FAIL: --single 不得與 --lock/--synth/argv 來源併用" >&2
@@ -1657,9 +1714,28 @@ if [ -n "${SINGLE_ARG}" ]; then
   _single_ids="$(extract_heading_ids "${SINGLE_ARG}" "${SINGLE_FAMILY}")" || _single_rc=1
   # ② 同檔重複 ID
   _check_same_file_dups "${SINGLE_ARG}" "${_single_ids}" || _single_rc=1
-  # ③ 空殼 finding（缺 **斷言**/**碼證**）+ P0/P1 來源摘要 digest
+  # ③a DOCROT2 Task 3.1：是否須類別與封閉值集，唯一判定在 scripts/_finding_category.py（與 _synth_attr／量測共用）。
+  #   helper 缺失、設定不合法 ⇒ FAIL（fail-closed，不得退回不查）。
+  _cc_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  _cat_req=1
+  _cat_vals=""
+  if [ ! -f "${_cc_dir}/_finding_category.py" ]; then
+    echo "COMPLETENESS FAIL: 缺 scripts/_finding_category.py（finding 類別判定之唯一實作）⇒ fail-closed" >&2
+    _single_rc=1
+  else
+    if [ "${SINGLE_ROUND_ID_SET}" = "1" ]; then
+      _cat_req="$(python3 "${_cc_dir}/_finding_category.py" required --round-id "${SINGLE_ROUND_ID}")" || { _cat_req=1; _single_rc=1; }
+    else
+      _cat_req="$(python3 "${_cc_dir}/_finding_category.py" required)" || { _cat_req=1; _single_rc=1; }
+    fi
+    case "${_cat_req}" in 0|1) : ;; *) _cat_req=1; _single_rc=1 ;; esac
+    # rc 直接取、不經 pipe（CLAUDE.md Gotchas）
+    _cat_vals="$(python3 "${_cc_dir}/_finding_category.py" values)" || { _cat_vals=""; _single_rc=1; }
+    _cat_vals="$(printf '%s' "${_cat_vals}" | tr '\n' '|')"
+  fi
+  # ③ 空殼 finding（缺 **斷言**/**碼證**）+ P0/P1 來源摘要 digest ＋（DOCROT2 Task 3.1）類別
   # GOVB1 Task 4.2：交件路徑啟用 hollow body 非空判定（三入口矩陣中唯一許可翻轉的一格）
-  _validate_finding_body "${SINGLE_ARG}" 1 || _single_rc=1
+  _validate_finding_body "${SINGLE_ARG}" 1 "${_cat_req}" "${_cat_vals}" || _single_rc=1
   # ④ DOCROT consult-r3 Task 1.4／consult-r4 Task 1.6（三家定案；只在 --single 交件路徑）：
   #   (a) 碼證／來源摘要／CODE-ANCHOR 之 `path:line` 落在該檔 HISTORY 區 ⇒ FAIL
   #   (b) P0/P1 缺 `CODE-ANCHOR:` 或 `MUTATION:` ⇒ FAIL（forward-only：只對新交件生效）

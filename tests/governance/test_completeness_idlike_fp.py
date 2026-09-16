@@ -121,6 +121,9 @@ def _iso_copy_script(label: str) -> Path:
     dest = ISO_ROOT / f"idlike_{label}_{int(time.time() * 1000)}"
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(COMPLETENESS_SH, dest / "completeness_check.sh")
+    # DOCROT2 Task 3.1：--single 之類別判定唯一實作（缺則 fail-closed rc=1，與本檔所驗之 heading 判準無關）
+    for helper in ("_finding_category.py", "governance_verdicts.json", "audit_events.json"):
+        shutil.copy2(COMPLETENESS_SH.parent / helper, dest / helper)
     return dest
 
 

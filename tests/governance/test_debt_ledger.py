@@ -109,6 +109,8 @@ def _open(
         "--field",
         f"session_name={session}",
         "--field",
+        "brief_kind=review",
+        "--field",
         f"actor={actor}",
         "--field",
         "origin_script=committee_run.sh",

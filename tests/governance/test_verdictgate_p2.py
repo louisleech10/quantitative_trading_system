@@ -10,11 +10,14 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from tests.governance import _debt_probe_helper as _dph
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS = (
     "prev_review_resolve.sh", "verdictgate_check.sh", "verdictgate_baseline.sh", "audit_append.sh", "audit_events.json",
     "governance_families.sh", "governance_families.json", "debt_ledger.sh", "_debt_ledger_core.py", "debt_clear.sh",
     "completeness_check.sh", "reconcile_body_hash.sh", "review_quorum_check.sh",
+    *_dph.DOCROT2_HELPER_SCRIPTS,
 )
 FAMS = ["codex", "composer", "grok"]
 
@@ -61,7 +64,13 @@ def _open(h: dict, task: str, rid: str, fams=FAMS, brief_kind: str | None = "rev
         fields.append(f"brief_kind={brief_kind}")
     for f in fields:
         args += ["--field", f]
-    r = _run(h, *args); assert r.returncode == 0, r.stderr
+    if brief_kind:
+        r = _run(h, *args)
+    else:
+        # DOCROT2 Task 3.2 起 brief_kind 為必填：legacy round 以「規則上線前之寫入端」寫入
+        with _dph.legacy_round_open_registry(h["root"] / "scripts"):
+            r = _run(h, *args)
+    assert r.returncode == 0, r.stderr
 
 
 def _out(h: dict, task: str, fam: str, verdict: str, blocked=(), closed=(), rid: str | None = None) -> None:

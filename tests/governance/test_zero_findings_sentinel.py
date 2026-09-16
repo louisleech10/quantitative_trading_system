@@ -190,7 +190,7 @@ def test_sentinel_id_is_canonical(tmp_path: Path, heading: str, why: str) -> Non
     """
     doc = tmp_path / "probe-composer.md"
     doc.write_text(
-        f"# t\n\n{heading}\n\n**斷言**: x。\n**碼證**: y。\n"
+        f"# t\n\n{heading}\n\n**斷言**: x。\n**碼證**: y。\n**類別**: other\n"
         f"**來源摘要**: scripts/x.sh#0123456789ab\n[MINOR] 信心度=High。\n",
         encoding="utf-8",
     )

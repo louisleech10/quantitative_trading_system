@@ -74,7 +74,8 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
   1. `**斷言**`：一句可證偽主張
   2. `**碼證**`：章節 / 路徑:行 / 命令+stdout 摘要；**P0／P1 必含 `CODE-ANCHOR: <path>:<line>` 與 `MUTATION: <可執行破壞>` 兩行**（缺則 `completeness_check --single` 拒收）；僅文檔字面差異者 ≤P3 標 `doc-literal-only`
   3. `**來源摘要**`：`<src_path>#sha256[:12]`（機器欄；P0/P1 缺則 FAIL）
-  4. 正文：會怎麼失敗 / 修法 / 信心度
+  4. `**類別**: <值>`：值與標籤同行，每條 finding（含零 findings sentinel）恰一行；封閉值集與語意唯一來源＝`scripts/governance_verdicts.json` 之 `finding_category_values`（缺、重複或不在集合 ⇒ `completeness_check --single` 拒收）
+  5. 正文：會怎麼失敗 / 修法 / 信心度
 - **禁止**：`## GROK-01`、`ADV-CODEX-1` 等缺 ROUND/SEVERITY 短 ID；跨檔重複同一 ID
 - **DEGRADE**（合法缺席，不進 union）：`## DEGRADE-<FAMILY>-<NN>`（見範本）
 
@@ -84,6 +85,8 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 **斷言**: <可證偽主張>
 
 **碼證**: <章節/原文短句 + RECHECK 步驟>
+
+**類別**: <finding_category_values 之一>
 
 **來源摘要**: path/to/spec.md#a1b2c3d4e5f6
 

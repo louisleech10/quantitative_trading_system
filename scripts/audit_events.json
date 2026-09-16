@@ -22,6 +22,8 @@
     "required_fields_per_event": "每事件的必要欄位；fields 必須是其超集。",
     "sequence_since": "（VERDICTGATE B1）該事件自此 ts 起才由 audit_append 寫入（帶 sequence）；此前由舊 writer 直寫之無 sequence 列為唯讀 legacy 資料，不進帳本序號連續性、不進債務判定。面向未來不回填（使用者 2026-08-05）。",
     "round_scoped": "（VERDICTGATE B1，CODEX-R1-P0-01）false＝事件不屬於任何 round 之債務數學（帳本 build_rounds 跳過、不要求 round_id）；仍計入序號連續性。committee_output 可帶 round_id（可選，供 Task 2.2 對輪）。",
+    "docrot2_round_metric": "（DOCROT2 Task 3.2）debt_clear.sh 收案前寫入，僅限 committee_round_open 序號大於 governance_verdicts.json.category_required_after_audit_sequence 之輪；同輪只寫一筆（已存在即不再寫）。category_counts＝委員類別計數（鍵恰為 finding_category_values）；canonical_count／計數範圍依 scripts/docrot2_metric_contract.json 之 finding_scope；committee_models＝各 participant 之 model 與 reasoning_effort，取不到記 unavailable（不寫推定值）；stamps＝本輪戳記標的陣列，每項 stamp_target／body_sha_before／body_sha_after／history_only。讀取端唯一為 scripts/docrot2_metrics.sh。",
+    "docrot2_gate_block": "（DOCROT2 Task 3.2）live_doc_write_guard.sh（hook 擋下、--staged 違規）與 live_doc_registry_check.sh（--staged 未登記）每擋一路徑之每一規則寫一筆；寫入失敗不改變擋下結果。rule_id 值集見 enums.rule_id；class＝live_doc_registry.json 之類別或 UNREGISTERED。",
     "family_field_name_patterns": "用於檢查新增 family 欄位是否登記到 family_valued_fields。",
     "audit_log_path": "audit append-only log 的 repo 相對路徑。",
     "fragment_scan_prefixes": "命名空間片段掃描前綴。",
@@ -35,7 +37,9 @@
     "gate_check.sh",
     "git_hooks/commit-msg",
     "git_hooks/post-commit",
-    "git_hooks/pre-push"
+    "git_hooks/pre-push",
+    "live_doc_registry_check.sh",
+    "live_doc_write_guard.sh"
   ],
   "p16_namespace_prefixes": [
     "committee_round_",
@@ -235,6 +239,39 @@
         "approver",
         "abandon_kind"
       ]
+    },
+    "docrot2_round_metric": {
+      "origin_script": "debt_clear.sh",
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "round_scoped": false,
+      "fields": [
+        "round_id",
+        "task_id",
+        "session_name",
+        "round_open_sequence",
+        "brief_kind",
+        "canonical_count",
+        "category_counts",
+        "mismatch_count",
+        "handoff_tree_commit",
+        "committee_models",
+        "stamps"
+      ]
+    },
+    "docrot2_gate_block": {
+      "opens_debt": false,
+      "in_debt_epoch": true,
+      "closes_debt": false,
+      "terminal": false,
+      "round_scoped": false,
+      "fields": [
+        "rule_id",
+        "path",
+        "class"
+      ]
     }
   },
   "non_debt_legacy_events": [
@@ -294,6 +331,17 @@
     "abandon_kind": [
       "no-findings-expected",
       "collection-failed"
+    ],
+    "rule_id": [
+      "status-literal",
+      "archaeology",
+      "history-pointer",
+      "handoff-grammar",
+      "handoff-lifecycle",
+      "write-alias",
+      "guard-error",
+      "unregistered-md",
+      "registry-error"
     ],
     "match_rule": [
       "family_cli",
@@ -358,7 +406,8 @@
       "lock_mode",
       "participants",
       "expected_outputs",
-      "session_name"
+      "session_name",
+      "brief_kind"
     ],
     "committee_family_result": [
       "round_id",
@@ -434,6 +483,24 @@
       "reason",
       "approver",
       "abandon_kind"
+    ],
+    "docrot2_round_metric": [
+      "round_id",
+      "task_id",
+      "session_name",
+      "round_open_sequence",
+      "brief_kind",
+      "canonical_count",
+      "category_counts",
+      "mismatch_count",
+      "handoff_tree_commit",
+      "committee_models",
+      "stamps"
+    ],
+    "docrot2_gate_block": [
+      "rule_id",
+      "path",
+      "class"
     ],
     "gate_deny": [
       "event",

@@ -69,6 +69,10 @@ def _setup(tmp_path: Path) -> tuple[Path, Path]:
         "reconcile_cluster_attribution_check.sh",
         "_synth_attr.py",
         "governance_verdicts.json",
+        # DOCROT2 Task 3.1／3.2：類別判定唯一實作與收案量測事件（debt_clear 收案前 fail-closed 需要）
+        "_finding_category.py",
+        "_docrot2_metrics.py",
+        "docrot2_metric_contract.json",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():
@@ -133,6 +137,8 @@ def _open_round(
         f"expected_outputs=@{json.dumps(outs, ensure_ascii=False)}",
         "--field",
         f"session_name={session}",
+        "--field",
+        "brief_kind=review",
         "--field",
         "actor=test",
         "--field",

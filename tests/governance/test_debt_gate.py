@@ -125,6 +125,8 @@ def _open_debt(
         "--field",
         f"session_name={session}",
         "--field",
+        "brief_kind=review",
+        "--field",
         "actor=test",
         "--field",
         "origin_script=committee_run.sh",

@@ -16,6 +16,7 @@
    - `**斷言**`：一句可證偽的主張
    - `**碼證**`：檔案路徑 / 行號 / 命令 / 觀測輸出摘要。🔴 **P0／P1 必含兩行封閉字面**（DOCROT consult-r4 Task 1.6，三家定案 2026-09-13）：`CODE-ANCHOR: <repo-relative-path>:<line>` 與 `MUTATION: <可執行破壞>`；缺任一 ⇒ `completeness_check.sh --single` FAIL；`CODE-ANCHOR` 落在 `HISTORY-BEGIN..END`／`## 沿革` ⇒ FAIL。僅文檔字面差異且無行為影響者最高 P3，標 `doc-literal-only`。
    - `**來源摘要**`：`<src_path>#sha256[:12]`（機器欄，非語意）
+   - `**類別**`：一行 `**類別**: <值>`，值與標籤同行（DOCROT2 Task 3.1）；封閉值集與各值語意之唯一來源＝`scripts/governance_verdicts.json` 之 `finding_category_values`（本範本不重列）。適用門檻後之輪次缺欄、重複或值不在集合 ⇒ `completeness_check.sh --single` FAIL；零 findings sentinel 亦須有。
    - 正文：說明 / 修法 / 影響
    - 🔴 **P0／P1 之「修法」為必填，且須附該修法自身之可行性證據**（2026-09-12 定；出處：SPLITUNIFY 規格輪 R9→R10 因「提出方只給方向、未驗該方向做不做得到」而空轉一輪——R9 要求補不可變性防護，R10 才實跑證明 Python 與 numpy 給不了該保證）。只點出缺陷而不給修法，或給了修法卻未證明其可達成，視同未完成該條。
 3. **P0/P1** 缺 `**來源摘要**`（或 harness 注入 `source_digest: <hex≥12>`）→ completeness **FAIL**
@@ -31,6 +32,8 @@
 **斷言**: <一句可證偽主張；無證據不得列 BLOCKING>
 
 **碼證**: <path:line 或 `cmd` + stdout 摘要>
+
+**類別**: <值；見 scripts/governance_verdicts.json 之 finding_category_values>
 
 **來源摘要**: path/to/source.md#a1b2c3d4e5f6
 
@@ -103,6 +106,7 @@ source_digest: a1b2c3d4e5f6
 **斷言**: 本輪未發現需阻擋收斂的 finding；sentinel body 為實質複驗摘要。
 **碼證**: `venv/bin/python -m pytest tests/governance/test_x.py -q` → 12 passed rc=0；
           三版對照探針 9/9 OK。
+**類別**: other
 ```
 
 ## 機械裁決塊（末段必填；VERDICTGATE Task 1.1）

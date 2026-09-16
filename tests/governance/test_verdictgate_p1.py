@@ -22,6 +22,8 @@ _SCRIPTS = (
     "completeness_check.sh", "_role_gate.sh", "reconcile_body_hash.sh", "debt_ledger.sh",
     "_debt_ledger_core.py", "template_check.sh", "review_quorum_check.sh", "verify_task_provenance.py",
     "stampable_artifacts.txt",
+    # DOCROT2 Task 3.1：completeness_check --single 之類別判定唯一實作
+    "_finding_category.py",
 )
 TASK = "20260911-ROOT-X-REVIEW-R2"
 ROUND = "11111111-1111-4111-8111-111111111111"

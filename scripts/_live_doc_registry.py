@@ -274,6 +274,38 @@ def check_path(root: str, path: str) -> Tuple[List[str], str]:
     return errs, f"{path}：{cls}"
 
 
+UNREGISTERED_CLASS = "UNREGISTERED"
+
+
+def emit_block_event(root: str, origin_script: str, path: str, cls: Optional[str], rule_ids: Sequence[str]) -> bool:
+    """DOCROT2 Task 3.2：擋下事件之唯一寫入實作（兩支守衛共用）。每個相異 rule_id 寫一筆 docrot2_gate_block。
+
+    寫入點固定為被守衛 repo（cwd 之 git 根）之 scripts/audit_append.sh；rule_id 值集由 audit_events.json 之
+    enums.rule_id 於寫入時驗證。寫入失敗只回 False 並印 stderr，**不改變呼叫端之擋下結果**。
+    """
+    append = os.path.join(root, "scripts", "audit_append.sh")
+    if not os.path.isfile(append):
+        print(f"{origin_script}: ⚠ 擋下事件未寫入（缺 scripts/audit_append.sh）；擋下結果不變", file=sys.stderr)
+        return False
+    ok = True
+    for rule in sorted(set(rule_ids)):
+        cmd = ["bash", append, "--event", "docrot2_gate_block",
+               "--field", f"rule_id={rule}", "--field", f"path={path}",
+               "--field", f"class={cls or UNREGISTERED_CLASS}",
+               "--field", f"actor={origin_script}", "--field", f"origin_script={origin_script}"]
+        try:
+            r = subprocess.run(cmd, cwd=root, capture_output=True, timeout=30)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print(f"{origin_script}: ⚠ 擋下事件寫入失敗（{exc}）；擋下結果不變", file=sys.stderr)
+            ok = False
+            continue
+        if r.returncode != 0:
+            print(f"{origin_script}: ⚠ 擋下事件寫入失敗 rc={r.returncode}："
+                  + r.stderr.decode("utf-8", "replace").strip() + "；擋下結果不變", file=sys.stderr)
+            ok = False
+    return ok
+
+
 def _staged_new_paths(root: str) -> List[str]:
     try:
         out = subprocess.run(
@@ -316,6 +348,9 @@ def _staged_mode(root: str, path: str) -> str:
 
 def check_staged(root: str) -> List[str]:
     errs, norm = _load(root)
+    if errs or not norm:
+        # DOCROT2 Task 3.2：登記檔不合規而擋下 commit ⇒ 擋下事件（無單一路徑，記登記檔本身）
+        emit_block_event(root, "live_doc_registry_check.sh", REGISTRY_REL, UNREGISTERED_CLASS, ["registry-error"])
     if not norm:
         return errs
     for path in _staged_new_paths(root):
@@ -324,9 +359,11 @@ def check_staged(root: str) -> List[str]:
         mode = _staged_mode(root, path)
         if mode not in ("100644", "100755"):
             errs.append(f"{path}（暫存新增）：暫存模式 {mode or '取不到'} 非 regular file（symlink＝120000）⇒ fail-closed")
+            emit_block_event(root, "live_doc_registry_check.sh", path, UNREGISTERED_CLASS, ["registry-error"])
             continue
         if classify(path, norm) is None:
             errs.append(f"{path}（暫存新增）：未登記（以 live_doc_registry_update.sh --add 登記）")
+            emit_block_event(root, "live_doc_registry_check.sh", path, UNREGISTERED_CLASS, ["unregistered-md"])
     return errs
 
 

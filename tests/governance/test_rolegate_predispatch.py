@@ -47,6 +47,7 @@ _SCRIPT_NAMES = (
     "debt_ledger.sh",
     "_debt_ledger_core.py",
     "completeness_check.sh",
+    *_dph.DOCROT2_HELPER_SCRIPTS,
 )
 
 
@@ -285,6 +286,8 @@ def _open_round(
         f"expected_outputs=@{outputs}",
         "--field",
         f"session_name={session}",
+        "--field",
+        "brief_kind=" + _dph.brief_kind_of(h["root"] / h["brief_rel"]),
         "--field",
         "actor=test",
         "--field",

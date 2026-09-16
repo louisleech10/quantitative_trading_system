@@ -8,6 +8,8 @@
 CODE-ANCHOR: tests/governance/fixtures/govb1/finding_hollow_p300.md:3
 MUTATION: 把 hollow fixture 的四欄填入實質內容 ⇒ `--single` 對它由 rc≠0 轉 rc=0。
 
+**類別**: code-contract
+
 **來源摘要**: tests/governance/fixtures/govb1/finding_real_p300.md#cafebabecafebabe
 
 正文：此 finding 具實質 sentinel 內容，四欄皆非空，供 zero-findings 契約正例。

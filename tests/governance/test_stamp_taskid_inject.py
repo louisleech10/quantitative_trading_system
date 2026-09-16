@@ -53,6 +53,7 @@ _SCRIPT_NAMES = (
     "governance_families.sh",
     # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT（cx_run / committee_run 共用）
     "_role_gate.sh",
+    *_dph.DOCROT2_HELPER_SCRIPTS,
 )
 
 
@@ -267,6 +268,7 @@ def _open_round(
         f"participants=@{participants}",
         f"expected_outputs=@{outputs_json}",
         f"session_name={session}",
+        "brief_kind=" + _dph.brief_kind_of(brief_path),
         "actor=test",
         "origin_script=committee_run.sh",
     ]

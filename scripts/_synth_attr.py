@@ -14,6 +14,11 @@
                     strict_defer=False（hook）⇒ 只驗 token 存在、不查目標。
   check_target      session 目錄名含 `-x-` 者必有 `**修訂標的**：<path>` 且檔案存在。
   check_placeholder 附錄已有 ID 而群集段仍含骨架「（待填）」⇒ 錯。
+  check_category    （DOCROT2 Task 3.1）synth 同目錄 sources.lock 之 round 須類別（判定唯一實作 scripts/_finding_category.py）時：
+                    每個 finding 之附錄區塊恰一行合法委員類別；含該 ID 之群集列（hook 模式只看已完成列）第 5 欄＝主委類別（封閉值，
+                    同 ID 多列須一致）；委員欄 ≠ 主委欄 ⇒ 該 ID 須列於 `類別不一致` 標題段內之一行，且該行含處置 token
+                    （`延後→` 目標形狀同 check_disposition，gate 模式另驗目標存在）。`類別不一致` 段內之表列不算群集列。
+                    無 sources.lock ⇒ 無從綁定輪次、不判（debt_clear 必帶 lock，gate 路徑不會落此）。
 不做：不判定「決議內容是否處理了 finding」（SPEC §N 第三項）。
 所有 check 回傳錯誤訊息列表（空＝通過）；比對前 NFC 正規化＋去所有空白，**不**寬容標點差異。
 
@@ -30,13 +35,15 @@ import re
 import sys
 import unicodedata
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 ID_RE = re.compile(r"^## ([A-Z]+-R\d+-P[0-3]-\d{2,})\s*$", re.M)
 TARGET_RE = re.compile(r"^\*\*修訂標的\*\*：(\S+)$", re.M)
 ASSERT_RE = re.compile(r"\*\*斷言\*\*\s*[:：]\s*(.*)")
 PLACEHOLDER = "（待填）"
 QUOTE_N = 20
+MISMATCH_HEADING_RE = re.compile(r"^#{2,6}[ \t]*類別不一致[ \t]*$")
+ANY_HEADING_RE = re.compile(r"^#{1,6}[ \t]")
 
 
 def nfc_strip(s: str) -> str:
@@ -52,6 +59,7 @@ def nfc_strip(s: str) -> str:
 class Finding:
     id: str
     assertion: str
+    block_lines: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -70,6 +78,7 @@ class SynthDoc:
     rel_path: str = ""
     head: str = ""
     warnings: List[str] = field(default_factory=list)
+    mismatch_lines: List[Tuple[int, str]] = field(default_factory=list)
 
 
 def _id_in(text: str, fid: str) -> bool:
@@ -119,7 +128,18 @@ def parse_defer_targets(cell: str):
 def parse_synth(text: str, rel_path: str) -> SynthDoc:
     head, _, app = text.partition("## 附錄")
     rows: List[Row] = []
+    mismatch_lines: List[Tuple[int, str]] = []
+    in_mismatch = False
     for i, line in enumerate(head.splitlines(), start=1):
+        # DOCROT2 Task 3.1：`類別不一致` 段（至下一個標題止）只供 check_category，段內表列不算群集列
+        if MISMATCH_HEADING_RE.match(line):
+            in_mismatch = True
+            continue
+        if ANY_HEADING_RE.match(line):
+            in_mismatch = False
+        if in_mismatch:
+            mismatch_lines.append((i, line))
+            continue
         s = line.strip()
         if not s.startswith("|"):
             continue
@@ -146,12 +166,18 @@ def parse_synth(text: str, rel_path: str) -> SynthDoc:
         assertion = am.group(1).strip() if am else ""
         if not am:
             warnings.append(f"{ids[idx]}: 附錄區塊無 `**斷言**:` 行（引用比對以空字串處理 ⇒ 必不合）")
-        findings.append(Finding(id=ids[idx], assertion=assertion))
+        # 類別判定之區塊：至下一個任意標題行止（與 completeness_check.sh 之 finding 區塊邊界同）
+        block_lines: List[str] = []
+        for bl in block.splitlines():
+            if ANY_HEADING_RE.match(bl):
+                break
+            block_lines.append(bl)
+        findings.append(Finding(id=ids[idx], assertion=assertion, block_lines=block_lines))
     tm = TARGET_RE.search(head)
     parts = rel_path.replace("\\", "/").split("/")
     session_dir = parts[2] if len(parts) >= 4 and parts[0] == "handoffs" and parts[1] == "reconcile" else (parts[-2] if len(parts) >= 2 else "")
     return SynthDoc(target=tm.group(1) if tm else None, rows=rows, findings=findings, session_dir=session_dir,
-                    rel_path=rel_path, head=head, warnings=warnings)
+                    rel_path=rel_path, head=head, warnings=warnings, mismatch_lines=mismatch_lines)
 
 
 def rows_for(doc: SynthDoc, fid: str) -> List[Row]:
@@ -223,6 +249,80 @@ def check_placeholder(doc: SynthDoc) -> List[str]:
     return []
 
 
+def _round_id_of_synth(synth_path: str) -> Tuple[Optional[str], Optional[str]]:
+    """回 (round_id, 錯誤)。同目錄無 sources.lock ⇒ (None, None)＝無從綁定輪次。"""
+    lock = os.path.join(os.path.dirname(os.path.abspath(synth_path)), "sources.lock")
+    if not os.path.lexists(lock):
+        return None, None
+    try:
+        with open(lock, encoding="utf-8") as fh:
+            rid = json.load(fh).get("round_id")
+    except (OSError, json.JSONDecodeError, AttributeError) as exc:
+        return None, f"⑦ sources.lock 讀取失敗，無法判定類別門檻：{exc}"
+    if not isinstance(rid, str) or not rid:
+        return None, "⑦ sources.lock 缺 round_id，無法判定類別門檻"
+    return rid, None
+
+
+def check_category(doc: SynthDoc, synth_path: str, values_path: str, disp_values: List[str],
+                   todo_text: Optional[str], *, mode: str) -> List[str]:
+    rid, err = _round_id_of_synth(synth_path)
+    if err:
+        return [err]
+    if rid is None:
+        return []
+    # 延遲載入：只有綁得到輪次時才需要（無 lock 之呼叫端不依賴本模組）；缺模組 ⇒ fail-closed
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    try:
+        import _finding_category as fcat  # noqa: WPS433
+    except ImportError as exc:
+        return [f"⑦ 缺 scripts/_finding_category.py（類別判定唯一實作）：{exc}"]
+    try:
+        cats, _thr = fcat.load_config(values_path)
+        if not fcat.category_required(rid, values_path):
+            return []
+    except fcat.ConfigError as exc:
+        return [f"⑦ 類別設定不可用：{exc}"]
+    errs: List[str] = []
+    for f in doc.findings:
+        committee, cerr = fcat.single_category(f.block_lines, cats)
+        if cerr:
+            errs.append(f"⑦ {f.id} 附錄區塊之委員類別：{cerr}")
+        rows = [r for r in rows_for(doc, f.id) if not r.placeholder]
+        if mode == "hook":
+            rows = [r for r in rows if _row_done(r, disp_values)]
+        chair_vals = set()
+        for r in rows:
+            v = r.cells[4] if len(r.cells) >= 5 else ""
+            if v not in cats:
+                errs.append(f"⑦ {f.id} 列 {r.line_no}：群集表第 5 欄（主委類別）須為 {cats} 之一（得「{v}」）")
+            else:
+                chair_vals.add(v)
+        if len(chair_vals) > 1:
+            errs.append(f"⑦ {f.id} 之群集列主委類別不一致：{sorted(chair_vals)}")
+            continue
+        if committee is None or not chair_vals:
+            continue
+        chair = next(iter(chair_vals))
+        if chair == committee:
+            continue
+        listed = [(n, ln) for n, ln in doc.mismatch_lines if _id_in(ln, f.id)]
+        done = [(n, ln) for n, ln in listed if any(_token_whole(ln, v) for v in disp_values)]
+        if not done:
+            errs.append(f"⑦ {f.id} 委員類別「{committee}」≠ 主委類別「{chair}」，須列於 `類別不一致` 段之一行並附處置 token（{' | '.join(disp_values)}）")
+            continue
+        for n, ln in done:
+            for tgt, derr in parse_defer_targets(ln):
+                if derr:
+                    errs.append(f"⑦ {f.id} 類別不一致段 L{n}：{derr}")
+                elif mode == "gate":
+                    if todo_text is None:
+                        errs.append(f"⑦ {f.id} 類別不一致段 L{n}：`延後→{tgt}` 但未提供 --todo，無法驗目標存在")
+                    elif not _target_in_todo(tgt, todo_text):
+                        errs.append(f"⑦ {f.id} 類別不一致段 L{n}：`延後→{tgt}` 之目標不存在於 TODO 檔（整詞比對）")
+    return errs
+
+
 def load_values(path: str) -> List[str]:
     with open(path, encoding="utf-8") as fh:
         d = json.load(fh)
@@ -232,7 +332,8 @@ def load_values(path: str) -> List[str]:
     return vals
 
 
-def run(doc: SynthDoc, mode: str, values: List[str], todo_text: Optional[str]) -> List[str]:
+def run(doc: SynthDoc, mode: str, values: List[str], todo_text: Optional[str],
+        synth_path: Optional[str] = None, values_path: Optional[str] = None) -> List[str]:
     errs = check_ids(doc) + check_target(doc)
     if mode == "hook":
         errs += check_disposition(doc, values, None, strict_defer=False)
@@ -242,6 +343,8 @@ def run(doc: SynthDoc, mode: str, values: List[str], todo_text: Optional[str]) -
         errs += check_quote20(doc, values=values, completed_only=False)
     else:
         raise ValueError(mode)
+    if synth_path is not None and values_path is not None:
+        errs += check_category(doc, synth_path, values_path, values, todo_text, mode=mode)
     if not errs:
         errs += check_placeholder(doc)
     return errs
@@ -288,7 +391,7 @@ def main(argv: List[str]) -> int:
     doc = parse_synth(text, rel)
     if a.report:
         report(doc)
-    errs = run(doc, a.mode, values, todo_text)
+    errs = run(doc, a.mode, values, todo_text, synth_path=a.synth, values_path=a.values)
     for w in doc.warnings:
         print(f"[_synth_attr] ⚠ {w}", file=sys.stderr)
     if errs:

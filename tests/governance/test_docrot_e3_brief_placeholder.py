@@ -216,6 +216,8 @@ def _finding(tmp: Path, name: str, *, sev: str, evidence: str) -> Path:
         f"## GROK-R9-{sev}-01\n\n"
         "**斷言**: 一句可證偽主張。\n\n"
         f"**碼證**: {evidence}\n\n"
+        # DOCROT2 Task 3.1：未給 round id 之 --single 須類別；補上使拒收只能來自本檔各條之原判準
+        "**類別**: code-contract\n\n"
         "**來源摘要**: docs/X.md#abcdef123456\n\n"
         "[BLOCKING] 信心度=High。修法：x。\n",
         encoding="utf-8",

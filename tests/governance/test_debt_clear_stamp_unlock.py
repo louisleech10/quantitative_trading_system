@@ -13,6 +13,7 @@ import json
 import uuid
 from pathlib import Path
 
+from tests.governance import _debt_probe_helper as _dph
 from tests.governance.test_debt_clear import (
     _append,
     _build_session,
@@ -45,7 +46,11 @@ def _open_round_kind(root: Path, audit: Path, *, round_id: str, session: str, fa
     ]
     if brief_kind is not None:
         args += ["--field", f"brief_kind={brief_kind}"]
-    _append(root, audit, *args)
+        _append(root, audit, *args)
+    else:
+        # DOCROT2 Task 3.2 起 brief_kind 為必填：缺 brief_kind 之 round 以「規則上線前之寫入端」寫入
+        with _dph.legacy_round_open_registry(root / "scripts"):
+            _append(root, audit, *args)
 
 
 def _prep(tmp_path: Path, *, session: str, brief_kind: str | None) -> tuple[Path, Path, str, Path, Path]:

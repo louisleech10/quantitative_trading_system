@@ -85,6 +85,8 @@ def _open_fields(
         "--field",
         f"actor={actor}",
         "--field",
+        "brief_kind=review",
+        "--field",
         "origin_script=committee_run.sh",
     ]
 
@@ -232,6 +234,8 @@ def test_missing_required_field_fail_closed(tmp_path: Path) -> None:
             'expected_outputs=@{"codex":"o.md"}',
             "--field",
             "session_name=s1",
+            "--field",
+            "brief_kind=review",
             "--field",
             "origin_script=committee_run.sh",
             # 缺 actor
@@ -1090,6 +1094,8 @@ def test_mutation_rc_propagation(
         "--field",
         "session_name=Src",
         "--field",
+        "brief_kind=review",
+        "--field",
         "origin_script=committee_run.sh",
         # 缺 actor
     ]
@@ -1177,6 +1183,8 @@ def test_require_absent_rejects_rs_injection(tmp_path: Path) -> None:
             'expected_outputs=@{"codex":"handoffs/x.md"}',
             "--field",
             "actor=test-actor",
+            "--field",
+            "brief_kind=review",
             "--field",
             "origin_script=committee_run.sh",
             env=env,
@@ -1337,6 +1345,8 @@ def test_mutation_rs_reject_guard(
         'expected_outputs=@{"codex":"handoffs/x.md"}',
         "--field",
         "actor=test-actor",
+        "--field",
+        "brief_kind=review",
         "--field",
         "origin_script=committee_run.sh",
     ]
@@ -1598,6 +1608,8 @@ def test_mutation_splitlines_fullset_reject(
         "session_name=sess-mut-ls",
         "--field",
         "actor=test-actor",
+        "--field",
+        "brief_kind=review",
         "--field",
         "origin_script=committee_run.sh",
     ]
@@ -2321,6 +2333,9 @@ def _b3_harness(tmp_path: Path) -> dict:
         #   缺它 ⇒ 本 harness 三條 stamp success 斷言紅在「檢查沒跑」而非測試本意；
         #   同 test_stamp_taskid_inject 之註解：缺工具＝檢查沒跑，補進清單而非放寬。
         "completeness_check.sh",
+        # DOCROT2 Task 3.1：--single 之類別判定唯一實作與值集（缺即 fail-closed，同上理由補進清單）
+        "_finding_category.py",
+        "governance_verdicts.json",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():
@@ -2479,6 +2494,8 @@ def _open_via_append(
         f"session_name={session}",
         "--field",
         "actor=test",
+        "--field",
+        "brief_kind=review",
         "--field",
         "origin_script=committee_run.sh",
         env=h["env"],
@@ -3062,6 +3079,8 @@ def test_b3_expected_outputs_family_unregistered(tmp_path: Path) -> None:
         "session_name=s-exp-miss",
         "--field",
         "actor=test",
+        "--field",
+        "brief_kind=review",
         "--field",
         "origin_script=committee_run.sh",
         env=h["env"],

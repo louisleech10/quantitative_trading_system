@@ -42,6 +42,7 @@ _SCRIPT_NAMES = (
     "brief_conformance_check.sh",
     "completeness_check.sh",
     "_role_gate.sh",
+    *_dph.DOCROT2_HELPER_SCRIPTS,
 )
 
 
@@ -129,6 +130,7 @@ def _open_round(
         f"participants=@{participants}",
         f"expected_outputs=@{outputs_json}",
         f"session_name={session}",
+        "brief_kind=" + _dph.brief_kind_of(brief_path),
         "actor=test",
         "origin_script=committee_run.sh",
     ]

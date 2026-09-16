@@ -608,7 +608,7 @@ for fam in participants:
             out_abs = out_rel if os.path.isabs(out_rel) else str(repo / out_rel)
             chk = subprocess.run(
                 ["bash", str(repo / "scripts" / "completeness_check.sh"),
-                 "--single", out_abs, "--family", fam],
+                 "--single", out_abs, "--family", fam, "--round-id", rid],
                 capture_output=True, text=True,
             )
             if chk.returncode != 0:
@@ -789,6 +789,19 @@ PY
 }
 
 # ── 銷帳 ────────────────────────────────────────────────
+_emit_round_metric() {
+  local rid="$1" session="$2" lock="$3"
+  if [ ! -f "${SCRIPT_DIR}/_docrot2_metrics.py" ] || [ ! -f "${SCRIPT_DIR}/_finding_category.py" ]; then
+    echo "ERROR: 缺 scripts/_docrot2_metrics.py 或 scripts/_finding_category.py（收案量測事件之唯一實作）⇒ 拒銷（fail-closed）" >&2
+    echo "DOCROT2_METRIC_REASON=helper-missing" >&2
+    return 1
+  fi
+  python3 "${SCRIPT_DIR}/_docrot2_metrics.py" emit-round --round-id "${rid}" --session "${session}" --lock "${lock}"
+  local rc=$?
+  [ "${rc}" -eq 0 ] || { echo "ERROR: docrot2_round_metric 未寫入 rc=${rc}（拒銷）" >&2; return 1; }
+  return 0
+}
+
 _assert_redispatch_archives_dispositioned() {
   # B-64 Task 1.7：帶保存檔之輪，銷帳須證明保存檔未被改動、收斂檔引用其路徑且其 finding 逐條有處置列。
   #   helper 缺失而該輪有帶保存檔之發放事件 ⇒ fail-closed（不得靜默放行）。
@@ -872,6 +885,10 @@ _cmd_clear() {
 
   # ⑤ 每家 success + sha 相符
   _assert_all_families_success_and_sha_match "${rid}" || return 1
+
+  # ⑤b DOCROT2 Task 3.2：收案前寫 docrot2_round_metric（僅門檻後之輪；同輪已有即不再寫）。
+  #   計算與寫入唯一實作＝scripts/_docrot2_metrics.py emit-round；helper 缺失、缺欄或寫入失敗 ⇒ 拒銷（fail-closed）。
+  _emit_round_metric "${rid}" "${session}" "${lock}" || return 1
 
   # ⑥ emit（含 lock_sha256）
   _emit_clear "${rid}" "${session}" "${lock}" || return 1

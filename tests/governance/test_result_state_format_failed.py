@@ -87,6 +87,7 @@ def _harness(tmp_path: Path, *, kind: str = "review") -> dict:
         "_debt_ledger_core.py",
         # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT
         "_role_gate.sh",
+        *_dph.DOCROT2_HELPER_SCRIPTS,
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():
@@ -176,6 +177,8 @@ def _open_round(
         f"expected_outputs=@{outputs}",
         "--field",
         f"session_name={session}",
+        "--field",
+        "brief_kind=" + _dph.brief_kind_of(h["root"] / h["brief_rel"]),
         "--field",
         "actor=test",
         "--field",

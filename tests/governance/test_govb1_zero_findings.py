@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -45,7 +46,8 @@ def _rc_single(path: Path, *, family: str = "codex") -> int:
 
 
 def _finding(body_assert: str, body_code: str, *, fid: str = "CODEX-R1-P3-00") -> str:
-    return f"## {fid}\n**斷言**: {body_assert}\n**碼證**: {body_code}\n"
+    # DOCROT2 Task 3.1：未給 round id 之 --single 須類別；補上使 rc 只反映本檔所驗之非空判定
+    return f"## {fid}\n**斷言**: {body_assert}\n**碼證**: {body_code}\n**類別**: other\n"
 
 
 # ---------------------------------------------------------------------------
@@ -220,13 +222,19 @@ def test_mut_drop_substantive_check_regresses(tmp_path: Path) -> None:
     #   否則量到的是兩閘之聯集、非空判定即使失效也不會現形（假承重）。
     anchor_tokens = '  _validate_anchors "${SINGLE_ARG}" || _single_rc=1\n'
     assert anchor_tokens in src, "mutation 錨點漂移：P0/P1 token 閘（_validate_anchors）"
+    # 🔴 DOCROT2 Task 3.1（2026-09-16）：`--single` 另有獨立之類別閘（hollow fixture 無 `**類別**`）
+    #   ⇒ 同上理由，held-out 時一併關閉類別要求，否則量到兩閘之聯集（後加守衛遮蔽先前守衛）。
+    anchor_cat = '_validate_finding_body "${SINGLE_ARG}" 1 "${_cat_req}" "${_cat_vals}"'
+    assert anchor_cat in src, "mutation 錨點漂移：類別閘（_validate_finding_body 第三參數）"
+    for helper in ("_finding_category.py", "governance_verdicts.json", "audit_events.json"):
+        shutil.copy2(REPO_ROOT / "scripts" / helper, tmp_path / helper)
     mut = tmp_path / "mut_completeness.sh"
     mut.write_text(
         src.replace(anchor, 'if ($0 ~ /\\*\\*斷言\\*\\*/) seen_assert=1', 1).replace(
             'if ($0 ~ /\\*\\*碼證\\*\\*/ && (!strict || substantive(field_body($0, "碼證")))) seen_code=1',
             'if ($0 ~ /\\*\\*碼證\\*\\*/) seen_code=1',
             1,
-        ).replace(anchor_tokens, "", 1),
+        ).replace(anchor_tokens, "", 1).replace(anchor_cat, '_validate_finding_body "${SINGLE_ARG}" 1 0 ""', 1),
         encoding="utf-8",
     )
     base = subprocess.run(

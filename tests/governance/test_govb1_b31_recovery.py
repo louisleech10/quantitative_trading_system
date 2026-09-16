@@ -26,6 +26,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.governance import _debt_probe_helper as _dph
 from tests.governance import test_govb1_zeroid_no_regression as _zeroid
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -207,7 +208,8 @@ def test_frozen_anchors_in_cx_run_are_intact() -> None:
         '          echo "ERROR: completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）" >&2\n'
         "          _rc=127\n"
         "        else\n",
-        '          bash "${_cc}" --single "${out}" --family "${fam}" >&2 || _rc=$?\n',
+        # DOCROT2 Task 3.1：交件呼叫面須帶同一 round id（TODO Task 3.1 要點 3）⇒ 錨點字面隨之更新
+        '          bash "${_cc}" --single "${out}" --family "${fam}" --round-id "${ROUND_ID:-}" >&2 || _rc=$?\n',
         '  _fmt_rc="$(_run_format_check_if_needed "${cli_rc}")"\n'
         '  _emit_family_result "${cli_rc}" "${_fmt_rc}" || {\n',
     ):
@@ -252,6 +254,7 @@ _FACT = "fact-verified: cx_run 交件路徑先跑格式檢查再 append audit"
 _ASSUMED = "assumed: CX_STUB_MODE=preserve 不覆寫既有產出"
 
 _COPY_SCRIPTS = (
+    *_dph.DOCROT2_HELPER_SCRIPTS,
     "cx_run.sh",
     "audit_append.sh",
     "audit_events.json",
@@ -349,8 +352,10 @@ def _harness(tmp_path: Path, kind: str = "review") -> dict:
     }
 
 
-def _open_round(h: dict, *, round_id: str, session: str, fams: list[str], out_prefix: str) -> None:
+def _open_round(h: dict, *, round_id: str, session: str, fams: list[str], out_prefix: str,
+                brief_kind: str | None = None) -> None:
     brief_sha = _sha256_file(h["brief"])
+    brief_kind = brief_kind or _dph.brief_kind_of(h["brief"])
     r = subprocess.run(
         [
             "bash", str(h["scripts"] / "audit_append.sh"),
@@ -366,6 +371,7 @@ def _open_round(h: dict, *, round_id: str, session: str, fams: list[str], out_pr
             "--field",
             f"expected_outputs=@{json.dumps({f: f'{out_prefix}-{f}.md' for f in fams})}",
             "--field", f"session_name={session}",
+            "--field", f"brief_kind={brief_kind}",
             "--field", "actor=test",
             "--field", "origin_script=committee_run.sh",
         ],
@@ -521,6 +527,7 @@ _U3_REAL = (
     "## {FAM}-R1-P3-00\n\n"
     "**斷言**: 本輪逐項核對後無 finding\n\n"
     "**碼證**: scripts/cx_run.sh:1\n\n"
+    "**類別**: other\n\n"   # DOCROT2 Task 3.1：未給 round id 之自檢一律須類別
     "**來源摘要**: handoffs/u3-{fam}.md#aaaaaaaaaaaa\n"
 )
 

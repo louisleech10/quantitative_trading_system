@@ -235,11 +235,22 @@ def _pointer_violation(ctx: Context, line: str) -> Optional[str]:
     return None
 
 
-def archaeology(ctx: Context, lines: Sequence[str], idxs: Sequence[int], reg: Dict[str, List[bool]],
-                handoff: bool) -> List[str]:
+# DOCROT2 Task 3.2：違規以 (rule_id, 訊息) 標記，rule_id 值集＝scripts/audit_events.json 之 enums.rule_id
+RULE_STATUS = "status-literal"
+RULE_ARCHAEOLOGY = "archaeology"
+RULE_HISTORY_POINTER = "history-pointer"
+RULE_HANDOFF_GRAMMAR = "handoff-grammar"
+RULE_HANDOFF_LIFECYCLE = "handoff-lifecycle"
+RULE_WRITE_ALIAS = "write-alias"
+RULE_GUARD_ERROR = "guard-error"
+ORIGIN = "live_doc_write_guard.sh"
+
+
+def archaeology_tagged(ctx: Context, lines: Sequence[str], idxs: Sequence[int], reg: Dict[str, List[bool]],
+                       handoff: bool) -> List[Tuple[str, str]]:
     literals = [s for s in (ctx.registry.get("archaeology_literals") or []) if isinstance(s, str) and s]
     entry_re = re.compile((ctx.registry.get("handoff") or {}).get("entry_marker_regex") or r"(?!)")
-    out: List[str] = []
+    out: List[Tuple[str, str]] = []
     for i in idxs:
         if reg["gen"][i] or reg["marker"][i]:
             continue
@@ -249,17 +260,22 @@ def archaeology(ctx: Context, lines: Sequence[str], idxs: Sequence[int], reg: Di
                 continue
             why = _pointer_violation(ctx, ln)
             if why:
-                out.append(f"L{i + 1}：歷史專區新增行{why}")
+                out.append((RULE_HISTORY_POINTER, f"L{i + 1}：歷史專區新增行{why}"))
             continue
         if "~~" in ln:
-            out.append(f"L{i + 1}：歷史專區外新增刪除線 `~~`（舊版字面不留在活文件；修訂史以指標指向不可變紀錄）")
+            out.append((RULE_ARCHAEOLOGY, f"L{i + 1}：歷史專區外新增刪除線 `~~`（舊版字面不留在活文件；修訂史以指標指向不可變紀錄）"))
         for lit in literals:
             if lit in ln:
-                out.append(f"L{i + 1}：歷史專區外新增考古字面「{lit}」")
+                out.append((RULE_ARCHAEOLOGY, f"L{i + 1}：歷史專區外新增考古字面「{lit}」"))
         m = FINDING_ID_RE.search(ln)
         if m:
-            out.append(f"L{i + 1}：歷史專區外新增 finding ID「{m.group(0)}」（出處留在收斂檔，活文件只寫現行條文）")
+            out.append((RULE_ARCHAEOLOGY, f"L{i + 1}：歷史專區外新增 finding ID「{m.group(0)}」（出處留在收斂檔，活文件只寫現行條文）"))
     return out
+
+
+def archaeology(ctx: Context, lines: Sequence[str], idxs: Sequence[int], reg: Dict[str, List[bool]],
+                handoff: bool) -> List[str]:
+    return [msg for _rule, msg in archaeology_tagged(ctx, lines, idxs, reg, handoff)]
 
 
 # ────────────────────────────────────────────────────────────── ③ 交接檔文法（Task 2.4）
@@ -273,6 +289,18 @@ def _spans(lines: Sequence[str], starts: List[Tuple[int, str]]) -> Dict[str, Tup
 
 
 def handoff_grammar(ctx: Context, lines: Sequence[str], reg: Dict[str, List[bool]], lifecycle: bool) -> List[str]:
+    return [msg for _rule, msg in handoff_grammar_tagged(ctx, lines, reg, lifecycle)]
+
+
+def handoff_grammar_tagged(ctx: Context, lines: Sequence[str], reg: Dict[str, List[bool]],
+                           lifecycle: bool) -> List[Tuple[str, str]]:
+    content, life = _handoff_grammar_impl(ctx, lines, reg, lifecycle)
+    return [(RULE_HANDOFF_GRAMMAR, m) for m in content] + [(RULE_HANDOFF_LIFECYCLE, m) for m in life]
+
+
+def _handoff_grammar_impl(ctx: Context, lines: Sequence[str], reg: Dict[str, List[bool]],
+                          lifecycle: bool) -> Tuple[List[str], List[str]]:
+    """回 (內容型違規, 一致性型〔條目生命週期〕違規)。"""
     spec = ctx.registry.get("handoff") or {}
     h2_set = list(spec.get("h2_sections") or [])
     gen_only = list(spec.get("generated_only_sections") or [])
@@ -282,6 +310,7 @@ def handoff_grammar(ctx: Context, lines: Sequence[str], reg: Dict[str, List[bool
     if not h2_set or not hist_sec or set(gen_only) - set(sec_keys):
         raise GuardError("live_doc_registry.json 之 handoff 文法定義不完整")
     out: List[str] = []
+    life: List[str] = []
     h1 = [i for i, ln in enumerate(lines) if ln.startswith("# ")]
     if len(h1) != 1:
         out.append(f"H1 須恰一行（實得 {len(h1)}）")
@@ -369,30 +398,48 @@ def handoff_grammar(ctx: Context, lines: Sequence[str], reg: Dict[str, List[bool
                         subjects.append(pm.group(1))
                 done = sorted({x for x in subjects if ctx.status_of.get(x) in ctx.completed})
                 if done:
-                    out.append(f"L{i + 1}：進行中紀錄之條目含已完成識別碼 {done}（整則移至 {spec.get('archive_path')}）")
-    return out
+                    life.append(f"L{i + 1}：進行中紀錄之條目含已完成識別碼 {done}（整則移至 {spec.get('archive_path')}）")
+    return out, life
 
 
 # ────────────────────────────────────────────────────────────── 組合
 
-def evaluate(ctx: Context, rel: str, old_text: str, new_text: str, *, lifecycle: bool,
-             new_lines_only: bool = True) -> List[str]:
+def evaluate_tagged(ctx: Context, rel: str, old_text: str, new_text: str, *, lifecycle: bool,
+                    new_lines_only: bool = True) -> List[Tuple[str, str]]:
     cls, flags = ctx.cls_flags(rel)
     if cls is None:
         return []
     new_lines = split_lines(new_text)
     reg = regions(new_lines, ctx.legal_keys(rel))
-    out: List[str] = []
+    out: List[Tuple[str, str]] = []
     if new_lines_only:
         idxs = added_indices(split_lines(old_text), new_lines) if old_text != new_text else []
         if flags.get("new_line_status_check"):
             cand = [i for i in idxs if not (reg["gen"][i] or reg["hist"][i] or reg["fence"][i] or reg["marker"][i])]
-            out += status_hits(ctx, new_lines, cand)
+            out += [(RULE_STATUS, m) for m in status_hits(ctx, new_lines, cand)]
         if flags.get("archaeology_check"):
-            out += archaeology(ctx, new_lines, idxs, reg, bool(flags.get("handoff_grammar")))
+            out += archaeology_tagged(ctx, new_lines, idxs, reg, bool(flags.get("handoff_grammar")))
     if flags.get("handoff_grammar"):
-        out += handoff_grammar(ctx, new_lines, reg, lifecycle)
+        out += handoff_grammar_tagged(ctx, new_lines, reg, lifecycle)
     return out
+
+
+def evaluate(ctx: Context, rel: str, old_text: str, new_text: str, *, lifecycle: bool,
+             new_lines_only: bool = True) -> List[str]:
+    return [msg for _rule, msg in evaluate_tagged(ctx, rel, old_text, new_text, lifecycle=lifecycle,
+                                                   new_lines_only=new_lines_only)]
+
+
+def _emit_block(root: str, rel: str, rules: Sequence[str], ctx: Optional["Context"] = None) -> None:
+    """DOCROT2 Task 3.2：擋下事件（寫入實作在 _live_doc_registry.emit_block_event）；類別取不到記 UNREGISTERED。"""
+    cls: Optional[str] = None
+    try:
+        if ctx is None:
+            ctx = Context(root)
+        cls, _ = ctx.cls_flags(rel)
+    except (GuardError, ValueError, OSError):
+        cls = None
+    ldr.emit_block_event(root, ORIGIN, rel, cls, rules)
 
 
 def _report(rel: str, viols: Sequence[str]) -> None:
@@ -530,6 +577,7 @@ def hook_mode(raw: str) -> int:
     # 硬連結無從得知其他名稱，不論副檔名一律擋。其後判定一律用正名。
     if alias is not None and (alias == ALIAS_HARDLINK or _md_like(rel) or _md_like(fp)):
         print(f"live_doc_write_guard: {fp}：別名寫入——{alias}（正名 {rel}）⇒ 擋；請直接寫正名絕對路徑", file=sys.stderr)
+        _emit_block(root, rel, [RULE_WRITE_ALIAS])
         return 2
     try:
         ctx = Context(root)
@@ -538,6 +586,7 @@ def hook_mode(raw: str) -> int:
         if not _md_like(rel):
             return 0
         print(f"live_doc_write_guard: {rel}：{exc} ⇒ fail-closed", file=sys.stderr)
+        ldr.emit_block_event(root, ORIGIN, rel, None, [RULE_GUARD_ERROR])
         return 2
     try:
         cls, _ = ctx.cls_flags(rel)
@@ -570,12 +619,14 @@ def hook_mode(raw: str) -> int:
         old_text = old or ""
         if new == old_text:
             return 0
-        viols = evaluate(ctx, rel, old_text, new, lifecycle=False)
+        tagged = evaluate_tagged(ctx, rel, old_text, new, lifecycle=False)
     except (GuardError, ValueError, UnicodeDecodeError) as exc:
         print(f"live_doc_write_guard: {rel}：{exc} ⇒ fail-closed", file=sys.stderr)
+        _emit_block(root, rel, [RULE_GUARD_ERROR], ctx)
         return 2
-    if viols:
-        _report(rel, viols)
+    if tagged:
+        _report(rel, [msg for _rule, msg in tagged])
+        _emit_block(root, rel, [rule for rule, _msg in tagged], ctx)
         return 2
     return 0
 
@@ -625,12 +676,14 @@ def staged_mode() -> int:
             continue
         old_text = _decode(_git_show(root, "HEAD:" + old_path)) or ""
         try:
-            viols = evaluate(ctx, path, old_text, new_text, lifecycle=True)
+            tagged = evaluate_tagged(ctx, path, old_text, new_text, lifecycle=True)
         except GuardError as exc:
             print(f"live_doc_write_guard: {path}：{exc} ⇒ fail-closed", file=sys.stderr)
+            _emit_block(root, path, [RULE_GUARD_ERROR], ctx)
             return 2
-        if viols:
-            _report(path + "（暫存）", viols)
+        if tagged:
+            _report(path + "（暫存）", [msg for _rule, msg in tagged])
+            _emit_block(root, path, [rule for rule, _msg in tagged], ctx)
             rc = 1
     return rc
 
