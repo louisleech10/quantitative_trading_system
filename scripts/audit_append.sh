@@ -711,19 +711,26 @@ _assert_file_unchanged_locked() {
 import hashlib, os, stat, sys
 p = os.environ["AUDIT_FU_PATH"]
 want = os.environ["AUDIT_FU_WANT"]
+# 🔴 b1 review-r4（CODEX-R4-P1-02）：以 O_NOFOLLOW 開檔後，一律用**同一個 fd** 做 fstat 與讀取，
+#    不得先 lstat 再以路徑 open——兩者之間可被原子換成 symlink（TOCTOU）。
 try:
     try:
-        st = os.lstat(p)
+        fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW)
     except FileNotFoundError:
         actual = "none"
+    except OSError as exc:
+        import errno
+        if exc.errno in (errno.ELOOP, errno.EMLINK):
+            sys.exit(1)                      # symlink ⇒ 身分已變，直接拒
+        sys.exit(2)
     else:
-        if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
-            sys.exit(1)                      # symlink 或非一般檔 ⇒ 身分已變，直接拒
-        if st.st_size == 0:
-            actual = "none"
-        else:
-            with open(p, "rb") as fh:
-                actual = hashlib.sha256(fh.read()).hexdigest()
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode):
+                sys.exit(1)                  # 非一般檔 ⇒ 拒
+            actual = "none" if st.st_size == 0 else hashlib.sha256(os.read(fd, st.st_size)).hexdigest()
+        finally:
+            os.close(fd)
 except OSError:
     sys.exit(2)
 sys.exit(0 if actual == want else 1)
@@ -820,6 +827,14 @@ while [ $# -gt 0 ]; do
       # B-64 b1 review-r3（CODEX-R3-P1-02）：路徑與雜湊拆成兩個參數——合法路徑可含 `@`，
       #   用 <path>@<sha> 單一參數會把既有路徑契約縮窄成黑名單而誤擋合法棄置。
       [ $# -ge 2 ] || die "--require-file-path 需要參數"
+      # 🔴 b1 review-r4（CODEX-R4-P1-01）：須套用與 path_token_ok 同一組路徑文法，
+      #    否則空字串配 sha=none 會讓整個檔案綁定變成 no-op（假防護）。
+      case "$2" in
+        ""|-*|*"'"*|*$'\n'*|*$'\r'*)
+          echo "ERROR: --require-file-path 值不合路徑文法（非空、不得以 - 起首、不得含單引號或換行）" >&2
+          exit 2
+          ;;
+      esac
       REQUIRE_FILE_PATH="$2"
       REQUIRE_FILE_PATH_SET=1
       shift 2

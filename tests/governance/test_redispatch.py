@@ -819,6 +819,22 @@ def test_audit_append_file_flag_alone_rc2(repo: Repo) -> None:
     assert proc.returncode == 2
 
 
+@pytest.mark.parametrize("bad_path", ["", "-x.md", "handoffs/it's.md"])
+def test_audit_append_file_path_illegal_rc2(repo: Repo, bad_path: str) -> None:
+    """檔案綁定之路徑須套用與 path_token_ok 同一文法（b1 r4 CODEX-R4-P1-01）。"""
+    proc = repo.run(["bash", str(repo.scripts / "audit_append.sh"),
+                     "--require-file-path", bad_path,
+                     "--require-file-sha256", "none",
+                     "--require-round-unchanged", "r1@0",
+                     "--event", "debt_abandon", "--field", "round_id=r1",
+                     "--field", "abandon_kind=collection-failed",
+                     "--field", "reason=redispatch-test-reason-000000001",
+                     "--field", "approver=redispatch-test-approver",
+                     "--field", "actor=debt_clear", "--field", "origin_script=debt_clear.sh"])
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
 def test_after_check_hook_without_harness_rc2(repo: Repo) -> None:
     """查核後掛鉤未綁 GOVERNANCE_TEST_HARNESS=1 ⇒ fail-closed rc=2。"""
     rid = _exhausted_round(repo)
