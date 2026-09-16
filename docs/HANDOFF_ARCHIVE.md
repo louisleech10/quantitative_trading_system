@@ -320,3 +320,24 @@
 - 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r4/synth.md`
 - 2026-09-15：D2B → commit `f42f35f4`
 - 2026-09-15：D2B → `handoffs/reconcile/20260915-docrot2-b2-review-r5/synth.md`
+
+## 2026-09-16 交接檔進行中紀錄移出：B-64（票收批，條目識別碼轉完成）
+
+<!-- ENTRY: B-64 -->
+- 2026-09-15：B-64 → `docs/REDISPATCH_SPEC.md`
+- 2026-09-15：B-64 → `docs/REDISPATCH_TODO.md`
+- 2026-09-15：B-64 → `handoffs/reconcile/20260915-redispatch-x-review-r7/synth.md`
+- 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-x-review-r12/synth.md`
+- 2026-09-16：B-64 → commit `7eb7ad27`
+- 2026-09-16：B-64 → commit `bfe7cdc0`
+- 2026-09-16：B-64 → commit `4de5b6a2`
+- 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-b1-review-r4/synth.md`
+- 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-b1-review-r5/synth.md`
+- 2026-09-16：B-64 → commit `cf048a76`
+- 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-b1-review-r6/synth.md`
+- 2026-09-16：B-64 → commit `d680df2d`
+- 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-b1-review-r7/synth.md`
+- 2026-09-16：B-64 → commit `d31bd7a0`
+- 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-b1-review-r8/synth.md`
+- 2026-09-16：B-64 → commit `12d1f748`
+- 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-b1-review-r9/synth.md`
