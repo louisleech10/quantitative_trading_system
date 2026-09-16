@@ -57,9 +57,12 @@ REQUIRE_ABSENT_SESSION=""
 # B-64 Task 1.3：--require-round-unchanged <round_id>@<sequence>（鎖內條件寫入）
 REQUIRE_ROUND_UNCHANGED_SET=0
 REQUIRE_ROUND_UNCHANGED=""
-# B-64 b1 review-r2：--require-file-unchanged <path>@<sha256|none>（鎖內重驗檔案雜湊）
-REQUIRE_FILE_UNCHANGED_SET=0
-REQUIRE_FILE_UNCHANGED=""
+# B-64 b1 review-r2／r3：--require-file-path <path> ＋ --require-file-sha256 <sha256|none>
+#   （鎖內重驗檔案雜湊；路徑與雜湊分開傳，避免與路徑文法衝突）
+REQUIRE_FILE_PATH_SET=0
+REQUIRE_FILE_PATH=""
+REQUIRE_FILE_SHA_SET=0
+REQUIRE_FILE_SHA=""
 # 以 RS(\x1e) 分隔的 field 鍵值（k=v / k=@json）；禁 NUL（env 傳不過）
 FIELD_RS=$'\x1e'
 FIELD_PAIRS=""
@@ -700,20 +703,27 @@ PY
 }
 
 _assert_file_unchanged_locked() {
-  # B-64 b1 review-r2：持鎖重驗 <path>@<sha256|none>。rc=0 相符／rc=1 已變動／rc=2 讀取失敗。
-  local spec="$1"
-  local path="${spec%@*}"
-  local want="${spec##*@}"
+  # B-64 b1 review-r2／r3：持鎖重驗檔案綁定。rc=0 相符／rc=1 已變動或身分被替換／rc=2 讀取失敗。
+  # 🔴 不跟隨 symlink（CODEX-R3-P1-01）：`os.path.isfile` 會跟隨連結，身分替換即無從察覺。
+  local path="$1"
+  local want="$2"
   AUDIT_FU_PATH="${path}" AUDIT_FU_WANT="${want}" python3 <<'PY'
-import hashlib, os, sys
+import hashlib, os, stat, sys
 p = os.environ["AUDIT_FU_PATH"]
 want = os.environ["AUDIT_FU_WANT"]
 try:
-    if not os.path.isfile(p) or os.path.getsize(p) == 0:
+    try:
+        st = os.lstat(p)
+    except FileNotFoundError:
         actual = "none"
     else:
-        with open(p, "rb") as fh:
-            actual = hashlib.sha256(fh.read()).hexdigest()
+        if stat.S_ISLNK(st.st_mode) or not stat.S_ISREG(st.st_mode):
+            sys.exit(1)                      # symlink 或非一般檔 ⇒ 身分已變，直接拒
+        if st.st_size == 0:
+            actual = "none"
+        else:
+            with open(p, "rb") as fh:
+                actual = hashlib.sha256(fh.read()).hexdigest()
 except OSError:
     sys.exit(2)
 sys.exit(0 if actual == want else 1)
@@ -746,13 +756,13 @@ _append_with_round_unchanged_guard() {
   esac
 
   # B-64 b1 review-r2（CODEX-R2-P1-01）：同一把鎖內一併重驗產出檔雜湊綁定
-  if [ "${REQUIRE_FILE_UNCHANGED_SET}" = "1" ]; then
-    _assert_file_unchanged_locked "${REQUIRE_FILE_UNCHANGED}"
+  if [ "${REQUIRE_FILE_PATH_SET}" = "1" ]; then
+    _assert_file_unchanged_locked "${REQUIRE_FILE_PATH}" "${REQUIRE_FILE_SHA}"
     case $? in
       0) : ;;
       1)
         _release_lock
-        echo "ERROR: 產出檔自快照後已被改動（${REQUIRE_FILE_UNCHANGED}），拒寫" >&2
+        echo "ERROR: 產出檔自快照後已被改動或身分被替換（${REQUIRE_FILE_PATH}），拒寫" >&2
         return 1
         ;;
       *)
@@ -806,13 +816,20 @@ while [ $# -gt 0 ]; do
       EVENT_NAME="$2"
       shift 2
       ;;
-    --require-file-unchanged)
-      # B-64 b1 review-r2（CODEX-R2-P1-01）：鎖內重驗檔案雜湊；none ＝ 須不存在或 0 byte。
-      [ $# -ge 2 ] || die "--require-file-unchanged 需要參數"
-      printf '%s' "$2" | grep -Eq '^[^@[:space:]]+@([0-9a-f]{64}|none)$' \
-        || die "--require-file-unchanged 值須為 <path>@<sha256|none>"
-      REQUIRE_FILE_UNCHANGED="$2"
-      REQUIRE_FILE_UNCHANGED_SET=1
+    --require-file-path)
+      # B-64 b1 review-r3（CODEX-R3-P1-02）：路徑與雜湊拆成兩個參數——合法路徑可含 `@`，
+      #   用 <path>@<sha> 單一參數會把既有路徑契約縮窄成黑名單而誤擋合法棄置。
+      [ $# -ge 2 ] || die "--require-file-path 需要參數"
+      REQUIRE_FILE_PATH="$2"
+      REQUIRE_FILE_PATH_SET=1
+      shift 2
+      ;;
+    --require-file-sha256)
+      [ $# -ge 2 ] || die "--require-file-sha256 需要參數"
+      printf '%s' "$2" | grep -Eq '^([0-9a-f]{64}|none)$' \
+        || die "--require-file-sha256 值須為 sha256 或 none"
+      REQUIRE_FILE_SHA="$2"
+      REQUIRE_FILE_SHA_SET=1
       shift 2
       ;;
     --require-round-unchanged)
@@ -850,6 +867,22 @@ while [ $# -gt 0 ]; do
       ;;
   esac
 done
+
+# B-64 b1 review-r3（CODEX-R3-P1-03）：檔案綁定旗標之互斥與 file-alone 守衛須先於所有早退分支
+#   （含必填欄檢查與 --require-absent-session 分支；否則併用時檔案守衛被靜默忽略＝假防護）
+if [ "${REQUIRE_FILE_PATH_SET}" = "1" ] || [ "${REQUIRE_FILE_SHA_SET}" = "1" ]; then
+  if [ "${REQUIRE_FILE_PATH_SET}" != "${REQUIRE_FILE_SHA_SET}" ]; then
+    echo "ERROR: --require-file-path 與 --require-file-sha256 須成對給定" >&2
+    exit 2
+  fi
+  # 🔴 不另設「檔案旗標不得與 --require-absent-session 併用」：該情形已由下一條
+  #    （檔案旗標須併 round 旗標）與既有「round 與 absent 互斥」共同涵蓋，
+  #    再寫一條即為不可達之死碼（mutation 永遠不轉紅＝假防護）。
+  if [ "${REQUIRE_ROUND_UNCHANGED_SET}" != "1" ]; then
+    echo "ERROR: 檔案綁定旗標須與 --require-round-unchanged 併用" >&2
+    exit 2
+  fi
+fi
 
 [ -n "${EVENT_NAME}" ] || die "必須指定 --event"
 [ -f "${REGISTRY}" ] || die "registry 缺檔: ${REGISTRY}"
@@ -925,13 +958,6 @@ if [ "${REQUIRE_ABSENT_SET}" = "1" ]; then
   fi
   _append_with_absent_guard "${REQUIRE_ABSENT_SESSION}"
   exit $?
-fi
-
-# B-64 b1 review-r2：--require-file-unchanged 須與 --require-round-unchanged 併用
-#   （單獨給會被靜默忽略＝假防護；fail-closed 拒收，rc=2）
-if [ "${REQUIRE_FILE_UNCHANGED_SET}" = "1" ] && [ "${REQUIRE_ROUND_UNCHANGED_SET}" != "1" ]; then
-  echo "ERROR: --require-file-unchanged 須與 --require-round-unchanged 併用" >&2
-  exit 2
 fi
 
 # B-64 Task 1.3：--require-round-unchanged（與 --require-absent-session 互斥；僅適用 debt 事件）

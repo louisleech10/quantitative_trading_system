@@ -693,12 +693,15 @@ def cmd_exhausted_check(argv: List[str]) -> int:
             fam0 = ok_fams[0]
             out_rel = ((rounds.get(rid) or {}).get("open") or {}).get("expected_outputs", {}).get(fam0) or ""
             q = repo / out_rel
+            # 🔴 路徑與雜湊分兩行輸出（b1 review-r3 CODEX-R3-P1-02）：合法路徑可含 `@`，
+            #    以單一 <path>@<sha> 傳遞會與路徑文法衝突而誤擋合法棄置。
             try:
-                binding = f"{out_rel}@{sha256_file(q)}" if (q.is_file() and q.stat().st_size > 0) \
-                    else f"{out_rel}@none"
+                st = q.lstat()
+                sha = sha256_file(q) if (not q.is_symlink() and st.st_size > 0) else "none"
             except OSError:
-                binding = f"{out_rel}@none"
-            print(f"snapshot_output={binding}")
+                sha = "none"
+            print(f"snapshot_output_path={out_rel}")
+            print(f"snapshot_output_sha={sha}")
             return 0
     for fam, v in per_family.items():
         for x in v:

@@ -746,9 +746,12 @@ _emit_abandon() {
   local snapshot="${5:-}"
   # B-64 b1 review-r2（CODEX-R2-P1-01）：第 6 參數＝<產出路徑>@<sha256|none>，鎖內一併重驗
   local snapshot_out="${6:-}"
+  local snapshot_sha="${7:-}"
   local _rd_guard=()
   [ -n "${snapshot}" ] && _rd_guard=(--require-round-unchanged "${rid}@${snapshot}")
-  [ -n "${snapshot_out}" ] && _rd_guard+=(--require-file-unchanged "${snapshot_out}")
+  if [ -n "${snapshot_out}" ] && [ -n "${snapshot_sha}" ]; then
+    _rd_guard+=(--require-file-path "${snapshot_out}" --require-file-sha256 "${snapshot_sha}")
+  fi
   bash "${AUDIT_APPEND}" \
     ${_rd_guard[@]+"${_rd_guard[@]}"} \
     --event debt_abandon \
@@ -910,9 +913,11 @@ _cmd_abandon() {
   _RD_SNAPSHOT=""
   if [ "${kind}" = "collection-failed" ] && [ -f "${SCRIPT_DIR}/_redispatch_check.py" ]; then
     _RD_SNAPSHOT_OUT=""
+    _RD_SNAPSHOT_SHA=""
     _rd_out="$(python3 "${SCRIPT_DIR}/_redispatch_check.py" exhausted-check --round-id "${rid}" 2>/dev/null)" \
       && _RD_SNAPSHOT="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_sequence=\([0-9][0-9]*\)$/\1/p')" \
-      && _RD_SNAPSHOT_OUT="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_output=\(.*\)$/\1/p')"
+      && _RD_SNAPSHOT_OUT="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_output_path=\(.*\)$/\1/p')" \
+      && _RD_SNAPSHOT_SHA="$(printf '%s\n' "${_rd_out}" | sed -n 's/^snapshot_output_sha=\(.*\)$/\1/p')"
     if [ -n "${REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD:-}" ]; then
       if [ "${GOVERNANCE_TEST_HARNESS:-}" = "1" ]; then
         bash -c "${REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD}" || true
@@ -986,7 +991,7 @@ PY
   fi
 
   # B-64 Task 1.3 要點 4：耗盡例外之寫入須帶「該輪自查核快照後未變動」條件（第 5 參數）
-  _emit_abandon "${rid}" "${kind}" "${reason}" "${approver}" "${_RD_SNAPSHOT:-}" "${_RD_SNAPSHOT_OUT:-}" || return 1
+  _emit_abandon "${rid}" "${kind}" "${reason}" "${approver}" "${_RD_SNAPSHOT:-}" "${_RD_SNAPSHOT_OUT:-}" "${_RD_SNAPSHOT_SHA:-}" || return 1
   echo "OK: abandoned round_id=${rid} kind=${kind}"
   return 0
 }

@@ -695,6 +695,23 @@ def _exhausted_round(repo: Repo) -> str:
     return rid
 
 
+def _exhausted_round_with_output(repo: Repo) -> tuple[str, Path]:
+    """造一輪：codex 六次重派皆已結束、最新結果為 format-failed 且**產出非空**（供檔案綁定測試）。"""
+    rid = str(uuid.uuid4())
+    expected = open_round(repo, rid)
+    body = "## CODEX-R1-P1-01\n**斷言**: 保存檔內容夠長以供逐字引用比對之用\n"
+    out = repo.write(expected["codex"], body)
+    for i in range(6):
+        nonce = f"y{i}"
+        _issue_event(repo, rid, "codex", nonce)
+        repo.append("redispatch_token_consumed", round_id=rid, family="codex", issue_nonce=nonce,
+                    command_sha256=sha256_text("c"), actor="gate_check", origin_script="gate_check.sh")
+        repo.append("redispatch_token_claimed", round_id=rid, family="codex", issue_nonce=nonce,
+                    actor="cx_run", origin_script="cx_run.sh")
+        family_result(repo, rid, "codex", "format-failed", expected["codex"], sha=sha256_text(body))
+    return rid, out
+
+
 def _abandon(repo: Repo, rid: str, env_extra: dict | None = None) -> subprocess.CompletedProcess:
     return repo.run(["bash", str(repo.scripts / "debt_clear.sh"), "--abandon", "--round-id", rid,
                      "--kind", "collection-failed",
@@ -736,6 +753,70 @@ def test_abandon_exhausted_output_modified_rc1(repo: Repo) -> None:
     proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
     assert proc.returncode != 0, proc.stdout + proc.stderr
     assert repo.events("debt_abandon") == []
+
+
+def test_abandon_exhausted_output_symlinked_rc1(repo: Repo) -> None:
+    """查核後把產出換成 symlink（身分替換）⇒ 棄置須被拒（b1 r3 CODEX-R3-P1-01）。"""
+    # 🔴 夾具須有**真實非空產出**且連結目標逐位元組相同：綁定值為 `none` 或內容不同時，
+    #    雜湊比對自己就會擋下，「不跟隨連結」這道判定將無從被證偽（mutation 不轉紅）。
+    rid, out = _exhausted_round_with_output(repo)
+    same = repo.root / "handoffs" / "same-bytes.md"
+    same.parent.mkdir(parents=True, exist_ok=True)
+    same.write_bytes(out.read_bytes())
+    hook = f"rm -f {out}; ln -s {same} {out}"
+    proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
+def test_abandon_exhausted_path_with_at_sign_rc0(repo: Repo) -> None:
+    """合法但含 `@` 之產出路徑不得被綁定參數之文法誤擋（b1 r3 CODEX-R3-P1-02）。"""
+    # 唯一 OPEN 輪，其 expected_outputs 之路徑含 `@`（合法路徑文法）
+    rid2 = str(uuid.uuid4())
+    expected = open_round(repo, rid2, out_prefix="handoffs/o@x")
+    family_result(repo, rid2, "codex", "failed", expected["codex"])
+    for i in range(6):
+        nonce = f"at{i}"
+        repo.append("redispatch_token_issued", round_id=rid2, family="codex", attempt_no="1",
+                    brief_path="handoffs/b.md", brief_sha256=sha256_text("brief body\n"),
+                    output_path=expected["codex"], reason="redispatch-test-reason-000000001",
+                    issue_nonce=nonce, permit_secret_sha256=sha256_text("s"),
+                    prev_output_sha256="none", prev_output_archive="none",
+                    actor="gate", origin_script="gate.sh")
+        repo.append("redispatch_token_consumed", round_id=rid2, family="codex", issue_nonce=nonce,
+                    command_sha256=sha256_text("c"), actor="gate_check", origin_script="gate_check.sh")
+        repo.append("redispatch_token_claimed", round_id=rid2, family="codex", issue_nonce=nonce,
+                    actor="cx_run", origin_script="cx_run.sh")
+        family_result(repo, rid2, "codex", "failed", expected["codex"])
+    proc = _abandon(repo, rid2)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert len(repo.events("debt_abandon")) == 1
+
+
+def test_audit_append_file_flag_with_absent_session_rc2(repo: Repo) -> None:
+    """檔案綁定旗標與 --require-absent-session 併用 ⇒ 守衛須先於任何分支，rc=2（b1 r3 CODEX-R3-P1-03）。"""
+    # 🔴 同時給 --require-round-unchanged：否則「未併 round 旗標」那道守衛會先擋，
+    #    「不得與 absent-session 併用」這道判定將無從被證偽（mutation 不轉紅）。
+    proc = repo.run(["bash", str(repo.scripts / "audit_append.sh"),
+                     "--require-file-path", "handoffs/o-codex.md",
+                     "--require-file-sha256", "none",
+                     "--require-round-unchanged", "r1@1",
+                     "--require-absent-session", "s1",
+                     "--event", "committee_round_open"])
+    assert proc.returncode == 2
+    assert repo.events("committee_round_open") == []
+
+
+def test_audit_append_file_flag_alone_rc2(repo: Repo) -> None:
+    proc = repo.run(["bash", str(repo.scripts / "audit_append.sh"),
+                     "--require-file-path", "handoffs/o-codex.md",
+                     "--require-file-sha256", "none",
+                     "--event", "debt_abandon", "--field", "round_id=r1",
+                     "--field", "abandon_kind=collection-failed",
+                     "--field", "reason=redispatch-test-reason-000000001",
+                     "--field", "approver=redispatch-test-approver",
+                     "--field", "actor=debt_clear", "--field", "origin_script=debt_clear.sh"])
+    assert proc.returncode == 2
 
 
 def test_after_check_hook_without_harness_rc2(repo: Repo) -> None:
