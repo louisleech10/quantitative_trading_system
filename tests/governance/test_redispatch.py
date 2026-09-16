@@ -728,6 +728,31 @@ def test_abandon_result_appended_after_check_rc1(repo: Repo) -> None:
     assert repo.events("debt_abandon") == []
 
 
+def test_abandon_exhausted_output_modified_rc1(repo: Repo) -> None:
+    """查核後改寫產出檔 ⇒ 棄置須被拒（b1 r2 CODEX-R2-P1-01：快照須綁檔案雜湊）。"""
+    rid = _exhausted_round(repo)
+    out = repo.root / "handoffs" / "o-codex.md"
+    hook = f"printf tampered > {out}"
+    proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
+def test_after_check_hook_without_harness_rc2(repo: Repo) -> None:
+    """查核後掛鉤未綁 GOVERNANCE_TEST_HARNESS=1 ⇒ fail-closed rc=2。"""
+    rid = _exhausted_round(repo)
+    env = dict(repo.env)
+    env["GOVERNANCE_TEST_HARNESS"] = "0"
+    env["REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD"] = "true"
+    proc = subprocess.run(
+        ["bash", str(repo.scripts / "debt_clear.sh"), "--abandon", "--round-id", rid,
+         "--kind", "collection-failed", "--reason", "redispatch-test-reason-000000001",
+         "--approver", "redispatch-test-approver"],
+        cwd=str(repo.root), env=env, capture_output=True, text=True,
+    )
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+
+
 def test_abandon_concurrent_single_event(repo: Repo) -> None:
     rid = _exhausted_round(repo)
     args = ["bash", str(repo.scripts / "debt_clear.sh"), "--abandon", "--round-id", rid,

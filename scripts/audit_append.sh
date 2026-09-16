@@ -57,6 +57,9 @@ REQUIRE_ABSENT_SESSION=""
 # B-64 Task 1.3：--require-round-unchanged <round_id>@<sequence>（鎖內條件寫入）
 REQUIRE_ROUND_UNCHANGED_SET=0
 REQUIRE_ROUND_UNCHANGED=""
+# B-64 b1 review-r2：--require-file-unchanged <path>@<sha256|none>（鎖內重驗檔案雜湊）
+REQUIRE_FILE_UNCHANGED_SET=0
+REQUIRE_FILE_UNCHANGED=""
 # 以 RS(\x1e) 分隔的 field 鍵值（k=v / k=@json）；禁 NUL（env 傳不過）
 FIELD_RS=$'\x1e'
 FIELD_PAIRS=""
@@ -696,6 +699,27 @@ sys.exit(1)
 PY
 }
 
+_assert_file_unchanged_locked() {
+  # B-64 b1 review-r2：持鎖重驗 <path>@<sha256|none>。rc=0 相符／rc=1 已變動／rc=2 讀取失敗。
+  local spec="$1"
+  local path="${spec%@*}"
+  local want="${spec##*@}"
+  AUDIT_FU_PATH="${path}" AUDIT_FU_WANT="${want}" python3 <<'PY'
+import hashlib, os, sys
+p = os.environ["AUDIT_FU_PATH"]
+want = os.environ["AUDIT_FU_WANT"]
+try:
+    if not os.path.isfile(p) or os.path.getsize(p) == 0:
+        actual = "none"
+    else:
+        with open(p, "rb") as fh:
+            actual = hashlib.sha256(fh.read()).hexdigest()
+except OSError:
+    sys.exit(2)
+sys.exit(0 if actual == want else 1)
+PY
+}
+
 _append_with_round_unchanged_guard() {
   # $1=<round_id>@<sequence>；比照 _append_with_absent_guard：鎖內判定後於同一鎖內 append。
   # 🔴 本函式刻意置於 _append_with_absent_guard **之後**，且尾端變數名不同（_rc_ru）：
@@ -720,6 +744,23 @@ _append_with_round_unchanged_guard() {
       return 2
       ;;
   esac
+
+  # B-64 b1 review-r2（CODEX-R2-P1-01）：同一把鎖內一併重驗產出檔雜湊綁定
+  if [ "${REQUIRE_FILE_UNCHANGED_SET}" = "1" ]; then
+    _assert_file_unchanged_locked "${REQUIRE_FILE_UNCHANGED}"
+    case $? in
+      0) : ;;
+      1)
+        _release_lock
+        echo "ERROR: 產出檔自快照後已被改動（${REQUIRE_FILE_UNCHANGED}），拒寫" >&2
+        return 1
+        ;;
+      *)
+        _release_lock
+        return 2
+        ;;
+    esac
+  fi
 
   local next_seq_ru
   next_seq_ru="$(_next_seq_locked)" || {
@@ -763,6 +804,15 @@ while [ $# -gt 0 ]; do
       # event 名會落地為 JSON 的 event 欄；套用同一套控制字元驗證
       _reject_serialized_control_chars "--event" "$2"
       EVENT_NAME="$2"
+      shift 2
+      ;;
+    --require-file-unchanged)
+      # B-64 b1 review-r2（CODEX-R2-P1-01）：鎖內重驗檔案雜湊；none ＝ 須不存在或 0 byte。
+      [ $# -ge 2 ] || die "--require-file-unchanged 需要參數"
+      printf '%s' "$2" | grep -Eq '^[^@[:space:]]+@([0-9a-f]{64}|none)$' \
+        || die "--require-file-unchanged 值須為 <path>@<sha256|none>"
+      REQUIRE_FILE_UNCHANGED="$2"
+      REQUIRE_FILE_UNCHANGED_SET=1
       shift 2
       ;;
     --require-round-unchanged)
@@ -875,6 +925,13 @@ if [ "${REQUIRE_ABSENT_SET}" = "1" ]; then
   fi
   _append_with_absent_guard "${REQUIRE_ABSENT_SESSION}"
   exit $?
+fi
+
+# B-64 b1 review-r2：--require-file-unchanged 須與 --require-round-unchanged 併用
+#   （單獨給會被靜默忽略＝假防護；fail-closed 拒收，rc=2）
+if [ "${REQUIRE_FILE_UNCHANGED_SET}" = "1" ] && [ "${REQUIRE_ROUND_UNCHANGED_SET}" != "1" ]; then
+  echo "ERROR: --require-file-unchanged 須與 --require-round-unchanged 併用" >&2
+  exit 2
 fi
 
 # B-64 Task 1.3：--require-round-unchanged（與 --require-absent-session 互斥；僅適用 debt 事件）

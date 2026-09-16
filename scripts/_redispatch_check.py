@@ -684,9 +684,21 @@ def cmd_exhausted_check(argv: List[str]) -> int:
             stack.enter_context(permit_lock(gdir, rid, fam))
         test_hook("REDISPATCH_TEST_IN_EXHAUSTED_LOCK_CMD")   # 僅測試：於鎖內觀測鎖是否真被持有
         per_family = exhausted_violations(repo, events, rounds, rid, time.time(), consts, active)
-        if any(not v for v in per_family.values()):
+        ok_fams = [f for f, v in per_family.items() if not v]
+        if ok_fams:
             seqs = [e.get("sequence") or 0 for e in events if e.get("round_id") == rid]
             print(f"snapshot_sequence={max(seqs) if seqs else 0}")
+            # 🔴 快照另綁該家產出檔雜湊（b1 review-r2 CODEX-R2-P1-01）：
+            #    只綁 audit 序號時，查核後改寫產出仍可棄置；寫入端於同一鎖內重驗此綁定。
+            fam0 = ok_fams[0]
+            out_rel = ((rounds.get(rid) or {}).get("open") or {}).get("expected_outputs", {}).get(fam0) or ""
+            q = repo / out_rel
+            try:
+                binding = f"{out_rel}@{sha256_file(q)}" if (q.is_file() and q.stat().st_size > 0) \
+                    else f"{out_rel}@none"
+            except OSError:
+                binding = f"{out_rel}@none"
+            print(f"snapshot_output={binding}")
             return 0
     for fam, v in per_family.items():
         for x in v:
