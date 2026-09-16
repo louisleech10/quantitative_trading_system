@@ -781,7 +781,9 @@ def test_abandon_exhausted_output_appended_after_read_rc1(repo: Repo) -> None:
     proc = _abandon(repo, rid, env_extra={
         "REDISPATCH_TEST_AFTER_READ_CMD": f"printf APPENDED >> {out}"})
     assert proc.returncode != 0, proc.stdout + proc.stderr
-    assert "RD_GUARD_REASON=size_or_mtime_changed" in proc.stderr, proc.stderr
+    # 🔴 由**最終確認**的重讀擋下，原因碼與讀取階段之 hash_mismatch 分開；共用同一碼時
+    #    「讀到 EOF」那道被改壞後本測試仍會是綠的。
+    assert "RD_GUARD_REASON=final_hash_mismatch" in proc.stderr, proc.stderr
     assert repo.events("debt_abandon") == []
 
 
@@ -814,7 +816,9 @@ def test_abandon_exhausted_output_same_length_overwrite_rc1(repo: Repo) -> None:
     hook = "sleep 0.01; python3 -c \"open('" + str(out) + "','wb').write(b'X'*" + str(n) + ")\""
     proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_READ_CMD": hook})
     assert proc.returncode != 0, proc.stdout + proc.stderr
-    assert "RD_GUARD_REASON=size_or_mtime_changed" in proc.stderr, proc.stderr
+    # 🔴 最終確認直接比內容，故原因碼為最終雜湊不符；不再依賴 mtime（粗解析度檔案系統上
+    #    同刻度內之同長度覆寫，mtime 看起來會沒變）。
+    assert "RD_GUARD_REASON=final_hash_mismatch" in proc.stderr, proc.stderr
     assert repo.events("debt_abandon") == []
 
 
@@ -860,6 +864,7 @@ def test_abandon_exhausted_output_hardlink_swapped_rc1(repo: Repo) -> None:
     hook = f"rm -f {out}; ln {other} {out}"
     proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
     assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "RD_GUARD_REASON=object_changed" in proc.stderr, proc.stderr
     assert repo.events("debt_abandon") == []
 
 
@@ -889,6 +894,7 @@ def test_abandon_exhausted_output_fifo_rc1(repo: Repo) -> None:
     except subprocess.TimeoutExpired:
         pytest.fail("棄置寫入在 FIFO 上阻塞（開檔未帶 O_NONBLOCK），審計鎖被持住")
     assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert "RD_GUARD_REASON=not_regular" in proc.stderr, proc.stderr
     assert repo.events("debt_abandon") == []
 
 

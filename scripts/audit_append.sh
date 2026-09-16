@@ -780,11 +780,14 @@ try:
                           file=sys.stderr)
                     sys.exit(2)
                 subprocess.run(["bash", "-c", _hook2], check=False)
-            # 🔴 b1 review-r6→r7：最終確認**只做一次、且是本函式最後一個動作**——重開該路徑取得
-            #    新 fd，在同一個 fd 上一併判定「是否仍是同一個物件」與「長度／mtime 是否改變」。
-            #    分成前後兩道（先以舊 fd 驗長度、再重開驗身分）會在兩道之間留下可用窗口：
-            #    同長度覆寫落在其間時，前一道已過、後一道只看身分，兩道都不拒（rc=0）。
-            #    合併之後，殘餘窗口只剩「本次確認之後 → append」，見 SPEC §C 誠實邊界⑧。
+            # 🔴 b1 review-r6→r7→r8：最終確認**只做一次、且是本函式最後一個動作**——重開該路徑
+            #    取得新 fd，在同一個 fd 上判定身分，再直接重讀內容比雜湊。
+            #    · 不拆成前後兩道（先以舊 fd 驗、再重開驗）：兩道之間的同長度覆寫會兩道都過。
+            #    · 最後一次觀測比**內容本身**，不以長度／mtime 當代理：mtime 之偵測力取決於
+            #      檔案系統解析度（粗解析度上、同一時間刻度內之同長度覆寫看不出來），
+            #      且 fstat 取值到比較之間本身也有間隙。
+            #    殘餘窗口＝最後一次觀測取得資料之後，見 SPEC §C 誠實邊界⑧（再加觀測只會把
+            #    邊界往後移，無法歸零——產出寫入端為第三方 CLI，無法與本端共用鎖）。
             try:
                 fd2 = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
             except OSError:
@@ -793,8 +796,18 @@ try:
                 st3 = os.fstat(fd2)
                 if (st3.st_dev, st3.st_ino) != (st.st_dev, st.st_ino):
                     _deny("path_object_changed")
-                if st3.st_size != total or st3.st_mtime_ns != st.st_mtime_ns:
-                    _deny("size_or_mtime_changed")
+                h2 = hashlib.sha256()
+                n2 = 0
+                while True:
+                    chunk2 = os.read(fd2, 1 << 20)
+                    if not chunk2:
+                        break
+                    n2 += len(chunk2)
+                    h2.update(chunk2)
+                # 🔴 原因碼刻意與讀取階段之 hash_mismatch **分開**：兩者對同一情境會給出
+                #    相同 rc，共用同一碼時「讀到 EOF」那道被改壞後測試仍綠（第三次遮蔽）。
+                if ("none" if n2 == 0 else h2.hexdigest()) != want:
+                    _deny("final_hash_mismatch")
             finally:
                 os.close(fd2)
         finally:
