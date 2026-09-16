@@ -92,6 +92,19 @@ def sha256_file(p: Path) -> str:
     return sha256_bytes(p.read_bytes())
 
 
+def test_hook(name: str) -> None:
+    """僅測試用之掛鉤：執行 env 指定之指令（供驗證「查核與動作之間」之不變式）。
+
+    未綁 GOVERNANCE_TEST_HARNESS=1 而設定 ⇒ fail-closed（rc=2），不得成為正式路徑之逃生口。
+    """
+    cmd = os.environ.get(name)
+    if not cmd:
+        return
+    if not harness():
+        die(f"{name} 僅允許 GOVERNANCE_TEST_HARNESS=1（fail-closed）")
+    subprocess.run(["bash", "-c", cmd])
+
+
 def fault(point: str) -> None:
     """僅測試用故障注入點；未綁 harness 而設定 ⇒ fail-closed。"""
     want = os.environ.get("REDISPATCH_FAULT_POINT")
@@ -454,7 +467,17 @@ def cmd_issue(argv: List[str]) -> int:
                        if e.get("event") == "redispatch_token_issued"
                        and e.get("round_id") == rid and e.get("family") == fam]) + 1
 
-        _, actual = prev_output_check(repo, latest, out_rel)
+        # 🔴 第二次查核之違規不得忽略（b1 review-r1 CODEX-R1-P1-02）：
+        #    條件判定與保存之間若產出檔被刪或截零，忽略 bad 會誤判成「無前次產出」而不保存。
+        bad, actual = prev_output_check(repo, latest, out_rel)
+        if bad:
+            print(f"ERROR: {bad}", file=sys.stderr)
+            return 1
+        test_hook("REDISPATCH_TEST_BEFORE_ARCHIVE_CMD")   # 僅測試：於查核後、保存前插入動作
+        bad, actual = prev_output_check(repo, latest, out_rel)
+        if bad:
+            print(f"ERROR: {bad}", file=sys.stderr)
+            return 1
         if actual is None:
             prev_sha, prev_arc = "none", "none"
         else:
@@ -553,6 +576,13 @@ def cmd_consume(_argv: List[str]) -> int:
             print(f"ERROR: 許可非待用狀態（{cur}）", file=sys.stderr); return 1
         if sha256_bytes((tok.get("secret") or "").encode()) != (issued[0].get("permit_secret_sha256") or ""):
             print("ERROR: 許可秘密不符", file=sys.stderr); return 1
+        # 🔴 許可檔之所有綁定欄須與**發放事件**逐欄相等（B-64 b1 review-r1 CODEX-R1-P1-01）：
+        #    只比對「許可 vs 指令」不足——竄改許可檔之 prev_output_* 即可讓保存檔綁定失效。
+        _ev = issued[0]
+        for _k in ("round_id", "family", "brief_path", "brief_sha256", "output_path",
+                   "attempt_no", "prev_output_sha256", "prev_output_archive"):
+            if (tok.get(_k) or "") != str(_ev.get(_k) or ""):
+                print(f"ERROR: 許可欄位與發放事件不符：{_k}", file=sys.stderr); return 1
         try:
             if sha256_file(repo / brief) != (tok.get("brief_sha256") or ""):
                 print("ERROR: brief 已於發放後改動", file=sys.stderr); return 1
@@ -645,11 +675,19 @@ def cmd_exhausted_check(argv: List[str]) -> int:
     rounds = ledger_rounds(repo)
     consts = constants(repo)
     active = stampers(repo)
-    per_family = exhausted_violations(repo, events, rounds, rid, time.time(), consts, active)
-    if any(not v for v in per_family.values()):
-        seqs = [e.get("sequence") or 0 for e in events if e.get("round_id") == rid]
-        print(f"snapshot_sequence={max(seqs) if seqs else 0}")
-        return 0
+    # 🔴 查核與快照須在（輪、家族）鎖內完成（b1 review-r1 CODEX-R1-P1-03）：
+    #    否則查核期間可並發發放／認領；寫入端另以 --require-round-unchanged 擋查核後之遲到事件。
+    from contextlib import ExitStack
+    gdir = gate_dir(repo)
+    with ExitStack() as stack:
+        for fam in (rounds.get(rid) or {}).get("participants") or []:
+            stack.enter_context(permit_lock(gdir, rid, fam))
+        test_hook("REDISPATCH_TEST_IN_EXHAUSTED_LOCK_CMD")   # 僅測試：於鎖內觀測鎖是否真被持有
+        per_family = exhausted_violations(repo, events, rounds, rid, time.time(), consts, active)
+        if any(not v for v in per_family.values()):
+            seqs = [e.get("sequence") or 0 for e in events if e.get("round_id") == rid]
+            print(f"snapshot_sequence={max(seqs) if seqs else 0}")
+            return 0
     for fam, v in per_family.items():
         for x in v:
             print(f"ERROR: [{fam}] {x}", file=sys.stderr)

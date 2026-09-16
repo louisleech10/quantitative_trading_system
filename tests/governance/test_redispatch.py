@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import uuid
@@ -239,6 +240,47 @@ def test_issue_failed_partial_output_archives_rc0(repo: Repo) -> None:
     assert (repo.root / ev["prev_output_archive"]).is_file()
 
 
+def test_issue_output_deleted_before_archive_rc1(repo: Repo) -> None:
+    """條件判定通過後、保存前產出檔被刪 ⇒ 不得誤判為「無前次產出」而照發（b1 r1 CODEX-R1-P1-02）。"""
+    rid = str(uuid.uuid4())
+    expected = open_round(repo, rid)
+    body = "## CODEX-R1-P1-01\n**斷言**: 測試用斷言內容夠長以供逐字引用比對\n"
+    repo.write(expected["codex"], body)
+    family_result(repo, rid, "codex", "format-failed", expected["codex"], sha=sha256_text(body))
+    hook = f"rm -f {repo.root / expected['codex']}"
+    proc = repo.run(["bash", str(repo.scripts / "gate.sh"), "redispatch", "--round-id", rid,
+                     "--family", "codex", "--reason", "redispatch-test-reason-000000001"],
+                    env_extra={"REDISPATCH_TEST_BEFORE_ARCHIVE_CMD": hook})
+    assert proc.returncode == 1, proc.stdout + proc.stderr
+    assert repo.events("redispatch_token_issued") == []
+    assert not (repo.root / "handoffs" / "redispatch_archive").exists()
+
+
+def test_exhausted_check_holds_permit_lock(repo: Repo) -> None:
+    """耗盡查核期間須持有（輪、家族）鎖（b1 r1 CODEX-R1-P1-03）。"""
+    rid = _exhausted_round(repo)
+    marker = repo.root / "lockstate.txt"
+    probe = repo.root / "probe_lock.py"
+    probe.write_text(
+        "import fcntl, os, sys\n"
+        f"p = {str(repo.gate / f'redispatch.{rid}.codex.lock')!r}\n"
+        "fd = os.open(p, os.O_CREAT | os.O_RDWR, 0o600)\n"
+        "try:\n"
+        "    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n"
+        "    state = 'free'\n"
+        "    fcntl.flock(fd, fcntl.LOCK_UN)\n"
+        "except BlockingIOError:\n"
+        "    state = 'held'\n"
+        f"open({str(marker)!r}, 'w').write(state)\n",
+        encoding="utf-8",
+    )
+    repo.run(["python3", str(repo.scripts / "_redispatch_check.py"), "exhausted-check",
+              "--round-id", rid],
+             env_extra={"REDISPATCH_TEST_IN_EXHAUSTED_LOCK_CMD": f"python3 {probe}"})
+    assert marker.is_file(), "掛鉤未執行"
+    assert marker.read_text(encoding="utf-8").strip() == "held"
+
+
 def test_issue_partial_output_missing_rc1(repo: Repo) -> None:
     rid = str(uuid.uuid4())
     expected = open_round(repo, rid)
@@ -423,6 +465,24 @@ def test_consume_archive_modified_rc2(repo: Repo) -> None:
     arc = repo.root / repo.events("redispatch_token_issued")[0]["prev_output_archive"]
     arc.write_text("tampered\n", encoding="utf-8")
     assert repo.run(["bash", str(repo.scripts / "gate_check.sh")], stdin=_payload(cmd)).returncode == 2
+
+
+def test_consume_token_tampered_prev_fields_rc2(repo: Repo) -> None:
+    """竄改許可檔之保存檔綁定欄 ⇒ 與發放事件不符，不得放行（b1 r1 CODEX-R1-P1-01）。"""
+    rid = str(uuid.uuid4())
+    expected = open_round(repo, rid)
+    body = "## CODEX-R1-P1-01\n**斷言**: 測試用斷言內容夠長以供逐字引用比對\n"
+    repo.write(expected["codex"], body)
+    family_result(repo, rid, "codex", "format-failed", expected["codex"], sha=sha256_text(body))
+    cmd = _issued_cmd(repo, rid)
+    tok = repo.gate / f"redispatch.{rid}.codex.token"
+    text = tok.read_text(encoding="utf-8")
+    text = re.sub(r"prev_output_archive=.*", "prev_output_archive=none", text)
+    text = re.sub(r"prev_output_sha256=.*", "prev_output_sha256=none", text)
+    tok.write_text(text, encoding="utf-8")
+    proc = repo.run(["bash", str(repo.scripts / "gate_check.sh")], stdin=_payload(cmd))
+    assert proc.returncode == 2
+    assert repo.events("redispatch_token_consumed") == []
 
 
 def test_non_dispatch_command_skips_redispatch_helper(repo: Repo) -> None:
@@ -621,6 +681,64 @@ def test_issue_interval_not_elapsed_rc1(repo: Repo) -> None:
 
 
 # ── Task 1.3：audit_append 之鎖內條件寫入 ──────────────────────────────
+def _exhausted_round(repo: Repo) -> str:
+    """造一輪：codex 六次重派皆已結束且最新結果為 failed 無產出 ⇒ 符合棄置例外。"""
+    rid, _ = _failed_no_output_round(repo)
+    for i in range(6):
+        nonce = f"x{i}"
+        _issue_event(repo, rid, "codex", nonce)
+        repo.append("redispatch_token_consumed", round_id=rid, family="codex", issue_nonce=nonce,
+                    command_sha256=sha256_text("c"), actor="gate_check", origin_script="gate_check.sh")
+        repo.append("redispatch_token_claimed", round_id=rid, family="codex", issue_nonce=nonce,
+                    actor="cx_run", origin_script="cx_run.sh")
+        family_result(repo, rid, "codex", "failed", "handoffs/o-codex.md")
+    return rid
+
+
+def _abandon(repo: Repo, rid: str, env_extra: dict | None = None) -> subprocess.CompletedProcess:
+    return repo.run(["bash", str(repo.scripts / "debt_clear.sh"), "--abandon", "--round-id", rid,
+                     "--kind", "collection-failed",
+                     "--reason", "redispatch-test-reason-000000001",
+                     "--approver", "redispatch-test-approver"], env_extra=env_extra)
+
+
+def test_abandon_exhausted_all_ended_rc0(repo: Repo) -> None:
+    rid = _exhausted_round(repo)
+    proc = _abandon(repo, rid)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert len(repo.events("debt_abandon")) == 1
+
+
+def test_abandon_below_max_attempts_rc1(repo: Repo) -> None:
+    rid, _ = _failed_no_output_round(repo)
+    assert _abandon(repo, rid).returncode != 0            # 未達上限 ⇒ 既有 C-9 拒絕不變
+    assert repo.events("debt_abandon") == []
+
+
+def test_abandon_result_appended_after_check_rc1(repo: Repo) -> None:
+    """查核通過後插入遲到結果 ⇒ 鎖內條件寫入須拒（b1 r1 CODEX-R1-P1-03／GROK-R1-P1-01）。"""
+    rid = _exhausted_round(repo)
+    hook = (f'bash {repo.scripts / "audit_append.sh"} --event committee_family_result '
+            f'--field round_id={rid} --field family=codex --field attempt_id=late-1 '
+            f'--field cli_rc=0 --field output_path=handoffs/o-codex.md '
+            f'--field output_sha256={sha256_text("late")} --field result_state=success '
+            f'--field actor=cx_run --field origin_script=cx_run.sh')
+    proc = _abandon(repo, rid, env_extra={"REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD": hook})
+    assert proc.returncode != 0, proc.stdout + proc.stderr
+    assert repo.events("debt_abandon") == []
+
+
+def test_abandon_concurrent_single_event(repo: Repo) -> None:
+    rid = _exhausted_round(repo)
+    args = ["bash", str(repo.scripts / "debt_clear.sh"), "--abandon", "--round-id", rid,
+            "--kind", "collection-failed", "--reason", "redispatch-test-reason-000000001",
+            "--approver", "redispatch-test-approver"]
+    procs = [subprocess.Popen(args, cwd=str(repo.root), env=repo.env,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(2)]
+    rcs = [p.wait() for p in procs]
+    assert len(repo.events("debt_abandon")) == 1, f"rcs={rcs}"
+
+
 def test_audit_append_round_unchanged_rejects_after_snapshot(repo: Repo) -> None:
     rid, _ = _failed_no_output_round(repo)
     snapshot = repo.events("committee_family_result")[-1]["sequence"]

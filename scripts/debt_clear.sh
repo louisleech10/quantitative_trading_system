@@ -980,7 +980,8 @@ PY
     return 1
   fi
 
-  _emit_abandon "${rid}" "${kind}" "${reason}" "${approver}" || return 1
+  # B-64 Task 1.3 要點 4：耗盡例外之寫入須帶「該輪自查核快照後未變動」條件（第 5 參數）
+  _emit_abandon "${rid}" "${kind}" "${reason}" "${approver}" "${_RD_SNAPSHOT:-}" || return 1
   echo "OK: abandoned round_id=${rid} kind=${kind}"
   return 0
 }
