@@ -640,7 +640,7 @@ def derive_event_split_from_plans(
   `ASSERT canonical_holdout_entry WHEN trigger_timeframe=12h feature_run_timeframe=1h THEN rc=0`（`receipts.per_tf` 含 1h 列，`build_event_keys(selected_timeframe="1h")` 不 raise，且對齊所用 bars 之週期集合 ⊇ {12h, 1h}）；
   `ASSERT canonical_holdout_entry WHEN event_anchor_in_manifest_range=true event_anchor_outside_post_trim_index=true THEN rc=0`（該事件 `scan_disposition=outside_post_trim_index`，不進投影）；
   `ASSERT canonical_holdout_entry WHEN disposition_value_not_in_contract=true THEN rc!=0`（處置帳值集自契約讀，手打值即紅）；
-  `ASSERT canonical_holdout_entry WHEN feature_cutoff_in_post_trim=true last_bar_open_outside_post_trim=true THEN rc=0`（該事件 `ic_disposition=feature_row_not_in_feature_index`；fixture 以真實事件批與分析用 `decision_offset_bars` 使至少一事件 `decision_at_ms == index_ms[0]`，不得手造 `t0`；無此事件即 rc!=0）；
+  `ASSERT canonical_holdout_entry WHEN feature_cutoff_in_post_trim=true last_bar_open_outside_post_trim=true THEN rc=0`（該事件 `ic_disposition=feature_row_not_in_feature_index`；fixture 以真實事件批、已註冊 FF run 與分析用 `decision_offset_bars` 取得，須至少一事件同時滿足 `feature_cutoff_ms ∈ post-trim feature_index` 且 `last_bar_open_ms ∉ post-trim feature_index`（索引首列前或索引缺列處皆可），不得手造 `t0`；無此事件即 rc!=0，並輸出該 `event_id` 與兩鍵）；
   `ASSERT canonical_holdout_entry WHEN feature_cutoff_in_post_trim=true last_bar_open_outside_post_trim=true ledger_key_source=feature_cutoff_ms THEN rc!=0`（同一 fixture；輸出 `event_id`、`feature_cutoff_ms`、`last_bar_open_ms` 與預測值）；
   `ASSERT resolve_event_label_spec WHEN ic_route_called=true resolver_factory_spy=true THEN rc=0`（IC route 經 `momentum/factories.py` 出口呼叫解析函式恰一次；spy 未被呼叫即紅）；
   `ASSERT canonical_holdout_entry WHEN event_label_spec=absent THEN rc=0`（逐事件 `decision_at_ms`／`label_start_ms`／`label_end_ms` 與 IC 事件路徑之 `prepare_analysis_windows` 逐值相等，`label_window_rows` 相等）；
@@ -701,7 +701,7 @@ def derive_event_split_from_plans(
   `ASSERT splitunify_r5_parity WHEN ic_test_ids_derived_from_ledger=true THEN rc!=0`（IC 測試段集合須取自 IC 實際產出）；
   `ASSERT splitunify_r5_parity WHEN stage3_drops_event_wrongly=true ledger_predicts_ic_consumed=true THEN rc!=0`（預測與觀測不等，輸出該 `event_id` 兩值）；
   `ASSERT splitunify_r5_parity WHEN ledger_ic_disposition_copied_from_stage3_receipt=true THEN rc!=0`（預測不得讀觀測）；
-  `ASSERT splitunify_r5_parity WHEN real_event=true feature_cutoff_in_post_trim=true last_bar_open_outside_post_trim=true ledger_key_source=feature_cutoff_ms THEN rc!=0`（fixture 同 `Task 10.4` 之首列邊界事件；輸出 `event_id`、兩鍵、預測值與觀測值）；
+  `ASSERT splitunify_r5_parity WHEN real_event=true feature_cutoff_in_post_trim=true last_bar_open_outside_post_trim=true ledger_key_source=feature_cutoff_ms THEN rc!=0`（fixture 同 `Task 10.4` 之兩鍵鑑別事件；輸出 `event_id`、兩鍵、預測值與觀測值）；
   `ASSERT splitunify_r5_parity WHEN projection_anchor=decision_at_ms THEN rc!=0`（輸出邊界事件之 `event_id`）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無後續 Phase。
