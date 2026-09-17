@@ -5,7 +5,7 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 偵察證實 IC 事件分析選特徵晚一根（未來資訊）與兩端標籤參數不一；規格 R 重開為 v7，三家對抗審中 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v7 三家已蓋章（x-stamp-r10）；待使用者白話審閱放行後寫施工清單 |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -16,7 +16,7 @@
 |---|---|---|---|---|
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 偵察證實 IC 事件分析選特徵晚一根（未來資訊）與兩端標籤參數不一；規格 R 重開為 v7，三家對抗審中 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v7 三家已蓋章（x-stamp-r10）；待使用者白話審閱放行後寫施工清單 |
 | 03-007 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 03-008 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 03-009 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
@@ -90,4 +90,5 @@
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-consult-r4/synth.md`
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r16/synth.md`
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r9/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r10/synth.md`
 <!-- HISTORY-END -->
