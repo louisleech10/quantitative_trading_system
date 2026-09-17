@@ -1106,10 +1106,14 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   4. `PerTfRow` 第四欄取自對齊收據同名欄；**不得**以 `feature_cutoff_ms` 減週期長度推導。GAP-3 主檔不解凍，第四欄以追加條目寫入 `docs/GAP3_EVENT_UX_SPEC.D-002.md`。
   5. 舊鍵語意之說明同步：`momentum/core/split_preview.py:379`、`momentum/Analysis/ic_filter_orchestrator.py:1195`／`:1707`、`momentum/Analysis/event_samples/ic_feed.py:9`、`tests/momentum/Analysis/test_evtlabel_stage3.py:42`。
   6. 數值變動揭露：`scripts/splitunify_ic_event_report_diff.py`（新）以真實事件批跑改前／改後 IC 報告逐鍵 diff，`--allow-diff` 模式寫 receipt 到 `handoffs/run_receipts/`。
-     🔴 **基準之捕獲（`Task 10.4` 之 strict 比對要用）**：本 Task **動碼前**先以該腳本之 `--capture` 模式跑一次現行 IC 事件 run，把 canonical bytes（去 `generated_at`）與 sha256 落成
-     `tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json`（本 Task 落地後**重捕一次**並覆蓋為 10.2 後之值，覆蓋須帶 `--authorize <old8>:<new8>`）；`Task 10.4` 之 strict 比對逐鍵讀該檔，不得於 B10C 當下另跑基準。
+     🔴 **兩份基準之捕獲（兩個檔、兩次命令，皆 write-once；`Task 10.4` 之 strict 比對要用）**：
+     - **動碼前**：`venv/bin/python scripts/splitunify_ic_event_report_diff.py --capture pre_task_10_2 --out tests/golden/splitunify/ic_event_report_baseline.pre_task_10_2.json`
+       ——落 canonical bytes（去 `generated_at`）與 sha256；此檔為**不可變**（`O_CREAT|O_EXCL`，已存在即拒，無授權覆蓋出口）。
+     - **本 Task 落地後**：`venv/bin/python scripts/splitunify_ic_event_report_diff.py --capture post_task_10_2 --out tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json`
+       ——同一批、同一 run、同一 `config_override`；覆蓋既有值須帶 `--authorize <old8>:<new8>`。
+     - 本 Task 之 allow-diff 比對以**兩個檔路徑**為輸入，`Task 10.4` 之 strict 比對逐鍵讀 `post_task_10_2` 那份，兩處皆不得於當批另跑基準。
   7. 受影響之既有 golden 以實跑列舉後同 commit 依各自授權流程重凍；已知含 `analysis_alignment_receipt_hash` 之 `per_tf` payload 者＝`scripts/gap3_label_golden.py` 與 `tests/golden/gap3_label/`（`PerTfRow` 增欄即改 hash）。
-- 修改檔案：`momentum/Analysis/event_samples/label_value_from_case.py`、`momentum/Analysis/event_samples/pipeline.py`、`momentum/factories.py`、`api/services/ic_analysis_service.py`、`momentum/core/split_preview.py`、`momentum/Analysis/ic_filter_orchestrator.py`（註解）、`momentum/Analysis/event_samples/ic_feed.py`（註解）、`tests/momentum/Analysis/test_evtlabel_stage3.py`（註解）、`tests/api/test_gap3_event_analysis_horizon_purge.py`、`tests/momentum/event_samples/test_ic_event_feature_row_key.py`（新）、`scripts/freeze_ic_event_row_key_golden.py`（新）、`tests/golden/splitunify/ic_event_row_key.json`（新）、`scripts/splitunify_ic_event_report_diff.py`（新）、`tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json`（新）、`scripts/gap3_label_golden.py`、`tests/golden/gap3_label/`（receipt hash 重凍）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`。
+- 修改檔案：`momentum/Analysis/event_samples/label_value_from_case.py`、`momentum/Analysis/event_samples/pipeline.py`、`momentum/factories.py`、`api/services/ic_analysis_service.py`、`momentum/core/split_preview.py`、`momentum/Analysis/ic_filter_orchestrator.py`（註解）、`momentum/Analysis/event_samples/ic_feed.py`（註解）、`tests/momentum/Analysis/test_evtlabel_stage3.py`（註解）、`tests/api/test_gap3_event_analysis_horizon_purge.py`、`tests/momentum/event_samples/test_ic_event_feature_row_key.py`（新）、`scripts/freeze_ic_event_row_key_golden.py`（新）、`tests/golden/splitunify/ic_event_row_key.json`（新）、`scripts/splitunify_ic_event_report_diff.py`（新）、`tests/golden/splitunify/ic_event_report_baseline.pre_task_10_2.json`（新，write-once）、`tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json`（新）、`scripts/gap3_label_golden.py`、`tests/golden/gap3_label/`（receipt hash 重凍）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`。
   既有 caller：`ICAnalysisService._run_event_label_stages`（含逐格掃描路徑）、`EventImportService.build_random_control_batch`（不傳 `feature_timeframe`，行為不變）。
 - 不可做：不得以 `feature_cutoff_ms` 減週期長度推導鍵；不得只載觸發週期之 bars；不得刪除或放寬既有斷言；不得改非事件 run 之輸出（G-2）；不得改 FF 之對齊慣例；本 Task 任一部分不得轉列 §E 殘留。
 - 邊界：① 12h 事件 × 12h run：鍵＝`decision_at_ms − 43200000`；② 12h 事件 × 1h run：鍵＝`decision_at_ms − 3600000`；③ 1h 事件 × 12h run：鍵＝收盤 ≤ `decision_at_ms` 之最後一根 12h 之開盤（**非網格對齊**）；④ 特徵 run 週期之 bars 起點晚於事件致該列缺 ⇒ 具名 fail-closed；⑤ `decision_offset_bars ≥ 1` ⇒ 鍵隨 `decision_at_ms` 前移；⑥ 多 symbol 批之他 symbol 事件維持既有排除。
@@ -1132,7 +1136,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
     - `test_alignment_timeframes_union_required`（只載觸發週期 ⇒ 12h 事件 × 1h run 具名 fail-closed）
     - `test_prepare_analysis_windows_missing_feature_tf_row_fail_closed`（訊息含 `event_id` 與週期字面）
     - `test_random_control_batch_unchanged_without_feature_timeframe`（`build_random_control_batch` 產出之 records 與改前逐值相同）
-  - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode allow-diff --baseline pre_task_10_2 --candidate post_task_10_2` rc=0（receipt 寫入 `handoffs/run_receipts/`，內含條件 IC 前後值）
+  - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode allow-diff --baseline tests/golden/splitunify/ic_event_report_baseline.pre_task_10_2.json --candidate tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json` rc=0（receipt 寫入 `handoffs/run_receipts/`，內含條件 IC 前後值）
   - 🔴 **1h 事件 × 12h run 之現行失敗型態（r17 codex 實跑更正）**：現行 `_run_event_label_stages` 以 `(event_id, 觸發週期)` 取列 ⇒ 1h 事件之鍵為 **1h cutoff**，多數不落在 12h 特徵索引 ⇒ 事件被**整筆丟棄**（非「選到晚收盤列」）。故該組之驗收斷言為：修正後 14 筆皆取得 12h 列且收盤 ≤ 決策時點；舊行為下取得之列數顯著少於 14（實跑貼數）。
   - mutation 自證（實跑並貼 rc）：`M-SU-R5-16` 鍵改回 `feature_cutoff_ms` ⇒ 12h×12h 與 12h×1h 兩條轉紅；`M-SU-R5-17` 只載觸發週期 ⇒ `test_alignment_timeframes_union_required` 與 1h×12h 那條轉紅；`M-SU-R5-18` 移除 PIT 守衛 ⇒ `test_pit_guard_rejects_open_eq_cutoff` 與 `test_pit_guard_rejects_cutoff_gt_decision` 轉紅
 - **存活至**：全票完工後保留。
@@ -1189,7 +1193,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
     - `test_ic_route_calls_shared_resolver_once`（factories 出口之 spy 被呼叫恰一次）
     - `test_resolver_out_of_domain_k_maps_to_422_same_kind`（`kind` 字面＝現行 `invalid_decision_offset_bars`；既有 `tests/api/test_gap3_ic_event_label_defaults.py` 同批跑，釘住該字面不因下沉而改）
     - `test_stage3_receipt_reset_per_analyze_and_absent_from_report`
-  - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode strict --baseline post_task_10_2 --candidate post_task_10_4` rc=0（逐鍵 diff 為空）
+  - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode strict --baseline tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json --candidate live` rc=0（逐鍵 diff 為空）
   - mutation 自證：`M-SU-R5-21` 處置帳改以 `feature_cutoff_ms` 預測 ⇒ 邊界事件那條轉紅；`M-SU-R5-10` 只載觸發週期 ⇒ 跨週期那條轉紅；`M-SU-R5-13` 略過 post-trim 首尾剔除 ⇒ `outside_post_trim_index` 那條轉紅
 - **存活至**：全票完工後保留（唯一邊界解析入口與唯一標籤參數解析函式）。
 - **覆蓋風險**：`Task 10.5` 只新增 caller，不改本入口簽名。
@@ -1251,7 +1255,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   3. UAT 條目寫入 §E `R-3` 列：含重跑 `fe5f715e` 之後之 IC 事件分析。
 - 修改檔案：`scripts/splitunify_r5_parity.py`（新）、`tests/golden/splitunify/r5_parity.json`（新）、`docs/SPLITUNIFY_TODO.md` §E `R-3` 列。
 - 不可做：禁合成 fixture；不得改既有 golden 鍵值；不執行 UAT；對證腳本不得自行推導特徵列鍵（只讀對齊收據）。
-- 邊界：① 至少一組觸發週期與 run 週期不同之真實組合；② 至少一組**事件被期間剔除**之真實組合——r17 實跑：現有已註冊 run 之特徵時間戳皆落在 K 線期間內（14／14 首尾裁切為 0），故本條改以 **coverage 剔除**行使（同一 12h 事件批配期間較短之 run，事件落在 run 期間外者進處置帳；路徑已有真實測試 `tests/api/test_period_auto_align.py`）；若日後出現真的發生首尾裁切之 run，另加一組、不取代本條；③ 至少一組非預設 `event_label_spec`；④ 不以 `boundary_hash` 代替逐值比對。
+- 邊界：① 至少一組觸發週期與 run 週期不同之真實組合；② 至少一組**事件被期間剔除**之真實組合——r17 實跑：現有已註冊 run 之特徵時間戳皆落在 K 線期間內（14／14 首尾裁切為 0），故本條改以 **coverage 剔除**行使（同一 12h 事件批配期間較短之 run，事件落在 run 期間外者進處置帳；路徑已有真實測試 `tests/api/test_period_auto_align.py`；r18 三家實跑之非零組合＝批 `20260901T132233Z-363ecc4f` × run `ETHUSDT/1h/5ea074390e98405cb83d602fe7b7fb00`，covered=39、dropped=21；**不得**取 `20260909T130533Z-7f73e4c7` × 同 run（實測 dropped=0，屬空心綠））；若日後出現真的發生首尾裁切之 run，另加一組、不取代本條；③ 至少一組非預設 `event_label_spec`；④ 不以 `boundary_hash` 代替逐值比對。
 - 風險緩解：`M-SU-R5-08`、`M-SU-R5-09`、`M-SU-R5-12`、`M-SU-R5-14`、`M-SU-R5-15`、`M-SU-R5-25`。
 - **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
   - `venv/bin/python scripts/splitunify_r5_parity.py` rc=0
