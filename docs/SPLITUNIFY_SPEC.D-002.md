@@ -1,5 +1,9 @@
 # SPLITUNIFY_SPEC.md 延伸 D-002
 
+> 🔴 **本延伸已因原檔 R 重開而失效（2026-09-17）**：依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1，`docs/SPLITUNIFY_SPEC.md` v6 R 重開，本檔全量失效；
+> 仍有效之義務已逐條併入 `docs/SPLITUNIFY_SPEC.md`（識別碼沿用，§V 錨點與 register 逐字相同）。本檔不得作為派工、實作或審查之依據；
+> 檔案暫留僅因 `scripts/freeze_splitunify_golden.py`、`scripts/register_anchor_check.py` 與測試仍以路徑讀取，改指工作＝`docs/SPLITUNIFY_SPEC.md` 之 `Task 10.1`。
+
 BASE: docs/SPLITUNIFY_SPEC.md @ 1be5be3f
 PREDECESSOR: docs/SPLITUNIFY_SPEC.D-001.md
 改什麼: 落實 `docs/SPLITUNIFY_TODO.md` §E 之殘留 `SU-RESID-2`（多 feature TF 之複合鍵），並**更正 D-001 兩處與實況不符的陳述**。

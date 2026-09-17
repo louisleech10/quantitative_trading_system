@@ -1,5 +1,9 @@
 # SPLITUNIFY — TODO
 
+> 🔴 **規格已 R 重開（2026-09-17）**：`docs/SPLITUNIFY_SPEC.md` 現為 v6（對抗審中），`docs/SPLITUNIFY_SPEC.D-001.md`／`D-002.md` 全量失效。
+> 本 TODO §0「本票之落點裁定（R2 之 D1）」一段與 v6 C-0 第 3 點互斥，以 v6 為準；Phase 10（`R-5`）之施工細目待 v6 三家戳記與使用者審閱放行後依 v6 重寫本檔。
+> 下方各批次之施工紀錄與存續義務不受影響（存續義務之權威改為 v6 §P「既有批次之存續義務」表）。
+
 **SPEC**：`docs/SPLITUNIFY_SPEC.md`（**v4**）　**票**：`SPLITUNIFY`　**日期**：2026-09-11　**狀態**：**v5（B1 放行版）**。
 **R3 審收斂**：`handoffs/reconcile/20260911-splitunify-x-review-r3/synth.md`（E1–E7）——
 🔴 三家分歧（composer／grok 判可進 B1、codex 判不可），依「看碼證不數人頭」採 codex：
@@ -1139,16 +1143,16 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 下一件：規格 R 重開後實作（DOCROT2 已於 2026-09-17 收票） |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v6 R 重開三家對抗審（x-review-r14 起）→ 戳記 → 使用者白話審閱 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 090 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
-| 100 | SU-RESID-9A-UI | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：api/ 出現 EventSamplePipeline.run 生產呼叫 |
+| 100 | SU-RESID-9A-UI | 未開工 | docs/SPLITUNIFY_SPEC.md R5-C5 | 隨 R-5 實作批交付（規格 v6 R5-C5） |
 | 110 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 | 120 | SU-RESID-3 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
-| 130 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.D-001.md 殘留節 | 待觸發：下一次動 IC 切分契約 |
-| 140 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.D-001.md 殘留節 | 待觸發：下一次動 SplitPlan 欄位契約 |
+| 130 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 IC 切分契約 |
+| 140 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 150 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 <!-- END GENERATED: splitunify-residual-status -->
 

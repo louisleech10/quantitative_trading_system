@@ -193,25 +193,25 @@
       "id": "DOCROT2-RESID-D001-SPLITUNIFY",
       "path": "docs/SPLITUNIFY_SPEC.D-001.md",
       "reason_class": "blocked-by",
-      "why": "SPLITUNIFY 規格延伸檔 D-001 之誠實邊界條文（L92「b8 收案前須重凍 golden」）；延伸檔於 D 延伸期間對原文唯一允許改動＝索引行（docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md §2），R 重開時延伸檔整體失效重寫",
+      "why": "SPLITUNIFY 規格延伸檔 D-001 已於 2026-09-17 隨原檔 v6 R 重開全量失效（檔頭失效標示），義務併入 docs/SPLITUNIFY_SPEC.md；命中行（L96「b8 收案前須重凍 golden」）屬失效檔之原文，不再修訂。檔案暫留僅因以路徑讀取之腳本與測試尚未改指",
       "owner": "SPLITUNIFY",
-      "trigger": "SPLITUNIFY 規格 R 重開之第一個 commit"
+      "trigger": "docs/SPLITUNIFY_SPEC.md 之 Task 10.1 落地（讀取者改指）後刪除本檔或清空命中行；命中歸零時本列由 --migration 判過期須刪"
     },
     {
       "id": "DOCROT2-RESID-D002-STRUCTURAL-RED",
       "path": "docs/SPLITUNIFY_SPEC.D-002.md",
       "reason_class": "blocked-by",
-      "why": "docs/SPLITUNIFY_SPEC.D-002.md 之結構性紅與既有正文狀態字面（L197、L231、L341、L360）；本票不得改 D-002（DOCROT2 TODO Task 4.1 邊界）",
+      "why": "docs/SPLITUNIFY_SPEC.D-002.md 已於 2026-09-17 隨原檔 v6 R 重開全量失效（檔頭失效標示），義務併入 docs/SPLITUNIFY_SPEC.md；結構性紅與命中之正文狀態字面（L201、L235、L345、L364）屬失效檔之原文，不再修訂。檔案暫留僅因 scripts/freeze_splitunify_golden.py、scripts/register_anchor_check.py 與測試仍以路徑讀取",
       "owner": "SPLITUNIFY",
-      "trigger": "SPLITUNIFY 規格 R 重開之第一個 commit"
+      "trigger": "docs/SPLITUNIFY_SPEC.md 之 Task 10.1 落地（讀取者改指）後刪除本檔或清空命中行；命中歸零時本列由 --migration 判過期須刪"
     },
     {
       "id": "DOCROT2-RESID-SPLITUNIFY-TODO",
       "path": "docs/SPLITUNIFY_TODO.md",
       "reason_class": "user-ruling",
-      "why": "SPLITUNIFY 施工清單之 SUPERSEDED 註記（L604、L700）與 §E 殘留表關閉依據（L1120）；狀態欄已於 Task 1.2 改生成區塊，命中行為當時修訂紀事。面向未來條：既有行不回洗",
+      "why": "SPLITUNIFY 施工清單之既有批次修訂紀事（L608、L704）與 §E 殘留表關閉依據（L1124）；狀態欄已於 Task 1.2 改生成區塊。2026-09-17 規格 R 重開之第一個 commit 只加檔頭 R 重開標示，Phase 10 施工清單依使用者裁定須待 v6 戳記與白話審閱放行後重寫，故命中行本 commit 不動。面向未來條：既有行不回洗",
       "owner": "SPLITUNIFY",
-      "trigger": "SPLITUNIFY 規格 R 重開之第一個 commit（施工清單隨之修訂）"
+      "trigger": "依 docs/SPLITUNIFY_SPEC.md v6 重寫本施工清單之 commit（使用者放行後）；該次改寫觸及命中行時守衛逐行強制改寫，命中歸零時本列由 --migration 判過期須刪"
     },
     {
       "id": "DOCROT2-RESID-VERDICTGATE-TODO",

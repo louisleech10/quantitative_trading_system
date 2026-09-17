@@ -1,5 +1,9 @@
 # SPLITUNIFY_SPEC.md 延伸 D-001
 
+> 🔴 **本延伸已因原檔 R 重開而失效（2026-09-17）**：依 `docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md` §2.1，`docs/SPLITUNIFY_SPEC.md` v6 R 重開，本檔全量失效；
+> 仍有效之義務已逐條併入 `docs/SPLITUNIFY_SPEC.md`（識別碼沿用）。本檔不得作為派工、實作或審查之依據；
+> 檔案暫留僅因以路徑讀取之腳本與測試尚未改指，改指工作＝`docs/SPLITUNIFY_SPEC.md` 之 `Task 10.1`。
+
 BASE: docs/SPLITUNIFY_SPEC.md @ b095cc754cb9de26bbf2dd35564db329aca3c98f
 PREDECESSOR: none
 改什麼: 落實 §N 之 `R-1`（per-symbol 投影）與 `docs/SPLITUNIFY_TODO.md` §E 之 `SU-RESID-3`（逐列時刻同源對證），並修正 R-1 解封後才會顯形的 per-symbol 門檻失效。
