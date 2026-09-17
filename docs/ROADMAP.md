@@ -55,7 +55,7 @@
 | 010 | D2A | 已完成 | docs/DOCROT2_TODO.md §B | — |
 | 020 | D2B | 已完成 | docs/DOCROT2_TODO.md §B | — |
 | 030 | D2C | 已完成 | docs/DOCROT2_TODO.md §B | — |
-| 040 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | 可開工（D2C 審碼 r2 三家閉合）：Task 4.1 全專案遷移 |
+| 040 | D2D | 已完成 | docs/DOCROT2_TODO.md §B | — |
 <!-- END GENERATED: docrot2-batch-status -->
 
 ### SPLITUNIFY 事件切分與 IC 時間切分統一

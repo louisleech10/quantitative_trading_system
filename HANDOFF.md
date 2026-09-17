@@ -13,7 +13,6 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 01-004 | D2D | 未開工 | docs/DOCROT2_TODO.md §B | 可開工（D2C 審碼 r2 三家閉合）：Task 4.1 全專案遷移 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
 | 03-005 | R-5 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 規格 R 重開後實作，排在 DOCROT2 之後 |
@@ -60,6 +59,9 @@
 - 🔴 **登記表 `<檔>:<行>` 只驗「非註解非空行」，語意漂移不會紅**：改任何被引用之腳本後，以 `git show HEAD:<檔> | sed -n <行>p` 取舊行內容、`grep -nF` 找新行號逐列更正；2026-09-16 對讀時另抓到四列原本即指錯行（`}`、他函式之 `return 0` 等）。
 - 🔴 **`gate.sh dispatch --impl-self` 與 `git commit` 必須以 `&&` 串接**：以 `;` 串接時 gate 拒發 token 而 commit 仍成立，post-commit 記 `token_fresh=false`，pre-push 段 1c 擋推送且事後領 token 不追認；未推送時之出路＝`git reset --soft HEAD~1`、先處理 gate 拒發原因（例：先銷帳）、重領 token 後重新 commit。
 - 🔴 **委員名冊變動會使舊收斂檔戳記不足**：`active_stampers` 增加家族後，`--impl-self --adversarial <收斂檔>` 要求現行全員戳記；出路＝只派缺席家族之 stamp 輪補簽（brief-kind stamp、stamp-target 指該收斂檔）。
+- 🔴 **全專案遷移判定有兩個模式**：`bash scripts/live_doc_registry_check.sh --migration` 讀工作樹（含未追蹤檔）；`--migration --index` 判暫存快照（清冊、內容、登記、`fact_keys`、殘留清單與生成器皆取 index），pre-commit 用後者。命中消失時 `scripts/docrot2_migration_residuals.json` 該列須同 commit 刪；新增狀態識別碼可讓未被編輯之既有行命中，改 `fact_keys.json` 後先跑一次。暫存檢查一律取快照，讀工作樹之判定會被「只暫存一半」或 `git rm --cached` 繞過。
+- 🔴 **委員並行跑會就地改寫檔案之 mutation 執行器會互相污染**（2026-09-17 閉合輪實例：一家兩次執行重疊，另一家看到未還原之改壞並自行 `git checkout` 還原）。收件後先 `git diff HEAD -- scripts tests docs` 對證零差異再收斂。
+- 🔴 **生成器無參數模式有 2 秒預算測試**（`test_govb1_factkey_gen.py::test_generator_runs_under_two_seconds`）：2026-09-17 新增一個狀態 key 前實測已 1.92 秒；`_fk_validate_shape` 七次 jq 合一後 1.65 秒。再加 key 前先量；worktree 基準量時須補齊 `handoffs/` 物件，否則生成器提早失敗、耗時失真。
 
 ## 進行中紀錄
 
@@ -74,4 +76,7 @@
 - 2026-09-17：B-63 → commit `0f39b345`
 - 2026-09-17：B-63 → commit `ea54367b`
 - 2026-09-17：B-63 → `handoffs/reconcile/20260915-docrot2-b3-review-r2/synth.md`
+- 2026-09-17：B-63 → commit `58515525`
+- 2026-09-17：B-63 → commit `a8fbab77`
+- 2026-09-17：B-63 → `handoffs/reconcile/20260915-docrot2-b4-review-r2/synth.md`
 <!-- HISTORY-END -->
