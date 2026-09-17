@@ -420,6 +420,12 @@ def derive_event_split_from_plans(
 3. 判定順序與 IC service 事件路徑相同（對齊 → run symbol → coverage → label 值 → 特徵列）；事件掃描端另於 coverage 之後判 `outside_post_trim_index`（R5-C4 1.(b)）。
 4. 事件掃描回應之 `period_alignment` 與 `excluded_by_symbol` 由處置帳導出，不另算。
 5. 處置帳本身不得作為「兩端相等」之證據：`Task 10.5` 以 IC 實際產出對證（R5-C7 4.）。
+6. **預測與觀測分離**：處置帳之 `ic_disposition` 為入口之**預測**（`cutoff_row_not_in_feature_index` 以事件 `feature_cutoff_ms` 是否屬於 post-trim `feature_index` 集合判定），
+   **不得**讀取 IC stage3 之結果或下點之觀測收據計算。
+7. **IC 端觀測收據**：`ic_filter_orchestrator` 之 stage3 事件過濾於事件路徑產出逐 `event_id` 觀測收據（`event_id`、`feature_cutoff_ms`、`observed` ∈ {`ic_consumed`, `cutoff_row_not_in_feature_index`}，
+   取自 stage3 實際之特徵列交集結果），存於 analyze 範圍之實例屬性、每次 analyze 入口歸零，**不寫入報告**（IC 報告逐位元組不變）。
+8. **對證順序**：`Task 10.5` 先驗「處置帳中被送入 IC 之事件，其 `ic_disposition` 與觀測收據之 `observed` 逐 `event_id` 相等」，再驗 R5-C7 4. 之集合等式；任一不等 ⇒ fail 並輸出該 `event_id` 之預測值與觀測值。
+9. 誠實邊界：兩端共用之上游（`align_events` 之 cutoff 取法、run symbol 過濾、coverage）若本身有錯，預測與觀測同錯而對證仍相等；該面由既有對齊測試與 mutation（G-5、`M-SU-12`）守，不由本節處置帳擔保。
 
 ## §G Golden / Baseline
 
@@ -498,6 +504,7 @@ def derive_event_split_from_plans(
 - 實作要點：① 只讀 FF run 索引，不為切分載入整份特徵矩陣；② K 線讀取器固定 `data_cache/feature_klines`；③ bars 載入 `trigger_timeframes ∪ {feature_run.timeframe}`；④ `check_feature_run_coverage`、run symbol 過濾與 look-ahead 深度抬高 `embargo` 之規則移入 momentum，IC service 改呼叫；
   ⑤ plan 由 `_build_holdout_split_plan` 建立；⑥ 請求之 `test_fraction`／`embargo_ms`／表用 `horizons` 不得餵入（R5-C3 7.）；⑦ 產出 R5-C8 處置帳（含事件掃描端之 post-trim 首尾剔除，R5-C4 1.(b)），值集自 `split_unify.json` 讀。
 - 修改檔案：`momentum/Analysis/event_samples/canonical_holdout.py`（新）、`momentum/factories.py`（出口）、`api/services/ic_analysis_service.py`（改呼叫）、`momentum/Analysis/contracts/split_unify.json`（新鍵 `event_disposition_values`）、
+  `momentum/Analysis/ic_filter_orchestrator.py`（stage3 觀測收據，R5-C8 7.；不進報告）、
   `tests/momentum/Analysis/test_splitunify_canonical_holdout.py`（新）、`scripts/splitunify_ic_event_report_diff.py`（新；IC 事件 run 報告改前後逐鍵比對）。既有 caller：`ICAnalysisService._run_event_label_stages` 與 IC 分析主流程。
 - 不可做：`momentum/` 不 import `api/`；service 不互 import；不改 `holdout_boundary` 與投影之簽名；不改 IC 任何輸出數值；不改 IC 事件歸屬規則（R5-C7 1.）。
 - 邊界：① `ic_train_test_split` 關閉 ⇒ 具名原因 `canonical_holdout_disabled`；② `SkippedResult` ⇒ `canonical_holdout_insufficient_rows`；③ run 不存在／`symbol` 或 `timeframe` 不符 ⇒ 具名錯誤；④ 交集為空 ⇒ `AlignmentViolationError`（既有語意）；⑤ 事件批觸發 TF 與 run feature TF 不同（例：12h 事件 × 1h run）為合法輸入。
@@ -508,6 +515,7 @@ def derive_event_split_from_plans(
   `ASSERT canonical_holdout_entry WHEN trigger_timeframe=12h feature_run_timeframe=1h THEN rc=0`（`receipts.per_tf` 含 1h 列，`build_event_keys(selected_timeframe="1h")` 不 raise，且對齊所用 bars 之週期集合 ⊇ {12h, 1h}）；
   `ASSERT canonical_holdout_entry WHEN event_decision_in_manifest_range=true event_decision_outside_post_trim_index=true THEN rc=0`（該事件 `scan_disposition=outside_post_trim_index`，不進投影）；
   `ASSERT canonical_holdout_entry WHEN disposition_value_not_in_contract=true THEN rc!=0`（處置帳值集自契約讀，手打值即紅）；
+  `ASSERT ic_stage3_receipt WHEN analyze_called_twice=true THEN rc=0`（第二次 analyze 之觀測收據不含第一次之事件；IC 報告 JSON 不含觀測收據之鍵）；
   `ASSERT splitunify_ic_event_report_diff WHEN baseline=pre_task_10_2 candidate=post_task_10_2 THEN rc=0`（真實事件批之 IC 報告逐鍵 diff 為空；receipt 寫入 `handoffs/run_receipts/`）；
   `ASSERT splitunify_ic_event_report_diff WHEN candidate_embargo_raise_removed=true THEN rc!=0`。
 - **存活至**：全票完工後保留（唯一邊界解析入口）。
@@ -548,19 +556,22 @@ def derive_event_split_from_plans(
 - 修改檔案：`scripts/splitunify_r5_parity.py`（新）、`tests/golden/splitunify/r5_parity.json`（新）、`docs/SPLITUNIFY_TODO.md` §E `R-3` 列之 UAT 項目。
 - 不可做：禁合成 fixture；不得改既有 golden 鍵值；不執行 UAT；不改 IC 事件歸屬規則。
 - 邊界：① 至少一組觸發 TF 與 run feature TF 不同之真實組合（12h 事件 × 1h run）；② 至少一組 FF run 期間與 K 線期間不同而發生裁切之真實組合；③ 對證比對 `test_plan.row_time_fingerprint`、`test_start_ms` 與測試段 `event_id` 集合，不以 `boundary_hash` 代替。
-- 風險緩解：`M-SU-R5-08`、`M-SU-R5-09`、`M-SU-R5-12`。
+- 風險緩解：`M-SU-R5-08`、`M-SU-R5-09`、`M-SU-R5-12`、`M-SU-R5-14`、`M-SU-R5-15`。
 - **驗證**：`venv/bin/python scripts/splitunify_r5_parity.py` rc=0；
   `ASSERT splitunify_r5_parity WHEN one_side_oos_test_size=0.3 THEN rc!=0`（輸出兩側 `test_start_ms`）；
   `ASSERT splitunify_r5_parity WHEN diff_event_without_ic_drop_reason=true THEN rc!=0`（輸出該 `event_id`）；
   `ASSERT splitunify_r5_parity WHEN parity_script_supplies_reason_not_from_disposition_ledger=true THEN rc!=0`（原因只准取自 R5-C8 處置帳）；
-  `ASSERT splitunify_r5_parity WHEN ic_test_ids_derived_from_ledger=true THEN rc!=0`（IC 測試段集合須取自 IC 實際產出）。
+  `ASSERT splitunify_r5_parity WHEN ic_test_ids_derived_from_ledger=true THEN rc!=0`（IC 測試段集合須取自 IC 實際產出）；
+  `ASSERT splitunify_r5_parity WHEN stage3_drops_event_wrongly=true ledger_predicts_ic_consumed=true THEN rc!=0`（預測與觀測不等，輸出該 `event_id` 兩值）；
+  `ASSERT splitunify_r5_parity WHEN ledger_ic_disposition_copied_from_stage3_receipt=true THEN rc!=0`（預測不得讀觀測）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無後續 Phase。
 
 **`R-5` mutation**（接續 §V 目錄）：`M-SU-R5-01` 事件端以 `test_fraction` 當 `oos_test_size`；`M-SU-R5-02` 事件端 `purge_gap` 只取 `effective_horizon`；`M-SU-R5-03` 事件端不抬高 `embargo`；
 `M-SU-R5-04` 略過 coverage 剔除；`M-SU-R5-05` `config_hash` 缺時回退最新 run；`M-SU-R5-06` 刪除 event-study-only 分支；`M-SU-R5-07` `unavailable` 時仍顯示計數或 `ok` 時不顯示 `discarded`；
 `M-SU-R5-08` 對證腳本只比 `boundary_hash`；`M-SU-R5-09` 對證腳本接受未附 IC 未保留原因之差集；`M-SU-R5-10` canonical 解析只載入觸發 TF 之 bars；`M-SU-R5-11` `EventAnalyzeResponse` 未宣告新欄致 route 序列化丟欄；
-`M-SU-R5-12` 對證腳本自行填寫差集原因（不讀處置帳）；`M-SU-R5-13` 事件掃描端只做 manifest 區間 coverage、略過 post-trim 首尾剔除。
+`M-SU-R5-12` 對證腳本自行填寫差集原因（不讀處置帳）；`M-SU-R5-13` 事件掃描端只做 manifest 區間 coverage、略過 post-trim 首尾剔除；
+`M-SU-R5-14` 處置帳之 `ic_disposition` 由 stage3 觀測收據回填（預測與觀測同源）；`M-SU-R5-15` 對證略過預測與觀測之逐 `event_id` 相等。
 
 ## §V 驗證策略與邊界測試目錄
 
