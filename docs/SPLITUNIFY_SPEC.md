@@ -466,7 +466,7 @@ def derive_event_split_from_plans(
 3. **對齊輸入**：`prepare_analysis_windows` 之 bars 與 `AlignmentConfig.timeframes` 為 `trigger_timeframes ∪ {F}`（F 以參數傳入，不得在函式內讀 request）；
    `PerTfRow` 增第四欄 `last_bar_open_ms`，取自對齊收據同名欄，**不得**以 `feature_cutoff_ms` 減週期長度推導；`analysis_alignment_receipt_hash` 之 `per_tf` 列隨之含此欄。
    事件缺 `(e, F)` 列 ⇒ fail-closed（具名錯誤，訊息含 `event_id` 與 F），不得略過或回退他週期之列。
-   `PerTfRow` 欄集與 receipt hash payload 屬 GAP-3 契約（`docs/GAP3_EVENT_UX_SPEC.md` 之 `per_tf` 三鍵），變更以追加條目登記於 `docs/GAP3_EVENT_UX_SPEC.D-002.md`（C-7）。
+   `PerTfRow` 欄集與 receipt hash payload 屬 GAP-3 契約：主檔 `docs/GAP3_EVENT_UX_SPEC.md` 之 `per_tf` 三鍵條文**不解凍、不改**；第四欄只以追加條目登記於 `docs/GAP3_EVENT_UX_SPEC.D-002.md`（C-7），receipt hash 之 `per_tf` 列形狀以該條目為準。
 4. **單一來源**：特徵列鍵只准取自對齊收據之 `last_bar_open_ms` 欄——IC 事件路徑、R5-C8 處置帳之預測、`build_event_keys` 之 `last_bar_open_ms` 欄同源；
    `ic_feed.py` 與 `feature_materialization.py` 既有之 `last_bar_open_ms` 讀法不改。
 5. **產出端 PIT 守衛**：IC 事件路徑組鍵當下逐事件驗 `last_bar_open_ms < feature_cutoff_ms <= decision_at_ms`（同一 `(e, F)` 列），違反即 raise；守衛住 momentum 單一函式、不得只存在於測試。
@@ -520,7 +520,8 @@ def derive_event_split_from_plans(
 **`R5-C9`（`Task 10.2`）IC 事件特徵列鍵之真實資料 golden**：真實事件批 × 真實 FF run（至少 12h 事件 × 12h run、12h 事件 × 1h run、1h 事件 × 12h run 三組），
 逐事件凍結 `(event_id, last_bar_open_ms, feature_cutoff_ms, decision_at_ms)` 與 stage3 實際保留之列時刻；斷言 stage3 保留列時刻＝特徵列鍵、`last_bar_open_ms < feature_cutoff_ms <= decision_at_ms`，
 並以只依賴當根之特徵（`*_L1_momentum_BOP`）與 kline 逐值對證「保留列之主週期值＝收盤 ≤ `decision_at_ms` 之那根」。
-1h 事件批以既有事件搜尋流程於真實 1h K 線產生並落檔於 `data_cache/events/`，不得手造 `t0`。
+1h 事件批取自真實記錄（`data_cache/events/20260901T132233Z-363ecc4f.json` 之 14 筆 1h 記錄經匯入流程另存為單一週期批，或既有事件搜尋流程於真實 1h K 線新產生之批），不得手造 `t0`。
+該批 1h 記錄之 `t0` 皆落在 12h 網格（x-review-r16 實測），故以分析用 `decision_offset_bars` 移動決策時點；前置條件＝fixture 中至少一筆 `last_bar_open_ms != decision_at_ms − 43200000`（決策時點不在 12h 網格），不成立即 rc!=0，不得以網格對齊之事件空心通過。
 
 **`R-5`（`Task 10.7`）**：新增「IC 分析端與事件掃描端對同一 FF run／同一事件批／同一分析用標籤參數之 canonical 邊界逐值相等、驗證段事件集合依 R5-C7 4. 對證」之真實資料 golden（`test_plan.row_time_fingerprint`、`test_start_ms`、`train_row_index` 逐值相等；逐事件 `decision_at_ms`／`label_start_ms`／`label_end_ms` 與 `label_window_rows` 逐值相等；測試段 `event_id` 差集只准為 R5-C8 處置帳記為 IC 端未消費之事件），fixture 必用 `data_cache/` 真實 FF run 與 kline，禁合成。
 
@@ -572,7 +573,8 @@ def derive_event_split_from_plans(
 - 目標：`R5-C9` 1.–5.、7.、8.：IC 事件路徑以特徵 run 週期之 `last_bar_open_ms` 為特徵列鍵；對齊載入觸發週期與特徵 run 週期之聯集；產出端 PIT 守衛；數值變動逐鍵揭露。
 - 修改檔案：`momentum/Analysis/event_samples/label_value_from_case.py`（`PerTfRow` 第四欄、`prepare_analysis_windows` 新增關鍵字參數 `feature_timeframe: Optional[str] = None`、特徵列鍵函式與 PIT 守衛）、
   `momentum/Analysis/event_samples/pipeline.py`（出口傳遞參數與鍵函式出口）、`api/services/ic_analysis_service.py`（bars 載入聯集、以鍵函式組 `ts_map` 與同鍵各表）、
-  `momentum/core/split_preview.py`（`binary_labels` 鍵語意之註解）、`tests/api/test_gap3_event_analysis_horizon_purge.py`（改新鍵並加 PIT 斷言）、
+  `momentum/core/split_preview.py`（L379 `binary_labels` 鍵語意之註解）、`momentum/Analysis/ic_filter_orchestrator.py`（L1195、L1707 `event_binary_labels` 同鍵語意之註解）、`momentum/Analysis/event_samples/ic_feed.py`（L9 模組說明之鍵語意）、
+  `tests/momentum/Analysis/test_evtlabel_stage3.py`（L42 helper 說明之鍵語意）、`tests/api/test_gap3_event_analysis_horizon_purge.py`（改新鍵並加 PIT 斷言）、
   `tests/momentum/event_samples/test_ic_event_feature_row_key.py`（新；真實資料）、`scripts/freeze_ic_event_row_key_golden.py`（新）、`tests/golden/splitunify/ic_event_row_key.json`（新）、
   `scripts/splitunify_ic_event_report_diff.py`（新；IC 事件 run 報告改前後逐鍵比對，`--allow-diff` 模式只寫 receipt）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`（追加 `per_tf` 第四欄條目）；
   受影響之既有 golden 以實跑列舉後同 commit 依各自授權流程重凍。
@@ -585,8 +587,11 @@ def derive_event_split_from_plans(
   `venv/bin/python -m pytest -q tests/momentum/event_samples/test_ic_event_feature_row_key.py tests/api/test_gap3_event_analysis_horizon_purge.py tests/api/test_gap3_feature_coverage_gate.py tests/momentum/event_samples/test_gap3_analysis_label_producer.py tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py tests/momentum/event_samples/test_gap3_label_feasible_bounds.py tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py` 之 summary 行無 failed；其中逐條：
   `ASSERT ic_event_feature_row_key WHEN batch=20260909T130533Z-7f73e4c7 ff_run=4a8a0b3726cc906ab3534994605e77f5 THEN rc=0`（stage3 保留列時刻逐事件＝`last_bar_open_ms`＝`decision_at_ms − 3600000`；`1h_L1_momentum_BOP` 值＝收盤 ≤ `decision_at_ms` 之那根之 kline BOP）；
   `ASSERT ic_event_feature_row_key WHEN batch=20260909T130533Z-7f73e4c7 ff_run=e53e22906c35363757f4cd49d27f973e THEN rc=0`（同上，12h）；
-  `ASSERT ic_event_feature_row_key WHEN trigger_timeframe=1h feature_run_timeframe=12h THEN rc=0`（§G 之 1h 事件批；鍵非網格對齊）；
+  `ASSERT ic_event_feature_row_key WHEN batch=realdata_1h_single_tf ff_run=e53e22906c35363757f4cd49d27f973e decision_offset_bars=5 THEN rc=0`（§G 之 1h 單週期批；至少一筆 `last_bar_open_ms != decision_at_ms − 43200000`；保留列之 12h 主週期收盤 ≤ `decision_at_ms`）；
+  `ASSERT ic_event_feature_row_key WHEN batch=realdata_1h_single_tf ff_run=e53e22906c35363757f4cd49d27f973e off_grid_events=0 THEN rc!=0`（前置條件不成立即紅，擋網格對齊事件之空心通過）；
+  `ASSERT ic_event_feature_row_key WHEN batch=realdata_1h_single_tf ff_run=e53e22906c35363757f4cd49d27f973e decision_offset_bars=5 key=feature_cutoff_ms THEN rc!=0`（非網格幾何下舊鍵選到收盤晚於決策時點之 12h 列）；
   `ASSERT ic_event_feature_row_key WHEN key=feature_cutoff_ms THEN rc!=0`（輸出第一個收盤晚於決策時點之 `event_id`）；
+  `ASSERT stale_feature_row_key_wording WHEN files=split_preview.py,ic_filter_orchestrator.py,ic_feed.py,test_evtlabel_stage3.py THEN rc=0`（`grep -n '同鍵\*\*（feature_cutoff_ms）\|鍵＝特徵列時間戳（feature_cutoff_ms）\|{feature_cutoff_ms: ' 四檔` 零命中）；
   `ASSERT ic_event_feature_row_key WHEN alignment_timeframes=trigger_only trigger_timeframe=12h feature_run_timeframe=1h THEN rc!=0`；
   `ASSERT prepare_analysis_windows WHEN feature_timeframe=1h per_tf_row_missing=true THEN rc!=0`（訊息含 `event_id` 與 `1h`）；
   `ASSERT ic_event_pit_guard WHEN last_bar_open_ms=feature_cutoff_ms THEN rc!=0`；
@@ -635,6 +640,9 @@ def derive_event_split_from_plans(
   `ASSERT canonical_holdout_entry WHEN trigger_timeframe=12h feature_run_timeframe=1h THEN rc=0`（`receipts.per_tf` 含 1h 列，`build_event_keys(selected_timeframe="1h")` 不 raise，且對齊所用 bars 之週期集合 ⊇ {12h, 1h}）；
   `ASSERT canonical_holdout_entry WHEN event_anchor_in_manifest_range=true event_anchor_outside_post_trim_index=true THEN rc=0`（該事件 `scan_disposition=outside_post_trim_index`，不進投影）；
   `ASSERT canonical_holdout_entry WHEN disposition_value_not_in_contract=true THEN rc!=0`（處置帳值集自契約讀，手打值即紅）；
+  `ASSERT canonical_holdout_entry WHEN feature_cutoff_in_post_trim=true last_bar_open_outside_post_trim=true THEN rc=0`（該事件 `ic_disposition=feature_row_not_in_feature_index`；fixture 以真實事件批與分析用 `decision_offset_bars` 使至少一事件 `decision_at_ms == index_ms[0]`，不得手造 `t0`；無此事件即 rc!=0）；
+  `ASSERT canonical_holdout_entry WHEN feature_cutoff_in_post_trim=true last_bar_open_outside_post_trim=true ledger_key_source=feature_cutoff_ms THEN rc!=0`（同一 fixture；輸出 `event_id`、`feature_cutoff_ms`、`last_bar_open_ms` 與預測值）；
+  `ASSERT resolve_event_label_spec WHEN ic_route_called=true resolver_factory_spy=true THEN rc=0`（IC route 經 `momentum/factories.py` 出口呼叫解析函式恰一次；spy 未被呼叫即紅）；
   `ASSERT canonical_holdout_entry WHEN event_label_spec=absent THEN rc=0`（逐事件 `decision_at_ms`／`label_start_ms`／`label_end_ms` 與 IC 事件路徑之 `prepare_analysis_windows` 逐值相等，`label_window_rows` 相等）；
   `ASSERT canonical_holdout_entry WHEN event_label_spec=k1_h6 THEN rc=0`（同上，非預設值）；
   `ASSERT resolve_event_label_spec WHEN decision_offset_bars_out_of_domain=true THEN rc!=0`（IC route 回 422，`kind` 字面同改前）；
@@ -661,6 +669,8 @@ def derive_event_split_from_plans(
   `ASSERT EventImportService.analyze WHEN feature_run=valid one_event_out_of_range=true THEN rc=0`（揭露該 `event_id`）；
   `ASSERT EventImportService.analyze WHEN feature_run=valid ic_train_test_split=false THEN rc=0`（reason＝`canonical_holdout_disabled`，無三計數鍵）；
   `ASSERT EventImportService.analyze WHEN feature_run=valid event_label_spec=k1_h6 THEN rc=0`（投影所用 `manifest.table` 之 `decision_at_ms` 與 IC 事件路徑同 spec 之 `prepare_analysis_windows` 逐事件相等）；
+  `ASSERT EventImportService.analyze WHEN feature_run=valid resolver_factory_spy=true THEN rc=0`（事件掃描端經 `momentum/factories.py` 出口呼叫解析函式恰一次，取得之四鍵與同請求 IC route 之解析結果逐鍵相等；spy 未被呼叫即紅）；
+  `ASSERT event_label_spec_single_source WHEN file=api/services/case_import_service.py THEN rc=0`（AST 掃描：不得出現對 `decision_offset_bars`／`entry_price_semantic`／`label_return_mode`／`horizon_bars` 之 `setdefault` 呼叫或以這四鍵為鍵之預設值字面；注入其一即 rc!=0）；
   `ASSERT POST_case_events_analyze_route WHEN feature_run=valid THEN rc=0`（HTTP 回應 JSON 含 `split_unify`、`period_alignment`、`excluded_by_symbol`、`event_label_spec` 四鍵且值與 service 回傳相同）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`R-3`（UAT）只新增 UAT 條目，不改本接線。
@@ -691,6 +701,7 @@ def derive_event_split_from_plans(
   `ASSERT splitunify_r5_parity WHEN ic_test_ids_derived_from_ledger=true THEN rc!=0`（IC 測試段集合須取自 IC 實際產出）；
   `ASSERT splitunify_r5_parity WHEN stage3_drops_event_wrongly=true ledger_predicts_ic_consumed=true THEN rc!=0`（預測與觀測不等，輸出該 `event_id` 兩值）；
   `ASSERT splitunify_r5_parity WHEN ledger_ic_disposition_copied_from_stage3_receipt=true THEN rc!=0`（預測不得讀觀測）；
+  `ASSERT splitunify_r5_parity WHEN real_event=true feature_cutoff_in_post_trim=true last_bar_open_outside_post_trim=true ledger_key_source=feature_cutoff_ms THEN rc!=0`（fixture 同 `Task 10.4` 之首列邊界事件；輸出 `event_id`、兩鍵、預測值與觀測值）；
   `ASSERT splitunify_r5_parity WHEN projection_anchor=decision_at_ms THEN rc!=0`（輸出邊界事件之 `event_id`）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無後續 Phase。

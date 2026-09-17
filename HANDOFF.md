@@ -88,4 +88,5 @@
 - 2026-09-17：R-5 → `handoffs/20260911-SPLITUNIFY-X-CONSULT-R4-BRIEF.md`
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-b9-stamp-r13/synth.md`
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-consult-r4/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r16/synth.md`
 <!-- HISTORY-END -->
