@@ -341,3 +341,19 @@
 - 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-b1-review-r8/synth.md`
 - 2026-09-16：B-64 → commit `12d1f748`
 - 2026-09-16：B-64 → `handoffs/reconcile/20260915-redispatch-b1-review-r9/synth.md`
+
+## 2026-09-17 交接檔進行中紀錄移出：B-63（票收票，條目識別碼轉完成）
+
+<!-- ENTRY: B-63 -->
+- 2026-09-15：B-63 → `docs/DOCROT2_SPEC.md`
+- 2026-09-15：B-63 → `docs/DOCROT2_TODO.md`
+- 2026-09-15：B-63 → `handoffs/reconcile/20260915-docrot2-b1-review-r2/synth.md`
+- 2026-09-15：B-63 → commit `80fb3cb2`
+- 2026-09-15：B-63 → `handoffs/reconcile/20260915-docrot2-b2-review-r5/synth.md`
+- 2026-09-15：B-63 → `docs/HANDOFF_ARCHIVE.md`
+- 2026-09-17：B-63 → commit `0f39b345`
+- 2026-09-17：B-63 → commit `ea54367b`
+- 2026-09-17：B-63 → `handoffs/reconcile/20260915-docrot2-b3-review-r2/synth.md`
+- 2026-09-17：B-63 → commit `58515525`
+- 2026-09-17：B-63 → commit `a8fbab77`
+- 2026-09-17：B-63 → `handoffs/reconcile/20260915-docrot2-b4-review-r2/synth.md`

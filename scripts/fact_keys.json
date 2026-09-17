@@ -216,7 +216,7 @@
       ["020", "R-2", "已完成", "docs/SPLITUNIFY_TODO.md §E", "—"],
       ["030", "R-3", "未開工", "docs/SPLITUNIFY_TODO.md §E", "UAT 排在最後一次做（使用者裁定）"],
       ["040", "R-4", "未開工", "docs/SPLITUNIFY_TODO.md §E", "另開接線票；本票只保證 assignments 語意不變"],
-      ["050", "R-5", "未開工", "docs/SPLITUNIFY_TODO.md §E", "規格 R 重開後實作，排在 DOCROT2 之後"],
+      ["050", "R-5", "未開工", "docs/SPLITUNIFY_TODO.md §E", "下一件：規格 R 重開後實作（DOCROT2 已於 2026-09-17 收票）"],
       ["060", "SU-RESID-2", "已完成", "docs/SPLITUNIFY_TODO.md §E", "—"],
       ["070", "SU-RESID-V8-ATTEST", "未開工", "docs/SPLITUNIFY_TODO.md §E", "待觸發：專案導入 commit 簽章或受保護分支"],
       ["080", "SU-RESID-PAUSED-NO-RESULT", "未開工", "docs/SPLITUNIFY_TODO.md §E", "待觸發：audit 出現同輪同家 failed 且無產出之結果列"],
@@ -369,7 +369,7 @@
       ["0600", "B-8", "未開工", "皆為 `FROZEN_DOC_AMENDMENT_PROCEDURE.md` v1.0 > 首次實戰才現形的問題：該程序創造了「D 延伸檔�…", "r4 三家一致（歸屬判準：他票副產物不算本票落地） ｜還缺：正式的拒絕清單確認機制未建；現行緩解僅「--rejected 覆寫限測試 harness」與「每次執行印出清單 sha256」"],
       ["0610", "B-9", "未開工", "`docs/` 內的 D 延伸檔無法取得可過機檢的戳記。", "r4 三家一致（歸屬判準：他票副產物不算本票落地） ｜還缺：修法須走程序 §5 的 R（完整三家審＋使用者裁定），尚未啟動"],
       ["0620", "B-62", "收案", "批次間閘只驗「有沒有派出去審」不讀裁決，且只在派工給委員時觸發——主委自任實作從未經過；收斂檔掉意見無機械擋", "SPEC v9 停輪＋TODO v3 FROZEN（三家戳記）；B1–B4 三家審碼＋原提出方閉合 CLOSED；收票審 R11／R12 三家 proceed（C-4 只擋進入新批、只認 review 輪）；SPLITUNIFY 補裁決輪三家 proceed；四掛載點 E-022～E-025 ｜無殘留（可做而未做者）；§E 具名殘留 E-1／E-2／E-4／E-7 user-ruling、E-3／E-6／E-8 needs-research、E-5 研究完成（mtime 保留）；SPEC C-4 字面修訂併入下張治理票（三家接受）"],
-      ["0630", "B-63", "部分完成", "DOCROT 未治好文件類多輪：只管規格檔、進度仍多處手寫、交接檔殘留舊案；使用者 2026-09-15 裁定修正並全專案涵蓋（DOCROT2）", "還缺：收票前治理全套（gov_check.sh --no-probe）跑一次並以改動前基準逐名比對無新增紅，收票時寫入 docrot2_metric_contract.json 之 closure_sequence（四批皆經三家審碼閉合，批次進度見 docrot2-batch-status；委員組成見 governance_families.json 之 active_stampers）"],
+      ["0630", "B-63", "收案", "DOCROT 未治好文件類多輪：只管規格檔、進度仍多處手寫、交接檔殘留舊案；使用者 2026-09-15 裁定修正並全專案涵蓋（DOCROT2）", "D2A–D2D 四批落地，各批三家審碼＋原提出方閉合（D2D：r1 兩條採納一條駁回、r2 三家 proceed）；收票前治理全套改動前後（61aa55b0 worktree 對照）逐名比對新增紅 0（69 failed 同名、passed 2329→2377）；產出端覆蓋 E-026～E-040；docrot2_metric_contract.json 之 closure_sequence＝4831，成效由其後首張票之前兩輪 review 以 bash scripts/docrot2_metrics.sh 量測｜無殘留（可做而未做者）；全專案遷移之具名留存 28 列見 scripts/docrot2_migration_residuals.json；SPEC 殘留 DOCROT2-RESID-D002-STRUCTURAL-RED 待 SPLITUNIFY 規格 R 重開"],
       ["0640", "B-64", "收案", "委員 CLI 失敗且無產出（例：模型容量滿）而該家仍在 active_stampers 時，同輪重派須 dispatch token、token 被本輪 OPEN 債拒發、銷帳缺該家產出、abandon 因該輪已有他家結果被擋 ⇒ 只能請使用者在終端機手動重派；違反「解除阻塞之路徑不得被同一族閘擋住」，同族第四次", "b1（Task 1.1–1.8）落地，審碼 r1–r9 三家收斂；19 條 P1 與 1 條 P2 全部由原提出方閉合或經主委複驗後具名處置；測試 103 條、mutation 35 條全數可證偽。還缺：無——唯一不可歸零之殘餘（最後一次觀測取得資料之後的窗口）已具名於 SPEC §C 誠實邊界⑧，含前置條件與為何現在不做，三家明示同意其為具名殘留而非未修缺陷"]
     ]
   },

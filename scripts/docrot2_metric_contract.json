@@ -40,5 +40,5 @@
     "body_hash_script": "scripts/reconcile_body_hash.sh",
     "max": 0
   },
-  "closure_sequence": null
+  "closure_sequence": 4831
 }
