@@ -266,14 +266,37 @@ def test_pre_commit_blocks_new_identifier_that_makes_existing_line_hit(tmp_path)
     assert r.returncode != 0 and "docs/A.md" in r.stderr and "NEWID" in r.stderr, r.stdout + r.stderr
 
 
-def test_pre_commit_gitignore_change_triggers_migration(tmp_path):
-    # 反向排除讓原被忽略之 .md 入清冊：只暫存 .gitignore 亦須觸發 ③
-    files = {".gitignore": "docs/HIDDEN.md\n", "docs/HIDDEN.md": HIT}
-    root = _precommit_repo(tmp_path, files, exact=[("docs/HIDDEN.md", "LIVE-CONTRACT")])
-    (root / ".gitignore").write_text("", encoding="utf-8")
-    _git(root, "add", ".gitignore")
+def test_pre_commit_blocks_index_only_new_identifier(tmp_path):
+    """〔CODEX-R1-P1-01〕只暫存新識別碼、工作樹 fact_keys 還原舊版：commit 內既有行命中，pre-commit 須擋。"""
+    root = _precommit_repo(tmp_path, {"docs/A.md": "# A\n\n- NEWID 進行中\n"}, exact=[CONTRACT])
+    old = (root / "scripts" / "fact_keys.json").read_text(encoding="utf-8")
+    fk = _fact_keys()
+    fk["d2-x"]["rows"].append(["020", "NEWID", "未開工", "x", "做 NEWID"])
+    (root / "scripts" / "fact_keys.json").write_text(json.dumps(fk, ensure_ascii=False, indent=2), encoding="utf-8")
+    _git(root, "add", "scripts/fact_keys.json")
+    (root / "scripts" / "fact_keys.json").write_text(old, encoding="utf-8")
     r = _precommit(root)
-    assert r.returncode != 0 and "docs/HIDDEN.md" in r.stderr, r.stdout + r.stderr
+    assert r.returncode != 0 and "docs/A.md" in r.stderr and "NEWID" in r.stderr, r.stdout + r.stderr
+
+
+def test_pre_commit_blocks_cached_delete_of_residual_listed_file(tmp_path):
+    """〔GROK-R1-P1-01〕git rm --cached 殘留列之檔（工作樹仍在）：commit 樹已無該檔，殘留列過期須擋。"""
+    root = _precommit_repo(tmp_path, {"docs/A.md": HIT}, exact=[CONTRACT], residuals=[_row("docs/A.md", "R-A")])
+    _git(root, "rm", "-q", "--cached", "docs/A.md")
+    assert (root / "docs" / "A.md").exists()
+    r = _precommit(root)
+    assert r.returncode != 0 and "R-A" in r.stderr and "清單過期" in r.stderr, r.stdout + r.stderr
+
+
+def test_pre_commit_untracked_hit_not_in_commit_passes(tmp_path):
+    # 暫存快照語意：未追蹤之命中檔不進 commit，不得擋（工作樹模式另由 --migration 單跑現形）
+    root = _precommit_repo(tmp_path, {"docs/A.md": CLEAN}, exact=[CONTRACT, CONTRACT_B])
+    (root / "docs" / "B.md").write_text(HIT, encoding="utf-8")
+    (root / "docs" / "A.md").write_text(CLEAN + "- 一般新行\n", encoding="utf-8")
+    _git(root, "add", "docs/A.md")
+    r = _precommit(root)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert _mig(root).returncode == 1
 
 
 def test_pre_commit_migration_not_triggered_by_unrelated_path(tmp_path):
@@ -282,6 +305,130 @@ def test_pre_commit_migration_not_triggered_by_unrelated_path(tmp_path):
     _git(root, "add", "notes.txt")
     r = _precommit(root)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+# ================================================================ 暫存快照模式（--migration --index；D2D review-r1）
+
+
+def _mig_index(root: Path) -> subprocess.CompletedProcess:
+    return subprocess.run(["bash", str(root / "scripts" / "live_doc_registry_check.sh"), "--migration", "--index"],
+                          cwd=str(root), capture_output=True, text=True)
+
+
+def _committed(tmp_path: Path, files: dict, **kw) -> Path:
+    root = _repo(tmp_path, files, **kw)
+    _git(root, "add", "-A")
+    _git(root, "commit", "-qm", "base")
+    return root
+
+
+def test_index_mode_reads_staged_content_not_worktree(tmp_path):
+    root = _committed(tmp_path, {"docs/A.md": CLEAN}, exact=[CONTRACT])
+    (root / "docs" / "A.md").write_text(HIT, encoding="utf-8")
+    _git(root, "add", "docs/A.md")
+    (root / "docs" / "A.md").write_text(CLEAN, encoding="utf-8")
+    assert _mig(root).returncode == 0
+    r = _mig_index(root)
+    assert r.returncode == 1 and "docs/A.md" in r.stderr, r.stderr
+
+
+def test_index_mode_excludes_untracked_hit(tmp_path):
+    root = _committed(tmp_path, {"docs/A.md": CLEAN}, exact=[CONTRACT, CONTRACT_B])
+    (root / "docs" / "B.md").write_text(HIT, encoding="utf-8")
+    assert _mig(root).returncode == 1
+    r = _mig_index(root)
+    assert r.returncode == 0 and "暫存快照" in r.stdout, r.stderr
+
+
+def test_index_mode_cached_delete_of_listed_file_is_stale(tmp_path):
+    root = _committed(tmp_path, {"docs/A.md": HIT}, exact=[CONTRACT], residuals=[_row("docs/A.md", "R-A")])
+    _git(root, "rm", "-q", "--cached", "docs/A.md")
+    assert _mig(root).returncode == 0
+    r = _mig_index(root)
+    assert r.returncode == 1 and "R-A" in r.stderr and "不在判定範圍" in r.stderr, r.stderr
+
+
+def test_index_mode_uses_index_fact_keys(tmp_path):
+    root = _committed(tmp_path, {"docs/A.md": "# A\n\n- NEWID 進行中\n"}, exact=[CONTRACT])
+    old = (root / "scripts" / "fact_keys.json").read_text(encoding="utf-8")
+    fk = _fact_keys()
+    fk["d2-x"]["rows"].append(["020", "NEWID", "未開工", "x", "做 NEWID"])
+    (root / "scripts" / "fact_keys.json").write_text(json.dumps(fk, ensure_ascii=False, indent=2), encoding="utf-8")
+    _git(root, "add", "scripts/fact_keys.json")
+    (root / "scripts" / "fact_keys.json").write_text(old, encoding="utf-8")
+    assert _mig(root).returncode == 0
+    r = _mig_index(root)
+    assert r.returncode == 1 and "NEWID" in r.stderr, r.stderr
+
+
+def test_index_mode_uses_index_residual_list(tmp_path):
+    root = _committed(tmp_path, {"docs/A.md": HIT}, exact=[CONTRACT], residuals=[_row("docs/A.md")])
+    (root / RES_REL).write_text(json.dumps({"residuals": []}), encoding="utf-8")
+    assert _mig(root).returncode == 1
+    r = _mig_index(root)
+    assert r.returncode == 0, r.stderr
+
+
+def test_index_mode_uses_index_registry(tmp_path):
+    # 暫存之登記把命中檔改為 LOG 類（不判定），工作樹登記仍為 LIVE-CONTRACT
+    root = _committed(tmp_path, {"docs/A.md": HIT}, exact=[CONTRACT], residuals=[_row("docs/A.md")])
+    reg_path = root / "scripts" / "live_doc_registry.json"
+    old = reg_path.read_text(encoding="utf-8")
+    reg = json.loads(old)
+    reg["exact"] = [["docs/A.md", "LOG"]]
+    reg_path.write_text(json.dumps(reg, ensure_ascii=False, indent=2), encoding="utf-8")
+    _git(root, "add", "scripts/live_doc_registry.json")
+    reg_path.write_text(old, encoding="utf-8")
+    assert _mig(root).returncode == 0
+    r = _mig_index(root)
+    assert r.returncode == 1 and "R-X" in r.stderr and "不在判定範圍" in r.stderr, r.stderr
+
+
+def test_index_mode_symlink_entry_rc1(tmp_path):
+    root = _committed(tmp_path, {"docs/real.txt": HIT}, exact=[CONTRACT])
+    os.symlink("real.txt", root / "docs" / "A.md")
+    _git(root, "add", "docs/A.md")
+    r = _mig_index(root)
+    assert r.returncode == 1 and "docs/A.md" in r.stderr and "非 regular file" in r.stderr, r.stderr
+
+
+def test_index_mode_residual_list_missing_in_index_rc2(tmp_path):
+    root = _committed(tmp_path, {"docs/A.md": CLEAN}, exact=[CONTRACT])
+    _git(root, "rm", "-q", "--cached", RES_REL)
+    r = _mig_index(root)
+    assert r.returncode == 2 and "暫存區缺" in r.stderr, r.stderr
+
+
+def test_index_flag_without_migration_rc2(tmp_path):
+    root = _committed(tmp_path, {"docs/A.md": CLEAN}, exact=[CONTRACT])
+    r = subprocess.run(["bash", str(root / "scripts" / "live_doc_registry_check.sh"), "--all", "--index"],
+                       cwd=str(root), capture_output=True, text=True)
+    assert r.returncode == 2, r.stderr
+
+
+def test_staged_guard_uses_index_identifiers(tmp_path):
+    """〔CODEX-R1-P1-01 同型〕`live_doc_write_guard.sh --staged` 之識別碼須取暫存版 fact_keys，工作樹不得代答。"""
+    root = _committed(tmp_path, {"docs/A.md": CLEAN}, exact=[CONTRACT])
+    old = (root / "scripts" / "fact_keys.json").read_text(encoding="utf-8")
+    fk = _fact_keys()
+    fk["d2-x"]["rows"].append(["020", "NEWID", "未開工", "x", "做 NEWID"])
+    (root / "scripts" / "fact_keys.json").write_text(json.dumps(fk, ensure_ascii=False, indent=2), encoding="utf-8")
+    (root / "docs" / "A.md").write_text(CLEAN + "- NEWID 進行中\n", encoding="utf-8")
+    _git(root, "add", "scripts/fact_keys.json", "docs/A.md")
+    (root / "scripts" / "fact_keys.json").write_text(old, encoding="utf-8")
+    r = subprocess.run(["bash", str(root / "scripts" / "live_doc_write_guard.sh"), "--staged"], cwd=str(root),
+                       capture_output=True, text=True)
+    assert r.returncode == 1 and "NEWID" in r.stderr, r.stdout + r.stderr
+
+
+def test_staged_guard_generator_absent_in_index_fail_closed(tmp_path):
+    root = _committed(tmp_path, {"docs/A.md": CLEAN}, exact=[CONTRACT])
+    _git(root, "rm", "-q", "--cached", "scripts/gen_fact_key_blocks.sh")
+    (root / "docs" / "A.md").write_text(CLEAN + "- 一般新行\n", encoding="utf-8")
+    _git(root, "add", "docs/A.md")
+    r = subprocess.run(["bash", str(root / "scripts" / "live_doc_write_guard.sh"), "--staged"], cwd=str(root),
+                       capture_output=True, text=True)
+    assert r.returncode == 2 and "gen_fact_key_blocks.sh" in r.stderr, r.stdout + r.stderr
 
 
 # ================================================================ 殘留清單檔封閉驗證（fail-closed rc=2）

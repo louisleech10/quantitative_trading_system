@@ -19,6 +19,7 @@
   --migration（Task 4.1）＝ `new_line_status_check`＝true 類之登記活文件全檔（豁免區同寫入前守衛）經
               `gen_fact_key_blocks.sh --status-hits` 一次判定：命中檔 ∉ `scripts/docrot2_migration_residuals.json`
               ⇒ 違規；清單列之檔已無命中或不在判定範圍 ⇒ 違規（清單過期）；清單檔不合規 ⇒ rc=2。
+              加 `--index`（pre-commit 用）＝清冊、內容、登記檔、fact_keys、殘留清單與判定碼皆取暫存快照，不含未追蹤檔。
 rc：0＝合規或範圍外；1＝違規；2＝用法或環境錯誤。
 """
 from __future__ import annotations
@@ -382,9 +383,12 @@ class MigrationConfigError(Exception):
     """殘留清單或判定環境不合規（呼叫端 rc=2，fail-closed）。"""
 
 
-def load_migration_residuals(root: str) -> List[dict]:
+def load_migration_residuals(root: str, text: Optional[str] = None) -> List[dict]:
     try:
-        data = load_json(os.path.join(root, MIGRATION_RESIDUALS_REL))
+        if text is None:
+            data = load_json(os.path.join(root, MIGRATION_RESIDUALS_REL))
+        else:
+            data = _json_object(text, MIGRATION_RESIDUALS_REL)
     except ValueError as exc:
         raise MigrationConfigError(str(exc))
     extra = sorted(set(data) - {"_schema", "residuals"})
@@ -417,36 +421,137 @@ def load_migration_residuals(root: str) -> List[dict]:
     return rows
 
 
-def migration_hits(root: str) -> Tuple[Dict[str, List[Tuple[str, str, str]]], set, List[str]]:
+def _json_object(text: str, rel: str) -> dict:
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{rel} 非合法 JSON：{exc}")
+    if not isinstance(data, dict):
+        raise ValueError(f"{rel} 頂層須為物件")
+    return data
+
+
+def _index_text(root: str, rel: str) -> str:
+    """暫存區版本之文字檔；缺失或非 UTF-8 ⇒ MigrationConfigError（不退回工作樹）。"""
+    spec = ":" + rel.replace(os.sep, "/")
+    r = subprocess.run(["git", "-C", root, "cat-file", "blob", spec], capture_output=True)
+    if r.returncode != 0:
+        raise MigrationConfigError(f"暫存區缺 {rel}")
+    try:
+        return r.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        raise MigrationConfigError(f"暫存區之 {rel} 非 UTF-8")
+
+
+def _index_entries(root: str) -> List[Tuple[str, str, str]]:
+    """暫存區清冊（mode, blob sha, path）；未解決衝突 ⇒ MigrationConfigError。"""
+    try:
+        out = subprocess.run(["git", "-C", root, "-c", "core.quotePath=false", "ls-files", "-s", "-z"],
+                             capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        raise MigrationConfigError("git ls-files -s 失敗")
+    entries: List[Tuple[str, str, str]] = []
+    for rec in out.split(b"\0"):
+        if not rec:
+            continue
+        meta, _tab, raw = rec.partition(b"\t")
+        mode, sha, stage = meta.decode("ascii").split(" ")
+        path = raw.decode("utf-8")
+        if stage != "0":
+            raise MigrationConfigError(f"暫存區有未解決衝突：{path}")
+        entries.append((mode, sha, path))
+    return entries
+
+
+def _cat_blobs(root: str, shas: Sequence[str]) -> Dict[str, bytes]:
+    uniq = sorted(set(shas))
+    if not uniq:
+        return {}
+    r = subprocess.run(["git", "-C", root, "cat-file", "--batch"], input=("\n".join(uniq) + "\n").encode("ascii"),
+                       capture_output=True)
+    if r.returncode != 0:
+        raise MigrationConfigError("git cat-file --batch 失敗")
+    out, pos, blobs = r.stdout, 0, {}
+    for _ in uniq:
+        nl = out.index(b"\n", pos)
+        head = out[pos:nl].decode("ascii").split(" ")
+        if len(head) != 3 or head[1] != "blob":
+            raise MigrationConfigError(f"git cat-file --batch 回傳非 blob：{' '.join(head)}")
+        size = int(head[2])
+        blobs[head[0]] = out[nl + 1:nl + 1 + size]
+        pos = nl + 1 + size + 1
+    return blobs
+
+
+def _migration_judged(ctx, rel: str, errs: List[str]) -> bool:
+    """已登記且屬 new_line_status_check 類 ⇒ 須判定；未登記 ⇒ 記違規。"""
+    cls, flags = ctx.cls_flags(rel)
+    if cls is None:
+        errs.append(f"{rel}：未登記 ⇒ 無法判定（以 live_doc_registry_update.sh --add 登記）")
+        return False
+    return bool(flags.get("new_line_status_check"))
+
+
+def migration_hits(root: str, snapshot: str = "worktree") -> Tuple[Dict[str, List[Tuple[str, str, str]]], set, List[str]]:
     """登記之 new_line_status_check＝true 類活文件全檔（去豁免區，豁免與寫入前守衛同一 regions）經共用判定入口
-    一次判定。回（{路徑: [(行號, 識別碼, 狀態)]}、已判定路徑集合、無法判定之違規）。"""
+    一次判定。回（{路徑: [(行號, 識別碼, 狀態)]}、已判定路徑集合、無法判定之違規）。
+    snapshot＝"worktree"：清冊同 --all（含未追蹤）、內容與登記讀工作樹；
+    snapshot＝"index"：清冊、內容、登記檔、fact_keys 與判定碼皆取暫存區（將被 commit 之快照；D2D review-r1）。"""
     import _live_doc_write_guard as ldw  # 延遲載入：守衛模組於載入時 import 本模組
 
     try:
-        ctx = ldw.Context(root)
+        if snapshot == "index":
+            ctx = ldw.Context(root, _index_text(root, FACT_KEYS_REL), registry_text=_index_text(root, REGISTRY_REL),
+                              snapshot_prefix=":")
+        else:
+            ctx = ldw.Context(root)
     except (ldw.GuardError, ValueError) as exc:
         raise MigrationConfigError(str(exc))
+    try:
+        return _migration_hits(root, ctx, snapshot)
+    finally:
+        ctx.close()
+
+
+def _migration_hits(root: str, ctx, snapshot: str) -> Tuple[Dict[str, List[Tuple[str, str, str]]], set, List[str]]:
+    import _live_doc_write_guard as ldw
+
     errs: List[str] = []
+    judged: List[Tuple[str, str]] = []
+    if snapshot == "index":
+        entries = sorted((e for e in _index_entries(root) if in_scope(e[2], ctx.norm["scope_roots"])),
+                         key=lambda e: _byte_key(e[2]))
+        todo: List[Tuple[str, str]] = []
+        for mode, sha, rel in entries:
+            if not _migration_judged(ctx, rel, errs):
+                continue
+            if mode not in ("100644", "100755"):
+                errs.append(f"{rel}：暫存模式 {mode} 非 regular file ⇒ 無法判定")
+                continue
+            todo.append((rel, sha))
+        blobs = _cat_blobs(root, [sha for _rel, sha in todo])
+        for rel, sha in todo:
+            try:
+                judged.append((rel, blobs[sha].decode("utf-8")))
+            except UnicodeDecodeError:
+                errs.append(f"{rel}：暫存版非 UTF-8 ⇒ 無法判定")
+    else:
+        for rel in discover_live_docs(root, ctx.norm["scope_roots"]):
+            if not _migration_judged(ctx, rel, errs):
+                continue
+            full = os.path.join(root, rel)
+            if os.path.islink(full) or not os.path.isfile(full):
+                errs.append(f"{rel}：非 regular file ⇒ 無法判定")
+                continue
+            try:
+                with open(full, encoding="utf-8", newline="") as fh:
+                    judged.append((rel, fh.read()))
+            except (OSError, UnicodeDecodeError) as exc:
+                errs.append(f"{rel}：讀取失敗（{exc.__class__.__name__}）⇒ 無法判定")
     scanned: set = set()
     by_label: Dict[str, str] = {}
     items: List[Tuple[str, str]] = []
-    for fi, rel in enumerate(discover_live_docs(root, ctx.norm["scope_roots"])):
-        cls, flags = ctx.cls_flags(rel)
-        if cls is None:
-            errs.append(f"{rel}：未登記 ⇒ 無法判定（以 live_doc_registry_update.sh --add 登記）")
-            continue
-        if not flags.get("new_line_status_check"):
-            continue
-        full = os.path.join(root, rel)
-        if os.path.islink(full) or not os.path.isfile(full):
-            errs.append(f"{rel}：非 regular file ⇒ 無法判定")
-            continue
-        try:
-            with open(full, encoding="utf-8", newline="") as fh:
-                text = fh.read()
-        except (OSError, UnicodeDecodeError) as exc:
-            errs.append(f"{rel}：讀取失敗（{exc.__class__.__name__}）⇒ 無法判定")
-            continue
+    for fi, (rel, text) in enumerate(judged):
         scanned.add(rel)
         lines = ldw.split_lines(text)
         reg = ldw.regions(lines, ctx.legal_keys(rel))
@@ -469,9 +574,10 @@ def migration_hits(root: str) -> Tuple[Dict[str, List[Tuple[str, str, str]]], se
     return hits, scanned, errs
 
 
-def check_migration(root: str) -> Tuple[List[str], str]:
-    residuals = load_migration_residuals(root)
-    hits, scanned, errs = migration_hits(root)
+def check_migration(root: str, snapshot: str = "worktree") -> Tuple[List[str], str]:
+    text = _index_text(root, MIGRATION_RESIDUALS_REL) if snapshot == "index" else None
+    residuals = load_migration_residuals(root, text)
+    hits, scanned, errs = migration_hits(root, snapshot)
     listed = {r["path"] for r in residuals}
     for rel in sorted(hits, key=_byte_key):
         if rel in listed:
@@ -485,7 +591,8 @@ def check_migration(root: str) -> Tuple[List[str], str]:
             continue
         why = "已無命中" if r["path"] in scanned else "不在判定範圍（不存在、未登記或屬不適用類別）"
         errs.append(f"殘留清單列 {r['id']}（{r['path']}）：{why} ⇒ 清單過期，刪除該列")
-    return errs, f"遷移判定合規：命中檔 {len(hits)} 個皆列於殘留清單，殘留 {len(residuals)} 列皆仍命中"
+    where = "暫存快照" if snapshot == "index" else "工作樹"
+    return errs, f"遷移判定合規（{where}）：命中檔 {len(hits)} 個皆列於殘留清單，殘留 {len(residuals)} 列皆仍命中"
 
 
 def _default_class(path: str, schema: dict) -> str:
@@ -542,6 +649,7 @@ def main(argv: List[str]) -> int:
     g.add_argument("--all", action="store_true")
     g.add_argument("--staged", action="store_true")
     g.add_argument("--migration", action="store_true")
+    c.add_argument("--index", action="store_true")
     u = sub.add_parser("update")
     u.add_argument("--add", required=True)
     u.add_argument("--class", dest="cls")
@@ -554,6 +662,9 @@ def main(argv: List[str]) -> int:
         return 2
     if args.cmd is None:
         ap.print_usage(sys.stderr)
+        return 2
+    if args.cmd == "check" and args.index and not args.migration:
+        print("live_doc_registry_check: --index 只與 --migration 併用 ⇒ fail-closed", file=sys.stderr)
         return 2
     root = repo_root()
     if args.cmd == "flag":
@@ -585,7 +696,7 @@ def main(argv: List[str]) -> int:
         errs, msg = check_all(root), ""
     elif args.migration:
         try:
-            errs, msg = check_migration(root)
+            errs, msg = check_migration(root, "index" if args.index else "worktree")
         except MigrationConfigError as exc:
             print(f"live_doc_registry_check: --migration 無法判定 ⇒ fail-closed：{exc}", file=sys.stderr)
             return 2

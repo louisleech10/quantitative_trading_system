@@ -65390,3 +65390,48 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
   todo=docs/DOCROT2_TODO.md
   manifest=
 {"actor": "gate", "batch": "4", "event": "impl_token_issued", "event_id": "f2d5bc2b-70d6-4fa4-a1d9-a2c258f28cec", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260915-DOCROT2", "round_start_head": "61aa55b0a0f277913bcf13147c8d459fa0bb66f0", "schema_version": 1, "sequence": 4810, "task_id": "20260915-DOCROT2-impl-b4-claude", "ts": "2026-09-17T01:13:05Z"}
+{"actor": "post-commit", "batch": "4", "event": "ticket_commit", "event_id": "88565e62-c66f-4d4b-bcf9-3f98a40e43c7", "origin_script": "git_hooks/post-commit", "prod_files": [], "producer": "audit_append.sh", "root": "20260915-DOCROT2", "schema_version": 1, "sequence": 4811, "sha": "585155254a133576d5cbd0693e33e89aa42cfc07", "token_fresh": "true", "trailer": "20260915-DOCROT2/b4", "ts": "2026-09-17T01:13:18Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260915-DOCROT2-B4-REVIEW-R1", "ts": "2026-09-17T01:14:24Z"}
+=== 2026-09-17 09:14:24 | dispatch ===
+  ts=2026-09-17 09:14:24
+  kind=dispatch
+  intent=DOCROT2 批次 D2D 審碼（Task 4.1 全專案遷移，commit 58515525）三家全員
+  risk=low
+  facts_asked=35 passed；回歸差集空；mutation 15/15；shape 改寫差分 20/20
+  review_role=codex composer grok 審碼（實作者＝claude 不自審）
+  template=n/a: 審碼輪
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260915-DOCROT2-B4-REVIEW-R1-BRIEF.md", "brief_sha256": "68d61ce3457c4cb5ad054c103877ac8e723d0827983f7db065aa8adc6923d2b6", "brief_sha256_norm": "68d61ce3457c4cb5ad054c103877ac8e723d0827983f7db065aa8adc6923d2b6", "event": "committee_round_open", "event_id": "2cc4cb96-0676-4e68-84bd-c6aa0a7cf4aa", "expected_outputs": {"codex": "handoffs/20260915-docrot2-b4-review-r1-codex.md", "composer": "handoffs/20260915-docrot2-b4-review-r1-composer.md", "grok": "handoffs/20260915-docrot2-b4-review-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "schema_version": 1, "sequence": 4812, "session_name": "20260915-docrot2-b4-review-r1", "task_id": "20260915-DOCROT2-B4-REVIEW-R1", "ts": "2026-09-17T01:14:31Z"}
+{"actor": "cx_run", "attempt_id": "b22fad3f-bd76-4229-931e-e2a7b06a9ee5", "cli_rc": "0", "event": "committee_family_result", "event_id": "ad817d53-08e2-4f9e-b60c-31f30ed835fd", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260915-docrot2-b4-review-r1-composer.md", "output_sha256": "ef8a6ad4da12aeb4ae159a9d0cfa1e31f41976d9340a33fcde2d11236ae2d5a2", "producer": "audit_append.sh", "result_state": "success", "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "schema_version": 1, "sequence": 4813, "ts": "2026-09-17T01:17:23Z"}
+{"actor": "gate", "blocked_by": [], "closed": [], "event": "committee_output", "event_id": "1157ba68-f924-4f8d-8a47-9178e787dd9a", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260915-docrot2-b4-review-r1-composer.md", "output_sha256": "ef8a6ad4da12aeb4ae159a9d0cfa1e31f41976d9340a33fcde2d11236ae2d5a2", "producer": "audit_append.sh", "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "schema_version": 1, "sequence": 4814, "task_id": "20260915-DOCROT2-B4-REVIEW-R1", "ts": "2026-09-17T01:17:24Z", "verdict": "proceed"}
+{"actor": "cx_run", "attempt_id": "b0139476-93f7-473b-9b4c-227ae4dbb250", "cli_rc": "0", "event": "committee_family_result", "event_id": "f7e3bb1c-fd36-49e6-963f-43d807355930", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260915-docrot2-b4-review-r1-grok.md", "output_sha256": "da8e906d03f56fed11531e63e2bf3820e9bc48dc62862b8d96f27d4904e44cd7", "producer": "audit_append.sh", "result_state": "success", "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "schema_version": 1, "sequence": 4815, "ts": "2026-09-17T01:31:41Z"}
+{"actor": "gate", "blocked_by": ["GROK-R1-P1-01"], "closed": [], "event": "committee_output", "event_id": "1958d9ca-7fee-42d0-8893-5b1b179a0632", "family": "grok", "origin_script": "gate.sh", "output_path": "handoffs/20260915-docrot2-b4-review-r1-grok.md", "output_sha256": "da8e906d03f56fed11531e63e2bf3820e9bc48dc62862b8d96f27d4904e44cd7", "producer": "audit_append.sh", "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "schema_version": 1, "sequence": 4816, "task_id": "20260915-DOCROT2-B4-REVIEW-R1", "ts": "2026-09-17T01:31:41Z", "verdict": "blocked"}
+{"actor": "cx_run", "attempt_id": "2545f73b-d213-4916-bd38-7b9c96d8cf25", "cli_rc": "0", "event": "committee_family_result", "event_id": "ceb11599-f388-4d40-9f1f-6dc8a66057c8", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260915-docrot2-b4-review-r1-codex.md", "output_sha256": "71e67304f20b448819f7cc33e1ce8a77832f6a6fa89ee988b890f875b194c196", "producer": "audit_append.sh", "result_state": "success", "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "schema_version": 1, "sequence": 4817, "ts": "2026-09-17T01:49:30Z"}
+{"actor": "gate", "blocked_by": ["CODEX-R1-P1-01", "CODEX-R1-P1-02"], "closed": [], "event": "committee_output", "event_id": "4e75271b-e222-4992-908e-8f538484897a", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260915-docrot2-b4-review-r1-codex.md", "output_sha256": "71e67304f20b448819f7cc33e1ce8a77832f6a6fa89ee988b890f875b194c196", "producer": "audit_append.sh", "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "schema_version": 1, "sequence": 4818, "task_id": "20260915-DOCROT2-B4-REVIEW-R1", "ts": "2026-09-17T01:49:30Z", "verdict": "blocked"}
+{"actor": "debt_clear", "brief_kind": "review", "canonical_count": 3, "category_counts": {"code-contract": 3, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}, "grok": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "2756a2eb-04bc-4c66-bd0f-a3db3bcc63c4", "handoff_tree_commit": "585155254a133576d5cbd0693e33e89aa42cfc07", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "round_open_sequence": 4812, "schema_version": 1, "sequence": 4819, "session_name": "20260915-docrot2-b4-review-r1", "stamps": [], "task_id": "20260915-DOCROT2-B4-REVIEW-R1", "ts": "2026-09-17T02:10:09Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "984457a0-69c9-40bc-9ba6-7ca55f665f7b", "lock_sha256": "bcf85f4491442f68f57befacf1ecb18c5ad6100adebcaedc9167efbf0cd35cc8", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "0ebcff62-5e5b-43e2-8896-e5140beb1668", "schema_version": 1, "sequence": 4820, "session_id": "20260915-docrot2-b4-review-r1", "synth_sha256": "e828732075eed9b73fcefca8a3473f57829c300433eb58a321cf3203433973d5", "ts": "2026-09-17T02:10:09Z"}
+{"event": "committee_dispatch", "family": "claude", "output_path": "handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md", "output_sha256": "974f41b8168b9fa6cf7430ecbab6f87a1107383650855d6ddc1ee3245e691a8d", "task_id": "20260915-DOCROT2-impl-b4-claude", "ts": "2026-09-17T02:10:34Z"}
+=== 2026-09-17 10:10:36 | dispatch ===
+  ts=2026-09-17 10:10:36
+  kind=dispatch
+  intent=DOCROT2 批次 D2D 審碼 r1 修補（CODEX-R1-P1-01／GROK-R1-P1-01 採納、CODEX-R1-P1-02 駁回）主委自任
+  risk=high
+  facts_asked=review-r1 已銷帳；48 passed；回歸新增紅 0；mutation 23/23
+  review_role=實作者＝claude；閉合＝原提出方
+  template=docs/DOCROT2_TODO.md Task 4.1
+  adversarial=handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md
+  reconcile=handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCROT2_SPEC.md
+  todo=docs/DOCROT2_TODO.md
+  manifest=
+{"actor": "gate", "batch": "4", "event": "impl_token_issued", "event_id": "3d0a93b8-8ad2-48e2-8bf3-c305dbf5f3cc", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260915-DOCROT2", "round_start_head": "585155254a133576d5cbd0693e33e89aa42cfc07", "schema_version": 1, "sequence": 4821, "task_id": "20260915-DOCROT2-impl-b4-claude", "ts": "2026-09-17T02:10:37Z"}

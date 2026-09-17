@@ -7,6 +7,7 @@
 #   bash scripts/live_doc_registry_check.sh --all                    # 全樹清冊＋登記檔自身＋status_scope 涵蓋
 #   bash scripts/live_doc_registry_check.sh --staged                 # 暫存之新增／重新命名 .md 須已登記
 #   bash scripts/live_doc_registry_check.sh --migration              # DOCROT2 Task 4.1：全檔手寫狀態命中檔須列殘留清單、清單不得過期
+#   bash scripts/live_doc_registry_check.sh --migration --index      # 同上，判暫存快照（pre-commit）
 #   bash scripts/live_doc_registry_check.sh flag --name <旗標> --path <p>  # DOCROT2 Task 2.5：印 true｜false｜unregistered｜out-of-scope
 # rc：0＝合規或範圍外；1＝違規；2＝用法或環境錯誤（fail-closed）
 set -u

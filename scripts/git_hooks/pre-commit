@@ -192,11 +192,12 @@ if [ "${_ldr_rc}" -ne 0 ]; then
 fi
 # ③ live_doc_registry_check.sh --migration（DOCROT2 Task 4.1）：全檔手寫狀態命中檔須列殘留清單、清單不得過期。
 #   新命中不只來自改文件——fact_keys.json 新增識別碼即可讓既有行命中；命中消失時殘留列同 commit 須刪。
-#   觸發＝暫存含 .md 或判定輸入（識別碼／登記／殘留清單／判定碼／.gitignore——清冊排除 ignore）；
-#   判定讀工作樹（同 --all），部分暫存不分辨。
+#   觸發＝暫存含 .md（含刪除）或判定輸入（識別碼／登記／殘留清單／判定碼）；
+#   🔴 判暫存快照（--index）：清冊、內容、登記、fact_keys、殘留清單與生成器皆取 index——
+#   讀工作樹時「只暫存識別碼變更」「git rm --cached 殘留列之檔」可讓 commit 帶命中或過期列（D2D review-r1）。
 if git diff --cached --name-only -z | tr '\0' '\n' \
-   | grep -qiE '\.md$|^scripts/(fact_keys\.json|live_doc_registry\.json|docrot2_migration_residuals\.json|_live_doc_registry\.py|_live_doc_write_guard\.py|gen_fact_key_blocks\.sh|live_doc_registry_check\.sh)$|(^|/)\.gitignore$'; then
-  bash scripts/live_doc_registry_check.sh --migration
+   | grep -qiE '\.md$|^scripts/(fact_keys\.json|live_doc_registry\.json|docrot2_migration_residuals\.json|_live_doc_registry\.py|_live_doc_write_guard\.py|gen_fact_key_blocks\.sh|live_doc_registry_check\.sh)$'; then
+  bash scripts/live_doc_registry_check.sh --migration --index
   _ldm_rc=$?          # 🔴 rc 直接取，禁經 pipe
   if [ "${_ldm_rc}" -ne 0 ]; then
     echo "pre-commit: 🔴 全專案遷移判定未過——命中檔改生成區塊或具名列入 scripts/docrot2_migration_residuals.json；已無命中之殘留列須刪" >&2

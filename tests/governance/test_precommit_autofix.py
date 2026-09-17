@@ -57,12 +57,13 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
     (scripts / "fact_keys.json").write_text(
         _json.dumps({"_schema": {"enforcement_completed_statuses": ["收案", "已落地", "已完成"]}}, ensure_ascii=False),
         encoding="utf-8")
-    # DOCROT2 D2D：pre-commit ③ --migration 缺殘留清單即 fail-closed；LOG 類不判定，空清單即合規。
+    # DOCROT2 D2D：pre-commit ③ --migration --index 暫存區缺殘留清單即 fail-closed；LOG 類不判定，空清單即合規。
     (scripts / "docrot2_migration_residuals.json").write_text('{"residuals": []}\n', encoding="utf-8")
     link_python_env(repo)
 
     (repo / "README.md").write_text("# temp\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md", "scripts/live_doc_registry.json", "scripts/fact_keys.json"],
+    subprocess.run(["git", "add", "README.md", "scripts/live_doc_registry.json", "scripts/fact_keys.json",
+                    "scripts/docrot2_migration_residuals.json"],
                    cwd=repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "chore: init"],

@@ -24,6 +24,7 @@ import difflib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -60,24 +61,46 @@ def _git_show(root: str, spec: str) -> Optional[bytes]:
 
 
 class Context:
-    """一次判定所需之登記資料（登記檔讀工作樹；fact_keys 依模式讀工作樹／index／commit）。"""
+    """一次判定所需之登記資料（登記檔預設讀工作樹；fact_keys 依模式讀工作樹／index／commit）。
 
-    def __init__(self, root: str, fact_keys_text: Optional[str] = None):
+    snapshot_prefix＝None ⇒ 判定碼（生成器）與識別碼讀工作樹；＝":"（暫存區）或 "<commit>:" ⇒
+    生成器、fact_keys 與其 rows_source 檔皆取自該快照，於暫存目錄物化後呼叫（DOCROT2 D2D review-r1：
+    〔CODEX-R1-P1-01〕判定讀工作樹時，只暫存之識別碼變更可讓 commit 內之命中逃過）。用畢須 close()。
+    """
+
+    def __init__(self, root: str, fact_keys_text: Optional[str] = None, *, registry_text: Optional[str] = None,
+                 snapshot_prefix: Optional[str] = None):
         self.root = root
-        errs, self.norm = ldr._load(root)
-        if errs or not self.norm:
-            raise GuardError("活文件登記檔不合規：" + "；".join(errs))
-        self.registry = ldr.load_json(os.path.join(root, ldr.REGISTRY_REL))
+        if registry_text is None:
+            errs, self.norm = ldr._load(root)
+            if errs or not self.norm:
+                raise GuardError("活文件登記檔不合規：" + "；".join(errs))
+            self.registry = ldr.load_json(os.path.join(root, ldr.REGISTRY_REL))
+        else:
+            try:
+                self.registry = json.loads(registry_text)
+            except json.JSONDecodeError as exc:
+                raise GuardError(f"live_doc_registry.json 非合法 JSON：{exc}")
+            if not isinstance(self.registry, dict):
+                raise GuardError("live_doc_registry.json 頂層須為物件")
+            errs, self.norm = ldr.validate_registry(self.registry)
+            if errs or not self.norm:
+                raise GuardError("活文件登記檔不合規：" + "；".join(errs))
         if fact_keys_text is None:
             try:
                 with open(os.path.join(root, ldr.FACT_KEYS_REL), encoding="utf-8") as fh:
                     fact_keys_text = fh.read()
             except OSError as exc:
                 raise GuardError(f"讀不到 fact_keys.json：{exc}")
+        self.fact_keys_text = fact_keys_text
+        self.snapshot_prefix = snapshot_prefix
+        self._gen_dir: Optional[str] = None
         try:
             self.fact_keys = json.loads(fact_keys_text)
         except json.JSONDecodeError as exc:
             raise GuardError(f"fact_keys.json 非合法 JSON：{exc}")
+        if not isinstance(self.fact_keys, dict):
+            raise GuardError("fact_keys.json 頂層須為物件")
         schema = self.fact_keys.get("_schema") or {}
         self.completed = set(schema.get("enforcement_completed_statuses") or [])
         if not self.completed:
@@ -111,6 +134,43 @@ class Context:
             if rel in targets:
                 out.add(key)
         return out
+
+    def gen_root(self) -> str:
+        """判定碼所在之 repo 根：工作樹模式即 root；快照模式首次呼叫時物化（生成器＋fact_keys＋rows_source 檔）。"""
+        if self.snapshot_prefix is None:
+            return self.root
+        if self._gen_dir is None:
+            d = tempfile.mkdtemp(prefix="docrot2-snapshot-gen-")
+            try:
+                files = {GEN_REL.replace(os.sep, "/")}
+                for spec in self.fact_keys.values():
+                    src = spec.get("rows_source") if isinstance(spec, dict) else None
+                    rel = src.get("file") if isinstance(src, dict) else None
+                    if isinstance(rel, str) and rel:
+                        parts = rel.split("/")
+                        if rel.startswith("/") or ".." in parts or "" in parts:
+                            raise GuardError(f"rows_source.file「{rel}」須為 repo 相對路徑")
+                        files.add(rel)
+                for rel in sorted(files):
+                    blob = _git_show(self.root, self.snapshot_prefix + rel)
+                    if blob is None:
+                        raise GuardError(f"快照 {self.snapshot_prefix} 缺 {rel}（判定碼須與快照一致，不退回工作樹）")
+                    dst = os.path.join(d, *rel.split("/"))
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    with open(dst, "wb") as fh:
+                        fh.write(blob)
+                with open(os.path.join(d, ldr.FACT_KEYS_REL), "w", encoding="utf-8") as fh:
+                    fh.write(self.fact_keys_text)
+            except BaseException:
+                shutil.rmtree(d, ignore_errors=True)
+                raise
+            self._gen_dir = d
+        return self._gen_dir
+
+    def close(self) -> None:
+        if self._gen_dir is not None:
+            shutil.rmtree(self._gen_dir, ignore_errors=True)
+            self._gen_dir = None
 
 
 # ────────────────────────────────────────────────────────────── 區段與新增行
@@ -184,7 +244,8 @@ def status_hit_rows(ctx: Context, items: Sequence[Tuple[str, str]]) -> List[Tupl
     DOCROT2 Task 4.1 之全專案遷移判定以同一入口批次呼叫（逐檔各起一次生成器為秒級×檔數）。"""
     if not items:
         return []
-    gen = os.path.join(ctx.root, GEN_REL)
+    gen_root = ctx.gen_root()
+    gen = os.path.join(gen_root, GEN_REL)
     if not os.path.isfile(gen):
         raise GuardError(f"缺 {GEN_REL}（判定碼唯一來源）")
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".lines") as fh:
@@ -192,7 +253,7 @@ def status_hit_rows(ctx: Context, items: Sequence[Tuple[str, str]]) -> List[Tupl
             fh.write(f"{label}\t{text}\n")
         tmp = fh.name
     try:
-        r = subprocess.run(["bash", gen, "--status-hits", tmp], cwd=ctx.root, capture_output=True)
+        r = subprocess.run(["bash", gen, "--status-hits", tmp], cwd=gen_root, capture_output=True)
     finally:
         os.unlink(tmp)
     if r.returncode != 0:
@@ -661,11 +722,19 @@ def staged_mode() -> int:
         print("live_doc_write_guard: index 之 scripts/fact_keys.json 缺失或非文字 ⇒ fail-closed", file=sys.stderr)
         return 2
     try:
-        ctx = Context(root, fk)
+        # 〔D2D review-r1，CODEX-R1-P1-01 同型〕識別碼與判定碼取暫存快照；工作樹之 fact_keys／生成器不得代答
+        ctx = Context(root, fk, snapshot_prefix=":")
     except (GuardError, ValueError) as exc:
         print(f"live_doc_write_guard: {exc} ⇒ fail-closed", file=sys.stderr)
         return 2
-    tokens = r.stdout.decode("utf-8").split("\0")
+    try:
+        return _staged_items(root, ctx, r.stdout)
+    finally:
+        ctx.close()
+
+
+def _staged_items(root: str, ctx: Context, name_status: bytes) -> int:
+    tokens = name_status.decode("utf-8").split("\0")
     items: List[Tuple[str, str]] = []
     i = 0
     while i < len(tokens) and tokens[i]:
