@@ -16,6 +16,9 @@
 > 🔴 **狀態不再手寫**：批次、第 9 批各小任務、殘留的狀態，由 `scripts/fact_keys.json` 產生（與施工清單
 > `docs/SPLITUNIFY_TODO.md` §B／§C-9／§E 同一份來源），請勿手改。本檔其餘段落只寫「發生過什麼」。
 > 接下來的順序（你裁定；DOCROT2 已於 9/17 結束）：重開一次規格審查＋最後一批（`R-5`）→ GLOBALH → 你的 UAT 驗收（`R-3`，B26–B34＋新增項目）。
+> **9/17 晚現在在哪**：`R-5` 的規格重開審查做完了——偵察 1 輪、對抗審 2 輪、戳記輪 2 輪，三家都已蓋章（規格 v6）。
+> 白話結論在 [SPLITUNIFY規格白話.md](SPLITUNIFY規格白話.md) 最上面一節，**等你看過放行**才寫施工清單。
+> 另有一件要你決定：最後一批實作開工時會被「前一批審查意見沒逐條標閉合」的關卡擋住（第 9 批有 110 條），見我給你的回報。
 
 **批次**
 
@@ -59,7 +62,7 @@
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v6 R 重開三家對抗審（x-review-r14 起）→ 戳記 → 使用者白話審閱 |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v6 三家戳記完成（x-stamp-r8）→ 待使用者白話審閱放行後寫施工清單 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |

@@ -42,3 +42,7 @@ scripts/decouple_allowlist.md
 #    ——理由類別 blocked-by：逐檔加入等於逐檔宣告「由委員戳記背書」，而那些檔的戳記是否
 #    對應現行 body hash 未經查證，盲加會把未驗證的背書寫成既成事實。
 docs/SPLITUNIFY_SPEC.D-002.md
+
+# SPLITUNIFY 規格 v6（R 重開）本體；`## 戳記` 區之三家 RECONCILE-STAMP 需指向本檔自身之 committee_output
+# 方能過 provenance（理由同上）。2026-09-17 於 20260911-SPLITUNIFY-X-STAMP-R8 三家 APPROVED 後加入。
+docs/SPLITUNIFY_SPEC.md

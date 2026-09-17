@@ -5,7 +5,7 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v6 R 重開三家對抗審（x-review-r14 起）→ 戳記 → 使用者白話審閱 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v6 三家戳記完成（x-stamp-r8）→ 待使用者白話審閱放行後寫施工清單 |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -16,7 +16,7 @@
 |---|---|---|---|---|
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v6 R 重開三家對抗審（x-review-r14 起）→ 戳記 → 使用者白話審閱 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v6 三家戳記完成（x-stamp-r8）→ 待使用者白話審閱放行後寫施工清單 |
 | 03-007 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 03-008 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 03-009 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
@@ -66,6 +66,8 @@
 - 🔴 **生成器無參數模式有 2 秒預算測試**（`test_govb1_factkey_gen.py::test_generator_runs_under_two_seconds`）：2026-09-17 新增一個狀態 key 前實測已 1.92 秒；`_fk_validate_shape` 七次 jq 合一後 1.65 秒。再加 key 前先量；worktree 基準量時須補齊 `handoffs/` 物件，否則生成器提早失敗、耗時失真。
 - 🔴 **SPLITUNIFY 規格層輪次用 `x` 命名，實作批要開 `b10` 會被 verdictgate 擋**（2026-09-17 實測）：`gate.sh dispatch` 對 `20260911-SPLITUNIFY-B10-*` 拒發 token——前批 `20260911-SPLITUNIFY-B9-REVIEW` 有 110 條 blocked finding 無同家後續 `CLOSED:`（codex 71、grok 29、composer 9）。規格輪沿用主規格一向之 `x-consult`／`x-review`／`x-stamp` 命名不經此閘；實作批開輪前須先處置（已報使用者，未改閘）。
 - 🔴 **`spec_xref_hook.sh` 之 synth 對證取的是字母序最早、不是最新之「修訂標的」收斂檔**（`grep -l … | head -1`）：寫 `docs/SPLITUNIFY_SPEC.md` 永遠對 `20260911-splitunify-x-consult-r2/synth.md` 對證而報 `split_projection.py:569` 缺失；D-001 同型報 b8 收斂檔。屬誤報，本輪收斂檔以 `bash scripts/spec_xref_check.sh --synth <本輪 synth> <標的>` 另跑為準（已報使用者，未改工具）。
+- 🔴 **委員裁決行多個 ID 須以半形逗號分隔**：`BLOCKED-BY: A; B` 會被 `verdict_parse` 拒收（`result_state=verdict_rejected`）而使 `debt_clear` 拒銷；出路＝主委把分號改逗號後 `bash scripts/gate.sh register-output <task> <委員檔>`（2026-09-17 x-review-r15 實例）。brief 格式硬約束段已加註此條。
+- 🔴 **規格寫入之權宜作法（2026-09-17）**：`docs/SPLITUNIFY_SPEC.md` 以 scratchpad 組稿後 `cp` 入檔；寫入前以同內容之 Write payload 餵 `bash scripts/live_doc_write_guard.sh`（rc=0 才 `cp`），寫入後跑 `doc_format_precheck.sh`、`spec_xref_check.sh --files <HEAD 版> <新版>`、`obligation_block_check.sh`。日後小幅修改一律用 Edit。
 
 ## 進行中紀錄
 
@@ -76,4 +78,6 @@
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r14/synth.md`
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r15/synth.md`
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r7/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r8/synth.md`
+- 2026-09-17：R-5 → `白話說明/SPLITUNIFY規格白話.md`
 <!-- HISTORY-END -->
