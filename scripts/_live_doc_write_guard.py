@@ -179,15 +179,17 @@ def added_indices(old_lines: Sequence[str], new_lines: Sequence[str]) -> List[in
 
 # ────────────────────────────────────────────────────────────── ① 手寫狀態（Task 2.1）
 
-def status_hits(ctx: Context, lines: Sequence[str], idxs: Sequence[int]) -> List[str]:
-    if not idxs:
+def status_hit_rows(ctx: Context, items: Sequence[Tuple[str, str]]) -> List[Tuple[str, str, str]]:
+    """一次呼叫共用判定入口：items＝(標籤, 行文)，標籤不得含 TAB／換行；回 (標籤, 識別碼, 狀態)。
+    DOCROT2 Task 4.1 之全專案遷移判定以同一入口批次呼叫（逐檔各起一次生成器為秒級×檔數）。"""
+    if not items:
         return []
     gen = os.path.join(ctx.root, GEN_REL)
     if not os.path.isfile(gen):
         raise GuardError(f"缺 {GEN_REL}（判定碼唯一來源）")
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, suffix=".lines") as fh:
-        for i in idxs:
-            fh.write(f"{i + 1}\t{lines[i]}\n")
+        for label, text in items:
+            fh.write(f"{label}\t{text}\n")
         tmp = fh.name
     try:
         r = subprocess.run(["bash", gen, "--status-hits", tmp], cwd=ctx.root, capture_output=True)
@@ -195,12 +197,17 @@ def status_hits(ctx: Context, lines: Sequence[str], idxs: Sequence[int]) -> List
         os.unlink(tmp)
     if r.returncode != 0:
         raise GuardError("--status-hits 執行失敗：" + r.stderr.decode("utf-8", "replace").strip())
-    out: List[str] = []
+    out: List[Tuple[str, str, str]] = []
     for row in r.stdout.decode("utf-8").splitlines():
         parts = row.split("\t")
         if len(parts) == 3:
-            out.append(f"L{parts[0]}：新增行含識別碼「{parts[1]}」與狀態「{parts[2]}」（狀態只准寫在 fact_keys.json 並以生成區塊呈現）")
+            out.append((parts[0], parts[1], parts[2]))
     return out
+
+
+def status_hits(ctx: Context, lines: Sequence[str], idxs: Sequence[int]) -> List[str]:
+    return [f"L{n}：新增行含識別碼「{ident}」與狀態「{st}」（狀態只准寫在 fact_keys.json 並以生成區塊呈現）"
+            for n, ident, st in status_hit_rows(ctx, [(str(i + 1), lines[i]) for i in idxs])]
 
 
 # ────────────────────────────────────────────────────────────── ② 舊版字面與歷史指標（Task 2.2）

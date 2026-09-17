@@ -15,6 +15,71 @@
 兩邊如果不一致，以那份為準（這份只解釋，不定規矩）。
 進度看 <a href="SPLITUNIFY施工進度.html">SPLITUNIFY施工進度.md</a>。</p>
 </blockquote>
+<p><strong>五個小任務的狀態</strong>（由 <code>scripts/fact_keys.json</code> 產生，請勿手改；下方各節標題不再寫狀態）：</p>
+<!-- BEGIN GENERATED: splitunify-task-status -->
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>序</th>
+<th>識別碼</th>
+<th>狀態</th>
+<th>權威路徑</th>
+<th>下一步</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>010</td>
+<td>Task 9.1</td>
+<td>已完成</td>
+<td>docs/SPLITUNIFY_TODO.md §C-9</td>
+<td>—</td>
+</tr>
+<tr>
+<td>020</td>
+<td>Task 9.2</td>
+<td>已完成</td>
+<td>docs/SPLITUNIFY_TODO.md §C-9</td>
+<td>—</td>
+</tr>
+<tr>
+<td>030</td>
+<td>Task 9.2a</td>
+<td>已完成</td>
+<td>docs/SPLITUNIFY_TODO.md §C-9</td>
+<td>—</td>
+</tr>
+<tr>
+<td>040</td>
+<td>Task 9.2b</td>
+<td>已完成</td>
+<td>docs/SPLITUNIFY_TODO.md §C-9</td>
+<td>—</td>
+</tr>
+<tr>
+<td>050</td>
+<td>Task 9.3</td>
+<td>已完成</td>
+<td>docs/SPLITUNIFY_TODO.md §C-9</td>
+<td>—</td>
+</tr>
+<tr>
+<td>060</td>
+<td>Task 9.4</td>
+<td>已完成</td>
+<td>docs/SPLITUNIFY_TODO.md §C-9</td>
+<td>—</td>
+</tr>
+<tr>
+<td>070</td>
+<td>Task 9.5</td>
+<td>已完成</td>
+<td>docs/SPLITUNIFY_TODO.md §C-9</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<!-- END GENERATED: splitunify-task-status -->
 <hr />
 <h2 id="先講清楚整批在解什麼問題">先講清楚：整批在解什麼問題</h2>
 <p>你篩出一批事件（例如「RSI 超賣」觸發了 165 次）。系統要為每個事件算特徵，
@@ -29,7 +94,7 @@
                                                           → 9.5（基準檔）
 </code></pre>
 <hr />
-<h2 id="task-91-先誠實記帳-已完成"><code>Task 9.1</code> — 先誠實記帳（✅ 已完成）</h2>
+<h2 id="task-91-先誠實記帳"><code>Task 9.1</code> — 先誠實記帳</h2>
 <p><strong>在做什麼</strong>：<strong>不改</strong>「只留一個週期」這個行為，但<strong>要說出丟了哪些、各丟幾列</strong>。</p>
 <p><strong>為什麼先做這個</strong>：如果一次把「記帳」和「不要再丟」一起做，出問題時分不出是哪一個弄壞的。
 所以先做只加不減的那一半。</p>
@@ -47,7 +112,7 @@
 <li>多標的時文件寫「逐標的相加」，但實際上那支函式是<strong>整批算一次</strong>的，照字面相加會<strong>重複計數</strong>。實作採原樣傳遞，文件改掉。</li>
 </ul>
 <hr />
-<h2 id="task-92-92a-停止只挑一個-已完成整批的核心"><code>Task 9.2</code> ＋ <code>9.2a</code> — 停止只挑一個（✅ 已完成；整批的核心）</h2>
+<h2 id="task-92-92a-停止只挑一個整批的核心"><code>Task 9.2</code> ＋ <code>9.2a</code> — 停止只挑一個（整批的核心）</h2>
 <p><strong>在做什麼</strong>：全部週期都留下來。同一個事件可以同時有 <code>1h</code> 和 <code>4h</code> 兩列，各自帶自己的週期標記。</p>
 <p><strong>為什麼四層要一起改</strong>（少改一層等於沒改）：</p>
 <ol>
@@ -68,7 +133,7 @@
 <p><strong>刻意沒動的</strong>：基準檔（golden）維持單一週期 ⇒ 既有數值<strong>一個都沒變</strong>。
 這樣萬一之後出問題，可以確定不是這批弄的。擴成多週期是 <code>9.5</code>。</p>
 <hr />
-<h2 id="task-92b-判邊改成看事件自己-程式完成審碼中"><code>Task 9.2b</code> — 判邊改成看事件自己（✅ 程式完成，審碼中）</h2>
+<h2 id="task-92b-判邊改成看事件自己"><code>Task 9.2b</code> — 判邊改成看事件自己</h2>
 <p><strong>在做什麼</strong>：決定「訓練還是測試」時，<strong>不再看該週期的取數時點</strong>，改看<strong>事件自己的決策時刻</strong>，
 判一次之後<strong>廣播</strong>給該事件的所有週期列。</p>
 <p><strong>為什麼</strong>：這正是本批要消滅的洩漏。<code>1h</code> 的取數時點和 <code>4h</code> 的不一樣，
@@ -116,7 +181,7 @@
 </ul>
 <p><strong>還做了</strong>：流程入口在做投影<strong>之前</strong>先驗證訓練／測試兩段的完整性（空段、隔離帶踩線都在這裡先擋）。</p>
 <hr />
-<h2 id="task-93-下游九處消費面-下一個做"><code>Task 9.3</code> — 下游九處消費面（⬜ 下一個做）</h2>
+<h2 id="task-93-下游九處消費面"><code>Task 9.3</code> — 下游九處消費面</h2>
 <p><strong>在做什麼</strong>：資料表的行粒度變了（一個事件可能多列），
 <strong>讀這張表的地方</strong>要逐處確認會不會出錯。</p>
 <p>🔴 <strong>重點是「逐處判斷」，不是「全部改成複合鍵」</strong>。九處裡<strong>多數是維持原樣 ＋ 補防誤改測試</strong>：</p>
@@ -165,13 +230,13 @@
 <p><strong>開工前置</strong>：要先產出一份「重掃收據」，逐條寫下 29 個消費點改前改後的分類與程式位置，
 <strong>檔案不存在就不算完成</strong>——沒有這一條，省略重掃在現行檢查下完全看不出來。</p>
 <hr />
-<h2 id="task-94-讓你看得見-未開工"><code>Task 9.4</code> — 讓你看得見（⬜ 未開工）</h2>
+<h2 id="task-94-讓你看得見"><code>Task 9.4</code> — 讓你看得見</h2>
 <p><strong>在做什麼</strong>：現在「測試段事件數不足」這個警告<strong>只存在於報告資料裡，畫面一個字都沒印</strong>。
 而且那個數字是用<strong>列數</strong>算的——同一事件有兩個週期就會讓 1 個事件冒充 2 個，<strong>靜靜通過門檻</strong>。</p>
 <p><strong>怎麼做</strong>：計數改成依事件去重；並把顯示補上。
 🔴 <strong>兩件要綁在一起做</strong>——只改計數等於修了也沒人看得到。</p>
 <hr />
-<h2 id="task-95-基準檔擴成多週期-最後"><code>Task 9.5</code> — 基準檔擴成多週期（⬜ 最後）</h2>
+<h2 id="task-95-基準檔擴成多週期"><code>Task 9.5</code> — 基準檔擴成多週期</h2>
 <p><strong>在做什麼</strong>：把 golden 基準檔從「單一週期」擴成「多週期平行組」，
 並把比對從「只比事件編號清單」改成「比（事件, 週期）的組合」。</p>
 <p><strong>為什麼非做不可</strong>：現在一個事件有多列，只比事件編號會<strong>把週期這個維度整個吃掉</strong>——

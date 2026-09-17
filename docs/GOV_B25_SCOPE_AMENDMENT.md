@@ -38,6 +38,7 @@ FACTKEY-DOCROT2-STATUS: splitunify-task-status
 FACTKEY-DOCROT2-STATUS: splitunify-residual-status
 FACTKEY-DOCROT2-STATUS: docrot2-batch-status
 FACTKEY-DOCROT2-STATUS: handoff-pending
+FACTKEY-DOCROT2-STATUS: roadmap-status
 ```
 
 🔴 **第七種宣告 `FACTKEY-DOCROT2-STATUS`（2026-09-15，`票 B-63` DOCROT2 Task 1.2 新增）**：

@@ -683,9 +683,10 @@ def test_su_resid3_history_pointer_resolves_to_original_row():
 
 def test_real_tree_check_rc0_and_docrot2_keys_declared():
     reg = _real_reg()
+    # DOCROT2 Task 4.1（D2D）追加 roadmap-status：docs/ROADMAP.md 狀態格改生成區塊
     assert set(reg["_schema"]["docrot2_status_keys"]) == {
         "splitunify-batch-status", "splitunify-task-status", "splitunify-residual-status",
-        "docrot2-batch-status", "handoff-pending"}
+        "docrot2-batch-status", "handoff-pending", "roadmap-status"}
     assert not set(reg["_schema"]["docrot2_status_keys"]) & set(reg["_schema"]["status_keys"])
     r = subprocess.run(["bash", str(GEN), "--check"], cwd=str(REPO), capture_output=True, text=True, env=_clean_env())
     assert r.returncode == 0, r.stderr

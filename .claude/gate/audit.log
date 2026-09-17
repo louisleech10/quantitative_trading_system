@@ -65370,3 +65370,23 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "debt_clear", "brief_kind": "review", "canonical_count": 0, "category_counts": {"code-contract": 0, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}, "grok": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "4e0b5653-19fb-41c4-8b17-31f21f545d2a", "handoff_tree_commit": "ea54367bf4d3213dd7f5372510737e8db8adee81", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "04fdc7be-7aad-48a1-af09-b43ceb89f2a2", "round_open_sequence": 4799, "schema_version": 1, "sequence": 4806, "session_name": "20260915-docrot2-b3-review-r2", "stamps": [], "task_id": "20260915-DOCROT2-B3-REVIEW-R2", "ts": "2026-09-16T17:23:04Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "e74190d6-f060-4242-b7e2-5048f9314e54", "lock_sha256": "10213e686cf8e5fc5b1ffcc3b91bb53e2cdb0fa401942ad363b3d4daf52bc849", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "04fdc7be-7aad-48a1-af09-b43ceb89f2a2", "schema_version": 1, "sequence": 4807, "session_id": "20260915-docrot2-b3-review-r2", "synth_sha256": "42cd477ef05322446a7dc13fda8e4d40048ccb59f46c8aab40f2a27c2d841d95", "ts": "2026-09-16T17:23:04Z"}
 {"actor": "live_doc_write_guard.sh", "class": "LIVE-HANDOFF", "event": "docrot2_gate_block", "event_id": "f80e414d-bcec-442b-8b38-96e7c683fac3", "origin_script": "live_doc_write_guard.sh", "path": "HANDOFF.md", "producer": "audit_append.sh", "rule_id": "status-literal", "schema_version": 1, "sequence": 4808, "ts": "2026-09-16T17:24:30Z"}
+{"actor": "live_doc_write_guard.sh", "class": "OTHER-DORMANT", "event": "docrot2_gate_block", "event_id": "3edbf2c1-7eb7-4d30-a780-b0fa958fd428", "origin_script": "live_doc_write_guard.sh", "path": "docs/GOV_ACTIVE_MECHANISMS.md", "producer": "audit_append.sh", "rule_id": "status-literal", "schema_version": 1, "sequence": 4809, "ts": "2026-09-16T23:01:14Z"}
+{"event":"gate_deny","ts":"2026-09-17T00:49:57Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"039035d730ae6e773eeef6103a9aa8be4cb565e428acd9840a3d0701e48266ba","cmd_head":"WT=/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/2ed701a5-da52-46b6-a5db-922849e8e1fb/scratchpad/wt_d2d_base; for i in 1 2 3; do venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_generator_runs_under_two_seconds 2>&1 | grep -E \"passed|failed|實測\" | tail -2; done; echo \"--- base\"; for i in 1 2; do (cd \"$WT\" && \"$OLDPWD/venv/bin/python\" -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_generator_runs_"}
+{"event": "committee_dispatch", "family": "claude", "output_path": "handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md", "output_sha256": "974f41b8168b9fa6cf7430ecbab6f87a1107383650855d6ddc1ee3245e691a8d", "task_id": "20260915-DOCROT2-impl-b4-claude", "ts": "2026-09-17T01:13:03Z"}
+=== 2026-09-17 09:13:05 | dispatch ===
+  ts=2026-09-17 09:13:05
+  kind=dispatch
+  intent=DOCROT2 批次 D2D（Task 4.1 全專案遷移）主委自任
+  risk=high
+  facts_asked=D2C review-r2 三家閉合；migration 35 passed；回歸無新增紅；mutation 15/15
+  review_role=實作者＝claude；審碼＝active_stampers 三家
+  template=docs/DOCROT2_TODO.md Task 4.1
+  adversarial=handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md
+  reconcile=handoffs/reconcile/20260915-docrot2-x-review-r4/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/DOCROT2_SPEC.md
+  todo=docs/DOCROT2_TODO.md
+  manifest=
+{"actor": "gate", "batch": "4", "event": "impl_token_issued", "event_id": "f2d5bc2b-70d6-4fa4-a1d9-a2c258f28cec", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260915-DOCROT2", "round_start_head": "61aa55b0a0f277913bcf13147c8d459fa0bb66f0", "schema_version": 1, "sequence": 4810, "task_id": "20260915-DOCROT2-impl-b4-claude", "ts": "2026-09-17T01:13:05Z"}

@@ -1,0 +1,233 @@
+{
+  "_schema": {
+    "about": "DOCROT2 Task 4.1（票 B-63）全專案遷移之具名殘留清單：列之檔＝全檔手寫狀態命中（識別碼＋status_enum 同行）而本票不遷移者。判定唯一實作＝scripts/_live_doc_registry.py 之 check_migration（入口 bash scripts/live_doc_registry_check.sh --migration）：命中檔不在本清單 ⇒ rc=1；本清單列之檔已無命中或不在判定範圍 ⇒ rc=1（清單過期須刪列）；本檔不合規 ⇒ rc=2。",
+    "fields": "每列鍵集恰為 id／path／reason_class／why／owner／trigger，皆非空字串；path 與 id 各自唯一。reason_class 三值（blocked-by／user-ruling／needs-research）寫死於判定碼，不由本檔自證。",
+    "selection_rule": "狀態視圖（docs/ROADMAP.md、白話說明進度表、票 SoT／執行登記表／機制現況表之散文）一律遷移為生成區塊或指向單一來源；規格契約（LIVE-SPEC 類）、敘事帳本、設計紀錄、簽核清單、使用者待決之白話日誌列為殘留——其命中行為契約條件句、他票批次名撞號或當日紀事，非現況狀態欄。依據＝docs/DOCROT2_SPEC.md 原則段「面向未來：既有行不回洗；新增行、新檔、本票遷移之檔才受新規則全量約束」。新增或改動之命中行一律由 live_doc_write_guard.sh 於寫入前擋。"
+  },
+  "residuals": [
+    {
+      "id": "DOCROT2-RESID-CONVERGENCE-SPEC",
+      "path": "docs/CONVERGENCE_METHOD_SPEC.md",
+      "reason_class": "user-ruling",
+      "why": "收斂方法工具之規格契約正文；命中 L44 為修訂紀錄之改法欄，fixture 名 b5 與 governance-batch-status 撞號。面向未來條：既有行不回洗",
+      "owner": "CONVERGENCE-METHOD（收斂方法工具）",
+      "trigger": "本檔正文下一次修訂觸及命中行（寫入前守衛逐行強制改寫）；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-DOCROT2-TODO",
+      "path": "docs/DOCROT2_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "本票 TODO 已凍結且使用者開 D2C 時定「兩份都已凍結、不要重寫規格」；命中 L66–L68 為 Task 1.2 一次性遷移對照之字面值、L184 為 Task 2.4 遷移條文、L255 為 Task 3.2 標題之事件名「收案事件」",
+      "owner": "DOCROT2（B-63）",
+      "trigger": "B-63 收票後本 TODO 之下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-DOCSIMPLIFY-B-SPEC",
+      "path": "docs/DOCSIMPLIFY_BATCHB_SPEC.md",
+      "reason_class": "user-ruling",
+      "why": "文檔簡化批次 B 之規格契約正文（三家對抗審修訂版）；命中 L73 為驗證條文，本票批次名 B1 與 governance-batch-status 撞號。面向未來條：既有行不回洗",
+      "owner": "DOCSIMPLIFY",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-EVTWARMUP-TODO",
+      "path": "docs/EVTWARMUP_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "EVTWARMUP／TFWINDOW 施工清單之批次依賴條件句（L10、L16、L54「B1 收案 commit 後才可開 B2」）；本票批次名 B1 與 governance-batch-status 撞號。面向未來條：既有行不回洗",
+      "owner": "EVTWARMUP／TFWINDOW",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GAP1-TODO",
+      "path": "docs/GAP1_STRATEGY_OVERFIT_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "GAP-1 凍結施工清單（FROZEN R3）之 Task 前置條件句（L446）；本票批次名 B4 與 governance-batch-status 撞號。面向未來條：既有行不回洗；凍結檔改字依 docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md",
+      "owner": "GAP-1",
+      "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GAP2-TODO",
+      "path": "docs/GAP2_MARGINAL_IC_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "GAP-2a 凍結施工清單之 B5 收尾 Gate 條文（L36、L266、L267）；本票批次名 B5 與 governance-batch-status 撞號。面向未來條：既有行不回洗；凍結檔改字依 docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md",
+      "owner": "GAP-2a",
+      "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GAP3-EVENT-TODO",
+      "path": "docs/GAP3_EVENT_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "GAP-3 凍結施工清單之 B5 Gate 條文（L482）；本票批次名 B5 與 governance-batch-status 撞號。面向未來條：既有行不回洗；凍結檔改字依 docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md",
+      "owner": "GAP-3",
+      "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GAP3-UX-SPEC",
+      "path": "docs/GAP3_EVENT_UX_SPEC.md",
+      "reason_class": "user-ruling",
+      "why": "GAP-3 UX 凍結規格之修訂註記（L2104 引用 B5 之落地狀態）；本票批次名 B5 與 governance-batch-status 撞號。面向未來條：既有行不回洗；凍結檔改字依 docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md",
+      "owner": "GAP-3",
+      "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GAP3-UX-TODO",
+      "path": "docs/GAP3_EVENT_UX_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "GAP-3 UX 凍結施工清單之退役批次表列（L116，B5 併入 B3）；本票批次名與 governance-batch-status 撞號。面向未來條：既有行不回洗；凍結檔改字依 docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md",
+      "owner": "GAP-3",
+      "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GAP3-SCAN-CUBE-TODO",
+      "path": "docs/GAP3_SCAN_CUBE_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "GAP-3 掃描立方體施工清單之批次依賴表（L32，B5 依賴 B4 且白話須描述完成之畫面）；本票批次名 B4 與 governance-batch-status 撞號。面向未來條：既有行不回洗",
+      "owner": "GAP-3",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GAP3-UAT-CHECKLIST",
+      "path": "docs/GAP3_UAT_CHECKLIST.md",
+      "reason_class": "user-ruling",
+      "why": "使用者簽核用之 UAT 清單規則句（L3「使用者未簽字 ⇒ epic 不收案（TODO B5.3 邊界②）」），引用 GAP-3 TODO 之批次 B5 與 governance-batch-status 撞號；UAT 排最後屬使用者裁定（SPLITUNIFY 殘留 R-3）",
+      "owner": "GAP-3（UAT）",
+      "trigger": "R-3 UAT 開始時本清單之修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GOVB0-SPEC",
+      "path": "docs/GOVB0_FRICTION_SPEC.md",
+      "reason_class": "user-ruling",
+      "why": "治理第 0 批規格契約之不可做條款（L543 引用 B-14 票面「已完成的審查」）與 findings 表要求（L588「TODO §0 須強制標 B-24 部分完成」）；為規範句而非現況狀態欄。面向未來條：既有行不回洗",
+      "owner": "治理第 0 批（B-14／B-24）",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GOVB0-TODO",
+      "path": "docs/GOVB0_FRICTION_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "治理第 0 批凍結施工清單之 §0 規範聲明（L22、L26「B-24＝部分完成，不是全綠」）與不可做條款（L655 引用 B-14）。面向未來條：既有行不回洗；凍結檔改字依凍結文件修訂程序",
+      "owner": "治理第 0 批（B-14／B-24）",
+      "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GOVB1-TODO",
+      "path": "docs/GOVB1_INPUT_QUALITY_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "治理第 1 批施工清單之前置守則表（L33「已完成票禁止重做：B-32 已 DONE」），為施工禁令而非現況狀態欄。面向未來條：既有行不回洗",
+      "owner": "治理第 1 批（B-32）",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GOVB25-SPEC",
+      "path": "docs/GOVB25_STATUS_FACTKEY_SPEC.md",
+      "reason_class": "user-ruling",
+      "why": "B-25 規格之實測紀錄（L38 票收案 union 清單含批次代號 B3R）。面向未來條：既有行不回洗",
+      "owner": "B-25",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GOVB50-TODO",
+      "path": "docs/GOVB50_WORKSPACE_DRIFT_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "B-50 施工清單之規範句（L115「任何文件不得宣稱 B-50 已完成」），為禁令而非狀態宣稱。面向未來條：既有行不回洗",
+      "owner": "B-50",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-GOVB49-SPEC",
+      "path": "docs/GOV_B49_PATH_GRANT_SPEC.md",
+      "reason_class": "user-ruling",
+      "why": "B-49 規格之目標句（L301 以「B-49 行為已落地」為行為判準之定義），為判準定義而非狀態宣稱。面向未來條：既有行不回洗",
+      "owner": "B-49",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-TICKET-SOT-DESIGN",
+      "path": "docs/GOV_TICKET_SOT_DESIGN.md",
+      "reason_class": "user-ruling",
+      "why": "治理票 SoT 計畫 S0.1–S0.3 之設計紀錄（檔頭自標草案 r2）；命中行為狀態值定義之章節標題與欄位表（S0.x 步驟號與狀態值同行、✅ 表必填），行內另含 finding ID。面向未來條：既有行不回洗",
+      "owner": "治理票 SoT 計畫（governance-sot-plan）",
+      "trigger": "本檔正文下一次修訂觸及命中行（該修訂須同時移除行內 finding ID，受考古字面守衛約束）；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-ICRESULT-PAGING-SPEC",
+      "path": "docs/ICRESULT_PAGING_SPEC.md",
+      "reason_class": "user-ruling",
+      "why": "IC 結果分頁規格之驗收條文（L54）；本票批次名 B3 與 governance-batch-status 撞號，行內另含 finding ID。面向未來條：既有行不回洗",
+      "owner": "ICRESULT-PAGING",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-ICRESULT-PAGING-TODO",
+      "path": "docs/ICRESULT_PAGING_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "IC 結果分頁施工清單之 SPEC→Task 對照段（L194）；本票批次名 B3 與 governance-batch-status 撞號。面向未來條：既有行不回洗",
+      "owner": "ICRESULT-PAGING",
+      "trigger": "本檔正文下一次修訂觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-IC1A-ALIGN-SPEC",
+      "path": "docs/IC_PHASE1_1A_ALIGN_SPEC.md",
+      "reason_class": "user-ruling",
+      "why": "IC Phase1 1-align 凍結規格（Frozen 2026-07-09）之版本註記（L6 缺口 B-1 補齊與程式碼落地），缺口代號 B-1 與治理票 B-1 撞號。面向未來條：既有行不回洗；凍結檔改字依凍結文件修訂程序",
+      "owner": "IC Phase1（1-align）",
+      "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-IC-QUANT-GAP-REGISTRY",
+      "path": "docs/IC_QUANT_GAP_REGISTRY.md",
+      "reason_class": "user-ruling",
+      "why": "量化缺口登記處（凍結規格引用之殘留登記）之列內關閉紀錄（L46、L62、L161、L162、L166、L182）；GAP 各票批次名 B0–B5 與 governance-batch-status 撞號，列內另含 finding ID 與考古字面。面向未來條：既有行不回洗",
+      "owner": "量化主線（IC 健檢缺口登記）",
+      "trigger": "該登記列下一次修訂觸及命中行（受考古字面守衛約束）；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-ROADMAP-DETAIL",
+      "path": "docs/ROADMAP_DETAIL.md",
+      "reason_class": "user-ruling",
+      "why": "敘事帳本（scripts/no_append_only_check.sh 之 LEDGER 集合，使用者 2026-08-14 定：流水帳只准寫進帳本）；命中為 P1-6 批次紀錄表（L27–L32）與 08-05 統計、第 0 批當時敘事（L92、L147）。面向未來條：既有行不回洗",
+      "owner": "ROADMAP（主委維護）",
+      "trigger": "帳本既有段落下一次改寫觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-D001-SPLITUNIFY",
+      "path": "docs/SPLITUNIFY_SPEC.D-001.md",
+      "reason_class": "blocked-by",
+      "why": "SPLITUNIFY 規格延伸檔 D-001 之誠實邊界條文（L92「b8 收案前須重凍 golden」）；延伸檔於 D 延伸期間對原文唯一允許改動＝索引行（docs/FROZEN_DOC_AMENDMENT_PROCEDURE_V2.md §2），R 重開時延伸檔整體失效重寫",
+      "owner": "SPLITUNIFY",
+      "trigger": "SPLITUNIFY 規格 R 重開之第一個 commit"
+    },
+    {
+      "id": "DOCROT2-RESID-D002-STRUCTURAL-RED",
+      "path": "docs/SPLITUNIFY_SPEC.D-002.md",
+      "reason_class": "blocked-by",
+      "why": "docs/SPLITUNIFY_SPEC.D-002.md 之結構性紅與既有正文狀態字面（L197、L231、L341、L360）；本票不得改 D-002（DOCROT2 TODO Task 4.1 邊界）",
+      "owner": "SPLITUNIFY",
+      "trigger": "SPLITUNIFY 規格 R 重開之第一個 commit"
+    },
+    {
+      "id": "DOCROT2-RESID-SPLITUNIFY-TODO",
+      "path": "docs/SPLITUNIFY_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "SPLITUNIFY 施工清單之 SUPERSEDED 註記（L604、L700）與 §E 殘留表關閉依據（L1120）；狀態欄已於 Task 1.2 改生成區塊，命中行為當時修訂紀事。面向未來條：既有行不回洗",
+      "owner": "SPLITUNIFY",
+      "trigger": "SPLITUNIFY 規格 R 重開之第一個 commit（施工清單隨之修訂）"
+    },
+    {
+      "id": "DOCROT2-RESID-VERDICTGATE-TODO",
+      "path": "docs/VERDICTGATE_TODO.md",
+      "reason_class": "user-ruling",
+      "why": "VERDICTGATE 凍結施工清單之批次間 Gate 條文（L34）與 §E 殘留列（L270）；本票批次名 B3 與 governance-batch-status 撞號。面向未來條：既有行不回洗；凍結檔改字依凍結文件修訂程序",
+      "owner": "VERDICTGATE（B-62）",
+      "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
+    },
+    {
+      "id": "DOCROT2-RESID-PLAIN-README-LOG",
+      "path": "白話說明/README.md",
+      "reason_class": "user-ruling",
+      "why": "2026-08 治理當日紀事段（治理第 1 批 B1–B10、B3R、B-25／B-31／B-50、S6.1／S6.2）；本檔屬 fact_keys.json 之 status_scope_grandfathered（2026-08-10 凍結之既存歷史日誌豁免，集合相等鎖死），白話說明各份如何整理由使用者待決（handoff-pending 之 HP-PLAINDOCS）",
+      "owner": "白話說明（HP-PLAINDOCS）",
+      "trigger": "HP-PLAINDOCS 使用者裁定白話說明整理方式後之落地 commit"
+    }
+  ]
+}

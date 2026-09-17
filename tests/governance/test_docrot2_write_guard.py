@@ -465,6 +465,8 @@ def _precommit_repo(tmp_path: Path) -> Path:
     (root / "scripts" / "git_hooks").mkdir()
     shutil.copy2(REPO / "scripts" / "git_hooks" / "pre-commit", root / "scripts" / "git_hooks" / "pre-commit")
     (root / "scripts" / "verification_claim_check.py").write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+    # DOCROT2 D2D：pre-commit ③ --migration 缺殘留清單即 fail-closed；本 fixture 無命中檔，空清單即合規。
+    (root / "scripts" / "docrot2_migration_residuals.json").write_text('{"residuals": []}\n', encoding="utf-8")
     _commit_all(root)
     return root
 

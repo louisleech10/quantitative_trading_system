@@ -360,68 +360,68 @@ _fk_render_of() {   # $1=key -> stdout: render 模式（未宣告 ⇒ tsv）
 }
 
 _fk_validate_shape() {   # $1=key；columns／render 之封閉驗證（全 fail-closed）
-  _fksh_rc=0
-  _fksh_mode="tsv"
-  _fksh_rty="$(LC_ALL=C jq -r --arg k "$1" \
-                 '.[$k] | if has("render") then (.render | type) else "absent" end' \
-                 "${REG}" 2>/dev/null)" || _fksh_rty=""
-  case "${_fksh_rty}" in
-    absent) : ;;
-    string)
-      _fksh_mode="$(LC_ALL=C jq -r --arg k "$1" '.[$k].render' "${REG}")" || return 1
-      case " ${_FK_RENDER_MODES} " in
-        *" ${_fksh_mode} "*) : ;;
-        *) echo "gen_fact_key_blocks: key ${1} 之 render='${_fksh_mode}' 不在 {${_FK_RENDER_MODES}} → fail-closed" >&2
-           _fksh_rc=1; _fksh_mode="tsv" ;;
-      esac ;;
-    *)
-      echo "gen_fact_key_blocks: key ${1} 之 render 型別不符（須字串）→ fail-closed" >&2
-      _fksh_rc=1 ;;
-  esac
-
-  _fksh_cty="$(LC_ALL=C jq -r --arg k "$1" \
-                 '.[$k] | if has("columns") then (.columns | type) else "absent" end' \
-                 "${REG}" 2>/dev/null)" || _fksh_cty=""
-  if [ "${_fksh_cty}" = "absent" ]; then
-    [ "${_fksh_mode}" != "table" ] || {
-      echo "gen_fact_key_blocks: key ${1} render=table 但未宣告 columns（無表頭）→ fail-closed" >&2
-      _fksh_rc=1; }
-  else
-    # 🔴 禁字元用**封閉集合**（`|` ∪ 全部控制字元），不是列舉黑名單〔CODEX-R1-P1-01〕：
-    #   初版只列 `| \t \n`，漏了 CR。表頭**不經 @tsv**（見 `_fk_gen_block` 的 columns 那兩行），
-    #   raw CR 會把表頭拆成兩行 ⇒ 產出 malformed markdown；而 `--check` 比的是字串，
-    #   宿主同樣壞掉即兩邊相符 ⇒ rc=0 靜默放行。codex 以 `columns:["a\rb","c"]` 實跑重現
-    #   （emit rc=0、stdout hex 含 `7c20610d62207c`、check rc=0）。
-    #   儲存格走 `@tsv` 會把 CR 轉義成字面 `\r` 故不受此害——**表頭與儲存格路徑不同**，
-    #   這正是只補一處會漏另一處的原因，故兩處都改用同一個封閉集合。
-    LC_ALL=C jq -e --arg k "$1" '
-      .[$k].columns
-      | type == "array"
-        and length > 0
-        and all(.[]; type == "string" and length > 0 and (test("[|[:cntrl:]]") | not))
-        and (length == (unique | length))
-    ' "${REG}" >/dev/null 2>&1 \
-      || { echo "gen_fact_key_blocks: key ${1} 之 columns 非法（須非空字串陣列；元素非空、不重複、不含 | 或任何控制字元）→ fail-closed" >&2
-           _fksh_rc=1; }
-    LC_ALL=C jq -e --arg k "$1" '
-      (.[$k].columns | length) as $n | .[$k].rows | all(.[]; length == $n)
-    ' "${REG}" >/dev/null 2>&1 \
-      || { echo "gen_fact_key_blocks: key ${1} 有列之欄數與 columns 宣告不符 → fail-closed" >&2
-           _fksh_rc=1; }
-  fi
-
+  # 效能（DOCROT2 D2D）：原逐條七次 jq 合為一次（每 key 省六次行程；無參數模式曾達 2 秒預算）。
+  #   每條判定以 ok() 之 try 隔離＝原本各自獨立呼叫之 rc（jq 錯誤或 false／null 即該條不成立）；
+  #   jq 只輸出違規代碼，訊息、順序與 rc 對照不變。render 合法性沿用原 shell 字串包含比對（" tsv table " 含 " <值> "）。
+  # 🔴 禁字元用**封閉集合**（`|` ∪ 全部控制字元），不是列舉黑名單〔CODEX-R1-P1-01〕：
+  #   初版只列 `| \t \n`，漏了 CR。表頭**不經 @tsv**（見 `_fk_gen_block` 的 columns 那兩行），
+  #   raw CR 會把表頭拆成兩行 ⇒ 產出 malformed markdown；而 `--check` 比的是字串，
+  #   宿主同樣壞掉即兩邊相符 ⇒ rc=0 靜默放行。codex 以 `columns:["a\rb","c"]` 實跑重現
+  #   （emit rc=0、stdout hex 含 `7c20610d62207c`、check rc=0）。
+  #   儲存格走 `@tsv` 會把 CR 轉義成字面 `\r` 故不受此害——**表頭與儲存格路徑不同**，
+  #   這正是只補一處會漏另一處的原因，故兩處都改用同一個封閉集合。
   # 儲存格字元限制：同上改用封閉集合（全部控制字元）。tab／換行破壞 @tsv 的「一列一行」
   # 語義；其餘控制字元 @tsv 不轉義、會原樣進入產出。既有四 key 實測零命中，故非放寬。
-  LC_ALL=C jq -e --arg k "$1" '.[$k].rows | all(.[][]; test("[[:cntrl:]]") | not)' \
-    "${REG}" >/dev/null 2>&1 \
-    || { echo "gen_fact_key_blocks: key ${1} 之儲存格含控制字元（破壞逐列語義）→ fail-closed" >&2
-         _fksh_rc=1; }
-  if [ "${_fksh_mode}" = "table" ]; then
-    LC_ALL=C jq -e --arg k "$1" '.[$k].rows | all(.[][]; test("[|]") | not)' \
-      "${REG}" >/dev/null 2>&1 \
-      || { echo "gen_fact_key_blocks: key ${1} render=table 之儲存格含 |（會切碎表格）→ fail-closed" >&2
-           _fksh_rc=1; }
-  fi
+  _fksh_rc=0
+  _fksh_codes="$(LC_ALL=C jq -r --arg k "$1" --arg modes "${_FK_RENDER_MODES}" '
+    def ok(f): try (if f then true else false end) catch false;
+    (try (.[$k] | if has("render") then (.render | type) else "absent" end) catch "") as $rty
+    | (try (.[$k] | if has("columns") then (.columns | type) else "absent" end) catch "") as $cty
+    | (if $rty == "string" then .[$k].render else null end) as $rv
+    | (if $rty == "string" and ((" " + $modes + " ") | contains(" " + $rv + " ")) then $rv else "tsv" end) as $mode
+    | (if $rty == "absent" then empty
+       elif $rty == "string" then (if $mode == $rv then empty else "render-mode" end)
+       else "render-type" end),
+      (if $cty == "absent" then (if $mode == "table" then "table-no-columns" else empty end)
+       else
+         (if ok(.[$k].columns
+                | type == "array"
+                  and length > 0
+                  and all(.[]; type == "string" and length > 0 and (test("[|[:cntrl:]]") | not))
+                  and (length == (unique | length)))
+          then empty else "columns" end),
+         (if ok((.[$k].columns | length) as $n | .[$k].rows | all(.[]; length == $n))
+          then empty else "row-width" end)
+       end),
+      (if ok(.[$k].rows | all(.[][]; test("[[:cntrl:]]") | not)) then empty else "cell-cntrl" end),
+      (if $mode == "table" then (if ok(.[$k].rows | all(.[][]; test("[|]") | not)) then empty else "cell-pipe" end)
+       else empty end)
+  ' "${REG}" 2>/dev/null)" || _fksh_codes="jq-failed"
+  while IFS= read -r _fksh_c; do
+    case "${_fksh_c}" in
+      "") continue ;;
+      render-mode)
+        _fksh_mv="$(LC_ALL=C jq -r --arg k "$1" '.[$k].render' "${REG}")" || return 1
+        echo "gen_fact_key_blocks: key ${1} 之 render='${_fksh_mv}' 不在 {${_FK_RENDER_MODES}} → fail-closed" >&2 ;;
+      render-type)
+        echo "gen_fact_key_blocks: key ${1} 之 render 型別不符（須字串）→ fail-closed" >&2 ;;
+      table-no-columns)
+        echo "gen_fact_key_blocks: key ${1} render=table 但未宣告 columns（無表頭）→ fail-closed" >&2 ;;
+      columns)
+        echo "gen_fact_key_blocks: key ${1} 之 columns 非法（須非空字串陣列；元素非空、不重複、不含 | 或任何控制字元）→ fail-closed" >&2 ;;
+      row-width)
+        echo "gen_fact_key_blocks: key ${1} 有列之欄數與 columns 宣告不符 → fail-closed" >&2 ;;
+      cell-cntrl)
+        echo "gen_fact_key_blocks: key ${1} 之儲存格含控制字元（破壞逐列語義）→ fail-closed" >&2 ;;
+      cell-pipe)
+        echo "gen_fact_key_blocks: key ${1} render=table 之儲存格含 |（會切碎表格）→ fail-closed" >&2 ;;
+      *)
+        echo "gen_fact_key_blocks: key ${1} 之 columns／render 驗證無法執行（${_fksh_c}）→ fail-closed" >&2 ;;
+    esac
+    _fksh_rc=1
+  done <<EOF
+${_fksh_codes}
+EOF
   return "${_fksh_rc}"
 }
 

@@ -33,15 +33,14 @@ RULED-BY: 使用者裁定「治理票的新增／刪減／修改／註解／狀�
 | `收案` | 閉合**且**已登記產出端覆蓋（見 `docs/GOV_ENFORCEMENT_REGISTRY.md`） |
 | `狀態未確認` | 🔴 **沒有證據可判定。不得用猜的填其他值** |
 
-🔴 **現況（`S0.4` 逐張查證後）：`未開工` 44 張、`部分完成` 17 張、其餘為 0。**
-數字會漂，權威一律看下方生成區塊，本節只記「`狀態未確認` 已清零」這個里程碑。
+🔴 **各狀態張數一律看下方生成區塊，本節不抄數字**（數字會漂；`S0.4` 逐張查證之過程見其收斂檔）。
 
 初始值之導出規則屬**一次性**歷史動作（`S0.4`），寫在 `handoffs/` 之收斂檔：
 當時以已刪除的 `closure` 表為主、backlog 之 `PARTIAL`／`PROVISIONAL`／`DONE` 映 `部分完成`、
 其餘一律 `狀態未確認`，再由三家逐張補證據把未確認清成 0。
 🔴 **該規則已完成使命，不再適用於新票**——新票直接依證據填值。
 
-🔴 **`B-32` 於 backlog 標 `DONE`，本表仍為 `部分完成`**——依產出端覆蓋鐵律，
+🔴 **`B-32` 於 backlog 標 `DONE`，本表不採該值**——依產出端覆蓋鐵律，
 未登記覆蓋者不得稱收案。這是規則的正確後果，三家 r1 一致確認非誤傷。
 `S6.2` 進一步釐清其真正原因：該票檢查之觸發源為**派工指令**而非檔案編輯，
 產出端覆蓋因而登記為豁免（`E-015`），故不具備標完成的條件。
@@ -73,10 +72,8 @@ RULED-BY: 使用者裁定「治理票的新增／刪減／修改／註解／狀�
    `governance-ticket-closure` 已整個刪除（現存 fact-key 清單可查）。
    ⇒ **本表已是唯一狀態源。** 內容一字未改係使用者裁定「標成舊文件就好」，
    不必付移除的不可逆代價。
-3. ~~43 張 `狀態未確認`~~ **（`S0.4` 已清零）**
-   🔴 現況：`狀態未確認` **0 張**——三家逐張補證據後全部落到 `未開工` 或 `部分完成`。
-   本條保留為體例提醒：消費端呈現仍須把「未確認」與「未開工」區分，
-   將來若再出現未確認，不得算成進度。
+3. **「未確認」之呈現體例**：消費端呈現須把「未確認」與「未開工」區分，
+   將來若再出現未確認，不得算成進度（`S0.4` 當時逐張補證據之過程見其收斂檔）。
 4. **MERGE／SPLIT／已作廢恢復等操作沿革無欄位承載**。backlog 索引區實有 `🔗 MERGE`
    與拆票裁決，本表無法表達。
 5. **`已完成` 的三條件（artifact ∧ 無阻塞殘留 ∧ 覆蓋）本表只能承載結果、不能承載證據**。
@@ -220,7 +217,7 @@ RULED-BY: 使用者裁定「治理票的新增／刪減／修改／註解／狀�
 | E-023 | B-62 | PreToolUse:Task,Bash,Write:scripts/gate_check.sh | 產出端 | 實作位置：scripts/gate.sh:959（dispatch／--impl-self 於發 token 前呼叫 verdictgate_check；前批任一家 blocked 未由原提出方 CLOSED 或無裁決 ⇒ 拒發）。路由：gate_check 於 PreToolUse 擋無 token 之派工指令 ⇒ 開輪必經 gate.sh ⇒ 必經 verdictgate_check。誠實邊界：讀的是 audit 狀態（多輪累積），故為一致性型；本票 B2–B4 開輪皆由此放行 | 一致性型 |
 | E-024 | B-62 | git commit-msg hook（commit 成立前） | 豁免 | PreToolUse不可：判定輸入是 commit 訊息全文＋staged 生產檔集合；主控端 Bash 指令字串只有 git commit -F <檔> 字樣，訊息本體在檔內或編輯器，寫入前拿不到。PostToolUse不可：Bash 完成時 commit 已成立，擋不了；且非 Claude 之 commit（委員、使用者）根本不經主控端 hook。部分閘：scripts/git_hooks/commit-msg:41（exec 前獨立呼叫 ticket_batch_check --msg，rc=2 拒 commit）；push 端 scripts/ticket_batch_check.sh:88 之 --push-range 由 gov_check 1c 呼叫（--no-verify 之 commit 在 push 前被抓） | n/a |
 | E-025 | B-62 | PostToolUse:Edit,Write:scripts/synth_attribution_hook.sh | 產出端 | 實作位置：scripts/synth_attribution_hook.sh:40（synth.md 寫入當下呼叫 scripts/_synth_attr.py hook 模式：ID 必列表＋逐字引用 20 字＋處置 token 整詞＋延後目標形狀）。第二層全量：scripts/debt_clear.sh:863（清債前 _run_attribution，含延後目標存在性）。誠實邊界：PreToolUse 不可——判定需整份 synth（附錄 ID 集合 vs 群集表），單次 Edit 內容不足；B4 R1 synth 寫入時本 hook 擋過主委一次 | 一致性型 |
-| E-026 | B-63 | PreToolUse:Edit,Write:scripts/live_doc_write_guard.sh | 產出端 | 實作位置：scripts/_live_doc_write_guard.py:622（寫入目標先解析成實際被寫之檔之正名——以 inode 判定在 repo 內、逐段取實際檔名；所給路徑不等於正名、解析經過任何 symlink 或目標為硬連結即為別名，別名寫活文件即擋；Edit／Write 以寫入後全文判定：新增行之識別碼＋狀態字面〔判定碼與 gen_fact_key_blocks.sh 共用〕、歷史專區外之刪除線／考古字面／finding ID、歷史專區指標文法、交接檔封閉文法之內容型部分）。誠實邊界：Bash 轉向與委員 CLI 之寫入不經本閘，由 E-027 之 pre-commit 兜底 | 內容型 |
+| E-026 | B-63 | PreToolUse:Edit,Write:scripts/live_doc_write_guard.sh | 產出端 | 實作位置：scripts/_live_doc_write_guard.py:629（寫入目標先解析成實際被寫之檔之正名——以 inode 判定在 repo 內、逐段取實際檔名；所給路徑不等於正名、解析經過任何 symlink 或目標為硬連結即為別名，別名寫活文件即擋；Edit／Write 以寫入後全文判定：新增行之識別碼＋狀態字面〔判定碼與 gen_fact_key_blocks.sh 共用〕、歷史專區外之刪除線／考古字面／finding ID、歷史專區指標文法、交接檔封閉文法之內容型部分）。誠實邊界：Bash 轉向與委員 CLI 之寫入不經本閘，由 E-027 之 pre-commit 兜底 | 內容型 |
 | E-027 | B-63 | git pre-commit hook（commit 成立前） | 豁免 | PreToolUse不可：Bash 轉向、生成器與委員 CLI 之寫入不產生主控端 Edit／Write 事件，寫入前無 payload 可判；交接檔條目生命週期須讀 scripts/fact_keys.json 之狀態，同一 commit 常先改狀態再移條目，寫入當下判定會擋住兩步編輯之中間態。PostToolUse不可：同一原因——觸發源非主控端工具，且中間態必紅。部分閘：scripts/git_hooks/pre-commit:181（live_doc_write_guard.sh --staged：暫存之登記活文件以同一判定擋，含條目生命週期）；scripts/git_hooks/pre-commit:187（live_doc_registry_check.sh --staged：暫存之新增 .md 須已登記） | n/a |
 | E-028 | B-63 | PostToolUse:Edit,Write:scripts/factkey_write_guard.sh | 產出端 | 實作位置：scripts/gen_fact_key_blocks.sh:1863（docrot2_status_keys 之封閉狀態值、下一步非空、識別碼跨全部狀態 key 唯一；同一 --check 內另有 rows_source／rows_filter 物化與交接投影對讀）。誠實邊界：改狀態後尚未 --write 之中間態必紅，故為一致性型 | 一致性型 |
 | E-029 | B-63 | PostToolUse:Edit,Write:scripts/spec_xref_hook.sh | 產出端 | 實作位置：scripts/spec_xref_hook.sh:57（「概念被拿掉須補版本標記」只對 concept_removal_xref 為 true 之類別執行；未登記路徑行為不變） | 內容型 |
@@ -233,5 +230,6 @@ RULED-BY: 使用者裁定「治理票的新增／刪減／修改／註解／狀�
 | E-036 | B-63 | PostToolUse:Edit,Write:scripts/synth_attribution_hook.sh | 產出端 | 實作位置：scripts/_synth_attr.py:347（check_category：synth 同目錄 sources.lock 之輪次屬類別門檻後時，附錄每條 finding 須恰一行合法委員類別、群集列第 5 欄為封閉值之主委類別、兩欄不一致者須列於類別不一致段並附處置 token；寫入當下只看已完成列）。第二層全量：scripts/debt_clear.sh:863（清債前 _run_attribution，延後目標另驗存在）。誠實邊界：無 sources.lock 之 synth 無從綁定輪次而不判，debt_clear 必帶 lock 故收案路徑不落此；DOCROT2 Task 3.1 | 內容型 |
 | E-037 | B-63 | cx_run.sh 交件當下（completeness_check.sh --single --round-id） | 豁免 | PreToolUse不可：委員交件由執行端 CLI 直接寫檔，主控端沒有 Edit／Write 事件可掛。PostToolUse不可：同一原因——觸發源不是主控端工具；主委自產之 findings 檔另由 doc_format_precheck.sh 於寫檔當下經 cx_run.sh --selfcheck 走同一判定（未給 round id 即須類別）。部分閘：scripts/completeness_check.sh:1705（--single 呼叫 scripts/_finding_category.py check-single：輪次之開債序號大於門檻、查無輪次或未給 round id ⇒ 每條 finding 含零 findings sentinel 須 fence 與 HTML 註解外恰一行合法類別；audit 不可讀即 FAIL；類別行文法與收斂檔、收案量測共用同一實作；門檻與值集唯一來源 governance_verdicts.json；DOCROT2 Task 3.1） | n/a |
 | E-038 | B-63 | debt_clear.sh 收案前（_docrot2_metrics.py emit-round） | 豁免 | PreToolUse不可：量測事件之輸入為收案當下之收斂檔、委員交件、audit 與 HEAD，收案前收斂檔仍可修改，寫入前沒有定稿可計。PostToolUse不可：同一原因——收斂檔寫入當下之群集與類別為中間態，收案才凍結。部分閘：scripts/debt_clear.sh:891（門檻後之輪收案前寫 docrot2_round_metric；缺委員類別、缺主委欄、開債事件缺欄或寫入失敗即拒銷）＋ scripts/_docrot2_metrics.py:320（經 audit_append.sh 寫入）；DOCROT2 Task 3.2 | n/a |
-| E-039 | B-63 | PreToolUse:Edit,Write:scripts/live_doc_write_guard.sh | 產出端 | 實作位置：scripts/_live_doc_write_guard.py:442（擋下事件：寫入前守衛擋下時每個相異規則寫一筆 docrot2_gate_block，寫入失敗不改變擋下結果）＋ scripts/_live_doc_registry.py:297（emit_block_event 唯一寫入實作，pre-commit 之 --staged 違規與未登記 .md 亦同）。誠實邊界：payload 不可解析或寫入目標無法解析為 repo 路徑者無路徑可記而不寫；--tree 重放非擋下不寫；DOCROT2 Task 3.2 | 內容型 |
+| E-039 | B-63 | PreToolUse:Edit,Write:scripts/live_doc_write_guard.sh | 產出端 | 實作位置：scripts/_live_doc_write_guard.py:449（擋下事件：寫入前守衛擋下時每個相異規則寫一筆 docrot2_gate_block，寫入失敗不改變擋下結果）＋ scripts/_live_doc_registry.py:300（emit_block_event 唯一寫入實作，pre-commit 之 --staged 違規與未登記 .md 亦同）。誠實邊界：payload 不可解析或寫入目標無法解析為 repo 路徑者無路徑可記而不寫；--tree 重放非擋下不寫；DOCROT2 Task 3.2 | 內容型 |
+| E-040 | B-63 | git pre-commit hook（commit 成立前） | 豁免 | PreToolUse不可：命中判定之識別碼取自 scripts/fact_keys.json 全部狀態 key，新增識別碼即可讓未被編輯之既有行命中，寫入前之單檔 payload 看不到其他檔；殘留列之過期須全專案掃描，而命中消失（改文件）與刪列（改清單）為兩步編輯，寫入當下判定中間態必紅。PostToolUse不可：同一中間態理由；新增行之手寫狀態已由 E-026 於寫入前擋。部分閘：scripts/git_hooks/pre-commit:199（暫存含 .md、.gitignore 或判定輸入檔時跑 live_doc_registry_check.sh --migration：命中檔須列 scripts/docrot2_migration_residuals.json、已無命中之列須刪、清單檔不合規即擋）＋ scripts/_live_doc_registry.py:473（判定實作，與寫入前守衛共用豁免區與 --status-hits 判定入口）；DOCROT2 Task 4.1 | n/a |
 <!-- END GENERATED: governance-enforcement -->

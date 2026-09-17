@@ -16,6 +16,9 @@
   --all     ＝ 登記檔錯誤 ∪ 探索所得路徑未登記／非 regular file ∪ exact 登記之路徑不在探索結果
               ∪ fact_keys.json `_schema.status_scope` 項未被登記涵蓋。
   --staged  ＝ 暫存之新增或重新命名 `.md`（範圍內）未登記。
+  --migration（Task 4.1）＝ `new_line_status_check`＝true 類之登記活文件全檔（豁免區同寫入前守衛）經
+              `gen_fact_key_blocks.sh --status-hits` 一次判定：命中檔 ∉ `scripts/docrot2_migration_residuals.json`
+              ⇒ 違規；清單列之檔已無命中或不在判定範圍 ⇒ 違規（清單過期）；清單檔不合規 ⇒ rc=2。
 rc：0＝合規或範圍外；1＝違規；2＝用法或環境錯誤。
 """
 from __future__ import annotations
@@ -25,7 +28,7 @@ import json
 import os
 import subprocess
 import sys
-from typing import List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 REGISTRY_REL = os.path.join("scripts", "live_doc_registry.json")
 FACT_KEYS_REL = os.path.join("scripts", "fact_keys.json")
@@ -367,6 +370,124 @@ def check_staged(root: str) -> List[str]:
     return errs
 
 
+# ────────────────────────────────────────────────────────────── DOCROT2 Task 4.1：全專案遷移判定
+
+MIGRATION_RESIDUALS_REL = os.path.join("scripts", "docrot2_migration_residuals.json")
+# 殘留理由類別三值（使用者 2026-08-17 定：殘留只准這三種理由）寫死於此，不由清單檔自證
+RESIDUAL_REASON_CLASSES = ("blocked-by", "user-ruling", "needs-research")
+RESIDUAL_FIELDS = ("id", "path", "reason_class", "why", "owner", "trigger")
+
+
+class MigrationConfigError(Exception):
+    """殘留清單或判定環境不合規（呼叫端 rc=2，fail-closed）。"""
+
+
+def load_migration_residuals(root: str) -> List[dict]:
+    try:
+        data = load_json(os.path.join(root, MIGRATION_RESIDUALS_REL))
+    except ValueError as exc:
+        raise MigrationConfigError(str(exc))
+    extra = sorted(set(data) - {"_schema", "residuals"})
+    if extra:
+        raise MigrationConfigError(f"{MIGRATION_RESIDUALS_REL} 頂層含未定義鍵：{extra}")
+    rows = data.get("residuals")
+    if not isinstance(rows, list):
+        raise MigrationConfigError(f"{MIGRATION_RESIDUALS_REL} 缺 residuals 陣列")
+    errs: List[str] = []
+    seen_path: set = set()
+    seen_id: set = set()
+    for n, row in enumerate(rows, 1):
+        if not isinstance(row, dict) or set(row) != set(RESIDUAL_FIELDS):
+            errs.append(f"第 {n} 列：鍵集須恰為 {list(RESIDUAL_FIELDS)}")
+            continue
+        blank = [f for f in RESIDUAL_FIELDS if not isinstance(row[f], str) or not row[f].strip()]
+        if blank:
+            errs.append(f"第 {n} 列：{blank} 須為非空字串")
+            continue
+        if row["reason_class"] not in RESIDUAL_REASON_CLASSES:
+            errs.append(f"第 {n} 列：reason_class「{row['reason_class']}」不屬 {list(RESIDUAL_REASON_CLASSES)}")
+        if row["path"] in seen_path:
+            errs.append(f"第 {n} 列：path {row['path']} 重複")
+        if row["id"] in seen_id:
+            errs.append(f"第 {n} 列：id {row['id']} 重複")
+        seen_path.add(row["path"])
+        seen_id.add(row["id"])
+    if errs:
+        raise MigrationConfigError(f"{MIGRATION_RESIDUALS_REL} 不合規：" + "；".join(errs))
+    return rows
+
+
+def migration_hits(root: str) -> Tuple[Dict[str, List[Tuple[str, str, str]]], set, List[str]]:
+    """登記之 new_line_status_check＝true 類活文件全檔（去豁免區，豁免與寫入前守衛同一 regions）經共用判定入口
+    一次判定。回（{路徑: [(行號, 識別碼, 狀態)]}、已判定路徑集合、無法判定之違規）。"""
+    import _live_doc_write_guard as ldw  # 延遲載入：守衛模組於載入時 import 本模組
+
+    try:
+        ctx = ldw.Context(root)
+    except (ldw.GuardError, ValueError) as exc:
+        raise MigrationConfigError(str(exc))
+    errs: List[str] = []
+    scanned: set = set()
+    by_label: Dict[str, str] = {}
+    items: List[Tuple[str, str]] = []
+    for fi, rel in enumerate(discover_live_docs(root, ctx.norm["scope_roots"])):
+        cls, flags = ctx.cls_flags(rel)
+        if cls is None:
+            errs.append(f"{rel}：未登記 ⇒ 無法判定（以 live_doc_registry_update.sh --add 登記）")
+            continue
+        if not flags.get("new_line_status_check"):
+            continue
+        full = os.path.join(root, rel)
+        if os.path.islink(full) or not os.path.isfile(full):
+            errs.append(f"{rel}：非 regular file ⇒ 無法判定")
+            continue
+        try:
+            with open(full, encoding="utf-8", newline="") as fh:
+                text = fh.read()
+        except (OSError, UnicodeDecodeError) as exc:
+            errs.append(f"{rel}：讀取失敗（{exc.__class__.__name__}）⇒ 無法判定")
+            continue
+        scanned.add(rel)
+        lines = ldw.split_lines(text)
+        reg = ldw.regions(lines, ctx.legal_keys(rel))
+        for i, ln in enumerate(lines):
+            if reg["gen"][i] or reg["hist"][i] or reg["fence"][i] or reg["marker"][i]:
+                continue
+            label = f"{fi}:{i + 1}"
+            by_label[label] = rel
+            items.append((label, ln))
+    try:
+        rows = ldw.status_hit_rows(ctx, items)
+    except ldw.GuardError as exc:
+        raise MigrationConfigError(str(exc))
+    hits: Dict[str, List[Tuple[str, str, str]]] = {}
+    for label, ident, st in rows:
+        rel = by_label.get(label)
+        if rel is None:
+            raise MigrationConfigError(f"判定入口回傳未知標籤 {label!r}")
+        hits.setdefault(rel, []).append((label.split(":", 1)[1], ident, st))
+    return hits, scanned, errs
+
+
+def check_migration(root: str) -> Tuple[List[str], str]:
+    residuals = load_migration_residuals(root)
+    hits, scanned, errs = migration_hits(root)
+    listed = {r["path"] for r in residuals}
+    for rel in sorted(hits, key=_byte_key):
+        if rel in listed:
+            continue
+        sample = "、".join(f"L{n}「{ident}」＋「{st}」" for n, ident, st in hits[rel][:3])
+        more = f" 等 {len(hits[rel])} 行" if len(hits[rel]) > 3 else ""
+        errs.append(f"{rel}：全檔命中（{sample}{more}）且不在殘留清單 ⇒ 狀態改生成區塊，"
+                    f"或具名列入 {MIGRATION_RESIDUALS_REL}")
+    for r in residuals:
+        if r["path"] in hits:
+            continue
+        why = "已無命中" if r["path"] in scanned else "不在判定範圍（不存在、未登記或屬不適用類別）"
+        errs.append(f"殘留清單列 {r['id']}（{r['path']}）：{why} ⇒ 清單過期，刪除該列")
+    return errs, f"遷移判定合規：命中檔 {len(hits)} 個皆列於殘留清單，殘留 {len(residuals)} 列皆仍命中"
+
+
 def _default_class(path: str, schema: dict) -> str:
     pred = schema.get("live_spec_predicate") or {}
     parent = pred.get("parent", "docs/")
@@ -420,6 +541,7 @@ def main(argv: List[str]) -> int:
     g.add_argument("--path")
     g.add_argument("--all", action="store_true")
     g.add_argument("--staged", action="store_true")
+    g.add_argument("--migration", action="store_true")
     u = sub.add_parser("update")
     u.add_argument("--add", required=True)
     u.add_argument("--class", dest="cls")
@@ -461,6 +583,12 @@ def main(argv: List[str]) -> int:
         errs, msg = check_path(root, args.path)
     elif args.all:
         errs, msg = check_all(root), ""
+    elif args.migration:
+        try:
+            errs, msg = check_migration(root)
+        except MigrationConfigError as exc:
+            print(f"live_doc_registry_check: --migration 無法判定 ⇒ fail-closed：{exc}", file=sys.stderr)
+            return 2
     else:
         errs, msg = check_staged(root), ""
     if errs:
