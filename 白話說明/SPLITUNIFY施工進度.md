@@ -16,9 +16,11 @@
 > 🔴 **狀態不再手寫**：批次、第 9 批各小任務、殘留的狀態，由 `scripts/fact_keys.json` 產生（與施工清單
 > `docs/SPLITUNIFY_TODO.md` §B／§C-9／§E 同一份來源），請勿手改。本檔其餘段落只寫「發生過什麼」。
 > 接下來的順序（你裁定；DOCROT2 已於 9/17 結束）：重開一次規格審查＋最後一批（`R-5`）→ GLOBALH → 你的 UAT 驗收（`R-3`，B26–B34＋新增項目）。
-> **9/17 晚現在在哪**：`R-5` 的規格重開審查做完了——偵察 1 輪、對抗審 2 輪、戳記輪 2 輪，三家都已蓋章（規格 v6）。
-> 白話結論在 [SPLITUNIFY規格白話.md](SPLITUNIFY規格白話.md) 最上面一節，**等你看過放行**才寫施工清單。
-> 另有一件要你決定：最後一批實作開工時會被「前一批審查意見沒逐條標閉合」的關卡擋住（第 9 批有 110 條），見我給你的回報。
+> **9/17 深夜現在在哪**：你放行 v6 後，我寫施工清單時查你問的「多週期特徵有沒有偷看未來」，發現 **IC 事件分析自 8/28 起每個事件都讀到晚一根的特徵**（用到決策之後、已算在答案裡的 K 線；三家委員各自用真實資料確認，165 個事件全中）。
+> 同時發現事件掃描頁和 IC 頁用的「答案」定義不同，切分邊界差 12 小時。兩件都推翻了 v6 的條文，規格重開為 **v7**，正在三家對抗審。
+> 你已裁定：未來洩漏一定要修、不准列殘留，修法由我跟委員決定。v7 把「修 IC 選列」排為最後一批的第一件，修好前不做後面。
+> **8/28 之後的 IC 事件分析結果都不可信**（特徵看起來比實際更能預測），修好後要重跑；UAT 會列入重驗。
+> 第 9 批 108 條「沒逐條標閉合」的審查意見已由三家各自核對、全數閉合，最後一批的開工關卡已放行。
 
 **批次**
 
@@ -62,12 +64,12 @@
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 使用者 2026-09-17 放行 v6；施工清單撰寫與 b9 閉合輪（b9-stamp-r13）並行 |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 偵察證實 IC 事件分析選特徵晚一根（未來資訊）與兩端標籤參數不一；規格 R 重開為 v7，三家對抗審中 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 090 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
-| 100 | SU-RESID-9A-UI | 未開工 | docs/SPLITUNIFY_SPEC.md R5-C5 | 隨 R-5 實作批交付（規格 v6 R5-C5） |
+| 100 | SU-RESID-9A-UI | 未開工 | docs/SPLITUNIFY_SPEC.md R5-C5 | 隨 R-5 實作批交付（規格 R5-C5） |
 | 110 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 | 120 | SU-RESID-3 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 130 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 IC 切分契約 |

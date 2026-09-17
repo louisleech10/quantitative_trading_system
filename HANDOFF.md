@@ -5,7 +5,7 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 使用者 2026-09-17 放行 v6；施工清單撰寫與 b9 閉合輪（b9-stamp-r13）並行 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 偵察證實 IC 事件分析選特徵晚一根（未來資訊）與兩端標籤參數不一；規格 R 重開為 v7，三家對抗審中 |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -16,11 +16,11 @@
 |---|---|---|---|---|
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 使用者 2026-09-17 放行 v6；施工清單撰寫與 b9 閉合輪（b9-stamp-r13）並行 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 偵察證實 IC 事件分析選特徵晚一根（未來資訊）與兩端標籤參數不一；規格 R 重開為 v7，三家對抗審中 |
 | 03-007 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 03-008 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 03-009 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
-| 03-010 | SU-RESID-9A-UI | 未開工 | docs/SPLITUNIFY_SPEC.md R5-C5 | 隨 R-5 實作批交付（規格 v6 R5-C5） |
+| 03-010 | SU-RESID-9A-UI | 未開工 | docs/SPLITUNIFY_SPEC.md R5-C5 | 隨 R-5 實作批交付（規格 R5-C5） |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 | 03-013 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 IC 切分契約 |
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
@@ -64,11 +64,11 @@
 - 🔴 **全專案遷移判定有兩個模式**：`bash scripts/live_doc_registry_check.sh --migration` 讀工作樹（含未追蹤檔）；`--migration --index` 判暫存快照（清冊、內容、登記、`fact_keys`、殘留清單與生成器皆取 index），pre-commit 用後者。命中消失時 `scripts/docrot2_migration_residuals.json` 該列須同 commit 刪；新增狀態識別碼可讓未被編輯之既有行命中，改 `fact_keys.json` 後先跑一次。暫存檢查一律取快照，讀工作樹之判定會被「只暫存一半」或 `git rm --cached` 繞過。
 - 🔴 **委員並行跑會就地改寫檔案之 mutation 執行器會互相污染**（2026-09-17 閉合輪實例：一家兩次執行重疊，另一家看到未還原之改壞並自行 `git checkout` 還原）。收件後先 `git diff HEAD -- scripts tests docs` 對證零差異再收斂。
 - 🔴 **生成器無參數模式有 2 秒預算測試**（`test_govb1_factkey_gen.py::test_generator_runs_under_two_seconds`）：2026-09-17 新增一個狀態 key 前實測已 1.92 秒；`_fk_validate_shape` 七次 jq 合一後 1.65 秒。再加 key 前先量；worktree 基準量時須補齊 `handoffs/` 物件，否則生成器提早失敗、耗時失真。
-- 🔴 **SPLITUNIFY 規格層輪次用 `x` 命名，實作批要開 `b10` 會被 verdictgate 擋**（2026-09-17 實測）：`gate.sh dispatch` 對 `20260911-SPLITUNIFY-B10-*` 拒發 token——前批 `20260911-SPLITUNIFY-B9-REVIEW` 有 110 條 blocked finding 無同家後續 `CLOSED:`（codex 71、grok 29、composer 9）。規格輪沿用主規格一向之 `x-consult`／`x-review`／`x-stamp` 命名不經此閘；實作批開輪前須先處置（已報使用者，未改閘）。
+- 🔴 **verdictgate 對 `<root>-B<N>-*` 派工要求前批每條 blocked finding 有同家後續 `CLOSED:`**：規格層輪次用 `x` 命名不經此閘；前批欠帳時以「只核對本家 ID」之閉合輪補（brief-kind closure、session kind stamp，附逐條 ID 清單附件），銷帳後重跑 `bash scripts/verdictgate_check.sh <root> <N> <前批 review 前綴>,<前批 stamp 前綴>` rc=0 才開下一批（2026-09-17 SPLITUNIFY b9 實例：108 條一輪閉合）。
 - 🔴 **`spec_xref_hook.sh` 之 synth 對證取的是字母序最早、不是最新之「修訂標的」收斂檔**（`grep -l … | head -1`）：寫 `docs/SPLITUNIFY_SPEC.md` 永遠對 `20260911-splitunify-x-consult-r2/synth.md` 對證而報 `split_projection.py:569` 缺失；D-001 同型報 b8 收斂檔。屬誤報，本輪收斂檔以 `bash scripts/spec_xref_check.sh --synth <本輪 synth> <標的>` 另跑為準（已報使用者，未改工具）。
 - 🔴 **委員裁決行多個 ID 須以半形逗號分隔**：`BLOCKED-BY: A; B` 會被 `verdict_parse` 拒收（`result_state=verdict_rejected`）而使 `debt_clear` 拒銷；出路＝主委把分號改逗號後 `bash scripts/gate.sh register-output <task> <委員檔>`（2026-09-17 x-review-r15 實例）。brief 格式硬約束段已加註此條。
-- 🔴 **規格 v6 之 R5-C3 請求欄缺分析用標籤參數**（2026-09-17 讀碼）：IC 事件路徑於 `prepare_analysis_windows` 以 `_analysis_copy` 把 `event_label_spec`（k／h／進場價語意／報酬模式；預設導出在 `api/routes/ic_analysis.py` 之 `_resolve_event_batch`）覆寫到記錄副本後才對齊，`decision_at_ms` 與 `label_window_rows`（進而 purge_gap）皆依之；事件掃描端 `_prepare` 用匯入原值。使用者改 k 或 h 時兩端邊界不同。處置排 v6 延伸檔 D-003，偵察見 `handoffs/20260911-SPLITUNIFY-X-CONSULT-R4-BRIEF.md`。
-- 🔴 **IC 事件路徑以 cutoff 精確比對特徵列之時間戳慣例未驗**：`ts_map` 以 `feature_cutoff_ms`（K 線收盤時刻）為鍵，stage3 `EventFilter.apply_filter` 以 `df.index.isin(timestamps)` 精確比對；若特徵表列時間戳為開盤時刻，選中者為收盤時刻開盤之下一根（一根特徵週期之未來資訊）。以真實 FF run 對證前不得宣稱有或無洩漏。
+- 🔴 **FF 特徵表列時間戳＝K 線開盤時刻**（列之主週期欄含該根收盤；跨週期欄 `OPEN_MINUS` 只含收盤 ≤ 列開盤之高週期 K 線）。凡以時間戳取「決策時點可用之特徵列」，鍵須為「收盤 ≤ 決策時點之最後一根」之**開盤**（對齊收據 `last_bar_open_ms`），**不是** `feature_cutoff_ms`（收盤時刻）。2026-09-17 真實資料三家實跑：IC 事件路徑 `_run_event_label_stages` 自 `fe5f715e`（8/28）起以 `feature_cutoff_ms` 為鍵，165／165 事件讀到晚一根（BOP 之 IC 0.074 被灌成 0.286）；修正排入 `docs/SPLITUNIFY_SPEC.md` v7 之 `R5-C9`（使用者裁定不得列殘留）。對證探針：`handoffs/20260911-splitunify-x-consult-r4-probes/`。
+- 🔴 **事件掃描端與 IC 端之分析用標籤參數不同源**：IC 路徑以 `event_label_spec`（預設導出在 `api/routes/ic_analysis.py` 之 `_resolve_event_batch`）建分析副本再對齊，事件掃描端 `_prepare` 用匯入原值；預設參數下兩端 `label_window_rows` 即不同（144／156），邊界差 12 小時。統一解析排入 v7 之 `R5-C10`。
 - **session 名之 kind 封閉集＝`impl|review|stamp|consult|fix`**：閉合輪之 session 用 `stamp`、brief 行首 `brief-kind: closure`（例 `20260911-splitunify-b9-stamp-r13`）。
 - **Bash 命令列含委員家族名字面（以豎線串接之三家名）會被 `gate_check.sh` 判為派工而擋**：要列家族時從 `scripts/governance_families.json` 以 `jq` 取，不在命令列寫字面。
 - 🔴 **規格寫入之權宜作法（2026-09-17）**：`docs/SPLITUNIFY_SPEC.md` 以 scratchpad 組稿後 `cp` 入檔；寫入前以同內容之 Write payload 餵 `bash scripts/live_doc_write_guard.sh`（rc=0 才 `cp`），寫入後跑 `doc_format_precheck.sh`、`spec_xref_check.sh --files <HEAD 版> <新版>`、`obligation_block_check.sh`。日後小幅修改一律用 Edit。
@@ -86,4 +86,6 @@
 - 2026-09-17：R-5 → `白話說明/SPLITUNIFY規格白話.md`
 - 2026-09-17：R-5 → `handoffs/20260911-SPLITUNIFY-B9-STAMP-R13-BRIEF.md`
 - 2026-09-17：R-5 → `handoffs/20260911-SPLITUNIFY-X-CONSULT-R4-BRIEF.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-b9-stamp-r13/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-consult-r4/synth.md`
 <!-- HISTORY-END -->

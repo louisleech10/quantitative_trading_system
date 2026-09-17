@@ -1143,12 +1143,12 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 使用者 2026-09-17 放行 v6；施工清單撰寫與 b9 閉合輪（b9-stamp-r13）並行 |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 偵察證實 IC 事件分析選特徵晚一根（未來資訊）與兩端標籤參數不一；規格 R 重開為 v7，三家對抗審中 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 090 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
-| 100 | SU-RESID-9A-UI | 未開工 | docs/SPLITUNIFY_SPEC.md R5-C5 | 隨 R-5 實作批交付（規格 v6 R5-C5） |
+| 100 | SU-RESID-9A-UI | 未開工 | docs/SPLITUNIFY_SPEC.md R5-C5 | 隨 R-5 實作批交付（規格 R5-C5） |
 | 110 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 | 120 | SU-RESID-3 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 130 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 IC 切分契約 |
