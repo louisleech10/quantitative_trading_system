@@ -73,4 +73,5 @@
 <!-- ENTRY: R-5 -->
 - 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-consult-r3/synth.md`
 - 2026-09-17：R-5 → `docs/SPLITUNIFY_SPEC.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r14/synth.md`
 <!-- HISTORY-END -->

@@ -169,13 +169,13 @@ deny-by-default 登記：canonical 恰一個，其餘同語意鍵必須逐值等
 ### C-7 GAP-3 延伸檔
 
 切分權威之變更與投影契約記於 `docs/GAP3_EVENT_UX_SPEC.D-002.md`（B1 交付）；GAP-3 原檔不解凍。
-該延伸檔須寫明投影所用 `feature_index` 為 **post-trim** universe。`R-5` 之事件掃描端行為變更**追加**條目至該延伸檔（`Task 10.4`）。
+該延伸檔須寫明投影所用 `feature_index` 為 **post-trim** universe。`R-5` 之事件掃描端行為變更**追加**條目至該延伸檔（`Task 10.3`）。
 
 ### C-8 新資料結構走 JSON 單一真相源
 
 `split_authority` 值集、fail-closed reason、`estimand_scope` 值集、`split_unify_keys`、`test_segment_count_keys`
 集中於 `momentum/Analysis/contracts/split_unify.json`；Python 與前端各自對證，禁散文複列。不含 purge reason（見 C-3）、不含 `assignment_states`。
-fail-closed reason 封閉集合（現行）＝`multi_symbol_projection_unsupported`、`missing_train_plan`、`missing_test_plan`、`canonical_feature_universe_unavailable`；`Task 10.4` 追加 `canonical_holdout_disabled`、`canonical_holdout_insufficient_rows`（R5-C3 5.）；
+fail-closed reason 封閉集合（現行）＝`multi_symbol_projection_unsupported`、`missing_train_plan`、`missing_test_plan`、`canonical_feature_universe_unavailable`；`Task 10.3` 追加 `canonical_holdout_disabled`、`canonical_holdout_insufficient_rows`（R5-C3 5.）；
 新增值須同步本節與前端對證測試。
 
 ### C-9 統一會改變數值
@@ -315,7 +315,7 @@ def derive_event_split_from_plans(
 | `C5-25` | `ic_feed` survivor 餵入端：雜湊 seam＝`event_context_from_windows` 之 `rows` 組裝，呼叫端＝`pipeline.event_context_for_analysis`〔ANCHOR `momentum/Analysis/event_samples/ic_feed.py:65` TOKENS `manifest_hash` `=` `hashlib` `.` `sha256` `(` `json` `.` `dumps` `(` `rows` `,` `sort_keys` `=` `True` `,` `separators` `=` `(` `","` `,` `":"` `)` `)` `.` `encode` `(` `"utf-8"` `)` `)` `.` `hexdigest` `(` `)`〕〔ANCHOR `momentum/Analysis/event_samples/ic_feed.py:57` TOKENS `(` `{` `"event_id"` `:` `str` `(` `w` `.` `event_id` `)` `,` `"label_start_ms"` `:` `int` `(` `w` `.` `label_start_ms` `)` `,` `"label_end_ms"` `:` `int` `(` `w` `.` `label_end_ms` `)` `}`〕〔ANCHOR `momentum/Analysis/event_samples/pipeline.py:409` TOKENS `return` `event_context_from_windows` `(`〕 | 丙 | 去重發生在 seam 內（任一呼叫端皆受保護）；同 ID 之 `label_start_ms`／`label_end_ms` 不完全相同即 raise | `Task 9.3` | `M-SU-D2-38` |
 | `C5-26` | `pipeline` 之 summary counts（`n_train`／`n_test`／`n_purged`）〔ANCHOR `momentum/Analysis/event_samples/pipeline.py:825` TOKENS `"n_train"` `:` `int` `(` `plan` `.` `assignments` `.` `loc` `[` `plan` `.` `assignments` `[` `"split_label"` `]` `==` `"train"` `,` `"event_id"` `]` `.` `nunique` `(` `)` `)` `if` `not` `plan` `.` `assignments` `.` `empty` `else` `0` `,`〕〔ANCHOR `momentum/Analysis/event_samples/pipeline.py:826` TOKENS `"n_test"` `:` `int` `(` `plan` `.` `assignments` `.` `loc` `[` `plan` `.` `assignments` `[` `"split_label"` `]` `==` `"test"` `,` `"event_id"` `]` `.` `nunique` `(` `)` `)` `if` `not` `plan` `.` `assignments` `.` `empty` `else` `0` `,`〕〔ANCHOR `momentum/Analysis/event_samples/pipeline.py:827` TOKENS `"n_purged"` `:` `int` `(` `plan` `.` `purged` `[` `"event_id"` `]` `.` `nunique` `(` `)` `)` `if` `not` `plan` `.` `purged` `.` `empty` `else` `0` `,`〕 | 丙 | 以 `event_id` 去重計數；列數另立新名 | `Task 9.4` | `M-SU-D2-13` |
 | `C5-27` | `split_projection` 之 `per_symbol_n`／`per_symbol_test_n` 與 `tier_min_test_events` 門檻〔ANCHOR `momentum/Analysis/event_samples/split_projection.py:881` TOKENS `per_symbol_n` `:` `Dict` `[` `str` `,` `int` `]` `=` `{`〕〔ANCHOR `momentum/Analysis/event_samples/split_projection.py:893` TOKENS `per_symbol_test_n` `=` `{` `s` `:` `n_test` `for` `s` `in` `per_symbol_n` `}` `,`〕〔ANCHOR `momentum/Analysis/event_samples/split_projection.py:1077` TOKENS `if` `int` `(` `per_symbol_test_n` `.` `get` `(` `s` `,` `0` `)` `)` `<` `int` `(` `tier_min_test_events` `)`〕 | 丙 | 以 `event_id` 去重計數；`per_symbol_test_n` 為內部門檻參數、不是 summary 鍵 | `Task 9.3` | `M-SU-D2-43` |
-| `C5-28` | 前端 `EventTablesPanel.tsx` 之 `train／test／purge` 計數顯示〔ANCHOR `frontend/src/components/ic-analysis/EventTablesPanel.tsx:361` LINESHA256 `2ba4a3f753f56049873446217a6e9c0be22a81235b075ab2c8c819634598ce16`〕〔非 `.py`：以正規化整行 sha256 相等＋該行在全 repo 之 `.ts`／`.tsx` 中恰好一次判定；掃描跳過 `node_modules`／`.next`／`dist`／`build`／`coverage`〕 | 丙 | 顯示值須為事件數；`R-5` 使本列首次有生產資料流，改由 `Task 10.5` 交付 | `Task 10.5` | `M-SU-R5-07` |
+| `C5-28` | 前端 `EventTablesPanel.tsx` 之 `train／test／purge` 計數顯示〔ANCHOR `frontend/src/components/ic-analysis/EventTablesPanel.tsx:361` LINESHA256 `2ba4a3f753f56049873446217a6e9c0be22a81235b075ab2c8c819634598ce16`〕〔非 `.py`：以正規化整行 sha256 相等＋該行在全 repo 之 `.ts`／`.tsx` 中恰好一次判定；掃描跳過 `node_modules`／`.next`／`dist`／`build`／`coverage`〕 | 丙 | 顯示值須為事件數；`R-5` 使本列首次有生產資料流，改由 `Task 10.4` 交付 | `Task 10.4` | `M-SU-R5-07` |
 | `C5-29` | `tables.py` 之 `assignments.set_index("event_id")["symbol"].reindex(idx)`〔ANCHOR `momentum/Analysis/event_samples/tables.py:372` TOKENS `sym` `=` `event_split_plan` `.` `assignments` `.` `set_index` `(` `"event_id"` `)` `[` `"symbol"` `]` `.` `reindex` `(` `idx` `)`〕 | 甲 | 不改碼；防誤改回歸 | `Task 9.3` | — |
 
 ### D-002-C6 事件數與列數是兩個量
@@ -334,9 +334,10 @@ def derive_event_split_from_plans(
 `time_bounds`、`row_time_fingerprint`、`purge_gap`、`embargo`、`base_universe_hash`）與 post-trim `feature_index`，
 與 IC 分析端 `ic_filter_orchestrator.analyze` 切分分支所建者**逐值相等**。
 
-決定邊界之輸入為封閉清單，缺一即兩端可能不同（偵察實跑：`purge_gap` 少算事件答案窗成分即差 7 小時；切分參數不同可差 2040 小時）：
+決定邊界（1–4）與進入投影之事件集合（5）之輸入為封閉清單，缺一即兩端可能不同（偵察實跑：`purge_gap` 少算事件答案窗成分即差 7 小時；切分參數不同可差 2040 小時）：
 1. FF run 識別 `(symbol, timeframe, config_hash)`；
 2. post-trim universe＝FF run 特徵索引 ∩ K 線期間（`_intersect_features_with_kline_period`，K 線來源＝`data_cache/feature_klines`）；
+   事件對齊所用之 bars 須載入 `trigger_timeframes ∪ {feature_run.timeframe}`，使 `receipts.per_tf` 含 run feature TF 之列（只載觸發 TF 時 `build_event_keys(selected_timeframe=feature_run.timeframe)` 必 fail-closed）；
 3. 生效 `ICConfig`（`load_ic_config(api_override=config_override)` 後經 orchestrator 之 `_apply_config_override`／`_apply_tier_config`）之
    `ic_train_test_split`、`oos_test_size`、`min_test_rows`、`embargo` 與 label horizon 來源；
 4. 事件隔離列數：`event_isolation.label_window_rows`（抬高 `purge_gap`）與 look-ahead 深度列數（抬高 `embargo`，只升不降）；
@@ -351,7 +352,7 @@ def derive_event_split_from_plans(
 3. plan 之建立沿用 `_build_holdout_split_plan`（不得另寫第二份 plan 建構）；其 `SkippedResult`（列數低於 `min_test_rows`）
    於事件掃描端依 R5-C3 5. 回 `unavailable` 與具名原因，不得以事件數另切。
 4. 下沉本身為行為不變型重構：非事件 run 報告逐位元組不變（G-2）；IC 事件 run 之報告數值於 `Task 10.2` 前後逐值不變。
-   IC 事件 run 數值之預期變動只由 R5-C7（`Task 10.3`）引入，且與本下沉分屬不同 commit。
+   本票不改 IC 事件路徑之事件歸屬規則（R5-C7）。
 
 ### R5-C3 請求與回應契約
 
@@ -359,7 +360,8 @@ def derive_event_split_from_plans(
    （語意同 IC 請求之同名欄）。**無「取最新 run」之 fallback**：`config_hash` 缺即 422，不得回退 `find_latest_materialized`。
 2. `feature_run` 缺席 ⇒ C-0 3.(ii) 既有分支，回應形狀逐位元組同 v5（`Task 3.3` 回歸）。
 3. `feature_run` 存在且解析成功 ⇒ `capability={"split":"ok"}`；`summary` 含 `n_train`／`n_test`／`n_purged`（事件數）與 `summary.split`（C-5 之 16 鍵扣 `per_symbol_n`）；
-   回應新增 `split_unify`（鍵集＝`split_unify_keys`，唯一產生點 `build_split_unify_disclosure`）與 `period_alignment`（被 coverage 剔除之事件 ID 與計數）。
+   回應新增 `split_unify`（鍵集＝`split_unify_keys`，唯一產生點 `build_split_unify_disclosure`）、`period_alignment`（被 coverage 剔除之事件 ID 與計數）與 `excluded_by_symbol`（R5-C4 2.）。
+   三個新欄須宣告於 `api/models/event_import_models.py` 之 `EventAnalyzeResponse`（該 route 以 `response_model` 序列化，未宣告之頂層鍵會被丟棄），並以 route 層測試驗其經 HTTP 回應仍在。
 4. `feature_run` 存在但**輸入錯誤**（run 不存在、`symbol`／`timeframe` 與 registry 條目不符、post-trim 交集為空、coverage 與 run symbol 過濾後零事件）⇒
    HTTP 4xx 具名錯誤，**不得**改走 event-study-only 冒充成功。
 5. `feature_run` 存在、輸入正確但**依 IC 設定沒有 canonical 邊界**（生效 `ic_train_test_split` 為關；或列數低於 `min_test_rows`，即 `_build_holdout_split_plan` 回 `SkippedResult`）⇒
@@ -376,7 +378,7 @@ def derive_event_split_from_plans(
 2. **run symbol 過濾與 IC 端同形**（IC 事件路徑之既有規則：只餵 `symbol == run symbol` 之事件，他 symbol 具名排除）：
    批內他 symbol 之事件於投影前排除，回應揭露「被排除之 symbol 與各自事件數及 `event_id`」；過濾後零事件 ⇒ R5-C3 4. 之 4xx。
    投影入口維持單標的，不以單一 run 之 plan 解釋他 symbol 之事件。
-3. 事件之 feature TF 列：`build_event_keys` 以 `selected_timeframe=feature_run.timeframe` 取用；其餘 feature TF 列數進 `discarded_rows_by_feature_tf` 並揭露。
+3. 事件之 feature TF 列：對齊時載入 `trigger_timeframes ∪ {feature_run.timeframe}`（R5-C1 2.），`build_event_keys` 以 `selected_timeframe=feature_run.timeframe` 取用；其餘 feature TF 列數進 `discarded_rows_by_feature_tf` 並揭露。
 4. coverage 剔除與 run symbol 過濾共用 IC 端之同一實作（R5-C2 2.），順序與 IC 端相同。
 
 ### R5-C5 `SU-RESID-9A-UI` 隨本批交付
@@ -390,21 +392,20 @@ def derive_event_split_from_plans(
 事件掃描端之 event-study-only 分支（C-0 3.(i)(ii)）**不得刪除**；有 FF run 之投影路徑為**新增**之對照路徑。
 同一事件批「無 FF run」與「有 FF run」兩次呼叫之 `tables` 差異屬 C-9 之預期數值變動，驗收以逐鍵 diff 揭露，不以相等斷言。
 
-### R5-C7 🔴 驗證段事件集合在兩端必須相同（邊界相同不足以保證）
+### R5-C7 🔴 兩端驗證段事件集合之對證（IC 事件歸屬規則不改）
 
-碼證：IC 事件路徑之測試段事件＝stage3 後事件列（以 run feature TF 之 `feature_cutoff_ms` 為列）落在 `test_plan.time_bounds` 閉區間者
-（`ic_filter_orchestrator._derive_stage_masks`；`metadata.split_unify.n_test = test_mask.sum()`）；
-事件掃描端投影之測試段事件＝以 `decision_at_ms` 三段式判側並經答案窗 purge 者（C-4）。兩者錨點（cutoff vs decision）與 purge 規則不同，
-邊界逐值相同時兩端之 `n_test` 仍可不同——即 §A2 要消滅之「同一批兩個驗證段數字」。
+兩端判定測試段事件之規則不同：IC 事件路徑以 stage3 保留之事件列（列時刻＝`feature_cutoff_ms`）落在 `test_plan.time_bounds` 閉區間者為測試段
+（`ic_filter_orchestrator._derive_stage_masks`；`metadata.split_unify.n_test = test_mask.sum()`）；投影 `derive_event_split_from_plans` 以 `decision_at_ms` 三段式判側（C-4；`D-002-C3` (3.1)），test 事件進 `assignments`。
+結構性質：`feature_cutoff_ms = max{close_ms ≤ decision_at_ms}`（`alignment._select_cutoff_idx`）且與 post-trim `feature_index` 同一 K 線網格時，
+`decision_at_ms ≥ test_start_ms ⇔ feature_cutoff_ms ≥ test_start_ms`；test 側事件不受答案窗 purge ⇒ 兩規則之測試段事件集合在 IC stage3 保留之事件內相等。
 
 決議：
-1. canonical 事件歸屬＝投影（`derive_event_split_from_plans`；`D-002-C3` (3.1) 已定事件級 `decision_at_ms` 錨定為正確語意）。
-2. IC 事件路徑之測試段／訓練段**事件**集合與 `metadata.split_unify.n_test` 改由同一投影導出（與事件掃描端同一次呼叫之同一函式），
-   不再以 `time_bounds` 閉區間遮罩事件列決定事件歸屬（承 C-4「禁以 `time_bounds` 閉區間取代」）。非事件 run 不受影響（G-2）。
-3. 本改動使 IC 事件 run 之 OOS 數值可能變動，屬 C-9 之預期變動：改前後逐 `event_id` 歸屬差集、`n_test`、IC 統計量之差異寫入 `handoffs/run_receipts/`，
-   不以舊 golden 擋。
-4. 驗收：同一事件批、同一 FF run、同一 `config_override` 下，IC 分析回應之測試段 `event_id` 集合與事件掃描回應之 `assignments` test 集合**集合相等**，
-   `metadata.split_unify.n_test == split_unify.n_test`（真實資料，`Task 10.6`）。
+1. IC 事件路徑之事件歸屬規則與 `metadata.split_unify.n_test` 之算法**不改**（非事件 run 與 IC 事件 run 之數值於本票皆不變）；`split_unify.json` 之 `test_segment_count_keys` 登記不變。
+2. 兩端差集之唯一合法來源＝IC stage3 未保留之事件（該事件在 IC 端無特徵列或無 label 值）；差集須逐 `event_id` 附 IC 端未保留之原因。
+   其他任何差異＝接線缺陷（K 線網格不同、cutoff 取法不同、參數不同），fail。
+3. 隔離帶內 `decision_at_ms > train_last_ms` 而 `feature_cutoff_ms ≤ train_last_ms` 之事件：投影判 purged、IC 判訓練段——兩端之訓練段／隔離之歸屬可不同，
+   不影響測試段與 `n_test`；本票不對齊，列為誠實邊界（改 IC 訓練段成員屬 C-9 數值變動，無 `n_test` 對齊收益）。
+4. 驗收：同一事件批、同一 FF run、同一 `config_override` 下，`IC 測試段 event_id 集合 == 投影 test 集合 − IC stage3 未保留且附原因之事件`（真實資料，`Task 10.5`）。
 
 ## §G Golden / Baseline
 
@@ -431,7 +432,7 @@ def derive_event_split_from_plans(
   5. 允許差異集合＝`g1_membership_v9` 與 v8 之逐 `event_id` diff，且其中每筆須同時被 `_oracle_membership` 與 fixture 之 `expected_side` 認可。
 - **D-002 (G-4e) 第三份判準**：`_event_keys()` 逐筆帶人手填入之字面 `expected_side` 與 `expected_decision_at_ms`（不可變字面，不得由 fixture 常數推導、不讀 `feature_index`、不經 `holdout_boundary`）；`main()` 先逐筆時刻對帳，再 `ASSERT 投影側 == oracle 側 == expected_side`。第三份**不得** import／呼叫投影、`_oracle_membership` 或兩者之共用 helper。誠實邊界：填值者照錯誤理解填時三份仍一致——屬 `SU-RESID-V8-ATTEST` 面 b，非機械保證。
 
-**`R-5`（`Task 10.6`）**：新增「IC 分析端與事件掃描端對同一 FF run／同一事件批之 canonical 邊界與驗證段事件集合相等」之真實資料 golden（`test_plan.row_time_fingerprint`、`test_start_ms`、`train_row_index` 逐值相等；測試段 `event_id` 集合相等；`n_test` 相等），fixture 必用 `data_cache/` 真實 FF run 與 kline，禁合成。
+**`R-5`（`Task 10.5`）**：新增「IC 分析端與事件掃描端對同一 FF run／同一事件批之 canonical 邊界逐值相等、驗證段事件集合依 R5-C7 4. 對證」之真實資料 golden（`test_plan.row_time_fingerprint`、`test_start_ms`、`train_row_index` 逐值相等；測試段 `event_id` 差集只准為 IC stage3 未保留且附原因之事件），fixture 必用 `data_cache/` 真實 FF run 與 kline，禁合成。
 
 ## §P Phase 與依賴
 
@@ -462,7 +463,7 @@ def derive_event_split_from_plans(
 
 ### Phase 10 — `R-5` 事件掃描端取得 post-trim feature universe（依賴：本檔三家戳記、使用者審閱放行、`docs/SPLITUNIFY_TODO.md` 依本版重寫並凍結）
 
-（`Task 10.1`～`Task 10.6` 之細目見下；落點與 fail-closed 以 `R5-C1`～`R5-C7` 為準。）
+（`Task 10.1`～`Task 10.5` 之細目見下；落點與 fail-closed 以 `R5-C1`～`R5-C7` 為準。）
 
 **Task 10.1 — 規格讀取者改指本檔**
 - 目標：以路徑讀取 `docs/SPLITUNIFY_SPEC.D-002.md`／`D-001.md` 之生產腳本與量化測試改讀本檔（§R0 效力 2）。
@@ -479,73 +480,68 @@ def derive_event_split_from_plans(
 
 **Task 10.2 — 事件批 canonical 邊界解析下沉 momentum（行為不變型重構）**
 - 目標：`R5-C1` 輸入 1–5 之解析與 plan 建立為 momentum 內單一入口，IC service 事件路徑改呼叫之（`R5-C2`）。
-- 輸入 / 輸出：FF run 識別、`config_override`、事件批 records 與宣告、K 線讀取器 → post-trim `feature_index`、`train_plan`／`test_plan`、coverage 與 run symbol 過濾結果、生效之 `oos_test_size`／`purge_gap`／`embargo`、`period_alignment`、無邊界之具名原因。
-- 實作要點：① 只讀 FF run 索引，不為切分載入整份特徵矩陣；② K 線讀取器固定 `data_cache/feature_klines`；③ `check_feature_run_coverage`、run symbol 過濾與 look-ahead 深度抬高 `embargo` 之規則移入 momentum，IC service 改呼叫；
-  ④ plan 由 `_build_holdout_split_plan` 建立；⑤ 請求之 `test_fraction`／`embargo_ms`／表用 `horizons` 不得餵入（R5-C3 7.）。
-- 修改檔案：`momentum/Analysis/`（新增入口或既有模組新增函式）、`momentum/factories.py`（出口）、`api/services/ic_analysis_service.py`（改呼叫）。既有 caller：`ICAnalysisService._run_event_label_stages` 與 IC 分析主流程。
-- 不可做：`momentum/` 不 import `api/`；service 不互 import；不改 `holdout_boundary` 與投影之簽名；不改 IC 任何輸出數值。
-- 邊界：① `ic_train_test_split` 關閉 ⇒ 具名原因 `canonical_holdout_disabled`；② `SkippedResult` ⇒ `canonical_holdout_insufficient_rows`；③ run 不存在／`symbol` 或 `timeframe` 不符 ⇒ 具名錯誤；④ 交集為空 ⇒ `AlignmentViolationError`（既有語意）。
-- 風險緩解：G-2；IC 事件 run 報告改前後逐鍵 diff 為空；`M-SU-R5-01`～`03`。
+- 輸入 / 輸出：FF run 識別、`config_override`、事件批 records 與宣告、K 線讀取器 → post-trim `feature_index`、`train_plan`／`test_plan`、對齊所用 bars（`trigger_timeframes ∪ {feature_run.timeframe}`）、coverage 與 run symbol 過濾結果、生效之 `oos_test_size`／`purge_gap`／`embargo`、`period_alignment`、無邊界之具名原因。
+- 實作要點：① 只讀 FF run 索引，不為切分載入整份特徵矩陣；② K 線讀取器固定 `data_cache/feature_klines`；③ bars 載入 `trigger_timeframes ∪ {feature_run.timeframe}`；④ `check_feature_run_coverage`、run symbol 過濾與 look-ahead 深度抬高 `embargo` 之規則移入 momentum，IC service 改呼叫；
+  ⑤ plan 由 `_build_holdout_split_plan` 建立；⑥ 請求之 `test_fraction`／`embargo_ms`／表用 `horizons` 不得餵入（R5-C3 7.）。
+- 修改檔案：`momentum/Analysis/event_samples/canonical_holdout.py`（新）、`momentum/factories.py`（出口）、`api/services/ic_analysis_service.py`（改呼叫）、
+  `tests/momentum/Analysis/test_splitunify_canonical_holdout.py`（新）、`scripts/splitunify_ic_event_report_diff.py`（新；IC 事件 run 報告改前後逐鍵比對）。既有 caller：`ICAnalysisService._run_event_label_stages` 與 IC 分析主流程。
+- 不可做：`momentum/` 不 import `api/`；service 不互 import；不改 `holdout_boundary` 與投影之簽名；不改 IC 任何輸出數值；不改 IC 事件歸屬規則（R5-C7 1.）。
+- 邊界：① `ic_train_test_split` 關閉 ⇒ 具名原因 `canonical_holdout_disabled`；② `SkippedResult` ⇒ `canonical_holdout_insufficient_rows`；③ run 不存在／`symbol` 或 `timeframe` 不符 ⇒ 具名錯誤；④ 交集為空 ⇒ `AlignmentViolationError`（既有語意）；⑤ 事件批觸發 TF 與 run feature TF 不同（例：12h 事件 × 1h run）為合法輸入。
+- 風險緩解：G-2；`M-SU-R5-01`～`03`、`M-SU-R5-10`。
 - **驗證**：`venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0；
-  `venv/bin/python -m pytest -q tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/api/test_splitunify_disclosure.py` 之 summary 行無 failed；
-  新入口之單元測試（檔名由 TODO 定）：`ASSERT canonical_holdout_entry WHEN ff_run=4a8a0b3726cc906ab3534994605e77f5 config_override=none THEN rc=0`（`test_plan.row_index` 與 `_build_holdout_split_plan` 逐值相等）；
-  真實事件批之 IC 報告改前後逐鍵 diff 輸出為空（receipt 寫入 `handoffs/run_receipts/`）。
+  `venv/bin/python -m pytest -q tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/api/test_splitunify_disclosure.py tests/momentum/Analysis/test_splitunify_canonical_holdout.py` 之 summary 行無 failed；
+  `ASSERT canonical_holdout_entry WHEN ff_run=4a8a0b3726cc906ab3534994605e77f5 config_override=none THEN rc=0`（`test_plan.row_index` 與 `row_time_fingerprint` 與 `_build_holdout_split_plan` 逐值相等）；
+  `ASSERT canonical_holdout_entry WHEN trigger_timeframe=12h feature_run_timeframe=1h THEN rc=0`（`receipts.per_tf` 含 1h 列，`build_event_keys(selected_timeframe="1h")` 不 raise）；
+  `ASSERT splitunify_ic_event_report_diff WHEN baseline=pre_task_10_2 candidate=post_task_10_2 THEN rc=0`（真實事件批之 IC 報告逐鍵 diff 為空；receipt 寫入 `handoffs/run_receipts/`）；
+  `ASSERT splitunify_ic_event_report_diff WHEN candidate_embargo_raise_removed=true THEN rc!=0`。
 - **存活至**：全票完工後保留（唯一邊界解析入口）。
-- **覆蓋風險**：`Task 10.3`／`10.4` 只新增 caller，不改本入口簽名。
+- **覆蓋風險**：`Task 10.3` 只新增 caller，不改本入口簽名。
 
-**Task 10.3 — IC 事件路徑之事件歸屬改由投影導出（R5-C7）**
-- 目標：IC 事件 run 之測試段／訓練段事件集合與 `metadata.split_unify.n_test` 由 `derive_event_split_from_plans` 導出，與事件掃描端同一函式。
-- 修改檔案：`momentum/Analysis/ic_filter_orchestrator.py`（事件路徑之事件歸屬與 `split_unify` 揭露）、必要時 `api/services/ic_analysis_service.py`（傳遞投影所需之事件鍵）。既有 caller：IC 分析主流程、`tests/api/test_splitunify_disclosure.py`。
-- 不可做：不動非事件 run；不改投影簽名；不以 `time_bounds` 閉區間決定事件歸屬；不刪 `test_segment_count_keys` 之 deny-by-default 登記。
-- 邊界：① 事件列之 `feature_cutoff_ms` 與 `decision_at_ms` 不同之事件須有 fixture；② 答案窗跨界之 train 事件在 IC 端亦不進訓練段。
-- 風險緩解：C-9 差異 receipt；`M-SU-R5-09`。
-- **驗證**：`venv/bin/python -m pytest -q tests/api/test_splitunify_disclosure.py` 之 summary 行無 failed；新增測試：
-  `ASSERT ic_event_membership WHEN decision_in_test=true cutoff_in_train=true THEN rc=0`（該事件計入 IC 之測試段事件）；
-  `ASSERT ic_event_membership WHEN train_event_label_end_ge_test_start=true THEN rc=0`（該事件不計入訓練段與測試段）；
-  改前後真實事件批之 `event_id` 歸屬差集、`n_test` 與 IC 統計量差異寫入 `handoffs/run_receipts/`。
-- **存活至**：全票完工後保留。
-- **覆蓋風險**：`Task 10.6` 之兩端對證以本 Task 之結果為前提。
-
-**Task 10.4 — 事件掃描端接線**
+**Task 10.3 — 事件掃描端接線**
 - 目標：`EventImportService.analyze` 依 C-0 3. 分派；帶 FF run 時經 `Task 10.2` 入口取邊界並呼叫 `EventSamplePipeline.run(train_plan=, test_plan=, feature_index=, selected_timeframe=)`（`R5-C3`～`R5-C6`）。
-- 修改檔案：`api/services/case_import_service.py`、`api/models/event_import_models.py`、`momentum/Analysis/contracts/split_unify.json`（新增兩個原因值）、`tests/momentum/Analysis/test_splitunify_contract.py`（原因集合 exact-set 同步）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`（追加條目）。既有 caller：`api/routes/` 之事件 analyze 端點。
+- 修改檔案：`api/services/case_import_service.py`、`api/models/event_import_models.py`（請求 `feature_run`／`config_override`；回應 `split_unify`／`period_alignment`／`excluded_by_symbol`）、`momentum/Analysis/contracts/split_unify.json`（新增兩個原因值）、
+  `tests/momentum/Analysis/test_splitunify_contract.py`（原因集合 exact-set 同步）、`tests/api/test_splitunify_event_scan_projection.py`（新；含 route 層測試）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`（追加條目）。既有 caller：`api/routes/case.py` 之事件 analyze 端點。
 - 不可做：不得刪除 event-study-only 分支；不得回退「取最新 run」；不得以 `test_fraction`／`embargo_ms` 決定邊界；不得以單一 run 之 plan 解釋他 symbol 之事件。
 - 邊界：① 無 `feature_run` ⇒ 回應逐位元組同 v5；② 深度不可證優先；③ 批內 1 筆界外 ⇒ 成功、揭露該 `event_id`、其餘事件切分；④ 過濾後零事件 ⇒ 4xx；⑤ 多 symbol 批 ⇒ 只投影 run symbol 並揭露他 symbol 之排除。
-- 風險緩解：`M-SU-R5-04`～`06`；register `C5-26` 之 ANCHOR 若移動依 (5.7) 重出。
-- **驗證**：`venv/bin/python -m pytest -q tests/api/test_splitunify_event_study_only.py tests/momentum/Analysis/test_splitunify_contract.py` 之 summary 行無 failed；新增 API 測試逐條：
+- 風險緩解：`M-SU-R5-04`～`06`、`M-SU-R5-11`；register `C5-26` 之 ANCHOR 若移動依 (5.7) 重出。
+- **驗證**：`venv/bin/python -m pytest -q tests/api/test_splitunify_event_study_only.py tests/momentum/Analysis/test_splitunify_contract.py tests/api/test_splitunify_event_scan_projection.py` 之 summary 行無 failed；其中逐條：
   `ASSERT EventImportService.analyze WHEN feature_run=absent THEN rc=0`（回應與 v5 相同）；
   `ASSERT EventImportService.analyze WHEN feature_run=valid lookahead_blocked=false THEN rc=0`（`capability.split=ok`，含三計數鍵與 `split_unify`）；
   `ASSERT EventImportService.analyze WHEN feature_run=valid lookahead_blocked=true THEN rc=0`（reason 為深度不可證）；
   `ASSERT EventImportService.analyze WHEN feature_run=unknown_config_hash THEN rc!=0`；
   `ASSERT EventImportService.analyze WHEN feature_run=valid batch_symbols=2 THEN rc=0`（揭露他 symbol 排除）；
   `ASSERT EventImportService.analyze WHEN feature_run=valid one_event_out_of_range=true THEN rc=0`（揭露該 `event_id`）；
-  `ASSERT EventImportService.analyze WHEN feature_run=valid ic_train_test_split=false THEN rc=0`（reason＝`canonical_holdout_disabled`，無三計數鍵）。
+  `ASSERT EventImportService.analyze WHEN feature_run=valid ic_train_test_split=false THEN rc=0`（reason＝`canonical_holdout_disabled`，無三計數鍵）；
+  `ASSERT POST_case_events_analyze_route WHEN feature_run=valid THEN rc=0`（HTTP 回應 JSON 含 `split_unify`、`period_alignment`、`excluded_by_symbol` 三鍵且值與 service 回傳相同）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`R-3`（UAT）只新增 UAT 條目，不改本接線。
 
-**Task 10.5 — 前端**
+**Task 10.4 — 前端**
 - 目標：IC 分析頁把已選之 `(symbol, timeframe, config_hash)` 與 `buildConfigOverride` 之結果傳入事件掃描請求；`capability.split=ok` 時顯示事件數計數、`split_unify` 揭露、被排除事件與 `discarded_rows_by_feature_tf`（`R5-C5`、`C5-28`）。
-- 修改檔案：`frontend/src/lib/api.ts`、`frontend/src/lib/types.ts`、`frontend/src/lib/splitCapability.ts`、`frontend/src/components/ic-analysis/EventTablesPanel.tsx`、`frontend/src/app/ic-analysis/page.tsx`。既有 caller：IC 分析頁。
+- 修改檔案：`frontend/src/lib/api.ts`、`frontend/src/lib/types.ts`、`frontend/src/lib/splitCapability.ts`、`frontend/src/components/ic-analysis/EventTablesPanel.tsx`、`frontend/src/app/ic-analysis/page.tsx`、
+  `frontend/src/components/ic-analysis/eventTablesPanelSplitOk.test.tsx`（新）。既有 caller：IC 分析頁。
 - 不可做：不得自行 auto-discover run；不得在 `unavailable` 時顯示計數；不得手打契約字面。
 - 邊界：① 頁面未選 run ⇒ 不送 `feature_run`；② `discarded` 為空 ⇒ 不顯示該列；③ 四條 unavailable reason 文案兩兩可分辨。
 - 風險緩解：`M-SU-R5-07`；`C5-28` 之 ANCHOR 行隨本 Task 移動 ⇒ 同 commit 依 (5.7) 重出。
-- **驗證**：`cd frontend && node_modules/.bin/vitest run src/components/ic-analysis/eventTablesPanelCapability.test.tsx` 與新增 vitest（檔名由 TODO 定）rc=0；`cd frontend && npm run build` rc=0。
+- **驗證**：`cd frontend && node_modules/.bin/vitest run src/components/ic-analysis/eventTablesPanelCapability.test.tsx src/components/ic-analysis/eventTablesPanelSplitOk.test.tsx` rc=0；`cd frontend && npm run build` rc=0。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無後續 Phase 改動本畫面。
 
-**Task 10.6 — 真實資料兩端對證與收尾登記**
-- 目標：§G 之 `R-5` 對證 golden（邊界與驗證段事件集合）；UAT 條目登記（不執行）。
-- 修改檔案：對證腳本（新增，路徑由 TODO 定）、`tests/golden/splitunify/`（新增鍵）、`docs/SPLITUNIFY_TODO.md` §E `R-3` 列之 UAT 項目。
-- 不可做：禁合成 fixture；不得改既有 golden 鍵值；不執行 UAT。
-- 邊界：① 至少一組 FF run 期間與 K 線期間不同而發生裁切之真實組合；② 對證比對 `test_plan.row_time_fingerprint`、`test_start_ms` 與測試段 `event_id` 集合，不以 `boundary_hash` 代替。
-- 風險緩解：`M-SU-R5-08`。
-- **驗證**：對證腳本 rc=0；手改一側 `oos_test_size` 後 rc=1 且輸出兩側 `test_start_ms`；手改一側事件歸屬規則後 rc=1 且輸出差集之 `event_id`。
+**Task 10.5 — 真實資料兩端對證與收尾登記**
+- 目標：§G 之 `R-5` 對證 golden（邊界逐值、驗證段事件集合依 R5-C7 4.）；UAT 條目登記（不執行）。
+- 修改檔案：`scripts/splitunify_r5_parity.py`（新）、`tests/golden/splitunify/r5_parity.json`（新）、`docs/SPLITUNIFY_TODO.md` §E `R-3` 列之 UAT 項目。
+- 不可做：禁合成 fixture；不得改既有 golden 鍵值；不執行 UAT；不改 IC 事件歸屬規則。
+- 邊界：① 至少一組觸發 TF 與 run feature TF 不同之真實組合（12h 事件 × 1h run）；② 至少一組 FF run 期間與 K 線期間不同而發生裁切之真實組合；③ 對證比對 `test_plan.row_time_fingerprint`、`test_start_ms` 與測試段 `event_id` 集合，不以 `boundary_hash` 代替。
+- 風險緩解：`M-SU-R5-08`、`M-SU-R5-09`。
+- **驗證**：`venv/bin/python scripts/splitunify_r5_parity.py` rc=0；
+  `ASSERT splitunify_r5_parity WHEN one_side_oos_test_size=0.3 THEN rc!=0`（輸出兩側 `test_start_ms`）；
+  `ASSERT splitunify_r5_parity WHEN diff_event_without_ic_drop_reason=true THEN rc!=0`（輸出該 `event_id`）。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：無後續 Phase。
 
 **`R-5` mutation**（接續 §V 目錄）：`M-SU-R5-01` 事件端以 `test_fraction` 當 `oos_test_size`；`M-SU-R5-02` 事件端 `purge_gap` 只取 `effective_horizon`；`M-SU-R5-03` 事件端不抬高 `embargo`；
 `M-SU-R5-04` 略過 coverage 剔除；`M-SU-R5-05` `config_hash` 缺時回退最新 run；`M-SU-R5-06` 刪除 event-study-only 分支；`M-SU-R5-07` `unavailable` 時仍顯示計數或 `ok` 時不顯示 `discarded`；
-`M-SU-R5-08` 對證腳本只比 `boundary_hash`；`M-SU-R5-09` IC 事件路徑之事件歸屬退回 `time_bounds` 遮罩。
+`M-SU-R5-08` 對證腳本只比 `boundary_hash`；`M-SU-R5-09` 對證腳本接受未附 IC 未保留原因之差集；`M-SU-R5-10` canonical 解析只載入觸發 TF 之 bars；`M-SU-R5-11` `EventAnalyzeResponse` 未宣告新欄致 route 序列化丟欄。
 
 ## §V 驗證策略與邊界測試目錄
 
@@ -680,14 +676,14 @@ benchmark：投影 O(n log n) 以內；門檻先量一次再定，不寫死未�
 ## §R 回退
 
 - 既有批次各自獨立 commit；Phase 9B（`Task 9.2`／`9.2a`）須整批回退，不得部分上線。
-- `R-5`：`Task 10.2`（共用解析下沉）、`Task 10.3`（IC 事件歸屬改由投影）、`Task 10.4`（事件掃描端接線）分屬不同 commit；回退 `10.4` 即回到 v5 之 event-study-only 行為（C-0 3.(ii) 分支始終存在）；回退 `10.3` 即回到 IC 事件路徑之 `time_bounds` 事件歸屬；`10.2` 回退須連同 G-2 驗證。
+- `R-5`：`Task 10.2`（共用解析下沉）與 `Task 10.3`（事件掃描端接線）分屬不同 commit；回退 `10.3` 即回到 v5 之 event-study-only 行為（C-0 3.(ii) 分支始終存在）；`10.2` 回退須連同 G-2 與 IC 事件 run 報告逐鍵比對驗證。
 
 ## §N N/A 登記與殘留
 
 **N/A 登記**：本版無省略之必填段。
 
 **殘留**（每條帶 `為何現在不做:`；狀態之唯一權威＝`scripts/fact_keys.json` 之 `splitunify-residual-status`，本節不寫狀態）：
-- `R-3` UAT 項目更新 — `為何現在不做: user-ruling:2026-09-10 使用者裁定 UAT 一律最後`；觸發：SPLITUNIFY 與 GLOBALH 之實作批次皆收批；登記處：`docs/SPLITUNIFY_TODO.md` §E。`R-5` 之 UAT 項只登記、不做（`Task 10.6`）。
+- `R-3` UAT 項目更新 — `為何現在不做: user-ruling:2026-09-10 使用者裁定 UAT 一律最後`；觸發：SPLITUNIFY 與 GLOBALH 之實作批次皆收批；登記處：`docs/SPLITUNIFY_TODO.md` §E。`R-5` 之 UAT 項只登記、不做（`Task 10.5`）。
 - `R-4` `pattern_bridge.extract_event_patterns` 無 production caller（測試 caller 8 處） — `為何現在不做: blocked-by:接線屬 GAP-3 另一票`；本票只保證其消費之 `assignments` 語意不變；觸發：該接線票開票。
 - `SU-RESID-1` attribution checker 擋不住語意歸屬錯置 — `為何現在不做: needs-research:語意對應無機械判準`；可機械化之半已由 `scripts/_synth_attr.py` 落實；具名限制、實測與觸發條件以 `docs/SPLITUNIFY_TODO.md` §E 同名列為權威。
 - `SU-RESID-4` `SplitPlan.row_index`（全框）與 `row_index_local`（標的內）並存 — `為何現在不做: needs-research:是否把 row_index 本身改為 symbol-local 並遷移 IC 主線全框驗證與既有 golden`；完成判準：列出所有依賴全框語意之消費端並給出可證偽之遷移測試；觸發：下一次動 IC 切分契約。
