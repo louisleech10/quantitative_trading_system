@@ -1,8 +1,8 @@
 # SPLITUNIFY — TODO
 
-> 🔴 **規格已 R 重開（2026-09-17）**：`docs/SPLITUNIFY_SPEC.md` 現為 v6（對抗審中），`docs/SPLITUNIFY_SPEC.D-001.md`／`D-002.md` 全量失效。
-> 本 TODO §0「本票之落點裁定（R2 之 D1）」一段與 v6 C-0 第 3 點互斥，以 v6 為準；Phase 10（`R-5`）之施工細目待 v6 三家戳記與使用者審閱放行後依 v6 重寫本檔。
-> 下方各批次之施工紀錄與存續義務不受影響（存續義務之權威改為 v6 §P「既有批次之存續義務」表）。
+> 🔴 **規格已 R 重開（2026-09-18 現行 v7，三家戳記、使用者放行）**：`docs/SPLITUNIFY_SPEC.md` 為 v7，`docs/SPLITUNIFY_SPEC.D-001.md`／`D-002.md` 全量失效。
+> 本 TODO §0「本票之落點裁定（R2 之 D1）」一段與 v7 C-0 第 3 點互斥，以 v7 為準；Phase 10（`R-5`）之施工細目見 §C-10，mutation 見 §D-10。
+> 下方各批次之施工紀錄與存續義務不受影響（存續義務之權威＝v7 §P「既有批次之存續義務」表）。
 
 **SPEC**：`docs/SPLITUNIFY_SPEC.md`（**v4**）　**票**：`SPLITUNIFY`　**日期**：2026-09-11　**狀態**：**v5（B1 放行版）**。
 **R3 審收斂**：`handoffs/reconcile/20260911-splitunify-x-review-r3/synth.md`（E1–E7）——
@@ -45,8 +45,9 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
      （`label_end_ms` 進測試段或 source bars 缺 endpoint ⇒ purged），**再**做集合判定。
      少了第一段等於刪掉 `event_split.py:114` 那道唯一擋標籤窗跨界洩漏的閘，
      直接違反「不得刪除任一既有 guard」。
-- **本票之落點裁定（R2 之 D1）**：事件掃描端（`EventImportService`）**恆走** event-study-only，
-  本票**不新增** universe 供給路徑（列為殘留 `R-5`）。IC 路徑才傳 canonical boundary。
+- **本票之落點裁定（🔴 v7 改寫，取代 R2 之 D1）**：事件掃描端（`EventImportService`）依 v7 C-0 第 3 點三態分派——
+  深度不可證或未帶 FF run ⇒ event-study-only（`Task 3.3` 分支保留）；帶 FF run ⇒ 取 canonical 邊界並走投影（`Task 10.5`）。
+  改寫前之敘述見 `handoffs/reconcile/20260911-splitunify-x-consult-r4/synth.md` 與 v7 §R0。
 - **防假綠**：驗收讀 pytest 自己的 summary 行（非 harness rc）；
   🔴 既有紅**逐條** `--deselect`（`tests/baselines/analysis_known_failures.nodeids`），
   **禁**寫「failed <= N」這類聚合期望數（R1 之 C3；grok 與 composer 各標 P0）。
@@ -72,6 +73,11 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | **B9C** | 9.2b | impl `a1e9680e`；審碼 r27，閉合 r28–r35 共九輪＋stamp-r6＋consult-r3/r4/r5；🔴 **consult-r4/r5 三家一致判定方向反轉**（見 `Task 9.3`）；~~現待 review 覆核 v32＋重簽~~ v32 之覆核與重簽已於 r36–r47 走完，方向反轉之退回由 `Task 9.3`（`4dcae642`）落地 | B9B | 側別改 `decision_at_ms` 錨定 ＋ `(3.2)` 跨表互斥；鍵不唯一時「同側」無定義，故須在複合鍵已存在後 | 大 |
 | **B9D** | 9.3 | impl `4dcae642`；審碼 r48 兩家 APPROVED v40、stamp-r7 覆核補測並戳記授權依據；Tier 0 同一 commit | B9C | 🔴 **v35 更正（v32 方向反轉後 §B 未同步）**：現行＝**把 `assignments`／`purged` 退回事件級＋同步計數**（具名 seam；Tier 0 同 commit）；下游表已改為追溯用、多數維持現狀；前端 `byEventId` owner 移 `Task 9.5`。以下原文保留供追溯：~~`Task 9.3` 表列**九處**逐處處置~~（七個下游消費模組——`feature_materialization`／`tables`／`ic_feed`／`counterexample_classifier`／`candidate_ledger`／`dedupe`／`pattern_bridge`——＋ event-level 表／manifest 與前端 `byEventId` 兩個支撐面，共九列；多為**防誤改**回歸測試，非改碼）。🔴 R13 `CODEX-R13-P2-03`：本欄原寫「六個下游消費面」與表列九列不符，已改為與表列一致 | 中 |
 | **B9E** | 9.4 | 審碼 r49 兩家 APPROVED v41、stamp-r8 戳記授權依據；commit 前工作區審碼，SPEC 隨之 v41 重出錨點 | B9C ＋ 🔴 **B9D**（v36，`CODEX-R39-P1-05`：報告／baseline 驗收依賴事件級輸出與計數完成） | 記帳鏈與 `baseline` 拆鍵（投影計數已移 `Task 9.3`） | 中 |
+| **B10A** | 10.1, 10.2 | — | v7 三家戳記＋使用者 2026-09-18 放行 | 讀取者改指與 IC 事件特徵列鍵更正同批：改指後之 freeze／錨點閘正是鍵更正之回歸面 | 大 |
+| **B10B** | 10.3 | — | B10A | 投影錨點與 v10 golden 一體，拆批會讓 oracle 與投影一邊新一邊舊 | 大 |
+| **B10C** | 10.4 | — | B10B | 邊界與標籤參數解析下沉＋處置帳；行為不變型重構，基準＝B10A 落地後 | 大 |
+| **B10D** | 10.5 | — | B10C | 事件掃描端接線與請求／回應契約（唯一新增生產呼叫點） | 大 |
+| **B10E** | 10.6, 10.7 | — | B10D | 前端顯示與真實資料兩端對證同批；對證需畫面所用之同一組回應欄 | 中 |
 | **B9F** | 9.5 | 審碼 r50 兩家 APPROVED v41，`CODEX-R50-P2-01` 當輪修掉並經 stamp-r9 由原提出方關閉；stamp-r9 戳記授權依據 | B9D ＋ B9E | golden 多 TF／交錯平行組與前端 `byEventId`；🔴 v36 澄清：decision-anchor 換錨已於 B9C 完成，本批不重做側別換錨；整合後比對舊單 TF 值、依既定允許面凍結新組 | 大 |
 
 <!-- BEGIN GENERATED: splitunify-batch-status -->
@@ -89,6 +95,11 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | 100 | B9D | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 110 | B9E | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 120 | B9F | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
+| 130 | SU-B10A | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.1 讀取者改指＋Task 10.2 IC 事件特徵列鍵更正 |
+| 140 | SU-B10B | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
+| 150 | SU-B10C | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
+| 160 | SU-B10D | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 事件掃描端接線與請求／回應契約 |
+| 170 | SU-B10E | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.6 前端＋Task 10.7 真實資料兩端對證與 UAT 登記 |
 <!-- END GENERATED: splitunify-batch-status -->
 
 🔴 **Phase 9 依賴序（`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md` 裁定；三家＋主委獨立版四方一致）**：
@@ -1055,6 +1066,221 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 
 ---
 
+## §C-10 Phase 10 Task 細目（`R-5`；SPEC v7）
+
+🔴 **順序不可調**：`10.1` → `10.2` → `10.3` → `10.4` → `10.5` → `10.6` → `10.7`；`10.2` 未收批前不得開其後任一 Task（SPEC §P Phase 10 前言）。
+🔴 **本 Phase 之共通禁令**（SPEC `R5-C9` 9.、§A 6.；使用者 2026-09-18 放行 v7 時重申）：`R5-C9` 之未來資訊修正與其驗收**不得**降級為 §E 具名殘留、不得以「另票」延後。
+🔴 **每批交付前**：跑 §D-10 之 mutation 自證（紅只認 rc=1），並以 `bash scripts/review_quorum_check.sh` 驗前批 quorum。
+
+### Task 10.1（B10A）—— 規格讀取者改指主規格（`票 SPLITUNIFY`）
+- SPEC ref：§R0 效力 2；§P Phase 10 `Task 10.1`
+- 目標：以路徑讀取 `docs/SPLITUNIFY_SPEC.D-002.md`／`D-001.md` 之生產腳本與量化測試改讀 `docs/SPLITUNIFY_SPEC.md`。
+- 輸入 / 輸出：無行為輸出改變；只改常數路徑。
+- 實作要點：
+  1. `scripts/freeze_splitunify_golden.py` 之 `_SPEC_PATH`、`scripts/register_anchor_check.py` 之 `SPEC_PATH` 改指主規格。
+  2. 四個測試檔中以 `SPLITUNIFY_SPEC.D-00` 字面定位規格之處一併改指。
+  3. 改指前後各跑一次 freeze 比對與錨點閘，輸出除路徑字面外逐行相同（貼兩次輸出到 commit 訊息或 receipt）。
+- 修改檔案：`scripts/freeze_splitunify_golden.py`、`scripts/register_anchor_check.py`、`tests/momentum/Analysis/test_splitunify_golden.py`、`tests/momentum/core/test_splitunify_producer_attest.py`、`tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py`、`tests/momentum/event_samples/test_splitunify_m5_coords_probe.py`。既有 caller：無新增。
+- 不可做：不改 `D-001`／`D-002` 之內容；不改 `tests/governance/` 之殘留清單斷言；不改任何錨點值。
+- 邊界：① 主規格 §V 恰一行 `V8_BASELINE_SHA256=`；② register 之 ANCHOR 子句與 `D-002` 逐字相同（否則錨點閘會紅）。
+- 風險緩解：無新 mutation；以改指前後輸出逐行相同自證。
+- **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
+  - `venv/bin/python scripts/freeze_splitunify_golden.py` rc=0
+  - `venv/bin/python scripts/register_anchor_check.py` rc=0 且輸出「共 22 個錨點，全數通過」
+  - `venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_golden.py tests/momentum/core/test_splitunify_producer_attest.py tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py tests/momentum/event_samples/test_splitunify_m5_coords_probe.py` summary 行無 failed
+  - `grep -rn 'SPLITUNIFY_SPEC.D-00' scripts/freeze_splitunify_golden.py scripts/register_anchor_check.py tests/momentum` 零命中
+- **存活至**：全票完工後保留。
+- **覆蓋風險**：後續 Task 改動 register ANCHOR 所指碼行時依 `D-002-C5` (5.7) 重出子句，不回改本 Task 之路徑。
+
+### Task 10.2（B10A）—— IC 事件路徑特徵列鍵更正（`票 SPLITUNIFY`）
+- SPEC ref：`R5-C9` 1.–5.、7.、8.；§G `R5-C9` golden；§P Phase 10 `Task 10.2`
+- 目標：IC 事件分析每個事件只使用「決策時點之前已收盤之最後一根特徵 run 週期 K 線」之特徵列，消除現行晚一根之未來資訊。
+- 輸入 / 輸出：
+  - 新增 `feature_row_open_ms(prepared, event_id, feature_timeframe) -> int`（暫名，實作時定於 `label_value_from_case.py` 並經 pipeline／factories 出口暴露），值取自對齊收據之 `last_bar_open_ms`。
+  - `prepare_analysis_windows(..., feature_timeframe: Optional[str] = None)`：給定時，對齊週期集合為 `trigger_timeframes ∪ {feature_timeframe}`，`per_tf` 含該週期之列。
+  - `PerTfRow` 由三鍵增為四鍵（加 `last_bar_open_ms`）；`analysis_alignment_receipt_hash` 之 `per_tf` payload 隨之。
+- 實作要點：
+  1. `api/services/ic_analysis_service.py::_run_event_label_stages`：bars 載入 `trigger_timeframes ∪ {request.timeframe}`；`prepare_analysis_windows` 傳 `feature_timeframe=request.timeframe`；`ts_map`／`event_binary_labels`／`by_id`／`event_label_owners` 之鍵一律改由鍵函式取得。🔴 同檔之逐格掃描路徑同改（同一入口）。
+  2. **產出端 PIT 守衛**（`R5-C9` 5.）：鍵函式內逐事件驗 `last_bar_open_ms < feature_cutoff_ms <= decision_at_ms`，違反即 raise（具名訊息含 `event_id`、feature TF、三個時刻）。守衛住 momentum 單一函式，**不得**只寫在測試。
+  3. 事件缺 `(event_id, feature_timeframe)` 列 ⇒ fail-closed，訊息含 `event_id` 與該週期；**不得**回退觸發週期之列、不得略過該事件。
+  4. `PerTfRow` 第四欄取自對齊收據同名欄；**不得**以 `feature_cutoff_ms` 減週期長度推導。GAP-3 主檔不解凍，第四欄以追加條目寫入 `docs/GAP3_EVENT_UX_SPEC.D-002.md`。
+  5. 舊鍵語意之說明同步：`momentum/core/split_preview.py:379`、`momentum/Analysis/ic_filter_orchestrator.py:1195`／`:1707`、`momentum/Analysis/event_samples/ic_feed.py:9`、`tests/momentum/Analysis/test_evtlabel_stage3.py:42`。
+  6. 數值變動揭露：`scripts/splitunify_ic_event_report_diff.py`（新）以真實事件批跑改前／改後 IC 報告逐鍵 diff，`--allow-diff` 模式寫 receipt 到 `handoffs/run_receipts/`；受影響之既有 golden 以實跑列舉後同 commit 依各自授權流程重凍。
+- 修改檔案：`momentum/Analysis/event_samples/label_value_from_case.py`、`momentum/Analysis/event_samples/pipeline.py`、`momentum/factories.py`、`api/services/ic_analysis_service.py`、`momentum/core/split_preview.py`、`momentum/Analysis/ic_filter_orchestrator.py`（註解）、`momentum/Analysis/event_samples/ic_feed.py`（註解）、`tests/momentum/Analysis/test_evtlabel_stage3.py`（註解）、`tests/api/test_gap3_event_analysis_horizon_purge.py`、`tests/momentum/event_samples/test_ic_event_feature_row_key.py`（新）、`scripts/freeze_ic_event_row_key_golden.py`（新）、`tests/golden/splitunify/ic_event_row_key.json`（新）、`scripts/splitunify_ic_event_report_diff.py`（新）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`。
+  既有 caller：`ICAnalysisService._run_event_label_stages`（含逐格掃描路徑）、`EventImportService.build_random_control_batch`（不傳 `feature_timeframe`，行為不變）。
+- 不可做：不得以 `feature_cutoff_ms` 減週期長度推導鍵；不得只載觸發週期之 bars；不得刪除或放寬既有斷言；不得改非事件 run 之輸出（G-2）；不得改 FF 之對齊慣例；本 Task 任一部分不得轉列 §E 殘留。
+- 邊界：① 12h 事件 × 12h run：鍵＝`decision_at_ms − 43200000`；② 12h 事件 × 1h run：鍵＝`decision_at_ms − 3600000`；③ 1h 事件 × 12h run：鍵＝收盤 ≤ `decision_at_ms` 之最後一根 12h 之開盤（**非網格對齊**）；④ 特徵 run 週期之 bars 起點晚於事件致該列缺 ⇒ 具名 fail-closed；⑤ `decision_offset_bars ≥ 1` ⇒ 鍵隨 `decision_at_ms` 前移；⑥ 多 symbol 批之他 symbol 事件維持既有排除。
+- 風險緩解：`M-SU-R5-16`、`M-SU-R5-17`、`M-SU-R5-18`；G-2。
+- **驗證**（1h 單週期批＝`data_cache/events/20260901T132233Z-363ecc4f.json` 之 14 筆 1h 記錄經匯入流程另存；不得手造 `t0`）：
+  - `venv/bin/python scripts/freeze_ic_event_row_key_golden.py` rc=0
+  - `venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0
+  - `venv/bin/python -m pytest -q tests/momentum/event_samples/test_ic_event_feature_row_key.py tests/api/test_gap3_event_analysis_horizon_purge.py tests/api/test_gap3_feature_coverage_gate.py tests/momentum/event_samples/test_gap3_analysis_label_producer.py tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py tests/momentum/event_samples/test_gap3_label_feasible_bounds.py tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py` summary 行無 failed，且須含下列具名測試皆 pass：
+    - `test_stage3_selected_rows_close_le_decision_12h_events_1h_run`（批 `20260909T130533Z-7f73e4c7` × run `4a8a0b3726cc906ab3534994605e77f5`：165 事件之選中列時刻皆＝`decision_at_ms − 3600000`，且 `1h_L1_momentum_BOP` 值等於「收盤 ≤ `decision_at_ms`」那根 kline 之 BOP）
+    - `test_stage3_selected_rows_close_le_decision_12h_events_12h_run`（同批 × run `e53e22906c35363757f4cd49d27f973e`）
+    - `test_stage3_selected_rows_close_le_decision_1h_events_12h_run_off_grid`（1h 單週期批 × 12h run、分析用 `decision_offset_bars=5`；**前置條件**：fixture 中至少一筆 `last_bar_open_ms != decision_at_ms − 43200000`，不成立即 fail）
+    - `test_pit_guard_rejects_cutoff_key`（鍵改回 `feature_cutoff_ms` ⇒ raise，訊息含第一個違規 `event_id`）
+    - `test_alignment_timeframes_union_required`（只載觸發週期 ⇒ 12h 事件 × 1h run 具名 fail-closed）
+    - `test_prepare_analysis_windows_missing_feature_tf_row_fail_closed`（訊息含 `event_id` 與週期字面）
+    - `test_random_control_batch_unchanged_without_feature_timeframe`（`build_random_control_batch` 產出之 records 與改前逐值相同）
+  - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode allow-diff --baseline pre_task_10_2 --candidate post_task_10_2` rc=0（receipt 寫入 `handoffs/run_receipts/`，內含條件 IC 前後值）
+  - mutation 自證（實跑並貼 rc）：`M-SU-R5-16` 鍵改回 `feature_cutoff_ms` ⇒ 前三條轉紅；`M-SU-R5-17` 只載觸發週期 ⇒ `test_alignment_timeframes_union_required` 轉紅；`M-SU-R5-18` 移除 PIT 守衛 ⇒ `test_pit_guard_rejects_cutoff_key` 轉紅
+- **存活至**：全票完工後保留。
+- **覆蓋風險**：`Task 10.4` 下沉解析時不得改鍵函式簽名；`Task 10.3`／`10.7` 以同一 `last_bar_open_ms` 欄為錨，不另算。
+
+### Task 10.3（B10B）—— 投影判側錨點改為特徵列鍵（`票 SPLITUNIFY`）
+- SPEC ref：C-4（`universe_timeframe`／`anchor_ms`／PIT 前置／`EVENT_KEY_COLUMNS`）；`D-002-C3` (3.1)；§G (G-4)(G-4c)(G-4d) 第 6 點與 (G-4e)
+- 目標：投影（`split_projection.py`）以 IC 實際消費之特徵列時刻判側，使兩端驗證段事件集合結構相等。
+- 輸入 / 輸出：`derive_event_split_from_plans(..., universe_timeframe: str)`（必填、無預設）；`EVENT_KEY_COLUMNS` 增 `last_bar_open_ms`；每事件 `anchor_ms`＝該週期列之 `last_bar_open_ms`。
+- 實作要點：
+  1. `build_event_keys` 由 `receipts.per_tf` 同名欄帶出 `last_bar_open_ms`；缺值 fail-closed。
+  2. `_derive_single_symbol` 之步驟 0④ 與三段式改用 `anchor_ms`；答案窗 purge（`label_end_ms >= test_start_ms`）不變。
+  3. PIT 前置：每事件驗 `anchor_ms < feature_cutoff_ms <= decision_at_ms`，違反即 raise。
+  4. 事件級欄一致性檢查加入 `anchor_ms`（同一 `event_id` 不唯一即 `AlignmentViolationError`）。
+  5. `scripts/freeze_splitunify_golden.py`：`_oracle_membership` 改以 `anchor_ms` 逐行重寫；新增 `g1_membership_v10`／`g3b_oracle_v10`（交錯組平行新鍵加 `_v10`）；`_event_keys()` 增人手字面 `expected_anchor_ms` 與 `expected_side_v10`；fixture 之 `event_keys` 增 `last_bar_open_ms` 欄，且須含至少一筆「`decision_at_ms >= test_start_ms` 而 `anchor_ms < test_start_ms`」之邊界事件。
+- 修改檔案：`momentum/Analysis/event_samples/split_projection.py`、`momentum/Analysis/event_samples/pipeline.py`、`scripts/freeze_splitunify_golden.py`、`tests/golden/splitunify/splitunify_golden.json`、`tests/momentum/Analysis/test_splitunify_derive.py`、`tests/momentum/Analysis/test_splitunify_golden.py`、`tests/momentum/event_samples/test_splitunify_wiring.py`、`tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py`。既有 caller：`EventSamplePipeline.run`（生產呼叫點數＝0，`Task 10.5` 為第一個）與測試。
+- 不可做：不得回退 `decision_at_ms` 或他週期之列作錨；不得覆寫 `_v9`／v8 之值；`_oracle_membership` 與 (G-4e) 第三份不得 import 投影；不得刪除答案窗 purge。
+- 邊界：① 邊界事件（`decision_at_ms >= test_start_ms` 而 `anchor_ms < test_start_ms`）⇒ `purged`；② 缺 `universe_timeframe` ⇒ raise；③ 事件缺該週期之 `event_keys` 列 ⇒ raise（訊息含 `event_id`）；④ 同事件多 feature TF 列恆同側；⑤ `anchor_ms >= feature_cutoff_ms` ⇒ raise。
+- 風險緩解：`M-SU-R5-19`、`M-SU-R5-20`；既有 `M-SU-D2-22`、`M-SU-D2-27`、`M-SU-D2-28` 依新錨重跑。
+- **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
+  - `venv/bin/python scripts/freeze_splitunify_golden.py` rc=0；`venv/bin/python scripts/register_anchor_check.py` rc=0
+  - `venv/bin/python -m pytest -q tests/momentum/Analysis/test_splitunify_derive.py tests/momentum/Analysis/test_splitunify_golden.py tests/momentum/event_samples/test_splitunify_wiring.py tests/momentum/event_samples/test_splitunify_g4e_triple_probe.py tests/momentum/event_samples/test_splitunify_m5_coords_probe.py` summary 行無 failed，且須含：
+    - `test_boundary_event_with_anchor_before_test_start_is_purged`
+    - `test_universe_timeframe_required`
+    - `test_event_keys_missing_universe_timeframe_row_fail_closed`
+    - `test_anchor_ms_ge_feature_cutoff_ms_fail_closed`
+    - `test_v9_keys_not_overwritten_by_v10_freeze`
+  - mutation 自證：`M-SU-R5-19` 錨改回 `decision_at_ms` ⇒ 第一條轉紅；`M-SU-R5-20` 缺該週期列時回退他週期 ⇒ 第三條轉紅
+- **存活至**：全票完工後保留。
+- **覆蓋風險**：`Task 10.5` 只新增呼叫，不改判側；register `C5-19`／`C5-21`／`C5-27` 之 ANCHOR 若移動依 (5.7) 同 commit 重出。
+
+### Task 10.4（B10C）—— canonical 邊界與分析用標籤參數解析下沉 momentum（`票 SPLITUNIFY`）
+- SPEC ref：`R5-C1` 輸入 1–6；`R5-C2`；`R5-C8`；`R5-C10` 1.–2.
+- 目標：邊界解析與標籤參數解析各成 momentum 內單一入口，IC 端改呼叫；產出逐事件處置帳。行為不變型重構（基準＝`Task 10.2` 落地後）。
+- 輸入 / 輸出：FF run 識別、`config_override`、`event_label_spec`（可缺）、事件批 records 與宣告、K 線讀取器 → 解析後四鍵與預設來源說明、分析副本對齊收據、post-trim `feature_index`、`train_plan`／`test_plan`、逐事件處置帳、生效之 `oos_test_size`／`purge_gap`／`embargo`、`period_alignment`、無邊界之具名原因。
+- 實作要點：
+  1. `momentum/Analysis/event_samples/event_label_spec_resolution.py`（新）：搬入 `_resolve_event_batch` 之值域檢查、深度宣告讀取、預設導出與四鍵補齊；momentum 端以具名例外表達錯誤，route 層映射 422 且 `kind` 字面與回應逐位元組不變。
+  2. `momentum/Analysis/event_samples/canonical_holdout.py`（新）：只讀 FF run 索引（不載整份特徵矩陣）；K 線讀取器固定 `data_cache/feature_klines`；bars 載入 `trigger_timeframes ∪ {feature_run.timeframe}`；`check_feature_run_coverage`、run symbol 過濾與深度抬高 `embargo` 之規則移入；plan 由 `_build_holdout_split_plan` 建立。
+  3. 處置帳（`R5-C8`）：每個通過匯入驗證之 `event_id` 恰一列；值集自 `split_unify.json` 之 `event_disposition_values` 讀；`ic_disposition` 之 `feature_row_not_in_feature_index` 以 `Task 10.2` 之鍵是否屬 post-trim 索引判定，**不得**讀 stage3。
+  4. stage3 觀測收據（`R5-C8` 7.）：analyze 範圍之實例屬性、入口歸零、不寫入報告。
+- 修改檔案：`momentum/Analysis/event_samples/canonical_holdout.py`（新）、`momentum/Analysis/event_samples/event_label_spec_resolution.py`（新）、`momentum/factories.py`、`api/services/ic_analysis_service.py`、`api/routes/ic_analysis.py`、`momentum/Analysis/contracts/split_unify.json`、`momentum/Analysis/ic_filter_orchestrator.py`、`tests/momentum/Analysis/test_splitunify_canonical_holdout.py`（新）、`tests/momentum/event_samples/test_event_label_spec_resolution.py`（新）。既有 caller：IC 分析 route 之事件批解析、`ICAnalysisService._run_event_label_stages` 與 IC 分析主流程。
+- 不可做：`momentum/` 不 import `api/`；service 不互 import；不改 `holdout_boundary` 與投影之簽名；不改 IC 任何輸出數值（以 `Task 10.2` 後為基準）；不改 IC route 之錯誤 `kind` 字面與回應。
+- 邊界：① `ic_train_test_split` 關閉 ⇒ `canonical_holdout_disabled`；② `SkippedResult` ⇒ `canonical_holdout_insufficient_rows`；③ run 不存在或識別不符 ⇒ 具名錯誤；④ 交集為空 ⇒ `AlignmentViolationError`；⑤ 觸發週期與 run 週期不同為合法輸入；⑥ 混週期批 ⇒ 解析函式回「當根」預設與說明；⑦ `decision_offset_bars` 值域外 ⇒ 具名例外、route 映射 422。
+- 風險緩解：G-2；`M-SU-R5-01`～`03`、`M-SU-R5-10`、`M-SU-R5-13`、`M-SU-R5-21`。
+- **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
+  - `venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0；`venv/bin/python scripts/freeze_ic_event_row_key_golden.py` rc=0
+  - `venv/bin/python -m pytest -q tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/api/test_splitunify_disclosure.py tests/momentum/Analysis/test_splitunify_canonical_holdout.py tests/momentum/event_samples/test_event_label_spec_resolution.py tests/api/test_gap3_event_analysis_horizon_purge.py` summary 行無 failed，且須含：
+    - `test_canonical_holdout_matches_ic_build_holdout_split_plan`（`test_plan.row_index` 與 `row_time_fingerprint` 逐值相等）
+    - `test_canonical_holdout_cross_tf_per_tf_has_run_timeframe`（12h 事件 × 1h run：`receipts.per_tf` 含 1h 列、bars 週期集合 ⊇ {12h, 1h}）
+    - `test_scan_disposition_outside_post_trim_index`（錨點在 manifest 區間內、在 post-trim 索引外 ⇒ 該值且不進投影）
+    - `test_disposition_values_read_from_contract`（手打值即紅）
+    - `test_boundary_event_ledger_predicts_feature_row_not_in_feature_index`（fixture 須含至少一事件同時滿足 `feature_cutoff_ms ∈ post-trim 索引` 且 `last_bar_open_ms ∉ post-trim 索引`；無此事件即 fail）
+    - `test_event_label_spec_absent_matches_ic`／`test_event_label_spec_k1_h6_matches_ic`（逐事件 `decision_at_ms`／`label_start_ms`／`label_end_ms` 與 `label_window_rows` 逐值相等）
+    - `test_ic_route_calls_shared_resolver_once`（factories 出口之 spy 被呼叫恰一次）
+    - `test_resolver_out_of_domain_k_maps_to_422_same_kind`
+    - `test_stage3_receipt_reset_per_analyze_and_absent_from_report`
+  - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode strict --baseline post_task_10_2 --candidate post_task_10_4` rc=0（逐鍵 diff 為空）
+  - mutation 自證：`M-SU-R5-21` 處置帳改以 `feature_cutoff_ms` 預測 ⇒ 邊界事件那條轉紅；`M-SU-R5-10` 只載觸發週期 ⇒ 跨週期那條轉紅；`M-SU-R5-13` 略過 post-trim 首尾剔除 ⇒ `outside_post_trim_index` 那條轉紅
+- **存活至**：全票完工後保留（唯一邊界解析入口與唯一標籤參數解析函式）。
+- **覆蓋風險**：`Task 10.5` 只新增 caller，不改本入口簽名。
+
+### Task 10.5（B10D）—— 事件掃描端接線（`票 SPLITUNIFY`）
+- SPEC ref：C-0 3.；`R5-C3`～`R5-C6`；`R5-C10` 3.
+- 目標：`EventImportService.analyze` 依三態分派；帶 FF run 時取 canonical 邊界與分析副本並走投影。
+- 輸入 / 輸出：請求增選填 `feature_run`（三欄必填）、`config_override`、`event_label_spec`（型別＝IC 請求同名欄之同一模型）；回應增 `split_unify`、`period_alignment`、`excluded_by_symbol`、`event_label_spec`。
+- 實作要點：
+  1. 分派順序：深度不可證 → 無 `feature_run` → 有 `feature_run`（投影）。
+  2. 投影路徑：經 `Task 10.4` 入口取邊界與分析副本對齊結果，呼叫 `EventSamplePipeline.run(train_plan=, test_plan=, feature_index=, selected_timeframe=, universe_timeframe=)`。
+  3. 匯入檢核只對匯入原值執行；對齊與投影用分析副本。
+  4. 四個新欄宣告於 `EventAnalyzeResponse`，並以 route 層測試驗經 HTTP 不丟欄。
+- 修改檔案：`api/services/case_import_service.py`、`api/models/event_import_models.py`、`momentum/Analysis/event_samples/pipeline.py`、`momentum/Analysis/contracts/split_unify.json`、`tests/momentum/Analysis/test_splitunify_contract.py`、`tests/api/test_splitunify_event_scan_projection.py`（新）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`。既有 caller：`api/routes/case.py` 之事件 analyze 端點。
+- 不可做：不得刪除 event-study-only 分支；不得回退「取最新 run」；不得以 `test_fraction`／`embargo_ms` 決定邊界；不得以單一 run 之 plan 解釋他 symbol 之事件；不得於事件掃描端另寫標籤參數預設；匯入檢核不得改對分析副本執行。
+- 邊界：① 無 `feature_run` ⇒ 回應逐位元組同 v5（帶 `event_label_spec` 亦同）；② 深度不可證優先；③ 批內 1 筆界外 ⇒ 成功並揭露；④ 過濾後零事件 ⇒ 4xx；⑤ 多 symbol 批只投影 run symbol；⑥ `event_label_spec` 值域不合 ⇒ 4xx。
+- 風險緩解：`M-SU-R5-04`～`06`、`M-SU-R5-11`、`M-SU-R5-22`、`M-SU-R5-23`；register `C5-26` 之 ANCHOR 若移動依 (5.7) 重出。
+- **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
+  - `venv/bin/python -m pytest -q tests/api/test_splitunify_event_study_only.py tests/momentum/Analysis/test_splitunify_contract.py tests/api/test_splitunify_event_scan_projection.py` summary 行無 failed，且須含：
+    - `test_analyze_without_feature_run_bytes_identical`（含帶 `event_label_spec` 之變體）
+    - `test_analyze_with_feature_run_split_ok`（`capability.split=ok`、三計數鍵、`split_unify`、`event_label_spec` 皆在）
+    - `test_analyze_with_feature_run_lookahead_blocked`
+    - `test_analyze_unknown_config_hash_4xx`
+    - `test_analyze_multi_symbol_discloses_exclusion`
+    - `test_analyze_one_event_out_of_range_discloses_event_id`
+    - `test_analyze_ic_train_test_split_off_reason`
+    - `test_analyze_event_label_spec_k1_h6_matches_ic_windows`
+    - `test_scan_calls_shared_resolver_once`（factories 出口 spy；與同請求 IC route 之解析結果逐鍵相等）
+    - `test_case_import_service_has_no_local_spec_defaults`（AST 掃 `api/services/case_import_service.py`：四鍵之 `setdefault` 或預設值字面即紅）
+    - `test_route_response_contains_four_new_keys`
+  - mutation 自證：`M-SU-R5-22` 投影改用匯入原值對齊 ⇒ `..._matches_ic_windows` 轉紅；`M-SU-R5-23` 事件掃描端自寫預設 ⇒ AST 那條轉紅；`M-SU-R5-11` 回應模型不宣告新欄 ⇒ route 那條轉紅
+- **存活至**：全票完工後保留。
+- **覆蓋風險**：`R-3`（UAT）只新增 UAT 條目，不改本接線。
+
+### Task 10.6（B10E）—— 前端（`票 SPLITUNIFY`）
+- SPEC ref：`R5-C5`；`R5-C3` 3.；register `C5-28`
+- 目標：IC 分析頁把已選 run、`buildConfigOverride` 結果與 `config.event_label_spec` 傳入事件掃描請求，並顯示切分結果與揭露欄。
+- 輸入 / 輸出：請求增三欄；畫面顯示事件數計數、`split_unify`、被排除事件、實際使用之標籤參數、`discarded_rows_by_feature_tf`。
+- 實作要點：型別與契約字面一律自 `split_unify.json` 對證；`unavailable` 時不顯示計數；四條 reason 文案兩兩可分辨。
+- 修改檔案：`frontend/src/lib/api.ts`、`frontend/src/lib/types.ts`、`frontend/src/lib/splitCapability.ts`、`frontend/src/components/ic-analysis/EventTablesPanel.tsx`、`frontend/src/app/ic-analysis/page.tsx`、`frontend/src/components/ic-analysis/eventTablesPanelSplitOk.test.tsx`（新）。既有 caller：IC 分析頁。
+- 不可做：不得自行 auto-discover run；不得在 `unavailable` 時顯示計數；不得手打契約字面；不得在前端補標籤參數預設值。
+- 邊界：① 未選 run ⇒ 不送 `feature_run`；② `discarded` 為空 ⇒ 不顯示該列；③ 四條 reason 文案可分辨；④ 使用者未改標籤參數 ⇒ 送出之 `event_label_spec` 與 IC 分析請求逐鍵相同。
+- 風險緩解：`M-SU-R5-07`、`M-SU-R5-24`；`C5-28` 之 ANCHOR 行隨本 Task 移動 ⇒ 同 commit 依 (5.7) 重出。
+- **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
+  - `cd frontend && node_modules/.bin/vitest run src/components/ic-analysis/eventTablesPanelCapability.test.tsx src/components/ic-analysis/eventTablesPanelSplitOk.test.tsx` rc=0，且須含 `analyzeEventImport` payload 之 `event_label_spec` 與同頁 IC 分析請求逐鍵相等之斷言
+  - `cd frontend && npm run build` rc=0
+  - mutation 自證：`M-SU-R5-24` 前端不帶 `event_label_spec` ⇒ payload 那條轉紅；`M-SU-R5-07` `unavailable` 時顯示計數 ⇒ capability 測試轉紅
+- **存活至**：全票完工後保留。
+- **覆蓋風險**：無後續 Phase 改動本畫面。
+
+### Task 10.7（B10E）—— 真實資料兩端對證與收尾登記（`票 SPLITUNIFY`）
+- SPEC ref：§G `R-5` golden；`R5-C7` 4.；`R5-C8` 5.、8.；`R5-C9` 8.
+- 目標：以真實資料（`scripts/splitunify_r5_parity.py`）證明兩端邊界逐值相等、驗證段事件集合依處置帳對證；UAT 條目只登記。
+- 輸入 / 輸出：`scripts/splitunify_r5_parity.py`（新）→ `tests/golden/splitunify/r5_parity.json`（新）與 receipt。
+- 實作要點：
+  1. 比對面：`test_plan.row_time_fingerprint`、`test_start_ms`、`train_row_index`、逐事件 `decision_at_ms`／`label_start_ms`／`label_end_ms`／`label_window_rows`、測試段 `event_id` 集合。
+  2. IC 測試段集合取自 IC 實際產出（測試段遮罩命中之列時刻經 `event_label_owners` 回綁），**不得**由處置帳推導；先驗預測＝觀測，再驗集合等式。
+  3. UAT 條目寫入 §E `R-3` 列：含重跑 `fe5f715e` 之後之 IC 事件分析。
+- 修改檔案：`scripts/splitunify_r5_parity.py`（新）、`tests/golden/splitunify/r5_parity.json`（新）、`docs/SPLITUNIFY_TODO.md` §E `R-3` 列。
+- 不可做：禁合成 fixture；不得改既有 golden 鍵值；不執行 UAT；對證腳本不得自行推導特徵列鍵（只讀對齊收據）。
+- 邊界：① 至少一組觸發週期與 run 週期不同之真實組合；② 至少一組發生裁切之真實組合；③ 至少一組非預設 `event_label_spec`；④ 不以 `boundary_hash` 代替逐值比對。
+- 風險緩解：`M-SU-R5-08`、`M-SU-R5-09`、`M-SU-R5-12`、`M-SU-R5-14`、`M-SU-R5-15`、`M-SU-R5-25`。
+- **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
+  - `venv/bin/python scripts/splitunify_r5_parity.py` rc=0
+  - mutation 自證（每條實跑並貼 rc=1）：一側 `oos_test_size=0.3`；一側用匯入原值標籤參數；差集事件無 IC 原因；對證腳本自填原因；IC 測試段由處置帳推導；stage3 錯丟而處置帳預測消費；處置帳回填觀測；投影錨點改回 `decision_at_ms`；處置帳鍵改 `feature_cutoff_ms`（對應 `M-SU-R5-08`／`09`／`12`／`14`／`15`／`25`／`19`／`21`）
+- **存活至**：全票完工後保留。
+- **覆蓋風險**：無後續 Phase。
+
+---
+
+## §D-10 Phase 10 mutation 對照表（25 條；自證，每批交付前跑，紅只認 rc=1）
+
+| ID | 改壞什麼 | 應紅之測試 | 所屬批 |
+|---|---|---|---|
+| `M-SU-R5-01` | 事件端以 `test_fraction` 當 `oos_test_size` | `test_splitunify_canonical_holdout.py` 邊界逐值相等 | B10C |
+| `M-SU-R5-02` | 事件端 `purge_gap` 只取 `effective_horizon` | 同上 | B10C |
+| `M-SU-R5-03` | 事件端不抬高 `embargo` | 同上 | B10C |
+| `M-SU-R5-04` | 略過 coverage 剔除 | `test_splitunify_event_scan_projection.py` 揭露斷言 | B10D |
+| `M-SU-R5-05` | `config_hash` 缺時回退最新 run | `test_analyze_unknown_config_hash_4xx` | B10D |
+| `M-SU-R5-06` | 刪除 event-study-only 分支 | `test_splitunify_event_study_only.py` | B10D |
+| `M-SU-R5-07` | `unavailable` 時仍顯示計數 | `eventTablesPanelCapability.test.tsx` | B10E |
+| `M-SU-R5-08` | 對證腳本只比 `boundary_hash` | `splitunify_r5_parity.py` 自證 | B10E |
+| `M-SU-R5-09` | 對證接受未附原因之差集 | 同上 | B10E |
+| `M-SU-R5-10` | canonical 解析只載觸發週期之 bars | `test_canonical_holdout_cross_tf_per_tf_has_run_timeframe` | B10C |
+| `M-SU-R5-11` | 回應模型未宣告新欄 | `test_route_response_contains_four_new_keys` | B10D |
+| `M-SU-R5-12` | 對證腳本自行填寫差集原因 | `splitunify_r5_parity.py` 自證 | B10E |
+| `M-SU-R5-13` | 只做 manifest 區間 coverage、略過 post-trim 首尾剔除 | `test_scan_disposition_outside_post_trim_index` | B10C |
+| `M-SU-R5-14` | 處置帳由 stage3 觀測回填 | `splitunify_r5_parity.py` 自證 | B10E |
+| `M-SU-R5-15` | 對證略過預測與觀測逐事件相等 | 同上 | B10E |
+| `M-SU-R5-16` | IC 事件路徑鍵改回 `feature_cutoff_ms` | `test_stage3_selected_rows_close_le_decision_*` 三條 | B10A |
+| `M-SU-R5-17` | IC 對齊只載觸發週期、以觸發週期列為鍵 | `test_alignment_timeframes_union_required` | B10A |
+| `M-SU-R5-18` | 移除產出端 PIT 守衛 | `test_pit_guard_rejects_cutoff_key` | B10A |
+| `M-SU-R5-19` | 投影判側錨點改回 `decision_at_ms` | `test_boundary_event_with_anchor_before_test_start_is_purged` | B10B |
+| `M-SU-R5-20` | 投影缺該週期列時回退他週期 | `test_event_keys_missing_universe_timeframe_row_fail_closed` | B10B |
+| `M-SU-R5-21` | 處置帳以 `feature_cutoff_ms` 預測 | `test_boundary_event_ledger_predicts_feature_row_not_in_feature_index` | B10C |
+| `M-SU-R5-22` | 事件掃描端投影改用匯入原值對齊 | `test_analyze_event_label_spec_k1_h6_matches_ic_windows` | B10D |
+| `M-SU-R5-23` | 事件掃描端另寫標籤參數預設 | `test_case_import_service_has_no_local_spec_defaults` | B10D |
+| `M-SU-R5-24` | 前端不帶 `event_label_spec` | `eventTablesPanelSplitOk.test.tsx` payload 斷言 | B10E |
+| `M-SU-R5-25` | 對證腳本不比逐事件錨點與答案窗 | `splitunify_r5_parity.py` 自證 | B10E |
+
+---
+
 ## §D mutation 對照表（13 條；自證，每批收案前跑，紅只認 rc=1）
 
 | ID | 改壞什麼 | 應紅之測試 | 所屬批 |
@@ -1143,7 +1369,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 規格 v7 三家已蓋章（x-stamp-r10）；待使用者白話審閱放行後寫施工清單 |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 使用者 2026-09-18 放行 v7；撰寫第 10 批施工清單（Task 10.1～10.7），待三家審查凍結後施工 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
