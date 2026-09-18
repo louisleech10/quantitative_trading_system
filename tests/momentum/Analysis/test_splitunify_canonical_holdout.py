@@ -253,3 +253,194 @@ def test_config_without_immutable_copy_path_is_fail_closed() -> None:
     with pytest.raises(CanonicalHoldoutError) as ei:
         _config_with_embargo(_Plain(), 7)
     assert ei.value.reason == "ic_config_not_copyable"
+
+
+# ── `Task 10.4` fail-closed 出口之具名測試（r17 `CODEX-R17-P2-01`）────────────
+# 🔴 出生理由：擴充後之驗收清單 179 passed，但本檔行覆蓋僅 90%，未覆蓋的 12 行
+#    **全是具名 fail-closed 出口**。「全綠」與「這些出口還在」是兩件事——把任一條
+#    raise 改成放行或回空索引，179 條沒有一條會紅。兩家對「要不要補」分歧
+#    （codex 要、composer 判不必），離線裁定採較嚴版：補。
+# 🔴 這些測試**不 mock 切分器**；用的是真實形狀之 `timestamps.parquet` 與純 parser 輸入。
+
+
+def _run_dir_with_timestamps(tmp_path, *, symbol="ETHUSDT", tf="1h", values=None):
+    """造一個**形狀真實**的 run 目錄：`<symbol>/<tf>/<hash>/timestamps.parquet`。
+
+    🔴 `values=None` 代表不寫該檔（測缺檔）；`values=[]` 代表寫一個空索引。
+    欄名與單位與生產一致（`timestamp`＝epoch 秒），故走的是同一條讀取路徑。
+    """
+    d = tmp_path / "data_cache/features" / symbol / tf / ("f" * 32)
+    d.mkdir(parents=True)
+    if values is not None:
+        pd.DataFrame({"timestamp": np.array(values, dtype=np.int64)}).to_parquet(
+            d / "timestamps.parquet",
+        )
+    return d
+
+
+def test_missing_timestamps_parquet_is_named_error(tmp_path) -> None:
+    """run 目錄在、`timestamps.parquet` 不在 ⇒ 具名 `feature_run_missing_timestamps`。
+
+    🔴 這是本票之關鍵不變式：涵蓋判定（manifest）通過**不保證**索引存在。
+    此處若靜默回空索引，處置帳會把每一筆都記成 `feature_row_not_in_feature_index`
+    ——一份看起來很有內容、實際全錯的帳。
+    鑑別力：把該 raise 改成 `return pd.DatetimeIndex([])` ⇒ 本條轉紅。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        CanonicalHoldoutError, load_post_trim_index,
+    )
+
+    with pytest.raises(CanonicalHoldoutError) as ei:
+        load_post_trim_index(_run_dir_with_timestamps(tmp_path, values=None))
+    assert ei.value.reason == "feature_run_missing_timestamps"
+
+
+def test_empty_post_trim_index_is_named_error(tmp_path) -> None:
+    """`timestamps.parquet` 在但零列 ⇒ 具名 `feature_run_empty_index`，不回空索引。
+
+    鑑別力：拿掉 `ts.size == 0` 那道閘 ⇒ 本條轉紅（會回一個合法但空的索引）。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        CanonicalHoldoutError, load_post_trim_index,
+    )
+
+    with pytest.raises(CanonicalHoldoutError) as ei:
+        load_post_trim_index(_run_dir_with_timestamps(tmp_path, values=[]))
+    assert ei.value.reason == "feature_run_empty_index"
+
+
+def test_unknown_run_timeframe_is_named_error(tmp_path) -> None:
+    """run 目錄之週期段不在 `TIMEFRAME_SECONDS` ⇒ 具名 `feature_run_unknown_timeframe`。
+
+    🔴 走**完整 resolver**（非直呼內部函式）：`repo_root` 指向 tmp 之 data_cache，
+    索引與目錄形狀皆真實，只有週期字面是未知值。
+    鑑別力：拿掉該閘 ⇒ 後續 `pd.Timedelta(seconds=...)` 會以 `KeyError` 炸在別處
+    （非具名），本條之 `reason` 斷言轉紅。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        CanonicalHoldoutError, resolve_canonical_holdout,
+    )
+
+    run = _run_dir_with_timestamps(tmp_path, tf="7h", values=[1_700_000_000 + 3600 * i for i in range(50)])
+    with pytest.raises(CanonicalHoldoutError) as ei:
+        resolve_canonical_holdout(
+            ff_run=run.name, symbol="ETHUSDT", ic_config=_cfg(),
+            purge_gap=1, lookahead_depth_rows=0, repo_root=tmp_path,
+        )
+    assert ei.value.reason == "feature_run_unknown_timeframe"
+
+
+def test_time_range_endpoint_non_string_is_named_error() -> None:
+    """`time_range` 端點非字串 ⇒ 具名 `feature_coverage_unknown_timestamp_format`。
+
+    🔴 不得以 `int()` 兜底：manifest 實測為「epoch 秒之**數字字串**」，
+    型別一變就代表落檔格式換了，猜一個轉型只會把格式漂移變成安靜的數值偏移。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        FeatureRunCoverageError, _parse_time_range_endpoint,
+    )
+
+    with pytest.raises(FeatureRunCoverageError) as ei:
+        _parse_time_range_endpoint(1_700_000_000)
+    assert ei.value.reason == "feature_coverage_unknown_timestamp_format"
+
+
+def test_time_range_endpoint_unparseable_string_is_named_error() -> None:
+    """既非十進位數字字串亦非 ISO ⇒ 具名 `feature_coverage_unknown_timestamp_format`。
+
+    鑑別力：把 `except ValueError` 改成吞掉並回 0 ⇒ 本條轉紅，而涵蓋判定會把
+    run 起點當成 1970 年 ⇒ 任何事件都「在涵蓋範圍內」。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        FeatureRunCoverageError, _parse_time_range_endpoint,
+    )
+
+    with pytest.raises(FeatureRunCoverageError) as ei:
+        _parse_time_range_endpoint("not-a-timestamp")
+    assert ei.value.reason == "feature_coverage_unknown_timestamp_format"
+
+
+def test_config_copy_fallbacks_do_not_mutate_caller() -> None:
+    """Pydantic v1 之 `copy(update=)` 與 dataclass 之 `replace` 兩條後備路徑。
+
+    🔴 生產之 `ICConfig` 走 Pydantic v2（`model_copy`），這兩條**只在型別換掉時**才用到
+    ——正因如此它們最容易在無人察覺下腐爛成「就地改寫」，而就地改寫正是
+    `CODEX-R41-P1-01` 要消滅的行為（前一批之 embargo 洩漏到下一批）。
+    本條逐條釘住：回傳之 embargo 已抬高，且**呼叫端物件逐欄不變**。
+    """
+    import dataclasses
+
+    from momentum.Analysis.event_samples.canonical_holdout import _config_with_embargo
+
+    class _V1Like:
+        """只有 `copy(update=)` 之物件（Pydantic v1 形狀）。"""
+
+        def __init__(self, embargo: int) -> None:
+            self.embargo = embargo
+
+        def copy(self, update=None):
+            return _V1Like(int((update or {}).get("embargo", self.embargo)))
+
+    v1 = _V1Like(3)
+    got = _config_with_embargo(v1, 11)
+    assert got is not v1 and got.embargo == 11
+    assert v1.embargo == 3, "Pydantic v1 後備路徑就地改寫了呼叫端之 config"
+
+    @dataclasses.dataclass(frozen=True)
+    class _DCLike:
+        embargo: int
+
+    dc = _DCLike(embargo=3)
+    got2 = _config_with_embargo(dc, 11)
+    assert got2 is not dc and got2.embargo == 11
+    assert dc.embargo == 3
+
+
+def test_v1_copy_rejecting_update_kwarg_falls_through_to_dataclass() -> None:
+    """`copy()` 不吃 `update=` 而丟 `TypeError` ⇒ 不得中止，續試 dataclass 路徑。
+
+    🔴 這條守的是「後備鏈不得在中途斷掉」：若 `except TypeError` 改成 `raise`，
+    一個同時是 dataclass、又剛好有無參數 `copy()` 的 config 會被誤判為不可複製。
+    """
+    import dataclasses
+
+    from momentum.Analysis.event_samples.canonical_holdout import _config_with_embargo
+
+    @dataclasses.dataclass
+    class _BadCopy:
+        embargo: int
+
+        def copy(self):          # 不接受 `update=` ⇒ 呼叫時 TypeError
+            raise AssertionError("本體不該被執行——TypeError 在呼叫當下就發生")
+
+    src = _BadCopy(embargo=2)
+    got = _config_with_embargo(src, 9)
+    assert got.embargo == 9 and src.embargo == 2
+
+
+def test_symbol_mismatch_is_served_by_run_not_found() -> None:
+    """🔴 邊界③之「識別不符」**實際由 `feature_run_not_found` 承擔**，不是 `feature_run_symbol_mismatch`。
+
+    `resolve_run_dir` 先以 symbol 篩選；`resolve_canonical_holdout` 傳的正是
+    `symbols=[symbol]` ⇒ 檔案裡那條 `feature_run_symbol_mismatch` 在現行唯一呼叫
+    路徑下**不可達**。本條把「真正會發生的那個 reason」釘住，免得日後有人看到那條
+    死守衛就以為邊界③已被它覆蓋（空殼守衛之假保證）。
+
+    🔴 本條刻意用**真實存在於別的 symbol 之 `config_hash`**：同一雜湊實測橫跨
+    BCHUSDT／BTCUSDT／ETHUSDT 三個幣種，所以「找得到目錄、但不屬於本 symbol」
+    這個情境是真的，不是造出來的。
+    """
+    _require(RUN_1H)
+    from momentum.Analysis.event_samples.canonical_holdout import resolve_run_dir
+
+    # 同一 hash 在 ETHUSDT 之下確實存在
+    assert resolve_run_dir(FF_1H, symbols=[SYM]).parent.parent.name == SYM
+
+    resolve, err_cls = _resolver()
+    with pytest.raises(err_cls) as ei:
+        resolve(ff_run=FF_1H, symbol="NOSUCHUSDT", ic_config=_cfg(),
+                purge_gap=156, lookahead_depth_rows=144)
+    assert ei.value.reason == "feature_run_not_found", (
+        f"識別不符之具名 reason 改變了（實得 {ei.value.reason!r}）"
+        "——邊界③之字面契約以本條為準"
+    )

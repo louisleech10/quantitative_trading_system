@@ -172,7 +172,15 @@ def resolve_canonical_holdout(
 
     run_dir = resolve_run_dir(ff_run, symbols=[symbol], repo_root=repo_root)
     run_tf = run_dir.parent.name
-    if run_dir.parent.parent.name != str(symbol):
+    # 🔴 **本條在現行唯一呼叫路徑下不可達**（r17 兩家與主委各自實測）：上一行已傳
+    #    `symbols=[symbol]`，`resolve_run_dir` 先以 symbol 篩選 ⇒ 不符者一律在該處
+    #    以 `feature_run_not_found` 擋下，永遠走不到這裡。三個共用同一 `config_hash`
+    #    的幣種實測 `mismatch=False`。
+    #    留著是為了「上一行哪天不再傳 `symbols`」時仍有守衛，**但不得**因為它存在
+    #    就宣稱邊界③之「識別不符」由它承擔——實際承擔者是 `feature_run_not_found`
+    #    （見 `test_symbol_mismatch_is_served_by_run_not_found`）。
+    #    🔴 不為它補測試：要測就得 mock `resolve_run_dir`，那是替空殼造一個假綠。
+    if run_dir.parent.parent.name != str(symbol):   # pragma: no cover - 見上
         raise CanonicalHoldoutError(
             "feature_run_symbol_mismatch",
             f"FF run {ff_run!r} 屬 {run_dir.parent.parent.name!r}，與事件批之 {symbol!r} 不符",
