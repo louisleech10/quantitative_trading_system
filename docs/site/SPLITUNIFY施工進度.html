@@ -27,7 +27,8 @@
 <p>🔴 <strong>狀態不再手寫</strong>：批次、第 9 批各小任務、殘留的狀態，由 <code>scripts/fact_keys.json</code> 產生（與施工清單
 <code>docs/SPLITUNIFY_TODO.md</code> §B／§C-9／§E 同一份來源），請勿手改。本檔其餘段落只寫「發生過什麼」。
 接下來的順序（你裁定；DOCROT2 已於 9/17 結束）：重開一次規格審查＋最後一批（<code>R-5</code>）→ GLOBALH → 你的 UAT 驗收（<code>R-3</code>，B26–B34＋新增項目）。
-<strong>9/18 晚間現在在哪</strong>：<strong>洩漏本身已經修掉並驗過了</strong>——「選中的那一列，它的 K 線收盤晚於決策時點」由 <strong>165/165 全中降到 0/165</strong>，每個事件的標籤值完全沒變，受影響的九個測試檔 241 條全過。現在卡住的<strong>不是洩漏</strong>，是「驗證這件事的那道關卡夠不夠硬」：<code>B10A</code> 已跑完<strong>七輪審碼修補</strong>（r1–r7），第八輪進行中。七輪的共同形態是——<strong>每一輪抓到的新問題，都落在我前一輪修補自己的盲點上</strong>，不是舊帳重提。詳見下方「9/18 B10A 七輪修補」。</p>
+<strong>9/19 凌晨現在在哪</strong>：<code>B10A</code>、<code>B10B</code> 都已收批。現在做的是 <strong><code>B10C</code></strong>（把「切分邊界」和「標籤參數」這兩件事各收成程式裡唯一的一支，再產一張「每個事件最後怎麼了」的帳）。本輪（第 15 輪）委員抓出兩條必修，<strong>兩條都已修完並推上 GitHub</strong>（commit <code>2fca67d0</code>）：①「這個特徵檔涵不涵蓋事件期」的判斷原本住在 API 服務層，事件掃描端要用只能再抄一份 → 已搬進共用層；②那張處置帳雖然寫好了，<strong>但正式流程從來沒呼叫過它</strong>——入口存在不等於有人用，所以這件工作原本根本無法驗收 → 已接進 IC 分析主流程，並補一條用真實資料跑的端對端測試（把索引換成空的，該測試會轉紅，證明它真的在驗東西）。順手補齊驗收清單裡兩條<strong>從來沒被建立過</strong>的測試，並標出更早一批（<code>B10A</code>）漏交的兩個檔案。第 16 輪審碼派工中。</p>
+<p><strong>9/18 晚間</strong>：<strong>洩漏本身已經修掉並驗過了</strong>——「選中的那一列，它的 K 線收盤晚於決策時點」由 <strong>165/165 全中降到 0/165</strong>，每個事件的標籤值完全沒變，受影響的九個測試檔 241 條全過。現在卡住的<strong>不是洩漏</strong>，是「驗證這件事的那道關卡夠不夠硬」：<code>B10A</code> 已跑完<strong>七輪審碼修補</strong>（r1–r7），第八輪進行中。七輪的共同形態是——<strong>每一輪抓到的新問題，都落在我前一輪修補自己的盲點上</strong>，不是舊帳重提。詳見下方「9/18 B10A 七輪修補」。</p>
 <p><strong>9/17 深夜（規格 v7 成立）</strong>：你放行 v6 後，我寫施工清單時查你問的「多週期特徵有沒有偷看未來」，發現 <strong>IC 事件分析自 8/28 起每個事件都讀到晚一根的特徵</strong>（用到決策之後、已算在答案裡的 K 線；三家委員各自用真實資料確認，165 個事件全中）。
 同時發現事件掃描頁和 IC 頁用的「答案」定義不同，切分邊界差 12 小時。兩件都推翻了 v6 的條文，規格重開為 <strong>v7</strong>；9/18 凌晨三家已蓋章（對抗審 1 輪、戳記輪 2 輪）。
 <strong>等你看</strong> <a href="SPLITUNIFY規格白話.html">SPLITUNIFY規格白話.md</a> 最上面一節，放行後才寫施工清單。
@@ -151,7 +152,7 @@
 <td>SU-B10C</td>
 <td>進行中</td>
 <td>docs/SPLITUNIFY_TODO.md §C-10</td>
-<td>Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳</td>
+<td>r15 兩條 P1 已修補收斂（coverage 下沉 momentum、IC 主路徑接處置帳）；r16 閉合輪審碼中</td>
 </tr>
 <tr>
 <td>160</td>
@@ -281,7 +282,7 @@
 <td>R-5</td>
 <td>進行中</td>
 <td>docs/SPLITUNIFY_SPEC.md Phase 10</td>
-<td>B10A／B10B 已收批（B10B 兩輪審碼、兩家 proceed）；開工 B10C：Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳</td>
+<td>B10A／B10B 已收批；B10C 進行中：r15 兩條 P1 已修補收斂，r16 閉合輪審碼中</td>
 </tr>
 <tr>
 <td>060</td>

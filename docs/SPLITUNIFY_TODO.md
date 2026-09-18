@@ -97,7 +97,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | 120 | B9F | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 130 | SU-B10A | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
 | 140 | SU-B10B | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
-| 150 | SU-B10C | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
+| 150 | SU-B10C | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r15 兩條 P1 已修補收斂（coverage 下沉 momentum、IC 主路徑接處置帳）；r16 閉合輪審碼中 |
 | 160 | SU-B10D | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 事件掃描端接線與請求／回應契約 |
 | 170 | SU-B10E | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.6 前端＋Task 10.7 真實資料兩端對證與 UAT 登記 |
 <!-- END GENERATED: splitunify-batch-status -->
@@ -1402,7 +1402,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B 已收批（B10B 兩輪審碼、兩家 proceed）；開工 B10C：Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B 已收批；B10C 進行中：r15 兩條 P1 已修補收斂，r16 閉合輪審碼中 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |

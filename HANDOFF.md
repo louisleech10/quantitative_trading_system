@@ -5,8 +5,8 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-015 | SU-B10C | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B 已收批（B10B 兩輪審碼、兩家 proceed）；開工 B10C：Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
+| 02-015 | SU-B10C | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r15 兩條 P1 已修補收斂（coverage 下沉 momentum、IC 主路徑接處置帳）；r16 閉合輪審碼中 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B 已收批；B10C 進行中：r15 兩條 P1 已修補收斂，r16 閉合輪審碼中 |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -15,12 +15,12 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-015 | SU-B10C | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
+| 02-015 | SU-B10C | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r15 兩條 P1 已修補收斂（coverage 下沉 momentum、IC 主路徑接處置帳）；r16 閉合輪審碼中 |
 | 02-016 | SU-B10D | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 事件掃描端接線與請求／回應契約 |
 | 02-017 | SU-B10E | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.6 前端＋Task 10.7 真實資料兩端對證與 UAT 登記 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B 已收批（B10B 兩輪審碼、兩家 proceed）；開工 B10C：Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B 已收批；B10C 進行中：r15 兩條 P1 已修補收斂，r16 閉合輪審碼中 |
 | 03-007 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 03-008 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 03-009 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
@@ -46,6 +46,11 @@
 - `committee_run` 的 harness exit code 不可信，**讀 `committee_rc=` 那行**。
 - 🔴 `pytest` 一律逐檔明列路徑；`-k` 只過濾執行、**不減少收集**，無路徑即從 rootdir 收全套。
 - 🔴 `reconcile_build.sh` 一律帶 `--mode review`；`debt_clear` 用 `--round-id <id> --session <name> --lock <sources.lock>`（不吃位置參數）。
+- 🔴 **`committee_run.sh` 之參數順序有硬規**：`--session <name>` 須在 `--` **之前**，`<brief> <out前綴> <fam1,fam2>` 為位置參數，gate flags 一律在 `--` 之後，且 `--brief-kind` **不是** gate flag（放進去會 `未預期參數` 而 fail-closed 不派工，brief-kind 由 brief 檔內 `brief-kind:` 行決定）。
+- 🔴 **`gate.sh dispatch --impl-self` 必帶 `--task-id <root>-impl-b<N>-claude`**（family 尾碼須為 `claude`），省略會被拒發 token。
+- 🔴 **`completeness_check.sh` 正式入口是 `--lock <sources.lock>`**；直接給 synth 路徑會被判「argv 來源僅 tests 隔離」而 FAIL。單檔檢查才用 `--single <委員檔>`。
+- 🔴 **逐段搬移函式時，模組級常數不會跟著走**：搬移腳本的錨點只涵蓋 `def`／`class`，模組頂層的常數落在所有段之外 ⇒ 搬過去的函式 import 當下不報錯、**跑到那一行才** `NameError`。搬完先 grep 被搬函式引用的所有大寫識別字。
+- 🔴 **stub 只 stub 一半會造出生產上不可能的狀態**：測試 monkeypatch 某個衍生值時，須把同源的其他衍生值一起 stub（例：`_feature_run_time_range` 與 `_feature_run_dir` 都由同一個 run 目錄導出，只 stub 前者會做出「涵蓋判定過、run 目錄不存在」這種真實請求走不到的狀態），否則後續加的 fail-closed 會被誤判為過嚴。
 - 🔴 `handoffs/` 整包在 `.git/info/exclude`：brief、委員產出、收斂檔只在本機，commit 時 `git add` 會被拒；commit 訊息之 REF 仍須指向含 VERIFY／SIGNOFF／RECONCILE-STAMP／CLOSED／APPROVED 字樣之檔。
 - 新增 `scripts/` 檔或改掛載後跑 `bash scripts/list_active_mechanisms.sh --write`，否則寫檔 hook 擋；在 fixture 目錄建檔名含 `TODO`／`SPEC` 之樁檔須先 `bash scripts/gate.sh artifact`。
 - 🔴 **既有紅（2026-09-14 實測，非 DOCROT2 改壞）**：`tests/governance/test_debt_emit.py` 之 7 條 `test_b3_*`（隔離 repo 缺 `scripts/prev_review_resolve.sh`）；`tests/governance/test_gate_deny_fields.py::test_01_corpus_a_covers_decision_branches`（錨點 `INPUT="$(cat)"` 已漂移）；`scripts/obligation_block_check.sh` 對 `docs/SPLITUNIFY_SPEC.D-002.md` 結構性 rc=1（舊段更正註記逐字引用裁決編號，義務區塊內零違規）。
@@ -109,4 +114,12 @@
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r13/synth.md`
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r1/synth.md`
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r2/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-consult-r1/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r9/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r10/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r11/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r12/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r13/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r14/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r15/synth.md`
 <!-- HISTORY-END -->
