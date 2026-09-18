@@ -5,8 +5,8 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-013 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r2 修補已交付（12a55c10），待 B10A 閉合輪 r3 判三條 P1 是否閉合 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 施工清單三家審查凍結（x-review-r21）；開工 B10A：Task 10.1 讀取者改指與 Task 10.2 IC 事件特徵列鍵更正 |
+| 02-014 | SU-B10B | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A 已收批（八輪審碼閉合，三家 proceed）；開工 B10B：Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -15,14 +15,13 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-013 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r2 修補已交付（12a55c10），待 B10A 閉合輪 r3 判三條 P1 是否閉合 |
-| 02-014 | SU-B10B | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
+| 02-014 | SU-B10B | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
 | 02-015 | SU-B10C | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
 | 02-016 | SU-B10D | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 事件掃描端接線與請求／回應契約 |
 | 02-017 | SU-B10E | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.6 前端＋Task 10.7 真實資料兩端對證與 UAT 登記 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 施工清單三家審查凍結（x-review-r21）；開工 B10A：Task 10.1 讀取者改指與 Task 10.2 IC 事件特徵列鍵更正 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A 已收批（八輪審碼閉合，三家 proceed）；開工 B10B：Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
 | 03-007 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 03-008 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 03-009 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |

@@ -497,13 +497,18 @@ def _diff(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
     #    `report_contract_digest` 漂移時根本看不出動到哪一欄。改逐鍵比對（嚴格度不變）。
     pa = a.get("production_evidence") or {}
     pb = b.get("production_evidence") or {}
-    if not (isinstance(pa, dict) and isinstance(pb, dict)):
-        if pa != pb:
-            diffs.append(f"production_evidence: {pa} → {pb}")
-    else:
-        for k in sorted(set(pa) | set(pb)):
-            if pa.get(k) != pb.get(k):
-                diffs.append(f"production_evidence.{k}: {pa.get(k)} → {pb.get(k)}")
+    # 🔴 `CODEX-R37-P2-01`：逐鍵仍只印出**直屬子 dict**，`ic_train_test_split.embargo`
+    #    或 `isolation.purge.bars` 這類巢狀單欄竄改只會看到整坨子物件 ⇒ 改**遞迴到葉**。
+    #    嚴格度不變（仍是相等比較），變的只有訊息之定位粒度。
+    def _walk(x: Any, y: Any, path: str) -> None:
+        if isinstance(x, dict) and isinstance(y, dict):
+            for k in sorted(set(x) | set(y)):
+                _walk(x.get(k), y.get(k), f"{path}.{k}")
+            return
+        if x != y:
+            diffs.append(f"{path}: {x} → {y}")
+
+    _walk(pa, pb, "production_evidence")
     ea = {r["event_id"]: r for r in a.get("events", [])}
     eb = {r["event_id"]: r for r in b.get("events", [])}
     for eid in sorted(set(ea) | set(eb)):

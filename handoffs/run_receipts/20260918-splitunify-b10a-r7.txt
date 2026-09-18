@@ -1,0 +1,68 @@
+SPLITUNIFY B10A 審碼閉合輪 r7 — 修補與實跑收據
+task-id: 20260911-SPLITUNIFY-B10-REVIEW-R7
+round_id: 74e2e627-d805-4c6d-b85e-7366d69f806f
+日期: 2026-09-18
+本輪審查 diff: 3e8eadb4..bc05386d
+本輪修補 commit: 4ed634d1
+
+== 委員裁決 ==
+codex    VERDICT: blocked   BLOCKED-BY: CODEX-R36-P1-01   CLOSED: CODEX-R35-P1-01
+composer VERDICT: proceed   （COMPOSER-R36-P3-00 零 findings sentinel）
+grok     VERDICT: proceed   （GROK-R36-P3-00 零 findings sentinel）
+⇒ r6 之 P1 閉合；本輪新增一 P1、一 P2。
+
+== CODEX-R36-P1-01：時鐘排除清單在事件路徑「過度排除」==
+病根：r6 沿用既有之 `canonical_sha`，其 `_CLOCK_MIRROR_PATHS` 以路徑排除
+`metadata.survivor_output.sha256`。該排除在**非事件路徑**成立（它是 `generated_at` 之鏡像
+⇒ 每跑必變）；但事件掃描路徑 `_suppress_persist=True`（`ic_analysis_service.py:1622-1633`），
+該五鍵 status object 恆為：
+  {"case_id":"ic_gatekeeper","path":null,"reason":"persist_suppressed",
+   "sha256":null,"status":"not_computed"}
+⇒ 排除它等於放掉一類竄改。提出方實跑：sha 改 `tampered-visible-hash`
+⇒ `report_contract_digest_equal=true`、`production_evidence_equal=true`、`diff_rc=0`。
+
+🔴 修法與提出方建議**不同**，且更小：
+  提出方建議＝讓 `canonical_sha` 按 persist 狀態分支、事件路徑保留 sha 欄。
+  主委不採＝該 helper 是 `tests/golden/`（`ichc_run`／`gap2_freeze_golden`）之對證基準，
+  改它會波及既有凍結。
+  主委採＝把整塊 `metadata.survivor_output` 直接納入 `production_evidence` 比對面。
+  覆蓋相同（整塊五鍵皆被綁），波及為零。
+
+== CODEX-R36-P2-02：digest 漂移不可定位（P2，非阻擋，一併修）==
+`_diff` 原本把 `production_evidence` 當單一值比對 ⇒ 失敗時只印出兩坨完整物件。
+改為逐鍵比對（`production_evidence.<key>`），嚴格度不變。
+
+== 實跑覆核（probe_r36_survivor.py，對重凍後之基準）==
+生產端基準重凍：9ba9a522 → b74f19a4（納入 survivor_output）。
+  M0 未竄改                                   → STRICT PASS rc=0
+  S1 survivor_output.sha256 → "tampered-visible-hash"（提出方形態）
+       → STRICT FAIL 1 項 rc=1  ← **由假綠轉紅**
+       · production_evidence.survivor_output: {...sha256: None...} → {...}
+  S2 survivor_output.status → "tampered-status"
+       → STRICT FAIL 2 項 rc=1（digest ＋ survivor_output **雙重偵測**）
+       · production_evidence.report_contract_digest: 456891226d72f69e… → a47b503aedca5ffe…
+  S3 report["version"] → "tampered-visible-version"（驗可定位性）
+       → STRICT FAIL 1 項 rc=1，訊息逐字指名
+       · production_evidence.report_contract_digest: 456891226d72f69e… → 05f3ce9704578e32…
+清單 §D-10 新增 M-SU-R5-36（sha 竄改須由 survivor_output 轉紅）、M-SU-R5-37（version 竄改須可定位）。
+
+== 提出方完成之 brief 必答（主委引用，未重跑）==
+必答 2a digest 穩定性下界：四次真實 `--capture` 皆 rc=0；
+  `none` 兩跑 canonical_sha256=1d039c85…、report_contract_digest=456891226d72f69e…、165/165；
+  `{"report":{"include_decay_analysis":false}}` 兩跑 canonical_sha256=f846ff14…、
+  report_contract_digest=071d31767a1b3165…、165/165；兩組各 `cmp rc=0`，跨條件 digest 有意不同。
+⇒ 「digest 在未竄改時恆定」之 assumed 未被否證。
+必答 3a 過度排除逐項判定：`generated_at`／`filtered_generated_at`／`stage_timings` 保留排除；
+  `metadata.survivor_output.sha256` 在事件路徑過度排除（已修）。
+
+== 回歸 ==
+受影響九檔 → 241 passed。
+
+== 本輪殘留（交 r8）==
+R1 子集（30 欄）vs 全宇宙之逐特徵 IC 相等性：已由 5→30 對照支持，全宇宙證明不可得。
+   理由＝blocked-by（本機 8 GB RAM，實測 rc=137）。
+R2 條件 IC 之母體為 canonical 測試段之 41 個事件。理由＝blocked-by（生產端行為，屬他票）。
+R3 `_run_scan_cell` 與主路徑 `_run_analysis` 之行為差未以實跑對照。
+   理由＝needs-research（本批為報酬版，差異不可觀測）。
+R4 digest 之排除清單僅就事件路徑逐項判過一次；其餘三項在**其他**路徑之前提未重新盤點。
+   理由＝needs-research（本票只走事件路徑）。

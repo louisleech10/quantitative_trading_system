@@ -1,0 +1,60 @@
+SPLITUNIFY B10A 審碼閉合輪 r8 — 收批收據
+task-id: 20260911-SPLITUNIFY-B10-REVIEW-R8
+round_id: 3613ca78-a472-43b2-824d-15177fca57b3
+日期: 2026-09-18
+本輪審查 diff: bc05386d..4ed634d1
+
+== 委員裁決：三家一致 proceed、零 BLOCKING ==
+codex    VERDICT: proceed   CLOSED: CODEX-R36-P1-01,CODEX-R36-P2-02
+composer VERDICT: proceed   （COMPOSER-R37-P3-00 零 findings sentinel）
+grok     VERDICT: proceed   （GROK-R37-P3-00 零 findings sentinel）
+⇒ B10A 之審碼閉合完成，可開 B10B。
+
+== 提出方完成之三條實跑必答（主委引用，未重跑）==
+必答 2a 兩種修法之覆蓋等價性：對事件路徑之 survivor_output 五鍵
+  （case_id／path／reason／sha256／status）逐一 mutation，主委之修法（整塊納入比對面）
+  與其原建議（改 canonical_sha 按 persist 分支）**detected 皆為 true、無不對稱案例**；
+  且前者保留共用 golden helper 之既有語義、不需改 helper。
+必答 3a 其餘三項時鐘排除在事件路徑之非決定性（逐項實跑）：
+  generated_at   base=12:39:39.816394、repeat=12:39:40.966432／12:39:42.135328 ⇒ 每跑必變
+  stage_timings  各 stage 皆有漂移
+  filtered_generated_at 三次均未發出（[]）
+  ⇒ 三項**未**命中過度排除，無本路徑修法。
+必答 3a 之推論：僅 survivor_output.sha256 在事件路徑恆定（已於 r7 修）。
+
+== 本輪兩條 P2（皆非阻擋）==
+CODEX-R37-P2-01 巢狀單欄竄改只印出直屬子 dict ⇒ **採納並修**：
+  `_diff` 之 production_evidence 改**遞迴到葉**比對（嚴格度不變，只改訊息粒度）。
+  實跑覆核（提出方所述之同兩條竄改）：
+    production_evidence.ic_train_test_split.embargo: 144 → 145
+    production_evidence.isolation.purge.bars: 156 → 155
+    未竄改 ⇒ []
+CODEX-R37-P2-02 scan 與 main 之 label-mode metadata 不同 ⇒ **延後→Task 10.4**：
+  提出方實測 scan 與 main 之五個 conditional IC、event_label_rule、isolation **皆相同**；
+  差異僅 label-mode metadata（scan requested:return_rule；
+  main requested:auto, effective:return_rule, reason:one_class, n_pos/n_neg:136/29）。
+  該具名偏離已於腳本 docstring 與 payload 之 named_deviation 揭露。
+
+== 修補後回歸 ==
+strict candidate-run → STRICT PASS: 逐鍵 diff 為空（rc=0）
+受影響九檔 → 241 passed
+
+== 流程坑（本輪踩到）==
+grok 交件檔內容完整且 `completeness_check --single` rc=0，但 cx_run 記錄之 cli_rc=1
+⇒ debt_clear 以「family grok 最新 result_state='failed'」拒銷。
+出路＝HANDOFF 已記之設計路徑：`bash scripts/gate.sh register-output <task> <檔>`（rc=0）後再銷帳，
+**不是重派**。
+
+== B10A 八輪總結（r1–r8）==
+洩漏本體：選中列收盤晚於決策時點 165/165 → 0/165；逐事件 label 值未變；九檔 241 passed。
+破壞性驗證（全部由綠轉紅、M0 恆 PASS）：
+  analyze 炸彈／purge_rows 位移／關閉 event_filter／半開四形態／
+  三種 stage4 重排／survivor_output 兩種竄改／report.version 竄改。
+清單 §D-10 之 mutation 由 M-SU-R5-16..18 擴充至 M-SU-R5-37。
+
+== 收批後殘留（交 B10B 起各批）==
+R1 子集（30 欄）vs 全宇宙之逐特徵 IC 相等性：5→30 與 15→30 兩組對照皆相同；
+   全宇宙證明不可得。理由＝blocked-by（本機 8 GB RAM，實測 rc=137）。
+R2 條件 IC 之母體為 canonical 測試段之 41 個事件。理由＝blocked-by（生產端行為，屬他票）。
+R3 scan 與 main 之 label-mode metadata parity。理由＝延後→Task 10.4。
+R4 時鐘排除清單在**非事件**路徑之前提未盤點。理由＝needs-research（本票只走事件路徑）。
