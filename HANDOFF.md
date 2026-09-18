@@ -76,6 +76,7 @@
 - 🔴 **事件掃描端與 IC 端之分析用標籤參數不同源**：IC 路徑以 `event_label_spec`（預設導出在 `api/routes/ic_analysis.py` 之 `_resolve_event_batch`）建分析副本再對齊，事件掃描端 `_prepare` 用匯入原值；預設參數下兩端 `label_window_rows` 即不同（144／156），邊界差 12 小時。統一解析排入 v7 之 `R5-C10`。
 - **session 名之 kind 封閉集＝`impl|review|stamp|consult|fix`**：閉合輪之 session 用 `stamp`、brief 行首 `brief-kind: closure`（例 `20260911-splitunify-b9-stamp-r13`）。
 - **Bash 命令列含委員家族名字面（以豎線串接之三家名）會被 `gate_check.sh` 判為派工而擋**：要列家族時從 `scripts/governance_families.json` 以 `jq` 取，不在命令列寫字面。
+- 🔴 **以行號 sed 改檔必以字面計數回驗**（2026-09-18 連兩輪同型事故：先把比對對象改成未定義字面，再因行號位移而只改了一半，兩次都由三家審查抓到）：改動後跑 `grep -c -- '<舊字面>' <檔>` 須為 0、`grep -n -- '<新字面>' <檔>` 須命中預期行；長行只看 `cut -c1-N` 的開頭會漏掉尾端未改處。能用 Edit 工具做精確字串取代時就不要用行號 sed。
 - 🔴 **規格寫入之權宜作法（2026-09-17）**：`docs/SPLITUNIFY_SPEC.md` 以 scratchpad 組稿後 `cp` 入檔；寫入前以同內容之 Write payload 餵 `bash scripts/live_doc_write_guard.sh`（rc=0 才 `cp`），寫入後跑 `doc_format_precheck.sh`、`spec_xref_check.sh --files <HEAD 版> <新版>`、`obligation_block_check.sh`。日後小幅修改一律用 Edit。
 
 ## 進行中紀錄
@@ -99,4 +100,5 @@
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r17/synth.md`
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r18/synth.md`
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r19/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r20/synth.md`
 <!-- HISTORY-END -->

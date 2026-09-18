@@ -1195,7 +1195,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
     - `test_ic_route_calls_shared_resolver_once`（factories 出口之 spy 被呼叫恰一次）
     - `test_resolver_out_of_domain_k_maps_to_422_same_kind`（`kind` 字面＝現行 `invalid_decision_offset_bars`；既有 `tests/api/test_gap3_ic_event_label_defaults.py` 同批跑，釘住該字面不因下沉而改）
     - `test_stage3_receipt_reset_per_analyze_and_absent_from_report`
-  - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode strict --baseline tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json --candidate live` rc=0（逐鍵 diff 為空）
+  - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode strict --baseline tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json --candidate-run --batch 20260909T130533Z-7f73e4c7 --ff-run 4a8a0b3726cc906ab3534994605e77f5 --config-override none` rc=0（candidate 為當下重跑之產出、逐鍵 diff 為空；以任何檔路徑充當 candidate ⇒ 腳本拒收 rc!=0；三元組與 baseline 檔之 meta 不符 ⇒ rc!=0）
   - mutation 自證：`M-SU-R5-21` 處置帳改以 `feature_cutoff_ms` 預測 ⇒ 邊界事件那條轉紅；`M-SU-R5-10` 只載觸發週期 ⇒ 跨週期那條轉紅；`M-SU-R5-13` 略過 post-trim 首尾剔除 ⇒ `outside_post_trim_index` 那條轉紅
 - **存活至**：全票完工後保留（唯一邊界解析入口與唯一標籤參數解析函式）。
 - **覆蓋風險**：`Task 10.5` 只新增 caller，不改本入口簽名。
