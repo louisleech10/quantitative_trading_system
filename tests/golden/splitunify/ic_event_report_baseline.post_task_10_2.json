@@ -6,13 +6,13 @@
     "test_start_ms": 1763758800000,
     "train_end_ms": 1762675200000
   },
-  "canonical_sha256": "124bd783b815560e9a7d5c7ff41bf73138d61187d6555b739eb9bbe4da6013ca",
+  "canonical_sha256": "eb7f0bc7004b0ea0ed56c825806c71a9b5ff8bd8764b793322a642a0ab87c9c8",
   "conditional_ic": {
-    "12h_L1_momentum_BOP": -0.015018863740974785,
-    "12h_L1_momentum_RSI": -0.032170962250729414,
-    "1h_L1_momentum_BOP": -0.062426199917014466,
-    "1h_L1_momentum_ROC": 0.03587213938525277,
-    "1h_L1_momentum_RSI": 0.03323286447158596
+    "12h_L1_momentum_BOP": 0.05167776763381122,
+    "12h_L1_momentum_RSI": 0.06982222201458332,
+    "1h_L1_momentum_BOP": -0.0976693646036835,
+    "1h_L1_momentum_ROC": 0.04651914521889828,
+    "1h_L1_momentum_RSI": 0.023073316619144264
   },
   "events": [
     {
@@ -1177,12 +1177,13 @@
   },
   "meta": {
     "batch": "20260909T130533Z-7f73e4c7",
-    "code_commit": "c14fc50bd764",
+    "code_commit": "fe83f777072b",
+    "collector": "ICAnalysisService._run_event_label_stages（生產路徑）",
     "config_override": "none",
     "ff_run": "4a8a0b3726cc906ab3534994605e77f5",
-    "ff_run_timeframe": "1h",
-    "key_source": "feature_row_keys(last_bar_open_ms)"
+    "ff_run_timeframe": "1h"
   },
   "n_consumed": 165,
-  "n_events": 165
+  "n_events": 165,
+  "purge_rows": 156
 }

@@ -90,6 +90,22 @@ per-symbol 投影未支援前，多 symbol 批一律 raise
   （本檔引用之三個字面 `kline_holdout`／`canonical_feature_universe_unavailable`／
   `full_sample_not_oos` 皆須在 `split_unify.json` 內）。
 
+## 追加條目（SPLITUNIFY v7 `R5-C9` 3.；2026-09-18）
+
+**`per_tf` 之欄集由三鍵改為四鍵**：`{event_id, timeframe, feature_cutoff_ms, last_bar_open_ms}`。
+`analysis_alignment_receipt_hash` 之 `per_tf` payload 隨之逐列多帶第四值。
+
+- **為什麼**：`feature_cutoff_ms` 是該根 K 線之**收盤**時刻，而 Feature Factory 特徵表之列以**開盤**時刻編索引
+  （真實資料實測：`1h_L1_momentum_BOP` 與「開盤＝列時間戳」那根逐值一致 0.978、與「收盤＝列時間戳」0.0003）。
+  以收盤時刻取列會取到**晚一根**、含決策時點之後之資訊；跨週期批（1h 事件 × 12h run）則多數落不進索引而整筆丟事件。
+  第四欄使「決策時點可用之特徵列」有唯一且可對證之來源（`alignment` 收據既有欄，只搬不算）。
+- **相容性**：`docs/GAP3_EVENT_UX_SPEC.md` 主檔之「`per_tf` 恰三鍵」條文**不解凍、不改**；本追加條目為其唯一覆寫來源。
+  受影響之落檔 golden＝`tests/golden/gap3_label/`（46 檔），重凍後逐檔僅 `analysis_alignment_receipt_hash` 一鍵變動，
+  label 值與事件數不變。
+- **消費點**：IC 事件路徑之 `event_timestamps`／`event_label_values`／`event_binary_labels`／`event_label_owners`
+  一律以特徵 run 週期之 `last_bar_open_ms` 為鍵（唯一取值出口＝`label_value_from_case.feature_row_keys`，
+  該出口於取鍵當下驗「開盤＋一根＝收盤」與「收盤 ≤ 決策時點」）。
+
 ## §N 本延伸未解者
 
 - per-symbol 投影（`SPLITUNIFY` 之殘留 `R-1`，needs-research）。

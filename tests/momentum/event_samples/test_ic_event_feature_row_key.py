@@ -59,7 +59,7 @@ def _prepare(run_tf: str):
         timeframe_seconds=pipe.timeframe_seconds_for(tfs),
         feature_timeframe=run_tf,
     )
-    return pipe, prepared
+    return pipe, prepared, pipe.timeframe_seconds_for(tfs)
 
 
 def _feature_index_ms(run_dir: Path) -> np.ndarray:
@@ -84,8 +84,8 @@ def test_selected_row_close_not_after_decision(run_tf: str, run_dir: Path) -> No
     對照（防空集合恆成立）：同一批以舊鍵（`feature_cutoff_ms`）計算時，**全部**事件之列收盤晚於決策時點。
     """
     _require(BATCH_12H, run_dir, KLINE)
-    pipe, prepared = _prepare(run_tf)
-    keys = pipe.feature_row_keys(prepared, feature_timeframe=run_tf)
+    pipe, prepared, tsec = _prepare(run_tf)
+    keys = pipe.feature_row_keys(prepared, feature_timeframe=run_tf, timeframe_seconds=tsec)
     index_ms = set(int(x) for x in _feature_index_ms(run_dir))
     bar = BAR_MS[run_tf]
     old_key_late = 0
@@ -115,8 +115,8 @@ def test_selected_row_value_matches_that_kline_bar(run_tf: str, run_dir: Path) -
     故以 95% 為門檻並同時要求「對錯一根」之比例為 0（選錯列會整批不符）。
     """
     _require(BATCH_12H, run_dir, KLINE)
-    pipe, prepared = _prepare(run_tf)
-    keys = pipe.feature_row_keys(prepared, feature_timeframe=run_tf)
+    pipe, prepared, tsec = _prepare(run_tf)
+    keys = pipe.feature_row_keys(prepared, feature_timeframe=run_tf, timeframe_seconds=tsec)
     ts = _feature_index_ms(run_dir)
     col = pd.read_parquet(run_dir / "raw" / f"{run_tf}_L1_momentum_BOP.parquet")
     values = pd.Series(col[col.columns[0]].to_numpy().astype(np.float64), index=ts)
@@ -170,7 +170,7 @@ def _prepare_1h_batch(k: int):
         timeframe_seconds=pipe.timeframe_seconds_for(tfs),
         feature_timeframe="12h",
     )
-    return pipe, prepared
+    return pipe, prepared, pipe.timeframe_seconds_for(tfs)
 
 
 def test_1h_events_12h_run_off_grid_key_is_pit_correct() -> None:
@@ -179,8 +179,8 @@ def test_1h_events_12h_run_off_grid_key_is_pit_correct() -> None:
     前置條件（不成立即 fail，擋空心通過）：fixture 中至少一筆 `last_bar_open_ms != decision_at_ms − 12h`。
     """
     _require(BATCH_1H, RUN_12H, KLINE)
-    pipe, prepared = _prepare_1h_batch(k=5)
-    keys = pipe.feature_row_keys(prepared, feature_timeframe="12h")
+    pipe, prepared, tsec = _prepare_1h_batch(k=5)
+    keys = pipe.feature_row_keys(prepared, feature_timeframe="12h", timeframe_seconds=tsec)
     index_ms = set(int(x) for x in _feature_index_ms(RUN_12H))
     bar = BAR_MS["12h"]
 
@@ -204,7 +204,7 @@ def test_1h_events_12h_run_old_key_drops_events_entirely() -> None:
     對照 12h 事件之失敗型態（晚一根仍落在索引內），此處舊鍵多半不落在 12h 索引 ⇒ IC 取不到列。
     """
     _require(BATCH_1H, RUN_12H, KLINE)
-    _pipe, prepared = _prepare_1h_batch(k=5)
+    _pipe, prepared, tsec = _prepare_1h_batch(k=5)
     index_ms = set(int(x) for x in _feature_index_ms(RUN_12H))
     old_keys = {
         p.event_id: int(p.feature_cutoff_ms) for p in prepared.per_tf if p.timeframe == "1h"
@@ -220,15 +220,39 @@ def test_pit_guard_rejects_open_eq_cutoff() -> None:
 
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
 
-    pipe, prepared = _prepare("1h")
+    pipe, prepared, tsec = _prepare("1h")
     bad = tuple(
         dataclasses.replace(p, last_bar_open_ms=p.feature_cutoff_ms) if p.timeframe == "1h" else p
         for p in prepared.per_tf
     )
     tampered = dataclasses.replace(prepared, per_tf=bad)
     with pytest.raises(Exception) as exc:
-        feature_row_keys(tampered, feature_timeframe="1h")
-    assert "PIT" in str(exc.value) or "決策" in str(exc.value)
+        feature_row_keys(tampered, feature_timeframe="1h", timeframe_seconds=tsec)
+    assert "非同一根" in str(exc.value)
+
+
+def test_pit_guard_rejects_earlier_real_bar_as_key() -> None:
+    """🔴 B10A 審碼 `CODEX-R30-P1-01`：把收據換成**更早之真實 bar**（仍滿足 開盤<收盤<=決策）須被擋。
+
+    只驗不等式擋不住這種竄改——守衛須驗「開盤＋一根＝收盤」，把列釘回 cutoff 所屬那根。
+    """
+    _require(BATCH_12H, RUN_1H, KLINE)
+    import dataclasses
+
+    from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
+
+    pipe, prepared, tsec = _prepare("1h")
+    bar = BAR_MS["1h"]
+    first = prepared.windows[0]
+    bad = tuple(
+        dataclasses.replace(p, last_bar_open_ms=p.last_bar_open_ms - 10 * bar)
+        if (p.event_id == first.event_id and p.timeframe == "1h") else p
+        for p in prepared.per_tf
+    )
+    tampered = dataclasses.replace(prepared, per_tf=bad)
+    with pytest.raises(Exception) as exc:
+        feature_row_keys(tampered, feature_timeframe="1h", timeframe_seconds=tsec)
+    assert first.event_id in str(exc.value) and "非同一根" in str(exc.value)
 
 
 def test_pit_guard_rejects_cutoff_after_decision() -> None:
@@ -238,7 +262,7 @@ def test_pit_guard_rejects_cutoff_after_decision() -> None:
 
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
 
-    pipe, prepared = _prepare("1h")
+    pipe, prepared, tsec = _prepare("1h")
     first = prepared.windows[0]
     bad = tuple(
         dataclasses.replace(p, feature_cutoff_ms=int(first.decision_at_ms) + BAR_MS["1h"])
@@ -247,7 +271,7 @@ def test_pit_guard_rejects_cutoff_after_decision() -> None:
     )
     tampered = dataclasses.replace(prepared, per_tf=bad)
     with pytest.raises(Exception) as exc:
-        feature_row_keys(tampered, feature_timeframe="1h")
+        feature_row_keys(tampered, feature_timeframe="1h", timeframe_seconds=tsec)
     assert first.event_id in str(exc.value)
 
 
@@ -258,18 +282,18 @@ def test_missing_feature_tf_row_fail_closed() -> None:
 
     from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
 
-    pipe, prepared = _prepare("1h")
+    pipe, prepared, tsec = _prepare("1h")
     dropped = prepared.windows[0].event_id
     bad = tuple(p for p in prepared.per_tf if not (p.event_id == dropped and p.timeframe == "1h"))
     tampered = dataclasses.replace(prepared, per_tf=bad)
     with pytest.raises(Exception) as exc:
-        feature_row_keys(tampered, feature_timeframe="1h")
+        feature_row_keys(tampered, feature_timeframe="1h", timeframe_seconds=tsec)
     assert dropped in str(exc.value) and "1h" in str(exc.value)
 
 
 def test_alignment_loads_union_of_timeframes() -> None:
     """`R5-C9` 3.：12h 事件 × 1h run ⇒ `per_tf` 須含 1h 列（只載觸發週期時取不到鍵）。"""
     _require(BATCH_12H, RUN_1H, KLINE)
-    _pipe, prepared = _prepare("1h")
+    _pipe, prepared, tsec = _prepare("1h")
     tfs = {p.timeframe for p in prepared.per_tf}
     assert {"12h", "1h"} <= tfs, f"per_tf 僅含 {sorted(tfs)}"

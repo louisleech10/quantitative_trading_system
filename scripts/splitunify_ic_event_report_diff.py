@@ -53,22 +53,41 @@ def _canonical_bytes(payload: Dict[str, Any]) -> bytes:
     return json.dumps(clean, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def _run_dir(ff_run: str) -> Path:
+def _run_dir(ff_run: str, symbols: Optional[set] = None) -> Path:
+    """以 `config_hash` 定位 run 目錄。
+
+    🔴 同一 `config_hash` 可存在於多個 symbol（實測 BCHUSDT 與 ETHUSDT 同雜湊）⇒ 必須以事件批之
+    symbol 篩選，否則會取到別的 symbol 之 run 而被 service 以「無同 symbol 事件」擋下。
+    篩選後仍多於一個 ⇒ fail-closed（不猜）。
+    """
     hits = sorted(_FEATURES_DIR.glob(f"*/*/{ff_run}"))
+    if symbols:
+        hits = [h for h in hits if h.parent.parent.name in symbols]
     if not hits:
-        raise SystemExit(f"ERROR: 找不到 FF run {ff_run}（{_FEATURES_DIR}）")
+        raise SystemExit(f"ERROR: 找不到 FF run {ff_run}（symbols={sorted(symbols or [])}）")
+    if len(hits) > 1:
+        raise SystemExit(f"ERROR: FF run {ff_run} 在多個路徑命中：{[str(h) for h in hits]}")
     return hits[0]
 
 
 def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]:
-    """**當下重跑**事件路徑並收集可證偽面。candidate 之唯一合法來源。"""
-    from momentum.factories import create_event_sample_pipeline
-    from momentum.Analysis.event_samples.label_value_from_case import isolation_terms_rows
+    """**當下重跑生產路徑**（`ICAnalysisService._run_event_label_stages`）並收集可證偽面。
+
+    🔴 B10A 審碼 `CODEX-R30-P1-03`：本函式原本自行組裝 pipeline／`isolation_terms_rows`／
+    `holdout_boundary`，等於第二份實作——生產 service 之 embargo／isolation 交接被移除時仍會綠。
+    改為**呼叫 service 之五階段入口**，逐鍵取其回傳（`event_timestamps`／`event_label_values`／
+    `label_window_rows`／`lookahead_depth_rows`／`purge_rows`／收據雜湊），邊界再由該值導出。
+    """
+    from api.services.ic_analysis_service import ICAnalysisService
     from momentum.core.split_preview import holdout_boundary
 
-    run_dir = _run_dir(ff_run)
-    run_tf = run_dir.parent.name
     batch_path = _EVENTS_DIR / f"{batch_id}.json"
+    if not batch_path.is_file():
+        raise SystemExit(f"ERROR: 找不到事件批 {batch_path}")
+    _syms = {str(r["symbol"]) for r in json.loads(batch_path.read_text())["records"]}
+    run_dir = _run_dir(ff_run, _syms)
+    run_tf = run_dir.parent.name
+    symbol = run_dir.parent.parent.name
     if not batch_path.is_file():
         raise SystemExit(f"ERROR: 找不到事件批 {batch_path}")
     batch = json.loads(batch_path.read_text())
@@ -81,40 +100,35 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
         "horizon_bars": int(decl[trigger_tfs[0]]),
         "decision_offset_bars": 0,
     }
-    pipe = create_event_sample_pipeline()
-    tfs = sorted(set(trigger_tfs) | {run_tf})
-    tsec = pipe.timeframe_seconds_for(tfs)
-    bars = pipe.bars_from_kline_cache(sorted({str(r["symbol"]) for r in recs}), tfs)
-    kw = dict(
-        event_label_spec=spec, event_import_id=batch["import_id"],
-        lookahead_bars_declared=decl, timeframe_seconds=tsec,
-    )
-    # 🔴 改前之實作沒有 `feature_timeframe`（只對齊觸發週期）——捕獲 pre 基準時須能在舊碼上跑。
-    import inspect as _inspect
-    if "feature_timeframe" in _inspect.signature(pipe.prepare_analysis_windows).parameters:
-        kw["feature_timeframe"] = run_tf
-    prepared = pipe.prepare_analysis_windows(tuple(recs), bars, **kw)
-    result = pipe.resolve_label_value_at_analyze(prepared, bars, event_label_spec=spec)
 
-    # 逐事件之鍵：新實作經單一出口取得；舊實作（改前）無該出口 ⇒ 回退觸發週期之 cutoff。
-    if hasattr(pipe, "feature_row_keys"):
-        keys = pipe.feature_row_keys(prepared, feature_timeframe=run_tf)
-        key_source = "feature_row_keys(last_bar_open_ms)"
-    else:
-        per_tf = {(p.event_id, p.timeframe): int(p.feature_cutoff_ms) for p in prepared.per_tf}
-        keys = {w.event_id: per_tf[(w.event_id, w.timeframe)] for w in prepared.windows}
-        key_source = "legacy(feature_cutoff_ms of trigger tf)"
+    class _Req:  # 最小 request：service 只讀這幾個屬性
+        event_import_id = batch["import_id"]
 
-    iso = isolation_terms_rows(
-        prepared.windows, lookahead_bars_declared=decl, timeframe_seconds=tsec, feature_timeframe=run_tf,
+    _Req.symbol = symbol
+    _Req.timeframe = run_tf
+    _Req.config_override = None if config_override in ("none", "", None) else json.loads(config_override)
+
+    event_batch = {
+        "records": tuple(recs),
+        "event_label_spec": spec,
+        "lookahead_bars_declared": decl,
+    }
+    staged = ICAnalysisService._run_event_label_stages(
+        _Req(), event_batch,
+        features_path=None, meta_path=None,
+        feature_manifest_path=str(run_dir / "feature_manifest.json"),
     )
+    prepared = staged["prepared"]
+    label_by_key = dict(staged["event_label_values"])
+    ts_keys = sorted(int(x) for x in staged["event_timestamps"])
+    iso_window = int(staged["label_window_rows"])
+    iso_depth = int(staged["lookahead_depth_rows"])
+
     ts = pd.read_parquet(run_dir / "timestamps.parquet")["timestamp"].to_numpy().astype(np.int64) * 1000
     feat_index = pd.to_datetime(ts, unit="ms")
     plan = holdout_boundary(
-        feat_index,
-        oos_test_size=0.2,
-        purge_gap=max(5, int(iso.label_window_rows)),
-        embargo=max(0, int(iso.lookahead_depth_rows)),
+        feat_index, oos_test_size=0.2,
+        purge_gap=max(5, iso_window), embargo=max(0, iso_depth),
     )
     boundary = {
         "test_start_ms": None if plan["test_start_ms"] is None else int(plan["test_start_ms"]),
@@ -124,25 +138,22 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
     }
 
     index_set = set(int(x) for x in ts)
+    owners = {int(k): v for k, v in dict(staged.get("event_label_owners") or {}).items()}
+    decision_by_id = {w.event_id: int(w.decision_at_ms) for w in prepared.windows}
     rows: List[Dict[str, Any]] = []
-    consumed: List[int] = []
-    for w in sorted(prepared.windows, key=lambda x: x.event_id):
-        k = int(keys[w.event_id])
-        v = result.label_values.get(w.event_id)
-        in_idx = k in index_set
-        if in_idx and v is not None:
-            consumed.append(k)
+    for key in ts_keys:
+        eid = owners.get(key, "")
         rows.append({
-            "event_id": w.event_id,
-            "decision_at_ms": int(w.decision_at_ms),
-            "feature_row_key_ms": k,
-            "row_in_feature_index": bool(in_idx),
-            "label_value": None if v is None else float(v),
+            "event_id": eid,
+            "decision_at_ms": decision_by_id.get(eid),
+            "feature_row_key_ms": int(key),
+            "row_in_feature_index": bool(int(key) in index_set),
+            "label_value": None if label_by_key.get(key) is None else float(label_by_key[key]),
         })
+    rows.sort(key=lambda r: (r["event_id"], r["feature_row_key_ms"]))
+    consumed = [r["feature_row_key_ms"] for r in rows if r["row_in_feature_index"] and r["label_value"] is not None]
 
-    # 條件 IC（固定特徵集、Spearman；只取實際被消費之列）
     ic: Dict[str, Optional[float]] = {}
-    lbl = {int(keys[w.event_id]): result.label_values.get(w.event_id) for w in prepared.windows}
     for name in _IC_FEATURES:
         f = run_dir / "raw" / f"{name}.parquet"
         if not f.is_file():
@@ -152,7 +163,7 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
         s = pd.Series(col[col.columns[0]].to_numpy().astype(np.float64), index=ts)
         xs, ys = [], []
         for k in consumed:
-            v = lbl.get(k)
+            v = label_by_key.get(k)
             if v is None or k not in s.index:
                 continue
             x = float(s.loc[k])
@@ -168,16 +179,14 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
             "ff_run_timeframe": run_tf,
             "config_override": config_override,
             "code_commit": head.stdout.strip()[:12] if head.returncode == 0 else "unknown",
-            "key_source": key_source,
+            "collector": "ICAnalysisService._run_event_label_stages（生產路徑）",
         },
         "n_events": len(rows),
         "n_consumed": len(consumed),
-        "isolation": {
-            "label_window_rows": int(iso.label_window_rows),
-            "lookahead_depth_rows": int(iso.lookahead_depth_rows),
-        },
+        "isolation": {"label_window_rows": iso_window, "lookahead_depth_rows": iso_depth},
+        "purge_rows": int(staged["purge_rows"]),
         "boundary": boundary,
-        "analysis_alignment_receipt_hash": prepared.analysis_alignment_receipt_hash,
+        "analysis_alignment_receipt_hash": staged["analysis_alignment_receipt_hash"],
         "events": rows,
         "conditional_ic": ic,
     }
@@ -259,6 +268,13 @@ def main(argv=None) -> int:
             print("ERROR: allow-diff 需 --baseline 與 --candidate 兩個檔路徑"); return 1
         base = json.loads(Path(a.baseline).read_text())
         cand = json.loads(Path(a.candidate).read_text())
+        # 🔴 B10A 審碼 `CODEX-R30-P1-02`：兩份基準之三元組須相同，否則「不同事件批」也會 diff=0。
+        mb, mc = base.get("meta", {}), cand.get("meta", {})
+        tb = (mb.get("batch"), mb.get("ff_run"), mb.get("config_override"))
+        tc = (mc.get("batch"), mc.get("ff_run"), mc.get("config_override"))
+        if tb != tc:
+            print(f"ERROR: 兩份基準之三元組不符：{tb} vs {tc}")
+            return 1
         diffs = _diff(base, cand)
         rec = Path(a.receipt_dir) / "splitunify-ic-event-report-diff.txt"
         rec.parent.mkdir(parents=True, exist_ok=True)

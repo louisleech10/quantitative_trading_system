@@ -756,6 +756,7 @@ def feature_row_keys(
     prepared: "PreparedAnalysisWindows",
     *,
     feature_timeframe: str,
+    timeframe_seconds: Mapping[str, int],
 ) -> Dict[str, int]:
     """v7 `R5-C9`：逐事件之**特徵列鍵**＝`(event_id, feature_timeframe)` 那列之 `last_bar_open_ms`。
 
@@ -763,13 +764,23 @@ def feature_row_keys(
     而 `feature_cutoff_ms <= decision_at_ms`（`alignment._select_cutoff_idx` 之 as-of 規則）
     ⇒ 取到的列**不含決策時點之後**的主週期資訊。
 
-    🔴 **產出端 PIT 守衛**（`R5-C9` 5.）：逐事件驗 `last_bar_open_ms < feature_cutoff_ms <= decision_at_ms`。
-    三者同屬一根 K 線與同一事件，違反即資料或上游取法有誤，當場 raise——**不是**只寫在測試裡。
+    🔴 **產出端 PIT 守衛**（`R5-C9` 5.）：逐事件驗兩條，違反即當場 raise——**不是**只寫在測試裡：
+      ① `last_bar_open_ms + bar_ms(feature_timeframe) == feature_cutoff_ms`
+         ——開盤與收盤須屬**同一根** K 線。只驗不等式不夠：任何**更早**之真實 bar 開盤也滿足
+         `open < cutoff <= decision`，收據被換成更早一根時守衛不會響（B10A 審碼 `CODEX-R30-P1-01` 實跑打穿）。
+      ② `feature_cutoff_ms <= decision_at_ms`——該根收盤不得晚於決策時點。
     🔴 缺 `(event_id, feature_timeframe)` 列 ⇒ raise（不得回退他週期之列、不得略過該事件）。
     """
     if not feature_timeframe:
         raise LabelProducerError("feature_row_keys 需要 feature_timeframe（特徵 run 週期），不得為空")
     tf = str(feature_timeframe)
+    if tf not in timeframe_seconds:
+        raise LabelProducerError(
+            f"timeframe_seconds 缺特徵週期 {tf!r}（{sorted(timeframe_seconds)}）——無從驗證開盤與收盤是否同一根（fail-closed）"
+        )
+    bar_ms = int(timeframe_seconds[tf]) * 1000
+    if bar_ms <= 0:
+        raise LabelProducerError(f"特徵週期 {tf!r} 之秒數非正（fail-closed）")
     per_tf_index = {
         (p.event_id, p.timeframe): p for p in prepared.per_tf
     }
@@ -785,11 +796,15 @@ def feature_row_keys(
         open_ms = int(row.last_bar_open_ms)
         cutoff_ms = int(row.feature_cutoff_ms)
         decision_ms = decision_by_id[w.event_id]
-        if not (open_ms < cutoff_ms <= decision_ms):
+        if open_ms + bar_ms != cutoff_ms:
             raise LabelProducerError(
-                f"事件 {w.event_id}（特徵週期 {tf}）之特徵列鍵違反 PIT 不變式："
-                f"last_bar_open_ms={open_ms}、feature_cutoff_ms={cutoff_ms}、decision_at_ms={decision_ms}；"
-                "須滿足 開盤 < 收盤 <= 決策時點（R5-C9 5.）"
+                f"事件 {w.event_id}（特徵週期 {tf}）之開盤與收盤非同一根 K 線："
+                f"last_bar_open_ms={open_ms} + {bar_ms} != feature_cutoff_ms={cutoff_ms}（R5-C9 5.①）"
+            )
+        if not (cutoff_ms <= decision_ms):
+            raise LabelProducerError(
+                f"事件 {w.event_id}（特徵週期 {tf}）之特徵列收盤晚於決策時點："
+                f"feature_cutoff_ms={cutoff_ms}、decision_at_ms={decision_ms}（R5-C9 5.②）"
             )
         out[w.event_id] = open_ms
     return out

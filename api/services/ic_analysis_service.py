@@ -887,7 +887,9 @@ class ICAnalysisService:
             raise ValueError(
                 "IC 事件路徑缺分析用 timeframe（request.timeframe）——特徵列鍵須依特徵 run 週期取得（R5-C9 2.）"
             )
-        feature_row_key_by_id = pipeline.feature_row_keys(prepared1, feature_timeframe=analysis_tf)
+        feature_row_key_by_id = pipeline.feature_row_keys(
+            prepared1, feature_timeframe=analysis_tf, timeframe_seconds=timeframe_seconds
+        )
         ts_map: Dict[int, float] = {}
         owner: Dict[int, str] = {}
         by_id: Dict[str, float] = {}  # EVTALIGN Task 2.1：逐事件 label 來源，供 analyze 後三元組回綁

@@ -6,13 +6,13 @@
     "test_start_ms": 1763758800000,
     "train_end_ms": 1762675200000
   },
-  "canonical_sha256": "fa1b1f648b1c4e7c8753238ed4ed32676c95560419e7d6b1fc28278e270d306b",
+  "canonical_sha256": "78228c6295ad5f59ce808f1b9c9663a328a61b1a312228346cd23855c1f155db",
   "conditional_ic": {
-    "12h_L1_momentum_BOP": 0.09002751582827988,
-    "12h_L1_momentum_RSI": 0.024250090495575093,
-    "1h_L1_momentum_BOP": 0.004501438924799193,
-    "1h_L1_momentum_ROC": -0.08348655162996522,
-    "1h_L1_momentum_RSI": 0.015026918219668084
+    "12h_L1_momentum_BOP": 0.0730934552228057,
+    "12h_L1_momentum_RSI": 0.10047318032667728,
+    "1h_L1_momentum_BOP": 0.08836326794759802,
+    "1h_L1_momentum_ROC": -0.03221228370485129,
+    "1h_L1_momentum_RSI": 0.04980922492545981
   },
   "events": [
     {
@@ -1178,11 +1178,12 @@
   "meta": {
     "batch": "20260909T130533Z-7f73e4c7",
     "code_commit": "96bf51a87642",
+    "collector": "ICAnalysisService._run_event_label_stages（生產路徑）",
     "config_override": "none",
     "ff_run": "4a8a0b3726cc906ab3534994605e77f5",
-    "ff_run_timeframe": "1h",
-    "key_source": "legacy(feature_cutoff_ms of trigger tf)"
+    "ff_run_timeframe": "1h"
   },
   "n_consumed": 165,
-  "n_events": 165
+  "n_events": 165,
+  "purge_rows": 156
 }
