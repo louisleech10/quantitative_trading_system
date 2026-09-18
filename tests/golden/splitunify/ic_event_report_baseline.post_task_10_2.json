@@ -1,0 +1,1188 @@
+{
+  "analysis_alignment_receipt_hash": "14ade67cdfacf36e4053b694f29c92d24dc0b84c53b984757d1bb9d7688c7dc2",
+  "boundary": {
+    "n_test_rows": 3771,
+    "n_train_rows": 16281,
+    "test_start_ms": 1763758800000,
+    "train_end_ms": 1762675200000
+  },
+  "canonical_sha256": "124bd783b815560e9a7d5c7ff41bf73138d61187d6555b739eb9bbe4da6013ca",
+  "conditional_ic": {
+    "12h_L1_momentum_BOP": -0.015018863740974785,
+    "12h_L1_momentum_RSI": -0.032170962250729414,
+    "1h_L1_momentum_BOP": -0.062426199917014466,
+    "1h_L1_momentum_ROC": 0.03587213938525277,
+    "1h_L1_momentum_RSI": 0.03323286447158596
+  },
+  "events": [
+    {
+      "decision_at_ms": 1735776000000,
+      "event_id": "ETHUSDT:12h:1735776000000",
+      "feature_row_key_ms": 1735772400000,
+      "label_value": -0.0031543522788936513,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1735905600000,
+      "event_id": "ETHUSDT:12h:1735905600000",
+      "feature_row_key_ms": 1735902000000,
+      "label_value": -0.07110152285229472,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1736208000000,
+      "event_id": "ETHUSDT:12h:1736208000000",
+      "feature_row_key_ms": 1736204400000,
+      "label_value": -0.17092618166318121,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1736467200000,
+      "event_id": "ETHUSDT:12h:1736467200000",
+      "feature_row_key_ms": 1736463600000,
+      "label_value": 0.041025742533109186,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1736769600000,
+      "event_id": "ETHUSDT:12h:1736769600000",
+      "feature_row_key_ms": 1736766000000,
+      "label_value": 0.051672381103276245,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1736812800000,
+      "event_id": "ETHUSDT:12h:1736812800000",
+      "feature_row_key_ms": 1736809200000,
+      "label_value": 0.07583080886896448,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1736942400000,
+      "event_id": "ETHUSDT:12h:1736942400000",
+      "feature_row_key_ms": 1736938800000,
+      "label_value": 0.0399829752205984,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1737072000000,
+      "event_id": "ETHUSDT:12h:1737072000000",
+      "feature_row_key_ms": 1737068400000,
+      "label_value": -0.028705807613021425,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1737288000000,
+      "event_id": "ETHUSDT:12h:1737288000000",
+      "feature_row_key_ms": 1737284400000,
+      "label_value": 0.0535844799360859,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1737331200000,
+      "event_id": "ETHUSDT:12h:1737331200000",
+      "feature_row_key_ms": 1737327600000,
+      "label_value": 0.030200329413683585,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1737633600000,
+      "event_id": "ETHUSDT:12h:1737633600000",
+      "feature_row_key_ms": 1737630000000,
+      "label_value": -0.030867632729255478,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1737979200000,
+      "event_id": "ETHUSDT:12h:1737979200000",
+      "feature_row_key_ms": 1737975600000,
+      "label_value": -0.061871110054752744,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1738195200000,
+      "event_id": "ETHUSDT:12h:1738195200000",
+      "feature_row_key_ms": 1738191600000,
+      "label_value": -0.10080282039312452,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1738281600000,
+      "event_id": "ETHUSDT:12h:1738281600000",
+      "feature_row_key_ms": 1738278000000,
+      "label_value": -0.13655931148819797,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1738584000000,
+      "event_id": "ETHUSDT:12h:1738584000000",
+      "feature_row_key_ms": 1738580400000,
+      "label_value": 0.017730628257272577,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1738713600000,
+      "event_id": "ETHUSDT:12h:1738713600000",
+      "feature_row_key_ms": 1738710000000,
+      "label_value": -0.008197852605812092,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1738886400000,
+      "event_id": "ETHUSDT:12h:1738886400000",
+      "feature_row_key_ms": 1738882800000,
+      "label_value": -0.011330158128958177,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1739361600000,
+      "event_id": "ETHUSDT:12h:1739361600000",
+      "feature_row_key_ms": 1739358000000,
+      "label_value": 0.017094991691851323,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1739750400000,
+      "event_id": "ETHUSDT:12h:1739750400000",
+      "feature_row_key_ms": 1739746800000,
+      "label_value": 0.05112706153992222,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1739923200000,
+      "event_id": "ETHUSDT:12h:1739923200000",
+      "feature_row_key_ms": 1739919600000,
+      "label_value": -0.08918789618029566,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1740182400000,
+      "event_id": "ETHUSDT:12h:1740182400000",
+      "feature_row_key_ms": 1740178800000,
+      "label_value": -0.20172735680506007,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1740484800000,
+      "event_id": "ETHUSDT:12h:1740484800000",
+      "feature_row_key_ms": 1740481200000,
+      "label_value": -0.11697824182030579,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1740744000000,
+      "event_id": "ETHUSDT:12h:1740744000000",
+      "feature_row_key_ms": 1740740400000,
+      "label_value": 0.035939364281163906,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1740916800000,
+      "event_id": "ETHUSDT:12h:1740916800000",
+      "feature_row_key_ms": 1740913200000,
+      "label_value": -0.015766725565980827,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1741089600000,
+      "event_id": "ETHUSDT:12h:1741089600000",
+      "feature_row_key_ms": 1741086000000,
+      "label_value": -0.11244035843263332,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1741132800000,
+      "event_id": "ETHUSDT:12h:1741132800000",
+      "feature_row_key_ms": 1741129200000,
+      "label_value": -0.1185263665129231,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1741219200000,
+      "event_id": "ETHUSDT:12h:1741219200000",
+      "feature_row_key_ms": 1741215600000,
+      "label_value": -0.14487489207980392,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1741435200000,
+      "event_id": "ETHUSDT:12h:1741435200000",
+      "feature_row_key_ms": 1741431600000,
+      "label_value": -0.10751881790319792,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1741564800000,
+      "event_id": "ETHUSDT:12h:1741564800000",
+      "feature_row_key_ms": 1741561200000,
+      "label_value": -0.07247469589060429,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1741651200000,
+      "event_id": "ETHUSDT:12h:1741651200000",
+      "feature_row_key_ms": 1741647600000,
+      "label_value": 0.02438461046584193,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1741910400000,
+      "event_id": "ETHUSDT:12h:1741910400000",
+      "feature_row_key_ms": 1741906800000,
+      "label_value": 0.06676534386454587,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1742299200000,
+      "event_id": "ETHUSDT:12h:1742299200000",
+      "feature_row_key_ms": 1742295600000,
+      "label_value": 0.09975581680745392,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1742342400000,
+      "event_id": "ETHUSDT:12h:1742342400000",
+      "feature_row_key_ms": 1742338800000,
+      "label_value": 0.07100028464576265,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1742774400000,
+      "event_id": "ETHUSDT:12h:1742774400000",
+      "feature_row_key_ms": 1742770800000,
+      "label_value": -0.0861021099526747,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1743120000000,
+      "event_id": "ETHUSDT:12h:1743120000000",
+      "feature_row_key_ms": 1743116400000,
+      "label_value": -0.10407903222023307,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1743206400000,
+      "event_id": "ETHUSDT:12h:1743206400000",
+      "feature_row_key_ms": 1743202800000,
+      "label_value": -0.05958143185018989,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1743465600000,
+      "event_id": "ETHUSDT:12h:1743465600000",
+      "feature_row_key_ms": 1743462000000,
+      "label_value": -0.18619099683328413,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1743508800000,
+      "event_id": "ETHUSDT:12h:1743508800000",
+      "feature_row_key_ms": 1743505200000,
+      "label_value": -0.1660947915106543,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1744027200000,
+      "event_id": "ETHUSDT:12h:1744027200000",
+      "feature_row_key_ms": 1744023600000,
+      "label_value": 0.07730379105153512,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1744070400000,
+      "event_id": "ETHUSDT:12h:1744070400000",
+      "feature_row_key_ms": 1744066800000,
+      "label_value": 0.07873583690757731,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1744200000000,
+      "event_id": "ETHUSDT:12h:1744200000000",
+      "feature_row_key_ms": 1744196400000,
+      "label_value": 0.09169746880216956,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1744329600000,
+      "event_id": "ETHUSDT:12h:1744329600000",
+      "feature_row_key_ms": 1744326000000,
+      "label_value": 0.04666151838905422,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1744459200000,
+      "event_id": "ETHUSDT:12h:1744459200000",
+      "feature_row_key_ms": 1744455600000,
+      "label_value": -0.003425268062126394,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1744588800000,
+      "event_id": "ETHUSDT:12h:1744588800000",
+      "feature_row_key_ms": 1744585200000,
+      "label_value": -0.0157345374116137,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1745193600000,
+      "event_id": "ETHUSDT:12h:1745193600000",
+      "feature_row_key_ms": 1745190000000,
+      "label_value": 0.13770030621395388,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1745280000000,
+      "event_id": "ETHUSDT:12h:1745280000000",
+      "feature_row_key_ms": 1745276400000,
+      "label_value": 0.14980660111870034,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1745323200000,
+      "event_id": "ETHUSDT:12h:1745323200000",
+      "feature_row_key_ms": 1745319600000,
+      "label_value": 0.10352352351153674,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1745366400000,
+      "event_id": "ETHUSDT:12h:1745366400000",
+      "feature_row_key_ms": 1745362800000,
+      "label_value": 0.04186193282918149,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1746057600000,
+      "event_id": "ETHUSDT:12h:1746057600000",
+      "feature_row_key_ms": 1746054000000,
+      "label_value": 0.023823318531837733,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1746532800000,
+      "event_id": "ETHUSDT:12h:1746532800000",
+      "feature_row_key_ms": 1746529200000,
+      "label_value": 0.4099337307579702,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1746662400000,
+      "event_id": "ETHUSDT:12h:1746662400000",
+      "feature_row_key_ms": 1746658800000,
+      "label_value": 0.4493542427776474,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1746705600000,
+      "event_id": "ETHUSDT:12h:1746705600000",
+      "feature_row_key_ms": 1746702000000,
+      "label_value": 0.33310515248281986,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1746748800000,
+      "event_id": "ETHUSDT:12h:1746748800000",
+      "feature_row_key_ms": 1746745200000,
+      "label_value": 0.1573442324471831,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1746878400000,
+      "event_id": "ETHUSDT:12h:1746878400000",
+      "feature_row_key_ms": 1746874800000,
+      "label_value": 0.06388907344888302,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1747137600000,
+      "event_id": "ETHUSDT:12h:1747137600000",
+      "feature_row_key_ms": 1747134000000,
+      "label_value": 0.005868568200881121,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1747353600000,
+      "event_id": "ETHUSDT:12h:1747353600000",
+      "feature_row_key_ms": 1747350000000,
+      "label_value": 0.04004004032769847,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1747656000000,
+      "event_id": "ETHUSDT:12h:1747656000000",
+      "feature_row_key_ms": 1747652400000,
+      "label_value": 0.055278372694803124,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1747872000000,
+      "event_id": "ETHUSDT:12h:1747872000000",
+      "feature_row_key_ms": 1747868400000,
+      "label_value": 0.041548408559143477,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1748174400000,
+      "event_id": "ETHUSDT:12h:1748174400000",
+      "feature_row_key_ms": 1748170800000,
+      "label_value": 0.012070149663209642,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1748304000000,
+      "event_id": "ETHUSDT:12h:1748304000000",
+      "feature_row_key_ms": 1748300400000,
+      "label_value": -0.03228147261452931,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1748606400000,
+      "event_id": "ETHUSDT:12h:1748606400000",
+      "feature_row_key_ms": 1748602800000,
+      "label_value": -0.07933899795491121,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1748865600000,
+      "event_id": "ETHUSDT:12h:1748865600000",
+      "feature_row_key_ms": 1748862000000,
+      "label_value": 0.011648916850006923,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1749168000000,
+      "event_id": "ETHUSDT:12h:1749168000000",
+      "feature_row_key_ms": 1749164400000,
+      "label_value": 0.13081085771533602,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1749470400000,
+      "event_id": "ETHUSDT:12h:1749470400000",
+      "feature_row_key_ms": 1749466800000,
+      "label_value": 0.0022936989266584005,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1749513600000,
+      "event_id": "ETHUSDT:12h:1749513600000",
+      "feature_row_key_ms": 1749510000000,
+      "label_value": -0.02355105006352814,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1749772800000,
+      "event_id": "ETHUSDT:12h:1749772800000",
+      "feature_row_key_ms": 1749769200000,
+      "label_value": -0.04193874265717017,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1750032000000,
+      "event_id": "ETHUSDT:12h:1750032000000",
+      "feature_row_key_ms": 1750028400000,
+      "label_value": -0.1077947670984294,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1750420800000,
+      "event_id": "ETHUSDT:12h:1750420800000",
+      "feature_row_key_ms": 1750417200000,
+      "label_value": -0.05243090682325792,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1750680000000,
+      "event_id": "ETHUSDT:12h:1750680000000",
+      "feature_row_key_ms": 1750676400000,
+      "label_value": 0.10948451566462011,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1750939200000,
+      "event_id": "ETHUSDT:12h:1750939200000",
+      "feature_row_key_ms": 1750935600000,
+      "label_value": 0.048997004374175646,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1751457600000,
+      "event_id": "ETHUSDT:12h:1751457600000",
+      "feature_row_key_ms": 1751454000000,
+      "label_value": 0.06933015331299701,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1751803200000,
+      "event_id": "ETHUSDT:12h:1751803200000",
+      "feature_row_key_ms": 1751799600000,
+      "label_value": 0.16976009083544527,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1752062400000,
+      "event_id": "ETHUSDT:12h:1752062400000",
+      "feature_row_key_ms": 1752058800000,
+      "label_value": 0.19473581030125237,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1752148800000,
+      "event_id": "ETHUSDT:12h:1752148800000",
+      "feature_row_key_ms": 1752145200000,
+      "label_value": 0.21328761709558147,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1752451200000,
+      "event_id": "ETHUSDT:12h:1752451200000",
+      "feature_row_key_ms": 1752447600000,
+      "label_value": 0.26402153541707823,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1752580800000,
+      "event_id": "ETHUSDT:12h:1752580800000",
+      "feature_row_key_ms": 1752577200000,
+      "label_value": 0.2620524937702016,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1752667200000,
+      "event_id": "ETHUSDT:12h:1752667200000",
+      "feature_row_key_ms": 1752663600000,
+      "label_value": 0.1890880379082898,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1752796800000,
+      "event_id": "ETHUSDT:12h:1752796800000",
+      "feature_row_key_ms": 1752793200000,
+      "label_value": 0.05126442108515374,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1752969600000,
+      "event_id": "ETHUSDT:12h:1752969600000",
+      "feature_row_key_ms": 1752966000000,
+      "label_value": 0.04102452879228146,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1753228800000,
+      "event_id": "ETHUSDT:12h:1753228800000",
+      "feature_row_key_ms": 1753225200000,
+      "label_value": 0.02127215031650478,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1753272000000,
+      "event_id": "ETHUSDT:12h:1753272000000",
+      "feature_row_key_ms": 1753268400000,
+      "label_value": 0.033170038358506196,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1753704000000,
+      "event_id": "ETHUSDT:12h:1753704000000",
+      "feature_row_key_ms": 1753700400000,
+      "label_value": -0.09873190725626478,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1754179200000,
+      "event_id": "ETHUSDT:12h:1754179200000",
+      "feature_row_key_ms": 1754175600000,
+      "label_value": 0.23455337228622536,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1754308800000,
+      "event_id": "ETHUSDT:12h:1754308800000",
+      "feature_row_key_ms": 1754305200000,
+      "label_value": 0.19542085010163285,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1754524800000,
+      "event_id": "ETHUSDT:12h:1754524800000",
+      "feature_row_key_ms": 1754521200000,
+      "label_value": 0.27340082792696524,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1754568000000,
+      "event_id": "ETHUSDT:12h:1754568000000",
+      "feature_row_key_ms": 1754564400000,
+      "label_value": 0.2409948739534021,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1754654400000,
+      "event_id": "ETHUSDT:12h:1754654400000",
+      "feature_row_key_ms": 1754650800000,
+      "label_value": 0.1605091100108705,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1754697600000,
+      "event_id": "ETHUSDT:12h:1754697600000",
+      "feature_row_key_ms": 1754694000000,
+      "label_value": 0.15579214042687695,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1755000000000,
+      "event_id": "ETHUSDT:12h:1755000000000",
+      "feature_row_key_ms": 1754996400000,
+      "label_value": 0.005138802516430365,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1755043200000,
+      "event_id": "ETHUSDT:12h:1755043200000",
+      "feature_row_key_ms": 1755039600000,
+      "label_value": -0.06134160020039601,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1755388800000,
+      "event_id": "ETHUSDT:12h:1755388800000",
+      "feature_row_key_ms": 1755385200000,
+      "label_value": 0.06398240067418588,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1755648000000,
+      "event_id": "ETHUSDT:12h:1755648000000",
+      "feature_row_key_ms": 1755644400000,
+      "label_value": 0.08628468819382977,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1755691200000,
+      "event_id": "ETHUSDT:12h:1755691200000",
+      "feature_row_key_ms": 1755687600000,
+      "label_value": 0.09661783571001428,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1755864000000,
+      "event_id": "ETHUSDT:12h:1755864000000",
+      "feature_row_key_ms": 1755860400000,
+      "label_value": 0.05535998859534363,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1756209600000,
+      "event_id": "ETHUSDT:12h:1756209600000",
+      "feature_row_key_ms": 1756206000000,
+      "label_value": -0.025465126897708478,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1756598400000,
+      "event_id": "ETHUSDT:12h:1756598400000",
+      "feature_row_key_ms": 1756594800000,
+      "label_value": -0.016852998067059654,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1757030400000,
+      "event_id": "ETHUSDT:12h:1757030400000",
+      "feature_row_key_ms": 1757026800000,
+      "label_value": 0.030770889595670144,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1757678400000,
+      "event_id": "ETHUSDT:12h:1757678400000",
+      "feature_row_key_ms": 1757674800000,
+      "label_value": 0.014798483903899933,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1758110400000,
+      "event_id": "ETHUSDT:12h:1758110400000",
+      "feature_row_key_ms": 1758106800000,
+      "label_value": -0.07288659846487816,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1758499200000,
+      "event_id": "ETHUSDT:12h:1758499200000",
+      "feature_row_key_ms": 1758495600000,
+      "label_value": -0.10182050085249127,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1758888000000,
+      "event_id": "ETHUSDT:12h:1758888000000",
+      "feature_row_key_ms": 1758884400000,
+      "label_value": 0.14806710129448283,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1759060800000,
+      "event_id": "ETHUSDT:12h:1759060800000",
+      "feature_row_key_ms": 1759057200000,
+      "label_value": 0.12392577455558301,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1759147200000,
+      "event_id": "ETHUSDT:12h:1759147200000",
+      "feature_row_key_ms": 1759143600000,
+      "label_value": 0.1001922561104623,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1759276800000,
+      "event_id": "ETHUSDT:12h:1759276800000",
+      "feature_row_key_ms": 1759273200000,
+      "label_value": 0.13598064473646546,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1759406400000,
+      "event_id": "ETHUSDT:12h:1759406400000",
+      "feature_row_key_ms": 1759402800000,
+      "label_value": 0.03352431549054039,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1759752000000,
+      "event_id": "ETHUSDT:12h:1759752000000",
+      "feature_row_key_ms": 1759748400000,
+      "label_value": -0.09174246079884549,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1760270400000,
+      "event_id": "ETHUSDT:12h:1760270400000",
+      "feature_row_key_ms": 1760266800000,
+      "label_value": 0.018021822964246037,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1760356800000,
+      "event_id": "ETHUSDT:12h:1760356800000",
+      "feature_row_key_ms": 1760353200000,
+      "label_value": -0.023968308710533376,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1760443200000,
+      "event_id": "ETHUSDT:12h:1760443200000",
+      "feature_row_key_ms": 1760439600000,
+      "label_value": 0.0018555264840493075,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1760961600000,
+      "event_id": "ETHUSDT:12h:1760961600000",
+      "feature_row_key_ms": 1760958000000,
+      "label_value": 0.030589594313907325,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1761004800000,
+      "event_id": "ETHUSDT:12h:1761004800000",
+      "feature_row_key_ms": 1761001200000,
+      "label_value": 0.045968850016427504,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1761264000000,
+      "event_id": "ETHUSDT:12h:1761264000000",
+      "feature_row_key_ms": 1761260400000,
+      "label_value": 0.006300572630284135,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1761436800000,
+      "event_id": "ETHUSDT:12h:1761436800000",
+      "feature_row_key_ms": 1761433200000,
+      "label_value": -0.01922702871525599,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1761480000000,
+      "event_id": "ETHUSDT:12h:1761480000000",
+      "feature_row_key_ms": 1761476400000,
+      "label_value": -0.04232652862664093,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1761739200000,
+      "event_id": "ETHUSDT:12h:1761739200000",
+      "feature_row_key_ms": 1761735600000,
+      "label_value": -0.18049318230941117,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1761825600000,
+      "event_id": "ETHUSDT:12h:1761825600000",
+      "feature_row_key_ms": 1761822000000,
+      "label_value": -0.11770117933047183,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1762344000000,
+      "event_id": "ETHUSDT:12h:1762344000000",
+      "feature_row_key_ms": 1762340400000,
+      "label_value": 0.028646392081643067,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1762516800000,
+      "event_id": "ETHUSDT:12h:1762516800000",
+      "feature_row_key_ms": 1762513200000,
+      "label_value": -0.008720918258793993,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1762689600000,
+      "event_id": "ETHUSDT:12h:1762689600000",
+      "feature_row_key_ms": 1762686000000,
+      "label_value": -0.07598341167090755,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1762905600000,
+      "event_id": "ETHUSDT:12h:1762905600000",
+      "feature_row_key_ms": 1762902000000,
+      "label_value": -0.10525899974605592,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1762992000000,
+      "event_id": "ETHUSDT:12h:1762992000000",
+      "feature_row_key_ms": 1762988400000,
+      "label_value": -0.09704499119247503,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1763337600000,
+      "event_id": "ETHUSDT:12h:1763337600000",
+      "feature_row_key_ms": 1763334000000,
+      "label_value": -0.09037925249962377,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1763467200000,
+      "event_id": "ETHUSDT:12h:1763467200000",
+      "feature_row_key_ms": 1763463600000,
+      "label_value": -0.034211941526324396,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1763726400000,
+      "event_id": "ETHUSDT:12h:1763726400000",
+      "feature_row_key_ms": 1763722800000,
+      "label_value": 0.12156213243867833,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1763985600000,
+      "event_id": "ETHUSDT:12h:1763985600000",
+      "feature_row_key_ms": 1763982000000,
+      "label_value": 0.06701152670541821,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1764072000000,
+      "event_id": "ETHUSDT:12h:1764072000000",
+      "feature_row_key_ms": 1764068400000,
+      "label_value": -0.031802014208073805,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1764158400000,
+      "event_id": "ETHUSDT:12h:1764158400000",
+      "feature_row_key_ms": 1764154800000,
+      "label_value": 0.02816759096636369,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1764676800000,
+      "event_id": "ETHUSDT:12h:1764676800000",
+      "feature_row_key_ms": 1764673200000,
+      "label_value": 0.10543560129795759,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1764720000000,
+      "event_id": "ETHUSDT:12h:1764720000000",
+      "feature_row_key_ms": 1764716400000,
+      "label_value": 0.040813474487208706,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1764763200000,
+      "event_id": "ETHUSDT:12h:1764763200000",
+      "feature_row_key_ms": 1764759600000,
+      "label_value": 0.07965888011947934,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1765152000000,
+      "event_id": "ETHUSDT:12h:1765152000000",
+      "feature_row_key_ms": 1765148400000,
+      "label_value": 0.008163765529070938,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1765281600000,
+      "event_id": "ETHUSDT:12h:1765281600000",
+      "feature_row_key_ms": 1765278000000,
+      "label_value": -0.049224748727017695,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1765756800000,
+      "event_id": "ETHUSDT:12h:1765756800000",
+      "feature_row_key_ms": 1765753200000,
+      "label_value": -0.021860678806396687,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1766102400000,
+      "event_id": "ETHUSDT:12h:1766102400000",
+      "feature_row_key_ms": 1766098800000,
+      "label_value": 0.03405259998850315,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1766404800000,
+      "event_id": "ETHUSDT:12h:1766404800000",
+      "feature_row_key_ms": 1766401200000,
+      "label_value": -0.03218711898693473,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1766448000000,
+      "event_id": "ETHUSDT:12h:1766448000000",
+      "feature_row_key_ms": 1766444400000,
+      "label_value": -0.016471306897231485,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1766707200000,
+      "event_id": "ETHUSDT:12h:1766707200000",
+      "feature_row_key_ms": 1766703600000,
+      "label_value": 0.029543042786446767,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1767355200000,
+      "event_id": "ETHUSDT:12h:1767355200000",
+      "feature_row_key_ms": 1767351600000,
+      "label_value": 0.01930561374193657,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1767744000000,
+      "event_id": "ETHUSDT:12h:1767744000000",
+      "feature_row_key_ms": 1767740400000,
+      "label_value": -0.0494050718700551,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1767787200000,
+      "event_id": "ETHUSDT:12h:1767787200000",
+      "feature_row_key_ms": 1767783600000,
+      "label_value": 0.03278319023658877,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1767830400000,
+      "event_id": "ETHUSDT:12h:1767830400000",
+      "feature_row_key_ms": 1767826800000,
+      "label_value": 0.03708121925773304,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1768305600000,
+      "event_id": "ETHUSDT:12h:1768305600000",
+      "feature_row_key_ms": 1768302000000,
+      "label_value": 0.017741220671204243,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1768392000000,
+      "event_id": "ETHUSDT:12h:1768392000000",
+      "feature_row_key_ms": 1768388400000,
+      "label_value": -0.10539163262906029,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1768737600000,
+      "event_id": "ETHUSDT:12h:1768737600000",
+      "feature_row_key_ms": 1768734000000,
+      "label_value": -0.11101144771128085,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1768780800000,
+      "event_id": "ETHUSDT:12h:1768780800000",
+      "feature_row_key_ms": 1768777200000,
+      "label_value": -0.1055102848560019,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1768824000000,
+      "event_id": "ETHUSDT:12h:1768824000000",
+      "feature_row_key_ms": 1768820400000,
+      "label_value": -0.12625043212356404,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1768867200000,
+      "event_id": "ETHUSDT:12h:1768867200000",
+      "feature_row_key_ms": 1768863600000,
+      "label_value": -0.093244883553353,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1768910400000,
+      "event_id": "ETHUSDT:12h:1768910400000",
+      "feature_row_key_ms": 1768906800000,
+      "label_value": -0.057728848676267076,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1769083200000,
+      "event_id": "ETHUSDT:12h:1769083200000",
+      "feature_row_key_ms": 1769079600000,
+      "label_value": 0.008028652764405363,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1769385600000,
+      "event_id": "ETHUSDT:12h:1769385600000",
+      "feature_row_key_ms": 1769382000000,
+      "label_value": -0.1437892040767473,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1769515200000,
+      "event_id": "ETHUSDT:12h:1769515200000",
+      "feature_row_key_ms": 1769511600000,
+      "label_value": -0.195407659174157,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1769774400000,
+      "event_id": "ETHUSDT:12h:1769774400000",
+      "feature_row_key_ms": 1769770800000,
+      "label_value": -0.3380739388140647,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1770033600000,
+      "event_id": "ETHUSDT:12h:1770033600000",
+      "feature_row_key_ms": 1770030000000,
+      "label_value": -0.08437908459676931,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1770336000000,
+      "event_id": "ETHUSDT:12h:1770336000000",
+      "feature_row_key_ms": 1770332400000,
+      "label_value": 0.088782244312895,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1770379200000,
+      "event_id": "ETHUSDT:12h:1770379200000",
+      "feature_row_key_ms": 1770375600000,
+      "label_value": 0.007854383467152521,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1770465600000,
+      "event_id": "ETHUSDT:12h:1770465600000",
+      "feature_row_key_ms": 1770462000000,
+      "label_value": 0.014835742002365012,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1770508800000,
+      "event_id": "ETHUSDT:12h:1770508800000",
+      "feature_row_key_ms": 1770505200000,
+      "label_value": 0.005989228746426349,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1770638400000,
+      "event_id": "ETHUSDT:12h:1770638400000",
+      "feature_row_key_ms": 1770634800000,
+      "label_value": -0.030410328761579696,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1770854400000,
+      "event_id": "ETHUSDT:12h:1770854400000",
+      "feature_row_key_ms": 1770850800000,
+      "label_value": 0.020729610970236373,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1770984000000,
+      "event_id": "ETHUSDT:12h:1770984000000",
+      "feature_row_key_ms": 1770980400000,
+      "label_value": -0.005596843192854336,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1771027200000,
+      "event_id": "ETHUSDT:12h:1771027200000",
+      "feature_row_key_ms": 1771023600000,
+      "label_value": -0.05112460059557481,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1771286400000,
+      "event_id": "ETHUSDT:12h:1771286400000",
+      "feature_row_key_ms": 1771282800000,
+      "label_value": -0.04155444939925418,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1771416000000,
+      "event_id": "ETHUSDT:12h:1771416000000",
+      "feature_row_key_ms": 1771412400000,
+      "label_value": -0.06535651033060957,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1771977600000,
+      "event_id": "ETHUSDT:12h:1771977600000",
+      "feature_row_key_ms": 1771974000000,
+      "label_value": 0.059035114883001144,
+      "row_in_feature_index": true
+    },
+    {
+      "decision_at_ms": 1772020800000,
+      "event_id": "ETHUSDT:12h:1772020800000",
+      "feature_row_key_ms": 1772017200000,
+      "label_value": 0.029234702114927368,
+      "row_in_feature_index": true
+    }
+  ],
+  "isolation": {
+    "label_window_rows": 156,
+    "lookahead_depth_rows": 144
+  },
+  "meta": {
+    "batch": "20260909T130533Z-7f73e4c7",
+    "code_commit": "c14fc50bd764",
+    "config_override": "none",
+    "ff_run": "4a8a0b3726cc906ab3534994605e77f5",
+    "ff_run_timeframe": "1h",
+    "key_source": "feature_row_keys(last_bar_open_ms)"
+  },
+  "n_consumed": 165,
+  "n_events": 165
+}
