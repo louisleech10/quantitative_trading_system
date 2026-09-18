@@ -114,6 +114,7 @@ def _materialize_named_subset(service, symbol: str, run_tf: str, ff_run: str, ru
 def _production_evidence(
     symbol: str, run_tf: str, ff_run: str, import_id: str,
     event_batch: Dict[str, Any], run_dir: Path, cfg_override: Optional[Dict[str, Any]],
+    *, staged_by_event_id: Dict[str, float],
 ) -> Dict[str, Any]:
     """走**生產端** `_run_scan_cell`（內含 `ICFilterOrchestrator.analyze`）取證據。
 
@@ -166,6 +167,43 @@ def _production_evidence(
         raise SystemExit(
             f"ERROR: 生產端之 statistic_kind={ef.get('statistic_kind')!r}，非 'conditional_ic'（fail-closed）"
         )
+    # 🔴 **半開事件分支**（B10A 閉合輪 `CODEX-R33-P1-01`）：只驗 `mode` 與 `statistic_kind`
+    #    擋不住「標記對、內容不對」——實測可同時回報 `mode!=none`、`statistic_kind=conditional_ic`、
+    #    `label_source=mainline_return_N`、`consumed_event_count=0` 而本腳本仍照收。
+    #    ⇒ 再綁三條：①標籤來源必須是事件標籤；②生產端確實消費了事件（非空）；
+    #    ③生產端消費之事件身分與鍵，須與 service staging 逐值一致（不是各算各的）。
+    if ef.get("label_source") != "event_label_value":
+        raise SystemExit(
+            f"ERROR: 生產端之 label_source={ef.get('label_source')!r}，非 'event_label_value'"
+            "——條件 IC 之標籤必須是事件標籤（fail-closed）"
+        )
+    consumed_labels = ef.get("consumed_event_labels")
+    if not isinstance(consumed_labels, dict) or not consumed_labels:
+        raise SystemExit(
+            "ERROR: 生產端未回報 consumed_event_labels（或為空）——無從證明真的消費了事件（fail-closed）"
+        )
+    prod_count = ef.get("consumed_event_count")
+    if int(prod_count or 0) != len(consumed_labels):
+        raise SystemExit(
+            f"ERROR: 生產端 consumed_event_count={prod_count} 與 consumed_event_labels "
+            f"筆數 {len(consumed_labels)} 不一致（fail-closed）"
+        )
+    # 🔴 `consumed_event_labels` 之鍵是 **event_id**（例 `ETHUSDT:12h:1735776000000`），
+    #    不是特徵列毫秒鍵——對證須以事件 id 為準（首版誤當毫秒鍵，實跑 ValueError 當場現形）。
+    prod_ids = {str(k) for k in consumed_labels}
+    if prod_ids != set(staged_by_event_id):
+        only_p = sorted(prod_ids - set(staged_by_event_id))[:3]
+        only_s = sorted(set(staged_by_event_id) - prod_ids)[:3]
+        raise SystemExit(
+            f"ERROR: 生產端消費之事件身分與 staging 不一致（生產端 {len(prod_ids)} 筆、staging "
+            f"{len(staged_by_event_id)} 筆；只在生產端 {only_p}、只在 staging {only_s}）（fail-closed）"
+        )
+    for k, v in consumed_labels.items():
+        sv = staged_by_event_id.get(str(k))
+        if sv is None or not np.isclose(float(v), float(sv), rtol=0, atol=0):
+            raise SystemExit(
+                f"ERROR: 事件 {k} 之生產端標籤 {v!r} 與 staging 之 {sv!r} 不一致（fail-closed）"
+            )
 
     # 逐特徵條件 IC：只取本比對面之特徵；缺席即 None（不造值）。
     by_name = {
@@ -202,7 +240,7 @@ def _production_evidence(
         "split_method": meta.get("split_method"),
         "oos_downgrade": meta.get("oos_downgrade"),
     }
-    return {"conditional_ic": cond, "evidence": evidence}
+    return {"conditional_ic": cond, "evidence": evidence, "n_consumed": len(consumed_labels)}
 
 
 def _canonical_bytes(payload: Dict[str, Any]) -> bytes:
@@ -332,6 +370,12 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
         })
     rows.sort(key=lambda r: (r["event_id"], r["feature_row_key_ms"]))
     consumed = [r["feature_row_key_ms"] for r in rows if r["row_in_feature_index"] and r["label_value"] is not None]
+    # 🔴 `CODEX-R33-P1-01`：以**事件 id** 建 staging 之消費面，供與生產端 `consumed_event_labels`
+    #    逐值對證（兩側各自導出、必須一致；任一側被改壞即現形）。
+    consumed_by_event_id: Dict[str, float] = {
+        str(r["event_id"]): float(r["label_value"])
+        for r in rows if r["row_in_feature_index"] and r["label_value"] is not None
+    }
 
     # 🔴 B10A 閉合輪 `CODEX-R32-P1-01`：條件 IC **不得**在腳本內自算。
     #    原本以 `run_dir/raw/<feature>.parquet` 重跑 Spearman ＝ 第二份實作：生產端
@@ -343,6 +387,7 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
     #    本批亦為報酬版 ⇒ 與主路徑同解；偏離揭露於 payload 之 `production_evidence.entrypoint`。
     prod = _production_evidence(
         symbol, run_tf, ff_run, str(batch["import_id"]), event_batch, run_dir, cfg_override,
+        staged_by_event_id=consumed_by_event_id,
     )
 
     head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True)
@@ -356,7 +401,10 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
             "collector": "ICAnalysisService._run_event_label_stages（生產路徑）",
         },
         "n_events": len(rows),
-        "n_consumed": len(consumed),
+        # 🔴 `CODEX-R33-P1-01`：`n_consumed` **只能**取生產端之 consumed evidence。
+        #    腳本自己的投影 `consumed` 只用來與生產端逐值對證（見 `_production_evidence`），
+        #    不得成為 payload 之值——否則生產端消費了別的列時，這個數字仍然好看。
+        "n_consumed": prod["n_consumed"],
         "isolation": {"label_window_rows": iso_window, "lookahead_depth_rows": iso_depth},
         "purge_rows": int(staged["purge_rows"]),
         "boundary": boundary,

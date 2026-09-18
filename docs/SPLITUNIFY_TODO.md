@@ -1300,6 +1300,9 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | `M-SU-R5-27` | 生產端 `analyze` 直接 raise（證明 strict 真的走到它） | `splitunify_ic_event_report_diff.py --mode strict` 自證 | B10A |
 | `M-SU-R5-28` | staging 之 `purge_rows` 位移一根 | 同上（`purge_rows` 已在 `_diff` 比對面） | B10A |
 | `M-SU-R5-29` | 移除 `config_override` 之 `event_filter`（事件分支被關掉） | 同上（`event_filter.mode=none` fail-closed） | B10A |
+| `M-SU-R5-30` | 半開：`label_source` 改為 `mainline_return_N`（標記仍對） | 同上（`label_source` fail-closed） | B10A |
+| `M-SU-R5-31` | 半開：`consumed_event_count` 與 `consumed_event_labels` 筆數不一致 | 同上（筆數對證 fail-closed） | B10A |
+| `M-SU-R5-32` | 半開：生產端消費之事件身分或標籤值與 staging 不符 | 同上（逐值對證 fail-closed） | B10A |
 
 ---
 
