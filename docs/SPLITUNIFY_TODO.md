@@ -1305,6 +1305,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | `M-SU-R5-32` | 半開：生產端消費之事件身分或標籤值與 staging 不符 | 同上（逐值對證 fail-closed） | B10A |
 | `M-SU-R5-33` | stage4 入口**只**重排 features（labels 不動） | 同上（五個 `conditional_ic` 全轉紅） | B10A |
 | `M-SU-R5-34` | stage4 入口**只**重排 labels（features 不動） | 同上（五個 `conditional_ic` 全轉紅） | B10A |
+| `M-SU-R5-35` | stage4 入口**配對**重排（features 與 labels 同排列、分區內） | 同上（`production_evidence.report_contract_digest` 轉紅；五個 `conditional_ic` 恆等，故只綁 IC 會漏） | B10A |
 
 ---
 

@@ -9,7 +9,7 @@
     "test_start_ms": 1763758800000,
     "train_end_ms": 1762675200000
   },
-  "canonical_sha256": "27fc6edba939f21f744c45c00d92828bec47b9aa4bcbaff4c33dffad8c637621",
+  "canonical_sha256": "9ba9a5224b1dc466223c71c574b59e54b03a5352116d10f9bccd6553ede9669c",
   "conditional_ic": {
     "12h_L1_momentum_BOP": 0.044599303135888516,
     "12h_L1_momentum_RSI": -0.19199442502640557,
@@ -1180,7 +1180,7 @@
   },
   "meta": {
     "batch": "20260909T130533Z-7f73e4c7",
-    "code_commit": "12a55c1094ae",
+    "code_commit": "3e8eadb48138",
     "collector": "ICAnalysisService._run_event_label_stages（生產路徑）",
     "config_override": "none",
     "ff_run": "4a8a0b3726cc906ab3534994605e77f5",
@@ -1241,6 +1241,34 @@
     "named_deviation": "掃描格恆為報酬版（label_mode_requested=return_rule）；本批亦為報酬版",
     "oos_downgrade": null,
     "oos_guarantees": true,
+    "order_sensitive": {
+      "12h_L1_momentum_BOP": {
+        "ic_half_life": 2.563725951977603,
+        "ic_hit_rate": "__nan__",
+        "icir": null
+      },
+      "12h_L1_momentum_RSI": {
+        "ic_half_life": 0.5687377919865815,
+        "ic_hit_rate": "__nan__",
+        "icir": null
+      },
+      "1h_L1_momentum_BOP": {
+        "ic_half_life": 0.01937726450301592,
+        "ic_hit_rate": "__nan__",
+        "icir": null
+      },
+      "1h_L1_momentum_ROC": {
+        "ic_half_life": 0.052294472059030664,
+        "ic_hit_rate": "__nan__",
+        "icir": null
+      },
+      "1h_L1_momentum_RSI": {
+        "ic_half_life": 0.05232117312175958,
+        "ic_hit_rate": "__nan__",
+        "icir": null
+      }
+    },
+    "report_contract_digest": "456891226d72f69e80a42abb3f8045fafc9a4145ffc3724b0019e0fa56cf7b4c",
     "split_mask": {
       "test_rows": 41,
       "train_rows": 118

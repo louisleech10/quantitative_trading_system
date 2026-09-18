@@ -215,8 +215,43 @@ def _production_evidence(
         name: (None if by_name.get(name) is None else float(by_name[name]))
         for name in _IC_FEATURES
     }
+    # 🔴 **完整報告之契約 digest**（B10A 閉合輪 `CODEX-R35-P1-01`）：只綁五個 `conditional_ic`
+    #    ＋事件 metadata **不夠**——stage4 之 `ic_decay`／`grouped_ic`／`summary_table.ic_half_life`
+    #    依賴**列序**，而 Spearman 不依賴。提出方實跑證據：train／test 分區內同步重排
+    #    features 與 labels（成員身分不變）⇒ 五個 `conditional_ic` 逐值不變（主委反證屬實），
+    #    但 `1h_L1_momentum_BOP` 之 `ic_half_life` 由 0.01937726450301592 變 64183.44883713336、
+    #    `12h_L1_amihud_illiq` 之 `decay_type` 由 non_exponential 變 exponential。
+    #    ⇒ 主委 r5 之「無錯誤輸出可達」結論**錯誤**（比對面窄，不是產出無誤）。
+    #    修法採提出方之較小方案：把整份 report 的契約面納入 digest，不動 IC 演算法。
+    #    時鐘鍵之排除沿用**既有**之 `tests/momentum/helpers/ichc_run.canonical_sha`，不另造第二份。
+    #    🔴 以檔案路徑載入，**不得**把 `REPO/tests` 塞進 `sys.path`——那會使後續之
+    #    `import momentum.*` 解析到 `tests/momentum/`，把真正的套件整個遮掉。
+    import importlib.util as _ilu
+
+    _hp = REPO / "tests/momentum/helpers/ichc_run.py"
+    _spec = _ilu.spec_from_file_location("_splitunify_ichc_run", _hp)
+    _mod = _ilu.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    canonical_sha = _mod.canonical_sha
+
+    # legible 面：digest 不符時要看得出動到哪裡 ⇒ 另記本比對面五特徵之**列序敏感**量。
+    # 🔴 NaN 必須消毒成字面 sentinel：`float('nan') != float('nan')` ⇒ 直接放進 payload
+    #    會讓 `_diff` 在**未被竄改**時也判為不同（實測 `ic_hit_rate` 即為 NaN）。
+    #    與 `canonical_sha` 之 `"__nan__"` 同一慣例。
+    def _nan_safe(x: Any) -> Any:
+        return "__nan__" if isinstance(x, float) and np.isnan(x) else x
+
+    order_sensitive = {
+        str(r.get("feature_name")): {
+            k: _nan_safe(r.get(k)) for k in ("ic_half_life", "icir", "ic_hit_rate")
+        }
+        for r in (report.get("summary_table") or [])
+        if isinstance(r, dict) and str(r.get("feature_name")) in set(_IC_FEATURES)
+    }
     evidence = {
         "entrypoint": "ICAnalysisService._run_scan_cell → ICFilterOrchestrator.analyze（生產端）",
+        "report_contract_digest": canonical_sha(report),
+        "order_sensitive": order_sensitive,
         "named_deviation": "掃描格恆為報酬版（label_mode_requested=return_rule）；本批亦為報酬版",
         "analysis_status": report.get("analysis_status"),
         "oos_guarantees": report.get("oos_guarantees"),
