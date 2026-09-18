@@ -657,7 +657,37 @@ def test_v9_keys_not_overwritten_by_v10_freeze(tmp_path: Path, monkeypatch, caps
             f"v9 鍵 {k} 被重凍改寫：{before[k]} → {after[k]}"
             "——v9 之值不得覆寫（Task 10.3 不可做第三條）"
         )
-    # 反面：v10 鍵必須真的存在且與 v9 **不同**，否則「沿用」退化成「兩組同值」而測不出換錨。
-    assert after["g1_membership_v10"] != after["g1_membership_v9"], (
-        "v10 與 v9 成員集合相同 ⇒ 換錨在 golden 上不可觀測（fixture 失去判別力）"
+    # 🔴 反面之**判別力**（`CODEX-R39-P1-01`／`COMPOSER-R39-P1-01` 兩家撞題）：
+    #    只比 `g1_membership_v10 != g1_membership_v9` 是**空心**的——前版兩集合不等
+    #    僅因 `bnd_shift`↔`bnd_v10` 換了 event_id，共享的 12 筆側別完全相同，
+    #    換錨本身在 golden 上根本沒被觀測到。
+    #    ⇒ 改為直接驗判別筆之幾何與「兩錨異側」：對 `bnd_v10` 逐值算出
+    #      v9 規則（decision 錨）與 v10 規則（anchor 錨）之側別，兩者必須不同。
+    m = _fz_module()
+    index = m._feature_index()
+    _tr, _te, b = m._plans(index)
+    v10_keys = m._event_keys_v10(index, b)
+    row = v10_keys.loc[v10_keys["event_id"] == "bnd_v10"].iloc[0]
+    train_last = int(index[b["train_row_index"][-1]])
+    test_start = int(index[b["test_row_index"][0]])
+    anchor, decision = int(row["last_bar_open_ms"]), int(row["decision_at_ms"])
+
+    assert anchor < int(row["feature_cutoff_ms"]) <= decision, "判別筆本身須滿足 PIT 前置"
+    assert decision >= test_start, (
+        f"判別筆之 decision_at_ms={decision} 未進 test 段（test_start={test_start}）"
+        "——(G-4d)⑥ 之前提不成立，換錨在 golden 上不可觀測"
+    )
+    assert anchor < test_start, f"判別筆之 anchor_ms={anchor} 未早於 test 段起點"
+
+    def _side(v: int) -> str:
+        if v <= train_last:
+            return "train"
+        return "test" if v >= test_start else "purged"
+
+    assert _side(decision) != _side(anchor), (
+        f"判別筆在兩種錨下同側（decision⇒{_side(decision)}、anchor⇒{_side(anchor)}）"
+        "——fixture 失去判別力"
+    )
+    assert after["g4e_hand_expected_membership_v10"]["purged"].count("bnd_v10") == 1, (
+        "人手 v10 側別未把判別筆標為 purged（第三份判準與前兩份脫節）"
     )

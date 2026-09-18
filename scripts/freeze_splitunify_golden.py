@@ -404,8 +404,16 @@ def _event_keys_v10(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
     for i, pos in enumerate(te[:5]):
         a = int(index[pos])
         rows.append((f"te{i}", a, a + H1, "test"))
-    # 🔴 判別筆：錨在 train 段末刻之後（隔離帶）、決策已進 test 段。
-    rows.append(("bnd_v10", train_last + H1, train_last + 2 * H1, "purged"))
+    # 🔴 判別筆（`CODEX-R39-P1-01`／`COMPOSER-R39-P1-01` **兩家撞題**修正）：
+    #    須真的滿足 (G-4d)⑥「`decision_at_ms >= test_start_ms` 而 `anchor_ms < test_start_ms`」。
+    #    前版取 `anchor=train_last+H1` ⇒ `decision=train_last+2*H1` **仍 < test_start**
+    #    ⇒ 兩錨同判 purged、判別筆空心；`g1_membership_v10 != g1_membership_v9` 當時只因
+    #    `bnd_shift`↔`bnd_v10` 換了 id 而成立，換錨本身在 golden 上**無人觀測**。
+    #    改為 `anchor = test_start - H1`（落在隔離帶）⇒ `cutoff = decision = test_start`：
+    #      v9（decision 錨）：`decision >= test_start` ⇒ **test**
+    #      v10（anchor 錨）：`train_last < anchor < test_start` ⇒ **purged**
+    #    兩者異側，換錨的行為差異在 golden 上現形。
+    rows.append(("bnd_v10", test_start - H1, test_start, "purged"))
 
     # 🔴 人手錨點字面（`CODEX-R29-P1-03` 之教訓：不得由 `BASE`／`H1` 推導，否則平移
     #    `BASE` 時人手值與實際值會**一起移動**、對帳照樣相等）。
@@ -422,7 +430,8 @@ def _event_keys_v10(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
         "te2": 1700525600000,
         "te3": 1700529200000,
         "te4": 1700532800000,
-        "bnd_v10": 1700504000000,
+        # `test_start`(1700518400000) − H1 ⇒ 落在隔離帶、決策恰為 test 段起點。
+        "bnd_v10": 1700514800000,
     }
     return pd.DataFrame([
         {"event_id": e, "last_bar_open_ms": a, "feature_cutoff_ms": a + H1,
@@ -461,6 +470,21 @@ def _frozen_v9_slice() -> Dict[str, Any]:
                if k not in frozen]
     if missing:
         raise SystemExit(f"ERROR: 凍結檔缺 v9 鍵 {missing}（fail-closed）")
+    # 🔴 **外部錨對證（`CODEX-R39-P2-02`）**：沿用而不重算，本身擋不住「直接改主檔之 v9 值」
+    #    ——那會讓守衛測試與 `--write` 同時回綠（自證不是證明）。⇒ 與 SPEC §V 之
+    #    `V9_SLICE_SHA256=` 逐值比對；該錨與主檔無共因。
+    anchor = _read_v9_anchor_from_spec()
+    if anchor is None:
+        raise SystemExit(
+            "ERROR: SPEC §V 缺（或有多於一個）逐字 `V9_SLICE_SHA256=<64-hex>` 錨點行"
+            "——v9 切片沒有外部錨即無從證明未被竄改（fail-closed）"
+        )
+    digest = _v9_slice_digest(frozen)
+    if digest != anchor:
+        raise SystemExit(
+            f"ERROR: v9 切片 digest 與 SPEC §V 之外部錨不符（實際 {digest}、錨 {anchor}）"
+            "——v9 之值不得改寫；若確為刻意變更，須同 commit 更新 SPEC §V 錨點並寫明理由"
+        )
     return frozen
 
 
@@ -711,6 +735,49 @@ def _read_v8_anchor_from_spec() -> Optional[str]:
         if 0 <= pos:
             text = text[:pos]
     hits = _V8_ANCHOR_RE.findall(text[start:])
+    return hits[0] if len(hits) == 1 else None
+
+
+#: v9 切片之七鍵（順序固定；digest 對 `sort_keys=True` 之 canonical JSON 取 sha256）。
+_V9_SLICE_KEYS = (
+    "g1_membership", "g1_membership_v9", "g3b_oracle", "g3b_oracle_v9",
+    "g4e_hand_expected_membership", "g4e_hand_decision_at_ms", "g4e_actual_decision_at_ms",
+)
+_V9_ANCHOR_RE = re.compile(r"`V9_SLICE_SHA256=([0-9a-f]{64})`")
+
+
+def _v9_slice_digest(golden: Dict[str, Any]) -> str:
+    """v9 七鍵之 canonical digest（與 `_read_v9_anchor_from_spec` 之錨點比對）。"""
+    payload = json.dumps(
+        {k: golden[k] for k in _V9_SLICE_KEYS},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _read_v9_anchor_from_spec() -> Optional[str]:
+    """由 SPEC **§V 區段內**讀出 `V9_SLICE_SHA256=<64-hex>`；缺或多於一個即 None。
+
+    🔴 **出生理由（`CODEX-R39-P2-02`）**：`test_v9_keys_not_overwritten_by_v10_freeze`
+    以**同一份可變主檔**建立 `before` 並與 `_frozen_v9_slice()` 比對 ⇒ 直接竄改主檔之
+    v9 值，守衛測試與 `--write` **會同時回綠**（該家實跑：改 `g1_membership_v9.train[0]`
+    為 `tampered_v9` ⇒ 測試 1 passed、`--write` rc=0）。自證不是證明。
+    ⇒ 比照 v8 之既有三層形態，把 v9 切片之 digest 釘在**已提交文件**（SPEC §V）上，
+    成為與主檔無共因的外部錨。
+    🔴 **誠實邊界**：與 v8 同型殘留（`SU-RESID-V8-ATTEST`）——擋不住「同一個 commit
+    同時改 §V 錨與主檔」；那需要受保護簽章，屬新建治理工具。不得讀作已關閉。
+    """
+    if not _SPEC_PATH.exists():
+        return None
+    text = _SPEC_PATH.read_text(encoding="utf-8")
+    start = text.find("§V")
+    if start < 0:
+        return None
+    for marker in ("<!-- HISTORY-BEGIN -->", "## 沿革與追溯索引"):
+        pos = text.find(marker)
+        if 0 <= pos:
+            text = text[:pos]
+    hits = _V9_ANCHOR_RE.findall(text[start:])
     return hits[0] if len(hits) == 1 else None
 
 

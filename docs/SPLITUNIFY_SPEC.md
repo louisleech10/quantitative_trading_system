@@ -727,6 +727,15 @@ def derive_event_split_from_plans(
 
 `V8_BASELINE_SHA256=f270e007ca9843a88eff9ca40987b2110646646f52df6a63a3508c9a8dab1217`
 
+**v9 切片之外部錨（`Task 10.3`。本行為唯一權威；helper 只讀）**：
+v9 之七鍵（`g1_membership`／`g1_membership_v9`／`g3b_oracle`／`g3b_oracle_v9`／
+`g4e_hand_expected_membership`／`g4e_hand_decision_at_ms`／`g4e_actual_decision_at_ms`）
+自 `Task 10.3` 起**沿用不重算**。沿用本身擋不住「直接改主檔之 v9 值」——那會讓守衛測試與
+`--write` 同時回綠（自證不是證明）⇒ 其 canonical digest 釘在本行，與主檔無共因。
+🔴 **誠實邊界**：與 v8 同型殘留（`SU-RESID-V8-ATTEST`）——擋不住「同一個 commit 同時改本行與主檔」。
+
+`V9_SLICE_SHA256=d5d10f547f9de954828604613cbf06bdfeb8bfe32dc222a4ccd18cc44873d39a`
+
 **固定文法斷言（併入之現行態）**：
 - `ASSERT derive_event_split_from_plans WHEN plans={A:(trA,teA), B:(trB,teB)} feature_index_by_symbol={A:idxA, B:idxB} THEN rc=0`
 - `ASSERT derive_event_split_from_plans WHEN mapping=absent symbols=2 THEN rc!=0`（訊息含 `multi_symbol_projection_unsupported`）
