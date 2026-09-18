@@ -17,6 +17,7 @@ coverage）若本身有錯，預測與觀測會**同錯**而對證仍相等。�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from functools import lru_cache
@@ -26,16 +27,33 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 _CONTRACT = Path(__file__).resolve().parents[2] / "Analysis/contracts/split_unify.json"
 
 
-@lru_cache(maxsize=4)
-def _load_values(_mtime_ns: int) -> Dict[str, Any]:
-    """實際讀檔；以 `mtime` 為快取鍵 ⇒ 契約一改就自然失效。
+def _no_duplicate_keys(pairs):
+    """JSON 物件解析鉤子：同名成員即 fail-closed（`CODEX-R43-P1-01`）。
 
-    🔴 `CODEX-R42-P2-02`：前版 `@lru_cache(maxsize=1)` 直接鎖在函式上，同一行程內
-    warm cache 之後改契約**不會生效**（該家實跑：改名後未清 cache 仍回舊值，清了才 fail-closed）。
-    長生命週期行程（API server）與同行程內之 mutation 覆核都會因此失真。
-    ⇒ 改以檔案 `mtime_ns` 當快取鍵；仍有快取效益，但契約變更即換鍵。
+    🔴 `json.loads` 對重複鍵是 **last-wins 且靜默**。契約若在合併、生成或部署時長出
+    第二個 `consumed`，accessor 會把後者當成語意值——該家實跑得到
+    `{'consumed': 'align_failed', ...}`，且 exact-key／subset／不重複三道檢查**全部通過**。
+    更糟的是既有測試以同一個 `json.loads` 結果對證 ⇒ parser、accessor、測試三方共因而假綠。
     """
-    data = json.loads(_CONTRACT.read_text(encoding="utf-8"))
+    seen = set()
+    for k, _v in pairs:
+        if k in seen:
+            raise ValueError(f"契約含重複 JSON 鍵：{k!r}——last-wins 會靜默改語意（fail-closed）")
+        seen.add(k)
+    return dict(pairs)
+
+
+@lru_cache(maxsize=4)
+def _load_values(_content_sha: str) -> Dict[str, Any]:
+    """實際讀檔；以**內容雜湊**為快取鍵。
+
+    🔴 `CODEX-R42-P2-02`：最初 `@lru_cache(maxsize=1)` 鎖在函式上，warm cache 後改契約
+    不生效（長生命週期行程一直用舊值、同行程之 mutation 覆核假綠）。
+    🔴 `CODEX-R43-P2-02`：改以 `mtime_ns` 為鍵仍不足——該家實跑證實「內容變更而 mtime
+    被保留」（同奈秒寫入、`cp -p`、`os.utime` 還原）時快取仍回舊值。
+    ⇒ 鍵改為內容之 sha256：內容變了就換鍵，與 mtime 無關。
+    """
+    data = json.loads(_CONTRACT.read_text(encoding="utf-8"), object_pairs_hook=_no_duplicate_keys)
     vals = data.get("event_disposition_values")
     if not isinstance(vals, dict) or not vals:
         raise ValueError(
@@ -50,11 +68,11 @@ def _load_values(_mtime_ns: int) -> Dict[str, Any]:
 
 
 def disposition_values() -> Dict[str, Any]:
-    """封閉值集（自契約讀；`R5-C8` 2.）。快取以契約 `mtime_ns` 為鍵，改檔即失效。"""
-    return _load_values(_CONTRACT.stat().st_mtime_ns)
+    """封閉值集（自契約讀；`R5-C8` 2.）。快取以**內容雜湊**為鍵，內容變了即失效。"""
+    return _load_values(hashlib.sha256(_CONTRACT.read_bytes()).hexdigest())
 
 
-#: 相容既有測試之顯式清快取入口（`mtime` 鍵已使其非必要，保留以免呼叫端壞掉）。
+#: 相容既有測試之顯式清快取入口（內容雜湊鍵已使其非必要，保留以免呼叫端壞掉）。
 disposition_values.cache_clear = _load_values.cache_clear  # type: ignore[attr-defined]
 
 

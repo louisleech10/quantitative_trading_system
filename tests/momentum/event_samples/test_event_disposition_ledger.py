@@ -259,3 +259,69 @@ def test_contract_change_takes_effect_without_manual_cache_clear() -> None:
     finally:
         CONTRACT.write_text(orig, encoding="utf-8")
     assert observed_values() == warm, "還原後未回到原值"
+
+
+def test_duplicate_json_key_in_contract_is_fail_closed() -> None:
+    """🔴 `CODEX-R43-P1-01`：契約含重複 JSON 成員 ⇒ fail-closed。
+
+    `json.loads` 對重複鍵是 **last-wins 且靜默**：契約若在合併／生成／部署時長出第二個
+    `consumed`，accessor 會把後者當語意值，而 exact-key／subset／不重複三道檢查**全過**
+    （提出方實跑得到 `{'consumed': 'align_failed', ...}`）。
+    更糟的是既有測試以同一個 `json.loads` 結果對證 ⇒ parser、accessor、測試三方共因假綠。
+    鑑別力：移除 `object_pairs_hook` 即轉綠（＝本條失效），故本條同時釘住該鉤子存在。
+    """
+    from momentum.Analysis.event_samples.event_disposition import (
+        disposition_values,
+        observed_values,
+    )
+
+    orig = CONTRACT.read_text(encoding="utf-8")
+    # 直接以文字插入第二個 `consumed` 成員（json.dumps 造不出重複鍵）
+    dup = orig.replace(
+        '"consumed": "ic_consumed",',
+        '"consumed": "ic_consumed",\n      "consumed": "align_failed",',
+        1,
+    )
+    assert dup != orig, "fixture 未真的插入重複鍵，本條空心"
+    try:
+        CONTRACT.write_text(dup, encoding="utf-8")
+        disposition_values.cache_clear()
+        with pytest.raises(ValueError, match="重複 JSON 鍵"):
+            observed_values()
+    finally:
+        CONTRACT.write_text(orig, encoding="utf-8")
+        disposition_values.cache_clear()
+
+
+def test_contract_change_with_preserved_mtime_still_takes_effect() -> None:
+    """🔴 `CODEX-R43-P2-02`：內容變更而 **mtime 被保留**時，快取仍須失效。
+
+    以 `mtime_ns` 為快取鍵時，同奈秒寫入／`cp -p`／`os.utime` 還原都會讓 accessor
+    回舊值（提出方實跑：`content_changed=True mtime_same=True stale=True`）。
+    改以**內容雜湊**為鍵後，mtime 是否前進與快取無關。
+    鑑別力：把鍵改回 `st_mtime_ns` ⇒ 本條轉紅。
+    """
+    import json as _json
+    import os
+
+    from momentum.Analysis.event_samples.event_disposition import observed_values
+
+    warm = observed_values()                      # warm cache（**不**清）
+    orig = CONTRACT.read_text(encoding="utf-8")
+    st = CONTRACT.stat()
+    raw = _json.loads(orig)
+    raw["event_disposition_values"]["ic_disposition"].append("probe_mtime_value")
+    raw["event_disposition_values"]["observed"]["row_missing"] = "probe_mtime_value"
+    try:
+        CONTRACT.write_text(_json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8")
+        os.utime(CONTRACT, ns=(st.st_atime_ns, st.st_mtime_ns))   # 還原 mtime
+        assert CONTRACT.stat().st_mtime_ns == st.st_mtime_ns, "fixture 未保留 mtime，本條空心"
+        got = observed_values()                   # 不清快取
+        assert got["row_missing"] == "probe_mtime_value", (
+            f"mtime 被保留時快取回舊值（stale）：{got} vs warm={warm}"
+        )
+    finally:
+        CONTRACT.write_text(orig, encoding="utf-8")
+        os.utime(CONTRACT, ns=(st.st_atime_ns, st.st_mtime_ns))
+    assert observed_values() == warm, "還原後未回到原值"
