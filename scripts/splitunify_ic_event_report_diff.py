@@ -43,6 +43,7 @@ _IC_FEATURES = [
     "1h_L1_momentum_BOP", "1h_L1_momentum_RSI", "1h_L1_momentum_ROC",
     "12h_L1_momentum_BOP", "12h_L1_momentum_RSI",
 ]
+_TF_MS = {"1h": 3_600_000, "4h": 14_400_000, "12h": 43_200_000, "1d": 86_400_000}
 _EVENTS_DIR = REPO / "data_cache/events"
 _FEATURES_DIR = REPO / "data_cache/features"
 
@@ -79,7 +80,8 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
     `label_window_rows`／`lookahead_depth_rows`／`purge_rows`／收據雜湊），邊界再由該值導出。
     """
     from api.services.ic_analysis_service import ICAnalysisService
-    from momentum.core.split_preview import holdout_boundary
+    from momentum.Analysis.ic_filter_orchestrator import _build_holdout_split_plan
+    from momentum.factories import load_ic_config
 
     batch_path = _EVENTS_DIR / f"{batch_id}.json"
     if not batch_path.is_file():
@@ -126,16 +128,37 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
 
     ts = pd.read_parquet(run_dir / "timestamps.parquet")["timestamp"].to_numpy().astype(np.int64) * 1000
     feat_index = pd.to_datetime(ts, unit="ms")
-    plan = holdout_boundary(
-        feat_index, oos_test_size=0.2,
-        purge_gap=max(5, iso_window), embargo=max(0, iso_depth),
+    # 🔴 B10A 閉合輪 `CODEX-R31-P1-02`：邊界**不得**在腳本內自算（原本寫死 oos_test_size=0.2，
+    #    生產端 builder 被改也不會紅）。改為呼叫**生產端**之 `_build_holdout_split_plan`，
+    #    切分參數取自生產端之 `load_ic_config`（含 `config_override`），embargo 由 service
+    #    之深度交接抬高——與 IC 事件 run 同一條路。
+    cfg_override = _Req.config_override
+    ic_cfg = load_ic_config(api_override=cfg_override) if cfg_override else load_ic_config()
+    try:
+        ic_cfg.embargo = max(int(getattr(ic_cfg, "embargo", 0) or 0), int(iso_depth))
+    except Exception:  # dataclass frozen 等情形
+        import dataclasses as _dc
+        ic_cfg = _dc.replace(ic_cfg, embargo=max(int(getattr(ic_cfg, "embargo", 0) or 0), int(iso_depth)))
+    feats = pd.DataFrame(index=feat_index)
+    expected_freq = pd.Timedelta(milliseconds=int(_TF_MS[run_tf]))
+    built = _build_holdout_split_plan(
+        feats, ic_cfg, symbol, expected_freq, purge_gap=max(int(staged["purge_rows"]), iso_window),
     )
-    boundary = {
-        "test_start_ms": None if plan["test_start_ms"] is None else int(plan["test_start_ms"]),
-        "train_end_ms": None if plan["train_end_ms"] is None else int(plan["train_end_ms"]),
-        "n_test_rows": int(len(plan["test_row_index"])),
-        "n_train_rows": int(len(plan["train_row_index"])),
-    }
+    if isinstance(built, tuple):
+        train_plan, test_plan = built
+        boundary = {
+            "test_start_ms": int(test_plan.time_bounds[0].value // 10**6)
+            if hasattr(test_plan.time_bounds[0], "value") else int(test_plan.time_bounds[0]),
+            "train_end_ms": int(train_plan.time_bounds[1].value // 10**6)
+            if hasattr(train_plan.time_bounds[1], "value") else int(train_plan.time_bounds[1]),
+            "n_test_rows": int(len(test_plan.row_index)),
+            "n_train_rows": int(len(train_plan.row_index)),
+            "oos_test_size": float(getattr(ic_cfg, "oos_test_size", float("nan"))),
+            "embargo": int(getattr(ic_cfg, "embargo", 0) or 0),
+            "builder": "ic_filter_orchestrator._build_holdout_split_plan（生產端）",
+        }
+    else:
+        boundary = {"skipped": str(getattr(built, "reason", built))}
 
     index_set = set(int(x) for x in ts)
     owners = {int(k): v for k, v in dict(staged.get("event_label_owners") or {}).items()}

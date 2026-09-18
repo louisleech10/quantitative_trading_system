@@ -1,12 +1,15 @@
 {
   "analysis_alignment_receipt_hash": "14ade67cdfacf36e4053b694f29c92d24dc0b84c53b984757d1bb9d7688c7dc2",
   "boundary": {
+    "builder": "ic_filter_orchestrator._build_holdout_split_plan（生產端）",
+    "embargo": 144,
     "n_test_rows": 3771,
     "n_train_rows": 16281,
+    "oos_test_size": 0.2,
     "test_start_ms": 1763758800000,
     "train_end_ms": 1762675200000
   },
-  "canonical_sha256": "eb7f0bc7004b0ea0ed56c825806c71a9b5ff8bd8764b793322a642a0ab87c9c8",
+  "canonical_sha256": "b9ca21e3bd72a33e4e62cb1dcd0a04d18b0a0574fe6658f07064734dedc69184",
   "conditional_ic": {
     "12h_L1_momentum_BOP": 0.05167776763381122,
     "12h_L1_momentum_RSI": 0.06982222201458332,
@@ -1177,7 +1180,7 @@
   },
   "meta": {
     "batch": "20260909T130533Z-7f73e4c7",
-    "code_commit": "fe83f777072b",
+    "code_commit": "ac7278357ffb",
     "collector": "ICAnalysisService._run_event_label_stages（生產路徑）",
     "config_override": "none",
     "ff_run": "4a8a0b3726cc906ab3534994605e77f5",

@@ -888,7 +888,8 @@ class ICAnalysisService:
                 "IC 事件路徑缺分析用 timeframe（request.timeframe）——特徵列鍵須依特徵 run 週期取得（R5-C9 2.）"
             )
         feature_row_key_by_id = pipeline.feature_row_keys(
-            prepared1, feature_timeframe=analysis_tf, timeframe_seconds=timeframe_seconds
+            prepared1, feature_timeframe=analysis_tf, timeframe_seconds=timeframe_seconds,
+            bars_by_tf=bars_by_tf,   # 🔴 供守衛以同一支 as-of 實作重算「最後一根」逐值對證
         )
         ts_map: Dict[int, float] = {}
         owner: Dict[int, str] = {}

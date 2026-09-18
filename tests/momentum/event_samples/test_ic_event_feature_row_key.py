@@ -255,6 +255,63 @@ def test_pit_guard_rejects_earlier_real_bar_as_key() -> None:
     assert first.event_id in str(exc.value) and "非同一根" in str(exc.value)
 
 
+def test_guard_rejects_coordinated_earlier_bar() -> None:
+    """🔴 B10A 閉合輪 `CODEX-R31-P1-01`／`GROK-R31-P2-01`：開盤與收盤**成對**換成更早之真實 bar
+    （幾何仍自洽、仍早於決策）須被擋——守衛須以同一支 as-of 實作重算「最後一根」逐值對證。
+    """
+    _require(BATCH_12H, RUN_1H, KLINE)
+    import dataclasses
+
+    from momentum.Analysis.event_samples.label_value_from_case import feature_row_keys
+
+    pipe, prepared, tsec = _prepare("1h")
+    b = _batch()
+    bars = pipe.bars_from_kline_cache(["ETHUSDT"], sorted({"12h", "1h"}))
+    bar = BAR_MS["1h"]
+    first = prepared.windows[0]
+    shift = 10 * bar
+    bad = tuple(
+        dataclasses.replace(
+            p,
+            last_bar_open_ms=p.last_bar_open_ms - shift,
+            feature_cutoff_ms=p.feature_cutoff_ms - shift,
+        )
+        if (p.event_id == first.event_id and p.timeframe == "1h") else p
+        for p in prepared.per_tf
+    )
+    tampered = dataclasses.replace(prepared, per_tf=bad)
+    with pytest.raises(Exception) as exc:
+        feature_row_keys(
+            tampered, feature_timeframe="1h", timeframe_seconds=tsec, bars_by_tf=bars,
+        )
+    assert first.event_id in str(exc.value) and "最後一根" in str(exc.value)
+
+
+def test_returned_key_equals_independent_asof_recomputation() -> None:
+    """獨立 oracle：逐事件之回傳鍵＝由真實 bars 重算之「收盤 ≤ 決策之最後一根」開盤。
+
+    🔴 這條擋的是「回傳值被整體位移」——`GROK-R31-P2-01` 實測把回傳改為 `open_ms - bar_ms` 時，
+    既有各條（不等式、值對證）**全部仍綠**，因為位移後那列仍是合法且自洽的一列。
+    """
+    _require(BATCH_12H, RUN_1H, KLINE)
+    import numpy as _np
+
+    pipe, prepared, tsec = _prepare("1h")
+    bars = pipe.bars_from_kline_cache(["ETHUSDT"], sorted({"12h", "1h"}))
+    keys = pipe.feature_row_keys(
+        prepared, feature_timeframe="1h", timeframe_seconds=tsec, bars_by_tf=bars,
+    )
+    sub = bars["ETHUSDT"]["1h"]
+    ct = sub["close_time_ms"].to_numpy()
+    ot = sub["open_time_ms"].to_numpy()
+    for w in prepared.windows:
+        idx = int(_np.searchsorted(ct, int(w.decision_at_ms), side="right")) - 1
+        assert idx >= 0, f"事件 {w.event_id} 無 as-of 列"
+        assert int(keys[w.event_id]) == int(ot[idx]), (
+            f"事件 {w.event_id}：回傳鍵 {keys[w.event_id]} != 重算之最後一根開盤 {int(ot[idx])}"
+        )
+
+
 def test_pit_guard_rejects_cutoff_after_decision() -> None:
     """`R5-C9` 5.：收據之收盤晚於決策時點 ⇒ 取鍵當下 raise。"""
     _require(BATCH_12H, RUN_1H, KLINE)

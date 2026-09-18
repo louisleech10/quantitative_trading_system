@@ -54,7 +54,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 
-from momentum.Analysis.event_samples.alignment import align_events
+from momentum.Analysis.event_samples.alignment import align_events, _select_cutoff_idx
 from momentum.Analysis.event_samples.canonical_serialize import (
     canonical_event_table_bytes,
     canonical_event_table_sha256,
@@ -757,6 +757,7 @@ def feature_row_keys(
     *,
     feature_timeframe: str,
     timeframe_seconds: Mapping[str, int],
+    bars_by_tf: Optional[Mapping[str, Mapping[str, Any]]] = None,
 ) -> Dict[str, int]:
     """v7 `R5-C9`：逐事件之**特徵列鍵**＝`(event_id, feature_timeframe)` 那列之 `last_bar_open_ms`。
 
@@ -796,6 +797,30 @@ def feature_row_keys(
         open_ms = int(row.last_bar_open_ms)
         cutoff_ms = int(row.feature_cutoff_ms)
         decision_ms = decision_by_id[w.event_id]
+        # 🔴 **最後一根之獨立重算**（B10A 閉合輪 `CODEX-R31-P1-01`／`GROK-R31-P2-01`）：
+        #    幾何自洽（開盤＋一根＝收盤）與不等式都擋不住「開盤與收盤**成對**往前搬」之竄改，
+        #    也擋不住回傳值被整體位移。給 bars 時以 `alignment._select_cutoff_idx`（同一支 as-of
+        #    實作，不另寫第二份）重算「收盤 ≤ 決策之最後一根」並逐值對證，不符即 raise。
+        if bars_by_tf is not None:
+            sub = (bars_by_tf.get(w.symbol) or {}).get(tf)
+            if sub is None:
+                raise LabelProducerError(
+                    f"事件 {w.event_id}：bars_by_tf 缺 {w.symbol}／{tf} 之 bars，無從重算最後一根（fail-closed）"
+                )
+            ct = sub["close_time_ms"].to_numpy()
+            ot = sub["open_time_ms"].to_numpy()
+            idx = _select_cutoff_idx(ct, decision_ms)
+            if idx < 0:
+                raise LabelProducerError(
+                    f"事件 {w.event_id}（特徵週期 {tf}）在 bars 中無 收盤 <= 決策時點 之 K 線（fail-closed）"
+                )
+            expect_open, expect_cutoff = int(ot[idx]), int(ct[idx])
+            if (open_ms, cutoff_ms) != (expect_open, expect_cutoff):
+                raise LabelProducerError(
+                    f"事件 {w.event_id}（特徵週期 {tf}）之收據非「收盤 <= 決策之最後一根」："
+                    f"收據 open={open_ms}／cutoff={cutoff_ms}，重算 open={expect_open}／cutoff={expect_cutoff}"
+                    "（R5-C9 5.③）"
+                )
         if open_ms + bar_ms != cutoff_ms:
             raise LabelProducerError(
                 f"事件 {w.event_id}（特徵週期 {tf}）之開盤與收盤非同一根 K 線："

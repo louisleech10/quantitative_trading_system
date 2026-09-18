@@ -335,7 +335,7 @@ class EventSamplePipeline:
         )
 
     @staticmethod
-    def feature_row_keys(prepared, *, feature_timeframe, timeframe_seconds):
+    def feature_row_keys(prepared, *, feature_timeframe, timeframe_seconds, bars_by_tf=None):
         """v7 `R5-C9` 之特徵列鍵出口（回 `{event_id: last_bar_open_ms}`，含產出端 PIT 守衛）。
 
         `timeframe_seconds`：注入之週期換算（與 purge／isolation 同一物件），供守衛驗開盤與收盤同一根。
@@ -344,7 +344,8 @@ class EventSamplePipeline:
             feature_row_keys as _impl,
         )
 
-        return _impl(prepared, feature_timeframe=feature_timeframe, timeframe_seconds=timeframe_seconds)
+        return _impl(prepared, feature_timeframe=feature_timeframe,
+                     timeframe_seconds=timeframe_seconds, bars_by_tf=bars_by_tf)
 
     @staticmethod
     def resolve_label_value_at_analyze(prepared, bars_by_tf, *, event_label_spec):
