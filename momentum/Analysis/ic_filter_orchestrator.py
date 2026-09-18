@@ -1141,6 +1141,9 @@ class ICFilterOrchestrator:
         self._binary_oracle_receipt: Optional[dict] = None
         #: label 視窗有幾根特徵 K 線（由 service 之 `event_isolation` 設定；決定區塊長度）。
         self._binary_label_window_bars: int = 0
+        # 🔴 `R5-C8` 7.：stage3 觀測收據之**建構期預設**。與 `_binary_label_window_bars`
+        #    同慣例——消費端不必靠 `getattr(..., default)` 兜底；真正的歸零在 `analyze` 入口。
+        self._stage3_event_observation: dict = {}
         self._preprocessor = DataPreprocessor(config.preprocessing.model_dump())
         self._ic_engine = ICEngine(config.ic_calculation.model_dump())
         self._stat_validator = StatisticalValidator(config.thresholds.model_dump())
@@ -1237,6 +1240,10 @@ class ICFilterOrchestrator:
         #    置換自檢過度樂觀 ⇒ 假倖存者可進 consumable。這正好打中主目標。
         self._binary_label_window_bars = 0
         self._binary_feature_bar_ms = 0
+        # 🔴 `R5-C8` 7.：stage3 觀測收據與上面三項同類——**analyze-scoped 之實例狀態**，
+        #    不在入口歸零就會跨 run 殘留（掃描格逐格重用同一個 analyzer）。
+        #    殘留之後 `Task 10.7` 會拿上一次的觀測去對證這一次的預測，而且看起來會很像對的。
+        self._stage3_event_observation = {}
         self._survivor_suppressed_reason = None
         self._binary_oracle_receipt = None
         self._clear_deep_analysis_cache()
@@ -3842,6 +3849,25 @@ class ICFilterOrchestrator:
             # {event_id: label_value}——只有 producer 傳 owners 時才綁得出；service 端再對自己的
             # 逐事件 label 來源逐筆比對（三元組 (event_id, timestamp, label_value) 之最後一腿）。
             info["consumed_event_labels"] = dict(consumed["consumed_event_labels"])
+            # 🔴 **SPLITUNIFY `R5-C8` 7.：stage3 之逐事件觀測收據**。
+            #    用途＝`Task 10.7` 以它對證處置帳之**預測**（`ic_disposition`）。
+            #    兩者必須**不同源**：處置帳在入口以「特徵列鍵是否屬 post-trim 索引」預測，
+            #    本收據取自 stage3 **實際**之交集結果 ⇒ 預測錯了才看得出來。
+            #    存於 analyze 範圍之實例屬性（入口已歸零）、**不寫入報告**
+            #    （IC 報告逐位元組不變是 §G-1 golden 之前提）。
+            _consumed_ids = set(consumed["consumed_event_labels"])
+            _owners = dict(event_label_owners or {})
+            self._stage3_event_observation = {
+                str(eid): {
+                    "event_id": str(eid),
+                    "feature_row_open_ms": int(key),
+                    "observed": (
+                        "ic_consumed" if str(eid) in _consumed_ids
+                        else "feature_row_not_in_feature_index"
+                    ),
+                }
+                for key, eid in _owners.items()
+            }
         # ── EVTLABEL Task 3.4：effective mode 決策 ＋ 0/1 綁定與驗證 ────────────
         info = self._resolve_label_mode_and_bind_binary(
             info,
