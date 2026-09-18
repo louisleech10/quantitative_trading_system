@@ -202,6 +202,11 @@ EVENT_KEY_COLUMNS = (
     # 🔴 D-002 `Task 9.2`：**feature** TF（取自 `per_tf`），與上面的 `timeframe`（**觸發** TF）
     #    是兩個語意（`D-002-C0`）。複合鍵為 `(event_id, feature_timeframe)`。
     "feature_timeframe",
+    # 🔴 v7 `R5-C9` 3.／`Task 10.3`：判側之**錨點**。`feature_cutoff_ms` 是該根 K 線之
+    #    **收盤**時刻，而特徵表之列以**開盤**時刻編索引 ⇒ 以收盤判側會選到晚一根。
+    #    `last_bar_open_ms` 即 IC 端實際消費之那一列之時刻（`Task 10.2` 之同一欄，只搬不算），
+    #    兩端因此以同一個錨判側。
+    "last_bar_open_ms",
 )
 
 
@@ -325,7 +330,18 @@ def build_event_keys(
     # 🔴 `Task 9.2` (b)：**新建**輸出欄 `feature_timeframe` 取自 `per_tf.timeframe`。
     #    不得以 `event_level.timeframe`（**觸發** TF）冒充——同事件兩列會同值而使複合鍵碰撞
     #    （`D-002-C0`；R5 三家獨立撞題）。
-    keyed = selected[["event_id", "timeframe", "feature_cutoff_ms"]].rename(
+    # 🔴 `Task 10.3` 1.：`last_bar_open_ms` 由 `per_tf` **同名欄**帶出（只搬不算）；
+    #    缺該欄即 fail-closed——沒有錨就沒有判側依據，不得回退 `feature_cutoff_ms`。
+    if "last_bar_open_ms" not in selected.columns:
+        raise ValueError(
+            "build_event_keys: per_tf 缺 last_bar_open_ms 欄——"
+            "判側錨點須為 IC 實際消費之列時刻（R5-C9 3.），不得以 feature_cutoff_ms 代替（fail-closed）"
+        )
+    if bool(selected["last_bar_open_ms"].isna().any()):
+        raise ValueError(
+            "build_event_keys: per_tf 之 last_bar_open_ms 欄有缺值——缺就是缺，不補預設（fail-closed）"
+        )
+    keyed = selected[["event_id", "timeframe", "feature_cutoff_ms", "last_bar_open_ms"]].rename(
         columns={"timeframe": "feature_timeframe"}
     )
     # 🔴 `Task 9.2a`：唯一性判準由「每事件一列」改為 **`(event_id, feature_timeframe)` 複合鍵唯一**。
@@ -359,7 +375,7 @@ def build_event_keys(
         )
     out = merged[
         ["event_id", "feature_cutoff_ms", "label_start_ms", "label_end_ms", "symbol",
-         "timeframe", "feature_timeframe"]
+         "timeframe", "feature_timeframe", "last_bar_open_ms"]
     ].copy()
     return out.reset_index(drop=True), discarded
 
@@ -520,6 +536,9 @@ def _derive_single_symbol(
     feature_index: Any,
     *,
     manifest: EventManifest,
+    # 🔴 `Task 10.3`：**必填、無預設**——判側錨點取自此週期之 `last_bar_open_ms`。
+    #    給預設就等於允許呼叫端不表態，而「該用哪一列判側」正是本票要釘死的東西。
+    universe_timeframe: str,
     bucket_ms: Optional[int] = None,
     tier_min_test_events: int = 1,
     # 🔴 D-002 Task 9.1：producer 之 `discarded` **原樣**帶進 summary（跨邊界傳遞，不重算）。
@@ -783,28 +802,69 @@ def _derive_single_symbol(
             "三段式判準之前兩條會同時成立而由分支順序靜默決定側別（fail-closed）"
         )
 
-    # 🔴 錨定來源＝`manifest.table`（事件級、欄已存在），**不是** `event_keys`
-    #    （stamp-r5 三家一致：`decision_at_ms` 不得加入 `EVENT_KEY_COLUMNS`、不得改
-    #    `build_event_keys` 之 merge——主委原本的假設被 SPEC §P `Task 9.2b` 原文否證）。
-    #    `manifest.table` 之 `event_id` 唯一已由上方 `man_dupes` 閘保證，故此處是 1:1 lookup。
-    if "decision_at_ms" not in manifest.table.columns:
+    # 🔴 v7 `R5-C9`／`Task 10.3`：判側錨點由事件級 `decision_at_ms` 改為
+    #    **`universe_timeframe` 那列之 `last_bar_open_ms`**（＝`anchor_ms`）。
+    #    理由：`decision_at_ms` 是決策時點，不是 IC 端**實際消費**的那一列之時刻；
+    #    以它判側，邊界事件（決策已過 `test_start_ms`，但可用之特徵列仍在 train 段）
+    #    會被判成 test，而 IC 端讀的是 train 段那一列 ⇒ 兩端對同一事件給出不同側別。
+    #    錨點改取自 `event_keys`（`Task 10.3` 已將 `last_bar_open_ms` 納入 `EVENT_KEY_COLUMNS`）。
+    if not universe_timeframe:
         raise ValueError(
-            "derive_event_split_from_plans: manifest.table 缺 decision_at_ms 欄"
-            "——事件級錨定沒有它就退化回 per-cutoff 判側（fail-closed）"
+            "derive_event_split_from_plans: 缺 universe_timeframe"
+            "——錨點須取自特徵 run 週期之列，沒有它就不知道該用哪一列（fail-closed）"
         )
-    _anchor_tbl = manifest.table[["event_id", "decision_at_ms"]]
-    assert_epoch_ms_array(
-        np.asarray(_anchor_tbl["decision_at_ms"]),
-        role="derive_event_split_from_plans: manifest.table.decision_at_ms",
+    _utf = str(universe_timeframe)
+    _anchor_rows = event_keys.loc[event_keys["feature_timeframe"].astype(str) == _utf]
+    _missing_utf = sorted(
+        set(event_keys["event_id"].astype(str)) - set(_anchor_rows["event_id"].astype(str))
     )
-    # 🔴 錨點唯一性已於上方（`man_dupes` **之前**）判過——見 `CODEX-R27-P2-06`。
-    #    此處不重複判，否則會出現兩份同語意的閘而其中一份永遠不可達。
+    if _missing_utf:
+        raise ValueError(
+            f"derive_event_split_from_plans: 事件 {_missing_utf[:5]} 缺 feature_timeframe="
+            f"{_utf!r} 之 event_keys 列——對齊須載入觸發週期與特徵 run 週期之聯集"
+            "（R5-C9 3.），不得回退他週期之列（fail-closed）"
+        )
+    assert_epoch_ms_array(
+        np.asarray(_anchor_rows["last_bar_open_ms"]),
+        role="derive_event_split_from_plans: event_keys.last_bar_open_ms",
+    )
+    # 🔴 事件級欄一致性（實作要點 4）：同一 `event_id` 之 `anchor_ms` 不唯一即上游壞掉。
+    _anchor_nuniq = _anchor_rows.groupby("event_id")["last_bar_open_ms"].nunique()
+    _bad_anchor = sorted(str(e) for e in _anchor_nuniq.index[_anchor_nuniq > 1])
+    if _bad_anchor:
+        raise AlignmentViolationError(
+            f"derive_event_split_from_plans: 事件 {_bad_anchor[:5]} 之 anchor_ms 不唯一"
+            "——事件級錨點必須單值（fail-closed）"
+        )
     anchor_by_event: Dict[Any, int] = {
         eid: int(v) for eid, v in
-        _anchor_tbl.drop_duplicates("event_id").itertuples(index=False, name=None)
+        _anchor_rows[["event_id", "last_bar_open_ms"]]
+        .drop_duplicates("event_id").itertuples(index=False, name=None)
     }
 
-    # 🔴 步驟 0 之界外閘：`index_ms[0] <= decision_at_ms <= index_ms[-1]`，任一不滿足即 raise
+    # 🔴 PIT 前置（實作要點 3）：`anchor_ms < feature_cutoff_ms <= decision_at_ms`。
+    #    第一段擋「錨點不早於該根收盤」（錨是開盤，必嚴格早於收盤）；第二段擋「收盤晚於決策」
+    #    ＝本票要修掉的未來洩漏。兩段皆在判側**之前**，違反即 raise（不得當成一種側別）。
+    _dec_tbl = manifest.table[["event_id", "decision_at_ms"]].drop_duplicates("event_id")
+    _dec_by_event = {str(e): int(v) for e, v in _dec_tbl.itertuples(index=False, name=None)}
+    for _eid, _anchor, _cut in _anchor_rows[
+        ["event_id", "last_bar_open_ms", "feature_cutoff_ms"]
+    ].itertuples(index=False, name=None):
+        _eid_s, _a, _c = str(_eid), int(_anchor), int(_cut)
+        if not (_a < _c):
+            raise ValueError(
+                f"derive_event_split_from_plans: 事件 {_eid_s} 之 anchor_ms={_a} 不早於 "
+                f"feature_cutoff_ms={_c}——錨點是該根之開盤、必嚴格早於其收盤"
+                "（R5-C9 5.；邊界⑤ fail-closed）"
+            )
+        _d = _dec_by_event.get(_eid_s)
+        if _d is not None and not (_c <= _d):
+            raise ValueError(
+                f"derive_event_split_from_plans: 事件 {_eid_s} 之 feature_cutoff_ms={_c} 晚於 "
+                f"decision_at_ms={_d}——該列含決策時點之後之資訊（R5-C9 1. fail-closed）"
+            )
+
+    # 🔴 步驟 0 之界外閘：`index_ms[0] <= anchor_ms <= index_ms[-1]`，任一不滿足即 raise
     #    （訊息含 `event_id`）。**不得**寫成第四條分類分支——寫成分支就等於恢復重疊，
     #    越界事件會被合法分到 train／test（TODO `Task 9.2b` 不可做第二條）。
     _out_of_range = sorted(
@@ -812,7 +872,7 @@ def _derive_single_symbol(
     )
     if _out_of_range:
         raise ValueError(
-            f"derive_event_split_from_plans: 事件 {_out_of_range[:5]} 之 decision_at_ms 落在 "
+            f"derive_event_split_from_plans: 事件 {_out_of_range[:5]} 之 anchor_ms 落在 "
             f"feature_index 之外（[{index_lo_ms}, {index_hi_ms}]）"
             "——界外不是一種側別，不得分類（fail-closed）"
         )
@@ -933,6 +993,13 @@ def derive_event_split_from_plans(
             "——per-symbol 投影需要每個 symbol 自己的 post-trim 索引（fail-closed）"
         )
     manifest = kwargs.pop("manifest")
+    # 🔴 `Task 10.3`：per-symbol 路徑同樣必填（`pop` 無預設 ⇒ 缺就 KeyError 之前先具名 raise）。
+    if "universe_timeframe" not in kwargs:
+        raise ValueError(
+            "derive_event_split_from_plans: 缺 universe_timeframe"
+            "——錨點須取自特徵 run 週期之列（fail-closed）"
+        )
+    universe_timeframe = kwargs.pop("universe_timeframe")
     bucket_ms = kwargs.pop("bucket_ms", None)
     tier_min_test_events = kwargs.pop("tier_min_test_events", 1)
     discarded_rows_by_feature_tf = kwargs.pop("discarded_rows_by_feature_tf", None)
@@ -963,8 +1030,8 @@ def derive_event_split_from_plans(
         sub_manifest = _manifest_subset(manifest, set(sub_keys["event_id"]))
         part = _derive_single_symbol(
             tr, te, sub_keys, feature_index_by_symbol[sym],
-            manifest=sub_manifest, bucket_ms=bucket_ms,
-            tier_min_test_events=tier_min_test_events,
+            manifest=sub_manifest, universe_timeframe=universe_timeframe,
+            bucket_ms=bucket_ms, tier_min_test_events=tier_min_test_events,
         )
         # 🔴 D-002 `Task 9.3`：每個 symbol 各自經 `_derive_single_symbol` 內之聚合 seam（各用自己的
         #    `event_state`）產出事件級兩表，本迴圈只**串接**；不得先合併各 symbol 之 `event_state` 再聚合

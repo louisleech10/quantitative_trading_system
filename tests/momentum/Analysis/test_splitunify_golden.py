@@ -619,3 +619,45 @@ def test_interleaved_parallel_group_g5_differs_and_is_stable(golden: dict) -> No
     # 全框列號只作「確實交錯」之證據：ETH 偶數、BTC 奇數，且不得冒充 payload（與標的內序號不同）
     assert all(p % 2 == 0 for p in glob["ETHUSDT"]) and all(p % 2 == 1 for p in glob["BTCUSDT"]), "非交錯全框位置"
     assert glob["BTCUSDT"] != local["BTCUSDT"], "全框列號與標的內序號相同 ⇒ fixture 未交錯或兩鍵被混用"
+
+
+def test_v9_keys_not_overwritten_by_v10_freeze(tmp_path: Path, monkeypatch, capsys) -> None:
+    """🔴 `Task 10.3`（`COMPOSER-R38-P1-01`／`CODEX-R38-P1-01`）：跑完 `--write` 之後，
+    v9 之七個鍵必須**逐值未變**。
+
+    出生理由：v9 之 fixture 在 v10 語意下已非合法輸入（`bnd_shift` 之 cutoff 晚於 decision
+    ⇒ 被 PIT 前置擋下），故 v9 鍵改為由凍結檔**沿用**而非重算。沿用若寫錯方向
+    （例：誤把 v10 重算結果填進 v9 鍵），沒有這一條就**無人察覺**——那正是把
+    「換錨前之基準」悄悄改成「換錨後之值」，v8→v9→v10 三層 diff 隨之失去意義。
+    鑑別力：把 `_build_actual()` 之 `"g1_membership_v9": _frozen[...]` 改成 `_membership`
+    （v10 重算值）即轉紅。
+    """
+    m = _fz_module()
+    gd = tmp_path / "golden"
+    gd.mkdir()
+    for src in (GOLDEN, V8, V8_SIDECAR):
+        shutil.copy2(src, gd / src.name)
+    before = json.loads((gd / GOLDEN.name).read_text(encoding="utf-8"))
+
+    # 🔴 **不帶** `--accept-value-changes`：v10 已凍結後重凍應**逐值不變**。
+    #    帶著它反而會被既有守衛以「列了未實際改變的鍵——寬鬆授權不得留著給下次用」擋下，
+    #    那道守衛是對的（一次性授權不得沉澱成常設旗標）。
+    rc = _run_main(m, monkeypatch, tmp_path, gd, "--write")
+    out = capsys.readouterr().out
+    assert rc == 0, out[-1500:]
+
+    after = json.loads((gd / GOLDEN.name).read_text(encoding="utf-8"))
+    v9_keys = (
+        "g1_membership", "g1_membership_v9", "g3b_oracle", "g3b_oracle_v9",
+        "g4e_hand_expected_membership", "g4e_hand_decision_at_ms", "g4e_actual_decision_at_ms",
+    )
+    for k in v9_keys:
+        assert k in after, f"v9 鍵 {k} 在重凍後消失——整檔覆寫不得丟鍵"
+        assert after[k] == before[k], (
+            f"v9 鍵 {k} 被重凍改寫：{before[k]} → {after[k]}"
+            "——v9 之值不得覆寫（Task 10.3 不可做第三條）"
+        )
+    # 反面：v10 鍵必須真的存在且與 v9 **不同**，否則「沿用」退化成「兩組同值」而測不出換錨。
+    assert after["g1_membership_v10"] != after["g1_membership_v9"], (
+        "v10 與 v9 成員集合相同 ⇒ 換錨在 golden 上不可觀測（fixture 失去判別力）"
+    )

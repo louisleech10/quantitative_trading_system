@@ -98,7 +98,7 @@ def test_splitunify_wiring_canonical_boundary_uses_projection(records, bars, spy
     train, test, index = _canonical(records, bars)
     res = EventSamplePipeline().run(
         records, bars, EventPipelineConfig(timeframes=(TF,)),
-        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+        train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=TF,
     )
     assert spy_split == [], "給了 canonical 邊界卻仍呼叫歷史切分（兩套切分同時活著）"
     assert res.split_plan is not None
@@ -145,7 +145,7 @@ def test_partial_boundary_gate_accepts_none_selected_timeframe(records, bars, sp
     train, test, index = _canonical(records, bars)
     res = EventSamplePipeline().run(
         records, bars, EventPipelineConfig(timeframes=(TF,)),
-        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=None,
+        train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=None,
     )
     assert spy_split == [], "selected_timeframe=None 竟退回歷史切分 ⇒ 三參數閘沒生效"
     assert res.split_plan is not None
@@ -177,7 +177,7 @@ def test_pipeline_rejects_split_plan_that_is_not_event_level(monkeypatch, record
     with pytest.raises(AlignmentViolationError, match="assignments"):
         EventSamplePipeline().run(
             records, bars, EventPipelineConfig(timeframes=(TF,)),
-            train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+            train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=TF,
         )
 
 
@@ -193,7 +193,7 @@ def test_splitunify_wiring_embargo_must_be_none_on_projection_path(records, bars
     with pytest.raises(ValueError, match="embargo_ms"):
         EventSamplePipeline().run(
             records, bars, cfg,
-            train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+            train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=TF,
         )
     assert spy_split == []
 
@@ -208,7 +208,7 @@ def test_splitunify_wiring_tier_min_test_events_reaches_projection(records, bars
     cfg = EventPipelineConfig(timeframes=(TF,), split=EventSplitConfig(tier_min_test_events=1000))
     res = EventSamplePipeline().run(
         records, bars, cfg,
-        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+        train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=TF,
     )
     assert res.split_plan.summary["insufficient_events_in_test"] == [SYM], (
         "下限設 1000 卻沒被判為不足 ⇒ 設定沒傳到投影"
@@ -245,7 +245,7 @@ def test_splitunify_wiring_discarded_rows_reaches_summary(records, bars_multi_tf
     cfg = EventPipelineConfig(timeframes=("4h", TF), split=EventSplitConfig())
     res = EventSamplePipeline().run(
         records, bars_multi_tf, cfg,
-        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+        train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=TF,
     )
     summary = res.split_plan.summary
     assert "discarded_rows_by_feature_tf" in summary, "生產路徑之 summary 缺記帳鍵"
@@ -272,7 +272,7 @@ def test_run_without_selected_timeframe_emits_all_feature_tf_rows(records, bars_
     cfg = EventPipelineConfig(timeframes=("4h", TF), split=EventSplitConfig())
     res = EventSamplePipeline().run(
         records, bars_multi_tf, cfg,
-        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=None,
+        train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=None,
     )
     assert spy_split == [], "全量模式竟退回歷史切分"
     assign = res.split_plan.assignments
@@ -299,7 +299,7 @@ def _run_multi_tf_full(records, bars_multi_tf):
     cfg = EventPipelineConfig(timeframes=("4h", TF), split=EventSplitConfig())
     res = EventSamplePipeline().run(
         records, bars_multi_tf, cfg,
-        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=None,
+        train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=None,
     )
     return res, train, test, index
 
@@ -371,7 +371,7 @@ def test_validate_split_pair_integrity_is_called_before_derive(monkeypatch, reco
     cfg = EventPipelineConfig(timeframes=(TF,), split=EventSplitConfig())
     EventSamplePipeline().run(
         records, bars, cfg,
-        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+        train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=TF,
     )
     assert "validate" in order, (
         "步驟 0 之 validate_split_pair_integrity 沒被呼叫——空段與 purge/embargo 踩線全無人擋"
@@ -402,7 +402,7 @@ def test_validate_receives_millisecond_clock_not_raw_ints(monkeypatch, records, 
     cfg = EventPipelineConfig(timeframes=(TF,), split=EventSplitConfig())
     EventSamplePipeline().run(
         records, bars, cfg,
-        train_plan=train, test_plan=test, feature_index=index, selected_timeframe=TF,
+        train_plan=train, test_plan=test, feature_index=index, universe_timeframe=TF, selected_timeframe=TF,
     )
     ts = seen["ts"]
     assert np.issubdtype(np.asarray(ts).dtype, np.datetime64), (
@@ -431,7 +431,7 @@ def test_mapping_plans_are_rejected_with_named_error(records, bars) -> None:
         EventSamplePipeline().run(
             records, bars, cfg,
             train_plan={SYM: (train, test)}, test_plan={SYM: (train, test)},
-            feature_index=index, selected_timeframe=TF,
+            feature_index=index, universe_timeframe=TF, selected_timeframe=TF,
         )
     assert not isinstance(ei.value, AttributeError)
     assert "train_plan" in str(ei.value), "訊息須指名是哪一個參數不合格"

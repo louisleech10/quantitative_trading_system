@@ -129,14 +129,19 @@ def _event_keys(rows) -> pd.DataFrame:
     """
     recs = []
     for r in rows:
-        eid, cutoff, label_end = r[0], r[1], r[2]
+        eid, anchor, label_end = r[0], r[1], r[2]
         sym = r[3] if len(r) > 3 else SYM
         feature_tf = r[4] if len(r) > 4 else "1h"
         recs.append(
             {
                 "event_id": eid,
-                "feature_cutoff_ms": int(cutoff),
-                "label_start_ms": int(cutoff),
+                # 🔴 `Task 10.3`：第二欄之語意改為**錨點**（該特徵列之時刻＝K 線開盤），
+                #    收盤則為錨點＋一根。舊語意把該欄當收盤，而特徵索引是以開盤編的
+                #    ⇒ 錨點會落在索引外或選到晚一根。`decision_at_ms` 由 `_manifest`
+                #    取 `feature_cutoff_ms`，故 `cutoff <= decision` 仍成立（相等）。
+                "last_bar_open_ms": int(anchor),
+                "feature_cutoff_ms": int(anchor) + H1,
+                "label_start_ms": int(anchor) + H1,
                 "label_end_ms": int(label_end),
                 "symbol": sym,
                 "timeframe": "1h",
@@ -219,7 +224,7 @@ def test_answer_window_one_ms_before_test_start_stays_in_train() -> None:
         ("e_one_ms_short", index[b["train_row_index"][-1]], test_start - 1),
         ("e_test", index[b["test_row_index"][0]], test_start + H1),
     ])
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1)
     labels = dict(zip(plan.assignments["event_id"], plan.assignments["split_label"]))
     assert labels.get("e_one_ms_short") == "train", (
         "答案窗在測試段起點前 1 毫秒結束 ⇒ 沒跨界，卻被 purge（比較式被挪了）"
@@ -232,7 +237,7 @@ def test_manifest_summary_missing_key_is_named_not_bare_keyerror() -> None:
     index, train, test, keys, man, _ = _basic_case()
     broken = EventManifest(table=man.table, summary={"n_events_effective": 4}, policy={})
     with pytest.raises(ValueError, match="manifest.summary 缺"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=broken, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=broken, bucket_ms=H1)
 
 
 def test_tier_min_test_events_is_honored_not_silently_one() -> None:
@@ -241,10 +246,10 @@ def test_tier_min_test_events_is_honored_not_silently_one() -> None:
     `_basic_case` 的 test 段只有 1 筆事件：下限 1 ⇒ 不足清單為空；下限 5 ⇒ 必須列出。
     """
     index, train, test, keys, man, _ = _basic_case()
-    default = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    default = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert default.summary["insufficient_events_in_test"] == []
     strict = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1, tier_min_test_events=5,
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1, tier_min_test_events=5,
     )
     assert strict.summary["insufficient_events_in_test"] == [SYM], (
         "下限設 5、測試段只有 1 筆，卻沒有列為不足（設定被靜默忽略）"
@@ -254,7 +259,7 @@ def test_tier_min_test_events_is_honored_not_silently_one() -> None:
 # ── 三態與容器形狀（M-SU-1／C-3）──────────────────────────────────────────
 def test_three_state_two_containers_cover_all_events() -> None:
     index, train, test, keys, man, _ = _basic_case()
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assigned = set(plan.assignments["event_id"])
     purged = set(plan.purged["event_id"])
     assert assigned & purged == set(), "三態互斥"
@@ -267,7 +272,7 @@ def test_three_state_two_containers_cover_all_events() -> None:
 
 def test_purge_reason_uses_existing_contract_literal() -> None:
     index, train, test, keys, man, _ = _basic_case()
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert set(plan.purged["reason"]) == {"interval_crosses_split_boundary"}
 
 
@@ -275,7 +280,7 @@ def test_purge_reason_uses_existing_contract_literal() -> None:
 def test_answer_window_crossing_train_event_is_purged() -> None:
     """答案窗伸進測試段的 **train** 事件必進 `purged`——事件側唯一擋洩漏的閘。"""
     index, train, test, keys, man, _ = _basic_case()
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert "e_train_leak" in set(plan.purged["event_id"])
     assert "e_train_leak" not in set(plan.assignments["event_id"])
 
@@ -285,7 +290,7 @@ def test_answer_window_boundary_is_ge_not_gt() -> None:
     index, train, test, _, _, test_start = _basic_case()
     exact = _event_keys([("e_exact", index[0], test_start)])
     plan = derive_event_split_from_plans(
-        train, test, exact, index, manifest=_manifest(exact), bucket_ms=H1
+        train, test, exact, index, universe_timeframe="1h", manifest=_manifest(exact), bucket_ms=H1
     )
     assert list(plan.purged["event_id"]) == ["e_exact"]
 
@@ -296,7 +301,7 @@ def test_answer_window_not_applied_to_test_side_events() -> None:
     t_rows = np.asarray(test.row_index, dtype=int)
     keys = _event_keys([("e_t", index[t_rows[0]], int(index[t_rows[-1]]))])
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+        train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
     )
     assert list(plan.assignments["split_label"]) == ["test"]
     assert plan.purged.empty
@@ -325,7 +330,7 @@ def test_membership_set_not_interval() -> None:
     assert int(index[tr[0]]) < hole_ms < int(index[tr[-1]]), "洞必須落在 train 的 time_bounds 之內"
     keys = _event_keys([("e_hole", hole_ms, hole_ms + H1)])
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+        train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
     )
     assert plan.purged.empty, (
         "9.2b 後不得再以「cutoff 不在集合中」判 purged——purged 只剩隔離帶與答案窗跨界兩種"
@@ -365,7 +370,7 @@ def test_dual_membership_raises_not_silent_pick() -> None:
     keys = _event_keys([("e_dual", index[tr[0]], int(index[tr[0]]) + H1)])
     with pytest.raises(ValueError, match="兩段在時間上重疊"):
         derive_event_split_from_plans(
-            train, overlapping_test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+            train, overlapping_test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
         )
 
 
@@ -384,7 +389,7 @@ def test_unmatched_timestamp_is_purged_not_train() -> None:
     off_grid = int(index[0]) + H1 // 3  # 兩根之間，但仍在 index 範圍內
     keys = _event_keys([("e_off", off_grid, off_grid + H1)])
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+        train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
     )
     assert plan.purged.empty, "界內非網格點不是 purge 的理由（9.2b 起）"
     assert list(plan.assignments["split_label"]) == ["train"], (
@@ -401,7 +406,7 @@ def test_multi_symbol_is_fail_closed() -> None:
     )
     with pytest.raises(ValueError, match="multi_symbol_projection_unsupported"):
         derive_event_split_from_plans(
-            train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+            train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
         )
 
 
@@ -410,7 +415,7 @@ def test_plan_symbols_differ_is_fail_closed() -> None:
     index, train, _, keys, man, _ = _basic_case()
     _, btc_test, _ = _plans(index, symbol="BTCUSDT")
     with pytest.raises(ValueError, match="plan 之 symbol 不同"):
-        derive_event_split_from_plans(train, btc_test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, btc_test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_plan_universes_differ_is_fail_closed() -> None:
@@ -433,7 +438,7 @@ def test_plan_universes_differ_is_fail_closed() -> None:
         symbol=SYM,
     )
     with pytest.raises(ValueError, match="base_universe_hash 不同"):
-        derive_event_split_from_plans(train, other_universe, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, other_universe, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_same_source_shifted_feature_index_is_fail_closed() -> None:
@@ -451,7 +456,7 @@ def test_same_source_shifted_feature_index_is_fail_closed() -> None:
     index, train, test, keys, man, _ = _basic_case()
     shifted = pd.Index([int(v) + 50 * H1 for v in index], dtype="int64")
     with pytest.raises(ValueError, match="指紋不符"):
-        derive_event_split_from_plans(train, test, keys, shifted, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, shifted, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_same_source_plans_from_shorter_grid_is_fail_closed() -> None:
@@ -468,7 +473,7 @@ def test_same_source_plans_from_shorter_grid_is_fail_closed() -> None:
     short = pd.Index([int(index[0]) + i * H1 * 2 for i in range(len(index))], dtype="int64")
     short_train, short_test, _ = _plans(short)          # 同 symbol、同 hash 字面，網格不同
     with pytest.raises(ValueError, match="指紋不符"):
-        derive_event_split_from_plans(short_train, short_test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(short_train, short_test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_plan_time_bounds_inconsistent_with_own_rows_is_fail_closed() -> None:
@@ -491,7 +496,7 @@ def test_plan_time_bounds_inconsistent_with_own_rows_is_fail_closed() -> None:
         symbol=SYM,
     )
     with pytest.raises(ValueError, match="不同源"):
-        derive_event_split_from_plans(train, bad_bounds, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, bad_bounds, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_same_source_accepts_datetime_time_bounds() -> None:
@@ -513,7 +518,7 @@ def test_same_source_accepts_datetime_time_bounds() -> None:
         base_universe_hash="deadbeef",
         symbol=SYM,
     )
-    plan = derive_event_split_from_plans(ts_train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(ts_train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert not plan.assignments.empty
 
 
@@ -532,12 +537,12 @@ def test_same_source_rejects_second_unit_time_bounds() -> None:
         symbol=SYM,
     )
     with pytest.raises(ValueError, match="epoch seconds"):
-        derive_event_split_from_plans(seconds, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(seconds, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_single_symbol_batch_unaffected() -> None:
     index, train, test, keys, man, _ = _basic_case()
-    derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_non_positional_index_kind_is_fail_closed() -> None:
@@ -554,7 +559,7 @@ def test_non_positional_index_kind_is_fail_closed() -> None:
         symbol=SYM,
     )
     with pytest.raises(ValueError, match="只接受 'positional'"):
-        derive_event_split_from_plans(train, bad, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, bad, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_empty_test_rows_is_fail_closed_not_none_compare() -> None:
@@ -572,13 +577,13 @@ def test_empty_test_rows_is_fail_closed_not_none_compare() -> None:
         symbol=SYM,
     )
     with pytest.raises(ValueError, match="missing_test_plan"):
-        derive_event_split_from_plans(train, empty_test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, empty_test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_missing_train_plan_is_fail_closed() -> None:
     index, _, test, keys, man, _ = _basic_case()
     with pytest.raises(ValueError, match="missing_train_plan"):
-        derive_event_split_from_plans(None, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(None, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 # ── 單位（M-SU-12）───────────────────────────────────────────────────────
@@ -587,15 +592,15 @@ def test_unit_normalize_rejects_seconds_index() -> None:
     index, train, test, keys, man, _ = _basic_case()
     seconds = pd.Index(np.asarray(index, dtype="int64") // 1000)
     with pytest.raises(ValueError, match="looks like epoch seconds"):
-        derive_event_split_from_plans(train, test, keys, seconds, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, seconds, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_unit_normalize_accepts_datetime_index() -> None:
     """DatetimeIndex 與 int64 毫秒 index 給出**相同**的三態結果。"""
     index, train, test, keys, man, _ = _basic_case()
     dt_index = pd.to_datetime(np.asarray(index, dtype="int64"), unit="ms")
-    a = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
-    b = derive_event_split_from_plans(train, test, keys, dt_index, manifest=man, bucket_ms=H1)
+    a = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
+    b = derive_event_split_from_plans(train, test, keys, dt_index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert set(a.purged["event_id"]) == set(b.purged["event_id"])
     assert a.assignments.equals(b.assignments)
 
@@ -618,7 +623,7 @@ def test_clusters_match_independent_frozen_oracle() -> None:
     )
     oracle = json.loads(oracle_path.read_text(encoding="utf-8"))
     keys = _event_keys(
-        [(r["event_id"], r["decision_at_ms"], r["decision_at_ms"] + H1) for r in oracle["fixture"]]
+        [(r["event_id"], r["decision_at_ms"] - H1, r["decision_at_ms"] + H1) for r in oracle["fixture"]]
     )
     got = build_time_clusters(_manifest(keys), int(oracle["bucket_ms"]))
     expected = pd.DataFrame(oracle["expected_clusters"])
@@ -644,7 +649,7 @@ def test_clusters_still_agree_with_split_events_shape() -> None:
         ).read_text(encoding="utf-8")
     )
     keys = _event_keys(
-        [(r["event_id"], r["decision_at_ms"], r["decision_at_ms"] + H1) for r in oracle["fixture"]]
+        [(r["event_id"], r["decision_at_ms"] - H1, r["decision_at_ms"] + H1) for r in oracle["fixture"]]
     )
     man = _manifest(keys)
     legacy = split_events(
@@ -655,7 +660,7 @@ def test_clusters_still_agree_with_split_events_shape() -> None:
 
 def test_summary_has_all_sixteen_keys() -> None:
     index, train, test, keys, man, _ = _basic_case()
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert set(plan.summary) == {
         "n_symbols",
         "per_symbol_n",
@@ -691,7 +696,7 @@ def test_empty_event_keys_gives_empty_three_states() -> None:
     index, train, test, _, _, _ = _basic_case()
     keys = pd.DataFrame(columns=list(_event_keys([("x", 0, 0)]).columns))
     man = _manifest(keys)
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert plan.assignments.empty and plan.purged.empty
 
 
@@ -701,7 +706,7 @@ def test_manifest_id_mismatch_is_fail_closed() -> None:
     index, train, test, keys, _, _ = _basic_case()
     foreign = _manifest(_event_keys([("foreign", int(index[0]), int(index[0]) + H1)]))
     with pytest.raises(ValueError, match="event_id 集合不相等"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=foreign, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=foreign, bucket_ms=H1)
 
 
 def test_manifest_superset_is_also_rejected() -> None:
@@ -712,7 +717,7 @@ def test_manifest_superset_is_also_rejected() -> None:
     )
     with pytest.raises(ValueError, match="不接受 subset"):
         derive_event_split_from_plans(
-            train, test, keys, index, manifest=_manifest(extra), bucket_ms=H1
+            train, test, keys, index, universe_timeframe="1h", manifest=_manifest(extra), bucket_ms=H1
         )
 
 
@@ -722,7 +727,7 @@ def test_plan_symbol_mismatch_is_fail_closed() -> None:
     btc_train, btc_test, _ = _plans(index, symbol="BTCUSDT")
     with pytest.raises(ValueError, match="與 plan symbol"):
         derive_event_split_from_plans(
-            btc_train, btc_test, keys, index, manifest=man, bucket_ms=H1
+            btc_train, btc_test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
         )
 
 
@@ -752,7 +757,7 @@ def test_plan_without_symbol_is_fail_closed() -> None:
         symbol=None,
     )
     with pytest.raises(ValueError, match="plan 未帶 symbol"):
-        derive_event_split_from_plans(anon, anon_test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(anon, anon_test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 # ── malformed feature index（H3；CODEX-R1-P1-03）─────────────────────────
@@ -763,7 +768,7 @@ def test_mixed_unit_index_is_fail_closed() -> None:
     mixed[5] = mixed[5] // 1000  # 只有一格是秒
     with pytest.raises(ValueError, match="混合"):
         derive_event_split_from_plans(
-            train, test, keys, pd.Index(mixed), manifest=man, bucket_ms=H1
+            train, test, keys, pd.Index(mixed), universe_timeframe="1h", manifest=man, bucket_ms=H1
         )
 
 
@@ -782,7 +787,7 @@ def test_negative_row_index_is_fail_closed() -> None:
         symbol=SYM,
     )
     with pytest.raises(ValueError, match="含負值"):
-        derive_event_split_from_plans(bad, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(bad, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_row_index_out_of_range_is_fail_closed() -> None:
@@ -799,7 +804,7 @@ def test_row_index_out_of_range_is_fail_closed() -> None:
         symbol=SYM,
     )
     with pytest.raises(ValueError, match="超出 universe 長度"):
-        derive_event_split_from_plans(bad, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(bad, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 # ── 輸入不變式（B2b R2 之 I1–I6）─────────────────────────────────────────
@@ -813,7 +818,7 @@ def test_unsorted_feature_index_is_fail_closed() -> None:
     reversed_index = pd.Index(np.asarray(index, dtype="int64")[::-1])
     with pytest.raises(ValueError, match="非嚴格遞增"):
         derive_event_split_from_plans(
-            train, test, keys, reversed_index, manifest=man, bucket_ms=H1
+            train, test, keys, reversed_index, universe_timeframe="1h", manifest=man, bucket_ms=H1
         )
 
 
@@ -823,7 +828,7 @@ def test_duplicate_feature_index_timestamps_is_fail_closed() -> None:
     dup = np.asarray(index, dtype="int64").copy()
     dup[10] = dup[9]
     with pytest.raises(ValueError, match="重複"):
-        derive_event_split_from_plans(train, test, keys, pd.Index(dup), manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, pd.Index(dup), universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_nan_in_numeric_index_is_fail_closed() -> None:
@@ -833,7 +838,7 @@ def test_nan_in_numeric_index_is_fail_closed() -> None:
     with_nan[3] = np.nan
     with pytest.raises(ValueError, match="NaN／inf"):
         derive_event_split_from_plans(
-            train, test, keys, pd.Index(with_nan), manifest=man, bucket_ms=H1
+            train, test, keys, pd.Index(with_nan), universe_timeframe="1h", manifest=man, bucket_ms=H1
         )
 
 
@@ -850,7 +855,7 @@ def test_duplicate_event_id_is_fail_closed() -> None:
     dup = pd.concat([keys, keys.iloc[[0]]], ignore_index=True)
     with pytest.raises(ValueError, match="複合鍵重複"):
         derive_event_split_from_plans(
-            train, test, dup, index, manifest=_manifest(dup.drop_duplicates("event_id")),
+            train, test, dup, index, universe_timeframe="1h", manifest=_manifest(dup.drop_duplicates("event_id")),
             bucket_ms=H1,
         )
 
@@ -865,7 +870,7 @@ def test_float_row_index_is_fail_closed() -> None:
         purge_semantic="rows", base_universe_hash="deadbeef", symbol=SYM,
     )
     with pytest.raises(ValueError, match="非整數值"):
-        derive_event_split_from_plans(bad, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(bad, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_inverted_answer_window_is_fail_closed() -> None:
@@ -874,7 +879,7 @@ def test_inverted_answer_window_is_fail_closed() -> None:
     inverted = _event_keys([("e_inv", index[0], int(index[0]) - H1)])
     with pytest.raises(ValueError, match="答案窗反轉"):
         derive_event_split_from_plans(
-            train, test, inverted, index, manifest=_manifest(inverted), bucket_ms=H1
+            train, test, inverted, index, universe_timeframe="1h", manifest=_manifest(inverted), bucket_ms=H1
         )
 
 
@@ -888,7 +893,7 @@ def test_event_keys_may_share_timestamps() -> None:
         [("e1", index[0], int(index[0]) + H1), ("e2", index[0], int(index[0]) + H1)]
     )
     plan = derive_event_split_from_plans(
-        train, test, same, index, manifest=_manifest(same), bucket_ms=H1
+        train, test, same, index, universe_timeframe="1h", manifest=_manifest(same), bucket_ms=H1
     )
     assert len(plan.assignments) + len(plan.purged) == 2
 
@@ -906,7 +911,7 @@ def test_datetime_index_unsorted_is_fail_closed() -> None:
     index, train, test, keys, man, _ = _basic_case()
     dt_desc = pd.to_datetime(np.asarray(index, dtype="int64")[::-1], unit="ms")
     with pytest.raises(ValueError, match="非嚴格遞增"):
-        derive_event_split_from_plans(train, test, keys, dt_desc, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, dt_desc, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_unsorted_row_index_is_fail_closed() -> None:
@@ -919,7 +924,7 @@ def test_unsorted_row_index_is_fail_closed() -> None:
         purge_semantic="rows", base_universe_hash="deadbeef", symbol=SYM,
     )
     with pytest.raises(ValueError, match="row_index 非嚴格遞增"):
-        derive_event_split_from_plans(train, rev, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, rev, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_none_symbol_is_fail_closed() -> None:
@@ -932,7 +937,7 @@ def test_none_symbol_is_fail_closed() -> None:
     keys = _event_keys([("e", index[0], int(index[0]) + H1, None)])
     with pytest.raises(ValueError, match="含 None／空字串"):
         derive_event_split_from_plans(
-            train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+            train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
         )
 
 
@@ -942,7 +947,7 @@ def test_blank_symbol_is_fail_closed() -> None:
     keys = _event_keys([("e", index[0], int(index[0]) + H1, "  ")])
     with pytest.raises(ValueError, match="含 None／空字串"):
         derive_event_split_from_plans(
-            train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+            train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
         )
 
 
@@ -957,7 +962,7 @@ def test_answer_window_one_ms_before_test_start_is_purged() -> None:
     index, train, test, _, _, test_start = _basic_case()
     keys = _event_keys([("e_near", index[0], test_start - 1)])
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+        train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
     )
     assert list(plan.assignments["split_label"]) == ["train"], (
         "差 1 毫秒就被 purge ⇒ 條件式比契約嚴（多減了緩衝）"
@@ -972,7 +977,7 @@ def test_all_purged_is_legal_output() -> None:
     gap = int(index[tr[-1]]) + H1
     keys = _event_keys([("g1", gap, gap + H1), ("g2", gap, gap + H1)])
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=_manifest(keys), bucket_ms=H1
+        train, test, keys, index, universe_timeframe="1h", manifest=_manifest(keys), bucket_ms=H1
     )
     assert plan.assignments.empty
     assert len(plan.purged) == 2
@@ -980,9 +985,21 @@ def test_all_purged_is_legal_output() -> None:
 
 # ── build_event_keys（R4 之 F2：producer 具名，禁 positional zip）────────
 def _receipts(event_rows, per_tf_rows) -> AlignmentReceipts:
+    """🔴 `Task 10.3`：`per_tf` 之 `last_bar_open_ms` 若未顯式給值，一律補 `cutoff - H1`。
+
+    集中在此補、不逐處改列：本 helper 的每一筆 per_tf 列都代表「某事件在某週期的收據」，
+    而錨點與收盤的關係是固定的（開盤＋一根＝收盤）。要測缺欄／壞值的個案仍可**顯式**
+    在該列給 `last_bar_open_ms`（含 `None`），此處只補沒給的。
+    """
+    rows = []
+    for r in per_tf_rows:
+        r = dict(r)
+        if "last_bar_open_ms" not in r and "feature_cutoff_ms" in r:
+            r["last_bar_open_ms"] = int(r["feature_cutoff_ms"]) - H1
+        rows.append(r)
     return AlignmentReceipts(
         event_level=pd.DataFrame(event_rows),
-        per_tf=pd.DataFrame(per_tf_rows),
+        per_tf=pd.DataFrame(rows),
     )
 
 
@@ -1074,7 +1091,7 @@ def test_purity_does_not_mutate_inputs() -> None:
     index, train, test, keys, man, _ = _basic_case()
     keys_before = keys.copy()
     table_before = man.table.copy()
-    derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     pd.testing.assert_frame_equal(keys, keys_before)
     pd.testing.assert_frame_equal(man.table, table_before)
 
@@ -1147,7 +1164,7 @@ def _interleaved_case(*, n_test_events=(1, 3)):
 def test_per_symbol_projection_assigns_both_symbols() -> None:
     """兩標的皆進 assignments（Task 8.1 斷言 1）。"""
     plans, idx, keys, man, _ = _interleaved_case()
-    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    res = derive_event_split_from_plans(plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert set(res.assignments["symbol"]) == {SYM, SYM_B}
     assert res.summary["n_symbols"] == 2
 
@@ -1156,7 +1173,7 @@ def test_per_symbol_plans_mapping_without_index_mapping_is_fail_closed() -> None
     """給了 plans Mapping 卻沒給對應的索引 Mapping ⇒ 擋（Task 8.1 斷言 2）。"""
     plans, idx, keys, man, _ = _interleaved_case()
     with pytest.raises(ValueError, match="multi_symbol_projection_unsupported"):
-        derive_event_split_from_plans(plans, keys, idx[SYM], manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(plans, keys, idx[SYM], universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_per_symbol_event_symbol_missing_from_plans_is_fail_closed() -> None:
@@ -1168,7 +1185,7 @@ def test_per_symbol_event_symbol_missing_from_plans_is_fail_closed() -> None:
     plans, idx, keys, man, _ = _interleaved_case()
     with pytest.raises(ValueError) as ei:
         derive_event_split_from_plans(
-            {SYM: plans[SYM]}, keys, {SYM: idx[SYM]}, manifest=man, bucket_ms=H1
+            {SYM: plans[SYM]}, keys, {SYM: idx[SYM]}, universe_timeframe="1h", manifest=man, bucket_ms=H1
         )
     msg = str(ei.value)
     assert "不一致" in msg
@@ -1182,7 +1199,7 @@ def test_per_symbol_shared_universe_hash_is_allowed() -> None:
     """
     plans, idx, keys, man, _ = _interleaved_case()
     assert plans[SYM][0].base_universe_hash == plans[SYM_B][0].base_universe_hash
-    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    res = derive_event_split_from_plans(plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert res.summary["n_symbols"] == 2
 
 
@@ -1191,25 +1208,25 @@ def test_per_symbol_crossed_feature_index_is_fail_closed() -> None:
     plans, idx, keys, man, _ = _interleaved_case()
     crossed = {SYM: idx[SYM], SYM_B: idx[SYM]}
     with pytest.raises(ValueError):
-        derive_event_split_from_plans(plans, keys, crossed, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(plans, keys, crossed, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_per_symbol_interleaved_never_indexes_full_frame() -> None:
     """B 的全框列號超出自己短索引長度 ⇒ 投影仍須成功且不得 IndexError（斷言 6）。"""
     plans, idx, keys, man, _ = _interleaved_case()
     assert int(np.asarray(plans[SYM_B][1].row_index).max()) >= len(idx[SYM_B])
-    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    res = derive_event_split_from_plans(plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert not res.assignments.empty
 
 
 def test_per_symbol_interleaved_matches_single_symbol_run() -> None:
     """B 的歸屬在「兩標的一起跑」與「只跑 B」之下必須逐筆相同（斷言 7）。"""
     plans, idx, keys, man, _ = _interleaved_case()
-    both = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    both = derive_event_split_from_plans(plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     b_keys = keys[keys["symbol"] == SYM_B].reset_index(drop=True)
     solo = derive_event_split_from_plans(
         {SYM_B: plans[SYM_B]}, b_keys, {SYM_B: idx[SYM_B]},
-        manifest=_manifest(b_keys), bucket_ms=H1,
+        universe_timeframe="1h", manifest=_manifest(b_keys), bucket_ms=H1,
     )
     got = dict(zip(both.assignments["event_id"], both.assignments["split_label"]))
     want = dict(zip(solo.assignments["event_id"], solo.assignments["split_label"]))
@@ -1220,7 +1237,7 @@ def test_per_symbol_interleaved_matches_single_symbol_run() -> None:
 def test_per_symbol_degraded_clears_with_two_symbols() -> None:
     """`n_symbols == 2` ⇒ `single_symbol` 不得亮（斷言 8）。"""
     plans, idx, keys, man, _ = _interleaved_case()
-    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    res = derive_event_split_from_plans(plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert "single_symbol" not in res.summary["degraded"]
 
 
@@ -1230,7 +1247,7 @@ def test_per_symbol_degraded_set_with_one_symbol() -> None:
     a_keys = keys[keys["symbol"] == SYM].reset_index(drop=True)
     res = derive_event_split_from_plans(
         {SYM: plans[SYM]}, a_keys, {SYM: idx[SYM]},
-        manifest=_manifest(a_keys), bucket_ms=H1,
+        universe_timeframe="1h", manifest=_manifest(a_keys), bucket_ms=H1,
     )
     assert res.summary["n_symbols"] == 1
     assert "single_symbol" in res.summary["degraded"]
@@ -1243,7 +1260,7 @@ def test_insufficient_events_in_test_is_per_symbol_not_batch() -> None:
     """
     plans, idx, keys, man, _ = _interleaved_case(n_test_events=(1, 3))
     res = derive_event_split_from_plans(
-        plans, keys, idx, manifest=man, bucket_ms=H1, tier_min_test_events=2,
+        plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1, tier_min_test_events=2,
     )
     assert sorted(res.summary["insufficient_events_in_test"]) == [SYM]
 
@@ -1252,7 +1269,7 @@ def test_insufficient_events_in_test_empty_when_all_above_threshold() -> None:
     """兩標的都達標 ⇒ 清單為空（Task 8.3 斷言 2）。"""
     plans, idx, keys, man, _ = _interleaved_case(n_test_events=(3, 3))
     res = derive_event_split_from_plans(
-        plans, keys, idx, manifest=man, bucket_ms=H1, tier_min_test_events=2,
+        plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1, tier_min_test_events=2,
     )
     assert res.summary["insufficient_events_in_test"] == []
 
@@ -1266,7 +1283,7 @@ def test_per_symbol_mapping_key_not_matching_plan_symbol_is_fail_closed() -> Non
     plans, idx, keys, man, _ = _interleaved_case()
     swapped = {SYM: plans[SYM_B], SYM_B: plans[SYM]}   # 鍵與 plan.symbol 對調
     with pytest.raises(ValueError):
-        derive_event_split_from_plans(swapped, keys, idx, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(swapped, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1289,13 +1306,13 @@ def test_fingerprint_mid_row_shift_caught_though_endpoints_match() -> None:
     vals[mid] += 1                      # 仍嚴格遞增、首尾不變
     tampered = pd.Index(vals, dtype="int64")
     with pytest.raises(ValueError, match="指紋不符"):
-        derive_event_split_from_plans(train, test, keys, tampered, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, tampered, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_fingerprint_passes_when_index_is_identical() -> None:
     """逐列相同 ⇒ 放行（避免上面那條是靠「什麼都擋」通過的）。"""
     index, train, test, keys, man, _ = _basic_case()
-    res = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    res = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert not res.assignments.empty
 
 
@@ -1328,7 +1345,7 @@ def test_fingerprint_missing_column_is_fail_closed() -> None:
     index, train, test, keys, man, _ = _basic_case()
     object.__setattr__(train, "row_time_fingerprint", "")
     with pytest.raises(ValueError, match="row_time_fingerprint"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_fingerprint_missing_row_index_local_is_fail_closed() -> None:
@@ -1336,7 +1353,7 @@ def test_fingerprint_missing_row_index_local_is_fail_closed() -> None:
     index, train, test, keys, man, _ = _basic_case()
     object.__setattr__(train, "row_index_local", None)
     with pytest.raises(ValueError, match="row_index_local"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_fingerprint_independent_oracle_matches_producer_value() -> None:
@@ -1364,7 +1381,7 @@ def test_fingerprint_reordered_rows_are_caught_by_monotonic_gate() -> None:
     loc[0], loc[1] = loc[1], loc[0]
     object.__setattr__(train, "row_index_local", loc)
     with pytest.raises(ValueError, match="非嚴格遞增"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_per_symbol_missing_feature_index_entry_is_fail_closed() -> None:
@@ -1377,7 +1394,7 @@ def test_per_symbol_missing_feature_index_entry_is_fail_closed() -> None:
     plans, idx, keys, man, _ = _interleaved_case()
     partial = {SYM: idx[SYM]}                       # 故意缺 SYM_B
     with pytest.raises(ValueError, match="feature_index_by_symbol"):
-        derive_event_split_from_plans(plans, keys, partial, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(plans, keys, partial, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_fingerprint_tampered_rows_are_caught_at_entry() -> None:
@@ -1389,7 +1406,7 @@ def test_fingerprint_tampered_rows_are_caught_at_entry() -> None:
     loc[-1] = int(loc[-1]) + 1
     object.__setattr__(train, "row_index_local", loc)
     with pytest.raises(ValueError, match="指紋不符") as ei:
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert re.search(r"[0-9a-f]{12}", str(ei.value)), "訊息未帶可比對的指紋前綴"
 
 
@@ -1448,13 +1465,13 @@ def test_summary_carries_discarded_rows_by_feature_tf_equal_to_producer() -> Non
     index, train, test, keys, man, _ = _basic_case()
     producer_discarded = {"4h": 3, "12h": 1}
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1,
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1,
         discarded_rows_by_feature_tf=producer_discarded,
     )
     assert plan.summary["discarded_rows_by_feature_tf"] == producer_discarded
     # 未給時須為 `{}`（缺鍵或 None 皆不合契約）。
     plan_none = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1,
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1,
     )
     assert plan_none.summary["discarded_rows_by_feature_tf"] == {}
 
@@ -1463,11 +1480,11 @@ def test_discarded_layer_is_independently_revertible() -> None:
     """獨立回退之可證偽斷言：拿掉該鍵後，summary 其餘鍵**逐值**與 9A 前相同。"""
     index, train, test, keys, man, _ = _basic_case()
     plan_with = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1,
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1,
         discarded_rows_by_feature_tf={"4h": 2},
     )
     plan_without = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1,
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1,
     )
     stripped_with = {k: v for k, v in plan_with.summary.items()
                      if k != "discarded_rows_by_feature_tf"}
@@ -1492,7 +1509,7 @@ def test_multi_symbol_branch_carries_discarded_rows_verbatim() -> None:
     plans, idx, keys, man, _ = _interleaved_case()
     producer_discarded = {"4h": 7, "12h": 2}
     res = derive_event_split_from_plans(
-        plans, keys, idx, manifest=man, bucket_ms=H1,
+        plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1,
         discarded_rows_by_feature_tf=producer_discarded,
     )
     assert res.summary["n_symbols"] == 2, "fixture 不是多標的 ⇒ 本測試沒測到該分支"
@@ -1589,7 +1606,7 @@ def test_assignments_composite_key_unique() -> None:
     """
     index, train, test, keys, man, _ = _multi_feature_tf_case()
     assert len(keys) == 2 * keys["event_id"].nunique(), "fixture 前提變了：須為每事件兩個 feature TF"
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert list(plan.assignments.columns) == ["event_id", "symbol", "split_label"]
     assert "feature_timeframe" not in plan.assignments.columns
     assert plan.assignments["event_id"].is_unique, "一事件恰一列"
@@ -1600,7 +1617,7 @@ def test_assignments_composite_key_unique() -> None:
 def test_purged_composite_key_unique() -> None:
     """🔴 D-002 `Task 9.3`（`M-SU-D2-41`）：`purged` 同樣退回事件級——一事件恰一列、無 `feature_timeframe` 欄。"""
     index, train, test, keys, man, _ = _multi_feature_tf_case()
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert list(plan.purged.columns) == ["event_id", "reason"]
     assert "feature_timeframe" not in plan.purged.columns
     assert plan.purged["event_id"].is_unique, "一事件恰一列"
@@ -1615,7 +1632,7 @@ def test_summary_has_n_events_and_n_event_tf_rows() -> None:
     一個 purged 事件帶兩個 feature TF ⇒ 前者 2、後者 1；改回 `len(purged)` 即得 1 而轉紅。
     """
     index, train, test, keys, man, _ = _multi_feature_tf_case()
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     s = plan.summary
     assert s["n_events"] == keys["event_id"].nunique()
     assert s["n_event_tf_rows"] == len(keys)
@@ -1628,7 +1645,7 @@ def test_summary_has_n_events_and_n_event_tf_rows() -> None:
     gap_anchor = int(gap_index[g_b["train_row_index"][-1]]) + H1  # 隔離帶內 ⇒ purged
     _, _, _, g_keys, g_man, _ = _anchor_case(anchor_by_event={"e_one_purged": gap_anchor})
     g_plan = derive_event_split_from_plans(
-        g_train, g_test, g_keys, gap_index, manifest=g_man, bucket_ms=H1
+        g_train, g_test, g_keys, gap_index, universe_timeframe="1h", manifest=g_man, bucket_ms=H1
     )
     assert len(g_keys) == 2 and g_keys["event_id"].nunique() == 1, "fixture 前提變了：一事件×兩 TF"
     assert g_plan.summary["n_purged"] == 1
@@ -1645,7 +1662,7 @@ def test_duplicate_composite_key_error_message_names_key_not_side() -> None:
     dup = pd.concat([keys, keys.iloc[[0]]], ignore_index=True)
     with pytest.raises(ValueError, match="複合鍵重複") as ei:
         derive_event_split_from_plans(
-            train, test, dup, index, manifest=_manifest(dup.drop_duplicates("event_id")),
+            train, test, dup, index, universe_timeframe="1h", manifest=_manifest(dup.drop_duplicates("event_id")),
             bucket_ms=H1,
         )
     msg = str(ei.value)
@@ -1657,7 +1674,7 @@ def test_duplicate_composite_key_error_message_names_key_not_side() -> None:
 def test_clusters_remain_event_level_when_multi_feature_tf() -> None:
     """`clusters` **不加** `feature_timeframe`、維持事件級——簇由 label 區間決定，與 feature TF 無關。"""
     index, train, test, keys, man, _ = _multi_feature_tf_case()
-    plan = derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    plan = derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert "feature_timeframe" not in plan.clusters.columns
     assert len(plan.clusters) == keys["event_id"].nunique(), (
         "簇被複製成多列 ⇒ w=1/n 權重與簇計數會失去定義"
@@ -1708,7 +1725,7 @@ def test_multi_symbol_branch_summary_counts_are_named() -> None:
     省略那三個 kwargs 後 summary 會靜默變 0 而 705 條仍全綠。
     """
     plans, idx, keys, man, _ = _interleaved_case()
-    res = derive_event_split_from_plans(plans, keys, idx, manifest=man, bucket_ms=H1)
+    res = derive_event_split_from_plans(plans, keys, idx, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert res.summary["n_symbols"] == 2, "fixture 不是多標的 ⇒ 沒測到該分支"
     assert res.summary["n_events"] == keys["event_id"].nunique()
     assert res.summary["n_event_tf_rows"] == len(keys)
@@ -1722,7 +1739,7 @@ def test_multi_symbol_branch_summary_counts_are_named() -> None:
     # 🔴 D-002 `Task 9.3`（v32 補 `CODEX-R36-P1-03`：原只覆蓋單標的主路徑）：多標的 × 兩 feature TF ×
     #    含 purged 事件 ⇒ 多標的分支之事件級輸出、去重計數與 purge 稽核計數皆須有鑑別力。
     mt_plans, mt_idx, mt_keys, mt_man = _interleaved_multi_tf_case()
-    mt = derive_event_split_from_plans(mt_plans, mt_keys, mt_idx, manifest=mt_man, bucket_ms=H1)
+    mt = derive_event_split_from_plans(mt_plans, mt_keys, mt_idx, universe_timeframe="1h", manifest=mt_man, bucket_ms=H1)
     assert mt.summary["n_symbols"] == 2
     assert len(mt_keys) == 2 * mt_keys["event_id"].nunique(), "fixture 前提變了：須每事件兩 TF"
     assert mt.assignments["event_id"].is_unique and mt.purged["event_id"].is_unique
@@ -1786,15 +1803,26 @@ def _anchor_case(*, anchor_by_event: dict, feature_tfs=("1h", "4h")):
             cut = int(index[train_rows[0]]) if i == 0 else int(index[test_rows[0]])
             rows.append((eid, cut, cut + H1, SYM, tf))
     keys = _event_keys(rows)
+    # 🔴 `Task 10.3`：錨點改為 `universe_timeframe`（此處＝第一個 feature TF）那列之
+    #    `last_bar_open_ms`，不再是事件級 `decision_at_ms`。其餘 TF 之 cutoff 仍刻意各不相同
+    #    ——側別若還被逐列 cutoff 影響，兩 TF 就會給出異側，本 fixture 正是要抓那個。
+    #    PIT 前置要求 `anchor < cutoff <= decision` ⇒ 該列之 cutoff 與 decision 皆取 `anchor + H1`。
+    _utf = feature_tfs[0]
+    _is_utf = keys["feature_timeframe"].astype(str) == str(_utf)
+    _anchor_col = keys["event_id"].map(anchor_by_event).astype("int64")
+    keys.loc[_is_utf, "last_bar_open_ms"] = _anchor_col[_is_utf]
+    keys.loc[_is_utf, "feature_cutoff_ms"] = _anchor_col[_is_utf] + H1
     # 🔴 `label_start_ms`／`label_end_ms` 是**事件級**欄（來自 `receipts.event_level`）⇒
     #    同事件各 feature TF 列必須**同值**，且與錨點同源。`_event_keys` 預設把它們綁在
     #    逐列 `feature_cutoff_ms` 上（9.2b 前 cutoff 就是判側依據，綁一起才合理），
     #    本 fixture 既然刻意讓 cutoff 逐列不同，就必須把這兩欄解綁回事件級——否則造出來的
     #    是「事件級欄逐列不同」的假資料，正是 9.2b 要擋的那一類缺陷。
-    keys["label_start_ms"] = keys["event_id"].map(anchor_by_event).astype("int64")
+    keys["label_start_ms"] = _anchor_col
     keys["label_end_ms"] = keys["label_start_ms"] + H1
     man = _manifest(keys.drop_duplicates("event_id"))
-    man.table["decision_at_ms"] = man.table["event_id"].map(anchor_by_event).astype("int64")
+    man.table["decision_at_ms"] = (
+        man.table["event_id"].map(anchor_by_event).astype("int64") + H1
+    )
     return index, train, test, keys, man, b
 
 
@@ -1811,7 +1839,7 @@ def test_event_level_anchor_broadcasts_side_to_all_feature_tf() -> None:
     anchor = int(index[train_rows[0]])  # 錨點落在 train 段
     _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_bc": anchor})
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
     )
     assert plan.purged.empty
     got = plan.assignments[plan.assignments["event_id"] == "e_bc"]
@@ -1841,7 +1869,7 @@ def test_gap_band_event_is_purged_not_train() -> None:
     assert train_last < gap_anchor < test_start, "fixture 沒造出隔離帶就測不到本條"
     _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_gap_band": gap_anchor})
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
     )
     assert plan.assignments.empty
     # 🔴 D-002 `Task 9.3`（v38 `CODEX-R41-P1-01`）：`purged` 恰一列且無 `feature_timeframe` 欄；
@@ -1858,7 +1886,7 @@ def test_decision_before_index_start_raises() -> None:
     train, test, _ = _plans(index)
     _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_early": int(index[0]) - H1})
     with pytest.raises(ValueError, match="e_early"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_decision_after_index_end_raises() -> None:
@@ -1870,7 +1898,7 @@ def test_decision_after_index_end_raises() -> None:
     train, test, _ = _plans(index)
     _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_late": int(index[-1]) + H1})
     with pytest.raises(ValueError, match="e_late"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_out_of_range_is_not_a_fourth_classification_branch() -> None:
@@ -1883,7 +1911,7 @@ def test_out_of_range_is_not_a_fourth_classification_branch() -> None:
     train, test, _ = _plans(index)
     _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_oob": int(index[-1]) + 5 * H1})
     with pytest.raises(ValueError) as ei:
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert "e_oob" in str(ei.value)
     assert not isinstance(ei.value, AlignmentViolationError), (
         "界外是輸入超出定義域，不是 (3.2) 之異側缺陷——兩者混用會讓呼叫端分不出病因"
@@ -1942,7 +1970,7 @@ def test_real_derive_never_produces_straddling_event() -> None:
         "e_c": int(index[train_rows[-1]]) + H1,
     })
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
     )
     assert set(plan.assignments["event_id"]) & set(plan.purged["event_id"]) == set()
     # 🔴 D-002 `Task 9.3`（v38）：兩表列數合計＝**事件數**（不是 `len(keys)`——退回後 keys 列數＝事件×TF）。
@@ -2025,7 +2053,7 @@ def test_multi_symbol_concat_rejects_cross_symbol_event_id_collision() -> None:
     keys = _event_keys([("SHARED", cut, cut + H1, SYM), ("SHARED", cut, cut + H1, SYM_B)])
     man = _manifest(keys.iloc[[0]].reset_index(drop=True))
     with pytest.raises(AlignmentViolationError, match=r"assignments 之 event_id 重複 \['SHARED'\]"):
-        derive_event_split_from_plans(plans, keys, {SYM: index, SYM_B: index}, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(plans, keys, {SYM: index, SYM_B: index}, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_tier_min_test_events_counts_unique_event_ids() -> None:
@@ -2041,7 +2069,7 @@ def test_tier_min_test_events_counts_unique_event_ids() -> None:
     _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_t": anchor})
     assert len(keys) == 2 and keys["event_id"].nunique() == 1, "fixture 前提變了：一事件×兩 TF"
     plan = derive_event_split_from_plans(
-        train, test, keys, index, manifest=man, bucket_ms=H1, tier_min_test_events=2,
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1, tier_min_test_events=2,
     )
     assert plan.assignments["split_label"].tolist() == ["test"], "fixture 前提變了：該事件須在 test"
     assert plan.summary["insufficient_events_in_test"] == [SYM], (
@@ -2054,7 +2082,7 @@ def test_tier_min_test_events_counts_unique_event_ids_multi_symbol_branch() -> N
     """同上，走多標的（Mapping）分支——該分支之門檻輸入與 `per_symbol_n` 各有一份計數碼。"""
     mt_plans, mt_idx, mt_keys, mt_man = _interleaved_multi_tf_case()
     res = derive_event_split_from_plans(
-        mt_plans, mt_keys, mt_idx, manifest=mt_man, bucket_ms=H1, tier_min_test_events=2,
+        mt_plans, mt_keys, mt_idx, universe_timeframe="1h", manifest=mt_man, bucket_ms=H1, tier_min_test_events=2,
     )
     # A 之 test 事件 1 個（2 列）⇒ 不足；B 之 test 事件 3 個（6 列）⇒ 足夠。
     assert res.summary["insufficient_events_in_test"] == [SYM]
@@ -2120,7 +2148,7 @@ def test_side_consistency_check_is_wired_into_derive(monkeypatch) -> None:
         "e_w1": int(index[train_rows[0]]),
         "e_w2": int(index[test_rows[0]]),
     })
-    derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert "assign" in seen, (
         "`derive_event_split_from_plans` 沒有呼叫同側／跨表互斥檢查"
         "——(3.2) 的閘等於不存在（`M-SU-D2-14`）"
@@ -2150,7 +2178,7 @@ def test_side_consistency_check_runs_before_dataframes_are_built(monkeypatch) ->
         anchor_by_event={"e_order": int(index[b["train_row_index"][0]])}
     )
     with pytest.raises(AlignmentViolationError, match="SPY-BOOM"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_empty_train_rows_is_fail_closed_not_skipped() -> None:
@@ -2181,7 +2209,7 @@ def test_empty_train_rows_is_fail_closed_not_skipped() -> None:
     )
     with pytest.raises(ValueError, match="train_plan.row_index 為空"):
         derive_event_split_from_plans(
-            empty_train, test, keys, index, manifest=man, bucket_ms=H1
+            empty_train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
         )
 
 
@@ -2203,7 +2231,7 @@ def test_inconsistent_label_end_ms_is_fail_closed(monkeypatch) -> None:
     # 只改其中一列的事件級欄 ⇒ 同事件兩值不同
     keys.loc[keys.index[0], "label_end_ms"] = int(keys["label_end_ms"].iloc[0]) + 10 * H1
     with pytest.raises(AlignmentViolationError, match="e_le"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_anchor_uniqueness_guard_is_reachable_before_duplicate_id_guard() -> None:
@@ -2223,7 +2251,7 @@ def test_anchor_uniqueness_guard_is_reachable_before_duplicate_id_guard() -> Non
     row["decision_at_ms"] = int(row["decision_at_ms"].iloc[0]) + H1
     man.table.loc[len(man.table)] = row.iloc[0]
     with pytest.raises(AlignmentViolationError, match="e_dup_anchor"):
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
 
 
 def test_duplicate_manifest_with_same_anchor_still_raises_value_error() -> None:
@@ -2239,7 +2267,97 @@ def test_duplicate_manifest_with_same_anchor_still_raises_value_error() -> None:
     )
     man.table.loc[len(man.table)] = man.table.iloc[0]  # 逐欄相同之重複列
     with pytest.raises(ValueError, match="event_id 重複") as ei:
-        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+        derive_event_split_from_plans(train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1)
     assert not isinstance(ei.value, AlignmentViolationError), (
         "純重複不是側別缺陷——改成 AlignmentViolationError 會動到既有錯誤型別契約"
     )
+
+
+# ── Task 10.3（B10B）：換錨之四條具名驗收 ────────────────────────────────
+def test_boundary_event_with_anchor_before_test_start_is_purged() -> None:
+    """🔴 `Task 10.3` 邊界①：`decision_at_ms >= test_start_ms` 而 `anchor_ms < test_start_ms`
+    之邊界事件 ⇒ **不得**進 test。
+
+    出生理由：這正是換錨要修的那一類。IC 端實際消費的是 `anchor_ms` 那一列（在 train 段），
+    若投影仍以 `decision_at_ms` 判側就會判成 test ⇒ 兩端對同一事件給出不同側別。
+    鑑別力（`M-SU-R5-19`）：把錨改回 `decision_at_ms`，本條立刻轉紅。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    train_last = int(index[b["train_row_index"][-1]])
+    test_start = int(index[b["test_row_index"][0]])
+    anchor = train_last + H1                      # 隔離帶內 ⇒ 早於 test_start
+    assert anchor < test_start, "fixture 沒造出『錨早於 test 起點』就測不到本條"
+
+    _, _, _, keys, man, _ = _anchor_case(anchor_by_event={"e_bnd": anchor})
+    # 決策推進到 test 段起點之後（錨仍在隔離帶）——v9 錨會判 test、v10 錨判 purged。
+    man.table["decision_at_ms"] = test_start
+    keys.loc[keys["feature_timeframe"] == "1h", "feature_cutoff_ms"] = anchor + H1
+    assert int(man.table["decision_at_ms"].iloc[0]) >= test_start, "fixture 前提不成立"
+
+    plan = derive_event_split_from_plans(
+        train, test, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
+    )
+    assert "e_bnd" not in set(
+        plan.assignments.loc[plan.assignments["split_label"] == "test", "event_id"]
+    ), "錨在 test 起點之前卻被判 test ⇒ 換錨沒生效（IC 端讀的是 train 段那一列）"
+    assert "e_bnd" in set(plan.purged["event_id"]), "錨落在隔離帶 ⇒ 應 purged"
+
+
+def test_universe_timeframe_required() -> None:
+    """🔴 `Task 10.3` 邊界②：缺 `universe_timeframe` ⇒ raise，**不得**有預設值。
+
+    給預設就等於允許呼叫端不表態，而「該用哪一列判側」正是本票要釘死的東西。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(
+        anchor_by_event={"e_req": int(index[b["train_row_index"][0]])}
+    )
+    with pytest.raises(TypeError):
+        derive_event_split_from_plans(train, test, keys, index, manifest=man, bucket_ms=H1)
+    # 顯式給空值同樣拒絕（具名 ValueError，不是靜默退化）
+    with pytest.raises(ValueError, match="universe_timeframe"):
+        derive_event_split_from_plans(
+            train, test, keys, index, universe_timeframe="", manifest=man, bucket_ms=H1
+        )
+
+
+def test_event_keys_missing_universe_timeframe_row_fail_closed() -> None:
+    """🔴 `Task 10.3` 邊界③：事件缺該週期之 `event_keys` 列 ⇒ raise，訊息含 `event_id`。
+
+    鑑別力（`M-SU-R5-20`）：若改成「缺就回退他週期之列」，本條立刻轉綠而洩漏無人擋。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(
+        anchor_by_event={"e_miss": int(index[b["train_row_index"][0]])}
+    )
+    dropped = keys[keys["feature_timeframe"].astype(str) != "1h"].copy()  # 只留 4h 列
+    assert not dropped.empty, "fixture 須有他週期之列，否則本條空心"
+    with pytest.raises(ValueError, match="e_miss") as ei:
+        derive_event_split_from_plans(
+            train, test, dropped, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
+        )
+    assert "1h" in str(ei.value), f"訊息未指出缺的是哪個週期：{ei.value}"
+
+
+def test_anchor_ms_ge_feature_cutoff_ms_fail_closed() -> None:
+    """🔴 `Task 10.3` 邊界⑤：`anchor_ms >= feature_cutoff_ms` ⇒ raise。
+
+    錨點是該根 K 線之**開盤**、`feature_cutoff_ms` 是其**收盤** ⇒ 必嚴格早於。
+    兩者相等或反序代表上游收據壞了，不是一種側別。
+    """
+    index = _feature_index()
+    train, test, b = _plans(index)
+    _, _, _, keys, man, _ = _anchor_case(
+        anchor_by_event={"e_geo": int(index[b["train_row_index"][0]])}
+    )
+    bad = keys.copy()
+    _utf = bad["feature_timeframe"].astype(str) == "1h"
+    bad.loc[_utf, "feature_cutoff_ms"] = bad.loc[_utf, "last_bar_open_ms"]  # 收盤＝開盤
+    with pytest.raises(ValueError, match="anchor_ms") as ei:
+        derive_event_split_from_plans(
+            train, test, bad, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
+        )
+    assert "e_geo" in str(ei.value), f"訊息未指名事件：{ei.value}"

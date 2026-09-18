@@ -1,0 +1,49 @@
+SPLITUNIFY B10B（Task 10.3）— 施工中狀態與一個待裁定之規格張力
+日期: 2026-09-18
+狀態: 核心邏輯已落地並綠；golden v10 凍結未完成。
+
+== 已完成（綠）==
+momentum/Analysis/event_samples/split_projection.py
+  - `EVENT_KEY_COLUMNS` 新增 `last_bar_open_ms`。
+  - `build_event_keys` 由 `per_tf` 同名欄帶出該值；缺欄／缺值皆 fail-closed
+    （不得以 `feature_cutoff_ms` 代替）。
+  - `_derive_single_symbol`／`derive_event_split_from_plans` 新增 `universe_timeframe`
+    （**必填、無預設**）；per-symbol 路徑亦必填。
+  - 判側錨點由事件級 `decision_at_ms` 改為 `universe_timeframe` 那列之 `last_bar_open_ms`
+    （＝`anchor_ms`）；事件級唯一性檢查改判 `anchor_ms`（不唯一 ⇒ AlignmentViolationError）。
+  - PIT 前置：逐事件驗 `anchor_ms < feature_cutoff_ms <= decision_at_ms`，違反即 raise。
+  - 界外閘改判 `anchor_ms`。
+tests/momentum/Analysis/test_splitunify_derive.py → **117 passed**
+  - `_event_keys` 第二欄語意改為**錨點**（開盤），收盤＝錨點＋一根。
+  - `_receipts` 未給 `last_bar_open_ms` 時補 `cutoff - H1`（個案仍可顯式覆寫）。
+  - `_anchor_case` 之錨點改放 `last_bar_open_ms`（universe TF 列），decision 改為 anchor + H1。
+  - 兩處 clusters oracle fixture 改傳 `decision - H1`，使 `label_start_ms` 語意不變、oracle 不需重凍。
+
+== 🔴 待裁定之規格張力（交 B10B 審碼輪）==
+`Task 10.3` 同時要求：
+  (a) PIT 前置 `anchor_ms < feature_cutoff_ms <= decision_at_ms`（實作要點 3）；
+  (b) 「不得覆寫 `_v9`／v8 之值」（不可做第三條）。
+兩者對 v9 golden fixture 之第 13 筆 `bnd_shift` **互斥**：
+該筆刻意令 `feature_cutoff_ms` 落在 test 段、`decision_at_ms` 落在 train 段
+（v9 用它證明「換錨會位移」），但在 v10 語意下 `cutoff <= decision` 不成立
+——那正是本票要修掉的洩漏形態，不能再當成合法樣本。
+實跑證據：
+  ValueError: derive_event_split_from_plans: 事件 bnd_shift 之
+  feature_cutoff_ms=1700522000000 晚於 decision_at_ms=1700000000000
+  ——該列含決策時點之後之資訊（R5-C9 1. fail-closed）
+
+主委之處置（**非顯然，交委員裁**）：
+  v9 之 `g1_membership`／`g3b_oracle` 由凍結檔**原樣沿用、不再重算**
+  （其 fixture 在 v10 語意下已非合法輸入）；`_build_actual()` 改只重算 v10 組
+  （`g1_membership_v10`／`g3b_oracle_v10`，fixture 為新的 `_event_keys_v10()`）。
+  理由：literal 地滿足 (b)「不覆寫 v9 值」，同時不弱化 (a)。
+  替代方案（未採）：把 PIT 前置改為可選／只在某些呼叫端開啟——等於留一條無守衛路徑，
+  與本票「不得列殘留」之裁定相斥。
+
+== 未完成 ==
+- `_event_keys_v10()`（含人手字面 `expected_anchor_ms`／`expected_side_v10`，
+  且須含一筆「`decision_at_ms >= test_start_ms` 而 `anchor_ms < test_start_ms`」之邊界事件）。
+- `_build_actual()` 之 v9 沿用／v10 重算分流。
+- `main()` 之 v10 對帳輸出與 `--write` 路徑。
+- 清單指定之其餘測試檔（wiring／g4e_triple_probe／m5_coords_probe）之呼叫端補參數。
+- `M-SU-R5-19`／`M-SU-R5-20` 之 mutation 自證。

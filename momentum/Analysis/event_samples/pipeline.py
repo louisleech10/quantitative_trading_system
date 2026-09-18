@@ -725,6 +725,11 @@ class EventSamplePipeline:
         test_plan: Optional[Any] = None,
         feature_index: Optional[Any] = None,
         selected_timeframe: Optional[str] = None,
+        # 🔴 `Task 10.3`：特徵 run 之週期，判側錨點取自該週期之列（`R5-C9` 3.）。
+        #    只在投影路徑（有 `train_plan`／`test_plan`／`feature_index`）為必要；
+        #    `event-study-only` 與 `split_events` 路徑不需要，故此處為 `None` 預設、
+        #    在投影分支內 fail-closed，而非簽名層必填（否則會擋掉合法的非投影呼叫）。
+        universe_timeframe: Optional[str] = None,
     ) -> EventPipelineResult:
         """全鏈（含切分）；匯入不合規 ⇒ raise ContractValidationError（fail-closed，不半套）。
 
@@ -826,10 +831,20 @@ class EventSamplePipeline:
                 receipts,
                 selected_timeframe=None if selected_timeframe is None else str(selected_timeframe),
             )
+            # 🔴 v7 `R5-C9`／`Task 10.3`：判側錨點取自**特徵 run 週期**那列之 `last_bar_open_ms`
+            #    ⇒ 呼叫端必須**明示**該週期。`CODEX-R38-P1-02`：**禁**由 `selected_timeframe`
+            #    或全量 TF 集合推定——那會在多 feature TF 批上靜默選錯錨點列。
+            #    真值由 `Task 10.5` 自 `feature_run.timeframe` 注入；在那之前呼叫端須顯式給。
+            if not universe_timeframe:
+                raise ValueError(
+                    "EventSamplePipeline.run: 投影路徑需要 universe_timeframe"
+                    "（特徵 run 週期）——判側錨點取自該週期之列，不得由 selected_timeframe 推定"
+                )
             plan = derive_event_split_from_plans(
                 train_plan, test_plan,
                 event_keys,
-                feature_index, manifest=manifest, bucket_ms=config.split.bucket_ms,
+                feature_index, universe_timeframe=str(universe_timeframe),
+                manifest=manifest, bucket_ms=config.split.bucket_ms,
                 discarded_rows_by_feature_tf=discarded_rows,
                 # 🔴 B2b R1 之 H6（2026-09-11 回溯稽核撈回）：原本沒傳 ⇒ 投影路徑把使用者設定的
                 #    測試段事件數下限靜默換成 1，與 split_events 路徑判定不一致。

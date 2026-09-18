@@ -1,0 +1,88 @@
+SPLITUNIFY B10B（Task 10.3）— 實作與實跑收據
+日期: 2026-09-18
+依據: handoffs/reconcile/20260911-splitunify-b10-consult-r1/synth.md（設計裁決）
+
+== 設計裁決來源（使用者明示交委員會決定）==
+b10-consult-r1：codex（VERDICT: blocked，兩條 P1）＋composer（VERDICT: proceed）
+🔴 grok CLI 於本輪交件失敗：`API error (status 402 Payment Required): Grok Build usage balance exhausted`
+   ⇒ 使用者改以 Cursor 承載 Grok；委員自 2026-09-18 起為兩家（見 commit 48ad2b76）。
+兩家獨立收斂到同一裁定：
+  ①v9 之鍵由凍結檔**原樣沿用、不重算**（其 fixture 在 v10 語意下已非合法輸入）；
+   另立 `_event_keys_v10()` 重算 v10 組。
+  ②**必須**補 `test_v9_keys_not_overwritten_by_v10_freeze`，否則沿用寫錯方向無人察覺。
+  ③`M-SU-D2-27`／`28` 之靶須改指 v10 鍵，否則因 v9 不再重算而永遠不轉紅（假綠）。
+  ④拒絕方案②（改 v9 數值）：composer 實跑全索引搜尋，確有 24360 組同時滿足 PIT 且
+   v9／v10 異側之數值（例 anchor=1700514800000、cutoff=decision=1700518400000，
+   v9=test、v10=purged），但套到 `bnd_shift` 會改動其 v9 側別 ⇒ 逐字違反「不得覆寫 v9 值」。
+  ⑤立法意圖經兩家逐字查證為「**值**不得變」（非「必須持續可重算」）：
+   `SPEC` D-002 (G-4)「`_v9` 之值保留不覆寫」、`TODO:1042`「既有 11 個頂層鍵逐值不變」。
+  ⑥`universe_timeframe` 必填不過嚴（生產 caller 現為 0，Task 10.5 才接線）；
+   但 `CODEX-R38-P1-02`：`pipeline.py` 之 caller 未傳值 ⇒ B10B 在補上前不算完成。
+
+== 實作 ==
+momentum/Analysis/event_samples/split_projection.py
+  - `EVENT_KEY_COLUMNS` 新增 `last_bar_open_ms`。
+  - `build_event_keys` 由 `per_tf` 同名欄帶出；缺欄／缺值皆 fail-closed。
+  - `_derive_single_symbol`／`derive_event_split_from_plans` 新增 `universe_timeframe`
+    （必填、無預設）；per-symbol 路徑亦必填。
+  - 判側錨點改為該週期列之 `last_bar_open_ms`；事件級唯一性改判 `anchor_ms`
+    （不唯一 ⇒ AlignmentViolationError）；界外閘改判 `anchor_ms`。
+  - PIT 前置：逐事件驗 `anchor_ms < feature_cutoff_ms <= decision_at_ms`。
+momentum/Analysis/event_samples/pipeline.py
+  - `run()` 新增 `universe_timeframe`（投影分支內 fail-closed，非簽名層必填——
+    `event-study-only` 與 `split_events` 兩條合法路徑不需要它）。
+  - 🔴 禁由 `selected_timeframe` 或全量 TF 集合推定（`CODEX-R38-P1-02`）。
+scripts/freeze_splitunify_golden.py
+  - 新增 `_event_keys_v10()`（13 筆，含人手不可變字面 `expected_anchor_ms`／`expected_side_v10`，
+    含判別筆 `bnd_v10`：decision 已進 test 段而 anchor 仍在隔離帶 ⇒ v9 判 test、v10 判 purged）。
+  - 新增 `_hand_expected_membership_v10()`、`_frozen_v9_slice()`。
+  - `_oracle_membership` 之錨點欄改為參數（v9 用 `decision_at_ms`、v10 用 `last_bar_open_ms`），
+    兩版共用同一支重寫規則——差別只在錨點欄，才能把「換錨」與「寫錯」分開。
+  - `_build_actual()`：v9 七鍵由凍結檔沿用；v10 五鍵重算。
+  - 負例（`_leakage_negative_case`）與遷移報告（`_migration_report`）亦改走 v10 fixture。
+  - 交錯組（G-2）fixture 補 `last_bar_open_ms`，`label_start_ms` 仍綁錨點 ⇒ 側別與分簇逐值不變。
+  - 🔴 **v8 拒寫閘前移到 `_build_actual()` 之前**：否則新的「缺 v9 鍵」守衛會**遮蔽**它，
+    測試拿到的是缺鍵訊息而非「v8 不可覆寫」。本票第四次踩到「後加的守衛遮蔽先前的守衛」。
+
+== golden 重凍 ==
+`--write --accept-value-changes g5_answer_window=73d9bf16:63c11272` rc=0。
+  新增鍵：g1_membership_v10、g3b_oracle_v10、g4e_hand_expected_membership_v10、
+          g4e_hand_anchor_ms、g4e_actual_anchor_ms
+  值有變之既有鍵：g5_answer_window（fixture 由 bnd_shift 換成 bnd_v10，已明示授權）
+  🔴 **V9_KEYS_UNCHANGED True**（七鍵逐值比對：g1_membership／g1_membership_v9／
+     g3b_oracle／g3b_oracle_v9／g4e_hand_expected_membership／g4e_hand_decision_at_ms／
+     g4e_actual_decision_at_ms）
+比對模式：`venv/bin/python scripts/freeze_splitunify_golden.py` rc=0、`GOLDEN OK`。
+過程中兩道既有守衛正確擋下我：①整檔覆寫靜默丟鍵（`GOLDEN REFUSE: --write 會讓既有頂層鍵
+… 從主檔消失`）②`--accept-value-changes` 列了未實際改變的鍵（一次性授權不得沉澱成常設旗標）。
+
+== 清單指定之五條具名測試（全數新增並綠）==
+test_boundary_event_with_anchor_before_test_start_is_purged   （derive）
+test_universe_timeframe_required                              （derive）
+test_event_keys_missing_universe_timeframe_row_fail_closed    （derive）
+test_anchor_ms_ge_feature_cutoff_ms_fail_closed               （derive）
+test_v9_keys_not_overwritten_by_v10_freeze                    （golden）
+
+== mutation 自證（改壞→轉紅→還原→回綠，附 sha256）==
+基準 sha：split_projection.py=801fbf535207bf38  freeze_splitunify_golden.py=560159049e01e84c
+  M0  未竄改                                   → 151 passed
+  M-SU-R5-19 錨改回 `feature_cutoff_ms`         → **2 failed** / 119 passed
+  M-SU-R5-20 缺該週期列時不 raise（回退他週期）  → **1 failed** / 120 passed
+  M-v9-carry v9 鍵改填 v10 重算值               → **5 failed** / 25 passed
+  還原後                                        → 151 passed
+  還原後 sha：801fbf535207bf38 / 560159049e01e84c（與改前逐值相同）
+
+== 回歸 ==
+清單指定五檔：tests/momentum/Analysis/test_splitunify_derive.py、test_splitunify_golden.py、
+tests/momentum/event_samples/test_splitunify_wiring.py、test_splitunify_g4e_triple_probe.py、
+test_splitunify_m5_coords_probe.py → **173 passed**（121＋30＋22）。
+`venv/bin/python scripts/register_anchor_check.py` → rc=1（**既有紅**，非本批造成；
+見下殘留 R2）。
+
+== 殘留（交 B10B 審碼輪）==
+R1 `M-SU-D2-27`／`M-SU-D2-28` 之靶尚未改指 v10 鍵（`COMPOSER-R38-P2-02` 指出）。
+   理由＝blocked-by（需先確認兩條 mutation 之現行定義落點，屬審碼輪可一次修）。
+R2 `scripts/register_anchor_check.py` rc=1：本批改動使 SPEC 之 register ANCHOR 行號位移，
+   依 (5.7) 須同 commit 重出。理由＝needs-research（需先確認哪幾條 ANCHOR 受影響）。
+R3 grok CLI 家族暫停中（402 餘額用罄），本輪裁定由兩家收斂。
+   理由＝blocked-by（外部帳務，使用者已改以 Cursor 承載 Grok）。

@@ -131,6 +131,10 @@ def _event_keys(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
         int(index[tr[0]]),              # decision_at_ms（train 段）
         "train",
     ))
+    # 🔴 `Task 10.3`：v10（anchor 錨）之 fixture **另立** `_event_keys_v10()`，不動本函式。
+    #    兩個理由：①「不得覆寫 `_v9`／v8 之值」；②本 fixture 之 `bnd_shift`（cutoff 在 test 段、
+    #    decision 在 train 段）在 v10 語意下**本身違反 PIT 前置**（`cutoff <= decision` 不成立）
+    #    ——那正是本票要修掉的洩漏形態，不能再當成合法樣本。
     # 🔴 D-002 `Task 9.2`：`event_keys` 行粒度已改為 `(event_id, feature_timeframe)`，
     #    本 fixture 補上該欄。**本批刻意維持單一 feature TF**（`1h`）⇒ 複合鍵退化為
     #    `event_id`；擴維為多 feature TF 平行組屬 `Task 9.5`。
@@ -165,6 +169,10 @@ def _event_keys(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame([
         {"event_id": e, "feature_cutoff_ms": c, "label_start_ms": d,
          "label_end_ms": le, "symbol": SYM, "timeframe": "1h", "feature_timeframe": "1h",
+         # 🔴 `Task 10.3`：`EVENT_KEY_COLUMNS` 已納入本欄 ⇒ v9 fixture 也必須帶，否則
+         #    投影端缺欄即 raise。**v9 之判側仍由 `decision_at_ms` 之人手值決定**
+         #    （本欄在 v9 只為滿足欄集，不參與 v9 oracle）；v10 走 `_event_keys_v10()`。
+         "last_bar_open_ms": int(c) - H1,
          "decision_at_ms": d, "expected_side": side,
          "expected_decision_at_ms": int(_hand_decision[e])}
         for e, c, le, d, side in rows
@@ -256,12 +264,18 @@ def _interleaved_event_keys(short: Dict[str, pd.Index], bounds: Dict[str, Dict[s
             (f"{s}_te0", int(ms[te[0]]), int(ms[te[0]]) + H1),
             (f"{s}_te1", int(ms[te[1]]), int(ms[te[1]]) + H1),
         ]
-        for eid, decision, label_end in events:
+        for eid, anchor, label_end in events:
             for tf in _PARALLEL_FEATURE_TFS:
                 rows.append({
-                    "event_id": eid, "feature_cutoff_ms": decision, "label_start_ms": decision,
+                    # 🔴 `Task 10.3`：第二值之語意改為**錨點**（該列時刻＝開盤），
+                    #    收盤與決策皆取 `anchor + H1` 以滿足 PIT 前置 `anchor < cutoff <= decision`。
+                    #    `label_start_ms` 仍綁錨點 ⇒ 分簇與側別**逐值不變**（判側值由
+                    #    「decision＝ms[pos]」改為「anchor＝ms[pos]」，數值相同），
+                    #    故本組（G-2）之 golden 不需重凍。
+                    "event_id": eid, "last_bar_open_ms": anchor,
+                    "feature_cutoff_ms": anchor + H1, "label_start_ms": anchor,
                     "label_end_ms": label_end, "symbol": s, "timeframe": "1h",
-                    "feature_timeframe": tf, "decision_at_ms": decision,
+                    "feature_timeframe": tf, "decision_at_ms": anchor + H1,
                 })
     return pd.DataFrame(rows)
 
@@ -271,7 +285,7 @@ def _build_interleaved_actual() -> Dict[str, Any]:
     plans, short, bounds, positions = _interleaved_plans()
     keys = _interleaved_event_keys(short, bounds)
     event_level = keys.loc[keys["feature_timeframe"] == _PARALLEL_FEATURE_TFS[0]].reset_index(drop=True)
-    plan = derive_event_split_from_plans(plans, keys, short, manifest=_manifest(event_level), bucket_ms=H1)
+    plan = derive_event_split_from_plans(plans, keys, short, universe_timeframe="1h", manifest=_manifest(event_level), bucket_ms=H1)
     a = plan.assignments
     fingerprints: Dict[str, str] = {}
     fp_positions: Dict[str, List[int]] = {}
@@ -312,7 +326,13 @@ def _sha(payload: Any) -> str:
 
 
 # ── 獨立 oracle（G-3b／G-5②）：不呼叫被測函式 ──────────────────────────
-def _oracle_membership(index: pd.Index, b: Dict[str, Any], keys: pd.DataFrame) -> Dict[str, list]:
+def _oracle_membership(
+    index: pd.Index,
+    b: Dict[str, Any],
+    keys: pd.DataFrame,
+    *,
+    anchor_col: str = "decision_at_ms",
+) -> Dict[str, list]:
     """直接由 `feature_index[row_index]` 投影出成員集合——與被測函式無因果關係。
 
     🔴 刻意**逐行重寫**規則（不 import 投影）：oracle 的價值就在於它是**第二份推導**，
@@ -330,7 +350,11 @@ def _oracle_membership(index: pd.Index, b: Dict[str, Any], keys: pd.DataFrame) -
     test_start = int(ms[int(te_rows[0])])
     train, test, purged = [], [], []
     for rec in keys.to_dict("records"):
-        decision, end = int(rec["decision_at_ms"]), int(rec["label_end_ms"])
+        # 🔴 `Task 10.3`：錨點欄由參數指定——v9 用 `decision_at_ms`、v10 用 `last_bar_open_ms`
+        #    （＝IC 端實際消費之那一列之時刻）。仍是**第二份推導**：逐行重寫、不 import 投影。
+        #    兩版共用同一支重寫規則是**刻意**的——差別只在錨點欄，才能把「換錨」與「寫錯」
+        #    分開；若各寫一份，兩份之間的分歧會被誤讀成換錨的效果。
+        decision, end = int(rec[anchor_col]), int(rec["label_end_ms"])
         # 三段式（逐行重寫，順序與投影端條文一致）
         if decision <= train_last:
             side = "train"
@@ -345,13 +369,110 @@ def _oracle_membership(index: pd.Index, b: Dict[str, Any], keys: pd.DataFrame) -
     return {"train": sorted(train), "test": sorted(test), "purged": sorted(purged)}
 
 
+def _event_keys_v10(index: pd.Index, b: Dict[str, Any]) -> pd.DataFrame:
+    """v10（`anchor_ms` 錨）之 fixture——**與 v9 之 `_event_keys()` 完全分開**。
+
+    🔴 **為何另立**（b10-consult-r1 兩家一致裁定，`handoffs/reconcile/20260911-splitunify-b10-consult-r1/synth.md`）：
+    v9 fixture 第 13 筆 `bnd_shift` 令 `feature_cutoff_ms` 落在 test 段、`decision_at_ms`
+    落在 train 段，在 v10 語意下 `cutoff <= decision` **不成立** ⇒ 被 PIT 前置擋下。
+    那正是本票要修掉的洩漏形態，**不能**再當合法樣本；而清單「不得覆寫 `_v9`／v8 之值」
+    之立法意圖經兩家逐字查證為「**值**不得變」（非「必須持續可重算」）⇒ v9 值原樣沿用、
+    不再重算，v10 另立 fixture 重算。
+
+    🔴 **v10 之判別筆 `bnd_v10`**：`decision_at_ms >= test_start_ms` 而 `anchor_ms < test_start_ms`。
+    v9（decision 錨）會判 **test**、v10（anchor 錨）判 **purged**（錨落在隔離帶）。
+    沒有這一筆，v10 golden 對「有沒有真的換錨」是空心的。
+
+    每列之人手欄：`expected_anchor_ms`（不可變字面，不由 `BASE`／`H1` 推導）與
+    `expected_side_v10`（第三份判準，不 import 投影或 oracle）。
+    """
+    tr, te = b["train_row_index"], b["test_row_index"]
+    test_start = int(index[te[0]])
+    train_last = int(index[tr[-1]])
+    rows: List[tuple] = []
+    # train 段 4 筆（錨在 train 段、答案窗不跨界）；錨取 tr[1..4] 使 `anchor - H1` 仍在索引內。
+    for i, pos in enumerate(tr[1:5]):
+        a = int(index[pos])
+        rows.append((f"tr{i}", a, a + H1, "train"))
+    # 答案窗恰好觸到 test 段起點 ⇒ purged（`>=` 而非 `>`）
+    rows.append(("tr_leak", train_last, test_start, "purged"))
+    # 隔離帶 2 筆（錨落在 train 段末刻與 test 段起點之間）
+    for i in (1, 2):
+        a = train_last + i * H1
+        rows.append((f"gap{i}", a, train_last + (i + 2) * H1, "purged"))
+    # test 段 5 筆（答案窗不對 test 側套用）
+    for i, pos in enumerate(te[:5]):
+        a = int(index[pos])
+        rows.append((f"te{i}", a, a + H1, "test"))
+    # 🔴 判別筆：錨在 train 段末刻之後（隔離帶）、決策已進 test 段。
+    rows.append(("bnd_v10", train_last + H1, train_last + 2 * H1, "purged"))
+
+    # 🔴 人手錨點字面（`CODEX-R29-P1-03` 之教訓：不得由 `BASE`／`H1` 推導，否則平移
+    #    `BASE` 時人手值與實際值會**一起移動**、對帳照樣相等）。
+    _hand_anchor = {
+        "tr0": 1700003600000,
+        "tr1": 1700007200000,
+        "tr2": 1700010800000,
+        "tr3": 1700014400000,
+        "tr_leak": 1700500400000,
+        "gap1": 1700504000000,
+        "gap2": 1700507600000,
+        "te0": 1700518400000,
+        "te1": 1700522000000,
+        "te2": 1700525600000,
+        "te3": 1700529200000,
+        "te4": 1700532800000,
+        "bnd_v10": 1700504000000,
+    }
+    return pd.DataFrame([
+        {"event_id": e, "last_bar_open_ms": a, "feature_cutoff_ms": a + H1,
+         "label_start_ms": a, "label_end_ms": le,
+         "symbol": SYM, "timeframe": "1h", "feature_timeframe": "1h",
+         # PIT 前置要求 `anchor < cutoff <= decision`；此處 `decision = cutoff`（相等合法）。
+         "decision_at_ms": a + H1,
+         "expected_side_v10": side,
+         "expected_anchor_ms": int(_hand_anchor[e])}
+        for e, a, le, side in rows
+    ])
+
+
+def _hand_expected_membership_v10(keys: pd.DataFrame) -> Dict[str, list]:
+    """把 v10 之人手 `expected_side_v10` 攤成三態集合。**不得含任何判準**（只是重排）。"""
+    out: Dict[str, list] = {"train": [], "test": [], "purged": []}
+    for eid, side in keys[["event_id", "expected_side_v10"]].itertuples(index=False, name=None):
+        out[str(side)].append(str(eid))
+    return {k: sorted(v) for k, v in out.items()}
+
+
+def _frozen_v9_slice() -> Dict[str, Any]:
+    """由**凍結檔**原樣讀取 v9 之兩鍵（`COMPOSER-R38-P1-01`／`CODEX-R38-P1-01`）。
+
+    🔴 不得改以重算填入：v9 之 fixture 在 v10 語意下已非合法輸入（PIT 會擋），
+    重算只會把 v10 的值寫進 v9 的鍵而無人察覺。守衛＝
+    `test_v9_keys_not_overwritten_by_v10_freeze`（跑完 freezer 後逐值比對）。
+    """
+    path = GOLDEN_DIR / "splitunify_golden.json"
+    if not path.is_file():
+        raise SystemExit(f"ERROR: 缺凍結檔 {path}——v9 鍵只能沿用、不得重算（fail-closed）")
+    frozen = json.loads(path.read_text(encoding="utf-8"))
+    missing = [k for k in ("g1_membership", "g1_membership_v9", "g3b_oracle", "g3b_oracle_v9",
+                           "g4e_hand_expected_membership", "g4e_hand_decision_at_ms",
+                           "g4e_actual_decision_at_ms")
+               if k not in frozen]
+    if missing:
+        raise SystemExit(f"ERROR: 凍結檔缺 v9 鍵 {missing}（fail-closed）")
+    return frozen
+
+
 def _build_actual() -> Dict[str, Any]:
     index = _feature_index()
     train_plan, test_plan, b = _plans(index)
-    keys = _event_keys(index, b)
+    # 🔴 v10 之重算走**新** fixture；v9 之兩鍵由凍結檔沿用（見 `_event_keys_v10` docstring）。
+    keys = _event_keys_v10(index, b)
     man = _manifest(keys)
+    _frozen = _frozen_v9_slice()
     plan = derive_event_split_from_plans(
-        train_plan, test_plan, keys, index, manifest=man, bucket_ms=H1
+        train_plan, test_plan, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
     )
     a = plan.assignments
     ms = np.asarray(index, dtype="int64")
@@ -368,31 +489,39 @@ def _build_actual() -> Dict[str, Any]:
         "test": sorted(a.loc[a["split_label"] == "test", "event_id"]),
         "purged": sorted(plan.purged["event_id"]),
     }
-    _oracle = _oracle_membership(index, b, keys)
+    _oracle = _oracle_membership(index, b, keys, anchor_col="last_bar_open_ms")
     return {
-        # G-1
-        "g1_membership": _membership,
-        # 🔴 **(G-4e) 第三份判準**（`CODEX-R27-P1-03`）：人手填入之 `expected_side` 攤平。
-        "g4e_hand_expected_membership": _hand_expected_membership(keys),
-        # 🔴 **(G-4e) 錨點時刻對帳（`CODEX-R28-P1-03`）**：人手常數 vs fixture 實際產生值。
-        "g4e_hand_decision_at_ms": {
+        # 🔴 **v9 之四鍵一律由凍結檔沿用、不重算**（b10-consult-r1 裁定）：其 fixture
+        #    在 v10 語意下已非合法輸入（`bnd_shift` 之 cutoff 晚於 decision ⇒ PIT 擋下）。
+        #    守衛＝`test_v9_keys_not_overwritten_by_v10_freeze` 逐值比對。
+        "g1_membership": _frozen["g1_membership"],
+        "g1_membership_v9": _frozen["g1_membership_v9"],
+        "g3b_oracle": _frozen["g3b_oracle"],
+        "g3b_oracle_v9": _frozen["g3b_oracle_v9"],
+        # 🔴 v9 之 `g4e_*` 三鍵同理沿用——它們描述的是 **v9 fixture** 之人手判準與實際值，
+        #    與 v10 無關。**不得刪除**：整檔覆寫靜默丟鍵已被 freezer 之既有守衛擋下
+        #    （實跑 `GOLDEN REFUSE: --write 會讓既有頂層鍵 … 從主檔消失`），那道守衛是對的。
+        "g4e_hand_expected_membership": _frozen["g4e_hand_expected_membership"],
+        "g4e_hand_decision_at_ms": _frozen["g4e_hand_decision_at_ms"],
+        "g4e_actual_decision_at_ms": _frozen["g4e_actual_decision_at_ms"],
+        # 🔴 **(G-4d) 第 6 點：v10 版本化新鍵**（`Task 10.3`）——錨點改 `anchor_ms` 後之
+        #    成員集合與 oracle。`M-SU-D2-27`／`M-SU-D2-28` 之靶改指這兩鍵
+        #    （`COMPOSER-R38-P2-02`：留在 v9 上會因 v9 不再重算而永遠不轉紅＝假綠）。
+        "g1_membership_v10": _membership,
+        "g3b_oracle_v10": _oracle,
+        # 🔴 **(G-4e) 第三份判準**：v10 之人手 `expected_side_v10` 攤平。
+        "g4e_hand_expected_membership_v10": _hand_expected_membership_v10(keys),
+        # 🔴 **(G-4e) 錨點時刻對帳**：人手不可變字面 vs fixture 實際產生值（v10 改對 `anchor_ms`）。
+        "g4e_hand_anchor_ms": {
             str(e): int(v) for e, v in
-            keys[["event_id", "expected_decision_at_ms"]].drop_duplicates()
+            keys[["event_id", "expected_anchor_ms"]].drop_duplicates()
             .itertuples(index=False, name=None)
         },
-        "g4e_actual_decision_at_ms": {
+        "g4e_actual_anchor_ms": {
             str(e): int(v) for e, v in
-            keys[["event_id", "decision_at_ms"]].drop_duplicates()
+            keys[["event_id", "last_bar_open_ms"]].drop_duplicates()
             .itertuples(index=False, name=None)
         },
-        # 🔴 **(G-4d)① 版本化新鍵**（`Task 9.2b`）：9B 之後的成員集合與 v8 不同批
-        #    （fixture 多了 `bnd_shift`、判側改事件級錨定）⇒ 用**新鍵**承載，
-        #    `splitunify_golden.v8.json` 保持不可覆寫之 9B 前錨點。
-        #    兩鍵並存的用途：`M-SU-D2-27`／`M-SU-D2-28` 改壞判準時**兩者同時轉紅**。
-        "g1_membership_v9": _membership,
-        "g3b_oracle_v9": _oracle,
-        # G-3b oracle（獨立推導）
-        "g3b_oracle": _oracle,
         # G-4 per-symbol counts（整數逐值相等）
         "g4_per_symbol_n": {k: int(v) for k, v in plan.summary["per_symbol_n"].items()},
         # G-5①
@@ -457,13 +586,15 @@ def _leakage_negative_case() -> str:
     """
     index = _feature_index()
     train_plan, test_plan, b = _plans(index)
-    keys = _event_keys(index, b)
+    # 🔴 `Task 10.3`：負例亦改走 v10 fixture——v9 之 `bnd_shift` 在 v10 語意下違反 PIT，
+    #    用它會讓本負例在「注入之前」就 raise，於是根本沒驗到 containment。
+    keys = _event_keys_v10(index, b)
     test_start = int(np.asarray(index, dtype="int64")[int(np.asarray(b["test_row_index"])[0])])
     injected = keys.copy()
     target = injected.index[injected["event_id"] == "tr0"][0]
     injected.loc[target, "label_end_ms"] = test_start + H1  # 推進 test 區
     plan = derive_event_split_from_plans(
-        train_plan, test_plan, injected, index, manifest=_manifest(injected), bucket_ms=H1
+        train_plan, test_plan, injected, index, universe_timeframe="1h", manifest=_manifest(injected), bucket_ms=H1
     )
     if "tr0" not in set(plan.purged["event_id"]):
         return "FAIL: 注入跨界之 train 事件 tr0 **未進 purged**（containment 已失效）"
@@ -476,10 +607,11 @@ def _migration_report() -> Dict[str, Any]:
     """G-3a：舊 `split_events` vs 新投影之差集（**一次性遷移報告，不進綠徑**）。"""
     index = _feature_index()
     train_plan, test_plan, b = _plans(index)
-    keys = _event_keys(index, b)
+    # 🔴 `Task 10.3`：遷移報告亦走 v10 fixture（理由同負例；v9 fixture 已非 v10 合法輸入）。
+    keys = _event_keys_v10(index, b)
     man = _manifest(keys)
     new = derive_event_split_from_plans(
-        train_plan, test_plan, keys, index, manifest=man, bucket_ms=H1
+        train_plan, test_plan, keys, index, universe_timeframe="1h", manifest=man, bucket_ms=H1
     )
     old = split_events(man, EventSplitConfig(test_fraction=0.3, bucket_ms=H1,
                                              tier_min_test_events=0))
@@ -703,6 +835,16 @@ def main() -> int:
     rc = _assert_v8_baseline_intact()
     if rc:
         return rc
+    # 🔴 **v8 拒寫閘必須在 `_build_actual()` 之前**（`Task 10.3` 施工中自抓）：
+    #    `_build_actual()` 會先讀主檔之 v9 鍵（`_frozen_v9_slice`），而 v8 基準沒有那些鍵
+    #    ⇒ 新守衛會**遮蔽**這道既有的專屬拒寫閘，測試拿到的是「缺 v9 鍵」而非
+    #    「v8 不可覆寫」。同一票內第四次踩到「後加的守衛遮蔽先前的守衛」。
+    #    下方 `--write` 分支內之同一判定保留（雙層無害），但判定權在此。
+    if args.write:
+        _v8_guard = GOLDEN_DIR / "splitunify_golden.v8.json"
+        if golden_path.resolve() == _v8_guard.resolve():
+            print("GOLDEN REFUSE: splitunify_golden.v8.json 為不可變基準，禁止 --write 覆寫")
+            return 1
     actual = _build_actual()
 
     # G-3b：新投影 vs 獨立 oracle，集合相等（**每次都驗**，不只在凍結時）
@@ -718,8 +860,8 @@ def main() -> int:
     #    的 `expected_side`，不經任何推導，故與前兩份無共因。
     # 🔴 **錨點時刻逐筆對帳（`CODEX-R28-P1-03`）**：側別相等擋不住「整批時刻位移」——
     #    該家以 +1 ms 探針實證。人手常數由 BASE／H1 手算，與 `_plans`／`holdout_boundary` 無共因。
-    _hand_ms = actual["g4e_hand_decision_at_ms"]
-    _actual_ms = actual["g4e_actual_decision_at_ms"]
+    _hand_ms = actual["g4e_hand_anchor_ms"]
+    _actual_ms = actual["g4e_actual_anchor_ms"]
     _ms_bad = sorted(
         f"{e}: 人手={_hand_ms.get(e)} 實際={_actual_ms.get(e)}"
         for e in set(_hand_ms) | set(_actual_ms) if _hand_ms.get(e) != _actual_ms.get(e)
@@ -731,8 +873,8 @@ def main() -> int:
         return 1
     print(f"  ✓ G-4e：{len(_hand_ms)} 筆錨點時刻與人手常數逐筆相符")
 
-    _hand = actual["g4e_hand_expected_membership"]
-    for _name, _other in (("投影", actual["g1_membership"]), ("oracle", actual["g3b_oracle"])):
+    _hand = actual["g4e_hand_expected_membership_v10"]
+    for _name, _other in (("投影", actual["g1_membership_v10"]), ("oracle", actual["g3b_oracle_v10"])):
         if _hand != _other:
             for line in _diff_report(_hand, _other):
                 print(f"  ✗ G-4e（人手 expected_side vs {_name}）: {line}")
