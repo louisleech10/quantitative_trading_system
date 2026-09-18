@@ -135,7 +135,6 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
             detail={"kind": "empty_event_batch",
                     "message": f"事件批 {request.event_import_id!r} 沒有任何 records"},
         )
-    seed = records[0]
     # 🔴 **混 `decision_offset_bars` ⇒ fail-closed**（`CODEX-R2-P1-02`，B-D1 R2 實跑命中）：
     #    契約層允許逐列不同（`decision_offset_bars` 不在同質維度內），而本函式取 `records[0]`
     #    之 k、`_analysis_copy` 再把它**套用全批** ⇒ 其餘事件被對齊到**錯的決策根**，
@@ -164,132 +163,51 @@ def _resolve_event_batch(request: ICAnalyzeRequest) -> Optional[Dict[str, Any]]:
     #       出口一律走 `momentum.factories`（Rule 3；直接 import
     #       `momentum.Analysis.event_samples.pipeline` 會被 `check_decoupling_imports.py`
     #       當場擋——本輪實際踩到一次，見 commit 訊息）。
-    from momentum.factories import create_event_sample_pipeline
-
-    k_domain = create_event_sample_pipeline().int_field_domain("decision_offset_bars")
-    k_min, k_max = k_domain["min"], k_domain["max"]
-    k_values = set()
-    k_missing = False
-    k_invalid = []
-    for r in records:
-        v = r.get("decision_offset_bars")
-        if v is None:
-            k_missing = True
-        elif isinstance(v, bool) or not isinstance(v, int):
-            # bool 是 int 的子型別且 `True` 會被當成 1 ⇒ 一律視為型別錯，不是 k=1。
-            k_invalid.append(v)
-        elif (k_min is not None and v < k_min) or (k_max is not None and v > k_max):
-            # 值域外＝與型別錯同一類「落檔已損壞」，不另立第四個 kind（三家 R5 判三分已足）。
-            k_invalid.append(v)
-        else:
-            k_values.add(int(v))
-    #    🔴 **`CODEX-R4-P1-02`（R4 閉合輪）**：全批皆缺時，下方 `spec.setdefault(..., seed.get(...))`
-    #       會留下 `None`，`normalize_event_label_spec` 隨即拋
-    #       `LabelProducerError ... 須為 int` ⇒ 分析在**深處**炸掉，使用者看到的是無關訊息。
-    #       主委原判「全批皆缺仍放行＝保留既有行為」，但那個「既有行為」本身就是壞的；
-    #       且我的 over 向斷言寫成 `in (0, None)`——**`None` 也算過**，剛好把它蓋住。
-    #       ⇒ 在能算錯（或亂噴錯）之前先擋，並在訊息裡指出這是繞過匯入驗證的落檔。
-    #    🔴 **`G3-D2` D4.3 起本條不再擋**（裁定②）：分析用 k **不再取自 records**
-    #       ⇒「整批都沒有 k」不會再讓 `setdefault` 留下 `None`，初始值是契約 min 之常數。
-    #       缺欄仍是**事實**，由 `batch_fact_notes.decision_offset_bars_record_values`
-    #       之**空清單**照實呈現（空 ≠ `[0]`）。保留變數供揭露用。
-    if k_missing and not k_values and not k_invalid:
-        pass
-    if k_invalid:
-        raise HTTPException(status_code=422, detail={
-            "kind": "invalid_decision_offset_bars",
-            "message": (
-                f"事件批 {request.event_import_id!r} 之 decision_offset_bars 有不合契約的值"
-                f"（{k_invalid[:3]}）。契約要求本欄為 int"
-                # 🔴 字面由契約導出，不手寫「>=0」——契約改 min 這句才不會過期。
-                f"{'' if k_min is None else f'>={k_min}'}"
-                f"{'' if k_max is None else f'<={k_max}'}"
-                "；出現其他型別或超出值域代表落檔已損壞或繞過了匯入驗證，分析層不猜測其意圖。"
-            ),
-        })
-    # 🔴 **`G3-D2` D4.3：混 k 之 422 已移除**（裁定②「k 之分析參數化」＝本 Task 之交付）。
-    #    原閘之前提是「分析 k 取自 `records[0]`」⇒ 批內不一致就會有事件被對齊到錯的決策根。
-    #    D4.3 之後分析 k **由使用者於分析頁指定、對全批一致套用**，records 之 k 只是**事實**
-    #    ⇒ 混值不再能造成錯誤對齊，擋它反而擋掉合法批（原訊息末句已預告本次解除）。
-    #    記錄值集合以 `decision_offset_bars_record_values` 揭露，供使用者看見「這批當初宣告了什麼」。
-    ks = sorted(k_values)
-    # 🔴 typed model（D4.3）：`exclude_none=True` 讓「沒給的鍵」不出現，
-    #    下方 `setdefault` 之語意（請求明給者優先）才不變。
-    spec = (
-        request.event_label_spec.model_dump(exclude_none=True)
-        if request.event_label_spec is not None else {}
+    # 🔴 **SPLITUNIFY `Task 10.4`／`R5-C10`：解析下沉為單一入口**。
+    #    值域檢查、深度宣告讀取、預設導出與四鍵補齊原本寫在本函式內，事件掃描端另有一份
+    #    ⇒ 兩端對同一批算出不同的答案窗與決策根、切分邊界差一整個週期。
+    #    現在一律走 `momentum.factories` 之唯一出口；route 只負責「查出 records」與
+    #    「把具名例外映射成 HTTP」。
+    #    🔴 錯誤之 `kind` 字面與回應形狀**逐位元組不變**（`Task 10.4` 不可做第五條）。
+    from momentum.factories import (
+        create_event_label_spec_resolver,
+        create_event_sample_pipeline,
     )
-    # 🔴 **`CODEX-R2-P1-01`（閉合輪抓到，真實批次跑不起來）**：深度宣告是**批次層 receipt**，
-    #    住在 payload 的**頂層** `lookahead_declaration`，**不是**每一列上。
-    #    首版只讀 `records[0]["lookahead_bars_declared"]` ⇒ 對真實批次（實測 780 列）拿到 `{}`，
-    #    producer 隨即 fail-closed（`缺 timeframe '12h'`）⇒ **事件分析在真實資料上根本跑不完**。
-    #    這正是我在 brief「我沒查的」第 5 列自己列出來的那件事——列出來了，但沒去打。
-    #    ⇒ 順序：批次 receipt（權威）→ 逐列欄（`/search` 匯出之 Task 4.1 ③ 會寫）→ fail-closed。
+
+    resolve_event_label_spec, EventLabelSpecError = create_event_label_spec_resolver()
     receipt = get_event_import_service()._stored_declaration(request.event_import_id)
-    declared = (receipt or {}).get("lookahead_bars_declared")
-    if not isinstance(declared, dict) or not declared:
-        row_level = seed.get("lookahead_bars_declared")
-        declared = row_level if isinstance(row_level, dict) and row_level else None
-    if not declared:
-        raise HTTPException(status_code=422, detail={
-            "kind": "missing_lookahead_declaration",
-            "message": (
-                f"事件批 {request.event_import_id!r} 沒有答案窗深度宣告"
-                "（批次 receipt 之 lookahead_bars_declared 與逐列欄皆缺）——"
-                "purge 下界無從導出，故不進行分析。請重新匯入並填寫深度宣告。"
+    try:
+        resolved = resolve_event_label_spec(
+            records,
+            requested_spec=(
+                request.event_label_spec.model_dump(exclude_none=True)
+                if request.event_label_spec is not None else None
             ),
-        })
-    # ── `G3-D2` D1.7：`event_label_spec` 之初始值依**宣告深度**導出（裁定②③ 2026-09-03）──
-    #
-    # 🔴 **deterministic，無隨機、無「取第一列」之隱性取樣**：
-    #    `trigger_tfs = sorted({r["timeframe"]})` ⇒ 單 tf 才有唯一深度可談。
-    # 🔴 **仍禁讀 `label_definition.window.horizon_bars`**（§D-3′-a）：該欄語意是 D-7 深度宣告，
-    #    分析層讀成答案窗即靜默給錯預設；深度一律取批次 receipt 之 `lookahead_bars_declared`。
-    # 🔴 `setdefault` 語意不變：**請求明確給的值一律優先**，本段只補「沒給」的那些鍵。
-    trigger_tfs = sorted({str(r.get("timeframe")) for r in records if r.get("timeframe")})
-    mixed_tf = len(trigger_tfs) > 1
-    if mixed_tf:
-        # 混 tf 批**不自動選深度**：各 tf 之「一根」長度不同，取任一個都是猜。
-        # ⇒ 退回「當根」（不依賴 h）並揭露，請使用者手動設定。
-        preset_entry, preset_mode, preset_h = "trigger_open", "open_to_close", 1
-        seed_note = "混合 timeframe 批，請手動設定量法與 h（未自動依深度選擇）"
-    else:
-        depth = int(declared.get(trigger_tfs[0], 0)) if trigger_tfs else 0
-        if depth >= 1:
-            # 「持有」：從 t₀ 開盤進場、持有 depth 根到收盤。
-            preset_entry, preset_mode, preset_h = "trigger_open", "open_to_horizon_close", depth
-            seed_note = f"本次量法＝持有（預設依宣告深度；續漲需手動選）；h＝{depth}（初始＝宣告深度）"
-        else:
-            # 「當根」：深度 0 ⇒ 事件當根內的漲跌，與 h 無關。
-            preset_entry, preset_mode, preset_h = "trigger_open", "open_to_close", 1
-            seed_note = "本次量法＝當根（預設依宣告深度；續漲需手動選）；當根不用 h"
-    spec.setdefault("entry_price_semantic", preset_entry)
-    spec.setdefault("label_return_mode", preset_mode)
-    # 🔴 「當根」下 `horizon_bars` **仍送 1**（inert 哨兵）：`event_label_spec` 恆為恰四鍵，
-    #    normalizer 對多一鍵少一鍵皆 fail-closed；`open_to_close` 之值與 h 無關（golden 已斷言）。
-    spec.setdefault("horizon_bars", preset_h)
-    # 🔴 `G3-D2` D4.3（裁定②）：分析用 k 之初始值＝**契約 min 之常數**，
-    #    **不再**取自該批之 `declaration_seeds.decision_offset_bars`（該欄已移除）。
-    #    理由：「這批當初宣告過 k=1」與「這次分析要用 k=1」沒有必然關係；
-    #    種子化會讓一個匯入時的宣告偷偷決定分析參數，而使用者以為自己在用預設值。
-    spec.setdefault("decision_offset_bars", int(k_min if k_min is not None else 0))
+            declared_receipt=receipt,
+            k_domain=create_event_sample_pipeline().int_field_domain("decision_offset_bars"),
+            batch_label=str(request.event_import_id),
+        )
+    except EventLabelSpecError as exc:
+        raise HTTPException(
+            status_code=422, detail={"kind": exc.kind, "message": exc.message},
+        ) from exc
+
     return {
         "records": records,
-        "event_label_spec": spec,
-        "lookahead_bars_declared": dict(declared),
+        "event_label_spec": resolved.spec,
+        "lookahead_bars_declared": resolved.lookahead_bars_declared,
         # 揭露字串由**後端**產生（前端不重組）：它描述的是後端實際採用的初始值規則。
-        "event_label_spec_seed_note": seed_note,
+        "event_label_spec_seed_note": resolved.seed_note,
         # 🔴 D4.3：批內**記錄**之 k 值集合（事實）與**本次分析**之 k（參數）分開揭露。
         #    兩者同名不同義，混在一起講就是 D1.7 那類「數字誤導」的來源。
-        "decision_offset_bars_record_values": ks,
-        "decision_offset_bars_analysis": int(spec["decision_offset_bars"]),
+        "decision_offset_bars_record_values": resolved.decision_offset_bars_record_values,
+        "decision_offset_bars_analysis": int(resolved.spec["decision_offset_bars"]),
         # 掃描網格（未給 ⇒ None；service 端據此決定單跑或掃格）。
         "event_label_scan": (
             request.event_label_scan.model_dump(exclude_none=True)
             if request.event_label_scan is not None else None
         ),
         # 🔴 EVTLABEL Task 3.2：只**透傳**使用者請求的模式，route 不解析 `auto`。
-        #    能不能用 0/1 要看切分後驗證段每類剩幾個 ⇒ 決策點在 orchestrator stage3（Task 3.4）。
         "event_label_mode": request.event_label_mode,
     }
 

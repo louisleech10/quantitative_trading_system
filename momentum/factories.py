@@ -1062,3 +1062,37 @@ def create_event_sample_pipeline() -> "EventSamplePipeline":
     from momentum.Analysis.event_samples.pipeline import EventSamplePipeline
 
     return EventSamplePipeline()
+
+
+def create_event_label_spec_resolver():
+    """SPLITUNIFY `Task 10.4`／`R5-C10`：分析用標籤參數之**唯一**解析出口。
+
+    🔴 存在理由：事件掃描端與 IC 端原本各自導出 `event_label_spec` 之預設，
+    兩端對同一批事件算出不同的答案窗與決策根 ⇒ 切分邊界相差一整個週期。
+    兩端一律經本出口取得，**不得**各自再寫一份（Rule 3：服務端不直 import momentum 內層）。
+
+    回傳 `(resolve_event_label_spec, EventLabelSpecError)`——呼叫端需要那個具名例外
+    才能把它映射成自己的錯誤形狀（route 映 422 之 `kind`，service 另有其表達）。
+    """
+    from momentum.Analysis.event_samples.event_label_spec_resolution import (
+        EventLabelSpecError,
+        resolve_event_label_spec,
+    )
+
+    return resolve_event_label_spec, EventLabelSpecError
+
+
+def create_canonical_holdout_resolver():
+    """SPLITUNIFY `Task 10.4`／`R5-C1`：canonical 邊界之**唯一**解析出口。
+
+    🔴 存在理由：邊界原本由各呼叫端自行導出（比對腳本內一度寫死 `oos_test_size=0.2`、
+    深度抬高之 embargo 未接上，B10A 審碼兩度被打穿）。一律經本出口取得。
+
+    回傳 `(resolve_canonical_holdout, CanonicalHoldoutError)`。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        CanonicalHoldoutError,
+        resolve_canonical_holdout,
+    )
+
+    return resolve_canonical_holdout, CanonicalHoldoutError
