@@ -141,6 +141,78 @@ def test_selected_row_value_matches_that_kline_bar(run_tf: str, run_dir: Path) -
     assert match_same / total >= 0.95, f"逐值相符率 {match_same}/{total} 低於門檻"
 
 
+BATCH_1H = REPO / "data_cache/events/20260918T060524Z-d2c97d3b.json"
+
+
+def _prepare_1h_batch(k: int):
+    """1h 單週期批 × 12h run（Task 10.2 邊界③之非整點幾何）。
+
+    該批依施工清單四步取得：真實混週期批之 14 筆 1h 記錄（`t0` 未改）、宣告裁切為僅 1h 鍵、
+    匯入時明示 `batch_defaults.label_origin="user_csv"`、落檔 `20260918T060524Z-d2c97d3b`
+    （`upload_sha256=72a8c9861ed3389350bab8c04ef672e250722100cbf0fb1aebd279467afb42ce`）。
+    """
+    b = json.loads(BATCH_1H.read_text())
+    decl = b["lookahead_declaration"]["lookahead_bars_declared"]
+    spec = {
+        "entry_price_semantic": "trigger_open",
+        "label_return_mode": "open_to_horizon_close",
+        "horizon_bars": max(1, int(decl["1h"])),
+        "decision_offset_bars": k,
+    }
+    pipe = create_event_sample_pipeline()
+    tfs = ["1h", "12h"]
+    bars = pipe.bars_from_kline_cache(["ETHUSDT"], tfs)
+    prepared = pipe.prepare_analysis_windows(
+        tuple(b["records"]), bars,
+        event_label_spec=spec,
+        event_import_id=b["import_id"],
+        lookahead_bars_declared=decl,
+        timeframe_seconds=pipe.timeframe_seconds_for(tfs),
+        feature_timeframe="12h",
+    )
+    return pipe, prepared
+
+
+def test_1h_events_12h_run_off_grid_key_is_pit_correct() -> None:
+    """`R5-C9` 1.＋Task 10.2 邊界③：1h 事件 × 12h run、決策時點**不在** 12h 網格上。
+
+    前置條件（不成立即 fail，擋空心通過）：fixture 中至少一筆 `last_bar_open_ms != decision_at_ms − 12h`。
+    """
+    _require(BATCH_1H, RUN_12H, KLINE)
+    pipe, prepared = _prepare_1h_batch(k=5)
+    keys = pipe.feature_row_keys(prepared, feature_timeframe="12h")
+    index_ms = set(int(x) for x in _feature_index_ms(RUN_12H))
+    bar = BAR_MS["12h"]
+
+    off_grid = 0
+    assert prepared.windows, "1h 批須有可用窗"
+    for w in prepared.windows:
+        key = int(keys[w.event_id])
+        dec = int(w.decision_at_ms)
+        assert key + bar <= dec, f"事件 {w.event_id}：列收盤 {key + bar} 晚於 decision_at {dec}"
+        assert key in index_ms, f"事件 {w.event_id}：鍵 {key} 不在 12h 特徵索引內"
+        if key != dec - bar:
+            off_grid += 1
+    assert off_grid >= 1, (
+        "前置條件不成立：fixture 中無任何決策時點落在 12h 網格外之事件 ⇒ 本條無鑑別力"
+    )
+
+
+def test_1h_events_12h_run_old_key_drops_events_entirely() -> None:
+    """舊鍵（觸發週期之 `feature_cutoff_ms`）在非整點幾何下之失敗型態＝事件**整筆丟棄**。
+
+    對照 12h 事件之失敗型態（晚一根仍落在索引內），此處舊鍵多半不落在 12h 索引 ⇒ IC 取不到列。
+    """
+    _require(BATCH_1H, RUN_12H, KLINE)
+    _pipe, prepared = _prepare_1h_batch(k=5)
+    index_ms = set(int(x) for x in _feature_index_ms(RUN_12H))
+    old_keys = {
+        p.event_id: int(p.feature_cutoff_ms) for p in prepared.per_tf if p.timeframe == "1h"
+    }
+    hit = sum(1 for w in prepared.windows if old_keys[w.event_id] in index_ms)
+    assert hit == 0, f"舊鍵仍有 {hit}/{len(prepared.windows)} 落在 12h 索引 ⇒ 對照失效"
+
+
 def test_pit_guard_rejects_open_eq_cutoff() -> None:
     """`R5-C9` 5.：收據之開盤等於收盤（非法幾何）⇒ 取鍵當下 raise。"""
     _require(BATCH_12H, RUN_1H, KLINE)
