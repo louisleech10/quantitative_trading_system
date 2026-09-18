@@ -69,7 +69,7 @@
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 使用者 2026-09-18 放行 v7；撰寫第 10 批施工清單（Task 10.1～10.7），待三家審查凍結後施工 |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 施工清單三家審查凍結（x-review-r21）；開工 B10A：Task 10.1 讀取者改指與 Task 10.2 IC 事件特徵列鍵更正 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
