@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import List, NamedTuple, Sequence, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SPEC_PATH = REPO_ROOT / "docs" / "SPLITUNIFY_SPEC.D-002.md"
+SPEC_PATH = REPO_ROOT / "docs" / "SPLITUNIFY_SPEC.md"
 
 # register 列之機器可讀錨點子句。逐字格式（反引號為分隔符）：
 #   ANCHOR `<path>:<line>` TOKENS `<t1>` `<t2>` ...

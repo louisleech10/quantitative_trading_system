@@ -6,7 +6,7 @@
 🔴 **Task 7.0b 已落地（2026-08-28），但走的是另一條路，請勿誤讀本模組**：
 分析時 producer 完成後，IC 分析路徑（`api/services/ic_analysis_service.py::_run_event_label_stages`）
 **不經過本模組**——它直接由 `PreparedAnalysisWindows` 之 `windows` ＋ `per_tf` 組出
-`{feature_cutoff_ms: label_value}` 餵給 `analyzer.analyze(event_label_values=...)`。
+`{特徵列時間戳（last_bar_open_ms）: label_value}` 餵給 `analyzer.analyze(event_label_values=...)`。
 理由：SPEC ⑩(ii″) 要求四處收到的物件**皆 `is prepared1`**（身分比對），
 而本模組的簽章吃的是 manifest／receipts／DataFrame，把 prepared 拆回 DataFrame 再組回來
 就等於**新增一次重組**，`is` 比對必然失效。

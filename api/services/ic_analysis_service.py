@@ -808,7 +808,9 @@ class ICAnalysisService:
         analysis_tf = str(getattr(request, "timeframe", None) or "").strip()
         tf_inputs = sorted(set(timeframes) | ({analysis_tf} if analysis_tf else set()))
         timeframe_seconds = pipeline.timeframe_seconds_for(tf_inputs)
-        bars_by_tf = pipeline.bars_from_kline_cache(symbols, timeframes)
+        # 🔴 v7 `R5-C9` 3.：bars 載入**觸發週期 ∪ 特徵 run 週期**。只載觸發週期時，跨週期批
+        #    （12h 事件 × 1h run）之 `per_tf` 不會有 run 週期之列，特徵列鍵就取不到。
+        bars_by_tf = pipeline.bars_from_kline_cache(symbols, tf_inputs)
 
         prepared0 = pipeline.prepare_analysis_windows(          # 階段 2（spy: call_count == 1）
             records, bars_by_tf,
@@ -816,6 +818,7 @@ class ICAnalysisService:
             event_import_id=request.event_import_id,
             lookahead_bars_declared=event_batch.get("lookahead_bars_declared") or {},
             timeframe_seconds=timeframe_seconds,
+            feature_timeframe=analysis_tf or None,
         )
         coverage = check_feature_run_coverage(                   # 階段 3a（EVTALIGN Task 3.1：逐事件）
             timeframe_seconds=timeframe_seconds,                 # 🔴 同一物件
@@ -876,11 +879,19 @@ class ICAnalysisService:
         #    log 警告），一筆都不剩 ⇒ loud。跨 symbol 合併分析屬 registry #4（Pooled/Panel IC）之範圍，本路徑不做。
         run_symbol = str(getattr(request, "symbol", "") or "") or None
         excluded_by_symbol: Dict[str, int] = {}
-        per_tf = {(p.event_id, p.timeframe): p.feature_cutoff_ms for p in prepared1.per_tf}
+        # 🔴 v7 `R5-C9` 1.–2.：特徵列鍵＝**特徵 run 週期**下「收盤 ≤ 決策時點」那根之**開盤**時刻
+        #    （`last_bar_open_ms`），由 momentum 之單一出口取得並於取得當下跑 PIT 守衛。
+        #    改前以觸發週期之 `feature_cutoff_ms`（收盤時刻）為鍵：FF 特徵表以開盤時刻為索引
+        #    ⇒ 同週期批選到晚一根（含決策後資訊）、跨週期批多數落不進索引而整筆丟事件。
+        if not analysis_tf:
+            raise ValueError(
+                "IC 事件路徑缺分析用 timeframe（request.timeframe）——特徵列鍵須依特徵 run 週期取得（R5-C9 2.）"
+            )
+        feature_row_key_by_id = pipeline.feature_row_keys(prepared1, feature_timeframe=analysis_tf)
         ts_map: Dict[int, float] = {}
         owner: Dict[int, str] = {}
         by_id: Dict[str, float] = {}  # EVTALIGN Task 2.1：逐事件 label 來源，供 analyze 後三元組回綁
-        # ── EVTLABEL Task 3.3：匯入 0/1 標籤之向量（與 ts_map **同鍵**：feature_cutoff_ms）──
+        # ── EVTLABEL Task 3.3：匯入 0/1 標籤之向量（與 ts_map **同鍵**：v7 R5-C9 之特徵列鍵）──
         # 🔴 `bin_rows_by_id` 由 records **獨立快照**建，不是從 bin_map 反推——它的用途是
         #    analyze 之後回比「orchestrator 消費的那份，還是我送出去的那份嗎」。
         #    若兩者同源，回比就是拿自己比自己（假綠）。
@@ -909,12 +920,12 @@ class ICAnalysisService:
             value = result.label_values.get(w.event_id)
             if value is None:
                 continue
-            cutoff = per_tf.get((w.event_id, w.timeframe))
-            if cutoff is None:
+            row_key = feature_row_key_by_id.get(w.event_id)
+            if row_key is None:
                 raise ValueError(
-                    f"事件 {w.event_id} 無 {w.timeframe} 之 per-TF 收據——不得靜默略過"
+                    f"事件 {w.event_id} 無 {analysis_tf} 之特徵列鍵——不得靜默略過（R5-C9 3.）"
                 )
-            key = int(cutoff)
+            key = int(row_key)
             # 🔴 **兩事件映射到同一個 feature 列 ⇒ raise**（`CODEX-R1-P1-03`）：
             #    原本這裡是 `ts_map[key] = value`，後到的會**靜默覆蓋**先到的
             #    ——那等於默默丟掉一個事件，而且丟哪一個取決於迭代順序。
@@ -1005,7 +1016,7 @@ class ICAnalysisService:
         #    而且一樣在 preprocessing 之前 ⇒「不必跑完才知道不足」的目的照樣達成。
         return {
             # ── EVTLABEL Task 3.3：匯入標籤模式之 staging 產物 ──────────────────
-            # `event_binary_labels` 與 `event_label_values` **同鍵**（feature_cutoff_ms）；
+            # `event_binary_labels` 與 `event_label_values` **同鍵**（v7 R5-C9 之特徵列鍵）；
             # `event_binary_rows_by_id` 是 records 之獨立快照，供 analyze 後回比。
             # 三者皆恆存在（值可為空 dict／None），不是「有才寫」——下游硬取，缺鍵即 KeyError。
             "event_binary_labels": dict(bin_map),

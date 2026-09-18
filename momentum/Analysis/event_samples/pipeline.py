@@ -315,8 +315,12 @@ class EventSamplePipeline:
 
     @staticmethod
     def prepare_analysis_windows(records, bars_by_tf, *, event_label_spec, event_import_id,
-                                 lookahead_bars_declared, timeframe_seconds):
-        """Task 7.0b 階段 2 之 R3 出口（回 `PreparedAnalysisWindows`；見上方具名例外）。"""
+                                 lookahead_bars_declared, timeframe_seconds,
+                                 feature_timeframe=None):
+        """Task 7.0b 階段 2 之 R3 出口（回 `PreparedAnalysisWindows`；見上方具名例外）。
+
+        `feature_timeframe`：v7 `R5-C9` 3. 之特徵 run 週期；給定時對齊週期為觸發週期與它之聯集。
+        """
         from momentum.Analysis.event_samples.label_value_from_case import (
             prepare_analysis_windows as _impl,
         )
@@ -327,7 +331,17 @@ class EventSamplePipeline:
             event_import_id=event_import_id,
             lookahead_bars_declared=lookahead_bars_declared,
             timeframe_seconds=timeframe_seconds,
+            feature_timeframe=feature_timeframe,
         )
+
+    @staticmethod
+    def feature_row_keys(prepared, *, feature_timeframe):
+        """v7 `R5-C9` 之特徵列鍵出口（回 `{event_id: last_bar_open_ms}`，含產出端 PIT 守衛）。"""
+        from momentum.Analysis.event_samples.label_value_from_case import (
+            feature_row_keys as _impl,
+        )
+
+        return _impl(prepared, feature_timeframe=feature_timeframe)
 
     @staticmethod
     def resolve_label_value_at_analyze(prepared, bars_by_tf, *, event_label_spec):

@@ -1,6 +1,6 @@
 """M5 座標系四案真值表——以 pytest 承載，使結論可重跑、改壞會紅。
 
-🔴 本檔驗的是 `docs/SPLITUNIFY_SPEC.D-002.md` `Task 9.2b` 步驟 0③ 之**契約完備性**：
+🔴 本檔驗的是 `docs/SPLITUNIFY_SPEC.md`（v7 併入 `D-002-C3`）`Task 9.2b` 步驟 0③ 之**契約完備性**：
 `validate_split_pair_integrity` 對「`row_index` 座標系」與「`ts`／`symbols` 宇宙」
 的四種組合各有不同結果，因此 SPEC 只寫「`row_index` 二擇一」並不足以定義行為。
 

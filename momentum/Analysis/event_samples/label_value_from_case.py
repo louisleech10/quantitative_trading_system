@@ -158,15 +158,21 @@ class WindowRow:
 
 @dataclass(frozen=True)
 class PerTfRow:
-    """逐 (event_id, timeframe) 之特徵截止點。欄集**恰三鍵**（SPEC R12）。
+    """逐 (event_id, timeframe) 之特徵截止點。欄集**恰四鍵**（`SPLITUNIFY_SPEC` v7 `R5-C9` 3.；原為三鍵）。
 
     這是 coverage／Task 7.7／§G G-3／`ic_feed` 之**唯一**讀取路徑——
     任何一處改成回頭自己算 cutoff，就是第二份實作。
+
+    🔴 `feature_cutoff_ms` 是那根 K 線之**收盤**時刻，`last_bar_open_ms` 是同一根之**開盤**時刻。
+    FF 特徵表之列以**開盤**時刻為索引 ⇒ 取「決策時點可用之特徵列」一律用 `last_bar_open_ms`
+    （`R5-C9` 1.）；以 `feature_cutoff_ms` 取列會取到晚一根、含決策後資訊之列。
+    兩值皆逐字取自 `align_events` 收據，本模組只搬不算（禁以收盤減週期長度推導開盤）。
     """
 
     event_id: str
     timeframe: str
     feature_cutoff_ms: int
+    last_bar_open_ms: int
 
 
 @dataclass(frozen=True)
@@ -691,6 +697,7 @@ def _per_tf_from_receipts(per_tf: pd.DataFrame) -> Tuple[PerTfRow, ...]:
             event_id=str(r["event_id"]),
             timeframe=str(r["timeframe"]),
             feature_cutoff_ms=int(r["feature_cutoff_ms"]),
+            last_bar_open_ms=int(r["last_bar_open_ms"]),
         )
         for r in per_tf.to_dict("records")
     ]
@@ -743,6 +750,49 @@ def purge_lower_bound_rows(
         SymbolPurgeRow(symbol=s, purge_lower_bound_ms=int(by_symbol[s]))
         for s in sorted(by_symbol, key=lambda x: x.encode("utf-8"))
     )
+
+
+def feature_row_keys(
+    prepared: "PreparedAnalysisWindows",
+    *,
+    feature_timeframe: str,
+) -> Dict[str, int]:
+    """v7 `R5-C9`：逐事件之**特徵列鍵**＝`(event_id, feature_timeframe)` 那列之 `last_bar_open_ms`。
+
+    語意：該鍵所指之特徵列，其主週期資訊截止於 `feature_cutoff_ms`（該根 K 線之收盤），
+    而 `feature_cutoff_ms <= decision_at_ms`（`alignment._select_cutoff_idx` 之 as-of 規則）
+    ⇒ 取到的列**不含決策時點之後**的主週期資訊。
+
+    🔴 **產出端 PIT 守衛**（`R5-C9` 5.）：逐事件驗 `last_bar_open_ms < feature_cutoff_ms <= decision_at_ms`。
+    三者同屬一根 K 線與同一事件，違反即資料或上游取法有誤，當場 raise——**不是**只寫在測試裡。
+    🔴 缺 `(event_id, feature_timeframe)` 列 ⇒ raise（不得回退他週期之列、不得略過該事件）。
+    """
+    if not feature_timeframe:
+        raise LabelProducerError("feature_row_keys 需要 feature_timeframe（特徵 run 週期），不得為空")
+    tf = str(feature_timeframe)
+    per_tf_index = {
+        (p.event_id, p.timeframe): p for p in prepared.per_tf
+    }
+    decision_by_id = {w.event_id: int(w.decision_at_ms) for w in prepared.windows}
+    out: Dict[str, int] = {}
+    for w in prepared.windows:
+        row = per_tf_index.get((w.event_id, tf))
+        if row is None:
+            raise LabelProducerError(
+                f"事件 {w.event_id} 缺特徵週期 {tf!r} 之 per-TF 收據——"
+                "對齊時須載入觸發週期與特徵 run 週期之聯集（R5-C9 3.），不得以他週期之列替代"
+            )
+        open_ms = int(row.last_bar_open_ms)
+        cutoff_ms = int(row.feature_cutoff_ms)
+        decision_ms = decision_by_id[w.event_id]
+        if not (open_ms < cutoff_ms <= decision_ms):
+            raise LabelProducerError(
+                f"事件 {w.event_id}（特徵週期 {tf}）之特徵列鍵違反 PIT 不變式："
+                f"last_bar_open_ms={open_ms}、feature_cutoff_ms={cutoff_ms}、decision_at_ms={decision_ms}；"
+                "須滿足 開盤 < 收盤 <= 決策時點（R5-C9 5.）"
+            )
+        out[w.event_id] = open_ms
+    return out
 
 
 def isolation_terms_rows(
@@ -869,7 +919,7 @@ def _receipt_hash(
              w.entry_at_ms, w.label_start_ms, w.label_end_ms]
             for w in windows
         ],
-        "per_tf": [[p.event_id, p.timeframe, p.feature_cutoff_ms] for p in per_tf],
+        "per_tf": [[p.event_id, p.timeframe, p.feature_cutoff_ms, p.last_bar_open_ms] for p in per_tf],
         # 🔴 `D-001` D4.1：entry 基準價座標進 hash ⇒ 同一批以不同 entry 語意 prepare
         #    會得到不同 hash。沒有這鍵，`trigger_open × open_to_close` 與
         #    `trigger_close × open_to_close` 之 `windows` 若恰好同值就會撞 hash。
@@ -887,8 +937,14 @@ def prepare_analysis_windows(
     event_label_spec,
     event_import_id,
     lookahead_bars_declared,
-    timeframe_seconds) -> PreparedAnalysisWindows:
-    """階段 2（prepare-windows）：唯一產生 receipt 與其 hash 之處。"""
+    timeframe_seconds,
+    feature_timeframe: Optional[str] = None) -> PreparedAnalysisWindows:
+    """階段 2（prepare-windows）：唯一產生 receipt 與其 hash 之處。
+
+    🔴 `feature_timeframe`（v7 `R5-C9` 3.）：分析所用之**特徵 run 週期**。給定時，對齊週期集合為
+    `觸發週期集合 ∪ {feature_timeframe}`，使 `per_tf` 含該週期之列，供 `feature_row_keys` 取特徵列鍵。
+    缺省（`None`）維持既有行為（只對齊觸發週期）——供不消費 `per_tf` 之呼叫端（例：隨機對照組組裝）使用。
+    """
     normalized = normalize_event_label_spec(event_label_spec)
     spec_bytes = canonical_event_table_bytes(normalized)
     token = uuid.uuid4().hex  # 🔴 非決定性：同輸入兩次呼叫必不同值（R11 之 2.）
@@ -908,8 +964,14 @@ def prepare_analysis_windows(
     #    而不是被忽略。若在這裡就早退回空窗，那條斷言沒有東西可斷。
     #    ⇒ `supported=False` 的語意是「**不會有 label_value**」，不是「什麼都不算」。
     events = _analysis_copy(rows, normalized)
+    # 🔴 v7 `R5-C9` 3.：對齊週期＝觸發週期 ∪ 特徵 run 週期（後者給定時）。只載觸發週期時，
+    #    跨週期批（例：12h 事件 × 1h run）之 `per_tf` 不會有 run 週期之列，特徵列鍵就無從取得。
+    align_tfs = tuple(sorted(
+        set(tf_keys) | ({str(feature_timeframe)} if feature_timeframe else set()),
+        key=lambda s: s.encode("utf-8"),
+    ))
     receipts, _failures = align_events(
-        events, bars_by_tf, AlignmentConfig(timeframes=tuple(tf_keys))
+        events, bars_by_tf, AlignmentConfig(timeframes=align_tfs)
     )
     windows = _windows_from_receipts(receipts.event_level)
     entry_price_refs = _refs_from_receipts(receipts.event_level)

@@ -39,7 +39,7 @@ def _features(n: int) -> pd.DataFrame:
 
 
 def _labels(feats: pd.DataFrame, pattern) -> dict:
-    """{feature_cutoff_ms: 0/1}，與 features index 同鍵。"""
+    """{特徵列時間戳: 0/1}，與 features index 同鍵（v7 R5-C9：列鍵為 last_bar_open_ms）。"""
     ms = (feats.index.asi8 // 10**6).astype("int64")
     return {int(t): int(v) for t, v in zip(ms, pattern)}
 

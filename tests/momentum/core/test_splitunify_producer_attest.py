@@ -1,6 +1,6 @@
 """SPLITUNIFY D-001 Task 8.2：producer 端 attest 與 `SplitPlan` 座標欄之契約測試。
 
-規格：`docs/SPLITUNIFY_SPEC.D-001.md` Task 8.2 之固定文法斷言（producer 側）；
+規格：`docs/SPLITUNIFY_SPEC.md`（v7 併入 `D-001-C2`）Task 8.2 之固定文法斷言（producer 側）；
 mutation `M-SU-D1-11`、`13`、`14`、`15`、`17`、`18`、`21`、`22`。
 
 🔴 **本檔的核心紀律**：`CrossSymbolLeakageError` **繼承** `ValueError`

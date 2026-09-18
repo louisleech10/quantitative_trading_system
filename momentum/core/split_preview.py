@@ -376,7 +376,7 @@ def count_binary_classes_in_rows(
     **已經算好的** `row_index`（orchestrator 的 `test_plan.row_index`），本函式只做計數 ——
     沒有第二份切分算術，就沒有可漂的東西。
 
-    `binary_labels` 之鍵＝特徵列時間戳（feature_cutoff_ms），與 `feature_index` 同單位。
+    `binary_labels` 之鍵＝特徵列時間戳（v7 R5-C9 之 last_bar_open_ms；**不是** feature_cutoff_ms），與 `feature_index` 同單位。
     不在 `feature_index` 上的鍵（期間對齊時已被剔除的事件）不計入，也不 raise。
     """
     if binary_labels is None:

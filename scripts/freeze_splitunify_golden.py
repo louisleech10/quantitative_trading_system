@@ -551,7 +551,7 @@ def _diff_report(expected: Dict[str, Any], actual: Dict[str, Any]) -> List[str]:
 #  的 Python 常數，但 SPEC §V 早已明定「錨在已提交文件、**helper 只讀**」（v13 之 O2）——
 #  寫在 helper 裡就又是**第二份真相**，且「改碼與改 golden 是同一個人、同一個 commit」
 #  這個攻擊面完全沒被縮小。現改為**只讀 SPEC**。
-_SPEC_PATH = REPO / "docs" / "SPLITUNIFY_SPEC.D-002.md"
+_SPEC_PATH = REPO / "docs" / "SPLITUNIFY_SPEC.md"
 _V8_ANCHOR_RE = re.compile(r"^\s*`?V8_BASELINE_SHA256=([0-9a-f]{64})`?\s*$", re.M)
 
 

@@ -1192,7 +1192,7 @@ class ICFilterOrchestrator:
         event_context: Optional[dict] = None,
         event_isolation: Optional[EventIsolationRows] = None,
         # ── EVTLABEL Task 3.3：匯入標籤模式之入口 kwargs（皆顯式，禁走 config_override）──
-        #: 與 `event_label_values` **同鍵**（feature_cutoff_ms）之 0/1 向量；None ⇒ 這批沒有可用 0/1。
+        #: 與 `event_label_values` **同鍵**（特徵列時間戳＝v7 R5-C9 之 last_bar_open_ms）之 0/1 向量；None ⇒ 這批沒有可用 0/1。
         event_binary_labels: Optional[dict] = None,
         #: 使用者**請求**的模式（auto／return_rule／imported_binary）。effective mode 在 stage3 決定。
         label_mode_requested: str = "auto",
@@ -1704,7 +1704,7 @@ class ICFilterOrchestrator:
         event_context: Optional[dict] = None,
         event_isolation: Optional[EventIsolationRows] = None,
         # ── EVTLABEL Task 3.3：匯入標籤模式之入口 kwargs（皆顯式，禁走 config_override）──
-        #: 與 `event_label_values` **同鍵**（feature_cutoff_ms）之 0/1 向量；None ⇒ 這批沒有可用 0/1。
+        #: 與 `event_label_values` **同鍵**（特徵列時間戳＝v7 R5-C9 之 last_bar_open_ms）之 0/1 向量；None ⇒ 這批沒有可用 0/1。
         event_binary_labels: Optional[dict] = None,
         #: 使用者**請求**的模式（auto／return_rule／imported_binary）。effective mode 在 stage3 決定。
         label_mode_requested: str = "auto",

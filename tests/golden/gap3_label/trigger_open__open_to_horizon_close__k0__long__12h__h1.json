@@ -58,7 +58,7 @@
     }
   },
   "nan_event_ids": [],
-  "analysis_alignment_receipt_hash": "c314ac05b1b0cea0c3f44c9af17a6d72a86f9fb32faed412158252f0057d0173",
+  "analysis_alignment_receipt_hash": "a92b8c6fb028291235f662195029ff4ea57a53d80ad55ea9bff5938bd958ec91",
   "purge_lower_bound_ms_by_symbol": {
     "ETHUSDT": 86400000
   }

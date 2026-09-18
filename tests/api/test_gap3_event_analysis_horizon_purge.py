@@ -279,8 +279,9 @@ def test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly
         features_path="data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5/x.h5", meta_path=None,
     )
     assert out["events_excluded_by_symbol"] == {"BTCUSDT": 1}
-    cutoff_to_eid = {p.feature_cutoff_ms: p.event_id for p in out["prepared"].per_tf}
-    fed = {cutoff_to_eid[ts] for ts in out["event_timestamps"]}
+    # 🔴 v7 `R5-C9`：餵進 IC 的鍵＝特徵列鍵（`last_bar_open_ms`），不是 `feature_cutoff_ms`（收盤時刻）。
+    rowkey_to_eid = {p.last_bar_open_ms: p.event_id for p in out["prepared"].per_tf}
+    fed = {rowkey_to_eid[ts] for ts in out["event_timestamps"]}
     assert fed == {eth_a["event_id"], eth_b["event_id"]}, fed   # 只有 ETH 兩筆；BTC 同 t0 者不在、也不撞列
     assert btc_a["event_id"] not in fed
 
@@ -359,8 +360,19 @@ def test_event_analysis_horizon_purge_10i_prepare_called_once(monkeypatch):
 
     # ⑭(c)：餵進 IC 的鍵集 ⊆ allowed_event_ids（以 per_tf 之 cutoff 反查 event_id）
     prepared = out["prepared"]
-    cutoff_to_eid = {p.feature_cutoff_ms: p.event_id for p in prepared.per_tf}
-    fed_eids = {cutoff_to_eid[ts] for ts in out["event_timestamps"] if ts in cutoff_to_eid}
+    # 🔴 v7 `R5-C9`：反查用特徵列鍵（`last_bar_open_ms`）；以 `feature_cutoff_ms` 反查會落空（那是收盤時刻）。
+    rowkey_to_eid = {p.last_bar_open_ms: p.event_id for p in prepared.per_tf}
+    fed_eids = {rowkey_to_eid[ts] for ts in out["event_timestamps"] if ts in rowkey_to_eid}
+    # 🔴 PIT：每個餵進 IC 的列鍵，其所屬 K 線之收盤不得晚於該事件之 decision_at（R5-C9 5.）
+    decision_by_id = {w.event_id: int(w.decision_at_ms) for w in prepared.windows}
+    per_tf_by_key = {(p.event_id, p.timeframe): p for p in prepared.per_tf}
+    for ts in out["event_timestamps"]:
+        eid = rowkey_to_eid[ts]
+        rows = [p for (e, _tf), p in per_tf_by_key.items() if e == eid and p.last_bar_open_ms == ts]
+        assert rows, f"列鍵 {ts} 反查不到 per_tf 列"
+        assert rows[0].feature_cutoff_ms <= decision_by_id[eid], (
+            f"事件 {eid} 之特徵列收盤 {rows[0].feature_cutoff_ms} 晚於 decision_at {decision_by_id[eid]}"
+        )
     assert fed_eids <= set(prepared.allowed_event_ids), "餵進 IC 的 event_id 不得超出 allowed"
     assert fed_eids, "對照：至少有一個 eid 真的被餵進去（防空集合恆成立）"
 

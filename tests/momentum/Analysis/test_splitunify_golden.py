@@ -424,7 +424,7 @@ def test_hand_decision_timestamps_have_independent_third_copy(golden: dict) -> N
 # 既有同主題測試多以 `inspect.getsource` 檢查字串存在；本節改為**真的執行**寫檔／建立／比對路徑，
 # 並把副作用導到 `tmp_path`（`monkeypatch` 模組層 `GOLDEN_DIR`／`RECEIPT_DIR`），不動 repo 內檔案。
 
-SPEC = REPO / "docs" / "SPLITUNIFY_SPEC.D-002.md"
+SPEC = REPO / "docs" / "SPLITUNIFY_SPEC.md"
 V8 = REPO / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.json"
 V8_SIDECAR = REPO / "tests" / "golden" / "splitunify" / "splitunify_golden.v8.sha256"
 _V8_TOP_KEYS = (
