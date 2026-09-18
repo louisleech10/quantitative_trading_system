@@ -17,6 +17,7 @@ coverage）若本身有錯，預測與觀測會**同錯**而對證仍相等。�
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from dataclasses import dataclass
@@ -68,8 +69,17 @@ def _load_values(_content_sha: str) -> Dict[str, Any]:
 
 
 def disposition_values() -> Dict[str, Any]:
-    """封閉值集（自契約讀；`R5-C8` 2.）。快取以**內容雜湊**為鍵，內容變了即失效。"""
-    return _load_values(hashlib.sha256(_CONTRACT.read_bytes()).hexdigest())
+    """封閉值集（自契約讀；`R5-C8` 2.）。快取以**內容雜湊**為鍵，內容變了即失效。
+
+    🔴 **回傳深複本**（`CODEX-R44-P1-01`／`COMPOSER-R44-P2-01` 兩家撞題）：
+    前版把 `lru_cache` 持有的 dict **原樣**交出去，呼叫端一改就污染後續所有呼叫，
+    而契約 bytes 與其 sha 都沒變 ⇒ 前四層守衛（手打字面、順序、重複鍵、快取陳舊）
+    **全部繞過**。提出方實跑：改 `vals["observed"]["consumed"]` 後
+    `observed_values()` 回被污染值、`_check("probe_only_value", …)` 通過。
+    🔴 淺複製不夠——`observed` 是巢狀 mapping，淺複製仍共用同一個內層 dict。
+    """
+    cached = _load_values(hashlib.sha256(_CONTRACT.read_bytes()).hexdigest())
+    return copy.deepcopy(cached)
 
 
 #: 相容既有測試之顯式清快取入口（內容雜湊鍵已使其非必要，保留以免呼叫端壞掉）。

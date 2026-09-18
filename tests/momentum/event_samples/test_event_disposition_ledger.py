@@ -325,3 +325,36 @@ def test_contract_change_with_preserved_mtime_still_takes_effect() -> None:
         CONTRACT.write_text(orig, encoding="utf-8")
         os.utime(CONTRACT, ns=(st.st_atime_ns, st.st_mtime_ns))
     assert observed_values() == warm, "還原後未回到原值"
+
+
+def test_returned_values_are_defensive_copy_not_cache_alias() -> None:
+    """🔴 `CODEX-R44-P1-01`／`COMPOSER-R44-P2-01`：公共邊界須回**深複本**。
+
+    前版把 `lru_cache` 持有之 dict 原樣交出 ⇒ 呼叫端一改就污染後續所有呼叫，
+    而契約 bytes 與其 sha **都沒變** ⇒ 前四層守衛（手打字面、順序、重複鍵、快取陳舊）
+    全部繞過。這是本票同型缺陷的第五層：守衛都在「讀進來」那一側，
+    污染卻發生在「交出去之後」。
+    鑑別力：把 `copy.deepcopy` 拿掉 ⇒ 本條轉紅（巢狀與頂層兩種突變各驗一次；
+    淺複製只會讓頂層那段轉綠、巢狀那段仍紅）。
+    """
+    from momentum.Analysis.event_samples.event_disposition import (
+        _check,
+        disposition_values,
+        observed_values,
+    )
+
+    base_observed = observed_values()
+    vals = disposition_values()
+    # ① 巢狀 mapping 就地改
+    vals["observed"]["consumed"] = "align_failed"
+    # ② 頂層序列就地換
+    vals["ic_disposition"] = tuple(vals["ic_disposition"]) + ("probe_only_value",)
+
+    assert observed_values() == base_observed, (
+        f"巢狀突變污染了快取：{observed_values()} vs {base_observed}"
+    )
+    with pytest.raises(ValueError, match="封閉值集"):
+        _check("probe_only_value", "ic_disposition")
+    assert disposition_values()["observed"]["consumed"] == base_observed["consumed"], (
+        "再次取得之值集仍帶有前次突變"
+    )
