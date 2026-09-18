@@ -575,7 +575,7 @@ def derive_event_split_from_plans(
   `momentum/Analysis/event_samples/pipeline.py`（出口傳遞參數與鍵函式出口）、`api/services/ic_analysis_service.py`（bars 載入聯集、以鍵函式組 `ts_map` 與同鍵各表）、
   `momentum/core/split_preview.py`（L379 `binary_labels` 鍵語意之註解）、`momentum/Analysis/ic_filter_orchestrator.py`（L1195、L1707 `event_binary_labels` 同鍵語意之註解）、`momentum/Analysis/event_samples/ic_feed.py`（L9 模組說明之鍵語意）、
   `tests/momentum/Analysis/test_evtlabel_stage3.py`（L42 helper 說明之鍵語意）、`tests/api/test_gap3_event_analysis_horizon_purge.py`（改新鍵並加 PIT 斷言）、
-  `tests/momentum/event_samples/test_ic_event_feature_row_key.py`（新；真實資料）、`scripts/freeze_ic_event_row_key_golden.py`（新）、`tests/golden/splitunify/ic_event_row_key.json`（新）、
+  `tests/momentum/event_samples/test_ic_event_feature_row_key.py`（新；真實資料）、
   `scripts/splitunify_ic_event_report_diff.py`（新；IC 事件 run 報告改前後逐鍵比對，`--allow-diff` 模式只寫 receipt）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`（追加 `per_tf` 第四欄條目）；
   受影響之既有 golden 以實跑列舉後同 commit 依各自授權流程重凍。
   既有 caller：`ICAnalysisService._run_event_label_stages`（含同檔之逐格掃描路徑）、`EventImportService.build_random_control_batch`（不傳 `feature_timeframe`，行為不變）。
@@ -583,7 +583,7 @@ def derive_event_split_from_plans(
 - 邊界：① 12h 事件 × 12h run：鍵＝`decision_at_ms − 43200000`；② 12h 事件 × 1h run：鍵＝`decision_at_ms − 3600000`；③ 1h 事件 × 12h run：鍵＝收盤 ≤ `decision_at_ms` 之最後一根 12h 之開盤（非網格對齊）；
   ④ 特徵 run 週期之 bars 起點晚於事件致 `(e, F)` 列缺 ⇒ 具名 fail-closed；⑤ `decision_offset_bars ≥ 1` ⇒ 鍵隨 `decision_at_ms` 前移；⑥ 多 symbol 批之他 symbol 事件維持既有排除，不因聯集載入而進 IC。
 - 風險緩解：`M-SU-R5-16`、`M-SU-R5-17`、`M-SU-R5-18`；G-2。
-- **驗證**：`venv/bin/python scripts/freeze_ic_event_row_key_golden.py` rc=0；`venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0；
+- **驗證**：`venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0；
   `venv/bin/python -m pytest -q tests/momentum/event_samples/test_ic_event_feature_row_key.py tests/api/test_gap3_event_analysis_horizon_purge.py tests/api/test_gap3_feature_coverage_gate.py tests/momentum/event_samples/test_gap3_analysis_label_producer.py tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py tests/momentum/event_samples/test_gap3_label_feasible_bounds.py tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py` 之 summary 行無 failed；其中逐條：
   `ASSERT ic_event_feature_row_key WHEN batch=20260909T130533Z-7f73e4c7 ff_run=4a8a0b3726cc906ab3534994605e77f5 THEN rc=0`（stage3 保留列時刻逐事件＝`last_bar_open_ms`＝`decision_at_ms − 3600000`；`1h_L1_momentum_BOP` 值＝收盤 ≤ `decision_at_ms` 之那根之 kline BOP）；
   `ASSERT ic_event_feature_row_key WHEN batch=20260909T130533Z-7f73e4c7 ff_run=e53e22906c35363757f4cd49d27f973e THEN rc=0`（同上，12h）；
@@ -634,7 +634,7 @@ def derive_event_split_from_plans(
 - 邊界：① `ic_train_test_split` 關閉 ⇒ 具名原因 `canonical_holdout_disabled`；② `SkippedResult` ⇒ `canonical_holdout_insufficient_rows`；③ run 不存在／`symbol` 或 `timeframe` 不符 ⇒ 具名錯誤；④ 交集為空 ⇒ `AlignmentViolationError`（既有語意）；⑤ 事件批觸發 TF 與 run feature TF 不同（例：12h 事件 × 1h run）為合法輸入；
   ⑥ 混週期批 ⇒ 解析函式回「當根」預設與說明（同現行 route 行為）；⑦ `decision_offset_bars` 值域外 ⇒ 具名例外、route 映射 422 且 `kind` 同現行。
 - 風險緩解：G-2；`M-SU-R5-01`～`03`、`M-SU-R5-10`、`M-SU-R5-13`、`M-SU-R5-21`。
-- **驗證**：`venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0；`venv/bin/python scripts/freeze_ic_event_row_key_golden.py` rc=0；
+- **驗證**：`venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0；
   `venv/bin/python -m pytest -q tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/api/test_splitunify_disclosure.py tests/momentum/Analysis/test_splitunify_canonical_holdout.py tests/momentum/event_samples/test_event_label_spec_resolution.py tests/api/test_gap3_event_analysis_horizon_purge.py` 之 summary 行無 failed；其中逐條：
   `ASSERT canonical_holdout_entry WHEN ff_run=4a8a0b3726cc906ab3534994605e77f5 config_override=none THEN rc=0`（`test_plan.row_index` 與 `row_time_fingerprint` 與 `_build_holdout_split_plan` 逐值相等）；
   `ASSERT canonical_holdout_entry WHEN trigger_timeframe=12h feature_run_timeframe=1h THEN rc=0`（`receipts.per_tf` 含 1h 列，`build_event_keys(selected_timeframe="1h")` 不 raise，且對齊所用 bars 之週期集合 ⊇ {12h, 1h}）；

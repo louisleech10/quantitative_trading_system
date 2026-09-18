@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime   # `_parse_time_range_endpoint` 之 ISO 解析（隨 coverage 一併搬入）
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
