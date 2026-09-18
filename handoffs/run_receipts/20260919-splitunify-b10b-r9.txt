@@ -1,0 +1,66 @@
+SPLITUNIFY B10B 審碼輪 r9 — 修補與實跑收據
+task-id: 20260911-SPLITUNIFY-B10-REVIEW-R9
+round_id: 80ac47b1-6497-4b4f-97af-8a6ee1ae2d70
+日期: 2026-09-19
+審查 diff: e4bc8fb9..76565a34｜修補 commit: 93a25dcf
+委員：兩家（codex＋composer）；grok CLI 暫停中（402 餘額用罄）
+
+== 裁決 ==
+codex    VERDICT: blocked  BLOCKED-BY: CODEX-R39-P1-01  CLOSED: CODEX-R38-P1-01,CODEX-R38-P1-02
+composer VERDICT: blocked  BLOCKED-BY: COMPOSER-R39-P1-01  CLOSED: COMPOSER-R38-P1-01
+⇒ b10-consult-r1 之五條處置經逐條對碼確認結構落地；走樣的只有判別筆幾何。
+
+== P1（兩家撞題）：v10 golden 之換錨判別筆是空心的 ==
+主委前版：`rows.append(("bnd_v10", train_last + H1, train_last + 2 * H1, "purged"))`
+  ⇒ decision = train_last + 2*H1 = 1700507600000 < test_start = 1700518400000
+  ⇒ (G-4d)⑥ 之前提「decision >= test_start」**不成立**
+  ⇒ v9 錨（decision）與 v10 錨（anchor）同判 purged ⇒ 判別筆無鑑別力。
+主委原自證之弱點（composer 指出）：`g1_membership_v10 != g1_membership_v9` 只因
+  `bnd_shift` ↔ `bnd_v10` 換了 event_id 而成立；共享之 12 筆側別逐值相同。
+  ⇒ 「通過檢查 ≠ 檢查有效」，本票再一次。
+
+修補：
+  fixture 改為 `rows.append(("bnd_v10", test_start - H1, test_start, "purged"))`
+    anchor = 1700514800000（隔離帶內）、cutoff = decision = 1700518400000（test 段起點）
+    v9 錨 ⇒ decision >= test_start ⇒ **test**
+    v10 錨 ⇒ train_last < anchor < test_start ⇒ **purged**
+  人手不可變字面 `_hand_anchor["bnd_v10"]` 同步改為 1700514800000。
+  斷言改為**直接驗判別力**（不再只比集合不等）：
+    ①判別筆滿足 PIT：anchor < cutoff <= decision
+    ②decision >= test_start（(G-4d)⑥ 前提一）
+    ③anchor < test_start（前提二）
+    ④兩錨側別**不同**
+    ⑤人手 v10 側別把該筆標為 purged（第三份判準不脫節）
+mutation 覆核：把幾何改回舊的空心版 ⇒ `test_v9_keys_not_overwritten_by_v10_freeze` 1 failed；
+  還原後 30 passed（freezer sha 337fb8895f1a1985）。
+
+== P2（提出方判非 blocker，主委仍在本輪修）：v9 守衛自證 ==
+`CODEX-R39-P2-02`：守衛以**同一份可變主檔**建 `before` 並與 `_frozen_v9_slice()` 比對
+  ⇒ 直接竄改主檔之 v9 值時，守衛測試與 `--write` **同時回綠**
+  （該家實跑：改 `g1_membership_v9.train[0]` 為 `tampered_v9` ⇒ 測試 1 passed、`--write` rc=0）。
+修補（沿用既有 v8 之三層形態，不另造機制）：
+  - `_V9_SLICE_KEYS` 七鍵之 canonical digest（sort_keys JSON 之 sha256）。
+  - SPEC §V 新增逐字錨點行 `V9_SLICE_SHA256=d5d10f547f9de954828604613cbf06bdfeb8bfe32dc222a4ccd18cc44873d39a`。
+  - `_read_v9_anchor_from_spec()` 只掃 §V 區段、排除 HISTORY 與沿革節（與 v8 同一支收窄規則）。
+  - `_frozen_v9_slice()` 逐值對證，不符即 SystemExit（訊息含實際與錨兩個 digest）。
+實跑覆核（提出方所述之同一竄改）：
+  竄改後 freezer          → rc=1，訊息 `v9 切片 digest 與 SPEC §V 之外部錨不符`
+  竄改後 `--write`        → rc=1
+  竄改後守衛測試          → 1 failed
+  還原後                  → 30 passed
+🔴 誠實邊界（逐字寫在 SPEC 該節與 helper docstring）：與 v8 同型殘留
+  `SU-RESID-V8-ATTEST`——擋不住「同一個 commit 同時改 §V 錨與主檔」；那需要受保護簽章。
+
+== golden 重凍 ==
+`--write --accept-value-changes g4e_actual_anchor_ms=89dab55e:5b26ecf3,g4e_hand_anchor_ms=89dab55e:5b26ecf3` rc=0
+  值有變之鍵僅上列兩個 v10 錨點鍵；**成員集合不變**（該筆在兩版下最終皆 purged）。
+  V9_KEYS_UNCHANGED True；比對模式 rc=0、`GOLDEN OK`。
+
+== 回歸 ==
+七檔 200 passed；`scripts/register_anchor_check.py` 22 個錨點全數通過。
+
+== 殘留（交 r10）==
+R1 `M-SU-D2-27`／`M-SU-D2-28` 之靶尚未改指 v10 鍵。理由＝延後→Task 10.4（r9 收斂檔已裁）。
+R2 v9 外部錨擋不住「同一 commit 同時改錨與主檔」。理由＝blocked-by（需受保護簽章，
+   屬新建治理工具；與 `SU-RESID-V8-ATTEST` 同型，不得讀作已關閉）。
+R3 grok CLI 暫停中。理由＝blocked-by（外部帳務）。
