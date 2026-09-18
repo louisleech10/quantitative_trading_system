@@ -117,6 +117,36 @@ def bars_timeframes_for(
     return sorted({str(t) for t in trigger_timeframes if t} | {str(run_timeframe)})
 
 
+def _config_with_embargo(ic_config: Any, embargo: int) -> Any:
+    """回一個 `embargo` 已設好之**複本**；呼叫端傳入之物件逐欄不變。
+
+    🔴 `CODEX-R41-P1-01`：就地改寫會讓同一個 config 被重用時承襲前一次之 embargo。
+    依序試三條不可變路徑，全部失敗即 fail-closed——**不得**退回就地改寫，
+    那正是本函式要消滅的行為。
+    """
+    # ① Pydantic v2（本專案之 `ICConfig` 實際型別）
+    model_copy = getattr(ic_config, "model_copy", None)
+    if callable(model_copy):
+        return model_copy(update={"embargo": int(embargo)})
+    # ② Pydantic v1
+    copy_fn = getattr(ic_config, "copy", None)
+    if callable(copy_fn):
+        try:
+            return copy_fn(update={"embargo": int(embargo)})
+        except TypeError:
+            pass
+    # ③ dataclass（含 frozen）
+    import dataclasses as _dc
+
+    if _dc.is_dataclass(ic_config):
+        return _dc.replace(ic_config, embargo=int(embargo))
+    raise CanonicalHoldoutError(
+        "ic_config_not_copyable",
+        f"{type(ic_config).__name__} 無不可變複本路徑（model_copy／copy／dataclass 皆不適用）"
+        "——不得就地改寫呼叫端之 config（fail-closed）",
+    )
+
+
 def resolve_canonical_holdout(
     *,
     ff_run: str,
@@ -155,15 +185,14 @@ def resolve_canonical_holdout(
             run_timeframe=run_tf, symbol=str(symbol),
         )
 
-    # 🔴 embargo 由深度抬高；`ICConfig` 可能是 frozen dataclass ⇒ 先試就地設、失敗再 replace。
+    # 🔴 embargo 由深度抬高——但**絕不就地改寫呼叫端之 config**（`CODEX-R41-P1-01`）。
+    #    前版做 `ic_config.embargo = raised`，於是同一個 config 物件重用時（掃描格逐格、
+    #    retry、不同事件批）第二次會**承襲第一次較大的 embargo**：提出方實跑證據——
+    #    先以深度 5 再以深度 0 呼叫，第二次回傳仍是 5 ⇒ 前一批之 lookahead 洩漏到下一批之
+    #    purge／holdout。這不是數值誤差，是打破「輸入 config 屬於呼叫端」之可重入契約。
+    #    ⇒ 一律傳 clone 給 `_build_holdout_split_plan`；三種形態各有不可變複本路徑。
     raised = max(int(getattr(ic_config, "embargo", 0) or 0), int(lookahead_depth_rows))
-    try:
-        ic_config.embargo = raised
-        cfg = ic_config
-    except Exception:  # pragma: no cover - frozen dataclass 之分支
-        import dataclasses as _dc
-
-        cfg = _dc.replace(ic_config, embargo=raised)
+    cfg = _config_with_embargo(ic_config, raised)
 
     from momentum.core.constants import TIMEFRAME_SECONDS
 

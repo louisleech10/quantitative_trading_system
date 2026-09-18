@@ -162,3 +162,36 @@ def test_ledger_does_not_read_stage3() -> None:
     sig = inspect.signature(build_event_disposition_ledger)
     bad = [p for p in sig.parameters if "observ" in p.lower() or "stage3" in p.lower()]
     assert not bad, f"處置帳簽名混入觀測面參數：{bad}"
+
+
+def test_observed_values_come_from_contract_not_hardcoded() -> None:
+    """🔴 `CODEX-R41-P1-02`：stage3 之 `observed` 字面由契約出口取得，不得手打。
+
+    鑑別力：契約改名後，producer 仍吐舊字面即紅（本條以出口回傳值直接對證契約）。
+    """
+    from momentum.Analysis.event_samples.event_disposition import observed_values
+
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    observed = contract["event_disposition_values"]["observed"]
+    got = observed_values()
+    assert got == {"consumed": observed[0], "row_missing": observed[1]}, (
+        f"出口之值與契約不符：{got} vs {observed}"
+    )
+
+
+def test_stage3_producer_has_no_hardcoded_observed_literal() -> None:
+    """producer 內不得出現 `observed` 之手打字面（機械判準）。"""
+    import inspect
+
+    from momentum.Analysis.ic_filter_orchestrator import ICFilterOrchestrator
+
+    src = inspect.getsource(ICFilterOrchestrator)
+    # 🔴 錨到**組裝處**而非建構期預設／入口歸零——後兩者同樣是 `= {}`，
+    #    用第一個命中會抓到空 dict 那行，整條測試就變成空心的。
+    idx = src.find('"feature_row_open_ms"')
+    assert idx > 0, "找不到 stage3 收據之組裝處（feature_row_open_ms）"
+    block = src[max(0, idx - 400): idx + 400]
+    assert '"ic_consumed"' not in block and '"feature_row_not_in_feature_index"' not in block, (
+        "stage3 收據仍手打 observed 字面——契約改名時不會在 producer 邊界 fail-closed"
+    )
+    assert "observed_values()" in block, "未經契約出口取值"

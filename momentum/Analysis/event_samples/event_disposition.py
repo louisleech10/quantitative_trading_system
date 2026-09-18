@@ -123,6 +123,33 @@ def build_event_disposition_ledger(
     return rows
 
 
+def observed_values() -> Dict[str, str]:
+    """stage3 觀測收據之 `observed` 值——**唯一取值出口**（`CODEX-R41-P1-02`）。
+
+    🔴 出生理由：stage3 producer 原本手打 `ic_consumed`／`feature_row_not_in_feature_index`，
+    契約若改名，producer 仍會吐舊字面而不在 producer 邊界 fail-closed
+    （提出方實跑：改契約後真實 run 之收據值落在新封閉集合之外）。
+    ⇒ 由本出口依**語意鍵**取值；契約缺鍵、欄位形狀不符或語意映射不全即擲錯。
+
+    回傳 `{"consumed": <字面>, "row_missing": <字面>}`。
+    """
+    vals = disposition_values()
+    observed = tuple(vals.get("observed", ()))
+    if len(observed) != 2:
+        raise ValueError(
+            f"契約之 event_disposition_values.observed 須恰兩值，實得 {list(observed)}（fail-closed）"
+        )
+    ic_vals = set(vals.get("ic_disposition", ()))
+    missing = [v for v in observed if v not in ic_vals]
+    if missing:
+        raise ValueError(
+            f"observed 之值 {missing} 不在 ic_disposition 值集內"
+            "——預測與觀測必須可逐值對證（fail-closed）"
+        )
+    # 語意由**順序**固定：第一值＝被消費、第二值＝特徵列不在索引內（契約 doc 已載明）。
+    return {"consumed": observed[0], "row_missing": observed[1]}
+
+
 def excluded_by_symbol(rows: Sequence[DispositionRow]) -> List[str]:
     """`R5-C8` 4.：由處置帳導出，**不另算**。"""
     return sorted(r.event_id for r in rows if r.scan_disposition == "symbol_not_run_symbol")

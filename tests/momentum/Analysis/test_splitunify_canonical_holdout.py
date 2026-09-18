@@ -180,3 +180,44 @@ def test_kline_cache_dir_is_feature_klines_not_app_cache() -> None:
     from momentum.Analysis.event_samples.canonical_holdout import FEATURE_KLINE_CACHE_DIR
 
     assert FEATURE_KLINE_CACHE_DIR == "data_cache/feature_klines"
+
+
+def test_resolver_does_not_mutate_caller_config() -> None:
+    """🔴 `CODEX-R41-P1-01`：resolver **不得**就地改寫呼叫端之 `ICConfig`。
+
+    形態：同一個 config 物件先以較大深度、再以較小深度呼叫。就地改寫時第二次會
+    **承襲第一次較大的 embargo** ⇒ 前一批之 lookahead 洩漏到下一批之 purge／holdout
+    （掃描格逐格、retry、換事件批都會踩到）。
+    鑑別力：把 `_config_with_embargo` 改回 `ic_config.embargo = raised` 即轉紅。
+    """
+    _require(RUN_1H, KLINE)
+    resolve, _err = _resolver()
+    cfg = _cfg()
+    before = int(getattr(cfg, "embargo", 0) or 0)
+
+    first = resolve(ff_run=FF_1H, symbol=SYM, ic_config=cfg,
+                    purge_gap=156, lookahead_depth_rows=before + 5)
+    assert int(getattr(cfg, "embargo", 0) or 0) == before, (
+        f"呼叫端之 config 被就地改寫：{before} → {getattr(cfg, 'embargo', None)}"
+    )
+    second = resolve(ff_run=FF_1H, symbol=SYM, ic_config=cfg,
+                     purge_gap=156, lookahead_depth_rows=0)
+    assert first.embargo == before + 5
+    assert second.embargo == before, (
+        f"第二次承襲了第一次的 embargo（{second.embargo}）——跨批污染"
+    )
+
+
+def test_config_without_immutable_copy_path_is_fail_closed() -> None:
+    """無不可變複本路徑之 config ⇒ fail-closed，**不得**退回就地改寫。"""
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        CanonicalHoldoutError,
+        _config_with_embargo,
+    )
+
+    class _Plain:
+        embargo = 0
+
+    with pytest.raises(CanonicalHoldoutError) as ei:
+        _config_with_embargo(_Plain(), 7)
+    assert ei.value.reason == "ic_config_not_copyable"

@@ -3855,6 +3855,11 @@ class ICFilterOrchestrator:
             #    本收據取自 stage3 **實際**之交集結果 ⇒ 預測錯了才看得出來。
             #    存於 analyze 範圍之實例屬性（入口已歸零）、**不寫入報告**
             #    （IC 報告逐位元組不變是 §G-1 golden 之前提）。
+            #    🔴 `observed` 之字面**不得手打**（`CODEX-R41-P1-02`）：契約若改名，
+            #    手打者仍會吐舊字面、且不在 producer 邊界 fail-closed。由唯一出口取值。
+            from momentum.Analysis.event_samples.event_disposition import observed_values
+
+            _obs = observed_values()
             _consumed_ids = set(consumed["consumed_event_labels"])
             _owners = dict(event_label_owners or {})
             self._stage3_event_observation = {
@@ -3862,8 +3867,7 @@ class ICFilterOrchestrator:
                     "event_id": str(eid),
                     "feature_row_open_ms": int(key),
                     "observed": (
-                        "ic_consumed" if str(eid) in _consumed_ids
-                        else "feature_row_not_in_feature_index"
+                        _obs["consumed"] if str(eid) in _consumed_ids else _obs["row_missing"]
                     ),
                 }
                 for key, eid in _owners.items()
