@@ -9,7 +9,7 @@
     "test_start_ms": 1763758800000,
     "train_end_ms": 1762675200000
   },
-  "canonical_sha256": "9ba9a5224b1dc466223c71c574b59e54b03a5352116d10f9bccd6553ede9669c",
+  "canonical_sha256": "b74f19a482133f13318add437010c797475d5391581413e3a48c24ee41987274",
   "conditional_ic": {
     "12h_L1_momentum_BOP": 0.044599303135888516,
     "12h_L1_momentum_RSI": -0.19199442502640557,
@@ -1180,7 +1180,7 @@
   },
   "meta": {
     "batch": "20260909T130533Z-7f73e4c7",
-    "code_commit": "3e8eadb48138",
+    "code_commit": "bc05386d62ce",
     "collector": "ICAnalysisService._run_event_label_stages（生產路徑）",
     "config_override": "none",
     "ff_run": "4a8a0b3726cc906ab3534994605e77f5",
@@ -1280,7 +1280,14 @@
       "reason": null,
       "split_authority": "kline_holdout"
     },
-    "statistic_kind": "conditional_ic"
+    "statistic_kind": "conditional_ic",
+    "survivor_output": {
+      "case_id": "ic_gatekeeper",
+      "path": null,
+      "reason": "persist_suppressed",
+      "sha256": null,
+      "status": "not_computed"
+    }
   },
   "purge_rows": 156
 }

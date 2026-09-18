@@ -1306,6 +1306,8 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | `M-SU-R5-33` | stage4 入口**只**重排 features（labels 不動） | 同上（五個 `conditional_ic` 全轉紅） | B10A |
 | `M-SU-R5-34` | stage4 入口**只**重排 labels（features 不動） | 同上（五個 `conditional_ic` 全轉紅） | B10A |
 | `M-SU-R5-35` | stage4 入口**配對**重排（features 與 labels 同排列、分區內） | 同上（`production_evidence.report_contract_digest` 轉紅；五個 `conditional_ic` 恆等，故只綁 IC 會漏） | B10A |
+| `M-SU-R5-36` | `metadata.survivor_output.sha256` 由 `None` 改為可見值 | 同上（`production_evidence.survivor_output` 轉紅；digest 以路徑排除該鍵，故只綁 digest 會漏） | B10A |
+| `M-SU-R5-37` | `report["version"]` 竄改（驗失敗訊息可定位） | 同上（訊息須逐字指名 `production_evidence.report_contract_digest`，不得只印整塊物件） | B10A |
 
 ---
 

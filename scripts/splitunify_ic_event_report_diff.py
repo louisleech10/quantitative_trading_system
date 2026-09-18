@@ -252,6 +252,15 @@ def _production_evidence(
         "entrypoint": "ICAnalysisService._run_scan_cell → ICFilterOrchestrator.analyze（生產端）",
         "report_contract_digest": canonical_sha(report),
         "order_sensitive": order_sensitive,
+        # 🔴 `CODEX-R36-P1-01`：`canonical_sha` 以路徑排除 `metadata.survivor_output.sha256`
+        #    （非事件路徑下它是 `generated_at` 之鏡像 ⇒ 每跑必變）。但事件掃描路徑
+        #    `_suppress_persist=True`，該五鍵 status object **恆為** not_computed／
+        #    persist_suppressed／None／None ⇒ 排除它在此屬**過度排除**：改成任意可見值
+        #    digest 也不變（提出方實跑：sha 改 tampered-visible-hash ⇒ `diff_rc=0`）。
+        #    🔴 修法不動共用 helper（`canonical_sha` 為 golden 之對證基準，改它會波及
+        #    `tests/golden/` 之既有凍結）；改把整塊 `survivor_output` 直接納入本比對面。
+        "survivor_output": (meta.get("survivor_output")
+                            if isinstance(meta.get("survivor_output"), dict) else None),
         "named_deviation": "掃描格恆為報酬版（label_mode_requested=return_rule）；本批亦為報酬版",
         "analysis_status": report.get("analysis_status"),
         "oos_guarantees": report.get("oos_guarantees"),
@@ -481,9 +490,20 @@ def _diff(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
     # 🔴 `CODEX-R32-P1-01`：`purge_rows` 原本在 payload 裡卻**不在比對面**
     #    （實跑：156→155 仍 `STRICT PASS`）；`production_evidence` 為本輪新增之生產端證據。
     for k in ("n_events", "n_consumed", "isolation", "purge_rows", "boundary",
-              "analysis_alignment_receipt_hash", "production_evidence"):
+              "analysis_alignment_receipt_hash"):
         if a.get(k) != b.get(k):
             diffs.append(f"{k}: {a.get(k)} → {b.get(k)}")
+    # 🔴 `CODEX-R36-P2-02`：`production_evidence` 原本整塊比對，不符時只印出兩坨完整物件，
+    #    `report_contract_digest` 漂移時根本看不出動到哪一欄。改逐鍵比對（嚴格度不變）。
+    pa = a.get("production_evidence") or {}
+    pb = b.get("production_evidence") or {}
+    if not (isinstance(pa, dict) and isinstance(pb, dict)):
+        if pa != pb:
+            diffs.append(f"production_evidence: {pa} → {pb}")
+    else:
+        for k in sorted(set(pa) | set(pb)):
+            if pa.get(k) != pb.get(k):
+                diffs.append(f"production_evidence.{k}: {pa.get(k)} → {pb.get(k)}")
     ea = {r["event_id"]: r for r in a.get("events", [])}
     eb = {r["event_id"]: r for r in b.get("events", [])}
     for eid in sorted(set(ea) | set(eb)):
