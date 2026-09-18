@@ -5,8 +5,8 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-015 | SU-B10C | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r15 兩條 P1 已修補收斂（coverage 下沉 momentum、IC 主路徑接處置帳）；r16 閉合輪審碼中 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B 已收批；B10C 進行中：r15 兩條 P1 已修補收斂，r16 閉合輪審碼中 |
+| 02-016 | SU-B10D | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | B10C 已收批（r18 兩家零實質 finding、皆 proceed）；開工 Task 10.5 事件掃描端接線與請求／回應契約 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B／B10C 已收批（B10C 共十輪審碼，r18 兩家零實質 finding）；下一步 B10D：Task 10.5 事件掃描端接線 |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -15,12 +15,11 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-015 | SU-B10C | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r15 兩條 P1 已修補收斂（coverage 下沉 momentum、IC 主路徑接處置帳）；r16 閉合輪審碼中 |
-| 02-016 | SU-B10D | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 事件掃描端接線與請求／回應契約 |
+| 02-016 | SU-B10D | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | B10C 已收批（r18 兩家零實質 finding、皆 proceed）；開工 Task 10.5 事件掃描端接線與請求／回應契約 |
 | 02-017 | SU-B10E | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.6 前端＋Task 10.7 真實資料兩端對證與 UAT 登記 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B 已收批；B10C 進行中：r15 兩條 P1 已修補收斂，r16 閉合輪審碼中 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B／B10C 已收批（B10C 共十輪審碼，r18 兩家零實質 finding）；下一步 B10D：Task 10.5 事件掃描端接線 |
 | 03-007 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 03-008 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 03-009 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
@@ -50,6 +49,8 @@
 - 🔴 **`gate.sh dispatch --impl-self` 必帶 `--task-id <root>-impl-b<N>-claude`**（family 尾碼須為 `claude`），省略會被拒發 token。
 - 🔴 **`completeness_check.sh` 正式入口是 `--lock <sources.lock>`**；直接給 synth 路徑會被判「argv 來源僅 tests 隔離」而 FAIL。單檔檢查才用 `--single <委員檔>`。
 - 🔴 **逐段搬移函式時，模組級常數不會跟著走**：搬移腳本的錨點只涵蓋 `def`／`class`，模組頂層的常數落在所有段之外 ⇒ 搬過去的函式 import 當下不報錯、**跑到那一行才** `NameError`。搬完先 grep 被搬函式引用的所有大寫識別字。
+- 🔴 **隔離 git worktree 跑 mutation 時，`skip` 與 `pass` 在 rc 上無法區分**：`data_cache/` 在 `.gitignore` 內 ⇒ 新建之 worktree 沒有它 ⇒ 需真實資料之測試一律 `skip`、rc=0，會被誤讀為「mutation 存活」或「測試通過」。修法＝①`ln -s <repo>/data_cache <worktree>/data_cache`；②harness 必須把 stdout 含 `skipped` 判為**無效**，不得只看 rc。
+- 🔴 **一個永遠不會觸發的守衛比沒有守衛更糟**：它讓覆蓋率缺一行、讓文件照它寫「這個邊界由它承擔」，而真正承擔者是別條。判準＝找出該分支之唯一生產呼叫點，看前置條件是否已排除它。處置＝**不替它補測試**（要測就得 mock 前置，那是替空殼造假綠），改標 `pragma: no cover` ＋碼內寫明為何不可達 ＋ 另補一條釘住「真正會發生的 reason」之測試 ＋ 同步改文件字面。
 - 🔴 **stub 只 stub 一半會造出生產上不可能的狀態**：測試 monkeypatch 某個衍生值時，須把同源的其他衍生值一起 stub（例：`_feature_run_time_range` 與 `_feature_run_dir` 都由同一個 run 目錄導出，只 stub 前者會做出「涵蓋判定過、run 目錄不存在」這種真實請求走不到的狀態），否則後續加的 fail-closed 會被誤判為過嚴。
 - 🔴 `handoffs/` 整包在 `.git/info/exclude`：brief、委員產出、收斂檔只在本機，commit 時 `git add` 會被拒；commit 訊息之 REF 仍須指向含 VERIFY／SIGNOFF／RECONCILE-STAMP／CLOSED／APPROVED 字樣之檔。
 - 新增 `scripts/` 檔或改掛載後跑 `bash scripts/list_active_mechanisms.sh --write`，否則寫檔 hook 擋；在 fixture 目錄建檔名含 `TODO`／`SPEC` 之樁檔須先 `bash scripts/gate.sh artifact`。
@@ -122,4 +123,7 @@
 - 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r13/synth.md`
 - 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r14/synth.md`
 - 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r15/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r16/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r17/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r18/synth.md`
 <!-- HISTORY-END -->

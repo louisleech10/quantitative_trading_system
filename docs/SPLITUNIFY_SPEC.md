@@ -631,7 +631,7 @@ def derive_event_split_from_plans(
   `momentum/Analysis/contracts/split_unify.json`（新鍵 `event_disposition_values`）、`momentum/Analysis/ic_filter_orchestrator.py`（stage3 觀測收據，R5-C8 7.；不進報告）、
   `tests/momentum/Analysis/test_splitunify_canonical_holdout.py`（新）、`tests/momentum/event_samples/test_event_label_spec_resolution.py`（新）。既有 caller：`ICAnalysisService._run_event_label_stages`、IC 分析 route 之事件批解析與 IC 分析主流程。
 - 不可做：`momentum/` 不 import `api/`；service 不互 import；不改 `holdout_boundary` 與投影之簽名；不改 IC 任何輸出數值（以 `Task 10.2` 落地後為基準）；不改 IC route 之錯誤 `kind` 字面與回應。
-- 邊界：① `ic_train_test_split` 關閉 ⇒ 具名原因 `canonical_holdout_disabled`；② `SkippedResult` ⇒ `canonical_holdout_insufficient_rows`；③ run 不存在／`symbol` 或 `timeframe` 不符 ⇒ 具名錯誤；④ 交集為空 ⇒ `AlignmentViolationError`（既有語意）；⑤ 事件批觸發 TF 與 run feature TF 不同（例：12h 事件 × 1h run）為合法輸入；
+- 邊界：① `ic_train_test_split` 關閉 ⇒ 具名原因 `canonical_holdout_disabled`；② `SkippedResult` ⇒ `canonical_holdout_insufficient_rows`；③ run 不存在／`symbol` 或 `timeframe` 不符 ⇒ 具名錯誤，且**三者之 reason 逐字為**：run 不存在與 `symbol` 不符皆 `feature_run_not_found`（`resolve_run_dir` 先以 symbol 篩選，故「hash 存在但屬別的 symbol」在篩選當下即被擋下）、`timeframe` 不符為 `feature_run_unknown_timeframe`。🔴 模組內另有一條 `feature_run_symbol_mismatch`，在現行唯一呼叫路徑下**不可達**（標 `pragma: no cover`），不得視為本邊界之承擔者；④ 交集為空 ⇒ `AlignmentViolationError`（既有語意）；⑤ 事件批觸發 TF 與 run feature TF 不同（例：12h 事件 × 1h run）為合法輸入；
   ⑥ 混週期批 ⇒ 解析函式回「當根」預設與說明（同現行 route 行為）；⑦ `decision_offset_bars` 值域外 ⇒ 具名例外、route 映射 422 且 `kind` 同現行。
 - 風險緩解：G-2；`M-SU-R5-01`～`03`、`M-SU-R5-10`、`M-SU-R5-13`、`M-SU-R5-21`。
 - **驗證**：`venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0；
