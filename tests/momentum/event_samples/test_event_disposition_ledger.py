@@ -173,10 +173,43 @@ def test_observed_values_come_from_contract_not_hardcoded() -> None:
 
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
     observed = contract["event_disposition_values"]["observed"]
+    # 🔴 `CODEX-R42-P1-01`：契約已改為**具名 mapping**——以順序定語意時，值集重排即靜默反語意。
+    assert isinstance(observed, dict), f"observed 須為具名 mapping，實得 {type(observed).__name__}"
+    assert set(observed) == {"consumed", "row_missing"}, f"observed 之鍵不符：{sorted(observed)}"
     got = observed_values()
-    assert got == {"consumed": observed[0], "row_missing": observed[1]}, (
+    assert got == {"consumed": observed["consumed"], "row_missing": observed["row_missing"]}, (
         f"出口之值與契約不符：{got} vs {observed}"
     )
+
+
+def test_observed_semantics_survive_contract_reordering() -> None:
+    """🔴 `CODEX-R42-P1-01` 之回歸：契約鍵順序調換時，語意**不得**跟著反轉。
+
+    鑑別力：把 `observed` 改回 list 並以第一／第二值定義語意 ⇒ 本條轉紅。
+    """
+    import json as _json
+
+    from momentum.Analysis.event_samples.event_disposition import (
+        disposition_values,
+        observed_values,
+    )
+
+    base = observed_values()
+    raw = _json.loads(CONTRACT.read_text(encoding="utf-8"))
+    ov = raw["event_disposition_values"]["observed"]
+    # 以相反插入順序重建同一組具名對應——語意由鍵決定，結果必須不變。
+    reordered = {"row_missing": ov["row_missing"], "consumed": ov["consumed"]}
+    assert list(reordered) != list(ov), "fixture 未真的調換順序，本條空心"
+
+    raw["event_disposition_values"]["observed"] = reordered
+    orig = CONTRACT.read_text(encoding="utf-8")
+    try:
+        CONTRACT.write_text(_json.dumps(raw, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        disposition_values.cache_clear()
+        assert observed_values() == base, "契約鍵順序調換後語意被反轉——順序依賴未消除"
+    finally:
+        CONTRACT.write_text(orig, encoding="utf-8")
+        disposition_values.cache_clear()
 
 
 def test_stage3_producer_has_no_hardcoded_observed_literal() -> None:
@@ -195,3 +228,34 @@ def test_stage3_producer_has_no_hardcoded_observed_literal() -> None:
         "stage3 收據仍手打 observed 字面——契約改名時不會在 producer 邊界 fail-closed"
     )
     assert "observed_values()" in block, "未經契約出口取值"
+
+
+def test_contract_change_takes_effect_without_manual_cache_clear() -> None:
+    """🔴 `CODEX-R42-P2-02`：契約改檔後同一行程內須**立即**生效，不靠手動清快取。
+
+    前版 `@lru_cache(maxsize=1)` 鎖在函式上 ⇒ warm cache 後改契約不生效：
+    長生命週期行程（API server）會一直用舊值，同行程內之 mutation 覆核也會假綠。
+    現改以檔案 `mtime_ns` 當快取鍵。
+    鑑別力：把快取鍵改回無參數之 `@lru_cache(maxsize=1)` ⇒ 本條轉紅。
+    """
+    import json as _json
+    import time
+
+    from momentum.Analysis.event_samples.event_disposition import observed_values
+
+    warm = observed_values()          # 先 warm cache（**不**清）
+    orig = CONTRACT.read_text(encoding="utf-8")
+    raw = _json.loads(orig)
+    raw["event_disposition_values"]["ic_disposition"].append("probe_only_value")
+    raw["event_disposition_values"]["observed"]["row_missing"] = "probe_only_value"
+    try:
+        time.sleep(0.01)              # 確保 mtime_ns 真的前進
+        CONTRACT.write_text(_json.dumps(raw, ensure_ascii=False, indent=2) + "\n",
+                            encoding="utf-8")
+        got = observed_values()       # 🔴 不清快取
+        assert got["row_missing"] == "probe_only_value", (
+            f"契約已改但 accessor 仍回舊值（warm cache 假綠）：{got} vs warm={warm}"
+        )
+    finally:
+        CONTRACT.write_text(orig, encoding="utf-8")
+    assert observed_values() == warm, "還原後未回到原值"

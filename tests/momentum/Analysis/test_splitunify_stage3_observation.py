@@ -61,13 +61,14 @@ def test_stage3_observation_values_are_from_contract() -> None:
     """觀測值集封閉且與契約一致（`observed` ∈ {ic_consumed, feature_row_not_in_feature_index}）。"""
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
     observed = contract["event_disposition_values"]["observed"]
-    assert observed == ["ic_consumed", "feature_row_not_in_feature_index"], (
-        f"觀測值集與 R5-C8 7. 不符：{observed}"
-    )
-    # 觀測值集須為 `ic_disposition` 之子集——否則對證時會出現預測永遠給不出的值。
+    # 🔴 `CODEX-R42-P1-01`：改為具名 mapping，語意不由順序決定。
+    assert observed == {
+        "consumed": "ic_consumed", "row_missing": "feature_row_not_in_feature_index",
+    }, f"觀測值集與 R5-C8 7. 不符：{observed}"
+    # 觀測值須為 `ic_disposition` 之子集——否則對證時會出現預測永遠給不出的值。
     ic_vals = set(contract["event_disposition_values"]["ic_disposition"])
-    assert set(observed) <= ic_vals, (
-        f"觀測值不在 ic_disposition 值集內：{set(observed) - ic_vals}"
+    assert set(observed.values()) <= ic_vals, (
+        f"觀測值不在 ic_disposition 值集內：{set(observed.values()) - ic_vals}"
     )
 
 
@@ -143,7 +144,7 @@ def test_stage3_observation_populated_on_real_event_run() -> None:
     obs = getattr(analyzer_holder["a"], "_stage3_event_observation", None)
     assert obs, "真實事件 run 之後 stage3 觀測收據為空"
     allowed = set(json.loads(CONTRACT.read_text(encoding="utf-8"))
-                  ["event_disposition_values"]["observed"])
+                  ["event_disposition_values"]["observed"].values())
     for eid, row in obs.items():
         assert row["observed"] in allowed, f"{eid} 之觀測值 {row['observed']!r} 不在封閉集合內"
         assert isinstance(row["feature_row_open_ms"], int)

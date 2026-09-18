@@ -8,7 +8,7 @@
     "kline_holdout"
   ],
 
-  "_event_disposition_values_doc": "SPLITUNIFY `R5-C8` 2.：逐事件處置帳之封閉值集。兩端差集與剔除揭露之唯一來源 ⇒ 字面由 Python 與前端共用，**禁散文複列、禁手打**（測試 `test_disposition_values_read_from_contract` 以手打值即紅釘住）。判定順序與 IC service 事件路徑相同（對齊 → run symbol → coverage → label 值 → 特徵列）；事件掃描端另於 coverage 之後判 `outside_post_trim_index`（`R5-C4` 1.(b)）。🔴 `ic_disposition` 為入口之**預測**：`feature_row_not_in_feature_index` 以事件之 `R5-C9` 特徵列鍵是否屬 post-trim `feature_index` 判定，**不得**讀 stage3 之結果（`R5-C8` 6.）。",
+  "_event_disposition_values_doc": "SPLITUNIFY `R5-C8` 2.：逐事件處置帳之封閉值集。兩端差集與剔除揭露之唯一來源 ⇒ 字面由 Python 與前端共用，**禁散文複列、禁手打**（測試 `test_disposition_values_read_from_contract` 以手打值即紅釘住）。判定順序與 IC service 事件路徑相同（對齊 → run symbol → coverage → label 值 → 特徵列）；事件掃描端另於 coverage 之後判 `outside_post_trim_index`（`R5-C4` 1.(b)）。🔴 `observed` 為**具名 mapping**（鍵＝`consumed`／`row_missing`），語意**不由順序決定**——以 list 之第一／第二值定義時，值集重排即靜默反語意（實跑證實）。🔴 `ic_disposition` 為入口之**預測**：`feature_row_not_in_feature_index` 以事件之 `R5-C9` 特徵列鍵是否屬 post-trim `feature_index` 判定，**不得**讀 stage3 之結果（`R5-C8` 6.）。",
   "event_disposition_values": {
     "scan_disposition": [
       "projected",
@@ -25,10 +25,10 @@
       "label_value_unavailable",
       "feature_row_not_in_feature_index"
     ],
-    "observed": [
-      "ic_consumed",
-      "feature_row_not_in_feature_index"
-    ]
+    "observed": {
+      "consumed": "ic_consumed",
+      "row_missing": "feature_row_not_in_feature_index"
+    }
   },
 
   "_fail_closed_reasons_doc": "投影與其接線端之 fail-closed 原因封閉集合（SPEC C-0/C-2）。字面由 Python 與前端共用，禁散文複列。multi_symbol_projection_unsupported＝per-symbol 投影未支援前的多標的批（SPEC C-2）；missing_train_plan／missing_test_plan＝缺任一側切分計畫（含 test_plan.row_index 為空，SPEC C-4 第一段之先決 fail-closed）；canonical_feature_universe_unavailable＝呼叫端拿不到 post-trim feature universe，須明示 event-study-only 而非按事件數另切（SPEC C-0 決議③）。🔴 B3 自查發現的第五種情形（train/test 兩 plan 之 base_universe_hash 不同）**刻意不在此登記**：登記會動到已戳記之 SPEC 的封閉值集與前端枚舉面，而該守衛的保護力不依賴字面——它在 split_projection.py 以明文 ValueError 擋下，是否要升格為具名 reason 交 B3 code review 裁定。",

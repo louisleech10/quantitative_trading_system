@@ -26,16 +26,36 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 _CONTRACT = Path(__file__).resolve().parents[2] / "Analysis/contracts/split_unify.json"
 
 
-@lru_cache(maxsize=1)
-def disposition_values() -> Dict[str, tuple]:
-    """封閉值集（自契約讀；`R5-C8` 2.）。"""
+@lru_cache(maxsize=4)
+def _load_values(_mtime_ns: int) -> Dict[str, Any]:
+    """實際讀檔；以 `mtime` 為快取鍵 ⇒ 契約一改就自然失效。
+
+    🔴 `CODEX-R42-P2-02`：前版 `@lru_cache(maxsize=1)` 直接鎖在函式上，同一行程內
+    warm cache 之後改契約**不會生效**（該家實跑：改名後未清 cache 仍回舊值，清了才 fail-closed）。
+    長生命週期行程（API server）與同行程內之 mutation 覆核都會因此失真。
+    ⇒ 改以檔案 `mtime_ns` 當快取鍵；仍有快取效益，但契約變更即換鍵。
+    """
     data = json.loads(_CONTRACT.read_text(encoding="utf-8"))
     vals = data.get("event_disposition_values")
     if not isinstance(vals, dict) or not vals:
         raise ValueError(
             f"{_CONTRACT} 缺 event_disposition_values——處置帳之值集不得手打（fail-closed）"
         )
-    return {k: tuple(v) for k, v in vals.items()}
+    # 🔴 `observed` 是具名 mapping（語意不由順序決定），其餘欄為封閉值集之 list。
+    #    一律 `tuple(v)` 會把 mapping 壓成鍵的 tuple ⇒ 語意消失（`CODEX-R42-P1-01` 之修補面）。
+    return {
+        k: (dict(v) if isinstance(v, dict) else tuple(v))
+        for k, v in vals.items()
+    }
+
+
+def disposition_values() -> Dict[str, Any]:
+    """封閉值集（自契約讀；`R5-C8` 2.）。快取以契約 `mtime_ns` 為鍵，改檔即失效。"""
+    return _load_values(_CONTRACT.stat().st_mtime_ns)
+
+
+#: 相容既有測試之顯式清快取入口（`mtime` 鍵已使其非必要，保留以免呼叫端壞掉）。
+disposition_values.cache_clear = _load_values.cache_clear  # type: ignore[attr-defined]
 
 
 @dataclass(frozen=True)
@@ -134,20 +154,33 @@ def observed_values() -> Dict[str, str]:
     回傳 `{"consumed": <字面>, "row_missing": <字面>}`。
     """
     vals = disposition_values()
-    observed = tuple(vals.get("observed", ()))
-    if len(observed) != 2:
+    observed = vals.get("observed")
+    # 🔴 **語意由具名鍵固定，不由順序**（`CODEX-R42-P1-01`）：前版以 list 之第一／第二值
+    #    定義「被消費／列不在索引內」，值集不變而**順序調換**時 producer 會靜默吐反的語意
+    #    （提出方實跑：反轉後 accessor 回傳之兩個語意值互換，rc=0、無人擋）。
+    #    ⇒ 契約改為 mapping，accessor 只按固定鍵讀。
+    if not isinstance(observed, dict):
         raise ValueError(
-            f"契約之 event_disposition_values.observed 須恰兩值，實得 {list(observed)}（fail-closed）"
+            f"契約之 event_disposition_values.observed 須為具名 mapping，實得 {type(observed).__name__}"
+            "——以順序定語意會在值集重排時靜默反轉（fail-closed）"
+        )
+    want = {"consumed", "row_missing"}
+    if set(observed) != want:
+        raise ValueError(
+            f"observed 之鍵須恰為 {sorted(want)}，實得 {sorted(observed)}（fail-closed）"
         )
     ic_vals = set(vals.get("ic_disposition", ()))
-    missing = [v for v in observed if v not in ic_vals]
+    missing = [v for v in observed.values() if v not in ic_vals]
     if missing:
         raise ValueError(
             f"observed 之值 {missing} 不在 ic_disposition 值集內"
             "——預測與觀測必須可逐值對證（fail-closed）"
         )
-    # 語意由**順序**固定：第一值＝被消費、第二值＝特徵列不在索引內（契約 doc 已載明）。
-    return {"consumed": observed[0], "row_missing": observed[1]}
+    if len(set(observed.values())) != 2:
+        raise ValueError(
+            f"observed 之兩個語意不得映射到同一值：{observed}（fail-closed）"
+        )
+    return {"consumed": str(observed["consumed"]), "row_missing": str(observed["row_missing"])}
 
 
 def excluded_by_symbol(rows: Sequence[DispositionRow]) -> List[str]:
