@@ -1096,3 +1096,40 @@ def create_canonical_holdout_resolver():
     )
 
     return resolve_canonical_holdout, CanonicalHoldoutError
+
+
+def create_feature_run_coverage_checker():
+    """SPLITUNIFY `Task 10.4` 實作要點 2：特徵 run 涵蓋判定之**唯一**出口。
+
+    🔴 規則已由 `api/services` 搬入 momentum（`CODEX-R45-P1-01`）；服務端一律經本出口取得，
+    不得直接 import momentum 內層（Rule 3，解耦閘會當場擋）。
+    回傳 `(check_feature_run_coverage, FeatureRunCoverage, FeatureRunCoverageError)`。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        FeatureRunCoverage,
+        FeatureRunCoverageError,
+        check_feature_run_coverage,
+    )
+
+    return check_feature_run_coverage, FeatureRunCoverage, FeatureRunCoverageError
+
+
+def create_post_trim_index_loader():
+    """SPLITUNIFY `R5-C9`：post-trim 特徵索引之**唯一**出口。
+
+    🔴 索引是 post-trim 的（期間對齊裁過頭尾），不是 K 線原始 universe；
+    服務端若自行讀 `timestamps.parquet` 就會出現第二份 universe 定義，
+    而兩端 universe 不同正是本票要消滅的病。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import load_post_trim_index
+
+    return load_post_trim_index
+
+
+def create_event_disposition_ledger():
+    """SPLITUNIFY `R5-C8`：逐事件處置帳之**唯一**出口。"""
+    from momentum.Analysis.event_samples.event_disposition import (
+        build_event_disposition_ledger,
+    )
+
+    return build_event_disposition_ledger

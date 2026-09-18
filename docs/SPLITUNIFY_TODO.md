@@ -1126,7 +1126,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   3. 走 `EventImportService.import_records` 並明示 `batch_defaults={"label_origin": "user_csv"}`（該 14 筆為對照組記錄、原批未帶本欄；scenario ∈ {A,B,two_stage} 缺本欄即 `conditional_required_missing`。三家實跑：不給預設 14／14 拒收，給預設 14／14 接受）。
   4. 落檔後把 `import_id`、`upload_sha256` 與取得步驟寫入 `handoffs/run_receipts/`，ASSERT 之 `batch=realdata_1h_single_tf` 綁該 `import_id`，不得改用他批。
 - **驗證**（1h 單週期批＝上列步驟所得之批；不得手造 `t0`）：
-  - `venv/bin/python scripts/freeze_ic_event_row_key_golden.py` rc=0
+  - 🔴 **本行原為 `venv/bin/python scripts/freeze_ic_event_row_key_golden.py` rc=0——該腳本與其 golden 從未建立**（見 `Task 10.4` 驗證段之同一註記）；逐事件 `feature_row_key_ms` 現由 strict 基準逐鍵釘住。處置待委員裁定。
   - `venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0
   - `venv/bin/python -m pytest -q tests/momentum/event_samples/test_ic_event_feature_row_key.py tests/api/test_gap3_event_analysis_horizon_purge.py tests/api/test_gap3_feature_coverage_gate.py tests/momentum/event_samples/test_gap3_analysis_label_producer.py tests/momentum/event_samples/test_gap3_label_rawbar_oracle.py tests/momentum/event_samples/test_gap3_label_feasible_bounds.py tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py` summary 行無 failed，且須含下列具名測試皆 pass：
     - `test_stage3_selected_rows_close_le_decision_12h_events_1h_run`（批 `20260909T130533Z-7f73e4c7` × run `4a8a0b3726cc906ab3534994605e77f5`：165 事件之選中列時刻皆＝`decision_at_ms − 3600000`，且 `1h_L1_momentum_BOP` 值等於「收盤 ≤ `decision_at_ms`」那根 kline 之 BOP）
@@ -1184,7 +1184,8 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 - 邊界：① `ic_train_test_split` 關閉 ⇒ `canonical_holdout_disabled`；② `SkippedResult` ⇒ `canonical_holdout_insufficient_rows`；③ run 不存在或識別不符 ⇒ 具名錯誤；④ 交集為空 ⇒ `AlignmentViolationError`；⑤ 觸發週期與 run 週期不同為合法輸入；⑥ 混週期批 ⇒ 解析函式回「當根」預設與說明；⑦ `decision_offset_bars` 值域外 ⇒ 具名例外、route 映射 422。
 - 風險緩解：G-2；`M-SU-R5-01`～`03`、`M-SU-R5-10`、`M-SU-R5-13`、`M-SU-R5-21`。
 - **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
-  - `venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0；`venv/bin/python scripts/freeze_ic_event_row_key_golden.py` rc=0
+  - `venv/bin/python scripts/freeze_evtlabel_survivor_golden.py` rc=0
+  - 🔴 **本行原另列 `scripts/freeze_ic_event_row_key_golden.py`，該腳本與 `tests/golden/splitunify/ic_event_row_key.json` 在 repo 內皆不存在**（`Task 10.2` 之交付缺項，八輪審碼未抓到）⇒ 該驗證從未可執行。逐事件 `feature_row_key_ms` 現已由 `ic_event_report_baseline.prod_task_10_4.json` 逐鍵釘住（strict 模式逐鍵比對）。**處置待委員裁定**（補做 vs 自 SPEC／TODO 刪除並記明已由 strict 涵蓋）；在裁定前本行不得當作已通過之驗收。
   - `venv/bin/python -m pytest -q tests/api/test_period_auto_align.py tests/momentum/event_samples/test_gap3_conditional_ic.py tests/api/test_splitunify_disclosure.py tests/momentum/Analysis/test_splitunify_canonical_holdout.py tests/momentum/event_samples/test_event_label_spec_resolution.py tests/api/test_gap3_event_analysis_horizon_purge.py tests/api/test_gap3_ic_event_label_defaults.py` summary 行無 failed，且須含：
     - `test_canonical_holdout_matches_ic_build_holdout_split_plan`（`test_plan.row_index` 與 `row_time_fingerprint` 逐值相等）
     - `test_canonical_holdout_cross_tf_per_tf_has_run_timeframe`（12h 事件 × 1h run：`receipts.per_tf` 含 1h 列、bars 週期集合 ⊇ {12h, 1h}）
@@ -1192,7 +1193,9 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
     - `test_disposition_values_read_from_contract`（手打值即紅）
     - `test_boundary_event_ledger_predicts_feature_row_not_in_feature_index`（fixture 須含至少一事件同時滿足 `feature_cutoff_ms ∈ post-trim 索引` 且 `last_bar_open_ms ∉ post-trim 索引`；無此事件即 fail）
     - `test_event_label_spec_absent_matches_ic`／`test_event_label_spec_k1_h6_matches_ic`（逐事件 `decision_at_ms`／`label_start_ms`／`label_end_ms` 與 `label_window_rows` 逐值相等）
-    - `test_ic_route_calls_shared_resolver_once`（factories 出口之 spy 被呼叫恰一次）
+    - `test_ic_route_calls_shared_resolver_once`（factories 出口之 spy 被呼叫恰一次；檔＝`tests/api/test_splitunify_route_shared_resolver.py`）
+    - `test_canonical_holdout_insufficient_rows_is_named_reason`（邊界②：隔離區長過整條索引 ⇒ `canonical_holdout_insufficient_rows`、plans 為 None；不 mock 切分器）
+    - `test_ic_main_path_emits_event_disposition_ledger`（IC 主路徑之 staged 產物含處置帳、全批覆蓋、`consumed` 筆數＝餵進 IC 之列數；檔＝`tests/api/test_splitunify_ic_disposition_wiring.py`）
     - `test_resolver_out_of_domain_k_maps_to_422_same_kind`（`kind` 字面＝現行 `invalid_decision_offset_bars`；既有 `tests/api/test_gap3_ic_event_label_defaults.py` 同批跑，釘住該字面不因下沉而改）
     - `test_stage3_receipt_reset_per_analyze_and_absent_from_report`
   - `venv/bin/python scripts/splitunify_ic_event_report_diff.py --mode strict --baseline tests/golden/splitunify/ic_event_report_baseline.prod_task_10_4.json --candidate-run --batch 20260909T130533Z-7f73e4c7 --ff-run 4a8a0b3726cc906ab3534994605e77f5 --config-override none` rc=0（candidate 為當下重跑之產出、逐鍵 diff 為空；以任何檔路徑充當 candidate ⇒ 腳本拒收 rc!=0；三元組與 baseline 檔之 meta 不符 ⇒ rc!=0）

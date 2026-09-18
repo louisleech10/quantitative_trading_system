@@ -56,9 +56,6 @@ class ResultRevisionMismatch(Exception):
 class ResultValidationError(Exception):
     """ICRESULT_PAGING §C-7(b)：refilter 結果未過出口守衛（先驗後寫；route 422）。"""
 
-#: 合理性上界＝2100-01-01（epoch 秒）。超出即判 parse failure（SPEC Task 7.7 ④ 之字面）。
-_EPOCH_SECONDS_UPPER_BOUND = 4102444800
-
 #: `G3-D2` D5.3：隨機對照批之 `sample_design` 揭露字面（觸發批為 `case_control`）。
 RANDOM_SAMPLE_DESIGN = "unconditional_random"
 
@@ -93,12 +90,16 @@ class CompareVerdict:
         return asdict(self)
 
 
-class FeatureRunCoverageError(ValueError):
-    """Task 7.7 之 fail-closed 例外。`reason` 取自 `ic_report_contract.reasons.analysis_rejected`。"""
+# 🔴 `Task 10.4` 實作要點 2：coverage 判定已搬入 `momentum`（單一入口）。
+# 本處只 re-export，**不得**在此保留第二份規則——那正是本票要消滅的「兩份實作」。
+from momentum.factories import (  # noqa: E402
+    create_feature_run_coverage_checker,
+    create_post_trim_index_loader,
+)
 
-    def __init__(self, reason: str, message: str):
-        self.reason = reason
-        super().__init__(f"{reason}: {message}")
+check_feature_run_coverage, FeatureRunCoverage, FeatureRunCoverageError = (
+    create_feature_run_coverage_checker()
+)
 
 
 def _find_event_filter_info(node: Any) -> Optional[Dict[str, Any]]:
@@ -418,159 +419,6 @@ def _inject_period_alignment(staged: Dict[str, Any], report: Any) -> None:
     metadata["period_alignment"] = merged
 
 
-def _parse_time_range_endpoint(value: Any) -> int:
-    """`time_range` 之單一端點字串 → epoch ms。**解析順序寫死：先數字後 ISO**（SPEC 7.7 ④）。
-
-    🔴 為什麼順序不能反：現存非 legacy manifest 的 `time_range` 是 **epoch 秒之數字字串**
-    （實測 12/14 份如此，例 `{"start": "1704067200", ...}`）。先試 `fromisoformat` 會對它直接
-    raise ⇒ **全部現存 run 都會被判成 parse failure**。R5 版就是這樣寫的，三家全員以真實
-    manifest 打穿。
-
-    🔴 tz-naive ISO ⇒ fail-closed，**不當成 UTC**：把 naive 當 UTC 是個假設，
-    假設錯了整個覆蓋判斷會偏移，而偏移多少取決於使用者的時區——看不出來也修不掉。
-    """
-    if not isinstance(value, str):
-        raise FeatureRunCoverageError(
-            "feature_coverage_unknown_timestamp_format",
-            f"time_range 端點須為字串，實得 {type(value).__name__}",
-        )
-    s = value.strip()
-    body = s[1:] if s.startswith("-") else s
-    if body.isdigit():
-        seconds = int(s)
-        if not (0 < seconds < _EPOCH_SECONDS_UPPER_BOUND):
-            raise FeatureRunCoverageError(
-                "feature_coverage_unknown_timestamp_format",
-                f"epoch 秒 {seconds} 落在合理範圍外（0, {_EPOCH_SECONDS_UPPER_BOUND}）",
-            )
-        return seconds * 1000
-    try:
-        parsed = datetime.fromisoformat(s)
-    except ValueError as exc:
-        raise FeatureRunCoverageError(
-            "feature_coverage_unknown_timestamp_format",
-            f"既非十進位數字字串亦非 ISO 格式：{s!r}（{exc}）",
-        ) from exc
-    if parsed.tzinfo is None:
-        raise FeatureRunCoverageError(
-            "feature_coverage_unknown_timestamp_format",
-            f"ISO 字串 {s!r} 為 tz-naive——不得假設為 UTC（假設錯誤會使覆蓋判斷整體偏移）",
-        )
-    return int(parsed.timestamp() * 1000)
-
-
-@dataclass(frozen=True)
-class FeatureRunCoverage:
-    """`check_feature_run_coverage` 之結果（EVTALIGN Task 3.1）。
-
-    `evaluated=False` ⇒ 沒有窗、什麼都沒判（呼叫端沿用 prepared 之全集）。
-    `covered_event_ids`／`dropped`：逐事件分類；`dropped` 為 `(event_id, reason)`，
-    reason 目前只有 `outside_feature_run`。
-    """
-
-    evaluated: bool
-    run_start_ms: Optional[int]
-    run_end_ms: Optional[int]
-    covered_event_ids: tuple
-    dropped: tuple
-
-    def disclosure(self) -> Dict[str, Any]:
-        """`metadata.period_alignment` 之 service 端部分——🔴 丟掉的事件**必列 ID**（`COMPOSER-R1-P2-01`／`GROK-R1-P1-02`：只報數不等價）。"""
-        dropped_ids = sorted(str(eid) for eid, _ in self.dropped)
-        return {
-            "feature_run": {"start_ms": self.run_start_ms, "end_ms": self.run_end_ms},
-            "dropped_events": {
-                "count": len(dropped_ids),
-                "ids": sorted(dropped_ids),
-                "reason": "outside_feature_run",
-            },
-            "covered_event_count": len(self.covered_event_ids),
-        }
-
-
-def check_feature_run_coverage(
-    *,
-    timeframe_seconds: Dict[str, int],
-    feature_manifest_time_range: Optional[Dict[str, Optional[str]]],
-    event_windows,
-) -> FeatureRunCoverage:
-    """Task 7.7 ③ → EVTALIGN Task 3.1：特徵 run 對事件期之涵蓋，**逐事件**判定。
-
-    🔴 語意變更（2026-09-08，R2 `CODEX-R2-P1-06`＋使用者原話④「還要手動重新生成特徵…太蠢了，是缺陷吧」）：
-    原本是**批次級** pass/fail——任一事件超出 run 區間就整批 raise，使用者得回頭重生特徵。
-    現在：超出 run 區間的事件**逐一剔除並揭露 ID**（呼叫端以 `apply_event_coverage` 縮集合、
-    `period_alignment.dropped_events` 進報告），只有**全部**事件都不在區間內才 fail-closed。
-    legacy run（無 time_range）與未知 timeframe 仍 fail-closed（無區間可對證，不能靜默放行）。
-
-    🔴 **唯一入口、keyword-only**：禁 `args[N]`、禁第二入口、禁掛在 pipeline 上當替身。
-    🔴 `timeframe_seconds` 是**注入之 map**——SPEC 明禁在本函式內直讀
-    `momentum/core/constants.py::TIMEFRAME_SECONDS`。呼叫端建構一次、以**同一物件**
-    同時傳給 purge 與本 gate，驗收以 `is` 比對。
-
-    containment（批內全部列皆須成立）：
-    ```
-    run_start_ms <= min_e decision_at_ms(e)   且   max_e label_end_ms(e) <= run_end_ms
-    ```
-    🔴 左界用 `decision_at_ms` **而非** `min(t0)`：IC 之特徵截止規則是
-    `max_close_ms <= decision_at`，`decision_offset_bars = k > 0` 時 `decision_at < t0`
-    ⇒ 用 `min(t0)` 會放行「run 根本沒涵蓋決策時點」的批次，那是個 fail-open 窗口。
-    """
-    windows = tuple(event_windows)
-    if not windows:
-        # 沒有窗就沒有東西要涵蓋。這不是錯誤——上游已對「全部對齊失敗」有自己的 loud 路徑。
-        return FeatureRunCoverage(False, None, None, (), ())
-
-    # ② 逐列用**該列自己的** timeframe；批內多 TF 允許，但任一列不在注入之鍵集 ⇒ 整批擋。
-    for w in windows:
-        if w.timeframe not in timeframe_seconds:
-            raise FeatureRunCoverageError(
-                "feature_coverage_unknown_timeframe",
-                f"事件 {w.event_id} 之 timeframe {w.timeframe!r} 不在注入之 timeframe_seconds 鍵集"
-                f"（{sorted(timeframe_seconds)}）",
-            )
-
-    # ⑤ legacy run：`{"start": None, "end": None}`。
-    # 🔴 **缺鍵與 `None` 同等處置**（`D-005` 之偵察輪裁定 1）：實掃 14 份 manifest 有 2 份
-    #    完全沒有 `time_range` 鍵，而 SPEC ⑤ 只裁定了 `{None, None}`。兩者資訊量相同
-    #    （都拿不到區間），分成兩個 reason 只會讓前端多一種要處理的字面；
-    #    且 §C0 只能更嚴，缺鍵放行才是弱化。
-    if not isinstance(feature_manifest_time_range, dict):
-        raise FeatureRunCoverageError(
-            "feature_coverage_unknown_legacy_run",
-            "feature run manifest 無 time_range（缺鍵或非 dict）——無法對證涵蓋範圍",
-        )
-    start_raw = feature_manifest_time_range.get("start")
-    end_raw = feature_manifest_time_range.get("end")
-    if start_raw is None or end_raw is None:
-        raise FeatureRunCoverageError(
-            "feature_coverage_unknown_legacy_run",
-            f"feature run 之 time_range 為 legacy 形（start={start_raw!r} end={end_raw!r}）"
-            "——不得視為『涵蓋全部』而放行",
-        )
-
-    run_start_ms = _parse_time_range_endpoint(start_raw)
-    run_end_ms = _parse_time_range_endpoint(end_raw)
-
-    # 逐事件：左界比 decision_at、右界比含答案窗之 label_end（閉區間）
-    covered: list = []
-    dropped: list = []
-    for w in windows:
-        if run_start_ms <= int(w.decision_at_ms) and int(w.label_end_ms) <= run_end_ms:
-            covered.append(str(w.event_id))
-        else:
-            dropped.append((str(w.event_id), "outside_feature_run"))
-    if not covered:
-        required_start = min(int(w.decision_at_ms) for w in windows)
-        required_end = max(int(w.label_end_ms) for w in windows)
-        raise FeatureRunCoverageError(
-            "feature_coverage_insufficient",
-            f"特徵 run 之區間 [{run_start_ms}, {run_end_ms}] 與事件期 "
-            f"[{required_start}, {required_end}] 無交集——{len(windows)} 筆事件全部落在 run 之外"
-            f"（左界比 decision_at、右界比含答案窗之 label_end；被丟 ID 前 5 筆：{[e for e, _ in dropped[:5]]}）",
-        )
-    return FeatureRunCoverage(True, run_start_ms, run_end_ms, tuple(covered), tuple(dropped))
-
-
 def _feature_run_time_range(*candidates: Optional[str]) -> Optional[Dict[str, Optional[str]]]:
     """由 feature run 之路徑找出 `feature_manifest.json` 並原樣取出 `time_range`。
 
@@ -583,22 +431,32 @@ def _feature_run_time_range(*candidates: Optional[str]) -> Optional[Dict[str, Op
     🔴 **原樣取出、不轉型別**（Task 7.7 ①）：manifest 實測為 epoch 秒之數字字串。
     找不到 manifest ⇒ 回 `None`，由 gate 判 `feature_coverage_unknown_legacy_run`（fail-closed）。
     """
+    base = _feature_run_dir(*candidates)
+    if base is None:
+        return None
+    try:
+        payload = json.loads((base / "feature_manifest.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    raw = payload.get("time_range") if isinstance(payload, dict) else None
+    if isinstance(raw, dict):
+        return {"start": raw.get("start"), "end": raw.get("end")}
+    return None
+
+
+def _feature_run_dir(*candidates: Optional[str]) -> Optional[Path]:
+    """由 run 之路徑候選找出**含 `feature_manifest.json` 的 run 目錄**。
+
+    🔴 只此一份搜法：涵蓋判定（`time_range`）與處置帳（post-trim 索引）都吃同一個目錄。
+    兩邊各搜一次就會出現「閘門看 A run、索引看 B run」的分歧——B9 花五輪修的正是這個病。
+    """
     for candidate in candidates:
         if not candidate:
             continue
         path = Path(candidate)
         for base in (path if path.is_dir() else path.parent, path.parent.parent):
-            manifest = base / "feature_manifest.json"
-            if not manifest.is_file():
-                continue
-            try:
-                payload = json.loads(manifest.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                return None
-            raw = payload.get("time_range") if isinstance(payload, dict) else None
-            if isinstance(raw, dict):
-                return {"start": raw.get("start"), "end": raw.get("end")}
-            return None
+            if (base / "feature_manifest.json").is_file():
+                return base
     return None
 
 
@@ -820,6 +678,7 @@ class ICAnalysisService:
             timeframe_seconds=timeframe_seconds,
             feature_timeframe=analysis_tf or None,
         )
+        run_dir = _feature_run_dir(feature_manifest_path, features_path, meta_path)
         coverage = check_feature_run_coverage(                   # 階段 3a（EVTALIGN Task 3.1：逐事件）
             timeframe_seconds=timeframe_seconds,                 # 🔴 同一物件
             feature_manifest_time_range=_feature_run_time_range(feature_manifest_path, features_path, meta_path),
@@ -1017,6 +876,20 @@ class ICAnalysisService:
         #      ⇒ 這段預檢從未真正執行過（grok 對 14 個真實路徑抽樣驗證）。
         #    orchestrator 那裡有 `test_plan.row_index`＝實際測試段，沒有第二份算術可漂，
         #    而且一樣在 preprocessing 之前 ⇒「不必跑完才知道不足」的目的照樣達成。
+
+        # 🔴 `R5-C8` 處置帳之 `in_index` 判定需 **post-trim** 特徵索引（毫秒集合）。
+        #    走到這裡 `run_dir` 必非 None——階段 3a 對「找不到 manifest ⇒ time_range 為 None」
+        #    已 fail-closed（`feature_coverage_unknown_legacy_run`），而兩者搜的是同一個目錄。
+        #    🔴 **取不到就 raise，不得以空集合代過**：空集合會把每一筆都記成 `row_missing`，
+        #    那是一份看起來很有內容、實際上全錯的帳。
+        if run_dir is None:
+            raise ValueError(
+                "特徵 run 目錄無從解析（找不到 feature_manifest.json）"
+                "——post-trim 索引取不到，處置帳不得以空索引產生（R5-C8）"
+            )
+        post_trim_index_ms = set(
+            (create_post_trim_index_loader()(run_dir).astype("int64") // 1_000_000).tolist()
+        )
         return {
             # ── EVTLABEL Task 3.3：匯入標籤模式之 staging 產物 ──────────────────
             # `event_binary_labels` 與 `event_label_values` **同鍵**（v7 R5-C9 之特徵列鍵）；
@@ -1072,7 +945,54 @@ class ICAnalysisService:
             #    ——沒有這一欄，使用者看不出手上這份 IC 是條件估計還是無條件估計，
             #    而兩者的解讀完全相反。值由 `control_kind` 機械導出，不由使用者宣告。
             "event_sample_design": ICAnalysisService._sample_design_of(records),
+            # 🔴 **SPLITUNIFY `R5-C8`：逐事件處置帳（`CODEX-R45-P1-02` 接線）**。
+            #    在此產生而非留到 `Task 10.5`：清單之「既有 caller」逐字含
+            #    `ICAnalysisService._run_event_label_stages` 與 IC 分析主流程
+            #    ⇒ 入口存在卻無生產呼叫端，本 Task 之交付實際上不可驗。
+            #    🔴 它是**入口之預測**：只吃本方法已算出之對齊、coverage、特徵列鍵與 label，
+            #    **不讀** stage3 之結果（`R5-C8` 6.）——讀了 `Task 10.7` 的對證就變成拿自己比自己。
+            "event_disposition_ledger": ICAnalysisService._build_disposition_ledger(
+                records=records,
+                run_symbol=str(getattr(request, "symbol", "") or ""),
+                prepared=prepared1,
+                coverage=coverage,
+                feature_row_key_by_id=feature_row_key_by_id,
+                feature_index_ms=post_trim_index_ms,
+                label_value_by_id=by_id,
+            ),
         }
+
+    @staticmethod
+    def _build_disposition_ledger(
+        *, records, run_symbol, prepared, coverage, feature_row_key_by_id,
+        feature_index_ms, label_value_by_id,
+    ):
+        """`R5-C8` 之處置帳——經 `momentum.factories` 之唯一出口產生（Rule 3）。
+
+        🔴 產生失敗**不得**吞掉：處置帳是兩端差集與剔除揭露之唯一來源，
+        靜默回 `None` 會讓下游以為「這批沒有被剔除的事件」。
+        """
+        from momentum.factories import create_event_disposition_ledger
+
+        build_ledger = create_event_disposition_ledger()
+        aligned = {str(w.event_id) for w in prepared.windows}
+        covered = (
+            {str(e) for e in coverage.covered_event_ids} if coverage.evaluated else aligned
+        )
+        rows = build_ledger(
+            events=[{"event_id": r.get("event_id"), "symbol": r.get("symbol")} for r in records],
+            run_symbol=run_symbol,
+            aligned_event_ids=aligned,
+            coverage_ok_event_ids=covered,
+            feature_row_key_by_id={str(k): int(v) for k, v in feature_row_key_by_id.items()},
+            post_trim_index_ms=feature_index_ms,
+            label_value_by_id=label_value_by_id,
+        )
+        return tuple(
+            {"event_id": r.event_id, "symbol": r.symbol,
+             "scan_disposition": r.scan_disposition, "ic_disposition": r.ic_disposition}
+            for r in rows
+        )
 
     @staticmethod
     def _sample_design_of(records) -> str:

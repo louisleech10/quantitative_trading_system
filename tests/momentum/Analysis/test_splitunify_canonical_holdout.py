@@ -142,6 +142,38 @@ def test_canonical_holdout_disabled_is_named_reason() -> None:
     assert got.feature_index is not None, "關閉切分不代表沒有 post-trim 索引"
 
 
+def test_canonical_holdout_insufficient_rows_is_named_reason() -> None:
+    """🔴 `Task 10.4` 邊界②：`_build_holdout_split_plan` 回 `SkippedResult`
+    ⇒ `reason=canonical_holdout_insufficient_rows`，plans 為 None。
+
+    🔴 **不 mock 切分器**——以真實 run 索引配一個大到切不出測試段的 `purge_gap`
+    （隔離區吃光整條索引），走的是與生產端同一支 `_build_holdout_split_plan`。
+    mock 會把「切分器何時判不足」這個真正的判準換成我自己的假設。
+
+    鑑別力：把「非 tuple ⇒ 具名 reason」那段改成回 `plans=None, reason=None`
+    ⇒ 下面兩條 assert 轉紅（靜默回空正是本條要擋的）。
+    """
+    _require(RUN_1H)
+    resolve, _err = _resolver()
+    index_len = len(_post_trim_index())
+    got = resolve(
+        ff_run=FF_1H, symbol=SYM, ic_config=_cfg(),
+        purge_gap=index_len * 2,   # 隔離區比整條索引還長 ⇒ 切不出測試段
+        lookahead_depth_rows=0,
+    )
+    assert got.reason == "canonical_holdout_insufficient_rows", (
+        f"切不出測試段時未給具名原因（reason={got.reason!r}）——靜默回空會被當成『沒有邊界』"
+    )
+    assert got.train_plan is None and got.test_plan is None
+    assert got.feature_index is not None, "切不出計畫不代表沒有 post-trim 索引"
+
+
+def _post_trim_index():
+    from momentum.factories import create_post_trim_index_loader
+
+    return create_post_trim_index_loader()(RUN_1H)
+
+
 def test_canonical_holdout_cross_tf_per_tf_has_run_timeframe() -> None:
     """🔴 `R5-C9` 3.：bars 之週期集合須為 `trigger_timeframes ∪ {run.timeframe}`。
 

@@ -12,6 +12,8 @@ mutation（`--phase 3`）：A7 ids 只回 count ⇒ `dropped_ids` 紅；A8 算�
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -114,6 +116,13 @@ def test_live_event_stages_drop_out_of_range_event_and_shrink_allowed_set(monkey
     # run 區間：涵蓋 ev0（含其 label 窗），不涵蓋 ev1
     monkeypatch.setattr(svc, "_feature_run_time_range",
                         lambda *c: {"start": secs(t0a - 10 * H12_MS), "end": secs(t0a + 10 * H12_MS)})
+    # 🔴 `R5-C8` 處置帳：run 區間被 stub 掉，run 目錄與 post-trim 索引也必須一起 stub。
+    #    生產路徑上兩者同源（都由 `_feature_run_dir` 定位，manifest 缺席時階段 3a 就已
+    #    fail-closed）；只 stub 其中一半會造出一個生產上不存在的狀態。
+    #    索引＝本批 12h bars 之開盤時刻，與特徵列鍵同一格網。
+    monkeypatch.setattr(svc, "_feature_run_dir", lambda *c: Path("data_cache/features/ETHUSDT/12h/x"))
+    _idx = pd.to_datetime(bars["ETHUSDT"]["12h"]["open_time_ms"].to_numpy(), unit="ms")
+    monkeypatch.setattr(svc, "create_post_trim_index_loader", lambda: (lambda _run_dir: _idx))
 
     class _Req:
         event_import_id = "imp-evtalign-31"
