@@ -1107,11 +1107,13 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   5. 舊鍵語意之說明同步：`momentum/core/split_preview.py:379`、`momentum/Analysis/ic_filter_orchestrator.py:1195`／`:1707`、`momentum/Analysis/event_samples/ic_feed.py:9`、`tests/momentum/Analysis/test_evtlabel_stage3.py:42`。
   6. 數值變動揭露：`scripts/splitunify_ic_event_report_diff.py`（新）以真實事件批跑改前／改後 IC 報告逐鍵 diff，`--allow-diff` 模式寫 receipt 到 `handoffs/run_receipts/`。
      🔴 **兩份基準之捕獲（兩個檔、兩次命令，皆 write-once；`Task 10.4` 之 strict 比對要用）**：
-     - **動碼前**：`venv/bin/python scripts/splitunify_ic_event_report_diff.py --capture pre_task_10_2 --out tests/golden/splitunify/ic_event_report_baseline.pre_task_10_2.json`
-       ——落 canonical bytes（去 `generated_at`）與 sha256；此檔為**不可變**（`O_CREAT|O_EXCL`，已存在即拒，無授權覆蓋出口）。
-     - **本 Task 落地後**：`venv/bin/python scripts/splitunify_ic_event_report_diff.py --capture post_task_10_2 --out tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json`
-       ——同一批、同一 run、同一 `config_override`；覆蓋既有值須帶 `--authorize <old8>:<new8>`。
-     - 本 Task 之 allow-diff 比對以**兩個檔路徑**為輸入，`Task 10.4` 之 strict 比對逐鍵讀 `post_task_10_2` 那份，兩處皆不得於當批另跑基準。
+     🔴 **三元組固定**（事件批、FF run 與 `config_override` 三者；兩次捕獲與其後所有比對皆用同一組，寫入各檔之 meta 並於比對時逐值對證，不符即 rc!=0）：
+     `--batch 20260909T130533Z-7f73e4c7 --ff-run 4a8a0b3726cc906ab3534994605e77f5 --config-override none`。
+     - **動碼前**：`venv/bin/python scripts/splitunify_ic_event_report_diff.py --capture --out tests/golden/splitunify/ic_event_report_baseline.pre_task_10_2.json --batch 20260909T130533Z-7f73e4c7 --ff-run 4a8a0b3726cc906ab3534994605e77f5 --config-override none`
+       ——`--capture` 一律**當下重跑** IC 事件路徑取報告，落 canonical bytes（去 `generated_at`）與 sha256；此檔為**不可變**（`O_CREAT|O_EXCL`，已存在即拒，無授權覆蓋出口）。
+     - **本 Task 落地後**：同一命令改 `--out tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json`；覆蓋既有值須帶 `--authorize <old8>:<new8>`。
+     - **candidate 之唯一合法來源＝當下重跑**：比對命令以 `--candidate-run` 表示「以三元組當場重跑 IC 事件路徑取報告」；**禁**以任何既有檔、既有 run 目錄或前次產物充當 candidate（實作須在 `--candidate-run` 路徑上拒收檔路徑參數）。
+     - 本 Task 之 allow-diff 以**兩個檔路徑**為輸入（兩份基準互比）；`Task 10.4` 之 strict 以 `post_task_10_2` 檔為 baseline、`--candidate-run` 為 candidate。
   7. 受影響之既有 golden 以實跑列舉後同 commit 依各自授權流程重凍；已知含 `analysis_alignment_receipt_hash` 之 `per_tf` payload 者＝`scripts/gap3_label_golden.py` 與 `tests/golden/gap3_label/`（`PerTfRow` 增欄即改 hash）。
 - 修改檔案：`momentum/Analysis/event_samples/label_value_from_case.py`、`momentum/Analysis/event_samples/pipeline.py`、`momentum/factories.py`、`api/services/ic_analysis_service.py`、`momentum/core/split_preview.py`、`momentum/Analysis/ic_filter_orchestrator.py`（註解）、`momentum/Analysis/event_samples/ic_feed.py`（註解）、`tests/momentum/Analysis/test_evtlabel_stage3.py`（註解）、`tests/api/test_gap3_event_analysis_horizon_purge.py`、`tests/momentum/event_samples/test_ic_event_feature_row_key.py`（新）、`scripts/freeze_ic_event_row_key_golden.py`（新）、`tests/golden/splitunify/ic_event_row_key.json`（新）、`scripts/splitunify_ic_event_report_diff.py`（新）、`tests/golden/splitunify/ic_event_report_baseline.pre_task_10_2.json`（新，write-once）、`tests/golden/splitunify/ic_event_report_baseline.post_task_10_2.json`（新）、`scripts/gap3_label_golden.py`、`tests/golden/gap3_label/`（receipt hash 重凍）、`docs/GAP3_EVENT_UX_SPEC.D-002.md`。
   既有 caller：`ICAnalysisService._run_event_label_stages`（含逐格掃描路徑）、`EventImportService.build_random_control_batch`（不傳 `feature_timeframe`，行為不變）。

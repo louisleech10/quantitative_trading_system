@@ -98,4 +98,5 @@
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r10/synth.md`
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r17/synth.md`
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r18/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r19/synth.md`
 <!-- HISTORY-END -->
