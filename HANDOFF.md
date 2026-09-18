@@ -5,7 +5,7 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-013 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.1 讀取者改指＋Task 10.2 IC 事件特徵列鍵更正 |
+| 02-013 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r2 修補已交付（12a55c10），待 B10A 閉合輪 r3 判三條 P1 是否閉合 |
 | 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | 施工清單三家審查凍結（x-review-r21）；開工 B10A：Task 10.1 讀取者改指與 Task 10.2 IC 事件特徵列鍵更正 |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
@@ -15,7 +15,7 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-013 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.1 讀取者改指＋Task 10.2 IC 事件特徵列鍵更正 |
+| 02-013 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r2 修補已交付（12a55c10），待 B10A 閉合輪 r3 判三條 P1 是否閉合 |
 | 02-014 | SU-B10B | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
 | 02-015 | SU-B10C | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
 | 02-016 | SU-B10D | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 事件掃描端接線與請求／回應契約 |
@@ -79,6 +79,10 @@
 - **Bash 命令列含委員家族名字面（以豎線串接之三家名）會被 `gate_check.sh` 判為派工而擋**：要列家族時從 `scripts/governance_families.json` 以 `jq` 取，不在命令列寫字面。
 - 🔴 **以行號 sed 改檔必以字面計數回驗**（2026-09-18 連兩輪同型事故：先把比對對象改成未定義字面，再因行號位移而只改了一半，兩次都由三家審查抓到）：改動後跑 `grep -c -- '<舊字面>' <檔>` 須為 0、`grep -n -- '<新字面>' <檔>` 須命中預期行；長行只看 `cut -c1-N` 的開頭會漏掉尾端未改處。能用 Edit 工具做精確字串取代時就不要用行號 sed。
 - 🔴 **規格寫入之權宜作法（2026-09-17）**：`docs/SPLITUNIFY_SPEC.md` 以 scratchpad 組稿後 `cp` 入檔；寫入前以同內容之 Write payload 餵 `bash scripts/live_doc_write_guard.sh`（rc=0 才 `cp`），寫入後跑 `doc_format_precheck.sh`、`spec_xref_check.sh --files <HEAD 版> <新版>`、`obligation_block_check.sh`。日後小幅修改一律用 Edit。
+- 🔴 **實作 commit 之 `--reconcile` 須指向「已蓋章」之收斂檔**：審碼輪之收斂檔沒有戳記，用它領 token 會被拒；SPLITUNIFY B10 之授權依據＝已蓋章之清單收斂檔（`handoffs/reconcile/20260911-splitunify-x-review-r21/synth.md`）。
+- 🔴 **收斂檔要能當 `--reconcile` 用，必須有 `## 戳記` 區段**：無該區段時 `bash scripts/reconcile_body_hash.sh <檔>` rc=1，派工單若叫委員跑該命令算 body hash，等於叫他們跑一條必失敗的指令（2026-09-18 由委員擋下）。補該區段時**不得**多插空白列——本體須與委員所審逐字相同，`printf '\n## 戳記\n'` 會多一行而改掉 body hash（同日再被擋一次）。
+- 🔴 **同一 `config_hash` 可存在於多個 symbol**（2026-09-18 實測 BCHUSDT 與 ETHUSDT 同雜湊）：以 glob 取 run 目錄時須再以事件批之 symbol 篩選，命中多於一個即 fail-closed，否則會拿到別的幣種之 run。
+- 🔴 **headless 搜尋探針會寫應用層快取 `data_cache/kline_cache.h5`**（2026-09-18 我造成之副作用，該檔現為 ETHUSDT/1h 1762 根、2 處缺口）：量化主線驗證用的是 `data_cache/feature_klines/kline_cache.h5`（實測未受影響，1h/4h/12h 各 20352/5088/1696 根、零缺口），兩者不是同一個檔，別互相當證據。
 
 ## 進行中紀錄
 
@@ -102,5 +106,9 @@
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r18/synth.md`
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r19/synth.md`
 - 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r20/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r21/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r11/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r12/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r13/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r1/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r2/synth.md`
 <!-- HISTORY-END -->

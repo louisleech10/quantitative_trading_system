@@ -752,12 +752,24 @@ def purge_lower_bound_rows(
     )
 
 
+#: 特徵列鍵之拒絕原因碼（`R5-C9` 5.）。每個拒絕出口一碼，訊息以 `[碼]` 開頭。
+#: 🔴 存在理由＝「後加的守衛會遮蔽先前的守衛」：多道守衛對同一輸入都會 raise 時，
+#: 只斷言「有 raise」的測試無法分辨是哪一道，先前那道被改壞也不會紅。測試須斷言原因碼。
+_ROWKEY_REASON_MISSING_PER_TF = "ROWKEY_MISSING_PER_TF"
+_ROWKEY_REASON_NOT_SAME_BAR = "ROWKEY_NOT_SAME_BAR"
+_ROWKEY_REASON_CUTOFF_AFTER_DECISION = "ROWKEY_CUTOFF_AFTER_DECISION"
+_ROWKEY_REASON_BARS_MISSING = "ROWKEY_BARS_MISSING"
+_ROWKEY_REASON_NO_ASOF_BAR = "ROWKEY_NO_ASOF_BAR"
+_ROWKEY_REASON_NOT_LAST_BAR = "ROWKEY_NOT_LAST_BAR"
+_ROWKEY_REASON_BARS_REQUIRED = "ROWKEY_BARS_REQUIRED"
+
+
 def feature_row_keys(
     prepared: "PreparedAnalysisWindows",
     *,
     feature_timeframe: str,
     timeframe_seconds: Mapping[str, int],
-    bars_by_tf: Optional[Mapping[str, Mapping[str, Any]]] = None,
+    bars_by_tf: Mapping[str, Mapping[str, Any]],
 ) -> Dict[str, int]:
     """v7 `R5-C9`：逐事件之**特徵列鍵**＝`(event_id, feature_timeframe)` 那列之 `last_bar_open_ms`。
 
@@ -782,6 +794,14 @@ def feature_row_keys(
     bar_ms = int(timeframe_seconds[tf]) * 1000
     if bar_ms <= 0:
         raise LabelProducerError(f"特徵週期 {tf!r} 之秒數非正（fail-closed）")
+    # 🔴 `CODEX-R32-P2-02`：`bars_by_tf` 曾為選填，省略時整段獨立重算被跳過＝守衛 fail-open
+    #    （實測 `bars_by_tf=None` 在真實批仍回傳 165 鍵而不 raise）。改為**必填**，
+    #    呼叫端不給就沒有鍵可取——守衛不再有可繞過之退化路徑。
+    if not bars_by_tf:
+        raise LabelProducerError(
+            f"[{_ROWKEY_REASON_BARS_REQUIRED}] feature_row_keys 需要 bars_by_tf（真實 K 線）"
+            "以獨立重算「收盤 <= 決策之最後一根」；缺它即無守衛，不得取鍵（R5-C9 5.③ fail-closed）"
+        )
     per_tf_index = {
         (p.event_id, p.timeframe): p for p in prepared.per_tf
     }
@@ -791,45 +811,54 @@ def feature_row_keys(
         row = per_tf_index.get((w.event_id, tf))
         if row is None:
             raise LabelProducerError(
-                f"事件 {w.event_id} 缺特徵週期 {tf!r} 之 per-TF 收據——"
+                f"[{_ROWKEY_REASON_MISSING_PER_TF}] 事件 {w.event_id} 缺特徵週期 {tf!r} 之 per-TF 收據——"
                 "對齊時須載入觸發週期與特徵 run 週期之聯集（R5-C9 3.），不得以他週期之列替代"
             )
         open_ms = int(row.last_bar_open_ms)
         cutoff_ms = int(row.feature_cutoff_ms)
         decision_ms = decision_by_id[w.event_id]
-        # 🔴 **最後一根之獨立重算**（B10A 閉合輪 `CODEX-R31-P1-01`／`GROK-R31-P2-01`）：
-        #    幾何自洽（開盤＋一根＝收盤）與不等式都擋不住「開盤與收盤**成對**往前搬」之竄改，
-        #    也擋不住回傳值被整體位移。給 bars 時以 `alignment._select_cutoff_idx`（同一支 as-of
-        #    實作，不另寫第二份）重算「收盤 ≤ 決策之最後一根」並逐值對證，不符即 raise。
-        if bars_by_tf is not None:
-            sub = (bars_by_tf.get(w.symbol) or {}).get(tf)
-            if sub is None:
-                raise LabelProducerError(
-                    f"事件 {w.event_id}：bars_by_tf 缺 {w.symbol}／{tf} 之 bars，無從重算最後一根（fail-closed）"
-                )
-            ct = sub["close_time_ms"].to_numpy()
-            ot = sub["open_time_ms"].to_numpy()
-            idx = _select_cutoff_idx(ct, decision_ms)
-            if idx < 0:
-                raise LabelProducerError(
-                    f"事件 {w.event_id}（特徵週期 {tf}）在 bars 中無 收盤 <= 決策時點 之 K 線（fail-closed）"
-                )
-            expect_open, expect_cutoff = int(ot[idx]), int(ct[idx])
-            if (open_ms, cutoff_ms) != (expect_open, expect_cutoff):
-                raise LabelProducerError(
-                    f"事件 {w.event_id}（特徵週期 {tf}）之收據非「收盤 <= 決策之最後一根」："
-                    f"收據 open={open_ms}／cutoff={cutoff_ms}，重算 open={expect_open}／cutoff={expect_cutoff}"
-                    "（R5-C9 5.③）"
-                )
+        # 🔴 **守衛順序不可調**（CLAUDE.md／HANDOFF 之「後加的守衛會遮蔽先前的守衛」）：
+        #    ③ 之逐值對證嚴格強於 ①②——bars 改必填後若把 ③ 排在前面，①② 從此**永遠不會**
+        #    觸發，它們被改壞也沒有測試會紅（實測：把 ③ 排前，`test_pit_guard_rejects_open_eq_cutoff`
+        #    與 `test_pit_guard_rejects_earlier_real_bar_as_key` 兩條之期望訊息立刻對不上）。
+        #    ⇒ ①② 先跑（各自之精確診斷），③ 最後跑（成對竄改／整體位移）。
+        #    每個拒絕出口帶可區分之原因碼，測試斷言原因碼而非只斷言「被拒」。
+        # ① 開盤與收盤須屬同一根 K 線
         if open_ms + bar_ms != cutoff_ms:
             raise LabelProducerError(
-                f"事件 {w.event_id}（特徵週期 {tf}）之開盤與收盤非同一根 K 線："
+                f"[{_ROWKEY_REASON_NOT_SAME_BAR}] 事件 {w.event_id}（特徵週期 {tf}）之開盤與收盤非同一根 K 線："
                 f"last_bar_open_ms={open_ms} + {bar_ms} != feature_cutoff_ms={cutoff_ms}（R5-C9 5.①）"
             )
+        # ② 該根收盤不得晚於決策時點
         if not (cutoff_ms <= decision_ms):
             raise LabelProducerError(
-                f"事件 {w.event_id}（特徵週期 {tf}）之特徵列收盤晚於決策時點："
+                f"[{_ROWKEY_REASON_CUTOFF_AFTER_DECISION}] 事件 {w.event_id}（特徵週期 {tf}）之特徵列收盤晚於決策時點："
                 f"feature_cutoff_ms={cutoff_ms}、decision_at_ms={decision_ms}（R5-C9 5.②）"
+            )
+        # ③ **最後一根之獨立重算**（B10A 閉合輪 `CODEX-R31-P1-01`／`GROK-R31-P2-01`）：
+        #    ①② 都擋不住「開盤與收盤**成對**往前搬」之竄改，也擋不住回傳值被整體位移。
+        #    以 `alignment._select_cutoff_idx`（同一支 as-of 實作，不另寫第二份）對真實 bars
+        #    重算「收盤 ≤ 決策之最後一根」並逐值對證，不符即 raise。
+        sub = (bars_by_tf.get(w.symbol) or {}).get(tf)
+        if sub is None:
+            raise LabelProducerError(
+                f"[{_ROWKEY_REASON_BARS_MISSING}] 事件 {w.event_id}：bars_by_tf 缺 {w.symbol}／{tf} 之 bars，"
+                "無從重算最後一根（fail-closed）"
+            )
+        ct = sub["close_time_ms"].to_numpy()
+        ot = sub["open_time_ms"].to_numpy()
+        idx = _select_cutoff_idx(ct, decision_ms)
+        if idx < 0:
+            raise LabelProducerError(
+                f"[{_ROWKEY_REASON_NO_ASOF_BAR}] 事件 {w.event_id}（特徵週期 {tf}）"
+                "在 bars 中無 收盤 <= 決策時點 之 K 線（fail-closed）"
+            )
+        expect_open, expect_cutoff = int(ot[idx]), int(ct[idx])
+        if (open_ms, cutoff_ms) != (expect_open, expect_cutoff):
+            raise LabelProducerError(
+                f"[{_ROWKEY_REASON_NOT_LAST_BAR}] 事件 {w.event_id}（特徵週期 {tf}）之收據非「收盤 <= 決策之最後一根」："
+                f"收據 open={open_ms}／cutoff={cutoff_ms}，重算 open={expect_open}／cutoff={expect_cutoff}"
+                "（R5-C9 5.③）"
             )
         out[w.event_id] = open_ms
     return out

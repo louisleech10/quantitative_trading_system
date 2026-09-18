@@ -40,7 +40,7 @@
 | 100 | B9D | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 110 | B9E | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 120 | B9F | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
-| 130 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.1 讀取者改指＋Task 10.2 IC 事件特徵列鍵更正 |
+| 130 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r2 修補已交付（12a55c10），待 B10A 閉合輪 r3 判三條 P1 是否閉合 |
 | 140 | SU-B10B | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
 | 150 | SU-B10C | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
 | 160 | SU-B10D | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 事件掃描端接線與請求／回應契約 |

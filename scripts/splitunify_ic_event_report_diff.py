@@ -16,10 +16,24 @@
   ... --mode strict --baseline <post.json> --candidate-run --batch <id> --ff-run <hash> --config-override none
 
 🔴 **具名偏離（交 B10A 審碼輪裁）**：清單寫「IC 報告逐鍵 diff」。本腳本捕獲之 payload 不是
-整份 IC 報告 JSON（那需物化全特徵矩陣、分鐘級），而是**事件路徑之可證偽面**：逐事件之
-特徵列鍵與標籤值、隔離列數、canonical 邊界、stage3 實際保留之列時刻，以及固定特徵集之條件 IC。
+整份 IC 報告 JSON，而是**事件路徑之可證偽面**：逐事件之特徵列鍵與標籤值、隔離列數、
+canonical 邊界、stage3 實際保留之列時刻，以及固定特徵集之條件 IC。
 `R5-C9` 7. 所要求之「條件 IC 前後值」與 `Task 10.4` 之 embargo mutation 皆落在此面內；
 整份報告之其餘鍵由 G-2（非事件 run 逐位元組不變）守。
+
+🔴 **基準檔有兩代，語意不同，不得混用**（B10A 閉合輪 `CODEX-R32-P1-01`）：
+  - `ic_event_report_baseline.{pre,post}_task_10_2.json`＝**凍結之歷史對照**，由本輪修補**之前**
+    的 collector 產生；其 `conditional_ic` 是**腳本自算**之 Spearman，母體＝全部 165 個 consumed
+    事件。兩檔同源可比，記錄的是 `Task 10.2` 之效果，**不再重新捕獲**。
+  - `ic_event_report_baseline.prod_task_10_4.json`＝**生產端基準**，`conditional_ic` 取自
+    `ICFilterOrchestrator.analyze` 之 `summary_table[*].ic_mean`，母體＝**canonical 測試段內之
+    41 個事件**（`split_mask.test_rows`）。`--mode strict` 一律對這一份。
+  🔴 兩者數值差很大且會變號（實測 12h RSI：自算 +0.0698 vs 生產端 −0.1920），因為母體與
+     特徵預處理階段都不同——**不是** bug，是「腳本的第二份實作」與「使用者實際看到的值」之差。
+
+🔴 **本腳本不得自行計算任何統計量**：條件 IC、stage3 消費數、切分／purge／embargo 一律只從
+生產端報告讀（`_production_evidence`）。修補前實跑證據：monkeypatch `analyze` 直接 raise
+⇒ 仍 `STRICT PASS`；`purge_rows` 156→155 ⇒ 仍 `STRICT PASS`。修補後三條 mutation 全數轉紅。
 """
 from __future__ import annotations
 
@@ -46,6 +60,149 @@ _IC_FEATURES = [
 _TF_MS = {"1h": 3_600_000, "4h": 14_400_000, "12h": 43_200_000, "1d": 86_400_000}
 _EVENTS_DIR = REPO / "data_cache/events"
 _FEATURES_DIR = REPO / "data_cache/features"
+
+
+#: 具名子集之額外特徵數（本比對面五個 L1 之外再取的 L1 欄，依檔名字母序，決定性）。
+_SUBSET_EXTRA = 25
+
+
+def _materialize_named_subset(service, symbol: str, run_tf: str, ff_run: str, run_dir: Path):
+    """以**生產端** `_write_features_h5`／`_build_ic_metadata_from_run` 物化一組**具名子集**。
+
+    🔴 **具名偏離（本輪新增，交 r4 裁）**：`_materialize_features_for_ic` 會先
+    `_feature_library.load()` 把整個 run 讀進 DataFrame。本 run 之 `raw/` 為 7.5 GB
+    （含 L2 chunk，單檔上百 MB、數千欄），本機 8 GB RAM ⇒ 實跑兩次皆 `rc=137`（OOM）。
+    ⇒ 改以本比對面之五個 L1 欄＋字母序前 `_SUBSET_EXTRA` 個 L1 欄物化。
+    影響：`ic_mean` 之母體與 stage5／stage6 之特徵宇宙是子集；**逐特徵** IC 本身由
+    `compute_ic` 逐欄算，不因其他欄存在與否改變（此點未獨立證明，列為本輪殘留）。
+    """
+    import pandas as _pd
+
+    ts = _pd.read_parquet(run_dir / "timestamps.parquet")["timestamp"].to_numpy()
+    index = _pd.to_datetime(ts.astype("int64") * 1000, unit="ms")
+    names: List[str] = list(_IC_FEATURES)
+    for p in sorted((run_dir / "raw").glob("*_L1_*.parquet")):
+        if len(names) >= len(_IC_FEATURES) + _SUBSET_EXTRA:
+            break
+        if p.stem not in names:
+            names.append(p.stem)
+    cols: Dict[str, Any] = {}
+    for n in names:
+        f = run_dir / "raw" / f"{n}.parquet"
+        if not f.is_file():
+            raise SystemExit(f"ERROR: 子集缺特徵 parquet {f}（不得靜默略過）")
+        c = _pd.read_parquet(f)
+        cols[n] = c[c.columns[0]].to_numpy().astype(np.float64)
+    feats = _pd.DataFrame(cols, index=index)
+
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    cache = REPO / "data_cache/reports/ic_ingest_cache"
+    cache.mkdir(parents=True, exist_ok=True)
+    key = f"{symbol}_{run_tf}_{ff_run}_splitunify_subset{len(names)}"
+    h5, meta = cache / f"{key}.h5", cache / f"{key}_meta.json"
+    if h5.exists():
+        h5.unlink()
+    ICAnalysisService._write_features_h5(h5, symbol, run_tf, feats)
+    meta.write_text(json.dumps(
+        service._build_ic_metadata_from_run(symbol, run_tf, ff_run, list(feats.columns)),
+        ensure_ascii=False,
+    ), encoding="utf-8")
+    return str(h5.resolve()), str(meta.resolve())
+
+
+def _production_evidence(
+    symbol: str, run_tf: str, ff_run: str, import_id: str,
+    event_batch: Dict[str, Any], run_dir: Path, cfg_override: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """走**生產端** `_run_scan_cell`（內含 `ICFilterOrchestrator.analyze`）取證據。
+
+    🔴 `CODEX-R32-P1-01`：本函式存在的唯一理由是「不要有第二份實作」。逐特徵條件 IC、
+    stage3 實際消費之事件數、canonical 切分／purge／embargo 一律**只從生產端報告讀**，
+    本腳本不再自行計算任何統計量。生產端拋錯即整支 fail（不得吞例外回退自算）。
+    """
+    from api.models.ic_models import ICAnalyzeRequest
+    from api.services.ic_analysis_service import ICAnalysisService
+    from momentum.factories import create_ic_analyzer, create_kline_storage_manager
+
+    # 🔴 **request 必須是生產端之 model，config_override 必須由生產端之 `_build_config_override`
+    #    導出**：`event_filter.enabled` 只在該函式裡因 `event_import_id` 而開啟。手搓最小 stub ＋
+    #    `config_override={}` 會讓 orchestrator 回 `event_filter.mode="none"` ⇒ 整份報告其實是
+    #    **全樣本 IC**，`statistic_kind` 等條件 IC 標記全部不存在，而 `analysis_status` 仍是 ok
+    #    （實跑證實；同型事故已記在 `ic_analysis_service.py:3145-3151` 之 UAT B17 註解）。
+    request = ICAnalyzeRequest(
+        symbol=symbol, timeframe=run_tf, config_hash=ff_run,
+        mode="longitudinal", event_import_id=import_id,
+        config_override=dict(cfg_override) if cfg_override else None,
+    )
+    service = ICAnalysisService()
+    cfg = service._build_config_override(request)
+    features_path, meta_path = _materialize_named_subset(service, symbol, run_tf, ff_run, run_dir)
+    # 事件路徑之 `labels_path` 為空 ⇒ `kline_reader` 必須非 None（stage2 生成鷹架主線標籤）。
+    kline_reader = create_kline_storage_manager(cache_dir="data_cache/feature_klines")
+    out = ICAnalysisService._run_scan_cell(
+        service, create_ic_analyzer, request, event_batch,
+        features_path=features_path, meta_path=meta_path,
+        feature_manifest_path=str(run_dir / "feature_manifest.json"),
+        labels_path=None, kline_reader=kline_reader,
+        config_override=dict(cfg or {}),
+        original_embargo=int((cfg_override or {}).get("embargo") or 0),
+    )
+    report = out["report"]
+    meta = report.get("metadata") or {}
+    ef = meta.get("event_filter") or {}
+    split = meta.get("ic_train_test_split") or {}
+    su = meta.get("split_unify") or {}
+
+    # 🔴 **事件分支 fail-closed**：`event_filter.mode == "none"` 表示 orchestrator 根本沒走
+    #    條件 IC 路徑，`summary_table.ic_mean` 是**全樣本主線 IC**——拿它當條件 IC 就是偷換
+    #    統計量，且 `analysis_status` 仍為 ok、從輸出看不出來（本輪實跑踩過一次）。
+    if str(ef.get("mode") or "none") == "none":
+        raise SystemExit(
+            "ERROR: 生產端回 event_filter.mode=none（未走條件 IC 分支）——"
+            "config_override 須由 `_build_config_override` 導出（event_import_id ⇒ enabled=True）"
+        )
+    if ef.get("statistic_kind") != "conditional_ic":
+        raise SystemExit(
+            f"ERROR: 生產端之 statistic_kind={ef.get('statistic_kind')!r}，非 'conditional_ic'（fail-closed）"
+        )
+
+    # 逐特徵條件 IC：只取本比對面之特徵；缺席即 None（不造值）。
+    by_name = {
+        str(r.get("feature_name")): r.get("ic_mean")
+        for r in (report.get("summary_table") or [])
+        if isinstance(r, dict)
+    }
+    cond = {
+        name: (None if by_name.get(name) is None else float(by_name[name]))
+        for name in _IC_FEATURES
+    }
+    evidence = {
+        "entrypoint": "ICAnalysisService._run_scan_cell → ICFilterOrchestrator.analyze（生產端）",
+        "named_deviation": "掃描格恆為報酬版（label_mode_requested=return_rule）；本批亦為報酬版",
+        "analysis_status": report.get("analysis_status"),
+        "oos_guarantees": report.get("oos_guarantees"),
+        "capability": out.get("capability"),
+        "n_events_staged": out.get("n_events"),
+        "statistic_kind": ef.get("statistic_kind"),
+        "label_source": ef.get("label_source"),
+        "consumed_event_count": ef.get("consumed_event_count"),
+        "split_mask": ef.get("split_mask"),
+        "ic_mean_source": (meta.get("ic_window_disclosure") or {}).get("ic_mean_source"),
+        "split_unify": {k: su.get(k) for k in ("n_test", "split_authority", "boundary_hash", "reason")},
+        "ic_train_test_split": {
+            k: split.get(k) for k in (
+                "applied", "purge_gap", "embargo", "effective_horizon",
+                "train_rows", "test_rows", "train_time_bounds", "test_time_bounds",
+                "purge_gap_source", "event_label_window_rows", "lookahead_depth_rows",
+                "oos_guarantees",
+            )
+        },
+        "isolation": meta.get("isolation"),
+        "split_method": meta.get("split_method"),
+        "oos_downgrade": meta.get("oos_downgrade"),
+    }
+    return {"conditional_ic": cond, "evidence": evidence}
 
 
 def _canonical_bytes(payload: Dict[str, Any]) -> bytes:
@@ -176,23 +333,17 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
     rows.sort(key=lambda r: (r["event_id"], r["feature_row_key_ms"]))
     consumed = [r["feature_row_key_ms"] for r in rows if r["row_in_feature_index"] and r["label_value"] is not None]
 
-    ic: Dict[str, Optional[float]] = {}
-    for name in _IC_FEATURES:
-        f = run_dir / "raw" / f"{name}.parquet"
-        if not f.is_file():
-            ic[name] = None
-            continue
-        col = pd.read_parquet(f)
-        s = pd.Series(col[col.columns[0]].to_numpy().astype(np.float64), index=ts)
-        xs, ys = [], []
-        for k in consumed:
-            v = label_by_key.get(k)
-            if v is None or k not in s.index:
-                continue
-            x = float(s.loc[k])
-            if np.isfinite(x) and np.isfinite(v):
-                xs.append(x); ys.append(float(v))
-        ic[name] = None if len(xs) < 3 else float(pd.Series(xs).corr(pd.Series(ys), method="spearman"))
+    # 🔴 B10A 閉合輪 `CODEX-R32-P1-01`：條件 IC **不得**在腳本內自算。
+    #    原本以 `run_dir/raw/<feature>.parquet` 重跑 Spearman ＝ 第二份實作：生產端
+    #    `ICFilterOrchestrator.analyze` 被炸掉、stage3／purge 證據被改壞時，strict 全部假綠
+    #    （實跑：analyze 直接 raise ⇒ 仍 `STRICT PASS`；`purge_rows` 156→155 ⇒ 仍 `STRICT PASS`）。
+    #    改為呼叫**生產端**之 `ICAnalysisService._run_scan_cell`——它自己做 staging、抬 embargo、
+    #    造 analyzer、跑 `analyze`，並套三個注入（三元組回綁／期間對齊／隔離來源）。
+    #    具名偏離：`_run_scan_cell` 恆為報酬版（`label_mode_requested="return_rule"`），
+    #    本批亦為報酬版 ⇒ 與主路徑同解；偏離揭露於 payload 之 `production_evidence.entrypoint`。
+    prod = _production_evidence(
+        symbol, run_tf, ff_run, str(batch["import_id"]), event_batch, run_dir, cfg_override,
+    )
 
     head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True)
     return {
@@ -211,7 +362,8 @@ def _collect(batch_id: str, ff_run: str, config_override: str) -> Dict[str, Any]
         "boundary": boundary,
         "analysis_alignment_receipt_hash": staged["analysis_alignment_receipt_hash"],
         "events": rows,
-        "conditional_ic": ic,
+        "conditional_ic": prod["conditional_ic"],
+        "production_evidence": prod["evidence"],
     }
 
 
@@ -243,7 +395,10 @@ def _write_once(path: Path, payload: Dict[str, Any], authorize: Optional[str]) -
 
 def _diff(a: Dict[str, Any], b: Dict[str, Any]) -> List[str]:
     diffs: List[str] = []
-    for k in ("n_events", "n_consumed", "isolation", "boundary", "analysis_alignment_receipt_hash"):
+    # 🔴 `CODEX-R32-P1-01`：`purge_rows` 原本在 payload 裡卻**不在比對面**
+    #    （實跑：156→155 仍 `STRICT PASS`）；`production_evidence` 為本輪新增之生產端證據。
+    for k in ("n_events", "n_consumed", "isolation", "purge_rows", "boundary",
+              "analysis_alignment_receipt_hash", "production_evidence"):
         if a.get(k) != b.get(k):
             diffs.append(f"{k}: {a.get(k)} → {b.get(k)}")
     ea = {r["event_id"]: r for r in a.get("events", [])}

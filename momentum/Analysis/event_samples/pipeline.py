@@ -335,10 +335,12 @@ class EventSamplePipeline:
         )
 
     @staticmethod
-    def feature_row_keys(prepared, *, feature_timeframe, timeframe_seconds, bars_by_tf=None):
+    def feature_row_keys(prepared, *, feature_timeframe, timeframe_seconds, bars_by_tf):
         """v7 `R5-C9` 之特徵列鍵出口（回 `{event_id: last_bar_open_ms}`，含產出端 PIT 守衛）。
 
         `timeframe_seconds`：注入之週期換算（與 purge／isolation 同一物件），供守衛驗開盤與收盤同一根。
+        `bars_by_tf`：**必填**之真實 K 線（`CODEX-R32-P2-02`）——守衛以它獨立重算「收盤 ≤ 決策之
+        最後一根」並逐值對證；選填會讓省略它成為無守衛之退化路徑。
         """
         from momentum.Analysis.event_samples.label_value_from_case import (
             feature_row_keys as _impl,

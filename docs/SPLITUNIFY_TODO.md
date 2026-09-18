@@ -95,7 +95,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | 100 | B9D | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 110 | B9E | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
 | 120 | B9F | 已完成 | docs/SPLITUNIFY_TODO.md §B | — |
-| 130 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.1 讀取者改指＋Task 10.2 IC 事件特徵列鍵更正 |
+| 130 | SU-B10A | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | r2 修補已交付（12a55c10），待 B10A 閉合輪 r3 判三條 P1 是否閉合 |
 | 140 | SU-B10B | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.3 投影判側錨點改為特徵列鍵＋v10 golden |
 | 150 | SU-B10C | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.4 邊界與標籤參數解析下沉＋逐事件處置帳 |
 | 160 | SU-B10D | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 事件掃描端接線與請求／回應契約 |
@@ -1296,6 +1296,10 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | `M-SU-R5-23` | 事件掃描端另寫標籤參數預設 | `test_case_import_service_has_no_local_spec_defaults` | B10D |
 | `M-SU-R5-24` | 前端不帶 `event_label_spec` | `eventTablesPanelSplitOk.test.tsx` payload 斷言 | B10E |
 | `M-SU-R5-25` | 對證腳本不比逐事件錨點與答案窗 | `splitunify_r5_parity.py` 自證 | B10E |
+| `M-SU-R5-26` | `feature_row_keys` 之 `bars_by_tf` 改回選填（預設 `None`） | `test_bars_are_required_no_guardless_degraded_path` | B10A |
+| `M-SU-R5-27` | 生產端 `analyze` 直接 raise（證明 strict 真的走到它） | `splitunify_ic_event_report_diff.py --mode strict` 自證 | B10A |
+| `M-SU-R5-28` | staging 之 `purge_rows` 位移一根 | 同上（`purge_rows` 已在 `_diff` 比對面） | B10A |
+| `M-SU-R5-29` | 移除 `config_override` 之 `event_filter`（事件分支被關掉） | 同上（`event_filter.mode=none` fail-closed） | B10A |
 
 ---
 
