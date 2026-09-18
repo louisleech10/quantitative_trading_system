@@ -47,7 +47,13 @@ while IFS= read -r fam; do
 done <<EOF
 $(python3 - "${AUDIT}" "${prefix}" <<'PY'
 import json, re, sys
-audit, prefix = sys.argv[1], sys.argv[2].lower()
+audit = sys.argv[1]
+# 🔴 前批可有**多個** review-task 前綴（`prev_review_resolve.sh` 以半形逗號回傳，例
+#    `<ROOT>-B9-REVIEW,<ROOT>-B9-STAMP`——同一批的審碼輪與閉合輪各自一個 root）。
+#    `verdictgate_check.sh` 本來就吃逗號清單，本檢查器原本只吃單一前綴，被餵清單時
+#    整串當一個前綴比對 ⇒ 恆 0 家、quorum 永遠拒發（2026-09-18 實測：兩個前綴分開查各 3 家）。
+#    ⇒ 逗號切開後**任一前綴命中即計入**（家族取聯集）；單一前綴之行為逐字不變。
+prefixes = [p for p in (x.strip().lower() for x in sys.argv[2].split(",")) if p]
 for raw in open(audit, encoding="utf-8").read().splitlines():
     s = raw.strip()
     if not s.startswith("{"):
@@ -57,7 +63,7 @@ for raw in open(audit, encoding="utf-8").read().splitlines():
     except json.JSONDecodeError:
         continue
     ev = r.get("event"); t = (r.get("task_id") or "").lower()
-    if not (t.startswith(prefix) and "review" in t):
+    if not (any(t.startswith(p) for p in prefixes) and "review" in t):
         continue
     if ev == "committee_dispatch":
         print(t.rsplit("-", 1)[-1])

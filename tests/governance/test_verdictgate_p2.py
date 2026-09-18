@@ -314,6 +314,32 @@ def test_quorum_counts_committee_output_families_case_insensitive(tmp_path: Path
     assert r2.returncode == 1
 
 
+def test_quorum_accepts_comma_list_of_prefixes_union_of_families(tmp_path: Path) -> None:
+    """2026-09-18 實測缺陷：`prev_review_resolve.sh` 對「同批有審碼輪＋閉合輪」回**逗號清單**
+    （例 `<ROOT>-B9-REVIEW,<ROOT>-B9-STAMP`），而 quorum 原本只吃單一前綴、把整串當一個前綴比對
+    ⇒ 恆 0 家、`--impl-self` 永遠拿不到 token（兩個前綴分開查各 3 家皆達標）。
+    本條鎖住：逗號清單逐前綴比對、家族取聯集；單一前綴行為不變。"""
+    h = _h(tmp_path)
+    _open(h, "ROOT-B1-REVIEW-R1", "rid1")
+    _out(h, "ROOT-B1-REVIEW-R1", "codex", "proceed", rid="rid1")
+    _open(h, "ROOT-B1-TASK31-REVIEW-R1", "rid2")
+    _out(h, "ROOT-B1-TASK31-REVIEW-R1", "grok", "proceed", rid="rid2")
+    # 單一前綴：各自只有 1 家 ⇒ 不足
+    assert _run(h, "scripts/review_quorum_check.sh", "ROOT-B1-REVIEW", "claude").returncode == 1
+    assert _run(h, "scripts/review_quorum_check.sh", "ROOT-B1-TASK31-REVIEW", "claude").returncode == 1
+    # 逗號清單：聯集 2 家 ⇒ 達標
+    r = _run(h, "scripts/review_quorum_check.sh", "ROOT-B1-REVIEW,ROOT-B1-TASK31-REVIEW", "claude")
+    assert r.returncode == 0 and "2 個" in r.stdout, r.stdout + r.stderr
+    # 實作者仍被排除：implementer=grok ⇒ 聯集只剩 codex 1 家
+    r2 = _run(h, "scripts/review_quorum_check.sh", "ROOT-B1-REVIEW,ROOT-B1-TASK31-REVIEW", "grok")
+    assert r2.returncode == 1
+    # 🔴 既有語意不因本修正而放寬：task_id 不含 `review` 字樣者（例閉合輪 `-STAMP-`）仍不計入
+    _open(h, "ROOT-B1-STAMP-R1", "rid3")
+    _out(h, "ROOT-B1-STAMP-R1", "composer", "proceed", rid="rid3")
+    r3 = _run(h, "scripts/review_quorum_check.sh", "ROOT-B1-STAMP", "claude")
+    assert r3.returncode == 1, r3.stdout + r3.stderr
+
+
 def test_report_cleared_root_not_live(tmp_path: Path) -> None:
     """CODEX-R1-P2-03／GROK-R1-P2-01：最新批 round 已 debt_clear ⇒ 不列 live_roots_unwatched。"""
     h = _h(tmp_path); _open(h, R1, "rid1", brief_kind=None)

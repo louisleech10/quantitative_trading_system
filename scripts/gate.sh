@@ -943,8 +943,11 @@ if [ "${kind}" = "dispatch" ]; then
         #   呼叫點不變、實作＝helper；descoped 批次由 helper 回溯。
         _rq_prev="$(bash "${SCRIPT_DIR}/prev_review_resolve.sh" "${_rq_root}" "${_rq_n}")" || { echo "GATE 拒發 token — prev_review_resolve 失敗"; exit 1; }
         if [ -n "${_rq_prev}" ]; then
-          # review_quorum_check 吃 `<root>-b<K>`（task_id 前綴，不含 -review）；helper 回傳含 -REVIEW 之真前綴 ⇒ 取到 -b<K> 為止
-          _rq_prev_q="$(printf '%s' "${_rq_prev}" | sed -E 's/^(.*-[bB][0-9]+)-.*$/\1/')"
+          # 🔴 2026-09-18 修正：原本以 sed 取到 `-b<K>` 為止，在 helper 回傳**多個**前綴（逗號清單，
+          #   例 `<ROOT>-B9-REVIEW,<ROOT>-B9-STAMP`）時會把整串截成 `<ROOT>-B9-REVIEW,<ROOT>-B9`
+          #   ——那不是任何 task_id 的前綴 ⇒ 恆 0 家、quorum 永遠拒發（實測：分開查各 3 家皆達標）。
+          #   ⇒ 原樣傳清單，由 review_quorum_check 逐前綴比對後取家族聯集（同 verdictgate_check 之慣例）。
+          _rq_prev_q="${_rq_prev}"
           bash "${SCRIPT_DIR}/review_quorum_check.sh" "${_rq_prev_q}" "${_rq_fam}" \
             || { echo "GATE 拒發 token — 前一批 ${_rq_prev_q} 未達 ≥2 非實作者家族 review quorum(codex/composer/grok 任二);見上,補派第二家後再派本批。"; exit 1; }
         else
