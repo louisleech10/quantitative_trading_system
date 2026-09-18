@@ -837,8 +837,8 @@ v9 之七鍵（`g1_membership`／`g1_membership_v9`／`g3b_oracle`／`g3b_oracle
 | `M-SU-D2-24` | 答案窗 purge 仍用逐列 `in_train` | `Task 9.2b` purge 反例 |
 | `M-SU-D2-25` | (3.2) 同側檢查被移到複合鍵唯一 guard 之前 | guard 先後斷言 |
 | `M-SU-D2-26` | `build_event_keys` 以 `event_level.timeframe` 冒充 `feature_timeframe` | `feature_timeframe` 值斷言 |
-| `M-SU-D2-27` | 只改投影判側、不改 `_oracle_membership` | G-3b |
-| `M-SU-D2-28` | 投影與 oracle 同時以 `feature_cutoff_ms` 判側 | (G-4e) 三者全等斷言 |
+| `M-SU-D2-27` | 只改投影判側、不改 `_oracle_membership` | G-3b（靶＝`g1_membership_v10` vs `g3b_oracle_v10`） |
+| `M-SU-D2-28` | 投影與 oracle 同時以 `feature_cutoff_ms` 判側 | (G-4e) 三者全等斷言（靶＝`g4e_hand_expected_membership_v10`） |
 | `M-SU-D2-29` | v8 基準被刪除、覆寫、與旁檔不同步，或主檔既有鍵被換錨值覆蓋 | (G-4d) 之 sha256 相等、`--write` 對 v8 raise、既有鍵逐值閘 |
 | `M-SU-D2-30` | `EventSamplePipeline.run` 略過 `validate_split_pair_integrity`，或空 train 段不 raise | `Task 9.2b` pair 完整性斷言 |
 | `M-SU-D2-31` | `baseline` 只輸出單一 `n_test` | 物化失敗 fixture |

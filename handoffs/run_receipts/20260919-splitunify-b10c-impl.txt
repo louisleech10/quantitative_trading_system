@@ -1,0 +1,88 @@
+SPLITUNIFY B10C（Task 10.4）— 實作與實跑收據
+日期: 2026-09-19
+commits: 41a82ac5（之一：解析下沉）、72bf3f82（之二：處置帳與觀測收據）
+委員：兩家（codex＋composer）；grok CLI 暫停中（402 餘額用罄）
+
+== 交付 ==
+R5-C10（標籤參數單一解析）
+  momentum/Analysis/event_samples/event_label_spec_resolution.py（新）
+  - 值域由契約導出（不手刻）；深度宣告批次 receipt 優先、逐列欄為退路；
+    預設依宣告深度選持有／當根；混週期批不猜、回當根並揭露；四鍵補齊。
+  - 錯誤以 EventLabelSpecError(kind, message) 表達，不 import api/。
+  api/routes/ic_analysis.py：_resolve_event_batch 改為「查 records ＋ 呼叫共用出口 ＋
+    HTTP 映射」；內嵌那份解析全數移除（grep 殘留 0）。
+  🔴 422 之 kind 字面與回應形狀逐位元組不變 ⇒ 既有 test_gap3_ic_event_label_defaults.py
+    30 條全過即為證據。
+
+R5-C1／R5-C2（canonical 邊界單一解析）
+  momentum/Analysis/event_samples/canonical_holdout.py（新）
+  - config_hash + symbol 定位 run（多命中 fail-closed）；只讀 timestamps.parquet 建
+    post-trim 索引（不載特徵矩陣——本 run raw/ 7.5 GB，載入即 OOM）；
+    embargo 由宣告深度抬高；plan 由生產端 _build_holdout_split_plan 建立。
+  - 邊界①切分關閉 ⇒ canonical_holdout_disabled；②列數不足 ⇒ canonical_holdout_insufficient_rows。
+
+R5-C8 1.–4.（逐事件處置帳）
+  momentum/Analysis/contracts/split_unify.json 新增 event_disposition_values（封閉值集）。
+  momentum/Analysis/event_samples/event_disposition.py（新）
+  - 每個 event_id 恰一列（重複 fail-closed）；判定順序 對齊 → run symbol → coverage →
+    label 值 → 特徵列；掃描端另於 coverage 後判 outside_post_trim_index；
+    excluded_by_symbol 由帳導出、不另算。
+  - 🔴 R5-C8 6.：ic_disposition 為入口之**預測**，不讀 stage3；以函式簽名為機械判準釘住。
+
+R5-C8 7.（stage3 觀測收據）
+  ic_filter_orchestrator：事件路徑產出逐 event_id 觀測收據（event_id／feature_row_open_ms／
+  observed），取自 stage3 實際交集；建構期安全預設＋analyze 入口歸零（與既有 analyze-scoped
+  狀態同一段）；**不寫入報告**。
+  🔴 既有同類狀態之慣例本身不一致（_stage_timings 無建構期預設、_binary_label_window_bars 有）；
+     本次選較安全的一邊並由測試釘住。
+
+momentum/factories.py：新增 create_event_label_spec_resolver、create_canonical_holdout_resolver。
+
+== 🔴 實測確認之既有危害 ==
+同一 config_hash **真的**跨三個幣種存在：
+  data_cache/features/BCHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5
+  data_cache/features/BTCUSDT/1h/4a8a0b3726cc906ab3534994605e77f5
+  data_cache/features/ETHUSDT/1h/4a8a0b3726cc906ab3534994605e77f5
+不篩 symbol 取首個命中即拿到別的幣種之 run（B10A 實際踩過）。
+已由 test_same_config_hash_across_symbols_requires_symbol_filter 釘住（不篩即 fail-closed）。
+
+== 新增測試（四檔）==
+tests/momentum/event_samples/test_event_label_spec_resolution.py        10 條
+tests/momentum/Analysis/test_splitunify_canonical_holdout.py             8 條
+tests/momentum/event_samples/test_event_disposition_ledger.py            7 條
+tests/momentum/Analysis/test_splitunify_stage3_observation.py            4 條
+清單指定之具名條目皆已落地：
+  test_canonical_holdout_matches_ic_build_holdout_split_plan（row_index ＋ row_time_fingerprint 逐值）
+  test_canonical_holdout_cross_tf_per_tf_has_run_timeframe
+  test_scan_disposition_outside_post_trim_index
+  test_disposition_values_read_from_contract（手打值即紅）
+  test_boundary_event_ledger_predicts_feature_row_not_in_feature_index（前提不成立即 fail）
+  test_event_label_spec_absent_matches_ic／test_event_label_spec_k1_h6_matches_ic
+  test_resolver_out_of_domain_k_maps_to_422_same_kind
+  test_stage3_receipt_reset_per_analyze_and_absent_from_report
+
+== mutation 自證（改壞→轉紅→還原→回綠）==
+基準 sha：event_disposition.py=7e6ded55b22ee0c1  canonical_holdout.py=64f1722c4dd3d258
+          freeze_splitunify_golden.py=86a3ea756e0f207f
+  M0 未竄改                                        → 45 passed
+  M-SU-R5-21 處置帳改以 feature_cutoff_ms 預測      → 2 failed / 5 passed
+  M-SU-R5-10 bars 只載觸發週期                      → 1 failed / 7 passed
+  M-SU-R5-13 略過 post-trim 首尾剔除                → 1 failed / 6 passed
+  M-SU-D2-27（**已改靶 v10**）oracle 不跟著換錨      → 6 failed / 24 passed
+  還原後                                            → 45 passed，三檔 sha 與改前逐值相同
+🔴 M-SU-D2-27／28 之靶已由 v9 改指 v10 鍵（SPEC §G mutation 表同步）——
+   v9 自 Task 10.3 起不再重算，靶留在 v9 會永遠不轉紅＝假綠（COMPOSER-R38-P2-02）。
+
+== 回歸 ==
+八檔 223 passed；GOLDEN OK；
+strict 逐鍵 diff 為空（report_contract_digest 未變 ⇒ 觀測收據確實沒寫進報告，§G-1 前提保住）；
+check_decoupling_imports 計數與 HEAD 相同（R2=1 R3=17 R4=3，既有紅，新模組零違規）。
+
+== 殘留（交 B10C 審碼輪）==
+R1 service 端（_run_event_label_stages）尚未改呼叫 canonical_holdout／event_disposition；
+   目前兩支新模組已上線並由測試覆蓋，但 IC 主路徑仍走原本的內嵌邏輯。
+   理由＝blocked-by（接線屬 Task 10.5 之工作面；本 Task 之交付是「單一入口存在且可被呼叫」）。
+R2 清單之驗收命令列 --baseline ...post_task_10_2.json，而 B10A r3 後 strict 之比對面已改
+   （新增 production_evidence／report_contract_digest），該基準缺這些鍵。
+   實際使用 prod_task_10_4.json。理由＝needs-research（清單條文與實作漂移，交委員裁是否重出）。
+R3 grok CLI 暫停中。理由＝blocked-by（外部帳務）。
