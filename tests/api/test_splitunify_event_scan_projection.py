@@ -509,6 +509,94 @@ def test_every_input_event_falls_in_exactly_one_partition(batch_key, ff) -> None
     )
 
 
+@pytest.mark.parametrize("case,mutate,expect_substr", [
+    ("duplicate", lambda rs: rs + [dict(rs[0])], "事件身分重複"),
+    ("none_id", lambda rs: [dict(r, event_id=None) if i == 0 else r for i, r in enumerate(rs)],
+     "非字串"),
+    ("int_id", lambda rs: [dict(r, event_id=123456789) if i == 0 else r for i, r in enumerate(rs)],
+     "非字串"),
+    ("blank_id", lambda rs: [dict(r, event_id="  ") if i == 0 else r for i, r in enumerate(rs)],
+     "空字串"),
+])
+def test_partition_gate_rejects_malformed_identity(case, mutate, expect_substr, monkeypatch) -> None:
+    """🔴 `CODEX-R4-P1-01`：守恆閘對**身分不合契約**之輸入 fail-closed。
+
+    首版把 records 直接降成 set 再比對 ⇒ 四個方向 fail-open（提出方實跑皆 HTTP 200）：
+    重複 `event_id` 被 set 折疊、`None` 變成字面 `"None"`、整數變成 `"123456789"`、
+    空字串照收。這些值還會**原樣出現在回應**，使用者看到的是一份「成功」的報告。
+    鑑別力：把 `_assert_event_partition_conserved` 之身分檢查拿掉 ⇒ 四個 case 皆轉綠。
+    """
+    _require(COV_BATCH_FILE, RUN_1H_SHORT, KLINE)
+    import copy as _copy
+
+    import api.services.case_import_service as svc_mod
+
+    batch_id = json.loads(COV_BATCH_FILE.read_text(encoding="utf-8"))["import_id"]
+    svc = svc_mod.get_event_import_service()
+    real_get = svc.get_import
+
+    def _patched(iid):
+        d = real_get(iid)
+        if d is None or iid != batch_id:
+            return d
+        d2 = _copy.deepcopy(d)
+        d2.records = mutate([dict(r) for r in d2.records])
+        return d2
+
+    monkeypatch.setattr(svc, "get_import", _patched)
+    r = client.post(f"/api/v1/case/events/{batch_id}/analyze",
+                    json={"horizons": [1], "feature_run": {
+                        "symbol": SYM, "timeframe": TF, "config_hash": FF_RUN_SHORT}})
+    assert r.status_code == 422, f"{case}: 應被擋下，實得 HTTP {r.status_code}"
+    assert expect_substr in str(r.json()["detail"]["message"]), (
+        f"{case}: 訊息未指出原因——{r.json()['detail']['message'][:120]}"
+    )
+
+
+def test_partition_gate_rejects_ghost_ids() -> None:
+    """🔴 `CODEX-R4-P1-01`：分區裡出現**不存在於輸入**之 `event_id` ⇒ fail-closed。
+
+    首版只算 `_all_input - _union`（未歸戶），沒算 `_union - _all_input` ⇒ 幽靈 ID
+    被當成「已處置」（提出方實跑注入 `GHOST:12h:0` ⇒ HTTP 200 且它出現在剔除清單）。
+    兩個方向都要算：少算一邊，守恆就只守了一半。
+    """
+    from api.services.case_import_service import _assert_event_partition_conserved
+
+    with pytest.raises(ValueError) as ei:
+        _assert_event_partition_conserved(
+            records=[{"event_id": "A"}, {"event_id": "B"}],
+            partitions={"projected": ["A", "B"], "dropped_by_coverage": ["GHOST:12h:0"]},
+        )
+    assert "不在輸入卻被歸戶" in str(ei.value), str(ei.value)[:160]
+
+
+def test_partition_gate_runs_on_unavailable_branch(monkeypatch) -> None:
+    """🔴 `CODEX-R4-P1-01`：`holdout.reason` 支線**也要**過守恆閘。
+
+    該分支直接 `return`，閘擺在它後面等於「沒有邊界的請求不受守恆約束」——
+    而那條路徑照樣把三份揭露回給使用者。
+    鑑別力：把閘移回 `return` 之後 ⇒ 呼叫次數變 0，本條轉紅。
+    """
+    _require(COV_BATCH_FILE, RUN_1H_SHORT, KLINE)
+    import api.services.case_import_service as svc_mod
+
+    calls = {"n": 0}
+    real = svc_mod._assert_event_partition_conserved
+
+    def _spy(**kw):
+        calls["n"] += 1
+        return real(**kw)
+
+    monkeypatch.setattr(svc_mod, "_assert_event_partition_conserved", _spy)
+    batch_id = json.loads(COV_BATCH_FILE.read_text(encoding="utf-8"))["import_id"]
+    out = _post({"horizons": [1],
+                 "feature_run": {"symbol": SYM, "timeframe": TF, "config_hash": FF_RUN_SHORT},
+                 "config_override": {"ic_train_test_split": False}},
+                batch_id=batch_id)
+    assert out["capability"]["reason"] == "canonical_holdout_disabled"
+    assert calls["n"] == 1, f"unavailable 支線未經守恆閘（呼叫 {calls['n']} 次）"
+
+
 @pytest.mark.parametrize("batch_key,ff_run", [
     ("BATCH", FF_RUN_SHORT), ("MULTI", FF_RUN), ("COV", FF_RUN_SHORT),
 ], ids=["post_trim", "multi_symbol", "partial_coverage"])

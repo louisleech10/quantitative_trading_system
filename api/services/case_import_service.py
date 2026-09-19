@@ -1840,6 +1840,21 @@ class EventImportService:
             },
             "post_trim_index_bounds_ms": [lo, hi],
         }
+        # 🔴 **分區守恆閘**（`CODEX-R3-P1-01` 建立、`CODEX-R4-P1-01` 補強）。
+        #    🔴 位置在 `holdout.reason` 之**前**：該分支直接 `return`，閘擺在它後面就等於
+        #    「沒有邊界的請求不受守恆約束」——而那條路徑照樣回三份揭露給使用者。
+        _assert_event_partition_conserved(
+            records=records,
+            partitions={
+                "dropped_in_alignment": dropped_in_alignment,
+                "dropped_by_coverage": dropped_by_coverage,
+                "dropped_outside_post_trim_index": dropped_outside_index,
+                "excluded_by_symbol": [
+                    str(e) for slot in excluded_by_symbol.values() for e in slot["event_ids"]
+                ],
+                "projected": sorted(allowed),
+            },
+        )
         # ── `R5-C3` 5.：run 正確但依 IC 設定沒有 canonical 邊界 ⇒ 具名 unavailable ──
         if holdout.reason is not None:
             return sanitize_for_json(self._projection_unavailable_payload(
@@ -1862,35 +1877,6 @@ class EventImportService:
             raise ValueError(
                 f"投影輸入筆數（{len(projected_records)}）與存活事件數（{len(allowed)}）不符"
                 "——records 與對齊窗之 event_id 對不上（fail-closed，不半套投影）"
-            )
-        # 🔴 **分區守恆閘**（`CODEX-R3-P1-01`）：每個輸入事件恰落**一個**具名分區
-        #    （對齊失敗／coverage／post-trim／他 symbol／存活）。筆數守恆擋不住
-        #    「某一步靜默吃掉事件」——那正是本 finding 的形態：12 筆既不在任何清單、
-        #    也不在 `align_failures`，而 HTTP 仍回 200。
-        #    🔴 用**集合**而非計數：等量錯置（A 分區多一個、B 分區少一個）在計數下看不出來。
-        _partitions = {
-            "dropped_in_alignment": set(dropped_in_alignment),
-            "dropped_by_coverage": set(dropped_by_coverage),
-            "dropped_outside_post_trim_index": set(dropped_outside_index),
-            "excluded_by_symbol": {
-                str(e) for slot in excluded_by_symbol.values() for e in slot["event_ids"]
-            },
-            "projected": set(allowed),
-        }
-        _all_input = {str(r.get("event_id")) for r in records}
-        _union: set = set()
-        _overlaps: Dict[str, set] = {}
-        for _name, _ids in _partitions.items():
-            if _union & _ids:
-                _overlaps[_name] = _union & _ids
-            _union |= _ids
-        _unaccounted = _all_input - _union
-        if _unaccounted or _overlaps:
-            raise ValueError(
-                f"事件分區不守恆（輸入 {len(_all_input)} 筆）："
-                f"未歸戶 {sorted(_unaccounted)[:5]}（共 {len(_unaccounted)}）；"
-                f"重複歸戶 { {k: sorted(v)[:3] for k, v in _overlaps.items()} }"
-                "——每個事件須恰落一個具名分區（fail-closed）"
             )
         res = pipe.run_projection_with_params(
             projected_records, bars,
@@ -1986,6 +1972,71 @@ class EventImportService:
             "excluded_by_symbol": excluded_by_symbol,
             "event_label_spec": {"spec": spec},
         })
+
+
+def _assert_event_partition_conserved(*, records, partitions: Dict[str, List[str]]) -> None:
+    """投影路徑之**分區守恆閘**：每個輸入事件恰落一個具名分區。
+
+    🔴 `CODEX-R3-P1-01` 建立本閘（12 筆對齊失敗者未歸戶而 HTTP 仍 200）；
+    `CODEX-R4-P1-01` 實跑指出首版**四個方向 fail-open**，逐一封住：
+
+    ① **重複 `event_id`**：原版把 records 直接降成 set，重複被折疊 ⇒ 多一筆假事件
+       進來完全看不見（實跑 `records.append(deepcopy(records[i]))` ⇒ HTTP 200）。
+       ⇒ 改以 `Counter` 驗身分唯一。
+    ② **`None`／非字串 `event_id`**：原版 `str(r.get("event_id"))` 把 `None` 變成字面
+       `"None"`、把 `123456789` 變成 `"123456789"`，兩者都成了合法 ID
+       （實跑皆 HTTP 200，且該值原樣出現在回應）。⇒ 型別與空值先拒。
+    ③ **`_union - _all_input`（幽靈 ID）**：原版只算 `_all_input - _union`
+       ⇒ 把**不存在於輸入**的事件當成已處置（實跑注入 `GHOST:12h:0` ⇒ HTTP 200
+       且它出現在 coverage 剔除清單）。⇒ 兩個方向都要算。
+    ④ **`holdout.reason` 支線**：呼叫端已把本閘移到該 `return` 之前。
+
+    🔴 用集合＋計數兩層：集合抓錯置與幽靈，計數抓重複——單用任一層都有洞。
+    """
+    seen = {}
+    bad_type, empties = [], 0
+    for idx, row in enumerate(records):
+        raw = row.get("event_id") if isinstance(row, dict) else None
+        if raw is None or not isinstance(raw, str):
+            bad_type.append(f"[{idx}]={raw!r}")
+            continue
+        eid = raw.strip()
+        if not eid:
+            empties += 1
+            continue
+        seen[eid] = seen.get(eid, 0) + 1
+    if bad_type or empties:
+        raise ValueError(
+            f"事件身分不合契約：非字串 {bad_type[:5]}（共 {len(bad_type)}）、"
+            f"空字串 {empties} 筆——`event_id` 須為非空字串（fail-closed）"
+        )
+    dupes = {e: n for e, n in seen.items() if n > 1}
+    if dupes:
+        raise ValueError(
+            f"事件身分重複：{sorted(dupes)[:5]}（共 {len(dupes)} 個 ID）"
+            "——同一 `event_id` 出現多次時分區守恆不可判定（fail-closed）"
+        )
+
+    all_input = set(seen)
+    union: set = set()
+    overlaps: Dict[str, List[str]] = {}
+    for name, ids in partitions.items():
+        current = set(ids)
+        if len(current) != len(list(ids)):
+            raise ValueError(f"分區 {name!r} 內有重複 `event_id`（fail-closed）")
+        if union & current:
+            overlaps[name] = sorted(union & current)[:5]
+        union |= current
+    unaccounted = sorted(all_input - union)
+    ghosts = sorted(union - all_input)
+    if unaccounted or ghosts or overlaps:
+        raise ValueError(
+            f"事件分區不守恆（輸入 {len(all_input)} 筆）："
+            f"未歸戶 {unaccounted[:5]}（共 {len(unaccounted)}）；"
+            f"不在輸入卻被歸戶 {ghosts[:5]}（共 {len(ghosts)}）；"
+            f"重複歸戶 {overlaps}"
+            "——每個事件須恰落一個具名分區（fail-closed）"
+        )
 
 
 _event_import_service: Optional[EventImportService] = None
