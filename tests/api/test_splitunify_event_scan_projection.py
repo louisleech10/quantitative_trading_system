@@ -30,6 +30,20 @@ KLINE = REPO / "data_cache/feature_klines/kline_cache.h5"
 SYM, TF, FF_RUN = "ETHUSDT", "1h", "4a8a0b3726cc906ab3534994605e77f5"
 FEATURE_RUN = {"symbol": SYM, "timeframe": TF, "config_hash": FF_RUN}
 
+# 🔴 **短 run**：post-trim 索引較窄，本批恰有 1 筆事件之錨點落在其外
+#    ⇒ 這是邊界③「批內 1 筆界外 ⇒ 成功並揭露」唯一能在真實資料上觸發的組合。
+#    預設長 run 上兩個剔除計數皆為 0，用它寫的揭露測試攔不住任何東西。
+FF_RUN_SHORT = "5ea074390e98405cb83d602fe7b7fb00"
+RUN_1H_SHORT = REPO / f"data_cache/features/ETHUSDT/1h/{FF_RUN_SHORT}"
+
+# 🔴 **真實混 symbol 批**（BTCUSDT＋ETHUSDT）：`excluded_by_symbol` 唯一能非空之來源。
+MULTI_BATCH_FILE = REPO / "data_cache/events/20260902T124358Z-ef2c6cd1.json"
+
+# 🔴 **能產生「部分」coverage 剔除之真實組合**（實掃全部批×run 後取得）：
+#    本批 × 短 run ⇒ `dropped_by_coverage` 非零。沒有它，「兩份剔除清單互斥」
+#    那條守衛在所有測試下都碰不到（空集合交集恆為空），mutation 會存活。
+COV_BATCH_FILE = REPO / "data_cache/events/20260906T105851Z-8cc44eea.json"
+
 client = TestClient(app)
 
 
@@ -43,8 +57,12 @@ def _batch_id() -> str:
     return json.loads(BATCH_FILE.read_text(encoding="utf-8"))["import_id"]
 
 
-def _post(body: dict, *, expect: int = 200) -> dict:
-    r = client.post(f"/api/v1/case/events/{_batch_id()}/analyze", json=body)
+def _multi_batch_id() -> str:
+    return json.loads(MULTI_BATCH_FILE.read_text(encoding="utf-8"))["import_id"]
+
+
+def _post(body: dict, *, expect: int = 200, batch_id: str = "") -> dict:
+    r = client.post(f"/api/v1/case/events/{batch_id or _batch_id()}/analyze", json=body)
     assert r.status_code == expect, f"HTTP {r.status_code}: {r.text[:400]}"
     return r.json()
 
@@ -319,31 +337,109 @@ def test_ic_route_and_scan_route_share_the_same_spec_error_kinds() -> None:
 def test_analyze_multi_symbol_discloses_exclusion() -> None:
     """🔴 `R5-C4` 2.：他 symbol 之事件於投影前排除，且**揭露** symbol、事件數與 ID。
 
-    鑑別力：靜默排除（不寫 `excluded_by_symbol`）⇒ 本條轉紅。使用者會看到一份
-    「少了一半事件」卻沒說為什麼的報告。
+    🔴 **用真實混 symbol 批**（`COMPOSER-R1-P2-02`）：原本用全 ETHUSDT 批，
+    `excluded_by_symbol` 恆為 `{}` ⇒ 把它整個改成 `{}` 測試仍綠（該家實跑證明）。
+    「斷言沒寫錯，是用例沒把會觸發的資料放進來」——空集合上的全稱斷言恆真。
+    鑑別力：靜默排除（payload 之 `excluded_by_symbol` 改 `{}`）⇒ 本條轉紅。
     """
-    _require(BATCH_FILE, RUN_1H, KLINE)
-    out = _analyze_projection()
-    assert out["excluded_by_symbol"] is not None, "缺 excluded_by_symbol 揭露欄"
-    for sym, slot in out["excluded_by_symbol"].items():
+    _require(MULTI_BATCH_FILE, RUN_1H, KLINE)
+    out = _post({"horizons": [1], "feature_run": FEATURE_RUN}, batch_id=_multi_batch_id())
+    ex = out["excluded_by_symbol"]
+    assert ex, "混 symbol 批之 excluded_by_symbol 為空——他 symbol 被靜默排除"
+    assert set(ex) == {"BTCUSDT"}, f"排除清單之 symbol 不如預期：{sorted(ex)}"
+    for sym, slot in ex.items():
         assert sym != SYM, "run symbol 自己不該出現在排除清單"
-        assert int(slot["count"]) == len(slot["event_ids"]), f"{sym} 之計數與 ID 數不符"
+        assert int(slot["count"]) == len(slot["event_ids"]) > 0, f"{sym} 之計數與 ID 數不符"
+    # 被排除者不得出現在投影結果之事件集合內
+    assert out["summary"]["n_test"] > 0
 
 
 def test_analyze_one_event_out_of_range_discloses_event_id() -> None:
-    """🔴 `R5-C4` 1.：coverage 與 post-trim 首尾兩步之剔除各自具名揭露 `event_id`。
+    """🔴 邊界③：批內 **1 筆** post-trim 界外 ⇒ **成功並揭露該 `event_id`**，不是 422。
 
-    兩步界線不同（manifest 區間是裁頭尾**前**），少任一步都會讓合法批在投影內部炸掉
-    而不是被具名剔除。
-    鑑別力：把兩個 ids 清單併成一個計數 ⇒ 本條轉紅（看不出是哪一步剔的）。
+    🔴 **用短 run**（`COMPOSER-R1-P2-02`）：預設長 run 上兩個剔除計數皆為 0，
+    把兩份 ids 清單併成同一份、測試仍綠（該家實跑證明）。本條改打會真的剔掉
+    一筆的 `RUN_1H_SHORT`，並斷言**恰含**該事件。
+    鑑別力：投影改回餵匯入原 records ⇒ `derive_event_split_from_plans` 炸成
+    422 `pipeline_rejected`，本條轉紅（這正是修補前的實際行為）。
     """
-    _require(BATCH_FILE, RUN_1H, KLINE)
-    pa = _analyze_projection()["period_alignment"]
-    for key in ("dropped_by_coverage", "dropped_outside_post_trim_index"):
-        assert key in pa, f"period_alignment 缺 {key}"
-        assert int(pa[key]["count"]) == len(pa[key]["ids"]), f"{key} 之計數與 ID 數不符"
+    _require(BATCH_FILE, RUN_1H_SHORT, KLINE)
+    out = _post({"horizons": [1],
+                 "feature_run": {"symbol": SYM, "timeframe": TF, "config_hash": FF_RUN_SHORT}})
+    pa = out["period_alignment"]
+    assert out["capability"]["split"] == "ok", "界外 1 筆應仍成功切分（邊界③）"
+    outside = pa["dropped_outside_post_trim_index"]
+    assert outside["count"] == 1 and len(outside["ids"]) == 1, (
+        f"post-trim 界外揭露不是恰 1 筆：{outside}"
+    )
     lo, hi = pa["post_trim_index_bounds_ms"]
     assert isinstance(lo, int) and isinstance(hi, int) and lo < hi
+    # 🔴 兩份清單**必須互斥**：`apply_event_coverage` 不動 `windows`，row-key 若取自
+    #    全量窗，coverage 已剔除者會被再記一次界外（`CODEX-R1-P1-02` 實跑 21/21 同一組）。
+    assert not (set(pa["dropped_by_coverage"]["ids"]) & set(outside["ids"])), (
+        "coverage 與 post-trim 兩份剔除清單重疊——同一事件被記了兩次"
+    )
+    for key in ("dropped_by_coverage", "dropped_outside_post_trim_index"):
+        assert int(pa[key]["count"]) == len(pa[key]["ids"]), f"{key} 之計數與 ID 數不符"
+
+
+def test_coverage_and_post_trim_drop_lists_are_disjoint() -> None:
+    """🔴 `CODEX-R1-P1-02`：coverage 與 post-trim 兩份剔除清單**互斥**，且各自具名。
+
+    🔴 **本條必須用會產生非零 coverage 剔除之真實組合**：`apply_event_coverage`
+    只改 `allowed_event_ids`、**不動 `windows`**，而 `feature_row_keys` 迭代全量窗
+    ⇒ 若不先以 coverage 存活集合過濾，已被 coverage 剔除者會被**再記一次**界外，
+    兩份清單出現同一批 ID（提出方實跑 21/21 同一組）。
+    在 `dropped_by_coverage` 為 0 的批上，本斷言之交集恆為空 ⇒ 守衛沒被執行到，
+    把過濾拿掉 mutation 也會存活（主委實跑證明）。
+
+    鑑別力：把 row-key 之 `if str(k) in allowed` 過濾拿掉 ⇒ 本條轉紅。
+    """
+    _require(COV_BATCH_FILE, RUN_1H_SHORT, KLINE)
+    batch_id = json.loads(COV_BATCH_FILE.read_text(encoding="utf-8"))["import_id"]
+    out = _post({"horizons": [1],
+                 "feature_run": {"symbol": SYM, "timeframe": TF, "config_hash": FF_RUN_SHORT}},
+                batch_id=batch_id)
+    pa = out["period_alignment"]
+    cov_ids = set(pa["dropped_by_coverage"]["ids"])
+    out_ids = set(pa["dropped_outside_post_trim_index"]["ids"])
+    assert cov_ids, "本條前提不成立：該組合未產生任何 coverage 剔除，守衛碰不到"
+    assert not (cov_ids & out_ids), (
+        f"兩份剔除清單重疊 {len(cov_ids & out_ids)} 筆——已被 coverage 剔除者被再記一次界外"
+    )
+    for key in ("dropped_by_coverage", "dropped_outside_post_trim_index"):
+        assert int(pa[key]["count"]) == len(pa[key]["ids"]), f"{key} 之計數與 ID 數不符"
+
+
+def test_projection_consumes_only_surviving_events() -> None:
+    """🔴 `CODEX-R1-P1-01`／`COMPOSER-R1-P1-01`：投影**只吃存活事件**，不吃匯入原列表。
+
+    `pipeline.run` 會對傳入之 records 重跑 `_prepare`；餵原列表等於把 coverage／
+    post-trim／run symbol 三步剔除全部丟掉——「算了但沒用」，而回應上的揭露欄
+    仍照常填，看起來完全正常。
+    鑑別力：把投影輸入改回 `records` ⇒ 短 run 那條轉 422、混 symbol 批之
+    `n_test` 會把他 symbol 一起算進去，本條兩項斷言皆轉紅。
+    """
+    _require(BATCH_FILE, MULTI_BATCH_FILE, RUN_1H, RUN_1H_SHORT, KLINE)
+    # ① 界外事件確實未進投影：投影後之事件時刻集合不含被剔除者之錨點
+    short = _post({"horizons": [1],
+                   "feature_run": {"symbol": SYM, "timeframe": TF, "config_hash": FF_RUN_SHORT}})
+    dropped_ids = set(short["period_alignment"]["dropped_outside_post_trim_index"]["ids"])
+    assert dropped_ids, "本條前提不成立：該 run 未剔除任何事件"
+    n_in = len(json.loads(BATCH_FILE.read_text(encoding="utf-8"))["records"])
+    assert len(short["event_timestamps"]) == n_in - len(dropped_ids), (
+        f"投影後事件數（{len(short['event_timestamps'])}）≠ 匯入數－剔除數"
+        f"（{n_in}－{len(dropped_ids)}）——投影吃到了被剔除的事件"
+    )
+    # ② 他 symbol 事件確實未進投影
+    multi = _post({"horizons": [1], "feature_run": FEATURE_RUN}, batch_id=_multi_batch_id())
+    n_multi = len(json.loads(MULTI_BATCH_FILE.read_text(encoding="utf-8"))["records"])
+    n_excluded = sum(int(v["count"]) for v in multi["excluded_by_symbol"].values())
+    assert n_excluded > 0
+    assert len(multi["event_timestamps"]) == n_multi - n_excluded, (
+        f"投影後事件數（{len(multi['event_timestamps'])}）≠ 匯入數－他 symbol 排除數"
+        f"（{n_multi}－{n_excluded}）——他 symbol 事件進了投影"
+    )
 
 
 def test_analyze_ic_train_test_split_off_reason() -> None:
@@ -401,14 +497,32 @@ def test_case_import_service_has_no_local_spec_defaults() -> None:
     src = (REPO / "api/services/case_import_service.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
     four = {"horizon_bars", "entry_price_semantic", "label_return_mode", "decision_offset_bars"}
+
+    def _is_four_key(node) -> bool:
+        return isinstance(node, ast.Constant) and node.value in four
+
+    def _mentions_four_key(node) -> bool:
+        """子樹內是否出現四鍵之一（字面或下標）。"""
+        return any(_is_four_key(n) for n in ast.walk(node))
+
     hits = []
     for node in ast.walk(tree):
-        # `x.setdefault("<四鍵之一>", ...)`
-        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "setdefault" and node.args
-                and isinstance(node.args[0], ast.Constant) and node.args[0].value in four):
-            hits.append(f"line {node.lineno}: setdefault({node.args[0].value!r}, ...)")
-        # `<四鍵之一> = <字面值>`（賦一個常數即為自寫預設）
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            # ① `x.setdefault("<四鍵>", <預設>)`
+            if (node.func.attr == "setdefault" and node.args and _is_four_key(node.args[0])):
+                hits.append(f"line {node.lineno}: setdefault({node.args[0].value!r}, …)")
+            # ② 🔴 `x.get("<四鍵>", <預設>)`（`COMPOSER-R1-P2-03`：原網只認 ①④，
+            #    這形態實跑證明可繞過）。單引數之 `.get` 不是預設，不算。
+            if (node.func.attr == "get" and len(node.args) >= 2 and _is_four_key(node.args[0])
+                    and isinstance(node.args[1], ast.Constant)):
+                hits.append(f"line {node.lineno}: .get({node.args[0].value!r}, {node.args[1].value!r})")
+        # ③ 🔴 `<含四鍵之運算式> or <常數>`（同上，原網漏）
+        if isinstance(node, ast.BoolOp) and isinstance(node.op, ast.Or):
+            for i, val in enumerate(node.values[:-1]):
+                nxt = node.values[i + 1]
+                if _mentions_four_key(val) and isinstance(nxt, ast.Constant) and nxt.value is not None:
+                    hits.append(f"line {node.lineno}: <…{'／'.join(sorted(four & {c.value for c in ast.walk(val) if _is_four_key(c)}))}…> or {nxt.value!r}")
+        # ④ `<四鍵> = <字面值>`
         if isinstance(node, ast.Assign):
             for tgt in node.targets:
                 if (isinstance(tgt, ast.Name) and tgt.id in four

@@ -1740,14 +1740,19 @@ class EventImportService:
         feature_index = create_post_trim_index_loader()(run_dir)
         index_ms = (feature_index.astype("int64") // 1_000_000).tolist()
         lo, hi = int(index_ms[0]), int(index_ms[-1])
-        prepared_cov = pipe.apply_event_coverage(prepared0, allowed)
-        row_key_by_id = pipe.feature_row_keys(
-            prepared_cov, feature_timeframe=run_tf,
-            timeframe_seconds=timeframe_seconds, bars_by_tf=bars,
-        )
+        # 🔴 `apply_event_coverage` **只改 `allowed_event_ids`、不動 `windows`**，而
+        #    `feature_row_keys` 迭代的是 `prepared.windows` 全量 ⇒ 直接拿它的結果做
+        #    post-trim 判定，會把**已被 coverage 剔除**的事件再記一次界外，兩份揭露清單
+        #    出現同一批 ID（`CODEX-R1-P1-02` 實跑：coverage 21 筆與界外 21 筆為同一組）。
+        #    ⇒ 取鍵後**先以 coverage 存活集合過濾**，兩步之揭露才互斥。
+        row_key_by_id = {
+            str(k): int(v) for k, v in pipe.feature_row_keys(
+                prepared0, feature_timeframe=run_tf,
+                timeframe_seconds=timeframe_seconds, bars_by_tf=bars,
+            ).items() if str(k) in allowed
+        }
         dropped_outside_index = sorted(
-            eid for eid, key in ((str(k), v) for k, v in row_key_by_id.items())
-            if not (lo <= int(key) <= hi)
+            eid for eid, key in row_key_by_id.items() if not (lo <= key <= hi)
         )
         allowed = allowed - frozenset(dropped_outside_index)
 
@@ -1775,10 +1780,16 @@ class EventImportService:
                 f"——不以 event-study-only 冒充成功"
             )
         prepared1 = pipe.apply_event_coverage(prepared0, allowed)
+        # 🔴 **`CODEX-R1-P1-01`／`COMPOSER-R1-P1-01`（兩家獨立命中）**：`prepared1.windows`
+        #    仍是**全量**（`apply_event_coverage` 不動 `windows`）⇒ 隔離列數與投影若吃它，
+        #    前面三步剔除等於「算了但沒用」。本 epic 在 IC 端犯過同一型
+        #    （`CODEX-R1-P1-02`：階段 4 之 purge 只算不用）。
+        #    ⇒ 濾後窗在此一次算出，後續隔離與投影**都只吃它**。
+        allowed_windows = [w for w in prepared1.windows if str(w.event_id) in allowed]
 
         # ── ⑦ canonical 邊界 ＋ 投影 ────────────────────────────────────────────
         iso = pipe.isolation_terms_rows(
-            prepared1.windows,
+            allowed_windows,
             lookahead_bars_declared=resolved.lookahead_bars_declared,
             timeframe_seconds=timeframe_seconds,
             feature_timeframe=run_tf,
@@ -1822,8 +1833,23 @@ class EventImportService:
                 period_alignment=period_alignment, excluded_by_symbol=excluded_by_symbol,
             ))
 
+        # 🔴 **投影只餵存活事件**（`CODEX-R1-P1-01`／`COMPOSER-R1-P1-01`）：
+        #    `pipeline.run` 會對傳入之 records **重跑一次 `_prepare`**；餵匯入原列表等於
+        #    把 coverage／post-trim／run symbol 三步剔除全部丟掉。實跑後果有二：
+        #      ①`mismatch_count=165`（投影面與分析面完全不同一批）；
+        #      ②批內 1 筆 post-trim 界外時 `derive_event_split_from_plans` 直接炸成
+        #        `422 pipeline_rejected`，而邊界③要的是**成功並揭露**。
+        #    🔴 不得改成「投影內把界外當第四側別」——C-4 步驟 0 明令禁止。
+        projected_records = [
+            r for r in records if str(r.get("event_id")) in allowed
+        ]
+        if len(projected_records) != len(allowed):
+            raise ValueError(
+                f"投影輸入筆數（{len(projected_records)}）與存活事件數（{len(allowed)}）不符"
+                "——records 與對齊窗之 event_id 對不上（fail-closed，不半套投影）"
+            )
         res = pipe.run_projection_with_params(
-            records, bars,
+            projected_records, bars,
             train_plan=holdout.train_plan, test_plan=holdout.test_plan,
             feature_index=holdout.feature_index,
             universe_timeframe=run_tf, selected_timeframe=run_tf,
