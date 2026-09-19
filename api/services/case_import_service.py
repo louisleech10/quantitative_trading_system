@@ -1994,48 +1994,58 @@ def _assert_event_partition_conserved(*, records, partitions: Dict[str, List[str
     🔴 用集合＋計數兩層：集合抓錯置與幽靈，計數抓重複——單用任一層都有洞。
     """
     # 🔴 `CODEX-R5-P1-01`：**身分規則之權威在契約，分析端不得自立**。
-    #    首版以 `.strip()` 自行定義 ID ⇒ ①把帶空白之原始 ID 與已正規化之分區誤判為同一個
-    #    （實跑 `HTTP_PADDED_RECORD_NORMALIZED_PARTITION 200 accepted`）；
-    #    ②`event_id="A"` 在分析端 200，而同一列在契約之 canonical 模式被判 `type_error`。
-    #    ⇒ 改為**逐字 exact identity**（不 strip、不轉型）＋ 直接對證契約公式。
-    #    實測全部落檔批 1664 筆事件**零例外**符合該公式（含 `platform_random_bars`），
-    #    故不需 provenance 分流；日後若出現合法例外，改法是在**契約**登記，不是在此放寬。
-    from momentum.factories import create_event_id_canonicalizer
-
-    canonical_event_id = create_event_id_canonicalizer()
-
+    #    首版以 `.strip()` 自行定義 ID ⇒ 把帶空白之原始 ID 與已正規化之分區誤判為同一個
+    #    （提出方實跑 `HTTP_PADDED_RECORD_NORMALIZED_PARTITION 200 accepted`）。
+    #    ⇒ 改為**逐字 exact identity**：不 strip、不轉型、不改寫。
+    #    帶空白之 ID 由下方**雙向差集**擋下（原始值未歸戶、分區值成幽靈），不需另立規則。
+    #
+    # 🔴 `CODEX-R6-P1-01`：本處**不得**對證 canonical 公式（主委 r5 判錯，此處記明）。
+    #    r5 主委以「全部落檔批 1664 筆零例外」為由，在此加了公式對證。該推論錯在
+    #    **只測了既有落檔資料、沒測產生器路徑**：
+    #      ①`event_import_contract.json` 之 `_event_id_template_doc` 逐字寫著
+    #        「僅**使用者宣告之匯入批次**強制……平台產生器之 ID 另帶 label 後綴，
+    #        **不受此約束**」；
+    #      ②`momentum/Analysis/event_samples/generator.py:224` 產生
+    #        `{symbol}:{tf}:{t0}:{label_id}` 形狀（例 `ETHUSDT:12h:1738843200000:up1`），
+    #        提出方實跑 41 列、`suffix_all=True`，送進本閘全數被誤擋。
+    #    ⇒ canonical 形式之強制**需要 provenance**（`event_id_source`），而該欄在落檔
+    #      receipt 與契約內皆不存在 ⇒ 屬匯入時之職責，不在守恆閘重判。
+    #      具名殘留見 `Task 10.5` 之驗證段。
+    # 🔴 `CODEX-R6-P2-01`：入口契約須完整——首版只驗 `records` 之型別，
+    #    `partitions=None` 會冒 `AttributeError`（未受控），空輸入則靜默 ACCEPT。
+    #    空批走到投影路徑本身就是缺陷（上游已有 zero-survivor 閘），在此當成
+    #    「沒有事件也算守恆」會讓那道閘壞掉時無人察覺。
     if not isinstance(records, (list, tuple)):
         raise ValueError(
             f"守恆閘之 `records` 須為序列，實得 {type(records).__name__}（fail-closed）"
         )
+    if not isinstance(partitions, dict):
+        raise ValueError(
+            f"守恆閘之 `partitions` 須為 dict，實得 {type(partitions).__name__}（fail-closed）"
+        )
+    if not records:
+        raise ValueError(
+            "守恆閘收到空 `records`——投影路徑不應在零事件下被呼叫"
+            "（零事件之受控拒絕在上游；此處放行等於讓那道閘壞掉時無人察覺）"
+        )
     seen: Dict[str, int] = {}
-    bad_type, non_canonical = [], []
+    bad_type = []
     for idx, row in enumerate(records):
         if not isinstance(row, dict):
             bad_type.append(f"[{idx}] 非 dict={type(row).__name__}")
             continue
         raw = row.get("event_id")
-        if not isinstance(raw, str) or not raw:
+        # 🔴 純空白**視為無效**，但這是**驗證**不是改寫：比對一律用 `raw` 逐字，
+        #    `strip()` 只用於判斷「這是不是一個有內容的 ID」，其結果不進任何集合。
+        #    兩者的差別正是 `CODEX-R5-P1-01`：改寫會抹平真實不一致，驗證不會。
+        if not isinstance(raw, str) or not raw.strip():
             bad_type.append(f"[{idx}]={raw!r}")
-            continue
-        try:
-            expected = canonical_event_id(row.get("symbol"), row.get("timeframe"), int(row.get("t0")))
-        except (TypeError, ValueError):
-            bad_type.append(f"[{idx}] symbol／timeframe／t0 無法組成 ID")
-            continue
-        if raw != expected:
-            non_canonical.append(f"[{idx}] {raw!r}≠{expected!r}")
             continue
         seen[raw] = seen.get(raw, 0) + 1
     if bad_type:
         raise ValueError(
             f"事件身分不合契約：{bad_type[:5]}（共 {len(bad_type)}）"
-            "——`event_id` 須為非空字串且該列須可組成契約 ID（fail-closed）"
-        )
-    if non_canonical:
-        raise ValueError(
-            f"事件身分不符契約公式：{non_canonical[:3]}（共 {len(non_canonical)}）"
-            "——`event_id` 只由 symbol／timeframe／t0 決定（D-2），分析端不得自訂或改寫"
+            "——`event_id` 須為非空字串（fail-closed）"
         )
     dupes = {e: n for e, n in seen.items() if n > 1}
     if dupes:

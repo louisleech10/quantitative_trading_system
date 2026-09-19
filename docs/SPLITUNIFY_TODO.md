@@ -1230,7 +1230,11 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
     - `test_scan_calls_shared_resolver_once`（factories 出口 spy；與同請求 IC route 之解析結果逐鍵相等）
     - `test_case_import_service_has_no_local_spec_defaults`（AST 掃 `api/services/case_import_service.py`：四鍵之 `setdefault` 或預設值字面即紅）
     - `test_route_response_contains_four_new_keys`
+    - `test_every_input_event_falls_in_exactly_one_partition`（三組真實組合；每個輸入事件恰落一個具名分區，聯集無重疊且聯集∪投影＝全輸入）
+    - `test_partition_gate_uses_exact_identity_without_rewriting`（守恆比對前不得改寫身分；帶空白之 ID 由雙向差集擋下）
+    - `test_partition_gate_accepts_platform_generated_suffix_ids`（平台產生器之 label 後綴 ID 不得被誤擋）
   - mutation 自證：`M-SU-R5-22` 投影改用匯入原值對齊 ⇒ `..._matches_ic_windows` 轉紅；`M-SU-R5-23` 事件掃描端自寫預設 ⇒ AST 那條轉紅；`M-SU-R5-11` 回應模型不宣告新欄 ⇒ route 那條轉紅
+- **具名殘留**：分區守恆閘**不重判 `event_id` 之 canonical 形式**。理由為 `blocked-by`：契約之 `_event_id_template_doc` 逐字寫「僅**使用者宣告之匯入批次**強制……平台產生器之 ID 另帶 label 後綴，**不受此約束**」，故重判須先知道該批之 provenance，而 `event_id_source` 欄在落檔 receipt 與契約內**皆不存在**。⇒ canonical 形式之強制留在匯入時（`EventSamplePipeline.validate` 開 `enforce_canonical_event_id`）；守恆閘只做 exact identity、唯一性、型別與雙向差集。日後若要在分析端重判，前置條件是先在**契約**登記 provenance 欄，不得在分析端自訂寬鬆版本。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`R-3`（UAT）只新增 UAT 條目，不改本接線。
 

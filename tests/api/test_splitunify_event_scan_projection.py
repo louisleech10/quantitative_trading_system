@@ -517,7 +517,7 @@ def test_every_input_event_falls_in_exactly_one_partition(batch_key, ff) -> None
      "身分不合契約"),
     # 🔴 空白字串現由**契約公式對證**擋下（不再 strip 後判空）——訊息字面隨之改變。
     ("blank_id", lambda rs: [dict(r, event_id="  ") if i == 0 else r for i, r in enumerate(rs)],
-     "不符契約公式"),
+     "身分不合契約"),
 ])
 def test_partition_gate_rejects_malformed_identity(case, mutate, expect_substr, monkeypatch) -> None:
     """🔴 `CODEX-R4-P1-01`：守恆閘對**身分不合契約**之輸入 fail-closed。
@@ -569,14 +569,15 @@ def _ok_rows():
     ]
 
 
-def test_partition_gate_identity_authority_is_the_contract() -> None:
-    """🔴 `CODEX-R5-P1-01`：身分規則之權威在**契約**，分析端不得自立。
+def test_partition_gate_uses_exact_identity_without_rewriting() -> None:
+    """🔴 `CODEX-R5-P1-01`：守恆比對之前**不得對身分做任何改寫**。
 
-    首版以 `.strip()` 自訂 ID，兩個後果（提出方實跑）：
-      ①帶空白之原始 ID 與已正規化之分區被誤判為同一個 ⇒ 真正的不一致被遮蔽；
-      ②`event_id="A"` 在分析端 200，而同一列在契約之 canonical 模式被判 `type_error`。
-    ⇒ 改為逐字 exact identity ＋ 直接對證 `canonical_event_id`。
-    鑑別力：把契約對證拿掉（只留非空字串檢查）⇒ 本條兩個 case 皆轉綠。
+    首版以 `.strip()` 自訂 ID ⇒ 帶空白之原始 ID 與已正規化之分區被誤判為同一個，
+    真正的不一致被我自己的程式抹平（提出方實跑 `200 accepted`）。
+    修法不是「換一條更嚴的規則」，而是**不改寫**——帶空白之 ID 自然會以
+    「原始值未歸戶 ＋ 分區值成幽靈」被雙向差集擋下，不需另立身分規則。
+
+    鑑別力：在 helper 內對 `raw` 或分區值任一側加 `.strip()` ⇒ 本條轉綠。
     """
     from api.services.case_import_service import _assert_event_partition_conserved
 
@@ -585,17 +586,36 @@ def test_partition_gate_identity_authority_is_the_contract() -> None:
 
     with pytest.raises(ValueError) as ei:
         _assert_event_partition_conserved(
-            records=[dict(rows[0], event_id="A"), rows[1]],
-            partitions={"projected": ["A", b]},
-        )
-    assert "不符契約公式" in str(ei.value)
-
-    with pytest.raises(ValueError) as ei2:
-        _assert_event_partition_conserved(
             records=[dict(rows[0], event_id=f" {a} "), rows[1]],
             partitions={"projected": [a, b]},
         )
-    assert "不符契約公式" in str(ei2.value), "帶空白之 ID 被 strip 後誤判為相同"
+    msg = str(ei.value)
+    assert "未歸戶" in msg and "不在輸入卻被歸戶" in msg, (
+        f"帶空白之 ID 被改寫後誤判為相同：{msg[:140]}"
+    )
+
+
+def test_partition_gate_accepts_platform_generated_suffix_ids() -> None:
+    """🔴 `CODEX-R6-P1-01`：**平台產生器之 label 後綴 ID 不得被誤擋**。
+
+    主委於 r5 以「全部落檔批 1664 筆零例外符合契約公式」為由在守恆閘加了公式對證，
+    該推論**錯在只測既有落檔資料、沒測產生器路徑**：
+      ①`event_import_contract.json` 之 `_event_id_template_doc` 逐字寫著
+        「僅**使用者宣告之匯入批次**強制……平台產生器之 ID 另帶 label 後綴，
+        **不受此約束**」；
+      ②`momentum/Analysis/event_samples/generator.py:224` 產生
+        `{symbol}:{tf}:{t0}:{label_id}` 形狀，提出方實跑 41 列全數被誤擋。
+    ⇒ canonical 形式之強制**需要 provenance**，屬匯入時職責，不在守恆閘重判。
+
+    鑑別力：在 helper 內恢復公式對證 ⇒ 本條轉紅。
+    """
+    from api.services.case_import_service import _assert_event_partition_conserved
+
+    pid = "ETHUSDT:12h:1738843200000:up1"   # generator.py:224 之形狀
+    _assert_event_partition_conserved(
+        records=[{"event_id": pid, "symbol": "ETHUSDT", "timeframe": "12h", "t0": 1738843200000}],
+        partitions={"projected": [pid]},
+    )
 
 
 @pytest.mark.parametrize("case,kwargs,expect", [
@@ -623,6 +643,56 @@ def test_partition_gate_rejects_malformed_partitions(case, kwargs, expect) -> No
     with pytest.raises(ValueError) as ei:
         _assert_event_partition_conserved(**kwargs)
     assert expect in str(ei.value), f"{case}: {str(ei.value)[:120]}"
+
+
+@pytest.mark.parametrize("case,kwargs,expect", [
+    ("partitions_none", {"records": [{"event_id": "X"}], "partitions": None}, "須為 dict"),
+    ("empty_records", {"records": [], "partitions": {}}, "空 `records`"),
+])
+def test_partition_gate_entry_contract_is_complete(case, kwargs, expect) -> None:
+    """🔴 `CODEX-R6-P2-01`：helper 之**入口契約**須完整，誤用不得未受控。
+
+    首版 `partitions=None` 冒 `AttributeError`（未受控出口），空輸入則靜默 ACCEPT。
+    後者尤其該擋：零事件之受控拒絕在上游，守恆閘若把「沒有事件」也算守恆，
+    上游那道閘壞掉時就沒有人會察覺。
+    """
+    from api.services.case_import_service import _assert_event_partition_conserved
+
+    with pytest.raises(ValueError) as ei:
+        _assert_event_partition_conserved(**kwargs)
+    assert expect in str(ei.value), f"{case}: {str(ei.value)[:120]}"
+
+
+def test_analyze_zero_survivors_is_4xx(monkeypatch) -> None:
+    """🔴 邊界④：過濾後零事件 ⇒ **4xx**，不得以 event-study-only 冒充成功。
+
+    🔴 `CODEX-R6-P2-02`：產品端守衛早就在，但**沒有任何一條測試直接走到它**
+    （該家 `rg` targeted 搜尋零命中）。「程式路徑存在」不等於「該邊界有測試證據」
+    ——守衛被改壞時，57 條全綠也照樣綠。
+    鑑別力：拿掉零事件之受控拒絕 ⇒ 本條由 422 變 200（或 500），轉紅。
+    """
+    _require(BATCH_FILE, RUN_1H, KLINE)
+    import dataclasses
+
+    import momentum.factories as F
+
+    real_factory = F.create_feature_run_coverage_checker
+
+    def _all_dropped():
+        check, cov_cls, err_cls = real_factory()
+
+        def _wrapped(**kw):
+            cov = check(**kw)
+            # coverage 把整批剔光（`evaluated=True` 但 covered 為空）
+            return dataclasses.replace(cov, covered_event_ids=tuple())
+
+        return _wrapped, cov_cls, err_cls
+
+    monkeypatch.setattr(F, "create_feature_run_coverage_checker", _all_dropped)
+    r = client.post(f"/api/v1/case/events/{_batch_id()}/analyze",
+                    json={"horizons": [1], "feature_run": FEATURE_RUN})
+    assert 400 <= r.status_code < 500, f"零事件應回 4xx，實得 {r.status_code}: {r.text[:200]}"
+    assert "沒有任何事件可投影" in str(r.json()["detail"]["message"]), r.json()["detail"]
 
 
 def test_partition_gate_rejects_ghost_ids() -> None:
