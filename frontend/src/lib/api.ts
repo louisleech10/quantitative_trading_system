@@ -979,12 +979,14 @@ export async function exportPdfReport(taskId: string): Promise<Blob> {
 // GAP-3 事件型（B5.2）：匯入批 / 兩張表（後端 /api/v1/case/events*）
 // ============================================================
 import type {
-  EventAnalyzeResponse, EventCsvMappingSubmission, EventImportDetail, EventImportListResponse,
-  EventImportRejected, EventImportResponse,
+  EventAnalyzeResponse, EventCsvMappingSubmission, EventFeatureRunRef, EventImportDetail,
+  EventImportListResponse, EventImportRejected, EventImportResponse, ICAnalysisConfig,
   RandomControlCompareRequest, RandomControlCompareResult, RandomControlGenerateRequest,
 } from './types';
 import type { LookaheadDeclarationPayload, LookaheadDeclarationPreview } from './lookaheadDeclaration';
 import { httpErrorMessage } from './httpError';
+// SPLITUNIFY `Task 10.6`：與 IC 分析請求**同一個** `config_override` 產生點（見該檔檔頭）。
+import { buildConfigOverride } from './icConfigOverride';
 
 export class EventImportRejectedError extends Error {
   payload: EventImportRejected;
@@ -1116,9 +1118,47 @@ export async function fetchLookaheadDeclarationPreview(
   return response.json();
 }
 
+/**
+ * SPLITUNIFY `Task 10.6`：事件掃描請求之**三個投影欄**（`feature_run`／`config_override`／
+ * `event_label_spec`）由 IC 分析頁之同一份 `config` 導出。
+ *
+ * 🔴 **`event_label_spec` 之送出條件與 IC 分析請求逐字相同**（`useICAnalysis` 之
+ * `...(config.event_label_spec ? { event_label_spec: config.event_label_spec } : {})`）：
+ * 有設定才送、沒設定整個鍵省略。兩端條件一旦不同，同一批事件會在兩端用不同答案窗對齊，
+ * 而兩份數字都看起來很正常——那正是本票要消滅的形態（`R5-C10` 1.）。
+ * 🔴 **前端不得補任何預設值**：沒設定時由後端共用出口依宣告深度導出（`Task 10.6` 不可做④）。
+ *
+ * 🔴 `feature_run` 三欄缺任一 ⇒ **整個鍵省略**（邊界①），不得送半套：後端 `FeatureRunRef`
+ * 三欄必填，送 `{symbol, timeframe}` 只會拿到 422；省略則落回既有 event-study-only 分支。
+ */
+export function buildEventScanRequest(config: ICAnalysisConfig): {
+  feature_run?: EventFeatureRunRef;
+  config_override?: Record<string, unknown>;
+  event_label_spec?: ICAnalysisConfig['event_label_spec'];
+} {
+  const symbol = config.symbol?.trim() || '';
+  const timeframe = config.timeframe?.trim() || '';
+  const configHash = config.config_hash?.trim() || '';
+  const hasRun = Boolean(symbol && timeframe && configHash);
+  return {
+    ...(hasRun ? { feature_run: { symbol, timeframe, config_hash: configHash } } : {}),
+    // `config_override` 只在有 run 時生效（後端同條件），無 run 時一併省略——
+    // 送一個不會被讀的鍵，只會讓請求看起來像「有指定切分設定」。
+    ...(hasRun ? { config_override: buildConfigOverride(config) } : {}),
+    ...(config.event_label_spec ? { event_label_spec: config.event_label_spec } : {}),
+  };
+}
+
 export async function analyzeEventImport(
   importId: string,
-  body: { horizons?: number[]; n_boot?: number; test_fraction?: number } = {},
+  body: {
+    horizons?: number[];
+    n_boot?: number;
+    test_fraction?: number;
+    feature_run?: EventFeatureRunRef;
+    config_override?: Record<string, unknown>;
+    event_label_spec?: ICAnalysisConfig['event_label_spec'];
+  } = {},
 ): Promise<EventAnalyzeResponse> {
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}/case/events/${encodeURIComponent(importId)}/analyze`, {
     method: 'POST',

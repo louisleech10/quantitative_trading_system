@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EventImportRejectedError, analyzeEventImport } from '@/lib/api';
+import { EventImportRejectedError, analyzeEventImport, buildEventScanRequest } from '@/lib/api';
 import { recordImportReference } from '@/lib/eventBatchReferences';
 import { metricTooltip } from '@/lib/eventMetricsGlossary';
 import { splitCapabilityView } from '@/lib/splitCapability';
@@ -18,6 +18,16 @@ interface EventTablesPanelProps {
    * 🔴 空／重複／非正整數一律**不傳**（fail-closed 回後端預設，不送出無意義的請求）。
    */
   horizons?: number[];
+  /**
+   * SPLITUNIFY `Task 10.6`：投影路徑之三個請求欄（`feature_run`／`config_override`／
+   * `event_label_spec`），由 IC 分析頁以 `buildEventScanRequest(config)` 導出。
+   *
+   * 🔴 **整包原樣轉送、本元件不重組**：拆成三個 prop 再逐一映射，等於多三個可以漏掉某一鍵的
+   * 位置，而漏掉 `event_label_spec` 的後果是兩端用不同答案窗對齊、兩份數字都看起來正常
+   * （`M-SU-R5-24`）。未選 run 時該物件**不含** `feature_run`（邊界①），後端落回
+   * event-study-only 分支。
+   */
+  scanRequest?: ReturnType<typeof buildEventScanRequest>;
   /** 測試／外部注入用；不給則依 importId 自行呼叫後端 */
   data?: EventAnalyzeResponse | null;
 }
@@ -278,10 +288,86 @@ function AllBarsTable({ table }: { table: EventTableStatus | undefined }) {
 }
 
 /**
+ * SPLITUNIFY `Task 10.6`／`R5-C5`：投影路徑之揭露區（切分結果、被排除事件、實際標籤參數、丟棄列數）。
+ *
+ * 🔴 四個新欄**只在帶 `feature_run` 之投影路徑**存在；event-study-only 回應整個鍵不存在，
+ *    此時本區不渲染（不是渲染成 0）——「沒有這段資訊」與「這段資訊是 0」是兩件事。
+ * 🔴 `split_unify.n_test` 為 `null` ⇒ **不顯示任何驗證段計數**，只顯示具名原因
+ *    （`Task 3.3` ④：沒有切分卻給計數，讀的人分不出「切了但都空」與「根本沒切」）。
+ * 🔴 契約字面（`reason`／`split_authority`）一律**原樣顯示**，不轉譯成自創說法——
+ *    看不懂的字面至少可以被搜尋，轉譯之後連「後端出現了沒人處理的新值」都看不見。
+ */
+function ProjectionDisclosure({ resp }: { resp: EventAnalyzeResponse }) {
+  const su = resp.split_unify;
+  const pa = resp.period_alignment;
+  const ebs = resp.excluded_by_symbol;
+  const spec = resp.event_label_spec;
+  const split = ((resp.summary as Record<string, unknown>)?.split ?? null) as Record<string, unknown> | null;
+  const discarded = (split?.discarded_rows_by_feature_tf ?? {}) as Record<string, number>;
+  const insufficient = (split?.insufficient_events_in_test ?? []) as string[];
+  const discardedEntries = Object.entries(discarded);
+  const excludedEntries = Object.entries(ebs ?? {});
+  if (!su && !pa && !ebs && !spec) return null;
+  return (
+    <div
+      className="rounded border border-slate-700/60 bg-slate-900/40 p-2 space-y-1 text-[11px] text-slate-300"
+      data-testid="event-projection-disclosure"
+    >
+      {su ? (
+        <p data-testid="event-split-unify" data-split-unify-reason={su.reason ?? ''}>
+          {/* 🔴 `n_test === null` ⇒ 本批沒有 canonical 邊界；顯示計數即是假 OOS 數字。 */}
+          {su.n_test === null || su.n_test === undefined
+            ? `切分：未執行（原因 ${su.reason ?? '後端未給'}）`
+            : `切分：驗證段事件數 ${su.n_test}／來源 ${String(su.split_authority ?? '—')}`}
+          {su.boundary_hash ? <span className="text-slate-500">　邊界 sha {String(su.boundary_hash).slice(0, 12)}</span> : null}
+        </p>
+      ) : null}
+      {pa ? (
+        <p data-testid="event-period-alignment">
+          被排除事件：對齊失敗 {pa.dropped_in_alignment.count}／期間未涵蓋 {pa.dropped_by_coverage.count}／
+          特徵索引首尾外 {pa.dropped_outside_post_trim_index.count}
+          {pa.post_trim_index_bounds_ms?.length === 2 ? (
+            <span className="text-slate-500">
+              　（特徵索引區間 {new Date(pa.post_trim_index_bounds_ms[0]).toISOString().slice(0, 16)}
+              {' ~ '}{new Date(pa.post_trim_index_bounds_ms[1]).toISOString().slice(0, 16)} UTC）
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+      {excludedEntries.length > 0 ? (
+        <p data-testid="event-excluded-by-symbol">
+          他標的事件已排除：{excludedEntries.map(([sym, v]) => `${sym} ${v.count}`).join('／')}
+        </p>
+      ) : null}
+      {spec ? (
+        <p data-testid="event-label-spec-used">
+          {/* 🔴 顯示**解析後實際使用**之參數（非請求值）：使用者沒設定時由後端依宣告深度導出。 */}
+          實際使用之標籤參數：
+          {Object.entries(spec.spec ?? {}).map(([k, v]) => `${k}=${String(v)}`).join('／') || '（後端未給）'}
+          {spec.seed_note ? <span className="text-slate-500">　{String(spec.seed_note)}</span> : null}
+        </p>
+      ) : null}
+      {/* 🔴 邊界②：`discarded` 為空 ⇒ **不顯示該列**（空的列會讓人以為「查過了、真的有丟棄 0 列」，
+          而事實是這條路徑根本沒有丟棄記帳）。 */}
+      {discardedEntries.length > 0 ? (
+        <p data-testid="event-discarded-rows">
+          對齊丟棄列數（依特徵週期）：{discardedEntries.map(([tf, n]) => `${tf} ${n}`).join('／')}
+        </p>
+      ) : null}
+      {insufficient.length > 0 ? (
+        <p className="text-amber-200/90" data-testid="event-insufficient-test">
+          驗證段事件數低於下限之標的：{insufficient.join('、')}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
  * GAP-3 B5.2：事件模式專屬表（事件後報酬表／正反例辨別表／全 K 線驗證）。
  * 只在事件模式掛載；後端 unavailable／not_computed 一律顯示原因，不顯示空白；前端不重算任何統計。
  */
-export default function EventTablesPanel({ importId, horizons, data }: EventTablesPanelProps) {
+export default function EventTablesPanel({ importId, horizons, scanRequest, data }: EventTablesPanelProps) {
   const [resp, setResp] = useState<EventAnalyzeResponse | null>(data ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -300,7 +386,12 @@ export default function EventTablesPanel({ importId, horizons, data }: EventTabl
     setError(null);
     // Task 4.2：把使用者在 IC 面板選的 horizon 集合真的送出去（此前恆送 `{}`）。
     const wanted = sanitizeHorizons(horizons);
-    analyzeEventImport(importId, wanted ? { horizons: wanted } : {})
+    // 🔴 `Task 10.6`：三個投影欄與 horizon 併入**同一個** body；`scanRequest` 原樣展開，
+    //    本元件不補任何預設值（不可做④：前端補標籤參數預設＝後端導出邏輯被靜默蓋掉）。
+    analyzeEventImport(importId, {
+      ...(wanted ? { horizons: wanted } : {}),
+      ...(scanRequest ?? {}),
+    })
       .then((r) => {
         // GAP-3 UX Task 3.3：記下「這批真的被拿去分析過」——**成功之後**才記，不是選取當下。
         // 判準與其誠實邊界見 `@/lib/eventBatchReferences`（PENDING-RULING）。
@@ -318,8 +409,10 @@ export default function EventTablesPanel({ importId, horizons, data }: EventTabl
       cancelled = true;
     };
     // `horizons` 以正規化後之字面入依賴，避免每次 render 之新陣列參考造成重打 API
+    // 🔴 `scanRequest` 同理以字面入依賴：頁面每次 render 都會產生新物件參考，
+    //    以參考入依賴會讓每次 render 都重打一次 analyze（該請求是秒級的真實計算）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [importId, data, JSON.stringify(sanitizeHorizons(horizons) ?? null)]);
+  }, [importId, data, JSON.stringify(sanitizeHorizons(horizons) ?? null), JSON.stringify(scanRequest ?? null)]);
 
   if (!importId && !resp) {
     return (
@@ -379,6 +472,8 @@ export default function EventTablesPanel({ importId, horizons, data }: EventTabl
           </p>
         )}
       </div>
+      {/* SPLITUNIFY Task 10.6／R5-C5：投影路徑之揭露區（無 feature_run 時整區不渲染）。 */}
+      <ProjectionDisclosure resp={resp} />
       <div>
         <p className="text-xs font-semibold text-slate-200 mb-1">事件後報酬表</p>
         <ForwardReturnTable table={resp.tables.event_forward_return_table} />

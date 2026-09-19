@@ -50,6 +50,8 @@ import { useAutoRefilter } from '@/hooks/useAutoRefilter';
 import { icFeatureCountLabel, icPollFailed, icTaskStatusLabel } from "@/lib/icTaskStatusLabel";
 import { icFallbackLabel, icSubProgressLabel, icTaskWarningLabel } from "@/lib/icProgressLabel";
 import { isSectionStatus } from "@/lib/types";
+// SPLITUNIFY Task 10.6：事件掃描請求之三個投影欄，與 IC 分析請求同源（見該函式 docstring）。
+import { buildEventScanRequest } from '@/lib/api';
 import { reshapeGroupedForFeature } from '@/lib/icGrouped';
 import type { GroupedICData, ICDecayData, ICReportLight, QuantileReturnData, SectionStatusObject, SummaryPageParams, TurnoverFeatureData } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
@@ -757,7 +759,16 @@ function ICAnalysisPageContent() {
             )}
 
             {config.mode === 'event' && (
-              <EventTablesPanel importId={config.event_import_id} horizons={config.horizons} />
+              /* 🔴 SPLITUNIFY Task 10.6：把**已選 run ＋ config_override ＋ 分析用標籤參數**
+                 送進事件掃描請求。缺這條接線，事件掃描端就永遠走 event-study-only，
+                 而 Task 10.5 的投影路徑在生產上不可達（本 epic 已為「兩端都有、但沒接上」
+                 付過兩次代價）。三欄之導出與省略條件住 `buildEventScanRequest`，
+                 與 IC 分析請求同源（`event_label_spec` 之條件逐字相同）。 */
+              <EventTablesPanel
+                importId={config.event_import_id}
+                horizons={config.horizons}
+                scanRequest={buildEventScanRequest(config)}
+              />
             )}
 
             {summaryText && (

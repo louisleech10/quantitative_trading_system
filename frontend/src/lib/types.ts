@@ -3171,6 +3171,18 @@ export interface EventTableStatus {
   [k: string]: unknown;
 }
 
+/**
+ * SPLITUNIFY `R5-C3` 1.（`Task 10.6`）：事件掃描端所指定之特徵 run。
+ *
+ * 🔴 **三欄皆必填且非空**（後端 `FeatureRunRef` 之 `min_length=1`）：`config_hash` 缺即 422，
+ * 後端**不回退最新 run**。前端同理不得自行 auto-discover——兩端各自挑 run 正是本票要消滅的形態。
+ */
+export interface EventFeatureRunRef {
+  symbol: string;
+  timeframe: string;
+  config_hash: string;
+}
+
 export interface EventAnalyzeResponse {
   import_id: string;
   summary: Record<string, unknown>;
@@ -3198,6 +3210,36 @@ export interface EventAnalyzeResponse {
     source: 'lookahead_declaration_lower_bound' | 'request' | 'label_window_max'
       | 'not_applicable_event_study_only' | string;
   };
+  // ── SPLITUNIFY `R5-C3` 3.（`Task 10.5` 後端／`Task 10.6` 前端）：投影路徑之四個新欄 ──
+  // 🔴 四欄**只在帶 `feature_run` 之投影路徑**出現；event-study-only 回應無此四鍵
+  //    （不是填 `null`，是整個鍵不存在）⇒ 型別一律選填，畫面以「鍵在不在」判斷要不要渲染。
+  /**
+   * `R5-C3` 3.：鍵集＝契約 `split_unify.json` 之 `split_unify_keys`（唯一產生點
+   * `build_split_unify_disclosure`）。🔴 fail-closed 時 `n_test` 為 `null`**而非 0**，
+   * 並帶 `reason`——`0` 是「切了但測試段空」，`null` 是「根本沒切」，畫面不得混為一談。
+   */
+  split_unify?: {
+    n_test: number | null;
+    split_authority?: string | null;
+    boundary_hash?: string | null;
+    per_symbol_counts?: Record<string, number> | null;
+    reason?: string | null;
+  } | null;
+  /** `R5-C4` 1.：三段具名剔除之事件 ID 與計數，加 post-trim 特徵索引之首尾時刻。 */
+  period_alignment?: {
+    dropped_in_alignment: { count: number; ids: string[] };
+    dropped_by_coverage: { count: number; ids: string[] };
+    dropped_outside_post_trim_index: { count: number; ids: string[] };
+    post_trim_index_bounds_ms: number[];
+  } | null;
+  /** `R5-C4` 2.：非 run symbol 之事件排除揭露（symbol → 事件數與 ID）。 */
+  excluded_by_symbol?: Record<string, { count: number; event_ids: string[] }> | null;
+  /**
+   * `R5-C10` 1.：**解析後實際使用**之標籤參數（不是請求送出的值）。
+   * 🔴 使用者未指定時由後端依宣告深度導出，`seed_note` 說明預設來源——畫面顯示這一份，
+   * 顯示請求值會在「後端導出預設」時講出與實際不符的參數。
+   */
+  event_label_spec?: { spec: Record<string, unknown>; seed_note?: string | null } | null;
 }
 
 // ══════════════════════════════════════════════════════════════════════════

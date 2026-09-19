@@ -16,6 +16,10 @@ import {
 import { useICAnalysisStore } from '@/store/icAnalysisStore';
 import { httpErrorMessage } from '@/lib/httpError';
 import { isSubmittableLabelSpec } from '@/lib/eventDimensions';
+// 🔴 SPLITUNIFY `Task 10.6`：`config_override` 之唯一產生點已抽到 `lib/icConfigOverride`，
+//    供本檔（IC 分析請求）與 `lib/api.ts` 之 `buildEventScanRequest`（事件掃描請求）共用。
+//    行為逐字不變；抽出理由見該檔檔頭。
+import { buildConfigOverride } from '@/lib/icConfigOverride';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000';
@@ -39,28 +43,6 @@ const requestJson = async <T>(path: string, options?: RequestInit): Promise<T> =
   }
 
   return response.json();
-};
-
-const buildConfigOverride = (config: ICAnalysisConfig) => {
-  const thresholds: Record<string, number> = {
-    ic_mean_min: config.thresholds.ic_mean_min,
-    icir_min: config.thresholds.icir_min,
-    p_value_max: config.thresholds.p_value_max,
-  };
-
-  if (typeof config.thresholds.monotonicity_score_min === 'number') {
-    thresholds.monotonicity_score_min = config.thresholds.monotonicity_score_min;
-  }
-
-  return {
-    thresholds,
-    redundancy: {
-      correlation_threshold: config.thresholds.correlation_threshold,
-    },
-    labels: {
-      horizons: config.horizons,
-    },
-  };
 };
 
 const buildRefilterPayload = (thresholds: ICAnalysisConfig['thresholds']) => ({

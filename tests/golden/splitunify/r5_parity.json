@@ -1,0 +1,201 @@
+{
+  "_doc": "SPLITUNIFY Task 10.7：兩端對證之凍結值。由 scripts/splitunify_r5_parity.py 產生。",
+  "combos": [
+    {
+      "combo": "coverage_drop",
+      "batch": "20260906T105851Z-8cc44eea",
+      "ff_run": "5ea074390e98405cb83d602fe7b7fb00",
+      "trigger_timeframes": [
+        "12h"
+      ],
+      "run_timeframe": "1h",
+      "event_label_spec": {
+        "entry_price_semantic": "trigger_open",
+        "label_return_mode": "open_to_horizon_close",
+        "horizon_bars": 12,
+        "decision_offset_bars": 0
+      },
+      "label_window_rows": 156,
+      "lookahead_depth_rows": 144,
+      "holdout_inputs": {
+        "purge_gap": 156,
+        "embargo": 144,
+        "oos_test_size": 0.2,
+        "lookahead_depth_rows": 144
+      },
+      "test_plan": {
+        "row_time_fingerprint": "f81a42f0118cd3855b07bc71997861bd3efb2bddf4f0fa0833e168217c3c0e0e",
+        "test_start_ms": 1766923200000,
+        "n_test_rows": 1789,
+        "n_train_rows": 8352
+      },
+      "n_windows": 207,
+      "period_alignment": {
+        "dropped_in_alignment": 12,
+        "dropped_by_coverage": 22,
+        "dropped_outside_post_trim_index": 0
+      },
+      "n_projection_test": 20,
+      "n_ic_test": 20,
+      "n_not_consumed_in_projection_test": 0,
+      "ic_test_event_ids": [
+        "ETHUSDT:12h:1767744000000",
+        "ETHUSDT:12h:1768305600000",
+        "ETHUSDT:12h:1768867200000",
+        "ETHUSDT:12h:1768910400000",
+        "ETHUSDT:12h:1769515200000",
+        "ETHUSDT:12h:1769817600000",
+        "ETHUSDT:12h:1769860800000",
+        "ETHUSDT:12h:1769947200000",
+        "ETHUSDT:12h:1770076800000",
+        "ETHUSDT:12h:1770336000000",
+        "ETHUSDT:12h:1770379200000",
+        "ETHUSDT:12h:1770465600000",
+        "ETHUSDT:12h:1770638400000",
+        "ETHUSDT:12h:1770984000000",
+        "ETHUSDT:12h:1771977600000",
+        "ETHUSDT:12h:1772020800000",
+        "ETHUSDT:12h:1772280000000",
+        "ETHUSDT:12h:1772452800000",
+        "ETHUSDT:12h:1772582400000",
+        "ETHUSDT:12h:1772625600000"
+      ]
+    },
+    {
+      "combo": "post_trim_drop",
+      "batch": "20260909T130533Z-7f73e4c7",
+      "ff_run": "5ea074390e98405cb83d602fe7b7fb00",
+      "trigger_timeframes": [
+        "12h"
+      ],
+      "run_timeframe": "1h",
+      "event_label_spec": {
+        "entry_price_semantic": "trigger_open",
+        "label_return_mode": "open_to_horizon_close",
+        "horizon_bars": 12,
+        "decision_offset_bars": 0
+      },
+      "label_window_rows": 156,
+      "lookahead_depth_rows": 144,
+      "holdout_inputs": {
+        "purge_gap": 156,
+        "embargo": 144,
+        "oos_test_size": 0.2,
+        "lookahead_depth_rows": 144
+      },
+      "test_plan": {
+        "row_time_fingerprint": "f81a42f0118cd3855b07bc71997861bd3efb2bddf4f0fa0833e168217c3c0e0e",
+        "test_start_ms": 1766923200000,
+        "n_test_rows": 1789,
+        "n_train_rows": 8352
+      },
+      "n_windows": 165,
+      "period_alignment": {
+        "dropped_in_alignment": 0,
+        "dropped_by_coverage": 0,
+        "dropped_outside_post_trim_index": 1
+      },
+      "n_projection_test": 28,
+      "n_ic_test": 28,
+      "n_not_consumed_in_projection_test": 0,
+      "ic_test_event_ids": [
+        "ETHUSDT:12h:1767355200000",
+        "ETHUSDT:12h:1767744000000",
+        "ETHUSDT:12h:1767787200000",
+        "ETHUSDT:12h:1767830400000",
+        "ETHUSDT:12h:1768305600000",
+        "ETHUSDT:12h:1768392000000",
+        "ETHUSDT:12h:1768737600000",
+        "ETHUSDT:12h:1768780800000",
+        "ETHUSDT:12h:1768824000000",
+        "ETHUSDT:12h:1768867200000",
+        "ETHUSDT:12h:1768910400000",
+        "ETHUSDT:12h:1769083200000",
+        "ETHUSDT:12h:1769385600000",
+        "ETHUSDT:12h:1769515200000",
+        "ETHUSDT:12h:1769774400000",
+        "ETHUSDT:12h:1770033600000",
+        "ETHUSDT:12h:1770336000000",
+        "ETHUSDT:12h:1770379200000",
+        "ETHUSDT:12h:1770465600000",
+        "ETHUSDT:12h:1770508800000",
+        "ETHUSDT:12h:1770638400000",
+        "ETHUSDT:12h:1770854400000",
+        "ETHUSDT:12h:1770984000000",
+        "ETHUSDT:12h:1771027200000",
+        "ETHUSDT:12h:1771286400000",
+        "ETHUSDT:12h:1771416000000",
+        "ETHUSDT:12h:1771977600000",
+        "ETHUSDT:12h:1772020800000"
+      ]
+    },
+    {
+      "combo": "non_default_spec",
+      "batch": "20260909T130533Z-7f73e4c7",
+      "ff_run": "5ea074390e98405cb83d602fe7b7fb00",
+      "trigger_timeframes": [
+        "12h"
+      ],
+      "run_timeframe": "1h",
+      "event_label_spec": {
+        "horizon_bars": 6,
+        "entry_price_semantic": "trigger_open",
+        "label_return_mode": "open_to_horizon_close",
+        "decision_offset_bars": 1
+      },
+      "label_window_rows": 84,
+      "lookahead_depth_rows": 144,
+      "holdout_inputs": {
+        "purge_gap": 84,
+        "embargo": 144,
+        "oos_test_size": 0.2,
+        "lookahead_depth_rows": 144
+      },
+      "test_plan": {
+        "row_time_fingerprint": "55dc1e12da3a9f7d70973923ffdbc67155b1d7e15c63c19b64ec4d81c4c924aa",
+        "test_start_ms": 1766664000000,
+        "n_test_rows": 1861,
+        "n_train_rows": 8352
+      },
+      "n_windows": 165,
+      "period_alignment": {
+        "dropped_in_alignment": 0,
+        "dropped_by_coverage": 1,
+        "dropped_outside_post_trim_index": 0
+      },
+      "n_projection_test": 28,
+      "n_ic_test": 28,
+      "n_not_consumed_in_projection_test": 0,
+      "ic_test_event_ids": [
+        "ETHUSDT:12h:1767355200000",
+        "ETHUSDT:12h:1767744000000",
+        "ETHUSDT:12h:1767787200000",
+        "ETHUSDT:12h:1767830400000",
+        "ETHUSDT:12h:1768305600000",
+        "ETHUSDT:12h:1768392000000",
+        "ETHUSDT:12h:1768737600000",
+        "ETHUSDT:12h:1768780800000",
+        "ETHUSDT:12h:1768824000000",
+        "ETHUSDT:12h:1768867200000",
+        "ETHUSDT:12h:1768910400000",
+        "ETHUSDT:12h:1769083200000",
+        "ETHUSDT:12h:1769385600000",
+        "ETHUSDT:12h:1769515200000",
+        "ETHUSDT:12h:1769774400000",
+        "ETHUSDT:12h:1770033600000",
+        "ETHUSDT:12h:1770336000000",
+        "ETHUSDT:12h:1770379200000",
+        "ETHUSDT:12h:1770465600000",
+        "ETHUSDT:12h:1770508800000",
+        "ETHUSDT:12h:1770638400000",
+        "ETHUSDT:12h:1770854400000",
+        "ETHUSDT:12h:1770984000000",
+        "ETHUSDT:12h:1771027200000",
+        "ETHUSDT:12h:1771286400000",
+        "ETHUSDT:12h:1771416000000",
+        "ETHUSDT:12h:1771977600000",
+        "ETHUSDT:12h:1772020800000"
+      ]
+    }
+  ]
+}

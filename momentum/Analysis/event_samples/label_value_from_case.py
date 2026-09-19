@@ -999,6 +999,36 @@ def _receipt_hash(
     return canonical_event_table_sha256(payload)
 
 
+def analysis_records(
+    records: Any,
+    event_label_spec: Any,
+) -> List[Dict[str, Any]]:
+    """SPLITUNIFY `Task 10.7`：把分析用四鍵套進 records 之**副本**，供投影路徑重新對齊用。
+
+    🔴 **存在理由（真實資料對證命中）**：`EventSamplePipeline.run` 的投影路徑會對傳入之
+    records **重跑一次 `_prepare`**，而 `_prepare` 只吃 `EventPipelineConfig`（週期與去重），
+    拿不到分析用 `event_label_spec` ⇒ 它以**匯入原值**對齊，算出的 `last_bar_open_ms`
+    （判側錨點）與 `label_start/end_ms` 是匯入參數下的值。IC 端則以分析副本對齊。
+    兩端在預設 spec 下同值（分析值＝匯入值），所以所有既有測試皆綠；一旦使用者改了
+    `k`／`h`，同一事件在兩端就會落在不同側——實跑（批 `20260909T130533Z-7f73e4c7`
+    × run `5ea07439…`、k=1/h=6）：`ETHUSDT:12h:1766707200000` 之錨點在 IC 端為
+    `1766660400000`（早於 `test_start_ms=1766664000000` ⇒ train），投影端以匯入原值
+    算成晚 12 小時 ⇒ 判成 test，兩端測試段相差一筆。
+
+    🔴 **不回寫**匯入檔或已落檔事件批：與 `_analysis_copy` 同一原則，只作用於本次分析。
+    回傳 `list[dict]` 而非 `DataFrame`：呼叫端在 `api/`，不得 import momentum 之型別（Rule 3/R7）。
+    """
+    normalized = normalize_event_label_spec(event_label_spec)
+    frame = _analysis_copy(_records_as_tuple(records), normalized)
+    # 🔴 `DataFrame` 會把「某些列沒有的欄」補成 `NaN`；原樣轉回 dict 等於替每一筆記錄
+    #    **憑空加上**它原本沒有的欄位（值為 `NaN`），下游 validator 看到的就不是原記錄了。
+    #    records 由 JSON 載入 ⇒ 不可能有真正的 `NaN` 值，故剔除 `NaN` 即還原原欄集。
+    return [
+        {k: v for k, v in row.items() if not (isinstance(v, float) and pd.isna(v))}
+        for row in frame.to_dict("records")
+    ]
+
+
 def prepare_analysis_windows(
     records,
     bars_by_tf,

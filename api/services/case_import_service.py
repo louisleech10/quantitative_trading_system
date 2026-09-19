@@ -1664,6 +1664,7 @@ class EventImportService:
         from api.utils.json_serializer import sanitize_for_json
         from momentum.factories import (
             create_canonical_holdout_resolver,
+            create_event_analysis_record_copier,
             create_event_label_spec_resolver,
             create_feature_run_coverage_checker,
             create_feature_run_locator,
@@ -1815,7 +1816,20 @@ class EventImportService:
         resolve_holdout, _HoldoutError = create_canonical_holdout_resolver()
         holdout = resolve_holdout(
             ff_run=ff_run, symbol=run_symbol, ic_config=ic_cfg,
-            purge_gap=max(int(purge_rows), int(iso.label_window_rows)),
+            # 🔴 **`Task 10.7` 真實資料對證命中之兩端分歧（本批修）**：原式為
+            #    `max(purge_rows, iso.label_window_rows)`，而 `purge_rows` 本身已是
+            #    `max(深度, 窗)` 之毫秒換算 ⇒ 深度被算進 `purge_gap` **一次**，又被
+            #    `resolve_canonical_holdout` 抬進 `embargo` **第二次**，總隔離多算一份深度。
+            #    IC 端（`ic_filter_orchestrator:1322`）用的是 `max(effective_horizon, 窗)`
+            #    ——深度只進 embargo。實跑（批 `20260909T130533Z-7f73e4c7` × run
+            #    `5ea07439…`、spec k=1/h=6）：掃描端 `purge_gap=144` vs IC 端 `84`
+            #    ⇒ `test_start_ms` 差 60 列（1766880000000 vs 1766664000000），
+            #    兩端 `row_time_fingerprint` 不同 ⇒ 違反 `R5-C7` 之「同一條邊界」。
+            #    深度 ≤ 窗 時兩式同值，所以預設 spec 的組合看不出來（空心綠）。
+            #    ⇒ 改為**逐字照 `resolve_canonical_holdout` 之參數契約**：
+            #    「`purge_gap`：答案窗換算之 purge 下界（呼叫端由 `event_isolation.label_window_rows` 導出）」。
+            #    `purge_rows` 仍算（多 symbol 之 purge 下界一致性檢查靠它），但不再進 purge_gap。
+            purge_gap=int(iso.label_window_rows),
             lookahead_depth_rows=int(iso.lookahead_depth_rows),
         )
         # 🔴 **`CODEX-R3-P1-01`：對齊階段之失敗是第四個分區，漏了它守恆就破**。
@@ -1878,6 +1892,17 @@ class EventImportService:
                 f"投影輸入筆數（{len(projected_records)}）與存活事件數（{len(allowed)}）不符"
                 "——records 與對齊窗之 event_id 對不上（fail-closed，不半套投影）"
             )
+        # 🔴 **`Task 10.7` 真實資料對證命中之第二處分歧（本批修）**：`run_projection_with_params`
+        #    內部之 `_prepare` 只吃 `EventPipelineConfig`（週期／去重），**拿不到**上面解析出的
+        #    `spec` ⇒ 它以**匯入原值**重新對齊，判側錨點 `last_bar_open_ms` 與答案窗
+        #    `label_start/end_ms` 都是匯入參數下的值，而 ①～⑥ 全部是以分析副本算的。
+        #    預設 spec 下兩者同值（分析值＝匯入值），所以既有測試全綠；使用者一改 k／h 就分家。
+        #    實跑（批 `20260909T130533Z-7f73e4c7` × run `5ea07439…`、k=1／h=6）：
+        #    `ETHUSDT:12h:1766707200000` 在 IC 端錨點 `1766660400000` < `test_start_ms`
+        #    ⇒ train，投影端以匯入原值算 ⇒ test，兩端測試段差一筆（違反 `R5-C7`）。
+        #    ⇒ 餵**分析副本**（四鍵已套用），讓投影重新對齊時與 ①～⑥ 同參數。
+        #    `event_id`／`symbol` 不被副本改動 ⇒ 上方之分區守恆與筆數檢查不受影響。
+        projected_records = create_event_analysis_record_copier()(projected_records, spec)
         res = pipe.run_projection_with_params(
             projected_records, bars,
             train_plan=holdout.train_plan, test_plan=holdout.test_plan,

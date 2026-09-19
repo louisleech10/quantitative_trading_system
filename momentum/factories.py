@@ -1082,6 +1082,22 @@ def create_event_label_spec_resolver():
     return resolve_event_label_spec, EventLabelSpecError
 
 
+def create_event_analysis_record_copier():
+    """SPLITUNIFY `Task 10.7`：分析用 records 副本之**唯一**出口（投影路徑重新對齊用）。
+
+    🔴 存在理由（真實資料對證命中）：投影路徑之 `EventSamplePipeline.run` 會對傳入之
+    records 重跑 `_prepare`，而 `_prepare` 只吃 `EventPipelineConfig`、拿不到分析用
+    `event_label_spec` ⇒ 以**匯入原值**算判側錨點與答案窗，與 IC 端（分析副本）分歧。
+    預設 spec 下兩者同值故既有測試全綠；使用者改 `k`／`h` 即現形（`R5-C7` 之兩端一致被打破）。
+
+    回傳 `analysis_records(records, event_label_spec) -> list[dict]`；呼叫端在 `api/`，
+    只收 `list[dict]`，不得 import momentum 之型別（Rule 3／R7）。
+    """
+    from momentum.Analysis.event_samples.label_value_from_case import analysis_records
+
+    return analysis_records
+
+
 def create_canonical_holdout_resolver():
     """SPLITUNIFY `Task 10.4`／`R5-C1`：canonical 邊界之**唯一**解析出口。
 

@@ -99,7 +99,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | 140 | SU-B10B | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
 | 150 | SU-B10C | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
 | 160 | SU-B10D | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
-| 170 | SU-B10E | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | splitCapability 兩條新 reason 文案已上線；待做 Task 10.6 請求三欄接線與畫面、Task 10.7 對證腳本 |
+| 170 | SU-B10E | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.6 與 10.7 實作完成（對證三組合逐值相等、mutation 9 條全紅），另修兩處兩端分歧；待審碼 b12-review |
 <!-- END GENERATED: splitunify-batch-status -->
 
 🔴 **Phase 9 依賴序（`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md` 裁定；三家＋主委獨立版四方一致）**：
@@ -1244,6 +1244,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 - 輸入 / 輸出：請求增三欄；畫面顯示事件數計數、`split_unify`、被排除事件、實際使用之標籤參數、`discarded_rows_by_feature_tf`。
 - 實作要點：型別與契約字面一律自 `split_unify.json` 對證；`unavailable` 時不顯示計數；四條 reason 文案兩兩可分辨。
 - 修改檔案：`frontend/src/lib/api.ts`、`frontend/src/lib/types.ts`、`frontend/src/lib/splitCapability.ts`、`frontend/src/components/ic-analysis/EventTablesPanel.tsx`、`frontend/src/app/ic-analysis/page.tsx`、`frontend/src/components/ic-analysis/eventTablesPanelSplitOk.test.tsx`（新）。既有 caller：IC 分析頁。
+  🔴 **具名偏離（B10E 實作時追加兩檔，交審碼輪裁）**：`frontend/src/lib/icConfigOverride.ts`（新）與 `frontend/src/hooks/useICAnalysis.ts`。理由＝`config_override` 必須**兩端同一份**才可能取得同一條 canonical 邊界，而它原本是 `useICAnalysis.ts` 的模組私有常數；複製一份到 `api.ts` 就是本票要消滅的「兩份真相源」。抽到 `lib/` 而非自 hooks 匯出，是因為 `api.ts` 匯入 hooks 模組會把 React 拉進所有 api 消費者。抽出時**行為逐字不變**（鍵、條件、型別原樣搬移），由既有 `src/hooks/icEventAnalysisRequest.test.ts` 等四檔 41 條回歸釘住。
 - 不可做：不得自行 auto-discover run；不得在 `unavailable` 時顯示計數；不得手打契約字面；不得在前端補標籤參數預設值。
 - 邊界：① 未選 run ⇒ 不送 `feature_run`；② `discarded` 為空 ⇒ 不顯示該列；③ 四條 reason 文案可分辨；④ 使用者未改標籤參數 ⇒ 送出之 `event_label_spec` 與 IC 分析請求逐鍵相同。
 - 風險緩解：`M-SU-R5-07`、`M-SU-R5-24`；`C5-28` 之 ANCHOR 行隨本 Task 移動 ⇒ 同 commit 依 (5.7) 重出。
@@ -1263,6 +1264,10 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   2. IC 測試段集合取自 IC 實際產出（測試段遮罩命中之列時刻經 `event_label_owners` 回綁），**不得**由處置帳推導；先驗預測＝觀測，再驗集合等式。
   3. UAT 條目寫入 §E `R-3` 列：含重跑 `fe5f715e` 之後之 IC 事件分析。
 - 修改檔案：`scripts/splitunify_r5_parity.py`（新）、`tests/golden/splitunify/r5_parity.json`（新）、`docs/SPLITUNIFY_TODO.md` §E `R-3` 列。
+  🔴 **具名偏離（B10E 實跑命中兩處生產分歧，同批修，交審碼輪裁）**：`api/services/case_import_service.py`、`momentum/Analysis/event_samples/label_value_from_case.py`、`momentum/factories.py`，以及 `docs/SPLITUNIFY_SPEC.md` 之 `C5-28` ANCHOR 行號（依 `D-002-C5` (5.7) 同 commit 重出，行內容未變、LINESHA256 不變）。兩處分歧皆**只在非預設 `event_label_spec` 下現形**，預設 spec 下兩式同值 ⇒ B10A～B10D 全綠：
+  1. **`purge_gap` 雙重計入宣告深度**：掃描端傳 `max(purge_rows, label_window_rows)`，而 `purge_rows` 本身已是 `max(深度, 窗)`，`resolve_canonical_holdout` 又把深度抬進 `embargo` ⇒ 深度算兩次；IC 端為 `max(effective_horizon, 窗)`。實跑（批 `20260909T130533Z-7f73e4c7` × run `5ea07439…`、k=1／h=6）：掃描端 `purge_gap=144` vs IC `84`，`test_start_ms` 1766880000000 vs 1766664000000。修法＝逐字照 `resolve_canonical_holdout` 之參數契約傳 `label_window_rows`。
+  2. **投影以匯入原值重新對齊**：`run_projection_with_params` 內部之 `_prepare` 只吃 `EventPipelineConfig`，拿不到分析用 spec ⇒ 判側錨點 `last_bar_open_ms` 與答案窗以匯入參數算。實跑：`ETHUSDT:12h:1766707200000` 之錨點在 IC 端 `1766660400000` < `test_start_ms` ⇒ train，投影端判 test，兩端測試段差一筆。修法＝經新出口 `create_event_analysis_record_copier()` 餵分析副本；`event_id`／`symbol` 不變，分區守恆不受影響。
+  🔴 **殘留（needs-research）**：`effective_horizon > label_window_rows` 時兩端仍可能分歧（掃描端不吃主線 horizon）。現行真實資料無此組合（`effective_horizon` 為個位數、窗為 84～156）⇒ 無法以實跑證偽；對證腳本已加「切分輸入 `purge_gap`／`embargo`／`oos_test_size` 逐值相等」一條，該情形一旦出現即紅。
 - 不可做：禁合成 fixture；不得改既有 golden 鍵值；不執行 UAT；對證腳本不得自行推導特徵列鍵（只讀對齊收據）。
 - 邊界：① 至少一組觸發週期與 run 週期不同之真實組合；② 至少一組**事件被期間剔除**之真實組合——r17 實跑：現有已註冊 run 之特徵時間戳皆落在 K 線期間內（14／14 首尾裁切為 0），故本條改以 **coverage 剔除**行使（同一 12h 事件批配期間較短之 run，事件落在 run 期間外者進處置帳；路徑已有真實測試 `tests/api/test_period_auto_align.py`；🔴 **r18 指定之組合已失效，B10E 改用下列實測值**：批 `20260901T132233Z-363ecc4f` 現走 analyze route 會 **422**（`label_origin` 之 `conditional_required_missing`——該批早於現行匯入契約，非本票改壞；B10E 實跑複核）。現行可用之非零組合為 **批 `20260906T105851Z-8cc44eea` × run `ETHUSDT/1h/5ea074390e98405cb83d602fe7b7fb00`**：對齊剔除 12、**coverage 剔除 22**、投影 110（B10E 實跑）；post-trim 剔除則取 **批 `20260909T130533Z-7f73e4c7` × 同 run**：post-trim 剔除 **1**、投影 164。🔴 **不得**取 `20260909T130533Z-7f73e4c7` × 長 run `4a8a0b37…`（實測三種剔除皆 0，屬空心綠））；若日後出現真的發生首尾裁切之 run，另加一組、不取代本條；③ 至少一組非預設 `event_label_spec`；④ 不以 `boundary_hash` 代替逐值比對。
 - 風險緩解：`M-SU-R5-08`、`M-SU-R5-09`、`M-SU-R5-12`、`M-SU-R5-14`、`M-SU-R5-15`、`M-SU-R5-25`。
@@ -1381,7 +1386,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 |---|---|---|---|
 | `R-1` | per-symbol 投影（讓多標的批能跑） | — | 關閉依據：2026-09-12，批次 B8；`docs/SPLITUNIFY_SPEC.D-001.md` 殘留節「本延伸落實」。🔴 **2026-09-15 補同步**：B8 落地時本列未隨 D-001 改狀態（一決定多落點之漏同步）。**關閉範圍**：`derive_event_split_from_plans` 之 Mapping 形式支援多標的；`EventSamplePipeline.run` 入口仍只收單標的（`momentum/Analysis/event_samples/pipeline.py` 具名 fail-closed），且事件掃描之生產路徑整條未走投影 ⇒ 多標的端到端須待生產路徑接上投影（`R-5`）後才有入口。以下為關閉前之敘述，保留供追溯：~~needs-research；`base_universe_hash` 在多標的下之唯一性語意未定；先 fail-closed 比先算錯好~~ |
 | `R-2` | `baseline`／`tables`／`pattern_bridge` 之 OOS 數值變動量 | — | 關閉依據：2026-09-11。🔴 **原本就不該是殘留**：SPEC C-9 把「改前後逐項差異」列為**驗收條件**，而阻塞它的 G-3a 遷移報告在 B2c 就已跑出（`only_in_new_test=['te0']`）。⇒ 以 `scripts/splitunify_c9_diff.py` 實跑，receipt `handoffs/run_receipts/splitunify-c9-diff.json`：**IC 端**四組參數（含真實規模 20352 列）列計畫**逐列相同**；**事件掃描端**差異全部是預期的降級揭露（`cluster_adjusted` 轉 False、`estimand_scope` 標全樣本、`reason` 標沒切分、CI 收斂為 `"unavailable"`）。🔴 **實跑同時挖出一個假數字並當場修掉**：沒切分時 `common.n_symbols` 從空 summary 取 ⇒ 單標的批寫成「**0 個標的**」，且 `degraded=[]` 與 `cluster_adjusted=False` 互相矛盾；改由 manifest 導出並共用 `_degraded_flags`，mutation `M-SU-B3-11`／`-12` 覆蓋 |
-| `R-3` | UAT 項目更新 | user-ruling | 使用者已裁定 UAT 一律最後 |
+| `R-3` | UAT 項目更新 | user-ruling | 使用者已裁定 UAT 一律最後。🔴 **`Task 10.7` 登記之重驗項目（B10E 寫入）**：① **IC 事件分析重跑**——`fe5f715e`（2026-08-28）至 `Task 10.2` 落地之間產出之事件型 IC 結果含未來資訊（`R5-C9` 8.），UAT 須以現行碼重跑並以新值為準，不得沿用舊報告；② **事件掃描端投影**——`Task 10.5` 使掃描端首次有切分，且 `Task 10.7` 真實資料對證於 B10E 修掉兩處兩端分歧（`purge_gap` 雙重計入宣告深度；投影以匯入原值重新對齊），非預設 `event_label_spec`（k／h 使用者自訂）之批次數值隨之改變 ⇒ UAT 須涵蓋「改過 k／h 的事件批」而非只跑預設；③ **前端揭露**（`Task 10.6`）——切分結果、被排除事件三段、實際使用之標籤參數、丟棄列數四塊須在 IC 分析頁實際可見。**判準**：以真實批與真實 run 於瀏覽器完成一次，非以測試代替 |
 | `R-4` | `extract_event_patterns` 無 **production** caller（測試 caller 8 處） | blocked-by | 本票只保證其消費之 `assignments` 語意不變；接線屬另一票 |
 | `R-5` | 事件掃描端取得 post-trim feature universe | needs-research | 要新增 `features_run_id` 跨棧參數（請求模型／前端／契約／UAT 全動），且 `EventImportService` 目前完全不碰 FF run ⇒ 超出本票；R2 之 D1 裁定事件掃描端恆走 event-study-only。日後實作**不得**刪除 Task 3.3 分支 |
 | `SU-RESID-2` | 多 TF 之 `(event_id, feature_timeframe)` 複合鍵 | blocked-by | 關閉依據：2026-09-15；`Task 9.3` 落地 `4dcae642`，review-r48 兩家 APPROVED ⇒ `assignments`／`purged` 已退回事件級並同步計數；SPEC v42 §N 同名條目同步。以下為關閉前之敘述，保留供追溯：**部分關閉；🔴 v32 改寫「未關閉的那一半」之定義（`COMPOSER-R36-P1-07`）——原文把「複合鍵要連 `EventSplitPlan` 下游一起改」當未竟之工，三家判定那一半本來就不該做；未關閉者改為「把 `assignments`／`purged` 退回事件級並同步計數（`Task 9.3`）」。下方為 v32 前敘述，保留供追溯**：🔴 **v35 更正（`CODEX-R38-P1-03`／`COMPOSER-R38-P1-03`）——producer／schema 面已關閉的只有 `event_keys` 稽核層**：`Task 9.2`＋`9.2a` 使 producer 停止單選、於 `event_keys` 輸出全量 `(event_id, feature_timeframe)` 列，guard 判準改複合鍵唯一（退回後 `assignments`／`purged` 端改驗 `event_id` 唯一）；~~`assignments`／`purged` 加 `feature_timeframe` 欄~~ 屬 v32 判定之做過頭，由 `Task 9.3` 退回，**不得據本列保留該欄**。🔴 **側別錨定（`Task 9.2b`）亦已於批次 B9C 關閉**（R27 `GROK-R27-P1-02`：帳面未隨批次前進）——事件級 `decision_at_ms` 三段式已落地、`feature_cutoff_ms` 退出 `split_label`、(3.2) 異側與跨表混態皆 fail-closed。🔴 **尚未關閉者＝`Task 9.3` 之 `assignments`／`purged` 事件級退回與同步計數**（v35 同步本列首句之 v32 定義；~~下游消費面九處逐處處置~~ v32 起多數改判維持現狀，見 `Task 9.3` 下游表）；~~與側別錨定（`Task 9.2b`）~~ ⇒ ~~原文「複合鍵要連 `EventSplitPlan` 之下游一起改」現只剩消費面那一半~~。**為何現在不做**：`blocked-by:Task 9.3 尚未實作`——依賴序明定 `9.2a → 9.2b → 9.3`，不得跳。🔴 **本列狀態自 R22 `CODEX-R22-P1-01` 更正**：主委於 R21 依 `CODEX-R21-P1-02` 之同型掃描曾標「已關閉」（那次只點名 `Task 2.2`），R22 該家實查指出下游仍在 `Task 9.3` ⇒ 只能部分關閉 |
@@ -1406,7 +1411,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A～B10D 已收批（B10D 共七輪審碼）；最後一批 B10E：Task 10.6 前端＋Task 10.7 兩端對證 |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A～B10D 已收批；最後一批 B10E 實作完成（含兩處兩端分歧之修），待 b12 審碼收斂後收票 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
