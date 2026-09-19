@@ -41,8 +41,10 @@
 | 170 | RM-TIERTOGGLE | TIERTOGGLE 幽靈開關（具名 preset 之 IC Decay／Grouped IC） | 已完成 | 白話說明/EVTLABEL施工進度.md | — |
 | 180 | RM-FU-3 | FU-3 報告逐 stage 耗時揭露（併 EVTLABEL P1） | 已完成 | momentum/Analysis/ic_filter_orchestrator.py（metadata.stage_timings） | — |
 | 190 | RM-FU-4 | FU-4 IC 頁說明框：報酬版 vs 標籤版（併 EVTLABEL Task 3.9） | 已完成 | docs/EVTLABEL_TODO.md Task 3.9 | — |
-| 200 | RM-GLOBALH | GLOBALH 多 horizon 全算＋逐列標 h／k＋可篩（中票） | 未開工 | 白話說明/接下來要做的票.md | SPLITUNIFY 收尾（R-5）後開票，不插隊 |
+| 200 | RM-GLOBALH | GLOBALH 多 horizon 全算＋逐列標 h／k＋可篩（中票） | 未開工 | 白話說明/接下來要做的票.md | 排序第 3（委員會 2026-09-19 共識：與 ICPATH 分開、排其後，理由＝兩者資料層不同，合併會返工） |
 | 210 | RM-DOCROT | DOCROT 文檔多輪根因（治理） | 已完成 | handoffs/reconcile/20260912-docrot-x-consult-r3/synth.md | — |
+| 220 | RM-SEARCH2EVENT | SEARCH2EVENT 搜尋條件→事件批接線（純轉接器） | 未開工 | handoffs/reconcile/20260919-icpath-x-consult-r1/synth.md | 排序第 1；範圍鎖死為轉接器（不讀報告摘要、不帶逐列模式與答案窗參數、只產現行匯入契約之批） |
+| 230 | RM-ICPATH | ICPATH 已完成項兩路支援＋區分＋改正（含盤點） | 未開工 | docs/IC_QUANT_GAP_REGISTRY.md「兩路涵蓋宣告」節 | 排序第 2（大票）；盤點為其規格第一段不另開票，粒度六欄；含邊際 IC 事件型補驗收為其 Task |
 <!-- END GENERATED: roadmap-status -->
 
 ### 治理票
