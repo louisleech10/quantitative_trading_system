@@ -57,6 +57,41 @@ def _batch_id() -> str:
     return json.loads(BATCH_FILE.read_text(encoding="utf-8"))["import_id"]
 
 
+def test_required_real_data_present_or_fail_closed() -> None:
+    """🔴 `CODEX-R2-P2-02`：本檔所依賴之真實資料缺席時**轉紅**，不是整批 skip。
+
+    🔴 問題不是 `_require` 的 skip 本身（資料缺席時 skip 是對的，禁以合成 fixture
+    代替），而是**只看 rc 分不出「17 passed」與「17 skipped」**——`COV_BATCH_FILE`
+    一被刪，重疊守衛那條就靜默消失而 `pytest` 仍 rc=0。
+    ⇒ 由本條單獨承擔 fail-closed：缺任一必需檔即紅，其餘各條維持 skip 語意。
+
+    🔴 另釘**內容**而非只釘存在：批之 `import_id` 與事件筆數一併斷言，
+    該批被重凍成另一份內容時本條轉紅，而不是讓下游測試在新內容上「剛好還是綠」。
+    """
+    required = {
+        "BATCH_FILE": (BATCH_FILE, "20260909T130533Z-7f73e4c7", 165),
+        "MULTI_BATCH_FILE": (MULTI_BATCH_FILE, "20260902T124358Z-ef2c6cd1", 165),
+        "COV_BATCH_FILE": (COV_BATCH_FILE, "20260906T105851Z-8cc44eea", 219),
+    }
+    missing = [name for name, (p, _, _) in required.items() if not p.exists()]
+    missing += [n for n, p in (("RUN_1H", RUN_1H), ("RUN_1H_SHORT", RUN_1H_SHORT),
+                               ("KLINE", KLINE)) if not p.exists()]
+    assert not missing, (
+        f"本檔之驗收依賴下列真實資料，現已缺席：{missing}。"
+        "缺席時其餘各條會 skip 而 pytest 仍 rc=0 ⇒ 守衛靜默消失，故在此 fail-closed。"
+        "🔴 **不得**以合成 fixture 補齊（CLAUDE.md 資料真實性鐵律）。"
+    )
+    for name, (path, want_id, want_n) in required.items():
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        assert payload.get("import_id") == want_id, (
+            f"{name} 之 import_id 已變（{payload.get('import_id')!r} ≠ {want_id!r}）"
+        )
+        assert len(payload.get("records") or []) == want_n, (
+            f"{name} 之事件筆數已變（{len(payload.get('records') or [])} ≠ {want_n}）"
+            "——下游之非零前提可能不再成立"
+        )
+
+
 def _multi_batch_id() -> str:
     return json.loads(MULTI_BATCH_FILE.read_text(encoding="utf-8"))["import_id"]
 
@@ -409,6 +444,48 @@ def test_coverage_and_post_trim_drop_lists_are_disjoint() -> None:
     )
     for key in ("dropped_by_coverage", "dropped_outside_post_trim_index"):
         assert int(pa[key]["count"]) == len(pa[key]["ids"]), f"{key} 之計數與 ID 數不符"
+
+
+def test_projection_input_event_ids_equal_allowed_set(monkeypatch) -> None:
+    """🔴 `CODEX-R2-P2-01`：投影**實際消費**之 `event_id` 集合**逐值等於**存活集合。
+
+    🔴 筆數守恆擋不住「等長、錯內容」：三步剔除若剔錯人但剔對數量，
+    `len` 完全一樣。本條在投影入口攔截實際傳入之 records，與回應揭露推得之
+    存活集合做集合相等（`missing`／`extra` 兩側皆列出）。
+
+    鑑別力：把 `projected_records` 改成「剔除數量相同但換一批 event_id」
+    （例：改取 `records[:len(allowed)]`）⇒ 筆數守恆那條仍綠，本條轉紅。
+    """
+    _require(BATCH_FILE, RUN_1H_SHORT, KLINE)
+    from momentum.Analysis.event_samples.pipeline import EventSamplePipeline
+
+    captured: dict = {}
+    real = EventSamplePipeline.run_projection_with_params
+
+    def _spy(self, records, bars_by_tf, **kw):
+        captured["ids"] = {str(r.get("event_id")) for r in records}
+        return real(self, records, bars_by_tf, **kw)
+
+    monkeypatch.setattr(EventSamplePipeline, "run_projection_with_params", _spy)
+    out = _post({"horizons": [1],
+                 "feature_run": {"symbol": SYM, "timeframe": TF, "config_hash": FF_RUN_SHORT}})
+
+    pa = out["period_alignment"]
+    all_ids = {str(r["event_id"])
+               for r in json.loads(BATCH_FILE.read_text(encoding="utf-8"))["records"]}
+    dropped = set(pa["dropped_by_coverage"]["ids"]) | set(pa["dropped_outside_post_trim_index"]["ids"])
+    for slot in out["excluded_by_symbol"].values():
+        dropped |= set(slot["event_ids"])
+    expected = all_ids - dropped
+
+    assert captured.get("ids") is not None, "投影入口未被呼叫——本條前提不成立"
+    assert dropped, "本條前提不成立：該組合未剔除任何事件"
+    missing = sorted(expected - captured["ids"])
+    extra = sorted(captured["ids"] - expected)
+    assert not missing and not extra, (
+        f"投影消費集合與存活集合不符：缺 {missing[:5]}（共 {len(missing)}）、"
+        f"多 {extra[:5]}（共 {len(extra)}）"
+    )
 
 
 def test_projection_consumes_only_surviving_events() -> None:
