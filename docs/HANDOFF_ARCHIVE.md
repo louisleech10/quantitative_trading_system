@@ -357,3 +357,55 @@
 - 2026-09-17：B-63 → commit `58515525`
 - 2026-09-17：B-63 → commit `a8fbab77`
 - 2026-09-17：B-63 → `handoffs/reconcile/20260915-docrot2-b4-review-r2/synth.md`
+
+<!-- ENTRY: R-5 -->
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-consult-r3/synth.md`
+- 2026-09-17：R-5 → `docs/SPLITUNIFY_SPEC.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r14/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r15/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r7/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r8/synth.md`
+- 2026-09-17：R-5 → `白話說明/SPLITUNIFY規格白話.md`
+- 2026-09-17：R-5 → `handoffs/20260911-SPLITUNIFY-B9-STAMP-R13-BRIEF.md`
+- 2026-09-17：R-5 → `handoffs/20260911-SPLITUNIFY-X-CONSULT-R4-BRIEF.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-b9-stamp-r13/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-consult-r4/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r16/synth.md`
+- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r9/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r10/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r17/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r18/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r19/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r20/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r11/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r12/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r13/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r1/synth.md`
+- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r2/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-consult-r1/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r9/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r10/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r11/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r12/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r13/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r14/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r15/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r16/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r17/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r18/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r19/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r20/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r1/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r2/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r3/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r4/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r5/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r6/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r7/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b12-stamp-r1/synth.md`
+- 2026-09-19：R-5 → `scripts/splitunify_r5_parity.py`
+- 2026-09-19：R-5 → `tests/golden/splitunify/r5_parity.json`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b12-review-r1/synth.md`
+- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b12-stamp-r2/synth.md`
+- 2026-09-19：R-5 → commit `fd55d018`
+- 2026-09-19：R-5 → commit `bbf2e331`

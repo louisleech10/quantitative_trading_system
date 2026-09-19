@@ -5,8 +5,6 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-017 | SU-B10E | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | splitCapability 兩條新 reason 文案已上線；待做 Task 10.6 請求三欄接線與畫面、Task 10.7 對證腳本 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A～B10D 已收批（B10D 共七輪審碼）；最後一批 B10E：Task 10.6 前端＋Task 10.7 兩端對證 |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -15,10 +13,8 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-017 | SU-B10E | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | splitCapability 兩條新 reason 文案已上線；待做 Task 10.6 請求三欄接線與畫面、Task 10.7 對證腳本 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A～B10D 已收批（B10D 共七輪審碼）；最後一批 B10E：Task 10.6 前端＋Task 10.7 兩端對證 |
 | 03-007 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 03-008 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 03-009 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
@@ -89,52 +85,13 @@
 - 🔴 **收斂檔要能當 `--reconcile` 用，必須有 `## 戳記` 區段**：無該區段時 `bash scripts/reconcile_body_hash.sh <檔>` rc=1，派工單若叫委員跑該命令算 body hash，等於叫他們跑一條必失敗的指令（2026-09-18 由委員擋下）。補該區段時**不得**多插空白列——本體須與委員所審逐字相同，`printf '\n## 戳記\n'` 會多一行而改掉 body hash（同日再被擋一次）。
 - 🔴 **同一 `config_hash` 可存在於多個 symbol**（2026-09-18 實測 BCHUSDT 與 ETHUSDT 同雜湊）：以 glob 取 run 目錄時須再以事件批之 symbol 篩選，命中多於一個即 fail-closed，否則會拿到別的幣種之 run。
 - 🔴 **headless 搜尋探針會寫應用層快取 `data_cache/kline_cache.h5`**（2026-09-18 我造成之副作用，該檔現為 ETHUSDT/1h 1762 根、2 處缺口）：量化主線驗證用的是 `data_cache/feature_klines/kline_cache.h5`（實測未受影響，1h/4h/12h 各 20352/5088/1696 根、零缺口），兩者不是同一個檔，別互相當證據。
+- 🔴 **批號與 session 名不是同一個計數**：SPLITUNIFY 的第 N 批（B10A…B10E）與 gate 批號 `b<N>` 對不上——B10D 用的是 `b11`（審碼 `b11-review-r1..r7`），B10E 因此是 **`b12`**。開新批前先 `bash scripts/debt_ledger.sh --list | tail` 看最後用到哪個號；session 名重複是 fail-closed，錯了要重開。
+- 🔴 **`verdictgate` 不認「被後續編號取代」**：一條 blocked 意見由後輪以**新編號承接**（甚至翻案）時，原編號從未進任何 `CLOSED:` ⇒ 開下一批被擋，而人看收斂檔會覺得「早就處理完了」。出路＝閉合輪（brief-kind `closure`、session kind `stamp`，只請原提出方核對本家編號）；閉合輪自身不受該閘擋。REF:handoffs/reconcile/20260911-splitunify-b12-stamp-r1/synth.md
+- 🔴 **兩端一致這種不變式，預設參數下驗不出來**：`max(深度, 窗)` 與 `窗`、分析副本與匯入原值，在**預設 `event_label_spec`** 下都同值。驗收組合**必須**含一組使用者改過參數（k／h）的真實批，否則綠燈只證明「預設路徑沒壞」。REF:handoffs/run_receipts/splitunify_r5_parity.b23de79e54b5.json
+- 🔴 **mutation 跑錯組合會得到假存活**：處置帳鍵位移一根那條，在 post-trim 剔除為 0 的組合上位移後每一筆仍落在索引內 ⇒ 預測逐字不變，看起來像「對證面有洞」。判準＝該 mutation 改的那個**判定**在該組合上是否真的會被觸發；配剔除 1 筆的組合後當場轉紅。REF:handoffs/run_receipts/splitunify_r5_parity_mutations.json
+- 🔴 **子集跑不得覆寫完整基準**：`--only <組合>` 跑完寫 golden、單條 mutation 跑完覆寫 receipt——兩者都會把其餘組合／條目**刪掉**，而剩下那份看起來完全正常。同型犯了兩次（2026-09-19），已分別改為「子集跑不寫」與「以 id 合併」。
 
 ## 進行中紀錄
 
 <!-- HISTORY-BEGIN -->
-<!-- ENTRY: R-5 -->
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-consult-r3/synth.md`
-- 2026-09-17：R-5 → `docs/SPLITUNIFY_SPEC.md`
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r14/synth.md`
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r15/synth.md`
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r7/synth.md`
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r8/synth.md`
-- 2026-09-17：R-5 → `白話說明/SPLITUNIFY規格白話.md`
-- 2026-09-17：R-5 → `handoffs/20260911-SPLITUNIFY-B9-STAMP-R13-BRIEF.md`
-- 2026-09-17：R-5 → `handoffs/20260911-SPLITUNIFY-X-CONSULT-R4-BRIEF.md`
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-b9-stamp-r13/synth.md`
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-consult-r4/synth.md`
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r16/synth.md`
-- 2026-09-17：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r9/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r10/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r17/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r18/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r19/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-review-r20/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r11/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r12/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-x-stamp-r13/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r1/synth.md`
-- 2026-09-18：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r2/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-consult-r1/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r9/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r10/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r11/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r12/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r13/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r14/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r15/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r16/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r17/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r18/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r19/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b10-review-r20/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r1/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r2/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r3/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r4/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r5/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r6/synth.md`
-- 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b11-review-r7/synth.md`
 <!-- HISTORY-END -->
