@@ -2008,9 +2008,12 @@ def _assert_event_partition_conserved(*, records, partitions: Dict[str, List[str
     #      ②`momentum/Analysis/event_samples/generator.py:224` 產生
     #        `{symbol}:{tf}:{t0}:{label_id}` 形狀（例 `ETHUSDT:12h:1738843200000:up1`），
     #        提出方實跑 41 列、`suffix_all=True`，送進本閘全數被誤擋。
-    #    ⇒ canonical 形式之強制**需要 provenance**（`event_id_source`），而該欄在落檔
-    #      receipt 與契約內皆不存在 ⇒ 屬匯入時之職責，不在守恆閘重判。
-    #      具名殘留見 `Task 10.5` 之驗證段。
+    #    ⇒ canonical 形式之強制**需要 provenance**（`event_id_source`）。
+    #    🔴 `CODEX-R7-P2-01`：該欄**本身存在**（契約 `receipt_schema.mapping_provenance`
+    #      之一欄，實測落檔值如 `derived_from_template`）——前一版註解寫「不存在」是錯的。
+    #      實質限制在三處：①只在 CSV 欄位對映路徑寫入（實測 24 批僅 5 批帶）；
+    #      ②JSON 直傳與平台產生器路徑不寫；③分析端 DTO 未暴露它，本閘取不到。
+    #      ⇒ 仍屬匯入時之職責，不在守恆閘重判。具名殘留見 `Task 10.5` 之驗證段。
     # 🔴 `CODEX-R6-P2-01`：入口契約須完整——首版只驗 `records` 之型別，
     #    `partitions=None` 會冒 `AttributeError`（未受控），空輸入則靜默 ACCEPT。
     #    空批走到投影路徑本身就是缺陷（上游已有 zero-survivor 閘），在此當成

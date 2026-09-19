@@ -98,8 +98,8 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | 130 | SU-B10A | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
 | 140 | SU-B10B | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
 | 150 | SU-B10C | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
-| 160 | SU-B10D | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 程式已落地（兩端邊界實測逐值相同）；r1–r3 三條 P1 已修補收斂，r4 閉合輪審碼中 |
-| 170 | SU-B10E | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.6 前端＋Task 10.7 真實資料兩端對證與 UAT 登記 |
+| 160 | SU-B10D | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
+| 170 | SU-B10E | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | B10D 已收批（r7 兩家 proceed、零 blocking）；開工 Task 10.6 前端＋Task 10.7 兩端對證 |
 <!-- END GENERATED: splitunify-batch-status -->
 
 🔴 **Phase 9 依賴序（`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md` 裁定；三家＋主委獨立版四方一致）**：
@@ -1234,7 +1234,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
     - `test_partition_gate_uses_exact_identity_without_rewriting`（守恆比對前不得改寫身分；帶空白之 ID 由雙向差集擋下）
     - `test_partition_gate_accepts_platform_generated_suffix_ids`（平台產生器之 label 後綴 ID 不得被誤擋）
   - mutation 自證：`M-SU-R5-22` 投影改用匯入原值對齊 ⇒ `..._matches_ic_windows` 轉紅；`M-SU-R5-23` 事件掃描端自寫預設 ⇒ AST 那條轉紅；`M-SU-R5-11` 回應模型不宣告新欄 ⇒ route 那條轉紅
-- **具名殘留**：分區守恆閘**不重判 `event_id` 之 canonical 形式**。理由為 `blocked-by`：契約之 `_event_id_template_doc` 逐字寫「僅**使用者宣告之匯入批次**強制……平台產生器之 ID 另帶 label 後綴，**不受此約束**」，故重判須先知道該批之 provenance，而 `event_id_source` 欄在落檔 receipt 與契約內**皆不存在**。⇒ canonical 形式之強制留在匯入時（`EventSamplePipeline.validate` 開 `enforce_canonical_event_id`）；守恆閘只做 exact identity、唯一性、型別與雙向差集。日後若要在分析端重判，前置條件是先在**契約**登記 provenance 欄，不得在分析端自訂寬鬆版本。
+- **具名殘留**：分區守恆閘**不重判 `event_id` 之 canonical 形式**。理由為 `blocked-by`：契約之 `_event_id_template_doc` 逐字寫「僅**使用者宣告之匯入批次**強制……平台產生器之 ID 另帶 label 後綴，**不受此約束**」，故重判須先知道該批之 provenance。🔴 **`event_id_source` 欄本身是存在的**（契約 `receipt_schema.mapping_provenance` 之一欄，實測落檔值如 `derived_from_template`），實質限制在三處：①它**只在 CSV 欄位對映路徑寫入**——實測 24 個落檔批僅 5 個帶該欄；②JSON 直傳與平台產生器路徑**不寫**該欄；③分析端之 DTO **未暴露**它，守恆閘取不到。⇒ canonical 形式之強制留在匯入時（`EventSamplePipeline.validate` 開 `enforce_canonical_event_id`）；守恆閘只做 exact identity、唯一性、型別與雙向差集。日後若要在分析端重判，前置是先定義 producer 之 persistence wire 並把 provenance 傳入分析 DTO，**不得**由分析端再造第二份 canonical 規則。`control_kind`／`source_name`／`contract_version` 皆**不可**替代該 discriminator：前者是批次語意，後兩者不是 ID 來源之封閉枚舉。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`R-3`（UAT）只新增 UAT 條目，不改本接線。
 
@@ -1406,7 +1406,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
 | 020 | R-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 030 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 040 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B／B10C 已收批；B10D 程式已落地並修完三條 P1，r4 閉合輪審碼中；其後為 B10E |
+| 050 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A～B10D 已收批（B10D 共七輪審碼）；最後一批 B10E：Task 10.6 前端＋Task 10.7 兩端對證 |
 | 060 | SU-RESID-2 | 已完成 | docs/SPLITUNIFY_TODO.md §E | — |
 | 070 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 080 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |

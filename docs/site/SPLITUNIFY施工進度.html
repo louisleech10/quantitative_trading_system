@@ -27,7 +27,50 @@
 <p>🔴 <strong>狀態不再手寫</strong>：批次、第 9 批各小任務、殘留的狀態，由 <code>scripts/fact_keys.json</code> 產生（與施工清單
 <code>docs/SPLITUNIFY_TODO.md</code> §B／§C-9／§E 同一份來源），請勿手改。本檔其餘段落只寫「發生過什麼」。
 接下來的順序（你裁定；DOCROT2 已於 9/17 結束）：重開一次規格審查＋最後一批（<code>R-5</code>）→ GLOBALH → 你的 UAT 驗收（<code>R-3</code>，B26–B34＋新增項目）。
-<strong>9/19 中午現在在哪</strong>：<strong><code>B10D</code> 施工中，程式已寫完，正在第 4 輪審碼</strong>。<code>B10D</code> 一句話：<strong>讓「事件掃描頁」和「IC 分析頁」用同一條切分線</strong>。以前掃描頁根本不碰特徵檔，所以它從來沒有切分過；現在接上了，實測兩邊算出來的切分線<strong>逐位元組相同</strong>（同一批事件、同一個特徵檔）。</p>
+<strong>9/19 下午現在在哪</strong>：<strong><code>B10D</code> 已收批</strong>（共七輪審碼，最後一輪兩位委員都沒有問題）。只剩<strong>最後一批 <code>B10E</code></strong>：前端顯示 ＋ 兩端數字對證。</p>
+<p><code>B10D</code> 一句話：<strong>讓「事件掃描頁」和「IC 分析頁」用同一條切分線</strong>。以前掃描頁根本不碰特徵檔，所以它從來沒有切分過；現在接上了，實測兩邊算出來的切分線<strong>逐位元組相同</strong>（同一批事件、同一個特徵檔）。</p>
+<p>🔴 <strong>七輪裡有兩輪是我自己判斷錯、被委員翻案</strong>，這兩件比修好的東西更值得記：</p>
+<ul>
+<li><strong>第 5 輪</strong>我加了一道「事件編號必須符合公式」的檢查，理由是「我掃過全部 1664 筆資料，零例外」。第 6 輪委員拿出規格文件<strong>逐字</strong>證明我錯了——規格白紙黑字寫著「平台自動產生的編號另帶後綴，不受此限」，而我那道檢查會把 41 筆合法資料全擋掉。<strong>我測的是現有資料，沒測產生程式碼</strong>，而我自己在派工單的「我沒查」欄就寫了這一條。</li>
+<li><strong>第 7 輪</strong>我寫殘留理由說「某個欄位不存在」，委員查出<strong>它其實存在</strong>，只是還沒傳到分析端。理由寫錯比沒寫更糟——下一個人會照著它放棄，其實只差一步。</li>
+</ul>
+<p>共同點是：<strong>拿一次不完整的查證去支撐一個全稱結論</strong>。規格文件本身就是一手證據，比掃資料更直接。</p>
+<p><strong>前六輪抓到什麼</strong>（都是真缺陷，都已修）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>輪次</th>
+<th>白話講抓到什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第 1 輪</td>
+<td>我把「哪些事件該剔除」算得很仔細，<strong>最後送進計算的卻是沒篩過的原始清單</strong>——算了沒用</td>
+</tr>
+<tr>
+<td>第 2 輪</td>
+<td>測試只比「數量對不對」，沒比「是不是同一批人」。數量一樣但換一批人，測試照樣綠</td>
+</tr>
+<tr>
+<td>第 3 輪</td>
+<td><strong>12 個事件憑空消失</strong>：不在任何一份「被剔除」的清單裡，系統還回報成功</td>
+</tr>
+<tr>
+<td>第 4 輪</td>
+<td>我第 3 輪加的那道總帳<strong>自己有四個方向漏水</strong>（重複編號被折疊、<code>None</code> 被變成合法值、只檢查單一方向、有一條路徑完全跳過）</td>
+</tr>
+<tr>
+<td>第 5 輪</td>
+<td>總帳在比對前會<strong>改寫</strong>編號（去掉前後空白），於是真正的不一致被我自己的程式抹平</td>
+</tr>
+<tr>
+<td>第 6 輪</td>
+<td>見上（翻案）</td>
+</tr>
+</tbody>
+</table></div>
+<p>貫穿全部的教訓：<strong>檢查之前不要「整理」資料</strong>。整理本身就會製造出合法值——<code>None</code> 變成一個叫 <code>&quot;None&quot;</code> 的事件、<code>&quot; A &quot;</code> 和 <code>&quot;A&quot;</code> 變成同一個人。要驗資料合不合法，去問規格，不要自己定一個寬鬆版本。</p>
 <p>🔴 <strong>但連續三輪審碼都抓到我真的寫錯的地方，而且是同一個形狀的錯</strong>：</p>
 <div class="table-wrap"><table>
 <thead>
@@ -191,16 +234,16 @@
 <tr>
 <td>160</td>
 <td>SU-B10D</td>
-<td>進行中</td>
+<td>已完成</td>
 <td>docs/SPLITUNIFY_TODO.md §C-10</td>
-<td>Task 10.5 程式已落地（兩端邊界實測逐值相同）；r1–r3 三條 P1 已修補收斂，r4 閉合輪審碼中</td>
+<td>—</td>
 </tr>
 <tr>
 <td>170</td>
 <td>SU-B10E</td>
-<td>未開工</td>
+<td>進行中</td>
 <td>docs/SPLITUNIFY_TODO.md §C-10</td>
-<td>Task 10.6 前端＋Task 10.7 真實資料兩端對證與 UAT 登記</td>
+<td>B10D 已收批（r7 兩家 proceed、零 blocking）；開工 Task 10.6 前端＋Task 10.7 兩端對證</td>
 </tr>
 </tbody>
 </table></div>
@@ -316,7 +359,7 @@
 <td>R-5</td>
 <td>進行中</td>
 <td>docs/SPLITUNIFY_SPEC.md Phase 10</td>
-<td>B10A／B10B／B10C 已收批；B10D 程式已落地並修完三條 P1，r4 閉合輪審碼中；其後為 B10E</td>
+<td>B10A～B10D 已收批（B10D 共七輪審碼）；最後一批 B10E：Task 10.6 前端＋Task 10.7 兩端對證</td>
 </tr>
 <tr>
 <td>060</td>
