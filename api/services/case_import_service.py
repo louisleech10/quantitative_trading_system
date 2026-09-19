@@ -1818,7 +1818,22 @@ class EventImportService:
             purge_gap=max(int(purge_rows), int(iso.label_window_rows)),
             lookahead_depth_rows=int(iso.lookahead_depth_rows),
         )
+        # 🔴 **`CODEX-R3-P1-01`：對齊階段之失敗是第四個分區，漏了它守恆就破**。
+        #    `prepare_analysis_windows` 內部把 `align_events` 的 `_failures` 逐字丟棄
+        #    （底線命名即是證據），失敗事件根本不會出現在 `prepared0.windows`
+        #    ⇒ 它們既不在 coverage 清單、也不在 post-trim 與 symbol 清單，
+        #    最終 `align_failures` 也是空的（那是**投影後**的失敗），於是使用者看到
+        #    HTTP 200 而 12 個事件憑空消失。實測：輸入 219、對齊後窗 207。
+        #    🔴 不以「修改測試 expected 吞掉」了事——那正是把守恆破口寫進驗收。
+        aligned_ids = {str(w.event_id) for w in prepared0.windows}
+        dropped_in_alignment = sorted(
+            str(r.get("event_id")) for r in records
+            if str(r.get("event_id")) not in aligned_ids
+        )
         period_alignment = {
+            "dropped_in_alignment": {
+                "count": len(dropped_in_alignment), "ids": dropped_in_alignment,
+            },
             "dropped_by_coverage": {"count": len(dropped_by_coverage), "ids": dropped_by_coverage},
             "dropped_outside_post_trim_index": {
                 "count": len(dropped_outside_index), "ids": dropped_outside_index,
@@ -1847,6 +1862,35 @@ class EventImportService:
             raise ValueError(
                 f"投影輸入筆數（{len(projected_records)}）與存活事件數（{len(allowed)}）不符"
                 "——records 與對齊窗之 event_id 對不上（fail-closed，不半套投影）"
+            )
+        # 🔴 **分區守恆閘**（`CODEX-R3-P1-01`）：每個輸入事件恰落**一個**具名分區
+        #    （對齊失敗／coverage／post-trim／他 symbol／存活）。筆數守恆擋不住
+        #    「某一步靜默吃掉事件」——那正是本 finding 的形態：12 筆既不在任何清單、
+        #    也不在 `align_failures`，而 HTTP 仍回 200。
+        #    🔴 用**集合**而非計數：等量錯置（A 分區多一個、B 分區少一個）在計數下看不出來。
+        _partitions = {
+            "dropped_in_alignment": set(dropped_in_alignment),
+            "dropped_by_coverage": set(dropped_by_coverage),
+            "dropped_outside_post_trim_index": set(dropped_outside_index),
+            "excluded_by_symbol": {
+                str(e) for slot in excluded_by_symbol.values() for e in slot["event_ids"]
+            },
+            "projected": set(allowed),
+        }
+        _all_input = {str(r.get("event_id")) for r in records}
+        _union: set = set()
+        _overlaps: Dict[str, set] = {}
+        for _name, _ids in _partitions.items():
+            if _union & _ids:
+                _overlaps[_name] = _union & _ids
+            _union |= _ids
+        _unaccounted = _all_input - _union
+        if _unaccounted or _overlaps:
+            raise ValueError(
+                f"事件分區不守恆（輸入 {len(_all_input)} 筆）："
+                f"未歸戶 {sorted(_unaccounted)[:5]}（共 {len(_unaccounted)}）；"
+                f"重複歸戶 { {k: sorted(v)[:3] for k, v in _overlaps.items()} }"
+                "——每個事件須恰落一個具名分區（fail-closed）"
             )
         res = pipe.run_projection_with_params(
             projected_records, bars,

@@ -69,9 +69,10 @@ def test_required_real_data_present_or_fail_closed() -> None:
     該批被重凍成另一份內容時本條轉紅，而不是讓下游測試在新內容上「剛好還是綠」。
     """
     required = {
-        "BATCH_FILE": (BATCH_FILE, "20260909T130533Z-7f73e4c7", 165),
-        "MULTI_BATCH_FILE": (MULTI_BATCH_FILE, "20260902T124358Z-ef2c6cd1", 165),
-        "COV_BATCH_FILE": (COV_BATCH_FILE, "20260906T105851Z-8cc44eea", 219),
+        # (檔, import_id, records 身分指紋前 16 位)
+        "BATCH_FILE": (BATCH_FILE, "20260909T130533Z-7f73e4c7", "2bc04164bc075807"),
+        "MULTI_BATCH_FILE": (MULTI_BATCH_FILE, "20260902T124358Z-ef2c6cd1", "b99c7a74d76beb52"),
+        "COV_BATCH_FILE": (COV_BATCH_FILE, "20260906T105851Z-8cc44eea", "5c5f9c9cfa9ec2c5"),
     }
     missing = [name for name, (p, _, _) in required.items() if not p.exists()]
     missing += [n for n, p in (("RUN_1H", RUN_1H), ("RUN_1H_SHORT", RUN_1H_SHORT),
@@ -81,14 +82,27 @@ def test_required_real_data_present_or_fail_closed() -> None:
         "缺席時其餘各條會 skip 而 pytest 仍 rc=0 ⇒ 守衛靜默消失，故在此 fail-closed。"
         "🔴 **不得**以合成 fixture 補齊（CLAUDE.md 資料真實性鐵律）。"
     )
-    for name, (path, want_id, want_n) in required.items():
+    # 🔴 `CODEX-R3-P2-01`：只釘 `import_id` 與筆數**擋不住內容替換**——該家實跑把
+    #    `records[0].event_id` 改成與 `records[1]` 相同後，兩欄皆未變而測試仍綠。
+    #    ⇒ 改釘 **records 之 canonical fingerprint**（逐事件之身分三元組排序後雜湊）。
+    #    只雜湊身分欄而非整份 payload：批之非身分欄（例落檔時間戳）本就可能變動，
+    #    拿整檔 SHA 會變成每次重凍都要改測試的噪音閘。
+    import hashlib
+
+    for name, (path, want_id, want_fp) in required.items():
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert payload.get("import_id") == want_id, (
             f"{name} 之 import_id 已變（{payload.get('import_id')!r} ≠ {want_id!r}）"
         )
-        assert len(payload.get("records") or []) == want_n, (
-            f"{name} 之事件筆數已變（{len(payload.get('records') or [])} ≠ {want_n}）"
-            "——下游之非零前提可能不再成立"
+        recs = payload.get("records") or []
+        triples = sorted(
+            f"{r.get('symbol')}|{r.get('timeframe')}|{r.get('t0')}|{r.get('event_id')}"
+            for r in recs
+        )
+        fp = hashlib.sha256("\n".join(triples).encode("utf-8")).hexdigest()[:16]
+        assert fp == want_fp, (
+            f"{name} 之 records 身分指紋已變（{fp} ≠ {want_fp}，{len(recs)} 筆）"
+            "——下游之非零前提可能不再成立；確認資料變更屬意圖後再更新本指紋"
         )
 
 
@@ -446,7 +460,59 @@ def test_coverage_and_post_trim_drop_lists_are_disjoint() -> None:
         assert int(pa[key]["count"]) == len(pa[key]["ids"]), f"{key} 之計數與 ID 數不符"
 
 
-def test_projection_input_event_ids_equal_allowed_set(monkeypatch) -> None:
+@pytest.mark.parametrize("batch_key,ff", [
+    ("BATCH", FF_RUN_SHORT),        # post-trim 剔 1 筆
+    ("MULTI", FF_RUN),              # 他 symbol 排除 66 筆
+    ("COV", FF_RUN_SHORT),          # 對齊失敗 12 ＋ coverage 22 ＋ 他 symbol 75
+], ids=["post_trim", "multi_symbol", "partial_coverage"])
+def test_every_input_event_falls_in_exactly_one_partition(batch_key, ff) -> None:
+    """🔴 `CODEX-R3-P1-01`：**每個輸入事件恰落一個具名分區**，無人憑空消失。
+
+    提出方實跑抓到 12 個 `event_id` 既不在三個剔除清單、也不在 `align_failures`，
+    而服務仍回 HTTP 200。根因是 `prepare_analysis_windows` 內部把 `align_events`
+    的失敗逐字丟棄（`receipts, _failures = align_events(...)`），失敗事件
+    **根本不會出現在 `prepared0.windows`** ⇒ 我原本的揭露從第一步就少算一整類。
+
+    🔴 用**集合**而非計數：等量錯置（A 分區多一個、B 分區少一個）在計數下看不出來。
+    鑑別力：拿掉 `dropped_in_alignment` 分區 ⇒ 部分 coverage 那組轉紅（12 筆未歸戶）。
+    """
+    files = {"BATCH": BATCH_FILE, "MULTI": MULTI_BATCH_FILE, "COV": COV_BATCH_FILE}
+    path = files[batch_key]
+    _require(path, RUN_1H, RUN_1H_SHORT, KLINE)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    out = _post({"horizons": [1],
+                 "feature_run": {"symbol": SYM, "timeframe": TF, "config_hash": ff}},
+                batch_id=payload["import_id"])
+
+    pa = out["period_alignment"]
+    partitions = {
+        k: set(pa[k]["ids"]) for k in
+        ("dropped_in_alignment", "dropped_by_coverage", "dropped_outside_post_trim_index")
+    }
+    partitions["excluded_by_symbol"] = {
+        e for slot in out["excluded_by_symbol"].values() for e in slot["event_ids"]
+    }
+    all_input = {str(r["event_id"]) for r in payload["records"]}
+
+    union: set = set()
+    overlaps = {}
+    for name, ids in partitions.items():
+        if union & ids:
+            overlaps[name] = sorted(union & ids)[:5]
+        union |= ids
+    assert not overlaps, f"分區重疊：{overlaps}"
+
+    n_projected = len(out["event_timestamps"])
+    assert len(all_input) == len(union) + n_projected, (
+        f"分區不守恆：輸入 {len(all_input)} ≠ 剔除 {len(union)} ＋ 投影 {n_projected}；"
+        f"各分區 { {k: len(v) for k, v in partitions.items()} }"
+    )
+
+
+@pytest.mark.parametrize("batch_key,ff_run", [
+    ("BATCH", FF_RUN_SHORT), ("MULTI", FF_RUN), ("COV", FF_RUN_SHORT),
+], ids=["post_trim", "multi_symbol", "partial_coverage"])
+def test_projection_input_event_ids_equal_allowed_set(batch_key, ff_run, monkeypatch) -> None:
     """🔴 `CODEX-R2-P2-01`：投影**實際消費**之 `event_id` 集合**逐值等於**存活集合。
 
     🔴 筆數守恆擋不住「等長、錯內容」：三步剔除若剔錯人但剔對數量，
@@ -456,7 +522,9 @@ def test_projection_input_event_ids_equal_allowed_set(monkeypatch) -> None:
     鑑別力：把 `projected_records` 改成「剔除數量相同但換一批 event_id」
     （例：改取 `records[:len(allowed)]`）⇒ 筆數守恆那條仍綠，本條轉紅。
     """
-    _require(BATCH_FILE, RUN_1H_SHORT, KLINE)
+    files = {"BATCH": BATCH_FILE, "MULTI": MULTI_BATCH_FILE, "COV": COV_BATCH_FILE}
+    path, ff = files[batch_key], ff_run
+    _require(path, RUN_1H, RUN_1H_SHORT, KLINE)
     from momentum.Analysis.event_samples.pipeline import EventSamplePipeline
 
     captured: dict = {}
@@ -467,13 +535,15 @@ def test_projection_input_event_ids_equal_allowed_set(monkeypatch) -> None:
         return real(self, records, bars_by_tf, **kw)
 
     monkeypatch.setattr(EventSamplePipeline, "run_projection_with_params", _spy)
+    payload = json.loads(path.read_text(encoding="utf-8"))
     out = _post({"horizons": [1],
-                 "feature_run": {"symbol": SYM, "timeframe": TF, "config_hash": FF_RUN_SHORT}})
+                 "feature_run": {"symbol": SYM, "timeframe": TF, "config_hash": ff}},
+                batch_id=payload["import_id"])
 
     pa = out["period_alignment"]
-    all_ids = {str(r["event_id"])
-               for r in json.loads(BATCH_FILE.read_text(encoding="utf-8"))["records"]}
-    dropped = set(pa["dropped_by_coverage"]["ids"]) | set(pa["dropped_outside_post_trim_index"]["ids"])
+    all_ids = {str(r["event_id"]) for r in payload["records"]}
+    dropped = set(pa["dropped_in_alignment"]["ids"]) | set(pa["dropped_by_coverage"]["ids"]) \
+        | set(pa["dropped_outside_post_trim_index"]["ids"])
     for slot in out["excluded_by_symbol"].values():
         dropped |= set(slot["event_ids"])
     expected = all_ids - dropped
