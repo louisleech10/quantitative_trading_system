@@ -32,11 +32,14 @@
   },
 
   "_fail_closed_reasons_doc": "投影與其接線端之 fail-closed 原因封閉集合（SPEC C-0/C-2）。字面由 Python 與前端共用，禁散文複列。multi_symbol_projection_unsupported＝per-symbol 投影未支援前的多標的批（SPEC C-2）；missing_train_plan／missing_test_plan＝缺任一側切分計畫（含 test_plan.row_index 為空，SPEC C-4 第一段之先決 fail-closed）；canonical_feature_universe_unavailable＝呼叫端拿不到 post-trim feature universe，須明示 event-study-only 而非按事件數另切（SPEC C-0 決議③）。🔴 B3 自查發現的第五種情形（train/test 兩 plan 之 base_universe_hash 不同）**刻意不在此登記**：登記會動到已戳記之 SPEC 的封閉值集與前端枚舉面，而該守衛的保護力不依賴字面——它在 split_projection.py 以明文 ValueError 擋下，是否要升格為具名 reason 交 B3 code review 裁定。",
+  "_fail_closed_reasons_task_10_5_doc": "R5-C3 5.（Task 10.5）追加兩條：canonical_holdout_disabled＝生效之 ic_train_test_split 為關；canonical_holdout_insufficient_rows＝列數低於 min_test_rows（_build_holdout_split_plan 回 SkippedResult）。🔴 兩者與既有 canonical_feature_universe_unavailable **語意不同、前端文案須可分辨**：前兩者是「run 找得到、universe 也有，但依 IC 設定本來就不切分」，後者是「根本拿不到 universe」。混用會讓使用者以為自己的 run 壞了。字面唯一產生點＝momentum/Analysis/event_samples/canonical_holdout.py 之 REASON_DISABLED／REASON_INSUFFICIENT_ROWS。",
   "fail_closed_reasons": [
     "multi_symbol_projection_unsupported",
     "missing_train_plan",
     "missing_test_plan",
-    "canonical_feature_universe_unavailable"
+    "canonical_feature_universe_unavailable",
+    "canonical_holdout_disabled",
+    "canonical_holdout_insufficient_rows"
   ],
 
   "_test_segment_count_keys_doc": "SPLITUNIFY Task 4.1／SPEC C-6：**整份 report**（不只 metadata）中鍵名含 `test` 且值為整數之鍵的**封閉登記**，dotted path 自 report 根起算（list 索引與 per-feature 名一律正規化為 `*`）。判準是 **deny-by-default**：掃到的每一個都必須落在下面四個桶之一，否則測試紅——新鍵必須先進本登記才寫得出去。🔴 B4 review R1 三家獨立命中：原版只掃 metadata 且只做正向計數，codex 實測注入 `summary_table[0].verification_test_event_count` 與 `validation.test_event_count` 皆**未被抓到**。🔴 同輪另一發現（grok）：事件路徑上 `oos_downgrade.test_rows` 其實是**事件數**（與 canonical 同值 13），原本被誤登記為列語意 ⇒ 已改列入 must_equal_canonical。C-6 之文字是「恰一個」，本實作採**更強且可機械化**的等價形式：canonical 恰一個，其餘同語意鍵**必須逐值等於** canonical——真正要禁的是「同一個問題兩個**不同**答案」（實測症狀 31 vs 33），而報告中同一個數字在多個 section 出現是既有事實（實測 7 處），逐一刪除會波及本票以外的消費者。此偏離已在 B4 review R2 具名送審。",

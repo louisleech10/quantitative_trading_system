@@ -1585,10 +1585,26 @@ class EventImportService:
         #    ⇒ B3 之立場：**能表達就套用，不能表達就拒絕**，絕不靜默折疊。
         #    檢查刻意排在載 bars **之前**：不可表達的下界不該先做任何工作。
         self._assert_scope_embargo_expressible(declaration)
-        bars = self._pipeline.bars_from_kline_cache(symbols, tfs)
         # 🔴 Task 1.12（L3）：深度不可證之批**不進切分**，改走 event-study-only executor。
         #    分派在此發生 ⇒ `split_events` 對該批**根本不會被呼叫**（非「呼叫後再擋」）。
+        # 🔴 `Task 10.5`：本行**提前到載 bars 之前**。投影分支需要的 bars 是
+        #    `trigger_timeframes ∪ {feature_run.timeframe}`（`R5-C4` 3.）——沿用下面那份
+        #    只含觸發週期的 bars，判側錨點那一列根本不在；而先載一次再為投影重載一次，
+        #    同一次請求會讀兩遍 K 線。先分派、再由各分支載自己要的，兩者都避開。
         split_blocked = self._pipeline.lookahead_split_blocked(declaration)
+        #
+        # 🔴 **`R5-C3`：分派順序（不可調）**
+        #    ① 深度不可證（C-0 3.(i)）**優先於本節全部**；② 無 `feature_run` ⇒ C-0 3.(ii)
+        #    既有分支，回應形狀逐位元組同 v5；③ 有 `feature_run` ⇒ 投影。
+        #    寫成單一有序判斷而非三個獨立 `if`：①②③ 之條件**並非互斥**（深度不可證的批
+        #    也可以帶 `feature_run`），先後一亂就會讓本該被擋下的批走進投影。
+        feature_run = getattr(req, "feature_run", None)
+        if (not split_blocked) and feature_run is not None:
+            return self._analyze_with_projection(
+                import_id=import_id, req=req, records=records, declaration=declaration,
+                feature_run=feature_run, symbols=symbols, tfs=tfs,
+            )
+        bars = self._pipeline.bars_from_kline_cache(symbols, tfs)
         # 🔴 SPLITUNIFY Task 3.3 ①（SPEC C-0 決議③；R2 之 D1 裁定）：**事件掃描端恆走
         #    event-study-only**。理由是碼證而非偏好——本 service 手上只有匯入的事件與 K 線，
         #    **完全不碰 FF run**，拿不到 canonical feature universe（＝IC 主線切分所依據的
@@ -1630,6 +1646,276 @@ class EventImportService:
             "event_timestamps_ic_seconds": [int(t) // 1000 for t in res.events["t0"].tolist()],  # IC 主線 row_index＝bar open 秒
         }
         return sanitize_for_json(payload)
+
+    def _analyze_with_projection(
+        self, *, import_id: str, req, records, declaration, feature_run, symbols, tfs,
+    ) -> Dict[str, object]:
+        """SPLITUNIFY `Task 10.5`：帶 `feature_run` 之投影路徑。
+
+        🔴 **順序與 IC 端相同**（`R5-C4` 4.；不可調）：
+          ① 解析標籤參數（共用出口）→ ② 載 bars（觸發週期 ∪ run 週期）→ ③ 對齊
+          → ④ coverage 剔除 → ⑤ post-trim 首尾剔除 → ⑥ run symbol 過濾 → ⑦ 投影。
+        兩端同序才可能逐值相等；任一步換位，同一批事件在兩端的測試段成員就會不同，
+        而兩份數字都看起來很正常——那正是本票要消滅的情形。
+
+        🔴 **全部共用邏輯一律經 `momentum.factories` 出口取得**，本方法不自寫任何一條
+        規則（Rule 3；解耦閘會當場擋直接 import momentum 內層）。
+        """
+        from api.utils.json_serializer import sanitize_for_json
+        from momentum.factories import (
+            create_canonical_holdout_resolver,
+            create_event_label_spec_resolver,
+            create_feature_run_coverage_checker,
+            create_feature_run_locator,
+            create_post_trim_index_loader,
+            load_ic_config,
+        )
+
+        run_symbol = str(feature_run.symbol)
+        run_tf = str(feature_run.timeframe)
+        ff_run = str(feature_run.config_hash)
+        pipe = self._pipeline
+
+        # ── ① 標籤參數：經共用出口解析，事件掃描端**不得**自寫預設（`R5-C10` 1.）──
+        resolve_spec, _SpecError = create_event_label_spec_resolver()
+        resolved = resolve_spec(
+            records,
+            requested_spec=(
+                req.event_label_spec.model_dump(exclude_none=True)
+                if getattr(req, "event_label_spec", None) is not None else None
+            ),
+            declared_receipt=declaration,
+            k_domain=pipe.int_field_domain("decision_offset_bars"),
+            batch_label=str(import_id),
+        )
+        spec = dict(resolved.spec)
+
+        # ── ② bars：觸發週期 ∪ run 週期（`R5-C4` 3.）────────────────────────────
+        tf_inputs = sorted(set(str(t) for t in tfs) | {run_tf})
+        timeframe_seconds = pipe.timeframe_seconds_for(tf_inputs)
+        bars = pipe.bars_from_kline_cache(symbols, tf_inputs)
+
+        # ── ③ 對齊（分析副本；匯入檢核已對匯入原值跑過，不重做）────────────────
+        prepared0 = pipe.prepare_analysis_windows(
+            records, bars,
+            event_label_spec=spec,
+            event_import_id=import_id,
+            lookahead_bars_declared=resolved.lookahead_bars_declared,
+            timeframe_seconds=timeframe_seconds,
+            feature_timeframe=run_tf,
+        )
+
+        # ── ④ coverage 剔除（與 IC 端同一實作）──────────────────────────────────
+        check_coverage, _Cov, _CovErr = create_feature_run_coverage_checker()
+        # 🔴 run 之定位一律經共用出口（`Task 10.5`）：自拼 `data_cache/features/...` 會
+        #    ①繞過 `resolve_run_dir` 的 symbol 篩選與多命中 fail-closed；②在 run 不存在時
+        #    回 `feature_coverage_unknown_legacy_run`（「找不到 manifest」被當成「manifest
+        #    沒有 time_range」），而 `R5-C3` 4. 要的是 `feature_run_not_found`。實跑踩到。
+        resolve_run_dir, feature_run_time_range, _RunErr = create_feature_run_locator()
+        run_dir = resolve_run_dir(ff_run, symbols=[run_symbol])
+        if run_dir.parent.name != run_tf:
+            raise _RunErr(
+                "feature_run_not_found",
+                f"FF run {ff_run!r} 之週期為 {run_dir.parent.name!r}，"
+                f"與請求之 {run_tf!r} 不符——不猜（fail-closed）",
+            )
+        coverage = check_coverage(
+            timeframe_seconds=timeframe_seconds,
+            feature_manifest_time_range=feature_run_time_range(run_dir),
+            event_windows=prepared0.windows,
+        )
+        allowed = (
+            frozenset(coverage.covered_event_ids) & prepared0.allowed_event_ids
+            if coverage.evaluated else prepared0.allowed_event_ids
+        )
+        dropped_by_coverage = sorted(str(e) for e in (prepared0.allowed_event_ids - allowed))
+
+        # ── ⑤ post-trim 首尾剔除（`R5-C4` 1.(b)）────────────────────────────────
+        # 🔴 coverage 用的是 manifest 之時間區間（**裁頭尾前**），而投影對 `anchor_ms`
+        #    落在 post-trim `feature_index` 首尾之外者 raise ⇒ 兩者不是同一條界線，
+        #    必須各剔一次。少了這一步，合法批會在投影內部炸掉而不是被具名剔除。
+        # 🔴 判側錨點＝**特徵 run 週期那列之 `last_bar_open_ms`**（`R5-C9`／`Task 10.3`），
+        #    不是 `WindowRow` 上的任何時刻。經共用出口取得（該出口同時跑 PIT 守衛），
+        #    在此自算就是第二份錨點實作——而兩端錨點不同正是本票要修的洩漏本體。
+        feature_index = create_post_trim_index_loader()(run_dir)
+        index_ms = (feature_index.astype("int64") // 1_000_000).tolist()
+        lo, hi = int(index_ms[0]), int(index_ms[-1])
+        prepared_cov = pipe.apply_event_coverage(prepared0, allowed)
+        row_key_by_id = pipe.feature_row_keys(
+            prepared_cov, feature_timeframe=run_tf,
+            timeframe_seconds=timeframe_seconds, bars_by_tf=bars,
+        )
+        dropped_outside_index = sorted(
+            eid for eid, key in ((str(k), v) for k, v in row_key_by_id.items())
+            if not (lo <= int(key) <= hi)
+        )
+        allowed = allowed - frozenset(dropped_outside_index)
+
+        # ── ⑥ run symbol 過濾（`R5-C4` 2.；與 IC 端同形）────────────────────────
+        excluded_by_symbol: Dict[str, Dict[str, object]] = {}
+        for w in prepared0.windows:
+            sym = str(w.symbol)
+            if sym == run_symbol or str(w.event_id) not in allowed:
+                continue
+            slot = excluded_by_symbol.setdefault(sym, {"count": 0, "event_ids": []})
+            slot["count"] = int(slot["count"]) + 1
+            slot["event_ids"].append(str(w.event_id))
+        allowed = frozenset(
+            str(w.event_id) for w in prepared0.windows
+            if str(w.event_id) in allowed and str(w.symbol) == run_symbol
+        )
+        # 🔴 剔除後零事件 ⇒ fail-closed（`R5-C3` 4.／`R5-C4` 1.、2.）：
+        #    改走 event-study-only 冒充成功，使用者會拿到一份「分析完成」卻與他指定之
+        #    run 毫無關係的報告。
+        if not allowed:
+            raise ValueError(
+                f"事件批 {import_id!r} 在 coverage 剔除（{len(dropped_by_coverage)} 筆）、"
+                f"post-trim 首尾剔除（{len(dropped_outside_index)} 筆）與 run symbol 過濾"
+                f"（排除 {sorted(excluded_by_symbol) or '無'}）之後沒有任何事件可投影"
+                f"——不以 event-study-only 冒充成功"
+            )
+        prepared1 = pipe.apply_event_coverage(prepared0, allowed)
+
+        # ── ⑦ canonical 邊界 ＋ 投影 ────────────────────────────────────────────
+        iso = pipe.isolation_terms_rows(
+            prepared1.windows,
+            lookahead_bars_declared=resolved.lookahead_bars_declared,
+            timeframe_seconds=timeframe_seconds,
+            feature_timeframe=run_tf,
+        )
+        purge = pipe.project_purge(prepared1.purge_lower_bound_ms_by_symbol)
+        distinct = {row.purge_lower_bound_ms for row in prepared1.purge_lower_bound_ms_by_symbol}
+        if len(distinct) > 1:
+            raise ValueError(
+                f"各 symbol 之 purge 下界不一致（{sorted(distinct)}）"
+                "——IC 切分器只接受全域 scalar embargo（同 IC 端之 §D-3′-a(ii)）"
+            )
+        purge_ms = distinct.pop() if distinct else 0
+        seconds = timeframe_seconds.get(run_tf)
+        if seconds is None:
+            raise ValueError(
+                f"特徵 run 週期 {run_tf!r} 不在注入之 timeframe_seconds 鍵集"
+                f"（{sorted(timeframe_seconds)}）——無法把 purge 下界換算成列數"
+            )
+        purge_rows = -(-int(purge_ms) // (int(seconds) * 1000))   # ceil
+        cfg_override = getattr(req, "config_override", None)
+        ic_cfg = load_ic_config(api_override=cfg_override) if cfg_override else load_ic_config()
+
+        resolve_holdout, _HoldoutError = create_canonical_holdout_resolver()
+        holdout = resolve_holdout(
+            ff_run=ff_run, symbol=run_symbol, ic_config=ic_cfg,
+            purge_gap=max(int(purge_rows), int(iso.label_window_rows)),
+            lookahead_depth_rows=int(iso.lookahead_depth_rows),
+        )
+        period_alignment = {
+            "dropped_by_coverage": {"count": len(dropped_by_coverage), "ids": dropped_by_coverage},
+            "dropped_outside_post_trim_index": {
+                "count": len(dropped_outside_index), "ids": dropped_outside_index,
+            },
+            "post_trim_index_bounds_ms": [lo, hi],
+        }
+        # ── `R5-C3` 5.：run 正確但依 IC 設定沒有 canonical 邊界 ⇒ 具名 unavailable ──
+        if holdout.reason is not None:
+            return sanitize_for_json(self._projection_unavailable_payload(
+                import_id=import_id, req=req, records=records, bars=bars,
+                declaration=declaration, reason=str(holdout.reason), spec=spec,
+                period_alignment=period_alignment, excluded_by_symbol=excluded_by_symbol,
+            ))
+
+        res = pipe.run_projection_with_params(
+            records, bars,
+            train_plan=holdout.train_plan, test_plan=holdout.test_plan,
+            feature_index=holdout.feature_index,
+            universe_timeframe=run_tf, selected_timeframe=run_tf,
+            # 🔴 **聯集必須傳進 config**（`R5-C4` 3.）：`per_tf` 由 `config.timeframes` 決定，
+            #    只給觸發週期時 `build_event_keys` 會以
+            #    「per_tf 無 timeframe=<run 週期> 之列」fail-closed（實跑踩到）。
+            timeframes=tuple(tf_inputs),
+        )
+        tables = pipe.analyze_tables(
+            res, bars, horizons=tuple(int(h) for h in req.horizons),
+            seed=int(req.seed), n_boot=int(req.n_boot),
+        )
+        summary = dict(res.summary)
+        # 🔴 `split_unify` **不在** pipeline 之 summary 內，須經唯一產生點取得
+        #    （`R5-C3` 3.：唯一產生點 `build_split_unify_disclosure`）。
+        #    `n_test` 之語意＝落在 canonical 測試段之**事件數**（與 IC 端逐字相同）；
+        #    `test_timestamps_ms` 只供算 `boundary_hash`，用 `test_plan.row_index` 之毫秒。
+        n_test_events = int(summary.get("n_test") or 0)
+        # 🔴 `test_plan.row_index` 是**位置索引**（`ndarray[int]`），不是時刻——直接當毫秒
+        #    會餵出一串小整數而被 `boundary_hash` 以「測試段時刻有重複」擋下（實跑踩到）。
+        #    正解＝以 post-trim `feature_index` 取對應時刻，與 IC 端同源同單位。
+        test_index_ms = [
+            int(v) for v in (
+                holdout.feature_index[list(holdout.test_plan.row_index)]
+                .astype("int64") // 1_000_000
+            )
+        ]
+        split_unify = pipe.split_unify_disclosure(
+            n_test=n_test_events,
+            test_timestamps_ms=test_index_ms,
+            per_symbol_counts={run_symbol: n_test_events},
+        )
+        payload = {
+            "import_id": import_id,
+            "lookahead_declaration": declaration,
+            "capability": {"split": "ok", "reason": None},
+            # 🔴 `R5-C3` 7.：`embargo_ms` 不是 canonical 邊界之輸入，故此處揭露的是
+            #    **生效之 row 單位 embargo**，不是請求帶進來的毫秒值。
+            "embargo": {"applied_ms": None, "source": "canonical_holdout_rows"},
+            "summary": summary,
+            "align_failures": res.align_failures.to_dict("records") if not res.align_failures.empty else [],
+            "tables": tables,
+            "event_timestamps": [int(t) for t in res.events["t0"].tolist()],
+            "event_timestamps_ic_seconds": [int(t) // 1000 for t in res.events["t0"].tolist()],
+            "split_unify": split_unify,
+            "period_alignment": period_alignment,
+            "excluded_by_symbol": excluded_by_symbol,
+            "event_label_spec": {"spec": spec, "seed_note": resolved.seed_note},
+        }
+        return sanitize_for_json(payload)
+
+
+    def _projection_unavailable_payload(
+        self, *, import_id, req, records, bars, declaration, reason, spec,
+        period_alignment, excluded_by_symbol,
+    ) -> Dict[str, object]:
+        """`R5-C3` 5.：run 找得到、universe 也有，但**依 IC 設定本來就不切分**。
+
+        🔴 與 `canonical_feature_universe_unavailable` **語意不同**：那條是「根本拿不到
+        universe」，這裡是「拿得到但這次不切」（`ic_train_test_split` 關、或列數不足）。
+        兩者混用會讓使用者以為自己的 run 壞了，所以 reason 字面必須分得出來。
+
+        🔴 **回應形狀同 C-0 4.(a)–(c)**（即 event-study-only 之形狀），因為此時確實沒有
+        切分可報；但 `split_unify.reason` 帶具名原因、`period_alignment` 與
+        `excluded_by_symbol` 照常揭露——那兩項是「我們確實照你指定的 run 篩過事件」的證據，
+        缺了就看不出剔除是否發生過。
+        """
+        from api.utils.json_serializer import sanitize_for_json
+
+        pipe = self._pipeline
+        res = pipe.run_event_study_only_with_params(records, bars)
+        tables = pipe.analyze_tables(
+            res, bars, horizons=tuple(int(h) for h in req.horizons),
+            seed=int(req.seed), n_boot=int(req.n_boot),
+        )
+        return sanitize_for_json({
+            "import_id": import_id,
+            "lookahead_declaration": declaration,
+            "capability": {"split": "unavailable", "reason": reason},
+            "embargo": {"applied_ms": None, "source": "not_applicable_event_study_only"},
+            "summary": res.summary,
+            "align_failures": res.align_failures.to_dict("records") if not res.align_failures.empty else [],
+            "tables": tables,
+            "event_timestamps": [int(t) for t in res.events["t0"].tolist()],
+            "event_timestamps_ic_seconds": [int(t) // 1000 for t in res.events["t0"].tolist()],
+            "split_unify": pipe.split_unify_disclosure(
+                n_test=None, test_timestamps_ms=[], reason=reason,
+            ),
+            "period_alignment": period_alignment,
+            "excluded_by_symbol": excluded_by_symbol,
+            "event_label_spec": {"spec": spec},
+        })
 
 
 _event_import_service: Optional[EventImportService] = None

@@ -13,6 +13,8 @@
 """
 from __future__ import annotations
 
+import json
+
 from dataclasses import dataclass
 from datetime import datetime   # `_parse_time_range_endpoint` 之 ISO 解析（隨 coverage 一併搬入）
 from pathlib import Path
@@ -85,6 +87,30 @@ def resolve_run_dir(
             f"FF run {ff_run!r} 在多個路徑命中：{[str(h) for h in hits]}——不猜（fail-closed）",
         )
     return hits[0]
+
+
+def feature_run_time_range(run_dir: Path) -> Optional[Dict[str, Optional[str]]]:
+    """原樣取出 run 之 `feature_manifest.json` 之 `time_range`（**不轉型別**）。
+
+    🔴 **原樣、不猜**（Task 7.7 ①）：manifest 實測為 epoch 秒之**數字字串**。
+    找不到檔或格式不符 ⇒ 回 `None`，由 `check_feature_run_coverage` 判
+    `feature_coverage_unknown_legacy_run`（fail-closed）——在此補一個預設區間，
+    等於宣稱「這個 run 涵蓋你所有事件」，而那是最糟的靜默放行。
+
+    🔴 出生理由（`Task 10.5`）：事件掃描端原本自寫了一份一模一樣的讀取，
+    兩份讀同一個檔的同一個鍵 ⇒ 哪天 manifest 格式改了只會改到一邊。
+    """
+    manifest = Path(run_dir) / "feature_manifest.json"
+    if not manifest.is_file():
+        return None
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    raw = payload.get("time_range") if isinstance(payload, dict) else None
+    if isinstance(raw, dict):
+        return {"start": raw.get("start"), "end": raw.get("end")}
+    return None
 
 
 def load_post_trim_index(run_dir: Path) -> pd.Index:

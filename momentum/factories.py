@@ -1114,6 +1114,26 @@ def create_feature_run_coverage_checker():
     return check_feature_run_coverage, FeatureRunCoverage, FeatureRunCoverageError
 
 
+def create_feature_run_locator():
+    """SPLITUNIFY `Task 10.5`：FF run 之**定位**與 manifest `time_range` 讀取之唯一出口。
+
+    🔴 出生理由：事件掃描端原本自拼 `data_cache/features/<sym>/<tf>/<hash>` 並自讀
+    manifest ⇒ ①run 不存在時回的是 `feature_coverage_unknown_legacy_run`（因為「找不到
+    manifest」被當成「manifest 沒有 time_range」），而 `R5-C3` 4. 要的是
+    `feature_run_not_found`；②繞過了 `resolve_run_dir` 的 symbol 篩選與多命中 fail-closed。
+    兩端一律經本出口。
+
+    回傳 `(resolve_run_dir, feature_run_time_range, CanonicalHoldoutError)`。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        CanonicalHoldoutError,
+        feature_run_time_range,
+        resolve_run_dir,
+    )
+
+    return resolve_run_dir, feature_run_time_range, CanonicalHoldoutError
+
+
 def create_post_trim_index_loader():
     """SPLITUNIFY `R5-C9`：post-trim 特徵索引之**唯一**出口。
 

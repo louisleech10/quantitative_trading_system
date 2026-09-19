@@ -67486,3 +67486,120 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "gate", "blocked_by": [], "closed": ["CODEX-R17-P2-01"], "event": "committee_output", "event_id": "b7b8a464-51b5-4f6c-93ca-51cbebd2a83a", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260911-splitunify-b10-review-r18-codex.md", "output_sha256": "5268c320a96b6afe14d89bb7eb882f00b55ee5688b8f22c9cede1eb8ec17832e", "producer": "audit_append.sh", "round_id": "1a027055-0eb7-47e9-abae-038a441a8554", "schema_version": 1, "sequence": 5202, "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R18", "ts": "2026-09-18T21:03:19Z", "verdict": "proceed"}
 {"actor": "debt_clear", "brief_kind": "closure", "canonical_count": 0, "category_counts": {"code-contract": 0, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "60312685-857b-4710-9d38-48d5e23e507c", "handoff_tree_commit": "c1de64a185fd1e431d9647f50373d54be1f2cea7", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "1a027055-0eb7-47e9-abae-038a441a8554", "round_open_sequence": 5198, "schema_version": 1, "sequence": 5203, "session_name": "20260911-splitunify-b10-review-r18", "stamps": [], "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R18", "ts": "2026-09-18T21:04:08Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "a8be9b11-8c6f-4655-92a8-e826b6fbdce6", "lock_sha256": "6a77c57cb48e83b784032c97d694acf6f354bbcf13bf3d0f651994243af6aedb", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "1a027055-0eb7-47e9-abae-038a441a8554", "schema_version": 1, "sequence": 5204, "session_id": "20260911-splitunify-b10-review-r18", "synth_sha256": "678ab7199576b17b711570cdd7cc4c0a4b9ed40805e34a485d69ff6cc44b12ed", "ts": "2026-09-18T21:04:08Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-impl-b10-claude", "ts": "2026-09-18T21:07:02Z"}
+=== 2026-09-19 05:07:02 | dispatch ===
+  ts=2026-09-19 05:07:02
+  kind=dispatch
+  intent=B10C 收批：SPEC 邊界③補釘 reason 字面、狀態轉已完成
+  risk=low
+  facts_asked=n/a
+  review_role=n/a
+  template=n/a:
+  adversarial=waived:impl-self
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "gate", "batch": "10", "event": "impl_token_issued", "event_id": "08eb0e65-30bb-4073-927b-9584b238e5cd", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260911-SPLITUNIFY", "round_start_head": "c1de64a185fd1e431d9647f50373d54be1f2cea7", "schema_version": 1, "sequence": 5205, "task_id": "20260911-SPLITUNIFY-impl-b10-claude", "ts": "2026-09-18T21:07:02Z"}
+{"actor": "post-commit", "batch": "10", "event": "ticket_commit", "event_id": "0bf73352-01c6-4b6d-9946-8956eea0b382", "origin_script": "git_hooks/post-commit", "prod_files": [], "producer": "audit_append.sh", "root": "20260911-SPLITUNIFY", "schema_version": 1, "sequence": 5206, "sha": "8f66484a31bb2d57f1d971bc71fff8f31579895f", "token_fresh": "true", "trailer": "20260911-SPLITUNIFY/b10", "ts": "2026-09-18T21:07:13Z"}
+{"event":"gate_deny","ts":"2026-09-19T00:24:44Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"877c8b4241ac878aeda26a14596e14f9d56ffe2c6391d3e7398e45b61c03fa3d","cmd_head":"bash scripts/committee_run.sh --session 20260911-splitunify-b10-review-r19 handoffs/20260911-SPLITUNIFY-B10-REVIEW-R19-BRIEF.md handoffs/20260911-splitunify-b10-review-r19 codex -- --task-id 20260911-SPLITUNIFY-B10-REVIEW-R19 --intent \"B10 補裁決輪 r19：請原提出方確認 CODEX-R34-P1-01 已由 R35 承接並補發 CLOSED\" --risk low --facts-asked \"R34 原始斷言是否被 R35 完整承接\" --review-role \"supplemental ruling\" --template \"n/a:\" --adversarial \"waived:review-dispatch\" > /private/tmp/cl"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R19", "ts": "2026-09-19T00:24:49Z"}
+=== 2026-09-19 08:24:49 | dispatch ===
+  ts=2026-09-19 08:24:49
+  kind=dispatch
+  intent=B10 補裁決輪 r19：請原提出方確認 CODEX-R34-P1-01 已由 R35 承接並補發 CLOSED
+  risk=low
+  facts_asked=R34 原始斷言是否被 R35 完整承接
+  review_role=supplemental ruling
+  template=n/a:
+  adversarial=waived:review-dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R19", "ts": "2026-09-19T00:24:58Z"}
+=== 2026-09-19 08:24:58 | dispatch ===
+  ts=2026-09-19 08:24:58
+  kind=dispatch
+  intent=B10 補裁決輪 r19：請原提出方確認 CODEX-R34-P1-01 已由 R35 承接並補發 CLOSED
+  risk=low
+  facts_asked=R34 原始斷言是否被 R35 完整承接
+  review_role=supplemental ruling
+  template=n/a:
+  adversarial=waived:review-dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "closure", "brief_path": "handoffs/20260911-SPLITUNIFY-B10-REVIEW-R19-BRIEF.md", "brief_sha256": "6faea47d81c140e2e1d1d09976da0cbf3cffc77a7f0f4d982ed41039e9de8ac4", "brief_sha256_norm": "6faea47d81c140e2e1d1d09976da0cbf3cffc77a7f0f4d982ed41039e9de8ac4", "event": "committee_round_open", "event_id": "827f00e2-758c-40fe-92af-4e6dd14052e3", "expected_outputs": {"codex": "handoffs/20260911-splitunify-b10-review-r19-codex.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex"], "producer": "audit_append.sh", "quorum_eligible": ["codex"], "round_id": "e5a8edc2-470b-4e39-b7fd-8b00c7a6553c", "schema_version": 1, "sequence": 5207, "session_name": "20260911-splitunify-b10-review-r19", "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R19", "ts": "2026-09-19T00:25:06Z"}
+{"event":"gate_deny","ts":"2026-09-19T00:30:59Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"34ced0627091a9d8b8cab71cd1d05a63a7ffa0d3eb2b522455625cceb48ff6e5","cmd_head":"bash scratchpad/cleanup_tmp.sh && printf '%s\\n' '--- cleanup verification ---' && if [ -d /tmp/claude-501 ]; then echo 'claude-501: preserved'; else echo 'claude-501: MISSING'; exit 1; fi && tmp_workdirs=$(find /tmp -maxdepth 1 -mindepth 1 -type d -name 'tmp.*' -print) && if [ -n \"$tmp_workdirs\" ]; then echo \"$tmp_workdirs\"; exit 1; else echo 'tmp.* workdirs: none'; fi"}
+{"actor": "cx_run", "attempt_id": "431d6d72-613a-4e45-aae8-df7b3d1feed1", "cli_rc": "0", "event": "committee_family_result", "event_id": "610638a7-6506-41cd-8882-cf234fb13f5c", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-splitunify-b10-review-r19-codex.md", "output_sha256": "36de71bc869e235530d54d9085a5c49541f60d4ed655276985b20566502bd177", "producer": "audit_append.sh", "result_state": "success", "round_id": "e5a8edc2-470b-4e39-b7fd-8b00c7a6553c", "schema_version": 1, "sequence": 5208, "ts": "2026-09-19T00:33:48Z"}
+{"actor": "gate", "blocked_by": [], "closed": ["CODEX-R34-P1-01"], "event": "committee_output", "event_id": "2af34396-adee-4de8-984c-ad366fe785aa", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260911-splitunify-b10-review-r19-codex.md", "output_sha256": "36de71bc869e235530d54d9085a5c49541f60d4ed655276985b20566502bd177", "producer": "audit_append.sh", "round_id": "e5a8edc2-470b-4e39-b7fd-8b00c7a6553c", "schema_version": 1, "sequence": 5209, "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R19", "ts": "2026-09-19T00:33:49Z", "verdict": "proceed"}
+{"actor": "debt_clear", "brief_kind": "closure", "canonical_count": 0, "category_counts": {"code-contract": 0, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "d88d29ac-6fb1-443f-831c-0651f83a6ed9", "handoff_tree_commit": "8f66484a31bb2d57f1d971bc71fff8f31579895f", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "e5a8edc2-470b-4e39-b7fd-8b00c7a6553c", "round_open_sequence": 5207, "schema_version": 1, "sequence": 5210, "session_name": "20260911-splitunify-b10-review-r19", "stamps": [], "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R19", "ts": "2026-09-19T00:34:50Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "7901431a-d61a-43e3-8260-b88a53f6542e", "lock_sha256": "ac348e73db34468df89b3d4317f7c43e6276565b4e8dd47898b9928a9b5f1c0e", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex"], "round_id": "e5a8edc2-470b-4e39-b7fd-8b00c7a6553c", "schema_version": 1, "sequence": 5211, "session_id": "20260911-splitunify-b10-review-r19", "synth_sha256": "e629faa4d0cbd24139ce9a44db699315970d8516eec201faa23eb9aff1a061e8", "ts": "2026-09-19T00:34:51Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R20", "ts": "2026-09-19T00:36:32Z"}
+=== 2026-09-19 08:36:32 | dispatch ===
+  ts=2026-09-19 08:36:32
+  kind=dispatch
+  intent=B10 補裁決輪 r20：三條未閉合 finding 之承接判定＋R30-P1-01 之 mutation 對現行 HEAD 重跑
+  risk=low
+  facts_asked=coordinated earlier-row mutation 對現行 HEAD 是否仍 MUTATED_PASS
+  review_role=supplemental ruling
+  template=n/a:
+  adversarial=waived:review-dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R20", "ts": "2026-09-19T00:36:33Z"}
+=== 2026-09-19 08:36:33 | dispatch ===
+  ts=2026-09-19 08:36:33
+  kind=dispatch
+  intent=B10 補裁決輪 r20：三條未閉合 finding 之承接判定＋R30-P1-01 之 mutation 對現行 HEAD 重跑
+  risk=low
+  facts_asked=coordinated earlier-row mutation 對現行 HEAD 是否仍 MUTATED_PASS
+  review_role=supplemental ruling
+  template=n/a:
+  adversarial=waived:review-dispatch
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "closure", "brief_path": "handoffs/20260911-SPLITUNIFY-B10-REVIEW-R20-BRIEF.md", "brief_sha256": "93702ed717454db372e250a0bb8af83a582029beaf39f79f9d5c8ffc37a4b9e6", "brief_sha256_norm": "93702ed717454db372e250a0bb8af83a582029beaf39f79f9d5c8ffc37a4b9e6", "event": "committee_round_open", "event_id": "98221d99-fde1-4b6c-9124-1afcb97ae85c", "expected_outputs": {"codex": "handoffs/20260911-splitunify-b10-review-r20-codex.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex"], "producer": "audit_append.sh", "quorum_eligible": ["codex"], "round_id": "88553224-1a19-4535-b162-5a62651d5c70", "schema_version": 1, "sequence": 5212, "session_name": "20260911-splitunify-b10-review-r20", "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R20", "ts": "2026-09-19T00:36:40Z"}
+{"actor": "cx_run", "attempt_id": "8b2a9773-eb34-4621-9a2d-888283c266ab", "cli_rc": "0", "event": "committee_family_result", "event_id": "e59bfe77-ce01-45f5-b7b9-61ee767b6532", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260911-splitunify-b10-review-r20-codex.md", "output_sha256": "e2652a5e3eec6697939c3ca28955e6e888eda98e6afe921fc86a7458674fb683", "producer": "audit_append.sh", "result_state": "success", "round_id": "88553224-1a19-4535-b162-5a62651d5c70", "schema_version": 1, "sequence": 5213, "ts": "2026-09-19T00:43:53Z"}
+{"actor": "gate", "blocked_by": [], "closed": ["CODEX-R30-P1-01", "CODEX-R30-P1-03", "CODEX-R31-P1-02"], "event": "committee_output", "event_id": "461965aa-a1df-4124-a383-2ad48e385706", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260911-splitunify-b10-review-r20-codex.md", "output_sha256": "e2652a5e3eec6697939c3ca28955e6e888eda98e6afe921fc86a7458674fb683", "producer": "audit_append.sh", "round_id": "88553224-1a19-4535-b162-5a62651d5c70", "schema_version": 1, "sequence": 5214, "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R20", "ts": "2026-09-19T00:43:53Z", "verdict": "proceed"}
+{"actor": "debt_clear", "brief_kind": "closure", "canonical_count": 0, "category_counts": {"code-contract": 0, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "cdcd97de-fc7f-48e8-ac04-41a8aeda2a65", "handoff_tree_commit": "8f66484a31bb2d57f1d971bc71fff8f31579895f", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "88553224-1a19-4535-b162-5a62651d5c70", "round_open_sequence": 5212, "schema_version": 1, "sequence": 5215, "session_name": "20260911-splitunify-b10-review-r20", "stamps": [], "task_id": "20260911-SPLITUNIFY-B10-REVIEW-R20", "ts": "2026-09-19T00:44:44Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "c38959aa-7c29-4e14-b271-d3daec5e9dfd", "lock_sha256": "c906e6b87a0bd010169eee1f97e8b500f02af422c80ac88fb39ce45b68011f1a", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex"], "round_id": "88553224-1a19-4535-b162-5a62651d5c70", "schema_version": 1, "sequence": 5216, "session_id": "20260911-splitunify-b10-review-r20", "synth_sha256": "b5727adaf8b1d1cdb46028075448b28f7b5a52904650385d93ed82b35780517d", "ts": "2026-09-19T00:44:45Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260911-SPLITUNIFY-impl-b11-claude", "ts": "2026-09-19T00:44:46Z"}
+=== 2026-09-19 08:44:46 | dispatch ===
+  ts=2026-09-19 08:44:46
+  kind=dispatch
+  intent=B10D 實作：事件掃描端接上 canonical 邊界（Task 10.5）
+  risk=low
+  facts_asked=n/a
+  review_role=n/a
+  template=n/a:
+  adversarial=waived:impl-self
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "gate", "batch": "11", "event": "impl_token_issued", "event_id": "96a77096-2461-4393-8d9d-f4933b727f34", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260911-SPLITUNIFY", "round_start_head": "8f66484a31bb2d57f1d971bc71fff8f31579895f", "schema_version": 1, "sequence": 5217, "task_id": "20260911-SPLITUNIFY-impl-b11-claude", "ts": "2026-09-19T00:44:46Z"}

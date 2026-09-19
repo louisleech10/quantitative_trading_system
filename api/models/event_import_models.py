@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+# 🔴 `R5-C3` 1.：`event_label_spec` 之型別**沿用 IC 請求之同一模型**，不另建第二份。
+from api.models.ic_models import EventLabelSpecModel
 
 
 class EventImportFailure(BaseModel):
@@ -292,15 +295,44 @@ class LookaheadDeclarationPreviewColumnsRequest(BaseModel):
     timeframes: List[str] = Field(..., description="批內出現之 timeframe 集合")
 
 
+class FeatureRunRef(BaseModel):
+    """SPLITUNIFY `R5-C3` 1.：事件掃描端所指定之特徵 run，**三欄皆必填且非空字串**。
+
+    🔴 **無「取最新 run」之 fallback**：`config_hash` 缺即 422，不得回退
+    `find_latest_materialized`。理由是本票要消滅的正是「兩端各自挑 run」——
+    掃描端若能自己挑最新，IC 端與掃描端就可能對同一批事件用到不同的 universe，
+    而兩份數字都會看起來很正常。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: str = Field(..., min_length=1, description="特徵 run 之 symbol")
+    timeframe: str = Field(..., min_length=1, description="特徵 run 之週期")
+    config_hash: str = Field(..., min_length=1, description="精確指定 run；缺即 422，不回退最新")
+
+
 class EventAnalyzeRequest(BaseModel):
     """對一筆匯入跑 validate→align→dedupe→split＋兩張表（純透傳；統計在 momentum）。"""
 
     horizons: List[int] = Field(default_factory=lambda: [1, 2, 4], description="事件後報酬表 horizon（bars）")
     n_boot: int = Field(300, ge=10, le=5000)
     seed: int = Field(20260820)
+    # 🔴 `R5-C3` 7.：以下三欄**不得**作為 canonical 邊界之輸入（同名異義——
+    #    `test_fraction` 預設 0.3 而 `ICConfig.oos_test_size` 預設 0.2；
+    #    `embargo_ms` 為毫秒而 IC `embargo` 為列）。保留只為前端相容。
     test_fraction: float = Field(0.3, gt=0.0, lt=1.0)
     embargo_ms: Optional[int] = None
     tier_min_test_events: int = Field(1, ge=0)
+    # ── SPLITUNIFY `R5-C3` 1.（`Task 10.5`）：投影路徑之三個選填輸入 ──────────
+    feature_run: Optional[FeatureRunRef] = Field(
+        None, description="指定特徵 run（三欄必填）；缺席即走既有 event-study-only 分支")
+    config_override: Optional[Dict[str, Any]] = Field(
+        None, description="語意同 IC 請求之同名欄；只在 feature_run 存在時生效")
+    # 🔴 **型別＝IC 請求同名欄之同一 pydantic 模型**（`R5-C3` 1. 逐字「不得另建第二份模型」）。
+    #    另建一份的後果不是重複而已：兩份模型的 `extra` 政策或欄位值域一旦漂移，
+    #    同一份 spec 在兩端會得到不同的驗證結果，而這正是本票要消滅的兩套規則。
+    event_label_spec: Optional[EventLabelSpecModel] = Field(
+        None, description="分析用標籤參數；缺席時由共用出口依宣告深度導出（R5-C10 1.）")
 
 
 class EventAnalyzeResponse(BaseModel):
@@ -320,3 +352,16 @@ class EventAnalyzeResponse(BaseModel):
         default_factory=dict,
         description=("GAP-3 UX Task 1.9：實際送進切分的 embargo（`applied_ms`）與其來源（`source`）。"
                      "🔴 宣告深度為**下界**：`source=lookahead_declaration_lower_bound` 表示請求值低於宣告深度而被提高"))
+    # ── SPLITUNIFY `R5-C3` 3.（`Task 10.5`）：投影路徑之四個新欄 ────────────────
+    # 🔴 **必須宣告在此**：本 route 以 `response_model` 序列化，未宣告之頂層鍵會被
+    #    pydantic **靜默丟棄**——service 端算得再對，經 HTTP 出去就是沒有。
+    #    故驗收含一條 route 層測試（`test_route_response_contains_four_new_keys`），
+    #    只驗 service 回傳不算數。
+    split_unify: Optional[Dict[str, Any]] = Field(
+        None, description="R5-C3 3.：鍵集＝split_unify_keys；唯一產生點 build_split_unify_disclosure")
+    period_alignment: Optional[Dict[str, Any]] = Field(
+        None, description="R5-C4 1.：被 coverage 與 post-trim 首尾剔除之事件 ID 與計數")
+    excluded_by_symbol: Optional[Dict[str, Any]] = Field(
+        None, description="R5-C4 2.：他 symbol 事件之排除揭露（symbol → 事件數／event_id）")
+    event_label_spec: Optional[Dict[str, Any]] = Field(
+        None, description="R5-C10 1.：解析後實際使用之四鍵及預設來源說明")

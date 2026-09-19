@@ -487,11 +487,36 @@ async def delete_event_import(import_id: str):
 @router.post("/case/events/{import_id}/analyze", response_model=EventAnalyzeResponse)
 async def analyze_event_import(import_id: str, request: EventAnalyzeRequest):
     """對一筆匯入跑對齊→去重→切分＋兩張表（真實 kline；統計全在 momentum）。缺 kline／契約違規 ⇒ 4xx 顯式。"""
+    # 🔴 **SPLITUNIFY `Task 10.5`／`R5-C3` 4.：具名例外必須排在 `except ValueError` 之前。**
+    #    三條實測事實（不是推測）：
+    #      ①`EventLabelSpecError` 與 ②`CanonicalHoldoutError` 之基底皆為 `Exception`
+    #        ⇒ 現行 catch-all 接不到，會漏成 **500**；
+    #      ③`FeatureRunCoverageError` 之基底是 `ValueError`
+    #        ⇒ 會被 catch-all 吞成 `pipeline_rejected`，**具名 reason 當場消失**。
+    #    ⇒ 三者各自具名映射，且 `kind` 一律取自例外物件自帶之欄位，**不在 route 手打**
+    #      （手打就是第二份字面；`R5-C3` 4. 要求與 IC route 逐字相同）。
+    from momentum.factories import (  # noqa: E402
+        create_canonical_holdout_resolver,
+        create_event_label_spec_resolver,
+        create_feature_run_coverage_checker,
+    )
+
+    _, EventLabelSpecError = create_event_label_spec_resolver()
+    _, CanonicalHoldoutError = create_canonical_holdout_resolver()
+    _, _, FeatureRunCoverageError = create_feature_run_coverage_checker()
+
     svc = get_event_import_service()
     try:
         out = svc.analyze(import_id, request)
     except (KeyError, FileNotFoundError) as exc:
         raise HTTPException(status_code=409, detail={"kind": "bars_unavailable", "message": str(exc)})
+    except EventLabelSpecError as exc:
+        # 🔴 `kind` 與 IC route 之 `_resolve_event_batch` **逐字相同**（同一個 `exc.kind`）。
+        raise HTTPException(status_code=422, detail={"kind": exc.kind, "message": exc.message}) from exc
+    except FeatureRunCoverageError as exc:
+        raise HTTPException(status_code=422, detail={"kind": exc.reason, "message": str(exc)}) from exc
+    except CanonicalHoldoutError as exc:
+        raise HTTPException(status_code=422, detail={"kind": exc.reason, "message": str(exc)}) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail={"kind": "pipeline_rejected", "message": str(exc)})
     if out is None:

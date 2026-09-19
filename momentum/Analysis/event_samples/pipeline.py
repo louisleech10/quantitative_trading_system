@@ -558,6 +558,62 @@ class EventSamplePipeline:
         )
         return self.run(records, bars_by_tf, cfg)
 
+    @staticmethod
+    def split_unify_disclosure(
+        *, n_test: Optional[int], test_timestamps_ms: Any,
+        per_symbol_counts: Optional[Dict[str, int]] = None, reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """`metadata.split_unify` 之 R3 出口（`Task 10.5`：事件掃描端經此取得）。
+
+        🔴 **純委派、不加工**：`build_split_unify_disclosure` 是該揭露之**唯一**產生點
+        （SPEC C-6）。本方法只是讓 service 端不必直接 import momentum 內層（Rule 3）；
+        在此補任何預設或轉型，就會出現第二套規則——而兩端的 `split_unify` 一旦不同源，
+        前端拿到的兩份數字都會看起來很正常。
+        """
+        from momentum.Analysis.event_samples.split_projection import (
+            build_split_unify_disclosure,
+        )
+
+        return build_split_unify_disclosure(
+            n_test=n_test, test_timestamps_ms=test_timestamps_ms,
+            per_symbol_counts=per_symbol_counts, reason=reason,
+        )
+
+    def run_projection_with_params(
+        self, records, bars_by_tf, *, train_plan: Any, test_plan: Any, feature_index: Any,
+        universe_timeframe: str, selected_timeframe: Optional[str] = None,
+        timeframes: Tuple[str, ...] = (), cluster_gap_ms: Optional[int] = None,
+        source_bytes: Optional[bytes] = None,
+    ) -> "EventPipelineResult":
+        """純量參數版 `run` 之**投影**路徑（`Task 10.5`：事件掃描端經此接線）。
+
+        🔴 **存在理由**：service 端不得 `import` momentum 之 dataclass（Rule 3／R7；
+        `check_decoupling_imports.py` 之 PostToolUse hook 當場擋）。沒有本出口，
+        事件掃描端要走投影就只能自建 `EventPipelineConfig` ——那正是解耦閘要擋的事。
+
+        🔴 **本出口不收 `test_fraction`／`embargo_ms`／`tier_min_test_events`**（`R5-C3` 7.）：
+        canonical 邊界由 `train_plan`／`test_plan`／`feature_index` 完整決定，隔離已含在
+        `test_plan.row_index[0]` 的起點裡。收了那三個只會讓呼叫端以為自己在調整切分，
+        而實際上一個都沒用到——同 `run_event_study_only_with_params`「不吃 split 參數」之既有裁定。
+        `EventSplitConfig` 之 `embargo_ms` 因此恆為 `None`，`run()` 的兩套隔離閘才不會被觸發。
+
+        🔴 `universe_timeframe` **必填無預設**：判側錨點取自特徵 run 週期那列之
+        `last_bar_open_ms`，由 `selected_timeframe` 或全量 TF 集合推定會在多 feature TF 批上
+        靜默選錯錨點列（`CODEX-R38-P1-02`）。真值＝`feature_run.timeframe`。
+        """
+        if not universe_timeframe:
+            raise ValueError(
+                "run_projection_with_params: universe_timeframe（特徵 run 週期）必填——"
+                "判側錨點取自該週期之列，不得推定"
+            )
+        cfg = EventPipelineConfig(timeframes=tuple(timeframes), cluster_gap_ms=cluster_gap_ms)
+        return self.run(
+            records, bars_by_tf, cfg, source_bytes=source_bytes,
+            train_plan=train_plan, test_plan=test_plan, feature_index=feature_index,
+            selected_timeframe=selected_timeframe,
+            universe_timeframe=str(universe_timeframe),
+        )
+
     def run_event_study_only_with_params(
         self, records, bars_by_tf, *, timeframes: Tuple[str, ...] = (), cluster_gap_ms: Optional[int] = None,
         source_bytes: Optional[bytes] = None,

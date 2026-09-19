@@ -62,13 +62,38 @@ def test_split_authority_is_kline_holdout(contract: dict) -> None:
 
 
 def test_fail_closed_reasons_exact_set(contract: dict) -> None:
-    """SPEC C-0／C-2 之四個 fail-closed 原因，逐值相等（不是 issubset）。"""
+    """SPEC C-0／C-2／`R5-C3` 5. 之六個 fail-closed 原因，逐值相等（不是 issubset）。
+
+    🔴 用 `==` 而非 `issubset` 是刻意的：新增字面必須同時改本條，
+    否則前端會收到一個它沒有文案的 reason 而顯示空白。
+    """
     assert set(contract["fail_closed_reasons"]) == {
         "multi_symbol_projection_unsupported",
         "missing_train_plan",
         "missing_test_plan",
         "canonical_feature_universe_unavailable",
+        # ── `R5-C3` 5.（`Task 10.5`）：run 找得到、universe 也有，但依 IC 設定本來就不切分 ──
+        # 🔴 與上一條 `canonical_feature_universe_unavailable` **語意不同**，前端文案須可分辨：
+        #    那條是「根本拿不到 universe」，這兩條是「拿得到但這次不切」。混用會讓
+        #    使用者以為自己的 run 壞了，而其實只是 `ic_train_test_split` 關著。
+        "canonical_holdout_disabled",
+        "canonical_holdout_insufficient_rows",
     }
+
+
+def test_fail_closed_reasons_match_momentum_constants(contract: dict) -> None:
+    """🔴 `Task 10.5` 兩條新字面之唯一產生點是 momentum 之常數，不得在契約手打。
+
+    鑑別力：把 `canonical_holdout.py` 的常數值改一個字 ⇒ 本條轉紅
+    （契約與程式各寫一份、且只改其中一邊，正是本 epic 反覆受傷處）。
+    """
+    from momentum.Analysis.event_samples.canonical_holdout import (
+        REASON_DISABLED, REASON_INSUFFICIENT_ROWS,
+    )
+
+    reasons = set(contract["fail_closed_reasons"])
+    assert REASON_DISABLED in reasons, f"{REASON_DISABLED!r} 不在契約 fail_closed_reasons"
+    assert REASON_INSUFFICIENT_ROWS in reasons, f"{REASON_INSUFFICIENT_ROWS!r} 不在契約"
 
 
 def test_estimand_scope_exact_set(contract: dict) -> None:
