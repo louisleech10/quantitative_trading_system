@@ -1993,22 +1993,49 @@ def _assert_event_partition_conserved(*, records, partitions: Dict[str, List[str
 
     🔴 用集合＋計數兩層：集合抓錯置與幽靈，計數抓重複——單用任一層都有洞。
     """
-    seen = {}
-    bad_type, empties = [], 0
+    # 🔴 `CODEX-R5-P1-01`：**身分規則之權威在契約，分析端不得自立**。
+    #    首版以 `.strip()` 自行定義 ID ⇒ ①把帶空白之原始 ID 與已正規化之分區誤判為同一個
+    #    （實跑 `HTTP_PADDED_RECORD_NORMALIZED_PARTITION 200 accepted`）；
+    #    ②`event_id="A"` 在分析端 200，而同一列在契約之 canonical 模式被判 `type_error`。
+    #    ⇒ 改為**逐字 exact identity**（不 strip、不轉型）＋ 直接對證契約公式。
+    #    實測全部落檔批 1664 筆事件**零例外**符合該公式（含 `platform_random_bars`），
+    #    故不需 provenance 分流；日後若出現合法例外，改法是在**契約**登記，不是在此放寬。
+    from momentum.factories import create_event_id_canonicalizer
+
+    canonical_event_id = create_event_id_canonicalizer()
+
+    if not isinstance(records, (list, tuple)):
+        raise ValueError(
+            f"守恆閘之 `records` 須為序列，實得 {type(records).__name__}（fail-closed）"
+        )
+    seen: Dict[str, int] = {}
+    bad_type, non_canonical = [], []
     for idx, row in enumerate(records):
-        raw = row.get("event_id") if isinstance(row, dict) else None
-        if raw is None or not isinstance(raw, str):
+        if not isinstance(row, dict):
+            bad_type.append(f"[{idx}] 非 dict={type(row).__name__}")
+            continue
+        raw = row.get("event_id")
+        if not isinstance(raw, str) or not raw:
             bad_type.append(f"[{idx}]={raw!r}")
             continue
-        eid = raw.strip()
-        if not eid:
-            empties += 1
+        try:
+            expected = canonical_event_id(row.get("symbol"), row.get("timeframe"), int(row.get("t0")))
+        except (TypeError, ValueError):
+            bad_type.append(f"[{idx}] symbol／timeframe／t0 無法組成 ID")
             continue
-        seen[eid] = seen.get(eid, 0) + 1
-    if bad_type or empties:
+        if raw != expected:
+            non_canonical.append(f"[{idx}] {raw!r}≠{expected!r}")
+            continue
+        seen[raw] = seen.get(raw, 0) + 1
+    if bad_type:
         raise ValueError(
-            f"事件身分不合契約：非字串 {bad_type[:5]}（共 {len(bad_type)}）、"
-            f"空字串 {empties} 筆——`event_id` 須為非空字串（fail-closed）"
+            f"事件身分不合契約：{bad_type[:5]}（共 {len(bad_type)}）"
+            "——`event_id` 須為非空字串且該列須可組成契約 ID（fail-closed）"
+        )
+    if non_canonical:
+        raise ValueError(
+            f"事件身分不符契約公式：{non_canonical[:3]}（共 {len(non_canonical)}）"
+            "——`event_id` 只由 symbol／timeframe／t0 決定（D-2），分析端不得自訂或改寫"
         )
     dupes = {e: n for e, n in seen.items() if n > 1}
     if dupes:
@@ -2021,8 +2048,22 @@ def _assert_event_partition_conserved(*, records, partitions: Dict[str, List[str
     union: set = set()
     overlaps: Dict[str, List[str]] = {}
     for name, ids in partitions.items():
+        # 🔴 `CODEX-R5-P2-01`：分區側亦須邊界檢查。首版直接 `set(ids)`／`list(ids)`
+        #    ⇒ `ids` 為 `None` 時 `TypeError` 冒成 **HTTP 500**（實跑），
+        #    分區值含 `None` 時 `sorted` 亦 `TypeError`。受控拒絕才是 fail-closed。
+        if not isinstance(ids, (list, tuple, set, frozenset)):
+            raise ValueError(
+                f"分區 {name!r} 之值須為序列，實得 {type(ids).__name__}（fail-closed）"
+            )
+        ids = list(ids)
+        bad_vals = [f"{v!r}" for v in ids if not isinstance(v, str) or not v]
+        if bad_vals:
+            raise ValueError(
+                f"分區 {name!r} 含非字串或空 `event_id`：{bad_vals[:5]}"
+                f"（共 {len(bad_vals)}）——fail-closed"
+            )
         current = set(ids)
-        if len(current) != len(list(ids)):
+        if len(current) != len(ids):
             raise ValueError(f"分區 {name!r} 內有重複 `event_id`（fail-closed）")
         if union & current:
             overlaps[name] = sorted(union & current)[:5]

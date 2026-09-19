@@ -1114,6 +1114,18 @@ def create_feature_run_coverage_checker():
     return check_feature_run_coverage, FeatureRunCoverage, FeatureRunCoverageError
 
 
+def create_event_id_canonicalizer():
+    """`event_id` 契約公式之**唯一**出口（`Task 1.3`／`D-2`；`CODEX-R5-P1-01`）。
+
+    🔴 出生理由：事件掃描端之守恆閘原本以 `.strip()` 自行定義身分 ⇒ 帶空白之原始 ID
+    與已正規化之分區被誤判為同一個，而 `event_id="A"` 這種列在分析端放行、
+    在契約之 canonical 模式卻被拒。**身分規則之權威只住契約**，分析端一律經本出口對證。
+    """
+    from momentum.Analysis.event_samples.import_contract import canonical_event_id
+
+    return canonical_event_id
+
+
 def create_feature_run_locator():
     """SPLITUNIFY `Task 10.5`：FF run 之**定位**與 manifest `time_range` 讀取之唯一出口。
 

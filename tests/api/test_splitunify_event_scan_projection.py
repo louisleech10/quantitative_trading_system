@@ -512,11 +512,12 @@ def test_every_input_event_falls_in_exactly_one_partition(batch_key, ff) -> None
 @pytest.mark.parametrize("case,mutate,expect_substr", [
     ("duplicate", lambda rs: rs + [dict(rs[0])], "事件身分重複"),
     ("none_id", lambda rs: [dict(r, event_id=None) if i == 0 else r for i, r in enumerate(rs)],
-     "非字串"),
+     "身分不合契約"),
     ("int_id", lambda rs: [dict(r, event_id=123456789) if i == 0 else r for i, r in enumerate(rs)],
-     "非字串"),
+     "身分不合契約"),
+    # 🔴 空白字串現由**契約公式對證**擋下（不再 strip 後判空）——訊息字面隨之改變。
     ("blank_id", lambda rs: [dict(r, event_id="  ") if i == 0 else r for i, r in enumerate(rs)],
-     "空字串"),
+     "不符契約公式"),
 ])
 def test_partition_gate_rejects_malformed_identity(case, mutate, expect_substr, monkeypatch) -> None:
     """🔴 `CODEX-R4-P1-01`：守恆閘對**身分不合契約**之輸入 fail-closed。
@@ -553,6 +554,77 @@ def test_partition_gate_rejects_malformed_identity(case, mutate, expect_substr, 
     )
 
 
+def _canon(sym: str, tf: str, t0: int) -> str:
+    from momentum.factories import create_event_id_canonicalizer
+
+    return create_event_id_canonicalizer()(sym, tf, t0)
+
+
+def _ok_rows():
+    a = _canon("ETHUSDT", "12h", 1735776000000)
+    b = _canon("ETHUSDT", "12h", 1735819200000)
+    return a, b, [
+        {"event_id": a, "symbol": "ETHUSDT", "timeframe": "12h", "t0": 1735776000000},
+        {"event_id": b, "symbol": "ETHUSDT", "timeframe": "12h", "t0": 1735819200000},
+    ]
+
+
+def test_partition_gate_identity_authority_is_the_contract() -> None:
+    """🔴 `CODEX-R5-P1-01`：身分規則之權威在**契約**，分析端不得自立。
+
+    首版以 `.strip()` 自訂 ID，兩個後果（提出方實跑）：
+      ①帶空白之原始 ID 與已正規化之分區被誤判為同一個 ⇒ 真正的不一致被遮蔽；
+      ②`event_id="A"` 在分析端 200，而同一列在契約之 canonical 模式被判 `type_error`。
+    ⇒ 改為逐字 exact identity ＋ 直接對證 `canonical_event_id`。
+    鑑別力：把契約對證拿掉（只留非空字串檢查）⇒ 本條兩個 case 皆轉綠。
+    """
+    from api.services.case_import_service import _assert_event_partition_conserved
+
+    a, b, rows = _ok_rows()
+    _assert_event_partition_conserved(records=rows, partitions={"projected": [a, b]})  # baseline
+
+    with pytest.raises(ValueError) as ei:
+        _assert_event_partition_conserved(
+            records=[dict(rows[0], event_id="A"), rows[1]],
+            partitions={"projected": ["A", b]},
+        )
+    assert "不符契約公式" in str(ei.value)
+
+    with pytest.raises(ValueError) as ei2:
+        _assert_event_partition_conserved(
+            records=[dict(rows[0], event_id=f" {a} "), rows[1]],
+            partitions={"projected": [a, b]},
+        )
+    assert "不符契約公式" in str(ei2.value), "帶空白之 ID 被 strip 後誤判為相同"
+
+
+@pytest.mark.parametrize("case,kwargs,expect", [
+    ("records_none", {"records": None, "partitions": {"projected": []}}, "須為序列"),
+    ("records_not_dict", {"records": ["x"], "partitions": {"projected": []}}, "非 dict"),
+    ("partition_value_none", None, "之值須為序列"),
+    ("partition_contains_none", None, "含非字串或空"),
+])
+def test_partition_gate_rejects_malformed_partitions(case, kwargs, expect) -> None:
+    """🔴 `CODEX-R5-P2-01`：分區側之型別邊界亦須**受控拒絕**，不得冒成 HTTP 500。
+
+    首版直接 `set(ids)`／`sorted(...)` ⇒ `ids` 為 `None` 或含 `None` 時 `TypeError`
+    冒到 route 外變成 **500**（提出方實跑 `partition_value_none 500`、
+    `partition_value_mixed_ghosts 500`）。500 與 422 的差別是「系統壞了」與
+    「你的輸入不合契約」——前者讓使用者以為是平台問題。
+    """
+    from api.services.case_import_service import _assert_event_partition_conserved
+
+    a, b, rows = _ok_rows()
+    if kwargs is None:
+        kwargs = {"records": rows, "partitions": (
+            {"projected": None} if case == "partition_value_none"
+            else {"projected": [a, b], "g": [None, "GHOST"]}
+        )}
+    with pytest.raises(ValueError) as ei:
+        _assert_event_partition_conserved(**kwargs)
+    assert expect in str(ei.value), f"{case}: {str(ei.value)[:120]}"
+
+
 def test_partition_gate_rejects_ghost_ids() -> None:
     """🔴 `CODEX-R4-P1-01`：分區裡出現**不存在於輸入**之 `event_id` ⇒ fail-closed。
 
@@ -562,10 +634,11 @@ def test_partition_gate_rejects_ghost_ids() -> None:
     """
     from api.services.case_import_service import _assert_event_partition_conserved
 
+    a, b, rows = _ok_rows()
     with pytest.raises(ValueError) as ei:
         _assert_event_partition_conserved(
-            records=[{"event_id": "A"}, {"event_id": "B"}],
-            partitions={"projected": ["A", "B"], "dropped_by_coverage": ["GHOST:12h:0"]},
+            records=rows,
+            partitions={"projected": [a, b], "dropped_by_coverage": ["ETHUSDT:12h:1"]},
         )
     assert "不在輸入卻被歸戶" in str(ei.value), str(ei.value)[:160]
 
