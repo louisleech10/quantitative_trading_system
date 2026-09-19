@@ -36,7 +36,7 @@
 | 120 | RM-TICKET-A | 票 A（timing-overlap 診斷） | 未開工 | docs/ROADMAP.md「後續兩票」節 | Phase 4；硬前置 FU-2 |
 | 130 | RM-TICKET-B | 票 B（多標的橫截面 attribution） | 未開工 | docs/ROADMAP.md「後續兩票」節 | 待觸發：研究宇宙變多標的；硬前置 FU-2 |
 | 140 | RM-FU-1 | FU-1 exposure `fillna` fail-closed | 未開工 | docs/ROADMAP.md「兩筆 follow-up」節 | 待觸發：下一次動 exposure 家族時處理 |
-| 150 | RM-FU-2 | FU-2 cache close carrier index 對齊 | 未開工 | docs/ROADMAP.md「兩筆 follow-up」節 | 票 A／票 B 開工前先做（硬前置） |
+| 150 | RM-FU-2 | FU-2 cache close carrier index 對齊 | 部分完成 | docs/ROADMAP.md「兩筆 follow-up」節 | 對齊與缺席 fail-closed 已隨 LA-2 B3 落地；剩「對齊後整欄 NaN 不擋」一條守衛，票 A／票 B 開工前補 |
 | 160 | RM-EVTLABEL | EVTLABEL 事件型 label 三缺陷＋匯入標籤模式 | 已完成 | docs/EVTLABEL_TODO.md | — |
 | 170 | RM-TIERTOGGLE | TIERTOGGLE 幽靈開關（具名 preset 之 IC Decay／Grouped IC） | 已完成 | 白話說明/EVTLABEL施工進度.md | — |
 | 180 | RM-FU-3 | FU-3 報告逐 stage 耗時揭露（併 EVTLABEL P1） | 已完成 | momentum/Analysis/ic_filter_orchestrator.py（metadata.stage_timings） | — |
@@ -135,6 +135,13 @@
   `fillna(0.0)`。嚴重度中（預設 `enabled=False`、僅餵 Radar 診斷非交易決策）。修法＝比照 `1d` B2。
 - **FU-2 cache close all-NaN carrier index 對齊**：kline `RangeIndex` vs features `DatetimeIndex` 對不齊。
   **是票 A／票 B 的硬前置**（全 NaN carrier 上無法接真歸因）。
+  🔴 **2026-09-19 狀態更正（使用者質疑「這我印象有做完了」後以碼複查，本列原標「未開工」為錯）**：
+  **已落地的半**＝carrier 對齊（`ic_filter_orchestrator.py:4257-4264`，`reindex(features_df.index)`，
+  隨 LA-2 B3 交付）＋缺 carrier 時 fail-closed（`:3031`，禁 silent fallback 到 `label_series`）。
+  **未關閉的半**＝**對齊後整欄 NaN 不擋**：`label_series` 有全 NaN 守衛（`:3366`），`close_series` **沒有**；
+  現行測試逐字載明此行為（`tests/momentum/Analysis/test_ic1d_baseline.py:228`「production 僅拒 None，
+  不拒 reindex 後 NaN」）⇒ 索引型別對不上時仍會安靜產出全 NaN carrier，正是本 FU 點名之症狀。
+  **落地時之驗收錨點**：`close_series` 全 NaN ⇒ fail-closed，且 mutation（把 carrier 灌成全 NaN）須轉紅。
 
 ### 🔴 票 MEM-RSS：Feature Factory 之記憶體閘以 RSS 為判準，在 macOS 上可能**漏擋**（2026-08-27 登記；**不插隊**，使用者裁定先做完 B9／IC-Analysis）
 
