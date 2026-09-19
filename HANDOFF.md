@@ -5,8 +5,8 @@
 <!-- BEGIN GENERATED: handoff-current -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-016 | SU-B10D | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | B10C 已收批（r18 兩家零實質 finding、皆 proceed）；開工 Task 10.5 事件掃描端接線與請求／回應契約 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B／B10C 已收批（B10C 共十輪審碼，r18 兩家零實質 finding）；下一步 B10D：Task 10.5 事件掃描端接線 |
+| 02-016 | SU-B10D | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 程式已落地（兩端邊界實測逐值相同）；r1–r3 三條 P1 已修補收斂，r4 閉合輪審碼中 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B／B10C 已收批；B10D 程式已落地並修完三條 P1，r4 閉合輪審碼中；其後為 B10E |
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
 <!-- END GENERATED: handoff-current -->
 
@@ -15,11 +15,11 @@
 <!-- BEGIN GENERATED: handoff-todo -->
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
-| 02-016 | SU-B10D | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | B10C 已收批（r18 兩家零實質 finding、皆 proceed）；開工 Task 10.5 事件掃描端接線與請求／回應契約 |
+| 02-016 | SU-B10D | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.5 程式已落地（兩端邊界實測逐值相同）；r1–r3 三條 P1 已修補收斂，r4 閉合輪審碼中 |
 | 02-017 | SU-B10E | 未開工 | docs/SPLITUNIFY_TODO.md §C-10 | Task 10.6 前端＋Task 10.7 真實資料兩端對證與 UAT 登記 |
 | 03-003 | R-3 | 未開工 | docs/SPLITUNIFY_TODO.md §E | UAT 排在最後一次做（使用者裁定） |
 | 03-004 | R-4 | 未開工 | docs/SPLITUNIFY_TODO.md §E | 另開接線票；本票只保證 assignments 語意不變 |
-| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B／B10C 已收批（B10C 共十輪審碼，r18 兩家零實質 finding）；下一步 B10D：Task 10.5 事件掃描端接線 |
+| 03-005 | R-5 | 進行中 | docs/SPLITUNIFY_SPEC.md Phase 10 | B10A／B10B／B10C 已收批；B10D 程式已落地並修完三條 P1，r4 閉合輪審碼中；其後為 B10E |
 | 03-007 | SU-RESID-V8-ATTEST | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：專案導入 commit 簽章或受保護分支 |
 | 03-008 | SU-RESID-PAUSED-NO-RESULT | 未開工 | docs/SPLITUNIFY_TODO.md §E | 待觸發：audit 出現同輪同家 failed 且無產出之結果列 |
 | 03-009 | SU-RESID-COMMITTEE-MODEL-EVIDENCE | 未開工 | docs/SPLITUNIFY_TODO.md §E | 實測兩 CLI 非互動輸出之型號與 effort 欄位 |
