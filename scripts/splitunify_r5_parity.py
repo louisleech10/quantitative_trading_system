@@ -621,6 +621,17 @@ def main(argv=None) -> int:
         return 0
     if GOLDEN.is_file() and not args.update:
         prev = json.loads(GOLDEN.read_text(encoding="utf-8"))
+        # 🔴 **先驗組合清單本身（含長度與順序），再比值**（`CODEX-R53-P2-01`）：
+        #    `zip` 在較短的一側就停 ⇒ golden 少一組（或多一組、或順序改掉）時，
+        #    只會比到共同前綴、`diff` 為空，而輸出仍印「golden 相符」。提出方實跑：
+        #    刪掉 golden 最後一組 ⇒ `stored=2 actual=3 compared=2 diff_count=0` 而判定進入相符分支。
+        prev_keys = [str(c.get("combo")) for c in (prev.get("combos") or [])]
+        now_keys = [str(c.get("combo")) for c in results]
+        if prev_keys != now_keys:
+            print(f"ERROR: golden 之組合清單與本次不符（golden {prev_keys} vs 本次 {now_keys}）"
+                  "——缺列／多列／順序改變皆不得以逐值比對吸收（值若為意圖變動，附理由後跑 --update）",
+                  file=sys.stderr)
+            return 1
         if prev.get("combos") != results:
             diff = [
                 f"{a.get('combo')}：{k}={a.get(k)!r} → {b.get(k)!r}"
