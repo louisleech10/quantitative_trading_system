@@ -99,7 +99,7 @@ D1–D8，body-hash `120b4d042d38…`，**三家 RECONCILE-STAMP 全數 APPROVED
 | 140 | SU-B10B | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
 | 150 | SU-B10C | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
 | 160 | SU-B10D | 已完成 | docs/SPLITUNIFY_TODO.md §C-10 | — |
-| 170 | SU-B10E | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | B10D 已收批（r7 兩家 proceed、零 blocking）；開工 Task 10.6 前端＋Task 10.7 兩端對證 |
+| 170 | SU-B10E | 進行中 | docs/SPLITUNIFY_TODO.md §C-10 | splitCapability 兩條新 reason 文案已上線；待做 Task 10.6 請求三欄接線與畫面、Task 10.7 對證腳本 |
 <!-- END GENERATED: splitunify-batch-status -->
 
 🔴 **Phase 9 依賴序（`handoffs/reconcile/20260911-splitunify-b9-consult-r2/synth.md` 裁定；三家＋主委獨立版四方一致）**：
@@ -1264,7 +1264,7 @@ n_event_tf_rows_purged = int(event_keys["event_id"].isin(purged_event_ids).sum()
   3. UAT 條目寫入 §E `R-3` 列：含重跑 `fe5f715e` 之後之 IC 事件分析。
 - 修改檔案：`scripts/splitunify_r5_parity.py`（新）、`tests/golden/splitunify/r5_parity.json`（新）、`docs/SPLITUNIFY_TODO.md` §E `R-3` 列。
 - 不可做：禁合成 fixture；不得改既有 golden 鍵值；不執行 UAT；對證腳本不得自行推導特徵列鍵（只讀對齊收據）。
-- 邊界：① 至少一組觸發週期與 run 週期不同之真實組合；② 至少一組**事件被期間剔除**之真實組合——r17 實跑：現有已註冊 run 之特徵時間戳皆落在 K 線期間內（14／14 首尾裁切為 0），故本條改以 **coverage 剔除**行使（同一 12h 事件批配期間較短之 run，事件落在 run 期間外者進處置帳；路徑已有真實測試 `tests/api/test_period_auto_align.py`；r18 三家實跑之非零組合＝批 `20260901T132233Z-363ecc4f` × run `ETHUSDT/1h/5ea074390e98405cb83d602fe7b7fb00`，covered=39、dropped=21；**不得**取 `20260909T130533Z-7f73e4c7` × 同 run（實測 dropped=0，屬空心綠））；若日後出現真的發生首尾裁切之 run，另加一組、不取代本條；③ 至少一組非預設 `event_label_spec`；④ 不以 `boundary_hash` 代替逐值比對。
+- 邊界：① 至少一組觸發週期與 run 週期不同之真實組合；② 至少一組**事件被期間剔除**之真實組合——r17 實跑：現有已註冊 run 之特徵時間戳皆落在 K 線期間內（14／14 首尾裁切為 0），故本條改以 **coverage 剔除**行使（同一 12h 事件批配期間較短之 run，事件落在 run 期間外者進處置帳；路徑已有真實測試 `tests/api/test_period_auto_align.py`；🔴 **r18 指定之組合已失效，B10E 改用下列實測值**：批 `20260901T132233Z-363ecc4f` 現走 analyze route 會 **422**（`label_origin` 之 `conditional_required_missing`——該批早於現行匯入契約，非本票改壞；B10E 實跑複核）。現行可用之非零組合為 **批 `20260906T105851Z-8cc44eea` × run `ETHUSDT/1h/5ea074390e98405cb83d602fe7b7fb00`**：對齊剔除 12、**coverage 剔除 22**、投影 110（B10E 實跑）；post-trim 剔除則取 **批 `20260909T130533Z-7f73e4c7` × 同 run**：post-trim 剔除 **1**、投影 164。🔴 **不得**取 `20260909T130533Z-7f73e4c7` × 長 run `4a8a0b37…`（實測三種剔除皆 0，屬空心綠））；若日後出現真的發生首尾裁切之 run，另加一組、不取代本條；③ 至少一組非預設 `event_label_spec`；④ 不以 `boundary_hash` 代替逐值比對。
 - 風險緩解：`M-SU-R5-08`、`M-SU-R5-09`、`M-SU-R5-12`、`M-SU-R5-14`、`M-SU-R5-15`、`M-SU-R5-25`。
 - **驗證**（逐條實跑；判綠讀 pytest summary 行，紅只認 rc=1，`--deselect` 逐條列既有紅）：
   - `venv/bin/python scripts/splitunify_r5_parity.py` rc=0

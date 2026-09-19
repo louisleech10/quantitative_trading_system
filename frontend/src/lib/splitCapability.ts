@@ -22,6 +22,23 @@ export const REASON_NO_UNIVERSE: string = (() => {
 })();
 
 /**
+ * `Task 10.5`／`R5-C3` 5. 之兩條字面（同樣**自契約讀、不手打**）。
+ *
+ * 🔴 語意與 `REASON_NO_UNIVERSE` **不同**：那條是「根本拿不到 universe」，
+ * 這兩條是「拿得到，但依 IC 設定這次不切」。混用會讓使用者以為自己的 run 壞了。
+ */
+function readFailClosedReason(literal: string): string {
+  const found = FAIL_CLOSED_REASONS.find((r) => r === literal);
+  if (!found) throw new Error(`split_unify.json 缺 ${literal}`);
+  return found;
+}
+
+export const REASON_HOLDOUT_DISABLED: string = readFailClosedReason('canonical_holdout_disabled');
+export const REASON_HOLDOUT_INSUFFICIENT_ROWS: string = readFailClosedReason(
+  'canonical_holdout_insufficient_rows',
+);
+
+/**
  * 「深度不可證」之字面（自事件匯入契約之**具名綁定**讀，與 Python
  * `lookahead_gate.split_blocked_reason()` 同一條解析路徑：綁定鍵 → 字面 → 封閉集合驗證）。
  */
@@ -66,6 +83,25 @@ export function splitCapabilityView(
     return {
       hasSplit: false,
       text: '本批未執行切分：事件掃描路徑取不到 K 線切分所依據的特徵宇宙，只做事件研究（全樣本，非 OOS），沒有訓練／驗證段。',
+    };
+  }
+  // 🔴 `Task 10.6` 邊界③：四條 reason 之文案**兩兩可分辨**。
+  //    下面兩條與上面那條的差別，使用者一定要看得出來——
+  //    上面是「**拿不到**特徵宇宙」（環境問題，他改不了）；
+  //    下面兩條是「**拿得到，但這次依設定不切分**」（他自己改設定就能切）。
+  //    給同一句話等於把可修的事情講成不可修。
+  if (reason === REASON_HOLDOUT_DISABLED) {
+    return {
+      hasSplit: false,
+      text: '本批未執行切分：這個特徵 run 找得到，但 IC 設定的「訓練／驗證切分」目前是關閉的，'
+        + '因此沒有驗證段。到 IC 設定把切分打開後重跑即可。',
+    };
+  }
+  if (reason === REASON_HOLDOUT_INSUFFICIENT_ROWS) {
+    return {
+      hasSplit: false,
+      text: '本批未執行切分：這個特徵 run 找得到、切分也開著，但可用列數不足以切出驗證段'
+        + '（扣掉隔離區後剩下的列太少）。改用期間較長的 run，或縮小答案窗與隔離設定後重跑。',
     };
   }
   return {
