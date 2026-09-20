@@ -1,0 +1,1090 @@
+
+=== _debt_ledger_core.py ===
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+DEBT_CUTOFF_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+audit 檔缺失: …
+audit 路徑不是一般檔: …
+round_id 不存在(cutoff 後): …
+
+=== _docrot2_metrics.py ===
+… 寫入失敗 rc=…：…
+
+=== _finding_category.py ===
+類別判定設定不可用 ⇒ fail-closed：… (file=…
+類別判定讀檔失敗：… (file=…
+finding 缺類別（**類別**: <值>，值集見 governance_verdicts.json.finding_category_values）: … (file=…
+finding 類別行重複（須恰一行 **類別**）: … (file=…
+finding 類別不在封閉值集（得「…」）: … (file=…
+
+=== _patch_hook_stdin_timeout.py ===
+…：**沒有命中任何錨點**——請手動確認（不靜默略過）
+
+=== _redispatch_check.py ===
+redispatch 未知或不完整之參數：…
+--round-id 須為小寫 UUID
+--family 不在 review_families：…
+--reason 須至少 {consts.get(
+保存檔雜湊與產出檔不符（已刪保存檔）
+發放事件寫入失敗（已刪許可檔）
+無對應之重派許可檔
+許可四欄與指令不符
+許可 nonce 之發放事件不唯一
+許可非待用狀態（…）
+: 許可秘密不符
+許可欄位與發放事件不符：…
+brief 已於發放後改動
+brief 讀取失敗
+保存檔缺失或已被改動
+保存檔不可讀或不在 repo 內
+許可改名失敗：…
+消費事件寫入失敗
+路徑無法以重派放行文法表示：{p!r}
+重派許可已逾啟動寬限，不執行
+同（輪、家族）已有派工器執行中
+收斂檔讀取失敗：…
+
+=== _role_gate.sh ===
+task_id 為空（白名單檢查，fail-closed）
+task_id 不符合白名單 …（第⑦道／committee 前移）: …
+brief-kind 解析為空（fail-closed）
+角色 SoT 缺檔: …(fail-closed
+角色 SoT 解析失敗或缺鍵(fail-closed): …
+角色 SoT implementer 為空(fail-closed): …
+無法載入 family SoT(fail-closed
+讀 review_families 失敗(fail-closed
+讀 executor_clis 失敗(fail-closed
+角色閘：家族清單為空
+角色閘不相容（完整清單；整批拒絕）:
+--kind 需要參數
+未知旗標: $1
+brief 不存在: …
+未知子命令: …
+
+=== _synth_attr.py ===
+--todo 讀取失敗: …
+…（mode=…）
+
+=== analyze_problem_features.py ===
+raw/ not found under …
+
+=== audit_append.sh ===
+AUDIT_APPEND_MAX_RETRY/RETRY_INTERVAL 須綁 GOVERNANCE_TEST_HARNESS=1
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+registry 讀取失敗: …
+registry 缺 audit_log_path
+LOCKDIR 未設定
+registry 壞: …
+讀 audit 失敗: …
+audit 含無法解析的 JSON 行
+registry debt_events 非 object
+registry 的 opens_debt 事件不是恰一筆
+registry 缺檔或 JSON 壞: …
+非法 --field（缺 =）: {pair!r}
+--field …=@... 非法 JSON: …
+未知 debt 事件: …
+event_id 非 UUID: {fields[
+未知事件（非 debt 亦非 legacy）: …
+event_id 重複: …
+append 失敗: …
+session_name 已存在: …
+REDISPATCH_TEST_AFTER_FSTAT_CMD 僅允許 GOVERNANCE_TEST_HARNESS=1
+REDISPATCH_TEST_AFTER_READ_CMD 僅允許 GOVERNANCE_TEST_HARNESS=1
+round 自快照後已有事件（…），拒寫
+產出檔自快照後已被改動或身分被替換（…），拒寫
+--require-file-path 值不合路徑文法（非空、不得以 - 起首、不得含單引號或換行）
+--require-file-path 與 --require-file-sha256 須成對給定
+檔案綁定旗標須與 --require-round-unchanged 併用
+檔案綁定旗標須併用 --require-file-dev-ino
+--require-file-dev-ino 須與 --require-file-path 併用
+--require-round-unchanged 不得與 --require-absent-session 併用
+
+=== benchmark_ethusdt_multitf.py ===
+] Pipeline 拋出例外: …: …
+
+=== brief_conformance_check.sh ===
+lifecycle matrix JSON 語法錯: …
+lifecycle matrix 不存在: …
+--emit 需要參數
+--only 需要參數
+未知旗標: $1
+多餘位置參數: $1
+brief 檔不存在: …
+brief 有未閉合的 code fence,宣告範圍無法判定(fail-closed): …
+brief fence 剝除失敗（fail-closed）: …
+brief 有多個【不一致】的行首
+_check_expected_delta 收到未經驗證之 brief-kind:
+brief-kind=impl 缺 EXPECTED-DELTA: 區塊
+EXPECTED-DELTA: 標題重複宣告(須恰 1 條,歧義一律 fail-closed
+EXPECTED-DELTA: 區塊為空
+EXPECTED-DELTA: 判定器無輸出(fail-closed): …
+未知 brief-kind: …(允許 review|consult|closure|impl|stamp
+--spec 派工之 brief-kind 須為 impl，實得: …
+未知 --only 檢查名: …（允許 expected-delta|impl-kind）
+brief 之程式碼 fence 未閉合（fail-closed，無法判定佔位是否在 fence 內）,拒派。
+brief 仍含 new_brief.sh 之**未填骨架佔位**,拒派:
+brief-kind=… 須**引用**委員範本(brief 內寫明 templates/<範本>.md 全文照做
+brief-kind=… 須含任務專屬**前提宣告**(範本 §0):逐條標
+brief-kind=stamp 缺 stamp-target: 欄
+stamp-target 有多個【不一致】宣告: $(printf
+stamp-target 須 handoffs/ 前綴: …
+stamp-target 不得含 ..: …
+stamp-target 檔不存在: …
+unclosed code fence (\`\`\`) — fail-closed
+無法自 completeness_check.sh 讀取 CANONICAL_ID_RE
+brief 內 finding ID 樣板不合規
+count: 宣稱之指令段須為成對反引號且不得為空
+fact-verified 計數宣稱含截斷運算子（head/tail/-mN）
+fact-verified 引用派工會改變之 rc，須標註「派工後預期值」
+無法寫入 --emit 檔: …
+
+=== capture_ic1eb_baseline.py ===
+staging 殘留 …,請先清理
+
+=== check_decoupling.sh ===
+…: momentum/ imports api/ (… violations
+…: AST import scanner rejected the tree or manifest
+…: momentum imports api.core.config (… violations
+…: lambda monkeypatch in services (… violations
+…: bidirectional api/models ↔ momentum/core (… violations
+
+=== check_decoupling_imports.py ===
+--update-baseline 須同時指定 --baseline
+這個動作會把現有違反全部吸收成『可接受』——產出必須經 review 才可 commit。
+
+=== check_decoupling_phase4.sh ===
+ED with … issue(s
+
+=== cleanup_pattern_nan_artifacts.py ===
+root not found: …
+ED to delete …: …
+
+=== cleanup_stale_dispatch.sh ===
+呆滯 pid=%-7s 已跑 %-10s …\n
+
+=== committee_run.sh ===
+--session 需要參數
+未知旗標: $1（--session 須在 -- 之前；gate flags 須在 -- 之後）
+多餘位置參數: $1
+缺必填 --session <name>
+缺 gate.sh dispatch flags(-- 之後
+brief 不存在: …
+out前綴須在 handoffs/: …
+路徑無法以重派放行文法表示（不開輪）: $(printf
+無法建立 out 目錄: …（fail-closed，不派工不開債）
+brief_conformance_check 未回傳 brief-kind（fail-closed）
+gate flags 缺 --task-id（開債必填；請在 -- 之後加上 --task-id <id>）
+命名規約未過 → 不發 token、不開債、不派工(fail-closed
+無法載入 family SoT(fail-closed
+讀 SoT families 失敗(fail-closed
+: 家族清單為空
+角色閘拒派 → 不發 token、不開債、不派工(fail-closed；audit 零新增
+票 B-50：偵測到疑似**執行端污染**（只回報、不擋、不改 rc）──
+形態②：下列 ambient 修改**消失**（疑似被還原成 HEAD）：
+形態③：工作區有 … 行新增含 MUTATION 標記（疑似 mutation 未還原）：
+前批裁決未閉合或缺機械裁決（verdictgate）→ 不開債、不派工(fail-closed
+gate 未放行 → 不開債、不派工(fail-closed
+開債失敗（session 重複或 audit 寫入失敗）→ 不啟動 cx_run
+
+=== completeness_check.sh ===
+COMPLETENESS_ALLOW_ARGV_SOURCES 僅允許 GOVERNANCE_TEST_HARNESS=1（正式路徑 fail-closed 拒 argv 來源）
+advisory-only 逃生口禁用（COMPLETENESS_ADVISORY_ONLY）
+ID_PATTERN 覆寫僅允許 GOVERNANCE_TEST_HARNESS=1（正式路徑 fail-closed 拒 env 過濾 finding）。
+ID_PATTERN 覆寫需 ALLOW_ID_PATTERN_OVERRIDE=1(僅測試 harness)。
+invalid family in ID:
+family-binding mismatch: heading
+invalid finding ID (schema/trailing):
+empty-shell finding (缺 **斷言**/**碼證**):
+P0/P1 missing source digest (**來源摘要** or source_digest:):
+P0/P1 finding 缺 CODE-ANCHOR:/MUTATION:（has_anchor=… has_mutation=…）: … (file=…
+anchor 落在歷史段（HISTORY-BEGIN..END／## 沿革）: … → …:…$( [
+same-file duplicate ID(s) in …:
+sources.lock 不存在(fail-closed): …
+sources.lock version 不符(期望 1, 得 …
+sources.lock closure_state 須為 FROZEN(得 …
+sources.lock mode 讀取失敗
+sources.lock mode 未知值
+degrade.json 含禁用語(waived:/skip/ALLOWLIST/ADVISORY_ONLY)；P0/P1 不得 waiver
+min_families<2 硬停（present=…；不得以降級繞過）
+roster 缺席但無 degrade.json（無合法 DEGRADED_PENDING）
+synth 不存在，無法驗證 DEGRADE 事件: …
+缺席家族 … 無顯式 ## …（synth）
+P0/P1 不得 waiver；degrade 禁 waived:/skip 字串（…）
+degrade.json 非法或不對齊缺席家族: …
+empty roster 且無 sources（vacuous 拒收）
+expected_roster 含重複家族: …
+expected_roster 含 allowlist 外家族: …（允許: codex,composer,grok,claude,agy）
+roster 缺席家族(無合法 DEGRADED_PENDING): …
+同家族多來源檔(跨 round/混入): …
+lock 含 roster 外家族/unknown: …
+sources/ 目錄不存在: …
+lock source 欄位不完整: …
+lock 列示來源不存在: …
+來源 realpath 出 session sources/（symlink/root外）: … → …
+來源在子目錄（禁）: …
+非 *.md 來源: …
+檔名不匹配 *-<family>.md: …
+lock.family(…) ≠ 檔名家族(…): …
+late/竄改（sha≠lock）: … lock=…… actual=……
+sources/ 含子目錄: …
+sources/ 出現 lock 未列檔（污染/跨 round/late）: …
+綜合檔不存在: …
+來源檔不存在: …
+… — …/… 個 ID 未出現在綜合檔:
+p0p1_missing (hard gate, not diluted by coverage ratio):
+cross-source duplicate ID(s):
+無任何來源抽出 heading ID(vacuous;可能 prose-only 或未遵守 ## <ID> 慣例)。
+完整性檢查未過(invalid ID / empty shell / 缺 digest / dup / dropped-ID / body-hash / unknown)。補齊後重跑。
+unknown ID(s) in synth (not in any source union): …
+無法讀檔做 body-hash: …: …
+committee_accepted.json 無法解析: …
+committee_accepted.json schema 須含 accepted_ids:[]
+accepted_ids 須為 list
+初稿 receipt 已存在不可回寫（write-once）: …
+coverage.json 已存在不可回寫（write-once）: …
+初稿 synth 不存在: …
+無法計算 synth sha256: …
+初稿 receipt/coverage 已存在不可回寫（write-once）: … / …
+初稿 receipt/coverage 寫入失敗（rc=…；不吞成 advisory）
+初稿 receipt/coverage 寫入後仍缺檔
+self-check 輸入錯誤 — synth 不存在: …
+self-check 輸入錯誤 — sources/ 不存在: …
+self-check 輸入錯誤 — lock.sources 為空
+self-check — synth ID schema 非法
+self-check 輸入錯誤 — 來源不存在: …
+self-check — 來源 ID schema 非法: …
+self-check 無法計算 coverage
+禁 --skip/--skip-completeness/--advisory-only 逃生口
+未知選項: $1
+--round-id 只與 --single 併用
+--single 不得與 --lock/--synth/argv 來源併用
+缺 scripts/_finding_category.py（finding 類別判定之唯一實作）⇒ fail-closed
+(single): … 格式不合規（見上）。
+正式 --lock 入口禁 argv 來源覆寫（收到 … 個多餘參數）
+COMPLETENESS_SOURCES_OVERRIDE 禁用（來源只讀 lock）
+lock.sources 為空（非 vacuous PASS）
+--self-check 必須搭配 --lock <sources.lock>
+正式入口必須 --lock <sources.lock>（argv 來源僅 tests 隔離 COMPLETENESS_ALLOW_ARGV_SOURCES=1）
+
+=== coverage_check.sh ===
+manifest 不存在: …
+target 不存在: …
+manifest 內找不到任何 [X-N] 格式 ID（慣例：- [A-1] 描述）
+… 漏掉 manifest 的 …/… 項：
+
+=== cx_run.sh ===
+lifecycle matrix JSON 語法錯: …
+lifecycle matrix 不存在: …
+--family 缺值
+--round-id 缺值
+--selfcheck 未知選項: $1
+--selfcheck 只接受一個產出檔: $1
+產出檔不存在: …
+brief 檔不存在: …
+output 須在 handoffs/: …
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+registry 讀取失敗: …
+registry 缺 audit_log_path
+ROUND_ID 未設（須由 committee_run 開債後注入，或直呼時帶合法 round）
+讀 audit 失敗: …
+audit 含無法解析的 JSON 行
+audit 無對應 committee_round_open（round_id=…）
+round_id 對應多筆 committee_round_open（round_id=…）
+committee_round_open.expected_outputs 非 object
+expected_outputs 未登記家族
+讀 brief 失敗: …
+open_ev 缺 task_id 或為空字串（第⑦道前置，拒派）
+open_ev.task_id 型別非法: …
+CX_STUB_MODE 須綁 GOVERNANCE_TEST_HARNESS=1
+register-output 失敗（待人工補記）task=… path=…
+verdict 拒收——… 產出之機械裁決塊不合契約（見上）；audit 記 verdict_rejected，主委修檔後可重新 register-output：…
+findings 落點違規 — 本輪在 stamp-target 新增了 canonical finding ID
+completeness_check.sh 不存在或不可讀 → fail-closed（不得記 success）
+completeness_check.sh 不存在或不可讀 → fail-closed（stamp 輪亦不得記 success）
+重跑前快照產出寫入簽章失敗 ⇒ 無法判定本次 attempt 是否寫入（fail-closed）: …
+未知 CX_STUB_MODE=…
+寫入 committee_family_result 失敗
+codex 不存在: …
+grok 不存在: …
+cursor-agent 不存在（composer CLI）
+unknown brief-kind=…（fail-closed）
+family 須為 codex|grok|composer, 得到: …
+
+=== debt_clear.sh ===
+debt_clear 拒絕：本輪標為「預期零 findings」，但產出檔內有實質 findings
+registry 缺 …
+sources.lock 不存在: …
+sources.lock 無法解析: …
+無法判定 round 狀態（不存在或帳本 fail-closed）: …
+round 已 ABANDONED，不可銷帳: …
+round 非 OPEN: … state=…
+completeness_check.sh 缺失: …
+completeness_check rc=…（拒銷）
+synth.md 缺失: …
+群集歸戶閘 rc=…（ID 未列／引用不逐字／無處置 token／延後目標不存在；拒銷）
+… 未宣告修訂標的（在群集段加一行：**修訂標的**：docs/<X>_SPEC.md）
+修訂標的不存在: …
+synth 處置欄概念未見於 …（拒銷）
+sources.lock mode 必須是 review（目前: …）
+sources.lock 缺 round_id（identity binding fail-closed）
+identity binding 失敗: lock.round_id=… != --round-id=…
+active_stampers 不合法（暫停缺席判定 fail-closed；原因見上方 stderr）
+讀帳本失敗（暫停缺席判定）
+讀帳本失敗（roster 檢查）
+round 不在帳本: …
+sources.lock 缺 expected_roster
+讀帳本失敗（family result 檢查）
+open.participants 空，無法驗家族結果
+家族 … 無 committee_family_result
+家族 … 產出檔讀不進來：…
+家族 … output_sha256 空
+讀取產出檔失敗 (…: …): …
+計算 lock sha256 失敗
+synth.md 不存在: …
+快照缺 snapshot_output_dev_ino，拒絕只以雜湊綁定產出檔
+--kind 不在 enums.abandon_kind: {k!r} allowed=…
+缺 scripts/_docrot2_metrics.py 或 scripts/_finding_category.py（收案量測事件之唯一實作）⇒ 拒銷（fail-closed）
+docrot2_round_metric 未寫入 rc=…（拒銷）
+_redispatch_check.py 缺失而本輪有保存檔，不得銷帳（fail-closed）
+--abandon 缺 --kind
+--abandon 缺 --reason
+--abandon 缺 --approver
+--reason 長度 < constants.reason_min_chars (…
+REDISPATCH_TEST_AFTER_EXHAUSTED_CHECK_CMD 僅允許 GOVERNANCE_TEST_HARNESS=1
+--abandon --kind collection-failed 拒：round … 已有 committee_family_result（family={r.get(
+帳本 fail-closed（缺檔/壞 JSON/同一 round 非恰一筆 open）: …
+round_id 不存在: …
+round 已 ABANDONED（不可逆）: …
+round 已 ABANDONED（單筆掃描）: …
+
+=== debt_ledger.sh ===
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+registry 讀取失敗: …
+registry 缺 audit_log_path
+DEBT_CUTOFF_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+registry 缺 cutoff_ts
+debt_ledger 核心缺失: …
+audit 檔缺失: …
+讀 audit 失敗: …
+audit 第 … 行 JSON 無法解析(fail-closed): …
+_round_exists_single 需要 round_id
+_round_state 需要 round_id
+未知參數: $1
+
+=== dispatch.sh ===
+output 已存在 (…)，請顯式給唯一 --task-id / --output
+task-id 已在 audit (…)，請顯式給唯一 --task-id
+
+=== draft_selfcheck.sh ===
+--rejected 覆寫僅 GOVERNANCE_TEST_HARNESS=1 可用（正式路徑拒受控清單替換）
+未知旗標: $1
+只接受一個草案檔
+草案檔不存在: …
+--only 只接受 1|2|3|4|5
+mktemp 失敗
+… 條違反。**修完再派委員**——這些是委員每輪都會抓到的同一批缺陷。
+
+=== evtalign_phase_gate.sh ===
+未知 phase=…（新 Phase 須先登記於本腳本）
+缺 artifact …
+測試檔不存在 …
+… pytest rc=…
+… 仍有 … 條 skip（skip 不是綠）
+tests/golden/evtalign/*.json 命中 0 個（空迴圈假綠）
+golden 基線自證 rc=…
+mutation rc=…
+mutation UNCOVERED=…（SKIP 不計入通過）
+
+=== evtlabel_phase_gate.sh ===
+未知 phase=…（新 Phase 須先登記於本腳本）
+缺 artifact …
+測試檔不存在 …
+… pytest rc=…
+… 仍有 … 條 skip（skip 不是綠）
+oracle benchmark 超出門檻（見 /tmp/evtlabel_oracle_bench.out）
+tests/golden/evtalign/*.json 命中 0 個（空迴圈假綠）
+tests/golden/evtlabel/*.json 命中 0 個（G-6 未凍結）
+mutation rc=…
+mutation UNCOVERED=…（SKIP 不計入通過）
+
+=== evtwarmup_phase_gate.sh ===
+未知 phase=…
+測試檔不存在 …
+… pytest rc=…
+… 仍有 … 條 skip
+tests/golden/evtwarmup/*.json 命中 0 個
+mutation rc=…
+mutation UNCOVERED=…
+
+=== factkey_write_guard.sh ===
+產出端檢查未過（你剛改了受管檔 …）
+
+=== freeze_evtlabel_survivor_golden.py ===
+golden 不存在（未凍結）: …
+….…: golden={want[field]!r} now={snap[field]!r}
+
+=== freeze_splitunify_golden.py ===
+缺凍結檔 …——v9 鍵只能沿用、不得重算（fail-closed）
+凍結檔缺 v9 鍵 …（fail-closed）
+G-3b（獨立 oracle）: …
+投影與獨立 oracle 不一致
+G-4e（錨點時刻對帳）: …
+人手錨點時刻與 fixture 實際值不符（整批位移在此擋下）
+G-4e（人手 expected_side vs …）: …
+G-5④ leakage negative case: …
+
+=== freeze_splitunify_report_keys.py ===
+…: 新增 …；消失 …
+
+=== g7_trailer_precheck.sh ===
+G-7 前移檢查：無法讀取 staged 內容（git diff rc=…）⇒ fail-closed，請修復後再 commit。
+G-7 前移檢查未過：本次 staged 含 **scope 外路徑**，但 commit 訊息的最後一段沒有 … trailer。
+現在不加就只能重寫歷史：G-7 的豁免是「該路徑在範圍內**只**被帶 trailer 的 commit 觸及」，
+
+=== gap1_b1_mutation_probe.sh ===
+探針已有另一個執行實例（鎖: …）。
+ED＝斷言失敗）
+…: rc=2（collection/語法錯）⇒ **mutation 設計錯**，不算可證偽
+…: rc=…、FAILED=… ⇒ **未轉紅**，測試不可證偽
+K2：baseline 紅即 fail-closed 退出，不得續跑）
+baseline 非綠 ⇒ mutation 之前提不成立（改壞才紅之判準失去意義）。中止。
+K2：任一不成立即 exit 1）
+有 mutant 殘留 ⇒ 還原機制失效（首版即因 git checkout 對未追蹤檔無效而發生）
+還原後非綠 ⇒ 探針弄髒了工作區。中止。
+有 mutation 未通過「可證偽」判準
+
+=== gap2_freeze_golden.py ===
+pre 檔缺：…
+CHECK FAIL:
+
+=== gap2_mutation_probe.sh ===
+batch … 之 case 表尚未定義（該批 Task 落地時加列）。
+未知 batch: …
+探針已有另一個執行實例（鎖: …）；本探針就地 mutate 共用工作區 ⇒ 不可並行。
+…: mutation 目標行不存在於 …: …
+
+=== gap3_label_golden.py ===
+…: 不在 cases.py 登記處（禁凍未登記案例）
+…: 不在 cases.py 登記處（凍結檔與登記處已脫鉤）
+
+=== gap3ux_apply_patch.py ===
+找不到補丁包：…
+AFTER 未入：…
+VERIFY 未達：`…` 期望 … 實得 %d
+
+=== gap3ux_count_check.sh ===
+找不到任何 …（fail-closed）
+基準檔不存在 …（fail-closed）
+
+=== gap3ux_header_round_check.sh ===
+檔頭 current-round receipt 不是恰好一行（實得 … 行）
+無法讀取債務帳本（debt_ledger --list rc=…）⇒ fail-closed
+債務帳本查無本 epic（pattern=…）之任何輪次 ⇒ fail-closed
+帳本可讀但 state 欄不可解析（round=R…）⇒ fail-closed
+檔頭 current-round receipt 不符
+未知之輪次 state=
+
+=== gap3ux_pre_review.sh ===
+%-28s rc=%d\n
+
+=== gate.sh ===
+治理家族 SoT 讀取失敗(fail-closed),拒發 token。修:確認 scripts/governance_families.json 存在且合法。
+SoT review_families 空(fail-closed
+治理家族 SoT families key 讀取失敗(fail-closed),拒發 token。
+RECONCILE_STAMPS_CHECK_OVERRIDE 僅允許 GOVERNANCE_TEST_HARNESS=1（正式路徑 fail-closed 拒覆寫）
+COMPLETENESS_CHECK_OVERRIDE 僅允許 GOVERNANCE_TEST_HARNESS=1（正式路徑 fail-closed 拒覆寫）
+kind 必須是 dispatch|artifact|register-output
+register-output 缺 task-id
+register-output 缺 path
+register-output 拒絕 legacy-* task-id（請用 legacy 白名單腳本）
+register-output 檔不存在:…
+stampable_artifacts.txt 含未封閉樣式或 ..（不接受萬用字元／目錄前綴）:…
+register-output 只接受 handoffs/ 內檔案，或 scripts/stampable_artifacts.txt 明列者:…
+register-output 路徑不可含 ..:…
+register-output 找不到先行 committee_dispatch task:…
+register-output 未知參數: $3
+--kind stamp 須帶 --family <fam>
+register-output 無法由檔名尾碼解析家族（須為 -<family>.md，family ∈ governance_families.json）:…
+register-output 找不到 task … 之 committee_round_open（非 committee_run 派出的輪不得註冊 review 產出）
+register-output 家族 … 不在該輪 quorum_eligible …
+register-output 路徑 … ≠ 該輪 expected_outputs[…]={expected!r}（同家任意 handoff 不得冒充該輪輸出）
+register-output 拒收——裁決塊不合契約（見上）:…
+register-output --kind 只准 review|stamp:…
+register-output 寫 audit 失敗（audit_append 拒寫，見上）
+未預期參數 $1
+family SoT 讀取失敗(fail-closed
+--adversarial 檔缺**已填實的** Verdict 行:…（D-1 拒發）
+adversarial 含 [BLOCKING] 或 ID: finding，--reconcile 必填（D-2 拒發）:…
+--reconcile 檔不存在:…（真實檢查失敗）
+reconcile 缺以下 finding 處置行(須含 →):…
+--adversarial 檔不存在:…（真實檢查失敗）
+adversarial provenance 檢查失敗（見上），拒發 token。
+--adversarial 既非 ADV 命名亦未獲 reconcile 戳記核可（見上），拒發 token。
+宣告的委員綜合檔不存在(fail-closed): …
+completeness_check 腳本不存在(fail-closed): …
+sources.lock 不存在(fail-closed completeness): …（session=…）
+completeness DEGRADED_PENDING(rc=3) — 合法降級不可發 final/實作 token。
+completeness 未過(rc=…)，拒發實作 token。
+debt_ledger 缺失（fail-closed），拒發 dispatch token。
+存在未清委員會債（OPEN），拒發 dispatch token（含實作派工；不分討論/實作）。
+請先銷帳（debt_clear）或 abandon；下列為帳本 --list：
+債務帳本不可信（debt_ledger --has-open rc=…，fail-closed），拒發 token。
+--spec 重複給值（parser 為 last-wins，會靜默抹除前值）
+--spec 之值為空或全空白（不得靜默降級為非 impl 派工）
+--reconcile 目標須為 session synth.md（防 target/synth 未綁定掉項）: …
+引用的委員綜合未過完整性機械驗（見上），拒發 token。
+impl reconcile 未獲委員核可。委員須 append RECONCILE-STAMP APPROVED。
+--brief 檔不存在: …
+缺 … → fail-closed 拒發 token
+GOVB1 TODO 深度自檢未過 → 拒發 impl token。
+Task … 歸屬票未具名 → 拒發 impl token。
+GOVB1 歸屬 TSV 結構未過 → 拒發 impl token。
+adversarial 檢查失敗（見上），拒發 token。
+SPEC 未過範本機檢（見上），拒發 token。
+SPEC 漏 manifest 項（見上），拒發 token。
+TODO 未過範本機檢（見上），拒發 token。
+TODO 漏 manifest 項（見上），拒發 token。
+--template-opened 檔不存在:…（真實檢查失敗）
+
+=== gate_check.sh ===
+debt_ledger 缺失（fail-closed）
+_gate_lex.sh missing (fail-closed dispatch scan
+
+=== gen_fact_key_blocks.sh ===
+ED: …（生成器自身失敗，未與宿主檔比對）→ fail-closed
+
+=== gen_govb1_contract_matrix.sh ===
+行為表現讀 0 行，pattern 已失效
+SPEC fixture fence 現算 0 項，path 錨點已失效
+fixture 清單僅 … 項，低於現算下界 …（heading pattern 可能已失效）
+missing fixture …/…
+unknown arg: $1
+
+=== gen_govflow_manifest.sh ===
+--record-base 需要 <N> 引數（N ∈ {0,1,2,3,4}）
+--record-base <N> 的 N 必須 ∈ {0,1,2,3,4}，取得: …
+… 已有 Phase … 列（append-only，禁改寫基準）
+TODO 不存在: …
+錨點完整性失敗: count(### Task)=… count(修改檔案)=… count(不可做)=…
+A 類 pattern 命中 0 筆（pattern 寫錯，非「沒有 consumer」）
+D 類機械抽取結果為空（TODO 錨點或 path 抽取 pattern 異常）
+B/C/D path 未映射 PHASE_MAP: …
+PHASE_MAP 反向收斂失敗: … → phases=… 但不在 B∪C∪D（禁把旁觀者直接映射進 Phase）
+應有 nodeid 而缺: …
+
+=== golden_staleness_check.sh ===
+STALE＝基準比它守的程式舊 ⇒ **該基準的紅與綠都不可信**（綠也可能只是巧合）。
+ORPHAN＝沒有任何測試引用它。UNKNOWN＝引用者未 import 專案模組，本工具不猜。
+已知過期基準未被判 STALE — 本工具的結論不可採信
+
+=== gov_check.sh ===
+active_stampers 含不在 review_families 之家族: …
+shell 語法未過
+缺依賴 … → fail-closed（不得靜默跳過格式檢查）
+無法解析 git base（merge-base/rev-parse 皆失敗）→ fail-closed
+格式未過: …（詳情跑 bash scripts/doc_format_precheck.sh …）
+計數字面檢查執行失敗（rc=…）: …
+計數字面多落點: …（同一「共 N 條」寫在活文多行；留一處當唯一來源，其餘寫指標）
+缺依賴 scripts/spec_count_audit.py → fail-closed: …
+治理文件格式：… 個未過（本次改動 … 個）
+白話說明已過期(見上;更新後推進各檔 SYNCED-AT
+gen_fact_key_blocks.sh 缺失或不可執行 → fail-closed
+事實單一來源漂移(見上;改 scripts/fact_keys.json 後跑 --write
+找不到 python → fail-closed
+governance 測試未過
+探針健檢未過(非既有債檔的探針失效,須修
+
+=== govb1_final_gate.sh ===
+plan 有檢查函式不存在（非 consumer closure，見 B.4#6）
+consumer 不在 allow 內:\n…\n
+缺 scope manifest …（fail-closed）
+scope manifest 雜湊不符（want=… got=…）
+scope manifest 含未知動詞（fail-closed）:\n…\n
+scope manifest 路徑形態不支援（fail-closed）:\n…\n
+meta 重複路徑（列數契約；精確凍結 6 項，禁重複列）:
+meta expected-set 不符（精確凍結集合；多一/少一/改字皆拒）
+抽取結果為空（pattern 失效）
+GOVB1_TODO 不可讀: …
+GOVB1_TODO 為空: …
+TODO 缺 ### Task …: …
+讀取 Task … 區段失敗: …
+Task … 區段空: …
+Task … 缺 **新建** 欄: …
+Task … 缺 **修改** 欄: …
+Task 1.2 新建欄抽取失敗
+Task 1.4 新建欄抽取失敗
+proxy 導出為空（Task 1.2／1.4 新建欄無路徑）
+Task 1.2 修改欄抽取失敗
+Task 1.4 修改欄抽取失敗
+target 導出為空（Task 1.2／1.4 修改∪新建無路徑）
+UNSUPPORTED-DELIVERY-SHAPE — 本批宣告路徑仍未 commit
+base_commit 非 HEAD 祖先（range 無意義）
+未宣告即修改:\n…\n
+… 在 base..HEAD 須 ≥2 獨立 commit（現 …；禁合併 1.2+1.4）
+base..HEAD 未見 _check_id_pattern 引入
+base..HEAD 未見 _check_fact_verified 引入
+1.2 與 1.4 併於同一 commit（禁合併）
+逆序——_check_fact_verified 先於 _check_id_pattern
+receipt 空檔: …
+receipt 缺 TASK_ID 欄: …
+檔名 TASK_ID≠內容 TASK_ID（file=… body=…）: …
+receipt TASK_ID 非 T12／T14 後綴: … (…
+receipt 缺母體定義: …
+receipt 狀態為待複核（須已完成非實作者複核）: …
+receipt 缺「已完成非實作者複核」狀態: …
+receipt 缺 95% CI [x%, y%]: …
+receipt 95% CI 上界解析失敗: …
+receipt 95% CI 上界>5%（…%）: …
+須恰好各一份 T12＋T14 receipt（T12=… T14=…；dir=…/govb1-fp-*.md；須含母體定義／95% CI 上界≤5%／已完成非實作者複核）
+權威檔不存在: …
+權威檔語法錯: …
+jq 正規化權威檔失敗: …
+腳本不存在: …
+… 缺 _LIFECYCLE_EMBED_B64
+… embed base64 解碼失敗
+… embed 解碼後非合法 JSON
+… embed ≠ …（jq -S 正規化後不等）
+零檢查執行（空轉）
+
+=== govb1_ghostpath_check.sh ===
+讀不到 base_commit（fail-closed）
+
+=== govb1_selfcheck.sh ===
+檢查覆蓋不完整（expected != seen）：
+INVARIANT: 印出 … 個 FAIL 但 rc=0（累積值被覆蓋）
+「$1」→ $3 仍為 …（檢查空轉）
+「行為表來源換檔」→ CHK-BEHAVIOR-ROWS 未轉紅（檢查空轉）
+
+=== govb1_single_source_check.sh ===
+找不到 §0.1b（判準單一來源表）
+找不到 §0.2 之 G-2 列
+G-2 列未指向 §0.1b（判準應只在 §0.1b 陳述）
+找不到 _g2_consumers() 區塊
+_g2_consumers() 未指向 §0.1b
+缺歸屬 TSV …（fail-closed）
+歸屬 TSV 無 Task … 之列（表未涵蓋該 Task）
+Task … 之歸屬票為空 ⇒ 不得派工。
+Task … 之歸屬票仍為「未標註／待確認」⇒ 不得派工。
+解鎖路徑（**不是死鎖**，本閘只擋 impl 派工）：
+**主委不得自行推測**：內文第一個出現的票號常為交叉引用而非歸屬
+--task 需帶 Task 編號（如 0.1）
+歸屬 TSV 未涵蓋 Task:…
+
+=== ic1c_freeze_baseline.py ===
+feature {name!r} not dict
+deep result missing results dict
+cannot locate module results map
+net_ic_analysis.features empty/missing
+g_new.result_cost_enabled.features empty
+analyze timeout
+deep-analysis timeout 60s
+… feature mismatch(es
+
+=== ic1cfr_stopgap_freeze.py ===
+report serialize not dict
+results.factor_returns missing or empty
+results.factor_returns has no finite numeric leaf
+rg not found on PATH
+rg exit=…: …
+…: missing before baseline …
+…: before.json root not dict
+…: non-FR path diffs (…):
+…: non-FR exact compare failed (… paths
+self-prove: no non-FR module in after results to tamper
+after-explicit: results.factor_returns missing or not dict
+after-explicit: union value must be ok dict
+after-explicit: ok path must not carry stopgap reason={reason!r}
+unknown profile for out path: {profile!r}
+missing …
+fixture missing: …
+requires_kline: missing …
+…: report.results not dict
+before-full: results.factor_returns missing or not dict
+before-full: union value must be null under stopgap
+before-full: unexpected reason={reason!r}
+before-full: factor_returns still has finite numeric leaf
+before-full: no non-FR module results to freeze
+before-full: payload missing top-level results
+after-full: report.results missing or empty
+after-full: results.factor_returns missing or not dict
+after-full: ok union value must be dict
+
+=== ic1d_baseline_freeze.py ===
+_ic_cache is None after analyze(
+
+=== ic1d_compare.py ===
+… root must be object/dict, got …
+before not found: …
+after not found: …
+… unallowed difference(s
+
+=== ic1eb_b2_mutation_probe.py ===
+expected exactly one occurrence of target line
+baseline test not green before mutation
+restore did not return file to original bytes
+mutation did NOT turn test red (fake-green risk
+test not green after restore
+
+=== ic1eb_b3_mutation_probe.py ===
+[…]: expected exactly 1 occurrence of ORIG block
+[…]: baseline not green
+[…]: restore sha mismatch
+[…]: mutation did NOT turn red (fake-green risk
+[…]: not green after restore
+
+=== icresult_paging_phase_gate.sh ===
+… 行數=…（須恰 1）
+… 須 PASS
+測試檔不存在 …
+… pytest rc=…
+… 仍有 … 條 skip
+golden --check rc=…
+mutation rc=…
+mutation UNCOVERED=…
+未知 phase=…
+
+=== list_active_mechanisms.sh ===
+產出為空或缺標記 → 不寫入（原檔保留）
+… 之掛載表與實況不一致 → fail-closed
+掛載一覽與實況不一致（你剛改了 …）\n
+
+=== measure_ic_footprint.sh ===
+缺必填參數 --$(echo
+取不到 hw.memsize（非 macOS？本協定綁 macOS sample）
+期望**恰好一個** run_api.py 進程，實得 … 個：…
+取不到 baseline footprint（sample 失敗；pid=…）
+peak=… 超過 … ⇒ 記為**超標點**並停止該分析
+Task 6.2 要求 ≥3 個量測點、且同一 run 重跑 2 次之 peak 差 < 20%；請分次跑齊再算上限。
+上限 ＝ **最小超標點之 feature_count × 0.5**；在 receipt 齊備前**不得**把數字寫進設定。
+
+=== mutation_probe_check.sh ===
+路徑不存在: …
+
+=== narrow_check_router.sh ===
+對照表腐爛：命中 … 之檢查腳本不存在或表列格式錯誤：…
+無法建立暫存檔（TMPDIR=… 不可寫？）⇒ 檢查 … 未執行
+你剛改了 …，其對應檢查未過（rc=…）：
+
+=== new_brief.sh ===
+檔已存在,拒覆寫: …
+brief 建議放 handoffs/: …
+交件形態（缺這段整輪會銷不了帳）
+輸入邊界：只餵 current block ＋ 本輪 diff）
+**不在審查範圍**：修訂沿革（\`HISTORY-BEGIN\`～\`HISTORY-END\`、「沿革與追溯索引」節）與逐字標記「作廢／前版／舊敘述／原寫」之字面。**finding 之 source anchor 落在歷史段者不受理*
+
+=== no_append_only_check.sh ===
+…：本次變更是**純檔尾追加**（既有內容一字未動）⇒ 拒絕。
+: 變短卻被誤判
+
+=== obligation_block_check.sh ===
+…:… 裁決編號出現在歷史專區之外
+…:… 區塊 … 內出現非義務項之行（自由散文不是合法行型）
+…:… 區塊 … 內出現裁決編號（義務項不得陳述本文件之歷史）
+…:… 區塊 … 混用主編號 … 與 …
+…:… 區塊 … 編號應為 … 但寫成 …（須自 1 起連續遞增）
+… 界標 …（起 … 行）沒有對應的 OBLIGATIONS-END
+
+=== patch_locus_check.py ===
+--diff-base 後須接 git ref
+git diff 失敗（fail-closed）
+補丁包不存在：…（fail-closed）
+…：以下 SYNC-LOCI 未被本次改動涵蓋
+
+=== plain_docs_guard_selftest.sh ===
+還原失敗 …（… → … 行）——請人工檢查
+注入進度表後 rc=…（期望 2）⇒ 守衛空心，未偵測到違規
+移除後 rc 仍為 2 ⇒ 守衛恆真，無鑑別力
+
+=== plain_docs_order_check.sh ===
+…（型樣：…）編號非遞增：
+
+=== plain_docs_render.py ===
+來源目錄不存在: …
+多餘產出（來源已不存在）: …
+… 檔不一致、… 條死連結（跑 bash scripts/plain_docs_render.sh 重生成）
+
+=== plain_docs_render.sh ===
+venv/bin/python 不存在（渲染器依賴 venv 內 markdown_it）
+渲染器缺失: …
+首次生成 rc=…
+缺 ….html
+缺 index/style
+站內連結未改寫成 .html
+Archived 連結未改寫
+表格未包 table-wrap
+非冪等（二次生成內容不同）
+--check 對最新產出應 rc=0
+來源改了但 --check 未報過期（rc=…，應 1）
+死連結應使生成 rc=1（rc=…）
+
+=== plain_docs_shape_check.sh ===
+…：章節「…」不在白名單
+…：缺必要章節「…」
+…：… 個章節，超過上限 …
+…：… 行，超過上限 … 行
+
+=== plain_docs_sync_check.sh ===
+非 git repo（fail-closed）
+白話說明/ 無任何 .md（fail-closed）
+(staged) … 未登記於 scripts/live_doc_registry.json
+(staged) … 未一併更新
+**本層是提醒，不擋 commit**（刻意設計）：若說明檔這次確實無需更動，
+… 含批次進度，但其 WATCHED 不含 scripts/ ⇒ 進度會過期且無人看管
+受管檔缺失: …（fail-closed；若已封存請自 MANAGED 移除並註明）
+… 未登記於 scripts/live_doc_registry.json（fail-closed；以 bash scripts/live_doc_registry_update.sh --add … 登記）
+… 無 WATCHED 定義（fail-closed）
+過期: …（尚未進版控，但其 WATCHED 已有改動）
+
+=== precommit_selfcheck.sh ===
+…（rc=%d）\n
+上列已紅 ⇒ **先修再 commit**，不要丟給全套去發現。
+
+=== prev_review_resolve.sh ===
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+
+=== proc_guard.sh ===
+程序水位過高 (…% ≥ …%
+
+=== profile_v6v7_comparison.py ===
+preprocessing.enabled is still False! Aborting
+
+=== quant_standard_check.sh ===
+基準只准**變短**：新增任何一條都會紅。
+量化主線偵測到「放水語」共 … 處
+2026-09-11 使用者再裁定：**整個專案（含治理）都不接受「95% 就收」**。
+
+=== reconcile_add_stamp_section.sh ===
+… 已有『## 戳記』區段，拒絕重複附加
+附加前 completeness_check --lock 就是 rc=…，先修好再加戳記區
+附加後 completeness_check 轉紅 (rc=…) — 戳記區破壞了最後一條 finding 的 body
+
+=== reconcile_body_hash.sh ===
+缺『## 戳記』區段標題
+
+=== reconcile_build.sh ===
+audit 讀取失敗(fail-closed): …
+registry 的 opens_debt 事件不是恰一筆
+audit 第 … 行 JSON 無法解析(fail-closed): …
+session_name 命中 … 筆(需恰 1): …
+committee_round_open 缺非空 round_id
+registry 狀態事件契約不完整
+--rebuild 需既有 sources.lock: …
+--rebuild 僅允許目標 mode=review
+既有 sources.lock 無法解析(fail-closed
+--rebuild 只允許 discovery → review；現有 mode=…
+--mode 需要值 review|discovery
+--mode 非法值
+--rebuild 不接受委員檔；既有 sources.lock 內容必須保持不變
+fresh 建立至少需要一個委員檔
+--rebuild lock 就地升級失敗
+委員檔不存在: …
+檔名推不出合法家族(須 *-{codex|composer|grok|claude|agy}.md): …
+session 已存在，未帶 --rebuild 時拒覆寫: …
+write_sources_lock 失敗
+synth 組建失敗
+
+=== reconcile_clear_stamps.sh ===
+… 無『## 戳記』區段
+
+=== reconcile_cluster_attribution_check.sh ===
+synth 不存在: …
+
+=== reconcile_stamps_check.sh ===
+家族 SoT 讀取失敗(fail-closed
+active_stampers 不合法 ⇒ 拒發（fail-closed；原因見上方 stderr）
+… 缺『## 戳記』區段標題(無法界定本體雜湊範圍
+… 未獲全數委員核可:
+
+=== regen_factkey_fixtures.sh ===
+補竄改後兩份 fixture 仍相同 → 鑑別力未恢復（竄改錨點可能已漂）
+兩份 fixture 差異列數為 …（期望 2＝恰一列不同的雙向） → fail-closed
+
+=== register_anchor_check.py ===
+register 表未解析到任何 ANCHOR 子句
+
+=== register_legacy_committee_files.sh ===
+legacy whitelist 不含:…
+legacy 檔不存在:…
+legacy sha256 不符:… expected=… actual=…
+
+=== register_v8_golden_lite.py ===
+] features dir not found: …
+] no parquet files in …
+
+=== review_quorum_check.sh ===
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+缺 <review-task-prefix>
+缺 <implementer-family>
+無 audit.log (…
+batch … 僅 … 個非實作者家族 review: …(需 ≥2;implementer=… 不計
+
+=== round_cost.sh ===
+上列全部由**委員實際交件檔**機械數出（扣掉零-findings sentinel），不讀任何自報標籤。
+「空輪」不等於浪費——收斂輪／複驗輪／戳記輪本來就該零 findings，那是收斂成功的訊號。
+「無產出」只表示現在查不到那些檔，不推論當時發生什麼（舊檔可能已清理或改名）。
+不實 %d｜產出檔查不到 %d\n
+不實＝該輪委員確實提了 findings 卻以「預期零 findings」結案 ⇒ 那些 findings 無紀錄可證被處置。
+
+=== session_name_check.sh ===
+session 不符命名規約: …
+偵測到裸數字後綴（如 -review2）：重派請改用 -r2，
+task-id 須為 session 的大寫形式
+
+=== set_roles.sh ===
+角色 SoT eligible 缺/壞 ⇒ 無從判定合法家族(fail-closed)\n
+active_stampers 缺席且 review_families 讀取失敗 ⇒ 無法評估 quorum(fail-closed
+active_stampers 不合法 ⇒ 無法評估 quorum 可行性(fail-closed
+可用家族集合為空 ⇒ 無法評估 quorum 可行性(fail-closed
+切成 implementer=… 會使可用之非實作者家族只剩 … 家(…
+使用 SET_ROLES_ALLOW_QUORUM_BREAK 須同時給 SET_ROLES_QUORUM_BREAK_REASON=
+讀 review_families 失敗 ⇒ 無從導出 reviewers(fail-closed
+
+=== smoke_test_pipeline.py ===
+] Pipeline raised exception after …
+
+=== spec_count_audit.py ===
+--baseline 後須接基準檔
+讀不到 …（fail-closed）
+--check 需要 --baseline <基準檔>
+計數字面有變動 ⇒ 請逐條複核它所計之物的實際數
+
+=== spec_ruling_task_sync.sh ===
+… 之裁定與施工段不同步
+
+=== spec_v_task_ref_check.sh ===
+… 之 §V 同時引用 Task 又複述其斷言（雙源）
+
+=== spec_xref_check.sh ===
+… — 下列概念在本次改動中被拿掉，但仍有未標版本的引用：
+… — 處置欄下列概念在 … 找不到（synth 說改了、標的沒改？）：
+
+=== spec_xref_hook.sh ===
+…：改一處漏一處——上列殘留或 synth 處置未同步，修掉再繼續
+
+=== splitunify_ic_event_report_diff.py ===
+子集缺特徵 parquet …（不得靜默略過）
+找不到 FF run …（symbols={sorted(symbols or [])}）
+FF run … 在多個路徑命中：{[str(h) for h in hits]}
+找不到事件批 …
+… 已存在（sha256 {old[:8]}）；覆蓋須帶 --authorize <old8>:<new8>
+--authorize 不符（需 …，得 …）
+--capture 需 --out／--batch／--ff-run
+allow-diff 需 --baseline 與 --candidate 兩個檔路徑
+兩份基準之三元組不符：… vs …
+strict 之 candidate 只准當下重跑（--candidate-run）；拒收檔路徑
+strict 需 --baseline／--candidate-run／--batch／--ff-run
+
+=== splitunify_r5_parity.py ===
+run {ff_run!r}（symbol=…）命中 … 個目錄：…
+--only {args.only!r} 不在組合清單 {[c[
+缺真實 K 線 …（禁以合成資料頂替）
+缺真實事件批 …（禁以合成資料頂替）
+golden 之組合清單與本次不符（golden … vs 本次 …）
+與 golden 不符（值若為意圖變動，附理由後跑 --update）：\n ·
+
+=== synth_attribution_hook.sh ===
+… 未過（VERDICTGATE Task 4.1 寫入時子集）；修好再繼續
+
+=== template_check.sh ===
+kind 必須是 spec|todo|result|dext|template
+
+=== test_template_check.sh ===
+fixture 目錄無可跑探針（…/*.md 為空或非 spec_/todo_/result_ 前綴）
+與 … 不一致（見上方 diff）
+EXPECTED 行數 … 與 fixture 數 … 不一致
+EXPECTED 與 fixture 清單不一致
+MUTATION.txt 無 id=…
+MUTATION … 破壞命令尚未填實（B2）
+--mutate 拒跑：矩陣未全綠（須先通過 test_template_check.sh 並 commit 實作）
+… 破壞後矩陣仍與 EXPECTED 一致（未轉紅）
+… 還原後矩陣與破壞前不一致
+… template_check.sh 未淨還原（cp 備份比對失敗）
+… template_check.sh 工作區未淨（git diff 非空）
+缺少 EXPECTED.txt: …
+
+=== ticket_batch_check.sh ===
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+staged 含生產碼（… 檔）但訊息最末段無 Ticket-Batch trailer
+Ticket-Batch: small 但 staged 生產檔 … > 3 ⇒ 改領 --impl-self
+small 不得碰 factories.py|protocols.py|config.py（膨脹訊號）⇒ 改領 --impl-self
+Ticket-Batch 值不合法:
+Ticket-Batch: … 但 token 不存在或已過期（900s）⇒ bash scripts/gate.sh dispatch --impl-self --task-id …-impl-b${batc
+寫 audit ticket_commit 失敗（commit 已成立；push 時 1c 會以「有 trailer 無事件」擋）
+… 含生產碼但無 Ticket-Batch trailer（--no-verify 繞過 commit-msg？）
+… Ticket-Batch 值不合法
+… 有 Ticket-Batch: … 卻無 audit ticket_commit 事件（post-commit 未跑或寫入失敗）
+… Ticket-Batch: … 於 commit 當下 token 無效（token_fresh≠true；事後領 token 不追認）
+small 累計生產檔 … 個（>3）或含 …：…；起算＝{
+
+=== todo_spec_crosscheck.sh ===
+（有 Task 完全缺漏）
+
+=== validate_cgsa_ab.py ===
+from exc
+
+=== verdictgate_baseline.sh ===
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+
+=== verdictgate_check.sh ===
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1
+… b… 不得開輪：
+
+=== verify_b4_independent.sh ===
+DEBT_AUDIT_OVERRIDE 須綁 GOVERNANCE_TEST_HARNESS=1\
+
+=== verify_cgsa_pipeline.py ===
+… not found
+No kline data available
+
+=== verify_hooks_health.sh ===
+不在 git repo
+missing …
+… not executable
+… missing verification_claim_check invocation
+jq not in PATH
+python (venv 或系統) missing
+… missing
+verification_claim_check.py not loadable
+missing … (治理文件格式檢查鏈
+缺 .claude/settings.json（無法確認產出端檢查已上線）→ fail-closed
+jq 缺席，無法驗證 PostToolUse 掛載（見上）
+claude/settings.json 未在 PostToolUse 的 Edit|Write matcher 下掛 doc_format_precheck.sh
+
+=== verify_mutation.sh ===
+找不到 python
+缺 scripts/mutation_worktree.py(隔離執行環境
+
+=== write_committee_accepted.sh ===
+未知參數: $1
+必填 --session
+必填 --review
+--force 僅允許 GOVERNANCE_TEST_HARNESS=1（正式路徑 fail-closed）
+session 目錄不存在: …
+review 檔不存在: …
+sources.lock 不存在: …
+committee_accepted.json 已存在，拒覆寫（write-once）: …
+
+=== write_sources_lock.sh ===
+audit 讀取失敗(fail-closed): …
+registry 的 opens_debt 事件不是恰一筆
+audit 第 … 行 JSON 無法解析(fail-closed): …
+session_name 命中 … 筆(需恰 1): …
+committee_round_open 缺非空 round_id
+registry 狀態事件契約不完整
+--roster 需要值
+--mode 需要值 discovery|review
+--round-id 需要值
+未知參數: $1
+必填 --session
+必填 --roster
+--mode 非法值
+--force 覆寫 FROZEN lock 僅允許 GOVERNANCE_TEST_HARNESS=1（正式路徑 fail-closed）
+--rebuild 不得與 --force 併用
+sources/ 不存在: …
+--rebuild 拒收呼叫端 --round-id；identity 必須由 audit 導出
+--rebuild 僅允許目標 mode=review
+--rebuild 需既有 sources.lock: …
+sources.lock 無法解析: …
+--rebuild 只允許既有 FROZEN lock
+review lock 拒收呼叫端 --round-id；identity 必須由 audit 導出
+sources.lock 已 FROZEN，拒覆寫（用 --force 僅限測試重建）: …
+roster family 不在 allowlist: …

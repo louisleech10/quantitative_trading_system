@@ -68778,3 +68778,116 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "gate", "blocked_by": ["CODEX-R65-P1-01", "CODEX-R65-P1-02", "CODEX-R65-P1-03", "CODEX-R65-P1-04", "CODEX-R65-P1-05"], "closed": [], "event": "committee_output", "event_id": "cd5930b8-4df6-4fff-8052-822c40e8ec82", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r1-codex.md", "output_sha256": "c0619e27c728daee7cf75a1f3ef0dea543e0b75a1e924dd4ef50403658c9f661", "producer": "audit_append.sh", "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "schema_version": 1, "sequence": 5389, "task_id": "20260920-PLAINDOCS-X-REVIEW-R1", "ts": "2026-09-20T13:29:14Z", "verdict": "blocked"}
 {"actor": "debt_clear", "brief_kind": "review", "canonical_count": 14, "category_counts": {"code-contract": 3, "doc-sync": 11, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "84bdb21a-3c79-46b1-90d3-977085c62b2f", "handoff_tree_commit": "4a9baba5df89c245ac4fdc976701f320a8b06a34", "mismatch_count": 4, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "round_open_sequence": 5385, "schema_version": 1, "sequence": 5390, "session_name": "20260920-plaindocs-x-review-r1", "stamps": [], "task_id": "20260920-PLAINDOCS-X-REVIEW-R1", "ts": "2026-09-20T13:36:09Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "6972e4eb-cc8e-48cf-94b0-88ac50347dc4", "lock_sha256": "e9d746ca5c66ea18871f7a8cfef09a85c745b1e7e2b36594b4af2026afa3241b", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "schema_version": 1, "sequence": 5391, "session_id": "20260920-plaindocs-x-review-r1", "synth_sha256": "2cd284ec126c6360859b344a0456fba4d1e20e614581413c2931517c33b027f6", "ts": "2026-09-20T13:36:10Z"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-SPEC", "event": "docrot2_gate_block", "event_id": "4bf221e6-564b-4ddd-8f2a-8474e8925a39", "origin_script": "live_doc_write_guard.sh", "path": "docs/PLAINDOCS_SPEC.md", "producer": "audit_append.sh", "rule_id": "archaeology", "schema_version": 1, "sequence": 5392, "ts": "2026-09-20T13:36:49Z"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-SPEC", "event": "docrot2_gate_block", "event_id": "3eafb679-e026-45fd-9325-d54ada0e5cf6", "origin_script": "live_doc_write_guard.sh", "path": "docs/PLAINDOCS_SPEC.md", "producer": "audit_append.sh", "rule_id": "status-literal", "schema_version": 1, "sequence": 5393, "ts": "2026-09-20T13:36:50Z"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-SPEC", "event": "docrot2_gate_block", "event_id": "03a213a0-a5f0-4973-a78e-08f82600503b", "origin_script": "live_doc_write_guard.sh", "path": "docs/PLAINDOCS_SPEC.md", "producer": "audit_append.sh", "rule_id": "status-literal", "schema_version": 1, "sequence": 5394, "ts": "2026-09-20T13:37:25Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260920-plaindocs-x-review-r2-codex.md", "output_sha256": "pending", "task_id": "20260920-PLAINDOCS-X-REVIEW-R2", "ts": "2026-09-20T13:38:16Z"}
+=== 2026-09-20 21:38:16 | dispatch ===
+  ts=2026-09-20 21:38:16
+  kind=dispatch
+  intent=PLAINDOCS SPEC 對抗審查 r2：確認 v3 是否真的關閉 r1 十四條（唯讀）
+  risk=low
+  facts_asked=r1 本家五條是否真關閉／v3 新寫入之選擇查證二分本身有無新洞／ticket_id 人工指定能否被查證擋下錯誤／可否凍結
+  review_role=spec-adversarial
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  adversarial=waived:本輪即 adversarial 本體，唯讀不產生變更
+  reconcile=handoffs/reconcile/20260920-plaindocs-x-review-r1/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260920-PLAINDOCS-X-REVIEW-R2", "ts": "2026-09-20T13:39:24Z"}
+=== 2026-09-20 21:39:24 | dispatch ===
+  ts=2026-09-20 21:39:24
+  kind=dispatch
+  intent=PLAINDOCS SPEC 對抗審查 r2：確認 v3 是否真的關閉 r1 十四條（唯讀）
+  risk=low
+  facts_asked=r1 本家五條是否真關閉／v3 新寫入之選擇查證二分有無新洞／錯誤 ticket_id 能否通過三項查證／v3 判準下實際可封存份數／可否凍結
+  review_role=spec-adversarial
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  adversarial=waived:本輪即 adversarial 本體，唯讀不產生變更
+  reconcile=handoffs/reconcile/20260920-plaindocs-x-review-r1/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260920-PLAINDOCS-X-REVIEW-R2-BRIEF.md", "brief_sha256": "1410f1aa29710e1dc7a540d3f008f9998981b8c92cd0359767f1d70b13bc4f2a", "brief_sha256_norm": "1410f1aa29710e1dc7a540d3f008f9998981b8c92cd0359767f1d70b13bc4f2a", "event": "committee_round_open", "event_id": "6047e3c6-9ee3-4706-89a8-d74c7893f09e", "expected_outputs": {"codex": "handoffs/20260920-plaindocs-x-review-r2-codex.md", "composer": "handoffs/20260920-plaindocs-x-review-r2-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "033b7f93-df4d-46c8-aa48-8e40db5c482b", "schema_version": 1, "sequence": 5395, "session_name": "20260920-plaindocs-x-review-r2", "task_id": "20260920-PLAINDOCS-X-REVIEW-R2", "ts": "2026-09-20T13:39:31Z"}
+{"actor": "cx_run", "attempt_id": "46258995-af24-4793-a683-0e7eee24d224", "cli_rc": "0", "event": "committee_family_result", "event_id": "49cb968b-d417-49fa-882b-8b6706eff78c", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r2-composer.md", "output_sha256": "5886b4dbedd49f36e757049736f02c39d58fcc684cf951f10677179cd92d7edf", "producer": "audit_append.sh", "result_state": "success", "round_id": "033b7f93-df4d-46c8-aa48-8e40db5c482b", "schema_version": 1, "sequence": 5396, "ts": "2026-09-20T13:49:14Z"}
+{"actor": "gate", "blocked_by": ["COMPOSER-R66-P1-01", "COMPOSER-R66-P1-02"], "closed": ["COMPOSER-R65-P1-01", "COMPOSER-R65-P1-02", "COMPOSER-R65-P1-03", "COMPOSER-R65-P1-04", "COMPOSER-R65-P1-05", "COMPOSER-R65-P2-01", "COMPOSER-R65-P2-02", "COMPOSER-R65-P2-03"], "event": "committee_output", "event_id": "d9f341e5-5e13-434d-8556-1d547fdfae8f", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r2-composer.md", "output_sha256": "5886b4dbedd49f36e757049736f02c39d58fcc684cf951f10677179cd92d7edf", "producer": "audit_append.sh", "round_id": "033b7f93-df4d-46c8-aa48-8e40db5c482b", "schema_version": 1, "sequence": 5397, "task_id": "20260920-PLAINDOCS-X-REVIEW-R2", "ts": "2026-09-20T13:49:15Z", "verdict": "blocked"}
+{"actor": "cx_run", "attempt_id": "6f7ba91b-333c-422f-b5c2-b7d134a9fdbf", "cli_rc": "0", "event": "committee_family_result", "event_id": "910d98c8-97ce-4817-9771-3c50713b119d", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r2-codex.md", "output_sha256": "fd77b67596a553c7411c07c5aaa17d827acb641c1fb255fc709142cd5f848b91", "producer": "audit_append.sh", "result_state": "success", "round_id": "033b7f93-df4d-46c8-aa48-8e40db5c482b", "schema_version": 1, "sequence": 5398, "ts": "2026-09-20T13:58:21Z"}
+{"actor": "gate", "blocked_by": ["CODEX-R66-P1-01", "CODEX-R66-P1-02", "CODEX-R66-P1-03", "CODEX-R66-P1-04"], "closed": ["CODEX-R65-P1-01", "CODEX-R65-P1-03", "CODEX-R65-P2-06"], "event": "committee_output", "event_id": "17ee19e2-b607-411e-957d-5e6b322990b8", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r2-codex.md", "output_sha256": "fd77b67596a553c7411c07c5aaa17d827acb641c1fb255fc709142cd5f848b91", "producer": "audit_append.sh", "round_id": "033b7f93-df4d-46c8-aa48-8e40db5c482b", "schema_version": 1, "sequence": 5399, "task_id": "20260920-PLAINDOCS-X-REVIEW-R2", "ts": "2026-09-20T13:58:22Z", "verdict": "blocked"}
+{"actor": "debt_clear", "brief_kind": "review", "canonical_count": 9, "category_counts": {"code-contract": 6, "doc-sync": 3, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "c44a05bf-c41e-4735-b60e-a84397bc43ea", "handoff_tree_commit": "a6c0ae6c51cfd465349e9eac07980d986f6aed27", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "033b7f93-df4d-46c8-aa48-8e40db5c482b", "round_open_sequence": 5395, "schema_version": 1, "sequence": 5400, "session_name": "20260920-plaindocs-x-review-r2", "stamps": [], "task_id": "20260920-PLAINDOCS-X-REVIEW-R2", "ts": "2026-09-20T14:00:07Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "138dd3a0-6387-4373-bac8-a42a72a20f9b", "lock_sha256": "9b769c335abe4c82690c1d587e31e659d88d95a1b84d20de7353c69c409eb0d8", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "033b7f93-df4d-46c8-aa48-8e40db5c482b", "schema_version": 1, "sequence": 5401, "session_id": "20260920-plaindocs-x-review-r2", "synth_sha256": "8cffb3606c74a49ce40b4dda2c83177aec1096d6a2df3d6a300af31fc589a3e6", "ts": "2026-09-20T14:00:07Z"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-PLAIN", "event": "docrot2_gate_block", "event_id": "5f797c2d-1467-4541-8a24-cb6f1ffade2c", "origin_script": "live_doc_write_guard.sh", "path": "白話說明/還沒做的事.md", "producer": "audit_append.sh", "rule_id": "status-literal", "schema_version": 1, "sequence": 5402, "ts": "2026-09-20T14:31:29Z"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-HANDOFF", "event": "docrot2_gate_block", "event_id": "ba0596e2-790d-4d41-9b50-b5754a65ed6d", "origin_script": "live_doc_write_guard.sh", "path": "HANDOFF.md", "producer": "audit_append.sh", "rule_id": "handoff-lifecycle", "schema_version": 1, "sequence": 5403, "ts": "2026-09-20T14:53:10Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260920-AGENTOPS-X-CONSULT-R1", "ts": "2026-09-20T15:50:35Z"}
+=== 2026-09-20 23:50:35 | dispatch ===
+  ts=2026-09-20 23:50:35
+  kind=dispatch
+  intent=AGENTOPS consult r1：十八條主線事故之同型複發實查（唯讀）
+  risk=low
+  facts_asked=十八條逐條可否機械偵測同型複發／能者實跑給實況三值／主委自承三條複發之獨立複核／可驗證成效之規則佔比／查證中看到而會改變留砍判斷之事實
+  review_role=incident-recurrence-investigation
+  template=n/a:consult brief 已過 doc_format_precheck
+  adversarial=waived:實查輪唯讀、不產生實作或文檔變更
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "consult", "brief_path": "handoffs/20260920-AGENTOPS-X-CONSULT-R1-BRIEF.md", "brief_sha256": "ee7949e77af1887961d12cf764d273171969b234f8a84b43053a14a21274e5bd", "brief_sha256_norm": "ee7949e77af1887961d12cf764d273171969b234f8a84b43053a14a21274e5bd", "event": "committee_round_open", "event_id": "9af0ddbb-1ee3-4b2b-8542-8ab107a14304", "expected_outputs": {"codex": "handoffs/20260920-agentops-x-consult-r1-codex.md", "composer": "handoffs/20260920-agentops-x-consult-r1-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "schema_version": 1, "sequence": 5404, "session_name": "20260920-agentops-x-consult-r1", "task_id": "20260920-AGENTOPS-X-CONSULT-R1", "ts": "2026-09-20T15:50:43Z"}
+{"actor": "cx_run", "attempt_id": "49e94f5e-e263-4423-bd1a-815ea0df75ba", "cli_rc": "143", "event": "committee_family_result", "event_id": "01efa0c0-a273-4820-9f84-fa6fe3ca92d4", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-agentops-x-consult-r1-codex.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "schema_version": 1, "sequence": 5405, "ts": "2026-09-20T15:50:56Z"}
+{"actor": "cx_run", "attempt_id": "f66016d0-7bf9-4039-aef7-f9de1b96bbfe", "cli_rc": "143", "event": "committee_family_result", "event_id": "6ced3987-2538-4742-9747-44b120605e84", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-agentops-x-consult-r1-composer.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "schema_version": 1, "sequence": 5406, "ts": "2026-09-20T15:50:56Z"}
+{"actor": "gate", "attempt_no": "1", "brief_path": "handoffs/20260920-AGENTOPS-X-CONSULT-R1-BRIEF.md", "brief_sha256": "ee7949e77af1887961d12cf764d273171969b234f8a84b43053a14a21274e5bd", "event": "redispatch_token_issued", "event_id": "429cd4d6-43f3-4fd4-a90b-16645c67903d", "family": "codex", "issue_nonce": "2adaa9a1-4405-45ee-bad8-8cb6fa75ae00", "origin_script": "gate.sh", "output_path": "handoffs/20260920-agentops-x-consult-r1-codex.md", "permit_secret_sha256": "d195401bf6b8ed47c83bb301dfb2e94f6a3028687d97cfbe723f71373a6b014b", "prev_output_archive": "none", "prev_output_sha256": "none", "producer": "audit_append.sh", "reason": "主委 kill 了執行中的 committee_run（違反 HANDOFF 坑段明文「永遠不要 kill 執行中的 committee_run」），原因為使用者當場指正 brief 框架錯誤：範圍被預設為 SCAR_LEDGER 之 18 條，而該帳本僅收錄已生成規則者。brief 已改為先建事故清單再查複發，零產出", "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "schema_version": 1, "sequence": 5407, "ts": "2026-09-20T15:52:26Z"}
+{"actor": "gate", "attempt_no": "1", "brief_path": "handoffs/20260920-AGENTOPS-X-CONSULT-R1-BRIEF.md", "brief_sha256": "ee7949e77af1887961d12cf764d273171969b234f8a84b43053a14a21274e5bd", "event": "redispatch_token_issued", "event_id": "a2f724ab-c9de-4976-ba80-81d43dc6b5ae", "family": "composer", "issue_nonce": "006a001f-fd4b-4cb2-b69e-1004ecc076ee", "origin_script": "gate.sh", "output_path": "handoffs/20260920-agentops-x-consult-r1-composer.md", "permit_secret_sha256": "03aea97d9190ddaeaef939b64216e3e643e68510da42d7b8d355a44fa67c494f", "prev_output_archive": "none", "prev_output_sha256": "none", "producer": "audit_append.sh", "reason": "同上：主委 kill 了執行中的 committee_run，brief 框架錯誤已修（範圍由 SCAR_LEDGER 18 條改為先建事故清單），零產出", "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "schema_version": 1, "sequence": 5408, "ts": "2026-09-20T15:52:39Z"}
+{"actor": "cx_run", "attempt_id": "a4903877-fcf8-439a-97f9-dcfc5c02a138", "cli_rc": "0", "event": "committee_family_result", "event_id": "3351c64e-ecbc-43bb-93f6-019a0fc4a39b", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-agentops-x-consult-r1-composer.md", "output_sha256": "08401d773a984924440f0a9305f8befb18e2d1d87fcbc9c80db297a171198c4f", "producer": "audit_append.sh", "result_state": "success", "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "schema_version": 1, "sequence": 5409, "ts": "2026-09-20T16:08:25Z"}
+{"event":"gate_deny","ts":"2026-09-20T16:12:24Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"113e720a5419631128768cc80e992dfb3e57cc348f18bdb407628fdade948dcc","cmd_head":"set +e\nbash scripts/completeness_check.sh --single handoffs/20260920-agentops-x-consult-r1-codex.md --family codex --round-id 4528ab0a-e4a1-47c6-8888-f3bf282c484e\nrc=$?\nprintf 'COMPLETENESS_RC=%s\\n' \"$rc\"\nexit \"$rc\""}
+{"actor": "cx_run", "attempt_id": "223e16f0-0641-4d94-a683-3d731ca0c5d7", "cli_rc": "0", "event": "committee_family_result", "event_id": "b18bb553-2bfc-486c-a3cd-3bc6412f08d8", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-agentops-x-consult-r1-codex.md", "output_sha256": "1c2af4b74e6f7945c533fa45b4bf0b04cb9e4b9d50686622166a58ae0cb63eec", "producer": "audit_append.sh", "result_state": "success", "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "schema_version": 1, "sequence": 5410, "ts": "2026-09-20T16:17:28Z"}
+{"actor": "debt_clear", "brief_kind": "consult", "canonical_count": 10, "category_counts": {"code-contract": 2, "doc-sync": 5, "format-reject": 0, "other": 3}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "5d8d2e28-4aed-4595-bcd8-194b7c6eda2a", "handoff_tree_commit": "722c6cd878af7f88ace18b360f343d0a909bec22", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "round_open_sequence": 5404, "schema_version": 1, "sequence": 5411, "session_name": "20260920-agentops-x-consult-r1", "stamps": [], "task_id": "20260920-AGENTOPS-X-CONSULT-R1", "ts": "2026-09-20T16:19:17Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "6feed046-4464-4f3d-a35b-4b06ea8c753c", "lock_sha256": "e8624b5daa46c415053be6e8a7f5ab4029c43678e39b62400489b393be7a8db3", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "4528ab0a-e4a1-47c6-8888-f3bf282c484e", "schema_version": 1, "sequence": 5412, "session_id": "20260920-agentops-x-consult-r1", "synth_sha256": "f75fc0c2896b21c56eaf44794c91770ec1ea2dea46da91391abc4a1451b4b68e", "ts": "2026-09-20T16:19:18Z"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260921-agentops-x-consult-r2-codex.md", "output_sha256": "pending", "task_id": "20260921-AGENTOPS-X-CONSULT-R2", "ts": "2026-09-20T16:20:33Z"}
+=== 2026-09-21 00:20:33 | dispatch ===
+  ts=2026-09-21 00:20:33
+  kind=dispatch
+  intent=AGENTOPS consult r2：從留痕回收症狀全集，標好發程度與嚴重度（唯讀）
+  risk=low
+  facts_asked=探針十條之實況與現有機制涵蓋度（附 mutation）／從778輪與6000行日誌回收症狀全集／每條六欄含好發程度分母與嚴重度S0-S3／各來源實際涵蓋率與飽和度／只能留三個機制留哪三個
+  review_role=symptom-inventory-investigation
+  template=n/a:consult brief 已過 doc_format_precheck
+  adversarial=waived:實查輪唯讀、不產生實作或文檔變更
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260921-AGENTOPS-X-CONSULT-R2", "ts": "2026-09-20T16:20:40Z"}
+=== 2026-09-21 00:20:40 | dispatch ===
+  ts=2026-09-21 00:20:40
+  kind=dispatch
+  intent=AGENTOPS consult r2：從留痕回收症狀全集，標好發程度與嚴重度（唯讀）
+  risk=low
+  facts_asked=探針十條之實況與現有機制涵蓋度（附 mutation）／從778輪與6000行日誌回收症狀全集／每條六欄含好發程度分母與嚴重度S0-S3／各來源實際涵蓋率與飽和度／只能留三個機制留哪三個
+  review_role=symptom-inventory-investigation
+  template=n/a:consult brief 已過 doc_format_precheck
+  adversarial=waived:實查輪唯讀、不產生實作或文檔變更
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "consult", "brief_path": "handoffs/20260921-AGENTOPS-X-CONSULT-R2-BRIEF.md", "brief_sha256": "cb5d566eaf7eec7f895448469d9b65fbfcceee64432dcaaf7b348754aaf9a03c", "brief_sha256_norm": "cb5d566eaf7eec7f895448469d9b65fbfcceee64432dcaaf7b348754aaf9a03c", "event": "committee_round_open", "event_id": "dd9a0107-6c1c-4d0f-9b85-615435b430ad", "expected_outputs": {"codex": "handoffs/20260921-agentops-x-consult-r2-codex.md", "composer": "handoffs/20260921-agentops-x-consult-r2-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "cda0c74a-4eea-41b6-b766-4edef0f15764", "schema_version": 1, "sequence": 5413, "session_name": "20260921-agentops-x-consult-r2", "task_id": "20260921-AGENTOPS-X-CONSULT-R2", "ts": "2026-09-20T16:20:47Z"}
+{"actor": "cx_run", "attempt_id": "37298f65-a22d-4198-90f3-2de79d393072", "cli_rc": "0", "event": "committee_family_result", "event_id": "7816ea5f-f537-47b6-a8af-b57aeda2fdcc", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260921-agentops-x-consult-r2-composer.md", "output_sha256": "cf0abe86cfb92e85925c3da57ae2e4effcb3106c64c42f5403caf0685dd0246f", "producer": "audit_append.sh", "result_state": "success", "round_id": "cda0c74a-4eea-41b6-b766-4edef0f15764", "schema_version": 1, "sequence": 5414, "ts": "2026-09-20T16:36:16Z"}
+{"event":"gate_deny","ts":"2026-09-20T16:51:20Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"5089bd035916025998f3dca75ae27c5e0b22b3fcca9ba1ea11be89e56abd2338","cmd_head":"set +e\nbash scripts/completeness_check.sh --single handoffs/20260921-agentops-x-consult-r2-codex.md --family codex --round-id cda0c74a-4eea-41b6-b766-4edef0f15764\nrc=$?\necho \"COMPLETENESS_RC=$rc\"\nexit $rc"}
+{"actor": "cx_run", "attempt_id": "6735eb51-c8b5-4d6d-9290-2e231f5c15d8", "cli_rc": "0", "event": "committee_family_result", "event_id": "b6fa3546-906d-4715-b216-ddfa789ccef9", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260921-agentops-x-consult-r2-codex.md", "output_sha256": "b32eb79dc07564c0c0277531286c9a285954b710fa8149dd3d60bff00fcd777b", "producer": "audit_append.sh", "result_state": "success", "round_id": "cda0c74a-4eea-41b6-b766-4edef0f15764", "schema_version": 1, "sequence": 5415, "ts": "2026-09-20T16:54:20Z"}
+{"actor": "debt_clear", "brief_kind": "consult", "canonical_count": 7, "category_counts": {"code-contract": 3, "doc-sync": 4, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "af336fce-0861-4324-98a2-80d140553fb5", "handoff_tree_commit": "722c6cd878af7f88ace18b360f343d0a909bec22", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "cda0c74a-4eea-41b6-b766-4edef0f15764", "round_open_sequence": 5413, "schema_version": 1, "sequence": 5416, "session_name": "20260921-agentops-x-consult-r2", "stamps": [], "task_id": "20260921-AGENTOPS-X-CONSULT-R2", "ts": "2026-09-20T16:55:54Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "b7c370ff-3720-4b09-a269-316e9c62dee7", "lock_sha256": "76e9c74dbcb8a1133bc2206173f016bb88ae54fe9a82147505a4cb6aed5000ab", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "cda0c74a-4eea-41b6-b766-4edef0f15764", "schema_version": 1, "sequence": 5417, "session_id": "20260921-agentops-x-consult-r2", "synth_sha256": "fdfc21437dc6cf8d71ce6d8599e46814b07c691b1eb577119b88c9add175c4d9", "ts": "2026-09-20T16:55:55Z"}
