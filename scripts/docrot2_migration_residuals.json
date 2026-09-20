@@ -220,14 +220,6 @@
       "why": "VERDICTGATE 凍結施工清單之批次間 Gate 條文（L34）與 §E 殘留列（L270）；本票批次名 B3 與 governance-batch-status 撞號。面向未來條：既有行不回洗；凍結檔改字依凍結文件修訂程序",
       "owner": "VERDICTGATE（B-62）",
       "trigger": "本檔依凍結文件修訂程序修訂且觸及命中行；命中歸零時本列由 --migration 判過期須刪"
-    },
-    {
-      "id": "DOCROT2-RESID-PLAIN-README-LOG",
-      "path": "白話說明/README.md",
-      "reason_class": "user-ruling",
-      "why": "2026-08 治理當日紀事段（治理第 1 批 B1–B10、B3R、B-25／B-31／B-50、S6.1／S6.2）；本檔屬 fact_keys.json 之 status_scope_grandfathered（2026-08-10 凍結之既存歷史日誌豁免，集合相等鎖死），白話說明各份如何整理由使用者待決（handoff-pending 之 HP-PLAINDOCS）",
-      "owner": "白話說明（HP-PLAINDOCS）",
-      "trigger": "HP-PLAINDOCS 使用者裁定白話說明整理方式後之落地 commit"
     }
   ]
 }

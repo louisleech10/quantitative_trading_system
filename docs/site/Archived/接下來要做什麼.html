@@ -4,15 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>接下來要做什麼</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="../style.css">
 </head>
 <body>
-<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">接下來要做什麼.md</span></nav>
+<nav class="top"><a href="../index.html">← 白話說明</a><span class="crumb">Archived ／ 接下來要做什麼.md</span></nav>
 <main>
 <h1 id="接下來要做什麼">接下來要做什麼</h1>
 <blockquote>
 <p>📌 <strong>2026-09-20（最新）——順序改了</strong>。原本排第一的 <code>SEARCH2EVENT</code> 停手（我把題目理解錯，見
-<a href="EVENTSCAN方向與做法.html">EVENTSCAN方向與做法.md</a> 第九節），改成 <strong><code>EVENTSCAN</code></strong>：條件成立時買入、
+<a href="../EVENTSCAN方向與做法.html">EVENTSCAN方向與做法.md</a> 第九節），改成 <strong><code>EVENTSCAN</code></strong>：條件成立時買入、
 持有 N 根的報酬，跟隨機買入持有同樣久比。</p>
 <p><strong>現在的順序</strong>（你 2026-09-20 裁定）：
 ① <strong>EVENTSCAN 的方向與做法定案</strong> ← 現在在這裡。等委員會回答量化問題（進場價口徑等）＋你確認最終版
@@ -82,7 +82,7 @@ UAT 之後的缺口票：<code>GAP-4</code>（多標的合併估 IC，排程即�
 <h2 id="現況95-晚量化主線-g3-d2-第-4-段程式完成待三家審碼">現況（9/5 晚）：量化主線 <code>G3-D2</code> 第 4 段程式完成、待三家審碼</h2>
 <p>治理那邊沒有新的事。<strong>現在做的是量化主線</strong>：<code>G3-D2</code> 灰色項目的第 4 段
 （進場語意全開 13 種、k 從匯出畫面搬到分析畫面並可掃網格）已經寫完並上 GitHub（<code>37fa0910</code>），
-正在送 codex＋composer＋grok 三家審碼。白話說明在 <a href="現在做到哪.html">現在做到哪.md</a>。</p>
+正在送 codex＋composer＋grok 三家審碼。白話說明在 <a href="../現在做到哪.html">現在做到哪.md</a>。</p>
 <p>順帶新增一支腳本 <code>scripts/gap3_scan_benchmark.py</code>——它的用途是<strong>在凍結參數之前先實測</strong>，
 這次就靠它抓到規格裡一個暫定值算錯了（掃描格數上限 121 應為 110）。
 <strong>這不是治理工具</strong>，是量化主線這一票的量測腳本，跑完就寫收據、不掛任何 gate。</p>
@@ -91,17 +91,17 @@ UAT 之後的缺口票：<code>GAP-4</code>（多標的合併估 IC，排程即�
 <p>你裁定把 G-7 改成不擋。量測依據：它的保護範圍裡量化路徑 <strong>0 條</strong>、對量化碼的判決<strong>恆為「未宣告」</strong>
 （一次全跑 501 檔、其中 93 個是量化主線）、而且<strong>它 fail 就整個停 ⇒ 全套 pytest 從沒跑到</strong>。
 改完當場驗證：故意提交不帶那行字的 commit，<strong>1.03 秒過</strong>、push <strong>2.58 秒</strong>。
-細節見 <a href="現在做到哪.html">現在做到哪.md</a> 之「9/5 收尾」與 <a href="流程摩擦記錄.html">流程摩擦記錄.md</a>。</p>
+細節見 <a href="../現在做到哪.html">現在做到哪.md</a> 之「9/5 收尾」與 <a href="流程摩擦記錄.html">流程摩擦記錄.md</a>。</p>
 <p><strong>下一件仍是第 4 段（B-D4），開新 session 做。</strong></p>
 <hr />
 <h2 id="現況95-上午第-013-段-完成下一件第-4-段開新-session">現況（9/5 上午）：第 0／1／3 段 ✅ 完成，下一件＝第 4 段（開新 session）</h2>
-<p><strong>即時進度開 <a href="現在做到哪.html">現在做到哪.md</a>。</strong></p>
+<p><strong>即時進度開 <a href="../現在做到哪.html">現在做到哪.md</a>。</strong></p>
 <p>一句話：G3-D2 的第 0、1、3 段都做完並上 GitHub 了，下一件是<strong>第 4 段</strong>（其餘進場語意全矩陣＋k／h 掃描），你已裁定<strong>開新 session</strong> 做。</p>
-<p><strong>9/5 中間插了一件 G-7，結論是我發散、你叫停、整套作廢</strong>——完整說明在 <a href="現在做到哪.html">現在做到哪.md</a> 的「9/5 插曲」。摘要：五輪委員會、產品碼零行，只留下兩樣有用的（TODO 加「路徑」欄、改掉兩處假敘述）。</p>
+<p><strong>9/5 中間插了一件 G-7，結論是我發散、你叫停、整套作廢</strong>——完整說明在 <a href="../現在做到哪.html">現在做到哪.md</a> 的「9/5 插曲」。摘要：五輪委員會、產品碼零行，只留下兩樣有用的（TODO 加「路徑」欄、改掉兩處假敘述）。</p>
 <p><strong>現在沒有任何事在等你決定，也沒有東西擋著第 4 段。</strong></p>
 <hr />
 <h2 id="現況94-深夜第-0-段-第-1-段實作完成並經三家審碼">現況（9/4 深夜）：第 0 段 ✅、第 1 段實作完成並經三家審碼</h2>
-<p><strong>即時進度請開 <a href="現在做到哪.html">現在做到哪.md</a></strong>（你 9/4 要求新建的那份，每完成一步就更新）。
+<p><strong>即時進度請開 <a href="../現在做到哪.html">現在做到哪.md</a></strong>（你 9/4 要求新建的那份，每完成一步就更新）。
 一句話：第 1 段七個小任務全做完，三家委員都交件了，他們抓到六個問題我全修完，
 現在等<strong>原提出方</strong>回頭確認「你說的那個問題真的修好了」（規則要求不能我自己說修好了）。</p>
 <p><strong>context 快滿，你裁定開新 session 而非 compact</strong> —— 交接已寫進 <code>HANDOFF.md</code>（新 session 第一件事＝
@@ -914,7 +914,7 @@ grok 指出：真缺口在下降時，這個比例<strong>會自動上升</stron
 <li><strong>重跑 GAP-3 的 UAT B1</strong>（4 個 symbol、2024/01/01–2026/04/27）——搜尋卡住的三個 bug 已修完、三家蓋章。</li>
 <li><strong>跑完 GAP-3 UAT B 段 13 項並簽字</strong> → GAP-3 才算結案。</li>
 </ol>
-<p><strong>搜尋修復摘要</strong>（完整版：<a href="Archived/search搜尋修復.html">search搜尋修復.md</a>）：</p>
+<p><strong>搜尋修復摘要</strong>（完整版：<a href="search搜尋修復.html">search搜尋修復.md</a>）：</p>
 <ul>
 <li>你的三個症狀＝三個 bug：游標用秒送出導致無窮迴圈＋資料重複、同步下載佔住主執行緒、子行程日誌不落檔。</li>
 <li>順便修掉一個更陰險的：資料下載不完整時<strong>原本會默默當成功回傳還寫進快取</strong>。現在改成整個拒收、任務標失敗。</li>
@@ -1574,7 +1574,7 @@ Codex 和 Grok 各自寫了一個反例程式證明<strong>還是會</strong>—
 </table></div>
 <!-- END GENERATED: governance-batch-status -->
 <p>🔴 <strong>「批次做完」不等於「票關掉」。</strong> 票的收案狀態與「對外不得宣稱什麼」，
-見 <a href="Archived/治理待辦總覽.html"><code>治理待辦總覽.md</code></a> 的同型生成區塊——那也是機械產物。</p>
+見 <a href="治理待辦總覽.html"><code>治理待辦總覽.md</code></a> 的同型生成區塊——那也是機械產物。</p>
 <hr />
 <h2 id="已知地雷動工前必看">已知地雷（動工前必看）</h2>
 <div class="table-wrap"><table>
@@ -1823,7 +1823,7 @@ bash scripts/friction_tally.sh --field-presence</p>
 並指向 <code>docs/ROADMAP.md</code> 狀態表。<strong>ROADMAP 改了而 HANDOFF 沒改，下一手照樣會走回治理。</strong></p>
 </blockquote>
 
-<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/接下來要做什麼.md</code> 生成；HTML 是產物，請改 .md。</footer>
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/Archived/接下來要做什麼.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
 </body>
 </html>
