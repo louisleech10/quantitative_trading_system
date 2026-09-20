@@ -274,6 +274,7 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <th>標準差</th>
 <th>最好</th>
 <th>最差</th>
+<th>成本歸零點</th>
 </tr>
 </thead>
 <tbody>
@@ -286,6 +287,7 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <td>1.8%</td>
 <td>+7.2%</td>
 <td>−5.1%</td>
+<td>4.2 bps</td>
 </tr>
 <tr>
 <td>10 根 ≈ 10 小時</td>
@@ -296,6 +298,7 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <td>2.6%</td>
 <td>+11.3%</td>
 <td>−7.8%</td>
+<td>6.8 bps</td>
 </tr>
 <tr>
 <td>30 根 ≈ 1.3 天</td>
@@ -306,6 +309,7 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <td>4.7%</td>
 <td>+19.6%</td>
 <td>−13.2%</td>
+<td>10.5 bps</td>
 </tr>
 <tr>
 <td>55 根 ≈ 2.3 天</td>
@@ -316,9 +320,15 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <td>6.3%</td>
 <td>+24.1%</td>
 <td>−18.7%</td>
+<td>9.1 bps</td>
 </tr>
 </tbody>
 </table></div>
+<blockquote>
+<p><strong>「成本歸零點」怎麼看</strong>：手續費加滑價<strong>超過這個數字</strong>，這個持有期就不賺了。
+例如上表 5 根那列是 4.2 bps——如果你的來回成本是 5 bps，<strong>那一列就是假的獲利</strong>。
+這一欄的用意是：你不必先猜費率，它反過來告訴你門檻在哪。詳見 7-9。</p>
+</blockquote>
 <p><strong>隨機對照批</strong>（同樣的欄位）</p>
 <div class="table-wrap"><table>
 <thead>
@@ -722,23 +732,45 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <p><strong>340 筆可能其實只是 10 段趨勢</strong>，你會以為有 340 次獨立的買賣，實際上沒有。</p>
 </blockquote>
 <p><strong>處置</strong>：主要數字用「<strong>每一段連續成立只進場一次</strong>」（first-of-run）。每根都算的版本保留為參考，但不當主數字。</p>
-<h3 id="7-5-兩張表並排相減-有效的統計比較推翻我">7-5 兩張表並排相減 ≠ 有效的統計比較（推翻我）</h3>
-<p>我原本說「兩批各算一張表、並排看差」就夠了。<strong>兩家都說不夠</strong>：</p>
-<ul>
-<li>掃描這條路<strong>永遠沒有信賴區間</strong>（技術原因：沒做切分 ⇒ 系統一律標 <code>unavailable</code>）</li>
-<li>觸發點連續成立 ⇒ 報酬序列高度重疊 ⇒ <strong>不能用「兩組獨立樣本」的公式</strong></li>
-<li>分開畫兩邊的區間、看有沒有重疊，也<strong>不能</strong>回答「差是不是 0」</li>
-</ul>
-<p><strong>處置</strong>：要用時間塊／群集 bootstrap 重算「差」的區間。在做出來之前，<strong>畫面必須硬性橫幅</strong>：</p>
+<h3 id="7-5-差-072是真的還是運氣現在答不出來推翻我">7-5 「差 +0.72%」是真的還是運氣？現在答不出來（推翻我）</h3>
+<p><strong>問題長這樣</strong>：表上寫「觸發批平均 +1.05%、隨機批 +0.33%、<strong>差 +0.72%</strong>」。</p>
+<p>那 <strong>+0.72% 到底是這條規則真的有效，還是剛好抽到好樣本？</strong> 這是你看完表最該問的問題。</p>
+<p>一般統計用<strong>信賴區間</strong>回答：「差是 +0.72%，區間 [+0.31%, +1.13%]，不含 0 ⇒ 大概不是運氣」。
+但<strong>這條路現在算不出這個區間</strong>，兩個原因：</p>
+<p><strong>原因一（技術性的）</strong>：系統算區間需要先做「切分」這個前置步驟，而事件掃描這條路<strong>沒有做切分</strong> ⇒ 系統直接標「無法提供」。</p>
+<p><strong>原因二（比較根本的）</strong>：你的 340 筆<strong>不是 340 個獨立樣本</strong>。</p>
 <blockquote>
-<p>「無信賴區間；平均差為正<strong>不得</strong>讀成這條規則會賺。」</p>
+<p>多頭排列連續成立時，第 100 根和第 101 根的「持有 30 根報酬」
+有 29 根是<strong>重疊的同一段價格</strong>。它們幾乎是同一筆交易，不是兩次獨立的下注。</p>
 </blockquote>
-<h3 id="7-6-期間池我自我推翻是對的但還不夠">7-6 期間池：我自我推翻是對的，但還不夠</h3>
-<p>我推翻自己的「該用整個 run」是對的，但「取觸發批期間」<strong>必要但不充分</strong>——現行配額是按<strong>每月候選根數</strong>分的，不是按<strong>每月觸發筆數</strong>。三條機械規則：</p>
+<p>如果拿「340 個獨立樣本」的公式去算區間，<strong>算出來會太窄</strong>——讓你以為「很確定有效」，其實資訊量遠沒有 340 筆那麼多。</p>
+<p><strong>還有一個常見的誤用</strong>：有人會分別畫觸發批和隨機批各自的區間，看它們重不重疊。<strong>這不能回答「差是不是 0」</strong>——兩個區間重疊，差仍可能顯著；不重疊，也不保證顯著。要看的是**「差」本身的區間**。</p>
+<p><strong>處置</strong>：用 bootstrap（把資料重複重抽幾百次、每次重算一遍差、看這些差分布在哪）算出「差」的區間，而且<strong>重抽的單位要是「一整段連續成立」而不是「一根」</strong>，這樣才不會把重疊當成獨立。</p>
+<p><strong>在做出來之前</strong>，表上方會有一條硬性橫幅：</p>
+<blockquote>
+<p>「<strong>無信賴區間；平均差為正不得讀成這條規則會賺。</strong>」</p>
+</blockquote>
+<h3 id="7-6-隨機對照要從哪段時間裡挑我自我推翻是對的但還不夠">7-6 隨機對照要從「哪段時間」裡挑？（我自我推翻是對的，但還不夠）</h3>
+<p><strong>問題長這樣</strong>：要挑 340 根隨機的 K 線當對照，從哪段時間裡挑？</p>
+<p><strong>如果從整個 run 挑</strong>（2024-01 到 2026-04，兩年多）：</p>
+<blockquote>
+<p>假設你的條件剛好都在 2024 年那波多頭成立。那你比的是
+「<strong>2024 多頭的報酬</strong> vs <strong>兩年平均的報酬</strong>」——
+差異來自<strong>行情</strong>，不是來自你的條件。條件根本沒被驗證到。</p>
+</blockquote>
+<p>所以要<strong>從有觸發點的那些月份裡挑</strong>，這樣兩邊在同一種行情下比。我先前寫「該用整個 run」是錯的，自己推翻掉。</p>
+<p><strong>但還不夠</strong>，委員又抓到一層：</p>
+<blockquote>
+<p>現在系統分配名額是按「<strong>每個月有多少根可以挑</strong>」，不是按「<strong>每個月有幾個觸發點</strong>」。</p>
+<p>假設觸發點 80% 集中在 1 月，但 1、2、3 月的 K 線數量差不多 ⇒
+隨機批還是會<strong>平均分到三個月</strong>。結果又變成「以 1 月為主 vs 三個月平均」，
+同一個毛病換個形式又出現。</p>
+</blockquote>
+<p><strong>三條機械規則</strong>：</p>
 <ol>
-<li>期間池＝有觸發點的那些月份（UTC）的聯集</li>
-<li>配額按<strong>觸發筆數</strong>分；某月候選不夠就<strong>直接失敗</strong>，不把缺額倒到別的月</li>
-<li>整個 run 只能當另一張敏感度表，標題要寫清楚它回答的是別的問題</li>
+<li>期間池＝<strong>有觸發點的那些月份</strong>（UTC）的聯集</li>
+<li>名額按<strong>觸發筆數</strong>分：1 月有 80% 觸發，1 月就抽 80% 的對照。某月候選不夠就<strong>直接回報失敗</strong>，不把缺額倒到別的月充數</li>
+<li>「整個 run」那版只能當<strong>另一張參考表</strong>，標題要寫清楚它回答的是不同的問題（「這個條件是不是只是選到了好行情」）</li>
 </ol>
 <h3 id="7-7-抽樣不足時不准偷偷縮水推翻我的措辭">7-7 抽樣不足時不准偷偷縮水（推翻我的措辭）</h3>
 <p>我說「樣本必須互斥」——codex 說這措辭過強：重疊<strong>不影響平均值</strong>，影響的是<strong>信賴區間和有效樣本數</strong>。但後果判斷我對。</p>
@@ -766,12 +798,70 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 <tr>
 <td>3</td>
+<td><strong>成本：主數字扣不扣？要不要加 breakeven 欄？</strong></td>
+<td>我建議「主數字不扣＋加 breakeven 欄＋揭露三項算不進去的」，見 7-9。等你一句話</td>
+</tr>
+<tr>
+<td>4</td>
 <td><strong>多標的什麼時候做</strong></td>
 <td>你已裁定先做單標的，多標的併 GAP-4</td>
 </tr>
 </tbody>
 </table></div>
-<h3 id="7-9-委員另外列了二十多條該定而未定">7-9 委員另外列了二十多條「該定而未定」</h3>
+<h3 id="7-9-手續費與滑點要不要算你-2026-09-20-提問">7-9 手續費與滑點要不要算？（你 2026-09-20 提問）</h3>
+<p><strong>業界做法分三層，答案不一樣</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>算什麼</th>
+<th>扣不扣成本</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>IC 本身</strong></td>
+<td><strong>不扣</strong>（業界標準）</td>
+<td>IC 是「因子值 vs 未來報酬」的相關係數，衡量<strong>排序能力</strong>。成本發生在<strong>換倉</strong>，不發生在「某個時點的相關性」上——扣了沒有明確定義</td>
+</tr>
+<tr>
+<td><strong>淨 IC（net IC）</strong></td>
+<td>扣</td>
+<td>進階診斷：扣掉換手成本後因子還有沒有效。<strong>不是 IC 的標準定義</strong>，是額外一層</td>
+</tr>
+<tr>
+<td><strong>事件研究的報酬</strong></td>
+<td>學術通常不扣</td>
+<td>它要衡量的是「資訊效應」，所以報未扣成本的異常報酬。但實務要判斷「能不能真的賺」就得扣</td>
+</tr>
+<tr>
+<td><strong>回測</strong></td>
+<td><strong>一定扣</strong></td>
+<td>它宣稱的就是「這樣做會賺多少」，不扣就是假的</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>本專案現況</strong>（實查 <code>momentum/Analysis/net_ic_analyzer.py</code>）：</p>
+<ul>
+<li>已有淨 IC，公式＝<code>淨值 = 毛值 − (成本bps ÷ 10000) × 換手率</code></li>
+<li><strong>預設關閉</strong>（<code>cost_enabled = False</code>）</li>
+<li>🔴 裡面有一個設計比「扣成本」更有用：<strong><code>breakeven_cost_bps</code></strong></li>
+</ul>
+<p><strong><code>breakeven_cost_bps</code> 是什麼</strong>：它不要你猜費率，而是<strong>反過來告訴你「成本要高到多少，這個獲利才會被吃光」</strong>。</p>
+<blockquote>
+<p>例：它回 <code>3.2</code>，而幣安吃單費約 5 bps ⇒ 你當場就知道
+<strong>這條規則扣完手續費就沒了</strong>，完全不必去設定任何費率。</p>
+</blockquote>
+<p><strong>我對 EVENTSCAN 的建議</strong>：</p>
+<ol>
+<li><strong>主數字報未扣成本</strong>（跟事件研究慣例一致，也跟委員建議一致）</li>
+<li><strong>但加一欄 breakeven</strong>：這批事件的平均報酬，在多少 bps 成本下會歸零</li>
+<li><strong>不在本票發明費率</strong>——我不知道你用哪家交易所、什麼手續費等級、吃單還是掛單</li>
+</ol>
+<p>理由：讓你猜一個費率再扣，猜錯了整張表就是錯的；breakeven 反過來給你一個<strong>不需要假設</strong>的判準。</p>
+<p><strong>委員另外提醒的三項成本</strong>（算不進報酬公式，只能揭露）：
+開盤第一筆成交價 ≠ 你真的買得到的均價、永續合約的資金費、滑價。</p>
+<h3 id="7-10-委員另外列了二十多條該定而未定">7-10 委員另外列了二十多條「該定而未定」</h3>
 <p>codex 列 16 條、composer 列 10 條，包括：零報酬算漲還是跌、交易成本要不要算、重疊持有不能加總成資金曲線、
 反覆換條件試到有效果（多重比較）、排除窗太寬會讓對照變成「條件區 vs 平靜區」等等。</p>
 <p><strong>這些我會在寫規格時逐條處理</strong>，不需要你現在決定——但其中兩條我要先講，因為它們影響你怎麼讀數字：</p>
