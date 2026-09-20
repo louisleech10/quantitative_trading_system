@@ -11,9 +11,11 @@
 <main>
 <h1 id="eventscan-條件掃描-持有報酬-vs-隨機對照">EVENTSCAN — 條件掃描 → 持有報酬 vs 隨機對照</h1>
 <blockquote>
-<p><strong>這份是給你看的方向說明，不是規格。</strong> 你看過同意，我才去寫規格。
-依據＝2026-09-20 委員唯讀偵察（composer 已交件、codex 進行中）＋我自己的讀碼查證。
-🔴 <strong>文中所有「數字」分兩類</strong>：標「實查」的是我實際從 repo／資料讀出來的；標「示意」的是排版用的假數字，<strong>不是實測結果</strong>。</p>
+<p><strong>這份是給你看的方向說明，不是規格。</strong> 你看過同意，我才去寫規格。</p>
+<p><strong>依據</strong>（皆 2026-09-20，兩家委員唯讀，全部收斂銷帳）：
+偵察輪 <code>consult r1</code>（十一條）＋量化方法輪 <code>consult r2</code>（十四條）＋我自己的讀碼查證。
+收斂檔：<code>handoffs/reconcile/20260920-eventscan-x-consult-r1/synth.md</code>、<code>…-r2/synth.md</code>。</p>
+<p>🔴 <strong>文中所有「數字」分兩類</strong>：標「實查」的是我實際從 repo／資料讀出來的；標「示意」的是排版用的假數字，<strong>不是實測結果</strong>。</p>
 </blockquote>
 <hr />
 <h2 id="一一句話">一、一句話</h2>
@@ -207,18 +209,25 @@
 <p>換算由系統算：<code>根數 × 週期長度</code>。同樣打 55，在 12h run 上會顯示「≈ 27.5 天」。</p>
 <h3 id="第-3-步系統掃描">第 3 步：系統掃描</h3>
 <p>在 20,352 根裡逐根求值你的條件，找出所有成立的根。</p>
-<p>假設找到 <strong>340 根</strong>（示意）。</p>
+<p>🔴 <strong>但不是每根都算一筆</strong>（委員會 2026-09-20 裁定，見 7-4）。</p>
+<p>多頭排列一旦成立，通常會<strong>連續維持好幾十根</strong>。如果每根都算一筆「買入持有 N 根」，
+<strong>340 筆可能其實只是 10 段趨勢</strong>，你會以為有 340 次獨立買賣。</p>
+<p>所以：<strong>每一段連續成立只算一次進場</strong>（進場點＝那段的第一根）。</p>
+<p>假設壓縮後得到 <strong>340 筆</strong>（示意）。「每根都算」的版本保留為參考表，但不當主數字。</p>
 <h3 id="第-4-步系統填-label你不用做任何事也不會被問任何門檻">第 4 步：系統填 <code>label</code>（你不用做任何事，也不會被問任何門檻）</h3>
 <p>🔴 <strong>你 2026-09-20 裁定：完全不要門檻，也不會給。</strong> 這一步照你的裁定設計。</p>
 <p>匯入契約<strong>強制</strong>每筆要有 <code>label</code>（0 或 1），而且一批裡必須兩類都有——這是硬的，
 實查 <code>momentum/Analysis/contracts/event_import_contract.json</code> 的 <code>required_fields</code>，繞不過去。</p>
-<p>所以 <code>label</code> 用<strong>漲跌的正負號</strong>填：</p>
+<p>所以 <code>label</code> 用<strong>漲跌的正負號</strong>填，<strong>綁你輸入的最長持有期</strong>（見 7-11）：</p>
 <ul>
-<li>報酬 &gt; 0 → <code>label = 1</code></li>
+<li>持有最長那個期間後，報酬 &gt; 0 → <code>label = 1</code></li>
 <li>報酬 ≤ 0 → <code>label = 0</code></li>
 </ul>
 <p><strong>這不是門檻，是漲跌的定義。</strong> 沒有任何數字要你設定，畫面上也不會出現門檻欄位。</p>
-<p>🔴 <strong>誠實講</strong>：這個 <code>label</code> 對你要的統計數據<strong>一點貢獻都沒有</strong>（勝率是另外從報酬直接算的，見第 6 步）。
+<p><strong>為什麼綁最長的</strong>：<code>label</code> 會決定「隔離區寬度」和「隨機對照的候選資格」，
+這兩者必須夠寬到涵蓋你要看的最長持有期。綁 5 而你在看 55，那 55 那一列的防護只有 5 根寬。</p>
+<p>🔴 <strong>誠實講</strong>：這個 <code>label</code> 對你要的統計數據<strong>一點貢獻都沒有</strong>（勝率是另外從報酬直接算的，見第 6 步），
+而且<strong>你輸入的每一個持有期都會有完整的一列統計，不是只算綁 <code>label</code> 的那個</strong>（見 7-11）。
 它純粹是匯入契約的形式要求，你在畫面上完全不會看到它。</p>
 <blockquote>
 <p><strong>如果你連這個內部欄位都不想要</strong>，另一條路是完全不走事件匯入、另建一條掃描→報酬統計的路徑。
@@ -226,16 +235,13 @@
 我不建議，但這是你的選擇。</p>
 </blockquote>
 <h3 id="第-5-步系統產一批隨機對照">第 5 步：系統產一批隨機對照</h3>
-<p>從同一個 run 隨機挑 <strong>340 根</strong>（跟觸發批同樣多），規則：</p>
+<p>隨機挑 <strong>340 根</strong>（跟觸發批<strong>同樣多</strong>），規則：</p>
 <ul>
 <li>避開觸發點附近（前後各留緩衝，免得對照組其實也在條件成立的區間裡）</li>
-<li>同一個標的、同一個週期、同一段期間</li>
-</ul>
-<h3 id="第-5-步系統產一批隨機對照">第 5 步：系統產一批隨機對照</h3>
-<p>從同一個 run 隨機挑 <strong>340 根</strong>（跟觸發批同樣多），規則：</p>
-<ul>
-<li>避開觸發點附近（前後各留緩衝，免得對照組其實也在條件成立的區間裡）</li>
-<li>同一個標的、同一個週期、同一段期間</li>
+<li>同一個標的、同一個週期</li>
+<li><strong>只從有觸發點的那些月份裡挑</strong>，而且<strong>名額按每月觸發筆數分配</strong>（委員會 2026-09-20 裁定，見 7-6）</li>
+<li><strong>進場語意、出場錨、持有期集合由觸發批帶入</strong>——不能各自取預設值（見 7-2 之阻斷性缺陷）</li>
+<li>樣本彼此的持有期<strong>不重疊</strong>；排不下就<strong>回報「無法比較」</strong>，不偷偷把數量縮小（見 7-7）</li>
 <li>亂數種子固定 → 同樣的設定重跑會得到<strong>一模一樣</strong>的結果</li>
 </ul>
 <h3 id="第-6-步兩批各自算報酬並排給你看">第 6 步：兩批各自算報酬，並排給你看</h3>
@@ -243,22 +249,18 @@
 <pre><code>報酬 = (出場那根的收盤價 − 進場價) / 進場價
 </code></pre>
 <p>做空會反號。資料不夠長的事件（例如最後 55 根之內的觸發點算不出 55 根報酬）<strong>直接排除，不會灌 0 拉低平均</strong>。</p>
-<p>🔴 <strong>進場價用哪一根、哪個價——這一條交委員會，還沒定案。</strong></p>
-<p><strong>你的想法</strong>（2026-09-20）：用條件成立那根的<strong>下一根開盤價</strong>（系統裡叫 <code>next_open</code>）。
-你同時聲明：這只是想法，沒深入評估是否有風險、統計數據或量化金融計算上的誤區。</p>
-<p><strong>我查到的現況</strong>：<code>next_open</code> 系統已經支援——實查 <code>momentum/Analysis/event_samples/alignment.py:102-106</code>，
+<p>✅ <strong>進場價＝條件成立那根的「下一根開盤價」</strong>（<code>next_open</code>）——你的提議，<strong>委員會兩家已確認正確</strong>。</p>
+<p><strong>現況</strong>：系統已支援——實查 <code>momentum/Analysis/event_samples/alignment.py:102-106</code>，
 取 <code>t0_idx + 1</code> 那根的 <code>open</code>，資料不夠（t0 是最後一根）就標 <code>missing_bar</code> 排除。
 五個可選值為 <code>trigger_open</code>／<code>trigger_close</code>／<code>next_open</code>／<code>decision_bar_open</code>／<code>decision_bar_close</code>。</p>
-<p><strong>我為什麼覺得你的直覺有道理</strong>：條件要用到 t0 那根的收盤價才算得出來（EMA 是收盤價算的）。
-如果進場價用 t0 的收盤價，等於假設「收盤瞬間同時算完指標並成交」。
-用下一根的開盤價比較接近真的買得到的價格。</p>
-<p><strong>但這正是要交委員會的原因</strong>——我不是量化金融專家，下面幾件事我沒有能力自己判斷：
-跳空風險怎麼處理、不同選擇會不會讓報酬統計產生系統性偏誤、
-隨機對照批是否必須用完全相同的進場語意、事件研究的標準做法是什麼。
-<strong>這一條在委員會給出結論前不算定案。</strong></p>
-<p>另外系統有一個並列揭露的口徑 <code>ret_label_anchor</code>（一律以 t0 收盤價為基準，不隨設定變），
-codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批與隨機批一律用同一個，且畫面標明是哪個</strong>，
-否則兩批各用一個去比，數字會失真。</p>
+<p><strong>為什麼是對的</strong>：條件要用到 t0 那根的收盤價才算得出來（EMA 是收盤價算的）。
+如果進場價用 t0 的收盤價，等於假設「收盤瞬間同時算完指標並成交」——做不到。</p>
+<p>🔴 <strong>但我原本的理由講反了</strong>（委員會更正，見 7-1）：我寫「跳空成本由 <code>next_open</code> 自然承擔」是錯的。
+<code>next_open</code> 的損益<strong>不包含</strong> t0 收盤→次根開盤那一段；是 <code>trigger_close</code> 把它算進去了。
+⇒ <strong>有樂觀偏誤的是 <code>trigger_close</code></strong>，不是 <code>next_open</code> 多付成本。</p>
+<p>系統另有並列口徑 <code>ret_label_anchor</code>（一律以 t0 收盤價為基準）。
+<strong>主欄用 <code>ret_entry</code></strong>（可成交的那個），<code>ret_label_anchor</code> 當診斷、<strong>不拿來跟隨機批相減</strong>。
+<strong>兩批一律用同一個口徑且畫面標明</strong>，否則各用一個去比會失真。</p>
 <p>你要的是「<strong>統計數據</strong>」，不只是一個平均值。所以每個持有期都給這幾個（示意數字，非實測）。</p>
 <p>🔴 <strong>你輸入的每一個持有期都是完整的一列</strong>——不是只算綁 <code>label</code> 的那一個（見 7-11）。
 🔴 <strong>只有「全體」一組</strong>——委員會 2026-09-20 裁定：不得顯示「正例組／反例組」，那在本票的 <code>label</code> 定義下是套套邏輯（見 7-2）。
@@ -514,7 +516,8 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 </tbody>
 </table></div>
-<h3 id="缺的四塊">缺的四塊</h3>
+<h3 id="缺的八塊">缺的八塊</h3>
+<p>（原本列四塊；委員會 2026-09-20 挖出兩塊、你追問挖出兩塊）</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -554,6 +557,16 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <td><strong>沒有欄位選擇器</strong></td>
 <td>這個 run 有 18 萬個以上欄名，後端能回清單但前端只能拿到一整包平鋪的。<strong>沒有逐層下拉＋搜尋，你寫不出條件</strong></td>
 </tr>
+<tr>
+<td>7</td>
+<td>🔴 <strong>「持有 N 根」有兩套時鐘</strong></td>
+<td>事件報酬表從進場根起算、全 K 線表從 t0 起算。選 <code>next_open</code> 時差一根，<strong>同一事件可能顯示正報酬卻被標成跌</strong>（見 7-3）</td>
+</tr>
+<tr>
+<td>8</td>
+<td>🔴 <strong>事件型沒有「成本歸零點」</strong></td>
+<td>序列型有且前端已顯示，事件型沒有。<strong>不是做不到，是公式前提（連續持倉序列）在事件型不存在</strong>（見 7-12）</td>
+</tr>
 </tbody>
 </table></div>
 <h4 id="缺口-4-細項四項都要修">缺口 4 細項（四項都要修）</h4>
@@ -574,17 +587,22 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <tr>
 <td>候選資格</td>
 <td>只看<strong>單一</strong>答案窗長度</td>
-<td>看你選的<strong>最長</strong>持有期</td>
+<td>看你輸入的<strong>最長</strong>持有期</td>
 </tr>
 <tr>
 <td>樣本之間</td>
-<td>只禁抽到同一根，<strong>不禁答案窗互相重疊</strong></td>
-<td>應互斥</td>
+<td>只禁抽到同一根，<strong>不禁持有期互相重疊</strong></td>
+<td>應互斥；排不下就<strong>回報無法比較</strong>，不偷偷縮小數量（見 7-7）</td>
 </tr>
 <tr>
 <td>期間池</td>
-<td>取自觸發批最早～最晚的 <code>t0</code></td>
-<td>應為整個 run 的期間</td>
+<td>取自觸發批最早～最晚的 <code>t0</code>，但<strong>名額按每月候選根數分配</strong></td>
+<td>🔴 <strong>不是改成整個 run</strong>（我先前寫錯，委員推翻）。應為：<strong>有觸發點的月份聯集＋名額按每月觸發筆數分配</strong>（見 7-6）</td>
+</tr>
+<tr>
+<td>🔴 兩批參數</td>
+<td>隨機批<strong>各自取預設值</strong></td>
+<td>進場語意／出場錨／持有期集合<strong>由觸發批帶入</strong>（見 7-2 阻斷性缺陷）</td>
 </tr>
 </tbody>
 </table></div>
@@ -814,6 +832,67 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 </tbody>
 </table></div>
+<h3 id="7-9-手續費與滑點要不要算你-2026-09-20-提問">7-9 手續費與滑點要不要算？（你 2026-09-20 提問）</h3>
+<p><strong>業界做法分三層，答案不一樣</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>算什麼</th>
+<th>扣不扣成本</th>
+<th>為什麼</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>IC 本身</strong></td>
+<td><strong>不扣</strong>（業界標準）</td>
+<td>IC 是「因子值 vs 未來報酬」的相關係數，衡量<strong>排序能力</strong>。成本發生在<strong>換倉</strong>，不發生在「某個時點的相關性」上——扣了沒有明確定義</td>
+</tr>
+<tr>
+<td><strong>淨 IC（net IC）</strong></td>
+<td>扣</td>
+<td>進階診斷：扣掉換手成本後因子還有沒有效。<strong>不是 IC 的標準定義</strong>，是額外一層</td>
+</tr>
+<tr>
+<td><strong>事件研究的報酬</strong></td>
+<td>學術通常不扣</td>
+<td>它要衡量的是「資訊效應」，所以報未扣成本的異常報酬。但實務要判斷「能不能真的賺」就得扣</td>
+</tr>
+<tr>
+<td><strong>回測</strong></td>
+<td><strong>一定扣</strong></td>
+<td>它宣稱的就是「這樣做會賺多少」，不扣就是假的</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>本專案現況</strong>（實查 <code>momentum/Analysis/net_ic_analyzer.py</code>）：</p>
+<ul>
+<li>已有淨 IC，公式＝<code>淨值 = 毛值 − (成本bps ÷ 10000) × 換手率</code></li>
+<li><strong>預設關閉</strong>（<code>cost_enabled = False</code>）</li>
+<li>🔴 裡面有一個設計比「扣成本」更有用：<strong><code>breakeven_cost_bps</code></strong></li>
+</ul>
+<p><strong><code>breakeven_cost_bps</code> 是什麼</strong>：它不要你猜費率，而是<strong>反過來告訴你「成本要高到多少，這個獲利才會被吃光」</strong>。</p>
+<blockquote>
+<p>例：它回 <code>3.2</code>，而幣安吃單費約 5 bps ⇒ 你當場就知道
+<strong>這條規則扣完手續費就沒了</strong>，完全不必去設定任何費率。</p>
+</blockquote>
+<p><strong>我對 EVENTSCAN 的建議</strong>：</p>
+<ol>
+<li><strong>主數字報未扣成本</strong>（跟事件研究慣例一致，也跟委員建議一致）</li>
+<li><strong>但加一欄 breakeven</strong>：這批事件的平均報酬，在多少 bps 成本下會歸零</li>
+<li><strong>不在本票發明費率</strong>——我不知道你用哪家交易所、什麼手續費等級、吃單還是掛單</li>
+</ol>
+<p>理由：讓你猜一個費率再扣，猜錯了整張表就是錯的；breakeven 反過來給你一個<strong>不需要假設</strong>的判準。</p>
+<p><strong>委員另外提醒的三項成本</strong>（算不進報酬公式，只能揭露）：
+開盤第一筆成交價 ≠ 你真的買得到的均價、永續合約的資金費、滑價。</p>
+<h3 id="7-10-委員另外列了二十多條該定而未定">7-10 委員另外列了二十多條「該定而未定」</h3>
+<p>codex 列 16 條、composer 列 10 條，包括：零報酬算漲還是跌、交易成本要不要算、重疊持有不能加總成資金曲線、
+反覆換條件試到有效果（多重比較）、排除窗太寬會讓對照變成「條件區 vs 平靜區」等等。</p>
+<p><strong>這些我會在寫規格時逐條處理</strong>，不需要你現在決定——但其中兩條我要先講，因為它們影響你怎麼讀數字：</p>
+<ul>
+<li><strong>本票不做權益曲線</strong>。340 筆重疊的持有期<strong>不能</strong>加總成「策略報酬」，那是另一件事（回測）。</li>
+<li><strong>換 EMA 組合試到有效果 = 沒有意義</strong>。畫面會寫「這是同一段樣本上的描述，不是驗證過的策略」。</li>
+</ul>
 <h3 id="7-11-輸入多個持有期但-label-只綁一個其他不就白輸入了你-2026-09-20-提問">7-11 🔴「輸入多個持有期但 <code>label</code> 只綁一個，其他不就白輸入了？」（你 2026-09-20 提問）</h3>
 <p><strong>不是白輸入。這是我上一版沒講清楚，現在補上。</strong></p>
 <p><strong>報酬表對你輸入的每一個持有期，都算一整列完整統計</strong>——平均／中位數／勝率／標準差／最好／最差／成本歸零點。
@@ -918,80 +997,20 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <p>⇒ <strong>不是做不到，是現有公式的前提（連續持倉序列）在事件型上不存在</strong>，需要一條專屬事件的公式。
 本票會做出來（做法第 10 步）。<strong>做出來之後，事件型 IC 也能直接用同一條</strong>——
 它跟本票一樣是「一個事件一趟來回」的結構。</p>
-<h3 id="7-9-手續費與滑點要不要算你-2026-09-20-提問">7-9 手續費與滑點要不要算？（你 2026-09-20 提問）</h3>
-<p><strong>業界做法分三層，答案不一樣</strong>：</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>算什麼</th>
-<th>扣不扣成本</th>
-<th>為什麼</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>IC 本身</strong></td>
-<td><strong>不扣</strong>（業界標準）</td>
-<td>IC 是「因子值 vs 未來報酬」的相關係數，衡量<strong>排序能力</strong>。成本發生在<strong>換倉</strong>，不發生在「某個時點的相關性」上——扣了沒有明確定義</td>
-</tr>
-<tr>
-<td><strong>淨 IC（net IC）</strong></td>
-<td>扣</td>
-<td>進階診斷：扣掉換手成本後因子還有沒有效。<strong>不是 IC 的標準定義</strong>，是額外一層</td>
-</tr>
-<tr>
-<td><strong>事件研究的報酬</strong></td>
-<td>學術通常不扣</td>
-<td>它要衡量的是「資訊效應」，所以報未扣成本的異常報酬。但實務要判斷「能不能真的賺」就得扣</td>
-</tr>
-<tr>
-<td><strong>回測</strong></td>
-<td><strong>一定扣</strong></td>
-<td>它宣稱的就是「這樣做會賺多少」，不扣就是假的</td>
-</tr>
-</tbody>
-</table></div>
-<p><strong>本專案現況</strong>（實查 <code>momentum/Analysis/net_ic_analyzer.py</code>）：</p>
-<ul>
-<li>已有淨 IC，公式＝<code>淨值 = 毛值 − (成本bps ÷ 10000) × 換手率</code></li>
-<li><strong>預設關閉</strong>（<code>cost_enabled = False</code>）</li>
-<li>🔴 裡面有一個設計比「扣成本」更有用：<strong><code>breakeven_cost_bps</code></strong></li>
-</ul>
-<p><strong><code>breakeven_cost_bps</code> 是什麼</strong>：它不要你猜費率，而是<strong>反過來告訴你「成本要高到多少，這個獲利才會被吃光」</strong>。</p>
-<blockquote>
-<p>例：它回 <code>3.2</code>，而幣安吃單費約 5 bps ⇒ 你當場就知道
-<strong>這條規則扣完手續費就沒了</strong>，完全不必去設定任何費率。</p>
-</blockquote>
-<p><strong>我對 EVENTSCAN 的建議</strong>：</p>
-<ol>
-<li><strong>主數字報未扣成本</strong>（跟事件研究慣例一致，也跟委員建議一致）</li>
-<li><strong>但加一欄 breakeven</strong>：這批事件的平均報酬，在多少 bps 成本下會歸零</li>
-<li><strong>不在本票發明費率</strong>——我不知道你用哪家交易所、什麼手續費等級、吃單還是掛單</li>
-</ol>
-<p>理由：讓你猜一個費率再扣，猜錯了整張表就是錯的；breakeven 反過來給你一個<strong>不需要假設</strong>的判準。</p>
-<p><strong>委員另外提醒的三項成本</strong>（算不進報酬公式，只能揭露）：
-開盤第一筆成交價 ≠ 你真的買得到的均價、永續合約的資金費、滑價。</p>
-<h3 id="7-10-委員另外列了二十多條該定而未定">7-10 委員另外列了二十多條「該定而未定」</h3>
-<p>codex 列 16 條、composer 列 10 條，包括：零報酬算漲還是跌、交易成本要不要算、重疊持有不能加總成資金曲線、
-反覆換條件試到有效果（多重比較）、排除窗太寬會讓對照變成「條件區 vs 平靜區」等等。</p>
-<p><strong>這些我會在寫規格時逐條處理</strong>，不需要你現在決定——但其中兩條我要先講，因為它們影響你怎麼讀數字：</p>
-<ul>
-<li><strong>本票不做權益曲線</strong>。340 筆重疊的持有期<strong>不能</strong>加總成「策略報酬」，那是另一件事（回測）。</li>
-<li><strong>換 EMA 組合試到有效果 = 沒有意義</strong>。畫面會寫「這是同一段樣本上的描述，不是驗證過的策略」。</li>
-</ul>
 <hr />
 <h2 id="八這張票多大">八、這張票多大</h2>
 <p><strong>大票</strong>——命中「跨模組／共用路徑」，會動到條件掃描、事件匯入、報酬計算、比較端點、前端五個地方。</p>
 <p>依規矩要走完整流程：規格 → 施工清單 → 兩家委員對抗審查 → 實作 → 審碼 → 收斂。</p>
 <h3 id="做的順序你-2026-09-20-裁定">做的順序（你 2026-09-20 裁定）</h3>
-<pre><code>① 本票的方向與做法定案   ← 現在在這裡
-     ├─ 委員會回答第七節的量化問題（進場價口徑等）
-     └─ 你確認最終版方向說明
-② 白話文檔整理（中票）    ← 定案後先做這個
-③ 本票實作               ← 規格 → 施工清單 → 審查 → 實作
+<pre><code>① 本票的方向與做法定案   ✅ 已完成（委員會兩輪收斂＋本檔逐章稽核）
+② 白話文檔整理（中票）    ← 接下來做這個
+─────────────── 本 session 到這裡結束（你 2026-09-20 裁定）
+③ 本票實作               ← 新 session 開始：規格 → 施工清單 → 審查 → 實作
 </code></pre>
 <p><strong>為什麼白話整理插在中間</strong>：本票是大票、會跑很多輪，期間會長出一批新的白話文檔。
 文檔結構還亂的時候先跑大票，等於讓問題擴大再收。先把索引與封存整理好，本票的文件就照規則進去。</p>
+<p>🔴 <strong>本 session 之停止點</strong>（你 2026-09-20 逐字）：
+「這個 Session 就到白話文檔整理完成就停，下一步到新的 Session 開始。」</p>
 <hr />
 <h2 id="九委員會推翻我的三處2026-09-20-consult-r2">九、委員會推翻我的三處（2026-09-20 consult r2）</h2>
 <p>我依規矩先寫了自己的答案讓他們攻。結果如下——留著給你看我在哪些地方會錯：</p>
