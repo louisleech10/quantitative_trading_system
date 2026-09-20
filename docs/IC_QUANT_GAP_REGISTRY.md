@@ -107,6 +107,7 @@
 | `6` 430K 規模防護 | **未宣告**（多屬共用層，但報告／前端面仍須宣告） | 本檔 #6 |
 | 票 A／票 B | **未宣告**（策略層，可能落「不適用」） | `docs/ROADMAP.md`「後續兩票」節 |
 | `FU-1`／`FU-2` | **未宣告** | `docs/ROADMAP.md`「兩筆 follow-up」節 |
+| **淨 IC／`breakeven_cost_bps`**（2026-09-20 使用者追問後補登） | **只支援全域序列型**；事件型**未支援** ⇒ 依 2026-09-19 補充裁定第 2 條，本列填 `未支援`，**不得填「不適用」** | 🔴 **根因＝公式前提，不是概念不成立**：`net = gross − (cost_bps/10000)×turnover`，其 `turnover = position.diff().abs()` 取自 `FactorTimingReturnSeries`（`momentum/Analysis/factor_return_analyzer.py:20`，註解逐字「單標的因子擇時多空序列」）。事件型只在事件時點有因子值、稀疏且不規則 ⇒ `position.diff()` 無定義，`_run_net_ic` 讀 `self._factor_return_series` 為空即回 `unavailable`（`ic_filter_orchestrator.py:3150-3191`）。**事件型之成本結構更單純**（一事件＝一趟來回，換手固定），breakeven 可直接寫成 `平均報酬 × 10000 ÷ 2 腿`，不需 turnover 中間量。⇒ **能做未做**。修法排入 `RM-EVENTSCAN` 做法第 10 步，該條落地後事件型 IC 可直接共用 |
 
 ### G3-D2 實作批殘留（B-D0…B-D5；**2026-09-05 補登**）
 

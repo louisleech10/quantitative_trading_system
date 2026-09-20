@@ -601,7 +601,7 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <li><strong>產隨機對照批</strong>——進場語意／出場錨／持有期集合<strong>由觸發批帶入</strong>，並修掉抽樣四項（見 7-6、7-7）</li>
 <li><strong>比較端點改成比報酬</strong>——現在只讀 label 算達標率；並加上 Δ 的時間塊／群集 bootstrap 區間（見 7-5）</li>
 <li><strong>前端</strong>——掃描設定畫面（持有期<strong>直接輸入</strong>、即時顯示約幾天）＋ 兩組統計並排的表＋<strong>硬性橫幅</strong>（無區間時不得讀成會賺）</li>
-<li>🔴 <strong>事件版的「成本歸零點」</strong>——現行 breakeven 建在因子報酬序列上（有換手率），事件報酬沒有換手率概念，要改寫成 <code>平均報酬 × 10000 ÷ 來回腿數</code>（見 7-12）</li>
+<li>🔴 <strong>事件版的「成本歸零點」</strong>——現行 breakeven 建在因子報酬序列上（有換手率），事件報酬沒有換手率概念，要改寫成 <code>平均報酬 × 10000 ÷ 2 腿</code>（見 7-12）。<strong>這條做出來後，事件型 IC 也能直接共用</strong>——它一直缺這個，不是做不到而是沒做</li>
 </ol>
 <h3 id="兩條我查過確定不走的路">兩條我查過、確定不走的路</h3>
 <div class="table-wrap"><table>
@@ -866,19 +866,58 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 <tr>
 <td><strong>事件型 IC</strong></td>
-<td>❌ <strong>沒有</strong>。事件路徑不產生「因子報酬序列」，而現行 breakeven 公式建在那個序列上</td>
+<td>❌ <strong>沒有——但是「沒做」不是「不能做」</strong>，理由見下</td>
 </tr>
 <tr>
 <td><strong>本票（EVENTSCAN）</strong></td>
-<td>❌ <strong>沒有，要新做</strong></td>
+<td>❌ <strong>沒有，要新做</strong>（做出來後事件型 IC 可直接共用）</td>
 </tr>
 </tbody>
 </table></div>
-<p>🔴 <strong>要誠實講</strong>：現行公式是 <code>毛報酬 ÷ 換手率</code>，那是<strong>因子擇時多空</strong>的語意——每期調倉、有換手率。</p>
-<p><strong>事件報酬沒有「換手率」這個概念</strong>——每個事件就是一次進場、一次出場，一趟來回。所以公式要重寫，但<strong>更簡單</strong>：</p>
-<pre><code>成本歸零點(bps) = 平均報酬 × 10000 ÷ 來回腿數
+<h4 id="事件型沒有-breakeven是不能做還是沒做你-2026-09-20-追問">事件型「沒有 breakeven」是不能做，還是沒做？（你 2026-09-20 追問）</h4>
+<p><strong>是「沒做」，不是「不能做」。</strong> 卡住的原因很具體：</p>
+<p>現行公式需要<strong>兩樣</strong>東西：</p>
+<pre><code>淨值 = 毛值 − (成本bps ÷ 10000) × 換手率
+                                    ↑
+                     turnover = position.diff().abs()
 </code></pre>
-<p>⇒ <strong>不是現成可用，但是小工作</strong>，概念直接對應。已列入做法第 10 步。</p>
+<p><code>換手率</code> 是從 <strong><code>position</code> 這條連續序列</strong>算出來的——「這期持有多少、下期持有多少、差多少就是換手」。
+這條序列由 <code>FactorTimingReturnSeries</code> 提供（實查 <code>momentum/Analysis/factor_return_analyzer.py:20</code>，
+註解逐字「單標的因子擇時多空序列」）。</p>
+<p>🔴 <strong>而事件型沒有這條連續序列</strong>。事件型只在<strong>事件發生的那些時點</strong>有因子值，
+中間是空的、不連續、間隔不規則——<code>position.diff()</code> 在稀疏不規則的點上<strong>沒有定義</strong>。</p>
+<p>所以現況是：<code>_run_net_ic</code> 去 <code>self._factor_return_series</code> 拿資料，事件路徑那裡是空的 ⇒ 回 <code>unavailable</code>。</p>
+<p><strong>但概念上完全成立，而且比序列型更簡單</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>全域序列型</th>
+<th>事件型</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>交易長怎樣</td>
+<td>每期調倉，換手率是連續變動的量</td>
+<td><strong>一次進場、一次出場，一趟來回</strong></td>
+</tr>
+<tr>
+<td>成本怎麼算</td>
+<td><code>成本 × 換手率</code>（要先算換手率）</td>
+<td><code>成本 × 2 腿</code>（固定）</td>
+</tr>
+<tr>
+<td>成本歸零點</td>
+<td><code>毛報酬 ÷ 換手率</code></td>
+<td><strong><code>平均報酬 × 10000 ÷ 2</code></strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>事件型<strong>不需要「換手率」這個中間量</strong>——每筆交易的換手是確定的，所以公式反而更直接。</p>
+<p>⇒ <strong>不是做不到，是現有公式的前提（連續持倉序列）在事件型上不存在</strong>，需要一條專屬事件的公式。
+本票會做出來（做法第 10 步）。<strong>做出來之後，事件型 IC 也能直接用同一條</strong>——
+它跟本票一樣是「一個事件一趟來回」的結構。</p>
 <h3 id="7-9-手續費與滑點要不要算你-2026-09-20-提問">7-9 手續費與滑點要不要算？（你 2026-09-20 提問）</h3>
 <p><strong>業界做法分三層，答案不一樣</strong>：</p>
 <div class="table-wrap"><table>
