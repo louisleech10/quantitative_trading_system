@@ -259,7 +259,9 @@
 <p>另外系統有一個並列揭露的口徑 <code>ret_label_anchor</code>（一律以 t0 收盤價為基準，不隨設定變），
 codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批與隨機批一律用同一個，且畫面標明是哪個</strong>，
 否則兩批各用一個去比，數字會失真。</p>
-<p>你要的是「<strong>統計數據</strong>」，不只是一個平均值。所以每個持有期都給這幾個（示意數字，非實測）：</p>
+<p>你要的是「<strong>統計數據</strong>」，不只是一個平均值。所以每個持有期都給這幾個（示意數字，非實測）。</p>
+<p>🔴 <strong>只有「全體」一組</strong>——委員會 2026-09-20 裁定：不得顯示「正例組／反例組」，那在本票的 <code>label</code> 定義下是套套邏輯（見 7-2）。
+🔴 <strong>筆數是「每段連續成立算一次」</strong>，不是每根都算（見 7-4）。</p>
 <p><strong>觸發批</strong></p>
 <div class="table-wrap"><table>
 <thead>
@@ -406,6 +408,11 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 </tbody>
 </table></div>
+<blockquote>
+<p>🔴 <strong>這張表上面會有一條硬性橫幅</strong>（委員會 2026-09-20 裁定，見 7-5）：
+「<strong>無信賴區間；平均差為正不得讀成這條規則會賺。</strong>」
+要拿掉這條橫幅，必須先做出「差」的 bootstrap 區間。在那之前這些數字只是描述，不是證據。</p>
+</blockquote>
 <p><strong>這就是你要的東西。</strong> 哪些現成、哪些要做（我實查 <code>momentum/Analysis/event_samples/tables.py:118-131</code>）：</p>
 <div class="table-wrap"><table>
 <thead>
@@ -571,15 +578,18 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tbody>
 </table></div>
 <hr />
-<h2 id="五做法七步">五、做法：七步</h2>
+<h2 id="五做法九步">五、做法：九步</h2>
+<p>（原本七步；委員會 2026-09-20 挖出兩件我沒算進去的工作，見第七節）</p>
 <ol>
 <li><strong>條件引擎吃 FF 欄位</strong>——把讀到的特徵表欄位名註冊給條件引擎，讓你能寫 <code>close_1h_trend_EMA_5 &gt; close_1h_trend_EMA_10</code>。<strong>並且欄名打錯要報錯，不能靜默回零命中</strong></li>
 <li><strong>欄位選擇器</strong>——逐層下拉（來源欄→週期→類別→指標→參數）＋打字搜尋。<strong>沒有這個你根本沒辦法從 18 萬個欄名裡挑出要的</strong></li>
 <li><strong>掃描函式接上 API</strong>——條件 → 事件批 → 匯入（<code>label</code> 用漲跌正負號填，進場價用 <code>next_open</code>）</li>
+<li>🔴 <strong>統一「持有 N 根」的時鐘</strong>——鎖定「從成交那根起算」，並讓 <code>label</code> 與報酬表用同一個出場根（現在差一根，見 7-3）</li>
+<li>🔴 <strong>連續成立只進場一次</strong>（first-of-run）——否則 340 筆可能只是 10 段趨勢（見 7-4）</li>
 <li><strong>報酬表補兩個統計量</strong>——加上<strong>標準差</strong>與<strong>最好／最差</strong></li>
-<li><strong>產隨機對照批</strong>——走既有端點，<strong>修掉缺口 4 的四項</strong></li>
-<li><strong>比較端點改成比報酬</strong>——現在只讀 label 算達標率，要改成讀報酬表並排全部統計量</li>
-<li><strong>前端</strong>——掃描設定畫面（持有期<strong>直接輸入</strong>、即時顯示約幾天）＋ 兩組統計並排的表（現在沒有並排元件）</li>
+<li><strong>產隨機對照批</strong>——進場語意／出場錨／持有期集合<strong>由觸發批帶入</strong>，並修掉抽樣四項（見 7-6、7-7）</li>
+<li><strong>比較端點改成比報酬</strong>——現在只讀 label 算達標率；並加上 Δ 的時間塊／群集 bootstrap 區間（見 7-5）</li>
+<li><strong>前端</strong>——掃描設定畫面（持有期<strong>直接輸入</strong>、即時顯示約幾天）＋ 兩組統計並排的表＋<strong>硬性橫幅</strong>（無區間時不得讀成會賺）</li>
 </ol>
 <h3 id="兩條我查過確定不走的路">兩條我查過、確定不走的路</h3>
 <div class="table-wrap"><table>
@@ -645,70 +655,130 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tbody>
 </table></div>
 <hr />
-<h2 id="七還沒決定的">七、還沒決定的</h2>
+<h2 id="七委員會的裁定2026-09-20兩家唯讀十四條">七、委員會的裁定（2026-09-20，兩家唯讀，十四條）</h2>
+<p>我先寫了自己的答案讓他們攻。結果：<strong>他們推翻我三處、確認我三處、挖出四件我完全沒想到的事。</strong></p>
+<h3 id="7-1-進場價結論對但我的理由是錯的">7-1 進場價：結論對，但我的理由是錯的</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>結論</strong></td>
+<td>✅ <strong>用 <code>next_open</code></strong>（下一根開盤價）。兩家都同意你的直覺是對的</td>
+</tr>
+<tr>
+<td>🔴 <strong>我錯在哪</strong></td>
+<td>我寫「跳空成本由 <code>next_open</code> 自然承擔」——<strong>方向講反了</strong>。<code>next_open</code> 的損益<strong>不包含</strong> t0 收盤到次根開盤那一段；是 <code>trigger_close</code> 把它算進去了。所以<strong>有樂觀偏誤的是 <code>trigger_close</code>，不是 <code>next_open</code> 多付成本</strong></td>
+</tr>
+<tr>
+<td><strong>正確說法</strong></td>
+<td>對「這條規則實際買得到的報酬」，<code>next_open</code> 算出來比較低的那個數字才是對的</td>
+</tr>
+<tr>
+<td><strong>要揭露而算不進去的</strong></td>
+<td>開盤第一筆成交價 ≠ 你真的買得到的均價、資金費、滑價</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="7-2-label-的問題比我以為的嚴重它會出現在主表">7-2 🔴 <code>label</code> 的問題比我以為的嚴重——它會出現在主表</h3>
+<p><strong>我原本判斷「<code>label</code> 不會進到你看得到的數字」，兩家都說錯了。</strong></p>
+<ul>
+<li>前端的事件報酬表<strong>一律讀「正例組／反例組／全體」三組</strong>，不讀我以為的那個全體表</li>
+<li><code>label</code> 若＝某個持有期的漲跌正負，那一列的**「正例組」平均報酬恆為正、勝率恆為 100%<strong>——這是</strong>套套邏輯**（把賺的挑出來再說他們賺）</li>
+<li>而且它會出現在<strong>主表</strong>，不是旁註</li>
+</ul>
+<p><strong>處置</strong>：<strong>主表只顯示全體一組</strong>，正例／反例分組在本票不顯示。<code>label</code> 只活在匯入契約裡。</p>
+<p>🔴 <strong>另外查出一件跟你的裁定直接衝突的</strong>：前端隨機對照的<strong>預設門檻是 0.02</strong>，不是你要的「完全無門檻」。這條必須改掉。</p>
+<h3 id="7-3-持有-n-根現在有兩套時鐘我完全沒想到">7-3 🔴「持有 N 根」現在有兩套時鐘（我完全沒想到）</h3>
+<p>兩張會同時出現的表，對「持有 5 根」的定義不一樣：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>表</th>
+<th>出場在哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>事件報酬表</td>
+<td>進場那根 + 5</td>
+</tr>
+<tr>
+<td>全 K 線表</td>
+<td>t0 + 5</td>
+</tr>
+</tbody>
+</table></div>
+<p>選 <code>next_open</code> 時進場根是 t0+1 ⇒ <strong>一張表出場在 t0+6、另一張在 t0+5</strong>。
+更糟的是：同一個事件可能在報酬表顯示<strong>正報酬</strong>、卻被標成 <code>label=0</code>。</p>
+<p><strong>處置</strong>：EVENTSCAN 鎖定「<strong>從成交那根起算 N 根</strong>」（對齊你說的「買入後持有 N 根」）。全 K 線表本票不顯示。</p>
+<h3 id="7-4-均線條件會連續好幾根都成立我完全沒想到">7-4 🔴 均線條件會連續好幾根都成立（我完全沒想到）</h3>
+<p>多頭排列一旦成立，通常會<strong>連續維持好幾十根</strong>。如果每一根都算一筆「買入持有 N 根」：</p>
+<blockquote>
+<p><strong>340 筆可能其實只是 10 段趨勢</strong>，你會以為有 340 次獨立的買賣，實際上沒有。</p>
+</blockquote>
+<p><strong>處置</strong>：主要數字用「<strong>每一段連續成立只進場一次</strong>」（first-of-run）。每根都算的版本保留為參考，但不當主數字。</p>
+<h3 id="7-5-兩張表並排相減-有效的統計比較推翻我">7-5 兩張表並排相減 ≠ 有效的統計比較（推翻我）</h3>
+<p>我原本說「兩批各算一張表、並排看差」就夠了。<strong>兩家都說不夠</strong>：</p>
+<ul>
+<li>掃描這條路<strong>永遠沒有信賴區間</strong>（技術原因：沒做切分 ⇒ 系統一律標 <code>unavailable</code>）</li>
+<li>觸發點連續成立 ⇒ 報酬序列高度重疊 ⇒ <strong>不能用「兩組獨立樣本」的公式</strong></li>
+<li>分開畫兩邊的區間、看有沒有重疊，也<strong>不能</strong>回答「差是不是 0」</li>
+</ul>
+<p><strong>處置</strong>：要用時間塊／群集 bootstrap 重算「差」的區間。在做出來之前，<strong>畫面必須硬性橫幅</strong>：</p>
+<blockquote>
+<p>「無信賴區間；平均差為正<strong>不得</strong>讀成這條規則會賺。」</p>
+</blockquote>
+<h3 id="7-6-期間池我自我推翻是對的但還不夠">7-6 期間池：我自我推翻是對的，但還不夠</h3>
+<p>我推翻自己的「該用整個 run」是對的，但「取觸發批期間」<strong>必要但不充分</strong>——現行配額是按<strong>每月候選根數</strong>分的，不是按<strong>每月觸發筆數</strong>。三條機械規則：</p>
+<ol>
+<li>期間池＝有觸發點的那些月份（UTC）的聯集</li>
+<li>配額按<strong>觸發筆數</strong>分；某月候選不夠就<strong>直接失敗</strong>，不把缺額倒到別的月</li>
+<li>整個 run 只能當另一張敏感度表，標題要寫清楚它回答的是別的問題</li>
+</ol>
+<h3 id="7-7-抽樣不足時不准偷偷縮水推翻我的措辭">7-7 抽樣不足時不准偷偷縮水（推翻我的措辭）</h3>
+<p>我說「樣本必須互斥」——codex 說這措辭過強：重疊<strong>不影響平均值</strong>，影響的是<strong>信賴區間和有效樣本數</strong>。但後果判斷我對。</p>
+<p>現行最危險的是：候選不夠時會<strong>靜默把 n 縮小</strong>（<code>n_target = min(n_requested, candidate_count)</code>）——<strong>估計量被換掉了，畫面看起來卻像成功</strong>。</p>
+<p><strong>處置</strong>（採較嚴的版本）：不縮 n、不放寬互斥、不抽相鄰根充數。互斥排下來不夠就**回報「無法比較」**並列出四個計數，讓你知道為什麼。</p>
+<h3 id="7-8-還沒決定的">7-8 還沒決定的</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
 <th>#</th>
 <th>問題</th>
-<th>誰決定、怎麼決定</th>
+<th>誰決定</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1</td>
-<td>🔴 <strong>進場價用哪一根、哪個價？</strong></td>
-<td><strong>交委員會</strong>（你 2026-09-20 指定）。要問的是：<code>next_open</code> 有沒有風險或統計誤區、跳空怎麼處理、不同選擇會不會讓報酬產生系統性偏誤、隨機對照批是否必須用相同語意、事件研究的標準做法。<strong>這一條沒結論就不算定案</strong></td>
+<td><strong><code>ret_entry</code> 與 <code>ret_label_anchor</code> 主顯示哪個</strong></td>
+<td>委員會已建議：主欄 <code>ret_entry</code>（可成交的那個），<code>ret_label_anchor</code> 當診斷、<strong>不拿來跟隨機批相減</strong>。我採納</td>
 </tr>
 <tr>
 <td>2</td>
-<td><strong><code>ret_entry</code> 與 <code>ret_label_anchor</code> 主顯示哪個？</strong></td>
-<td>併入第 1 題一起問委員會（兩題同源）</td>
+<td><strong>多持有期時 <code>label</code> 綁哪一個</strong></td>
+<td>委員會建議綁一個「主持有期」，其他持有期不做 label 衍生的推論。<strong>這題要你選主持有期</strong>，或授權我跟委員定</td>
 </tr>
 <tr>
 <td>3</td>
-<td><strong><code>label</code> 用漲跌正負號，統計上有沒有問題？</strong></td>
-<td>你已接受這個做法，但併入委員會一起檢查有無副作用（例如它會不會讓某些既有的表算出誤導性的數字）</td>
-</tr>
-<tr>
-<td>4</td>
-<td><strong>隨機對照抽樣的四項修法怎麼做才對？</strong></td>
-<td>併入委員會。特別是「樣本之間不得重疊」這條——重疊會讓有效樣本數虛高，統計檢定會過度樂觀</td>
-</tr>
-<tr>
-<td>5</td>
-<td><strong>多標的什麼時候做？</strong></td>
-<td>你已裁定先做單標的，多標的併 GAP-4。本票只做單標的</td>
+<td><strong>多標的什麼時候做</strong></td>
+<td>你已裁定先做單標的，多標的併 GAP-4</td>
 </tr>
 </tbody>
 </table></div>
-<h3 id="我自己查的時候又挖出三個問題一併交委員會">我自己查的時候又挖出三個問題（一併交委員會）</h3>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>#</th>
-<th>問題</th>
-<th>為什麼重要</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>6</td>
-<td>🔴 <strong>兩批的報酬算法可能根本不一致</strong></td>
-<td>隨機對照批的標籤<strong>寫死用收盤到收盤</strong>（<code>random_control.py</code>）。如果觸發批改用「下一根開盤價」進場，<strong>兩批算的不是同一件事，並排比較沒有意義</strong>。這條沒解決，前面所有數字都不能信</td>
-</tr>
-<tr>
-<td>7</td>
-<td>🔴 <strong>多個持有期時，<code>label</code> 該用哪一個算？</strong></td>
-<td><code>label</code> 在契約裡是<strong>一個值</strong>，但漲跌會隨持有期不同而不同（5 根漲、55 根跌是常態）。契約只有一個 <code>horizon_bars</code> 欄位 ⇒ 必須指定一個。用哪個、為什麼</td>
-</tr>
-<tr>
-<td>8</td>
-<td>🔴 <strong>我先前說「期間池該用整個 run」可能是錯的</strong></td>
-<td>如果觸發點集中在多頭期間，拿整個 run 當對照池等於在比「多頭 vs 全期」——差異可能來自行情而不是條件。<strong>取觸發批的期間反而可能才對</strong>（控制行情）。我沒把握，交委員會</td>
-</tr>
-</tbody>
-</table></div>
+<h3 id="7-9-委員另外列了二十多條該定而未定">7-9 委員另外列了二十多條「該定而未定」</h3>
+<p>codex 列 16 條、composer 列 10 條，包括：零報酬算漲還是跌、交易成本要不要算、重疊持有不能加總成資金曲線、
+反覆換條件試到有效果（多重比較）、排除窗太寬會讓對照變成「條件區 vs 平靜區」等等。</p>
+<p><strong>這些我會在寫規格時逐條處理</strong>，不需要你現在決定——但其中兩條我要先講，因為它們影響你怎麼讀數字：</p>
+<ul>
+<li><strong>本票不做權益曲線</strong>。340 筆重疊的持有期<strong>不能</strong>加總成「策略報酬」，那是另一件事（回測）。</li>
+<li><strong>換 EMA 組合試到有效果 = 沒有意義</strong>。畫面會寫「這是同一段樣本上的描述，不是驗證過的策略」。</li>
+</ul>
 <hr />
 <h2 id="八這張票多大">八、這張票多大</h2>
 <p><strong>大票</strong>——命中「跨模組／共用路徑」，會動到條件掃描、事件匯入、報酬計算、比較端點、前端五個地方。</p>
@@ -723,7 +793,39 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <p><strong>為什麼白話整理插在中間</strong>：本票是大票、會跑很多輪，期間會長出一批新的白話文檔。
 文檔結構還亂的時候先跑大票，等於讓問題擴大再收。先把索引與封存整理好，本票的文件就照規則進去。</p>
 <hr />
-<h2 id="九我在這輪自己抓到的三個錯">九、我在這輪自己抓到的三個錯</h2>
+<h2 id="九委員會推翻我的三處2026-09-20-consult-r2">九、委員會推翻我的三處（2026-09-20 consult r2）</h2>
+<p>我依規矩先寫了自己的答案讓他們攻。結果如下——留著給你看我在哪些地方會錯：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>題</th>
+<th>我的答案</th>
+<th>委員會</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>進場價跳空</td>
+<td>「跳空成本由 <code>next_open</code> 自然承擔」</td>
+<td><strong>方向反了</strong>。<code>next_open</code> 不含那段，<code>trigger_close</code> 才含 ⇒ 有樂觀偏誤的是後者。結論（選 <code>next_open</code>）仍對，理由錯</td>
+</tr>
+<tr>
+<td><code>label</code> 副作用</td>
+<td>「對使用者看到的數字零影響」</td>
+<td><strong>不成立</strong>。前端主表一律讀正例／反例分組 ⇒ 套套邏輯會上主畫面</td>
+</tr>
+<tr>
+<td>兩張表並排</td>
+<td>「這是有效的統計比較」</td>
+<td><strong>不是</strong>。沒有信賴區間、報酬序列高度重疊、兩側區間重疊與否也不能回答差是否為 0</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>兩處確認我對</strong>：兩批進場語意不一致是阻斷性缺陷（而且比我說的更嚴重）、期間池我自我推翻是對的。</p>
+<p><strong>四件我完全沒想到</strong>：持有 N 根有兩套時鐘、均線條件連續成立會讓 340 筆其實只是 10 段、
+候選不足時會靜默縮 n、前端隨機對照預設門檻 0.02 與你的裁定衝突。</p>
+<hr />
+<h2 id="十我在偵察那輪自己抓到的三個錯">十、我在偵察那輪自己抓到的三個錯</h2>
 <p>留著給你看，不是自責，是讓你知道哪些地方我容易出錯：</p>
 <ol>
 <li><strong>我原本推薦的做法（掃描時把隨機列混進同一批）是錯的</strong>，在給你看之前查碼才發現被明文擋死。</li>
