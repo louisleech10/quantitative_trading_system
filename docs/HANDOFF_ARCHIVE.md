@@ -409,3 +409,8 @@
 - 2026-09-19：R-5 → `handoffs/reconcile/20260911-splitunify-b12-stamp-r2/synth.md`
 - 2026-09-19：R-5 → commit `fd55d018`
 - 2026-09-19：R-5 → commit `bbf2e331`
+- 2026-09-20：RM-PLAINDOCS → `白話說明/README.md`
+- 2026-09-20：RM-PLAINDOCS → `scripts/plain_docs_shape_check.sh`
+- 2026-09-20：RM-PLAINDOCS → `handoffs/reconcile/20260920-plaindocs-x-review-r1/synth.md`
+- 2026-09-20：RM-PLAINDOCS → `handoffs/reconcile/20260920-plaindocs-x-review-r2/synth.md`
+- 2026-09-20：RM-PLAINDOCS → commit `dd3ca561`

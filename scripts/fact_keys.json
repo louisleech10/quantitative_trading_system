@@ -410,9 +410,9 @@
         "240",
         "RM-PLAINDOCS",
         "白話說明整理（內容跟上最新＋該封存的移 Archived）",
-        "未開工",
+        "已完成",
         "白話說明/README.md",
-        "排序 1-B（使用者 2026-09-20 裁定：EVENTSCAN 方向與做法定案後先做本票，再回頭做 EVENTSCAN 實作）；含監看設定與 HTML 生成同步。SPEC 草稿與判準乾跑已備（乾跑自檢出三處草稿缺陷＋主委索引誤標兩份），待 EVENTSCAN 方向定案即可開票"
+        "根目錄 29 → 7 份；22 份被取代者 git mv 入 Archived（內容不改）。四份核心檔各答一個問題並各有互補維護規則（整段覆蓋／做完刪行／只增不改／只寫結論），由 scripts/plain_docs_shape_check.sh 機械強制（章節白名單＋行數上限，掛 pre-commit 硬擋；三種繞法實測 rc=1）。README 990 → 37 行。🔴 未走完整管線：兩輪審查 23 條後主委判定封存機制之設計成本遠高於效益（僅約 4–5 份可封存），停修 SPEC 改為直接交付；SPEC 與兩輪收斂檔保留於 docs/PLAINDOCS_SPEC.md 與 handoffs/reconcile/20260920-plaindocs-x-review-r{1,2}/"
       ]
     ]
   },

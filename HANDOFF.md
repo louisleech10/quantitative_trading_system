@@ -94,6 +94,10 @@
 - 🔴 **偵察輪的債會擋住一切**：委員債是「一扇門」——開一輪唯讀偵察即擋住**所有**新派工與 `docs/*{SPEC,TODO,PLAN}*.md` 創建（實測 `[GATE BLOCKED] kind=artifact 有 fresh token，但債務帳本重查未通過`）。⇒ 「偵察與另一張票並行」在本專案**做不到**，排程時不要假設可並行。
 - 🔴 **`fact_keys.json` 狀態欄是封閉集合**：`docrot2_status_values` 只有 `未開工／進行中／部分完成／待審／停手／狀態未確認／已完成`。自創值會被 `gen_fact_key_blocks` fail-closed。改完一律跑 `bash scripts/gen_fact_key_blocks.sh --write`。
 - 🔴 **`committee_run --session` 有命名規約**：`<YYYYMMDD>-<epic>-<batch>-<kind>-r<N>`，`kind ∈ {impl, review, stamp, consult, fix}`。偵察輪要用 `consult`（`recon` 會被拒），且 brief 的 `brief-kind` 同樣只收 `review|consult|closure|impl|stamp`；`consult` 另強制 §0 前提宣告至少各一條 `fact-verified:` 與 `assumed:`。
+- 🔴 **`gen_fact_key_blocks.sh` 之 `_fk_root()` 回傳 `.`（相對 cwd）**：自非 repo 根呼叫會誤報 receipt「指向不存在之檔 → fail-closed」，看起來像既有 bug 其實是呼叫方式錯。一律 `GOVB1_FACTKEY_ROOT=<repo 絕對路徑>` 或先在 repo 根。2026-09-20 踩到並一度誤判。
+- 🔴 **`plain_docs_render.sh --check` 之「死連結 0」不涵蓋 md 內相對連結**：它掃的是生成後的 HTML。`git mv` 一批白話檔後，`做過什麼.md` 內五條指向舊路徑的連結全斷而該檢查仍報 0。⇒ 移檔後須另以 `grep -o '](...)' + test -f` 逐條驗。
+- 🔴 **寫新機械閘前先 grep 既有同類閘的檔頭**：2026-09-20 寫 `plain_docs_shape_check.sh` 首版用黑名單（列兩個 emoji），使用者當場指出「換個圖示不就繞過了」。而「黑名單永遠列不完」這條**既寫在 memory 也寫在 `plain_docs_order_check.sh` 檔頭**，我沒回頭看。封閉集合的問法是「內容只能去哪幾個地方」，再逐個堵死。
+- 🔴 **白話檔改職責時，其 WATCHED 必須跟著改**：`現在做到哪.md` 由「GAP-3 即時進度」改為「現在在做哪張票」後，WATCHED 仍是 11 條 GAP-3 實作路徑 ⇒ 任何相關改動都誤報過期。職責與監看集合是一組，改一個就要改另一個。
 
 ## 進行中紀錄
 

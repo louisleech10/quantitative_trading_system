@@ -46,7 +46,7 @@
 | 220 | RM-SEARCH2EVENT | SEARCH2EVENT 搜尋條件→事件批接線（純轉接器）— 已作廢，由 RM-EVENTSCAN 取代 | 停手 | docs/SEARCH2EVENT_SPEC.md §SUPERSEDED | 使用者 2026-09-20 裁定方向重定：七輪 SPEC 皆在解「搬運」，而使用者要的是「條件本身能不能用指標」；實查條件掃描無任何均線／RSI／MACD ⇒ 搬運做完也答不了使用者的問題。v7 六條 finding 全數轉為 RM-EVENTSCAN 之輸入事實 |
 | 225 | RM-EVENTSCAN | EVENTSCAN 條件掃描→持有 N 根報酬 vs 隨機對照報酬（大票，單標的） | 待審 | 白話說明/EVENTSCAN方向與做法.md | 使用者 2026-09-20 裁定之順序：①本票方向與做法定案（現在在此）→ ②RM-PLAINDOCS → ③本票實作。偵察 r1 已收斂（codex+composer 十一條全數採納，handoffs/reconcile/20260920-eventscan-x-consult-r1/synth.md）；白話方向書 v4 已交使用者審閱，依 2026-09-20 裁定「目標／方向／可能做法先討論好再開始 SPEC」。使用者已定六項：持有期用根計算但畫面顯示約幾天、前端直接輸入非勾選、資料源只用 FF 現有欄、完全無門檻、label 用漲跌正負號、順序如上。🔴 待委員會裁定四項（進場價口徑與其量化風險、兩口徑主顯示、label 正負號之統計副作用、隨機抽樣四項修法），未有結論前方向不算定案。做法七步（含欄位選擇器，因該 run 欄名逾 18 萬）。多標的併 GAP-4 |
 | 230 | RM-ICPATH | ICPATH 已完成項兩路支援＋區分＋改正（含盤點） | 未開工 | docs/IC_QUANT_GAP_REGISTRY.md「兩路涵蓋宣告」節 | 排序 3（使用者 2026-09-20 裁定：SEARCH2EVENT 與白話整理完成後，另開新 session 起）；盤點為其規格第一段不另開票，粒度六欄；含邊際 IC 事件型補驗收為其 Task |
-| 240 | RM-PLAINDOCS | 白話說明整理（內容跟上最新＋該封存的移 Archived） | 未開工 | 白話說明/README.md | 排序 1-B（使用者 2026-09-20 裁定：EVENTSCAN 方向與做法定案後先做本票，再回頭做 EVENTSCAN 實作）；含監看設定與 HTML 生成同步。SPEC 草稿與判準乾跑已備（乾跑自檢出三處草稿缺陷＋主委索引誤標兩份），待 EVENTSCAN 方向定案即可開票 |
+| 240 | RM-PLAINDOCS | 白話說明整理（內容跟上最新＋該封存的移 Archived） | 已完成 | 白話說明/README.md | 根目錄 29 → 7 份；22 份被取代者 git mv 入 Archived（內容不改）。四份核心檔各答一個問題並各有互補維護規則（整段覆蓋／做完刪行／只增不改／只寫結論），由 scripts/plain_docs_shape_check.sh 機械強制（章節白名單＋行數上限，掛 pre-commit 硬擋；三種繞法實測 rc=1）。README 990 → 37 行。🔴 未走完整管線：兩輪審查 23 條後主委判定封存機制之設計成本遠高於效益（僅約 4–5 份可封存），停修 SPEC 改為直接交付；SPEC 與兩輪收斂檔保留於 docs/PLAINDOCS_SPEC.md 與 handoffs/reconcile/20260920-plaindocs-x-review-r{1,2}/ |
 <!-- END GENERATED: roadmap-status -->
 
 ### 治理票
