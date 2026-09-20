@@ -11,6 +11,9 @@
 <main>
 <h1 id="治理施工-白話進度日誌">治理施工 — 白話進度日誌</h1>
 <blockquote>
+<p>📌 <strong>2026-09-20（量化主線，治理零擴建）</strong>：本日改的 <code>scripts/fact_keys.json</code> 只是<strong>狀態資料列</strong>（<code>RM-SEARCH2EVENT</code> 轉停手、新增 <code>RM-EVENTSCAN</code>、白話索引補一列），<strong>沒有新增或修改任何治理工具</strong>。本日踩到的三個既有機制邊界只記錄、不改閘：①委員債「一扇門」擋住偵察期間的所有新派工與規格創建 ②<code>fact_keys.json</code> 的狀態欄是封閉集合，自創值會 fail-closed ③<code>committee_run</code> 的 session 命名規約與 brief-kind 都是封閉集合（偵察輪要用 <code>consult</code>）。三條都已寫進交接文件的坑段。</p>
+</blockquote>
+<blockquote>
 <p>📌 <strong>2026-09-15（量化主線，非治理擴建）</strong>：SPLITUNIFY 第 9 批 9.5 修改了 <code>scripts/freeze_splitunify_golden.py</code>——它是<strong>產生量化測試基準檔</strong>的腳本（新增多標的多週期平行組），不是治理工具；治理腳本本日零改動。第 9 批三個任務每批都多跑了「commit 前審碼＋蓋章輪」兩輪，原因記在 <a href="流程摩擦記錄.html">流程摩擦記錄.md</a>。</p>
 </blockquote>
 <blockquote>

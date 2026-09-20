@@ -90,8 +90,16 @@
 - 🔴 **兩端一致這種不變式，預設參數下驗不出來**：`max(深度, 窗)` 與 `窗`、分析副本與匯入原值，在**預設 `event_label_spec`** 下都同值。驗收組合**必須**含一組使用者改過參數（k／h）的真實批，否則綠燈只證明「預設路徑沒壞」。REF:handoffs/run_receipts/splitunify_r5_parity.b23de79e54b5.json
 - 🔴 **mutation 跑錯組合會得到假存活**：處置帳鍵位移一根那條，在 post-trim 剔除為 0 的組合上位移後每一筆仍落在索引內 ⇒ 預測逐字不變，看起來像「對證面有洞」。判準＝該 mutation 改的那個**判定**在該組合上是否真的會被觸發；配剔除 1 筆的組合後當場轉紅。REF:handoffs/run_receipts/splitunify_r5_parity_mutations.json
 - 🔴 **子集跑不得覆寫完整基準**：`--only <組合>` 跑完寫 golden、單條 mutation 跑完覆寫 receipt——兩者都會把其餘組合／條目**刪掉**，而剩下那份看起來完全正常。同型犯了兩次（2026-09-19），已分別改為「子集跑不寫」與「以 id 合併」。
+- 🔴 **SPEC 寫死具體值前必先 grep 對證**：SEARCH2EVENT 同一票內犯三次——不存在的前端路徑 `/case/events/{import_id}`（實為後端 API，前端 404）、錯誤函式簽名 `buildDeclarationPayload(declState)`（實為三參，單參回 null ⇒ 斷言恆綠）、轉述他人碼證時放大後果（codex 給「走 CSV 分支回空列表」，主委寫成「使用者得到成功但空的批」，實際會被 `contract_violation` 拒收）。**派工前逐一 grep 每個識別字**。同型亦適用委員清單：2026-09-20 composer 列 7 個 EMA 週期，自查 manifest 實得 14 個。
+- 🔴 **`committee_run` 未完全退出前不能銷帳**：委員 `.md` 已落檔不代表可銷——`committee_family_result` 由 `cx_run.sh` 結束時才登記，提早跑 `debt_clear` 會得 `ERROR: 家族 <fam> 無 committee_family_result`。判準＝`pgrep -f committee_run` 為空才銷。
+- 🔴 **偵察輪的債會擋住一切**：委員債是「一扇門」——開一輪唯讀偵察即擋住**所有**新派工與 `docs/*{SPEC,TODO,PLAN}*.md` 創建（實測 `[GATE BLOCKED] kind=artifact 有 fresh token，但債務帳本重查未通過`）。⇒ 「偵察與另一張票並行」在本專案**做不到**，排程時不要假設可並行。
+- 🔴 **`fact_keys.json` 狀態欄是封閉集合**：`docrot2_status_values` 只有 `未開工／進行中／部分完成／待審／停手／狀態未確認／已完成`。自創值會被 `gen_fact_key_blocks` fail-closed。改完一律跑 `bash scripts/gen_fact_key_blocks.sh --write`。
+- 🔴 **`committee_run --session` 有命名規約**：`<YYYYMMDD>-<epic>-<batch>-<kind>-r<N>`，`kind ∈ {impl, review, stamp, consult, fix}`。偵察輪要用 `consult`（`recon` 會被拒），且 brief 的 `brief-kind` 同樣只收 `review|consult|closure|impl|stamp`；`consult` 另強制 §0 前提宣告至少各一條 `fact-verified:` 與 `assumed:`。
 
 ## 進行中紀錄
 
 <!-- HISTORY-BEGIN -->
+<!-- ENTRY: RM-SEARCH2EVENT,RM-EVENTSCAN -->
+- 2026-09-20：RM-SEARCH2EVENT → `docs/SEARCH2EVENT_SPEC.md`
+- 2026-09-20：RM-EVENTSCAN → `白話說明/EVENTSCAN方向與做法.md`
 <!-- HISTORY-END -->
