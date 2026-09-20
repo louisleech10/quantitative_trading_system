@@ -138,7 +138,62 @@
 </tr>
 </tbody>
 </table></div>
-<h3 id="第-2-步你選持有期可以複選">第 2 步：你選持有期（可以複選）</h3>
+<hr />
+<h4 id="-那你怎麼知道有哪些欄位名字怎麼拼你-2026-09-20-提問">🔴 那你怎麼知道有哪些欄位、名字怎麼拼？（你 2026-09-20 提問）</h4>
+<p><strong>這是真問題。光這一個 run 就有 18 萬個以上的欄名</strong>（實查：<code>close_1h_</code> 開頭的就有 32,747 個），
+平鋪一張清單給你完全沒用。</p>
+<p><strong>好消息是欄名完全有結構</strong>：</p>
+<pre><code>close_1h_trend_EMA_5
+ │     │    │     │  └ 參數（5）
+ │     │    │     └ 指標（EMA）
+ │     │    └ 類別（trend）
+ │     └ 週期（1h）
+ └ 來源欄（close）
+</code></pre>
+<p>實查這個 run 的五個層級各有什麼：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>層級</th>
+<th>有哪些（實查）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>來源欄</td>
+<td><code>close</code>、<code>volume</code>、<code>hlc</code>、<code>hl</code>、<code>tr</code>、<code>ms</code></td>
+</tr>
+<tr>
+<td>週期</td>
+<td><code>1h</code>、<code>12h</code>（這個 run 同時有兩個週期）</td>
+</tr>
+<tr>
+<td>類別</td>
+<td><code>trend</code>、<code>momentum</code>、<code>statistics</code>、<code>Lag</code>…</td>
+</tr>
+<tr>
+<td>指標</td>
+<td>見上面的家族表</td>
+</tr>
+<tr>
+<td>參數</td>
+<td>每個指標各自的週期數，例如 EMA 有 14 個</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>為什麼會到 18 萬</strong>：因為還有兩兩組合的衍生欄，例如
+<code>close_12h_momentum_CMO_13_144_Cross</code>（CMO13 與 CMO144 的交叉）、<code>..._Ratio</code>（比值）。</p>
+<p><strong>所以畫面要這樣做</strong>（這是本票要新做的東西）：</p>
+<ol>
+<li><strong>逐層下拉</strong>：選來源欄 → 選週期 → 選類別 → 選指標 → 選參數。每一層只有幾個到幾十個選項，
+選完自動把正確欄名填進條件式。<strong>你永遠不用自己拼字串。</strong></li>
+<li><strong>打字搜尋</strong>：想直接打 <code>EMA</code> 就跳出所有含 EMA 的欄位，選一個貼進去。</li>
+<li><strong>打錯要報錯</strong>：現在系統找不到欄位時<strong>直接判「條件不成立」</strong>，你會看到「零筆命中」而不是錯誤訊息
+（缺口 2）。本票會改成明確報錯並告訴你最接近的欄名。</li>
+</ol>
+<p><strong>現況</strong>：後端已經有 <code>GET /api/v1/ic/features/list</code>（給 標的＋週期＋run識別碼，回該 run 的全部欄名），
+前端也有呼叫它的程式（<code>fetchAvailableFeatures</code>）。<strong>缺的是上面這三件事</strong>——現在只能拿到一整包平鋪清單。</p>
+<h3 id="第-2-步你輸入持有期">第 2 步：你輸入持有期</h3>
 <p>你 2026-09-20 裁定：<strong>用「根」計算，但畫面要顯示大約幾天；而且要支援複選</strong>。</p>
 <p>所以畫面會長這樣（示意）：</p>
 <pre><code>持有期（直接輸入，逗號分隔，要幾個都行）
@@ -188,30 +243,22 @@
 <pre><code>報酬 = (出場那根的收盤價 − 進場價) / 進場價
 </code></pre>
 <p>做空會反號。資料不夠長的事件（例如最後 55 根之內的觸發點算不出 55 根報酬）<strong>直接排除，不會灌 0 拉低平均</strong>。</p>
-<p>🔴 <strong>「進場價」有兩種算法，這件事要先講定</strong>（codex 2026-09-20 查出）：</p>
-<div class="table-wrap"><table>
-<thead>
-<tr>
-<th>口徑</th>
-<th>進場價是什麼</th>
-<th>白話</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>ret_entry</code></td>
-<td>依設定的「進場語意」取價（預設＝觸發那根的<strong>收盤價</strong>）</td>
-<td>「條件成立那根收盤時買進」</td>
-</tr>
-<tr>
-<td><code>ret_label_anchor</code></td>
-<td>一律用觸發那根的收盤價當基準</td>
-<td>固定基準，不隨設定變</td>
-</tr>
-</tbody>
-</table></div>
-<p>兩個算出來的平均<strong>都合法，但不是同一件事</strong>。如果不講清楚用哪個，觸發批跟隨機批可能各用一個口徑去比，數字會失真。</p>
-<p><strong>我的建議</strong>：兩批一律用同一個口徑，並在畫面上標出來是哪個。這條要寫進規格鎖死。</p>
+<p>🔴 <strong>進場價用哪一根、哪個價——這一條交委員會，還沒定案。</strong></p>
+<p><strong>你的想法</strong>（2026-09-20）：用條件成立那根的<strong>下一根開盤價</strong>（系統裡叫 <code>next_open</code>）。
+你同時聲明：這只是想法，沒深入評估是否有風險、統計數據或量化金融計算上的誤區。</p>
+<p><strong>我查到的現況</strong>：<code>next_open</code> 系統已經支援——實查 <code>momentum/Analysis/event_samples/alignment.py:102-106</code>，
+取 <code>t0_idx + 1</code> 那根的 <code>open</code>，資料不夠（t0 是最後一根）就標 <code>missing_bar</code> 排除。
+五個可選值為 <code>trigger_open</code>／<code>trigger_close</code>／<code>next_open</code>／<code>decision_bar_open</code>／<code>decision_bar_close</code>。</p>
+<p><strong>我為什麼覺得你的直覺有道理</strong>：條件要用到 t0 那根的收盤價才算得出來（EMA 是收盤價算的）。
+如果進場價用 t0 的收盤價，等於假設「收盤瞬間同時算完指標並成交」。
+用下一根的開盤價比較接近真的買得到的價格。</p>
+<p><strong>但這正是要交委員會的原因</strong>——我不是量化金融專家，下面幾件事我沒有能力自己判斷：
+跳空風險怎麼處理、不同選擇會不會讓報酬統計產生系統性偏誤、
+隨機對照批是否必須用完全相同的進場語意、事件研究的標準做法是什麼。
+<strong>這一條在委員會給出結論前不算定案。</strong></p>
+<p>另外系統有一個並列揭露的口徑 <code>ret_label_anchor</code>（一律以 t0 收盤價為基準，不隨設定變），
+codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批與隨機批一律用同一個，且畫面標明是哪個</strong>，
+否則兩批各用一個去比，數字會失真。</p>
 <p>你要的是「<strong>統計數據</strong>」，不只是一個平均值。所以每個持有期都給這幾個（示意數字，非實測）：</p>
 <p><strong>觸發批</strong></p>
 <div class="table-wrap"><table>
@@ -484,6 +531,11 @@
 <td><strong>統計欄位差兩個</strong></td>
 <td>現成的有筆數／平均／中位數／勝率／信賴區間；<strong>標準差</strong>與<strong>最好／最差</strong>沒有，要加（實查 <code>tables.py:118-131</code>）</td>
 </tr>
+<tr>
+<td>6</td>
+<td><strong>沒有欄位選擇器</strong></td>
+<td>這個 run 有 18 萬個以上欄名，後端能回清單但前端只能拿到一整包平鋪的。<strong>沒有逐層下拉＋搜尋，你寫不出條件</strong></td>
+</tr>
 </tbody>
 </table></div>
 <h4 id="缺口-4-細項四項都要修">缺口 4 細項（四項都要修）</h4>
@@ -519,10 +571,11 @@
 </tbody>
 </table></div>
 <hr />
-<h2 id="五做法六步">五、做法：六步</h2>
+<h2 id="五做法七步">五、做法：七步</h2>
 <ol>
 <li><strong>條件引擎吃 FF 欄位</strong>——把讀到的特徵表欄位名註冊給條件引擎，讓你能寫 <code>close_1h_trend_EMA_5 &gt; close_1h_trend_EMA_10</code>。<strong>並且欄名打錯要報錯，不能靜默回零命中</strong></li>
-<li><strong>掃描函式接上 API</strong>——條件 → 事件批 → 匯入</li>
+<li><strong>欄位選擇器</strong>——逐層下拉（來源欄→週期→類別→指標→參數）＋打字搜尋。<strong>沒有這個你根本沒辦法從 18 萬個欄名裡挑出要的</strong></li>
+<li><strong>掃描函式接上 API</strong>——條件 → 事件批 → 匯入（<code>label</code> 用漲跌正負號填，進場價用 <code>next_open</code>）</li>
 <li><strong>報酬表補兩個統計量</strong>——加上<strong>標準差</strong>與<strong>最好／最差</strong></li>
 <li><strong>產隨機對照批</strong>——走既有端點，<strong>修掉缺口 4 的四項</strong></li>
 <li><strong>比較端點改成比報酬</strong>——現在只讀 label 算達標率，要改成讀報酬表並排全部統計量</li>
@@ -571,6 +624,18 @@
 </tr>
 <tr>
 <td>4</td>
+<td><strong>接受「內部用漲跌正負號當 <code>label</code>」</strong>——走既有管線，保住未來資料防護</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>進場價傾向用下一根開盤價</strong>（<code>next_open</code>）——但你聲明這只是想法、沒深入評估風險與統計誤區，<strong>交委員會討論</strong>（見第七節）</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>順序＝本票方向與做法定案 → 白話文檔整理 → 才做本票實作</strong></td>
+</tr>
+<tr>
+<td>7</td>
 <td>先看完整白話文檔＋舉例，才決定放不放行</td>
 </tr>
 </tbody>
@@ -582,29 +647,39 @@
 <tr>
 <th>#</th>
 <th>問題</th>
-<th>我的建議</th>
+<th>誰決定、怎麼決定</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>1</td>
-<td><strong>要不要接受「內部用漲跌正負號當 <code>label</code>」？</strong></td>
-<td>建議接受（見第三節第 4 步）。它不需要你設任何數字、畫面不出現門檻欄位，而且保住所有未來資料防護。替代方案是另建一條沒護網的平行路徑</td>
+<td>🔴 <strong>進場價用哪一根、哪個價？</strong></td>
+<td><strong>交委員會</strong>（你 2026-09-20 指定）。要問的是：<code>next_open</code> 有沒有風險或統計誤區、跳空怎麼處理、不同選擇會不會讓報酬產生系統性偏誤、隨機對照批是否必須用相同語意、事件研究的標準做法。<strong>這一條沒結論就不算定案</strong></td>
 </tr>
 <tr>
 <td>2</td>
-<td><strong>報酬的「進場價」用哪個口徑？</strong></td>
-<td>兩批一律用同一個並在畫面標出來。這是技術參數，我跟委員定</td>
+<td><strong><code>ret_entry</code> 與 <code>ret_label_anchor</code> 主顯示哪個？</strong></td>
+<td>併入第 1 題一起問委員會（兩題同源）</td>
 </tr>
 <tr>
 <td>3</td>
-<td><strong>多標的什麼時候做？</strong></td>
-<td>你已裁定先做單標的，多標的併 GAP-4。本票只做單標的</td>
+<td><strong><code>label</code> 用漲跌正負號，統計上有沒有問題？</strong></td>
+<td>你已接受這個做法，但併入委員會一起檢查有無副作用（例如它會不會讓某些既有的表算出誤導性的數字）</td>
 </tr>
 <tr>
 <td>4</td>
-<td><strong>這張票排在白話文檔整理之前還是之後？</strong></td>
-<td>我建議整理排前面（你現在看不懂文檔，而新流程要你看白話方向書才放行——決策介面得先能用）</td>
+<td><strong>隨機對照抽樣的四項修法怎麼做才對？</strong></td>
+<td>併入委員會。特別是「樣本之間不得重疊」這條——重疊會讓有效樣本數虛高，統計檢定會過度樂觀</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>欄位選擇器要做到多細？</strong></td>
+<td>建議逐層下拉（五層）＋打字搜尋兩者都做，見第三節第 1 步。兩者都不做的話你根本沒辦法寫條件。這題偏介面，等你一句話</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>多標的什麼時候做？</strong></td>
+<td>你已裁定先做單標的，多標的併 GAP-4。本票只做單標的</td>
 </tr>
 </tbody>
 </table></div>
@@ -612,6 +687,15 @@
 <h2 id="八這張票多大">八、這張票多大</h2>
 <p><strong>大票</strong>——命中「跨模組／共用路徑」，會動到條件掃描、事件匯入、報酬計算、比較端點、前端五個地方。</p>
 <p>依規矩要走完整流程：規格 → 施工清單 → 兩家委員對抗審查 → 實作 → 審碼 → 收斂。</p>
+<h3 id="做的順序你-2026-09-20-裁定">做的順序（你 2026-09-20 裁定）</h3>
+<pre><code>① 本票的方向與做法定案   ← 現在在這裡
+     ├─ 委員會回答第七節的量化問題（進場價口徑等）
+     └─ 你確認最終版方向說明
+② 白話文檔整理（中票）    ← 定案後先做這個
+③ 本票實作               ← 規格 → 施工清單 → 審查 → 實作
+</code></pre>
+<p><strong>為什麼白話整理插在中間</strong>：本票是大票、會跑很多輪，期間會長出一批新的白話文檔。
+文檔結構還亂的時候先跑大票，等於讓問題擴大再收。先把索引與封存整理好，本票的文件就照規則進去。</p>
 <hr />
 <h2 id="九我在這輪自己抓到的三個錯">九、我在這輪自己抓到的三個錯</h2>
 <p>留著給你看，不是自責，是讓你知道哪些地方我容易出錯：</p>

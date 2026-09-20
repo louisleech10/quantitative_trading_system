@@ -44,9 +44,9 @@
 | 200 | RM-GLOBALH | GLOBALH 多 horizon 全算＋逐列標 h／k＋可篩（中票） | 未開工 | 白話說明/接下來要做的票.md | 排序 4（委員會共識：與 ICPATH 分開、排其後，理由＝兩者資料層不同，合併會返工） |
 | 210 | RM-DOCROT | DOCROT 文檔多輪根因（治理） | 已完成 | handoffs/reconcile/20260912-docrot-x-consult-r3/synth.md | — |
 | 220 | RM-SEARCH2EVENT | SEARCH2EVENT 搜尋條件→事件批接線（純轉接器）— 已作廢，由 RM-EVENTSCAN 取代 | 停手 | docs/SEARCH2EVENT_SPEC.md §SUPERSEDED | 使用者 2026-09-20 裁定方向重定：七輪 SPEC 皆在解「搬運」，而使用者要的是「條件本身能不能用指標」；實查條件掃描無任何均線／RSI／MACD ⇒ 搬運做完也答不了使用者的問題。v7 六條 finding 全數轉為 RM-EVENTSCAN 之輸入事實 |
-| 225 | RM-EVENTSCAN | EVENTSCAN 條件掃描→持有 N 根報酬 vs 隨機對照報酬（大票，單標的） | 待審 | 白話說明/EVENTSCAN方向與做法.md | 排序 1。偵察 r1 已收斂（codex+composer 十一條全數採納，handoffs/reconcile/20260920-eventscan-x-consult-r1/synth.md）；白話方向書已交使用者審閱，依 2026-09-20 裁定「目標／方向／可能做法先討論好再開始 SPEC」，放行後才進 SPEC。已定：持有期用根計算但畫面顯示約幾天且輸入輸出皆複選；資料源只用 FF 現有欄。多標的併 GAP-4 |
+| 225 | RM-EVENTSCAN | EVENTSCAN 條件掃描→持有 N 根報酬 vs 隨機對照報酬（大票，單標的） | 待審 | 白話說明/EVENTSCAN方向與做法.md | 使用者 2026-09-20 裁定之順序：①本票方向與做法定案（現在在此）→ ②RM-PLAINDOCS → ③本票實作。偵察 r1 已收斂（codex+composer 十一條全數採納，handoffs/reconcile/20260920-eventscan-x-consult-r1/synth.md）；白話方向書 v4 已交使用者審閱，依 2026-09-20 裁定「目標／方向／可能做法先討論好再開始 SPEC」。使用者已定六項：持有期用根計算但畫面顯示約幾天、前端直接輸入非勾選、資料源只用 FF 現有欄、完全無門檻、label 用漲跌正負號、順序如上。🔴 待委員會裁定四項（進場價口徑與其量化風險、兩口徑主顯示、label 正負號之統計副作用、隨機抽樣四項修法），未有結論前方向不算定案。做法七步（含欄位選擇器，因該 run 欄名逾 18 萬）。多標的併 GAP-4 |
 | 230 | RM-ICPATH | ICPATH 已完成項兩路支援＋區分＋改正（含盤點） | 未開工 | docs/IC_QUANT_GAP_REGISTRY.md「兩路涵蓋宣告」節 | 排序 3（使用者 2026-09-20 裁定：SEARCH2EVENT 與白話整理完成後，另開新 session 起）；盤點為其規格第一段不另開票，粒度六欄；含邊際 IC 事件型補驗收為其 Task |
-| 240 | RM-PLAINDOCS | 白話說明整理（內容跟上最新＋該封存的移 Archived） | 未開工 | 白話說明/README.md | 排序 2（使用者 2026-09-20 裁定，排在 SEARCH2EVENT 之後、ICPATH 之前）；含監看設定與 HTML 生成同步 |
+| 240 | RM-PLAINDOCS | 白話說明整理（內容跟上最新＋該封存的移 Archived） | 未開工 | 白話說明/README.md | 排序 1-B（使用者 2026-09-20 裁定：EVENTSCAN 方向與做法定案後先做本票，再回頭做 EVENTSCAN 實作）；含監看設定與 HTML 生成同步。SPEC 草稿與判準乾跑已備（乾跑自檢出三處草稿缺陷＋主委索引誤標兩份），待 EVENTSCAN 方向定案即可開票 |
 <!-- END GENERATED: roadmap-status -->
 
 ### 治理票
