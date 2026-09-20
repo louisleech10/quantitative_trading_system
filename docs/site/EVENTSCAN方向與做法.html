@@ -260,7 +260,8 @@
 codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批與隨機批一律用同一個，且畫面標明是哪個</strong>，
 否則兩批各用一個去比，數字會失真。</p>
 <p>你要的是「<strong>統計數據</strong>」，不只是一個平均值。所以每個持有期都給這幾個（示意數字，非實測）。</p>
-<p>🔴 <strong>只有「全體」一組</strong>——委員會 2026-09-20 裁定：不得顯示「正例組／反例組」，那在本票的 <code>label</code> 定義下是套套邏輯（見 7-2）。
+<p>🔴 <strong>你輸入的每一個持有期都是完整的一列</strong>——不是只算綁 <code>label</code> 的那一個（見 7-11）。
+🔴 <strong>只有「全體」一組</strong>——委員會 2026-09-20 裁定：不得顯示「正例組／反例組」，那在本票的 <code>label</code> 定義下是套套邏輯（見 7-2）。
 🔴 <strong>筆數是「每段連續成立算一次」</strong>，不是每根都算（見 7-4）。</p>
 <p><strong>觸發批</strong></p>
 <div class="table-wrap"><table>
@@ -588,18 +589,19 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tbody>
 </table></div>
 <hr />
-<h2 id="五做法九步">五、做法：九步</h2>
-<p>（原本七步；委員會 2026-09-20 挖出兩件我沒算進去的工作，見第七節）</p>
+<h2 id="五做法十步">五、做法：十步</h2>
+<p>（原本七步；委員會挖出兩件、你追問挖出一件，皆 2026-09-20，見第七節）</p>
 <ol>
 <li><strong>條件引擎吃 FF 欄位</strong>——把讀到的特徵表欄位名註冊給條件引擎，讓你能寫 <code>close_1h_trend_EMA_5 &gt; close_1h_trend_EMA_10</code>。<strong>並且欄名打錯要報錯，不能靜默回零命中</strong></li>
 <li><strong>欄位選擇器</strong>——逐層下拉（來源欄→週期→類別→指標→參數）＋打字搜尋。<strong>沒有這個你根本沒辦法從 18 萬個欄名裡挑出要的</strong></li>
-<li><strong>掃描函式接上 API</strong>——條件 → 事件批 → 匯入（<code>label</code> 用漲跌正負號填，進場價用 <code>next_open</code>）</li>
+<li><strong>掃描函式接上 API</strong>——條件 → 事件批 → 匯入（<code>label</code> 用漲跌正負號填、<strong>綁最長持有期</strong>，進場價用 <code>next_open</code>）</li>
 <li>🔴 <strong>統一「持有 N 根」的時鐘</strong>——鎖定「從成交那根起算」，並讓 <code>label</code> 與報酬表用同一個出場根（現在差一根，見 7-3）</li>
 <li>🔴 <strong>連續成立只進場一次</strong>（first-of-run）——否則 340 筆可能只是 10 段趨勢（見 7-4）</li>
 <li><strong>報酬表補兩個統計量</strong>——加上<strong>標準差</strong>與<strong>最好／最差</strong></li>
 <li><strong>產隨機對照批</strong>——進場語意／出場錨／持有期集合<strong>由觸發批帶入</strong>，並修掉抽樣四項（見 7-6、7-7）</li>
 <li><strong>比較端點改成比報酬</strong>——現在只讀 label 算達標率；並加上 Δ 的時間塊／群集 bootstrap 區間（見 7-5）</li>
 <li><strong>前端</strong>——掃描設定畫面（持有期<strong>直接輸入</strong>、即時顯示約幾天）＋ 兩組統計並排的表＋<strong>硬性橫幅</strong>（無區間時不得讀成會賺）</li>
+<li>🔴 <strong>事件版的「成本歸零點」</strong>——現行 breakeven 建在因子報酬序列上（有換手率），事件報酬沒有換手率概念，要改寫成 <code>平均報酬 × 10000 ÷ 來回腿數</code>（見 7-12）</li>
 </ol>
 <h3 id="兩條我查過確定不走的路">兩條我查過、確定不走的路</h3>
 <div class="table-wrap"><table>
@@ -660,6 +662,10 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 <tr>
 <td>8</td>
+<td><strong>成本：主數字不扣，但要顯示「成本歸零點」（breakeven）</strong></td>
+</tr>
+<tr>
+<td>9</td>
 <td>先看完整白話文檔＋舉例，才決定放不放行</td>
 </tr>
 </tbody>
@@ -794,12 +800,12 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 <tr>
 <td>2</td>
 <td><strong>多持有期時 <code>label</code> 綁哪一個</strong></td>
-<td>委員會建議綁一個「主持有期」，其他持有期不做 label 衍生的推論。<strong>這題要你選主持有期</strong>，或授權我跟委員定</td>
+<td>✅ <strong>已解</strong>：綁<strong>最長的那個</strong>。理由見 7-11</td>
 </tr>
 <tr>
 <td>3</td>
 <td><strong>成本：主數字扣不扣？要不要加 breakeven 欄？</strong></td>
-<td>我建議「主數字不扣＋加 breakeven 欄＋揭露三項算不進去的」，見 7-9。等你一句話</td>
+<td>✅ <strong>已定</strong>（你 2026-09-20）：主數字不扣＋<strong>加 breakeven 欄</strong>＋揭露三項算不進去的。見 7-9、7-12</td>
 </tr>
 <tr>
 <td>4</td>
@@ -808,6 +814,71 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 </tbody>
 </table></div>
+<h3 id="7-11-輸入多個持有期但-label-只綁一個其他不就白輸入了你-2026-09-20-提問">7-11 🔴「輸入多個持有期但 <code>label</code> 只綁一個，其他不就白輸入了？」（你 2026-09-20 提問）</h3>
+<p><strong>不是白輸入。這是我上一版沒講清楚，現在補上。</strong></p>
+<p><strong>報酬表對你輸入的每一個持有期，都算一整列完整統計</strong>——平均／中位數／勝率／標準差／最好／最差／成本歸零點。
+輸入 <code>5, 10, 30, 55</code> 就是<strong>四列，每列都完整</strong>。</p>
+<p>🔴 <strong><code>label</code> 綁哪個持有期，不影響這四列的任何數字</strong>——實查 <code>momentum/Analysis/event_samples/tables.py:118-131</code>，
+算這些統計的函式（<code>_weighted_stats</code>）<strong>根本不讀 <code>label</code></strong>。</p>
+<p><strong>那 <code>label</code> 到底影響什麼？三件你看不到的事</strong>：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>影響</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>通過匯入契約</td>
+<td>純形式要求，契約規定每筆必須有 0 或 1</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>隔離區寬度</strong></td>
+<td>防止未來資料洩漏的緩衝帶，寬度由它決定（實查 <code>ic_filter_orchestrator.py:1211</code>：<code>label_window_rows</code> 抬 purge）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>隨機對照的候選資格</strong></td>
+<td>哪些 K 線有足夠的後續資料可以當對照</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>所以這題有唯一正確答案，不需要你選：綁「最長的那個」。</strong></p>
+<p>理由是第 2、3 點——<strong>隔離區和候選資格必須夠寬到涵蓋你要看的最長持有期</strong>。
+若綁 5 而你在看 55，那 55 那一列的防護只有 5 根寬，<strong>不夠</strong>；綁 55 則四列都安全。
+這也正是委員說的「候選資格應該用 <code>max(持有期)</code>」。</p>
+<h3 id="7-12-breakeven-現在在哪三條路都能用嗎你-2026-09-20-提問">7-12 breakeven 現在在哪？三條路都能用嗎？（你 2026-09-20 提問）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>路徑</th>
+<th>現況（實查）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>全域序列型 IC</strong></td>
+<td>✅ <strong>有，且前端已在顯示</strong>。<code>frontend/src/components/ic-analysis/NetICChart.tsx</code> 掛在 <code>/ic-analysis</code>，三個鍵 <code>breakeven_cost_bps</code>／<code>profitable_after_cost</code>／<code>net_factor_return</code>。但<strong>預設關閉</strong>（<code>cost_enabled = False</code>）</td>
+</tr>
+<tr>
+<td><strong>事件型 IC</strong></td>
+<td>❌ <strong>沒有</strong>。事件路徑不產生「因子報酬序列」，而現行 breakeven 公式建在那個序列上</td>
+</tr>
+<tr>
+<td><strong>本票（EVENTSCAN）</strong></td>
+<td>❌ <strong>沒有，要新做</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>要誠實講</strong>：現行公式是 <code>毛報酬 ÷ 換手率</code>，那是<strong>因子擇時多空</strong>的語意——每期調倉、有換手率。</p>
+<p><strong>事件報酬沒有「換手率」這個概念</strong>——每個事件就是一次進場、一次出場，一趟來回。所以公式要重寫，但<strong>更簡單</strong>：</p>
+<pre><code>成本歸零點(bps) = 平均報酬 × 10000 ÷ 來回腿數
+</code></pre>
+<p>⇒ <strong>不是現成可用，但是小工作</strong>，概念直接對應。已列入做法第 10 步。</p>
 <h3 id="7-9-手續費與滑點要不要算你-2026-09-20-提問">7-9 手續費與滑點要不要算？（你 2026-09-20 提問）</h3>
 <p><strong>業界做法分三層，答案不一樣</strong>：</p>
 <div class="table-wrap"><table>
