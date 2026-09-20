@@ -68721,3 +68721,60 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "6d2fd379-5b8b-48bf-8f00-3aada81d71a3", "cli_rc": "0", "event": "committee_family_result", "event_id": "343a8d8a-bb29-4006-bfb2-41701725d123", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-eventscan-x-consult-r2-codex.md", "output_sha256": "fd95062c89ac39bbbb30deebd1e5d06f7314b52c821678fdd89aad36d3133001", "producer": "audit_append.sh", "result_state": "success", "round_id": "f3aa7e47-a9ef-49e1-a294-020dd28ef9be", "schema_version": 1, "sequence": 5382, "ts": "2026-09-20T11:35:41Z"}
 {"actor": "debt_clear", "brief_kind": "consult", "canonical_count": 14, "category_counts": {"code-contract": 11, "doc-sync": 0, "format-reject": 0, "other": 3}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "eac7d840-c894-44d2-83b0-7c464a4d8a88", "handoff_tree_commit": "586fce5676ce9be8c3d39bf429f958cfaead783b", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "f3aa7e47-a9ef-49e1-a294-020dd28ef9be", "round_open_sequence": 5380, "schema_version": 1, "sequence": 5383, "session_name": "20260920-eventscan-x-consult-r2", "stamps": [], "task_id": "20260920-EVENTSCAN-X-CONSULT-R2", "ts": "2026-09-20T11:39:58Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "5d37d5e4-fd66-4231-a186-5407543d7304", "lock_sha256": "34206620a46b70e4669f9cd080a07d8f28ff2f56fbb5b6b59f568bbe079e31bc", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "f3aa7e47-a9ef-49e1-a294-020dd28ef9be", "schema_version": 1, "sequence": 5384, "session_id": "20260920-eventscan-x-consult-r2", "synth_sha256": "662e6a121df988399471da8856bdf42e896ef5c9723a4860b8e955e853e5ce0e", "ts": "2026-09-20T11:39:58Z"}
+=== 2026-09-20 20:56:03 | artifact ===
+  ts=2026-09-20 20:56:03
+  kind=artifact
+  intent=
+  risk=
+  facts_asked=
+  review_role=
+  template=
+  adversarial=
+  reconcile=
+  file=docs/PLAINDOCS_SPEC.md
+  template_opened=templates/SPEC_TEMPLATE.md
+  sections=§RISK=filled; §A=filled; §C=filled; §P=filled; §V=filled; §R=filled; §N=filled; §G=N/A:RISK-HIT none,不碰數值/ML,已於 §N 登記
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260920-plaindocs-x-review-r1-codex.md", "output_sha256": "pending", "task_id": "20260920-PLAINDOCS-X-REVIEW-R1", "ts": "2026-09-20T13:00:02Z"}
+=== 2026-09-20 21:00:02 | dispatch ===
+  ts=2026-09-20 21:00:02
+  kind=dispatch
+  intent=PLAINDOCS SPEC 對抗審查 r1：封存判準是否真的機械可導出（唯讀）
+  risk=low
+  facts_asked=三值判準是否互斥窮盡且 24 份求值與乾跑一致／permanent 是否需人判斷／四 Phase 依賴方向／mutation 是否假存活／四條 assumed／可否凍結／你認為還該問的
+  review_role=spec-adversarial
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  adversarial=waived:本輪即 adversarial 本體，唯讀不產生變更
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260920-PLAINDOCS-X-REVIEW-R1", "ts": "2026-09-20T13:00:08Z"}
+=== 2026-09-20 21:00:08 | dispatch ===
+  ts=2026-09-20 21:00:08
+  kind=dispatch
+  intent=PLAINDOCS SPEC 對抗審查 r1：封存判準是否真的機械可導出（唯讀）
+  risk=low
+  facts_asked=三值判準是否互斥窮盡且 24 份求值與乾跑一致／permanent 是否需人判斷／四 Phase 依賴方向／mutation 是否假存活／四條 assumed／可否凍結／你認為還該問的
+  review_role=spec-adversarial
+  template=templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md
+  adversarial=waived:本輪即 adversarial 本體，唯讀不產生變更
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260920-PLAINDOCS-X-REVIEW-R1-BRIEF.md", "brief_sha256": "428658180089a9cc9c338760e0dd05bf95f2da22f151719a87930407c3169ea8", "brief_sha256_norm": "428658180089a9cc9c338760e0dd05bf95f2da22f151719a87930407c3169ea8", "event": "committee_round_open", "event_id": "2d5f268d-c5a4-4686-9a59-0aba2666bfb9", "expected_outputs": {"codex": "handoffs/20260920-plaindocs-x-review-r1-codex.md", "composer": "handoffs/20260920-plaindocs-x-review-r1-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "schema_version": 1, "sequence": 5385, "session_name": "20260920-plaindocs-x-review-r1", "task_id": "20260920-PLAINDOCS-X-REVIEW-R1", "ts": "2026-09-20T13:00:16Z"}
+{"actor": "cx_run", "attempt_id": "004523db-6324-4e5d-aff0-610aaa5f980f", "cli_rc": "0", "event": "committee_family_result", "event_id": "69be21b5-87f8-404e-b943-4ea0aaa89c7e", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r1-composer.md", "output_sha256": "88f833041ec3a75928c896e2ac4e0019b92ad84195a01522c189f1868175a21b", "producer": "audit_append.sh", "result_state": "success", "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "schema_version": 1, "sequence": 5386, "ts": "2026-09-20T13:10:24Z"}
+{"actor": "gate", "blocked_by": ["COMPOSER-R65-P1-01", "COMPOSER-R65-P1-02", "COMPOSER-R65-P1-03", "COMPOSER-R65-P1-04", "COMPOSER-R65-P1-05"], "closed": [], "event": "committee_output", "event_id": "e86b90c5-0220-41ec-8711-b2e65ff50648", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r1-composer.md", "output_sha256": "88f833041ec3a75928c896e2ac4e0019b92ad84195a01522c189f1868175a21b", "producer": "audit_append.sh", "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "schema_version": 1, "sequence": 5387, "task_id": "20260920-PLAINDOCS-X-REVIEW-R1", "ts": "2026-09-20T13:10:25Z", "verdict": "blocked"}
+{"actor": "cx_run", "attempt_id": "e43f3d8b-2cde-40e5-b58d-f0e6d8f9c84d", "cli_rc": "0", "event": "committee_family_result", "event_id": "37c82607-4818-46a2-9d1a-85a098206f56", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r1-codex.md", "output_sha256": "c0619e27c728daee7cf75a1f3ef0dea543e0b75a1e924dd4ef50403658c9f661", "producer": "audit_append.sh", "result_state": "success", "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "schema_version": 1, "sequence": 5388, "ts": "2026-09-20T13:29:14Z"}
+{"actor": "gate", "blocked_by": ["CODEX-R65-P1-01", "CODEX-R65-P1-02", "CODEX-R65-P1-03", "CODEX-R65-P1-04", "CODEX-R65-P1-05"], "closed": [], "event": "committee_output", "event_id": "cd5930b8-4df6-4fff-8052-822c40e8ec82", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260920-plaindocs-x-review-r1-codex.md", "output_sha256": "c0619e27c728daee7cf75a1f3ef0dea543e0b75a1e924dd4ef50403658c9f661", "producer": "audit_append.sh", "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "schema_version": 1, "sequence": 5389, "task_id": "20260920-PLAINDOCS-X-REVIEW-R1", "ts": "2026-09-20T13:29:14Z", "verdict": "blocked"}
+{"actor": "debt_clear", "brief_kind": "review", "canonical_count": 14, "category_counts": {"code-contract": 3, "doc-sync": 11, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "84bdb21a-3c79-46b1-90d3-977085c62b2f", "handoff_tree_commit": "4a9baba5df89c245ac4fdc976701f320a8b06a34", "mismatch_count": 4, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "round_open_sequence": 5385, "schema_version": 1, "sequence": 5390, "session_name": "20260920-plaindocs-x-review-r1", "stamps": [], "task_id": "20260920-PLAINDOCS-X-REVIEW-R1", "ts": "2026-09-20T13:36:09Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "6972e4eb-cc8e-48cf-94b0-88ac50347dc4", "lock_sha256": "e9d746ca5c66ea18871f7a8cfef09a85c745b1e7e2b36594b4af2026afa3241b", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "39953c48-eba2-446c-9296-72e4c5e585a8", "schema_version": 1, "sequence": 5391, "session_id": "20260920-plaindocs-x-review-r1", "synth_sha256": "2cd284ec126c6360859b344a0456fba4d1e20e614581413c2931517c33b027f6", "ts": "2026-09-20T13:36:10Z"}

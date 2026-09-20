@@ -67,6 +67,16 @@ _watched_for() {
     第*批-*.md)                       echo "scripts/ docs/GOV tests/governance/" ;;
     "README.md"|"治理進度日誌.md"|"流程摩擦記錄.md"|"接下來要做什麼.md")
                                       echo "scripts/ docs/GOV tests/governance/" ;;
+    # 2026-09-20 補登：此二檔長期無 WATCHED（fail-closed），由 PLAINDOCS SPEC 審查 r1
+    #   之 CODEX-R65-P2-06 抓出。`接下來要做的票.md` 為跨票導航（同 接下來要做什麼.md）；
+    #   `EVENTSCAN方向與做法.md` 盯其所描述之三處實作面與 ROADMAP 狀態來源。
+    "接下來要做的票.md")             echo "docs/ROADMAP.md docs/IC_QUANT_GAP_REGISTRY.md" ;;
+    "EVENTSCAN方向與做法.md")        echo "momentum/Analysis/event_samples/ momentum/DataExtraction/case_search_engine.py momentum/Analysis/net_ic_analyzer.py docs/ROADMAP.md" ;;
+    # 同批補登（同一 fail-closed 缺口；各盯其票之權威技術文件與實作面）
+    "EVTLABEL施工進度.md"|"EVTLABEL規格白話.md")
+                                      echo "docs/EVTLABEL_TODO.md momentum/Analysis/event_samples/" ;;
+    "GAP-3還沒做的事.md")            echo "docs/IC_QUANT_GAP_REGISTRY.md docs/GAP3_UAT_CHECKLIST.md" ;;
+    "SPLITUNIFY第9批任務白話.md")    echo "docs/SPLITUNIFY_TODO.md momentum/core/split_preview.py" ;;
     # 量化主線 ICHC epic 白話檔（2026-08-17）：看板盯憲章與閘門腳本；偵察結果盯缺口 registry
     "IC健檢施工進度.md")             echo "docs/IC_HEALTHCHECK_SPEC.md docs/IC_HEALTHCHECK_TODO.md scripts/ic_wiring_check.py" ;;
     # GAP-1 施工看板：WATCHED 含 scripts/（gap1 探針）⇒ 合法持有批次進度；實作路徑動了就必須同步
