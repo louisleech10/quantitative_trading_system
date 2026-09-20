@@ -68677,3 +68677,43 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "live_doc_write_guard.sh", "class": "LIVE-HANDOFF", "event": "docrot2_gate_block", "event_id": "3422e540-61f8-47e7-a25f-c53a2b6f5a34", "origin_script": "live_doc_write_guard.sh", "path": "HANDOFF.md", "producer": "audit_append.sh", "rule_id": "archaeology", "schema_version": 1, "sequence": 5373, "ts": "2026-09-20T09:29:38Z"}
 {"actor": "live_doc_write_guard.sh", "class": "LIVE-HANDOFF", "event": "docrot2_gate_block", "event_id": "00c09a2e-268f-495c-a6af-ea39ab130566", "origin_script": "live_doc_write_guard.sh", "path": "HANDOFF.md", "producer": "audit_append.sh", "rule_id": "handoff-grammar", "schema_version": 1, "sequence": 5374, "ts": "2026-09-20T09:30:08Z"}
 {"actor": "live_doc_write_guard.sh", "class": "LIVE-HANDOFF", "event": "docrot2_gate_block", "event_id": "785b052f-e997-4daf-ab55-4d0dffa1f4bf", "origin_script": "live_doc_write_guard.sh", "path": "HANDOFF.md", "producer": "audit_append.sh", "rule_id": "history-pointer", "schema_version": 1, "sequence": 5375, "ts": "2026-09-20T09:30:09Z"}
+{"actor": "live_doc_registry_check.sh", "class": "UNREGISTERED", "event": "docrot2_gate_block", "event_id": "42ee656d-a718-472a-b3f1-fcda087cb185", "origin_script": "live_doc_registry_check.sh", "path": "docs/SEARCH2EVENT_SPEC.md", "producer": "audit_append.sh", "rule_id": "unregistered-md", "schema_version": 1, "sequence": 5376, "ts": "2026-09-20T09:32:00Z"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-PLAIN", "event": "docrot2_gate_block", "event_id": "1f215747-3ac5-4902-8ff8-a56c857bffec", "origin_script": "live_doc_write_guard.sh", "path": "白話說明/現在做到哪.md", "producer": "audit_append.sh", "rule_id": "archaeology", "schema_version": 1, "sequence": 5377, "ts": "2026-09-20T09:32:23Z"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-SPEC", "event": "docrot2_gate_block", "event_id": "29bf5a65-4621-478c-b677-f02ecdb9e017", "origin_script": "live_doc_write_guard.sh", "path": "docs/SEARCH2EVENT_SPEC.md", "producer": "audit_append.sh", "rule_id": "archaeology", "schema_version": 1, "sequence": 5378, "ts": "2026-09-20T09:34:35Z"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-PLAIN", "event": "docrot2_gate_block", "event_id": "16f33756-3323-4a3d-b7d5-7efc15ded2b8", "origin_script": "live_doc_write_guard.sh", "path": "白話說明/EVENTSCAN方向與做法.md", "producer": "audit_append.sh", "rule_id": "archaeology", "schema_version": 1, "sequence": 5379, "ts": "2026-09-20T11:04:34Z"}
+{"event":"gate_deny","ts":"2026-09-20T11:06:56Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"fd8298dfcdf7acfe6960110120936033747862ab2b375fac0e0af19142a01947","cmd_head":"bash scripts/committee_run.sh --session 20260920-eventscan-x-consult-r2 handoffs/20260920-EVENTSCAN-X-CONSULT-R2-BRIEF.md handoffs/20260920-eventscan-x-consult-r2 codex,composer -- --task-id 20260920-EVENTSCAN-X-CONSULT-R2 --intent \"EVENTSCAN 量化方法 consult r2：進場語意／label 定義／對照抽樣之正確性（唯讀）\" --risk low --facts-asked \"next_open 有無量化偏誤／兩批進場語意不一致是否阻斷／label=sign(報酬) 之副作用與多 horizon 綁定／隨機抽樣四項修"}
+{"event": "committee_dispatch", "family": "codex", "output_path": "handoffs/20260920-eventscan-x-consult-r2-codex.md", "output_sha256": "pending", "task_id": "20260920-EVENTSCAN-X-CONSULT-R2", "ts": "2026-09-20T11:07:01Z"}
+=== 2026-09-20 19:07:01 | dispatch ===
+  ts=2026-09-20 19:07:01
+  kind=dispatch
+  intent=EVENTSCAN 量化方法 consult r2：進場語意／label 定義／對照抽樣之正確性（唯讀）
+  risk=low
+  facts_asked=next_open 有無量化偏誤／兩批進場語意不一致是否阻斷／label=sign(報酬) 之副作用與多 horizon 綁定／隨機抽樣四項修法與期間池選擇／兩表並排是否有效統計比較／你認為還該問而 brief 沒問的
+  review_role=quant-methodology-consult
+  template=n/a:consult brief 已過 doc_format_precheck
+  adversarial=waived:諮詢輪唯讀、不產生實作或文檔變更
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260920-EVENTSCAN-X-CONSULT-R2", "ts": "2026-09-20T11:07:06Z"}
+=== 2026-09-20 19:07:06 | dispatch ===
+  ts=2026-09-20 19:07:06
+  kind=dispatch
+  intent=EVENTSCAN 量化方法 consult r2：進場語意／label 定義／對照抽樣之正確性（唯讀）
+  risk=low
+  facts_asked=next_open 有無量化偏誤／兩批進場語意不一致是否阻斷／label=sign(報酬) 之副作用與多 horizon 綁定／隨機抽樣四項修法與期間池選擇／兩表並排是否有效統計比較／你認為還該問而 brief 沒問的
+  review_role=quant-methodology-consult
+  template=n/a:consult brief 已過 doc_format_precheck
+  adversarial=waived:諮詢輪唯讀、不產生實作或文檔變更
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "consult", "brief_path": "handoffs/20260920-EVENTSCAN-X-CONSULT-R2-BRIEF.md", "brief_sha256": "d0f2a57206067b3caa3b311d0ca77b697f219fcd0122f3c06822cc8442d7f92c", "brief_sha256_norm": "d0f2a57206067b3caa3b311d0ca77b697f219fcd0122f3c06822cc8442d7f92c", "event": "committee_round_open", "event_id": "65f47a90-a226-456e-ba3b-bfb4954f37c8", "expected_outputs": {"codex": "handoffs/20260920-eventscan-x-consult-r2-codex.md", "composer": "handoffs/20260920-eventscan-x-consult-r2-composer.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer"], "round_id": "f3aa7e47-a9ef-49e1-a294-020dd28ef9be", "schema_version": 1, "sequence": 5380, "session_name": "20260920-eventscan-x-consult-r2", "task_id": "20260920-EVENTSCAN-X-CONSULT-R2", "ts": "2026-09-20T11:07:14Z"}

@@ -636,6 +636,10 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 <tr>
 <td>7</td>
+<td><strong>欄位選擇器＝逐層下拉（來源欄→週期→類別→指標→參數）＋打字搜尋，兩個都做</strong></td>
+</tr>
+<tr>
+<td>8</td>
 <td>先看完整白話文檔＋舉例，才決定放不放行</td>
 </tr>
 </tbody>
@@ -673,13 +677,35 @@ codex 2026-09-20 查出兩者並存。<strong>不論最後選哪個：觸發批�
 </tr>
 <tr>
 <td>5</td>
-<td><strong>欄位選擇器要做到多細？</strong></td>
-<td>建議逐層下拉（五層）＋打字搜尋兩者都做，見第三節第 1 步。兩者都不做的話你根本沒辦法寫條件。這題偏介面，等你一句話</td>
-</tr>
-<tr>
-<td>6</td>
 <td><strong>多標的什麼時候做？</strong></td>
 <td>你已裁定先做單標的，多標的併 GAP-4。本票只做單標的</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="我自己查的時候又挖出三個問題一併交委員會">我自己查的時候又挖出三個問題（一併交委員會）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>#</th>
+<th>問題</th>
+<th>為什麼重要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>6</td>
+<td>🔴 <strong>兩批的報酬算法可能根本不一致</strong></td>
+<td>隨機對照批的標籤<strong>寫死用收盤到收盤</strong>（<code>random_control.py</code>）。如果觸發批改用「下一根開盤價」進場，<strong>兩批算的不是同一件事，並排比較沒有意義</strong>。這條沒解決，前面所有數字都不能信</td>
+</tr>
+<tr>
+<td>7</td>
+<td>🔴 <strong>多個持有期時，<code>label</code> 該用哪一個算？</strong></td>
+<td><code>label</code> 在契約裡是<strong>一個值</strong>，但漲跌會隨持有期不同而不同（5 根漲、55 根跌是常態）。契約只有一個 <code>horizon_bars</code> 欄位 ⇒ 必須指定一個。用哪個、為什麼</td>
+</tr>
+<tr>
+<td>8</td>
+<td>🔴 <strong>我先前說「期間池該用整個 run」可能是錯的</strong></td>
+<td>如果觸發點集中在多頭期間，拿整個 run 當對照池等於在比「多頭 vs 全期」——差異可能來自行情而不是條件。<strong>取觸發批的期間反而可能才對</strong>（控制行情）。我沒把握，交委員會</td>
 </tr>
 </tbody>
 </table></div>
