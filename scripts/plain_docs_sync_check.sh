@@ -71,6 +71,12 @@ _watched_for() {
     #   之 CODEX-R65-P2-06 抓出。`接下來要做的票.md` 為跨票導航（同 接下來要做什麼.md）；
     #   `EVENTSCAN方向與做法.md` 盯其所描述之三處實作面與 ROADMAP 狀態來源。
     "接下來要做的票.md")             echo "docs/ROADMAP.md docs/IC_QUANT_GAP_REGISTRY.md" ;;
+    # 2026-09-20 PLAINDOCS：四份核心檔，各回答一個問題，各有互補之維護規則（寫在各檔檔尾）。
+    #   現在做到哪＝整段覆蓋／還沒做的事＝做完刪行／做過什麼＝只增不改／<票名>結論＝只寫結論。
+    #   三者皆盯 ROADMAP 之狀態生成區塊（狀態變了這三份就該同步）。
+    "還沒做的事.md"|"做過什麼.md")   echo "docs/ROADMAP.md docs/IC_QUANT_GAP_REGISTRY.md" ;;
+    # 樣式分派：`<票名>結論.md` 一律盯 ROADMAP 與缺口登記；新票之結論書自動取得 WATCHED。
+    *結論.md)                         echo "docs/ROADMAP.md docs/IC_QUANT_GAP_REGISTRY.md" ;;
     "EVENTSCAN方向與做法.md")        echo "momentum/Analysis/event_samples/ momentum/DataExtraction/case_search_engine.py momentum/Analysis/net_ic_analyzer.py docs/ROADMAP.md" ;;
     # 同批補登（同一 fail-closed 缺口；各盯其票之權威技術文件與實作面）
     "EVTLABEL施工進度.md"|"EVTLABEL規格白話.md")

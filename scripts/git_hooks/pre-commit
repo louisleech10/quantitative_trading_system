@@ -111,6 +111,19 @@ done < <(git diff --cached --name-only --diff-filter=ACMR -z)
 #    本層的價值＝在**當下**提醒，而非等到 push 時 commit 訊息都寫完了才發現。
 [ -f scripts/plain_docs_sync_check.sh ] && bash scripts/plain_docs_sync_check.sh --staged || true
 
+# 白話核心檔「形狀」閘（PLAINDOCS，2026-09-20）——**本層硬擋**，與上面的同步提醒不同。
+# 🔴 為何這層要擋而同步那層不擋：同步是「你這次是不是忘了更新」，可能確實無需更動 ⇒ 提醒即可；
+#    形狀是「你又把它寫成流水帳了」，那是**確定的違規**，沒有合法例外。
+#    出生事故：26 份／17,549 行，`GAP-3施工進度.md` 內含 29 輪審查流水帳，
+#    使用者三度指出「找不到結論／不知還剩什麼／連做過哪些都找不到」。
+# 實測（2026-09-20）：mutation 加一行 `> 📌` ⇒ rc=1；還原 ⇒ rc=0。非空心綠。
+if [ -f scripts/plain_docs_shape_check.sh ]; then
+  if ! bash scripts/plain_docs_shape_check.sh; then
+    echo "pre-commit: 🔴 白話核心檔形狀未過——核心檔不得往上疊流水帳條目，改掉後再 commit" >&2
+    exit 1
+  fi
+fi
+
 # ── 文件錨點／死連結（scripts/check_doc_anchors.sh）────────────────────────
 # 🔴 為何掛這裡而不是產出端（使用者 2026-08-14T18:40+08:00：「耗費時間太多也是原因」）：
 #   實測 2026-08-14：全庫 3.61 秒、`--files HANDOFF.md` 窄跑 3.76 秒——**窄化省不到**，
