@@ -1050,7 +1050,12 @@
       [
         "070",
         "新增數值之容差",
-        "`abs ≤ 1e-12` 或 `rel ≤ 1e-9`。**適用全部新增數值鍵**：`std`／`ret_max`／`ret_min`／`breakeven_cost_bps`／`delta.*`（逐 h 之報酬差各欄）／Δ 之 `ci_low`／`ci_high`／`n_clusters`；任一新增鍵未列入即為缺漏"
+        "`abs ≤ 1e-12` 或 `rel ≤ 1e-9`；超出即列出該（批, h）與實際 diff = FAIL"
+      ],
+      [
+        "075",
+        "新增數值之適用鍵（**唯一清單**，SPEC 散文不得自列）",
+        "`std`／`ret_max`／`ret_min`／`breakeven_cost_bps`／`delta.*`（逐 h 之報酬差各欄）／Δ 之 `ci_low`／`ci_high`／`n_clusters`。任一新增鍵未列入本列即為缺漏；比對對象為 `numpy` 直算之參考值"
       ],
       [
         "080",
@@ -1191,7 +1196,7 @@
       [
         "040",
         "本票之准入規則",
-        "**逐 gid 之列舉式白名單**：允許之 group id 全量列舉於契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json`；`groups.<gid>.columns[]` 之欄只在其 `gid` **逐字命中**該檔時才進 registry"
+        "契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`；欄只在「該 run 之三元組已核准」**且**「其 `gid` 命中」**且**「該 gid 之 `columns` 實算 sha256 與登記值相等」時才進 registry"
       ],
       [
         "045",
@@ -1199,14 +1204,24 @@
         "「`<週期>_<層>_<類別>_<指標>` 四段文法」只蓋住 1004 個中的 316 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是**"
       ],
       [
+        "047",
+        "🔴 為何索引要綁三元組與欄摘要（跨 run 實測）",
+        "兩個真實 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）**"
+      ],
+      [
         "050",
-        "缺 metadata 與未命中之處置",
-        "欄不屬任何 group，或其 gid 不在白名單 ⇒ fail-closed 不收該欄，並逐 gid 可列舉被拒欄數；**不得**以「看起來像技術指標」放行"
+        "未命中之處置（三種皆 fail-closed）",
+        "① 三元組未核准 ② gid 不在該 run 之登記 ③ `columns` 實算摘要與登記值不等 ⇒ 皆 fail-closed 不收該欄，並逐情形可列舉被拒欄數；**不得**以「看起來像技術指標」或「同名 gid 上次過了」放行"
       ],
       [
         "055",
-        "白名單之產生與凍結",
-        "由 `scripts/gen_eventscan_pit_allowlist.sh` 自 manifest 全量列出候選 gid，經一次人工＋委員審定後凍結入契約檔；新 FF run 出現白名單外之 gid 一律 fail-closed（保守方向），須再審一次才加入"
+        "核准流程",
+        "由 `scripts/gen_eventscan_pit_allowlist.sh` 對指定三元組自 manifest 全量產出 `gid → columns_sha256` 候選，審定後寫入契約檔之該三元組區段；**新 run 只需審其新 gid**，既有三元組不受影響"
+      ],
+      [
+        "057",
+        "誠實邊界（操作成本）",
+        "每個新 FF run 需跑一次核准流程才能用於掃描。實測上第二個 run 之 43 個共用 gid 可直接沿用（欄摘要相等者），只需審其餘。成本不為零，但安全方向正確且不得以放寬 fail-closed 換取便利"
       ],
       [
         "060",
@@ -1289,6 +1304,18 @@
         "段間相依診斷門檻",
         "段層級報酬之一階自相關絕對值 `abs(rho_1) > 0.2` ⇒ 收據標 `cluster_dependence_suspected`",
         "5.2"
+      ],
+      [
+        "090",
+        "AST 呼叫點凍結清單之落檔",
+        "`tests/golden/eventscan/analyze_tables_callsites.json`；schema＝`{\"expected_count\": <int>, \"callsites\": [{\"file\": <repo 相對路徑>, \"line\": <int>, \"qualname\": <str>}]}`，以 `(file, qualname)` 為 entry identity",
+        "2.4"
+      ],
+      [
+        "095",
+        "AST 凍結清單之防腐",
+        "測試須同時斷言「AST 實掃集合 `==` 清單」**且**「集合大小 `==` `expected_count`」；只比對集合而不釘數量時，清單被整批清空仍會通過",
+        "2.4"
       ]
     ]
   },

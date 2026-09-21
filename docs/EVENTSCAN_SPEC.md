@@ -285,10 +285,12 @@
 | 020 | 角色隔離之現行保護 | `_role_violation` 只拒「角色非 `pit_feature`」與「欄名以 `future_` 為前綴」兩種 |
 | 030 | 🔴 該保護之缺口 | 不含 `future_` 前綴而語意上含未來資訊之欄，現行 guard 放行（委員實跑反例已重現） |
 | 035 | 🔴 manifest 實況（全量實查，非抽樣） | reference run 有 **1004 個 group**；gid 之底線段數分佈為 3 段 8 個／4 段 316 個／5 段 383 個／6 段 99 個／7 段 198 個；group 物件之鍵為 `column_count`／`columns`／`dtype`／`dtype_counts`／`encoded_column_count`／`file`／`file_size_bytes`／`float32_columns`／`nan_ratio`／`path`／`row_count`／`source_group_id`——**沒有類別欄，也沒有指標欄** |
-| 040 | 本票之准入規則 | **逐 gid 之列舉式白名單**：允許之 group id 全量列舉於契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json`；`groups.<gid>.columns[]` 之欄只在其 `gid` **逐字命中**該檔時才進 registry |
+| 040 | 本票之准入規則 | 契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`；欄只在「該 run 之三元組已核准」**且**「其 `gid` 命中」**且**「該 gid 之 `columns` 實算 sha256 與登記值相等」時才進 registry |
 | 045 | 🔴 為何不切 gid 字串 | 「`<週期>_<層>_<類別>_<指標>` 四段文法」只蓋住 1004 個中的 316 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是** |
-| 050 | 缺 metadata 與未命中之處置 | 欄不屬任何 group，或其 gid 不在白名單 ⇒ fail-closed 不收該欄，並逐 gid 可列舉被拒欄數；**不得**以「看起來像技術指標」放行 |
-| 055 | 白名單之產生與凍結 | 由 `scripts/gen_eventscan_pit_allowlist.sh` 自 manifest 全量列出候選 gid，經一次人工＋委員審定後凍結入契約檔；新 FF run 出現白名單外之 gid 一律 fail-closed（保守方向），須再審一次才加入 |
+| 047 | 🔴 為何索引要綁三元組與欄摘要（跨 run 實測） | 兩個真實 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）** |
+| 050 | 未命中之處置（三種皆 fail-closed） | ① 三元組未核准 ② gid 不在該 run 之登記 ③ `columns` 實算摘要與登記值不等 ⇒ 皆 fail-closed 不收該欄，並逐情形可列舉被拒欄數；**不得**以「看起來像技術指標」或「同名 gid 上次過了」放行 |
+| 055 | 核准流程 | 由 `scripts/gen_eventscan_pit_allowlist.sh` 對指定三元組自 manifest 全量產出 `gid → columns_sha256` 候選，審定後寫入契約檔之該三元組區段；**新 run 只需審其新 gid**，既有三元組不受影響 |
+| 057 | 誠實邊界（操作成本） | 每個新 FF run 需跑一次核准流程才能用於掃描。實測上第二個 run 之 43 個共用 gid 可直接沿用（欄摘要相等者），只需審其餘。成本不為零，但安全方向正確且不得以放寬 fail-closed 換取便利 |
 | 060 | 白名單之維護點 | 契約檔為唯一來源；**不得手寫欄名清單**，也**不得**在程式碼內另列 gid（黑名單與散落清單永遠列不完） |
 | 070 | 誠實邊界 | 粒度為 group 而非逐欄因果證明：同一 group 內若存在非因果變體則擋不住。逐欄因果 provenance 需 FF 在產出端補欄，列殘留 RESID-6 |
 <!-- END GENERATED: eventscan-pit-admission -->
@@ -308,6 +310,8 @@
 | 060 | Δ bootstrap seed | `20260921`（寫入收據；同設定重跑逐位元組相同） | 5.2 |
 | 070 | 排除比例警告門檻 | `excluded / n_rows > 0.5` ⇒ 收據標警告，**不自動改排除窗寬度** | 4.3 |
 | 080 | 段間相依診斷門檻 | 段層級報酬之一階自相關絕對值 `abs(rho_1) > 0.2` ⇒ 收據標 `cluster_dependence_suspected` | 5.2 |
+| 090 | AST 呼叫點凍結清單之落檔 | `tests/golden/eventscan/analyze_tables_callsites.json`；schema＝`{"expected_count": <int>, "callsites": [{"file": <repo 相對路徑>, "line": <int>, "qualname": <str>}]}`，以 `(file, qualname)` 為 entry identity | 2.4 |
+| 095 | AST 凍結清單之防腐 | 測試須同時斷言「AST 實掃集合 `==` 清單」**且**「集合大小 `==` `expected_count`」；只比對集合而不釘數量時，清單被整批清空仍會通過 | 2.4 |
 <!-- END GENERATED: eventscan-params -->
 
 ### K-13 失敗原因碼之優先序
@@ -344,8 +348,12 @@
     ④ 既有之 digest 與 provenance 鍵集合不變。任一不等即 FAIL 並列出首個不等之鍵與兩側值。
     🔴 **「輸出鍵集合皆不變」之初稿措辭與 Task 3.1（新增三鍵）自相矛盾**（本輪兩家獨立指出），
     已改為上列①②——**允許新增鍵、禁止改動或移除既有鍵**。新增鍵之正確性走下列「新增數值」那套。
-  - **新增數值**：`mean`／`median`／`std`／`ret_max`／`ret_min`／`breakeven_cost_bps` 對 `numpy` 直算之參考值
-    比對，容差見 `eventscan-golden-reference` 070／090；超出即列出該（批, h）與實際 diff = FAIL。
+    🔴 **兩套之歸屬不得有縫**（R3 之 finding 即落在此縫）：既有鍵（含 `mean`／`median`／`win_rate`／
+    `n`／`n_effective`）走本套；新增鍵之**唯一清單**由 `eventscan-golden-reference` 075 界定。
+    任一輸出鍵若兩套皆不涵蓋，即為 §G 缺漏，不得以「大概屬於某一套」帶過。
+  - **新增數值**：適用鍵之**唯一清單**見 `eventscan-golden-reference` 075，容差見 070、
+    exact 項見 090。🔴 本處**不自列鍵名**——R3 兩家指出此處之手打副本已與該列脫節，
+    修法是把清單整段移入生成區塊，不是把副本改對。
   - **對照一致**：同一批以單一 h 跑 vs 以含該 h 之集合一次跑，該 h 之所有數值須相等。
 - 🔴 **子集跑不得覆寫完整基準**：`--only` 類子集跑一律**不寫** golden；逐條 mutation 之收據以 id 合併，不得整檔覆寫。
 - 跑完之副作用還原指令見 `eventscan-golden-reference` 100。
@@ -361,7 +369,8 @@
 | 040 | reference FF run | `config_hash = 4a8a0b3726cc906ab3534994605e77f5` |
 | 050 | 取 run 目錄之守衛 | 同一 `config_hash` 可存在於多個 symbol ⇒ 須再以 symbol 篩選，命中多於一個即 fail-closed |
 | 060 | golden 存放路徑 | `tests/golden/eventscan/` |
-| 070 | 新增數值之容差 | `abs ≤ 1e-12` 或 `rel ≤ 1e-9`。**適用全部新增數值鍵**：`std`／`ret_max`／`ret_min`／`breakeven_cost_bps`／`delta.*`（逐 h 之報酬差各欄）／Δ 之 `ci_low`／`ci_high`／`n_clusters`；任一新增鍵未列入即為缺漏 |
+| 070 | 新增數值之容差 | `abs ≤ 1e-12` 或 `rel ≤ 1e-9`；超出即列出該（批, h）與實際 diff = FAIL |
+| 075 | 新增數值之適用鍵（**唯一清單**，SPEC 散文不得自列） | `std`／`ret_max`／`ret_min`／`breakeven_cost_bps`／`delta.*`（逐 h 之報酬差各欄）／Δ 之 `ci_low`／`ci_high`／`n_clusters`。任一新增鍵未列入本列即為缺漏；比對對象為 `numpy` 直算之參考值 |
 | 080 | 行為不變型之容差 | 無容差——**既有鍵**之值與 NaN 逐鍵相等、既有鍵不得移除或改名、列數不變、既有 digest 與 provenance 鍵集合不變。🔴 **允許新增鍵**（新增鍵走下一列之「新增數值」驗收） |
 | 090 | `n` 與 `nan_ratio` | exact，不得有容差 |
 | 100 | 跑完之副作用還原 | `bash scripts/restore_golden_inventory.sh` |
@@ -440,8 +449,10 @@
 - 檔案：`momentum/Analysis/event_samples/condition_engine.py`（`ConditionError` 之 payload）、
   `momentum/Analysis/contracts/condition_engine_contract.json`（`failure_reasons` 同步）。
 - 既有 caller／影響面：`ConditionError` 之既有欄位不得移除或改名；建議清單以**新增鍵**承載。
-- 改法：`unregistered_column` 拋出時附最接近欄名（以編輯距離對 registry 鍵排序），
-  清單長度上限與耗時上限見 `eventscan-params` 010／020。原因碼集合見 `eventscan-failure-reasons`。
+- 改法：`unregistered_column` 拋出時附最接近欄名，**演算法依 `eventscan-params` 020**
+  （token 交集預篩 ⇒ 只對候選算編輯距離；**禁**對全部鍵直算）。
+  清單長度上限見 `eventscan-params` 010、耗時上限見 **025**（R3 兩家指出此處指針原指到 020，
+  而 020 是演算法列、耗時在 025）。原因碼集合見 `eventscan-failure-reasons`。
 - **驗證**：`eventscan-test-vectors` 080；另 registry 為空時建議清單為空、原因碼仍為
   `unregistered_column`（不得改成另一碼）。指令：`pytest tests/momentum/event_samples/test_condition_engine_suggest.py -q`
 - **邊界**：① registry 逾 18 萬鍵時建議計算之耗時須有上限（超時回空建議、不得讓請求掛住）；
@@ -467,8 +478,11 @@
 
 ### Phase 2 — 掃描與時鐘（依賴：Phase 1）
 
-🔴 **本 Phase 之執行順序＝ Task 2.4 → 2.1 → 2.2 → 2.3**（編號為標籤，非順序）。
-2.4 之抑制參數須先存在，2.1 才傳得進去；文件列序已依執行順序排列，TODO 生成時照此序。
+🔴 **本 Phase 之執行順序＝ Task 2.4 → 2.2 → 2.3 → 2.1**（編號為標籤，非順序）。
+2.1（掃描端點）同時需要 2.4 之抑制參數、2.2 之 first-of-run 與 2.3 之時鐘定義，故排在最後。
+文件列序已依執行順序排列，TODO 生成時照此序。
+🔴 R2 之修法只把 2.4 提前，仍把 2.1 排在 2.2 之前，而 2.1 之改法正以 2.2 為前置 ⇒ 順序矛盾未清；
+R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照序執行的前提。**
 **Task 2.4 — 主表只顯示全體（後端抑制參數；本輪自 Phase 3 移入）**
 - 目標：消滅 `label = sign(報酬)` 下的套套邏輯上主表。
 - 檔案：`momentum/Analysis/event_samples/tables.py::_by_label_groups`、
@@ -495,6 +509,8 @@
   `analyze_tables` 呼叫點，R1 之初稿盯錯函式，本輪委員指出）：以 **AST 走訪**（`ast` 模組解析
   `api/` 與 `momentum/` 之 `.py`，收集對 `analyze_tables` 之 `Call` 節點）取得呼叫點集合，
   與凍結清單逐字比對；新增未納入即 FAIL。
+  凍結清單之落檔路徑與 schema 見 `eventscan-params` 090，防腐斷言見 095
+  （R3 兩家指出：只寫「與凍結清單逐字比對」而不定路徑、schema 與預期數，清單自己會腐爛）。
   🔴 **誠實邊界**：AST 走訪只認得語法上的直接呼叫；以 `getattr`、字串反射或包裝函式間接呼叫者
   **抓不到**。本票不另做動態偵測（成本遠高於效益），該殘餘具名於 §N 之 RESID-8。
   `grep -c` 之文字比對更弱（連別名都抓不到），本輪已棄用。
@@ -508,29 +524,6 @@
 - **覆蓋風險**：無。
 - 不可做：不得改 `win_rate` 公式；不得刪除 `by_label` 之程式碼路徑（IC 事件路徑在用）。
 
-
-**Task 2.1 — 掃描函式接上 API**
-- 目標：條件式 → 事件批 → 走既有匯入契約落檔，前端可觸發。
-- 檔案：`api/routes/ic_analysis.py`（新增掃描端點）、`api/services/ic_analysis_service.py`、
-  `momentum/Analysis/event_samples/generator.py::generate_events`（唯讀取用）。
-- 既有 caller／影響面：`generate_events` 目前 `api/` 零呼叫者；本 Task 為其第一個生產呼叫端。
-- 改法：端點收 `(symbol, timeframe, config_hash, expression, horizons[], direction)`；
-  以 Task 1.1 之 registry 解析條件 → 求值 → 壓成 first-of-run（Task 2.2）→ 填 label（`eventscan-clock` 080）
-  → 走既有匯入契約落批。進場語意、時鐘見 `eventscan-clock`。
-  🔴 **本端點之不變式**：經 `pipeline.analyze_tables` 組表時**恆**傳入 Task 2.4 之
-  `by_label_suppressed_reason`；漏傳即為缺陷，須有測試釘住（見下驗證條）。
-  （Task 2.4 與本 Task 同屬 Phase 2，為同 Phase 內之順序依賴：2.4 之參數須先存在，本 Task 才能傳。）
-- **驗證**：對 reference run 與一條多頭排列條件，端點回之批可被 `import_contract.py` 之既有驗證器收下（不放寬任何既有檢查），
-  且批內每筆之 `t0` 對應之特徵列鍵為該根 `open_time`（`eventscan-clock` 100）；
-  另以 spy 斷言本端點對 `pipeline.analyze_tables` 之每一次呼叫，其
-  `by_label_suppressed_reason` 皆非 `None`（釘住上述不變式）。
-  指令：`pytest tests/api/test_eventscan_endpoint.py -q`
-- **邊界**：① 條件零筆成立 ⇒ 回 `no_trigger_events`，與欄名錯誤明確區分；② 條件全根成立 ⇒ first-of-run 後為 1 筆，
-  且須通過匯入契約之「一批須兩類 label 皆有」檢查或以可區分之原因碼拒收（不得靜默產出單類批）；
-  ③ `max(horizons)` 大於資料長度 ⇒ fail-closed。
-- **存活至**：Phase 6 完工後仍保留。
-- **覆蓋風險**：無。Phase 4／5 讀本 Task 產出之批，不覆寫。
-- 不可做：不得在掃描批內混入隨機列；不得改匯入契約之 `required_fields`；不得自建一條繞過匯入契約檢查的路徑。
 
 **Task 2.2 — first-of-run 壓縮**
 - 目標：一段連續成立只算一次進場。
@@ -574,6 +567,35 @@
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
 - 不可做：不得把全 K 線表改成同一時鐘後再展示——那是另一條估計量，本票不驗收它。
+
+**Task 2.1 — 掃描函式接上 API**
+- 目標：條件式 → 事件批 → 走既有匯入契約落檔，前端可觸發。
+- 檔案：`api/routes/ic_analysis.py`（新增掃描端點）、`api/services/ic_analysis_service.py`、
+  `momentum/Analysis/event_samples/generator.py::generate_events`（唯讀取用）。
+- 既有 caller／影響面：`generate_events` 目前 `api/` 零呼叫者；本 Task 為其第一個生產呼叫端。
+- 改法：端點收 `(symbol, timeframe, config_hash, expression, horizons[], primary_horizon, direction)`；
+  以 Task 1.1 之 registry 解析條件 → 求值 → 壓成 first-of-run（Task 2.2）→ 填 label（`eventscan-clock` 080）
+  → 走既有匯入契約落批。進場語意、時鐘見 `eventscan-clock`。
+  🔴 **`primary_horizon` 為必填請求欄**（R3 兩家指出：R2 只把它寫進 Task 5.1 與 Q-C10，
+  端點輸入契約沒有承載它 ⇒ 主 horizon 可被猜測、遺失或由後端代填）：型別為整數，
+  **須為 `horizons[]` 之成員**，否則 fail-closed 並列出兩者；Task 5.1 之收據自本欄取值。
+  🔴 **本端點之不變式**：經 `pipeline.analyze_tables` 組表時**恆**傳入 Task 2.4 之
+  `by_label_suppressed_reason`；漏傳即為缺陷，須有測試釘住（見下驗證條）。
+  （本 Task 為 Phase 2 之**最後**一個：其輸入同時需要 2.4 之抑制參數、2.2 之 first-of-run
+  與 2.3 之時鐘定義，故列於三者之後。）
+- **驗證**：對 reference run 與一條多頭排列條件，端點回之批可被 `import_contract.py` 之既有驗證器收下（不放寬任何既有檢查），
+  且批內每筆之 `t0` 對應之特徵列鍵為該根 `open_time`（`eventscan-clock` 100）；
+  另以 spy 斷言本端點對 `pipeline.analyze_tables` 之每一次呼叫，其
+  `by_label_suppressed_reason` 皆非 `None`（釘住上述不變式）。
+  指令：`pytest tests/api/test_eventscan_endpoint.py -q`
+- **邊界**：① 條件零筆成立 ⇒ 回 `no_trigger_events`，與欄名錯誤明確區分；② 條件全根成立 ⇒ first-of-run 後為 1 筆，
+  且須通過匯入契約之「一批須兩類 label 皆有」檢查或以可區分之原因碼拒收（不得靜默產出單類批）；
+  ③ `max(horizons)` 大於資料長度 ⇒ fail-closed；
+  ④ `primary_horizon` 缺欄、非整數、或不在 `horizons[]` 內 ⇒ fail-closed，
+  **不得**由後端取 `horizons[0]` 或 `max(horizons)` 代填（代填等於系統替使用者做了預先登記）。
+- **存活至**：Phase 6 完工後仍保留。
+- **覆蓋風險**：無。Phase 4／5 讀本 Task 產出之批，不覆寫。
+- 不可做：不得在掃描批內混入隨機列；不得改匯入契約之 `required_fields`；不得自建一條繞過匯入契約檢查的路徑。
 
 ### Phase 3 — 報酬與統計（依賴：Phase 2）
 
@@ -753,10 +775,17 @@
 - 檔案：`frontend/src/components/ic-analysis/`（掃描設定面板）。
 - 既有 caller／影響面：新元件，無既有 caller。
 - 改法：文字輸入框解析為整數集合；換算＝`根數 × 週期長度`，週期長度由該 run 之 `timeframe` 決定。
-- **驗證**：vitest——`eventscan-test-vectors` 090（兩個 timeframe 同測試內並列，換算字串逐字比對）。
+  🔴 **另須一個「主 horizon」選擇器**（R3 兩家指出：R2 只把 `primary_horizon` 寫進後端收據與 Q-C10，
+  前端沒有任何承載它的輸入 ⇒ 使用者無從宣告、系統只能猜）：選項集合恆等於當前已輸入之
+  `horizons[]`；使用者未選時**送出鈕停用**，前端不得預選任何值（預選等於替使用者做預先登記）。
+  送出之 payload 含 `primary_horizon`。
+- **驗證**：vitest——`eventscan-test-vectors` 090（兩個 timeframe 同測試內並列，換算字串逐字比對）；
+  另 ① 主 horizon 未選 ⇒ 送出鈕 `disabled`；② 改動 `horizons[]` 使已選之主 horizon 不再在集合內
+  ⇒ 該選擇被清空且送出鈕停用；③ 送出之 payload 之 `primary_horizon` 等於使用者所選值。
   指令：`cd frontend && npx vitest run src/components/ic-analysis/__tests__/HorizonInput.test.tsx`
 - **邊界**：① 空輸入 ⇒ 送出鈕停用且說明原因；② 含非整數或 ≤0 ⇒ 標出該項並拒送；
-  ③ 重複值 ⇒ 去重並顯示已去重。
+  ③ 重複值 ⇒ 去重並顯示已去重；④ 僅輸入一個持有期 ⇒ 主 horizon 仍須**明示選取**，
+  不得自動代選（同一理由：代選即系統替使用者登記）。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
 - 不可做：不得提供勾選清單取代輸入框（`eventscan-rulings` 010）。
@@ -781,9 +810,15 @@
   本票路徑之預設值須獨立，**不得**直接改既有常數而影響 IC 路徑。
 - 改法：橫幅字面與位置見 `eventscan-banner`；門檻與筆數依 `eventscan-random-control` 080／010，
   且畫面不出現門檻欄、筆數為唯讀顯示。
-- **驗證**：vitest——`delta.status != "ok"` 時橫幅 010 必渲染且字面逐字相符；
-  本票掃描面板之 DOM 不含門檻輸入欄；`nRequested` 顯示值等於觸發批 `n`。
-  **mutation**：把橫幅條件改為恆不顯示須使第一條斷言轉紅。
+- **驗證**：vitest——**三格皆須斷言**（R3 兩家指出原驗證只覆蓋第一格，
+  「只看 `status` 就隱藏橫幅」之實作可通過）：
+  ① `delta.status != "ok"` ⇒ 橫幅 010 渲染且字面逐字相符；
+  ② `delta.status == "ok"` **且** `cluster_dependence_suspected == true` ⇒ 橫幅 010 **仍**渲染；
+  ③ `delta.status == "ok"` **且** `cluster_dependence_suspected == false` ⇒ 橫幅 010 不渲染。
+  另本票掃描面板之 DOM 不含門檻輸入欄；`nRequested` 顯示值等於觸發批 `n`。
+  **mutation**：① 把橫幅條件改為恆不顯示須使①轉紅；
+  ② 把判定改為「只看 `delta.status`」（忽略相依旗標）須使②轉紅——
+  沒有②，前一條 mutation 抓不到這個實作。
   指令：`cd frontend && npx vitest run src/components/ic-analysis/__tests__/EventScanBanner.test.tsx`
 - **邊界**：① 橫幅 010 之隱藏條件＝`eventscan-banner` 010 解除條件之**兩條皆成立**
   （`delta.status = ok` **且** `cluster_dependence_suspected` 為假）；只成立其一仍須顯示。
@@ -908,6 +943,15 @@
   在本專案尚無定論，且需先有真實批之段間自相關量測才能選`；觸發：`eventscan-params` 080 之診斷在真實批上
   經常為真時；登記處：`docs/IC_QUANT_GAP_REGISTRY.md`「兩路涵蓋宣告」節。
   在此之前以 Task 5.2 之診斷旗標＋橫幅不解除承擔（**不是**假裝沒有這個問題）。
+- **RESID-9 同一個值在生成區塊外被手打，無機械閘可擋**
+  — `為何現在不做: user-ruling:2026-09-21 使用者對代號 B 之裁定逐字含「不新建工具」；
+  且手寫偵測之 status_scope 不含 docs/ 其餘檔，擴充它即為新建治理工具`；
+  觸發：使用者解除「不新建工具」之限制，或 `status_scope` 因他票需要而擴充至 `docs/` 時；
+  登記處：`docs/AGENTOPS_PROBLEM_DEFINITION.md`。
+  🔴 **實證發生率（本票兩輪）**：R2 之十九條中有**四條**屬此形態
+  （§G 散文與 golden-reference 080 不同步、收斂檔宣稱之處置與 Task 4.4 字面不符、
+  橫幅解除條件兩處不同步、Q-C10 指向之殘留 ID 與 §N 用途衝突）。
+  在此之前只能靠兩家對抗審，且**會漏**。
 - **RESID-7 主 horizon 之預先登記無法擋「重跑一批新的」**
   — `為何現在不做: blocked-by:本票只在同一批內鎖住 primary_horizon；使用者換條件重跑一批新的即可繞過，
   要擋住那個需要跨批之研究登記簿（研究 id、條件式 digest、宣告時序），其資料模型不在本票範圍`；
