@@ -225,7 +225,8 @@
 <!-- BEGIN GENERATED: eventscan-banner -->
 | 序 | 位置 | 字面 | 解除條件 |
 |---|---|---|---|
-| 010 | 「差（觸發 − 隨機）」表上方 | 無信賴區間；平均差為正不得讀成這條規則會賺。 | Δ 之 bootstrap 區間 `status = ok` **且** `cluster_dependence_suspected` 為假（兩條件皆須成立） |
+| 010 | 「差（觸發 − 隨機）」表上方——`status` 非 `ok` 時 | 無信賴區間；平均差為正不得讀成這條規則會賺。 | Δ 之 bootstrap 區間 `status = ok` |
+| 015 | 「差（觸發 − 隨機）」表上方——`status = ok` **且** `cluster_dependence_suspected` 為真時 | 區間已算出，但段與段之間偵測到序列相依；此區間可能過窄，平均差為正不得讀成這條規則會賺。 | `cluster_dependence_suspected` 轉為假。🔴 本列為 R4 修正：此情形下區間**確實有回傳**（Task 5.2 邊界④），沿用 010 之「無信賴區間」字面與畫面事實矛盾 |
 | 020 | 掃描結果頁 | 這是同一段樣本上的描述，不是驗證過的策略。 | **不可解除**（本票不做樣本外驗證） |
 | 030 | 報酬表 | 主數字未扣成本；未含吃單費、資金費、開盤滑價。 | **不可解除** |
 <!-- END GENERATED: eventscan-banner -->
@@ -240,7 +241,7 @@
 | 030 | 比較比的是達標率不是報酬 | 現有比較端點只回 prevalence／lift，且常因缺 `label_rule` 收據而灰 | 5.1 |
 | 040 | 隨機抽樣不公平（四項） | 筆數／候選資格／樣本互斥／期間池與配額 | 4.1–4.4 |
 | 050 | 統計欄差兩項 | 標準差與最好／最差沒有 | 3.1 |
-| 060 | 沒有欄位選擇器 | 單一 run 欄名逾 18 萬，後端能回清單但只有平鋪一包 | 1.3、6.1 |
+| 060 | 沒有欄位選擇器 | 單一 run 欄名規模見 `eventscan-column-selector` 100，後端能回清單但只有平鋪一包 | 1.3、6.1 |
 | 070 | 「持有 N 根」有兩套時鐘 | 事件報酬表自進場根起算、全 K 線表自 t0 起算，選 next_open 時差一根 | 2.3 |
 | 080 | 事件型沒有成本歸零點 | 序列型有且前端已顯示；事件型是「沒做」不是「不能做」 | 3.2 |
 <!-- END GENERATED: eventscan-gaps -->
@@ -273,7 +274,7 @@
 | 070 | 衍生欄 | `_Cross`／`_Ratio` 等兩兩組合欄，同列於其所屬層；歸屬規則須可列舉，禁丟棄 | Task 1.3 邊界① |
 | 080 | 打字搜尋 | 對欄名做子字串比對，回相符欄名與其所屬層級路徑 | **本票新增** |
 | 090 | 後端既有來源 | `GET /api/v1/ic/features/list`（回整包平鋪清單） | api/routes/ic_analysis.py:344 |
-| 100 | 規模 | 單一 run 欄名逾 18 萬 ⇒ 平鋪清單對使用者不可用 | 實查 reference run |
+| 100 | 規模（**唯一數字來源**，SPEC 散文不得自列） | reference run 之欄數＝ `437,110`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用 | 實查 reference run（🔴 方向書所寫之「逾 18 萬」為錯值，勿沿用） |
 <!-- END GENERATED: eventscan-column-selector -->
 
 ### K-11 條件欄之 PIT 准入規則
@@ -286,11 +287,12 @@
 | 030 | 🔴 該保護之缺口 | 不含 `future_` 前綴而語意上含未來資訊之欄，現行 guard 放行（委員實跑反例已重現） |
 | 035 | 🔴 manifest 實況（全量實查，非抽樣） | reference run 有 **1004 個 group**；gid 之底線段數分佈為 3 段 8 個／4 段 316 個／5 段 383 個／6 段 99 個／7 段 198 個；group 物件之鍵為 `column_count`／`columns`／`dtype`／`dtype_counts`／`encoded_column_count`／`file`／`file_size_bytes`／`float32_columns`／`nan_ratio`／`path`／`row_count`／`source_group_id`——**沒有類別欄，也沒有指標欄** |
 | 040 | 本票之准入規則 | 契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`；欄只在「該 run 之三元組已核准」**且**「其 `gid` 命中」**且**「該 gid 之 `columns` 實算 sha256 與登記值相等」時才進 registry |
+| 042 | `columns_sha256` 之 canonical 定義（缺此定義即算不出同一個值） | ① 取 `groups.<gid>.columns` 之字串陣列；② 以 `LC_ALL=C` 位元組序**排序**（不可依賴 Python 預設 locale）；③ 以 `\\n` 連接、**尾端不加** `\\n`；④ 以 `UTF-8` 編碼（不加 BOM）；⑤ 取 `sha256` 之小寫十六進位。🔴 委員實測：同一份真實 `columns` 以四種常見算法可得**四個不同值** ⇒ 五步缺一即為不同實作 |
 | 045 | 🔴 為何不切 gid 字串 | 「`<週期>_<層>_<類別>_<指標>` 四段文法」只蓋住 1004 個中的 316 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是** |
 | 047 | 🔴 為何索引要綁三元組與欄摘要（跨 run 實測） | 兩個真實 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）** |
 | 050 | 未命中之處置（三種皆 fail-closed） | ① 三元組未核准 ② gid 不在該 run 之登記 ③ `columns` 實算摘要與登記值不等 ⇒ 皆 fail-closed 不收該欄，並逐情形可列舉被拒欄數；**不得**以「看起來像技術指標」或「同名 gid 上次過了」放行 |
-| 055 | 核准流程 | 由 `scripts/gen_eventscan_pit_allowlist.sh` 對指定三元組自 manifest 全量產出 `gid → columns_sha256` 候選，審定後寫入契約檔之該三元組區段；**新 run 只需審其新 gid**，既有三元組不受影響 |
-| 057 | 誠實邊界（操作成本） | 每個新 FF run 需跑一次核准流程才能用於掃描。實測上第二個 run 之 43 個共用 gid 可直接沿用（欄摘要相等者），只需審其餘。成本不為零，但安全方向正確且不得以放寬 fail-closed 換取便利 |
+| 055 | 核准流程 | 由 `scripts/gen_eventscan_pit_allowlist.sh` 對指定三元組自 manifest 全量產出 `gid → columns_sha256` 候選，審定後寫入契約檔之該三元組區段。**須審之集合＝「新 gid」∪「gid 相同但 `columns_sha256` 與任一既有三元組之登記值不等者」**——只審新 gid 會漏掉欄漂（047 之 `1h_L2_Momentum_chunk2` 即此形態） |
+| 057 | 誠實邊界（操作成本） | 每個新 FF run 需跑一次核准流程才能用於掃描。可直接沿用者＝gid 相同**且**欄摘要相等；實測第二個 run 之 43 個共用 gid 中有此性質者才免審。成本不為零，但安全方向正確且不得以放寬 fail-closed 換取便利 |
 | 060 | 白名單之維護點 | 契約檔為唯一來源；**不得手寫欄名清單**，也**不得**在程式碼內另列 gid（黑名單與散落清單永遠列不完） |
 | 070 | 誠實邊界 | 粒度為 group 而非逐欄因果證明：同一 group 內若存在非因果變體則擋不住。逐欄因果 provenance 需 FF 在產出端補欄，列殘留 RESID-6 |
 <!-- END GENERATED: eventscan-pit-admission -->
@@ -305,8 +307,9 @@
 | 025 | 建議計算之耗時上限 | `200` 毫秒，**綁定 020 之演算法**且須附 reference 規模（437,110 鍵）之實測收據才算驗收通過；逾時回空建議清單並標原因，不得讓請求掛住 | 1.2 |
 | 030 | Δ bootstrap 重抽次數 | `2000` | 5.2 |
 | 040 | Δ bootstrap 分位 | `2.5` 與 `97.5`（雙尾 95%） | 5.2 |
-| 050 | Δ bootstrap 之最小段數（**判準，非常數**） | 🔴 不得寫死。定義＝「在同分布模擬下，Δ 區間之覆蓋率達名目水準所需之最小段數」，由 Task 5.2 之覆蓋率校準測試輸出並回填本列；回填前本列之值為 `待校準`，且**校準測試本身是 SPEC 之驗收條件**。理由＝固定 20 未經校準，在 reference 之常見均線條件上可能使區間幾乎恆為 `unavailable`（委員實證質疑） | 5.2 |
-| 055 | 校準之覆蓋率名目水準 | `0.95`（與 040 之雙尾分位一致）；校準測試以同分布兩批模擬，取覆蓋率首次達該水準之段數 | 5.2 |
+| 050 | Δ bootstrap 之最小段數（**判準，非常數**） | 值＝`待校準`，由 056 之校準程序輸出後回填本列。🔴 **機械綁定**：Task 5.2 之驗收含一條測試，斷言本列之值**不為** `待校準`；未回填即該測試紅，Task 5.2 不得標完成。理由＝任何未經校準之下限都可能使區間在真實條件下幾乎恆為 `unavailable` | 5.2 |
+| 055 | 校準之覆蓋率名目水準 | `0.95`（與 040 之雙尾分位一致） | 5.2 |
+| 056 | 校準程序（**可重現，缺一即不同實作**） | ① 段數網格＝`[5, 10, 15, 20, 30, 40, 60, 80]`；② 每格模擬重複數＝`2000`；③ 校準 RNG seed＝`20260921`；④ 每次模擬以同分布兩批產生 Δ 之真值 0；⑤ 覆蓋率之判定用 **Wilson 二項式區間下界 ≥ 055**（非點估計 ≥ 055——點估計會因模擬噪音在邊界上跳動）；⑥ 取網格中**首個**滿足⑤者為最小段數；⑦ 全網格皆不滿足 ⇒ fail-closed 並列出各格覆蓋率，不得取最接近者 | 5.2 |
 | 060 | Δ bootstrap seed | `20260921`（寫入收據；同設定重跑逐位元組相同） | 5.2 |
 | 070 | 排除比例警告門檻 | `excluded / n_rows > 0.5` ⇒ 收據標警告，**不自動改排除窗寬度** | 4.3 |
 | 080 | 段間相依診斷門檻 | 段層級報酬之一階自相關絕對值 `abs(rho_1) > 0.2` ⇒ 收據標 `cluster_dependence_suspected` | 5.2 |
@@ -371,7 +374,7 @@
 | 060 | golden 存放路徑 | `tests/golden/eventscan/` |
 | 070 | 新增數值之容差 | `abs ≤ 1e-12` 或 `rel ≤ 1e-9`；超出即列出該（批, h）與實際 diff = FAIL |
 | 075 | 新增數值之適用鍵（**唯一清單**，SPEC 散文不得自列） | `std`／`ret_max`／`ret_min`／`breakeven_cost_bps`／`delta.*`（逐 h 之報酬差各欄）／Δ 之 `ci_low`／`ci_high`／`n_clusters`。任一新增鍵未列入本列即為缺漏；比對對象為 `numpy` 直算之參考值 |
-| 080 | 行為不變型之容差 | 無容差——**既有鍵**之值與 NaN 逐鍵相等、既有鍵不得移除或改名、列數不變、既有 digest 與 provenance 鍵集合不變。🔴 **允許新增鍵**（新增鍵走下一列之「新增數值」驗收） |
+| 080 | 行為不變型之容差 | 無容差——**既有鍵**之值與 NaN 逐鍵相等、既有鍵不得移除或改名、列數不變、既有 digest 與 provenance 鍵集合不變。🔴 **允許新增鍵**，其驗收見本表 **070（容差）與 075（適用鍵清單）**——不寫「下一列」，序號插入會使相對指涉失效（R4 實例：075 插入後「下一列」變成 090） |
 | 090 | `n` 與 `nan_ratio` | exact，不得有容差 |
 | 100 | 跑完之副作用還原 | `bash scripts/restore_golden_inventory.sh` |
 <!-- END GENERATED: eventscan-golden-reference -->
@@ -426,10 +429,10 @@
   ⇒ 改為**封閉白名單式准入**：機械導出、缺 metadata 即拒收（040–060），誠實邊界見 070。
 - **驗證**：`parse_condition("close_1h_trend_EMA_5 > close_1h_trend_EMA_10", <FF registry>, "feature")`
   回 `ConditionSpec` 且 `column_roles` 兩欄皆為 `pit_feature`；同一式在**未註冊 FF 欄**之 registry 下
-  仍 `raise ConditionError("unregistered_column", …)`；另以不在白名單之家族欄建 registry，該欄須**不在**
+  仍 `raise ConditionError("unregistered_column", …)`；另以「gid 不在白名單」與「gid 在白名單但 `columns_sha256` 不等」兩種欄各建一次 registry，該欄皆須**不在**
   registry 內且被拒欄數可列舉。
   **mutation（須測本票新增之碼，不是既有碼）**：把本 Task 之白名單比對改為「恆命中」，
-  須使「不在白名單之家族欄不得進 registry」之斷言轉紅。
+  須使上述兩條「不得進 registry」之斷言各自轉紅（**兩條都要**：只擋 gid 不擋欄摘要，仍會放行欄漂之 run）。
   🔴 R1 原指定之 mutation（改 `expression_role` 為 `selection_predicate`）測的是既有
   `condition_engine._role_violation`，**不是本票新增之准入邏輯**（本輪委員指出）；
   該條降為**前提檢查**：先斷言既有 role isolation 仍在守（`future_` 前綴欄在 `feature` 角色下被拒），
@@ -438,7 +441,7 @@
   `pytest tests/momentum/event_samples/test_condition_engine_ff_registry.py -q`
 - **邊界**：① FF run 不存在 ⇒ fail-closed 並回可區分之原因碼，禁回空 registry（空 registry 會讓所有欄名都變成
   「打錯字」）；② 同一 `config_hash` 命中多個 symbol ⇒ fail-closed；③ 欄名含 Python 保留字或非識別字字元
-  ⇒ 該欄不得進 registry，且須可列舉（不得靜默丟棄）；④ manifest 之家族欄缺失或值不在白名單
+  ⇒ 該欄不得進 registry，且須可列舉（不得靜默丟棄）；④ 三元組未核准、gid 不在登記、或 `columns_sha256` 與登記值不等（`eventscan-pit-admission` 050 之三種情形）
   ⇒ 依 `eventscan-pit-admission` 050 拒收該欄，**不得**回落到「當作 `pit_feature`」。
 - **存活至**：Phase 6 完工後仍保留（前端選擇器與掃描端共用同一份 registry）。
 - **覆蓋風險**：無。後續 Phase 只讀不改本 Task 產出。
@@ -455,7 +458,7 @@
   而 020 是演算法列、耗時在 025）。原因碼集合見 `eventscan-failure-reasons`。
 - **驗證**：`eventscan-test-vectors` 080；另 registry 為空時建議清單為空、原因碼仍為
   `unregistered_column`（不得改成另一碼）。指令：`pytest tests/momentum/event_samples/test_condition_engine_suggest.py -q`
-- **邊界**：① registry 逾 18 萬鍵時建議計算之耗時須有上限（超時回空建議、不得讓請求掛住）；
+- **邊界**：① registry 達 `eventscan-column-selector` 100 之規模時，建議計算之耗時須符合 `eventscan-params` 025（超時回空建議、不得讓請求掛住）；
   ② 查詢字串為空或全空白 ⇒ 走既有 `empty_expression`，不進建議路徑。
 - **存活至**：Phase 6 完工後仍保留（前端直接顯示建議清單）。
 - **覆蓋風險**：無。
@@ -471,10 +474,10 @@
   任取一條葉路徑組回之欄名存在於 `features/list` 之回應中（雙向對證，防層級樹自己編出不存在的欄）。
   指令：`pytest tests/api/test_feature_selector_index.py -q`
 - **邊界**：① 欄名段數不等於五（衍生欄如 `_Cross`／`_Ratio`）⇒ 須有明確歸屬規則且可列舉，禁丟棄；
-  ② 搜尋字串為空 ⇒ 回空結果而非全部 18 萬筆；③ run 無任何欄 ⇒ 回空樹且標明原因，非 500。
+  ② 搜尋字串為空 ⇒ 回空結果而非全部欄名（規模見 `eventscan-column-selector` 100）；③ run 無任何欄 ⇒ 回空樹且標明原因，非 500。
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
-- 不可做：不得把 18 萬筆平鋪清單直接回給前端；不得在後端做前端排版。
+- 不可做：不得把全量平鋪清單直接回給前端（規模見 `eventscan-column-selector` 100）；不得在後端做前端排版。
 
 ### Phase 2 — 掃描與時鐘（依賴：Phase 1）
 
@@ -578,7 +581,14 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   → 走既有匯入契約落批。進場語意、時鐘見 `eventscan-clock`。
   🔴 **`primary_horizon` 為必填請求欄**（R3 兩家指出：R2 只把它寫進 Task 5.1 與 Q-C10，
   端點輸入契約沒有承載它 ⇒ 主 horizon 可被猜測、遺失或由後端代填）：型別為整數，
-  **須為 `horizons[]` 之成員**，否則 fail-closed 並列出兩者；Task 5.1 之收據自本欄取值。
+  **須為 `horizons[]` 之成員**，否則 fail-closed 並列出兩者。
+  🔴 **且須落到可驗證、可持久化的批次收據**（R4 委員指出：R3 只把它加在請求上，
+  `event_import_contract.json` 之 `receipt_schema.batch` 與 API DTO 皆無此欄
+  ⇒ 請求收下後該值不落檔，Task 5.1 之「收據自本欄取值」沒有可取之處）：
+  本票於 `receipt_schema.batch` **新增** `primary_horizon` 與 `primary_horizon_declared_at` 兩鍵
+  （`required: false`，缺＝舊批合法，與 `label_rule` 同型），並於 API 回應 DTO 同步新增。
+  ⚠️ 此為 §C 所禁「改 `required_fields`」之**例外邊界**：新增之鍵在 `receipt_schema` 而非
+  `required_fields`，且為選填 ⇒ 舊批不受影響、既有驗證器行為不變。此點須由 R5 明確判定是否成立。
   🔴 **本端點之不變式**：經 `pipeline.analyze_tables` 組表時**恆**傳入 Task 2.4 之
   `by_label_suppressed_reason`；漏傳即為缺陷，須有測試釘住（見下驗證條）。
   （本 Task 為 Phase 2 之**最後**一個：其輸入同時需要 2.4 之抑制參數、2.2 之 first-of-run
@@ -639,6 +649,11 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
 
 ### Phase 4 — 隨機對照（依賴：Phase 2）
 
+🔴 **本 Phase 之執行順序＝ Task 4.1 → 4.4 → 4.2 → 4.3**（編號為標籤，非順序）。
+4.1 先把觸發批之 `horizons` 帶入；4.4 以 `max(horizons)` 定候選資格；4.2 在該候選池上配額；
+4.3 再於配額結果上做互斥 packing。R4 兩家指出：R3 只修了 Phase 2 之列序，Phase 4 之
+4.2／4.3 依賴 4.4 定義之候選池，而 4.4 列在其後——**同型矛盾，逐 Phase 都要查**。
+
 **Task 4.1 — 參數由觸發批帶入 ＋ 身分閘擴充**
 - 目標：兩批用同一把尺。
 - 檔案：`momentum/Analysis/event_samples/random_control.py`、`api/services/ic_analysis_service.py`（身分閘）。
@@ -654,6 +669,20 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
 - 不可做：不得以「畫面標明用了哪個」代替帶入——尺不同就不能相減。
+
+**Task 4.4 — 候選資格改用 `max(horizons)`**
+- 目標：候選資格要夠寬到涵蓋最長持有期。
+- 檔案：`momentum/Analysis/event_samples/random_control.py`（eligibility 判定）。
+- 既有 caller／影響面：既有呼叫端只傳單一 `label_rule.horizon_bars` 時，`max` 退化為該值，行為不變。
+- 改法：eligibility 改吃 `horizons` 集合並取其最大值；規則見 `eventscan-random-control` 020。
+- **驗證**：`eventscan-test-vectors` 070（`pytest` 兩組同測試內並列，證明差異真實）。
+  **mutation**：把 `max` 改為 `min` 須使該列之第一條斷言轉紅。
+  指令：`pytest tests/momentum/event_samples/test_random_control_eligibility.py -q`
+- **邊界**：① `horizons` 僅一元素 ⇒ 與既有行為 byte 級相同；② `horizons` 含 0 或負值 ⇒ fail-closed；
+  ③ 剔除後候選為 0 ⇒ 依 `eventscan-failure-precedence` 030 回**月配額**碼（缺額＝該月全部配額），**不是** packing 碼——三處指向同一支，消除 R1 之三重重疊。
+- **存活至**：Phase 6 完工後仍保留。
+- **覆蓋風險**：無。
+- 不可做：不得同時放寬其他資格條件來補回被剔除的候選數。
 
 **Task 4.2 — 期間池與配額改按觸發筆數**
 - 目標：讓對照落在觸發所在的行情，而非窗內平均行情。
@@ -686,20 +715,6 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
 - 不可做：不得放寬互斥、不得抽相鄰根充數、不得縮小 n。
-
-**Task 4.4 — 候選資格改用 `max(horizons)`**
-- 目標：候選資格要夠寬到涵蓋最長持有期。
-- 檔案：`momentum/Analysis/event_samples/random_control.py`（eligibility 判定）。
-- 既有 caller／影響面：既有呼叫端只傳單一 `label_rule.horizon_bars` 時，`max` 退化為該值，行為不變。
-- 改法：eligibility 改吃 `horizons` 集合並取其最大值；規則見 `eventscan-random-control` 020。
-- **驗證**：`eventscan-test-vectors` 070（`pytest` 兩組同測試內並列，證明差異真實）。
-  **mutation**：把 `max` 改為 `min` 須使該列之第一條斷言轉紅。
-  指令：`pytest tests/momentum/event_samples/test_random_control_eligibility.py -q`
-- **邊界**：① `horizons` 僅一元素 ⇒ 與既有行為 byte 級相同；② `horizons` 含 0 或負值 ⇒ fail-closed；
-  ③ 剔除後候選為 0 ⇒ 依 `eventscan-failure-precedence` 030 回**月配額**碼（缺額＝該月全部配額），**不是** packing 碼——三處指向同一支，消除 R1 之三重重疊。
-- **存活至**：Phase 6 完工後仍保留。
-- **覆蓋風險**：無。
-- 不可做：不得同時放寬其他資格條件來補回被剔除的候選數。
 
 ### Phase 5 — 比較端點（依賴：Phase 3、Phase 4）
 
@@ -750,7 +765,9 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   ② 兩側段數差距極大 ⇒ 須可列舉兩側段數，不得只回一個區間；
   ③ 重抽次數不足 ⇒ fail-closed 而非回較差的區間；
   ④ 相依診斷為真而區間仍算得出來 ⇒ 區間照回，但旗標須隨之回傳且橫幅不解除。
-- **存活至**：Phase 6 完工後仍保留；其 `status = ok` **且**相依旗標為假，才是 `eventscan-banner` 010 之解除條件。
+- **存活至**：Phase 6 完工後仍保留。其 `status = ok` 是 `eventscan-banner` 010 之解除條件；
+  相依旗標轉為假才是 015 之解除條件。**兩條橫幅各有各的解除條件，不可合併判斷**
+  （R4 指出：合併後 `status = ok` 且相依為真時會掛上「無信賴區間」，與該情形下區間確實回傳之事實矛盾）。
 - **覆蓋風險**：無。
 - 不可做：不得分別畫兩側 CI 再看重不重疊——那不能回答「差是否為 0」；
   不得在本 Task 宣稱因果或「這條規則會賺」。
@@ -812,17 +829,19 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   且畫面不出現門檻欄、筆數為唯讀顯示。
 - **驗證**：vitest——**三格皆須斷言**（R3 兩家指出原驗證只覆蓋第一格，
   「只看 `status` 就隱藏橫幅」之實作可通過）：
-  ① `delta.status != "ok"` ⇒ 橫幅 010 渲染且字面逐字相符；
-  ② `delta.status == "ok"` **且** `cluster_dependence_suspected == true` ⇒ 橫幅 010 **仍**渲染；
-  ③ `delta.status == "ok"` **且** `cluster_dependence_suspected == false` ⇒ 橫幅 010 不渲染。
+  ① `delta.status != "ok"` ⇒ 橫幅 010 渲染且字面逐字相符、015 不渲染；
+  ② `delta.status == "ok"` **且** `cluster_dependence_suspected == true` ⇒ 橫幅 **015** 渲染且字面逐字相符、
+     010 **不**渲染（R4 修正：此情形下區間確實有回傳，掛 010 之「無信賴區間」與事實矛盾）；
+  ③ `delta.status == "ok"` **且** `cluster_dependence_suspected == false` ⇒ 010 與 015 皆不渲染。
   另本票掃描面板之 DOM 不含門檻輸入欄；`nRequested` 顯示值等於觸發批 `n`。
   **mutation**：① 把橫幅條件改為恆不顯示須使①轉紅；
   ② 把判定改為「只看 `delta.status`」（忽略相依旗標）須使②轉紅——
   沒有②，前一條 mutation 抓不到這個實作。
   指令：`cd frontend && npx vitest run src/components/ic-analysis/__tests__/EventScanBanner.test.tsx`
-- **邊界**：① 橫幅 010 之隱藏條件＝`eventscan-banner` 010 解除條件之**兩條皆成立**
-  （`delta.status = ok` **且** `cluster_dependence_suspected` 為假）；只成立其一仍須顯示。
-  橫幅 020／030 恆顯示；
+- **邊界**：① 三種狀態各對應一組渲染，**不得合併成單一判斷**：
+  `delta.status != ok` ⇒ 010 顯示、015 不顯示；
+  `delta.status = ok` 且 `cluster_dependence_suspected` 為真 ⇒ 010 不顯示、**015 顯示**；
+  `delta.status = ok` 且該旗標為假 ⇒ 兩者皆不顯示。橫幅 020／030 恆顯示；
   ② 後端未回 `delta` 鍵（舊批）⇒ 視同非 ok，顯示橫幅；③ 觸發批 `n=0` ⇒ 不進本畫面。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
