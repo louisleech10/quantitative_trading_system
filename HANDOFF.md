@@ -6,6 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
+| 04-003 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 寫 SPEC（大票管線第①步）；方向與做法已定案，SPEC 未起草 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -23,6 +24,7 @@
 | 03-013 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 IC 切分契約 |
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
+| 04-003 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 寫 SPEC（大票管線第①步）；方向與做法已定案，SPEC 未起草 |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑

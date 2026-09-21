@@ -29,6 +29,7 @@
 |---|---|---|---|---|
 | 010 | HP-PLAINDOCS | 已完成 | 白話說明/README.md | — |
 | 020 | HP-REDISPATCH | 已完成 | docs/REDISPATCH_SPEC.md | — |
+| 030 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 寫 SPEC（大票管線第①步）；方向與做法已定案，SPEC 未起草 |
 <!-- END GENERATED: handoff-pending -->
 
 ---
