@@ -78,7 +78,10 @@ _gen_loose = re.compile(r"<!--\s*(BEGIN|END) GENERATED:")
 _fence = re.compile(r"^\s*(?P<f>```|~~~)")
 fence_kind = ""
 # 跨行 outer HTML 註解（R11：合法成對 marker 藏在其中仍被當生成區塊）
-_c_open = re.compile(r"<!--")
+# 🔴 只在**整行就是**未閉合之註解開頭時才進註解狀態（R12 自驗：原用 `search` ⇒
+# 散文行提到 `<!--` 字面也會進狀態，其後之合法生成區塊被誤判為 prose 而誤報）。
+# 行首可有空白；`<!--` 後只准空白或註解內容，不得有反引號（inline code 之引用形態）。
+_c_open = re.compile(r"^\s*<!--(?![^`]*`)")
 _c_close = re.compile(r"-->")
 in_outer_comment = False
 in_fence = False
@@ -103,7 +106,7 @@ for n, line in enumerate(new, 1):
         if _c_close.search(line):
             in_outer_comment = False
         continue
-    if _c_open.search(line) and not _c_close.search(line) \
+    if _c_open.match(line) and not _c_close.search(line) \
             and not _gen_begin.match(line) and not _gen_end.match(line):
         in_outer_comment = True
         continue

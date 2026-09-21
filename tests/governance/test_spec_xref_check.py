@@ -198,6 +198,31 @@ def test_malformed_generated_markers_fail_closed(src: str, why: str, tmp_path: P
     assert r.returncode == 1, f"{why} marker 未 fail-closed\n{r.stdout}{r.stderr}"
 
 
+PROSE_COMMENT_THEN_BLOCK = (
+    "# T\n"
+    "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+    "說明：生成區塊以 `<!--` 開頭的註解標記包住。\n"
+    "<!-- BEGIN GENERATED: k -->\n"
+    "| 100 | 規模 | `TOKEN_ABCDEF` |\n"
+    "<!-- END GENERATED: k -->\n"
+)
+
+
+def test_prose_mentioning_comment_open_does_not_swallow_following_block(
+    tmp_path: Path,
+) -> None:
+    """散文行提到 `<!--` 字面後，其後之合法生成區塊仍須被視為生成區塊（rc=0）。
+
+    跨行註解追蹤首版用 `search` ⇒ 散文行也會進註解狀態，
+    使其後之合法區塊被誤判為 prose 而誤報（R12 自驗抓到）。
+    """
+    new = "\n".join(
+        ln for ln in PROSE_COMMENT_THEN_BLOCK.splitlines() if "規模數字為" not in ln
+    ) + "\n"
+    r = _run(PROSE_COMMENT_THEN_BLOCK, new, tmp_path)
+    assert r.returncode == 0, f"散文之 `<!--` 誤吞了其後之生成區塊\n{r.stdout}{r.stderr}"
+
+
 def test_staged_entry_inherits_structure_validation(tmp_path: Path) -> None:
     """`--staged` 與 `--files` 共用 `_check_pair` ⇒ 結構驗證須一併生效（R10 指出只測了 --files）。
 
