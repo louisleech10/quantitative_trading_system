@@ -100,6 +100,10 @@
 - 🔴 **白話檔改職責時，其 WATCHED 必須跟著改**：`現在做到哪.md` 由「GAP-3 即時進度」改為「現在在做哪張票」後，WATCHED 仍是 11 條 GAP-3 實作路徑 ⇒ 任何相關改動都誤報過期。職責與監看集合是一組，改一個就要改另一個。
 - 🔴 **改了 brief 就不能掛回原 round**：開債記錄綁 `brief_sha256`。委員交件失敗後若順手改了 brief，同輪重派會對不上；須把 brief byte-exact 還原到原 sha 才解得開。配合既有坑「永遠不要 kill 執行中的 `committee_run`」——kill 後會落得「有 failed 結果又不能棄置」的死結。
 - 🔴 **`cd <專案路徑>` 前綴 ＋ `bash -c` 會觸發權限分類器**：2026-09-20 實測卡 **588 秒**，使用者乾等。CLAUDE.md 已明文禁 `cd` 前綴，`bash -c` 包裝是同型放大。
+- 🔴 **主委自產版不得進 `sources.lock` 也不得進收斂檔附錄**（既有慣例，查 `20260920-eventscan-x-consult-r2`／`20260920-plaindocs-x-review-r2` 皆 roster 只有兩家、synth 零個 `## CLAUDE-`）。放進去有兩個後果：①`debt_clear` 的 roster 比對用 `lock_set == open_set − paused`，`claude` 不在 `open.participants` ⇒ 永遠不等、拒銷；②`completeness_check` 報 `unknown ID(s) in synth`。主委版寫成獨立檔，收斂檔以一行指回去即可。
+- 🔴 **`sources.lock` 是 write-once**：`--rebuild` **不收委員檔**（「既有 sources.lock 內容必須保持不變」），不帶 `--rebuild` 又拒覆寫既有 session。要改 roster 只能把**整個 session 目錄移開**再重建——**先備份 `synth.md`**，重建會把它打回骨架。
+- 🔴 **收斂檔附錄必須與來源逐位元組相同**：任何**全域字串替換**（例如把「三家」改「兩家」）都會打到附錄裡的委員區塊 ⇒ `body-hash 不符` 拒銷，而錯誤訊息只給兩個 sha 指不到你改了哪。改群集段要逐段改，或改完把附錄自來源重新逐字抽一次。
+- 🔴 **委員檔案被還原／修好後要 `register-output` 才解鎖**：`cx_run` 收尾時產出缺檔會記 `result_state=failed`，之後即使檔案補回來，`debt_clear` 仍報「最新 result_state='failed' 且其後無同 round 之 committee_output」。補跑 `bash scripts/gate.sh register-output <task-id> <檔>`。
 - 🔴 **findings 檔內出現 `<!--` 字面會吞掉後續必填欄**：`completeness_check.sh` 的解析把 HTML 註解開頭之後的內容當註解，導致 `**類別**` 明明寫了卻報「finding 缺類別」，錯誤訊息完全指不到真因。2026-09-21 踩到（碼證欄引用 `grep 'BEGIN GENERATED'` 的完整字面）。⇒ 在 findings／brief 內引用含 `<!--` 的字面時，去掉註解開頭符號。
 
 ## 進行中紀錄

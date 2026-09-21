@@ -17,37 +17,28 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p><strong>查清楚文檔問題有沒有解</strong>（AGENTOPS／DOCFIX）。</p>
-<p>你問的是：幾個月、幾百個 session、幾千份文檔、一堆治理票，到底有沒有解決問題？
-所以先把病定義出來，再去外面看有沒有藥。</p>
+<p><strong>本 session 已收尾。</strong> 依你 2026-09-20 的裁定，這個 session 停在白話文檔整理完成，
+<strong>EVENTSCAN 從新 session 開始寫規格</strong>。</p>
 <h2 id="做到哪">做到哪</h2>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>步驟</th>
+<th>這個 session 做了什麼</th>
 <th>狀態</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>病因目錄（掃全部腳本，得 862 個真拒絕點）</td>
+<td>白話文檔整理（根目錄 29 → 7 份，README 990 → 37 行）</td>
 <td>✅ 完成</td>
 </tr>
 <tr>
-<td>歸因：哪個閘真的有效</td>
+<td>查清楚文檔問題有沒有解（病因定義＋外部方案調查）</td>
 <td>✅ 完成</td>
 </tr>
 <tr>
-<td>外部方案調查（我＋兩家委員各查一版）</td>
+<td>修掉四個機械缺陷（見下）</td>
 <td>✅ 完成</td>
-</tr>
-<tr>
-<td>收斂成一份結論</td>
-<td>✅ 完成（14 條意見全進群集表，機械檢查過）</td>
-</tr>
-<tr>
-<td><strong>你裁定要不要動手</strong></td>
-<td><strong>← 現在卡在這</strong></td>
 </tr>
 </tbody>
 </table></div>
@@ -60,28 +51,56 @@ GitHub 官方的 Spec Kit 也做同一件事，但明文寫死「只報告、不
 9/20 那兩輪就抓出 23 條我自己寫出來的矛盾。問題不是抓不到，是<strong>抓不穩</strong>，
 所以不能拿來當「過／不過」的自動判定。</p>
 <p><strong>三、真正有效的是「同一件事只寫一次」，而我們只裝了 6.5%。</strong>
-我們早就有這個機制（改一處、所有文件自動同步，手改會被擋）。
-但它只裝在 <strong>14 份文件</strong>上，而且 18 個受保護的事實<strong>全部是治理自己的記帳</strong>——
-EVENTSCAN、IC、Feature Factory 的任何裁定，<strong>一個都沒有</strong>。
-這就是為什麼之前兩張文檔票花了很多時間卻沒效：它們加的是格式規則（摩擦），不是保護。</p>
+我們早就有這個機制（改一處、所有文件自動同步，手改會被擋），
+但它只裝在 14 份文件上，18 個受保護的事實<strong>全部是治理自己的記帳</strong>——
+EVENTSCAN、IC、Feature Factory 的任何決定，一個都沒有。</p>
+<p>🔴 <strong>這件事的上限也要講清楚</strong>：那是<strong>零件型號表，不是組裝圖</strong>。
+它管「同一個值不會在三份文件寫成三個樣」，<strong>不管架構對不對、零件怎麼接、為什麼這樣設計</strong>。
+論述那一半外面沒有解，我們也沒有，只能靠委員審查，而且會漏。</p>
+<h3 id="順手修掉的四個機械缺陷">順手修掉的四個機械缺陷</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>缺陷</th>
+<th>後果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>派工不讀「現役委員名冊」</td>
+<td>我照舊記憶派了已停用的 Grok，當場失敗</td>
+</tr>
+<tr>
+<td><code>AGENTS.md</code> 的「30 行」沒限定適用對象</td>
+<td>委員把已通過檢查的 71 行報告壓成 29 行，產出整份消失</td>
+</tr>
+<tr>
+<td>監控程式在委員重寫檔案當下砍掉它</td>
+<td>同上，已改成先備份再砍、砍完不完整就回填</td>
+</tr>
+<tr>
+<td>封存目錄用逐檔黑名單</td>
+<td>白話檔一次搬 22 份就整批漏列，連 HANDOFF 都寫不進去</td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="要你決定嗎">要你決定嗎</h2>
-<p><strong>要。</strong> 見下方「下一件事」。</p>
+<p><strong>不用。</strong> 下一步你已經定了。</p>
 <h2 id="卡住嗎">卡住嗎</h2>
-<p>沒有卡住，但<strong>等你決定</strong>才知道下一步做哪個。</p>
+<p>沒有。委員債已銷、所有檢查綠燈、已推上 GitHub。</p>
 <hr />
 <h2 id="下一件事">下一件事</h2>
-<p><strong>兩條路，請你選一條。</strong></p>
-<p><strong>路 A：先做 EVENTSCAN 寫規格</strong>（你原本排的主線）
-條件成立時買入、持有 N 期的報酬，跟隨機買入比。方向與做法已定案，
-完整說明見 <a href="EVENTSCAN方向與做法.html">EVENTSCAN方向與做法.md</a>。
-🔴 是「寫規格」不是「實作」——大票要走完整流程：
-寫 SPEC → 兩家對抗審 → 凍結 → 寫 TODO → 兩家對抗審 → 凍結 → 分批實作 → 每批審碼。</p>
-<p><strong>路 B：先把「同一件事只寫一次」裝到量化主線</strong>
-把 EVENTSCAN／IC／FF 的每個裁定登記成一個受保護的事實，
-規格書、白話說明、路線圖三處都從同一份生成，改一處全同步、手改直接被擋。
-<strong>不需要新建任何工具</strong>（機制已經在跑，只是沒裝上去），但要一條條把裁定搬進去。</p>
-<p>我的建議是 <strong>A 先走，B 在寫 EVENTSCAN 規格的同時順手做</strong>——
-因為 EVENTSCAN 的九項裁定正是現在散在三個地方、最容易被我改漏的那批。</p>
+<p><strong>EVENTSCAN 寫規格</strong>（新 session）。</p>
+<p>條件成立時買入、持有 N 期的報酬，跟隨機買入比。方向與做法已定案，
+完整說明見 <a href="EVENTSCAN方向與做法.html">EVENTSCAN方向與做法.md</a>。</p>
+<p>🔴 <strong>是「寫規格」不是「實作」。</strong> 大票走完整流程：</p>
+<pre><code>① 寫 SPEC → ② 兩家對抗審 → 收斂 → 凍結
+③ 寫 TODO → ④ 兩家對抗審 → 收斂 → 凍結
+⑤ 分批實作 → ⑥ 每批審碼 → 收斂
+</code></pre>
+<p>寫 SPEC 時會順手做一件事：凡是<strong>會被 TODO／測試／白話再抄一次的值</strong>
+（時鐘定義、進場規則、抽樣四條、統計欄、breakeven 公式、失敗原因碼、你的七項裁定…約 40–60 條），
+登記成「只寫一次」的格子，不手打。這是寫規格的細節，不是另一張票。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
