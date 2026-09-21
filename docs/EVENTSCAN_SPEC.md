@@ -83,9 +83,35 @@
 ② **拒收訊息沒有「最接近欄名」建議**，使用者分不清「打錯字」與「這個 run 沒有這個指標」。
 本 SPEC 之 Task 1.1／1.2 分別對應。**不需要「把靜默改成報錯」——那條在本票路徑上不存在。**
 
+### 🔴 R5 揭露之前提崩塌：reference run 之特徵欄已被轉換，跨週期不可比
+
+委員 R5 實測「`close_1h_trend_EMA_5 > close_1h_trend_EMA_10` 在 reference run 上只有 1 段」，
+主委追查真因並逐項實跑對證，結果推翻本票（與方向書）之一個核心前提。
+
+- FACT-RECEIPT: `PYTHONPATH=. venv/bin/python <probe>` 以真實 kline 重算 EMA 並與落檔欄比對 →
+  印出 `EMA_200 corr(落檔,未轉換EMA)=1.0000`、`EMA_5 corr=0.9102`、`EMA_55 corr=-0.0080`
+  ⇒ 短週期欄已被轉換、`EMA_200`／`EMA_233` 未被轉換（Claude 實跑 2026-09-21）
+- FACT-RECEIPT: `jq '.entries' data_cache/feature_preprocessing/d_star_ETHUSDT_1h_dcc154ced6b6.json` →
+  印出 `close_trend_EMA_5=0.3906`／`EMA_34=0.6875`／`EMA_200=1.0`，且 `EMA_89`／`100`／`144`／`233`
+  **無紀錄**（Claude 實跑 2026-09-21）
+- FACT-RECEIPT: 以快取所記 `d*` 套用 `_frac_diff_ffd` 後與落檔比對 → `EMA_5..34` 相關 `0.89–0.99`、
+  `EMA_200` 相關 `0.0049` ⇒ **`EMA_200` 之 `d*` 有紀錄但轉換未被套用**（Claude 實跑 2026-09-21）
+- FACT-RECEIPT: `jq` 掃 `data_cache/features/*/*/*/feature_manifest.json` → 印出 14 個可用 run
+  **全部** `fracdiff=True winsor=True`（Claude 實跑 2026-09-21）
+
+⇒ **方向書給使用者看的例題在本資料上無意義**：兩欄量綱不同，條件恆為真、命中 100%、不分段。
+⇒ **本票之「條件掃描」前提（FF 欄彼此可直接比較）在現有任何 run 上皆不成立。**
+
+**使用者 2026-09-21 裁定**：由主委重跑一個**關閉 `winsorization` 與 `fractional_differencing`** 的 FF run
+供本票使用；另就 `d*` 紀錄與實際套用不一致**另立票**；🔴 使用者同日補充裁定「先跟委員確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」⇒ 該票之第一步為唯讀定性，非修改（見 §N 之 RESID-10）。
+
+⇒ 本 SPEC 之 `eventscan-golden-reference` 020–040 之 reference 設定，
+**待該新 run 產生後改指向它**；`eventscan-pit-admission` 全節之必要性亦須於該時重新評估
+（若新 run 未經任何轉換，PIT 准入之複雜度可大幅降低）。**此為 SPEC 凍結之硬前置。**
+
 ### 待使用者確認
 
-`待確認：無`
+`待確認：無`（2026-09-21 裁定已取得：重跑 FF 由主委執行；`d*` 不一致**另立票且先定性再談修**，見 §N 之 RESID-10）
 
 ### 已確認結果
 
@@ -585,10 +611,16 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   🔴 **且須落到可驗證、可持久化的批次收據**（R4 委員指出：R3 只把它加在請求上，
   `event_import_contract.json` 之 `receipt_schema.batch` 與 API DTO 皆無此欄
   ⇒ 請求收下後該值不落檔，Task 5.1 之「收據自本欄取值」沒有可取之處）：
-  本票於 `receipt_schema.batch` **新增** `primary_horizon` 與 `primary_horizon_declared_at` 兩鍵
-  （`required: false`，缺＝舊批合法，與 `label_rule` 同型），並於 API 回應 DTO 同步新增。
-  ⚠️ 此為 §C 所禁「改 `required_fields`」之**例外邊界**：新增之鍵在 `receipt_schema` 而非
-  `required_fields`，且為選填 ⇒ 舊批不受影響、既有驗證器行為不變。此點須由 R5 明確判定是否成立。
+  本票於 `receipt_schema.batch` **新增** `primary_horizon` 與 `primary_horizon_declared_at` 兩鍵，
+  並於 API 回應 DTO 同步新增。
+  🔴 **typed shape 須釘死**（R5 兩家指出：R4 只寫「選填」而未定形狀；該 namespace 之既有純量鍵
+  皆為 leaf，而 **leaf 恆必填** ⇒ 直接寫成純量會變成必填鍵、使舊批驗證失敗）：
+  兩鍵一律寫成**與 `label_rule` 同型之 typed node**——
+  `{"type": <型別>, "required": false, "doc": <說明>}`，`primary_horizon` 型別 `int`、
+  `primary_horizon_declared_at` 型別 `int`（epoch ms UTC）。
+  ⚠️ §C 之「不得改匯入契約之 `required_fields`」**未被逾越**（R5 判定）：新增之鍵在 `receipt_schema`
+  而非 `required_fields`。**驗收須附碼證**：以一個不含該兩鍵之既有批跑 `validate_event_import`，
+  結果與改動前逐欄相同。
   🔴 **本端點之不變式**：經 `pipeline.analyze_tables` 組表時**恆**傳入 Task 2.4 之
   `by_label_suppressed_reason`；漏傳即為缺陷，須有測試釘住（見下驗證條）。
   （本 Task 為 Phase 2 之**最後**一個：其輸入同時需要 2.4 之抑制參數、2.2 之 first-of-run
@@ -749,7 +781,7 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
 - 改法：重抽樣單位＝**一整段連續成立**（觸發側以 first-of-run 之連通段 id；對照側以互斥槽 id），
   每次重抽重算兩側均值再相減，回 Δ 之分位區間與重抽次數；參數與前置條件見 `eventscan-params` 030–060、080。
   另須輸出**段間相依診斷**（`eventscan-params` 080）：超過門檻即於收據標
-  `cluster_dependence_suspected`，該旗標為真時 `eventscan-banner` 010 **不得解除**。
+  `cluster_dependence_suspected`。該旗標為真時之畫面行為依 `eventscan-banner` **015**（區間已算出但標明可能過窄）——**不是**掛 010 之「無信賴區間」，該情形下區間確實有回傳（見下邊界④）。
 - **驗證**：`eventscan-test-vectors` 055 之凍結 fixture（`pytest`，`seed` 固定、逐位元組可重播）；
   另對人造資料——兩批同分布 ⇒ Δ 之區間涵蓋 0 之比例接近名目水準；
   對觸發側整體平移一個已知常數 ⇒ Δ 之點估計 `==` 該常數且區間不含 0；
@@ -759,7 +791,7 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   ② 把相依診斷改為恆回 false 須使上述旗標斷言轉紅。
   指令：`pytest tests/momentum/event_samples/test_delta_bootstrap.py -q`
 - **覆蓋率校準（本輪新增，為 `eventscan-params` 050 之值的唯一來源）**：以同分布兩批模擬，
-  掃描段數由小而大，取 Δ 區間覆蓋率首次達 `eventscan-params` 055 之名目水準的段數，回填 050。
+  程序與其全部參數依 `eventscan-params` **056**（含段數網格、每格重複數、seed、以及**以 Wilson 二項式區間下界判覆蓋率**）；名目水準見 055。本處不複述判定式——點估計與區間下界會得到不同的回填值。
   **該校準測試本身是驗收條件**——未跑出值即不得宣稱 Task 5.2 完成。
 - **邊界**：① 段數未達 `eventscan-params` 050 之下限 ⇒ 回 `unavailable`，**禁**以單簇假算；
   ② 兩側段數差距極大 ⇒ 須可列舉兩側段數，不得只回一個區間；
@@ -871,7 +903,7 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
 | Q-C12 | 方向與部位（long／short sign、sizing、單筆 vs 累積） | `direction` 由觸發批帶入（Task 4.1）；`eventscan-scope` 010：本票不做累積報酬／權益曲線 |
 | Q-C13 | 條件發現與驗證（同一資料搜出來的條件） | `eventscan-banner` 020 為**不可解除**之字面揭露；本票不做時間序 holdout（見 §N 殘留 RESID-2） |
 | Q-C14 | label 之用途（是否只作 metadata、by-label 是否隱藏） | Task 2.4：主表禁 by_label，判定點在呼叫端並穿透 `analyze_tables`；`eventscan-clock` 080 綁 `max(horizons)`；label 不出現在任何使用者可見欄 |
-| Q-C15 | 因果語句（條件報酬差 vs 預測關聯 vs 因果效果） | 措辭固定為「條件報酬差」；`eventscan-banner` 010／020 承載；本票不宣稱因果 |
+| Q-C15 | 因果語句（條件報酬差 vs 預測關聯 vs 因果效果） | 措辭固定為「條件報酬差」；由 `eventscan-banner` **010／015／020** 三條承載（015 為 R4 新增且同含「平均差為正不得讀成會賺」，R5 指出原處置漏列）；本票不宣稱因果 |
 | Q-C16 | 單標的邊界與未來 pooled 之前置 | `eventscan-scope` 040；pooled estimand／symbol 等權／跨標的 snapshot 為 GAP-4 之前置，見 §N 殘留 RESID-1 |
 | Q-P01 | 連續 True 根是否每根都進場 | Task 2.2（與 Q-C07 同群） |
 | Q-P02 | 主表禁 by_label／prevalence | Task 2.4；`prevalence`／`lift` 既有鍵保留但本票畫面不顯示（Task 6.3） |
@@ -962,6 +994,22 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   在本專案尚無定論，且需先有真實批之段間自相關量測才能選`；觸發：`eventscan-params` 080 之診斷在真實批上
   經常為真時；登記處：`docs/IC_QUANT_GAP_REGISTRY.md`「兩路涵蓋宣告」節。
   在此之前以 Task 5.2 之診斷旗標＋橫幅不解除承擔（**不是**假裝沒有這個問題）。
+- **RESID-10 `d*` 紀錄與實際套用不一致（Feature Factory；**尚未定性為缺陷**）**
+  🔴 **定性未定，禁止逕行修改**（使用者 2026-09-21 逐字：「那個bug你跟委員要先確認是真的是bug
+  還是特殊原因才這樣定義，不要直接修掉」）。⇒ 第一步是**唯讀諮詢輪**，由委員與主委各自獨立判定
+  下列四型是設計意圖還是缺陷；**判定為缺陷者**才進入「找真因 → 修正」（使用者同日前一句
+  「一定要找到真因然後修正掉」適用於該情形）。
+  — `為何現在不做: user-ruling:2026-09-21 使用者裁定先定性再修，且另立票；
+  該路徑在 Feature Factory 預處理層，命中高風險原則 (a) 數值／資料品質，
+  須走完整管線，不得在本票內順手改`；
+  觸發：**已觸發**，票號 `FFDSTAR`，本票之新 FF run 產生後立即開；
+  登記處：`docs/ROADMAP.md` 之工作線表。
+  已確認之症狀四型（皆附 §A 之 FACT-RECEIPT）：①有紀錄且有套用（`EMA_5..34`）
+  ②有紀錄但套用之 `d` 與紀錄不符（`EMA_50`／`55`）③無紀錄但有套用（`EMA_89`／`100`／`144`）
+  ④**有紀錄但完全未套用**（`EMA_200`）。
+  真因候選三條（皆已定位到具名碼，尚未定案）：`apply_to="non_stationary"` 之 ADF 閘與 `d*` 計算
+  為兩條獨立判斷（`feature_preprocessor.py:3167`）／`d*` 快取鍵不帶週期前綴而本 run 同含
+  `1h_` 與 `12h_` 兩套欄（`_d_star_cache.py:479`）／`value_aliases` 以數值指紋跨欄名共用 `d*`。
 - **RESID-9 同一個值在生成區塊外被手打，無機械閘可擋**
   — `為何現在不做: user-ruling:2026-09-21 使用者對代號 B 之裁定逐字含「不新建工具」；
   且手寫偵測之 status_scope 不含 docs/ 其餘檔，擴充它即為新建治理工具`；
