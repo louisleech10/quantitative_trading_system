@@ -131,12 +131,32 @@ MALFORMED_NESTED = (
 )
 
 
+MALFORMED_LABEL_MISMATCH = (
+    "# T\n"
+    "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+    "<!-- BEGIN GENERATED: k -->\n"
+    "| 100 | 規模 | `TOKEN_ABCDEF` |\n"
+    "<!-- END GENERATED: other -->\n"
+)
+
+MALFORMED_TILDE_FENCE = (
+    "# T\n"
+    "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+    "~~~\n"
+    "<!-- BEGIN GENERATED: k -->\n"
+    "~~~\n"
+    "別處散文也寫 `TOKEN_ABCDEF`。\n"
+)
+
+
 @pytest.mark.parametrize(
     "src,why",
     [
         (MALFORMED_UNCLOSED, "未閉合"),
         (MALFORMED_FENCED, "fence 內"),
         (MALFORMED_NESTED, "巢狀"),
+        (MALFORMED_LABEL_MISMATCH, "END label 錯配"),
+        (MALFORMED_TILDE_FENCE, "~~~ fence 內"),
     ],
 )
 def test_malformed_generated_markers_fail_closed(src: str, why: str, tmp_path: Path) -> None:
@@ -148,6 +168,37 @@ def test_malformed_generated_markers_fail_closed(src: str, why: str, tmp_path: P
     new = "\n".join(ln for ln in src.splitlines() if "規模數字為" not in ln) + "\n"
     r = _run(src, new, tmp_path)
     assert r.returncode == 1, f"{why} marker 未 fail-closed\n{r.stdout}{r.stderr}"
+
+
+def test_staged_entry_inherits_structure_validation(tmp_path: Path) -> None:
+    """`--staged` 與 `--files` 共用 `_check_pair` ⇒ 結構驗證須一併生效（R10 指出只測了 --files）。
+
+    以 git index 為輸入：在暫時 repo 內 commit 合法版、staged 改成未閉合版，須 rc=1。
+    """
+    repo = tmp_path / "r"
+    repo.mkdir()
+    doc = repo / "docs"
+    doc.mkdir()
+    f = doc / "X_SPEC.md"
+    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+           "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+    def git(*a: str) -> subprocess.CompletedProcess[str]:
+        import os
+        return subprocess.run(["git", *a], cwd=repo, capture_output=True, text=True,
+                              check=False, env={**os.environ, **env})
+    git("init", "-q")
+    f.write_text(GEN_OLD, encoding="utf-8")
+    git("add", "-A"); git("commit", "-q", "-m", "base")
+    # staged 版：拿掉定義行與 END ⇒ 未閉合
+    f.write_text(
+        "\n".join(ln for ln in GEN_OLD.splitlines()
+                  if "規模數字為" not in ln and "END GENERATED" not in ln) + "\n",
+        encoding="utf-8",
+    )
+    git("add", "-A")
+    r = subprocess.run(["bash", str(SCRIPT), "--staged"], cwd=repo,
+                       capture_output=True, text=True, check=False)
+    assert r.returncode == 1, f"--staged 未繼承結構驗證\n{r.stdout}{r.stderr}"
 
 
 def test_mutation_removing_structure_validation_turns_red(tmp_path: Path) -> None:

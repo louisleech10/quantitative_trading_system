@@ -69,12 +69,13 @@ for line in removed:
 # 🔴 結構驗證（R9 CODEX-R9-P1-05：首版只用 boolean、接受任意行內 marker ⇒ 未閉合與 fence 內
 # marker 皆 fail-open，實測 rc=0）。現行規則＝**只接受 fence 外、行首、成對且不巢狀**之 marker；
 # 任何未閉合／巢狀／錯配一律 non-zero 並報結構錯，不得靜默放行。
-_gen_begin = re.compile(r"^\s*<!--\s*BEGIN GENERATED:")
-_gen_end = re.compile(r"^\s*<!--\s*END GENERATED:")
+_gen_begin = re.compile(r"^\s*<!--\s*BEGIN GENERATED:\s*(?P<k>[^\s>-]+)")
+_gen_end = re.compile(r"^\s*<!--\s*END GENERATED:\s*(?P<k>[^\s>-]+)")
 _fence = re.compile(r"^\s*(```|~~~)")
 in_fence = False
 in_gen = False
 gen_open_line = 0
+gen_open_key = ""
 generated_lines = set()
 struct_errs = []
 for n, line in enumerate(new, 1):
@@ -83,16 +84,25 @@ for n, line in enumerate(new, 1):
         continue
     if in_fence:
         continue
-    if _gen_begin.match(line):
+    mb = _gen_begin.match(line)
+    if mb:
         if in_gen:
             struct_errs.append((n, "巢狀 BEGIN GENERATED（前一個於 L%d 尚未關閉）" % gen_open_line))
         in_gen = True
         gen_open_line = n
+        gen_open_key = mb.group("k")
     if in_gen:
         generated_lines.add(n)
-    if _gen_end.match(line):
+    me = _gen_end.match(line)
+    if me:
         if not in_gen:
             struct_errs.append((n, "END GENERATED 無對應之 BEGIN"))
+        elif me.group("k") != gen_open_key:
+            # label 錯配：BEGIN k 配 END other ⇒ 不得視為合法閉合（R10 CODEX-R10-P1-04）
+            struct_errs.append(
+                (n, "END GENERATED label 與 L%d 之 BEGIN 不符（%s vs %s）"
+                 % (gen_open_line, gen_open_key, me.group("k")))
+            )
         in_gen = False
 if in_gen:
     struct_errs.append((gen_open_line, "BEGIN GENERATED 未閉合至檔尾"))

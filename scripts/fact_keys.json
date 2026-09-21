@@ -1177,8 +1177,8 @@
       [
         "055",
         "5.2",
-        "凍結 fixture，**構造規則可逐位元組重建**：`seed = 20260921`；兩側各 24 段；每段長 8 根；段內報酬由 `numpy.random.default_rng(20260921).normal(0, 0.01, …)` 之累積和產生（同段共用一條路徑 ⇒ 段內高度重疊）；fixture 落檔於 `tests/golden/eventscan/delta_bootstrap_fixture.npz` 並記其 `sha256`",
-        "「段改為單一事件」之 mutation 在此 fixture 上**必**轉紅；重建之 `sha256` 與落檔值 `==`（不得依賴 bootstrap 隨機誤差，亦不得只靠口頭描述重建）"
+        "凍結 fixture，**構造規則可逐位元組重建**：`seed = 20260921`；兩側各 24 段；每段長 8 根；段內報酬由 `numpy.random.default_rng(20260921).normal(0, 0.01, …)` 之累積和產生（同段共用一條路徑 ⇒ 段內高度重疊）；fixture 落檔於 `tests/golden/eventscan/delta_bootstrap_fixture.npz` 並記其 `sha256`。🔴 **R10 釘死三個先前未指定之量**：① **平移量** `shift = 0.02`（固定，不得由實作者自選）；② 套用於**觸發側**之 `ret_entry` 欄（不動對照側）；③ 期望輸出 `delta_point_estimate`、`ci_low`、`ci_high` 三值於 Phase 0 產出時實算並回填至 fixture meta，佔位為 `<PENDING: Phase 0 回填>`",
+        "① Δ 點估計 `== shift` 且容差 `atol` 由回填之 CI 寬度導出（不得寫死魔術數）；② 區間**不含 0**；③ **三點校準**：`shift = 0` 時區間**須含 0**、`shift = 0.002`（小於 CI 寬度）時**允許**含 0、`shift = 0.02` 時**須不含** 0——三者缺一即 FAIL（只測一點無法證明 gate 有鑑別力）；④「段改為單一事件」之 mutation 在此 fixture 上**必**轉紅；⑤ 重建之 `sha256` 與落檔值 `==`（不得依賴 bootstrap 隨機誤差，亦不得只靠口頭描述重建）。🔴 **本 fixture 為統計方法之 Monte Carlo 校準專用**，與 §C「驗證一律用真實 kline、禁合成 fixture」**分層**：真實 kline 之驗收在 Task 5.1／5.2 之另一條，本列不取代它"
       ],
       [
         "050",
@@ -1515,6 +1515,24 @@
         "多碼同時成立時之收據",
         "收據須同時列出**全部**成立之情境與其計數，只有 `reason` 欄取優先序首位",
         "只回一碼會讓使用者以為只有一個問題"
+      ],
+      [
+        "055",
+        "🔴 **全域優先序（R10 新增；原表只涵蓋 random-control 四碼，新增之兩碼與既有 condition 碼無序可循）**",
+        "自前置到下游，先命中者先報：**① `timeframe_source_unavailable`（run 層前置）→ ② `allowlist_not_generated`（契約層前置）→ ③ `unregistered_column`／`constant_expression`（條件層）→ ④ `alignment_*`（對齊層）→ ⑤ `random_control_*`（對照層，其內部序見 010–040）→ ⑥ `no_trigger_events`（結果層）**",
+        "階段序即因果序：前置未滿足時下游根本沒跑，回下游碼會誤導使用者去修錯地方。🔴 **判準**：每一碼只在其階段被求值，階段未進入即不得回該碼"
+      ],
+      [
+        "057",
+        "🔴 **兩碼同時成立之明確裁定**",
+        "`timeframe_source_unavailable` 與 `allowlist_not_generated` 可在同一請求同時成立（run 無 task_record **且** 契約檔缺檔）⇒ `reason` 取 **`timeframe_source_unavailable`**（階段較前），但收據須依 050 同時列出兩者",
+        "委員指出兩碼可同時命中而原表無序。取前者之理由＝週期來源不可用時，連要核准哪些 gid 都無從判定"
+      ],
+      [
+        "059",
+        "🔴 **兩碼之繼承範圍（原文只寫在 Task 1.3，掃描路徑未繼承）**",
+        "`timeframe_source_unavailable` 與 `allowlist_not_generated` 為**跨 Task 之前置碼**，**Task 1.1（registry 建構）與 Task 2.1（掃描端點）一律繼承**；該二 Task 對同一根因**不得**回 `unregistered_column` 或 `no_trigger_events`",
+        "委員指出：同一根因在不同入口回不同碼，使用者會被導向錯誤的修法（以為是欄名打錯或條件不成立）"
       ]
     ]
   },
