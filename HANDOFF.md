@@ -43,7 +43,9 @@
 - `committee_run` 的 harness exit code 不可信，**讀 `committee_rc=` 那行**。
 - 🔴 `pytest` 一律逐檔明列路徑；`-k` 只過濾執行、**不減少收集**，無路徑即從 rootdir 收全套。
 - 🔴 `reconcile_build.sh` 一律帶 `--mode review`；`debt_clear` 用 `--round-id <id> --session <name> --lock <sources.lock>`（不吃位置參數）。
-- 🔴 **`committee_run.sh` 之參數順序有硬規**：`--session <name>` 須在 `--` **之前**，`<brief> <out前綴> <fam1,fam2>` 為位置參數，gate flags 一律在 `--` 之後，且 `--brief-kind` **不是** gate flag（放進去會 `未預期參數` 而 fail-closed 不派工，brief-kind 由 brief 檔內 `brief-kind:` 行決定）。
+- 🔴 **`committee_run.sh` 之參數順序有硬規**：`--session <name>` 須在 `--` **之前**，`<brief> <out前綴> <fam1,fam2>` 為位置參數，gate flags 一律在 `--` 之後，且 `--brief-kind` **不是** gate flag（放進去會 `未預期參數` 而 fail-closed 不派工，brief-kind 由 brief 檔內 `brief-kind:` 行決定）。**`--` 之後還必帶 `--task-id <id>`**（開債必填）——先跑 `gate.sh dispatch` 拿到的 token 不會替它補，缺了會 `ERROR: gate flags 缺 --task-id` 而 rc=2（乾淨失敗，不開債、委員不跑，可直接重下）。
+- 🔴 **`gate_check.sh` 的 PreToolUse 偵測會誤判「字串裡含家族名或派工樣式」的無害指令**：`pgrep -f "codex exec"`、`ls | grep composer` 這種等待迴圈會被判成 kind=dispatch 而 GATE BLOCKED（本輪連續踩兩次）。避法＝等待迴圈用 glob（`ls -1 <prefix>-*.md`）不要寫出家族名。
+- 🔴 **`brief-kind` 的合法值是 `review|consult|closure|impl|stamp`**，**沒有 `discovery`**（雖然 `reconcile_build.sh --mode` 有 `discovery`，兩者不同命名空間）。寫錯會被 `doc_format_precheck` 在寫檔當下擋。
 - 🔴 **`gate.sh dispatch --impl-self` 必帶 `--task-id <root>-impl-b<N>-claude`**（family 尾碼須為 `claude`），省略會被拒發 token。
 - 🔴 **`completeness_check.sh` 正式入口是 `--lock <sources.lock>`**；直接給 synth 路徑會被判「argv 來源僅 tests 隔離」而 FAIL。單檔檢查才用 `--single <委員檔>`。
 - 🔴 **逐段搬移函式時，模組級常數不會跟著走**：搬移腳本的錨點只涵蓋 `def`／`class`，模組頂層的常數落在所有段之外 ⇒ 搬過去的函式 import 當下不報錯、**跑到那一行才** `NameError`。搬完先 grep 被搬函式引用的所有大寫識別字。

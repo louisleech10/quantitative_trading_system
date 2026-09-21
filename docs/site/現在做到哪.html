@@ -17,14 +17,9 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p>三件事同時進行：</p>
-<ol>
-<li><strong>EVENTSCAN 寫規格</strong> — 規格已寫、審了五輪，但<strong>不能凍結</strong>（原因見下）</li>
-<li><strong>重跑一個沒有轉換的 Feature Factory</strong> — 跑中</li>
-<li><strong>FFDSTAR</strong>（新票）— 規格已寫，審查中</li>
-</ol>
+<p><strong>委員正在研究你點出的兩個 Feature Factory 缺陷</strong>（你說「應該是要修吧，先研究是真缺陷看怎麼修」）。
+EVENTSCAN 規格的下一輪審查排在它後面——委員一次只能開一輪。</p>
 <h2 id="做到哪">做到哪</h2>
-<h3 id="交付項目表">交付項目表</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -34,74 +29,55 @@
 </thead>
 <tbody>
 <tr>
+<td><strong>FF 兩個缺陷：定性＋修法</strong></td>
+<td>🔄 兩家委員跑中；我的獨立版已寫完</td>
+</tr>
+<tr>
+<td>沒有轉換的 FF run</td>
+<td>✅ 完成（<code>d9935491…</code>，含 1h＋12h）</td>
+</tr>
+<tr>
 <td>EVENTSCAN 規格初稿</td>
 <td>✅ 完成</td>
 </tr>
 <tr>
-<td>規格兩家委員對抗審</td>
-<td>✅ 跑了<strong>五輪</strong>，78 條意見全數採納、零駁回</td>
+<td>規格兩家對抗審</td>
+<td>✅ 八輪，106 條全數採納或部分採納、零駁回</td>
 </tr>
 <tr>
 <td>規格凍結</td>
-<td>🛑 <strong>卡住</strong>（等下面第 2 項）</td>
-</tr>
-<tr>
-<td>沒有轉換的 FF run</td>
-<td>🔄 跑中，約剩 10 分鐘</td>
-</tr>
-<tr>
-<td>FFDSTAR 規格</td>
-<td>✅ 完成</td>
-</tr>
-<tr>
-<td>FFDSTAR 對抗審</td>
-<td>🔄 跑中</td>
+<td>🛑 還不行（第 9 輪還沒跑）</td>
 </tr>
 <tr>
 <td>逐條白話解釋給你聽</td>
 <td>⬜ 等規格能凍結才做</td>
 </tr>
-</tbody>
-</table></div>
-<h3 id="-卡住的原因我給你看的例子是錯的">🔴 卡住的原因：我給你看的例子是錯的</h3>
-<p>我在方向說明裡寫「你可以寫 <code>EMA_5 &gt; EMA_10</code>，這是多頭排列」。</p>
-<p><strong>在實際資料上，那個條件永遠成立</strong>——20,294 根全部命中、一段都不分。</p>
-<p>真因：存檔的特徵<strong>已經被轉換過</strong>（fracdiff），而且<strong>每個週期轉的程度不一樣</strong>：</p>
-<div class="table-wrap"><table>
-<thead>
 <tr>
-<th>欄</th>
-<th>實際內容</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>EMA_5 ～ EMA_34</td>
-<td>各自被轉換不同程度</td>
-</tr>
-<tr>
-<td>EMA_50 ～ EMA_144</td>
-<td>被轉成「變動量」</td>
-</tr>
-<tr>
-<td>EMA_200、EMA_233</td>
-<td><strong>完全沒轉換</strong>（還是價格）</td>
+<td>FFDSTAR 規格</td>
+<td>✅ 完成，審到第 2 輪</td>
 </tr>
 </tbody>
 </table></div>
-<p>所以 EMA_5（約 208）跟 EMA_10（約 124）比大小，比的是兩個不同尺度的東西，<strong>沒有意義</strong>。
-14 個現有的 run 全都是這樣。⇒ 這就是為什麼要重跑一個沒轉換的。</p>
-<h3 id="你那句話擋下了一次錯誤的修改">你那句話擋下了一次錯誤的修改</h3>
-<p>我本來認定這是 bug、準備去修。你說「先確認是真的是 bug 還是特殊原因」。</p>
-<p>委員查完：<strong>我認定的四種症狀裡，兩種是設計本來就該這樣，一種是我自己配對錯了資料。</strong>
-只有一項是真問題——「查不到某個 run 當時用了什麼參數」，那就是 FFDSTAR 這張票。</p>
+<p><strong>缺陷一（欄位名字）</strong>：你記得「來源名不能有底線」——<strong>你記對了，規則就寫在程式裡</strong>。
+問題是同一次產出、同一個特徵出現兩種名字：<code>..._LINEARREG_SLOPE_10_144_Cross</code>
+與 <code>..._LINEARREG-SLOPE_10_Lag_1</code>。原因是算完基礎特徵時欄名有照規則轉換、
+旁邊記的那份資料沒有，後面另一段程式拿沒轉換的那份重拼名字。
+你問的兩個 <code>taker</code> 形式<strong>不是兩個特徵</strong>——數值相關 0.999994，同一份資料兩個名字。
+（我最初說「是 bug」的理由是錯的，循環論證，已撤回重驗。）
+影響 2,404 ＋ 1,604 欄。<strong>難處＝改掉後既有 run 欄名全變</strong>，對不上舊校驗值與測試基準。</p>
+<p><strong>缺陷二（週期記了兩次）</strong>：同一次產出，<code>feature_manifest.json</code> 寫 <code>[&quot;1h&quot;]</code>、
+<code>task_record.json</code> 寫 <code>[&quot;1h&quot;,&quot;12h&quot;]</code>。漏掉的 12h 是 402 個群組、209,235 欄，差不多一半，
+而檔案同時標著「complete」，<strong>不發任何警告</strong>。根因是整條程式鏈型別上就只能接一個週期。
+好消息：我全查過，<strong>現在沒有任何正式程式在讀那個欄位</strong>，只有 FF 自己的測試，
+所以是「寫錯了但還沒害到誰」，修起來風險低。</p>
 <h2 id="要你決定嗎">要你決定嗎</h2>
-<p><strong>現在不用。</strong> 之後會有一個：FFDSTAR 會讓每個 run 多產一個檔，我會<strong>量出實際大小再來問你</strong>。</p>
+<p><strong>還不用，但快了。</strong> 排隊中的兩個：① 缺陷一的相容性怎麼處理（只對新 run 生效／做對照表／
+全部重跑）——等委員算成本 ② FFDSTAR 會讓每個 run 多產一個檔——我量出大小再問你。</p>
 <h2 id="卡住嗎">卡住嗎</h2>
-<p>沒有卡在需要你的地方。等 FF 跑完就能繼續。</p>
-<hr />
+<p>沒有卡在需要你的地方。</p>
 <h2 id="下一件事">下一件事</h2>
-<p>FF 跑完 → 改 EVENTSCAN 規格裡「用哪個 run」那段 → 再審一輪 → 凍結 → <strong>逐條白話講給你聽</strong> → 你放行才寫施工清單。</p>
+<p>委員交件 → 兩個缺陷的定性與修法拿給你看 → 你決定相容性怎麼辦
+→ 回 EVENTSCAN 第 9 輪審查 → 凍結 → <strong>逐條白話講給你聽</strong> → 你放行才寫施工清單。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
