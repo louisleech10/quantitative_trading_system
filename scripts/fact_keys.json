@@ -1994,7 +1994,7 @@
         "B-7",
         "—",
         "豁免",
-        "PreToolUse不可：判定對象為委員產出的戳記行，派工前尚不存在。PostToolUse不可：🔴 R8 實測更正（2026-08-14T19:0x+08:00）——原登記「不經主控端 Edit/Write ⇒ 該 hook 不會被觸發」**只對了一半**：真的把探針掛上 PostToolUse:Bash 後，派工指令**確實觸發**它（實證：scripts/probe_dispatch_posttooluse.sh，記錄於 .claude/tmp/probe_b50.log）。真正的限制是**時點**：委員派工依合約以背景執行（前景必 timeout），hook 觸發於**啟動當下**，該時點 handoffs/ 下只有 brief、無任何委員產出檔（實測 ls 僅列出 BRIEF 一列）⇒ 戳記行尚不存在，無標的可判。部分閘：有——scripts/cx_run.sh:1048（派工 prompt 逐字注入 task-id 並明令 brief 內範例值不得採用，從源頭消滅手抄）＋ scripts/cx_run.sh:422（task_id 缺漏即拒派）。🔴 R6 更正：原登記「改法未完成、現樹無對應檢查可掛、部分閘無」為事實錯誤",
+        "PreToolUse不可：判定對象為委員產出的戳記行，派工前尚不存在。PostToolUse不可：🔴 R8 實測更正（2026-08-14T19:0x+08:00）——原登記「不經主控端 Edit/Write ⇒ 該 hook 不會被觸發」**只對了一半**：真的把探針掛上 PostToolUse:Bash 後，派工指令**確實觸發**它（實證：scripts/probe_dispatch_posttooluse.sh，記錄於 .claude/tmp/probe_b50.log）。真正的限制是**時點**：委員派工依合約以背景執行（前景必 timeout），hook 觸發於**啟動當下**，該時點 handoffs/ 下只有 brief、無任何委員產出檔（實測 ls 僅列出 BRIEF 一列）⇒ 戳記行尚不存在，無標的可判。部分閘：有——scripts/cx_run.sh:1060（派工 prompt 逐字注入 task-id 並明令 brief 內範例值不得採用，從源頭消滅手抄）＋ scripts/cx_run.sh:422（task_id 缺漏即拒派）。🔴 R6 更正：原登記「改法未完成、現樹無對應檢查可掛、部分閘無」為事實錯誤",
         "n/a"
       ],
       [
@@ -2090,7 +2090,7 @@
         "B-50",
         "—",
         "豁免",
-        "PreToolUse不可：判定需「派工前」與「派工後」兩個工作區快照之差，寫入前只有單點。PostToolUse不可：🔴 R8 實測更正（2026-08-14T19:0x+08:00）——真的掛上 PostToolUse:Bash 探針實測，得到**兩個各自獨立就足以判死**的理由：①hook 只有**一個**時間點，「派工前」那個快照不在其視野內，差值算不出來 ②派工依合約背景執行 ⇒ 觸發當下「派工後」根本尚未發生（實測該時點 git status --porcelain 計數等於派工前之值）。原登記之成本理由（對每個 Bash 呼叫做 git status 全掃）仍成立，但那是次要理由，主因是上述時點問題。部分閘：有——scripts/committee_run.sh:341（_ws_snapshot，派工前後比對）。🔴 R6 更正：原填 :267 落在註解行。🔴 R7 更正：R6 改填之 :311 於同輪內因本檔新增 mkdir 守衛而位移成註解行，三家 r2 一致以 --check rc=1 攔下——**行號引用會隨上游編輯漂移，這是本機制的內建代價，換來的是不會靜默腐爛**",
+        "PreToolUse不可：判定需「派工前」與「派工後」兩個工作區快照之差，寫入前只有單點。PostToolUse不可：🔴 R8 實測更正（2026-08-14T19:0x+08:00）——真的掛上 PostToolUse:Bash 探針實測，得到**兩個各自獨立就足以判死**的理由：①hook 只有**一個**時間點，「派工前」那個快照不在其視野內，差值算不出來 ②派工依合約背景執行 ⇒ 觸發當下「派工後」根本尚未發生（實測該時點 git status --porcelain 計數等於派工前之值）。原登記之成本理由（對每個 Bash 呼叫做 git status 全掃）仍成立，但那是次要理由，主因是上述時點問題。部分閘：有——scripts/committee_run.sh:365（_ws_snapshot，派工前後比對）。🔴 R6 更正：原填 :267 落在註解行。🔴 R7 更正：R6 改填之 :311 於同輪內因本檔新增 mkdir 守衛而位移成註解行，三家 r2 一致以 --check rc=1 攔下——**行號引用會隨上游編輯漂移，這是本機制的內建代價，換來的是不會靜默腐爛**",
         "n/a"
       ],
       [
@@ -2106,7 +2106,7 @@
         "B-62",
         "cx_run.sh 交件當下（執行端）",
         "豁免",
-        "PreToolUse不可：委員產出由執行端 CLI（codex／cursor-agent／grok）直接寫檔，主控端沒有 Edit／Write 事件可掛，寫入前該檔不存在。PostToolUse不可：同一原因——觸發源不是主控端工具；主委事後手動 register-output 才是 Edit 路徑，但那已在交件之後。部分閘：scripts/cx_run.sh:715（cx_run 收到 STATUS: DONE 或 VERDICT: 行即呼叫 gate.sh register-output ⇒ verdict_parse 拒收即寫 audit verdict_rejected；B3／B4 審碼實戰各擋一次）。第二層：scripts/gate.sh:973（開輪／領 token 前呼叫 verdictgate_check 讀裁決）",
+        "PreToolUse不可：委員產出由執行端 CLI（codex／cursor-agent／grok）直接寫檔，主控端沒有 Edit／Write 事件可掛，寫入前該檔不存在。PostToolUse不可：同一原因——觸發源不是主控端工具；主委事後手動 register-output 才是 Edit 路徑，但那已在交件之後。部分閘：scripts/cx_run.sh:714（cx_run 收到 STATUS: DONE 或 VERDICT: 行即呼叫 gate.sh register-output ⇒ verdict_parse 拒收即寫 audit verdict_rejected；B3／B4 審碼實戰各擋一次）。第二層：scripts/gate.sh:973（開輪／領 token 前呼叫 verdictgate_check 讀裁決）",
         "n/a"
       ],
       [
