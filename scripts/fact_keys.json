@@ -1237,9 +1237,21 @@
         "fracdiff 參數雜湊；與既有快取檔名所用者同源"
       ],
       [
+        "072",
+        "頂層 `execution_outcome`",
+        "`ran` ｜ `skipped_no_statsmodels` ｜ `skipped_disabled` ｜ `skipped_no_target_columns`",
+        "🔴 **空 `entries` 有多種成因**，只看 entries 無法區分「沒跑」與「跑了但零欄」；本欄為唯一區分點（R2 委員指出 K-1 原無此欄）"
+      ],
+      [
+        "074",
+        "`source` 與「重跑 byte 級相同」之相容性",
+        "重跑之 byte 級比對**排除 `source` 欄**；其餘欄須逐位元組相同",
+        "🔴 首次 `search`、次次 `cache_hit` 時 `source` 本來就會變（R2 委員指出兩條規定互斥）；`source` 記的是「這次怎麼取得」，不是 run 之身分"
+      ],
+      [
         "080",
         "落點",
-        "`data_cache/feature_preprocessing/`，檔名含 `config_hash`",
+        "`data_cache/feature_preprocessing/`，檔名為 `dstar_receipt_<symbol>_<timeframe>_<config_hash>.json`。🔴 **不得**以 `d_star_` 為前綴——`tests/feature_engineering/test_batch2d_dstar_align.py:59` 與 `:104` 對該目錄之 `d_star_*.json` glob 斷言**恰一檔**，同前綴即打破它（R2 委員實查、主委複核）",
         "🔴 **不得**落在 run 目錄——會使既有 failopen 檔案集合比對轉紅（見 SPEC §A 裁定 1）"
       ]
     ]
@@ -1261,7 +1273,12 @@
       [
         "020",
         "回填之機械約束",
-        "Task 1.1 之驗證① 斷言「收據欄集合 == 進入函式之欄集合」；任一離開路徑未對應到本表之值，該斷言即轉紅 ⇒ 本表之完整性由測試而非紀律保證"
+        "🔴 **R1 所寫之約束不成立**（R2 兩家指出）：Task 1.1 驗證① 只比**欄名集合**，不比 `reason` **值** ⇒ 回填前 TODO 與測試仍可各自發明值。**改為**：驗證① 增一條——收據中每筆 `applied=false` 之 `reason`，其值須逐字命中本表；本表僅含佔位列時，任何 `applied=false` 之筆皆使該斷言轉紅 ⇒ **回填前實作不可能通過驗收**"
+      ],
+      [
+        "030",
+        "🔴 唯一之 column universe（R2 委員指出原文未定義）",
+        "「進入 `_apply_fractional_differencing` 之欄」歧義（df input／numeric columns／layer-filtered targets／selected columns 四者不同）。**定義為**：該函式**實際迭代過**之欄，亦即 `columns` 變數在 `_select_columns` 與 `_filter_fracdiff_target_columns` 之後、`nan_rates` 過濾之前的內容；其後之 `eligible_columns` 與 `skipped_high_nan` 皆為其子集"
       ]
     ]
   },

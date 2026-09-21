@@ -116,7 +116,9 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
 | 050 | 頂層 `symbol`／`timeframe`／`config_hash` | 字串 | run 之身分；`config_hash` 為本票解決 owner mismatch 之關鍵欄 |
 | 060 | 頂層 `row_count`／`time_range` | 整數／物件 | 與 run 對齊；與既有共用快取之同名欄語意相同 |
 | 070 | 頂層 `fracdiff_hash` | 字串 | fracdiff 參數雜湊；與既有快取檔名所用者同源 |
-| 080 | 落點 | `data_cache/feature_preprocessing/`，檔名含 `config_hash` | 🔴 **不得**落在 run 目錄——會使既有 failopen 檔案集合比對轉紅（見 SPEC §A 裁定 1） |
+| 072 | 頂層 `execution_outcome` | `ran` ｜ `skipped_no_statsmodels` ｜ `skipped_disabled` ｜ `skipped_no_target_columns` | 🔴 **空 `entries` 有多種成因**，只看 entries 無法區分「沒跑」與「跑了但零欄」；本欄為唯一區分點（R2 委員指出 K-1 原無此欄） |
+| 074 | `source` 與「重跑 byte 級相同」之相容性 | 重跑之 byte 級比對**排除 `source` 欄**；其餘欄須逐位元組相同 | 🔴 首次 `search`、次次 `cache_hit` 時 `source` 本來就會變（R2 委員指出兩條規定互斥）；`source` 記的是「這次怎麼取得」，不是 run 之身分 |
+| 080 | 落點 | `data_cache/feature_preprocessing/`，檔名為 `dstar_receipt_<symbol>_<timeframe>_<config_hash>.json`。🔴 **不得**以 `d_star_` 為前綴——`tests/feature_engineering/test_batch2d_dstar_align.py:59` 與 `:104` 對該目錄之 `d_star_*.json` glob 斷言**恰一檔**，同前綴即打破它（R2 委員實查、主委複核） | 🔴 **不得**落在 run 目錄——會使既有 failopen 檔案集合比對轉紅（見 SPEC §A 裁定 1） |
 <!-- END GENERATED: ffdstar-receipt-schema -->
 
 ### K-2 未套用原因碼（待實作以碼證回填）
@@ -125,7 +127,8 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
 | 序 | 值 | 語意 |
 |---|---|---|
 | 010 | （待實作時以碼證補齊） | 🔴 本表之值集合**不得由主委憑印象填寫**——SPEC 初稿曾杜撰四個不存在的分支名，經 R1 兩家以碼證推翻。實作 Task 1.1 之第一步即為列出 `_apply_fractional_differencing` 之實際離開路徑，逐一對應後回填本表；回填前本表僅此一列 |
-| 020 | 回填之機械約束 | Task 1.1 之驗證① 斷言「收據欄集合 == 進入函式之欄集合」；任一離開路徑未對應到本表之值，該斷言即轉紅 ⇒ 本表之完整性由測試而非紀律保證 |
+| 020 | 回填之機械約束 | 🔴 **R1 所寫之約束不成立**（R2 兩家指出）：Task 1.1 驗證① 只比**欄名集合**，不比 `reason` **值** ⇒ 回填前 TODO 與測試仍可各自發明值。**改為**：驗證① 增一條——收據中每筆 `applied=false` 之 `reason`，其值須逐字命中本表；本表僅含佔位列時，任何 `applied=false` 之筆皆使該斷言轉紅 ⇒ **回填前實作不可能通過驗收** |
+| 030 | 🔴 唯一之 column universe（R2 委員指出原文未定義） | 「進入 `_apply_fractional_differencing` 之欄」歧義（df input／numeric columns／layer-filtered targets／selected columns 四者不同）。**定義為**：該函式**實際迭代過**之欄，亦即 `columns` 變數在 `_select_columns` 與 `_filter_fracdiff_target_columns` 之後、`nan_rates` 過濾之前的內容；其後之 `eligible_columns` 與 `skipped_high_nan` 皆為其子集 |
 <!-- END GENERATED: ffdstar-skip-reasons -->
 
 ---
@@ -158,6 +161,13 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
   `feature_preprocessor.py:2471` 與 `:2484` 被重設，**其內容是最後一次 transform 的殘局**，
   不是整個 run 的清單；且其型別為 `set[str]`（`:150`），**不帶 `d` 值**。
   ⇒ 收據容器須為 **run 層級、不被 per-transform 重設**之累加結構。
+  🔴 **「掛在 parent 實例上」不夠**（R2 兩家指出，主委實跑對證）：生產路徑對 compact-aligned group
+  會另建 **sibling `FeaturePreprocessor`**（`feature_preprocessor.py:813` 與 `:979` 之 `native_pp`），
+  於其上跑 `_transform_single` 後**丟棄該實例**。只累加在 parent 上會**漏記這些欄**。
+  ⇒ 本 Task 須定義**明確之 owner／merge 契約**：sibling 之累加結果須在丟棄前併回 owner；
+  併入時鍵衝突即 fail-closed（不得後寫覆蓋——那正是本票要消滅的形態）。
+  **驗證須含一條走 sibling 路徑（`feature_preprocessor.py:813`）之 `pytest` 案例**，
+  斷言該路徑之欄亦出現在收據中；否則該契約無人守。
 - 改法：**第一步是盤出實際分支**——R1 兩家指出本 SPEC 初稿所列之「四個既有分支」
   （`applied`／`skipped_not_selected`／`skipped_high_nan`／`skipped_filtered`）**在碼上不存在**，
   是主委未經查證的杜撰。
@@ -205,7 +215,12 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
   R1 兩家一致指出：降級為 `logger.warning` 會再產出一個「成功但沒有 per-run `d*` 紀錄」的 run，
   **正是本票要消滅的型③**，且與 CLAUDE.md「擬合參數（逐字含 `d*`）必須持久化才能上線」鐵律衝突。
   主委初稿之「收據是診斷物不是產物」不成立——它是本票要新增之 provenance 產物。
-  ③ 同一 run 重跑 ⇒ 覆寫自己的收據（同 `config_hash`，不涉跨 run 覆蓋）。
+  🔴 **fail-closed 不會從既有之原子寫入接縫自然得到**（R2 委員指出）：既有 cache flush 會吞例外，
+  L6.5 之 wrapper 亦可能把新 writer 之例外吃掉。⇒ 本 Task 須**明確指定一個會把例外往上傳的接縫**
+  （實作時以碼證指出該位置與其例外傳播行為），並加一條 `pytest`：注入寫入失敗（例如唯讀目錄）
+  後，**該 run 之對外結果為失敗**；若僅記 log 而 run 仍成功即 FAIL。
+  ③ 同一 run 重跑 ⇒ 覆寫自己的收據（同 `config_hash`，不涉跨 run 覆蓋）；
+  byte 級比對之範圍見 `ffdstar-receipt-schema` 074（排除 `source` 欄）。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
 - 不可做：不得改既有共用快取之讀寫；不得因寫收據而改變 run 之任何既有輸出。
@@ -230,13 +245,18 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
 - **mutation 條件**：`RISK-HIT: none` ⇒ 不強制。但本 SPEC 仍於 Task 1.1／1.2 各指定一條
   可證偽之 mutation，因為兩者皆宣稱「記錄與實際一致」，該宣稱若無 mutation 即為空殼。
 - **測試層級**：單元（收集與序列化）＋ 整合（跑一個小 run 後讀收據）；
-  可獨立 `pytest tests/momentum/...` 跑，不需 `run_api.py`。
+  可獨立 `pytest tests/feature_engineering/preprocessing/` 跑，不需 `run_api.py`。
 - **防假綠**：
-  1. 「收據與實際一致」不得以「讀自己剛寫的檔」自證——須與 `_fracdiff_processed_columns`
-     這個**既有**、非本票新增的來源比對。
-  2. 既有測試斷言一律 diff，不得放寬。
+  1. 「收據與實際一致」不得以「讀自己剛寫的檔」自證——須以 **Task 1.1 驗證② 之獨立重算 oracle**
+     （取收據之 `d`、以 `_frac_diff_ffd` 重跑該欄、與落檔值比對）核對。
+     🔴 **不得**以 `_fracdiff_processed_columns` 為 oracle——它是不帶值之 `set[str]`，核對不了 `d`
+     （R1 指出；R2 指出本節仍留著該錯誤指涉，屬「只修被點名處」之復發）。
+  2. 既有測試斷言一律 diff，不得放寬。**特別列名**：
+     `tests/feature_engineering/test_batch2d_dstar_align.py`（該目錄 `d_star_*.json` 恰一檔）與
+     `tests/feature_engineering/test_failopen_correctness.py`（run 目錄檔案集合）**皆須維持綠**。
   3. 用真實 run，禁合成 fixture。
-- **邊界目錄**：✔ 空輸入（eligible 為空）／✔ 並行合併重複鍵／✔ 寫入失敗降級；
+- **邊界目錄**：✔ 空輸入（`columns` 為空）／✔ 並行與 sibling 實例之合併重複鍵／
+  ✔ **寫入失敗 fail-closed**（🔴 非「降級」——R1 已推翻降級寫法，本節字面同步更正）；
   ✗ 大尺度浮點（本票不算任何數值）／✗ 並發寫（單 run 單寫者）。
 
 ---
