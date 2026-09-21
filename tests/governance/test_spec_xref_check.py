@@ -103,6 +103,70 @@ def test_prose_residue_still_fails_when_generated_block_also_holds_token(tmp_pat
     assert "別處散文也寫" in r.stdout
 
 
+MALFORMED_UNCLOSED = (
+    "# T\n"
+    "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+    "<!-- BEGIN GENERATED: k -->\n"
+    "| 100 | 規模 | `TOKEN_ABCDEF` |\n"
+)
+
+MALFORMED_FENCED = (
+    "# T\n"
+    "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+    "```\n"
+    "<!-- BEGIN GENERATED: k -->\n"
+    "```\n"
+    "別處散文也寫 `TOKEN_ABCDEF`。\n"
+)
+
+MALFORMED_NESTED = (
+    "# T\n"
+    "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+    "<!-- BEGIN GENERATED: outer -->\n"
+    "<!-- BEGIN GENERATED: inner -->\n"
+    "| x |\n"
+    "<!-- END GENERATED: inner -->\n"
+    "| 100 | 規模 | `TOKEN_ABCDEF` |\n"
+    "<!-- END GENERATED: outer -->\n"
+)
+
+
+@pytest.mark.parametrize(
+    "src,why",
+    [
+        (MALFORMED_UNCLOSED, "未閉合"),
+        (MALFORMED_FENCED, "fence 內"),
+        (MALFORMED_NESTED, "巢狀"),
+    ],
+)
+def test_malformed_generated_markers_fail_closed(src: str, why: str, tmp_path: Path) -> None:
+    """未閉合／fence 內／巢狀之 GENERATED marker 一律 rc=1。
+
+    首版只用 boolean 且接受行內 marker，前兩種實測 fail-open（rc=0）；
+    見 CODEX-R9-P1-05。
+    """
+    new = "\n".join(ln for ln in src.splitlines() if "規模數字為" not in ln) + "\n"
+    r = _run(src, new, tmp_path)
+    assert r.returncode == 1, f"{why} marker 未 fail-closed\n{r.stdout}{r.stderr}"
+
+
+def test_mutation_removing_structure_validation_turns_red(tmp_path: Path) -> None:
+    """mutation：拿掉結構驗證之 fail-closed ⇒ 未閉合那條必須翻綠（證明綠燈來自該分支）。"""
+    src = SCRIPT.read_text(encoding="utf-8")
+    mutated = src.replace("if struct_errs:\n", "if False:\n")
+    assert mutated != src, "錨點已漂移，mutation 沒生效"
+    m = tmp_path / "mutated.sh"
+    m.write_text(mutated, encoding="utf-8")
+    new = "\n".join(
+        ln for ln in MALFORMED_UNCLOSED.splitlines() if "規模數字為" not in ln
+    ) + "\n"
+    o = tmp_path / "o.md"; n = tmp_path / "n.md"
+    o.write_text(MALFORMED_UNCLOSED, encoding="utf-8"); n.write_text(new, encoding="utf-8")
+    r = subprocess.run(["bash", str(m), "--files", str(o), str(n)], cwd=ROOT,
+                       capture_output=True, text=True, check=False)
+    assert r.returncode == 0, "拿掉結構驗證後仍紅 ⇒ 該測試沒在測那個分支"
+
+
 def test_mutation_removing_generated_exclusion_turns_red(tmp_path: Path) -> None:
     """mutation：拿掉生成區塊之排除 ⇒ 上面那條 PASS 必須翻紅（證明綠燈來自該分支）。"""
     src = SCRIPT.read_text(encoding="utf-8")

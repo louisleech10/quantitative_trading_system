@@ -266,6 +266,8 @@
 | 060 | `random_control_rule_mismatch` | 身分閘任一葉不等 | 附不等之葉名與兩批各自的值 |
 | 070 | `no_trigger_events` | 條件在該 run 上零筆成立 | 條件成立 0 次（與欄名錯誤明確區分） |
 | 080 | `constant_expression` | 條件恆真／恆假或不引用任何欄位 | 沿用既有 `condition_engine` 之拒收理由 |
+| 090 | `timeframe_source_unavailable` | 該 run 之 `task_record.json` 缺檔，或 `metadata.present_timeframes` 缺 key／為空 | 此 run 不在本票輸入域，須以具該欄之 run 重跑。🔴 **不得**退回讀 `feature_manifest.json` 同名欄、**不得**以 gid 前綴當權威、**不得**用 `config_used.timeframes.training` 當 fallback（`654bd63b…` 之 training 為 `["12h"]` 而 groups 只有 `1h`） |
+| 100 | `allowlist_not_generated` | PIT allowlist 契約檔不存在（**非**「存在但 entries 為空」） | 須先跑 `eventscan-pit-admission` 055 之產生流程（Task 0.3）。🔴 **缺檔**與**已產生但為空**是兩種狀態，payload 不得相同——後者為正常空樹、非錯誤 |
 <!-- END GENERATED: eventscan-failure-reasons -->
 
 ### K-6 成本歸零點
@@ -473,7 +475,64 @@
 > 修法＝該參數之後端新增移入 Phase 2（Task 2.4），Phase 3 不再承載它。
 > 此後 Task 2.1 對它的依賴為**同 Phase 內之順序依賴**（2.4 先於 2.1 之驗收），非跨 Phase。
 
-### Phase 1 — 條件層可用（依賴：無）
+### Phase 0 — 前置產物（依賴：無；Phase 1 起之驗收皆依賴本 Phase）
+
+> 🔴 **本 Phase 為 R9 新增**。原文把 fixture 與 allowlist 的回填閘寫成「Phase 0 驗收須…」，
+> 但 §P 當時只有 Phase 1–6，**沒有 Phase 0 也沒有承載該閘的 Task** ⇒ 回填閘只是條件宣示、
+> 不是可重跑的 fail-closed receipt（兩家獨立指出）。本 Phase 把它變成有 owner、有命令、
+> 有輸出、有 runner 的產物任務。
+
+**Task 0.1 — 產出並凍結隨機對照 fixture（承載 `eventscan-test-vectors` 045／060 之回填閘）**
+- 目標：把 045／060 之四項 identity 由 `<PENDING: Phase 0 回填>` 變成實算值。
+- 檔案：`tests/golden/eventscan/random_control_fixture.npz` 與同目錄
+  `random_control_fixture.meta.json`（實查：該目錄與兩檔**皆不存在**）。
+- 輸入（全部已寫死於 current block，不需新決策）：reference run 之 `config_hash`
+  （見 `eventscan-golden-reference` 040）、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40`。
+- 改法：以上列輸入生成 fixture，並以 `sha256sum` 實算 `config_hash`／`sample_ids_digest`／
+  `fixture_sha256`／`source_manifest_sha256` 四值，**就地回填**至 045（060 沿用同一份）。
+- **驗證**：`pytest` ① 回填後四值與當次重建之 `sha256` **逐字相等**；② 以同一 seed 但不同 candidate pool 重建，
+  四值須**不**相等（證明 identity 真的綁住輸入）；③ harness 對**缺檔**、**仍為 `<PENDING>`**、
+  **hash 不符**三種情形一律 non-zero，**且不得以 `skip` 當 pass**。
+  **mutation**：把 `<PENDING>` 保留不回填而直接跑 Phase 4 驗收，須 fail-closed 而非 skip。
+  指令：`pytest tests/momentum/event_samples/test_random_control_exclusivity.py -q`
+- **邊界**：① 目錄不存在 ⇒ 建立而非跳過；② fixture 已存在且 hash 相符 ⇒ 冪等不重建。
+- **存活至**：本票交付後保留為 golden。
+- **覆蓋風險**：無（新檔）。
+- 不可做：不得以合成資料或隨機重建取代凍結 fixture；不得把 `skip` 當通過。
+
+**Task 0.2 — 產出 `eventscan-test-vectors` 055 之 fixture 與其 hash 閘**
+- 目標：055 目前**連佔位與回填閘都沒有**（委員指出；045／060 至少有 `<PENDING>`）。
+- 改法：比照 Task 0.1，為 055 建立其自有 artifact／meta／`sha256`，並於 055 寫入
+  `<PENDING: Phase 0 回填>` 佔位與同一組回填閘。
+- **驗證**：`sha256sum` 實算值與 055 回填值逐字相等；缺檔、`<PENDING>` 未回填、
+  hash 不符三種情形各自 rc≠0；Phase 5 之驗收須**真正載入**該檔而非僅檢查存在。
+  **mutation**：刪除該 artifact 後跑 Phase 5 驗收，須轉紅。
+  指令：`pytest tests/momentum/event_samples/test_delta_bootstrap.py -q`
+- **邊界**：同 Task 0.1。
+- **存活至**：本票交付後保留。
+- **覆蓋風險**：無（新檔）。
+- 不可做：同 Task 0.1。
+
+**Task 0.3 — 產出 PIT allowlist 契約檔與其產生器**
+- 目標：`eventscan-pit-admission` 055 已定義產生流程，但**產生器與契約檔皆不存在**
+  （實查 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 與
+  `scripts/gen_eventscan_pit_allowlist.sh` 均 absent）⇒ 首次使用只能穩定走空交集，
+  無法由驗收證明「缺檔」與「已產生但為空」是兩種狀態。
+- 檔案：`scripts/gen_eventscan_pit_allowlist.sh`（新）、
+  `momentum/Analysis/contracts/eventscan_pit_allowlist.json`（新）。
+- 改法：產生器讀指定三元組之 manifest，對每個 gid 以 `eventscan-pit-admission` 042 之
+  canonical 算法產出 `columns_sha256` 候選；審定後寫入契約檔該三元組區段並輸出成功 receipt。
+- **驗證**：`pytest` ① 對 reference 三元組產出之契約檔，其 gid 集合 `==` manifest 之 944 個 gid，
+  且每個 `columns_sha256` 與現算之 `sha256` 逐字相等；② **三態正交**——缺檔／空 entries／
+  reference-approved 三者在選擇器端得到三個不同可觀測結果（對應 Task 1.3 之驗證⑦）。
+  **mutation**：令產生器用非 042 之算法（例如未排序或加尾端換行），須使①轉紅。
+  指令：`pytest tests/api/test_feature_selector_index.py -q`
+- **邊界**：① 三元組未指定 ⇒ 拒跑，不猜預設 run；② 契約檔已有該三元組區段 ⇒ 須明示覆寫或拒絕。
+- **存活至**：本票交付後保留為契約。
+- **覆蓋風險**：無（新檔）。
+- 不可做：不得產生空 allowlist 讓測試變綠；不得手寫欄名清單（`eventscan-pit-admission` 060）。
+
+### Phase 1 — 條件層可用（依賴：Phase 0）
 
 **Task 1.1 — 把 FF 欄位註冊給條件引擎**
 - 目標：讓條件式能引用該 FF run 的真實欄名。
@@ -543,18 +602,34 @@
 - **驗證**（`pytest`）：① 週期層之集合 `==` `task_record.json` 之 `metadata.present_timeframes`；
   以 gid 前綴導出之集合若與之不等即 FAIL（該切分只用於偵測分歧，見 030）；
   ② 任取一個 gid，其回傳之 `columns` 逐字等於 manifest 該 gid 之 `columns`（雙向對證，防層級樹自己編出不存在的欄）；
-  ③ **全量守恆 gate**（取代原「任取一個 gid」之抽查）：展平**全部頁**後斷言
-  `set(items) == union(groups[].columns) == union(944 個 parquet 之 schema 欄名)`、
-  `len(set(items)) == manifest.total_features`、跨 group 重複為 `0`、每個 gid 均出現至少一次；
+  ③ **全量守恆 gate**（取代原「任取一個 gid」之抽查）。🔴 **R9 更正其右端**：R8 同時採納
+  「樹＝PIT 子集」與「守恆＝manifest 全量」，兩者在 allowlist 非整份 944 時**不可能同時為真**
+  （委員以「核准 943 個 gid」之 mutation 證明）。⇒ 守恆之右端一律取**已核准子集**：
+  `set(items) == union(已核准 gid 之 columns) == union(該子集之 parquet schema 欄名)`、
+  `len(set(items)) == 該子集之欄數總和`、跨 group 重複為 `0`、每個**已核准** gid 均出現至少一次。
+  「allowlist 核准全部 944 gid ⇒ 上式右端等於 `manifest.total_features`」保留為**額外向量**，
+  **不是**通用恆等式；契約檔未產生時③不適用，改測邊界⑧。
+  🔴 **執行層寫死（R9；原文未寫死，兩個實作者可做出不同覆蓋）**：③走
+  **service／materialization 層**（`api/services/ic_analysis_service.py`），一次比對集合；
+  ④走 **API integration 層**（`api/routes/ic_analysis.py`，以 `TestClient` 跟 `next_cursor` 遍歷）。
+  **禁止**③直接讀 manifest／parquet 充數而繞過端點，亦**禁止**把全量欄當 HTTP page 遍歷；
   ④ **分頁完整性**（取代原「第 2 頁不同且 `total` 不變」之 smoke）：對最大 gid
   （`12h_L2_Momentum_part1`，5,000 欄）遍歷全部頁，斷言無重複、無遺漏、聯集等於該 gid 之 `columns[]`，
   且 `next_cursor` 於遍歷完畢時為 `null`；帶跨 run／跨 query 之 cursor 須 fail-closed；
   ⑤ 選擇器樹之 gid 集合 `==` PIT allowlist 已核准之 gid 集合；未核准 gid 不得出現；
-  ⑥ 任取之葉欄名須同時存在於既有 `features/list` 之回應中（防兩條路徑各說各話）。
+  ⑥ 任取之葉欄名須同時存在於既有 `features/list` 之回應中（防兩條路徑各說各話）；
+  ⑦ 🔴 **三態正交測試（R9 新增；原本只測「登記被刪／digest 被改」，前置是檔案已存在）**：
+  (i) 契約檔**缺檔** ⇒ 回 `allowlist_not_generated`，且其 payload **不得**與 (ii) 相同；
+  (ii) 契約檔存在但 entries 為**空** ⇒ 回空樹（正常狀態，非錯誤）；
+  (iii) reference-approved 契約 ⇒ 樹等於核准子集。三者須為三個不同可觀測結果；
+  ⑧ 🔴 run 無可用之 `task_record.metadata.present_timeframes` ⇒ 回
+  `timeframe_source_unavailable`，且**不得**退回讀 manifest 同名欄或以 gid 前綴當權威。
   **mutation**：(a) 把結構來源改回「以底線切欄名」，須使②在含 `taker_ratio` 之 gid 上轉紅；
-  (b) 把**未被②抽到**之任一 gid 的一欄替換為同週期已存在之重複欄，須使③轉紅；
-  (c) 移除某 gid 之 allowlist 登記或改其 `columns_sha256`，須使⑤轉紅；
-  (d) 令第 2 頁與第 1 頁重疊一筆（`total` 不變），須使④轉紅。
+  (b) 把**未被②抽到**之任一**已核准** gid 的一欄替換為同週期已存在之重複欄，須使③轉紅；
+  (c) 移除某 gid 之 allowlist 登記或改其 `columns_sha256`，須使⑤轉紅（③仍須綠——此即③⑤已對帳之證明）；
+  (d) 令第 2 頁與第 1 頁重疊一筆（`total` 不變），須使④轉紅；
+  (e) 令缺檔與空 entries 回同一 payload，須使⑦轉紅；
+  (f) 令實作在缺 `task_record` 時退回讀 manifest 同名欄，須使⑧轉紅。
   指令：`pytest tests/api/test_feature_selector_index.py -q`
 - **邊界**：① 欄名含底線或連字號之來源欄（`taker_ratio`／`taker-ratio` 同時存在）⇒ 因不解析欄名而**不受影響**，
   但須有一條測試釘住此性質；② 搜尋字串為空 ⇒ 回空結果而非全部欄名（規模見 `eventscan-column-selector` 100）；
@@ -566,8 +641,18 @@
   ⑥ `source_group_id == gid` 之 688 個 group ⇒ 中間層折疊不顯示（040）；
   ⑦ 🔴 **`task_record.json` 缺檔、或 `metadata.present_timeframes` 為 `null`／空陣列**
   ⇒ **fail-closed**，回理由碼 `timeframe_source_unavailable`，**不得**退回 manifest 同名欄或 gid 前綴。
-  主委全掃 18 個既存 run：僅 **1** 個（reference run）該欄有值，3 個為 `null`、14 個無該檔
-  ⇒ 此分支是**常態路徑而非邊角**，須有專屬測試；
+  主委全掃 18 個既存 run：僅 **1** 個（reference run）該欄有值，**3 個檔案缺該 key**
+  （委員更正主委措辭：`jq has(...)` 為 `false`，不是值為 `null`）、14 個無該檔
+  ⇒ 此分支是**常態路徑而非邊角**，須有專屬測試（驗證⑧）。
+  🔴 **輸入支援域之裁定**：本票之輸入域**限於具非空 `metadata.present_timeframes` 之 run**；
+  其餘 `config_hash` 一律回 `timeframe_source_unavailable`，**不做 backfill**。
+  理由＝使用者 2026-08-05 定死之「面向未來不溯及既往：不把舊錯誤／不合規／麻煩包回來；
+  遇舊資料不合新規預設封存非遷移」。
+  🔴 **不得以 training list 當 fallback**（委員實證）：`654bd63b…` 之
+  `config_used.timeframes.training` 為 `["12h"]` 而其 groups 只有 `1h`
+  ⇒ training list 與實際產出不一致，不能當替代來源。
+  🔴 **誠實邊界**：此裁定使 17／18 既有 run 不可用於掃描。與 `eventscan-pit-admission` 057
+  之「每個新 run 需核准」同向；若日後需要舊 run，應另立 backfill 票，不在本票放寬 fail-closed；
   ⑧ 🔴 **PIT allowlist 契約檔尚未產生**（實查 `momentum/Analysis/contracts/eventscan_pit_allowlist.json`
   **不存在**）⇒ 選擇器取交集後將為空。此時**不得**回空樹了事，須回明確理由碼
   `allowlist_not_generated` 並指向 `eventscan-pit-admission` 055 之產生流程；
@@ -1005,9 +1090,14 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
 ## §V 驗證策略與邊界測試目錄
 
 - **mutation 條件**：`RISK-HIT` 含 a／d ⇒ 必附可證偽之 mutation 設計。本 SPEC 於下列 Task 逐條指定
-  mutation 與其應轉紅之斷言：1.1、2.2、2.3、2.4、3.1、3.2、4.1、4.2、4.3、4.4、5.1、5.2、6.4。
+  mutation 與其應轉紅之斷言：**0.1、0.2、0.3**、1.1、**1.3**、2.2、2.3、2.4、3.1、3.2、
+  4.1、4.2、4.3、4.4、5.1、5.2、**6.1**、6.4。
   設計依據引 `docs/TEST_DESIGN_CHARTER.md`。
-- 🔴 **mutation 之驗收組合一律指定到 `eventscan-test-vectors` 之具名列**，不得只寫「對某批跑」。
+- 🔴 **mutation 之驗收組合一律指定到 `eventscan-test-vectors` 之具名列**——
+  **本句收窄為「數值型 mutation」**（R9：Task 0.1／0.3／1.3／6.1 之 mutation 為
+  **結構／契約型**，其「輸入」是檔案存在性、集合關係與分頁狀態，不是可列舉之數值向量，
+  故無對應之測試向量列可掛；原文之全稱使這四個 Task 的 mutation 無處可掛）。
+  結構／契約型 mutation 直接寫在該 Task 之 **mutation** 欄，不另建向量列。
   本輪已因此改掉三處：3.1 由 030（`n = 1`，mutation 不會被觸發）改為必跑 035；
   4.3 與 5.2 由未凍結之隨機抽樣改為 045／055 之凍結 fixture。
   判準＝**該 mutation 改的那個判定，在該組合上是否真的會被執行**；答不出來就是假存活。

@@ -66,17 +66,42 @@ for line in removed:
 # 生成區塊之行不列入「殘留引用」：它們由 scripts/fact_keys.json 機械生成，**就是**唯一來源，
 # 不是忘了同步的副本。不排除的話，「把重複值收進 fact-key 區塊」這個正確動作必然觸發誤報
 # （2026-09-21 EVENTSCAN R8 實際撞到：§A 依 B 政策移除規模數字後，僅存引用正是該區塊本身）。
-_gen_begin = re.compile(r"<!--\s*BEGIN GENERATED:")
-_gen_end = re.compile(r"<!--\s*END GENERATED:")
+# 🔴 結構驗證（R9 CODEX-R9-P1-05：首版只用 boolean、接受任意行內 marker ⇒ 未閉合與 fence 內
+# marker 皆 fail-open，實測 rc=0）。現行規則＝**只接受 fence 外、行首、成對且不巢狀**之 marker；
+# 任何未閉合／巢狀／錯配一律 non-zero 並報結構錯，不得靜默放行。
+_gen_begin = re.compile(r"^\s*<!--\s*BEGIN GENERATED:")
+_gen_end = re.compile(r"^\s*<!--\s*END GENERATED:")
+_fence = re.compile(r"^\s*(```|~~~)")
+in_fence = False
 in_gen = False
+gen_open_line = 0
 generated_lines = set()
+struct_errs = []
 for n, line in enumerate(new, 1):
-    if _gen_begin.search(line):
+    if _fence.match(line):
+        in_fence = not in_fence
+        continue
+    if in_fence:
+        continue
+    if _gen_begin.match(line):
+        if in_gen:
+            struct_errs.append((n, "巢狀 BEGIN GENERATED（前一個於 L%d 尚未關閉）" % gen_open_line))
         in_gen = True
+        gen_open_line = n
     if in_gen:
         generated_lines.add(n)
-    if _gen_end.search(line):
+    if _gen_end.match(line):
+        if not in_gen:
+            struct_errs.append((n, "END GENERATED 無對應之 BEGIN"))
         in_gen = False
+if in_gen:
+    struct_errs.append((gen_open_line, "BEGIN GENERATED 未閉合至檔尾"))
+if struct_errs:
+    print(f"SPEC-XREF FAIL: {label} — 生成區塊標記結構不合法（未閉合／巢狀／錯配即 fail-closed）：")
+    for n, why in struct_errs:
+        print(f"  · L{n}: {why}")
+    print("  修法：BEGIN/END GENERATED 須成對、行首、不巢狀、且不在程式碼 fence 內。")
+    sys.exit(1)
 violations = []
 for t in sorted(dropped):
     for n, line in enumerate(new, 1):
