@@ -461,6 +461,752 @@
       ]
     ]
   },
+  "eventscan-rulings": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "裁定",
+      "日期"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "持有期以「根」計算、畫面顯示約多少天；前端直接輸入不用勾選清單；輸入與輸出皆支援多個",
+        "2026-09-20"
+      ],
+      [
+        "020",
+        "資料源即 Feature Factory run，FF 有什麼就用什麼；系統不自行再算任何指標",
+        "2026-09-20"
+      ],
+      [
+        "030",
+        "完全無門檻設定，畫面不得出現門檻欄位",
+        "2026-09-20"
+      ],
+      [
+        "040",
+        "接受以漲跌正負號當內部 label，走既有事件匯入管線以保住未來資料防護",
+        "2026-09-20"
+      ],
+      [
+        "050",
+        "進場價用下一根開盤價 next_open",
+        "2026-09-20"
+      ],
+      [
+        "060",
+        "欄位選擇器＝逐層下拉（來源欄→週期→類別→指標→參數）＋打字搜尋，兩者都做",
+        "2026-09-20"
+      ],
+      [
+        "070",
+        "成本：報酬主數字不扣，另加成本歸零點欄",
+        "2026-09-20"
+      ],
+      [
+        "080",
+        "先做單標的，多標的併 GAP-4",
+        "2026-09-20"
+      ],
+      [
+        "090",
+        "寫 SPEC 時同步把可列舉之值改為 fact-key 生成區塊、不手打；不另立票、不新建工具、不延後 SPEC",
+        "2026-09-21"
+      ]
+    ]
+  },
+  "eventscan-clock": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "項目",
+      "規格值",
+      "依據"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "進場語意",
+        "`entry_price_semantic = next_open`；進場根＝`t0_idx + 1`，取價欄 `open`",
+        "使用者裁定 050；alignment.py:102-105"
+      ],
+      [
+        "020",
+        "進場根不存在",
+        "t0 為資料最後一根 ⇒ 該事件以 `missing_bar` 排除，不灌 0",
+        "alignment.py:104"
+      ],
+      [
+        "030",
+        "持有時鐘",
+        "自**成交根**起算 N 根：`exit_idx = entry_idx + h`",
+        "tables.py:243"
+      ],
+      [
+        "040",
+        "出場價",
+        "`close[exit_idx]`",
+        "tables.py:245"
+      ],
+      [
+        "050",
+        "資料不足",
+        "`exit_idx >= len(bars)` ⇒ 該（事件, h）格排除、`n` 反映，不灌 0",
+        "tables.py:239-240"
+      ],
+      [
+        "060",
+        "全 K 線表",
+        "本票不展示 `evaluate_all_bars` 之 `hold` 欄——其出場錨為 t0（`close[i + horizon]`），與本票時鐘差一根",
+        "all_bars_eval.py:185"
+      ],
+      [
+        "070",
+        "first-of-run",
+        "一段連續成立只取第一根為進場點；每根皆取之版本列為敏感度，不得當主數字",
+        "COMPOSER-R64-P2-01"
+      ],
+      [
+        "080",
+        "label 綁定",
+        "`label = 1 if ret_entry[max(horizons)] > 0 else 0`；綁最長持有期",
+        "方向書 7-11"
+      ],
+      [
+        "090",
+        "零報酬",
+        "`ret_entry == 0` 歸 `label = 0`，且不計入勝率分子（`win_rate` 定義為 `ret_entry > 0` 之加權比例）",
+        "tables.py:128；CODEX 必答 6 第 2 條"
+      ],
+      [
+        "100",
+        "條件求值列之鍵",
+        "條件成立根之 `open_time`（FF 列時間戳＝K 線開盤、該根收盤已在列內）；**禁**用 t0+1 特徵列",
+        "COMPOSER 必答 6 第 5 條"
+      ]
+    ]
+  },
+  "eventscan-return-columns": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "欄",
+      "語意",
+      "本票定位",
+      "現況"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "`ret_entry`",
+        "`(close[exit_idx] − entry_price) / entry_price`，做空反號",
+        "**主欄**；與隨機批相減者",
+        "已有"
+      ],
+      [
+        "020",
+        "`ret_label_anchor`",
+        "以 t0 收盤為基準之同期報酬",
+        "診斷欄；**不得**與隨機批相減",
+        "已有"
+      ],
+      [
+        "030",
+        "`n`",
+        "該（批, h）之有效事件數",
+        "顯示",
+        "已有"
+      ],
+      [
+        "040",
+        "`mean`",
+        "加權平均",
+        "顯示",
+        "已有"
+      ],
+      [
+        "050",
+        "`median`",
+        "加權中位數",
+        "顯示",
+        "已有"
+      ],
+      [
+        "060",
+        "`win_rate`",
+        "`ret_entry > 0` 之加權比例（**不讀 `label`**）",
+        "顯示",
+        "已有"
+      ],
+      [
+        "070",
+        "`std`",
+        "與 `mean` 同一組權重之加權標準差",
+        "顯示",
+        "**本票新增**"
+      ],
+      [
+        "080",
+        "`ret_max`",
+        "該格 `ret_entry` 之最大值",
+        "顯示",
+        "**本票新增**"
+      ],
+      [
+        "090",
+        "`ret_min`",
+        "該格 `ret_entry` 之最小值",
+        "顯示",
+        "**本票新增**"
+      ],
+      [
+        "100",
+        "`breakeven_cost_bps`",
+        "見 `eventscan-breakeven`",
+        "顯示",
+        "**本票新增**"
+      ],
+      [
+        "110",
+        "`ci`",
+        "單批之信賴區間",
+        "本票不顯示單批 CI——掃描端 `event_split_plan` 恆 `None` ⇒ 值為字面 `\"unavailable\"`",
+        "已有"
+      ],
+      [
+        "120",
+        "`strata.by_label`",
+        "依 `label` 切正例／反例組",
+        "**主表禁顯示**；標 `not_computed`，理由＝label 由同一報酬之符號導出、分組統計無訊息",
+        "已有"
+      ]
+    ]
+  },
+  "eventscan-random-control": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "項",
+      "規格值",
+      "現況（實查）"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "筆數",
+        "`n_requested = n_trigger`（first-of-run 壓縮後之觸發筆數）",
+        "前端寫死 `nRequested: 100`"
+      ],
+      [
+        "020",
+        "候選資格",
+        "以 `max(horizons)` 判定後續資料是否足夠",
+        "只吃單一 `label_rule.horizon_bars`"
+      ],
+      [
+        "030",
+        "期間池",
+        "有 ≥1 筆觸發 `t0` 之 UTC 月之聯集",
+        "取 `t0` min–max，且只需與觸發窗有交集"
+      ],
+      [
+        "040",
+        "名額配額",
+        "按**每月觸發筆數**成比例；某月候選不足其配額 ⇒ fail-closed，不把缺額倒入他月",
+        "`proportional_to_candidates`（按每月候選根數）"
+      ],
+      [
+        "050",
+        "樣本互斥",
+        "持有窗互斥 packing；`n_packed < n_trigger` ⇒ 比較端 `capability_status = unavailable`，不縮 n",
+        "`replace=False` 只禁同一根；`n_target = min(n_requested, candidate_count)` 靜默縮 n"
+      ],
+      [
+        "060",
+        "參數帶入",
+        "進場語意／出場錨／持有期集合／`direction` 一律由觸發批帶入，隨機批不得各自取預設",
+        "隨機批取契約 default `trigger_close`、模組常數 `close_to_close`"
+      ],
+      [
+        "070",
+        "身分閘",
+        "比較前之身分 tuple 須加入 `entry_price_semantic` 與 `decision_offset_bars`",
+        "tuple 為 `(threshold, horizon_bars, direction, label_return_mode)`"
+      ],
+      [
+        "080",
+        "門檻",
+        "`threshold = 0.0`（使用者裁定 030 無門檻）",
+        "前端預設 `threshold: 0.02`"
+      ],
+      [
+        "090",
+        "亂數",
+        "seed 固定並寫入收據；同設定重跑之批逐位元組相同",
+        "已有 seed 與 `sample_ids_digest`"
+      ],
+      [
+        "100",
+        "全 run 對照",
+        "只得作為另一張敏感度表，標題須寫明其回答之問題為「條件是否只選到好行情」；不得當主比較",
+        "無"
+      ]
+    ]
+  },
+  "eventscan-failure-reasons": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "原因碼",
+      "觸發條件",
+      "使用者可見訊息之內容"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "`unregistered_column`",
+        "條件式引用未註冊於該 run 之欄名",
+        "該欄名不在這個 run，附最接近欄名之建議清單"
+      ],
+      [
+        "020",
+        "`missing_bar`",
+        "t0 為資料最後一根，取不到 next_open",
+        "該事件已排除，附排除筆數"
+      ],
+      [
+        "030",
+        "`insufficient_bars_for_horizon`",
+        "`exit_idx >= len(bars)`",
+        "該（事件, h）格已排除，逐 h 附排除筆數"
+      ],
+      [
+        "040",
+        "`random_control_exclusivity_unsatisfiable`",
+        "互斥 packing 後 `n_packed < n_trigger`",
+        "無法比較，附 `n_trigger`／`n_packed`／`candidate_count`／`max_h` 四個計數"
+      ],
+      [
+        "050",
+        "`random_control_month_shortage`",
+        "某觸發月之候選數不足其配額",
+        "無法比較，附該月份與缺額"
+      ],
+      [
+        "060",
+        "`random_control_rule_mismatch`",
+        "身分閘任一葉不等",
+        "附不等之葉名與兩批各自的值"
+      ],
+      [
+        "070",
+        "`no_trigger_events`",
+        "條件在該 run 上零筆成立",
+        "條件成立 0 次（與欄名錯誤明確區分）"
+      ],
+      [
+        "080",
+        "`constant_expression`",
+        "條件恆真／恆假或不引用任何欄位",
+        "沿用既有 `condition_engine` 之拒收理由"
+      ]
+    ]
+  },
+  "eventscan-breakeven": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "項目",
+      "值"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "事件型公式",
+        "`breakeven_cost_bps = mean(ret_entry) × 10000 ÷ 2`"
+      ],
+      [
+        "020",
+        "分母 2 之來源",
+        "一次進場一次出場＝兩腿；事件型無連續持倉序列，故無換手率這個中間量"
+      ],
+      [
+        "030",
+        "序列型公式（僅供對照，本票不用）",
+        "`mean(gross) ÷ mean(turnover) × 10000`（net_ic_analyzer.py:83）"
+      ],
+      [
+        "040",
+        "前提",
+        "`mean(ret_entry) > 0` 才有意義；`≤ 0` ⇒ 該格標 `not_profitable_pre_cost`"
+      ],
+      [
+        "050",
+        "主數字",
+        "報酬主數字**不扣成本**"
+      ],
+      [
+        "060",
+        "必須揭露而算不進公式者",
+        "開盤第一筆成交價 ≠ 可成交均價、永續合約資金費、滑價"
+      ],
+      [
+        "070",
+        "共用",
+        "本公式落地後事件型 IC 可直接共用同一支（結構同為一趟來回）"
+      ]
+    ]
+  },
+  "eventscan-banner": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "位置",
+      "字面",
+      "解除條件"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "「差（觸發 − 隨機）」表上方",
+        "無信賴區間；平均差為正不得讀成這條規則會賺。",
+        "Δ 之 cluster／時間塊 bootstrap 區間落地且該批 `status = ok`"
+      ],
+      [
+        "020",
+        "掃描結果頁",
+        "這是同一段樣本上的描述，不是驗證過的策略。",
+        "**不可解除**（本票不做樣本外驗證）"
+      ],
+      [
+        "030",
+        "報酬表",
+        "主數字未扣成本；未含吃單費、資金費、開盤滑價。",
+        "**不可解除**"
+      ]
+    ]
+  },
+  "eventscan-gaps": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "缺口",
+      "一句",
+      "對應 Task"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "掃描函式沒有 API 接口",
+        "`generate_events` 存在且能跑，但 `api/` 零呼叫者",
+        "2.1"
+      ],
+      [
+        "020",
+        "條件讀不到 FF 欄位",
+        "讀特徵表與求條件兩端都有，中間沒有任何程式把 FF 欄名註冊給條件引擎",
+        "1.1、1.2"
+      ],
+      [
+        "030",
+        "比較比的是達標率不是報酬",
+        "現有比較端點只回 prevalence／lift，且常因缺 `label_rule` 收據而灰",
+        "5.1"
+      ],
+      [
+        "040",
+        "隨機抽樣不公平（四項）",
+        "筆數／候選資格／樣本互斥／期間池與配額",
+        "4.1–4.4"
+      ],
+      [
+        "050",
+        "統計欄差兩項",
+        "標準差與最好／最差沒有",
+        "3.1"
+      ],
+      [
+        "060",
+        "沒有欄位選擇器",
+        "單一 run 欄名逾 18 萬，後端能回清單但只有平鋪一包",
+        "1.3、6.1"
+      ],
+      [
+        "070",
+        "「持有 N 根」有兩套時鐘",
+        "事件報酬表自進場根起算、全 K 線表自 t0 起算，選 next_open 時差一根",
+        "2.3"
+      ],
+      [
+        "080",
+        "事件型沒有成本歸零點",
+        "序列型有且前端已顯示；事件型是「沒做」不是「不能做」",
+        "3.2"
+      ]
+    ]
+  },
+  "eventscan-scope": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "項目",
+      "本票做不做",
+      "理由"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "權益曲線／複利加總",
+        "不做",
+        "持有窗高度重疊，簡單加總不是策略報酬——那是回測"
+      ],
+      [
+        "020",
+        "`strata.by_label` 正例／反例組",
+        "不顯示",
+        "label 由同一報酬之符號導出 ⇒ 分組統計為套套邏輯"
+      ],
+      [
+        "030",
+        "全 K 線表（`evaluate_all_bars`）",
+        "不展示",
+        "時鐘不同，且會產出與本票無關之 AUC"
+      ],
+      [
+        "040",
+        "多標的",
+        "不做",
+        "使用者裁定 080，併 GAP-4"
+      ],
+      [
+        "050",
+        "多重比較調整",
+        "不做",
+        "改以畫面字面揭露；主 horizon 須先寫下再看表"
+      ],
+      [
+        "060",
+        "費率設定",
+        "不做",
+        "不在本票發明費率，改報成本歸零點"
+      ],
+      [
+        "070",
+        "改事件匯入契約",
+        "不做",
+        "label 由系統導出即滿足契約，改契約是不必要的擴散"
+      ]
+    ]
+  },
+  "eventscan-golden-reference": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "項目",
+      "值"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "kline 來源",
+        "`data_cache/feature_klines/kline_cache.h5`（禁合成 fixture）"
+      ],
+      [
+        "020",
+        "reference symbol",
+        "`ETHUSDT`"
+      ],
+      [
+        "030",
+        "reference timeframe",
+        "`1h`"
+      ],
+      [
+        "040",
+        "reference FF run",
+        "`config_hash = 4a8a0b3726cc906ab3534994605e77f5`"
+      ],
+      [
+        "050",
+        "取 run 目錄之守衛",
+        "同一 `config_hash` 可存在於多個 symbol ⇒ 須再以 symbol 篩選，命中多於一個即 fail-closed"
+      ],
+      [
+        "060",
+        "golden 存放路徑",
+        "`tests/golden/eventscan/`"
+      ],
+      [
+        "070",
+        "新增數值之容差",
+        "`abs ≤ 1e-12` 或 `rel ≤ 1e-9`"
+      ],
+      [
+        "080",
+        "行為不變型之容差",
+        "無容差——byte 級一致（值／NaN／數量／輸出鍵集合皆不變）"
+      ],
+      [
+        "090",
+        "`n` 與 `nan_ratio`",
+        "exact，不得有容差"
+      ],
+      [
+        "100",
+        "跑完之副作用還原",
+        "`bash scripts/restore_golden_inventory.sh`"
+      ]
+    ]
+  },
+  "eventscan-test-vectors": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "對應 Task",
+      "輸入",
+      "預期輸出"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "2.2",
+        "布林序列 `[F, T, T, T, F, T, F]`",
+        "first-of-run 後 2 筆，`t0` 索引為 `1` 與 `5`"
+      ],
+      [
+        "020",
+        "2.3",
+        "`h = 1`、`entry_price_semantic = next_open`",
+        "`exit_idx == t0_idx + 2`（兩套時鐘差距最大之情形）"
+      ],
+      [
+        "030",
+        "3.1",
+        "`n = 1`",
+        "`std == 0`，且 `ret_max == ret_min == mean`"
+      ],
+      [
+        "040",
+        "3.2",
+        "某格 `mean(ret_entry) = 0.0105`",
+        "`breakeven_cost_bps == 52.5`（參考值由測試以獨立算式算出）"
+      ],
+      [
+        "050",
+        "4.2",
+        "三個自然月、觸發筆數 `80 / 10 / 10`、每月候選根數相等",
+        "新模式配額 `80 / 10 / 10`；既有模式於同輸入下約 `34 / 33 / 33`（兩者須同測試內並列）"
+      ],
+      [
+        "060",
+        "4.3",
+        "reference run、`max(h) = 2`、抽 40 根",
+        "任兩個持有窗不重疊（逐對檢查，非抽樣）"
+      ],
+      [
+        "070",
+        "4.4",
+        "`horizons = [5, 55]` vs `horizons = [5]`",
+        "前者剔除距尾端不足 55 根之候選，後者不剔除（同測試內並列）"
+      ],
+      [
+        "080",
+        "1.2",
+        "registry 含 `close_1h_trend_EMA_5`，查詢 `close_1h_trend_EMA_50000`",
+        "建議清單首項為 `close_1h_trend_EMA_5`"
+      ],
+      [
+        "090",
+        "6.2",
+        "輸入 `5, 10, 30, 55`",
+        "`timeframe = 1h` 與 `timeframe = 12h` 之換算字串不同（同測試內並列）"
+      ]
+    ]
+  },
+  "eventscan-column-selector": {
+    "target": "docs/EVENTSCAN_SPEC.md",
+    "columns": [
+      "序",
+      "層／項",
+      "內容",
+      "來源"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "欄名結構",
+        "`<來源欄>_<週期>_<類別>_<指標>_<參數>`",
+        "FF manifest"
+      ],
+      [
+        "020",
+        "第 1 層 來源欄",
+        "該 run manifest 之首段去重集合",
+        "Task 1.3 由 manifest 導出，不得前端硬編"
+      ],
+      [
+        "030",
+        "第 2 層 週期",
+        "該 run 之 timeframe 集合",
+        "同上"
+      ],
+      [
+        "040",
+        "第 3 層 類別",
+        "該（來源欄, 週期）下之類別集合",
+        "同上"
+      ],
+      [
+        "050",
+        "第 4 層 指標",
+        "該（來源欄, 週期, 類別）下之指標集合",
+        "同上"
+      ],
+      [
+        "060",
+        "第 5 層 參數",
+        "該指標之參數集合",
+        "同上"
+      ],
+      [
+        "070",
+        "衍生欄",
+        "`_Cross`／`_Ratio` 等兩兩組合欄，同列於其所屬層；歸屬規則須可列舉，禁丟棄",
+        "Task 1.3 邊界①"
+      ],
+      [
+        "080",
+        "打字搜尋",
+        "對欄名做子字串比對，回相符欄名與其所屬層級路徑",
+        "**本票新增**"
+      ],
+      [
+        "090",
+        "後端既有來源",
+        "`GET /api/v1/ic/features/list`（回整包平鋪清單）",
+        "api/routes/ic_analysis.py:344"
+      ],
+      [
+        "100",
+        "規模",
+        "單一 run 欄名逾 18 萬 ⇒ 平鋪清單對使用者不可用",
+        "實查 reference run"
+      ]
+    ]
+  },
   "handoff-current": {
     "target": "HANDOFF.md",
     "columns": [
