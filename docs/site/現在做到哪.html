@@ -17,83 +17,91 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p><strong>EVENTSCAN 寫規格。</strong> 這個 session 只寫規格，<strong>不實作</strong>。</p>
-<p>要回答的問題（你的原話）：條件成立時買入、持有 N 期的報酬，跟隨機買入持有同期比較。單標的先做。
-方向與做法已定案，完整說明見 <a href="EVENTSCAN方向與做法.html">EVENTSCAN方向與做法.md</a>。</p>
+<p>三件事同時進行：</p>
+<ol>
+<li><strong>EVENTSCAN 寫規格</strong> — 規格已寫、審了五輪，但<strong>不能凍結</strong>（原因見下）</li>
+<li><strong>重跑一個沒有轉換的 Feature Factory</strong> — 跑中</li>
+<li><strong>FFDSTAR</strong>（新票）— 規格已寫，審查中</li>
+</ol>
 <h2 id="做到哪">做到哪</h2>
+<h3 id="交付項目表">交付項目表</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>步驟</th>
+<th>項目</th>
 <th>狀態</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>① 寫 SPEC</td>
-<td>🔄 進行中</td>
+<td>EVENTSCAN 規格初稿</td>
+<td>✅ 完成</td>
 </tr>
 <tr>
-<td>② 兩家委員對抗審 → 收斂 → 凍結</td>
-<td>⬜ 未開始</td>
+<td>規格兩家委員對抗審</td>
+<td>✅ 跑了<strong>五輪</strong>，78 條意見全數採納、零駁回</td>
 </tr>
 <tr>
-<td>③ 寫 TODO</td>
-<td>⬜ 未開始</td>
+<td>規格凍結</td>
+<td>🛑 <strong>卡住</strong>（等下面第 2 項）</td>
 </tr>
 <tr>
-<td>④ 兩家委員對抗審 → 收斂 → 凍結</td>
-<td>⬜ 未開始</td>
+<td>沒有轉換的 FF run</td>
+<td>🔄 跑中，約剩 10 分鐘</td>
 </tr>
 <tr>
-<td>⑤ 分批實作</td>
-<td>⬜ 未開始</td>
+<td>FFDSTAR 規格</td>
+<td>✅ 完成</td>
 </tr>
 <tr>
-<td>⑥ 每批審碼 → 收斂</td>
-<td>⬜ 未開始</td>
+<td>FFDSTAR 對抗審</td>
+<td>🔄 跑中</td>
+</tr>
+<tr>
+<td>逐條白話解釋給你聽</td>
+<td>⬜ 等規格能凍結才做</td>
 </tr>
 </tbody>
 </table></div>
-<p><strong>開工前的稽核已做完</strong>，修掉四處跟實況不符的地方：</p>
+<h3 id="-卡住的原因我給你看的例子是錯的">🔴 卡住的原因：我給你看的例子是錯的</h3>
+<p>我在方向說明裡寫「你可以寫 <code>EMA_5 &gt; EMA_10</code>，這是多頭排列」。</p>
+<p><strong>在實際資料上，那個條件永遠成立</strong>——20,294 根全部命中、一段都不分。</p>
+<p>真因：存檔的特徵<strong>已經被轉換過</strong>（fracdiff），而且<strong>每個週期轉的程度不一樣</strong>：</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
-<th>修了什麼</th>
-<th>原本錯在哪</th>
+<th>欄</th>
+<th>實際內容</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>文件登記表指向兩份已封存的檔</td>
-<td>上一張票搬檔沒更新登記，機械檢查一直紅</td>
+<td>EMA_5 ～ EMA_34</td>
+<td>各自被轉換不同程度</td>
 </tr>
 <tr>
-<td>「README 990 → 37 行」</td>
-<td>從來不是 37，實際 49；同一個錯數字被抄進三份文件</td>
+<td>EMA_50 ～ EMA_144</td>
+<td>被轉成「變動量」</td>
 </tr>
 <tr>
-<td>HANDOFF 的「現況」看不到現在在做哪張票</td>
-<td>只收治理票，量化主線的票進不去</td>
-</tr>
-<tr>
-<td>ROADMAP 沒記 9/21 重算的病因結論</td>
-<td>文檔類問題合計 62.7%，是第一大病因</td>
+<td>EMA_200、EMA_233</td>
+<td><strong>完全沒轉換</strong>（還是價格）</td>
 </tr>
 </tbody>
 </table></div>
-<p><strong>寫規格時順手做的一件事</strong>：凡是<strong>會被施工清單／測試／白話再抄一次的值</strong>
-（時鐘定義、進場規則、抽樣四條、統計欄、breakeven 公式、失敗原因碼、你的七項裁定…約 40–60 條），
-登記成「只寫一次」的格子，不手打。上面那個「37 行」就是這類錯的樣本。
-這是寫規格的細節，不是另一張票。</p>
+<p>所以 EMA_5（約 208）跟 EMA_10（約 124）比大小，比的是兩個不同尺度的東西，<strong>沒有意義</strong>。
+14 個現有的 run 全都是這樣。⇒ 這就是為什麼要重跑一個沒轉換的。</p>
+<h3 id="你那句話擋下了一次錯誤的修改">你那句話擋下了一次錯誤的修改</h3>
+<p>我本來認定這是 bug、準備去修。你說「先確認是真的是 bug 還是特殊原因」。</p>
+<p>委員查完：<strong>我認定的四種症狀裡，兩種是設計本來就該這樣，一種是我自己配對錯了資料。</strong>
+只有一項是真問題——「查不到某個 run 當時用了什麼參數」，那就是 FFDSTAR 這張票。</p>
 <h2 id="要你決定嗎">要你決定嗎</h2>
-<p><strong>現在不用。</strong> 規格寫完、兩家委員審完收斂後，我會把最終結論用白話講給你聽，
-由你決定要不要進下一階段。</p>
+<p><strong>現在不用。</strong> 之後會有一個：FFDSTAR 會讓每個 run 多產一個檔，我會<strong>量出實際大小再來問你</strong>。</p>
 <h2 id="卡住嗎">卡住嗎</h2>
-<p>沒有。委員債已銷、開工前稽核已修完。</p>
+<p>沒有卡在需要你的地方。等 FF 跑完就能繼續。</p>
 <hr />
 <h2 id="下一件事">下一件事</h2>
-<p>規格初稿寫完後派兩家委員（codex、composer）對抗審查。</p>
+<p>FF 跑完 → 改 EVENTSCAN 規格裡「用哪個 run」那段 → 再審一輪 → 凍結 → <strong>逐條白話講給你聽</strong> → 你放行才寫施工清單。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
