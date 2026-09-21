@@ -110,9 +110,23 @@
 **使用者 2026-09-21 裁定**：由主委重跑一個**關閉 `winsorization` 與 `fractional_differencing`** 的 FF run
 供本票使用；另就 `d*` 快取之可追溯性**另立票**；🔴 使用者同日補充裁定「先跟委員確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」⇒ 定性輪已跑完，結論見 §N 之 RESID-10（主委原判大部分不成立）。
 
-⇒ 本 SPEC 之 `eventscan-golden-reference` 020–040 之 reference 設定，
-**待該新 run 產生後改指向它**；`eventscan-pit-admission` 全節之必要性亦須於該時重新評估
-（若新 run 未經任何轉換，PIT 准入之複雜度可大幅降低）。**此為 SPEC 凍結之硬前置。**
+### ✅ 前提已修復（2026-09-21，新 run 產生並實測通過）
+
+- FACT-RECEIPT: `POST /api/v1/features/generate`（`winsorization=false`、`fractional_differencing=false`）
+  → 新 run `config_hash = 654bd63b455606f0fce861d22d61ed0a`，`209,484` 欄／`542` group／`20,352` 列；
+  manifest 之 `raw_artifact_applied.steps` 六項全為 `false`（Claude 實跑 2026-09-21）
+- FACT-RECEIPT: 以真實 kline 重算 EMA 與新 run 落檔欄比對 → **14 個 EMA 欄之
+  `corr(落檔, 未轉換EMA)` 全部為 `1.0000`**，且值域回到價格尺度（2296–2328，隨週期遞增）
+  （Claude 實跑 2026-09-21）
+- FACT-RECEIPT: 新 run 上 `EMA_5 > EMA_10` → 命中 `46.7%`、**956 段**（舊 run 為 100%、1 段）；
+  多頭排列 `EMA_5 > EMA_10 > EMA_34` → **671 段**（Claude 實跑 2026-09-21）
+
+⇒ **「FF 欄可直接互比」之前提在新 run 上成立**，凍結之硬前置已解除。
+⇒ `eventscan-golden-reference` 之 reference 設定與 `eventscan-column-selector` 之規模數字
+**已改指新 run**；`eventscan-pit-admission` 之實查數字亦已依新 run 全量重取。
+🔴 **PIT 准入不因此廢除**——它防的是「欄內含未來資訊」，與 fracdiff 造成的「量綱不可比」
+是兩件事；新 run 只解決後者。
+🔴 **舊 run `4a8a0b37…` 不得再用於本票**（其預處理使跨週期欄不可比）。
 
 ### 待使用者確認
 
@@ -181,6 +195,7 @@
 | 050 | 資料不足 | `exit_idx >= len(bars)` ⇒ 該（事件, h）格排除、`n` 反映，不灌 0 | tables.py:239-240 |
 | 060 | 全 K 線表 | 本票不展示 `evaluate_all_bars` 之 `hold` 欄——其出場錨為 t0（`close[i + horizon]`），與本票時鐘差一根 | all_bars_eval.py:185 |
 | 070 | first-of-run | 一段連續成立只取第一根為進場點；每根皆取之版本列為敏感度，不得當主數字 | COMPOSER-R64-P2-01 |
+| 075 | 🔴 first-of-run 之實測依據（新 reference run） | `EMA_5 > EMA_10`：命中 9,503／20,343（46.7%）、**956 段**、中位段長 7 根、最長 79 根。多頭排列 `EMA_5 > EMA_10 > EMA_34`：命中 7,107、**671 段**、中位段長 7 根 ⇒ 不壓成段，671 次進場會被算成 7,107 筆 | Claude 實跑 2026-09-21（同條件在舊 run 上為 100% 命中、1 段——見 §A 之前提崩塌段） |
 | 080 | label 綁定 | `label = 1 if ret_entry[max(horizons)] > 0 else 0`；綁最長持有期 | 方向書 7-11 |
 | 090 | 零報酬 | `ret_entry == 0` 歸 `label = 0`，且不計入勝率分子（`win_rate` 定義為 `ret_entry > 0` 之加權比例） | tables.py:128；CODEX 必答 6 第 2 條 |
 | 100 | 條件求值列之鍵 | 條件成立根之 `open_time`（FF 列時間戳＝K 線開盤、該根收盤已在列內）；**禁**用 t0+1 特徵列 | COMPOSER 必答 6 第 5 條 |
@@ -305,7 +320,7 @@
 | 070 | 衍生欄 | `_Cross`／`_Ratio` 等兩兩組合欄，同列於其所屬層；歸屬規則須可列舉，禁丟棄 | Task 1.3 邊界① |
 | 080 | 打字搜尋 | 對欄名做子字串比對，回相符欄名與其所屬層級路徑 | **本票新增** |
 | 090 | 後端既有來源 | `GET /api/v1/ic/features/list`（回整包平鋪清單） | api/routes/ic_analysis.py:344 |
-| 100 | 規模（**唯一數字來源**，SPEC 散文不得自列） | reference run 之欄數＝ `437,110`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用 | 實查 reference run（🔴 方向書所寫之「逾 18 萬」為錯值，勿沿用） |
+| 100 | 規模（**唯一數字來源**，SPEC 散文不得自列） | reference run（`654bd63b…`）之欄數＝ `209,484`，group 數＝ `542`，列數＝ `20,352`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用 | 實查新 reference run（🔴 舊 run 之 `437,110` 已不適用——其預處理會額外產生轉換後欄位；方向書所寫之「逾 18 萬」更是錯值，兩者皆勿沿用） |
 <!-- END GENERATED: eventscan-column-selector -->
 
 ### K-11 條件欄之 PIT 准入規則
@@ -316,10 +331,10 @@
 | 010 | 條件式之角色 | 掃描端恆以 `expression_role=feature` 呼叫；`filter` **不是**合法值，contract 之 `expression_roles` 不含它 |
 | 020 | 角色隔離之現行保護 | `_role_violation` 只拒「角色非 `pit_feature`」與「欄名以 `future_` 為前綴」兩種 |
 | 030 | 🔴 該保護之缺口 | 不含 `future_` 前綴而語意上含未來資訊之欄，現行 guard 放行（委員實跑反例已重現） |
-| 035 | 🔴 manifest 實況（全量實查，非抽樣） | reference run 有 **1004 個 group**；gid 之底線段數分佈為 3 段 8 個／4 段 316 個／5 段 383 個／6 段 99 個／7 段 198 個；group 物件之鍵為 `column_count`／`columns`／`dtype`／`dtype_counts`／`encoded_column_count`／`file`／`file_size_bytes`／`float32_columns`／`nan_ratio`／`path`／`row_count`／`source_group_id`——**沒有類別欄，也沒有指標欄** |
+| 035 | 🔴 manifest 實況（全量實查，非抽樣） | 新 reference run（`654bd63b…`）有 **542 個 group**；gid 之底線段數分佈為 3 段 3 個／4 段 147 個／5 段 194 個／7 段 198 個；group 物件之鍵為 `column_count`／`columns`／`dtype`／`dtype_counts`／`encoded_column_count`／`file`／`file_size_bytes`／`float32_columns`／`nan_ratio`／`path`／`row_count`／`source_group_id`——**沒有類別欄，也沒有指標欄** |
 | 040 | 本票之准入規則 | 契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`；欄只在「該 run 之三元組已核准」**且**「其 `gid` 命中」**且**「該 gid 之 `columns` 實算 sha256 與登記值相等」時才進 registry |
 | 042 | `columns_sha256` 之 canonical 定義（缺此定義即算不出同一個值） | ① 取 `groups.<gid>.columns` 之字串陣列；② 以 `LC_ALL=C` 位元組序**排序**（不可依賴 Python 預設 locale）；③ 以 `\\n` 連接、**尾端不加** `\\n`；④ 以 `UTF-8` 編碼（不加 BOM）；⑤ 取 `sha256` 之小寫十六進位。🔴 委員實測：同一份真實 `columns` 以四種常見算法可得**四個不同值** ⇒ 五步缺一即為不同實作 |
-| 045 | 🔴 為何不切 gid 字串 | 「`<週期>_<層>_<類別>_<指標>` 四段文法」只蓋住 1004 個中的 316 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是** |
+| 045 | 🔴 為何不切 gid 字串 | 「`<週期>_<層>_<類別>_<指標>` 四段文法」在新 reference run 上只蓋住 542 個中的 147 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是** |
 | 047 | 🔴 為何索引要綁三元組與欄摘要（跨 run 實測） | 兩個真實 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）** |
 | 050 | 未命中之處置（三種皆 fail-closed） | ① 三元組未核准 ② gid 不在該 run 之登記 ③ `columns` 實算摘要與登記值不等 ⇒ 皆 fail-closed 不收該欄，並逐情形可列舉被拒欄數；**不得**以「看起來像技術指標」或「同名 gid 上次過了」放行 |
 | 055 | 核准流程 | 由 `scripts/gen_eventscan_pit_allowlist.sh` 對指定三元組自 manifest 全量產出 `gid → columns_sha256` 候選，審定後寫入契約檔之該三元組區段。**須審之集合＝「新 gid」∪「gid 相同但 `columns_sha256` 與任一既有三元組之登記值不等者」**——只審新 gid 會漏掉欄漂（047 之 `1h_L2_Momentum_chunk2` 即此形態） |
@@ -334,8 +349,8 @@
 | 序 | 參數 | 值 | 對應 Task |
 |---|---|---|---|
 | 010 | 欄名建議清單長度上限 | `5` | 1.2 |
-| 020 | 建議之演算法（先定法，再談耗時） | ① 以查詢字串之底線分段 token 與 registry 鍵做**交集預篩**取候選；② 只對候選算編輯距離。🔴 **禁**對全部鍵直接算編輯距離——reference registry 為 437,110 鍵，那在任何時間預算下都不可行 | 1.2 |
-| 025 | 建議計算之耗時上限 | `200` 毫秒，**綁定 020 之演算法**且須附 reference 規模（437,110 鍵）之實測收據才算驗收通過；逾時回空建議清單並標原因，不得讓請求掛住 | 1.2 |
+| 020 | 建議之演算法（先定法，再談耗時） | ① 以查詢字串之底線分段 token 與 registry 鍵做**交集預篩**取候選；② 只對候選算編輯距離。🔴 **禁**對全部鍵直接算編輯距離——reference registry 之規模見 `eventscan-column-selector` 100，直算在任何時間預算下都不可行 | 1.2 |
+| 025 | 建議計算之耗時上限 | `200` 毫秒，**綁定 020 之演算法**且須附 reference 規模（見 `eventscan-column-selector` 100）之實測收據才算驗收通過；逾時回空建議清單並標原因，不得讓請求掛住 | 1.2 |
 | 030 | Δ bootstrap 重抽次數 | `2000` | 5.2 |
 | 040 | Δ bootstrap 分位 | `2.5` 與 `97.5`（雙尾 95%） | 5.2 |
 | 050 | Δ bootstrap 之最小段數（**判準，非常數**） | 值＝`待校準`，由 056 之校準程序輸出後回填本列。🔴 **機械綁定**：Task 5.2 之驗收含一條測試，斷言本列之值**不為** `待校準`；未回填即該測試紅，Task 5.2 不得標完成。理由＝任何未經校準之下限都可能使區間在真實條件下幾乎恆為 `unavailable` | 5.2 |
@@ -400,7 +415,7 @@
 | 010 | kline 來源 | `data_cache/feature_klines/kline_cache.h5`（禁合成 fixture） |
 | 020 | reference symbol | `ETHUSDT` |
 | 030 | reference timeframe | `1h` |
-| 040 | reference FF run | `config_hash = 4a8a0b3726cc906ab3534994605e77f5` |
+| 040 | reference FF run | `config_hash = 654bd63b455606f0fce861d22d61ed0a`（🔴 2026-09-21 新產生之**未轉換** run；舊 run `4a8a0b37…` 因 fracdiff 使跨週期欄不可比，不得再用） |
 | 050 | 取 run 目錄之守衛 | 同一 `config_hash` 可存在於多個 symbol ⇒ 須再以 symbol 篩選，命中多於一個即 fail-closed |
 | 060 | golden 存放路徑 | `tests/golden/eventscan/` |
 | 070 | 新增數值之容差 | `abs ≤ 1e-12` 或 `rel ≤ 1e-9`；超出即列出該（批, h）與實際 diff = FAIL |
