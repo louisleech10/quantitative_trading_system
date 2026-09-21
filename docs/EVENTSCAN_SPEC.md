@@ -284,10 +284,13 @@
 | 010 | 條件式之角色 | 掃描端恆以 `expression_role=feature` 呼叫；`filter` **不是**合法值，contract 之 `expression_roles` 不含它 |
 | 020 | 角色隔離之現行保護 | `_role_violation` 只拒「角色非 `pit_feature`」與「欄名以 `future_` 為前綴」兩種 |
 | 030 | 🔴 該保護之缺口 | 不含 `future_` 前綴而語意上含未來資訊之欄，現行 guard 放行（委員實跑反例已重現） |
-| 040 | 本票之准入規則 | 欄之指標家族須屬 FF manifest 宣告之技術指標家族封閉白名單，不在白名單者**不得進 registry** |
-| 050 | 缺 metadata 之處置 | manifest 無法導出該欄之指標家族 ⇒ fail-closed 不收該欄，並可列舉被拒欄數 |
-| 060 | 白名單之維護點 | 白名單由 FF manifest 之家族欄機械導出，**不得手寫欄名清單**（黑名單永遠列不完） |
-| 070 | 誠實邊界 | 粒度為指標家族而非逐欄因果證明；FF 日後新增非因果家族而未更新白名單時會被拒收（保守方向），但同家族內若出現非因果變體則擋不住 |
+| 035 | 🔴 manifest 實況（全量實查，非抽樣） | reference run 有 **1004 個 group**；gid 之底線段數分佈為 3 段 8 個／4 段 316 個／5 段 383 個／6 段 99 個／7 段 198 個；group 物件之鍵為 `column_count`／`columns`／`dtype`／`dtype_counts`／`encoded_column_count`／`file`／`file_size_bytes`／`float32_columns`／`nan_ratio`／`path`／`row_count`／`source_group_id`——**沒有類別欄，也沒有指標欄** |
+| 040 | 本票之准入規則 | **逐 gid 之列舉式白名單**：允許之 group id 全量列舉於契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json`；`groups.<gid>.columns[]` 之欄只在其 `gid` **逐字命中**該檔時才進 registry |
+| 045 | 🔴 為何不切 gid 字串 | 「`<週期>_<層>_<類別>_<指標>` 四段文法」只蓋住 1004 個中的 316 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是** |
+| 050 | 缺 metadata 與未命中之處置 | 欄不屬任何 group，或其 gid 不在白名單 ⇒ fail-closed 不收該欄，並逐 gid 可列舉被拒欄數；**不得**以「看起來像技術指標」放行 |
+| 055 | 白名單之產生與凍結 | 由 `scripts/gen_eventscan_pit_allowlist.sh` 自 manifest 全量列出候選 gid，經一次人工＋委員審定後凍結入契約檔；新 FF run 出現白名單外之 gid 一律 fail-closed（保守方向），須再審一次才加入 |
+| 060 | 白名單之維護點 | 契約檔為唯一來源；**不得手寫欄名清單**，也**不得**在程式碼內另列 gid（黑名單與散落清單永遠列不完） |
+| 070 | 誠實邊界 | 粒度為 group 而非逐欄因果證明：同一 group 內若存在非因果變體則擋不住。逐欄因果 provenance 需 FF 在產出端補欄，列殘留 RESID-6 |
 <!-- END GENERATED: eventscan-pit-admission -->
 
 ### K-12 數值參數
@@ -296,10 +299,12 @@
 | 序 | 參數 | 值 | 對應 Task |
 |---|---|---|---|
 | 010 | 欄名建議清單長度上限 | `5` | 1.2 |
-| 020 | 建議計算之耗時上限 | `200` 毫秒；逾時回空建議清單並標原因，不得讓請求掛住 | 1.2 |
+| 020 | 建議之演算法（先定法，再談耗時） | ① 以查詢字串之底線分段 token 與 registry 鍵做**交集預篩**取候選；② 只對候選算編輯距離。🔴 **禁**對全部鍵直接算編輯距離——reference registry 為 437,110 鍵，那在任何時間預算下都不可行 | 1.2 |
+| 025 | 建議計算之耗時上限 | `200` 毫秒，**綁定 020 之演算法**且須附 reference 規模（437,110 鍵）之實測收據才算驗收通過；逾時回空建議清單並標原因，不得讓請求掛住 | 1.2 |
 | 030 | Δ bootstrap 重抽次數 | `2000` | 5.2 |
 | 040 | Δ bootstrap 分位 | `2.5` 與 `97.5`（雙尾 95%） | 5.2 |
-| 050 | Δ bootstrap 之最小段數 | 兩側各 `>= 20`；未達即回 `unavailable`，不得回較差的區間 | 5.2 |
+| 050 | Δ bootstrap 之最小段數（**判準，非常數**） | 🔴 不得寫死。定義＝「在同分布模擬下，Δ 區間之覆蓋率達名目水準所需之最小段數」，由 Task 5.2 之覆蓋率校準測試輸出並回填本列；回填前本列之值為 `待校準`，且**校準測試本身是 SPEC 之驗收條件**。理由＝固定 20 未經校準，在 reference 之常見均線條件上可能使區間幾乎恆為 `unavailable`（委員實證質疑） | 5.2 |
+| 055 | 校準之覆蓋率名目水準 | `0.95`（與 040 之雙尾分位一致）；校準測試以同分布兩批模擬，取覆蓋率首次達該水準之段數 | 5.2 |
 | 060 | Δ bootstrap seed | `20260921`（寫入收據；同設定重跑逐位元組相同） | 5.2 |
 | 070 | 排除比例警告門檻 | `excluded / n_rows > 0.5` ⇒ 收據標警告，**不自動改排除窗寬度** | 4.3 |
 | 080 | 段間相依診斷門檻 | 段層級報酬之一階自相關絕對值 `abs(rho_1) > 0.2` ⇒ 收據標 `cluster_dependence_suspected` | 5.2 |
@@ -356,8 +361,8 @@
 | 040 | reference FF run | `config_hash = 4a8a0b3726cc906ab3534994605e77f5` |
 | 050 | 取 run 目錄之守衛 | 同一 `config_hash` 可存在於多個 symbol ⇒ 須再以 symbol 篩選，命中多於一個即 fail-closed |
 | 060 | golden 存放路徑 | `tests/golden/eventscan/` |
-| 070 | 新增數值之容差 | `abs ≤ 1e-12` 或 `rel ≤ 1e-9` |
-| 080 | 行為不變型之容差 | 無容差——byte 級一致（值／NaN／數量／輸出鍵集合皆不變） |
+| 070 | 新增數值之容差 | `abs ≤ 1e-12` 或 `rel ≤ 1e-9`。**適用全部新增數值鍵**：`std`／`ret_max`／`ret_min`／`breakeven_cost_bps`／`delta.*`（逐 h 之報酬差各欄）／Δ 之 `ci_low`／`ci_high`／`n_clusters`；任一新增鍵未列入即為缺漏 |
+| 080 | 行為不變型之容差 | 無容差——**既有鍵**之值與 NaN 逐鍵相等、既有鍵不得移除或改名、列數不變、既有 digest 與 provenance 鍵集合不變。🔴 **允許新增鍵**（新增鍵走下一列之「新增數值」驗收） |
 | 090 | `n` 與 `nan_ratio` | exact，不得有容差 |
 | 100 | 跑完之副作用還原 | `bash scripts/restore_golden_inventory.sh` |
 <!-- END GENERATED: eventscan-golden-reference -->
@@ -373,8 +378,9 @@
 | 035 | 3.1 | `values = [0.01, 0.03]`、`weights = [1.0, 3.0]`（權重不等、`n = 2`） | 加權 `mean == 0.025`、加權 `std == 0.0086602540378444`（參考值由測試獨立算出）。🔴 本列為 030 之補位：030 是 `n = 1`，權重正規化在單元素上等價 ⇒ 「拿掉正規化」之 mutation 在其上**不會轉紅**（委員實證之假存活） |
 | 040 | 3.2 | 某格 `mean(ret_entry) = 0.0105` | `breakeven_cost_bps == 52.5`（參考值由測試以獨立算式算出） |
 | 045 | 4.3 | 凍結 fixture：reference run、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40` | 抽樣結果逐位元組可重播；`max(horizons) → 1` 之 mutation 在此 fixture 上**必**轉紅（不得依賴隨機抽樣碰巧重疊） |
+| 047 | 4.3／4.2 | **兩碼同時成立**之組合：三個觸發月、觸發筆數 `80 / 10 / 10`，其中 1 月候選數 `< 80`（月配額不足），**且**全域互斥 packing 之槽數 `< 100`（packing 亦不足） | 依 `eventscan-failure-precedence` 010 回月配額碼；收據須同時列出**兩個**情境與其計數（010 與 020 皆列），只有 `reason` 欄取月配額碼。🔴 無此組合則優先序條文無法被驗證（委員指出 R1 未附） |
 | 050 | 4.2 | 三個自然月、觸發筆數 `80 / 10 / 10`、每月候選根數相等 | 新模式配額 `80 / 10 / 10`；既有模式於同輸入下約 `34 / 33 / 33`（兩者須同測試內並列） |
-| 055 | 5.2 | 凍結 fixture：兩側各 24 段、段內高度重疊之人造報酬路徑、`seed = 20260921` | 「段改為單一事件」之 mutation 在此 fixture 上**必**轉紅（不得依賴 bootstrap 隨機誤差） |
+| 055 | 5.2 | 凍結 fixture，**構造規則可逐位元組重建**：`seed = 20260921`；兩側各 24 段；每段長 8 根；段內報酬由 `numpy.random.default_rng(20260921).normal(0, 0.01, …)` 之累積和產生（同段共用一條路徑 ⇒ 段內高度重疊）；fixture 落檔於 `tests/golden/eventscan/delta_bootstrap_fixture.npz` 並記其 `sha256` | 「段改為單一事件」之 mutation 在此 fixture 上**必**轉紅；重建之 `sha256` 與落檔值 `==`（不得依賴 bootstrap 隨機誤差，亦不得只靠口頭描述重建） |
 | 060 | 4.3 | reference run、`max(h) = 2`、抽 40 根 | 任兩個持有窗不重疊（逐對檢查，非抽樣） |
 | 070 | 4.4 | `horizons = [5, 55]` vs `horizons = [5]` | 前者剔除距尾端不足 55 根之候選，後者不剔除（同測試內並列） |
 | 080 | 1.2 | registry 含 `close_1h_trend_EMA_5`，查詢 `close_1h_trend_EMA_50000` | 建議清單首項為 `close_1h_trend_EMA_5` |
@@ -401,7 +407,7 @@
   `momentum/FeatureEngineering/feature_library.py::FeatureLibrary.load`（唯讀取用，不改）。
 - 既有 caller／影響面：`condition_engine.parse_condition` 之 `column_registry` 參數現由事件產生器呼叫端提供；
   新增者為**另一個建構來源**，既有呼叫端傳入之 registry 行為不變。
-- 改法：由 `(symbol, timeframe, config_hash)` 讀 FF 特徵表欄名，依 `eventscan-pit-admission` 040／050
+- 改法：由 `(symbol, timeframe, config_hash)` 讀 FF 特徵表欄名，依 `eventscan-pit-admission` 040/050
   之准入規則**逐欄判定是否收進 registry**，收進者標角色 `pit_feature`；輸出 `Mapping[str, str]` 餵
   `parse_condition`，`expression_role` 依 `eventscan-pit-admission` 010。
 - 🔴 **無條件把全部 FF 欄標成 `pit_feature` 是不成立的**（本輪兩家獨立以碼證推翻）：
@@ -412,8 +418,14 @@
 - **驗證**：`parse_condition("close_1h_trend_EMA_5 > close_1h_trend_EMA_10", <FF registry>, "feature")`
   回 `ConditionSpec` 且 `column_roles` 兩欄皆為 `pit_feature`；同一式在**未註冊 FF 欄**之 registry 下
   仍 `raise ConditionError("unregistered_column", …)`；另以不在白名單之家族欄建 registry，該欄須**不在**
-  registry 內且被拒欄數可列舉。**mutation**：把 `expression_role` 改為 `selection_predicate` 須使
-  「`future_` 前綴欄被拒」之斷言轉紅（證明 role isolation 真的在守）。測試指令：
+  registry 內且被拒欄數可列舉。
+  **mutation（須測本票新增之碼，不是既有碼）**：把本 Task 之白名單比對改為「恆命中」，
+  須使「不在白名單之家族欄不得進 registry」之斷言轉紅。
+  🔴 R1 原指定之 mutation（改 `expression_role` 為 `selection_predicate`）測的是既有
+  `condition_engine._role_violation`，**不是本票新增之准入邏輯**（本輪委員指出）；
+  該條降為**前提檢查**：先斷言既有 role isolation 仍在守（`future_` 前綴欄在 `feature` 角色下被拒），
+  再測新增之白名單邏輯，兩者不得混為一條。
+  測試指令：
   `pytest tests/momentum/event_samples/test_condition_engine_ff_registry.py -q`
 - **邊界**：① FF run 不存在 ⇒ fail-closed 並回可區分之原因碼，禁回空 registry（空 registry 會讓所有欄名都變成
   「打錯字」）；② 同一 `config_hash` 命中多個 symbol ⇒ fail-closed；③ 欄名含 Python 保留字或非識別字字元
@@ -454,6 +466,48 @@
 - 不可做：不得把 18 萬筆平鋪清單直接回給前端；不得在後端做前端排版。
 
 ### Phase 2 — 掃描與時鐘（依賴：Phase 1）
+
+🔴 **本 Phase 之執行順序＝ Task 2.4 → 2.1 → 2.2 → 2.3**（編號為標籤，非順序）。
+2.4 之抑制參數須先存在，2.1 才傳得進去；文件列序已依執行順序排列，TODO 生成時照此序。
+**Task 2.4 — 主表只顯示全體（後端抑制參數；本輪自 Phase 3 移入）**
+- 目標：消滅 `label = sign(報酬)` 下的套套邏輯上主表。
+- 檔案：`momentum/Analysis/event_samples/tables.py::_by_label_groups`、
+  `momentum/Analysis/event_samples/pipeline.py::EventSamplePipeline.analyze_tables`（參數穿透）。
+  前端接線在 Task 6.3，本 Task 只做後端。
+- 既有 caller／影響面：IC 事件路徑之 `strata.by_label` **仍須可用**（其 label 為外部匯入或帶門檻之規則所產，
+  非本次分析之報酬符號導出）。
+  🔴 **生產路徑是 `analyze_tables` 而非直接呼叫報酬表函式**（本輪兩家獨立指出，主委實跑對證）：
+  `event_forward_return_table` 之生產呼叫端為 `pipeline.analyze_tables`，其呼叫者為
+  `api/services/case_import_service.py` 之三處；`api/services/ic_analysis_service.py` **零呼叫**該表函式
+  （初稿誤列該檔）。⇒ 新參數**必須穿過 `analyze_tables`**，只改報酬表函式簽名等於保護沒有接上生產路徑。
+- 🔴 **判定點在呼叫端，不在批的 provenance 欄**：`label_origin` 之值域為封閉五值
+  （`search_positive_case`／`user_csv`／`platform_generator`／`platform_random`／`search_unlabeled`），
+  **沒有任何一值能區分**「label 由本次分析之報酬符號導出」與「label 由帶門檻之規則產生」——
+  兩者都會落在 `platform_generator`。擴充該 enum 等於改匯入契約，§C 明文禁止。
+  ⇒ 改由 `event_forward_return_table` 與 `analyze_tables` 各新增參數
+  `by_label_suppressed_reason: Optional[str]`，缺省 `None` ⇒ 行為與現況 byte 級相同。
+  「本次分析之 label 與報酬是否同源」是**分析請求之性質**，只有發起該請求者知道，不可從批上反推。
+- 改法：該參數非 `None` 時，`strata.by_label` 回 `not_computed` ＋ 該原因字串（見 `eventscan-return-columns` 120）。
+- **驗證**（`pytest` caller matrix 正反兩路，缺一不可）：
+  ① 經 `analyze_tables` 傳入該參數 ⇒ `strata.by_label` `==` `not_computed` 且原因字面非空；
+  ② 經 `analyze_tables` 不傳（IC 事件路徑之三個既有呼叫點各一）⇒ `strata.by_label` 與改動前逐鍵 `==`；
+  ③ **呼叫點盤點以 `analyze_tables` 為對象**（不是 `event_forward_return_table`——邊界③ 要擋的是新的
+  `analyze_tables` 呼叫點，R1 之初稿盯錯函式，本輪委員指出）：以 **AST 走訪**（`ast` 模組解析
+  `api/` 與 `momentum/` 之 `.py`，收集對 `analyze_tables` 之 `Call` 節點）取得呼叫點集合，
+  與凍結清單逐字比對；新增未納入即 FAIL。
+  🔴 **誠實邊界**：AST 走訪只認得語法上的直接呼叫；以 `getattr`、字串反射或包裝函式間接呼叫者
+  **抓不到**。本票不另做動態偵測（成本遠高於效益），該殘餘具名於 §N 之 RESID-8。
+  `grep -c` 之文字比對更弱（連別名都抓不到），本輪已棄用。
+  **mutation**：把判定改成忽略該參數而恆抑制，須使②轉紅；把參數只加在報酬表函式而不穿透
+  `analyze_tables`，須使①轉紅。
+  指令：`pytest tests/momentum/event_samples/test_return_table_by_label.py -q`
+- **邊界**：① 參數為空字串（非 `None`）⇒ fail-closed，不得當成「不抑制」也不得當成「抑制但無理由」；
+  ② 掃描端漏傳 ⇒ 由 Task 2.1 之端點層 spy 斷言擋下；③ 日後新增第四個 `analyze_tables` 呼叫點
+  ⇒ 由上述驗證③之計數斷言擋下（此為對「呼叫端遺忘導致保護靜默失效」之機械防護，非紀律）。
+- **存活至**：Phase 6 完工後仍保留。
+- **覆蓋風險**：無。
+- 不可做：不得改 `win_rate` 公式；不得刪除 `by_label` 之程式碼路徑（IC 事件路徑在用）。
+
 
 **Task 2.1 — 掃描函式接上 API**
 - 目標：條件式 → 事件批 → 走既有匯入契約落檔，前端可觸發。
@@ -520,40 +574,6 @@
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
 - 不可做：不得把全 K 線表改成同一時鐘後再展示——那是另一條估計量，本票不驗收它。
-
-**Task 2.4 — 主表只顯示全體（後端抑制參數；本輪自 Phase 3 移入）**
-- 目標：消滅 `label = sign(報酬)` 下的套套邏輯上主表。
-- 檔案：`momentum/Analysis/event_samples/tables.py::_by_label_groups`、
-  `momentum/Analysis/event_samples/pipeline.py::EventSamplePipeline.analyze_tables`（參數穿透）。
-  前端接線在 Task 6.3，本 Task 只做後端。
-- 既有 caller／影響面：IC 事件路徑之 `strata.by_label` **仍須可用**（其 label 為外部匯入或帶門檻之規則所產，
-  非本次分析之報酬符號導出）。
-  🔴 **生產路徑是 `analyze_tables` 而非直接呼叫報酬表函式**（本輪兩家獨立指出，主委實跑對證）：
-  `event_forward_return_table` 之生產呼叫端為 `pipeline.analyze_tables`，其呼叫者為
-  `api/services/case_import_service.py` 之三處；`api/services/ic_analysis_service.py` **零呼叫**該表函式
-  （初稿誤列該檔）。⇒ 新參數**必須穿過 `analyze_tables`**，只改報酬表函式簽名等於保護沒有接上生產路徑。
-- 🔴 **判定點在呼叫端，不在批的 provenance 欄**：`label_origin` 之值域為封閉五值
-  （`search_positive_case`／`user_csv`／`platform_generator`／`platform_random`／`search_unlabeled`），
-  **沒有任何一值能區分**「label 由本次分析之報酬符號導出」與「label 由帶門檻之規則產生」——
-  兩者都會落在 `platform_generator`。擴充該 enum 等於改匯入契約，§C 明文禁止。
-  ⇒ 改由 `event_forward_return_table` 與 `analyze_tables` 各新增參數
-  `by_label_suppressed_reason: Optional[str]`，缺省 `None` ⇒ 行為與現況 byte 級相同。
-  「本次分析之 label 與報酬是否同源」是**分析請求之性質**，只有發起該請求者知道，不可從批上反推。
-- 改法：該參數非 `None` 時，`strata.by_label` 回 `not_computed` ＋ 該原因字串（見 `eventscan-return-columns` 120）。
-- **驗證**（`pytest` caller matrix 正反兩路，缺一不可）：
-  ① 經 `analyze_tables` 傳入該參數 ⇒ `strata.by_label` `==` `not_computed` 且原因字面非空；
-  ② 經 `analyze_tables` 不傳（IC 事件路徑之三個既有呼叫點各一）⇒ `strata.by_label` 與改動前逐鍵 `==`；
-  ③ 以 `grep -c` 斷言 `event_forward_return_table` 在 `momentum/` 與 `api/` 之生產呼叫點數等於預期值，
-  新增呼叫點未納入 caller matrix 即 FAIL（防日後新路徑繞過）。
-  **mutation**：把判定改成忽略該參數而恆抑制，須使②轉紅；把參數只加在報酬表函式而不穿透
-  `analyze_tables`，須使①轉紅。
-  指令：`pytest tests/momentum/event_samples/test_return_table_by_label.py -q`
-- **邊界**：① 參數為空字串（非 `None`）⇒ fail-closed，不得當成「不抑制」也不得當成「抑制但無理由」；
-  ② 掃描端漏傳 ⇒ 由 Task 2.1 之端點層 spy 斷言擋下；③ 日後新增第四個 `analyze_tables` 呼叫點
-  ⇒ 由上述驗證③之計數斷言擋下（此為對「呼叫端遺忘導致保護靜默失效」之機械防護，非紀律）。
-- **存活至**：Phase 6 完工後仍保留。
-- **覆蓋風險**：無。
-- 不可做：不得改 `win_rate` 公式；不得刪除 `by_label` 之程式碼路徑（IC 事件路徑在用）。
 
 ### Phase 3 — 報酬與統計（依賴：Phase 2）
 
@@ -654,7 +674,7 @@
   **mutation**：把 `max` 改為 `min` 須使該列之第一條斷言轉紅。
   指令：`pytest tests/momentum/event_samples/test_random_control_eligibility.py -q`
 - **邊界**：① `horizons` 僅一元素 ⇒ 與既有行為 byte 級相同；② `horizons` 含 0 或負值 ⇒ fail-closed；
-  ③ 剔除後候選為 0 ⇒ 走 Task 4.3 之失敗原因碼。
+  ③ 剔除後候選為 0 ⇒ 依 `eventscan-failure-precedence` 030 回**月配額**碼（缺額＝該月全部配額），**不是** packing 碼——三處指向同一支，消除 R1 之三重重疊。
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
 - 不可做：不得同時放寬其他資格條件來補回被剔除的候選數。
@@ -667,8 +687,11 @@
 - 既有 caller／影響面：既有 `prevalence`／`lift` 鍵**保留不動**（既有 UI 在讀）；報酬差以新鍵承載。
 - 改法：新增逐 `h` 之 `trigger`／`random`／`delta` 三組，欄位集合等同 `eventscan-return-columns`；
   `delta` 只由 `ret_entry` 相減，**不得**用 `ret_label_anchor`。
-  另**收據須記錄本次請求宣告之主 horizon 與其送出時刻**（Q-C10 之機械承載），
-  該欄一經寫入，同一批之後續請求不得改寫（改寫即 fail-closed 並列出兩值）。
+  另**收據須記錄本次請求宣告之主 horizon 與其送出時刻**（Q-C10 之機械承載）。
+  🔴 **該值需要一個請求欄才承載得住**（本輪委員指出：掃描請求與前端輸入皆只有 `horizons[]`，
+  一個整數集合表達不了「哪一個是事先宣告的主 horizon」）⇒ Task 2.1 之掃描請求與 Task 6.2 之輸入
+  **各須新增一個必填欄** `primary_horizon`（須為 `horizons[]` 之成員，否則 fail-closed）；
+  Task 5.1 之收據自該欄取值。該欄一經寫入，同一批之後續請求不得改寫（改寫即 fail-closed 並列出兩值）。
 - **驗證**：對兩批已知之 `mean`，`delta.mean` `==` 兩者相減之值（參考值由測試獨立算出）；
   觸發批以 `ret_label_anchor` 餵入時端點拒收並回可區分之原因碼。
   **mutation**：把 `delta` 之被減數改為 `ret_label_anchor` 須使斷言轉紅。
@@ -698,6 +721,9 @@
   （**必須跑在該凍結 fixture 上**——初稿未凍結，mutation 可因 bootstrap 隨機誤差存活，本輪委員指出）；
   ② 把相依診斷改為恆回 false 須使上述旗標斷言轉紅。
   指令：`pytest tests/momentum/event_samples/test_delta_bootstrap.py -q`
+- **覆蓋率校準（本輪新增，為 `eventscan-params` 050 之值的唯一來源）**：以同分布兩批模擬，
+  掃描段數由小而大，取 Δ 區間覆蓋率首次達 `eventscan-params` 055 之名目水準的段數，回填 050。
+  **該校準測試本身是驗收條件**——未跑出值即不得宣稱 Task 5.2 完成。
 - **邊界**：① 段數未達 `eventscan-params` 050 之下限 ⇒ 回 `unavailable`，**禁**以單簇假算；
   ② 兩側段數差距極大 ⇒ 須可列舉兩側段數，不得只回一個區間；
   ③ 重抽次數不足 ⇒ fail-closed 而非回較差的區間；
@@ -759,7 +785,9 @@
   本票掃描面板之 DOM 不含門檻輸入欄；`nRequested` 顯示值等於觸發批 `n`。
   **mutation**：把橫幅條件改為恆不顯示須使第一條斷言轉紅。
   指令：`cd frontend && npx vitest run src/components/ic-analysis/__tests__/EventScanBanner.test.tsx`
-- **邊界**：① `delta.status = ok` ⇒ 橫幅 010 不顯示，橫幅 020／030 仍顯示；
+- **邊界**：① 橫幅 010 之隱藏條件＝`eventscan-banner` 010 解除條件之**兩條皆成立**
+  （`delta.status = ok` **且** `cluster_dependence_suspected` 為假）；只成立其一仍須顯示。
+  橫幅 020／030 恆顯示；
   ② 後端未回 `delta` 鍵（舊批）⇒ 視同非 ok，顯示橫幅；③ 觸發批 `n=0` ⇒ 不進本畫面。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
@@ -784,7 +812,7 @@
 | Q-C07 | 依賴單位（事件叢集、持有窗重疊、cluster 與 n_eff） | Task 2.2（觸發側壓成段）＋ Task 5.2（以段為重抽單位）；`n_effective` 既有欄保留 |
 | Q-C08 | 候選不足之處置 | Task 4.3：不縮 n、不放寬互斥、不抽相鄰根；回 `eventscan-failure-reasons` 040／050 |
 | Q-C09 | 可重現性（seed、digest、重抽次數、禁多 seed 挑最好） | Task 4.1／5.2：seed 與 digest 寫入收據；重抽次數不足即 fail-closed；本票不提供多 seed 介面 |
-| Q-C10 | 多重比較（多 N、多條件探索） | `eventscan-scope` 050：本票不做調整，改以 `eventscan-banner` 020 之字面揭露。🔴 **本輪修正**：初稿之「主 horizon 須先寫下再看表」**沒有任何機械承載**（委員指出：Task 6.2 只有 horizons 輸入，無 pre-registration 欄／收據／UI 狀態）⇒ 那是忠告不是統計控制。改為 **Task 5.1 之收據須記錄「本次請求宣告之主 horizon」與其送出時刻**，且該欄一經寫入不得於同一批之後續請求改寫；做不到即列殘留 RESID-5，不得以散文冒充控制 |
+| Q-C10 | 多重比較（多 N、多條件探索） | `eventscan-scope` 050：本票不做調整，改以 `eventscan-banner` 020 之字面揭露。🔴 **本輪修正**：初稿之「主 horizon 須先寫下再看表」**沒有任何機械承載**（委員指出：Task 6.2 只有 horizons 輸入，無 pre-registration 欄／收據／UI 狀態）⇒ 那是忠告不是統計控制。改為 **Task 5.1 之收據須記錄「本次請求宣告之主 horizon」與其送出時刻**，且該欄一經寫入不得於同一批之後續請求改寫；做不到即列殘留 RESID-7（**不是** RESID-5，後者已用於段間相依），不得以散文冒充控制 |
 | Q-C11 | 尾端分母（逐 N 之有效 n、被排除數、兩批同一 availability mask） | Task 3.1 驗證條 ＋ Task 4.4；逐 `h` 回 `n` 與排除筆數，兩批用同一 eligibility 定義 |
 | Q-C12 | 方向與部位（long／short sign、sizing、單筆 vs 累積） | `direction` 由觸發批帶入（Task 4.1）；`eventscan-scope` 010：本票不做累積報酬／權益曲線 |
 | Q-C13 | 條件發現與驗證（同一資料搜出來的條件） | `eventscan-banner` 020 為**不可解除**之字面揭露；本票不做時間序 holdout（見 §N 殘留 RESID-2） |
@@ -880,7 +908,16 @@
   在本專案尚無定論，且需先有真實批之段間自相關量測才能選`；觸發：`eventscan-params` 080 之診斷在真實批上
   經常為真時；登記處：`docs/IC_QUANT_GAP_REGISTRY.md`「兩路涵蓋宣告」節。
   在此之前以 Task 5.2 之診斷旗標＋橫幅不解除承擔（**不是**假裝沒有這個問題）。
-- **RESID-6 逐欄因果 provenance（取代指標家族白名單）**
+- **RESID-7 主 horizon 之預先登記無法擋「重跑一批新的」**
+  — `為何現在不做: blocked-by:本票只在同一批內鎖住 primary_horizon；使用者換條件重跑一批新的即可繞過，
+  要擋住那個需要跨批之研究登記簿（研究 id、條件式 digest、宣告時序），其資料模型不在本票範圍`；
+  觸發：出現跨批之研究登記需求或使用者要求可稽核之探索紀錄時；登記處：`docs/IC_QUANT_GAP_REGISTRY.md` #3。
+  在此之前以 `eventscan-banner` 020 之不可解除字面承擔。
+- **RESID-8 間接呼叫繞過 caller matrix**
+  — `為何現在不做: user-ruling:2026-09-11 使用者定「與委員判定繞過成本≥合規成本即收」；
+  AST 走訪已擋住全部語法直接呼叫，再擋 getattr／反射／包裝函式需動態偵測，成本遠高於效益`；
+  觸發：實際出現以間接方式呼叫 `analyze_tables` 之生產路徑時；登記處：`docs/IC_QUANT_GAP_REGISTRY.md` #3。
+- **RESID-6 逐欄因果 provenance（取代 group 白名單）**
   — `為何現在不做: blocked-by:reference manifest 無 available_at／causal 欄，逐欄因果證明須 Feature Factory
   在產出端補 provenance，而本票 §C 明文不改 FF`；觸發：Feature Factory 下次動產出端 schema 時；
   登記處：`docs/IC_QUANT_GAP_REGISTRY.md` #3。誠實邊界見 `eventscan-pit-admission` 070。
