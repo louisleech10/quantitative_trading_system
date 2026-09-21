@@ -416,6 +416,22 @@
         "病因目錄＋外部方案調查皆完成並收斂（handoffs/reconcile/20260921-docfix-x-consult-r1/synth.md，10 條 findings 全進群集表、機械檢查 rc=0）。三項結論：①外部無通用語意矛盾 blocking gate（consistency-checker ADR-0015 在散文上 254 候選只認 1 條後關掉；PRISMM-Bench 含 GPT-5 高推理 21 模型最好 53.9%；GitHub Spec Kit /analyze 官方明文 non-blocking）②本 repo 現行兩家對抗審已是該路線最強形態（2026-09-20 兩輪實得 23 條），問題是抓不穩不是抓不到 ③唯一結構性解＝同一事實只寫一次，而 fact_keys 只覆蓋 14／216 份 live 文件＝6.5%、18 個 key 全為治理記帳、量化主線為 0。⇒ 行動落在 RM-EVENTSCAN 的 B（寫 SPEC 時同步建），本票不另開治理票。🔴 **B 之實測成效（EVENTSCAN 五輪）**：doc-sync 型 findings 每輪皆有（R2 4／19、R3 8／14、R5 4／10），**比例未下降**——因為修補落在 fact-key 而散文引用點同時增加；且 R5 抓到 `scripts/fact_keys.json` **自身的手寫描述欄位不受 B 保護**。⇒ B 擋得住「貼了標記的格」，擋不住別處手打同一個值，此洞已具名於 EVENTSCAN SPEC §N 之 RESID-9。🔴 **2026-09-21 使用者質問後重算病因分類**：把原先拆散的「掉項 214／編號 52／狀態漂移 42」加總為**文檔類 308 個拒絕點＝已分類者之 62.7%**（全體 35.7%），為壓倒性第一；主委先前未列為重大缺失之兩個原因（拆散不加總、嚴重度錨點錨在「會不會算出錯的數值」）已寫入 docs/AGENTOPS_PROBLEM_DEFINITION.md。"
       ],
       [
+        "270",
+        "RM-FFTFMETA",
+        "FF-TFMETA：同一 run 之 present_timeframes 兩個值（completeness 鏈型別只接單一週期）",
+        "未開工",
+        "docs/FFDEFECT_DECISION.md",
+        "起因＝EVENTSCAN R7／R8 追查欄位選擇器之週期來源時發現。🔴 定性輪（handoffs/reconcile/20260921-ffdefect-x-consult-r1/synth.md）codex＋composer **獨立同判為真缺陷**，零駁回。根因＝`build_completeness_meta_from_layer_results(..., *, timeframe: str)` 型別上只接單一週期，三個寫入點全傳純量；多週期之正確值只存在於 `multi_tf_generator._present_timeframes()` 並流向 `task_record.json`，從未進 manifest。且 `_apply_failed_timeframe_metadata` 開頭即 `if not failed_timeframes: return` ⇒ **只有在有週期失敗時才寫得完整，全部成功時反而是錯的**。實測：18 個 run 中 4 個多週期 run 之 manifest 皆只宣告主週期。嚴重度＝**latent**（生產端零消費者，命中全在測試與 profile 腳本；EVENTSCAN 會是第一個真實消費者）。修法＝producer 產 ordered unique completeness object 同時餵 manifest 與 task record，`expected_timeframes` 須一併改；canonical 來源＝ordered training config 與 skip／failure 集合，**gid 前綴只作 diagnostic cross-check 不得當權威**（codex 修正，同時修正主委與 composer）。**排序＝先於 FF-NAME**（不改欄名、風險低）。不併入 FFDSTAR。"
+      ],
+      [
+        "280",
+        "RM-FFNAME",
+        "FF-NAME：衍生層欄名未經來源／指標正規化（3,596 欄／0.859%）",
+        "未開工",
+        "docs/FFDEFECT_DECISION.md",
+        "起因＝使用者 2026-09-21 問「FF 的名稱中不能有 `_`，taker_ratio 應該要是 taker-ratio？」🔴 定性輪 codex＋composer **獨立同判為真缺陷**。命名規則明文於 `talib_wrapper.py:36-37`。根因＝`derived_operators.py:816-831` 之 **metadata-hit 分支取 raw、fallback 分支 `:833-851` 取 normalized**（**不是**主委原判之「L2 一律從 raw 重建」——實測 Distance 272／Momentum 8,700／Abs 870／TsRank 2,610 皆用連字號，只有 Cross 1,194／Ratio 1,194／Lag 16 用底線）。週期標記器**不是**缺陷（本 run 走 CGSA 之 `feature_storage.py:862-873`，對合規名行為正確）。修法＝只改 `derived_operators.py:303-306` 與 pandas 路徑 `:549-552` 兩處造名 f-string，**不得改 `FeatureInfo.source` 或 atomic metadata**（`info.source` 是查 kline 欄名之鍵，kline 實有 `taker_ratio` 無 `taker-ratio`；另 entropy 之 `close_return` 與 `ic_analysis_service.py:2472` 之 `data_source` 外送前端皆依賴 raw）。相容性＝**只對新 run 生效**（依使用者 2026-08-05「面向未來不溯及既往」既有裁定；選項 B／C 皆與之相斥），加 manifest `naming_version` 機械防護。須重簽 `tests/_golden/batch2d/` 三檔（已有 `scripts/freeze_batch2d_baseline.py`）。**排序＝後於 FF-TFMETA**。不併入 FFDSTAR。"
+      ],
+      [
         "260",
         "RM-FFDSTAR",
         "FFDSTAR 每個 FF run 自帶 d* 收據（可追溯性，中票）",
