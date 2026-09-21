@@ -70,6 +70,57 @@ def test_unchanged_file_passes(tmp_path: Path) -> None:
     assert r.returncode == 0
 
 
+GEN_OLD = (
+    "# T\n"
+    "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+    "別處散文也寫 `TOKEN_ABCDEF`，這是副本。\n"
+    "<!-- BEGIN GENERATED: k -->\n"
+    "| 100 | 規模 | `TOKEN_ABCDEF` |\n"
+    "<!-- END GENERATED: k -->\n"
+)
+
+
+def test_generated_block_is_not_counted_as_residue(tmp_path: Path) -> None:
+    """B 政策之核心動作：值自 prose 收進 fact-key 生成區塊 ⇒ 僅存引用在區塊內，rc=0。
+
+    不排除生成區塊的話，這個「正確動作」每次都會被誤判為漏改。
+    """
+    new = "\n".join(
+        ln for ln in GEN_OLD.splitlines()
+        if "規模數字為" not in ln and "別處散文也寫" not in ln
+    ) + "\n"
+    r = _run(GEN_OLD, new, tmp_path)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_prose_residue_still_fails_when_generated_block_also_holds_token(tmp_path: Path) -> None:
+    """對照組：生成區塊之例外**不得**順便放行區塊外的 prose 副本 ⇒ rc=1 且指名那一行。"""
+    new = "\n".join(
+        ln for ln in GEN_OLD.splitlines() if "規模數字為" not in ln
+    ) + "\n"
+    r = _run(GEN_OLD, new, tmp_path)
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "別處散文也寫" in r.stdout
+
+
+def test_mutation_removing_generated_exclusion_turns_red(tmp_path: Path) -> None:
+    """mutation：拿掉生成區塊之排除 ⇒ 上面那條 PASS 必須翻紅（證明綠燈來自該分支）。"""
+    src = SCRIPT.read_text(encoding="utf-8")
+    mutated = src.replace("        if n in generated_lines:\n            continue\n", "")
+    assert mutated != src, "錨點已漂移，mutation 沒生效"
+    m = tmp_path / "mutated.sh"
+    m.write_text(mutated, encoding="utf-8")
+    new = "\n".join(
+        ln for ln in GEN_OLD.splitlines()
+        if "規模數字為" not in ln and "別處散文也寫" not in ln
+    ) + "\n"
+    o = tmp_path / "o.md"; n = tmp_path / "n.md"
+    o.write_text(GEN_OLD, encoding="utf-8"); n.write_text(new, encoding="utf-8")
+    r = subprocess.run(["bash", str(m), "--files", str(o), str(n)], cwd=ROOT,
+                       capture_output=True, text=True, check=False)
+    assert r.returncode == 1, "拿掉排除後仍綠 ⇒ 該測試沒在測那個分支"
+
+
 def test_mutation_disabling_check_turns_red(tmp_path: Path) -> None:
     """mutation：把違規判準改成永不成立 ⇒ 第一條測試必須翻紅（證明測試不是廉價綠燈）。"""
     src = SCRIPT.read_text(encoding="utf-8")

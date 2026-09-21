@@ -11,6 +11,13 @@
 #   該 token 若仍出現在 staged 版某行，而該行**沒有版本標記**（regex：v[0-9]+）⇒ 違規。
 #   理由：合法殘留只有一種——「歷史敘述」，而歷史敘述本就該標它是哪一版的事。
 #   要通過 = 真的同步改掉，或在那行標上版本（這正是正確寫法），沒有環境變數逃生口。
+#   **例外（2026-09-21 加）**：`<!-- BEGIN GENERATED: k -->`…`<!-- END GENERATED: k -->` 之間的行
+#   不算殘留引用。它們由 scripts/fact_keys.json 機械生成、由 factkey_write_guard.sh 擋手改，
+#   **就是**唯一來源。不排除的話，「把散在各處的重複值收進 fact-key 區塊」這個正確動作
+#   必然觸發誤報（EVENTSCAN R8 實撞：§A 移除規模數字後，僅存引用正是該區塊本身）。
+#   🔴 誠實邊界（此例外放掉的覆蓋）：若 fact_keys.json 內的值本身已過期，本閘不再因
+#   「prose 被改而區塊沒改」而偶然報紅。該洞本就存在（見 EVENTSCAN SPEC §N RESID-9），
+#   本例外未使其變壞，但也未補上。
 #
 # 第二入口（使用者 2026-09-11：「不止 SPEC/TODO，每個要整理委員產出時候都會要用到」）：
 #   --synth <synth.md> <target.md>：收斂檔群集表「處置」欄裡的反引號概念，必須在修訂標的
@@ -56,9 +63,25 @@ for line in removed:
     for t in tok_re.findall(line):
         if t not in added_text:
             dropped.add(t)
+# 生成區塊之行不列入「殘留引用」：它們由 scripts/fact_keys.json 機械生成，**就是**唯一來源，
+# 不是忘了同步的副本。不排除的話，「把重複值收進 fact-key 區塊」這個正確動作必然觸發誤報
+# （2026-09-21 EVENTSCAN R8 實際撞到：§A 依 B 政策移除規模數字後，僅存引用正是該區塊本身）。
+_gen_begin = re.compile(r"<!--\s*BEGIN GENERATED:")
+_gen_end = re.compile(r"<!--\s*END GENERATED:")
+in_gen = False
+generated_lines = set()
+for n, line in enumerate(new, 1):
+    if _gen_begin.search(line):
+        in_gen = True
+    if in_gen:
+        generated_lines.add(n)
+    if _gen_end.search(line):
+        in_gen = False
 violations = []
 for t in sorted(dropped):
     for n, line in enumerate(new, 1):
+        if n in generated_lines:
+            continue
         if t in line and not ver_re.search(line):
             violations.append((t, n, line.strip()[:110]))
 if not violations:

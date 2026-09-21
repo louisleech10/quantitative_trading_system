@@ -389,7 +389,7 @@
         "EVENTSCAN 條件掃描→持有 N 根報酬 vs 隨機對照報酬（大票，單標的）",
         "進行中",
         "白話說明/EVENTSCAN方向與做法.md",
-        "🔴 下一步＝**寫 SPEC**，不是實作。方向與做法已定案（偵察 r1 十一條＋量化方法 consult r2 十四條皆收斂銷帳；使用者九項裁定；方向書 v10 經逐章稽核），但那是 SPEC 之**前置**不是替代。大票完整管線：①寫 SPEC →②兩家對抗審→收斂→凍結 →③寫 TODO →④兩家對抗審→收斂→凍結 →⑤分批實作 →⑥每批審碼→收斂。權威＝白話說明/EVENTSCAN方向與做法.md（使用者要的數字、九項裁定、十步做法、八個缺口）。做法十步含：條件引擎吃 FF 欄且欄名打錯要報錯／欄位選擇器（該 run 欄名規模見 SPEC 之 `eventscan-column-selector` 100）／掃描函式接 API／統一持有時鐘／連續成立只進場一次／報酬表補標準差與最好最差／隨機批參數由觸發批帶入＋抽樣四修／比較端點改比報酬＋Δ 之 bootstrap 區間／前端含硬性橫幅／事件版成本歸零點。單標的先做，多標的併 GAP-4 🔴 **使用者 2026-09-21 追加裁定**：寫 SPEC 時**同步建「同一事實只寫一次」（代號 B）**——凡會被 TODO／測試／白話再抄一次的**值**（時鐘定義、first-of-run、隨機對照抽樣四條、報酬欄主顯示、統計欄、breakeven 公式、失敗原因碼、欄名打錯要報錯、使用者七項裁定…約 40–60 條），於寫到該格的**當下**改為 `fact_keys` 生成區塊，不手打；不是獨立的票、不新建工具、不延後 SPEC。BEFORE 基線已記於 handoffs/run_receipts/20260921-eventscan-b-baseline.json（69 輪、251 條 canonical、doc-sync 55 條＝21.9%、每輪 1.00 條），AFTER 用同一支 docrot2_round_metric 比。🔴 **誠實邊界**：B 只管可列舉的**值**（零件型號表），**不管架構對不對、零件怎麼接、為什麼這樣設計**；同一份文件內前後矛盾與論述寫錯外部無解、本專案亦無解，只能靠兩家對抗審且會漏。🔴 **已知洞**：手寫偵測之 status_scope 只含 HANDOFF.md／docs/GOVERNANCE_EXECUTION_ORDER.md／白話說明/，**docs/ 其餘檔不在內** ⇒ SPEC 內貼了標記的格會同步，但在別段落手打同一個值不會被擋；補洞代價未查。🔴 **2026-09-21 進度**：SPEC v1 已寫並經**五輪**兩家對抗審（R1 21 條／R2 19／R3 14／R4 14／R5 10，**全數採納、零駁回**），fact-key 15 組約 130 列。🔴 **R5 曾揭露前提崩塌並已修復**：舊 run 之特徵欄被 fracdiff 轉換且逐週期 d 不同，故 `EMA_5 > EMA_10` 恆為真、1 段。使用者裁定重跑無轉換 FF run，已完成（`654bd63b…`，EMA 欄 corr 全 1.0000、該條件 956 段）⇒ **凍結硬前置已解除**。🔴 **R6 抓到第一次重跑漏了 12h 欄**，主委補 `timeframes.training` 重發後完成；**reference 已定版為 `d9935491…`**（規模見 SPEC 之 `eventscan-column-selector` 100）。🔴 **R7 另推翻主委之欄位選擇器設計**：原「以欄名底線切五層」只涵蓋 0.77%，且切分不可靠（來源欄名含底線、指標可多參數）⇒ 改以 manifest `groups` 為結構來源、全程不解析欄名。**SPEC 仍未凍結**，待 R8 複查。"
+        "🔴 **現況＝SPEC 已起草，兩家對抗審至 R8，尚未凍結**（下一步＝收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO；**不是實作**）。大票完整管線：①寫 SPEC →②兩家對抗審→收斂→凍結 →③寫 TODO →④兩家對抗審→收斂→凍結 →⑤分批實作 →⑥每批審碼→收斂，目前在②。方向與做法已定案（偵察 r1 十一條＋量化方法 consult r2 十四條皆收斂銷帳；使用者九項裁定；方向書 v10 經逐章稽核），但那是 SPEC 之**前置**不是替代。權威＝白話說明/EVENTSCAN方向與做法.md（使用者要的數字、九項裁定、十步做法、八個缺口）。做法十步含：條件引擎吃 FF 欄且欄名打錯要報錯／欄位選擇器（該 run 欄名規模見 SPEC 之 `eventscan-column-selector` 100）／掃描函式接 API／統一持有時鐘／連續成立只進場一次／報酬表補標準差與最好最差／隨機批參數由觸發批帶入＋抽樣四修／比較端點改比報酬＋Δ 之 bootstrap 區間／前端含硬性橫幅／事件版成本歸零點。單標的先做，多標的併 GAP-4 🔴 **使用者 2026-09-21 追加裁定**：寫 SPEC 時**同步建「同一事實只寫一次」（代號 B）**——凡會被 TODO／測試／白話再抄一次的**值**（時鐘定義、first-of-run、隨機對照抽樣四條、報酬欄主顯示、統計欄、breakeven 公式、失敗原因碼、欄名打錯要報錯、使用者七項裁定…約 40–60 條），於寫到該格的**當下**改為 `fact_keys` 生成區塊，不手打；不是獨立的票、不新建工具、不延後 SPEC。BEFORE 基線已記於 handoffs/run_receipts/20260921-eventscan-b-baseline.json（69 輪、251 條 canonical、doc-sync 55 條＝21.9%、每輪 1.00 條），AFTER 用同一支 docrot2_round_metric 比。🔴 **誠實邊界**：B 只管可列舉的**值**（零件型號表），**不管架構對不對、零件怎麼接、為什麼這樣設計**；同一份文件內前後矛盾與論述寫錯外部無解、本專案亦無解，只能靠兩家對抗審且會漏。🔴 **已知洞**：手寫偵測之 status_scope 只含 HANDOFF.md／docs/GOVERNANCE_EXECUTION_ORDER.md／白話說明/，**docs/ 其餘檔不在內** ⇒ SPEC 內貼了標記的格會同步，但在別段落手打同一個值不會被擋；補洞代價未查。🔴 **2026-09-21 進度**：SPEC v1 已寫並經**五輪**兩家對抗審（R1 21 條／R2 19／R3 14／R4 14／R5 10，**全數採納、零駁回**），fact-key 15 組約 130 列。🔴 **R5 曾揭露前提崩塌並已修復**：舊 run 之特徵欄被 fracdiff 轉換且逐週期 d 不同，故 `EMA_5 > EMA_10` 恆為真、1 段。使用者裁定重跑無轉換 FF run。🔴 **第一次重跑（`654bd63b…`）被 R6 抓到漏了全部 12h 欄，該 run 不可用**；主委補 `timeframes.training` 重發後完成，**reference 定版為 `d9935491…`**（規模見 SPEC 之 `eventscan-column-selector` 100；EMA 欄 corr 全 1.0000、該條件 956 段）⇒ **凍結硬前置已解除**。🔴 **R7 推翻主委之欄位選擇器設計本體**：原「以欄名底線切五層」只涵蓋 0.77%，且切分不可靠（來源欄名含底線、指標可多參數）⇒ 改以 manifest `groups` 為結構來源、全程不解析欄名。🔴 **R8 複查該改動，findings 回升至 14 條（自 R1 起 21→19→14→14→10→7→7→14），回升全數由 R7 之改動引入**：R7 在 020 把不存在的 `timeframe`／`layer`／`category`／`indicator` 寫成 group 物件之結構化欄位（944 個物件中各出現 0 次），050 之群內不變式被否證，分頁只有 smoke 無完整性契約，選擇器與 PIT 成員資格不一致。週期來源改採 `task_record.json`（兩家提案皆不採，見 K-10 030）。R8 之 14 條 12 採納／2 部分採納／零駁回，**SPEC 仍未凍結**，待 R9 複查。"
       ],
       [
         "230",
@@ -1137,7 +1137,7 @@
       [
         "045",
         "4.3",
-        "凍結 fixture：reference run（**以 `eventscan-golden-reference` 040 之 `config_hash` 為準，不得寫成未限定之「reference run」**）、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40`。**可重播 identity（R7 指出 R6 之修補只有規格字面、無實際 artifact）**：fixture 落檔 `tests/golden/eventscan/random_control_fixture.npz`，並於同目錄之 `random_control_fixture.meta.json` 記 `config_hash`／`sample_ids_digest`／`fixture_sha256`／`source_manifest_sha256` 四者；驗收須斷言該四者與當次重建結果逐字相等，缺任一即 FAIL",
+        "凍結 fixture：reference run（**以 `eventscan-golden-reference` 040 之 `config_hash` 為準，不得寫成未限定之「reference run」**）、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40`。**可重播 identity（R7 指出 R6 之修補只有規格字面、無實際 artifact）**：fixture 落檔 `tests/golden/eventscan/random_control_fixture.npz`，並於同目錄之 `random_control_fixture.meta.json` 記 `config_hash`／`sample_ids_digest`／`fixture_sha256`／`source_manifest_sha256` 四者；驗收須斷言該四者與當次重建結果逐字相等，缺任一即 FAIL。🔴 **該 artifact 與四項 identity 之值現為明示佔位 `<PENDING: Phase 0 回填>`**——R8 實查 `tests/golden/eventscan/` 目錄與兩個檔案**皆不存在**。它們是 **Phase 0 之實作產出**，不是 SPEC 凍結之前置（凍結前要求產出等於跳過管線第①②步）。**回填閘**：Phase 0 驗收須以 `sha256sum` 實算並就地回填四值，**未回填即 fail-closed**；凍結後不得以「之後補」略過此閘",
         "抽樣結果逐位元組可重播；`max(horizons) → 1` 之 mutation 在此 fixture 上**必**轉紅（不得依賴隨機抽樣碰巧重疊）"
       ],
       [
@@ -1161,7 +1161,7 @@
       [
         "060",
         "4.3",
-        "reference run（依 `eventscan-golden-reference` 040）、`max(h) = 2`、抽 40 根；**沿用 045 之同一 fixture 與其四項 identity**，不另建",
+        "reference run（依 `eventscan-golden-reference` 040）、`max(h) = 2`、抽 40 根；**沿用 045 之同一 fixture 與其四項 identity**，不另建（含 045 之 `<PENDING: Phase 0 回填>` 佔位與回填閘）",
         "任兩個持有窗不重疊（逐對檢查，非抽樣）"
       ],
       [
@@ -1509,26 +1509,26 @@
       [
         "020",
         "**改用 group 結構，不解析欄名**",
-        "選擇器之層級一律由 manifest 之 `groups` 導出：`groups.<gid>` 給 (週期, 層, 類別／指標)，`groups.<gid>.columns[]` 給該群之欄。此為**結構化欄位**，與 PIT 准入所用之來源同一份（見 `eventscan-pit-admission` 040）",
-        "Task 1.3 由 manifest 導出，不得前端硬編，**亦不得以底線切欄名**"
+        "選擇器之層級一律由 manifest 之 `groups` 導出：鍵（gid）給節點身分，`groups.<gid>.columns[]` 給該群之欄。🔴 **group 物件並沒有 `timeframe`／`layer`／`category`／`indicator` 欄**（R8 全量實查：944 個物件中各出現 **0 次**；鍵清單見 `eventscan-pit-admission` 035）⇒ 不得向 group 物件索取這四者，週期另由 030 取得",
+        "Task 1.3 由 manifest 導出，不得前端硬編，**亦不得以底線切欄名**。🔴 R7 曾在本格把上列四欄寫成「結構化欄位」，經 R8 兩家實查否證"
       ],
       [
         "030",
-        "第 1 層 週期",
-        "自 gid 取；最終 run 實測為 `1h` 209,484 欄、`12h` 209,235 欄（兩者近乎對半）",
-        "🔴 `manifest.present_timeframes` 只宣告 `1h`，與 raw groups 含 402 個 `12h` **矛盾**；**以 groups 為準**，該矛盾另列殘留"
+        "第 1 層 週期（**唯一來源＝`task_record.json`**）",
+        "週期集合取自該 run 之 `task_record.json` 之 `metadata.present_timeframes`（reference run 實測為 `[\"1h\",\"12h\"]`，且 `metadata.skipped_timeframes` 為 `[]`）。gid 歸屬週期之算法＝對該集合逐一做**前綴成員測試**（`tf + \"_\"`）；命中 0 個或 ≥2 個即 **fail-closed**。此為對封閉集合之成員測試，**不是**把 gid 切開再解讀其段義",
+        "🔴 **禁用 `feature_manifest.json` 之 `present_timeframes`**：同一 run 之 manifest 寫 `[\"1h\"]`、`task_record.json` 寫 `[\"1h\",\"12h\"]`，**同名欄兩個值**，而 manifest 同時標 `quality_status=complete` 不發警告。矛盾本體屬 FF 產出端，見 RESID-11。加固對證：以 gid 前綴導出之集合若與 `task_record` 不等即 fail-closed——該切分**只用於偵測分歧，永不作為權威**"
       ],
       [
         "040",
-        "第 2 層 group",
-        "該週期下之 gid 集合（最終 run 共 944 個，見 `eventscan-pit-admission` 035）",
-        "gid 本身即「層／類別／指標」之複合鍵，不再拆成三層"
+        "第 2 層 group（`source_group_id` 為可選中間層）",
+        "該週期下之 gid 集合（最終 run 共 944 個，見 `eventscan-pit-admission` 035）。**可選中間層**＝`groups.<gid>.source_group_id`（結構化欄，不切字串）：R8 實測 796 個相異值，其中 **108 個一對多**（最大 `1h_L2_WorldQuant` 轄 20 個 shard）、688 個 `source_group_id == gid`；後者**折疊不顯示**，只有一對多者才多一層",
+        "🔴 gid **不是**可理解之「層／類別／指標」複合鍵（R8 兩家獨立否證）——它是**不透明節點鍵**，顯示即原字串，不得由其導出語意"
       ],
       [
         "050",
         "第 3 層 欄",
-        "該 gid 之 `columns[]`；群內之欄僅參數與衍生尾綴不同",
-        "群內若欄數過多，由 Task 1.3 之分頁契約處理（見 090）"
+        "該 gid 之 `columns[]`，視為**不透明清單**。🔴 **禁止宣稱「群內之欄僅參數與衍生尾綴不同」**：R8 實查最大 gid `12h_L4_lag_2` 之 5,000 欄，其第一個底線前之 token 去重即有 **16 個**（`taker-ratio` 1,434／`volume` 1,419／`close` 1,418／`hlc` 435…），該不變式被否證",
+        "群內欄數過多**不得以翻頁當導航**：由 085 之分頁契約承載傳輸，由 080 之群內搜尋承載導航"
       ],
       [
         "060",
@@ -1538,9 +1538,9 @@
       ],
       [
         "085",
-        "🔴 回應契約（R7 指出原本完全缺失）",
-        "分層端點**一律分頁**：每層回應含 `items`／`total`／`next_cursor`；單次回應之 `items` 上限 `500` 筆。**禁全量傳輸**（418,719 欄、14,103 個參數尾綴）。逾上限而未帶 `next_cursor` 即為契約違反；**截斷須顯式**——回應須帶 `truncated: true` 與 `total`，不得靜默截短",
-        "Task 1.3／6.1；驗收須含「請求第 2 頁得到不同 `items` 且 `total` 不變」之 `pytest`"
+        "🔴 回應契約（R7 指出原本完全缺失；R8 補完整性語意）",
+        "分層端點**一律分頁**：每層回應含 `items`／`total`／`next_cursor`；單次回應之 `items` 上限 `500` 筆（**單次傳輸上限，不是導航手段**——R8 實測 258／944 gid 逾此值、最大 gid 需 10 頁）。**禁全量傳輸**。**① 排序**：`items` 依 `LC_ALL=C` 位元組序**穩定排序**（與 `eventscan-pit-admission` 042 同一套 canonical 位元組序），同一 `(來源集合, query)` 下跨請求不得改變順序。**② cursor 綁定**：`next_cursor` 綁定 `(symbol, timeframe, config_hash, query, parent_gid)` 五元組；收到綁定不符之 cursor **fail-closed**（不得靜默回第一頁）。**③ 終止語意**：遍歷完畢時 `next_cursor` 明確為 `null`；`total <= 500` ⇒ `next_cursor` 為 `null` 且 `truncated=false`；`total > 500` ⇒ **必帶** `next_cursor`。**④ 截斷須顯式**：`truncated: true` 僅表示「本頁非全集」，須與 `total` 同時出現，不得靜默截短",
+        "Task 1.3／6.1。驗收**不得**以「第 2 頁不同且 `total` 不變」之 smoke 代替完整性——須對最大 gid（`12h_L2_Momentum_part1`，5,000 欄／10 頁）**遍歷全部頁**並斷言無重複、無遺漏、聯集等於該 gid 之 `columns[]`；另須有跨 run／跨 query cursor 之 fail-closed 反例"
       ],
       [
         "080",
@@ -1644,7 +1644,14 @@
         "HP-EVENTSCAN",
         "進行中",
         "白話說明/EVENTSCAN方向與做法.md",
-        "寫 SPEC（大票管線第①步）；方向與做法已定案，SPEC 未起草"
+        "收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO（大票管線第②步末）；SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 R8，**未凍結**"
+      ],
+      [
+        "040",
+        "HP-FFDSTAR",
+        "進行中",
+        "docs/FFDSTAR_SPEC.md",
+        "R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷"
       ]
     ]
   },

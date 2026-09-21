@@ -6,7 +6,8 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
-| 04-003 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 寫 SPEC（大票管線第①步）；方向與做法已定案，SPEC 未起草 |
+| 04-003 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO（大票管線第②步末）；SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 R8，**未凍結** |
+| 04-004 | HP-FFDSTAR | 進行中 | docs/FFDSTAR_SPEC.md | R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -24,7 +25,8 @@
 | 03-013 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 IC 切分契約 |
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
-| 04-003 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 寫 SPEC（大票管線第①步）；方向與做法已定案，SPEC 未起草 |
+| 04-003 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO（大票管線第②步末）；SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 R8，**未凍結** |
+| 04-004 | HP-FFDSTAR | 進行中 | docs/FFDSTAR_SPEC.md | R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷 |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑
@@ -107,6 +109,11 @@
 - 🔴 **收斂檔附錄必須與來源逐位元組相同**：任何**全域字串替換**（例如把「三家」改「兩家」）都會打到附錄裡的委員區塊 ⇒ `body-hash 不符` 拒銷，而錯誤訊息只給兩個 sha 指不到你改了哪。改群集段要逐段改，或改完把附錄自來源重新逐字抽一次。
 - 🔴 **委員檔案被還原／修好後要 `register-output` 才解鎖**：`cx_run` 收尾時產出缺檔會記 `result_state=failed`，之後即使檔案補回來，`debt_clear` 仍報「最新 result_state='failed' 且其後無同 round 之 committee_output」。補跑 `bash scripts/gate.sh register-output <task-id> <檔>`。
 - 🔴 **findings 檔內出現 `<!--` 字面會吞掉後續必填欄**：`completeness_check.sh` 的解析把 HTML 註解開頭之後的內容當註解，導致 `**類別**` 明明寫了卻報「finding 缺類別」，錯誤訊息完全指不到真因。2026-09-21 踩到（碼證欄引用 `grep 'BEGIN GENERATED'` 的完整字面）。⇒ 在 findings／brief 內引用含 `<!--` 的字面時，去掉註解開頭符號。
+- 🔴 **`printf` 組 commit 訊息遇 `%` 會從該處截斷**：訊息含 `46.7%` 時 `printf` 把它當格式指令，commit `3331ae9a` 實際被截。⇒ commit 訊息一律 Write 成檔再 `git commit -F`，不用 `printf`／`echo -e`。
+- 🔴 **Monitor 的過濾條件必須涵蓋「實際的完成字面」**：FF 生成完成印的是 `data_quality background bake completed` 與 `CGSA catalog cached`，**不含** `Layer N done` 這類常見詞。用常見詞當過濾 ⇒ 監看 30 分鐘零事件而任務其實早已結束。⇒ 設過濾前先跑一次抓實際尾段字面。
+- 🔴 **`sed -i ''` 對 `scripts/fact_keys.json` 插入含 `\"` 的字面會破壞 JSON**（`jq` rc=5）。含引號的內容改用 Edit 工具。
+- 🔴 **背景 handle 要分清「伺服器」與「它跑的工作」**：`venv/bin/python run_api.py` 是常駐伺服器、永不結束，FF 生成只是它內部的 task。把伺服器 handle 標成「FF 重跑」會讓使用者看到「跑了兩小時還沒結束」而誤以為卡住。⇒ 標示與回報一律指工作本身（task_id／產出路徑），不指伺服器。
+- 🔴 **`data_cache/features/ETHUSDT/1h/` 下有三個外觀相似的 FF run，其中兩個不可用**：`4a8a0b37…`（fracdiff 已轉換）、`654bd63b…`（漏全部 12h 欄，542 group 全 1h）。可用者為 `d9935491…`（944 group＝1h 542＋12h 402、418,719 欄、20,352 列、六項預處理全 false）。⇒ 引用 reference run 一律先核對 `config_hash`，不靠目錄時間排序。
 
 ## 進行中紀錄
 
@@ -120,4 +127,6 @@
 - 2026-09-21：RM-EVENTSCAN → `handoffs/reconcile/20260921-eventscan-x-review-r5/synth.md`
 - 2026-09-21：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`
 - 2026-09-21：RM-FFDSTAR → `docs/FFDSTAR_SPEC.md`
+- 2026-09-21：RM-EVENTSCAN → `handoffs/reconcile/20260921-eventscan-x-review-r7/synth.md`
+- 2026-09-21：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-review-r2/synth.md`
 <!-- HISTORY-END -->

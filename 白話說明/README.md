@@ -29,7 +29,8 @@
 |---|---|---|---|---|
 | 010 | HP-PLAINDOCS | 已完成 | 白話說明/README.md | — |
 | 020 | HP-REDISPATCH | 已完成 | docs/REDISPATCH_SPEC.md | — |
-| 030 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 寫 SPEC（大票管線第①步）；方向與做法已定案，SPEC 未起草 |
+| 030 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO（大票管線第②步末）；SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 R8，**未凍結** |
+| 040 | HP-FFDSTAR | 進行中 | docs/FFDSTAR_SPEC.md | R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷 |
 <!-- END GENERATED: handoff-pending -->
 
 ---
