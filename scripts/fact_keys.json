@@ -389,7 +389,7 @@
         "EVENTSCAN 條件掃描→持有 N 根報酬 vs 隨機對照報酬（大票，單標的）",
         "進行中",
         "白話說明/EVENTSCAN方向與做法.md",
-        "🔴 下一步＝**寫 SPEC**，不是實作。方向與做法已定案（偵察 r1 十一條＋量化方法 consult r2 十四條皆收斂銷帳；使用者九項裁定；方向書 v10 經逐章稽核），但那是 SPEC 之**前置**不是替代。大票完整管線：①寫 SPEC →②兩家對抗審→收斂→凍結 →③寫 TODO →④兩家對抗審→收斂→凍結 →⑤分批實作 →⑥每批審碼→收斂。權威＝白話說明/EVENTSCAN方向與做法.md（使用者要的數字、九項裁定、十步做法、八個缺口）。做法十步含：條件引擎吃 FF 欄且欄名打錯要報錯／欄位選擇器（該 run 欄名規模見 SPEC 之 `eventscan-column-selector` 100）／掃描函式接 API／統一持有時鐘／連續成立只進場一次／報酬表補標準差與最好最差／隨機批參數由觸發批帶入＋抽樣四修／比較端點改比報酬＋Δ 之 bootstrap 區間／前端含硬性橫幅／事件版成本歸零點。單標的先做，多標的併 GAP-4 🔴 **使用者 2026-09-21 追加裁定**：寫 SPEC 時**同步建「同一事實只寫一次」（代號 B）**——凡會被 TODO／測試／白話再抄一次的**值**（時鐘定義、first-of-run、隨機對照抽樣四條、報酬欄主顯示、統計欄、breakeven 公式、失敗原因碼、欄名打錯要報錯、使用者七項裁定…約 40–60 條），於寫到該格的**當下**改為 `fact_keys` 生成區塊，不手打；不是獨立的票、不新建工具、不延後 SPEC。BEFORE 基線已記於 handoffs/run_receipts/20260921-eventscan-b-baseline.json（69 輪、251 條 canonical、doc-sync 55 條＝21.9%、每輪 1.00 條），AFTER 用同一支 docrot2_round_metric 比。🔴 **誠實邊界**：B 只管可列舉的**值**（零件型號表），**不管架構對不對、零件怎麼接、為什麼這樣設計**；同一份文件內前後矛盾與論述寫錯外部無解、本專案亦無解，只能靠兩家對抗審且會漏。🔴 **已知洞**：手寫偵測之 status_scope 只含 HANDOFF.md／docs/GOVERNANCE_EXECUTION_ORDER.md／白話說明/，**docs/ 其餘檔不在內** ⇒ SPEC 內貼了標記的格會同步，但在別段落手打同一個值不會被擋；補洞代價未查。🔴 **2026-09-21 進度**：SPEC v1 已寫並經**五輪**兩家對抗審（R1 21 條／R2 19／R3 14／R4 14／R5 10，**全數採納、零駁回**），fact-key 15 組約 130 列。🔴 **SPEC 尚不得凍結**——R5 揭露前提崩塌：FF 落檔之特徵欄已被 fracdiff 轉換且逐週期 d 不同（EMA_5..34 各異、EMA_50..144 為 d=1.0、EMA_200/233 未轉換），故 `EMA_5 > EMA_10` 在現有任何 run 上皆恆為真、命中 100%、不分段 ⇒ 本票「FF 欄可直接互比」之前提不成立。使用者裁定由主委重跑一個關閉 winsorization 與 fractional_differencing 之 FF run；reference 設定與 `eventscan-pit-admission` 全節待該 run 產生後重評，此為凍結之硬前置。"
+        "🔴 下一步＝**寫 SPEC**，不是實作。方向與做法已定案（偵察 r1 十一條＋量化方法 consult r2 十四條皆收斂銷帳；使用者九項裁定；方向書 v10 經逐章稽核），但那是 SPEC 之**前置**不是替代。大票完整管線：①寫 SPEC →②兩家對抗審→收斂→凍結 →③寫 TODO →④兩家對抗審→收斂→凍結 →⑤分批實作 →⑥每批審碼→收斂。權威＝白話說明/EVENTSCAN方向與做法.md（使用者要的數字、九項裁定、十步做法、八個缺口）。做法十步含：條件引擎吃 FF 欄且欄名打錯要報錯／欄位選擇器（該 run 欄名規模見 SPEC 之 `eventscan-column-selector` 100）／掃描函式接 API／統一持有時鐘／連續成立只進場一次／報酬表補標準差與最好最差／隨機批參數由觸發批帶入＋抽樣四修／比較端點改比報酬＋Δ 之 bootstrap 區間／前端含硬性橫幅／事件版成本歸零點。單標的先做，多標的併 GAP-4 🔴 **使用者 2026-09-21 追加裁定**：寫 SPEC 時**同步建「同一事實只寫一次」（代號 B）**——凡會被 TODO／測試／白話再抄一次的**值**（時鐘定義、first-of-run、隨機對照抽樣四條、報酬欄主顯示、統計欄、breakeven 公式、失敗原因碼、欄名打錯要報錯、使用者七項裁定…約 40–60 條），於寫到該格的**當下**改為 `fact_keys` 生成區塊，不手打；不是獨立的票、不新建工具、不延後 SPEC。BEFORE 基線已記於 handoffs/run_receipts/20260921-eventscan-b-baseline.json（69 輪、251 條 canonical、doc-sync 55 條＝21.9%、每輪 1.00 條），AFTER 用同一支 docrot2_round_metric 比。🔴 **誠實邊界**：B 只管可列舉的**值**（零件型號表），**不管架構對不對、零件怎麼接、為什麼這樣設計**；同一份文件內前後矛盾與論述寫錯外部無解、本專案亦無解，只能靠兩家對抗審且會漏。🔴 **已知洞**：手寫偵測之 status_scope 只含 HANDOFF.md／docs/GOVERNANCE_EXECUTION_ORDER.md／白話說明/，**docs/ 其餘檔不在內** ⇒ SPEC 內貼了標記的格會同步，但在別段落手打同一個值不會被擋；補洞代價未查。🔴 **2026-09-21 進度**：SPEC v1 已寫並經**五輪**兩家對抗審（R1 21 條／R2 19／R3 14／R4 14／R5 10，**全數採納、零駁回**），fact-key 15 組約 130 列。🔴 **R5 曾揭露前提崩塌並已修復**：舊 run 之特徵欄被 fracdiff 轉換且逐週期 d 不同，故 `EMA_5 > EMA_10` 恆為真、1 段。使用者裁定重跑無轉換 FF run，已完成（`654bd63b…`，EMA 欄 corr 全 1.0000、該條件 956 段）⇒ **凍結硬前置已解除**。🔴 **R6 另抓到該次重跑漏了 12h 欄**（新 run 542 group 全為 1h，舊 run 有 441 個 12h），主委已補 `timeframes.training` 重發第二次；reference 綁定待其完成後最終定版。"
       ],
       [
         "230",
@@ -1137,7 +1137,7 @@
       [
         "045",
         "4.3",
-        "凍結 fixture：reference run、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40`",
+        "凍結 fixture：reference run（**以 `eventscan-golden-reference` 040 之 `config_hash` 為準，不得寫成未限定之「reference run」**）、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40`；fixture 落檔於 `tests/golden/eventscan/random_control_fixture.npz` 並記其 `sha256` 與來源 manifest digest",
         "抽樣結果逐位元組可重播；`max(horizons) → 1` 之 mutation 在此 fixture 上**必**轉紅（不得依賴隨機抽樣碰巧重疊）"
       ],
       [
@@ -1161,7 +1161,7 @@
       [
         "060",
         "4.3",
-        "reference run、`max(h) = 2`、抽 40 根",
+        "reference run（依 `eventscan-golden-reference` 040）、`max(h) = 2`、抽 40 根",
         "任兩個持有窗不重疊（逐對檢查，非抽樣）"
       ],
       [
@@ -1311,8 +1311,8 @@
       ],
       [
         "047",
-        "🔴 為何索引要綁三元組與欄摘要（跨 run 實測）",
-        "兩個真實 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）**"
+        "🔴 為何索引要綁三元組與欄摘要（**跨 run 漂移之證據，取自兩個舊 run**，非現行 reference）",
+        "**以下為證據，不是現行設定**（現行 reference 見 `eventscan-golden-reference` 040）。兩個舊 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）**"
       ],
       [
         "050",
@@ -1327,7 +1327,7 @@
       [
         "057",
         "誠實邊界（操作成本）",
-        "每個新 FF run 需跑一次核准流程才能用於掃描。可直接沿用者＝gid 相同**且**欄摘要相等；實測第二個 run 之 43 個共用 gid 中有此性質者才免審。成本不為零，但安全方向正確且不得以放寬 fail-closed 換取便利"
+        "每個新 FF run 需跑一次核准流程才能用於掃描。可直接沿用者＝gid 相同**且**欄摘要相等；上列 047 之兩個舊 run 實測顯示共用 gid 僅 43 個，其中再扣掉欄摘要已漂者才免審（**該數字為舊 run 之觀測，非現行 reference 之成本**）。成本不為零，但安全方向正確且不得以放寬 fail-closed 換取便利"
       ],
       [
         "060",
@@ -1541,7 +1541,7 @@
         "100",
         "規模（**唯一數字來源**，SPEC 散文不得自列）",
         "reference run（`654bd63b…`）之欄數＝ `209,484`，group 數＝ `542`，列數＝ `20,352`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用",
-        "實查新 reference run（🔴 舊 run 之 `437,110` 已不適用——其預處理會額外產生轉換後欄位；方向書所寫之「逾 18 萬」更是錯值，兩者皆勿沿用）"
+        "實查新 reference run。🔴 **舊 run 之 `437,110` 不適用之真因（R6 委員更正主委）＝舊 run 另含 441 個 `12h_` group，非「預處理額外產生轉換後欄位」**；方向書所寫之「逾 18 萬」則是純錯值。兩者皆勿沿用"
       ]
     ]
   },

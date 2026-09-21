@@ -83,7 +83,7 @@
 ② **拒收訊息沒有「最接近欄名」建議**，使用者分不清「打錯字」與「這個 run 沒有這個指標」。
 本 SPEC 之 Task 1.1／1.2 分別對應。**不需要「把靜默改成報錯」——那條在本票路徑上不存在。**
 
-### 🔴 R5 揭露之前提崩塌：reference run 之特徵欄已被轉換，跨週期不可比
+### 🔴 R5 揭露之前提崩塌：**舊** reference run（`4a8a0b37…`）之特徵欄已被轉換，跨週期不可比
 
 委員 R5 實測「`close_1h_trend_EMA_5 > close_1h_trend_EMA_10` 在 reference run 上只有 1 段」，
 主委追查真因並逐項實跑對證，結果推翻本票（與方向書）之一個核心前提。
@@ -105,7 +105,7 @@
   **全部** `fracdiff=True winsor=True`（Claude 實跑 2026-09-21）
 
 ⇒ **方向書給使用者看的例題在本資料上無意義**：兩欄量綱不同，條件恆為真、命中 100%、不分段。
-⇒ **本票之「條件掃描」前提（FF 欄彼此可直接比較）在現有任何 run 上皆不成立。**
+⇒ **本票之「條件掃描」前提（FF 欄彼此可直接比較）在當時已存在之任何 run 上皆不成立**（其後由新 run 修復，見下節）。
 
 **使用者 2026-09-21 裁定**：由主委重跑一個**關閉 `winsorization` 與 `fractional_differencing`** 的 FF run
 供本票使用；另就 `d*` 快取之可追溯性**另立票**；🔴 使用者同日補充裁定「先跟委員確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」⇒ 定性輪已跑完，結論見 §N 之 RESID-10（主委原判大部分不成立）。
@@ -320,7 +320,7 @@
 | 070 | 衍生欄 | `_Cross`／`_Ratio` 等兩兩組合欄，同列於其所屬層；歸屬規則須可列舉，禁丟棄 | Task 1.3 邊界① |
 | 080 | 打字搜尋 | 對欄名做子字串比對，回相符欄名與其所屬層級路徑 | **本票新增** |
 | 090 | 後端既有來源 | `GET /api/v1/ic/features/list`（回整包平鋪清單） | api/routes/ic_analysis.py:344 |
-| 100 | 規模（**唯一數字來源**，SPEC 散文不得自列） | reference run（`654bd63b…`）之欄數＝ `209,484`，group 數＝ `542`，列數＝ `20,352`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用 | 實查新 reference run（🔴 舊 run 之 `437,110` 已不適用——其預處理會額外產生轉換後欄位；方向書所寫之「逾 18 萬」更是錯值，兩者皆勿沿用） |
+| 100 | 規模（**唯一數字來源**，SPEC 散文不得自列） | reference run（`654bd63b…`）之欄數＝ `209,484`，group 數＝ `542`，列數＝ `20,352`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用 | 實查新 reference run。🔴 **舊 run 之 `437,110` 不適用之真因（R6 委員更正主委）＝舊 run 另含 441 個 `12h_` group，非「預處理額外產生轉換後欄位」**；方向書所寫之「逾 18 萬」則是純錯值。兩者皆勿沿用 |
 <!-- END GENERATED: eventscan-column-selector -->
 
 ### K-11 條件欄之 PIT 准入規則
@@ -335,10 +335,10 @@
 | 040 | 本票之准入規則 | 契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`；欄只在「該 run 之三元組已核准」**且**「其 `gid` 命中」**且**「該 gid 之 `columns` 實算 sha256 與登記值相等」時才進 registry |
 | 042 | `columns_sha256` 之 canonical 定義（缺此定義即算不出同一個值） | ① 取 `groups.<gid>.columns` 之字串陣列；② 以 `LC_ALL=C` 位元組序**排序**（不可依賴 Python 預設 locale）；③ 以 `\\n` 連接、**尾端不加** `\\n`；④ 以 `UTF-8` 編碼（不加 BOM）；⑤ 取 `sha256` 之小寫十六進位。🔴 委員實測：同一份真實 `columns` 以四種常見算法可得**四個不同值** ⇒ 五步缺一即為不同實作 |
 | 045 | 🔴 為何不切 gid 字串 | 「`<週期>_<層>_<類別>_<指標>` 四段文法」在新 reference run 上只蓋住 542 個中的 147 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是** |
-| 047 | 🔴 為何索引要綁三元組與欄摘要（跨 run 實測） | 兩個真實 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）** |
+| 047 | 🔴 為何索引要綁三元組與欄摘要（**跨 run 漂移之證據，取自兩個舊 run**，非現行 reference） | **以下為證據，不是現行設定**（現行 reference 見 `eventscan-golden-reference` 040）。兩個舊 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）** |
 | 050 | 未命中之處置（三種皆 fail-closed） | ① 三元組未核准 ② gid 不在該 run 之登記 ③ `columns` 實算摘要與登記值不等 ⇒ 皆 fail-closed 不收該欄，並逐情形可列舉被拒欄數；**不得**以「看起來像技術指標」或「同名 gid 上次過了」放行 |
 | 055 | 核准流程 | 由 `scripts/gen_eventscan_pit_allowlist.sh` 對指定三元組自 manifest 全量產出 `gid → columns_sha256` 候選，審定後寫入契約檔之該三元組區段。**須審之集合＝「新 gid」∪「gid 相同但 `columns_sha256` 與任一既有三元組之登記值不等者」**——只審新 gid 會漏掉欄漂（047 之 `1h_L2_Momentum_chunk2` 即此形態） |
-| 057 | 誠實邊界（操作成本） | 每個新 FF run 需跑一次核准流程才能用於掃描。可直接沿用者＝gid 相同**且**欄摘要相等；實測第二個 run 之 43 個共用 gid 中有此性質者才免審。成本不為零，但安全方向正確且不得以放寬 fail-closed 換取便利 |
+| 057 | 誠實邊界（操作成本） | 每個新 FF run 需跑一次核准流程才能用於掃描。可直接沿用者＝gid 相同**且**欄摘要相等；上列 047 之兩個舊 run 實測顯示共用 gid 僅 43 個，其中再扣掉欄摘要已漂者才免審（**該數字為舊 run 之觀測，非現行 reference 之成本**）。成本不為零，但安全方向正確且不得以放寬 fail-closed 換取便利 |
 | 060 | 白名單之維護點 | 契約檔為唯一來源；**不得手寫欄名清單**，也**不得**在程式碼內另列 gid（黑名單與散落清單永遠列不完） |
 | 070 | 誠實邊界 | 粒度為 group 而非逐欄因果證明：同一 group 內若存在非因果變體則擋不住。逐欄因果 provenance 需 FF 在產出端補欄，列殘留 RESID-6 |
 <!-- END GENERATED: eventscan-pit-admission -->
@@ -435,11 +435,11 @@
 | 030 | 3.1 | `n = 1` | `std == 0`，且 `ret_max == ret_min == mean` |
 | 035 | 3.1 | `values = [0.01, 0.03]`、`weights = [1.0, 3.0]`（權重不等、`n = 2`） | 加權 `mean == 0.025`、加權 `std == 0.0086602540378444`（參考值由測試獨立算出）。🔴 本列為 030 之補位：030 是 `n = 1`，權重正規化在單元素上等價 ⇒ 「拿掉正規化」之 mutation 在其上**不會轉紅**（委員實證之假存活） |
 | 040 | 3.2 | 某格 `mean(ret_entry) = 0.0105` | `breakeven_cost_bps == 52.5`（參考值由測試以獨立算式算出） |
-| 045 | 4.3 | 凍結 fixture：reference run、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40` | 抽樣結果逐位元組可重播；`max(horizons) → 1` 之 mutation 在此 fixture 上**必**轉紅（不得依賴隨機抽樣碰巧重疊） |
+| 045 | 4.3 | 凍結 fixture：reference run（**以 `eventscan-golden-reference` 040 之 `config_hash` 為準，不得寫成未限定之「reference run」**）、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40`；fixture 落檔於 `tests/golden/eventscan/random_control_fixture.npz` 並記其 `sha256` 與來源 manifest digest | 抽樣結果逐位元組可重播；`max(horizons) → 1` 之 mutation 在此 fixture 上**必**轉紅（不得依賴隨機抽樣碰巧重疊） |
 | 047 | 4.3／4.2 | **兩碼同時成立**之組合：三個觸發月、觸發筆數 `80 / 10 / 10`，其中 1 月候選數 `< 80`（月配額不足），**且**全域互斥 packing 之槽數 `< 100`（packing 亦不足） | 依 `eventscan-failure-precedence` 010 回月配額碼；收據須同時列出**兩個**情境與其計數（010 與 020 皆列），只有 `reason` 欄取月配額碼。🔴 無此組合則優先序條文無法被驗證（委員指出 R1 未附） |
 | 050 | 4.2 | 三個自然月、觸發筆數 `80 / 10 / 10`、每月候選根數相等 | 新模式配額 `80 / 10 / 10`；既有模式於同輸入下約 `34 / 33 / 33`（兩者須同測試內並列） |
 | 055 | 5.2 | 凍結 fixture，**構造規則可逐位元組重建**：`seed = 20260921`；兩側各 24 段；每段長 8 根；段內報酬由 `numpy.random.default_rng(20260921).normal(0, 0.01, …)` 之累積和產生（同段共用一條路徑 ⇒ 段內高度重疊）；fixture 落檔於 `tests/golden/eventscan/delta_bootstrap_fixture.npz` 並記其 `sha256` | 「段改為單一事件」之 mutation 在此 fixture 上**必**轉紅；重建之 `sha256` 與落檔值 `==`（不得依賴 bootstrap 隨機誤差，亦不得只靠口頭描述重建） |
-| 060 | 4.3 | reference run、`max(h) = 2`、抽 40 根 | 任兩個持有窗不重疊（逐對檢查，非抽樣） |
+| 060 | 4.3 | reference run（依 `eventscan-golden-reference` 040）、`max(h) = 2`、抽 40 根 | 任兩個持有窗不重疊（逐對檢查，非抽樣） |
 | 070 | 4.4 | `horizons = [5, 55]` vs `horizons = [5]` | 前者剔除距尾端不足 55 根之候選，後者不剔除（同測試內並列） |
 | 080 | 1.2 | registry 含 `close_1h_trend_EMA_5`，查詢 `close_1h_trend_EMA_50000` | 建議清單首項為 `close_1h_trend_EMA_5` |
 | 090 | 6.2 | 輸入 `5, 10, 30, 55` | `timeframe = 1h` 與 `timeframe = 12h` 之換算字串不同（同測試內並列） |
@@ -1013,7 +1013,7 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   — `為何現在不做: needs-research:段之間仍可能存在行情層級相依，正確的區塊長度選擇法（例如自動 block length）
   在本專案尚無定論，且需先有真實批之段間自相關量測才能選`；觸發：`eventscan-params` 080 之診斷在真實批上
   經常為真時；登記處：`docs/IC_QUANT_GAP_REGISTRY.md`「兩路涵蓋宣告」節。
-  在此之前以 Task 5.2 之診斷旗標＋橫幅不解除承擔（**不是**假裝沒有這個問題）。
+  在此之前以 Task 5.2 之診斷旗標承擔：旗標為真時畫面掛 `eventscan-banner` **015**（區間已算出但標明可能過窄），**不是** 010 之「無信賴區間」——該情形下區間確實有回傳（**不是**假裝沒有這個問題）。
 - **RESID-10 共用 `d*` 快取之可追溯性（Feature Factory）**
   🔴 **定性輪已跑完**（使用者 2026-09-21 逐字：「那個bug你跟委員要先確認是真的是bug
   還是特殊原因才這樣定義，不要直接修掉」）。該裁定**直接擋下一次針對非缺陷的修改**——
