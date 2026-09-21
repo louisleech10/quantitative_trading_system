@@ -1055,7 +1055,7 @@
       [
         "040",
         "reference FF run",
-        "`config_hash = 654bd63b455606f0fce861d22d61ed0a`（🔴 2026-09-21 新產生之**未轉換** run；舊 run `4a8a0b37…` 因 fracdiff 使跨週期欄不可比，不得再用）"
+        "`config_hash = d9935491cea49e8cada481a8bf9487d6`（2026-09-21 產生之**未轉換且含 1h＋12h** run）。🔴 **兩個不可用之 run**：`4a8a0b37…`（fracdiff 使跨週期欄不可比）與 `654bd63b…`（同為未轉換，但**漏了全部 12h 欄**，542 group 全為 1h）——後者仍在磁碟上，誤用風險高，任何引用皆須先核對 `config_hash`"
       ],
       [
         "050",
@@ -1297,7 +1297,7 @@
       [
         "035",
         "🔴 manifest 實況（全量實查，非抽樣）",
-        "新 reference run（`654bd63b…`）有 **542 個 group**；gid 之底線段數分佈為 3 段 3 個／4 段 147 個／5 段 194 個／7 段 198 個；group 物件之鍵為 `column_count`／`columns`／`dtype`／`dtype_counts`／`encoded_column_count`／`file`／`file_size_bytes`／`float32_columns`／`nan_ratio`／`path`／`row_count`／`source_group_id`——**沒有類別欄，也沒有指標欄**"
+        "新 reference run（`d9935491…`）有 **944 個 group**；gid 之底線段數分佈為 3 段 8 個／4 段 263 個／5 段 376 個／6 段 99 個／7 段 198 個；group 物件之鍵為 `column_count`／`columns`／`dtype`／`dtype_counts`／`encoded_column_count`／`file`／`file_size_bytes`／`float32_columns`／`nan_ratio`／`path`／`row_count`／`source_group_id`——**沒有類別欄，也沒有指標欄**"
       ],
       [
         "040",
@@ -1307,7 +1307,7 @@
       [
         "045",
         "🔴 為何不切 gid 字串",
-        "「`<週期>_<層>_<類別>_<指標>` 四段文法」在新 reference run 上只蓋住 542 個中的 147 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是**"
+        "「`<週期>_<層>_<類別>_<指標>` 四段文法」在新 reference run 上只蓋住 944 個中的 263 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是**"
       ],
       [
         "047",
@@ -1540,7 +1540,7 @@
       [
         "100",
         "規模（**唯一數字來源**，SPEC 散文不得自列）",
-        "reference run（`654bd63b…`）之欄數＝ `209,484`，group 數＝ `542`，列數＝ `20,352`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用",
+        "reference run（`d9935491…`）之欄數＝ `418,719`，group 數＝ `944`（`1h` 542 ＋ `12h` 402），列數＝ `20,352`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用",
         "實查新 reference run。🔴 **舊 run 之 `437,110` 不適用之真因（R6 委員更正主委）＝舊 run 另含 441 個 `12h_` group，非「預處理額外產生轉換後欄位」**；方向書所寫之「逾 18 萬」則是純錯值。兩者皆勿沿用"
       ]
     ]
