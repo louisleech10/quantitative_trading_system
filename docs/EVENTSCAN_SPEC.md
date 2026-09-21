@@ -114,8 +114,9 @@
 
 - FACT-RECEIPT: `POST /api/v1/features/generate`（`winsorization=false`、`fractional_differencing=false`、
   `timeframes.training=["1h","12h"]`）→ 新 run `config_hash = d9935491cea49e8cada481a8bf9487d6`，
-  `418,719` 欄／`944` group（`1h` 542 ＋ `12h` 402）／`20,352` 列；
-  manifest 之 `raw_artifact_applied.steps` 六項全為 `false`（Claude 實跑 2026-09-21）
+  規模見 `eventscan-column-selector` 100；manifest 之 `raw_artifact_applied.steps` 六項全為 `false`
+  （Claude 實跑 2026-09-21）。🔴 **本段不重述規模數字**——R7 指出主委在同一份 SPEC 之
+  第 26–28 行寫下「不得手打會被再抄的值」，卻在本段手打 `418,719`／`944`／`20,352`。
 - 🔴 **第一次重跑（`654bd63b…`）不可用，但仍在磁碟上**：該次請求漏給 `timeframes.training`，
   產出之 542 個 group **全為 `1h`、零個 `12h`**（R6 委員抓出）。**它與現行 reference 外觀相似
   （同為未轉換），誤用風險高** ⇒ 任何引用 reference 之處皆須核對 `config_hash`。
@@ -123,8 +124,8 @@
 - FACT-RECEIPT: 以真實 kline 重算 EMA 與新 run 落檔欄比對 → **14 個 EMA 欄之
   `corr(落檔, 未轉換EMA)` 全部為 `1.0000`**，且值域回到價格尺度（2296–2328，隨週期遞增）
   （Claude 實跑 2026-09-21）
-- FACT-RECEIPT: 新 run 上 `EMA_5 > EMA_10` → 命中 `46.7%`、**956 段**（舊 run 為 100%、1 段）；
-  多頭排列 `EMA_5 > EMA_10 > EMA_34` → **671 段**（Claude 實跑 2026-09-21）
+- FACT-RECEIPT: 新 run 上 `EMA_5 > EMA_10` 與多頭排列 `EMA_5 > EMA_10 > EMA_34` 之命中率與段數
+  見 `eventscan-clock` 075（舊 run 同條件為 100% 命中、1 段）（Claude 實跑 2026-09-21）
 
 ⇒ **「FF 欄可直接互比」之前提在新 run 上成立**，凍結之硬前置已解除。
 ⇒ `eventscan-golden-reference` 之 reference 設定與 `eventscan-column-selector` 之規模數字
@@ -182,7 +183,7 @@
 | 030 | 完全無門檻設定，畫面不得出現門檻欄位 | 2026-09-20 |
 | 040 | 接受以漲跌正負號當內部 label，走既有事件匯入管線以保住未來資料防護 | 2026-09-20 |
 | 050 | 進場價用下一根開盤價 next_open | 2026-09-20 |
-| 060 | 欄位選擇器＝逐層下拉（來源欄→週期→類別→指標→參數）＋打字搜尋，兩者都做 | 2026-09-20 |
+| 060 | 欄位選擇器＝**逐層下拉＋打字搜尋，兩者都做**（🔴 括號內之層名「來源欄→週期→類別→指標→參數」係主委當時之提案，已由 R7 實證推翻——只涵蓋 0.77%；**使用者所裁定者為「逐層下拉＋搜尋」此一需求，非特定層名**。現行層定義見 `eventscan-column-selector` 020–060） | 2026-09-20 |
 | 070 | 成本：報酬主數字不扣，另加成本歸零點欄 | 2026-09-20 |
 | 080 | 先做單標的，多標的併 GAP-4 | 2026-09-20 |
 | 090 | 寫 SPEC 時同步把可列舉之值改為 fact-key 生成區塊、不手打；不另立票、不新建工具、不延後 SPEC | 2026-09-21 |
@@ -316,14 +317,14 @@
 <!-- BEGIN GENERATED: eventscan-column-selector -->
 | 序 | 層／項 | 內容 | 來源 |
 |---|---|---|---|
-| 010 | 欄名結構 | `<來源欄>_<週期>_<類別>_<指標>_<參數>` | FF manifest |
-| 020 | 第 1 層 來源欄 | 該 run manifest 之首段去重集合 | Task 1.3 由 manifest 導出，不得前端硬編 |
-| 030 | 第 2 層 週期 | 該 run 之 timeframe 集合 | 同上 |
-| 040 | 第 3 層 類別 | 該（來源欄, 週期）下之類別集合 | 同上 |
-| 050 | 第 4 層 指標 | 該（來源欄, 週期, 類別）下之指標集合 | 同上 |
-| 060 | 第 5 層 參數 | 該指標之參數集合 | 同上 |
-| 070 | 衍生欄 | `_Cross`／`_Ratio` 等兩兩組合欄，同列於其所屬層；歸屬規則須可列舉，禁丟棄 | Task 1.3 邊界① |
-| 080 | 打字搜尋 | 對欄名做子字串比對，回相符欄名與其所屬層級路徑 | **本票新增** |
+| 010 | 🔴 欄名**不得**以底線切分（R7 實證推翻主委原設計） | 原設計之 `<來源欄>_<週期>_<類別>_<指標>_<參數>` 五段文法**只涵蓋 0.77%**（3,235／418,719）。實測段數分佈：4 段 302／5 段 3,235／6 段 16,835／**7 段 393,731（94.03%）**／8 段 3,946／9 段 670。且切分本身不可靠——來源欄名含底線（`taker_ratio` 被切成兩段，同資料另有 `taker-ratio` 用連字號）、指標可有多個參數（`Klinger_34_55`）⇒ 六段以上之欄中 **11,198 個前五段不對應任何既存欄** | Claude 實跑最終 run 全量 2026-09-21 |
+| 020 | **改用 group 結構，不解析欄名** | 選擇器之層級一律由 manifest 之 `groups` 導出：`groups.<gid>` 給 (週期, 層, 類別／指標)，`groups.<gid>.columns[]` 給該群之欄。此為**結構化欄位**，與 PIT 准入所用之來源同一份（見 `eventscan-pit-admission` 040） | Task 1.3 由 manifest 導出，不得前端硬編，**亦不得以底線切欄名** |
+| 030 | 第 1 層 週期 | 自 gid 取；最終 run 實測為 `1h` 209,484 欄、`12h` 209,235 欄（兩者近乎對半） | 🔴 `manifest.present_timeframes` 只宣告 `1h`，與 raw groups 含 402 個 `12h` **矛盾**；**以 groups 為準**，該矛盾另列殘留 |
+| 040 | 第 2 層 group | 該週期下之 gid 集合（最終 run 共 944 個，見 `eventscan-pit-admission` 035） | gid 本身即「層／類別／指標」之複合鍵，不再拆成三層 |
+| 050 | 第 3 層 欄 | 該 gid 之 `columns[]`；群內之欄僅參數與衍生尾綴不同 | 群內若欄數過多，由 Task 1.3 之分頁契約處理（見 090） |
+| 060 | 衍生尾綴之處置 | `_Lag_1`／`_Momentum_L3`／`_Cross`／`_Ratio`／`_TsRank_W5` 等尾綴**不另立層**，只作群內之篩選條件；97.3%（403,984）之六段以上欄其前五段對應既存基底欄，但**餘 11,198 個不對應**，故不得以「基底欄＋尾綴」為結構假設 | Claude 實跑最終 run 全量 2026-09-21 |
+| 080 | 打字搜尋 | 對欄名做子字串比對，回相符欄名與其所屬 gid；同樣受 085 之分頁與顯式截斷約束 | **本票新增** |
+| 085 | 🔴 回應契約（R7 指出原本完全缺失） | 分層端點**一律分頁**：每層回應含 `items`／`total`／`next_cursor`；單次回應之 `items` 上限 `500` 筆。**禁全量傳輸**（418,719 欄、14,103 個參數尾綴）。逾上限而未帶 `next_cursor` 即為契約違反；**截斷須顯式**——回應須帶 `truncated: true` 與 `total`，不得靜默截短 | Task 1.3／6.1；驗收須含「請求第 2 頁得到不同 `items` 且 `total` 不變」之 `pytest` |
 | 090 | 後端既有來源 | `GET /api/v1/ic/features/list`（回整包平鋪清單） | api/routes/ic_analysis.py:344 |
 | 100 | 規模（**唯一數字來源**，SPEC 散文不得自列） | reference run（`d9935491…`）之欄數＝ `418,719`，group 數＝ `944`（`1h` 542 ＋ `12h` 402），列數＝ `20,352`（兩條獨立推導一致：manifest `total_features`，與 `groups[].column_count` 加總）⇒ 平鋪清單對使用者不可用 | 實查新 reference run。🔴 **舊 run 之 `437,110` 不適用之真因（R6 委員更正主委）＝舊 run 另含 441 個 `12h_` group，非「預處理額外產生轉換後欄位」**；方向書所寫之「逾 18 萬」則是純錯值。兩者皆勿沿用 |
 <!-- END GENERATED: eventscan-column-selector -->
@@ -440,11 +441,11 @@
 | 030 | 3.1 | `n = 1` | `std == 0`，且 `ret_max == ret_min == mean` |
 | 035 | 3.1 | `values = [0.01, 0.03]`、`weights = [1.0, 3.0]`（權重不等、`n = 2`） | 加權 `mean == 0.025`、加權 `std == 0.0086602540378444`（參考值由測試獨立算出）。🔴 本列為 030 之補位：030 是 `n = 1`，權重正規化在單元素上等價 ⇒ 「拿掉正規化」之 mutation 在其上**不會轉紅**（委員實證之假存活） |
 | 040 | 3.2 | 某格 `mean(ret_entry) = 0.0105` | `breakeven_cost_bps == 52.5`（參考值由測試以獨立算式算出） |
-| 045 | 4.3 | 凍結 fixture：reference run（**以 `eventscan-golden-reference` 040 之 `config_hash` 為準，不得寫成未限定之「reference run」**）、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40`；fixture 落檔於 `tests/golden/eventscan/random_control_fixture.npz` 並記其 `sha256` 與來源 manifest digest | 抽樣結果逐位元組可重播；`max(horizons) → 1` 之 mutation 在此 fixture 上**必**轉紅（不得依賴隨機抽樣碰巧重疊） |
+| 045 | 4.3 | 凍結 fixture：reference run（**以 `eventscan-golden-reference` 040 之 `config_hash` 為準，不得寫成未限定之「reference run」**）、`seed = 20260921`、`max(h) = 2`、`n_trigger = 40`。**可重播 identity（R7 指出 R6 之修補只有規格字面、無實際 artifact）**：fixture 落檔 `tests/golden/eventscan/random_control_fixture.npz`，並於同目錄之 `random_control_fixture.meta.json` 記 `config_hash`／`sample_ids_digest`／`fixture_sha256`／`source_manifest_sha256` 四者；驗收須斷言該四者與當次重建結果逐字相等，缺任一即 FAIL | 抽樣結果逐位元組可重播；`max(horizons) → 1` 之 mutation 在此 fixture 上**必**轉紅（不得依賴隨機抽樣碰巧重疊） |
 | 047 | 4.3／4.2 | **兩碼同時成立**之組合：三個觸發月、觸發筆數 `80 / 10 / 10`，其中 1 月候選數 `< 80`（月配額不足），**且**全域互斥 packing 之槽數 `< 100`（packing 亦不足） | 依 `eventscan-failure-precedence` 010 回月配額碼；收據須同時列出**兩個**情境與其計數（010 與 020 皆列），只有 `reason` 欄取月配額碼。🔴 無此組合則優先序條文無法被驗證（委員指出 R1 未附） |
 | 050 | 4.2 | 三個自然月、觸發筆數 `80 / 10 / 10`、每月候選根數相等 | 新模式配額 `80 / 10 / 10`；既有模式於同輸入下約 `34 / 33 / 33`（兩者須同測試內並列） |
 | 055 | 5.2 | 凍結 fixture，**構造規則可逐位元組重建**：`seed = 20260921`；兩側各 24 段；每段長 8 根；段內報酬由 `numpy.random.default_rng(20260921).normal(0, 0.01, …)` 之累積和產生（同段共用一條路徑 ⇒ 段內高度重疊）；fixture 落檔於 `tests/golden/eventscan/delta_bootstrap_fixture.npz` 並記其 `sha256` | 「段改為單一事件」之 mutation 在此 fixture 上**必**轉紅；重建之 `sha256` 與落檔值 `==`（不得依賴 bootstrap 隨機誤差，亦不得只靠口頭描述重建） |
-| 060 | 4.3 | reference run（依 `eventscan-golden-reference` 040）、`max(h) = 2`、抽 40 根 | 任兩個持有窗不重疊（逐對檢查，非抽樣） |
+| 060 | 4.3 | reference run（依 `eventscan-golden-reference` 040）、`max(h) = 2`、抽 40 根；**沿用 045 之同一 fixture 與其四項 identity**，不另建 | 任兩個持有窗不重疊（逐對檢查，非抽樣） |
 | 070 | 4.4 | `horizons = [5, 55]` vs `horizons = [5]` | 前者剔除距尾端不足 55 根之候選，後者不剔除（同測試內並列） |
 | 080 | 1.2 | registry 含 `close_1h_trend_EMA_5`，查詢 `close_1h_trend_EMA_50000` | 建議清單首項為 `close_1h_trend_EMA_5` |
 | 090 | 6.2 | 輸入 `5, 10, 30, 55` | `timeframe = 1h` 與 `timeframe = 12h` 之換算字串不同（同測試內並列） |
@@ -516,16 +517,26 @@
 - 不可做：不得把 `unregistered_column` 降級為警告後回零命中——那正是本票要消滅的症狀。
 
 **Task 1.3 — 欄位選擇器之後端分層索引**
-- 目標：把平鋪欄名清單轉成 `eventscan-column-selector` 所定之五層結構 ＋ 子字串搜尋。
+- 目標：把平鋪欄名清單轉成 `eventscan-column-selector` 所定之**分層結構 ＋ 子字串搜尋**。
 - 檔案：`api/routes/ic_analysis.py`（既有 `GET /api/v1/ic/features/list` 旁新增分層端點）、
   `api/services/ic_analysis_service.py`。
 - 既有 caller／影響面：既有 `features/list` 之回應 schema **不得改動**（前端 `fetchAvailableFeatures` 在用）。
-- 改法：以欄名結構切分為五層，回層級樹 ＋ 每層計數；搜尋以子字串比對，回相符欄名與其所屬路徑。
-- **驗證**：對 reference run 呼叫分層端點，第 1 層回傳集合等於對全部欄名取首段之去重集合；
-  任取一條葉路徑組回之欄名存在於 `features/list` 之回應中（雙向對證，防層級樹自己編出不存在的欄）。
+- 🔴 **改法已由 R7 推翻並重定**：主委原設計「以欄名底線切成五層」**只涵蓋 0.77%**，
+  且切分本身不可靠（來源欄名含底線、指標可有多參數）——實測見 `eventscan-column-selector` 010。
+  ⇒ 改為**以 manifest 之 `groups` 為結構來源**（020–060），與 `eventscan-pit-admission` 040
+  用同一份結構化欄位，**全程不解析欄名**。回應一律分頁，契約見 085。
+- **驗證**（`pytest`）：① 週期層之集合 `==` 自 `groups` 之 gid 導出者，且逐週期欄數與
+  `eventscan-column-selector` 030 之實測值相等；② 任取一個 gid，其回傳之 `columns` 逐字等於
+  manifest 該 gid 之 `columns`（雙向對證，防層級樹自己編出不存在的欄）；
+  ③ 分頁：請求第 2 頁得到不同 `items` 且 `total` 不變；逾 085 之上限而未帶 `next_cursor` 即 FAIL；
+  ④ 任取之葉欄名須同時存在於既有 `features/list` 之回應中（防兩條路徑各說各話）。
+  **mutation**：把結構來源改回「以底線切欄名」，須使②在含 `taker_ratio` 之 gid 上轉紅。
   指令：`pytest tests/api/test_feature_selector_index.py -q`
-- **邊界**：① 欄名段數不等於五（衍生欄如 `_Cross`／`_Ratio`）⇒ 須有明確歸屬規則且可列舉，禁丟棄；
-  ② 搜尋字串為空 ⇒ 回空結果而非全部欄名（規模見 `eventscan-column-selector` 100）；③ run 無任何欄 ⇒ 回空樹且標明原因，非 500。
+- **邊界**：① 欄名含底線或連字號之來源欄（`taker_ratio`／`taker-ratio` 同時存在）⇒ 因不解析欄名而**不受影響**，
+  但須有一條測試釘住此性質；② 搜尋字串為空 ⇒ 回空結果而非全部欄名（規模見 `eventscan-column-selector` 100）；
+  ③ run 無任何 group ⇒ 回空樹且標明原因，非 500；
+  ④ 🔴 `manifest.present_timeframes` 與 `groups` 之週期集合不一致 ⇒ **以 `groups` 為準**並記警告
+  （最終 run 實際命中此情形，見 `eventscan-column-selector` 030 與 §N 之 RESID-11）。
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
 - 不可做：不得把全量平鋪清單直接回給前端（規模見 `eventscan-column-selector` 100）；不得在後端做前端排版。
@@ -836,7 +847,7 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
 - 檔案：`frontend/src/components/ic-analysis/`（新元件）、`frontend/src/lib/`（API client）。
 - 既有 caller／影響面：既有 `fetchAvailableFeatures` 不改。
 - 改法：消費 Task 1.3 之分層端點；選完自動把欄名填入條件式輸入框；顯示 Task 1.2 之建議清單。
-- **驗證**：vitest——選定一條五層路徑後，條件式輸入框之內容等於該葉之欄名字面；
+- **驗證**：vitest——選定一條分層路徑（週期→gid→欄，見 `eventscan-column-selector` 030–050）後，條件式輸入框之內容等於該葉之欄名字面；
   搜尋 `EMA` 時結果清單長度等於後端回傳長度（不得前端另行截斷而不揭露）。
   指令：`cd frontend && npx vitest run src/components/ic-analysis/__tests__/FeatureSelector.test.tsx`
 - **邊界**：① 空態（run 無欄）；② 載入中；③ 錯誤態（端點 4xx／5xx）——三者皆須有明確畫面，非空白。
@@ -1019,6 +1030,12 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   在本專案尚無定論，且需先有真實批之段間自相關量測才能選`；觸發：`eventscan-params` 080 之診斷在真實批上
   經常為真時；登記處：`docs/IC_QUANT_GAP_REGISTRY.md`「兩路涵蓋宣告」節。
   在此之前以 Task 5.2 之診斷旗標承擔：旗標為真時畫面掛 `eventscan-banner` **015**（區間已算出但標明可能過窄），**不是** 010 之「無信賴區間」——該情形下區間確實有回傳（**不是**假裝沒有這個問題）。
+- **RESID-11 `manifest.present_timeframes` 與 `groups` 之週期集合不一致**
+  — `為何現在不做: blocked-by:該欄由 Feature Factory 之 manifest 產出端寫入，本票不改 FF
+  （§C 明文）；且本票已以「以 groups 為準」繞開，不影響掃描正確性`；
+  觸發：下一次動 FF 之 manifest 產出端時；登記處：本 SPEC §N（ROADMAP 只放票列 pointer）。
+  實況：最終 run 之 `present_timeframes` 宣告 `["1h"]`，而 `groups` 含 402 個 `12h` gid
+  ——**宣告與內容矛盾**，任何以 `present_timeframes` 判週期之下游都會漏掉一半資料。
 - **RESID-10 共用 `d*` 快取之可追溯性（Feature Factory）**
   🔴 **定性輪已跑完**（使用者 2026-09-21 逐字：「那個bug你跟委員要先確認是真的是bug
   還是特殊原因才這樣定義，不要直接修掉」）。該裁定**直接擋下一次針對非缺陷的修改**——
