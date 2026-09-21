@@ -98,6 +98,9 @@
 - 🔴 **`plain_docs_render.sh --check` 之「死連結 0」不涵蓋 md 內相對連結**：它掃的是生成後的 HTML。`git mv` 一批白話檔後，`做過什麼.md` 內五條指向舊路徑的連結全斷而該檢查仍報 0。⇒ 移檔後須另以 `grep -o '](...)' + test -f` 逐條驗。
 - 🔴 **寫新機械閘前先 grep 既有同類閘的檔頭**：2026-09-20 寫 `plain_docs_shape_check.sh` 首版用黑名單（列兩個 emoji），使用者當場指出「換個圖示不就繞過了」。而「黑名單永遠列不完」這條**既寫在 memory 也寫在 `plain_docs_order_check.sh` 檔頭**，我沒回頭看。封閉集合的問法是「內容只能去哪幾個地方」，再逐個堵死。
 - 🔴 **白話檔改職責時，其 WATCHED 必須跟著改**：`現在做到哪.md` 由「GAP-3 即時進度」改為「現在在做哪張票」後，WATCHED 仍是 11 條 GAP-3 實作路徑 ⇒ 任何相關改動都誤報過期。職責與監看集合是一組，改一個就要改另一個。
+- 🔴 **改了 brief 就不能掛回原 round**：開債記錄綁 `brief_sha256`。委員交件失敗後若順手改了 brief，同輪重派會對不上；須把 brief byte-exact 還原到原 sha 才解得開。配合既有坑「永遠不要 kill 執行中的 `committee_run`」——kill 後會落得「有 failed 結果又不能棄置」的死結。
+- 🔴 **`cd <專案路徑>` 前綴 ＋ `bash -c` 會觸發權限分類器**：2026-09-20 實測卡 **588 秒**，使用者乾等。CLAUDE.md 已明文禁 `cd` 前綴，`bash -c` 包裝是同型放大。
+- 🔴 **findings 檔內出現 `<!--` 字面會吞掉後續必填欄**：`completeness_check.sh` 的解析把 HTML 註解開頭之後的內容當註解，導致 `**類別**` 明明寫了卻報「finding 缺類別」，錯誤訊息完全指不到真因。2026-09-21 踩到（碼證欄引用 `grep 'BEGIN GENERATED'` 的完整字面）。⇒ 在 findings／brief 內引用含 `<!--` 的字面時，去掉註解開頭符號。
 
 ## 進行中紀錄
 
@@ -105,4 +108,6 @@
 <!-- ENTRY: RM-SEARCH2EVENT,RM-EVENTSCAN -->
 - 2026-09-20：RM-SEARCH2EVENT → `docs/SEARCH2EVENT_SPEC.md`
 - 2026-09-20：RM-EVENTSCAN → `白話說明/EVENTSCAN方向與做法.md`
+<!-- ENTRY: RM-AGENTOPS -->
+- 2026-09-21：RM-AGENTOPS → `docs/AGENTOPS_PROBLEM_DEFINITION.md`
 <!-- HISTORY-END -->

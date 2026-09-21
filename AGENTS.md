@@ -9,6 +9,16 @@
 
 **結束前(必執行)**:寫交接到 `handoffs/<YYYYMMDD>-<task-id>.md`(append-only,≤30 行:正在做/待辦/阻塞/本次決策/踩坑提醒);根 `HANDOFF.md` 由 Claude 維護,執行端不得改寫
 
+🔴 **本條之 ≤30 行只管上面那一種「狀態交接檔」（檔名無家族後綴）。**
+**不適用於 `--output` 指定的本輪產出檔**——委員 findings／review／consult 交件
+(`handoffs/<session>-<family>.md`,家族後綴 = codex|composer|grok|claude|agy)、
+收斂檔 (`handoffs/reconcile/**`)、receipt (`handoffs/run_receipts/**`) **一律無行數上限**,
+其合約是四欄 findings + 必答成對(見 `templates/COMMITTEE_FINDING_TEMPLATE.md`),
+由 `scripts/completeness_check.sh` 驗;**內容完整優先於篇幅,禁為湊行數刪 findings 或壓縮必答**。
+出生事故(2026-09-21):codex 已寫完 71 行研究報告並自驗 `COMPLETENESS PASS`,
+卻因把本條讀成適用於自己的 `--output`,開始壓成 29 行重寫,
+watchdog 正好在重寫當下砍掉子樹 ⇒ **一份合格產出整份消失**,只能自 runlog 逐字還原。
+
 ---
 
 ## 執行任務時（被 Claude 以 `codex exec` headless 派工的合約）

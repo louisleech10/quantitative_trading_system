@@ -68891,3 +68891,45 @@ ts=2026-08-19 11:08:11 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "cx_run", "attempt_id": "6735eb51-c8b5-4d6d-9290-2e231f5c15d8", "cli_rc": "0", "event": "committee_family_result", "event_id": "b6fa3546-906d-4715-b216-ddfa789ccef9", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260921-agentops-x-consult-r2-codex.md", "output_sha256": "b32eb79dc07564c0c0277531286c9a285954b710fa8149dd3d60bff00fcd777b", "producer": "audit_append.sh", "result_state": "success", "round_id": "cda0c74a-4eea-41b6-b766-4edef0f15764", "schema_version": 1, "sequence": 5415, "ts": "2026-09-20T16:54:20Z"}
 {"actor": "debt_clear", "brief_kind": "consult", "canonical_count": 7, "category_counts": {"code-contract": 3, "doc-sync": 4, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "af336fce-0861-4324-98a2-80d140553fb5", "handoff_tree_commit": "722c6cd878af7f88ace18b360f343d0a909bec22", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "cda0c74a-4eea-41b6-b766-4edef0f15764", "round_open_sequence": 5413, "schema_version": 1, "sequence": 5416, "session_name": "20260921-agentops-x-consult-r2", "stamps": [], "task_id": "20260921-AGENTOPS-X-CONSULT-R2", "ts": "2026-09-20T16:55:54Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "b7c370ff-3720-4b09-a269-316e9c62dee7", "lock_sha256": "76e9c74dbcb8a1133bc2206173f016bb88ae54fe9a82147505a4cb6aed5000ab", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer"], "round_id": "cda0c74a-4eea-41b6-b766-4edef0f15764", "schema_version": 1, "sequence": 5417, "session_id": "20260921-agentops-x-consult-r2", "synth_sha256": "fdfc21437dc6cf8d71ce6d8599e46814b07c691b1eb577119b88c9add175c4d9", "ts": "2026-09-20T16:55:55Z"}
+{"actor": "live_doc_write_guard.sh", "class": "OTHER-DORMANT", "event": "docrot2_gate_block", "event_id": "af1f4bff-554f-49de-9eed-0340ca014f2d", "origin_script": "live_doc_write_guard.sh", "path": "docs/AGENTOPS_PROBLEM_DEFINITION.md", "producer": "audit_append.sh", "rule_id": "archaeology", "schema_version": 1, "sequence": 5418, "ts": "2026-09-20T22:59:48Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260921-DOCFIX-X-CONSULT-R1", "ts": "2026-09-20T23:44:32Z"}
+=== 2026-09-21 07:44:32 | dispatch ===
+  ts=2026-09-21 07:44:32
+  kind=dispatch
+  intent=派 codex/composer/grok 三家平行查外部方案：同文件內語意矛盾偵測、語意層掉項偵測、跨文件一致性
+  risk=low
+  facts_asked=none-needed: 病因已由 consult r1/r2 實查確立，brief 內附 fact-verified 與出處
+  review_role=三家平行獨立作答，互為交叉驗證；brief 內設 assumed 三條供攻擊
+  template=n/a: 外部方案調查，非 SPEC/code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260921-DOCFIX-X-CONSULT-R1", "ts": "2026-09-20T23:44:42Z"}
+=== 2026-09-21 07:44:42 | dispatch ===
+  ts=2026-09-21 07:44:42
+  kind=dispatch
+  intent=派 codex/composer/grok 三家平行查外部方案：同文件內語意矛盾偵測、語意層掉項偵測、跨文件一致性
+  risk=low
+  facts_asked=none-needed: 病因已由 consult r1/r2 實查確立，brief 內附 fact-verified 與出處
+  review_role=三家平行獨立作答，互為交叉驗證；brief 內設 assumed 三條供攻擊
+  template=n/a: 外部方案調查，非 SPEC/code review
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "consult", "brief_path": "handoffs/20260921-DOCFIX-X-CONSULT-R1-BRIEF.md", "brief_sha256": "3e974652aa7b1a263a651894d211a677479174f53198a01e7005afb0cd5ff7ce", "brief_sha256_norm": "3e974652aa7b1a263a651894d211a677479174f53198a01e7005afb0cd5ff7ce", "event": "committee_round_open", "event_id": "17502dc4-ab87-4f43-a051-4578fc41f3a2", "expected_outputs": {"codex": "handoffs/20260921-docfix-x-consult-r1-codex.md", "composer": "handoffs/20260921-docfix-x-consult-r1-composer.md", "grok": "handoffs/20260921-docfix-x-consult-r1-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "8fb730d6-4b93-4346-bc32-6ad038b46880", "schema_version": 1, "sequence": 5419, "session_name": "20260921-docfix-x-consult-r1", "task_id": "20260921-DOCFIX-X-CONSULT-R1", "ts": "2026-09-20T23:44:50Z"}
+{"actor": "cx_run", "attempt_id": "be2fe928-7c12-4acb-a1d8-c1f3a11a8092", "cli_rc": "1", "event": "committee_family_result", "event_id": "e2a7ff40-0810-4eda-8e78-d0f8a284218c", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260921-docfix-x-consult-r1-grok.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "8fb730d6-4b93-4346-bc32-6ad038b46880", "schema_version": 1, "sequence": 5420, "ts": "2026-09-20T23:44:56Z"}
+{"actor": "cx_run", "attempt_id": "abc3e319-f071-4af1-a2aa-f0b9183102a3", "cli_rc": "0", "event": "committee_family_result", "event_id": "3b7fa686-518f-49bf-9a40-6cede78edd2a", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260921-docfix-x-consult-r1-codex.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "8fb730d6-4b93-4346-bc32-6ad038b46880", "schema_version": 1, "sequence": 5421, "ts": "2026-09-21T00:03:36Z"}
+{"event":"gate_deny","ts":"2026-09-21T00:04:25Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"0d662477677d0bfba1c9c8d30a7bc94ee9764510714a44a722fcdac2716693ff","cmd_head":"bash -n scripts/committee_run.sh && echo \"syntax OK\"\necho \"=== 反例1：派 grok 應被拒 ===\"\nbash scripts/committee_run.sh --session 20260921-zz-x-consult-r9 handoffs/20260921-DOCFIX-X-CONSULT-R1-BRIEF.md /tmp/zz codex,grok -- --task-id ZZ --risk low --intent x --facts-asked \"none-needed: t\" --review-role x --template \"n/a:\" 2>&1 | grep -i 'ERROR\\|暫停' | head -3\necho \"=== 反例2：只派現役兩家應通過家族檢查（會在後續步驟停，看有無家族 ERROR）===\"\nbash scripts/committee_ru"}
+{"actor": "cx_run", "attempt_id": "989cb7ff-555d-43e6-bde4-59fd1577d9b4", "cli_rc": "0", "event": "committee_family_result", "event_id": "1d46f57e-5ce5-4e83-9d22-ceecd5622d36", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260921-docfix-x-consult-r1-composer.md", "output_sha256": "66fe6a02b10be37435df13109a47ae7ce647077870060949f0f0ac10943a95f2", "producer": "audit_append.sh", "result_state": "success", "round_id": "8fb730d6-4b93-4346-bc32-6ad038b46880", "schema_version": 1, "sequence": 5422, "ts": "2026-09-21T00:22:13Z"}
+{"event":"gate_deny","ts":"2026-09-21T00:30:20Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"7271ffbe2de49eae789b7a286cf00985424397967f2fae385d31916774555e0e","cmd_head":"bash -n scripts/cx_run.sh && echo \"syntax OK\"; bash scripts/list_active_mechanisms.sh --write > /tmp/m2.log 2>&1; tail -2 /tmp/m2.log"}
+{"event":"gate_deny","ts":"2026-09-21T00:30:23Z","tool":"Bash","kind":"dispatch","reason":"token_expired","match_rule":"token_expired","cmd_sha256":"67d2faa5a74e55d7cb0ca557e0a7220755cc20f331bacff1d557dc10eb9633c3","cmd_head":"bash -n scripts/cx_run.sh && echo \"syntax OK\""}

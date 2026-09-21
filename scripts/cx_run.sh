@@ -553,11 +553,23 @@ _run_cli_watched() {
     if [ "${_done_since}" -lt 0 ] && [ -f "${_out}" ] && grep -q '^STATUS: DONE' "${_out}" 2>/dev/null \
        && { [ -z "${_pre_attempt_out_sig:-}" ] || [ "$(_output_write_sig "${_out}")" != "${_pre_attempt_out_sig}" ]; }; then
       _done_since="${_elapsed}"
+      # 🔴 見到 STATUS: DONE 的**當下**就快照（2026-09-21 出生事故）：
+      #   grace 窗內 CLI 仍可能重寫自己的產出（codex 為遷就 AGENTS.md ≤30 行而壓縮 71 行報告），
+      #   kill 正好落在 delete→write 之間 ⇒ **一份已合格的產出整份消失**，只能自 runlog 逐字還原。
+      #   此處快照的是「已含 STATUS: DONE」的版本，kill 後若產出不見或不再完整即回填。
+      cp -p "${_out}" "${_out}.prekill" 2>/dev/null || true
     fi
     if [ "${_done_since}" -ge 0 ] && [ $((_elapsed - _done_since)) -ge "${_grace}" ]; then
       echo "[cx_run] WATCHDOG killed_after_done: 產出已 STATUS: DONE 逾 ${_grace}s 而 CLI 仍存活（pid ${_pid}）⇒ 終止子樹，cli_rc 取 0" >&2
       _terminate_cli_group "${_pid}"
       wait "${_pid}" 2>/dev/null || true
+      # kill 後回填：產出缺檔／空／不再含 STATUS: DONE ⇒ 用快照還原，並在 runlog 具名
+      if [ -f "${_out}.prekill" ] \
+         && { [ ! -s "${_out}" ] || ! grep -q '^STATUS: DONE' "${_out}" 2>/dev/null; }; then
+        cp -p "${_out}.prekill" "${_out}" 2>/dev/null \
+          && echo "[cx_run] WATCHDOG restored_from_prekill: kill 後產出缺/不完整 ⇒ 已自 ${_out}.prekill 還原（CLI 在 grace 窗內重寫了自己的產出）" >&2
+      fi
+      rm -f "${_out}.prekill" 2>/dev/null || true
       trap - INT TERM
       return 0
     fi

@@ -184,6 +184,21 @@ fi
 . "${SCRIPT_DIR}/governance_families.sh" || { echo "ERROR: 無法載入 family SoT(fail-closed)" >&2; exit 1; }
 valid_fams="$(families_get families ' ')" || { echo "ERROR: 讀 SoT families 失敗(fail-closed)" >&2; exit 1; }
 advisory="$(families_get advisory_only ' ' 2>/dev/null || echo "")"
+# 🔴 暫停中的委員 ＝ review_families \ active_stampers(2026-09-21)。
+#    出生事故:SoT 與 ORCH §1 都已載明 grok 自 2026-09-18 暫停(402 額度用罄),
+#    但本處只驗 `families`(正式名冊,含暫停者)⇒ 主委照舊名冊派三家,grok 當場 402 失敗,
+#    該輪留下一個 result_state=failed 的家族。**SoT 記了、派工路徑不讀**即是 fail-open。
+#    改為機械擋:名冊內但非現役者一律拒派,不靠主委記得看 ORCH。
+review_fams="$(families_get review_families ' ')" || { echo "ERROR: 讀 SoT review_families 失敗(fail-closed)" >&2; exit 1; }
+# 🔴 rc 語義由 governance_families.sh 檔頭定死,不得把兩種 rc 併成同一條回退路徑:
+#    rc=3 ＝ key 不存在 ⇒ 回退 review_families(乾淨 clone,行為逐字不變)
+#    rc=1 ＝ key 存在但不合法 ⇒ **fail-closed 拒,禁回退**(否則改壞 SoT 反而放行全員)
+active_fams="$(families_active_stampers ' ')"; _af_rc=$?
+case "${_af_rc}" in
+  0) : ;;
+  3) active_fams="${review_fams}" ;;
+  *) echo "ERROR: active_stampers 不合法(rc=${_af_rc}) ⇒ 拒派(fail-closed)" >&2; exit 1 ;;
+esac
 
 fams="$(printf '%s' "${fams_csv}" | tr ',' ' ')"
 n_fams=0
@@ -191,6 +206,13 @@ for f in ${fams}; do
   case " ${valid_fams} " in
     *" ${f} "*) : ;;
     *) echo "ERROR: 未知家族 '${f}'(SoT 合法值: ${valid_fams})。新增家族請改 scripts/governance_families.json + cx_run.sh 配方" >&2; exit 2 ;;
+  esac
+  case " ${review_fams} " in
+    *" ${f} "*)
+      case " ${active_fams} " in
+        *" ${f} "*) : ;;
+        *) echo "ERROR: 家族 '${f}' 在正式名冊內但**不在現役 active_stampers**(現役: ${active_fams})⇒ 暫停中,拒派(fail-closed)。要恢復請改 scripts/governance_families.json 之 active_stampers" >&2; exit 2 ;;
+      esac ;;
   esac
   case " ${advisory} " in
     *" ${f} "*) echo "[committee_run] ⚠️ ${f} 為 advisory_only:諮詢性質,**不計入 quorum**" ;;

@@ -609,11 +609,20 @@ _fk_scope_files() {   # stdout: 範圍內檔案（相對 root），一行一筆
       n = 0
       while ((getline line < sf) > 0) if (line != "") S[++n] = line
       close(sf)
-      while ((getline line < gff) > 0) if (line != "") EX[line] = 1
+      # 🔴 豁免項與 status_scope 同語義：以 / 結尾＝目錄前綴，否則＝精確路徑
+      #    （2026-09-21：原僅支援精確路徑 ⇒ 封存目錄必須逐檔列舉，
+      #     PLAINDOCS 一次 git mv 22 份即整批漏列而誤報。黑名單列不完，
+      #     改為「封存目錄整個不受現行規則管轄」這一條封閉規則。）
+      ne = 0
+      while ((getline line < gff) > 0) if (line != "") { EX[line] = 1; EXA[++ne] = line }
       close(gff)
     }
     {
       if ($0 == "" || ($0 in EX)) next
+      for (j = 1; j <= ne; j++) {
+        q = EXA[j]
+        if (q ~ /\/$/ && index($0, q) == 1) next
+      }
       hit = 0
       for (i = 1; i <= n; i++) {
         p = S[i]; if (p == "") continue
