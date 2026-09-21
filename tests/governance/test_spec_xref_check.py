@@ -185,6 +185,26 @@ MALFORMED_TILDE_FENCE = (
             "別處散文也寫 `TOKEN_ABCDEF`。\n",
             "fence 標記混用",
         ),
+        (
+            "# T\n"
+            "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+            "<!-- 以下為 `舊版` 說明，暫時註解掉\n"
+            "<!-- BEGIN GENERATED: k -->\n"
+            "| 100 | `TOKEN_ABCDEF` |\n"
+            "<!-- END GENERATED: k -->\n"
+            "-->\n",
+            "跨行註解開頭行含 inline code",
+        ),
+        (
+            "# T\n"
+            "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+            "````\n"
+            "```\n"
+            "<!-- BEGIN GENERATED: k -->\n"
+            "````\n"
+            "別處散文也寫 `TOKEN_ABCDEF`。\n",
+            "四反引號 fence 內含三反引號",
+        ),
     ],
 )
 def test_malformed_generated_markers_fail_closed(src: str, why: str, tmp_path: Path) -> None:

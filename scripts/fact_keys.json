@@ -1353,7 +1353,7 @@
       [
         "040",
         "本票之准入規則",
-        "契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`；欄只在「該 run 之三元組已核准」**且**「其 `gid` 命中」**且**「該 gid 之 `columns` 實算 sha256 與登記值相等」時才進 registry"
+        "契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`。🔴 **准入為四項合取（R12 補入第④項；原文只有三項，而 Task 1.1 之 digest 條件只寫在其正文後段，照本列執行 040 的人會漏掉）**：欄只在 ①「該 run 之三元組已核准」**且** ②「其 `gid` 命中」**且** ③「該 gid 之 `columns` 實算 sha256 與登記值相等」**且** ④「該欄在 `tests/golden/eventscan/reference_column_digests.json` 中存在，且 `value_sha256`／`nan_mask_sha256`／`dtype`／`n_rows` 四者與現算值逐欄相等（該檔之 run identity 須與請求之三元組逐字相等）」時才進 registry。**四者缺一即拒收；未證欄 fail-closed**"
       ],
       [
         "045",
@@ -1536,14 +1536,14 @@
       ],
       [
         "057",
-        "🔴 **兩碼同時成立之明確裁定**",
-        "`timeframe_source_unavailable` 與 `allowlist_not_generated` 可在同一請求同時成立（run 無 task_record **且** 契約檔缺檔）⇒ `reason` 取 **`timeframe_source_unavailable`**（階段較前），但收據須依 050 同時列出兩者",
-        "委員指出兩碼可同時命中而原表無序。取前者之理由＝週期來源不可用時，連要核准哪些 gid 都無從判定"
+        "🔴 **多碼同時成立之明確裁定（R12 補入 `allowlist_invalid`；原文只列兩碼）**",
+        "`timeframe_source_unavailable`、`allowlist_invalid`、`allowlist_not_generated` 三者可在同一請求同時成立（run 無 task_record **且** 契約檔缺檔或損壞）⇒ `reason` 依 055 之階段序取**最前者**（即 `timeframe_source_unavailable`），但收據須依 050 同時列出全部成立者。🔴 `allowlist_invalid` 與 `allowlist_not_generated` **互斥**（檔案不可能同時不存在與存在而損壞），故此二者不會同時出現",
+        "委員指出原表無序且漏 `allowlist_invalid`。取最前者之理由＝週期來源不可用時，連要核准哪些 gid 都無從判定"
       ],
       [
         "059",
-        "🔴 **兩碼之繼承範圍（原文只寫在 Task 1.3，掃描路徑未繼承）**",
-        "`timeframe_source_unavailable` 與 `allowlist_not_generated` 為**跨 Task 之前置碼**，**Task 1.1（registry 建構）與 Task 2.1（掃描端點）一律繼承**；該二 Task 對同一根因**不得**回 `unregistered_column` 或 `no_trigger_events`",
+        "🔴 **三碼之繼承範圍（R12 補入 `allowlist_invalid`；原文只列兩碼且只寫在 Task 1.3）**",
+        "`timeframe_source_unavailable`、`allowlist_not_generated` 與 `allowlist_invalid` 為**跨 Task 之前置碼**，**Task 1.1（registry 建構）與 Task 2.1（掃描端點）一律繼承**；該二 Task 對同一根因**不得**回 `unregistered_column` 或 `no_trigger_events`",
         "委員指出：同一根因在不同入口回不同碼，使用者會被導向錯誤的修法（以為是欄名打錯或條件不成立）"
       ]
     ]

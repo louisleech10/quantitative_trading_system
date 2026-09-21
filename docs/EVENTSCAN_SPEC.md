@@ -363,7 +363,7 @@
 | 020 | 角色隔離之現行保護 | `_role_violation` 只拒「角色非 `pit_feature`」與「欄名以 `future_` 為前綴」兩種 |
 | 030 | 🔴 該保護之缺口 | 不含 `future_` 前綴而語意上含未來資訊之欄，現行 guard 放行（委員實跑反例已重現） |
 | 035 | 🔴 manifest 實況（全量實查，非抽樣） | 新 reference run（`d9935491…`）有 **944 個 group**；gid 之底線段數分佈為 3 段 8 個／4 段 263 個／5 段 376 個／6 段 99 個／7 段 198 個；group 物件之鍵為 `column_count`／`columns`／`dtype`／`dtype_counts`／`encoded_column_count`／`file`／`file_size_bytes`／`float32_columns`／`nan_ratio`／`path`／`row_count`／`source_group_id`——**沒有類別欄，也沒有指標欄** |
-| 040 | 本票之准入規則 | 契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`；欄只在「該 run 之三元組已核准」**且**「其 `gid` 命中」**且**「該 gid 之 `columns` 實算 sha256 與登記值相等」時才進 registry |
+| 040 | 本票之准入規則 | 契約檔 `momentum/Analysis/contracts/eventscan_pit_allowlist.json` 之索引鍵為 **(`symbol`, `timeframe`, `config_hash`)**，其下逐筆記 `gid → columns_sha256`。🔴 **准入為四項合取（R12 補入第④項；原文只有三項，而 Task 1.1 之 digest 條件只寫在其正文後段，照本列執行 040 的人會漏掉）**：欄只在 ①「該 run 之三元組已核准」**且** ②「其 `gid` 命中」**且** ③「該 gid 之 `columns` 實算 sha256 與登記值相等」**且** ④「該欄在 `tests/golden/eventscan/reference_column_digests.json` 中存在，且 `value_sha256`／`nan_mask_sha256`／`dtype`／`n_rows` 四者與現算值逐欄相等（該檔之 run identity 須與請求之三元組逐字相等）」時才進 registry。**四者缺一即拒收；未證欄 fail-closed** |
 | 042 | `columns_sha256` 之 canonical 定義（缺此定義即算不出同一個值） | ① 取 `groups.<gid>.columns` 之字串陣列；② 以 `LC_ALL=C` 位元組序**排序**（不可依賴 Python 預設 locale）；③ 以 `\\n` 連接、**尾端不加** `\\n`；④ 以 `UTF-8` 編碼（不加 BOM）；⑤ 取 `sha256` 之小寫十六進位。🔴 委員實測：同一份真實 `columns` 以四種常見算法可得**四個不同值** ⇒ 五步缺一即為不同實作 |
 | 045 | 🔴 為何不切 gid 字串 | 「`<週期>_<層>_<類別>_<指標>` 四段文法」在新 reference run 上只蓋住 944 個中的 263 個（見 035），且切字串與被推翻的命名慣例是同一類防護。**列舉式白名單是封閉集合，切字串不是** |
 | 047 | 🔴 為何索引要綁三元組與欄摘要（**跨 run 漂移之證據，取自兩個舊 run**，非現行 reference） | **以下為證據，不是現行設定**（現行 reference 見 `eventscan-golden-reference` 040）。兩個舊 ETHUSDT/1h run 比對：`4a8a0b37…` 有 1004 個 group、`5ea07439…` 只有 54；共用僅 43，其中 `1h_L2_Momentum_chunk2` 之 `column_count` 由 2000 變為 10。⇒ **純 gid 白名單同時造成大量誤拒（961 個未知 gid）與語意漏放（同 gid 欄集合已漂）** |
@@ -406,8 +406,8 @@
 | 045 | 🔴 **`random_control_rule_mismatch`（K-5 之 060）在對照層內部之位置（R11 新增；原 010–040 未涵蓋它）** | **身分閘最先**：`random_control_rule_mismatch` 於 `random_control_month_shortage` 與 `random_control_exclusivity_unsatisfiable` **之前** | 身分閘不等代表兩批**根本不是同一組參數產生**，此時談配額或 packing 是否足夠沒有意義。⇒ 對照層內部序＝`rule_mismatch` → `month_shortage` → `exclusivity_unsatisfiable` |
 | 050 | 多碼同時成立時之收據 | 收據須同時列出**全部**成立之情境與其計數，只有 `reason` 欄取優先序首位 | 只回一碼會讓使用者以為只有一個問題 |
 | 055 | 🔴 **全域優先序（R10 新增；原表只涵蓋 random-control 四碼，新增之兩碼與既有 condition 碼無序可循）** | 自前置到下游，先命中者先報：**① `timeframe_source_unavailable`（run 層前置）→ ② `allowlist_invalid`→③ `allowlist_not_generated`（契約層前置）→ ④ `unregistered_column`／`constant_expression`（條件層）→ ⑤ `alignment_*`（對齊層）→ ⑥ `random_control_*`（對照層，其內部序見 010–040 與 045）→ ⑦ `no_trigger_events`（結果層）** | 階段序即因果序：前置未滿足時下游根本沒跑，回下游碼會誤導使用者去修錯地方。🔴 **判準**：每一碼只在其階段被求值，階段未進入即不得回該碼 |
-| 057 | 🔴 **兩碼同時成立之明確裁定** | `timeframe_source_unavailable` 與 `allowlist_not_generated` 可在同一請求同時成立（run 無 task_record **且** 契約檔缺檔）⇒ `reason` 取 **`timeframe_source_unavailable`**（階段較前），但收據須依 050 同時列出兩者 | 委員指出兩碼可同時命中而原表無序。取前者之理由＝週期來源不可用時，連要核准哪些 gid 都無從判定 |
-| 059 | 🔴 **兩碼之繼承範圍（原文只寫在 Task 1.3，掃描路徑未繼承）** | `timeframe_source_unavailable` 與 `allowlist_not_generated` 為**跨 Task 之前置碼**，**Task 1.1（registry 建構）與 Task 2.1（掃描端點）一律繼承**；該二 Task 對同一根因**不得**回 `unregistered_column` 或 `no_trigger_events` | 委員指出：同一根因在不同入口回不同碼，使用者會被導向錯誤的修法（以為是欄名打錯或條件不成立） |
+| 057 | 🔴 **多碼同時成立之明確裁定（R12 補入 `allowlist_invalid`；原文只列兩碼）** | `timeframe_source_unavailable`、`allowlist_invalid`、`allowlist_not_generated` 三者可在同一請求同時成立（run 無 task_record **且** 契約檔缺檔或損壞）⇒ `reason` 依 055 之階段序取**最前者**（即 `timeframe_source_unavailable`），但收據須依 050 同時列出全部成立者。🔴 `allowlist_invalid` 與 `allowlist_not_generated` **互斥**（檔案不可能同時不存在與存在而損壞），故此二者不會同時出現 | 委員指出原表無序且漏 `allowlist_invalid`。取最前者之理由＝週期來源不可用時，連要核准哪些 gid 都無從判定 |
+| 059 | 🔴 **三碼之繼承範圍（R12 補入 `allowlist_invalid`；原文只列兩碼且只寫在 Task 1.3）** | `timeframe_source_unavailable`、`allowlist_not_generated` 與 `allowlist_invalid` 為**跨 Task 之前置碼**，**Task 1.1（registry 建構）與 Task 2.1（掃描端點）一律繼承**；該二 Task 對同一根因**不得**回 `unregistered_column` 或 `no_trigger_events` | 委員指出：同一根因在不同入口回不同碼，使用者會被導向錯誤的修法（以為是欄名打錯或條件不成立） |
 <!-- END GENERATED: eventscan-failure-precedence -->
 
 ---
@@ -563,6 +563,12 @@
   「設定沒開轉換」與「這一欄的值確實沒被轉換」是兩件事，前者不蘊含後者（可能有其他路徑改值）。
 - 目標：為 reference run 之**每一欄**產出可重播之 digest，使任何值層變動可被偵測。
 - 檔案：`tests/golden/eventscan/reference_column_digests.json`（新）。
+  🔴 **須綁 run identity（R12：原文未綁，而 Task 1.1 接受任意 `(symbol, timeframe, config_hash)`
+  ⇒ 跨 run 會拿 reference 之 digest 去核另一個 run 的欄，必然全部不符或誤符）**：
+  檔內須帶 `{symbol, timeframe, config_hash, source_manifest_sha256}` 四項 identity；
+  Task 1.1 之合取④僅在**請求之三元組與本檔 identity 逐字相等**時適用。
+  🔴 **三元組不等時**：該 run **不在**本票輸入域（見 Task 1.3 邊界⑦之輸入域裁定），
+  一律回 `timeframe_source_unavailable`，**不得**以「digest 檔不涵蓋此 run」為由放行未證欄。
 - 改法：對 reference run 逐欄計算 `(value_sha256, nan_mask_sha256, dtype, n_rows)` 四元組，
   以 `LC_ALL=C` 位元組序寫入（與 `eventscan-pit-admission` 042 同一套 canonical）。
   **不重算特徵**，只對既有 parquet 取 digest。
@@ -595,13 +601,27 @@
   `momentum/Analysis/contracts/eventscan_pit_allowlist.json`（新）。
 - 改法：產生器讀指定三元組之 manifest，對每個 gid 以 `eventscan-pit-admission` 042 之
   canonical 算法產出 `columns_sha256` 候選；審定後寫入契約檔該三元組區段並輸出成功 receipt。
+  🔴 **契約檔 schema 之權威落點＝本 Task 之產生器**（R12：委員要求把 schema 釘成封閉輸入契約；
+  主委判定 schema 本體**不寫進 SPEC**——那會造成第三份要同步的事實，正是本票已踩過的病根）。
+  SPEC 只規定產生器與讀取端**必須滿足**之五態機械判別要求：
+  ① **root 須為 object**；非 object（例如 JSON array、空字串、`null`）⇒ `invalid`；
+  ② **`entries` 內之 gid 須唯一**；讀取端須以**保留重複鍵**之方式解析（例如 `object_pairs_hook`），
+  發現 raw duplicate key ⇒ `invalid`。🔴 **不得用預設的 last-wins 解析**——
+  委員實跑證明預設解析會讓 duplicate 靜默得到 `approved`；
+  ③ 每個 `columns_sha256` 值須為 **64 位小寫十六進位**；不合即 `invalid`；
+  ④ **未知欄位**：出現於 `entries` 之 gid 物件內者 ⇒ `invalid`（fail-closed，不忽略）；
+  ⑤ 上列任一不滿足即 `invalid`，**不得**降級為 `empty` 或 `partial`。
+  **五態測試須涵蓋**：空字串、JSON array、duplicate gid、zero-gid 之空 entries、
+  非零 gid 之空 entries——委員實跑之最小 probe 對應結果為
+  `空字串=invalid`／`JSON array=invalid`／`非零 gid 空=empty`／`zero-gid 空=approved`／
+  `duplicate 預設解析=approved`（最後一項即本條要擋掉的）。
 - **驗證**：`pytest` ① 對 reference 三元組產出之契約檔，其 gid 集合 `==` manifest 之 944 個 gid，
-  且每個 `columns_sha256` 與現算之 `sha256` 逐字相等；② 產生器對四個狀態
+  且每個 `columns_sha256` 與現算之 `sha256` 逐字相等；② 產生器對五個狀態
   （`missing`／`empty`／`partial`／`approved`）各能產出對應之契約檔，且其 discriminator 可機械判別。
   **mutation**：令產生器用非 042 之算法（例如未排序或加尾端換行），須使①轉紅。
   🔴 **本 Task 之驗收只到產物層，不跨 Phase。**
   指令：`pytest tests/api/test_eventscan_allowlist_gen.py -q`
-  消費層由 Task 1.3 之驗證⑦（四態正交）承擔，其指令為
+  消費層由 Task 1.3 之驗證⑦（五態正交）承擔，其指令為
   `pytest tests/api/test_feature_selector_index.py -q`；**本 Task 不把該指令當成自己的驗收**。
 - **邊界**：① 三元組未指定 ⇒ 拒跑，不猜預設 run；② 契約檔已有該三元組區段 ⇒ 須明示覆寫或拒絕。
 - **存活至**：本票交付後保留為契約。
@@ -649,7 +669,7 @@
   ⇒ 該欄不得進 registry，且須可列舉（不得靜默丟棄）；④ 三元組未核准、gid 不在登記、或 `columns_sha256` 與登記值不等（`eventscan-pit-admission` 050 之三種情形）
   ⇒ 依 `eventscan-pit-admission` 050 拒收該欄，**不得**回落到「當作 `pit_feature`」；
   ⑤ 🔴 該欄不在 Task 0.4 之 digest 檔、或四元組任一不等 ⇒ 拒收該欄並可列舉（R11 新增）；
-  ⑥ 🔴 **本 Task 繼承兩個前置碼**（`eventscan-failure-precedence` 059）：
+  ⑥ 🔴 **本 Task 繼承三個前置碼**（`eventscan-failure-precedence` 059）：
   run 無可用 `task_record.metadata.present_timeframes` ⇒ 回 `timeframe_source_unavailable`；
   allowlist 契約檔缺檔／不合法 ⇒ 回 `allowlist_not_generated`／`allowlist_invalid`。
   **此三種情形一律不得回 `unregistered_column` 或空 registry**——原文之邊界①雖已禁空 registry，
@@ -697,7 +717,7 @@
 - **驗證**（`pytest`）：① 週期層之集合 `==` `task_record.json` 之 `metadata.present_timeframes`；
   以 gid 前綴導出之集合若與之不等即 FAIL（該切分只用於偵測分歧，見 030）；
   ② 任取一個 gid，其回傳之 `columns` 逐字等於 manifest 該 gid 之 `columns`（雙向對證，防層級樹自己編出不存在的欄）；
-  🔴 **allowlist 之四個狀態（本 Task 全部驗收之共同前提；R10 新增）**：
+  🔴 **allowlist 之五個狀態（本 Task 全部驗收之共同前提）**：
   由契約檔導出唯一之 discriminator。🔴 **R11 補窮盡性**（原四態在三種狀態上無定義、
   一種上重疊）——**五態**，依序判定，**先命中者為準**：
   | 序 | 態 | 判定條件 |
@@ -707,7 +727,7 @@
   | 3 | `empty` | schema 合法且 entries 為空，**且該 run 之 gid 集合非空** |
   | 4 | `approved` | entries 等於該 run 之全部 gid |
   | 5 | `partial` | 其餘（entries 非空且為該 run gid 之真子集） |
-  🔴 **`invalid` 一律 fail-closed**，回理由碼 `allowlist_invalid`（K-5 新增 110），
+  🔴 **`invalid` 一律 fail-closed**，回理由碼 `allowlist_invalid`（`eventscan-failure-reasons` 100），
   **不得**降級成 `empty` 或 `partial`——「檔案壞了」與「沒核准任何東西」是兩件事。
   🔴 **零 gid run**（該 run 之 gid 集合為空）：原四態下 `empty` 與 `approved` 會同時成立
   （空==空），故上表以**序 3 之附加條件「該 run 之 gid 集合非空」**排除之；
@@ -720,6 +740,7 @@
   | allowlist 狀態 | ③ 守恆 | ⑤ gid 對帳 | ⑦ |
   |---|---|---|---|
   | `missing` | **不適用**（不得以空集合過關） | **不適用**（同左） | (i) 回 `allowlist_not_generated` |
+  | `invalid` | **不適用**（同 `missing`，不得以空集合過關） | **不適用**（同左） | (v) 回 `allowlist_invalid`，payload ≠ (i) 且 ≠ (ii) |
   | `empty` | 綠（空核准集合之正常態） | 綠（空樹） | (ii) 空樹、非錯誤、payload ≠ (i) |
   | `partial` | 綠，且 `items` 恰為該子集 | 綠 | (iv) 樹等於該子集 |
   | `approved` | 綠 | 綠 | (iii) 樹等於全部 gid |
@@ -741,12 +762,13 @@
   🔴 **`missing` 態下⑤與③同樣不適用**（與③之豁免對稱；R9 只在③寫了豁免、⑤沒跟上，
   此為「只修被點名處」之再犯）；
   ⑥ 任取之葉欄名須同時存在於既有 `features/list` 之回應中（防兩條路徑各說各話）；
-  ⑦ 🔴 **四態正交測試**（R9 原為三態，缺 `partial`；而 `partial` 正是 mutation (c) 所預設之情境）：
+  ⑦ 🔴 **五態正交測試**（R9 原為三態，缺 `partial`；而 `partial` 正是 mutation (c) 所預設之情境）：
   (i) `missing` ⇒ 回 `allowlist_not_generated`，其 payload **不得**與 (ii) 相同；
   (ii) `empty` ⇒ 回空樹（正常狀態，非錯誤）；
   (iii) `approved` ⇒ 樹等於全部 gid；
-  (iv) `partial` ⇒ 樹等於該子集，且③之右端同步取該子集。
-  四者須為四個不同可觀測結果；
+  (iv) `partial` ⇒ 樹等於該子集，且③之右端同步取該子集；
+  (v) `invalid` ⇒ 回 `allowlist_invalid`，其 payload **不得**與 (i) 或 (ii) 相同。
+  五者須為**五個不同可觀測結果**；
   ⑧ 🔴 run 無可用之 `task_record.metadata.present_timeframes` ⇒ 回
   `timeframe_source_unavailable`，且**不得**退回讀 manifest 同名欄或以 gid 前綴當權威。
   **mutation**：(a) 把結構來源改回「以底線切欄名」，須使②在含 `taker_ratio` 之 gid 上轉紅；
@@ -755,9 +777,12 @@
   （R11 更正：改 `columns_sha256` **不會**改變 discriminator，entries 之 gid 集合不變仍是 `approved`；
   它只會讓該 gid 在逐欄比對時被拒，那是 ⑤ 之另一條路徑，不是態轉換）——
   **而選擇器樹不重建**，須使**③與⑤同時轉紅**。
-  (c3) `columns_sha256` 改動之獨立情境：態仍為 `approved` 但該 gid 之摘要不等，
-  須使⑤轉紅（此時③之右端已排除該 gid，故③綠——**與 (c) 不同，此組合可達**）；委員以集合 probe 證明「⑤轉紅而③仍綠」這個組合**不可達**——
-  樹跟著新 allowlist 則③⑤同綠、樹不更新則③⑤同紅，故不得以該組合當對帳證明；
+  (c3) 🔴 **`columns_sha256` 漂移之獨立情境**：態仍為 `approved`，但某 gid 之摘要與登記值不等。
+  **③與⑤皆取同一份 snapshot，故兩者對該 gid 之判定必然一致** ⇒ **須使③與⑤同時轉紅**。
+  🔴 **本條在 R10／R11 兩度被寫成「⑤紅而③綠」，兩度被委員以集合 probe 推翻**：
+  只要③⑤綁同一 snapshot（見上），「一紅一綠」在集合論上就不可達；
+  若硬要讓它可達，等於要求兩者讀不同的已核准集合，**那正是本票要消除的兩條 authority path**。
+  ⇒ 本條之價值不在「區分③⑤」，而在釘住「摘要漂移**不得**被靜默放行」；
   (c2) 反向：令樹重建而③之右端仍取舊快照，亦須轉紅（此即「③⑤綁同一 snapshot」之機械證明）；
   (d) 令第 2 頁與第 1 頁重疊一筆（`total` 不變），須使④轉紅；
   (e) 令 `missing` 與 `empty` 回同一 payload，須使⑦(i)(ii) 轉紅；
@@ -924,7 +949,7 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   ③ `max(horizons)` 大於資料長度 ⇒ fail-closed；
   ④ `primary_horizon` 缺欄、非整數、或不在 `horizons[]` 內 ⇒ fail-closed，
   **不得**由後端取 `horizons[0]` 或 `max(horizons)` 代填（代填等於系統替使用者做了預先登記）；
-  ⑤ 🔴 **本 Task 繼承兩個前置碼**（`eventscan-failure-precedence` 059；R11 指出原文只寫在
+  ⑤ 🔴 **本 Task 繼承三個前置碼**（`eventscan-failure-precedence` 059；R11 指出原文只寫在
   Task 1.3，本 Task 未繼承）：run 無可用 `task_record.metadata.present_timeframes` ⇒ 回
   `timeframe_source_unavailable`；allowlist 缺檔／不合法 ⇒ 回
   `allowlist_not_generated`／`allowlist_invalid`。
@@ -1344,6 +1369,19 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   ⇒ 原列之「`apply_to=\"non_stationary\"` 之 ADF 閘與 `d*` 計算為兩條獨立判斷」
   **不是缺陷而是設計**：委員以本 run 校準窗實跑，該閘判 `EMA_200`／`EMA_233` 平穩故不轉換。
   ⇒ 下一步**須先由使用者確認是否值得投入**，非自動進入修正。
+- **RESID-14 「同一事實在多處的計數詞與序號沒跟上」無機械閘可擋**
+  — `為何現在不做: user-ruling:2026-09-15 使用者裁定治理工具不再擴建；且本缺口之
+  機械化需要語意計數比對（例如「五態」與矩陣列數、序號與其引用），
+  不是既有 spec_xref_check 之 token 殘留模型能涵蓋`；
+  觸發：使用者解除「不擴建治理工具」之限制時；登記處：本 SPEC §N。
+  實況：`scripts/spec_xref_check.sh` 只驗「反引號 token **被拿掉**後是否仍有未標版本之引用」。
+  本票 R11／R12 之多數缺陷是**新增**一個狀態或碼，而別處之計數詞（「四態」「兩個前置碼」）
+  與序號引用沒跟上——那不是 token 被拿掉，是**語意計數不一致**，現有閘在設計上看不到。
+  現行承擔方式：每輪修補後以 `grep` 對「計數詞、序號、碼名」做**全檔掃描**，不逐點修。
+  🔴 **誠實邊界**：此為紀律型承擔，與使用者 2026-09-13 之「不接受紀律當解法」相斥；
+  之所以仍列殘留而非改機械，是因為上位裁定（不擴建治理工具）優先，**非因成本考量**。
+  同屬本殘留者：`spec_xref_check.sh` 之 fence parser 未追蹤 delimiter 長度
+  （現行在已知形態上被 inline-code 剝除修補擋住，但更深之長度組合未覆蓋）。
 - **RESID-13 逐欄「未被轉換」之值層證明（全量 418,719 欄）**
   — `為何現在不做: needs-research:要逐欄證明「產出當下未被轉換」，需對每一欄重算一份
   未轉換對照，成本與 FF 重跑同級（reference run 實測約 2 小時／單 symbol）；

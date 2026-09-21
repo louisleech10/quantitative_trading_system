@@ -80,8 +80,13 @@ fence_kind = ""
 # 跨行 outer HTML 註解（R11：合法成對 marker 藏在其中仍被當生成區塊）
 # 🔴 只在**整行就是**未閉合之註解開頭時才進註解狀態（R12 自驗：原用 `search` ⇒
 # 散文行提到 `<!--` 字面也會進狀態，其後之合法生成區塊被誤判為 prose 而誤報）。
-# 行首可有空白；`<!--` 後只准空白或註解內容，不得有反引號（inline code 之引用形態）。
-_c_open = re.compile(r"^\s*<!--(?![^`]*`)")
+# 🔴 判斷前先**剝除 inline code span**（R12 委員：用「該行不得含反引號」之啟發式，
+# 會使真跨行註解之開頭行只要含 inline code 就不進狀態，其內之成對 marker 被當真生成區塊
+# ⇒ fail-open）。剝除是結構性作法，不依賴反引號出現與否。
+_inline_code = re.compile(r"`[^`\n]*`")
+def _strip_code(s):
+    return _inline_code.sub("", s)
+_c_open = re.compile(r"^\s*<!--")
 _c_close = re.compile(r"-->")
 in_outer_comment = False
 in_fence = False
@@ -101,12 +106,14 @@ for n, line in enumerate(new, 1):
         continue
     if in_fence:
         continue
-    # 跨行 outer HTML 註解：整段內容（含其中之 marker）不算生成區塊
+    # 跨行 outer HTML 註解：整段內容（含其中之 marker）不算生成區塊。
+    # 先剝除 inline code span 再判斷，避免散文引用 `<!--` 字面被誤當註解開頭。
+    bare = _strip_code(line)
     if in_outer_comment:
-        if _c_close.search(line):
+        if _c_close.search(bare):
             in_outer_comment = False
         continue
-    if _c_open.match(line) and not _c_close.search(line) \
+    if _c_open.match(bare) and not _c_close.search(bare) \
             and not _gen_begin.match(line) and not _gen_end.match(line):
         in_outer_comment = True
         continue
