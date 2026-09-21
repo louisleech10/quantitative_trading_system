@@ -1178,6 +1178,87 @@
       ]
     ]
   },
+  "ffdstar-receipt-schema": {
+    "target": "docs/FFDSTAR_SPEC.md",
+    "columns": [
+      "序",
+      "欄",
+      "型別／值集",
+      "說明"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "`applied`",
+        "布林",
+        "本次 run 該欄是否實際套用 fracdiff"
+      ],
+      [
+        "020",
+        "`d`",
+        "浮點；`applied` 為真時**必填**，為假時**必須缺席**",
+        "本次實際使用之分數階；缺席與 `null` 語意不同，須以缺席表達"
+      ],
+      [
+        "030",
+        "`source`",
+        "`cache_hit` ｜ `search`；`applied` 為真時必填",
+        "`d` 之來源＝命中既有快取，或本次重新搜尋"
+      ],
+      [
+        "040",
+        "`reason`",
+        "封閉集合，見 `ffdstar-skip-reasons`；`applied` 為假時必填",
+        "未套用之原因"
+      ],
+      [
+        "050",
+        "頂層 `symbol`／`timeframe`／`config_hash`",
+        "字串",
+        "run 之身分；`config_hash` 為本票解決 owner mismatch 之關鍵欄"
+      ],
+      [
+        "060",
+        "頂層 `row_count`／`time_range`",
+        "整數／物件",
+        "與 run 對齊；與既有共用快取之同名欄語意相同"
+      ],
+      [
+        "070",
+        "頂層 `fracdiff_hash`",
+        "字串",
+        "fracdiff 參數雜湊；與既有快取檔名所用者同源"
+      ],
+      [
+        "080",
+        "落點",
+        "`data_cache/feature_preprocessing/`，檔名含 `config_hash`",
+        "🔴 **不得**落在 run 目錄——會使既有 failopen 檔案集合比對轉紅（見 SPEC §A 裁定 1）"
+      ]
+    ]
+  },
+  "ffdstar-skip-reasons": {
+    "target": "docs/FFDSTAR_SPEC.md",
+    "columns": [
+      "序",
+      "值",
+      "語意"
+    ],
+    "render": "table",
+    "rows": [
+      [
+        "010",
+        "（待實作時以碼證補齊）",
+        "🔴 本表之值集合**不得由主委憑印象填寫**——SPEC 初稿曾杜撰四個不存在的分支名，經 R1 兩家以碼證推翻。實作 Task 1.1 之第一步即為列出 `_apply_fractional_differencing` 之實際離開路徑，逐一對應後回填本表；回填前本表僅此一列"
+      ],
+      [
+        "020",
+        "回填之機械約束",
+        "Task 1.1 之驗證① 斷言「收據欄集合 == 進入函式之欄集合」；任一離開路徑未對應到本表之值，該斷言即轉紅 ⇒ 本表之完整性由測試而非紀律保證"
+      ]
+    ]
+  },
   "eventscan-pit-admission": {
     "target": "docs/EVENTSCAN_SPEC.md",
     "columns": [

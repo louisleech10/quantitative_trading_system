@@ -59,26 +59,74 @@
 「**Never** … change output size without user approval」。
 
 ⇒ **唯一需要使用者裁示的是輸出增量本身，且必須帶著實測數字去問**
-（技術類選擇不問使用者，依既有裁定交委員會——見下「交委員會決定」）。
+（技術類選擇不問使用者，依既有裁定交委員會——結果見下「委員會已裁定之技術選擇」）。
 ⇒ 因此順序為：Task 1.1／1.2 實作 → Task 1.3 量出絕對位元組與佔比 → **帶數字請使用者核可** → 交付。
 **未取得核可前不得宣告本票完工**；使用者否決即整票回退（§R）。
 
 `待確認：無`（實作前無待決；輸出增量之核可屬**交付前**關卡，非實作前關卡）
 
-### 交委員會決定（技術選擇，依 2026-07 既有裁定不問使用者）
+### 委員會已裁定之技術選擇（R1 收斂，不再是待決）
 
-1. **落點**：收據寫進 run 目錄（例 `<run>/d_star_receipt.json`），或寫進
-   `data_cache/feature_preprocessing/` 但檔名加入 `config_hash`？
-   （前者使 run 自我描述、搬移 run 即帶著收據；後者不動 run 目錄之檔案集合。）
-2. **覆蓋率**：只記「本次實際進入 fracdiff 且完成套用」之欄，
-   或連「被 ADF 判為平穩而未轉換」之欄也記一筆（`applied: false`）？
-   後者才答得出「這欄到底有沒有被轉換」，但檔會大很多——**此選擇直接決定上述輸出增量**。
-3. **既有 7 個共用檔**：保留原狀（只面向未來），或一併標記為「來源 run 不明」？
-   🔴 本票預設**保留原狀不動**（面向未來不溯及既往，2026-08-05 使用者定死）。
+1. **落點＝`data_cache/feature_preprocessing/`，檔名含 `config_hash`。**
+   🔴 **決定性理由（composer 實查）**：若落在 run 目錄，既有
+   `tests/feature_engineering/test_failopen_correctness.py:348::test_v3_multi_tf_btc_matches_frozen_baseline`
+   會把新 JSON 當資料檔而使檔案集合比對轉紅 ⇒ **直接命中 §RISK 升級訊號③**。
+   選共用目錄則 run 目錄之檔案集合**逐位元組不變**，該測試維持綠。
+2. **覆蓋率＝全部進入判定之欄，各帶 `applied` 與 `reason`／`source`。**
+   理由（codex）：只記已套用者**解決不了型③**——不在收據內的欄有兩種可能
+   （未進 fracdiff／進了但沒記），無法區分等於沒做。
+3. **既有 7 個共用檔＝保留原狀不動**（面向未來不溯及既往，2026-08-05 使用者定死）。
+4. **本票套用 `fact_keys` 生成區塊**（codex `P2-07`）：主委原判「值很少故不套用」不成立——
+   可觀測之值已含四類原因碼、`source` 值集、收據頂層欄位、落點路徑、三條升級訊號。
+
+### 🔴 唯一之閘序（本 SPEC 內先前三處互斥宣告，以本段為準）
+
+R1 兩家各自指出 §A／Phase 1／Task 1.2 對「何時可開工」給了互斥條件。**統一為**：
+
+```
+Task 1.1（收集，不落檔）  → 可立即開工，不需任何裁示
+Task 1.2（落檔）          → 可立即開工（落點與覆蓋率已由上述裁定確定）
+Task 1.3（量測輸出增量）  → 依賴 1.2
+使用者核可輸出增量        → 交付前關卡，非實作前關卡
+```
+
+**沒有任何 Task 以「等使用者裁示」為開工條件。** 使用者之核可只擋**交付**。
 
 ### 已確認結果（2026-09-21 使用者裁定，逐條見下）
 - `2026-09-21 使用者裁定：先確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉` → 定性輪已跑完
 - `2026-09-21 使用者裁定：同意做「每個 run 自帶 d* 收據」`
+
+---
+
+## §K 本 SPEC 註冊之 fact-key
+
+> 下列區塊由 `scripts/fact_keys.json` 生成，**禁手改**。改值＝改該檔後跑
+> `bash scripts/gen_fact_key_blocks.sh --write`。TODO 與測試引用同一值時掛同一區塊，不得手打。
+> （採用理由：R1 之 codex `P2-07` 推翻主委「值很少故不套用」之判斷。）
+
+### K-1 收據 schema
+
+<!-- BEGIN GENERATED: ffdstar-receipt-schema -->
+| 序 | 欄 | 型別／值集 | 說明 |
+|---|---|---|---|
+| 010 | `applied` | 布林 | 本次 run 該欄是否實際套用 fracdiff |
+| 020 | `d` | 浮點；`applied` 為真時**必填**，為假時**必須缺席** | 本次實際使用之分數階；缺席與 `null` 語意不同，須以缺席表達 |
+| 030 | `source` | `cache_hit` ｜ `search`；`applied` 為真時必填 | `d` 之來源＝命中既有快取，或本次重新搜尋 |
+| 040 | `reason` | 封閉集合，見 `ffdstar-skip-reasons`；`applied` 為假時必填 | 未套用之原因 |
+| 050 | 頂層 `symbol`／`timeframe`／`config_hash` | 字串 | run 之身分；`config_hash` 為本票解決 owner mismatch 之關鍵欄 |
+| 060 | 頂層 `row_count`／`time_range` | 整數／物件 | 與 run 對齊；與既有共用快取之同名欄語意相同 |
+| 070 | 頂層 `fracdiff_hash` | 字串 | fracdiff 參數雜湊；與既有快取檔名所用者同源 |
+| 080 | 落點 | `data_cache/feature_preprocessing/`，檔名含 `config_hash` | 🔴 **不得**落在 run 目錄——會使既有 failopen 檔案集合比對轉紅（見 SPEC §A 裁定 1） |
+<!-- END GENERATED: ffdstar-receipt-schema -->
+
+### K-2 未套用原因碼（待實作以碼證回填）
+
+<!-- BEGIN GENERATED: ffdstar-skip-reasons -->
+| 序 | 值 | 語意 |
+|---|---|---|
+| 010 | （待實作時以碼證補齊） | 🔴 本表之值集合**不得由主委憑印象填寫**——SPEC 初稿曾杜撰四個不存在的分支名，經 R1 兩家以碼證推翻。實作 Task 1.1 之第一步即為列出 `_apply_fractional_differencing` 之實際離開路徑，逐一對應後回填本表；回填前本表僅此一列 |
+| 020 | 回填之機械約束 | Task 1.1 之驗證① 斷言「收據欄集合 == 進入函式之欄集合」；任一離開路徑未對應到本表之值，該斷言即轉紅 ⇒ 本表之完整性由測試而非紀律保證 |
+<!-- END GENERATED: ffdstar-skip-reasons -->
 
 ---
 
@@ -98,24 +146,35 @@
 > 🔴 **本 Phase 表之執行順序＝ Task 1.1 → 1.2 → 1.3**（列序即執行序）。
 > 自檢已做：無 forward dependency。
 
-### Phase 1 — 收據落檔（依賴：使用者對 §A 三項否決點之裁示）
+### Phase 1 — 收據落檔（依賴：無。三項技術選擇已由 R1 收斂裁定，見 §A）
 
 **Task 1.1 — 在預處理層收集「本次實際套用之 `d`」**
 - 目標：讓一次 run 結束時，手上有一份「欄 → 實際用的 `d` ／ 未套用及其原因」。
 - 檔案：`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py`
   （`_apply_fractional_differencing_serial` 與 `_apply_fractional_differencing_parallel` 兩條路徑，
   以及 `_apply_fractional_differencing` 之 eligible／skip 分支）。
-- 既有 caller／影響面：三條路徑之既有回傳值與副作用**不得改變**；收集僅為累加至一個實例屬性
-  （比照既有之 `self._fracdiff_processed_columns`）。
-- 改法：於既有 `_fracdiff_processed_columns` 旁新增一個 `dict`，
-  在**已存在**的四個分支各記一筆：`applied`（含 `d` 與來源＝cache hit 或 search）／
-  `skipped_not_selected`（ADF 判平穩）／`skipped_high_nan`／`skipped_filtered`（layer／safe-skip）。
-  **不新增任何判斷分支**——只在既有分支上記錄。
-- **驗證**（`pytest`）：對 reference run 之一個小 group，收集所得之
-  `applied` 欄集合 `==` 既有 `_fracdiff_processed_columns`（兩者必須一致，否則記錄漏了）；
-  且 `applied ∪ skipped_*` `==` 進入該函式之全部欄（無欄落在四類之外）。
-  **mutation**：拿掉任一 `skipped_*` 分支之記錄，須使第二條斷言轉紅。
-  指令：`pytest tests/momentum/feature_engineering/test_dstar_receipt.py -q`
+- 既有 caller／影響面：三條路徑之既有回傳值與副作用**不得改變**。
+  🔴 **不得比照 `self._fracdiff_processed_columns` 之生命週期**（R1 兩家指出）：該屬性於
+  `feature_preprocessor.py:2471` 與 `:2484` 被重設，**其內容是最後一次 transform 的殘局**，
+  不是整個 run 的清單；且其型別為 `set[str]`（`:150`），**不帶 `d` 值**。
+  ⇒ 收據容器須為 **run 層級、不被 per-transform 重設**之累加結構。
+- 改法：**第一步是盤出實際分支**——R1 兩家指出本 SPEC 初稿所列之「四個既有分支」
+  （`applied`／`skipped_not_selected`／`skipped_high_nan`／`skipped_filtered`）**在碼上不存在**，
+  是主委未經查證的杜撰。
+  ⇒ 本 SPEC **只定義收據必須涵蓋之語意**，不指定分支名：
+  **每一個進入 `_apply_fractional_differencing` 之欄，收據須有且恰有一筆**，
+  含 `applied`（布林）、`d`（`applied` 為真時必填）、`source`（`d` 從何而來）、
+  `reason`（`applied` 為假時必填）。值集合見 §K 之生成區塊。
+  實作時須先以碼證列出實際的離開路徑，再逐一對應到上述語意；**新增任何判斷分支即為違規**。
+- **驗證**（`pytest`，兩層）：
+  ① **窮盡性**：收據之欄集合 `==` 進入該函式之欄集合（逐欄，非計數）；
+  任一欄缺席或重複即 FAIL。此條不依賴任何既有屬性，只依賴函式之輸入。
+  ② **`d` 值正確性**：🔴 **不得**以 `_fracdiff_processed_columns` 核對——它沒有 `d` 值（見上）。
+  改用**獨立重算**：取收據之 `d`，以 `_frac_diff_ffd` 重跑該欄，與落檔值比對
+  （相關性 `>= 0.9999`；此即主委 2026-09-21 追查時實際用過的 oracle）。
+  **mutation**：把任一離開路徑之記錄拿掉，須使①轉紅；把收據之 `d` 改寫成固定值，須使②轉紅。
+  指令：`pytest tests/feature_engineering/preprocessing/test_d_star_receipt.py -q`
+  （🔴 測試樹依既有 `test_d_star_*.py` 之所在，非主委初稿所寫之 `tests/momentum/...`）
 - **邊界**：① fracdiff 整段被 early return（`HAS_STATSMODELS` 為 false）⇒ 收據為空且須可區分
   「沒跑」與「跑了但零欄」；② `eligible_columns` 為空；③ parallel 路徑之多 worker 結果合併後
   不得有重複鍵，重複即 fail-closed。
@@ -127,19 +186,25 @@
 - 目標：把 Task 1.1 收集到的東西寫成一份檔。
 - 檔案：`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py`（落檔呼叫點）；
   新增 `momentum/FeatureEngineering/preprocessing/_dstar_receipt.py`（序列化）。
-- 既有 caller／影響面：落檔為**新增副作用**；落點與覆蓋率依 §A 之使用者裁示，
-  **裁示未到前本 Task 不得開工**。
+- 既有 caller／影響面：落檔為**新增副作用**。落點與覆蓋率**已由 R1 收斂裁定**（見 §A），
+  本 Task **無待決、可立即開工**。
 - 改法：以既有 `DStarCache.flush_atomic` 之同型原子寫入（temp ＋ `os.replace`），
+  落於 `data_cache/feature_preprocessing/`，檔名含 `config_hash`。
   內容含 `symbol`／`timeframe`／`config_hash`／`row_count`／`time_range`／
   `fracdiff_hash`／逐欄記錄。**欄名一律用落檔當下之欄名**（不做任何正規化——
   共用快取之鍵不帶週期前綴正是本票要解的可追溯性問題之一部分）。
-- **驗證**（`pytest`）：跑一個小 run 後，收據之 `config_hash` `==` 該 run 目錄之 `config_hash`；
-  收據逐欄之 `d` 與同次執行之 `_fracdiff_processed_columns` 對應值相等；
-  同一 run 連跑兩次，收據 byte 級相同。
-  **mutation**：把 `config_hash` 改為寫入 `symbol`，須使第一條斷言轉紅。
-  指令：`pytest tests/momentum/feature_engineering/test_dstar_receipt.py -q`
-- **邊界**：① 落點目錄不存在 ⇒ 建立而非失敗；② 寫入失敗 ⇒ **不得**讓整個 run 失敗
-  （收據是診斷物，不是產物），但須 `logger.warning` 且可由測試斷言該警告；
+- **驗證**（`pytest`）：跑一個小 run 後，收據之 `config_hash` `==` 該 run 之 `config_hash`；
+  收據逐欄之 `d` 以 Task 1.1 驗證② 之獨立重算 oracle 核對（**不得**用
+  `_fracdiff_processed_columns`，它沒有 `d` 值）；同一 run 連跑兩次，收據 byte 級相同。
+  另**斷言 run 目錄之檔案集合與改動前逐項相同**——此條直接對應 `§RISK` 升級訊號③。
+  **mutation**：把 `config_hash` 改為寫入 `symbol`，須使第一條斷言轉紅；
+  把落點改回 run 目錄，須使「run 目錄檔案集合不變」之斷言轉紅。
+  指令：`pytest tests/feature_engineering/preprocessing/test_d_star_receipt.py -q`
+- **邊界**：① 落點目錄不存在 ⇒ 建立而非失敗；
+  ② 🔴 **寫入失敗 ⇒ 整個 run 判失敗（fail-closed）**。
+  R1 兩家一致指出：降級為 `logger.warning` 會再產出一個「成功但沒有 per-run `d*` 紀錄」的 run，
+  **正是本票要消滅的型③**，且與 CLAUDE.md「擬合參數（逐字含 `d*`）必須持久化才能上線」鐵律衝突。
+  主委初稿之「收據是診斷物不是產物」不成立——它是本票要新增之 provenance 產物。
   ③ 同一 run 重跑 ⇒ 覆寫自己的收據（同 `config_hash`，不涉跨 run 覆蓋）。
 - **存活至**：本票交付後保留。
 - **覆蓋風險**：無。
@@ -196,16 +261,21 @@
 
 - **FFDSTAR-R1 既有 7 個共用快取檔之來源 run 不明**
   — `為何現在不做: user-ruling:2026-08-05 使用者定死「修正只考慮以後，不把舊錯誤包回來」`；
-  觸發：使用者要求回溯查證某個既有 run 之 `d*` 時；登記處：`docs/ROADMAP.md`。
+  觸發：使用者要求回溯查證某個既有 run 之 `d*` 時；登記處：本 SPEC §N（ROADMAP 只放票列 `RM-FFDSTAR` 之 pointer，不重複列殘留識別碼）。
   🔴 **誠實邊界**：本票**救不回過去**。reference run（特徵落檔 `Jul 4 15:35`）當時之 `d*`
   已被 `Sep 9 20:45` 之另一 run 覆寫，除重跑外無法取得。
 - **FFDSTAR-R2 `/api/v1/features/generate` 回之 `task_id` 於 `/task/{task_id}` 查不到**
   — `為何現在不做: blocked-by:本票範圍限於預處理層之可追溯性，該缺陷在 api/ 之任務登記路徑，
   屬不同模組且需獨立定性（是否為已知設計）`；
   觸發：**已觸發**，2026-09-21 主委跑 FF 重跑時實遇（三個候選狀態端點皆 404，生成本身正常）；
-  登記處：`docs/ROADMAP.md`。
+  登記處：本 SPEC §N（ROADMAP 只放票列 `RM-FFDSTAR` 之 pointer，不重複列殘留識別碼）。
 - **FFDSTAR-R3 收據覆蓋率與欄數之落差**
-  — `為何現在不做: needs-research:現存共用快取僅 148 entries 而 run 有 437,110 欄，
-  該落差是「只有少數欄進 fracdiff」還是「記錄本身不全」尚未區分；須待 Task 1.1 之收集上線後，
-  以真實 run 之四類計數回答`；
-  觸發：Task 1.1 完工並跑過一次真實 run 後；登記處：`docs/ROADMAP.md`。
+  🔴 **本輪已先拆掉一半**（R1 composer 指出「不實作也能拆」，主委照做）：
+  FACT-RECEIPT: FF 重跑之 L6.5 日誌逐字印出
+  `fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2']`（Claude 實跑 2026-09-21）
+  ⇒ **L3 以上之欄從不進入 fracdiff**，437,110 不是候選母體；候選僅 L1＋L2
+  （同次 run 之 L2 完成量為 44,827 欄）。
+  ⇒ 剩下待答的只有「L1＋L2 候選中，被 ADF 判為非平穩者是否恰為 148」。
+  — `為何現在不做: needs-research:上述剩餘問題須以真實 run 之逐欄判定計數回答，
+  而該計數正是 Task 1.1 之產出；在其上線前無獨立來源`；
+  觸發：Task 1.1 完工並跑過一次真實 run 後；登記處：本 SPEC §N（ROADMAP 只放票列 `RM-FFDSTAR` 之 pointer，不重複列殘留識別碼）。
