@@ -68,36 +68,42 @@
 <tbody>
 <tr>
 <td>1</td>
-<td><strong>PLAINDOCS</strong></td>
-<td>白話文檔重整（就是你現在在看的這件事）</td>
-<td>進行中</td>
+<td><strong>EVENTSCAN</strong></td>
+<td>條件掃描 → 持有報酬 vs 隨機對照</td>
+<td>方向定案，<strong>下一步＝寫 SPEC</strong>（不是實作）；寫的同時建 B，見下</td>
 </tr>
 <tr>
 <td>2</td>
-<td><strong>EVENTSCAN</strong></td>
-<td>條件掃描 → 持有報酬 vs 隨機對照</td>
-<td>方向定案，待實作</td>
-</tr>
-<tr>
-<td>3</td>
 <td><strong>ICPATH</strong></td>
 <td>已完成項目逐項確認兩路（全域序列型／事件型）都支援且算得對</td>
 <td>未開工</td>
 </tr>
 <tr>
-<td>4</td>
+<td>3</td>
 <td><strong>GLOBALH</strong></td>
 <td>多個持有期全部算、逐列標 h／k、可篩</td>
 <td>未開工</td>
 </tr>
 <tr>
-<td>5</td>
+<td>4</td>
 <td><strong>UAT 驗收</strong></td>
 <td>你實機驗收（一定最後）</td>
 <td>未開工</td>
 </tr>
 </tbody>
 </table></div>
+<h3 id="夾在-eventscan-裡的-b不是獨立的票">夾在 EVENTSCAN 裡的 B（不是獨立的票）</h3>
+<p>寫 SPEC 時，凡是<strong>會被 TODO／測試／白話再抄一次的值</strong>，改成「只寫一次」的格子，不手打。
+約 40–60 條（時鐘定義、進場只算一次、隨機對照抽樣四條、統計欄、成本歸零點公式、
+失敗原因碼、欄名打錯要報錯、你的七項裁定…）。</p>
+<ul>
+<li><strong>它解什麼</strong>：同一個值被抄到多處、改一處漏多處；值打錯但格式合法</li>
+<li><strong>它不解什麼</strong>：架構對不對、零件怎麼接、為什麼這樣設計、同一份檔內前後矛盾</li>
+<li><strong>有沒有效怎麼看</strong>：before 已記（每輪 1.00 條文件同步類問題，見
+<code>handoffs/run_receipts/20260921-eventscan-b-baseline.json</code>），做完用同一支指標比</li>
+<li><strong>已知的洞</strong>：<code>docs/</code> 不在手寫偵測範圍內 ⇒ 貼了標記的格會同步，但在 SPEC 別的段落
+手打同一個值不會被擋。補洞代價還沒查</li>
+</ul>
 <hr />
 <h2 id="三待觸發條件沒到就不做不是拖延">三、待觸發（條件沒到就不做，不是拖延）</h2>
 <div class="table-wrap"><table>

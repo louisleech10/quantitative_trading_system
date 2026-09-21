@@ -414,3 +414,6 @@
 - 2026-09-20：RM-PLAINDOCS → `handoffs/reconcile/20260920-plaindocs-x-review-r1/synth.md`
 - 2026-09-20：RM-PLAINDOCS → `handoffs/reconcile/20260920-plaindocs-x-review-r2/synth.md`
 - 2026-09-20：RM-PLAINDOCS → commit `dd3ca561`
+- 2026-09-21：RM-AGENTOPS → `docs/AGENTOPS_PROBLEM_DEFINITION.md`
+- 2026-09-21：RM-AGENTOPS → `handoffs/reconcile/20260921-docfix-x-consult-r1/synth.md`
+- 2026-09-21：RM-AGENTOPS → commit `40483cc9`
