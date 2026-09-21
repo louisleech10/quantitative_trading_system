@@ -117,4 +117,7 @@
 - 2026-09-21：RM-EVENTSCAN → `handoffs/run_receipts/20260921-eventscan-b-baseline.json`
 - 2026-09-21：RM-EVENTSCAN → `docs/EVENTSCAN_SPEC.md`
 - 2026-09-21：RM-EVENTSCAN → `handoffs/20260921-EVENTSCAN-SPEC-REVIEW-R1-BRIEF.md`
+- 2026-09-21：RM-EVENTSCAN → `handoffs/reconcile/20260921-eventscan-x-review-r5/synth.md`
+- 2026-09-21：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`
+- 2026-09-21：RM-FFDSTAR → `docs/FFDSTAR_SPEC.md`
 <!-- HISTORY-END -->
