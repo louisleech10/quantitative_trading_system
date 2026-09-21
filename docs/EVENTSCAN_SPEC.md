@@ -91,11 +91,16 @@
 - FACT-RECEIPT: `PYTHONPATH=. venv/bin/python <probe>` 以真實 kline 重算 EMA 並與落檔欄比對 →
   印出 `EMA_200 corr(落檔,未轉換EMA)=1.0000`、`EMA_5 corr=0.9102`、`EMA_55 corr=-0.0080`
   ⇒ 短週期欄已被轉換、`EMA_200`／`EMA_233` 未被轉換（Claude 實跑 2026-09-21）
-- FACT-RECEIPT: `jq '.entries' data_cache/feature_preprocessing/d_star_ETHUSDT_1h_dcc154ced6b6.json` →
-  印出 `close_trend_EMA_5=0.3906`／`EMA_34=0.6875`／`EMA_200=1.0`，且 `EMA_89`／`100`／`144`／`233`
-  **無紀錄**（Claude 實跑 2026-09-21）
-- FACT-RECEIPT: 以快取所記 `d*` 套用 `_frac_diff_ffd` 後與落檔比對 → `EMA_5..34` 相關 `0.89–0.99`、
-  `EMA_200` 相關 `0.0049` ⇒ **`EMA_200` 之 `d*` 有紀錄但轉換未被套用**（Claude 實跑 2026-09-21）
+- 🔴 **主委原列之「`d*` 紀錄與實際套用不一致」兩條 FACT-RECEIPT 已由 FFDSTAR 定性輪推翻**：
+  主委所讀之 `data_cache/feature_preprocessing/d_star_ETHUSDT_1h_dcc154ced6b6.json`
+  **不是** reference run 之收據（其 `row_count=10441` 屬另一 run，本 run 為 20352 列；
+  該快取檔跨 run 共用且會被後寫覆蓋）。以它與本 run 之 parquet 配對所得之結論不成立。
+  逐型定性見 `handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`：
+  **`EMA_200`／`EMA_233` 未被轉換是 `apply_to="non_stationary"` 之 ADF 設計路徑**
+  （委員以本 run 之 20352 列校準窗實跑，判其平穩故不進 fracdiff），不是缺陷。
+- FACT-RECEIPT: 委員以本 run 校準窗實跑 `_get_non_stationary_columns` → 名單含 `EMA_5..144`、
+  **不含** `EMA_200`／`EMA_233`；落檔之 `EMA_50`／`55`／`89`／`100`／`144` 與
+  `_frac_diff_ffd(d=1.0)` 相關 `1.0000`（composer 實跑 2026-09-21）
 - FACT-RECEIPT: `jq` 掃 `data_cache/features/*/*/*/feature_manifest.json` → 印出 14 個可用 run
   **全部** `fracdiff=True winsor=True`（Claude 實跑 2026-09-21）
 
@@ -103,7 +108,7 @@
 ⇒ **本票之「條件掃描」前提（FF 欄彼此可直接比較）在現有任何 run 上皆不成立。**
 
 **使用者 2026-09-21 裁定**：由主委重跑一個**關閉 `winsorization` 與 `fractional_differencing`** 的 FF run
-供本票使用；另就 `d*` 紀錄與實際套用不一致**另立票**；🔴 使用者同日補充裁定「先跟委員確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」⇒ 該票之第一步為唯讀定性，非修改（見 §N 之 RESID-10）。
+供本票使用；另就 `d*` 快取之可追溯性**另立票**；🔴 使用者同日補充裁定「先跟委員確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」⇒ 定性輪已跑完，結論見 §N 之 RESID-10（主委原判大部分不成立）。
 
 ⇒ 本 SPEC 之 `eventscan-golden-reference` 020–040 之 reference 設定，
 **待該新 run 產生後改指向它**；`eventscan-pit-admission` 全節之必要性亦須於該時重新評估
@@ -111,7 +116,7 @@
 
 ### 待使用者確認
 
-`待確認：無`（2026-09-21 裁定已取得：重跑 FF 由主委執行；`d*` 不一致**另立票且先定性再談修**，見 §N 之 RESID-10）
+`待確認：無`（2026-09-21 裁定已取得：重跑 FF 由主委執行；`d*` 快取可追溯性**另立票且已完成定性**，見 §N 之 RESID-10）
 
 ### 已確認結果
 
@@ -994,22 +999,23 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   在本專案尚無定論，且需先有真實批之段間自相關量測才能選`；觸發：`eventscan-params` 080 之診斷在真實批上
   經常為真時；登記處：`docs/IC_QUANT_GAP_REGISTRY.md`「兩路涵蓋宣告」節。
   在此之前以 Task 5.2 之診斷旗標＋橫幅不解除承擔（**不是**假裝沒有這個問題）。
-- **RESID-10 `d*` 紀錄與實際套用不一致（Feature Factory；**尚未定性為缺陷**）**
-  🔴 **定性未定，禁止逕行修改**（使用者 2026-09-21 逐字：「那個bug你跟委員要先確認是真的是bug
-  還是特殊原因才這樣定義，不要直接修掉」）。⇒ 第一步是**唯讀諮詢輪**，由委員與主委各自獨立判定
-  下列四型是設計意圖還是缺陷；**判定為缺陷者**才進入「找真因 → 修正」（使用者同日前一句
-  「一定要找到真因然後修正掉」適用於該情形）。
+- **RESID-10 共用 `d*` 快取之可追溯性（Feature Factory）**
+  🔴 **定性輪已跑完**（使用者 2026-09-21 逐字：「那個bug你跟委員要先確認是真的是bug
+  還是特殊原因才這樣定義，不要直接修掉」）。該裁定**直接擋下一次針對非缺陷的修改**——
+  主委原判之四型中，兩型經委員以本 run 實跑判為設計意圖、一型因主委配對錯誤而不成立。
   — `為何現在不做: user-ruling:2026-09-21 使用者裁定先定性再修，且另立票；
   該路徑在 Feature Factory 預處理層，命中高風險原則 (a) 數值／資料品質，
   須走完整管線，不得在本票內順手改`；
   觸發：**已觸發**，票號 `FFDSTAR`，本票之新 FF run 產生後立即開；
   登記處：`docs/ROADMAP.md` 之工作線表。
-  已確認之症狀四型（皆附 §A 之 FACT-RECEIPT）：①有紀錄且有套用（`EMA_5..34`）
-  ②有紀錄但套用之 `d` 與紀錄不符（`EMA_50`／`55`）③無紀錄但有套用（`EMA_89`／`100`／`144`）
-  ④**有紀錄但完全未套用**（`EMA_200`）。
-  真因候選三條（皆已定位到具名碼，尚未定案）：`apply_to="non_stationary"` 之 ADF 閘與 `d*` 計算
-  為兩條獨立判斷（`feature_preprocessor.py:3167`）／`d*` 快取鍵不帶週期前綴而本 run 同含
-  `1h_` 與 `12h_` 兩套欄（`_d_star_cache.py:479`）／`value_aliases` 以數值指紋跨欄名共用 `d*`。
+  🔴 **定性已完成，結論與主委原判相反**（`handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md`）：
+  主委原列之四型症狀，兩家逐型判定為——**兩型為設計意圖、一型不成立（主委配對錯誤）、
+  僅 provenance 一項為真缺陷**。
+  ⇒ 本殘留之範圍**限縮為單一議題**：共用之 `d*` 快取檔跨 run 覆寫、且無 per-column 收據，
+  導致無法追溯任一 run 當下所用之 `d*`（可追溯性／耐久性）。
+  ⇒ 原列之「`apply_to=\"non_stationary\"` 之 ADF 閘與 `d*` 計算為兩條獨立判斷」
+  **不是缺陷而是設計**：委員以本 run 校準窗實跑，該閘判 `EMA_200`／`EMA_233` 平穩故不轉換。
+  ⇒ 下一步**須先由使用者確認是否值得投入**，非自動進入修正。
 - **RESID-9 同一個值在生成區塊外被手打，無機械閘可擋**
   — `為何現在不做: user-ruling:2026-09-21 使用者對代號 B 之裁定逐字含「不新建工具」；
   且手寫偵測之 status_scope 不含 docs/ 其餘檔，擴充它即為新建治理工具`；
