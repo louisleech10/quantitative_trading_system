@@ -1515,8 +1515,8 @@
       [
         "030",
         "第 1 層 週期（**唯一來源＝`task_record.json`**）",
-        "週期集合取自該 run 之 `task_record.json` 之 `metadata.present_timeframes`（reference run 實測為 `[\"1h\",\"12h\"]`，且 `metadata.skipped_timeframes` 為 `[]`）。gid 歸屬週期之算法＝對該集合逐一做**前綴成員測試**（`tf + \"_\"`）；命中 0 個或 ≥2 個即 **fail-closed**。此為對封閉集合之成員測試，**不是**把 gid 切開再解讀其段義",
-        "🔴 **禁用 `feature_manifest.json` 之 `present_timeframes`**：同一 run 之 manifest 寫 `[\"1h\"]`、`task_record.json` 寫 `[\"1h\",\"12h\"]`，**同名欄兩個值**，而 manifest 同時標 `quality_status=complete` 不發警告。矛盾本體屬 FF 產出端，見 RESID-11。加固對證：以 gid 前綴導出之集合若與 `task_record` 不等即 fail-closed——該切分**只用於偵測分歧，永不作為權威**"
+        "週期集合取自該 run 之 `task_record.json` 之 `metadata.present_timeframes`（reference run 實測為 `[\"1h\",\"12h\"]`，且 `metadata.skipped_timeframes` 為 `[]`）。gid 歸屬週期之算法＝對該集合逐一做**前綴成員測試**（`tf + \"_\"`）；命中 0 個或 ≥2 個即 **fail-closed**。此為對封閉集合之成員測試，**不是**把 gid 切開再解讀其段義。🔴 **該欄缺失、為 `null` 或為空陣列 ⇒ fail-closed，該 run 不得用於掃描**（理由碼 `timeframe_source_unavailable`），**不得**退回讀 manifest 之同名欄、**不得**退回以 gid 前綴當權威",
+        "🔴 **禁用 `feature_manifest.json` 之 `present_timeframes`**：同一 run 之 manifest 寫 `[\"1h\"]`、`task_record.json` 寫 `[\"1h\",\"12h\"]`，**同名欄兩個值**，而 manifest 同時標 `quality_status=complete` 不發警告。**此為系統性而非個案**——全掃 18 個既存 run，4 個多週期 run（`4a8a0b37…` 於 BCH／BTC／ETH 三 symbol、以及 reference）之 manifest 皆只宣告主週期；單週期 run 則 manifest 正確。矛盾本體屬 FF 產出端，見 RESID-11。加固對證：以 gid 前綴導出之集合若與 `task_record` 不等即 fail-closed——該切分**只用於偵測分歧，永不作為權威**。🔴 **誠實邊界（可用性代價）**：全掃 18 個既存 run，`task_record.json` 存在**且**該欄有值者**僅 1 個**（正是 reference run）；3 個有該檔但欄為 `null`、14 個無該檔 ⇒ 依本規則，其餘 17 個 run 須重跑或補產 `task_record` 才能用於掃描。此代價與 `eventscan-pit-admission` 057 之「每個新 run 需核准」同向，不另放寬"
       ],
       [
         "040",

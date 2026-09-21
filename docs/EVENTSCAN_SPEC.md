@@ -329,7 +329,7 @@
 |---|---|---|---|
 | 010 | 🔴 欄名**不得**以底線切分（R7 實證推翻主委原設計） | 原設計之 `<來源欄>_<週期>_<類別>_<指標>_<參數>` 五段文法**只涵蓋 0.77%**（3,235／418,719）。實測段數分佈：4 段 302／5 段 3,235／6 段 16,835／**7 段 393,731（94.03%）**／8 段 3,946／9 段 670。且切分本身不可靠——來源欄名含底線（`taker_ratio` 被切成兩段，同資料另有 `taker-ratio` 用連字號）、指標可有多個參數（`Klinger_34_55`）⇒ 六段以上之欄中 **11,198 個前五段不對應任何既存欄** | Claude 實跑最終 run 全量 2026-09-21 |
 | 020 | **改用 group 結構，不解析欄名** | 選擇器之層級一律由 manifest 之 `groups` 導出：鍵（gid）給節點身分，`groups.<gid>.columns[]` 給該群之欄。🔴 **group 物件並沒有 `timeframe`／`layer`／`category`／`indicator` 欄**（R8 全量實查：944 個物件中各出現 **0 次**；鍵清單見 `eventscan-pit-admission` 035）⇒ 不得向 group 物件索取這四者，週期另由 030 取得 | Task 1.3 由 manifest 導出，不得前端硬編，**亦不得以底線切欄名**。🔴 R7 曾在本格把上列四欄寫成「結構化欄位」，經 R8 兩家實查否證 |
-| 030 | 第 1 層 週期（**唯一來源＝`task_record.json`**） | 週期集合取自該 run 之 `task_record.json` 之 `metadata.present_timeframes`（reference run 實測為 `["1h","12h"]`，且 `metadata.skipped_timeframes` 為 `[]`）。gid 歸屬週期之算法＝對該集合逐一做**前綴成員測試**（`tf + "_"`）；命中 0 個或 ≥2 個即 **fail-closed**。此為對封閉集合之成員測試，**不是**把 gid 切開再解讀其段義 | 🔴 **禁用 `feature_manifest.json` 之 `present_timeframes`**：同一 run 之 manifest 寫 `["1h"]`、`task_record.json` 寫 `["1h","12h"]`，**同名欄兩個值**，而 manifest 同時標 `quality_status=complete` 不發警告。矛盾本體屬 FF 產出端，見 RESID-11。加固對證：以 gid 前綴導出之集合若與 `task_record` 不等即 fail-closed——該切分**只用於偵測分歧，永不作為權威** |
+| 030 | 第 1 層 週期（**唯一來源＝`task_record.json`**） | 週期集合取自該 run 之 `task_record.json` 之 `metadata.present_timeframes`（reference run 實測為 `["1h","12h"]`，且 `metadata.skipped_timeframes` 為 `[]`）。gid 歸屬週期之算法＝對該集合逐一做**前綴成員測試**（`tf + "_"`）；命中 0 個或 ≥2 個即 **fail-closed**。此為對封閉集合之成員測試，**不是**把 gid 切開再解讀其段義。🔴 **該欄缺失、為 `null` 或為空陣列 ⇒ fail-closed，該 run 不得用於掃描**（理由碼 `timeframe_source_unavailable`），**不得**退回讀 manifest 之同名欄、**不得**退回以 gid 前綴當權威 | 🔴 **禁用 `feature_manifest.json` 之 `present_timeframes`**：同一 run 之 manifest 寫 `["1h"]`、`task_record.json` 寫 `["1h","12h"]`，**同名欄兩個值**，而 manifest 同時標 `quality_status=complete` 不發警告。**此為系統性而非個案**——全掃 18 個既存 run，4 個多週期 run（`4a8a0b37…` 於 BCH／BTC／ETH 三 symbol、以及 reference）之 manifest 皆只宣告主週期；單週期 run 則 manifest 正確。矛盾本體屬 FF 產出端，見 RESID-11。加固對證：以 gid 前綴導出之集合若與 `task_record` 不等即 fail-closed——該切分**只用於偵測分歧，永不作為權威**。🔴 **誠實邊界（可用性代價）**：全掃 18 個既存 run，`task_record.json` 存在**且**該欄有值者**僅 1 個**（正是 reference run）；3 個有該檔但欄為 `null`、14 個無該檔 ⇒ 依本規則，其餘 17 個 run 須重跑或補產 `task_record` 才能用於掃描。此代價與 `eventscan-pit-admission` 057 之「每個新 run 需核准」同向，不另放寬 |
 | 040 | 第 2 層 group（`source_group_id` 為可選中間層） | 該週期下之 gid 集合（最終 run 共 944 個，見 `eventscan-pit-admission` 035）。**可選中間層**＝`groups.<gid>.source_group_id`（結構化欄，不切字串）：R8 實測 796 個相異值，其中 **108 個一對多**（最大 `1h_L2_WorldQuant` 轄 20 個 shard）、688 個 `source_group_id == gid`；後者**折疊不顯示**，只有一對多者才多一層 | 🔴 gid **不是**可理解之「層／類別／指標」複合鍵（R8 兩家獨立否證）——它是**不透明節點鍵**，顯示即原字串，不得由其導出語意 |
 | 050 | 第 3 層 欄 | 該 gid 之 `columns[]`，視為**不透明清單**。🔴 **禁止宣稱「群內之欄僅參數與衍生尾綴不同」**：R8 實查最大 gid `12h_L4_lag_2` 之 5,000 欄，其第一個底線前之 token 去重即有 **16 個**（`taker-ratio` 1,434／`volume` 1,419／`close` 1,418／`hlc` 435…），該不變式被否證 | 群內欄數過多**不得以翻頁當導航**：由 085 之分頁契約承載傳輸，由 080 之群內搜尋承載導航 |
 | 060 | 衍生尾綴之處置 | `_Lag_1`／`_Momentum_L3`／`_Cross`／`_Ratio`／`_TsRank_W5` 等尾綴**不另立層**，只作群內之篩選條件；97.3%（403,984）之六段以上欄其前五段對應既存基底欄，但**餘 11,198 個不對應**，故不得以「基底欄＋尾綴」為結構假設 | Claude 實跑最終 run 全量 2026-09-21 |
@@ -563,7 +563,15 @@
   ⇒ **以 `task_record.json` 為準**並記警告（reference run 實際命中：manifest 寫 `["1h"]`、
   task_record 寫 `["1h","12h"]`，見 `eventscan-column-selector` 030 與 §N 之 RESID-11）；
   ⑤ gid 無法對 030 之週期集合命中唯一前綴（0 個或 ≥2 個）⇒ **fail-closed**，不猜；
-  ⑥ `source_group_id == gid` 之 688 個 group ⇒ 中間層折疊不顯示（040）。
+  ⑥ `source_group_id == gid` 之 688 個 group ⇒ 中間層折疊不顯示（040）；
+  ⑦ 🔴 **`task_record.json` 缺檔、或 `metadata.present_timeframes` 為 `null`／空陣列**
+  ⇒ **fail-closed**，回理由碼 `timeframe_source_unavailable`，**不得**退回 manifest 同名欄或 gid 前綴。
+  主委全掃 18 個既存 run：僅 **1** 個（reference run）該欄有值，3 個為 `null`、14 個無該檔
+  ⇒ 此分支是**常態路徑而非邊角**，須有專屬測試；
+  ⑧ 🔴 **PIT allowlist 契約檔尚未產生**（實查 `momentum/Analysis/contracts/eventscan_pit_allowlist.json`
+  **不存在**）⇒ 選擇器取交集後將為空。此時**不得**回空樹了事，須回明確理由碼
+  `allowlist_not_generated` 並指向 `eventscan-pit-admission` 055 之產生流程；
+  空樹與「allowlist 未產生」是兩種不同狀態，不得合併。
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
 - 不可做：不得把全量平鋪清單直接回給前端（規模見 `eventscan-column-selector` 100）；不得在後端做前端排版。
