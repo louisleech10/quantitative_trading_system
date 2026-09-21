@@ -69,9 +69,18 @@ for line in removed:
 # 🔴 結構驗證（R9 CODEX-R9-P1-05：首版只用 boolean、接受任意行內 marker ⇒ 未閉合與 fence 內
 # marker 皆 fail-open，實測 rc=0）。現行規則＝**只接受 fence 外、行首、成對且不巢狀**之 marker；
 # 任何未閉合／巢狀／錯配一律 non-zero 並報結構錯，不得靜默放行。
-_gen_begin = re.compile(r"^\s*<!--\s*BEGIN GENERATED:\s*(?P<k>[^\s>-]+)")
-_gen_end = re.compile(r"^\s*<!--\s*END GENERATED:\s*(?P<k>[^\s>-]+)")
-_fence = re.compile(r"^\s*(```|~~~)")
+# marker 須為**完整且獨佔整行**之 HTML 註解（R11：prefix regex 接受缺行尾 `-->` 之殘缺標記）
+_gen_begin = re.compile(r"^\s*<!--\s*BEGIN GENERATED:\s*(?P<k>[A-Za-z0-9_.-]+)\s*-->\s*$")
+_gen_end = re.compile(r"^\s*<!--\s*END GENERATED:\s*(?P<k>[A-Za-z0-9_.-]+)\s*-->\s*$")
+# 殘缺形態（有 marker 關鍵字但不合上式）一律報結構錯，不得靜默忽略
+_gen_loose = re.compile(r"<!--\s*(BEGIN|END) GENERATED:")
+# fence 須同種標記成對（R11：``` 與 ~~~ 混用時 boolean 會被錯誤翻回）
+_fence = re.compile(r"^\s*(?P<f>```|~~~)")
+fence_kind = ""
+# 跨行 outer HTML 註解（R11：合法成對 marker 藏在其中仍被當生成區塊）
+_c_open = re.compile(r"<!--")
+_c_close = re.compile(r"-->")
+in_outer_comment = False
 in_fence = False
 in_gen = False
 gen_open_line = 0
@@ -79,10 +88,27 @@ gen_open_key = ""
 generated_lines = set()
 struct_errs = []
 for n, line in enumerate(new, 1):
-    if _fence.match(line):
-        in_fence = not in_fence
+    mf = _fence.match(line)
+    if mf:
+        if not in_fence:
+            in_fence, fence_kind = True, mf.group("f")
+        elif mf.group("f") == fence_kind:
+            in_fence, fence_kind = False, ""
+        # 不同種 fence 標記在 fence 內 ⇒ 視為內容，不翻狀態
         continue
     if in_fence:
+        continue
+    # 跨行 outer HTML 註解：整段內容（含其中之 marker）不算生成區塊
+    if in_outer_comment:
+        if _c_close.search(line):
+            in_outer_comment = False
+        continue
+    if _c_open.search(line) and not _c_close.search(line) \
+            and not _gen_begin.match(line) and not _gen_end.match(line):
+        in_outer_comment = True
+        continue
+    if _gen_loose.search(line) and not _gen_begin.match(line) and not _gen_end.match(line):
+        struct_errs.append((n, "GENERATED marker 不是完整且獨佔整行之 HTML 註解"))
         continue
     mb = _gen_begin.match(line)
     if mb:

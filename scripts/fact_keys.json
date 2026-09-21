@@ -854,6 +854,12 @@
       ],
       [
         "100",
+        "`allowlist_invalid`",
+        "PIT allowlist 契約檔存在但**無法解析為 JSON**、schema 不合法、或 entries 含該 run 沒有的 gid（超集／非子集）",
+        "契約檔損壞或與該 run 不相稱，須重跑產生流程。🔴 **不得降級為 `empty` 或 `partial`**——「檔案壞了」與「沒核准任何東西」是兩件事"
+      ],
+      [
+        "110",
         "`allowlist_not_generated`",
         "PIT allowlist 契約檔不存在（**非**「存在但 entries 為空」）",
         "須先跑 `eventscan-pit-admission` 055 之產生流程（Task 0.3）。🔴 **缺檔**與**已產生但為空**是兩種狀態，payload 不得相同——後者為正常空樹、非錯誤"
@@ -1511,6 +1517,12 @@
         "訊息須能區分「無交集」與「有交集但候選不足」，但原因碼同一支"
       ],
       [
+        "045",
+        "🔴 **`random_control_rule_mismatch`（K-5 之 060）在對照層內部之位置（R11 新增；原 010–040 未涵蓋它）**",
+        "**身分閘最先**：`random_control_rule_mismatch` 於 `random_control_month_shortage` 與 `random_control_exclusivity_unsatisfiable` **之前**",
+        "身分閘不等代表兩批**根本不是同一組參數產生**，此時談配額或 packing 是否足夠沒有意義。⇒ 對照層內部序＝`rule_mismatch` → `month_shortage` → `exclusivity_unsatisfiable`"
+      ],
+      [
         "050",
         "多碼同時成立時之收據",
         "收據須同時列出**全部**成立之情境與其計數，只有 `reason` 欄取優先序首位",
@@ -1519,7 +1531,7 @@
       [
         "055",
         "🔴 **全域優先序（R10 新增；原表只涵蓋 random-control 四碼，新增之兩碼與既有 condition 碼無序可循）**",
-        "自前置到下游，先命中者先報：**① `timeframe_source_unavailable`（run 層前置）→ ② `allowlist_not_generated`（契約層前置）→ ③ `unregistered_column`／`constant_expression`（條件層）→ ④ `alignment_*`（對齊層）→ ⑤ `random_control_*`（對照層，其內部序見 010–040）→ ⑥ `no_trigger_events`（結果層）**",
+        "自前置到下游，先命中者先報：**① `timeframe_source_unavailable`（run 層前置）→ ② `allowlist_invalid`→③ `allowlist_not_generated`（契約層前置）→ ④ `unregistered_column`／`constant_expression`（條件層）→ ⑤ `alignment_*`（對齊層）→ ⑥ `random_control_*`（對照層，其內部序見 010–040 與 045）→ ⑦ `no_trigger_events`（結果層）**",
         "階段序即因果序：前置未滿足時下游根本沒跑，回下游碼會誤導使用者去修錯地方。🔴 **判準**：每一碼只在其階段被求值，階段未進入即不得回該碼"
       ],
       [

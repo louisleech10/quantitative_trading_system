@@ -279,7 +279,8 @@
 | 070 | `no_trigger_events` | 條件在該 run 上零筆成立 | 條件成立 0 次（與欄名錯誤明確區分） |
 | 080 | `constant_expression` | 條件恆真／恆假或不引用任何欄位 | 沿用既有 `condition_engine` 之拒收理由 |
 | 090 | `timeframe_source_unavailable` | 該 run 之 `task_record.json` 缺檔，或 `metadata.present_timeframes` 缺 key／為空 | 此 run 不在本票輸入域，須以具該欄之 run 重跑。🔴 **不得**退回讀 `feature_manifest.json` 同名欄、**不得**以 gid 前綴當權威、**不得**用 `config_used.timeframes.training` 當 fallback（`654bd63b…` 之 training 為 `["12h"]` 而 groups 只有 `1h`） |
-| 100 | `allowlist_not_generated` | PIT allowlist 契約檔不存在（**非**「存在但 entries 為空」） | 須先跑 `eventscan-pit-admission` 055 之產生流程（Task 0.3）。🔴 **缺檔**與**已產生但為空**是兩種狀態，payload 不得相同——後者為正常空樹、非錯誤 |
+| 100 | `allowlist_invalid` | PIT allowlist 契約檔存在但**無法解析為 JSON**、schema 不合法、或 entries 含該 run 沒有的 gid（超集／非子集） | 契約檔損壞或與該 run 不相稱，須重跑產生流程。🔴 **不得降級為 `empty` 或 `partial`**——「檔案壞了」與「沒核准任何東西」是兩件事 |
+| 110 | `allowlist_not_generated` | PIT allowlist 契約檔不存在（**非**「存在但 entries 為空」） | 須先跑 `eventscan-pit-admission` 055 之產生流程（Task 0.3）。🔴 **缺檔**與**已產生但為空**是兩種狀態，payload 不得相同——後者為正常空樹、非錯誤 |
 <!-- END GENERATED: eventscan-failure-reasons -->
 
 ### K-6 成本歸零點
@@ -402,8 +403,9 @@
 | 020 | 月配額皆足，互斥 packing 不足 | `random_control_exclusivity_unsatisfiable` | 唯一成立者 |
 | 030 | eligibility 剔除後候選為 0 | `random_control_month_shortage`（缺額＝該月全部配額） | 候選為 0 是月配額不足之極端值，不另開碼；Task 4.4 邊界③ 依此，不指向 packing 碼 |
 | 040 | 期間池與觸發窗無交集 | `random_control_month_shortage`（觸發月聯集為空之特例，訊息須寫明為無交集） | 訊息須能區分「無交集」與「有交集但候選不足」，但原因碼同一支 |
+| 045 | 🔴 **`random_control_rule_mismatch`（K-5 之 060）在對照層內部之位置（R11 新增；原 010–040 未涵蓋它）** | **身分閘最先**：`random_control_rule_mismatch` 於 `random_control_month_shortage` 與 `random_control_exclusivity_unsatisfiable` **之前** | 身分閘不等代表兩批**根本不是同一組參數產生**，此時談配額或 packing 是否足夠沒有意義。⇒ 對照層內部序＝`rule_mismatch` → `month_shortage` → `exclusivity_unsatisfiable` |
 | 050 | 多碼同時成立時之收據 | 收據須同時列出**全部**成立之情境與其計數，只有 `reason` 欄取優先序首位 | 只回一碼會讓使用者以為只有一個問題 |
-| 055 | 🔴 **全域優先序（R10 新增；原表只涵蓋 random-control 四碼，新增之兩碼與既有 condition 碼無序可循）** | 自前置到下游，先命中者先報：**① `timeframe_source_unavailable`（run 層前置）→ ② `allowlist_not_generated`（契約層前置）→ ③ `unregistered_column`／`constant_expression`（條件層）→ ④ `alignment_*`（對齊層）→ ⑤ `random_control_*`（對照層，其內部序見 010–040）→ ⑥ `no_trigger_events`（結果層）** | 階段序即因果序：前置未滿足時下游根本沒跑，回下游碼會誤導使用者去修錯地方。🔴 **判準**：每一碼只在其階段被求值，階段未進入即不得回該碼 |
+| 055 | 🔴 **全域優先序（R10 新增；原表只涵蓋 random-control 四碼，新增之兩碼與既有 condition 碼無序可循）** | 自前置到下游，先命中者先報：**① `timeframe_source_unavailable`（run 層前置）→ ② `allowlist_invalid`→③ `allowlist_not_generated`（契約層前置）→ ④ `unregistered_column`／`constant_expression`（條件層）→ ⑤ `alignment_*`（對齊層）→ ⑥ `random_control_*`（對照層，其內部序見 010–040 與 045）→ ⑦ `no_trigger_events`（結果層）** | 階段序即因果序：前置未滿足時下游根本沒跑，回下游碼會誤導使用者去修錯地方。🔴 **判準**：每一碼只在其階段被求值，階段未進入即不得回該碼 |
 | 057 | 🔴 **兩碼同時成立之明確裁定** | `timeframe_source_unavailable` 與 `allowlist_not_generated` 可在同一請求同時成立（run 無 task_record **且** 契約檔缺檔）⇒ `reason` 取 **`timeframe_source_unavailable`**（階段較前），但收據須依 050 同時列出兩者 | 委員指出兩碼可同時命中而原表無序。取前者之理由＝週期來源不可用時，連要核准哪些 gid 都無從判定 |
 | 059 | 🔴 **兩碼之繼承範圍（原文只寫在 Task 1.3，掃描路徑未繼承）** | `timeframe_source_unavailable` 與 `allowlist_not_generated` 為**跨 Task 之前置碼**，**Task 1.1（registry 建構）與 Task 2.1（掃描端點）一律繼承**；該二 Task 對同一根因**不得**回 `unregistered_column` 或 `no_trigger_events` | 委員指出：同一根因在不同入口回不同碼，使用者會被導向錯誤的修法（以為是欄名打錯或條件不成立） |
 <!-- END GENERATED: eventscan-failure-precedence -->
@@ -564,11 +566,14 @@
 - 改法：對 reference run 逐欄計算 `(value_sha256, nan_mask_sha256, dtype, n_rows)` 四元組，
   以 `LC_ALL=C` 位元組序寫入（與 `eventscan-pit-admission` 042 同一套 canonical）。
   **不重算特徵**，只對既有 parquet 取 digest。
-- **驗證**：`pytest` ① digest 檔之欄集合 `==` manifest 之 `total_features`；
-  ② 重跑 digest 兩次結果逐位元組相同；③ Task 1.1 之 registry 准入須額外要求該欄之 digest
-  存在且相符，**未證欄 fail-closed**（不得因「設定層全 false」就放行）。
-  **mutation**：對**一個非 EMA** 之 allowlisted 欄做值層或 NaN-mask 變動，③須轉紅
-  （此即關掉盲區之證明——現行條文下該 mutation 會存活）。
+- **驗證**：`pytest` ① digest 檔之欄集合 `==` `union(groups[].columns)`
+  （**集合對集合**；R11 指出原文寫成與純量 `manifest.total_features` 相等，為單位錯置——
+  基數相等改列為②之附帶斷言 `len(digest 檔之欄集合) == manifest.total_features`）；
+  ② 重跑 digest 兩次結果逐位元組相同，且基數與 `manifest.total_features` 相等。
+  **mutation**：對**一個非 EMA** 之欄做值層或 NaN-mask 變動，②之逐位元組斷言須轉紅。
+  🔴 **「Task 1.1 之 registry 准入須逐欄要求 digest 相符」是該 Task 之 admission predicate 條款④**
+  （已寫入 Task 1.1 之改法與邊界⑤），**不在本 Task 驗收**——R11 指出原文把該消費宣告
+  寫成本 Task 之驗證③，與「本 Task 驗收只到產物層、不跨 Phase」自相矛盾。
   🔴 **本 Task 之驗收只到產物層，不跨 Phase。**
   指令：`pytest tests/momentum/event_samples/test_phase0_artifacts.py -q`
   消費層由 Task 1.1 之 registry 准入承擔。
@@ -614,6 +619,14 @@
 - 改法：由 `(symbol, timeframe, config_hash)` 讀 FF 特徵表欄名，依 `eventscan-pit-admission` 040/050
   之准入規則**逐欄判定是否收進 registry**，收進者標角色 `pit_feature`；輸出 `Mapping[str, str]` 餵
   `parse_condition`，`expression_role` 依 `eventscan-pit-admission` 010。
+  🔴 **admission predicate 之完整合取（R11：原文只引 040/050，Task 0.4 之 digest 條件只寫在
+  0.4 的消費宣告而**未落入本 Task**，此為「只修被點名處」）——本 Task 之准入須**同時**滿足：
+  ① `eventscan-pit-admission` 040 之三元組核准；② gid 命中登記；③ `columns_sha256` 相等；
+  ④ 🔴 該欄在 Task 0.4 之 `reference_column_digests.json` 中**存在**，且其
+  `value_sha256`／`nan_mask_sha256`／`dtype`／`n_rows` 四者與現算值**逐欄相等**。
+  四者缺一即拒收；**未證欄 fail-closed**，不得因「設定層全 `false`」而放行。
+  🔴 **單位對齊**：①–③ 之單位為 **gid**，④ 之單位為 **欄**；兩者之欄集合須以
+  `groups[].columns` 為共同基準比對，不得一邊用 parquet schema、另一邊用 manifest。
 - 🔴 **無條件把全部 FF 欄標成 `pit_feature` 是不成立的**（本輪兩家獨立以碼證推翻）：
   現行角色隔離只拒兩種情形（見 `eventscan-pit-admission` 020），委員實跑之反例——名稱不含
   `future_` 而值取自未來的欄——**被放行**（030）；且 reference manifest 無 `available_at`／`causal` 欄，
@@ -634,7 +647,18 @@
 - **邊界**：① FF run 不存在 ⇒ fail-closed 並回可區分之原因碼，禁回空 registry（空 registry 會讓所有欄名都變成
   「打錯字」）；② 同一 `config_hash` 命中多個 symbol ⇒ fail-closed；③ 欄名含 Python 保留字或非識別字字元
   ⇒ 該欄不得進 registry，且須可列舉（不得靜默丟棄）；④ 三元組未核准、gid 不在登記、或 `columns_sha256` 與登記值不等（`eventscan-pit-admission` 050 之三種情形）
-  ⇒ 依 `eventscan-pit-admission` 050 拒收該欄，**不得**回落到「當作 `pit_feature`」。
+  ⇒ 依 `eventscan-pit-admission` 050 拒收該欄，**不得**回落到「當作 `pit_feature`」；
+  ⑤ 🔴 該欄不在 Task 0.4 之 digest 檔、或四元組任一不等 ⇒ 拒收該欄並可列舉（R11 新增）；
+  ⑥ 🔴 **本 Task 繼承兩個前置碼**（`eventscan-failure-precedence` 059）：
+  run 無可用 `task_record.metadata.present_timeframes` ⇒ 回 `timeframe_source_unavailable`；
+  allowlist 契約檔缺檔／不合法 ⇒ 回 `allowlist_not_generated`／`allowlist_invalid`。
+  **此三種情形一律不得回 `unregistered_column` 或空 registry**——原文之邊界①雖已禁空 registry，
+  但未指名該回哪一碼，實作者會落回逐欄拒收而產出空 registry → `unregistered_column`（R11 指出）。
+- **本 Task 新增之驗證（R11）**：⑤ 以一個非 EMA 之 allowlisted 欄，令其 digest 四元組任一不等，
+  該欄須**不在** registry 內且被拒原因可列舉；⑥ 缺 `task_record` 與缺 allowlist 兩種前置，
+  各須回其對應前置碼而非 `unregistered_column`。
+  **對應 mutation**：(g) 令 digest 條件恆真，須使⑤轉紅；(h) 令前置失敗時回 `unregistered_column`，
+  須使⑥轉紅。
 - **存活至**：Phase 6 完工後仍保留（前端選擇器與掃描端共用同一份 registry）。
 - **覆蓋風險**：無。後續 Phase 只讀不改本 Task 產出。
 - 不可做：不得在此 Task 內新增任何指標計算；不得為了讓使用者例題可跑而補算 `EMA_30`。
@@ -674,9 +698,20 @@
   以 gid 前綴導出之集合若與之不等即 FAIL（該切分只用於偵測分歧，見 030）；
   ② 任取一個 gid，其回傳之 `columns` 逐字等於 manifest 該 gid 之 `columns`（雙向對證，防層級樹自己編出不存在的欄）；
   🔴 **allowlist 之四個狀態（本 Task 全部驗收之共同前提；R10 新增）**：
-  由契約檔導出唯一之 discriminator，四者互斥且窮盡——
-  `missing`（檔案不存在）／`empty`（檔案存在且 schema 合法但 entries 為空）／
-  `partial`（entries 非空且為該 run gid 之真子集）／`approved`（entries 等於該 run 之全部 gid）。
+  由契約檔導出唯一之 discriminator。🔴 **R11 補窮盡性**（原四態在三種狀態上無定義、
+  一種上重疊）——**五態**，依序判定，**先命中者為準**：
+  | 序 | 態 | 判定條件 |
+  |---|---|---|
+  | 1 | `missing` | 檔案不存在 |
+  | 2 | `invalid` | 檔案存在但**無法解析為 JSON**、或 schema 不合法、或 entries 含**該 run 沒有的 gid**（超集／非子集） |
+  | 3 | `empty` | schema 合法且 entries 為空，**且該 run 之 gid 集合非空** |
+  | 4 | `approved` | entries 等於該 run 之全部 gid |
+  | 5 | `partial` | 其餘（entries 非空且為該 run gid 之真子集） |
+  🔴 **`invalid` 一律 fail-closed**，回理由碼 `allowlist_invalid`（K-5 新增 110），
+  **不得**降級成 `empty` 或 `partial`——「檔案壞了」與「沒核准任何東西」是兩件事。
+  🔴 **零 gid run**（該 run 之 gid 集合為空）：原四態下 `empty` 與 `approved` 會同時成立
+  （空==空），故上表以**序 3 之附加條件「該 run 之 gid 集合非空」**排除之；
+  零 gid run 落入 `approved`（vacuously），且 Task 1.3 之邊界③已規定回空樹並標明原因。
   🔴 **`missing` 不得被讀成「核准集合為空」**——那會讓集合等式以空集合 vacuous pass，
   使 ⑤ 綠而 ⑦(i) 紅（兩條驗收無交集）。`missing` 一律走 ⑦(i) 之 fail-closed 路徑。
   🔴 **③與⑤須綁同一份已驗證 snapshot**：兩者之「已核准集合」必須取自**同一次**讀取，
@@ -716,9 +751,12 @@
   `timeframe_source_unavailable`，且**不得**退回讀 manifest 同名欄或以 gid 前綴當權威。
   **mutation**：(a) 把結構來源改回「以底線切欄名」，須使②在含 `taker_ratio` 之 gid 上轉紅；
   (b) 把**未被②抽到**之任一**已核准** gid 的一欄替換為同週期已存在之重複欄，須使③轉紅；
-  (c) 🔴 **stale-tree**：令 allowlist 自 `approved` 改為 `partial`（移除某 gid 之登記，
-  或改其 `columns_sha256` 使該 gid 落出核准集合）**而選擇器樹不重建**，
-  須使**③與⑤同時轉紅**。委員以集合 probe 證明「⑤轉紅而③仍綠」這個組合**不可達**——
+  (c) 🔴 **stale-tree**：令 allowlist 自 `approved` 改為 `partial`——**方法為移除某 gid 之登記**
+  （R11 更正：改 `columns_sha256` **不會**改變 discriminator，entries 之 gid 集合不變仍是 `approved`；
+  它只會讓該 gid 在逐欄比對時被拒，那是 ⑤ 之另一條路徑，不是態轉換）——
+  **而選擇器樹不重建**，須使**③與⑤同時轉紅**。
+  (c3) `columns_sha256` 改動之獨立情境：態仍為 `approved` 但該 gid 之摘要不等，
+  須使⑤轉紅（此時③之右端已排除該 gid，故③綠——**與 (c) 不同，此組合可達**）；委員以集合 probe 證明「⑤轉紅而③仍綠」這個組合**不可達**——
   樹跟著新 allowlist 則③⑤同綠、樹不更新則③⑤同紅，故不得以該組合當對帳證明；
   (c2) 反向：令樹重建而③之右端仍取舊快照，亦須轉紅（此即「③⑤綁同一 snapshot」之機械證明）；
   (d) 令第 2 頁與第 1 頁重疊一筆（`total` 不變），須使④轉紅；
@@ -885,7 +923,14 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
   且須通過匯入契約之「一批須兩類 label 皆有」檢查或以可區分之原因碼拒收（不得靜默產出單類批）；
   ③ `max(horizons)` 大於資料長度 ⇒ fail-closed；
   ④ `primary_horizon` 缺欄、非整數、或不在 `horizons[]` 內 ⇒ fail-closed，
-  **不得**由後端取 `horizons[0]` 或 `max(horizons)` 代填（代填等於系統替使用者做了預先登記）。
+  **不得**由後端取 `horizons[0]` 或 `max(horizons)` 代填（代填等於系統替使用者做了預先登記）；
+  ⑤ 🔴 **本 Task 繼承兩個前置碼**（`eventscan-failure-precedence` 059；R11 指出原文只寫在
+  Task 1.3，本 Task 未繼承）：run 無可用 `task_record.metadata.present_timeframes` ⇒ 回
+  `timeframe_source_unavailable`；allowlist 缺檔／不合法 ⇒ 回
+  `allowlist_not_generated`／`allowlist_invalid`。
+  **此三種情形一律不得回 `no_trigger_events`**——邊界①之「零筆成立」是**條件真的沒命中**，
+  與「前置不成立所以根本沒掃」是兩件事，回同一碼會讓使用者去改條件而非補前置。
+  **對應 mutation**：令前置失敗時回 `no_trigger_events`，須使本邊界之測試轉紅。
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。Phase 4／5 讀本 Task 產出之批，不覆寫。
 - 不可做：不得在掃描批內混入隨機列；不得改匯入契約之 `required_fields`；不得自建一條繞過匯入契約檢查的路徑。
@@ -1185,8 +1230,10 @@ R3 兩家各自指出後改為本序。**列序與依賴一致，是 TODO 可照
 ## §V 驗證策略與邊界測試目錄
 
 - **mutation 條件**：`RISK-HIT` 含 a／d ⇒ 必附可證偽之 mutation 設計。本 SPEC 於下列 Task 逐條指定
-  mutation 與其應轉紅之斷言：**0.1、0.2、0.3**、1.1、**1.3**、2.2、2.3、2.4、3.1、3.2、
+  mutation 與其應轉紅之斷言：**0.1、0.2、0.3、0.4**、1.1、**1.3**、2.1、2.2、2.3、2.4、3.1、3.2、
   4.1、4.2、4.3、4.4、5.1、5.2、**6.1**、6.4。
+  🔴 R11 補 **0.4**（其非 EMA 欄值層 mutation 正是「digest 關掉盲區」之機械證明）與 **2.1**
+  （前置碼繼承之 mutation）。
   設計依據引 `docs/TEST_DESIGN_CHARTER.md`。
 - 🔴 **mutation 之驗收組合一律指定到 `eventscan-test-vectors` 之具名列**——
   **本句收窄為「數值型 mutation」**（R9：Task 0.1／0.3／1.3／6.1 之 mutation 為

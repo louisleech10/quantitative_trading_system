@@ -157,6 +157,34 @@ MALFORMED_TILDE_FENCE = (
         (MALFORMED_NESTED, "巢狀"),
         (MALFORMED_LABEL_MISMATCH, "END label 錯配"),
         (MALFORMED_TILDE_FENCE, "~~~ fence 內"),
+        (
+            "# T\n"
+            "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+            "<!--\n"
+            "<!-- BEGIN GENERATED: k -->\n"
+            "| 100 | `TOKEN_ABCDEF` |\n"
+            "<!-- END GENERATED: k -->\n"
+            "-->\n",
+            "成對 marker 藏在跨行 outer 註解內",
+        ),
+        (
+            "# T\n"
+            "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+            "<!-- BEGIN GENERATED: k\n"
+            "| 100 | `TOKEN_ABCDEF` |\n"
+            "<!-- END GENERATED: k -->\n",
+            "BEGIN 缺行尾 -->",
+        ),
+        (
+            "# T\n"
+            "規模數字為 `TOKEN_ABCDEF` 共 944 個。\n"
+            "```\n"
+            "~~~\n"
+            "<!-- BEGIN GENERATED: k -->\n"
+            "```\n"
+            "別處散文也寫 `TOKEN_ABCDEF`。\n",
+            "fence 標記混用",
+        ),
     ],
 )
 def test_malformed_generated_markers_fail_closed(src: str, why: str, tmp_path: Path) -> None:

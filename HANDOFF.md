@@ -46,6 +46,8 @@
 - 🔴 **`committee_run.sh` 之參數順序有硬規**：`--session <name>` 須在 `--` **之前**，`<brief> <out前綴> <fam1,fam2>` 為位置參數，gate flags 一律在 `--` 之後，且 `--brief-kind` **不是** gate flag（放進去會 `未預期參數` 而 fail-closed 不派工，brief-kind 由 brief 檔內 `brief-kind:` 行決定）。**`--` 之後還必帶 `--task-id <id>`**（開債必填）——先跑 `gate.sh dispatch` 拿到的 token 不會替它補，缺了會 `ERROR: gate flags 缺 --task-id` 而 rc=2（乾淨失敗，不開債、委員不跑，可直接重下）。
 - 🔴 **`gate_check.sh` 的 PreToolUse 偵測會誤判「字串裡含家族名或派工樣式」的無害指令**：`pgrep -f "codex exec"`、`ls | grep composer` 這種等待迴圈會被判成 kind=dispatch 而 GATE BLOCKED（本輪連續踩兩次）。避法＝等待迴圈用 glob（`ls -1 <prefix>-*.md`）不要寫出家族名。
 - 🔴 **`brief-kind` 的合法值是 `review|consult|closure|impl|stamp`**，**沒有 `discovery`**（雖然 `reconcile_build.sh --mode` 有 `discovery`，兩者不同命名空間）。寫錯會被 `doc_format_precheck` 在寫檔當下擋。
+- 🔴 **委員在 `CLOSED:` 列別家族的 finding ID 會被 `verdict_parse` 拒收**（「前綴家族 ≠ 本產出家族」），`debt_clear` 則報 `result_state='verdict_rejected'` 而不說原因。查法＝`bash scripts/verdict_parse.sh <委員檔> <family>`（**要帶 family 參數**，只給檔名會回「未知參數」且 rc=0 誤導）。修法＝主委刪掉跨家族 ID 後 `bash scripts/gate.sh register-output <task> <檔>`。
+- 🔴 **改 `spec_xref_check.sh` 的 GENERATED marker regex 時，key 字元類必須含連字號**：真實 key 皆為 `eventscan-rulings` 這種帶連字號者。用 `[^\s>-]+` 會在**加上行尾錨點後**把全檔合法 marker 判成結構不合法；無錨點時因 `match()` 只做前綴比對而僥倖不報，**所以上一輪不會發現**。
 - 🔴 **`gate.sh dispatch --impl-self` 必帶 `--task-id <root>-impl-b<N>-claude`**（family 尾碼須為 `claude`），省略會被拒發 token。
 - 🔴 **`completeness_check.sh` 正式入口是 `--lock <sources.lock>`**；直接給 synth 路徑會被判「argv 來源僅 tests 隔離」而 FAIL。單檔檢查才用 `--single <委員檔>`。
 - 🔴 **逐段搬移函式時，模組級常數不會跟著走**：搬移腳本的錨點只涵蓋 `def`／`class`，模組頂層的常數落在所有段之外 ⇒ 搬過去的函式 import 當下不報錯、**跑到那一行才** `NameError`。搬完先 grep 被搬函式引用的所有大寫識別字。
