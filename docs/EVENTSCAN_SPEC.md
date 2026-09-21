@@ -401,8 +401,12 @@
 - 改法：端點收 `(symbol, timeframe, config_hash, expression, horizons[], direction)`；
   以 Task 1.1 之 registry 解析條件 → 求值 → 壓成 first-of-run（Task 2.2）→ 填 label（`eventscan-clock` 080）
   → 走既有匯入契約落批。進場語意、時鐘見 `eventscan-clock`。
+  🔴 **本端點之不變式**：呼叫 `event_forward_return_table` 時**恆**傳入 Task 3.3 之
+  `by_label_suppressed_reason`；漏傳即為缺陷，須有測試釘住（見下驗證條）。
 - **驗證**：對 reference run 與一條多頭排列條件，端點回之批可被 `import_contract.py` 之既有驗證器收下（不放寬任何既有檢查），
-  且批內每筆之 `t0` 對應之特徵列鍵為該根 `open_time`（`eventscan-clock` 100）。
+  且批內每筆之 `t0` 對應之特徵列鍵為該根 `open_time`（`eventscan-clock` 100）；
+  另以 spy 斷言本端點對 `event_forward_return_table` 之每一次呼叫，其
+  `by_label_suppressed_reason` 皆非 `None`（釘住上述不變式）。
   指令：`pytest tests/api/test_eventscan_endpoint.py -q`
 - **邊界**：① 條件零筆成立 ⇒ 回 `no_trigger_events`，與欄名錯誤明確區分；② 條件全根成立 ⇒ first-of-run 後為 1 筆，
   且須通過匯入契約之「一批須兩類 label 皆有」檢查或以可區分之原因碼拒收（不得靜默產出單類批）；
@@ -483,15 +487,24 @@
 - 目標：消滅 `label = sign(報酬)` 下的套套邏輯上主表。
 - 檔案：`momentum/Analysis/event_samples/tables.py::_by_label_groups`、
   `frontend/src/components/ic-analysis/EventTablesPanel.tsx`（Phase 6 接線，本 Task 只做後端旗標）。
-- 既有 caller／影響面：IC 事件路徑之 `strata.by_label` **仍須可用**（其 label 為外部匯入、非報酬符號導出）；
-  本 Task 以批的 `label_origin` 判定，不得對所有批一律關閉。
-- 改法：批之 label 由報酬符號導出時，`strata.by_label` 回 `not_computed` ＋ 原因（見 `eventscan-return-columns` 120）。
-- **驗證**：對 label 由報酬符號導出之批，`tables.py` 回之 `strata.by_label` `==` `not_computed` 且原因字面非空；
-  對外部匯入 label 之批，`strata.by_label` 與改動前 byte 級相同。
-  **mutation**：把判定條件改成恆真（對所有批關閉）須使第二條斷言轉紅。
+- 既有 caller／影響面：IC 事件路徑之 `strata.by_label` **仍須可用**（其 label 為外部匯入或帶門檻之規則所產，
+  非本次分析之報酬符號導出）。
+- 🔴 **判定點在呼叫端，不在批的 provenance 欄**（此為對本 Task 初稿之更正，理由必須讀）：
+  `label_origin` 之值域為封閉五值（`search_positive_case`／`user_csv`／`platform_generator`／
+  `platform_random`／`search_unlabeled`），**沒有任何一值能區分**「label 由本次分析之報酬符號導出」
+  與「label 由帶門檻之規則產生」——兩者都會落在 `platform_generator`。
+  擴充該 enum 等於改匯入契約，§C 明文禁止。
+  ⇒ 改由 `event_forward_return_table` 新增參數 `by_label_suppressed_reason: Optional[str]`，
+  缺省 `None` ⇒ 行為與現況 byte 級相同；**掃描端恆傳入**，IC 事件路徑不傳。
+  「本次分析之 label 與報酬是否同源」是**分析請求之性質**，只有發起該請求者知道，不可從批上反推。
+- 改法：該參數非 `None` 時，`strata.by_label` 回 `not_computed` ＋ 該原因字串（見 `eventscan-return-columns` 120）。
+- **驗證**：傳入該參數時 `tables.py` 回之 `strata.by_label` `==` `not_computed` 且原因字面非空；
+  不傳時 `strata.by_label` 與改動前 byte 級相同（逐鍵 `==`）。
+  **mutation**：把判定改成忽略該參數而恆抑制，須使第二條斷言轉紅。
   指令：`pytest tests/momentum/event_samples/test_return_table_by_label.py -q`
-- **邊界**：① 批缺 `label_origin` ⇒ fail-closed，不得預設為「外部匯入」（預設寬鬆會讓套套邏輯漏上主表）；
-  ② 批同時含兩種來源之 label ⇒ fail-closed。
+- **邊界**：① 參數為空字串（非 `None`）⇒ fail-closed，不得當成「不抑制」也不得當成「抑制但無理由」；
+  ② 掃描端漏傳 ⇒ 由 Task 2.1 之端點層斷言擋下（掃描端恆傳為該端點之不變式，須有測試釘住，
+  否則本 Task 之保護可被呼叫端遺忘而靜默失效）。
 - **存活至**：Phase 6 完工後仍保留。
 - **覆蓋風險**：無。
 - 不可做：不得改 `win_rate` 公式；不得刪除 `by_label` 之程式碼路徑（IC 事件路徑在用）。
@@ -763,4 +776,5 @@
 
 本票涵蓋**事件型**一路。全域序列型不在範圍內：本票之估計量以事件為單位，
 序列型之 `position`／`turnover` 前提在事件型不存在（`eventscan-breakeven` 020／030 即此差異之落點）。
-「支援」含「區分」——Task 3.3 之 `label_origin` 判定即為兩路之機械區分點，不得對兩路一律套用同一行為。
+「支援」含「區分」——Task 3.3 之 `by_label_suppressed_reason` 參數即為兩路之機械區分點
+（掃描端恆傳、IC 事件路徑不傳），不得對兩路一律套用同一行為。
