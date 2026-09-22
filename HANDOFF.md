@@ -48,6 +48,10 @@
 - 🔴 **`brief-kind` 的合法值是 `review|consult|closure|impl|stamp`**，**沒有 `discovery`**（雖然 `reconcile_build.sh --mode` 有 `discovery`，兩者不同命名空間）。寫錯會被 `doc_format_precheck` 在寫檔當下擋。
 - 🔴 **委員在 `CLOSED:` 列別家族的 finding ID 會被 `verdict_parse` 拒收**（「前綴家族 ≠ 本產出家族」），`debt_clear` 則報 `result_state='verdict_rejected'` 而不說原因。查法＝`bash scripts/verdict_parse.sh <委員檔> <family>`（**要帶 family 參數**，只給檔名會回「未知參數」且 rc=0 誤導）。修法＝主委刪掉跨家族 ID 後 `bash scripts/gate.sh register-output <task> <檔>`。
 - 🔴 **改 `spec_xref_check.sh` 的 GENERATED marker regex 時，key 字元類必須含連字號**：真實 key 皆為 `eventscan-rulings` 這種帶連字號者。用 `[^\s>-]+` 會在**加上行尾錨點後**把全檔合法 marker 判成結構不合法；無錨點時因 `match()` 只做前綴比對而僥倖不報，**所以上一輪不會發現**。
+- 🔴 **`committee_run.sh` 自己會跑 `gate.sh dispatch`**：所有 gate 旗標（`--risk`／`--intent`／`--facts-asked`／`--review-role`／`--template`／`--adversarial`）都要放在 `--` 之後，先獨立開一次 gate 是多餘的（token 不會被它沿用）。位置參數 `<brief> <out前綴> <fam1,fam2,...>` 必須在 `--` **之前**。
+- 🔴 **`--task-id` 必須等於 session 名的大寫形式**：session `20260922-todofmt-x-consult-r1` ⇒ task-id `20260922-TODOFMT-X-CONSULT-R1`。給短名（`20260922-TODOFMT`）會 `ERROR: task-id 須為 session 的大寫形式` 而 fail-closed（不發 token、不開債，可直接重下）。
+- 🔴 **收斂檔必須逐條附上完整 finding body（`## <ID>` 標題）**：`completeness_check` 用 `extract_heading_ids` 找 `## <ID>` **標題**，群集表裡的「來源 ID」欄**不算**。`reconcile_build.sh` 產的 scaffold 已含這些區塊，手寫 synth 覆蓋掉就會全數報 `未出現在綜合檔`。補法＝從 `sources/*.md` 機械複製各 `## <ID>` 區塊附在檔尾。
+- 🔴 **計數一輪的 finding 數：一律數來源檔的 `## <FAMILY>-R<n>-P<0-3>-<NN>` 標題並扣除 `P3-00`，禁止改數 synth 內出現的 ID**——synth 會引用前幾輪的 ID，那樣會灌水（2026-09-22 主委據此得出「EVENTSCAN 曲線平坦」之錯誤結論，由 grok 與 codex 各自獨立抓出）。重跑：`cat handoffs/reconcile/<session>/sources/*.md | grep -E "^## [A-Z]+-R[0-9]+-P[0-3]-[0-9]+" | grep -vc "P3-00"`。
 - 🔴 **`.claude/settings.json` 之 `permissions.deny` 含 `Bash(rm *)`＝硬性拒絕、不跳核准提示**：使用者看不到任何提示，Claude 只收到 deny。需要刪檔一律改請使用者自行在終端機執行。
 - 🔴 **開門指令與派工指令必須分兩次 Bash 呼叫**（`gate.sh dispatch` 一次、`committee_run.sh` 一次）：寫在同一條指令裡，PreToolUse hook 會在 token 落地前先擋。
 - 🔴 **連 `awk`／`sed` 的文字內容也會觸發 dispatch 偵測**：只要指令列裡出現派工樣式或家族名（即使只是要把它寫進本檔當成坑），就 GATE BLOCKED。避法＝把文字先用 Write 工具落成檔案，再讓 `awk` 從檔案讀，指令列本身不含觸發字串。
@@ -145,4 +149,5 @@
 - 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-procopt-x-consult-r3/synth.md`
 - 2026-09-22：RM-PROCOPT → `docs/PROCOPT_DECISION.md`
 - 2026-09-22：RM-PROCOPT → `白話說明/SPEC與TODO流程優化.md`
+- 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-todofmt-x-consult-r1/synth.md`
 <!-- HISTORY-END -->
