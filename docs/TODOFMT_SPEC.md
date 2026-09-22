@@ -139,7 +139,7 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
 - 🔴 **窗口檢查**（r7 codex／grok 同判：C-6「設計定案至收案間不得新開票」無機械後果——新 SPEC 不帶散文 TODO 時，hook 無對象、Task 1.4 邊界⑫只比對 L，可靜默通過）：
   令 **W＝首個「已掛載且實作齊備」之 commit**：依序走 `git rev-list --reverse <L>..HEAD`，取第一個同時滿足下列兩條件之 commit：
   (a) 該版 `.claude/settings.json` 之 `PreToolUse` 中存在一個 `matcher` 同時匹配 `Edit` 與 `Write` 之條目，其 `hooks` 含命令 `bash scripts/todofmt_write_guard.sh`（以 `jq` 判定；r8 codex 指出只搜字串會被放錯 matcher 或未生效之條目提前命中；此判定與 Task 1.2 之掛載對證**共用同一函式**）；
-  (b) 該 commit 之樹中存在 `docs/manifests/TODOFMT.json` 及其 `stub_modules`／`test_files`／`script_acceptance`／`contract_jsons` 所列之全部路徑（與「L 須先於實作」對稱；r9 codex：只取首次掛載時，先掛 hook 再補其餘實作會使 W 過早、窗口提前結束）。
+  (b) 該 commit 之樹中存在 `docs/manifests/TODOFMT.json` 及其 `stub_modules`／`test_files`／`script_acceptance`／`contract_jsons` 所列之全部路徑（與「L 須先於實作」對稱；r9 codex：只取首次掛載時，先掛 hook 再補其餘實作會使 W 過早、窗口提前結束），**且**存在 Phase 3 尾端之四個具名路徑：`scripts/todofmt_freeze_check.sh`、`tests/governance/test_todofmt_freeze_check.py`、`docs/manifests/FFTFMETA.json`、`tests/governance/test_todofmt_sample_fftfmeta.py`（r10 grok：Task 3.1 之 manifest 若只列當時已存在之路徑，該 commit 即滿足前半而成為 W，Task 3.2／3.3 落在窗口外；四路徑為本 SPEC 已寫死之交付，其存在不依賴 W）。
   **尚無該 commit 時 W＝HEAD**。先行掛載而實作未齊之 commit 不成為 W，故該期間仍在窗口內。W 之 gate 分支與兩組字面陣列另由 Task 1.4 之進入條件字面比對與 Task 1.2 邊界⑮、Task 1.4 邊界⑫ 以 X＝W 驗之。
   測試斷言：`git log --no-renames --diff-filter=A --name-only --format= <L>..<W>` 所列之**全部新增路徑**中，符合 Task 1.2 步驟 2 樣式者、與 `docs/` 下任一層 `*_SPEC*.md` 者，皆須為空；非空即 fail，訊息列出之（r8 codex：只比 W 之終點樹會漏掉窗口內新增後又刪除者）。
   W 一經存在即固定，故**收案後新開之票不使本檔測試失敗**；未 commit 之路徑不在任何 commit 上，本檢查看不見（領 token 仍經 Task 1.4）。`--no-renames` 使窗口內把既有檔移入 `docs/Archived/` 亦計為新增而 fail（方向為較嚴，且不受本機 rename 偵測設定影響）。
@@ -292,7 +292,7 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
 - 🔴 **陣列之機械對照**（r2–r4 之 sha256 自保護四句與首次寫入例外**全數移除**；r6 grok 指出「改腳本即三家 code review」實為紀律，**已刪除該等同**）：
   **測試斷言「hook 腳本之字面陣列＝L 樹之符合路徑集合」**（見 §P「生效之判定」）——往陣列多加一行即使該測試失敗。欲蓄意繞過須同時改掉該測試之預期集合，列 RESID-12 蓄意等價。
 - **不可做**：不得擋既有清單內檔案之編輯；不得掃全 repo；不得執行 pytest；**不得以 git 狀態（`ls-files`／`status`／`diff`）作為判定依據**；**不得另建獨立清單檔**。
-- **邊界**：① 新建 `docs/X_TODO.md`（擋） ② 編輯既有清單內之 `docs/GAP2_MARGINAL_IC_TODO.md`（放行） ③ 新建 `docs/X_TODO.yaml`（放行） ④ 路徑含空白 ⑤ 傳入**絕對路徑**或 `./docs/X_TODO.md`（須正規化後正確判定） ⑥ 已 `git add` 但未 commit 之新散文 TODO（**須擋**） ⑦ symlink 指向既有清單內檔案（放行） ⑧ **大小寫變體** `Docs/X_Todo.md`（須擋） ⑨ **子目錄** `docs/sub/X_TODO.md`（須擋） ⑩ 硬連結別名指向既有清單內檔案，以別名路徑寫入（擋） ⑪ **延伸檔** `docs/NEWEPIC_TODO.D-001.md`（須擋） ⑫ 編輯**既有延伸檔** `docs/GAP3_EVENT_TODO.D-001.md`（放行，因在字面陣列內） ⑬ 編輯 `docs/Archived/` 下既有之 `*_TODO.md`（放行） ⑭ **生產呼叫（不傳清單參數）使用之陣列＝腳本字面**，與測試傳入之陣列為同一函式之不同呼叫（斷言生產路徑不讀任何外部檔） ⑮ **X 版 hook 腳本之字面陣列＝L 樹之符合路徑集合**（不等即 fail；往陣列多加一行、或設計定案後才建立之散文 TODO 被收進陣列，皆使本測試失敗） ⑯ 設計定案後新建之 `docs/LATE_TODO.md`（不在陣列內，生效後須擋） ⑰ **窗口檢查之 TODO 半邊**（§P「生效之判定」）：L..W 區間新增之路徑中無符合樣式者 ⑱ **既有散文 TODO 內容不變**（r9 codex：只守路徑集合，不守 C-6 之「不改寫」）：L 樹中符合樣式之每一路徑，其 X 版內容須與 `git show <L>:<路徑>` **逐位元組相等**；X＝W 時收案後之合法續修不受影響，W 之前（含 `gen_fact_key_blocks.sh --write` 改寫其生成區塊）則即紅。
+- **邊界**：① 新建 `docs/X_TODO.md`（擋） ② 編輯既有清單內之 `docs/GAP2_MARGINAL_IC_TODO.md`（放行） ③ 新建 `docs/X_TODO.yaml`（放行） ④ 路徑含空白 ⑤ 傳入**絕對路徑**或 `./docs/X_TODO.md`（須正規化後正確判定） ⑥ 已 `git add` 但未 commit 之新散文 TODO（**須擋**） ⑦ symlink 指向既有清單內檔案（放行） ⑧ **大小寫變體** `Docs/X_Todo.md`（須擋） ⑨ **子目錄** `docs/sub/X_TODO.md`（須擋） ⑩ 硬連結別名指向既有清單內檔案，以別名路徑寫入（擋） ⑪ **延伸檔** `docs/NEWEPIC_TODO.D-001.md`（須擋） ⑫ 編輯**既有延伸檔** `docs/GAP3_EVENT_TODO.D-001.md`（放行，因在字面陣列內） ⑬ 編輯 `docs/Archived/` 下既有之 `*_TODO.md`（放行） ⑭ **生產呼叫（不傳清單參數）使用之陣列＝腳本字面**，與測試傳入之陣列為同一函式之不同呼叫（斷言生產路徑不讀任何外部檔） ⑮ **X 版 hook 腳本之字面陣列＝L 樹之符合路徑集合**（不等即 fail；往陣列多加一行、或設計定案後才建立之散文 TODO 被收進陣列，皆使本測試失敗） ⑯ 設計定案後新建之 `docs/LATE_TODO.md`（不在陣列內，生效後須擋） ⑰ **窗口檢查之 TODO 半邊**（§P「生效之判定」）：L..W 區間新增之路徑中無符合樣式者 ⑱ **既有散文 TODO 內容不變**（r9 codex：只守路徑集合，不守 C-6 之「不改寫」）：L 樹中符合樣式之每一路徑，其 X 版內容須與 `git show <L>:<路徑>` **逐位元組相等**，**但生成區塊（`gen_fact_key_blocks.sh` 所維護之成對起訖註解標記行）之間之內容不比**（r10 codex 實查：`docs/DOCROT2_TODO.md`、`docs/SPLITUNIFY_TODO.md` 含生成區塊，由 `gen_fact_key_blocks.sh --write` 依 `scripts/fact_keys.json` 正常改寫，屬另一系統之狀態鏡像而非本票之改寫）；標記行本身之序列須兩版相同（生成區塊不得增刪）。X＝W 時收案後之合法續修不受影響。
 - **驗證**：`tests/governance/test_todofmt_write_guard.py`：對本 Task 全部邊界各一具名測試；hook 掛載點與 `.claude/settings.json` **機械對證**（比照既有 `factkey_write_guard` 之對證作法）；耗時以 `date +%s%N` 記錄寫入 §V（依 C-1 不比門檻）；`test_mutation_*` 一支。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`.claude/settings.json` 為共用掛載點，新增條目不得影響既有 hook 之觸發順序——須有回歸測試斷言 **`git show <L>:.claude/settings.json` 之 hook 清單**為 X 版清單之子集（直接取自 L，無基準檔）。
@@ -378,6 +378,7 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
   **測試之斷言內容屬 FF-TFMETA 之實作，不屬本票**（本 Task 不可做：不得實作 FF-TFMETA）；其正確性由 FF-TFMETA 之三家 code review 驗。本樣本只驗 manifest 已**宣告**此對應。
 
 - **樣本之具體路徑**（r9 codex：本節只以語意描述 producer、契約與測試）：`stub_modules`／`contract_jsons`／`test_files` 之具體路徑屬 FF-TFMETA 自身之設計，本票不代為決定；Task 3.2 實作時依決策檔缺陷 B 修法節讀碼選定，並於樣本之 `batch_card.risk_mitigation` 逐條記錄「路徑 ← 決策檔段落 ← 定位所用之 grep 命令」。`test_files` 之四個測試須逐一對應決策檔之四情況，`coverage_risk` 之五條等式須逐一對應其中之具名測試。FF-TFMETA 開工時依其 SPEC 覆核並更新（見本 Task 覆蓋風險）。
+  🔴 **本樣本不承諾其路徑由本 SPEC 唯一決定**（r10 codex：兩名實作者依同一決策檔可選出不同路徑）：本樣本之作用是以真實票之形狀驗證 manifest 格式與路由，不是替 FF-TFMETA 定稿；其路徑之唯一性屬 FF-TFMETA 自身 SPEC 之責任。
 
 🔴 **本樣本之涵蓋邊界——逐欄對照契約表**（r3 指出原以票型描述代替、未窮舉 `batch_card` 各欄）。欄值：「有值」＝本樣本該欄非空且被驗；「驗空」＝本樣本驗該欄為空之情形；「不驗」＝本樣本不驗此欄非空之情形；「不涵蓋」＝列入 RESID-9a／9b。
 
@@ -417,7 +418,7 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
 - **目標**：實作下方收案判定表之聚合入口；其行為規則以下方「聚合入口規則」三句為準（本 Task 不重述）。
 - **實作要點**：執行陣列為腳本內之字面陣列，每項為完整 argv（見下方規則 1）；判定函式以參數接受陣列，生產呼叫不傳參數即用腳本字面（與 Task 1.2 同一模式）。**不讀本 SPEC**。
 - **不可做**：不得以 glob 選檔；不得把 `gate.sh` 列入陣列；不得把本 Task 自身之單元測試列入陣列。
-- **邊界**：① 陣列第二項之行程未啟動（rc 非 0） ② 全部項目 rc=0（rc=0） ③ 某項有 skip（rc 非 0） ④ 某項有 xfail（rc 非 0） ⑤ 某項 rc 非 0（聚合 rc 非 0） ⑥ 生產呼叫之陣列＝腳本字面（斷言不讀任何外部清單檔或本 SPEC）。
+- **邊界**：① 陣列第二項之行程未啟動（rc 非 0） ② 全部項目 rc=0（rc=0） ③ 某項有 skip（rc 非 0） ④ 某項有 xfail（rc 非 0） ⑤ 某項 rc 非 0（聚合 rc 非 0） ⑥ 生產呼叫之陣列＝腳本字面（斷言不讀任何外部清單檔或本 SPEC） ⑦ 生產陣列每一項皆為完整 argv：首元素為可執行者（`bash` 或 repo 之 venv python）、無 glob 字元（`*`／`?`／`[`）、不含 `gate.sh`（靜態讀腳本字面斷言） ⑧ 記錄時點：以一支先印出成功字樣、稍後以非 0 結束之 stub 驗證——該項之紀錄須為其最終 rc（非 0），聚合 rc 非 0（若於啟動時即記錄則會記成通過） ⑨ 執行紀錄少一項、多一項、或順序與陣列不同（各 rc 非 0）。
 - **驗證**：`tests/governance/test_todofmt_freeze_check.py`：對本 Task 全部邊界各一具名測試（以參數傳入 stub 陣列）；**此測試不經聚合器執行**，故無自我參照；耗時記錄於 §V；`test_mutation_*` 一支（移除「執行紀錄與陣列之比對」即轉紅）。
 - **存活至**：`lifecycle: keep`。
 - **覆蓋風險**：無既有 caller（新增檔）。
@@ -431,7 +432,7 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
 | 0.1 | `tests/governance/test_todofmt_contract.py` | 全 pass | — |
 | 0.2 | `tests/governance/test_template_check_todofmt.py` | 全 pass | `scripts/template_check.sh` 相對 L 之差異恰為轉呼叫行一行 |
 | 1.1 | `tests/governance/test_mutation_scope_extension.py` | 全 pass | 第 6 段通過句之來源字面同為 `git show <L>:scripts/gov_check.sh` 與 X 版之子字串（**不跑第 6 段**） |
-| 1.2 | `tests/governance/test_todofmt_write_guard.py` | 全 pass | `git show <L>:.claude/settings.json` 之 hook 清單 ⊆ X 版清單；既有散文 TODO 內容 L 對 X 逐位元組相等 |
+| 1.2 | `tests/governance/test_todofmt_write_guard.py` | 全 pass | `git show <L>:.claude/settings.json` 之 hook 清單 ⊆ X 版清單；既有散文 TODO 內容 L 對 X 逐位元組相等（生成區塊除外） |
 | 1.3 | `tests/governance/test_gate_todo_routing.py` | 全 pass | legacy 分支呼叫字面同為 L 與 X 版 `scripts/gate.sh` 之子字串 |
 | 1.4 | `tests/governance/test_gate_impl_requires_manifest.py` | 全 pass | 非 impl 路徑實跑 rc=0 且無本 Task 訊息；進入條件字面見於 X 版 `scripts/gate.sh` |
 | 2.1 | `tests/governance/test_todofmt_template.py` | 全 pass | — |
@@ -463,7 +464,7 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
 | **機械閘層** | 🔴 **各 Task 之邊界以該 Task 正文為唯一權威，本表不重述條數**（r3：重述之條數於 r2 後漂移四處——0.1、1.2 條數錯、1.4／2.1／2.2／3.1 漏列；數字只存一處即不會再漂）。每 Task 之驗證段一律為「對本 Task 全部邊界各一具名測試」；收案判定見 §P 收案判定表 |
 | **效能層** | 🔴 **每個新增檢查皆須寫入實測耗時**（C-1）；**不與門檻比對**，僅要求回填且不得仍為 `PENDING-MEASURE`。量法：`date +%s%N` 前後差，或 `time` 之 real 值 |
 | **真陽性層** | Task 1.1 之兩段斷言：(i) 量化 26 檔 fatal 集合 == §A 具名之 12 支；(ii) 治理扣除既有三檔後 fatal 集合 == 27 支。**皆只跑靜態器** |
-| **不變式層** | 一律 L 對 X（見收案判定表）：`template_check.sh` 相對 L 之差異恰為轉呼叫行；`gov_check.sh` 第 6 段通過句字面同存於 L 與 X；`gate.sh` legacy 分支字面同存於 L 與 X；`gate.sh` 之 `dispatch`／`artifact`／`register-output` 三條既有路徑行為不變（Task 1.3 覆蓋風險）；`git show <L>:.claude/settings.json` 之 hook 清單 ⊆ X 版清單；既有散文 TODO 之內容 L 對 X 逐位元組相等（Task 1.2 邊界⑱）；**審查強度四項之片段存於現行憲法檔**（Task 2.2；原文為 L 之本 SPEC 之 `INV || ` 行） |
+| **不變式層** | 一律 L 對 X（見收案判定表）：`template_check.sh` 相對 L 之差異恰為轉呼叫行；`gov_check.sh` 第 6 段通過句字面同存於 L 與 X；`gate.sh` legacy 分支字面同存於 L 與 X；`gate.sh` 之 `dispatch`／`artifact`／`register-output` 三條既有路徑行為不變（Task 1.3 覆蓋風險）；`git show <L>:.claude/settings.json` 之 hook 清單 ⊆ X 版清單；既有散文 TODO 之內容 L 對 X 逐位元組相等、生成區塊除外（Task 1.2 邊界⑱）；**審查強度四項之片段存於現行憲法檔**（Task 2.2；原文為 L 之本 SPEC 之 `INV || ` 行） |
 | **樣本層** | 自我樣本（Task 3.1）＋ FF-TFMETA 樣本（Task 3.2）**皆須通過**方得收案 |
 | **mutation** | 每個新增測試檔須有 `test_mutation_*`（依 `docs/TEST_DESIGN_CHARTER.md`） |
 
