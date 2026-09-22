@@ -144,4 +144,5 @@
 - 2026-09-22：RM-FFNAME → `docs/FFDEFECT_DECISION.md`
 - 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-procopt-x-consult-r3/synth.md`
 - 2026-09-22：RM-PROCOPT → `docs/PROCOPT_DECISION.md`
+- 2026-09-22：RM-PROCOPT → `白話說明/SPEC與TODO流程優化.md`
 <!-- HISTORY-END -->
