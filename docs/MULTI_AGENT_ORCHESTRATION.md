@@ -193,6 +193,8 @@ ASSERT <命令> WHEN <key>=<value> ... THEN rc=<n>|rc!=<n>
 | 中 | 完整管線同大型（SPEC+TODO+至少一家不同模型 adversarial;2026-06-05 使用者定死不得跳步,D-1 維持）——判準與步驟見 CLAUDE.md **任務分派決策表** |
 | 大 / 高風險(a/b/c/d) | 完整管線（下方）；分級見 CLAUDE.md **任務分派決策表** |
 
+**TODO＝五類落點 manifest**（`docs/manifests/<EPIC>.json`：生產 stub／具名驗收測試與腳本／契約 JSON／機讀批次卡／實跑收據）；生成指引 `templates/TODO_GENERATION_PROMPT.md`，機檢 `bash scripts/template_check.sh todofmt <manifest>`，規格 `docs/TODOFMT_SPEC.md`。設計定案前已存在之散文 TODO 維持原狀；新 SPEC 派工時 `--todo` 須為 manifest，且其 `spec_path` 須等於 `--spec`。
+
 > **前置鐵律（反 C3，最高優先）**：開審前，SPEC §A 的「待使用者確認事實」必須**真的問過使用者並填入回覆**。
 > C3 事故證明 **Opus+GPT-5.5+Composer 2.5 三家族全沒抓到**——因為那是「缺一個只有使用者知道的事實 + 共享我框的錯前提」，不是推理盲點。**家族再多也救不了缺事實。** 故 facts-first 比加審查者更重要；gate `--facts-asked` 擋。
 

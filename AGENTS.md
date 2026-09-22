@@ -26,7 +26,7 @@ watchdog 正好在重寫當下砍掉子樹 ⇒ **一份合格產出整份消失*
 > Claude 負責規劃與驗收，你負責執行 + debug。完整編排見 `docs/MULTI_AGENT_ORCHESTRATION.md`。
 > 以下規則零容忍，違反任一條 → 停下、輸出 `STATUS: BLOCKED`、寫明原因，不要自行繞過。
 
-1. **先讀再做**：開工前讀 `HANDOFF.md` + 指定的 `specs/*_SPEC.md`（與其 TODO）+ 本檔。讀不到任何一份 → 停，要求補路徑，**不得假裝已讀或腦補內容**。
+1. **先讀再做**：開工前讀 `HANDOFF.md` + 指定的 `specs/*_SPEC.md`（與其 TODO；新票之 TODO＝manifest `docs/manifests/<EPIC>.json` 所列之落點）+ 本檔。讀不到任何一份 → 停，要求補路徑，**不得假裝已讀或腦補內容**。
    - **小任務免 SPEC**：若 prompt 明確標記 `SMALL_INLINE`，可無 SPEC，但 prompt 必須含：scope、驗收命令、允許改的檔案、禁止事項。缺任一 → BLOCKED。
 2. **嚴守 scope**：只改 SPEC / TODO / 指令明確指定的檔案。發現根因在範圍外（caller / fixture / config / factory / schema）→ **不直接改超界檔**，改輸出 `STATUS: BLOCKED — 需擴大 scope: <檔案+原因+證據>`，等 Claude 核准。可新增 failing test、讀取 caller 佐證。
 3. **品質 gate 不可弱化**（C-OPT-3）：禁止 fake data、跨 symbol cache 污染、弱化 NaN/inf/float16 gate。改變輸出 schema / 檔案大小需在回報中明確標記，**不擅自做**。**亦不得為了通過驗收而放寬/刪除既有測試斷言、降門檻或跳過用例（假綠）**；任何測試改動須在收尾報告說明理由。
