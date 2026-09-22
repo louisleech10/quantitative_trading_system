@@ -6,7 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
-| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。SPEC 三家對抗審 r1–r7 皆已收斂銷帳並 push（24→26→20→16→16→16→9）；r5 以結構性簡化 S1–S5 取代 r2–r4 疊加之執行機制，r6 修正 S1 兩處前提錯誤，r7 以「設計定案 commit＝SPEC 內設計定案標記行首次出現之 commit」固定其身分並移除 r6 所加之引入 commit 結構檢查（淨減一層）。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝r8 → 設計定案 → 實作 Phase 0–3 → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
+| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。SPEC 三家對抗審 r1–r8 皆已收斂銷帳並 push（24→26→20→16→16→16→9→10）；r7 以「設計定案 commit＝SPEC 內設計定案標記行首次出現之 commit」固定其身分；r8 之 10 條中 8 條打在主委 r7 自加之物，修法以移除為主（刪基準檔與首行 blob、改為 L 對 X 之內容比較；四項審查強度不變式原文改寫進 SPEC 由三家審）。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝r9 → 設計定案 → 實作 Phase 0–3 → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -25,7 +25,7 @@
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。復工條件＝流程改法裁決後，依新停輪條件重定本票續審形狀 |
-| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。SPEC 三家對抗審 r1–r7 皆已收斂銷帳並 push（24→26→20→16→16→16→9）；r5 以結構性簡化 S1–S5 取代 r2–r4 疊加之執行機制，r6 修正 S1 兩處前提錯誤，r7 以「設計定案 commit＝SPEC 內設計定案標記行首次出現之 commit」固定其身分並移除 r6 所加之引入 commit 結構檢查（淨減一層）。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝r8 → 設計定案 → 實作 Phase 0–3 → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
+| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。SPEC 三家對抗審 r1–r8 皆已收斂銷帳並 push（24→26→20→16→16→16→9→10）；r7 以「設計定案 commit＝SPEC 內設計定案標記行首次出現之 commit」固定其身分；r8 之 10 條中 8 條打在主委 r7 自加之物，修法以移除為主（刪基準檔與首行 blob、改為 L 對 X 之內容比較；四項審查強度不變式原文改寫進 SPEC 由三家審）。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝r9 → 設計定案 → 實作 Phase 0–3 → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
 | 04-005 | HP-PROCOPT | 待審 | docs/PROCOPT_DECISION.md | 診斷完成（r1→r2→r3）。使用者後續裁定：**先完成 TODO 優化**（見 HP-TODOFMT），其餘改法待 TODOFMT 完工後再議。r3 之四步改法經使用者逐條質詢後大多撤回或降級，現存狀態見 白話說明/SPEC與TODO流程優化.md。**未實施任何流程改動** |
 | 04-006 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
 <!-- END GENERATED: handoff-todo -->
@@ -133,6 +133,7 @@
 - 🔴 **`scripts/git_hooks/commit-msg` 之 G-7 前移檢查以 `|| true` 結尾，只提示不擋**：不要為它加 `Governance-Scope: out-of-epic` 豁免 trailer——auto-mode 分類器會判為繞過而拒，判得對。
 - 🔴 **`spec_xref_hook` 對 HEAD 比對，會把本次已刪之 token 一路累列**：真要修的是「被刪之專名仍被別處引用」；通用詞可在新段落如實提及以消警。
 - 🔴 **收斂檔機械附 finding body 時，某家來源只有一條 finding ⇒ 迴圈會算出 `head -n 0`，macOS 視為非法參數**：以 `if [ "$last" -gt 1 ]` 包住該分支。
+- 🔴 **`handoffs/` 整個被 `.git/info/exclude` 排除，從不入 git**（收斂檔、委員產出、brief 皆然）：任何以「某 handoffs 檔之 git 歷史」為錨點的設計（例：「引入收斂檔之 commit」）恆查無。要用 git 歷史當錨點，錨點必須落在追蹤檔（如 `docs/`、`tests/`、`scripts/`）。2026-09-23 TODOFMT r7 修補時犯過一次，派 r8 前自查實跑 0 行才抓到。
 - 🔴 **`data_cache/features/ETHUSDT/1h/` 下有三個外觀相似的 FF run，其中兩個不可用**：`4a8a0b37…`（fracdiff 已轉換）、`654bd63b…`（漏全部 12h 欄，542 group 全 1h）。可用者為 `d9935491…`（944 group＝1h 542＋12h 402、418,719 欄、20,352 列、六項預處理全 false）。⇒ 引用 reference run 一律先核對 `config_hash`，不靠目錄時間排序。
 
 ## 進行中紀錄
@@ -158,4 +159,6 @@
 - 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-todofmt-x-consult-r1/synth.md`
 - 2026-09-22：RM-TODOFMT → `docs/TODOFMT_SPEC.md`
 - 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r6/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r7/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r8/synth.md`
 <!-- HISTORY-END -->
