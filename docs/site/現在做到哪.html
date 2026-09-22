@@ -17,11 +17,10 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p><strong>等你逐條裁決 SPEC／TODO 流程的改法。</strong> 完整文件在
-<a href="SPEC與TODO流程優化.html">SPEC與TODO流程優化.md</a>——你的四個問題都有答案、
-討論過程（含我被推翻的九處）、四步改法、CLAUDE.md 逐字改寫兩家版本並列。
-<strong>要你決定的事集中在 §七，編號 D1–D8。</strong></p>
-<p><strong>EVENTSCAN 依你裁定維持暫停</strong>，等流程改完再回來。</p>
+<p><strong>TODO 優化</strong>——把「用中文散文寫的施工清單」改成電腦看得懂、能直接跑的檔案，
+並把相關的範本和檢查機制一起改掉。</p>
+<p>依你的裁定：<strong>我和三家委員共識決，不用給你看技術細節；做完再給你一份白話說明。</strong>
+其他票（EVENTSCAN、FF 兩票、FFDSTAR）<strong>全部暫停</strong>，等這張做完再討論下一步。</p>
 <h2 id="做到哪">做到哪</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -32,67 +31,43 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>SPEC／TODO 流程診斷</strong></td>
-<td>✅ 三輪完成（兩家委員、零駁回、全部銷帳）</td>
+<td>方向（散文 TODO 廢止、改成哪幾種檔）</td>
+<td>✅ 三家委員已定</td>
 </tr>
 <tr>
-<td><strong>四個問題的答案</strong></td>
-<td>✅ 完成（§一）</td>
+<td>規格書（SPEC）第 1 輪審查</td>
+<td>✅ 收完（24 條全改）</td>
 </tr>
 <tr>
-<td><strong>四步改法＋風險</strong></td>
-<td>✅ 完成（§四）</td>
+<td>規格書第 2 輪審查</td>
+<td>✅ 收完（26 條全改）</td>
 </tr>
 <tr>
-<td><strong>CLAUDE.md 逐字改寫候選</strong></td>
-<td>✅ 兩家版本並列（§五）</td>
+<td>規格書第 3 輪審查</td>
+<td>🔨 <strong>進行中</strong>（兩家委員因我這邊重啟程式而重派）</td>
 </tr>
 <tr>
-<td><strong>你裁決 D1–D8</strong></td>
-<td>🛑 <strong>等你</strong></td>
+<td>規格書凍結</td>
+<td>⬜ 還沒</td>
 </tr>
 <tr>
-<td>流程改動實施</td>
-<td>⬜ <strong>一步都還沒做</strong>（等 D1–D8）</td>
+<td><strong>改程式</strong>（範本、檢查機制、閘門）</td>
+<td>🛑 <strong>一行都還沒改</strong></td>
 </tr>
 <tr>
-<td>EVENTSCAN 規格</td>
-<td>🛑 <strong>暫停</strong>（審到第 12 輪收斂、未凍結、仍剩 11 條 P1）</td>
-</tr>
-<tr>
-<td>FF 兩個缺陷：<strong>查清楚是不是真的</strong>（兩家獨立同判「是」）</td>
-<td>✅ 完成</td>
-</tr>
-<tr>
-<td>FF 兩個缺陷：<strong>改程式</strong></td>
-<td>🛑 <strong>一行都還沒改</strong>。SPEC 沒寫、測試沒寫、票是「未開工」</td>
-</tr>
-<tr>
-<td>FFDSTAR 規格</td>
-<td>✅ 完成，審到第 2 輪</td>
+<td>白話說明給你</td>
+<td>⬜ 做完才寫</td>
 </tr>
 </tbody>
 </table></div>
-<p><strong>三個數字最能說明問題</strong>（都可重跑）：</p>
-<ol>
-<li><strong>量化主線的規格票中位數 8 輪</strong>，治理票 4 輪——差距來自 CLAUDE.md 那條
-「SPEC 審完自動開一輪 TODO 全審」，它讓 finding 數從 0 跳回 20。
-量化票發生 4 次、治理票 0 次。</li>
-<li><strong>委員抽樣 18 個實作缺陷</strong>：<strong>40% 是「規格寫對了、實作沒照做」</strong>、
-50% 是「規格根本沒寫到」。⇒ 再多審幾輪規格也擋不住那 40%。</li>
-<li><strong>EVENTSCAN 寫規格 20 分鐘、審 12 小時</strong>，期間產出的可執行程式 0。</li>
-</ol>
+<p><strong>你上次的更正已經落地</strong>：我原本自己加了「每個檢查不能超過 2 秒」，你說你只是不准跑很久的東西，
+不是要我定死秒數——那條已經拿掉，改成「不准分鐘級以上」。</p>
 <h2 id="要你決定嗎">要你決定嗎</h2>
-<p>🔴 <strong>要。八個決策點，在 <a href="SPEC與TODO流程優化.html">SPEC與TODO流程優化.md</a> §七。</strong>
-其中 D2、D3 會動到 <code>CLAUDE.md</code>（你已說過可以改）；
-D7 涉及新建治理工具，跟你 2026-09-15 的限制有關，需要你明示。</p>
-<p>我的建議摘要：<strong>D1 採（零成本）、D2 採（切掉最大的那個機制）、D3 採但限新票、
-D4 可延後、D5 選 composer 版、D6 不改、D7 你決定、D8 已裁定維持暫停。</strong></p>
+<p><strong>不用。</strong> 依你的裁定，這張票的所有取捨由我和委員共識決。</p>
 <h2 id="卡住嗎">卡住嗎</h2>
-<p><strong>卡在等你裁決。</strong> 裁決前我不動 EVENTSCAN、不改 CLAUDE.md、不實施任何一步。</p>
+<p>沒有。</p>
 <h2 id="下一件事">下一件事</h2>
-<p>你回 D1–D8 → 我照裁決改 CLAUDE.md／ORCH／範本 → 用新規則重啟 EVENTSCAN。
-FF 兩張票排在那之後，各自走（改過的）流程。</p>
+<p>第 3 輪審查收完 → 判斷能不能凍結規格 → 能就開始改程式 → 三家檢查程式 → 寫白話說明給你。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
