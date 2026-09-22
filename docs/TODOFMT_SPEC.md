@@ -78,7 +78,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 
 ### C-6～C-9：範圍與相容
 
-- **C-6 不溯及既往**：既有 `docs/*_TODO.md`（`GAP1`／`GAP2`／`GAP3_EVENT`／`SPLITUNIFY`／`EVTLABEL`／`DOCROT2`／`REDISPATCH`／`VERDICTGATE` 等）**不遷移、不改寫**。新格式**只對本 SPEC 凍結後新開之票**生效。
+- **C-6 不溯及既往**：既有 `docs/*_TODO.md`（`GAP1`／`GAP2`／`GAP3_EVENT`／`SPLITUNIFY`／`EVTLABEL`／`DOCROT2`／`REDISPATCH`／`VERDICTGATE` 等）**不遷移、不改寫**。新格式**只對本票收案後新開之票**生效。
 - **C-7 不修 fatal 名單、不改分類器**：§A 具名之量化 12 支與治理 27 支（合計 39），本票**只讓它們被新入口列出**，**不修探針、不改分類器、不新增排除**。正確修法屬分類器認列規則之重新設計，另票處理（RESID-1）。
 - **C-8 不改審查家數與家族**：依 `docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行，本檔不寫數字。
 - **C-9 不合併 SPEC 審與 TODO 審**：依 r1 收斂檔 C7，§A（前提／FACT-RECEIPT）之審查槽必須保留且獨立。本票**不得**取消 SPEC 對抗審。
@@ -98,6 +98,17 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 ---
 
 ## §P Phase 與依賴（事故：宣稱無依賴卻有 forward dependency）
+
+### 🔴 本票之三個時點（r3 後主委自查：原文以「凍結」一詞同指兩個互斥時點）
+
+| 時點 | 定義 | 允許之動作 |
+|---|---|---|
+| **設計定案** | 三家審查之 Verdict 皆無未閉合之「規格不完備」P0／P1 | 准予開始實作 Phase 0–3。**對應 `CLAUDE.md` 中／大管線之「SPEC 凍結」** |
+| **收案** | §P 收案判定表之全部測試皆通過（聚合入口 rc=0） | 新格式對之後新開之票生效；C-6 之界線以此時點為準 |
+| **快照時點** | ＝收案時點 | 於收案之**最後一步**寫入真實白名單 `scripts/legacy_prose_todo.txt` 與 `scripts/legacy_spec_snapshot.txt`；實作與測試期間一律使用 `tests/governance/fixtures/` 下之 fixture 白名單 |
+
+⇒ 原文之「凍結前置」「凍結條件」「凍結判定表」語意皆為**收案**，已全數改稱。聚合入口檔名沿用 r3 收斂檔之 `scripts/todofmt_freeze_check.sh`，其語意為收案判定。
+⇒ 基準檔（見收案判定表）於**設計定案之後、任何實作改動之前**擷取。
 
 ### Phase 0 — 落點定義與機械判定（依賴：無）
 
@@ -184,7 +195,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
   **整套五類落點檢查被完全繞過而 token 照發**。現成案例＝`docs/EVENTSCAN_SPEC.md`（有 SPEC、無 TODO 檔）。
 - **目標**：`--spec` 有值時**強制要求** `--todo`，且其須為新格式 manifest。
 - **實作要點**（插在 `scripts/gate.sh` 發 token 之前、與 Task 1.3 同一段；**`--impl-self` 走同一段**；`scripts/dispatch.sh` 以 `exec gate.sh` 單點收口，無須另做）：
-  1. `--spec` 指向**凍結前既有 SPEC 清單**（快照 `scripts/legacy_spec_snapshot.txt`，與 Task 1.2 白名單**同一保護規則**）⇒ 放行（C-6）。
+  1. `--spec` 指向**收案時點既有之 SPEC 清單**（快照 `scripts/legacy_spec_snapshot.txt`，與 Task 1.2 白名單**同一保護規則**）⇒ 放行（C-6）。
   2. 否則 `--todo` 缺值 ⇒ **fail-closed**，訊息印出五類落點與 manifest 樣板路徑。
   3. `--todo` 有值但判型為 legacy `.md` 且 `--spec` 不在既有清單 ⇒ fail-closed。
   4. 🔴 **manifest 與 SPEC 之對應**（r3 grok 指出可拿任一合法 manifest 為新 SPEC 領 token）：manifest 之 `spec_path` 經與 Task 1.2 步驟 1 相同之正規化（剝根、剝 `./`、`casefold`）後，**必須等於**同樣正規化後之 `--spec`；不等 ⇒ fail-closed。一次 `jq` 字串比較。
@@ -218,7 +229,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
      （涵蓋 `X_TODO.md` 與延伸檔 `X_TODO.D-001.md`，比對前已 casefold；r3 指出原樣式放行 `docs/NEWEPIC_TODO.D-001.md`）
      ⇒ 進入白名單比對；否則放行（非本 hook 管轄）。
   3. **白名單比對**：以步驟 1 之字串比對白名單；另以 `realpath` 解析後之路徑**再比一次**，兩者任一命中即視為命中（涵蓋 symlink／硬連結指向白名單檔之情形）。
-  4. 命中白名單（即凍結當下既有之 `docs/*_TODO.md`）⇒ 放行（C-6）；未命中 ⇒ fail-closed 並印五類落點指引。
+  4. 命中白名單（即收案時點既有之 `docs/*_TODO.md`）⇒ 放行（C-6）；未命中 ⇒ fail-closed 並印五類落點指引。
 - 🔴 **白名單檔自身之保護（r3 grok 四句規則，取代 r2 之「只准刪行＋sha256 自驗」——該二句無共同基準、合法刪行即自相衝突）**：
   白名單檔＝`scripts/legacy_prose_todo.txt`，其**最後一行**固定為 `sha256 <64 hex>`。對它之 Write／Edit：
   1. **雜湊位元組**＝除尾端 `sha256 <hex>` 行以外之全部內容。
@@ -268,21 +279,21 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 #### Task 3.1 — 以新格式產出本票之 TODO（`票 TODOFMT/P3`）
 
 - **目標**：**本票自己吃自己的狗糧**——本票之 TODO 以 Phase 0 定義之五類落點產出，不產生散文 TODO 檔。
-- 🔴 **時序（r2 指出原文自相矛盾：「凍結後才產 manifest」與「manifest 通過才准凍結」互斥）**：
-  manifest 之產出與檢查**皆在凍結之前**；`template_check.sh todofmt` rc=0 是**凍結前置**，不是凍結後動作。
-  凍結之後不再改 manifest，只依 invalidation 條件重產。
+- 🔴 **時序（r2 指出原文自相矛盾：「收案後才產 manifest」與「manifest 通過才准收案」互斥）**：
+  manifest 之產出與檢查**皆在收案之前**；`template_check.sh todofmt` rc=0 是**收案前置**，不是收案後動作。
+  收案之後不再改 manifest，只依 invalidation 條件重產。
 - **不可做**：不得回頭寫散文 TODO；不得因「本票是治理票、沒有生產模組」而免除測試檔落點。
 - **邊界**：① 本票無生產模組（`stub_modules` 為空）⇒ 須明示為 `not_executable` 並附三值理由 ② 契約 JSON 落點 ③ 批次卡欄位齊備 ④ 收據落點 ⑤ 五類齊備檢查通過 ⑥ `template_check todofmt` rc=0。
 - **驗證**：以本票 manifest 跑 `template_check.sh` 之 `todofmt` 子命令須 rc=0；並以 Phase 0 之六條邊界測試覆蓋。
-- 🔴 **promotion 條件**（r1 三家要求，原 SPEC 只說「受控回饋邊」而無機制）：本票 manifest 通過 `template_check.sh todofmt` 且 Task 1.3 路由測試綠 ⇒ 該 manifest **凍結為樣本**，寫入 `tests/governance/fixtures/todofmt_sample_self.json`。
-- 🔴 **invalidation 條件**：Phase 0 之契約（鍵集或值域）**任一變更** ⇒ 全部已凍結樣本**須重產**（舊樣本檔刪除，不保留），且 Task 0.1 之測試須斷言「樣本記錄之 `contract_digest` == loader 以現行契約計算之 `contract_digest`」，不等即 fail。因該值由契約內容衍生，**改鍵集或值域而不改版本號之情形不存在**。
+- 🔴 **promotion 條件**（r1 三家要求，原 SPEC 只說「受控回饋邊」而無機制）：本票 manifest 通過 `template_check.sh todofmt` 且 Task 1.3 路由測試綠 ⇒ 該 manifest **promote 為樣本**，寫入 `tests/governance/fixtures/todofmt_sample_self.json`。
+- 🔴 **invalidation 條件**：Phase 0 之契約（鍵集或值域）**任一變更** ⇒ 全部已 promote 之樣本**須重產**（舊樣本檔刪除，不保留），且 Task 0.1 之測試須斷言「樣本記錄之 `contract_digest` == loader 以現行契約計算之 `contract_digest`」，不等即 fail。因該值由契約內容衍生，**改鍵集或值域而不改版本號之情形不存在**。
 - **存活至**：`lifecycle: keep`（作為新格式之第一個活樣本）。
 - **覆蓋風險**：若 Phase 0 之契約在 Phase 3 發現不足，須回頭改 Phase 0 ⇒ 由上述 invalidation 條件機械處理，不靠紀律。
 
-#### Task 3.2 — 第二樣本：FF-TFMETA manifest（**凍結前置**）（`票 TODOFMT/P3`）
+#### Task 3.2 — 第二樣本：FF-TFMETA manifest（**收案前置**）（`票 TODOFMT/P3`）
 
 - 🔴 **起因**（r1 三家同判）：本票為**治理票**，`stub_modules` 只能為空、`test_files` 全是治理測試 ⇒ 五類對本票退化為二類，**Task 3.1 之 dogfooding 不足以驗收**「含生產 stub ＋ golden 路徑」之真實實作票。
-- **目標**：在本 SPEC 凍結**之前**，為下一張真實實作票 **FF-TFMETA** 產出一份 manifest 並通過 `template_check.sh todofmt`。
+- **目標**：在本票收案**之前**，為下一張真實實作票 **FF-TFMETA** 產出一份 manifest 並通過 `template_check.sh todofmt`。
 - **驗收之 identity 與資料流**：四情況依 `docs/FFDEFECT_DECISION.md` 缺陷 B 修法節原文「驗收須覆蓋**健康多 TF／skip／failed／單 TF** 四種情況」，每一情況對應 `test_files` 中之一個具名測試。
   🔴 **r3 更正**：主委 r2 寫成「單週期／多週期／兩值一致／兩值不一致」並宣稱逐字對齊，**為誤**。以決策檔原文為準。
   🔴 **本 SPEC 不自行陳述 FF-TFMETA 之 golden 狀態**——以決策檔為準。
@@ -316,9 +327,9 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 - **存活至**：`lifecycle: keep`（FF-TFMETA 開工時直接沿用）。
 - **覆蓋風險**：若 FF-TFMETA 之真實需求與本樣本不符，該票開工時須先更新樣本並重跑 Task 0.1 之 `contract_digest` 比較。
 
-🔴 **凍結條件**（r2 加嚴；r3 改為可機械判定）：下表全部列之測試**皆通過**方得凍結本 SPEC。
+🔴 **收案條件**（r2 加嚴；r3 改為可機械判定）：下表全部列之測試**皆通過**方得收案。
 
-#### §P 凍結判定表（r3 新增；聚合入口 `scripts/todofmt_freeze_check.sh`）
+#### §P 收案判定表（r3 新增；聚合入口 `scripts/todofmt_freeze_check.sh`）
 
 | Task | 測試檔（逐檔明列，禁 glob） | 預期 | 基準檔（「逐字不變」類之比較對象） |
 |---|---|---|---|
@@ -335,8 +346,8 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 
 - **基準檔之取得時點**：**實作開始時**（任何改動之前）以對應命令之 stdout 寫入；基準檔一經寫入，其後只准以「使用者或委員共識決」更新。
 - **聚合入口規則**：`scripts/todofmt_freeze_check.sh` 逐檔明列上表測試執行（**禁 glob**，依既有「pytest 逐檔明列」規則）；**skip／xfail 一律計為未通過**；回傳聚合 rc（任一未通過即非 0）。
-- **耗時**：依 C-1 記錄於 §V，不設門檻。此入口**僅於凍結前執行一次**，非每次寫檔之檢查，不受 C-5 之禁 pytest 約束（C-5 管轄寫檔當下之檢查）。
-單靠 Task 3.1（自我 dogfooding）不足；單靠 3.1＋3.2 亦不足——新增之 Task 1.3／1.4 之回歸斷言亦為凍結前置。
+- **耗時**：依 C-1 記錄於 §V，不設門檻。此入口**僅於收案前執行一次**，非每次寫檔之檢查，不受 C-5 之禁 pytest 約束（C-5 管轄寫檔當下之檢查）。
+單靠 Task 3.1（自我 dogfooding）不足；單靠 3.1＋3.2 亦不足——新增之 Task 1.3／1.4 之回歸斷言亦為收案前置。
 
 ---
 
@@ -345,14 +356,14 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 | 層 | 內容 |
 |---|---|
 | **契約層** | Task 0.1 之契約鍵集 vs loader 回傳鍵集相等 |
-| **機械閘層** | 🔴 **各 Task 之邊界以該 Task 正文為唯一權威，本表不重述條數**（r3：重述之條數於 r2 後漂移四處——0.1、1.2 條數錯、1.4／2.1／2.2／3.1 漏列；數字只存一處即不會再漂）。每 Task 之驗證段一律為「對本 Task 全部邊界各一具名測試」；凍結判定見 §P 凍結判定表 |
+| **機械閘層** | 🔴 **各 Task 之邊界以該 Task 正文為唯一權威，本表不重述條數**（r3：重述之條數於 r2 後漂移四處——0.1、1.2 條數錯、1.4／2.1／2.2／3.1 漏列；數字只存一處即不會再漂）。每 Task 之驗證段一律為「對本 Task 全部邊界各一具名測試」；收案判定見 §P 收案判定表 |
 | **效能層** | 🔴 **每個新增檢查皆須寫入實測耗時**（C-1）；**不與門檻比對**，僅要求回填且不得仍為 `PENDING-MEASURE`。量法：`date +%s%N` 前後差，或 `time` 之 real 值 |
 | **真陽性層** | Task 1.1 之兩段斷言：(i) 量化 26 檔 fatal 集合 == §A 具名之 12 支；(ii) 治理扣除既有三檔後 fatal 集合 == 27 支。**皆只跑靜態器** |
 | **不變式層** | `template_check.sh spec` 子命令輸出逐字不變；`gov_check.sh` 第 6 段輸出逐字不變；`gate.sh` 之 `dispatch`／`artifact`／`register-output` 三條既有路徑行為不變；`.claude/settings.json` 既有 hook 清單為新清單之子集；既有散文 TODO 零改動；**審查強度四項字面快照逐字存在**（Task 2.2；字面只存於 fixture 檔） |
-| **樣本層** | 自我樣本（Task 3.1）＋ FF-TFMETA 樣本（Task 3.2）**皆須通過**方得凍結 |
+| **樣本層** | 自我樣本（Task 3.1）＋ FF-TFMETA 樣本（Task 3.2）**皆須通過**方得收案 |
 | **mutation** | 每個新增測試檔須有 `test_mutation_*`（依 `docs/TEST_DESIGN_CHARTER.md`） |
 
-**實測耗時回填欄**（實作時以 receipt 覆寫下列 `PENDING-MEASURE`；凍結前仍為該字面即 FAIL）：
+**實測耗時回填欄**（實作時以 receipt 覆寫下列 `PENDING-MEASURE`；收案前仍為該字面即 FAIL）：
 
 - `template_check.sh todofmt`：`PENDING-MEASURE`
 - 產出端 hook（Task 1.2）：`PENDING-MEASURE`
