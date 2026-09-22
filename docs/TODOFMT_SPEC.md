@@ -78,7 +78,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 
 ### C-6～C-9：範圍與相容
 
-- **C-6 不溯及既往**：收案 commit 當下符合 Task 1.2 步驟 2 樣式之既有散文 TODO（即 `docs/*_TODO.md` 及其延伸檔與 `docs/Archived/` 下者；r5 grok 指出原僅以 glob 稱呼，與清單定義不一致）（`GAP1`／`GAP2`／`GAP3_EVENT`／`SPLITUNIFY`／`EVTLABEL`／`DOCROT2`／`REDISPATCH`／`VERDICTGATE` 等）**不遷移、不改寫**。新格式**只對本票收案後新開之票**生效。
+- **C-6 不溯及既往**：設計定案 commit 之 git 樹中符合 Task 1.2 步驟 2 樣式之既有散文 TODO（樣式定義以該步驟為唯一權威，含任一層子目錄與延伸檔；r5／r6 grok 指出不得以 glob 舉例等同之）（`GAP1`／`GAP2`／`GAP3_EVENT`／`SPLITUNIFY`／`EVTLABEL`／`DOCROT2`／`REDISPATCH`／`VERDICTGATE` 等）**不遷移、不改寫**。**legacy 之界線＝設計定案 commit**（與 Task 1.2／1.4 字面陣列之來源一致）；新格式之**強制**自收案起生效。🔴 **設計定案至收案之間不得新開任何票**（使用者 2026-09-22 已裁定「TODO優化完成後再討論下一步」，其餘票暫停）；若仍有，其散文 TODO 不在字面陣列內，收案後即被擋，須轉為新格式。
 - **C-7 不修 fatal 名單、不改分類器**：§A 具名之量化 12 支與治理 27 支（合計 39），本票**只讓它們被新入口列出**，**不修探針、不改分類器、不新增排除**。正確修法屬分類器認列規則之重新設計，另票處理（RESID-1）。
 - **C-8 不改審查家數與家族**：依 `docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行，本檔不寫數字。
 - **C-9 不合併 SPEC 審與 TODO 審**：依 r1 收斂檔 C7，§A（前提／FACT-RECEIPT）之審查槽必須保留且獨立。本票**不得**取消 SPEC 對抗審。
@@ -104,29 +104,34 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 | 時點 | 定義 | 允許之動作 |
 |---|---|---|
 | **設計定案** | 三家審查之 Verdict 皆無未閉合之「規格不完備」P0／P1 | 准予開始實作 Phase 0–3。**對應 `CLAUDE.md` 中／大管線之「SPEC 凍結」** |
-| **收案** | §P 收案判定表之全部測試皆通過（聚合入口 rc=0） | 新格式對之後新開之票生效；C-6 之界線以此時點為準 |
+| **收案** | §P 收案判定表之全部測試皆通過（聚合入口 rc=0） | 新格式之**強制**自此生效（hook 掛載、gate 分支加入）；legacy 之**界線**則為設計定案 commit（見 C-6） |
 | **生效時點** | ＝收案 commit | 既有散文 TODO 清單與既有 SPEC 清單以**字面陣列**寫入 hook／gate 腳本，且 hook 掛載於 `.claude/settings.json`——**三者於同一個 commit 完成** |
 
 ⇒ 原文之「凍結前置」「凍結條件」「凍結判定表」語意皆為**收案**，已全數改稱。聚合入口檔名沿用 r3 收斂檔之 `scripts/todofmt_freeze_check.sh`，其語意為收案判定。
 ⇒ 基準檔（見收案判定表）於**設計定案之後、任何實作改動之前**擷取。
 
-### 🔴 生效之判定——結構性簡化（r5 主委提案 S1，交 r6 攻擊）
+### 🔴 生效之判定——結構性簡化（r5 主委提案 S1；r6 三家攻擊後修正）
 
 **r2–r5 之經過**：r2 為「白名單只減不增」加 sha256 自保護 → r3 發現其與刪行衝突而改四句規則 →
 r3 為避開實作期誤擋而把清單延至收案才寫 → r4 發現啟用空窗而加生效標記三態機與 `TODOFMT_LIST_DIR` 注入 →
 r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修補新增一層機制，該機制於下一輪生出新邊界。**
-
-**第一性原理**：這整層在防的是「有人往既有清單加一行，使新散文 TODO 過關」——**那是蓄意行為**，
-不存在「意外往 legacy 清單加一行」之情境。依使用者 2026-09-11 判準（繞過成本 ≥ 合規成本即收），此類**不需機械防護**（見 RESID-12）。
+⇒ r5 以結構性簡化 S1 取代整層；r6 三家攻擊 S1，**抓出其兩處前提錯誤**（見下），已依三家修法修正，**皆未新增機制層**。
 
 **現行設計**：
-- 🔴 **既有清單＝腳本內之字面陣列**：兩份清單（既有散文 TODO、既有 SPEC）於收案 commit 由主委**一次生成**，
-  以字面陣列寫入 `scripts/` 下之 Task 1.2 hook 腳本，與 Task 1.4 之 `gate.sh` 分支（判 `--spec`／`--todo`）。**無獨立清單檔、無 sha256 自保護、無生效標記、無三態機、無環境變數。**
+- 🔴 **既有清單＝腳本內之字面陣列**：兩份清單（既有散文 TODO、既有 SPEC），以字面陣列寫入 `scripts/` 下之 Task 1.2 hook 腳本，與 Task 1.4 之 `gate.sh` 分支（判 `--spec`／`--todo`）。**無獨立清單檔、無 sha256 自保護、無生效標記、無三態機、無環境變數。**
   （r2–r4 曾規劃之 `scripts/legacy_prose_todo.txt`／`scripts/legacy_spec_snapshot.txt`／`scripts/todofmt_active.marker` 三檔**於 S1 下全數不建立**。）
+- 🔴 **陣列之輸入＝設計定案 commit 之 git 樹，不是收案時之工作樹**（r6 三家獨立同判 S1 之前提「不存在意外加行」不成立：
+  設計定案至收案之間 hook 未掛，其間新建之散文 TODO 若以收案時工作樹掃描生成，會被**意外**收進 legacy 陣列）：
+  陣列內容＝`git ls-tree -r --name-only <設計定案 sha>` 之輸出，再套 Task 1.2 步驟 2 樣式（既有 SPEC 陣列比照，套 `*_SPEC*.md`）。
+  **設計定案 sha 以字面寫於陣列旁**。未追蹤殘檔與設計定案後才 commit 之新檔**不會進集合**。
+  `git ls-tree <固定 sha>` 為**一次性生成時**讀取不可變內容，非執行期之 git 狀態判定——hook 與 gate 執行時**只比對字面陣列**（r1 之「不得以 git 狀態判定」維持）。
+- 🔴 **陣列之機械對照**（r6 grok 指出「改腳本即三家 code review」**不成立**——現有機器只在下一次派 impl 時數前批家族數，**不讀陣列之 diff**，實為「記得去看那一行」＝紀律，違反使用者 2026-09-13「不接受紀律或記憶當解法」）：
+  **測試斷言「字面陣列＝設計定案樹之符合路徑集合」**。往陣列**多加一行即使該測試失敗**——防線是這條測試，**不是 code review**。
+  欲蓄意繞過須同時改掉該測試之預期集合（見 RESID-12）。
 - 🔴 **生效＝掛載**：hook 掛於 `.claude/settings.json` 且 `gate.sh` 分支存在，即生效。**掛載前行為同現行**（hook 不存在即不執行）。
-  字面清單寫入、hook 掛載、gate 分支三者**於同一個收案 commit 完成**，故無啟用空窗。
-- **改清單＝改腳本＝經三家 code review**（管線強制步驟，非紀律）。
+  字面陣列寫入、hook 掛載、gate 分支三者**於同一個收案 commit 完成**，故無啟用空窗。
 - **測試**：直接呼叫判定函式並**以參數傳入清單**（測試用清單可置於 `tests/governance/fixtures/`）；生產呼叫**不傳參數**即用腳本字面。兩者為同一函式之不同呼叫，無「測試讀 A、生產讀 B」之分岔。
+- **設計定案 sha 之記錄時點**：commit 無法包含自身 sha ⇒ 由**實作之第一個 commit** 將設計定案 commit 之全長 sha 寫入本節與 Task 2.2 擷取句旁。
 
 ### Phase 0 — 落點定義與機械判定（依賴：無）
 
@@ -142,7 +147,7 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
   | `script_acceptance` | 路徑陣列 | `scripts/**` 之驗收腳本／探針（consult r1 第 2 類之另一半，與 `test_files` 分列） |
   | `contract_jsons` | 路徑陣列 | 鍵集、枚舉、reason 字面 |
   | `spec_path` | repo 相對路徑 | 🔴 本 manifest 所對應之 SPEC；Task 1.4 發 token 前須與 `--spec` 正規化後相等（防拿任一合法 manifest 領 token） |
-  | `contract_digest` | 128 字元 hex | 🔴 **衍生值，不得手寫**（r5 主委提案 S2）：＝ **sha256(契約 JSON 檔之 canonical 形式) ∥ sha256(`template_check.sh todofmt` 之 checker 腳本)**，由 loader 計算。**判定規則不論改在契約 JSON 或改在 checker 程式碼，digest 皆變**、樣本皆失效。樣本記錄其產生時之值，與現行計算值不等即 fail（Task 3.1 之 invalidation 依此）。**取代手寫 `schema_version: vN`** |
+  | `contract_digest` | 128 字元 hex | 🔴 **衍生值，不得手寫**（r5 主委提案 S2）：＝ **sha256(契約 JSON 檔之 canonical 形式) ∥ sha256(`scripts/todofmt_check.sh`)**（r6 三家同判 digest 若串接整份 `template_check.sh`（781 行、含其他子命令）範圍過寬；改為 todofmt 檢查器**獨立成檔**，digest 只涵蓋該檔），由 loader 計算。**判定規則不論改在契約 JSON 或改在 checker 程式碼，digest 皆變**、樣本皆失效。樣本記錄其產生時之值，與現行計算值不等即 fail（Task 3.1 之 invalidation 依此）；**樣本失效時只替換樣本之 `contract_digest` 欄**，不重寫 manifest 其餘內容。**取代手寫 `schema_version: vN`** |
   | `run_receipts` | 物件陣列 `{path, cmd, rc, honest_bounds}` | 🔴 **資訊性紀錄，不是收案之閘**（r5 主委提案 S4）：只驗 `path` 存在且位於 `handoffs/run_receipts/` 之下、檔內含 `schema_version`／`command`／`exit_code` 三鍵（沿用既有 receipt validator 之欄名）。**收案判定只看聚合器之新鮮執行結果**（見收案判定表），故 receipt 不需身分綁定 |
   | `batch_card.depends` | 字串陣列（Task id） | 批序 |
   | `batch_card.touches` | 路徑陣列 | 本批會動之檔 |
@@ -174,7 +179,7 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
 #### Task 0.2 — `template_check.sh todofmt` 子命令（`票 TODOFMT/P0`）
 
 - **目標**：機械驗「一張票之 TODO 五類落點齊備且合法」，秒級。
-- **實作要點**：純 `jq` ＋ 路徑存在性檢查；**禁止執行 pytest**（C-5）。
+- **實作要點**：檢查邏輯置於**獨立檔 `scripts/todofmt_check.sh`**，`template_check.sh todofmt` 子命令只轉呼叫之（r6：使 `contract_digest` 之 checker 部分只涵蓋此檔，`template_check.sh` 其他子命令之修改不使樣本失效）；純 `jq` ＋ 路徑存在性檢查；**禁止執行 pytest**（C-5）。
 - **不可做**：不得讀取測試內容做語義判斷；不得掃全 repo。
 - **邊界**：① manifest 不存在 ② JSON 不合法 ③ 缺任一類 ④ **`exists_check=true` 之欄位**路徑不存在（依契約 JSON 之 `exists_check` 判定，r4 指出原文未指向例外即會對全部路徑欄套存在性檢查而誤殺） ⑤ `not_executable` 缺 owner ⑥ `expiry` 格式非 `YYYY-MM-DD` ⑦ `exists_check=false` 之欄位指向不存在路徑（須放行）。
 - **驗證**：`tests/governance/test_template_check_todofmt.py`：對本 Task 全部邊界各一具名測試；耗時以 `date +%s%N` 前後差量測並**記錄**至 §V（**不與任何門檻比對**，依 C-1）；`test_mutation_*` 一支。
@@ -237,7 +242,7 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
   | 缺 | 任意 | 任意 | 缺 | 非 impl 路徑，本 Task 不介入 |
 
 - **不可做**：不得放行「新 SPEC ＋ legacy 散文 TODO」之組合；不得改動 `--spec`／`--manifest` 之既有語義；**不得以內容 digest 判定既有 SPEC**（見 RESID-10）。
-- **邊界**：① 新 SPEC ＋ 無 `--todo`（擋） ② 新 SPEC ＋ manifest 且 `spec_path` 相等（放行） ③ 既有 SPEC ＋ 無 `--todo`（放行） ④ 既有 SPEC ＋ 散文 TODO（放行） ⑤ 新 SPEC ＋ 散文 TODO（擋） ⑥ `--spec` 之大小寫變體或 `./` 前綴命中既有 SPEC 字面陣列（放行，須正規化後判定） ⑦ 新 SPEC ＋ manifest 但 `spec_path` 不等（擋） ⑧ 新 SPEC ＋ 只給 `--manifest` 未給 `--todo`（擋） ⑨ `--impl-self` ＋ 新 SPEC ＋ 無 `--todo`（擋） ⑩ **`--impl-self` ＋ 無 `--spec`**（擋） ⑪ 生產呼叫所用之既有 SPEC 陣列＝`gate.sh` 腳本字面（斷言不讀任何外部清單檔）。
+- **邊界**：① 新 SPEC ＋ 無 `--todo`（擋） ② 新 SPEC ＋ manifest 且 `spec_path` 相等（放行） ③ 既有 SPEC ＋ 無 `--todo`（放行） ④ 既有 SPEC ＋ 散文 TODO（放行） ⑤ 新 SPEC ＋ 散文 TODO（擋） ⑥ `--spec` 之大小寫變體或 `./` 前綴命中既有 SPEC 字面陣列（放行，須正規化後判定） ⑦ 新 SPEC ＋ manifest 但 `spec_path` 不等（擋） ⑧ 新 SPEC ＋ 只給 `--manifest` 未給 `--todo`（擋） ⑨ `--impl-self` ＋ 新 SPEC ＋ 無 `--todo`（擋） ⑩ **`--impl-self` ＋ 無 `--spec`**（擋） ⑪ 生產呼叫所用之既有 SPEC 陣列＝`gate.sh` 腳本字面（斷言不讀任何外部清單檔） ⑫ **既有 SPEC 字面陣列＝設計定案樹之 `docs/` 下全部 `*_SPEC*.md`**（不等即 fail）。
 - **驗證**：`tests/governance/test_gate_impl_requires_manifest.py`：對本 Task 全部邊界各一具名測試；
   `dispatch` 之非 impl 路徑（無 `--spec` **且**無 `--impl-self`）行為逐字不變之回歸斷言；`test_mutation_*` 一支。
 - **存活至**：`lifecycle: keep`。
@@ -257,11 +262,12 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
   3. **既有清單比對**：以步驟 1 之字串比對 hook 腳本內之字面陣列；另以 `realpath` 解析後之路徑**再比一次**，兩者任一命中即視為命中（涵蓋 symlink／硬連結指向既有清單內檔案之情形）。
   4. 命中既有清單 ⇒ 放行（C-6）；未命中 ⇒ fail-closed 並印五類落點指引。
 - 🔴 **既有清單（字面陣列）之內容**（r4 grok 實查：若以 `docs/*_TODO.md` glob 定義，現存 69 個命中樣式之檔中有 **12 個**——延伸檔 7（`docs/GAP3_EVENT_TODO.D-001.md`、`docs/GAP3_EVENT_UX_TODO.D-001.md` 至 `D-006.md`）、`docs/Archived/` 下 5 個——不在該 glob 內，生效後其合法編輯會被誤擋）：
-  **內容＝收案 commit 當下工作樹中，符合本 Task 步驟 2 樣式之全部路徑**（含延伸檔與任一層子目錄），正規化並排序後寫為 hook 腳本內之字面陣列。**不以 `docs/*_TODO.md` glob 當全集。**
-  新延伸檔因不在該陣列內仍被擋（r3 之原反例不會回來）。Task 1.4 `gate.sh` 內之既有 SPEC 字面陣列比照：收案 commit 當下 `docs/` 下全部 `*_SPEC*.md`。
-- 🔴 **清單之防竄改——不設機械防護**（r5 主委提案 S1；r2–r4 之 sha256 自保護四句與首次寫入例外**全數移除**）：往字面陣列加一行以放行新散文 TODO **屬蓄意**；改陣列＝改 hook 腳本＝經三家 code review。依使用者 2026-09-11 判準列 RESID-12 蓄意等價。
+  **內容＝設計定案 commit 之 git 樹中，符合本 Task 步驟 2 樣式之全部路徑**（`git ls-tree -r --name-only <設計定案 sha>` 再套樣式；含延伸檔與任一層子目錄），正規化並排序後寫為 hook 腳本內之字面陣列。**不以 `docs/*_TODO.md` glob 當全集；不取收案時之工作樹**（r6 三家同判：設計定案至收案之間新建之散文 TODO 會被意外收進）。
+  新延伸檔因不在該陣列內仍被擋（r3 之原反例不會回來）。Task 1.4 `gate.sh` 內之既有 SPEC 字面陣列比照：設計定案 commit 之 git 樹中 `docs/` 下全部 `*_SPEC*.md`。
+- 🔴 **陣列之機械對照**（r2–r4 之 sha256 自保護四句與首次寫入例外**全數移除**；r6 grok 指出「改腳本即三家 code review」實為紀律，**已刪除該等同**）：
+  **測試斷言「hook 腳本之字面陣列＝設計定案樹之符合路徑集合」**（見 §P「生效之判定」）——往陣列多加一行即使該測試失敗。欲蓄意繞過須同時改掉該測試之預期集合，列 RESID-12 蓄意等價。
 - **不可做**：不得擋既有清單內檔案之編輯；不得掃全 repo；不得執行 pytest；**不得以 git 狀態（`ls-files`／`status`／`diff`）作為判定依據**；**不得另建獨立清單檔**。
-- **邊界**：① 新建 `docs/X_TODO.md`（擋） ② 編輯既有清單內之 `docs/GAP2_MARGINAL_IC_TODO.md`（放行） ③ 新建 `docs/X_TODO.yaml`（放行） ④ 路徑含空白 ⑤ 傳入**絕對路徑**或 `./docs/X_TODO.md`（須正規化後正確判定） ⑥ 已 `git add` 但未 commit 之新散文 TODO（**須擋**） ⑦ symlink 指向既有清單內檔案（放行） ⑧ **大小寫變體** `Docs/X_Todo.md`（須擋） ⑨ **子目錄** `docs/sub/X_TODO.md`（須擋） ⑩ 硬連結指向既有清單內檔案（放行） ⑪ **延伸檔** `docs/NEWEPIC_TODO.D-001.md`（須擋） ⑫ 編輯**既有延伸檔** `docs/GAP3_EVENT_TODO.D-001.md`（放行，因在字面陣列內） ⑬ 編輯 `docs/Archived/` 下既有之 `*_TODO.md`（放行） ⑭ **生產呼叫（不傳清單參數）使用之陣列＝腳本字面**，與測試傳入之陣列為同一函式之不同呼叫（斷言生產路徑不讀任何外部檔）。
+- **邊界**：① 新建 `docs/X_TODO.md`（擋） ② 編輯既有清單內之 `docs/GAP2_MARGINAL_IC_TODO.md`（放行） ③ 新建 `docs/X_TODO.yaml`（放行） ④ 路徑含空白 ⑤ 傳入**絕對路徑**或 `./docs/X_TODO.md`（須正規化後正確判定） ⑥ 已 `git add` 但未 commit 之新散文 TODO（**須擋**） ⑦ symlink 指向既有清單內檔案（放行） ⑧ **大小寫變體** `Docs/X_Todo.md`（須擋） ⑨ **子目錄** `docs/sub/X_TODO.md`（須擋） ⑩ 硬連結指向既有清單內檔案（放行） ⑪ **延伸檔** `docs/NEWEPIC_TODO.D-001.md`（須擋） ⑫ 編輯**既有延伸檔** `docs/GAP3_EVENT_TODO.D-001.md`（放行，因在字面陣列內） ⑬ 編輯 `docs/Archived/` 下既有之 `*_TODO.md`（放行） ⑭ **生產呼叫（不傳清單參數）使用之陣列＝腳本字面**，與測試傳入之陣列為同一函式之不同呼叫（斷言生產路徑不讀任何外部檔） ⑮ **字面陣列＝設計定案樹之符合路徑集合**（不等即 fail；往陣列多加一行、或設計定案後才建立之散文 TODO 被收進陣列，皆使本測試失敗） ⑯ 設計定案後新建之 `docs/LATE_TODO.md`（不在陣列內，生效後須擋）。
 - **驗證**：`tests/governance/test_todofmt_write_guard.py`：對本 Task 全部邊界各一具名測試；hook 掛載點與 `.claude/settings.json` **機械對證**（比照既有 `factkey_write_guard` 之對證作法）；耗時以 `date +%s%N` 記錄寫入 §V（依 C-1 不比門檻）；`test_mutation_*` 一支。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`.claude/settings.json` 為共用掛載點，新增條目不得影響既有 hook 之觸發順序——須有回歸測試斷言既有 hook 清單為新清單之子集。
@@ -281,12 +287,15 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
 
 - **目標**：`CLAUDE.md:30,38` 與 `docs/MULTI_AGENT_ORCHESTRATION.md` 中型列，將「TODO」之定義改為五類落點。
 - **不可做**：🔴 **不得放寬審查強度**——對抗式審查、實作者不自審、家數（ORCH §1）、不得跳步四項逐字不動；不得取消 SPEC 對抗審（C-9）；`CLAUDE.md` 不得自寫家數。
-- **邊界**：① 只改 `CLAUDE.md` 未改 ORCH（產生第二權威） ② 改動誤及「不得跳步」之審查強度語義 ③ 家數字面被寫入 `CLAUDE.md` ④ 既有 `--spec/--todo` 旗標說明失效 ⑤ 觸發句表失同步 ⑥ 交叉引用殘留。
+- **邊界**：① 只改 `CLAUDE.md` 未改 ORCH（產生第二權威） ② 改動誤及「不得跳步」之審查強度語義 ③ 家數字面被寫入 `CLAUDE.md` ④ 既有 `--spec/--todo` 旗標說明失效 ⑤ 觸發句表失同步 ⑥ 交叉引用殘留 ⑦ **fixture 之引入 commit 同時修改任一憲法檔**（`git diff-tree` 之檔名清單含憲法檔即 fail） ⑧ **fixture 之引入 commit 之父樹中憲法檔 blob 不等於設計定案 commit 之 blob**（即 fail；防擷取已弱化之文本）。
 - **驗證**：`tests/governance/test_todofmt_constitution_sync.py`：
   1. 🔴 **審查強度四項不變式之逐字快照比對**（r1 三家同判：只比對 TODO 定義一致性，抓不到「兩份文件一起被改弱」；r2 加入第四項；r3 指出原標題仍寫「三段」且無 exact literal）。
      **四項之逐字字面只存於一處**：`tests/governance/fixtures/constitution_invariants.txt`——**實作開始時**由主委自現行檔擷取寫入，本 SPEC **不複寫其字面**。
      🔴 **fixture 之擷取 commit 只得含 fixture 檔**（r4 codex 指出從現行樹自取之風險；r5 codex 指出「同一 commit 既建 fixture 又改憲法」仍可擷取已弱化之字面；r5 主委提案 S5）：
-     擷取 commit **不得**同時修改 `CLAUDE.md`／`docs/MULTI_AGENT_ORCHESTRATION.md`／`AGENTS.md`／`.cursorrules` 任一檔（以 `git diff --name-only` 於該 commit 機械驗證）。
+     擷取 commit **不得**同時修改 `CLAUDE.md`／`docs/MULTI_AGENT_ORCHESTRATION.md`／`AGENTS.md`／`.cursorrules` 任一檔。
+     🔴 **機械驗證之兩句**（r6 三家同判：無版本引數之 `git diff --name-only` 看的是工作樹不是擷取 commit；原未定義由誰、何時驗）：
+     (a) 本 Task 之編號測試以 `git diff-tree --no-commit-id --name-only -r <引入 fixture 之 commit>` 取該 commit 之檔名清單，**只得含 fixture 檔**（`constitution_invariants.txt`、`constitution_exception_allowlist.txt`）；**禁用**無版本引數之 `git diff --name-only`。
+     (b) 該 commit 之**父樹**中四份憲法檔之 blob sha，**必須等於設計定案 commit 中同檔之 blob sha**（`git rev-parse <commit>^:<path>` 對 `git rev-parse <設計定案 sha>:<path>`）。設計定案 sha 依 §P「生效之判定」之記錄時點寫入。
      ⇒ fixture 擷取之文本即**設計定案時**之文本；本票其後之憲法改動（本 Task 2.2 本身）**受該 fixture 約束**。
      fixture 檔頭另記擷取來源之檔路徑與擷取當下之 sha256，作為輔助稽核（非主要防線）。四項為：
      (i) 對抗式審查之要求 (ii) 實作者不自審之要求 (iii) 家數與家族指向 ORCH §1 現行分工行 (iv) 「不得跳步」。
@@ -376,10 +385,13 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
 | 3.2 | `tests/governance/test_todofmt_sample_fftfmeta.py` ＋ 以 FF-TFMETA manifest 經 `gate.sh --todo` 新路由 | 全 pass ＋ rc=0 | — |
 
 - **基準檔之取得時點**：**實作開始時**（任何改動之前）以對應命令之 stdout 寫入；基準檔一經寫入，其後只准以「使用者或委員共識決」更新。
-- **聚合入口規則**：`scripts/todofmt_freeze_check.sh` 逐檔明列上表測試執行（**禁 glob**，依既有「pytest 逐檔明列」規則）；**skip／xfail 一律計為未通過**；回傳聚合 rc（任一未通過即非 0）。
-- 🔴 **聚合器於返回前自行斷言**（r4 codex 指出之漏跑風險；r5 三家中兩家指出「自測入表」造成自我參照而收案 rc 永遠到不了 0；r5 主委提案 S3 取代 grok 之三句追加協議）：
-  聚合器**自身**於返回前比對「已執行之測試檔集合」與「本表測試檔欄中以 `tests/` 開頭、`.py` 結尾之路徑集合」，**不等即 rc 非 0**。**不設入表之自測檔**。
-- **聚合器之單元測試置於本表之外**：`tests/governance/test_todofmt_freeze_check.py` 餵入一張缺一檔之表，斷言聚合器 rc 非 0；餵入完整之表（以 stub 測試檔），斷言 rc=0。**此測試不經聚合器執行**，故無自我參照。
+- 🔴 **本表之權威來源＝`scripts/todofmt_freeze_check.sh` 內之字面陣列，本表為其說明**（r6 三家同判：若聚合器之期望集合取自本 SPEC 之 markdown 表，即依賴散文格式，漏解析一列即假綠）。**聚合器不讀本 SPEC。**
+- **聚合入口規則**（r6 grok 三句修法）：
+  1. **執行清單與期望集合只准是聚合器腳本內之同一個字面陣列**；上表之兩條非 `.py` 命令（Task 3.1、3.2 之 `template_check.sh todofmt`／`gate.sh --todo`）亦寫入同一陣列。逐項執行（**禁 glob**，依既有「pytest 逐檔明列」規則）。
+  2. **每一項只在其行程結束並取得 rc 之後才追加進執行紀錄**；返回前比對「執行紀錄」與「字面陣列」，**不等即 rc 非 0**（漏跑一項即不等）。
+  3. **skip／xfail 一律計為未通過**；回傳聚合 rc（任一未通過即非 0）。**不設入表之自測檔。**
+- **聚合器之單元測試置於本表之外**：`tests/governance/test_todofmt_freeze_check.py` 餵入兩支 stub、令第二支不啟動，斷言聚合器 rc 非 0；兩支皆正常，斷言 rc=0。**此測試不經聚合器執行**，故無自我參照。
+- **誠實邊界**：聚合器之字面陣列與本表散文之後仍可能各寫各的。**不為對齊二者而做 markdown 解析器**（r6 grok 明言）；列 RESID-13。
 - **耗時**：依 C-1 記錄於 §V，不設門檻。此入口**僅於收案前執行一次**，非每次寫檔之檢查，不受 C-5 之禁 pytest 約束（C-5 管轄寫檔當下之檢查）。
 單靠 Task 3.1（自我 dogfooding）不足；單靠 3.1＋3.2 亦不足——新增之 Task 1.3／1.4 之回歸斷言亦為收案前置。
 
@@ -441,5 +453,8 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
 - **RESID-11 — 經 Bash 重導寫入散文 TODO**：`為何現在不做: needs-research:Task 1.2 之 hook 掛於 Write／Edit；Bash 之重導與 tee 不在該掛載面上，本票不做命令解析`。
   （r4 曾列之「刪除生效標記 `scripts/todofmt_active.marker` 與清單以回到未收案態」一項，因 S1 移除生效標記與清單檔**已無對應機制**，自本殘留刪除。）
 - **RESID-12 — 往既有清單（hook／gate 腳本內之字面陣列）加行以放行新散文 TODO 或新 SPEC**：`為何現在不做: user-ruling:2026-09-11 使用者判準「繞過成本 ≥ 合規成本即收，歸 §N 蓄意等價」`。
-  **為何是蓄意**：不存在「意外往 legacy 清單加一行」之情境——加行之唯一目的即為使某檔被放行。加行須改 hook 或 `gate.sh` 腳本，經三家 code review。
-  **r2–r5 曾以 sha256 自保護、生效標記、三態機、環境變數注入等機械防護此項**，r5 主委提案 S1 依本判準全數移除；是否成立交 r6 三家攻擊。
+  **意外之路徑已由測試封閉**（r6 三家同判：r5 主委所稱「不存在意外加行」**不成立**——若陣列取自收案時之工作樹，設計定案後新建之散文 TODO 會被意外收進）：陣列改取自設計定案 commit 之 git 樹，且**測試斷言陣列＝該樹之符合路徑集合**，意外收進或多加一行皆使該測試失敗。
+  **剩餘者為蓄意**：欲放行某新檔，須**同時改掉陣列與該測試之預期集合**——其成本與照規寫一份 manifest 並列，依本判準為蓄意等價。
+  🔴 **本殘留不以 code review 為防線**（r6 grok 指出「改腳本即三家 code review」不成立——現有機器只在下一次派 impl 時數前批家族數，不讀陣列 diff，實為紀律）。
+  r2–r5 曾以 sha256 自保護、生效標記、三態機、環境變數注入等機械防護此項，r5 以結構性簡化全數移除，r6 以上述測試取代。
+- **RESID-13 — 聚合器字面陣列與本 SPEC 收案判定表散文之漂移**：`為何現在不做: needs-research:對齊二者須解析本 SPEC 之 markdown 表，即重新引入 r6 三家所指之散文格式依賴`。聚合器之字面陣列為權威、本表為說明；**不為對齊二者而做 markdown 解析器**（r6 grok 明言）。漂移之後果＝說明過時，不影響收案判定之正確性。
