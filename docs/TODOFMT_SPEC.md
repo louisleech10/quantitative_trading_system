@@ -130,6 +130,7 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
   取得方式＝`git log --format=%H -S <標記前綴> -- docs/TODOFMT_SPEC.md` 須**恰印一行**，否則 fail（前綴於設計定案前已被寫出、或其後被刪除，皆使結果非一行）。本 SPEC、hook 腳本、`gate.sh` 皆**不複寫 L 之 sha**。
   🔴 **L 須先於實作**：L 之 git 樹中不得存在本票 manifest（`docs/manifests/TODOFMT.json`）之 `stub_modules`／`test_files`／`script_acceptance`／`contract_jsons` 所列之任一路徑，亦不得存在 `docs/manifests/TODOFMT.json` 本身；任一存在即 fail（防標記行晚於實作才補上）。
   🔴 **既有檔亦須先於實作**（r9 codex：上句只涵蓋新檔，先改既有之 `gate.sh`／settings 再補標記行時仍綠）：令 **A＝本 SPEC 中首次出現 `INV || ` 前綴之 commit**（`git log --reverse --format=%H -S 'INV || ' -- docs/TODOFMT_SPEC.md` 之第一行）；`git log --format=%H <A>..<L> -- <P>` 須為空，其中 P＝本票 manifest 之 `batch_card.touches` 中於 L 樹已存在之路徑、扣除本 SPEC。即自不變式行寫入起至設計定案，本票要改之既有檔一律未被改動。
+  本票 manifest 之 `touches` **只列實作改動之檔**，不列交接與進度類檔（`HANDOFF.md`、`docs/ROADMAP.md`、`scripts/fact_keys.json`、`白話說明/` 下之檔）——後者每輪收斂皆會更新，列入則本句必紅（r10 前主委自查）。誤列時本句 fail，修 manifest 即可。
   ⇒ 憲法檔（屬 P）於 A 至 L 間不變，故 Task 2.2 以 L 之憲法檔計次數為有效基準；憲法不變式之原文則以 Task 2.2 寫於本 SPEC 之不變式行為準（r8 grok 實測：以 L 之憲法檔為原文時，先改弱 `CLAUDE.md` 再加標記行即過）。
   **L 之語意**（r8 codex）：L 為 **repo 狀態之錨點**，不代表本 SPEC 內容之終態；L 之後對本 SPEC 之修改（如 §V 耗時回填）不影響任何由 L 推導之集合。讀取 L 中本 SPEC 內容者**只有** Task 2.2 之不變式行，其於標記行之前即已寫入。
   所有需要 L 之測試（Task 1.2 邊界⑮⑰⑱、Task 1.4 邊界⑫⑬、Task 2.2、收案判定表「逐字不變」欄）與 W 之一次性陣列生成，皆經該模組之同一函式取得 L；A 與 W 亦由同一模組推導。本節凡稱「本票 manifest 所列」者，清單一律取自 X 版 `docs/manifests/TODOFMT.json`。
