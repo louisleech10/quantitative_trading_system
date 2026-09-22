@@ -523,3 +523,5 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
 - **RESID-14 — 改寫已推送之歷史（rebase／squash／force push）使 L 或 W 之推導改變**：`為何現在不做: user-ruling:2026-09-11 使用者判準「繞過成本 ≥ 合規成本即收，歸 §N 蓄意等價」`。
   本 repo 於 main 直推、不改寫已推送歷史；改寫須 force push，屬蓄意。推導結果變為零行或多行時 fail-closed；推導至另一 commit 而結果等價時不影響判定。
   **不涵蓋之理由**：L 與 W 之推導皆讀不可變之 commit 歷史；防歷史改寫須在 git 之外另建簽章或外部記錄，即新增一層機制。
+
+TODOFMT-DESIGN-FREEZE: 20260922-todofmt-x-review-r11
