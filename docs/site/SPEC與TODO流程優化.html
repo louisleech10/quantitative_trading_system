@@ -59,10 +59,10 @@ Claude.md 也可以改。可以一步一步來，沒有要你一次到位。</p>
 <tbody>
 <tr>
 <td><strong>M1</strong></td>
-<td><strong>相位大跳</strong>（finding 數從 0 跳到 20 那種）</td>
-<td><strong>4 次</strong></td>
-<td><strong>0 次</strong></td>
-<td><strong>模式</strong></td>
+<td><strong>相位躍升</strong>（換審查文件時 finding 數跳上去）</td>
+<td>跳幅 <strong>+12～+19</strong></td>
+<td>跳幅 <strong>+3～+5</strong></td>
+<td><strong>模式</strong>（是程度差，不是有無）</td>
 </tr>
 <tr>
 <td><strong>M2</strong></td>
@@ -80,14 +80,67 @@ Claude.md 也可以改。可以一步一步來，沒有要你一次到位。</p>
 </tr>
 </tbody>
 </table></div>
-<p><strong>M1 的來源是 CLAUDE.md 的規定</strong>：SPEC 對抗審完 → 凍結 → <strong>自動開一輪 TODO 全審</strong>。
-所以曲線會出現 0→20、0→13。實例（實查）：</p>
-<ul>
-<li><code>gap2</code> r6→r7：SPEC 實質 0 → TODO 首審 <strong>20 條</strong></li>
-<li><code>gap3</code> r6→r7：<strong>0 → 13</strong></li>
-<li><code>gap1</code> r7→r8：1 → TODO <strong>22 條</strong></li>
-<li><code>splitunify</code> r13→r14：換審查標的</li>
-</ul>
+<blockquote>
+<p>🔴 <strong>2026-09-22 更正（你提問後我實查改正；未經委員複驗）</strong>
+M1 這一列先前把治理票記成「0 次」，<strong>那是錯的</strong>。
+<code>redispatch</code>／<code>verdictgate</code>／<code>docrot2</code> 都有 TODO 檔、都有兩相位，邊界也都有躍升。
+正確說法是<strong>跳幅差</strong>。依你裁示（樣本數少、不在數字上糾結），只改結論、不再擴表。</p>
+</blockquote>
+<p><strong>M1 的來源是 CLAUDE.md 的規定</strong>：SPEC 對抗審完 → 凍結 → <strong>自動開一輪 TODO 全審</strong>；
+而<strong>輪次計數器綁在「票」上、不綁在「文件」上</strong>（session 名是 <code>&lt;epic&gt;-x-review-r&lt;N&gt;</code>，
+epic 是票名不是檔名），所以兩份不同文件的收斂曲線被畫成同一條。</p>
+<p>相位邊界實查（同一套計數法，排除佔位符）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>票</th>
+<th>邊界</th>
+<th style="text-align:right">前一輪</th>
+<th style="text-align:right">後一輪</th>
+<th style="text-align:right">跳幅</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gap1</code></td>
+<td>SPEC→TODO</td>
+<td style="text-align:right">3</td>
+<td style="text-align:right">22</td>
+<td style="text-align:right"><strong>+19</strong></td>
+</tr>
+<tr>
+<td><code>gap2</code></td>
+<td>SPEC→TODO</td>
+<td style="text-align:right">2</td>
+<td style="text-align:right">20</td>
+<td style="text-align:right"><strong>+18</strong></td>
+</tr>
+<tr>
+<td><code>gap3</code></td>
+<td>SPEC→TODO</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">13</td>
+<td style="text-align:right"><strong>+12</strong></td>
+</tr>
+<tr>
+<td><code>verdictgate</code>（治理）</td>
+<td>SPEC→TODO</td>
+<td style="text-align:right">9</td>
+<td style="text-align:right">14</td>
+<td style="text-align:right"><strong>+5</strong></td>
+</tr>
+<tr>
+<td><code>redispatch</code>（治理）</td>
+<td>TODO→SPEC</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">4 → 7 → 8 → 9</td>
+<td style="text-align:right"><strong>+3，之後一路爬</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>🔴 <strong>拆成「每份文件」算之後，量化與治理的差距比 §2-2 那組數字小很多</strong>：
+量化每份文件中位數約 <strong>6</strong>、治理約 <strong>4.5</strong>（§2-2 的「8 vs 4」是把兩份文件接成一條算的）。
+<strong>但拆開不會讓數字變好看</strong>——見 2-6。</p>
 <p><strong>M2 的來源是我</strong>：只修被點名的地方、改一處又弄壞另一處。
 EVENTSCAN 的收斂檔裡「只修被點名處」這句話出現 <strong>12 次</strong>（實查），
 「主委被推翻／錯／漏」出現 <strong>9 次</strong>（實查）。</p>
@@ -136,8 +189,8 @@ EVENTSCAN 的收斂檔裡「只修被點名處」這句話出現 <strong>12 次<
 <p><strong>否證 A — 治理票是不是也在震盪？</strong>
 如果治理票（同一個主委）完全不震盪，那「小回升歸主委」就不成立。
 實查：<strong>同一份文件內小回升，量化 7／9 票、治理 5／9 票，兩組都有。</strong>
-但<strong>相位大跳量化 4 次、治理 0 次</strong>。
-⇒ <strong>大跳是模式，小回升是我</strong>（因為兩種票型都會發生）。</p>
+而相位躍升<strong>兩組都有</strong>，差在幅度（量化 +12～+19、治理 +3～+5，見 1-1 更正框）。
+⇒ <strong>躍升是模式（程度差），小回升是我</strong>（因為兩種票型都會發生）。</p>
 <p><strong>否證 B — 治理票是不是只是比較簡單？</strong>
 如果治理票本來就簡單，那「量化輪數高歸模式」就不成立。
 委員用「第 1 輪的實質 findings 數」當複雜度代理：
@@ -337,6 +390,8 @@ EVENTSCAN 的收斂檔裡「只修被點名處」這句話出現 <strong>12 次<
 evtwarmup 5、evtlabel 3、ffdstar 2。</p>
 <p><strong>中位數 8／平均 8.7／≥7 輪 6 票（67%）</strong>；
 對照治理 9 票：<strong>中位數 4／平均 5.6／≥7 輪 22%</strong>。</p>
+<p>🔴 <strong>這組數字是「一票 ＝ 一條曲線」算的，而一票含 SPEC 與 TODO 兩份文件。</strong>
+拆成每份文件之後差距會縮小（量化約 6、治理約 4.5），見 2-6。</p>
 <h3 id="2-3-findings-的實際組成codex-逐條分類-eventscan-的-145-條">2-3 findings 的實際組成（codex 逐條分類 EVENTSCAN 的 145 條）</h3>
 <div class="table-wrap"><table>
 <thead>
@@ -419,6 +474,59 @@ evtwarmup 5、evtlabel 3、ffdstar 2。</p>
 <strong>不能</strong>拿它推論成「量化票普遍比治理票缺可執行物」——那個推論我提過兩次，
 被委員用同一套啟發式掃過兩組全部輪次推翻：
 <strong>強可跑比例 44.8%（量化）vs 42.8%（治理），沒有顯著差異，且方向跟我的假設相反。</strong></p>
+<h3 id="2-6-拆成-spectodo-兩份文件之後2026-09-22-你提問後補查">2-6 拆成 SPEC／TODO 兩份文件之後（2026-09-22 你提問後補查）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>票</th>
+<th style="text-align:right">SPEC 階段輪數</th>
+<th style="text-align:right">TODO 階段輪數</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>splitunify</td>
+<td style="text-align:right"><strong>16</strong></td>
+<td style="text-align:right">5</td>
+</tr>
+<tr>
+<td>eventscan</td>
+<td style="text-align:right"><strong>12</strong></td>
+<td style="text-align:right">0（沒走到）</td>
+</tr>
+<tr>
+<td>gap1</td>
+<td style="text-align:right">7</td>
+<td style="text-align:right">2</td>
+</tr>
+<tr>
+<td>search2event</td>
+<td style="text-align:right">7</td>
+<td style="text-align:right">0</td>
+</tr>
+<tr>
+<td>gap2</td>
+<td style="text-align:right">6</td>
+<td style="text-align:right">5</td>
+</tr>
+<tr>
+<td>gap3</td>
+<td style="text-align:right">6</td>
+<td style="text-align:right">2</td>
+</tr>
+<tr>
+<td>ffdstar</td>
+<td style="text-align:right">2</td>
+<td style="text-align:right">0</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>SPEC 單獨的中位數約 7，TODO 階段中位數只有約 2。</strong>
+業界設計審查是 1–2 輪。</p>
+<p>⇒ 🔴 <strong>拆開不能救數字</strong>：主體在 <strong>SPEC 階段內部</strong>，不在「後面多接了一段 TODO」。
+這直接影響改法排序，見 §四開頭。</p>
+<p>🔴 <strong>誠實邊界</strong>：<code>evtwarmup</code>（5 輪）與 <code>evtlabel</code>（3 輪）無法從檔名可靠分相位，未列入。
+樣本只有 7 票，中位數會因單票而漂；此表用途是<strong>判方向</strong>，不是精確估計。</p>
 <hr />
 <h2 id="三這三輪討論中被推翻的含我自己錯的">三、這三輪討論中被推翻的（含我自己錯的）</h2>
 <p>這節列出來是因為你要 review 的是「討論」，不只是結論。
@@ -477,6 +585,16 @@ evtwarmup 5、evtlabel 3、ffdstar 2。</p>
 <p>排序依據＝<strong>信號／成本比</strong>，不是重要性。
 每一條都標了「覆蓋率上限」——那是根據 §2-3 的 findings 組成算的，<strong>是上限不是預測</strong>。</p>
 </blockquote>
+<blockquote>
+<p>🔴 <strong>2026-09-22 排序更正（你問 1-1 之後實查改的）</strong>
+依 2-6：<strong>輪數的主體在 SPEC 階段內部</strong>（SPEC 中位數約 7），
+而 TODO 階段中位數只有約 2。</p>
+<p>⇒ <strong>4-0 是唯一主藥</strong>：它針對的正是 SPEC 階段內部那 7 輪。
+⇒ <strong>4-2 降級</strong>：切斷相位串接省下的是 TODO 那 ~2 輪，不是主體；
+而且它要動 <code>CLAUDE.md</code> 兩句（成本最高的一條）。
+它仍值得做（治理票邊界也在爬，見 1-1 的 <code>redispatch</code>），但<strong>不該排在 4-0 前面</strong>。
+⇒ 4-1、4-3 排序不變。</p>
+</blockquote>
 <h3 id="4-0-不變式的可執行-owner-只審-diff-建議優先">4-0 不變式的可執行 owner ＋ 只審 diff　【建議優先】</h3>
 <div class="table-wrap"><table>
 <thead>
@@ -504,7 +622,7 @@ evtwarmup 5、evtlabel 3、ffdstar 2。</p>
 </tr>
 <tr>
 <td><strong>覆蓋率</strong></td>
-<td>直接針對 M1（相位大跳）＋ M2（同文件回升）兩個機制</td>
+<td>🔴 <strong>唯一打到主體的一條</strong>：依 2-6，輪數集中在 SPEC 階段內部（中位數約 7），而 4-0 正是收束那一段；同時也治 M2（同文件回升）</td>
 </tr>
 <tr>
 <td><strong>成本</strong></td>
@@ -578,11 +696,11 @@ evtwarmup 5、evtlabel 3、ffdstar 2。</p>
 </tr>
 <tr>
 <td><strong>為什麼有效</strong></td>
-<td>直接切掉 M1，也就是<strong>量化票 4 次、治理票 0 次的那個機制</strong>——唯一能解釋兩組輪數差距的機制</td>
+<td>切掉 M1（相位躍升）。🔴 <strong>但它不是主體</strong>：依 2-6，TODO 階段中位數只有約 2 輪，切掉省的就是那 ~2 輪</td>
 </tr>
 <tr>
 <td><strong>覆蓋率</strong></td>
-<td>針對 M1（相位大跳）</td>
+<td>針對 M1，量化跳幅 +12～+19、治理 +3～+5（治理票也有，只是小）</td>
 </tr>
 <tr>
 <td><strong>風險（委員警告）</strong></td>
@@ -726,13 +844,13 @@ composer 版的風險是「執行端可能把『薄切片』讀成『可以不�
 <tr>
 <td><strong>D1</strong></td>
 <td>採不採 4-0（可執行 owner ＋ 只審 diff）</td>
-<td><strong>採</strong>。零成本、不改憲法、下一張票就能試</td>
-<td>直接針對 M1＋M2</td>
+<td><strong>採，且優先</strong>。零成本、不改憲法、下一張票就能試；🔴 依 2-6 它是<strong>唯一打到主體</strong>的一條</td>
+<td>收束 SPEC 階段內部那 ~7 輪</td>
 </tr>
 <tr>
 <td><strong>D2</strong></td>
 <td>採不採 4-2（切斷 SPEC→TODO 串接）</td>
-<td><strong>採</strong>。它是唯一能解釋量化 vs 治理輪數差的機制</td>
+<td><strong>採，但排在 D1 之後</strong>。🔴 更正：它省的是 TODO 那 ~2 輪，不是主體，卻要動憲法兩句</td>
 <td><strong>要改 CLAUDE.md 5-1＋5-2（必須一起）</strong></td>
 </tr>
 <tr>
