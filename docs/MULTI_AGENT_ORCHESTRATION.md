@@ -58,7 +58,7 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 - **不得**因效率題改變正確性 gate 的判定；與 `CLAUDE.md` 優化優先序一致（**執行速度排第 4**，前三為跨層可重現／多標的穩定／資料品質）。
 - 常態題**預設答「無」即可**通過，避免 bikeshedding 與注意力稀釋。
 
-🔴 **恢復三家(2026-09-16 使用者通知):討論/code review/adversarial/戳記＝Codex+Composer(Cursor)+Grok**——使用者原話「Grok回來了，你可以先檢查是不是Grok4.6，然後也可以派工，改回三家委員。Cursor也回到Composer2.5」。機器版=`scripts/governance_families.json` 之 `active_stampers`(暫停者=與 `review_families` 之差集;要再暫停只改該行)。委員之模型一律依使用者在各 CLI 設定檔之選擇(`cx_run.sh` 自 2026-09-14 起不再寫死型號)。
+🔴 **討論/code review/adversarial/戳記之家族清單，唯一權威＝下方生成區塊**（機器版＝`scripts/governance_families.json` 之 `active_stampers`；暫停者＝與 `review_families` 之差集；要暫停或恢復只改該行）。**本段不得手寫家族名或家數**——2026-09-16 起同一事實曾在本行與 §1 現行分工行各寫一次，兩者於 09-18 的暫停後不同步，屬同型漂移（2026-09-22 收掉）。委員之模型一律依使用者在各 CLI 設定檔之選擇（`cx_run.sh` 自 2026-09-14 起不再寫死型號）。
 
 本期實際蓋章委員（由 `scripts/governance_families.json` 之 `active_stampers` 生成，勿手改；改名單只改該 JSON 後跑 `bash scripts/gen_fact_key_blocks.sh --write`）：
 
@@ -67,9 +67,10 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 |---|---|
 | 001 | codex |
 | 002 | composer |
+| 003 | grok |
 <!-- END GENERATED: committee-roster -->
 
-**現行分工(2026-09-18 使用者調整,Grok CLI 額度用罄後改由 Cursor 承載 Grok):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Claude(Fable 5/Opus)主委自任**;**討論/code review/adversarial=Codex+Composer(Cursor,現跑 Grok) 兩家全員**(實作者不自審);委員會審查=兩家;簽核 quorum=兩家;小=Claude 自做。** 🔴 獨立之 `grok` CLI 家族**暫停**(402 Payment Required,餘額用罄),仍留在 `review_families` 名冊內、只移出 `active_stampers`——差集由 `gov_check.sh` 每次 push 印出,不靠記憶。🔴 **家族名≠模型名**:`composer` 指的是 `cursor-agent` 這個執行端,其背後模型由使用者在 Cursor 設定,現為 Grok;查型號看 CLI 設定檔,不寫死在本檔。 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-08-17 五調、2026-07-14 三調全文見 git log〕
+**現行分工(2026-09-22 使用者調整,Grok CLI 額度恢復、Cursor 切回 Composer):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Claude(Fable 5/Opus)主委自任**;**討論/code review/adversarial=Codex+Composer+Grok 三家全員**(實作者不自審);委員會審查=三家;簽核 quorum=三家;小=Claude 自做。** 🔴 獨立之 `grok` CLI 家族**已恢復**並回到 `active_stampers`(前次暫停原因=402 Payment Required 餘額用罄,2026-09-18~09-22);`review_families` 與 `active_stampers` 現已無差集,該差集仍由 `gov_check.sh` 每次 push 印出,不靠記憶。🔴 **家族名≠模型名**:`composer` 指的是 `cursor-agent` 這個執行端,其背後模型由使用者在 Cursor 設定,現已切回 Composer;查型號看 CLI 設定檔,不寫死在本檔。 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-09-18 六調、2026-08-17 五調、2026-07-14 三調全文見 git log〕
 
 > 🔴 **本行是散文版,機器版才是判定依據**:`scripts/governance_roles.json`(`implementer`/`reviewers`,角色閘讀它)
 > 與 `scripts/governance_families.json`(`active_stampers`,戳記 quorum 讀它)。兩者不一致時**以機器版為準**,
