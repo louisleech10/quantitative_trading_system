@@ -118,11 +118,14 @@
   manifest 之 `raw_artifact_applied.steps` 六項全為 `false`（Claude 實跑 2026-09-21）。
   🔴 **本段不得重述上列任一可列舉值**——第 26–28 行自訂之 B 政策明定「不得手打會被再抄的值」，
   而主委在本段已**三次**違反（R7 手打規模數字、R8 再手打 `config_hash` 與失效 run 之 group 數）。
-- 🔴 **第一次重跑不可用，但仍在磁碟上**：該次請求漏給 `timeframes.training`，
+- 🔴 **第一次重跑不可用，已由使用者於 2026-09-22 刪除**：該次請求漏給 `timeframes.training`，
   產出之 group **全為 `1h`、零個 `12h`**（R6 委員抓出；識別碼與 group 數見
   `eventscan-golden-reference` 040 之失效 run 欄）。**它與現行 reference 外觀相似
   （同為未轉換），誤用風險高** ⇒ 任何引用 reference 之處皆須核對 `config_hash`。
-  本票**不刪該 run**（刪除為破壞性動作，須使用者裁示）。
+  刪除前實查其功能引用為 **0**（`tests/`／`momentum/`／`api/`／`scripts/`／`docs/`／`frontend/src`），
+  故刪除不影響任何測試；`data_cache/features` 自 18 個 run／41 GB 降為 **17 個／35 GB**。
+  🔴 **另一個不可用之 run `4a8a0b37…` 不刪**：它對本票不可用，但有 **33 處功能引用**
+  （`tests/momentum/Analysis/test_splitunify_*` 等），刪除會弄壞既有測試。
 - FACT-RECEIPT: 以真實 kline 重算 EMA 與新 run 落檔欄比對 → **該批 EMA 欄之
   `corr(落檔, 未轉換EMA)` 全部為 `1.0000`**，值域回到價格尺度（欄數與值域見 `eventscan-clock` 075）
   （Claude 實跑 2026-09-21）
@@ -450,7 +453,7 @@
 | 010 | kline 來源 | `data_cache/feature_klines/kline_cache.h5`（禁合成 fixture） |
 | 020 | reference symbol | `ETHUSDT` |
 | 030 | reference timeframe | `1h` |
-| 040 | reference FF run | `config_hash = d9935491cea49e8cada481a8bf9487d6`（2026-09-21 產生之**未轉換且含 1h＋12h** run）。🔴 **兩個不可用之 run**：`4a8a0b37…`（fracdiff 使跨週期欄不可比）與 `654bd63b…`（同為未轉換，但**漏了全部 12h 欄**，542 group 全為 1h）——後者仍在磁碟上，誤用風險高，任何引用皆須先核對 `config_hash` |
+| 040 | reference FF run | `config_hash = d9935491cea49e8cada481a8bf9487d6`（2026-09-21 產生之**未轉換且含 1h＋12h** run）。🔴 **兩個不可用之 run**：`4a8a0b37…`（fracdiff 使跨週期欄不可比）與 `654bd63b…`（同為未轉換，但**漏了全部 12h 欄**，542 group 全為 1h）——**後者已於 2026-09-22 由使用者刪除**（刪除前實查功能引用為 0；`data_cache/features` 自 18 個 run／41 GB 降為 17 個／35 GB）。前者**不刪**：對本票不可用，但有 33 處功能引用（`tests/momentum/Analysis/test_splitunify_*` 等），刪除會弄壞既有測試。任何引用 reference 之處仍須先核對 `config_hash` |
 | 050 | 取 run 目錄之守衛 | 同一 `config_hash` 可存在於多個 symbol ⇒ 須再以 symbol 篩選，命中多於一個即 fail-closed |
 | 060 | golden 存放路徑 | `tests/golden/eventscan/` |
 | 070 | 新增數值之容差 | `abs ≤ 1e-12` 或 `rel ≤ 1e-9`；超出即列出該（批, h）與實際 diff = FAIL |

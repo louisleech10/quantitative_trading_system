@@ -1089,7 +1089,7 @@
       [
         "040",
         "reference FF run",
-        "`config_hash = d9935491cea49e8cada481a8bf9487d6`（2026-09-21 產生之**未轉換且含 1h＋12h** run）。🔴 **兩個不可用之 run**：`4a8a0b37…`（fracdiff 使跨週期欄不可比）與 `654bd63b…`（同為未轉換，但**漏了全部 12h 欄**，542 group 全為 1h）——後者仍在磁碟上，誤用風險高，任何引用皆須先核對 `config_hash`"
+        "`config_hash = d9935491cea49e8cada481a8bf9487d6`（2026-09-21 產生之**未轉換且含 1h＋12h** run）。🔴 **兩個不可用之 run**：`4a8a0b37…`（fracdiff 使跨週期欄不可比）與 `654bd63b…`（同為未轉換，但**漏了全部 12h 欄**，542 group 全為 1h）——**後者已於 2026-09-22 由使用者刪除**（刪除前實查功能引用為 0；`data_cache/features` 自 18 個 run／41 GB 降為 17 個／35 GB）。前者**不刪**：對本票不可用，但有 33 處功能引用（`tests/momentum/Analysis/test_splitunify_*` 等），刪除會弄壞既有測試。任何引用 reference 之處仍須先核對 `config_hash`"
       ],
       [
         "050",
