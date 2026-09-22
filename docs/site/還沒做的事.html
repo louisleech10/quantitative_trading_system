@@ -28,9 +28,14 @@
 </thead>
 <tbody>
 <tr>
+<td><strong>SPEC／TODO 流程優化</strong></td>
+<td>為什麼一份規格要審 8 輪、實作還是一堆 bug</td>
+<td>🔴 <strong>等你逐條裁決</strong>：<a href="SPEC與TODO流程優化.html">SPEC與TODO流程優化.md</a> §七 D1–D8</td>
+</tr>
+<tr>
 <td><strong>EVENTSCAN</strong></td>
 <td>條件成立買入、持有 N 期報酬 vs 隨機對照</td>
-<td>方向已定案，<strong>正在寫 SPEC</strong>（見下第二節第 1 列）</td>
+<td>🔴 <strong>暫停中</strong>：SPEC 審至第 12 輪、未凍結、仍剩 11 條 P1；等流程改法裁決後再續</td>
 </tr>
 <tr>
 <td><strong>GAP-3 的 UAT 驗收</strong></td>
@@ -67,25 +72,43 @@
 </thead>
 <tbody>
 <tr>
+<td>0</td>
+<td><strong>流程優化</strong></td>
+<td>SPEC／TODO 要審幾輪、驗收條件放哪裡</td>
+<td>🔴 <strong>等你裁決 D1–D8</strong>；裁決前 EVENTSCAN 不動</td>
+</tr>
+<tr>
 <td>1</td>
 <td><strong>EVENTSCAN</strong></td>
 <td>條件掃描 → 持有報酬 vs 隨機對照</td>
-<td>方向定案，<strong>下一步＝寫 SPEC</strong>（不是實作）；寫的同時建 B，見下</td>
+<td>🔴 <strong>暫停</strong>（SPEC R12 收斂、未凍結）；寫的同時建 B，見下</td>
 </tr>
 <tr>
 <td>2</td>
+<td><strong>FF-TFMETA</strong></td>
+<td>FF run 的週期標記只記單一週期，多週期 run 會標錯</td>
+<td>未開工（已定性為真缺陷，只對新 run 生效）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>FF-NAME</strong></td>
+<td>衍生層欄名沒經過命名正規化（3,596 欄／0.859%）</td>
+<td>未開工（已定性為真缺陷，排在 FF-TFMETA 之後）</td>
+</tr>
+<tr>
+<td>4</td>
 <td><strong>ICPATH</strong></td>
 <td>已完成項目逐項確認兩路（全域序列型／事件型）都支援且算得對</td>
 <td>未開工</td>
 </tr>
 <tr>
-<td>3</td>
+<td>5</td>
 <td><strong>GLOBALH</strong></td>
 <td>多個持有期全部算、逐列標 h／k、可篩</td>
 <td>未開工</td>
 </tr>
 <tr>
-<td>4</td>
+<td>6</td>
 <td><strong>UAT 驗收</strong></td>
 <td>你實機驗收（一定最後）</td>
 <td>未開工</td>

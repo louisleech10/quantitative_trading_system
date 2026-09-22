@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPEC／TODO 流程 — 完整問題、討論與改法</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">SPEC與TODO流程優化.md</span></nav>
+<main>
+<h1 id="spectodo-流程-完整問題討論與改法">SPEC／TODO 流程 — 完整問題、討論與改法</h1>
+<blockquote>
+<p><strong>這份是給你逐條審閱的。我還沒做任何改動。</strong></p>
+<p><strong>由來</strong>：你 2026-09-22 的四個問題（逐字收錄於 §一）。
+<strong>依據</strong>：三輪唯讀委員會（codex＋composer 兩家），全部收斂銷帳、零駁回。
+收斂檔：<code>handoffs/reconcile/20260922-procopt-x-consult-r{1,2,3}/synth.md</code>。
+<strong>機器紀錄</strong>：<code>docs/PROCOPT_DECISION.md</code>（同內容的技術版，給我和委員用）。</p>
+<p><strong>怎麼 review</strong>：每一條都有編號（例如 <code>4-2</code>、<code>5-1</code>）。
+你可以直接回「4-2 不同意」「5-1 要改成 XXX」，我就只動那一條。</p>
+<p>🔴 <strong>標示約定</strong>：
+「<strong>實查</strong>」＝我實際從 repo／git log／檔案讀出來的，可重跑。
+「<strong>委員查</strong>」＝委員實查、我抽驗過。
+「<strong>判斷</strong>」＝推論，不是事實。
+「<strong>誠實邊界</strong>」＝這個數字或結論的已知限制。</p>
+</blockquote>
+<hr />
+<h2 id="一你問的四個問題與答案">一、你問的四個問題與答案</h2>
+<h3 id="1-0-你的原話逐字">1-0 你的原話（逐字）</h3>
+<blockquote>
+<ol>
+<li>現在的問題就是量化主線的 SPEC 和 TODO 為何要這麼多輪，而且還無法收斂</li>
+<li>量化和軟體業界的模式和流程是什麼，跟我們的有什麼不一樣，我們要如何優化</li>
+<li>輪數那麼多是因為模式和流程錯了嗎，還是只是你主委問題發散和寫文檔錯誤？</li>
+<li>花那麼多時間在 SPEC 和 TODO，但實作還是一堆問題和 bug，這是正常的嗎？</li>
+</ol>
+<p>解決問題和品質為最高優先，但也要考量成本和效率和時間，從 First principle 來開始，
+Claude.md 也可以改。可以一步一步來，沒有要你一次到位。</p>
+</blockquote>
+<h3 id="1-1-q1為何這麼多輪是不是無法收斂">1-1 Q1：為何這麼多輪、是不是無法收斂</h3>
+<p><strong>「無法收斂」是假的。</strong></p>
+<p>零實質 finding <strong>確實達到過好幾次</strong>（實查）：<code>gap2</code> 第 6 輪、<code>gap3</code> 第 6 輪、
+<code>splitunify</code> 第 13 與第 21 輪、<code>docrot</code> 三輪內從 22 條降到 0。</p>
+<p>達不到的不是「零」，<strong>是「到了零之後把票停住」</strong>——例如 <code>redispatch</code> 第 7 輪已經是 0，
+還繼續跑。</p>
+<p>🔴 所以問題不在「收斂不了」，在<strong>沒有明確的停輪出口</strong>。</p>
+<p><strong>至於為什麼輪數多</strong>，委員把它拆成<strong>三個機制</strong>（我原本只切成兩塊，委員說那個切面太粗、
+把兩種不同的東西捆在一起）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>編號</th>
+<th>機制</th>
+<th>量化 9 票</th>
+<th>治理 9 票</th>
+<th>歸因</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>M1</strong></td>
+<td><strong>相位大跳</strong>（finding 數從 0 跳到 20 那種）</td>
+<td><strong>4 次</strong></td>
+<td><strong>0 次</strong></td>
+<td><strong>模式</strong></td>
+</tr>
+<tr>
+<td><strong>M2</strong></td>
+<td><strong>同一份文件內小回升</strong>（7→14 那種）</td>
+<td>7／9 票</td>
+<td>5／9 票</td>
+<td><strong>我的編輯紀律</strong></td>
+</tr>
+<tr>
+<td><strong>M3</strong></td>
+<td><strong>到零卻不停住</strong></td>
+<td>有</td>
+<td>少</td>
+<td><strong>模式</strong>（無出口判定）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>M1 的來源是 CLAUDE.md 的規定</strong>：SPEC 對抗審完 → 凍結 → <strong>自動開一輪 TODO 全審</strong>。
+所以曲線會出現 0→20、0→13。實例（實查）：</p>
+<ul>
+<li><code>gap2</code> r6→r7：SPEC 實質 0 → TODO 首審 <strong>20 條</strong></li>
+<li><code>gap3</code> r6→r7：<strong>0 → 13</strong></li>
+<li><code>gap1</code> r7→r8：1 → TODO <strong>22 條</strong></li>
+<li><code>splitunify</code> r13→r14：換審查標的</li>
+</ul>
+<p><strong>M2 的來源是我</strong>：只修被點名的地方、改一處又弄壞另一處。
+EVENTSCAN 的收斂檔裡「只修被點名處」這句話出現 <strong>12 次</strong>（實查），
+「主委被推翻／錯／漏」出現 <strong>9 次</strong>（實查）。</p>
+<h3 id="1-2-q2業界是怎麼做的差在哪">1-2 Q2：業界是怎麼做的，差在哪</h3>
+<p><strong>一句話：業界驗證行為，我們驗證文字。</strong></p>
+<p>逐項對照（委員實查，具體到可查證的組織與慣例）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>尺度</th>
+<th>本專案（實查）</th>
+<th>業界常態（委員查）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>單票審查輪數</td>
+<td>中位數 5／平均 6.8／p75 8／最大 21；<strong>44% 要 7 輪以上、28% 要 10 輪以上</strong></td>
+<td>設計審查 1–2 輪；RFC last-call 2–3 輪；量化期刊 referee 1–3 輪</td>
+</tr>
+<tr>
+<td>寫 vs 審的時間比</td>
+<td>EVENTSCAN <strong>寫 20 分鐘 : 審 12 小時 ＝ 36:1</strong></td>
+<td>同數量級（數小時到數日）</td>
+</tr>
+<tr>
+<td>何時開始寫碼</td>
+<td>中／大鐵律：SPEC 凍結前不實作</td>
+<td>設計「夠用」就開 spike／薄切片</td>
+</tr>
+<tr>
+<td><strong>停輪條件</strong></td>
+<td><strong>近乎零 finding</strong></td>
+<td><strong>P0/P1 閉合，小問題可後補</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>⇒ 🔴 <strong>最大的單一差距是停輪條件。</strong></p>
+<p>🔴 <strong>這裡要更正我先前的說法</strong>：我以前寫過「我們的中位數接近業界」——<strong>那是錯的</strong>，
+因為我算的母體混進了 115 張批次 code review。用正確母體（18 張有 SPEC／TODO 的票）看，
+中位數 5 是設計審查的 <strong>2–5 倍</strong>、RFC last-call 的約 <strong>2 倍</strong>。</p>
+<p><strong>我們做對、業界也這樣做、不該動的</strong>（兩家獨立同判）：
+對抗式審查、實作者不自審、預先登記（pre-registration）、PIT／防洩漏／防過擬合的量化紀律。</p>
+<h3 id="1-3-q3是模式錯了還是我發散文檔寫錯">1-3 Q3：是模式錯了，還是我發散、文檔寫錯</h3>
+<p><strong>兩個都是。</strong> 而且委員不是憑感覺分的，是用兩個「否證觀測」把它釘死：</p>
+<p><strong>否證 A — 治理票是不是也在震盪？</strong>
+如果治理票（同一個主委）完全不震盪，那「小回升歸主委」就不成立。
+實查：<strong>同一份文件內小回升，量化 7／9 票、治理 5／9 票，兩組都有。</strong>
+但<strong>相位大跳量化 4 次、治理 0 次</strong>。
+⇒ <strong>大跳是模式，小回升是我</strong>（因為兩種票型都會發生）。</p>
+<p><strong>否證 B — 治理票是不是只是比較簡單？</strong>
+如果治理票本來就簡單，那「量化輪數高歸模式」就不成立。
+委員用「第 1 輪的實質 findings 數」當複雜度代理：
+<strong>量化中位 16、治理中位 12，很接近。</strong>
+但治理能 3 輪內從 22 降到 0，而 EVENTSCAN 開場 21 條、<strong>跑了 12 輪還剩 11 條</strong>。
+⇒ 「治理比較簡單」<strong>解釋不了收斂速度的差距</strong>。</p>
+<p><strong>反事實估計</strong>（委員修正了我的樂觀估計）：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>情境</th>
+<th>中位數輪次</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>現況</td>
+<td>8</td>
+</tr>
+<tr>
+<td>換一個編輯紀律完美的主委、模式照舊</td>
+<td><strong>6–7</strong></td>
+</tr>
+<tr>
+<td>只改模式、主委照舊</td>
+<td>5–6，但 EVENTSCAN 還是會 12 輪</td>
+</tr>
+</tbody>
+</table></div>
+<p>我原本估「完美主委能降到 5–6」，委員說偏樂觀——因為<strong>完美的主委也消不掉相位串接</strong>。</p>
+<h3 id="1-4-q4花那麼多時間寫文件實作還是一堆-bug正常嗎">1-4 Q4：花那麼多時間寫文件，實作還是一堆 bug，正常嗎</h3>
+<p>委員逐條抽樣了 <strong>18 個實作階段的缺陷群集</strong>，分類如下：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>類別</th>
+<th style="text-align:right">條數</th>
+<th style="text-align:right">比例</th>
+<th>意義</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>SPEC 已經寫對、實作沒照做</strong></td>
+<td style="text-align:right"><strong>8</strong></td>
+<td style="text-align:right"><strong>≈40%</strong></td>
+<td><strong>再審 10 輪 SPEC 也擋不住</strong></td>
+</tr>
+<tr>
+<td><strong>SPEC 根本沒寫到</strong></td>
+<td style="text-align:right"><strong>9</strong></td>
+<td style="text-align:right"><strong>≈50%</strong></td>
+<td>凍結前想像不全，讀散文補不了</td>
+</tr>
+<tr>
+<td>修補時引入的新問題</td>
+<td style="text-align:right">1</td>
+<td style="text-align:right">≈6%</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>委員的結論（逐字）：</p>
+<blockquote>
+<p><strong>這直接否定「花更多 SPEC 輪換實作品質」。實作有洞正常；
+用 12 小時零產物去買那筆品質，不正常。</strong></p>
+</blockquote>
+<p><strong>最刺眼的實例</strong>：<code>Math.max</code> 把 per-timeframe 的值塌成一個——
+<strong>SPEC 明文禁止、B3 批次修過、B5 批次又犯。</strong>
+⇒ 不是規格沒寫清楚，是<strong>規格沒有變成一個會擋人的測試</strong>。</p>
+<p>🔴 <strong>誠實邊界（委員自己標的）</strong>：這是<strong>非隨機抽樣</strong>，偏向有長收斂檔的重輪，
+所以<strong>會高估嚴重的洞、低估那些一條 finding 都沒有的綠批</strong>。
+真實比例可能沒這麼極端，但「SPEC 寫對卻沒照做」這一類確實存在且不是個案。</p>
+<hr />
+<h2 id="二支撐上面結論的數據全部可重跑">二、支撐上面結論的數據（全部可重跑）</h2>
+<h3 id="2-1-輪數分佈母體18-張有-spec-或-todo-的票">2-1 輪數分佈（母體＝18 張有 SPEC 或 TODO 的票）</h3>
+<p><strong>母體怎麼定的</strong>：對每個 <code>*-x-review-r1</code> session 取 epic 名，
+檢查 <code>docs/&lt;EPIC&gt;*SPEC*.md</code> 或 <code>docs/&lt;EPIC&gt;*TODO*.md</code> 是否存在；存在才計入。
+133 張 review 票中<strong>只有 18 張</strong>有 SPEC／TODO，其餘 115 張是批次 code review。</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>票</th>
+<th style="text-align:right">輪數</th>
+<th></th>
+<th>票</th>
+<th style="text-align:right">輪數</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>splitunify</td>
+<td style="text-align:right"><strong>21</strong></td>
+<td></td>
+<td>evtwarmup</td>
+<td style="text-align:right">4</td>
+</tr>
+<tr>
+<td>redispatch</td>
+<td style="text-align:right"><strong>12</strong></td>
+<td></td>
+<td>docrot2</td>
+<td style="text-align:right">4</td>
+</tr>
+<tr>
+<td>eventscan</td>
+<td style="text-align:right"><strong>12</strong></td>
+<td></td>
+<td>evtlabel</td>
+<td style="text-align:right">3</td>
+</tr>
+<tr>
+<td>verdictgate</td>
+<td style="text-align:right"><strong>11</strong></td>
+<td></td>
+<td>docrot</td>
+<td style="text-align:right">3</td>
+</tr>
+<tr>
+<td>gap2</td>
+<td style="text-align:right"><strong>11</strong></td>
+<td></td>
+<td>plaindocs</td>
+<td style="text-align:right">2</td>
+</tr>
+<tr>
+<td>gap3</td>
+<td style="text-align:right">8</td>
+<td></td>
+<td>govb1</td>
+<td style="text-align:right">2</td>
+</tr>
+<tr>
+<td>gap1</td>
+<td style="text-align:right">8</td>
+<td></td>
+<td>g7fix</td>
+<td style="text-align:right">2</td>
+</tr>
+<tr>
+<td>search2event</td>
+<td style="text-align:right">7</td>
+<td></td>
+<td>ffdstar</td>
+<td style="text-align:right">2</td>
+</tr>
+<tr>
+<td>govb25</td>
+<td style="text-align:right">6</td>
+<td></td>
+<td>govb37</td>
+<td style="text-align:right">5</td>
+</tr>
+</tbody>
+</table></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>指標</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>票數</td>
+<td>18</td>
+</tr>
+<tr>
+<td>中位數</td>
+<td><strong>5</strong></td>
+</tr>
+<tr>
+<td>平均</td>
+<td><strong>6.8</strong></td>
+</tr>
+<tr>
+<td>p75</td>
+<td><strong>8</strong></td>
+</tr>
+<tr>
+<td>≥7 輪</td>
+<td><strong>44%（8 票）</strong></td>
+</tr>
+<tr>
+<td>≥10 輪</td>
+<td><strong>28%（5 票）</strong></td>
+</tr>
+<tr>
+<td>最大</td>
+<td><strong>21</strong></td>
+</tr>
+</tbody>
+</table></div>
+<p>⇒ <strong>你的印象「至少也都有 7、8 輪」跟實測相符</strong>（平均 6.8、p75 是 8）。</p>
+<h3 id="2-2-只看量化主線-9-票這是-q1-真正問的">2-2 只看量化主線 9 票（這是 Q1 真正問的）</h3>
+<p>splitunify 21、eventscan 12、gap2 11、gap1 9、gap3 8、search2event 7、
+evtwarmup 5、evtlabel 3、ffdstar 2。</p>
+<p><strong>中位數 8／平均 8.7／≥7 輪 6 票（67%）</strong>；
+對照治理 9 票：<strong>中位數 4／平均 5.6／≥7 輪 22%</strong>。</p>
+<h3 id="2-3-findings-的實際組成codex-逐條分類-eventscan-的-145-條">2-3 findings 的實際組成（codex 逐條分類 EVENTSCAN 的 145 條）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>軸</th>
+<th>分類</th>
+<th style="text-align:right">條數</th>
+<th style="text-align:right">比例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 能不能用實跑證偽</td>
+<td>可由實跑證偽</td>
+<td style="text-align:right">67</td>
+<td style="text-align:right"><strong>46.2%</strong></td>
+</tr>
+<tr>
+<td></td>
+<td>只有讀才找得到</td>
+<td style="text-align:right">78</td>
+<td style="text-align:right">53.8%</td>
+</tr>
+<tr>
+<td>② 缺陷性質</td>
+<td>規格不完備</td>
+<td style="text-align:right">97</td>
+<td style="text-align:right"><strong>66.9%</strong></td>
+</tr>
+<tr>
+<td></td>
+<td>副本不同步（同一件事寫在兩處，其中一處過時）</td>
+<td style="text-align:right">48</td>
+<td style="text-align:right">33.1%</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>這組數字決定了每個改法的天花板</strong>：</p>
+<ul>
+<li>薄切片先行<strong>最多</strong>覆蓋 46.2%（是上限，不是預測值）</li>
+<li>分類式停輪<strong>最多</strong>覆蓋 33.1%</li>
+<li><strong>兩者都不是主藥，而且處理的不是同一批東西</strong></li>
+</ul>
+<h3 id="2-4-spec-審完之後實作階段還要審多少實查">2-4 SPEC 審完之後，實作階段還要審多少（實查）</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>票</th>
+<th>SPEC 階段</th>
+<th>實作階段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>splitunify</td>
+<td>21 輪／122 條</td>
+<td><strong>91 輪／534 條</strong></td>
+</tr>
+<tr>
+<td>gap3ux</td>
+<td>36 輪／472 條</td>
+<td>41 輪／203 條</td>
+</tr>
+<tr>
+<td>gap2</td>
+<td>11 輪／92 條</td>
+<td>5 輪／32 條</td>
+</tr>
+<tr>
+<td>gap1</td>
+<td>9 輪／91 條</td>
+<td>4 輪／56 條</td>
+</tr>
+</tbody>
+</table></div>
+<p>⇒ <strong>SPEC 審到零，不代表實作就乾淨。</strong> 這是 Q4 的量化背景。</p>
+<h3 id="2-5-寫-vs-審eventscan實查-git-log">2-5 寫 vs 審（EVENTSCAN，實查 git log）</h3>
+<p>寫 SPEC <strong>20 分鐘</strong>，審 <strong>12 小時</strong>，比例 <strong>36:1</strong>，期間產出的可執行程式 <strong>0</strong>。</p>
+<p>🔴 <strong>誠實邊界</strong>：這是 EVENTSCAN 單票的事實。
+<strong>不能</strong>拿它推論成「量化票普遍比治理票缺可執行物」——那個推論我提過兩次，
+被委員用同一套啟發式掃過兩組全部輪次推翻：
+<strong>強可跑比例 44.8%（量化）vs 42.8%（治理），沒有顯著差異，且方向跟我的假設相反。</strong></p>
+<hr />
+<h2 id="三這三輪討論中被推翻的含我自己錯的">三、這三輪討論中被推翻的（含我自己錯的）</h2>
+<p>這節列出來是因為你要 review 的是「討論」，不只是結論。
+<strong>下面每一條，最後採用的都是被推翻後的版本。</strong></p>
+<h3 id="3-1-我把輪數統計的母體連續搞錯三次">3-1 我把輪數統計的母體連續搞錯三次</h3>
+<p>① 用全專案 798 個 reconcile 目錄當分母（那裡面含 stamp／consult／歷史命名，不是審查輪數）
+② 改用委員報的數字而<strong>沒有自己算</strong>（違反既有明文規則「執行端產物視為不可信資料」）
+③ 自己算了，但母體仍含 115 張批次 code review</p>
+<p><strong>每一次都是你指出來我才更正。</strong>
+判準已記下：回答「某類文件要審幾輪」之前，先定義並檢驗母體。</p>
+<h3 id="3-2-我說停輪零-finding所以數學上不可達為假">3-2 我說「停輪＝零 finding、所以數學上不可達」——為假</h3>
+<p>零實質 finding 多次達到過。
+我錯在兩點：把<strong>範本裡的文字</strong>當成執行中的規則；
+以及把 <code>P3-00</code> 這種「沒有 finding 時的佔位符」算進剩餘 findings
+（<code>splitunify</code>／<code>gap2</code> 末輪那「3 條」全是佔位符，實質是 0）。</p>
+<h3 id="3-3-我說非單調的主因是批次修補為假">3-3 我說「非單調的主因是批次修補」——為假</h3>
+<p>實查：9 票最大回升點<strong>全部</strong>是相位切換（換審查標的），不是批次修補。
+批次修補降級為「同一份文件內的加速器」。</p>
+<h3 id="3-4-我說量化票沒東西可跑所以比治理嚴重為假且被推翻兩次">3-4 我說「量化票沒東西可跑，所以比治理嚴重」——為假，且被推翻兩次</h3>
+<p>見 2-5。</p>
+<h3 id="3-5-我說薄切片能發現-spec-審查抓不到的東西委員判為高估">3-5 我說「薄切片能發現 SPEC 審查抓不到的東西」——委員判為高估</h3>
+<p>委員逐一檢查我舉的兩個實例，結論是：
+<strong>薄切片的邊際價值是「提早」，不是「獨門偵測」。</strong>
+現行 SPEC 審加上探針本來就會抓到 FF 前提崩塌，只是抓得晚（晚了四輪）。</p>
+<p>⇒ <strong>我原本設計的驗收條件被駁回</strong>（我寫的是「如果切片發現的問題 SPEC 多數也能抓到，
+就恢復現行」——委員指出那會假陰性）。
+<strong>正確的驗收</strong>是：「同一個探針如果在 fan-out 之前跑，<strong>省下幾輪建立在假前提上的文字</strong>」。</p>
+<h3 id="3-6-我說331-的副本不同步對實作品質零貢獻為假">3-6 我說「33.1% 的副本不同步對實作品質零貢獻」——為假</h3>
+<p>委員找出至少三條：如果不修，實作者會照錯的那一份做。
+例如 Task 正文的指針指到第 020 列（演算法列），但真正的上限在 025 列——
+照 Task 做就會鎖錯列。</p>
+<p>⇒ <strong>改法 4-3 的理由要改寫</strong>：真正的理由是 Q4 的「沒照做 40%」，
+<strong>不是</strong>「副本不同步只是衛生問題」。</p>
+<p>但委員也同意可以再細分：<strong>「雙權威」</strong>（指針指錯列、計數詞跟表不一致）是規格不完備，
+要擋凍結；<strong>「回聲」</strong>（票描述停在舊狀態、某個數字過時）才接近零貢獻，可以不擋。</p>
+<h3 id="3-7-boehm-的缺陷越晚修越貴曲線自本文件移除">3-7 Boehm 的「缺陷越晚修越貴」曲線——<strong>自本文件移除</strong></h3>
+<p>我把它當成既有認知寫進了提案的理由裡。委員查不到可引用的出處與年份來確證或推翻。
+⇒ <strong>不以未查證的外部主張支撐內部決策</strong>，該論點整條移除，不作為任何改法的理由。</p>
+<h3 id="3-8-我兩次犯的流程錯誤你當場指正">3-8 我兩次犯的流程錯誤（你當場指正）</h3>
+<ul>
+<li><strong>在四個問題都還沒有答案的時候就提三步方案</strong> —— 你的原話「問題都還沒答案，你做什麼那三步？」</li>
+<li><strong>把你的提問當成裁定</strong> —— 你的原話「你不能因為我說說什麼就說要排除，然後之後又說應該要做」</li>
+<li><strong>用「窮舉攻擊面」的問法派工</strong> —— 那不是業界慣例，而且
+<code>templates/BRIEF_REVIEW_TEMPLATE.md</code> §6 早就明文警告「每輪擴攻擊面」會製造非單調重輪。
+<strong>寫在範本裡我還是照犯——這本身證明「寫進文件」不是有效的防護</strong>，
+也是改法 4-0 與 4-3 的核心動機。</li>
+</ul>
+<h3 id="3-9-r2-那一輪整輪方向錯誤你指出來的">3-9 r2 那一輪整輪方向錯誤（你指出來的）</h3>
+<p>r2 交出的是停輪判定、相位鎖、熔斷——<strong>全部都是「控制審查迴圈」的手段，
+預設了迴圈本身有價值，而那個預設從來沒被檢驗過。</strong>
+你的原話：「從 First principle 來看，R2 那只是掩蓋問題吧」。
+⇒ r3 才去檢驗那個預設本身，也才生出改法 4-0。</p>
+<hr />
+<h2 id="四改法四步逐條審閱">四、改法（四步，逐條審閱）</h2>
+<blockquote>
+<p>排序依據＝<strong>信號／成本比</strong>，不是重要性。
+每一條都標了「覆蓋率上限」——那是根據 §2-3 的 findings 組成算的，<strong>是上限不是預測</strong>。</p>
+</blockquote>
+<h3 id="4-0-不變式的可執行-owner-只審-diff-建議優先">4-0 不變式的可執行 owner ＋ 只審 diff　【建議優先】</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>誰提的</strong></td>
+<td>composer。<strong>我和 r2 都沒想到這條。</strong></td>
+</tr>
+<tr>
+<td><strong>現在怎樣</strong></td>
+<td>每一輪都重讀整份 SPEC（EVENTSCAN 是 1,400 行），每輪都可能生出新 finding</td>
+</tr>
+<tr>
+<td><strong>改成怎樣</strong></td>
+<td>R1–R2 做完設計對抗之後，<strong>每一條還開著的 P0／P1 必須指向一個測試檔或 probe 檔</strong>。指不出來就標成具名殘留，<strong>不開 R3 全文重讀</strong>。之後如果還有輪次，<strong>只審 diff</strong>。</td>
+</tr>
+<tr>
+<td><strong>為什麼有效</strong></td>
+<td>它砍的是「審查迴圈本身」，不是像 r2 那樣去控制迴圈。對應業界的 Jane Street Iron／Google CL 審查模型：審變更，不審全文</td>
+</tr>
+<tr>
+<td><strong>覆蓋率</strong></td>
+<td>直接針對 M1（相位大跳）＋ M2（同文件回升）兩個機制</td>
+</tr>
+<tr>
+<td><strong>成本</strong></td>
+<td><strong>零</strong>。不用改 CLAUDE.md，不用新工具，<strong>下一張派工單的「停輪條件」欄就能寫</strong></td>
+</tr>
+<tr>
+<td><strong>風險</strong></td>
+<td>如果「指向測試檔」被寫得太寬鬆（例如指向一個空的 test stub），會變成形式主義。需要在 brief 寫死「該測試必須能被改壞而轉紅」</td>
+</tr>
+<tr>
+<td><strong>要改 CLAUDE.md？</strong></td>
+<td><strong>不用</strong></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="4-1-薄切片先行">4-1 薄切片先行</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>現在怎樣</strong></td>
+<td>SPEC 凍結前不寫任何可執行的東西</td>
+</tr>
+<tr>
+<td><strong>改成怎樣</strong></td>
+<td>fan-out 派委員之前，先跑一次真實資料上的探針，產出實跑收據（FACT-RECEIPT）</td>
+</tr>
+<tr>
+<td><strong>範圍限定</strong>（委員加的）</td>
+<td><strong>只對</strong> runtime／資料／PIT／狀態可行性、跨域 schema、真實 manifest identity。<strong>純治理文字不強迫造假的 runtime</strong></td>
+</tr>
+<tr>
+<td><strong>驗收條件</strong></td>
+<td>🔴 <strong>不是</strong>「切片能不能抓到 SPEC 抓不到的東西」（見 3-5），<strong>是</strong>「同一個探針在 fan-out 前跑，省下幾輪建立在假前提上的文字」</td>
+</tr>
+<tr>
+<td><strong>覆蓋率上限</strong></td>
+<td><strong>46.2%</strong>（可實跑證偽的那一半），且那是上限</td>
+</tr>
+<tr>
+<td><strong>風險</strong></td>
+<td>探針本身可能寫錯，變成新的假前提來源。需要探針的輸出是原始數值，不是判斷句</td>
+</tr>
+<tr>
+<td><strong>要改 CLAUDE.md？</strong></td>
+<td><strong>單票試辦不用</strong>；第二張票起要改</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="4-2-切斷-spectodo-相位串接">4-2 切斷 SPEC→TODO 相位串接</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>現在怎樣</strong></td>
+<td>CLAUDE.md 中／大鐵律：SPEC 對抗審 → 凍結 → <strong>自動</strong>開 TODO 對抗審</td>
+</tr>
+<tr>
+<td><strong>改成怎樣</strong></td>
+<td>TODO <strong>照寫</strong>、機器 coverage check <strong>照跑</strong>；但對抗審改成「<strong>只審 delta／只審一輪</strong>」。要開全文對抗審，<strong>要你點頭</strong></td>
+</tr>
+<tr>
+<td><strong>為什麼有效</strong></td>
+<td>直接切掉 M1，也就是<strong>量化票 4 次、治理票 0 次的那個機制</strong>——唯一能解釋兩組輪數差距的機制</td>
+</tr>
+<tr>
+<td><strong>覆蓋率</strong></td>
+<td>針對 M1（相位大跳）</td>
+</tr>
+<tr>
+<td><strong>風險（委員警告）</strong></td>
+<td>🔴 如果沒有範圍 hash／晉級閘／殘留帳，會退化成「<strong>先寫 code 再補規格</strong>」</td>
+</tr>
+<tr>
+<td><strong>要改 CLAUDE.md？</strong></td>
+<td><strong>要</strong>（見 §五）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="4-3-驗收條件從散文移到測試檔">4-3 驗收條件從散文移到測試檔</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>現在怎樣</strong></td>
+<td>驗收條件寫在 SPEC／TODO 的散文裡</td>
+</tr>
+<tr>
+<td><strong>改成怎樣</strong></td>
+<td>每一條驗收對應一個 test／probe／receipt。不可執行的要明寫 <code>NOT_EXECUTABLE</code> ＋ 原因 ＋ 負責人 ＋ 到期日</td>
+</tr>
+<tr>
+<td><strong>為什麼有效</strong></td>
+<td>直接針對 Q4 的「SPEC 寫對但實作沒照做 40%」。<code>Math.max</code> 那個例子就是規格寫了、沒人擋</td>
+</tr>
+<tr>
+<td><strong>理由已改寫</strong></td>
+<td>🔴 <strong>不是</strong>「副本不同步只是衛生問題」（那條被推翻，見 3-6），<strong>是</strong> Q4 的 40%</td>
+</tr>
+<tr>
+<td><strong>風險（委員警告）</strong></td>
+<td>🔴 如果不同時要求「<strong>觸發該分支的真實組合</strong>」，只是把假綠從 markdown 搬到 pytest。<code>splitunify-b11</code> 已經證明測試可以建在「剔除＝0」上，讓全稱斷言恆真</td>
+</tr>
+<tr>
+<td><strong>要改 CLAUDE.md？</strong></td>
+<td><strong>要</strong>（可以只對新票生效，不回溯）</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="4-4-兩家共同的風險警告我原提案沒寫補上">4-4 兩家共同的風險警告（我原提案沒寫，補上）</h3>
+<ol>
+<li><strong>4-3 的假綠搬家風險</strong>（見上）。</li>
+<li><strong>4-2 的「先寫 code 再補規格」風險</strong>（見上）。</li>
+<li>🔴 <strong>高風險數值契約（命中 CLAUDE.md 的 a–d 四條）仍須完整 SPEC／TODO／adversarial 才能凍結，
+不得一併放寬。</strong> 也就是說：這四步改法<strong>不適用</strong>於 Feature Factory／IC Gatekeeper／回測引擎
+這類會影響數值正確性的東西。</li>
+</ol>
+<hr />
+<h2 id="五claudemd-逐字改寫兩家版本並列供你挑">五、CLAUDE.md 逐字改寫（兩家版本並列，供你挑）</h2>
+<blockquote>
+<p><strong>本輪沒有改任何一個字。</strong> 下面是兩家各自給的候選文字。
+4-2 與 4-3 如果你要採納，就需要動其中幾句。</p>
+</blockquote>
+<h3 id="5-1-claudemd30任務分派表中管線格">5-1 <code>CLAUDE.md:30</code>（任務分派表「中／管線」格）</h3>
+<p><strong>現行逐字</strong>：</p>
+<blockquote>
+<p>完整管線：<strong>SPEC + TODO + adversarial</strong>，<strong>不得跳步/不跳</strong>（D-1）</p>
+</blockquote>
+<p><strong>composer 版</strong>：</p>
+<blockquote>
+<p>完整管線：<strong>SPEC 對抗至本文件規格不完備之 P0/P1 關閉</strong>；TODO 是工作拆解，<strong>不</strong>自動開與 SPEC 同規格的第二段全文對抗（另開須使用者 go）。凍結前允許真實資料薄切片。D-1 改指審查強度（對抗＋實作者不自審＋家數＝ORCH §1），不指相位串接。</p>
+</blockquote>
+<p><strong>codex 版</strong>：</p>
+<blockquote>
+<p>命中共享／數值／跨域 contract 或 PIT/data identity 風險者，必須 SPEC + TODO + adversarial；其餘中型任務先交付最小 contract block + executable feasibility probe，再依 probe 結果決定是否展開完整文件。任何省步須列 scope、exit criterion、residual，並讓使用者可否決。</p>
+</blockquote>
+<p><strong>風險</strong>：D-1 是 2026-06-05 你定死的「不得跳步」。改這句等於動鎖定條款。
+codex 版的風險是「風險分類沒有機器檢查就可能被濫用成省略高風險審查」。
+composer 版的風險是「執行端可能把『薄切片』讀成『可以不寫 SPEC』」。</p>
+<p><strong>我的判斷</strong>：composer 版較窄、較安全（它只切斷串接，沒有引入新的風險分類判斷）。</p>
+<h3 id="5-2-claudemd38中大鐵律①">5-2 <code>CLAUDE.md:38</code>（中／大鐵律①）</h3>
+<p><strong>現行逐字</strong>：</p>
+<blockquote>
+<p>① 完整管線不得跳步（SPEC/TODO/adversarial 都要）</p>
+</blockquote>
+<p><strong>composer 版</strong>：</p>
+<blockquote>
+<p>① 審查強度不得跳步（對抗＋實作者不自審；家數與家族＝ORCH §1）。SPEC 對抗與 TODO 對抗不串成同一曲線；TODO 全文對抗須使用者 go。copy-drift／P2／P3 不擋本文件凍結。</p>
+</blockquote>
+<p><strong>codex 版</strong>：</p>
+<blockquote>
+<p><strong>中/大鐵律</strong>：不得跳過與風險相稱的 evidence gate；高風險仍必須 SPEC/TODO/adversarial；其他任務可由 decision block + executable acceptance artifact 替代全量展開，但必須留下 scope、exit criterion、residual、quorum 與 audit receipt。</p>
+</blockquote>
+<p>🔴 <strong>委員特別註明</strong>：5-1 和 5-2 <strong>必須一起改</strong>。
+只改表不改鐵律的話，執行端還是會按鐵律自動開 TODO 審——<code>gap2</code> r6 就是這樣發生的。</p>
+<h3 id="5-3-docsmulti_agent_orchestrationmd-中型列約-l192">5-3 <code>docs/MULTI_AGENT_ORCHESTRATION.md</code> 中型列（約 L192）</h3>
+<p><strong>現行逐字</strong>：</p>
+<blockquote>
+<p>中 | 完整管線同大型（SPEC+TODO+至少一家不同模型 adversarial;2026-06-05 使用者定死不得跳步,D-1 維持）</p>
+</blockquote>
+<p><strong>建議</strong>：與 5-1 同義改寫，保留「D-1 維持」但括注「強度、非串接」。
+<strong>理由</strong>：ORCH 不改的話，CLAUDE.md 改了仍有第二個權威來源，會互相矛盾。</p>
+<h3 id="5-4-新增一句配合-4-3不刪舊句">5-4 新增一句（配合 4-3，不刪舊句）</h3>
+<p><strong>composer 建議新增</strong>：</p>
+<blockquote>
+<p>驗收條件之權威落點＝測試檔或 <code>ASSERT</code> 行；SPEC／TODO 散文只得 pointer。空集合上的全稱斷言不算驗收。</p>
+</blockquote>
+<p><strong>風險</strong>：與 ORCH 既有的「驗收段裡每次提到受管命令必須在 ASSERT 行內」同向，衝突小。
+舊票不回溯就沒有立即成本。</p>
+<h3 id="5-5-codex-另外提的兩句我傾向不採但列給你看">5-5 codex 另外提的兩句（我傾向不採，但列給你看）</h3>
+<ul>
+<li><code>CLAUDE.md:46</code>「判不出大小：先當中」→ 改成「先只允許可逆的最小 feasibility probe」</li>
+<li><code>CLAUDE.md:50</code>「宏觀斷路器：≤2 輪失敗開委員會」→ 改成「同一假設／同一 scope ≤2 輪失敗，
+停止同形態重跑，回到最近一個可執行 contract block 重新界定」</li>
+</ul>
+<p><strong>我不建議現在動的理由（判斷，非事實）</strong>：這兩句跟本次四問診斷出的三個機制沒有直接關係，
+而且「先當中」是 fail-safe 設計，放寬它會引入新的判斷點。</p>
+<h3 id="5-6-明確不動的條文兩家一致">5-6 明確不動的條文（兩家一致）</h3>
+<p>實作者不自審、家數不在 CLAUDE.md 寫死（唯一來源是 ORCH §1）、
+產出端覆蓋鐵律、高風險 (a)–(d)、facts-first。</p>
+<hr />
+<h2 id="六不得動的兩家獨立同判">六、不得動的（兩家獨立同判）</h2>
+<ol>
+<li><strong>對抗式審查</strong></li>
+<li><strong>實作者不自審</strong>（高風險 contract；純文字尾掃可降級由我自查）</li>
+<li><strong>兩家獨立產出</strong>（現行家數已經是下限）</li>
+<li><strong>PIT／防洩漏／防過擬合的量化紀律</strong></li>
+<li><strong>不用比例式判準停輪</strong>（你 2026-09-11 定死，全專案適用）</li>
+</ol>
+<p>🔴 <strong>負邊際在「每輪擴攻擊面」與「零 finding 才凍結」，不在家數。</strong>
+也就是說：<strong>減少委員家數不會改善任何一個機制</strong>，只會降低品質。</p>
+<hr />
+<h2 id="七等你裁決的事逐條">七、等你裁決的事（逐條）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>編號</th>
+<th>要你決定的</th>
+<th>我的建議</th>
+<th>影響</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>D1</strong></td>
+<td>採不採 4-0（可執行 owner ＋ 只審 diff）</td>
+<td><strong>採</strong>。零成本、不改憲法、下一張票就能試</td>
+<td>直接針對 M1＋M2</td>
+</tr>
+<tr>
+<td><strong>D2</strong></td>
+<td>採不採 4-2（切斷 SPEC→TODO 串接）</td>
+<td><strong>採</strong>。它是唯一能解釋量化 vs 治理輪數差的機制</td>
+<td><strong>要改 CLAUDE.md 5-1＋5-2（必須一起）</strong></td>
+</tr>
+<tr>
+<td><strong>D3</strong></td>
+<td>採不採 4-3（驗收移到測試檔）</td>
+<td><strong>採，但限新票</strong>，且必須配「觸發該分支的真實組合」要求</td>
+<td><strong>要改 CLAUDE.md（5-4）</strong></td>
+</tr>
+<tr>
+<td><strong>D4</strong></td>
+<td>採不採 4-1（薄切片先行）</td>
+<td><strong>可延後</strong>。覆蓋率上限 46.2%，且委員判定它的價值是「提早」不是「獨門」</td>
+<td>單票試辦不用改憲法</td>
+</tr>
+<tr>
+<td><strong>D5</strong></td>
+<td>5-1／5-2 用 composer 版還是 codex 版</td>
+<td><strong>composer 版</strong>（較窄、不引入新的風險分類判斷）</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>D6</strong></td>
+<td>5-5 那兩句（判不出大小、宏觀斷路器）要不要一起改</td>
+<td><strong>不改</strong>。跟這次診斷的三個機制無關</td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>D7</strong></td>
+<td>改完之後要不要補機械閘（4-2 的範圍 hash／晉級閘／殘留帳）</td>
+<td>🔴 <strong>這會是新建治理工具</strong>。你 2026-09-15 裁定過治理工具的擴建限制，需要你明示</td>
+<td>不補的話 4-2 有「先寫 code 再補規格」風險</td>
+</tr>
+<tr>
+<td><strong>D8</strong></td>
+<td>EVENTSCAN 怎麼辦</td>
+<td><strong>已裁定：維持暫停</strong>，流程改完再回來</td>
+<td>已記入 HANDOFF</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="八這份怎麼維護">八、這份怎麼維護</h2>
+<ul>
+<li><strong>這份是一次性的審閱文件</strong>，不是活文件。你逐條裁決完、改動實施完之後，
+結論搬進 <code>CLAUDE.md</code> 與 <code>docs/PROCOPT_DECISION.md</code>，這份移到 <code>Archived/</code>。</li>
+<li><strong>技術版在</strong> <code>docs/PROCOPT_DECISION.md</code>（含三輪的完整推翻紀錄，我和委員用）。</li>
+<li><strong>原始收斂檔在</strong> <code>handoffs/reconcile/20260922-procopt-x-consult-r{1,2,3}/synth.md</code>。</li>
+<li><strong>不要在這份往上疊進度</strong>。進度在 <code>白話說明/現在做到哪.md</code>。</li>
+</ul>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/SPEC與TODO流程優化.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

@@ -17,9 +17,11 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p><strong>你點出的兩個 Feature Factory 缺陷已定性完成——兩個都是真缺陷，兩家委員獨立同判、零駁回。</strong>
-結論與修法寫在 <code>docs/FFDEFECT_DECISION.md</code>，已開成兩張票登記在 ROADMAP。
-接下來回 EVENTSCAN 規格第 9 輪審查。</p>
+<p><strong>等你逐條裁決 SPEC／TODO 流程的改法。</strong> 完整文件在
+<a href="SPEC與TODO流程優化.html">SPEC與TODO流程優化.md</a>——你的四個問題都有答案、
+討論過程（含我被推翻的九處）、四步改法、CLAUDE.md 逐字改寫兩家版本並列。
+<strong>要你決定的事集中在 §七，編號 D1–D8。</strong></p>
+<p><strong>EVENTSCAN 依你裁定維持暫停</strong>，等流程改完再回來。</p>
 <h2 id="做到哪">做到哪</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -30,32 +32,40 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>FF 兩個缺陷：定性＋修法</strong></td>
-<td>✅ 完成（兩家獨立同判、零駁回；我三處判斷被推翻並已更正）</td>
+<td><strong>SPEC／TODO 流程診斷</strong></td>
+<td>✅ 三輪完成（兩家委員、零駁回、全部銷帳）</td>
 </tr>
 <tr>
-<td>FF-TFMETA（週期）／FF-NAME（命名）兩張票</td>
-<td>⬜ 已登記、未實作。週期那張先做</td>
+<td><strong>四個問題的答案</strong></td>
+<td>✅ 完成（§一）</td>
 </tr>
 <tr>
-<td>沒有轉換的 FF run</td>
-<td>✅ 完成（<code>d9935491…</code>，含 1h＋12h）</td>
+<td><strong>四步改法＋風險</strong></td>
+<td>✅ 完成（§四）</td>
 </tr>
 <tr>
-<td>EVENTSCAN 規格初稿</td>
-<td>✅ 完成</td>
+<td><strong>CLAUDE.md 逐字改寫候選</strong></td>
+<td>✅ 兩家版本並列（§五）</td>
 </tr>
 <tr>
-<td>規格兩家對抗審</td>
-<td>✅ 八輪，106 條全數採納或部分採納、零駁回</td>
+<td><strong>你裁決 D1–D8</strong></td>
+<td>🛑 <strong>等你</strong></td>
 </tr>
 <tr>
-<td>規格凍結</td>
-<td>🛑 還不行（第 9 輪還沒跑）</td>
+<td>流程改動實施</td>
+<td>⬜ <strong>一步都還沒做</strong>（等 D1–D8）</td>
 </tr>
 <tr>
-<td>逐條白話解釋給你聽</td>
-<td>⬜ 等規格能凍結才做</td>
+<td>EVENTSCAN 規格</td>
+<td>🛑 <strong>暫停</strong>（審到第 12 輪收斂、未凍結、仍剩 11 條 P1）</td>
+</tr>
+<tr>
+<td>FF 兩個缺陷定性</td>
+<td>✅ 完成（兩家獨立同判、零駁回），兩張票已登記</td>
+</tr>
+<tr>
+<td>FF-TFMETA／FF-NAME 實作</td>
+<td>⬜ 未開工</td>
 </tr>
 <tr>
 <td>FFDSTAR 規格</td>
@@ -63,30 +73,26 @@
 </tr>
 </tbody>
 </table></div>
-<p><strong>缺陷一（欄位名字）</strong>：你記得「來源名不能有底線」——<strong>你記對了，規則就寫在程式裡</strong>。
-問題是同一次產出、同一個特徵出現兩種名字：<code>..._LINEARREG_SLOPE_10_144_Cross</code>
-與 <code>..._LINEARREG-SLOPE_10_Lag_1</code>。原因是算完基礎特徵時欄名有照規則轉換、
-旁邊記的那份資料沒有，後面另一段程式拿沒轉換的那份重拼名字。
-你問的兩個 <code>taker</code> 形式<strong>不是兩個特徵</strong>——數值相關 0.999994，同一份資料兩個名字。
-（我最初說「是 bug」的理由是錯的，循環論證，已撤回重驗。）
-影響 2,404 ＋ 1,604 欄。<strong>難處＝改掉後既有 run 欄名全變</strong>，對不上舊校驗值與測試基準。</p>
-<p><strong>缺陷二（週期記了兩次）</strong>：同一次產出，<code>feature_manifest.json</code> 寫 <code>[&quot;1h&quot;]</code>、
-<code>task_record.json</code> 寫 <code>[&quot;1h&quot;,&quot;12h&quot;]</code>。漏掉的 12h 是 402 個群組、209,235 欄，差不多一半，
-而檔案同時標著「complete」，<strong>不發任何警告</strong>。根因是整條程式鏈型別上就只能接一個週期。
-好消息：我全查過，<strong>現在沒有任何正式程式在讀那個欄位</strong>，只有 FF 自己的測試，
-所以是「寫錯了但還沒害到誰」，修起來風險低。</p>
+<p><strong>三個數字最能說明問題</strong>（都可重跑）：</p>
+<ol>
+<li><strong>量化主線的規格票中位數 8 輪</strong>，治理票 4 輪——差距來自 CLAUDE.md 那條
+「SPEC 審完自動開一輪 TODO 全審」，它讓 finding 數從 0 跳回 20。
+量化票發生 4 次、治理票 0 次。</li>
+<li><strong>委員抽樣 18 個實作缺陷</strong>：<strong>40% 是「規格寫對了、實作沒照做」</strong>、
+50% 是「規格根本沒寫到」。⇒ 再多審幾輪規格也擋不住那 40%。</li>
+<li><strong>EVENTSCAN 寫規格 20 分鐘、審 12 小時</strong>，期間產出的可執行程式 0。</li>
+</ol>
 <h2 id="要你決定嗎">要你決定嗎</h2>
-<p><strong>相容性那題我認為不用你決定，理由是你已經裁過了。</strong> 你 2026-08-05 定死「面向未來不溯及既往：
-修正只考慮以後，不把舊錯誤／不合規／麻煩包回來」。三個選項裡，只有「只對新 run 生效」符合它
-（做對照表＝把舊麻煩包回來；全部重跑 41 GB＝溯及既往）。兩家委員也都建議同一個。
-所以我按「只對新 run」做，另加一個機械防護：檔案裡記命名世代，跨世代比較就擋下來，不靠人記得。
-<strong>你要推翻就說一聲。</strong></p>
-<p>還排隊的一個：FFDSTAR 會讓每個 run 多產一個檔，我量出實際大小再問你。</p>
+<p>🔴 <strong>要。八個決策點，在 <a href="SPEC與TODO流程優化.html">SPEC與TODO流程優化.md</a> §七。</strong>
+其中 D2、D3 會動到 <code>CLAUDE.md</code>（你已說過可以改）；
+D7 涉及新建治理工具，跟你 2026-09-15 的限制有關，需要你明示。</p>
+<p>我的建議摘要：<strong>D1 採（零成本）、D2 採（切掉最大的那個機制）、D3 採但限新票、
+D4 可延後、D5 選 composer 版、D6 不改、D7 你決定、D8 已裁定維持暫停。</strong></p>
 <h2 id="卡住嗎">卡住嗎</h2>
-<p>沒有卡在需要你的地方。</p>
+<p><strong>卡在等你裁決。</strong> 裁決前我不動 EVENTSCAN、不改 CLAUDE.md、不實施任何一步。</p>
 <h2 id="下一件事">下一件事</h2>
-<p>回 EVENTSCAN 第 9 輪審查 → 凍結 → <strong>逐條白話講給你聽</strong> → 你放行才寫施工清單。
-兩張 FF 票排在 EVENTSCAN 之後，各自走完整流程。</p>
+<p>你回 D1–D8 → 我照裁決改 CLAUDE.md／ORCH／範本 → 用新規則重啟 EVENTSCAN。
+FF 兩張票排在那之後，各自走（改過的）流程。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
