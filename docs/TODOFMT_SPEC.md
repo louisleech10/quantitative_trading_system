@@ -126,10 +126,12 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
   未追蹤殘檔與設計定案後才 commit 之新檔**不會進集合**。
   `git ls-tree <L>` 為**一次性生成時**讀取不可變內容，非執行期之 git 狀態判定——hook 與 gate 執行時**只比對字面陣列**（r1 之「不得以 git 狀態判定」維持）。
 - 🔴 **L 之身分**（r7 三家中二家同判：原「由實作之第一個 commit 寫入設計定案 sha」無法自 git 物件識別；grok 實測若 sha 誤取為 fixture commit，父樹 blob 比較恆等而弱化文本仍過）：
-  **L＝引入設計定案收斂檔之唯一 commit**——`git log --diff-filter=A --format=%H -- <設計定案收斂檔路徑>` 須**恰印一行**，否則 fail。
-  該收斂檔路徑於設計定案前即已知（commit 無法含自身 sha，但可含已知之路徑），其**唯一字面落點＝`tests/governance/_todofmt_anchor.py`**（實作時寫入）；本 SPEC、hook 腳本、`gate.sh` 皆**不複寫 L 之 sha 或該路徑**。
+  **L＝本 SPEC 中首次出現「設計定案標記行」之 commit**：設計定案 commit 於本 SPEC 檔尾附加**恰一行**標記行（含設計定案收斂檔之 session 名）；標記行之**字面前綴唯一定義於 `tests/governance/_todofmt_anchor.py`**（實作時依已提交之標記行寫入），本 SPEC 之說明文字**不得含該前綴**。
+  取得方式＝`git log --format=%H -S <標記前綴> -- docs/TODOFMT_SPEC.md` 須**恰印一行**，否則 fail（前綴於設計定案前已被寫出、或其後被刪除，皆使結果非一行）。本 SPEC、hook 腳本、`gate.sh` 皆**不複寫 L 之 sha**。
+  🔴 **L 須先於實作**：L 之 git 樹中不得存在本票 manifest（`docs/manifests/TODOFMT.json`）之 `stub_modules`／`test_files`／`script_acceptance`／`contract_jsons` 所列之任一路徑，亦不得存在 `docs/manifests/TODOFMT.json` 本身；任一存在即 fail（防標記行晚於實作才補上，使 L 落在已改動之狀態）。
   所有需要 L 之測試（Task 1.2 邊界⑮⑰、Task 1.4 邊界⑫⑬、Task 2.2、收案判定表「基準」欄）與 W 之一次性陣列生成，皆經該模組之同一函式取得 L。
-  **不採之兩案**：①「實作起始 commit 之 parent 即 L」——grok 實測以 F 之父樹反推 L 則比較恆等，錨點不得自後續 commit 反推；② git tag 標記——tag 為可於任何時點手動建立或移動之 ref，誤標於 fixture 之後之 HEAD 即重現同一反例；收斂檔之引入為固定之歷史事件。
+  **為何不以收斂檔錨定**：`handoffs/` 為本機排除路徑（`.git/info/exclude`），收斂檔從不入 git，「引入收斂檔之 commit」恆查無（主委 r7 修補時之前提錯誤，r8 前自查實跑 0 行）。
+  **不採之兩案**：①「實作起始 commit 之 parent 即 L」——grok 實測以 F 之父樹反推 L 則比較恆等，錨點不得自後續 commit 反推；② git tag 標記——tag 為可於任何時點手動建立或移動之 ref，誤標於 fixture 之後之 HEAD 即重現同一反例；標記行之首次出現為固定之歷史事件。
 - 🔴 **窗口檢查**（r7 codex／grok 同判：C-6「設計定案至收案間不得新開票」無機械後果——新 SPEC 不帶散文 TODO 時，hook 無對象、Task 1.4 邊界⑫只比對 L，可靜默通過）：
   令 W＝`.claude/settings.json` 首次含 `scripts/todofmt_write_guard.sh` 之 commit（`git log --reverse --format=%H -S todofmt_write_guard.sh -- .claude/settings.json` 之第一行）；**尚無該 commit 時 W＝HEAD**。
   測試斷言：W 之 git 樹中符合 Task 1.2 步驟 2 樣式之路徑集合 **⊆** L 之同集合；且 W 之 git 樹中 `docs/` 下任一層 `*_SPEC*.md` 之路徑集合 **⊆** L 之同集合。差集非空即 fail，訊息列出差集。
@@ -471,7 +473,7 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
 - **RESID-11 — 經 Bash 重導寫入散文 TODO**：`為何現在不做: needs-research:Task 1.2 之 hook 掛於 Write／Edit；Bash 之重導與 tee 不在該掛載面上，本票不做命令解析`。
   （r4 曾列之「刪除生效標記 `scripts/todofmt_active.marker` 與清單以回到未收案態」一項，因 S1 移除生效標記與清單檔**已無對應機制**，自本殘留刪除。）
 - **RESID-12 — 往既有清單（hook／gate 腳本內之字面陣列）加行以放行新散文 TODO 或新 SPEC**：`為何現在不做: user-ruling:2026-09-11 使用者判準「繞過成本 ≥ 合規成本即收，歸 §N 蓄意等價」`。
-  **意外之路徑已由測試封閉**（r6 三家同判：r5 主委所稱「不存在意外加行」**不成立**——若陣列取自收案時之工作樹，設計定案後新建之散文 TODO 會被意外收進）：陣列改取自 L 之 git 樹，且**測試斷言陣列＝該樹之符合路徑集合**，意外收進或多加一行皆使該測試失敗；L 之身分由引入設計定案收斂檔之 commit 推導，不靠手寫 sha。
+  **意外之路徑已由測試封閉**（r6 三家同判：r5 主委所稱「不存在意外加行」**不成立**——若陣列取自收案時之工作樹，設計定案後新建之散文 TODO 會被意外收進）：陣列改取自 L 之 git 樹，且**測試斷言陣列＝該樹之符合路徑集合**，意外收進或多加一行皆使該測試失敗；L 之身分由本 SPEC 設計定案標記行之首次出現推導，不靠手寫 sha。
   **剩餘者為蓄意**：欲放行某新檔，須**同時改掉陣列與該測試之預期集合**——其成本與照規寫一份 manifest 並列，依本判準為蓄意等價。
   🔴 **本殘留不以 code review 為防線**（r6 grok 指出「改腳本即三家 code review」不成立——現有機器只在下一次派 impl 時數前批家族數，不讀陣列 diff，實為紀律）。
   r2–r5 曾以 sha256 自保護、生效標記、三態機、環境變數注入等機械防護此項，r5 以結構性簡化全數移除，r6 以上述測試取代。
