@@ -74,12 +74,12 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 - **C-2 新增之寫檔當下檢查須擋在產出端**：本票**新增**之 per-write 檢查一律掛 `PreToolUse`／`PostToolUse` hook，於寫檔當下報。**既有批次入口（如 `gov_check.sh`）之範圍擴充不在此限**——其性質為批次而非 hook，見 Task 1.1。
 - **C-3 禁止擴成全量掃描**：mutation 靜態檢查維持 **opt-in**（僅選中已宣告 `def test_mutation_` 之檔）。**不得**在本票內改為「每個測試檔都必須有探針或 N/A」。
 - **C-4 不得動 `pre-push`**：`pre-push` 維持 `gov_check.sh --fast`。本票**不得**新增任何項目進 `pre-push`。
-- **C-5 不得引入 pytest 執行段**：本票所加之寫檔當下檢查**只准做靜態分析**（AST／grep／jq），**不得**在該路徑上執行 `pytest`。依 §A receipt：靜態段 0 秒抓到 12／12 空心探針，pytest 段額外抓到 **0** 支。
+- **C-5 不得引入 pytest 執行段**：本票所加之寫檔當下檢查**只准做靜態分析**（AST／grep／jq），**不得**在該路徑上執行 `pytest`。依 §A receipt：對**該批 26 檔**，靜態器 rc=1 並列出 12 支 fatal，pytest 段**額外**列出 **0** 支。🔴 此成立範圍限該批 26 檔，**不得外推**為「pytest 段普遍無價值」（見 RESID-4）。
 
 ### C-6～C-9：範圍與相容
 
 - **C-6 不溯及既往**：既有 `docs/*_TODO.md`（`GAP1`／`GAP2`／`GAP3_EVENT`／`SPLITUNIFY`／`EVTLABEL`／`DOCROT2`／`REDISPATCH`／`VERDICTGATE` 等）**不遷移、不改寫**。新格式**只對本 SPEC 凍結後新開之票**生效。
-- **C-7 不修空心探針**：§A 具名之 12 支空心探針，本票**只讓它們被檢查看見**，**不修**。修理另開票。
+- **C-7 不修 fatal 名單、不改分類器**：§A 具名之量化 12 支與治理 27 支（合計 39），本票**只讓它們被新入口列出**，**不修探針、不改分類器、不新增排除**。正確修法屬分類器認列規則之重新設計，另票處理（RESID-1）。
 - **C-8 不改審查家數與家族**：依 `docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行，本檔不寫數字。
 - **C-9 不合併 SPEC 審與 TODO 審**：依 r1 收斂檔 C7，§A（前提／FACT-RECEIPT）之審查槽必須保留且獨立。本票**不得**取消 SPEC 對抗審。
 
@@ -92,7 +92,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 | `docs/MULTI_AGENT_ORCHESTRATION.md` | 中型列同義敘述 | 同步改寫，避免第二權威 |
 | `scripts/template_check.sh` | 有 `spec` 子命令 | 新增 `todofmt` 子命令（驗五類落點齊備） |
 | `scripts/gate.sh` | `--todo` 旗標收 `docs/*_TODO.md` 路徑 | 接受新格式之 manifest 路徑 |
-| `scripts/gov_check.sh:500` | mutation 掃描範圍寫死 `tests/governance/test_*.py` | 擴至量化三層（**僅靜態段**，見 C-5） |
+| `scripts/gov_check.sh` 第 6 段 | 呼叫含 pytest 段之 `mutation_probe_check.sh`，選檔範圍 `tests/governance/test_*.py` | 🔴 **完全不動**。改為**新增獨立靜態入口**與之並存（Task 1.1） |
 | `.claude/settings.json` | hook 掛載點 | 新增產出端 hook 掛載 |
 
 ---
@@ -112,7 +112,8 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
   | `test_files` | 路徑陣列 | 具名驗收測試、邊界測試、`test_mutation_*` |
   | `script_acceptance` | 路徑陣列 | `scripts/**` 之驗收腳本／探針（consult r1 第 2 類之另一半，與 `test_files` 分列） |
   | `contract_jsons` | 路徑陣列 | 鍵集、枚舉、reason 字面 |
-  | `run_receipts` | 路徑陣列 | 真實命令、輸入 identity、rc、誠實邊界 |
+  | `schema_version` | 字串 `vN` | 🔴 契約版本；樣本之 `schema_version` 須與之相等，不等即 fail（Task 3.1 之 invalidation 依此） |
+  | `run_receipts` | 物件陣列 `{path, cmd, rc, inputs_identity, honest_bounds}` | 🔴 **非僅路徑陣列**（r2 指出原文把應承載欄位只寫在自然語言）：`cmd` 非空字串、`rc` 整數、`inputs_identity` 字串、`honest_bounds` 字串（可空但鍵須在） |
   | `batch_card.depends` | 字串陣列（Task id） | 批序 |
   | `batch_card.touches` | 路徑陣列 | 本批會動之檔 |
   | `batch_card.callers_now` | 路徑陣列（可空） | **現有**呼叫者 |
@@ -129,7 +130,8 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 
 - **封閉 reason enum**（`RESID_REASON_ENUM`，§N 之殘留理由值亦用同一 enum）：`blocked-by`／`user-ruling`／`needs-research`。
 - **不可做**：不得新增第六類落點；不得讓任一欄位值為自由散文（除 `not_executable.item` 與 `risk_mitigation`／`coverage_risk` 之描述文字，該三者允許自然語言但**不承載判定**）。
-- **邊界**：① 五類皆空 ② 只有 `batch_card` ③ `not_executable.reason` 非三值之一 ④ `expiry` 已過期 ⑤ 路徑指向不存在之檔 ⑥ `gate_cmd` 為空字串。
+- **邊界**：① 五類皆空 ② 只有 `batch_card` ③ `not_executable.reason` 非三值之一 ④ `expiry` 已過期 ⑤ **`stub_modules`／`test_files`／`script_acceptance`／`contract_jsons` 之路徑不存在（須 fail）** ⑥ `gate_cmd` 為空字串 ⑦ `schema_version` 與樣本不等。
+  🔴 **路徑存在性之例外**（r2 指出原文一律當失敗會誤殺）：`batch_card.callers_later` 與 `batch_card.relocates_to` **指向尚不存在之未來落點屬合法**，該兩欄**不驗存在性**，只驗路徑字串格式。
 - **驗證**：`tests/governance/test_todofmt_contract.py`：對 ①–⑥ 各一具名測試；契約鍵集與 loader 回傳鍵集相等；`test_mutation_*` 探針一支（改壞值域即轉紅）。合法 manifest 之 `template_check.sh todofmt` 須 rc=0；缺 `batch_card` 之 manifest 須 rc 非 0（六條邊界各對應一測試，於測試內以 `subprocess` 斷言 rc，不在本 SPEC 內放可執行斷言行）。
 - **存活至**：全票完工後保留（為新票之權威契約）。
 - **覆蓋風險**：無（新增檔，無既有 caller）。
@@ -140,7 +142,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 - **實作要點**：純 `jq` ＋ 路徑存在性檢查；**禁止執行 pytest**（C-5）。
 - **不可做**：不得讀取測試內容做語義判斷；不得掃全 repo。
 - **邊界**：① manifest 不存在 ② JSON 不合法 ③ 缺任一類 ④ 路徑不存在 ⑤ `not_executable` 缺 owner ⑥ `expiry` 格式非 `YYYY-MM-DD`。
-- **驗證**：`tests/governance/test_template_check_todofmt.py`：六條邊界各一測試；耗時以 `date` 前後差量測並斷言 ≤ 2 秒（實測值回填 §V）；`test_mutation_*` 一支。
+- **驗證**：`tests/governance/test_template_check_todofmt.py`：六條邊界各一測試；耗時以 `date +%s%N` 前後差量測並**記錄**至 §V（**不與任何門檻比對**，依 C-1）；`test_mutation_*` 一支。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`template_check.sh` 既有 `spec` 子命令行為不得改變——須有回歸測試斷言 `spec` 子命令輸出逐字不變。
 
@@ -164,23 +166,50 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 
 - 🔴 **起因**（r1 三家同判）：`--todo` 有值時 `gate.sh` **無條件**呼叫 legacy `template_check.sh todo`，該子命令要求 markdown 錨點（`## §0` 等）⇒ **新格式 manifest 必被擋**，C-6 之並存在命令路由上未落地。
 - **目標**：`gate.sh` 依 `--todo` 之**機械判型**路由，判型規則須可機械導出、不得靠散文說明。
-- **判型規則（封閉）**：副檔名 `.md` ⇒ legacy 路徑（`template_check.sh todo`）；副檔名 `.json` 且頂層含 `stub_modules` 鍵 ⇒ 新路徑（`template_check.sh todofmt`）；其餘 ⇒ fail-closed 並印兩種合法形式。
+- **判型規則（封閉）**：副檔名**經 `casefold` 後**為 `.md` ⇒ legacy 路徑（`template_check.sh todo`）；`casefold` 後為 `.json` 且頂層含 `stub_modules` 鍵 ⇒ 新路徑（`template_check.sh todofmt`）；其餘 ⇒ fail-closed 並印兩種合法形式。
+  🔴 **`casefold` 為必要**（r2 指出：本機大小寫不敏感卷上 `X_TODO.MD` 會判不出 legacy）。
+- 🔴 **`--manifest` 等既有旗標不受影響**（r2 指出原文未定義）：本 Task **只改 `--todo` 之分派**，其餘旗標之路徑解析與 rc 語義逐字不變，並以回歸測試斷言。
 - **不可做**：不得以內容啟發式猜測；不得讓同一輸入同時進兩條路徑；不得改動 legacy 路徑之 rc 語義。
 - **邊界**：① `.md` 走 legacy 且 rc 語義不變 ② 合法 manifest 走新路徑 ③ `.json` 但缺 `stub_modules` ④ 副檔名為 `.yaml` ⑤ 檔不存在 ⑥ 兩種皆給（應 fail-closed）。
 - **驗證**：`tests/governance/test_gate_todo_routing.py`：對 ①–⑥ 各一測試；legacy 路徑之輸出逐字不變之回歸斷言；`test_mutation_*` 一支（改壞判型即轉紅）。
 - **存活至**：`lifecycle: keep`。
 - **覆蓋風險**：`gate.sh` 為全專案共用控制流——改動須有回歸測試斷言 `dispatch`／`artifact`／`register-output` 三條既有路徑行為不變。
 
+#### Task 1.4 — `gate.sh` 於 impl 派工強制要求 manifest（`票 TODOFMT/P1`）
+
+- 🔴 **起因（r2 最重之單條）**：`scripts/gate.sh:1004-1006` 僅在 `--todo` **非空**時呼叫檢查；
+  `:927` 對高風險派工只要求 `--spec`，**不要求** `--todo`。
+  ⇒ 新票只交 `--spec`、省略 `--todo`，則 Task 1.2 之 hook 無路徑可擋、檢查條件為假，
+  **整套五類落點檢查被完全繞過而 token 照發**。現成案例＝`docs/EVENTSCAN_SPEC.md`（有 SPEC、無 TODO 檔）。
+- **目標**：`--spec` 有值時**強制要求** `--todo`，且其須為新格式 manifest。
+- **實作要點**：
+  1. `--spec` 指向**凍結前既有 SPEC 清單**（快照 `scripts/legacy_spec_snapshot.txt`，與白名單同一保護機制）⇒ 放行（C-6）。
+  2. 否則 `--todo` 缺值 ⇒ **fail-closed**，訊息印出五類落點與 manifest 樣板路徑。
+  3. `--todo` 有值但判型為 legacy `.md` 且 `--spec` 不在既有清單 ⇒ fail-closed。
+- **不可做**：不得放行「新 SPEC ＋ legacy 散文 TODO」之組合；不得改動 `--spec` 之既有語義。
+- **邊界**：① 新 SPEC ＋ 無 `--todo`（擋） ② 新 SPEC ＋ manifest（放行） ③ 既有 SPEC ＋ 無 `--todo`（放行） ④ 既有 SPEC ＋ 散文 TODO（放行） ⑤ 新 SPEC ＋ 散文 TODO（擋） ⑥ SPEC 快照檔 sha256 不符（fail-closed）。
+- **驗證**：`tests/governance/test_gate_impl_requires_manifest.py`：對 ①–⑥ 各一測試；
+  `dispatch` 之非 impl 路徑（無 `--spec`）行為逐字不變之回歸斷言；`test_mutation_*` 一支。
+- **存活至**：`lifecycle: keep`。
+- **覆蓋風險**：`gate.sh` 為全專案共用控制流；本 Task 與 Task 1.3 同檔改動，須合併為單一 diff 並同批回歸。
+
 #### Task 1.2 — 產出端 hook：新票寫散文 TODO 即擋（`票 TODOFMT/P1`）
 
-- **目標**：`PreToolUse` hook，於 Write／Edit 建立**新的** `docs/<EPIC>_TODO.md` 時 fail-closed，並印出五類落點指引。
+- **目標**：`PreToolUse` hook，於 Write／Edit 建立**新的**散文 TODO（樣式 `docs/**/<任意>_TODO.md`，含 `docs/*_TODO.md` 與子目錄）時 fail-closed，並印出五類落點指引。
 - 🔴 **判定不得依賴 git 狀態**（r1 三家各自獨立打穿 `git ls-files` 版：已 `git add` 之佔位檔會被當成既有檔；hook 收到之**絕對路徑**與 `./` 前綴皆不在 `git ls-files` 輸出中）。
 - **實作要點**：
   1. **路徑正規化**：先轉為 repo 相對路徑（剝 repo root 前綴、剝 `./`、`realpath` 解 symlink），再比對。
-  2. **判定來源＝凍結時寫入之既有散文 TODO 白名單快照**（`scripts/legacy_prose_todo.txt`，內容為本 SPEC 凍結當下 `docs/*_TODO.md` 之清單）。該快照**只減不增**：檔案被刪可從清單移除，**不得新增**。
-  3. 命中白名單 ⇒ 放行（C-6）；未命中且形如 `docs/<EPIC>_TODO.md` ⇒ fail-closed 並印五類落點指引。
+  2. **判定來源＝凍結時寫入之既有散文 TODO 白名單快照**（`scripts/legacy_prose_todo.txt`）。
+     🔴 **「只減不增」須機械強制**（r2 指出原文只是紀律）：白名單檔**自身亦受本 hook 保護**——
+     對它的 Write／Edit，只放行「移除既有行」之 diff；任何新增行 ⇒ fail-closed。
+     另附完整性來源：白名單檔尾記其自身之 `sha256`，hook 每次先驗；不符即 fail-closed。
+  3. 🔴 **比對須大小寫不敏感**（本機為大小寫不敏感卷；`Docs/X_Todo.md` 不得繞過）：
+     正規化後一律 `casefold` 再比對。
+  4. 🔴 **樣式須涵蓋多段路徑**（r2 指出原文只擋單段）：判定樣式為
+     `docs/**/<任意>_TODO.md`（含 `docs/sub/X_TODO.md`），不限 `docs/` 直屬。
+  5. 命中白名單 ⇒ 放行（C-6）；未命中且命中上述樣式 ⇒ fail-closed 並印五類落點指引。
 - **不可做**：不得擋白名單內檔案之編輯；不得掃全 repo；不得執行 pytest；**不得以 git 狀態（`ls-files`／`status`／`diff`）作為判定依據**。
-- **邊界**：① 新建 `docs/X_TODO.md` ② 編輯白名單內之 `docs/GAP2_MARGINAL_IC_TODO.md` ③ 新建 `docs/X_TODO.yaml`（放行） ④ 路徑含空白 ⑤ 傳入**絕對路徑**或 `./docs/X_TODO.md`（須正規化後正確判定） ⑥ 白名單檔不存在或不可讀（fail-closed 擋） ⑦ 已 `git add` 但未 commit 之新散文 TODO（**須擋**） ⑧ symlink 指向白名單內檔案。
+- **邊界**：① 新建 `docs/X_TODO.md` ② 編輯白名單內之 `docs/GAP2_MARGINAL_IC_TODO.md` ③ 新建 `docs/X_TODO.yaml`（放行） ④ 路徑含空白 ⑤ 傳入**絕對路徑**或 `./docs/X_TODO.md`（須正規化後正確判定） ⑥ 白名單檔不存在或不可讀（fail-closed 擋） ⑦ 已 `git add` 但未 commit 之新散文 TODO（**須擋**） ⑧ symlink 指向白名單內檔案 ⑨ **大小寫變體** `Docs/X_Todo.md`（須擋） ⑩ **子目錄** `docs/sub/X_TODO.md`（須擋） ⑪ **對白名單檔本身新增行**（須擋） ⑫ **白名單檔 sha256 不符**（fail-closed 擋） ⑬ 硬連結指向白名單內檔案。
 - **驗證**：`tests/governance/test_todofmt_write_guard.py`：對 ①–⑧ 各一具名測試；hook 掛載點與 `.claude/settings.json` **機械對證**（比照既有 `factkey_write_guard` 之對證作法）；耗時以 `date +%s%N` 記錄寫入 §V（依 C-1 不比門檻）；`test_mutation_*` 一支。
 - **存活至**：全票完工後保留。
 - **覆蓋風險**：`.claude/settings.json` 為共用掛載點，新增條目不得影響既有 hook 之觸發順序——須有回歸測試斷言既有 hook 清單為新清單之子集。
@@ -206,6 +235,9 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
      - 對抗式審查之要求字面
      - 實作者不自審之要求字面
      - 家數與家族指向 ORCH §1 現行分工行之字面
+     - 🔴 **「不得跳步」之字面亦納入快照**（r2 指出：只驗三項存在性，擋不住把「不得跳步」整句刪掉）
+     - 🔴 **快照比對之標的含 `AGENTS.md` 與 `.cursorrules`**（r2 指出：只釘 `CLAUDE.md` 與 ORCH，執行端合約未釘）
+  1b. 🔴 **例外條款偵測**（r2 指出：字面逐字保留但可在他處新增例外抵銷）：對四份檔（`CLAUDE.md`／ORCH／`AGENTS.md`／`.cursorrules`）做**新增行**掃描，凡新增行同時命中「審查／對抗／自審／家數」任一關鍵詞**且**命中「例外／不適用／可略／免」任一者 ⇒ fail，須人工裁決後具名放行。**誠實邊界**：此為關鍵詞啟發式，非封閉集合，可被改寫繞過；其角色是提醒不是保證，已於 §N 具名。
   2. `CLAUDE.md` 與 ORCH 之 TODO 定義字面一致性機械斷言。
   3. `grep -c` 確認家數數字未被寫入 `CLAUDE.md`。
   4. 全 repo 殘留掃描：`templates/` ＋ `scripts/` 內指向舊散文 TODO 路徑樣式之命中數應為 0。
@@ -217,7 +249,10 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 
 #### Task 3.1 — 以新格式產出本票之 TODO（`票 TODOFMT/P3`）
 
-- **目標**：**本票自己吃自己的狗糧**——本 SPEC 凍結後，其 TODO 以 Phase 0 定義之五類落點產出，不產生散文 TODO 檔。
+- **目標**：**本票自己吃自己的狗糧**——本票之 TODO 以 Phase 0 定義之五類落點產出，不產生散文 TODO 檔。
+- 🔴 **時序（r2 指出原文自相矛盾：「凍結後才產 manifest」與「manifest 通過才准凍結」互斥）**：
+  manifest 之產出與檢查**皆在凍結之前**；`template_check.sh todofmt` rc=0 是**凍結前置**，不是凍結後動作。
+  凍結之後不再改 manifest，只依 invalidation 條件重產。
 - **不可做**：不得回頭寫散文 TODO；不得因「本票是治理票、沒有生產模組」而免除測試檔落點。
 - **邊界**：① 本票無生產模組（`stub_modules` 為空）⇒ 須明示為 `not_executable` 並附三值理由 ② 契約 JSON 落點 ③ 批次卡欄位齊備 ④ 收據落點 ⑤ 五類齊備檢查通過 ⑥ `template_check todofmt` rc=0。
 - **驗證**：以本票 manifest 跑 `template_check.sh` 之 `todofmt` 子命令須 rc=0；並以 Phase 0 之六條邊界測試覆蓋。
@@ -230,14 +265,26 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 
 - 🔴 **起因**（r1 三家同判）：本票為**治理票**，`stub_modules` 只能為空、`test_files` 全是治理測試 ⇒ 五類對本票退化為二類，**Task 3.1 之 dogfooding 不足以驗收**「含生產 stub ＋ golden 路徑」之真實實作票。
 - **目標**：在本 SPEC 凍結**之前**，為下一張真實實作票 **FF-TFMETA** 產出一份 manifest 並通過 `template_check.sh todofmt`。
-- **驗收之 identity 與資料流**：須能承載 FF-TFMETA 之四情況（單週期 run／多週期 run／`feature_manifest.json` 與 `task_record.json` 兩值一致／兩值不一致），每一情況對應 `test_files` 中之一個具名測試。
+- **驗收之 identity 與資料流**：四情況須**逐字對齊** `docs/FFDEFECT_DECISION.md` 之 B-4 驗收面（單週期 run／多週期 run／`feature_manifest.json` 與 `task_record.json` 兩值一致／兩值不一致），每一情況對應 `test_files` 中之一個具名測試。🔴 **本 SPEC 不自行陳述 FF-TFMETA 之 golden 狀態**（r2 指出原陳述未經查證）——以決策檔為準。
+
+🔴 **本樣本之涵蓋邊界（r2 要求明示，不得默示）**：
+
+| 票型特徵 | 本樣本是否涵蓋 |
+|---|---|
+| 單模組、無跨批搬遷 | ✅ 涵蓋 |
+| 有生產 stub ＋ 具名測試 | ✅ 涵蓋 |
+| `callers_later` 非空（後續批才接線） | ✅ 涵蓋 |
+| **跨批搬遷**（`relocates_to`／`relocates_at` 實際發生） | ❌ **不涵蓋** → RESID-9 |
+| **golden 重簽**（如 FF-NAME 之 146 MB 三檔） | ❌ **不涵蓋** → RESID-9 |
+| **前端消費者**（`frontend/` 落點） | ❌ **不涵蓋** → RESID-9 |
 - **不可做**：不得實作 FF-TFMETA（本票只產其 manifest）；不得為了讓 manifest 通過而放寬契約值域。
 - **邊界**：① `stub_modules` 非空（FF-TFMETA 有生產模組） ② `contract_jsons` 指向既有 FF 契約 ③ `batch_card.callers_now` 為空而 `callers_later` 非空（EVENTSCAN 為後續消費者） ④ `coverage_risk` 含「既有 18 個 run 之 metadata 不得改寫」 ⑤ `lifecycle` 值合法 ⑥ 四情況各有具名測試。
 - **驗證**：`tests/governance/test_todofmt_sample_fftfmeta.py`：對 ①–⑥ 各一測試；該 manifest 通過 `template_check.sh todofmt`（rc=0）；`test_mutation_*` 一支。
 - **存活至**：`lifecycle: keep`（FF-TFMETA 開工時直接沿用）。
 - **覆蓋風險**：若 FF-TFMETA 之真實需求與本樣本不符，該票開工時須先更新樣本並重跑 Task 0.1 之 schema 版本斷言。
 
-🔴 **凍結條件**：Task 3.1 與 **Task 3.2 皆通過**方得凍結本 SPEC。單靠 3.1（自我 dogfooding）**不足**。
+🔴 **凍結條件**（r2 加嚴）：**Phase 0–3 全部 Task 之驗證皆綠**方得凍結本 SPEC。
+單靠 Task 3.1（自我 dogfooding）不足；單靠 3.1＋3.2 亦不足——新增之 Task 1.3／1.4 之回歸斷言亦為凍結前置。
 
 ---
 
@@ -246,7 +293,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 | 層 | 內容 |
 |---|---|
 | **契約層** | Task 0.1 之契約鍵集 vs loader 回傳鍵集相等 |
-| **機械閘層** | Task 0.2／1.1／1.2 各自之六條邊界 |
+| **機械閘層** | Task 0.1 六條邊界／Task 0.2 六條／Task 1.1 六條／**Task 1.2 八條**／**Task 1.3 六條**／Task 3.2 六條 |
 | **效能層** | 🔴 **每個新增檢查皆須寫入實測耗時**（C-1）；**不與門檻比對**，僅要求回填且不得仍為 `PENDING-MEASURE`。量法：`date +%s%N` 前後差，或 `time` 之 real 值 |
 | **真陽性層** | Task 1.1 之兩段斷言：(i) 量化 26 檔 fatal 集合 == §A 具名之 12 支；(ii) 治理扣除既有三檔後 fatal 集合 == 27 支。**皆只跑靜態器** |
 | **不變式層** | `template_check.sh spec` 子命令輸出逐字不變；`gov_check.sh` 第 6 段輸出逐字不變；`gate.sh` 之 `dispatch`／`artifact`／`register-output` 三條既有路徑行為不變；`.claude/settings.json` 既有 hook 清單為新清單之子集；既有散文 TODO 零改動；**審查強度三項字面快照逐字存在**（Task 2.2） |
@@ -263,7 +310,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 
 ## §R 回退
 
-- **Phase 0–1**：新增檔與新增子命令，回退＝刪除新增檔 ＋ 還原 `gov_check.sh:500` 之 glob ＋ 移除 `.claude/settings.json` 新增條目。無資料遷移，無既有檔改寫。
+- **Phase 0–1**：新增檔與新增子命令，回退＝刪除新增檔 ＋ 移除 `.claude/settings.json` 新增條目 ＋ 還原 `gate.sh` 之判型分支。🔴 **`gov_check.sh` 第 6 段全程未改，故無須還原**。無資料遷移，無既有檔改寫。
 - **Phase 2**：`CLAUDE.md`／ORCH／範本之改動皆在 git 追蹤內，回退＝`git revert`。
 - **Phase 3**：本票 manifest 為新增檔，刪除即回退。
 - **回退後之一致狀態**：既有 `docs/*_TODO.md` 全程零改動（C-6），故回退不需處理任何既有票。
@@ -281,4 +328,11 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
 - **RESID-4 — `mutation_probe_check.sh` 之 pytest 段不擴至量化層**：`為何現在不做: user-ruling:2026-09-22 C-5`。🔴 **成立範圍須明記**：「pytest 段額外抓到 0 支」僅對**本批 26 檔**成立（該批靜態器 rc=1、fatal 12 行）；**不得**外推為「pytest 段普遍無價值」。
 - **RESID-5 — 審 stub＋測試檔之每輪成本上升未量測**：`為何現在不做: needs-research:三家於 r1 consult 同判成本不相當，但無人給出量法；需於本票之新格式試辦後才有可量對象`。
 - **RESID-6 — §A 前提詮釋之缺陷（有限 receipt → 全稱結論）不在本票範圍**：`為何現在不做: needs-research:本方向完全不碰 §A；2026-09-22 該問題之六個候選改法全數被實測或使用者推翻，尚無可行設計`。（理由值自 `blocked-by` 改為 `needs-research`——非被他方阻擋，而是無設計。）
-- **RESID-7 — 靜態 AST 原理上偵測不到、而實跑會轉紅之假綠類型**：`為何現在不做: user-ruling:2026-09-22 使用者定死不得引入分鐘級以上之檢查（C-1、C-5）`。🔴 **具名取捨**：C-5 以「只做靜態分析」換取速度，其代價是此類假綠**本票不覆蓋**；三家於 r1 同判此取捨存在，本節具名之以免日後被當成已解決。
+- **RESID-7 — 靜態分析原理上偵測不到、而實跑會轉紅之類型**：`為何現在不做: user-ruling:2026-09-22 使用者定死不得引入分鐘級以上之檢查（C-1、C-5）`。🔴 **具名取捨**：C-5 以「只做靜態分析」換速度，代價是此類**本票不覆蓋**。
+  **已觀測之兩種靜態行為（供日後可查，r2 要求補）**：
+  (i) **偽陽性**——探針確實觸及系統，但觸及方式不在分類器認列清單（`subprocess`、本地 helper、`monkeypatch.setenv`、`tests.fixtures`），即 §A 之 39 支；
+  (ii) **偽陰性之可能面**——探針 import 了 `momentum`／`api` 符號因而通過靜態認列，但其斷言與被 mutate 之行為無因果關係；靜態器只驗「有無觸及」不驗「因果」，此面**未經量測**。
+- **RESID-8 — Task 2.2 之例外條款偵測為關鍵詞啟發式**：`為何現在不做: needs-research:封閉可導出集合尚未設計；黑名單式關鍵詞可被改寫繞過`。其角色為提醒不為保證，已於 Task 2.2 步驟 1b 明記。
+- **RESID-9 — 三種實作票型態未有樣本**：`為何現在不做: blocked-by:本票之第二樣本為 FF-TFMETA，其票型不含跨批搬遷／golden 重簽／前端落點；須待相應票型之真實票出現才有可對之樣本`。
+  具名三型：**跨批搬遷**（`relocates_to`／`relocates_at` 實際發生）、**golden 重簽**（FF-NAME 之三檔共 146 MB）、**前端消費者**（`frontend/` 落點）。
+  🔴 **觸發條件**：**FF-NAME 開工前**須先補「golden 重簽」型樣本並通過 `template_check.sh todofmt`，否則該票不得依本格式派工。

@@ -69924,3 +69924,46 @@ ts=2026-09-22 23:41:46 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "d5b48490-d822-4d61-aaf1-66faaddb6c27", "lock_sha256": "fb0ffb88141f32e81ecb5dcfa1b6e20d610c3bf96f0a4b598261c4aebd5f72f1", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "b4b63a44-db3b-41a8-a817-bcad7fb2e83e", "schema_version": 1, "sequence": 5580, "session_id": "20260922-todofmt-x-review-r1", "synth_sha256": "c00b05510d29900cbb94a028737cfdf67d601ca83332aca244d5aa5ab5f2b6f5", "ts": "2026-09-22T16:07:37Z"}
 {"actor": "live_doc_registry_check.sh", "class": "UNREGISTERED", "event": "docrot2_gate_block", "event_id": "fbc6e66a-6adc-4433-b98b-0310682fd9d2", "origin_script": "live_doc_registry_check.sh", "path": "docs/TODOFMT_SPEC.md", "producer": "audit_append.sh", "rule_id": "unregistered-md", "schema_version": 1, "sequence": 5581, "ts": "2026-09-22T16:08:02Z"}
 {"actor": "live_doc_write_guard.sh", "class": "LIVE-SPEC", "event": "docrot2_gate_block", "event_id": "2011f288-0023-488e-8c8e-438c6f80c62a", "origin_script": "live_doc_write_guard.sh", "path": "docs/TODOFMT_SPEC.md", "producer": "audit_append.sh", "rule_id": "archaeology", "schema_version": 1, "sequence": 5582, "ts": "2026-09-22T16:08:37Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260922-TODOFMT-X-REVIEW-R2", "ts": "2026-09-22T16:10:57Z"}
+=== 2026-09-23 00:10:57 | dispatch ===
+  ts=2026-09-23 00:10:57
+  kind=dispatch
+  intent=TODOFMT SPEC 第二輪三家對抗審（閉合複查為首要）
+  risk=low
+  facts_asked=r1 之 24 條已全數落地且兩閘 rc=0；12 支 fatal 為分類器誤報非空心探針；治理層另有 27 支同型；使用者已移除秒數門檻並取消白話閘
+  review_role=三家全員：先由原提出方逐條閉合複查 r1 findings，再攻五條新 assumed
+  template=n/a: review 唯讀輪，不改碼不改範本不改 SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260922-TODOFMT-X-REVIEW-R2", "ts": "2026-09-22T16:11:07Z"}
+=== 2026-09-23 00:11:07 | dispatch ===
+  ts=2026-09-23 00:11:07
+  kind=dispatch
+  intent=TODOFMT SPEC 第二輪三家對抗審（閉合複查為首要）
+  risk=low
+  facts_asked=r1 之 24 條已全數落地且兩閘 rc=0；12 支 fatal 為分類器誤報非空心探針；治理層另有 27 支同型；使用者已移除秒數門檻並取消白話閘
+  review_role=三家全員：先由原提出方逐條閉合複查 r1 findings，再攻五條新 assumed
+  template=n/a: review 唯讀輪，不改碼不改範本不改 SPEC
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260922-TODOFMT-SPEC-REVIEW-R2-BRIEF.md", "brief_sha256": "230d66d8df491322a20c0d5640e6a327829a4aa5472ab2373aa345466e0febad", "brief_sha256_norm": "230d66d8df491322a20c0d5640e6a327829a4aa5472ab2373aa345466e0febad", "event": "committee_round_open", "event_id": "55ee83f6-43ce-4fe3-bb35-11e8755c7611", "expected_outputs": {"codex": "handoffs/20260922-todofmt-x-review-r2-codex.md", "composer": "handoffs/20260922-todofmt-x-review-r2-composer.md", "grok": "handoffs/20260922-todofmt-x-review-r2-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "schema_version": 1, "sequence": 5583, "session_name": "20260922-todofmt-x-review-r2", "task_id": "20260922-TODOFMT-X-REVIEW-R2", "ts": "2026-09-22T16:11:21Z"}
+{"actor": "cx_run", "attempt_id": "23c11798-3a39-4e01-9dde-f171f3f59714", "cli_rc": "0", "event": "committee_family_result", "event_id": "57a02307-cdda-4a45-a648-60d5bdf6b125", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260922-todofmt-x-review-r2-composer.md", "output_sha256": "163eae42d880ed119e59586068fa7e446029d9f414c1cedfbf21766a99425a40", "producer": "audit_append.sh", "result_state": "success", "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "schema_version": 1, "sequence": 5584, "ts": "2026-09-22T16:14:13Z"}
+{"actor": "gate", "blocked_by": ["COMPOSER-R2-P1-01", "COMPOSER-R2-P1-02"], "closed": ["COMPOSER-R1-P1-01", "COMPOSER-R1-P1-03", "COMPOSER-R1-P1-04", "COMPOSER-R1-P2-01", "COMPOSER-R1-P2-02", "COMPOSER-R1-P2-03"], "event": "committee_output", "event_id": "ffc48316-205b-407e-b192-1b913639aac7", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260922-todofmt-x-review-r2-composer.md", "output_sha256": "163eae42d880ed119e59586068fa7e446029d9f414c1cedfbf21766a99425a40", "producer": "audit_append.sh", "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "schema_version": 1, "sequence": 5585, "task_id": "20260922-TODOFMT-X-REVIEW-R2", "ts": "2026-09-22T16:14:15Z", "verdict": "blocked"}
+{"actor": "cx_run", "attempt_id": "d90e533f-a4c1-43fc-b01d-2ddc17d69750", "cli_rc": "0", "event": "committee_family_result", "event_id": "91dc1b25-5bfa-44c8-ace0-bfa2dc62e74e", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260922-todofmt-x-review-r2-codex.md", "output_sha256": "0cf50bee762e8969cdda9ab3e6c9e3e783808bde6647f65a05b3fabe5b63ae6b", "producer": "audit_append.sh", "result_state": "success", "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "schema_version": 1, "sequence": 5586, "ts": "2026-09-22T16:30:36Z"}
+{"actor": "gate", "blocked_by": ["CODEX-R2-P1-01", "CODEX-R2-P1-02", "CODEX-R2-P1-03", "CODEX-R2-P1-04", "CODEX-R2-P1-05", "CODEX-R2-P1-06", "CODEX-R2-P1-07", "CODEX-R2-P1-08"], "closed": ["CODEX-R1-P1-02", "CODEX-R1-P1-03", "CODEX-R1-P1-04", "CODEX-R1-P1-05", "CODEX-R1-P1-09", "CODEX-R1-P2-01", "CODEX-R1-P2-02"], "event": "committee_output", "event_id": "4cd3244a-56f1-4622-be61-d455815caacf", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260922-todofmt-x-review-r2-codex.md", "output_sha256": "0cf50bee762e8969cdda9ab3e6c9e3e783808bde6647f65a05b3fabe5b63ae6b", "producer": "audit_append.sh", "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "schema_version": 1, "sequence": 5587, "task_id": "20260922-TODOFMT-X-REVIEW-R2", "ts": "2026-09-22T16:30:37Z", "verdict": "blocked"}
+{"actor": "cx_run", "attempt_id": "ba02539a-23dd-4130-8751-1a8ac792d56c", "cli_rc": "0", "event": "committee_family_result", "event_id": "bf776d0d-12d7-4e22-a87f-e2391af21f1c", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260922-todofmt-x-review-r2-grok.md", "output_sha256": "b51ea241922ead6345ee7d9d24a4978254e45b58a2b7cceca4cbfabce3f9c17d", "producer": "audit_append.sh", "result_state": "success", "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "schema_version": 1, "sequence": 5588, "ts": "2026-09-22T16:30:41Z"}
+{"actor": "gate", "blocked_by": ["GROK-R2-P1-01", "GROK-R2-P1-02", "GROK-R2-P1-03", "GROK-R2-P1-04", "GROK-R2-P1-05", "GROK-R2-P1-06", "GROK-R2-P1-07", "GROK-R2-P1-08", "GROK-R2-P1-09", "GROK-R2-P1-10"], "closed": ["GROK-R1-P1-01", "GROK-R1-P1-02", "GROK-R1-P1-04", "GROK-R1-P1-05"], "event": "committee_output", "event_id": "954b0be7-665a-44fd-b417-b4714e8f8fd0", "family": "grok", "origin_script": "gate.sh", "output_path": "handoffs/20260922-todofmt-x-review-r2-grok.md", "output_sha256": "b51ea241922ead6345ee7d9d24a4978254e45b58a2b7cceca4cbfabce3f9c17d", "producer": "audit_append.sh", "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "schema_version": 1, "sequence": 5589, "task_id": "20260922-TODOFMT-X-REVIEW-R2", "ts": "2026-09-22T16:30:42Z", "verdict": "blocked"}
+{"actor": "debt_clear", "brief_kind": "review", "canonical_count": 0, "category_counts": {"code-contract": 0, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}, "grok": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "ebf746b4-26ec-464e-92d1-7e00909abad6", "handoff_tree_commit": "2cdb94f240e9f6b9889dc9440677bf0f528b8ab8", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "round_open_sequence": 5583, "schema_version": 1, "sequence": 5590, "session_name": "20260922-todofmt-x-review-r2", "stamps": [], "task_id": "20260922-TODOFMT-X-REVIEW-R2", "ts": "2026-09-22T16:41:26Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "d2c9dd8e-feee-4c39-9daf-e04d3746f3cd", "lock_sha256": "a0fa33f618030b05e959cd40157e9cb48817ca4cf542cf0f7612ace2817200a0", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "71fe521c-965a-418b-b6bf-251e002b1768", "schema_version": 1, "sequence": 5591, "session_id": "20260922-todofmt-x-review-r2", "synth_sha256": "ad18cd8f6aa2eb409ce88e48a208865eb5b1cb2691d38d352de62d7d61d8dec1", "ts": "2026-09-22T16:41:27Z"}
