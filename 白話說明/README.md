@@ -29,7 +29,8 @@
 |---|---|---|---|---|
 | 010 | HP-PLAINDOCS | 已完成 | 白話說明/README.md | — |
 | 020 | HP-REDISPATCH | 已完成 | docs/REDISPATCH_SPEC.md | — |
-| 030 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO（大票管線第②步末）；SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 R8，**未凍結** |
+| 030 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。復工條件＝流程改法裁決後，依新停輪條件重定本票續審形狀 |
+| 035 | HP-PROCOPT | 待審 | docs/PROCOPT_DECISION.md | 診斷完成（r1→r2→r3 三輪、兩家零駁回），**未實施任何流程改動**。使用者四問已答（三機制分解／業界差異／模式與主委各佔一部分／實作缺陷抽樣 40% 是「SPEC 寫對但沒照做」）。下一步＝**使用者裁決採納哪幾步**；第 2、3 步須改 CLAUDE.md |
 | 040 | HP-FFDSTAR | 進行中 | docs/FFDSTAR_SPEC.md | R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷 |
 <!-- END GENERATED: handoff-pending -->
 

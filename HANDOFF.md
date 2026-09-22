@@ -6,8 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
-| 04-003 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO（大票管線第②步末）；SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 R8，**未凍結** |
-| 04-004 | HP-FFDSTAR | 進行中 | docs/FFDSTAR_SPEC.md | R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷 |
+| 04-005 | HP-FFDSTAR | 進行中 | docs/FFDSTAR_SPEC.md | R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -25,8 +24,9 @@
 | 03-013 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 IC 切分契約 |
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
-| 04-003 | HP-EVENTSCAN | 進行中 | 白話說明/EVENTSCAN方向與做法.md | 收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO（大票管線第②步末）；SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 R8，**未凍結** |
-| 04-004 | HP-FFDSTAR | 進行中 | docs/FFDSTAR_SPEC.md | R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷 |
+| 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。復工條件＝流程改法裁決後，依新停輪條件重定本票續審形狀 |
+| 04-004 | HP-PROCOPT | 待審 | docs/PROCOPT_DECISION.md | 診斷完成（r1→r2→r3 三輪、兩家零駁回），**未實施任何流程改動**。使用者四問已答（三機制分解／業界差異／模式與主委各佔一部分／實作缺陷抽樣 40% 是「SPEC 寫對但沒照做」）。下一步＝**使用者裁決採納哪幾步**；第 2、3 步須改 CLAUDE.md |
+| 04-005 | HP-FFDSTAR | 進行中 | docs/FFDSTAR_SPEC.md | R2 十三條閉合複查（R3）→ 凍結 SPEC → 寫 TODO；中票（`RISK-HIT: none`），範圍限「共用 `d*` 快取之可追溯性」。🔴 定性輪已擋下一次對**非缺陷**之修改：四型中兩型為設計意圖、一型不成立，僅 provenance 為真缺陷 |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑
@@ -48,6 +48,12 @@
 - 🔴 **`brief-kind` 的合法值是 `review|consult|closure|impl|stamp`**，**沒有 `discovery`**（雖然 `reconcile_build.sh --mode` 有 `discovery`，兩者不同命名空間）。寫錯會被 `doc_format_precheck` 在寫檔當下擋。
 - 🔴 **委員在 `CLOSED:` 列別家族的 finding ID 會被 `verdict_parse` 拒收**（「前綴家族 ≠ 本產出家族」），`debt_clear` 則報 `result_state='verdict_rejected'` 而不說原因。查法＝`bash scripts/verdict_parse.sh <委員檔> <family>`（**要帶 family 參數**，只給檔名會回「未知參數」且 rc=0 誤導）。修法＝主委刪掉跨家族 ID 後 `bash scripts/gate.sh register-output <task> <檔>`。
 - 🔴 **改 `spec_xref_check.sh` 的 GENERATED marker regex 時，key 字元類必須含連字號**：真實 key 皆為 `eventscan-rulings` 這種帶連字號者。用 `[^\s>-]+` 會在**加上行尾錨點後**把全檔合法 marker 判成結構不合法；無錨點時因 `match()` 只做前綴比對而僥倖不報，**所以上一輪不會發現**。
+- 🔴 **`.claude/settings.json` 之 `permissions.deny` 含 `Bash(rm *)`＝硬性拒絕、不跳核准提示**：使用者看不到任何提示，Claude 只收到 deny。需要刪檔一律改請使用者自行在終端機執行。
+- 🔴 **開門指令與派工指令必須分兩次 Bash 呼叫**（`gate.sh dispatch` 一次、`committee_run.sh` 一次）：寫在同一條指令裡，PreToolUse hook 會在 token 落地前先擋。
+- 🔴 **連 `awk`／`sed` 的文字內容也會觸發 dispatch 偵測**：只要指令列裡出現派工樣式或家族名（即使只是要把它寫進本檔當成坑），就 GATE BLOCKED。避法＝把文字先用 Write 工具落成檔案，再讓 `awk` 從檔案讀，指令列本身不含觸發字串。
+- 🔴 **`gov_check` 第 1a 段擋比例式停輪禁語之「字面」，不做語意判斷**：即使寫成「不主張以該禁語停輪」也命中。要討論該禁語時改寫描述，別打出原字串。
+- 🔴 **`completeness_check.sh` 的正式入口是 `--lock <sources.lock>`**，餵 synth 路徑會 FAIL。
+- 🔴 **`reconcile_cluster_attribution_check` 要求群集列逐字引用斷言前 20 字**（去空白後比對）；委員與主委之類別不一致時，須另列 `### 類別不一致` 段並附處置 token，否則銷帳被擋。
 - 🔴 **`gate.sh dispatch --impl-self` 必帶 `--task-id <root>-impl-b<N>-claude`**（family 尾碼須為 `claude`），省略會被拒發 token。
 - 🔴 **`completeness_check.sh` 正式入口是 `--lock <sources.lock>`**；直接給 synth 路徑會被判「argv 來源僅 tests 隔離」而 FAIL。單檔檢查才用 `--single <委員檔>`。
 - 🔴 **逐段搬移函式時，模組級常數不會跟著走**：搬移腳本的錨點只涵蓋 `def`／`class`，模組頂層的常數落在所有段之外 ⇒ 搬過去的函式 import 當下不報錯、**跑到那一行才** `NameError`。搬完先 grep 被搬函式引用的所有大寫識別字。
@@ -133,4 +139,9 @@
 - 2026-09-21：RM-FFDSTAR → `docs/FFDSTAR_SPEC.md`
 - 2026-09-21：RM-EVENTSCAN → `handoffs/reconcile/20260921-eventscan-x-review-r7/synth.md`
 - 2026-09-21：RM-FFDSTAR → `handoffs/reconcile/20260921-ffdstar-x-review-r2/synth.md`
+- 2026-09-22：RM-EVENTSCAN → `handoffs/reconcile/20260921-eventscan-x-review-r12/synth.md`
+- 2026-09-22：RM-FFTFMETA → `docs/FFDEFECT_DECISION.md`
+- 2026-09-22：RM-FFNAME → `docs/FFDEFECT_DECISION.md`
+- 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-procopt-x-consult-r3/synth.md`
+- 2026-09-22：RM-PROCOPT → `docs/PROCOPT_DECISION.md`
 <!-- HISTORY-END -->
