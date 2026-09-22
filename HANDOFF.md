@@ -6,7 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
-| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。**程式尚未改動**。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝實作 Phase 0–3 → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
+| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組，44 條測試過。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝b1 三家審碼 → b2（Task 2.1／2.2／3.3）→ b3＝W（Task 1.2／1.3／1.4／3.1／3.2＋掛載） → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -25,7 +25,7 @@
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。復工條件＝流程改法裁決後，依新停輪條件重定本票續審形狀 |
-| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。**程式尚未改動**。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝實作 Phase 0–3 → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
+| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組，44 條測試過。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝b1 三家審碼 → b2（Task 2.1／2.2／3.3）→ b3＝W（Task 1.2／1.3／1.4／3.1／3.2＋掛載） → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
 | 04-005 | HP-PROCOPT | 待審 | docs/PROCOPT_DECISION.md | 診斷完成（r1→r2→r3）。使用者後續裁定：**先完成 TODO 優化**（見 HP-TODOFMT），其餘改法待 TODOFMT 完工後再議。r3 之四步改法經使用者逐條質詢後大多撤回或降級，現存狀態見 白話說明/SPEC與TODO流程優化.md。**未實施任何流程改動** |
 | 04-006 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
 <!-- END GENERATED: handoff-todo -->
@@ -163,4 +163,6 @@
 - 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r8/synth.md`
 - 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r9/synth.md`
 - 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r10/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r11/synth.md`
+- 2026-09-23：RM-TODOFMT → `scripts/todofmt_check.sh`
 <!-- HISTORY-END -->
