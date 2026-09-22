@@ -78,6 +78,10 @@ _watched_for() {
     # 樣式分派：`<票名>結論.md` 一律盯 ROADMAP 與缺口登記；新票之結論書自動取得 WATCHED。
     *結論.md)                         echo "docs/ROADMAP.md docs/IC_QUANT_GAP_REGISTRY.md" ;;
     "EVENTSCAN方向與做法.md")        echo "momentum/Analysis/event_samples/ momentum/DataExtraction/case_search_engine.py momentum/Analysis/net_ic_analyzer.py docs/ROADMAP.md" ;;
+    # 2026-09-22 PROCOPT：一次性審閱文件（使用者逐條裁決 D1–D8 後封存）。
+    #   盯其所描述之三個權威來源：決策紀錄、流程憲法、編排手冊——
+    #   任一改動代表「文中所寫的現行條文或結論已非現況」，該檔必須同步。
+    "SPEC與TODO流程優化.md")         echo "docs/PROCOPT_DECISION.md CLAUDE.md docs/MULTI_AGENT_ORCHESTRATION.md" ;;
     # 同批補登（同一 fail-closed 缺口；各盯其票之權威技術文件與實作面）
     "EVTLABEL施工進度.md"|"EVTLABEL規格白話.md")
                                       echo "docs/EVTLABEL_TODO.md momentum/Analysis/event_samples/" ;;
