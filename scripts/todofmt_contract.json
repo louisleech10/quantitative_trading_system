@@ -1,0 +1,30 @@
+{
+  "contract": "todofmt-manifest",
+  "spec": "docs/TODOFMT_SPEC.md",
+  "top": {
+    "stub_modules": {"type": "path_array", "required": true, "exists_check": true},
+    "test_files": {"type": "path_array", "required": true, "exists_check": true},
+    "script_acceptance": {"type": "path_array", "required": true, "exists_check": true},
+    "contract_jsons": {"type": "path_array", "required": true, "exists_check": true},
+    "spec_path": {"type": "path", "required": true, "exists_check": true},
+    "contract_digest": {"type": "hex128", "required": true, "exists_check": false},
+    "run_receipts": {"type": "receipt_array", "required": true, "exists_check": true},
+    "batch_card": {"type": "batch_card", "required": true, "exists_check": false}
+  },
+  "batch_card": {
+    "depends": {"type": "string_array", "required": true, "exists_check": false},
+    "touches": {"type": "path_array", "required": true, "exists_check": true},
+    "callers_now": {"type": "path_array", "required": true, "exists_check": true},
+    "callers_later": {"type": "path_array", "required": true, "exists_check": false},
+    "relocates_to": {"type": "path", "required": false, "exists_check": false},
+    "relocates_at": {"type": "string", "required": false, "exists_check": false},
+    "reexport": {"type": "bool", "required": false, "exists_check": false},
+    "tests_stay": {"type": "bool", "required": false, "exists_check": false},
+    "gate_cmd": {"type": "nonempty_string", "required": true, "exists_check": false},
+    "forbidden": {"type": "forbidden_array", "required": true, "exists_check": false},
+    "risk_mitigation": {"type": "string_array", "required": true, "exists_check": false},
+    "coverage_risk": {"type": "string_array", "required": true, "exists_check": false},
+    "lifecycle": {"type": "lifecycle", "required": true, "exists_check": false},
+    "not_executable": {"type": "not_executable_array", "required": true, "exists_check": false}
+  }
+}

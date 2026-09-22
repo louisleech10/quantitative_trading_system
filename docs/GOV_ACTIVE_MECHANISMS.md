@@ -90,6 +90,7 @@
 | `ticket_batch_check.sh` | 常態檢查 | commit-msg gov_check  |
 | `ticket_universe.sh` | 常態檢查 | 未掛 |
 | `todo_spec_crosscheck.sh` | 常態檢查 | 未掛 |
+| `todofmt_check.sh` | 常態檢查 | 未掛 |
 | `verdict_filled_check.sh` | 常態檢查 | gate  |
 | `verdictgate_check.sh` | 常態檢查 | gate committee_run  |
 | `verify_b1_independent.sh` | 一次性驗證 | 未掛 |

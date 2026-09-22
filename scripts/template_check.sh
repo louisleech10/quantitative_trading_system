@@ -18,6 +18,7 @@ _lc_repo_rel() {
   case "${_p}" in "${REPO_ROOT}/"*) printf '%s' "${_p#${REPO_ROOT}/}" ;; *) printf '%s' "${_p}" ;; esac
 }
 kind="${1:-}"; file="${2:-}"
+[ "${kind}" = "todofmt" ] && exec bash "${SCRIPT_DIR}/todofmt_check.sh" "${file}"
 [ -n "${kind}" ] && [ -n "${file}" ] || { echo "用法: template_check.sh spec|todo|result|dext|template <file>"; exit 1; }
 [ -f "${file}" ] || { echo "ERROR: 檔不存在: ${file}"; exit 1; }
 
