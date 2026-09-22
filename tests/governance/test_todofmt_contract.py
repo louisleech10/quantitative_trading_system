@@ -117,6 +117,15 @@ def test_boundary_01_all_five_categories_empty_fails(repo: Path) -> None:
     rc, out = _run(repo, m)
     assert rc == 1, out
     assert "stub_modules 為空" in out and "contract_jsons 為空" in out
+    assert "test_files 與 script_acceptance 皆空" in out  # b1 審碼 grok：原未斷言此句，刪其子句仍綠
+
+
+def test_boundary_01b_script_acceptance_alone_satisfies_test_category(repo: Path) -> None:
+    """合取之另一半：test_files 空而 script_acceptance 非空者，第二類視為齊備。"""
+    m = _valid(repo)
+    m.update(test_files=[], script_acceptance=["scripts/todofmt_check.sh"])
+    rc, out = _run(repo, m)
+    assert rc == 0, out
 
 
 def test_boundary_02_only_batch_card_fails(repo: Path) -> None:
@@ -182,6 +191,15 @@ def test_boundary_09_receipt_missing_key_fails(repo: Path) -> None:
     rc, out = _run(repo, _valid(repo))
     assert rc == 1, out
     assert "receipt 缺" in out
+
+
+def test_boundary_09b_receipt_path_is_directory_fails(repo: Path) -> None:
+    """b1 審碼 grok：receipt 路徑為目錄時原本跳過三鍵檢查而放行。"""
+    (repo / "handoffs/run_receipts/subdir").mkdir()
+    m = _valid(repo)
+    m["run_receipts"][0]["path"] = "handoffs/run_receipts/subdir"
+    rc, out = _run(repo, m)
+    assert rc == 1 and "須為一般檔" in out, out
 
 
 def test_boundary_10_exists_check_false_missing_path_passes(repo: Path) -> None:
@@ -251,6 +269,32 @@ def test_boundary_16_symlink_resolving_outside_repo_fails(repo: Path, tmp_path: 
     rc, out = _run(repo, m)
     assert rc == 1, out
     assert "位於 repo 根之外" in out
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("test_files", ["tests/test_x.py\nfalse\tignored\tnot-present.py"]),  # b1 審碼 codex 之反例原樣
+        ("test_files", ["tests/test_x.py\nnot-present.py"]),  # b1 審碼 grok：換行後接不存在路徑
+        ("test_files", ["tests/test_x.py\n../outside"]),  # 換行後接 ..
+        ("test_files", ["tests/test_x.py\n/etc/passwd"]),  # 換行後接絕對路徑
+        ("spec_path", "docs/X_SPEC.md\n/etc/passwd"),
+        ("touches", ["momentum/m.py\n../outside"]),
+        ("receipt", "handoffs/run_receipts/r.json\n../outside"),
+    ],
+    ids=["codex-tab-forge", "newline-missing", "newline-dotdot", "newline-abs", "spec_path", "touches", "receipt"],
+)
+def test_path_domain_rejects_control_characters(repo: Path, field: str, value: object) -> None:
+    """路徑值域不得含控制字元：逐行＋tab 讀取不得被路徑值本身拆開而使其後段逃過檢查。"""
+    m = _valid(repo)
+    if field == "touches":
+        m["batch_card"]["touches"] = value
+    elif field == "receipt":
+        m["run_receipts"][0]["path"] = value
+    else:
+        m[field] = value
+    rc, out = _run(repo, m)
+    assert rc == 1 and "控制字元" in out, out
 
 
 def test_recorded_digest_equals_loader_computed(repo: Path) -> None:

@@ -71,6 +71,8 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
     bad_expiry["batch_card"]["not_executable"][0]["expiry"] = "2099/01/01"
     later_absent = json.loads(json.dumps(v))
     later_absent["batch_card"]["callers_later"] = ["api/not_yet_written.py"]
+    ctrl = json.loads(json.dumps(v))
+    ctrl["test_files"] = ["tests/governance/test_template_check_todofmt.py\n../outside"]
     return {
         "valid": _write(tmp_path, "valid.json", v),
         "b1_missing": tmp_path / "absent.json",
@@ -80,7 +82,14 @@ def _inputs(tmp_path: Path) -> dict[str, Path]:
         "b5_no_owner": _write(tmp_path, "no_owner.json", no_owner),
         "b6_bad_expiry": _write(tmp_path, "bad_expiry.json", bad_expiry),
         "b7_exists_false_absent": _write(tmp_path, "later_absent.json", later_absent),
+        "b4b_control_char_in_path": _write(tmp_path, "ctrl.json", ctrl),
     }
+
+
+def test_boundary_04b_control_character_in_path_fails(tmp_path: Path) -> None:
+    """b1 審碼：路徑值夾帶換行時，其後段不得逃過路徑規則（經 wrapper 亦同）。"""
+    r = _tc(_inputs(tmp_path)["b4b_control_char_in_path"])
+    assert r.returncode == 1 and "控制字元" in r.stdout, r.stdout
 
 
 def test_valid_manifest_rc0(tmp_path: Path) -> None:

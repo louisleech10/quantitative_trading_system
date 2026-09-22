@@ -132,20 +132,26 @@ EOF
 fi
 
 # ── 3. 路徑：repo 相對、無 `..`、exists_check=true 者須存在且解析後位於 repo 根下 ─────
+# 路徑值含控制字元（換行、tab 等）者不輸出原值、改以 CTRL 標記＋JSON 編碼，
+#   使下方逐行＋tab 分隔之讀取不會被路徑值本身拆開（b1 審碼 codex：換行可偽造一筆 exists_check=false 紀錄）。
 _PATHS='
+def row($ex; $key): if test("[[:cntrl:]]") then "CTRL\t\($key)\t\(tojson)" else "\($ex)\t\($key)\t\(.)" end;
 $c[0] as $C | . as $m
 | ( $C.top | to_entries[] | select(.value.type=="path_array" or .value.type=="path") | . as $e
-    | ($m[$e.key] | if type=="array" then .[] else . end) | "\($e.value.exists_check)\t\($e.key)\t\(.)" ),
+    | ($m[$e.key] | if type=="array" then .[] else . end) | row($e.value.exists_check; $e.key) ),
   ( $C.batch_card | to_entries[] | select(.value.type=="path_array" or .value.type=="path") | . as $e
     | select($m.batch_card|has($e.key))
-    | ($m.batch_card[$e.key] | if type=="array" then .[] else . end) | "\($e.value.exists_check)\tbatch_card.\($e.key)\t\(.)" ),
-  ( $m.run_receipts[] | "\($C.top.run_receipts.exists_check)\trun_receipts[].path\t\(.path)" )
+    | ($m.batch_card[$e.key] | if type=="array" then .[] else . end) | row($e.value.exists_check; "batch_card.\($e.key)") ),
+  ( $m.run_receipts[] | .path | row($C.top.run_receipts.exists_check; "run_receipts[].path") )
 '
 _root_real="$(realpath "${REPO_ROOT}" 2>/dev/null)" || { _err "repo 根無法解析"; _fail_now; }
 paths_out="$(jq -r --slurpfile c "${CONTRACT}" "${_PATHS}" "${manifest}" 2>&1)" || { _err "路徑擷取執行失敗：${paths_out}"; _fail_now; }
 _tab="$(printf '\t')"
 while IFS="${_tab}" read -r _ex _key _p; do
   [ -n "${_key}" ] || continue
+  if [ "${_ex}" = "CTRL" ]; then
+    _err "路徑含控制字元（換行、tab 等）：${_key}：${_p}"; continue
+  fi
   case "${_p}" in
     "") _err "路徑為空：${_key}"; continue ;;
     /*) _err "路徑須為 repo 相對（不得以 / 開頭）：${_key}：${_p}"; continue ;;
@@ -167,14 +173,17 @@ ${paths_out}
 EOF
 
 # ── 4. run_receipts：資訊性，只驗位置與三鍵（SPEC Task 0.1 契約表）────────────────
-_receipts="$(jq -r '.run_receipts[].path' "${manifest}")"
+# 含控制字元之路徑已於路徑段報錯，此處略過，免被換行拆成數列
+_receipts="$(jq -r '.run_receipts[].path | select(test("[[:cntrl:]]")|not)' "${manifest}")"
 while IFS= read -r _rp_path; do
   [ -n "${_rp_path}" ] || continue
   case "${_rp_path}" in
     handoffs/run_receipts/*) : ;;
     *) _err "run_receipts 之 path 須位於 handoffs/run_receipts/ 之下：${_rp_path}"; continue ;;
   esac
-  [ -f "${REPO_ROOT}/${_rp_path}" ] || continue   # 不存在已於路徑段報
+  [ -e "${REPO_ROOT}/${_rp_path}" ] || continue   # 不存在已於路徑段報
+  # b1 審碼 grok：路徑為目錄時原本跳過三鍵檢查而放行
+  [ -f "${REPO_ROOT}/${_rp_path}" ] || { _err "receipt 須為一般檔（非目錄等）：${_rp_path}"; continue; }
   jq -e 'type=="object" and has("schema_version") and has("command") and has("exit_code")' \
      "${REPO_ROOT}/${_rp_path}" >/dev/null 2>&1 \
     || _err "receipt 缺 schema_version／command／exit_code 三鍵之一（或非 JSON 物件）：${_rp_path}"
