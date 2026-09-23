@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "command": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py",
+  "command": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py --refreeze-baseline",
   "exit_code": 0,
   "epic": "FFTFMETA",
   "date": "2026-09-24",
