@@ -120,9 +120,15 @@ def test_step1b_no_new_exception_clause_outside_allowlist() -> None:
     assert hits == [], hits
 
 
+def _definition_lines(rel: str) -> list[str]:
+    return [ln for ln in _current(rel).splitlines() if ln.startswith(TODO_DEFINITION)]
+
+
 def test_step2_todo_definition_identical_in_claude_and_orch() -> None:
-    assert TODO_DEFINITION in _current("CLAUDE.md")
-    assert TODO_DEFINITION in _current("docs/MULTI_AGENT_ORCHESTRATION.md")
+    """兩檔各恰一行以該定義開頭，且整行逐字相等（b2 審碼 grok：只比前綴時句尾分叉看不見）。"""
+    claude, orch = _definition_lines("CLAUDE.md"), _definition_lines("docs/MULTI_AGENT_ORCHESTRATION.md")
+    assert len(claude) == 1 and len(orch) == 1, (claude, orch)
+    assert claude == orch
 
 
 def test_step3_no_family_count_added_to_claude_md() -> None:

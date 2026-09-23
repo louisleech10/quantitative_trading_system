@@ -68,8 +68,9 @@ while IFS= read -r _item; do
   _why=""
   if [ "${_rc}" -ne 0 ]; then
     _why="rc=${_rc}"
+  # 掃完整輸出（b2 審碼 codex：只看末三行時，摘要之後另有輸出即漏判；全掃之誤判只會偏向不通過）
   elif printf '%s' "${_item}" | grep -q -- '-m pytest' \
-       && printf '%s\n' "${_out}" | tail -n 3 | grep -Eq '[0-9]+ (skipped|xfailed|xpassed)'; then
+       && printf '%s\n' "${_out}" | grep -Eq '(^|[^0-9])[0-9]+ (skipped|xfailed|xpassed)'; then
     _why="含 skipped／xfailed／xpassed"
   fi
   # 規則 2：取得 rc 之後才追加紀錄

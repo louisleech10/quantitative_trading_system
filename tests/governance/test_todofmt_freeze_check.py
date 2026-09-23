@@ -61,6 +61,22 @@ def test_boundary_03_skip_counts_as_failure(tmp_path: Path) -> None:
     assert r.returncode != 0 and "skipped" in r.stdout, r.stdout
 
 
+def test_boundary_03b_skip_detected_even_when_output_follows_summary(tmp_path: Path) -> None:
+    """b2 審碼 codex／grok：pytest 摘要之後另有輸出（此處以 pytest_unconfigure 印四行）時，skip 仍須被判未通過。"""
+    d = tmp_path / "suite"
+    d.mkdir()
+    (d / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (d / "conftest.py").write_text(
+        "def pytest_unconfigure(config):\n    for i in range(4):\n        print(f'FOOTER-{i}')\n", encoding="utf-8"
+    )
+    (d / "test_f.py").write_text(
+        "import pytest\n\ndef test_a():\n    pytest.skip('x')\n\ndef test_b():\n    assert 1\n", encoding="utf-8"
+    )
+    item = f"venv/bin/python -m pytest -q -p no:cacheprovider -c {d}/pytest.ini --rootdir {d} {d}/test_f.py"
+    r = _run("--items-file", str(_items(tmp_path, [item])))
+    assert r.returncode != 0 and "skipped" in r.stdout, r.stdout
+
+
 def test_boundary_04_xfail_counts_as_failure(tmp_path: Path) -> None:
     item = _pytest_item(tmp_path, "test_x.py", "import pytest\n\n@pytest.mark.xfail\ndef test_a():\n    assert 0\n")
     r = _run("--items-file", str(_items(tmp_path, [item])))

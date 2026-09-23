@@ -32,7 +32,7 @@ All code must support this evolution via clean decoupling.
 | **code review** | — | **家數與家族＝`ORCH §1 現行分工行`（唯一來源，本檔不重述）**；實作者不自審 | 同左 |
 | **SMALL_INLINE** | scope + 驗收命令 + 允許檔 + 禁止事項 | — | — |
 
-**TODO＝五類落點 manifest**（`docs/manifests/<EPIC>.json`：生產 stub／具名驗收測試與腳本／契約 JSON／機讀批次卡／實跑收據）；生成指引 `templates/TODO_GENERATION_PROMPT.md`，機檢 `bash scripts/template_check.sh todofmt <manifest>`，規格 `docs/TODOFMT_SPEC.md`。設計定案前已存在之散文 TODO 維持原狀；新 SPEC 派工時 `--todo` 須為 manifest。
+**TODO＝五類落點 manifest**（`docs/manifests/<EPIC>.json`：生產 stub／具名驗收測試與腳本／契約 JSON／機讀批次卡／實跑收據）；生成指引 `templates/TODO_GENERATION_PROMPT.md`，機檢 `bash scripts/template_check.sh todofmt <manifest>`，規格 `docs/TODOFMT_SPEC.md`。設計定案前已存在之散文 TODO 維持原狀；新 SPEC 派工時 `--todo` 須為 manifest，且其 `spec_path` 須等於 `--spec`。
 
 **高風險原則 (a)-(d)**：(a) 數值/資料品質 (b) 跨模組/共用路徑 (c) 多 phase/難回退 (d) ML/回測正確性。範例：Feature Factory/cache、IC Gatekeeper、回測引擎。
 

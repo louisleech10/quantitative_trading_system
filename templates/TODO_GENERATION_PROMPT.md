@@ -5,6 +5,8 @@ TODO 生成 Prompt V14 — 五類落點（取代 V13 之散文 TODO）
 機檢：`bash scripts/template_check.sh todofmt docs/manifests/{{EPIC}}.json`（轉呼叫 scripts/todofmt_check.sh；契約 scripts/todofmt_contract.json）。
 派工：`bash scripts/gate.sh dispatch ... --spec {{SPEC_FILE}} --todo docs/manifests/{{EPIC}}.json`。
 設計定案前已存在之散文 TODO 維持原狀（不遷移、不改寫；SPEC C-6）；新票一律用本版。
+既有散文 TODO 之 `template_check.sh todo` 失敗訊息仍指向本檔名（該腳本依 TODOFMT Task 0.2 不得另改）；
+其所需之錨點（`## §0`、`## §B`、各 Task 區塊）請對照設計定案版：`git show f2146e3d:templates/TODO_GENERATION_PROMPT.md`。本檔只產新格式 manifest。
 用法：填 {{SPEC_FILE}}／{{EPIC}}，把「Prompt 開始→結束」送給生成 agent（或 Claude 自己跑）。
 -->
 
