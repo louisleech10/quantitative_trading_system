@@ -49,6 +49,7 @@
 | `doc_format_precheck.sh` | 常態檢查 | PostToolUse gov_check  |
 | `draft_selfcheck.sh` | 常態檢查 | 未掛 |
 | `factkey_write_guard.sh` | 常態檢查 | PostToolUse  |
+| `fkperf_freeze_check.sh` | 常態檢查 | 未掛 |
 | `g7_trailer_precheck.sh` | 常態檢查 | commit-msg  |
 | `gap3ux_count_check.sh` | 常態檢查 | narrow_check_router  |
 | `gap3ux_header_round_check.sh` | 常態檢查 | 未掛 |

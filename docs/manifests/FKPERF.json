@@ -1,0 +1,96 @@
+{
+  "stub_modules": [
+    "scripts/_gen_fact_key_blocks.py"
+  ],
+  "test_files": [
+    "tests/governance/test_fkperf_differential.py",
+    "tests/governance/test_fkperf_scale.py",
+    "tests/governance/test_fkperf_cutover.py",
+    "tests/governance/test_fkperf_govb1_equiv.py"
+  ],
+  "script_acceptance": [
+    "scripts/fkperf_freeze_check.sh"
+  ],
+  "contract_jsons": [
+    "tests/governance/fixtures/fkperf_scale_contract.json"
+  ],
+  "spec_path": "docs/FKPERF_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20260923-fkperf-recon.json",
+      "cmd": "bash handoffs/run_receipts/fkperf_probes/prof_spawn.sh guard",
+      "rc": 0,
+      "honest_bounds": "PATH shim 計數不計時；未含 bash 本身之子程序（r1 grok 另計 bash 後 4326）；耗時為負載平均約 3 下之單機實測"
+    }
+  ],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "scripts/gen_fact_key_blocks.sh",
+      "scripts/_gen_fact_key_blocks.py",
+      "scripts/factkey_write_guard.sh",
+      "scripts/git_hooks/pre-commit",
+      "scripts/fact_keys.json",
+      "docs/GOV_ENFORCEMENT_REGISTRY.md",
+      "docs/GOV_TICKET_SOT.md",
+      "docs/IC_QUANT_GAP_REGISTRY.md",
+      "tests/governance/fixtures/govb1/factkey_clean",
+      "tests/governance/fixtures/govb1/factkey_drifted",
+      "tests/governance/test_govb1_factkey_gen.py",
+      "tests/governance/_fkperf_oracle.py",
+      "tests/governance/_fkperf_spawn.py",
+      "tests/governance/_fkperf_opens.py"
+    ],
+    "callers_now": [
+      "scripts/factkey_write_guard.sh",
+      "scripts/_live_doc_write_guard.py",
+      "scripts/gov_check.sh",
+      "scripts/precommit_selfcheck.sh",
+      "scripts/regen_factkey_fixtures.sh"
+    ],
+    "callers_later": [],
+    "gate_cmd": "bash scripts/fkperf_freeze_check.sh",
+    "forbidden": [
+      {"rule": "新實作與 oracle 之 stdout、stderr、rc、寫檔結果不得有差異（唯一例外：缺 jq→缺 python3 之前置字面）", "observable": true},
+      {"rule": "不得保留 bash 實作作為常駐備援或切換旗標", "observable": true},
+      {"rule": "不得碰 momentum/ 與 api/（解耦 7 條不涉）", "observable": true},
+      {"rule": "不得另訂或放寬比例門檻（10 倍規模差、20 倍、三次取最小值）", "observable": true},
+      {"rule": "不得放寬或刪除既有測試斷言", "observable": false},
+      {"rule": "不得改 GOVB1 硬保護集（govb1_scope.manifest、govb1_frozen_hashes.txt、docs/GOVB1_*）", "observable": false},
+      {"rule": "不得引入快取、sidecar 或跨呼叫之增量索引", "observable": false},
+      {"rule": "不得新增分鐘級以上之每次檢查，不得動 pre-push", "observable": false}
+    ],
+    "risk_mitigation": [
+      "scripts/factkey_write_guard.sh ← _managed() 須列核心（r1 三家 P1）← grep -n '_gen_fact_key_blocks.py' scripts/factkey_write_guard.sh",
+      "scripts/git_hooks/pre-commit ← 遷移判定觸發式須含核心 ← grep -n 'gen_fact_key_blocks' scripts/git_hooks/pre-commit",
+      "scripts/fact_keys.json ← E-028 實作位置引用行號須改指核心並重生成 ← grep -n 'gen_fact_key_blocks.sh:1863' scripts/fact_keys.json",
+      "scripts/_live_doc_write_guard.py ← 經入口呼叫 --status-hits，判定碼須唯一（C-11）← grep -n 'status-hits' scripts/_live_doc_write_guard.py",
+      "tests/governance/test_govb1_factkey_gen.py ← 耦合 bash 原始碼之 mutation 須重定向並立 FKPERF_MUTATION_MAP ← grep -n '_mutate(\\|GEN.read_text' tests/governance/test_govb1_factkey_gen.py",
+      "scripts/govb1_final_gate.sh ← g2／g3 以路徑掃描入口，核心改由 test_fkperf_govb1_equiv.py 施加同等檢查 ← grep -n '_G2_UNITS=\\|^_g3()' scripts/govb1_final_gate.sh"
+    ],
+    "coverage_risk": [
+      "Task 0.1 驗證①～④：tests/governance/test_fkperf_differential.py::test_oracle_self_zero_diff_and_real_check_rc0、::test_every_case_hits_its_expected_branch、::test_mutation_one_extra_byte_is_reported、::test_exit_catalog_equals_corpus_labels",
+      "Task 0.1 語料①之 --help 三種呼叫與 C-5 前置例外配對：tests/governance/test_fkperf_differential.py::test_corpus_covers_all_five_kinds_and_help_variants",
+      "Task 1.1 鍵序驗證：tests/governance/test_fkperf_differential.py::test_key_iteration_order_matches_jq_keys",
+      "Task 1.2 決定性驗證：tests/governance/test_fkperf_differential.py::test_core_emit_deterministic_no_bom_no_crlf",
+      "Task 2.1 驗證中「docrot2 write_guard／metrics 以直呼核心照跑全綠」：切換前由差分語料覆蓋，切換後由既有測試經入口覆蓋（fkperf_freeze_check.sh 既有 DOCROT2 測試項）",
+      "Task 3.1／3.2 驗證中既有 s1x／s2x／s6x 系列：切換後經入口由 fkperf_freeze_check.sh 既有生成器測試項覆蓋",
+      "Task 4.1 驗證：tests/governance/test_fkperf_cutover.py::test_managed_set_includes_core_and_broken_core_is_caught、::test_precommit_migration_trigger_includes_core、::test_e028_citation_points_into_core",
+      "Task 4.2 驗證：tests/governance/test_fkperf_cutover.py::test_coupling_map_covers_every_bash_source_line（對照表 FKPERF_MUTATION_MAP 由實作者於 test_govb1_factkey_gen.py 建立）",
+      "Task 4.3 驗證：tests/governance/test_fkperf_govb1_equiv.py::test_core_has_no_g2_literal_denominators、::test_core_has_no_g3_disable_switch、::test_injected_literal_and_switch_are_detected",
+      "Task 4.4 驗證：tests/governance/test_fkperf_scale.py::test_spawn_and_open_counts_scale_invariant、::test_ratio_40x_within_20x_of_4x、::test_guard_spawns_scale_invariant；R-GOVTEST-5 之 strict xfail 轉 XPASS 後移除並關閉登記列",
+      "SPEC 邊界 34 條：編號 01–32 各對應一支 test_boundary_NN_*（01–18 差分、19–25 規模、26–30 切換、31–32 GOVB1）；Task 4.5 之兩條見 not_executable"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {"item": "不得放寬或刪除既有測試斷言", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "不得改 GOVB1 硬保護集（govb1_scope.manifest、govb1_frozen_hashes.txt、docs/GOVB1_*）", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "不得引入快取、sidecar 或跨呼叫之增量索引", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "不得新增分鐘級以上之每次檢查，不得動 pre-push", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "Task 4.5 邊界①：既有 strict xfail（R-GOVTEST-1／3／4、R-G7-OFF-2）不得意外轉 XPASS——須跑全套 pytest tests/governance（小時級），收票前背景手動跑一次，不納入每次跑之驗收", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "Task 4.5 邊界②：restore_golden_inventory.sh 還原後工作區除本票檔外無殘留改動——屬全套跑後之收尾步驟，隨上一項手動執行並寫收據", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "Task 0.2 驗證②：現行 bash 實作之 1×／4×／10× 外部程序數基準——切換後 bash 實作不存在，基準以 Phase 0 產出之收據留存，不做常駐測試", "reason": "blocked-by", "owner": "claude", "expiry": "2099-12-31"}
+    ]
+  }
+}

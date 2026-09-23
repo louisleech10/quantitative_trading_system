@@ -1,0 +1,14 @@
+{
+  "_doc": "FKPERF 規模驗收之單一落點（docs/FKPERF_SPEC.md C-6、Task 0.2／4.4、§A 使用者 2026-09-23 裁定）。測試一律讀本檔，不在測試內另抄數值。",
+  "scale_total_keys": {"1x": null, "4x": 140, "10x": 350, "40x": 1400},
+  "scale_total_keys_note": "1x＝真實註冊表之總 fact-key 數（SPEC 定案時為 35）；其餘為總 fact-key 數目標，只複製 FACTKEY-CONTENT 宣告之 key，餘數依 jq keys[] 序取前 k 個補足",
+  "bash_baseline_scales": ["1x", "4x", "10x"],
+  "post_cutover_scales": ["1x", "4x", "10x", "40x"],
+  "invariance_modes": ["emit", "--check", "--write", "--status-hits"],
+  "ratio_pair": ["4x", "40x"],
+  "ratio_required_scale_factor": 10,
+  "ratio_max": 20,
+  "ratio_modes": ["--check", "guard", "--status-hits"],
+  "trials": 3,
+  "trial_statistic": "min"
+}
