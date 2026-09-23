@@ -204,7 +204,7 @@ ASSERT <命令> WHEN <key>=<value> ... THEN rc=<n>|rc!=<n>
 2. **Manifest ~2 頁**：每 Phase×子項攤成扁平 `[A-1]` ID 清單 + 各自驗證點。小、在指令預算內 → 一次寫全不掉。
    **使用者讀這 2 頁確認範圍**（不是讀 3000 行）；機器用 `coverage_check.sh` 逐 ID 驗。
 3. **逐 Phase 展開**：Opus 一次只展開一個 Phase（遠低於指令預算 → 結構上不可能掉別的 Phase），拼成 SPEC。缺項時 coverage 列出 → **只補缺項，不重生成整份**。
-4. **機器把關**：`template_check`（錨點+反空殼）+ `coverage_check`（manifest 全覆蓋）。皆綠才往下。
+4. **機器把關**：`template_check`（錨點+反空殼）+ `coverage_check`（manifest 全覆蓋）。皆綠才往下。（此處之 manifest＝上一步之 `[A-1]` coverage 清單，驗的是 SPEC；新格式 TODO 另走 `template_check.sh todofmt`，coverage_check 不適用——兩者同名不同物。）
 5. **adversarial 稽核 = §1 現行分工行所列之全部審查家族都跑**（本行**不寫家數也不寫家族名**；機器版＝`scripts/governance_roles.json` 之 `reviewers`）（買保險、各自獨立輸出、`-o` 只讀結論）：查語義/跨 Phase 銜接/空殼/挑戰前提。Claude 綜合「收斂 vs 分歧」給使用者。
    **誠實界定**：多家族保「推理/結構/空殼漏看」（C1/C2 實證有效）；**不保「共享錯前提+缺使用者事實」**（C3 全滅）→ 靠前置鐵律 + 挑戰前提 + 使用者驗 scope + Golden/執行閘。
    🔴 本行原寫「GPT-5.5 + Composer 2.5 **兩家族**都跑」，與 §1 之三家全員衝突（2026-09-13 由 stamp-r1 codex 抓出；主委當天的自證 grep 只掃「雙家族」而漏掉此處字面為「兩家族」——自證的排除條件濾掉了待抓目標）。

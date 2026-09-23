@@ -37,7 +37,7 @@
 - **同輪重派＝兩個指令，不經使用者終端機**（該家最新結果非 success 時）：①`bash scripts/gate.sh redispatch --round-id <id> --family <fam> --reason <文字>` 取得綁定許可並印出唯一可放行之指令；②以 Bash 原樣執行該指令（不得加重導向或串接）。前次產出會自動保存於 `handoffs/redispatch_archive/`，銷帳前收斂檔須引用保存檔路徑並逐條處置其 finding。重派達上限時改棄置：`bash scripts/debt_clear.sh --abandon --round-id <id> --kind collection-failed --reason <文字> --approver <文字>`，再以新 session 重審。**永遠不要 kill 執行中的 `committee_run`**。
 - **session 名不得重複**（fail-closed），格式 `<YYYYMMDD>-<epic>-b<N>-<kind>-r<N>`（`scripts/session_name_check.sh`）；派前先 `bash scripts/debt_ledger.sh --list | grep <session>`。
 - **SPEC 戳記輪的 brief-kind 要用 `closure` 不是 `stamp`**：`brief_conformance_check.sh:425` 要求 `stamp-target` 須 `handoffs/` 前綴，而 SPEC 在 `docs/`。既有作法見 `handoffs/20260912-SPLITUNIFY-D001-STAMP-BRIEF.md`。
-- **synth 處置欄的反引號 token 必須逐字出現在標的檔**（`spec_xref_check --synth`），否則寫檔 hook 擋；`延後→Task N.N` 之說明**不得有巢狀全形括號**，且目標須已存在於同票 TODO——`debt_clear` 依 session 第二段推：先找散文 `docs/<EPIC>_TODO.md`，無則找 `docs/manifests/<EPIC>.json`（新格式之票，目標字面須出現在 manifest 內，例如 `not_executable` 之 item 或具名測試名）。
+- **synth 處置欄的反引號 token 必須逐字出現在標的檔**（`spec_xref_check --synth`），否則寫檔 hook 擋；`延後→Task N.N` 之說明**不得有巢狀全形括號**，且目標須已存在於同票 TODO——`debt_clear` 依 session 第二段推：先找散文 `docs/<EPIC>_TODO.md`，無則找 `docs/manifests/<EPIC>.json`（新格式之票：目標只准 `Task N.N` 或殘留 ID 形狀，且須**恰等於** manifest `batch_card.not_executable[].item` 之一，例 item `E-4` 才能 `延後→E-4`；出現在描述欄不算，具名測試名不合目標形狀）。
 - `committee_run` 的 harness exit code 不可信，**讀 `committee_rc=` 那行**。
 - 🔴 `pytest` 一律逐檔明列路徑；`-k` 只過濾執行、**不減少收集**，無路徑即從 rootdir 收全套。
 - 🔴 `reconcile_build.sh` 一律帶 `--mode review`；`debt_clear` 用 `--round-id <id> --session <name> --lock <sources.lock>`（不吃位置參數）。

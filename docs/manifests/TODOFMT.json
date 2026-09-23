@@ -44,6 +44,7 @@
       "templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md",
       "templates/SPEC_TEMPLATE.md",
       "scripts/debt_clear.sh",
+      "scripts/_synth_attr.py",
       "scripts/reconcile_build.sh",
       "scripts/mutation_scope_static.sh",
       "tests/governance/_todofmt_anchor.py",

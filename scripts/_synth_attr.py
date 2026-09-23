@@ -101,8 +101,8 @@ def _token_whole(cell: str, tok: str) -> bool:
     return re.search(r"(?<![A-Za-z0-9" + _CJK + r"])" + re.escape(tok) + r"(?![A-Za-z0-9" + _CJK + r"])", cell) is not None
 
 
-def _target_in_todo(tgt: str, todo_text: str) -> bool:
-    return re.search(r"(?<![A-Za-z0-9.\-])" + re.escape(tgt) + r"(?![A-Za-z0-9.])", todo_text) is not None
+def _target_in_todo(tgt: str, todo_text) -> bool:  # todo_text：散文 TODO 全文（str），或 manifest 之 not_executable item 集（frozenset，完全相等）
+    return (tgt in todo_text) if isinstance(todo_text, frozenset) else re.search(r"(?<![A-Za-z0-9.\-])" + re.escape(tgt) + r"(?![A-Za-z0-9.])", todo_text) is not None
 
 
 def parse_defer_targets(cell: str):
@@ -387,6 +387,15 @@ def main(argv: List[str]) -> int:
         except OSError as exc:
             print(f"[_synth_attr] ERROR: --todo 讀取失敗: {exc}", file=sys.stderr)
             return 2
+        # TODOFMT b4 審碼（codex P1／composer P2）：--todo 為 manifest（.json）時，延後目標只認
+        #   batch_card.not_executable[].item 之完全相等——不對整份 JSON 搜字（描述欄、gate_cmd 偶含同字面會誤放）
+        if a.todo.endswith(".json"):
+            try:
+                _items = json.loads(todo_text)["batch_card"]["not_executable"]
+                todo_text = frozenset(x["item"] for x in _items if isinstance(x, dict) and isinstance(x.get("item"), str))
+            except (ValueError, KeyError, TypeError) as exc:
+                print(f"[_synth_attr] ERROR: --todo manifest 無法取得 batch_card.not_executable（fail-closed）: {exc!r}", file=sys.stderr)
+                return 2
     rel = os.path.relpath(a.synth) if not a.synth.startswith("handoffs/") else a.synth
     doc = parse_synth(text, rel)
     if a.report:

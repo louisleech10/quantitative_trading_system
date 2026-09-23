@@ -471,7 +471,7 @@ Task 2.1／2.2 只涵蓋 TODO 範本與 TODO 定義句；主委盤點 `templates
 | `templates/TODO_GENERATION_PROMPT.md` | 舊版全域規則節（解耦、不可違反原則、不得放寬既有測試斷言）於新格式無落點 | 規定其落點為 `batch_card.forbidden`；必讀清單加「The 7 Decoupling Rules」「Non-Negotiable Principles」；階段 3 加第 6 項自檢 |
 | `templates/SPEC_TEMPLATE.md` | 「對應 TODO」為散文路徑寫法 | 指向 `docs/manifests/<EPIC>.json` |
 | `docs/MULTI_AGENT_ORCHESTRATION.md` | 範本說明、`--todo` 機檢、機器把關三處只描述散文 TODO | 補新格式之機檢路徑；註明 `--manifest`（coverage 清單）與 TODO manifest 同名不同物 |
-| `scripts/debt_clear.sh` | 收斂檔 `延後→X` 只到 `docs/<EPIC>_TODO.md` 找 X ⇒ 新格式之票有延後即拒銷 | 無散文 TODO 時改查 `docs/manifests/<EPIC>.json`（舊票行為不變）；具名測試 `tests/governance/test_debt_clear.py::test_clear_attribution_gate_defer_target_uses_epic_manifest_without_prose_todo` |
+| `scripts/debt_clear.sh`、`scripts/_synth_attr.py` | 收斂檔 `延後→X` 只到 `docs/<EPIC>_TODO.md` 找 X ⇒ 新格式之票有延後即拒銷 | 無散文 TODO 時改查 `docs/manifests/<EPIC>.json`（舊票行為不變）；manifest 只認 `batch_card.not_executable[].item` 之**完全相等**，不對整份 JSON 搜字（第 4 批審碼 codex／composer：描述欄、`gate_cmd` 偶含同字面會誤放）；具名測試 `tests/governance/test_debt_clear.py::test_clear_attribution_gate_defer_target_uses_epic_manifest_without_prose_todo`（含「只在描述欄出現 ⇒ 拒」之反例） |
 
 - **不可做**：不得動 TODO 定義句（Task 2.2 之兩檔逐字相同）與任何 `INV || ` 片段所在語句；不得使 `docs/TODOFMT_SPEC.md` 之設計定案標記行再次出現；`scripts/debt_clear.sh` 之行數不得改變（`scripts/fact_keys.json` 以行號引用其第 544、891 行）。
 - **驗證**：本票 11 個測試檔＋`tests/governance/test_debt_clear.py` 全數通過；收案聚合器 12 項 rc=0；三家審碼。

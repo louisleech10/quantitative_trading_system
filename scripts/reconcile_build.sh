@@ -327,7 +327,7 @@ header = (
     "## 群集 / 處置（待 Claude 填）\n\n"
     # 修訂標的行：debt_clear ③b 對 -x-review- 層以 spec_xref_check --synth 驗「處置欄概念皆見於標的」
     # （使用者 2026-09-11「每個要整理委員產出時候都會要用到」）。程式碼審查層可刪此行。
-    "**修訂標的**：docs/<填 SPEC 或 TODO 檔名>.md\n\n"
+    "**修訂標的**：<填 SPEC 或 TODO 路徑：docs/<EPIC>_SPEC.md、舊票 docs/<EPIC>_TODO.md、新票 docs/manifests/<EPIC>.json>\n\n"
     # Task 4.1 群集表表頭提示：第 4 欄須含處置 token（governance_verdicts.json.disposition_values）；
     #   每列須逐字引用該 finding 斷言前 20 字；`延後→` 後接同票 TODO §E 殘留 ID 或 Task N.N。
     "<!-- 群集表格式（Task 4.1 閘）：| 群集（含斷言前 20 字逐字） | 嚴重度 | 來源 ID | 處置（採納｜部分採納｜駁回｜延後→E-n 或 Task N.N，單一目標，說明以（）括起；token 須整詞：`不採納` 不算） | -->\n\n"
