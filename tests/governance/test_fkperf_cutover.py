@@ -164,12 +164,16 @@ _MUTATE_PRECONDITION = "mutation 目標字串不存在"  # test_govb1_factkey_ge
 def _assertion_diagnostic(stdout: str) -> str:
     """pytest 失敗診斷中 `E   AssertionError:` 之**訊息**（含多行訊息之後續 `E ` 行），遇 pytest 改寫之
     `E   assert …`／`E    + …`／`where`／`and` 行即止（r7 codex／grok P1：Captured stdout 不算；r8 codex P1：
-    他斷言之比較值不算）。2026-09-24 主委實跑六例：性質斷言失敗（單行／多行訊息）命中；print 同字面後他斷言失敗、
-    前置斷言失敗、他斷言之比較值含同字面、RuntimeError 帶同字面皆不命中。"""
+    他斷言之比較值不算）。主委實跑：性質斷言失敗（單行／多行訊息）命中；print 同字面後他斷言失敗、
+    前置斷言失敗、他斷言之比較值含同字面、無自訂訊息之字串比較（改寫與 AssertionError 同一行；r9 grok P1）、
+    RuntimeError 帶同字面皆不命中（七例，2026-09-24）。"""
     msgs, cur = [], None
     for line in stdout.splitlines():
         m = re.match(r"^E\s+AssertionError:\s?(.*)$", line)
         if m:
+            if re.match(r"assert\s", m.group(1)):  # 無自訂訊息時 pytest 把改寫寫在同一行（r9 grok P1-01）
+                cur = None
+                continue
             cur = [m.group(1)]
             msgs.append(cur)
             continue
@@ -193,7 +197,10 @@ def test_fail_substr_only_counts_in_assertion_diagnostic() -> None:
                 "E   AssertionError: unrelated condition\nE   assert 0 == '" + phrase + "'\n"
                 "E    +  where 0 = unrelated()\n= 1 failed in 0.02s =\n")
     assert phrase in printed and phrase not in _assertion_diagnostic(printed)
+    bare = ("F\n>       assert unrelated() == \"" + phrase + "\"\n"
+            "E   AssertionError: assert 0 == '" + phrase + "'\nE    +  where 0 = unrelated()\n= 1 failed in 0.03s =\n")
     assert phrase in compared and phrase not in _assertion_diagnostic(compared)  # r8 codex P1 反例
+    assert phrase in bare and phrase not in _assertion_diagnostic(bare)  # r9 grok P1 反例
     assert phrase in _assertion_diagnostic(target)
 
 
