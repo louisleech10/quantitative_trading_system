@@ -84,8 +84,12 @@
 <td>✅ 全過</td>
 </tr>
 <tr>
+<td>收案後補遺（你追問「範本產生 prompt 等 TODO 相關文件有沒有跟上」）</td>
+<td>✅ 查出五處仍預設散文 TODO，已改；三家審兩輪，第二輪零問題</td>
+</tr>
+<tr>
 <td>整套治理測試</td>
-<td>✅ 跑過一次：2,590 條通過；78 條失敗逐條查過，<strong>沒有一條是本票造成的</strong>（本票動工前就壞，或屬偶發、環境因素）</td>
+<td>✅ 跑過一次：2,590 條通過；78 條失敗逐條查過，<strong>沒有一條是本票造成的</strong>（本票動工前就壞，或屬偶發、環境因素）。其後已處理完，見「還剩什麼」</td>
 </tr>
 <tr>
 <td><strong>量化程式</strong></td>
@@ -111,6 +115,8 @@
 <li><code>.claude/settings.json</code>：掛上兩個守衛</li>
 <li>TODO 範本；CLAUDE.md、分工手冊、AGENTS.md、.cursorrules 各改一句定義</li>
 <li>另一張舊票（VERDICTGATE）的 3 條測試：補上新規則要的測試資料，驗的東西不變</li>
+<li>收案後補遺：委員審查 SPEC／TODO 用的提示詞、TODO 生成指引（解耦規則等全域約束寫在哪）、SPEC 範本、分工手冊，
+以及收斂時「延後到某處」的檢查（<code>scripts/debt_clear.sh</code>、<code>scripts/_synth_attr.py</code>）——新格式的票也認得了</li>
 </ul>
 </li>
 <li><strong>範例兩份</strong>：本票自己的清單檔、FF-TFMETA 的清單檔（該票復工時直接用）</li>
@@ -120,7 +126,7 @@
 <ul>
 <li><strong>暫停中的四張票</strong>（EVENTSCAN、FF-TFMETA、FF-NAME、FFDSTAR）：你會另開新 session 做；復工時各自先用新格式產出清單檔。</li>
 <li><strong>流程優化其餘改法</strong>：不做（記錄在 <a href="Archived/SPEC與TODO流程優化.html">Archived/SPEC與TODO流程優化.md</a> 開頭與 <code>docs/PROCOPT_DECISION.md</code>）。</li>
-<li><strong>治理測試裡的 78 條舊紅燈</strong>（本票動工前就壞了，多半是舊測試沒跟上後來其他票的改動）：由我處理，不找委員。</li>
+<li><strong>治理測試裡的 78 條舊紅燈</strong>（本票動工前就壞了，多半是舊測試沒跟上後來其他票的改動）：依你的裁定由我處理、不找委員，<strong>已處理完</strong>——67 條修好變綠；11 條要等某件事做了才會綠（例如已停用的 G-7 復工），標成「預期失敗」並在 <code>docs/IC_QUANT_GAP_REGISTRY.md</code> 寫明原因，等那件事做了會自動報錯提醒拿掉標記。</li>
 </ul>
 <p><strong>刻意沒做的</strong>（每條都有理由，不是「之後再說」）：</p>
 <div class="table-wrap"><table>
@@ -164,6 +170,7 @@
 <li><strong>總驗收只看測試輸出最後三行</strong>，被跳過的測試會被漏看、誤報全過。</li>
 <li><strong>驗證用的測試複本少帶了相依檔</strong>，測試因為別的原因變紅，看起來像驗證有效，其實沒驗到。</li>
 <li><strong>新規則上線後，另一張舊票有 3 條測試被打紅</strong>——規格要求改閘門時要一起跑舊測試，我第一次提交時漏跑；收尾自查時補跑才發現，已修。</li>
+<li><strong>補遺審查抓到：新格式的「延後到某處」檢查會對整份清單檔搜字</strong>，目標只出現在描述欄也會被接受。已改成只認清單檔裡「做不到的項目」那一欄。</li>
 </ol>
 <h2 id="技術文件在哪">技術文件在哪</h2>
 <p>規格 <code>docs/TODOFMT_SPEC.md</code>；清單檔範例 <code>docs/manifests/TODOFMT.json</code>、<code>docs/manifests/FFTFMETA.json</code>；

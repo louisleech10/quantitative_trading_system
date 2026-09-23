@@ -2336,6 +2336,10 @@ def _b3_harness(tmp_path: Path) -> dict:
         # DOCROT2 Task 3.1：--single 之類別判定唯一實作與值集（缺即 fail-closed，同上理由補進清單）
         "_finding_category.py",
         "governance_verdicts.json",
+        # VERDICTGATE Task 3.x：committee_run 開輪前以 prev_review_resolve 定前批、verdictgate_check 讀裁決
+        #   （缺即 bash 127 ⇒ 開債前就死，斷言紅在「檢查沒跑」而非測試本意；同上理由補進清單）
+        "prev_review_resolve.sh",
+        "verdictgate_check.sh",
     ):
         src = REPO_ROOT / "scripts" / name
         if src.is_file():

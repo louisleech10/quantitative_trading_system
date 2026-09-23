@@ -1,6 +1,7 @@
 """VERIFY_GATE 過嚴回歸修補 (O1–O2) — staged 增量掃描與 REF 檔案路徑。"""
 from __future__ import annotations
 
+import json
 import shutil
 import stat
 import subprocess
@@ -52,10 +53,25 @@ def _setup_temp_git_repo(tmp_path: Path) -> Path:
         "verify_pretooluse.sh",
     ):
         (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
+    # DOCROT2 D2B：pre-commit 之活文件兩道判定缺 helper 即 fail-closed ⇒ 迷你 repo 須備齊 helper
+    # （缺它時「應擋」各條是因缺檔而擋，不是因假 claim 而擋——假綠）。本檔只測 claim 閘，
+    # 故把會暫存之測試文件登記為 LOG 類（兩道判定不適用），斷言不變。同 test_precommit_autofix.py。
+    for name in ("live_doc_write_guard.sh", "_live_doc_write_guard.py", "live_doc_registry_check.sh", "_live_doc_registry.py"):
+        (scripts / name).symlink_to(REPO_ROOT / "scripts" / name)
+    reg = json.loads((REPO_ROOT / "scripts" / "live_doc_registry.json").read_text(encoding="utf-8"))
+    reg["prefix"] = []
+    reg["exact"] = [[p, "LOG"] for p in ("HANDOFF.md", "README.md")]
+    (scripts / "live_doc_registry.json").write_text(json.dumps(reg, ensure_ascii=False), encoding="utf-8")
+    (scripts / "fact_keys.json").write_text(
+        json.dumps({"_schema": {"enforcement_completed_statuses": ["收案", "已落地", "已完成"]}}, ensure_ascii=False),
+        encoding="utf-8")
+    (scripts / "docrot2_migration_residuals.json").write_text('{"residuals": []}\n', encoding="utf-8")
     link_python_env(repo)
 
     (repo / "README.md").write_text("# temp\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "add", "README.md", "scripts/live_doc_registry.json", "scripts/fact_keys.json",
+                    "scripts/docrot2_migration_residuals.json"],
+                   cwd=repo, check=True, capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "chore: init"],
         cwd=repo,

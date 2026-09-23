@@ -616,9 +616,15 @@ def _real_reg() -> dict:
 _SU_RENAME = {"B1": "SU-B1", "B3": "SU-B3", "B4": "SU-B4"}
 
 
+# 遷移定案時之註冊表：D2A r1 修補（加 _SU_RENAME）後。本測驗「切換當下」之遷移等價，須比對當時之
+# 註冊表——比對現行檔則 SPLITUNIFY 往後每加一批、每改一次狀態就紅（2026-09-18 d2b6e833 起即如此），
+# 那是正常進展而非遷移錯誤。實測 688e8c5b～cd3638fb（B-63 收票）之註冊表皆與遷移結果逐列相等。
+CUTOVER_FINAL = "688e8c5b"
+
+
 def test_splitunify_status_cutover_rows_equal_migration_of_pre_cutover_text():
     mapped = _migrate(_git_show(f"{PRE_CUTOVER}:docs/SPLITUNIFY_TODO.md"))
-    reg = _real_reg()
+    reg = json.loads(_git_show(f"{CUTOVER_FINAL}:scripts/fact_keys.json"))
     old_ids = {r[1] for k in reg["_schema"]["status_keys"] for r in reg[k]["rows"]}
     assert set(_SU_RENAME) == {i for i, _ in mapped["splitunify-batch-status"] if i in old_ids}
     mapped["splitunify-batch-status"] = [(_SU_RENAME.get(i, i), s) for i, s in mapped["splitunify-batch-status"]]
@@ -667,7 +673,10 @@ def test_splitunify_todo_migrated_columns_carry_no_status_literal():
             cells = ln.split("|")
             assert re.fullmatch(r" `[A-Za-z0-9-]+` ", cells[1]), cells[1]
             assert "已關閉" not in cells[3] and "✅" not in cells[3], cells[3]
-    assert seen == {"B": 12, "C9": 7, "E": 15}, seen
+    # 防空轉：各節手寫列數須等於對應狀態鍵之列數（原寫死 12／7／15，SPLITUNIFY 加 B10A～E 後即紅）。
+    reg = _real_reg()
+    assert seen == {"B": len(reg["splitunify-batch-status"]["rows"]), "C9": len(reg["splitunify-task-status"]["rows"]),
+                    "E": len(reg["splitunify-residual-status"]["rows"])}, seen
     assert "（原文，保留供對照）" not in text
 
 
@@ -696,8 +705,9 @@ def test_b63_ticket_row_and_ticket_universe_rc0():
     t = _real_reg()["governance-ticket-sot"]
     rows = [r for r in t["rows"] if r[t["columns"].index("票")] == "B-63"]
     assert len(rows) == 1
-    assert rows[0][t["columns"].index("狀態")] == "部分完成"
-    assert rows[0][t["columns"].index("狀態依據")].startswith("還缺：")
+    # D2A 寫時 B-63 為「部分完成／還缺：…」；2026-09-17（cd3638fb）收票後為終態，不再漂移。
+    assert rows[0][t["columns"].index("狀態")] == "收案"
+    assert not rows[0][t["columns"].index("狀態依據")].startswith("還缺：")
     r = subprocess.run(["bash", str(REPO / "scripts" / "ticket_universe.sh"), "--check"], cwd=str(REPO),
                        capture_output=True, text=True)
     assert r.returncode == 0, r.stderr

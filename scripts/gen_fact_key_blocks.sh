@@ -190,7 +190,7 @@ EOF
   LC_ALL=C jq -e --arg k "$1" '
     [.[$k].rows_filter.source_keys[] as $s | .[$s].rows | length] | length <= 99 and all(.[]; . <= 999)
   ' "$2" >/dev/null 2>&1 \
-    || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 逾序號位數（來源 key 逾 99 或單一來源逾 999 列）→ fail-closed" >&2
+    || { echo "gen_fact_key_blocks: key ${1} 之 rows_filter 逾序號位數（來源 key 數限兩位、單一來源列數限三位）→ fail-closed" >&2
          return 1; }
   LC_ALL=C jq -c --arg k "$1" '
     . as $r | $r[$k].rows_filter as $f | $r[$k].columns[1:] as $need
@@ -611,7 +611,7 @@ _fk_scope_files() {   # stdout: 範圍內檔案（相對 root），一行一筆
       close(sf)
       # 🔴 豁免項與 status_scope 同語義：以 / 結尾＝目錄前綴，否則＝精確路徑
       #    （2026-09-21：原僅支援精確路徑 ⇒ 封存目錄必須逐檔列舉，
-      #     PLAINDOCS 一次 git mv 22 份即整批漏列而誤報。黑名單列不完，
+      #     PLAINDOCS 一次 git mv 整批封存檔即全數漏列而誤報。黑名單列不完，
       #     改為「封存目錄整個不受現行規則管轄」這一條封閉規則。）
       ne = 0
       while ((getline line < gff) > 0) if (line != "") { EX[line] = 1; EXA[++ne] = line }

@@ -47,6 +47,9 @@ _SCRIPT_NAMES = (
     "debt_ledger.sh",
     "_debt_ledger_core.py",
     "completeness_check.sh",
+    # VERDICTGATE：committee_run 開輪前以 prev_review_resolve 定前批、verdictgate_check 讀裁決（缺即 127，檢查沒跑）
+    "prev_review_resolve.sh",
+    "verdictgate_check.sh",
     *_dph.DOCROT2_HELPER_SCRIPTS,
 )
 
@@ -505,6 +508,9 @@ def test_t3_task_id_whitelist_committee_pre_gate(tmp_path: Path) -> None:
     _assert_zero_side_effects(h, before)
 
 
+_WHITELIST_DEF = __import__("re").compile(r"""(?:\^|['"])\[A-Za-z0-9\._-\]\+(?:\$|['"])""")
+
+
 def test_t3_task_id_regex_single_source() -> None:
     """白名單 regex 僅在 _role_gate.sh 一處定義。"""
     import subprocess
@@ -537,7 +543,9 @@ def test_t3_task_id_regex_single_source() -> None:
         if "A-Za-z0-9._-" in text or r"[A-Za-z0-9._-]+" in text:
             # 允許註解引用，但定義形（ROLE_GATE_TASK_ID_REGEX= 或 fullmatch 字面）計數
             for i, line in enumerate(text.splitlines(), 1):
-                if "A-Za-z0-9._-" not in line:
+                # 只計「整條 regex 就是此字元類」之定義形（前為 ^ 或引號、後為 $ 或引號）；
+                #   嵌在其他 regex 內之同字元類（交接檔指標、條目標記、批次 trailer）不是本白名單之副本
+                if not _WHITELIST_DEF.search(line):
                     continue
                 if line.strip().startswith("#"):
                     continue

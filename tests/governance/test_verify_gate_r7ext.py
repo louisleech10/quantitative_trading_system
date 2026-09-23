@@ -181,7 +181,10 @@ def test_register_output_requires_prior_dispatch_and_handoffs_path(
     try:
         dispatch = _dispatch_low(env, task_id="r7ext-register", output=rel)
         assert dispatch.returncode == 0, dispatch.stdout + dispatch.stderr
-        registered = _run_gate(env, "register-output", "r7ext-register", rel)
+        # VERDICTGATE Task 1.2 起，預設 --kind review 須 committee_run 之 committee_round_open
+        # 與 `-<family>.md` 尾碼；單純 `gate.sh dispatch` 之產出只剩 stamp 一途可註冊。
+        # 本測守的是「先行 dispatch＋handoffs 路徑」這兩道前置，故走 stamp 路徑。
+        registered = _run_gate(env, "register-output", "r7ext-register", rel, "--kind", "stamp", "--family", "codex")
         assert registered.returncode == 0, registered.stdout + registered.stderr
     finally:
         handoff.unlink(missing_ok=True)
@@ -232,7 +235,8 @@ def test_reconcile_full_chain_dispatch_register_stamp_passes(
     try:
         dispatch = _dispatch_low(env, task_id="r7ext-chain", output=rel)
         assert dispatch.returncode == 0, dispatch.stdout + dispatch.stderr
-        registered = _run_gate(env, "register-output", "r7ext-chain", rel)
+        # reconcile 檔是戳記標的（非 review 產出）⇒ VERDICTGATE Task 1.2 之 `--kind stamp --family`。
+        registered = _run_gate(env, "register-output", "r7ext-chain", rel, "--kind", "stamp", "--family", "codex")
         assert registered.returncode == 0, registered.stdout + registered.stderr
         _append_approved_stamps(reconcile, task_id="r7ext-chain")
 

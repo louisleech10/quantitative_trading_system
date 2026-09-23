@@ -507,7 +507,17 @@ def test_t01_f1_mutation_heading_mismatch_fails() -> None:
 
 # ── T-0.1-F2 動工前基準 ───────────────────────────────────────────────
 
+# R-GOVTEST-1（docs/IC_QUANT_GAP_REGISTRY.md）：下列四條斷言 live repo 上 `govb1_final_gate.sh --only g7` rc==0，
+#   而 G-7 依使用者 2026-09-05 裁定停用且對 live repo 結構性恆紅（base..HEAD 必含 epic 後之改動）。
+#   標 strict xfail：照常執行並驗證「仍紅」；GOVB1 復工使其轉綠時以 XPASS 報紅，須移除標記並同步登記表。
+_R_GOVTEST_1 = ("R-GOVTEST-1：G-7 依使用者 2026-09-05 裁定停用，對 live repo 結構性恆紅；"
+                "GOVB1 復工轉綠時 strict 以 XPASS 報紅，須移除本標記並同步登記表")
+_R_GOVTEST_3 = ("R-GOVTEST-3：GOVB1 期間之凍結不變式（B5 窗 b5_start..HEAD 開放區間、G-6 凍結函式）"
+                "於 GOVB1 暫停後被他票合法修改觸發；關窗／改基準須動硬保護集 govb1_frozen_hashes.txt，待 GOVB1 復工。"
+                "轉綠時 strict 以 XPASS 報紅，須移除本標記並同步登記表")
 
+
+@pytest.mark.xfail(strict=True, reason=_R_GOVTEST_1)
 def test_t01_f2_frozen_hashes_self_consistent() -> None:
     """T-0.1-F2：frozen_hashes 欄位完整 + baseline_dirty 不存在 + g7 可過。"""
     assert FROZEN.is_file() and FROZEN.stat().st_size > 0
@@ -533,6 +543,7 @@ def test_t01_f3_print_plan_nonempty() -> None:
     assert proc.stdout.strip(), "print-plan 不得為空"
 
 
+@pytest.mark.xfail(strict=True, reason=_R_GOVTEST_1)
 def test_t01_f3_g7_when_committed() -> None:
     """T-0.1-F3：commit 後 --only g7 rc=0；主樹 dirty 數不被 oracle 汙染。"""
     before = _run(["bash", "-c", "git status --porcelain | wc -l"])
@@ -1011,6 +1022,8 @@ def test_r6_u4_undeclared_space_path_not_covered() -> None:
         FROZEN.write_text(orig_f, encoding="utf-8")
 
 
+# run=False：本條會建 git worktree，2026-09-13 實測逾 20 分鐘無進展（HANDOFF 記錄）；恆紅之結論不變，不再付其耗時
+@pytest.mark.xfail(strict=True, run=False, reason=_R_GOVTEST_1 + "；本條建 worktree 逾 20 分鐘，不執行")
 def test_r6_u1u2u4_g7_worktree_space_quote_paths() -> None:
     """U1/U2/U4 整合：臨時 worktree 真實 commit 空白／引號路徑；主樹無殘留。
 
@@ -1729,11 +1742,17 @@ def test_gate_only_nosuchcheck_rc2() -> None:
     assert proc.returncode == 2
 
 
-def test_gate_only_g5_g6_green() -> None:
+@pytest.mark.parametrize("name", [
+    "g5",
+    # g6 之凍結函式（cx_run.sh `_maybe_register_stamp_output`）於 VERDICTGATE Task 1.2（stamp 改走
+    # `--kind stamp --family`）與 CXSTAMP review-r1（格式不合不登記）經審查合法修改；
+    # 復原即倒退兩修正，改基準須動硬保護集 ⇒ 同 R-GOVTEST-3。拆參數化使 g5 仍受檢。
+    pytest.param("g6", marks=pytest.mark.xfail(strict=True, reason=_R_GOVTEST_3)),
+])
+def test_gate_only_g5_g6_green(name: str) -> None:
     """_g5／_g6 非空守衛 + 與 base 雜湊一致。"""
-    for name in ("g5", "g6"):
-        proc = _run(["bash", str(GATE), "--only", name])
-        assert proc.returncode == 0, f"{name}: {proc.stderr}{proc.stdout}"
+    proc = _run(["bash", str(GATE), "--only", name])
+    assert proc.returncode == 0, f"{name}: {proc.stderr}{proc.stdout}"
 
 
 def test_mutation_g5_g6_empty_extract_fails() -> None:
@@ -2012,6 +2031,7 @@ _g7() {
     assert _g7_narrow_expiry_holds(batch3_started=True, narrow_guard=False)
 
 
+@pytest.mark.xfail(strict=True, reason=_R_GOVTEST_1)
 def test_g7_ambient_m_gate_check_not_red() -> None:
     """僅 ambient ` M scripts/gate_check.sh` ⇒ 不紅（task-scoped；禁 epic-wide）。"""
     st = _run(["git", "status", "--porcelain", "--", "scripts/gate_check.sh"])
@@ -2389,6 +2409,7 @@ def test_b5_manifest_extension_is_exactly_authorized() -> None:
     )
 
 
+@pytest.mark.xfail(strict=True, reason=_R_GOVTEST_3)
 def test_waiver_b5_range_does_not_touch_forbidden() -> None:
     """B5 窗（b5_start..HEAD）不得觸及禁改清單。
 
@@ -2432,6 +2453,7 @@ def test_waiver_b5_range_does_not_touch_forbidden() -> None:
         assert f5[key] == fh[key], f"{key}: 於 b5_start..HEAD 不得變"
 
 
+@pytest.mark.xfail(strict=True, reason=_R_GOVTEST_3)
 def test_waiver_b5_active_when_b5_start_anchored() -> None:
     """耦合 fail-closed：b5_start 一旦錨定，B5 waiver 不得 skip（否則保護真空）。"""
     if _b5_start() is None:

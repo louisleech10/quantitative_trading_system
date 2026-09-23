@@ -133,12 +133,21 @@ def test_listed_path_outside_judgement_range_rc1(tmp_path, path, files):
     assert r.returncode == 1 and "R-OUT" in r.stderr and "不在判定範圍" in r.stderr, r.stderr
 
 
+def _rendered_order(rows: list) -> list:
+    """生成器之唯一排序點（`gen_fact_key_blocks.sh` `_fk_rows_tsv`）：整列 @tsv 後 LC_ALL=C 位元組序。
+    登記表列序不受約束（2026-09-23 實例：roadmap-status 之 260 排在 270／280 之後），比對前須同序。"""
+    return sorted(rows, key=lambda r: "\t".join(str(c) for c in r).encode("utf-8"))
+
+
 def test_splitunify_residual_ids_identical_across_rendered_targets():
-    """邊界②：SPLITUNIFY 殘留識別碼集合，遷移後各生成落點與 fact_keys rows 逐 ID 相同（含本批新增之 ROADMAP／白話進度表）。"""
+    """邊界②：SPLITUNIFY 殘留識別碼集合，遷移後各生成落點與 fact_keys rows 逐 ID 相同（含本批新增之 ROADMAP）。
+
+    D2D 當時另有落點 `白話說明/SPLITUNIFY施工進度.md`；該檔於 2026-09-20（dd3ca561）隨白話整理移入
+    Archived、落點一併撤除 ⇒ 此處只釘仍為落點之 ROADMAP，其餘落點由下方迴圈逐一對讀。"""
     spec = REAL_FACT_KEYS["splitunify-residual-status"]
-    ids = [row[1] for row in spec["rows"]]
+    ids = [row[1] for row in _rendered_order(spec["rows"])]
     targets = spec["target"] if isinstance(spec["target"], list) else [spec["target"]]
-    assert {"docs/ROADMAP.md", "白話說明/SPLITUNIFY施工進度.md"} <= set(targets)
+    assert "docs/ROADMAP.md" in targets
     for rel in targets:
         text = (REPO / rel).read_text(encoding="utf-8")
         m = re.search(r"^<!-- BEGIN GENERATED: splitunify-residual-status -->\n(.*?)^<!-- END GENERATED: splitunify-residual-status -->$",
@@ -153,7 +162,7 @@ def test_roadmap_generated_block_matches_fact_keys_rows():
     spec = REAL_FACT_KEYS["roadmap-status"]
     assert spec["target"] == "docs/ROADMAP.md"
     si = spec["columns"].index("狀態")
-    want = [(row[1], row[si]) for row in spec["rows"]]
+    want = [(row[1], row[si]) for row in _rendered_order(spec["rows"])]
     text = (REPO / "docs" / "ROADMAP.md").read_text(encoding="utf-8")
     m = re.search(r"^<!-- BEGIN GENERATED: roadmap-status -->\n(.*?)^<!-- END GENERATED: roadmap-status -->$", text, re.S | re.M)
     assert m

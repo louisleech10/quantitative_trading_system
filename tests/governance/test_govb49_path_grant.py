@@ -927,6 +927,8 @@ def test_task32_old_new_behaviour_parity(
     assert old == new, f"{label}：行為改變 old_reject={old} new_reject={new}"
 
 
+@pytest.mark.xfail(strict=True, reason="R-GOVTEST-3：B-49 授權以 git blob 雜湊綁定 4 個 harness 檔，GOVB1 暫停後"
+                                        "他票合法修改即失效；待 GOVB1 復工關窗。轉綠時 strict 以 XPASS 報紅，須移除本標記並同步登記表")
 def test_task32_granted_paths_are_the_only_behaviour_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

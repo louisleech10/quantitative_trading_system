@@ -86,6 +86,15 @@ def _mkrepo(tmp_path: Path, mutate=None) -> Path:
                     if _src.is_file() and not _dst.exists():
                         _dst.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(_src, _dst)
+    # 🔴 `rows_source.file` 亦由註冊表機械導出（同上「不寫死清單」）：2026-09 起 committee-roster 之列衍生自
+    #    scripts/governance_families.json；沙箱缺它 ⇒ 生成器 fail-closed ⇒ 全部基準紅在「缺檔」而非受測邏輯。
+    for _k, _v in data.items():
+        _rs = _v.get("rows_source") if isinstance(_v, dict) else None
+        if isinstance(_rs, dict) and isinstance(_rs.get("file"), str):
+            _src, _dst = REPO / _rs["file"], root / _rs["file"]
+            if _src.is_file() and not _dst.exists():
+                _dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(_src, _dst)
     # 宿主檔（含空邊界標記）
     # 🔴 同一檔可能是多個 key 的 target（如 GOVERNANCE_EXECUTION_ORDER.md 有三個）
     #    ⇒ 必須**累積**所有標記後一次寫入；逐 key 覆寫只會留下最後一個（初版即如此，基準轉紅）。

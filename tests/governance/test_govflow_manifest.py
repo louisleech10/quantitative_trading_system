@@ -95,6 +95,16 @@ def _iso_tree(label: str) -> Path:
         capture_output=True,
         check=False,
     )
+    # 關 commit 後之背景自動維護：它於背景寫 .git/objects/info/packs，與 _cleanup_iso 之 rmtree
+    # 競態——2026-09-23 全套實跑 T0-N3 因此 FileNotFoundError（重跑即綠），.claude/tmp 另殘留
+    # 多個只剩該 1 位元組檔之隔離樹。git 2.54 實測只關 gc.auto 仍殘留，須連 maintenance.auto 一併關。
+    for key, val in (("gc.auto", "0"), ("maintenance.auto", "false")):
+        subprocess.run(
+            ["git", "config", key, val],
+            cwd=str(dest),
+            capture_output=True,
+            check=False,
+        )
     # 至少一個 commit 讓 rev-parse HEAD 可用
     subprocess.run(
         ["git", "add", "-A"],

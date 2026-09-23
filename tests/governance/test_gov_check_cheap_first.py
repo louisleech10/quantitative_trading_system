@@ -24,6 +24,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[2]
 GOV_CHECK = REPO / "scripts" / "gov_check.sh"
 TC = REPO / "scripts" / "template_check.sh"
@@ -35,6 +37,9 @@ _DEPS = (
     "doc_format_precheck.sh",
     "template_check.sh",
     "brief_conformance_check.sh",
+    # 第 1a 段（放水語掃描）與第 1c 段（Ticket-Batch）之腳本，缺即依 fail-closed 判紅（2026-09 起）
+    "quant_standard_check.sh",
+    "ticket_batch_check.sh",
 )
 
 _GIT_ENV = {
@@ -126,7 +131,8 @@ def test_mutation_removing_early_exit_makes_pytest_run(tmp_path: Path) -> None:
     _install_drift(root)
     p = root / "scripts" / "gov_check.sh"
     src = p.read_text(encoding="utf-8")
-    old = '  _gc_summary "便宜段(第 1–4 段,合計約 10 秒)已失敗 → 早退,不跑 pytest(省約 700 秒)。修好後重跑。"\n  exit "${rc_all}"\n'
+    # 錨點隨現行訊息（2026-09-05 起改寫耗時描述；早退之語意不變）
+    old = '  _gc_summary "便宜段(第 1–4 段)已失敗 → 早退,不跑 pytest(十分鐘級以上)。修好後重跑。"\n  exit "${rc_all}"\n'
     assert old in src, "早退閘錨點不存在（重構?→須更新本測，不得靜默略過）"
     p.write_text(src.replace(old, "  :  # MUTATED: 早退失效\n", 1), encoding="utf-8")
     r = _run(root, "--no-probe")
@@ -136,6 +142,12 @@ def test_mutation_removing_early_exit_makes_pytest_run(tmp_path: Path) -> None:
     )
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="R-G7-OFF-2（docs/IC_QUANT_GAP_REGISTRY.md）：G-7 依使用者 2026-09-05 裁定於 gov_check 第 4 段停用，"
+           "manifest 在時只印「已停用」⇒ 刪腳本不再轉紅。GOVB1 復工、第 4 段改回擋時本條會轉綠——"
+           "strict 使其屆時以 XPASS 報紅，須移除本標記並同步登記表",
+)
 def test_mutation_removing_g7_script_turns_red(tmp_path: Path) -> None:
     """🔴〔CODEX-R1-P1-01〕刪掉 G-7 腳本但留下 manifest ⇒ 必須紅。
 

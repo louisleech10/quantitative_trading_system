@@ -699,13 +699,14 @@ def _decision_branches_from_gate_check(path: Path = GATE_CHECK) -> dict[str, int
     """自 gate_check.sh **結構**機械導出會產生 (rc, kind) 差異的判定分支。
 
     禁硬編分支清單：每個 id 必須在源碼中有可定位錨點；錨點漂移 → 本函式 assert 失敗。
-    搜尋範圍限主判定段（``INPUT="$(cat)"`` 之後），避免命中 deny 後的 match_info 鏡像正則。
+    搜尋範圍限主判定段（行首 ``INPUT="$(`` 賦值之後），避免命中 deny 後的 match_info 鏡像正則。
+    錨點只認賦值開頭、不綁讀法：2026-09-11 stdin 逾時修法把 ``$(cat)`` 改成帶 alarm 之讀取。
     回傳 ``{branch_id: 1-based line_no}``。
     """
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines()
-    marker = 'INPUT="$(cat)"'
-    assert marker in text, "gate_check 主判定段錨點 INPUT= 漂移"
+    marker = '\nINPUT="$('
+    assert text.count(marker) == 1, "gate_check 主判定段錨點 INPUT= 漂移（須恰一處行首賦值）"
     main_off = text.index(marker)
     main = text[main_off:]
     found: dict[str, int] = {}

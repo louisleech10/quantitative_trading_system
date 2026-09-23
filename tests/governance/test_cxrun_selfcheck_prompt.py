@@ -222,13 +222,30 @@ def test_selfcheck_catches_real_format_failure(tmp_path: Path) -> None:
     )
     assert "digest" in (bad.stdout + bad.stderr).lower(), "攔下的理由不是缺 digest（可能攔錯東西）"
 
-    # 對照：補上 digest 後須放行——證明上面攔的是「缺 digest」而非「整支恆紅」
+    # 對照：補上 digest 後須放行——證明上面攔的是「缺 digest」而非「整支恆紅」。
+    # fixture 之後上線之必填欄（DOCROT2 `**類別**`；DOCROT Task 1.6 P0/P1 之 CODE-ANCHOR/MUTATION，
+    # 須落在 **碼證** 段內）先補齊成「只缺 digest」之形態，並斷言它仍因 digest 被攔
+    # ⇒ 下面兩份對照只差 `**來源摘要**` 一行。fixture 本身維持逐字不動。
+    code_line = "**碼證**: `scripts/completeness_check.sh` 的 P0/P1 digest 檢查。"
+    only_missing_digest = fixture.read_text(encoding="utf-8").replace(
+        code_line,
+        code_line + "\nCODE-ANCHOR: scripts/completeness_check.sh:1\n"
+        "MUTATION: 刪去 P0/P1 digest 檢查段 ⇒ 本 fixture 轉為放行\n**類別**: other",
+    )
+    nodigest = tmp_path / "nodigest-composer.md"
+    nodigest.write_text(only_missing_digest, encoding="utf-8")
+    still_bad = subprocess.run(
+        ["bash", str(REPO_ROOT / "scripts" / "completeness_check.sh"),
+         "--single", str(nodigest), "--family", "composer"],
+        capture_output=True, text=True, cwd=str(REPO_ROOT),
+    )
+    assert still_bad.returncode != 0 and "digest" in (still_bad.stdout + still_bad.stderr).lower(), (
+        f"補齊其餘必填欄後未因缺 digest 被攔 ⇒ 對照不成立\n{still_bad.stdout}{still_bad.stderr}"
+    )
     fixed = tmp_path / "fixed-composer.md"
     fixed.write_text(
-        fixture.read_text(encoding="utf-8").replace(
-            "**碼證**: `scripts/completeness_check.sh` 的 P0/P1 digest 檢查。",
-            "**碼證**: `scripts/completeness_check.sh` 的 P0/P1 digest 檢查。\n"
-            "**來源摘要**: scripts/completeness_check.sh#0123456789ab",
+        only_missing_digest.replace(
+            "**類別**: other", "**類別**: other\n**來源摘要**: scripts/completeness_check.sh#0123456789ab"
         ),
         encoding="utf-8",
     )

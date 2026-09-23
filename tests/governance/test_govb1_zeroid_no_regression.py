@@ -140,9 +140,11 @@ def test_single_column_discriminates_between_inputs(tmp_path: Path) -> None:
     real.write_text(
         "## CODEX-R1-P0-01\n**斷言**: 有實質內容的斷言。\n"
         "**碼證**: `bash x.sh` rc=2，可複驗。\n"
+        # DOCROT Task 1.6：P0/P1 之 **碼證** 段須含 CODE-ANCHOR:／MUTATION: 兩行；DOCROT2：須帶 **類別**
+        "CODE-ANCHOR: scripts/x.sh:1\nMUTATION: 刪 scripts/x.sh 第 1 行 ⇒ rc 由 2 變 0\n"
         # 🔴 `**來源摘要**` 須為 `<路徑>#<12 位雜湊>`；寫行號會 FAIL
         #    （出生事故：主委自己寫行號，4 個 P0/P1 全 FAIL）
-        "**來源摘要**: scripts/x.sh#0123456789ab\n",
+        "**來源摘要**: scripts/x.sh#0123456789ab\n**類別**: code-contract\n",
         encoding="utf-8",
     )
     assert _rc(["bash", str(COMPLETENESS), "--single", str(real), "--family", "codex"]) == 0

@@ -87,6 +87,9 @@ def _harness(tmp_path: Path, *, kind: str = "review") -> dict:
         "_debt_ledger_core.py",
         # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT
         "_role_gate.sh",
+        # VERDICTGATE Task 4.1：debt_clear 於 result_state 判定前先跑群集歸戶閘（缺即 127，拒銷原因即非受測者）
+        "reconcile_cluster_attribution_check.sh",
+        "_synth_attr.py",
         *_dph.DOCROT2_HELPER_SCRIPTS,
     ):
         src = REPO_ROOT / "scripts" / name
@@ -227,6 +230,8 @@ def _force_stub_bad_finding(scripts: Path) -> None:
     """隔離副本：findings-kind stub 改寫空殼 finding → completeness 必紅。"""
     path = scripts / "cx_run.sh"
     text = path.read_text(encoding="utf-8")
+    # 錨點隨 cx_run 現行 stub（DOCROT2 加類別行、VERDICTGATE 加尾段）：只換掉 finding 本體，
+    #   尾段（CX_STUB_TAIL 之 case 與 `} > "${out}"`）原樣保留
     old = (
         "      local fam_u\n"
         "      fam_u=\"$(printf '%s' \"${fam}\" | tr '[:lower:]' '[:upper:]')\"\n"
@@ -234,9 +239,10 @@ def _force_stub_bad_finding(scripts: Path) -> None:
         "        printf '## %s-R1-P2-01\\n\\n' \"${fam_u}\"\n"
         "        printf '**斷言**: CX_STUB_MODE=success harness minimal legal finding\\n\\n'\n"
         "        printf '**碼證**: scripts/cx_run.sh CX_STUB_MODE=success\\n\\n'\n"
+        "        # DOCROT2 Task 3.1：門檻後之輪 --single 須類別 ⇒ stub 一律帶合法類別（值取封閉集之一）\n"
+        "        printf '**類別**: other\\n\\n'\n"
         "        printf '**來源摘要**: handoffs/stub-%s.md#aaaaaaaaaaaa\\n\\n' \"${fam}\"\n"
         "        printf 'stub harness body\\n'\n"
-        "      } > \"${out}\"\n"
     )
     new = (
         "      local fam_u\n"
@@ -244,7 +250,6 @@ def _force_stub_bad_finding(scripts: Path) -> None:
         "      {\n"
         "        printf '## %s-R1-P0-01\\n\\n' \"${fam_u}\"\n"
         "        printf 'empty shell — missing required fields\\n'\n"
-        "      } > \"${out}\"\n"
     )
     assert old in text, "stub success findings-kind anchor missing in isolated cx_run"
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
@@ -569,7 +574,15 @@ def test_t2_c1_debt_clear_rejects_format_failed(tmp_path: Path) -> None:
     sources.mkdir(parents=True)
     src = sources / "review-codex.md"
     src.write_text(body, encoding="utf-8")
-    (sess / "synth.md").write_text(body, encoding="utf-8")
+    # VERDICTGATE Task 4.1：群集歸戶閘排在 result_state 判定之前 ⇒ synth 須含最小合法群集表（逐字引用斷言、處置 token），
+    #   拒銷才會落在本測所證之 format-failed，而非群集表缺漏
+    (sess / "synth.md").write_text(
+        "## 群集 / 處置\n\n"
+        "| 群集（含斷言前 20 字逐字） | 嚴重度 | 來源 ID | 處置 |\n|---|---|---|---|\n"
+        "| 「clear reject test」 | P0 | CODEX-R1-P0-01 | 採納 |\n\n"
+        "**Verdict**: 需修補後合併\n\n---\n\n" + body,
+        encoding="utf-8",
+    )
     lock = {
         "version": 1,
         "session_id": session,

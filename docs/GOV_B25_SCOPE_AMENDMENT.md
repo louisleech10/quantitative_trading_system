@@ -39,7 +39,32 @@ FACTKEY-DOCROT2-STATUS: splitunify-residual-status
 FACTKEY-DOCROT2-STATUS: docrot2-batch-status
 FACTKEY-DOCROT2-STATUS: handoff-pending
 FACTKEY-DOCROT2-STATUS: roadmap-status
+FACTKEY-CONTENT: eventscan-banner
+FACTKEY-CONTENT: eventscan-breakeven
+FACTKEY-CONTENT: eventscan-clock
+FACTKEY-CONTENT: eventscan-column-selector
+FACTKEY-CONTENT: eventscan-failure-precedence
+FACTKEY-CONTENT: eventscan-failure-reasons
+FACTKEY-CONTENT: eventscan-gaps
+FACTKEY-CONTENT: eventscan-golden-reference
+FACTKEY-CONTENT: eventscan-params
+FACTKEY-CONTENT: eventscan-pit-admission
+FACTKEY-CONTENT: eventscan-random-control
+FACTKEY-CONTENT: eventscan-return-columns
+FACTKEY-CONTENT: eventscan-rulings
+FACTKEY-CONTENT: eventscan-scope
+FACTKEY-CONTENT: eventscan-test-vectors
+FACTKEY-CONTENT: ffdstar-receipt-schema
+FACTKEY-CONTENT: ffdstar-skip-reasons
+FACTKEY-CONTENT: plaindocs-index
 ```
+
+🔴 **第八種宣告 `FACTKEY-CONTENT`（2026-09-23，舊紅燈處理補登）**：
+純內容 key——規格值表（`EVENTSCAN_SPEC`／`FFDSTAR_SPEC` 之值一律入 fact-key）與白話索引表；
+不是狀態、判準、機制、產出端覆蓋 key，rows 亦為靜態。2026-09-20～21 新增這 18 個 key 時未補登本檔，
+契約 1 自此紅（該測試只在小時級全套跑，無人察覺）。集合須**恰等於**「註冊表中不屬任何
+`_schema.*_keys` 清單、無 `rows_source`／`rows_filter`、且非 `FACTKEY-FROZEN` 之 key」（由欄位導出，非自證）；
+與其他七種宣告兩兩不相交。
 
 🔴 **第七種宣告 `FACTKEY-DOCROT2-STATUS`（2026-09-15，`票 B-63` DOCROT2 Task 1.2 新增）**：
 集合須**恰等於** `_schema.docrot2_status_keys`（理由同 1b）；刻意不併入 `FACTKEY-ADDED`／`status_keys`，理由見 `scripts/fact_keys.json` 之 `docrot2_status_note`。
@@ -66,9 +91,10 @@ rows 由 `rows_source`／`rows_filter` 物化之 key（註冊表內無靜態 row
 
 **契約（測試強制，缺一即紅）**：
 1. `scripts/fact_keys.json` 之 fact-key 集合 **恰等於** `FACTKEY-FROZEN` ∪ `FACTKEY-ADDED`
-   ∪ `FACTKEY-CRITERIA` ∪ `FACTKEY-MECHANISM` ∪ `FACTKEY-ENFORCEMENT` ∪ `FACTKEY-DERIVED` ∪ `FACTKEY-DOCROT2-STATUS`。
-   （🔴 `WL-02` 起加入第三個聯集項、`WL-03` 起加入第四個、產出端覆蓋規則起第五個、DOCROT2 Task 1.3／1.2 起第六、第七個；
-   七個清單兩兩不相交，亦以集合相等鎖死。）
+   ∪ `FACTKEY-CRITERIA` ∪ `FACTKEY-MECHANISM` ∪ `FACTKEY-ENFORCEMENT` ∪ `FACTKEY-DERIVED` ∪ `FACTKEY-DOCROT2-STATUS`
+   ∪ `FACTKEY-CONTENT`。
+   （🔴 `WL-02` 起加入第三個聯集項、`WL-03` 起加入第四個、產出端覆蓋規則起第五個、DOCROT2 Task 1.3／1.2 起第六、第七個、
+   2026-09-23 起第八個；八個清單兩兩不相交，亦以集合相等鎖死。）
 1b. `FACTKEY-CRITERIA` 集合 **恰等於** `_schema.criteria_keys`。
 1c. `FACTKEY-MECHANISM` 集合 **恰等於** `_schema.mechanism_keys`（理由同 1b）。
 1d. `FACTKEY-ENFORCEMENT` 集合 **恰等於** `_schema.enforcement_keys`（理由同 1b）。

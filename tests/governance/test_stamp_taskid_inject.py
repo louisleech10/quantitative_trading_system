@@ -53,6 +53,9 @@ _SCRIPT_NAMES = (
     "governance_families.sh",
     # GOVFLOW Task 3.1：角色閘 + task_id 白名單 SSOT（cx_run / committee_run 共用）
     "_role_gate.sh",
+    # VERDICTGATE：committee_run 開輪前以 prev_review_resolve 定前批、verdictgate_check 讀裁決（缺即 127，檢查沒跑）
+    "prev_review_resolve.sh",
+    "verdictgate_check.sh",
     *_dph.DOCROT2_HELPER_SCRIPTS,
 )
 
@@ -1630,12 +1633,14 @@ def test_mutation_committee_partial_check_reopens_orphan_debt(
     monkeypatch.setattr(_dph, "COMMITTEE_RUN_TARGET", h["scripts"] / "committee_run.sh")
 
     def partial_check(text: str) -> str:
-        old = 'bash "${SCRIPT_DIR}/brief_conformance_check.sh" "${brief}" || exit $?'
+        # 錨點隨現行呼叫形式（VERDICTGATE Task 1.2 起以 --emit 取回 brief-kind 供 round_open 持久化）
+        old = 'bash "${SCRIPT_DIR}/brief_conformance_check.sh" "${brief}" --emit "${_cr_bk_kv}" || { _rc=$?; rm -f "${_cr_bk_kv}"; exit "${_rc}"; }'
         assert old in text, "committee_run 未呼叫 brief_conformance_check（錨點不存在）"
-        # 修法前的等效行為：只驗有沒有 brief-kind 行
+        # 修法前的等效行為：只驗有沒有 brief-kind 行（仍把 kind 寫進 emit 檔，下一行照常讀取）
         t = text.replace(
             old,
-            'grep -qE \'^brief-kind:\' "${brief}" || exit 2  # MUTATED: 只驗 kind',
+            'grep -qE \'^brief-kind:\' "${brief}" || exit 2; '
+            'sed -n \'s/^brief-kind:[[:space:]]*//p\' "${brief}" | head -1 > "${_cr_bk_kv}"  # MUTATED: 只驗 kind',
             1,
         )
         # GOVFLOW-B3：_role_gate 會再跑完整 brief_conformance --emit，須一併跳過
@@ -1672,7 +1677,11 @@ def test_mutation_v4_move_after_gate_adds_audit(
         )
         end = text.find("# task_id 從透傳 gate argv 解析")
         assert start != -1 and end != -1 and start < end, "V4 committee anchor missing"
-        t = text[:start] + text[end:]
+        # 該段自 VERDICTGATE Task 1.2 起兼負「取回 brief-kind 值」（供 round_open 持久化）；刪光檢查後
+        #   補回只取值不驗之一行，否則後段讀未定義變數而紅在 set -u，非本 MUT 之受測者
+        t = (text[:start]
+             + '_cr_brief_kind="$(sed -n \'s/^brief-kind:[[:space:]]*//p\' "${brief}" | head -1)"  # MUTATED V4: 取值不驗\n'
+             + text[end:])
         # GOVFLOW-B3：角色閘與 task_id 白名單亦在 gate 前；V4 語意＝刪光 gate 前檢查
         rg = (
             'bash "${SCRIPT_DIR}/_role_gate.sh" check-families "${brief}" "${fams_csv}" || {\n'
@@ -1691,7 +1700,7 @@ def test_mutation_v4_move_after_gate_adds_audit(
     _write_brief(h, stamp_target=None, name="brief.md")
     r = _run_mut_committee(h, monkeypatch)
     opens = _events(h["audit"], "committee_round_open")
-    assert len(opens) >= 1, f"刪除 gate 前檢查後應已開債；rc={r.returncode}"
+    assert len(opens) >= 1, f"刪除 gate 前檢查後應已開債；rc={r.returncode} {r.stderr}"
 
     h2 = _harness(tmp_path / "restore4")
     _write_brief(h2, stamp_target=None, name="brief.md")
@@ -1788,8 +1797,9 @@ def test_mutation_v7_skip_register_turns_red(
     monkeypatch.setattr(_dph, "CX_RUN_TARGET", h["scripts"] / "cx_run.sh")
 
     def neuter_reg(text: str) -> str:
+        # 錨點隨 cx_run 現行呼叫形式（戳記輪改為 `--kind stamp --family`，VERDICTGATE 後）
         old = (
-            '  if ! bash "${SCRIPT_DIR}/gate.sh" register-output "${task_id}" "${stamp_target}"; then\n'
+            '  if ! bash "${SCRIPT_DIR}/gate.sh" register-output "${task_id}" "${stamp_target}" --kind stamp --family "${fam}"; then\n'
             "    # 註冊失敗（與合法 no-op 機械可分）：可辨識錯誤字串、rc 不變、不回捲 family_result\n"
             '    echo "ERROR: register-output 失敗（待人工補記）task=${task_id} path=${stamp_target}" >&2\n'
             "  fi\n"
@@ -2417,7 +2427,13 @@ def test_mutation_v18_skip_missing_kind_turns_red(
             "}"
         )
         assert rg in text, "V18 role gate anchor missing"
-        return text.replace(rg, "true  # MUTATED V18: skip role gate", 1)
+        t = text.replace(rg, "true  # MUTATED V18: skip role gate", 1)
+        # VERDICTGATE Task 1.2 起 committee_run 自有同性質之空 kind 守衛（縱深防禦）；本 MUT 證的是
+        #   brief_conformance 之缺欄守衛，故比照角色閘一併略過，否則紅在別道守衛而非受測者
+        kg = ('[ -n "${_cr_brief_kind}" ] || { echo "ERROR: brief_conformance_check 未回傳 brief-kind'
+              '（fail-closed）" >&2; exit 2; }')
+        assert kg in t, "V18 committee empty-kind guard anchor missing"
+        return t.replace(kg, "true  # MUTATED V18: skip committee empty-kind guard", 1)
 
     _mutate_committee(h, skip_role_gate_for_v18)
     (h["handoffs"] / "brief.md").write_text(
@@ -2425,7 +2441,10 @@ def test_mutation_v18_skip_missing_kind_turns_red(
         encoding="utf-8",
     )
     (h["handoffs"] / "target.md").write_text("t\n", encoding="utf-8")
-    r = _run_mut_committee(h, monkeypatch)
+    # DOCROT2 Task 3.2 起 round_open 之 brief_kind 為必填（第三層防護）；本 MUT 證的是 brief_conformance
+    #   之缺欄守衛，故以既有輔助模擬「brief_kind 尚非必填」之寫入端（只動沙箱副本，離開即逐 bytes 還原）
+    with _dph.legacy_round_open_registry(h["scripts"]):
+        r = _run_mut_committee(h, monkeypatch)
     opens = _events(h["audit"], "committee_round_open")
     assert len(opens) >= 1, f"V18 閹割後應開債；rc={r.returncode} {r.stderr}"
 
