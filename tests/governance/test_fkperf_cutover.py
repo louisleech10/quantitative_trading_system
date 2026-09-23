@@ -162,19 +162,22 @@ _MUTATE_PRECONDITION = "mutation 目標字串不存在"  # test_govb1_factkey_ge
 
 
 def _assertion_diagnostic(stdout: str) -> str:
-    """pytest 失敗診斷中以 `AssertionError` 起頭之連續 `E ` 行區塊（r7 codex／grok P1：Captured stdout 等處之同字面不算）。
-    2026-09-24 主委實跑五例：性質斷言失敗（單行／多行訊息）命中；print 同字面後他斷言失敗、前置斷言失敗、
-    RuntimeError 帶同字面皆不命中。"""
-    blocks, cur = [], []
+    """pytest 失敗診斷中 `E   AssertionError:` 之**訊息**（含多行訊息之後續 `E ` 行），遇 pytest 改寫之
+    `E   assert …`／`E    + …`／`where`／`and` 行即止（r7 codex／grok P1：Captured stdout 不算；r8 codex P1：
+    他斷言之比較值不算）。2026-09-24 主委實跑六例：性質斷言失敗（單行／多行訊息）命中；print 同字面後他斷言失敗、
+    前置斷言失敗、他斷言之比較值含同字面、RuntimeError 帶同字面皆不命中。"""
+    msgs, cur = [], None
     for line in stdout.splitlines():
-        if re.match(r"^E\s", line):
-            cur.append(line)
-        elif cur:
-            blocks.append(cur)
-            cur = []
-    if cur:
-        blocks.append(cur)
-    return "\n".join("\n".join(b) for b in blocks if "AssertionError" in b[0])
+        m = re.match(r"^E\s+AssertionError:\s?(.*)$", line)
+        if m:
+            cur = [m.group(1)]
+            msgs.append(cur)
+            continue
+        if cur is not None and re.match(r"^E\s", line) and not re.match(r"^E\s+(assert\s|\+|where\s|and\s)", line):
+            cur.append(re.sub(r"^E\s+", "", line))
+            continue
+        cur = None
+    return "\n".join("\n".join(m) for m in msgs)
 
 
 def test_fail_substr_only_counts_in_assertion_diagnostic() -> None:
@@ -186,7 +189,11 @@ def test_fail_substr_only_counts_in_assertion_diagnostic() -> None:
                "----- Captured stdout call -----\n" + phrase + "\n= 1 failed in 0.02s =\n")
     target = ("F\n_ test _\n>       assert a != b, \"" + phrase + "\"\n"
               "E   AssertionError: " + phrase + "\nE   assert 'a' != 'a'\n= 1 failed in 0.02s =\n")
+    compared = ("F\n>       assert unrelated() == \"" + phrase + "\", \"unrelated condition\"\n"
+                "E   AssertionError: unrelated condition\nE   assert 0 == '" + phrase + "'\n"
+                "E    +  where 0 = unrelated()\n= 1 failed in 0.02s =\n")
     assert phrase in printed and phrase not in _assertion_diagnostic(printed)
+    assert phrase in compared and phrase not in _assertion_diagnostic(compared)  # r8 codex P1 反例
     assert phrase in _assertion_diagnostic(target)
 
 
