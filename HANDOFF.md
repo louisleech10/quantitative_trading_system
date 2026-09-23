@@ -6,6 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
+| 04-006 | HP-FKPERF | 進行中 | docs/FKPERF_SPEC.md | 2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票（大任務：共用路徑 b、多 phase c）。偵察：存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq（收據 handoffs/run_receipts/20260923-fkperf-recon.json）。SPEC 初稿已寫（方案 A：核心移入單一 Python 程序，行為逐位元組不變，以外部程序數之規模不變性驗收，不設秒數門檻）。下一步：三家對抗審 SPEC r1（兼委員獨立重測偵察數據），收斂後白話逐條交使用者審閱，再寫 TODO manifest |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -24,7 +25,8 @@
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀 |
-| 04-006 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工；該票已於 2026-09-23 完工，何時復工待使用者決定）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
+| 04-006 | HP-FKPERF | 進行中 | docs/FKPERF_SPEC.md | 2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票（大任務：共用路徑 b、多 phase c）。偵察：存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq（收據 handoffs/run_receipts/20260923-fkperf-recon.json）。SPEC 初稿已寫（方案 A：核心移入單一 Python 程序，行為逐位元組不變，以外部程序數之規模不變性驗收，不設秒數門檻）。下一步：三家對抗審 SPEC r1（兼委員獨立重測偵察數據），收斂後白話逐條交使用者審閱，再寫 TODO manifest |
+| 04-007 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工；該票已於 2026-09-23 完工，何時復工待使用者決定）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑

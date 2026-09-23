@@ -454,6 +454,14 @@
         "已完成",
         "白話說明/TODO優化結論.md",
         "2026-09-23 收案。起因＝RM-PROCOPT 之診斷（實作缺陷 40% 為「規格寫對但沒照做」、散文 TODO 為測試檔之低保真草稿）。新票之 TODO＝五類落點 manifest（`docs/manifests/<EPIC>.json`；規格 docs/TODOFMT_SPEC.md，SPEC 審 11 輪後設計定案，L＝`f2146e3d`）。自 W（`26048178`）起生效之機制：寫散文 TODO 即擋（PreToolUse）、manifest 寫入當下機檢（PostToolUse）、派工閘門（新 SPEC 須 manifest 且 spec_path 相等；`--impl-self` 須帶 `--spec`）。實作三批皆經三家審碼閉合；收案聚合器 12 項 rc=0（HEAD `d8107deb`）；全套治理測試 78 紅逐條歸因，皆早於本票或屬偶發／環境（見 HANDOFF 坑）。🔴 硬約束沿用：不得引入分鐘級以上之檢查、不得動 pre-push、mutation 靜態擴覆蓋維持 opt-in。被暫停之票何時復工待使用者決定。"
+      ],
+      [
+        "310",
+        "RM-FKPERF",
+        "FKPERF：fact-key 生成器之存檔檢查不隨登記規模變慢",
+        "進行中",
+        "docs/FKPERF_SPEC.md",
+        "2026-09-23 使用者裁定開票（「這會膨脹很快……這無法接受」）。存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq。方向（SPEC 初稿）：核心移入單一 Python 程序、行為逐位元組不變、以外部程序數之規模不變性驗收。下一步：SPEC 三家對抗審。"
       ]
     ]
   },
@@ -1725,7 +1733,7 @@
         "HP-TODOFMT",
         "已完成",
         "白話說明/TODO優化結論.md",
-        "2026-09-23 收案。新票之 TODO＝五類落點 manifest（`docs/manifests/<EPIC>.json`，規格 docs/TODOFMT_SPEC.md）；寫散文 TODO 即擋、manifest 寫入當下機檢、派工閘門認新格式（`--impl-self` 須帶 `--spec`）自 W（`26048178`）生效。三批皆經三家審碼閉合，末輪 r3 零 finding；收案聚合器 12 項 rc=0（HEAD `d8107deb`）；全套治理測試 78 紅逐條歸因，皆早於本票或屬偶發／環境。其餘票使用者將另開 session 處理。**收案後補遺（第 4 批）**：使用者追問 TODO 相關文件是否都更新，主委盤點查出審查提示詞、TODO 範本之全域約束落點、SPEC 範本、分工手冊與 `debt_clear` 之延後目標查找五處仍預設散文 TODO，已改（docs/TODOFMT_SPEC.md Phase 4）。審碼 r1：codex 擋 1 條（新格式之延後目標對整份 manifest 搜字，目標只在描述欄亦被接受；composer 同判），另 doc-sync 三條；6 條全數已修（延後目標改為只認 not_executable 之 item 完全相等，commit `14ccb24b`）；審碼 r2 三家 proceed，r1 六條全數由原提出方確認閉合、零新 finding（`handoffs/reconcile/20260922-todofmt-b4-review-r2/synth.md` 已銷帳）；第 4 批收，收案聚合器 12 項 rc=0（HEAD `14ccb24b`）。**全套治理測試之 78 條舊紅燈**依使用者裁定由主委自處理：67 條修綠、11 條 strict xfail 引登記 ID（R-GOVTEST-1／3／4／5、R-G7-OFF-2，見 docs/IC_QUANT_GAP_REGISTRY.md）；待使用者決定是否開票優化 fact-key 生成器（R-GOVTEST-5：key 數兩天 17→35，--check 約 10 秒）"
+        "2026-09-23 收案。新票之 TODO＝五類落點 manifest（`docs/manifests/<EPIC>.json`，規格 docs/TODOFMT_SPEC.md）；寫散文 TODO 即擋、manifest 寫入當下機檢、派工閘門認新格式（`--impl-self` 須帶 `--spec`）自 W（`26048178`）生效。三批皆經三家審碼閉合，末輪 r3 零 finding；收案聚合器 12 項 rc=0（HEAD `d8107deb`）；全套治理測試 78 紅逐條歸因，皆早於本票或屬偶發／環境。其餘票使用者將另開 session 處理。**收案後補遺（第 4 批）**：使用者追問 TODO 相關文件是否都更新，主委盤點查出審查提示詞、TODO 範本之全域約束落點、SPEC 範本、分工手冊與 `debt_clear` 之延後目標查找五處仍預設散文 TODO，已改（docs/TODOFMT_SPEC.md Phase 4）。審碼 r1：codex 擋 1 條（新格式之延後目標對整份 manifest 搜字，目標只在描述欄亦被接受；composer 同判），另 doc-sync 三條；6 條全數已修（延後目標改為只認 not_executable 之 item 完全相等，commit `14ccb24b`）；審碼 r2 三家 proceed，r1 六條全數由原提出方確認閉合、零新 finding（`handoffs/reconcile/20260922-todofmt-b4-review-r2/synth.md` 已銷帳）；第 4 批收，收案聚合器 12 項 rc=0（HEAD `14ccb24b`）。**全套治理測試之 78 條舊紅燈**依使用者裁定由主委自處理：67 條修綠、11 條 strict xfail 引登記 ID（R-GOVTEST-1／3／4／5、R-G7-OFF-2，見 docs/IC_QUANT_GAP_REGISTRY.md）；fact-key 生成器變慢（R-GOVTEST-5）經使用者 2026-09-23 裁定開票，見 HP-FKPERF"
       ],
       [
         "035",
@@ -1733,6 +1741,13 @@
         "已完成",
         "docs/PROCOPT_DECISION.md",
         "2026-09-23 使用者裁定：散文 TODO 廢止一項已由 HP-TODOFMT 實施；「最終改法」四步不做、CLAUDE.md 不改（第 3 步之實質已含於 TODOFMT）。裁定逐字與逐項見 docs/PROCOPT_DECISION.md 檔首；白話審閱文件已封存於 白話說明/Archived/SPEC與TODO流程優化.md"
+      ],
+      [
+        "036",
+        "HP-FKPERF",
+        "進行中",
+        "docs/FKPERF_SPEC.md",
+        "2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票（大任務：共用路徑 b、多 phase c）。偵察：存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq（收據 handoffs/run_receipts/20260923-fkperf-recon.json）。SPEC 初稿已寫（方案 A：核心移入單一 Python 程序，行為逐位元組不變，以外部程序數之規模不變性驗收，不設秒數門檻）。下一步：三家對抗審 SPEC r1（兼委員獨立重測偵察數據），收斂後白話逐條交使用者審閱，再寫 TODO manifest"
       ],
       [
         "040",

@@ -270,6 +270,10 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/FKPERF_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/FRACDIFF_MAXLAG_SPEC.md",
       "LIVE-SPEC"
     ],
