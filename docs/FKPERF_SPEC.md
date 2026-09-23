@@ -1,10 +1,10 @@
 # FKPERF — fact-key 生成器：外部程序數與登記規模解耦 — SPEC
 
-> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
+> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v2（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
 
 ## §RISK 風險分級
 - **大小**：大。
-- **命中高風險原則**：(b) 共用路徑——`scripts/gen_fact_key_blocks.sh` 有 8 個消費端（PostToolUse 產出端 hook、PreToolUse `--status-hits`、pre-commit、`precommit_selfcheck`、`gov_check` 第 3 段、`regen_factkey_fixtures`、`govb1_final_gate` g2／g3 掃描、`settings.json` 掛載），皆以其 rc／stderr 作 fail-closed 判定；(c) 多 phase，切換（Phase 4）後之回退為整體 revert。
+- **命中高風險原則**：(b) 共用路徑——`scripts/gen_fact_key_blocks.sh` 之消費端分呼叫型與路徑字面型兩類（逐一列舉見 C-2），呼叫型皆以其 rc／stderr 作 fail-closed 判定；(c) 多 phase，切換（Phase 4）後之回退為整體 revert。
 - **RISK-HIT 宣告**（機檢依據）：
 RISK-HIT: b,c
 
@@ -18,16 +18,21 @@ RISK-HIT: b,c
   - FACT-RECEIPT: `bash --version | head -1` → 印出 `GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)`（無關聯陣列 ⇒ 逐 key 狀態只能重查 jq）（主委 實跑 2026-09-23）
   - FACT-RECEIPT: PreToolUse `live_doc_write_guard.sh` 以 Edit HANDOFF.md payload 計時 → 印出 `rc=0 0.1s`（判定核心為 Python `_live_doc_write_guard.py`）（主委 實跑 2026-09-23）
   - FACT-RECEIPT: `grep -n '缺 jq\|without_jq\|shutil.which("jq")' tests/governance/test_govb1_factkey_*.py tests/governance/test_docrot2_*.py` → 印出空（無測試守「缺 jq」行為）（主委 實跑 2026-09-23）
-- **待確認：無**
+  - FACT-RECEIPT: `prof_spawn.sh --check`／`guard`（三家各於隔離複本重跑）→ 印出 `4317`／`4322`～`4323`，與主委收據相同；`--check` 耗時 11.2～12.25s（codex／composer／grok 實跑 2026-09-23，見 r1 收斂檔）
+  - FACT-RECEIPT: `grep -rno 'gen_fact_key_blocks\.sh:[0-9][0-9-]*' docs scripts tests` → 生產引用僅 `scripts/fact_keys.json` E-028 列之 `gen_fact_key_blocks.sh:1863`（生成至 `docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md` 與兩組 fixture）（主委 實跑 2026-09-23）
+- **待使用者確認**（未確認前不得寫 TODO）：
+  - 是否另加「存檔檢查耗時上限」之回歸測試（秒數或相對 1× 之倍數）。主委建議**不加**：①程序數與開檔數之規模不變性（C-6）已決定性地擋住「逐 key 重開外部程式／重讀檔」這類意外漂移；②計時斷言在負載下不穩（同一機器三家實測 `--check` 10.55～12.25s），專案 CI 即因「效能斷言在共用 runner 不可靠」而刪除；③實測秒數仍寫入本 SPEC 與收據（C-6），收票時呈報。codex r1 之判準要求「須先由使用者確認」，故列此。
 - **已確認結果**：2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票；目標＝存檔檢查之等待不隨登記規模增長。
 
 ## §C 約束
 - **C-1 行為逐位元組不變**：六種呼叫形態（emit、`--check`、`--write`、`--status-hits <行檔>`、`-h|--help`、錯誤參數），其 stdout、stderr、rc 以及寫檔後的宿主檔位元組，在 §V 差分語料上須與 oracle（Phase 4 切換前之 bash 實作，commit 寫死於 Task 0.1）逐位元組相同。**唯一具名例外**＝C-5 之前置條件字面（`缺 jq` → `缺 python3`）。其餘任何差異＝FAIL，新增例外須改本條並經審。
-- **C-2 入口與 env 語意不變**：`bash scripts/gen_fact_key_blocks.sh [mode]` 仍為唯一入口，8 個消費端呼叫方式不改。`GOVB1_FACTKEY_ROOT` 只影響宿主查找；`rows_source` 相對註冊表所在 repo，不隨 ROOT 改變；receipt 相對 ROOT。三者語意照舊。
-- **C-3 決定性契約不變**：唯一排序點＝整列 @tsv 後以位元組序排序（現行 `LC_ALL=C sort`）；jq `@tsv` 之跳脫（`\t` `\n` `\r` `\\`）逐位元組重現；全程 LF、無 BOM、無時間戳。`keys[]` 之序照 jq（碼點序），不得沿用 Python dict 插入序。
+- **C-2 入口之 CLI、env、rc 語意不變**：`bash scripts/gen_fact_key_blocks.sh [mode]` 仍為唯一入口。`GOVB1_FACTKEY_ROOT` 只影響宿主查找；`rows_source` 相對註冊表所在 repo，不隨 ROOT 改變；receipt 相對 ROOT。三者語意照舊。消費端逐一列舉（分兩型）：
+  - **呼叫型**（經入口，呼叫方式不改）：`scripts/factkey_write_guard.sh`（`--check`，由 `.claude/settings.json` PostToolUse 掛載）；`scripts/_live_doc_write_guard.py`（`--status-hits`，其上游為 PreToolUse `scripts/live_doc_write_guard.sh` 與 `scripts/git_hooks/pre-commit` 之 `live_doc_write_guard.sh --staged`）；`scripts/gov_check.sh` 第 3 段（`--check`）；`scripts/precommit_selfcheck.sh`（`--check`）；`scripts/regen_factkey_fixtures.sh`（`--write`）。
+  - **路徑字面型**（以檔名判定，須把核心列入）：`scripts/factkey_write_guard.sh` 之 `_managed()` 受管集合；`scripts/git_hooks/pre-commit` 之遷移判定觸發式；`scripts/fact_keys.json` E-028 列之實作位置引用（行號）；`scripts/govb1_final_gate.sh` g2／g3（屬硬保護集，不改，走 Task 4.3）。前三者於 Task 4.1 加入或改指核心。
+- **C-3 決定性契約不變**：唯一排序點＝整列 @tsv 後以位元組序排序（現行 `LC_ALL=C sort`）；jq `@tsv` 之跳脫（`\t` `\n` `\r` `\\`）逐位元組重現；全程 LF、無 BOM、無時間戳。fact-key 迭代序照 jq `keys[]`（碼點序），不得沿用 Python dict 插入序。手寫狀態判定（`_FK_HIT_AWK` 之 `has_token`）之 `length`／`substr` 與範圍列舉之 `\001` 換行編碼，照現行 `LC_ALL=C` awk／tr，以 UTF-8 **位元組**為單位，不得改用 Python 字元（碼點）長度。
 - **C-4 fail-closed 不減**：檔頭列舉之 fail-closed 點與各 validator 之拒絕集合全數保留，不得新增 fail-open 路徑。`factkey_write_guard.sh` 既有之刻意 fail-open（其檔頭誠實邊界第 4 條）照舊。
 - **C-5 執行環境**：只用標準庫；以系統 `python3`（3.9）執行，不依賴 venv。缺 `python3` ⇒ fail-closed，訊息 `gen_fact_key_blocks: 缺 python3 → fail-closed`，rc 同現行缺 jq（1）。JSON 解析須拒 `NaN`／`Infinity` 等 jq 不接受之字面，與現行「非合法 JSON 物件 → fail-closed」同判。
-- **C-6 效能驗收不設秒數門檻**：遵使用者定死之「新閘禁固定秒數門檻」，本票效能驗收以**外部程序數之規模不變性**判定（決定性）；實測耗時只作收據。
+- **C-6 效能驗收**：使用者 2026-09-22 定死「任何每次都會跑的檢查，單次必須秒級；要寫進 SPEC 的是實測秒數」。本票**新增**之驗收分兩層：①決定性：emit、`--check`、`--write`、`--status-hits` 四模式之**外部程序數**與**核心開檔次數**，在 1×／4×／10× 規模下相等（Task 0.2／4.4）；②實測：四模式與 `factkey_write_guard.sh` 於三種規模之耗時寫入本 SPEC §A 與收據。是否另加耗時上限測試待使用者確認（§A）。既有測試 `test_generator_runs_under_two_seconds` 不屬本條新增驗收，依 C-8 不得刪除或放寬，XPASS 後移除其 strict xfail 即回復原斷言。
 - **C-7 不加快取**：不得引入 sidecar、增量索引或跨呼叫快取（快取失效即新漂移來源；同債務帳本「無 sidecar 快取」原則）。
 - **C-8 判定寬嚴不變**：由 C-1 語料與既有測試共同守住；既有測試之斷言不得放寬或刪除。
 - **C-9 GOVB1 硬保護集不動**：`scripts/govb1_scope.manifest`、`scripts/govb1_frozen_hashes.txt`、`docs/GOVB1_*` 皆不改。g2（consumer 字面分母）與 g3（停用開關）按路徑掃描 `gen_fact_key_blocks.sh`；核心移入新檔後，這兩道對核心失效，須由 Task 4.3 對新核心施加同等檢查。
@@ -38,8 +43,8 @@ RISK-HIT: b,c
 ## 方案比較（主委建議；委員裁）
 | 方案 | 外部程序數對 key 數 | 結論 |
 |---|---|---|
-| **A 核心移入單一 Python 程序**，bash 檔改薄包裝 | O(1)：`python3` 一次；`--check` 另 `git ls-files` 一次 | **採** |
-| B bash 內批次化 jq | 仍 O(key)：bash 3.2 無關聯陣列，逐 key 狀態須重查 | 否 |
+| **A 核心移入單一 Python 程序**，bash 檔改薄包裝 | 與 key 數無關：`python3` 一次，另保留既有子程序（`git rev-parse`、`git ls-files`、`bash scripts/ticket_universe.sh --check`）；以規模不變性判定，不以固定個數 | **採** |
+| B bash 內批次化（一次 jq 物化＋一次 awk 掃檔） | 可與 key 數無關（awk 有關聯陣列；r1 codex／grok 實證） | 否：判定散在 jq 與 awk 兩種 DSL；C-10 之 mutation 錨在巨石字串；BSD awk `-v` 拒換行之既有坑延續；與 `_live_doc_write_guard.py` 不同族，C-11 單一實作更難守 |
 | C hook 只查被編輯檔 | 仍隨該檔 key 數成長（`EVENTSCAN_SPEC.md` 一檔 15 key）；改 `fact_keys.json` 本身仍須全量 | 否 |
 | D 快取／增量 | — | 否（C-7） |
 
@@ -48,25 +53,27 @@ RISK-HIT: b,c
 ### Phase 0 — 基準與 oracle（依賴：無）
 **Task 0.1 — 差分 harness 與語料**
 - 目標：把切換前的 bash 實作凍結為 oracle，建立新舊實作逐位元組比對的 harness 與語料。
-- 檔案：新建 `tests/governance/_fkperf_oracle.py`（helper：`git show <ORACLE_COMMIT>:scripts/gen_fact_key_blocks.sh` 取至 tmp；兩實作於相同 env、cwd、參數、stdin 下各跑一次，比對 stdout、stderr、rc 與宿主檔寫前寫後位元組）；新建 `tests/governance/test_fkperf_differential.py`。`ORACLE_COMMIT` 寫死於 helper，值＝實作起點 commit。
-  - 🔴 oracle 之 stderr 內含其所在路徑者（例：`宿主檔與 <REG 路徑> 不一致`），比對前只准正規化「oracle 暫存路徑 ↔ 真實路徑」這一種替換，替換規則寫死於 helper；其他正規化一律禁止。
+- 檔案：新建 `tests/governance/_fkperf_oracle.py`（helper）與 `tests/governance/test_fkperf_differential.py`。`ORACLE_COMMIT` 寫死於 helper，值＝實作起點 commit。
+- 沙箱建法（🔴 只搬腳本 blob 會因 `REG=${SCRIPT_DIR}/fact_keys.json` 在前置檢查失敗，不得如此）：每筆語料建**兩個同形完整沙箱**——同一輸入樹（`git archive <ORACLE_COMMIT>` 或該語料之沙箱樹）＋註冊表所引用而未追蹤之 receipt 檔；oracle 沙箱之 `scripts/gen_fact_key_blocks.sh` 為 `git show <ORACLE_COMMIT>:scripts/gen_fact_key_blocks.sh`，新實作沙箱放新入口與核心；兩者皆各有 `fact_keys.json`、rows_source 來源、settings.json 與宿主檔，並各自 `git init`（語料需要時）。兩邊於相同 env、參數、stdin、相對 cwd 下各跑一次，比對 stdout、stderr、rc，以及宿主檔寫後位元組與權限位。
+  - 🔴 stderr 內含沙箱絕對路徑者（例：`宿主檔與 <REG 路徑> 不一致`），比對前只准正規化「兩沙箱根目錄互換」這一種替換，規則寫死於 helper；其他正規化一律禁止。
 - 既有 caller／影響面：新建，無 caller。
-- 改法：語料三類。①真實 repo，六種呼叫形態各一。②既有測試建立的沙箱情境：以 `test_govb1_factkey_gen.py` 的 `_sandbox`／`_mkroot`、docrot2 測試的 `_fk_sandbox` 等 helper 建樹，逐一列入。③系統化單點破壞：檔頭 fail-closed 清單每一條、各 validator 每一個拒絕分支，各至少一例；分支清單由 Task 0.1 列舉並附對應 oracle 之 stderr 首行。
-- **驗證**（`pytest tests/governance/test_fkperf_differential.py` 全綠，含下列三項）：
-  - `pytest tests/governance/test_fkperf_differential.py -k oracle_self` ⇒ oracle 對 oracle，差異 0；
+- 改法：每筆語料帶**預期分支標籤**＝oracle 應得之 rc 與 stderr 首行（成功分支則為 rc=0 與 stdout 首行），先斷言 oracle 命中該標籤，再比對新實作；共同前置失敗因此不能充數。語料五類：①真實 repo，六種呼叫形態各一（含 `--help`）。②既有測試建立的沙箱情境：以 `test_govb1_factkey_gen.py` 的 `_sandbox`／`_mkroot`、docrot2 測試的 `_fk_sandbox` 等 helper 建樹，逐一列入。③系統化單點破壞：檔頭 fail-closed 清單每一條、各 validator 每一個拒絕出口，各至少一例；出口清單以現行函式之每個 `return 1`／`_fk_die`／`exit` 逐一列舉並附對應 oracle 之 stderr 首行。④鍵序：一份以非排序插入序寫成之註冊表（C-3）。⑤位元組語意：狀態識別碼含三位元組 UTF-8 字元一筆，左右鄰分別為屬與不屬 `A-Za-z0-9_-` 之字元（C-3）。
+- **驗證**（`pytest tests/governance/test_fkperf_differential.py` 全綠，含下列四項）：
+  - `pytest tests/governance/test_fkperf_differential.py -k oracle_self` ⇒ oracle 對 oracle 差異 0，且其中至少一筆為真實 repo 之 `--check` rc=0（證明沙箱完整）；
+  - 每筆語料之 oracle 命中其預期分支標籤（斷言）；
   - mutation：新實作 stub 輸出多一個位元組 ⇒ 該語料項報差異、測試紅；
-  - 語料清單數 ≥ 分支清單數，且每一分支都有對應語料（集合相等斷言）。
+  - 出口清單與語料之分支標籤集合相等（少列一個出口或多一個無主語料即紅）。
 - **邊界**：①沙箱缺 rows_source 來源、receipt 或 settings.json ⇒ 兩實作同樣 fail-closed，比對照常成立。②`--status-hits` 以行檔輸入，行內含 TAB 或 `\001` 編碼換行 ⇒ 照樣比對。③非 git 的 ROOT ⇒ 兩實作同樣 fail-closed。
 - **存活至**：本票完工後保留，作為回歸防線。
 - **覆蓋風險**：Phase 4 刪除 bash 實作後，oracle 改以 git blob 取得，不受影響。
 - 不可做：不得把 oracle 輸出存成預期檔來取代實跑 oracle（等於另立一份會過期的副本）；不得為了讓比對通過而擴大正規化範圍。
 
 **Task 0.2 — 規模探針**
-- 目標：可重用的外部程序計數 helper，加上合成規模註冊表。
-- 檔案：新建 `tests/governance/_fkperf_spawn.py`（PATH shim 計數，工具集合同收據）；新建 `tests/governance/test_fkperf_scale.py`。
+- 目標：可重用的外部程序計數與開檔計數 helper，加上合成規模註冊表。
+- 檔案：新建 `tests/governance/_fkperf_spawn.py`（PATH shim 計數，工具集合同收據另加 `bash`；shim 以真實路徑 `exec`，不得對 builtin 名稱建 shim——r1 grok 實測 `printf` shim 會使 emit 早退）；新建 `tests/governance/_fkperf_opens.py`（以子程序 `python3` 啟動，先 `sys.addaudithook` 計 `open` 事件，再以 `runpy.run_path` 執行核心；只計 ROOT 與註冊表所在 repo 之下的路徑）；新建 `tests/governance/test_fkperf_scale.py`。
 - 既有 caller／影響面：新建，無 caller。
-- 改法：以真實註冊表為底，將純內容 key（`FACTKEY-CONTENT` 宣告者）複製為 1×、4×、10× 並改名（改名規則寫死），其宿主區塊以 `--write` 物化；於三種規模量測 emit、`--check`、`--write` 的外部程序數。規模不變性斷言在 Phase 4 之前以 `xfail(strict=True)` 標記。
-- **驗證**：①helper 自測：shim 計數等於實際呼叫次數（以已知呼叫數之小腳本驗證）；②基準記錄：現行實作下 1× 的 `--check` 程序數與收據 4317 同量級，且 4× 大於 1×（證明探針有鑑別力）。
+- 改法：以真實註冊表為底，將純內容 key（`FACTKEY-CONTENT` 宣告者）複製為 1×、4×、10× 並改名（改名規則寫死），其宿主區塊以 `--write` 物化；於三種規模量測 emit、`--check`、`--write`、`--status-hits`（小行檔 fixture）的外部程序數，Phase 4 後另量核心開檔次數。規模不變性斷言在 Phase 4 之前以 `xfail(strict=True)` 標記。
+- **驗證**：①helper 自測：shim 計數等於實際呼叫次數、開檔計數等於已知開檔數（各以已知次數之小腳本驗證）；②基準記錄：現行實作下 1× 的 `--check` 程序數與收據 4317 相同，且 4× 大於 1×（證明探針有鑑別力）。
 - **邊界**：①10× 規模 key 名稱須合 `_schema.key_pattern`；②合成 key 不得與既有 key 或狀態識別碼撞名。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：Task 4.4 移除 xfail 標記，不刪檔。
@@ -77,8 +84,8 @@ RISK-HIT: b,c
 - 目標：新建 `scripts/_gen_fact_key_blocks.py`（下稱核心），涵蓋 preflight、keys、shape、rows、schema sets、rows_source／rows_filter 物化，與對應之 fail-closed 訊息。
 - 既有 caller／影響面：新建。本 Phase 不接入入口，只由差分測試直呼。
 - 改法：以 bash 各函式（`_fk_preflight`、`_fk_validate_keys`、`_fk_validate_shape`、`_fk_validate_rows`、`_fk_validate_schema_sets`、`_fk_materialize`、`_fk_rows_source_rows`、`_fk_rows_filter_rows`）為規格逐條移植；訊息字串逐字照抄。
-- **驗證**：差分語料中屬本 Task 分支者全等；`pytest tests/governance/test_fkperf_differential.py -k phase1` 全綠。
-- **邊界**：①空註冊表 ⇒ rc=0 契約不變（`test_empty_registry_is_rc_zero_not_failure`）；②rows_filter 序號位數溢位 ⇒ 同訊息 fail-closed。
+- **驗證**：差分語料中屬本 Task 分支者全等；`pytest tests/governance/test_fkperf_differential.py -k phase1` 全綠；核心之 fact-key 迭代序＝`jq -r 'keys[]'` 之序，以語料④（非排序插入序之註冊表）驗證。
+- **邊界**：①空註冊表 ⇒ rc=0 契約不變（`test_empty_registry_is_rc_zero_not_failure`）；②rows_filter 序號位數溢位 ⇒ 同訊息 fail-closed；③註冊表含 `NaN` 字面 ⇒ 同「非合法 JSON 物件」訊息 fail-closed（C-5）。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不改任何 validator 的接受集合；不合併或改寫訊息字串。
@@ -99,7 +106,7 @@ RISK-HIT: b,c
 - 既有 caller／影響面：`--status-hits` 為 `_live_doc_write_guard.py` 所用（C-11）。
 - 改法：判定碼移入核心，是唯一實作；`--status-hits` 由核心提供；`_live_doc_write_guard.py` 呼叫路徑不改（C-2）。
 - **驗證**：差分語料全等；`tests/governance/test_docrot2_write_guard.py`、`test_docrot2_metrics.py` 以直呼核心方式照跑全綠。
-- **邊界**：①檔名含換行 ⇒ 與 oracle 同判；②非 git 的 ROOT ⇒ 同訊息 fail-closed；③識別碼邊界（如 `B3RB3R`）⇒ 同判。
+- **邊界**：①檔名含換行 ⇒ 與 oracle 同判；②非 git 的 ROOT ⇒ 同訊息 fail-closed；③識別碼邊界（如 `B3RB3R`）⇒ 同判；④識別碼含多位元組字元、鄰接字元屬或不屬 `A-Za-z0-9_-` ⇒ 與 oracle 同判（語料⑤，C-3 位元組語意）。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不擴大或縮小掃描範圍（status_scope、豁免清單之字首語義照舊）。
@@ -137,11 +144,15 @@ RISK-HIT: b,c
 
 ### Phase 4 — 切換與收尾（依賴：Phase 2、Phase 3）
 **Task 4.1 — 入口切換**
-- 目標：`scripts/gen_fact_key_blocks.sh` 改為薄包裝：檢查 `python3` 存在（缺 ⇒ C-5 訊息，rc=1），隨後 `exec python3 <核心> "$@"`。
-- 既有 caller／影響面：8 個消費端（C-2），呼叫方式不變。
-- 改法：以單一 commit 切換（§R）；bash 中已移入核心的函式在本 Task 刪除；檔頭改為指向核心。
-- **驗證**：差分語料對入口全等（只允許 C-1 那一條例外）；8 個消費端各自的既有測試全綠。
-- **邊界**：①`PATH` 中無 `python3` ⇒ rc=1 與 C-5 訊息；②以 `bash -n` 檢查包裝器語法。
+- 目標：`scripts/gen_fact_key_blocks.sh` 改為薄包裝：檢查 `python3` 存在（缺 ⇒ C-5 訊息，rc=1），隨後 `exec python3 <核心> "$@"`；C-2 路徑字面型消費端同步改指核心。
+- 既有 caller／影響面：C-2 所列呼叫型消費端（呼叫方式不變）與路徑字面型消費端（本 Task 更新）。
+- 改法：以單一 commit 切換（§R）：
+  - 入口檔第 2–20 行（`--help` 之輸出來源）**原文保留**；指向核心之說明自第 21 行起；bash 中已移入核心之函式刪除。核心於 preflight 之後讀入口檔第 2–20 行輸出，次序同 oracle（缺註冊表時 `--help` 仍先報前置失敗）。
+  - `scripts/factkey_write_guard.sh` 之 `_managed()` 加入 `scripts/_gen_fact_key_blocks.py`（與既有入口行並列）。
+  - `scripts/git_hooks/pre-commit` 之遷移判定觸發式加入 `_gen_fact_key_blocks\.py`。
+  - `scripts/fact_keys.json` E-028 列之實作位置由 `scripts/gen_fact_key_blocks.sh:1863` 改指核心中對應判定之行，並以 `--write` 重生成 `docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md`；兩組 fixture（`factkey_clean`／`factkey_drifted`）之同一引用照 `scripts/regen_factkey_fixtures.sh` 既有流程更新。
+- **驗證**：差分語料對入口全等（只允許 C-1 那一條例外；`--help` 逐位元組相同）；C-2 呼叫型消費端各自的既有測試全綠；「只改核心」之正反測試：①核心被改壞（例：寫入 `raise RuntimeError`）後，以核心路徑呼叫 `bash scripts/factkey_write_guard.sh scripts/_gen_fact_key_blocks.py` ⇒ rc≠0（修前 r1 反例為 rc=0）；②暫存區只含核心之 commit ⇒ pre-commit 遷移判定被觸發；③還原後兩者 rc=0；E-028 引用經 `--check` 之實作位置驗證 rc=0。
+- **邊界**：①`PATH` 中無 `python3` ⇒ rc=1 與 C-5 訊息；②以 `bash -n` 檢查包裝器語法；③E-028 引用指到核心之註解行 ⇒ 既有「引用指向註解行即拒」判定照樣擋。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不保留 bash 實作作為常駐備援或切換旗標（雙實作即雙倍漂移面；回退走 git revert，見 §R）。
@@ -167,14 +178,14 @@ RISK-HIT: b,c
 - 不可做：不改硬保護集（C-9）。
 
 **Task 4.4 — 規模驗收**
-- 目標：證明外部程序數與登記規模無關。
+- 目標：證明外部程序數與核心開檔次數皆與登記規模無關，並把實測秒數寫進 SPEC（C-6）。
 - 既有 caller／影響面：`tests/governance/test_fkperf_scale.py`（Task 0.2）。
-- 改法：移除規模不變性斷言的 xfail 標記。
-- **驗證**：1×／4×／10× 三種規模下，emit、`--check`、`--write` 各自的外部程序數相等；`factkey_write_guard.sh HANDOFF.md` 的程序數與規模無關。實測耗時寫入收據 `handoffs/run_receipts/<日期>-fkperf-scale.json`，不作斷言。`test_generator_runs_under_two_seconds` 的 R-GOVTEST-5 strict xfail 轉為 XPASS ⇒ 移除標記，並關閉 `docs/IC_QUANT_GAP_REGISTRY.md` 的 R-GOVTEST-5 列。
-- **邊界**：①10× 規模下 `--check` rc=0；②合成 key 被 `FACTKEY-CONTENT` 宣告測試拒收 ⇒ 合成註冊表只在 tmp 沙箱內使用，不寫入真實註冊表。
+- 改法：移除規模不變性斷言的 xfail 標記；把實測秒數回填 §A。
+- **驗證**：1×／4×／10× 三種規模下，emit、`--check`、`--write`、`--status-hits` 各自的外部程序數相等、核心開檔次數相等；`factkey_write_guard.sh HANDOFF.md` 的程序數與規模無關。四模式與 guard 於三種規模之耗時（各取三次）寫入收據 `handoffs/run_receipts/<日期>-fkperf-scale.json`，並回填 §A 為 FACT-RECEIPT。既有 `test_generator_runs_under_two_seconds` 之 R-GOVTEST-5 strict xfail 轉為 XPASS ⇒ 移除標記、回復原斷言（C-6、C-8），並關閉 `docs/IC_QUANT_GAP_REGISTRY.md` 的 R-GOVTEST-5 列。
+- **邊界**：①10× 規模下 `--check` rc=0；②合成 key 被 `FACTKEY-CONTENT` 宣告測試拒收 ⇒ 合成註冊表只在 tmp 沙箱內使用，不寫入真實註冊表；③每 key 迴圈內新增一次讀檔之 mutation ⇒ 開檔次數之規模不變性斷言紅。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
-- 不可做：不以秒數作斷言（C-6）。
+- 不可做：不自訂新的耗時上限斷言（是否增設待使用者確認，見 §A）。
 
 **Task 4.5 — 收尾驗收**
 - 目標：受影響測試與差分語料全綠；全套 `pytest tests/governance` 背景跑一次（本票動共用控制流，符合 CLAUDE.md 全套條件），與 `4bdc2d56` 之基線（0 紅）逐名比對。
@@ -190,7 +201,7 @@ RISK-HIT: b,c
 - **mutation 條件**：適用。RISK-HIT 雖不含 a／d，但本票宣稱「行為不變」，須可證偽：差分 harness 自身須過 mutation（Task 0.1），既有 mutation 對核心重定向（Task 4.2）。
 - **測試層級**：差分（Task 0.1，主防線）；既有單元與整合測試（直呼核心，以及切換後經入口）；規模（Task 0.2／4.4）；全套（Task 4.5）。全部可用 `pytest tests/governance/...` 獨立跑，不需 `run_api.py`。
 - **防假綠**：diff 既有測試斷言，不得放寬或刪除；差分比對之正規化只准 Task 0.1 那一種。
-- **邊界目錄**：空註冊表（Task 1.1）／非 git ROOT（Task 2.1）／檔名含換行（Task 2.1）／控制字元與 `|`（Task 1.2）／大規模 10×（Task 4.4）／缺 python3（Task 4.1）／`--write` 寫檔語意（Task 1.2）。
+- **邊界目錄**：空註冊表（Task 1.1）／非 git ROOT（Task 2.1）／檔名含換行（Task 2.1）／控制字元與 `|`（Task 1.2）／大規模 10×（Task 4.4）／缺 python3（Task 4.1）／`--write` 寫檔語意（Task 1.2）／非排序插入之鍵序（Task 1.1）／多位元組識別碼（Task 2.1）／`--help` 位元組與前置次序（Task 4.1）／只改核心之產出端與 pre-commit 觸發（Task 4.1）。
 
 ## §R 回退
 - Phase 0–3 不接入入口（核心只由測試直呼），各 Phase 可單獨 revert。

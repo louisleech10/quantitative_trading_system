@@ -114,7 +114,7 @@
 <td>HP-FKPERF</td>
 <td>進行中</td>
 <td>docs/FKPERF_SPEC.md</td>
-<td>2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票（大任務：共用路徑 b、多 phase c）。偵察：存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq（收據 handoffs/run_receipts/20260923-fkperf-recon.json）。SPEC 初稿已寫（方案 A：核心移入單一 Python 程序，行為逐位元組不變，以外部程序數之規模不變性驗收，不設秒數門檻）。下一步：三家對抗審 SPEC r1（兼委員獨立重測偵察數據），收斂後白話逐條交使用者審閱，再寫 TODO manifest</td>
+<td>2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票（大任務：共用路徑 b、多 phase c）。偵察：存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq（收據 handoffs/run_receipts/20260923-fkperf-recon.json）。SPEC r1 三家皆 blocked、皆認方案 A（核心移入單一 Python 程序）可採；13 條採納 12、部分採納 1（handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md 已銷帳），SPEC 改 v2：路徑字面型消費端列入核心、oracle 改兩個同形完整沙箱＋預期分支標籤、驗收加開檔數之規模不變性並回填實測秒數、<code>--help</code> 位元組保留；另更正 v1 誤稱使用者定「禁秒數門檻」（原文為「每次都跑的檢查須秒級、SPEC 寫實測秒數」），耗時上限測試列 §A 待使用者確認。r1 銷帳時發現帳本 dump 1.04MB 超過 ARG_MAX 致 debt_clear 起不來，經使用者選「直接修，交第 2 輪委員一起審」，已改經 fd 3 傳遞（行數不變）＋回歸測試。下一步：派 r2（兼審帳本修正），收斂後白話逐條交使用者審閱（含 §A 待確認），再寫 TODO manifest</td>
 </tr>
 <tr>
 <td>040</td>

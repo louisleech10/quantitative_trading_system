@@ -187,9 +187,9 @@ _latest_result_per_family() {
   [ -n "${rid}" ] || return 2
   local dump
   dump="$(_ledger_core dump_json)" || return $?
-  DEBT_LEDGER_DUMP="${dump}" DEBT_LEDGER_RID="${rid}" python3 <<'PY'
+  DEBT_LEDGER_RID="${rid}" python3 3<<<"${dump}" <<'PY'
 import json, os, sys
-dump = json.loads(os.environ["DEBT_LEDGER_DUMP"])
+dump = json.loads(os.fdopen(3, encoding="utf-8").read())  # 帳本經 fd 3 傳入：放環境變數會超過 ARG_MAX（2026-09-23 帳本 1.04MB）
 rid = os.environ["DEBT_LEDGER_RID"]
 info = (dump.get("rounds") or {}).get(rid)
 if not info:

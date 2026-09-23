@@ -336,6 +336,41 @@ def test_clear_happy_path(tmp_path: Path) -> None:
     assert clears[0]["round_id"] == rid
 
 
+def test_clear_ledger_dump_not_passed_via_environment(tmp_path: Path) -> None:
+    """帳本 dump 不得經環境變數傳給 python3。
+
+    出生事故（2026-09-23）：真實帳本 dump 達 1,043,751 bytes，放進環境變數後超過 macOS
+    ARG_MAX（1,048,576，含參數與環境），`python3` 起不來（`Argument list too long`），
+    每一輪委員審查都銷不了帳。修法改經 fd 3 傳入。本測以 PATH shim 攔下 `python3` 之每次啟動、
+    記下其全部環境變數；斷言沒有任何一個值含帳本 dump——舊寫法無論帳本大小都會被抓到。
+    """
+    root, audit = _setup(tmp_path)
+    rid, lock = _happy_path_prep(root, audit, session="envdump")
+    dump = _ledger(root, audit, "--dump-json").stdout.strip()
+    assert len(dump) > 100, "帳本 dump 過短，下方斷言無鑑別力"
+    real_py = shutil.which("python3")
+    assert real_py, "找不到 python3"
+    shim = tmp_path / "pyshim"
+    shim.mkdir()
+    log = tmp_path / "python3_env.log"
+    (shim / "python3").write_text(
+        f'#!/bin/bash\nenv -0 >> "{log}"\nprintf "\\0" >> "{log}"\nexec "{real_py}" "$@"\n',
+        encoding="utf-8",
+    )
+    (shim / "python3").chmod(0o755)
+    env = _hermetic_env(audit, PATH=f"{shim}:{os.environ.get('PATH', '/usr/bin:/bin')}")
+    r = helper.run_cmd(
+        root / "scripts" / "debt_clear.sh",
+        "--round-id", rid, "--session", "envdump", "--lock", str(lock),
+        env=env,
+        cwd=root,
+    )
+    assert r.returncode == 0, r.stderr + r.stdout
+    assert log.is_file() and log.stat().st_size > 0, "shim 未攔到任何 python3 呼叫——本測失去鑑別力"
+    leaked = [v[:60] for v in log.read_bytes().split(b"\0") if dump.encode("utf-8") in v]
+    assert not leaked, f"帳本 dump 經環境變數傳入 python3：{leaked}"
+
+
 def test_clear_wrong_round_id_binding(tmp_path: Path) -> None:
     """拿 A 輪 lock 銷 B 輪 → rc≠0。"""
     root, audit = _setup(tmp_path)

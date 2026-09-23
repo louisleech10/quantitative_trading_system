@@ -371,12 +371,12 @@ _paused_absent_families() {
   }
   local _ap6
   _ap6="$(_resolve_audit_path 2>/dev/null || true)"
-  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap6}" \
-    DEBT_CLEAR_ACTIVE="${active}" REPO_ROOT="${REPO}" python3 <<'PY'
+  DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap6}" \
+    DEBT_CLEAR_ACTIVE="${active}" REPO_ROOT="${REPO}" python3 3<<<"${dump}" <<'PY'
 import json, os, sys
 from pathlib import Path
 
-dump = json.loads(os.environ["DEBT_CLEAR_DUMP"])
+dump = json.loads(os.fdopen(3, encoding="utf-8").read())  # 帳本經 fd 3 傳入：放環境變數會超過 ARG_MAX（2026-09-23 帳本 1.04MB）
 rid = os.environ["DEBT_CLEAR_RID"]
 info = (dump.get("rounds") or {}).get(rid) or {}
 participants = info.get("participants") or []
@@ -453,11 +453,11 @@ _assert_roster_equals() {
     echo "ERROR: 讀帳本失敗（roster 檢查）" >&2
     return 1
   }
-  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_LOCK="${lock}" \
-    DEBT_CLEAR_PAUSED_ABSENT="${PAUSED_ABSENT:-}" python3 <<'PY'
+  DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_LOCK="${lock}" \
+    DEBT_CLEAR_PAUSED_ABSENT="${PAUSED_ABSENT:-}" python3 3<<<"${dump}" <<'PY'
 import json, os, sys
 
-dump = json.loads(os.environ["DEBT_CLEAR_DUMP"])
+dump = json.loads(os.fdopen(3, encoding="utf-8").read())  # 帳本經 fd 3 傳入（理由同上）
 rid = os.environ["DEBT_CLEAR_RID"]
 lock = json.load(open(os.environ["DEBT_CLEAR_LOCK"], encoding="utf-8"))
 
@@ -499,8 +499,8 @@ _assert_all_families_success_and_sha_match() {
   }
   local _ap5
   _ap5="$(_resolve_audit_path 2>/dev/null || true)"
-  DEBT_CLEAR_DUMP="${dump}" DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap5}" REPO_ROOT="${REPO}" \
-    DEBT_CLEAR_PAUSED_ABSENT="${PAUSED_ABSENT:-}" python3 <<'PY'
+  DEBT_CLEAR_RID="${rid}" DEBT_CLEAR_AUDIT="${_ap5}" REPO_ROOT="${REPO}" \
+    DEBT_CLEAR_PAUSED_ABSENT="${PAUSED_ABSENT:-}" python3 3<<<"${dump}" <<'PY'
 import hashlib
 import json
 import os
@@ -508,7 +508,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-dump = json.loads(os.environ["DEBT_CLEAR_DUMP"])
+dump = json.loads(os.fdopen(3, encoding="utf-8").read())  # 帳本經 fd 3 傳入（理由同上）
 rid = os.environ["DEBT_CLEAR_RID"]
 audit_path = os.environ.get("DEBT_CLEAR_AUDIT") or ""
 
