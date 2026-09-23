@@ -51,7 +51,7 @@ def test_golden_multi_tf_features_unchanged_and_timeframes_canonical(tmp_path: P
         assert (m["expected_layers"], m["present_layers"], m["failed_layers"], m["failure_reasons"]) == (
             layers, layers, [], []), where
     assert fp["allowed"]["manifest"]["root"]["run_status"] == "complete"
-    assert fp["allowed"]["manifest"]["raw"]["run_status"] is None  # raw 無此鍵（§C 不新增；r6 codex P1-02）
+    assert "run_status" not in fp["allowed"]["present_keys"]["raw"]  # raw 無此鍵（§C 不新增；r6／r7 codex P1-02：須驗鍵存在性，非值）
     t = fp["allowed"]["task"]
     assert (t["expected_timeframes"], t["present_timeframes"], t["failed_timeframes"]) == (_MULTI, _MULTI, [])
     assert (t["quality_status"], t["run_status"]) == ("complete", "complete")
@@ -68,7 +68,7 @@ def test_golden_degraded_single_tf_manifest_matches_task_record(tmp_path: Path) 
     assert base["allowed"]["manifest"]["root"]["quality_status"] == "complete"  # 改前（缺陷）：manifest 未降級
     assert root["quality_status"] == root["run_status"] == "partial"
     assert raw["quality_status"] == "partial"
-    assert raw["run_status"] is None  # raw 無此鍵（§C 不新增；r6 codex P1-02）
+    assert "run_status" not in fp["allowed"]["present_keys"]["raw"]  # raw 無此鍵（r6／r7 codex P1-02）
     assert root["failure_reasons"] == task["failure_reasons"]
     assert any(r.startswith("nan_ratio=") and ">max_nan_ratio=0" in r for r in task["failure_reasons"])
     for key in ("quality_status", "failure_reasons", "quality_thresholds"):
@@ -115,6 +115,15 @@ def test_mutation_registry_reference_missing_file_is_caught(tmp_path: Path, monk
     (work / "manifest.json").unlink()
     assert g.registry_refs_problems(manifest) != []
     assert g.registry_refs_problems({"x": {"source_registry_manifest": "/elsewhere/manifest.json"}}) != []
+
+
+def test_mutation_raw_null_run_status_key_is_caught() -> None:
+    """r7 codex P1-02：raw 新增 `"run_status": null` ⇒ 鍵存在性投影必見（值投影 `.get` 分不出缺鍵與 null）。"""
+    absent = {"artifacts": {"raw": {"quality_status": "complete"}}}
+    null_key = {"artifacts": {"raw": {"quality_status": "complete", "run_status": None}}}
+    assert "run_status" not in g.allowed_values(absent, {})["present_keys"]["raw"]
+    assert "run_status" in g.allowed_values(null_key, {})["present_keys"]["raw"]
+    assert g.allowed_values(absent, {})["manifest"]["raw"] == g.allowed_values(null_key, {})["manifest"]["raw"]
 
 
 def test_mutation_golden_compare_detects_single_group_change(monkeypatch: pytest.MonkeyPatch) -> None:

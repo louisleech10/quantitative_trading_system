@@ -253,6 +253,11 @@ def allowed_values(manifest: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[s
             name: {key: container.get(key) for key in COMPLETENESS_KEYS}
             for name, container in zip(names, containers)
         },
+        # 鍵之存在性（`.get` 分不出缺鍵與 null；r7 codex P1-02：§C 禁新增 manifest 鍵，raw 須無 run_status）
+        "present_keys": {
+            name: sorted(key for key in COMPLETENESS_KEYS if key in container)
+            for name, container in zip(names, containers)
+        },
         "task": {key: metadata.get(key) for key in COMPLETENESS_KEYS + ("quality_thresholds",)},
     }
 

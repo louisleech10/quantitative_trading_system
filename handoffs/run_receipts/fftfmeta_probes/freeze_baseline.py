@@ -15,6 +15,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
+from _isolate import isolate  # noqa: E402  須先於任何 momentum／helper 匯入（r7 codex P1-01）
+
+ISOLATED_ROOT = isolate()
+
 from tests.feature_engineering import fftfmeta_golden_helpers as g  # noqa: E402
 
 

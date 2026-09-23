@@ -23,7 +23,7 @@
     {
       "cmd": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py",
       "rc": 0,
-      "observed": "FROZEN multi: groups=84 manifest_bytes=730464 task_bytes=24998；FROZEN degraded: groups=42 manifest_bytes=472726 task_bytes=24119（v6 位置正規化收窄後重凍結）；WROTE tests/_golden/fftfmeta/baseline.json（20198 bytes）",
+      "observed": "FROZEN multi: groups=84 manifest_bytes=730464 task_bytes=24999；FROZEN degraded: groups=42 manifest_bytes=472726 task_bytes=24119（r7 起經 _isolate 隔離後重凍結，fingerprint 加鍵存在性投影）；WROTE tests/_golden/fftfmeta/baseline.json（20198 bytes）",
       "frozen_at_head": "cb604963"
     }
   ],

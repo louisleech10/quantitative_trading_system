@@ -42,7 +42,8 @@
       "conftest.py",
       "tests/_golden/fftfmeta/baseline.json",
       "tests/_golden/fftfmeta/allowed_paths.json",
-      "handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py"
+      "handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py",
+      "handoffs/run_receipts/fftfmeta_probes/_isolate.py"
     ],
     "callers_now": [
       "momentum/FeatureEngineering/feature_factory.py",
@@ -86,7 +87,7 @@
       "Task 2.3 驗證：tests/feature_engineering/test_failopen_manifest.py::test_degradation_in_manifest_cgsa_nan_threshold、::test_degradation_in_manifest_frame_l65_failure；純函式：::test_degradation_pure_nan_threshold、::test_degradation_pure_healthy_unchanged、::test_degradation_pure_l65_failure",
       "Task 3.1 驗證：tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases（cgsa_serial／cgsa_parallel／legacy × healthy／skip／failed／single）、::test_canonical_completeness_dependency_failed_on_12h_reaches_manifest[cgsa_serial／cgsa_parallel]",
       "Task 3.2 驗證：tests/test_multi_tf_generator.py::test_crosscheck_present_timeframes_missing_group_raises（真實 ColumnGroupRegistry）",
-      "§G：tests/feature_engineering/test_fftfmeta_golden.py::test_golden_multi_tf_features_unchanged_and_timeframes_canonical、::test_golden_degraded_single_tf_manifest_matches_task_record、::test_golden_baseline_frozen_before_change、::test_mutation_registry_reference_wrong_target_changes_digest、::test_mutation_registry_reference_missing_file_is_caught（允許路徑逐鍵斷言、raw 無 run_status、位置正規化只換前綴且 reference 須指向本次工作根下存在之檔；r5 codex P1-03／P2-01、r6 codex P1-02／P2-01）；Numba 編譯快取經根 conftest.py 之 NUMBA_CACHE_DIR 落系統 tmp，不寫 repo 內 __pycache__（r6 codex P1-01）；真實 run 一律經 fftfmeta_golden_helpers.prepare_env 隔離 feature registry 與 CGSA 工作目錄於 tmp（r5 codex P1-01）；manifest 與 task record 之 JSON 位元組大小差由實作後重跑 freeze_baseline 之同參數量測寫入收據",
+      "§G：tests/feature_engineering/test_fftfmeta_golden.py::test_golden_multi_tf_features_unchanged_and_timeframes_canonical、::test_golden_degraded_single_tf_manifest_matches_task_record、::test_golden_baseline_frozen_before_change、::test_mutation_registry_reference_wrong_target_changes_digest、::test_mutation_registry_reference_missing_file_is_caught、::test_mutation_raw_null_run_status_key_is_caught（raw 無 run_status 以鍵存在性投影驗；r7 codex P1-02；允許路徑逐鍵斷言、raw 無 run_status、位置正規化只換前綴且 reference 須指向本次工作根下存在之檔；r5 codex P1-03／P2-01、r6 codex P1-02／P2-01）；Numba 編譯快取經根 conftest.py 之 NUMBA_CACHE_DIR 落系統 tmp，不寫 repo 內 __pycache__（r6 codex P1-01）；直接執行之探針一律先經 handoffs/run_receipts/fftfmeta_probes/_isolate.py 把 Numba 快取、feature registry、CGSA 工作目錄導向 tmp（r7 codex P1-01）；真實 run 一律經 fftfmeta_golden_helpers.prepare_env 隔離 feature registry 與 CGSA 工作目錄於 tmp（r5 codex P1-01）；manifest 與 task record 之 JSON 位元組大小差由實作後重跑 freeze_baseline 之同參數量測寫入收據",
       "§V mutant ①②：tests/feature_engineering/test_failopen_manifest.py::test_mutation_storage_single_tf_timeframes_is_caught、tests/test_multi_tf_generator.py::test_mutation_canonical_completeness_single_tf_timeframes_is_caught；③：::test_mutation_resolve_completeness_ignoring_cross_tf_failures_is_caught；④：::test_canonical_completeness_dependency_failed_on_12h_reaches_manifest（改回只收 layer_failed 即紅）；⑤：::test_mutation_degradation_in_manifest_writer_skips_gate_is_caught",
       "邊界 21 條：01–04 Task 1.1、05–07 Task 1.2、08–10 Task 1.3、11–12 Task 2.1、13–14 Task 2.2、15–16 Task 2.3、17–19 Task 3.1、20–21 Task 3.2，各一支 test_boundary_NN_*",
       "既有行為不得變更：單週期未降級 run 之 manifest 值不變（::test_writer_timeframe_completeness_fresh_single_tf_unchanged、::test_resolve_completeness_single_tf_unchanged、§G golden）；既有 test_completeness_fields 等斷言不得放寬；既有 18 個 run 之 metadata 不得改寫（只對新 run 生效）"

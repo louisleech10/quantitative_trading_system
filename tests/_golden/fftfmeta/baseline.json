@@ -1,5 +1,5 @@
 {
- "frozen_at_head": "80f3f85a42c5",
+ "frozen_at_head": "73f17b7027f3",
  "references": {
   "degraded": {
    "allowed": {
@@ -54,6 +54,29 @@
       "quality_status": "complete",
       "run_status": "complete"
      }
+    },
+    "present_keys": {
+     "raw": [
+      "expected_layers",
+      "expected_timeframes",
+      "failed_layers",
+      "failed_timeframes",
+      "failure_reasons",
+      "present_layers",
+      "present_timeframes",
+      "quality_status"
+     ],
+     "root": [
+      "expected_layers",
+      "expected_timeframes",
+      "failed_layers",
+      "failed_timeframes",
+      "failure_reasons",
+      "present_layers",
+      "present_timeframes",
+      "quality_status",
+      "run_status"
+     ]
     },
     "task": {
      "expected_layers": null,
@@ -269,6 +292,29 @@
       "run_status": "complete"
      }
     },
+    "present_keys": {
+     "raw": [
+      "expected_layers",
+      "expected_timeframes",
+      "failed_layers",
+      "failed_timeframes",
+      "failure_reasons",
+      "present_layers",
+      "present_timeframes",
+      "quality_status"
+     ],
+     "root": [
+      "expected_layers",
+      "expected_timeframes",
+      "failed_layers",
+      "failed_timeframes",
+      "failure_reasons",
+      "present_layers",
+      "present_timeframes",
+      "quality_status",
+      "run_status"
+     ]
+    },
     "task": {
      "expected_layers": null,
      "expected_timeframes": null,
@@ -465,7 +511,7 @@
      ]
     }
    },
-   "task_bytes": 24998,
+   "task_bytes": 24999,
    "task_stripped_sha256": "d3384830d93c2bb567eb788de3bcd79901dc429c26f84557f87f9c1a94c09f4a"
   }
  },
