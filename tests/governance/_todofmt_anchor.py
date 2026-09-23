@@ -13,7 +13,9 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
+import sys
 from functools import lru_cache
 from pathlib import Path
 
@@ -148,6 +150,55 @@ def diff_lines_vs_l(path: str) -> tuple[list[str], list[str]]:
     return added, removed
 
 
+_TODO_BASENAME = re.compile(r"^[a-z0-9_]+_todo(\.[a-z0-9-]+)?\.md$")
+
+
+def is_legacy_todo_style(path: str) -> bool:
+    """SPEC Task 1.2 步驟 2 之樣式（casefold 後）：首段 docs、檔名 ^[a-z0-9_]+_todo(\\.[a-z0-9-]+)?\\.md$。"""
+    lp = path.lower()
+    return lp.startswith("docs/") and bool(_TODO_BASENAME.match(lp.rsplit("/", 1)[-1]))
+
+
+def is_spec_style(path: str) -> bool:
+    """`docs/` 下任一層之 `*_SPEC*.md`（casefold 後）。"""
+    lp = path.lower()
+    base = lp.rsplit("/", 1)[-1]
+    return lp.startswith("docs/") and "_spec" in base and base.endswith(".md")
+
+
+def _tree_paths(commit: str) -> list[str]:
+    return _git("ls-tree", "-r", "--name-only", commit).stdout.splitlines()
+
+
+def legacy_todo_paths() -> list[str]:
+    """L 樹中符合 Task 1.2 步驟 2 樣式之全部路徑（正規化＝casefold，排序）。"""
+    return sorted({p.lower() for p in _tree_paths(design_freeze_commit()) if is_legacy_todo_style(p)})
+
+
+def legacy_spec_paths() -> list[str]:
+    """L 樹中 `docs/` 下任一層全部 `*_SPEC*.md`（casefold，排序）。"""
+    return sorted({p.lower() for p in _tree_paths(design_freeze_commit()) if is_spec_style(p)})
+
+
+def window_additions() -> list[str]:
+    """L..W（無 W 時 L..HEAD）區間內任一 commit 新增之路徑（--no-renames）。"""
+    hi = effective_commit() or "HEAD"
+    out = _git("log", "--no-renames", "--diff-filter=A", "--name-only", "--format=",
+               f"{design_freeze_commit()}..{hi}").stdout
+    return sorted({ln for ln in out.splitlines() if ln.strip()})
+
+
+def literal_block(text: str, begin: str, end: str) -> list[str]:
+    """取腳本中 `# BEGIN <begin>` 與 `# END <end>` 之間、單引號字串內之非空行。"""
+    lines = text.splitlines()
+    try:
+        s = next(i for i, ln in enumerate(lines) if ln.startswith(f"# BEGIN {begin}"))
+        e = next(i for i, ln in enumerate(lines) if ln.startswith(f"# END {end}"))
+    except StopIteration as exc:
+        raise AnchorError(f"找不到字面清單區塊：{begin}") from exc
+    return [ln.strip() for ln in lines[s + 1:e] if ln.strip() and "'" not in ln]
+
+
 def invariant_lines() -> list[tuple[str, str, str]]:
     """L 之本 SPEC 中行首為 INV_PREFIX 之行，拆為（項, 所屬檔, 片段）；非四欄即 AnchorError。"""
     text = show(design_freeze_commit(), SPEC)
@@ -162,3 +213,16 @@ def invariant_lines() -> list[tuple[str, str, str]]:
             raise AnchorError(f"不變式行不為四欄：{line!r}")
         rows.append((parts[1], parts[2], parts[3]))
     return rows
+
+
+if __name__ == "__main__":
+    # 一次性陣列生成（於 W 寫入 hook 與 gate.sh 之字面清單）：
+    #   venv/bin/python -m tests.governance._todofmt_anchor legacy-todos|legacy-specs
+    _cmd = sys.argv[1] if len(sys.argv) > 1 else ""
+    if _cmd == "legacy-todos":
+        print("\n".join(legacy_todo_paths()))
+    elif _cmd == "legacy-specs":
+        print("\n".join(legacy_spec_paths()))
+    else:
+        print("用法: python -m tests.governance._todofmt_anchor legacy-todos|legacy-specs", file=sys.stderr)
+        sys.exit(2)

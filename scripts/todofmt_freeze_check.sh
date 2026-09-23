@@ -68,10 +68,17 @@ while IFS= read -r _item; do
   _why=""
   if [ "${_rc}" -ne 0 ]; then
     _why="rc=${_rc}"
-  # 掃完整輸出（b2 審碼 codex：只看末三行時，摘要之後另有輸出即漏判；全掃之誤判只會偏向不通過）
-  elif printf '%s' "${_item}" | grep -q -- '-m pytest' \
-       && printf '%s\n' "${_out}" | grep -Eq '(^|[^0-9])[0-9]+ (skipped|xfailed|xpassed)'; then
-    _why="含 skipped／xfailed／xpassed"
+  elif printf '%s' "${_item}" | grep -q -- '-m pytest'; then
+    # 只認 pytest 之結果摘要行（「N passed, M skipped in Xs」，可夾 = 框線），不論其在第幾行：
+    #   b2 審碼 codex／grok：只看末三行時，摘要之後另有輸出即漏判；
+    #   b3 主委實跑：全文掃描會把參數化測試名中之「− skipped」誤判為計數。
+    #   找不到摘要行即 fail-closed（不當作通過）。
+    _summary="$(printf '%s\n' "${_out}" | grep -E '^=*[[:space:]]*[0-9]+ [a-z]+(, [0-9]+ [a-z]+)* in [0-9.]+s' || true)"
+    if [ -z "${_summary}" ]; then
+      _why="找不到 pytest 結果摘要行"
+    elif printf '%s\n' "${_summary}" | grep -Eq '[0-9]+ (skipped|xfailed|xpassed)'; then
+      _why="含 skipped／xfailed／xpassed"
+    fi
   fi
   # 規則 2：取得 rc 之後才追加紀錄
   _record="${_record}${_item}

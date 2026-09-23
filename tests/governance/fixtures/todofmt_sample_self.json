@@ -1,0 +1,81 @@
+{
+  "stub_modules": [],
+  "test_files": [
+    "tests/governance/test_todofmt_contract.py",
+    "tests/governance/test_template_check_todofmt.py",
+    "tests/governance/test_mutation_scope_extension.py",
+    "tests/governance/test_todofmt_write_guard.py",
+    "tests/governance/test_gate_todo_routing.py",
+    "tests/governance/test_gate_impl_requires_manifest.py",
+    "tests/governance/test_todofmt_template.py",
+    "tests/governance/test_todofmt_constitution_sync.py",
+    "tests/governance/test_todofmt_sample_self.py",
+    "tests/governance/test_todofmt_sample_fftfmeta.py",
+    "tests/governance/test_todofmt_freeze_check.py"
+  ],
+  "script_acceptance": [
+    "scripts/todofmt_freeze_check.sh",
+    "scripts/mutation_scope_static.sh"
+  ],
+  "contract_jsons": [
+    "scripts/todofmt_contract.json"
+  ],
+  "spec_path": "docs/TODOFMT_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "docs/TODOFMT_SPEC.md",
+      "scripts/template_check.sh",
+      "scripts/gate.sh",
+      ".claude/settings.json",
+      "templates/TODO_GENERATION_PROMPT.md",
+      "CLAUDE.md",
+      "docs/MULTI_AGENT_ORCHESTRATION.md",
+      "AGENTS.md",
+      ".cursorrules",
+      "docs/GOV_ACTIVE_MECHANISMS.md",
+      "scripts/todofmt_check.sh",
+      "scripts/todofmt_contract.json",
+      "scripts/todofmt_write_guard.sh",
+      "scripts/todofmt_freeze_check.sh",
+      "scripts/mutation_scope_static.sh",
+      "tests/governance/_todofmt_anchor.py",
+      "tests/governance/fixtures/constitution_exception_allowlist.txt",
+      "docs/manifests/TODOFMT.json",
+      "docs/manifests/FFTFMETA.json"
+    ],
+    "callers_now": [
+      "scripts/dispatch.sh",
+      "scripts/committee_run.sh"
+    ],
+    "callers_later": [],
+    "gate_cmd": "bash scripts/todofmt_freeze_check.sh",
+    "forbidden": [
+      {"rule": "不得引入分鐘級以上之檢查", "observable": false},
+      {"rule": "不得動 pre-push", "observable": false},
+      {"rule": "mutation 靜態檢查維持 opt-in，不得擴成全量掃描", "observable": true},
+      {"rule": "不得修 SPEC §A 具名之 fatal 名單、不得改分類器", "observable": true}
+    ],
+    "risk_mitigation": [
+      "設計定案 commit（L）由 SPEC 設計定案標記行之首次出現推導，不手寫 sha（tests/governance/_todofmt_anchor.py）",
+      "hook 與 gate.sh 之 legacy 字面清單由 L 樹生成，測試斷言與 L 樹之符合路徑集合相等",
+      "「逐字不變」一律 L 對 X（X＝W 或工作樹），不擷取基準檔"
+    ],
+    "coverage_risk": [
+      "gov_check.sh 第 6 段全程不動（Task 1.1 邊界③）",
+      "template_check.sh 相對 L 恰新增一行轉呼叫（Task 0.2）",
+      "gate.sh 之 legacy --todo 分支呼叫字面不變（Task 1.3）",
+      "既有散文 TODO 之內容 L 對 X 逐位元組相等、生成區塊除外（Task 1.2 邊界⑱）",
+      "L 之 hook 清單為 X 之子集（Task 1.2 覆蓋風險）",
+      "審查強度四項不變式之片段存於現行憲法檔且次數不減（Task 2.2）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {"item": "stub_modules", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "不得引入分鐘級以上之檢查", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "不得動 pre-push", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"}
+    ]
+  }
+}

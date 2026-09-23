@@ -156,9 +156,12 @@ def test_mutation_dropping_tests_api_from_selection_turns_red(tmp_path: Path, mo
     src = ENTRY.read_text(encoding="utf-8")
     anchor_txt = "for d in tests/momentum tests/api tests/feature_engineering; do"
     assert src.count(anchor_txt) == 1
+    probes = {"tests/api/test_a.py": _HOLLOW}
+    # 前提：同佈局之未改壞複本會列出該探針（排除「入口因別的理由不輸出」之假綠）
+    rc0, names0, out0 = _run_entry(_mini_repo(tmp_path / "orig", probes))
+    assert names0 == {"tests/api/test_a.py::test_mutation_hollow"}, out0
     mutant = tmp_path / "mutant_entry.sh"
     mutant.write_text(src.replace(anchor_txt, "for d in tests/momentum tests/feature_engineering; do"), encoding="utf-8")
     monkeypatch.setattr(sys.modules[__name__], "ENTRY", mutant)
-    root = _mini_repo(tmp_path, {"tests/api/test_a.py": _HOLLOW})
-    rc, names, out = _run_entry(root)
-    assert names == set(), f"mutation 未生效：{out}"
+    rc, names, out = _run_entry(_mini_repo(tmp_path / "mut", probes))
+    assert rc == 0 and names == set(), f"mutation 未生效或入口異常：{out}"

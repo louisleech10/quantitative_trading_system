@@ -77,6 +77,26 @@ def test_boundary_03b_skip_detected_even_when_output_follows_summary(tmp_path: P
     assert r.returncode != 0 and "skipped" in r.stdout, r.stdout
 
 
+def test_boundary_03c_test_id_text_is_not_misread_as_skip_count(tmp_path: Path) -> None:
+    """b3 主委實跑：參數化測試名「a − skipped」於輸出中轉義為「\\u2212 skipped」，不得被當成 skip 計數。"""
+    d = tmp_path / "suite2"
+    d.mkdir()
+    (d / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+    (d / "test_p.py").write_text(
+        "import pytest\n\n@pytest.mark.parametrize('x', ['a − skipped'])\ndef test_a(x):\n    assert x\n",
+        encoding="utf-8",
+    )
+    item = f"venv/bin/python -m pytest -v -p no:cacheprovider -c {d}/pytest.ini --rootdir {d} {d}/test_p.py"
+    r = _run("--items-file", str(_items(tmp_path, [item])))
+    assert r.returncode == 0, r.stdout
+
+
+def test_boundary_03d_missing_pytest_summary_fails_closed(tmp_path: Path) -> None:
+    """pytest 項若輸出中找不到結果摘要行，不得當作通過。"""
+    r = _run("--items-file", str(_items(tmp_path, ["venv/bin/python -m pytest --version"])))
+    assert r.returncode != 0 and "找不到 pytest 結果摘要行" in r.stdout, r.stdout
+
+
 def test_boundary_04_xfail_counts_as_failure(tmp_path: Path) -> None:
     item = _pytest_item(tmp_path, "test_x.py", "import pytest\n\n@pytest.mark.xfail\ndef test_a():\n    assert 0\n")
     r = _run("--items-file", str(_items(tmp_path, [item])))

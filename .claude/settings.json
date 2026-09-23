@@ -132,6 +132,15 @@
             "command": "bash scripts/live_doc_write_guard.sh"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/todofmt_write_guard.sh"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [

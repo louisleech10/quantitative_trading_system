@@ -387,7 +387,7 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
 | `stub_modules` | 非空（FF completeness producer） | 有值 |
 | `test_files` | 非空（決策檔四情況＋mutation） | 有值 |
 | `script_acceptance` | 空 | 不驗 |
-| `contract_jsons` | 指向既有 FF 契約 | 有值 |
+| `contract_jsons` | 空，以 `not_executable` 宣告（實作期實查：FF 無既有 completeness 契約 JSON，`momentum/FeatureEngineering` 下之 JSON 只有 `_resources/max_nan_ratio.json`） | 驗空類宣告 |
 | `spec_path` | `docs/FFDEFECT_DECISION.md`（見上） | 有值 |
 | `run_receipts` | 空（實作前無收據） | 不驗 |
 | `batch_card.depends` | 空（單批） | 不驗 |
@@ -405,7 +405,7 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
 | （契約外）golden 重簽 | — | **不涵蓋**（阻擋項 `RM-FFNAME`） |
 | （契約外）前端落點（`frontend/`） | — | **不涵蓋** |
 - **不可做**：不得實作 FF-TFMETA（本票只產其 manifest）；不得為了讓 manifest 通過而放寬契約值域。
-- **邊界**：① `stub_modules` 非空（FF-TFMETA 有生產模組） ② `contract_jsons` 指向既有 FF 契約 ③ `batch_card.callers_now` 為空而 `callers_later` 非空（EVENTSCAN 為後續消費者） ④ `coverage_risk` 含「既有 18 個 run 之 metadata 不得改寫」 ⑤ `lifecycle` 值合法 ⑥ 四情況各有具名測試。
+- **邊界**：① `stub_modules` 非空（FF-TFMETA 有生產模組） ② `contract_jsons` 指向既有 FF 契約；無既有契約時為空並以 `not_executable` 宣告此類（實作期實查為後者） ③ `batch_card.callers_now` 為空而 `callers_later` 非空（EVENTSCAN 為後續消費者） ④ `coverage_risk` 含「既有 18 個 run 之 metadata 不得改寫」 ⑤ `lifecycle` 值合法 ⑥ 四情況各有具名測試。
 - **驗證**：`tests/governance/test_todofmt_sample_fftfmeta.py`：對本 Task 全部邊界各一具名測試；該 manifest 通過 `template_check.sh todofmt`（rc=0）；`test_mutation_*` 一支。
   🔴 **經 `gate.sh` 路由之斷言在本測試檔內，不在聚合器**（r7 codex／grok 同判：`gate.sh --todo` 非合法 top-level 命令，rc=1 於 kind 檢查；補成 `dispatch` 又在讀 manifest 前因未清債 rc=1，且 rc=0 之意義是已發 token 而非 manifest 合法）：
   以既有治理測試之隔離（`GATE_DIR_OVERRIDE` 指向 tmp、`GOVERNANCE_TEST_HARNESS=1`、conftest 之債務隔離；比照 `tests/governance/test_gate_impl_dispatch.py`）執行非 impl 之 `gate.sh dispatch --todo docs/manifests/FFTFMETA.json`（不帶 `--spec`，其餘必填旗標以固定值給足），斷言 rc=0 且 stdout 含 todofmt 路徑之通過句；token 只落於 tmp。
@@ -470,11 +470,12 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
 
 **實測耗時回填欄**（實作時以 receipt 覆寫下列 `PENDING-MEASURE`；收案前仍為該字面即 FAIL）：
 
-- `template_check.sh todofmt`：`PENDING-MEASURE`
-- 產出端 hook（Task 1.2）：`PENDING-MEASURE`
-- mutation 靜態擴覆蓋（Task 1.1）：`PENDING-MEASURE`（參考基準：26 檔實測 0 秒）
-- 收案聚合入口（Task 3.3）：`PENDING-MEASURE`（僅收案判定時執行一次）
-- 窗口檢查與 W 之判定（§P「生效之判定」）：`PENDING-MEASURE`（參考：r9 codex 實跑 `.claude/settings.json` 之 29 個歷史版本逐一 `jq` 共 448 毫秒）
+- `template_check.sh todofmt`：**0.11 秒**（`time` real；以 `docs/manifests/TODOFMT.json`，2026-09-23 主委實跑）
+- 產出端 hook（Task 1.2）：**0.02 秒**（`time` real；擋下之情形，2026-09-23 主委實跑）
+- mutation 靜態擴覆蓋（Task 1.1）：**1.71 秒**（`bash scripts/mutation_scope_static.sh`，量化 26 檔＋治理層；2026-09-23 主委實跑）
+- 收案聚合入口（Task 3.3）：**41.9 秒**（12 項；僅收案判定時執行一次；2026-09-23 主委實跑）
+- 窗口檢查與 W 之判定（§P「生效之判定」）：**0.30 秒**（W 尚未存在時之 L..HEAD 全走一遍；2026-09-23 主委實跑；另參考 r9 codex 實跑 `.claude/settings.json` 之 29 個歷史版本逐一 `jq` 共 448 毫秒）
+- 以上五項皆已自 `PENDING-MEASURE` 回填為實測值。
 
 ---
 

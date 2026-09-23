@@ -6,7 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
-| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1（同一根因：聚合器只看 pytest 輸出末三行會漏判 skip）與 2 條 P3 已修。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝b2 審碼 r2（原提出方確認閉合）→ b3＝W→ b3＝W（Task 1.2／1.3／1.4／3.1／3.2＋掛載） → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
+| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1 與 2 條 P3 已修、r2 三家確認閉合，**b2 收批**。**b3＝W 已提交**（Task 1.2 hook 掛載、Task 1.3／1.4 gate.sh 路由與新 SPEC 須 manifest、Task 3.1／3.2 兩份樣本；新規則自此生效）；收案聚合器 12 項 rc=0（41.9 秒）。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝b3 三家審碼 → 收案→ b3＝W（Task 1.2／1.3／1.4／3.1／3.2＋掛載） → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -25,7 +25,7 @@
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。復工條件＝流程改法裁決後，依新停輪條件重定本票續審形狀 |
-| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1（同一根因：聚合器只看 pytest 輸出末三行會漏判 skip）與 2 條 P3 已修。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝b2 審碼 r2（原提出方確認閉合）→ b3＝W→ b3＝W（Task 1.2／1.3／1.4／3.1／3.2＋掛載） → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
+| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1 與 2 條 P3 已修、r2 三家確認閉合，**b2 收批**。**b3＝W 已提交**（Task 1.2 hook 掛載、Task 1.3／1.4 gate.sh 路由與新 SPEC 須 manifest、Task 3.1／3.2 兩份樣本；新規則自此生效）；收案聚合器 12 項 rc=0（41.9 秒）。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝b3 三家審碼 → 收案→ b3＝W（Task 1.2／1.3／1.4／3.1／3.2＋掛載） → 三家 code review → 收案（聚合器 rc=0）→ 白話說明 |
 | 04-005 | HP-PROCOPT | 待審 | docs/PROCOPT_DECISION.md | 診斷完成（r1→r2→r3）。使用者後續裁定：**先完成 TODO 優化**（見 HP-TODOFMT），其餘改法待 TODOFMT 完工後再議。r3 之四步改法經使用者逐條質詢後大多撤回或降級，現存狀態見 白話說明/SPEC與TODO流程優化.md。**未實施任何流程改動** |
 | 04-006 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
 <!-- END GENERATED: handoff-todo -->
@@ -134,6 +134,11 @@
 - 🔴 **`spec_xref_hook` 對 HEAD 比對，會把本次已刪之 token 一路累列**：真要修的是「被刪之專名仍被別處引用」；通用詞可在新段落如實提及以消警。
 - 🔴 **收斂檔機械附 finding body 時，某家來源只有一條 finding ⇒ 迴圈會算出 `head -n 0`，macOS 視為非法參數**：以 `if [ "$last" -gt 1 ]` 包住該分支。
 - 🔴 **`handoffs/` 整個被 `.git/info/exclude` 排除，從不入 git**（收斂檔、委員產出、brief 皆然）：任何以「某 handoffs 檔之 git 歷史」為錨點的設計（例：「引入收斂檔之 commit」）恆查無。要用 git 歷史當錨點，錨點必須落在追蹤檔（如 `docs/`、`tests/`、`scripts/`）。2026-09-23 TODOFMT r7 修補時犯過一次，派 r8 前自查實跑 0 行才抓到。
+- 🔴 **Bash 工具跑的是 zsh：未加引號之 `$VAR` 不斷字**，整串多行被當成一個參數（例：把檔案清單丟給 `mutation_probe_static.py` 會只收到一個怪參數）。清單一律 `tr '\n' '\0' | xargs -0 …`。
+- 🔴 **macOS 預設 bash 3.2：`$( … )` 內含 `case … in x) …` 會解析錯誤**；把含 `case` 之邏輯抽成函式再 `$(fn)`。`set -u` 下空陣列展開亦會報 unbound，腳本改用換行字串累積。
+- 🔴 **mutation 探針把腳本複本放到 tmp 時，須一併複製它開頭 source 之相依檔**（例：`gate.sh` 開頭 source `governance_families.sh`／`.json`），否則複本早退、探針「因別的理由」而紅或綠（TODOFMT b3 自查：兩支探針因此假綠）。探針一律先以**同佈局之未改壞複本**斷言前提，再比改壞後之結果與原因。
+- 🔴 **改 `scripts/gate.sh` 等被 `fact_keys.json` 以行號引用之檔時，插入行會使引用落到註解**：`factkey_write_guard` 會報「行號落在註解」；依報告之「最近可執行碼」找回原語句之新行號後更新引用（TODOFMT b3：E-022／E-023 由 `:973` 改 `:1146`）。
+- 🔴 **委員收尾會清 `/tmp`，連帶刪掉主委寫在 `/tmp` 之 log**（例：`committee_run` 之 `> /tmp/cr9.log` 事後不存在）：派工與測試之 log 一律寫 scratchpad。
 - 🔴 **`data_cache/features/ETHUSDT/1h/` 下有三個外觀相似的 FF run，其中兩個不可用**：`4a8a0b37…`（fracdiff 已轉換）、`654bd63b…`（漏全部 12h 欄，542 group 全 1h）。可用者為 `d9935491…`（944 group＝1h 542＋12h 402、418,719 欄、20,352 列、六項預處理全 false）。⇒ 引用 reference run 一律先核對 `config_hash`，不靠目錄時間排序。
 
 ## 進行中紀錄

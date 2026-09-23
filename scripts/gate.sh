@@ -9,6 +9,8 @@
 #   bash scripts/gate.sh artifact --file docs/X_SPEC.md \
 #        --template-opened templates/SPEC_TEMPLATE.md --sections "§G Golden 狀態=filled; §0.A=N/A:..."
 #   bash scripts/gate.sh register-output <task-id> <handoffs/path.md>
+#   bash scripts/gate.sh todofmt-route [--spec X] [--todo Y] [--impl-self] [--legacy-spec-list F]
+#        # TODOFMT Task 1.3／1.4 判定之測試入口：只跑判定、不發 token、不寫 audit；--legacy-spec-list 只此入口收
 #
 # 誠實邊界：不驗證填入內容為真，只強制「必填有內容」+ 對可機檢項做真實檢查
 #   （高風險派工的 --adversarial 檔須存在；artifact 的 --template-opened 檔須存在），其餘記入審計供稽核。
@@ -70,11 +72,181 @@ EOF
 }
 
 kind="${1:-}"; shift || true
-[ "${kind}" = "dispatch" ] || [ "${kind}" = "artifact" ] || [ "${kind}" = "register-output" ] || {
+[ "${kind}" = "dispatch" ] || [ "${kind}" = "artifact" ] || [ "${kind}" = "register-output" ] || [ "${kind}" = "todofmt-route" ] || {
   echo "ERROR: kind 必須是 dispatch|artifact|register-output"
   _print_usage
   exit 1
 }
+
+# ── TODOFMT Task 1.3／1.4：--todo 判型路由與新 SPEC 須 manifest（docs/TODOFMT_SPEC.md；於 W 起生效）──────────
+# BEGIN TODOFMT LEGACY SPEC LIST（L 樹中 docs/ 下任一層 *_SPEC*.md，casefold；由 tests/governance/_todofmt_anchor.py 生成，勿手改）
+_TODOFMT_LEGACY_SPECS='
+docs/api_specification.md
+docs/archived/factor_research_pipeline_spec.md
+docs/archived/feature_factory_optimization_spec.md
+docs/archived/feature_optimization_spec.md
+docs/archived/optimization_formula_spec.md
+docs/archived/phase3_lightgbm_xgboost_spec.md
+docs/b7_l65_parallel_spec.md
+docs/convergence_method_spec.md
+docs/decouple_allowlist_spec.md
+docs/decouple_fix4_spec.md
+docs/decouple_p3_spec.md
+docs/decouple_scan2_spec.md
+docs/docrot2_spec.md
+docs/docsimplify_batcha_spec.md
+docs/docsimplify_batchb_spec.md
+docs/eventscan_spec.md
+docs/evtlabel_spec.md
+docs/evtwarmup_spec.md
+docs/ff_deepaudit_p0_spec.md
+docs/ffdstar_spec.md
+docs/fracdiff_maxlag_spec.md
+docs/g7fix_spec.md
+docs/gap1_strategy_overfit_spec.md
+docs/gap2_marginal_ic_spec.md
+docs/gap3_event_alignment_spec.md
+docs/gap3_event_disclosure_spec.md
+docs/gap3_event_spec.md
+docs/gap3_event_spec_amendments.md
+docs/gap3_event_ux_spec.d-001.md
+docs/gap3_event_ux_spec.d-002.md
+docs/gap3_event_ux_spec.md
+docs/gap3_scan_cube_spec.md
+docs/gov_b49_path_grant_spec.md
+docs/gov_b49_unfreeze_window_spec.md
+docs/gov_dispatch_flow_fix_spec.md
+docs/gov_gatechain_spec.md
+docs/gov_o3ext_r7_spec.md
+docs/govb0_b3r_lexer_spec.md
+docs/govb0_friction_spec.md
+docs/govb1_input_quality_spec.md
+docs/govb25_status_factkey_spec.md
+docs/govb37_friction_tally_spec.md
+docs/govb39_idlike_heading_spec.md
+docs/governance_harness_p0_spec.md
+docs/ic1c_netic_spec.md
+docs/ic1cfr_full_spec.md
+docs/ic1cfr_stopgap_spec.md
+docs/ic1d_attribution_spec.md
+docs/ic_healthcheck_spec.md
+docs/ic_la0_spec.md
+docs/ic_la1_spec.md
+docs/ic_la2_spec.md
+docs/ic_phase0_spec.md
+docs/ic_phase1_1a_align_spec.md
+docs/ic_phase1_1a_cut1_spec.md
+docs/ic_phase1_1a_cut2_rowindex_spec.md
+docs/ic_phase1_1a_cut2_xsectional_spec.md
+docs/ic_phase1_1e1b_signif_spec.md
+docs/ic_phase1_contract_spec.md
+docs/ic_run_selector_spec.md
+docs/icresult_paging_spec.md
+docs/instrev_phasea_spec.md
+docs/instrev_phaseb_spec.md
+docs/p16_committee_debt_spec.d-001.md
+docs/p16_committee_debt_spec.md
+docs/p2debt_t1_govfix_spec.md
+docs/p2debt_t2_dcredirect_spec.md
+docs/p2debt_t3_tscfix_spec.md
+docs/plaindocs_spec.md
+docs/redispatch_spec.md
+docs/search2event_spec.md
+docs/splitunify_spec.d-001.md
+docs/splitunify_spec.d-002.md
+docs/splitunify_spec.md
+docs/template_gate_fix_spec.md
+docs/tfwindow_spec.md
+docs/todofmt_spec.md
+docs/verdictgate_spec.md
+docs/verify_gate_spec.md
+docs/verify_gate_spec_plain.md
+docs/verify_gate_spec_plain_codex.md
+docs/verify_gate_spec_plain_composer.md
+'
+# END TODOFMT LEGACY SPEC LIST
+
+# 正規化（SPEC Task 1.2 步驟 1／Task 1.4 步驟 4）：剝 repo 根前綴（casefold 比對）、剝 ./、整串 casefold
+_todofmt_norm() {
+  _tn_p="$1"
+  _tn_l="$(printf '%s' "${_tn_p}" | tr '[:upper:]' '[:lower:]')"
+  _tn_r="$(printf '%s' "${REPO_ROOT}" | tr '[:upper:]' '[:lower:]')"
+  case "${_tn_l}" in "${_tn_r}/"*) _tn_l="${_tn_l:$(( ${#REPO_ROOT} + 1 ))}" ;; esac
+  while :; do case "${_tn_l}" in ./*) _tn_l="${_tn_l#./}" ;; *) break ;; esac; done
+  printf '%s' "${_tn_l}"
+}
+
+# Task 1.3：--todo 之機械判型（只看 casefold 後副檔名與 JSON 頂層鍵，不做內容嗅探）→ legacy｜todofmt｜reject
+_todofmt_todo_kind() {
+  _tk_l="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "${_tk_l}" in
+    *.md) echo legacy ;;
+    *.json)
+      if jq -e 'type=="object" and has("stub_modules")' "$1" >/dev/null 2>&1; then echo todofmt; else echo reject; fi ;;
+    *) echo reject ;;
+  esac
+}
+
+# Task 1.3／1.4 之判定（同一函式：生產呼叫不傳清單即用上方字面；測試以 todofmt-route 傳入清單）
+#   參數：<spec> <todo> <impl_self 0|1> <todo_count> [<既有 SPEC 清單字串>]；rc 0＝放行／1＝擋（原因印 stdout）
+_todofmt_route_check() {
+  _rc_spec="$1"; _rc_todo="$2"; _rc_impl="$3"; _rc_cnt="$4"; _rc_list="${5-${_TODOFMT_LEGACY_SPECS}}"
+  if [ "${_rc_cnt}" -gt 1 ]; then
+    echo "TODOFMT 拒：--todo 重複給定（同一次呼叫只准一個 TODO／manifest）"; return 1
+  fi
+  _rc_kind=""
+  if [ -n "${_rc_todo}" ]; then
+    _rc_kind="$(_todofmt_todo_kind "${_rc_todo}")"
+    if [ "${_rc_kind}" = "reject" ]; then
+      echo "TODOFMT 拒：--todo 判型失敗；合法形式僅兩種：散文 TODO（.md，設計定案前已存在者）或 manifest（.json 且頂層含 stub_modules）：${_rc_todo}"
+      return 1
+    fi
+  fi
+  if [ -n "${_rc_spec}" ] || [ "${_rc_impl}" = "1" ]; then
+    if [ -z "${_rc_spec}" ]; then
+      echo "TODOFMT 拒：--impl-self 須同時給 --spec（impl 許可必須綁定 SPEC 與合法 manifest）"; return 1
+    fi
+    _rc_ns="$(_todofmt_norm "${_rc_spec}")"
+    if printf '%s\n' "${_rc_list}" | grep -Fxq -- "${_rc_ns}"; then
+      return 0   # 既有 SPEC（設計定案時已存在）：C-6 不溯及既往
+    fi
+    if [ -z "${_rc_todo}" ]; then
+      echo "TODOFMT 拒：新 SPEC 須以 --todo 給五類落點 manifest（docs/manifests/<EPIC>.json）；生成指引見 templates/TODO_GENERATION_PROMPT.md"
+      return 1
+    fi
+    if [ "${_rc_kind}" != "todofmt" ]; then
+      echo "TODOFMT 拒：新 SPEC 不得配散文 TODO；改以 manifest（docs/manifests/<EPIC>.json）"; return 1
+    fi
+    _rc_sp="$(jq -r '.spec_path // ""' "${_rc_todo}" 2>/dev/null)"
+    if [ "$(_todofmt_norm "${_rc_sp}")" != "${_rc_ns}" ]; then
+      echo "TODOFMT 拒：manifest 之 spec_path（${_rc_sp}）與 --spec（${_rc_spec}）不等"; return 1
+    fi
+  fi
+  return 0
+}
+
+# 測試入口（不發 token、不寫 audit）：bash scripts/gate.sh todofmt-route [--spec X] [--todo Y] [--impl-self] [--legacy-spec-list 檔]
+if [ "${kind}" = "todofmt-route" ]; then
+  _tr_spec=""; _tr_todo=""; _tr_impl=0; _tr_cnt=0; _tr_list_file=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --spec) _tr_spec="${2:-}"; shift 2 ;;
+      --todo) _tr_todo="${2:-}"; _tr_cnt=$((_tr_cnt + 1)); shift 2 ;;
+      --impl-self) _tr_impl=1; shift ;;
+      --legacy-spec-list) _tr_list_file="${2:-}"; shift 2 ;;
+      *) echo "ERROR: todofmt-route 未預期參數 $1"; exit 2 ;;
+    esac
+  done
+  if [ -n "${_tr_list_file}" ]; then
+    [ -f "${_tr_list_file}" ] || { echo "ERROR: --legacy-spec-list 檔不存在"; exit 2; }
+    _todofmt_route_check "${_tr_spec}" "${_tr_todo}" "${_tr_impl}" "${_tr_cnt}" "$(cat "${_tr_list_file}")"
+  else
+    _todofmt_route_check "${_tr_spec}" "${_tr_todo}" "${_tr_impl}" "${_tr_cnt}"
+  fi
+  _tr_rc=$?
+  [ "${_tr_rc}" -eq 0 ] && echo "TODOFMT ROUTE PASS"
+  exit "${_tr_rc}"
+fi
 
 intent=""; risk=""; facts_asked=""; review_role=""; template=""; adversarial=""
 reconcile=""
@@ -82,6 +254,7 @@ task_id=""; output_path=""
 file=""; template_opened=""; sections=""; spec=""; todo=""; manifest=""
 # `--spec` 出現次數〔`CODEX-R1-P1-01`〕：只看值非空不夠，須知道旗標**有沒有被給**。
 spec_count=0
+todo_count=0   # TODOFMT Task 1.3：--todo 重複給定即拒
 brief=""
 impl_self=0   # VERDICTGATE Task 3.1
 
@@ -357,7 +530,7 @@ while [ $# -gt 0 ]; do
     --template-opened) template_opened="${2:-}"; shift 2 ;;
     --sections)        sections="${2:-}"; shift 2 ;;
     --spec)            spec="${2:-}"; spec_count=$((spec_count + 1)); shift 2 ;;
-    --todo)            todo="${2:-}"; shift 2 ;;
+    --todo)            todo="${2:-}"; todo_count=$((todo_count + 1)); shift 2 ;;
     --manifest)        manifest="${2:-}"; shift 2 ;;
     --brief)           brief="${2:-}"; shift 2 ;;
     --impl-self)       impl_self=1; shift ;;   # VERDICTGATE Task 3.1：主委自任實作領權限（走同一條 dispatch 路徑，C-6）
@@ -1001,10 +1174,17 @@ print((m.group("root")+" "+m.group("n")) if m else "")')"
     # coverage_check 比對 manifest 項是否都在文件裡，與 kind 無關，兩種都跑
     [ -n "${manifest}" ] && { bash scripts/coverage_check.sh "${manifest}" "${spec}" || { echo "ERROR: SPEC 漏 manifest 項（見上），拒發 token。"; exit 1; }; }
   fi
+  # TODOFMT Task 1.3／1.4：判型路由與新 SPEC 須 manifest（判定函式見檔頭 TODOFMT 區塊；--manifest 不計入）
+  _todofmt_route_check "${spec}" "${todo}" "${impl_self:-0}" "${todo_count}" \
+    || { echo "GATE 拒發 token — TODOFMT（見上）"; exit 1; }
   if [ -n "${todo}" ]; then
+    if [ "$(_todofmt_todo_kind "${todo}")" = "todofmt" ]; then
+      bash scripts/template_check.sh todofmt "${todo}" || { echo "ERROR: TODO manifest 未過 todofmt 機檢（見上），拒發 token。"; exit 1; }
+    else
     # 🔴 同上：只驗範本錨點；ASSERT 預設不執行。理由見上一處註解。
     bash scripts/template_check.sh todo "${todo}" || { echo "ERROR: TODO 未過範本機檢（見上），拒發 token。"; exit 1; }
     [ -n "${manifest}" ] && { bash scripts/coverage_check.sh "${manifest}" "${todo}" || { echo "ERROR: TODO 漏 manifest 項（見上），拒發 token。"; exit 1; }; }
+    fi
   fi
   if [ -z "${missing}" ] && [ -n "${task_id}" ]; then
     if [ "${risk}" != "high" ] || [ -z "${adversarial}" ] || [ ! -f "${adversarial}" ]; then

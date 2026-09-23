@@ -171,7 +171,12 @@ def test_mutation_removing_exec_breaks_equivalence(tmp_path: Path, monkeypatch: 
     m["batch_card"]["touches"] = ["tests/t.py"]
     mf = _write(tmp_path, "m.json", m)
     direct = subprocess.run(["bash", str(scripts / "todofmt_check.sh"), str(mf)], capture_output=True, text=True, check=False)
+    assert direct.returncode == 0, direct.stdout
+    # 前提：同佈局之未改壞複本與檢查器等價（排除「因別的理由而不等」之假綠）
+    (scripts / "template_check_orig.sh").write_text(src, encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "TEMPLATE_CHECK", scripts / "template_check_orig.sh")
+    orig = _tc(mf)
+    assert (orig.returncode, orig.stdout) == (direct.returncode, direct.stdout), orig.stdout + orig.stderr
     monkeypatch.setattr(sys.modules[__name__], "TEMPLATE_CHECK", scripts / "template_check.sh")
     via = _tc(mf)
-    assert direct.returncode == 0, direct.stdout
     assert (via.returncode, via.stdout) != (direct.returncode, direct.stdout), "移除 exec 後仍等價 ⇒ 邊界⑧ 無鑑別力"

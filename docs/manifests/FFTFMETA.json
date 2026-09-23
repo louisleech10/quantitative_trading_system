@@ -1,0 +1,58 @@
+{
+  "stub_modules": [
+    "momentum/FeatureEngineering/timeframe/multi_tf_generator.py"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_failopen_manifest.py"
+  ],
+  "script_acceptance": [],
+  "contract_jsons": [],
+  "spec_path": "docs/FFDEFECT_DECISION.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "run_receipts": [],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/FeatureEngineering/feature_factory.py",
+      "api/services/feature_factory_service.py"
+    ],
+    "callers_now": [],
+    "callers_later": [
+      "momentum/Analysis/event_samples/condition_engine.py"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_failopen_manifest.py",
+    "forbidden": [
+      {"rule": "不得在 storage 端由 primary tf 猜多週期集合", "observable": false},
+      {"rule": "不得在 manifest 寫完後只 patch metadata", "observable": false}
+    ],
+    "risk_mitigation": [
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py ← 決策檔 B-2／B-4（canonical completeness object 由 MultiTF producer 形成）← grep -n '_present_timeframes\\|_apply_failed_timeframe_metadata' momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/FeatureEngineering/feature_storage.py ← 決策檔 B-2（build_completeness_meta_from_layer_results 只收純量）← grep -n 'def build_completeness_meta_from_layer_results' momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/feature_factory.py ← 決策檔 B-2（呼叫端傳 primary timeframe）← grep -n 'build_completeness_meta' momentum/FeatureEngineering/feature_factory.py",
+      "api/services/feature_factory_service.py ← 決策檔 B-2（task_record 寫入 present_timeframes）← grep -n 'present_timeframes' api/services/feature_factory_service.py",
+      "tests/feature_engineering/test_failopen_manifest.py ← 既有 completeness 欄位測試之所在 ← grep -n 'def test_completeness_fields' tests/feature_engineering/test_failopen_manifest.py",
+      "momentum/Analysis/event_samples/condition_engine.py ← EVENTSCAN 為首個真實消費者（決策檔 B-3）← grep -n 'present_timeframes' docs/EVENTSCAN_SPEC.md",
+      "contract_jsons 為空 ← FF 無既有 completeness 契約 JSON ← find momentum/FeatureEngineering -name '*.json'（只得 _resources/max_nan_ratio.json）"
+    ],
+    "coverage_risk": [
+      "情況「健康多 TF」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_healthy_multi_tf",
+      "情況「skip」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_skipped_tf",
+      "情況「failed」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_failed_tf",
+      "情況「單 TF」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_single_tf",
+      "等式「expected = ordered(training_tfs)」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_expected_is_ordered_training_tfs",
+      "等式「present = expected − skipped/failed」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_present_excludes_skipped_failed",
+      "等式「failed ⊆ expected」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_failed_subset_of_expected",
+      "等式「expected = present ∪ failed」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_expected_is_present_union_failed",
+      "等式「complete 時 failed = [] 且 present == expected」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_complete_invariant",
+      "既有 18 個 run 之 metadata 不得改寫（只對新 run 生效；決策檔 B-4 相容性）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {"item": "contract_jsons", "reason": "needs-research", "owner": "FF-TFMETA", "expiry": "2099-12-31"},
+      {"item": "不得在 storage 端由 primary tf 猜多週期集合", "reason": "needs-research", "owner": "FF-TFMETA", "expiry": "2099-12-31"},
+      {"item": "不得在 manifest 寫完後只 patch metadata", "reason": "needs-research", "owner": "FF-TFMETA", "expiry": "2099-12-31"}
+    ]
+  }
+}
