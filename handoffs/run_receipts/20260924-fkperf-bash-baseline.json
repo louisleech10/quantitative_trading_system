@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "command": "handoffs/run_receipts/fkperf_probes/bash_baseline.py",
+  "exit_code": 0,
+  "rows": [
+    {
+      "scale": "1x",
+      "total_keys": 35,
+      "mode": "--check",
+      "spawns": 4610,
+      "top": {
+        "jq": 1492,
+        "tr": 954,
+        "wc": 912,
+        "grep": 590,
+        "sort": 501,
+        "awk": 100
+      }
+    },
+    {
+      "scale": "1x",
+      "total_keys": 35,
+      "mode": "emit",
+      "spawns": 664,
+      "top": {
+        "jq": 438,
+        "awk": 83,
+        "grep": 81,
+        "sort": 41,
+        "tr": 18,
+        "dirname": 2
+      }
+    },
+    {
+      "scale": "4x",
+      "total_keys": 140,
+      "mode": "--check",
+      "spawns": 16750,
+      "top": {
+        "jq": 4917,
+        "tr": 3684,
+        "wc": 3642,
+        "grep": 2165,
+        "sort": 1971,
+        "awk": 205
+      }
+    },
+    {
+      "scale": "4x",
+      "total_keys": 140,
+      "mode": "emit",
+      "spawns": 1609,
+      "top": {
+        "jq": 1068,
+        "awk": 188,
+        "grep": 186,
+        "sort": 146,
+        "tr": 18,
+        "dirname": 2
+      }
+    },
+    {
+      "scale": "10x",
+      "total_keys": 350,
+      "mode": "--check",
+      "spawns": 41056,
+      "top": {
+        "jq": 11793,
+        "tr": 9144,
+        "wc": 9102,
+        "grep": 5315,
+        "sort": 4911,
+        "awk": 415
+      }
+    },
+    {
+      "scale": "10x",
+      "total_keys": 350,
+      "mode": "emit",
+      "spawns": 3499,
+      "top": {
+        "jq": 2328,
+        "awk": 398,
+        "grep": 396,
+        "sort": 356,
+        "tr": 18,
+        "dirname": 2
+      }
+    }
+  ]
+}

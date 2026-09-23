@@ -66,6 +66,11 @@ def _case(case_id: str, args: Sequence[str], build: Callable[[Path], None], labe
         assert first is not None, f"{case_id}：成功分支須給 stdout 首行字面"
         return fo.Case(case_id, tuple(args), build, 0, first, **kw)
     assert label in cat, f"出口標籤 {label!r} 不在 oracle 出口清單（Task 0.1 須列舉之）"
+    if first is not None:
+        # 訊息含輸入之動態段（檔名、receipt 路徑）者，同一出口於不同輸入之首行不同：以本邊界之實跑字面為準，
+        # 並須與 catalog 值共用同一靜態前綴（至第一個動態段為止）
+        assert first.split("：")[0].split(":")[0] == cat[label].split("：")[0].split(":")[0], (first, cat[label])
+        return fo.Case(case_id, tuple(args), build, 1, first, **kw)
     return fo.Case(case_id, tuple(args), build, 1, cat[label], **kw)
 
 
@@ -100,7 +105,7 @@ def test_every_case_hits_its_expected_branch(tmp_path: Path) -> None:
             assert out.rc == case.expect_rc, case.case_id
             stream = out.stderr if case.expect_rc else out.stdout
             first = stream.decode("utf-8", "replace").splitlines()[0] if stream else ""
-            assert first == case.expect_first_line, (case.case_id, first)
+            assert first == fo.expected_first(case, oroot), (case.case_id, first)
 
 
 @pytest.mark.parametrize("kind", ["real", "sandbox", "exit", "key_order", "bytes"])
@@ -177,7 +182,7 @@ def _site_rules(src: List[str], n: int) -> Tuple[Set[str], Optional[str]]:
             return {"warning"}, s
         return ({"LABEL", "continuation"} if prev_open(n) else {"LABEL"}), s
     cont = (text.startswith("  ") or (n >= 2 and src[n - 2].rstrip().endswith("\\"))
-            or (re.search(r"printf\s+'\s*%s\\n'", t) and prev_open(n)))
+            or (re.search(r"printf\s+'\s*%s(\\n)?'", t) and prev_open(n)))
     return ({"LABEL", "continuation"} if cont else {"LABEL"}), s
 
 
@@ -190,7 +195,7 @@ def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
     之行（`>&2` 或 `_fk_die `），`exit_sites()` 須逐行歸類且合 `_site_rules`；出口首行不得歸為 continuation／helper，
     出口首行之標籤兩兩相異，且 `exit_catalog()[標籤]` 以該行靜態字面（至首個 `$`／`%` 為止）開頭；每個出口標籤至少一行。
     出口清單少列一個出口 ⇒ 該行不得為續行而又無標籤可用即紅（2026-09-23 主委以本規則實跑 oracle：187 行＝helper 1、
-    warning 2〔L1505、L1786，皆不退出〕、須標籤 145〔含 L791〕、可續行 39〔含 L792〕；r7 收緊後重跑，2026-09-24）。"""
+    warning 2〔L1505、L1786，皆不退出〕、tool_failure 24、須標籤 119〔含 L791〕、可續行 41〔含 L792、L1689、L1696〕；2026-09-24 實作時重跑）。"""
     import subprocess
     src = subprocess.run(["git", "-C", str(fo.REPO), "show", f"{fo.ORACLE_COMMIT}:scripts/gen_fact_key_blocks.sh"],
                          capture_output=True, text=True, check=True).stdout.splitlines()
@@ -328,14 +333,19 @@ def test_mutation_one_extra_byte_is_reported(tmp_path: Path, monkeypatch: pytest
 
 # ---------------------------------------------------------------- 邊界（Task 0.1）
 
+# b01-1 之 receipt 路徑為動態段，首行與 catalog（receipt 指向 __fkperf_missing__）不同：以實跑字面為準（2026-09-24 主委實跑）
+_B01_FIRST = {1: "gen_fact_key_blocks: key governance-mechanism 之 receipt 指向不存在之檔："
+                  "handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md → fail-closed（宣稱實跑但無物可查）"}
+
+
 def test_boundary_01_missing_dependency_both_fail_closed(tmp_path: Path) -> None:
     """Task 0.1 邊界①：沙箱缺 rows_source 來源、receipt 或 settings.json ⇒ 兩實作同樣 fail-closed。"""
     for i, (omit, label) in enumerate((
         (("scripts/governance_families.json",), "rows_source_missing"),
-        (("handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md",), "mechanism_receipt_missing"),
+        (("handoffs/reconcile/20260813-govwl03-x-consult-r1/synth.md",), "mechanism_receipt_missing"),  # 首行見下
         ((".claude/settings.json",), "enforcement_settings_missing"),
     )):
-        _assert_same(tmp_path / str(i), _case(f"b01-{i}", ["--check"], _tree(omit=omit), label))
+        _assert_same(tmp_path / str(i), _case(f"b01-{i}", ["--check"], _tree(omit=omit), label, first=_B01_FIRST.get(i)))
 
 
 def test_boundary_02_status_hits_line_with_tab_and_soh(tmp_path: Path) -> None:
@@ -394,7 +404,8 @@ def test_boundary_08_rows_differing_only_by_case_sort_like_oracle(tmp_path: Path
 
 def test_boundary_09_filename_with_newline(tmp_path: Path) -> None:
     """Task 2.1 邊界①：範圍內檔名含換行 ⇒ 與 oracle 同判。"""
-    _assert_same(tmp_path, _case("b09", ["--check"], _tree(_write("白話說明/a\nb.md", "WL-01 收案\n")), "handwritten_status"))
+    _assert_same(tmp_path, _case("b09", ["--check"], _tree(_write("白話說明/a\nb.md", "WL-01 收案\n")), "handwritten_status",
+                                 first="FACTKEY HANDWRITTEN STATUS: 白話說明/a<LF>b.md:1 識別碼=WL-01 狀態=收案"))
 
 
 def test_boundary_10_check_on_non_git_root(tmp_path: Path) -> None:
@@ -415,7 +426,8 @@ def test_boundary_12_multibyte_identifier_neighbours(tmp_path: Path) -> None:
         d["governance-worklist"]["rows"].append(["999", "WL-識別碼", "未開工", "FKPERF 探針"])
     doc = "前WL-識別碼後 未開工\n_WL-識別碼 未開工\nxWL-識別碼 未開工\n"
     _assert_same(tmp_path, _case("b12", ["--check"], _tree(_reg(add), _sync, _write("白話說明/mb.md", doc)),
-                                 "handwritten_status"))
+                                 "handwritten_status",
+                                 first="FACTKEY HANDWRITTEN STATUS: 白話說明/mb.md:1 識別碼=WL-識別碼 狀態=未開工"))
 
 
 # ---------------------------------------------------------------- 邊界（Task 3.1）

@@ -47,7 +47,9 @@
       "tests/governance/test_govb1_factkey_gen.py",
       "tests/governance/_fkperf_oracle.py",
       "tests/governance/_fkperf_spawn.py",
-      "tests/governance/_fkperf_opens.py"
+      "tests/governance/_fkperf_opens.py",
+      "tests/governance/_fkperf_corpus.py",
+      "handoffs/run_receipts/fkperf_probes/bash_baseline.py"
     ],
     "callers_now": [
       "scripts/factkey_write_guard.sh",
