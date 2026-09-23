@@ -20,7 +20,8 @@ RISK-HIT: b,c
   - FACT-RECEIPT: `grep -n '缺 jq\|without_jq\|shutil.which("jq")' tests/governance/test_govb1_factkey_*.py tests/governance/test_docrot2_*.py` → 印出空（無測試守「缺 jq」行為）（主委 實跑 2026-09-23）
   - FACT-RECEIPT: `prof_spawn.sh --check`／`guard`（三家各於隔離複本重跑）→ 印出 `4317`／`4322`～`4323`，與主委收據相同；`--check` 耗時 11.2～12.25s（codex／composer／grok 實跑 2026-09-23，見 r1 收斂檔）
   - FACT-RECEIPT: `grep -rno 'gen_fact_key_blocks\.sh:[0-9][0-9-]*' docs scripts tests` → 生產引用僅 `scripts/fact_keys.json` E-028 列之 `gen_fact_key_blocks.sh:1863`（生成至 `docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md` 與兩組 fixture）（主委 實跑 2026-09-23）
-- **待使用者確認**（白話審閱時出示；未確認前不得寫 TODO）：
+- **待確認：無**（原待確認之量測端點，已於 2026-09-23 白話審閱獲使用者確認，見下）
+- **白話審閱**：`白話說明/FKPERF規格審閱.md`；使用者 2026-09-23 逐問「量測點數字不同有什麼差異」「以後會越來越大、很多地方用到會不會拖慢」，經說明後回「ok」⇒ SPEC 定案、端點依下條：
   - 量測端點取總 fact-key 數 140 與 1400（35 之 4 倍與 40 倍，仍相差 10 倍、門檻仍 20 倍），不取使用者選項說明中之 1 倍與 10 倍——主委自查：每次呼叫之固定開銷約 0.1s（`python3` 啟動 0.022s、`ticket_universe.sh --check` 0.03s，另 git 與包裝層），1×／10× 直接相除會被稀釋，r2 反例之比例僅約 13.5 倍而漏抓；grok r3 以純內容夾具實測 4×／40× 同型反例純 CPU 52 倍、含固定開銷 31 倍，且冪次成長下不存在「1×／10× 會紅而 4×／40× 不紅」之情形（此改動為收緊，非放寬）。
   - FACT-RECEIPT: `bash scripts/ticket_universe.sh --check`（計時三次）→ 印出 `0.04s`、`0.03s`、`0.03s`；`python3 -c pass` → `0.022s`（主委 實跑 2026-09-23）
 - **已確認結果**：2026-09-23 使用者逐字（見下列兩則）
