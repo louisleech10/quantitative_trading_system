@@ -100,6 +100,7 @@
       {"item": "不得新增分鐘級以上之每次檢查，不得動 pre-push", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
       {"item": "Task 4.5 邊界①：既有 strict xfail（R-GOVTEST-1／3／4、R-G7-OFF-2）不得意外轉 XPASS——須跑全套 pytest tests/governance（小時級），收票前背景手動跑一次，不納入每次跑之驗收", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
       {"item": "Task 4.5 邊界②：restore_golden_inventory.sh 還原後工作區除本票檔外無殘留改動——屬全套跑後之收尾步驟，隨上一項手動執行並寫收據", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "oracle 內部子程序（jq／awk／mktemp）自身失敗之出口 23 處不建差分語料——字面合 test_fkperf_differential._TOOL_FAILURE 封閉集，歸類 tool_failure、數量釘 23", "reason": "blocked-by", "owner": "claude", "expiry": "2099-12-31"},
       {"item": "Task 0.2 驗證②：現行 bash 實作之 1×／4×／10× 外部程序數基準——切換後 bash 實作不存在，基準以 Phase 0 產出之收據留存，不做常駐測試", "reason": "blocked-by", "owner": "claude", "expiry": "2099-12-31"}
     ]
   }

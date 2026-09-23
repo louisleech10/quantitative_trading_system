@@ -124,11 +124,17 @@ def test_exit_catalog_equals_corpus_labels() -> None:
 
 _SITE_LIT = re.compile(r"""(?:echo|_fk_die)\s+"([^"]*)|printf\s+'([^']*)'""")
 _SITE_TERM = re.compile(r"return 1|exit [1-9]|_rc=1|_fk_die ")
+# oracle 內部工具（jq／awk／mktemp 子程序）自身失敗之出口：新實作不呼叫這些子程序（C-2 目標），無對應分支，
+# 不建差分語料（manifest not_executable 同名項）。封閉字面集；2026-09-24 主委對 oracle 實跑恰命中 23 行（測試釘此數）：
+# L213 216 218 221 234 256 419 691 695 706 1440 1496 1553 1587 1626 1706 1730 1754 1816 1842 1937 1954 1983 之首行。
+_TOOL_FAILURE = re.compile(r"jq 非零|jq 失敗|讀取[^→]*失敗|判定執行失敗|無法建立暫存目錄|無法寫暫存註冊表|物化寫入失敗"
+                           r"|無法解析 repo 根|GEN FAILED|驗證無法執行")
 
 
 def _site_rules(src: List[str], n: int) -> Tuple[Set[str], Optional[str]]:
     """oracle 第 n 行（寫 stderr 者）之允許歸類與其靜態訊息字面（r6 codex／grok P1-01）。
-    回傳 ({"helper"}|{"warning"}|{"LABEL"}|{"LABEL","continuation"}, 字面或 None)；LABEL＝須為 exit_catalog 之鍵。
+    回傳 ({"helper"}|{"warning"}|{"LABEL"}|{"LABEL","continuation"}|{"LABEL","tool_failure"}, 字面或 None)；LABEL＝須為 exit_catalog 之鍵。
+    - tool_failure：出口首行之字面合 `_TOOL_FAILURE` 封閉集（oracle 內部子程序失敗；不入 catalog、不建語料）。
     - helper：只准 `_fk_die()` 定義行。
     - 含 `_fk_die "` ⇒ LABEL。字面以 `gen_fact_key_blocks:`／`FACTKEY` 開頭者 ⇒ LABEL，唯上一物理行為未終止分支之
       stderr 行時亦可為 continuation（如 L792 接於 L791 之後；r7 grok P1-01）；字面不含 `fail-closed` 且同一分支
@@ -159,9 +165,12 @@ def _site_rules(src: List[str], n: int) -> Tuple[Set[str], Optional[str]]:
     if re.match(r"\s*_fk_die\(\)", t):
         return {"helper"}, s
     text = s or ""
+    head = '_fk_die "' in t or text.startswith(("gen_fact_key_blocks:", "FACTKEY"))
+    if head and _TOOL_FAILURE.search(text) and not prev_open(n):
+        return {"LABEL", "tool_failure"}, s
     if '_fk_die "' in t:
         return {"LABEL"}, s
-    if text.startswith(("gen_fact_key_blocks:", "FACTKEY")):
+    if head:
         if "fail-closed" not in text and not branch_exits(n):
             return {"warning"}, s
         return ({"LABEL", "continuation"} if prev_open(n) else {"LABEL"}), s
@@ -191,7 +200,7 @@ def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
     for n in sorted(lines):
         allowed, s = _site_rules(src, n)
         v = sites[n]
-        if v in ("helper", "warning", "continuation"):
+        if v in ("helper", "warning", "continuation", "tool_failure"):
             assert v in allowed, (n, v, sorted(allowed))
             continue
         assert "LABEL" in allowed and v in cat, (n, v)
@@ -200,6 +209,8 @@ def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
             label_lines[v] = n
         if s:
             assert cat[v].startswith(_static_prefix(s)), (n, v, cat[v], s)
+    tool_lines = [n for n in sorted(lines) if "tool_failure" in _site_rules(src, n)[0]]
+    assert len(tool_lines) == 23, tool_lines  # 封閉集之規模釘死：字面集擴張即紅
     assert set(cat) <= set(sites.values()), sorted(set(cat) - set(sites.values()))
 
 

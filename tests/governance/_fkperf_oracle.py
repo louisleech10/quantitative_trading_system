@@ -73,7 +73,8 @@ def exit_catalog() -> Dict[str, str]:
 
 def exit_sites() -> Dict[int, str]:
     """oracle 原始碼中每一條寫 stderr 之行（`>&2` 或 `_fk_die `）之行號 → 歸類：`exit_catalog()` 之出口標籤、
-    "continuation"（多行訊息之後續行）、"warning"（不退出之預警首行）或 "helper"（`_fk_die` 定義行）。逐行手寫歸類，
+    "continuation"（多行訊息之後續行）、"warning"（不退出之預警首行）、"tool_failure"（oracle 內部 jq／awk／mktemp
+    子程序自身失敗之出口，字面合測試之封閉集；新實作無對應分支，不入 catalog）或 "helper"（`_fk_die` 定義行）。逐行手寫歸類，
     須合 `test_fkperf_differential._site_rules` 之機械規則（出口首行不得為續行；r6 codex／grok P1-01），
     供出口清單之獨立完整性錨（`test_exit_sites_cover_every_stderr_line_of_oracle`）。"""
     raise NotImplementedError("FKPERF Task 0.1")
