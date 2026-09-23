@@ -198,6 +198,30 @@ def _normalize_registry_path(node: Any, prefixes: List[str]) -> None:
             _normalize_registry_path(item, prefixes)
 
 
+def registry_refs_problems(manifest: Dict[str, Any]) -> List[str]:
+    """`source_registry_manifest` 之每一處須指向本次 CGSA 工作根下**實際存在**之檔（r6 codex P2-01：同字面但檔已消失不得掩蓋）。"""
+    import os
+    problems: List[str] = []
+    prefixes = _work_dir_prefixes()
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == REGISTRY_MANIFEST_KEY and isinstance(value, str):
+                    if not any(value.startswith(pre + "/") for pre in prefixes):
+                        problems.append(f"不在本次工作根下：{value}")
+                    elif not os.path.isfile(value):
+                        problems.append(f"指向之檔不存在：{value}")
+                else:
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(manifest)
+    return problems
+
+
 def strip_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
     """去除 manifest 之允許變動路徑，並把 CGSA 工作目錄前綴換成定值。"""
     out = copy.deepcopy(manifest)
@@ -259,6 +283,8 @@ def fingerprint(artifacts: GenerationArtifacts) -> Dict[str, Any]:
         per_column = [[col, _column_fingerprint(table.column(col))] for col in table.column_names]
         groups[name] = _sha(canonical_json(per_column))  # 每群組＝逐欄（欄名序）四 hash 之摘要（SPEC v5 §G）
     manifest = artifacts.manifest
+    problems = registry_refs_problems(manifest)
+    assert problems == [], problems  # 位置正規化前先證 reference 真指向本次 run 之檔（r6 codex P2-01）
     features_root = str(artifacts.run_dir.parents[2])
     metadata = json.loads(canonical_json(artifacts.metadata).decode("utf-8").replace(features_root, ROOT_PLACEHOLDER))
     return {

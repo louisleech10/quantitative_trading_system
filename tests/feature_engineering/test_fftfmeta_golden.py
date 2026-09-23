@@ -51,6 +51,7 @@ def test_golden_multi_tf_features_unchanged_and_timeframes_canonical(tmp_path: P
         assert (m["expected_layers"], m["present_layers"], m["failed_layers"], m["failure_reasons"]) == (
             layers, layers, [], []), where
     assert fp["allowed"]["manifest"]["root"]["run_status"] == "complete"
+    assert fp["allowed"]["manifest"]["raw"]["run_status"] is None  # raw 無此鍵（§C 不新增；r6 codex P1-02）
     t = fp["allowed"]["task"]
     assert (t["expected_timeframes"], t["present_timeframes"], t["failed_timeframes"]) == (_MULTI, _MULTI, [])
     assert (t["quality_status"], t["run_status"]) == ("complete", "complete")
@@ -67,6 +68,7 @@ def test_golden_degraded_single_tf_manifest_matches_task_record(tmp_path: Path) 
     assert base["allowed"]["manifest"]["root"]["quality_status"] == "complete"  # 改前（缺陷）：manifest 未降級
     assert root["quality_status"] == root["run_status"] == "partial"
     assert raw["quality_status"] == "partial"
+    assert raw["run_status"] is None  # raw 無此鍵（§C 不新增；r6 codex P1-02）
     assert root["failure_reasons"] == task["failure_reasons"]
     assert any(r.startswith("nan_ratio=") and ">max_nan_ratio=0" in r for r in task["failure_reasons"])
     for key in ("quality_status", "failure_reasons", "quality_thresholds"):
@@ -100,6 +102,19 @@ def test_mutation_registry_reference_wrong_target_changes_digest(monkeypatch: py
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", "/tmp/work_a")
     assert digest(wrong_name) != digest(right)
     assert digest(wrong_run) != digest(right)
+
+
+def test_mutation_registry_reference_missing_file_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """r6 codex P2-01：同字面 reference 但指向之檔已消失 ⇒ 指紋前置檢查必報。"""
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "manifest.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work))
+    manifest = {"generation_metadata": {"source_registry_manifest": str(work / "manifest.json")}}
+    assert g.registry_refs_problems(manifest) == []
+    (work / "manifest.json").unlink()
+    assert g.registry_refs_problems(manifest) != []
+    assert g.registry_refs_problems({"x": {"source_registry_manifest": "/elsewhere/manifest.json"}}) != []
 
 
 def test_mutation_golden_compare_detects_single_group_change(monkeypatch: pytest.MonkeyPatch) -> None:

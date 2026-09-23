@@ -4,9 +4,16 @@ Pytest configuration file
 設定測試環境和 Python 路徑
 """
 
+import os
 import sys
 import importlib.util
+import tempfile
 from pathlib import Path
+
+# FF-TFMETA r6 codex P1-01：Numba `cache=True` 之編譯檔預設寫在原始碼旁之 `__pycache__`（含 30 個已追蹤之 .nbi），
+# 測試會把 repo 樹弄髒。快取位置於 numba 匯入、各 njit 裝飾當下即定，故須在本檔任何專案匯入之前設定（本檔為
+# pytest 最先載入者）；用系統 tmp 下固定目錄，跨 session 仍保溫。已由呼叫端指定者不覆寫。
+os.environ.setdefault("NUMBA_CACHE_DIR", str(Path(tempfile.gettempdir()) / "qts_numba_cache"))
 
 # P1-5(2026-07-24):治理守衛測試(tests/governance)自足,不需 api/numpy/momentum 等重依賴。
 # 為讓 CI 能用輕量環境(僅 pytest+pyyaml)跑治理測試,頂部重 import 缺依賴時容錯跳過:
