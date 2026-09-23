@@ -22,6 +22,12 @@
       "cmd": "bash handoffs/run_receipts/fkperf_probes/prof_spawn.sh guard",
       "rc": 0,
       "honest_bounds": "PATH shim 計數不計時；未含 bash 本身之子程序（r1 grok 另計 bash 後 4326）；耗時為負載平均約 3 下之單機實測"
+    },
+    {
+      "path": "handoffs/run_receipts/20260923-fkperf-todo-exit-probes.json",
+      "cmd": "python3 probe_exits{,2,3,4,5}.py＋probe_nan.sh（主委 scratchpad；以 git archive HEAD 建沙箱跑現行生成器）",
+      "rc": 0,
+      "honest_bounds": "以現行 bash 生成器（即 oracle 同版）實跑差分語料建法，未經 _fkperf_oracle helper（尚未實作）；b10 以 ROOT=. 經 env 指定之形未單獨實跑"
     }
   ],
   "batch_card": {

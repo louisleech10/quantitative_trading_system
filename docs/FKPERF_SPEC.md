@@ -1,6 +1,6 @@
 # FKPERF — fact-key 生成器：外部程序數與登記規模解耦 — SPEC
 
-> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v5（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`；r2 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md`；v4＝主委自查修訂：比例量測端點改 4×／40×；v5＝r3 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r3/synth.md`：規模改以總 fact-key 數定義、端點改列待使用者確認）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
+> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v6（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`；r2 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md`；v4＝主委自查修訂：比例量測端點改 4×／40×；v5＝r3 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r3/synth.md`：規模改以總 fact-key 數定義、端點改列待使用者確認；v6＝寫 TODO 時主委實測更正 C-5 與 Task 1.1 邊界③之 NaN 描述：jq 接受 NaN，由型別檢查拒絕）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
 
 ## §RISK 風險分級
 - **大小**：大。
@@ -20,6 +20,7 @@ RISK-HIT: b,c
   - FACT-RECEIPT: `grep -n '缺 jq\|without_jq\|shutil.which("jq")' tests/governance/test_govb1_factkey_*.py tests/governance/test_docrot2_*.py` → 印出空（無測試守「缺 jq」行為）（主委 實跑 2026-09-23）
   - FACT-RECEIPT: `prof_spawn.sh --check`／`guard`（三家各於隔離複本重跑）→ 印出 `4317`／`4322`～`4323`，與主委收據相同；`--check` 耗時 11.2～12.25s（codex／composer／grok 實跑 2026-09-23，見 r1 收斂檔）
   - FACT-RECEIPT: `grep -rno 'gen_fact_key_blocks\.sh:[0-9][0-9-]*' docs scripts tests` → 生產引用僅 `scripts/fact_keys.json` E-028 列之 `gen_fact_key_blocks.sh:1863`（生成至 `docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md` 與兩組 fixture）（主委 實跑 2026-09-23）
+  - FACT-RECEIPT: `printf '{"x": NaN}' | jq -e 'type == "object"'` → rc=0（jq-1.7.1-apple）；`printf '{"x": Infinity}' | jq -c .` → `{"x":1.7976931348623157e+308}`；最小沙箱 `{"x": NaN}` 經現行生成器 → rc=1 `key x 之 rows 型別不符（須為字串陣列之陣列）`（主委 實跑 2026-09-23，寫 TODO 時推翻 v5 C-5 之「jq 不接受 NaN」，收據 `handoffs/run_receipts/20260923-fkperf-todo-exit-probes.json`）
 - **待確認：無**（原待確認之量測端點，已於 2026-09-23 白話審閱獲使用者確認，見下）
 - **白話審閱**：`白話說明/FKPERF規格審閱.md`；使用者 2026-09-23 逐問「量測點數字不同有什麼差異」「以後會越來越大、很多地方用到會不會拖慢」，經說明後回「ok」⇒ SPEC 定案、端點依下條：
   - 量測端點取總 fact-key 數 140 與 1400（35 之 4 倍與 40 倍，仍相差 10 倍、門檻仍 20 倍），不取使用者選項說明中之 1 倍與 10 倍——主委自查：每次呼叫之固定開銷約 0.1s（`python3` 啟動 0.022s、`ticket_universe.sh --check` 0.03s，另 git 與包裝層），1×／10× 直接相除會被稀釋，r2 反例之比例僅約 13.5 倍而漏抓；grok r3 以純內容夾具實測 4×／40× 同型反例純 CPU 52 倍、含固定開銷 31 倍，且冪次成長下不存在「1×／10× 會紅而 4×／40× 不紅」之情形（此改動為收緊，非放寬）。
@@ -35,7 +36,7 @@ RISK-HIT: b,c
   - **路徑字面型**（以檔名判定，須把核心列入）：`scripts/factkey_write_guard.sh` 之 `_managed()` 受管集合；`scripts/git_hooks/pre-commit` 之遷移判定觸發式；`scripts/fact_keys.json` E-028 列之實作位置引用（行號）；`scripts/govb1_final_gate.sh` g2／g3（屬硬保護集，不改，走 Task 4.3）。前三者於 Task 4.1 加入或改指核心。
 - **C-3 決定性契約不變**：唯一排序點＝整列 @tsv 後以位元組序排序（現行 `LC_ALL=C sort`）；jq `@tsv` 之跳脫（`\t` `\n` `\r` `\\`）逐位元組重現；全程 LF、無 BOM、無時間戳。fact-key 迭代序照 jq `keys[]`（碼點序），不得沿用 Python dict 插入序。手寫狀態判定（`_FK_HIT_AWK` 之 `has_token`）之 `length`／`substr` 與範圍列舉之 `\001` 換行編碼，照現行 `LC_ALL=C` awk／tr，以 UTF-8 **位元組**為單位，不得改用 Python 字元（碼點）長度。
 - **C-4 fail-closed 不減**：檔頭列舉之 fail-closed 點與各 validator 之拒絕集合全數保留，不得新增 fail-open 路徑。`factkey_write_guard.sh` 既有之刻意 fail-open（其檔頭誠實邊界第 4 條）照舊。
-- **C-5 執行環境**：只用標準庫；以系統 `python3`（3.9）執行，不依賴 venv。缺 `python3` ⇒ fail-closed，訊息 `gen_fact_key_blocks: 缺 python3 → fail-closed`，rc 同現行缺 jq（1）。JSON 解析須拒 `NaN`／`Infinity` 等 jq 不接受之字面，與現行「非合法 JSON 物件 → fail-closed」同判。
+- **C-5 執行環境**：只用標準庫；以系統 `python3`（3.9）執行，不依賴 venv。缺 `python3` ⇒ fail-closed，訊息 `gen_fact_key_blocks: 缺 python3 → fail-closed`，rc 同現行缺 jq（1）。JSON 解析須與 jq 同樣**接受** `NaN`／`Infinity`（jq 1.7.1 視為數值），不得在解析階段另行拒絕；註冊表之值須為字串，此類值由其後之型別檢查以與 oracle 相同之訊息拒絕（例：`key x 之 rows 型別不符`）。
 - **C-6 效能驗收**：使用者 2026-09-22 定死「任何每次都會跑的檢查，單次必須秒級；要寫進 SPEC 的是實測秒數」。本票**新增**之驗收分三層：①決定性：emit、`--check`、`--write`、`--status-hits` 四模式之**外部程序數**與**核心開檔次數**，在 1×／4×／10×／40× 規模下相等（規模一律以**總 fact-key 數**定義：35／140／350／1400；Task 0.2／4.4）；②比例型耗時（使用者 2026-09-23 裁定，§A）：`--check`、`factkey_write_guard.sh`、`--status-hits` 於 40× 之耗時不得超過 4× 之 20 倍（兩端總 key 數恰相差 10 倍，端點選擇待使用者確認，見 §A），兩端各量三次取最小值；40× 端以「20 × 4× 端最小值」為逾時上限，逾時即判紅（Task 4.4）——擋住程序數與開檔數都不變的純 CPU 退化；③實測：四模式與 `factkey_write_guard.sh` 於四種規模之耗時寫入本 SPEC §A 與收據。既有測試 `test_generator_runs_under_two_seconds` 不屬本條新增驗收，依 C-8 不得刪除或放寬，XPASS 後移除其 strict xfail 即回復原斷言。
 - **C-7 不加快取**：不得引入 sidecar、增量索引或跨呼叫快取（快取失效即新漂移來源；同債務帳本「無 sidecar 快取」原則）。
 - **C-8 判定寬嚴不變**：由 C-1 語料與既有測試共同守住；既有測試之斷言不得放寬或刪除。
@@ -89,7 +90,7 @@ RISK-HIT: b,c
 - 既有 caller／影響面：新建。本 Phase 不接入入口，只由差分測試直呼。
 - 改法：以 bash 各函式（`_fk_preflight`、`_fk_validate_keys`、`_fk_validate_shape`、`_fk_validate_rows`、`_fk_validate_schema_sets`、`_fk_materialize`、`_fk_rows_source_rows`、`_fk_rows_filter_rows`）為規格逐條移植；訊息字串逐字照抄。
 - **驗證**：差分語料中屬本 Task 分支者全等；`pytest tests/governance/test_fkperf_differential.py -k phase1` 全綠；核心之 fact-key 迭代序＝`jq -r 'keys[]'` 之序，以語料④（非排序插入序之註冊表）驗證。
-- **邊界**：①空註冊表 ⇒ rc=0 契約不變（`test_empty_registry_is_rc_zero_not_failure`）；②rows_filter 序號位數溢位 ⇒ 同訊息 fail-closed；③註冊表含 `NaN` 字面 ⇒ 同「非合法 JSON 物件」訊息 fail-closed（C-5）。
+- **邊界**：①空註冊表 ⇒ rc=0 契約不變（`test_empty_registry_is_rc_zero_not_failure`）；②rows_filter 序號位數溢位 ⇒ 同訊息 fail-closed；③註冊表含 `NaN` 字面 ⇒ 與 oracle 同訊息 fail-closed（由 rows 型別檢查拒絕，非解析失敗；C-5）。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不改任何 validator 的接受集合；不合併或改寫訊息字串。

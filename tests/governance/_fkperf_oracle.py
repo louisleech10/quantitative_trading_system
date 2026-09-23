@@ -81,8 +81,10 @@ def check_case(tmp_path: Path, case: Case) -> List[str]:
     raise NotImplementedError("FKPERF Task 0.1")
 
 
-def build_sandbox_tree(root: Path, *, omit: Sequence[str] = (), git_init: bool = True) -> None:
-    """以 `git archive ORACLE_COMMIT` 之受管檔＋註冊表引用之 receipt 建完整樹；`omit` 指定要刪之相依檔。"""
+def build_sandbox_tree(root: Path, *, omit: Sequence[str] = (), git_init: bool = True, minimal: bool = False) -> None:
+    """以 `git archive ORACLE_COMMIT` 之受管檔＋註冊表引用之 receipt 建完整樹；`omit` 指定要刪之相依檔。
+    `minimal=True`：只放入口（與核心）及註冊表，比照既有 `test_empty_registry_is_rc_zero_not_failure` 之沙箱
+    （完整樹下空註冊表會先撞交接投影檢查，2026-09-23 主委實測）。"""
     raise NotImplementedError("FKPERF Task 0.1")
 
 

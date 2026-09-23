@@ -26,9 +26,10 @@ def _edit_registry(root: Path, fn: Callable[[dict], None]) -> None:
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def _tree(*edits: Callable[[Path], None], omit: Sequence[str] = (), git_init: bool = True) -> Callable[[Path], None]:
+def _tree(*edits: Callable[[Path], None], omit: Sequence[str] = (), git_init: bool = True,
+          minimal: bool = False) -> Callable[[Path], None]:
     def build(root: Path) -> None:
-        fo.build_sandbox_tree(root, omit=omit, git_init=git_init)
+        fo.build_sandbox_tree(root, omit=omit, git_init=git_init, minimal=minimal)
         for e in edits:
             e(root)
     return build
@@ -44,6 +45,14 @@ def _write(rel: str, text: str) -> Callable[[Path], None]:
 
 def _reg(fn: Callable[[dict], None]) -> Callable[[Path], None]:
     return lambda root: _edit_registry(root, fn)
+
+
+def _sync(root: Path) -> None:
+    """合規之註冊表改動後，以該沙箱自身之入口 `--write` 同步宿主區塊；否則 `--check` 首行為漂移而非目標出口
+    （2026-09-23 主委以現行生成器實測：未同步時 b12 首行為 FACTKEY DRIFT）。"""
+    import subprocess
+    r = subprocess.run(["bash", "scripts/gen_fact_key_blocks.sh", "--write"], cwd=str(root), capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
 
 
 def _case(case_id: str, args: Sequence[str], build: Callable[[Path], None], label: str, **kw) -> fo.Case:
@@ -133,7 +142,7 @@ def test_boundary_01_missing_dependency_both_fail_closed(tmp_path: Path) -> None
 
 def test_boundary_02_status_hits_line_with_tab_and_soh(tmp_path: Path) -> None:
     """Task 0.1 邊界②：`--status-hits` 行檔內含 TAB 或 `\\001` ⇒ 照樣比對。"""
-    lines = "L1\tHP-FKPERF 已完成\nL2\tRM\x01FKPERF 進行中\n"
+    lines = "L1\tWL-01 收案\nL2\tx\x01WL-01 收案\n"
     _assert_same(tmp_path, _case("b02", ["--status-hits", "lines.txt"], _tree(_write("lines.txt", lines)), "ok"))
 
 
@@ -145,34 +154,33 @@ def test_boundary_03_non_git_root_both_fail_closed(tmp_path: Path) -> None:
 # ---------------------------------------------------------------- 邊界（Task 1.1）
 
 def test_boundary_04_empty_registry_rc0(tmp_path: Path) -> None:
-    """Task 1.1 邊界①：空註冊表 ⇒ rc=0 契約不變。"""
-    _assert_same(tmp_path, _case("b04", [], _tree(_write(REG_REL, "{}\n")), "ok"))
+    """Task 1.1 邊界①：空註冊表 ⇒ rc=0 契約不變（最小沙箱，比照 `test_empty_registry_is_rc_zero_not_failure`）。"""
+    _assert_same(tmp_path, _case("b04", [], _tree(_write(REG_REL, "{}\n"), minimal=True), "ok"))
 
 
 def test_boundary_05_rows_filter_sequence_overflow(tmp_path: Path) -> None:
-    """Task 1.1 邊界②：rows_filter 序號位數溢位（單一來源逾三位列數）⇒ 同訊息 fail-closed。"""
+    """Task 1.1 邊界②：rows_filter 序號位數溢位（來源 `handoff-pending` 逾三位列數）⇒ 同訊息 fail-closed。
+    以 `--write` 跑：註冊表不合規時 `--write` 先驗證即拒，首行為目標出口（`--check` 會先報漂移）。"""
     def grow(d: dict) -> None:
-        base = _first_status_row(d, "roadmap-status")
-        si = d["roadmap-status"]["columns"].index("狀態")
-        d["roadmap-status"]["rows"] = [
-            [f"{i:04d}", f"RM-OVF{i:04d}"] + base[2:si] + ["進行中"] + base[si + 1:] for i in range(1000)
+        d["handoff-pending"]["rows"] = [
+            [f"{i % 1000:03d}", f"HP-OVF{i:04d}", "進行中", "docs/FKPERF_SPEC.md", f"做 OVF{i}"] for i in range(1000)
         ]
-    _assert_same(tmp_path, _case("b05", [], _tree(_reg(grow)), "rows_filter_seq_overflow"))
+    _assert_same(tmp_path, _case("b05", ["--write"], _tree(_reg(grow)), "rows_filter_seq_overflow"))
 
 
 def test_boundary_06_nan_literal_rejected(tmp_path: Path) -> None:
-    """Task 1.1 邊界③：註冊表含 `NaN` 字面 ⇒ 同「非合法 JSON 物件」訊息 fail-closed（C-5）。"""
-    _assert_same(tmp_path, _case("b06", [], _tree(_write(REG_REL, '{"x": NaN}\n')), "registry_not_json_object"))
+    """Task 1.1 邊界③：註冊表含 `NaN` 字面 ⇒ 與 oracle 同訊息 fail-closed——jq 接受 NaN，由 rows 型別檢查拒絕（C-5）。"""
+    _assert_same(tmp_path, _case("b06", [], _tree(_write(REG_REL, '{"x": NaN}\n'), minimal=True), "rows_type_mismatch"))
 
 
 # ---------------------------------------------------------------- 邊界（Task 1.2）
 
 def test_boundary_07_cell_with_control_char_or_pipe(tmp_path: Path) -> None:
     """Task 1.2 邊界①：儲存格含控制字元或 `|` ⇒ 同訊息 fail-closed。"""
-    for i, bad in enumerate(("a\x01b", "a|b")):
+    for i, (bad, label) in enumerate((("a\x01b", "cell_control_char"), ("a|b", "cell_pipe_in_table"))):
         def put(d: dict, bad: str = bad) -> None:
             d["eventscan-banner"]["rows"][0][2] = bad
-        _assert_same(tmp_path / str(i), _case(f"b07-{i}", [], _tree(_reg(put)), "cell_illegal_char"))
+        _assert_same(tmp_path / str(i), _case(f"b07-{i}", [], _tree(_reg(put)), label))
 
 
 def test_boundary_08_rows_differing_only_by_case_sort_like_oracle(tmp_path: Path) -> None:
@@ -186,15 +194,13 @@ def test_boundary_08_rows_differing_only_by_case_sort_like_oracle(tmp_path: Path
 
 def test_boundary_09_filename_with_newline(tmp_path: Path) -> None:
     """Task 2.1 邊界①：範圍內檔名含換行 ⇒ 與 oracle 同判。"""
-    _assert_same(tmp_path, _case("b09", ["--check"], _tree(_write("白話說明/a\nb.md", "HP-FKPERF 已完成\n")), "handwritten_status"))
+    _assert_same(tmp_path, _case("b09", ["--check"], _tree(_write("白話說明/a\nb.md", "WL-01 收案\n")), "handwritten_status"))
 
 
 def test_boundary_10_check_on_non_git_root(tmp_path: Path) -> None:
-    """Task 2.1 邊界②：`--check` 之 ROOT 非 git 工作樹 ⇒ 同訊息 fail-closed（經 GOVB1_FACTKEY_ROOT 指定）。"""
-    def mk_plain(root: Path) -> None:
-        (root / "plainroot").mkdir()
-    case = _case("b10", ["--check"], _tree(mk_plain), "scope_not_git_tree",
-                 env={"GOVB1_FACTKEY_ROOT": "plainroot"})
+    """Task 2.1 邊界②：`--check` 之 ROOT 非 git 工作樹 ⇒ 同訊息 fail-closed（經 GOVB1_FACTKEY_ROOT 顯式指定）。
+    ROOT 須為宿主檔齊全之樹：指向空目錄時首行為「找不到宿主檔」而非「非 git 樹」（2026-09-23 主委實測）。"""
+    case = _case("b10", ["--check"], _tree(git_init=False), "scope_not_git_tree", env={"GOVB1_FACTKEY_ROOT": "."})
     _assert_same(tmp_path, case)
 
 
@@ -205,12 +211,11 @@ def test_boundary_11_identifier_boundary_b3rb3r(tmp_path: Path) -> None:
 
 def test_boundary_12_multibyte_identifier_neighbours(tmp_path: Path) -> None:
     """Task 2.1 邊界④：識別碼含多位元組字元、鄰接字元屬或不屬 `A-Za-z0-9_-` ⇒ 與 oracle 同判（C-3 位元組語意）。"""
-    def add(d: dict) -> None:
-        row = _first_status_row(d, "roadmap-status")
-        row[0], row[1] = "997", "RM-識別碼"
-        d["roadmap-status"]["rows"].append(row)
-    doc = "前RM-識別碼後 已完成\n_RM-識別碼 已完成\nxRM-識別碼 已完成\n"
-    _assert_same(tmp_path, _case("b12", ["--check"], _tree(_reg(add), _write("白話說明/mb.md", doc)), "handwritten_status"))
+    def add(d: dict) -> None:  # 手寫狀態偵測之識別碼取自 _schema.status_keys（governance-worklist 在內）
+        d["governance-worklist"]["rows"].append(["999", "WL-識別碼", "未開工", "FKPERF 探針"])
+    doc = "前WL-識別碼後 未開工\n_WL-識別碼 未開工\nxWL-識別碼 未開工\n"
+    _assert_same(tmp_path, _case("b12", ["--check"], _tree(_reg(add), _sync, _write("白話說明/mb.md", doc)),
+                                 "handwritten_status"))
 
 
 # ---------------------------------------------------------------- 邊界（Task 3.1）
@@ -224,7 +229,7 @@ def test_boundary_13_mechanism_receipt_path_missing(tmp_path: Path) -> None:
                 if cell.startswith("receipt:"):
                     row[j] = "receipt:handoffs/run_receipts/__fkperf_missing__.json"
                     return
-    _assert_same(tmp_path, _case("b13", ["--check"], _tree(_reg(point)), "mechanism_receipt_missing"))
+    _assert_same(tmp_path, _case("b13", ["--write"], _tree(_reg(point)), "mechanism_receipt_missing"))
 
 
 def test_boundary_14_criteria_conflicting_expectation(tmp_path: Path) -> None:
@@ -234,10 +239,11 @@ def test_boundary_14_criteria_conflicting_expectation(tmp_path: Path) -> None:
         roles = d["_schema"]["criteria_column_roles"]
         cols = d[key]["columns"]
         row = list(d[key]["rows"][0])
-        exp_idx = cols.index(roles["expect"]) if "expect" in roles else len(row) - 1
-        row[exp_idx] = row[exp_idx] + "（相異）"
+        row[cols.index(roles["id"])] = "C-999"
+        e = cols.index(roles["expect"])
+        row[e] = "1" if row[e] == "0" else "0"
         d[key]["rows"].append(row)
-    _assert_same(tmp_path, _case("b14", ["--check"], _tree(_reg(dup)), "criteria_conflict"))
+    _assert_same(tmp_path, _case("b14", ["--write"], _tree(_reg(dup)), "criteria_conflict"))
 
 
 # ---------------------------------------------------------------- 邊界（Task 3.2）
@@ -259,7 +265,7 @@ def test_boundary_16_citation_points_at_comment_line(tmp_path: Path) -> None:
                 if "gen_fact_key_blocks.sh:" in cell:
                     row[j] = cell.split("gen_fact_key_blocks.sh:")[0] + "gen_fact_key_blocks.sh:2"
                     return
-    _assert_same(tmp_path, _case("b16", ["--check"], _tree(_reg(cite_comment)), "enforcement_citation_comment_line"))
+    _assert_same(tmp_path, _case("b16", ["--write"], _tree(_reg(cite_comment)), "enforcement_citation_comment_line"))
 
 
 # ---------------------------------------------------------------- 邊界（Task 3.3）
@@ -270,7 +276,7 @@ def test_boundary_17_same_id_in_two_status_keys(tmp_path: Path) -> None:
         row = _first_status_row(d, "roadmap-status")
         row[0], row[1] = "996", d["handoff-pending"]["rows"][0][1]
         d["roadmap-status"]["rows"].append(row)
-    _assert_same(tmp_path, _case("b17", ["--check"], _tree(_reg(clash)), "status_id_duplicate"))
+    _assert_same(tmp_path, _case("b17", ["--write"], _tree(_reg(clash)), "status_id_duplicate"))
 
 
 def test_boundary_18_b9_vs_b9a_token_boundary(tmp_path: Path) -> None:
