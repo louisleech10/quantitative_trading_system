@@ -17,14 +17,8 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p><strong>TODO 優化的收尾補遺</strong>（主體已完成，結論見 <a href="TODO優化結論.html">TODO優化結論.md</a>）。你 2026-09-23 追問「TODO 相關的文件都有跟著更新了嗎」，我盤點後發現還有幾處沒跟上：</p>
-<ul>
-<li>委員審查 SPEC／TODO 用的提示詞，還在叫委員檢查舊散文 TODO 的「§0 全域規則」節，但新格式已經沒有這一節</li>
-<li>新的 TODO 範本沒寫「解耦規則、不可違反原則」要放在新格式的哪裡</li>
-<li>收斂意見時的「延後到某處」檢查，只認舊散文 TODO，新格式的票會被卡住</li>
-<li>分工手冊、規格範本各有一兩句還在描述舊格式</li>
-</ul>
-<p>這些改完會交三家審。之後處理整套治理測試裡 78 條舊紅燈（你裁定由我處理、不找委員）。</p>
+<p><strong>處理整套治理測試裡的 78 條舊紅燈</strong>（你裁定由我自己處理、不找委員）。這 78 條都已查證<strong>不是 TODO 優化弄壞的</strong>：絕大多數是測試本身跟不上後來的程式改動（例如測試搭的臨時環境少複製了後來新增的腳本、比對的程式片段已改寫），少數是你先前裁定停用的功能（G-7）留下的紅燈。</p>
+<p>做法：在一份獨立的工作副本上改測試，改完整批搬回主線、實跑確認再提交。<strong>主線的測試檔目前還沒動</strong>。</p>
 <h2 id="做到哪">做到哪</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -36,7 +30,7 @@
 <tbody>
 <tr>
 <td>TODO 優化主體</td>
-<td>✅ 完成</td>
+<td>✅ 完成（程式已改、已提交）</td>
 </tr>
 <tr>
 <td>流程優化其餘改法</td>
@@ -44,11 +38,15 @@
 </tr>
 <tr>
 <td>TODO 相關文件補遺</td>
-<td>⬜ 進行中</td>
+<td>✅ 完成（程式已改、已提交；三家審兩輪，第二輪零問題）</td>
+</tr>
+<tr>
+<td>時間哨兵</td>
+<td>✅ 已依你的裁定移除</td>
 </tr>
 <tr>
 <td>78 條舊紅燈</td>
-<td>⬜ 補遺審完後處理</td>
+<td>⬜ 48 條已在工作副本修好，<strong>尚未搬回主線</strong></td>
 </tr>
 </tbody>
 </table></div>
@@ -57,7 +55,7 @@
 <h2 id="卡住嗎">卡住嗎</h2>
 <p>沒有。</p>
 <h2 id="下一件事">下一件事</h2>
-<p>補遺改完交三家審 → 處理舊紅燈 → 提醒你四張暫停的票（EVENTSCAN、FF-TFMETA、FF-NAME、FFDSTAR）要另開新 session 做。</p>
+<p>修完剩下約 30 條 → 搬回主線實跑、提交 → 提醒你四張暫停的票（EVENTSCAN、FF-TFMETA、FF-NAME、FFDSTAR）要另開新 session 做。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
