@@ -1,7 +1,7 @@
 # FF-TFMETA：多週期 run 之 completeness 由 MultiTF producer 一次形成 — SPEC
 
 > 來源 PLAN/診斷：`docs/FFDEFECT_DECISION.md` 第二節（缺陷 B；定性輪 `handoffs/reconcile/20260921-ffdefect-x-consult-r1/synth.md`）　|　日期：2026-09-24　|　對應 TODO：`docs/manifests/FFTFMETA.json`（五類落點 manifest；本 SPEC 定案後依 TODO_GENERATION_PROMPT 覆寫既有樣本）
-> 版本：v2（r1 收斂 `handoffs/reconcile/20260924-fftfmeta-x-review-r1/synth.md`：層失敗集合對齊 `FAILOPEN_LAYER_FAILURE_STATUSES`、resume 保存逐週期層狀態、legacy 路徑契約改為 meta.json、IC-first 二次寫入保留週期欄、品質降級同步定範圍、registry 迭代介面更正）
+> 版本：v3（r2 收斂 `handoffs/reconcile/20260924-fftfmeta-x-review-r2/synth.md`：Task 1.3 記憶體欄隨 flush 往返、parallel worker 回傳六層狀態、resume 閘不改而以可 resume 組態驗收、IC-first 保留根之全部 completeness 與品質欄、§G 加降級單週期 reference）；v2（r1 收斂 `handoffs/reconcile/20260924-fftfmeta-x-review-r1/synth.md`：層失敗集合對齊 `FAILOPEN_LAYER_FAILURE_STATUSES`、resume 保存逐週期層狀態、legacy 路徑契約改為 meta.json、IC-first 二次寫入保留週期欄、品質降級同步定範圍、registry 迭代介面更正）
 
 ## §RISK 風險分級
 - **大小**：大（CLAUDE.md 任務分派規則：命中 a、b）。
@@ -23,7 +23,7 @@
 
 ## §C 約束
 - 解耦 7 條：`momentum/` 不 import `api/`；`api/services/feature_factory_service.py` **不改**（`_persist_task_record` 以 `summary.get("metadata")` 整包寫入，修 producer 即自動正確）。
-- **特徵資料檔、欄名、欄數、列數、檔案集合不變**；metadata JSON（manifest、`meta.json`、task record）因既有欄位值改變與 task metadata 補齊 `expected_timeframes`／`failed_timeframes` 而大小可變——允許變動之 JSON 路徑見 §G，實測大小差寫入收據（r1 codex P2-07）。
+- **特徵資料檔、欄名、欄數、列數、檔案集合不變**；metadata JSON（manifest、`meta.json`、task record）因既有欄位值改變、task metadata 補齊 `expected_timeframes`／`failed_timeframes`、降級 run 之 manifest 品質欄改為與 task record 同值而大小可變；**不新增 manifest 鍵**（`quality_thresholds` 等降級細節仍只在 task record）——允許變動之 JSON 路徑見 §G，實測大小差寫入收據（r1 codex P2-07）。
 - 權威來源（決策檔 B-4）：週期集合之 canonical＝ordered training config（`MultiTFGenerator._training_tfs`）＋ skip／failure 集合；registry 群組之週期只作 diagnostic cross-check。
 - 決策檔禁令：不得在 storage 端由 primary tf 猜多週期集合；不得在 manifest 寫完後只 patch metadata；persist 之後不得再改寫 `COMPLETENESS_FIELD_NAMES`、`quality_status`、`run_status`（r1 composer P2-01）。
 - 欄位名集合沿用既有單一真相源 `feature_storage.COMPLETENESS_FIELD_NAMES`，**不新增 manifest 欄位**；registry 工作 manifest（中間產物）新增逐週期層狀態見 Task 1.3。
@@ -35,6 +35,7 @@
 - **凍結時機 / reference**：動工前以當下 HEAD 跑一次，存 `tests/_golden/fftfmeta/baseline.json`：run 參數；群組檔名集合 sha256；每群組以 pyarrow 讀出之每欄 `dtype`、`shape`、NaN mask sha256、以 little-endian 原生 dtype 序列化之值 sha256；manifest 與 task record 之 canonical JSON（`sort_keys=True`、`ensure_ascii=False`、`separators=(",", ":")`）去除下列**允許變動路徑**後之 sha256。
 - **允許變動路徑（封閉集）**：manifest 根與 `artifacts.raw`（及 `artifacts.processed`，若存在）之 `expected_timeframes`、`present_timeframes`、`failed_timeframes`、`expected_layers`、`present_layers`、`failed_layers`、`failure_reasons`、`quality_status`、`run_status`，以及 `created_at`、`updated_at`、`generation_metadata.generation_time`；task record 之 `metadata` 下同名鍵、`generation_time`、`persisted_at`。
 - **通過條件（可證偽）**：改後同參數重跑 ⇒ 群組檔名集合、每群組每欄四個 hash、去除允許路徑後之兩份 canonical JSON sha256 **全等**；允許路徑之改後值**恰為** Task 3.1 所定（健康 run：週期三欄＝`["1h","12h"]`／`["1h","12h"]`／`[]`，`quality_status`＝`complete`）。任一不等即列出路徑與 diff＝FAIL。
+- **降級單週期 reference（r2 codex P2-03）**：同一小窗、單週期 `1h`（不經 MultiTF），以設定 `max_nan_ratio=0.0` 觸發 NaN 門檻降級（真實資料必含 warmup NaN），改前改後各跑一次：特徵資料四 hash 與去除允許路徑後之 canonical JSON 全等；允許路徑逐鍵預期＝manifest 根與 `artifacts.raw` 之 `quality_status`／`run_status` 由 `complete` 變 `partial`、`failure_reasons` 等於 task record 之 `failure_reasons`（含 `nan_ratio=…>max_nan_ratio=…`），task record 之 `quality_status`、`failure_reasons`、`quality_thresholds` 改前改後相等；manifest、task record 之 JSON 位元組大小差寫入收據。
 
 ## §P Phase 與依賴
 
@@ -58,10 +59,10 @@
 - 不可做：不得改 `build_completeness_meta_from_layer_results` 之簽名與單週期輸出；不得新增 manifest 欄位名；不得把原因改寫成固定字面。
 
 **Task 1.3 — resume 保存逐週期層狀態（r1 codex P1-03）**
-- 目標：CGSA resume 跳過之週期仍能提供其 L1–L6 狀態與失敗原因。　檔案：`momentum/FeatureEngineering/core/column_group_registry.py`（registry 工作 manifest，即既有 resume checkpoint）、`multi_tf_generator.py` 之兩條 CGSA 路徑　既有 caller：`_has_resume_checkpoint_for_timeframe`（`multi_tf_generator.py:148`、`:407`、`:477`）。
-- 改法：registry 新增 `record_layer_status(tf, layer_id, status, reason)` 與 `layer_status_by_tf() -> Dict[str, Dict[str, Tuple[str, str]]]`，隨既有 `write_manifest()` 原子寫入工作 manifest 之新鍵 `layer_status_by_tf`；每週期 L1–L6 執行後記錄（含非失敗狀態）；resume 跳過之週期自此讀回、併入 `cross_tf_layer_failures` 與 `expected_layers`。舊 checkpoint 無此鍵 ⇒ 該週期層狀態視為缺證據 ⇒ `quality_status`＝`unknown`（不得解為無失敗）。
-- **驗證**：`pytest tests/test_cgsa_resume.py -k layer_status` 全綠：第一次 run 令 12h 之 L2 `dependency_failed`（`allow_partial_layers=True`）並於 persist 前中止；resume 後 manifest `failed_layers` 含 `L2:12h`、`quality_status == "partial"`；以無 `layer_status_by_tf` 之舊 checkpoint resume ⇒ `quality_status == "unknown"`。
-- **邊界**：①全部週期皆由 checkpoint 跳過 ⇒ 層狀態全數讀回，健康者 `quality_status == "complete"`；②checkpoint 之 `layer_status_by_tf` 含 training 以外之週期 ⇒ 忽略並記 warning。
+- 目標：CGSA resume 跳過之週期仍能提供其 L1–L6 狀態與失敗原因。　檔案：`momentum/FeatureEngineering/core/column_group_registry.py`（registry 工作 manifest，即既有 resume checkpoint）、`multi_tf_generator.py` 之兩條 CGSA 路徑與 `_tf_worker_entry`　既有 caller：`_has_resume_checkpoint_for_timeframe`（`multi_tf_generator.py:148`、`:407`、`:477`）。
+- 改法：①registry 新增記憶體欄 `layer_status_by_tf: Dict[str, Dict[str, Tuple[str, str]]]`（週期 → L1–L6 → (status, reason)），`record_layer_status(tf, statuses)` 以整組取代該週期舊條目；`write_manifest()` 之 payload 帶此欄，`resume_from_manifest()` 讀回同一記憶體欄（r2 grok P1-02：只讀進區域變數會於下一次 flush 被整檔重寫抹除）。②循序路徑：每週期 L1–L6 執行後、`write_manifest()` 前記錄六層（含非失敗狀態）。③parallel 路徑：`_tf_worker_entry` 回傳增加六層 `(status, reason)`；parent 於該週期群組註冊成功後、`:586` 之 `write_manifest()` 前記錄；註冊失敗 rollback 時清掉該週期條目；primary 於 `:466` flush 前記錄（r2 codex P1-02、composer P2-01）。④stale alignment 拆除群組後重跑之週期，以新六層記錄取代舊條目。⑤resume 跳過之週期自此欄讀回，併入 `cross_tf_layer_failures` 與 `expected_layers`；該週期無條目、或條目未涵蓋其已啟用之 L1–L6 ⇒ 缺證據 ⇒ `quality_status`＝`unknown`（不得解為無失敗）。⑥**resume 閘不改**：`_prepare_cgsa_registry`（`feature_factory.py:1034`）於有 config hash 時，L7 manifest 缺席或不可快取即不 resume、層全數重算，無層狀態流失；本 Task 只保證「確實 resume 時」層狀態不流失（r2 codex／grok P1-01 指出之不可達，改以可 resume 之組態驗收，見驗證）。
+- **驗證**：`pytest tests/test_cgsa_resume.py -k layer_status` 全綠——以可 resume 之組態（`FFACT_CGSA_WORK_DIR` 指定工作目錄，gate 只驗工作 manifest 存在）：第一次 run 令 12h 之 L2 `dependency_failed`（`allow_partial_layers=True`）並於 persist 前中止；resume 後斷言確實命中跳過分支（log 或 spy），manifest `failed_layers` 含 `L2:12h:<原因>` 之前綴、`quality_status == "partial"`；循序與 parallel 各一；中途再 flush 一次（第三個週期寫入）後條目仍在；以無 `layer_status_by_tf` 之舊 checkpoint resume ⇒ `quality_status == "unknown"`；parallel 註冊失敗 rollback ⇒ 該週期無條目。
+- **邊界**：①全部週期皆由 checkpoint 跳過 ⇒ 層狀態全數讀回，健康者 `quality_status == "complete"`；②checkpoint 之 `layer_status_by_tf` 含 training 以外之週期 ⇒ 忽略並記 warning；③條目只涵蓋部分層 ⇒ `unknown`。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
 - 不可做：不得另建 sidecar 檔；不得以 registry 群組之 `group.layer` 回推層狀態。
@@ -69,8 +70,8 @@
 ### Phase 2 — persist 鏈傳遞與品質降級同步（依賴：Phase 1）
 **Task 2.1 — storage writer 傳遞與 IC-first 保留**
 - 目標：writer 接收並使用 canonical 輸入；後續不帶週期資訊之寫入不得覆蓋既有週期欄。　檔案：`feature_storage.py` 之 `write_raw_from_registry_stream`（`:733`）、`write_raw`（`:705`）、`write_processed`、`_write_l7_v2_artifact`（`:1274`）、`_build_feature_manifest_v2`（`:1773`）　既有 caller：`feature_factory.py` 之 CGSA、frame 與 IC-first（`:2179`、`:2247`）。
-- 改法：各 writer 加同名 keyword-only 參數並原樣傳入 `resolve_completeness_meta`；未傳 `timeframe_completeness` 且既有 manifest 根已有週期三欄時，`_build_feature_manifest_v2` 保留既有根之週期三欄（r1 grok P1-03）；全新 run 無既有 manifest ⇒ 單週期預設不變。
-- **驗證**：`pytest tests/feature_engineering/test_failopen_manifest.py -k writer_timeframe_completeness` 全綠：以 `tmp_path` 寫 artifact，`manifest["present_timeframes"] == canonical["present_timeframes"]`（三欄與 `quality_status` 同）；先寫多週期再以 IC-first 形（不帶參數）寫 processed ⇒ 根之週期三欄 `==` 多週期值；全新單週期未傳參數 ⇒ 與改前 `==`。
+- 改法：各 writer 加同名 keyword-only 參數並原樣傳入 `resolve_completeness_meta`；未傳 `timeframe_completeness` 與 `cross_tf_layer_failures` 且既有 manifest 根已有週期三欄時，`_build_feature_manifest_v2` 保留既有根之六個 `COMPLETENESS_FIELD_NAMES` 欄、`failure_reasons`、`quality_status`、`run_status`，不執行根賦值（`:1839-1847`）；新 artifact 仍寫入 `artifacts.<kind>`（r1 grok P1-03、r2 grok P1-03）；全新 run 無既有 manifest ⇒ 單週期預設不變。
+- **驗證**：`pytest tests/feature_engineering/test_failopen_manifest.py -k writer_timeframe_completeness` 全綠：以 `tmp_path` 寫 artifact，`manifest["present_timeframes"] == canonical["present_timeframes"]`（三欄與 `quality_status` 同）；先寫多週期（含 12h 層失敗與 Task 2.3 降級）再以 IC-first 形（不帶參數）各寫一次 raw 與 processed ⇒ 根之六欄、`failure_reasons`、`quality_status`、`run_status` 皆 `==` 寫入前值；全新單週期未傳參數 ⇒ 與改前 `==`。
 - **邊界**：①registry-stream 路徑既有 artifact 已存在（`.previous-raw-*`）⇒ 合併取新值；②`allow_empty` 導致 `empty_selection` ⇒ 週期欄仍為 canonical。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
