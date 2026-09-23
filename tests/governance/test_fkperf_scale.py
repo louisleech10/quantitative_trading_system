@@ -36,13 +36,37 @@ def _ratio_verdict(root4: Path, root40: Path, mode: str) -> bool:
     return math.isfinite(min(t40)) and min(t40) <= C["ratio_max"] * t4
 
 
-def _mutated_core(tmp_path: Path, injected: str) -> Path:
-    """於核心 `if __name__` 前注入一段覆寫 `gen_block` 之碼，產生 mutant 核心檔。"""
-    src = CORE.read_text(encoding="utf-8")
+def _install_mutant(root: Path, injected: str) -> Path:
+    """於沙箱核心 `if __name__` 前注入一段覆寫 `gen_block` 之碼，**寫回該沙箱之 scripts/**（核心以腳本同目錄解析
+    註冊表；寫在沙箱外則讀不到縮放後之註冊表——r5 grok 實測 `REG_EXISTS False`）。回傳沙箱核心路徑。"""
+    core = root / "scripts" / "_gen_fact_key_blocks.py"
+    src = core.read_text(encoding="utf-8")
     assert src.count(MUTATION_ANCHOR) == 1, "核心 __main__ 錨點須恰一處"
-    mutant = tmp_path / "_gen_fact_key_blocks_mutant.py"
-    mutant.write_text(src.replace(MUTATION_ANCHOR, injected + "\n\n" + MUTATION_ANCHOR, 1), encoding="utf-8")
-    return mutant
+    core.write_text(src.replace(MUTATION_ANCHOR, injected + "\n\n" + MUTATION_ANCHOR, 1), encoding="utf-8")
+    return core
+
+
+def _registry_keys(root: Path) -> List[str]:
+    import json
+    return [k for k in json.loads((root / "scripts" / "fact_keys.json").read_text(encoding="utf-8")) if k != "_schema"]
+
+
+def _status_ids(root: Path) -> set:
+    """狀態識別碼集合：`_schema.status_keys` 與 `docrot2_status_keys` 所指各表之第二欄。"""
+    import json
+    data = json.loads((root / "scripts" / "fact_keys.json").read_text(encoding="utf-8"))
+    sch = data["_schema"]
+    return {row[1] for k in list(sch.get("status_keys", [])) + list(sch.get("docrot2_status_keys", []))
+            for row in data.get(k, {}).get("rows", []) if len(row) > 1}
+
+
+_PROBE_INJECTION = (
+    "import os as _fkperf_os\n"
+    "_fkperf_orig_gen_block = gen_block\n"
+    "def gen_block(reg, key):  # FKPERF 探針：記錄每次呼叫之 key\n"
+    "    with open(_fkperf_os.environ['FKPERF_PROBE'], 'a', encoding='utf-8') as _f:\n"
+    "        _f.write(key + '\\n')\n"
+    "    return _fkperf_orig_gen_block(reg, key)")
 
 
 # ---------------------------------------------------------------- 規則檔與 helper 自測（Task 0.2 驗證①）
@@ -71,6 +95,21 @@ def test_open_counter_counts_known_opens(tmp_path: Path) -> None:
     assert n == 2, paths
 
 
+def test_measurement_helpers_raise_on_nonzero_rc(tmp_path: Path) -> None:
+    """helper 自測（r5 三家 P1）：被量之呼叫 rc≠0 ⇒ 三支量測 helper 皆拋例外，不回傳可當「有限／不變」之數值。"""
+    import subprocess
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "gen_fact_key_blocks.sh").write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
+    core = tmp_path / "scripts" / "_gen_fact_key_blocks.py"
+    core.write_text("import sys\nsys.exit(1)\n", encoding="utf-8")
+    with pytest.raises(subprocess.CalledProcessError):
+        sp.time_mode(tmp_path, "--check", 1)
+    with pytest.raises(subprocess.CalledProcessError):
+        sp.count_spawns(tmp_path, "--check")
+    with pytest.raises(subprocess.CalledProcessError):
+        op.count_opens(tmp_path, ["--check"], core)
+
+
 # ---------------------------------------------------------------- 邊界（Task 0.2）
 
 def test_boundary_19_scaled_key_names_match_key_pattern(tmp_path: Path) -> None:
@@ -80,21 +119,30 @@ def test_boundary_19_scaled_key_names_match_key_pattern(tmp_path: Path) -> None:
 
 
 def test_boundary_20_scaled_keys_do_not_collide(tmp_path: Path) -> None:
-    """Task 0.2 邊界②：合成 key 不與既有 key 或狀態識別碼撞名（總數恰等於目標，集合無重複）。"""
-    root = sp.build_scaled_tree(tmp_path, C["scale_total_keys"]["4x"])
-    import json
-    data = json.loads((root / "scripts" / "fact_keys.json").read_text(encoding="utf-8"))
-    keys = [k for k in data if k != "_schema"]
-    assert len(keys) == len(set(keys)) == C["scale_total_keys"]["4x"]
+    """Task 0.2 邊界②：合成 key 不與既有 key 或狀態識別碼撞名（r5 codex P2：dict 之 key 恆不重複，須顯式比交集）。"""
+    target = C["scale_total_keys"]["4x"]
+    root = sp.build_scaled_tree(tmp_path, target)
+    assert sp.verify_scaled_tree(root, target) == []
+    keys = _registry_keys(root)
+    assert len(keys) == target
+    synth = set(keys) - set(_registry_keys(REPO))
+    assert synth, "合成 key 集合為空"
+    assert len(synth) == target - sp.total_key_count(REPO)
+    assert not synth & _status_ids(root), sorted(synth & _status_ids(root))
+    assert not synth & _status_ids(REPO), sorted(synth & _status_ids(REPO))
 
 
 # ---------------------------------------------------------------- 邊界（Task 4.4）
 
 def test_boundary_21_check_rc0_at_10x_and_40x(tmp_path: Path) -> None:
-    """Task 4.4 邊界①：10× 與 40× 規模下 `--check` rc=0（經入口）。"""
+    """Task 4.4 邊界①：10× 與 40× 規模下 `--check` rc=0（經入口）。
+    rc≠0 由 `time_mode` 拋例外即紅（r5 三家 P1）；10×／40× 以既有比例上限 `ratio_max × min(4×)` 為逾時，
+    超線性實作停在此處即判紅而非掛住（不另訂秒數）。"""
+    r4 = sp.build_scaled_tree(tmp_path / "4x", C["scale_total_keys"]["4x"])
+    t4 = min(sp.time_mode(r4, "--check", 1))
     for label in ("10x", "40x"):
         root = sp.build_scaled_tree(tmp_path / label, C["scale_total_keys"][label])
-        t = sp.time_mode(root, "--check", 1)
+        t = sp.time_mode(root, "--check", 1, timeout=C["ratio_max"] * t4)
         assert math.isfinite(t[0]), label
 
 
@@ -113,29 +161,35 @@ def test_boundary_22_synthetic_registry_stays_in_tmp(tmp_path: Path) -> None:
 
 
 def test_boundary_23_per_key_extra_read_breaks_open_invariance(tmp_path: Path) -> None:
-    """Task 4.4 邊界③：每 key 多讀一次檔之 mutant ⇒ 開檔次數隨規模改變（不變性斷言會紅）。"""
-    mutant = _mutated_core(tmp_path, (
+    """Task 4.4 邊界③：每 key 多讀一次檔之 mutant ⇒ 開檔次數隨規模改變（不變性斷言會紅）。
+    先證 mutant 確實打進每 key 迴圈：同一 4× 樹上 mutant 之開檔數須多於原核心（r5 codex P1-01）。"""
+    injected = (
         "_fkperf_orig_gen_block = gen_block\n"
         "def gen_block(reg, key):  # FKPERF mutation：每 key 多讀一次檔\n"
         "    open(str(reg.path)).read()\n"
-        "    return _fkperf_orig_gen_block(reg, key)"))
+        "    return _fkperf_orig_gen_block(reg, key)")
     r4 = sp.build_scaled_tree(tmp_path / "4x", C["scale_total_keys"]["4x"])
     r10 = sp.build_scaled_tree(tmp_path / "10x", C["scale_total_keys"]["10x"])
-    assert op.count_opens(r4, [], mutant)[0] != op.count_opens(r10, [], mutant)[0]
+    n4_orig = op.count_opens(r4, [], r4 / "scripts" / "_gen_fact_key_blocks.py")[0]
+    m4, m10 = _install_mutant(r4, injected), _install_mutant(r10, injected)
+    n4 = op.count_opens(r4, [], m4)[0]
+    assert n4 > n4_orig, (n4, n4_orig)
+    assert n4 != op.count_opens(r10, [], m10)[0]
 
 
 def test_boundary_24_per_key_json_roundtrip_breaks_ratio(tmp_path: Path) -> None:
-    """Task 4.4 邊界④：每 key 對整份註冊表做 JSON 往返之 mutant ⇒ 比例型耗時判否，且在逾時上限內判出。"""
-    mutant = _mutated_core(tmp_path, (
+    """Task 4.4 邊界④：每 key 對整份註冊表做 JSON 往返之 mutant ⇒ 比例型耗時判否，且在逾時上限內判出。
+    注入點打得到每 key 迴圈由 `test_gen_block_injection_reaches_every_key`（`--check` 在內）以行為證明。"""
+    injected = (
         "import json as _fkperf_json\n"
         "_fkperf_orig_gen_block = gen_block\n"
         "def gen_block(reg, key):  # FKPERF mutation：每 key 對整份註冊表做 JSON 往返\n"
         "    _fkperf_json.loads(_fkperf_json.dumps(reg.data, ensure_ascii=False))\n"
-        "    return _fkperf_orig_gen_block(reg, key)"))
+        "    return _fkperf_orig_gen_block(reg, key)")
     r4 = sp.build_scaled_tree(tmp_path / "4x", C["scale_total_keys"]["4x"])
     r40 = sp.build_scaled_tree(tmp_path / "40x", C["scale_total_keys"]["40x"])
     for root in (r4, r40):
-        (root / "scripts" / "_gen_fact_key_blocks.py").write_bytes(mutant.read_bytes())
+        _install_mutant(root, injected)
     assert _ratio_verdict(r4, r40, "--check") is False
 
 
@@ -148,6 +202,24 @@ def test_boundary_25_bad_synthesis_is_rejected(tmp_path: Path, monkeypatch: pyte
 
 
 # ---------------------------------------------------------------- Task 4.4 驗證
+
+@pytest.mark.parametrize("mode", ["emit", "--check", "--write"])
+def test_gen_block_injection_reaches_every_key(tmp_path: Path, mode: str) -> None:
+    """可測性契約（r5 三家 P1）：覆寫模組全域 `gen_block` 之探針，於三種渲染模式皆記錄到每個合成 key
+    ⇒ 邊界 23／24 之 mutant 真的打進每 key 迴圈（核心若以別名／私有函式渲染，此處即紅）。"""
+    import os
+    import subprocess
+    root = sp.build_scaled_tree(tmp_path, C["scale_total_keys"]["4x"])
+    core = _install_mutant(root, _PROBE_INJECTION)
+    probe = tmp_path / "probe.txt"
+    args = [] if mode == "emit" else [mode]
+    r = subprocess.run(["python3", str(core), *args], cwd=str(root), capture_output=True,
+                       env=dict(os.environ, FKPERF_PROBE=str(probe)))
+    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
+    called = set(probe.read_text(encoding="utf-8").splitlines()) if probe.exists() else set()
+    synth = set(_registry_keys(root)) - set(_registry_keys(REPO))
+    assert synth and synth <= called, sorted(synth - called)[:5]
+
 
 @pytest.mark.parametrize("mode", C["invariance_modes"])
 def test_spawn_and_open_counts_scale_invariant(tmp_path: Path, mode: str) -> None:

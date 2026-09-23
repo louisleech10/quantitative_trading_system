@@ -55,11 +55,15 @@ def _sync(root: Path) -> None:
     assert r.returncode == 0, r.stderr
 
 
-def _case(case_id: str, args: Sequence[str], build: Callable[[Path], None], label: str, **kw) -> fo.Case:
-    """label＝`exit_catalog()` 之出口標籤，或 "ok"（rc=0）。"""
+def _case(case_id: str, args: Sequence[str], build: Callable[[Path], None], label: str, first: str = None,
+          **kw) -> fo.Case:
+    """label＝`exit_catalog()` 之出口標籤，或 "ok"（rc=0）。
+    "ok" 須以 `first` 給 oracle stdout 首行之字面（空輸出為 ""；2026-09-23 主委以現行生成器實測），
+    成功分支亦釘首行（r5 grok P1-01）。"""
     cat = fo.exit_catalog()
     if label == "ok":
-        return fo.Case(case_id, tuple(args), build, 0, "", **kw)
+        assert first is not None, f"{case_id}：成功分支須給 stdout 首行字面"
+        return fo.Case(case_id, tuple(args), build, 0, first, **kw)
     assert label in cat, f"出口標籤 {label!r} 不在 oracle 出口清單（Task 0.1 須列舉之）"
     return fo.Case(case_id, tuple(args), build, 1, cat[label], **kw)
 
@@ -95,15 +99,42 @@ def test_every_case_hits_its_expected_branch(tmp_path: Path) -> None:
             assert out.rc == case.expect_rc, case.case_id
             stream = out.stderr if case.expect_rc else out.stdout
             first = stream.decode("utf-8", "replace").splitlines()[0] if stream else ""
-            if case.expect_rc:
-                assert first == case.expect_first_line, (case.case_id, first)
+            assert first == case.expect_first_line, (case.case_id, first)
+
+
+@pytest.mark.parametrize("kind", ["real", "sandbox", "exit", "key_order", "bytes"])
+def test_every_corpus_case_new_equals_oracle(tmp_path: Path, kind: str) -> None:
+    """Task 0.1 改法（r5 grok P1-01）：五類語料之每一筆，新實作與 oracle 逐位元組相同（C-1）——
+    不只邊界 01–18 點名者；`check_case` 先斷言 oracle 命中預期分支再比差異。"""
+    cases = fo.corpus(kind)
+    assert cases, kind
+    for case in cases:
+        diffs = fo.check_case(tmp_path / case.case_id, case)
+        assert diffs == [], f"{case.case_id}：新實作與 oracle 不同：{diffs}"
 
 
 def test_exit_catalog_equals_corpus_labels() -> None:
-    """Task 0.1 驗證④：出口清單與「exit」類語料之分支標籤集合相等（少列一個出口或多一筆無主語料即紅）。"""
+    """Task 0.1 驗證④：出口清單與「exit」類語料之分支標籤集合相等（少列一個出口或多一筆無主語料即紅）。
+    `corpus("exit")` 之每筆以手寫建法與字面首行構成，不得由 `exit_catalog()` 轉手產生（否則集合恆等；r5 grok P1-01）。"""
     cat = fo.exit_catalog()
     labels = {c.expect_first_line for c in fo.corpus("exit")}
     assert set(cat.values()) == labels
+
+
+def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
+    """Task 0.1 驗證④之獨立錨（r5 grok P1-01）：以本測試自帶之正則掃 oracle 原始碼中每一條寫 stderr 之行
+    （`>&2` 或 `_fk_die `），`exit_sites()` 須恰逐行歸類——歸到出口標籤、"continuation"（多行訊息之後續行）
+    或 "helper"（`_fk_die` 定義行）；每個出口標籤至少有一行歸入。出口清單少列一個出口 ⇒ 該行無歸類即紅。"""
+    import re
+    import subprocess
+    src = subprocess.run(["git", "-C", str(fo.REPO), "show", f"{fo.ORACLE_COMMIT}:scripts/gen_fact_key_blocks.sh"],
+                         capture_output=True, text=True, check=True).stdout
+    lines = {n for n, l in enumerate(src.splitlines(), 1) if re.search(r">&2|_fk_die ", l)}
+    sites = fo.exit_sites()
+    cat = fo.exit_catalog()
+    assert set(sites) == lines, (sorted(lines - set(sites))[:10], sorted(set(sites) - lines)[:10])
+    assert set(sites.values()) <= set(cat) | {"continuation", "helper"}
+    assert set(cat) <= set(sites.values()), sorted(set(cat) - set(sites.values()))
 
 
 def test_corpus_covers_all_five_kinds_and_help_variants() -> None:
@@ -143,7 +174,8 @@ def test_boundary_01_missing_dependency_both_fail_closed(tmp_path: Path) -> None
 def test_boundary_02_status_hits_line_with_tab_and_soh(tmp_path: Path) -> None:
     """Task 0.1 邊界②：`--status-hits` 行檔內含 TAB 或 `\\001` ⇒ 照樣比對。"""
     lines = "L1\tWL-01 收案\nL2\tx\x01WL-01 收案\n"
-    _assert_same(tmp_path, _case("b02", ["--status-hits", "lines.txt"], _tree(_write("lines.txt", lines)), "ok"))
+    _assert_same(tmp_path, _case("b02", ["--status-hits", "lines.txt"], _tree(_write("lines.txt", lines)), "ok",
+                                 first="L1\tWL-01\t收案"))
 
 
 def test_boundary_03_non_git_root_both_fail_closed(tmp_path: Path) -> None:
@@ -155,7 +187,7 @@ def test_boundary_03_non_git_root_both_fail_closed(tmp_path: Path) -> None:
 
 def test_boundary_04_empty_registry_rc0(tmp_path: Path) -> None:
     """Task 1.1 邊界①：空註冊表 ⇒ rc=0 契約不變（最小沙箱，比照 `test_empty_registry_is_rc_zero_not_failure`）。"""
-    _assert_same(tmp_path, _case("b04", [], _tree(_write(REG_REL, "{}\n"), minimal=True), "ok"))
+    _assert_same(tmp_path, _case("b04", [], _tree(_write(REG_REL, "{}\n"), minimal=True), "ok", first=""))
 
 
 def test_boundary_05_rows_filter_sequence_overflow(tmp_path: Path) -> None:
@@ -187,7 +219,8 @@ def test_boundary_08_rows_differing_only_by_case_sort_like_oracle(tmp_path: Path
     """Task 1.2 邊界②：兩列只差大小寫 ⇒ 排序與 oracle 相同（C collation）。"""
     def add(d: dict) -> None:
         d["eventscan-banner"]["rows"] += [["998", "b", "x", "y"], ["998", "B", "x", "y"]]
-    _assert_same(tmp_path, _case("b08", [], _tree(_reg(add)), "ok"))
+    _assert_same(tmp_path, _case("b08", [], _tree(_reg(add)), "ok",
+                                 first="<!-- BEGIN GENERATED: committee-roster -->"))
 
 
 # ---------------------------------------------------------------- 邊界（Task 2.1）
@@ -206,7 +239,7 @@ def test_boundary_10_check_on_non_git_root(tmp_path: Path) -> None:
 
 def test_boundary_11_identifier_boundary_b3rb3r(tmp_path: Path) -> None:
     """Task 2.1 邊界③：識別碼邊界（`B3RB3R` 不得被判為 `B3R`）⇒ 與 oracle 同判。"""
-    _assert_same(tmp_path, _case("b11", ["--check"], _tree(_write("白話說明/x.md", "B3RB3R 收案\n")), "ok"))
+    _assert_same(tmp_path, _case("b11", ["--check"], _tree(_write("白話說明/x.md", "B3RB3R 收案\n")), "ok", first=""))
 
 
 def test_boundary_12_multibyte_identifier_neighbours(tmp_path: Path) -> None:
@@ -281,7 +314,7 @@ def test_boundary_17_same_id_in_two_status_keys(tmp_path: Path) -> None:
 
 def test_boundary_18_b9_vs_b9a_token_boundary(tmp_path: Path) -> None:
     """Task 3.3 邊界②：`B9` 與 `B9A` 之識別碼邊界 ⇒ 與 oracle 同判（B9A 不得命中 B9）。"""
-    _assert_same(tmp_path, _case("b18", ["--check"], _tree(_write("白話說明/b9.md", "B9A 已完成之前情\n")), "ok"))
+    _assert_same(tmp_path, _case("b18", ["--check"], _tree(_write("白話說明/b9.md", "B9A 已完成之前情\n")), "ok", first=""))
 
 
 # ---------------------------------------------------------------- Task 1.1／1.2 驗證項

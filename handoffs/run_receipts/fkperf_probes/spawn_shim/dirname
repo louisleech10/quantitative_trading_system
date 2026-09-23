@@ -1,0 +1,3 @@
+#!/bin/bash
+echo dirname >> "handoffs/run_receipts/fkperf_probes/spawn.log"
+exec "/usr/bin/dirname" "$@"

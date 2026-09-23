@@ -10,6 +10,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -39,7 +40,8 @@ def _break_core(root: Path) -> None:
 
 
 def _mutation_map() -> list:
-    """Task 4.2 之對照表（原破壞語意 → 核心中之對應錨點），置於 test_govb1_factkey_gen.py。"""
+    """Task 4.2 之對照表（原破壞語意 → 核心中之對應錨點），置於 test_govb1_factkey_gen.py。
+    每列鍵：`test_ref`（耦合行 `檔名:行`）、`core_anchor`、`core_mutant`、`red_test`（mutant 下應紅之 pytest node id）。"""
     mod = importlib.import_module("tests.governance.test_govb1_factkey_gen")
     table = getattr(mod, "FKPERF_MUTATION_MAP")
     assert table, "對照表為空"
@@ -136,15 +138,50 @@ def test_e028_citation_points_into_core() -> None:
     assert f"{CORE_REL}:" in cell and "gen_fact_key_blocks.sh:" not in cell, cell
 
 
+COUPLED_FILE = "test_govb1_factkey_gen.py"
+
+
 def test_coupling_map_covers_every_bash_source_line() -> None:
-    """Task 4.2 驗證：對照表之耦合處集合＝以 grep 列舉之讀寫 bash 原始碼行（集合相等）。"""
+    """Task 4.2 驗證：對照表之耦合處集合＝以 grep 列舉之讀寫 bash 原始碼行（集合相等）。
+    掃描限 `test_govb1_factkey_gen.py`（其 `GEN`＝`gen_fact_key_blocks.sh`）：其餘檔之 `_mutate(`／`GEN.read_text`
+    指向別的腳本（r5 grok P1-03 實測 13 行誤中）；另斷言他檔無直讀生成器原始碼之行。
+    `def _mutate(` 定義行本身不算耦合處。"""
     table = {row["test_ref"] for row in _mutation_map()}
-    listed = set()
-    for p in sorted((REPO / "tests" / "governance").glob("test_*.py")):
-        for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
-            if re.search(r"_mutate\(|GEN\.read_text|gen_fact_key_blocks\.sh\"\)\.read_text", line):
-                listed.add(f"{p.name}:{n}")
+    src = (REPO / "tests" / "governance" / COUPLED_FILE).read_text(encoding="utf-8")
+    assert re.search(r'^GEN = REPO / "scripts" / "gen_fact_key_blocks\.sh"$', src, re.M), "GEN 指向漂移"
+    listed = {f"{COUPLED_FILE}:{n}" for n, line in enumerate(src.splitlines(), 1)
+              if re.search(r"(?<!def )_mutate\(|GEN\.read_text", line)}
     assert table == listed, (sorted(listed - table), sorted(table - listed))
+    for p in sorted((REPO / "tests" / "governance").glob("test_*.py")):
+        if p.name != COUPLED_FILE and not p.name.startswith("test_fkperf_"):
+            assert not re.search(r'gen_fact_key_blocks\.(sh|py)"\)\.read_text', p.read_text(encoding="utf-8")), p.name
+
+
+def test_every_mutation_map_row_turns_its_red_test_red(tmp_path: Path) -> None:
+    """Task 4.2 驗證（r5 codex／grok P1-03）：對照表每一列於隔離樹把核心之 `core_anchor` 換成 `core_mutant`，
+    跑該列 `red_test`（pytest node id，驗被破壞之性質者）⇒ rc=1；還原後同一 node ⇒ rc=0。
+    可編譯但無語意之 mutant（例：`core_mutant == core_anchor`）於此即紅。
+    環境變數 `FKPERF_MUTATION_RECEIPT` 指定路徑時，逐列寫入收據（列、命令、兩次 rc）。"""
+    fo.build_current_tree(tmp_path)
+    core = tmp_path / CORE_REL
+    good = core.read_text(encoding="utf-8")
+    rows_out = []
+    for row in _mutation_map():
+        assert row["core_mutant"] != row["core_anchor"], row
+        cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", row["red_test"]]
+        core.write_text(good.replace(row["core_anchor"], row["core_mutant"], 1), encoding="utf-8")
+        red = _run(cmd, tmp_path).returncode
+        core.write_text(good, encoding="utf-8")
+        green = _run(cmd, tmp_path).returncode
+        rows_out.append({"test_ref": row["test_ref"], "red_test": row["red_test"], "command": " ".join(cmd),
+                         "mutant_rc": red, "restored_rc": green})
+        assert (red, green) == (1, 0), rows_out[-1]
+    out = os.environ.get("FKPERF_MUTATION_RECEIPT")
+    if out:
+        Path(out).write_text(json.dumps({"schema_version": 1, "command": "pytest " + __file__ +
+                                         "::test_every_mutation_map_row_turns_its_red_test_red",
+                                         "exit_code": 0, "rows": rows_out}, ensure_ascii=False, indent=2) + "\n",
+                             encoding="utf-8")
 
 
 def test_mutation_guard_without_core_in_managed_misses_broken_core(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

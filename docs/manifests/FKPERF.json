@@ -33,6 +33,7 @@
   "batch_card": {
     "depends": [],
     "touches": [
+      "docs/FKPERF_SPEC.md",
       "scripts/gen_fact_key_blocks.sh",
       "scripts/_gen_fact_key_blocks.py",
       "scripts/factkey_write_guard.sh",
@@ -76,15 +77,18 @@
       "scripts/govb1_final_gate.sh ← g2／g3 以路徑掃描入口，核心改由 test_fkperf_govb1_equiv.py 施加同等檢查 ← grep -n '_G2_UNITS=\\|^_g3()' scripts/govb1_final_gate.sh"
     ],
     "coverage_risk": [
-      "Task 0.1 驗證①～④：tests/governance/test_fkperf_differential.py::test_oracle_self_zero_diff_and_real_check_rc0、::test_every_case_hits_its_expected_branch、::test_mutation_one_extra_byte_is_reported、::test_exit_catalog_equals_corpus_labels",
+      "Task 0.1 驗證①～④：tests/governance/test_fkperf_differential.py::test_oracle_self_zero_diff_and_real_check_rc0、::test_every_case_hits_its_expected_branch、::test_mutation_one_extra_byte_is_reported、::test_exit_catalog_equals_corpus_labels、::test_exit_sites_cover_every_stderr_line_of_oracle（出口清單之獨立錨）",
+      "Task 0.1 改法（五類語料逐筆新舊比對，C-1）：tests/governance/test_fkperf_differential.py::test_every_corpus_case_new_equals_oracle",
       "Task 0.1 語料①之 --help 三種呼叫與 C-5 前置例外配對：tests/governance/test_fkperf_differential.py::test_corpus_covers_all_five_kinds_and_help_variants",
       "Task 1.1 鍵序驗證：tests/governance/test_fkperf_differential.py::test_key_iteration_order_matches_jq_keys",
       "Task 1.2 決定性驗證：tests/governance/test_fkperf_differential.py::test_core_emit_deterministic_no_bom_no_crlf",
       "Task 2.1 驗證中「docrot2 write_guard／metrics 以直呼核心照跑全綠」：切換前由差分語料覆蓋，切換後由既有測試經入口覆蓋（fkperf_freeze_check.sh 既有 DOCROT2 測試項）",
       "Task 3.1／3.2 驗證中既有 s1x／s2x／s6x 系列：切換後經入口由 fkperf_freeze_check.sh 既有生成器測試項覆蓋",
       "Task 4.1 驗證：tests/governance/test_fkperf_cutover.py::test_managed_set_includes_core_and_broken_core_is_caught、::test_precommit_migration_trigger_includes_core、::test_e028_citation_points_into_core",
-      "Task 4.2 驗證：tests/governance/test_fkperf_cutover.py::test_coupling_map_covers_every_bash_source_line（對照表 FKPERF_MUTATION_MAP 由實作者於 test_govb1_factkey_gen.py 建立）",
+      "Task 4.2 驗證：tests/governance/test_fkperf_cutover.py::test_coupling_map_covers_every_bash_source_line、::test_every_mutation_map_row_turns_its_red_test_red（逐列 mutant 紅／還原綠；對照表 FKPERF_MUTATION_MAP 由實作者於 test_govb1_factkey_gen.py 建立，每列含 red_test）；逐列收據由 scripts/fkperf_freeze_check.sh 經 FKPERF_MUTATION_RECEIPT 寫入並以 jq 驗完整",
       "Task 4.3 驗證：tests/governance/test_fkperf_govb1_equiv.py::test_core_has_no_g2_literal_denominators、::test_core_has_no_g3_disable_switch、::test_injected_literal_and_switch_are_detected",
+      "Task 0.2／4.4 量測 helper 之 rc 契約（rc≠0 即拋例外，快速失敗不得充當有限／不變）：tests/governance/test_fkperf_scale.py::test_measurement_helpers_raise_on_nonzero_rc",
+      "Task 4.4 邊界③④之注入可達性（每 key 渲染經模組全域 gen_block）：tests/governance/test_fkperf_scale.py::test_gen_block_injection_reaches_every_key",
       "Task 4.4 驗證：tests/governance/test_fkperf_scale.py::test_spawn_and_open_counts_scale_invariant、::test_ratio_40x_within_20x_of_4x、::test_guard_spawns_scale_invariant；R-GOVTEST-5 之 strict xfail 轉 XPASS 後移除並關閉登記列",
       "SPEC 邊界 34 條：編號 01–32 各對應一支 test_boundary_NN_*（01–18 差分、19–25 規模、26–30 切換、31–32 GOVB1）；Task 4.5 之兩條見 not_executable"
     ],

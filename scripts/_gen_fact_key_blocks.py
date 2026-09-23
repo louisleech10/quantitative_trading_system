@@ -34,7 +34,8 @@ class Outcome:
 
 
 def preflight(reg_path: Path) -> Optional[Outcome]:
-    """註冊表存在且為合法 JSON 物件（拒 NaN／Infinity）；失敗回傳 rc=1 之 Outcome（SPEC Task 1.1，C-5）。"""
+    """註冊表存在且為合法 JSON 物件；失敗回傳 rc=1 之 Outcome（SPEC Task 1.1，C-5）。
+    `NaN`／`Infinity` 字面於解析階段接受（與 jq 1.7.1 相同），交由 rows 型別檢查以 oracle 同訊息拒絕（SPEC v6 C-5）。"""
     raise NotImplementedError("FKPERF Task 1.1")
 
 
@@ -49,7 +50,12 @@ def rows_tsv(reg: Registry, key: str) -> List[bytes]:
 
 
 def gen_block(reg: Registry, key: str) -> bytes:
-    """產出單一 key 之生成區塊內容（tsv／table render；SPEC Task 1.2）。"""
+    """產出單一 key 之生成區塊內容（tsv／table render；SPEC Task 1.2）。
+
+    🔴 可測性契約（r5 三家 P1）：`emit_all`／`write_all`／`check_hosts` 之每 key 渲染一律在**呼叫當下**以模組全域名
+    `gen_block(reg, key)` 呼叫——不得以模組層別名（`_x = gen_block`）、預設參數或閉包綁定，亦不得改走另一私有渲染函式。
+    規模邊界 23／24 之 mutant 以覆寫此全域名注入每 key 迴圈；
+    `tests/governance/test_fkperf_scale.py::test_gen_block_injection_reaches_every_key` 以行為驗證此契約。"""
     raise NotImplementedError("FKPERF Task 1.2")
 
 

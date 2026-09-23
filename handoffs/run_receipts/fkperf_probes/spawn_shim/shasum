@@ -1,0 +1,3 @@
+#!/bin/bash
+echo shasum >> "handoffs/run_receipts/fkperf_probes/spawn.log"
+exec "/usr/bin/shasum" "$@"

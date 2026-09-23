@@ -46,12 +46,14 @@ def count_spawns_cmd(argv: Sequence[str], cwd: Path) -> Tuple[int, Dict[str, int
 
 
 def count_spawns(root: Path, mode: str) -> Tuple[int, Dict[str, int]]:
-    """以 PATH shim 計 `mode`（emit／--check／--write／--status-hits／guard）之外部程序數。"""
+    """以 PATH shim 計 `mode`（emit／--check／--write／--status-hits／guard）之外部程序數。
+    被量之呼叫 rc≠0 ⇒ 拋 `subprocess.CalledProcessError`（快速失敗之路徑不得充當「與規模無關」；r5 三家 P1）。"""
     raise NotImplementedError("FKPERF Task 0.2")
 
 
 def time_mode(root: Path, mode: str, trials: int, timeout: float = 0.0) -> List[float]:
-    """量 `mode` 之牆鐘耗時 `trials` 次；`timeout`>0 時單次逾時即回傳 inf。"""
+    """量 `mode` 之牆鐘耗時 `trials` 次；`timeout`>0 時單次逾時即回傳 inf（逾時之那次不看 rc）。
+    未逾時而 rc≠0 ⇒ 拋 `subprocess.CalledProcessError`（快速失敗不得充當「耗時有限」；r5 三家 P1）。"""
     raise NotImplementedError("FKPERF Task 4.4")
 
 

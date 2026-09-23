@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "command": "bash handoffs/run_receipts/fkperf_probes/prof_spawn.sh guard",
+  "exit_code": 0,
+  "receipt": "FKPERF 偵察（主委實跑 2026-09-23，HEAD 4bdc2d56，macOS，負載平均約 3）",
+  "trigger": "使用者 2026-09-23 逐字：「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」",
+  "timings_seconds": {
+    "factkey_write_guard HANDOFF.md": 10.3,
+    "factkey_write_guard 白話說明/現在做到哪.md": 10.2,
+    "factkey_write_guard docs/EVENTSCAN_SPEC.md": 10.5,
+    "factkey_write_guard momentum/factories.py (非受管檔)": 0.0,
+    "gen_fact_key_blocks.sh --check (x2)": [10.73, 10.55],
+    "gen_fact_key_blocks.sh emit (x3)": [2.53, 2.45, 2.45],
+    "live_doc_write_guard.sh (PreToolUse, Python) Edit HANDOFF.md": 0.1
+  },
+  "fact_key_count": {"2026-09-19 (9ce175c2)": 17, "2026-09-23 (HEAD)": 35},
+  "external_process_spawns": {
+    "method": "handoffs/run_receipts/fkperf_probes/prof_spawn.sh <emit|guard>：PATH shim 對 jq/awk/sort/grep/sed/git/tr/cut/wc/head/tail/shasum/python3/cat/mktemp/printf/comm/uniq/basename/dirname/realpath/stat/find 計次，不計時",
+    "emit": {"total": 664, "jq": 438, "awk": 83, "grep": 81, "sort": 41, "tr": 18},
+    "guard (HANDOFF.md)": {"total": 4322, "jq": 1417, "tr": 882, "wc": 842, "grep": 555, "sort": 466, "awk": 99, "sed": 52, "git": 2}
+  },
+  "per_function_attribution_check_mode": {
+    "method": "handoffs/run_receipts/fkperf_probes/prof_func.sh：xtrace PS4 以 FUNCNAME 標註，計各函式發出之外部指令（含子 shell，與 shim 計數口徑不同）",
+    "top": [
+      "315 _fk_reject_handwritten_status grep",
+      "160 _fk_targets jq", "142 _fk_targets wc", "142 _fk_targets tr", "71 _fk_targets sort",
+      "76 _fk_markers_ok grep", "70 _fk_gen_block jq", "48 _fk_validate_enforcement awk",
+      "46 _fk_rows_filter_rows jq", "44 _fk_validate_enforcement grep", "38 _fk_reject_unregistered_blocks grep",
+      "38 _fk_check sed", "36 _fk_mount_exists jq", "35 each: _fk_validate_shape jq / _fk_validate_rows jq / _fk_validate_keys grep / _fk_rows_tsv sort+jq / _fk_render_of jq / _fk_reject_rc_claims_outside_blocks grep"
+    ]
+  },
+  "platform": "bash 3.2.57（macOS 內建；無關聯陣列 ⇒ 逐 key 狀態只能重查 jq）；python3 3.9（系統）",
+  "consumers_of_gen_fact_key_blocks_sh": [
+    ".claude/settings.json（經 factkey_write_guard.sh 掛 PostToolUse Edit|Write）",
+    "scripts/factkey_write_guard.sh（--check）",
+    "scripts/_live_doc_write_guard.py（--status-hits，PreToolUse）",
+    "scripts/gov_check.sh 第 3 段（--check）",
+    "scripts/git_hooks/pre-commit",
+    "scripts/precommit_selfcheck.sh",
+    "scripts/regen_factkey_fixtures.sh（--write）",
+    "scripts/govb1_final_gate.sh（g2 consumer 字面分母、g3 停用開關：以路徑掃描本檔；清單 scripts/govb1_scope.manifest 由 govb1_frozen_hashes.txt 鎖雜湊，屬硬保護集）"
+  ],
+  "tests_coupled_to_bash_source": {
+    "test_govb1_factkey_gen.py 內 _mutate／GEN.read_text 等改寫或讀取 bash 原始碼之處": 14,
+    "tests/governance 中引用 gen_fact_key_blocks 之檔數": 10,
+    "_mutate(sdir 形式之 mutation 呼叫": 4
+  },
+  "modes": ["（無參數）emit", "--check", "--write", "--status-hits <行檔>", "-h|--help", "未知參數 rc=2", "多參數 rc=2"]
+}

@@ -1,0 +1,3 @@
+#!/bin/bash
+echo stat >> "handoffs/run_receipts/fkperf_probes/spawn.log"
+exec "/usr/bin/stat" "$@"

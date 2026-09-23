@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "command": "python3 <scratchpad>/probe_exits{,2,3,4}.py（以 git archive HEAD＋receipt 建沙箱，現行 bash 生成器實跑各差分語料之建法）",
+  "exit_code": 0,
+  "receipt": "FKPERF 施工清單送審前主委實測：差分測試各沙箱建法以現行（oracle）生成器實跑，是否命中預期出口（2026-09-23）",
+  "first_attempt_refuted": {
+    "b05 emit／1000 列 roadmap-status": "rc=1 首行『key roadmap-status 之列違規』（下一步佔位符），非序號溢位",
+    "b13／b16／b17 以 --check": "rc=1 首行 FACTKEY DRIFT（改註冊表未同步宿主），非目標出口",
+    "b12 roadmap-status 識別碼": "rc=0：手寫狀態偵測之識別碼只取 _schema.status_keys，roadmap-status 不在內",
+    "b14 改末欄": "rc=0：末欄非期望欄（期望欄＝期望rc）",
+    "b09 HP-FKPERF": "--check 之手寫狀態偵測不含 HP-*（--status-hits 則含）"
+  },
+  "final_builders_verified": {
+    "b01 缺 governance_families.json（--check）": "rc=1『key committee-roster 之 rows_source.file 不存在或非一般檔』",
+    "b01 缺機制 receipt（--check）": "rc=1『key governance-mechanism 之 receipt 指向不存在之檔』",
+    "b01 缺 settings.json（--check）": "rc=1『E-001 之掛載點無法對證——hook 設定之承載目錄存在，但設定檔缺失』",
+    "b02 --status-hits 含 TAB 與 \\001": "rc=0 stdout 兩行命中 WL-01",
+    "b05 handoff-pending 1000 列（--write）": "rc=1『key handoff-current 之 rows_filter 逾序號位數』",
+    "b09 檔名含換行（--check）": "rc=1『FACTKEY HANDWRITTEN STATUS: 白話說明/a<LF>b.md:1 識別碼=WL-01』",
+    "b11 B3RB3R（--check）": "rc=0",
+    "b12 WL-識別碼（同步後 --check）": "rc=1『FACTKEY HANDWRITTEN STATUS: … 識別碼=WL-識別碼 狀態=未開工』",
+    "b13 receipt 指向不存在（--write）": "rc=1『key governance-mechanism 之 receipt 指向不存在之檔』",
+    "b14 同範圍同條件相異期望rc（--write）": "rc=1『key governance-criteria 有互斥判準』",
+    "b15 缺 settings.json 而目錄在（--check）": "rc=1『E-001 之掛載點無法對證』",
+    "b16 引用指向註解行（--write）": "rc=1『下列引用之行號落在註解／空行或檔案不存在』",
+    "b17 識別碼跨 key 重複（--write）": "rc=1『status_keys 與 docrot2_status_keys 之識別碼跨 key 重複』",
+    "b18 B9A（--check）": "rc=0"
+  },
+  "second_pass_refuted_and_fixed": {
+    "b10 ROOT 指向空目錄": "rc=1 首行『FACTKEY MISSING TARGET』非『非 git 樹』→ 改指宿主齊全而無 .git 之樹",
+    "b04／b06 於完整樹": "rc=1 首行『交接投影與活文件登記不符』→ 改最小沙箱（只含生成器與註冊表）",
+    "b06 NaN": "jq 1.7.1 接受 NaN／Infinity（Infinity→1.7976931348623157e+308），非解析失敗；最小沙箱 rc=1『key x 之 rows 型別不符』→ SPEC v6 更正 C-5 與 Task 1.1 邊界③",
+    "b07 控制字元與 |": "兩個不同出口：『儲存格含控制字元』與『render=table 之儲存格含 |』→ 拆兩標籤"
+  },
+  "second_pass_verified": {
+    "b03 無 .git（--check）": "rc=1『FACTKEY SCAN: . 非 git 工作樹 ⇒ fail-closed』",
+    "b04 最小沙箱 {}": "rc=0",
+    "b06 最小沙箱 {\"x\": NaN}": "rc=1『key x 之 rows 型別不符（須為字串陣列之陣列）』",
+    "b07 控制字元": "rc=1『key eventscan-banner 之儲存格含控制字元』",
+    "b07 |": "rc=1『key eventscan-banner render=table 之儲存格含 |』",
+    "b08 大小寫": "rc=0；輸出序 `| 998 | B |` 在 `| 998 | b |` 之前（C collation）"
+  },
+  "r5_ok_first_lines": {
+    "_how": "python3 <scratchpad>/probe_okfirst.py（git archive HEAD 沙箱＋現行 bash 生成器；r5 grok P1-01 要求成功分支亦釘 stdout 首行）",
+    "b02 --status-hits": "rc=0 首行『L1<TAB>WL-01<TAB>收案』共 2 行",
+    "b04 最小沙箱 {} emit": "rc=0 stdout 空",
+    "b08 emit": "rc=0 首行『<!-- BEGIN GENERATED: committee-roster -->』",
+    "b11 --check": "rc=0 stdout 空",
+    "b18 --check": "rc=0 stdout 空",
+    "real --check": "rc=0 stdout 空",
+    "real emit": "rc=0 首行『<!-- BEGIN GENERATED: committee-roster -->』共 609 行"
+  },
+  "not_probed": ["b10 以 ROOT=. 指向無 .git 之完整樹（同 b03 之出口，僅改經 env 指定）"]
+}
