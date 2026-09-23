@@ -387,9 +387,9 @@
         "225",
         "RM-EVENTSCAN",
         "EVENTSCAN 條件掃描→持有 N 根報酬 vs 隨機對照報酬（大票，單標的）",
-        "進行中",
+        "停手",
         "白話說明/EVENTSCAN方向與做法.md",
-        "🔴 **現況＝SPEC 已起草，兩家對抗審至 R8，尚未凍結**（下一步＝收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO；**不是實作**）。大票完整管線：①寫 SPEC →②兩家對抗審→收斂→凍結 →③寫 TODO →④兩家對抗審→收斂→凍結 →⑤分批實作 →⑥每批審碼→收斂，目前在②。方向與做法已定案（偵察 r1 十一條＋量化方法 consult r2 十四條皆收斂銷帳；使用者九項裁定；方向書 v10 經逐章稽核），但那是 SPEC 之**前置**不是替代。權威＝白話說明/EVENTSCAN方向與做法.md（使用者要的數字、九項裁定、十步做法、八個缺口）。做法十步含：條件引擎吃 FF 欄且欄名打錯要報錯／欄位選擇器（該 run 欄名規模見 SPEC 之 `eventscan-column-selector` 100）／掃描函式接 API／統一持有時鐘／連續成立只進場一次／報酬表補標準差與最好最差／隨機批參數由觸發批帶入＋抽樣四修／比較端點改比報酬＋Δ 之 bootstrap 區間／前端含硬性橫幅／事件版成本歸零點。單標的先做，多標的併 GAP-4 🔴 **使用者 2026-09-21 追加裁定**：寫 SPEC 時**同步建「同一事實只寫一次」（代號 B）**——凡會被 TODO／測試／白話再抄一次的**值**（時鐘定義、first-of-run、隨機對照抽樣四條、報酬欄主顯示、統計欄、breakeven 公式、失敗原因碼、欄名打錯要報錯、使用者七項裁定…約 40–60 條），於寫到該格的**當下**改為 `fact_keys` 生成區塊，不手打；不是獨立的票、不新建工具、不延後 SPEC。BEFORE 基線已記於 handoffs/run_receipts/20260921-eventscan-b-baseline.json（69 輪、251 條 canonical、doc-sync 55 條＝21.9%、每輪 1.00 條），AFTER 用同一支 docrot2_round_metric 比。🔴 **誠實邊界**：B 只管可列舉的**值**（零件型號表），**不管架構對不對、零件怎麼接、為什麼這樣設計**；同一份文件內前後矛盾與論述寫錯外部無解、本專案亦無解，只能靠兩家對抗審且會漏。🔴 **已知洞**：手寫偵測之 status_scope 只含 HANDOFF.md／docs/GOVERNANCE_EXECUTION_ORDER.md／白話說明/，**docs/ 其餘檔不在內** ⇒ SPEC 內貼了標記的格會同步，但在別段落手打同一個值不會被擋；補洞代價未查。🔴 **2026-09-21 進度**：SPEC v1 已寫並經**五輪**兩家對抗審（R1 21 條／R2 19／R3 14／R4 14／R5 10，**全數採納、零駁回**），fact-key 15 組約 130 列。🔴 **R5 曾揭露前提崩塌並已修復**：舊 run 之特徵欄被 fracdiff 轉換且逐週期 d 不同，故 `EMA_5 > EMA_10` 恆為真、1 段。使用者裁定重跑無轉換 FF run。🔴 **第一次重跑（`654bd63b…`）被 R6 抓到漏了全部 12h 欄，該 run 不可用**；主委補 `timeframes.training` 重發後完成，**reference 定版為 `d9935491…`**（規模見 SPEC 之 `eventscan-column-selector` 100；EMA 欄 corr 全 1.0000、該條件 956 段）⇒ **凍結硬前置已解除**。🔴 **R7 推翻主委之欄位選擇器設計本體**：原「以欄名底線切五層」只涵蓋 0.77%，且切分不可靠（來源欄名含底線、指標可多參數）⇒ 改以 manifest `groups` 為結構來源、全程不解析欄名。🔴 **R8 複查該改動，findings 回升至 14 條，回升全數由 R7 之改動引入**：R7 在 020 把不存在的 `timeframe`／`layer`／`category`／`indicator` 寫成 group 物件之結構化欄位（944 個物件中各出現 0 次），050 之群內不變式被否證，分頁只有 smoke 無完整性契約，選擇器與 PIT 成員資格不一致。週期來源改採 `task_record.json`（兩家提案皆不採，見 K-10 030）。🔴 **R9（findings 數自 R1 起 21→19→14→14→10→7→7→14→10）：R8 之十四條 13 CLOSED、1 STILL-OPEN**；主委在 R8 之兩處「與委員提案相左」之裁定**皆被判成立**（週期來源、fixture 不列凍結前置），但兩者契約不完整已補。R9 最重之一條是**主委在 R8 自己製造的邏輯矛盾**——同一輪採納「樹＝PIT 子集」與「守恆＝manifest 全量聯集」，兩者在 allowlist 非整份 944 時不可能同時為真，已改守恆右端為已核准子集。另**主委自改之 `spec_xref_check.sh` 被抓到兩個 fail-open 洞**（未閉合 marker、fence 內 marker），已改為結構驗證並把回歸測試自 18 增至 22。本輪新增 §P **Phase 0**（三個 Task：fixture 產出、055 之 hash 閘、PIT allowlist 產生器）承載原本無處可掛之回填閘。R9 之 10 條全數採納、零駁回，**SPEC 仍未凍結**，待 R10 複查。"
+        "🔴 **2026-09-22 起暫停**（使用者裁定先做 SPEC／TODO 流程優化；其中 TODO 改格式已於 2026-09-23 由 RM-TODOFMT 完工，何時復工待使用者決定；復工時先依新格式產出本票 manifest）。停手時：SPEC 經兩家對抗審至 R12 收斂、未凍結，R12 末仍 11×P1。以下為停手前之沿革——🔴 **現況＝SPEC 已起草，兩家對抗審至 R8，尚未凍結**（下一步＝收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO；**不是實作**）。大票完整管線：①寫 SPEC →②兩家對抗審→收斂→凍結 →③寫 TODO →④兩家對抗審→收斂→凍結 →⑤分批實作 →⑥每批審碼→收斂，目前在②。方向與做法已定案（偵察 r1 十一條＋量化方法 consult r2 十四條皆收斂銷帳；使用者九項裁定；方向書 v10 經逐章稽核），但那是 SPEC 之**前置**不是替代。權威＝白話說明/EVENTSCAN方向與做法.md（使用者要的數字、九項裁定、十步做法、八個缺口）。做法十步含：條件引擎吃 FF 欄且欄名打錯要報錯／欄位選擇器（該 run 欄名規模見 SPEC 之 `eventscan-column-selector` 100）／掃描函式接 API／統一持有時鐘／連續成立只進場一次／報酬表補標準差與最好最差／隨機批參數由觸發批帶入＋抽樣四修／比較端點改比報酬＋Δ 之 bootstrap 區間／前端含硬性橫幅／事件版成本歸零點。單標的先做，多標的併 GAP-4 🔴 **使用者 2026-09-21 追加裁定**：寫 SPEC 時**同步建「同一事實只寫一次」（代號 B）**——凡會被 TODO／測試／白話再抄一次的**值**（時鐘定義、first-of-run、隨機對照抽樣四條、報酬欄主顯示、統計欄、breakeven 公式、失敗原因碼、欄名打錯要報錯、使用者七項裁定…約 40–60 條），於寫到該格的**當下**改為 `fact_keys` 生成區塊，不手打；不是獨立的票、不新建工具、不延後 SPEC。BEFORE 基線已記於 handoffs/run_receipts/20260921-eventscan-b-baseline.json（69 輪、251 條 canonical、doc-sync 55 條＝21.9%、每輪 1.00 條），AFTER 用同一支 docrot2_round_metric 比。🔴 **誠實邊界**：B 只管可列舉的**值**（零件型號表），**不管架構對不對、零件怎麼接、為什麼這樣設計**；同一份文件內前後矛盾與論述寫錯外部無解、本專案亦無解，只能靠兩家對抗審且會漏。🔴 **已知洞**：手寫偵測之 status_scope 只含 HANDOFF.md／docs/GOVERNANCE_EXECUTION_ORDER.md／白話說明/，**docs/ 其餘檔不在內** ⇒ SPEC 內貼了標記的格會同步，但在別段落手打同一個值不會被擋；補洞代價未查。🔴 **2026-09-21 進度**：SPEC v1 已寫並經**五輪**兩家對抗審（R1 21 條／R2 19／R3 14／R4 14／R5 10，**全數採納、零駁回**），fact-key 15 組約 130 列。🔴 **R5 曾揭露前提崩塌並已修復**：舊 run 之特徵欄被 fracdiff 轉換且逐週期 d 不同，故 `EMA_5 > EMA_10` 恆為真、1 段。使用者裁定重跑無轉換 FF run。🔴 **第一次重跑（`654bd63b…`）被 R6 抓到漏了全部 12h 欄，該 run 不可用**；主委補 `timeframes.training` 重發後完成，**reference 定版為 `d9935491…`**（規模見 SPEC 之 `eventscan-column-selector` 100；EMA 欄 corr 全 1.0000、該條件 956 段）⇒ **凍結硬前置已解除**。🔴 **R7 推翻主委之欄位選擇器設計本體**：原「以欄名底線切五層」只涵蓋 0.77%，且切分不可靠（來源欄名含底線、指標可多參數）⇒ 改以 manifest `groups` 為結構來源、全程不解析欄名。🔴 **R8 複查該改動，findings 回升至 14 條，回升全數由 R7 之改動引入**：R7 在 020 把不存在的 `timeframe`／`layer`／`category`／`indicator` 寫成 group 物件之結構化欄位（944 個物件中各出現 0 次），050 之群內不變式被否證，分頁只有 smoke 無完整性契約，選擇器與 PIT 成員資格不一致。週期來源改採 `task_record.json`（兩家提案皆不採，見 K-10 030）。🔴 **R9（findings 數自 R1 起 21→19→14→14→10→7→7→14→10）：R8 之十四條 13 CLOSED、1 STILL-OPEN**；主委在 R8 之兩處「與委員提案相左」之裁定**皆被判成立**（週期來源、fixture 不列凍結前置），但兩者契約不完整已補。R9 最重之一條是**主委在 R8 自己製造的邏輯矛盾**——同一輪採納「樹＝PIT 子集」與「守恆＝manifest 全量聯集」，兩者在 allowlist 非整份 944 時不可能同時為真，已改守恆右端為已核准子集。另**主委自改之 `spec_xref_check.sh` 被抓到兩個 fail-open 洞**（未閉合 marker、fence 內 marker），已改為結構驗證並把回歸測試自 18 增至 22。本輪新增 §P **Phase 0**（三個 Task：fixture 產出、055 之 hash 閘、PIT allowlist 產生器）承載原本無處可掛之回填閘。R9 之 10 條全數採納、零駁回，**SPEC 仍未凍結**，待 R10 複查。"
       ],
       [
         "230",
@@ -421,7 +421,7 @@
         "FF-TFMETA：同一 run 之 present_timeframes 兩個值（completeness 鏈型別只接單一週期）",
         "未開工",
         "docs/FFDEFECT_DECISION.md",
-        "起因＝EVENTSCAN R7／R8 追查欄位選擇器之週期來源時發現。🔴 定性輪（handoffs/reconcile/20260921-ffdefect-x-consult-r1/synth.md）codex＋composer **獨立同判為真缺陷**，零駁回。根因＝`build_completeness_meta_from_layer_results(..., *, timeframe: str)` 型別上只接單一週期，三個寫入點全傳純量；多週期之正確值只存在於 `multi_tf_generator._present_timeframes()` 並流向 `task_record.json`，從未進 manifest。且 `_apply_failed_timeframe_metadata` 開頭即 `if not failed_timeframes: return` ⇒ **只有在有週期失敗時才寫得完整，全部成功時反而是錯的**。實測：18 個 run 中 4 個多週期 run 之 manifest 皆只宣告主週期。嚴重度＝**latent**（生產端零消費者，命中全在測試與 profile 腳本；EVENTSCAN 會是第一個真實消費者）。修法＝producer 產 ordered unique completeness object 同時餵 manifest 與 task record，`expected_timeframes` 須一併改；canonical 來源＝ordered training config 與 skip／failure 集合，**gid 前綴只作 diagnostic cross-check 不得當權威**（codex 修正，同時修正主委與 composer）。**排序＝先於 FF-NAME**（不改欄名、風險低）。不併入 FFDSTAR。"
+        "起因＝EVENTSCAN R7／R8 追查欄位選擇器之週期來源時發現。🔴 定性輪（handoffs/reconcile/20260921-ffdefect-x-consult-r1/synth.md）codex＋composer **獨立同判為真缺陷**，零駁回。根因＝`build_completeness_meta_from_layer_results(..., *, timeframe: str)` 型別上只接單一週期，三個寫入點全傳純量；多週期之正確值只存在於 `multi_tf_generator._present_timeframes()` 並流向 `task_record.json`，從未進 manifest。且 `_apply_failed_timeframe_metadata` 開頭即 `if not failed_timeframes: return` ⇒ **只有在有週期失敗時才寫得完整，全部成功時反而是錯的**。實測：18 個 run 中 4 個多週期 run 之 manifest 皆只宣告主週期。嚴重度＝**latent**（生產端零消費者，命中全在測試與 profile 腳本；EVENTSCAN 會是第一個真實消費者）。修法＝producer 產 ordered unique completeness object 同時餵 manifest 與 task record，`expected_timeframes` 須一併改；canonical 來源＝ordered training config 與 skip／failure 集合，**gid 前綴只作 diagnostic cross-check 不得當權威**（codex 修正，同時修正主委與 composer）。**排序＝先於 FF-NAME**（不改欄名、風險低）。不併入 FFDSTAR。清單檔（manifest）範例已備：docs/manifests/FFTFMETA.json（TODOFMT 樣本；開工時依本票 SPEC 覆核，其中標「待 FF-TFMETA 新增」之九個測試名由本票補上）。"
       ],
       [
         "280",
@@ -445,15 +445,15 @@
         "PROCOPT：SPEC／TODO 流程優化（診斷完成，改法待使用者裁決）",
         "待審",
         "docs/PROCOPT_DECISION.md",
-        "起因＝使用者 2026-09-22 逐字四問（量化主線 SPEC／TODO 為何這麼多輪且無法收斂／業界模式差異／是模式還是主委／花時間在文件但實作仍有 bug 是否正常）。r1→r2→r3 三輪唯讀診斷，兩家零駁回，**未實施任何流程改動**。結論：①「無法收斂」為假——零實質 finding 多次達到，達不到的是「達到後把票停住」②三機制分解：相位大跳（量化 4 次／治理 0 次）＝模式；同文件小回升（7／9 vs 5／9）＝主委編輯紀律；到零不停＝模式 ③委員抽樣 18 個實作缺陷群集：**SPEC 寫對但沒照做 40%、SPEC 根本沒寫到 50%** ⇒ 直接否定「加 SPEC 輪數可換實作品質」。⇒ 四步改法（0 不變式之可執行 owner＋只審 diff／1 薄切片先行／2 切斷 SPEC→TODO 相位串接／3 驗收條件移到測試檔）。🔴 **否決點**：採納哪幾步由使用者裁決；第 2、3 步須改 `CLAUDE.md`。裁決前 RM-EVENTSCAN 之 R13 停手。"
+        "起因＝使用者 2026-09-22 逐字四問（量化主線 SPEC／TODO 為何這麼多輪且無法收斂／業界模式差異／是模式還是主委／花時間在文件但實作仍有 bug 是否正常）。r1→r2→r3 三輪唯讀診斷，兩家零駁回，**未實施任何流程改動**。結論：①「無法收斂」為假——零實質 finding 多次達到，達不到的是「達到後把票停住」②三機制分解：相位大跳（量化 4 次／治理 0 次）＝模式；同文件小回升（7／9 vs 5／9）＝主委編輯紀律；到零不停＝模式 ③委員抽樣 18 個實作缺陷群集：**SPEC 寫對但沒照做 40%、SPEC 根本沒寫到 50%** ⇒ 直接否定「加 SPEC 輪數可換實作品質」。⇒ 四步改法（0 不變式之可執行 owner＋只審 diff／1 薄切片先行／2 切斷 SPEC→TODO 相位串接／3 驗收條件移到測試檔）。🔴 **否決點**：採納哪幾步由使用者裁決；第 2、3 步須改 `CLAUDE.md`。裁決前 RM-EVENTSCAN 之 R13 停手。2026-09-23：其中「TODO 改為五類落點」一項已由 RM-TODOFMT 實施完成；其餘各步仍待使用者逐條裁決。"
       ],
       [
         "300",
         "RM-TODOFMT",
         "TODOFMT：散文 TODO 廢止，改五類可執行落點＋對應範本與閘門",
-        "進行中",
-        "docs/TODOFMT_SPEC.md",
-        "起因＝RM-PROCOPT 之診斷（實作缺陷 40% 為「規格寫對但沒照做」、散文 TODO 為測試檔之低保真草稿）。consult r1 三家定方向（五類落點：生產 stub／tests+scripts／契約 JSON／機讀批次卡／實跑收據）。SPEC 審 11 輪後設計定案（L＝`f2146e3d`）。實作三批皆已提交（第 3 批＝W `26048178`，新規則自此生效）；第 1、2 批已收批；第 3 批審碼 r1 之 8 條已修並經 r2 由原提出方確認閉合。收案前自查另修三項（VERDICTGATE 三條測試之派工夾具、manifest 寫入當下檢查、路由空值邊角），待全套治理測試與 r3 審碼後重跑收案聚合器即收案。🔴 硬約束：不得引入分鐘級以上之檢查、不得動 pre-push、mutation 靜態擴覆蓋維持 opt-in。其餘票依使用者裁定暫停至本票完工。"
+        "已完成",
+        "白話說明/TODO優化結論.md",
+        "2026-09-23 收案。起因＝RM-PROCOPT 之診斷（實作缺陷 40% 為「規格寫對但沒照做」、散文 TODO 為測試檔之低保真草稿）。新票之 TODO＝五類落點 manifest（`docs/manifests/<EPIC>.json`；規格 docs/TODOFMT_SPEC.md，SPEC 審 11 輪後設計定案，L＝`f2146e3d`）。自 W（`26048178`）起生效之機制：寫散文 TODO 即擋（PreToolUse）、manifest 寫入當下機檢（PostToolUse）、派工閘門（新 SPEC 須 manifest 且 spec_path 相等；`--impl-self` 須帶 `--spec`）。實作三批皆經三家審碼閉合；收案聚合器 12 項 rc=0（HEAD `d8107deb`）；全套治理測試 78 紅逐條歸因，皆早於本票或屬偶發／環境（見 HANDOFF 坑）。🔴 硬約束沿用：不得引入分鐘級以上之檢查、不得動 pre-push、mutation 靜態擴覆蓋維持 opt-in。被暫停之票何時復工待使用者決定。"
       ]
     ]
   },
@@ -1718,28 +1718,28 @@
         "HP-EVENTSCAN",
         "停手",
         "白話說明/EVENTSCAN方向與做法.md",
-        "🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。復工條件＝流程改法裁決後，依新停輪條件重定本票續審形狀"
+        "🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀"
       ],
       [
         "033",
         "HP-TODOFMT",
-        "進行中",
-        "docs/TODOFMT_SPEC.md",
-        "大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1 與 2 條 P3 已修、r2 三家確認閉合，**b2 收批**。**b3＝W 已提交**（Task 1.2 hook 掛載、Task 1.3／1.4 gate.sh 路由與新 SPEC 須 manifest、Task 3.1／3.2 兩份樣本；新規則自此生效）；收案聚合器 12 項 rc=0（41.9 秒）。**b3 審碼 r1**：composer、grok 判可收；codex 擋 1 條 P1（路徑值夾帶換行會被逐行清單比對拆成多個樣式而放行，hook 與 gate.sh 同型），另 P2×3、P3×3。8 條全數已修；主委另實測 Write 工具會字面折疊 `..`（經不存在之目錄亦照寫）⇒ hook 同步折疊，指向 repo 之別名路徑改以 `-ef` 比對祖先目錄。**b3 審碼 r2**：三家皆判可收，r1 八條全數由原提出方確認閉合。**主委收案前自查**：①以 gate 相關既有測試回歸（SPEC Task 1.4 要求同批回歸、提交時漏跑）查出 VERDICTGATE 三條 `--impl-self` 測試因邊界⑩轉紅 ⇒ 補其派工夾具、斷言不動 ②依產出端覆蓋鐵律，manifest 格式檢查改為寫入當下亦跑（新 PostToolUse 守衛）③路由判定對正規化後為空之 `--spec` 即拒（r2 grok 正文之邊角）。`test_debt_gate.py` 之 100 ms 延遲測試為舊紅（相關腳本 09-16 後未改，audit 長大所致），不屬本票。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝全套治理測試（背景）→ b3 審碼 r3（上述三項）→ 重跑收案聚合器 → 收案 → 白話結論書"
+        "已完成",
+        "白話說明/TODO優化結論.md",
+        "2026-09-23 收案。新票之 TODO＝五類落點 manifest（`docs/manifests/<EPIC>.json`，規格 docs/TODOFMT_SPEC.md）；寫散文 TODO 即擋、manifest 寫入當下機檢、派工閘門認新格式（`--impl-self` 須帶 `--spec`）自 W（`26048178`）生效。三批皆經三家審碼閉合，末輪 r3 零 finding；收案聚合器 12 項 rc=0（HEAD `d8107deb`）；全套治理測試 78 紅逐條歸因，皆早於本票或屬偶發／環境。其餘票何時復工待使用者決定"
       ],
       [
         "035",
         "HP-PROCOPT",
         "待審",
         "docs/PROCOPT_DECISION.md",
-        "診斷完成（r1→r2→r3）。使用者後續裁定：**先完成 TODO 優化**（見 HP-TODOFMT），其餘改法待 TODOFMT 完工後再議。r3 之四步改法經使用者逐條質詢後大多撤回或降級，現存狀態見 白話說明/SPEC與TODO流程優化.md。**未實施任何流程改動**"
+        "診斷完成（r1→r2→r3）。使用者後續裁定：**先完成 TODO 優化**（見 HP-TODOFMT）——已於 2026-09-23 完工（§四之二 TODO 改為五類落點）；其餘改法待使用者逐條裁決。r3 之四步改法經使用者逐條質詢後大多撤回或降級，現存狀態見 白話說明/SPEC與TODO流程優化.md。**未實施任何流程改動**"
       ],
       [
         "040",
         "HP-FFDSTAR",
         "停手",
         "docs/FFDSTAR_SPEC.md",
-        "🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest"
+        "🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工；該票已於 2026-09-23 完工，何時復工待使用者決定）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest"
       ]
     ]
   },
@@ -3624,7 +3624,7 @@
       ],
       [
         "某張已完成的票，結論是什麼？",
-        "[GAP-3結論.md](GAP-3結論.md) 等 `<票名>結論.md`",
+        "[GAP-3結論.md](GAP-3結論.md)、[TODO優化結論.md](TODO優化結論.md) 等 `<票名>結論.md`",
         "只寫結論，不寫過程"
       ],
       [

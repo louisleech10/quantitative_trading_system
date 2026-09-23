@@ -6,7 +6,6 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
-| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1 與 2 條 P3 已修、r2 三家確認閉合，**b2 收批**。**b3＝W 已提交**（Task 1.2 hook 掛載、Task 1.3／1.4 gate.sh 路由與新 SPEC 須 manifest、Task 3.1／3.2 兩份樣本；新規則自此生效）；收案聚合器 12 項 rc=0（41.9 秒）。**b3 審碼 r1**：composer、grok 判可收；codex 擋 1 條 P1（路徑值夾帶換行會被逐行清單比對拆成多個樣式而放行，hook 與 gate.sh 同型），另 P2×3、P3×3。8 條全數已修；主委另實測 Write 工具會字面折疊 `..`（經不存在之目錄亦照寫）⇒ hook 同步折疊，指向 repo 之別名路徑改以 `-ef` 比對祖先目錄。**b3 審碼 r2**：三家皆判可收，r1 八條全數由原提出方確認閉合。**主委收案前自查**：①以 gate 相關既有測試回歸（SPEC Task 1.4 要求同批回歸、提交時漏跑）查出 VERDICTGATE 三條 `--impl-self` 測試因邊界⑩轉紅 ⇒ 補其派工夾具、斷言不動 ②依產出端覆蓋鐵律，manifest 格式檢查改為寫入當下亦跑（新 PostToolUse 守衛）③路由判定對正規化後為空之 `--spec` 即拒（r2 grok 正文之邊角）。`test_debt_gate.py` 之 100 ms 延遲測試為舊紅（相關腳本 09-16 後未改，audit 長大所致），不屬本票。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝全套治理測試（背景）→ b3 審碼 r3（上述三項）→ 重跑收案聚合器 → 收案 → 白話結論書 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -24,10 +23,9 @@
 | 03-013 | SU-RESID-4 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 IC 切分契約 |
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
-| 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。復工條件＝流程改法裁決後，依新停輪條件重定本票續審形狀 |
-| 04-004 | HP-TODOFMT | 進行中 | docs/TODOFMT_SPEC.md | 大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1 與 2 條 P3 已修、r2 三家確認閉合，**b2 收批**。**b3＝W 已提交**（Task 1.2 hook 掛載、Task 1.3／1.4 gate.sh 路由與新 SPEC 須 manifest、Task 3.1／3.2 兩份樣本；新規則自此生效）；收案聚合器 12 項 rc=0（41.9 秒）。**b3 審碼 r1**：composer、grok 判可收；codex 擋 1 條 P1（路徑值夾帶換行會被逐行清單比對拆成多個樣式而放行，hook 與 gate.sh 同型），另 P2×3、P3×3。8 條全數已修；主委另實測 Write 工具會字面折疊 `..`（經不存在之目錄亦照寫）⇒ hook 同步折疊，指向 repo 之別名路徑改以 `-ef` 比對祖先目錄。**b3 審碼 r2**：三家皆判可收，r1 八條全數由原提出方確認閉合。**主委收案前自查**：①以 gate 相關既有測試回歸（SPEC Task 1.4 要求同批回歸、提交時漏跑）查出 VERDICTGATE 三條 `--impl-self` 測試因邊界⑩轉紅 ⇒ 補其派工夾具、斷言不動 ②依產出端覆蓋鐵律，manifest 格式檢查改為寫入當下亦跑（新 PostToolUse 守衛）③路由判定對正規化後為空之 `--spec` 即拒（r2 grok 正文之邊角）。`test_debt_gate.py` 之 100 ms 延遲測試為舊紅（相關腳本 09-16 後未改，audit 長大所致），不屬本票。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝全套治理測試（背景）→ b3 審碼 r3（上述三項）→ 重跑收案聚合器 → 收案 → 白話結論書 |
-| 04-005 | HP-PROCOPT | 待審 | docs/PROCOPT_DECISION.md | 診斷完成（r1→r2→r3）。使用者後續裁定：**先完成 TODO 優化**（見 HP-TODOFMT），其餘改法待 TODOFMT 完工後再議。r3 之四步改法經使用者逐條質詢後大多撤回或降級，現存狀態見 白話說明/SPEC與TODO流程優化.md。**未實施任何流程改動** |
-| 04-006 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
+| 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀 |
+| 04-005 | HP-PROCOPT | 待審 | docs/PROCOPT_DECISION.md | 診斷完成（r1→r2→r3）。使用者後續裁定：**先完成 TODO 優化**（見 HP-TODOFMT）——已於 2026-09-23 完工（§四之二 TODO 改為五類落點）；其餘改法待使用者逐條裁決。r3 之四步改法經使用者逐條質詢後大多撤回或降級，現存狀態見 白話說明/SPEC與TODO流程優化.md。**未實施任何流程改動** |
+| 04-006 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工；該票已於 2026-09-23 完工，何時復工待使用者決定）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑
@@ -143,6 +141,7 @@
 - 🔴 **Claude 的 Write 工具會字面折疊 `..`**：寫 `<dir>/不存在的目錄/../x` 會成功寫到 `<dir>/x`，且不建立該目錄。凡以路徑字串判定之守衛須用同法解讀（`scripts/todofmt_write_guard.sh` 之 `_lexfold`）；指向 repo 之別名（符號連結、`/System/Volumes/Data` 前綴）改以 `[ A -ef B ]` 比對祖先目錄。
 - 🔴 **pytest 參數化測試名之非 ASCII 會被轉義**（例：`−` 成 `−`），「數字＋空白＋skipped」這類全文掃描會把測試名誤判成跳過計數；判讀 pytest 結果只認結尾摘要行（`N passed, M skipped in Xs`），找不到摘要行即當失敗。
 - 🔴 **`gate_check.sh` 的派工偵測對含 `$'…'`、多層引號之多行 Bash 會 fail-closed 判為派工**（要求 gate token）：探針或對照實驗寫成 scratchpad 腳本再 `bash <檔>`，不要把整段塞進一條 Bash 指令。
+- 🔴 **全套 `pytest tests/governance` 於 2026-09-23 實跑 78 紅／2,590 綠（7,625 秒，比預期慢一倍）**，逐條歸因皆早於 TODOFMT 或屬偶發／環境，清單與方法見 `handoffs/run_receipts/20260923-todofmt-govsuite-attribution.json`。下次動共用控制流前後拿它當基線比對，不必再逐條歸因。歸因方法之坑：**`test_govb1_contract_matrix.py` 部分測試內部會再跑整套檢查，單條 20 分鐘級**，逐條重跑前先看它屬不屬這類；舊版本對照用 `git worktree add --detach <路徑> <commit>`，該 worktree 沒有 `handoffs/`（被 exclude），依賴它的測試要改看失敗訊息。
 - 🔴 **`tests/governance/test_debt_gate.py::test_gate_check_latency_under_100ms` 目前恆紅（約 150 ms）**：它複製真實 `.claude/gate/audit.log`（2026-09-23 為 70,747 行）量 `gate_check.sh` 冷啟動，門檻 100 ms；相關腳本自 2026-09-16 未改，紅因是 audit 長大，不是新改動造成。
 - 🔴 **`verify_pretooluse` 對 scratchpad 內「含 `docs/` 段而目錄尚不存在」之路徑 fail-closed**：先建目錄，或改用不含 `docs/` 段之平面檔名。
 - 🔴 **委員收尾會清 `/tmp`，連帶刪掉主委寫在 `/tmp` 之 log**（例：`committee_run` 之 `> /tmp/cr9.log` 事後不存在）：派工與測試之 log 一律寫 scratchpad。
@@ -169,15 +168,4 @@
 - 2026-09-22：RM-PROCOPT → `docs/PROCOPT_DECISION.md`
 - 2026-09-22：RM-PROCOPT → `白話說明/SPEC與TODO流程優化.md`
 - 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-todofmt-x-consult-r1/synth.md`
-- 2026-09-22：RM-TODOFMT → `docs/TODOFMT_SPEC.md`
-- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r6/synth.md`
-- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r7/synth.md`
-- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r8/synth.md`
-- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r9/synth.md`
-- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r10/synth.md`
-- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r11/synth.md`
-- 2026-09-23：RM-TODOFMT → `scripts/todofmt_check.sh`
-- 2026-09-23：RM-TODOFMT → `docs/manifests/TODOFMT.json`
-- 2026-09-23：RM-TODOFMT → `scripts/todofmt_manifest_guard.sh`
-- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-b3-review-r2/synth.md`
 <!-- HISTORY-END -->

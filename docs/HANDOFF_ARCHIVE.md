@@ -417,3 +417,22 @@
 - 2026-09-21：RM-AGENTOPS → `docs/AGENTOPS_PROBLEM_DEFINITION.md`
 - 2026-09-21：RM-AGENTOPS → `handoffs/reconcile/20260921-docfix-x-consult-r1/synth.md`
 - 2026-09-21：RM-AGENTOPS → commit `40483cc9`
+
+## 2026-09-23 交接檔進行中紀錄移出：RM-TODOFMT（條目識別碼轉完成）
+
+<!-- ENTRY: RM-TODOFMT -->
+- 2026-09-22：RM-TODOFMT → `docs/TODOFMT_SPEC.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r6/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r7/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r8/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r9/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r10/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-x-review-r11/synth.md`
+- 2026-09-23：RM-TODOFMT → `scripts/todofmt_check.sh`
+- 2026-09-23：RM-TODOFMT → `docs/manifests/TODOFMT.json`
+- 2026-09-23：RM-TODOFMT → `scripts/todofmt_manifest_guard.sh`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-b3-review-r2/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/reconcile/20260922-todofmt-b3-review-r3/synth.md`
+- 2026-09-23：RM-TODOFMT → `handoffs/run_receipts/20260923-todofmt-govsuite-attribution.json`
+- 2026-09-23：RM-TODOFMT → `白話說明/TODO優化結論.md`
+- 2026-09-23：RM-TODOFMT → commit `d8107deb`
