@@ -116,15 +116,6 @@
         ]
       },
       {
-        "matcher": "Bash|Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash scripts/ts_stamp.sh IN"
-          }
-        ]
-      },
-      {
         "matcher": "Edit|Write",
         "hooks": [
           {
@@ -139,16 +130,6 @@
           {
             "type": "command",
             "command": "bash scripts/todofmt_write_guard.sh"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash scripts/ts_stamp.sh USER"
           }
         ]
       }
@@ -194,15 +175,6 @@
       }
     ],
     "PostToolUse": [
-      {
-        "matcher": "Bash|Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash scripts/ts_stamp.sh OUT"
-          }
-        ]
-      },
       {
         "matcher": "Edit|Write",
         "hooks": [

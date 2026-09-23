@@ -121,13 +121,7 @@ pytest                                           # all tests
   丟背景仍是好習慣（輸出回灌），但**不再是「前景一定 timeout」**。
   原文（保留供理解舊 log）：「pre-push 委派 `gov_check.sh` 跑全套（十分鐘級）> Bash 前景上限 120 秒 ⇒ 前景一定 timeout」。
 
-**哨兵**：`scripts/ts_stamp.sh`（掛 Pre/PostToolUse on `Bash|Edit|Write` + `UserPromptSubmit`）。
-- **A 類**（call 內 >10s）＝分類器路徑掛住 → 🐌 警告
-- **B 類**（call 之間 **>120s**，且**期間使用者未輸入**）＝結果回傳＋Claude 生成慢 → 🐌 警告
-  （2026-08-05 使用者由 60→120：60s 常被正常長段生成觸發，訊噪比太低。
-  代價＝`git push` 全輸出回灌那類（實測 89.9s）不再報警；要抓回設 `TS_STAMP_WARN_B_SEC=60`）
-- 兩類都**自動注入 Claude context**（非只顯示給使用者），Claude 會主動回報；並寫 `.claude/gate/ts_stamp.log.slow`
-- **使用者不必盯螢幕、不必算時間、不必回報**。移除法見腳本檔頭。
+**時間哨兵已移除**（2026-09-23 使用者裁定）：原 `scripts/ts_stamp.sh`（Pre/PostToolUse＋UserPromptSubmit）以「單次呼叫 >10 秒」「呼叫間隔 >120 秒」判卡頓，但分不出「本來就要跑這麼久」（全套測試、提交檢查、等候委員之迴圈、等使用者回答）與分類器卡住——移除前一日所報 5 次全屬前者；每次呼叫另印兩行 T-IN／T-OUT 於使用者畫面。上方三條觸發條件與避法仍有效，照做即可，不再依賴事後偵測。
 
 **測試與 CI**
 - 🔴 `pytest tests/governance -q` 是**小時級**（不再是十分鐘級）且**隨測試數持續變長** ⇒ **前景必 timeout，一律丟背景**。
