@@ -212,7 +212,8 @@ def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
         if s:
             assert cat[v].startswith(_static_prefix(s)), (n, v, cat[v], s)
     tool_lines = [n for n in sorted(lines) if "tool_failure" in _site_rules(src, n)[0]]
-    assert len(tool_lines) == 24, tool_lines  # 封閉集之規模釘死：字面集擴張即紅
+    assert tool_lines == [213, 216, 218, 221, 234, 256, 419, 691, 695, 706, 1440, 1496, 1553, 1587, 1626, 1706, 1730,
+                          1754, 1816, 1842, 1937, 1954, 1983, 2035], tool_lines  # 逐行釘死（r11 codex P2-03：只釘數量擋不住同數量換位）
     assert set(cat) <= set(sites.values()), sorted(set(cat) - set(sites.values()))
 
 
@@ -239,6 +240,42 @@ def test_new_impl_host_write_failure_is_fail_closed(tmp_path: Path) -> None:
         os.chmod(host.parent, mode)
     assert out.rc == 1, out.stderr.decode("utf-8", "replace")
     assert host.read_bytes() == before
+
+
+@pytest.mark.parametrize("args", [(), ("--check",), ("--status-hits", "lines.txt")])
+def test_new_impl_tmpdir_unusable_still_succeeds(tmp_path: Path, args: tuple) -> None:
+    """SPEC C-1 例外②：TMPDIR 不存在時，新實作照常執行，且 stdout、stderr、rc 等於 oracle 於可用 TMPDIR 下之結果
+    （oracle 於不可用 TMPDIR 下 mktemp／暫存重導向失敗：r11 codex 實跑 L691 首行 `…line 687: …<PID>: No such file…`）。"""
+    import dataclasses
+    case = _case("tmpdir", list(args), _tree(_write("lines.txt", "L1\tWL-01 收案\n")), "ok",
+                 first="L1\tWL-01\t收案" if args[:1] == ("--status-hits",) else
+                 ("" if args else "<!-- BEGIN GENERATED: committee-roster -->"))
+    oroot, nroot = fo.make_pair(tmp_path, case)
+    good = fo.run_oracle(oroot, case)
+    bad_env = dataclasses.replace(case, env={**case.env, "TMPDIR": str(tmp_path / "no_such_dir" / "x")})
+    new = fo.normalize(fo.run_new(nroot, bad_env), nroot, oroot)
+    assert good.rc == 0
+    assert fo.diff(good, new) == []
+
+
+def test_new_impl_unreadable_status_hits_file_rc2(tmp_path: Path) -> None:
+    """SPEC C-1 例外④：`--status-hits` 行檔存在但不可讀 ⇒ 新實作 rc=2、stdout 無命中、行檔位元組與權限不變
+    （oracle 同情境 rc=2，stderr 首行為 awk 自身訊息 `awk: can't open file lines.txt`，r11 codex 實跑；stderr 不比對）。"""
+    import os
+    case = _case("unreadable", ["--status-hits", "lines.txt"], _tree(_write("lines.txt", "L1\tWL-01 收案\n")), "ok",
+                 first="L1\tWL-01\t收案")
+    oroot, nroot = fo.make_pair(tmp_path, case)
+    lines = nroot / "lines.txt"
+    before = lines.read_bytes()
+    os.chmod(lines, 0)
+    try:
+        out = fo.run_new(nroot, case)
+        mode_after = lines.stat().st_mode & 0o777
+    finally:
+        os.chmod(lines, 0o644)
+    assert out.rc == 2, out.stderr.decode("utf-8", "replace")
+    assert out.stdout == b""
+    assert mode_after == 0 and lines.read_bytes() == before
 
 
 def test_mutation_exit_site_hidden_as_continuation_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:

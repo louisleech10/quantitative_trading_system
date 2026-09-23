@@ -59,7 +59,7 @@
     "callers_later": [],
     "gate_cmd": "bash scripts/fkperf_freeze_check.sh",
     "forbidden": [
-      {"rule": "新實作與 oracle 之 stdout、stderr、rc、寫檔結果不得有差異（唯一例外：缺 jq→缺 python3 之前置字面）", "observable": true},
+      {"rule": "新實作與 oracle 之 stdout、stderr、rc、寫檔結果不得有差異（具名例外封閉集四項，見 SPEC C-1：缺 jq→缺 python3 之前置字面；TMPDIR 不可用時新實作照常執行；宿主寫入失敗與不可讀之 --status-hits 行檔兩者 stderr 不比對而 rc 與檔案結果有具名測試）", "observable": true},
       {"rule": "不得保留 bash 實作作為常駐備援或切換旗標", "observable": true},
       {"rule": "不得碰 momentum/ 與 api/（解耦 7 條不涉）", "observable": true},
       {"rule": "不得另訂或放寬比例門檻（10 倍規模差、20 倍、三次取最小值）", "observable": true},
@@ -77,7 +77,7 @@
       "scripts/govb1_final_gate.sh ← g2／g3 以路徑掃描入口，核心改由 test_fkperf_govb1_equiv.py 施加同等檢查 ← grep -n '_G2_UNITS=\\|^_g3()' scripts/govb1_final_gate.sh"
     ],
     "coverage_risk": [
-      "Task 0.1 驗證①～④：tests/governance/test_fkperf_differential.py::test_oracle_self_zero_diff_and_real_check_rc0、::test_every_case_hits_its_expected_branch、::test_mutation_one_extra_byte_is_reported、::test_exit_catalog_equals_corpus_labels、::test_exit_sites_cover_every_stderr_line_of_oracle（出口清單之獨立錨；歸類以機械規則收緊，出口首行不得為續行）、::test_mutation_exit_site_hidden_as_continuation_is_caught、::test_new_impl_host_write_failure_is_fail_closed（SPEC v7：tool_failure 之宿主寫入失敗，新實作 rc=1 且宿主檔不變）",
+      "Task 0.1 驗證①～④：tests/governance/test_fkperf_differential.py::test_oracle_self_zero_diff_and_real_check_rc0、::test_every_case_hits_its_expected_branch、::test_mutation_one_extra_byte_is_reported、::test_exit_catalog_equals_corpus_labels、::test_exit_sites_cover_every_stderr_line_of_oracle（出口清單之獨立錨；歸類以機械規則收緊，出口首行不得為續行）、::test_mutation_exit_site_hidden_as_continuation_is_caught、::test_new_impl_host_write_failure_is_fail_closed、::test_new_impl_tmpdir_unusable_still_succeeds、::test_new_impl_unreadable_status_hits_file_rc2（SPEC C-1 具名例外②③④之行為驗收）",
       "Task 0.1 改法（五類語料逐筆新舊比對，C-1）：tests/governance/test_fkperf_differential.py::test_every_corpus_case_new_equals_oracle",
       "Task 0.1 語料①之 --help 三種呼叫與 C-5 前置例外配對：tests/governance/test_fkperf_differential.py::test_corpus_covers_all_five_kinds_and_help_variants",
       "Task 1.1 鍵序驗證：tests/governance/test_fkperf_differential.py::test_key_iteration_order_matches_jq_keys",
