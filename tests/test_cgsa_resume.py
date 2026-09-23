@@ -433,3 +433,282 @@ def test_collect_layer_counts_from_registry(tmp_path: Path) -> None:
         "layer5": 2,
         "layer6": 1,
     }
+
+
+# ---------------------------------------------------------------------------
+# FF-TFMETA（docs/FFTFMETA_SPEC.md）Task 1.3：resume 保存逐週期層狀態
+# ---------------------------------------------------------------------------
+
+import dataclasses  # noqa: E402
+import inspect  # noqa: E402
+import logging  # noqa: E402
+
+import pandas as pd  # noqa: E402
+
+from momentum.core.contracts import LayerStatus  # noqa: E402
+from momentum.FeatureEngineering.feature_config import AlignmentMode  # noqa: E402
+from momentum.FeatureEngineering.feature_storage import resolve_completeness_meta  # noqa: E402
+from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator  # noqa: E402
+from tests.feature_engineering.test_failopen_producer import (  # noqa: E402
+    _CgsaStubFactory,
+    _ThreadPoolAsProcessPool,
+)
+
+_SIX_OK = {f"L{i}": ("ok", "") for i in range(1, 7)}
+_CFG_HASH = "fftfmeta0resume0"
+# 改前 registry 工作 manifest 之頂層鍵（Task 1.3 新欄之外者；用以造「舊 checkpoint」）
+_PRE_FFTFMETA_WORK_KEYS = {
+    "schema_version", "symbol", "primary_tf", "training_tfs", "config_hash", "config_snapshot",
+    "total_features", "total_groups", "created_at", "groups",
+}
+
+
+class _ResumeTfs:
+    primary = "1h"
+    training = ["1h", "12h"]
+    alignment_mode = AlignmentMode.OPEN_MINUS
+
+
+class _ResumeConfig:
+    def __init__(self) -> None:
+        self.timeframes = _ResumeTfs()
+        self.preprocessing = SimpleNamespace(enabled=False)
+        self.allow_partial_timeframes = True
+        self.allow_partial_layers = True
+
+
+class _CanonicalStubFactory(_CgsaStubFactory):
+    """L7 persist 樁：把 generator 傳入之 canonical 參數原樣交 `resolve_completeness_meta`（比照 Task 2.2 之 factory）。"""
+
+    def __init__(self, data_by_tf: dict, registry: ColumnGroupRegistry) -> None:
+        super().__init__(data_by_tf, registry)
+        self.captured: dict = {}
+        self.layer_results: dict = {}
+
+    def _layer7_raw_from_cgsa_pipeline(self, symbol, timeframe, raw_data, config, elapsed, config_hash,
+                                       compute_warnings=None, persist=True, batch_id=None, **canonical):
+        result = super()._layer7_raw_from_cgsa_pipeline(
+            symbol, timeframe, raw_data, config, elapsed, config_hash, compute_warnings, persist, batch_id
+        )
+        self.captured = dict(canonical)
+        accepted = set(inspect.signature(resolve_completeness_meta).parameters)
+        meta = resolve_completeness_meta(
+            self.layer_results, timeframe, **{k: v for k, v in canonical.items() if k in accepted}
+        )
+        result.metadata.update(meta)
+        result.metadata["run_status"] = meta["quality_status"]
+        return result
+
+
+def _resume_frames() -> dict:
+    hourly = pd.DataFrame({"timestamp": [i * 3600 * 1000 for i in range(48)], "value": list(range(48))})
+    half_day = pd.DataFrame({"timestamp": [i * 12 * 3600 * 1000 for i in range(4)], "value": [10, 11, 12, 13]})
+    return {"1h": hourly, "12h": half_day}
+
+
+def _generator(factory: object, monkeypatch: pytest.MonkeyPatch, *, parallel: bool, fail_12h_l2: bool) -> tuple:
+    monkeypatch.setenv("FFACT_USE_CGSA", "1")
+    monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1" if parallel else "0")
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
+    gen = MultiTFGenerator(factory, _ResumeConfig())
+    orig = gen._run_tf_l1_l6_results
+    calls: list = []
+
+    def run_layers(raw_data):
+        calls.append(str(factory._current_timeframe))
+        results = orig(raw_data)
+        if fail_12h_l2 and factory._current_timeframe == "12h":
+            results[1] = dataclasses.replace(results[1], status=LayerStatus.dependency_failed, reason="L1 missing")
+        return results
+
+    monkeypatch.setattr(gen, "_run_tf_l1_l6_results", run_layers)
+    return gen, calls
+
+
+def _checkpoint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, fail_12h_l2: bool = True) -> Path:
+    """第一次（循序）run：於 work_dir 留下兩週期之 L1 群組與（實作後）逐週期層狀態。"""
+    work_dir = (tmp_path / "work").resolve()
+    factory = _CanonicalStubFactory(_resume_frames(), ColumnGroupRegistry(work_dir))
+    gen, calls = _generator(factory, monkeypatch, parallel=False, fail_12h_l2=fail_12h_l2)
+    gen.generate_multi_tf("BTCUSDT")
+    assert calls == ["1h", "12h"]
+    return work_dir
+
+
+def _resume_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, feature_factory: FeatureFactory, work_dir: Path,
+                *, parallel: bool, write_l7: bool = True) -> tuple:
+    """第二次 run：經真實 `_prepare_cgsa_registry` 之 resume 閘取得 registry，再走 MultiTF（spy resume 與逐層執行）。"""
+    monkeypatch.setenv("FFACT_USE_CGSA", "1")
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(work_dir))
+    if write_l7:
+        _write_complete_l7_manifest(feature_factory, "BTCUSDT", "1h", _CFG_HASH)
+    spy = Mock(wraps=ColumnGroupRegistry.resume_from_manifest)
+    monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", spy)
+    registry = feature_factory._prepare_cgsa_registry("BTCUSDT", "1h", _CFG_HASH)
+    factory = _CanonicalStubFactory(_resume_frames(), registry)
+    gen, calls = _generator(factory, monkeypatch, parallel=parallel, fail_12h_l2=True)
+    gen.generate_multi_tf("BTCUSDT")
+    return spy, calls, factory, registry
+
+
+def _canonical(factory: _CanonicalStubFactory) -> dict:
+    accepted = set(inspect.signature(resolve_completeness_meta).parameters)
+    return resolve_completeness_meta(
+        {}, "1h", **{k: v for k, v in factory.captured.items() if k in accepted}
+    )
+
+
+def test_layer_status_roundtrip_through_manifest_flushes(tmp_path: Path) -> None:
+    """① 記憶體欄隨 write_manifest 落盤、resume 讀回同一欄；再 flush 一次後仍在（r2 grok P1-02）。"""
+    statuses = {**_SIX_OK, "L2": ("dependency_failed", "L1 missing"), "L5": ("empty_disabled", "")}
+    reg = ColumnGroupRegistry(tmp_path / "w")
+    reg.record_layer_status("12h", statuses)
+    reg.write_manifest()
+    resumed = ColumnGroupRegistry.resume_from_manifest(tmp_path / "w")
+    assert resumed.layer_status_by_tf == {"12h": statuses}
+    resumed.write_manifest()
+    again = ColumnGroupRegistry.resume_from_manifest(tmp_path / "w")
+    assert again.layer_status_by_tf == {"12h": statuses}
+
+
+def test_layer_status_record_replaces_whole_timeframe_entry(tmp_path: Path) -> None:
+    """① 整組取代該週期舊條目；④ stale alignment 重跑以新六層取代舊條目。"""
+    reg = ColumnGroupRegistry(tmp_path / "w")
+    reg.record_layer_status("12h", {**_SIX_OK, "L3": ("layer_failed", "old")})
+    reg.record_layer_status("12h", _SIX_OK)
+    reg.record_layer_status("1h", _SIX_OK)
+    assert reg.layer_status_by_tf == {"12h": _SIX_OK, "1h": _SIX_OK}
+
+
+@pytest.mark.parametrize("parallel", [False, True], ids=["serial", "parallel"])
+def test_layer_status_skip_branch_reads_back_failures(
+    parallel: bool, feature_factory: FeatureFactory, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """驗證①跳過分支：resume_from_manifest 被呼叫、兩週期皆跳過（不再執行 L1–L6），canonical 含讀回之 L2:12h 失敗。"""
+    work_dir = _checkpoint(tmp_path, monkeypatch)
+    spy, calls, factory, registry = _resume_run(tmp_path, monkeypatch, feature_factory, work_dir, parallel=parallel)
+    assert spy.call_count == 1
+    assert calls == []
+    meta = _canonical(factory)
+    assert meta["failed_layers"] == ["L2:12h"]
+    assert any(reason.startswith("L2:12h:") for reason in meta["failure_reasons"])
+    assert meta["quality_status"] == "partial"
+    assert meta["expected_timeframes"] == ["1h", "12h"]
+    assert "L1" in meta["expected_layers"] and "L1" in meta["present_layers"]
+    registry.write_manifest()
+    reread = json.loads((work_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert set(reread) - _PRE_FFTFMETA_WORK_KEYS, "再 flush 後工作 manifest 須仍帶逐週期層狀態欄"
+    assert set(ColumnGroupRegistry.resume_from_manifest(work_dir).layer_status_by_tf) == {"1h", "12h"}
+
+
+def test_layer_status_old_checkpoint_without_field_is_unknown(
+    feature_factory: FeatureFactory, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """驗證①：無逐週期層狀態之同形 checkpoint ⇒ 缺證據 ⇒ quality_status == unknown（不得解為無失敗）。"""
+    work_dir = _checkpoint(tmp_path, monkeypatch)
+    manifest_path = work_dir / "manifest.json"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_path.write_text(
+        json.dumps({k: v for k, v in payload.items() if k in _PRE_FFTFMETA_WORK_KEYS}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    _spy, calls, factory, _registry = _resume_run(tmp_path, monkeypatch, feature_factory, work_dir, parallel=False)
+    assert calls == []
+    meta = _canonical(factory)
+    assert meta["quality_status"] == "unknown"
+    assert meta["expected_timeframes"] == ["1h", "12h"] and meta["present_timeframes"] == ["1h", "12h"]
+
+
+def test_layer_status_gate_refusal_recomputes(
+    feature_factory: FeatureFactory, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """驗證②閘拒絕分支（對照）：無 L7 manifest ⇒ resume_from_manifest 未被呼叫、兩週期層重算，completeness 為重算結果。"""
+    work_dir = _checkpoint(tmp_path, monkeypatch)
+    spy, calls, factory, _registry = _resume_run(
+        tmp_path, monkeypatch, feature_factory, work_dir, parallel=False, write_l7=False
+    )
+    assert spy.call_count == 0
+    assert calls == ["1h", "12h"]
+    meta = _canonical(factory)
+    assert meta["failed_layers"] == ["L2:12h"]
+    assert meta["quality_status"] == "partial"
+
+
+def test_boundary_08_layer_status_all_skipped_healthy_complete(
+    feature_factory: FeatureFactory, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """邊界①：全部週期皆由 checkpoint 跳過、層狀態全數讀回，健康者 quality_status == complete。"""
+    work_dir = _checkpoint(tmp_path, monkeypatch, fail_12h_l2=False)
+    spy, calls, factory, _registry = _resume_run(tmp_path, monkeypatch, feature_factory, work_dir, parallel=False)
+    assert spy.call_count == 1 and calls == []
+    meta = _canonical(factory)
+    assert meta["quality_status"] == "complete"
+    assert meta["failed_layers"] == []
+
+
+def test_boundary_09_layer_status_foreign_timeframe_ignored_with_warning(
+    feature_factory: FeatureFactory, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """邊界②：checkpoint 之逐週期層狀態含 training 以外之週期 ⇒ 忽略並記 warning。"""
+    work_dir = _checkpoint(tmp_path, monkeypatch, fail_12h_l2=False)
+    reg = ColumnGroupRegistry.resume_from_manifest(work_dir)
+    reg.record_layer_status("4h", {**_SIX_OK, "L3": ("layer_failed", "foreign")})
+    reg.write_manifest()
+    with caplog.at_level(logging.WARNING):
+        _spy, calls, factory, _registry = _resume_run(tmp_path, monkeypatch, feature_factory, work_dir, parallel=False)
+    meta = _canonical(factory)
+    assert calls == []
+    assert meta["quality_status"] == "complete"
+    assert all("4h" not in item for item in meta["failed_layers"] + meta["failure_reasons"])
+    assert any("4h" in record.getMessage() for record in caplog.records if record.levelno >= logging.WARNING)
+
+
+def test_boundary_10_layer_status_partial_entry_is_unknown(
+    feature_factory: FeatureFactory, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """邊界③：條目只涵蓋部分層（12h 只記 L1）⇒ quality_status == unknown。"""
+    work_dir = _checkpoint(tmp_path, monkeypatch, fail_12h_l2=False)
+    reg = ColumnGroupRegistry.resume_from_manifest(work_dir)
+    reg.record_layer_status("12h", {"L1": ("ok", "")})
+    reg.write_manifest()
+    _spy, calls, factory, _registry = _resume_run(tmp_path, monkeypatch, feature_factory, work_dir, parallel=False)
+    assert calls == []
+    assert _canonical(factory)["quality_status"] == "unknown"
+
+
+@pytest.mark.requires_kline
+def test_layer_status_parallel_rollback_clears_entry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """驗證①：parallel 路徑 12h 群組註冊失敗 rollback ⇒ 該週期無層狀態條目；primary 仍有六層（真實 kline 輕量 run）。"""
+    from tests.feature_engineering import fftfmeta_golden_helpers as fg
+
+    fg.prepare_env(monkeypatch, tmp_path, FFACT_USE_CGSA="1", FFACT_MULTI_TF_PARALLEL="1")
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
+
+    def _fail_register(self, registry, groups_data, tf, *args, **kwargs):
+        raise RuntimeError(f"injected registration failure for {tf}")
+
+    monkeypatch.setattr(MultiTFGenerator, "_register_worker_groups", _fail_register)
+    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY, allow_partial_timeframes=True)
+    _root, factory, result = fg.generate(tmp_path, payload)
+    statuses = factory._cgsa_registry.layer_status_by_tf
+    assert "12h" not in statuses
+    assert set(statuses.get("1h", {})) == {f"L{i}" for i in range(1, 7)}
+    assert result.metadata["failed_timeframes"] == ["12h"]
+
+
+def test_mutation_layer_status_dropped_on_resume_is_caught(
+    feature_factory: FeatureFactory, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """改壞：resume 只讀進區域變數（記憶體欄為空）⇒ 跳過分支之讀回失敗必紅（r2 grok P1-02 之形）。"""
+    real_resume = ColumnGroupRegistry.resume_from_manifest.__func__
+
+    def _mutant(cls, work_dir):
+        registry = real_resume(cls, work_dir)
+        registry.record_layer_status("1h", {})
+        registry.record_layer_status("12h", {})
+        return registry
+
+    monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(_mutant))
+    with pytest.raises(AssertionError):
+        test_layer_status_skip_branch_reads_back_failures(False, feature_factory, monkeypatch, tmp_path)

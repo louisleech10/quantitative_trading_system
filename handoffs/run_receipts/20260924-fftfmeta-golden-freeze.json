@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "command": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py",
+  "exit_code": 0,
+  "epic": "FFTFMETA",
+  "date": "2026-09-24",
+  "runs": [
+    {
+      "cmd": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/time_one_run.py 2026-01-01 2026-01-31 multi",
+      "rc": 0,
+      "observed": "seconds=9.9 groups=84 rows=721；manifest 根 present_timeframes=[\"1h\"]、task present_timeframes=[\"1h\",\"12h\"]；task quality_status=partial（nan_ratio=0.0958914945688>max_nan_ratio=0.0157991655707）而 manifest complete"
+    },
+    {
+      "cmd": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/time_one_run.py 2026-01-01 2026-01-31 degraded",
+      "rc": 0,
+      "observed": "seconds=5.2 groups=42；validation.nan_ratio=0.009618709250635746（>0，降級 reference 可用）；task partial、manifest complete"
+    },
+    {
+      "cmd": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/golden_determinism.py 2026-01-01 2026-01-31 multi",
+      "rc": 0,
+      "observed": "同程序兩跑：群組檔名、每群組四 hash、去除允許路徑之 manifest 皆等；task record 正規化後亦等（未正規化前僅 manifest_path、raw_path、multi_tf_stage_seconds.* 不等）"
+    },
+    {
+      "cmd": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py",
+      "rc": 0,
+      "observed": "FROZEN multi: groups=84 manifest_bytes=730464 task_bytes=24999；FROZEN degraded: groups=42 manifest_bytes=472726 task_bytes=24121；WROTE tests/_golden/fftfmeta/baseline.json（20198 bytes）",
+      "frozen_at_head": "cb604963"
+    }
+  ],
+  "honest_bounds": "單機單次實跑；pytest 下 tests/feature_engineering/conftest.py 把 CGSA 工作目錄設於 tmp，故 manifest 之 source_registry_manifest 另做位置正規化（見 tests/_golden/fftfmeta/allowed_paths.json）；凍結時之 HEAD 已含 FF-TFMETA 空殼，空殼於預設參數下行為不變（新參數非預設時才拋 NotImplementedError）"
+}

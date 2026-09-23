@@ -1,58 +1,103 @@
 {
+  "spec_path": "docs/FFTFMETA_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
   "stub_modules": [
-    "momentum/FeatureEngineering/timeframe/multi_tf_generator.py"
+    "momentum/FeatureEngineering/feature_storage.py",
+    "momentum/FeatureEngineering/core/column_group_registry.py"
   ],
   "test_files": [
-    "tests/feature_engineering/test_failopen_manifest.py"
+    "tests/feature_engineering/test_failopen_manifest.py",
+    "tests/feature_engineering/test_failopen_producer.py",
+    "tests/test_cgsa_resume.py",
+    "tests/test_multi_tf_generator.py",
+    "tests/feature_engineering/test_fftfmeta_golden.py"
   ],
   "script_acceptance": [],
-  "contract_jsons": [],
-  "spec_path": "docs/FFDEFECT_DECISION.md",
-  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
-  "run_receipts": [],
+  "contract_jsons": [
+    "tests/_golden/fftfmeta/allowed_paths.json"
+  ],
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20260924-fftfmeta-golden-freeze.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py",
+      "rc": 0,
+      "honest_bounds": "單機單次實跑；基準凍結於含空殼之 HEAD（空殼於預設參數下行為不變）；輕量設定（trend、close、rolling 5／13、winsorization）非全開設定，全開設定單次約 150 秒不宜作為常跑驗收"
+    }
+  ],
   "batch_card": {
     "depends": [],
     "touches": [
+      "docs/FFTFMETA_SPEC.md",
+      "docs/FFDEFECT_DECISION.md",
       "momentum/FeatureEngineering/feature_storage.py",
-      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
       "momentum/FeatureEngineering/feature_factory.py",
-      "api/services/feature_factory_service.py"
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/FeatureEngineering/core/column_group_registry.py",
+      "tests/feature_engineering/test_failopen_manifest.py",
+      "tests/feature_engineering/test_failopen_producer.py",
+      "tests/test_cgsa_resume.py",
+      "tests/test_multi_tf_generator.py",
+      "tests/feature_engineering/test_fftfmeta_golden.py",
+      "tests/feature_engineering/fftfmeta_golden_helpers.py",
+      "tests/_golden/fftfmeta/baseline.json",
+      "tests/_golden/fftfmeta/allowed_paths.json",
+      "handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py"
     ],
-    "callers_now": [],
+    "callers_now": [
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "api/services/feature_factory_service.py",
+      "tests/test_multi_tf_generator.py",
+      "tests/feature_engineering/test_failopen_producer.py"
+    ],
     "callers_later": [
       "momentum/Analysis/event_samples/condition_engine.py"
     ],
-    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_failopen_manifest.py",
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_failopen_manifest.py tests/feature_engineering/test_failopen_producer.py tests/test_cgsa_resume.py tests/test_multi_tf_generator.py tests/feature_engineering/test_fftfmeta_golden.py",
     "forbidden": [
-      {"rule": "不得在 storage 端由 primary tf 猜多週期集合", "observable": false},
-      {"rule": "不得在 manifest 寫完後只 patch metadata", "observable": false}
+      {"rule": "不得在 storage 端由 primary tf 猜多週期集合；不得以 _present_timeframes() 或 group id 當週期權威", "observable": true},
+      {"rule": "persist 之後不得再改寫 COMPLETENESS_FIELD_NAMES、quality_status、run_status（manifest 與 result.metadata 須同源）", "observable": true},
+      {"rule": "不得改特徵資料值、欄名、欄數、列數、檔案集合（§G golden 全等）", "observable": true},
+      {"rule": "不得新增 manifest 欄位名（§G 去除允許路徑後之 canonical JSON 全等）", "observable": true},
+      {"rule": "不得弱化 NaN／inf 品質閘（門檻 None 之解析與判定結果須與改前相同）", "observable": true},
+      {"rule": "不得以 registry 群組之 group.layer 回推層狀態；逐週期層狀態缺證據須為 unknown", "observable": true},
+      {"rule": "momentum/ 不得 import api/（解耦規則 1）", "observable": true},
+      {"rule": "不得放寬或刪除既有測試斷言", "observable": false},
+      {"rule": "不得另建 sidecar 檔保存逐週期層狀態", "observable": false},
+      {"rule": "api/services/feature_factory_service.py 不改", "observable": false},
+      {"rule": "既有 run 之 manifest 不回填（面向未來不溯及既往）", "observable": false}
     ],
     "risk_mitigation": [
-      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py ← 決策檔 B-2／B-4（canonical completeness object 由 MultiTF producer 形成）← grep -n '_present_timeframes\\|_apply_failed_timeframe_metadata' momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
-      "momentum/FeatureEngineering/feature_storage.py ← 決策檔 B-2（build_completeness_meta_from_layer_results 只收純量）← grep -n 'def build_completeness_meta_from_layer_results' momentum/FeatureEngineering/feature_storage.py",
-      "momentum/FeatureEngineering/feature_factory.py ← 決策檔 B-2（呼叫端傳 primary timeframe）← grep -n 'build_completeness_meta' momentum/FeatureEngineering/feature_factory.py",
-      "api/services/feature_factory_service.py ← 決策檔 B-2（`_present_timeframes()` 之值經 result.metadata 整包由 `_persist_task_record` 寫入 task_record.json）← grep -n 'def _persist_task_record' api/services/feature_factory_service.py",
-      "tests/feature_engineering/test_failopen_manifest.py ← 既有 completeness 欄位測試之所在 ← grep -n 'def test_completeness_fields' tests/feature_engineering/test_failopen_manifest.py",
-      "momentum/Analysis/event_samples/condition_engine.py ← EVENTSCAN 為首個真實消費者（決策檔 B-3）← grep -n 'present_timeframes' docs/EVENTSCAN_SPEC.md",
-      "contract_jsons 為空 ← FF 無既有 completeness 契約 JSON ← find momentum/FeatureEngineering -name '*.json'（只得 _resources/max_nan_ratio.json）"
+      "momentum/FeatureEngineering/feature_storage.py ← SPEC Task 1.1／1.2／2.1／2.3（build_timeframe_completeness、resolve_completeness_meta、writer 傳遞、apply_quality_degradation）← grep -n 'def resolve_completeness_meta\\|def build_timeframe_completeness\\|def apply_quality_degradation\\|def _build_feature_manifest_v2' momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/core/column_group_registry.py ← SPEC Task 1.3 ①（layer_status_by_tf 隨 write_manifest／resume_from_manifest 往返）← grep -n 'def record_layer_status\\|def resume_from_manifest\\|def _write_manifest' momentum/FeatureEngineering/core/column_group_registry.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py ← SPEC Task 1.3 ②③⑤、3.1、3.2（persist 前形成 canonical、刪 persist 後覆寫、_collect_failed_layer_ids 改用失敗集合、worker 回傳六層）← grep -n '_collect_failed_layer_ids\\|_apply_failed_timeframe_metadata\\|_present_timeframes\\|def _tf_worker_entry' momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/FeatureEngineering/feature_factory.py ← SPEC Task 2.2／2.3（persist 入口傳遞、writer 回傳值寫 result.metadata、刪事後降級呼叫）← grep -n '_apply_runtime_quality_gate(\\|_apply_preprocessing_degradation_metadata(\\|def _layer7_raw_from_cgsa_pipeline\\|def _layer7_validate_and_persist' momentum/FeatureEngineering/feature_factory.py",
+      "tests/test_multi_tf_generator.py 之 StubFactory 與 tests/feature_engineering/test_failopen_producer.py 之 _CgsaStubFactory ← generator 改傳 canonical keyword 參數後，兩樁之 _layer7_validate_and_persist／_layer7_raw_from_cgsa_pipeline 須收 **kwargs 並以 resolve_completeness_meta 產 metadata（比照 tests/test_cgsa_resume.py 之 _CanonicalStubFactory），既有斷言不變 ← grep -n 'def _layer7_validate_and_persist\\|def _layer7_raw_from_cgsa_pipeline' tests/test_multi_tf_generator.py tests/feature_engineering/test_failopen_producer.py",
+      "tests/feature_engineering/test_failopen_producer.py::test_quality_gate_max_ratios_do_not_change_config_hash ← 既存紅（寫死之 config hash 依 kline 末根日期，資料更新即漂；2026-09-24 主委實跑，與本票無關）← grep -n '1dbe534ed08793b0ea2f80b3748fa1a0' tests/feature_engineering/test_failopen_producer.py",
+      "api/services/feature_factory_service.py ← SPEC §C 不改（_persist_task_record 以 result.metadata 整包寫 task_record.json，修 producer 即正確）← grep -n 'def _persist_task_record' api/services/feature_factory_service.py"
     ],
     "coverage_risk": [
-      "情況「健康多 TF」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_healthy_multi_tf（待 FF-TFMETA 新增）",
-      "情況「skip」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_skipped_tf（待 FF-TFMETA 新增）",
-      "情況「failed」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_failed_tf（待 FF-TFMETA 新增）",
-      "情況「單 TF」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_single_tf（待 FF-TFMETA 新增）",
-      "等式「expected = ordered(training_tfs)」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_expected_is_ordered_training_tfs（待 FF-TFMETA 新增）",
-      "等式「present = expected − skipped/failed」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_present_excludes_skipped_failed（待 FF-TFMETA 新增）",
-      "等式「failed ⊆ expected」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_failed_subset_of_expected（待 FF-TFMETA 新增）",
-      "等式「expected = present ∪ failed」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_expected_is_present_union_failed（待 FF-TFMETA 新增）",
-      "等式「complete 時 failed = [] 且 present == expected」：tests/feature_engineering/test_failopen_manifest.py::test_completeness_complete_invariant（待 FF-TFMETA 新增）",
-      "既有 18 個 run 之 metadata 不得改寫（只對新 run 生效；決策檔 B-4 相容性）"
+      "Task 1.1 五條等式：tests/feature_engineering/test_failopen_manifest.py::test_timeframe_completeness_expected_is_ordered_training_tfs（expected＝ordered training tfs）、::test_timeframe_completeness_present_is_expected_minus_failed（present＝expected − failed）、::test_timeframe_completeness_failed_subset_of_expected（failed ⊆ expected）、::test_timeframe_completeness_expected_is_present_union_failed（expected＝present ∪ failed、present 保序）、::test_timeframe_completeness_no_failed_present_equals_expected（failed 空時 present＝expected）；expected 為空 ⇒ ::test_timeframe_completeness_empty_expected_raises",
+      "Task 1.2 四情況＋三失敗狀態：::test_resolve_completeness_single_tf_unchanged（既有輸入改前改後 ==）、::test_resolve_completeness_healthy_multi_tf、::test_resolve_completeness_skipped_tf、::test_resolve_completeness_failed_tf_with_layer_failure、::test_resolve_completeness_single_tf_via_canonical_equals_legacy、::test_resolve_completeness_layer_failed_on_non_primary、::test_resolve_completeness_all_engines_failed_on_non_primary、::test_resolve_completeness_dependency_failed_on_non_primary、::test_resolve_completeness_cross_tf_failures_are_authoritative",
+      "Task 1.3 驗證：tests/test_cgsa_resume.py::test_layer_status_roundtrip_through_manifest_flushes、::test_layer_status_record_replaces_whole_timeframe_entry、::test_layer_status_skip_branch_reads_back_failures[serial／parallel]（spy 證 resume_from_manifest 被呼叫且兩週期不再執行 L1–L6、再 flush 後條目仍在）、::test_layer_status_old_checkpoint_without_field_is_unknown、::test_layer_status_gate_refusal_recomputes（spy 證未 resume、層重算）、::test_layer_status_parallel_rollback_clears_entry（真實 parallel run 注入 _register_worker_groups 失敗 ⇒ 12h 無條目、primary 六層俱在）",
+      "Task 2.1 驗證：tests/feature_engineering/test_failopen_manifest.py::test_writer_timeframe_completeness_passes_canonical、::test_writer_timeframe_completeness_ic_first_rewrite_preserves_root（先寫多週期含 12h 層失敗再以 IC-first 形寫 raw 與 processed，根之六欄、failure_reasons、quality_status、run_status 皆不變）、::test_writer_timeframe_completeness_fresh_single_tf_unchanged；首寫含 Task 2.3 降級之形由 partial（層失敗）代表，writer 之門檻參數名 SPEC 未定，降級進 manifest 由 Task 2.3 真實 run 驗",
+      "Task 2.2 驗證：tests/feature_engineering/test_failopen_producer.py::test_persist_completeness_same_source_multi_tf_cgsa、::test_persist_completeness_same_source_degraded_single_tf、::test_persist_completeness_same_source_frame_path（真實 kline 輕量 run）",
+      "Task 2.3 驗證：tests/feature_engineering/test_failopen_manifest.py::test_degradation_in_manifest_cgsa_nan_threshold、::test_degradation_in_manifest_frame_l65_failure；純函式：::test_degradation_pure_nan_threshold、::test_degradation_pure_healthy_unchanged、::test_degradation_pure_l65_failure",
+      "Task 3.1 驗證：tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases（cgsa_serial／cgsa_parallel／legacy × healthy／skip／failed／single）、::test_canonical_completeness_dependency_failed_on_12h_reaches_manifest[cgsa_serial／cgsa_parallel]",
+      "Task 3.2 驗證：tests/test_multi_tf_generator.py::test_crosscheck_present_timeframes_missing_group_raises（真實 ColumnGroupRegistry）",
+      "§G：tests/feature_engineering/test_fftfmeta_golden.py::test_golden_multi_tf_features_unchanged_and_timeframes_canonical、::test_golden_degraded_single_tf_manifest_matches_task_record、::test_golden_baseline_frozen_before_change；manifest 與 task record 之 JSON 位元組大小差由實作後重跑 freeze_baseline 之同參數量測寫入收據",
+      "§V mutant ①②：tests/feature_engineering/test_failopen_manifest.py::test_mutation_storage_single_tf_timeframes_is_caught、tests/test_multi_tf_generator.py::test_mutation_canonical_completeness_single_tf_timeframes_is_caught；③：::test_mutation_resolve_completeness_ignoring_cross_tf_failures_is_caught；④：::test_canonical_completeness_dependency_failed_on_12h_reaches_manifest（改回只收 layer_failed 即紅）；⑤：::test_mutation_degradation_in_manifest_writer_skips_gate_is_caught",
+      "邊界 21 條：01–04 Task 1.1、05–07 Task 1.2、08–10 Task 1.3、11–12 Task 2.1、13–14 Task 2.2、15–16 Task 2.3、17–19 Task 3.1、20–21 Task 3.2，各一支 test_boundary_NN_*",
+      "既有行為不得變更：單週期未降級 run 之 manifest 值不變（::test_writer_timeframe_completeness_fresh_single_tf_unchanged、::test_resolve_completeness_single_tf_unchanged、§G golden）；既有 test_completeness_fields 等斷言不得放寬；既有 18 個 run 之 metadata 不得改寫（只對新 run 生效）"
     ],
     "lifecycle": "keep",
     "not_executable": [
-      {"item": "contract_jsons", "reason": "needs-research", "owner": "FF-TFMETA", "expiry": "2099-12-31"},
-      {"item": "不得在 storage 端由 primary tf 猜多週期集合", "reason": "needs-research", "owner": "FF-TFMETA", "expiry": "2099-12-31"},
-      {"item": "不得在 manifest 寫完後只 patch metadata", "reason": "needs-research", "owner": "FF-TFMETA", "expiry": "2099-12-31"}
+      {"item": "script_acceptance", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "不得放寬或刪除既有測試斷言", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "不得另建 sidecar 檔保存逐週期層狀態", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "api/services/feature_factory_service.py 不改", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "既有 run 之 manifest 不回填（面向未來不溯及既往）", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "CGSA 路徑之 L6.5 預處理失敗未進 completeness（SPEC §N 殘留；收案時補列 docs/FFDEFECT_DECISION.md）", "reason": "needs-research", "owner": "claude", "expiry": "2026-12-31"}
     ]
   }
 }

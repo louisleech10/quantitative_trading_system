@@ -1,0 +1,20 @@
+{
+  "_doc": "FF-TFMETA §G golden 之允許變動路徑與 run 位置正規化封閉集（docs/FFTFMETA_SPEC.md §G v5）；tests/feature_engineering/fftfmeta_golden_helpers.py 讀本檔，不另抄。",
+  "completeness_keys": [
+    "expected_timeframes",
+    "present_timeframes",
+    "failed_timeframes",
+    "expected_layers",
+    "present_layers",
+    "failed_layers",
+    "failure_reasons",
+    "quality_status",
+    "run_status"
+  ],
+  "manifest_containers": ["raw", "processed"],
+  "manifest_volatile": [["created_at"], ["updated_at"], ["generation_metadata", "generation_time"]],
+  "task_volatile": [["generation_time"], ["persisted_at"], ["multi_tf_stage_seconds"]],
+  "manifest_location_key": "source_registry_manifest",
+  "manifest_location_placeholder": "<cgsa_work>/manifest.json",
+  "task_root_placeholder": "<features_root>"
+}

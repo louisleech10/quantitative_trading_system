@@ -488,3 +488,93 @@ async def test_api_generation_partial_maps_completed_degraded(
     await service._run_task(task_id, request)
 
     assert service._tasks[task_id]["status"] == "completed_degraded"
+
+
+# ---------------------------------------------------------------------------
+# FF-TFMETA（docs/FFTFMETA_SPEC.md）Task 2.2：manifest 與 result.metadata 之 completeness 同源（真實 kline 輕量 run）
+# ---------------------------------------------------------------------------
+
+from momentum.FeatureEngineering import feature_storage as _fs_module  # noqa: E402
+from momentum.FeatureEngineering.feature_storage import COMPLETENESS_FIELD_NAMES  # noqa: E402
+from tests.feature_engineering import fftfmeta_golden_helpers as _fg  # noqa: E402
+
+_SAME_SOURCE_KEYS = COMPLETENESS_FIELD_NAMES + ("quality_status", "failure_reasons")
+
+
+def _assert_same_source(artifact: dict, metadata: dict) -> None:
+    for key in _SAME_SOURCE_KEYS:
+        assert key in metadata, key
+        assert artifact[key] == metadata[key], (key, artifact.get(key), metadata.get(key))
+
+
+@pytest.mark.requires_kline
+def test_persist_completeness_same_source_multi_tf_cgsa(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """多週期 CGSA：manifest 根之 completeness 各鍵與 quality_status ＝ result.metadata 同鍵（週期欄＝[1h,12h]）。"""
+    _fg.prepare_env(monkeypatch, tmp_path)
+    root, _factory, result = _fg.generate(tmp_path, _fg.multi_tf_payload())
+    manifest = _fg.l7_manifest(root, "1h", result)
+    _assert_same_source(manifest, result.metadata)
+    _assert_same_source(manifest["artifacts"]["raw"], result.metadata)
+    assert manifest["present_timeframes"] == ["1h", "12h"]
+
+
+@pytest.mark.requires_kline
+def test_persist_completeness_same_source_degraded_single_tf(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """單週期 CGSA 降級（max_nan_ratio=0.0）：manifest 與 result.metadata 之 quality_status、failure_reasons 同源（partial）。"""
+    _fg.prepare_env(monkeypatch, tmp_path)
+    root, _factory, result = _fg.generate(tmp_path, _fg.degraded_single_tf_payload())
+    manifest = _fg.l7_manifest(root, "1h", result)
+    _assert_same_source(manifest, result.metadata)
+    assert result.metadata["quality_status"] == "partial"
+
+
+@pytest.mark.requires_kline
+def test_persist_completeness_same_source_frame_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """非 CGSA frame 路徑：meta.json 之 completeness 各鍵與 quality_status ＝ result.metadata（同一物件寫出）。"""
+    _fg.prepare_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
+    root, _factory, result = _fg.generate(tmp_path, _fg.fast_payload(["1h"], **_fg.HEALTHY))
+    _assert_same_source(_fg.meta_json(root, "1h"), result.metadata)
+    assert result.metadata["present_timeframes"] == ["1h"]
+
+
+@pytest.mark.requires_kline
+def test_boundary_13_persist_completeness_same_source_single_generate_defaults(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Task 2.2 邊界①：單週期 generate 不傳參數 ⇒ result.metadata 與 manifest 之週期欄皆為 [timeframe]。"""
+    _fg.prepare_env(monkeypatch, tmp_path)
+    root, _factory, result = _fg.generate(tmp_path, _fg.fast_payload(["1h"], **_fg.HEALTHY))
+    manifest = _fg.l7_manifest(root, "1h", result)
+    for source in (manifest, result.metadata):
+        assert (source["expected_timeframes"], source["present_timeframes"], source["failed_timeframes"]) == (
+            ["1h"], ["1h"], []
+        )
+
+
+@pytest.mark.requires_kline
+def test_boundary_14_persist_completeness_same_source_persist_false(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Task 2.2 邊界②：persist=False ⇒ result.metadata 仍含 canonical 週期欄（多週期 [1h,12h]）。"""
+    _fg.prepare_env(monkeypatch, tmp_path)
+    _root, _factory, result = _fg.generate(tmp_path, _fg.multi_tf_payload(), persist=False)
+    assert result.metadata["expected_timeframes"] == ["1h", "12h"]
+    assert result.metadata["present_timeframes"] == ["1h", "12h"]
+    assert result.metadata["failed_timeframes"] == []
+
+
+@pytest.mark.requires_kline
+def test_mutation_persist_completeness_dropping_canonical_inputs_is_caught(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """改壞：completeness 組裝丟棄 canonical 輸入（週期物件與跨週期層失敗）⇒ 多週期同源測試必紅。"""
+    real = _fs_module.resolve_completeness_meta
+
+    def mutant(layer_results, timeframe, **kwargs):
+        kwargs.pop("timeframe_completeness", None)
+        kwargs.pop("cross_tf_layer_failures", None)
+        return real(layer_results, timeframe, **kwargs)
+
+    monkeypatch.setattr(_fs_module, "resolve_completeness_meta", mutant)
+    with pytest.raises(AssertionError):
+        test_persist_completeness_same_source_multi_tf_cgsa(monkeypatch, tmp_path)

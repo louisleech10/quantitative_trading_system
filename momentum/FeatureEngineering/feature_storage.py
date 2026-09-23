@@ -21,7 +21,7 @@ import hashlib
 import shutil
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple
 from pathlib import Path
 from datetime import datetime
 
@@ -602,13 +602,46 @@ def build_completeness_meta_from_layer_results(
     }
 
 
+def build_timeframe_completeness(
+    expected_tfs: Sequence[str],
+    failed_tfs: Sequence[str],
+) -> Dict[str, List[str]]:
+    """週期三欄之 canonical 形成（docs/FFTFMETA_SPEC.md Task 1.1）——**空殼，尚未實作**。
+
+    expected＝expected_tfs 首次出現序去重；failed 依 expected 序去重且須 ⊆ expected；present＝expected − failed（保序）。
+    """
+    raise NotImplementedError("FFTFMETA Task 1.1")
+
+
+def apply_quality_degradation(
+    meta: Dict[str, Any],
+    *,
+    inf_ratio: float,
+    nan_ratio: float,
+    max_inf_ratio: float,
+    max_nan_ratio: float,
+    preprocessing_applied: Optional[bool],
+) -> Dict[str, Any]:
+    """NaN／inf 門檻與 L6.5 失敗之降級判定（docs/FFTFMETA_SPEC.md Task 2.3）——**空殼，尚未實作**。
+
+    門檻為已解析之實值（`None` 由 factory 政策層先解析）；回傳併入降級後之新 completeness dict。
+    """
+    raise NotImplementedError("FFTFMETA Task 2.3")
+
+
 def resolve_completeness_meta(
     layer_results: Optional[Dict[str, LayerExecutionResult]],
     timeframe: str,
     *,
     override_quality_status: Optional[str] = None,
+    timeframe_completeness: Optional[Dict[str, List[str]]] = None,
+    cross_tf_layer_failures: Sequence[str] = (),
 ) -> Dict[str, Any]:
-    """組裝 artifact completeness；僅 consumer 政策（如 empty_selection）可覆寫 layer 衍生狀態。"""
+    """組裝 artifact completeness；僅 consumer 政策（如 empty_selection）可覆寫 layer 衍生狀態。
+    `timeframe_completeness`／`cross_tf_layer_failures`：MultiTF canonical 輸入（docs/FFTFMETA_SPEC.md Task 1.2，
+    **尚未實作**；預設值時行為不變）。"""
+    if timeframe_completeness is not None or cross_tf_layer_failures:
+        raise NotImplementedError("FFTFMETA Task 1.2")
     if layer_results:
         meta = build_completeness_meta_from_layer_results(layer_results, timeframe=timeframe)
     else:

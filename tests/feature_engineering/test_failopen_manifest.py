@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import threading
 import time
 from contextlib import contextmanager
@@ -484,3 +485,498 @@ def test_v2_old_manifest_reader_returns_unknown(tmp_path: Path) -> None:
         artifact_kind="raw",
     )
     assert FeatureReader.resolve_run_status(manifest_missing_schema) == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# FF-TFMETA（docs/FFTFMETA_SPEC.md）Task 1.1／1.2／2.1／2.3 驗收
+# ---------------------------------------------------------------------------
+
+from momentum.FeatureEngineering import feature_storage as fs_module  # noqa: E402
+from momentum.FeatureEngineering.feature_storage import (  # noqa: E402
+    apply_quality_degradation,
+    build_timeframe_completeness,
+    resolve_completeness_meta,
+)
+
+_ALL_LAYERS = ["L1", "L2", "L3", "L4", "L5", "L6"]
+_MULTI = ["1h", "12h"]
+_IDX3 = pd.date_range("2026-01-01", periods=3, freq="h")
+
+
+def _expected_meta(
+    *,
+    expected_tfs: list[str],
+    present_tfs: list[str],
+    failed_tfs: list[str],
+    failed_layers: list[str],
+    present_layers: list[str],
+    quality_status: str,
+    failure_reasons: list[str],
+    expected_layers: list[str] = _ALL_LAYERS,
+) -> dict[str, object]:
+    return {
+        "expected_layers": list(expected_layers),
+        "present_layers": list(present_layers),
+        "failed_layers": list(failed_layers),
+        "expected_timeframes": list(expected_tfs),
+        "present_timeframes": list(present_tfs),
+        "failed_timeframes": list(failed_tfs),
+        "quality_status": quality_status,
+        "failure_reasons": list(failure_reasons),
+    }
+
+
+# --- Task 1.1 ---------------------------------------------------------------
+
+def test_timeframe_completeness_expected_is_ordered_training_tfs() -> None:
+    out = build_timeframe_completeness(["12h", "1h", "4h"], [])
+    assert out["expected_timeframes"] == ["12h", "1h", "4h"]
+
+
+def test_timeframe_completeness_present_is_expected_minus_failed() -> None:
+    out = build_timeframe_completeness(["1h", "4h", "12h"], ["4h"])
+    assert out["present_timeframes"] == ["1h", "12h"]
+
+
+def test_timeframe_completeness_failed_subset_of_expected() -> None:
+    out = build_timeframe_completeness(["1h", "4h", "12h"], ["12h", "1h"])
+    assert set(out["failed_timeframes"]) <= set(out["expected_timeframes"])
+    assert out["failed_timeframes"] == ["1h", "12h"]
+
+
+def test_timeframe_completeness_expected_is_present_union_failed() -> None:
+    out = build_timeframe_completeness(["1h", "4h", "12h"], ["4h"])
+    assert set(out["expected_timeframes"]) == set(out["present_timeframes"]) | set(out["failed_timeframes"])
+    assert out["present_timeframes"] == [tf for tf in out["expected_timeframes"] if tf not in out["failed_timeframes"]]
+
+
+def test_timeframe_completeness_no_failed_present_equals_expected() -> None:
+    out = build_timeframe_completeness(_MULTI, [])
+    assert out == {"expected_timeframes": _MULTI, "present_timeframes": _MULTI, "failed_timeframes": []}
+
+
+def test_timeframe_completeness_empty_expected_raises() -> None:
+    with pytest.raises(ValueError):
+        build_timeframe_completeness([], [])
+
+
+def test_boundary_01_timeframe_completeness_unknown_failed_raises() -> None:
+    with pytest.raises(ValueError):
+        build_timeframe_completeness(_MULTI, ["4h"])
+
+
+def test_boundary_02_timeframe_completeness_dedup_first_occurrence() -> None:
+    out = build_timeframe_completeness(["1h", "12h", "1h"], [])
+    assert out["expected_timeframes"] == ["1h", "12h"]
+    assert out["present_timeframes"] == ["1h", "12h"]
+
+
+def test_boundary_03_timeframe_completeness_all_failed_present_empty() -> None:
+    out = build_timeframe_completeness(_MULTI, ["12h", "1h"])
+    assert out == {"expected_timeframes": _MULTI, "present_timeframes": [], "failed_timeframes": _MULTI}
+
+
+def test_boundary_04_timeframe_completeness_failed_reordered_by_expected() -> None:
+    out = build_timeframe_completeness(["1h", "4h", "12h"], ["12h", "4h", "12h"])
+    assert out["failed_timeframes"] == ["4h", "12h"]
+
+
+# --- Task 1.2 ---------------------------------------------------------------
+
+def test_resolve_completeness_single_tf_unchanged() -> None:
+    healthy = _healthy_layer_results(_IDX3)
+    partial = _healthy_layer_results(_IDX3)
+    partial["Layer 3"] = _failed_layer(pd.DataFrame(index=_IDX3), reason="boom")
+    for layer_results in (healthy, partial):
+        assert resolve_completeness_meta(layer_results, "1h") == build_completeness_meta_from_layer_results(
+            layer_results, timeframe="1h"
+        )
+    assert resolve_completeness_meta({}, "1h") == default_completeness_meta("1h")
+    assert resolve_completeness_meta(None, "1h") == default_completeness_meta("1h")
+
+
+def test_resolve_completeness_healthy_multi_tf() -> None:
+    meta = resolve_completeness_meta(
+        _healthy_layer_results(_IDX3),
+        "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, []),
+    )
+    assert meta == _expected_meta(
+        expected_tfs=_MULTI, present_tfs=_MULTI, failed_tfs=[],
+        failed_layers=[], present_layers=_ALL_LAYERS, quality_status="complete", failure_reasons=[],
+    )
+
+
+def test_resolve_completeness_skipped_tf() -> None:
+    meta = resolve_completeness_meta(
+        _healthy_layer_results(_IDX3),
+        "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, ["12h"]),
+    )
+    assert meta == _expected_meta(
+        expected_tfs=_MULTI, present_tfs=["1h"], failed_tfs=["12h"],
+        failed_layers=[], present_layers=_ALL_LAYERS, quality_status="partial",
+        failure_reasons=["timeframe:12h"],
+    )
+
+
+def test_resolve_completeness_failed_tf_with_layer_failure() -> None:
+    meta = resolve_completeness_meta(
+        _healthy_layer_results(_IDX3),
+        "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, ["12h"]),
+        cross_tf_layer_failures=("L2:1h:injected L2 failure",),
+    )
+    assert meta == _expected_meta(
+        expected_tfs=_MULTI, present_tfs=["1h"], failed_tfs=["12h"],
+        failed_layers=["L2:1h"], present_layers=["L1", "L3", "L4", "L5", "L6"], quality_status="partial",
+        failure_reasons=["timeframe:12h", "L2:1h:injected L2 failure"],
+    )
+
+
+def test_resolve_completeness_single_tf_via_canonical_equals_legacy() -> None:
+    healthy = _healthy_layer_results(_IDX3)
+    meta = resolve_completeness_meta(
+        healthy, "1h", timeframe_completeness=build_timeframe_completeness(["1h"], [])
+    )
+    assert meta == build_completeness_meta_from_layer_results(healthy, timeframe="1h")
+
+
+def _assert_non_primary_status_case(status_value: str) -> None:
+    meta = resolve_completeness_meta(
+        _healthy_layer_results(_IDX3),
+        "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, []),
+        cross_tf_layer_failures=(f"L3:12h:{status_value}",),
+    )
+    assert meta == _expected_meta(
+        expected_tfs=_MULTI, present_tfs=_MULTI, failed_tfs=[],
+        failed_layers=["L3:12h"], present_layers=["L1", "L2", "L4", "L5", "L6"], quality_status="partial",
+        failure_reasons=[f"L3:12h:{status_value}"],
+    )
+
+
+def test_resolve_completeness_layer_failed_on_non_primary() -> None:
+    _assert_non_primary_status_case(LayerStatus.layer_failed.value)
+
+
+def test_resolve_completeness_all_engines_failed_on_non_primary() -> None:
+    _assert_non_primary_status_case(LayerStatus.all_engines_failed.value)
+
+
+def test_resolve_completeness_dependency_failed_on_non_primary() -> None:
+    _assert_non_primary_status_case(LayerStatus.dependency_failed.value)
+
+
+def test_resolve_completeness_cross_tf_failures_are_authoritative() -> None:
+    """layer_results 為最後處理之週期（可被覆寫），層失敗以 cross_tf_layer_failures 為準。"""
+    stale = _healthy_layer_results(_IDX3)
+    stale["Layer 3"] = _failed_layer(pd.DataFrame(index=_IDX3), reason="stale")
+    meta = resolve_completeness_meta(
+        stale,
+        "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, []),
+        cross_tf_layer_failures=("L3:1h:injected",),
+    )
+    assert meta["failed_layers"] == ["L3:1h"]
+    assert meta["failure_reasons"] == ["L3:1h:injected"]
+
+
+def test_boundary_05_resolve_completeness_empty_selection_override_wins() -> None:
+    meta = resolve_completeness_meta(
+        _healthy_layer_results(_IDX3),
+        "1h",
+        override_quality_status="empty_selection",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, ["12h"]),
+    )
+    assert meta["quality_status"] == "empty_selection"
+    assert meta["failed_timeframes"] == ["12h"]
+
+
+def test_boundary_06_resolve_completeness_no_layer_evidence_unknown() -> None:
+    meta = resolve_completeness_meta(
+        {}, "1h", timeframe_completeness=build_timeframe_completeness(_MULTI, [])
+    )
+    assert meta == _expected_meta(
+        expected_tfs=_MULTI, present_tfs=_MULTI, failed_tfs=[], expected_layers=[],
+        failed_layers=[], present_layers=[], quality_status="unknown", failure_reasons=[],
+    )
+
+
+def test_boundary_07_resolve_completeness_same_layer_two_tfs() -> None:
+    meta = resolve_completeness_meta(
+        _healthy_layer_results(_IDX3),
+        "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, []),
+        cross_tf_layer_failures=("L3:1h:a", "L3:12h:b"),
+    )
+    assert meta["failed_layers"] == ["L3:1h", "L3:12h"]
+    assert meta["present_layers"] == ["L1", "L2", "L4", "L5", "L6"]
+    assert meta["failure_reasons"] == ["L3:1h:a", "L3:12h:b"]
+    assert meta["quality_status"] == "partial"
+
+
+def test_mutation_resolve_completeness_ignoring_cross_tf_failures_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§V mutant ③：忽略 cross_tf_layer_failures ⇒ 非 primary 層失敗之案例必紅。"""
+    real = fs_module.resolve_completeness_meta
+
+    def _mutant(layer_results, timeframe, **kwargs):
+        kwargs["cross_tf_layer_failures"] = ()
+        return real(layer_results, timeframe, **kwargs)
+
+    monkeypatch.setattr(sys.modules[__name__], "resolve_completeness_meta", _mutant)
+    with pytest.raises(AssertionError):
+        _assert_non_primary_status_case(LayerStatus.dependency_failed.value)
+
+
+def test_mutation_storage_single_tf_timeframes_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§V mutant ②：storage 改回 [timeframe] ⇒ 健康多週期之週期欄必紅。"""
+    real = fs_module.resolve_completeness_meta
+
+    def _mutant(layer_results, timeframe, **kwargs):
+        meta = dict(real(layer_results, timeframe, **kwargs))
+        meta.update({"expected_timeframes": [timeframe], "present_timeframes": [timeframe], "failed_timeframes": []})
+        return meta
+
+    monkeypatch.setattr(sys.modules[__name__], "resolve_completeness_meta", _mutant)
+    with pytest.raises(AssertionError):
+        test_resolve_completeness_healthy_multi_tf()
+
+
+# --- Task 2.1 ---------------------------------------------------------------
+
+_ROOT_PRESERVED_KEYS = COMPLETENESS_FIELD_NAMES + ("failure_reasons", "quality_status", "run_status")
+_TC_FAILURE = ("L2:12h:dependency_failed",)
+
+
+def _write_multi_raw(storage: FeatureStorage, config_hash: str) -> dict:
+    storage.write_raw(
+        "BTCUSDT", "1h", config_hash, _sample_groups(_IDX3),
+        row_index=_IDX3,
+        layer_results=_healthy_layer_results(_IDX3),
+        timeframe_completeness=build_timeframe_completeness(_MULTI, []),
+        cross_tf_layer_failures=_TC_FAILURE,
+    )
+    path = storage.feature_run_dir("BTCUSDT", "1h", config_hash) / FeatureStorage.L7_V2_MANIFEST_NAME
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_writer_timeframe_completeness_passes_canonical(tmp_path: Path) -> None:
+    storage = FeatureStorage(str(tmp_path / "features"))
+    manifest = _write_multi_raw(storage, "cfg_tfmeta_writer")
+    canonical = resolve_completeness_meta(
+        _healthy_layer_results(_IDX3), "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, []),
+        cross_tf_layer_failures=_TC_FAILURE,
+    )
+    for key in COMPLETENESS_FIELD_NAMES + ("quality_status", "failure_reasons"):
+        assert manifest[key] == canonical[key], key
+        assert manifest["artifacts"]["raw"][key] == canonical[key], key
+    assert manifest["present_timeframes"] == _MULTI
+    assert manifest["quality_status"] == "partial"
+
+
+def test_writer_timeframe_completeness_ic_first_rewrite_preserves_root(tmp_path: Path) -> None:
+    storage = FeatureStorage(str(tmp_path / "features"))
+    before = _write_multi_raw(storage, "cfg_tfmeta_icfirst")
+    storage.write_raw(
+        "BTCUSDT", "1h", "cfg_tfmeta_icfirst", _sample_groups(_IDX3),
+        row_index=_IDX3, layer_results=_healthy_layer_results(_IDX3),
+    )
+    storage.write_processed(
+        "BTCUSDT", "1h", "cfg_tfmeta_icfirst", _sample_groups(_IDX3),
+        layer_results=_healthy_layer_results(_IDX3),
+    )
+    path = storage.feature_run_dir("BTCUSDT", "1h", "cfg_tfmeta_icfirst") / FeatureStorage.L7_V2_MANIFEST_NAME
+    after = json.loads(path.read_text(encoding="utf-8"))
+    for key in _ROOT_PRESERVED_KEYS:
+        assert after[key] == before[key], key
+    assert "processed" in after["artifacts"]
+
+
+def test_writer_timeframe_completeness_fresh_single_tf_unchanged(tmp_path: Path) -> None:
+    storage = FeatureStorage(str(tmp_path / "features"))
+    storage.write_raw(
+        "BTCUSDT", "1h", "cfg_tfmeta_single", _sample_groups(_IDX3),
+        row_index=_IDX3, layer_results=_healthy_layer_results(_IDX3),
+    )
+    path = storage.feature_run_dir("BTCUSDT", "1h", "cfg_tfmeta_single") / FeatureStorage.L7_V2_MANIFEST_NAME
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    legacy = build_completeness_meta_from_layer_results(_healthy_layer_results(_IDX3), timeframe="1h")
+    for key in COMPLETENESS_FIELD_NAMES + ("quality_status", "failure_reasons"):
+        assert manifest[key] == legacy[key], key
+    assert manifest["run_status"] == "complete"
+
+
+def test_boundary_11_writer_timeframe_completeness_overwrite_takes_new(tmp_path: Path) -> None:
+    storage = FeatureStorage(str(tmp_path / "features"))
+    _write_multi_raw(storage, "cfg_tfmeta_overwrite")
+    storage.write_raw(
+        "BTCUSDT", "1h", "cfg_tfmeta_overwrite", _sample_groups(_IDX3),
+        row_index=_IDX3, layer_results=_healthy_layer_results(_IDX3),
+        timeframe_completeness=build_timeframe_completeness(_MULTI, ["12h"]),
+    )
+    path = storage.feature_run_dir("BTCUSDT", "1h", "cfg_tfmeta_overwrite") / FeatureStorage.L7_V2_MANIFEST_NAME
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    assert manifest["failed_timeframes"] == ["12h"]
+    assert manifest["failed_layers"] == []
+    assert manifest["failure_reasons"] == ["timeframe:12h"]
+
+
+def test_boundary_12_writer_timeframe_completeness_empty_selection_keeps_canonical(tmp_path: Path) -> None:
+    storage = FeatureStorage(str(tmp_path / "features"))
+    storage.write_processed(
+        "BTCUSDT", "1h", "cfg_tfmeta_empty", {},
+        layer_results=_healthy_layer_results(_IDX3),
+        timeframe_completeness=build_timeframe_completeness(_MULTI, []),
+    )
+    path = storage.feature_run_dir("BTCUSDT", "1h", "cfg_tfmeta_empty") / FeatureStorage.L7_V2_MANIFEST_NAME
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    assert manifest["artifacts"]["processed"]["quality_status"] == "empty_selection"
+    assert manifest["present_timeframes"] == _MULTI
+    assert manifest["expected_timeframes"] == _MULTI
+
+
+def test_mutation_writer_timeframe_completeness_root_overwrite_is_caught(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """IC-first 二次寫入若把根週期欄改回 [tf]，保留測試必紅。"""
+    real_build = FeatureStorage._build_feature_manifest_v2
+
+    def _mutant(self, **kwargs):
+        manifest = real_build(self, **kwargs)
+        manifest["present_timeframes"] = [kwargs["tf"]]
+        return manifest
+
+    monkeypatch.setattr(FeatureStorage, "_build_feature_manifest_v2", _mutant)
+    with pytest.raises(AssertionError):
+        test_writer_timeframe_completeness_ic_first_rewrite_preserves_root(tmp_path)
+
+
+# --- Task 2.3（純函式；整合驗收見 test_degradation_in_manifest_*） ---------------
+
+def _complete_meta() -> dict[str, object]:
+    return build_completeness_meta_from_layer_results(_healthy_layer_results(_IDX3), timeframe="1h")
+
+
+def test_degradation_pure_nan_threshold() -> None:
+    out = apply_quality_degradation(
+        _complete_meta(), inf_ratio=0.0, nan_ratio=0.3, max_inf_ratio=0.0, max_nan_ratio=0.1,
+        preprocessing_applied=None,
+    )
+    assert out["quality_status"] == "partial"
+    assert out["run_status"] == "partial"
+    assert out["failure_reasons"] == ["nan_ratio=0.3>max_nan_ratio=0.1"]
+    assert out["quality_thresholds"] == {
+        "max_inf_ratio": 0.0, "max_nan_ratio": 0.1, "observed_inf_ratio": 0.0, "observed_nan_ratio": 0.3,
+    }
+
+
+def test_degradation_pure_healthy_unchanged() -> None:
+    meta = _complete_meta()
+    out = apply_quality_degradation(
+        meta, inf_ratio=0.0, nan_ratio=0.05, max_inf_ratio=0.0, max_nan_ratio=0.1, preprocessing_applied=True,
+    )
+    assert out == meta
+
+
+def test_degradation_pure_l65_failure() -> None:
+    out = apply_quality_degradation(
+        _complete_meta(), inf_ratio=0.0, nan_ratio=0.0, max_inf_ratio=0.0, max_nan_ratio=0.1,
+        preprocessing_applied=False,
+    )
+    assert out["quality_status"] == "partial"
+    assert out["failure_reasons"] == ["L6.5:preprocessing_failed"]
+    assert out["preprocessing_applied"] is False
+
+
+def test_boundary_16_degradation_in_manifest_reason_order_timeframe_layer_quality() -> None:
+    meta = resolve_completeness_meta(
+        _healthy_layer_results(_IDX3), "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, ["12h"]),
+        cross_tf_layer_failures=("L2:1h:x",),
+    )
+    out = apply_quality_degradation(
+        meta, inf_ratio=0.01, nan_ratio=0.3, max_inf_ratio=0.0, max_nan_ratio=0.1, preprocessing_applied=False,
+    )
+    assert out["failure_reasons"] == [
+        "timeframe:12h",
+        "L2:1h:x",
+        "L6.5:preprocessing_failed",
+        "inf_ratio=0.01>max_inf_ratio=0",
+        "nan_ratio=0.3>max_nan_ratio=0.1",
+    ]
+
+
+@pytest.mark.requires_kline
+def test_degradation_in_manifest_cgsa_nan_threshold(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Task 2.3 驗證：NaN 比例超門檻（真實 run、max_nan_ratio=0.0）⇒ manifest 與 result.metadata 之 quality_status
+    皆 partial 且 failure_reasons 相等。"""
+    from tests.feature_engineering import fftfmeta_golden_helpers as fg
+
+    fg.prepare_env(monkeypatch, tmp_path)
+    root, _factory, result = fg.generate(tmp_path, fg.degraded_single_tf_payload())
+    manifest = fg.l7_manifest(root, "1h", result)
+    assert manifest["quality_status"] == result.metadata["quality_status"] == "partial"
+    assert manifest["artifacts"]["raw"]["quality_status"] == "partial"
+    assert manifest["failure_reasons"] == result.metadata["failure_reasons"]
+    assert any(r.startswith("nan_ratio=") for r in manifest["failure_reasons"])
+
+
+@pytest.mark.requires_kline
+def test_degradation_in_manifest_frame_l65_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Task 2.3 驗證：frame 路徑 L6.5 失敗 ⇒ meta.json 與 result.metadata 皆含 L6.5:preprocessing_failed。"""
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    from tests.feature_engineering import fftfmeta_golden_helpers as fg
+
+    def _boom(self, *_args, **_kwargs):
+        raise RuntimeError("injected preprocessing failure")
+
+    fg.prepare_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
+    monkeypatch.setattr(FeatureFactory, "_layer6_5_pre_ic", _boom)
+    root, _factory, result = fg.generate(tmp_path, fg.fast_payload(["1h"], **fg.HEALTHY))
+    meta = fg.meta_json(root, "1h")
+    for source in (meta, result.metadata):
+        assert "L6.5:preprocessing_failed" in source["failure_reasons"]
+        assert source["quality_status"] == "partial"
+    assert meta["failure_reasons"] == result.metadata["failure_reasons"]
+
+
+def test_boundary_15_degradation_in_manifest_none_threshold_matches_old_verdict() -> None:
+    """Task 2.3 邊界①：門檻 None 由 factory 政策層解析為實值後，純函式判定與改前 factory 事後判定相同（同輸入比對）。"""
+    factory = create_feature_factory(validate_continuity=False)
+    config = factory._resolve_config({})
+    resolved_nan = factory._default_max_nan_ratio("BTCUSDT", "12h")
+    for nan_ratio, inf_ratio in ((0.001, 0.0), (0.5, 0.0), (0.0, 0.01), (0.5, 0.01)):
+        old = dict(_complete_meta())
+        old["run_status"] = "complete"
+        factory._apply_runtime_quality_gate(old, config, "BTCUSDT", "12h", nan_ratio=nan_ratio, inf_ratio=inf_ratio)
+        new = apply_quality_degradation(
+            {**_complete_meta(), "run_status": "complete"}, inf_ratio=inf_ratio, nan_ratio=nan_ratio,
+            max_inf_ratio=0.0, max_nan_ratio=resolved_nan, preprocessing_applied=None,
+        )
+        for key in ("quality_status", "run_status", "failure_reasons", "quality_thresholds"):
+            assert new.get(key) == old.get(key), (nan_ratio, inf_ratio, key)
+
+
+@pytest.mark.requires_kline
+def test_mutation_degradation_in_manifest_writer_skips_gate_is_caught(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """§V mutant ⑤：writer 不做降級（恢復事後只改 metadata）⇒ manifest 仍 complete ⇒ 驗收必紅。"""
+    monkeypatch.setattr(fs_module, "apply_quality_degradation", lambda meta, **_kwargs: dict(meta))
+    with pytest.raises(AssertionError):
+        test_degradation_in_manifest_cgsa_nan_threshold(monkeypatch, tmp_path)
+
+
+def test_mutation_degradation_skipping_nan_gate_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """改壞：NaN 門檻判定被略過 ⇒ 純函式驗收必紅。"""
+    real = fs_module.apply_quality_degradation
+
+    def _mutant(meta, **kwargs):
+        kwargs["nan_ratio"] = 0.0
+        return real(meta, **kwargs)
+
+    monkeypatch.setattr(sys.modules[__name__], "apply_quality_degradation", _mutant)
+    with pytest.raises(AssertionError):
+        test_degradation_pure_nan_threshold()

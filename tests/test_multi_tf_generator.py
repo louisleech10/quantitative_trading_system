@@ -458,3 +458,233 @@ def test_multi_tf_generator_propagates_date_range_to_all_layer0_calls():
     assert {call["timeframe"] for call in factory.calls} == {"12h", "1h"}
     assert all(call["start_date"] == "2024-01-02" for call in factory.calls)
     assert all(call["end_date"] == "2024-01-03" for call in factory.calls)
+
+
+# ---------------------------------------------------------------------------
+# FF-TFMETA（docs/FFTFMETA_SPEC.md）Task 3.1／3.2：真實 kline 小窗 run（輕量設定，單次約 5–10 秒）
+# ---------------------------------------------------------------------------
+
+import dataclasses  # noqa: E402
+
+from momentum.core.contracts import LayerStatus  # noqa: E402
+from momentum.FeatureEngineering import feature_storage as fs_module  # noqa: E402
+from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource  # noqa: E402
+from momentum.FeatureEngineering.feature_factory import FeatureFactory  # noqa: E402
+from tests.feature_engineering import fftfmeta_golden_helpers as fg  # noqa: E402
+
+_TF_KEYS = ("expected_timeframes", "present_timeframes", "failed_timeframes")
+_PATH_ENV = {
+    "cgsa_serial": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
+    "cgsa_parallel": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
+    "legacy": {"FFACT_USE_CGSA": "0", "FFACT_MULTI_TF_PARALLEL": "0"},
+}
+_CASES = {
+    "healthy": (["1h", "12h"], (["1h", "12h"], ["1h", "12h"], []), "complete"),
+    "skip": (["1h", "12h"], (["1h", "12h"], ["1h"], ["12h"]), "partial"),
+    "failed": (["1h", "12h"], (["1h", "12h"], ["1h"], ["12h"]), "partial"),
+    "single": (["1h"], (["1h"], ["1h"], []), "complete"),
+}
+
+
+def _thread_pool(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.feature_engineering.test_failopen_producer import _ThreadPoolAsProcessPool
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
+
+
+def _inject_12h_load(monkeypatch: pytest.MonkeyPatch, exc: Exception) -> None:
+    real = FeatureFactory._layer0_data_ingestion
+
+    def patched(self, symbol, timeframe, config, *args, **kwargs):
+        if timeframe == "12h":
+            raise exc
+        return real(self, symbol, timeframe, config, *args, **kwargs)
+
+    monkeypatch.setattr(FeatureFactory, "_layer0_data_ingestion", patched)
+
+
+def _inject_layer_status(monkeypatch: pytest.MonkeyPatch, timeframe: str, layer_name: str, status: LayerStatus) -> None:
+    real = FeatureFactory._execute_layer1_6_preserve_dtype
+
+    def patched(self, name, func, *args):
+        result = real(self, name, func, *args)
+        if name == layer_name and str(getattr(self, "_current_timeframe", "")) == timeframe:
+            return dataclasses.replace(result, status=status, reason=None)
+        return result
+
+    monkeypatch.setattr(FeatureFactory, "_execute_layer1_6_preserve_dtype", patched)
+
+
+def _artifact(path: str, root, primary_tf: str, result) -> dict:
+    return fg.meta_json(root, primary_tf) if path == "legacy" else fg.l7_manifest(root, primary_tf, result)
+
+
+def _run_case(tmp_path, monkeypatch, path: str, case: str, **overrides):
+    fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV[path])
+    if path == "cgsa_parallel":
+        _thread_pool(monkeypatch)
+    if case == "skip":
+        _inject_12h_load(monkeypatch, FileNotFoundError("12h"))
+    elif case == "failed":
+        _inject_12h_load(monkeypatch, RuntimeError("injected 12h load failure"))
+    training = _CASES[case][0]
+    payload = fg.fast_payload(training, **fg.HEALTHY, allow_partial_timeframes=True, **overrides)
+    root, _factory, result = fg.generate(tmp_path, payload)
+    return root, result
+
+
+def _assert_canonical_case(tmp_path, monkeypatch, path: str, case: str) -> None:
+    root, result = _run_case(tmp_path, monkeypatch, path, case)
+    artifact = _artifact(path, root, "1h", result)
+    _training, expected_tfs, quality = _CASES[case]
+    for key, expected in zip(_TF_KEYS, expected_tfs):
+        assert result.metadata.get(key) == expected, (path, case, key, result.metadata.get(key))
+        assert artifact.get(key) == expected, (path, case, key, artifact.get(key))
+    assert result.metadata["quality_status"] == artifact["quality_status"] == quality, (path, case)
+    if case in ("skip", "failed"):
+        assert "timeframe:12h" in result.metadata["failure_reasons"]
+        assert artifact["failure_reasons"] == result.metadata["failure_reasons"]
+        assert result.metadata["skipped_timeframes"] == result.metadata["failed_timeframes"]
+
+
+@pytest.mark.requires_kline
+@pytest.mark.parametrize("case", list(_CASES))
+@pytest.mark.parametrize("path", list(_PATH_ENV))
+def test_canonical_completeness_three_paths_four_cases(path, case, tmp_path, monkeypatch) -> None:
+    """Task 3.1 驗證：三路徑 × 四情況，manifest（legacy 為 meta.json）與 result.metadata 之週期三欄與 quality_status
+    皆等於預期且兩兩相等。"""
+    _assert_canonical_case(tmp_path, monkeypatch, path, case)
+
+
+@pytest.mark.requires_kline
+@pytest.mark.parametrize("path", ["cgsa_serial", "cgsa_parallel"])
+def test_canonical_completeness_dependency_failed_on_12h_reaches_manifest(path, tmp_path, monkeypatch) -> None:
+    """Task 3.1 改法（§V mutant ④）：非 primary 週期之 dependency_failed ⇒ manifest 與 metadata 之 failed_layers 含 L3:12h、partial。"""
+    fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV[path])
+    if path == "cgsa_parallel":
+        _thread_pool(monkeypatch)
+    _inject_layer_status(monkeypatch, "12h", "Layer 3", LayerStatus.dependency_failed)
+    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY, allow_partial_layers=True)
+    root, _factory, result = fg.generate(tmp_path, payload)
+    manifest = fg.l7_manifest(root, "1h", result)
+    for source in (manifest, result.metadata):
+        assert "L3:12h" in source["failed_layers"], source["failed_layers"]
+        assert any(r.startswith("L3:12h:") for r in source["failure_reasons"]), source["failure_reasons"]
+        assert source["quality_status"] == "partial"
+    assert manifest["failed_layers"] == result.metadata["failed_layers"]
+
+
+@pytest.mark.requires_kline
+def test_boundary_17_canonical_completeness_primary_missing_raises(tmp_path, monkeypatch) -> None:
+    """Task 3.1 邊界①：primary 週期失敗（其 L1 layer_failed ⇒ 該週期 rollback 並記入 skip）⇒ 既有
+    ValueError("Primary timeframe data missing…") 不變。"""
+    fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV["cgsa_serial"])
+    _inject_layer_status(monkeypatch, "1h", "Layer 1", LayerStatus.layer_failed)
+    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY, allow_partial_timeframes=True)
+    with pytest.raises(ValueError, match="Primary timeframe data missing"):
+        fg.generate(tmp_path, payload)
+
+
+@pytest.mark.requires_kline
+def test_boundary_18_canonical_completeness_training_order_kept(tmp_path, monkeypatch) -> None:
+    """Task 3.1 邊界②：training 序 ["12h","1h"]（primary 12h）⇒ expected 依 training 序。"""
+    fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV["cgsa_serial"])
+    payload = fg.fast_payload(["12h", "1h"], **fg.HEALTHY)
+    payload["timeframes"]["primary"] = "12h"
+    root, _factory, result = fg.generate(tmp_path, payload, primary_tf="12h")
+    manifest = fg.l7_manifest(root, "12h", result)
+    assert manifest["expected_timeframes"] == result.metadata["expected_timeframes"] == ["12h", "1h"]
+
+
+@pytest.mark.requires_kline
+def test_boundary_19_canonical_completeness_parallel_error_fail_closed(tmp_path, monkeypatch) -> None:
+    """Task 3.1 邊界③：parallel worker 回報 error 且 allow_partial_timeframes=False ⇒ 既有拋錯不變。"""
+    fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV["cgsa_parallel"])
+    _thread_pool(monkeypatch)
+    _inject_12h_load(monkeypatch, RuntimeError("injected 12h load failure"))
+    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY)
+    with pytest.raises(RuntimeError, match="Timeframe 12h failed"):
+        fg.generate(tmp_path, payload)
+
+
+@pytest.mark.requires_kline
+def test_mutation_canonical_completeness_single_tf_timeframes_is_caught(tmp_path, monkeypatch) -> None:
+    """§V mutant ①②：週期物件退回只含 primary（storage 改回 [timeframe]）⇒ 健康多週期案例必紅。"""
+    from momentum.FeatureEngineering.timeframe import multi_tf_generator as mtf_module
+    real = fs_module.build_timeframe_completeness
+
+    def mutant(expected, failed):
+        return real(list(expected)[:1], [])
+
+    monkeypatch.setattr(fs_module, "build_timeframe_completeness", mutant)
+    monkeypatch.setattr(mtf_module, "build_timeframe_completeness", mutant, raising=False)  # 若以 from-import 綁名
+    with pytest.raises(AssertionError):
+        _assert_canonical_case(tmp_path, monkeypatch, "cgsa_serial", "healthy")
+
+
+# --- Task 3.2 ---------------------------------------------------------------
+
+def _crosscheck():
+    return getattr(MultiTFGenerator, "_crosscheck_present_timeframes")
+
+
+def _register(registry: ColumnGroupRegistry, timeframe: str) -> None:
+    arr = np.zeros((4, 1), dtype=np.float32)
+    group = ColumnGroup(
+        group_id=f"{timeframe}_L1_probe", layer=LayerSource.L1, timeframe=timeframe, data_source="close",
+        indicator="probe", columns=(f"close_{timeframe}_probe",), shape=arr.shape, dtype="float32",
+    )
+    registry.save_data(group, arr)
+
+
+def test_crosscheck_present_timeframes_missing_group_raises(tmp_path) -> None:
+    """Task 3.2 驗證：真實 registry 中 12h 無群組而 present 含 12h ⇒ RuntimeError；健康 ⇒ 不拋。"""
+    registry = ColumnGroupRegistry(tmp_path / "w")
+    _register(registry, "1h")
+    with pytest.raises(RuntimeError):
+        _crosscheck()(registry, ["1h", "12h"])
+    _register(registry, "12h")
+    _crosscheck()(registry, ["1h", "12h"])
+
+
+@pytest.mark.requires_kline
+def test_boundary_20_crosscheck_present_timeframes_before_l7_dead_drop(tmp_path, monkeypatch) -> None:
+    """Task 3.2 邊界①：cross-check 於 L7 persist（dead-drop 在其中）之前；dead-drop 開啟之真實 run 不拋。"""
+    fg.prepare_env(monkeypatch, tmp_path, **_PATH_ENV["cgsa_serial"])
+    order: list = []
+    real_check = _crosscheck()
+    real_persist = FeatureFactory._layer7_raw_from_cgsa_pipeline
+
+    def check(registry, present):
+        order.append("crosscheck")
+        return real_check(registry, present)
+
+    def persist(self, *args, **kwargs):
+        order.append("persist")
+        return real_persist(self, *args, **kwargs)
+
+    monkeypatch.setattr(MultiTFGenerator, "_crosscheck_present_timeframes", staticmethod(check))
+    monkeypatch.setattr(FeatureFactory, "_layer7_raw_from_cgsa_pipeline", persist)
+    payload = fg.fast_payload(["1h", "12h"], **fg.HEALTHY)
+    payload["nan_strategy"] = {"l7_dead_feature_drop": {"enabled": True, "min_valid_samples": 100}}
+    fg.generate(tmp_path, payload)
+    assert order == ["crosscheck", "persist"]
+
+
+def test_boundary_21_crosscheck_present_timeframes_counts_resumed_groups(tmp_path) -> None:
+    """Task 3.2 邊界②：resume 讀回之週期群組亦計入。"""
+    registry = ColumnGroupRegistry(tmp_path / "w")
+    _register(registry, "1h")
+    _register(registry, "12h")
+    registry.write_manifest()
+    resumed = ColumnGroupRegistry.resume_from_manifest(tmp_path / "w")
+    _crosscheck()(resumed, ["1h", "12h"])
+    with pytest.raises(RuntimeError):
+        _crosscheck()(resumed, ["1h", "4h", "12h"])
+
+
+def test_mutation_crosscheck_ignoring_registry_is_caught(tmp_path, monkeypatch) -> None:
+    """改壞：cross-check 恆不拋 ⇒ 缺群組之驗收必紅。"""
+    monkeypatch.setattr(MultiTFGenerator, "_crosscheck_present_timeframes", staticmethod(lambda registry, present: None),
+                        raising=False)
+    with pytest.raises(pytest.fail.Exception):
+        test_crosscheck_present_timeframes_missing_group_raises(tmp_path)

@@ -13,7 +13,7 @@ from dataclasses import replace
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Mapping, Optional
+from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -267,6 +267,18 @@ class ColumnGroupRegistry:
         """Iterate all groups in deterministic group_id order."""
         for group_id in sorted(self._groups.keys()):
             yield group_id, self._groups[group_id]
+
+    def record_layer_status(self, tf: str, statuses: Mapping[str, Tuple[str, str]]) -> None:
+        """記錄週期 `tf` 之 L1–L6 狀態（層代號 → (status 值, reason)），整組取代該週期舊條目。
+
+        docs/FFTFMETA_SPEC.md Task 1.3 ①——**空殼，尚未實作**；隨 `write_manifest()` 落盤、`resume_from_manifest()` 讀回。
+        """
+        raise NotImplementedError("FFTFMETA Task 1.3")
+
+    @property
+    def layer_status_by_tf(self) -> Dict[str, Dict[str, Tuple[str, str]]]:
+        """週期 → L1–L6 → (status 值, reason) 之記憶體欄（docs/FFTFMETA_SPEC.md Task 1.3 ①——**空殼，尚未實作**）。"""
+        raise NotImplementedError("FFTFMETA Task 1.3")
 
     def load_data(self, group_id: str) -> np.ndarray:
         """Load column group data; transparently concatenates shards if sharded."""
