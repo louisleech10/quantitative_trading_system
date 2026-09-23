@@ -1,6 +1,6 @@
 # FKPERF — fact-key 生成器：外部程序數與登記規模解耦 — SPEC
 
-> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v4（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`；r2 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md`；v4＝主委自查修訂：比例量測端點改 4×／40×；v5＝r3 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r3/synth.md`：規模改以總 fact-key 數定義、端點改列待使用者確認）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
+> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v5（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`；r2 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md`；v4＝主委自查修訂：比例量測端點改 4×／40×；v5＝r3 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r3/synth.md`：規模改以總 fact-key 數定義、端點改列待使用者確認）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
 
 ## §RISK 風險分級
 - **大小**：大。
