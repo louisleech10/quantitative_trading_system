@@ -1,6 +1,6 @@
 # FKPERF — fact-key 生成器：外部程序數與登記規模解耦 — SPEC
 
-> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v2（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
+> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v3（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`；r2 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md`）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
 
 ## §RISK 風險分級
 - **大小**：大。
@@ -20,9 +20,10 @@ RISK-HIT: b,c
   - FACT-RECEIPT: `grep -n '缺 jq\|without_jq\|shutil.which("jq")' tests/governance/test_govb1_factkey_*.py tests/governance/test_docrot2_*.py` → 印出空（無測試守「缺 jq」行為）（主委 實跑 2026-09-23）
   - FACT-RECEIPT: `prof_spawn.sh --check`／`guard`（三家各於隔離複本重跑）→ 印出 `4317`／`4322`～`4323`，與主委收據相同；`--check` 耗時 11.2～12.25s（codex／composer／grok 實跑 2026-09-23，見 r1 收斂檔）
   - FACT-RECEIPT: `grep -rno 'gen_fact_key_blocks\.sh:[0-9][0-9-]*' docs scripts tests` → 生產引用僅 `scripts/fact_keys.json` E-028 列之 `gen_fact_key_blocks.sh:1863`（生成至 `docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md` 與兩組 fixture）（主委 實跑 2026-09-23）
-- **待使用者確認**（未確認前不得寫 TODO）：
-  - 是否另加「存檔檢查耗時上限」之回歸測試（秒數或相對 1× 之倍數）。主委建議**不加**：①程序數與開檔數之規模不變性（C-6）已決定性地擋住「逐 key 重開外部程式／重讀檔」這類意外漂移；②計時斷言在負載下不穩（同一機器三家實測 `--check` 10.55～12.25s），專案 CI 即因「效能斷言在共用 runner 不可靠」而刪除；③實測秒數仍寫入本 SPEC 與收據（C-6），收票時呈報。codex r1 之判準要求「須先由使用者確認」，故列此。
-- **已確認結果**：2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票；目標＝存檔檢查之等待不隨登記規模增長。
+- **待確認：無**
+- **已確認結果**：
+  - 2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票；目標＝存檔檢查之等待不隨登記規模增長。
+  - 2026-09-23 使用者於 AskUserQuestion 選「比例型：規模放大 10 倍最多慢 20 倍」⇒ C-6 ②、Task 4.4 之比例型耗時斷言，涵蓋 `--check`、`factkey_write_guard.sh`、`--status-hits`（r2 codex／composer 以「每 key 對整份註冊表做 JSON 往返」反例證明程序數與開檔數之不變性抓不到純 CPU 退化：35 key 0.024s → 350 key 2.476s）。
 
 ## §C 約束
 - **C-1 行為逐位元組不變**：六種呼叫形態（emit、`--check`、`--write`、`--status-hits <行檔>`、`-h|--help`、錯誤參數），其 stdout、stderr、rc 以及寫檔後的宿主檔位元組，在 §V 差分語料上須與 oracle（Phase 4 切換前之 bash 實作，commit 寫死於 Task 0.1）逐位元組相同。**唯一具名例外**＝C-5 之前置條件字面（`缺 jq` → `缺 python3`）。其餘任何差異＝FAIL，新增例外須改本條並經審。
@@ -32,7 +33,7 @@ RISK-HIT: b,c
 - **C-3 決定性契約不變**：唯一排序點＝整列 @tsv 後以位元組序排序（現行 `LC_ALL=C sort`）；jq `@tsv` 之跳脫（`\t` `\n` `\r` `\\`）逐位元組重現；全程 LF、無 BOM、無時間戳。fact-key 迭代序照 jq `keys[]`（碼點序），不得沿用 Python dict 插入序。手寫狀態判定（`_FK_HIT_AWK` 之 `has_token`）之 `length`／`substr` 與範圍列舉之 `\001` 換行編碼，照現行 `LC_ALL=C` awk／tr，以 UTF-8 **位元組**為單位，不得改用 Python 字元（碼點）長度。
 - **C-4 fail-closed 不減**：檔頭列舉之 fail-closed 點與各 validator 之拒絕集合全數保留，不得新增 fail-open 路徑。`factkey_write_guard.sh` 既有之刻意 fail-open（其檔頭誠實邊界第 4 條）照舊。
 - **C-5 執行環境**：只用標準庫；以系統 `python3`（3.9）執行，不依賴 venv。缺 `python3` ⇒ fail-closed，訊息 `gen_fact_key_blocks: 缺 python3 → fail-closed`，rc 同現行缺 jq（1）。JSON 解析須拒 `NaN`／`Infinity` 等 jq 不接受之字面，與現行「非合法 JSON 物件 → fail-closed」同判。
-- **C-6 效能驗收**：使用者 2026-09-22 定死「任何每次都會跑的檢查，單次必須秒級；要寫進 SPEC 的是實測秒數」。本票**新增**之驗收分兩層：①決定性：emit、`--check`、`--write`、`--status-hits` 四模式之**外部程序數**與**核心開檔次數**，在 1×／4×／10× 規模下相等（Task 0.2／4.4）；②實測：四模式與 `factkey_write_guard.sh` 於三種規模之耗時寫入本 SPEC §A 與收據。是否另加耗時上限測試待使用者確認（§A）。既有測試 `test_generator_runs_under_two_seconds` 不屬本條新增驗收，依 C-8 不得刪除或放寬，XPASS 後移除其 strict xfail 即回復原斷言。
+- **C-6 效能驗收**：使用者 2026-09-22 定死「任何每次都會跑的檢查，單次必須秒級；要寫進 SPEC 的是實測秒數」。本票**新增**之驗收分三層：①決定性：emit、`--check`、`--write`、`--status-hits` 四模式之**外部程序數**與**核心開檔次數**，在 1×／4×／10× 規模下相等（Task 0.2／4.4）；②比例型耗時（使用者 2026-09-23 裁定，§A）：`--check`、`factkey_write_guard.sh`、`--status-hits` 於 10× 之耗時不得超過 1× 之 20 倍，兩端各量三次取最小值（Task 4.4）——擋住程序數與開檔數都不變的純 CPU 退化；③實測：四模式與 `factkey_write_guard.sh` 於三種規模之耗時寫入本 SPEC §A 與收據。既有測試 `test_generator_runs_under_two_seconds` 不屬本條新增驗收，依 C-8 不得刪除或放寬，XPASS 後移除其 strict xfail 即回復原斷言。
 - **C-7 不加快取**：不得引入 sidecar、增量索引或跨呼叫快取（快取失效即新漂移來源；同債務帳本「無 sidecar 快取」原則）。
 - **C-8 判定寬嚴不變**：由 C-1 語料與既有測試共同守住；既有測試之斷言不得放寬或刪除。
 - **C-9 GOVB1 硬保護集不動**：`scripts/govb1_scope.manifest`、`scripts/govb1_frozen_hashes.txt`、`docs/GOVB1_*` 皆不改。g2（consumer 字面分母）與 g3（停用開關）按路徑掃描 `gen_fact_key_blocks.sh`；核心移入新檔後，這兩道對核心失效，須由 Task 4.3 對新核心施加同等檢查。
@@ -57,7 +58,7 @@ RISK-HIT: b,c
 - 沙箱建法（🔴 只搬腳本 blob 會因 `REG=${SCRIPT_DIR}/fact_keys.json` 在前置檢查失敗，不得如此）：每筆語料建**兩個同形完整沙箱**——同一輸入樹（`git archive <ORACLE_COMMIT>` 或該語料之沙箱樹）＋註冊表所引用而未追蹤之 receipt 檔；oracle 沙箱之 `scripts/gen_fact_key_blocks.sh` 為 `git show <ORACLE_COMMIT>:scripts/gen_fact_key_blocks.sh`，新實作沙箱放新入口與核心；兩者皆各有 `fact_keys.json`、rows_source 來源、settings.json 與宿主檔，並各自 `git init`（語料需要時）。兩邊於相同 env、參數、stdin、相對 cwd 下各跑一次，比對 stdout、stderr、rc，以及宿主檔寫後位元組與權限位。
   - 🔴 stderr 內含沙箱絕對路徑者（例：`宿主檔與 <REG 路徑> 不一致`），比對前只准正規化「兩沙箱根目錄互換」這一種替換，規則寫死於 helper；其他正規化一律禁止。
 - 既有 caller／影響面：新建，無 caller。
-- 改法：每筆語料帶**預期分支標籤**＝oracle 應得之 rc 與 stderr 首行（成功分支則為 rc=0 與 stdout 首行），先斷言 oracle 命中該標籤，再比對新實作；共同前置失敗因此不能充數。語料五類：①真實 repo，六種呼叫形態各一（含 `--help`）。②既有測試建立的沙箱情境：以 `test_govb1_factkey_gen.py` 的 `_sandbox`／`_mkroot`、docrot2 測試的 `_fk_sandbox` 等 helper 建樹，逐一列入。③系統化單點破壞：檔頭 fail-closed 清單每一條、各 validator 每一個拒絕出口，各至少一例；出口清單以現行函式之每個 `return 1`／`_fk_die`／`exit` 逐一列舉並附對應 oracle 之 stderr 首行。④鍵序：一份以非排序插入序寫成之註冊表（C-3）。⑤位元組語意：狀態識別碼含三位元組 UTF-8 字元一筆，左右鄰分別為屬與不屬 `A-Za-z0-9_-` 之字元（C-3）。
+- 改法：每筆語料帶**預期分支標籤**＝oracle 應得之 rc 與 stderr 首行（成功分支則為 rc=0 與 stdout 首行），先斷言 oracle 命中該標籤，再比對新實作；共同前置失敗因此不能充數。語料五類：①真實 repo，六種呼叫形態各一（含 `--help`；`--help` 另以相對路徑與同目錄 symlink 呼叫入口各一筆；C-5 前置例外以「oracle 沙箱缺 jq」與「新實作沙箱缺 python3」配成一對，各自斷言其預期分支，不得以擴大正規化處理）。②既有測試建立的沙箱情境：以 `test_govb1_factkey_gen.py` 的 `_sandbox`／`_mkroot`、docrot2 測試的 `_fk_sandbox` 等 helper 建樹，逐一列入。③系統化單點破壞：檔頭 fail-closed 清單每一條、各 validator 每一個拒絕出口，各至少一例；出口清單以現行函式之每個 `return 1`／`_fk_die`／`exit` 逐一列舉並附對應 oracle 之 stderr 首行。④鍵序：一份以非排序插入序寫成之註冊表（C-3）。⑤位元組語意：狀態識別碼含三位元組 UTF-8 字元一筆，左右鄰分別為屬與不屬 `A-Za-z0-9_-` 之字元（C-3）。
 - **驗證**（`pytest tests/governance/test_fkperf_differential.py` 全綠，含下列四項）：
   - `pytest tests/governance/test_fkperf_differential.py -k oracle_self` ⇒ oracle 對 oracle 差異 0，且其中至少一筆為真實 repo 之 `--check` rc=0（證明沙箱完整）；
   - 每筆語料之 oracle 命中其預期分支標籤（斷言）；
@@ -181,11 +182,11 @@ RISK-HIT: b,c
 - 目標：證明外部程序數與核心開檔次數皆與登記規模無關，並把實測秒數寫進 SPEC（C-6）。
 - 既有 caller／影響面：`tests/governance/test_fkperf_scale.py`（Task 0.2）。
 - 改法：移除規模不變性斷言的 xfail 標記；把實測秒數回填 §A。
-- **驗證**：1×／4×／10× 三種規模下，emit、`--check`、`--write`、`--status-hits` 各自的外部程序數相等、核心開檔次數相等；`factkey_write_guard.sh HANDOFF.md` 的程序數與規模無關。四模式與 guard 於三種規模之耗時（各取三次）寫入收據 `handoffs/run_receipts/<日期>-fkperf-scale.json`，並回填 §A 為 FACT-RECEIPT。既有 `test_generator_runs_under_two_seconds` 之 R-GOVTEST-5 strict xfail 轉為 XPASS ⇒ 移除標記、回復原斷言（C-6、C-8），並關閉 `docs/IC_QUANT_GAP_REGISTRY.md` 的 R-GOVTEST-5 列。
-- **邊界**：①10× 規模下 `--check` rc=0；②合成 key 被 `FACTKEY-CONTENT` 宣告測試拒收 ⇒ 合成註冊表只在 tmp 沙箱內使用，不寫入真實註冊表；③每 key 迴圈內新增一次讀檔之 mutation ⇒ 開檔次數之規模不變性斷言紅。
+- **驗證**：1×／4×／10× 三種規模下，emit、`--check`、`--write`、`--status-hits` 各自的外部程序數相等、核心開檔次數相等；`factkey_write_guard.sh HANDOFF.md` 的程序數與規模無關。比例型耗時斷言（C-6 ②）：`--check`、`factkey_write_guard.sh`、`--status-hits` 各自 `min(10× 三次) <= 20 * min(1× 三次)`。四模式與 guard 於三種規模之耗時（各取三次）寫入收據 `handoffs/run_receipts/<日期>-fkperf-scale.json`，並回填 §A 為 FACT-RECEIPT。既有 `test_generator_runs_under_two_seconds` 之 R-GOVTEST-5 strict xfail 轉為 XPASS ⇒ 移除標記、回復原斷言（C-6、C-8），並關閉 `docs/IC_QUANT_GAP_REGISTRY.md` 的 R-GOVTEST-5 列。
+- **邊界**：①10× 規模下 `--check` rc=0；②合成 key 被 `FACTKEY-CONTENT` 宣告測試拒收 ⇒ 合成註冊表只在 tmp 沙箱內使用，不寫入真實註冊表；③每 key 迴圈內新增一次讀檔之 mutation ⇒ 開檔次數之規模不變性斷言紅；④每 key 迴圈內對整份註冊表做一次 `json.loads(json.dumps(...))` 之 mutation ⇒ 比例型耗時斷言紅（r2 反例，10× 約為 1× 之百倍）。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
-- 不可做：不自訂新的耗時上限斷言（是否增設待使用者確認，見 §A）。
+- 不可做：不得另訂或放寬比例門檻（20 倍與「各取三次最小值」為使用者裁定，見 §A）；不加絕對秒數斷言。
 
 **Task 4.5 — 收尾驗收**
 - 目標：受影響測試與差分語料全綠；全套 `pytest tests/governance` 背景跑一次（本票動共用控制流，符合 CLAUDE.md 全套條件），與 `4bdc2d56` 之基線（0 紅）逐名比對。
