@@ -1,6 +1,6 @@
 # FKPERF — fact-key 生成器：外部程序數與登記規模解耦 — SPEC
 
-> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v3（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`；r2 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md`）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
+> 來源：使用者 2026-09-23 逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」；偵察收據 `handoffs/run_receipts/20260923-fkperf-recon.json`（探針 `handoffs/run_receipts/fkperf_probes/`）　|　日期：2026-09-23　|　版本：v4（r1 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md`；r2 收斂 `handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md`；v4＝主委自查修訂：比例量測端點改 4×／40×，理由見 §A）　|　對應 TODO：`docs/manifests/FKPERF.json`（五類落點 manifest，SPEC 定案後由 TODO_GENERATION_PROMPT 生成）
 
 ## §RISK 風險分級
 - **大小**：大。
@@ -23,7 +23,8 @@ RISK-HIT: b,c
 - **待確認：無**
 - **已確認結果**：
   - 2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票；目標＝存檔檢查之等待不隨登記規模增長。
-  - 2026-09-23 使用者於 AskUserQuestion 選「比例型：規模放大 10 倍最多慢 20 倍」⇒ C-6 ②、Task 4.4 之比例型耗時斷言，涵蓋 `--check`、`factkey_write_guard.sh`、`--status-hits`（r2 codex／composer 以「每 key 對整份註冊表做 JSON 往返」反例證明程序數與開檔數之不變性抓不到純 CPU 退化：35 key 0.024s → 350 key 2.476s）。
+  - 2026-09-23 使用者於 AskUserQuestion 選「比例型：規模放大 10 倍最多慢 20 倍」⇒ C-6 ②、Task 4.4 之比例型耗時斷言，涵蓋 `--check`、`factkey_write_guard.sh`、`--status-hits`（r2 codex／composer 以「每 key 對整份註冊表做 JSON 往返」反例證明程序數與開檔數之不變性抓不到純 CPU 退化：35 key 0.024s → 350 key 2.476s）。量測端點取 4× 與 40×（仍相差 10 倍、門檻仍 20 倍），不取 1× 與 10×——主委自查：每次呼叫之固定開銷約 0.1s（`python3` 啟動 0.022s、`ticket_universe.sh --check` 0.03s，另 git 與包裝層），1×／10× 直接相除會被稀釋，上述反例之比例僅約 13.5 倍而漏抓；4×／40× 下同一反例約 60 倍、正常線性實作約 6.6 倍。
+  - FACT-RECEIPT: `bash scripts/ticket_universe.sh --check`（計時三次）→ 印出 `0.04s`、`0.03s`、`0.03s`；`python3 -c pass` → `0.022s`（主委 實跑 2026-09-23）
 
 ## §C 約束
 - **C-1 行為逐位元組不變**：六種呼叫形態（emit、`--check`、`--write`、`--status-hits <行檔>`、`-h|--help`、錯誤參數），其 stdout、stderr、rc 以及寫檔後的宿主檔位元組，在 §V 差分語料上須與 oracle（Phase 4 切換前之 bash 實作，commit 寫死於 Task 0.1）逐位元組相同。**唯一具名例外**＝C-5 之前置條件字面（`缺 jq` → `缺 python3`）。其餘任何差異＝FAIL，新增例外須改本條並經審。
@@ -33,7 +34,7 @@ RISK-HIT: b,c
 - **C-3 決定性契約不變**：唯一排序點＝整列 @tsv 後以位元組序排序（現行 `LC_ALL=C sort`）；jq `@tsv` 之跳脫（`\t` `\n` `\r` `\\`）逐位元組重現；全程 LF、無 BOM、無時間戳。fact-key 迭代序照 jq `keys[]`（碼點序），不得沿用 Python dict 插入序。手寫狀態判定（`_FK_HIT_AWK` 之 `has_token`）之 `length`／`substr` 與範圍列舉之 `\001` 換行編碼，照現行 `LC_ALL=C` awk／tr，以 UTF-8 **位元組**為單位，不得改用 Python 字元（碼點）長度。
 - **C-4 fail-closed 不減**：檔頭列舉之 fail-closed 點與各 validator 之拒絕集合全數保留，不得新增 fail-open 路徑。`factkey_write_guard.sh` 既有之刻意 fail-open（其檔頭誠實邊界第 4 條）照舊。
 - **C-5 執行環境**：只用標準庫；以系統 `python3`（3.9）執行，不依賴 venv。缺 `python3` ⇒ fail-closed，訊息 `gen_fact_key_blocks: 缺 python3 → fail-closed`，rc 同現行缺 jq（1）。JSON 解析須拒 `NaN`／`Infinity` 等 jq 不接受之字面，與現行「非合法 JSON 物件 → fail-closed」同判。
-- **C-6 效能驗收**：使用者 2026-09-22 定死「任何每次都會跑的檢查，單次必須秒級；要寫進 SPEC 的是實測秒數」。本票**新增**之驗收分三層：①決定性：emit、`--check`、`--write`、`--status-hits` 四模式之**外部程序數**與**核心開檔次數**，在 1×／4×／10× 規模下相等（Task 0.2／4.4）；②比例型耗時（使用者 2026-09-23 裁定，§A）：`--check`、`factkey_write_guard.sh`、`--status-hits` 於 10× 之耗時不得超過 1× 之 20 倍，兩端各量三次取最小值（Task 4.4）——擋住程序數與開檔數都不變的純 CPU 退化；③實測：四模式與 `factkey_write_guard.sh` 於三種規模之耗時寫入本 SPEC §A 與收據。既有測試 `test_generator_runs_under_two_seconds` 不屬本條新增驗收，依 C-8 不得刪除或放寬，XPASS 後移除其 strict xfail 即回復原斷言。
+- **C-6 效能驗收**：使用者 2026-09-22 定死「任何每次都會跑的檢查，單次必須秒級；要寫進 SPEC 的是實測秒數」。本票**新增**之驗收分三層：①決定性：emit、`--check`、`--write`、`--status-hits` 四模式之**外部程序數**與**核心開檔次數**，在 1×／4×／10× 規模下相等（Task 0.2／4.4）；②比例型耗時（使用者 2026-09-23 裁定，§A）：`--check`、`factkey_write_guard.sh`、`--status-hits` 於 40× 之耗時不得超過 4× 之 20 倍（兩端相差 10 倍，端點選擇理由見 §A），兩端各量三次取最小值；40× 端以「20 × 4× 端最小值」為逾時上限，逾時即判紅（Task 4.4）——擋住程序數與開檔數都不變的純 CPU 退化；③實測：四模式與 `factkey_write_guard.sh` 於三種規模之耗時寫入本 SPEC §A 與收據。既有測試 `test_generator_runs_under_two_seconds` 不屬本條新增驗收，依 C-8 不得刪除或放寬，XPASS 後移除其 strict xfail 即回復原斷言。
 - **C-7 不加快取**：不得引入 sidecar、增量索引或跨呼叫快取（快取失效即新漂移來源；同債務帳本「無 sidecar 快取」原則）。
 - **C-8 判定寬嚴不變**：由 C-1 語料與既有測試共同守住；既有測試之斷言不得放寬或刪除。
 - **C-9 GOVB1 硬保護集不動**：`scripts/govb1_scope.manifest`、`scripts/govb1_frozen_hashes.txt`、`docs/GOVB1_*` 皆不改。g2（consumer 字面分母）與 g3（停用開關）按路徑掃描 `gen_fact_key_blocks.sh`；核心移入新檔後，這兩道對核心失效，須由 Task 4.3 對新核心施加同等檢查。
@@ -73,7 +74,7 @@ RISK-HIT: b,c
 - 目標：可重用的外部程序計數與開檔計數 helper，加上合成規模註冊表。
 - 檔案：新建 `tests/governance/_fkperf_spawn.py`（PATH shim 計數，工具集合同收據另加 `bash`；shim 以真實路徑 `exec`，不得對 builtin 名稱建 shim——r1 grok 實測 `printf` shim 會使 emit 早退）；新建 `tests/governance/_fkperf_opens.py`（以子程序 `python3` 啟動，先 `sys.addaudithook` 計 `open` 事件，再以 `runpy.run_path` 執行核心；只計 ROOT 與註冊表所在 repo 之下的路徑）；新建 `tests/governance/test_fkperf_scale.py`。
 - 既有 caller／影響面：新建，無 caller。
-- 改法：以真實註冊表為底，將純內容 key（`FACTKEY-CONTENT` 宣告者）複製為 1×、4×、10× 並改名（改名規則寫死），其宿主區塊以 `--write` 物化；於三種規模量測 emit、`--check`、`--write`、`--status-hits`（小行檔 fixture）的外部程序數，Phase 4 後另量核心開檔次數。規模不變性斷言在 Phase 4 之前以 `xfail(strict=True)` 標記。
+- 改法：以真實註冊表為底，將純內容 key（`FACTKEY-CONTENT` 宣告者）複製為 1×、4×、10×、40× 並改名（改名規則寫死），其宿主區塊以 `--write` 物化；於四種規模量測 emit、`--check`、`--write`、`--status-hits`（小行檔 fixture）的外部程序數，Phase 4 後另量核心開檔次數。規模不變性斷言在 Phase 4 之前以 `xfail(strict=True)` 標記。
 - **驗證**：①helper 自測：shim 計數等於實際呼叫次數、開檔計數等於已知開檔數（各以已知次數之小腳本驗證）；②基準記錄：現行實作下 1× 的 `--check` 程序數與收據 4317 相同，且 4× 大於 1×（證明探針有鑑別力）。
 - **邊界**：①10× 規模 key 名稱須合 `_schema.key_pattern`；②合成 key 不得與既有 key 或狀態識別碼撞名。
 - **存活至**：本票完工後保留。
@@ -182,11 +183,11 @@ RISK-HIT: b,c
 - 目標：證明外部程序數與核心開檔次數皆與登記規模無關，並把實測秒數寫進 SPEC（C-6）。
 - 既有 caller／影響面：`tests/governance/test_fkperf_scale.py`（Task 0.2）。
 - 改法：移除規模不變性斷言的 xfail 標記；把實測秒數回填 §A。
-- **驗證**：1×／4×／10× 三種規模下，emit、`--check`、`--write`、`--status-hits` 各自的外部程序數相等、核心開檔次數相等；`factkey_write_guard.sh HANDOFF.md` 的程序數與規模無關。比例型耗時斷言（C-6 ②）：`--check`、`factkey_write_guard.sh`、`--status-hits` 各自 `min(10× 三次) <= 20 * min(1× 三次)`。四模式與 guard 於三種規模之耗時（各取三次）寫入收據 `handoffs/run_receipts/<日期>-fkperf-scale.json`，並回填 §A 為 FACT-RECEIPT。既有 `test_generator_runs_under_two_seconds` 之 R-GOVTEST-5 strict xfail 轉為 XPASS ⇒ 移除標記、回復原斷言（C-6、C-8），並關閉 `docs/IC_QUANT_GAP_REGISTRY.md` 的 R-GOVTEST-5 列。
-- **邊界**：①10× 規模下 `--check` rc=0；②合成 key 被 `FACTKEY-CONTENT` 宣告測試拒收 ⇒ 合成註冊表只在 tmp 沙箱內使用，不寫入真實註冊表；③每 key 迴圈內新增一次讀檔之 mutation ⇒ 開檔次數之規模不變性斷言紅；④每 key 迴圈內對整份註冊表做一次 `json.loads(json.dumps(...))` 之 mutation ⇒ 比例型耗時斷言紅（r2 反例，10× 約為 1× 之百倍）。
+- **驗證**：1×／4×／10×／40× 四種規模下，emit、`--check`、`--write`、`--status-hits` 各自的外部程序數相等、核心開檔次數相等；`factkey_write_guard.sh HANDOFF.md` 的程序數與規模無關。比例型耗時斷言（C-6 ②）：`--check`、`factkey_write_guard.sh`、`--status-hits` 各自 `min(40× 三次) <= 20 * min(4× 三次)`，40× 單次逾時上限＝`20 * min(4× 三次)`，逾時即判紅。四模式與 guard 於四種規模之耗時（各取三次）寫入收據 `handoffs/run_receipts/<日期>-fkperf-scale.json`，並回填 §A 為 FACT-RECEIPT。既有 `test_generator_runs_under_two_seconds` 之 R-GOVTEST-5 strict xfail 轉為 XPASS ⇒ 移除標記、回復原斷言（C-6、C-8），並關閉 `docs/IC_QUANT_GAP_REGISTRY.md` 的 R-GOVTEST-5 列。
+- **邊界**：①10× 與 40× 規模下 `--check` rc=0；②合成 key 被 `FACTKEY-CONTENT` 宣告測試拒收 ⇒ 合成註冊表只在 tmp 沙箱內使用，不寫入真實註冊表；③每 key 迴圈內新增一次讀檔之 mutation ⇒ 開檔次數之規模不變性斷言紅；④每 key 迴圈內對整份註冊表做一次 `json.loads(json.dumps(...))` 之 mutation ⇒ 比例型耗時斷言紅（r2 反例；以 4×／40× 量測約 60 倍，並須在逾時上限內判紅而非等其跑完）。
 - **存活至**：本票完工後保留。
 - **覆蓋風險**：無。
-- 不可做：不得另訂或放寬比例門檻（20 倍與「各取三次最小值」為使用者裁定，見 §A）；不加絕對秒數斷言。
+- 不可做：不得另訂或放寬比例門檻（10 倍規模差、20 倍時間門檻、各取三次最小值為使用者裁定，見 §A；端點改動須經審）；不加絕對秒數斷言。
 
 **Task 4.5 — 收尾驗收**
 - 目標：受影響測試與差分語料全綠；全套 `pytest tests/governance` 背景跑一次（本票動共用控制流，符合 CLAUDE.md 全套條件），與 `4bdc2d56` 之基線（0 紅）逐名比對。
