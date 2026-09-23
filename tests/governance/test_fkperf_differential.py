@@ -130,10 +130,11 @@ def _site_rules(src: List[str], n: int) -> Tuple[Set[str], Optional[str]]:
     """oracle 第 n 行（寫 stderr 者）之允許歸類與其靜態訊息字面（r6 codex／grok P1-01）。
     回傳 ({"helper"}|{"warning"}|{"LABEL"}|{"LABEL","continuation"}, 字面或 None)；LABEL＝須為 exit_catalog 之鍵。
     - helper：只准 `_fk_die()` 定義行。
-    - 含 `_fk_die "` 或字面以 `gen_fact_key_blocks:`／`FACTKEY ` 開頭者為出口首行 ⇒ LABEL；
-      唯字面不含 `fail-closed` 且同一分支（至 `;;`、行尾 `}` 或 `fi`，至多 8 行）無 return 1／exit／_rc=1 者為 warning。
-    - 其餘：字面以兩空白開頭、`printf '%s\\n'` 類變數明細、或 `>&2` 落在上一行以 `\\` 續行之下一物理行 ⇒ 可為 continuation，
-      否則須為 LABEL。"""
+    - 含 `_fk_die "` ⇒ LABEL。字面以 `gen_fact_key_blocks:`／`FACTKEY` 開頭者 ⇒ LABEL，唯上一物理行為未終止分支之
+      stderr 行時亦可為 continuation（如 L792 接於 L791 之後；r7 grok P1-01）；字面不含 `fail-closed` 且同一分支
+      （至 `;;`、行尾 `}` 或 `fi`，至多 8 行）無 return 1／exit／_rc=1 者為 warning。
+    - 其餘：字面以兩空白開頭、`>&2` 落在上一行以 `\\` 續行之下一物理行、或 `printf '%s\\n'` 類變數明細且上一物理行為
+      未終止分支之 stderr 行 ⇒ 可為 continuation；否則須為 LABEL（如 L791 為出口首行，r7 grok P1-01）。"""
     def lit(k: int) -> Optional[str]:
         m = _SITE_LIT.search(src[k - 1])
         if m:
@@ -149,15 +150,23 @@ def _site_rules(src: List[str], n: int) -> Tuple[Set[str], Optional[str]]:
                 return False
         return True
 
+    def prev_open(k: int) -> bool:
+        """上一物理行為 stderr 行且未終止分支（無 return／exit／_rc=1／_fk_die／`;;`）——r7 grok P1-01。"""
+        p = src[k - 2] if k >= 2 else ""
+        return bool(re.search(r">&2|_fk_die ", p)) and not _SITE_TERM.search(p) and ";;" not in p
+
     t, s = src[n - 1], lit(n)
     if re.match(r"\s*_fk_die\(\)", t):
         return {"helper"}, s
     text = s or ""
-    if '_fk_die "' in t or text.startswith(("gen_fact_key_blocks:", "FACTKEY ")):
+    if '_fk_die "' in t:
+        return {"LABEL"}, s
+    if text.startswith(("gen_fact_key_blocks:", "FACTKEY")):
         if "fail-closed" not in text and not branch_exits(n):
             return {"warning"}, s
-        return {"LABEL"}, s
-    cont = text.startswith("  ") or re.search(r"printf\s+'\s*%s\\n'", t) or (n >= 2 and src[n - 2].rstrip().endswith("\\"))
+        return ({"LABEL", "continuation"} if prev_open(n) else {"LABEL"}), s
+    cont = (text.startswith("  ") or (n >= 2 and src[n - 2].rstrip().endswith("\\"))
+            or (re.search(r"printf\s+'\s*%s\\n'", t) and prev_open(n)))
     return ({"LABEL", "continuation"} if cont else {"LABEL"}), s
 
 
@@ -170,7 +179,7 @@ def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
     之行（`>&2` 或 `_fk_die `），`exit_sites()` 須逐行歸類且合 `_site_rules`；出口首行不得歸為 continuation／helper，
     出口首行之標籤兩兩相異，且 `exit_catalog()[標籤]` 以該行靜態字面（至首個 `$`／`%` 為止）開頭；每個出口標籤至少一行。
     出口清單少列一個出口 ⇒ 該行不得為續行而又無標籤可用即紅（2026-09-23 主委以本規則實跑 oracle：187 行＝helper 1、
-    warning 2〔L1505、L1786，皆不退出〕、須標籤 145、可續行 39）。"""
+    warning 2〔L1505、L1786，皆不退出〕、須標籤 145〔含 L791〕、可續行 39〔含 L792〕；r7 收緊後重跑，2026-09-24）。"""
     import subprocess
     src = subprocess.run(["git", "-C", str(fo.REPO), "show", f"{fo.ORACLE_COMMIT}:scripts/gen_fact_key_blocks.sh"],
                          capture_output=True, text=True, check=True).stdout.splitlines()

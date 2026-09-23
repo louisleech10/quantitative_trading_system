@@ -161,10 +161,40 @@ def test_coupling_map_covers_every_bash_source_line() -> None:
 _MUTATE_PRECONDITION = "mutation 目標字串不存在"  # test_govb1_factkey_gen._mutate 之前置斷言訊息
 
 
+def _assertion_diagnostic(stdout: str) -> str:
+    """pytest 失敗診斷中以 `AssertionError` 起頭之連續 `E ` 行區塊（r7 codex／grok P1：Captured stdout 等處之同字面不算）。
+    2026-09-24 主委實跑五例：性質斷言失敗（單行／多行訊息）命中；print 同字面後他斷言失敗、前置斷言失敗、
+    RuntimeError 帶同字面皆不命中。"""
+    blocks, cur = [], []
+    for line in stdout.splitlines():
+        if re.match(r"^E\s", line):
+            cur.append(line)
+        elif cur:
+            blocks.append(cur)
+            cur = []
+    if cur:
+        blocks.append(cur)
+    return "\n".join("\n".join(b) for b in blocks if "AssertionError" in b[0])
+
+
+def test_fail_substr_only_counts_in_assertion_diagnostic() -> None:
+    """鑑別力（r7 codex／grok P1 之反例）：`fail_substr` 只出現在 Captured stdout、失敗斷言為他句 ⇒ 不算命中；
+    改由目標斷言失敗 ⇒ 命中。"""
+    phrase = "拿掉排序輸出未變"
+    printed = ("F\n_ test _\n    def test_x():\n>       assert 1 == 0, \"別的斷言\"\n"
+               "E   AssertionError: 別的斷言\nE   assert 1 == 0\n"
+               "----- Captured stdout call -----\n" + phrase + "\n= 1 failed in 0.02s =\n")
+    target = ("F\n_ test _\n>       assert a != b, \"" + phrase + "\"\n"
+              "E   AssertionError: " + phrase + "\nE   assert 'a' != 'a'\n= 1 failed in 0.02s =\n")
+    assert phrase in printed and phrase not in _assertion_diagnostic(printed)
+    assert phrase in _assertion_diagnostic(target)
+
+
 def test_every_mutation_map_row_turns_its_red_test_red(tmp_path: Path) -> None:
     """Task 4.2 驗證（r5 codex／grok P1-03）：對照表每一列於隔離樹把核心之 `core_anchor` 換成 `core_mutant`，
     跑該列 `red_test`（pytest node id，驗被破壞之性質者）⇒ rc=1；還原後同一 node ⇒ rc=0。
-    紅須由**被破壞之性質**造成（r6 codex／grok P1-02）：mutant 那次之輸出須含該列 `fail_substr`（性質斷言之訊息）、
+    紅須由**被破壞之性質**造成（r6 codex／grok P1-02；r7 收緊）：mutant 那次之 `AssertionError` 診斷區塊（`E ` 行，
+    不含 Captured stdout）須含該列 `fail_substr`（性質斷言之訊息）、
     不含 `_mutate` 前置斷言訊息、摘要恰 `1 failed` 且無 error（setup／import／fixture 例外同為 rc=1，須排除）。
     可編譯但無語意之 mutant（例：`core_mutant == core_anchor`）於此即紅。
     環境變數 `FKPERF_MUTATION_RECEIPT` 指定路徑時，逐列寫入收據（列、命令、兩次 rc）。"""
@@ -183,7 +213,7 @@ def test_every_mutation_map_row_turns_its_red_test_red(tmp_path: Path) -> None:
         summary = red.stdout.strip().splitlines()[-1] if red.stdout.strip() else ""
         rows_out.append({"test_ref": row["test_ref"], "red_test": row["red_test"], "command": " ".join(cmd),
                          "fail_substr": row["fail_substr"], "mutant_rc": red.returncode, "restored_rc": green,
-                         "fail_substr_seen": row["fail_substr"] in red.stdout,
+                         "fail_substr_seen": row["fail_substr"] in _assertion_diagnostic(red.stdout),
                          "precondition_failed": _MUTATE_PRECONDITION in red.stdout,
                          "summary": summary})
         r = rows_out[-1]

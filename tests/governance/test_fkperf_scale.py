@@ -206,19 +206,26 @@ def test_boundary_25_bad_synthesis_is_rejected(tmp_path: Path, monkeypatch: pyte
 @pytest.mark.parametrize("mode", ["emit", "--check", "--write"])
 def test_gen_block_injection_reaches_every_key(tmp_path: Path, mode: str) -> None:
     """可測性契約（r5 三家 P1）：覆寫模組全域 `gen_block` 之探針，於三種渲染模式皆記錄到每個合成 key
-    ⇒ 邊界 23／24 之 mutant 真的打進每 key 迴圈（核心若以別名／私有函式渲染，此處即紅）。"""
+    ⇒ 邊界 23／24 之 mutant 真的打進每 key 迴圈（核心若以別名／私有函式渲染，此處即紅）。
+    直呼核心與經入口（`bash scripts/gen_fact_key_blocks.sh`）兩條路徑各跑一次、各自須記錄到每個合成 key，
+    且兩次 stdout 相同（r7 codex P1-02：入口可設環境變數使核心改走私有渲染，只直呼時量不到）。"""
     import os
     import subprocess
     root = sp.build_scaled_tree(tmp_path, C["scale_total_keys"]["4x"])
     core = _install_mutant(root, _PROBE_INJECTION)
-    probe = tmp_path / "probe.txt"
     args = [] if mode == "emit" else [mode]
-    r = subprocess.run(["python3", str(core), *args], cwd=str(root), capture_output=True,
-                       env=dict(os.environ, FKPERF_PROBE=str(probe)))
-    assert r.returncode == 0, r.stderr.decode("utf-8", "replace")
-    called = set(probe.read_text(encoding="utf-8").splitlines()) if probe.exists() else set()
     synth = set(_registry_keys(root)) - set(_registry_keys(REPO))
-    assert synth and synth <= called, sorted(synth - called)[:5]
+    assert synth
+    outs = {}
+    for path, argv in (("direct", ["python3", str(core), *args]),
+                       ("entry", ["bash", "scripts/gen_fact_key_blocks.sh", *args])):
+        probe = tmp_path / f"probe_{path}.txt"
+        r = subprocess.run(argv, cwd=str(root), capture_output=True, env=dict(os.environ, FKPERF_PROBE=str(probe)))
+        assert r.returncode == 0, (path, r.stderr.decode("utf-8", "replace"))
+        called = set(probe.read_text(encoding="utf-8").splitlines()) if probe.exists() else set()
+        assert synth <= called, (path, sorted(synth - called)[:5])
+        outs[path] = r.stdout
+    assert outs["direct"] == outs["entry"]
 
 
 @pytest.mark.parametrize("mode", C["invariance_modes"])
