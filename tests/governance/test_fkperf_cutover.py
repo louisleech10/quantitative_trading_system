@@ -41,7 +41,8 @@ def _break_core(root: Path) -> None:
 
 def _mutation_map() -> list:
     """Task 4.2 之對照表（原破壞語意 → 核心中之對應錨點），置於 test_govb1_factkey_gen.py。
-    每列鍵：`test_ref`（耦合行 `檔名:行`）、`core_anchor`、`core_mutant`、`red_test`（mutant 下應紅之 pytest node id）。"""
+    每列鍵：`test_ref`（耦合行 `檔名:行`）、`core_anchor`、`core_mutant`、`red_test`（mutant 下應紅之 pytest node id）、
+    `fail_substr`（`red_test` 中被破壞性質之斷言訊息，mutant 那次輸出須含之）。"""
     mod = importlib.import_module("tests.governance.test_govb1_factkey_gen")
     table = getattr(mod, "FKPERF_MUTATION_MAP")
     assert table, "對照表為空"
@@ -157,9 +158,14 @@ def test_coupling_map_covers_every_bash_source_line() -> None:
             assert not re.search(r'gen_fact_key_blocks\.(sh|py)"\)\.read_text', p.read_text(encoding="utf-8")), p.name
 
 
+_MUTATE_PRECONDITION = "mutation 目標字串不存在"  # test_govb1_factkey_gen._mutate 之前置斷言訊息
+
+
 def test_every_mutation_map_row_turns_its_red_test_red(tmp_path: Path) -> None:
     """Task 4.2 驗證（r5 codex／grok P1-03）：對照表每一列於隔離樹把核心之 `core_anchor` 換成 `core_mutant`，
     跑該列 `red_test`（pytest node id，驗被破壞之性質者）⇒ rc=1；還原後同一 node ⇒ rc=0。
+    紅須由**被破壞之性質**造成（r6 codex／grok P1-02）：mutant 那次之輸出須含該列 `fail_substr`（性質斷言之訊息）、
+    不含 `_mutate` 前置斷言訊息、摘要恰 `1 failed` 且無 error（setup／import／fixture 例外同為 rc=1，須排除）。
     可編譯但無語意之 mutant（例：`core_mutant == core_anchor`）於此即紅。
     環境變數 `FKPERF_MUTATION_RECEIPT` 指定路徑時，逐列寫入收據（列、命令、兩次 rc）。"""
     fo.build_current_tree(tmp_path)
@@ -168,14 +174,22 @@ def test_every_mutation_map_row_turns_its_red_test_red(tmp_path: Path) -> None:
     rows_out = []
     for row in _mutation_map():
         assert row["core_mutant"] != row["core_anchor"], row
+        assert row["fail_substr"].strip(), row
         cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", row["red_test"]]
         core.write_text(good.replace(row["core_anchor"], row["core_mutant"], 1), encoding="utf-8")
-        red = _run(cmd, tmp_path).returncode
+        red = _run(cmd, tmp_path)
         core.write_text(good, encoding="utf-8")
         green = _run(cmd, tmp_path).returncode
+        summary = red.stdout.strip().splitlines()[-1] if red.stdout.strip() else ""
         rows_out.append({"test_ref": row["test_ref"], "red_test": row["red_test"], "command": " ".join(cmd),
-                         "mutant_rc": red, "restored_rc": green})
-        assert (red, green) == (1, 0), rows_out[-1]
+                         "fail_substr": row["fail_substr"], "mutant_rc": red.returncode, "restored_rc": green,
+                         "fail_substr_seen": row["fail_substr"] in red.stdout,
+                         "precondition_failed": _MUTATE_PRECONDITION in red.stdout,
+                         "summary": summary})
+        r = rows_out[-1]
+        assert (r["mutant_rc"], r["restored_rc"]) == (1, 0), r
+        assert r["fail_substr_seen"] and not r["precondition_failed"], r
+        assert re.search(r"\b1 failed\b", summary) and "error" not in summary, r
     out = os.environ.get("FKPERF_MUTATION_RECEIPT")
     if out:
         Path(out).write_text(json.dumps({"schema_version": 1, "command": "pytest " + __file__ +

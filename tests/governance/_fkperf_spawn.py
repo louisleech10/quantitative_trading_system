@@ -53,6 +53,8 @@ def count_spawns(root: Path, mode: str) -> Tuple[int, Dict[str, int]]:
 
 def time_mode(root: Path, mode: str, trials: int, timeout: float = 0.0) -> List[float]:
     """量 `mode` 之牆鐘耗時 `trials` 次；`timeout`>0 時單次逾時即回傳 inf（逾時之那次不看 rc）。
+    逾時須先殺死該次子程序再回傳（`subprocess.run(timeout=…)`；入口以 `exec python3` 使核心即為該子程序，
+    否則未 exec 之孫程序於逾時後續跑、與下一次計時疊加；r6 grok P2-04 實測）。
     未逾時而 rc≠0 ⇒ 拋 `subprocess.CalledProcessError`（快速失敗不得充當「耗時有限」；r5 三家 P1）。"""
     raise NotImplementedError("FKPERF Task 4.4")
 

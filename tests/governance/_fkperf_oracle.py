@@ -73,15 +73,17 @@ def exit_catalog() -> Dict[str, str]:
 
 def exit_sites() -> Dict[int, str]:
     """oracle 原始碼中每一條寫 stderr 之行（`>&2` 或 `_fk_die `）之行號 → 歸類：`exit_catalog()` 之出口標籤、
-    "continuation"（多行訊息之後續行）或 "helper"（`_fk_die` 定義行）。逐行手寫歸類，供出口清單之獨立完整性錨
-    （`test_exit_sites_cover_every_stderr_line_of_oracle`；r5 grok P1-01）。"""
+    "continuation"（多行訊息之後續行）、"warning"（不退出之預警首行）或 "helper"（`_fk_die` 定義行）。逐行手寫歸類，
+    須合 `test_fkperf_differential._site_rules` 之機械規則（出口首行不得為續行；r6 codex／grok P1-01），
+    供出口清單之獨立完整性錨（`test_exit_sites_cover_every_stderr_line_of_oracle`）。"""
     raise NotImplementedError("FKPERF Task 0.1")
 
 
 def corpus(kind: str) -> List[Case]:
     """語料五類：real／sandbox／exit／key_order／bytes（SPEC Task 0.1 改法①～⑤）。
     每筆之 `expect_first_line` 為字面：rc≠0 為 stderr 首行、rc=0 為 stdout 首行（空輸出為 ""）。
-    `exit` 類每筆以手寫建法構成，不得迴圈轉手 `exit_catalog()` 產生（否則與出口清單之集合比對恆等；r5 grok P1-01）。"""
+    `exit` 類每筆以手寫建法構成，不得迴圈轉手 `exit_catalog()` 產生（否則與出口清單之集合比對恆等；r5 grok P1-01）。
+    `bytes` 類至少一筆為 `--write` 且以 `watch_files` 列出其寫入之宿主檔（供寫檔結果之差分與鑑別力；r6 grok P1-03）。"""
     raise NotImplementedError("FKPERF Task 0.1")
 
 
