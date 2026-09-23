@@ -15,6 +15,6 @@
   "manifest_volatile": [["created_at"], ["updated_at"], ["generation_metadata", "generation_time"]],
   "task_volatile": [["generation_time"], ["persisted_at"], ["multi_tf_stage_seconds"]],
   "manifest_location_key": "source_registry_manifest",
-  "manifest_location_placeholder": "<cgsa_work>/manifest.json",
+  "manifest_location_placeholder": "<cgsa_work>",
   "task_root_placeholder": "<features_root>"
 }

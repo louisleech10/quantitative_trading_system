@@ -682,6 +682,52 @@ def test_resolve_completeness_cross_tf_failures_are_authoritative() -> None:
     assert meta["failure_reasons"] == ["L3:1h:injected"]
 
 
+def _statuses(**overrides: tuple) -> dict:
+    base = {f"L{i}": ("ok", "") for i in range(1, 7)}
+    base.update(overrides)
+    return base
+
+
+def test_resolve_completeness_layer_status_evidence_expected_layers() -> None:
+    """v6（r5 codex P2-02）：有 `layer_status_by_tf` 時層證據以之為準、layer_results 不參與；
+    expected_layers＝各 present 週期非 empty_disabled 之 L<n> 聯集（L1–L6 序）。"""
+    stale = _healthy_layer_results(_IDX3)
+    stale["Layer 3"] = _failed_layer(pd.DataFrame(index=_IDX3), reason="stale")
+    meta = resolve_completeness_meta(
+        stale, "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, []),
+        layer_status_by_tf={"1h": _statuses(L2=("empty_disabled", ""), L5=("empty_disabled", "")),
+                            "12h": _statuses(L5=("empty_disabled", ""))},
+    )
+    assert meta["expected_layers"] == ["L1", "L2", "L3", "L4", "L6"]
+    assert meta["present_layers"] == ["L1", "L2", "L3", "L4", "L6"]
+    assert meta["failed_layers"] == [] and meta["quality_status"] == "complete"
+
+
+def test_resolve_completeness_layer_status_missing_or_partial_entry_is_unknown() -> None:
+    """v6：任一 present 週期無條目、或條目未含 L1–L6 全部六鍵 ⇒ unknown（不得解為無失敗）。"""
+    tc = build_timeframe_completeness(_MULTI, [])
+    missing = resolve_completeness_meta({}, "1h", timeframe_completeness=tc, layer_status_by_tf={"1h": _statuses()})
+    partial = resolve_completeness_meta({}, "1h", timeframe_completeness=tc,
+                                        layer_status_by_tf={"1h": _statuses(), "12h": {"L1": ("ok", "")}})
+    assert missing["quality_status"] == "unknown"
+    assert partial["quality_status"] == "unknown"
+
+
+def test_resolve_completeness_layer_status_failures_come_from_cross_tf() -> None:
+    """v6：層失敗之唯一權威仍為 cross_tf_layer_failures；skipped 週期不需條目。"""
+    meta = resolve_completeness_meta(
+        {}, "1h",
+        timeframe_completeness=build_timeframe_completeness(_MULTI, ["12h"]),
+        cross_tf_layer_failures=("L2:1h:dependency_failed",),
+        layer_status_by_tf={"1h": _statuses(L2=("dependency_failed", ""))},
+    )
+    assert meta["failed_layers"] == ["L2:1h"]
+    assert meta["present_layers"] == ["L1", "L3", "L4", "L5", "L6"]
+    assert meta["failure_reasons"] == ["timeframe:12h", "L2:1h:dependency_failed"]
+    assert meta["quality_status"] == "partial"
+
+
 def test_boundary_05_resolve_completeness_empty_selection_override_wins() -> None:
     meta = resolve_completeness_meta(
         _healthy_layer_results(_IDX3),
@@ -921,6 +967,31 @@ def test_degradation_in_manifest_cgsa_nan_threshold(monkeypatch: pytest.MonkeyPa
     assert manifest["artifacts"]["raw"]["quality_status"] == "partial"
     assert manifest["failure_reasons"] == result.metadata["failure_reasons"]
     assert any(r.startswith("nan_ratio=") for r in manifest["failure_reasons"])
+
+
+@pytest.mark.requires_kline
+def test_writer_timeframe_completeness_ic_first_rewrite_preserves_quality_degradation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Task 2.1 驗證（r5 codex P1-02）：先寫含 Task 2.3 品質降級之 run（真實 kline、max_nan_ratio=0.0），
+    再以 IC-first 形（不帶週期參數）各寫一次 raw 與 processed ⇒ 根與 raw 之 quality_status、run_status、
+    failure_reasons（含 nan_ratio= 原因）逐鍵等於首寫。"""
+    from tests.feature_engineering import fftfmeta_golden_helpers as fg
+
+    fg.prepare_env(monkeypatch, tmp_path)
+    root, factory, result = fg.generate(tmp_path, fg.degraded_single_tf_payload())
+    before = fg.l7_manifest(root, "1h", result)
+    assert any(r.startswith("nan_ratio=") for r in before["failure_reasons"])
+    config_hash = str(result.metadata["config_hash"])
+    storage = factory._storage
+    storage.write_raw("BTCUSDT", "1h", config_hash, _sample_groups(_IDX3), row_index=_IDX3,
+                      layer_results=_healthy_layer_results(_IDX3))
+    storage.write_processed("BTCUSDT", "1h", config_hash, _sample_groups(_IDX3),
+                            layer_results=_healthy_layer_results(_IDX3))
+    after = fg.l7_manifest(root, "1h", result)
+    for key in ("quality_status", "run_status", "failure_reasons") + COMPLETENESS_FIELD_NAMES:
+        assert after[key] == before[key], key
+    assert after["quality_status"] == "partial"
 
 
 @pytest.mark.requires_kline

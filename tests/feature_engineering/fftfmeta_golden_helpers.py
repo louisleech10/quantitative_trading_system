@@ -100,11 +100,18 @@ HEALTHY = {"max_nan_ratio": 1.0}  # 輕量設定之實測 nan_ratio 0.0959 超�
 
 
 def prepare_env(monkeypatch: Any, tmp_path: Path, **env: str) -> None:
-    """固定環境；`env` 覆寫個別鍵。CGSA 工作目錄：非 parallel 固定於 tmp；parallel 不設——worker 以
-    `_prepare_cgsa_registry(symbol, tf, "worker")` 取目錄，設定此變數會使 worker 與主程序共用同一目錄（預設各自分目錄）。"""
+    """固定環境並把一切寫入隔離到 tmp（r5 codex P1-01：不得碰專案 data_cache）；`env` 覆寫個別鍵。
+    - feature registry：`FFACT_FEATURE_REGISTRY_PATH`＝tmp 下（預設為相對 cwd 之 data_cache/features/registry.json）。
+    - CGSA 工作目錄：非 parallel 固定於 tmp；parallel 不設——worker 以 `_prepare_cgsa_registry(symbol, tf, "worker")`
+      取目錄，設定此變數會使 worker 與主程序共用同一目錄——改把 cwd 移到 tmp，使 `Path.cwd()/data_cache/cgsa_work`
+      落在 tmp 且主程序與 worker 各自分目錄；相對路徑讀取之 `config/` 以 symlink 指回 repo（kline 已為絕對路徑）。"""
     merged = {**FIXED_ENV, **env}
     for name, value in merged.items():
         monkeypatch.setenv(name, value)
+    monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(tmp_path / "features" / "registry.json"))
+    monkeypatch.chdir(tmp_path)
+    if not (tmp_path / "config").exists():
+        (tmp_path / "config").symlink_to(REPO / "config")
     if merged.get("FFACT_MULTI_TF_PARALLEL") == "1":
         monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
     else:
@@ -167,22 +174,34 @@ REGISTRY_MANIFEST_KEY: str = _CONTRACT["manifest_location_key"]  # CGSA 工作�
 REGISTRY_PLACEHOLDER: str = _CONTRACT["manifest_location_placeholder"]
 
 
-def _normalize_registry_path(node: Any) -> None:
+def _work_dir_prefixes() -> List[str]:
+    """本次 run 之 CGSA 工作目錄（`FFACT_CGSA_WORK_DIR`，未設則 `cwd/data_cache/cgsa_work`）之字面形（原形與 realpath）。"""
+    import os
+    base = os.environ.get("FFACT_CGSA_WORK_DIR", "").strip() or str(Path.cwd() / "data_cache" / "cgsa_work")
+    forms = {base.rstrip("/"), str(Path(base).resolve()).rstrip("/")}
+    return sorted(forms, key=len, reverse=True)
+
+
+def _normalize_registry_path(node: Any, prefixes: List[str]) -> None:
+    """只把工作目錄**前綴**換成定值；其後之相對位置與檔名保留進 digest（r5 codex P2-01：整值替換會掩蓋錯指向）。"""
     if isinstance(node, dict):
         for key, value in node.items():
             if key == REGISTRY_MANIFEST_KEY and isinstance(value, str):
-                node[key] = REGISTRY_PLACEHOLDER
+                for pre in prefixes:
+                    if value.startswith(pre + "/"):
+                        node[key] = REGISTRY_PLACEHOLDER + value[len(pre):]
+                        break
             else:
-                _normalize_registry_path(value)
+                _normalize_registry_path(value, prefixes)
     elif isinstance(node, list):
         for item in node:
-            _normalize_registry_path(item)
+            _normalize_registry_path(item, prefixes)
 
 
 def strip_manifest(manifest: Dict[str, Any]) -> Dict[str, Any]:
-    """去除 manifest 之允許變動路徑，並把 CGSA 工作目錄路徑換成定值。"""
+    """去除 manifest 之允許變動路徑，並把 CGSA 工作目錄前綴換成定值。"""
     out = copy.deepcopy(manifest)
-    _normalize_registry_path(out)
+    _normalize_registry_path(out, _work_dir_prefixes())
     for container in _manifest_containers(out):
         for key in COMPLETENESS_KEYS:
             container.pop(key, None)

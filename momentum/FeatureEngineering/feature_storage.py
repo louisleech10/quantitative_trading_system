@@ -636,11 +636,12 @@ def resolve_completeness_meta(
     override_quality_status: Optional[str] = None,
     timeframe_completeness: Optional[Dict[str, List[str]]] = None,
     cross_tf_layer_failures: Sequence[str] = (),
+    layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
 ) -> Dict[str, Any]:
     """組裝 artifact completeness；僅 consumer 政策（如 empty_selection）可覆寫 layer 衍生狀態。
-    `timeframe_completeness`／`cross_tf_layer_failures`：MultiTF canonical 輸入（docs/FFTFMETA_SPEC.md Task 1.2，
-    **尚未實作**；預設值時行為不變）。"""
-    if timeframe_completeness is not None or cross_tf_layer_failures:
+    `timeframe_completeness`／`cross_tf_layer_failures`／`layer_status_by_tf`：MultiTF canonical 輸入
+    （docs/FFTFMETA_SPEC.md Task 1.2／1.3，**尚未實作**；預設值時行為不變）。"""
+    if timeframe_completeness is not None or cross_tf_layer_failures or layer_status_by_tf is not None:
         raise NotImplementedError("FFTFMETA Task 1.2")
     if layer_results:
         meta = build_completeness_meta_from_layer_results(layer_results, timeframe=timeframe)

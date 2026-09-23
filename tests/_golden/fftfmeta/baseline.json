@@ -1,5 +1,5 @@
 {
- "frozen_at_head": "cb6049630cd6",
+ "frozen_at_head": "80f3f85a42c5",
  "references": {
   "degraded": {
    "allowed": {
@@ -212,7 +212,7 @@
      ]
     }
    },
-   "task_bytes": 24121,
+   "task_bytes": 24119,
    "task_stripped_sha256": "991eaad6d7de2219e28154a6e54273a070b6e485518c199ced075d65a4f90374"
   },
   "multi": {
@@ -465,7 +465,7 @@
      ]
     }
    },
-   "task_bytes": 24999,
+   "task_bytes": 24998,
    "task_stripped_sha256": "d3384830d93c2bb567eb788de3bcd79901dc429c26f84557f87f9c1a94c09f4a"
   }
  },
