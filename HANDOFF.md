@@ -24,7 +24,6 @@
 | 03-014 | SU-RESID-5 | 未開工 | docs/SPLITUNIFY_SPEC.md §N | 待觸發：下一次動 SplitPlan 欄位契約 |
 | 03-015 | SU-RESID-C5-TARGETS | 未開工 | docs/SPLITUNIFY_TODO.md Task 9.3 | 待觸發：Task 9.3 驗收段兩條觸發條件 |
 | 04-003 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀 |
-| 04-005 | HP-PROCOPT | 待審 | docs/PROCOPT_DECISION.md | 診斷完成（r1→r2→r3）。使用者後續裁定：**先完成 TODO 優化**（見 HP-TODOFMT）——已於 2026-09-23 完工（§四之二 TODO 改為五類落點）；其餘改法待使用者逐條裁決。r3 之四步改法經使用者逐條質詢後大多撤回或降級，現存狀態見 白話說明/SPEC與TODO流程優化.md。**未實施任何流程改動** |
 | 04-006 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工；該票已於 2026-09-23 完工，何時復工待使用者決定）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
 <!-- END GENERATED: handoff-todo -->
 
@@ -164,8 +163,4 @@
 - 2026-09-22：RM-EVENTSCAN → `handoffs/reconcile/20260921-eventscan-x-review-r12/synth.md`
 - 2026-09-22：RM-FFTFMETA → `docs/FFDEFECT_DECISION.md`
 - 2026-09-22：RM-FFNAME → `docs/FFDEFECT_DECISION.md`
-- 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-procopt-x-consult-r3/synth.md`
-- 2026-09-22：RM-PROCOPT → `docs/PROCOPT_DECISION.md`
-- 2026-09-22：RM-PROCOPT → `白話說明/SPEC與TODO流程優化.md`
-- 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-todofmt-x-consult-r1/synth.md`
 <!-- HISTORY-END -->

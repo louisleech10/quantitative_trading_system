@@ -436,3 +436,11 @@
 - 2026-09-23：RM-TODOFMT → `handoffs/run_receipts/20260923-todofmt-govsuite-attribution.json`
 - 2026-09-23：RM-TODOFMT → `白話說明/TODO優化結論.md`
 - 2026-09-23：RM-TODOFMT → commit `d8107deb`
+
+## 2026-09-23 交接檔進行中紀錄移出：RM-PROCOPT（條目識別碼轉完成）
+
+<!-- ENTRY: RM-PROCOPT -->
+- 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-procopt-x-consult-r3/synth.md`
+- 2026-09-22：RM-PROCOPT → `docs/PROCOPT_DECISION.md`
+- 2026-09-22：RM-PROCOPT → `白話說明/Archived/SPEC與TODO流程優化.md`
+- 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-todofmt-x-consult-r1/synth.md`
