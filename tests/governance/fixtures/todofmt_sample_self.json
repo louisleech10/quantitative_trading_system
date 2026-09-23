@@ -39,6 +39,7 @@
       "scripts/todofmt_check.sh",
       "scripts/todofmt_contract.json",
       "scripts/todofmt_write_guard.sh",
+      "scripts/todofmt_manifest_guard.sh",
       "scripts/todofmt_freeze_check.sh",
       "scripts/mutation_scope_static.sh",
       "tests/governance/_todofmt_anchor.py",

@@ -328,9 +328,37 @@ def test_33_pre_push_skip_env_leaves_audit(tmp_path: Path) -> None:
 
 # ───────────── Task 3.1：gate.sh --impl-self ─────────────
 
+# TODOFMT Task 1.4 邊界⑩（設計定案 f2146e3d，自 W＝26048178 生效）：`--impl-self` 須帶 `--spec`。
+# `--spec` 為 gate.sh 既有之 impl 判準，帶上即連帶要求 impl 型 brief（含 EXPECTED-DELTA）、session reconcile＋戳記
+# 與 SPEC 範本機檢——與本票 SPEC C-6「主委路徑與委員路徑走同一道判定」一致。
+# 本段測的是 verdictgate／quorum／family；上述其餘閘以最小合法夾具滿足（斷言不動）：
+#   SPEC 取設計定案前已存在者（TODOFMT 既有清單內，免 manifest）；completeness／stamp 以 harness 專用覆寫替身。
+_IMPL_SPEC = "docs/VERDICTGATE_SPEC.md"
+
+
+def _impl_fixtures(h: dict) -> tuple[str, ...]:
+    root = h["root"]
+    shutil.copy2(REPO_ROOT / "scripts" / "brief_conformance_check.sh", root / "scripts" / "brief_conformance_check.sh")
+    (root / "docs").mkdir(exist_ok=True)
+    shutil.copy2(REPO_ROOT / _IMPL_SPEC, root / _IMPL_SPEC)
+    sess = root / "handoffs" / "reconcile" / "s-impl"
+    sess.mkdir(parents=True, exist_ok=True)
+    (sess / "synth.md").write_text("# s\n", encoding="utf-8")
+    (sess / "sources.lock").write_text("{}\n", encoding="utf-8")
+    (root / "handoffs" / "impl-brief.md").write_text(
+        "brief-kind: impl\n\nEXPECTED-DELTA:\n- tests: unit\n\nstub\n", encoding="utf-8")
+    stub = root.parent / "stub_pass.sh"
+    stub.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    stub.chmod(0o755)
+    h["env"].update({"COMPLETENESS_CHECK_OVERRIDE": str(stub), "RECONCILE_STAMPS_CHECK_OVERRIDE": str(stub)})
+    return ("--spec", _IMPL_SPEC, "--brief", "handoffs/impl-brief.md", "--reconcile", "handoffs/reconcile/s-impl/synth.md")
+
+
 def _dispatch(h: dict, task: str, *extra: str) -> subprocess.CompletedProcess[str]:
+    fixtures = _impl_fixtures(h)
     return subprocess.run(["bash", "scripts/gate.sh", "dispatch", "--impl-self", "--task-id", task, "--intent", "t", "--risk", "low",
-                           "--facts-asked", "none-needed:unit", "--review-role", "single-executor:n/a", "--template", "n/a:unit", *extra],
+                           "--facts-asked", "none-needed:unit", "--review-role", "single-executor:n/a", "--template", "n/a:unit",
+                           *fixtures, *extra],
                           cwd=h["root"], env=h["env"], capture_output=True, text=True, check=False)
 
 

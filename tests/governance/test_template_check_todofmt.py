@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -180,3 +181,113 @@ def test_mutation_removing_exec_breaks_equivalence(tmp_path: Path, monkeypatch: 
     monkeypatch.setattr(sys.modules[__name__], "TEMPLATE_CHECK", scripts / "template_check.sh")
     via = _tc(mf)
     assert (via.returncode, via.stdout) != (direct.returncode, direct.stdout), "移除 exec 後仍等價 ⇒ 邊界⑧ 無鑑別力"
+
+
+# ── C-2 實作期補強（產出端覆蓋鐵律）：manifest 寫入當下即以同一檢查器判定（PostToolUse）──────────────
+
+GUARD = REPO_ROOT / "scripts" / "todofmt_manifest_guard.sh"
+GUARD_CMD = "bash scripts/todofmt_manifest_guard.sh"
+
+
+def _guard_repo(tmp_path: Path) -> tuple[Path, Path]:
+    """迷你 repo：守衛（取自模組層級 GUARD，mutation 探針以 monkeypatch 換成改壞之複本）、檢查器與契約之複本；回（根, 守衛）。"""
+    root = tmp_path / "repo"
+    scripts = root / "scripts"
+    scripts.mkdir(parents=True)
+    guard = scripts / "todofmt_manifest_guard.sh"
+    guard.write_text(GUARD.read_text(encoding="utf-8"), encoding="utf-8")
+    shutil.copy(CHECKER, scripts / "todofmt_check.sh")
+    shutil.copy(REPO_ROOT / "scripts" / "todofmt_contract.json", scripts / "todofmt_contract.json")
+    (root / "tests").mkdir()
+    (root / "tests" / "t.py").write_text("x\n", encoding="utf-8")
+    (root / "docs" / "manifests").mkdir(parents=True)
+    return root, guard
+
+
+def _mini_manifest(root: Path, **batch_card: object) -> str:
+    """路徑相對迷你 repo 根之合法 manifest；以 batch_card 參數覆寫欄位可造出不合法者。"""
+    digest = subprocess.run(["bash", str(root / "scripts" / "todofmt_check.sh"), "--digest"],
+                            capture_output=True, text=True, check=True).stdout.strip()
+    m = _valid()
+    m.update(test_files=["tests/t.py"], spec_path="scripts/todofmt_contract.json", contract_digest=digest)
+    m["batch_card"]["touches"] = ["tests/t.py"]
+    m["batch_card"].update(batch_card)
+    return json.dumps(m, ensure_ascii=False)
+
+
+def _post(guard: Path, file_path: str, tool: str = "Write") -> subprocess.CompletedProcess[str]:
+    payload = json.dumps({"tool_name": tool, "tool_input": {"file_path": file_path}})
+    return subprocess.run(["bash", str(guard)], input=payload, capture_output=True, text=True, check=False)
+
+
+def test_manifest_guard_mounted_post_tool_use() -> None:
+    settings = json.loads((REPO_ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
+    cmds = [
+        h.get("command")
+        for e in settings.get("hooks", {}).get("PostToolUse", [])
+        if all(re.fullmatch(f"(?:{e.get('matcher') or ''})", t) for t in ("Edit", "Write"))
+        for h in e.get("hooks", [])
+    ]
+    assert GUARD_CMD in cmds, cmds
+
+
+@pytest.mark.parametrize("name", ["TODOFMT.json", "FFTFMETA.json"])
+def test_manifest_guard_real_manifests_pass(name: str) -> None:
+    assert _post(GUARD, f"docs/manifests/{name}").returncode == 0
+
+
+def test_manifest_guard_valid_manifest_passes(tmp_path: Path) -> None:
+    root, guard = _guard_repo(tmp_path)
+    mf = root / "docs" / "manifests" / "X.json"
+    mf.write_text(_mini_manifest(root), encoding="utf-8")
+    for tool in ("Write", "Edit"):
+        r = _post(guard, str(mf), tool)
+        assert r.returncode == 0, r.stderr
+
+
+def test_manifest_guard_invalid_manifest_blocked(tmp_path: Path) -> None:
+    root, guard = _guard_repo(tmp_path)
+    (root / "docs" / "manifests" / "X.json").write_text(_mini_manifest(root, lifecycle="forever"), encoding="utf-8")
+    for fp in (str(root / "docs" / "manifests" / "X.json"), "docs/manifests/X.json", "./docs/manifests/X.json"):
+        r = _post(guard, fp)
+        assert r.returncode == 2 and "未過 todofmt 機檢" in r.stderr, (fp, r.stderr)
+
+
+def test_manifest_guard_alias_path_governed(tmp_path: Path) -> None:
+    """經指向 repo 之符號連結寫入：所在目錄以 -ef 比對，與正規路徑同判。"""
+    root, guard = _guard_repo(tmp_path)
+    (root / "docs" / "manifests" / "X.json").write_text(_mini_manifest(root, lifecycle="forever"), encoding="utf-8")
+    link = tmp_path / "repolink"
+    link.symlink_to(root, target_is_directory=True)
+    assert (link / "docs" / "manifests").samefile(root / "docs" / "manifests")
+    r = _post(guard, str(link / "docs" / "manifests" / "X.json"))
+    assert r.returncode == 2 and "未過 todofmt 機檢" in r.stderr, r.stderr
+
+
+def test_manifest_guard_out_of_scope_not_checked(tmp_path: Path) -> None:
+    """管轄外（子目錄、docs/ 他處、非 .json、不存在之檔）一律放行，即使內容不合法。"""
+    root, guard = _guard_repo(tmp_path)
+    bad = _mini_manifest(root, lifecycle="forever")
+    for rel in ("docs/manifests/sub/X.json", "docs/X.json", "docs/manifests/X.txt"):
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(bad, encoding="utf-8")
+        assert _post(guard, str(p)).returncode == 0, rel
+    assert _post(guard, str(root / "docs" / "manifests" / "absent.json")).returncode == 0
+
+
+def test_mutation_guard_without_checker_lets_invalid_through(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """守衛不呼叫檢查器 ⇒ 不合法 manifest 放行（證上述擋下之測試有鑑別力）。"""
+    src = GUARD.read_text(encoding="utf-8")
+    call = '_out="$(bash "${SCRIPT_DIR}/todofmt_check.sh" "${_abs}" 2>&1)" && exit 0'
+    assert src.count(call) == 1
+    # 前提：同佈局之未改壞複本擋下不合法 manifest（排除「因別的理由而放行」之假綠）
+    root, guard = _guard_repo(tmp_path / "orig")
+    (root / "docs" / "manifests" / "X.json").write_text(_mini_manifest(root, lifecycle="forever"), encoding="utf-8")
+    assert _post(guard, str(root / "docs" / "manifests" / "X.json")).returncode == 2
+    mutant = tmp_path / "mutant_guard.sh"
+    mutant.write_text(src.replace(call, "exit 0"), encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "GUARD", mutant)
+    root2, guard2 = _guard_repo(tmp_path / "mut")
+    (root2 / "docs" / "manifests" / "X.json").write_text(_mini_manifest(root2, lifecycle="forever"), encoding="utf-8")
+    assert _post(guard2, str(root2 / "docs" / "manifests" / "X.json")).returncode == 0

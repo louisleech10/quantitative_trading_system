@@ -210,7 +210,7 @@ _todofmt_route_check() {
     if [ -z "${_rc_spec}" ]; then
       echo "TODOFMT 拒：--impl-self 須同時給 --spec（impl 許可必須綁定 SPEC 與合法 manifest）"; return 1
     fi
-    _rc_ns="$(_todofmt_norm "${_rc_spec}")"
+    _rc_ns="$(_todofmt_norm "${_rc_spec}")"; [ -n "${_rc_ns}" ] || { echo "TODOFMT 拒：--spec 正規化後為空（${_rc_spec}）——不是一份 SPEC 檔"; return 1; }
     if printf '%s\n' "${_rc_list}" | grep -Fxq -- "${_rc_ns}"; then
       return 0   # 既有 SPEC（設計定案時已存在）：C-6 不溯及既往
     fi

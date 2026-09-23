@@ -237,6 +237,10 @@
           {
             "type": "command",
             "command": "bash scripts/synth_attribution_hook.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/todofmt_manifest_guard.sh"
           }
         ]
       }

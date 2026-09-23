@@ -140,6 +140,15 @@ def test_boundary_14_control_char_in_spec_or_todo_rejected(args: tuple[str, ...]
     assert r.returncode == 1 and "控制字元" in r.stdout, r.stdout
 
 
+@pytest.mark.parametrize("spec", ["./", "././", f"{REPO_ROOT}/", f"{REPO_ROOT}/./"],
+                         ids=["dot-slash", "dot-slash-twice", "repo-root-slash", "repo-root-dot-slash"])
+def test_boundary_15_empty_normalized_spec_rejected(spec: str) -> None:
+    """r2 grok 正文：正規化後為空之 --spec 經逐行比對會命中字面陣列之空行而誤報放行（生產字面清單）。"""
+    r = subprocess.run(["bash", str(GATE), "todofmt-route", "--spec", spec],
+                       cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+    assert r.returncode == 1 and "正規化後為空" in r.stdout, r.stdout
+
+
 def test_regression_non_impl_path_untouched(tmp_path: Path) -> None:
     assert ENTRY_CONDITION in (anchor.read_x("scripts/gate.sh") or "")
     env = os.environ.copy()

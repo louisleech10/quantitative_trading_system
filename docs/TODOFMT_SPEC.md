@@ -72,6 +72,7 @@ Task 1.1 之真陽性斷言改為兩段（見該 Task）。
   - **偏慢時之處置**：不設死數字門檻；實測偏慢者交委員共識決——**砍範圍**或**列具名殘留**，二擇一，不得默默留著。
   - 量法：`date +%s%N` 前後差（奈秒精度）或 `time` 之 real 值；記錄實測值，不與門檻比對。
 - **C-2 新增之寫檔當下檢查須擋在產出端**：本票**新增**之 per-write 檢查一律掛 `PreToolUse`／`PostToolUse` hook，於寫檔當下報。**既有批次入口（如 `gov_check.sh`）之範圍擴充不在此限**——其性質為批次而非 hook，見 Task 1.1。
+  🔴 **實作期補強**（主委收案前自查，依 `CLAUDE.md` 產出端覆蓋鐵律）：manifest 之格式檢查原只在派工時（Task 1.3／1.4 之 `gate.sh`）執行，寫入當下無人報。另掛 `PostToolUse`（matcher `Edit|Write`）`scripts/todofmt_manifest_guard.sh`：所寫之檔之所在目錄即 repo 之 `docs/manifests`（`-ef` 比對；子目錄不管轄）且副檔名為 `.json` 時，以同一檢查器 `scripts/todofmt_check.sh` 判定，未過 ⇒ rc=2 並回報（`PostToolUse` 不回滾已寫入之內容）；派工時之檢查不變。具名測試於 `tests/governance/test_template_check_todofmt.py`（掛載、兩份實際 manifest 放行、合法放行、不合法擋、別名路徑、管轄外放行、`test_mutation_*` 一支）。依範本階段 2 之順序（先建空殼與測試檔、後寫 manifest），寫入當下即應可通過。
 - **C-3 禁止擴成全量掃描**：mutation 靜態檢查維持 **opt-in**（僅選中已宣告 `def test_mutation_` 之檔）。**不得**在本票內改為「每個測試檔都必須有探針或 N/A」。
 - **C-4 不得動 `pre-push`**：`pre-push` 維持 `gov_check.sh --fast`。本票**不得**新增任何項目進 `pre-push`。
 - **C-5 不得引入 pytest 執行段**：本票所加之寫檔當下檢查**只准做靜態分析**（AST／grep／jq），**不得**在該路徑上執行 `pytest`。依 §A receipt：對**該批 26 檔**，靜態器 rc=1 並列出 12 支 fatal，pytest 段**額外**列出 **0** 支。🔴 此成立範圍限該批 26 檔，**不得外推**為「pytest 段普遍無價值」（見 RESID-4）。
@@ -266,11 +267,12 @@ r5 三家打穿三態機之組合判定與環境變數殘留。**每一輪之修
 
 - **不可做**：不得放行「新 SPEC ＋ legacy 散文 TODO」之組合；不得改動 `--spec`／`--manifest` 之既有語義；**不得以內容 digest 判定既有 SPEC**（見 RESID-10）。
 - 🔴 **本矩陣之「放行」只就本 Task 之判定而言**：`--spec` 仍須通過既有之 `template_check.sh spec`（`scripts/gate.sh` 既有行為，本 Task 不改）。
-- **邊界**：① 新 SPEC ＋ 無 `--todo`（擋） ② 新 SPEC ＋ manifest 且 `spec_path` 相等（放行；夾具之 SPEC 須通過 `template_check.sh spec`——以參數傳入不含 `docs/TODOFMT_SPEC.md` 之既有清單，令該檔充當新 SPEC；**不得**以 `docs/FFDEFECT_DECISION.md` 充當，r8 grok 實跑其 `template_check.sh spec` rc=1） ③ 既有 SPEC ＋ 無 `--todo`（放行） ④ 既有 SPEC ＋ 散文 TODO（放行） ⑤ 新 SPEC ＋ 散文 TODO（擋） ⑥ `--spec` 之大小寫變體或 `./` 前綴命中既有 SPEC 字面陣列（放行，須正規化後判定） ⑦ 新 SPEC ＋ manifest 但 `spec_path` 不等（擋） ⑧ 新 SPEC ＋ 只給 `--manifest` 未給 `--todo`（擋） ⑨ `--impl-self` ＋ 新 SPEC ＋ 無 `--todo`（擋） ⑩ **`--impl-self` ＋ 無 `--spec`**（擋） ⑪ 生產呼叫所用之既有 SPEC 陣列＝`gate.sh` 腳本字面（斷言不讀任何外部清單檔） ⑫ **X 版 `gate.sh` 之既有 SPEC 字面陣列＝L 樹之 `docs/` 下任一層全部 `*_SPEC*.md`**（不等即 fail） ⑬ **窗口檢查之 SPEC 半邊**（§P「生效之判定」）：L..W 區間新增之路徑中無 `docs/` 下任一層之 `*_SPEC*.md`（含其後被刪除者）。 ⑭ `--spec`／`--todo` 含控制字元（例：既有 SPEC 接換行再接新檔名、尾端換行）（擋；b3 審碼 codex／grok：逐行比對會命中其中一行而誤報放行）。
+- **邊界**：① 新 SPEC ＋ 無 `--todo`（擋） ② 新 SPEC ＋ manifest 且 `spec_path` 相等（放行；夾具之 SPEC 須通過 `template_check.sh spec`——以參數傳入不含 `docs/TODOFMT_SPEC.md` 之既有清單，令該檔充當新 SPEC；**不得**以 `docs/FFDEFECT_DECISION.md` 充當，r8 grok 實跑其 `template_check.sh spec` rc=1） ③ 既有 SPEC ＋ 無 `--todo`（放行） ④ 既有 SPEC ＋ 散文 TODO（放行） ⑤ 新 SPEC ＋ 散文 TODO（擋） ⑥ `--spec` 之大小寫變體或 `./` 前綴命中既有 SPEC 字面陣列（放行，須正規化後判定） ⑦ 新 SPEC ＋ manifest 但 `spec_path` 不等（擋） ⑧ 新 SPEC ＋ 只給 `--manifest` 未給 `--todo`（擋） ⑨ `--impl-self` ＋ 新 SPEC ＋ 無 `--todo`（擋） ⑩ **`--impl-self` ＋ 無 `--spec`**（擋） ⑪ 生產呼叫所用之既有 SPEC 陣列＝`gate.sh` 腳本字面（斷言不讀任何外部清單檔） ⑫ **X 版 `gate.sh` 之既有 SPEC 字面陣列＝L 樹之 `docs/` 下任一層全部 `*_SPEC*.md`**（不等即 fail） ⑬ **窗口檢查之 SPEC 半邊**（§P「生效之判定」）：L..W 區間新增之路徑中無 `docs/` 下任一層之 `*_SPEC*.md`（含其後被刪除者）。 ⑭ `--spec`／`--todo` 含控制字元（例：既有 SPEC 接換行再接新檔名、尾端換行）（擋；b3 審碼 codex／grok：逐行比對會命中其中一行而誤報放行） ⑮ `--spec` 經正規化後為空字串（例：`./`、repo 根加尾斜線）（擋；r2 grok 正文：逐行比對會命中字面陣列開頭之空行而誤報放行——派工路徑上雖有範本機檢先擋，判定函式之結果不得倚賴其他檢查之先後）。
 - **驗證**：`tests/governance/test_gate_impl_requires_manifest.py`：對本 Task 全部邊界各一具名測試；
   `dispatch` 之非 impl 路徑（無 `--spec` **且**無 `--impl-self`）之回歸＝以既有治理測試隔離實跑該路徑，斷言 rc=0 且輸出不含本 Task 之任何拒絕訊息；另斷言本 Task 區塊之進入條件只含 `--spec` 非空或 `--impl-self`（字面比對 X 版 `scripts/gate.sh`）；`test_mutation_*` 一支。
 - **存活至**：`lifecycle: keep`。
 - **覆蓋風險**：`gate.sh` 為全專案共用控制流；本 Task 與 Task 1.3 同檔改動，須合併為單一 diff 並同批回歸。
+  🔴 **實作期補記**（同批回歸實跑查出）：邊界⑩使主委自任實作（`--impl-self`）必帶 `--spec`，而 `--spec` 為 `gate.sh` 既有之 impl 判準——帶上即連帶要求 impl 型 `--brief`（含 EXPECTED-DELTA）、`--reconcile` 之 session 收斂檔與戳記、SPEC 範本機檢；新 SPEC 另須 `--todo` manifest。此與 VERDICTGATE SPEC C-6「主委路徑與委員路徑走同一道判定」一致。`tests/governance/test_verdictgate_p3.py` 三條以 `--impl-self` 不帶 `--spec` 而期望發 token 之測試因此轉紅，已改其派工夾具滿足上述閘（該三條所測之 verdictgate／quorum 斷言不動）。
 
 #### Task 1.2 — 產出端 hook：新票寫散文 TODO 即擋（`票 TODOFMT/P1`）
 
