@@ -1,7 +1,7 @@
 """TODOFMT Task 1.2：產出端 hook——新票寫散文 TODO 即擋（docs/TODOFMT_SPEC.md Task 1.2、§P「生效之判定」）。
 
-判定邊界①–⑬以 `--legacy-list` 傳入測試清單（同一判定函式；生產呼叫不傳即用腳本字面）；
-⑭–⑱ 與掛載、§P 之 L 時序檢查以錨點模組對 L／X 驗證。
+判定邊界①–⑬、⑳、㉑以 `--legacy-list` 傳入測試清單（同一判定函式；生產呼叫不傳即用腳本字面）；
+⑭–⑱ 與掛載、§P 之 L 時序檢查以錨點模組對 L／X 驗證；⑲ 以生產字面清單驗證。
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ TEST_LIST = [
     "docs/gap3_event_todo.d-001.md",
     "docs/archived/old_todo.md",
 ]
-_GEN_BLOCK = re.compile(r"^<!-- (BEGIN|END) GENERATED: [^>]+-->\s*$")
+_GEN_BLOCK = re.compile(rb"^<!-- (BEGIN|END) GENERATED: [^>]+-->\s*$")
 
 
 def _list_file(tmp_path: Path, entries: list[str] = TEST_LIST) -> Path:
@@ -124,6 +124,53 @@ def test_boundary_13_listed_archived_todo_allowed(tmp_path: Path) -> None:
     assert _guard("docs/Archived/OLD_TODO.md", _list_file(tmp_path))[0] == 0
 
 
+# ── 實作期補強（b3 審碼 r1）：⑲ 控制字元 ⑳ `..` 字面折疊 ㉑ 別名根／目錄別名 ───────────────
+
+
+@pytest.mark.parametrize(
+    "fp",
+    ["docs/GAP2_MARGINAL_IC_TODO.md\nNEW_TODO.md", "docs/GAP2_MARGINAL_IC_TODO.md\n", "docs/X_TODO.md\tY"],
+    ids=["listed-newline-new", "listed-trailing-newline", "tab"],
+)
+def test_boundary_19_control_char_in_path_blocked(fp: str) -> None:
+    """codex 反例：清單內之檔＋換行＋新檔名，逐行比對會把它當成清單內之檔（生產字面清單）。"""
+    rc, err = _guard(fp, None)
+    assert rc == 2 and "控制字元" in err, err
+
+
+@pytest.mark.parametrize(
+    ("fp", "want"),
+    [
+        (f"{REPO_ROOT}/scripts/../docs/X_TODO.md", 2),
+        (f"{REPO_ROOT}/scripts/todofmt_no_such_dir/../../docs/X_TODO.md", 2),
+        ("scripts/../docs/X_TODO.md", 2),
+        (f"{REPO_ROOT}/scripts/../docs/GAP2_MARGINAL_IC_TODO.md", 0),
+        ("docs/./sub/../GAP2_MARGINAL_IC_TODO.md", 0),
+    ],
+    ids=["abs-dotdot-new", "dotdot-through-missing-dir-new", "rel-dotdot-new", "abs-dotdot-listed", "rel-dot-dotdot-listed"],
+)
+def test_boundary_20_dotdot_folded_like_write_tool(tmp_path: Path, fp: str, want: int) -> None:
+    """Write 工具字面折疊 `..`（經不存在之目錄亦照寫）；hook 須以折疊後之路徑判定。"""
+    assert _guard(fp, _list_file(tmp_path))[0] == want
+
+
+def test_boundary_21_alias_root_and_alias_dir_judged_as_canonical(tmp_path: Path) -> None:
+    """grok 反例：經指向 repo 根之符號連結、或 repo 內指向 docs 之目錄別名寫入，須與正規路徑同判。"""
+    root = _mini_repo(tmp_path)
+    script = root / "scripts" / "todofmt_write_guard.sh"
+    lf = _list_file(tmp_path)
+    link = tmp_path / "repolink"
+    link.symlink_to(root, target_is_directory=True)
+    (root / "mydocs").symlink_to(root / "docs", target_is_directory=True)
+    # 前提：別名確實指向同一目錄，且正規路徑之判定如預期
+    assert (link / "docs").samefile(root / "docs") and (root / "mydocs").samefile(root / "docs")
+    assert _guard(str(root / "docs" / "X_TODO.md"), lf, script)[0] == 2
+    assert _guard(str(link / "docs" / "X_TODO.md"), lf, script)[0] == 2
+    assert _guard(str(link / "docs" / "sub" / "X_TODO.md"), lf, script)[0] == 2
+    assert _guard(str(root / "mydocs" / "X_TODO.md"), lf, script)[0] == 2
+    assert _guard(str(link / "docs" / "GAP2_MARGINAL_IC_TODO.md"), lf, script)[0] == 0
+
+
 # ── ⑭–⑱ 與掛載、§P（L／X）────────────────────────────────────────────────
 
 
@@ -154,18 +201,19 @@ def test_boundary_17_window_has_no_new_prose_todo() -> None:
     assert [p for p in anchor.window_additions() if anchor.is_legacy_todo_style(p)] == []
 
 
-def _strip_generated(text: str) -> tuple[str, list[str]]:
+def _strip_generated(data: bytes) -> tuple[bytes, list[bytes]]:
+    """遮去成對生成區塊標記行之間之位元組；其餘（含標記行本身與每行之行尾）逐位元組保留。"""
     kept, markers, inside = [], [], False
-    for ln in text.splitlines():
+    for ln in data.splitlines(keepends=True):
         m = _GEN_BLOCK.match(ln)
         if m:
             markers.append(ln)
-            inside = m.group(1) == "BEGIN"
+            inside = m.group(1) == b"BEGIN"
             kept.append(ln)
             continue
         if not inside:
             kept.append(ln)
-    return "\n".join(kept), markers
+    return b"".join(kept), markers
 
 
 def test_boundary_18_legacy_todo_content_unchanged_except_generated_blocks() -> None:
@@ -174,8 +222,8 @@ def test_boundary_18_legacy_todo_content_unchanged_except_generated_blocks() -> 
     for path in anchor._tree_paths(lo):
         if not anchor.is_legacy_todo_style(path):
             continue
-        at_l = anchor.show(lo, path) or ""
-        at_x = anchor.read_x(path)
+        at_l = anchor.show_bytes(lo, path) or b""
+        at_x = anchor.read_x_bytes(path)
         if at_x is None:
             changed.append(f"{path}：X 版不存在")
             continue
@@ -183,6 +231,14 @@ def test_boundary_18_legacy_todo_content_unchanged_except_generated_blocks() -> 
         if mk_l != mk_x or body_l != body_x:
             changed.append(path)
     assert changed == [], changed
+
+
+def test_boundary_18_comparison_is_byte_faithful() -> None:
+    """⑱ 之比較值：行尾差異（末換行之有無、CRLF）不得被抹平；只有生成區塊內之差異不比（codex b3 r1 反例）。"""
+    body = b"legacy\n<!-- BEGIN GENERATED: k -->\nold\n<!-- END GENERATED: k -->\ntail\n"
+    assert _strip_generated(body) == _strip_generated(body.replace(b"old", b"new"))
+    for variant in (body.rstrip(b"\n"), body.replace(b"legacy\n", b"legacy\r\n"), body.replace(b"\n", b"\r\n")):
+        assert _strip_generated(variant) != _strip_generated(body), variant
 
 
 def test_hook_mounted_in_x_settings() -> None:

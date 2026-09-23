@@ -6,9 +6,11 @@
 #   bash scripts/todofmt_write_guard.sh                         # hook 模式（stdin＝PreToolUse payload）；rc 0＝放行／2＝擋
 #   bash scripts/todofmt_write_guard.sh --legacy-list <檔>      # 測試用：以參數傳入既有清單（一行一路徑，已正規化）
 #
-# 判定順序（SPEC 步驟 1–4，不得調換）：
-#   1. 字串層正規化：剝 repo 根前綴、剝 `./`，整串 casefold。
-#   2. 先比樣式、後解 symlink：首段為 docs 且檔名符合 ^[a-z0-9_]+_todo(\.[a-z0-9-]+)?\.md$ 才管轄，否則放行。
+# 判定順序（SPEC 步驟 1–4，不得調換；步驟 0 與步驟 1、2 之補強見 SPEC Task 1.2「實作期補強」）：
+#   0. 路徑值含控制字元（換行、tab 等）⇒ 擋。
+#   1. 字串層正規化：轉絕對、字面折疊 `.`／`..`／空段（與 Write 工具一致）、剝 repo 根前綴，整串 casefold。
+#   2. 先比樣式、後解 symlink：檔名符合 ^[a-z0-9_]+_todo(\.[a-z0-9-]+)?\.md$，且首段為 docs 才管轄，否則放行。
+#      字串層首段不為 docs 者，再以 `-ef` 由近而遠比對祖先目錄是否即 repo 之 docs（符號連結／firmlink 別名）。
 #   3. 既有清單比對：正規化字串、或 realpath 解析後之 repo 相對路徑（casefold），任一命中清單即放行。
 #      硬連結別名不做 inode 比對——以別名路徑寫入者視為新路徑而擋。
 #   4. 未命中 ⇒ 擋，印五類落點指引。
@@ -101,29 +103,64 @@ fi
 
 command -v jq >/dev/null 2>&1 || { echo "todofmt_write_guard: 找不到 jq ⇒ fail-closed" >&2; exit 2; }
 _payload="$(cat)"
+
+# 0. 路徑值含控制字元（換行、tab 等）即擋——於 JSON 字串層以 jq 判定（命令替換會吃掉尾端換行，不可於 shell 層判）。
+#    下方逐行之清單比對會把換行拆成多個樣式（b3 審碼 codex：「清單內之檔＋換行＋新檔名」被當成清單內之檔而放行）。
+if printf '%s' "${_payload}" | jq -e '(.tool_input.file_path // "") | test("[[:cntrl:]]")' >/dev/null 2>&1; then
+  echo "[todofmt_write_guard] 🔴 擋下：路徑含控制字元（換行、tab 等）：$(printf '%s' "${_payload}" | jq -c '.tool_input.file_path')" >&2
+  exit 2
+fi
 _fp="$(printf '%s' "${_payload}" | jq -r '.tool_input.file_path // empty' 2>/dev/null)" || _fp=""
 [ -n "${_fp}" ] || exit 0
 
 _lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+# 字面折疊 `.`／`..`／空段（輸入為絕對路徑）。Write 工具實測亦如此折疊：經不存在之目錄之 `..` 照樣寫入折疊後之路徑。
+_lexfold() {
+  _lf_in="${1#/}/"; _lf_out=""
+  while [ -n "${_lf_in}" ]; do
+    _lf_seg="${_lf_in%%/*}"; _lf_in="${_lf_in#*/}"
+    case "${_lf_seg}" in
+      ''|.) : ;;
+      ..) _lf_out="${_lf_out%/*}" ;;
+      *) _lf_out="${_lf_out}/${_lf_seg}" ;;
+    esac
+  done
+  printf '%s' "${_lf_out:-/}"
+}
 
-# 1. 字串層正規化
-_rel="${_fp}"
-_lfp="$(_lower "${_fp}")"; _lroot="$(_lower "${REPO_ROOT}")"
-case "${_lfp}" in "${_lroot}/"*) _rel="${_fp:$(( ${#REPO_ROOT} + 1 ))}" ;; esac
-while :; do case "${_rel}" in ./*) _rel="${_rel#./}" ;; *) break ;; esac; done
+# 1. 字串層正規化：轉絕對（相對路徑視為 repo 相對）、字面折疊（含剝 `./`）、剝 repo 根前綴（casefold 比對）
+_absin="${_fp}"
+case "${_absin}" in /*) : ;; *) _absin="${REPO_ROOT}/${_fp}" ;; esac
+_lex="$(_lexfold "${_absin}")"
+_rel="${_lex}"
+case "$(_lower "${_lex}")" in "$(_lower "${REPO_ROOT}")/"*) _rel="${_lex:$(( ${#REPO_ROOT} + 1 ))}" ;; esac
 _norm="$(_lower "${_rel}")"
 
-# 2. 樣式（首段 docs、檔名樣式）
-case "${_norm}" in docs/*) : ;; *) exit 0 ;; esac
+# 2. 樣式：檔名以寫入之字面為準（先比樣式、後解 symlink），且位於 docs/ 下
 _base="${_norm##*/}"
 printf '%s' "${_base}" | grep -Eq '^[a-z0-9_]+_todo(\.[a-z0-9-]+)?\.md$' || exit 0
+case "${_norm}" in
+  docs/*) : ;;
+  *)
+    # 字串層不在 docs/ 下（例：經指向 repo 之符號連結、/System/Volumes/Data 別名寫入）：由近而遠比對各祖先目錄
+    # 是否即 repo 之 docs（`-ef`＝同裝置同 inode）；命中即以其下之剩餘段為 docs/ 下之路徑。
+    # 只比祖先目錄、不解檔案本身，故檔名樣式仍以寫入之字面為準（b3 審碼 grok）。
+    _d="${_lex%/*}"; _rest="${_lex##*/}"; _rel=""
+    while [ -n "${_d}" ]; do
+      if [ "${_d}" -ef "${REPO_ROOT}/docs" ]; then _rel="docs/${_rest}"; break; fi
+      _rest="${_d##*/}/${_rest}"; _d="${_d%/*}"
+    done
+    [ -n "${_rel}" ] || exit 0
+    _norm="$(_lower "${_rel}")" ;;
+esac
 
-# 3. 既有清單比對（字串；realpath 後再比一次）
-_in_list() { printf '%s\n' "${_list}" | grep -Fxq -- "$1"; }
+# 3. 既有清單比對（字串；realpath 後再比一次）。含控制字元之值一律不算命中（逐行比對會被它拆成多個樣式）
+_in_list() {
+  case "$1" in *[[:cntrl:]]*) return 1 ;; esac
+  printf '%s\n' "${_list}" | grep -Fxq -- "$1"
+}
 _in_list "${_norm}" && exit 0
-_abs="${_fp}"
-case "${_abs}" in /*) : ;; *) _abs="${REPO_ROOT}/${_rel}" ;; esac
-if _rp="$(realpath "${_abs}" 2>/dev/null)"; then
+if _rp="$(realpath "${_lex}" 2>/dev/null)"; then
   _root_real="$(realpath "${REPO_ROOT}" 2>/dev/null || printf '%s' "${REPO_ROOT}")"
   case "${_rp}" in "${_root_real}/"*) _in_list "$(_lower "${_rp#"${_root_real}/"}")" && exit 0 ;; esac
 fi

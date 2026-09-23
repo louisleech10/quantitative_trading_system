@@ -61,6 +61,14 @@ def show(commit: str, path: str) -> str | None:
     return proc.stdout if proc.returncode == 0 else None
 
 
+def show_bytes(commit: str, path: str) -> bytes | None:
+    """`git show <commit>:<path>` 之原始位元組（不做換行轉換）；該版不存在此檔時回 None。"""
+    proc = subprocess.run(
+        ["git", "show", f"{commit}:{path}"], cwd=REPO_ROOT, capture_output=True, check=False
+    )
+    return proc.stdout if proc.returncode == 0 else None
+
+
 def exists_at(commit: str, path: str) -> bool:
     return _git("cat-file", "-e", f"{commit}:{path}", check=False).returncode == 0
 
@@ -131,6 +139,15 @@ def read_x(path: str) -> str | None:
         return show(w, path)
     p = REPO_ROOT / path
     return p.read_text(encoding="utf-8") if p.is_file() else None
+
+
+def read_x_bytes(path: str) -> bytes | None:
+    """X 版之原始位元組（不做換行轉換）：W 已存在時取 W，否則取工作樹。"""
+    w = effective_commit()
+    if w is not None:
+        return show_bytes(w, path)
+    p = REPO_ROOT / path
+    return p.read_bytes() if p.is_file() else None
 
 
 def diff_lines_vs_l(path: str) -> tuple[list[str], list[str]]:

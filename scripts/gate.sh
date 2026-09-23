@@ -191,6 +191,10 @@ _todofmt_todo_kind() {
 #   參數：<spec> <todo> <impl_self 0|1> <todo_count> [<既有 SPEC 清單字串>]；rc 0＝放行／1＝擋（原因印 stdout）
 _todofmt_route_check() {
   _rc_spec="$1"; _rc_todo="$2"; _rc_impl="$3"; _rc_cnt="$4"; _rc_list="${5-${_TODOFMT_LEGACY_SPECS}}"
+  # 含控制字元（換行、tab 等）之值即拒：下方逐行之清單比對會把換行拆成多個樣式（b3 審碼 codex）
+  case "${_rc_spec}${_rc_todo}" in
+    *[[:cntrl:]]*) echo "TODOFMT 拒：--spec／--todo 含控制字元（換行、tab 等）"; return 1 ;;
+  esac
   if [ "${_rc_cnt}" -gt 1 ]; then
     echo "TODOFMT 拒：--todo 重複給定（同一次呼叫只准一個 TODO／manifest）"; return 1
   fi

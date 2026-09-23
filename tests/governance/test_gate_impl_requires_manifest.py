@@ -123,6 +123,23 @@ def test_boundary_13_window_has_no_new_spec() -> None:
     assert [p for p in anchor.window_additions() if anchor.is_spec_style(p)] == []
 
 
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("--spec", "docs/TODOFMT_SPEC.md\nNEW_SPEC.md"),
+        ("--spec", "docs/NOT_A_REAL_SPEC.md\ndocs/eventscan_spec.md"),
+        ("--spec", "docs/TODOFMT_SPEC.md\n"),
+        ("--spec", "docs/TODOFMT_SPEC.md", "--todo", "docs/manifests/TODOFMT.json\n"),
+    ],
+    ids=["legacy-newline-new", "new-newline-legacy", "spec-trailing-newline", "todo-trailing-newline"],
+)
+def test_boundary_14_control_char_in_spec_or_todo_rejected(args: tuple[str, ...]) -> None:
+    """codex／grok 反例：含換行之 --spec 經逐行比對命中既有 SPEC 而誤報 PASS（生產字面清單）。"""
+    r = subprocess.run(["bash", str(GATE), "todofmt-route", *args],
+                       cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+    assert r.returncode == 1 and "控制字元" in r.stdout, r.stdout
+
+
 def test_regression_non_impl_path_untouched(tmp_path: Path) -> None:
     assert ENTRY_CONDITION in (anchor.read_x("scripts/gate.sh") or "")
     env = os.environ.copy()

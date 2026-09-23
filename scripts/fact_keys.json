@@ -453,7 +453,7 @@
         "TODOFMT：散文 TODO 廢止，改五類可執行落點＋對應範本與閘門",
         "進行中",
         "docs/TODOFMT_SPEC.md",
-        "起因＝RM-PROCOPT 之診斷（實作缺陷 40% 為「規格寫對但沒照做」、散文 TODO 為測試檔之低保真草稿）。consult r1 三家定方向（五類落點：生產 stub／tests+scripts／契約 JSON／機讀批次卡／實跑收據）。SPEC 審 11 輪後設計定案（L＝`f2146e3d`），下一步實作 Phase 0–3。🔴 硬約束：不得引入分鐘級以上之檢查、不得動 pre-push、mutation 靜態擴覆蓋維持 opt-in。其餘票依使用者裁定暫停至本票完工。"
+        "起因＝RM-PROCOPT 之診斷（實作缺陷 40% 為「規格寫對但沒照做」、散文 TODO 為測試檔之低保真草稿）。consult r1 三家定方向（五類落點：生產 stub／tests+scripts／契約 JSON／機讀批次卡／實跑收據）。SPEC 審 11 輪後設計定案（L＝`f2146e3d`）。實作三批皆已提交（第 3 批＝W `26048178`，新規則自此生效）；第 1、2 批已收批，第 3 批審碼 r1 之 8 條已修、待 r2 由原提出方確認閉合，之後重跑收案聚合器即收案。🔴 硬約束：不得引入分鐘級以上之檢查、不得動 pre-push、mutation 靜態擴覆蓋維持 opt-in。其餘票依使用者裁定暫停至本票完工。"
       ]
     ]
   },
@@ -1725,7 +1725,7 @@
         "HP-TODOFMT",
         "進行中",
         "docs/TODOFMT_SPEC.md",
-        "大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1 與 2 條 P3 已修、r2 三家確認閉合，**b2 收批**。**b3＝W 已提交**（Task 1.2 hook 掛載、Task 1.3／1.4 gate.sh 路由與新 SPEC 須 manifest、Task 3.1／3.2 兩份樣本；新規則自此生效）；收案聚合器 12 項 rc=0（41.9 秒）。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝b3 三家審碼 → 收案→ b3＝W（Task 1.2／1.3／1.4／3.1／3.2＋掛載） → 三家 code review → 收案（聚合器 rc=0）→ 白話說明"
+        "大票（RISK-HIT b,c）。使用者 2026-09-22 裁定「你跟委員先將TODO的優化完成…TODO優化完成後再討論下一步」且「對抗共識決就好，不用給我看，完成後再白話解釋」⇒ 本票無使用者裁決點、取消凍結前白話閘。🔴 **SPEC 已設計定案**（2026-09-23，r11 三家皆判可定案；L＝commit `f2146e3d`）。審查共 11 輪（24→26→20→16→16→16→9→10→9→5→1；P1 自 r8 起 8→5→2→0）；r7／r8 兩輪多出之 finding 主要打在主委自加之檢查上。r11 收斂檔三家戳記 PASS。**實作 b1 已提交（commit `3a6d4102`）**：Task 0.1／0.2／1.1 與錨點模組；b1 審碼 r1 之 2 條 P1（同一根因：路徑值夾帶換行可繞過路徑檢查）與 2 條 P2 已修，r2 三家確認閉合，**b1 收批**。**b2 已提交**（Task 2.1 範本改寫、Task 2.2 CLAUDE.md／ORCH／AGENTS.md／.cursorrules 同步、Task 3.3 收案聚合入口）；b2 審碼 r1 之 2 條 P1 與 2 條 P3 已修、r2 三家確認閉合，**b2 收批**。**b3＝W 已提交**（Task 1.2 hook 掛載、Task 1.3／1.4 gate.sh 路由與新 SPEC 須 manifest、Task 3.1／3.2 兩份樣本；新規則自此生效）；收案聚合器 12 項 rc=0（41.9 秒）。**b3 審碼 r1**：composer、grok 判可收；codex 擋 1 條 P1（路徑值夾帶換行會被逐行清單比對拆成多個樣式而放行，hook 與 gate.sh 同型），另 P2×3、P3×3。8 條全數已修；主委另實測 Write 工具會字面折疊 `..`（經不存在之目錄亦照寫）⇒ hook 同步折疊，指向 repo 之別名路徑改以 `-ef` 比對祖先目錄。🔴 使用者中途更正：不設固定秒數門檻，只禁分鐘級以上之檢查。下一步＝b3 審碼 r2（原提出方確認閉合）→ 重跑收案聚合器 → 收案 → 白話結論書"
       ],
       [
         "035",
@@ -3309,7 +3309,7 @@
         "B-62",
         "cx_run.sh 交件當下（執行端）",
         "豁免",
-        "PreToolUse不可：委員產出由執行端 CLI（codex／cursor-agent／grok）直接寫檔，主控端沒有 Edit／Write 事件可掛，寫入前該檔不存在。PostToolUse不可：同一原因——觸發源不是主控端工具；主委事後手動 register-output 才是 Edit 路徑，但那已在交件之後。部分閘：scripts/cx_run.sh:714（cx_run 收到 STATUS: DONE 或 VERDICT: 行即呼叫 gate.sh register-output ⇒ verdict_parse 拒收即寫 audit verdict_rejected；B3／B4 審碼實戰各擋一次）。第二層：scripts/gate.sh:1146（開輪／領 token 前呼叫 verdictgate_check 讀裁決）",
+        "PreToolUse不可：委員產出由執行端 CLI（codex／cursor-agent／grok）直接寫檔，主控端沒有 Edit／Write 事件可掛，寫入前該檔不存在。PostToolUse不可：同一原因——觸發源不是主控端工具；主委事後手動 register-output 才是 Edit 路徑，但那已在交件之後。部分閘：scripts/cx_run.sh:714（cx_run 收到 STATUS: DONE 或 VERDICT: 行即呼叫 gate.sh register-output ⇒ verdict_parse 拒收即寫 audit verdict_rejected；B3／B4 審碼實戰各擋一次）。第二層：scripts/gate.sh:1150（開輪／領 token 前呼叫 verdictgate_check 讀裁決）",
         "n/a"
       ],
       [
@@ -3317,7 +3317,7 @@
         "B-62",
         "PreToolUse:Task,Bash,Write:scripts/gate_check.sh",
         "產出端",
-        "實作位置：scripts/gate.sh:1146（dispatch／--impl-self 於發 token 前呼叫 verdictgate_check；前批任一家 blocked 未由原提出方 CLOSED 或無裁決 ⇒ 拒發）。路由：gate_check 於 PreToolUse 擋無 token 之派工指令 ⇒ 開輪必經 gate.sh ⇒ 必經 verdictgate_check。誠實邊界：讀的是 audit 狀態（多輪累積），故為一致性型；本票 B2–B4 開輪皆由此放行",
+        "實作位置：scripts/gate.sh:1150（dispatch／--impl-self 於發 token 前呼叫 verdictgate_check；前批任一家 blocked 未由原提出方 CLOSED 或無裁決 ⇒ 拒發）。路由：gate_check 於 PreToolUse 擋無 token 之派工指令 ⇒ 開輪必經 gate.sh ⇒ 必經 verdictgate_check。誠實邊界：讀的是 audit 狀態（多輪累積），故為一致性型；本票 B2–B4 開輪皆由此放行",
         "一致性型"
       ],
       [
