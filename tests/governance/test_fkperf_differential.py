@@ -125,9 +125,11 @@ def test_exit_catalog_equals_corpus_labels() -> None:
 _SITE_LIT = re.compile(r"""(?:echo|_fk_die)\s+"([^"]*)|printf\s+'([^']*)'""")
 _SITE_TERM = re.compile(r"return 1|exit [1-9]|_rc=1|_fk_die ")
 # oracle 內部工具（jq／awk／mktemp 子程序）自身失敗之出口：新實作不呼叫這些子程序（C-2 目標），無對應分支，
-# 不建差分語料（manifest not_executable 同名項）。封閉字面集；2026-09-24 主委對 oracle 實跑恰命中 23 行（測試釘此數）：
-# L213 216 218 221 234 256 419 691 695 706 1440 1496 1553 1587 1626 1706 1730 1754 1816 1842 1937 1954 1983 之首行。
-_TOOL_FAILURE = re.compile(r"jq 非零|jq 失敗|讀取[^→]*失敗|判定執行失敗|無法建立暫存目錄|無法寫暫存註冊表|物化寫入失敗"
+# 不建差分語料（manifest not_executable 同名項）。封閉字面集；2026-09-24 主委對 oracle 實跑恰命中 24 行（測試釘此數）：
+# L213 216 218 221 234 256 419 691 695 706 1440 1496 1553 1587 1626 1706 1730 1754 1816 1842 1937 1954 1983 2035。
+# 另實測：L218 可由 TMPDIR 不可用觸發、L2035 可由宿主目錄唯讀觸發，但兩者 oracle 之 stderr 首行皆為子程序／bash 自身
+# 訊息且含隨機字尾或 PID（mktemp: mkdtemp failed on …XXXXXX；…factkey-blk.<pid>: Permission denied），本質不可逐位元組比對。
+_TOOL_FAILURE = re.compile(r"jq 非零|jq 失敗|讀取[^→]*失敗|判定執行失敗|無法建立暫存目錄|無法寫暫存註冊表|寫入失敗"
                            r"|無法解析 repo 根|GEN FAILED|驗證無法執行")
 
 
@@ -210,8 +212,33 @@ def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
         if s:
             assert cat[v].startswith(_static_prefix(s)), (n, v, cat[v], s)
     tool_lines = [n for n in sorted(lines) if "tool_failure" in _site_rules(src, n)[0]]
-    assert len(tool_lines) == 23, tool_lines  # 封閉集之規模釘死：字面集擴張即紅
+    assert len(tool_lines) == 24, tool_lines  # 封閉集之規模釘死：字面集擴張即紅
     assert set(cat) <= set(sites.values()), sorted(set(cat) - set(sites.values()))
+
+
+def test_new_impl_host_write_failure_is_fail_closed(tmp_path: Path) -> None:
+    """SPEC v7 Task 0.1 ③：宿主寫入失敗（L2035 屬 tool_failure、訊息不比對）時，新實作仍須 rc=1 fail-closed，
+    且宿主檔位元組不變（不留半寫）。以宿主所在目錄唯讀觸發（2026-09-24 主委以 oracle 實測可觸發）。"""
+    import os
+    import stat
+
+    def add(d: dict) -> None:
+        d["eventscan-banner"]["rows"].append(["997", "zz", "x", "y"])
+
+    case = _case("wfail", ["--write"], _tree(_reg(add)), "ok", first="")
+    _, nroot = fo.make_pair(tmp_path, case)
+    data = json.loads((nroot / REG_REL).read_text(encoding="utf-8"))
+    tgt = data["eventscan-banner"]["target"]
+    host = nroot / (tgt[0] if isinstance(tgt, list) else tgt)
+    before = host.read_bytes()
+    mode = host.parent.stat().st_mode
+    os.chmod(host.parent, stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        out = fo.run_new(nroot, case)
+    finally:
+        os.chmod(host.parent, mode)
+    assert out.rc == 1, out.stderr.decode("utf-8", "replace")
+    assert host.read_bytes() == before
 
 
 def test_mutation_exit_site_hidden_as_continuation_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
