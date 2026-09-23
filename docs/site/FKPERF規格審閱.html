@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FKPERF 規格書審閱（存檔檢查不再越來越慢）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">FKPERF規格審閱.md</span></nav>
+<main>
+<h1 id="fkperf-規格書審閱存檔檢查不再越來越慢">FKPERF 規格書審閱（存檔檢查不再越來越慢）</h1>
+<blockquote>
+<p><strong>這份是給你審的。</strong> 規格書原文在 <code>docs/FKPERF_SPEC.md</code>（給委員看的技術版）；這份是白話逐條版。
+看完後回答最下面一題即可。三家委員已審 4 輪，最後一輪三家都判「可以往下做」。</p>
+</blockquote>
+<hr />
+<h2 id="一要解決什麼">一、要解決什麼</h2>
+<p>每次存檔交接文件、白話說明或規格書，檢查要等約 <strong>10 秒</strong>，而且登記項目越多越慢：兩天內項目從 17 個增加到 35 個，以後還會繼續增加。</p>
+<p><strong>原因</strong>：這個檢查是用 bash 寫的，每處理一個項目就要另外開好幾個小程式，存檔一次總共開了 <strong>4,322 個</strong>。</p>
+<h2 id="二怎麼改">二、怎麼改</h2>
+<p>把檢查的核心改寫成 Python，<strong>只開一次程式</strong>。預計存檔等待從約 10 秒降到約 0.2 秒，而且不再隨項目變多而明顯變慢。對外的指令與用法完全不變。</p>
+<h2 id="三怎麼保證改完結果一模一樣">三、怎麼保證改完結果一模一樣</h2>
+<ul>
+<li>把<strong>現在的舊版當標準答案</strong>，各種情況逐一對照新舊兩版：正常輸出、錯誤訊息、寫進文件的內容，都必須<strong>一字不差</strong>。</li>
+<li>唯一允許不同的地方：缺工具時的錯誤訊息，從「缺 jq」變成「缺 python3」。</li>
+<li>8 個會用到它的地方，呼叫方式都不變。另有 3 個地方是靠檔名辨認的，會把新檔加進去，改新檔時照樣會被檢查。</li>
+</ul>
+<h2 id="四怎麼防止以後又變慢三道自動檢查">四、怎麼防止以後又變慢（三道自動檢查）</h2>
+<ol>
+<li><strong>開的程式數、開的檔案數</strong>，不能隨項目變多而增加。</li>
+<li><strong>你定的比例</strong>：規模放大 10 倍，時間最多只能慢 20 倍。正常寫法約慢 4～10 倍，寫壞了會慢到約 100 倍。</li>
+<li><strong>實測秒數</strong>寫進規格書，每次收尾報給你。</li>
+</ol>
+<h2 id="五分幾步做">五、分幾步做</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>步驟</th>
+<th>內容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>先做「新舊對照」工具與規模測試</td>
+</tr>
+<tr>
+<td>1～3</td>
+<td>分三段改寫核心（資料處理、檢查文件、各種規則檢查），這段期間新核心還沒接上，不影響現在的使用</td>
+</tr>
+<tr>
+<td>4</td>
+<td>最後一步才切換到新核心，並把舊的破壞測試改成針對新核心；出問題可以一次退回舊版</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="六明確不做的">六、明確不做的</h2>
+<p>不加快取、不改任何檢查的寬嚴、不動 GOVB1 的保護檔、不設絕對秒數門檻。沒有「留到以後再做」的項目。</p>
+<h2 id="七要你確認的一題">七、要你確認的一題</h2>
+<p><strong>比例的量測點</strong>：規格書用 <strong>140 個對 1400 個項目</strong>，不是當初說的 35 對 350。</p>
+<ul>
+<li><strong>為什麼</strong>：每次檢查都有約 0.1 秒的固定開銷（啟動程式等）。用 35 對 350 時，這段固定時間會把比例稀釋掉，連委員舉的「寫壞變慢」例子都只算得出 13.5 倍，抓不到。</li>
+<li><strong>140 對 1400</strong>：仍是相差 10 倍、門檻仍是 20 倍，同一個例子算出來約 31～52 倍，會被抓到。</li>
+<li><strong>結論</strong>：這是收緊，不是放寬。</li>
+</ul>
+<p><strong>請回答</strong>：規格書（含量測點 140 對 1400）可以定案，往下寫施工清單嗎？</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/FKPERF規格審閱.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
