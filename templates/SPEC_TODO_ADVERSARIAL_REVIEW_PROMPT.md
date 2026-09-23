@@ -1,15 +1,18 @@
 <!--
-SPEC/TODO Adversarial Review Prompt V13（取代 V12）
-新增（本對話事故教訓）：①§0 挑戰前提 — 不只答作者框好的題，要質疑 SPEC 把「假設」當「事實」陳述者（C3 委員會在我的錯誤前提上一起錯）。
+SPEC/TODO Adversarial Review Prompt V14（取代 V13）
+V14（TODOFMT 收案後補遺，2026-09-23）：新票之 TODO＝五類落點 manifest（docs/TODOFMT_SPEC.md），不再是散文檔；
+凡原本指向散文 TODO 之欄位／節（變數、§1 第 11 類之欄位、§2 之全域約束檢查、獵空殼）改為新舊格式並陳。
+V13 新增（沿用）：①§0 挑戰前提 — 不只答作者框好的題，要質疑 SPEC 把「假設」當「事實」陳述者（C3 委員會在我的錯誤前提上一起錯）。
 ②要求標注 fact-verified vs assumed。③多 reviewer 時相關性 review 警告。④檢查新範本必填錨點(§RISK/§A/§G)是否落實。
 保留 V12 的 10 類失敗模式必查 + 不可違反原則 + 證據要求。緊湊版，便於每次真的貼出去用。
 -->
 
-# SPEC/TODO Adversarial Review Prompt V13
+# SPEC/TODO Adversarial Review Prompt V14
 
 > 用途：對 SPEC/TODO 做獨立 adversarial review，找矛盾、漏項、不可測需求、錯誤 quant 假設、過度工程、Agent 實作風險、**以及被當成事實的未驗證假設**。
 > 建議時機：SPEC→TODO 後、Frozen 前、大型 Phase 實作前。
 > 變數：`{{SPEC_FILE}}` `{{TODO_FILE}}` `{{PLAN_FILE|N/A}}` `{{REVIEW_FOCUS|完整審查}}`
+> `{{TODO_FILE}}`：**新票＝`docs/manifests/<EPIC>.json` 及其所列之生產空殼、具名測試／驗收腳本、契約 JSON**（五類落點，見 `docs/TODOFMT_SPEC.md` Task 0.1）；設計定案前已存在之舊票＝散文 TODO。
 
 ## Prompt 開始
 
@@ -44,7 +47,7 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 8. **API/型別/相容**：backward compat；Pydantic↔TS 一致；Python 版本；新參數有預設+migration；flag off 回舊行為。
 9. **測試品質**：只驗 smoke 不驗核心；edge（空/全NaN/inf/單值/中斷/cache corrupt）；效能有 baseline/tier/規模；multi-symbol 真驗 isolation；regression 保護舊行為。
 10. **Agent 可執行性**：每 Task 精確到檔案+函式；足夠偽碼；列不可做+驗證；Phase Gate 可執行；無「自行判斷/適當處理/優化一下」模糊指令。
-11. **必要性/短命工**（2026-07-20 制度案新增）：**列出實作後會被後續 Phase 刪除或覆蓋的工作；沒有請答「無」。** 逐 Task 對照其 `存活至` / `覆蓋風險` 欄位是否屬實（欄位由 `template_check.sh` 機檢存在，**語義正確性是本題的責任**）。若某 Task 產出在最終狀態不存在 → 質疑該工作是否應**刪除或與後續 Phase 合併**。
+11. **必要性/短命工**（2026-07-20 制度案新增）：**列出實作後會被後續 Phase 刪除或覆蓋的工作；沒有請答「無」。** 逐 Task 對照其存活與覆蓋欄位是否屬實——新格式＝manifest `batch_card.lifecycle`／`coverage_risk`（`relocates_to`／`relocates_at` 若有）；舊票散文 TODO＝各 Task 之 `存活至` / `覆蓋風險`（欄位由 `template_check.sh` 機檢存在，**語義正確性是本題的責任**）。若某 Task 產出在最終狀態不存在 → 質疑該工作是否應**刪除或與後續 Phase 合併**。
     - **出生事故**：1d SPEC 走六輪 adversarial（BLOCKING 9→0）未發現「Phase 1 在 orchestrator 加的鍵會被 Phase 3 整棵刪除」＝白工，由**使用者**一句「這欄位需不需要存在」揭露；三家事後複核全數 SIMPLIFY-YES。**前十類全在問「對不對」，無一類問「值不值得」。**
 
 ### §2 範本錨點落實 + 獵空殼（本版新增，配合 gate；**作者模型不可自審此節**）
@@ -52,7 +55,7 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 - §G 的 golden 是否只比 aggregate（mean/std）→ 提醒會被值重排/局部漂移繞過（要 value/NaN-mask hash）。
 - **FACT-RECEIPT 落實**：§A fact-scope 內資料結構斷言是否皆附 receipt？缺 → MAJOR。
 - **RISK-HIT↔§G**：RISK-HIT 含 a,d ⇒ §G 非 N/A 且含數值 golden token（atol/rtol/sha256）？§N 不得 N/A 豁免 §G。
-- **TODO §0 完整性**：含解耦 7 條+不可違反原則相關子集（純前端/文檔可聲明不適用；缺 → MAJOR）。
+- **TODO 全域約束完整性**：須含解耦 7 條＋不可違反原則之相關子集＋「不得放寬既有測試斷言」——新格式查 manifest `batch_card.forbidden`（`observable=false` 者須於 `not_executable` 有同字面 item）；舊票散文 TODO 查其 §0。純前端/文檔可聲明不適用；缺 → MAJOR。
 - **§N 殘留逐條攻「為何現在不做」（2026-08-17 常設必答；出生事故＝GAP-1 三項殘留為主委偷懶/誤分類）**：
   對 §N 每條殘留，檢查其 `為何現在不做:` 是否為 `blocked-by:`／`user-ruling:`／`needs-research:` 三種之一
   **且理由成立**（依賴真的存在？裁決真的涵蓋此項？研究真的沒有公認方法？）。
@@ -61,6 +64,7 @@ SPEC/TODO Adversarial Review Prompt V13（取代 V12）
 - **獵空殼（機械 grep 抓不到，靠你逐段讀實際內容）**：對每個必填段與每個 Task，**引用其實際內容**；
   若只有標題/表頭/欄位標籤（如 `驗證:`、表頭列）而**內容空泛或缺實質**（偽碼空、函式名沒寫、驗證是「確認正確」式空話、表格只有表頭；例：「確認有 1 個檔案」含數字仍空殼）→ 列 **BLOCKING 空殼**，附該段原文證明。
   機械 gate 只擋明顯空（空表/樣板/驗證無 token）；**「貌似有內容但邏輯空」只有你這層抓得到**。
+  新格式另須逐一打開 manifest 所列之空殼與具名測試：斷言是否可證偽（禁「不拋錯即過」）、`test_mutation_*` 是否真換入改壞之待測物、SPEC 每條邊界是否恰對應一個具名測試；manifest 通過 `template_check.sh todofmt` 只證**形狀**，不證這三點。
 
 ### §3 不可違反原則（與其矛盾即 Blocking）
 跨 tier 重複穩定 / 多 symbol 不 OOM / 最高數據品質（禁 fake·污染·弱化 NaN·inf gate）/ 不假最佳化（禁刪特徵·縮窗·跳檢查換速度）。

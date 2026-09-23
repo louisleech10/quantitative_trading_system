@@ -461,6 +461,21 @@ INV || iv || docs/MULTI_AGENT_ORCHESTRATION.md || 使用者定死不得跳步,D-
 - **耗時**：依 C-1 記錄於 §V，不設門檻。此入口**僅於收案判定時執行**（HEAD 為 W 或其後代；見 §P 三時點表），非每次寫檔之檢查，不受 C-5 之禁 pytest 約束（C-5 管轄寫檔當下之檢查）。
 單靠 Task 3.1（自我 dogfooding）不足；單靠 3.1＋3.2 亦不足——新增之 Task 1.3／1.4 之回歸斷言亦為收案前置。
 
+### Phase 4 — 收案後補遺（依賴：Phase 3；使用者 2026-09-23 追問「其他 TODO 相關的文件都有跟著更新了嗎」）
+
+Task 2.1／2.2 只涵蓋 TODO 範本與 TODO 定義句；主委盤點 `templates/`、`docs/MULTI_AGENT_ORCHESTRATION.md`、`scripts/` 後，另查出五處仍預設散文 TODO，於第 4 批一併改正：
+
+| 落點 | 原狀 | 改為 |
+|---|---|---|
+| `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` | V13：TODO 檔變數未定義新格式；§1 第 11 類之欄位、§2 之全域約束檢查、獵空殼皆指散文 TODO | V14：新舊格式並陳；全域約束改查 manifest `batch_card.forbidden`；獵空殼另須逐一打開空殼與具名測試 |
+| `templates/TODO_GENERATION_PROMPT.md` | 舊版全域規則節（解耦、不可違反原則、不得放寬既有測試斷言）於新格式無落點 | 規定其落點為 `batch_card.forbidden`；必讀清單加「The 7 Decoupling Rules」「Non-Negotiable Principles」；階段 3 加第 6 項自檢 |
+| `templates/SPEC_TEMPLATE.md` | 「對應 TODO」為散文路徑寫法 | 指向 `docs/manifests/<EPIC>.json` |
+| `docs/MULTI_AGENT_ORCHESTRATION.md` | 範本說明、`--todo` 機檢、機器把關三處只描述散文 TODO | 補新格式之機檢路徑；註明 `--manifest`（coverage 清單）與 TODO manifest 同名不同物 |
+| `scripts/debt_clear.sh` | 收斂檔 `延後→X` 只到 `docs/<EPIC>_TODO.md` 找 X ⇒ 新格式之票有延後即拒銷 | 無散文 TODO 時改查 `docs/manifests/<EPIC>.json`（舊票行為不變）；具名測試 `tests/governance/test_debt_clear.py::test_clear_attribution_gate_defer_target_uses_epic_manifest_without_prose_todo` |
+
+- **不可做**：不得動 TODO 定義句（Task 2.2 之兩檔逐字相同）與任何 `INV || ` 片段所在語句；不得使 `docs/TODOFMT_SPEC.md` 之設計定案標記行再次出現；`scripts/debt_clear.sh` 之行數不得改變（`scripts/fact_keys.json` 以行號引用其第 544、891 行）。
+- **驗證**：本票 11 個測試檔＋`tests/governance/test_debt_clear.py` 全數通過；收案聚合器 12 項 rc=0；三家審碼。
+
 ---
 
 ## §V 驗證策略與邊界測試目錄

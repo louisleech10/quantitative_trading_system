@@ -530,6 +530,24 @@ def test_clear_attribution_gate_defer_target_uses_epic_todo(tmp_path: Path) -> N
     assert r.returncode == 0, r.stderr
 
 
+def test_clear_attribution_gate_defer_target_uses_epic_manifest_without_prose_todo(tmp_path: Path) -> None:
+    """TODOFMT 收案後補遺：無 docs/<EPIC>_TODO.md 時改以 docs/manifests/<EPIC>.json 查延後目標；不在 ⇒ 拒、在 ⇒ 過。"""
+    root, audit = _setup(tmp_path)
+    (root / "docs" / "manifests").mkdir(parents=True, exist_ok=True)
+    (root / "docs" / "manifests" / "T.json").write_text(
+        json.dumps({"stub_modules": [], "batch_card": {"not_executable": [{"item": "E-4"}]}}), encoding="utf-8")
+    assert not (root / "docs" / "T_TODO.md").exists()
+    rid, lock = _happy_path_prep(root, audit, session="20260911-t-b1-review-r1", families=["codex"])
+    synth = lock.parent / "synth.md"
+    base = synth.read_text(encoding="utf-8")
+    synth.write_text(base.replace("| 採納 |", "| 延後→E-9 |"), encoding="utf-8")
+    r = _clear(root, audit, "--round-id", rid, "--session", "20260911-t-b1-review-r1", "--lock", str(lock))
+    assert r.returncode != 0 and "E-9" in (r.stderr or "")
+    synth.write_text(base.replace("| 採納 |", "| 延後→E-4 |"), encoding="utf-8")
+    r = _clear(root, audit, "--round-id", rid, "--session", "20260911-t-b1-review-r1", "--lock", str(lock))
+    assert r.returncode == 0, r.stderr
+
+
 def test_clear_idempotent_noop(tmp_path: Path) -> None:
     """重複銷帳 → 冪等 no-op。"""
     root, audit = _setup(tmp_path)

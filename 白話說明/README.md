@@ -30,7 +30,7 @@
 | 010 | HP-PLAINDOCS | 已完成 | 白話說明/README.md | — |
 | 020 | HP-REDISPATCH | 已完成 | docs/REDISPATCH_SPEC.md | — |
 | 030 | HP-EVENTSCAN | 停手 | 白話說明/EVENTSCAN方向與做法.md | 🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀 |
-| 033 | HP-TODOFMT | 已完成 | 白話說明/TODO優化結論.md | 2026-09-23 收案。新票之 TODO＝五類落點 manifest（`docs/manifests/<EPIC>.json`，規格 docs/TODOFMT_SPEC.md）；寫散文 TODO 即擋、manifest 寫入當下機檢、派工閘門認新格式（`--impl-self` 須帶 `--spec`）自 W（`26048178`）生效。三批皆經三家審碼閉合，末輪 r3 零 finding；收案聚合器 12 項 rc=0（HEAD `d8107deb`）；全套治理測試 78 紅逐條歸因，皆早於本票或屬偶發／環境。其餘票何時復工待使用者決定 |
+| 033 | HP-TODOFMT | 已完成 | 白話說明/TODO優化結論.md | 2026-09-23 收案。新票之 TODO＝五類落點 manifest（`docs/manifests/<EPIC>.json`，規格 docs/TODOFMT_SPEC.md）；寫散文 TODO 即擋、manifest 寫入當下機檢、派工閘門認新格式（`--impl-self` 須帶 `--spec`）自 W（`26048178`）生效。三批皆經三家審碼閉合，末輪 r3 零 finding；收案聚合器 12 項 rc=0（HEAD `d8107deb`）；全套治理測試 78 紅逐條歸因，皆早於本票或屬偶發／環境。其餘票使用者將另開 session 處理。**收案後補遺（第 4 批）**：使用者追問 TODO 相關文件是否都更新，主委盤點查出審查提示詞、TODO 範本之全域約束落點、SPEC 範本、分工手冊與 `debt_clear` 之延後目標查找五處仍預設散文 TODO，已改（docs/TODOFMT_SPEC.md Phase 4），待三家審碼 |
 | 035 | HP-PROCOPT | 已完成 | docs/PROCOPT_DECISION.md | 2026-09-23 使用者裁定：散文 TODO 廢止一項已由 HP-TODOFMT 實施；「最終改法」四步不做、CLAUDE.md 不改（第 3 步之實質已含於 TODOFMT）。裁定逐字與逐項見 docs/PROCOPT_DECISION.md 檔首；白話審閱文件已封存於 白話說明/Archived/SPEC與TODO流程優化.md |
 | 040 | HP-FFDSTAR | 停手 | docs/FFDSTAR_SPEC.md | 🔴 **停手**（使用者 2026-09-22 裁定「TODO優化完成後再討論下一步」⇒ 其餘票暫停至 HP-TODOFMT 完工；該票已於 2026-09-23 完工，何時復工待使用者決定）。停手前狀態：SPEC 已寫、R2 十三條待閉合複查（R3 未派）、未凍結；中票（RISK-HIT: none），範圍限共用 d* 快取之可追溯性。復工時先依 TODOFMT 新格式產出本票 manifest |
 <!-- END GENERATED: handoff-pending -->

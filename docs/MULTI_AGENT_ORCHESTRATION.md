@@ -114,7 +114,7 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 
 **機制**：`scripts/gate_check.sh`（PreToolUse hook，matcher `Task|Bash|Write`）守**通道**不守實例：
 - `Task` 工具 = 全涵蓋（零列舉）；`Bash` = 比對 executor pattern（codex/cursor-agent/agy/gemini…）；
-- `Write` 到新 `docs/*{SPEC,TODO,PLAN}*.md` = 創建治理文件。
+- `Write` 到新 `docs/*{SPEC,TODO,PLAN}*.md` = 創建治理文件（新票不再寫散文 TODO：`scripts/todofmt_write_guard.sh` 於寫檔當下即擋；TODO 改寫 `docs/manifests/<EPIC>.json`，寫入當下由 `scripts/todofmt_manifest_guard.sh` 機檢）。
 - 無對應 fresh token（TTL 900s）→ **exit 2 擋下**，Claude 無法靜默跳過。
 
 ### reconcile 委員核可閘（防「Claude 自產 reconcile 無人複核就派實作」）
@@ -135,11 +135,12 @@ Claude 當綜合者：提煉「共識 / 分歧 / 我的判斷」給使用者，�
 **第二階段候選（暫緩）**：把 findings/reconcile/stamp 包成單一命令（CODEX B-4）→ 先用批次化，包命令視摩擦殘量再議。
 
 **範本（V13 緊湊+錨點版，compliance-first）**：`templates/SPEC_TEMPLATE.md`（§RISK/§A/§C/§G/§P/§V/§R/§N 必填錨點）、
-`TODO_GENERATION_PROMPT.md`（蒸餾 1030→緊湊；產出 §0/§B/Task 驗證·邊界·不可做）、`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（加「挑戰前提」）。
+`TODO_GENERATION_PROMPT.md`（V14：產出五類落點與 manifest，不再產散文 TODO；舊票散文 TODO 所需之錨點見其檔頭所指之設計定案版）、`SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md`（加「挑戰前提」；V14 起新舊 TODO 格式並陳）。
 為何重寫：舊版過長 → 被 grep 一下就改寫成扁平 checklist（compliance 失敗）。新版緊湊到「讀的成本 < 改寫的成本」+ 錨點綁 gate 機檢。
 
 **開門**：`bash scripts/gate.sh dispatch|artifact <必填>`，缺欄位拒發 token。**對 SPEC/TODO 派工附 `--spec/--todo`（可選 `--manifest`）→ 三道機檢，任一不過=拒發**：
 ① `template_check.sh` 必填錨點；② 反空殼（空表/樣板殘留/驗證無可證偽 token，抓「只寫表頭內容空」）；③ `coverage_check.sh` 比對 manifest 每個 `[A-1]` ID 落進文件沒（抓掉項 churn）。
+`--todo` 為新格式 manifest（`.json` 且頂層含 `stub_modules`）時，① 改走 `template_check.sh todofmt`（五類落點契約）、②③ 不適用，且新 SPEC 須以之派工、其 `spec_path` 須等於 `--spec`（`docs/TODOFMT_SPEC.md` Task 1.3／1.4）。🔴 `--manifest` 是上述 ③ 之 coverage 清單，與 TODO manifest 同名不同物，不得互相替代。
 誠實邊界：機械只抓明顯空殼；「貌似合理但邏輯空」靠 adversarial（不同模型、作者不自審）+ 執行閘兜底。必填即「會漏的事」清單：
 - `--facts-asked`：code/log 推不出、**該先問使用者**的事實（如 tier、是否 concurrent>1、IC-First 選擇）問了沒。
 - `--review-role`：委員會**指派誰挑戰前提/當 adversary**（避免全員答 Claude 框好的同一題 → 相關性錯誤）。
@@ -207,7 +208,7 @@ ASSERT <命令> WHEN <key>=<value> ... THEN rc=<n>|rc!=<n>
 5. **adversarial 稽核 = §1 現行分工行所列之全部審查家族都跑**（本行**不寫家數也不寫家族名**；機器版＝`scripts/governance_roles.json` 之 `reviewers`）（買保險、各自獨立輸出、`-o` 只讀結論）：查語義/跨 Phase 銜接/空殼/挑戰前提。Claude 綜合「收斂 vs 分歧」給使用者。
    **誠實界定**：多家族保「推理/結構/空殼漏看」（C1/C2 實證有效）；**不保「共享錯前提+缺使用者事實」**（C3 全滅）→ 靠前置鐵律 + 挑戰前提 + 使用者驗 scope + Golden/執行閘。
    🔴 本行原寫「GPT-5.5 + Composer 2.5 **兩家族**都跑」，與 §1 之三家全員衝突（2026-09-13 由 stamp-r1 codex 抓出；主委當天的自證 grep 只掃「雙家族」而漏掉此處字面為「兩家族」——自證的排除條件濾掉了待抓目標）。
-6. **TODO 預設 Opus 寫**（深度只能 Opus；GPT-5.5/Composer 廣度深度不足）；**交執行端生成僅 Opus 額度吃緊時 fallback，且須配 Opus adversarial 抓淺**。機器把關（template+coverage+反空殼）+ adversarial 同 SPEC（**家數見 §1 現行分工行**，本行不寫數字）。
+6. **TODO 預設 Opus 寫**（深度只能 Opus；GPT-5.5/Composer 廣度深度不足）；**交執行端生成僅 Opus 額度吃緊時 fallback，且須配 Opus adversarial 抓淺**。機器把關（新格式：`template_check.sh todofmt`＋寫入當下守衛；舊票散文 TODO：template+coverage+反空殼）+ adversarial 同 SPEC（**家數見 §1 現行分工行**，本行不寫數字）。
 
 ### 信任分工（解「使用者看不懂 3000 行程式/量化」）
 | 誰 | 驗什麼 |

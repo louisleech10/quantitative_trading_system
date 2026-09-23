@@ -38,7 +38,7 @@ per-Task 必填欄（awk 機檢）：驗證 / 邊界 / **存活至** / **覆蓋�
 
 # {{專案/任務名稱}} — SPEC
 
-> 來源 PLAN/診斷：{{路徑 / N/A}}　|　日期：{{YYYY-MM-DD}}　|　對應 TODO：{{由 TODO_GENERATION_PROMPT 生成的路徑}}
+> 來源 PLAN/診斷：{{路徑 / N/A}}　|　日期：{{YYYY-MM-DD}}　|　對應 TODO：{{docs/manifests/<EPIC>.json（五類落點 manifest，由 TODO_GENERATION_PROMPT 生成）}}
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：{{小 / 中 / 大}}（接 CLAUDE.md 任務分派規則）。

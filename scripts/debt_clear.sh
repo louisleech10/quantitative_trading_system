@@ -251,14 +251,14 @@ _run_completeness() {
 }
 
 # ②b 群集歸戶閘（VERDICTGATE Task 4.1；SPEC C-1）：附錄每個 ID 必列於群集表＋逐字引用斷言前 20 字＋處置 token；
-#    `延後→X` 之 X 須存在於同票 TODO（`docs/<EPIC>_TODO.md`，EPIC＝session 第二段大寫；缺檔則不傳 --todo ⇒ 有延後即拒）。
+#    `延後→X` 之 X 須存在於同票 TODO（先找散文 `docs/<EPIC>_TODO.md`，無則找 TODOFMT manifest `docs/manifests/<EPIC>.json`；EPIC＝session 第二段大寫；皆缺則不傳 --todo ⇒ 有延後即拒）。
 #    與 synth_attribution_hook.sh 同一模組（scripts/_synth_attr.py）；本處為全量模式。
 _run_attribution() {
   local lock="$1" synth epic todo_arg=""
   synth="$(dirname "${lock}")/synth.md"
   [ -f "${synth}" ] || { echo "ERROR: synth.md 缺失: ${synth}" >&2; return 1; }
   epic="$(printf '%s' "${SESSION}" | awk -F- '{print toupper($2)}')"
-  [ -n "${epic}" ] && [ -f "docs/${epic}_TODO.md" ] && todo_arg="docs/${epic}_TODO.md"
+  [ -n "${epic}" ] && for _t in "docs/${epic}_TODO.md" "docs/manifests/${epic}.json"; do [ -f "${_t}" ] && { todo_arg="${_t}"; break; }; done
   if [ -n "${todo_arg}" ]; then
     bash "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" "${synth}" --todo "${todo_arg}"
   else

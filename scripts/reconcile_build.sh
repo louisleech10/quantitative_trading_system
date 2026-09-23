@@ -384,7 +384,7 @@ fi
 if [ -x "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" ]; then
   echo "[reconcile_build] === 群集歸戶（建檔當下必未填；正式判定在 synth 寫入 hook 與 debt_clear）==="
   bash "${SCRIPT_DIR}/reconcile_cluster_attribution_check.sh" "${SESS}/synth.md" --report 2>/dev/null | grep -A2 '^──' || true
-  echo "[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh ${SESS}/synth.md [--todo docs/<EPIC>_TODO.md]"
+  echo "[reconcile_build] 手填群集後請重跑：bash scripts/reconcile_cluster_attribution_check.sh ${SESS}/synth.md [--todo docs/<EPIC>_TODO.md 或 docs/manifests/<EPIC>.json]"
 fi
 
 echo "[reconcile_build] ✅ 完成。接著：手填 ${SESS}/synth.md 的『群集/處置』(④b)，再改 SPEC/TODO(⑥) + template_check(⑦)。"

@@ -24,7 +24,7 @@ TODO 生成 Prompt V14 — 五類落點（取代 V13 之散文 TODO）
 **不產生散文 TODO 檔。** 按下列階段輸出，不可跳過。
 
 ### 階段 0：讀憲法 + 反注入
-- **必讀**：`AGENTS.md`（執行端真合約）＋`CLAUDE.md`「Multi-Agent 協作協議」「驗證保真度鐵律」「三方數據正確性簽核鐵律」三節＋`{{SPEC_FILE}}` §C＋`docs/TODOFMT_SPEC.md` Task 0.1 契約表。讀不到 → 要求貼全文，不得假裝讀過。
+- **必讀**：`AGENTS.md`（執行端真合約）＋`CLAUDE.md`「Multi-Agent 協作協議」「驗證保真度鐵律」「三方數據正確性簽核鐵律」「The 7 Decoupling Rules」「Non-Negotiable Principles」五節＋`{{SPEC_FILE}}` §C＋`docs/TODOFMT_SPEC.md` Task 0.1 契約表。讀不到 → 要求貼全文，不得假裝讀過。
 - **按需觸發**（SPEC 未列觸及模組 → 僅必讀清單）：
   | 觸及模組 | 追加閱讀 |
   |---|---|
@@ -52,6 +52,7 @@ TODO 生成 Prompt V14 — 五類落點（取代 V13 之散文 TODO）
 3. **契約 JSON**（`contract_jsons`）：鍵集、枚舉、reason 字面等「資料層規則」之單一落點；測試引用之，不在測試內另抄一份。
 4. **機讀批次卡**（`batch_card`）：`depends`／`touches`／`callers_now`／`callers_later`／`gate_cmd`／`forbidden`／`risk_mitigation`／`coverage_risk`／`lifecycle`／`not_executable`，
    跨批搬遷時另填 `relocates_to`／`relocates_at`／`reexport`／`tests_stay`。
+   - `forbidden` 須涵蓋本票觸及之解耦規則（`CLAUDE.md`「The 7 Decoupling Rules」）、不可違反原則（跨 tier／多 symbol／資料品質／不弱化 NaN·inf gate／不擅改輸出大小）與「不得放寬既有測試斷言」之相關子集——此即舊散文 TODO 全域規則節之落點；可觀測者以具名測試或 `scripts/check_decoupling.sh` 驗之，純前端／文檔可於 `risk_mitigation` 聲明不適用。
    - `forbidden` 之 `observable=false` 者（無法以測試觀測之負向約束）須於 `not_executable` 有同字面之 item。
    - **無法寫成可執行落點者**一律進 `not_executable`：`reason` 只准 `blocked-by`／`user-ruling`／`needs-research` 三值，並填 `owner` 與 `expiry`（`YYYY-MM-DD`，不得已過期）。
    - 某一類為空時（例：治理票無生產模組），於 `not_executable` 加一項 item 恰為該鍵名（`stub_modules`／`test_files`／`contract_jsons`）並附理由。
@@ -66,6 +67,7 @@ manifest 其餘欄：`spec_path`＝`{{SPEC_FILE}}`（須與派工之 `--spec` �
 3. **鑑別力**：每支 `test_mutation_*` 經靜態器 rc=0，且確實換入改壞之待測物。
 4. **語義**：引用之檔案／函式真的存在（比對程式碼）；改既有函式之呼叫者列於 `callers_now` 並有對應測試；驗證前置（golden／baseline）有落點產出。
 5. **全棧跨層**（多層 SPEC 才查）：每功能有 後端→API→前端→整合測試 鏈；無只建檔無業務邏輯之空殼。
+6. **全域約束**：`forbidden` 已涵蓋本票觸及之解耦規則、不可違反原則與「不得放寬既有測試斷言」（見階段 2 第 4 類）。
 
 ### 階段 4：送審
 輸出一行：`SPEC={{SPEC_FILE}} MANIFEST=docs/manifests/{{EPIC}}.json FOCUS={{REVIEW_FOCUS}}`，交對抗審（家數與家族見 `docs/MULTI_AGENT_ORCHESTRATION.md` §1 現行分工行，本檔不寫數字）；Blocking 修補後才可派實作。
