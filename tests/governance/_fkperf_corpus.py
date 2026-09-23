@@ -8,6 +8,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Callable, Dict, List, Sequence, Tuple
@@ -762,10 +763,37 @@ def _bytes() -> List[fo.Case]:
     ]
 
 
+def _recorded_cases() -> List[fo.Case]:
+    """語料②之逐一列入：既有兩檔測試以 helper 建之每一個沙箱、每一次生成器呼叫（錄製重播，見 `_fkperf_record`）。
+    沙箱根下 `t/`＝錄得之樹；repo 側呼叫另以目前工作樹之 SANDBOX_PATHS 建 `r/`。預期分支標籤＝錄製時之 rc 與首行。"""
+    from tests.governance import _fkperf_record as fr
+
+    def sub(value: str, root_token: str) -> str:
+        return value.replace("{anchor}", f"{root_token}t").replace("{repo}", f"{root_token}r")
+
+    cases: List[fo.Case] = []
+    for rec in fr.recorded()["records"]:
+        src = fr.record_tree(rec)
+
+        def build(root: Path, src: Path = src, repo_side: bool = rec["repo_side"]) -> None:
+            shutil.copytree(src, root / "t", symlinks=True)
+            if repo_side:
+                shutil.copytree(fr.repo_side_tree(), root / "r", symlinks=True)
+
+        script_rel, cwd = sub(rec["script"], ""), sub(rec["cwd"], "")
+        cases.append(fo.Case(
+            f"rec-{rec['dir']}", tuple(rec["args"]), build, rec["rc"], sub(rec["first_line"], "{root}/"),
+            stdin=rec["stdin"].encode("utf-8") if rec["stdin"] is not None else None,
+            env={k: sub(v, "{root}/") for k, v in rec["env"].items()},
+            invoke=os.path.relpath(script_rel, cwd), cwd=cwd, script_rel=script_rel,
+            unset_env=tuple(rec["unset"])))
+    return cases
+
+
 CORPUS: Dict[str, Callable[[], List[fo.Case]]] = {
     "exit": lambda: [c for _, c in EXIT_CASES],
     "real": _real,
-    "sandbox": _sandbox,
+    "sandbox": lambda: _sandbox() + _recorded_cases(),
     "key_order": _key_order,
     "bytes": _bytes,
 }

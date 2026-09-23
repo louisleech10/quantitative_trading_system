@@ -2,7 +2,7 @@
 
 oracle＝`git show ORACLE_COMMIT:scripts/gen_fact_key_blocks.sh`（切換前之 bash 實作）。每筆語料建兩個同形沙箱：
 同一輸入樹＋註冊表引用之未追蹤 receipt，oracle 沙箱放 oracle 入口、新實作沙箱另放新核心（與新入口）；
-兩邊於相同 env／參數／stdin／相對 cwd 下各跑一次，比對 stdout、stderr、rc 與宿主檔寫後位元組、權限位。
+兩邊於相同 env／參數／stdin／相對 cwd 下各跑一次，比對 stdout、stderr、rc 與沙箱全樹寫後位元組、權限位。
 唯一正規化：兩沙箱根目錄路徑互換（寫死於 `normalize`）。
 
 輸入樹＝`git archive ORACLE_COMMIT -- <SANDBOX_PATHS>`：生成器讀取之路徑（入口、註冊表、rows_source、receipt、
@@ -33,7 +33,7 @@ _SANDBOX_DROP = ("docs/site",)  # 生成之 HTML，生成器不讀
 
 @dataclass(frozen=True)
 class RunOut:
-    """單次呼叫之觀測：rc、stdout、stderr，與指定宿主檔寫後之（位元組, 權限位）。"""
+    """單次呼叫之觀測：rc、stdout、stderr，與沙箱全樹寫後之（位元組, 權限位）。"""
 
     rc: int
     stdout: bytes
@@ -47,7 +47,7 @@ class Case:
 
     `env`／`oracle_env`／`new_env` 之值可含 `{root}`，執行時代換為該沙箱根目錄。
     `invoke`＝相對 `cwd` 呼叫入口之路徑（`--help` 之相對路徑與 symlink 語料用）。
-    `expect_new`＝C-5 前置例外配對：新實作一側之 (rc, stderr 首行)；設定時不比差異、各自斷言預期分支。"""
+    `expect_new`＝C-5 前置例外配對：新實作一側之 (rc, stderr 首行)；只准該具名訊息行不同，其餘全等。"""
 
     case_id: str
     args: Tuple[str, ...]
@@ -56,13 +56,20 @@ class Case:
     expect_first_line: str                  # rc≠0：stderr 首行；rc=0：stdout 首行
     stdin: Optional[bytes] = None
     env: Dict[str, str] = field(default_factory=dict)
-    watch_files: Tuple[str, ...] = ()       # 比對寫後位元組與權限位之宿主檔（相對沙箱根）
+    watch_files: Tuple[str, ...] = ()       # 寫檔語料之宿主檔（相對沙箱根）；寫後快照須含之（全樹皆比對，見 snapshot_tree）
     entry: str = "core"                     # 新實作之呼叫方式：core＝直呼核心、entry＝經入口檔
     invoke: str = ENTRY_REL
     cwd: str = "."
     oracle_env: Dict[str, str] = field(default_factory=dict)
     new_env: Dict[str, str] = field(default_factory=dict)
     expect_new: Optional[Tuple[int, str]] = None
+    script_rel: str = ENTRY_REL              # 入口於沙箱根下之位置（錄製語料之生成器位於錄得之樹內；核心置於同目錄）
+    unset_env: Tuple[str, ...] = ()          # 呼叫時自環境移除之鍵（錄製語料：原呼叫之 env 缺此鍵）
+
+
+def core_rel(case: Case) -> str:
+    """新核心於沙箱根下之位置：與入口同目錄。"""
+    return os.path.join(os.path.dirname(case.script_rel), os.path.basename(CORE_REL))
 
 
 def _oracle_blob(rel: str) -> bytes:
@@ -106,7 +113,7 @@ def build_sandbox_tree(root: Path, *, omit: Sequence[str] = (), git_init: bool =
         subprocess.run(["git", "add", "-A"], cwd=str(root), check=True, capture_output=True)
 
 
-def build_current_tree(root: Path) -> None:
+def build_current_tree(root: Path, include_tests: bool = True) -> None:
     """以目前工作樹之受管檔（SANDBOX_PATHS 範圍，含新入口與核心）＋註冊表引用之 receipt 建樹並 `git init`（切換後驗收用）。"""
     root.mkdir(parents=True, exist_ok=True)
     files = subprocess.run(["git", "-C", str(REPO), "ls-files", "-z", "--", *SANDBOX_PATHS],
@@ -125,7 +132,7 @@ def build_current_tree(root: Path) -> None:
             os.symlink(os.readlink(src), dst)
         else:
             shutil.copy2(src, dst)
-    for rel in ("tests", "pytest.ini", "conftest.py"):  # 巢狀 pytest（Task 4.2）所需
+    for rel in (("tests", "pytest.ini", "conftest.py") if include_tests else ()):  # 巢狀 pytest（Task 4.2）所需；錄製語料之 repo 側不需
         src = REPO / rel
         if src.is_dir():
             files = subprocess.run(["git", "-C", str(REPO), "ls-files", "-z", "--", rel],
@@ -148,34 +155,56 @@ def make_pair(tmp_path: Path, case: Case) -> Tuple[Path, Path]:
     oroot, nroot = tmp_path / "o", tmp_path / "n"
     for root in (oroot, nroot):
         case.build(root)
-    (oroot / ENTRY_REL).write_bytes(_oracle_blob(ENTRY_REL))
-    (nroot / "scripts").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(REPO / CORE_REL, nroot / CORE_REL)
+    (oroot / case.script_rel).parent.mkdir(parents=True, exist_ok=True)
+    (oroot / case.script_rel).write_bytes(_oracle_blob(ENTRY_REL))
+    (nroot / core_rel(case)).parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(REPO / CORE_REL, nroot / core_rel(case))
     if case.entry == "entry":
-        shutil.copy2(REPO / ENTRY_REL, nroot / ENTRY_REL)
+        shutil.copy2(REPO / ENTRY_REL, nroot / case.script_rel)
     return oroot, nroot
 
 
-def _env(root: Path, *parts: Dict[str, str]) -> Dict[str, str]:
+def _env(root: Path, *parts: Dict[str, str], unset: Sequence[str] = ()) -> Dict[str, str]:
     env = dict(os.environ)
-    for part in parts:
-        env.update({k: v.replace("{root}", str(root)) for k, v in part.items()})
+    for key in unset:
+        env.pop(key, None)
+    for part in parts:  # realpath 形：與 `expected_first` 之 `{root}` 代換同形（macOS /var ↔ /private/var）
+        env.update({k: v.replace("{root}", str(root.resolve())) for k, v in part.items()})
     return env
+
+
+# 兩沙箱依設計不同之檔（oracle 入口 vs 新核心／新入口）與版本庫、位元組碼快取，不入寫後快照
+_SNAPSHOT_SKIP_DIRS = (".git", "__pycache__")
+_SNAPSHOT_SKIP_FILES = (ENTRY_REL, CORE_REL)
+
+
+def snapshot_tree(root: Path, skip: Sequence[str] = _SNAPSHOT_SKIP_FILES) -> Dict[str, Tuple[bytes, int]]:
+    """沙箱內全部檔之寫後（位元組, 權限位）；symlink 記其目標（r1 codex P1-01：只看手列宿主檔會漏其他受管 target）。
+    `skip`＝兩側依設計不同之入口與核心位置。"""
+    files: Dict[str, Tuple[bytes, int]] = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in _SNAPSHOT_SKIP_DIRS)
+        for name in sorted(filenames):
+            p = Path(dirpath) / name
+            rel = p.relative_to(root).as_posix()
+            if rel in skip:
+                continue
+            if p.is_symlink():
+                files[rel] = (b"symlink:" + os.readlink(p).encode("utf-8"), 0)
+            elif p.is_file():
+                files[rel] = (p.read_bytes(), stat.S_IMODE(p.stat().st_mode))
+    return files
 
 
 def _run(root: Path, argv: List[str], case: Case, env: Dict[str, str]) -> RunOut:
     r = subprocess.run(argv, cwd=str(root / case.cwd), input=case.stdin, capture_output=True, env=env)
-    files: Dict[str, Tuple[bytes, int]] = {}
-    for rel in case.watch_files:
-        p = root / rel
-        if p.is_file():
-            files[rel] = (p.read_bytes(), stat.S_IMODE(p.stat().st_mode))
-    return RunOut(r.returncode, r.stdout, r.stderr, files)
+    return RunOut(r.returncode, r.stdout, r.stderr, snapshot_tree(root, (case.script_rel, core_rel(case))))
 
 
 def run_oracle(root: Path, case: Case) -> RunOut:
     """於 oracle 沙箱跑 oracle 入口。"""
-    return _run(root, ["bash", case.invoke, *case.args], case, _env(root, case.env, case.oracle_env))
+    return _run(root, ["bash", case.invoke, *case.args], case,
+                _env(root, case.env, case.oracle_env, unset=case.unset_env))
 
 
 def run_new(root: Path, case: Case) -> RunOut:
@@ -183,9 +212,9 @@ def run_new(root: Path, case: Case) -> RunOut:
     if case.entry == "entry":
         argv = ["bash", case.invoke, *case.args]
     else:
-        core = os.path.relpath(root / CORE_REL, root / case.cwd)
+        core = os.path.relpath(root / core_rel(case), root / case.cwd)
         argv = ["python3", core, *case.args]
-    return _run(root, argv, case, _env(root, case.env, case.new_env))
+    return _run(root, argv, case, _env(root, case.env, case.new_env, unset=case.unset_env))
 
 
 def normalize(out: RunOut, root: Path, other_root: Path) -> RunOut:
@@ -238,10 +267,15 @@ def check_case(tmp_path: Path, case: Case) -> List[str]:
     a = run_oracle(oroot, case)
     got = first_line(a.stderr if case.expect_rc else a.stdout)
     assert (a.rc, got) == (case.expect_rc, expected_first(case, oroot)), (case.case_id, a.rc, got)
+    for rel in case.watch_files:
+        assert rel in a.files, (case.case_id, "watch_files 所列宿主檔不在 oracle 寫後快照", rel)
     b = run_new(nroot, case)
     if case.expect_new is not None:
-        got_new = (b.rc, first_line(b.stderr))
-        return [] if got_new == case.expect_new else [f"新實作預期分支 {case.expect_new} 實得 {got_new}"]
+        # C-5 前置例外配對：只准具名訊息不同；stdout、其餘 stderr、rc 與寫後檔案仍全等（r1 codex P2-04）
+        named = (expected_first(case, oroot) + "\n").encode("utf-8")
+        new_named = (case.expect_new[1] + "\n").encode("utf-8")
+        expected = RunOut(case.expect_new[0], a.stdout, a.stderr.replace(named, new_named, 1), a.files)
+        return diff(expected, normalize(b, nroot, oroot))
     return diff(a, normalize(b, nroot, oroot))
 
 

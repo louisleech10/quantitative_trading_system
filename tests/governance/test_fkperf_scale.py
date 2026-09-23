@@ -15,6 +15,7 @@ from typing import List
 import pytest
 
 from tests.governance import _fkperf_opens as op
+from tests.governance import _fkperf_oracle as fo
 from tests.governance import _fkperf_spawn as sp
 
 REPO = Path(__file__).resolve().parents[2]
@@ -93,6 +94,29 @@ def test_open_counter_counts_known_opens(tmp_path: Path) -> None:
     script.write_text("open('a.txt').read(); open('b.txt').read()\n", encoding="utf-8")
     n, paths = op.count_opens(tmp_path, [], script)
     assert n == 2, paths
+
+
+def test_core_spawn_counter_counts_absolute_path_calls(tmp_path: Path) -> None:
+    """r1 codex P2-05：核心側子程序計數含絕對路徑啟動（PATH shim 對此計 0，量測範圍於此釘死）。"""
+    script = tmp_path / "probe.py"
+    script.write_text("import os, subprocess\nsubprocess.run(['/bin/date'], capture_output=True)\n"
+                      "os.system('/usr/bin/true')\n", encoding="utf-8")
+    n, events = op.count_core_spawns(tmp_path, [], script)
+    assert n == 2 and events == ["subprocess.Popen", "os.system"], events
+    sh = tmp_path / "probe.sh"
+    sh.write_text("/bin/date >/dev/null\n", encoding="utf-8")
+    assert sp.count_spawns_cmd(["bash", str(sh)], tmp_path) == (0, {})
+
+
+def test_oracle_has_no_absolute_path_command() -> None:
+    """r1 codex P2-05：bash 基準之 PATH shim 計數涵蓋 oracle 全部外部程序之前提——oracle 無以絕對路徑啟動之命令。"""
+    import re
+    import subprocess
+    src = subprocess.run(["git", "-C", str(fo.REPO), "show", f"{fo.ORACLE_COMMIT}:{fo.ENTRY_REL}"],
+                         capture_output=True, text=True, check=True).stdout.splitlines()
+    hits = [(n, l) for n, l in enumerate(src, 1)
+            if not l.lstrip().startswith("#") and re.search(r"(^|[\s;|&(`$])/(usr/)?(local/)?s?bin/", l)]
+    assert hits == [], hits[:5]
 
 
 def test_measurement_helpers_raise_on_nonzero_rc(tmp_path: Path) -> None:
@@ -232,15 +256,18 @@ def test_gen_block_injection_reaches_every_key(tmp_path: Path, mode: str) -> Non
 def test_spawn_and_open_counts_scale_invariant(tmp_path: Path, mode: str) -> None:
     """Task 4.4 驗證：四模式之外部程序數與核心開檔次數，在 1×／4×／10×／40× 皆相等。"""
     targets = _targets()
-    spawns, opens = set(), set()
+    spawns, opens, core_spawns = set(), set(), set()
     args = {"emit": [], "--status-hits": ["--status-hits", "lines.txt"]}.get(mode, [mode])
     for label in C["post_cutover_scales"]:
         root = sp.build_scaled_tree(tmp_path / label, targets[label])
         (root / "lines.txt").write_text("L1\tHP-FKPERF 已完成\n", encoding="utf-8")
         spawns.add(sp.count_spawns(root, mode)[0])
-        opens.add(op.count_opens(root, args, root / "scripts" / "_gen_fact_key_blocks.py")[0])
+        core = root / "scripts" / "_gen_fact_key_blocks.py"
+        opens.add(op.count_opens(root, args, core)[0])
+        core_spawns.add(op.count_core_spawns(root, args, core)[0])  # 含絕對路徑啟動（r1 codex P2-05）
     assert len(spawns) == 1, spawns
     assert len(opens) == 1, opens
+    assert len(core_spawns) == 1, core_spawns
 
 
 @pytest.mark.parametrize("mode", C["ratio_modes"])

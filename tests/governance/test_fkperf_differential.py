@@ -190,6 +190,28 @@ def _static_prefix(s: str) -> str:
     return re.split(r"[$%]", s, maxsplit=1)[0]
 
 
+# 首行字面與他出口相同之標籤 → 其所在 oracle 函式（2026-09-24 主委讀 oracle 原始碼：L1848 在 _fk_check、L2014 在 _fk_write）
+_DUP_LABEL_FUNC = {"missing_target_check": "_fk_check", "missing_target_write": "_fk_write"}
+
+
+def _enclosing_func(src: Sequence[str], n: int) -> str:
+    """oracle 第 n 行所在之 bash 函式名（往上找最近之 `name() {`）；不在任何函式內回傳空字串。"""
+    for line in reversed(src[: n - 1]):
+        m = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\(\) *\{", line)
+        if m:
+            return m.group(1)
+    return ""
+
+
+def test_mutation_duplicate_literal_exit_sites_swapped_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """r1 codex P2-06：互換兩個同字面出口（L1848 ↔ L2014）之標籤 ⇒ 出口完整性測試必紅。"""
+    orig = fo.exit_sites
+    swapped = {**orig(), 1848: orig()[2014], 2014: orig()[1848]}
+    monkeypatch.setattr(fo, "exit_sites", lambda: swapped)
+    with pytest.raises(AssertionError):
+        test_exit_sites_cover_every_stderr_line_of_oracle()
+
+
 def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
     """Task 0.1 驗證④之獨立錨（r5 grok P1-01；r6 codex／grok P1-01 收緊）：以本測試自帶之正則掃 oracle 每一條寫 stderr
     之行（`>&2` 或 `_fk_die `），`exit_sites()` 須逐行歸類且合 `_site_rules`；出口首行不得歸為 continuation／helper，
@@ -216,6 +238,15 @@ def test_exit_sites_cover_every_stderr_line_of_oracle() -> None:
             label_lines[v] = n
         if s:
             assert cat[v].startswith(_static_prefix(s)), (n, v, cat[v], s)
+    # 同字面之出口首行（如 L1848／L2014 皆印 MISSING TARGET）：字面擋不住兩標籤互換，改以所在 oracle 函式定位（r1 codex P2-06）
+    by_prefix: Dict[str, List[str]] = {}
+    for v, n in label_lines.items():  # 整行字面、變數名一律視同（兩行只差區域變數名即同字面）
+        literal = re.sub(r"\$\{[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*", "$", src[n - 1].strip())
+        by_prefix.setdefault(literal, []).append(v)
+    dups = {v for vs in by_prefix.values() if len(vs) > 1 for v in vs}
+    assert dups == set(_DUP_LABEL_FUNC), (sorted(dups), sorted(_DUP_LABEL_FUNC))
+    for v in sorted(dups):
+        assert _enclosing_func(src, label_lines[v]) == _DUP_LABEL_FUNC[v], (v, label_lines[v], _enclosing_func(src, label_lines[v]))
     tool_lines = [n for n in sorted(lines) if "tool_failure" in _site_rules(src, n)[0]]
     assert tool_lines == [213, 216, 218, 221, 234, 256, 419, 691, 695, 706, 1440, 1496, 1553, 1587, 1626, 1706, 1730,
                           1754, 1816, 1842, 1937, 1954, 1983, 2035], tool_lines  # 逐行釘死（r11 codex P2-03：只釘數量擋不住同數量換位）
@@ -297,6 +328,47 @@ def test_mutation_exit_site_hidden_as_continuation_is_caught(monkeypatch: pytest
         test_exit_sites_cover_every_stderr_line_of_oracle()
 
 
+def _recorded_coverage_gaps() -> List[Tuple[str, str]]:
+    from tests.governance import _fkperf_record as fr
+    seen = {(e["nodeid"].split("::")[0], e["nodeid"].split("::")[1].split("[")[0])
+            for e in fr.recorded()["log"] if "::" in e["nodeid"]}
+    return [(f, t) for f, tests in fr.helper_tests().items() for t in tests if (f, t) not in seen]
+
+
+def test_recorded_sandbox_corpus_covers_every_helper_test() -> None:
+    """Task 0.1 語料②「以 helper 建樹、逐一列入」（r1 codex P1-03、composer P2-01）：既有兩檔中直接或經包裝呼叫
+    `_sandbox`／`_mkroot`／`_fk_sandbox`／`_d2_sandbox` 之每一支 test（AST 呼叫圖閉包，獨立於錄製）皆有生成器呼叫之錄製
+    紀錄；略過者只准「變異本」與「真 repo 入口」兩類；錄得之每筆以語料 `rec-*` 進入分支斷言與新舊逐筆比對。"""
+    from tests.governance import _fkperf_record as fr
+    data = fr.recorded()
+    assert data["records"], data["tail"]
+    assert _recorded_coverage_gaps() == []
+    reasons = {e.get("reason") for e in data["log"] if e["status"] == "skipped"}
+    assert reasons <= {"mutated", "repo-entry"}, reasons
+    assert len([c for c in fo.corpus("sandbox") if c.case_id.startswith("rec-")]) == len(data["records"])
+
+
+def test_recorded_files_invoke_generator_only_via_subprocess_run() -> None:
+    """錄製只攔 `subprocess.run(["bash", …gen_fact_key_blocks.sh, …])`：兩檔不得以其他 API 啟動子程序（否則漏錄）。"""
+    import ast
+    from tests.governance import _fkperf_record as fr
+    other = {"Popen", "check_output", "call", "check_call", "system", "popen", "spawnv", "execv"}
+    for rel in fr.RECORD_FILES:
+        tree = ast.parse((fo.REPO / rel).read_text(encoding="utf-8"))
+        bad = [n.lineno for n in ast.walk(tree)
+               if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in other]
+        assert bad == [], (rel, bad)
+
+
+def test_mutation_recorded_corpus_missing_test_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """鑑別力：helper 閉包多出一支未錄之測試 ⇒ 逐一列入之對證必紅。"""
+    from tests.governance import _fkperf_record as fr
+    orig = fr.helper_tests
+    monkeypatch.setattr(fr, "helper_tests", lambda: {**orig(), fr.RECORD_FILES[0]: orig()[fr.RECORD_FILES[0]] + ["test_zz_not_recorded"]})
+    with pytest.raises(AssertionError):
+        test_recorded_sandbox_corpus_covers_every_helper_test()
+
+
 def test_corpus_covers_all_five_kinds_and_help_variants() -> None:
     """Task 0.1 改法：五類語料皆非空；語料①含 `--help`（經入口、相對路徑、同目錄 symlink）與 C-5 前置例外配對。"""
     for kind in ("real", "sandbox", "exit", "key_order", "bytes"):
@@ -307,28 +379,45 @@ def test_corpus_covers_all_five_kinds_and_help_variants() -> None:
 
 
 def test_mutation_one_extra_byte_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 0.1 驗證③：新實作之 stdout、stderr、或某個監視宿主檔之位元組各多一個位元組 ⇒ 差分皆報差異
-    （r6 grok P1-03：只改 stdout 時，只比 rc／stdout 之 `diff` 亦過）。"""
-    orig = fo.run_new
+    """Task 0.1 驗證③：新實作之 stdout、stderr、監視宿主檔、或未列於 watch_files 之其他檔各多一個位元組 ⇒ 差分皆報差異
+    （r6 grok P1-03：只改 stdout 時，只比 rc／stdout 之 `diff` 亦過）。先以 oracle 充當新實作證零差異基線，
+    否則恆報失敗之 `diff` 亦使本測試過（r1 codex P1-02）；未列檔之變異證全樹快照（r1 codex P1-01）。
+    C-5 前置例外配對另證：具名訊息行以外多印 stdout／stderr 亦報差異（r1 codex P2-04）。"""
     watched = [c for c in fo.corpus("bytes") if c.watch_files]
     assert watched, "bytes 類語料須至少一筆帶 watch_files（--write 之宿主檔）"
+    c5 = next(c for c in fo.corpus("real") if c.expect_new is not None)
 
-    def bump(field: str) -> None:
+    def oracle_as_new(root: Path, c: fo.Case) -> fo.RunOut:
+        (root / c.script_rel).write_bytes(fo._oracle_blob(fo.ENTRY_REL))
+        return fo._run(root, ["bash", c.invoke, *c.args], c, fo._env(root, c.env, c.oracle_env, unset=c.unset_env))
+
+    def c5_as_new(root: Path, c: fo.Case) -> fo.RunOut:
+        out = oracle_as_new(root, c)
+        named = fo.first_line(out.stderr).encode("utf-8")
+        return fo.RunOut(c.expect_new[0], out.stdout, out.stderr.replace(named, c.expect_new[1].encode("utf-8"), 1), out.files)
+
+    def bump(base: Callable[[Path, fo.Case], fo.RunOut], field: str) -> Callable[[Path, fo.Case], fo.RunOut]:
         def broken(root: Path, c: fo.Case) -> fo.RunOut:
-            out = orig(root, c)
+            out = base(root, c)
             if field == "stdout":
                 return fo.RunOut(out.rc, out.stdout + b"x", out.stderr, out.files)
             if field == "stderr":
                 return fo.RunOut(out.rc, out.stdout, out.stderr + b"x", out.files)
             files = dict(out.files)
-            k = sorted(files)[0]
+            k = c.watch_files[0] if field == "watched" else sorted(set(files) - set(c.watch_files))[0]
             files[k] = (files[k][0] + b"x", files[k][1])
             return fo.RunOut(out.rc, out.stdout, out.stderr, files)
-        monkeypatch.setattr(fo, "run_new", broken)
+        return broken
 
-    for field, case in (("stdout", fo.corpus("real")[0]), ("stderr", fo.corpus("real")[0]), ("files", watched[0])):
-        bump(field)
-        assert fo.check_case(tmp_path / field, case) != [], field
+    real0 = fo.corpus("real")[0]
+    for name, base, case in (("real", oracle_as_new, real0), ("write", oracle_as_new, watched[0]), ("c5", c5_as_new, c5)):
+        monkeypatch.setattr(fo, "run_new", base)
+        assert fo.check_case(tmp_path / f"base-{name}", case) == [], name
+    for field, base, case in (("stdout", oracle_as_new, real0), ("stderr", oracle_as_new, real0),
+                              ("watched", oracle_as_new, watched[0]), ("unwatched", oracle_as_new, watched[0]),
+                              ("stdout", c5_as_new, c5), ("stderr", c5_as_new, c5)):
+        monkeypatch.setattr(fo, "run_new", bump(base, field))
+        assert fo.check_case(tmp_path / f"{field}-{case.case_id}", case) != [], (field, case.case_id)
 
 
 # ---------------------------------------------------------------- 邊界（Task 0.1）

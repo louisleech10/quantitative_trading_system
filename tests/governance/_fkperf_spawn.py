@@ -129,6 +129,8 @@ def _shim_dir(log: Path) -> Path:
 
 def count_spawns_cmd(argv: Sequence[str], cwd: Path) -> Tuple[int, Dict[str, int]]:
     """對任意指令以同一 PATH shim 計外部程序數（helper 自測用）；頂層指令以真實路徑啟動、不計入。
+    量測範圍＝經 PATH 解析之命令；以絕對路徑啟動者不計（r1 codex P2-05）——oracle 無絕對路徑呼叫（見
+    `test_oracle_has_no_absolute_path_command`），核心側之全部子程序另以 `_fkperf_opens.count_core_spawns` 計。
     被量之呼叫 rc≠0 ⇒ 拋 `subprocess.CalledProcessError`（快速失敗之路徑不得充當「與規模無關」；r5 三家 P1）。"""
     with tempfile.TemporaryDirectory() as t:
         log = Path(t) / "spawn.log"

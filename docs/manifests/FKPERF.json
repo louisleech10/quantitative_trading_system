@@ -49,6 +49,7 @@
       "tests/governance/_fkperf_spawn.py",
       "tests/governance/_fkperf_opens.py",
       "tests/governance/_fkperf_corpus.py",
+      "tests/governance/_fkperf_record.py",
       "handoffs/run_receipts/fkperf_probes/bash_baseline.py"
     ],
     "callers_now": [
@@ -82,6 +83,10 @@
       "Task 0.1 驗證①～④：tests/governance/test_fkperf_differential.py::test_oracle_self_zero_diff_and_real_check_rc0、::test_every_case_hits_its_expected_branch、::test_mutation_one_extra_byte_is_reported、::test_exit_catalog_equals_corpus_labels、::test_exit_sites_cover_every_stderr_line_of_oracle（出口清單之獨立錨；歸類以機械規則收緊，出口首行不得為續行）、::test_mutation_exit_site_hidden_as_continuation_is_caught、::test_new_impl_host_write_failure_is_fail_closed、::test_new_impl_tmpdir_unusable_still_succeeds、::test_new_impl_unreadable_status_hits_file_rc2（SPEC C-1 具名例外②③④之行為驗收）",
       "Task 0.1 改法（五類語料逐筆新舊比對，C-1）：tests/governance/test_fkperf_differential.py::test_every_corpus_case_new_equals_oracle",
       "Task 0.1 語料①之 --help 三種呼叫與 C-5 前置例外配對：tests/governance/test_fkperf_differential.py::test_corpus_covers_all_five_kinds_and_help_variants",
+      "Task 0.1 語料②逐一列入（b1 r1 codex P1-03、composer P2-01）：錄製重播——跑既有兩檔中直接或經包裝呼叫建沙箱 helper 之測試，攔截每次生成器呼叫並於呼叫前快照其沙箱樹、以錄得之 rc 與首行為預期分支標籤；tests/governance/test_fkperf_differential.py::test_recorded_sandbox_corpus_covers_every_helper_test（AST 呼叫圖閉包對證每支皆有錄製、略過只准變異本與真 repo 入口）、::test_recorded_files_invoke_generator_only_via_subprocess_run、::test_mutation_recorded_corpus_missing_test_is_caught",
+      "Task 0.1 驗證③之鑑別力（b1 r1 codex P1-01／P1-02／P2-04）：寫後比對改為沙箱全樹快照；tests/governance/test_fkperf_differential.py::test_mutation_one_extra_byte_is_reported 先以 oracle 充當新實作證零差異基線，再各改 stdout、stderr、監視宿主檔、未列於 watch_files 之檔各一位元組，C-5 配對另驗具名訊息行以外多印即報差異",
+      "Task 0.1 驗證④之同字面出口定位（b1 r1 codex P2-06）：tests/governance/test_fkperf_differential.py::test_exit_sites_cover_every_stderr_line_of_oracle 以所在 oracle 函式定位同字面出口、::test_mutation_duplicate_literal_exit_sites_swapped_is_caught",
+      "Task 0.2／4.4 外部程序計數範圍（b1 r1 codex P2-05）：PATH shim 只計經 PATH 解析之命令，oracle 無絕對路徑呼叫（tests/governance/test_fkperf_scale.py::test_oracle_has_no_absolute_path_command）；核心側另以 audit hook 計全部子程序事件（::test_core_spawn_counter_counts_absolute_path_calls），並入 ::test_spawn_and_open_counts_scale_invariant",
       "Task 1.1 鍵序驗證：tests/governance/test_fkperf_differential.py::test_key_iteration_order_matches_jq_keys",
       "Task 1.2 決定性驗證：tests/governance/test_fkperf_differential.py::test_core_emit_deterministic_no_bom_no_crlf",
       "Task 2.1 驗證中「docrot2 write_guard／metrics 以直呼核心照跑全綠」：切換前由差分語料覆蓋，切換後由既有測試經入口覆蓋（fkperf_freeze_check.sh 既有 DOCROT2 測試項）",
