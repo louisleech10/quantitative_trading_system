@@ -1,7 +1,7 @@
 # FF-NAME：衍生層與 L4 raw lag 欄名經來源／指標正規化，並以命名世代防跨世代混用 — SPEC
 
 > 來源 PLAN/診斷：`docs/FFDEFECT_DECISION.md` 第一節（缺陷 A；定性輪 `handoffs/reconcile/20260921-ffdefect-x-consult-r1/synth.md`）　|　日期：2026-09-24　|　對應 TODO：`docs/manifests/FFNAME.json`（五類落點 manifest；本 SPEC 定案後依 TODO_GENERATION_PROMPT 產出）
-> 版本：v5（r4 收斂 `handoffs/reconcile/20260924-ffname-x-review-r4/synth.md`：§G 映射改為凍結時錄組名零件、由零件以同一 formatter 推導新名，不再以字串清單推導；§G 改序列 CGSA）；v4（r3 收斂 `handoffs/reconcile/20260924-ffname-x-review-r3/synth.md`：§G 映射清單改由凍結 run 自身之 `indicator_specs` 錄得，涵蓋自製 atomic metadata〔entropy 之 `close_return`／`fractal_dimension` 等〕；HDF5 無 `metadata_json` attr ⇒ 世代 1）；v3（r2 收斂 `handoffs/reconcile/20260924-ffname-x-review-r2/synth.md`：Task 1.5 之來源集合寫死並加 `layer1_only` 逐欄數值對照；§G 映射清單改為 wrapper 實際輸出之指標名（含多輸出）與三段式來源、涵蓋 `_Lag_k` 後綴；Task 4.1 改為沿用 reference 原設定；HDF5 metadata 無法解析 ⇒ 世代未知、混世代閘拒絕；§C 釐清 frame 固定檔名覆寫）；v2（r1 收斂 `handoffs/reconcile/20260924-ffname-x-review-r1/synth.md`：新增 Task 1.5 名稱前綴型選欄器改由 formatter 導出；命名世代寫入 `result.metadata` 使 frame 路徑 HDF5 可判世代；L4 raw 改名驗收涵蓋 `quote_volume`／`taker_buy_volume`；132 欄 safe-skip 改述為白名單語意之一致化並加分母收據；§G 映射算法定死）；v1（主委起草）
+> 版本：v6（r5 收斂 `handoffs/reconcile/20260924-ffname-x-review-r5/synth.md`：mutant ⑨ 之紅燈位置更正為映射 helper 單元測試）；v5（r4 收斂 `handoffs/reconcile/20260924-ffname-x-review-r4/synth.md`：§G 映射改為凍結時錄組名零件、由零件以同一 formatter 推導新名，不再以字串清單推導；§G 改序列 CGSA）；v4（r3 收斂 `handoffs/reconcile/20260924-ffname-x-review-r3/synth.md`：§G 映射清單改由凍結 run 自身之 `indicator_specs` 錄得，涵蓋自製 atomic metadata〔entropy 之 `close_return`／`fractal_dimension` 等〕；HDF5 無 `metadata_json` attr ⇒ 世代 1）；v3（r2 收斂 `handoffs/reconcile/20260924-ffname-x-review-r2/synth.md`：Task 1.5 之來源集合寫死並加 `layer1_only` 逐欄數值對照；§G 映射清單改為 wrapper 實際輸出之指標名（含多輸出）與三段式來源、涵蓋 `_Lag_k` 後綴；Task 4.1 改為沿用 reference 原設定；HDF5 metadata 無法解析 ⇒ 世代未知、混世代閘拒絕；§C 釐清 frame 固定檔名覆寫）；v2（r1 收斂 `handoffs/reconcile/20260924-ffname-x-review-r1/synth.md`：新增 Task 1.5 名稱前綴型選欄器改由 formatter 導出；命名世代寫入 `result.metadata` 使 frame 路徑 HDF5 可判世代；L4 raw 改名驗收涵蓋 `quote_volume`／`taker_buy_volume`；132 欄 safe-skip 改述為白名單語意之一致化並加分母收據；§G 映射算法定死）；v1（主委起草）
 
 ## §RISK 風險分級
 - **大小**：大（CLAUDE.md 任務分派規則：命中 a、b、d）。
@@ -143,7 +143,7 @@
 - 不可做：不得重簽 `tests/_golden/batch2d/*`。
 
 ## §V 驗證策略與邊界測試目錄
-- **mutation 條件**：適用（RISK-HIT 含 a、d）。至少五個 mutant 必使具名測試紅：①Task 1.2 只改欄名不改分組鍵（兩分支不合併）；②Task 1.2 移除重複參數 ValueError；③Task 1.3 只改 CGSA 分支之 raw 改名；④Task 2.1 移除 hash 鹽；⑤Task 2.2 `load_multi` 不呼叫 assert；⑥Task 1.5 前綴改回寫死底線形；⑦§G 映射改為全欄 `replace("_","-")`（§G ①或②必紅）；⑧Task 2.2 HDF5 fallback 一律回 1；⑨映射改回以字串清單推導（自訂 L1 `Foo_Bar` 之 Cross 映射失敗，§G ①必紅）；⑩`read_factory_output_naming_version` 解析失敗回 1（邊界④必紅）。
+- **mutation 條件**：適用（RISK-HIT 含 a、d）。至少五個 mutant 必使具名測試紅：①Task 1.2 只改欄名不改分組鍵（兩分支不合併）；②Task 1.2 移除重複參數 ValueError；③Task 1.3 只改 CGSA 分支之 raw 改名；④Task 2.1 移除 hash 鹽；⑤Task 2.2 `load_multi` 不呼叫 assert；⑥Task 1.5 前綴改回寫死底線形；⑦§G 映射改為全欄 `replace("_","-")`（§G ①或②必紅）；⑧Task 2.2 HDF5 fallback 一律回 1；⑨映射改回以字串清單推導（映射 helper 之自訂 L1 `close_trend_Foo_Bar_5`／`_15` Cross 單元測試必紅——§G 真實 run 無自訂欄，不作此 mutant 之紅燈點；r5 codex P2-01）；⑩`read_factory_output_naming_version` 解析失敗回 1（邊界④必紅）。
 - 測試層級：單元（1.1、1.2、1.4、3.1）、真實 kline 輕量 run（§G、1.3、2.1）、打樁整合（2.2）。可獨立 `pytest tests/feature_engineering/…` 跑，不需 run_api.py。
 - **防假綠**：既有 `tests/test_feature_factory_operators.py:62-63`、`tests/feature_engineering/test_adf_safe_skip.py`（含 `:326-338` 禁底線多組件 pattern 之斷言）不得放寬；`tests/feature_engineering/test_batch2d_dstar_align.py` 須實跑仍綠（Task 4.2）。
 - **邊界目錄**：冪等正規化（1.1①）、兩分支同家族（1.2③④）、raw 撞名（1.3②）、固定工作目錄 resume（2.1①）、混世代（2.2）。
