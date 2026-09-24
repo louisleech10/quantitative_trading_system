@@ -1,7 +1,7 @@
 # FF-STAT：平穩化處理之判定不得依欄名（免檢判定結構化、d\* 例外 fail-closed、刪 layer1_only）— SPEC
 
 > 來源 PLAN/診斷：研究輪 `handoffs/reconcile/20260924-ffnamestat-x-consult-r1/synth.md`（兩家＋主委獨立版五題一致、零駁回）　|　日期：2026-09-24　|　對應 TODO：`docs/manifests/FFSTAT.json`（本 SPEC 定案後產出）
-> 版本：v3（r2 收斂 `handoffs/reconcile/20260924-ffstat-x-review-r2/synth.md`：d\* 失敗欄同輪亦不得 ADF 差分；ADF 差分與 fracdiff 之 `apply_to` 限封閉值、regex／清單拒收；d\* 快取讀／搜尋／寫三出口各自語義、parallel 先判 status 後寫快取、無 manifest 路徑亦傳事件；raw 輸入欄身分由 ingestion 給出；L3 streaming 落盤寫身分；Task 2.0 抽樣單位與有效樣本；§G 冷快取）；v2（r1 收斂 `handoffs/reconcile/20260924-ffstat-x-review-r1/synth.md`：身分涵蓋全部進入 ADF 差分之層；L1 身分由產出端契約給出、缺即 fail-closed；逐欄身分之權威存放處；d\* 例外以擴充 `apply_quality_degradation` 之事件輸入併入；免檢表每項須附跨標的實證收據、實證研究收為本票 Task；自訂子字串設定移除並拒收；§G 基準加存每欄 `d` 與決策）；v1（主委起草）
+> 版本：v4（r3 收斂 `handoffs/reconcile/20260924-ffstat-x-review-r3/synth.md`：d\* 快取讀失敗含磁碟載入、改為事件＋照常搜尋；寫失敗含 `flush_atomic` 落盤；raw 身分落點具名 `_layer0_data_ingestion`）；v3（r2 收斂 `handoffs/reconcile/20260924-ffstat-x-review-r2/synth.md`：d\* 失敗欄同輪亦不得 ADF 差分；ADF 差分與 fracdiff 之 `apply_to` 限封閉值、regex／清單拒收；d\* 快取讀／搜尋／寫三出口各自語義、parallel 先判 status 後寫快取、無 manifest 路徑亦傳事件；raw 輸入欄身分由 ingestion 給出；L3 streaming 落盤寫身分；Task 2.0 抽樣單位與有效樣本；§G 冷快取）；v2（r1 收斂 `handoffs/reconcile/20260924-ffstat-x-review-r1/synth.md`：身分涵蓋全部進入 ADF 差分之層；L1 身分由產出端契約給出、缺即 fail-closed；逐欄身分之權威存放處；d\* 例外以擴充 `apply_quality_degradation` 之事件輸入併入；免檢表每項須附跨標的實證收據、實證研究收為本票 Task；自訂子字串設定移除並拒收；§G 基準加存每欄 `d` 與決策）；v1（主委起草）
 
 ## §RISK 風險分級
 - **大小**：大（命中 a、b、d）。
@@ -24,10 +24,10 @@
 
 ## §C 約束
 - 名稱不得參與任何平穩化之判定（免檢、fracdiff 目標、ADF 差分候選）；欄名只作顯示與索引。`ADFDifferencingConfig.apply_to` 與 `FractionalDifferencingConfig.apply_to` 只收封閉值 `non_stationary`、`all`；regex、欄名清單、`layer1_only` 於設定驗證拒收（訊息指名只收二值），`_select_columns` 之 regex 分支不得再被此二步驟觸及。
-- **逐欄身分**：每個進入 L6.5 之欄（**全部層與 raw 輸入欄**）帶結構化身分 `(layer, kind, name, base)`——raw：`layer=raw`、`kind=source`、`name`＝kline 載入器所宣告之欄 schema 項（由 ingestion 給出，非解析欄名）；L1：`kind=indicator`、`name`＝指標輸出身分（TA-Lib 多輸出含輸出名）；L2：`kind=operator`、`name`＝運算子；L3：`kind=aggregator`；L4：`kind=lag`、`base`＝被延遲欄之身分；L5、L6：`kind` 依其產生函式。身分由**產出端契約**給出（atomic metadata、衍生運算子、各層產出函式），**缺身分即 fail-closed**，不得以欄名補救。
+- **逐欄身分**：每個進入 L6.5 之欄（**全部層與 raw 輸入欄**）帶結構化身分 `(layer, kind, name, base)`——raw：`layer=raw`、`kind=source`、`name`＝`feature_factory._layer0_data_ingestion` 組裝之 `sources` 列表之鍵（`_BASE_OHLCV`∪`enabled_sources`∪`synthetic_sources`，由該函式出口附身分，非事後解析 HDF5 物理欄名）；L1：`kind=indicator`、`name`＝指標輸出身分（TA-Lib 多輸出含輸出名）；L2：`kind=operator`、`name`＝運算子；L3：`kind=aggregator`；L4：`kind=lag`、`base`＝被延遲欄之身分；L5、L6：`kind` 依其產生函式。身分由**產出端契約**給出（atomic metadata、衍生運算子、各層產出函式），**缺身分即 fail-closed**，不得以欄名補救。
 - **權威存放處**：CGSA 路徑＝registry 群組之逐欄身分（與 `columns` 對齊之 `column_identities`，隨工作 manifest 往返）；frame 路徑＝factory 傳給 preprocessor 之 `column_identity_map`（取代 `_column_layer_map`）。preprocessor、§G 測試 helper 與收據皆只讀此二處。
 - **免檢政策與數學理由分離**：單一真相源＝`config/stationarity_exempt.json`，每項含 `identity` 樣式、`policy`（僅 `exempt`）、`reason_class`、`evidence`（跨標的實證收據路徑）；**無 evidence 之項不得為 exempt**。**比值與差值類（Ratio、Cross、Distance）一律須檢定**；SPEC 不列舉表之內容。
-- **d\* 三出口**（循序與 parallel 同語義）：①快取讀取例外或②搜尋例外 ⇒ 該欄**保原值**——不套用 fracdiff、同輪亦排除於 ADF 差分候選、不寫 d\* 快取，事件 `fracdiff_search_failed`；③快取寫入例外 ⇒ 該欄已得之 `d` 照常套用，事件 `dstar_cache_write_failed`。parallel 路徑主程序**先判 worker `status` 再寫快取**，worker 失敗者不寫。事件經 `apply_quality_degradation` 新增之 keyword 參數 `extra_failure_reasons: Sequence[str]`（例 `fracdiff_search_failed:<欄數>`）併入 `failure_reasons` 並使品質降為 `partial`——CGSA 串流 writer 於 manifest 合併前、frame 路徑於 factory persist 前、`_resolve_completeness_without_manifest` 各傳入同一事件，同一函式（沿用 FF-TFMETA 之同源契約）。不得以任何預設 `d` 替代。
+- **d\* 三出口**（循序與 parallel 同語義；含磁碟層 `_d_star_cache.py`）：①快取讀取失敗——`DStarCache` 載入檔案時 `OSError` 或內容損壞（檔案不存在仍為正常冷快取，不算失敗），或單欄 `cache.get` 例外 ⇒ 事件 `dstar_cache_read_failed`，受影響欄視為未命中並照常搜尋（搜尋結果決定是否套用，不以任何預設值替代；之後 flush 以新內容覆寫損壞檔）；②搜尋例外 ⇒ 該欄**保原值**——不套用 fracdiff、同輪亦排除於 ADF 差分候選、不寫 d\* 快取，事件 `fracdiff_search_failed`；③快取寫入失敗——單欄 `cache.set` 例外或整批 `flush_atomic` 之 `write_text`／`os.replace` 失敗（改為回報結果，不再只記 warning）⇒ 已得之 `d` 照常套用，事件 `dstar_cache_write_failed:<受影響欄數>`。parallel 路徑主程序**先判 worker `status` 再寫快取**，worker 失敗者不寫。事件經 `apply_quality_degradation` 新增之 keyword 參數 `extra_failure_reasons: Sequence[str]`（例 `fracdiff_search_failed:<欄數>`）併入 `failure_reasons` 並使品質降為 `partial`——CGSA 串流 writer 於 manifest 合併前、frame 路徑於 factory persist 前、`_resolve_completeness_without_manifest` 各傳入同一事件，同一函式（沿用 FF-TFMETA 之同源契約）。不得以任何預設 `d` 替代。
 - 刪除 `layer1_only` 分支與其寫死前綴；刪除 `adf_safe_skip.additional_patterns`／`exclusion_patterns` 設定欄；設定驗證對此三者之舊值（`layer1_only`、非空 pattern 清單）明確拒收（訊息指名已移除），不得落入其他路徑。
 - 不改 fracdiff 層範圍（L1、L2 寫死，使用者確認）。特徵欄數、列數不變；允許變動之數值限於「決策改變之欄」與「d\* 例外之欄」，由收據逐欄列舉並逐欄說明原因。
 
@@ -42,7 +42,7 @@
 
 ### Phase 1 — 逐欄身分（依賴：無）
 **Task 1.1 — 產出端身分契約**
-- 目標：全部層與 raw 輸入欄之產出處給出逐欄身分。　檔案：kline 載入器（raw，依其宣告之欄 schema）、atomic 各模組 metadata（L1；含多輸出之輸出名）、`operators/derived_operators.py`（L2，含 WorldQuant 逐欄運算子）、L3 滾動聚合（含 `_StreamingL3Persister._flush` 之預設 streaming 落盤）、L4 lag（`base`）、L5、L6 產出處；`feature_factory.py` 之 `_build_indicator_specs` 缺鍵改 fail-closed。
+- 目標：全部層與 raw 輸入欄之產出處給出逐欄身分。　檔案：`feature_factory._layer0_data_ingestion`（raw，依 `sources` 列表之鍵）、atomic 各模組 metadata（L1；含多輸出之輸出名）、`operators/derived_operators.py`（L2，含 WorldQuant 逐欄運算子）、L3 滾動聚合（含 `_StreamingL3Persister._flush` 之預設 streaming 落盤）、L4 lag（`base`）、L5、L6 產出處；`feature_factory.py` 之 `_build_indicator_specs` 缺鍵改 fail-closed。
 - **驗證**：`pytest tests/feature_engineering/test_ffstat_identity.py` 綠——真實輕量 run（L3 streaming 與非 streaming 各一）中每個欄皆有身分（欄集合相等）；`L2_WorldQuant` 各欄之運算子逐欄等於產出函式所用者；人為移除某 atomic metadata 之指標鍵 ⇒ run fail-closed；raw 欄與 L1 欄各改名一次（mutation）⇒ 身分與 L4 `base` 不變。
 - **邊界**：①多輸出指標（MACD、BBANDS、AROON）之輸出名逐欄正確；②L4 lag 之 `base` 等於被延遲欄之身分（含 `lag_features.apply_to='layer1_and_raw'` 之 raw 欄）。
 - **存活至**：永久。**覆蓋風險**：無。
@@ -73,9 +73,9 @@
 
 ### Phase 3 — d\* 例外與刪 layer1_only（依賴：Phase 1 之 Task 1.2）
 **Task 3.1 — d\* 例外 fail-closed**
-- 檔案：`feature_preprocessor.py:3035-3060`（讀／搜尋／寫拆為三出口）與 parallel 路徑（`_slow_path_parallel.py` 之 worker 失敗回報、主程序先判 `status` 後寫快取）、ADF 差分候選排除失敗欄、`feature_storage.py`（`apply_quality_degradation` 加 `extra_failure_reasons`；CGSA 串流 writer 傳入）、`feature_factory.py`（frame 路徑與 `_resolve_completeness_without_manifest` 傳入）。
+- 檔案：`preprocessing/_d_star_cache.py`（載入失敗與「檔案不存在」分開回報；`flush_atomic` 回報寫入結果）、`feature_preprocessor.py:3035-3060`（讀／搜尋／寫拆為三出口）與 parallel 路徑（`_slow_path_parallel.py` 之 worker 失敗回報、主程序先判 `status` 後寫快取）、ADF 差分候選排除失敗欄、`feature_storage.py`（`apply_quality_degradation` 加 `extra_failure_reasons`；CGSA 串流 writer 傳入）、`feature_factory.py`（frame 路徑與 `_resolve_completeness_without_manifest` 傳入）。
 - **驗證**：`pytest tests/feature_engineering/test_ffstat_dstar_failure.py` 綠——注入 `_find_min_d` 拋例外（ADF 差分同時開啟）⇒ 該欄最終值等於 L6.5 輸入值、快取無該欄、manifest 與 `result.metadata` 之 `failure_reasons` 皆含 `fracdiff_search_failed:1`、`quality_status == "partial"`；循序、parallel、frame 各一。
-- **邊界**：①`cache.get` 例外同①②規則；②`cache.set` 例外 ⇒ 該欄照常套用、事件 `dstar_cache_write_failed:1`、`partial`；③parallel worker 失敗 ⇒ 快取無該欄；④全部欄皆例外 ⇒ run `partial`；⑤無例外 ⇒ `apply_quality_degradation` 輸出與 FF-TFMETA 現行逐位元組相同。
+- **邊界**：①快取檔內容損壞、載入時 `OSError`、單欄 `cache.get` 例外各一 ⇒ 事件 `dstar_cache_read_failed`、該欄照常搜尋套用、`partial`；快取檔不存在 ⇒ 無事件；②單欄 `cache.set` 例外與 `flush_atomic` 之 `os.replace` 失敗各一 ⇒ 值照常套用、事件 `dstar_cache_write_failed:<欄數>`、`partial`；③parallel worker 失敗 ⇒ 快取無該欄；④全部欄皆例外 ⇒ run `partial`；⑤無例外 ⇒ `apply_quality_degradation` 輸出與 FF-TFMETA 現行逐位元組相同。
 - **存活至**：永久。**覆蓋風險**：無。
 - 不可做：不得以任何預設 `d` 替代；不得在 writer 之外另寫品質欄。
 
@@ -94,7 +94,7 @@
 - 不可做：不得放寬 §G 通過條件。
 
 ## §V 驗證策略與邊界測試目錄
-- **mutation 條件**：適用。至少九個 mutant 必使具名測試紅：①判定退回欄名子字串；②Ratio 身分加入免檢表；③d\* 例外改回 `d=1.0`；④缺身分時退回欄名；⑤`layer1_only` 分支恢復；⑥免檢表某項之 `evidence` 指向不存在之收據；⑦d\* 失敗欄重回 ADF 差分候選；⑧parallel 主程序於判 `status` 前寫快取；⑨ADF 差分設定接受 regex。
+- **mutation 條件**：適用。至少十一個 mutant 必使具名測試紅：①判定退回欄名子字串；②Ratio 身分加入免檢表；③d\* 例外改回 `d=1.0`；④缺身分時退回欄名；⑤`layer1_only` 分支恢復；⑥免檢表某項之 `evidence` 指向不存在之收據；⑦d\* 失敗欄重回 ADF 差分候選；⑧parallel 主程序於判 `status` 前寫快取；⑨ADF 差分設定接受 regex；⑩快取載入失敗改回靜默空快取；⑪`flush_atomic` 失敗改回只記 warning。
 - **防假綠**：`tests/feature_engineering/test_adf_safe_skip.py` 既有斷言中「依欄名」者改為依身分，須逐條於對照表說明，不得刪除。
 - **邊界目錄**：缺身分之欄、封閉表缺檔、d\* 例外（循序／parallel／frame／快取）、fracdiff 關閉、`layer1_only` 與 pattern 設定、resume 往返。
 
