@@ -10,7 +10,7 @@
 - RISK-HIT: a,b,d
 
 ## §A 假設與待使用者確認
-- **已驗證事實**（10 條 FACT-RECEIPT）：
+- **已驗證事實**（11 條 FACT-RECEIPT）：
   - FACT-RECEIPT: `sed -n 95,150p momentum/FeatureEngineering/utils/adf_safe_skip.py` → `is_safe_skip` 以欄名子字串比對封閉 pattern 集（主委 實跑 2026-09-24）；以之對 reference run（ETH 1h `d9935491…`）L1＋L2 欄名計數 → 55,779／90,006 欄今日被名字免檢（主委 實跑 2026-09-24）。
   - FACT-RECEIPT: 主委 ADF 探針 → reference run 12h L2 Ratio 名字免檢之 60 欄中 1 欄 ADF p>0.05；多組件比值最大絕對值 12h 2021、1h 210288（`handoffs/20260924-ffnamestat-x-consult-r1-claude.md`，主委 實跑 2026-09-24）。
   - FACT-RECEIPT: `sed -n 3035,3060p momentum/FeatureEngineering/preprocessing/feature_preprocessor.py` → `cache.get`／`_find_min_d` 拋例外時 `d_star=1.0` 套用並只記 warning（主委 讀檔 2026-09-24）。
@@ -37,8 +37,8 @@
 - **校準前置關卡**：開啟平穩化時，校準為一次生成之**第一步**——對本次**會進入 L6.5 之全部原生週期**（含 resume 時 L1–L6 已完成、本次不重算但仍進 L6.5 之週期）完成校準域計算、截取與有效值檢查，才進行 `_prepare_cgsa_registry`、主週期任何層之落盤與多週期 worker 之啟動；worker 不自行重算校準。
 - **校準封包**：每個原生週期之校準結果為一個封包，**只由前置關卡產生**（不接受任何呼叫端提供之封包或校準值），含身分鍵（symbol、原生週期、輸出起始日、設定 hash、N、欄集合指紋）、每欄之最晚校準時間與校準值，以及來源紀錄 `calibration_source_sha256`＝該週期前史切片 `[calibration_ingest_start, 輸出起始日)` 之 K 線依下列位元組框架之 sha256：①表頭＝各來源欄名依 UTF-8 位元組升序排列、以 `\n`（0x0A）連接之 UTF-8 位元組，後接 `\n\n`；②表身逐列（時間戳升序、列優先），每列＝時間戳 int64 奈秒小端 8 位元組，接各來源欄（同表頭次序）之 float64 小端 8 位元組；③任何 NaN 一律寫為 `0x7FF8000000000000`（小端），±inf 依 IEEE-754 原樣；由前置關卡從其實際讀入之切片計算，記入 manifest 與收據供重現（封包只在本次 run 內產生與使用，此紀錄不作身分核對項）；L6.5 使用前逐項核對身分鍵與當次公開域一致，且每欄最晚校準時間早於輸出起始日；不符或缺封包 ⇒ 零寫入失敗，錯誤訊息指名週期、欄與不符之身分欄位（或校準時間）。多週期 worker 只接收其自身週期之封包。
 - **校準域錯誤不可降級**：校準域之載入、各層計算、截取、對齊任一步驟之例外（含前史不足、缺欄），皆為**生成失敗**——不經 `_execute_l65_with_degradation`、`_safe_execute` 或 `allow_partial_layers` 之降級路徑；因校準為前置關卡，任一週期失敗時整個 run 目錄與 registry 皆零寫入；不得回退用輸出範圍內資料校準。
-- **前史深度**：`calibration_ingest_start`＝輸出起始日往前 `estimate_max_warmup_bars`（依原生週期）＋ N ＋ 該週期之首個有效值最大延遲（以輕量真實 run 量得並登記於設定常數，§G 驗）根。校準域內任一欄於輸出起始日之前之有限值少於 N ⇒ 該次生成 fail-closed，錯誤指名 symbol、週期、欄名與缺少根數；不得縮窗、不得退回用輸出範圍內資料；無輸出起始日亦 fail-closed。
-- **三路同一有效長度**：三路 ADF 皆以同一 N 為樣本數（刪 d\* 內層寫死之 500、parallel 與循序同值）；收據逐欄記校準時間範圍、N、ADF p 值、決策。N 之預設值依 §A 使用者裁定。
+- **前史深度**：`calibration_ingest_start`＝輸出起始日往前 `estimate_max_warmup_bars`（依原生週期）＋ N ＋ 該週期之首個有效值最大延遲（以輕量真實 run 量得並登記於設定常數，Task 2.1 邊界④驗）根。校準域內任一欄於輸出起始日之前之有限值少於 N ⇒ 該次生成 fail-closed，錯誤指名 symbol、週期、欄名與缺少根數；不得縮窗、不得退回用輸出範圍內資料；無輸出起始日亦 fail-closed。
+- **三路同一有效長度**：同一原生週期內三路 ADF 皆以同一 N 為樣本數（刪 d\* 內層寫死之 500、parallel 與循序同值）；N 可依原生週期分設，預設皆 500，最終預設依 §A 使用者裁定；收據逐欄記校準時間範圍、N、ADF p 值、決策。
 - **d\* 三出口**（循序與 parallel 同語義；含磁碟層 `_d_star_cache.py`）：①快取讀取失敗——`DStarCache` 載入時 `OSError` 或內容損壞（檔案不存在為正常冷快取），或單欄 `cache.get` 例外 ⇒ 事件 `dstar_cache_read_failed`，受影響欄視為未命中並照常搜尋；之後 flush 以新內容覆寫損壞檔；同路徑兩 run 交錯 flush 沿用「最後寫入者勝出」，不發事件；②搜尋例外 ⇒ 該欄**保原值**——不套用 fracdiff、同輪排除於 ADF 差分候選、不寫快取，事件 `fracdiff_search_failed`；③快取寫入失敗——單欄 `cache.set` 例外或 `flush_atomic` 之 `write_text`／`os.replace` 失敗（改為回報結果）⇒ 已得之 `d` 照常套用，事件 `dstar_cache_write_failed:<受影響欄數>`。parallel 主程序**先判 worker `status` 再寫快取**。事件經 `apply_quality_degradation` 新增之 keyword 參數 `extra_failure_reasons: Sequence[str]` 併入 `failure_reasons` 並使品質降為 `partial`——CGSA 串流 writer 於 manifest 合併前、frame 路徑於 factory persist 前、`_resolve_completeness_without_manifest` 各傳入同一事件。不得以任何預設 `d` 替代。
 - **d\* 快取鍵**：含校準值指紋與 N（現行 `_compute_fracdiff_hash` 已含 `calibration_bars`，須改為實際 N 並確認含值指紋）；校準資料改變即未命中。
 - 不改 fracdiff 層範圍（L1、L2）。特徵欄數、列數不變；每欄之平穩化決策與所用 `d` 由收據逐欄列出。
@@ -103,7 +103,7 @@
 - 不可做：不得放寬 §G 通過條件。
 
 ## §V 驗證策略與邊界測試目錄
-- **mutation 條件**：適用。至少十二個 mutant 必使具名測試紅：①判定退回欄名子字串免檢；②目標層退回欄名解析；③層對照缺欄時當非目標而不 fail；④d\* 例外改回 `d=1.0`；⑤`layer1_only` 分支恢復；⑥校準改回取輸出範圍最早 N 根；⑦前史不足時縮窗；⑦′公開域計算起點改用校準域起點（公開值變動）；⑦″校準域例外被降級路徑吞下而照常寫出特徵；⑦‴多週期 worker 以主週期校準值充數；⑦⁗校準前置關卡移到主週期落盤之後（第二週期失敗時已有寫入）；⑦⁵前置關卡只校準 worker 待辦週期（resume 已完成週期缺封包）；⑦⁶封包身分鍵不核對；⑦⁷不核對最晚校準時間早於輸出起始日；⑦⁸平穩化開啟時 `run_ic_first` 接受自帶層；⑦⁹來源紀錄只雜湊最末時間戳（前史值改動不改指紋）；⑧d\* 內層 ADF 寫死 500；⑨d\* 失敗欄重回 ADF 差分候選；⑩parallel 主程序於判 `status` 前寫快取；⑪快取載入失敗改回靜默空快取；⑫`flush_atomic` 失敗改回只記 warning。
+- **mutation 條件**：適用。下列二十一個 mutant 各自必使具名測試紅：①判定退回欄名子字串免檢；②目標層退回欄名解析；③層對照缺欄時當非目標而不 fail；④d\* 例外改回 `d=1.0`；⑤`layer1_only` 分支恢復；⑥校準改回取輸出範圍最早 N 根；⑦前史不足時縮窗；⑦′公開域計算起點改用校準域起點（公開值變動）；⑦″校準域例外被降級路徑吞下而照常寫出特徵；⑦‴多週期 worker 以主週期校準值充數；⑦⁗校準前置關卡移到主週期落盤之後（第二週期失敗時已有寫入）；⑦⁵前置關卡只校準 worker 待辦週期（resume 已完成週期缺封包）；⑦⁶封包身分鍵不核對；⑦⁷不核對最晚校準時間早於輸出起始日；⑦⁸平穩化開啟時 `run_ic_first` 接受自帶層；⑦⁹來源紀錄只雜湊最末時間戳（前史值改動不改指紋）；⑧d\* 內層 ADF 寫死 500；⑨d\* 失敗欄重回 ADF 差分候選；⑩parallel 主程序於判 `status` 前寫快取；⑪快取載入失敗改回靜默空快取；⑫`flush_atomic` 失敗改回只記 warning。
 - **防假綠**：`tests/feature_engineering/test_adf_safe_skip.py` 既有斷言隨免檢刪除而退役，須逐條於對照表說明退役理由，不得靜默刪除。
 - **邊界目錄**：層對照缺欄、全部欄逐欄檢定、校準前史（多週期、晚生欄、無起始日、兩種 trim 設定）、三路同 N、d\* 例外（循序／parallel／frame／快取）、`layer1_only` 與 `adf_safe_skip` 設定。
 
