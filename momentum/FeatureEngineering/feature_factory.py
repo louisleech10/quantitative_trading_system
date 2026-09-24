@@ -215,6 +215,10 @@ class FeatureFactory:
     Layer 7: Validation & persistence -> FeatureValidator + FeatureStorage
     """
 
+    # FFSTAT Task 2.1：最近一次 L6.5 之逐欄平穩化決策（metadata `stationarity_decisions` 之同一來源；
+    # run_ic_first 於 L6.5 形成、先於 IC 階段）。未開平穩化或尚未執行為 None。
+    last_stationarity_decisions: Optional[Dict[str, Dict[str, Any]]] = None
+
     def __init__(self, config_manager: ConfigManager, adapter_registry: AdapterRegistry) -> None:
         self._config_manager = config_manager
         self._adapter_registry = adapter_registry

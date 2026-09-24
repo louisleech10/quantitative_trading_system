@@ -90,10 +90,11 @@
     "cache_write_failed"
   ],
   "adf_path_functions": {
-    "adf_differencing": "_apply_adf_differencing",
-    "fracdiff_target": "_get_non_stationary_columns",
-    "dstar_search": "_find_min_d",
-    "dstar_search_parallel_worker": "process_fracdiff_column_values"
+    "adf_differencing": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_adf_differencing",
+    "fracdiff_target": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._get_non_stationary_columns",
+    "dstar_search": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._find_min_d",
+    "dstar_search_parallel_worker": "momentum.FeatureEngineering.preprocessing._slow_path_parallel:process_fracdiff_column_values"
   },
+  "factory_decisions_attr": "last_stationarity_decisions",
   "test_tmp_isolation": "prepare_stat_env 把 tempfile.tempdir 導向 <tmp>/sys_tmp；校準暫存目錄殘留只查此處"
 }

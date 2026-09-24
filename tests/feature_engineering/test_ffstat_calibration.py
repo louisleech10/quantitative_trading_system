@@ -259,20 +259,29 @@ def test_cross_sectional_public_values_unchanged_by_calibration(tmp_path: Path,
 
 def test_three_entries_same_decisions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 驗證：同 symbol／週期／起始日／設定下，generate_features、run_ic_first（自算路徑）、
-    多週期 worker（parallel）之 1h 欄校準時間上界、N、決策與 d 全同。"""
+    多週期 worker（parallel）之 1h 欄校準時間上界、N、決策與 d 全同。run_ic_first 之決策讀 factory 之
+    `factory_decisions_attr`（契約；L6.5 形成、先於 IC 階段；呼叫前清空以防讀到 generate_features 之殘值），
+    IC 階段既有之 `AlignmentViolationError` 見 `ffstat_helpers.ic_first_to_l65`。"""
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
+    attr = CONTRACT["factory_decisions_attr"]
     h.prepare_stat_env(monkeypatch, tmp_path / "gen", FFACT_USE_CGSA="0")
     root, factory, gen = h.run_stat(tmp_path / "gen", h.stat_payload())
+    assert getattr(factory, attr) == h.decisions(gen)  # 同一物件為 metadata 之來源
+    setattr(factory, attr, None)
     # run_ic_first 沿用同一 factory 於 generate_features 所設之輸出窗（比照 test_b6_warmup_trim 之用法），走自算路徑
-    ic = factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, factory._resolve_config(h.stat_payload()),
-                              ic_engine=ICEngine({"methods": ["spearman"]}), feature_reader=FeatureReader(str(root)),
-                              storage=factory._storage, ic_threshold=0.0, persist=True)
+    ic = h.ic_first_to_l65(factory, factory._resolve_config(h.stat_payload()),
+                           ic_engine=ICEngine({"methods": ["spearman"]}), feature_reader=FeatureReader(str(root)),
+                           storage=factory._storage, ic_threshold=0.0, persist=True)
+    i = getattr(factory, attr)
+    assert i, "run_ic_first 未產生平穩化決策"
+    if ic is not None:
+        assert h.decisions(ic) == i
     h.prepare_stat_env(monkeypatch, tmp_path / "par", FFACT_MULTI_TF_PARALLEL="1")
     _, _, par = h.run_stat(tmp_path / "par", h.stat_payload(["1h", "12h"]))
     keys = ("calibration_end", "n", "fracdiff", "d", "adf_differenced")
-    g, i, p = h.decisions(gen), h.decisions(ic), h.decisions(par)
+    g, p = h.decisions(gen), h.decisions(par)
     for col, d in g.items():
         assert tuple(i[col][k] for k in keys) == tuple(d[k] for k in keys), col
         assert tuple(p[col][k] for k in keys) == tuple(d[k] for k in keys), col
@@ -365,19 +374,21 @@ def test_ic_first_second_tf_failure_zero_writes(tmp_path: Path, monkeypatch: pyt
 
 
 def test_ic_first_supplied_layers_unchanged_when_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 驗證（r18 codex P1-01）：平穩化關閉時 run_ic_first 自帶 raw_data／layers 照常成功，
-    且產出之欄名與值等於同設定之自算路徑（舊行為不變）。"""
-    h.prepare_stat_env(monkeypatch, tmp_path / "self", FFACT_USE_CGSA="0")
-    off = h.stat_payload(fracdiff=False, adf=False)
-    root, factory, _ = h.run_stat(tmp_path / "self", off)
-    cfg = factory._resolve_config(off)
-    self_path = factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, cfg, **{**_ic_first_kwargs(factory, root), "persist": False})
-    raw, layers = factory._run_l1_l6_for_ic_first(h.SYMBOL, h.PRIMARY_TF, cfg)
-    supplied = factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, cfg, raw_data=raw, layers=layers,
-                                    **{**_ic_first_kwargs(factory, root), "persist": False})
-    assert list(supplied.metadata["feature_names"]) == list(self_path.metadata["feature_names"])
-    if self_path.features_df is not None:
-        pd.testing.assert_frame_equal(supplied.features_df, self_path.features_df)
+    """Task 2.1 驗證（r18 codex P1-01、r19 codex P1-01）：平穩化關閉時 run_ic_first 自帶 raw_data／layers 不被
+    FF-STAT 拒收，且其 L6.5 產物（經 `write_raw` 於 IC 階段前落盤之 L7 raw）與改前凍結之 `ic_first_supplied_off`
+    基準逐欄四 hash 全等——舊行為不變。IC 階段之既有 `AlignmentViolationError`（另立票，見
+    `ffstat_helpers.ic_first_to_l65`）只在 L7 raw 已落盤後容許；未過 L6.5 即失敗或拋 `CalibrationError` ⇒ 紅。"""
+    import json as _json
+
+    baseline = _json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))["ic_first_supplied_off"]
+    h.prepare_stat_env(monkeypatch, tmp_path, **h.IC_FIRST_OFF_ENV)
+    result, raw_fp = h.ic_first_supplied_off(tmp_path)
+    assert raw_fp, "未見 L7 raw 產物"
+    assert set(raw_fp) == set(baseline)
+    diff = [c for c in baseline if raw_fp[c] != baseline[c]]
+    assert diff == [], diff[:5]
+    if result is not None:
+        assert list(result.metadata["feature_names"])
 
 
 def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -428,10 +439,15 @@ def test_auto_start_reserves_calibration_segment(tmp_path: Path, monkeypatch: py
     for col, d in h.decisions(auto).items():
         assert pd.Timestamp(d["calibration_end"]) < eff, col
     h.prepare_stat_env(monkeypatch, tmp_path / "explicit")
-    _, _, explicit = h.run_stat(tmp_path / "explicit", h.stat_payload(["1h", "12h"]),
-                                start_date=eff.isoformat(), end_date="2024-04-30")
+    root_x, _, explicit = h.run_stat(tmp_path / "explicit", h.stat_payload(["1h", "12h"]),
+                                     start_date=eff.isoformat(), end_date="2024-04-30")
     assert h.decisions(explicit) == h.decisions(auto)
     assert explicit.metadata[h.META["output_start_source"]] == "user"
+    # 公開輸出全同（r19 codex P1-02）：基礎欄逐欄四 hash、衍生欄逐欄值 hash
+    auto_base, explicit_base = h.base_fingerprints(root), h.base_fingerprints(root_x)
+    assert auto_base and set(auto_base) == set(explicit_base)
+    assert [c for c in auto_base if auto_base[c] != explicit_base[c]] == []
+    assert h.derived_fingerprints(root) == h.derived_fingerprints(root_x)
 
 
 def test_auto_start_cache_does_not_skip_preflight(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -573,12 +589,34 @@ def test_boundary_09_worker_missing_packet_fails_before_registry(tmp_path: Path,
 
 # ---------------------------------------------------------------- Task 2.2 三路同一有效長度
 
+def _adf_path_codes() -> Dict[Any, str]:
+    """契約 `adf_path_functions`（`模組:限定名`）→ 各路函式之 code object（r19 codex P2-05：以物件身分判路徑，
+    同名 wrapper 不誤歸；函式改名／搬移 ⇒ 此處即明確失敗並指向契約，不會靜默記成 unknown）。"""
+    import importlib
+
+    codes: Dict[Any, str] = {}
+    for path, ref in CONTRACT["adf_path_functions"].items():
+        module_name, qualname = ref.split(":")
+        obj: Any = importlib.import_module(module_name)
+        for part in qualname.split("."):
+            obj = getattr(obj, part, None)
+            assert obj is not None, f"契約 adf_path_functions[{path}]={ref} 解析失敗：函式改名或搬移須同步契約"
+        codes[inspect.unwrap(obj).__code__] = path
+    return codes
+
+
 def _path_of_call() -> str:
-    """由呼叫堆疊判定本次 ADF 屬哪一路（契約 `adf_path_functions`）。"""
-    names = {v: k for k, v in CONTRACT["adf_path_functions"].items()}
-    for frame in inspect.stack()[2:]:
-        if frame.function in names:
-            return names[frame.function]
+    """由呼叫堆疊判定本次 ADF 屬哪一路：堆疊中第一個 code object 屬契約四路者。"""
+    codes = _adf_path_codes()
+    frame = inspect.currentframe()
+    try:
+        f = frame.f_back.f_back if frame is not None and frame.f_back is not None else None
+        while f is not None:
+            if f.f_code in codes:
+                return codes[f.f_code]
+            f = f.f_back
+    finally:
+        del frame
     return "unknown"
 
 
@@ -618,6 +656,39 @@ def test_three_paths_same_n(n: int, mode: str, tmp_path: Path, monkeypatch: pyte
     assert expected <= set(seen), (mode, sorted(seen))
     for path in expected:
         assert seen[path] == {n}, (mode, path, sorted(seen[path]))
+
+
+def test_parallel_real_worker_same_n_and_decisions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.2 驗證（r19 codex P2-06）：d* 搜尋走真實子程序 worker（不覆寫 `ParallelSlowPath.map`）、非預設 N=2000
+    ⇒ 送往 worker 之每筆 metadata 之 ADF 樣本數皆為 N，且逐欄決策（fracdiff、ADF 階數、d、N）與同 N 之循序路徑全同
+    （循序路徑之 N 已由 `test_three_paths_same_n` 以 spy 驗；worker 內寫死 500 則 d 必有欄不同）。"""
+    from momentum.FeatureEngineering.preprocessing import _slow_path_parallel as spp
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    n = 2000
+    payload = h.stat_payload()
+    payload["preprocessing"]["calibration_bars"] = n
+    h.prepare_stat_env(monkeypatch, tmp_path / "serial")
+    _, _, serial = h.run_stat(tmp_path / "serial", payload)
+
+    sent: list = []
+    real_map = spp.ParallelSlowPath.map
+
+    def _record(self, items, worker_function):
+        items = list(items)
+        sent.extend(int(dict(m).get("sample_size", -1)) for _, m in items)
+        return real_map(self, items, worker_function)
+
+    h.prepare_stat_env(monkeypatch, tmp_path / "parallel")
+    monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self, *a, **k: 2)
+    monkeypatch.setattr(spp.ParallelSlowPath, "map", _record)
+    _, _, par = h.run_stat(tmp_path / "parallel", payload)
+    assert sent and set(sent) == {n}, sorted(set(sent))
+    keys = ("fracdiff", "adf_differenced", "d", "n")
+    s, p = h.decisions(serial), h.decisions(par)
+    assert set(s) == set(p)
+    for col in s:
+        assert tuple(p[col][k] for k in keys) == tuple(s[col][k] for k in keys), col
 
 
 def test_boundary_12_n_change_misses_dstar_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

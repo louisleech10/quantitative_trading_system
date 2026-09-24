@@ -2,7 +2,8 @@
 
 3 標的 × 2 週期 × N＝500／1000／2000 之真實冷 run（各自子程序、隔離 tmp 與 d* 快取），逐 run 記：
 - 分段耗時：校準域（`run_calibration_preflight`）、ADF（`_adf_pvalue_for_values` 累計）、d* 搜尋（`_find_min_d` 累計）、總計；
-- 分階段峰值記憶體：取樣執行緒每 50 ms 記「本程序＋全部子程序」RSS，依當下階段（校準／公開）分別取最大；
+- 分階段峰值記憶體：取樣執行緒每 50 ms 記「本程序＋全部子程序」之 RSS 合計與 USS 合計，依當下階段
+  （校準／交接／公開；交接＝送出第一個 worker 至第一個 worker 完成）分別取最大；tier 判定用 USS（RSS 會重計共享頁）；
 - 暫存清理：run 後隔離系統 tmp 下校準暫存前綴（契約 `calibration_tmp_prefix`）之殘留數；
 - 各 N 與最大 N 之決策一致率。
 另於 FFACT_MEMORY_TIER=8gb 跑一次多週期平行（含封包交接 worker 之父＋子峰值），峰值超過 8 GiB 即判失敗。
@@ -27,8 +28,14 @@ CONTRACT = json.loads((REPO / "tests" / "_golden" / "ffstat" / "contract.json").
 GIB = 1024 ** 3
 
 
+STAGES = ("calibration", "handoff", "public")
+
+
 class _Sampler:
-    """每 50 ms 取樣「本程序＋全部子程序」RSS，依階段記最大值。"""
+    """每 50 ms 取樣「本程序＋全部子程序」之 RSS 合計與 USS 合計，依當下階段各記最大值。
+
+    RSS 合計會重計父子共享頁（fork／spawn 之 worker 共用函式庫與唯讀頁），只列原始值供對照；
+    tier 判定用 USS 合計（各程序獨占頁，不重計共享；r19 codex P2-03）。"""
 
     def __init__(self) -> None:
         import psutil
@@ -39,19 +46,24 @@ class _Sampler:
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
-    def _rss(self) -> int:
-        total = self._proc.memory_info().rss
-        for child in self._proc.children(recursive=True):
+    def _sample(self) -> tuple:
+        rss = uss = 0
+        for proc in [self._proc, *self._proc.children(recursive=True)]:
             try:
-                total += child.memory_info().rss
+                info = proc.memory_full_info()
             except Exception:
-                pass
-        return total
+                continue
+            rss += info.rss
+            uss += getattr(info, "uss", info.rss)
+        return rss, uss
 
     def _run(self) -> None:
         while not self._stop.is_set():
-            rss = self._rss()
-            self.peaks[self.stage] = max(self.peaks.get(self.stage, 0), rss)
+            rss, uss = self._sample()
+            stage = self.stage
+            for metric, value in (("rss", rss), ("uss", uss)):
+                key = f"peak_{metric}_{stage}_bytes"
+                self.peaks[key] = max(self.peaks.get(key, 0), value)
             time.sleep(0.05)
 
     def __enter__(self) -> "_Sampler":
@@ -110,6 +122,29 @@ def child(symbol: str, timeframe: str, n: int, multi: bool) -> None:
     FeaturePreprocessor._adf_pvalue_for_values = staticmethod(_adf)
     FeaturePreprocessor._find_min_d = _dstar
 
+    # 交接階段（SPEC Task 4.1「封包交接 worker 之瞬間」）：自送出第一個 worker 起，至第一個 worker 完成止
+    # ——涵蓋父程序持有封包＋序列化送出＋子程序反序列化載入。multi_tf_generator 於函式內匯入
+    # ProcessPoolExecutor，故於類別層級包裝 submit。
+    from concurrent.futures import ProcessPoolExecutor
+
+    real_submit = ProcessPoolExecutor.submit
+    handoff = {"submitted": 0}
+
+    def _submit(self, fn, *a, **k):
+        if handoff["submitted"] == 0:
+            sampler.stage = "handoff"
+        handoff["submitted"] += 1
+        future = real_submit(self, fn, *a, **k)
+
+        def _done(_f):
+            if sampler.stage == "handoff":
+                sampler.stage = "public"
+
+        future.add_done_callback(_done)
+        return future
+
+    ProcessPoolExecutor.submit = _submit
+
     tfs = ["1h", "12h"] if multi else [timeframe]
     payload = h.stat_payload(tfs)
     payload["timeframes"]["primary"] = timeframe
@@ -128,8 +163,8 @@ def child(symbol: str, timeframe: str, n: int, multi: bool) -> None:
     print("RESULT " + json.dumps({
         "seconds_total": round(total, 2), "seconds_calibration": round(timers["calibration"], 2),
         "seconds_adf": round(timers["adf"], 2), "seconds_dstar": round(timers["dstar"], 2),
-        "peak_rss_calibration_bytes": int(sampler.peaks.get("calibration", 0)),
-        "peak_rss_public_bytes": int(sampler.peaks.get("public", 0)),
+        **{k: int(v) for k, v in sampler.peaks.items()},
+        "workers_submitted": handoff["submitted"],
         "calibration_tmp_leftover": leftover,
         "decisions": {c: [bool(d["fracdiff"]), int(d["adf_differenced"] or 0)] for c, d in dec.items()},
     }))
@@ -145,15 +180,21 @@ def run_child(args: list, env: dict) -> dict:
 
 
 def verdict(rows: list, tier: dict) -> list:
-    """失敗原因清單（空＝通過）：任一 run 失敗、暫存殘留、tier run 峰值超過上限。"""
+    """失敗原因清單（空＝通過）：任一 run 失敗、暫存殘留、tier run 缺任一階段峰值（含交接）、
+    tier run 任一階段 USS 合計峰值超過上限（RSS 合計只列收據、不作判定：會重計共享頁）。"""
     problems = [f"run failed: {r.get('symbol')} {r.get('timeframe')} N={r.get('n')}" for r in rows if r.get("rc") != 0]
     problems += [f"tmp leftover: {r.get('symbol')} {r.get('timeframe')} N={r.get('n')}"
                  for r in rows if r.get("calibration_tmp_leftover")]
     limit = CONTRACT["min_memory_tier_gb"] * GIB
     if tier.get("rc") != 0:
         problems.append("tier run failed")
-    elif max(tier.get("peak_rss_calibration_bytes", 0), tier.get("peak_rss_public_bytes", 0)) > limit:
-        problems.append(f"tier peak exceeds {CONTRACT['min_memory_tier_gb']} GiB")
+        return problems
+    for stage in STAGES:
+        key = f"peak_uss_{stage}_bytes"
+        if key not in tier:
+            problems.append(f"tier run missing {stage} peak")
+        elif tier[key] > limit:
+            problems.append(f"tier {stage} peak exceeds {CONTRACT['min_memory_tier_gb']} GiB")
     return problems
 
 

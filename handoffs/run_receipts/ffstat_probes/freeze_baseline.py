@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -112,6 +113,19 @@ def main() -> int:
                                         force_regenerate=True, start_date=None, end_date=off_end, persist=True)
     off_dir = off_root / "features" / h.SYMBOL / h.PRIMARY_TF / str(off.metadata["config_hash"])
     data["auto_off"] = {"end_date": off_end, "base": collect(off_dir)["base"]}
+    # Task 2.1「平穩化關閉時 run_ic_first 自帶 raw_data／layers 行為不變」之基準（r19 codex P1-01）：
+    # L6.5 產物（IC 階段前落盤之 L7 raw）逐欄四 hash；環境只在此呼叫期間設定
+    saved = {k: os.environ.get(k) for k in h.IC_FIRST_OFF_ENV}
+    os.environ.update(h.IC_FIRST_OFF_ENV)
+    try:
+        _, raw_fp = h.ic_first_supplied_off(ISOLATED_ROOT / "ic_first_off")
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    data["ic_first_supplied_off"] = raw_fp
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     dec = data["decisions"].values()

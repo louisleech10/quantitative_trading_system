@@ -5,6 +5,7 @@
   "exit_code": 0,
   "head": "FF-STAT TODO 前（空殼不改行為：新 keyword 預設空、新函式未被呼叫）",
   "result": {"rows": 721, "base_columns": 3572, "derived_columns": 1551, "name_exempt": 268, "fracdiff": 290, "adf_diff": 1185, "d_known": 256},
-  "reproducibility": "同參數以 --out 重跑一次：base／derived／decisions 三者全等（主委實跑 2026-09-24）",
+  "reproducibility": "同參數以 --out 重跑一次：base／derived／decisions 三者全等（主委實跑 2026-09-24）；r19 加 ic_first_supplied_off 後以 --out 與 --refreeze-baseline 各跑一次，兩檔逐位元組相同，且既有鍵與加入前全等",
+  "ic_first_supplied_off": "平穩化關閉、run_ic_first 自帶 raw_data／layers（FFACT_WARMUP_TRIM=1、FFACT_USE_CGSA=0）之 L7 raw（IC 階段前落盤之 L6.5 產物）3632 欄、721 列逐欄四 hash；IC 階段因既有 AlignmentViolationError 未完成（另立票），不影響 L6.5 產物（r19 codex P1-01）",
   "honest_bounds": "單機單次真實 run（BTCUSDT 1h、2026-01-01～01-31、輕量設定 stat_payload、L6.5 append 模式）；d 由隔離 d* 快取讀得，快取鍵為加週期標記前之欄名，290 個 fracdiff 欄中 256 個對得上；探針先前三次未隔離 d* 快取，曾寫入 data_cache/feature_preprocessing/d_star_BTCUSDT_1h_dcc154ced6b6.json（快取、以值指紋為鍵，不致錯值），已於 _isolate.isolate_dstar_cache 與 ffstat_helpers.prepare_stat_env 修正"
 }

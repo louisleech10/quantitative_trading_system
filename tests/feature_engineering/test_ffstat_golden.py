@@ -6,44 +6,18 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict
 
-import numpy as np
 import pyarrow.parquet as pq
 import pytest
 
 from tests.feature_engineering import ffstat_helpers as h
+from tests.feature_engineering.ffstat_helpers import base_fingerprints, column_fingerprint  # noqa: F401  與凍結腳本同一定義
 
 _SKIP = ("timestamp", "__index_level_0__", "index")
-
-
-def _sha(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def column_fingerprint(values: np.ndarray) -> Dict[str, Any]:
-    """四 hash（與凍結腳本同一定義）：dtype、shape、NaN mask、值（NaN 以 0 取代後之位元組）。"""
-    arr = np.asarray(values)
-    mask = np.isnan(arr) if arr.dtype.kind == "f" else np.zeros(arr.shape, dtype=bool)
-    filled = np.where(mask, 0, arr) if arr.dtype.kind == "f" else arr
-    return {"dtype": str(arr.dtype), "shape": list(arr.shape), "nan_mask": _sha(mask.tobytes()),
-            "values": _sha(np.ascontiguousarray(filled).tobytes())}
-
-
-def base_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
-    """run 目錄下基礎欄（非 `*_L65.parquet`）之逐欄四 hash。"""
-    out: Dict[str, Dict[str, Any]] = {}
-    for p in sorted(root.rglob("*.parquet")):
-        if p.name.endswith("_L65.parquet"):
-            continue
-        table = pq.read_table(p)
-        for n in table.column_names:
-            if n not in _SKIP:
-                out[n] = column_fingerprint(table.column(n).to_numpy(zero_copy_only=False))
-    return out
+_REPO = Path(__file__).resolve().parents[2]
 
 
 def derived_names(root: Path) -> set:
@@ -98,8 +72,8 @@ def test_golden_base_values_unchanged_trim1(tmp_path: Path, monkeypatch: pytest.
 
 
 def test_golden_derived_consistent_with_decisions(baseline: Dict[str, Any], on_run: Dict[str, Any]) -> None:
-    """§G ②′：改後衍生欄集合與收據決策逐欄一致（有 `_fracdiff` ⇔ fracdiff、有 `_diffK` ⇔ ADF 差分 K 階）；
-    並列出與基準相比決策改變之欄數（資訊性，寫入收據時用）。"""
+    """§G ②′：改後衍生欄集合與逐欄決策一致（有 `_fracdiff` ⇔ fracdiff、有 `_diffK` ⇔ ADF 差分 K 階）；
+    摘要與逐欄重新計數一致。與基準相比之決策改變由 `test_golden_receipt_change_report` 驗。"""
     derived = derived_names(on_run["root"])
     dec = h.decisions(on_run["result"])
     for col, d in dec.items():
@@ -116,17 +90,35 @@ def test_golden_derived_consistent_with_decisions(baseline: Dict[str, Any], on_r
     for key, event in (("search_failed", "search_failed"), ("cache_read_failed", "cache_read_failed"),
                        ("cache_write_failed", "cache_write_failed")):
         assert summary[key] == sum(1 for d in dec.values() if h.EVENTS[event] in d["events"])
-    # 與基準相比決策改變之欄：分類計數加總＝改變欄數（寫入 Task 4.1 收據之數字由此產生）
-    changed = {c: ((baseline["decisions"][c]["fracdiff"], baseline["decisions"][c]["adf_diff_order"]),
-                   (bool(dec[c]["fracdiff"]), int(dec[c]["adf_differenced"] or 0))) for c in dec
-               if (bool(dec[c]["fracdiff"]), int(dec[c]["adf_differenced"] or 0))
-               != (baseline["decisions"][c]["fracdiff"], baseline["decisions"][c]["adf_diff_order"])}
-    by_kind: Dict[str, int] = {}
-    for old, new in changed.values():
-        by_kind[f"{old}->{new}"] = by_kind.get(f"{old}->{new}", 0) + 1
-    assert sum(by_kind.values()) == len(changed)
-    exempt_changed = [c for c in changed if baseline["decisions"][c]["name_exempt"]]
-    assert set(exempt_changed) <= set(changed)
+
+
+def test_decision_change_report_counts_exactly() -> None:
+    """§G ②′ 報告函式之鑑別力（純邏輯、手算期望）：兩欄改變（一欄原屬名字免檢）、一欄不變、一欄只在一邊。"""
+    base = {"a": {"fracdiff": False, "adf_diff_order": 0, "name_exempt": True},
+            "b": {"fracdiff": True, "adf_diff_order": 0, "name_exempt": False},
+            "c": {"fracdiff": False, "adf_diff_order": 1, "name_exempt": False},
+            "only_base": {"fracdiff": False, "adf_diff_order": 0, "name_exempt": False}}
+    now = {"a": {"fracdiff": False, "adf_differenced": 1}, "b": {"fracdiff": True, "adf_differenced": None},
+           "c": {"fracdiff": True, "adf_differenced": 0}, "only_now": {"fracdiff": True, "adf_differenced": 0}}
+    rep = h.decision_change_report(base, now)
+    assert rep["changed_count"] == 2 and set(rep["changed_columns"]) == {"a", "c"}
+    assert rep["by_kind"] == {"(False, 0)->(False, 1)": 1, "(False, 1)->(True, 0)": 1}
+    assert rep["name_exempt_changed"] == ["a"]
+
+
+def test_golden_receipt_change_report(baseline: Dict[str, Any], on_run: Dict[str, Any]) -> None:
+    """§G ②′／Task 4.1 收據（r19 codex P2-04）：最新 `handoffs/run_receipts/*-ffstat-golden.json`
+    （由 `ffstat_probes/golden_receipt.py` 產出）之逐欄決策與本次 run 相同（fracdiff、ADF 階數、d），
+    且其 `change_report` 等於以收據逐欄決策對基準獨立重算之結果。"""
+    receipts = sorted((_REPO / "handoffs" / "run_receipts").glob("*-ffstat-golden.json"))
+    assert receipts, "缺 golden 收據：須跑 handoffs/run_receipts/ffstat_probes/golden_receipt.py"
+    receipt = json.loads(receipts[-1].read_text(encoding="utf-8"))
+    dec = h.decisions(on_run["result"])
+    key = ("fracdiff", "adf_differenced", "d")
+    assert {c: [d[k] for k in key] for c, d in receipt["decisions"].items()} == \
+        {c: [d[k] for k in key] for c, d in json.loads(json.dumps(dec)).items()}
+    assert receipt["change_report"] == json.loads(json.dumps(h.decision_change_report(baseline["decisions"],
+                                                                                      receipt["decisions"])))
 
 
 def test_boundary_21_both_off_identical_to_baseline_base(baseline: Dict[str, Any], tmp_path: Path,
@@ -165,12 +157,17 @@ def _cost_probe():
 
 
 def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
-    """Task 4.1 驗證（r18 codex P1-04）：成本探針之判定——tier run 峰值 9 GiB 且 rc=0 ⇒ 失敗；暫存殘留 ⇒ 失敗；
-    皆正常 ⇒ 通過。"""
+    """Task 4.1 驗證（r18 codex P1-04、r19 codex P2-03）：成本探針之判定——tier run 任一階段（校準／交接／公開）
+    之 USS 合計峰值 9 GiB 且 rc=0 ⇒ 失敗；tier run 缺交接階段峰值 ⇒ 失敗；RSS 合計超過而 USS 未超過 ⇒ 不失敗
+    （共享頁不重計）；暫存殘留 ⇒ 失敗；皆正常 ⇒ 通過。"""
     probe = _cost_probe()
     ok_row = {"symbol": "BTCUSDT", "timeframe": "1h", "n": 500, "rc": 0, "calibration_tmp_leftover": 0}
-    ok_tier = {"rc": 0, "peak_rss_calibration_bytes": 2 * probe.GIB, "peak_rss_public_bytes": 3 * probe.GIB}
+    ok_tier = {"rc": 0, **{f"peak_{m}_{s}_bytes": 3 * probe.GIB for m in ("rss", "uss") for s in probe.STAGES}}
     assert probe.verdict([ok_row], ok_tier) == []
-    assert probe.verdict([ok_row], {**ok_tier, "peak_rss_public_bytes": 9 * probe.GIB})
+    for stage in probe.STAGES:
+        assert probe.verdict([ok_row], {**ok_tier, f"peak_uss_{stage}_bytes": 9 * probe.GIB}), stage
+    assert probe.verdict([ok_row], {**ok_tier, "peak_rss_handoff_bytes": 9 * probe.GIB}) == []
+    no_handoff = {k: v for k, v in ok_tier.items() if "handoff" not in k}
+    assert probe.verdict([ok_row], no_handoff)
     assert probe.verdict([{**ok_row, "calibration_tmp_leftover": 1}], ok_tier)
     assert probe.verdict([{**ok_row, "rc": 1}], ok_tier)

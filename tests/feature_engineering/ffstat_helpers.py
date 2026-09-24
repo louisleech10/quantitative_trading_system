@@ -41,6 +41,7 @@ def prepare_stat_env(monkeypatch: Any, tmp_path: Path, **env: str) -> Path:
 
     import tempfile
 
+    tmp_path.mkdir(parents=True, exist_ok=True)  # 子目錄（如 tmp_path / "on"）須先存在：prepare_env 會 chdir 進去
     prepare_env(monkeypatch, tmp_path, **env)
     target = tmp_path / "dstar_cache"
     target.mkdir(parents=True, exist_ok=True)
@@ -172,3 +173,134 @@ def scale_kline_close(kline_dir: Path, start: str, end: str, factor: float, *, s
         arr["close"][np.asarray(mask)] = arr["close"][np.asarray(mask)] * np.float32(factor)
         ds[...] = arr
         return int(mask.sum())
+
+
+def derived_fingerprints(root: Path) -> Dict[str, str]:
+    """root 下全部 L6.5 衍生欄（`*_L65.parquet`）之 欄名 → 值 sha256（NaN mask 併入）；
+    決策與 d 相同 ⇔ 衍生欄集合與值相同（append 模式）。"""
+    import hashlib
+
+    import numpy as np
+    import pyarrow.parquet as pq
+
+    out: Dict[str, str] = {}
+    for p in sorted(root.rglob("*_L65.parquet")):
+        table = pq.read_table(p)
+        for n in table.column_names:
+            if n in ("timestamp", "__index_level_0__", "index"):
+                continue
+            arr = np.asarray(table.column(n).to_numpy(zero_copy_only=False), dtype=np.float64)
+            mask = np.isnan(arr)
+            out[n] = hashlib.sha256(mask.tobytes() + np.where(mask, 0.0, arr).tobytes()).hexdigest()
+    return out
+IC_FIRST_OFF_ENV = {"FFACT_WARMUP_TRIM": "1", "FFACT_USE_CGSA": "0"}
+
+
+def ic_first_to_l65(factory: Any, config: Any, **kwargs: Any) -> Optional[Any]:
+    """呼叫 `run_ic_first`；回傳結果，或於 IC 階段既有之 `AlignmentViolationError` 時回傳 None。
+
+    既有退化（主委實跑 2026-09-24，與本票無關、另立票）：真實 kline 下 `ICEngine._align_label_to_group`
+    之 label 為時間戳 index、自 L7 raw 讀回之群組為 RangeIndex ⇒ IC 階段必拋（`test_b6_warmup_trim.py::
+    test_warmup_trim_ic_first` 於 main 同紅）。FF-STAT 之決策與平穩化產出皆於 L6.5 形成、經 `write_raw`
+    於 IC 階段之前落盤 ⇒ 驗收改在 L6.5 產物觀測。只吞此一型且須 L7 raw 已落盤（證明已過 L6.5）；
+    其他例外（含 `CalibrationError`）一律上拋。"""
+    from momentum.core.contracts import AlignmentViolationError
+
+    root = Path(kwargs["storage"].base_path)
+    try:
+        return factory.run_ic_first(SYMBOL, PRIMARY_TF, config, **kwargs)
+    except AlignmentViolationError:
+        assert raw_artifact_fingerprints(root), "IC 階段前未見 L7 raw 產物：失敗發生於 L6.5 之前"
+        return None
+
+
+def raw_artifact_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
+    """root 下 L7 raw 產物（`<run_dir>/raw/*.parquet`＝L6.5 pre_ic 輸出）之 欄名 → 四 hash。"""
+    import pyarrow.parquet as pq
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for p in sorted(root.rglob("raw/*.parquet")):
+        if any(part.startswith(".tmp-raw-") for part in p.parts):
+            continue
+        table = pq.read_table(p)
+        for n in table.column_names:
+            if n in ("timestamp", "__index_level_0__", "index"):
+                continue
+            out[n] = column_fingerprint(table.column(n).to_numpy(zero_copy_only=False))
+    return out
+
+
+def column_fingerprint(values: Any) -> Dict[str, Any]:
+    """四 hash：dtype、shape、NaN mask、值（NaN 以 0 取代後之位元組）；與 `freeze_baseline.column_fingerprint` 同式。"""
+    import hashlib
+
+    import numpy as np
+
+    arr = np.asarray(values)
+    mask = np.isnan(arr) if arr.dtype.kind == "f" else np.zeros(arr.shape, dtype=bool)
+    filled = np.where(mask, 0, arr) if arr.dtype.kind == "f" else arr
+    return {"dtype": str(arr.dtype), "shape": list(arr.shape),
+            "nan_mask": hashlib.sha256(mask.tobytes()).hexdigest(),
+            "values": hashlib.sha256(np.ascontiguousarray(filled).tobytes()).hexdigest()}
+
+
+def ic_first_supplied_off(tmp_path: Path) -> Tuple[Optional[Any], Dict[str, Dict[str, Any]]]:
+    """平穩化關閉、`run_ic_first` 自帶 raw_data／layers（比照 `test_b6_warmup_trim` 之 IC-first 用法：先設輸出窗、
+    以含前史之 ingest 起點讀原始資料、帶 config_hash）；呼叫端須先設 `IC_FIRST_OFF_ENV`。
+    回傳 (結果或 None, L7 raw 四 hash)——Task 2.1 舊行為守衛與 §G 凍結同源。"""
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.warmup_window import resolve_output_window
+
+    root = tmp_path / "features"
+    factory = create_feature_factory(cache_dir=KLINE_DIR, validate_continuity=False)
+    factory._storage = FeatureStorage(str(root))
+    config = factory._resolve_config(stat_payload(fracdiff=False, adf=False))
+    start, end = WINDOW
+    window = resolve_output_window(config, PRIMARY_TF, start, end)
+    factory._current_output_window = window
+    raw_data = factory._layer0_data_ingestion(
+        SYMBOL, PRIMARY_TF, config,
+        start_date=window.ingest_start if window.warmup_enabled else start, end_date=end,
+    )
+    _, layers = factory._run_l1_l6_for_ic_first(SYMBOL, PRIMARY_TF, config)
+    result = ic_first_to_l65(
+        factory, config, raw_data=raw_data, layers=layers,
+        config_hash=factory._compute_config_hash(config, SYMBOL, PRIMARY_TF, start_date=start, end_date=end),
+        ic_engine=ICEngine({"methods": ["spearman"]}), feature_reader=FeatureReader(str(root)),
+        storage=factory._storage, ic_threshold=0.0, persist=False,
+    )
+    return result, raw_artifact_fingerprints(root)
+
+
+def base_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
+    """run 目錄下基礎欄（非 `*_L65.parquet`）之逐欄四 hash；與 `freeze_baseline.collect` 同一取檔範圍。"""
+    import pyarrow.parquet as pq
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for p in sorted(root.rglob("*.parquet")):
+        if p.name.endswith("_L65.parquet"):
+            continue
+        table = pq.read_table(p)
+        for n in table.column_names:
+            if n not in ("timestamp", "__index_level_0__", "index"):
+                out[n] = column_fingerprint(table.column(n).to_numpy(zero_copy_only=False))
+    return out
+
+
+def decision_change_report(baseline_decisions: Dict[str, Dict[str, Any]],
+                           decisions_now: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """§G ②′ 與基準相比之決策改變（Task 4.1 golden 收據之唯一來源）：逐欄 (fracdiff, ADF 差分階數) 舊→新、
+    依「舊->新」分類計數、其中原屬名字免檢之欄。只比兩邊皆有之欄。"""
+    changed: Dict[str, Dict[str, Any]] = {}
+    for col in sorted(set(baseline_decisions) & set(decisions_now)):
+        old = [bool(baseline_decisions[col]["fracdiff"]), int(baseline_decisions[col]["adf_diff_order"])]
+        new = [bool(decisions_now[col]["fracdiff"]), int(decisions_now[col]["adf_differenced"] or 0)]
+        if old != new:
+            changed[col] = {"old": old, "new": new, "name_exempt": bool(baseline_decisions[col]["name_exempt"])}
+    by_kind: Dict[str, int] = {}
+    for c in changed.values():
+        key = f"{tuple(c['old'])}->{tuple(c['new'])}"
+        by_kind[key] = by_kind.get(key, 0) + 1
+    return {"changed_columns": changed, "changed_count": len(changed), "by_kind": dict(sorted(by_kind.items())),
+            "name_exempt_changed": sorted(c for c, v in changed.items() if v["name_exempt"])}
