@@ -182,8 +182,20 @@ def snapshot_tree(root: Path, skip: Sequence[str] = _SNAPSHOT_SKIP_FILES) -> Dic
     """沙箱內全部檔之寫後（位元組, 權限位）；symlink 記其目標（r1 codex P1-01：只看手列宿主檔會漏其他受管 target）。
     `skip`＝兩側依設計不同之入口與核心位置。"""
     files: Dict[str, Tuple[bytes, int]] = {}
-    for dirpath, dirnames, filenames in os.walk(root):
+    seen_real: set = set()
+    # 追入目錄 symlink（b2 r1 codex P2-03：經目錄 symlink 寫到沙箱外之檔原本不入快照）；記目錄 symlink 本身；
+    # 以 realpath 防循環
+    for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
+        real = os.path.realpath(dirpath)
+        if real in seen_real:
+            dirnames[:] = []
+            continue
+        seen_real.add(real)
         dirnames[:] = sorted(d for d in dirnames if d not in _SNAPSHOT_SKIP_DIRS)
+        for d in dirnames:
+            dp = Path(dirpath) / d
+            if dp.is_symlink():
+                files[dp.relative_to(root).as_posix() + "/"] = (b"symlink:" + os.readlink(dp).encode("utf-8"), 0)
         for name in sorted(filenames):
             p = Path(dirpath) / name
             rel = p.relative_to(root).as_posix()

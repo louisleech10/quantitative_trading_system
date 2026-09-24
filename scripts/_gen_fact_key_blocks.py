@@ -2127,7 +2127,13 @@ def _write(self: "Gen") -> int:
                 tmp = path + ".factkey.%d" % os.getpid()
                 fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
                 try:
-                    os.write(fd, bytes(out))
+                    # 寫完全部位元組（os.write 可短寫；只呼叫一次會以截斷內容覆蓋宿主並回 rc=0；b2 r1 codex P1-01）
+                    view = memoryview(bytes(out))
+                    while view:
+                        written = os.write(fd, view)
+                        if written <= 0:
+                            raise OSError("short write")
+                        view = view[written:]
                 finally:
                     os.close(fd)
                 os.replace(tmp, path)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
@@ -278,6 +279,51 @@ def test_new_impl_host_write_failure_is_fail_closed(tmp_path: Path) -> None:
         os.chmod(host.parent, mode)
     assert out.rc == 1, out.stderr.decode("utf-8", "replace")
     assert host.read_bytes() == before
+
+
+def test_new_impl_short_os_write_still_writes_whole_host(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """b2 審碼 r1 codex P1-01：`os.write` 短寫（每次只寫 1 位元組）時，`--write` 仍須寫完整宿主檔，
+    結果與未注入之 oracle `--write` 逐位元組相同（原實作只呼叫一次 os.write ⇒ 宿主被截斷而 rc=0）。"""
+    import importlib.util
+    import os
+
+    def add(d: dict) -> None:
+        d["eventscan-banner"]["rows"].append(["997", "zz", "x", "y"])
+
+    case = _case("shortw", ["--write"], _tree(_reg(add)), "ok", first="")
+    oroot, nroot = fo.make_pair(tmp_path, case)
+    good = fo.run_oracle(oroot, case)
+    assert good.rc == 0
+    spec = importlib.util.spec_from_file_location("_fk_core_shortw", str(nroot / fo.core_rel(case)))
+    core = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, "_fk_core_shortw", core)  # dataclass 解析型別需模組已註冊
+    spec.loader.exec_module(core)
+    real_write = core.os.write
+    monkeypatch.setattr(core.os, "write", lambda fd, data: real_write(fd, bytes(data[:1])))
+    monkeypatch.chdir(nroot)
+    monkeypatch.setenv("GOVB1_FACTKEY_ROOT", str(nroot))
+    res = core.run(["--write"], str(nroot / "scripts"))
+    monkeypatch.setattr(core.os, "write", real_write)
+    assert res.rc == 0, res.stderr.decode("utf-8", "replace")
+    after = fo.snapshot_tree(nroot, (case.script_rel, fo.core_rel(case)))
+    changed = sorted(k for k in good.files if after.get(k) != good.files[k])
+    assert not changed, changed
+
+
+@pytest.mark.parametrize("payload", ["{}\n{}\n", "[]\n{}\n"])
+@pytest.mark.parametrize("args", [("--help",), (), ("--check",), ("--write",)])
+def test_new_impl_multi_value_registry_fail_closed(tmp_path: Path, payload: str, args: tuple) -> None:
+    """SPEC C-1 例外⑥（v9，b2 審碼 r1 codex P2-02）：註冊表為多值 JSON 串流時，新實作一律 rc=1、stdout 空、
+    stderr 首行為前置訊息「非合法 JSON 物件」、不寫任何檔（oracle 因 jq 只看最後一值而放行，屬意外寬鬆）。"""
+    case = fo.Case("multi", args, _tree(_write(REG_REL, payload), minimal=True), 0, "")
+    _, nroot = fo.make_pair(tmp_path, case)
+    before = fo.snapshot_tree(nroot, (case.script_rel, fo.core_rel(case)))
+    out = fo.run_new(nroot, case)
+    assert out.rc == 1, out.stderr.decode("utf-8", "replace")
+    assert out.stdout == b""
+    first = out.stderr.decode("utf-8", "replace").splitlines()[0]
+    assert first.startswith("gen_fact_key_blocks: 註冊表 ") and first.endswith("非合法 JSON 物件 → fail-closed"), first
+    assert out.files == before
 
 
 @pytest.mark.parametrize("args", [(), ("--check",), ("--status-hits", "lines.txt")])
