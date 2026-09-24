@@ -30,6 +30,7 @@ GIB = 1024 ** 3
 
 
 STAGES = ("calibration", "handoff", "public")
+SAMPLE_INTERVAL_S = 0.05  # 取樣間隔：短於此之瞬間峰值可能漏拍（固有界限，列入收據）
 
 
 class _Sampler:
@@ -37,8 +38,9 @@ class _Sampler:
 
     tier 判定值（`peak_judged_*`）逐筆取：該筆全部程序皆取得 USS ⇒ USS 合計（不重計共享頁；r19 codex P2-03）；
     任一程序 USS 被拒（macOS 對同使用者之 spawn 子程序 `task_for_pid` 即拒，主委實跑 2026-09-24）⇒ 該筆整筆改用
-    RSS 合計（每程序 RSS ≥ USS，只會高估、不會漏算；r20 codex P1-01），計入 `samples_rss_fallback`。任一程序連
-    RSS 亦取不到 ⇒ 該筆記入 `samples_incomplete`，verdict 判量測失敗。`peak_uss_*` 只取全數取得 USS 之筆。"""
+    RSS 合計（每程序 RSS ≥ USS，只會高估、不會漏算；r20 codex P1-01），計入 `samples_rss_fallback`；RSS 已計入後
+    USS 才遇程序結束者同。任一程序連 RSS 亦取不到、或列舉子程序本身失敗 ⇒ 該筆記入 `samples_incomplete`、不留判定值，
+    verdict 判量測失敗（r21 codex P1-01）。`peak_uss_*` 只取全數取得 USS 之筆。取樣途中階段轉換 ⇒ 該筆計入前後兩階段。"""
 
     def __init__(self) -> None:
         import psutil
@@ -55,40 +57,54 @@ class _Sampler:
 
         rss = uss = 0
         uss_ok = complete = True
-        for proc in [self._proc, *self._proc.children(recursive=True)]:
+        try:
+            procs = [self._proc, *self._proc.children(recursive=True)]
+        except Exception:
+            # 列舉子程序失敗（沙箱禁 sysctl 時拋 PermissionError／AccessDenied；r21 codex P1-01）⇒ 不知有哪些 worker，
+            # 本筆不完整、不作判定值
+            procs = [self._proc]
+            complete = uss_ok = False
+        for proc in procs:
             try:
                 rss += proc.memory_info().rss
             except psutil.NoSuchProcess:
-                continue  # 取樣期間已結束之程序
+                continue  # 讀 RSS 前已結束之程序：本筆未佔用
             except Exception:
                 complete = uss_ok = False
                 continue
             try:
                 uss += proc.memory_full_info().uss
-            except psutil.NoSuchProcess:
-                continue
             except Exception:
+                # 含 RSS 已計入後才結束（NoSuchProcess）：其 RSS 已在合計內，本筆改以 RSS 為判定值（r21 codex P2-01）
                 uss_ok = False
         return rss, (uss if uss_ok else None), complete
 
-    def _record(self, sample: tuple) -> None:
-        """把一筆 `_sample()` 結果計入當下階段之峰值與計數。"""
+    def _record(self, sample: tuple, stages: tuple) -> None:
+        """把一筆 `_sample()` 結果計入 `stages` 內各階段之峰值（計數只加一次）。
+        不完整之筆不計入任何判定值（由 verdict 之 samples_incomplete 判失敗）。"""
         rss, uss, complete = sample
-        judged = uss if uss is not None else rss
+        judged = None if not complete else (uss if uss is not None else rss)
         if uss is None:
             self.peaks["samples_rss_fallback"] = self.peaks.get("samples_rss_fallback", 0) + 1
         if not complete:
             self.peaks["samples_incomplete"] = self.peaks.get("samples_incomplete", 0) + 1
-        for metric, value in (("rss", rss), ("uss", uss), ("judged", judged)):
-            if value is None:
-                continue
-            key = f"peak_{metric}_{self.stage}_bytes"
-            self.peaks[key] = max(self.peaks.get(key, 0), value)
+        for stage in stages:
+            for metric, value in (("rss", rss), ("uss", uss), ("judged", judged)):
+                if value is None:
+                    continue
+                key = f"peak_{metric}_{stage}_bytes"
+                self.peaks[key] = max(self.peaks.get(key, 0), value)
+
+    def _tick(self) -> None:
+        """取一筆：取樣前後各擷取一次階段；途中階段轉換 ⇒ 該筆同時計入前後兩階段（跨界峰值兩邊皆不漏；r21 codex P2-02）。"""
+        before = self.stage
+        sample = self._sample()
+        self._record(sample, tuple(dict.fromkeys((before, self.stage))))
 
     def _run(self) -> None:
         while not self._stop.is_set():
-            self._record(self._sample())
-            time.sleep(0.05)
+            self._tick()
+            time.sleep(SAMPLE_INTERVAL_S)
 
     def __enter__(self) -> "_Sampler":
         self._thread.start()
@@ -242,7 +258,7 @@ def main() -> int:
     tier.pop("decisions", None)
     problems = verdict(rows, tier)
     out = REPO / "handoffs" / "run_receipts" / f"{_dt.date.today():%Y%m%d}-ffstat-cost.json"
-    out.write_text(json.dumps({"spec": "docs/FFSTAT_SPEC.md Task 4.1", "rows": rows, "min_tier_multi_tf": tier,
+    out.write_text(json.dumps({"spec": "docs/FFSTAT_SPEC.md Task 4.1", "sample_interval_seconds": SAMPLE_INTERVAL_S, "rows": rows, "min_tier_multi_tf": tier,
                                "problems": problems}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(out)
     return 1 if problems else 0

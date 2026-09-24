@@ -176,54 +176,86 @@ def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
 
 
 def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:
-    """Task 4.1 驗證（r20 codex P1-01）：子程序 USS 被拒（macOS 對 spawn 子程序之實況）⇒ 該筆整筆以 RSS 合計
-    判定、子程序 7 GiB 不被漏算、記一筆 rss_fallback；子程序連 RSS 亦取不到 ⇒ 記 samples_incomplete。
-    另對真實子程序取樣一次：每程序皆取得 RSS（不完整即紅）。"""
+    """Task 4.1 驗證（r20 codex P1-01、r21 codex P1-01／P2-01／P2-02）：取樣器五種序列——
+    ①子程序 USS 被拒（macOS 對 spawn 子程序之實況）⇒ 整筆以 RSS 合計判定、7 GiB 子程序不漏算、記 rss_fallback；
+    ②子程序連 RSS 亦取不到 ⇒ 記 samples_incomplete、不留判定值；
+    ③列舉子程序本身拋例外（沙箱禁 sysctl）⇒ 記 samples_incomplete、不留判定值，verdict 判失敗；
+    ④子程序 RSS 已計入後 USS 拋 NoSuchProcess ⇒ 改以 RSS 合計判定（不以較小之 USS 充數）；
+    ⑤取樣途中階段由交接轉公開 ⇒ 該筆兩階段皆記。另對真實子程序取樣一次：須完整。"""
     import subprocess
     import sys
 
     import psutil
 
     probe = _cost_probe()
+    gib = probe.GIB
 
-    class _Child:
-        def __init__(self, rss_ok: bool) -> None:
-            self.rss_ok = rss_ok
+    class _Info:
+        def __init__(self, rss: int, uss: int = 0) -> None:
+            self.rss, self.uss = rss, uss
+
+    class _Proc:
+        def __init__(self, rss=None, uss=None, rss_exc=None, uss_exc=None, children=(), children_exc=None,
+                     on_uss=None) -> None:
+            self._rss, self._uss, self._rss_exc, self._uss_exc = rss, uss, rss_exc, uss_exc
+            self._children, self._children_exc, self._on_uss = list(children), children_exc, on_uss
+
+        def children(self, recursive=True):
+            if self._children_exc is not None:
+                raise self._children_exc
+            return self._children
 
         def memory_info(self):
-            if not self.rss_ok:
-                raise psutil.AccessDenied(1)
-            return type("I", (), {"rss": 7 * probe.GIB})()
+            if self._rss_exc is not None:
+                raise self._rss_exc
+            return _Info(self._rss)
 
         def memory_full_info(self):
-            raise psutil.AccessDenied(1)
+            if self._on_uss is not None:
+                self._on_uss()
+            if self._uss_exc is not None:
+                raise self._uss_exc
+            return _Info(self._rss, self._uss)
 
-    for rss_ok in (True, False):
-        sampler = probe._Sampler()
-        sampler._proc = type("P", (), {
-            "memory_info": lambda self: type("I", (), {"rss": probe.GIB})(),
-            "memory_full_info": lambda self: type("I", (), {"rss": probe.GIB, "uss": probe.GIB // 2})(),
-            "children": lambda self, recursive=True, _c=_Child(rss_ok): [_c],
-        })()
-        sampler.stage = "handoff"
-        sample = sampler._sample()
-        sampler._record(sample)
-        rss, uss, complete = sample
-        assert uss is None and sampler.peaks["samples_rss_fallback"] == 1
-        if rss_ok:
-            assert complete and rss == 8 * probe.GIB
-            assert sampler.peaks["peak_judged_handoff_bytes"] == 8 * probe.GIB
-            assert "peak_uss_handoff_bytes" not in sampler.peaks
-        else:
-            assert not complete and sampler.peaks["samples_incomplete"] == 1
-    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"])
+    def _run_one(proc: "_Proc", stage: str = "handoff", sampler=None):
+        sampler = sampler or probe._Sampler()
+        sampler._proc = proc
+        sampler.stage = stage
+        sampler._tick()
+        return sampler
+
+    parent = dict(rss=gib, uss=gib // 2)
+    # ①
+    s = _run_one(_Proc(**parent, children=[_Proc(rss=7 * gib, uss_exc=psutil.AccessDenied(1))]))
+    assert s.peaks["peak_judged_handoff_bytes"] == 8 * gib and s.peaks["samples_rss_fallback"] == 1
+    assert "peak_uss_handoff_bytes" not in s.peaks and "samples_incomplete" not in s.peaks
+    # ②
+    s = _run_one(_Proc(**parent, children=[_Proc(rss_exc=psutil.AccessDenied(1))]))
+    assert s.peaks["samples_incomplete"] == 1 and "peak_judged_handoff_bytes" not in s.peaks
+    # ③：先有三階段低峰值，再一筆列舉失敗 ⇒ verdict 仍判失敗
+    s = probe._Sampler()
+    for stage in probe.STAGES:
+        _run_one(_Proc(**parent), stage, s)
+    _run_one(_Proc(**parent, children_exc=PermissionError(1, "Operation not permitted")), "public", s)
+    assert s.peaks["samples_incomplete"] == 1
+    assert probe.verdict([], {"rc": 0, **s.peaks})
+    # ④
+    s = _run_one(_Proc(**parent, children=[_Proc(rss=9 * gib, uss_exc=psutil.NoSuchProcess(123))]))
+    assert s.peaks["peak_judged_handoff_bytes"] == 10 * gib and s.peaks["samples_rss_fallback"] == 1
+    # ⑤
+    s = probe._Sampler()
+    child = _Proc(rss=9 * gib, uss=9 * gib, on_uss=lambda: setattr(s, "stage", "public"))
+    _run_one(_Proc(**parent, children=[child]), "handoff", s)
+    assert s.peaks["peak_judged_handoff_bytes"] == s.peaks["peak_judged_public_bytes"] == 9 * gib + gib // 2
+    # 真實子程序
+    real = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"])
     try:
         import time
 
         time.sleep(0.5)
         rss, _, complete = probe._Sampler()._sample()
         assert complete
-        assert rss >= psutil.Process(child.pid).memory_info().rss
+        assert rss >= psutil.Process(real.pid).memory_info().rss
     finally:
-        child.kill()
-        child.wait()
+        real.kill()
+        real.wait()
