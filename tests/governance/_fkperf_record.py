@@ -150,8 +150,11 @@ def record_all(out: Path) -> Dict[str, Any]:
     fo.build_current_tree(out / "repo_side", include_tests=False)  # 錄製當下凍結 repo 側（重播不讀活的工作樹）
     env = dict(os.environ, **{ENV_RECORD_DIR: str(out)})
     selected = [f"{rel}::{name}" for rel, names in helper_tests().items() for name in names]  # 只跑建沙箱者（真 repo 慢測試不在語料②）
+    # 內層 pytest 之暫存目錄放在錄製目錄內：沙箱中指向沙箱外之 symlink（如 ext → tmp_path/outside）於重播時
+    # 仍存在；否則 pytest 之 basetemp 輪替（只留最近 3 次）會在其間之任一 pytest 執行後刪掉目標，重播改走「不存在」分支
+    # （2026-09-24 實跑 rec-0260）。錄製目錄程序結束即刪，不留殘檔。
     r = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "-p",
-                        "tests.governance._fkperf_record", *selected],
+                        "tests.governance._fkperf_record", f"--basetemp={out / 'basetemp'}", *selected],
                        cwd=str(REPO), env=env, capture_output=True, text=True)
     records = [json.loads((d / "record.json").read_text(encoding="utf-8"))
                for d in sorted(out.iterdir()) if (d / "record.json").is_file()]
