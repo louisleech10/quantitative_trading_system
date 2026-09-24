@@ -336,3 +336,21 @@ def test_batched_write_alias_targets_same_host_keep_both_blocks(tmp_path: Path, 
     assert c.returncode == 0, c.stdout + c.stderr
     after = host.read_text(encoding="utf-8")
     assert after[after.index(begin) + len(begin):after.index(end)].strip(), "%s 區塊被蓋回陳舊內容" % first
+
+
+def test_batched_write_stat_failure_falls_back_to_sequential(tmp_path: Path) -> None:
+    """b3 審碼 R3-P2-01：批次規劃取宿主實體身分（`os.stat`）失敗 ⇒ 退回逐 key 路徑照常寫出（rc=0、寫後 --check 綠），
+    不得以 traceback 中斷。以沙箱核心把該呼叫改為拋 `OSError` 模擬（只動沙箱複本）。"""
+    import subprocess
+    root = tmp_path / "t"
+    fo.build_current_tree(root, include_tests=False)
+    core = root / "scripts" / "_gen_fact_key_blocks.py"
+    src = core.read_text(encoding="utf-8")
+    needle = "            st = os.stat(path)\n"
+    assert src.count(needle) == 1, "批次規劃之 stat 呼叫須恰一處"
+    core.write_text(src.replace(needle, "            raise OSError('injected stat failure')\n", 1), encoding="utf-8")
+    gen = ["bash", "scripts/gen_fact_key_blocks.sh"]
+    w = subprocess.run(gen + ["--write"], cwd=str(root), capture_output=True, text=True)
+    assert w.returncode == 0 and "Traceback" not in w.stderr, w.stderr
+    c = subprocess.run(gen + ["--check"], cwd=str(root), capture_output=True, text=True)
+    assert c.returncode == 0, c.stdout + c.stderr

@@ -2193,7 +2193,12 @@ def _write_batched(self: "Gen", root: str, reg: "Registry") -> Optional[int]:
     for _k, _t, path, bpos, epos, block_lines in plan:
         # 不同字面 target 指向同一實體宿主（`./host.md`、symlink、大小寫不敏感檔案系統之大小寫別名、硬連結）⇒ 分組會
         # 各自規劃、後寫蓋先寫：以檔案實體身分（裝置號＋inode）比對，同實體不同字面即退回逐 key 路徑
-        st = os.stat(path)
+        try:
+            st = os.stat(path)
+        except OSError:  # 無法取得實體身分 ⇒ 無法證明不互蓋：退回逐 key 路徑（該路徑自行處理存取失敗）
+            del self.out[out_mark:]
+            del self.errbuf[err_mark:]
+            return None
         if real_of.setdefault((st.st_dev, st.st_ino), path) != path:
             del self.out[out_mark:]
             del self.errbuf[err_mark:]
