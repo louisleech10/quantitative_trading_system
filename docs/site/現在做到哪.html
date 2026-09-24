@@ -17,34 +17,31 @@
 </blockquote>
 <hr />
 <h2 id="現在在做">現在在做</h2>
-<p><strong>FF-TFMETA：✅ 完工。</strong></p>
-<p><strong>FKPERF：讓事實登記表的存檔檢查不再越來越慢。</strong></p>
+<p><strong>FF-STAT：要不要做平穩化，改成看特徵「是什麼」，不再看名字。</strong>（你 2026-09-24 第 4 點開的票）</p>
 <ul>
-<li><strong>程式改了沒</strong>：<strong>已改並接上</strong>。存檔時跑的已是新的 Python 核心。</li>
-<li><strong>實測</strong>：登記量放大 40 倍時，存檔檢查從 10.7 秒降到 0.56 秒，守衛從 10.3 秒降到 0.77 秒；而且不再隨登記量線性變慢。</li>
-<li><strong>審查</strong>：第 3 批程式碼審了三輪，codex 依序抓到三個真 bug（同一個檔案用兩種寫法、大小寫不同的寫法時，批次寫入會互相蓋掉；取不到檔案資訊時會整個中斷），都已修掉、各有測試證明改壞會抓到，兩家放行。</li>
-<li><strong>剩下</strong>：收尾前跑一次全套治理測試（小時級，放背景）。</li>
-</ul>
-<p><strong>FF-STAT：要不要做平穩化，改成看特徵「是什麼」，不再看名字。</strong>（你 2026-09-24 第 4 點開的票，排在 FF-NAME 前面）</p>
+<li><strong>程式改了沒</strong>：<strong>還沒改</strong>。目前在審「施工清單」——也就是先寫好的 121 支驗收測試，外加一份「改之前長什麼樣」的快照。實作時就拿這些來證明做對了。</li>
+<li><strong>規格書</strong>：已定案。你 2026-09-24 回了「同意施工」。之後寫施工清單時實跑發現兩個事實，改了兩處描述：平穩化的結果另存新欄、原欄不動；真實 K 線資料沒有任何缺口。</li>
+<li><strong>你的裁定已寫進去</strong>：
 <ul>
-<li><strong>程式改了沒</strong>：<strong>還沒改</strong>。</li>
-<li><strong>規格書</strong>：審了 5 輪收斂，但你審閱時問了抽樣和前 500 根的問題，所以又做了研究：
-<ul>
-<li>研究第 1 輪結論：<strong>「免檢表」拿掉，全部檢定</strong>（三方一致）。代價是開平穩化時每個幣種每次生成多約 2 分鐘。</li>
-<li>研究第 1 輪另外查出：「前 500 根校準」<strong>沒有保證避開測試資料</strong>，屬於偷看未來，必須修。</li>
-<li>研究第 2 輪（委員正在做）：決定校準資料要從哪裡取（只用訓練段，或只用起始日之前的資料），以及窗長多長（1h 實測 2000 根比 500 根準很多）。</li>
+<li>校準窗長「先實測再定」：預設 500 根，實作完量 500／1000／2000 根的耗時、記憶體、判定差異，再請你定。</li>
+<li>沒填開始日期時「自動預留校準段」。</li>
 </ul>
 </li>
-<li>研究完會改規格書第 6 版，再給你白話審閱。</li>
-</ul>
-<p><strong>FF-NAME：衍生特徵的名字照命名規則。</strong></p>
+<li><strong>審查進度</strong>：清單已審到第 20 輪。第 19 輪 codex 又抓到 6 個漏洞，全都修了。例如：
 <ul>
-<li><strong>程式改了沒</strong>：<strong>還沒改</strong>。照你的四點擴大範圍（單一指標層、三族前綴、舊資料刪掉重生），要等 FF-STAT 定案後重寫規格書。</li>
+<li>有一支測試在兩邊都失敗時也會算通過。</li>
+<li>自動預留和手動填同一天時，沒有比對產出內容是否相同。</li>
+<li>記憶體量測會把共用的記憶體重複算進去。</li>
 </ul>
-<p><strong>FFDSTAR：每次產出都附上當次用的 d* 紀錄。</strong></p>
+</li>
+</ul>
+<p><strong>另外發現一個舊問題（不是這張票弄壞的，已另開一票 ICFIRSTALIGN）</strong>：用真實資料跑「IC 優先」那條選特徵路徑時，最後算 IC 的那一步一定會報錯。原因是兩份資料的時間標籤對不上——一邊是時間，另一邊是 0、1、2… 的流水號。既有的測試在主線上本來就是紅的。FF-STAT 的驗收已改成看報錯之前那一步的產出，不受它影響。這個修正排在 FF-STAT 之後。</p>
+<p><strong>FKPERF：讓事實登記表的存檔檢查不再越來越慢。</strong></p>
 <ul>
-<li><strong>程式改了沒</strong>：<strong>還沒改</strong>。第 3 輪審查的修正已寫進規格書；等 FF-NAME 定案後再審。</li>
+<li><strong>程式改了沒</strong>：<strong>已改並接上</strong>。登記量放大 40 倍時，存檔檢查從 10.7 秒降到 0.56 秒。</li>
+<li><strong>剩下</strong>：收尾前要跑一次全套治理測試（小時級，放背景）。這個測試跑的時候不能改檔案，上次跑到一半因為要改 FF-STAT 規格而停掉了，要等沒在改檔的空檔重跑。</li>
 </ul>
+<p><strong>FF-NAME／FFDSTAR</strong>：<strong>程式都還沒改</strong>。依序排在 FF-STAT 之後。</p>
 <h2 id="做到哪">做到哪</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -64,19 +61,31 @@
 </tr>
 <tr>
 <td>FKPERF 收尾全套測試</td>
-<td>⏳ 待跑</td>
+<td>⏳ 待空檔重跑</td>
 </tr>
 <tr>
-<td>FF-STAT 研究（免檢表、校準窗）</td>
-<td>⏳ 第 2 輪研究中</td>
+<td>FF-STAT 規格書</td>
+<td>✅ 你已同意施工</td>
 </tr>
 <tr>
-<td>FF-STAT 規格書第 6 版 → 你審閱</td>
-<td>⬜ 研究完</td>
+<td>FF-STAT 施工清單（驗收測試）</td>
+<td>⏳ 第 20 輪審查中</td>
+</tr>
+<tr>
+<td>FF-STAT 實作</td>
+<td>⬜ 清單審過後</td>
+</tr>
+<tr>
+<td>FF-STAT 校準窗長</td>
+<td>⬜ 實作後實測，再請你定</td>
+</tr>
+<tr>
+<td>ICFIRSTALIGN（IC 優先路徑報錯，舊問題）</td>
+<td>⬜ FF-STAT 之後</td>
 </tr>
 <tr>
 <td>FF-NAME 規格書重寫</td>
-<td>⬜ FF-STAT 定案後</td>
+<td>⬜ FF-STAT 之後</td>
 </tr>
 <tr>
 <td>FFDSTAR 規格書第 4 輪審查</td>
@@ -85,16 +94,16 @@
 </tbody>
 </table></div>
 <h2 id="要你決定嗎">要你決定嗎</h2>
-<p><strong>現在不用。</strong> FF-STAT 規格書第 6 版出來後會請你審（研究結論會一併白話說明）。要知道的事：</p>
+<p><strong>現在不用。</strong> 接下來會問你的只有兩件：</p>
 <ul>
-<li><strong>Codex 審查強度已改為 medium</strong>（照你的要求，<code>~/.codex/config.toml</code>）。</li>
-<li><strong>Grok 暫停中</strong>：帳戶額度用完（錯誤碼 402），目前只有 Codex、Composer 兩家審查；儲值後恢復三家。</li>
-<li><strong>FFDSTAR 會多出一個輸出檔</strong>：依規定改輸出大小要你同意，做到那裡時會量好大小再問你。</li>
+<li><strong>校準窗長</strong>：FF-STAT 實作完、量出數字後才會問。</li>
+<li><strong>FFDSTAR 會多出一個輸出檔</strong>：做到那裡時會量好大小再問你。</li>
 </ul>
+<p>另外還有一件你之前沒回的：探針先前誤寫進共用快取的檔案 <code>data_cache/feature_preprocessing/d_star_BTCUSDT_1h_dcc154ced6b6.json</code>，要刪還是留？它是快取，不會造成錯誤數值。</p>
 <h2 id="卡住嗎">卡住嗎</h2>
-<p>沒有。EVENTSCAN 照你說的沒動。</p>
+<p>沒有。EVENTSCAN 照你說的沒動。Grok 仍暫停（額度用完），目前只有 Codex、Composer 兩家審查。</p>
 <h2 id="下一件事">下一件事</h2>
-<p>等 FF-STAT 研究第 2 輪 → 改規格書第 6 版 → 送委員審 → 請你白話審閱。同時背景跑 FKPERF 收尾全套測試。</p>
+<p>等 FF-STAT 施工清單第 20 輪審查 → 兩家放行後我開始實作 → 委員審程式碼。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
