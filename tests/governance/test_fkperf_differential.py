@@ -399,13 +399,14 @@ def _recorded_coverage_gaps() -> List[Tuple[str, str]]:
 def test_recorded_sandbox_corpus_covers_every_helper_test() -> None:
     """Task 0.1 語料②「以 helper 建樹、逐一列入」（r1 codex P1-03、composer P2-01）：既有兩檔中直接或經包裝呼叫
     `_sandbox`／`_mkroot`／`_fk_sandbox`／`_d2_sandbox` 之每一支 test（AST 呼叫圖閉包，獨立於錄製）皆有生成器呼叫之錄製
-    紀錄；略過者只准「變異本」與「真 repo 入口」兩類；錄得之每筆以語料 `rec-*` 進入分支斷言與新舊逐筆比對。"""
+    紀錄；略過者只准「變異本」（入口變異 `mutated`；切換後 mutation 施於核心，`mutated-core`——Task 4.2）與「真 repo
+    入口」；錄得之每筆以語料 `rec-*` 進入分支斷言與新舊逐筆比對。"""
     from tests.governance import _fkperf_record as fr
     data = fr.recorded()
     assert data["records"], data["tail"]
     assert _recorded_coverage_gaps() == []
     reasons = {e.get("reason") for e in data["log"] if e["status"] == "skipped"}
-    assert reasons <= {"mutated", "repo-entry"}, reasons
+    assert reasons <= {"mutated", "mutated-core", "repo-entry"}, reasons
     assert len([c for c in fo.corpus("sandbox") if c.case_id.startswith("rec-")]) == len(data["records"])
 
 

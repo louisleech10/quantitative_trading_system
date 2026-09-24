@@ -275,6 +275,9 @@ def test_ratio_40x_within_20x_of_4x(tmp_path: Path, mode: str) -> None:
     """Task 4.4 驗證／C-6 ②：`min(40× 三次) <= 20 * min(4× 三次)`。"""
     r4 = sp.build_scaled_tree(tmp_path / "4x", C["scale_total_keys"]["4x"])
     r40 = sp.build_scaled_tree(tmp_path / "40x", C["scale_total_keys"]["40x"])
+    if mode == "--status-hits":  # 行檔須存在（同 :263 之建法；原缺此步 ⇒ 生成器正確回 rc=2 而非量到耗時）
+        for root in (r4, r40):
+            (root / "lines.txt").write_text("L1\tHP-FKPERF 已完成\n", encoding="utf-8")
     assert _ratio_verdict(r4, r40, mode)
 
 

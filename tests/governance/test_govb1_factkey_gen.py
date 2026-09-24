@@ -23,6 +23,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 GEN = REPO / "scripts" / "gen_fact_key_blocks.sh"
+CORE = REPO / "scripts" / "_gen_fact_key_blocks.py"
 REG = REPO / "scripts" / "fact_keys.json"
 FIX = REPO / "tests" / "governance" / "fixtures" / "govb1"
 CLEAN = FIX / "factkey_clean"
@@ -268,10 +269,7 @@ def test_output_has_no_bom_no_crlf_no_timestamp():
     )
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "R-GOVTEST-5：生成器逐 key 多次呼叫 jq，耗時隨 key 數線性成長；2026-09-19→23 key 數 17→35"
-    "（EVENTSCAN／FFDSTAR 規格值入 fact-key、白話索引），實測 2.45–2.53s（--check 10.6s）。"
-    "優化生成器屬中任務須完整管線，待開票；落地轉綠時 strict 以 XPASS 報紅，須移除本標記並同步登記表"))
+# R-GOVTEST-5 已由 FKPERF（Python 核心，外部程序數與 key 數無關）關閉：strict xfail 轉 XPASS，依標記原註移除（SPEC Task 4.4）
 def test_generator_runs_under_two_seconds():
     t0 = time.monotonic()
     r = _gen()
@@ -297,7 +295,8 @@ _LOCALE_PROBE_ROWS = [["a-y", "x"], ["B-x", "x"], ["_z", "x"]]
 #   ⇒ 兩條 mutation 打到「去重排序」而非「生成排序」，**測試轉紅但原因是錨點失準**。
 #   修法＝把錨點收窄到只有 `_fk_gen_block` 具備的前綴（含 `"${REG}"`）。
 #   這是**加嚴**（更精確的定位），不是放寬。
-_ROWS_SORT_ANCHOR = '"${REG}" | LC_ALL=C sort'
+# FKPERF Task 4.2：判定實作移入核心後，排序錨點改為核心之唯一生成排序點（bytes 序＝原 LC_ALL=C sort）
+_ROWS_SORT_ANCHOR = "        return sorted(lines)"
 
 
 def _sandbox(tmp_path: Path, registry: dict, *, inject_schema: bool = True) -> Path:
@@ -323,6 +322,7 @@ def _sandbox(tmp_path: Path, registry: dict, *, inject_schema: bool = True) -> P
     sdir = tmp_path / "scripts"
     sdir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(GEN, sdir / GEN.name)
+    shutil.copy2(CORE, sdir / CORE.name)  # FKPERF：入口 exec 同目錄核心
     (sdir / "fact_keys.json").write_text(
         json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
@@ -352,13 +352,13 @@ def _mkroot(tmp_path: Path, name: str = "root") -> Path:
 
 
 def _mutate(sdir: Path, old: str, new: str) -> None:
-    p = sdir / GEN.name
+    p = sdir / CORE.name  # FKPERF Task 4.2：mutation 施於核心（入口為薄包裝）
     src = p.read_text(encoding="utf-8")
     # 🔴 訊息須指向真正的病〔COMPOSER-R1-P2-01〕：若生產檔已失去 locale 釘子，
     #    原訊息只說「測試脫節」，委員會據此會往「測試壞了」的方向查——反了。
     assert old in src, (
         f"mutation 目標字串不存在: {old!r}\n"
-        "若目標是 `| LC_ALL=C sort`，代表**生產檔已失去 locale 釘子**——"
+        "若目標是生成排序錨點，代表**生產檔已失去 bytes 序排序**——"
         "那正是 T-2.1-M1 要防的回歸，不是測試脫節。"
     )
     p.write_text(src.replace(old, new, 1), encoding="utf-8")
@@ -394,7 +394,7 @@ def test_t21_m1a_sort_is_load_bearing(tmp_path):
     reg = {"k": {"target": "t.md", "rows": [["030", "c"], ["010", "a"], ["020", "b"]]}}
     good = _sandbox(tmp_path / "good", reg)
     bad = _sandbox(tmp_path / "bad", reg)
-    _mutate(bad, _ROWS_SORT_ANCHOR, '"${REG}" | cat')
+    _mutate(bad, _ROWS_SORT_ANCHOR, _SORT_REMOVED)
 
     out_good = _run([str(good / GEN.name)]).stdout
     out_bad = _run([str(bad / GEN.name)]).stdout
@@ -414,7 +414,7 @@ def test_t21_m1b_locale_pin_removal_breaks_determinism(tmp_path):
         #    靜默 skip 會讓 locale 貧瘠的 runner（CI）完全不驗這條 mutation ⇒ fail-open。
         #    退化成較弱但**仍有 oracle** 的來源檢查：釘子必須在。
         #    m1a 只證「sort 承重」，不證「locale 已釘」——兩者不可互相頂替。
-        assert _ROWS_SORT_ANCHOR in GEN.read_text(encoding="utf-8"), (
+        assert _ROWS_SORT_ANCHOR in CORE.read_text(encoding="utf-8"), (
             f"本機無差異 locale 且生產檔已無 `{_ROWS_SORT_ANCHOR}` ⇒ 決定性契約失守"
         )
         return
@@ -422,7 +422,7 @@ def test_t21_m1b_locale_pin_removal_breaks_determinism(tmp_path):
     reg = {"k": {"target": "t.md", "rows": _LOCALE_PROBE_ROWS}}
     pinned = _sandbox(tmp_path / "pinned", reg)
     unpinned = _sandbox(tmp_path / "unpinned", reg)
-    _mutate(unpinned, _ROWS_SORT_ANCHOR, '"${REG}" | sort')
+    _mutate(unpinned, _ROWS_SORT_ANCHOR, _SORT_LOCALE_DEPENDENT)
 
     def out(sdir: Path, lc: str) -> str:
         return _run([str(sdir / GEN.name)], env_extra={"LC_ALL": lc}).stdout
@@ -454,11 +454,12 @@ def test_t21_m1c_generation_failure_is_not_swallowed(tmp_path):
     assert _run([str(sdir / GEN.name), "--write"], env_extra=env).returncode == 0
     assert _run([str(sdir / GEN.name), "--check"], env_extra=env).returncode == 0
 
-    _mutate(sdir, "  printf '<!-- END GENERATED: %s -->\\n' \"$1\" || return 1",
-            "  printf '<!-- END GENERATED: %s -->\\n' \"$1\"\n  return 1")
+    # FKPERF Task 4.2：核心不經 jq／printf 子程序生成，原「GEN FAILED」出口屬 oracle 內部工具失敗（SPEC C-1），
+    # 無對應分支；破壞語意改寫為「生成函式輸出完整區塊後拋例外」，性質不變：生成失敗不得被 --check 吞掉。
+    _mutate(sdir, _GEN_BLOCK_END_ANCHOR, _GEN_BLOCK_END_ANCHOR + "\n        raise RuntimeError(\"gen failed\")")
     r = _run([str(sdir / GEN.name), "--check"], env_extra=env)
     assert r.returncode != 0, "生成器失敗卻放行 ⇒ --check 只比字串、不驗生成成功"
-    assert "GEN FAILED" in r.stderr, r.stderr
+    assert "gen failed" in r.stderr, r.stderr
 
 
 def test_unregistered_generated_block_is_rejected(tmp_path):
@@ -1327,7 +1328,7 @@ def test_wl01_mutation_removing_length_check_lets_ragged_rows_through(tmp_path):
     reg = _shape_reg(columns=["a", "b", "c"], rows=[["010", "x", "y"], ["020", "z"]])
     good = _sandbox(tmp_path / "good", reg)
     bad = _sandbox(tmp_path / "bad", reg)
-    _mutate(bad, "length == $n", "length >= 0")
+    _mutate(bad, _ROW_WIDTH_ANCHOR, "                pass")
     assert _run([str(good / GEN.name)]).returncode != 0
     assert _run([str(bad / GEN.name)]).returncode == 0, "這條 mutation 是空心的"
 
@@ -1340,7 +1341,7 @@ def test_wl01_mutation_removing_shape_call_in_check_lets_bad_render_through(tmp_
     reg = {"k": {"target": "docs/t.md", "render": "markdown", "rows": [["010", "a"]]}}
     good = _sandbox(tmp_path / "good", reg)
     bad = _sandbox(tmp_path / "bad", reg)
-    _mutate(bad, '_fk_validate_shape "${_fkc_k}" || { _fkc_rc=1; continue; }', ":")
+    _mutate(bad, _CHECK_SHAPE_ANCHOR, "        if False:")
     env = {"GOVB1_FACTKEY_ROOT": str(root)}
     g = _run([str(good / GEN.name), "--check"], env_extra=env)
     b = _run([str(bad / GEN.name), "--check"], env_extra=env)
@@ -1355,7 +1356,7 @@ def test_wl01_sort_anchor_stays_unique_in_generator():
     WL-01 新增 table 分支時若各自寫一行排序，錨點會再度變成兩處 ⇒ 兩條 mutation
     打不到生成排序而**空心通過**。修法＝排序集中在 `_fk_rows_tsv`；本測試釘住之。
     """
-    src = GEN.read_text(encoding="utf-8")
+    src = CORE.read_text(encoding="utf-8")
     n = src.count(_ROWS_SORT_ANCHOR)
     assert n == 1, (
         f"排序錨點 {_ROWS_SORT_ANCHOR!r} 在生產檔出現 {n} 次（須恰 1）——"
@@ -1524,8 +1525,8 @@ def test_wl02_claim_form_list_is_frozen_named_set():
     只有正則沒有清單時，「涵蓋哪些」只存在於一串難讀的字元類裡，
     文件要引用就只能再抄一份 —— 那就是本註冊表要治的病。
     """
-    src = GEN.read_text(encoding="utf-8")
-    m = re.search(r"^_FK_RC_CLAIM_FORMS='([^']*)'$", src, re.M)
+    src = CORE.read_text(encoding="utf-8")
+    m = re.search(r'^_FK_RC_CLAIM_FORMS = "([^"]*)"$', src, re.M)
     assert m, "生產檔缺 _FK_RC_CLAIM_FORMS 具名清單"
     forms = m.group(1).split()
     assert forms == sorted(set(forms), key=forms.index), "具名清單不得有重複項"
@@ -1634,7 +1635,7 @@ def test_wl02_mutation_removing_conflict_check_lets_contradiction_through(tmp_pa
     reg = _crit_reg(rows)
     good = _sandbox(tmp_path / "good", reg)
     bad = _sandbox(tmp_path / "bad", reg)
-    _mutate(bad, "_fk_validate_criteria || _fkc_rc=1", ":")
+    _mutate(bad, _CHECK_CRITERIA_ANCHOR, _CHECK_CRITERIA_REMOVED)
     root = _crit_root(tmp_path / "r")
     env = {"GOVB1_FACTKEY_ROOT": str(root)}
     _run([str(good / GEN.name), "--write"], env_extra=env)
@@ -1648,7 +1649,7 @@ def test_wl02_mutation_removing_rc_scan_lets_outside_claim_through(tmp_path):
     reg = _crit_reg(_CRIT_OK)
     good = _sandbox(tmp_path / "good", reg)
     bad = _sandbox(tmp_path / "bad", reg)
-    _mutate(bad, "_fk_reject_rc_claims_outside_blocks || _fkc_rc=1", ":")
+    _mutate(bad, _CHECK_RC_SCAN_ANCHOR, _CHECK_RC_SCAN_REMOVED)
     root = _crit_root(tmp_path / "r", body="驗收：rc=0\n")
     env = {"GOVB1_FACTKEY_ROOT": str(root)}
     _run([str(good / GEN.name), "--write"], env_extra=env)
@@ -2027,8 +2028,9 @@ def test_wl03_jq_failure_is_fail_closed_not_empty_registry(tmp_path):
     """
     root = _mech_root(tmp_path)
     sdir = _sandbox(tmp_path, _mech_reg(_MECH_OK))
-    _mutate(sdir, """_fk_raw_keys() { LC_ALL=C jq -r 'keys[]' "${REG}"; }""",
-            "_fk_raw_keys() { return 1; }")
+    # FKPERF Task 4.2：核心不以 jq 子程序讀 key 清單（無 jq 失敗分支，SPEC C-1 tool_failure）；
+    # 破壞語意改寫為「讀 key 清單時拋出帶真病名之例外」，性質不變：失敗須報真病、不得偽裝成 key 未註冊。
+    _mutate(sdir, _RAW_KEYS_ANCHOR, _RAW_KEYS_FAILED)
     r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
     assert r.returncode != 0, "jq 失敗被當成空註冊表而放行 ⇒ 假綠"
     assert "讀取 fact-key 清單失敗" in r.stderr, (
@@ -2161,9 +2163,7 @@ def test_wl03_mutation_removing_scope_syntax_guard_turns_green(tmp_path):
     good, _, _ = _mech_run(tmp_path / "g", reg)
     # 🔴 錨點必須唯一：`*'*'*|*'?'*|*'['*)` 在 status_scope 的守衛裡也有一份，
     #   `_mutate` 只換第一處 ⇒ 會打到那邊而空心（初版即如此）。故連同專屬變數一起錨定。
-    bad, _, _ = _mech_run(tmp_path / "b", reg, mutate=(
-        '    case "${_fkvm_sc}" in\n      *\'*\'*|*\'?\'*|*\'[\'*)',
-        '    case "${_fkvm_sc}" in\n      __never_match__)'))
+    bad, _, _ = _mech_run(tmp_path / "b", reg, mutate=(_MECH_WILDCARD_ANCHOR, _MECH_WILDCARD_REMOVED))
     assert "不得含 wildcard" in good.stderr, good.stderr
     assert "不得含 wildcard" not in bad.stderr, (
         f"拿掉 wildcard 守衛後仍報同一錯因 ⇒ 這條斷言是空心的\n{bad.stderr}"
@@ -2197,8 +2197,7 @@ def test_wl03_mutation_removing_subtree_scan_lets_unregistered_through(tmp_path)
     # 🔴 錨在**函式定義**上，不錨在呼叫點：r1 修補後子樹掃描有兩個呼叫點
     #   （`--check` 與 `--write`），只 mutate 一處會讓 `--write` 仍紅而測不到東西。
     bad, _, _ = _mech_run(tmp_path / "b", reg, spec_body=_GAIFA_CONTINUATION, mutate=(
-        "_fk_reject_unregistered_mechanisms() {\n  _fk_mechanism_schema_present || return 0",
-        "_fk_reject_unregistered_mechanisms() {\n  return 0"))
+        _MECH_SUBTREE_ANCHOR, _MECH_SUBTREE_REMOVED))
     assert good.returncode != 0, good.stderr
     assert bad.returncode == 0, (
         f"拿掉子樹掃描後仍紅 ⇒ 這條 mutation 是空心的\n{bad.stderr}"
@@ -2213,7 +2212,7 @@ def test_wl03_mutation_removing_receipt_check_lets_missing_file_through(tmp_path
     # 🔴 `[ -f X ] || { 報錯 }` 的反面是 `true ||`，不是 `false ||`
     #    —— 後者反而**必定**進入報錯分支（本測試初版即打反，由紅燈抓到）
     bad, _, _ = _mech_run(tmp_path / "b", reg,
-                          mutate=('[ -f "$(_fk_root)/${_fkvm_val}" ] || {', "true || {"))
+                          mutate=(_MECH_RECEIPT_ANCHOR, _MECH_RECEIPT_REMOVED))
     assert good.returncode != 0, good.stderr
     assert bad.returncode == 0, (
         f"拿掉 receipt 存在性判定後仍紅 ⇒ 這條 mutation 是空心的\n{bad.stderr}"
@@ -2226,9 +2225,9 @@ def test_wl03_token_matching_is_literal_table_not_path_probe():
     本機 `setsid` 不在 PATH ⇒ 以 `command -v`／`which` 做候選會**漏掉出生事故本身**。
     這是被實測直接證偽過的 assumed，不得回退。
     """
-    src = GEN.read_text(encoding="utf-8")
+    src = CORE.read_text(encoding="utf-8")
     body = src.split("WL-03（票 B-25 機制證據登記）", 1)[1]
-    for probe in ["command -v", "which ", "type -P"]:
+    for probe in ["command -v", "which ", "type -P", "shutil.which"]:
         assert probe not in body, (
             f"WL-03 區段出現 PATH 探測 {probe!r} ⇒ setsid 不在 PATH，這會漏掉出生事故本身"
         )
@@ -2464,3 +2463,182 @@ def test_s61_non_script_extension_citation_is_verified(tmp_path):
     out = r.stdout + r.stderr
     assert r.returncode != 0, f".md 假碼證被放行 ⇒ 換個副檔名即可繞過：{out}"
     assert "檔案不存在" in out, f"rc≠0 但未具名 ⇒ 可能紅在別的原因：{out}"
+
+
+# ==========================================================================
+# FKPERF Task 4.2 — mutation 重定向：核心錨點與「被破壞性質」之正向測試
+# 入口改薄包裝後判定全在 `scripts/_gen_fact_key_blocks.py`；本節錨點皆須在核心恰出現一次
+# （test_fkperf_cutover.py::test_boundary_29_mutation_anchors_unique_in_core）。
+# ==========================================================================
+
+_SORT_REMOVED = "        return list(lines)"
+_SORT_LOCALE_DEPENDENT = (
+    "        import locale\n"
+    "        locale.setlocale(locale.LC_ALL, \"\")\n"
+    "        return sorted(lines, key=lambda b: locale.strxfrm(b.decode(\"utf-8\", \"surrogateescape\")))"
+)
+_GEN_BLOCK_END_ANCHOR = '        out += to_b("<!-- END GENERATED: %s -->\\n" % k)'
+_ROW_WIDTH_ANCHOR = '                codes.append("row-width")'
+_CHECK_SHAPE_ANCHOR = "        if not self.validate_shape(k):  # --check 之形狀驗證（WL-01；mutation 錨）"
+_CHECK_CRITERIA_ANCHOR = ("    for check in (self.reject_unregistered_blocks, self.reject_handwritten_status, "
+                          "self.validate_criteria,")
+_CHECK_CRITERIA_REMOVED = "    for check in (self.reject_unregistered_blocks, self.reject_handwritten_status,"
+_CHECK_RC_SCAN_ANCHOR = ("                  self.reject_rc_claims_outside_blocks, self.validate_mechanism, "
+                         "self.validate_enforcement,")
+_CHECK_RC_SCAN_REMOVED = "                  self.validate_mechanism, self.validate_enforcement,"
+_MECH_WILDCARD_ANCHOR = ('        if "*" in sc or "?" in sc or "[" in sc:\n'
+                         '            self.err("gen_fact_key_blocks: _schema.mechanism_scope 不得含 wildcard')
+_MECH_WILDCARD_REMOVED = ('        if False:\n'
+                          '            self.err("gen_fact_key_blocks: _schema.mechanism_scope 不得含 wildcard')
+_MECH_SUBTREE_ANCHOR = 'def _reject_unregistered_mechanisms(self: "Gen") -> bool:\n    if not any('
+_MECH_SUBTREE_REMOVED = 'def _reject_unregistered_mechanisms(self: "Gen") -> bool:\n    return True\n    if not any('
+_MECH_RECEIPT_ANCHOR = ('            if not os.path.isfile(rp):\n'
+                        '                self.err("gen_fact_key_blocks: key %s 之 receipt 指向不存在之檔')
+_MECH_RECEIPT_REMOVED = ('            if False:\n'
+                         '                self.err("gen_fact_key_blocks: key %s 之 receipt 指向不存在之檔')
+_RAW_KEYS_ANCHOR = "    def raw_keys(self) -> List[str]:\n        return read_lines("
+_RAW_KEYS_FAILED = ("    def raw_keys(self) -> List[str]:\n"
+                    "        raise RuntimeError(\"讀取 fact-key 清單失敗\")\n"
+                    "        return read_lines(")
+_RC_FORMS_ANCHOR = ('_FK_RC_CLAIM_FORMS = "rc-op rc-unchanged returncode-op exit-code exit-n exitcode-zh '
+                    'endcode-zh nonzero-zh"')
+_WL03_MARKER_ANCHOR = ("# WL-03（票 B-25 機制證據登記）：平台機制 token 以 _schema.mechanism_tokens 字面封閉表比對，"
+                       "不做任何可執行檔探測")
+
+
+def test_fkperf_prop_rows_emitted_sorted(tmp_path):
+    """性質：生成列依位元組序排序（註冊表 rows 亂序給入）。"""
+    sdir = _sandbox(tmp_path, {"k": {"target": "t.md", "rows": [["030", "c"], ["010", "a"], ["020", "b"]]}})
+    lines = _run([str(sdir / GEN.name)]).stdout.splitlines()
+    assert [ln.split("\t")[0] for ln in lines[1:4]] == ["010", "020", "030"], "生成列未依位元組序排序"
+
+
+def test_fkperf_prop_output_independent_of_locale(tmp_path):
+    """性質：輸出不隨環境 locale 改變（決定性契約）。"""
+    loc = _discriminating_locale()
+    assert loc is not None, "本機無可區分排序之 locale，本性質無法驗證"
+    sdir = _sandbox(tmp_path, {"k": {"target": "t.md", "rows": _LOCALE_PROBE_ROWS}})
+    a = _run([str(sdir / GEN.name)], env_extra={"LC_ALL": "C"}).stdout
+    b = _run([str(sdir / GEN.name)], env_extra={"LC_ALL": loc}).stdout
+    assert a == b, "輸出隨環境 locale 改變"
+
+
+def test_fkperf_prop_valid_registry_emits_rc_zero(tmp_path):
+    """性質：合法註冊表之生成 rc=0。"""
+    sdir = _sandbox(tmp_path, {"k": {"target": "t.md", "rows": [["010", "a"]]}})
+    r = _run([str(sdir / GEN.name)])
+    assert r.returncode == 0, "合法註冊表生成失敗：" + r.stderr[-400:]
+
+
+def test_fkperf_prop_write_then_check_is_rc_zero(tmp_path):
+    """性質：`--write` 後之 `--check` rc=0（生成成功且宿主同步）。"""
+    root = _mkroot(tmp_path)
+    (root / "docs" / "t.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n", encoding="utf-8")
+    sdir = _sandbox(tmp_path, {"k": {"target": "docs/t.md", "rows": [["010", "a"]]}})
+    env = {"GOVB1_FACTKEY_ROOT": str(root)}
+    w = _run([str(sdir / GEN.name), "--write"], env_extra=env)
+    c = _run([str(sdir / GEN.name), "--check"], env_extra=env)
+    assert w.returncode == 0 and c.returncode == 0, "--write 後 --check 未回 0：" + (w.stderr + c.stderr)[-400:]
+
+
+def test_fkperf_prop_ragged_rows_rejected(tmp_path):
+    """性質：列欄數與 columns 宣告不符即拒。"""
+    reg = _shape_reg(columns=["a", "b", "c"], rows=[["010", "x", "y"], ["020", "z"]])
+    r = _emit(tmp_path, reg)
+    assert r.returncode != 0 and "欄數" in r.stderr, "參差列未被拒"
+
+
+def test_fkperf_prop_check_rejects_bad_render(tmp_path):
+    """性質：`--check` 路徑執行形狀驗證（非法 render 被報出）。"""
+    root = _mkroot(tmp_path)
+    (root / "docs" / "t.md").write_text(
+        "<!-- BEGIN GENERATED: k -->\n<!-- END GENERATED: k -->\n", encoding="utf-8")
+    sdir = _sandbox(tmp_path, {"k": {"target": "docs/t.md", "render": "markdown", "rows": [["010", "a"]]}})
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+    assert "render" in r.stderr, "--check 未報非法 render"
+
+
+def test_fkperf_prop_check_reports_conflicting_criteria(tmp_path):
+    """性質：`--check` 報出互斥判準。"""
+    # 直跑 --check（`_crit_run` 於 --write 擋下時回傳 write 之輸出，會掩蓋 --check 路徑是否執行該驗證）
+    rows = _CRIT_OK + [["C-3", "s1", "cond-a", "1", "現行", "test_c"]]
+    root = _crit_root(tmp_path / "r")
+    sdir = _sandbox(tmp_path / "s", _crit_reg(rows))
+    r = _run([str(sdir / GEN.name), "--check"], env_extra={"GOVB1_FACTKEY_ROOT": str(root)})
+    assert "互斥判準" in r.stderr, "--check 未報互斥判準"
+
+
+def test_fkperf_prop_check_reports_rc_claim_outside_block(tmp_path):
+    """性質：`--check` 報出生成區塊外之期望結束狀態陳述。"""
+    r, _, _ = _crit_run(tmp_path, _crit_reg(_CRIT_OK), body="驗收：rc=0\n", sub="fkperfprop")
+    assert "生成區塊外陳述期望結束狀態" in r.stderr, "--check 未報區塊外 rc 陳述"
+
+
+def test_fkperf_prop_mechanism_scope_wildcard_rejected(tmp_path):
+    """性質：mechanism_scope 含 wildcard 即拒。"""
+    reg = _mech_reg(_MECH_OK, scope=["docs/m.md", "docs/spec.md", "docs/*.md"])
+    r, _, _ = _mech_run(tmp_path, reg)
+    assert "不得含 wildcard" in r.stderr, "mechanism_scope 之 wildcard 未被拒"
+
+
+def test_fkperf_prop_unregistered_mechanism_in_subtree_rejected(tmp_path):
+    """性質：改法子樹中未登記為現行之平台機制即拒。"""
+    r, _, _ = _mech_run(tmp_path, _mech_reg(_MECH_OK), spec_body=_GAIFA_CONTINUATION)
+    assert "未登記為現行" in r.stderr, "改法子樹未登記機制未被拒"
+
+
+def test_fkperf_prop_missing_receipt_rejected(tmp_path):
+    """性質：receipt 指向不存在之檔即拒。"""
+    rows = [["M-1", "timeout", "s1", "receipt:docs/NO_SUCH.md", "可用", "現行"]]
+    r, _, _ = _mech_run(tmp_path, _mech_reg(rows))
+    assert "receipt 指向不存在之檔" in r.stderr, "缺檔 receipt 未被拒"
+
+
+_P = "tests/governance/test_govb1_factkey_gen.py::"
+# 對照表（原破壞語意 → 核心錨點；`red_test`＝不經 `_mutate`、以核心直接驗被破壞性質之測試，
+# `fail_substr`＝其斷言訊息）。`test_ref` 為本檔中呼叫 mutation helper 之耦合行（test_fkperf_cutover 以集合相等核對）。
+# 對應不到之原破壞語意（核心無該分支）改寫而非刪除，於 `note` 說明（SPEC Task 4.2 不可做）。
+FKPERF_MUTATION_MAP = [
+    {"test_ref": "test_govb1_factkey_gen.py:397", "core_anchor": _ROWS_SORT_ANCHOR, "core_mutant": _SORT_REMOVED,
+     "red_test": _P + "test_fkperf_prop_rows_emitted_sorted", "fail_substr": "生成列未依位元組序排序",
+     "note": "原 `\"${REG}\" | LC_ALL=C sort` → `| cat`：拿掉生成排序"},
+    {"test_ref": "test_govb1_factkey_gen.py:425", "core_anchor": _ROWS_SORT_ANCHOR,
+     "core_mutant": _SORT_LOCALE_DEPENDENT,
+     "red_test": _P + "test_fkperf_prop_output_independent_of_locale", "fail_substr": "輸出隨環境 locale 改變",
+     "note": "原拿掉 LC_ALL=C 釘子 → 核心排序改依環境 locale 之 strxfrm"},
+    {"test_ref": "test_govb1_factkey_gen.py:459", "core_anchor": _GEN_BLOCK_END_ANCHOR,
+     "core_mutant": _GEN_BLOCK_END_ANCHOR + "\n        raise RuntimeError(\"gen failed\")",
+     "red_test": _P + "test_fkperf_prop_write_then_check_is_rc_zero", "fail_substr": "--write 後 --check 未回 0",
+     "note": "原 printf 後 return 1（oracle 之 GEN FAILED 出口屬內部工具失敗，核心無此分支）→ 改寫為生成函式輸出完整區塊後拋例外"},
+    {"test_ref": "test_govb1_factkey_gen.py:1331", "core_anchor": _ROW_WIDTH_ANCHOR, "core_mutant": "                pass",
+     "red_test": _P + "test_fkperf_prop_ragged_rows_rejected", "fail_substr": "參差列未被拒",
+     "note": "原 `length == $n` → `length >= 0`：列長比對恆真"},
+    {"test_ref": "test_govb1_factkey_gen.py:1344", "core_anchor": _CHECK_SHAPE_ANCHOR, "core_mutant": "        if False:",
+     "red_test": _P + "test_fkperf_prop_check_rejects_bad_render", "fail_substr": "--check 未報非法 render",
+     "note": "原 `_fk_validate_shape` 於 --check 之呼叫 → `:`"},
+    {"test_ref": "test_govb1_factkey_gen.py:1638", "core_anchor": _CHECK_CRITERIA_ANCHOR,
+     "core_mutant": _CHECK_CRITERIA_REMOVED,
+     "red_test": _P + "test_fkperf_prop_check_reports_conflicting_criteria", "fail_substr": "--check 未報互斥判準",
+     "note": "原 `_fk_validate_criteria || _fkc_rc=1` → `:`"},
+    {"test_ref": "test_govb1_factkey_gen.py:1652", "core_anchor": _CHECK_RC_SCAN_ANCHOR,
+     "core_mutant": _CHECK_RC_SCAN_REMOVED,
+     "red_test": _P + "test_fkperf_prop_check_reports_rc_claim_outside_block", "fail_substr": "--check 未報區塊外 rc 陳述",
+     "note": "原 `_fk_reject_rc_claims_outside_blocks || _fkc_rc=1` → `:`"},
+    {"test_ref": "test_govb1_factkey_gen.py:1766", "core_anchor": _MECH_WILDCARD_ANCHOR,
+     "core_mutant": _MECH_WILDCARD_REMOVED,
+     "red_test": _P + "test_fkperf_prop_mechanism_scope_wildcard_rejected", "fail_substr": "mechanism_scope 之 wildcard 未被拒",
+     "note": "經 `_mech_run(mutate=…)`：原 mechanism_scope 之 wildcard case 守衛 → 永不命中"},
+    {"test_ref": "test_govb1_factkey_gen.py:1766", "core_anchor": _MECH_SUBTREE_ANCHOR,
+     "core_mutant": _MECH_SUBTREE_REMOVED,
+     "red_test": _P + "test_fkperf_prop_unregistered_mechanism_in_subtree_rejected",
+     "fail_substr": "改法子樹未登記機制未被拒",
+     "note": "經 `_mech_run(mutate=…)`：原 `_fk_reject_unregistered_mechanisms` 函式首行 return 0"},
+    {"test_ref": "test_govb1_factkey_gen.py:1766", "core_anchor": _MECH_RECEIPT_ANCHOR,
+     "core_mutant": _MECH_RECEIPT_REMOVED,
+     "red_test": _P + "test_fkperf_prop_missing_receipt_rejected", "fail_substr": "缺檔 receipt 未被拒",
+     "note": "經 `_mech_run(mutate=…)`：原 receipt 存在性判定 → `true ||`"},
+    {"test_ref": "test_govb1_factkey_gen.py:2033", "core_anchor": _RAW_KEYS_ANCHOR, "core_mutant": _RAW_KEYS_FAILED,
+     "red_test": _P + "test_fkperf_prop_valid_registry_emits_rc_zero", "fail_substr": "合法註冊表生成失敗",
+     "note": "原 `_fk_raw_keys` 之 jq 失敗（核心不以 jq 子程序讀 key，無此分支）→ 改寫為讀 key 清單時拋出帶病名之例外"},
+]

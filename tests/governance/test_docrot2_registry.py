@@ -300,6 +300,7 @@ def _fk_sandbox(tmp_path: Path, keys: dict, *, source=None, schema_extra: dict |
     (root / "docs").mkdir()
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     shutil.copy2(GEN, root / "scripts" / GEN.name)
+    shutil.copy2(GEN.with_name("_gen_fact_key_blocks.py"), root / "scripts" / "_gen_fact_key_blocks.py")  # FKPERF：入口 exec 同目錄核心
     reg = {"_schema": {**_FK_MIN_SCHEMA, **(schema_extra or {})}, **keys}
     (root / "scripts" / "fact_keys.json").write_text(
         json.dumps(reg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

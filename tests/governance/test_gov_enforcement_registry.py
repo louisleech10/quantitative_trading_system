@@ -34,6 +34,7 @@ def _mkrepo(tmp_path: Path, mutate=None) -> Path:
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     (root / ".claude").mkdir(parents=True, exist_ok=True)
     shutil.copy2(GEN, root / "scripts" / GEN.name)
+    shutil.copy2(GEN.with_name("_gen_fact_key_blocks.py"), root / "scripts" / "_gen_fact_key_blocks.py")  # FKPERF：入口 exec 同目錄核心
     shutil.copy2(SETTINGS, root / ".claude" / "settings.json")
     # 🔴 掛載點對證會驗「片段對應的腳本在 repo 內存在」⇒ 假 repo 必須備齊被登記的 hook 腳本，
     #    否則基準會因對證失敗而紅（初版漏複製，DRIFT 把真正的錯因蓋掉）。
@@ -257,11 +258,12 @@ def test_mutation_removing_closure_binding_lets_it_through(tmp_path):
     """反面實證：拿掉收案綁定後，未覆蓋的收案票就通過 ⇒ 證明該條非空心。"""
     root = _mkrepo(tmp_path,
                    lambda d: _add_ticket(d, d["_schema"]["enforcement_closed_status"]))
-    p = root / "scripts" / GEN.name
+    # FKPERF Task 4.2：入口改薄包裝後判定在核心；錨點改指核心之收案綁定判定（原 bash `[ -z "${_fkve_missing}" ] ||`）
+    p = root / "scripts" / "_gen_fact_key_blocks.py"
     src = p.read_text(encoding="utf-8")
-    anchor = '  [ -z "${_fkve_missing}" ] || {'
-    assert anchor in src, "mutation 錨點不存在"
-    p.write_text(src.replace(anchor, '  [ -n "${_fkve_missing}" ] || {', 1), encoding="utf-8")
+    anchor = "    if missing:\n        self.err(\"gen_fact_key_blocks: 下列票已標『%s』但未在 %s-enforcement 登記產出端覆蓋"
+    assert src.count(anchor) == 1, "mutation 錨點不存在或不唯一"
+    p.write_text(src.replace(anchor, anchor.replace("    if missing:", "    if False:", 1), 1), encoding="utf-8")
     r = _check(root)
     assert "登記產出端覆蓋" not in r.stderr, (
         f"拿掉收案綁定後仍報同一訊息 ⇒ 這條 mutation 是空心的\n{r.stderr}"

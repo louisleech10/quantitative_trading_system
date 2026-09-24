@@ -45,6 +45,7 @@ TARGET_REL = "docs/GOVERNANCE_EXECUTION_ORDER.md"
 _DEPS = (
     "gov_check.sh",
     "gen_fact_key_blocks.sh",
+    "_gen_fact_key_blocks.py",   # FKPERF 切換：入口 exec 之核心
     "fact_keys.json",
     "doc_format_precheck.sh",
     "template_check.sh",

@@ -43,6 +43,7 @@ def _mkrepo(tmp_path: Path, *, registry: dict | None = None, drift_same: bool = 
     (root / "docs").mkdir(parents=True, exist_ok=True)
     shutil.copy2(GUARD, root / "scripts" / GUARD.name)
     shutil.copy2(GEN, root / "scripts" / GEN.name)
+    shutil.copy2(GEN.with_name("_gen_fact_key_blocks.py"), root / "scripts" / "_gen_fact_key_blocks.py")  # FKPERF：入口 exec 同目錄核心
     reg = registry if registry is not None else {
         "_schema": dict(_MIN_SCHEMA),
         "k": {"target": "docs/t.md", "rows": [["010", "ZZ-01", "x"]]},

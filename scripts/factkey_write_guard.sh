@@ -84,6 +84,8 @@ _managed() {
   #   真正的獨立錨是 pytest（`test_guard_is_wired_into_posttooluse` 等）與 pre-push。
   #   本項只擋「意外改壞」，不擋蓄意；見登記表殘留 3。
   printf '%s\n' "scripts/gen_fact_key_blocks.sh"
+  # FKPERF Task 4.1：入口改薄包裝後判定全在核心；只改核心亦須觸發（否則掏空核心不被察覺）
+  printf '%s\n' "scripts/_gen_fact_key_blocks.py"
   printf '%s\n' "scripts/factkey_write_guard.sh"
   LC_ALL=C jq -r '._schema.enforcement_settings_path? // empty' "${REG}" 2>/dev/null
   LC_ALL=C jq -r 'to_entries[] | select(.key != "_schema") | (.value.target | if type == "array" then .[] else . end),

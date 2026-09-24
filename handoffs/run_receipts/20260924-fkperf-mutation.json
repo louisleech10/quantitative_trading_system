@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "command": "pytest /Users/louis/Desktop/quantitative_trading_system/tests/governance/test_fkperf_cutover.py::test_every_mutation_map_row_turns_its_red_test_red",
+  "exit_code": 0,
+  "rows": [
+    {
+      "test_ref": "test_govb1_factkey_gen.py:397",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_rows_emitted_sorted",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_rows_emitted_sorted",
+      "fail_substr": "生成列未依位元組序排序",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.34s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:425",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_output_independent_of_locale",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_output_independent_of_locale",
+      "fail_substr": "輸出隨環境 locale 改變",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.27s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:459",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_write_then_check_is_rc_zero",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_write_then_check_is_rc_zero",
+      "fail_substr": "--write 後 --check 未回 0",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.29s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:1331",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_ragged_rows_rejected",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_ragged_rows_rejected",
+      "fail_substr": "參差列未被拒",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.20s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:1344",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_check_rejects_bad_render",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_check_rejects_bad_render",
+      "fail_substr": "--check 未報非法 render",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.25s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:1638",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_check_reports_conflicting_criteria",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_check_reports_conflicting_criteria",
+      "fail_substr": "--check 未報互斥判準",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.30s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:1652",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_check_reports_rc_claim_outside_block",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_check_reports_rc_claim_outside_block",
+      "fail_substr": "--check 未報區塊外 rc 陳述",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.34s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:1766",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_mechanism_scope_wildcard_rejected",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_mechanism_scope_wildcard_rejected",
+      "fail_substr": "mechanism_scope 之 wildcard 未被拒",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.25s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:1766",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_unregistered_mechanism_in_subtree_rejected",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_unregistered_mechanism_in_subtree_rejected",
+      "fail_substr": "改法子樹未登記機制未被拒",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.33s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:1766",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_missing_receipt_rejected",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_missing_receipt_rejected",
+      "fail_substr": "缺檔 receipt 未被拒",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.33s ==============================="
+    },
+    {
+      "test_ref": "test_govb1_factkey_gen.py:2033",
+      "red_test": "tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_valid_registry_emits_rc_zero",
+      "command": "/Users/louis/Desktop/quantitative_trading_system/venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_govb1_factkey_gen.py::test_fkperf_prop_valid_registry_emits_rc_zero",
+      "fail_substr": "合法註冊表生成失敗",
+      "mutant_rc": 1,
+      "restored_rc": 0,
+      "fail_substr_seen": true,
+      "precondition_failed": false,
+      "summary": "============================== 1 failed in 0.21s ==============================="
+    }
+  ]
+}

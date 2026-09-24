@@ -35,6 +35,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _live_doc_registry as ldr  # noqa: E402
 
 GEN_REL = os.path.join("scripts", "gen_fact_key_blocks.sh")
+# FKPERF 切換後入口為薄包裝，exec 同目錄之核心；快照物化須連核心一併取出（缺則入口 exec 失敗）
+GEN_CORE_REL = os.path.join("scripts", "_gen_fact_key_blocks.py")
 BEGIN_GEN_RE = re.compile(r"^<!-- BEGIN GENERATED: (.+) -->$")
 END_GEN_RE = re.compile(r"^<!-- END GENERATED: (.+) -->$")
 HIST_BEGIN = "<!-- HISTORY-BEGIN -->"
@@ -142,7 +144,7 @@ class Context:
         if self._gen_dir is None:
             d = tempfile.mkdtemp(prefix="docrot2-snapshot-gen-")
             try:
-                files = {GEN_REL.replace(os.sep, "/")}
+                files = {GEN_REL.replace(os.sep, "/"), GEN_CORE_REL.replace(os.sep, "/")}
                 for spec in self.fact_keys.values():
                     src = spec.get("rows_source") if isinstance(spec, dict) else None
                     rel = src.get("file") if isinstance(src, dict) else None

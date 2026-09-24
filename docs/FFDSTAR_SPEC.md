@@ -111,7 +111,7 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
 |---|---|---|---|
 | 010 | `applied` | 布林 | 本次 run 該欄是否實際套用 fracdiff |
 | 020 | `d` | 浮點；`applied` 為真時**必填**，為假時**必須缺席** | 本次實際使用之分數階；缺席與 `null` 語意不同，須以缺席表達 |
-| 030 | `source` | `cache_hit` ｜ `search`；`applied` 為真時必填 | `d` 之來源＝命中既有快取，或本次重新搜尋 |
+| 030 | `source` | `cache_hit` ｜ `search` ｜ `search_error_default`；`applied` 為真時必填 | `d` 之來源＝命中既有快取、本次重新搜尋，或**搜尋拋例外後現行碼以 `d=1.0` 套用**（`feature_preprocessor.py:3035-3060` 之 `except Exception` 分支；R3 codex P1-02）——本票只如實記錄此分支，不改其行為；該分支是否應 fail-closed 屬平穩化處理之數值正確性，交另案研究 |
 | 040 | `reason` | 封閉集合，見 `ffdstar-skip-reasons`；`applied` 為假時必填 | 未套用之原因 |
 | 050 | 頂層 `symbol`／`timeframe`／`config_hash` | 字串 | run 之身分；`config_hash` 為本票解決 owner mismatch 之關鍵欄 |
 | 060 | 頂層 `row_count`／`time_range` | 整數／物件 | 與 run 對齊；與既有共用快取之同名欄語意相同 |
@@ -127,7 +127,7 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
 | 序 | 值 | 語意 |
 |---|---|---|
 | 010 | （待實作時以碼證補齊） | 🔴 本表之值集合**不得由主委憑印象填寫**——SPEC 初稿曾杜撰四個不存在的分支名，經 R1 兩家以碼證推翻。實作 Task 1.1 之第一步即為列出 `_apply_fractional_differencing` 之實際離開路徑，逐一對應後回填本表；回填前本表僅此一列 |
-| 020 | 回填之機械約束 | 🔴 **R1 所寫之約束不成立**（R2 兩家指出）：Task 1.1 驗證① 只比**欄名集合**，不比 `reason` **值** ⇒ 回填前 TODO 與測試仍可各自發明值。**改為**：驗證① 增一條——收據中每筆 `applied=false` 之 `reason`，其值須逐字命中本表；本表僅含佔位列時，任何 `applied=false` 之筆皆使該斷言轉紅 ⇒ **回填前實作不可能通過驗收** |
+| 020 | 回填之機械約束 | 🔴 **只有值符合 `^[a-z][a-z0-9_]*$` 之列才是原因碼**（R3 codex P1-01：原寫法使本表之說明列〔如本列之值〕亦可被當成合法 reason 寫入而通過）。Task 1.1 驗證③：收據中每筆 `applied=false` 之 `reason` 須逐字命中本表中**值合此樣式之列**；回填前本表無任何此樣式之值 ⇒ 任何 `applied=false` 之筆皆使驗證③轉紅，**回填前實作不可能通過驗收** |
 | 030 | 🔴 唯一之 column universe（R2 委員指出原文未定義） | 「進入 `_apply_fractional_differencing` 之欄」歧義（df input／numeric columns／layer-filtered targets／selected columns 四者不同）。**定義為**：該函式**實際迭代過**之欄，亦即 `columns` 變數在 `_select_columns` 與 `_filter_fracdiff_target_columns` 之後、`nan_rates` 過濾之前的內容；其後之 `eligible_columns` 與 `skipped_high_nan` 皆為其子集 |
 <!-- END GENERATED: ffdstar-skip-reasons -->
 
@@ -149,7 +149,7 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
 > 🔴 **本 Phase 表之執行順序＝ Task 1.1 → 1.2 → 1.3**（列序即執行序）。
 > 自檢已做：無 forward dependency。
 
-### Phase 1 — 收據落檔（依賴：無。三項技術選擇已由 R1 收斂裁定，見 §A）
+### Phase 1 — 收據落檔（依賴：**FF-NAME 實作完成**——收據之 `config_hash` 與逐欄鍵皆依 FF-NAME 之命名世代與欄名；於 FF-NAME 前實作即鎖在舊世代、須重做驗收〔R3 codex P2-03／composer P2-02〕。三項技術選擇已由 R1 收斂裁定，見 §A）
 
 **Task 1.1 — 在預處理層收集「本次實際套用之 `d`」**
 - 目標：讓一次 run 結束時，手上有一份「欄 → 實際用的 `d` ／ 未套用及其原因」。
@@ -182,7 +182,8 @@ Task 1.3（量測輸出增量）  → 依賴 1.2
   ② **`d` 值正確性**：🔴 **不得**以 `_fracdiff_processed_columns` 核對——它沒有 `d` 值（見上）。
   改用**獨立重算**：取收據之 `d`，以 `_frac_diff_ffd` 重跑該欄，與落檔值比對
   （相關性 `>= 0.9999`；此即主委 2026-09-21 追查時實際用過的 oracle）。
-  **mutation**：把任一離開路徑之記錄拿掉，須使①轉紅；把收據之 `d` 改寫成固定值，須使②轉紅。
+  ③ **原因碼封閉**（R3 composer P2-01：原只寫在 K-2 表，Task 段漏列）：每筆 `applied=false` 之 `reason` 須逐字命中 `ffdstar-skip-reasons` 中值符合 `^[a-z][a-z0-9_]*$` 之列；`applied=true` 之 `source` 須屬 `ffdstar-receipt-schema` 030 之三值。
+  **mutation**：把任一離開路徑之記錄拿掉，須使①轉紅；把收據之 `d` 改寫成固定值，須使②轉紅；把某筆 `reason` 寫成 K-2 表之說明文字，須使③轉紅。
   指令：`pytest tests/feature_engineering/preprocessing/test_d_star_receipt.py -q`
   （🔴 測試樹依既有 `test_d_star_*.py` 之所在，非主委初稿所寫之 `tests/momentum/...`）
 - **邊界**：① fracdiff 整段被 early return（`HAS_STATSMODELS` 為 false）⇒ 收據為空且須可區分

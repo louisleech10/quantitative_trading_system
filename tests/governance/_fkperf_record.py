@@ -82,6 +82,11 @@ def _intercept(args: Any, kw: Dict[str, Any], out: Path) -> Optional[Dict[str, A
     if script.read_bytes() != (REPO / "scripts" / ENTRY_NAME).read_bytes():
         _log(out, {**base, "status": "skipped", "reason": "mutated"})
         return None
+    # FKPERF 切換後 mutation 施於入口同目錄之核心（Task 4.2）：核心與目前核心不同者亦為變異本，不錄
+    core = script.parent / "_gen_fact_key_blocks.py"
+    if core.is_file() and core.read_bytes() != (REPO / "scripts" / "_gen_fact_key_blocks.py").read_bytes():
+        _log(out, {**base, "status": "skipped", "reason": "mutated-core"})
+        return None
     root_env = env.get("GOVB1_FACTKEY_ROOT")
     root_path = (cwd / root_env) if root_env else cwd
     tmpdir = env.get("TMPDIR") if env.get("TMPDIR") != os.environ.get("TMPDIR") else None

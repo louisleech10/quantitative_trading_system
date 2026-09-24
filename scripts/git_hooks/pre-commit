@@ -209,7 +209,7 @@ fi
 #   🔴 判暫存快照（--index）：清冊、內容、登記、fact_keys、殘留清單與生成器皆取 index——
 #   讀工作樹時「只暫存識別碼變更」「git rm --cached 殘留列之檔」可讓 commit 帶命中或過期列（D2D review-r1）。
 if git diff --cached --name-only -z | tr '\0' '\n' \
-   | grep -qiE '\.md$|^scripts/(fact_keys\.json|live_doc_registry\.json|docrot2_migration_residuals\.json|_live_doc_registry\.py|_live_doc_write_guard\.py|gen_fact_key_blocks\.sh|live_doc_registry_check\.sh)$'; then
+   | grep -qiE '\.md$|^scripts/(fact_keys\.json|live_doc_registry\.json|docrot2_migration_residuals\.json|_live_doc_registry\.py|_live_doc_write_guard\.py|gen_fact_key_blocks\.sh|_gen_fact_key_blocks\.py|live_doc_registry_check\.sh)$'; then
   bash scripts/live_doc_registry_check.sh --migration --index
   _ldm_rc=$?          # 🔴 rc 直接取，禁經 pipe
   if [ "${_ldm_rc}" -ne 0 ]; then

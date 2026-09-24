@@ -54,7 +54,6 @@
 | `gap3ux_count_check.sh` | 常態檢查 | narrow_check_router  |
 | `gap3ux_header_round_check.sh` | 常態檢查 | 未掛 |
 | `gate_check.sh` | 常態檢查 | PreToolUse gate committee_run  |
-| `gen_fact_key_blocks.sh` | 常態檢查 | PreCompact gov_check  |
 | `golden_staleness_check.sh` | 常態檢查 | 未掛 |
 | `gov_check.sh` | 常態檢查 | pre-push  |
 | `govb1_ghostpath_check.sh` | 常態檢查 | 未掛 |

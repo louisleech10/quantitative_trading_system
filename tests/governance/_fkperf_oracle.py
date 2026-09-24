@@ -161,6 +161,11 @@ def make_pair(tmp_path: Path, case: Case) -> Tuple[Path, Path]:
     shutil.copy2(REPO / CORE_REL, nroot / core_rel(case))
     if case.entry == "entry":
         shutil.copy2(REPO / ENTRY_REL, nroot / case.script_rel)
+    else:
+        # 直呼核心時入口檔只是輸入資料（如 E-002 引用入口行號之判定會讀它）：兩沙箱須同為 oracle 入口，
+        # 否則錄得之樹（切換後含新薄包裝）使輸入不同而非實作不同（2026-09-24 實跑 rec-0036）
+        (nroot / case.script_rel).parent.mkdir(parents=True, exist_ok=True)
+        (nroot / case.script_rel).write_bytes(_oracle_blob(ENTRY_REL))
     return oroot, nroot
 
 
@@ -176,6 +181,14 @@ def _env(root: Path, *parts: Dict[str, str], unset: Sequence[str] = ()) -> Dict[
 # 兩沙箱依設計不同之檔（oracle 入口 vs 新核心／新入口）與版本庫、位元組碼快取，不入寫後快照
 _SNAPSHOT_SKIP_DIRS = (".git", "__pycache__")
 _SNAPSHOT_SKIP_FILES = (ENTRY_REL, CORE_REL)
+
+
+def _root_token(target: str, root: Path) -> bytes:
+    """symlink 目標中之沙箱根路徑（含 realpath 形）換成 `{root}`：兩沙箱之絕對目標只差根目錄，
+    與 `normalize` 對 stdout／stderr 之根目錄互換同一語意（2026-09-24 實跑 exit-rows_source_outside_repo）。"""
+    for src in sorted({str(root.resolve()), str(root)}, key=len, reverse=True):
+        target = target.replace(src, "{root}")
+    return target.encode("utf-8")
 
 
 def snapshot_tree(root: Path, skip: Sequence[str] = _SNAPSHOT_SKIP_FILES) -> Dict[str, Tuple[bytes, int]]:
@@ -195,14 +208,14 @@ def snapshot_tree(root: Path, skip: Sequence[str] = _SNAPSHOT_SKIP_FILES) -> Dic
         for d in dirnames:
             dp = Path(dirpath) / d
             if dp.is_symlink():
-                files[dp.relative_to(root).as_posix() + "/"] = (b"symlink:" + os.readlink(dp).encode("utf-8"), 0)
+                files[dp.relative_to(root).as_posix() + "/"] = (b"symlink:" + _root_token(os.readlink(dp), root), 0)
         for name in sorted(filenames):
             p = Path(dirpath) / name
             rel = p.relative_to(root).as_posix()
             if rel in skip:
                 continue
             if p.is_symlink():
-                files[rel] = (b"symlink:" + os.readlink(p).encode("utf-8"), 0)
+                files[rel] = (b"symlink:" + _root_token(os.readlink(p), root), 0)
             elif p.is_file():
                 mode = stat.S_IMODE(p.stat().st_mode)
                 try:

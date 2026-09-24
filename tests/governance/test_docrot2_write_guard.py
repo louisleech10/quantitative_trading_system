@@ -17,7 +17,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = ["_live_doc_registry.py", "live_doc_registry_check.sh", "_live_doc_write_guard.py",
-           "live_doc_write_guard.sh", "gen_fact_key_blocks.sh", "governance_families.json"]
+           "live_doc_write_guard.sh", "gen_fact_key_blocks.sh", "_gen_fact_key_blocks.py", "governance_families.json"]
 REAL_REGISTRY = json.loads((REPO / "scripts" / "live_doc_registry.json").read_text(encoding="utf-8"))
 STATUS_ENUM = json.loads((REPO / "scripts" / "fact_keys.json").read_text(encoding="utf-8"))["_schema"]["status_enum"]
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
@@ -139,7 +139,19 @@ def test_handoff_edit_adds_id_with_status_exit2(tmp_path):
     assert r.returncode == 2 and "B-63" in r.stderr and "部分完成" in r.stderr, r.stderr
 
 
-INSIDE = "# A\n\n正文\n\n<!-- HISTORY-BEGIN -->\nXYZ-SLOT\n<!-- HISTORY-END -->\n"
+def test_staged_snapshot_generator_runs_and_judges_status_rc1(tmp_path):
+    """快照模式（pre-commit `--staged`）自 index 物化判定碼後實跑 `--status-hits`：須得出「識別碼＋狀態」判定，
+    不得因快照缺 FKPERF 切換後之核心而以「執行失敗」fail-closed（2026-09-24 切換批提交時實際踩到）。"""
+    root = _repo(tmp_path, {"HANDOFF.md": HANDOFF_OK, "docs/A_SPEC.md": "# A\n"}, exact=[HANDOFF, SPEC])
+    (root / "HANDOFF.md").write_text(HANDOFF_OK.replace("- 一般教訓 ANCHOR-PIT", "- 一般教訓 ANCHOR-PIT\n- B-63 部分完成 待補"),
+                                     encoding="utf-8")
+    _git(root, "add", "HANDOFF.md")
+    r = _run(root, "--staged")
+    assert r.returncode == 1 and "B-63" in r.stderr and "部分完成" in r.stderr, r.stderr
+    assert "執行失敗" not in r.stderr, r.stderr
+
+
+INSIDE ="# A\n\n正文\n\n<!-- HISTORY-BEGIN -->\nXYZ-SLOT\n<!-- HISTORY-END -->\n"
 OUTSIDE = "# A\n\nXYZ-SLOT\n\n<!-- HISTORY-BEGIN -->\n<!-- HISTORY-END -->\n"
 
 

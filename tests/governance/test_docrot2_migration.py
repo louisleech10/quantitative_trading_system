@@ -20,7 +20,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 SCRIPTS = ["_live_doc_registry.py", "live_doc_registry_check.sh", "_live_doc_write_guard.py",
-           "live_doc_write_guard.sh", "gen_fact_key_blocks.sh", "governance_families.json"]
+           "live_doc_write_guard.sh", "gen_fact_key_blocks.sh", "_gen_fact_key_blocks.py", "governance_families.json"]
 REAL_REGISTRY = json.loads((REPO / "scripts" / "live_doc_registry.json").read_text(encoding="utf-8"))
 REAL_FACT_KEYS = json.loads((REPO / "scripts" / "fact_keys.json").read_text(encoding="utf-8"))
 STATUS_ENUM = REAL_FACT_KEYS["_schema"]["status_enum"]

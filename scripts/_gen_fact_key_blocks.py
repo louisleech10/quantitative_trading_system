@@ -33,6 +33,8 @@ _FK_RC_CLAIM_RES = (rb"rc[ \t\n\v\f\r]*(=|==|\xe2\x89\xa0|!=|:|\xe6\x98\xaf|\xe7
                     rb"|returncode[ \t\n\v\f\r]*(=|==|\xe2\x89\xa0|!=)|[Ee]xit[ \t\n\v\f\r]*[Cc]ode|exit[ \t\n\v\f\r]+[0-9]+"
                     rb"|\xe9\x80\x80\xe5\x87\xba\xe7\xa2\xbc|\xe7\xb5\x90\xe6\x9d\x9f\xe7\xa2\xbc|\xe9\x9d\x9e\xe9\x9b\xb6\xe9\x80\x80\xe5\x87\xba")
 _FK_RC_CLAIM_PAT = re.compile(_FK_RC_CLAIM_RES)
+# 涵蓋形態之具名清單（與 _FK_RC_CLAIM_RES 之分支一一對應，測試以集合相等鎖死；擴充須同改兩者）
+_FK_RC_CLAIM_FORMS = "rc-op rc-unchanged returncode-op exit-code exit-n exitcode-zh endcode-zh nonzero-zh"
 _FK_CRITERIA_SCHEMA_FIELDS = ("criteria_keys", "criteria_status_enum", "criteria_column_roles", "criteria_live_status")
 _FK_MECHANISM_SCHEMA_FIELDS = ("mechanism_keys", "mechanism_status_enum", "mechanism_live_status",
                                "mechanism_column_roles", "mechanism_scope", "mechanism_tokens")
@@ -430,6 +432,8 @@ class Gen:
         self.out = bytearray()
         self.errbuf = bytearray()
         self._files: Dict[bytes, bytes] = {}
+        self._lines: Dict[bytes, List[bytes]] = {}
+        self._marks: Dict[bytes, Dict[bytes, List[int]]] = {}
         self._targets: Dict[str, Tuple[List[str], Optional[str]]] = {}
 
     # ------------------------------------------------------------ 讀檔快取（SPEC Task 4.4：開檔數與登記規模無關）
@@ -442,7 +446,29 @@ class Gen:
         return self._files[key]
 
     def remember(self, path: Any, data: bytes) -> None:
-        self._files[os.fsencode(path)] = data
+        key = os.fsencode(path)
+        self._files[key] = data
+        self._lines.pop(key, None)
+        self._marks.pop(key, None)
+
+    # FKPERF Task 4.4（規模驗收實測：每 key 重切整份宿主為行，成本隨 key 數平方成長）：每路徑只切一次行、
+    # 只建一次標記索引；語意與逐次重切相同（快取隨 remember 失效）。
+    def lines_of(self, path: Any) -> List[bytes]:
+        key = os.fsencode(path)
+        if key not in self._lines:
+            self._lines[key] = awk_lines(self.read_bytes(path))
+        return self._lines[key]
+
+    def marks_of(self, path: Any) -> Dict[bytes, List[int]]:
+        """生成區塊標記行 → 其行號（升冪）。"""
+        key = os.fsencode(path)
+        if key not in self._marks:
+            idx: Dict[bytes, List[int]] = {}
+            for i, ln in enumerate(self.lines_of(path)):
+                if ln.startswith(b"<!-- BEGIN GENERATED: ") or ln.startswith(b"<!-- END GENERATED: "):
+                    idx.setdefault(ln, []).append(i)
+            self._marks[key] = idx
+        return self._marks[key]
 
     # ------------------------------------------------------------ 輸出
     def err(self, s: str) -> None:
@@ -841,14 +867,14 @@ class Gen:
 
     # ------------------------------------------------------------ 宿主
     def markers_ok(self, k: str, path: str, rel: str) -> bool:
-        try:
-            lines = awk_lines(self.read_bytes(path))
-        except OSError:
-            lines = []
         b = to_b("<!-- BEGIN GENERATED: %s -->" % k)
         e = to_b("<!-- END GENERATED: %s -->" % k)
-        nb = sum(1 for ln in lines if ln == b)
-        ne = sum(1 for ln in lines if ln == e)
+        try:
+            marks = self.marks_of(path)
+        except OSError:
+            marks = {}
+        nb = len(marks.get(b, ()))
+        ne = len(marks.get(e, ()))
         if nb == 1 and ne == 1:
             return True
         self.err("FACTKEY MARKER: %s in %s（BEGIN=%d END=%d，須各恰 1）→ fail-closed" % (k, rel, nb, ne))
@@ -1189,6 +1215,7 @@ def _registered_tokens(self: "Gen") -> Optional[List[str]]:
 Gen.registered_tokens = _registered_tokens  # type: ignore[attr-defined]
 
 
+# WL-03（票 B-25 機制證據登記）：平台機制 token 以 _schema.mechanism_tokens 字面封閉表比對，不做任何可執行檔探測
 def _validate_mechanism(self: "Gen") -> bool:
     if not any(_schema_has(self.data, f) for f in _FK_MECHANISM_SCHEMA_FIELDS):
         return True
@@ -2014,6 +2041,36 @@ Gen.emit_all = _emit_all  # type: ignore[attr-defined]
 Gen.validate_schema_sets = _validate_schema_sets  # type: ignore[attr-defined]
 
 
+def _sed_block_indexed(self: "Gen", path: str, k: str) -> bytes:
+    """同 `_sed_block(self.read_bytes(path), k)`，以標記索引直取區段（每 key 不再掃整份宿主）：
+    sed 區段自每個 BEGIN 行起、至其後第一個 END 行止（區段內之 BEGIN 行照印），無 END 則至檔尾。"""
+    lines = self.lines_of(path)
+    marks = self.marks_of(path)
+    bs = marks.get(to_b("<!-- BEGIN GENERATED: %s -->" % k), [])
+    es = marks.get(to_b("<!-- END GENERATED: %s -->" % k), [])
+    out: List[bytes] = []
+    p = 0
+    bi = ei = 0
+    while True:
+        while bi < len(bs) and bs[bi] < p:
+            bi += 1
+        if bi >= len(bs):
+            break
+        s = bs[bi]
+        while ei < len(es) and es[ei] <= s:
+            ei += 1
+        if ei >= len(es):
+            out.extend(lines[s:])
+            break
+        t = es[ei]
+        out.extend(lines[s:t + 1])
+        p = t + 1
+    return b"".join(x + b"\n" for x in out)
+
+
+Gen.sed_block_of = _sed_block_indexed  # type: ignore[attr-defined]
+
+
 def _sed_block(data: bytes, k: str) -> bytes:
     """`sed -n '/^BEGIN$/,/^END$/p'`（命令替換前）。"""
     b = to_b("<!-- BEGIN GENERATED: %s -->" % k)
@@ -2044,7 +2101,7 @@ def _check(self: "Gen") -> int:
         if not self.validate_rows(k):
             rc = 1
             continue
-        if not self.validate_shape(k):
+        if not self.validate_shape(k):  # --check 之形狀驗證（WL-01；mutation 錨）
             rc = 1
             continue
         tg = self.targets(k)
@@ -2061,7 +2118,7 @@ def _check(self: "Gen") -> int:
             if not self.markers_ok(k, path, tgt):
                 rc = 1
                 continue
-            cur = _sed_block(self.read_bytes(path), k).rstrip(b"\n")
+            cur = self.sed_block_of(path, k).rstrip(b"\n")
             if cur != want:
                 self.err("FACTKEY DRIFT: %s in %s（宿主檔與 %s 不一致；跑 --write 重生成）" % (k, tgt, self.reg_src))
                 rc = 1
@@ -2083,8 +2140,118 @@ def _write(self: "Gen") -> int:
         if not check():
             return 1
     root = self.root()
-    rc = 0
     reg = Registry(Path(self.reg_src), self.data, tuple(self.keys()))
+    fast = _write_batched(self, root, reg)
+    if fast is not None:
+        return fast
+    return _write_sequential(self, root, reg)
+
+
+def _write_batched(self: "Gen", root: str, reg: "Registry") -> Optional[int]:
+    """FKPERF Task 4.4：規劃全部替換後每宿主只寫一次（開檔數與 key 數無關）。
+
+    與逐 key 路徑（`_write_sequential`＝oracle 語意）逐位元組等價之前提：每個待寫 (key, 宿主) 之 BEGIN／END 標記
+    於原宿主各恰一處且 BEGIN 在前、同宿主各區段互不重疊、生成內容不含任何生成區塊標記行——此時逐 key 替換不改變
+    其後 key 之標記計數與位置。任一前提不成立即回 None，由呼叫端改走逐 key 路徑（輸出緩衝還原至進入前）。"""
+    out_mark, err_mark = len(self.out), len(self.errbuf)
+    rc = 0
+    plan: List[Tuple[str, str, str, int, int, List[bytes]]] = []
+    for k in self.keys():
+        if not self.validate_rows(k):
+            rc = 1
+            continue
+        if not self.validate_shape(k):
+            rc = 1
+            continue
+        tg = self.targets(k)
+        if tg is None:
+            rc = 1
+            continue
+        for tgt in read_lines(tg):
+            path = root + "/" + tgt
+            if not os.path.isfile(path):
+                self.err("FACTKEY MISSING TARGET: %s → %s → fail-closed" % (k, path))
+                rc = 1
+                continue
+            try:
+                marks = self.marks_of(path)
+            except OSError:
+                marks = {}
+            bl = marks.get(to_b("<!-- BEGIN GENERATED: %s -->" % k), [])
+            el = marks.get(to_b("<!-- END GENERATED: %s -->" % k), [])
+            block_lines = awk_lines(gen_block(reg, k))
+            if len(bl) != 1 or len(el) != 1 or el[0] < bl[0] or any(
+                    x.startswith(b"<!-- BEGIN GENERATED: ") or x.startswith(b"<!-- END GENERATED: ")
+                    for x in block_lines[1:-1]):
+                del self.out[out_mark:]
+                del self.errbuf[err_mark:]
+                return None
+            plan.append((k, tgt, path, bl[0], el[0], block_lines))
+    by_path: Dict[str, List[Tuple[int, int, List[bytes]]]] = {}
+    order: List[str] = []
+    for _k, _t, path, bpos, epos, block_lines in plan:
+        if path not in by_path:
+            by_path[path] = []
+            order.append(path)
+        by_path[path].append((bpos, epos, block_lines))
+    new_bytes: Dict[str, bytes] = {}
+    for path in order:
+        regions = sorted(by_path[path], key=lambda r: r[0])
+        for a, b2 in zip(regions, regions[1:]):
+            if b2[0] <= a[1]:
+                del self.out[out_mark:]
+                del self.errbuf[err_mark:]
+                return None
+        lines = self.lines_of(path)
+        buf = bytearray()
+        cur = 0
+        for bpos, epos, block_lines in regions:
+            for ln in lines[cur:bpos]:
+                buf += ln + b"\n"
+            for ln in block_lines:
+                buf += ln + b"\n"
+            cur = epos + 1
+        for ln in lines[cur:]:
+            buf += ln + b"\n"
+        new_bytes[path] = bytes(buf)
+    failed: set = set()
+    for path in order:
+        try:
+            _atomic_write(path, new_bytes[path])
+            self.remember(path, new_bytes[path])
+        except OSError:
+            self.err("gen_fact_key_blocks: 寫入失敗 %s" % path)
+            try:
+                os.unlink(path + ".factkey.%d" % os.getpid())
+            except OSError:
+                pass
+            failed.add(path)
+            rc = 1
+    for k, tgt, path, _b, _e, _bl in plan:
+        if path not in failed:
+            self.out += to_b("FACTKEY WROTE: %s → %s\n" % (k, tgt))
+    return rc
+
+
+def _atomic_write(path: str, data: bytes) -> None:
+    """暫存檔寫完全部位元組後 `os.replace`（os.write 可短寫；只呼叫一次會以截斷內容覆蓋宿主；b2 r1 codex P1-01）。"""
+    tmp = path + ".factkey.%d" % os.getpid()
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+    try:
+        view = memoryview(data)
+        while view:
+            written = os.write(fd, view)
+            if written <= 0:
+                raise OSError("short write")
+            view = view[written:]
+    finally:
+        os.close(fd)
+    os.replace(tmp, path)
+
+
+def _write_sequential(self: "Gen", root: str, reg: "Registry") -> int:
+    """逐 key 寫入（oracle 語意；僅於 `_write_batched` 之等價前提不成立時使用）。"""
+    rc = 0
     for k in self.keys():
         if not self.validate_rows(k):
             rc = 1
@@ -2109,7 +2276,7 @@ def _write(self: "Gen") -> int:
             b = to_b("<!-- BEGIN GENERATED: %s -->" % k)
             e = to_b("<!-- END GENERATED: %s -->" % k)
             try:
-                src = awk_lines(self.read_bytes(path))
+                src = self.lines_of(path)
                 out = bytearray()
                 skip = False
                 for ln in src:
@@ -2124,19 +2291,7 @@ def _write(self: "Gen") -> int:
                     if skip:
                         continue
                     out += ln + b"\n"
-                tmp = path + ".factkey.%d" % os.getpid()
-                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
-                try:
-                    # 寫完全部位元組（os.write 可短寫；只呼叫一次會以截斷內容覆蓋宿主並回 rc=0；b2 r1 codex P1-01）
-                    view = memoryview(bytes(out))
-                    while view:
-                        written = os.write(fd, view)
-                        if written <= 0:
-                            raise OSError("short write")
-                        view = view[written:]
-                finally:
-                    os.close(fd)
-                os.replace(tmp, path)
+                _atomic_write(path, bytes(out))
                 self.remember(path, bytes(out))
             except OSError:
                 self.err("gen_fact_key_blocks: 寫入失敗 %s" % path)
