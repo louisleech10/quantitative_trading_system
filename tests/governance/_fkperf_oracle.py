@@ -288,10 +288,32 @@ def expected_first(case: Case, root: Path) -> str:
     return case.expect_first_line.replace("{root}", str(root.resolve()))
 
 
+def _shared_external_dirs(oroot: Path, nroot: Path) -> List[str]:
+    """兩沙箱中目錄 symlink 所指、位於各自根之外且兩側共用之實體目錄（realpath）。"""
+    def externals(root: Path) -> set:
+        real_root = os.path.realpath(root)
+        found = set()
+        for dirpath, dirnames, _ in os.walk(root):
+            for d in dirnames:
+                p = Path(dirpath) / d
+                if p.is_symlink():
+                    target = os.path.realpath(p)
+                    if os.path.isdir(target) and not (target + os.sep).startswith(real_root + os.sep):
+                        found.add(target)
+        return found
+    return sorted(externals(oroot) & externals(nroot))
+
+
 def check_case(tmp_path: Path, case: Case) -> List[str]:
     """跑一筆語料：先斷言 oracle 命中預期分支，再回傳新舊差異（空＝全等）。"""
     oroot, nroot = make_pair(tmp_path, case)
+    shared = _shared_external_dirs(oroot, nroot)
+    shared_before = {d: snapshot_tree(Path(d), ()) for d in shared}
     a = run_oracle(oroot, case)
+    # 兩沙箱之目錄 symlink 指向同一外部目錄時，oracle 寫入該處會同時出現在新側快照 ⇒ 差分失去鑑別力
+    # （b2 r2 codex P2-01）；此類語料一律判不可比、須改為各沙箱獨立之目標
+    for d in shared:
+        assert snapshot_tree(Path(d), ()) == shared_before[d], (case.case_id, "oracle 寫入兩沙箱共用之外部目錄", d)
     got = first_line(a.stderr if case.expect_rc else a.stdout)
     assert (a.rc, got) == (case.expect_rc, expected_first(case, oroot)), (case.case_id, a.rc, got)
     for rel in case.watch_files:

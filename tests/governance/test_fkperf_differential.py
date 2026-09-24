@@ -310,6 +310,19 @@ def test_new_impl_short_os_write_still_writes_whole_host(tmp_path: Path, monkeyp
     assert not changed, changed
 
 
+def test_shared_external_symlink_target_is_detected(tmp_path: Path) -> None:
+    """b2 r2 codex P2-01：兩沙箱之目錄 symlink 同指一個外部目錄 ⇒ 列為共用（check_case 據此於 oracle 寫入時判不可比）；
+    各沙箱獨立之相對目標 ⇒ 不列。"""
+    import os
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    for name in ("o", "n"):
+        (tmp_path / name / "own").mkdir(parents=True)
+        os.symlink(str(shared), tmp_path / name / "ext")
+        os.symlink("own", tmp_path / name / "local")
+    assert fo._shared_external_dirs(tmp_path / "o", tmp_path / "n") == [os.path.realpath(shared)]
+
+
 @pytest.mark.parametrize("payload", ["{}\n{}\n", "[]\n{}\n"])
 @pytest.mark.parametrize("args", [("--help",), (), ("--check",), ("--write",)])
 def test_new_impl_multi_value_registry_fail_closed(tmp_path: Path, payload: str, args: tuple) -> None:
