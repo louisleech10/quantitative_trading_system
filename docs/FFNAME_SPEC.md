@@ -1,7 +1,7 @@
 # FF-NAME：衍生層與 L4 raw lag 欄名經來源／指標正規化，並以命名世代防跨世代混用 — SPEC
 
 > 來源 PLAN/診斷：`docs/FFDEFECT_DECISION.md` 第一節（缺陷 A；定性輪 `handoffs/reconcile/20260921-ffdefect-x-consult-r1/synth.md`）　|　日期：2026-09-24　|　對應 TODO：`docs/manifests/FFNAME.json`（五類落點 manifest；本 SPEC 定案後依 TODO_GENERATION_PROMPT 產出）
-> 版本：v2（r1 收斂 `handoffs/reconcile/20260924-ffname-x-review-r1/synth.md`：新增 Task 1.5 名稱前綴型選欄器改由 formatter 導出；命名世代寫入 `result.metadata` 使 frame 路徑 HDF5 可判世代；L4 raw 改名驗收涵蓋 `quote_volume`／`taker_buy_volume`；132 欄 safe-skip 改述為白名單語意之一致化並加分母收據；§G 映射算法定死）；v1（主委起草）
+> 版本：v3（r2 收斂 `handoffs/reconcile/20260924-ffname-x-review-r2/synth.md`：Task 1.5 之來源集合寫死並加 `layer1_only` 逐欄數值對照；§G 映射清單改為 wrapper 實際輸出之指標名（含多輸出）與三段式來源、涵蓋 `_Lag_k` 後綴；Task 4.1 改為沿用 reference 原設定；HDF5 metadata 無法解析 ⇒ 世代未知、混世代閘拒絕；§C 釐清 frame 固定檔名覆寫）；v2（r1 收斂 `handoffs/reconcile/20260924-ffname-x-review-r1/synth.md`：新增 Task 1.5 名稱前綴型選欄器改由 formatter 導出；命名世代寫入 `result.metadata` 使 frame 路徑 HDF5 可判世代；L4 raw 改名驗收涵蓋 `quote_volume`／`taker_buy_volume`；132 欄 safe-skip 改述為白名單語意之一致化並加分母收據；§G 映射算法定死）；v1（主委起草）
 
 ## §RISK 風險分級
 - **大小**：大（CLAUDE.md 任務分派規則：命中 a、b、d）。
@@ -36,12 +36,12 @@
 - 特徵**值**、列數不變；欄數不變（僅改名）。允許變動：3,596 欄之欄名、132 欄 Ratio 之 ADF／fracdiff 路徑（fracdiff 覆蓋 L2 時）、fracdiff `apply_to=layer1_only` 之選欄集合（Task 1.5：改為與命名規則一致之來源前綴）、LINEARREG_SLOPE 等 Cross／Ratio 欄於 `column_group_registry._column_sort_key` 之排序位置、`feature_schema_hash`、config hash。**manifest 與 `result.metadata` 各新增一鍵 `feature_naming_version`**（決策檔 A-5 之機械防護，唯一新增鍵；frame 路徑經 `result.metadata` 落入 meta.json 與 HDF5 `metadata_json`）。
 - 命名世代之單一真相源＝新模組中之常數 `CURRENT_FEATURE_NAMING_VERSION`（本票起為 `2`；manifest 無此鍵者視為 `1`）；不得在其他檔寫死數字。
 - 不處理：atomic 層硬寫之底線指標字面（`Keltner_Width`、`Donchian_Width`、`VolumeMA_Ratio`、`BullishCount_W…`）與 `ms_`／`tr_`／`ent_` 前綴族——列 §N 殘留。
-- 不回填、不遷移舊 run、舊 cache、舊 golden（使用者 2026-08-05 裁定）。
+- 不回填、不遷移舊 run、舊 cache、舊 golden（使用者 2026-08-05 裁定）。「不動」指以 config hash 為鍵之 run 目錄、CGSA 工作目錄與 registry 條目；frame 路徑之 `{symbol}_{timeframe}_factory.h5` 為固定檔名，任何重生（不論世代）本就覆寫之——此為既有行為、本票不改，世代由 Task 2.1 寫入之 metadata 判定（r2 codex P2-05）。
 
 ## §G Golden / Baseline
 - **feature/kline 條件**：適用。真實 `data_cache/feature_klines/kline_cache.h5`；沿用 `tests/feature_engineering/fftfmeta_golden_helpers.py` 之 run 隔離與輕量真實設定，但設定須開啟 L2 Cross／Ratio、L4 lag（含 raw）、`taker_ratio`／`quote_volume`／`taker_buy_volume` 三個資料源、至少一個多組件指標（`PLUS_DI` 或 `LINEARREG_SLOPE`）；多週期 `["1h","12h"]`；禁合成 fixture。
 - **凍結時機 / reference**：動工前以當下 HEAD 跑一次，存 `tests/_golden/ffname/baseline.json`：逐欄（欄名序）`dtype`、`shape`、NaN mask sha256、值 sha256，以**舊欄名**為鍵。
-- **舊名→新名映射算法（封閉，r1 composer P2-01）**：只作用於 L2 Cross／Ratio 與 L4 raw lag 欄；①raw 來源段：對原始資料欄名中含 `_` 者（封閉清單＝kline dataset 欄名，實跑列舉），把週期標記後之形 `{a}_{tf}_{b}_`（CGSA 標記器對 `{a}_{b}` 之產物）改寫為 `{a}-{b}_{tf}_`；②指標段：對 TA-Lib wrapper 登記之指標名中含 `_` 者（封閉清單，實跑列舉），把整段 `_{X}_{Y}_` 改寫為 `_{X}-{Y}_`；其餘字元一律不動。**禁**以全欄 `replace("_","-")` 作映射。
+- **舊名→新名映射算法（封閉，r1 composer P2-01；r2 codex P1-02 補全）**：作用於 L2 Cross／Ratio、L4 lag（含其 `_Lag_<k>` 後綴，涵蓋 frame 路徑 `lag_features.apply_to="all"` 把 L2 欄送入 L4 之產物）；①raw 來源段：清單＝資料 adapter 宣告之 kline 欄名中含 `_` 者（實跑列舉，含三段式 `taker_buy_volume`）；來源 `{p1}_{p2}_…_{pn}` 經 CGSA 標記器（`split("_",1)` 於首段後插週期）之舊形為 `{p1}_{tf}_{p2}_…_{pn}`，改寫為 `{p1}-{p2}-…-{pn}_{tf}`；②指標段：清單＝TA-Lib wrapper **實際產出之指標段名**中含 `_` 者——單輸出取 `spec.name`，多輸出取 `spec.name + "_" + output_name`（`talib_wrapper.py:483-495` 之組名法，如 `BBANDS_Upper`、`MACDFIX_Hist`、`AROON_aroondown`），以程式自 wrapper 列舉，禁手寫；把整段 `_{X}_{Y}_` 改寫為 `_{X}-{Y}_`；其餘字元一律不動。**禁**以全欄 `replace("_","-")` 作映射。映射 helper 須有單元測試：`close_12h_trend_BBANDS_Upper_13_55_Cross`→`close_12h_trend_BBANDS-Upper_13_55_Cross`、`taker_12h_buy_volume_Lag_1`→`taker-buy-volume_12h_Lag_1`。
 - **通過條件（可證偽）**：改後同參數重跑，以上述映射（僅供測試，放 `tests/` helper，生產碼不得持有對照表）將 baseline 鍵轉為新名後——①新舊欄名集合經映射後**全等**（無多無少）；②每欄四個 hash **全等**（fracdiff 關閉之 reference，故 ADF 白名單變化不影響值）；③改名欄數等於映射中「新名≠舊名」之數，且 >0；④新 run 所有欄名不含子字串 `taker_ratio`、`taker_buy_volume`、`quote_volume`、`number_of_trades`；⑤新 run 之 manifest `feature_naming_version == 2`。任一不等即列出欄名與 diff＝FAIL。
 - **fracdiff 開啟之對照（Task 1.4）**：另以同設定開 fracdiff（覆蓋 L1、L2）跑改前、改後各一次；除 132 類欄（多組件有界指標之 Ratio）外，所有欄經映射後四 hash 全等；132 類欄改後之值等於其 L2 raw 值（未 fracdiff）；實測欄數與位元組大小差寫入收據。
 
@@ -87,8 +87,8 @@
 
 **Task 1.5 — 名稱前綴型選欄器改由 formatter 導出（r1 codex P1-01）**
 - 目標：依欄名前綴判來源之選欄器與命名規則一致。　檔案：`preprocessing/feature_preprocessor.py` `_select_columns` 之 `layer1_only` 分支（`:3564-3566`）。　既有 caller：fracdiff（`apply_to="layer1_only"`，須使用者明設）。
-- 改法：前綴集合＝`{canonical_segment(c) + "_" for c in 原始資料來源名}` ∪ 既有非資料來源前綴（`ms_`／`ent_`／`tr_`），由 `feature_naming` 之 formatter 導出，不得再寫死底線形；實作前以 `grep -rnE '"(taker|quote_volume|taker_buy|number_of)_' momentum api` 列舉其他同型字面，命中者同法處理並列入本 Task。
-- **驗證**：`pytest tests/feature_engineering/test_ffname_selectors.py` 綠——新前綴下 `taker-ratio_12h_trend_EMA_5`（L1）與 `taker-ratio_12h_statistics_LINEARREG-SLOPE_5_21_Ratio`（L2）皆被選中；`close_`／`ms_` 等既有前綴之選中集合不變；收據記改前（舊名＋舊前綴）與改後（新名＋新前綴）於 §G reference 之選中欄數。
+- 改法：前綴集合＝`{canonical_segment(c) + "_" for c in ("close", "open", "high", "low", "volume", "quote_volume", "taker_ratio", "taker_buy_volume")}` ∪ `{"ms_", "ent_", "tr_"}`——來源集合寫死為今日前綴所涵蓋之來源（舊 `taker_` 前綴同時涵蓋 `taker_ratio` 與 `taker_buy_volume`），**不得**改取 `enabled_sources` 或 adapter 全欄（前者縮小、後者擴大選欄；r2 composer P2-01），不得再寫死底線形；實作前以 `grep -rnE '"(taker|quote_volume|taker_buy|number_of)_' momentum api` 列舉其他同型字面，命中者同法處理並列入本 Task。
+- **驗證**：`pytest tests/feature_engineering/test_ffname_selectors.py` 綠——新前綴下 `taker-ratio_12h_trend_EMA_5`（L1）與 `taker-ratio_12h_statistics_LINEARREG-SLOPE_5_21_Ratio`（L2）皆被選中；`close_`／`open_`／`high_`／`low_`／`ms_` 等既有前綴之選中集合不變；**`layer1_only` 逐欄數值對照（r2 codex P1-01）**：真實 kline 輕量 run 固定 `fractional_differencing.apply_to="layer1_only"` 跑改前、改後各一次；定義差集 Δ＝（新前綴於新名所選）△（舊前綴於舊名所選，經 §G 映射轉新名），Δ 以外之全部欄經映射後四 hash 全等；Δ 內每欄記改前改後之 NaN mask sha256 與值 sha256 於收據，且 Δ 恰等於「今日因 L1 已正規化而漏選之 `taker-ratio`／`quote-volume`／`taker-buy-volume` 欄」（reference 實測 L1 新增 872 欄，r2 codex 探針）——Δ 出現其他欄即 FAIL。
 - **邊界**：①來源名無底線（`close`，前綴不變）；②`apply_to` 為 list 或 `all`（不受影響）。
 - **存活至**：永久。
 - **覆蓋風險**：無。
@@ -106,10 +106,10 @@
 - 不可做：不得修改或刪除舊 run 目錄、舊 cgsa_work、registry 舊條目。
 
 **Task 2.2 — 跨世代合併 fail-closed**
-- 目標：多 run 合併點遇到兩世代即拒絕。　檔案：`feature_library.py` `_load_internal`（讀 manifest 處設 `features_df.attrs["feature_naming_version"]`，manifest 無鍵 ⇒ `1`；HDF5 fallback 讀其 metadata 之 `feature_naming_version`，缺鍵才 ⇒ `1`）、`load_multi`；`consumer_gate.py` 新增 `assert_single_feature_naming_version(versions: Dict[str, int], *, error_type)`；`api/services/xgboost_batch_service.py` 逐 symbol 載入迴圈（載入後立即讀 attrs，再做欄篩選）。　既有 caller：`ic_analysis_service.py:1712`、`cross_symbol_training_service.py:38`（經 `load_multi`，不改）。
+- 目標：多 run 合併點遇到兩世代即拒絕。　檔案：`feature_library.py` `_load_internal`（讀 manifest 處設 `features_df.attrs["feature_naming_version"]`，manifest 無鍵 ⇒ `1`；HDF5 fallback 以 storage 新增之 `read_factory_output_naming_version(symbol, timeframe) -> Optional[int]` 讀：`metadata_json` 可解析且有鍵 ⇒ 其值、可解析而缺鍵 ⇒ `1`、**無法解析或非物件 ⇒ `None`（未知）**；r2 codex P1-04——既有 `load_factory_output` 會把解析失敗吞成空 dict，不得據以判世代）、`load_multi`；`consumer_gate.py` 新增 `assert_single_feature_naming_version(versions: Dict[str, Optional[int]], *, error_type)`（任一為 `None` 且 symbol 數 ≥2 ⇒ 拒絕；錯誤訊息標「世代未知」）；`api/services/xgboost_batch_service.py` 逐 symbol 載入迴圈（載入後立即讀 attrs，再做欄篩選）。　既有 caller：`ic_analysis_service.py:1712`、`cross_symbol_training_service.py:38`（經 `load_multi`，不改）。
 - 改法：`load_multi` 收齊各 symbol 之世代後呼叫 assert；xgboost batch 於迴圈結束、交集前呼叫同一 assert；錯誤訊息列出每 symbol 之世代與「以新版重新生成」。
 - **驗證**：`pytest tests/feature_engineering/test_ffname_generation_gate.py` 綠——2 個 symbol 一舊（manifest 無鍵，世代 1）一新（世代 2）⇒ `load_multi` 拋 `error_type`（IC 路徑經 `ValueError` 包裝回報）；同世代 ⇒ 通過且回傳值不變；xgboost batch 同斷言。
-- **邊界**：①單 symbol（不檢）；②全部舊世代（通過：同世代內自洽）；③HDF5 fallback 與 v2 混用（fallback 依其 metadata 判世代；舊 HDF5 缺鍵為 1）。
+- **邊界**：①單 symbol（不檢）；②全部舊世代（通過：同世代內自洽）；③HDF5 fallback 與 v2 混用（fallback 依其 metadata 判世代；舊 HDF5 缺鍵為 1）；④新世代 HDF5 之 `metadata_json` 被改成 `{bad`、配一個合法缺鍵之舊 HDF5，走 `load_multi(..., for_training=False)` ⇒ 拒絕（r2 codex P1-04 反例）。
 - **存活至**：永久。
 - **覆蓋風險**：無。
 - 不可做：不得自動改名或別名對映以「救回」混用；不得放寬既有 `assert_required_columns_present`／交集檢查。
@@ -128,7 +128,7 @@
 
 **Task 4.1 — 全量 reference 之名稱不變式**
 - 目標：以全開設定真實 run 證明產出端無底線來源段。　檔案：探針 `handoffs/run_receipts/ffname_probes/`（隔離同 FF-TFMETA `_isolate.py`）。
-- **驗證**：ETHUSDT 1h＋12h 全設定一次 run：欄數等於 reference `d9935491…` 之 418,719；§G ④ 成立；改名欄數與決策檔 A-3 之 3,596 比對，差異逐類列入收據。
+- **驗證**：ETHUSDT 1h＋12h，**設定逐字沿用 reference `d9935491…` 之 task record `config_used`**（不另啟用來源；r2 codex P1-03）一次 run：欄數等於 reference 之 418,719；§G ④ 成立；改名欄數與決策檔 A-3 之 3,596 比對，差異逐類列入收據。
 - **邊界**：①fracdiff 關（同 reference）；②欄數不等 ⇒ FAIL 並列差集。
 - **存活至**：收據永久。
 - **覆蓋風險**：無。
@@ -143,7 +143,7 @@
 - 不可做：不得重簽 `tests/_golden/batch2d/*`。
 
 ## §V 驗證策略與邊界測試目錄
-- **mutation 條件**：適用（RISK-HIT 含 a、d）。至少五個 mutant 必使具名測試紅：①Task 1.2 只改欄名不改分組鍵（兩分支不合併）；②Task 1.2 移除重複參數 ValueError；③Task 1.3 只改 CGSA 分支之 raw 改名；④Task 2.1 移除 hash 鹽；⑤Task 2.2 `load_multi` 不呼叫 assert；⑥Task 1.5 前綴改回寫死底線形；⑦§G 映射改為全欄 `replace("_","-")`（§G ①或②必紅）；⑧Task 2.2 HDF5 fallback 一律回 1。
+- **mutation 條件**：適用（RISK-HIT 含 a、d）。至少五個 mutant 必使具名測試紅：①Task 1.2 只改欄名不改分組鍵（兩分支不合併）；②Task 1.2 移除重複參數 ValueError；③Task 1.3 只改 CGSA 分支之 raw 改名；④Task 2.1 移除 hash 鹽；⑤Task 2.2 `load_multi` 不呼叫 assert；⑥Task 1.5 前綴改回寫死底線形；⑦§G 映射改為全欄 `replace("_","-")`（§G ①或②必紅）；⑧Task 2.2 HDF5 fallback 一律回 1；⑨映射指標清單只取 `spec.name`（`BBANDS_Upper` 映射失敗，§G ①必紅）；⑩`read_factory_output_naming_version` 解析失敗回 1（邊界④必紅）。
 - 測試層級：單元（1.1、1.2、1.4、3.1）、真實 kline 輕量 run（§G、1.3、2.1）、打樁整合（2.2）。可獨立 `pytest tests/feature_engineering/…` 跑，不需 run_api.py。
 - **防假綠**：既有 `tests/test_feature_factory_operators.py:62-63`、`tests/feature_engineering/test_adf_safe_skip.py`（含 `:326-338` 禁底線多組件 pattern 之斷言）不得放寬；`tests/feature_engineering/test_batch2d_dstar_align.py` 須實跑仍綠（Task 4.2）。
 - **邊界目錄**：冪等正規化（1.1①）、兩分支同家族（1.2③④）、raw 撞名（1.3②）、固定工作目錄 resume（2.1①）、混世代（2.2）。
