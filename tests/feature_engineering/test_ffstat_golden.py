@@ -181,7 +181,7 @@ def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:
     ②子程序連 RSS 亦取不到 ⇒ 記 samples_incomplete、不留判定值；
     ③列舉子程序本身拋例外（沙箱禁 sysctl）⇒ 記 samples_incomplete、不留判定值，verdict 判失敗；
     ④子程序 RSS 已計入後 USS 拋 NoSuchProcess ⇒ 改以 RSS 合計判定（不以較小之 USS 充數）；
-    ⑤取樣途中階段由交接轉公開 ⇒ 該筆兩階段皆記；⑥途中 public→handoff→public ⇒ 交接亦記；⑦實際起點間隔入 max_sample_gap_seconds。
+    ⑤取樣途中階段由交接轉公開 ⇒ 該筆兩階段皆記；⑥途中 public→handoff→public ⇒ 交接亦記；⑦實際起點間隔入 max_sample_gap_seconds；⑧轉收據保留秒數小數；⑨階段設定與快照共用一鎖。
     另對真實子程序取樣一次：須完整。"""
     import subprocess
     import sys
@@ -266,6 +266,28 @@ def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:
     s._tick()
     s._tick()
     assert s.peaks["max_sample_gap_seconds"] >= 0.1
+    # ⑧ 轉收據保留秒數小數（r23 codex P2-01：int() 曾把 0.1 秒截為 0）
+    out = probe.peaks_for_result(s.peaks)
+    assert out["max_sample_gap_seconds"] >= 0.1 and isinstance(out["peak_judged_public_bytes"], int)
+    assert probe.peaks_for_result({"max_sample_gap_seconds": 0.1017, "samples_rss_fallback": 2}) == \
+        {"max_sample_gap_seconds": 0.1017, "samples_rss_fallback": 2}
+    # ⑨ 階段設定與取樣之階段快照共用一鎖（r23 codex P2-02）：鎖被持有時，設定不會只改一半、快照不會讀到半態
+    import threading
+
+    s = probe._Sampler()
+    s._proc = _Proc(**parent)
+    with s._lock:
+        setter = threading.Thread(target=lambda: setattr(s, "stage", "handoff"))
+        ticker = threading.Thread(target=s._tick)
+        setter.start()
+        ticker.start()
+        _time.sleep(0.1)
+        assert setter.is_alive() and ticker.is_alive()
+        assert s._stage == "public" and s._history == ["public"]
+    setter.join(2)
+    ticker.join(2)
+    assert not setter.is_alive() and not ticker.is_alive()
+    assert s._stage == "handoff" and s._history[-1] == "handoff"
     # 真實子程序
     real = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"])
     try:

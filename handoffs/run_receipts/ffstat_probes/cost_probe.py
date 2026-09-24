@@ -46,6 +46,8 @@ class _Sampler:
         import psutil
 
         self._proc = psutil.Process()
+        # 階段設定（改當下值＋附加歷史）與取樣之階段快照共用此鎖，兩者不得交錯（r23 codex P2-02）
+        self._lock = threading.Lock()
         self._history: list = []  # 每次設定階段即附加（取樣途中經過之全部階段皆可查；r22 codex P2-01）
         self.stage = "public"
         self.peaks: dict = {}
@@ -59,8 +61,9 @@ class _Sampler:
 
     @stage.setter
     def stage(self, value: str) -> None:
-        self._stage = value
-        self._history.append(value)
+        with self._lock:
+            self._stage = value
+            self._history.append(value)
 
     def _sample(self) -> tuple:
         """回傳 (RSS 合計, USS 合計或 None〔任一程序 USS 取不到〕, 是否完整〔每程序皆取得 RSS〕)。"""
@@ -114,10 +117,13 @@ class _Sampler:
             gap = start - self._last_start
             self.peaks["max_sample_gap_seconds"] = max(self.peaks.get("max_sample_gap_seconds", 0.0), gap)
         self._last_start = start
-        mark = len(self._history)
-        before = self.stage
+        with self._lock:
+            mark = len(self._history)
+            before = self._stage
         sample = self._sample()
-        self._record(sample, tuple(dict.fromkeys((before, *self._history[mark:]))))
+        with self._lock:
+            stages = tuple(dict.fromkeys((before, *self._history[mark:])))
+        self._record(sample, stages)
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -221,11 +227,16 @@ def child(symbol: str, timeframe: str, n: int, multi: bool) -> None:
     print("RESULT " + json.dumps({
         "seconds_total": round(total, 2), "seconds_calibration": round(timers["calibration"], 2),
         "seconds_adf": round(timers["adf"], 2), "seconds_dstar": round(timers["dstar"], 2),
-        **{k: int(v) for k, v in sampler.peaks.items()},
+        **peaks_for_result(sampler.peaks),
         "workers_submitted": handoff["submitted"],
         "calibration_tmp_leftover": leftover,
         "decisions": {c: [bool(d["fracdiff"]), int(d["adf_differenced"] or 0)] for c, d in dec.items()},
     }))
+
+
+def peaks_for_result(peaks: dict) -> dict:
+    """取樣器結果轉收據：位元組與筆數為整數，秒數保留小數（r23 codex P2-01：`int()` 曾把 0.1 秒間隔截為 0）。"""
+    return {k: (round(float(v), 4) if k.endswith("_seconds") else int(v)) for k, v in peaks.items()}
 
 
 def run_child(args: list, env: dict) -> dict:
