@@ -606,11 +606,22 @@ def build_timeframe_completeness(
     expected_tfs: Sequence[str],
     failed_tfs: Sequence[str],
 ) -> Dict[str, List[str]]:
-    """週期三欄之 canonical 形成（docs/FFTFMETA_SPEC.md Task 1.1）——**空殼，尚未實作**。
+    """週期三欄之 canonical 形成（docs/FFTFMETA_SPEC.md Task 1.1）。
 
     expected＝expected_tfs 首次出現序去重；failed 依 expected 序去重且須 ⊆ expected；present＝expected − failed（保序）。
     """
-    raise NotImplementedError("FFTFMETA Task 1.1")
+    expected: List[str] = list(dict.fromkeys(str(tf) for tf in expected_tfs))
+    if not expected:
+        raise ValueError("build_timeframe_completeness: expected_tfs 不得為空")
+    failed_set = {str(tf) for tf in failed_tfs}
+    unknown = sorted(failed_set.difference(expected))
+    if unknown:
+        raise ValueError(f"build_timeframe_completeness: failed_tfs 含不在 expected 之週期 {unknown}")
+    return {
+        "expected_timeframes": expected,
+        "present_timeframes": [tf for tf in expected if tf not in failed_set],
+        "failed_timeframes": [tf for tf in expected if tf in failed_set],
+    }
 
 
 def apply_quality_degradation(
@@ -622,11 +633,118 @@ def apply_quality_degradation(
     max_nan_ratio: float,
     preprocessing_applied: Optional[bool],
 ) -> Dict[str, Any]:
-    """NaN／inf 門檻與 L6.5 失敗之降級判定（docs/FFTFMETA_SPEC.md Task 2.3）——**空殼，尚未實作**。
+    """NaN／inf 門檻與 L6.5 失敗之降級判定（docs/FFTFMETA_SPEC.md Task 2.3）。
 
     門檻為已解析之實值（`None` 由 factory 政策層先解析）；回傳併入降級後之新 completeness dict。
+    健康（無任何降級原因）時回傳與輸入相等之副本；原因順序固定：既有（週期→層）→ L6.5 → inf → nan。
     """
-    raise NotImplementedError("FFTFMETA Task 2.3")
+    out = dict(meta)
+    reasons: List[str] = []
+    if preprocessing_applied is False:
+        out["preprocessing_applied"] = False
+        reasons.append("L6.5:preprocessing_failed")
+    quality_reasons: List[str] = []
+    if inf_ratio > max_inf_ratio:
+        quality_reasons.append(f"inf_ratio={inf_ratio:.12g}>max_inf_ratio={max_inf_ratio:.12g}")
+    if nan_ratio > max_nan_ratio:
+        quality_reasons.append(f"nan_ratio={nan_ratio:.12g}>max_nan_ratio={max_nan_ratio:.12g}")
+    if quality_reasons:
+        out["quality_thresholds"] = {
+            "max_inf_ratio": max_inf_ratio,
+            "max_nan_ratio": max_nan_ratio,
+            "observed_inf_ratio": float(inf_ratio),
+            "observed_nan_ratio": float(nan_ratio),
+        }
+    reasons.extend(quality_reasons)
+    if not reasons:
+        return out
+    out["quality_status"] = "partial"
+    out["run_status"] = "partial"
+    out["failure_reasons"] = list(out.get("failure_reasons", [])) + reasons
+    return out
+
+
+def _status_value(status: Any) -> str:
+    return str(getattr(status, "value", status))
+
+
+def _resolve_multi_tf_completeness(
+    layer_results: Optional[Dict[str, LayerExecutionResult]],
+    timeframe: str,
+    *,
+    timeframe_completeness: Optional[Dict[str, List[str]]],
+    cross_tf_layer_failures: Sequence[str],
+    layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]],
+) -> Dict[str, Any]:
+    """MultiTF canonical completeness（Task 1.2／1.3）。
+
+    週期三欄取 `timeframe_completeness`；層失敗之唯一權威＝`cross_tf_layer_failures`（`L<n>:<tf>:<reason>`）；
+    層之 expected 證據：有 `layer_status_by_tf` 時取各 present 週期非 empty_disabled 之 L<n> 聯集，否則取 `layer_results`。
+    證據缺（無條目、條目缺 L1–L6 任一鍵、layer_results 缺層或為空）⇒ quality_status＝unknown。
+    """
+    from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_id
+
+    tc = timeframe_completeness or build_timeframe_completeness([timeframe], [])
+    layer_ids = list(LAYER_NAME_TO_ID.values())
+
+    failed_layers: List[str] = []
+    failed_ids: set = set()
+    layer_reasons: List[str] = []
+    for entry in cross_tf_layer_failures:
+        qualified = qualify_failed_layer_id(str(entry), timeframe)
+        parts = qualified.split(":", 2)
+        prefix = ":".join(parts[:2])
+        if prefix not in failed_layers:
+            failed_layers.append(prefix)
+        failed_ids.add(parts[0])
+        layer_reasons.append(qualified)
+
+    evidence_missing = False
+    expected_layers: List[str] = []
+    if layer_status_by_tf is not None:
+        present_tfs = tc["present_timeframes"]
+        for tf in present_tfs:
+            statuses = layer_status_by_tf.get(tf)
+            if not isinstance(statuses, dict) or not set(layer_ids) <= set(statuses):
+                evidence_missing = True
+        expected_layers = [
+            layer_id
+            for layer_id in layer_ids
+            if any(
+                _status_value(layer_status_by_tf[tf][layer_id][0]) != LayerStatus.empty_disabled.value
+                for tf in present_tfs
+                if isinstance(layer_status_by_tf.get(tf), dict) and layer_id in layer_status_by_tf[tf]
+            )
+        ]
+    elif layer_results:
+        for layer_name, layer_id in LAYER_NAME_TO_ID.items():
+            result = layer_results.get(layer_name)
+            if result is None:
+                evidence_missing = True
+                continue
+            if result.status != LayerStatus.empty_disabled:
+                expected_layers.append(layer_id)
+    else:
+        evidence_missing = True
+
+    present_layers = [layer_id for layer_id in expected_layers if layer_id not in failed_ids]
+    if evidence_missing or not expected_layers:
+        quality_status = "unknown"
+    elif tc["failed_timeframes"] or failed_layers:
+        quality_status = "partial"
+    else:
+        quality_status = "complete"
+
+    return {
+        "expected_layers": expected_layers,
+        "present_layers": present_layers,
+        "failed_layers": failed_layers,
+        "expected_timeframes": list(tc["expected_timeframes"]),
+        "present_timeframes": list(tc["present_timeframes"]),
+        "failed_timeframes": list(tc["failed_timeframes"]),
+        "quality_status": quality_status,
+        "failure_reasons": [f"timeframe:{tf}" for tf in tc["failed_timeframes"]] + layer_reasons,
+    }
 
 
 def resolve_completeness_meta(
@@ -640,10 +758,16 @@ def resolve_completeness_meta(
 ) -> Dict[str, Any]:
     """組裝 artifact completeness；僅 consumer 政策（如 empty_selection）可覆寫 layer 衍生狀態。
     `timeframe_completeness`／`cross_tf_layer_failures`／`layer_status_by_tf`：MultiTF canonical 輸入
-    （docs/FFTFMETA_SPEC.md Task 1.2／1.3，**尚未實作**；預設值時行為不變）。"""
+    （docs/FFTFMETA_SPEC.md Task 1.2／1.3；預設值時行為不變）。"""
     if timeframe_completeness is not None or cross_tf_layer_failures or layer_status_by_tf is not None:
-        raise NotImplementedError("FFTFMETA Task 1.2")
-    if layer_results:
+        meta = _resolve_multi_tf_completeness(
+            layer_results,
+            timeframe,
+            timeframe_completeness=timeframe_completeness,
+            cross_tf_layer_failures=cross_tf_layer_failures,
+            layer_status_by_tf=layer_status_by_tf,
+        )
+    elif layer_results:
         meta = build_completeness_meta_from_layer_results(layer_results, timeframe=timeframe)
     else:
         meta = default_completeness_meta(timeframe)
@@ -651,6 +775,22 @@ def resolve_completeness_meta(
         meta = dict(meta)
         meta["quality_status"] = override_quality_status
     return meta
+
+
+def _is_default_completeness_input(
+    timeframe_completeness: Optional[Dict[str, List[str]]],
+    cross_tf_layer_failures: Sequence[str],
+    layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]],
+) -> bool:
+    """writer 未收到任何 MultiTF canonical 輸入（IC-first 等後續寫入之形；Task 2.1）。"""
+    return timeframe_completeness is None and not cross_tf_layer_failures and layer_status_by_tf is None
+
+
+_ROOT_PRESERVED_COMPLETENESS_KEYS: Tuple[str, ...] = COMPLETENESS_FIELD_NAMES + (
+    "failure_reasons",
+    "quality_status",
+    "run_status",
+)
 
 
 def _consumer_quality_override(quality_status: str) -> Optional[str]:
@@ -745,6 +885,9 @@ class FeatureStorage:
         *,
         row_index: Optional[pd.DatetimeIndex] = None,
         layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
+        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
+        cross_tf_layer_failures: Sequence[str] = (),
+        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
     ) -> Path:
         """Write IC-First raw L7 groups to the canonical V2 raw path.
 
@@ -762,6 +905,9 @@ class FeatureStorage:
             quality_status="complete",
             row_index=row_index,
             layer_results=layer_results,
+            timeframe_completeness=timeframe_completeness,
+            cross_tf_layer_failures=cross_tf_layer_failures,
+            layer_status_by_tf=layer_status_by_tf,
         )
 
     def write_raw_from_registry_stream(
@@ -782,6 +928,10 @@ class FeatureStorage:
         row_index: Optional[pd.DatetimeIndex] = None,
         row_slice: Optional[slice] = None,
         layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
+        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
+        cross_tf_layer_failures: Sequence[str] = (),
+        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
+        quality_gate: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Path, Dict[str, Any]]:
         """Stream CGSA registry groups into the canonical L7_raw artifact.
 
@@ -1202,7 +1352,30 @@ class FeatureStorage:
             if extra_metadata:
                 stream_metadata.update(extra_metadata)
 
-            completeness_meta = resolve_completeness_meta(layer_results, tf)
+            completeness_meta = resolve_completeness_meta(
+                layer_results,
+                tf,
+                timeframe_completeness=timeframe_completeness,
+                cross_tf_layer_failures=cross_tf_layer_failures,
+                layer_status_by_tf=layer_status_by_tf,
+            )
+            if quality_gate is not None:
+                # Task 2.3：品質降級於 manifest 合併前定案（validation 比率於上方已算出）
+                completeness_meta = apply_quality_degradation(
+                    completeness_meta,
+                    inf_ratio=inf_ratio,
+                    nan_ratio=nan_ratio,
+                    max_inf_ratio=float(quality_gate["max_inf_ratio"]),
+                    max_nan_ratio=float(quality_gate["max_nan_ratio"]),
+                    preprocessing_applied=quality_gate.get("preprocessing_applied"),
+                )
+            # manifest 只收既有鍵（completeness 六欄＋quality_status＋failure_reasons）；
+            # quality_thresholds／run_status 等降級細節只經 summary 回給 factory（§C 不新增 manifest 鍵）
+            manifest_completeness = {
+                key: completeness_meta[key]
+                for key in COMPLETENESS_FIELD_NAMES + ("quality_status", "failure_reasons")
+                if key in completeness_meta
+            }
 
             if final_artifact_dir.exists():
                 backup_dir = run_dir / f".previous-raw-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
@@ -1225,7 +1398,7 @@ class FeatureStorage:
                 group_manifest=ordered_group_manifest,
                 extra_metadata=stream_metadata,
                 row_index=row_index_manifest,
-                completeness_meta=completeness_meta,
+                completeness_meta=manifest_completeness,
             )
 
             if backup_dir is not None and backup_dir.exists():
@@ -1249,6 +1422,8 @@ class FeatureStorage:
                 "l65_mode": str(l65_mode),
                 "dead_dropped_cols": int(dead_dropped_cols),
                 "dead_affected_groups": int(dead_affected_groups),
+                # 最終 completeness（含 Task 2.3 降級）；factory 以之寫 result.metadata（Task 2.2 同源）
+                "completeness": dict(completeness_meta),
             }
             self.logger.info(
                 "[L7_raw] registry stream persist done: symbol=%s tf=%s groups=%d features=%d "
@@ -1290,6 +1465,9 @@ class FeatureStorage:
         groups: Dict[str, pd.DataFrame],
         *,
         layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
+        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
+        cross_tf_layer_failures: Sequence[str] = (),
+        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
     ) -> Path:
         """Write IC-First processed L7 groups to the canonical V2 processed path."""
         quality_status = "empty_selection" if not groups else "complete"
@@ -1303,6 +1481,9 @@ class FeatureStorage:
             allow_empty=True,
             quality_status=quality_status,
             layer_results=layer_results,
+            timeframe_completeness=timeframe_completeness,
+            cross_tf_layer_failures=cross_tf_layer_failures,
+            layer_status_by_tf=layer_status_by_tf,
         )
 
     def _write_l7_v2_artifact(
@@ -1317,6 +1498,9 @@ class FeatureStorage:
         quality_status: str,
         row_index: Optional[pd.DatetimeIndex] = None,
         layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
+        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
+        cross_tf_layer_failures: Sequence[str] = (),
+        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
     ) -> Path:
         pa_module, pq_module = _require_pyarrow()
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
@@ -1333,8 +1517,14 @@ class FeatureStorage:
             layer_results,
             tf,
             override_quality_status=_consumer_quality_override(quality_status),
+            timeframe_completeness=timeframe_completeness,
+            cross_tf_layer_failures=cross_tf_layer_failures,
+            layer_status_by_tf=layer_status_by_tf,
         )
         resolved_quality_status = str(completeness_meta["quality_status"])
+        preserve_root = _is_default_completeness_input(
+            timeframe_completeness, cross_tf_layer_failures, layer_status_by_tf
+        )
 
         feature_schema_hash = self._build_l7_v2_schema_hash(
             schema_version=schema_version,
@@ -1398,6 +1588,7 @@ class FeatureStorage:
                 group_manifest=group_manifest,
                 row_index=row_index_manifest,
                 completeness_meta=completeness_meta,
+                preserve_root_completeness=preserve_root,
             )
 
             if backup_dir is not None and backup_dir.exists():
@@ -1780,6 +1971,7 @@ class FeatureStorage:
         extra_metadata: Optional[Dict[str, Any]] = None,
         row_index: Optional[Dict[str, Any]] = None,
         completeness_meta: Optional[Dict[str, Any]] = None,
+        preserve_root_completeness: bool = False,
     ) -> Dict[str, Any]:
         """Locked read-modify-write so raw/processed writers cannot clobber each other."""
         with self._manifest_v2_lock(run_dir):
@@ -1800,6 +1992,7 @@ class FeatureStorage:
                 extra_metadata=extra_metadata,
                 row_index=row_index,
                 completeness_meta=completeness_meta,
+                preserve_root_completeness=preserve_root_completeness,
             )
             self._write_feature_manifest_v2_unlocked(run_dir, manifest)
             return manifest
@@ -1822,12 +2015,26 @@ class FeatureStorage:
         extra_metadata: Optional[Dict[str, Any]] = None,
         row_index: Optional[Dict[str, Any]] = None,
         completeness_meta: Optional[Dict[str, Any]] = None,
+        preserve_root_completeness: bool = False,
     ) -> Dict[str, Any]:
         if existing_manifest:
             for key, expected in (("symbol", symbol), ("tf", tf), ("config_hash", config_hash)):
                 actual = existing_manifest.get(key)
                 if actual is not None and actual != expected:
                     raise ValueError(f"Manifest {key} mismatch: expected {expected}, got {actual}")
+
+        # Task 2.1：不帶週期資訊之後續寫入（IC-first）不得覆蓋既有根之 completeness／品質欄
+        preserved_root: Dict[str, Any] = {}
+        if (
+            preserve_root_completeness
+            and existing_manifest
+            and all(key in existing_manifest for key in ("expected_timeframes", "present_timeframes", "failed_timeframes"))
+        ):
+            preserved_root = {
+                key: json.loads(json.dumps(existing_manifest[key]))
+                for key in _ROOT_PRESERVED_COMPLETENESS_KEYS
+                if key in existing_manifest
+            }
 
         artifact_manifest = {
             "complete": True,
@@ -1879,6 +2086,7 @@ class FeatureStorage:
                     manifest[field] = completeness_meta[field]
             if "failure_reasons" in completeness_meta:
                 manifest["failure_reasons"] = list(completeness_meta["failure_reasons"])
+        manifest.update(preserved_root)
         return manifest
 
     @staticmethod

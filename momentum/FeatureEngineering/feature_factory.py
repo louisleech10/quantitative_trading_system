@@ -15,7 +15,7 @@ import threading
 import psutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -27,8 +27,11 @@ from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistr
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
 from momentum.FeatureEngineering.feature_storage import (
+    COMPLETENESS_FIELD_NAMES,
     FeatureStorage,
+    apply_quality_degradation,
     build_completeness_meta_from_layer_results,
+    resolve_completeness_meta,
 )
 from momentum.FeatureEngineering.feature_validator import FeatureValidator
 from momentum.FeatureEngineering.run_paths import cgsa_work_dir
@@ -3045,13 +3048,7 @@ class FeatureFactory:
         inf_ratio: float,
     ) -> None:
         """超過 NaN/Inf 上限時將產物標為 partial，不改動數值。"""
-        max_inf_ratio = float(self._runtime_config_value(config, "max_inf_ratio", 0.0))
-        configured_nan = self._runtime_config_value(config, "max_nan_ratio", None)
-        max_nan_ratio = (
-            self._default_max_nan_ratio(symbol, timeframe)
-            if configured_nan is None
-            else float(configured_nan)
-        )
+        max_inf_ratio, max_nan_ratio = self._resolve_quality_thresholds(config, symbol, timeframe)
         reasons: List[str] = []
         if inf_ratio > max_inf_ratio:
             reasons.append(f"inf_ratio={inf_ratio:.12g}>max_inf_ratio={max_inf_ratio:.12g}")
@@ -3068,6 +3065,61 @@ class FeatureFactory:
             "observed_inf_ratio": float(inf_ratio),
             "observed_nan_ratio": float(nan_ratio),
         }
+
+    def _resolve_quality_thresholds(
+        self, config: "FactoryConfig", symbol: str, timeframe: str
+    ) -> Tuple[float, float]:
+        """品質門檻政策層：`None` 於此解析為實值（inf 預設 0.0；nan 讀健康 run artifact）。"""
+        max_inf_ratio = float(self._runtime_config_value(config, "max_inf_ratio", 0.0))
+        configured_nan = self._runtime_config_value(config, "max_nan_ratio", None)
+        max_nan_ratio = (
+            self._default_max_nan_ratio(symbol, timeframe)
+            if configured_nan is None
+            else float(configured_nan)
+        )
+        return max_inf_ratio, max_nan_ratio
+
+    def _final_completeness(
+        self,
+        config: "FactoryConfig",
+        symbol: str,
+        timeframe: str,
+        *,
+        nan_ratio: float,
+        inf_ratio: float,
+        preprocessing_applied: Optional[bool],
+        **canonical: Any,
+    ) -> Dict[str, Any]:
+        """無 manifest writer 之路徑：以與 writer 同一組函式形成最終 completeness（FF-TFMETA Task 2.2／2.3）。"""
+        meta = resolve_completeness_meta(self.layer_results, timeframe, **canonical)
+        max_inf_ratio, max_nan_ratio = self._resolve_quality_thresholds(config, symbol, timeframe)
+        return apply_quality_degradation(
+            meta,
+            inf_ratio=inf_ratio,
+            nan_ratio=nan_ratio,
+            max_inf_ratio=max_inf_ratio,
+            max_nan_ratio=max_nan_ratio,
+            preprocessing_applied=preprocessing_applied,
+        )
+
+    def _apply_completeness_to_metadata(
+        self, metadata: Dict[str, Any], completeness: Dict[str, Any], timeframe: str
+    ) -> None:
+        """result.metadata 之 completeness／品質欄一律取自 writer（或同函式）回傳之最終物件（Task 2.2 同源）。"""
+        for key in COMPLETENESS_FIELD_NAMES:
+            metadata[key] = list(completeness.get(key, []))
+        quality_status = str(completeness["quality_status"])
+        metadata["quality_status"] = quality_status
+        metadata["run_status"] = str(completeness.get("run_status", quality_status))
+        metadata["failed_layers"] = qualify_failed_layer_ids(completeness.get("failed_layers", []), timeframe)
+        metadata["failure_reasons"] = qualify_failed_layer_ids(completeness.get("failure_reasons", []), timeframe)
+        if "quality_thresholds" in completeness:
+            metadata["quality_thresholds"] = dict(completeness["quality_thresholds"])
+        if completeness.get("preprocessing_applied") is False:
+            metadata["preprocessing_applied"] = False
+            metadata["effective_preprocessing_config"] = copy.deepcopy(
+                getattr(self, "_effective_preprocessing_config", None) or {}
+            )
 
     def _apply_preprocessing_degradation_metadata(self, metadata: Dict[str, Any]) -> None:
         """僅 L6.5 實際失敗時寫降級資訊，健康 run metadata 不變。"""
@@ -3152,6 +3204,9 @@ class FeatureFactory:
         compute_warnings: Optional[List[str]] = None,
         persist: bool = True,
         batch_id: Optional[str] = None,
+        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
+        cross_tf_layer_failures: Sequence[str] = (),
+        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
     ) -> FeatureGenerationResult:
         """CGSA generation path: L1-L6 → L6.5 mode → canonical L7_raw."""
         if self._cgsa_registry is None:
@@ -3238,6 +3293,16 @@ class FeatureFactory:
                 time_range=public_time_range,
                 row_slice=row_slice,
                 layer_results=self.layer_results,
+                timeframe_completeness=timeframe_completeness,
+                cross_tf_layer_failures=cross_tf_layer_failures,
+                layer_status_by_tf=layer_status_by_tf,
+                quality_gate=dict(
+                    zip(
+                        ("max_inf_ratio", "max_nan_ratio"),
+                        self._resolve_quality_thresholds(config, symbol, timeframe),
+                    ),
+                    preprocessing_applied=None,  # CGSA 串流不經 _execute_l65_with_degradation，不臆造旗標
+                ),
                 extra_metadata={
                     **self._build_l7_raw_preprocessing_metadata(
                         config,
@@ -3268,10 +3333,19 @@ class FeatureFactory:
 
         manifest_path = str(stream_summary.get("manifest_path") or self._cgsa_registry.manifest_path)
         raw_path_value = str(stream_summary.get("raw_path") or "")
-        completeness_meta = build_completeness_meta_from_layer_results(
-            self.layer_results,
-            timeframe=timeframe,
-        )
+        completeness_meta = stream_summary.get("completeness")
+        if completeness_meta is None:  # persist=False：以與 writer 同一組函式形成
+            completeness_meta = self._final_completeness(
+                config,
+                symbol,
+                timeframe,
+                nan_ratio=self._resolve_stream_nan_ratio(validation_summary),
+                inf_ratio=float(validation_summary.get("inf_ratio", 0.0)),
+                preprocessing_applied=None,
+                timeframe_completeness=timeframe_completeness,
+                cross_tf_layer_failures=cross_tf_layer_failures,
+                layer_status_by_tf=layer_status_by_tf,
+            )
         metadata = {
             "feature_names": [],
             "feature_count": feature_count,
@@ -3304,26 +3378,9 @@ class FeatureFactory:
                 "groups_with_inf": int(validation_summary.get("groups_with_inf", 0)),
                 "constant_features_removed": [],
             },
-            "quality_status": str(completeness_meta["quality_status"]),
-            "run_status": str(completeness_meta["quality_status"]),
-            "failed_layers": qualify_failed_layer_ids(
-                completeness_meta.get("failed_layers", []), timeframe
-            ),
-            "failure_reasons": qualify_failed_layer_ids(
-                completeness_meta.get("failure_reasons", []), timeframe
-            ),
         }
+        self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
         self._apply_warmup_metadata(metadata, config, ingest_raw)
-        self._apply_preprocessing_degradation_metadata(metadata)
-        stream_nan_ratio = float(metadata["validation"]["nan_ratio"])
-        self._apply_runtime_quality_gate(
-            metadata,
-            config,
-            symbol,
-            timeframe,
-            nan_ratio=stream_nan_ratio,
-            inf_ratio=float(validation_summary.get("inf_ratio", 0.0)),
-        )
 
         result = FeatureGenerationResult(
             features_df=pd.DataFrame(index=trimmed_raw.index),
@@ -3396,6 +3453,9 @@ class FeatureFactory:
         compute_warnings: Optional[List[str]] = None,
         persist: bool = True,
         batch_id: Optional[str] = None,
+        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
+        cross_tf_layer_failures: Sequence[str] = (),
+        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
     ) -> FeatureGenerationResult:
         """CGSA Layer 7 path: per-group scan validation + per-group parquet persistence."""
         if self._cgsa_registry is None:
@@ -3470,16 +3530,19 @@ class FeatureFactory:
                 "constant_features_removed": [],
             },
         }
-        self._apply_warmup_metadata(metadata, config, raw_data)
-        self._apply_preprocessing_degradation_metadata(metadata)
-        self._apply_runtime_quality_gate(
-            metadata,
+        completeness_meta = self._final_completeness(
             config,
             symbol,
             timeframe,
             nan_ratio=float(validation_summary.get("nan_ratio", 1.0 - float(validation_summary["coverage"]))),
             inf_ratio=float(validation_summary.get("inf_ratio", 0.0)),
+            preprocessing_applied=getattr(self, "_preprocessing_applied", None),
+            timeframe_completeness=timeframe_completeness,
+            cross_tf_layer_failures=cross_tf_layer_failures,
+            layer_status_by_tf=layer_status_by_tf,
         )
+        self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
+        self._apply_warmup_metadata(metadata, config, raw_data)
 
         result = FeatureGenerationResult(
             features_df=pd.DataFrame(index=trimmed_raw.index),
@@ -3525,6 +3588,9 @@ class FeatureFactory:
         compute_warnings: Optional[List[str]] = None,
         persist: bool = True,
         batch_id: Optional[str] = None,
+        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
+        cross_tf_layer_failures: Sequence[str] = (),
+        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
     ) -> FeatureGenerationResult:
         if self._cgsa_enabled() and self._cgsa_registry is not None:
             return self._layer7_validate_and_persist_cgsa(
@@ -3537,6 +3603,9 @@ class FeatureFactory:
                 compute_warnings=compute_warnings,
                 persist=persist,
                 batch_id=batch_id,
+                timeframe_completeness=timeframe_completeness,
+                cross_tf_layer_failures=cross_tf_layer_failures,
+                layer_status_by_tf=layer_status_by_tf,
             )
 
         features_df = self._combine_layers(layers, context="layer7_final")
@@ -3570,9 +3639,12 @@ class FeatureFactory:
         }
 
         data_range = self._data_range(raw_data)
-        completeness_meta = build_completeness_meta_from_layer_results(
+        completeness_meta = resolve_completeness_meta(
             self.layer_results,
-            timeframe=timeframe,
+            timeframe,
+            timeframe_completeness=timeframe_completeness,
+            cross_tf_layer_failures=cross_tf_layer_failures,
+            layer_status_by_tf=layer_status_by_tf,
         )
         metadata = {
             "feature_names": list(features_df.columns),
@@ -3619,15 +3691,17 @@ class FeatureFactory:
         value_count = int(values.size)
         nan_ratio = float(self._abnormal_nan_count(values) / value_count) if value_count else 0.0
         inf_ratio = float(np.isinf(values).sum() / value_count) if value_count else 0.0
-        self._apply_preprocessing_degradation_metadata(metadata)
-        self._apply_runtime_quality_gate(
-            metadata,
-            config,
-            symbol,
-            timeframe,
-            nan_ratio=nan_ratio,
+        # Task 2.3 ④：frame 路徑 L6.5 旗標與比率皆於 persist 前已知，以同一函式先判再存
+        max_inf_ratio, max_nan_ratio = self._resolve_quality_thresholds(config, symbol, timeframe)
+        completeness_meta = apply_quality_degradation(
+            completeness_meta,
             inf_ratio=inf_ratio,
+            nan_ratio=nan_ratio,
+            max_inf_ratio=max_inf_ratio,
+            max_nan_ratio=max_nan_ratio,
+            preprocessing_applied=getattr(self, "_preprocessing_applied", None),
         )
+        self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
         result.metadata = metadata
         result.feature_count = int(result.features_df.shape[1])
 

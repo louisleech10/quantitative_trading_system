@@ -106,6 +106,8 @@ class ColumnGroupRegistry:
         self._work_dir = Path(work_dir)
         self._work_dir.mkdir(parents=True, exist_ok=True)
         self._manifest_context: dict[str, Any] = {}
+        # FF-TFMETA Task 1.3：週期 → L1–L6 → (status 值, reason)；隨 manifest 往返供 resume 讀回
+        self._layer_status_by_tf: Dict[str, Dict[str, Tuple[str, str]]] = {}
         self._group_parquet_paths: dict[str, str] = {}
         self._memory_buffer: dict[str, np.ndarray] = {}
         self._memory_buffer_limit = max(0, int(memory_buffer_groups))
@@ -271,14 +273,25 @@ class ColumnGroupRegistry:
     def record_layer_status(self, tf: str, statuses: Mapping[str, Tuple[str, str]]) -> None:
         """記錄週期 `tf` 之 L1–L6 狀態（層代號 → (status 值, reason)），整組取代該週期舊條目。
 
-        docs/FFTFMETA_SPEC.md Task 1.3 ①——**空殼，尚未實作**；隨 `write_manifest()` 落盤、`resume_from_manifest()` 讀回。
+        docs/FFTFMETA_SPEC.md Task 1.3 ①；隨 `write_manifest()` 落盤、`resume_from_manifest()` 讀回。
         """
-        raise NotImplementedError("FFTFMETA Task 1.3")
+        entry = {
+            str(layer_id): (str(getattr(status, "value", status)), str(reason or ""))
+            for layer_id, (status, reason) in statuses.items()
+        }
+        with self._manifest_lock:
+            self._layer_status_by_tf[str(tf)] = entry
+
+    def discard_layer_status(self, tf: str) -> None:
+        """移除週期 `tf` 之層狀態條目（parallel 註冊失敗 rollback；Task 1.3 ③）。"""
+        with self._manifest_lock:
+            self._layer_status_by_tf.pop(str(tf), None)
 
     @property
     def layer_status_by_tf(self) -> Dict[str, Dict[str, Tuple[str, str]]]:
-        """週期 → L1–L6 → (status 值, reason) 之記憶體欄（docs/FFTFMETA_SPEC.md Task 1.3 ①——**空殼，尚未實作**）。"""
-        raise NotImplementedError("FFTFMETA Task 1.3")
+        """週期 → L1–L6 → (status 值, reason) 之記憶體欄（docs/FFTFMETA_SPEC.md Task 1.3 ①；回傳副本）。"""
+        with self._manifest_lock:
+            return {tf: dict(entry) for tf, entry in self._layer_status_by_tf.items()}
 
     def load_data(self, group_id: str) -> np.ndarray:
         """Load column group data; transparently concatenates shards if sharded."""
@@ -1350,6 +1363,17 @@ class ColumnGroupRegistry:
             "config_snapshot": manifest.get("config_snapshot") or {},
             "created_at": manifest.get("created_at") or datetime.utcnow().isoformat(),
         }
+        raw_layer_status = manifest.get("layer_status_by_tf")
+        if isinstance(raw_layer_status, dict):
+            registry._layer_status_by_tf = {
+                str(tf): {
+                    str(layer_id): (str(pair[0]), str(pair[1]))
+                    for layer_id, pair in entry.items()
+                    if isinstance(pair, (list, tuple)) and len(pair) == 2
+                }
+                for tf, entry in raw_layer_status.items()
+                if isinstance(entry, dict)
+            }
 
         manifest_schema = int(manifest.get("schema_version", 1))
         if manifest_schema not in (1, 2):
@@ -1578,6 +1602,11 @@ class ColumnGroupRegistry:
             "created_at": default_created_at,
             "groups": groups_payload,
         }
+        if self._layer_status_by_tf:
+            payload["layer_status_by_tf"] = {
+                tf: {layer_id: [status, reason] for layer_id, (status, reason) in sorted(entry.items())}
+                for tf, entry in sorted(self._layer_status_by_tf.items())
+            }
 
         with tempfile.NamedTemporaryFile(
             mode="w",

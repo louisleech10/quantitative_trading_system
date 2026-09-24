@@ -891,7 +891,9 @@ def test_mutation_writer_timeframe_completeness_root_overwrite_is_caught(
 
     def _mutant(self, **kwargs):
         manifest = real_build(self, **kwargs)
-        manifest["present_timeframes"] = [kwargs["tf"]]
+        # 只改寫「已有 manifest」之二次寫入（首寫亦改則 before／after 同被改寫，比較恆等＝空心 mutant；實作時實跑發現）
+        if kwargs.get("existing_manifest"):
+            manifest["present_timeframes"] = [kwargs["tf"]]
         return manifest
 
     monkeypatch.setattr(FeatureStorage, "_build_feature_manifest_v2", _mutant)

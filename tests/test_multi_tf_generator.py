@@ -85,12 +85,13 @@ class StubFactory:
     def _compute_config_hash(self, config, symbol=None, timeframe=None, start_date=None, end_date=None):
         return "dummy_hash"
 
-    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash, batch_id=None):
+    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash, batch_id=None, **_canonical):
         features_df = self._combine_layers(layers).reindex(raw_data.index)
         return SimpleNamespace(
             features_df=features_df,
             labels_df=pd.DataFrame(index=features_df.index),
-            metadata={"config_hash": config_hash, "layer_counts": {}},
+            # 新契約：週期三欄由工廠依產生器傳入之 canonical 物件產出（FF-TFMETA Task 2.2）
+            metadata={"config_hash": config_hash, "layer_counts": {}, **(_canonical.get("timeframe_completeness") or {})},
             feature_count=features_df.shape[1],
             generation_time=elapsed,
             layer_counts={},
@@ -617,6 +618,9 @@ def test_mutation_canonical_completeness_single_tf_timeframes_is_caught(tmp_path
 
     monkeypatch.setattr(fs_module, "build_timeframe_completeness", mutant)
     monkeypatch.setattr(mtf_module, "build_timeframe_completeness", mutant, raising=False)  # 若以 from-import 綁名
+    # Task 3.2 之交叉檢查會先以 RuntimeError 攔下此 mutant；本測試要證的是週期斷言本身抓得到，故關閉之
+    # （交叉檢查另由 test_mutation_crosscheck_ignoring_registry_is_caught 驗；實作時實跑發現）
+    monkeypatch.setattr(MultiTFGenerator, "_crosscheck_present_timeframes", staticmethod(lambda registry, present: None))
     with pytest.raises(AssertionError):
         _assert_canonical_case(tmp_path, monkeypatch, "cgsa_serial", "healthy")
 

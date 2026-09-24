@@ -151,6 +151,7 @@ class _CgsaStubFactory(StubFactory):
         compute_warnings=None,
         persist: bool = True,
         batch_id=None,
+        **_canonical,
     ):
         del symbol, timeframe, config, compute_warnings, persist
         frames = []
@@ -165,7 +166,8 @@ class _CgsaStubFactory(StubFactory):
         return SimpleNamespace(
             features_df=features_df,
             labels_df=pd.DataFrame(index=features_df.index),
-            metadata={"config_hash": config_hash, "quality_status": "complete"},
+            # 新契約：週期三欄由工廠依產生器傳入之 canonical 物件產出（FF-TFMETA Task 2.2）
+            metadata={"config_hash": config_hash, "quality_status": "complete", **(_canonical.get("timeframe_completeness") or {})},
             feature_count=features_df.shape[1],
             generation_time=elapsed,
             layer_counts={},

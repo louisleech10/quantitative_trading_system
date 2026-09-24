@@ -1,0 +1,14 @@
+{
+  "ticket": "RM-FFTFMETA",
+  "batch": "20260924-fftfmeta/b1",
+  "cmd": "venv/bin/python handoffs/run_receipts/fftfmeta_probes/freeze_baseline.py --out <scratchpad>/fft_after.json",
+  "rc": 0,
+  "baseline": "tests/_golden/fftfmeta/baseline.json（動工前凍結，未覆寫）",
+  "bytes": {
+    "multi": {"manifest_before": 730464, "manifest_after": 730536, "manifest_delta": 72, "task_before": 24999, "task_after": 25134, "task_delta": 135},
+    "degraded": {"manifest_before": 472726, "manifest_after": 472859, "manifest_delta": 133, "task_before": 24119, "task_after": 24280, "task_delta": 161}
+  },
+  "observed_validation_nan_ratio": {"multi": 0.09589149456879037, "degraded": 0.009618709250635746},
+  "gate_cmd_result": "142 passed、3 failed（其中 2 條為本票前既有紅燈：test_quality_gate_max_ratios_do_not_change_config_hash〔hash 依最新 kline 日期〕、test_cgsa_config_hash_passed_correctly〔測試假設定缺 timeframes.primary，feature_factory.py:353 未經本票改動〕；第 3 條 mutation 測試已修後單跑 1 passed）",
+  "honest_bounds": "單機單次實跑；輕量設定（trend、close、rolling 5／13、winsorization）；大小差只來自 metadata JSON（completeness 欄補齊與降級欄同步），特徵資料由 test_fftfmeta_golden 逐群組四 hash 比對"
+}

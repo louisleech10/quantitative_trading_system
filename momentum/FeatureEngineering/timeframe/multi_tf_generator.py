@@ -18,6 +18,10 @@ from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.core.column_group_registry import normalize_npy_persistence_float32
+from momentum.FeatureEngineering.feature_storage import (
+    FAILOPEN_LAYER_FAILURE_STATUSES,
+    build_timeframe_completeness,
+)
 from momentum.FeatureEngineering.timeframe.tf_aligner import CURRENT_MTF_ALIGN_VERSION, TimeframeAligner
 
 
@@ -127,7 +131,7 @@ class MultiTFGenerator:
 
         registry = self._factory._cgsa_registry
         skipped_tfs: List[str] = []
-        failed_layers: List[str] = []
+        fresh_failed: Dict[str, List[str]] = {}
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
         stage_seconds: Dict[str, float] = {
             "dual_tf_l1_l6": 0.0,
@@ -203,10 +207,13 @@ class MultiTFGenerator:
                 layer1, layer2, layer3, layer4, layer5, layer6 = [
                     self._factory.layer_data(item) for item in layer_results
                 ]
-                failed_layers.extend(self._collect_failed_layer_ids(layer_results, timeframe))
+                fresh_failed[timeframe] = self._collect_failed_layer_ids(layer_results, timeframe)
+                # Task 1.3 ②：六層狀態（含非失敗）於 write_manifest 前記錄；stale 重跑者整組取代
+                registry.record_layer_status(timeframe, self._layer_statuses(layer_results))
             except Exception as exc:
                 logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
                 registry.rollback_timeframe(timeframe)
+                registry.discard_layer_status(timeframe)
                 skipped_tfs.append(timeframe)
                 self._raise_for_failed_timeframe(timeframe, str(exc))
                 continue
@@ -300,6 +307,8 @@ class MultiTFGenerator:
                     )
                 stage_seconds["alignment"] += time.perf_counter() - align_start
 
+            registry.write_manifest()
+
         if self._primary_tf in skipped_tfs:
             raise ValueError(f"Primary timeframe data missing for {symbol}/{self._primary_tf}")
 
@@ -311,6 +320,10 @@ class MultiTFGenerator:
             raise ValueError(f"All training timeframes skipped for {symbol}")
 
         logger.info("[CGSA][multi_tf] All TFs done: %d total groups in registry", total_groups)
+        canonical = self._canonical_completeness(skipped_tfs, fresh_failed, registry)
+        self._crosscheck_present_timeframes(
+            registry, canonical["timeframe_completeness"]["present_timeframes"]
+        )
 
         # L6.5 + L7_raw via registry streaming. This avoids full .npy overwrite
         # before parquet persist and keeps IC Gatekeeper/post transforms downstream.
@@ -330,6 +343,7 @@ class MultiTFGenerator:
             config_hash=config_hash,
             persist=persist,
             batch_id=batch_id,
+            **canonical,
         )
         stage_seconds["l65_l7"] = time.perf_counter() - l65_l7_start
         total_elapsed = time.time() - start_time
@@ -341,10 +355,9 @@ class MultiTFGenerator:
         result.metadata["multi_tf_stage_timing_complete"] = True
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
-        result.metadata["skipped_timeframes"] = skipped_tfs
-        result.metadata["present_timeframes"] = self._present_timeframes(skipped_tfs)
-        self._apply_failed_timeframe_metadata(result, skipped_tfs)
-        self._apply_failed_layer_metadata(result, failed_layers)
+        # Task 3.1：completeness／quality 由 persist 前之 canonical 物件定案，此處不再覆寫；
+        # skipped_timeframes 僅為 diagnostic 鍵，值＝failed_timeframes
+        result.metadata["skipped_timeframes"] = list(canonical["timeframe_completeness"]["failed_timeframes"])
 
         self._report_progress("complete", 1.0, f"[CGSA] MultiTF generation completed ({total_elapsed:.2f}s)")
         return result
@@ -386,7 +399,7 @@ class MultiTFGenerator:
 
         registry = self._factory._cgsa_registry
         skipped_tfs: List[str] = []
-        failed_layers: List[str] = []
+        fresh_failed: Dict[str, List[str]] = {}
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
         # dual_tf_l1_l6: worker L1-L6 runs in child processes; parent cannot
         # measure it (future.result() wait ≈ 0). Leave None — not 0.
@@ -457,7 +470,8 @@ class MultiTFGenerator:
             tf_layer_counts[self._primary_tf] = self._collect_layer_counts_from_registry(
                 registry, self._primary_tf
             )
-            failed_layers.extend(self._collect_failed_layer_ids(layer_results, self._primary_tf))
+            fresh_failed[self._primary_tf] = self._collect_failed_layer_ids(layer_results, self._primary_tf)
+            registry.record_layer_status(self._primary_tf, self._layer_statuses(layer_results))
             gc.collect()
 
             # Persist primary TF progress immediately so a crash before workers
@@ -560,9 +574,11 @@ class MultiTFGenerator:
                     # OOM Fix: result now carries only metadata + npy paths,
                     # so the pickle payload is KB rather than GB.
                     tf_layer_counts[tf] = result.get("layer_counts", {})
-                    failed_layers.extend(
-                        qualify_failed_layer_ids(result.get("failed_layers", []), tf)
-                    )
+                    worker_failed = qualify_failed_layer_ids(result.get("failed_layers", []), tf)
+                    worker_statuses = {
+                        str(layer_id): (str(pair[0]), str(pair[1]))
+                        for layer_id, pair in (result.get("layer_statuses") or {}).items()
+                    }
                     groups_data = result.get("groups", [])
                     source_ts_ms = result.get("source_timestamps_ms")
                     align_start = time.perf_counter()
@@ -574,9 +590,13 @@ class MultiTFGenerator:
                         )
                     except Exception as exc:
                         registry.rollback_timeframe(tf)
+                        registry.discard_layer_status(tf)
                         skipped_tfs.append(tf)
                         self._raise_for_failed_timeframe(tf, str(exc))
                         continue
+                    # Task 1.3 ③：群組註冊成功後、write_manifest 前記錄該週期六層狀態
+                    fresh_failed[tf] = worker_failed
+                    registry.record_layer_status(tf, worker_statuses)
                     stage_seconds["alignment"] += time.perf_counter() - align_start
                     # Resume support: persist worker progress to manifest now,
                     # so a SIGKILL during the next worker / L6.5 leaves a
@@ -604,6 +624,12 @@ class MultiTFGenerator:
             raise ValueError(f"All training timeframes skipped for {symbol}")
 
         logger.info("[CGSA-parallel] All TFs done: %d total groups in registry", total_groups)
+        if self._primary_tf in skipped_tfs:
+            raise ValueError(f"Primary timeframe data missing for {symbol}/{self._primary_tf}")
+        canonical = self._canonical_completeness(skipped_tfs, fresh_failed, registry)
+        self._crosscheck_present_timeframes(
+            registry, canonical["timeframe_completeness"]["present_timeframes"]
+        )
 
         # L6.5 + L7_raw via registry streaming. IC Gatekeeper and selected
         # post-transforms remain downstream of generation.
@@ -623,6 +649,7 @@ class MultiTFGenerator:
             config_hash=config_hash,
             persist=persist,
             batch_id=batch_id,
+            **canonical,
         )
         stage_seconds["l65_l7"] = time.perf_counter() - l65_l7_start
         total_elapsed = time.time() - start_time
@@ -635,10 +662,9 @@ class MultiTFGenerator:
         result.metadata["multi_tf_stage_timing_complete"] = False
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
-        result.metadata["skipped_timeframes"] = skipped_tfs
-        result.metadata["present_timeframes"] = self._present_timeframes(skipped_tfs)
-        self._apply_failed_timeframe_metadata(result, skipped_tfs)
-        self._apply_failed_layer_metadata(result, failed_layers)
+        # Task 3.1：completeness／quality 由 persist 前之 canonical 物件定案，此處不再覆寫；
+        # skipped_timeframes 僅為 diagnostic 鍵，值＝failed_timeframes
+        result.metadata["skipped_timeframes"] = list(canonical["timeframe_completeness"]["failed_timeframes"])
 
         self._report_progress("complete", 1.0, f"[CGSA-parallel] MultiTF completed ({total_elapsed:.2f}s)")
         return result
@@ -1268,7 +1294,8 @@ class MultiTFGenerator:
         """Legacy multi-TF: combine layers into wide DF, align, then L6.5 + L7."""
         aligned_outputs: List[pd.DataFrame] = []
         skipped_tfs: List[str] = []
-        failed_layers: List[str] = []
+        fresh_failed: Dict[str, List[str]] = {}
+        local_statuses: Dict[str, Dict[str, Tuple[str, str]]] = {}
         tf_layer_counts: Dict[str, Dict[str, int]] = {}
         total_tfs = len(self._training_tfs)
 
@@ -1311,7 +1338,8 @@ class MultiTFGenerator:
                 layer1, layer2, layer3, layer4, layer5, layer6 = [
                     self._factory.layer_data(item) for item in layer_results
                 ]
-                failed_layers.extend(self._collect_failed_layer_ids(layer_results, timeframe))
+                fresh_failed[timeframe] = self._collect_failed_layer_ids(layer_results, timeframe)
+                local_statuses[timeframe] = self._layer_statuses(layer_results)
             except Exception as exc:
                 logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
                 skipped_tfs.append(timeframe)
@@ -1376,6 +1404,7 @@ class MultiTFGenerator:
             )
 
         self._report_progress("persist", 0.9, "Running Layer 7 validate and persist")
+        canonical = self._canonical_completeness(skipped_tfs, fresh_failed, local_statuses=local_statuses)
         config_hash = self._factory._compute_config_hash(
             self._config, symbol, self._primary_tf,
             start_date=start_date, end_date=end_date,
@@ -1390,13 +1419,13 @@ class MultiTFGenerator:
             elapsed=elapsed,
             config_hash=config_hash,
             batch_id=batch_id,
+            **canonical,
         )
 
         total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
-        result.metadata["skipped_timeframes"] = skipped_tfs
-        result.metadata["present_timeframes"] = self._present_timeframes(skipped_tfs)
-        self._apply_failed_timeframe_metadata(result, skipped_tfs)
-        self._apply_failed_layer_metadata(result, failed_layers)
+        # Task 3.1：completeness／quality 由 persist 前之 canonical 物件定案，此處不再覆寫；
+        # skipped_timeframes 僅為 diagnostic 鍵，值＝failed_timeframes
+        result.metadata["skipped_timeframes"] = list(canonical["timeframe_completeness"]["failed_timeframes"])
 
         self._report_progress("complete", 1.0, f"MultiTF generation completed ({elapsed:.2f}s)")
         return result
@@ -1466,48 +1495,79 @@ class MultiTFGenerator:
         if not allow_partial:
             raise RuntimeError(f"Timeframe {timeframe} failed: {reason}")
 
-    def _apply_failed_timeframe_metadata(
-        self,
-        result: "FeatureGenerationResult",
-        failed_timeframes: List[str],
-    ) -> None:
-        if not failed_timeframes:
-            return
-        failed = list(dict.fromkeys(failed_timeframes))
-        result.metadata["expected_timeframes"] = list(self._training_tfs)
-        result.metadata["present_timeframes"] = [
-            tf for tf in self._training_tfs if tf not in failed
-        ]
-        result.metadata["failed_timeframes"] = failed
-        result.metadata["quality_status"] = "partial"
-        result.metadata["run_status"] = "partial"
-        result.metadata["failure_reasons"] = list(
-            result.metadata.get("failure_reasons", [])
-        ) + [f"timeframe:{tf}" for tf in failed]
+    @staticmethod
+    def _layer_statuses(layer_results: Iterable[LayerExecutionResult]) -> Dict[str, Tuple[str, str]]:
+        """六層 LayerExecutionResult → {L<n>: (status 值, reason)}（Task 1.3 ②③）。"""
+        return {
+            f"L{index}": (str(getattr(item.status, "value", item.status)), str(item.reason or ""))
+            for index, item in enumerate(layer_results, start=1)
+        }
+
+    @staticmethod
+    def _failed_layer_ids_from_statuses(statuses: Dict[str, Tuple[str, str]], timeframe: str) -> List[str]:
+        """層狀態 → `L<n>:<tf>:<reason 或 status 值>`（失敗集合＝FAILOPEN_LAYER_FAILURE_STATUSES）。"""
+        failure_values = {status.value for status in FAILOPEN_LAYER_FAILURE_STATUSES}
+        entries: List[str] = []
+        for layer_id in sorted(statuses, key=lambda item: int(item[1:])):
+            status, reason = statuses[layer_id]
+            if status in failure_values:
+                entries.append(f"{layer_id}:{timeframe}:{reason or status}")
+        return entries
 
     @staticmethod
     def _collect_failed_layer_ids(
         layer_results: Iterable[LayerExecutionResult],
         timeframe: str,
     ) -> List[str]:
-        return [
-            f"L{index}:{timeframe}"
-            for index, layer_result in enumerate(layer_results, start=1)
-            if layer_result.status == LayerStatus.layer_failed
-        ]
+        """Task 3.1：以 FAILOPEN_LAYER_FAILURE_STATUSES 判定並保留原因。"""
+        return MultiTFGenerator._failed_layer_ids_from_statuses(
+            MultiTFGenerator._layer_statuses(layer_results), timeframe
+        )
+
+    def _canonical_completeness(
+        self,
+        skipped_tfs: List[str],
+        fresh_failed_layers: Dict[str, List[str]],
+        registry: Optional[object] = None,
+        *,
+        local_statuses: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
+    ) -> Dict[str, Any]:
+        """persist 前形成 canonical 輸入（Task 1.3 ⑤／3.1）：週期物件、跨週期層失敗、逐週期層狀態。
+
+        本 run 執行之週期取 `fresh_failed_layers`；resume 跳過之週期自 registry 層狀態讀回。
+        """
+        timeframe_completeness = build_timeframe_completeness(self._training_tfs, skipped_tfs)
+        present = timeframe_completeness["present_timeframes"]
+        statuses_all: Dict[str, Dict[str, Tuple[str, str]]] = dict(local_statuses or {})
+        if registry is not None:
+            statuses_all = registry.layer_status_by_tf
+            foreign = sorted(set(statuses_all) - set(self._training_tfs))
+            if foreign:
+                logger.warning(
+                    "[CGSA:resume] checkpoint layer_status_by_tf 含 training 以外之週期 %s；忽略", foreign
+                )
+        failures: List[str] = []
+        for tf in present:
+            if tf in fresh_failed_layers:
+                failures.extend(fresh_failed_layers[tf])
+            elif tf in statuses_all:
+                failures.extend(self._failed_layer_ids_from_statuses(statuses_all[tf], tf))
+        canonical: Dict[str, Any] = {
+            "timeframe_completeness": timeframe_completeness,
+            "cross_tf_layer_failures": tuple(dict.fromkeys(failures)),
+        }
+        if registry is not None or local_statuses is not None:
+            canonical["layer_status_by_tf"] = {tf: statuses_all[tf] for tf in present if tf in statuses_all}
+        return canonical
 
     @staticmethod
-    def _apply_failed_layer_metadata(
-        result: "FeatureGenerationResult",
-        failed_layers: List[str],
-    ) -> None:
-        if not failed_layers:
-            return
-        failed = list(dict.fromkeys(failed_layers))
-        existing = list(result.metadata.get("failed_layers", []))
-        result.metadata["failed_layers"] = list(dict.fromkeys(existing + failed))
-        result.metadata["quality_status"] = "partial"
-        result.metadata["run_status"] = "partial"
+    def _crosscheck_present_timeframes(registry: object, present: List[str]) -> None:
+        """Task 3.2：registry 實際出現之週期集合（ColumnGroup.timeframe）須等於 canonical present（fail-closed）。"""
+        observed = {group.timeframe for _, group in registry.iter_all()}
+        if observed != set(present):
+            raise RuntimeError(
+                f"present_timeframes cross-check failed: registry={sorted(observed)} canonical={sorted(present)}"
+            )
 
     @staticmethod
     def _collect_layer_counts(
@@ -1892,6 +1952,10 @@ def _tf_worker_entry(
             "failed_layers": MultiTFGenerator._collect_failed_layer_ids(
                 [r1, r2, r3, r4, r5, r6], timeframe
             ),
+            "layer_statuses": {
+                layer_id: list(pair)
+                for layer_id, pair in MultiTFGenerator._layer_statuses([r1, r2, r3, r4, r5, r6]).items()
+            },
         }
     except Exception as exc:
         return {"timeframe": timeframe, "error": str(exc)}
