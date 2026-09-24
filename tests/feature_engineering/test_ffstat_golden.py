@@ -181,7 +181,8 @@ def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:
     ②子程序連 RSS 亦取不到 ⇒ 記 samples_incomplete、不留判定值；
     ③列舉子程序本身拋例外（沙箱禁 sysctl）⇒ 記 samples_incomplete、不留判定值，verdict 判失敗；
     ④子程序 RSS 已計入後 USS 拋 NoSuchProcess ⇒ 改以 RSS 合計判定（不以較小之 USS 充數）；
-    ⑤取樣途中階段由交接轉公開 ⇒ 該筆兩階段皆記。另對真實子程序取樣一次：須完整。"""
+    ⑤取樣途中階段由交接轉公開 ⇒ 該筆兩階段皆記；⑥途中 public→handoff→public ⇒ 交接亦記；⑦實際起點間隔入 max_sample_gap_seconds。
+    另對真實子程序取樣一次：須完整。"""
     import subprocess
     import sys
 
@@ -247,6 +248,24 @@ def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:
     child = _Proc(rss=9 * gib, uss=9 * gib, on_uss=lambda: setattr(s, "stage", "public"))
     _run_one(_Proc(**parent, children=[child]), "handoff", s)
     assert s.peaks["peak_judged_handoff_bytes"] == s.peaks["peak_judged_public_bytes"] == 9 * gib + gib // 2
+    # ⑥ 取樣途中 public→handoff→public（首個 worker 送出即完成）⇒ 交接峰值亦記（r22 codex P2-01）
+    s = probe._Sampler()
+
+    def _flip_twice() -> None:
+        s.stage = "handoff"
+        s.stage = "public"
+
+    child = _Proc(rss=9 * gib, uss=9 * gib, on_uss=_flip_twice)
+    _run_one(_Proc(**parent, children=[child]), "public", s)
+    assert s.peaks["peak_judged_handoff_bytes"] == s.peaks["peak_judged_public_bytes"] == 9 * gib + gib // 2
+    # ⑦ 實際起點間隔：每筆取樣耗時 0.1 s ⇒ max_sample_gap_seconds ≥ 0.1（不以睡眠常數充當間隔；r22 codex P2-02）
+    import time as _time
+
+    s = probe._Sampler()
+    s._proc = _Proc(**parent, on_uss=lambda: _time.sleep(0.1))
+    s._tick()
+    s._tick()
+    assert s.peaks["max_sample_gap_seconds"] >= 0.1
     # 真實子程序
     real = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"])
     try:

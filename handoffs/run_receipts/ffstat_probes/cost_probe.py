@@ -2,7 +2,7 @@
 
 3 標的 × 2 週期 × N＝500／1000／2000 之真實冷 run（各自子程序、隔離 tmp 與 d* 快取），逐 run 記：
 - 分段耗時：校準域（`run_calibration_preflight`）、ADF（`_adf_pvalue_for_values` 累計）、d* 搜尋（`_find_min_d` 累計）、總計；
-- 分階段峰值記憶體：取樣執行緒每 50 ms 記「本程序＋全部子程序」之 RSS 合計與 USS 合計，依當下階段
+- 分階段峰值記憶體：取樣執行緒每筆取樣後睡 50 ms（實際起點間隔最大值另記）記「本程序＋全部子程序」之 RSS 合計與 USS 合計，依當下階段
   （校準／交接／公開；交接＝送出第一個 worker 至第一個 worker 完成）分別取最大；tier 判定用 USS，
   任一程序 USS 被拒之筆整筆改用 RSS 合計（上界，不漏算；macOS 子程序 USS 必被拒），取樣不完整即判失敗；
 - 暫存清理：run 後隔離系統 tmp 下校準暫存前綴（契約 `calibration_tmp_prefix`）之殘留數；
@@ -30,26 +30,37 @@ GIB = 1024 ** 3
 
 
 STAGES = ("calibration", "handoff", "public")
-SAMPLE_INTERVAL_S = 0.05  # 取樣間隔：短於此之瞬間峰值可能漏拍（固有界限，列入收據）
+SAMPLE_INTERVAL_S = 0.05  # 每筆取樣完成後之睡眠秒數；實際起點間隔＝取樣耗時＋此值，逐 run 實測最大值記 max_sample_gap_seconds
 
 
 class _Sampler:
-    """每 50 ms 取樣「本程序＋全部子程序」之 RSS 合計與 USS 合計，依當下階段各記最大值。
+    """每筆取樣後睡 50 ms 取樣「本程序＋全部子程序」之 RSS 合計與 USS 合計，依階段各記最大值。
 
     tier 判定值（`peak_judged_*`）逐筆取：該筆全部程序皆取得 USS ⇒ USS 合計（不重計共享頁；r19 codex P2-03）；
     任一程序 USS 被拒（macOS 對同使用者之 spawn 子程序 `task_for_pid` 即拒，主委實跑 2026-09-24）⇒ 該筆整筆改用
     RSS 合計（每程序 RSS ≥ USS，只會高估、不會漏算；r20 codex P1-01），計入 `samples_rss_fallback`；RSS 已計入後
     USS 才遇程序結束者同。任一程序連 RSS 亦取不到、或列舉子程序本身失敗 ⇒ 該筆記入 `samples_incomplete`、不留判定值，
-    verdict 判量測失敗（r21 codex P1-01）。`peak_uss_*` 只取全數取得 USS 之筆。取樣途中階段轉換 ⇒ 該筆計入前後兩階段。"""
+    verdict 判量測失敗（r21 codex P1-01）。`peak_uss_*` 只取全數取得 USS 之筆。取樣途中經過之每個階段皆計入該筆（見 `_tick`）。"""
 
     def __init__(self) -> None:
         import psutil
 
         self._proc = psutil.Process()
+        self._history: list = []  # 每次設定階段即附加（取樣途中經過之全部階段皆可查；r22 codex P2-01）
         self.stage = "public"
         self.peaks: dict = {}
+        self._last_start = None  # 上一筆取樣起點（monotonic）；實際起點間隔最大值入收據（r22 codex P2-02）
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
+
+    @property
+    def stage(self) -> str:
+        return self._stage
+
+    @stage.setter
+    def stage(self, value: str) -> None:
+        self._stage = value
+        self._history.append(value)
 
     def _sample(self) -> tuple:
         """回傳 (RSS 合計, USS 合計或 None〔任一程序 USS 取不到〕, 是否完整〔每程序皆取得 RSS〕)。"""
@@ -96,10 +107,17 @@ class _Sampler:
                 self.peaks[key] = max(self.peaks.get(key, 0), value)
 
     def _tick(self) -> None:
-        """取一筆：取樣前後各擷取一次階段；途中階段轉換 ⇒ 該筆同時計入前後兩階段（跨界峰值兩邊皆不漏；r21 codex P2-02）。"""
+        """取一筆：該筆計入取樣開始時之階段＋取樣途中設定過之每個階段（如 public→handoff→public 亦記交接；
+        r21 codex P2-02、r22 codex P2-01）；並記相鄰取樣起點之實際間隔最大值 `max_sample_gap_seconds`。"""
+        start = time.monotonic()
+        if self._last_start is not None:
+            gap = start - self._last_start
+            self.peaks["max_sample_gap_seconds"] = max(self.peaks.get("max_sample_gap_seconds", 0.0), gap)
+        self._last_start = start
+        mark = len(self._history)
         before = self.stage
         sample = self._sample()
-        self._record(sample, tuple(dict.fromkeys((before, self.stage))))
+        self._record(sample, tuple(dict.fromkeys((before, *self._history[mark:]))))
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -258,7 +276,7 @@ def main() -> int:
     tier.pop("decisions", None)
     problems = verdict(rows, tier)
     out = REPO / "handoffs" / "run_receipts" / f"{_dt.date.today():%Y%m%d}-ffstat-cost.json"
-    out.write_text(json.dumps({"spec": "docs/FFSTAT_SPEC.md Task 4.1", "sample_interval_seconds": SAMPLE_INTERVAL_S, "rows": rows, "min_tier_multi_tf": tier,
+    out.write_text(json.dumps({"spec": "docs/FFSTAT_SPEC.md Task 4.1", "sleep_after_sample_seconds": SAMPLE_INTERVAL_S, "rows": rows, "min_tier_multi_tf": tier,
                                "problems": problems}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(out)
     return 1 if problems else 0
