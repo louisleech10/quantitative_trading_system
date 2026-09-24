@@ -1,0 +1,131 @@
+{
+ "alpha": 0.05,
+ "per_file": 3,
+ "late_cap": 8000,
+ "results": [
+  {
+   "symbol": "BTCUSDT",
+   "tf": "1h",
+   "columns": 783,
+   "late_start": 2000,
+   "late_nonstationary_rate": 0.0779,
+   "n500": {
+    "nonstationary_rate": 0.2043,
+    "agree_with_late": 0.8608,
+    "danger_rate": 0.0064
+   },
+   "n1000": {
+    "nonstationary_rate": 0.1367,
+    "agree_with_late": 0.931,
+    "danger_rate": 0.0051
+   },
+   "n2000": {
+    "nonstationary_rate": 0.0894,
+    "agree_with_late": 0.9885,
+    "danger_rate": 0.0
+   },
+   "jaccard_nonstat_w1_w2": 0.5607
+  },
+  {
+   "symbol": "ETHUSDT",
+   "tf": "1h",
+   "columns": 755,
+   "late_start": 2000,
+   "late_nonstationary_rate": 0.0808,
+   "n500": {
+    "nonstationary_rate": 0.2503,
+    "agree_with_late": 0.8305,
+    "danger_rate": 0.0
+   },
+   "n1000": {
+    "nonstationary_rate": 0.1404,
+    "agree_with_late": 0.9404,
+    "danger_rate": 0.0
+   },
+   "n2000": {
+    "nonstationary_rate": 0.1033,
+    "agree_with_late": 0.9775,
+    "danger_rate": 0.0
+   },
+   "jaccard_nonstat_w1_w2": 0.6226
+  },
+  {
+   "symbol": "BCHUSDT",
+   "tf": "1h",
+   "columns": 782,
+   "late_start": 2000,
+   "late_nonstationary_rate": 0.0729,
+   "n500": {
+    "nonstationary_rate": 0.1701,
+    "agree_with_late": 0.8772,
+    "danger_rate": 0.0128
+   },
+   "n1000": {
+    "nonstationary_rate": 0.0831,
+    "agree_with_late": 0.9182,
+    "danger_rate": 0.0358
+   },
+   "n2000": {
+    "nonstationary_rate": 0.0946,
+    "agree_with_late": 0.9783,
+    "danger_rate": 0.0
+   },
+   "jaccard_nonstat_w1_w2": 0.5067
+  },
+  {
+   "symbol": "BTCUSDT",
+   "tf": "12h",
+   "columns": 780,
+   "late_start": 1000,
+   "late_nonstationary_rate": 0.1308,
+   "n500": {
+    "nonstationary_rate": 0.2179,
+    "agree_with_late": 0.8538,
+    "danger_rate": 0.0295
+   },
+   "n1000": {
+    "nonstationary_rate": 0.0705,
+    "agree_with_late": 0.8987,
+    "danger_rate": 0.0808
+   },
+   "jaccard_nonstat_w1_w2": 0.4184
+  },
+  {
+   "symbol": "ETHUSDT",
+   "tf": "12h",
+   "columns": 782,
+   "late_start": 1000,
+   "late_nonstationary_rate": 0.1893,
+   "n500": {
+    "nonstationary_rate": 0.1714,
+    "agree_with_late": 0.8951,
+    "danger_rate": 0.0614
+   },
+   "n1000": {
+    "nonstationary_rate": 0.0767,
+    "agree_with_late": 0.8696,
+    "danger_rate": 0.1215
+   },
+   "jaccard_nonstat_w1_w2": 0.4534
+  },
+  {
+   "symbol": "BCHUSDT",
+   "tf": "12h",
+   "columns": 782,
+   "late_start": 1000,
+   "late_nonstationary_rate": 0.1061,
+   "n500": {
+    "nonstationary_rate": 0.179,
+    "agree_with_late": 0.8606,
+    "danger_rate": 0.0332
+   },
+   "n1000": {
+    "nonstationary_rate": 0.0307,
+    "agree_with_late": 0.9194,
+    "danger_rate": 0.078
+   },
+   "jaccard_nonstat_w1_w2": 0.3418
+  }
+ ],
+ "seconds": 1350.7
+}

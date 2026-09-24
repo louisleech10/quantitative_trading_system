@@ -1,0 +1,33 @@
+{
+ "run": "data_cache/features/ETHUSDT/1h/d9935491cea49e8cada481a8bf9487d6/raw",
+ "calibration_values_per_column": 500,
+ "counts": {
+  "12h_L1": {
+   "files": 286,
+   "columns": 1585,
+   "rows": 20352
+  },
+  "12h_L2": {
+   "files": 13,
+   "columns": 43359,
+   "rows": 20352
+  },
+  "1h_L1": {
+   "files": 292,
+   "columns": 1591,
+   "rows": 20352
+  },
+  "1h_L2": {
+   "files": 39,
+   "columns": 43471,
+   "rows": 20352
+  }
+ },
+ "total_l1_l2_columns": 90006,
+ "timed_columns": 2919,
+ "skipped_lt20_finite": 717,
+ "timed_seconds": 6.2905,
+ "seconds_per_column": 0.002155035017129162,
+ "extrapolated_seconds_all_l1_l2": 193.97,
+ "peak_rss_mb": 325.6
+}
