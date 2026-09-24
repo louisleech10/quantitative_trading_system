@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FF-NAME 規格書審閱（衍生特徵的名字照命名規則，`taker_ratio` → `taker-ratio`）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">FF-NAME規格審閱.md</span></nav>
+<main>
+<h1 id="ff-name-規格書審閱衍生特徵的名字照命名規則taker_ratio-taker-ratio">FF-NAME 規格書審閱（衍生特徵的名字照命名規則，<code>taker_ratio</code> → <code>taker-ratio</code>）</h1>
+<blockquote>
+<p><strong>這份是給你審的。</strong> 規格書原文在 <code>docs/FFNAME_SPEC.md</code>（給委員看的技術版，第 6 版）；這份是白話逐條版。
+規格書已由兩家委員審 5 輪收斂。<strong>你同意後我才寫施工清單、才動程式；現在一行程式都還沒改。</strong></p>
+</blockquote>
+<hr />
+<h2 id="一要解決什麼">一、要解決什麼</h2>
+<p>特徵的名字有一條規則：<strong>底線 <code>_</code> 分段，同一段裡的字用連字號 <code>-</code> 連起來</strong>。例如 <code>close_trend_EMA_20</code>：來源 <code>close</code>、類別 <code>trend</code>、指標 <code>EMA</code>、參數 <code>20</code>。</p>
+<p>但有兩批特徵沒照規則，名字裡用了底線，把本來同一段的字拆開了：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>哪一批</th>
+<th>現在的名字（錯）</th>
+<th>應該是</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>兩個指標互相比較的特徵（Cross、Ratio）</td>
+<td><code>taker_12h_ratio_statistics_LINEARREG_SLOPE_10_144_Cross</code></td>
+<td><code>taker-ratio_12h_statistics_LINEARREG-SLOPE_10_144_Cross</code></td>
+</tr>
+<tr>
+<td>原始 K 線欄位的延遲值（Lag）</td>
+<td><code>taker_12h_ratio_Lag_1</code></td>
+<td><code>taker-ratio_12h_Lag_1</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>後果：同一個來源在不同特徵裡有兩種寫法（<code>taker-ratio</code> 與 <code>taker_ratio</code>），加上週期標記時還會插錯位置（<code>taker_12h_ratio</code>）。靠名字分析的程式（前端篩選、統計分組）會把它當成來源 <code>taker</code> 而不是 <code>taker-ratio</code>。</p>
+<p>參考那次產出共 41.9 萬欄，其中 <strong>3,596 欄（0.86%）</strong> 名字不對。</p>
+<h2 id="二怎麼改">二、怎麼改</h2>
+<ol>
+<li><strong>一個命名函式</strong>：把「底線換連字號」集中成一個函式，所有組名的地方都用它（以前各處各寫一份）。</li>
+<li><strong>衍生特徵組名時照規則</strong>：Cross、Ratio 組名時，來源和指標都先經過命名函式。</li>
+<li><strong>K 線原始欄位的延遲值照規則</strong>：<code>taker_ratio</code>、<code>quote_volume</code>、<code>taker_buy_volume</code> 這三個原始欄位名本身有底線，做延遲值時改用 <code>taker-ratio</code> 等名稱（<strong>K 線資料本身的欄名不動</strong>）。</li>
+<li><strong>有個設定原本依名字前綴挑欄位</strong>（fracdiff 的 <code>layer1_only</code>，要你手動開才會用到）：前綴改成由同一個命名函式產生。</li>
+<li><strong>只對新產出生效</strong>（照你 2026-08-05「面向未來不溯及既往」的裁定）：舊的產出不改、不遷移。</li>
+</ol>
+<h2 id="三這次改名連帶的三個影響委員審查時逐一確認過">三、這次改名連帶的三個影響（委員審查時逐一確認過）</h2>
+<ol>
+<li><strong>有 132 欄的數值處理方式會改變</strong>：系統靠名字判斷「哪些特徵不用做平穩化處理」（fracdiff），名單上寫的是連字號形（例如 <code>PLUS-DI</code>）。這 132 欄現在名字是底線形，沒被認出來；改名後會被認出來、改為不做平穩化。同類型的另外 349 欄（名字本來就對，例如 RSI 的比值）今天已經是這樣處理，改名後兩批一致。
+<ul>
+<li>但委員也指出：「名字在名單上」不等於「真的不需要平穩化」（比值的分母可能接近 0）。這個問題<strong>今天就存在於那 349 欄</strong>，不是這次造成的，列為待研究事項，這次只記錄分母的實際數值範圍供之後判斷。</li>
+<li>只有開啟 fracdiff 且涵蓋第 2 層時才會有差（參考那次產出沒開）。</li>
+</ul>
+</li>
+<li><strong>上面第 4 點的 <code>layer1_only</code> 設定</strong>：那個設定其實早就壞了，一直漏挑 L1 欄。改名後順便修好，實測會多挑 872 欄。只有你手動開這個設定才會用到；驗收會逐欄記錄改前改後的數值。</li>
+<li><strong>新舊兩代名字不能混用</strong>：
+<ul>
+<li>舊產出和新產出的名字不同，若多個幣種一個用舊的、一個用新的，一起分析時會對不上。IC 分析會多出一半空值的欄，XGBoost 則會默默丟掉欄位。</li>
+<li>做法：每份產出記上「命名第幾代」；混用時直接擋下並提示重新產出。</li>
+<li>快取也加上這個代號，新設定不會誤用舊的快取或接著舊的進度跑。</li>
+</ul>
+</li>
+</ol>
+<h2 id="四怎麼保證沒改壞">四、怎麼保證沒改壞</h2>
+<ul>
+<li><strong>特徵數值一個位元都不能變</strong>（除了上面第三節說的 132 欄與 <code>layer1_only</code>）：動工前用真實資料跑一次，錄下每一欄的指紋，<strong>同時錄下每個名字是用哪些零件組出來的</strong>。改完再跑一次，用同樣的零件算出新名字、逐欄比對指紋，必須完全相同。
+<ul>
+<li>這個「錄零件」的做法是第 5 輪才定下的：前面三輪委員每輪都找到一種我沒列到的名字寫法（多輸出指標、自製指標、自訂指標）。改成直接錄組名的零件後，這類漏洞整類消失。</li>
+</ul>
+</li>
+<li><strong>全量對照</strong>：用參考那次產出的原設定再跑一次，欄數必須還是 41.9 萬（只改名、不增減欄）。</li>
+<li><strong>故意改壞測試會抓到</strong>：例如只改名字不改分組、拿掉混用檢查、HDF5 記錄壞掉時誤判為舊代，對應測試都會變紅（共 10 種）。</li>
+<li><strong>不動的東西</strong>：K 線資料、舊產出、舊的比對基準都不動。</li>
+</ul>
+<h2 id="五這次不做逐條說明為何現在不做">五、這次不做（逐條說明為何現在不做）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>為何現在不做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>舊產出不回頭改名</td>
+<td>你 2026-08-05 的裁定「面向未來不溯及既往」</td>
+</tr>
+<tr>
+<td>單一指標層有些名字也寫死了底線（例如 <code>Keltner_Width</code>）</td>
+<td>那是單一指標層自己的名字，改它會動到單一指標的身分與 IC 歷史比對，需要另開一張票</td>
+</tr>
+<tr>
+<td><code>ms_</code>、<code>tr_</code>、<code>ent_</code> 開頭的三族特徵有自己的命名方式</td>
+<td>要先研究它們該不該套用「來源/類別/指標」三段式</td>
+</tr>
+<tr>
+<td>132 欄與 349 欄比值是否真的不需要平穩化</td>
+<td>要先看實際分母分佈與平穩性檢定結果再決定（本票會留下數據）</td>
+</tr>
+<tr>
+<td>你存過的 IC 篩選條件若寫了 <code>taker_ratio</code>，改名後不再命中</td>
+<td>同「不溯及既往」；會在完工說明提醒你</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<p><strong>請你決定</strong>：同意這份規格、讓我寫施工清單並開工？或有哪一條要改？</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/FF-NAME規格審閱.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
