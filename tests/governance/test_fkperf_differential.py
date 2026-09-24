@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
@@ -106,6 +107,7 @@ def test_every_case_hits_its_expected_branch(tmp_path: Path) -> None:
             stream = out.stderr if case.expect_rc else out.stdout
             first = stream.decode("utf-8", "replace").splitlines()[0] if stream else ""
             assert first == fo.expected_first(case, oroot), (case.case_id, first)
+            shutil.rmtree(tmp_path / case.case_id, ignore_errors=True)  # 逐筆即刪：409 筆沙箱累積為 GB 級
 
 
 @pytest.mark.parametrize("kind", ["real", "sandbox", "exit", "key_order", "bytes"])
@@ -367,6 +369,26 @@ def test_mutation_recorded_corpus_missing_test_is_caught(monkeypatch: pytest.Mon
     monkeypatch.setattr(fr, "helper_tests", lambda: {**orig(), fr.RECORD_FILES[0]: orig()[fr.RECORD_FILES[0]] + ["test_zz_not_recorded"]})
     with pytest.raises(AssertionError):
         test_recorded_sandbox_corpus_covers_every_helper_test()
+
+
+def test_jq_error_line_filter_is_exact_and_oracle_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SPEC v8 C-1 ⑤：只刪恰符合 `jq: error (at …): …` 之整行；相近形、行內片段不刪；
+    新實作印出此形之行 ⇒ 仍報差異（過濾只套用於 oracle 側）。"""
+    raw = (b"gen_fact_key_blocks: a\njq: error (at /tmp/x/fact_keys.json:3742): Cannot iterate over null (null)\n"
+           b"xjq: error (at y): z\njq: error: compile\n  jq: error (at y): z\ngen_fact_key_blocks: b\n")
+    assert fo.drop_jq_error_lines(raw) == (b"gen_fact_key_blocks: a\nxjq: error (at y): z\njq: error: compile\n"
+                                           b"  jq: error (at y): z\ngen_fact_key_blocks: b\n")
+    case = next(c for c in fo.corpus("real") if c.case_id == "real-check")
+    orig = fo.run_new
+
+    def oracle_plus_jq_line(root: Path, c: fo.Case) -> fo.RunOut:
+        (root / c.script_rel).write_bytes(fo._oracle_blob(fo.ENTRY_REL))
+        out = fo._run(root, ["bash", c.invoke, *c.args], c, fo._env(root, c.env, c.oracle_env, unset=c.unset_env))
+        return fo.RunOut(out.rc, out.stdout, out.stderr + b"jq: error (at x:1): y\n", out.files)
+
+    monkeypatch.setattr(fo, "run_new", oracle_plus_jq_line)
+    assert fo.check_case(tmp_path / "jqline", case) != []
+    monkeypatch.setattr(fo, "run_new", orig)
 
 
 def test_corpus_covers_all_five_kinds_and_help_variants() -> None:

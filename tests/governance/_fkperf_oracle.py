@@ -192,7 +192,12 @@ def snapshot_tree(root: Path, skip: Sequence[str] = _SNAPSHOT_SKIP_FILES) -> Dic
             if p.is_symlink():
                 files[rel] = (b"symlink:" + os.readlink(p).encode("utf-8"), 0)
             elif p.is_file():
-                files[rel] = (p.read_bytes(), stat.S_IMODE(p.stat().st_mode))
+                mode = stat.S_IMODE(p.stat().st_mode)
+                try:
+                    files[rel] = (p.read_bytes(), mode)
+                except PermissionError:
+                    # 權限位為 0 之檔（C-1 例外④ 行檔）：記「不可讀＋權限位」，兩側同法比對，不崩潰
+                    files[rel] = (b"unreadable:", mode)
     return files
 
 
@@ -252,6 +257,16 @@ def diff(a: RunOut, b: RunOut) -> List[str]:
     return out
 
 
+# SPEC v8 C-1 具名例外⑤：oracle 之 jq 執行期錯誤行（jq 自身印出，輸入檔常為 mktemp 物化暫存檔、措辭為 jq 內部實作）
+_JQ_ERROR_LINE = re.compile(rb"^jq: error \(at [^\n]*\): [^\n]*$")
+
+
+def drop_jq_error_lines(stderr: bytes) -> bytes:
+    """只刪**恰符合** `_JQ_ERROR_LINE` 之整行；其餘位元組（含換行）原樣保留。只套用於 oracle 側。"""
+    kept = [ln for ln in stderr.split(b"\n") if not _JQ_ERROR_LINE.match(ln)]
+    return b"\n".join(kept)
+
+
 def first_line(stream: bytes) -> str:
     return stream.decode("utf-8", "replace").splitlines()[0] if stream else ""
 
@@ -276,7 +291,12 @@ def check_case(tmp_path: Path, case: Case) -> List[str]:
         new_named = (case.expect_new[1] + "\n").encode("utf-8")
         expected = RunOut(case.expect_new[0], a.stdout, a.stderr.replace(named, new_named, 1), a.files)
         return diff(expected, normalize(b, nroot, oroot))
-    return diff(a, normalize(b, nroot, oroot))
+    a = RunOut(a.rc, a.stdout, drop_jq_error_lines(a.stderr), a.files)  # C-1 ⑤：只刪 oracle 側
+    diffs = diff(a, normalize(b, nroot, oroot))
+    if not diffs:  # 全等即刪兩沙箱（逐筆累積為 GB 級，2026-09-24 佔滿磁碟）；有差異者留供除錯
+        for root in (oroot, nroot):
+            shutil.rmtree(root, ignore_errors=True)
+    return diffs
 
 
 def exit_catalog() -> Dict[str, str]:

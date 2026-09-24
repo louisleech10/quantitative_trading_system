@@ -9,6 +9,7 @@ stdout）為預期分支標籤。cwd 或宿主根為 repo 本身者記 `repo_sid
 """
 from __future__ import annotations
 
+import atexit
 import json
 import os
 import shutil
@@ -163,9 +164,10 @@ _CACHE: Dict[str, Any] = {}
 
 
 def recorded() -> Dict[str, Any]:
-    """本程序內錄製一次並快取（錄製目錄於系統 tmp）。"""
+    """本程序內錄製一次並快取（錄製目錄於系統 tmp，程序結束即刪——2026-09-24 未刪之錄製目錄累積佔滿磁碟）。"""
     if "data" not in _CACHE:
         _CACHE["dir"] = Path(tempfile.mkdtemp(prefix="fkperf_record_"))
+        atexit.register(shutil.rmtree, _CACHE["dir"], True)
         _CACHE["data"] = record_all(_CACHE["dir"])
     return _CACHE["data"]
 
