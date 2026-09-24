@@ -632,12 +632,16 @@ def apply_quality_degradation(
     max_inf_ratio: float,
     max_nan_ratio: float,
     preprocessing_applied: Optional[bool],
+    extra_failure_reasons: Sequence[str] = (),
 ) -> Dict[str, Any]:
     """NaN／inf 門檻與 L6.5 失敗之降級判定（docs/FFTFMETA_SPEC.md Task 2.3）。
 
     門檻為已解析之實值（`None` 由 factory 政策層先解析）；回傳併入降級後之新 completeness dict。
     健康（無任何降級原因）時回傳與輸入相等之副本；原因順序固定：既有（週期→層）→ L6.5 → inf → nan。
+    `extra_failure_reasons`：d* 三出口之欄級事件（docs/FFSTAT_SPEC.md §C、Task 3.1），非空時併入並降為 partial。
     """
+    if extra_failure_reasons:
+        raise NotImplementedError("FFSTAT Task 3.1")
     out = dict(meta)
     reasons: List[str] = []
     # 降級只往更嚴重方向：unknown／failed 等優先序高於 partial 者不得被改寫為 partial（r1 codex P1-03）

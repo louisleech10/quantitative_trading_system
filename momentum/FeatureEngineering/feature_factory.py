@@ -2058,6 +2058,21 @@ class FeatureFactory:
             failed_engines=tuple(failed_engines),
         )
 
+    def run_calibration_preflight(
+        self,
+        symbol: str,
+        timeframes: List[str],
+        config: FactoryConfig,
+        output_start: Optional[str],
+    ) -> Dict[str, Any]:
+        """校準前置關卡（docs/FFSTAT_SPEC.md §C「校準前置關卡」「兩個資料域」、Task 2.1／2.3）。
+
+        開啟平穩化時為一次生成之第一步：以獨立 `FeatureFactory` 實例對本次會進入 L6.5 之全部原生週期計算
+        校準資料域（只吃輸出起始日之前之前史切片、不寫 registry／resume、不落盤），回傳
+        `{"output_start": 有效起始日, "output_start_source": ..., "packets": {timeframe: CalibrationPacket}}`；
+        任一步驟錯誤拋 `CalibrationError`（不可降級）。`output_start` 為 None 時依 §C 未填起始日推算。"""
+        raise NotImplementedError("FFSTAT Task 2.1")
+
     def run_ic_first(
         self,
         symbol: str,

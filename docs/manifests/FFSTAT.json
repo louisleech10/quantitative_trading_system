@@ -1,0 +1,131 @@
+{
+  "spec_path": "docs/FFSTAT_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [
+    "momentum/FeatureEngineering/preprocessing/calibration.py",
+    "momentum/FeatureEngineering/feature_factory.py",
+    "momentum/FeatureEngineering/feature_storage.py"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_ffstat_layer.py",
+    "tests/feature_engineering/test_ffstat_all_tested.py",
+    "tests/feature_engineering/test_ffstat_calibration.py",
+    "tests/feature_engineering/test_ffstat_dstar_failure.py",
+    "tests/feature_engineering/test_ffstat_apply_to.py",
+    "tests/feature_engineering/test_ffstat_golden.py"
+  ],
+  "script_acceptance": [
+    "handoffs/run_receipts/ffstat_probes/freeze_baseline.py",
+    "handoffs/run_receipts/ffstat_probes/cost_probe.py"
+  ],
+  "contract_jsons": [
+    "tests/_golden/ffstat/contract.json"
+  ],
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20260924-ffstat-golden-freeze.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/ffstat_probes/freeze_baseline.py --refreeze-baseline",
+      "rc": 0,
+      "honest_bounds": "單機單次真實 run（BTCUSDT 1h、2026-01、輕量設定、append 模式）；同參數重跑 base／derived／decisions 全等；d 由隔離 d* 快取讀得，290 個 fracdiff 欄中 256 個鍵對得上"
+    }
+  ],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "docs/FFSTAT_SPEC.md",
+      "momentum/FeatureEngineering/preprocessing/calibration.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/preprocessing/_d_star_cache.py",
+      "momentum/FeatureEngineering/preprocessing/_slow_path_parallel.py",
+      "momentum/FeatureEngineering/utils/adf_safe_skip.py",
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/feature_config.py",
+      "momentum/FeatureEngineering/warmup_window.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "config/scan_config.yaml",
+      "api/models/feature_factory_models.py",
+      "frontend/src/lib/types.ts",
+      "frontend/src/app/feature-factory/page.tsx",
+      "tests/feature_engineering/ffstat_helpers.py",
+      "tests/feature_engineering/test_ffstat_layer.py",
+      "tests/feature_engineering/test_ffstat_all_tested.py",
+      "tests/feature_engineering/test_ffstat_calibration.py",
+      "tests/feature_engineering/test_ffstat_dstar_failure.py",
+      "tests/feature_engineering/test_ffstat_apply_to.py",
+      "tests/feature_engineering/test_ffstat_golden.py",
+      "tests/feature_engineering/test_adf_safe_skip.py",
+      "tests/_golden/ffstat/contract.json",
+      "tests/_golden/ffstat/baseline.json",
+      "handoffs/run_receipts/ffstat_probes/_isolate.py",
+      "handoffs/run_receipts/ffstat_probes/freeze_baseline.py",
+      "handoffs/run_receipts/ffstat_probes/cost_probe.py",
+      "handoffs/run_receipts/ffstat_probes/time_one_run.py"
+    ],
+    "callers_now": [
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/FeatureEngineering/warmup_window.py",
+      "api/services/feature_factory_service.py",
+      "tests/feature_engineering/test_adf_safe_skip.py",
+      "tests/test_feature_factory_batch2d.py",
+      "tests/feature_engineering/test_b6_warmup_trim.py",
+      "tests/feature_engineering/test_ic_first_pipeline.py"
+    ],
+    "callers_later": [
+      "frontend/src/app/feature-factory/page.tsx",
+      "docs/FFNAME_SPEC.md",
+      "docs/FFDSTAR_SPEC.md"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_ffstat_layer.py tests/feature_engineering/test_ffstat_all_tested.py tests/feature_engineering/test_ffstat_calibration.py tests/feature_engineering/test_ffstat_dstar_failure.py tests/feature_engineering/test_ffstat_apply_to.py tests/feature_engineering/test_ffstat_golden.py",
+    "forbidden": [
+      {"rule": "名稱不得參與任何平穩化判定（免檢、fracdiff 目標層、ADF 差分候選）", "observable": true},
+      {"rule": "校準值不得取自輸出起始日（含）之後之任何資料；不得縮窗、不得退回輸出範圍內資料", "observable": true},
+      {"rule": "不得延長公開域之計算起點；公開域基礎欄值不得因校準域而變（§G ② 四 hash 全等）", "observable": true},
+      {"rule": "校準域不得寫 CGSA registry、resume checkpoint 或輸出目錄；暫存目錄須刪除", "observable": true},
+      {"rule": "校準域錯誤不得經降級路徑吞下；任一週期失敗時整個 run 目錄零寫入", "observable": true},
+      {"rule": "d* 搜尋失敗不得以任何預設 d 替代", "observable": true},
+      {"rule": "不接受呼叫端提供之校準封包或校準值；平穩化開啟時 run_ic_first 拒收自帶 raw_data／layers", "observable": true},
+      {"rule": "不得改 FFACT_WARMUP_TRIM 預設、不得改 fracdiff 層範圍（L1、L2）", "observable": true},
+      {"rule": "momentum/ 不得 import api/（解耦規則 1）", "observable": true},
+      {"rule": "不得弱化 NaN／inf 品質閘（無事件時 apply_quality_degradation 輸出逐位元組不變）", "observable": true},
+      {"rule": "不得放寬或刪除既有測試斷言（test_adf_safe_skip.py 之退役須逐條於對照表說明理由）", "observable": false},
+      {"rule": "不得改輸出大小以外之欄名、欄數；平穩化關閉時產出與改前逐位元組相同", "observable": true},
+      {"rule": "既有 run 之產出不回填（面向未來不溯及既往；舊資料依使用者裁定刪除重生）", "observable": false}
+    ],
+    "risk_mitigation": [
+      "momentum/FeatureEngineering/preprocessing/calibration.py ← SPEC Task 2.1／2.3（封包、身分鍵核對、來源紀錄 sha256、前史取值、ingest 起點、有效起始日、兩個注入介面 load_calibration_klines／compute_calibration_domain）← grep -n '^def \\|^class ' momentum/FeatureEngineering/preprocessing/calibration.py",
+      "momentum/FeatureEngineering/feature_factory.py ← SPEC Task 2.1／2.3／3.1（run_calibration_preflight 為生成第一步，置於 _prepare_cgsa_registry、主週期落盤、worker 啟動之前；有效起始日於 _resolve_config／config hash／快取查詢之前推算；run_ic_first 自帶層分支拒收；_resolve_completeness_without_manifest 傳事件）← grep -n 'def run_calibration_preflight\\|def run_ic_first\\|def _run_l1_l6_for_ic_first\\|def _prepare_cgsa_registry\\|def _resolve_completeness_without_manifest\\|def _resolve_config' momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py ← SPEC Task 1.1／1.2／2.1／2.2／3.1／3.2（目標層只讀 _column_layer_map／群組 layer、刪 _FRACDIFF_LAYER_RE 與 _apply_adf_safe_skip、_calibration_series 改取校準封包、三路同 N 刪 :3744-3745 寫死 500、d* 讀／搜尋／寫三出口、失敗欄排除於 ADF 差分候選、刪 layer1_only 分支）← grep -n '_FRACDIFF_LAYER_RE\\|def _apply_adf_safe_skip\\|def _calibration_series\\|def _find_min_d\\|layer1_only\\|sample_size=500' momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/preprocessing/_d_star_cache.py ← SPEC Task 3.1／2.2（load_error 與檔案不存在分開、flush_atomic 回傳 bool、快取鍵含實際 N 與校準值指紋）← grep -n 'def _load_or_init\\|def flush_atomic\\|def _compute_fracdiff_hash' momentum/FeatureEngineering/preprocessing/_d_star_cache.py",
+      "momentum/FeatureEngineering/preprocessing/_slow_path_parallel.py ← SPEC Task 3.1（worker 失敗回報不再以 d=1.0 產值；主程序先判 status 再寫快取；worker 取同一 N）← grep -n 'status = \"fallback\"\\|d_star = 1.0\\|sample_size' momentum/FeatureEngineering/preprocessing/_slow_path_parallel.py",
+      "momentum/FeatureEngineering/feature_config.py 與 config/scan_config.yaml ← SPEC Task 1.2／3.2（刪 ADFSafeSkipConfig 並拒收該段；兩平穩化步驟 apply_to 只收 non_stationary／all；新增 calibration_bars_by_timeframe）← grep -n 'class ADFSafeSkipConfig\\|class ADFDifferencingConfig\\|class FractionalDifferencingConfig\\|calibration_bars' momentum/FeatureEngineering/feature_config.py",
+      "tests/test_feature_factory_batch2d.py 與 tests/_golden/batch2d/*.json ← 設定序列化含 adf_safe_skip 段；刪該設定後須確認此 legacy oracle 之斷言語意（FF-NAME 研究曾定性為「不得相等」oracle），不得放寬 ← grep -n 'adf_safe_skip' tests/_golden/batch2d/control.json",
+      "tests/feature_engineering/test_adf_safe_skip.py ← 既有斷言隨免檢刪除而退役，須逐條於對照表說明（§V 防假綠）← grep -n 'def test_' tests/feature_engineering/test_adf_safe_skip.py",
+      "api/services/feature_factory_service.py ← generate_features 呼叫端；Task 2.3 生成結果回傳有效起始日與來源 ← grep -n 'generate_features(' api/services/feature_factory_service.py",
+      "handoffs/run_receipts/ffstat_probes/_isolate.py ← 現行 FeaturePreprocessor._d_star_cache_dir 固定指向專案 data_cache，不受環境變數影響；探針與測試一律經 isolate_dstar_cache／prepare_stat_env 導向 tmp（2026-09-24 探針未隔離時曾寫入共用快取）← grep -n 'def _d_star_cache_dir' momentum/FeatureEngineering/preprocessing/feature_preprocessor.py"
+    ],
+    "coverage_risk": [
+      "邊界 21 條：01–02 Task 1.1（test_ffstat_layer.py）、03–04 Task 1.2（test_ffstat_all_tested.py）、05–09 Task 2.1、10–11 Task 2.3、12–13 Task 2.2（test_ffstat_calibration.py）、14–19 Task 3.1（test_ffstat_dstar_failure.py）、20 Task 3.2（test_ffstat_apply_to.py）、21 Task 4.1（test_ffstat_golden.py），各一支 test_boundary_NN_*（07、14 另有 07b、14b 補充同一邊界之另一面）",
+      "Task 1.1 驗證：test_ffstat_layer.py::test_boundary_01_target_layers_on_both_paths[cgsa／frame]、::test_missing_column_in_layer_map_fails_closed、::test_rename_does_not_change_targets",
+      "Task 1.2 驗證：test_ffstat_all_tested.py::test_every_column_entering_step_has_pvalue、::test_adf_safe_skip_config_section_rejected",
+      "Task 2.1 驗證：test_ffstat_calibration.py 之 source_sha256 三支（獨立 struct.pack 實作、NaN 正規化、改一值必變）、verify_packet 三支（身分鍵四欄、缺欄、最晚校準時間）、calibration_values_before 兩支、::test_every_column_calibrated_before_output_start、::test_leak_output_range_change_does_not_change_decisions、::test_leak_pre_history_change_changes_some_decision、::test_cross_sectional_public_values_unchanged_by_calibration、::test_three_entries_same_decisions、::test_second_tf_calibration_failure_zero_writes[frame／cgsa_serial／cgsa_parallel × read／compute／short_history]、::test_ic_first_rejects_supplied_layers_when_stationarizing、::test_resume_calibrates_completed_timeframes、::test_changed_pre_history_value_misses_only_affected_columns",
+      "Task 2.2 驗證：::test_three_paths_same_n（spy 三路 ADF 樣本數，N=500／2000）",
+      "Task 2.3 驗證：::test_calibration_ingest_start_counts_actual_rows_across_gap（真實 kline 無缺口，以真實 index 刪 48 列模擬）、::test_resolve_effective_output_start_exact_depth_rows_before、::test_auto_start_reserves_calibration_segment、::test_auto_start_cache_does_not_skip_preflight、::test_auto_start_off_unchanged、::test_auto_start_history_too_short_fails；前端顯示之 vitest 與 npm run build 於實作批補（前端元件尚無測試檔落點，見 not_executable）",
+      "Task 3.1 驗證：test_ffstat_dstar_failure.py::test_search_failure_keeps_original_and_degrades[serial／parallel／frame]、::test_cache_load_error_distinguished_from_missing、::test_flush_atomic_reports_failure、::test_extra_failure_reasons_degrade_to_partial",
+      "Task 3.2 驗證：test_ffstat_apply_to.py::test_stationarity_apply_to_rejects_non_closed_values[兩步驟 × 三種值]、::test_stationarity_apply_to_accepts_closed_values、::test_select_columns_has_no_layer1_only_prefix_branch",
+      "§G：test_ffstat_golden.py::test_golden_baseline_frozen_before_change、::test_golden_base_names_and_rows_equal（①）、::test_golden_base_values_unchanged_trim0／trim1（②）、::test_golden_derived_consistent_with_decisions（②′）；③④ 見 test_ffstat_calibration.py；⑤ 見 test_ffstat_dstar_failure.py；⑥（改欄名決策不變）由 test_ffstat_layer.py::test_rename_does_not_change_targets 與 mutant ① 之測試共同涵蓋",
+      "§V mutant 對應：①→test_ffstat_all_tested.py::test_mutation_name_exemption_reinstated_is_caught；②→test_ffstat_layer.py::test_mutation_regex_layer_fallback_is_caught；③→::test_mutation_missing_map_entry_treated_as_non_target_is_caught；⑤→test_ffstat_apply_to.py::test_mutation_layer1_only_branch_restored_is_caught；⑥→test_ffstat_calibration.py::test_mutation_values_before_uses_output_range_is_caught；⑦→::test_mutation_values_before_shrinks_window_is_caught；⑦⁶→::test_mutation_verify_packet_noop_is_caught；⑦⁹→::test_mutation_source_sha_last_ts_only_is_caught；⑦¹¹→::test_mutation_effective_start_not_reserved_is_caught；⑨→::test_mutation_regex_accepted_is_caught；⑫→test_ffstat_dstar_failure.py::test_mutation_flush_swallows_error_is_caught；品質降級→::test_mutation_degradation_ignores_events_is_caught；§G 鑑別力→test_ffstat_golden.py::test_mutation_fracdiff_overwrites_base_is_caught（已於現行碼實跑綠）。其餘 mutant（④ d*=1.0、⑦′ 延長公開起點、⑦″ 例外被吞、⑦‴ ffill 充數、⑦⁗ 關卡移後、⑦⁵ resume 缺封包、⑦⁷ 時間核對、⑦⁸ 接受自帶層、⑦¹⁰ 共用實例、⑦¹² 快取先命中、⑧ 內層 500、⑩ 先寫快取、⑪ 靜默空快取）由對應具名測試於實作後以 mutation 收據逐列實跑（比照 FKPERF mutation map），收據 handoffs/run_receipts/<日期>-ffstat-mutation.json",
+      "測試時長：整合測試每次真實 run 約 36 秒（BTCUSDT 1h 輕量設定，主委實跑），全檔約數十次 run；gate_cmd 屬批次驗收，丟背景跑，不掛每次存檔"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {"item": "不得放寬或刪除既有測試斷言（test_adf_safe_skip.py 之退役須逐條於對照表說明理由）", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "既有 run 之產出不回填（面向未來不溯及既往；舊資料依使用者裁定刪除重生）", "reason": "user-ruling", "owner": "claude", "expiry": "2099-12-31"},
+      {"item": "前端有效起始日顯示之 vitest 測試檔（frontend 生成結果元件目前無測試落點；實作 Task 2.3 時新建並列入 gate）", "reason": "blocked-by", "owner": "claude", "expiry": "2026-12-31"},
+      {"item": "N 之最終預設值（Task 4.1 成本收據後由使用者裁決）", "reason": "user-ruling", "owner": "user", "expiry": "2026-12-31"}
+    ]
+  }
+}
