@@ -162,12 +162,68 @@ def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
     （共享頁不重計）；暫存殘留 ⇒ 失敗；皆正常 ⇒ 通過。"""
     probe = _cost_probe()
     ok_row = {"symbol": "BTCUSDT", "timeframe": "1h", "n": 500, "rc": 0, "calibration_tmp_leftover": 0}
-    ok_tier = {"rc": 0, **{f"peak_{m}_{s}_bytes": 3 * probe.GIB for m in ("rss", "uss") for s in probe.STAGES}}
+    ok_tier = {"rc": 0, **{f"peak_{m}_{s}_bytes": 3 * probe.GIB for m in ("rss", "uss", "judged")
+                           for s in probe.STAGES}}
     assert probe.verdict([ok_row], ok_tier) == []
     for stage in probe.STAGES:
-        assert probe.verdict([ok_row], {**ok_tier, f"peak_uss_{stage}_bytes": 9 * probe.GIB}), stage
+        assert probe.verdict([ok_row], {**ok_tier, f"peak_judged_{stage}_bytes": 9 * probe.GIB}), stage
     assert probe.verdict([ok_row], {**ok_tier, "peak_rss_handoff_bytes": 9 * probe.GIB}) == []
     no_handoff = {k: v for k, v in ok_tier.items() if "handoff" not in k}
     assert probe.verdict([ok_row], no_handoff)
+    assert probe.verdict([ok_row], {**ok_tier, "samples_incomplete": 1})
     assert probe.verdict([{**ok_row, "calibration_tmp_leftover": 1}], ok_tier)
     assert probe.verdict([{**ok_row, "rc": 1}], ok_tier)
+
+
+def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:
+    """Task 4.1 驗證（r20 codex P1-01）：子程序 USS 被拒（macOS 對 spawn 子程序之實況）⇒ 該筆整筆以 RSS 合計
+    判定、子程序 7 GiB 不被漏算、記一筆 rss_fallback；子程序連 RSS 亦取不到 ⇒ 記 samples_incomplete。
+    另對真實子程序取樣一次：每程序皆取得 RSS（不完整即紅）。"""
+    import subprocess
+    import sys
+
+    import psutil
+
+    probe = _cost_probe()
+
+    class _Child:
+        def __init__(self, rss_ok: bool) -> None:
+            self.rss_ok = rss_ok
+
+        def memory_info(self):
+            if not self.rss_ok:
+                raise psutil.AccessDenied(1)
+            return type("I", (), {"rss": 7 * probe.GIB})()
+
+        def memory_full_info(self):
+            raise psutil.AccessDenied(1)
+
+    for rss_ok in (True, False):
+        sampler = probe._Sampler()
+        sampler._proc = type("P", (), {
+            "memory_info": lambda self: type("I", (), {"rss": probe.GIB})(),
+            "memory_full_info": lambda self: type("I", (), {"rss": probe.GIB, "uss": probe.GIB // 2})(),
+            "children": lambda self, recursive=True, _c=_Child(rss_ok): [_c],
+        })()
+        sampler.stage = "handoff"
+        sample = sampler._sample()
+        sampler._record(sample)
+        rss, uss, complete = sample
+        assert uss is None and sampler.peaks["samples_rss_fallback"] == 1
+        if rss_ok:
+            assert complete and rss == 8 * probe.GIB
+            assert sampler.peaks["peak_judged_handoff_bytes"] == 8 * probe.GIB
+            assert "peak_uss_handoff_bytes" not in sampler.peaks
+        else:
+            assert not complete and sampler.peaks["samples_incomplete"] == 1
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"])
+    try:
+        import time
+
+        time.sleep(0.5)
+        rss, _, complete = probe._Sampler()._sample()
+        assert complete
+        assert rss >= psutil.Process(child.pid).memory_info().rss
+    finally:
+        child.kill()
+        child.wait()

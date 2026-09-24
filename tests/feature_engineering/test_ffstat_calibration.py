@@ -257,6 +257,19 @@ def test_cross_sectional_public_values_unchanged_by_calibration(tmp_path: Path,
     assert {c: on[c] for c in l5} == {c: off[c] for c in l5}
 
 
+def test_decisions_attr_is_instance_level() -> None:
+    """Task 2.1 契約（r20 composer P2-02）：`factory_decisions_attr` 為實例屬性、初值 None，不宣告於類別上
+    （多實例／多週期不得互相覆寫）。"""
+    from momentum.factories import create_feature_factory
+
+    attr = CONTRACT["factory_decisions_attr"]
+    assert attr not in vars(FeatureFactory)
+    a, b = create_feature_factory(), create_feature_factory()
+    assert attr in vars(a) and getattr(a, attr) is None
+    setattr(a, attr, {"x": {}})
+    assert getattr(b, attr) is None
+
+
 def test_three_entries_same_decisions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 驗證：同 symbol／週期／起始日／設定下，generate_features、run_ic_first（自算路徑）、
     多週期 worker（parallel）之 1h 欄校準時間上界、N、決策與 d 全同。run_ic_first 之決策讀 factory 之

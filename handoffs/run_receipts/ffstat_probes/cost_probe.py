@@ -3,7 +3,8 @@
 3 標的 × 2 週期 × N＝500／1000／2000 之真實冷 run（各自子程序、隔離 tmp 與 d* 快取），逐 run 記：
 - 分段耗時：校準域（`run_calibration_preflight`）、ADF（`_adf_pvalue_for_values` 累計）、d* 搜尋（`_find_min_d` 累計）、總計；
 - 分階段峰值記憶體：取樣執行緒每 50 ms 記「本程序＋全部子程序」之 RSS 合計與 USS 合計，依當下階段
-  （校準／交接／公開；交接＝送出第一個 worker 至第一個 worker 完成）分別取最大；tier 判定用 USS（RSS 會重計共享頁）；
+  （校準／交接／公開；交接＝送出第一個 worker 至第一個 worker 完成）分別取最大；tier 判定用 USS，
+  任一程序 USS 被拒之筆整筆改用 RSS 合計（上界，不漏算；macOS 子程序 USS 必被拒），取樣不完整即判失敗；
 - 暫存清理：run 後隔離系統 tmp 下校準暫存前綴（契約 `calibration_tmp_prefix`）之殘留數；
 - 各 N 與最大 N 之決策一致率。
 另於 FFACT_MEMORY_TIER=8gb 跑一次多週期平行（含封包交接 worker 之父＋子峰值），峰值超過 8 GiB 即判失敗。
@@ -34,8 +35,10 @@ STAGES = ("calibration", "handoff", "public")
 class _Sampler:
     """每 50 ms 取樣「本程序＋全部子程序」之 RSS 合計與 USS 合計，依當下階段各記最大值。
 
-    RSS 合計會重計父子共享頁（fork／spawn 之 worker 共用函式庫與唯讀頁），只列原始值供對照；
-    tier 判定用 USS 合計（各程序獨占頁，不重計共享；r19 codex P2-03）。"""
+    tier 判定值（`peak_judged_*`）逐筆取：該筆全部程序皆取得 USS ⇒ USS 合計（不重計共享頁；r19 codex P2-03）；
+    任一程序 USS 被拒（macOS 對同使用者之 spawn 子程序 `task_for_pid` 即拒，主委實跑 2026-09-24）⇒ 該筆整筆改用
+    RSS 合計（每程序 RSS ≥ USS，只會高估、不會漏算；r20 codex P1-01），計入 `samples_rss_fallback`。任一程序連
+    RSS 亦取不到 ⇒ 該筆記入 `samples_incomplete`，verdict 判量測失敗。`peak_uss_*` 只取全數取得 USS 之筆。"""
 
     def __init__(self) -> None:
         import psutil
@@ -47,23 +50,44 @@ class _Sampler:
         self._thread = threading.Thread(target=self._run, daemon=True)
 
     def _sample(self) -> tuple:
+        """回傳 (RSS 合計, USS 合計或 None〔任一程序 USS 取不到〕, 是否完整〔每程序皆取得 RSS〕)。"""
+        import psutil
+
         rss = uss = 0
+        uss_ok = complete = True
         for proc in [self._proc, *self._proc.children(recursive=True)]:
             try:
-                info = proc.memory_full_info()
+                rss += proc.memory_info().rss
+            except psutil.NoSuchProcess:
+                continue  # 取樣期間已結束之程序
             except Exception:
+                complete = uss_ok = False
                 continue
-            rss += info.rss
-            uss += getattr(info, "uss", info.rss)
-        return rss, uss
+            try:
+                uss += proc.memory_full_info().uss
+            except psutil.NoSuchProcess:
+                continue
+            except Exception:
+                uss_ok = False
+        return rss, (uss if uss_ok else None), complete
+
+    def _record(self, sample: tuple) -> None:
+        """把一筆 `_sample()` 結果計入當下階段之峰值與計數。"""
+        rss, uss, complete = sample
+        judged = uss if uss is not None else rss
+        if uss is None:
+            self.peaks["samples_rss_fallback"] = self.peaks.get("samples_rss_fallback", 0) + 1
+        if not complete:
+            self.peaks["samples_incomplete"] = self.peaks.get("samples_incomplete", 0) + 1
+        for metric, value in (("rss", rss), ("uss", uss), ("judged", judged)):
+            if value is None:
+                continue
+            key = f"peak_{metric}_{self.stage}_bytes"
+            self.peaks[key] = max(self.peaks.get(key, 0), value)
 
     def _run(self) -> None:
         while not self._stop.is_set():
-            rss, uss = self._sample()
-            stage = self.stage
-            for metric, value in (("rss", rss), ("uss", uss)):
-                key = f"peak_{metric}_{stage}_bytes"
-                self.peaks[key] = max(self.peaks.get(key, 0), value)
+            self._record(self._sample())
             time.sleep(0.05)
 
     def __enter__(self) -> "_Sampler":
@@ -181,7 +205,8 @@ def run_child(args: list, env: dict) -> dict:
 
 def verdict(rows: list, tier: dict) -> list:
     """失敗原因清單（空＝通過）：任一 run 失敗、暫存殘留、tier run 缺任一階段峰值（含交接）、
-    tier run 任一階段 USS 合計峰值超過上限（RSS 合計只列收據、不作判定：會重計共享頁）。"""
+    tier run 有取樣不完整之筆、tier run 任一階段判定值（`peak_judged_*`：USS 合計，USS 取不到之筆以 RSS 合計為上界）
+    超過上限。"""
     problems = [f"run failed: {r.get('symbol')} {r.get('timeframe')} N={r.get('n')}" for r in rows if r.get("rc") != 0]
     problems += [f"tmp leftover: {r.get('symbol')} {r.get('timeframe')} N={r.get('n')}"
                  for r in rows if r.get("calibration_tmp_leftover")]
@@ -189,8 +214,10 @@ def verdict(rows: list, tier: dict) -> list:
     if tier.get("rc") != 0:
         problems.append("tier run failed")
         return problems
+    if tier.get("samples_incomplete"):
+        problems.append(f"tier sampling incomplete: {tier['samples_incomplete']} samples")
     for stage in STAGES:
-        key = f"peak_uss_{stage}_bytes"
+        key = f"peak_judged_{stage}_bytes"
         if key not in tier:
             problems.append(f"tier run missing {stage} peak")
         elif tier[key] > limit:

@@ -215,10 +215,6 @@ class FeatureFactory:
     Layer 7: Validation & persistence -> FeatureValidator + FeatureStorage
     """
 
-    # FFSTAT Task 2.1：最近一次 L6.5 之逐欄平穩化決策（metadata `stationarity_decisions` 之同一來源；
-    # run_ic_first 於 L6.5 形成、先於 IC 階段）。未開平穩化或尚未執行為 None。
-    last_stationarity_decisions: Optional[Dict[str, Dict[str, Any]]] = None
-
     def __init__(self, config_manager: ConfigManager, adapter_registry: AdapterRegistry) -> None:
         self._config_manager = config_manager
         self._adapter_registry = adapter_registry
@@ -237,6 +233,10 @@ class FeatureFactory:
         self._ic_engine: Optional[Any] = None
         self.layer_results: Dict[str, LayerExecutionResult] = {}
         self._preprocessing_applied: Optional[bool] = None
+        # FFSTAT Task 2.1：本實例最近一次 L6.5 之逐欄平穩化決策（metadata `stationarity_decisions` 之同一來源；
+        # run_ic_first 於 L6.5 形成、先於 IC 階段）。實例屬性（不得寫在類別上：多實例／多週期互不覆寫）；
+        # 未開平穩化或尚未執行為 None。
+        self.last_stationarity_decisions: Optional[Dict[str, Dict[str, Any]]] = None
         self._effective_preprocessing_config: Optional[Dict[str, Any]] = None
         self._column_layer_map: Optional[Dict[str, str]] = None
         self._current_output_window: Optional[OutputWindow] = None
