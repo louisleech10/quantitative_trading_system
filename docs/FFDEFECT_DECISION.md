@@ -213,3 +213,9 @@ FFDSTAR 只 cross-link 追蹤。
 
 **判準**：委員進程仍存活時**不得**視為交件完成；`committee_run` 之收尾才是交件信號，
 **檔案存在不是**。
+
+## 六、FF-TFMETA 收案殘留（2026-09-24 收批，實作 `cb53ff19`＋審碼修補 `afa1f4bd`）
+
+- 殘留：既有 18 個 run 之 manifest 不回填 — `為何現在不做: user-ruling:2026-08-05 面向未來不溯及既往`；觸發：無（舊 run 依 task-record authority 使用）。
+- 殘留：CGSA 路徑之 L6.5 預處理失敗未進 completeness — `為何現在不做: needs-research:CGSA 串流於 manifest 合併前，哪一個已產生之 run 級信號代表 preprocessing 失敗（_preprocessing_applied 只於 frame 路徑設定，CGSA 兩路徑不經 _execute_l65_with_degradation）`；觸發：研究得出信號後另立票。
+- 待辦：grok 復役後自行重驗其 SPEC 審查第 3 輪所提兩條 P1（本期由 codex 同等重跑閉合）— `為何現在不做: blocked-by:grok 帳戶額度用完（402），委員名冊 active_stampers 暫無 grok`。

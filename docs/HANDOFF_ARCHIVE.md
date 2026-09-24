@@ -447,3 +447,13 @@
 - 2026-09-22：RM-PROCOPT → `docs/PROCOPT_DECISION.md`
 - 2026-09-22：RM-PROCOPT → `白話說明/Archived/SPEC與TODO流程優化.md`
 - 2026-09-22：RM-PROCOPT → `handoffs/reconcile/20260922-todofmt-x-consult-r1/synth.md`
+
+## 2026-09-24 交接檔進行中紀錄移出：RM-FFTFMETA（條目識別碼轉完成）
+
+<!-- ENTRY: RM-FFTFMETA -->
+- 2026-09-24：RM-FFTFMETA → `docs/FFTFMETA_SPEC.md`
+- 2026-09-24：RM-FFTFMETA → `docs/manifests/FFTFMETA.json`
+- 2026-09-24：RM-FFTFMETA → `handoffs/reconcile/20260924-fftfmeta-x-review-r8/synth.md`
+- 2026-09-24：RM-FFTFMETA → `handoffs/reconcile/20260924-fftfmeta-x-stamp-r1/synth.md`
+- 2026-09-24：RM-FFTFMETA → `handoffs/run_receipts/20260924-fftfmeta-impl-sizes.json`
+- 2026-09-22：RM-FFTFMETA → `docs/FFDEFECT_DECISION.md`
