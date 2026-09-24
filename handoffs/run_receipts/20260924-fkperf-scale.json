@@ -1,0 +1,247 @@
+{
+  "schema_version": 1,
+  "command": "handoffs/run_receipts/fkperf_probes/scale_receipt.py",
+  "exit_code": 0,
+  "rows": [
+    {
+      "scale": "1x",
+      "total_keys": 35,
+      "mode": "emit",
+      "seconds": [
+        0.0989,
+        0.0963,
+        0.0957
+      ],
+      "min_seconds": 0.0957,
+      "spawns": 2
+    },
+    {
+      "scale": "1x",
+      "total_keys": 35,
+      "mode": "--check",
+      "seconds": [
+        0.1954,
+        0.1929,
+        0.1904
+      ],
+      "min_seconds": 0.1904,
+      "spawns": 17
+    },
+    {
+      "scale": "1x",
+      "total_keys": 35,
+      "mode": "--write",
+      "seconds": [
+        0.1291,
+        0.1096,
+        0.1067
+      ],
+      "min_seconds": 0.1067,
+      "spawns": 2
+    },
+    {
+      "scale": "1x",
+      "total_keys": 35,
+      "mode": "--status-hits",
+      "seconds": [
+        0.076,
+        0.0748,
+        0.135
+      ],
+      "min_seconds": 0.0748,
+      "spawns": 2
+    },
+    {
+      "scale": "1x",
+      "total_keys": 35,
+      "mode": "guard",
+      "seconds": [
+        0.2282,
+        0.2183,
+        0.218
+      ],
+      "min_seconds": 0.218,
+      "spawns": 23
+    },
+    {
+      "scale": "4x",
+      "total_keys": 140,
+      "mode": "emit",
+      "seconds": [
+        0.1185,
+        0.1183,
+        0.1185
+      ],
+      "min_seconds": 0.1183,
+      "spawns": 2
+    },
+    {
+      "scale": "4x",
+      "total_keys": 140,
+      "mode": "--check",
+      "seconds": [
+        0.2184,
+        0.2089,
+        0.2077
+      ],
+      "min_seconds": 0.2077,
+      "spawns": 17
+    },
+    {
+      "scale": "4x",
+      "total_keys": 140,
+      "mode": "--write",
+      "seconds": [
+        0.146,
+        0.1353,
+        0.1338
+      ],
+      "min_seconds": 0.1338,
+      "spawns": 2
+    },
+    {
+      "scale": "4x",
+      "total_keys": 140,
+      "mode": "--status-hits",
+      "seconds": [
+        0.0787,
+        0.0773,
+        0.0777
+      ],
+      "min_seconds": 0.0773,
+      "spawns": 2
+    },
+    {
+      "scale": "4x",
+      "total_keys": 140,
+      "mode": "guard",
+      "seconds": [
+        0.2687,
+        0.2518,
+        0.2545
+      ],
+      "min_seconds": 0.2518,
+      "spawns": 23
+    },
+    {
+      "scale": "10x",
+      "total_keys": 350,
+      "mode": "emit",
+      "seconds": [
+        0.1649,
+        0.1638,
+        0.1618
+      ],
+      "min_seconds": 0.1618,
+      "spawns": 2
+    },
+    {
+      "scale": "10x",
+      "total_keys": 350,
+      "mode": "--check",
+      "seconds": [
+        0.2837,
+        0.2688,
+        0.2743
+      ],
+      "min_seconds": 0.2688,
+      "spawns": 17
+    },
+    {
+      "scale": "10x",
+      "total_keys": 350,
+      "mode": "--write",
+      "seconds": [
+        0.199,
+        0.1915,
+        0.1877
+      ],
+      "min_seconds": 0.1877,
+      "spawns": 2
+    },
+    {
+      "scale": "10x",
+      "total_keys": 350,
+      "mode": "--status-hits",
+      "seconds": [
+        0.0856,
+        0.0851,
+        0.0849
+      ],
+      "min_seconds": 0.0849,
+      "spawns": 2
+    },
+    {
+      "scale": "10x",
+      "total_keys": 350,
+      "mode": "guard",
+      "seconds": [
+        0.3542,
+        0.3389,
+        0.3383
+      ],
+      "min_seconds": 0.3383,
+      "spawns": 23
+    },
+    {
+      "scale": "40x",
+      "total_keys": 1400,
+      "mode": "emit",
+      "seconds": [
+        0.3839,
+        0.3829,
+        0.3823
+      ],
+      "min_seconds": 0.3823,
+      "spawns": 2
+    },
+    {
+      "scale": "40x",
+      "total_keys": 1400,
+      "mode": "--check",
+      "seconds": [
+        0.5774,
+        0.5607,
+        0.5595
+      ],
+      "min_seconds": 0.5595,
+      "spawns": 17
+    },
+    {
+      "scale": "40x",
+      "total_keys": 1400,
+      "mode": "--write",
+      "seconds": [
+        0.4793,
+        0.4596,
+        0.4576
+      ],
+      "min_seconds": 0.4576,
+      "spawns": 2
+    },
+    {
+      "scale": "40x",
+      "total_keys": 1400,
+      "mode": "--status-hits",
+      "seconds": [
+        0.1253,
+        0.1215,
+        0.1218
+      ],
+      "min_seconds": 0.1215,
+      "spawns": 2
+    },
+    {
+      "scale": "40x",
+      "total_keys": 1400,
+      "mode": "guard",
+      "seconds": [
+        0.7896,
+        0.7776,
+        0.7708
+      ],
+      "min_seconds": 0.7708,
+      "spawns": 23
+    }
+  ]
+}

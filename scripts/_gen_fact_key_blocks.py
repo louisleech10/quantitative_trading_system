@@ -2189,7 +2189,14 @@ def _write_batched(self: "Gen", root: str, reg: "Registry") -> Optional[int]:
             plan.append((k, tgt, path, bl[0], el[0], block_lines))
     by_path: Dict[str, List[Tuple[int, int, List[bytes]]]] = {}
     order: List[str] = []
+    real_of: Dict[str, str] = {}
     for _k, _t, path, bpos, epos, block_lines in plan:
+        # 不同字面 target 指向同一實體宿主（`./host.md`、symlink 別名）⇒ 分組會各自規劃、後寫蓋先寫：退回逐 key 路徑
+        real = os.path.realpath(path)
+        if real_of.setdefault(real, path) != path:
+            del self.out[out_mark:]
+            del self.errbuf[err_mark:]
+            return None
         if path not in by_path:
             by_path[path] = []
             order.append(path)

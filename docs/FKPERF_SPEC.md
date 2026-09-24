@@ -25,6 +25,8 @@ RISK-HIT: b,c
 - **白話審閱**：`白話說明/FKPERF規格審閱.md`；使用者 2026-09-23 逐問「量測點數字不同有什麼差異」「以後會越來越大、很多地方用到會不會拖慢」，經說明後回「ok」⇒ SPEC 定案、端點依下條：
   - 量測端點取總 fact-key 數 140 與 1400（35 之 4 倍與 40 倍，仍相差 10 倍、門檻仍 20 倍），不取使用者選項說明中之 1 倍與 10 倍——主委自查：每次呼叫之固定開銷約 0.1s（`python3` 啟動 0.022s、`ticket_universe.sh --check` 0.03s，另 git 與包裝層），1×／10× 直接相除會被稀釋，r2 反例之比例僅約 13.5 倍而漏抓；grok r3 以純內容夾具實測 4×／40× 同型反例純 CPU 52 倍、含固定開銷 31 倍，且冪次成長下不存在「1×／10× 會紅而 4×／40× 不紅」之情形（此改動為收緊，非放寬）。
   - FACT-RECEIPT: `bash scripts/ticket_universe.sh --check`（計時三次）→ 印出 `0.04s`、`0.03s`、`0.03s`；`python3 -c pass` → `0.022s`（主委 實跑 2026-09-23）
+- **切換後實測**（Task 4.4，C-6）：
+  - FACT-RECEIPT: `venv/bin/python handoffs/run_receipts/fkperf_probes/scale_receipt.py` → 收據 `handoffs/run_receipts/20260924-fkperf-scale.json`；三次最小值（秒）1×／4×／10×／40×：emit `0.096／0.118／0.162／0.382`、`--check` `0.19／0.208／0.269／0.56`、`--write` `0.107／0.134／0.188／0.458`、`--status-hits` `0.075／0.077／0.085／0.121`、guard `0.218／0.252／0.338／0.771`；外部程序數四規模皆同（emit 2、`--check` 17、`--write` 2、`--status-hits` 2、guard 23）（主委 實跑 2026-09-24；改前 `--check` 10.73s、guard 10.3s）
 - **已確認結果**：2026-09-23 使用者逐字（見下列兩則）
   - 2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票；目標＝存檔檢查之等待不隨登記規模增長。
   - 2026-09-23 使用者於 AskUserQuestion 選「比例型：規模放大 10 倍最多慢 20 倍」（兩端各量三次取最小值）⇒ C-6 ②、Task 4.4 之比例型耗時斷言，涵蓋 `--check`、`factkey_write_guard.sh`、`--status-hits`（r2 codex／composer 以「每 key 對整份註冊表做 JSON 往返」反例證明程序數與開檔數之不變性抓不到純 CPU 退化：35 key 0.024s → 350 key 2.476s）。
