@@ -3111,8 +3111,8 @@ class FeatureFactory:
         quality_status = str(completeness["quality_status"])
         metadata["quality_status"] = quality_status
         metadata["run_status"] = str(completeness.get("run_status", quality_status))
-        metadata["failed_layers"] = qualify_failed_layer_ids(completeness.get("failed_layers", []), timeframe)
-        metadata["failure_reasons"] = qualify_failed_layer_ids(completeness.get("failure_reasons", []), timeframe)
+        # failed_layers／failure_reasons 與 manifest 逐字同源（不另行限定週期；r1 codex P1-01）
+        metadata["failure_reasons"] = list(completeness.get("failure_reasons", []))
         if "quality_thresholds" in completeness:
             metadata["quality_thresholds"] = dict(completeness["quality_thresholds"])
         if completeness.get("preprocessing_applied") is False:

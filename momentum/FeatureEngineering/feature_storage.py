@@ -640,6 +640,14 @@ def apply_quality_degradation(
     """
     out = dict(meta)
     reasons: List[str] = []
+    # 降級只往更嚴重方向：unknown／failed 等優先序高於 partial 者不得被改寫為 partial（r1 codex P1-03）
+    current = str(out.get("quality_status", "complete"))
+    degraded_status = (
+        current
+        if current in QUALITY_STATUS_PRECEDENCE
+        and QUALITY_STATUS_PRECEDENCE.index(current) < QUALITY_STATUS_PRECEDENCE.index("partial")
+        else "partial"
+    )
     if preprocessing_applied is False:
         out["preprocessing_applied"] = False
         reasons.append("L6.5:preprocessing_failed")
@@ -658,8 +666,8 @@ def apply_quality_degradation(
     reasons.extend(quality_reasons)
     if not reasons:
         return out
-    out["quality_status"] = "partial"
-    out["run_status"] = "partial"
+    out["quality_status"] = degraded_status
+    out["run_status"] = degraded_status
     out["failure_reasons"] = list(out.get("failure_reasons", [])) + reasons
     return out
 
@@ -2051,6 +2059,14 @@ class FeatureStorage:
         if completeness_meta:
             artifact_manifest.update(completeness_meta)
             artifact_manifest["quality_status"] = str(completeness_meta.get("quality_status", quality_status))
+        if preserved_root:
+            # 後續寫入之 artifact 承襲 run 之 canonical completeness，使 resolve_run_status 與根一致
+            # （否則 IC-first 覆寫後 artifacts 皆 complete、resume 閘誤判可快取；r1 codex P1-02）
+            for key in COMPLETENESS_FIELD_NAMES + ("failure_reasons",):
+                if key in preserved_root:
+                    artifact_manifest[key] = json.loads(json.dumps(preserved_root[key]))
+            if quality_status != "empty_selection" and "quality_status" in preserved_root:
+                artifact_manifest["quality_status"] = str(preserved_root["quality_status"])
         if extra_metadata:
             artifact_manifest["metadata"] = dict(extra_metadata)
         manifest = existing_manifest or {

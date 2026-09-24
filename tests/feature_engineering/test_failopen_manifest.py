@@ -1053,3 +1053,47 @@ def test_mutation_degradation_skipping_nan_gate_is_caught(monkeypatch: pytest.Mo
     monkeypatch.setattr(sys.modules[__name__], "apply_quality_degradation", _mutant)
     with pytest.raises(AssertionError):
         test_degradation_pure_nan_threshold()
+
+
+# --- FF-TFMETA b1 審碼 r1 回歸（codex P1-01／P1-02／P1-03 之反例） ------------------
+
+def test_single_tf_layer_failure_metadata_equals_manifest_fields() -> None:
+    """r1 codex P1-01：單週期層失敗時 result.metadata 之 failed_layers／failure_reasons 與 manifest 逐字相同。"""
+    layer_results = _healthy_layer_results(_IDX3)
+    layer_results["Layer 3"] = _failed_layer(pd.DataFrame(index=_IDX3), reason="injected L3 failure")
+    completeness = resolve_completeness_meta(layer_results, "1h")
+    metadata: dict = {}
+    create_feature_factory(validate_continuity=False)._apply_completeness_to_metadata(metadata, completeness, "1h")
+    for key in COMPLETENESS_FIELD_NAMES + ("failure_reasons", "quality_status"):
+        assert metadata[key] == completeness[key], key
+    assert metadata["failed_layers"] == ["L3"]
+
+
+def test_writer_ic_first_rewrite_keeps_artifact_and_run_status(tmp_path: Path) -> None:
+    """r1 codex P1-02：IC-first 不帶 canonical 覆寫既有 partial run ⇒ artifacts 與 resolve_run_status 仍 partial
+    （否則 resume 閘把不完整 run 當可快取）。"""
+    storage = FeatureStorage(str(tmp_path / "features"))
+    _write_multi_raw(storage, "cfg_tfmeta_runstatus")
+    storage.write_raw("BTCUSDT", "1h", "cfg_tfmeta_runstatus", _sample_groups(_IDX3), row_index=_IDX3,
+                      layer_results=_healthy_layer_results(_IDX3))
+    storage.write_processed("BTCUSDT", "1h", "cfg_tfmeta_runstatus", _sample_groups(_IDX3),
+                            layer_results=_healthy_layer_results(_IDX3))
+    path = storage.feature_run_dir("BTCUSDT", "1h", "cfg_tfmeta_runstatus") / FeatureStorage.L7_V2_MANIFEST_NAME
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    assert manifest["artifacts"]["raw"]["quality_status"] == "partial"
+    assert manifest["artifacts"]["processed"]["quality_status"] == "partial"
+    assert fs_module.resolve_run_status(manifest) == "partial"
+    assert manifest["artifacts"]["raw"]["failed_layers"] == manifest["failed_layers"]
+
+
+def test_degradation_keeps_unknown_when_evidence_missing() -> None:
+    """r1 codex P1-03：缺證據（unknown）時超門檻不得被改寫為 partial；原因仍追加。"""
+    meta = resolve_completeness_meta(
+        None, "1h", timeframe_completeness=build_timeframe_completeness(_MULTI, []), layer_status_by_tf={}
+    )
+    assert meta["quality_status"] == "unknown"
+    out = apply_quality_degradation(
+        meta, inf_ratio=0.0, nan_ratio=0.1, max_inf_ratio=0.0, max_nan_ratio=0.01, preprocessing_applied=None,
+    )
+    assert out["quality_status"] == "unknown" and out["run_status"] == "unknown"
+    assert out["failure_reasons"] == ["nan_ratio=0.1>max_nan_ratio=0.01"]
