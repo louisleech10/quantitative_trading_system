@@ -39,11 +39,38 @@ def prepare_stat_env(monkeypatch: Any, tmp_path: Path, **env: str) -> Path:
     回傳隔離之 d* 快取目錄（§G：兩次 run 皆以各自隔離之空 d* 快取執行）。"""
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
+    import tempfile
+
     prepare_env(monkeypatch, tmp_path, **env)
     target = tmp_path / "dstar_cache"
     target.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(FeaturePreprocessor, "_d_star_cache_dir", staticmethod(lambda: target))
+    # 本測試之系統暫存導向 <tmp>/sys_tmp（契約 test_tmp_isolation）：校準暫存殘留只查此處，不掃全系統 tmp
+    sys_tmp = tmp_path / "sys_tmp"
+    sys_tmp.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(tempfile, "tempdir", str(sys_tmp))
     return target
+
+
+def sys_tmp(tmp_path: Path) -> Path:
+    """`prepare_stat_env` 所設之本測試系統暫存目錄。"""
+    return tmp_path / "sys_tmp"
+
+
+def first_output_timestamp(root: Path):
+    """落盤基礎欄之第一列時間（讀任一基礎欄 parquet 之 timestamp 欄或 index）。"""
+    import pandas as pd
+    import pyarrow.parquet as pq
+
+    for p in sorted(root.rglob("*.parquet")):
+        if p.name.endswith("_L65.parquet"):
+            continue
+        frame = pq.read_table(p).to_pandas()
+        if "timestamp" in frame.columns:
+            ts = frame["timestamp"].iloc[0]
+            return pd.to_datetime(ts, unit="ms", utc=True) if isinstance(ts, (int, float)) else pd.Timestamp(ts)
+        return pd.Timestamp(frame.index[0])
+    raise AssertionError("無基礎欄 parquet")
 
 
 def stat_payload(training_tfs: Optional[List[str]] = None, *, fracdiff: bool = True, adf: bool = True,

@@ -342,6 +342,44 @@ def test_ic_first_rejects_supplied_layers_when_stationarizing(tmp_path: Path, mo
     assert h.snapshot_tree(tmp_path) == before
 
 
+def _ic_first_kwargs(factory: Any, root: Path) -> Dict[str, Any]:
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    return {"ic_engine": ICEngine({"methods": ["spearman"]}), "feature_reader": FeatureReader(str(root)),
+            "storage": factory._storage, "ic_threshold": 0.0, "persist": True}
+
+
+def test_ic_first_second_tf_failure_zero_writes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.1 驗證（r18 codex P1-01）：IC-first 自算路徑，第二原生週期校準讀取錯 ⇒ CalibrationError，
+    呼叫前後整個 tmp 樹（run 目錄、registry、CGSA 工作目錄）快照相同。"""
+    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
+    # 先以平穩化關閉跑一次，使 factory 具輸出窗（比照 test_b6_warmup_trim 之 run_ic_first 用法）
+    root, factory, _ = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], fracdiff=False, adf=False))
+    _fail_second_tf_read(monkeypatch)
+    before = h.snapshot_tree(tmp_path)
+    with pytest.raises(CalibrationError):
+        factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, factory._resolve_config(h.stat_payload(["1h", "12h"])),
+                             **_ic_first_kwargs(factory, root))
+    assert h.snapshot_tree(tmp_path) == before
+
+
+def test_ic_first_supplied_layers_unchanged_when_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.1 驗證（r18 codex P1-01）：平穩化關閉時 run_ic_first 自帶 raw_data／layers 照常成功，
+    且產出之欄名與值等於同設定之自算路徑（舊行為不變）。"""
+    h.prepare_stat_env(monkeypatch, tmp_path / "self", FFACT_USE_CGSA="0")
+    off = h.stat_payload(fracdiff=False, adf=False)
+    root, factory, _ = h.run_stat(tmp_path / "self", off)
+    cfg = factory._resolve_config(off)
+    self_path = factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, cfg, **{**_ic_first_kwargs(factory, root), "persist": False})
+    raw, layers = factory._run_l1_l6_for_ic_first(h.SYMBOL, h.PRIMARY_TF, cfg)
+    supplied = factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, cfg, raw_data=raw, layers=layers,
+                                    **{**_ic_first_kwargs(factory, root), "persist": False})
+    assert list(supplied.metadata["feature_names"]) == list(self_path.metadata["feature_names"])
+    if self_path.features_df is not None:
+        pd.testing.assert_frame_equal(supplied.features_df, self_path.features_df)
+
+
 def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 驗證：resume（第二次同設定 run 經 CGSA 工作目錄續跑）時，前置關卡仍涵蓋 L1–L6 已完成之週期，
     決策與首跑全同；該週期校準讀取錯 ⇒ 零寫入失敗。"""
@@ -368,18 +406,32 @@ def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pyt
 def test_auto_start_reserves_calibration_segment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.3 驗證：不帶 start_date、開平穩化 ⇒ 公開第一列＝有效起始日（已對齊主週期）、每欄校準早於它、
     來源為 auto_reserved_calibration；同一有效起始日以 start_date 明示重跑，決策與 d 全同。"""
+    import json as _json
+
     h.prepare_stat_env(monkeypatch, tmp_path / "auto")
-    _, _, auto = h.run_stat(tmp_path / "auto", h.stat_payload(), start_date=None, end_date="2024-04-30")
+    root, _, auto = h.run_stat(tmp_path / "auto", h.stat_payload(["1h", "12h"]), start_date=None,
+                               end_date="2024-04-30")
     meta = auto.metadata
     eff = pd.Timestamp(meta[h.META["effective_output_start"]])
     assert meta[h.META["output_start_source"]] == "auto_reserved_calibration"
+    manifest = _json.loads(Path(meta["manifest_path"]).read_text(encoding="utf-8"))
+    assert manifest[h.META["output_start_source"]] == "auto_reserved_calibration"
+    assert pd.Timestamp(manifest[h.META["effective_output_start"]]) == eff
     assert eff in set(h.kline_frame().index)
+    # 落盤公開欄之第一列＝有效起始日（r18 codex P1-03）
+    assert h.first_output_timestamp(root) == eff
+    # 各原生週期於有效起始日之前之實際 K 線列數 ≥ N（前史深度含 N；依列計數）
+    n = CONTRACT["calibration_n_default"]
+    for tf in ("1h", "12h"):
+        idx = h.kline_frame(timeframe=tf).index
+        assert int((idx < eff).sum()) >= n, tf
     for col, d in h.decisions(auto).items():
         assert pd.Timestamp(d["calibration_end"]) < eff, col
     h.prepare_stat_env(monkeypatch, tmp_path / "explicit")
-    _, _, explicit = h.run_stat(tmp_path / "explicit", h.stat_payload(), start_date=str(eff.date()) if eff.hour == 0
-                                else eff.isoformat(), end_date="2024-04-30")
+    _, _, explicit = h.run_stat(tmp_path / "explicit", h.stat_payload(["1h", "12h"]),
+                                start_date=eff.isoformat(), end_date="2024-04-30")
     assert h.decisions(explicit) == h.decisions(auto)
+    assert explicit.metadata[h.META["output_start_source"]] == "user"
 
 
 def test_auto_start_cache_does_not_skip_preflight(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -402,12 +454,18 @@ def test_auto_start_cache_does_not_skip_preflight(tmp_path: Path, monkeypatch: p
 
 
 def test_auto_start_off_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 驗證：平穩化關閉、不帶 start_date ⇒ 輸出第一列為可用 K 線第一根（行為與改前相同）。"""
+    """Task 2.3 驗證：平穩化關閉、不帶 start_date ⇒ 基礎欄與改前凍結之 `auto_off` 基準逐欄四 hash 全等
+    （行為與改前逐位元組相同；r18 codex P1-03）。"""
+    import json as _json
+
+    from tests.feature_engineering.test_ffstat_golden import base_fingerprints
+
+    baseline = _json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))["auto_off"]
     h.prepare_stat_env(monkeypatch, tmp_path)
-    _, _, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=None,
-                              end_date="2024-02-29")
-    first = pd.Timestamp(result.metadata["data_range"][0])  # `_data_range` 回傳 [start, end] 字串
-    assert (first.tz_localize("UTC") if first.tzinfo is None else first) == h.kline_frame().index[0]
+    root, _, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=None,
+                                 end_date=baseline["end_date"])
+    assert base_fingerprints(root) == baseline["base"]
+    assert result.metadata.get(h.META["output_start_source"]) is None
 
 
 def test_auto_start_history_too_short_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -444,37 +502,37 @@ def test_boundary_06_late_born_column_fails_with_name_and_shortfall(tmp_path: Pa
 
 def test_boundary_07_calibration_domain_leaves_no_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 邊界③：校準域不在 registry、resume checkpoint、輸出目錄留檔；暫存目錄於成功後已刪。"""
-    import tempfile
-
     prefix = CONTRACT["calibration_tmp_prefix"]
+    hashes = {}
     h.prepare_stat_env(monkeypatch, tmp_path / "on", FFACT_USE_CGSA="1")
-    h.run_stat(tmp_path / "on", h.stat_payload())
+    _, _, on = h.run_stat(tmp_path / "on", h.stat_payload())
+    hashes["on"] = str(on.metadata["config_hash"])
     h.prepare_stat_env(monkeypatch, tmp_path / "off", FFACT_USE_CGSA="1")
-    h.run_stat(tmp_path / "off", h.stat_payload(fracdiff=False, adf=False))
+    _, _, off = h.run_stat(tmp_path / "off", h.stat_payload(fracdiff=False, adf=False))
+    hashes["off"] = str(off.metadata["config_hash"])
 
     def _files(side: str) -> set:
-        # 去掉 config hash 目錄段（兩次設定不同 ⇒ hash 不同）；L6.5 衍生欄檔為平穩化之合法差異
+        # 只把本 run 之 config hash 字串換成佔位（兩次設定不同 ⇒ hash 不同；r18 codex P2-06）；
+        # L6.5 衍生欄檔為平穩化之合法差異；本測試之系統暫存目錄另查
         out = set()
         for rel in h.snapshot_tree(tmp_path / side):
-            parts = [p for p in rel.split("/") if not (len(p) == 32 and all(c in "0123456789abcdef" for c in p))]
-            if not parts[-1].endswith("_L65.parquet"):
-                out.add("/".join(parts))
+            if rel.startswith("sys_tmp/") or rel.endswith("_L65.parquet"):
+                continue
+            out.add(rel.replace(hashes[side], "<config_hash>"))
         return out
 
     extra = _files("on") - _files("off")
     assert extra == set(), sorted(extra)[:10]
-    assert list(Path(tempfile.gettempdir()).glob(prefix + "*")) == []
+    assert list(h.sys_tmp(tmp_path / "on").glob(prefix + "*")) == []
 
 
 def test_boundary_07b_calibration_temp_removed_on_exception(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 邊界③：校準域計算拋例外時，其暫存目錄亦已刪除。"""
-    import tempfile
-
     h.prepare_stat_env(monkeypatch, tmp_path)
     _fail_second_tf_compute(monkeypatch)
     with pytest.raises(CalibrationError):
         h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]))
-    assert list(Path(tempfile.gettempdir()).glob(CONTRACT["calibration_tmp_prefix"] + "*")) == []
+    assert list(h.sys_tmp(tmp_path).glob(CONTRACT["calibration_tmp_prefix"] + "*")) == []
 
 
 @pytest.mark.parametrize("symbol", CONTRACT["cost_measure_symbols"])
@@ -515,24 +573,51 @@ def test_boundary_09_worker_missing_packet_fails_before_registry(tmp_path: Path,
 
 # ---------------------------------------------------------------- Task 2.2 三路同一有效長度
 
-def test_three_paths_same_n(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.2 驗證：以 spy 記三路每次 ADF 之樣本數，N=500 與 N=2000 兩設定下皆等於 N（循序）。"""
+def _path_of_call() -> str:
+    """由呼叫堆疊判定本次 ADF 屬哪一路（契約 `adf_path_functions`）。"""
+    names = {v: k for k, v in CONTRACT["adf_path_functions"].items()}
+    for frame in inspect.stack()[2:]:
+        if frame.function in names:
+            return names[frame.function]
+    return "unknown"
+
+
+@pytest.mark.parametrize("n", [500, 2000])
+@pytest.mark.parametrize("mode", ["serial", "parallel"])
+def test_three_paths_same_n(n: int, mode: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.2 驗證（r18 codex P1-02）：以呼叫堆疊逐路記 ADF 樣本數——ADF 差分候選、fracdiff 目標篩選、
+    d* 搜尋（循序）與 d* 搜尋（parallel worker，於主程序內執行以使 spy 可見）——每路非空且皆等於 N。"""
+    from momentum.FeatureEngineering.preprocessing import _slow_path_parallel as spp
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
-    for n in (500, 2000):
-        sizes: list = []
-        real = FeaturePreprocessor._adf_pvalue_for_values
+    seen: Dict[str, set] = {}
+    real = FeaturePreprocessor._adf_pvalue_for_values
+    real_worker = spp._statsmodels_adf_pvalue
 
-        def _spy(values, sample_size=500, _real=real, _sizes=sizes):
-            _sizes.append(int(sample_size))
-            return _real(values, sample_size=sample_size)
+    def _spy(values, sample_size=500):
+        seen.setdefault(_path_of_call(), set()).add(int(sample_size))
+        return real(values, sample_size=sample_size)
 
-        h.prepare_stat_env(monkeypatch, tmp_path / str(n))
-        monkeypatch.setattr(FeaturePreprocessor, "_adf_pvalue_for_values", staticmethod(_spy))
-        payload = h.stat_payload()
-        payload["preprocessing"]["calibration_bars"] = n
-        h.run_stat(tmp_path / str(n), payload, start_date="2025-10-01" if n == 2000 else h.WINDOW[0])
-        assert sizes and set(sizes) == {n}, (n, sorted(set(sizes)))
+    def _spy_worker(values, sample_size=500):
+        seen.setdefault(_path_of_call(), set()).add(int(sample_size))
+        return real_worker(values, sample_size=sample_size)
+
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    monkeypatch.setattr(FeaturePreprocessor, "_adf_pvalue_for_values", staticmethod(_spy))
+    monkeypatch.setattr(spp, "_statsmodels_adf_pvalue", _spy_worker)
+    if mode == "parallel":
+        monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self, *a, **k: 2)
+        monkeypatch.setattr(spp.ParallelSlowPath, "map",
+                            lambda self, items, worker_function: [worker_function(np.asarray(v, dtype=np.float64),
+                                                                                  dict(m)) for v, m in items])
+    payload = h.stat_payload()
+    payload["preprocessing"]["calibration_bars"] = n
+    h.run_stat(tmp_path, payload)
+    expected = {"adf_differencing", "fracdiff_target",
+                "dstar_search_parallel_worker" if mode == "parallel" else "dstar_search"}
+    assert expected <= set(seen), (mode, sorted(seen))
+    for path in expected:
+        assert seen[path] == {n}, (mode, path, sorted(seen[path]))
 
 
 def test_boundary_12_n_change_misses_dstar_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

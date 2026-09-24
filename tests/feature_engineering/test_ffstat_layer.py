@@ -109,3 +109,18 @@ def test_mutation_missing_map_entry_treated_as_non_target_is_caught(monkeypatch:
     monkeypatch.setattr(FeaturePreprocessor, "_filter_fracdiff_target_columns", _lenient)
     with pytest.raises(pytest.fail.Exception):
         test_missing_column_in_layer_map_fails_closed()
+
+
+def test_rename_real_values_same_nonstationary_decisions() -> None:
+    """§G ⑥（r18 codex P2-05）：以真實 kline 之值做 ADF 判定，欄名全數改掉後，逐欄（依位置對照）
+    是否判為不平穩全同——判定只看值、不看名。"""
+    frame = h.kline_frame().iloc[:500][["open", "high", "low", "close", "volume", "taker_ratio"]]
+    frame = frame.assign(close_diff=frame["close"].diff(), vol_diff=frame["volume"].diff())
+    pre = FeaturePreprocessor(_PRE_CONFIG)
+    got = set(pre._get_non_stationary_columns(frame))
+    renamed = frame.copy()
+    renamed.columns = [f"zz{i}" for i in range(len(frame.columns))]
+    got_renamed = set(FeaturePreprocessor(_PRE_CONFIG)._get_non_stationary_columns(renamed))
+    mapping = dict(zip(frame.columns, renamed.columns))
+    assert {mapping[c] for c in got} == got_renamed
+    assert got and len(got) < len(frame.columns)

@@ -6,27 +6,94 @@
     "cache_write_failed": "dstar_cache_write_failed"
   },
   "event_reason_format": "<event>:<受影響欄數>",
-  "stationarity_apply_to_allowed": ["non_stationary", "all"],
-  "stationarity_apply_to_rejected_examples": ["layer1_only", "^close_", ["close_trend_EMA_20"]],
-  "removed_config_sections": ["adf_safe_skip"],
-  "fracdiff_target_layers": ["L1", "L2"],
-  "packet_key_fields": ["symbol", "timeframe", "output_start", "config_hash", "n", "column_set_digest"],
-  "output_start_sources": ["user", "auto_reserved_calibration"],
+  "stationarity_apply_to_allowed": [
+    "non_stationary",
+    "all"
+  ],
+  "stationarity_apply_to_rejected_examples": [
+    "layer1_only",
+    "^close_",
+    [
+      "close_trend_EMA_20"
+    ]
+  ],
+  "removed_config_sections": [
+    "adf_safe_skip"
+  ],
+  "fracdiff_target_layers": [
+    "L1",
+    "L2"
+  ],
+  "packet_key_fields": [
+    "symbol",
+    "timeframe",
+    "output_start",
+    "config_hash",
+    "n",
+    "column_set_digest"
+  ],
+  "output_start_sources": [
+    "user",
+    "auto_reserved_calibration"
+  ],
   "metadata_keys": {
     "decisions": "stationarity_decisions",
     "effective_output_start": "effective_output_start",
     "output_start_source": "output_start_source",
-    "calibration_source_sha256": "calibration_source_sha256"
+    "calibration_source_sha256": "calibration_source_sha256",
+    "summary": "stationarity_summary"
   },
-  "decision_fields": ["timeframe", "layer", "calibration_start", "calibration_end", "n", "adf_pvalue", "fracdiff", "d", "adf_differenced", "dstar_cache_hit", "events"],
+  "decision_fields": [
+    "timeframe",
+    "layer",
+    "calibration_start",
+    "calibration_end",
+    "n",
+    "adf_pvalue",
+    "fracdiff",
+    "d",
+    "adf_differenced",
+    "dstar_cache_hit",
+    "events"
+  ],
   "canonical_nan_bits_hex": "7ff8000000000000",
   "calibration_n_default": 500,
   "n_config_key": "preprocessing.calibration_bars",
   "n_by_timeframe_config_key": "preprocessing.calibration_bars_by_timeframe",
-  "cost_measure_n": [500, 1000, 2000],
-  "cost_measure_symbols": ["BTCUSDT", "ETHUSDT", "BCHUSDT"],
-  "cost_measure_timeframes": ["1h", "12h"],
+  "cost_measure_n": [
+    500,
+    1000,
+    2000
+  ],
+  "cost_measure_symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "BCHUSDT"
+  ],
+  "cost_measure_timeframes": [
+    "1h",
+    "12h"
+  ],
   "min_memory_tier_gb": 8,
   "calibration_tmp_prefix": "ffstat_calib_",
-  "dstar_cache_api": {"load_error_attr": "load_error", "flush_atomic_returns": "bool"}
+  "dstar_cache_api": {
+    "load_error_attr": "load_error",
+    "flush_atomic_returns": "bool"
+  },
+  "summary_fields": [
+    "tested",
+    "fracdiff",
+    "adf_diff_1",
+    "adf_diff_2",
+    "search_failed",
+    "cache_read_failed",
+    "cache_write_failed"
+  ],
+  "adf_path_functions": {
+    "adf_differencing": "_apply_adf_differencing",
+    "fracdiff_target": "_get_non_stationary_columns",
+    "dstar_search": "_find_min_d",
+    "dstar_search_parallel_worker": "process_fracdiff_column_values"
+  },
+  "test_tmp_isolation": "prepare_stat_env 把 tempfile.tempdir 導向 <tmp>/sys_tmp；校準暫存目錄殘留只查此處"
 }

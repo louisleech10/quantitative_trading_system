@@ -106,9 +106,27 @@ def test_golden_derived_consistent_with_decisions(baseline: Dict[str, Any], on_r
         assert (f"{col}_fracdiff" in derived) == bool(d["fracdiff"]), col
         order = next((k for k in (1, 2) if f"{col}_diff{k}" in derived), 0)
         assert order == int(d["adf_differenced"] or 0), col
-    changed = [c for c in dec if (bool(dec[c]["fracdiff"]), int(dec[c]["adf_differenced"] or 0))
-               != (baseline["decisions"][c]["fracdiff"], baseline["decisions"][c]["adf_diff_order"])]
-    assert isinstance(changed, list)
+    # 摘要（契約 metadata_keys.summary）須與逐欄資料重新計數一致（r18 codex P2-05）
+    summary = on_run["result"].metadata[h.META["summary"]]
+    assert set(h.CONTRACT["summary_fields"]) <= set(summary)
+    assert summary["tested"] == len(dec)
+    assert summary["fracdiff"] == sum(1 for d in dec.values() if d["fracdiff"])
+    assert summary["adf_diff_1"] == sum(1 for c in dec if f"{c}_diff1" in derived)
+    assert summary["adf_diff_2"] == sum(1 for c in dec if f"{c}_diff2" in derived)
+    for key, event in (("search_failed", "search_failed"), ("cache_read_failed", "cache_read_failed"),
+                       ("cache_write_failed", "cache_write_failed")):
+        assert summary[key] == sum(1 for d in dec.values() if h.EVENTS[event] in d["events"])
+    # 與基準相比決策改變之欄：分類計數加總＝改變欄數（寫入 Task 4.1 收據之數字由此產生）
+    changed = {c: ((baseline["decisions"][c]["fracdiff"], baseline["decisions"][c]["adf_diff_order"]),
+                   (bool(dec[c]["fracdiff"]), int(dec[c]["adf_differenced"] or 0))) for c in dec
+               if (bool(dec[c]["fracdiff"]), int(dec[c]["adf_differenced"] or 0))
+               != (baseline["decisions"][c]["fracdiff"], baseline["decisions"][c]["adf_diff_order"])}
+    by_kind: Dict[str, int] = {}
+    for old, new in changed.values():
+        by_kind[f"{old}->{new}"] = by_kind.get(f"{old}->{new}", 0) + 1
+    assert sum(by_kind.values()) == len(changed)
+    exempt_changed = [c for c in changed if baseline["decisions"][c]["name_exempt"]]
+    assert set(exempt_changed) <= set(changed)
 
 
 def test_boundary_21_both_off_identical_to_baseline_base(baseline: Dict[str, Any], tmp_path: Path,
@@ -134,3 +152,25 @@ def test_mutation_fracdiff_overwrites_base_is_caught(baseline: Dict[str, Any], t
     root, _, result = h.run_stat(tmp_path, h.stat_payload())
     with pytest.raises(AssertionError):
         test_golden_base_values_unchanged_trim0(baseline, {"root": root, "result": result})
+
+
+def _cost_probe():
+    import importlib.util
+
+    path = Path(__file__).resolve().parents[2] / "handoffs" / "run_receipts" / "ffstat_probes" / "cost_probe.py"
+    spec = importlib.util.spec_from_file_location("ffstat_cost_probe", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
+    """Task 4.1 驗證（r18 codex P1-04）：成本探針之判定——tier run 峰值 9 GiB 且 rc=0 ⇒ 失敗；暫存殘留 ⇒ 失敗；
+    皆正常 ⇒ 通過。"""
+    probe = _cost_probe()
+    ok_row = {"symbol": "BTCUSDT", "timeframe": "1h", "n": 500, "rc": 0, "calibration_tmp_leftover": 0}
+    ok_tier = {"rc": 0, "peak_rss_calibration_bytes": 2 * probe.GIB, "peak_rss_public_bytes": 3 * probe.GIB}
+    assert probe.verdict([ok_row], ok_tier) == []
+    assert probe.verdict([ok_row], {**ok_tier, "peak_rss_public_bytes": 9 * probe.GIB})
+    assert probe.verdict([{**ok_row, "calibration_tmp_leftover": 1}], ok_tier)
+    assert probe.verdict([{**ok_row, "rc": 1}], ok_tier)

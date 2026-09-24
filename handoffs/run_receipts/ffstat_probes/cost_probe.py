@@ -1,8 +1,12 @@
 """FF-STAT Task 4.1 成本收據（docs/FFSTAT_SPEC.md Task 4.1；使用者 2026-09-24「先實測再定」窗長）。
 
-3 標的 × 2 週期 × N＝500／1000／2000 之真實冷 run（各自子程序、隔離 tmp 與 d* 快取），記耗時、峰值記憶體
-（子程序 RUSAGE_SELF＋RUSAGE_CHILDREN）、各 N 與 N=2000 之決策一致率；另於 FFACT_MEMORY_TIER=8gb 跑一次多週期平行
-（含封包交接之父＋子峰值）。輸出 `handoffs/run_receipts/<日期>-ffstat-cost.json`，交使用者裁決 N 之最終預設。
+3 標的 × 2 週期 × N＝500／1000／2000 之真實冷 run（各自子程序、隔離 tmp 與 d* 快取），逐 run 記：
+- 分段耗時：校準域（`run_calibration_preflight`）、ADF（`_adf_pvalue_for_values` 累計）、d* 搜尋（`_find_min_d` 累計）、總計；
+- 分階段峰值記憶體：取樣執行緒每 50 ms 記「本程序＋全部子程序」RSS，依當下階段（校準／公開）分別取最大；
+- 暫存清理：run 後隔離系統 tmp 下校準暫存前綴（契約 `calibration_tmp_prefix`）之殘留數；
+- 各 N 與最大 N 之決策一致率。
+另於 FFACT_MEMORY_TIER=8gb 跑一次多週期平行（含封包交接 worker 之父＋子峰值），峰值超過 8 GiB 即判失敗。
+任一 run 失敗、有暫存殘留或超過 tier 上限 ⇒ 退出碼非 0。輸出 `handoffs/run_receipts/<日期>-ffstat-cost.json`。
 
 用法：venv/bin/python handoffs/run_receipts/ffstat_probes/cost_probe.py
 """
@@ -14,16 +18,52 @@ import json
 import os
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 CONTRACT = json.loads((REPO / "tests" / "_golden" / "ffstat" / "contract.json").read_text(encoding="utf-8"))
+GIB = 1024 ** 3
+
+
+class _Sampler:
+    """每 50 ms 取樣「本程序＋全部子程序」RSS，依階段記最大值。"""
+
+    def __init__(self) -> None:
+        import psutil
+
+        self._proc = psutil.Process()
+        self.stage = "public"
+        self.peaks: dict = {}
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+
+    def _rss(self) -> int:
+        total = self._proc.memory_info().rss
+        for child in self._proc.children(recursive=True):
+            try:
+                total += child.memory_info().rss
+            except Exception:
+                pass
+        return total
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            rss = self._rss()
+            self.peaks[self.stage] = max(self.peaks.get(self.stage, 0), rss)
+            time.sleep(0.05)
+
+    def __enter__(self) -> "_Sampler":
+        self._thread.start()
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self._stop.set()
+        self._thread.join()
 
 
 def child(symbol: str, timeframe: str, n: int, multi: bool) -> None:
-    import resource
-    import time
-
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     sys.path.insert(0, str(REPO))
     from _isolate import isolate  # noqa: E402
@@ -31,25 +71,68 @@ def child(symbol: str, timeframe: str, n: int, multi: bool) -> None:
     root = isolate("ffstat_cost_")
     from _isolate import isolate_dstar_cache  # noqa: E402
     from momentum.factories import create_feature_factory  # noqa: E402
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory  # noqa: E402
     from momentum.FeatureEngineering.feature_storage import FeatureStorage  # noqa: E402
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor  # noqa: E402
     from tests.feature_engineering import ffstat_helpers as h  # noqa: E402
 
     isolate_dstar_cache(root)
+    timers = {"calibration": 0.0, "adf": 0.0, "dstar": 0.0}
+    sampler = _Sampler()
+    real_pre = FeatureFactory.run_calibration_preflight
+    real_adf = FeaturePreprocessor._adf_pvalue_for_values
+    real_dstar = FeaturePreprocessor._find_min_d
+
+    def _preflight(self, *a, **k):
+        sampler.stage = "calibration"
+        t = time.perf_counter()
+        try:
+            return real_pre(self, *a, **k)
+        finally:
+            timers["calibration"] += time.perf_counter() - t
+            sampler.stage = "public"
+
+    def _adf(values, sample_size=500):
+        t = time.perf_counter()
+        try:
+            return real_adf(values, sample_size=sample_size)
+        finally:
+            timers["adf"] += time.perf_counter() - t
+
+    def _dstar(self, series, **kw):
+        t = time.perf_counter()
+        try:
+            return real_dstar(self, series, **kw)
+        finally:
+            timers["dstar"] += time.perf_counter() - t
+
+    FeatureFactory.run_calibration_preflight = _preflight
+    FeaturePreprocessor._adf_pvalue_for_values = staticmethod(_adf)
+    FeaturePreprocessor._find_min_d = _dstar
+
     tfs = ["1h", "12h"] if multi else [timeframe]
     payload = h.stat_payload(tfs)
     payload["timeframes"]["primary"] = timeframe
     payload["preprocessing"]["calibration_bars"] = n
     factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
     factory._storage = FeatureStorage(str(root / "features"))
-    t0 = time.time()
-    result = factory.generate_features(symbol, timeframe, config_override=payload, force_regenerate=True,
-                                       start_date="2025-10-01", end_date="2025-12-31", persist=True)
-    elapsed = time.time() - t0
-    rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss + resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    t0 = time.perf_counter()
+    with sampler:
+        result = factory.generate_features(symbol, timeframe, config_override=payload, force_regenerate=True,
+                                           start_date="2025-10-01", end_date="2025-12-31", persist=True)
+    total = time.perf_counter() - t0
+    import tempfile
+
+    leftover = len(list(Path(tempfile.gettempdir()).glob(CONTRACT["calibration_tmp_prefix"] + "*")))
     dec = h.decisions(result)
-    print("RESULT " + json.dumps({"seconds": round(elapsed, 1), "peak_rss_bytes": int(rss),
-                                  "decisions": {c: [bool(d["fracdiff"]), int(d["adf_differenced"] or 0)]
-                                                for c, d in dec.items()}}))
+    print("RESULT " + json.dumps({
+        "seconds_total": round(total, 2), "seconds_calibration": round(timers["calibration"], 2),
+        "seconds_adf": round(timers["adf"], 2), "seconds_dstar": round(timers["dstar"], 2),
+        "peak_rss_calibration_bytes": int(sampler.peaks.get("calibration", 0)),
+        "peak_rss_public_bytes": int(sampler.peaks.get("public", 0)),
+        "calibration_tmp_leftover": leftover,
+        "decisions": {c: [bool(d["fracdiff"]), int(d["adf_differenced"] or 0)] for c, d in dec.items()},
+    }))
 
 
 def run_child(args: list, env: dict) -> dict:
@@ -57,8 +140,21 @@ def run_child(args: list, env: dict) -> dict:
                        env={**os.environ, **env}, cwd=str(REPO))
     line = next((ln for ln in r.stdout.splitlines() if ln.startswith("RESULT ")), None)
     if r.returncode != 0 or line is None:
-        return {"rc": r.returncode, "error": r.stderr[-800:]}
+        return {"rc": r.returncode or 1, "error": r.stderr[-800:]}
     return {"rc": 0, **json.loads(line[len("RESULT "):])}
+
+
+def verdict(rows: list, tier: dict) -> list:
+    """失敗原因清單（空＝通過）：任一 run 失敗、暫存殘留、tier run 峰值超過上限。"""
+    problems = [f"run failed: {r.get('symbol')} {r.get('timeframe')} N={r.get('n')}" for r in rows if r.get("rc") != 0]
+    problems += [f"tmp leftover: {r.get('symbol')} {r.get('timeframe')} N={r.get('n')}"
+                 for r in rows if r.get("calibration_tmp_leftover")]
+    limit = CONTRACT["min_memory_tier_gb"] * GIB
+    if tier.get("rc") != 0:
+        problems.append("tier run failed")
+    elif max(tier.get("peak_rss_calibration_bytes", 0), tier.get("peak_rss_public_bytes", 0)) > limit:
+        problems.append(f"tier peak exceeds {CONTRACT['min_memory_tier_gb']} GiB")
+    return problems
 
 
 def main() -> int:
@@ -76,11 +172,12 @@ def main() -> int:
     tier = run_child([CONTRACT["cost_measure_symbols"][0], "1h", str(CONTRACT["calibration_n_default"]), "multi"],
                      {"FFACT_MEMORY_TIER": f"{CONTRACT['min_memory_tier_gb']}gb", "FFACT_MULTI_TF_PARALLEL": "1"})
     tier.pop("decisions", None)
+    problems = verdict(rows, tier)
     out = REPO / "handoffs" / "run_receipts" / f"{_dt.date.today():%Y%m%d}-ffstat-cost.json"
-    out.write_text(json.dumps({"spec": "docs/FFSTAT_SPEC.md Task 4.1", "rows": rows, "min_tier_multi_tf": tier},
-                              ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    out.write_text(json.dumps({"spec": "docs/FFSTAT_SPEC.md Task 4.1", "rows": rows, "min_tier_multi_tf": tier,
+                               "problems": problems}, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(out)
-    return 0 if all(r.get("rc") == 0 for r in rows) and tier.get("rc") == 0 else 1
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":

@@ -102,6 +102,16 @@ def main() -> int:
     data = collect(run_dir)
     data.update({"spec": "docs/FFSTAT_SPEC.md §G", "symbol": h.SYMBOL, "timeframe": h.PRIMARY_TF,
                  "window": list(h.WINDOW), "quality_status": result.metadata.get("quality_status")})
+    # Task 2.3「平穩化關閉、未填起始日 ⇒ 行為與改前逐位元組相同」之基準（r18 codex P1-03）
+    off_root = ISOLATED_ROOT / "auto_off"
+    off_end = "2024-02-29"
+    off_factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    off_factory._storage = FeatureStorage(str(off_root / "features"))
+    off = off_factory.generate_features(h.SYMBOL, h.PRIMARY_TF,
+                                        config_override=h.stat_payload([h.PRIMARY_TF], fracdiff=False, adf=False),
+                                        force_regenerate=True, start_date=None, end_date=off_end, persist=True)
+    off_dir = off_root / "features" / h.SYMBOL / h.PRIMARY_TF / str(off.metadata["config_hash"])
+    data["auto_off"] = {"end_date": off_end, "base": collect(off_dir)["base"]}
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(data, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     dec = data["decisions"].values()
