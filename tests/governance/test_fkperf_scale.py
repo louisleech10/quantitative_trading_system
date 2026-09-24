@@ -301,10 +301,11 @@ def test_mutation_ratio_verdict_flags_superlinear(tmp_path: Path, monkeypatch: p
     assert _ratio_verdict(tmp_path / "4x", tmp_path / "40x", "--check") is False
 
 
-def test_batched_write_alias_targets_same_host_keep_both_blocks(tmp_path: Path) -> None:
-    """b3 審碼 R1-P1-01：兩 key 之 target 字面不同但指向同一宿主（`X.md`／`./X.md`）⇒ 批次寫入須退回逐 key 路徑，
-    兩區塊皆為最新；否則後寫之宿主快照蓋掉先寫之區塊，而 stdout 仍報兩 key 已寫入。
-    取註冊表中相鄰、共宿主之兩 key：先者之區塊清成陳舊、後者 target 改為 `./` 別名。"""
+@pytest.mark.parametrize("alias", ["dot", "case"])
+def test_batched_write_alias_targets_same_host_keep_both_blocks(tmp_path: Path, alias: str) -> None:
+    """b3 審碼 R1-P1-01／R2-P1-01：兩 key 之 target 字面不同但指向同一宿主（`X.md`／`./X.md`；大小寫不敏感檔案系統之
+    `docs/X.md`／`Docs/X.md`）⇒ 批次寫入須退回逐 key 路徑，兩區塊皆為最新；否則後寫之宿主快照蓋掉先寫之區塊，
+    而 stdout 仍報兩 key 已寫入。取註冊表中相鄰、共宿主之兩 key：先者之區塊清成陳舊、後者 target 改為別名。"""
     import json
     import subprocess
     root = tmp_path / "t"
@@ -314,7 +315,14 @@ def test_batched_write_alias_targets_same_host_keep_both_blocks(tmp_path: Path) 
     keys = [k for k in fk if k != "_schema" and isinstance(fk[k], dict) and isinstance(fk[k].get("target"), str)]
     first, second = next((a, b) for a, b in zip(keys, keys[1:])
                          if fk[a]["target"] == fk[b]["target"] and not fk[a]["target"].startswith("HANDOFF"))
-    fk[second]["target"] = "./" + fk[second]["target"]
+    tgt = fk[second]["target"]
+    if alias == "dot":
+        fk[second]["target"] = "./" + tgt
+    else:
+        swapped = tgt[0].swapcase() + tgt[1:]
+        if not (root / swapped).exists():
+            pytest.skip("檔案系統大小寫敏感：大小寫別名不指向同一宿主")
+        fk[second]["target"] = swapped
     fk_path.write_text(json.dumps(fk, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     host = root / fk[first]["target"]
     text = host.read_text(encoding="utf-8")
