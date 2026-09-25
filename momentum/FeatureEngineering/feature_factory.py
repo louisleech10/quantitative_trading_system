@@ -64,7 +64,12 @@ from momentum.FeatureEngineering.preprocessing._d_star_cache import (
     compute_data_fingerprint,
     compute_feature_schema_hash,
 )
-from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
+    EVENT_ADF_UNTESTED,
+    FeaturePreprocessor,
+    StationarityIncompleteError,
+    StationarityProvenanceError,
+)
 from momentum.FeatureEngineering.utils.nan_stats import abnormal_nan_count
 from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
 from momentum.FeatureEngineering.warmup_window import (
@@ -239,6 +244,7 @@ class FeatureFactory:
         self.last_stationarity_decisions: Optional[Dict[str, Dict[str, Any]]] = None
         self._effective_preprocessing_config: Optional[Dict[str, Any]] = None
         self._column_layer_map: Optional[Dict[str, str]] = None
+        self._column_timeframe_map: Optional[Dict[str, str]] = None  # FFSTAT：legacy 多週期合併 frame 各欄原生週期（只供決策紀錄）
         self._current_output_window: Optional[OutputWindow] = None
 
     def generate_features(
@@ -298,6 +304,7 @@ class FeatureFactory:
         """
         config = self._resolve_config(config_override)
         self.last_stationarity_decisions = None  # FFSTAT：每次生成重新累計
+        self._stationarity_failed_groups = []
         self._progress_callback = progress_callback
         self._current_symbol = symbol
         self._current_timeframe = timeframe
@@ -419,6 +426,7 @@ class FeatureFactory:
 
         if config.preprocessing.enabled:
             self._column_layer_map = _build_column_layer_map(layers)
+            self._column_timeframe_map = None
             all_features = self._combine_layers(layers, context="layer6_5_input")
             # IC-First is now the only generation path: run winsorization +
             # fracdiff/ADF now; rank/zscore/gaussian remain downstream transforms.
@@ -704,6 +712,8 @@ class FeatureFactory:
             self._preprocessing_applied = True
             self._report_progress(layer_name, 1.0, f"{layer_name} completed: {result.shape[1]} features")
             return self._ensure_float32(result) if not result.empty else result
+        except StationarityProvenanceError:
+            raise  # FFSTAT：平穩化來源缺漏不可降級為「未做 L6.5 照常輸出」
         except Exception as exc:
             self._preprocessing_applied = False
             logger.error("%s failed; continuing without preprocessing: %s", layer_name, exc, exc_info=True)
@@ -737,6 +747,8 @@ class FeatureFactory:
             )
             logger.info("%s done: %d cols, rss=%dMB", layer_name, result.shape[1], _PROC.memory_info().rss >> 20)
             return result
+        except StationarityProvenanceError:
+            raise  # FFSTAT：平穩化來源缺漏不可降級為空結果
         except Exception as exc:
             logger.error("%s failed: %s", layer_name, exc, exc_info=True)
             return pd.DataFrame()
@@ -2153,6 +2165,7 @@ class FeatureFactory:
         """
         start = start_time if start_time is not None else time.time()
         self.last_stationarity_decisions = None  # FFSTAT：每次 IC-first 重新累計
+        self._stationarity_failed_groups = []
         resolved_config_hash = config_hash or self._current_config_hash or self._compute_config_hash(
             config,
             symbol,
@@ -2195,6 +2208,9 @@ class FeatureFactory:
             selection_window = {"start_pos": 0, "end_pos": int(len(label))}
             split_id = "ic_first_full_window"
 
+        # FFSTAT Task 1.1：fracdiff 目標層之結構化來源與標準 frame 路徑同一 helper（本次 layers 建）
+        self._column_layer_map = _build_column_layer_map(layers)
+        self._column_timeframe_map = None
         all_features = self._combine_layers(layers, context="ic_first_l65_pre_input")
         pre_ic_frame = self._safe_execute("Layer 6.5 pre_ic", self._layer6_5_pre_ic, all_features, config)
         _, pre_ic_frame, _ = self._trim_for_public_output(ingest_raw, pre_ic_frame, labels_df)
@@ -2661,6 +2677,7 @@ class FeatureFactory:
             preprocessing_config,
             context=context,
             column_layer_map=self._column_layer_map,
+            column_timeframe_map=getattr(self, "_column_timeframe_map", None),
         )
 
         if self._cgsa_enabled() and self._cgsa_registry is not None:
@@ -2681,7 +2698,7 @@ class FeatureFactory:
                 )
             finally:
                 self._cgsa_registry.finalize()
-            self._capture_stationarity_decisions(preprocessor)
+            self._capture_stationarity_decisions(preprocessor, config)
             # CGSA streaming path: L6.5 outputs live in CGSA registry, not in this
             # frame. L7 dead-feature drop on registry-side data is out of scope for
             # this step (see NAN_REDUCTION_STRATEGY.md §5.3 / PLAN §2.7).
@@ -2692,7 +2709,7 @@ class FeatureFactory:
         # See NAN_REDUCTION_STRATEGY.md §5.3 — drops ONLY constant/insufficient-
         # sample columns, NEVER drops by NaN ratio.
         result_frame = preprocessor.transform(all_features)
-        self._capture_stationarity_decisions(preprocessor)
+        self._capture_stationarity_decisions(preprocessor, config)
         return self._apply_l7_dead_feature_drop(result_frame, config)
 
     def _apply_cascade_blacklist(
@@ -3337,7 +3354,7 @@ class FeatureFactory:
                 },
             )
             if preprocessor is not None:
-                self._capture_stationarity_decisions(preprocessor)
+                self._capture_stationarity_decisions(preprocessor, config)
             stream_summary["raw_path"] = str(raw_path)
 
         self._cgsa_registry.save_state(
@@ -3885,9 +3902,21 @@ class FeatureFactory:
         logger.info("Cache hit for %s/%s [hash=%s]", symbol, timeframe, config_hash[:8])
         return cached
 
-    def _capture_stationarity_decisions(self, preprocessor: FeaturePreprocessor) -> None:
+    def _capture_stationarity_decisions(self, preprocessor: FeaturePreprocessor, config: Any = None) -> None:
         """FFSTAT：把 L6.5 前處理器之逐欄決策（鍵＝原生週期＋L6.5 所見欄名）轉為落盤欄名為鍵，
-        存於 `last_stationarity_decisions`（同一 run 多次 L6.5 者合併）。平穩化關閉時不記。"""
+        存於 `last_stationarity_decisions`（同一 run 多次 L6.5 者合併）。平穩化關閉時不記。
+
+        平穩化開啟而 registry 有群組轉換失敗（被容忍而繼續）⇒ 該群組之欄無決策、平穩化不完整：
+        未允許 partial（`allow_partial_layers`）即失敗；允許者記入摘要 `failed_groups`。"""
+        failed = preprocessor.failed_groups() if preprocessor._stationarity_enabled() else []
+        if failed:
+            allow_partial = bool(self._runtime_config_value(config, "allow_partial_layers", False)) if config else False
+            if not allow_partial:
+                raise StationarityIncompleteError(
+                    f"[L6.5] 平穩化開啟時 {len(failed)} 個群組轉換失敗（{failed[:5]}），其欄無平穩化決策；"
+                    "未允許 partial，拒絕輸出不完整結果"
+                )
+            self._stationarity_failed_groups = sorted(set(getattr(self, "_stationarity_failed_groups", [])) | set(failed))
         raw = preprocessor.stationarity_decisions()
         if not raw:
             return
@@ -3907,7 +3936,10 @@ class FeatureFactory:
             return {}
         events = [event for record in decisions.values() for event in record.get("events", [])]
         summary = {
-            "tested": len(decisions),
+            # tested＝實際做了 ADF（有 p 值）之欄；untested＝進入步驟但校準窗有效值不足、以事件標示者
+            "tested": sum(1 for record in decisions.values() if record.get("adf_pvalue") is not None),
+            "untested": events.count(EVENT_ADF_UNTESTED),
+            "failed_groups": len(getattr(self, "_stationarity_failed_groups", []) or []),
             "fracdiff": sum(1 for record in decisions.values() if record.get("fracdiff")),
             "adf_diff_1": sum(1 for record in decisions.values() if int(record.get("adf_differenced") or 0) == 1),
             "adf_diff_2": sum(1 for record in decisions.values() if int(record.get("adf_differenced") or 0) == 2),

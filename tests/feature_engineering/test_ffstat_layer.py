@@ -132,3 +132,58 @@ def test_rename_real_values_same_nonstationary_decisions() -> None:
     mapping = dict(zip(frame.columns, renamed.columns))
     assert {mapping[c] for c in got} == got_renamed
     assert got and len(got) < len(frame.columns)
+
+
+def test_provenance_error_not_degraded() -> None:
+    """b1 審碼 r1 codex P1-01：平穩化來源缺漏之錯誤不得被 `_execute_l65_with_degradation`／`_safe_execute`
+    降級為「未做 L6.5 照常輸出」。"""
+    import pandas as pd
+
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import StationarityProvenanceError
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    config = factory._resolve_config(h.stat_payload())
+
+    def _missing(*_a, **_k):
+        raise StationarityProvenanceError("no layer source")
+
+    with pytest.raises(StationarityProvenanceError):
+        factory._execute_l65_with_degradation("Layer 6.5", _missing, pd.DataFrame({"a": [1.0]}), config)
+    with pytest.raises(StationarityProvenanceError):
+        factory._safe_execute("Layer 6.5 pre_ic", _missing)
+
+
+def test_legacy_multi_tf_uses_structured_layers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """b1 審碼 r1 codex P1-01：legacy 多週期 frame 路徑（CGSA 關閉、1h＋12h）以結構化層判 fracdiff 目標，
+    L6.5 確有執行（未降級）、決策含 12h 原生週期之欄且其 timeframe 欄為 12h、層皆為 L1／L2。"""
+    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
+    _, factory, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], adf=False))
+    assert factory._preprocessing_applied is True
+    dec = h.decisions(result)
+    assert dec and {d["layer"] for d in dec.values()} <= set(h.CONTRACT["fracdiff_target_layers"])
+    tf12 = {c: d for c, d in dec.items() if "_12h_" in c}
+    assert tf12 and all(d["timeframe"] == "12h" for d in tf12.values())
+    assert all(d["timeframe"] == "1h" for c, d in dec.items() if "_1h_" in c)
+
+
+def test_ic_first_fresh_path_uses_structured_layers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """b1 審碼 r1 codex P1-01：IC-first 自算路徑（fresh factory，未先跑 generate_features）之 L6.5 以本次 layers
+    建之層對照判 fracdiff 目標：決策非空、層皆為 L1／L2（未因缺對照而失敗或降級）。"""
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+    from momentum.FeatureEngineering.warmup_window import resolve_output_window
+    from momentum.factories import create_feature_factory
+
+    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
+    root = tmp_path / "features"
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    factory._storage = FeatureStorage(str(root))
+    config = factory._resolve_config(h.stat_payload(adf=False))
+    factory._current_output_window = resolve_output_window(config, h.PRIMARY_TF, *h.WINDOW)
+    h.ic_first_to_l65(factory, config, ic_engine=ICEngine({"methods": ["spearman"]}),
+                      feature_reader=FeatureReader(str(root)), storage=factory._storage,
+                      ic_threshold=0.0, persist=False)
+    dec = factory.last_stationarity_decisions
+    assert dec and {d["layer"] for d in dec.values()} <= set(h.CONTRACT["fracdiff_target_layers"])

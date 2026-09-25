@@ -66,6 +66,19 @@ _PROC = psutil.Process()  # Cached for low-overhead RSS sampling
 _WARNED_CAUSAL_OVERRIDE = False
 
 
+# FFSTAT：欄已進入平穩化步驟但校準窗有效值不足、未做 ADF 之事件碼（決策紀錄 events；摘要計 untested）
+EVENT_ADF_UNTESTED = "adf_untested_insufficient_data"
+
+
+class StationarityProvenanceError(ValueError):
+    """FFSTAT：平穩化判定所需之結構化來源（fracdiff 目標層）缺漏。不可降級——L6.5 降級路徑、
+    群組失敗容忍與 native-tf 回退一律原樣上拋，不得以「未做平穩化」繼續輸出。"""
+
+
+class StationarityIncompleteError(StationarityProvenanceError):
+    """FFSTAT：平穩化開啟時有群組轉換失敗而未允許 partial ⇒ 決策不完整，同屬不可降級。"""
+
+
 def _is_ratio_unsafe_column(col: str) -> bool:
     """Belt-and-suspenders pattern guard for L6.5 entry.
 
@@ -113,10 +126,13 @@ class FeaturePreprocessor:
         config: Dict,
         context: Optional[PreprocessingContext] = None,
         column_layer_map: Optional[Mapping[str, str]] = None,
+        column_timeframe_map: Optional[Mapping[str, str]] = None,
     ) -> None:
         self._config = config or {}
         self._preprocessing_context = context or PreprocessingContext()
         self._column_layer_map = dict(column_layer_map) if column_layer_map is not None else None
+        # 多週期合併 frame（legacy 路徑）各欄之原生週期；只供決策紀錄之 timeframe 欄，不參與任何判定
+        self._column_timeframe_map = dict(column_timeframe_map) if column_timeframe_map is not None else None
         self.rank_config = self._config.get("rank_transform", {})
         self.gaussian_config = self._config.get("gaussian_normalize", {})
         self.adf_config = self._config.get("adf_differencing", {})
@@ -149,6 +165,8 @@ class FeaturePreprocessor:
         self._decisions_lock = threading.Lock()
         self._decision_tls = threading.local()
         self._adf_pvalue_by_cache_key: Dict[Any, Optional[float]] = {}
+        # 群組轉換失敗而被容忍之群組 id（CGSA registry；呼叫端據此判斷平穩化決策是否完整）
+        self._failed_groups: List[str] = []
 
     # ---------------------------------------------------------------- FFSTAT 逐欄決策紀錄
 
@@ -169,6 +187,8 @@ class FeaturePreprocessor:
         timeframe, group_layer, input_columns = self._decision_scope()
         if input_columns is not None and column not in input_columns:
             return
+        if getattr(self._decision_tls, "timeframe", None) is None and self._column_timeframe_map:
+            timeframe = self._column_timeframe_map.get(column, timeframe)
         layer = group_layer
         if not layer and self._column_layer_map is not None:
             layer = self._column_layer_map.get(column)
@@ -198,10 +218,25 @@ class FeaturePreprocessor:
             calibration_end=index[-1].isoformat() if is_time else None,
         )
 
+    def _record_untested(self, column: str) -> None:
+        """進入平穩化步驟但校準窗有效值不足而未做 ADF：以明確事件標示（不留無原因之空 p 值）。"""
+        self._record_decision(column, events=[EVENT_ADF_UNTESTED])
+
+    def _record_cached_test(self, column: str, pvalue: Optional[float]) -> None:
+        """同實例內重複檢定命中快取：沿用首次結果；首次即未檢定者同樣標示事件。"""
+        if pvalue is None:
+            self._record_untested(column)
+        else:
+            self._record_decision(column, adf_pvalue=float(pvalue))
+
     def stationarity_decisions(self) -> Dict[Tuple[str, str], Dict[str, Any]]:
         """本實例（含併入之 native-tf 子實例）累計之逐欄決策：{(原生週期, L6.5 所見欄名): 紀錄}。"""
         with self._decisions_lock:
             return {key: dict(value, events=list(value["events"])) for key, value in self._decisions.items()}
+
+    def failed_groups(self) -> List[str]:
+        """本實例 registry 轉換中失敗而被容忍之群組 id。"""
+        return list(self._failed_groups)
 
     def _merge_decisions_from(self, other: "FeaturePreprocessor") -> None:
         for key, value in other.stationarity_decisions().items():
@@ -874,6 +909,8 @@ class FeaturePreprocessor:
                 source_timeframe=self._group_timeframe(group),
             )
         except Exception as exc:  # noqa: BLE001
+            if isinstance(exc, StationarityProvenanceError):
+                raise  # FFSTAT：平穩化來源缺漏不可以 native-tf 回退吞下
             logger.warning(
                 "[L6.5] native-tf transform failed: group=%s err=%s, falling back",
                 group_id,
@@ -1042,6 +1079,8 @@ class FeaturePreprocessor:
                 source_timeframe=self._group_timeframe(group),
             )
         except Exception as exc:  # noqa: BLE001
+            if isinstance(exc, StationarityProvenanceError):
+                raise  # FFSTAT：平穩化來源缺漏不可以 native-tf 回退吞下
             logger.warning(
                 "[L6.5] native-tf in-place transform failed: group=%s err=%s, "
                 "falling back",
@@ -1315,6 +1354,9 @@ class FeaturePreprocessor:
                     last_group_label = f"{gid} ({'slow' if slow_route_candidate else 'fast'})"
                 completed += 1
             except Exception as error:
+                if isinstance(error, StationarityProvenanceError):
+                    raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
+                self._failed_groups.append(str(gid))
                 failed += 1
                 logger.error(
                     "[L6.5] Failed group %s: %s",
@@ -1530,6 +1572,9 @@ class FeaturePreprocessor:
                             completed += 1
                             last_group_label = f"{gid} (split→merged)"
                 except Exception as error:
+                    if isinstance(error, StationarityProvenanceError):
+                        raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
+                    self._failed_groups.append(str(gid))
                     failed += 1
                     logger.error(
                         "[L6.5] Failed group %s (%s): %s",
@@ -1580,6 +1625,9 @@ class FeaturePreprocessor:
                 completed += 1
                 last_group_label = f"{gid} (slow-chunked)"
             except Exception as error:
+                if isinstance(error, StationarityProvenanceError):
+                    raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
+                self._failed_groups.append(str(gid))
                 failed += 1
                 logger.error(
                     "[L6.5] Failed slow-chunked group %s: %s",
@@ -2936,7 +2984,7 @@ class FeaturePreprocessor:
 
         if source_layer is not None:
             if not str(source_layer).strip():
-                raise ValueError(
+                raise StationarityProvenanceError(
                     f"[L6.5] FracDiff 目標層判定失敗：群組 layer 為空（{len(columns)} 欄，"
                     f"示例 {[str(c) for c in list(columns)[:5]]}）；不得由欄名解析層"
                 )
@@ -2945,13 +2993,13 @@ class FeaturePreprocessor:
             return []
 
         if self._column_layer_map is None:
-            raise ValueError(
+            raise StationarityProvenanceError(
                 f"[L6.5] FracDiff 目標層判定失敗：無層來源（無群組 layer、無 column_layer_map；{len(columns)} 欄，"
                 f"示例 {[str(c) for c in list(columns)[:5]]}）；不得由欄名解析層"
             )
         unknown_columns = [column for column in columns if column not in self._column_layer_map]
         if unknown_columns:
-            raise ValueError(
+            raise StationarityProvenanceError(
                 f"[L6.5] FracDiff 目標層判定失敗：column_layer_map 缺 {len(unknown_columns)}/{len(columns)} 欄，"
                 f"示例 {[str(c) for c in unknown_columns[:5]]}"
             )
@@ -3351,7 +3399,7 @@ class FeaturePreprocessor:
             column for column in candidate_columns if column not in eligible_columns
         ]
         for column in skipped_high_nan:
-            self._record_decision(str(column))  # 進入 ADF 差分步驟但校準窗有效值過少：無 p 值
+            self._record_untested(str(column))  # 進入 ADF 差分步驟但校準窗有效值過少：未檢定
 
         for column in eligible_columns:
             series = result[column].astype(float)
@@ -3363,6 +3411,8 @@ class FeaturePreprocessor:
             for diff_order in range(max_diff + 1):
                 clean = decision_working.dropna()
                 if len(clean) < 20:
+                    if diff_order == 0:
+                        self._record_untested(str(column))
                     break
                 sample = clean.head(sample_size)
                 pvalue = self._adf_pvalue_for_values(sample.to_numpy(dtype=np.float64), sample_size=sample_size)
@@ -3627,7 +3677,7 @@ class FeaturePreprocessor:
             )
             cached = self._non_stationary_cache.get(cache_key)
             if cached is not None:
-                self._record_decision(str(column), adf_pvalue=self._adf_pvalue_by_cache_key.get(cache_key))
+                self._record_cached_test(str(column), self._adf_pvalue_by_cache_key.get(cache_key))
                 if cached:
                     non_stationary.append(column)
                 continue
@@ -3635,7 +3685,7 @@ class FeaturePreprocessor:
             if float(decision_series.isna().mean()) > 0.5:
                 self._non_stationary_cache.set(cache_key, False)
                 self._adf_pvalue_by_cache_key[cache_key] = None
-                self._record_decision(str(column))
+                self._record_untested(str(column))
                 continue
 
             series = decision_series.dropna()
@@ -3643,7 +3693,7 @@ class FeaturePreprocessor:
                 is_non_stationary = True
                 self._non_stationary_cache.set(cache_key, is_non_stationary)
                 self._adf_pvalue_by_cache_key[cache_key] = None
-                self._record_decision(str(column))
+                self._record_untested(str(column))
                 non_stationary.append(column)
                 continue
 

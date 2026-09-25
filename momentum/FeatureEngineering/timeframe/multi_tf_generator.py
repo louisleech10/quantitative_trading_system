@@ -1293,6 +1293,9 @@ class MultiTFGenerator:
     ) -> "FeatureGenerationResult":
         """Legacy multi-TF: combine layers into wide DF, align, then L6.5 + L7."""
         aligned_outputs: List[pd.DataFrame] = []
+        # FFSTAT Task 1.1：合併後各欄之結構化來源層（隨週期標記改名），供 L6.5 fracdiff 目標層判定
+        merged_layer_map: Dict[str, str] = {}
+        merged_timeframe_map: Dict[str, str] = {}
         skipped_tfs: List[str] = []
         fresh_failed: Dict[str, List[str]] = {}
         local_statuses: Dict[str, Dict[str, Tuple[str, str]]] = {}
@@ -1348,6 +1351,9 @@ class MultiTFGenerator:
 
             tf_layer_counts[timeframe] = self._collect_layer_counts(layer_results)
 
+            from momentum.FeatureEngineering.feature_factory import _build_column_layer_map
+
+            tf_layer_map = _build_column_layer_map([layer1, layer2, layer3, layer4, layer5, layer6])
             combined = self._factory._combine_layers(
                 [layer1, layer2, layer3, layer4, layer5, layer6],
                 context="multi_tf_layers",
@@ -1372,10 +1378,15 @@ class MultiTFGenerator:
                     self._primary_tf, self._config.timeframes.alignment_mode,
                 )
             aligned.attrs = {}
+            untagged_columns = [str(column) for column in aligned.columns]
             aligned = self._apply_timeframe_tag(
                 aligned, timeframe,
                 registry=getattr(self._factory, "_cgsa_registry", None),
             )
+            for before, after in zip(untagged_columns, aligned.columns):
+                if before in tf_layer_map:
+                    merged_layer_map.setdefault(str(after), tf_layer_map[before])
+                    merged_timeframe_map.setdefault(str(after), timeframe)
             aligned_outputs.append(aligned)
 
         if self._primary_tf in skipped_tfs:
@@ -1396,6 +1407,8 @@ class MultiTFGenerator:
 
         if self._config.preprocessing.enabled:
             self._report_progress("preprocessing", 0.75, "Running Layer 6.5 preprocessing")
+            self._factory._column_layer_map = merged_layer_map
+            self._factory._column_timeframe_map = merged_timeframe_map
             merged_df = self._factory._execute_l65_with_degradation(
                 "Layer 6.5",
                 self._factory._layer6_5_preprocessing,

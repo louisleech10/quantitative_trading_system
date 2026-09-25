@@ -83,3 +83,42 @@ def test_mutation_name_exemption_reinstated_is_caught(tmp_path: Path, monkeypatc
     mutated = {"decisions": h.decisions(result)}
     with pytest.raises(AssertionError):
         test_boundary_03_formerly_name_exempt_columns_are_tested(mutated)
+
+
+def test_untested_column_marked_and_not_counted_as_tested() -> None:
+    """b1 審碼 r1 codex P2-02：進入步驟但校準窗有效值不足（高 NaN）之欄，決策以明確事件標示未檢定，
+    摘要 tested 不計入、untested 計入（真實 kline 值，前段置 NaN 模擬晚生欄）。"""
+    import numpy as np
+
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import EVENT_ADF_UNTESTED
+
+    frame = h.kline_frame().iloc[:600][["close", "volume"]].copy()
+    frame.loc[frame.index[:400], "volume"] = np.nan
+    pre = FeaturePreprocessor({"fractional_differencing": {"enabled": False},
+                               "adf_differencing": {"enabled": True, "apply_to": "non_stationary"}})
+    pre._get_non_stationary_columns(frame)
+    dec = {col: d for (_, col), d in pre.stationarity_decisions().items()}
+    assert isinstance(dec["close"]["adf_pvalue"], float) and EVENT_ADF_UNTESTED not in dec["close"]["events"]
+    assert dec["volume"]["adf_pvalue"] is None and EVENT_ADF_UNTESTED in dec["volume"]["events"]
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    factory.last_stationarity_decisions = dec
+    summary = factory._stationarity_metadata()["stationarity_summary"]
+    assert summary["tested"] == 1 and summary["untested"] == 1
+
+
+def test_failed_group_makes_stationarity_incomplete() -> None:
+    """b1 審碼 r1 codex P2-03：平穩化開啟時 registry 有群組轉換失敗 ⇒ 未允許 partial 即拋不可降級之
+    `StationarityIncompleteError`；允許 partial 者記入摘要 failed_groups。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import StationarityIncompleteError
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    pre = FeaturePreprocessor({"adf_differencing": {"enabled": True}})
+    pre._failed_groups.append("1h_L1_trend_EMA")
+    pre._record_decision("close_trend_EMA_5", adf_pvalue=0.5)
+    with pytest.raises(StationarityIncompleteError):
+        factory._capture_stationarity_decisions(pre, factory._resolve_config(h.stat_payload()))
+    factory._stationarity_failed_groups = []
+    factory._capture_stationarity_decisions(pre, factory._resolve_config(h.stat_payload(allow_partial_layers=True)))
+    assert factory._stationarity_metadata()["stationarity_summary"]["failed_groups"] == 1
