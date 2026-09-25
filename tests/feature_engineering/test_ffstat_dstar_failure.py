@@ -338,3 +338,47 @@ def test_mutation_flush_swallows_error_is_caught(tmp_path: Path, monkeypatch: py
     monkeypatch.setattr(DStarCache, "flush_atomic", lambda self: None)
     with pytest.raises(AssertionError):
         test_flush_atomic_reports_failure(tmp_path, monkeypatch)
+
+
+@pytest.mark.parametrize("damage", ["missing_entries", "bad_row_count"])
+def test_cache_structural_damage_is_read_failure(damage: str, tmp_path: Path) -> None:
+    """b2 審碼 r1 codex P2-01：缺 `entries` 或 header 型別損壞（row_count 非整數）⇒ 記 `load_error`、
+    當空快取（照常搜尋），不得靜默當冷快取、也不得於載入時拋例外中止。"""
+    ctx = PreprocessingContext(symbol=h.SYMBOL, timeframe=h.PRIMARY_TF, config_hash="cfg")
+    first = _cache(ctx, tmp_path)
+    first.set("col", 0.3, h.kline_frame()["close"].to_numpy()[:500])
+    assert first.flush_atomic() is True
+    for f in tmp_path.glob("*.json"):
+        payload = json.loads(f.read_text(encoding="utf-8"))
+        if damage == "missing_entries":
+            payload.pop("entries")
+            payload.pop("value_aliases", None)
+        else:
+            payload["row_count"] = "not-an-int"
+        f.write_text(json.dumps(payload), encoding="utf-8")
+    reread = _cache(ctx, tmp_path)
+    assert getattr(reread, API["load_error_attr"])
+    assert reread.get("col", h.kline_frame()["close"].to_numpy()[:500]) is None
+
+
+def test_flush_failure_marks_only_same_timeframe_column() -> None:
+    """b2 審碼 r1 codex P2-02：同名欄分屬 1h／12h 時，1h 寫入之快取 flush 失敗 ⇒ 只 1h 那筆記
+    `dstar_cache_write_failed`，彙總為 `:1`（不誤標 12h、不放大計數）。"""
+    pre = FeaturePreprocessor({"fractional_differencing": {"enabled": True}})
+    for tf in ("1h", "12h"):
+        pre._decision_tls.timeframe = tf
+        pre._record_decision("same", fracdiff=True, d=0.4)
+    pre._decision_tls.timeframe = "1h"
+
+    class _FailingCache:
+        def flush_atomic(self) -> bool:
+            return False
+
+    cache = _FailingCache()
+    pre._note_cache_set(cache, "same")
+    pre._decision_tls.timeframe = None
+    pre._flush_dstar_cache(cache)
+    dec = pre.stationarity_decisions()
+    assert EV["cache_write_failed"] in dec[("1h", "same")]["events"]
+    assert EV["cache_write_failed"] not in dec[("12h", "same")]["events"]
+    assert pre.stationarity_failure_reasons() == [f"{EV['cache_write_failed']}:1"]

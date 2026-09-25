@@ -362,10 +362,22 @@ class DStarCache:
             self.load_error = f"invalid payload type: {type(payload).__name__}"
             return {}
 
-        if not self._payload_matches(payload):
+        try:
+            matches = self._payload_matches(payload)
+        except (TypeError, ValueError) as exc:
+            # header 欄位型別損壞（如 row_count 非整數）屬內容損壞，不得中止載入（r1 codex P2-01）
+            logger.warning("[d_star_cache] corrupt header cache=%s: %s", self._path, exc)
+            self.load_error = f"corrupt header: {type(exc).__name__}: {exc}"
+            return {}
+        if not matches:
             return {}
 
-        entries = payload.get("entries", {})
+        if "entries" not in payload:
+            # 結構缺漏屬內容損壞，不得靜默當空快取（r1 codex P2-01）
+            logger.warning("[d_star_cache] missing entries cache=%s", self._path)
+            self.load_error = "missing entries"
+            return {}
+        entries = payload["entries"]
         if not isinstance(entries, dict):
             logger.warning("[d_star_cache] invalid entries cache=%s", self._path)
             self.load_error = f"invalid entries type: {type(entries).__name__}"

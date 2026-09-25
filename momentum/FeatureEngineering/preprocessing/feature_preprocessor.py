@@ -174,6 +174,8 @@ class FeaturePreprocessor:
         self._failed_groups: List[str] = []
         # 本次轉換中 d* 搜尋失敗之欄（保原值：不 fracdiff、同輪排除於 ADF 差分候選；Task 3.1）
         self._dstar_failed_columns: set = set()
+        # 各 d* 快取（以 id 區分）本次寫入之 (原生週期, 欄)；flush 失敗時據此標記（r1 codex P2-02）
+        self._cache_pending_keys: Dict[int, set] = {}
 
     # ---------------------------------------------------------------- FFSTAT 逐欄決策紀錄
 
@@ -186,16 +188,28 @@ class FeaturePreprocessor:
         timeframe = getattr(tls, "timeframe", None) or self._preprocessing_context.timeframe or ""
         return str(timeframe), getattr(tls, "layer", None), getattr(tls, "input_columns", None)
 
+    def _decision_timeframe_for(self, column: str) -> str:
+        """一欄決策紀錄之原生週期：當次群組週期 → legacy 多週期之欄週期對照 → 前處理脈絡週期。"""
+        timeframe = self._decision_scope()[0]
+        if getattr(self._decision_tls, "timeframe", None) is None and self._column_timeframe_map:
+            timeframe = self._column_timeframe_map.get(column, timeframe)
+        return timeframe
+
+    def _note_cache_set(self, cache: DStarCache, column: str) -> None:
+        """記下本次寫入某 d* 快取之 (原生週期, 欄)；flush 失敗時只標記這些確切鍵（r1 codex P2-02：
+        同名欄分屬多週期時不得誤標；非原生週期群組共用主週期快取，故不以快取脈絡之週期比對）。"""
+        with self._decisions_lock:
+            self._cache_pending_keys.setdefault(id(cache), set()).add((self._decision_timeframe_for(column), str(column)))
+
     def _record_decision(self, column: str, **fields: Any) -> None:
         """更新一欄之決策紀錄（只記本次轉換之輸入欄；append 模式新產生之衍生欄不記）。
         `adf_pvalue` 等「首次檢定」欄只在尚未記錄時寫入（該欄以校準值首次檢定之結果）。"""
         if not self._stationarity_enabled():
             return
-        timeframe, group_layer, input_columns = self._decision_scope()
+        _, group_layer, input_columns = self._decision_scope()
         if input_columns is not None and column not in input_columns:
             return
-        if getattr(self._decision_tls, "timeframe", None) is None and self._column_timeframe_map:
-            timeframe = self._column_timeframe_map.get(column, timeframe)
+        timeframe = self._decision_timeframe_for(column)
         layer = group_layer
         if not layer and self._column_layer_map is not None:
             layer = self._column_layer_map.get(column)
@@ -241,21 +255,22 @@ class FeaturePreprocessor:
         with self._decisions_lock:
             return {key: dict(value, events=list(value["events"])) for key, value in self._decisions.items()}
 
-    def _mark_event_on_columns(self, columns: Iterable[str], event: str) -> None:
-        """對既有決策紀錄中欄名相符者附加事件（不新建紀錄；flush 等轉換外之時點用）。"""
-        names = {str(column) for column in columns}
+    def _mark_event_on_keys(self, keys: Iterable[Tuple[str, str]], event: str) -> None:
+        """對既有決策紀錄中 (原生週期, 欄) 確切相符者附加事件（不新建紀錄；flush 等轉換外之時點用）。"""
         with self._decisions_lock:
-            for (_, column), record in self._decisions.items():
-                if column in names:
+            for key in keys:
+                record = self._decisions.get(key)
+                if record is not None:
                     record["events"] = sorted(set(record["events"]) | {event})
 
     def _flush_dstar_cache(self, cache: Optional[DStarCache]) -> None:
-        """flush d* 快取；失敗 ⇒ 本次待寫之欄記 `dstar_cache_write_failed`（值已照常套用，Task 3.1 出口③）。"""
+        """flush d* 快取；失敗 ⇒ 本次寫入該快取之 (週期, 欄) 記 `dstar_cache_write_failed`（值已照常套用，出口③）。"""
         if cache is None:
             return
-        pending = cache.pending_columns()
+        with self._decisions_lock:
+            pending = self._cache_pending_keys.pop(id(cache), set())
         if cache.flush_atomic() is False:
-            self._mark_event_on_columns(pending, EVENT_DSTAR_WRITE_FAILED)
+            self._mark_event_on_keys(pending, EVENT_DSTAR_WRITE_FAILED)
 
     def stationarity_failure_reasons(self) -> List[str]:
         """d* 三出口事件彙總為 `<事件>:<受影響欄數>`（固定順序；無事件之類不列）。"""
@@ -3172,6 +3187,7 @@ class FeaturePreprocessor:
                 if cache is not None:
                     try:
                         cache.set(column, d_star, cache_arr)
+                        self._note_cache_set(cache, column)
                     except Exception as exc:
                         logger.warning("FracDiff d* cache write failed for %s: %s", column, exc)
                         events.append(EVENT_DSTAR_WRITE_FAILED)
@@ -3284,6 +3300,7 @@ class FeaturePreprocessor:
                         target_values = self._calibration_values(target_values)
                     try:
                         cache.set(target_column, d_star, target_values)
+                        self._note_cache_set(cache, target_column)
                     except Exception as exc:
                         logger.warning("FracDiff d* cache write failed for %s: %s", target_column, exc)
                         events.append(EVENT_DSTAR_WRITE_FAILED)
