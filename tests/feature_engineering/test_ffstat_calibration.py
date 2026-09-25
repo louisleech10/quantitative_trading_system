@@ -212,6 +212,21 @@ def test_verify_packet_rejects_non_finite_values(bad: float) -> None:
     assert err.value.column == "close_1h_x" and err.value.field == "values"
 
 
+def test_verify_packet_rejects_mixed_timezone_last_ts() -> None:
+    """b3 審碼 r2 codex P2-01：最晚校準時間無 tz、輸出起始日有 tz（或反之）⇒ CalibrationError(field=timezone)。"""
+    pkt = _packet()
+    naive_last = pd.Timestamp(pkt.last_calibration_ts["close_1h_x"]).tz_localize(None)
+    with pytest.raises(CalibrationError) as err:
+        cal.verify_packet(_with_values(pkt, pkt.values, {"close_1h_x": naive_last}), _expected_key(), ["close_1h_x"])
+    assert err.value.field == "timezone" and err.value.column == "close_1h_x"
+    naive_key = CalibrationKey(**{**_expected_key().__dict__, "output_start": OUT_START.tz_localize(None)})
+    naive_pkt = CalibrationPacket(key=naive_key, values=pkt.values, last_calibration_ts=pkt.last_calibration_ts,
+                                  calibration_source_sha256=pkt.calibration_source_sha256)
+    with pytest.raises(CalibrationError) as err:
+        cal.verify_packet(naive_pkt, naive_key, ["close_1h_x"])
+    assert err.value.field == "timezone"
+
+
 def test_verify_packet_accepts_exact_packet() -> None:
     """P1-02 之對照：欄集合、長度、有限值皆合 ⇒ 不拋（避免上列測試因一律拋錯而假綠）。"""
     cal.verify_packet(_packet(), _expected_key(), ["close_1h_x"])

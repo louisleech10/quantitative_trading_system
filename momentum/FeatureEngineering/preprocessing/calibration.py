@@ -131,6 +131,13 @@ def verify_packet(packet: CalibrationPacket, expected: CalibrationKey, columns: 
                 timeframe=timeframe, column=name, field="values",
             )
         last_ts = pd.Timestamp(packet.last_calibration_ts[name])
+        # b3 審碼 r2 codex P2-01：時區狀態不一（有 tz／無 tz）即拒收，不隱式轉換
+        if (last_ts.tz is None) != (output_start.tz is None):
+            raise CalibrationError(
+                f"校準時間與輸出起始日時區狀態不一致：週期 {timeframe} 欄 {name} 最晚校準時間 {last_ts}、"
+                f"輸出起始日 {output_start}",
+                timeframe=timeframe, column=name, field="timezone",
+            )
         if not last_ts < output_start:
             raise CalibrationError(
                 f"校準時間未早於輸出起始日：週期 {timeframe} 欄 {name} 最晚校準時間 {last_ts} ≥ {output_start}",
