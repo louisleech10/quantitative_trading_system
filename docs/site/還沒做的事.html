@@ -33,9 +33,14 @@
 <td>🔴 <strong>暫停中</strong>：SPEC 審至第 12 輪、未凍結、仍剩 11 條 P1；你會另開 session 處理</td>
 </tr>
 <tr>
-<td><strong>事實登記表的存檔檢查越來越慢</strong>（FKPERF）</td>
-<td>存檔交接文件、白話說明或規格書時要等約 10 秒，而且會隨登記項目增加而變慢</td>
-<td>你已裁定開票；規格書初稿寫好，正交委員審</td>
+<td><strong>FKPERF 收尾</strong></td>
+<td>存檔檢查已改快（40 倍規模下 10.7 秒 → 0.56 秒）；只剩收尾前一次全套治理測試</td>
+<td>要找沒在改檔的空檔跑（小時級，跑的時候不能改檔）</td>
+</tr>
+<tr>
+<td><strong>「IC 優先」選特徵路徑用真實資料必定報錯</strong>（ICFIRSTALIGN）</td>
+<td>最後算 IC 那步對不上時間標籤；既有測試在主線上本來就紅</td>
+<td>舊問題、不是 FF-STAT 弄壞的；排在 FF-STAT 之後</td>
 </tr>
 <tr>
 <td><strong>GAP-3 的 UAT 驗收</strong></td>
@@ -79,15 +84,21 @@
 </tr>
 <tr>
 <td>2</td>
-<td><strong>FF-TFMETA</strong></td>
-<td>FF run 的週期標記只記單一週期，多週期 run 會標錯</td>
-<td><strong>程式一行都沒改</strong>。已查清楚是真缺陷；只對新 run 生效；新格式清單檔範例已備</td>
+<td><strong>FF-STAT</strong></td>
+<td>要不要做平穩化改看特徵「是什麼」、不看名字；校準只用開始日期之前的資料</td>
+<td><strong>程式正在改</strong>：5 批完成 2 批、第 3 批前半審查中；見 <a href="現在做到哪.html">現在做到哪</a></td>
 </tr>
 <tr>
 <td>3</td>
 <td><strong>FF-NAME</strong></td>
 <td>衍生層欄名沒經過命名正規化（3,596 欄／0.859%）</td>
-<td><strong>程式一行都沒改</strong>。已查清楚是真缺陷；排在 FF-TFMETA 之後</td>
+<td><strong>程式一行都沒改</strong>；規格書要照你的四點重寫，排在 FF-STAT 之後</td>
+</tr>
+<tr>
+<td>3′</td>
+<td><strong>FFDSTAR</strong></td>
+<td>每次產出附上當次用的 d* 紀錄</td>
+<td><strong>程式一行都沒改</strong>；排在 FF-NAME 之後；會多一個輸出檔，屆時量好大小請你同意</td>
 </tr>
 <tr>
 <td>4</td>
