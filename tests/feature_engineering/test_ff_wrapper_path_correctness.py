@@ -318,7 +318,10 @@ def test_v7_3_l65_polars_optimized_and_fracdiff_serial_paths(
 
     calls.update({"polars": 0, "optimized": 0, "fracdiff": 0})
     monkeypatch.setattr(polars_adapter, "polars_enabled", lambda: True)
-    _ = FeaturePreprocessor(_l65_config(fracdiff=True)).transform(frame)
+    # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+    _ = FeaturePreprocessor(
+        _l65_config(fracdiff=True), column_layer_map={column: "L1" for column in frame.columns}
+    ).transform(frame)
     assert calls["fracdiff"] >= 1
     assert calls["polars"] == 0
 

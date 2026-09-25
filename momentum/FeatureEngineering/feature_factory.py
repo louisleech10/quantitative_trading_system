@@ -297,6 +297,7 @@ class FeatureFactory:
         Layer 0 failure stops the pipeline. Layer 1-6 failures return empty DataFrame.
         """
         config = self._resolve_config(config_override)
+        self.last_stationarity_decisions = None  # FFSTAT：每次生成重新累計
         self._progress_callback = progress_callback
         self._current_symbol = symbol
         self._current_timeframe = timeframe
@@ -2151,6 +2152,7 @@ class FeatureFactory:
             where disk space is the bottleneck and re-generation is acceptable.
         """
         start = start_time if start_time is not None else time.time()
+        self.last_stationarity_decisions = None  # FFSTAT：每次 IC-first 重新累計
         resolved_config_hash = config_hash or self._current_config_hash or self._compute_config_hash(
             config,
             symbol,
@@ -2329,6 +2331,7 @@ class FeatureFactory:
             processed_feature_count,
             float(ic_memory.peak_rss_gb),
         )
+        metadata.update(self._stationarity_metadata())  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         return FeatureGenerationResult(
             features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
@@ -2678,6 +2681,7 @@ class FeatureFactory:
                 )
             finally:
                 self._cgsa_registry.finalize()
+            self._capture_stationarity_decisions(preprocessor)
             # CGSA streaming path: L6.5 outputs live in CGSA registry, not in this
             # frame. L7 dead-feature drop on registry-side data is out of scope for
             # this step (see NAN_REDUCTION_STRATEGY.md §5.3 / PLAN §2.7).
@@ -2688,6 +2692,7 @@ class FeatureFactory:
         # See NAN_REDUCTION_STRATEGY.md §5.3 — drops ONLY constant/insufficient-
         # sample columns, NEVER drops by NaN ratio.
         result_frame = preprocessor.transform(all_features)
+        self._capture_stationarity_decisions(preprocessor)
         return self._apply_l7_dead_feature_drop(result_frame, config)
 
     def _apply_cascade_blacklist(
@@ -3331,6 +3336,8 @@ class FeatureFactory:
                     "source_registry_manifest": str(self._cgsa_registry.manifest_path),
                 },
             )
+            if preprocessor is not None:
+                self._capture_stationarity_decisions(preprocessor)
             stream_summary["raw_path"] = str(raw_path)
 
         self._cgsa_registry.save_state(
@@ -3401,6 +3408,7 @@ class FeatureFactory:
         self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
         self._apply_warmup_metadata(metadata, config, ingest_raw)
 
+        metadata.update(self._stationarity_metadata())  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         result = FeatureGenerationResult(
             features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
@@ -3563,6 +3571,7 @@ class FeatureFactory:
         self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
         self._apply_warmup_metadata(metadata, config, raw_data)
 
+        metadata.update(self._stationarity_metadata())  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         result = FeatureGenerationResult(
             features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
@@ -3688,6 +3697,7 @@ class FeatureFactory:
         ingest_raw = self._current_raw_data if self._current_raw_data is not None else raw_data
         self._apply_warmup_metadata(metadata, config, ingest_raw)
 
+        metadata.update(self._stationarity_metadata())  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         result = FeatureGenerationResult(
             features_df=features_df,
             labels_df=labels_df,
@@ -3874,6 +3884,51 @@ class FeatureFactory:
             return None
         logger.info("Cache hit for %s/%s [hash=%s]", symbol, timeframe, config_hash[:8])
         return cached
+
+    def _capture_stationarity_decisions(self, preprocessor: FeaturePreprocessor) -> None:
+        """FFSTAT：把 L6.5 前處理器之逐欄決策（鍵＝原生週期＋L6.5 所見欄名）轉為落盤欄名為鍵，
+        存於 `last_stationarity_decisions`（同一 run 多次 L6.5 者合併）。平穩化關閉時不記。"""
+        raw = preprocessor.stationarity_decisions()
+        if not raw:
+            return
+        from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+        tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
+        merged: Dict[str, Dict[str, Any]] = dict(getattr(self, "last_stationarity_decisions", None) or {})
+        for (timeframe, column), record in raw.items():
+            name = self._timeframe_tagged_name(column, timeframe, tf_keys) if timeframe else column
+            merged[name] = record
+        self.last_stationarity_decisions = merged
+
+    def _stationarity_metadata(self) -> Dict[str, Any]:
+        """FFSTAT：結果 metadata 之 `stationarity_decisions`／`stationarity_summary`（無決策 ⇒ 空，metadata 不變）。"""
+        decisions = getattr(self, "last_stationarity_decisions", None)
+        if not decisions:
+            return {}
+        events = [event for record in decisions.values() for event in record.get("events", [])]
+        summary = {
+            "tested": len(decisions),
+            "fracdiff": sum(1 for record in decisions.values() if record.get("fracdiff")),
+            "adf_diff_1": sum(1 for record in decisions.values() if int(record.get("adf_differenced") or 0) == 1),
+            "adf_diff_2": sum(1 for record in decisions.values() if int(record.get("adf_differenced") or 0) == 2),
+            "search_failed": events.count("fracdiff_search_failed"),
+            "cache_read_failed": events.count("dstar_cache_read_failed"),
+            "cache_write_failed": events.count("dstar_cache_write_failed"),
+        }
+        return {
+            "stationarity_decisions": {name: dict(record) for name, record in decisions.items()},
+            "stationarity_summary": summary,
+        }
+
+    @staticmethod
+    def _timeframe_tagged_name(column: str, timeframe: str, tf_keys: set) -> str:
+        """單欄名加週期標記（與 `_apply_timeframe_tag` 同規則：第二段已為任一週期則不動）。"""
+        if column.startswith("label_"):
+            return column
+        parts = column.split("_")
+        if len(parts) < 2 or parts[1] in tf_keys:
+            return column
+        return "_".join([parts[0], timeframe] + parts[1:])
 
     @staticmethod
     def _apply_timeframe_tag(features_df: pd.DataFrame, timeframe: str) -> pd.DataFrame:

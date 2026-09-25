@@ -279,7 +279,7 @@ def test_batch2d_filter_parity_map_matches_registry_layer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("FFACT_FRACDIFF_APPLY_TO_LAYERS", "L1,L2")
-    columns = ["close", "volume", "rolling", "unknown"]
+    columns = ["close", "volume", "rolling"]
     column_layer_map = {"close": "L1", "volume": "L2", "rolling": "L3"}
     mapped = FeaturePreprocessor({}, column_layer_map=column_layer_map)
     l1_registry = FeaturePreprocessor({})
@@ -293,7 +293,9 @@ def test_batch2d_filter_parity_map_matches_registry_layer(
 
     assert mapped_columns == expected
     assert "rolling" not in mapped_columns
-    assert "unknown" not in mapped_columns
+    # FFSTAT Task 1.1（改寫：原斷言「對照缺欄 unknown 當非目標」）：對照缺欄 ⇒ fail-closed，不當非目標
+    with pytest.raises(ValueError, match="缺 1/4"):
+        mapped._filter_fracdiff_target_columns(columns + ["unknown"])
 
 
 def test_batch2d_filter_parity_all_precedes_map(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -305,14 +307,15 @@ def test_batch2d_filter_parity_all_precedes_map(monkeypatch: pytest.MonkeyPatch)
     ]
 
 
-def test_batch2d_filter_parity_regex_fallback_without_map(
+def test_batch2d_filter_without_map_fails_closed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """FFSTAT Task 1.1（取代已退役之 `test_batch2d_filter_parity_regex_fallback_without_map`：該測試驗無對照時
+    以欄名 `L<k>_` 解析層之退路，此退路依 SPEC §C「目標層」刪除）：無對照、無群組 layer ⇒ fail-closed。"""
     monkeypatch.setenv("FFACT_FRACDIFF_APPLY_TO_LAYERS", "L1,L2")
     preprocessor = FeaturePreprocessor({})
-    assert preprocessor._filter_fracdiff_target_columns(
-        ["L1_price", "L2_volume", "L3_rolling", "bare"]
-    ) == ["L1_price", "L2_volume"]
+    with pytest.raises(ValueError, match="無層來源"):
+        preprocessor._filter_fracdiff_target_columns(["L1_price", "L2_volume", "L3_rolling", "bare"])
 
 
 def test_batch2d_read_d_star_json_exports_values(tmp_path: Path) -> None:

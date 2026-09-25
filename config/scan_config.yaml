@@ -502,14 +502,6 @@ preprocessing:
     epsilon: 1.0e-8
     apply_to: all
 
-  # ADF / Fracdiff safe-skip whitelist
-  # 對數學上嚴格 I(0) 欄位（嚴格有界 / 數學差分 / 共整合差）bypass ADF
-  # 詳見 docs/NAN_REDUCTION_STRATEGY.md §4.5
-  adf_safe_skip:
-    enabled: true
-    additional_patterns: []  # 額外擴增 skip pattern（substring match）
-    exclusion_patterns: []   # 強制讓 whitelist 命中項回到 ADF（debug 用）
-
 operators:
   distance:
     enabled: true

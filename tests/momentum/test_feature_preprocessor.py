@@ -195,7 +195,9 @@ def test_fracdiff_convergence_failure(monkeypatch: pytest.MonkeyPatch) -> None:
                 "cache_d_star": False,
             },
             "mode": "append",
-        }
+        },
+        # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+        column_layer_map={"L1_f2": "L1"},
     )
 
     def _raise(*_args, **_kwargs):
@@ -231,7 +233,9 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
                 "max_diff": 2,
             },
             "mode": "append",
-        }
+        },
+        # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+        column_layer_map={"L1_f2": "L1"},
     )
 
     monkeypatch.setattr(pre, "_find_min_d", lambda *_args, **_kwargs: 0.5)

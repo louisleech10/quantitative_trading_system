@@ -61,7 +61,9 @@ def test_high_nan_no_adf_for_non_stationary_selection(monkeypatch: pytest.Monkey
                 "precision": 0.02,
             },
             "mode": "append",
-        }
+        },
+        # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+        column_layer_map={"L1_high_nan": "L1"},
     )
 
     output = preprocessor.transform(frame)

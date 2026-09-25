@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional, Literal, Union
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator, model_serializer
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_serializer, model_validator
 
 
 class GlobalSettings(BaseModel):
@@ -171,6 +171,19 @@ class WinsorConfig(BaseModel):
     apply_to: Union[str, List[str]] = "all"
 
 
+# FFSTAT Task 3.2：平穩化步驟之 apply_to 封閉集合（regex、欄名清單、layer1_only 一律拒收）
+STATIONARITY_APPLY_TO_ALLOWED = ("non_stationary", "all")
+
+
+def _check_stationarity_apply_to(value: Any, step: str) -> str:
+    if not isinstance(value, str) or value not in STATIONARITY_APPLY_TO_ALLOWED:
+        raise ValueError(
+            f"preprocessing.{step}.apply_to 只收 {' 或 '.join(STATIONARITY_APPLY_TO_ALLOWED)}，"
+            f"收到 {value!r}（regex、欄名清單與 layer1_only 已移除）"
+        )
+    return value
+
+
 class ADFDifferencingConfig(BaseModel):
     enabled: bool = False
     # 0.10 為業界常用顯著水準；金融序列難以通過嚴格的 0.05（如長週期 EMA）
@@ -178,6 +191,11 @@ class ADFDifferencingConfig(BaseModel):
     max_diff: int = 2
     sample_size: int = 500
     apply_to: str = "non_stationary"
+
+    @field_validator("apply_to", mode="before")
+    @classmethod
+    def _closed_apply_to(cls, value: Any) -> str:
+        return _check_stationarity_apply_to(value, "adf_differencing")
 
 
 class FractionalDifferencingConfig(BaseModel):
@@ -192,23 +210,10 @@ class FractionalDifferencingConfig(BaseModel):
     apply_to: str = "non_stationary"
     cache_d_star: bool = True
 
-
-class ADFSafeSkipConfig(BaseModel):
-    """ADF / Fracdiff safe-skip whitelist。
-
-    對數學上嚴格 I(0) 的欄位（嚴格有界 / 數學差分 / 共整合差），bypass ADF 測試直接
-    判定為 I(0) → 不執行 fracdiff。詳見 NAN_REDUCTION_STRATEGY.md §4.5。
-
-    為何需要：
-      (1) 省 ADF CPU（對數十萬個已知 I(0) 欄位重複跑 ADF 是純浪費）
-      (2) 跨 symbol 一致性：ADF 在 finite sample 偶會 false-positive，導致同名特徵
-          在不同 symbol 被處理到不同空間（fracdiff vs raw），破壞 IC 可比性
-    """
-    enabled: bool = True
-    # 額外擴增的 skip pattern（substring match against column name）
-    additional_patterns: List[str] = Field(default_factory=list)
-    # 強制讓某個 whitelist 命中項回到 ADF 測試（debug / 實驗用）
-    exclusion_patterns: List[str] = Field(default_factory=list)
+    @field_validator("apply_to", mode="before")
+    @classmethod
+    def _closed_apply_to(cls, value: Any) -> str:
+        return _check_stationarity_apply_to(value, "fractional_differencing")
 
 
 class RankTransformConfig(BaseModel):
@@ -244,7 +249,14 @@ class PreprocessingConfig(BaseModel):
     rank_transform: RankTransformConfig = Field(default_factory=RankTransformConfig)
     gaussian_normalize: GaussianNormalizeConfig = Field(default_factory=GaussianNormalizeConfig)
     adaptive_zscore: AdaptiveZScoreConfig = Field(default_factory=AdaptiveZScoreConfig)
-    adf_safe_skip: ADFSafeSkipConfig = Field(default_factory=ADFSafeSkipConfig)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_sections(cls, data: Any) -> Any:
+        # FFSTAT Task 1.2：名字免檢清單已移除——開啟平穩化時逐欄檢定，名稱不得參與判定
+        if isinstance(data, dict) and "adf_safe_skip" in data:
+            raise ValueError("preprocessing.adf_safe_skip 已移除（FF-STAT：平穩化改為逐欄檢定，不設名稱免檢清單）")
+        return data
 
 
 class AtomicIndicatorConfig(BaseModel):

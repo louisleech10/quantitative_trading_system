@@ -138,6 +138,8 @@ def test_find_min_d_short_clean_series_returns_one() -> None:
 
 def test_short_dataframe_fracdiff_keeps_row_count(monkeypatch: pytest.MonkeyPatch) -> None:
     preprocessor = _preprocessor(calibration_bars=500, cache_d_star=False)
+    # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+    preprocessor._column_layer_map = {"L1_close": "L1"}
     frame = pd.DataFrame({"L1_close": np.linspace(1.0, 2.0, 300, dtype=np.float64)})
     resolved: list[int] = []
 

@@ -4,6 +4,7 @@ import copy
 import gc
 import os
 import re
+import threading
 import time
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -39,7 +40,6 @@ from momentum.FeatureEngineering.preprocessing._numba_transforms import (
     _rolling_rank_numba,
     rolling_quantile_2d,
 )
-from momentum.FeatureEngineering.utils.adf_safe_skip import filter_safe_skip
 from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
 from momentum.FeatureEngineering.utils.winsor_params import resolve_winsor_min_periods
 from momentum.FeatureEngineering.operators.derived_operators import (
@@ -63,7 +63,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 _PROC = psutil.Process()  # Cached for low-overhead RSS sampling
-_FRACDIFF_LAYER_RE = re.compile(r"^(L\d+)_")
 _WARNED_CAUSAL_OVERRIDE = False
 
 
@@ -78,15 +77,6 @@ def _is_ratio_unsafe_column(col: str) -> bool:
     parts = str(col).split("_", 2)
     return len(parts) >= 2 and parts[1] in RATIO_UNSAFE_CATEGORIES
 
-
-def _is_fracdiff_target_layer(column: str, allowed_layers: FrozenSet[str]) -> bool:
-    if "ALL" in allowed_layers:
-        return True
-
-    match = _FRACDIFF_LAYER_RE.match(str(column))
-    if not match:
-        return False
-    return match.group(1) in allowed_layers
 
 try:
     from scipy.special import ndtri
@@ -133,7 +123,6 @@ class FeaturePreprocessor:
         self.zscore_config = self._config.get("adaptive_zscore", {})
         self.winsor_config = self._config.get("winsorization", {})
         self.fracdiff_config = self._config.get("fractional_differencing", {})
-        self.adf_safe_skip_config = self._config.get("adf_safe_skip", {}) or {}
         # 預設 replace：確保跨標的欄位名稱一致
         self.mode = self._config.get("mode", "replace")
         # ⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會
@@ -154,6 +143,70 @@ class FeaturePreprocessor:
         self._d_star_cache: Optional[DStarCache] = None
         self._d_star_cache_shared = False
         self._numba_warmed_up = False
+        # FFSTAT：逐欄平穩化決策紀錄，鍵＝(原生週期, L6.5 所見欄名)；CGSA 以執行緒池逐群組轉換，故加鎖，
+        # 當次群組之週期／層／輸入欄集合放執行緒區域（見 `_transform_single`）
+        self._decisions: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        self._decisions_lock = threading.Lock()
+        self._decision_tls = threading.local()
+        self._adf_pvalue_by_cache_key: Dict[Any, Optional[float]] = {}
+
+    # ---------------------------------------------------------------- FFSTAT 逐欄決策紀錄
+
+    def _stationarity_enabled(self) -> bool:
+        return bool(self.fracdiff_config.get("enabled", False)) or bool(self.adf_config.get("enabled", False))
+
+    def _decision_scope(self) -> Tuple[str, Optional[str], Optional[FrozenSet[str]]]:
+        """當次轉換之 (週期, 群組層, 輸入欄集合)；無群組脈絡時週期取前處理脈絡之週期。"""
+        tls = self._decision_tls
+        timeframe = getattr(tls, "timeframe", None) or self._preprocessing_context.timeframe or ""
+        return str(timeframe), getattr(tls, "layer", None), getattr(tls, "input_columns", None)
+
+    def _record_decision(self, column: str, **fields: Any) -> None:
+        """更新一欄之決策紀錄（只記本次轉換之輸入欄；append 模式新產生之衍生欄不記）。
+        `adf_pvalue` 等「首次檢定」欄只在尚未記錄時寫入（該欄以校準值首次檢定之結果）。"""
+        if not self._stationarity_enabled():
+            return
+        timeframe, group_layer, input_columns = self._decision_scope()
+        if input_columns is not None and column not in input_columns:
+            return
+        layer = group_layer
+        if not layer and self._column_layer_map is not None:
+            layer = self._column_layer_map.get(column)
+        first_only = {"adf_pvalue", "n", "calibration_start", "calibration_end"}
+        with self._decisions_lock:
+            record = self._decisions.setdefault((timeframe, column), {
+                "timeframe": timeframe, "layer": layer, "calibration_start": None, "calibration_end": None,
+                "n": None, "adf_pvalue": None, "fracdiff": False, "d": None, "adf_differenced": 0,
+                "dstar_cache_hit": None, "events": [],
+            })
+            for key, value in fields.items():
+                if key == "events":
+                    record["events"] = sorted(set(record["events"]) | set(value))
+                elif key in first_only and record[key] is not None:
+                    continue
+                else:
+                    record[key] = value
+
+    def _record_adf_test(self, column: str, sample: pd.Series, pvalue: Optional[float]) -> None:
+        index = sample.index
+        is_time = isinstance(index, pd.DatetimeIndex) and len(index) > 0
+        self._record_decision(
+            column,
+            adf_pvalue=None if pvalue is None else float(pvalue),
+            n=int(len(sample)),
+            calibration_start=index[0].isoformat() if is_time else None,
+            calibration_end=index[-1].isoformat() if is_time else None,
+        )
+
+    def stationarity_decisions(self) -> Dict[Tuple[str, str], Dict[str, Any]]:
+        """本實例（含併入之 native-tf 子實例）累計之逐欄決策：{(原生週期, L6.5 所見欄名): 紀錄}。"""
+        with self._decisions_lock:
+            return {key: dict(value, events=list(value["events"])) for key, value in self._decisions.items()}
+
+    def _merge_decisions_from(self, other: "FeaturePreprocessor") -> None:
+        for key, value in other.stationarity_decisions().items():
+            with self._decisions_lock:
+                self._decisions[key] = value
 
     def _rolling_window(self) -> int:
         window = int(self.winsor_config.get("window", self.rank_config.get("window", 252)))
@@ -818,6 +871,7 @@ class FeaturePreprocessor:
             processed_df = native_pp._transform_single(
                 native_df,
                 source_layer=self._group_layer_name(group),
+                source_timeframe=self._group_timeframe(group),
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
@@ -886,6 +940,7 @@ class FeaturePreprocessor:
             primary_n_rows,
             len(outputs),
         )
+        self._merge_decisions_from(native_pp)  # FFSTAT：native-tf 子實例之決策併回
         return len(outputs)
 
     def _maybe_run_native_l65_inplace(
@@ -984,6 +1039,7 @@ class FeaturePreprocessor:
             processed_df = native_pp._transform_single(
                 native_df,
                 source_layer=self._group_layer_name(group),
+                source_timeframe=self._group_timeframe(group),
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning(
@@ -1064,6 +1120,7 @@ class FeaturePreprocessor:
             source_n_rows,
             primary_n_rows,
         )
+        self._merge_decisions_from(native_pp)  # FFSTAT：native-tf 子實例之決策併回
         return True
 
     def _warmup_numba_if_needed(self) -> None:
@@ -1665,6 +1722,7 @@ class FeaturePreprocessor:
                 processed_df = self._transform_single(
                     chunk_df,
                     source_layer=self._group_layer_name(group),
+                    source_timeframe=self._group_timeframe(group),
                 )
 
                 orig_chunks.append(
@@ -1825,6 +1883,7 @@ class FeaturePreprocessor:
         processed_df = self._transform_single(
             group_df,
             source_layer=self._group_layer_name(group),
+            source_timeframe=self._group_timeframe(group),
         )
 
         if is_append and len(processed_df.columns) > getattr(group, "n_cols"):
@@ -1908,6 +1967,7 @@ class FeaturePreprocessor:
         processed_df = self._transform_single(
             group_df,
             source_layer=self._group_layer_name(group),
+            source_timeframe=self._group_timeframe(group),
         )
 
         if is_append and len(processed_df.columns) > len(columns):
@@ -1964,6 +2024,7 @@ class FeaturePreprocessor:
                 processed_df = self._transform_single(
                     chunk_df,
                     source_layer=self._group_layer_name(group),
+                    source_timeframe=self._group_timeframe(group),
                 )
                 orig_chunks.append(processed_df[chunk_cols].to_numpy(dtype=np.float32, copy=False))
                 if is_append:
@@ -2146,6 +2207,7 @@ class FeaturePreprocessor:
                 processed_df = self._transform_single(
                     chunk_df,
                     source_layer=self._group_layer_name(group),
+                    source_timeframe=self._group_timeframe(group),
                 )
 
                 chunk_outputs: List[Tuple[str, List[str], np.ndarray]] = []
@@ -2228,6 +2290,12 @@ class FeaturePreprocessor:
         if value is None:
             return None
         return str(value)
+
+    @staticmethod
+    def _group_timeframe(group: object) -> Optional[str]:
+        """群組之原生週期（registry 群組之 `timeframe` 欄；無則 None）。"""
+        value = getattr(group, "timeframe", None)
+        return str(value) if value else None
 
     def _can_use_optimized_dataframe_path(self) -> bool:
         if get_l65_optimization_profile() != "optimized":
@@ -2466,13 +2534,23 @@ class FeaturePreprocessor:
         self,
         features_df: pd.DataFrame,
         source_layer: Optional[str] = None,
+        source_timeframe: Optional[str] = None,
     ) -> pd.DataFrame:
         """Original transform logic applied to a full DataFrame."""
         self._fracdiff_processed_columns = set()
         if self._can_use_optimized_dataframe_path():
             return self._transform_single_optimized_df(features_df)
 
-        return self._transform_single_legacy(features_df, source_layer=source_layer)
+        # FFSTAT：決策紀錄之當次脈絡（群組之原生週期與層、本次輸入欄集合）
+        tls = self._decision_tls
+        saved = (getattr(tls, "timeframe", None), getattr(tls, "layer", None), getattr(tls, "input_columns", None))
+        tls.timeframe = source_timeframe or saved[0]
+        tls.layer = source_layer if source_layer else saved[1]
+        tls.input_columns = frozenset(str(c) for c in features_df.columns)
+        try:
+            return self._transform_single_legacy(features_df, source_layer=source_layer)
+        finally:
+            tls.timeframe, tls.layer, tls.input_columns = saved
 
     def _transform_single_legacy(
         self,
@@ -2851,91 +2929,37 @@ class FeaturePreprocessor:
         columns: List[str],
         source_layer: Optional[str] = None,
     ) -> List[str]:
+        """fracdiff 目標欄：只由結構化層來源判定（FFSTAT Task 1.1）——CGSA 群組之 `layer`、
+        frame 路徑之 `_column_layer_map`；層來源缺漏 ⇒ fail-closed（ValueError），不由欄名解析層。"""
         if "ALL" in self._fracdiff_apply_to_layers:
-            return self._apply_adf_safe_skip(list(columns), context="fracdiff")
+            return list(columns)
 
-        if source_layer:
+        if source_layer is not None:
+            if not str(source_layer).strip():
+                raise ValueError(
+                    f"[L6.5] FracDiff 目標層判定失敗：群組 layer 為空（{len(columns)} 欄，"
+                    f"示例 {[str(c) for c in list(columns)[:5]]}）；不得由欄名解析層"
+                )
             if source_layer in self._fracdiff_apply_to_layers:
-                return self._apply_adf_safe_skip(list(columns), context=f"fracdiff/{source_layer}")
-            logger.info(
-                "[L6.5] FracDiff skipped by registry layer: layer=%s allowed=%s columns=%d",
-                source_layer,
-                sorted(self._fracdiff_apply_to_layers),
-                len(columns),
-            )
+                return list(columns)
             return []
 
-        if self._column_layer_map is not None:
-            target_columns = [
-                column
-                for column in columns
-                if column in self._column_layer_map
-                and self._column_layer_map[column] in self._fracdiff_apply_to_layers
-            ]
-            unknown_columns = [column for column in columns if column not in self._column_layer_map]
-            if unknown_columns:
-                logger.warning(
-                    "[L6.5] FracDiff layer map missing %d/%d columns; "
-                    "treating unknown columns as non-target. examples=%s",
-                    len(unknown_columns),
-                    len(columns),
-                    [str(column) for column in unknown_columns[:5]],
-                )
-            return self._apply_adf_safe_skip(target_columns, context="fracdiff/layer_map")
-
-        target_columns: List[str] = []
-        parse_failed = 0
-        parse_failed_examples: List[str] = []
-        for column in columns:
-            column_text = str(column)
-            match = _FRACDIFF_LAYER_RE.match(column_text)
-            if match is None:
-                parse_failed += 1
-                if len(parse_failed_examples) < 5:
-                    parse_failed_examples.append(column_text)
-                continue
-            if match.group(1) in self._fracdiff_apply_to_layers:
-                target_columns.append(column)
-
-        if parse_failed:
-            logger.warning(
-                "[L6.5] Layer parse failed for FracDiff filter: unparsed_columns=%d/%d "
-                "allowed=%s examples=%s; treating unparsed columns as non-target",
-                parse_failed,
-                len(columns),
-                sorted(self._fracdiff_apply_to_layers),
-                parse_failed_examples,
+        if self._column_layer_map is None:
+            raise ValueError(
+                f"[L6.5] FracDiff 目標層判定失敗：無層來源（無群組 layer、無 column_layer_map；{len(columns)} 欄，"
+                f"示例 {[str(c) for c in list(columns)[:5]]}）；不得由欄名解析層"
             )
-
-        return self._apply_adf_safe_skip(target_columns, context="fracdiff")
-
-    def _apply_adf_safe_skip(self, columns: List[str], *, context: str) -> List[str]:
-        """對 columns 套用 ADF safe-skip whitelist。
-
-        對「數學上嚴格 I(0)」的欄位（嚴格有界 / 數學差分 / 共整合差）
-        bypass ADF 測試直接視為 I(0) → 不進入 fracdiff / adf_differencing。
-
-        詳見 docs/NAN_REDUCTION_STRATEGY.md §4.5。
-        """
-        if not columns:
-            return columns
-        cfg = self.adf_safe_skip_config
-        enabled = bool(cfg.get("enabled", True))
-        additional = tuple(cfg.get("additional_patterns") or ())
-        exclusions = tuple(cfg.get("exclusion_patterns") or ())
-        needs_adf, skipped = filter_safe_skip(
-            columns,
-            enabled=enabled,
-            additional_patterns=additional,
-            exclusion_patterns=exclusions,
-        )
-        if skipped:
-            pct = len(skipped) / max(len(columns), 1) * 100.0
-            logger.info(
-                "[ADF Safe-Skip][%s] bypassed %d/%d cols (%.1f%%); examples: %s",
-                context, len(skipped), len(columns), pct, skipped[:3],
+        unknown_columns = [column for column in columns if column not in self._column_layer_map]
+        if unknown_columns:
+            raise ValueError(
+                f"[L6.5] FracDiff 目標層判定失敗：column_layer_map 缺 {len(unknown_columns)}/{len(columns)} 欄，"
+                f"示例 {[str(c) for c in unknown_columns[:5]]}"
             )
-        return needs_adf
+        return [
+            column
+            for column in columns
+            if self._column_layer_map[column] in self._fracdiff_apply_to_layers
+        ]
 
     @staticmethod
     def _d_star_cache_dir() -> Path:
@@ -3032,6 +3056,7 @@ class FeaturePreprocessor:
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
             cache_arr = self._calibration_values(col_arr)
 
+            cached_d_star = None
             try:
                 cached_d_star = cache.get(column, cache_arr) if cache is not None else None
                 if cached_d_star is not None:
@@ -3058,6 +3083,8 @@ class FeaturePreprocessor:
             )
             self._assign_fracdiff_result(result, column, fracdiff_series, self.mode)
             self._fracdiff_processed_columns.add(column)
+            self._record_decision(str(column), fracdiff=True, d=float(d_star),
+                                  dstar_cache_hit=bool(cached_d_star is not None))
 
         return result
 
@@ -3130,6 +3157,8 @@ class FeaturePreprocessor:
             for target_column in duplicate_columns:
                 self._assign_fracdiff_result(result, target_column, fracdiff_series, self.mode)
                 self._fracdiff_processed_columns.add(target_column)
+                self._record_decision(str(target_column), fracdiff=True, d=d_star,
+                                      dstar_cache_hit=bool(output.get("cache_hit", False)))
 
                 if cache is not None and (
                     not bool(output.get("cache_hit", False)) or target_column != column
@@ -3311,8 +3340,6 @@ class FeaturePreprocessor:
         candidate_columns = [
             column for column in columns if column not in self._fracdiff_processed_columns
         ]
-        # ADF safe-skip：對數學嚴格 I(0) 欄位 bypass ADF（詳見 utils/adf_safe_skip.py）
-        candidate_columns = self._apply_adf_safe_skip(candidate_columns, context="adf_diff")
         if not candidate_columns:
             return result
 
@@ -3323,6 +3350,8 @@ class FeaturePreprocessor:
         skipped_high_nan: List[str] = [
             column for column in candidate_columns if column not in eligible_columns
         ]
+        for column in skipped_high_nan:
+            self._record_decision(str(column))  # 進入 ADF 差分步驟但校準窗有效值過少：無 p 值
 
         for column in eligible_columns:
             series = result[column].astype(float)
@@ -3337,6 +3366,8 @@ class FeaturePreprocessor:
                     break
                 sample = clean.head(sample_size)
                 pvalue = self._adf_pvalue_for_values(sample.to_numpy(dtype=np.float64), sample_size=sample_size)
+                if diff_order == 0:
+                    self._record_adf_test(str(column), sample, pvalue)
 
                 if pvalue <= threshold:
                     chosen_diff = diff_order
@@ -3346,6 +3377,7 @@ class FeaturePreprocessor:
                     decision_working = decision_working.diff()
                     full_working = full_working.diff()
 
+            self._record_decision(str(column), adf_differenced=int(chosen_diff))
             if chosen_diff == 0:
                 continue
 
@@ -3561,10 +3593,6 @@ class FeaturePreprocessor:
         if apply_to == "all":
             return numeric_columns
 
-        if apply_to == "layer1_only":
-            prefixes = ("close_", "open_", "high_", "low_", "volume_", "quote_volume_", "taker_", "ms_", "ent_", "tr_")
-            return [col for col in numeric_columns if col.startswith(prefixes)]
-
         if apply_to == "non_stationary":
             return self._get_non_stationary_columns(df[numeric_columns])
 
@@ -3599,25 +3627,33 @@ class FeaturePreprocessor:
             )
             cached = self._non_stationary_cache.get(cache_key)
             if cached is not None:
+                self._record_decision(str(column), adf_pvalue=self._adf_pvalue_by_cache_key.get(cache_key))
                 if cached:
                     non_stationary.append(column)
                 continue
 
             if float(decision_series.isna().mean()) > 0.5:
                 self._non_stationary_cache.set(cache_key, False)
+                self._adf_pvalue_by_cache_key[cache_key] = None
+                self._record_decision(str(column))
                 continue
 
             series = decision_series.dropna()
             if len(series) < 20:
                 is_non_stationary = True
                 self._non_stationary_cache.set(cache_key, is_non_stationary)
+                self._adf_pvalue_by_cache_key[cache_key] = None
+                self._record_decision(str(column))
                 non_stationary.append(column)
                 continue
 
+            sample = series.head(sample_size)
             pvalue = self._adf_pvalue_for_values(
-                series.head(sample_size).to_numpy(dtype=np.float64),
+                sample.to_numpy(dtype=np.float64),
                 sample_size=sample_size,
             )
+            self._adf_pvalue_by_cache_key[cache_key] = float(pvalue)
+            self._record_adf_test(str(column), sample, pvalue)
 
             is_non_stationary = bool(pvalue > threshold)
             self._non_stationary_cache.set(cache_key, is_non_stationary)

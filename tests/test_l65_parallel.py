@@ -188,27 +188,20 @@ def test_parallel_slow_path_chunks_only_large_groups(
     assert chunked_groups == ["group_2"]
 
 
-def test_fracdiff_layer_parse_warning_is_aggregated(
-    l65_config: dict,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """測試 FracDiff layer parse warning：不可 per-column 洗版。"""
+def test_fracdiff_without_layer_source_fails_closed(l65_config: dict) -> None:
+    """FFSTAT Task 1.1（取代已退役之 `test_fracdiff_layer_parse_warning_is_aggregated`：該測試驗欄名解析層之
+    退路〔`L1_valid_feature` 由欄名判為 L1〕，此退路依 SPEC §C「目標層」刪除）：無群組 layer、無
+    column_layer_map ⇒ fail-closed，訊息含欄數與示例，不得由欄名判層。"""
     config = dict(l65_config)
     config["fractional_differencing"] = {"enabled": True}
     preprocessor = FeaturePreprocessor(config)
     preprocessor._fracdiff_apply_to_layers = frozenset({"L1"})
 
-    with caplog.at_level("WARNING"):
-        selected = preprocessor._filter_fracdiff_target_columns(
+    with pytest.raises(ValueError) as err:
+        preprocessor._filter_fracdiff_target_columns(
             ["close_1h_trend_EMA_5", "volume_1h_volume_OBV", "L1_valid_feature"]
         )
-
-    warning_messages = [record.getMessage() for record in caplog.records]
-    parse_warnings = [message for message in warning_messages if "Layer parse failed" in message]
-
-    assert selected == ["L1_valid_feature"]
-    assert len(parse_warnings) == 1
-    assert "unparsed_columns=2/3" in parse_warnings[0]
+    assert "3 欄" in str(err.value) and "L1_valid_feature" in str(err.value)
 
 
 def test_fracdiff_registry_layer_filter_uses_group_metadata(l65_config: dict) -> None:
@@ -272,7 +265,7 @@ def test_fracdiff_non_target_registry_group_stays_on_fast_path(
     # Patch it to False so the test exercises the intended slow-path → _transform_single routing.
     monkeypatch.setattr(preprocessor, "_can_use_optimized_dataframe_path", lambda: False)
 
-    def fake_slow(frame: pd.DataFrame, source_layer=None) -> pd.DataFrame:
+    def fake_slow(frame: pd.DataFrame, source_layer=None, source_timeframe=None) -> pd.DataFrame:
         slow_layers.append(str(source_layer))
         return frame
 

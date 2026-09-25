@@ -41,7 +41,8 @@ def test_boundary_03_formerly_name_exempt_columns_are_tested(stat_run: Dict[str,
     exempt = [c for c, d in baseline["decisions"].items() if d["name_exempt"]]
     assert exempt and any("Cross" in c or "Ratio" in c for c in exempt)
     dec = stat_run["decisions"]
-    assert all(isinstance(dec[c]["adf_pvalue"], float) for c in exempt)
+    # 缺決策紀錄與缺 p 值同判失敗（用 get：缺欄須成為斷言失敗而非 KeyError，mutant ① 之測試方能接住）
+    assert all(isinstance(dec.get(c, {}).get("adf_pvalue"), float) for c in exempt)
 
 
 def test_boundary_04_adf_apply_to_all_tests_each_column(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

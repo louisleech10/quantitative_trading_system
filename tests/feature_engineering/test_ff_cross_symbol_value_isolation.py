@@ -86,7 +86,8 @@ def test_v5_2_shared_dstar_cache_is_reset_after_chunked_transform(
     }
     monkeypatch.setattr(FeaturePreprocessor, "_d_star_cache_dir", staticmethod(lambda: tmp_path / "dstar"))
     monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self: 1)
-    preprocessor = FeaturePreprocessor(config)
+    # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+    preprocessor = FeaturePreprocessor(config, column_layer_map={column: "L1" for column in frame.columns})
     preprocessor._preprocessing_context = dstar_context(BASELINE_SYMBOL)
     preprocessor._d_star_cache_shared = True
     preprocessor._apply_fractional_differencing(frame)

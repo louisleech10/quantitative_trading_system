@@ -23,6 +23,11 @@ def _frame() -> pd.DataFrame:
     )
 
 
+def _layer_map() -> dict:
+    """FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L<k>_` 前綴推層）；層值與舊欄名前綴同。"""
+    return {"L1_alpha": "L1", "L2_beta": "L2", "L3_gamma": "L3", "L4_delta": "L4", "raw_unknown": "L0"}
+
+
 def _config() -> dict:
     columns = ["L1_alpha", "L2_beta", "L3_gamma", "L4_delta", "raw_unknown"]
     return {
@@ -56,7 +61,7 @@ def test_layer_filter_optimized_profile_processes_only_l1_l2(monkeypatch: pytest
     monkeypatch.setattr(FeaturePreprocessor, "_find_min_d", _stub_find_min_d)
     monkeypatch.setattr(fp_mod, "HAS_STATSMODELS", True)
 
-    output = FeaturePreprocessor(_config()).transform(_frame())
+    output = FeaturePreprocessor(_config(), column_layer_map=_layer_map()).transform(_frame())
 
     assert "L1_alpha_fracdiff" in output.columns
     assert "L2_beta_fracdiff" in output.columns
@@ -71,24 +76,25 @@ def test_layer_filter_legacy_profile_restores_l1_to_l4(monkeypatch: pytest.Monke
     monkeypatch.setattr(FeaturePreprocessor, "_find_min_d", _stub_find_min_d)
     monkeypatch.setattr(fp_mod, "HAS_STATSMODELS", True)
 
-    output = FeaturePreprocessor(_config()).transform(_frame())
+    output = FeaturePreprocessor(_config(), column_layer_map=_layer_map()).transform(_frame())
 
     for column in ("L1_alpha", "L2_beta", "L3_gamma", "L4_delta"):
         assert f"{column}_fracdiff" in output.columns
     assert "raw_unknown_fracdiff" not in output.columns
 
 
-def test_unknown_layer_warning_and_skip(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+def test_unknown_layer_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FFSTAT Task 1.1（取代已退役之 `test_unknown_layer_warning_and_skip`：該測試驗欄名解析失敗時記警告並
+    當非目標，此退路依 SPEC §C「目標層」刪除）：層對照缺欄 ⇒ fail-closed，訊息含缺漏欄數與欄名。"""
     monkeypatch.delenv("FFACT_L65_OPTIMIZATION_PROFILE", raising=False)
     monkeypatch.delenv("FFACT_FRACDIFF_APPLY_TO_LAYERS", raising=False)
     monkeypatch.setattr(FeaturePreprocessor, "_find_min_d", _stub_find_min_d)
     monkeypatch.setattr(fp_mod, "HAS_STATSMODELS", True)
+    layer_map = {k: v for k, v in _layer_map().items() if k != "raw_unknown"}
 
-    FeaturePreprocessor(_config()).transform(_frame())
-
-    # Log message format updated to include summary counts and examples list.
-    assert "Layer parse failed" in caplog.text
-    assert "raw_unknown" in caplog.text
+    with pytest.raises(ValueError) as err:
+        FeaturePreprocessor(_config(), column_layer_map=layer_map).transform(_frame())
+    assert "缺 1/5" in str(err.value) and "raw_unknown" in str(err.value)
 
 
 def test_layer_filter_runs_non_stationary_adf_only_for_target_layers(
@@ -125,7 +131,8 @@ def test_layer_filter_runs_non_stationary_adf_only_for_target_layers(
                 "max_lag": 8,
             },
             "mode": "append",
-        }
+        },
+        column_layer_map={"L1_alpha": "L1", "L3_gamma": "L3"},
     )
 
     output = preprocessor.transform(frame)

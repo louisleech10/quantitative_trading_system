@@ -181,7 +181,9 @@ def test_joblib_pickle_fail_falls_back_to_serial(monkeypatch: pytest.MonkeyPatch
                 "max_lag": 8,
             },
             "mode": "append",
-        }
+        },
+        # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+        column_layer_map={"L1_alpha": "L1", "L1_beta": "L1"},
     )
 
     output = preprocessor.transform(frame)
