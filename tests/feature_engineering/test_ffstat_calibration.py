@@ -170,6 +170,85 @@ def test_boundary_10_effective_start_takes_latest_timeframe() -> None:
     assert int((idx_12h < eff).sum()) >= 700 and int((idx_1h < eff).sum()) >= 700
 
 
+def _with_values(pkt: CalibrationPacket, values: Dict[str, Any], last_ts: Dict[str, Any] = None) -> CalibrationPacket:
+    return CalibrationPacket(key=pkt.key, values=values,
+                             last_calibration_ts=pkt.last_calibration_ts if last_ts is None else last_ts,
+                             calibration_source_sha256=pkt.calibration_source_sha256)
+
+
+@pytest.mark.parametrize("where", ["values", "last_calibration_ts"])
+def test_verify_packet_rejects_extra_column(where: str) -> None:
+    """b3 審碼 r1 codex P1-02：封包多出欄集合以外之欄 ⇒ CalibrationError，指名該欄與欄位。"""
+    pkt = _packet()
+    values = dict(pkt.values)
+    last_ts = dict(pkt.last_calibration_ts)
+    target = values if where == "values" else last_ts
+    target["close_1h_extra"] = next(iter(target.values()))
+    with pytest.raises(CalibrationError) as err:
+        cal.verify_packet(_with_values(pkt, values, last_ts), _expected_key(), ["close_1h_x"])
+    assert err.value.column == "close_1h_extra" and err.value.field == where
+    assert "close_1h_extra" in str(err.value) and h.PRIMARY_TF in str(err.value)
+
+
+@pytest.mark.parametrize("bad", ["short", "long", "2d"])
+def test_verify_packet_rejects_wrong_length_values(bad: str) -> None:
+    """b3 審碼 r1 codex P1-02：校準值須為一維、長度恰為 N（短、長、二維各一）。"""
+    pkt = _packet()
+    v = pkt.values["close_1h_x"]
+    wrong = {"short": v[:-1], "long": np.concatenate([v, v[:1]]), "2d": v.reshape(-1, 1)}[bad]
+    with pytest.raises(CalibrationError) as err:
+        cal.verify_packet(_with_values(pkt, {"close_1h_x": wrong}), _expected_key(), ["close_1h_x"])
+    assert err.value.column == "close_1h_x" and err.value.field == "values"
+
+
+@pytest.mark.parametrize("bad", [np.nan, np.inf, -np.inf])
+def test_verify_packet_rejects_non_finite_values(bad: float) -> None:
+    """b3 審碼 r1 codex P1-02：校準值含 NaN／±inf ⇒ CalibrationError。"""
+    pkt = _packet()
+    v = np.asarray(pkt.values["close_1h_x"], dtype=np.float64).copy()
+    v[3] = bad
+    with pytest.raises(CalibrationError) as err:
+        cal.verify_packet(_with_values(pkt, {"close_1h_x": v}), _expected_key(), ["close_1h_x"])
+    assert err.value.column == "close_1h_x" and err.value.field == "values"
+
+
+def test_verify_packet_accepts_exact_packet() -> None:
+    """P1-02 之對照：欄集合、長度、有限值皆合 ⇒ 不拋（避免上列測試因一律拋錯而假綠）。"""
+    cal.verify_packet(_packet(), _expected_key(), ["close_1h_x"])
+
+
+def test_resolve_effective_output_start_rejects_mixed_timezone() -> None:
+    """b3 審碼 r1 codex P2-03：主週期與 K 線 index 時區狀態不一（有 tz／無 tz）⇒ CalibrationError(field=timezone)。"""
+    idx_1h = h.kline_frame(timeframe="1h").index
+    naive = idx_1h.tz_localize(None) if idx_1h.tz is not None else idx_1h
+    aware = naive.tz_localize("UTC")
+    for klines, primary in ((aware, naive), (naive, aware)):
+        with pytest.raises(CalibrationError) as err:
+            cal.resolve_effective_output_start({"1h": klines}, {"1h": 700}, primary)
+        assert err.value.field == "timezone"
+    assert cal.resolve_effective_output_start({"1h": naive}, {"1h": 700}, naive) == naive[700]
+
+
+def test_warmup_converts_each_native_n_to_primary_bars() -> None:
+    """b3 審碼 r1 codex P1-01：warmup 之 N 逐原生週期換成主週期根數＝ceil(N_tf × 週期秒 ÷ 主週期秒)。
+    主 1h、訓練 [1h,12h]、calibration_bars=20、12h 分設 2000 ⇒ 12h 前史 2000 根＝24000 根 1h。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.warmup_window import estimate_max_warmup_bars
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+
+    def warmup(by_tf: Dict[str, int]) -> int:
+        payload = h.stat_payload(["1h", "12h"])
+        payload["preprocessing"]["calibration_bars"] = 20
+        payload["preprocessing"]["calibration_bars_by_timeframe"] = by_tf
+        return estimate_max_warmup_bars(factory._resolve_config(payload), "1h", ["1h", "12h"])
+
+    base = warmup({})
+    assert base >= 20 * 12  # 12h 之 N=20 ＝ 240 根 1h
+    assert warmup({"12h": 2000}) == max(base, 24000)
+    assert warmup({"1h": 2000}) == max(base, 2000)
+
+
 def test_seams_exist_for_injection() -> None:
     """注入介面存在（前置關卡須經之讀前史與計算校準域；Task 2.1 驗證之注入點）。"""
     assert callable(cal.load_calibration_klines) and callable(cal.compute_calibration_domain)

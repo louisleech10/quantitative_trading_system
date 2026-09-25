@@ -287,7 +287,6 @@ def _collect_l65_warmup_bars(
             base_windows.append(int(pp.rank_transform.window))
         if pp.adaptive_zscore.enabled:
             base_windows.extend(int(w) for w in pp.adaptive_zscore.windows)
-        base_windows.append(int(pp.calibration_bars))
         if pp.fractional_differencing.enabled:
             max_lag = int(pp.fractional_differencing.model_dump().get("max_lag", 0) or 0)
             if max_lag <= 0:
@@ -296,9 +295,15 @@ def _collect_l65_warmup_bars(
                 # fallback because it only extends preheat, not feature values.
                 max_lag = 252
             base_windows.append(max_lag)
-        # FFSTAT Task 2.2：ADF 樣本數即 N（calibration_bars，已列入上方）；依週期分設者取其最大
-        if pp.calibration_bars_by_timeframe:
-            base_windows.append(max(int(v) for v in pp.calibration_bars_by_timeframe.values()))
+    # FFSTAT Task 2.2（b3 審碼 r1 codex P1-01）：N 為各原生週期之「原生列數」，換成主週期根數＝
+    # ceil(N_tf × 週期秒數 ÷ 主週期秒數)，逐原生週期計（不先取全域最大、不用 primary→source 之縮放）
+    n_primary_bars = 0
+    if pp.enabled:
+        primary_sec = TIMEFRAME_SECONDS[primary_tf]
+        for tf in training_tfs:
+            n_tf = int(pp.calibration_bars_by_timeframe.get(tf, pp.calibration_bars))
+            tf_sec = TIMEFRAME_SECONDS[tf]
+            n_primary_bars = max(n_primary_bars, -(-n_tf * tf_sec // primary_sec))
 
     if not base_windows:
         return 0
@@ -311,7 +316,7 @@ def _collect_l65_warmup_bars(
         for window in base_windows:
             scaled = scale_window_for_native(int(window), tf, primary_tf)
             max_scaled = max(max_scaled, scaled)
-    return max_scaled
+    return max(max_scaled, int(n_primary_bars))
 
 
 def estimate_max_warmup_bars(

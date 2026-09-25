@@ -102,11 +102,34 @@ def verify_packet(packet: CalibrationPacket, expected: CalibrationKey, columns: 
                 timeframe=timeframe, field=field_name,
             )
     output_start = pd.Timestamp(expected.output_start)
+    want_columns = {str(c) for c in columns}
+    # b3 審碼 r1 codex P1-02：values／last_calibration_ts 之鍵集須恰為欄集合（缺、多皆拒），
+    # 每欄校準值須為一維、長度恰為 N、全為有限值
+    for field_name, mapping in (("values", packet.values), ("last_calibration_ts", packet.last_calibration_ts)):
+        got_columns = {str(k) for k in mapping}
+        missing = sorted(want_columns - got_columns)
+        extra = sorted(got_columns - want_columns)
+        if missing or extra:
+            name = (missing or extra)[0]
+            kind = "缺欄" if missing else "多欄"
+            raise CalibrationError(
+                f"校準封包{kind}：週期 {timeframe} 欄 {name}（欄位 {field_name}；缺 {missing}，多 {extra}）",
+                timeframe=timeframe, column=name, field=field_name,
+            )
+    n = int(expected.n)
     for column in columns:
         name = str(column)
-        if name not in packet.values or name not in packet.last_calibration_ts:
-            raise CalibrationError(f"校準封包缺欄：週期 {timeframe} 欄 {name}", timeframe=timeframe, column=name,
-                                   field="values")
+        values = np.asarray(packet.values[name])
+        if values.ndim != 1 or values.shape[0] != n:
+            raise CalibrationError(
+                f"校準值形狀不符：週期 {timeframe} 欄 {name} 形狀 {values.shape}，須為一維 {n} 筆",
+                timeframe=timeframe, column=name, field="values",
+            )
+        if not np.issubdtype(values.dtype, np.number) or not np.isfinite(values.astype(np.float64)).all():
+            raise CalibrationError(
+                f"校準值含非有限值或非數值：週期 {timeframe} 欄 {name}",
+                timeframe=timeframe, column=name, field="values",
+            )
         last_ts = pd.Timestamp(packet.last_calibration_ts[name])
         if not last_ts < output_start:
             raise CalibrationError(
@@ -151,6 +174,13 @@ def resolve_effective_output_start(
 ) -> pd.Timestamp:
     """未填起始日時之有效起始日（§C 未填起始日）：各原生週期取實際 K 線列以 0 起算之索引 `depth` 那一列之時間，
     取最晚者，再對齊為 `primary_index` 中第一個不早於它之時間戳；歷史不足 ⇒ 拋 `CalibrationError`。Task 2.3。"""
+    # b3 審碼 r1 codex P2-03：各 index 之時區狀態須一致（全有 tz 或全無），混用即拒收，不隱式轉換
+    tz_aware = {name: getattr(idx, "tz", None) is not None
+                for name, idx in [("primary", primary_index), *kline_indexes.items()]}
+    if len(set(tz_aware.values())) > 1:
+        raise CalibrationError(
+            f"時間索引時區狀態不一致（有 tz＝True）：{tz_aware}", field="timezone",
+        )
     candidates = []
     for timeframe, index in kline_indexes.items():
         depth = int(depth_by_tf[timeframe])
