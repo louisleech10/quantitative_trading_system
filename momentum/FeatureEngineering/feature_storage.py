@@ -640,8 +640,6 @@ def apply_quality_degradation(
     健康（無任何降級原因）時回傳與輸入相等之副本；原因順序固定：既有（週期→層）→ L6.5 → inf → nan。
     `extra_failure_reasons`：d* 三出口之欄級事件（docs/FFSTAT_SPEC.md §C、Task 3.1），非空時併入並降為 partial。
     """
-    if extra_failure_reasons:
-        raise NotImplementedError("FFSTAT Task 3.1")
     out = dict(meta)
     reasons: List[str] = []
     # 降級只往更嚴重方向：unknown／failed 等優先序高於 partial 者不得被改寫為 partial（r1 codex P1-03）
@@ -655,6 +653,8 @@ def apply_quality_degradation(
     if preprocessing_applied is False:
         out["preprocessing_applied"] = False
         reasons.append("L6.5:preprocessing_failed")
+    # FFSTAT Task 3.1：d* 三出口欄級事件（`<事件>:<欄數>`）併入並降級；位置在 L6.5 之後、inf／nan 之前
+    reasons.extend(str(reason) for reason in extra_failure_reasons)
     quality_reasons: List[str] = []
     if inf_ratio > max_inf_ratio:
         quality_reasons.append(f"inf_ratio={inf_ratio:.12g}>max_inf_ratio={max_inf_ratio:.12g}")
@@ -1380,6 +1380,12 @@ class FeatureStorage:
                     max_inf_ratio=float(quality_gate["max_inf_ratio"]),
                     max_nan_ratio=float(quality_gate["max_nan_ratio"]),
                     preprocessing_applied=quality_gate.get("preprocessing_applied"),
+                    # FFSTAT Task 3.1：呼叫端已知之 d* 事件＋本串流 L6.5 前處理器所記事件（manifest 合併前）
+                    extra_failure_reasons=tuple(quality_gate.get("extra_failure_reasons", ())) + tuple(
+                        preprocessor.stationarity_failure_reasons()
+                        if preprocessor is not None and hasattr(preprocessor, "stationarity_failure_reasons")
+                        else ()
+                    ),
                 )
             # manifest 只收既有鍵（completeness 六欄＋quality_status＋failure_reasons）；
             # quality_thresholds／run_status 等降級細節只經 summary 回給 factory（§C 不新增 manifest 鍵）

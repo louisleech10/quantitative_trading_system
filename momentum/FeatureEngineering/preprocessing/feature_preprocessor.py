@@ -10,7 +10,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import psutil
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -68,6 +68,11 @@ _WARNED_CAUSAL_OVERRIDE = False
 
 # FFSTAT：欄已進入平穩化步驟但校準窗有效值不足、未做 ADF 之事件碼（決策紀錄 events；摘要計 untested）
 EVENT_ADF_UNTESTED = "adf_untested_insufficient_data"
+# FFSTAT Task 3.1：d* 三出口之欄級事件（併入 failure_reasons 為 `<事件>:<欄數>` 並使品質降為 partial）
+EVENT_DSTAR_READ_FAILED = "dstar_cache_read_failed"
+EVENT_DSTAR_SEARCH_FAILED = "fracdiff_search_failed"
+EVENT_DSTAR_WRITE_FAILED = "dstar_cache_write_failed"
+DSTAR_FAILURE_EVENTS = (EVENT_DSTAR_SEARCH_FAILED, EVENT_DSTAR_READ_FAILED, EVENT_DSTAR_WRITE_FAILED)
 
 
 class StationarityProvenanceError(ValueError):
@@ -167,6 +172,8 @@ class FeaturePreprocessor:
         self._adf_pvalue_by_cache_key: Dict[Any, Optional[float]] = {}
         # 群組轉換失敗而被容忍之群組 id（CGSA registry；呼叫端據此判斷平穩化決策是否完整）
         self._failed_groups: List[str] = []
+        # 本次轉換中 d* 搜尋失敗之欄（保原值：不 fracdiff、同輪排除於 ADF 差分候選；Task 3.1）
+        self._dstar_failed_columns: set = set()
 
     # ---------------------------------------------------------------- FFSTAT 逐欄決策紀錄
 
@@ -196,7 +203,7 @@ class FeaturePreprocessor:
         with self._decisions_lock:
             record = self._decisions.setdefault((timeframe, column), {
                 "timeframe": timeframe, "layer": layer, "calibration_start": None, "calibration_end": None,
-                "n": None, "adf_pvalue": None, "fracdiff": False, "d": None, "adf_differenced": 0,
+                "n": None, "adf_pvalue": None, "fracdiff": False, "d": None, "adf_differenced": False,
                 "dstar_cache_hit": None, "events": [],
             })
             for key, value in fields.items():
@@ -233,6 +240,32 @@ class FeaturePreprocessor:
         """本實例（含併入之 native-tf 子實例）累計之逐欄決策：{(原生週期, L6.5 所見欄名): 紀錄}。"""
         with self._decisions_lock:
             return {key: dict(value, events=list(value["events"])) for key, value in self._decisions.items()}
+
+    def _mark_event_on_columns(self, columns: Iterable[str], event: str) -> None:
+        """對既有決策紀錄中欄名相符者附加事件（不新建紀錄；flush 等轉換外之時點用）。"""
+        names = {str(column) for column in columns}
+        with self._decisions_lock:
+            for (_, column), record in self._decisions.items():
+                if column in names:
+                    record["events"] = sorted(set(record["events"]) | {event})
+
+    def _flush_dstar_cache(self, cache: Optional[DStarCache]) -> None:
+        """flush d* 快取；失敗 ⇒ 本次待寫之欄記 `dstar_cache_write_failed`（值已照常套用，Task 3.1 出口③）。"""
+        if cache is None:
+            return
+        pending = cache.pending_columns()
+        if cache.flush_atomic() is False:
+            self._mark_event_on_columns(pending, EVENT_DSTAR_WRITE_FAILED)
+
+    def stationarity_failure_reasons(self) -> List[str]:
+        """d* 三出口事件彙總為 `<事件>:<受影響欄數>`（固定順序；無事件之類不列）。"""
+        decisions = self.stationarity_decisions()
+        reasons = []
+        for event in DSTAR_FAILURE_EVENTS:
+            count = sum(1 for record in decisions.values() if event in record["events"])
+            if count:
+                reasons.append(f"{event}:{count}")
+        return reasons
 
     def failed_groups(self) -> List[str]:
         """本實例 registry 轉換中失敗而被容忍之群組 id。"""
@@ -1791,7 +1824,7 @@ class FeaturePreprocessor:
         finally:
             # Persist d_star cache once after all chunks complete.
             if use_shared_dstar_cache and self._d_star_cache is not None:
-                self._d_star_cache.flush_atomic()
+                self._flush_dstar_cache(self._d_star_cache)
                 self._d_star_cache = None
             self._d_star_cache_shared = previous_shared_cache
 
@@ -2083,7 +2116,7 @@ class FeaturePreprocessor:
                 del chunk_df, processed_df
         finally:
             if use_shared_dstar_cache and self._d_star_cache is not None:
-                self._d_star_cache.flush_atomic()
+                self._flush_dstar_cache(self._d_star_cache)
                 self._d_star_cache = None
             self._d_star_cache_shared = previous_shared_cache
             del full_array
@@ -2294,7 +2327,7 @@ class FeaturePreprocessor:
                 gc.collect()
         finally:
             if use_shared_dstar_cache and self._d_star_cache is not None:
-                self._d_star_cache.flush_atomic()
+                self._flush_dstar_cache(self._d_star_cache)
                 self._d_star_cache = None
             self._d_star_cache_shared = previous_shared_cache
             del full_array
@@ -2586,6 +2619,7 @@ class FeaturePreprocessor:
     ) -> pd.DataFrame:
         """Original transform logic applied to a full DataFrame."""
         self._fracdiff_processed_columns = set()
+        self._dstar_failed_columns = set()
         if self._can_use_optimized_dataframe_path():
             return self._transform_single_optimized_df(features_df)
 
@@ -2608,6 +2642,7 @@ class FeaturePreprocessor:
         """Legacy per-transform DataFrame-copy pipeline."""
         transformed = features_df.copy()
         self._fracdiff_processed_columns = set()
+        self._dstar_failed_columns = set()
 
         transformed = self._apply_winsorization(transformed)
 
@@ -2775,7 +2810,7 @@ class FeaturePreprocessor:
         finally:
             if use_shared_dstar_cache and self._d_star_cache is not None:
                 # Save once after all chunks complete.
-                self._d_star_cache.flush_atomic()
+                self._flush_dstar_cache(self._d_star_cache)
                 self._d_star_cache = None
             self._d_star_cache_shared = previous_shared_cache
 
@@ -3104,12 +3139,23 @@ class FeaturePreprocessor:
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
             cache_arr = self._calibration_values(col_arr)
 
+            # Task 3.1 d* 三出口：①讀失敗 ⇒ 視為未命中照常搜尋；②搜尋例外 ⇒ 保原值、不寫快取、排除於 ADF 差分；
+            # ③寫失敗 ⇒ 值照常套用。三者皆記欄級事件，不以任何預設 d 替代
+            events: List[str] = []
+            if cache is not None and getattr(cache, "load_error", None):
+                events.append(EVENT_DSTAR_READ_FAILED)
             cached_d_star = None
-            try:
-                cached_d_star = cache.get(column, cache_arr) if cache is not None else None
-                if cached_d_star is not None:
-                    d_star = cached_d_star
-                else:
+            if cache is not None:
+                try:
+                    cached_d_star = cache.get(column, cache_arr)
+                except Exception as exc:
+                    logger.warning("FracDiff d* cache read failed for %s: %s; treating as miss", column, exc)
+                    events.append(EVENT_DSTAR_READ_FAILED)
+                    cached_d_star = None
+            if cached_d_star is not None:
+                d_star = cached_d_star
+            else:
+                try:
                     d_star = self._find_min_d(
                         series,
                         adf_threshold=adf_threshold,
@@ -3117,11 +3163,18 @@ class FeaturePreprocessor:
                         precision=precision,
                         max_lag=max_lag,
                     )
-                    if cache is not None:
+                except Exception as exc:
+                    logger.warning("FracDiff d* search failed for %s: %s; keeping original values", column, exc)
+                    self._dstar_failed_columns.add(column)
+                    self._record_decision(str(column), fracdiff=False, d=None, adf_differenced=False,
+                                          events=events + [EVENT_DSTAR_SEARCH_FAILED])
+                    continue
+                if cache is not None:
+                    try:
                         cache.set(column, d_star, cache_arr)
-            except Exception as exc:
-                logger.warning("FracDiff d* search failed for %s: %s; fallback to d=1.0", column, exc)
-                d_star = 1.0
+                    except Exception as exc:
+                        logger.warning("FracDiff d* cache write failed for %s: %s", column, exc)
+                        events.append(EVENT_DSTAR_WRITE_FAILED)
 
             fracdiff_series = self._frac_diff_ffd(
                 series,
@@ -3132,7 +3185,7 @@ class FeaturePreprocessor:
             self._assign_fracdiff_result(result, column, fracdiff_series, self.mode)
             self._fracdiff_processed_columns.add(column)
             self._record_decision(str(column), fracdiff=True, d=float(d_star),
-                                  dstar_cache_hit=bool(cached_d_star is not None))
+                                  dstar_cache_hit=bool(cached_d_star is not None), events=events)
 
         return result
 
@@ -3159,21 +3212,27 @@ class FeaturePreprocessor:
         duplicate_columns_by_rep: Dict[str, List[str]] = {}
         item_rep_by_value: Dict[str, str] = {}
         items: List[Tuple[np.ndarray, Dict[str, object]]] = []
+        # Task 3.1：各欄已知之 d* 事件（讀失敗、寫失敗），於結果處理時併入決策紀錄
+        column_events: Dict[str, List[str]] = {}
+        load_failed = cache is not None and bool(getattr(cache, "load_error", None))
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
             cache_arr = self._calibration_values(col_arr)
             col_input_arrays[column] = col_arr
             value_key = _strong_col_value_fingerprint(col_arr)
-            cached_d_star = (
-                cache.get_by_value_fingerprint(
-                    column,
-                    weak_fp=_col_value_fingerprint(cache_arr),
-                    strong_fp=_strong_col_value_fingerprint(cache_arr),
-                )
-                if cache is not None
-                else None
-            )
+            column_events[column] = [EVENT_DSTAR_READ_FAILED] if load_failed else []
+            cached_d_star = None
+            if cache is not None:
+                try:
+                    cached_d_star = cache.get_by_value_fingerprint(
+                        column,
+                        weak_fp=_col_value_fingerprint(cache_arr),
+                        strong_fp=_strong_col_value_fingerprint(cache_arr),
+                    )
+                except Exception as exc:
+                    logger.warning("FracDiff d* cache read failed for %s: %s; treating as miss", column, exc)
+                    column_events[column] = sorted(set(column_events[column]) | {EVENT_DSTAR_READ_FAILED})
             dedupe_key = f"{value_key}:{cached_d_star if cached_d_star is not None else 'miss'}"
             representative = item_rep_by_value.get(dedupe_key)
             if representative is not None:
@@ -3198,15 +3257,24 @@ class FeaturePreprocessor:
         failed_columns: List[str] = []
         for output in outputs:
             column = str(output["column"])
+            duplicate_columns = duplicate_columns_by_rep.get(column, [column])
+            # Task 3.1：先判 worker status 再套用／寫快取——搜尋失敗之欄保原值、不寫快取、排除於 ADF 差分
+            if output.get("status") != "ok":
+                failed_columns.extend(duplicate_columns)
+                for target_column in duplicate_columns:
+                    self._dstar_failed_columns.add(target_column)
+                    self._record_decision(
+                        str(target_column), fracdiff=False, d=None, adf_differenced=False,
+                        events=column_events.get(target_column, []) + [EVENT_DSTAR_SEARCH_FAILED],
+                    )
+                continue
             d_star = float(output["d_star"])
             fracdiff_values = np.asarray(output["fracdiff_values"], dtype=np.float64)
             fracdiff_series = pd.Series(fracdiff_values, index=result.index)
-            duplicate_columns = duplicate_columns_by_rep.get(column, [column])
             for target_column in duplicate_columns:
                 self._assign_fracdiff_result(result, target_column, fracdiff_series, self.mode)
                 self._fracdiff_processed_columns.add(target_column)
-                self._record_decision(str(target_column), fracdiff=True, d=d_star,
-                                      dstar_cache_hit=bool(output.get("cache_hit", False)))
+                events = list(column_events.get(target_column, []))
 
                 if cache is not None and (
                     not bool(output.get("cache_hit", False)) or target_column != column
@@ -3214,13 +3282,17 @@ class FeaturePreprocessor:
                     target_values = col_input_arrays.get(target_column)
                     if target_values is not None:
                         target_values = self._calibration_values(target_values)
-                    cache.set(target_column, d_star, target_values)
-            if output.get("status") != "ok":
-                failed_columns.extend(duplicate_columns)
+                    try:
+                        cache.set(target_column, d_star, target_values)
+                    except Exception as exc:
+                        logger.warning("FracDiff d* cache write failed for %s: %s", target_column, exc)
+                        events.append(EVENT_DSTAR_WRITE_FAILED)
+                self._record_decision(str(target_column), fracdiff=True, d=d_star,
+                                      dstar_cache_hit=bool(output.get("cache_hit", False)), events=events)
 
         if failed_columns:
             logger.warning(
-                "[L6.5] FracDiff joblib fallback d=1.0 for %d columns. Sample: %s",
+                "[L6.5] FracDiff d* search failed for %d columns (kept original values). Sample: %s",
                 len(failed_columns),
                 failed_columns[:10],
             )
@@ -3356,7 +3428,7 @@ class FeaturePreprocessor:
 
         if cache_enabled and cache is not None:
             if not shared_cache:
-                cache.flush_atomic()
+                self._flush_dstar_cache(cache)
             cache_hits, cache_misses = cache.stats()
             total_lookups = cache_hits + cache_misses
             if total_lookups > 0:
@@ -3386,7 +3458,10 @@ class FeaturePreprocessor:
         max_diff = int(self.adf_config.get("max_diff", 2))
         sample_size = int(self.adf_config.get("sample_size", 500))
         candidate_columns = [
-            column for column in columns if column not in self._fracdiff_processed_columns
+            column
+            for column in columns
+            # d* 搜尋失敗之欄保原值，同輪不得改走 ADF 差分（Task 3.1 出口②）
+            if column not in self._fracdiff_processed_columns and column not in self._dstar_failed_columns
         ]
         if not candidate_columns:
             return result

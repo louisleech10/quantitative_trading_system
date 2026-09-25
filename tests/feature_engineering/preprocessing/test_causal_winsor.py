@@ -295,7 +295,9 @@ def test_all_l65_entrypoints_causal(monkeypatch: pytest.MonkeyPatch) -> None:
                     "apply_to": "all",
                     "precision": 0.5,
                 },
-            }
+            },
+            # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
+            column_layer_map={"L1_alpha": "L1"},
         )
         original_fracdiff = fracdiff_pre._apply_fractional_differencing
         fracdiff_calls: list[bool] = []

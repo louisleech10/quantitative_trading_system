@@ -3141,7 +3141,20 @@ class FeatureFactory:
             max_inf_ratio=max_inf_ratio,
             max_nan_ratio=max_nan_ratio,
             preprocessing_applied=preprocessing_applied,
+            extra_failure_reasons=self._stationarity_failure_reasons(),
         )
+
+    def _stationarity_failure_reasons(self) -> List[str]:
+        """FFSTAT Task 3.1：本次 run 之 d* 三出口事件彙總為 `<事件>:<欄數>`（固定順序；無事件 ⇒ 空）。"""
+        from momentum.FeatureEngineering.preprocessing.feature_preprocessor import DSTAR_FAILURE_EVENTS
+
+        decisions = getattr(self, "last_stationarity_decisions", None) or {}
+        reasons = []
+        for event in DSTAR_FAILURE_EVENTS:
+            count = sum(1 for record in decisions.values() if event in record.get("events", []))
+            if count:
+                reasons.append(f"{event}:{count}")
+        return reasons
 
     def _apply_completeness_to_metadata(
         self, metadata: Dict[str, Any], completeness: Dict[str, Any], timeframe: str
@@ -3746,6 +3759,7 @@ class FeatureFactory:
             max_inf_ratio=max_inf_ratio,
             max_nan_ratio=max_nan_ratio,
             preprocessing_applied=getattr(self, "_preprocessing_applied", None),
+            extra_failure_reasons=self._stationarity_failure_reasons(),
         )
         self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
         result.metadata = metadata

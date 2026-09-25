@@ -26,6 +26,13 @@ EV = h.EVENTS
 API = h.CONTRACT["dstar_cache_api"]
 
 
+def _cache(ctx: PreprocessingContext, cache_dir: Path) -> DStarCache:
+    """比照生產端 `FeaturePreprocessor._create_d_star_cache` 帶齊中繼參數（`max_lag`／`sample_size` 為 None 時
+    `_payload_matches` 之整數比對恆不等，快取寫出後永遠讀不回；主委實跑 2026-09-25）。"""
+    return DStarCache(ctx, cache_dir, adf_threshold=0.1, precision=0.02, max_lag=0, weight_threshold=1e-5,
+                      sample_size=500, calibration_bars=500)
+
+
 def _derived(root: Path) -> List[str]:
     return [n for p in root.rglob("*_L65.parquet") for n in pq.ParquetFile(p).schema_arrow.names]
 
@@ -43,10 +50,18 @@ def _assert_search_failed_one(root: Path, result: Any, dstar_dir: Path) -> None:
     dec = h.decisions(result)[col]
     assert dec["fracdiff"] is False and dec["d"] is None and dec["adf_differenced"] is False
     entries = {k for f in dstar_dir.glob("*.json") for k in json.loads(f.read_text(encoding="utf-8"))["entries"]}
-    fracdiffed = [c for c, d in h.decisions(result).items() if d["fracdiff"]]
-    assert len(entries) == len(fracdiffed)
+    # 快取鍵為加週期標記前之欄名（`close_trend_…`）；值完全相同之欄經值別名共用 d*、不另立項，
+    # 故不比筆數（主委實跑 2026-09-25：464 個 fracdiff 欄對 453／411 項）——SPEC 要求＝失敗欄不入快取
+    untag = lambda c: c.replace(f"_{h.PRIMARY_TF}_", "_", 1)  # noqa: E731
+    fracdiffed = {untag(c) for c, d in h.decisions(result).items() if d["fracdiff"]}
+    assert entries and untag(col) not in entries
+    assert entries <= fracdiffed
     meta = result.metadata
-    manifest = json.loads(Path(meta["manifest_path"]).read_text(encoding="utf-8"))
+    # CGSA 路徑之落盤紀錄＝manifest；frame 路徑無 manifest，落盤紀錄為 `<symbol>_<tf>_factory_meta.json`
+    # （`FeatureStorage.save_metadata_json`，主委實跑 2026-09-25）
+    persisted_path = (Path(meta["manifest_path"]) if "manifest_path" in meta
+                      else root / f"{h.SYMBOL}_{h.PRIMARY_TF}_factory_meta.json")
+    manifest = json.loads(persisted_path.read_text(encoding="utf-8"))
     for src in (meta, manifest):
         assert f"{EV['search_failed']}:1" in src["failure_reasons"]
         assert src["quality_status"] == "partial"
@@ -177,14 +192,14 @@ def test_boundary_14b_missing_cache_file_no_event(tmp_path: Path, monkeypatch: p
 def test_cache_load_error_distinguished_from_missing(tmp_path: Path) -> None:
     """Task 3.1：`DStarCache` 載入失敗與檔案不存在分開回報（契約 `dstar_cache_api.load_error_attr`）。"""
     ctx = PreprocessingContext(symbol=h.SYMBOL, timeframe=h.PRIMARY_TF, config_hash="cfg")
-    missing = DStarCache(ctx, tmp_path / "a")
+    missing = _cache(ctx, tmp_path / "a")
     assert getattr(missing, API["load_error_attr"]) is None
-    first = DStarCache(ctx, tmp_path / "b")
+    first = _cache(ctx, tmp_path / "b")
     first.set("close_trend_EMA_10", 0.45, h.kline_frame()["close"].to_numpy()[:500])
     assert first.flush_atomic() is True
     for f in (tmp_path / "b").glob("*.json"):
         f.write_text("{", encoding="utf-8")
-    broken = DStarCache(ctx, tmp_path / "b")
+    broken = _cache(ctx, tmp_path / "b")
     assert getattr(broken, API["load_error_attr"])
 
 
@@ -194,18 +209,36 @@ def test_boundary_15_interleaved_flush_last_writer_wins(tmp_path: Path) -> None:
     """Task 3.1 邊界①′：同路徑兩個 DStarCache 實例交錯 flush_atomic ⇒ 後寫者勝出、先寫之項下次為未命中、無事件。"""
     ctx = PreprocessingContext(symbol=h.SYMBOL, timeframe=h.PRIMARY_TF, config_hash="cfg")
     values = h.kline_frame()["close"].to_numpy()
-    a, b = DStarCache(ctx, tmp_path), DStarCache(ctx, tmp_path)
+    a, b = _cache(ctx, tmp_path), _cache(ctx, tmp_path)
     b.set("col_b", 0.4, values[:500])
     assert b.flush_atomic() is True
     a.set("col_a", 0.2, values[500:1000])
     assert a.flush_atomic() is True
-    reread = DStarCache(ctx, tmp_path)
+    reread = _cache(ctx, tmp_path)
     assert reread.get("col_a", values[500:1000]) == pytest.approx(0.2)
     assert reread.get("col_b", values[:500]) is None
     assert getattr(reread, API["load_error_attr"]) is None
 
 
 # ---------------------------------------------------------------- 邊界②：寫入失敗
+
+def _fail_dstar_cache_os_replace(monkeypatch: pytest.MonkeyPatch) -> None:
+    """只讓 d* 快取模組之 `os.replace` 失敗：以代理物件取代該模組參照之 `os`（其餘屬性轉交真 os）。
+    直接改 `dmod.os.replace` 會改到全域 os 模組，連 CGSA 落盤之 os.replace 一併失敗（主委實跑 2026-09-25）。"""
+    from momentum.FeatureEngineering.preprocessing import _d_star_cache as dmod
+
+    real_os = dmod.os
+
+    class _OsProxy:
+        def __getattr__(self, name):
+            return getattr(real_os, name)
+
+        @staticmethod
+        def replace(*a, **k):
+            raise OSError("injected replace")
+
+    monkeypatch.setattr(dmod, "os", _OsProxy())
+
 
 @pytest.mark.parametrize("where", ["set", "os_replace"])
 def test_boundary_16_cache_write_failure_applies_and_degrades(where: str, tmp_path: Path,
@@ -225,9 +258,7 @@ def test_boundary_16_cache_write_failure_applies_and_degrades(where: str, tmp_pa
 
         monkeypatch.setattr(DStarCache, "set", _set)
     else:
-        from momentum.FeatureEngineering.preprocessing import _d_star_cache as dmod
-
-        monkeypatch.setattr(dmod.os, "replace", lambda *a, **k: (_ for _ in ()).throw(OSError("injected replace")))
+        _fail_dstar_cache_os_replace(monkeypatch)
     root, _, result = h.run_stat(tmp_path, h.stat_payload())
     reasons = [r for r in result.metadata["failure_reasons"] if r.startswith(EV["cache_write_failed"] + ":")]
     assert len(reasons) == 1 and int(reasons[0].split(":")[1]) >= 1
@@ -238,12 +269,10 @@ def test_boundary_16_cache_write_failure_applies_and_degrades(where: str, tmp_pa
 
 def test_flush_atomic_reports_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 3.1：flush_atomic 之 os.replace 失敗 ⇒ 回報 False（不再只記 warning）。"""
-    from momentum.FeatureEngineering.preprocessing import _d_star_cache as dmod
-
     ctx = PreprocessingContext(symbol=h.SYMBOL, timeframe=h.PRIMARY_TF, config_hash="cfg")
-    cache = DStarCache(ctx, tmp_path)
+    cache = _cache(ctx, tmp_path)
     cache.set("col", 0.3, h.kline_frame()["close"].to_numpy()[:500])
-    monkeypatch.setattr(dmod.os, "replace", lambda *a, **k: (_ for _ in ()).throw(OSError("injected replace")))
+    _fail_dstar_cache_os_replace(monkeypatch)
     assert cache.flush_atomic() is False
 
 

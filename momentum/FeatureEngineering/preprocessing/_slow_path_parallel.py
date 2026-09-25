@@ -164,9 +164,15 @@ def process_fracdiff_column_values(values: np.ndarray, column_metadata: Dict[str
                 d_range=d_range,
             )
     except Exception as error:
-        status = "fallback"
-        error_message = str(error)
-        d_star = 1.0
+        # FFSTAT Task 3.1：搜尋失敗不再以 d=1.0 產值——回報失敗，由主程序保原值、不寫快取、記事件
+        return {
+            "column": column,
+            "d_star": None,
+            "fracdiff_values": None,
+            "cache_hit": cache_hit,
+            "status": "failed",
+            "error": str(error),
+        }
 
     fracdiff_values = fracdiff_fn(values, float(d_star))
     return {

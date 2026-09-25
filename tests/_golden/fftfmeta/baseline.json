@@ -145,7 +145,7 @@
     "1h_L6_meta.parquet": "9fd010a991309a02e3e8789a266ac87d096d62ee8909f4d86feebc05331c464c"
    },
    "manifest_bytes": 472726,
-   "manifest_stripped_sha256": "ea33dd0da85bf403c9dfd2fbd9a6da5018634283bee0d99f3191badd97f0ae8b",
+   "manifest_stripped_sha256": "c5bd9daf2eaec5c44f7d2f712a71aef87a3e51ccdf371f43a9132c7dac9e2230",
    "payload": {
     "atomic_indicators": {
      "cycle": {
@@ -236,7 +236,7 @@
     }
    },
    "task_bytes": 24119,
-   "task_stripped_sha256": "991eaad6d7de2219e28154a6e54273a070b6e485518c199ced075d65a4f90374"
+   "task_stripped_sha256": "7d9795fc4fbcad1ca337df38ecb2244ff57e80ab79ef873c90f171528e356850"
   },
   "multi": {
    "allowed": {
@@ -420,7 +420,7 @@
     "1h_L6_meta.parquet": "9fd010a991309a02e3e8789a266ac87d096d62ee8909f4d86feebc05331c464c"
    },
    "manifest_bytes": 730464,
-   "manifest_stripped_sha256": "b76e6931453bd0dd1a7738cded6e2ab93782efd980b849a048769cfec8142bc0",
+   "manifest_stripped_sha256": "4eedf97f0562d5cc2c707e1c0674a59a3f615f1f30dfeb0b61b2ea99880992db",
    "payload": {
     "atomic_indicators": {
      "cycle": {
@@ -512,7 +512,7 @@
     }
    },
    "task_bytes": 24999,
-   "task_stripped_sha256": "d3384830d93c2bb567eb788de3bcd79901dc429c26f84557f87f9c1a94c09f4a"
+   "task_stripped_sha256": "7060d2bcd137f45a19a8c20f64513ad59d8a33191df338fc5368ec840128f38c"
   }
  },
  "symbol": "BTCUSDT",

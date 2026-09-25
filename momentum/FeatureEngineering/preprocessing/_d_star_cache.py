@@ -311,6 +311,11 @@ class DStarCache:
         self._misses = 0
         self._entries: Dict[str, Dict[str, Any]] = {}
         self._value_aliases: Dict[str, Dict[str, Any]] = {}
+        # FFSTAT Task 3.1：載入失敗（讀取 OSError、內容損壞）之原因；檔案不存在（冷快取）為 None。
+        # 呼叫端據此對經本快取查詢之欄記 `dstar_cache_read_failed` 事件；之後 flush 以新內容覆寫損壞檔。
+        self.load_error: Optional[str] = None
+        # 自上次 flush 以來 set 過之欄（flush 失敗時據此計受影響欄數）
+        self._pending_columns: set = set()
 
         if not self.is_enabled:
             logger.warning(
@@ -349,10 +354,12 @@ class DStarCache:
             payload = json.loads(self._path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             logger.warning("[d_star_cache] failed to load cache=%s: %s", self._path, exc)
+            self.load_error = f"{type(exc).__name__}: {exc}"
             return {}
 
         if not isinstance(payload, dict):
             logger.warning("[d_star_cache] invalid payload type cache=%s", self._path)
+            self.load_error = f"invalid payload type: {type(payload).__name__}"
             return {}
 
         if not self._payload_matches(payload):
@@ -361,6 +368,7 @@ class DStarCache:
         entries = payload.get("entries", {})
         if not isinstance(entries, dict):
             logger.warning("[d_star_cache] invalid entries cache=%s", self._path)
+            self.load_error = f"invalid entries type: {type(entries).__name__}"
             return {}
         loaded_entries = {
             str(column): dict(entry)
@@ -563,6 +571,7 @@ class DStarCache:
             entry["input_fingerprint"] = self._ctx.data_fingerprint
         self._entries[str(column)] = entry
         self._dirty = True
+        self._pending_columns.add(str(column))
 
     def _maybe_gc(self) -> None:
         """Trim oldest entries when the cache exceeds MAX_CACHE_ENTRIES."""
@@ -592,9 +601,11 @@ class DStarCache:
             self._path,
         )
 
-    def flush_atomic(self) -> None:
+    def flush_atomic(self) -> bool:
+        """原子寫出快取；回傳是否成功（無待寫內容或快取停用 ⇒ True）。失敗時保留待寫欄於
+        `pending_columns()` 供呼叫端記 `dstar_cache_write_failed:<欄數>`（FFSTAT Task 3.1）。"""
         if not self.is_enabled or not self._dirty:
-            return
+            return True
         self._maybe_gc()
         payload = self._base_payload_fields()
         payload["entries"] = self._entries
@@ -610,14 +621,21 @@ class DStarCache:
             )
             os.replace(tmp_path, self._path)
             self._dirty = False
+            self._pending_columns = set()
+            return True
         except Exception as exc:
             logger.warning("[d_star_cache] atomic write failed path=%s: %s", self._path, exc)
+            return False
         finally:
             if tmp_path.exists():
                 try:
                     tmp_path.unlink()
                 except OSError:
                     pass
+
+    def pending_columns(self) -> List[str]:
+        """自上次成功 flush 以來 set 過、尚未寫出之欄。"""
+        return sorted(self._pending_columns)
 
     def stats(self) -> Tuple[int, int]:
         return self._hits, self._misses
