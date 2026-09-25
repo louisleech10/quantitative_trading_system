@@ -473,7 +473,6 @@ preprocessing:
     # 0.10 為業界常用顯著水準；金融序列難以通過嚴格的 0.05 檢定（如 EMA_89/100）
     adf_threshold: 0.10
     max_diff: 2
-    sample_size: 500
     apply_to: non_stationary
 
   fractional_differencing:

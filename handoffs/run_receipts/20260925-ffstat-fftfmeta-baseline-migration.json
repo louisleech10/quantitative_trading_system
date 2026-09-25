@@ -1,40 +1,46 @@
 {
  "old_tree": "/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/1db7b6cf-7ac1-44f2-866f-40691bef987d/scratchpad/wt_pre",
+ "original_rev": "02350721^",
+ "schema_changes": [
+  "drop preprocessing.adf_safe_skip",
+  "drop preprocessing.adf_differencing.sample_size",
+  "add preprocessing.calibration_bars_by_timeframe={}"
+ ],
  "references": {
   "degraded": {
    "checks": {
-    "old_reproduces_frozen": true,
+    "old_reproduces_original_frozen": true,
     "features_unchanged": true,
     "manifest_only_schema_diff": true,
     "task_only_schema_diff": true
    },
    "old_config_hash": "3e0f50e7801bc492da1ad4674a859658",
-   "new_config_hash": "4c9af9b80fbd6f552352d95d37110c11",
+   "new_config_hash": "8c2f86605a0de5b531b784ed850f2c71",
    "manifest_sha": [
     "ea33dd0da85bf403c9dfd2fbd9a6da5018634283bee0d99f3191badd97f0ae8b",
-    "c5bd9daf2eaec5c44f7d2f712a71aef87a3e51ccdf371f43a9132c7dac9e2230"
+    "5efcb88b92f9ce773b2deabfc66e41f1c17b724517af70bb1d34aca306fdfd9a"
    ],
    "task_sha": [
     "991eaad6d7de2219e28154a6e54273a070b6e485518c199ced075d65a4f90374",
-    "7d9795fc4fbcad1ca337df38ecb2244ff57e80ab79ef873c90f171528e356850"
+    "d127630d76be3e5818cacf26adf0bc8ea272a649fb264378bdef33e30f6b4af4"
    ]
   },
   "multi": {
    "checks": {
-    "old_reproduces_frozen": true,
+    "old_reproduces_original_frozen": true,
     "features_unchanged": true,
     "manifest_only_schema_diff": true,
     "task_only_schema_diff": true
    },
    "old_config_hash": "915ff156979ec5d3e0218149fa67e94f",
-   "new_config_hash": "43251dd22e6cc5aa4a699fc4510b3759",
+   "new_config_hash": "a0344bbcca888a4410a7a6f6079aaf1d",
    "manifest_sha": [
     "b76e6931453bd0dd1a7738cded6e2ab93782efd980b849a048769cfec8142bc0",
-    "4eedf97f0562d5cc2c707e1c0674a59a3f615f1f30dfeb0b61b2ea99880992db"
+    "194192973d87039a720647b67e342477ee72c5a24f5c07c24eca8d56c444bdb9"
    ],
    "task_sha": [
     "d3384830d93c2bb567eb788de3bcd79901dc429c26f84557f87f9c1a94c09f4a",
-    "7060d2bcd137f45a19a8c20f64513ad59d8a33191df338fc5368ec840128f38c"
+    "409b8bc7b76db888cf0c24fda457fed1d8dd4e220e5af21ac33be34fcc3f7464"
    ]
   }
  }

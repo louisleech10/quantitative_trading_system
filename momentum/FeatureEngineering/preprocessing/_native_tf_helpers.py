@@ -112,7 +112,7 @@ def scale_preprocessing_config_for_native(
     * ``winsorization.window`` -> primary->source rows
     * ``adaptive_zscore.windows`` -> list of primary->source rows
     * ``adaptive_zscore.window`` (legacy)
-    * top-level ``calibration_bars`` -> primary->source rows
+    * top-level ``calibration_bars`` -> kept（FFSTAT Task 2.2：ADF 觀測筆數 N，不縮放）
     * ``fractional_differencing.sample_size`` -> kept (sample size is
       observation count for ADF, not a time window). NOT scaled.
     * ``fractional_differencing.max_lag`` -> kept (lag in observations).
@@ -154,8 +154,8 @@ def scale_preprocessing_config_for_native(
             if key in zscore_cfg and isinstance(zscore_cfg[key], (list, tuple)):
                 zscore_cfg[key] = [_scale_window(w) for w in zscore_cfg[key]]
 
-    scaled["calibration_bars"] = _scale_window(scaled.get("calibration_bars", 500))
-
+    # FFSTAT Task 2.2：calibration_bars 為平穩化 ADF 之觀測筆數 N（同 sample_size），不隨週期縮放；
+    # 各原生週期之 N 由 calibration_bars_by_timeframe 明示分設
     return scaled
 
 

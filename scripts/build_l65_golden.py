@@ -123,6 +123,19 @@ def _extract_layer(column_name: str) -> str:
     return match.group(1) if match else "unknown"
 
 
+def fixture_layer_map(frame: pd.DataFrame) -> Dict[str, str]:
+    """本模組 fixture（`make_synthetic_l65_dataset`、`_build_l1_l2_real_features`）之欄→層對照。
+
+    這些 fixture 於建構時即以 `<層>_…` 命名（層為建構規則之一部分），故此處依建構規則還原層；
+    僅供 L6.5 基準／benchmark 工具傳入 `FeaturePreprocessor(column_layer_map=...)`
+    （FFSTAT Task 1.1：生產端 fracdiff 目標層只取自結構化層來源、不由欄名推層）。非本模組 fixture 之欄 ⇒ 拋錯。"""
+    layer_map = {str(column): _extract_layer(str(column)) for column in frame.columns}
+    unknown = [column for column, layer in layer_map.items() if layer == "unknown"]
+    if unknown:
+        raise ValueError(f"非 L6.5 fixture 之欄（無建構層）：{unknown[:5]}")
+    return layer_map
+
+
 def _extract_source(column_name: str) -> str:
     parts = column_name.split("_")
     if len(parts) >= 2 and LAYER_RE.match(column_name):
@@ -262,6 +275,7 @@ def _run_l65_full_preprocessing(frame: pd.DataFrame) -> Tuple[pd.DataFrame, Dict
             preprocessor = FeaturePreprocessor(
                 _l65_full_preprocessing_config(),
                 context=context,
+                column_layer_map=fixture_layer_map(frame),
             )
             processed = preprocessor.transform(frame)
         finally:
@@ -506,9 +520,13 @@ def build_ic_first_golden(
             stationary_ratio=0.6,
         )
 
-    raw_frame = FeaturePreprocessor(_ic_first_raw_config()).transform(source_frame)
+    raw_frame = FeaturePreprocessor(
+        _ic_first_raw_config(), column_layer_map=fixture_layer_map(source_frame)
+    ).transform(source_frame)
     selected_features = list(raw_frame.columns[: min(20, len(raw_frame.columns))])
-    processed_frame = FeaturePreprocessor(_ic_first_processed_config()).transform(
+    processed_frame = FeaturePreprocessor(
+        _ic_first_processed_config(), column_layer_map=fixture_layer_map(raw_frame.loc[:, selected_features])
+    ).transform(
         raw_frame.loc[:, selected_features]
     )
 

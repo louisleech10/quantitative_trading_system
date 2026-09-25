@@ -184,13 +184,31 @@ def _check_stationarity_apply_to(value: Any, step: str) -> str:
     return value
 
 
+def _reject_step_sample_size(data: Any, step: str) -> Any:
+    # FFSTAT Task 2.2：三路 ADF 同一樣本數 N＝preprocessing.calibration_bars（可依週期以 calibration_bars_by_timeframe 分設）
+    if isinstance(data, dict) and "sample_size" in data:
+        raise ValueError(
+            f"preprocessing.{step}.sample_size 已移除：ADF 樣本數統一為 preprocessing.calibration_bars"
+            "（可依週期以 preprocessing.calibration_bars_by_timeframe 分設）"
+        )
+    return data
+
+
+# FFSTAT Task 2.2：ADF 最少樣本數（少於此數之校準窗無法做 ADF）
+MIN_CALIBRATION_BARS = 20
+
+
 class ADFDifferencingConfig(BaseModel):
     enabled: bool = False
     # 0.10 為業界常用顯著水準；金融序列難以通過嚴格的 0.05（如長週期 EMA）
     adf_threshold: float = 0.10
     max_diff: int = 2
-    sample_size: int = 500
     apply_to: str = "non_stationary"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_sample_size(cls, data: Any) -> Any:
+        return _reject_step_sample_size(data, "adf_differencing")
 
     @field_validator("apply_to", mode="before")
     @classmethod
@@ -209,6 +227,11 @@ class FractionalDifferencingConfig(BaseModel):
     max_lag: int = Field(default=0, ge=0)
     apply_to: str = "non_stationary"
     cache_d_star: bool = True
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_sample_size(cls, data: Any) -> Any:
+        return _reject_step_sample_size(data, "fractional_differencing")
 
     @field_validator("apply_to", mode="before")
     @classmethod
@@ -239,7 +262,10 @@ class PreprocessingConfig(BaseModel):
     enabled: bool = True
     # ⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會
     causal_preprocessing: bool = True
-    calibration_bars: int = 500
+    # FFSTAT Task 2.2：平穩化校準窗長 N（三路 ADF 同一樣本數；預設 500，最終預設待 Task 4.1 實測後使用者裁定）
+    calibration_bars: int = Field(default=500, ge=MIN_CALIBRATION_BARS)
+    # 依原生週期分設 N（未列之週期用 calibration_bars）；N 為觀測筆數，不隨週期縮放
+    calibration_bars_by_timeframe: Dict[str, int] = Field(default_factory=dict)
     # replace：原地覆蓋，確保跨標的欄位名稱一致（業界標準）
     # append 會產生 _diff1/_diff2/_fracdiff，不同標的欄位名可能不同 → 多標的訓練 schema 錯誤
     mode: str = "replace"
@@ -257,6 +283,16 @@ class PreprocessingConfig(BaseModel):
         if isinstance(data, dict) and "adf_safe_skip" in data:
             raise ValueError("preprocessing.adf_safe_skip 已移除（FF-STAT：平穩化改為逐欄檢定，不設名稱免檢清單）")
         return data
+
+    @field_validator("calibration_bars_by_timeframe")
+    @classmethod
+    def _check_calibration_bars_by_timeframe(cls, value: Dict[str, int]) -> Dict[str, int]:
+        for timeframe, bars in value.items():
+            if timeframe not in SUPPORTED_TIMEFRAMES:
+                raise ValueError(f"calibration_bars_by_timeframe 之週期 {timeframe} 不支援，可用：{SUPPORTED_TIMEFRAMES}")
+            if int(bars) < MIN_CALIBRATION_BARS:
+                raise ValueError(f"calibration_bars_by_timeframe[{timeframe}]={bars} 小於 ADF 最少樣本 {MIN_CALIBRATION_BARS}")
+        return {str(k): int(v) for k, v in value.items()}
 
 
 class AtomicIndicatorConfig(BaseModel):

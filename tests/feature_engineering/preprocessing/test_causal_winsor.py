@@ -335,7 +335,8 @@ def test_all_l65_entrypoints_causal(monkeypatch: pytest.MonkeyPatch) -> None:
     }
     scaled = scale_preprocessing_config_for_native(native_config, "12h", "1h")
     assert scaled["winsorization"]["window"] == 20
-    assert scaled["calibration_bars"] == 50
+    # FFSTAT Task 2.2（改寫：原斷言縮放為 50）：calibration_bars 為 ADF 觀測筆數 N，不隨週期縮放
+    assert scaled["calibration_bars"] == 600
     native_values = np.r_[np.linspace(1.0, 60.0, 60), 9999.0].astype(np.float32)[:, None]
     native_perturbed_values = native_values.copy()
     native_perturbed_values[-1, 0] = -9999.0

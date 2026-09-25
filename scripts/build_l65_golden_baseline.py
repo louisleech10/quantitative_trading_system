@@ -210,8 +210,9 @@ def _load_hdf5_kline_frame(symbol: str, tf: str, hdf5_path: Path) -> pd.DataFram
     return frame
 
 
-def _build_l1_l2_real_features(raw_frame: pd.DataFrame, max_cols: int) -> pd.DataFrame:
-    """從真實 kline OHLCV 衍生 L1/L2 特徵（與 build_l65_golden 一致）。"""
+def _build_l1_l2_real_features(raw_frame: pd.DataFrame, max_cols: int) -> Tuple[pd.DataFrame, Dict[str, str]]:
+    """從真實 kline OHLCV 衍生 L1/L2 特徵（與 build_l65_golden 一致）；另回傳建構時即知之欄→層對照
+    （FFSTAT Task 1.1：L6.5 之 fracdiff 目標層只取自結構化層來源）。"""
     numeric = raw_frame.select_dtypes(include=[np.number]).copy()
     numeric = numeric.drop(columns=["timestamp"], errors="ignore")
     if numeric.empty:
@@ -242,9 +243,11 @@ def _build_l1_l2_real_features(raw_frame: pd.DataFrame, max_cols: int) -> pd.Dat
         derived[f"L2_derived_volume_mean_{window}"] = volume.rolling(window, min_periods=1).mean()
 
     frames.append(pd.DataFrame(derived, index=raw_frame.index))
+    layer_map = {**{str(c): "L1" for frame in frames[:-1] for c in frame.columns}, **{str(c): "L2" for c in derived}}
     feature_frame = pd.concat(frames, axis=1).replace([np.inf, -np.inf], np.nan)
     feature_frame = feature_frame.iloc[:, :max_cols]
-    return feature_frame.astype(np.float32, copy=False)
+    feature_frame = feature_frame.astype(np.float32, copy=False)
+    return feature_frame, {c: layer_map[c] for c in feature_frame.columns}
 
 
 def _resolve_sample_row_indices(n_rows: int) -> List[int]:
@@ -315,8 +318,9 @@ def _run_ic_first_l65(
     symbol: str,
     tf: str,
     full_config: Dict[str, Any],
+    layer_map: Optional[Dict[str, str]] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
-    """跑 IC-First 兩段式 L6.5，回傳 (pre_ic, post_ic, selected_features)。"""
+    """跑 IC-First 兩段式 L6.5，回傳 (pre_ic, post_ic, selected_features)。`layer_map`：欄→層（fracdiff 目標層來源）。"""
     with tempfile.TemporaryDirectory(prefix="l65_hardening_dstar_") as temp_dir:
         original_cache_dir = FeaturePreprocessor.__dict__["_d_star_cache_dir"]
         FeaturePreprocessor._d_star_cache_dir = staticmethod(lambda: Path(temp_dir))
@@ -337,13 +341,13 @@ def _run_ic_first_l65(
                 row_count=len(source_frame),
                 source_data_version="l65-hardening-v1",
             )
-            pre_ic_pp = FeaturePreprocessor(_pre_ic_config(full_config), context=context)
+            pre_ic_pp = FeaturePreprocessor(_pre_ic_config(full_config), context=context, column_layer_map=layer_map)
             pre_ic_frame = pre_ic_pp.transform(source_frame)
             selected = _select_ic_first_features(
                 list(pre_ic_frame.columns),
                 IC_FIRST_SELECTED_FEATURE_COUNT,
             )
-            post_ic_pp = FeaturePreprocessor(_post_ic_config(full_config), context=context)
+            post_ic_pp = FeaturePreprocessor(_post_ic_config(full_config), context=context, column_layer_map=layer_map)
             post_ic_frame = post_ic_pp.transform(pre_ic_frame.loc[:, selected])
         finally:
             FeaturePreprocessor._d_star_cache_dir = original_cache_dir
@@ -364,12 +368,13 @@ def _build_symbol_tf_record(
             f"{symbol}/{tf} 資料列數不足：{len(raw_frame)} < 100"
         )
     recent = raw_frame.tail(max_rows)
-    source_frame = _build_l1_l2_real_features(recent, max_cols=max_cols)
+    source_frame, layer_map = _build_l1_l2_real_features(recent, max_cols=max_cols)
     pre_ic_frame, post_ic_frame, selected = _run_ic_first_l65(
         source_frame,
         symbol,
         tf,
         full_config,
+        layer_map=layer_map,
     )
     return {
         "symbol": symbol,

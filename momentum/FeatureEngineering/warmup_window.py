@@ -296,8 +296,9 @@ def _collect_l65_warmup_bars(
                 # fallback because it only extends preheat, not feature values.
                 max_lag = 252
             base_windows.append(max_lag)
-        if pp.adf_differencing.enabled:
-            base_windows.append(int(pp.adf_differencing.sample_size))
+        # FFSTAT Task 2.2：ADF 樣本數即 N（calibration_bars，已列入上方）；依週期分設者取其最大
+        if pp.calibration_bars_by_timeframe:
+            base_windows.append(max(int(v) for v in pp.calibration_bars_by_timeframe.values()))
 
     if not base_windows:
         return 0

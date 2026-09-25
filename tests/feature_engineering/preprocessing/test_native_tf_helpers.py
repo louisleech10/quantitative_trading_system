@@ -84,7 +84,8 @@ class TestScaleConfig:
         assert scaled["adaptive_zscore"]["window"] == 20
         # [60/12, 120/12, 240/12] = [5, 10, 20]
         assert scaled["adaptive_zscore"]["windows"] == [5, 10, 20]
-        assert scaled["calibration_bars"] == 50
+        # FFSTAT Task 2.2（改寫：原斷言縮放為 50）：calibration_bars 為 ADF 觀測筆數 N，不隨週期縮放
+        assert scaled["calibration_bars"] == 600
         # enabled flags preserved
         assert scaled["rank_transform"]["enabled"] is True
         assert scaled["adaptive_zscore"]["enabled"] is True
@@ -114,13 +115,15 @@ class TestScaleConfig:
         assert scaled["fractional_differencing"]["max_lag"] == 50
         assert scaled["winsorization"]["lower_q"] == 0.01
         assert scaled["winsorization"]["window"] == 21
-        assert scaled["calibration_bars"] == 42
+        # FFSTAT Task 2.2（改寫：原斷言注入縮放後之 42）：calibration_bars 不縮放、未設者不注入
+        assert "calibration_bars" not in scaled
 
     def test_missing_keys_no_error(self):
         cfg = {"winsorization": {"lower_q": 0.01}}
         scaled = scale_preprocessing_config_for_native(cfg, "12h", "1h")
         assert scaled["winsorization"] == {"lower_q": 0.01, "window": 21}
-        assert scaled["calibration_bars"] == 42
+        # FFSTAT Task 2.2（改寫：原斷言注入縮放後之 42）：calibration_bars 不縮放、未設者不注入
+        assert "calibration_bars" not in scaled
         assert scaled is not cfg
 
     def test_deep_copy_isolation(self):

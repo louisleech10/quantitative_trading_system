@@ -67,6 +67,7 @@ from scripts.build_l65_golden import (  # noqa: E402
     _build_l1_l2_real_features,
     _l65_full_preprocessing_config,
     _load_hdf5_kline_frame,
+    fixture_layer_map,
     make_synthetic_l65_dataset,
 )
 
@@ -555,7 +556,7 @@ def _run_l65_transform(
         config_hash=config_hash,
         source_data_version=SUITE_SCHEMA_VERSION,
     )
-    preprocessor = FeaturePreprocessor(config, context=context)
+    preprocessor = FeaturePreprocessor(config, context=context, column_layer_map=fixture_layer_map(frame))
     DSTAR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     preprocessor._d_star_cache_dir = lambda: DSTAR_CACHE_DIR
     preprocessor._d_star_cache_shared = True

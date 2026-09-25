@@ -205,7 +205,12 @@ def test_fracdiff_convergence_failure(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(pre, "_find_min_d", _raise)
     out = pre.transform(df)
-    assert "L1_f2_fracdiff" in out.columns
+    # FFSTAT Task 3.1（改寫：原斷言搜尋失敗仍以 d=1.0 產出 `L1_f2_fracdiff`）：搜尋失敗保原值、
+    # 不產 fracdiff 衍生欄、原欄值不變，並記 `fracdiff_search_failed` 事件（SPEC §C「不得以任何預設 d 替代」）
+    assert "L1_f2_fracdiff" not in out.columns
+    pd.testing.assert_series_equal(out["L1_f2"], df["L1_f2"])
+    events = [e for record in pre.stationarity_decisions().values() for e in record["events"]]
+    assert "fracdiff_search_failed" in events
 
 
 def test_fracdiff_short_data() -> None:

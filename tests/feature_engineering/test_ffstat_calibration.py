@@ -705,15 +705,21 @@ def test_parallel_real_worker_same_n_and_decisions(tmp_path: Path, monkeypatch: 
 
 
 def test_boundary_12_n_change_misses_dstar_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.2 邊界①：N 變更 ⇒ d* 快取未命中（同一隔離快取目錄先以 N=500 填入，再以 N=1000 跑）。"""
-    dstar = h.prepare_stat_env(monkeypatch, tmp_path)
-    h.run_stat(tmp_path, h.stat_payload())
+    """Task 2.2 邊界①：N 變更 ⇒ 不命中舊 N 之 d* 快取（同一隔離快取目錄先以 N=500 填入，再以 N=1000 跑）。
+    同一 run 內值完全相同之欄經值別名共用 d*、亦記為命中（主委實跑 2026-09-25），故以「全新快取目錄直接跑
+    N=1000」之逐欄命中為對照：兩者須全等（舊 N 之快取未貢獻任何命中），且快取目錄出現新 N 之檔。"""
     payload = h.stat_payload()
     payload["preprocessing"]["calibration_bars"] = 1000
-    _, _, result = h.run_stat(tmp_path, payload)
-    hits = [d["dstar_cache_hit"] for d in h.decisions(result).values() if d["fracdiff"]]
-    assert hits and not any(hits)
-    assert any(dstar.iterdir())
+    h.prepare_stat_env(monkeypatch, tmp_path / "fresh")
+    _, _, fresh = h.run_stat(tmp_path / "fresh", payload)
+    fresh_hits = {c: d["dstar_cache_hit"] for c, d in h.decisions(fresh).items() if d["fracdiff"]}
+    dstar = h.prepare_stat_env(monkeypatch, tmp_path / "warm")
+    h.run_stat(tmp_path / "warm", h.stat_payload())
+    files_n500 = set(dstar.iterdir())
+    _, _, result = h.run_stat(tmp_path / "warm", payload)
+    hits = {c: d["dstar_cache_hit"] for c, d in h.decisions(result).items() if d["fracdiff"]}
+    assert hits and hits == fresh_hits
+    assert set(dstar.iterdir()) - files_n500
 
 
 def test_boundary_13_same_n_hits_dstar_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

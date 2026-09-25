@@ -197,7 +197,9 @@ def slow_full_chain_config_payload(reference_symbol: str) -> dict[str, object]:
             "rank_transform": {"enabled": False},
             "adaptive_zscore": {"enabled": False},
             "gaussian_normalize": {"enabled": False},
-            "adf_differencing": {"enabled": True, "sample_size": 256, "max_diff": 1},
+            # FFSTAT Task 2.2：ADF 樣本數統一為 calibration_bars（原 adf_differencing.sample_size=256）
+            "calibration_bars": 256,
+            "adf_differencing": {"enabled": True, "max_diff": 1},
             "fractional_differencing": {
                 "enabled": True,
                 "cache_d_star": True,

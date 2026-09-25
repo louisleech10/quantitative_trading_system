@@ -299,10 +299,15 @@ class FeaturePreprocessor:
     def _rolling_min_periods(window: int) -> int:
         return resolve_winsor_min_periods(int(window))
 
+    def _stationarity_n(self) -> int:
+        """平穩化三路（ADF 差分候選、fracdiff 目標篩選、d* 搜尋）共用之樣本數 N（FFSTAT Task 2.2）：
+        當次原生週期於 `calibration_bars_by_timeframe` 之值，未列者用 `calibration_bars`（預設 500）。"""
+        by_timeframe = self._config.get("calibration_bars_by_timeframe") or {}
+        timeframe = self._decision_scope()[0]
+        return int(by_timeframe.get(timeframe, self._config.get("calibration_bars", 500)))
+
     def _calibration_bars(self) -> int:
-        adf_sample = int(self.adf_config.get("sample_size", self.fracdiff_config.get("sample_size", 500)))
-        configured = int(self._config.get("calibration_bars", 500))
-        return max(adf_sample, configured, 500)
+        return self._stationarity_n()
 
     def _calibration_series(self, series: pd.Series) -> pd.Series:
         bars = min(len(series), self._calibration_bars())
@@ -3071,12 +3076,7 @@ class FeaturePreprocessor:
         max_lag: int,
         weight_threshold: float,
     ) -> DStarCache:
-        sample_size = int(
-            self.fracdiff_config.get(
-                "sample_size",
-                self.adf_config.get("sample_size", 500),
-            )
-        )
+        sample_size = self._stationarity_n()  # FFSTAT Task 2.2：三路同一 N
         return DStarCache(
             self._preprocessing_context,
             self._d_star_cache_dir(),
@@ -3218,12 +3218,7 @@ class FeaturePreprocessor:
         weight_threshold: float,
         n_jobs: int,
     ) -> pd.DataFrame:
-        sample_size = int(
-            self.fracdiff_config.get(
-                "sample_size",
-                self.adf_config.get("sample_size", 500),
-            )
-        )
+        sample_size = self._stationarity_n()  # FFSTAT Task 2.2：三路同一 N
         col_input_arrays: Dict[str, np.ndarray] = {}
         duplicate_columns_by_rep: Dict[str, List[str]] = {}
         item_rep_by_value: Dict[str, str] = {}
@@ -3364,7 +3359,12 @@ class FeaturePreprocessor:
         cache_enabled = bool(self.fracdiff_config.get("cache_d_star", True))
         cache: Optional[DStarCache] = None
         shared_cache = False
-        if cache_enabled and self._d_star_cache_shared:
+        shared_n_matches = (
+            self._d_star_cache is None
+            or int(self._d_star_cache._metadata.get("sample_size") or -1) == self._stationarity_n()
+        )
+        # 共享快取之檔層鍵含 N；本次群組之週期 N 不同（calibration_bars_by_timeframe）⇒ 改用本次專屬快取
+        if cache_enabled and self._d_star_cache_shared and shared_n_matches:
             if self._d_star_cache is None:
                 self._d_star_cache = self._create_d_star_cache(
                     adf_threshold=adf_threshold,
@@ -3473,7 +3473,7 @@ class FeaturePreprocessor:
         result = df.copy()
         threshold = float(self.adf_config.get("adf_threshold", 0.05))
         max_diff = int(self.adf_config.get("max_diff", 2))
-        sample_size = int(self.adf_config.get("sample_size", 500))
+        sample_size = self._stationarity_n()  # FFSTAT Task 2.2：三路同一 N
         candidate_columns = [
             column
             for column in columns
@@ -3750,7 +3750,7 @@ class FeaturePreprocessor:
             return []
 
         threshold = float(self.adf_config.get("adf_threshold", self.fracdiff_config.get("adf_threshold", 0.05)))
-        sample_size = int(self.adf_config.get("sample_size", self.fracdiff_config.get("sample_size", 500)))
+        sample_size = self._stationarity_n()  # FFSTAT Task 2.2：三路同一 N
         sample_size = max(sample_size, 1)
         nan_policy = "dropna"
         non_stationary: List[str] = []
@@ -3882,6 +3882,7 @@ class FeaturePreprocessor:
         if effective_precision <= 0.0:
             effective_precision = self._resolve_fracdiff_precision()
         weight_threshold = float(self.fracdiff_config.get("weight_threshold", 1e-5))
+        stationarity_n = self._stationarity_n()  # FFSTAT Task 2.2：d* 內層 ADF 與 ADF 差分候選、fracdiff 目標篩選同一 N
         values = clean.to_numpy(dtype=np.float64, copy=False)
 
         # ── Precompute filled_slice once ─────────────────────────────────────
@@ -3920,7 +3921,7 @@ class FeaturePreprocessor:
             clean_values = clean_values[np.isfinite(clean_values)]
             if clean_values.size < 20:
                 return 1.0
-            return self._adf_pvalue_for_values(clean_values, sample_size=500)
+            return self._adf_pvalue_for_values(clean_values, sample_size=stationarity_n)  # FFSTAT Task 2.2：d* 內層同一 N（原寫死 500）
 
         def _full_search() -> float:
             return find_min_d_full_bisection(
