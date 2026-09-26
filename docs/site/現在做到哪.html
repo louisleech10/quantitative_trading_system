@@ -24,15 +24,15 @@
 <li>✅ <strong>第 1 批</strong>：拿掉「看名字就跳過檢定」的清單；要不要做 fracdiff 只看特徵真正屬於哪一層（查不到就直接報錯，不再從名字猜）；每一欄的判斷結果（層、檢定 p 值、有沒有做、用的 d）都寫進產出紀錄。</li>
 <li>✅ <strong>第 2 批</strong>：d* 算不出來時不再偷偷用 d=1 硬套，改成保留原值、記下失敗、整次產出標記為「部分完成」；快取檔壞掉、寫不進去也都會記下來。</li>
 <li>✅ <strong>第 3 批</strong>：判斷只用開始日期之前的資料（修掉偷看未來的關鍵），三個檢定步驟用同一個樣本數 N；依你 2026-09-26 的裁定，某欄歷史不夠時只有那一欄不做平穩化、標記「歷史不足」並把整批標為「部分完成」。後半審了 4 輪（Codex 最後一輪放行），期間修掉 6 個問題：同一個程式物件重跑「IC 優先」時會沿用上一次的暫存資料、參考標的在開始日前沒資料會整批失敗、非 UTC 時區的市場（台股、美股）日期比較會當掉、跨標的參考資料的快取不分時間段（早的時間段會拿到晚的資料，產出靜默變空）、多標的平行跑完不刪暫存目錄；另外補修 3 支因 FF-STAT 而壞掉、之前沒被跑到的測試。</li>
-<li>⬜ <strong>第 4 批</strong>：沒填開始日期時自動預留校準段，並在前端顯示（順手修第 3 批最後一輪提到的暫存清理小漏洞）。</li>
+<li>⏳ <strong>第 4 批</strong>：沒填開始日期時自動預留校準段，並在前端顯示（順手修第 3 批最後一輪提到的暫存清理小漏洞）。<strong>程式還沒改</strong>：動工前發現原本測試窗根本湊不滿前史，規格重新設計（依你裁定「主訓練週期優先、主週期＝介面主框架」），委員審到第 12 輪兩家都放行；逐條白話版在 <a href="FF-STAT未填起始日審閱.html">FF-STAT未填起始日審閱.md</a>，<strong>等你同意才動程式</strong>。</li>
 <li>⬜ <strong>第 5 批</strong>：量 500／1000／2000 根的耗時、記憶體與判斷差異，帶數字請你定 N，並請你選 N 的定義（「N 個有效值」或「N 根時間長度」）。</li>
 </ul>
 </li>
 <li><strong>速度代價（已實測）</strong>：用預設設定（平穩化關閉）生成時，改前改後一樣快；打開 fracdiff 時，12h 600 根一次多約 95 秒（336 → 431 秒），在你之前同意的「每次多約 2 分鐘」範圍內。</li>
 </ul>
-<p><strong>另外記下的舊問題</strong>：「IC 優先」選特徵路徑用真實資料一定在最後算 IC 那步報錯（ICFIRSTALIGN），不是這張票弄壞的，排在 FF-STAT 之後。</p>
+<p><strong>IC-First 管線合一（原 ICFIRSTALIGN）</strong>：<strong>程式還沒改</strong>。你 2026-09-26 裁定 <code>run_ic_first</code> 不刪、FF-STAT 之後立刻做：IC 頁「套用後處理」改用特徵工廠正式轉換程式（順便修掉偷看未來）、<code>run_ic_first</code> 不再借用工廠殘留狀態、修真實資料 IC 報錯。</p>
 <p><strong>FKPERF</strong>：程式已改完並接上；收尾前還要找一個沒在改檔的空檔跑一次全套治理測試。</p>
-<p><strong>FF-NAME／FFDSTAR</strong>：<strong>程式都還沒改</strong>，排在 FF-STAT 之後。</p>
+<p><strong>FF-NAME／FFDSTAR</strong>：<strong>程式都還沒改</strong>，排在 IC-First 管線合一之後。</p>
 <h2 id="做到哪">做到哪</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -55,8 +55,12 @@
 <td>✅ 完成並審過（後半審 4 輪，Codex 放行）</td>
 </tr>
 <tr>
-<td>FF-STAT 第 4 批（自動預留校準段＋前端顯示）</td>
-<td>⏳ 下一步</td>
+<td>FF-STAT 第 4 批規格（沒填開始日期）</td>
+<td>✅ 委員審到第 12 輪放行，⏳ 等你逐條審閱</td>
+</tr>
+<tr>
+<td>FF-STAT 第 4 批程式（自動預留校準段＋前端顯示）</td>
+<td>⬜ 你同意後動工</td>
 </tr>
 <tr>
 <td>FF-STAT 第 5 批（實測後請你定 N）</td>
@@ -71,8 +75,12 @@
 <td>⬜ 第 5 批實測後請你定</td>
 </tr>
 <tr>
-<td>ICFIRSTALIGN（IC 優先路徑報錯，舊問題）</td>
-<td>⬜ FF-STAT 之後</td>
+<td><code>run_ic_first</code> 去留查證</td>
+<td>✅ 三方查完，你裁定不刪</td>
+</tr>
+<tr>
+<td>IC-First 管線合一（含 IC 頁偷看未來）</td>
+<td>⬜ FF-STAT 之後立刻做</td>
 </tr>
 <tr>
 <td>FKPERF 收尾全套測試</td>
@@ -80,16 +88,16 @@
 </tr>
 <tr>
 <td>FF-NAME、FFDSTAR</td>
-<td>⬜ FF-STAT 之後</td>
+<td>⬜ IC-First 管線合一之後</td>
 </tr>
 </tbody>
 </table></div>
 <h2 id="要你決定嗎">要你決定嗎</h2>
-<p><strong>現在不用。</strong> 接下來會問你的只有：校準窗長 N 與 N 的定義（第 5 批量出數字後）、FFDSTAR 多出一個輸出檔的大小。</p>
+<p><strong>要。</strong> 請看 <a href="FF-STAT未填起始日審閱.html">FF-STAT未填起始日審閱.md</a>，同意後才動第 4 批程式。之後會問你的：校準窗長 N 與 N 的定義（第 5 批量出數字後）、FFDSTAR 多出一個輸出檔的大小。</p>
 <h2 id="卡住嗎">卡住嗎</h2>
 <p>沒有。只有一件要你動手：我這邊的權限不能刪檔，測試暫存（約 1.1 GB）的清理指令已在對話中給你，執行過就不用管。</p>
 <h2 id="下一件事">下一件事</h2>
-<p>第 4 批：沒填開始日期時自動預留校準段、前端顯示（寫程式 → 委員審 → 修 → 收）。</p>
+<p>你同意第 4 批規格後：寫程式 → 委員審 → 修 → 收。</p>
 
 <footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/現在做到哪.md</code> 生成；HTML 是產物，請改 .md。</footer>
 </main>
