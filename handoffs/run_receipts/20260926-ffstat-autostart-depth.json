@@ -1,0 +1,23 @@
+{
+  "purpose": "FF-STAT Task 2.3（未填起始日自動預留）可行性：SPEC §C 前史深度公式 vs 真實資料每欄湊滿 N 所需前史列數",
+  "date": "2026-09-26",
+  "by": "claude（主委實跑，唯讀探針）",
+  "probes": [
+    "/private/tmp/claude-501/.../scratchpad/probe_depth.py（公式深度 vs 真實根數）",
+    "/private/tmp/claude-501/.../scratchpad/probe_first_valid.py（全歷史校準域，每欄第 N 個有效值之列索引＋1）"
+  ],
+  "config": "tests/feature_engineering/ffstat_helpers.stat_payload（輕量設定、單週期、3,632 欄）；N=calibration_bars=500",
+  "formula": "SPEC §C：前史深度＝estimate_max_warmup_bars(1049)＋N(500)＋CALIBRATION_FIRST_VALID_DELAY_BARS(1404，僅量自 BTC 1h)＝2953（各週期同值）",
+  "results": [
+    {"symbol": "BTCUSDT", "tf": "1h", "rows": 20352, "need_rows_p50": 558, "need_rows_p99": 1592, "need_rows_max": 1904, "never_reach_N": 2, "formula_depth": 2953, "formula_feasible": true},
+    {"symbol": "BTCUSDT", "tf": "12h", "rows": 1696, "need_rows_p50": 554, "need_rows_p99": 1323, "need_rows_max": 1688, "never_reach_N": 39, "formula_depth": 2953, "formula_feasible": false},
+    {"symbol": "ETHUSDT", "tf": "1h", "rows": 20352, "need_rows_p50": 558, "need_rows_p99": 1498, "need_rows_max": 1904, "never_reach_N": 2, "formula_depth": 2953, "formula_feasible": true},
+    {"symbol": "ETHUSDT", "tf": "12h", "rows": 1696, "need_rows_p50": 555, "need_rows_p99": 1208, "need_rows_max": 1532, "never_reach_N": 37, "formula_depth": 2953, "formula_feasible": false}
+  ],
+  "observations": [
+    "1h 之 need_rows 最大值 1904＝1404＋500：量 1404 時之「首個有效值最大延遲」已含 warmup，公式再加 estimate_max_warmup_bars 為重複計算",
+    "estimate_max_warmup_bars（1049）低估部分欄之實際首個有效值位置（最大 1404），疑為複合窗（如長週期指標再滾動、再延遲）未累加",
+    "12h 真實資料 1,696 根 < 公式 2,953 ⇒ 依現行 SPEC，任何含 12h 之 run 未填起始日必 fail-closed",
+    "完整鏈設定（ff_artifact_compare_helpers.slow_full_chain_config_payload、N=256、12h）另測：前史 1,034 根時約 569 欄不足、1,278 根時約 330 欄不足（b3 r3 主委探針）"
+  ]
+}
