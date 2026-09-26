@@ -416,6 +416,79 @@ class TestT51MultiSymbolParallel:
         assert len(parts[1][1]) == 2500
 
 
+class TestMultiSymbolReferenceIpcCleanup:
+    """FFSTAT b3 r5（CODEX-R5-P2-01）：run_multi_symbol 之參考資料 IPC 暫存目錄（ffact_multi_*）於所有出口皆刪。
+    參考資料取自真實 kline；只以假 pool 取代子程序（驗資源生命週期，不驗特徵值）。拿掉 finally 清理 ⇒ 紅。"""
+
+    @staticmethod
+    def _run(monkeypatch, tmp_path, pool_cls):
+        import concurrent.futures as cf
+        import tempfile
+
+        from momentum.factories import create_feature_factory
+        from momentum.FeatureEngineering import arrow_ipc_utils
+        from momentum.FeatureEngineering import feature_factory as ff_mod
+
+        monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))  # 失敗時殘留只落在本測試目錄
+        monkeypatch.setattr(ff_mod, "_warmup_numba_functions", lambda: None)
+        monkeypatch.setattr(cf, "ProcessPoolExecutor", pool_cls)
+        created: list = []
+        real_write = arrow_ipc_utils.write_reference_data_ipc
+
+        def _spy_write(ref_df, work_dir, ref_symbol):
+            created.append(work_dir)
+            return real_write(ref_df, work_dir, ref_symbol)
+
+        monkeypatch.setattr(arrow_ipc_utils, "write_reference_data_ipc", _spy_write)
+        factory = create_feature_factory(cache_dir="data_cache/feature_klines", validate_continuity=False)
+        payload = {"timeframes": {"primary": "1h", "training": ["1h"]},
+                   "cross_sectional": {"enabled": True, "reference_symbol": "ETHUSDT"}}
+        try:
+            out = factory.run_multi_symbol(["ADAUSDT"], config_override=payload, max_workers=1)
+        finally:
+            assert len(created) == 1, created
+            assert created[0].name.startswith("ffact_multi_")
+        return out, created[0]
+
+    @pytest.mark.requires_kline
+    def test_ipc_workdir_removed_after_success(self, monkeypatch, tmp_path):
+        import concurrent.futures as cf
+
+        class _DonePool:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def submit(self, fn, sym, config_payload, cache_dir, ref_ipc_path):
+                assert ref_ipc_path and os.path.exists(ref_ipc_path)  # 派工當下 IPC 仍在
+                future = cf.Future()
+                future.set_result({"ok": True})
+                return future
+
+        (results, errors), work_dir = self._run(monkeypatch, tmp_path, _DonePool)
+        assert results == {"ADAUSDT": {"ok": True}} and errors == {}
+        assert not work_dir.exists()
+
+    @pytest.mark.requires_kline
+    def test_ipc_workdir_removed_when_pool_raises(self, monkeypatch, tmp_path):
+        class _BrokenPool:
+            def __init__(self, *args, **kwargs):
+                raise RuntimeError("pool start failed")
+
+        created: list = []
+        with pytest.raises(RuntimeError, match="pool start failed"):
+            try:
+                self._run(monkeypatch, tmp_path, _BrokenPool)
+            finally:
+                created.extend(p for p in tmp_path.iterdir() if p.name.startswith("ffact_multi_"))
+        assert created == [], created
+
+
 # ===========================================================================
 # T5.2: No crosstalk between workers (unit-level)
 # ===========================================================================

@@ -4597,6 +4597,7 @@ class FeatureFactory:
         # 寫進錯誤的 cache key → 讀取端靜默拿到錯誤標的的資料。
         effective_ref_symbol = config.cross_sectional.reference_symbol or ref_symbol
         ref_ipc_path: Optional[str] = None
+        work_dir: Optional[Path] = None
         try:
             from momentum.FeatureEngineering.arrow_ipc_utils import write_reference_data_ipc
             ref_data = self._load_reference_if_available(effective_ref_symbol, config)
@@ -4615,24 +4616,31 @@ class FeatureFactory:
         results: Dict[str, Any] = {}
         errors: Dict[str, str] = {}
 
-        with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
-            futures = {
-                pool.submit(
-                    _worker_entry,
-                    sym,
-                    config_payload,
-                    cache_dir,
-                    ref_ipc_path,
-                ): sym
-                for sym in symbols
-            }
-            for future in as_completed(futures):
-                sym = futures[future]
-                try:
-                    results[sym] = future.result(timeout=timeout_per_symbol)
-                except Exception as exc:
-                    errors[sym] = str(exc)
-                    logger.error("Symbol %s failed: %s", sym, exc)
+        try:
+            with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
+                futures = {
+                    pool.submit(
+                        _worker_entry,
+                        sym,
+                        config_payload,
+                        cache_dir,
+                        ref_ipc_path,
+                    ): sym
+                    for sym in symbols
+                }
+                for future in as_completed(futures):
+                    sym = futures[future]
+                    try:
+                        results[sym] = future.result(timeout=timeout_per_symbol)
+                    except Exception as exc:
+                        errors[sym] = str(exc)
+                        logger.error("Symbol %s failed: %s", sym, exc)
+        finally:
+            if work_dir is not None:
+                # 參考資料 IPC 暫存目錄：所有出口（成功、worker 失敗、pool 例外）皆刪，避免重複執行累積（FFSTAT b3 r5）
+                import shutil
+
+                shutil.rmtree(work_dir, ignore_errors=True)
 
         logger.info(
             "Multi-symbol run complete: %d succeeded, %d failed",
