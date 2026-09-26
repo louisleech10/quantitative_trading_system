@@ -128,14 +128,14 @@
 <td>HP-FFSTAT</td>
 <td>進行中</td>
 <td>docs/FFSTAT_SPEC.md</td>
-<td>2026-09-24 使用者第 4 點開票；SPEC v5 經 r1–r5 兩家收斂（commit <code>ae8b3cba</code>）；白話審閱（白話說明/FF-STAT規格審閱.md）時使用者連問免檢表抽樣、全量 ADF 成本、前 500 根抽樣誤差，並指示「將量化業界和統計分析怎麼做考量進去做研究」⇒ 研究 r1 已收斂（handoffs/reconcile/20260924-ffstatres-x-consult-r1/synth.md 已銷帳）；研究 r2 定乙案（起始日前資料、獨立校準域）。成本收據 handoffs/run_receipts/20260924-ffstat-adf-cost.json（L1＋L2 90,006 欄全量約 194 秒／標的／次）。使用者 2026-09-24 裁定：窗長「先實測再定」、未填起始日「自動預留校準段」、SPEC v17「同意施工」；v18 兩處事實更正。TODO manifest docs/manifests/FFSTAT.json 定案（r24、兩家戳記）；實作 b1–b3 收批（b3 含 SPEC v19 前史不足逐欄〔使用者 2026-09-26 裁定〕與 v20 審碼修補，r3–r6 共六輪，r6 codex proceed）；b4 動工前重設計未填起始日（使用者 2026-09-26 裁定主訓練週期優先、主週期＝介面主框架），SPEC v21→v30 經審查 r2–r10，下一步 r11 → 白話逐條審閱 → b4 實作，餘 b5</td>
+<td>2026-09-24 使用者第 4 點開票；SPEC v5 經 r1–r5 兩家收斂（commit <code>ae8b3cba</code>）；白話審閱（白話說明/FF-STAT規格審閱.md）時使用者連問免檢表抽樣、全量 ADF 成本、前 500 根抽樣誤差，並指示「將量化業界和統計分析怎麼做考量進去做研究」⇒ 研究 r1 已收斂（handoffs/reconcile/20260924-ffstatres-x-consult-r1/synth.md 已銷帳）；研究 r2 定乙案（起始日前資料、獨立校準域）。成本收據 handoffs/run_receipts/20260924-ffstat-adf-cost.json（L1＋L2 90,006 欄全量約 194 秒／標的／次）。使用者 2026-09-24 裁定：窗長「先實測再定」、未填起始日「自動預留校準段」、SPEC v17「同意施工」；v18 兩處事實更正。TODO manifest docs/manifests/FFSTAT.json 定案（r24、兩家戳記）；實作 b1–b3 收批（b3 含 SPEC v19 前史不足逐欄〔使用者 2026-09-26 裁定〕與 v20 審碼修補，r3–r6 共六輪，r6 codex proceed）；b4 動工前重設計未填起始日（使用者 2026-09-26 裁定主訓練週期優先、主週期＝介面主框架），SPEC v21→v31 經審查 r2–r11（r11 後經 run_ic_first 去留查證，使用者裁定不刪、另開合一票），下一步 r12 → 白話逐條審閱 → b4 實作，餘 b5</td>
 </tr>
 <tr>
 <td>042</td>
 <td>HP-ICFIRSTALIGN</td>
 <td>未開工</td>
 <td>docs/manifests/FFSTAT.json</td>
-<td>2026-09-24 FF-STAT r19 追查時發現：真實 kline 下 run_ic_first 之 IC 階段必拋 AlignmentViolationError（label 時間戳 index 對 L7 raw 讀回 RangeIndex；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 <code>78c85bb2</code>）。另立票，排在 FF-STAT 之後；併入平穩化關閉時 run_ic_first 只能讀最近一次輸出窗之選窗介面（FF-STAT r9）；動工前先查證 run_ic_first 是否仍需要（無呼叫者、與頁面三步流程重疊），帶證據請使用者裁定刪或修</td>
+<td>2026-09-24 FF-STAT r19 追查時發現：真實 kline 下 run_ic_first 之 IC 階段必拋 AlignmentViolationError（label 時間戳 index 對 L7 raw 讀回 RangeIndex；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 <code>78c85bb2</code>）。使用者 2026-09-26 裁定 run_ic_first 不刪（去留查證 handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md），本票改為 IC-First 管線合一：IC 頁套用後處理改用正式實作並修其未來洩漏（未勾 rank 時 Gaussian 全樣本排名）、run_ic_first 去除 factory 可變狀態依賴、修對齊；排 FF-STAT 之後立刻做（先於 FF-NAME、FFDSTAR）</td>
 </tr>
 </tbody>
 </table></div>
