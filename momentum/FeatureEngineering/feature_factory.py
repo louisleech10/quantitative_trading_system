@@ -235,7 +235,8 @@ class FeatureFactory:
         self._current_timeframe: Optional[str] = None
         self._current_config_hash: Optional[str] = None
         self._current_raw_data: Optional[pd.DataFrame] = None
-        self._reference_data_cache: Dict[Tuple[str, str], pd.DataFrame] = {}
+        # 鍵＝(參考標的, 週期, L0 載入起點, 輸出終點)；全歷史載入者後兩者為 None（見 _layer5_cross_sectional）
+        self._reference_data_cache: Dict[Tuple[str, str, Optional[str], Optional[str]], Optional[pd.DataFrame]] = {}
         self._cgsa_registry: Optional[ColumnGroupRegistry] = None
         self._cgsa_force_fresh: bool = False
         self._memory_profiler = _MemoryProfiler()
@@ -1900,7 +1901,11 @@ class FeatureFactory:
                 present_engines=0,
             )
 
-        cache_key = (reference_symbol, timeframe)
+        ref_start = self._layer0_ingest_start_date_for_tf(timeframe, config.timeframes.primary)
+        ref_end = self._current_output_window.output_end if self._current_output_window is not None else None
+        # 快取鍵含本次參考資料之載入時間窗（FFSTAT b3 r4；SPEC §C 快取鍵須含載入時間窗）：同一時間窗之多標的
+        # 批次共用，不同時間窗不互相命中（否則早窗會取到晚窗截斷之參考資料，公開 L5 欄靜默變空或錯值）
+        cache_key = (reference_symbol, timeframe, ref_start, ref_end)
         try:
             if cache_key in self._reference_data_cache:
                 ref_data = self._reference_data_cache[cache_key]
@@ -1914,18 +1919,7 @@ class FeatureFactory:
                     )
             else:
                 ref_data = self._layer0_data_ingestion(
-                    reference_symbol,
-                    timeframe,
-                    config,
-                    start_date=self._layer0_ingest_start_date_for_tf(
-                        timeframe,
-                        config.timeframes.primary,
-                    ),
-                    end_date=(
-                        self._current_output_window.output_end
-                        if self._current_output_window is not None
-                        else None
-                    ),
+                    reference_symbol, timeframe, config, start_date=ref_start, end_date=ref_end,
                 )
                 self._reference_data_cache[cache_key] = ref_data
         except Exception as exc:
@@ -4656,7 +4650,8 @@ class FeatureFactory:
         try:
             training_tfs = list(dict.fromkeys(config.timeframes.training))
             tf = training_tfs[0] if training_tfs else "1h"
-            cached = self._reference_data_cache.get((ref_symbol, tf))
+            # 全歷史載入（無起訖）⇒ 快取鍵之時間窗兩端皆 None（與 _layer5_cross_sectional 同一鍵形）
+            cached = self._reference_data_cache.get((ref_symbol, tf, None, None))
             if cached is not None:
                 return cached
             # Attempt adapter fetch
@@ -4798,7 +4793,8 @@ def _worker_entry(
             ref_symbol = config_payload.get("cross_sectional", {}).get(
                 "reference_symbol", "BTCUSDT"
             )
-            factory._reference_data_cache[(ref_symbol, tf)] = ref_df
+            # 預載者為全歷史，且下方 generate_features 無起訖 ⇒ 時間窗兩端皆 None（與 _layer5_cross_sectional 同一鍵形）
+            factory._reference_data_cache[(ref_symbol, tf, None, None)] = ref_df
         except Exception:
             pass  # Proceed without reference data
 

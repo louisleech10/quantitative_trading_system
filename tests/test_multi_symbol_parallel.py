@@ -471,11 +471,12 @@ class TestT52NoCrosstalk:
             ref_ipc_path=str(ipc_path),
         )
 
-        assert (ref_symbol, "1h") in captured["cache_keys"], (
+        # FFSTAT b3 r4：快取鍵含載入時間窗；預載為全歷史 ⇒ (參考標的, 週期, None, None)
+        assert (ref_symbol, "1h", None, None) in captured["cache_keys"], (
             f"參考資料應以 config 的 reference_symbol={ref_symbol} 為 cache key，"
             f"實際: {captured['cache_keys']}"
         )
-        assert ("BTCUSDT", "1h") not in captured["cache_keys"], (
+        assert not any(key[:2] == ("BTCUSDT", "1h") for key in captured["cache_keys"]), (
             "不得把參考資料寫進硬編碼的 BTCUSDT key（:4109 bug）"
         )
 

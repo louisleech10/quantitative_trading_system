@@ -450,6 +450,47 @@ def test_cross_sectional_reference_without_pre_history_column_skipped(tmp_path: 
     assert any(r.startswith(f"{event}:") for r in result.metadata["failure_reasons"])
 
 
+def test_reference_cache_keyed_by_load_window(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """b3 r4（CODEX-R4-P1-01；SPEC §C 快取鍵須含載入時間窗）：同一 factory 依序算晚窗、早窗之 L5 ⇒ 早窗 cs 欄
+    與新 factory 算早窗逐欄相同（不取晚窗截斷之參考資料），且參考資料讀兩次；同窗再算則命中快取不再讀。
+    拿掉鍵中時間窗 ⇒ 早窗重用晚窗參考資料、無重疊 ⇒ cs 欄消失 ⇒ 紅。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.warmup_window import resolve_output_window
+
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    payload = h.stat_payload(cross_sectional=True, fracdiff=False, adf=False)
+    reference = payload["cross_sectional"]["reference_symbol"]
+
+    def _l5(factory: Any, start: str, end: str) -> pd.DataFrame:
+        config = factory._resolve_config(payload)
+        factory._current_symbol, factory._current_timeframe = h.SYMBOL, h.PRIMARY_TF
+        factory._current_output_window = resolve_output_window(config, h.PRIMARY_TF, start, end)
+        raw = factory._layer0_data_ingestion(h.SYMBOL, h.PRIMARY_TF, config, start_date=start, end_date=end)
+        factory._current_raw_data = raw
+        empty = pd.DataFrame(index=raw.index)
+        return factory._layer5_cross_sectional(empty, empty, config).data
+
+    reused = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    fetches: list = []
+    real_ingest = reused._layer0_data_ingestion
+
+    def _spy(symbol: str, *args: Any, **kwargs: Any) -> pd.DataFrame:
+        if symbol == reference:
+            fetches.append(kwargs.get("start_date"))
+        return real_ingest(symbol, *args, **kwargs)
+
+    monkeypatch.setattr(reused, "_layer0_data_ingestion", _spy)
+    late = _l5(reused, "2025-01-15", "2025-01-25")
+    early = _l5(reused, "2025-01-01", "2025-01-10")
+    fresh = _l5(create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False), "2025-01-01", "2025-01-10")
+    assert list(late.columns) == list(fresh.columns) and len(fresh.columns) == 3, (late.columns, fresh.columns)
+    pd.testing.assert_frame_equal(early, fresh)
+    assert len(fetches) == 2, fetches
+    again = _l5(reused, "2025-01-01", "2025-01-10")
+    pd.testing.assert_frame_equal(again, fresh)
+    assert len(fetches) == 2, "同一時間窗應命中快取"
+
+
 def test_decisions_attr_is_instance_level() -> None:
     """Task 2.1 契約（r20 composer P2-02）：`factory_decisions_attr` 為實例屬性、初值 None，不宣告於類別上
     （多實例／多週期不得互相覆寫）。"""

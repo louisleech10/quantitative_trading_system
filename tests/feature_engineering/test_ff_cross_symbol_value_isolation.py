@@ -226,9 +226,9 @@ def test_v5_5_l5_reference_cache_uses_reference_symbol_timeframe_key(
         config_payload=config,
     )
 
-    expected_key = (OTHER_SYMBOL, BASELINE_TIMEFRAME)
-    assert expected_key in factory._reference_data_cache
-    assert all(len(key) == 2 for key in factory._reference_data_cache)
+    # FFSTAT b3 r4：鍵＝(參考標的, 週期, L0 載入起點, 輸出終點)；參考標的仍在鍵內（跨標的隔離）
+    assert any(key[:2] == (OTHER_SYMBOL, BASELINE_TIMEFRAME) for key in factory._reference_data_cache)
+    assert all(len(key) == 4 for key in factory._reference_data_cache)
     sampled = representative_columns(first, limit=20)
     assert_sampled_values_equal(first, second, columns=sampled)
 
@@ -240,7 +240,7 @@ def test_v5_reference_cache_source_uses_tuple_key_and_effective_ref_symbol() -> 
 
     assert "effective_ref_symbol = config.cross_sectional.reference_symbol or ref_symbol" in source
     assert "write_reference_data_ipc(ref_data, work_dir, effective_ref_symbol)" in source
-    assert "self._reference_data_cache.get((ref_symbol, tf))" in lookup_source
+    assert "self._reference_data_cache.get((ref_symbol, tf, None, None))" in lookup_source
 
 
 def test_mutation_m5_1_shared_dstar_path_fails_isolation(
