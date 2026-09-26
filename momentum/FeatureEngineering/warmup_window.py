@@ -408,6 +408,16 @@ def coerce_index_to_datetime(index: pd.Index) -> pd.Series:
     return pd.to_datetime(index_series, errors="coerce")
 
 
+def to_utc(values: Any) -> Any:
+    """時間比較之共用換算（FFSTAT D12）：無時區者視為 UTC、有時區者轉為 UTC；接受 `Timestamp`、
+    `DatetimeIndex` 或 datetime64 `Series`，回傳同型之 UTC 值。公開 L0 起訖、warmup 裁切與校準域邊界皆經此
+    換算後比較（無時區對無時區之結果不變；轉接器回傳有時區之 index 時不再因與無時區起訖比較而拋 `TypeError`）。
+    只用於比較，回傳給呼叫端之時間值維持原表示。"""
+    if isinstance(values, pd.Series):
+        return values.dt.tz_localize("UTC") if values.dt.tz is None else values.dt.tz_convert("UTC")
+    return values.tz_localize("UTC") if values.tz is None else values.tz_convert("UTC")
+
+
 def compute_row_bounds(
     index: pd.Index,
     window: OutputWindow,
@@ -416,13 +426,13 @@ def compute_row_bounds(
     if not window.warmup_enabled or window.output_start is None:
         return 0, len(index)
 
-    dt_index = coerce_index_to_datetime(index)
-    start_ts = window.output_start_ts
+    dt_index = to_utc(coerce_index_to_datetime(index))
+    start_ts = to_utc(window.output_start_ts)
     end_ts = window.output_end_ts
 
     mask = dt_index >= start_ts
     if end_ts is not None:
-        mask &= dt_index <= end_ts
+        mask &= dt_index <= to_utc(end_ts)
 
     if not mask.any():
         return 0, 0
@@ -443,9 +453,8 @@ def compute_warmup_insufficient(
     if needed <= 0:
         return None
 
-    dt_index = coerce_index_to_datetime(raw_data.index)
-    start_ts = window.output_start_ts
-    before_mask = dt_index < start_ts
+    dt_index = to_utc(coerce_index_to_datetime(raw_data.index))
+    before_mask = dt_index < to_utc(window.output_start_ts)
     available = int(before_mask.sum())
 
     if available >= needed:
@@ -540,8 +549,7 @@ def max_ingest_index_before_output_start(
     if not window.warmup_enabled or window.output_start is None:
         return None
     dt_index = coerce_index_to_datetime(raw_data.index)
-    start_ts = window.output_start_ts
-    before = dt_index[dt_index < start_ts]
+    before = dt_index[(to_utc(dt_index) < to_utc(window.output_start_ts)).to_numpy()]
     if before.empty:
         return None
     return before.max()
@@ -554,6 +562,7 @@ __all__ = [
     "coerce_index_to_datetime",
     "compute_row_bounds",
     "compute_warmup_insufficient",
+    "to_utc",
     "estimate_max_warmup_bars",
     "ingest_layer0_start_date",
     "is_warmup_trim_enabled",

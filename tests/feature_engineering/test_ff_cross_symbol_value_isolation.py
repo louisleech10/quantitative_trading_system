@@ -14,6 +14,7 @@ from momentum.FeatureEngineering.feature_factory import FeatureFactory
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from momentum.FeatureEngineering.preprocessing._d_star_cache import DStarCache
 from momentum.FeatureEngineering.run_paths import cgsa_work_dir, features_run_dir
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 from tests.feature_engineering.ff_artifact_compare_helpers import (
     BASELINE_SYMBOL,
     BASELINE_TIMEFRAME,
@@ -39,6 +40,12 @@ from tests.feature_engineering.ff_artifact_compare_helpers import (
     runtime_output_manifest,
     slow_full_chain_config_payload,
 )
+
+# FFSTAT（SPEC §C、v19）：開啟平穩化須有開始日前之前史——自資料起點開始即「起始日前全無 K 線」而零寫入失敗。
+# 慢測改自共同窗第 SLOW_PRE_HISTORY_BARS 根起輸出。2026-09-26 主委探針（完整鏈設定、12h、N=256）：前史 1,034 根時
+# BTCUSDT／ETHUSDT 各約 569 欄前史不足（長窗欄；前史 1,278 根仍約 330 欄）——12h 真實資料約 848 天內不存在全欄足夠
+# 之起始日，故本測試之品質為 v19 partial（assert_full_chain_runtime 只容許該原因）。
+SLOW_PRE_HISTORY_BARS = 1034
 
 
 def test_v5_4_run_and_cgsa_paths_are_symbol_scoped(tmp_path: Path) -> None:
@@ -83,12 +90,15 @@ def test_v5_2_shared_dstar_cache_is_reset_after_chunked_transform(
         "gaussian_normalize": {"enabled": False},
         "adf_differencing": {"enabled": False},
         "fractional_differencing": {"enabled": True, "cache_d_star": True, "max_lag": 2},
+        # FFSTAT b3b：平穩化判定值只取校準封包；本測試驗 d* 快取路徑之標的隔離，以 fixture 本身建封包（N＝列數）
+        "calibration_bars": rows,
     }
     monkeypatch.setattr(FeaturePreprocessor, "_d_star_cache_dir", staticmethod(lambda: tmp_path / "dstar"))
     monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self: 1)
     # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
     preprocessor = FeaturePreprocessor(config, column_layer_map={column: "L1" for column in frame.columns})
     preprocessor._preprocessing_context = dstar_context(BASELINE_SYMBOL)
+    attach_unit_calibration(preprocessor, frame, symbol=BASELINE_SYMBOL)
     preprocessor._d_star_cache_shared = True
     preprocessor._apply_fractional_differencing(frame)
 
@@ -370,7 +380,11 @@ def test_v5_slow_solo_a_equals_batch_b_then_a_artifacts(
     baseline_kline = requires_kline_data(BASELINE_SYMBOL, BASELINE_TIMEFRAME, min_rows=1600)
     other_kline = requires_kline_data(OTHER_SYMBOL, BASELINE_TIMEFRAME, min_rows=1600)
     assert len(baseline_kline) == len(other_kline)
-    start, end = kline_full_window_dates(baseline_kline, other_kline)
+    _, end = kline_full_window_dates(baseline_kline, other_kline)
+    start = max(
+        pd.Timestamp(int(kline["timestamp"].astype(np.int64).iloc[SLOW_PRE_HISTORY_BARS]), unit="s", tz="UTC")
+        for kline in (baseline_kline, other_kline)
+    ).strftime("%Y-%m-%d")
     config = slow_full_chain_config_payload(reference_symbol=OTHER_SYMBOL)
 
     solo_dstar_dir = tmp_path / "dstar" / "solo"

@@ -176,6 +176,26 @@ def scale_kline_close(kline_dir: Path, start: str, end: str, factor: float, *, s
         return int(mask.sum())
 
 
+def drop_kline_rows_before(kline_dir: Path, before: str, *, symbol: str, timeframe: str = PRIMARY_TF) -> int:
+    """把複本中 `before` 之前之列刪除（真實資料、以刪列模擬晚上市之標的；重建 dataset 並保留屬性）；回傳刪除列數。"""
+    import h5py
+    import numpy as np
+    import pandas as pd
+
+    with h5py.File(kline_dir / "kline_cache.h5", "r+") as f:
+        group = f[symbol][timeframe]
+        arr = group["data"][()]
+        attrs = dict(group["data"].attrs)
+        ts = arr["timestamp"].astype("int64")
+        unit = "ms" if ts.max() > 10**12 else "s"
+        keep = np.asarray(pd.to_datetime(ts, unit=unit, utc=True) >= pd.Timestamp(before, tz="UTC"))
+        del group["data"]
+        ds = group.create_dataset("data", data=arr[keep], maxshape=(None,), chunks=True)
+        for key, value in attrs.items():
+            ds.attrs[key] = value
+        return int((~keep).sum())
+
+
 def derived_fingerprints(root: Path) -> Dict[str, str]:
     """root 下全部 L6.5 衍生欄（`*_L65.parquet`）之 欄名 → 值 sha256（NaN mask 併入）；
     決策與 d 相同 ⇔ 衍生欄集合與值相同（append 模式）。"""

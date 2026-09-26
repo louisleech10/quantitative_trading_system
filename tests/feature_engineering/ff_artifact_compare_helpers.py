@@ -286,10 +286,16 @@ def assert_full_chain_runtime(factory, result, *, manifest: Mapping[str, Any] | 
     assert fracdiff.get("cache_d_star") is True
     output_manifest = manifest or runtime_output_manifest(result)
     assert int(output_manifest.get("feature_count", output_manifest.get("total_features", result.feature_count))) > 0
-    assert str(output_manifest.get("run_status", output_manifest.get("quality_status", "complete"))) in {
-        "complete",
-        "ok",
-    }
+    status = str(output_manifest.get("run_status", output_manifest.get("quality_status", "complete")))
+    if status == "partial":
+        # FFSTAT v19（使用者 2026-09-26 裁定）：開始日前有效值不足 N 之欄只該欄不平穩化、品質 partial；
+        # 只容許此一原因，其餘任何降級照擋
+        from momentum.FeatureEngineering.preprocessing.feature_preprocessor import EVENT_CALIBRATION_INSUFFICIENT
+
+        reasons = [str(r) for r in ((result.metadata or {}).get("failure_reasons") or [])]
+        assert reasons and all(r.startswith(f"{EVENT_CALIBRATION_INSUFFICIENT}:") for r in reasons), reasons
+    else:
+        assert status in {"complete", "ok"}, status
 
 
 def make_factory(tmp_path: Path):

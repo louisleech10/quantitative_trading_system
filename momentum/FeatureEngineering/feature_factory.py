@@ -83,6 +83,7 @@ from momentum.FeatureEngineering.warmup_window import (
     is_warmup_trim_enabled,
     output_row_count,
     resolve_output_window,
+    to_utc,
     trim_dataframe_to_output_window,
     trim_series_to_output_window,
 )
@@ -880,15 +881,16 @@ class FeatureFactory:
         data = data.sort_index()
 
         if start_date is not None or end_date is not None:
-            index_as_datetime = self._coerce_index_to_datetime(data.index)
+            # 起訖與 index 皆經 to_utc 換算後比較（無時區視為 UTC；與校準域邊界同一換算，FFSTAT D12）
+            index_as_datetime = to_utc(self._coerce_index_to_datetime(data.index))
 
             if start_date is not None:
-                start_ts = pd.Timestamp(start_date)
+                start_ts = to_utc(pd.Timestamp(start_date))
                 start_mask = (index_as_datetime >= start_ts).to_numpy()
                 data = data[start_mask]
                 index_as_datetime = index_as_datetime[start_mask]
             if end_date is not None:
-                end_ts = pd.Timestamp(end_date)
+                end_ts = to_utc(pd.Timestamp(end_date))
                 end_mask = (index_as_datetime <= end_ts).to_numpy()
                 data = data[end_mask]
         if not data.index.is_unique:
@@ -1968,7 +1970,20 @@ class FeatureFactory:
             [symbol_close.rename("symbol"), btc_close.rename("btc")],
             axis=1,
         ).dropna()
+        features = config.cross_sectional.features
         if aligned.empty:
+            configured = [
+                f"cs_{name}" for name in ("relative_price", "beta", "idiosyncratic_momentum")
+                if name in features and features[name].enabled
+            ]
+            if getattr(self, "_calibration_domain", False) and configured:
+                # FFSTAT b3 r3：校準域不依資料剔欄——參考標的於前史切片無重疊時保留已設定之 cs 欄（全 NaN），
+                # 使其列入封包 empty_columns、由 L6.5 依 v19 逐欄處理，而非因公開域有此欄而整批缺欄失敗
+                return self._build_layer_result(
+                    data=pd.DataFrame(np.nan, index=index, columns=configured),
+                    configured_engines=1,
+                    present_engines=0,
+                )
             return self._build_layer_result(
                 data=pd.DataFrame(index=index),
                 configured_engines=1,
@@ -1980,7 +1995,6 @@ class FeatureFactory:
         btc_returns = btc_close.pct_change()
 
         frames: List[pd.Series] = []
-        features = config.cross_sectional.features
         if "relative_price" in features and features["relative_price"].enabled:
             frames.append(processor.compute_relative_price(symbol_close, btc_close).rename("cs_relative_price"))
         if "beta" in features and features["beta"].enabled:
@@ -2173,11 +2187,10 @@ class FeatureFactory:
 
     @staticmethod
     def _normalize_calibration_ts(value: Any) -> pd.Timestamp:
-        """校準域之時間基準：與公開域 L0（`_layer0_data_ingestion` 以 `_coerce_index_to_datetime` 之無時區時間戳直接比
-        起始日）同一換算——無時區之起始日視為 UTC；校準邊界因而與公開域起始邊界一致（無洩漏之前提）。
-        非 UTC 交易所（台股、美股、期貨）接入時，時區須於轉接器／L0 統一，本處沿用 L0 之換算，不另設時區。"""
-        ts = pd.Timestamp(value)
-        return ts.tz_localize("UTC") if ts.tz is None else ts.tz_convert("UTC")
+        """校準域之時間基準：與公開域 L0 起訖比較、warmup 裁切同一換算（`warmup_window.to_utc`：無時區視為 UTC、
+        有時區轉 UTC）；校準邊界因而與公開域起始邊界一致（無洩漏之前提），轉接器回傳有時區 index（台股、美股、
+        期貨等非 UTC 交易所）時兩域亦同一換算。"""
+        return to_utc(pd.Timestamp(value))
 
     def _calibrate_timeframe(self, cal: Any, symbol: str, timeframe: str, config: FactoryConfig,
                              output_start: pd.Timestamp) -> Any:
@@ -2192,6 +2205,7 @@ class FeatureFactory:
                 f"校準前史讀取失敗：{symbol} 週期 {timeframe}：{exc}", timeframe=timeframe, field="read",
             ) from exc
         history = klines[np.asarray(self._calibration_datetime_index(klines.index) < output_start)]
+        del klines  # §C 資源界線：起始日前原始列只留一份（讀取之整份 frame 已於讀取函式內釋放）
         if history.empty:
             raise CalibrationError(
                 f"校準前史不足：{symbol} 週期 {timeframe} 於 {output_start} 之前無 K 線，需至少 {n} 根有效值",
@@ -2199,8 +2213,8 @@ class FeatureFactory:
             )
         public_rows = self._public_row_count(symbol, timeframe, config)
         # §C 前史深度：warmup（依原生週期）＋ N ＋首個有效值最大延遲。稀疏欄（值常為 NaN 者）於此深度內有效值
-        # 可能不足 N ⇒ 深度加倍重算，至不再有「將 fail-closed 之欄」或已達資料起點；實際前史短於深度時自資料起點
-        # 載入。硬條件為下方逐欄「起始日前有限值 ≥ N」（不縮窗、不退回輸出範圍）
+        # 可能不足 N ⇒ 深度加倍重算，至不再有 `"short"` 欄或已達資料起點；實際前史短於深度時自資料起點載入。
+        # 仍不足 N 之欄不帶校準值（v19 逐欄事件；不縮窗、不以不足 N 之值判定、不退回輸出範圍）
         depth = estimate_max_warmup_bars(config, timeframe, [timeframe]) + n + cal.CALIBRATION_FIRST_VALID_DELAY_BARS
         while True:
             before = history.iloc[max(0, len(history) - depth):]
@@ -2268,9 +2282,10 @@ class FeatureFactory:
         """校準域一欄之分類（FFSTAT Task 2.1）：
         - `"ok"`：起始日前有效值 ≥ N ⇒ 取校準值；
         - `"deferred"`：全無有效值；或不足 N 但首個有效值之延遲 ≥ 公開域載入列數（公開序列必全 NaN）；或不足 N 且於
-          校準域為死欄（NaN 率 > 0.9 或常數；校準域不依資料剔欄，此類欄於公開域多被 L3 剔除）⇒ 不帶校準值，交 L6.5
-          依公開序列覆核（公開亦全 NaN ⇒ 未檢定；公開有有效值 ⇒ fail-closed）；
-        - `"short"`：其餘不足 N 者 ⇒ 前置關卡即 fail-closed（零寫入）。"""
+          校準域為死欄（NaN 率 > 0.9 或常數；校準域不依資料剔欄，此類欄於公開域多被 L3 剔除）⇒ 不加深前史；
+        - `"short"`：其餘不足 N 者 ⇒ 只用於驅動前史深度加倍（加深可能補足）。
+        非 `"ok"` 者（含加深至資料起點後仍 `"short"`）皆不帶校準值、列入封包 `empty_columns`，由 L6.5 依 v19 逐欄處理：
+        公開序列亦全 NaN ⇒ 只記未檢定；否則該欄不平穩化、記 `calibration_insufficient_history` 與缺少根數、品質 partial。"""
         finite = np.isfinite(values)
         n_finite = int(finite.sum())
         if n_finite >= int(n):
@@ -2284,7 +2299,7 @@ class FeatureFactory:
 
     @classmethod
     def _calibration_short_columns(cls, frame: pd.DataFrame, n: int, public_rows: int) -> List[str]:
-        """校準域中分類為 `"short"`（前置關卡將 fail-closed）之欄。"""
+        """校準域中分類為 `"short"`（加深前史可能補足）之欄。"""
         short: List[str] = []
         for column in frame.columns:
             status = cls._classify_calibration_column(frame[column].to_numpy(dtype=np.float64), n, public_rows)
@@ -2296,7 +2311,7 @@ class FeatureFactory:
         """公開域該原生週期之載入列數（L0 起點＝warmup 開時之 ingest 起點、否則輸出起始日；至輸出結束日）。"""
         window = getattr(self, "_calibration_public_window", None)
         if window is None:
-            # 無公開域視窗 ⇒ 不做「公開必全 NaN」之推定（前史不足一律 fail-closed）
+            # 無公開域視窗 ⇒ 不做「公開必全 NaN」之推定（前史不足一律列 short、加深至資料起點）
             return int(np.iinfo(np.int64).max)
         start = ingest_layer0_start_date(window, timeframe, config.timeframes.primary)
         return int(len(self._layer0_data_ingestion(symbol, timeframe, config, start_date=start,
@@ -2319,8 +2334,7 @@ class FeatureFactory:
     def _calibration_datetime_index(self, index: pd.Index) -> pd.DatetimeIndex:
         """L0 index（epoch 整數或時間戳）→ UTC `DatetimeIndex`（校準域之時間比較、來源紀錄與校準值擷取用；
         換算同 L0，見 `_normalize_calibration_ts`）。"""
-        dt = pd.DatetimeIndex(self._coerce_index_to_datetime(index))
-        return dt.tz_localize("UTC") if dt.tz is None else dt.tz_convert("UTC")
+        return to_utc(pd.DatetimeIndex(self._coerce_index_to_datetime(index)))
 
     def _compute_calibration_domain(self, symbol: str, timeframe: str, config: FactoryConfig,
                                     klines: pd.DataFrame) -> pd.DataFrame:
@@ -2481,8 +2495,9 @@ class FeatureFactory:
         self._current_config_hash = resolved_config_hash
         if not hasattr(self, "_progress_callback"):
             self._progress_callback = None
-        if not hasattr(self, "_cgsa_registry"):
-            self._cgsa_registry = None
+        # IC-first 從不建 CGSA registry：非 None 必為前次 generate_features 之殘留，沿用會使 L6.5 處理舊 registry
+        # 而非本次 frame（FFSTAT b3 r3）⇒ 每次一律重置
+        self._cgsa_registry = None
         if not hasattr(self, "_reference_data_cache"):
             self._reference_data_cache = {}
 

@@ -269,6 +269,80 @@ def test_seams_exist_for_injection() -> None:
     assert callable(cal.load_calibration_klines) and callable(cal.compute_calibration_domain)
 
 
+@pytest.mark.parametrize("tz", ["America/New_York", "UTC", None])
+def test_l0_and_calibration_boundaries_share_utc(tz: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """b3 r3（CODEX-R3-P2-02）：轉接器回傳有時區（紐約、UTC）或無時區之 index（真實 kline 值，只換 index 表示）時，
+    公開 L0 起訖選列、warmup 裁切（`compute_row_bounds`）與校準域邊界皆經同一 UTC 換算（無時區起訖視為 UTC）：
+    三種表示選出同一批 UTC 時間、不拋 TypeError，且校準最晚時間 < 起始日 ≤ 公開首列。
+    拿掉 L0 或 `compute_row_bounds` 之 `to_utc` ⇒ 有時區兩組拋 TypeError ⇒ 紅。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.warmup_window import OutputWindow, compute_row_bounds
+
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    frame = h.kline_frame().loc["2025-11-25":"2025-12-10"].copy()
+    utc = frame.index
+    frame.index = utc.tz_localize(None) if tz is None else utc.tz_convert(tz)
+
+    class _Registry:
+        def fetch_aligned(self, symbol: str, timeframe: str, sources: Any) -> pd.DataFrame:
+            return frame.copy()
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    factory._adapter_registry = _Registry()
+    config = factory._resolve_config(h.stat_payload())
+    start, end = "2025-12-01", "2025-12-05"
+    expected = utc[(utc >= pd.Timestamp(start, tz="UTC")) & (utc <= pd.Timestamp(end, tz="UTC"))]
+    assert len(expected) > 0
+    public = factory._layer0_data_ingestion(h.SYMBOL, h.PRIMARY_TF, config, start_date=start, end_date=end)
+    got = factory._calibration_datetime_index(public.index)
+    assert list(got) == list(expected)
+    window = OutputWindow(ingest_start="2025-11-25", output_start=start, output_end=end, max_warmup_bars=1,
+                          warmup_enabled=True)
+    lo, hi = compute_row_bounds(frame.index, window)
+    assert list(utc[lo:hi]) == list(expected)
+    boundary = factory._normalize_calibration_ts(start)
+    everything = factory._calibration_datetime_index(frame.index)
+    assert everything[everything < boundary].max() < boundary <= got.min()
+
+
+def test_calibration_domain_input_bounded_before_output_start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """b3 r3（CODEX-R3-P1-01 部分採納）：§C 資源界線——讀取入口只回傳起始日前之列；校準域之計算輸入（L1–L6 之輸入）
+    每次皆早於輸出起始日，且列數依序＝min(深度×2^k, 起始日前實際列數)（深度＝warmup＋N＋首個有效值最大延遲）。
+    拿掉讀取之起始日前遮罩或深度截取 ⇒ 紅。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.warmup_window import estimate_max_warmup_bars
+
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    config = factory._resolve_config(h.stat_payload())
+    reads: list = []
+    inputs: list = []
+    real_load, real_compute = cal.load_calibration_klines, cal.compute_calibration_domain
+
+    def _load(f: Any, symbol: str, timeframe: str, start: Any, end: Any) -> pd.DataFrame:
+        out = real_load(f, symbol, timeframe, start, end)
+        reads.append(out.index)
+        return out
+
+    def _compute(f: Any, symbol: str, timeframe: str, cfg: Any, klines: pd.DataFrame) -> pd.DataFrame:
+        inputs.append(klines.index)
+        return real_compute(f, symbol, timeframe, cfg, klines)
+
+    monkeypatch.setattr(cal, "load_calibration_klines", _load)
+    monkeypatch.setattr(cal, "compute_calibration_domain", _compute)
+    factory.run_calibration_preflight(h.SYMBOL, [h.PRIMARY_TF], config, h.WINDOW[0])
+    to_dt = factory._calibration_datetime_index
+    assert len(reads) == 1 and inputs
+    available = int((to_dt(reads[0]) < OUT_START).sum())
+    assert available == len(reads[0]), "讀取入口回傳含輸出起始日（含）之後之列"
+    n = int(config.preprocessing.calibration_bars_by_timeframe.get(h.PRIMARY_TF, config.preprocessing.calibration_bars))
+    depth = estimate_max_warmup_bars(config, h.PRIMARY_TF, [h.PRIMARY_TF]) + n + cal.CALIBRATION_FIRST_VALID_DELAY_BARS
+    assert depth < available, "前提：前史長於深度，截取確有作用"
+    for k, idx in enumerate(inputs):
+        assert to_dt(idx).max() < OUT_START, k
+        assert len(idx) == min(depth * 2 ** k, available), (k, len(idx), depth, available)
+
+
 # ---------------------------------------------------------------- 真實 run（模組共用）
 
 @pytest.fixture(scope="module")
@@ -353,6 +427,27 @@ def test_cross_sectional_public_values_unchanged_by_calibration(tmp_path: Path,
     l5 = [c for c in off if "_L5_" in c or "relative" in c.lower() or "beta" in c.lower()]
     assert l5, "cross-sectional 須產出 L5 欄"
     assert {c: on[c] for c in l5} == {c: off[c] for c in l5}
+
+
+def test_cross_sectional_reference_without_pre_history_column_skipped(tmp_path: Path,
+                                                                       monkeypatch: pytest.MonkeyPatch) -> None:
+    """b3 r3（CODEX-R3-P2-01）：參考標的於輸出起始日前無資料（真實 kline 複本刪 ETHUSDT 起始日前之列）⇒ 校準域 L5
+    保留已設定之 cs 欄（全 NaN）、列入 empty_columns；生成完成，cs 欄依 v19 記 `calibration_insufficient_history`、
+    未平穩化，品質 partial，其餘欄照常。拿掉校準域保留欄 ⇒ 公開 cs 欄不在封包、整批 CalibrationError ⇒ 紅。"""
+    event = h.EVENTS["calibration_insufficient"]
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    klines = h.kline_copy(tmp_path)
+    assert h.drop_kline_rows_before(klines, h.WINDOW[0], symbol="ETHUSDT") > 0
+    _, _, result = h.run_stat(tmp_path, h.stat_payload(cross_sectional=True), kline_dir=str(klines))
+    dec = h.decisions(result)
+    cs = {c: d for c, d in dec.items() if c.startswith("cs_")}
+    assert cs, "cross-sectional 欄須進入 L6.5"
+    for col, d in cs.items():
+        assert event in d["events"], col
+        assert d["adf_pvalue"] is None and not d["fracdiff"] and not d["adf_differenced"], col
+    assert any(isinstance(d["adf_pvalue"], float) for c, d in dec.items() if c not in cs)
+    assert result.metadata["quality_status"] == "partial"
+    assert any(r.startswith(f"{event}:") for r in result.metadata["failure_reasons"])
 
 
 def test_decisions_attr_is_instance_level() -> None:
@@ -495,6 +590,35 @@ def _ic_first_kwargs(factory: Any, root: Path) -> Dict[str, Any]:
 
     return {"ic_engine": ICEngine({"methods": ["spearman"]}), "feature_reader": FeatureReader(str(root)),
             "storage": factory._storage, "ic_threshold": 0.0, "persist": True}
+
+
+def test_ic_first_ignores_stale_cgsa_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """b3 r3（CODEX-R3-P1-02）：同一 factory 先以 CGSA 生成（留下 registry）、再 IC-first 自算 ⇒ L6.5 處理本次
+    frame（`transform` 有呼叫、產生平穩化決策），不碰前次 registry（`transform_registry_groups` 零呼叫）。
+    拿掉 run_ic_first 之 registry 重置 ⇒ 走 registry 分支 ⇒ 紅。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    attr = CONTRACT["factory_decisions_attr"]
+    h.prepare_stat_env(monkeypatch, tmp_path)  # FFACT_USE_CGSA 預設開
+    root, factory, _ = h.run_stat(tmp_path, h.stat_payload())
+    assert factory._cgsa_registry is not None, "前提：CGSA 生成後 registry 殘留於 factory"
+    calls = {"registry": 0, "frame": 0}
+    real_registry, real_frame = FeaturePreprocessor.transform_registry_groups, FeaturePreprocessor.transform
+
+    def _registry(self, *args, **kwargs):
+        calls["registry"] += 1
+        return real_registry(self, *args, **kwargs)
+
+    def _frame(self, *args, **kwargs):
+        calls["frame"] += 1
+        return real_frame(self, *args, **kwargs)
+
+    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", _registry)
+    monkeypatch.setattr(FeaturePreprocessor, "transform", _frame)
+    setattr(factory, attr, None)
+    h.ic_first_to_l65(factory, factory._resolve_config(h.stat_payload()), **_ic_first_kwargs(factory, root))
+    assert calls == {"registry": 0, "frame": calls["frame"]} and calls["frame"] >= 1, calls
+    assert getattr(factory, attr), "run_ic_first 未產生平穩化決策"
 
 
 def test_ic_first_second_tf_failure_zero_writes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -299,8 +299,9 @@ def test_zero_copy_spill_preserves_memmap_sharing(monkeypatch: pytest.MonkeyPatc
 
     original_create = memmap_utils.create_temp_memmap
 
-    def _capture_memmap(shape, dtype=np.float32, prefix: str = "ff_"):
-        memmap_array = original_create(shape, dtype=dtype, prefix=prefix)
+    # FFSTAT b3b：create_temp_memmap 新增 dir=（校準域 L2 暫存寫在獨立目錄）；替身須原樣轉交
+    def _capture_memmap(shape, dtype=np.float32, prefix: str = "ff_", dir=None):
+        memmap_array = original_create(shape, dtype=dtype, prefix=prefix, dir=dir)
         memmap_holder["base"] = memmap_array
         return memmap_array
 

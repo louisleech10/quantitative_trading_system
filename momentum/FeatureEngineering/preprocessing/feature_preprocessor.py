@@ -284,8 +284,8 @@ class FeaturePreprocessor:
     def _calibration_lookup(self, column: str, public_values: Optional[np.ndarray] = None) -> np.ndarray:
         """一欄之校準值（該欄原生週期封包中、輸出起始日前最後 N 個有效值）；並記入決策之校準時間範圍與 N。
 
-        校準域內全無有效值之欄（封包 `empty_columns`）：公開序列亦全無有效值 ⇒ 回傳空陣列（呼叫端記未檢定，
-        該欄無任何值可轉換）；公開序列有有效值（晚生於前史）⇒ `CalibrationError`，指名欄與缺少根數。"""
+        起始日前有效值不足 N 之欄（封包 `empty_columns`）：回傳空陣列（呼叫端略過判定與轉換，保留原值）；公開序列
+        亦全無有效值 ⇒ 只記未檢定，否則另記 `calibration_insufficient_history` 與缺少根數（v19）。"""
         timeframe = self._decision_timeframe_for(str(column))
         packets = self._calibration_packets
         if packets is None:

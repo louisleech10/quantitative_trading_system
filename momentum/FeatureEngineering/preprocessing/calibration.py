@@ -252,7 +252,8 @@ def restrict_packet(packet: CalibrationPacket, columns: Sequence[str]) -> Calibr
             f"公開域之欄在校準域缺欄：週期 {timeframe} 欄 {missing[0]}（共 {len(missing)} 欄）",
             timeframe=timeframe, column=missing[0], field="values",
         )
-    # 校準域內全無有效值之欄（empty_columns）不帶校準值，由 L6.5 依公開序列判定（全 NaN ⇒ 未檢定；否則 fail）
+    # 起始日前有效值不足 N 之欄（empty_columns）不帶校準值，由 L6.5 依 v19 逐欄處理（公開全 NaN ⇒ 未檢定；
+    # 否則不平穩化、記 calibration_insufficient_history）
     wanted = [c for c in requested if c not in empty]
     first_ts = dict(packet.extras.get("first_calibration_ts", {}))
     key = CalibrationKey(**{**packet.key.__dict__, "column_set_digest": column_set_digest(wanted)})
