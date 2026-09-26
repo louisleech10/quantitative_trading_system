@@ -92,7 +92,8 @@ def stat_payload(training_tfs: Optional[List[str]] = None, *, fracdiff: bool = T
     pre["fractional_differencing"] = {"enabled": fracdiff, "apply_to": "non_stationary"}
     pre["adf_differencing"] = {"enabled": adf, "apply_to": "non_stationary"}
     if cross_sectional:
-        payload["cross_sectional"] = {"enabled": True}
+        # 參考標的預設 BTCUSDT 與本 helper 之 SYMBOL 相同 ⇒ L5 不適用（empty_not_applicable；b3b 實跑）⇒ 改以 ETHUSDT 為參考
+        payload["cross_sectional"] = {"enabled": True, "reference_symbol": "ETHUSDT"}
     payload.update(overrides)
     return payload
 
@@ -271,6 +272,63 @@ def ic_first_supplied_off(tmp_path: Path) -> Tuple[Optional[Any], Dict[str, Dict
         storage=factory._storage, ic_threshold=0.0, persist=False,
     )
     return result, raw_artifact_fingerprints(root)
+
+
+def attach_unit_calibration(preprocessor: Any, pre_history: Any, public_columns: Optional[List[str]] = None, *,
+                            timeframe: Optional[str] = None, symbol: str = SYMBOL, config_hash: str = "unit") -> None:
+    """前處理器單元測試用：以 `pre_history` 各欄最後 N 個有效值建封包並交付、核對（形同前置關卡之產物；
+    全無有效值之欄列入 empty_columns）。`pre_history` 可為真實前史，亦可為單元測試之 frame 本身——後者只用於
+    數值／等價性（serial vs parallel、快取、精度）測試，不用於洩漏驗收；生產端無此路徑（封包只由前置關卡產生）。
+    index 非 DatetimeIndex 者以 UTC 秒序號代之；無時區者視為 UTC（同前置關卡之正規化）。"""
+    import numpy as np
+    import pandas as pd
+
+    from momentum.FeatureEngineering.preprocessing import calibration as cal
+
+    columns = [str(c) for c in (public_columns if public_columns is not None else pre_history.columns)]
+    frame = pre_history.loc[:, columns]
+    if preprocessor.winsor_config.get("enabled", False):
+        # L6.5 先縮尾再做平穩化判定；校準值取同一縮尾後之值（同生產端校準域）
+        frame = preprocessor._apply_winsorization(frame)
+    if isinstance(frame.index, pd.DatetimeIndex):
+        index = frame.index.tz_localize("UTC") if frame.index.tz is None else frame.index.tz_convert("UTC")
+    else:
+        index = pd.Timestamp("1970-01-01", tz="UTC") + pd.to_timedelta(np.arange(len(frame)), unit="s")
+    frame = frame.set_axis(index, axis=0)
+    timeframe = timeframe or preprocessor._decision_scope()[0]  # 未給則同前處理器脈絡之週期
+    n = preprocessor._stationarity_n_for(timeframe)
+    output_start = pd.Timestamp(index[-1]) + pd.Timedelta(seconds=1)
+    values, first, last, empty = {}, {}, {}, []
+    for column in columns:
+        name = cal.tagged_column_name(column, timeframe)
+        series = frame[column].astype(np.float64).rename(name)
+        if not np.isfinite(series.to_numpy()).any():
+            empty.append(name)
+            continue
+        values[name], first[name], last[name] = cal.calibration_window_before(series, output_start, n)
+    key = cal.CalibrationKey(symbol=symbol, timeframe=timeframe, output_start=output_start, config_hash=config_hash,
+                             n=n, column_set_digest=cal.column_set_digest(list(values)))
+    packet = cal.CalibrationPacket(key=key, values=values, last_calibration_ts=last,
+                                   calibration_source_sha256=cal.calibration_source_sha256(frame.astype(np.float64)),
+                                   extras={"first_calibration_ts": first, "empty_columns": sorted(empty)})
+    preprocessor.set_calibration({timeframe: packet}, symbol=symbol, output_start=output_start,
+                                 config_hash=config_hash)
+    preprocessor._prepare_calibration({timeframe: columns})
+
+
+def all_nan_base_columns() -> set:
+    """凍結基準中公開輸出全為 NaN 之基礎欄（nan_mask＝全 True 之 hash；依資料判定、不依欄名）。
+    此類欄於校準域與公開域皆無任何有效值 ⇒ 無法做 ADF，決策以未檢定事件明示（b3b 審碼表具名）。"""
+    import hashlib
+
+    import numpy as np
+
+    baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    out = set()
+    for name, fp in baseline["base"].items():
+        if fp["nan_mask"] == hashlib.sha256(np.ones(tuple(fp["shape"]), dtype=bool).tobytes()).hexdigest():
+            out.add(name)
+    return out
 
 
 def base_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:

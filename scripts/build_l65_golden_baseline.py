@@ -35,6 +35,7 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (  # 
     FeaturePreprocessor,
 )
 from momentum.core.logging import get_logger  # noqa: E402
+from scripts.build_l65_golden import attach_fixture_calibration  # noqa: E402
 
 logger = get_logger(__name__)
 
@@ -342,12 +343,14 @@ def _run_ic_first_l65(
                 source_data_version="l65-hardening-v1",
             )
             pre_ic_pp = FeaturePreprocessor(_pre_ic_config(full_config), context=context, column_layer_map=layer_map)
+            attach_fixture_calibration(pre_ic_pp, source_frame)  # FFSTAT b3b：工具用樣本內校準封包
             pre_ic_frame = pre_ic_pp.transform(source_frame)
             selected = _select_ic_first_features(
                 list(pre_ic_frame.columns),
                 IC_FIRST_SELECTED_FEATURE_COUNT,
             )
             post_ic_pp = FeaturePreprocessor(_post_ic_config(full_config), context=context, column_layer_map=layer_map)
+            attach_fixture_calibration(post_ic_pp, pre_ic_frame.loc[:, selected])
             post_ic_frame = post_ic_pp.transform(pre_ic_frame.loc[:, selected])
         finally:
             FeaturePreprocessor._d_star_cache_dir = original_cache_dir

@@ -123,6 +123,63 @@ def _extract_layer(column_name: str) -> str:
     return match.group(1) if match else "unknown"
 
 
+def attach_fixture_calibration(preprocessor: FeaturePreprocessor, frame: pd.DataFrame) -> None:
+    """L6.5 基準／benchmark 工具用之校準封包（FFSTAT b3b：生產端校準值只取前置關卡自起始日前之前史產生之封包）。
+
+    工具之 fixture 無前史 ⇒ 以 fixture 各欄**前 N 個有效值**作校準值（即 FF-STAT 前「前 N 根」語意，無 NaN 之欄
+    與改前逐位元組相同，基準得以延續）。🔴 此為樣本內校準、非洩漏安全，只供本模組與 benchmark 工具量測 L6.5
+    數值／效能，不得用於任何生成路徑。全無有效值之欄列入 empty_columns；有效值少於 N 之欄 ⇒ 拋錯（fixture 過短）。"""
+    from momentum.FeatureEngineering.preprocessing import calibration as cal
+
+    if not preprocessor._stationarity_enabled():
+        return
+    if preprocessor.winsor_config.get("enabled", False):
+        # L6.5 先縮尾再做平穩化判定；校準值取同一縮尾後之值（同生產端校準域，見 FeatureFactory._compute_calibration_domain）
+        frame = preprocessor._apply_winsorization(frame)
+    timeframe = preprocessor._decision_scope()[0]
+    n = preprocessor._stationarity_n_for(timeframe)
+    finite_counts = [int(np.isfinite(frame[c].to_numpy(dtype=np.float64)).sum()) for c in frame.columns]
+    shortest = min((k for k in finite_counts if k > 0), default=0)
+    if 0 < shortest < n:
+        # fixture 短於 N（如 phase0 smoke 之 64 列）：工具將 N 降為各欄有效值之最小值（同 FF-STAT 前「min(列數, N)」
+        # 之語意；只改本工具建立之前處理器，下限 20）
+        if shortest < 20:
+            raise GoldenBuildError(f"fixture 過短：最少之欄有效值 {shortest} 根 < 20")
+        n = shortest
+        by_tf = dict(preprocessor._config.get("calibration_bars_by_timeframe") or {})
+        if timeframe in by_tf:
+            by_tf[timeframe] = n
+            preprocessor._config["calibration_bars_by_timeframe"] = by_tf
+        else:
+            preprocessor._config["calibration_bars"] = n
+    index = pd.DatetimeIndex(frame.index)
+    index = index.tz_localize("UTC") if index.tz is None else index.tz_convert("UTC")
+    output_start = pd.Timestamp(index[-1]) + pd.Timedelta(seconds=1)
+    values: Dict[str, np.ndarray] = {}
+    first: Dict[str, pd.Timestamp] = {}
+    last: Dict[str, pd.Timestamp] = {}
+    empty: List[str] = []
+    for column in frame.columns:
+        name = cal.tagged_column_name(str(column), timeframe)
+        arr = frame[column].to_numpy(dtype=np.float64)
+        finite = np.flatnonzero(np.isfinite(arr))
+        if finite.size == 0:
+            empty.append(name)
+            continue
+        if finite.size < n:
+            raise GoldenBuildError(f"fixture 過短：欄 {column} 有效值 {finite.size} 根 < N={n}")
+        take = finite[:n]
+        values[name] = arr[take]
+        first[name], last[name] = pd.Timestamp(index[take[0]]), pd.Timestamp(index[take[-1]])
+    key = cal.CalibrationKey(symbol="FIXTURE", timeframe=timeframe, output_start=output_start, config_hash="fixture",
+                             n=n, column_set_digest=cal.column_set_digest(list(values)))
+    packet = cal.CalibrationPacket(key=key, values=values, last_calibration_ts=last,
+                                   calibration_source_sha256="", extras={"first_calibration_ts": first,
+                                                                         "empty_columns": sorted(empty)})
+    preprocessor.set_calibration({timeframe: packet}, symbol="FIXTURE", output_start=output_start,
+                                 config_hash="fixture")
+
+
 def fixture_layer_map(frame: pd.DataFrame) -> Dict[str, str]:
     """本模組 fixture（`make_synthetic_l65_dataset`、`_build_l1_l2_real_features`）之欄→層對照。
 
@@ -277,6 +334,7 @@ def _run_l65_full_preprocessing(frame: pd.DataFrame) -> Tuple[pd.DataFrame, Dict
                 context=context,
                 column_layer_map=fixture_layer_map(frame),
             )
+            attach_fixture_calibration(preprocessor, frame)  # FFSTAT b3b：工具用樣本內校準封包
             processed = preprocessor.transform(frame)
         finally:
             FeaturePreprocessor._d_star_cache_dir = original_cache_dir
@@ -520,15 +578,15 @@ def build_ic_first_golden(
             stationary_ratio=0.6,
         )
 
-    raw_frame = FeaturePreprocessor(
-        _ic_first_raw_config(), column_layer_map=fixture_layer_map(source_frame)
-    ).transform(source_frame)
+    raw_pp = FeaturePreprocessor(_ic_first_raw_config(), column_layer_map=fixture_layer_map(source_frame))
+    attach_fixture_calibration(raw_pp, source_frame)  # FFSTAT b3b：工具用樣本內校準封包
+    raw_frame = raw_pp.transform(source_frame)
     selected_features = list(raw_frame.columns[: min(20, len(raw_frame.columns))])
-    processed_frame = FeaturePreprocessor(
+    processed_pp = FeaturePreprocessor(
         _ic_first_processed_config(), column_layer_map=fixture_layer_map(raw_frame.loc[:, selected_features])
-    ).transform(
-        raw_frame.loc[:, selected_features]
     )
+    attach_fixture_calibration(processed_pp, raw_frame.loc[:, selected_features])
+    processed_frame = processed_pp.transform(raw_frame.loc[:, selected_features])
 
     raw_path = out_dir / f"{symbol}_{tf}_raw.parquet"
     processed_path = out_dir / f"{symbol}_{tf}_processed.parquet"

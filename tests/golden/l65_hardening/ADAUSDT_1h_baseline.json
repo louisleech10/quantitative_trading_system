@@ -129,14 +129,14 @@
         "std": 1.0061576776399257
       },
       "L2_derived_close_std_13": {
-        "mean": -0.01066329389599408,
+        "mean": -0.010665581357420033,
         "nan_ratio": 0.087,
-        "std": 1.0500235756734388
+        "std": 1.049814147180064
       },
       "L2_derived_close_std_21": {
-        "mean": -0.01808192597605303,
+        "mean": -0.017768052583973477,
         "nan_ratio": 0.087,
-        "std": 1.0654088809759164
+        "std": 1.0647620693316895
       },
       "L2_derived_close_std_3": {
         "mean": -0.004782877373447021,
@@ -165,7 +165,7 @@
       1750,
       1999
     ],
-    "sampled_value_hash": "9b4012f6af2830b811291651d8ece7cfe124144d71740263aa18051670c4a6c9"
+    "sampled_value_hash": "63204d69294f75b569f3ab1b084f6dbb8ebdfde5fc39b5637c3609f257ae13a2"
   },
   "pre_ic": {
     "dtypes": {
@@ -325,14 +325,14 @@
         "std": 0.0069819032626913975
       },
       "L2_derived_close_std_13": {
-        "mean": 0.001449853080573844,
+        "mean": 0.0014343851087001605,
         "nan_ratio": 0.025,
-        "std": 0.0012781555090483326
+        "std": 0.0012721094108072307
       },
       "L2_derived_close_std_21": {
-        "mean": 0.0009880117459668107,
+        "mean": 0.000949947288028488,
         "nan_ratio": 0.025,
-        "std": 0.0010599262557716498
+        "std": 0.00104168852976097
       },
       "L2_derived_close_std_3": {
         "mean": 0.0012088413475784359,
@@ -431,7 +431,7 @@
       1750,
       1999
     ],
-    "sampled_value_hash": "574fe9272b7e9e9d9dd619ac4f180146e40f2c46cb8d2644d92e8785d7d6321e"
+    "sampled_value_hash": "f464b23c76b58e04324c4ab3b21b57d02e8318f7092f8ed7dcf87f9670a1c7bc"
   },
   "selected_feature_count": 20,
   "selected_feature_ids": [

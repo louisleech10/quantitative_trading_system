@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from typing import Dict, Mapping, Sequence, Tuple
+from typing import Dict, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -23,6 +23,14 @@ OUTPUT_START_SOURCES: Tuple[str, ...] = (OUTPUT_START_SOURCE_USER, OUTPUT_START_
 
 # `calibration_source_sha256` 之 NaN 正規化位元樣式（§C 位元組框架③）
 CANONICAL_NAN_BITS = 0x7FF8000000000000
+
+# 校準域暫存目錄前綴（contract.json `calibration_tmp_prefix`；Task 2.1 邊界③）
+CALIBRATION_TMP_PREFIX = "ffstat_calib_"
+
+# §C 前史深度之「首個有效值最大延遲」（根）：輕量真實 run（BTC 1h、ffstat_helpers.stat_payload、至 2025-06-01
+# 之全部前史）中有效值 ≥ 500 之欄，其首個有效值位置之最大值＝1404（主委實跑 2026-09-26）。
+# 較重設定可能更長；硬條件仍為逐欄「起始日前有限值 ≥ N」（見 FeatureFactory._calibrate_timeframe）
+CALIBRATION_FIRST_VALID_DELAY_BARS = 1404
 
 
 class CalibrationError(RuntimeError):
@@ -205,16 +213,70 @@ def resolve_effective_output_start(
     return pd.Timestamp(aligned[0])
 
 
-def load_calibration_klines(factory: object, symbol: str, timeframe: str,
-                            start: pd.Timestamp, end: pd.Timestamp) -> pd.DataFrame:
-    """前置關卡讀取校準前史 K 線之唯一入口（`[start, end)`，該原生週期；§C 兩個資料域）。
+def calibration_window_before(
+    series: pd.Series, output_start: pd.Timestamp, n: int
+) -> Tuple[np.ndarray, pd.Timestamp, pd.Timestamp]:
+    """`calibration_values_before` 之值，另回傳該 `n` 個有限值之最早與最晚時間（收據之校準時間範圍）。"""
+    values = calibration_values_before(series, output_start, n)
+    before = series[series.index < pd.Timestamp(output_start)]
+    finite_index = before.index[np.isfinite(before.to_numpy(dtype=np.float64))]
+    stamps = finite_index[-int(n):]
+    return values, pd.Timestamp(stamps[0]), pd.Timestamp(stamps[-1])
 
-    前置關卡須經此函式讀前史（測試以之注入讀取錯誤）；讀取錯誤轉為 `CalibrationError`。Task 2.1。"""
-    raise NotImplementedError("FFSTAT Task 2.1")
+
+def tagged_column_name(column: str, timeframe: str) -> str:
+    """欄名加週期標記（與 `FeatureFactory._apply_timeframe_tag` 同規則：`label_` 開頭或第二段已為任一週期則不動）。
+
+    封包以標記後之欄名為鍵；L6.5 各路徑所見欄名（單週期未標記、多週期已標記）經此正規化後查封包。"""
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+    name = str(column)
+    if name.startswith("label_"):
+        return name
+    parts = name.split("_")
+    if len(parts) < 2 or parts[1] in set(TimeframeAligner._timeframe_seconds_keys()):
+        return name
+    return "_".join([parts[0], str(timeframe)] + parts[1:])
+
+
+def restrict_packet(packet: CalibrationPacket, columns: Sequence[str]) -> CalibrationPacket:
+    """取封包中 `columns`（標記後欄名）之子封包，欄集合指紋改為 `columns` 之指紋；`columns` 任一欄不在封包
+    ⇒ 拋 `CalibrationError`（§C「公開域之欄在校準域缺欄 ⇒ fail-closed」）。校準域可多出公開域未用之欄
+    （如進入 L6.5 前依名稱剝離之類別欄），多出者不帶入。"""
+    timeframe = str(packet.key.timeframe)
+    empty = set(packet.extras.get("empty_columns", ()))
+    requested = [str(c) for c in columns]
+    missing = [c for c in requested if c not in empty and (c not in packet.values or c not in packet.last_calibration_ts)]
+    if missing:
+        raise CalibrationError(
+            f"公開域之欄在校準域缺欄：週期 {timeframe} 欄 {missing[0]}（共 {len(missing)} 欄）",
+            timeframe=timeframe, column=missing[0], field="values",
+        )
+    # 校準域內全無有效值之欄（empty_columns）不帶校準值，由 L6.5 依公開序列判定（全 NaN ⇒ 未檢定；否則 fail）
+    wanted = [c for c in requested if c not in empty]
+    first_ts = dict(packet.extras.get("first_calibration_ts", {}))
+    key = CalibrationKey(**{**packet.key.__dict__, "column_set_digest": column_set_digest(wanted)})
+    extras = {**packet.extras, "first_calibration_ts": {c: first_ts[c] for c in wanted if c in first_ts},
+              "empty_columns": sorted(c for c in requested if c in empty)}
+    return CalibrationPacket(
+        key=key,
+        values={c: packet.values[c] for c in wanted},
+        last_calibration_ts={c: packet.last_calibration_ts[c] for c in wanted},
+        calibration_source_sha256=packet.calibration_source_sha256,
+        extras=extras,
+    )
+
+
+def load_calibration_klines(factory: object, symbol: str, timeframe: str,
+                            start: Optional[pd.Timestamp], end: pd.Timestamp) -> pd.DataFrame:
+    """前置關卡讀取校準前史 K 線之唯一入口（`[start, end)`，該原生週期；`start` 為 None ⇒ 自資料起點；
+    §C 兩個資料域）。前置關卡須經此函式讀前史（測試以之注入讀取錯誤）；讀取錯誤由前置關卡轉為
+    `CalibrationError`。Task 2.1。"""
+    return factory._load_calibration_klines(symbol, timeframe, start, end)  # type: ignore[attr-defined]
 
 
 def compute_calibration_domain(factory: object, symbol: str, timeframe: str, config: object,
                                klines: pd.DataFrame) -> pd.DataFrame:
     """以獨立 `FeatureFactory` 實例對前史切片計算進入 L6.5 之各層特徵（校準資料域之唯一計算入口；
     不寫 registry／resume、不落盤、暫存目錄算完即刪）。測試以之注入計算錯誤。Task 2.1。"""
-    raise NotImplementedError("FFSTAT Task 2.1")
+    return factory._compute_calibration_domain(symbol, timeframe, config, klines)  # type: ignore[attr-defined]

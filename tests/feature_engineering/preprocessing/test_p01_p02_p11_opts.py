@@ -209,6 +209,9 @@ def _make_fracdiff_items(n_rows: int, n_cols: int) -> list:
             "weight_threshold": 1e-4,
             "sample_size": min(n_rows, 200),
             "cached_d_star": None,
+            # FFSTAT b3b：worker 之判定值只取主程序交付之校準值；原 metadata 無 calibration_bars（＝以全序列判定），
+            # 此處交付全序列以維持原測試語意
+            "calibration_values": values.astype(np.float64),
         }
         items.append((values.astype(np.float64), metadata))
     return items

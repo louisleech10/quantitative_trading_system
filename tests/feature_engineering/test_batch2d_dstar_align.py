@@ -89,13 +89,15 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from scripts.freeze_batch2d_baseline import (
-    END_DATE,
     KLINE_PATH,
-    START_DATE,
     SYMBOL,
     TIMEFRAME,
     _base_override,
 )
+# FFSTAT b3b：fracdiff 開啟時校準值只取起始日前之前史（每欄 ≥ N＝500 個有效值，否則 fail-closed）；
+# 凍結窗 2024-06-01 起之 12h 前史僅約 300 根 ⇒ 本 frame／CGSA 同值比對改用前史充足之窗（不依凍結基準）
+START_DATE = "2025-10-01"
+END_DATE = "2026-04-01"
 from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.preprocessing._d_star_cache import read_d_star_json
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
@@ -110,7 +112,10 @@ def _read_cache(cache_dir: Path):
 with tempfile.TemporaryDirectory(prefix="batch2d_p4_worker_") as temp_dir:
     temp_root = Path(temp_dir)
     override = _base_override()
-    override["preprocessing"] = {{"fractional_differencing": {{"enabled": True}}}}
+    # FFSTAT b3b：完整設定之部分欄於 12h 前史有效值不足 500（實跑：close_12h_trend_MIDPOINT_144_Std_W3 於 2025-10-01 前
+    # 僅 407 個；N=200 時 MIDPOINT_233_Skew_W3 僅 197 個）⇒ fail-closed；
+    # 本測試只驗 frame 與 CGSA 兩路 d* 同值（兩路同 N），故設 N=100
+    override["preprocessing"] = {{"calibration_bars": 100, "fractional_differencing": {{"enabled": True}}}}
     if {phase!r} == "frame":
         os.environ["FFACT_USE_CGSA"] = "0"
         feature_dir = temp_root / "frame" / "features"

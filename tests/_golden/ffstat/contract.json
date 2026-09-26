@@ -3,7 +3,8 @@
   "events": {
     "cache_read_failed": "dstar_cache_read_failed",
     "search_failed": "fracdiff_search_failed",
-    "cache_write_failed": "dstar_cache_write_failed"
+    "cache_write_failed": "dstar_cache_write_failed",
+    "calibration_insufficient": "calibration_insufficient_history"
   },
   "event_reason_format": "<event>:<受影響欄數>",
   "stationarity_apply_to_allowed": [
@@ -87,7 +88,8 @@
     "adf_diff_2",
     "search_failed",
     "cache_read_failed",
-    "cache_write_failed"
+    "cache_write_failed",
+    "calibration_insufficient"
   ],
   "adf_path_functions": {
     "adf_differencing": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_adf_differencing",

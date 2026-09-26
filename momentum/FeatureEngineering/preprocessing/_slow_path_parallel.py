@@ -152,9 +152,11 @@ def process_fracdiff_column_values(values: np.ndarray, column_metadata: Dict[str
         if cache_hit:
             d_star = float(cached_d_star)
         else:
-            decision_values = values
-            if calibration_bars > 0:
-                decision_values = values[: min(len(values), calibration_bars)]
+            # FFSTAT Task 2.1：判定值只取主程序交付之校準值（輸出起始日前之前史），不取輸出範圍之列
+            calibration_values = column_metadata.get("calibration_values")
+            if calibration_values is None:
+                raise ValueError(f"column {column}: missing calibration_values (calibration_bars={calibration_bars})")
+            decision_values = np.asarray(calibration_values, dtype=np.float64)
             d_star = find_min_d_with_prior(
                 decision_values,
                 precision=precision,

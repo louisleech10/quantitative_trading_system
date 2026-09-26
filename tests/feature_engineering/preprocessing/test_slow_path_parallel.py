@@ -12,6 +12,7 @@ from momentum.FeatureEngineering.preprocessing._slow_path_parallel import (
     process_fracdiff_column_values,
 )
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 from momentum.core.config import get_slowpath_n_jobs
 
 
@@ -32,7 +33,11 @@ def test_slow_path_parallel_results_match_serial() -> None:
     rng = np.random.default_rng(11)
     values_a = np.cumsum(rng.normal(0.0, 1.0, size=180))
     values_b = np.cumsum(rng.normal(0.0, 1.0, size=180))
-    items = [(values_a, _metadata("L1_alpha")), (values_b, _metadata("L1_beta"))]
+    # FFSTAT b3b：worker 之判定值只取主程序交付之校準值；原 metadata 無 calibration_bars（＝以全序列判定）⇒ 交付全序列
+    items = [
+        (values_a, {**_metadata("L1_alpha"), "calibration_values": values_a}),
+        (values_b, {**_metadata("L1_beta"), "calibration_values": values_b}),
+    ]
 
     serial_results = ParallelSlowPath(1).map(items, process_fracdiff_column_values)
     parallel_results = ParallelSlowPath(2).map(items, process_fracdiff_column_values)
@@ -181,11 +186,13 @@ def test_joblib_pickle_fail_falls_back_to_serial(monkeypatch: pytest.MonkeyPatch
                 "max_lag": 8,
             },
             "mode": "append",
+            "calibration_bars": 60,  # FFSTAT b3b：fixture 120 列；封包以 fixture 本身建，僅驗回退路徑
         },
         # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
         column_layer_map={"L1_alpha": "L1", "L1_beta": "L1"},
     )
 
+    attach_unit_calibration(preprocessor, frame)
     output = preprocessor.transform(frame)
 
     assert fallback_called["serial"] is True

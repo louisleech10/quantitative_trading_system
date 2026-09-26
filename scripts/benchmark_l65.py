@@ -67,6 +67,7 @@ from scripts.build_l65_golden import (  # noqa: E402
     _build_l1_l2_real_features,
     _l65_full_preprocessing_config,
     _load_hdf5_kline_frame,
+    attach_fixture_calibration,
     fixture_layer_map,
     make_synthetic_l65_dataset,
 )
@@ -560,6 +561,7 @@ def _run_l65_transform(
     DSTAR_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     preprocessor._d_star_cache_dir = lambda: DSTAR_CACHE_DIR
     preprocessor._d_star_cache_shared = True
+    attach_fixture_calibration(preprocessor, frame)  # FFSTAT b3b：工具用樣本內校準封包
 
     process = psutil.Process()
     rss_before_mb = int(process.memory_info().rss // BYTES_PER_MB)

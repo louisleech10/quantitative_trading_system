@@ -350,9 +350,9 @@
         "std": 26.127581096964608
       },
       "L2_derived_close_std_55": {
-        "mean": 42.11687767547861,
+        "mean": 34.67732160930675,
         "nan_ratio": 0.025,
-        "std": 29.960039446732495
+        "std": 26.26710025317918
       },
       "L2_derived_close_std_8": {
         "mean": 44.46738690957837,
@@ -431,7 +431,7 @@
       1750,
       1999
     ],
-    "sampled_value_hash": "1e577e2bb10f16949d47f4df1ef87849e1467b8fd57f755ad360e11d682ef681"
+    "sampled_value_hash": "d3966c6320a5203616ae03a2fb213b7b38a9d8bd316f759ed31246f771dde122"
   },
   "selected_feature_count": 20,
   "selected_feature_ids": [

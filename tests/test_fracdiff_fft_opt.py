@@ -17,6 +17,7 @@ from momentum.FeatureEngineering.preprocessing._hurst_prior import (
     get_weights_ffd_values,
 )
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -144,10 +145,15 @@ class TestFindMinDPrecomputedMatchesOriginal:
         """d* from precomputed closure == d* from original (per-call preprocessing)."""
         rng = np.random.default_rng(0)
         # Clearly non-stationary: random walk
-        raw = np.cumsum(rng.standard_normal(300)) + 50.0
-        series = pd.Series(raw, dtype=float)
+        raw = np.cumsum(rng.standard_normal(600)) + 50.0  # FFSTAT b3b：≥ N（500）以建校準封包
+        series = pd.Series(raw, dtype=float, name="x")
 
-        pp = _make_preprocessor()
+        # FFSTAT b3b：判定值只取封包（以 fixture 本身建，僅驗決定性與精度）；封包只在平穩化開啟時交付，
+        # 而 `_make_preprocessor` 之設定巢在 "preprocessing" 之下、前處理器讀不到（fracdiff 實為關閉），故此處明設開啟
+        pp = FeaturePreprocessor(
+            {"fractional_differencing": {"enabled": True, "precision": 0.02, "cache_d_star": False}}
+        )
+        attach_unit_calibration(pp, series.to_frame())
         d_star_new = pp._find_min_d(series, max_lag=50)
 
         # Compute reference with original approach (direct _frac_diff_ffd calls)

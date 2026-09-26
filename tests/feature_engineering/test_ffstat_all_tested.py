@@ -27,12 +27,25 @@ def stat_run(tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Any]:
         mp.undo()
 
 
+def _assert_pvalue_or_explicitly_empty(dec: Dict[str, Dict[str, Any]]) -> None:
+    """每欄皆有 ADF p 值；唯一例外＝公開輸出全為 NaN（依凍結基準之 nan_mask 判定，不依欄名）且決策以未檢定事件明示者
+    （此類欄於校準域亦無任何有效值時無法做 ADF；b3b 審碼表具名）。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import EVENT_ADF_UNTESTED
+
+    all_nan = h.all_nan_base_columns()
+    for name, record in dec.items():
+        if name in all_nan and record["adf_pvalue"] is None:
+            assert EVENT_ADF_UNTESTED in record["events"], name
+        else:
+            assert isinstance(record["adf_pvalue"], float), name
+
+
 def test_every_column_entering_step_has_pvalue(stat_run: Dict[str, Any]) -> None:
     """Task 1.2 驗證：開啟平穩化之真實輕量 run 中，進入步驟之每欄皆有 ADF p 值紀錄（欄集合＝基礎欄集合）。"""
     baseline = json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))
     dec = stat_run["decisions"]
     assert set(dec) == set(baseline["base"])
-    assert all(isinstance(d["adf_pvalue"], float) for d in dec.values())
+    _assert_pvalue_or_explicitly_empty(dec)
 
 
 def test_boundary_03_formerly_name_exempt_columns_are_tested(stat_run: Dict[str, Any]) -> None:
@@ -54,7 +67,7 @@ def test_boundary_04_adf_apply_to_all_tests_each_column(tmp_path: Path, monkeypa
     dec = h.decisions(result)
     baseline = json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))
     assert set(dec) == set(baseline["base"])
-    assert all(isinstance(d["adf_pvalue"], float) for d in dec.values())
+    _assert_pvalue_or_explicitly_empty(dec)
 
 
 def test_adf_safe_skip_config_section_rejected() -> None:
@@ -86,17 +99,21 @@ def test_mutation_name_exemption_reinstated_is_caught(tmp_path: Path, monkeypatc
 
 
 def test_untested_column_marked_and_not_counted_as_tested() -> None:
-    """b1 審碼 r1 codex P2-02：進入步驟但校準窗有效值不足（高 NaN）之欄，決策以明確事件標示未檢定，
-    摘要 tested 不計入、untested 計入（真實 kline 值，前段置 NaN 模擬晚生欄）。"""
+    """b1 審碼 r1 codex P2-02：進入步驟但無校準值可檢定之欄，決策以明確事件標示未檢定，
+    摘要 tested 不計入、untested 計入。b3b 起校準值只取前史（封包）：以真實 kline 前 600 列為前史、其後 200 列為
+    公開區段；volume 於前史與公開區段皆置 NaN（校準域與公開皆無有效值 ⇒ 未檢定；原「前段置 NaN」之晚生欄於 b3b
+    改為前置關卡 fail-closed，另由 test_ffstat_calibration 之 boundary_06 驗）。"""
     import numpy as np
 
     from momentum.factories import create_feature_factory
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import EVENT_ADF_UNTESTED
 
-    frame = h.kline_frame().iloc[:600][["close", "volume"]].copy()
-    frame.loc[frame.index[:400], "volume"] = np.nan
+    klines = h.kline_frame().iloc[:800][["close", "volume"]].copy()
+    klines["volume"] = np.nan
+    pre_history, frame = klines.iloc[:600], klines.iloc[600:]
     pre = FeaturePreprocessor({"fractional_differencing": {"enabled": False},
                                "adf_differencing": {"enabled": True, "apply_to": "non_stationary"}})
+    h.attach_unit_calibration(pre, pre_history, ["close", "volume"])
     pre._get_non_stationary_columns(frame)
     dec = {col: d for (_, col), d in pre.stationarity_decisions().items()}
     assert isinstance(dec["close"]["adf_pvalue"], float) and EVENT_ADF_UNTESTED not in dec["close"]["events"]

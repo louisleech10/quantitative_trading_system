@@ -11,6 +11,7 @@ import pytest
 import momentum.FeatureEngineering.preprocessing.feature_preprocessor as fp_mod
 from momentum.FeatureEngineering.preprocessing._d_star_cache import DStarCache, PreprocessingContext
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 
 
 def test_precision_corr_002_matches_001() -> None:
@@ -18,9 +19,10 @@ def test_precision_corr_002_matches_001() -> None:
         pytest.skip("statsmodels unavailable")
 
     rng = np.random.default_rng(7)
-    series = pd.Series(np.cumsum(rng.normal(0.0, 1.0, size=360)))
+    series = pd.Series(np.cumsum(rng.normal(0.0, 1.0, size=360)), name="x")
     preprocessor = FeaturePreprocessor(
         {
+            "calibration_bars": 360,  # FFSTAT b3b：原判定取前 min(500, 360) 根＝全序列；封包以全序列建
             "fractional_differencing": {
                 "enabled": True,
                 "precision": 0.02,
@@ -30,6 +32,7 @@ def test_precision_corr_002_matches_001() -> None:
         }
     )
 
+    attach_unit_calibration(preprocessor, series.to_frame())
     d_001 = preprocessor._find_min_d(series, precision=0.01, max_lag=64)
     d_002 = preprocessor._find_min_d(series, precision=0.02, max_lag=64)
     frac_001 = preprocessor._frac_diff_ffd(series, d_001, max_width=64).dropna()
@@ -70,11 +73,13 @@ def test_precision_override_reaches_find_min_d(monkeypatch: pytest.MonkeyPatch) 
                 "max_lag": 8,
             },
             "mode": "append",
+            "calibration_bars": 40,  # FFSTAT b3b：fixture 80 列；封包以 fixture 本身建，僅驗 precision 傳遞
         },
         # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
         column_layer_map={"L1_alpha": "L1"},
     )
 
+    attach_unit_calibration(preprocessor, frame)
     preprocessor.transform(frame)
 
     assert captured == [0.01]

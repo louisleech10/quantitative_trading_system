@@ -190,7 +190,7 @@
       "L2_derived_close_std_3": "float32",
       "L2_derived_close_std_34": "float32",
       "L2_derived_close_std_5": "float32",
-      "L2_derived_close_std_55": "float64",
+      "L2_derived_close_std_55": "float32",
       "L2_derived_close_std_8": "float32",
       "L2_derived_close_std_89": "float64",
       "L2_derived_log_close": "float64",
@@ -242,7 +242,7 @@
       "L2_derived_volume_mean_89"
     ],
     "feature_names_sha256": "88c331886c6053726a27e2fc008c0ced5af12e1c433ddafbe670ff9aa034ae1c",
-    "nan_mask_hash": "32a331a27a24ee6f665df53b0486b7d2e5e990d7c278e75eab0d33bba38cf5c9",
+    "nan_mask_hash": "72f7053e654c20814f866fa1e7077e5c3551221881e368cfc349df5c75789b6b",
     "per_feature_stats": {
       "L1_binance_close": {
         "mean": 0.05867671130764857,
@@ -350,9 +350,9 @@
         "std": 0.0061565738053570495
       },
       "L2_derived_close_std_55": {
-        "mean": 0.005308100860505007,
-        "nan_ratio": 0.025,
-        "std": 0.00487646533592219
+        "mean": 0.024074301372523074,
+        "nan_ratio": 0.0005,
+        "std": 0.016048235782641876
       },
       "L2_derived_close_std_8": {
         "mean": 0.009337568733560014,
@@ -360,9 +360,9 @@
         "std": 0.007306333762729961
       },
       "L2_derived_close_std_89": {
-        "mean": 0.0006018718655355819,
+        "mean": 0.0005334009432613884,
         "nan_ratio": 0.025,
-        "std": 0.0015203437011958728
+        "std": 0.0014565072626467493
       },
       "L2_derived_log_close": {
         "mean": -0.07233007222186824,
@@ -431,7 +431,7 @@
       1750,
       1999
     ],
-    "sampled_value_hash": "63c10ed4e7a5c8d9170e30e87d87741276a02b0a2b650e9aa6256402f8b951e8"
+    "sampled_value_hash": "2baa2bc511aea8bb0d5fe92bae1fd18fe1daec4e647e8bfb91e83c254fae2a9d"
   },
   "selected_feature_count": 20,
   "selected_feature_ids": [

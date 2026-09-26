@@ -8,6 +8,7 @@ import pytest
 
 import momentum.FeatureEngineering.preprocessing.feature_preprocessor as fp_mod
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 
 
 def _frame() -> pd.DataFrame:
@@ -40,6 +41,7 @@ def _config() -> dict:
             "max_lag": 8,
         },
         "mode": "append",
+        "calibration_bars": 40,  # FFSTAT b3b：fixture 80 列，N 取 40（封包以 fixture 本身建，僅驗層篩選）
     }
 
 
@@ -61,7 +63,9 @@ def test_layer_filter_optimized_profile_processes_only_l1_l2(monkeypatch: pytest
     monkeypatch.setattr(FeaturePreprocessor, "_find_min_d", _stub_find_min_d)
     monkeypatch.setattr(fp_mod, "HAS_STATSMODELS", True)
 
-    output = FeaturePreprocessor(_config(), column_layer_map=_layer_map()).transform(_frame())
+    pre = FeaturePreprocessor(_config(), column_layer_map=_layer_map())
+    attach_unit_calibration(pre, _frame())
+    output = pre.transform(_frame())
 
     assert "L1_alpha_fracdiff" in output.columns
     assert "L2_beta_fracdiff" in output.columns
@@ -76,7 +80,9 @@ def test_layer_filter_legacy_profile_restores_l1_to_l4(monkeypatch: pytest.Monke
     monkeypatch.setattr(FeaturePreprocessor, "_find_min_d", _stub_find_min_d)
     monkeypatch.setattr(fp_mod, "HAS_STATSMODELS", True)
 
-    output = FeaturePreprocessor(_config(), column_layer_map=_layer_map()).transform(_frame())
+    pre = FeaturePreprocessor(_config(), column_layer_map=_layer_map())
+    attach_unit_calibration(pre, _frame())
+    output = pre.transform(_frame())
 
     for column in ("L1_alpha", "L2_beta", "L3_gamma", "L4_delta"):
         assert f"{column}_fracdiff" in output.columns
@@ -93,7 +99,9 @@ def test_unknown_layer_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
     layer_map = {k: v for k, v in _layer_map().items() if k != "raw_unknown"}
 
     with pytest.raises(ValueError) as err:
-        FeaturePreprocessor(_config(), column_layer_map=layer_map).transform(_frame())
+        pre = FeaturePreprocessor(_config(), column_layer_map=layer_map)
+        attach_unit_calibration(pre, _frame())
+        pre.transform(_frame())
     assert "缺 1/5" in str(err.value) and "raw_unknown" in str(err.value)
 
 
@@ -131,10 +139,12 @@ def test_layer_filter_runs_non_stationary_adf_only_for_target_layers(
                 "max_lag": 8,
             },
             "mode": "append",
+            "calibration_bars": 40,
         },
         column_layer_map={"L1_alpha": "L1", "L3_gamma": "L3"},
     )
 
+    attach_unit_calibration(preprocessor, frame)
     output = preprocessor.transform(frame)
 
     assert call_count["adf"] == 1

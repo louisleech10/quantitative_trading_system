@@ -288,8 +288,12 @@ def test_every_column_calibrated_before_output_start(user_run: Dict[str, Any]) -
     """§G ③：每欄 max(校準時間) < 輸出起始日；收據逐欄含校準時間範圍、N、p 值、決策。"""
     dec = user_run["decisions"]
     assert dec, "須有逐欄決策"
+    all_nan = h.all_nan_base_columns()  # 公開輸出全 NaN 且校準域亦無有效值 ⇒ 無校準窗（b3b 審碼表具名）
     for col, d in dec.items():
         assert set(CONTRACT["decision_fields"]) <= set(d), col
+        if col in all_nan and d["calibration_end"] is None:
+            assert d["adf_pvalue"] is None and d["n"] is None, col
+            continue
         assert pd.Timestamp(d["calibration_end"]) < OUT_START, col
         assert d["n"] == CONTRACT["calibration_n_default"], col
 
@@ -421,24 +425,51 @@ def _fail_second_tf_compute(monkeypatch: pytest.MonkeyPatch) -> None:
     {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
     {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
 ], ids=["frame", "cgsa_serial", "cgsa_parallel"])
-@pytest.mark.parametrize("injection", ["read", "compute", "short_history"])
+@pytest.mark.parametrize("injection", ["read", "compute"])
 def test_second_tf_calibration_failure_zero_writes(path_env: Dict[str, str], injection: str, tmp_path: Path,
                                                    monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 驗證：第二原生週期之校準讀取錯（注入 OSError）、計算錯、前史不足 ⇒ 失敗，且整個 run 目錄與
-    registry 前後快照相同（零寫入）；`allow_partial_layers=True` 亦同。"""
+    """Task 2.1 驗證：第二原生週期之校準讀取錯（注入 OSError）、計算錯 ⇒ 失敗，且整個 run 目錄與
+    registry 前後快照相同（零寫入）；`allow_partial_layers=True` 亦同。（前史不足於 v19 改為逐欄，見下一支。）"""
     h.prepare_stat_env(monkeypatch, tmp_path, **path_env)
-    start = h.WINDOW[0]
     if injection == "read":
         _fail_second_tf_read(monkeypatch)
-    elif injection == "compute":
-        _fail_second_tf_compute(monkeypatch)
     else:
-        start = "2024-02-01"  # 12h 前史約 62 根，不足 N=500
+        _fail_second_tf_compute(monkeypatch)
     before = h.snapshot_tree(tmp_path)
     with pytest.raises(CalibrationError):
-        h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], allow_partial_layers=True), start_date=start)
+        h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], allow_partial_layers=True), start_date=h.WINDOW[0])
     after = h.snapshot_tree(tmp_path)
     assert after == before
+
+
+@pytest.mark.parametrize("path_env", [
+    {"FFACT_USE_CGSA": "0"},
+    {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
+    {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
+], ids=["frame", "cgsa_serial", "cgsa_parallel"])
+def test_second_tf_insufficient_history_column_skipped(path_env: Dict[str, str], tmp_path: Path,
+                                                       monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.1 驗證（v19，使用者 2026-09-26 裁定）：第二原生週期（12h）前史有效值不足 N 之欄 ⇒ 生成完成；
+    該欄決策記 `calibration_insufficient_history`（含缺少根數）、未平穩化（無 p 值、無 fracdiff、無差分）；
+    品質 `partial` 且 `failure_reasons` 含該事件；1h 欄照常以 N 個前史有效值檢定（mutant ⑦¹³ 之靶）。"""
+    event = h.EVENTS["calibration_insufficient"]
+    h.prepare_stat_env(monkeypatch, tmp_path, **path_env)
+    # 12h 真實 kline 始於 2024-01-01 ⇒ 2024-02-01 前僅約 62 根，所有有值之 12h 欄皆不足 N=500；1h 約 744 根
+    _, _, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]), start_date="2024-02-01",
+                              end_date="2024-03-31")
+    dec = h.decisions(result)
+    short = {c: d for c, d in dec.items() if event in d["events"]}
+    # 12h 無任一欄可檢定；1h 之長週期欄（如首值約第 697 根之 TEMA_233）於 744 根前史內亦可能不足（主委實跑）
+    assert any(d["timeframe"] == "12h" for d in short.values())
+    assert not [c for c, d in dec.items() if d["timeframe"] == "12h" and d["adf_pvalue"] is not None]
+    for col, d in short.items():
+        assert d["adf_pvalue"] is None and not d["fracdiff"] and not d["adf_differenced"], col
+        assert 0 < int(d["calibration_shortfall"]) <= CONTRACT["calibration_n_default"], col
+    tested_1h = [d for d in dec.values() if d["timeframe"] == "1h" and d["adf_pvalue"] is not None]
+    assert tested_1h and all(d["n"] == CONTRACT["calibration_n_default"] for d in tested_1h)
+    assert result.metadata["quality_status"] == "partial"
+    assert f"{event}:{len(short)}" in result.metadata["failure_reasons"]
+    assert result.metadata[h.META["summary"]]["calibration_insufficient"] == len(short)
 
 
 def test_ic_first_rejects_supplied_layers_when_stationarizing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -513,7 +544,12 @@ def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pyt
     monkeypatch.setattr(FeatureFactory, "run_calibration_preflight", _spy)
     _, _, second = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]), force_regenerate=False)
     assert seen and set(seen[-1]) == {"1h", "12h"}
-    assert h.decisions(second) == h.decisions(first)
+    # 第二次 run 讀到首跑寫入之 d* 快取 ⇒ dstar_cache_hit 由 False 轉 True 屬預期（b3b 實跑：差異只在此欄位，825 欄）；
+    # 其餘決策欄位（校準時間、N、p 值、fracdiff、d、差分階數、事件）須全同
+    def _without_hit(decisions: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        return {c: {k: v for k, v in d.items() if k != "dstar_cache_hit"} for c, d in decisions.items()}
+
+    assert _without_hit(h.decisions(second)) == _without_hit(h.decisions(first))
     _fail_second_tf_read(monkeypatch)
     before = h.snapshot_tree(tmp_path)
     with pytest.raises(CalibrationError):
@@ -605,7 +641,15 @@ def test_boundary_05_multi_tf_each_own_pre_history(tmp_path: Path, monkeypatch: 
     """Task 2.1 邊界①：多週期各自取前史——12h 欄之校準時間落在 12h 格點上，不得以主週期 ffill 值充數。"""
     h.prepare_stat_env(monkeypatch, tmp_path)
     _, _, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]))
-    twelve = {c: d for c, d in h.decisions(result).items() if d["timeframe"] == "12h"}
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import EVENT_ADF_UNTESTED
+
+    decisions12 = {c: d for c, d in h.decisions(result).items() if d["timeframe"] == "12h"}
+    # 無校準窗之欄（校準域全無有效值，或前史不足 N 而公開序列必全 NaN：如 T3_233，b3b 實跑所見）以未檢定明示，
+    # 無校準時間可驗；其餘 12h 欄之校準時間皆須落在 12h 格點
+    twelve = {c: d for c, d in decisions12.items() if d["calibration_start"] is not None}
+    for col, d in decisions12.items():
+        if d["calibration_start"] is None:
+            assert d["adf_pvalue"] is None and EVENT_ADF_UNTESTED in d["events"], col
     assert twelve
     for col, d in twelve.items():
         for key in ("calibration_start", "calibration_end"):
@@ -615,12 +659,20 @@ def test_boundary_05_multi_tf_each_own_pre_history(tmp_path: Path, monkeypatch: 
 
 def test_boundary_06_late_born_column_fails_with_name_and_shortfall(tmp_path: Path,
                                                                     monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 邊界②：前史有效值不足 ⇒ CalibrationError，訊息含欄名與缺少根數。"""
+    """Task 2.1 邊界②（v19，使用者 2026-09-26 裁定；測試名沿用施工清單）：前史有效值不足之欄 ⇒ 該欄記
+    `calibration_insufficient_history` 與缺少根數、不做平穩化，品質 `partial`（其餘欄照常另由 test_second_tf_insufficient_history_column_skipped 驗）。"""
+    event = h.EVENTS["calibration_insufficient"]
     h.prepare_stat_env(monkeypatch, tmp_path)
-    with pytest.raises(CalibrationError) as err:
-        h.run_stat(tmp_path, h.stat_payload(), start_date="2024-01-15")
-    assert err.value.column and err.value.column in str(err.value)
-    assert any(ch.isdigit() for ch in str(err.value))
+    # 1h 真實 kline 始於 2024-01-01 ⇒ 2024-01-15 前約 336 根：短週期欄亦不足 N=500
+    _, _, result = h.run_stat(tmp_path, h.stat_payload(), start_date="2024-01-15", end_date="2024-02-15")
+    dec = h.decisions(result)
+    short = {c: d for c, d in dec.items() if event in d["events"]}
+    assert short
+    for col, d in short.items():
+        assert d["adf_pvalue"] is None and not d["fracdiff"] and not d["adf_differenced"], col
+        assert 0 < int(d["calibration_shortfall"]) <= CONTRACT["calibration_n_default"], col
+    assert result.metadata["quality_status"] == "partial"
+    assert f"{event}:{len(short)}" in result.metadata["failure_reasons"]
 
 
 def test_boundary_07_calibration_domain_leaves_no_files(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -636,10 +688,11 @@ def test_boundary_07_calibration_domain_leaves_no_files(tmp_path: Path, monkeypa
 
     def _files(side: str) -> set:
         # 只把本 run 之 config hash 字串換成佔位（兩次設定不同 ⇒ hash 不同；r18 codex P2-06）；
-        # L6.5 衍生欄檔為平穩化之合法差異；本測試之系統暫存目錄另查
+        # L6.5 衍生欄檔與 d* 快取檔（隔離之 dstar_cache/，fracdiff 搜尋結果；b3b 實跑所見）為平穩化之合法差異，
+        # 非校準域所留；本測試之系統暫存目錄另查
         out = set()
         for rel in h.snapshot_tree(tmp_path / side):
-            if rel.startswith("sys_tmp/") or rel.endswith("_L65.parquet"):
+            if rel.startswith(("sys_tmp/", "dstar_cache/")) or rel.endswith("_L65.parquet"):
                 continue
             out.add(rel.replace(hashes[side], "<config_hash>"))
         return out
@@ -662,7 +715,10 @@ def test_boundary_07b_calibration_temp_removed_on_exception(tmp_path: Path, monk
 @pytest.mark.parametrize("timeframe", CONTRACT["cost_measure_timeframes"])
 def test_boundary_08_default_runs_no_column_short(symbol: str, timeframe: str, tmp_path: Path,
                                                   monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 邊界④：預設設定之 3 標的 × 2 週期真實輕量 run 無欄因前史不足而失敗（驗首個有效值延遲常數）。"""
+    """Task 2.1 邊界④：預設設定之 3 標的 × 2 週期真實輕量 run 無欄因前史不足而失敗（驗首個有效值延遲常數）。
+    窗 2026-03-01～04-27（b3b 改；原 2025-06-01～07-31：真實 kline 12h 始於 2024-01，其前僅 1034 根，
+    MIDPRICE_89_Std_W5 等稀疏欄前史有效值不足 N=500 ⇒ 該欄未平穩化（v19；原為 fail-closed）；主委實跑 BTC、BCH 各 6 欄、ETH 亦有，
+    本窗 BTC、BCH 皆 0 欄）。"""
     from momentum.factories import create_feature_factory
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
@@ -672,8 +728,11 @@ def test_boundary_08_default_runs_no_column_short(symbol: str, timeframe: str, t
     payload = h.stat_payload([timeframe])
     payload["timeframes"]["primary"] = timeframe
     result = factory.generate_features(symbol, timeframe, config_override=payload, force_regenerate=True,
-                                       start_date="2025-06-01", end_date="2025-07-31", persist=True)
-    assert h.decisions(result)
+                                       start_date="2026-03-01", end_date="2026-04-27", persist=True)
+    dec = h.decisions(result)
+    assert dec
+    # v19：前史不足改為逐欄不平穩化 ⇒ 本邊界驗「無欄因前史不足而未平穩化」
+    assert not [c for c, d in dec.items() if h.EVENTS["calibration_insufficient"] in d["events"]]
 
 
 def test_boundary_09_worker_missing_packet_fails_before_registry(tmp_path: Path,
@@ -840,6 +899,13 @@ def test_changed_pre_history_value_misses_only_affected_columns(tmp_path: Path,
     assert frac
     for c in frac:
         changed_values = d1[c]["adf_pvalue"] != d2[c]["adf_pvalue"]
+        if changed_values and d2[c]["dstar_cache_hit"]:
+            # d* 快取另以值指紋跨欄別名（`_value_aliases`）：同一 run 內值全同之另一欄先未命中並寫入後，本欄即命中
+            # （d* 只依值；b3b 實跑所見 BBANDS_Middle_13_89_Cross 與同值 SMA 交叉欄）⇒ 須有同 run、同 d 與 p 值且未命中之孿生欄
+            twins = [o for o in frac if o != c and not d2[o]["dstar_cache_hit"]
+                     and (d2[o]["d"], d2[o]["adf_pvalue"]) == (d2[c]["d"], d2[c]["adf_pvalue"])]
+            assert twins, c
+            continue
         assert d2[c]["dstar_cache_hit"] is (not changed_values), c
 
 

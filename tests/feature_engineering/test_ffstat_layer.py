@@ -122,13 +122,18 @@ def test_mutation_missing_map_entry_treated_as_non_target_is_caught(monkeypatch:
 def test_rename_real_values_same_nonstationary_decisions() -> None:
     """§G ⑥（r18 codex P2-05）：以真實 kline 之值做 ADF 判定，欄名全數改掉後，逐欄（依位置對照）
     是否判為不平穩全同——判定只看值、不看名。"""
-    frame = h.kline_frame().iloc[:500][["open", "high", "low", "close", "volume", "taker_ratio"]]
-    frame = frame.assign(close_diff=frame["close"].diff(), vol_diff=frame["volume"].diff())
+    # b3b 起判定值只取前史封包：前 600 列為前史、其後 500 列為公開區段（兩者皆真實 kline）
+    klines = h.kline_frame().iloc[:1100][["open", "high", "low", "close", "volume", "taker_ratio"]]
+    klines = klines.assign(close_diff=klines["close"].diff(), vol_diff=klines["volume"].diff())
+    pre_history, frame = klines.iloc[:600], klines.iloc[600:]
     pre = FeaturePreprocessor(_PRE_CONFIG)
+    h.attach_unit_calibration(pre, pre_history, list(frame.columns))
     got = set(pre._get_non_stationary_columns(frame))
-    renamed = frame.copy()
-    renamed.columns = [f"zz{i}" for i in range(len(frame.columns))]
-    got_renamed = set(FeaturePreprocessor(_PRE_CONFIG)._get_non_stationary_columns(renamed))
+    names = [f"zz{i}" for i in range(len(frame.columns))]
+    renamed, renamed_history = frame.set_axis(names, axis=1), pre_history.set_axis(names, axis=1)
+    pre_renamed = FeaturePreprocessor(_PRE_CONFIG)
+    h.attach_unit_calibration(pre_renamed, renamed_history, names)
+    got_renamed = set(pre_renamed._get_non_stationary_columns(renamed))
     mapping = dict(zip(frame.columns, renamed.columns))
     assert {mapping[c] for c in got} == got_renamed
     assert got and len(got) < len(frame.columns)

@@ -67,6 +67,8 @@ from momentum.FeatureEngineering.preprocessing._d_star_cache import (
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
     EVENT_ADF_UNTESTED,
     FeaturePreprocessor,
+    NON_DEGRADABLE_ERRORS,
+    CalibrationError,
     StationarityIncompleteError,
     StationarityProvenanceError,
 )
@@ -75,6 +77,7 @@ from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
 from momentum.FeatureEngineering.warmup_window import (
     OutputWindow,
     build_warmup_metadata,
+    estimate_max_warmup_bars,
     compute_row_bounds,
     ingest_layer0_start_date,
     is_warmup_trim_enabled,
@@ -246,6 +249,10 @@ class FeatureFactory:
         self._column_layer_map: Optional[Dict[str, str]] = None
         self._column_timeframe_map: Optional[Dict[str, str]] = None  # FFSTAT：legacy 多週期合併 frame 各欄原生週期（只供決策紀錄）
         self._current_output_window: Optional[OutputWindow] = None
+        # FFSTAT Task 2.1：本次 run 之校準前置關卡結果（只在本次 run 內使用）與前置關卡讀前史所用之設定
+        self._calibration_result: Optional[Dict[str, Any]] = None
+        self._calibration_config: Optional[Any] = None
+        self._calibration_public_window: Optional[OutputWindow] = None
 
     def generate_features(
         self,
@@ -263,7 +270,21 @@ class FeatureFactory:
         """Run the pipeline while holding the per-run lease."""
         config = self._resolve_config(config_override)
         config_hash = self._compute_config_hash(config, symbol, timeframe, start_date=start_date, end_date=end_date)
-        lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, timeframe, config_hash, timeout=0)
+        # FFSTAT Task 2.1：校準前置關卡為一次生成之第一步——先於 run lease、快取查詢、registry 與任何落盤
+        # （任一週期失敗 ⇒ 整個 run 目錄與 registry 零寫入）
+        self._calibration_result = None
+        if self._stationarity_config_enabled(config):
+            training_tfs = list(dict.fromkeys(config.timeframes.training))
+            self._current_config_hash = config_hash
+            self._run_calibration_gate(
+                symbol, training_tfs if len(training_tfs) > 1 else [timeframe], config, start_date,
+                resolve_output_window(config, timeframe, start_date, end_date),
+            )
+        try:
+            lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, timeframe, config_hash, timeout=0)
+        except BaseException:
+            self._calibration_result = None
+            raise
         retained = False
         try:
             result = self._generate_features_impl(
@@ -282,8 +303,44 @@ class FeatureFactory:
                 retained = True
             return result
         finally:
+            self._calibration_result = None  # 封包只在本次 run 內使用
             if not retained:
                 lease.release()
+
+    @staticmethod
+    def _stationarity_config_enabled(config: "FactoryConfig") -> bool:
+        """L6.5 開啟且 fracdiff 或 ADF 差分任一開啟（平穩化開啟；FFSTAT 校準前置關卡之觸發條件）。"""
+        pp = config.preprocessing
+        return bool(pp.enabled) and (
+            bool(pp.fractional_differencing.enabled) or bool(pp.adf_differencing.enabled)
+        )
+
+    def _run_calibration_gate(self, symbol: str, timeframes: List[str], config: "FactoryConfig",
+                              output_start: Optional[str], public_window: Optional[OutputWindow]) -> None:
+        """執行校準前置關卡並核對每個會進入 L6.5 之原生週期皆有封包（缺即 `CalibrationError`，於 registry 之前；
+        Task 2.1 邊界⑤）；結果存於 `_calibration_result` 供本次 run 之 L6.5 取用。"""
+        self._calibration_public_window = public_window
+        try:
+            result = self.run_calibration_preflight(symbol, list(timeframes), config, output_start)
+        finally:
+            self._calibration_public_window = None
+        packets = result.get("packets") or {}
+        missing = [tf for tf in dict.fromkeys(timeframes) if tf not in packets]
+        if missing:
+            raise CalibrationError(
+                f"校準前置關卡缺週期封包：{symbol} 週期 {missing}", timeframe=str(missing[0]), field="packet",
+            )
+        self._calibration_result = result
+
+    def _attach_calibration(self, preprocessor: FeaturePreprocessor) -> None:
+        """把本次 run 之封包與公開域身分交給 L6.5 前處理器（平穩化關閉或非生成路徑 ⇒ 不交付）。"""
+        result = getattr(self, "_calibration_result", None)
+        if result is None:
+            return
+        preprocessor.set_calibration(
+            result["packets"], symbol=str(self._current_symbol), output_start=result["output_start"],
+            config_hash=str(self._current_config_hash or ""),
+        )
 
     def _generate_features_impl(
         self,
@@ -335,10 +392,17 @@ class FeatureFactory:
             if cached:
                 return cached
 
+        training_tfs = list(dict.fromkeys(config.timeframes.training))
+        if self._stationarity_config_enabled(config) and getattr(self, "_calibration_result", None) is None:
+            # 未經 generate_features 入口（直接呼叫 impl）時之前置關卡；仍先於 registry 與任何落盤
+            self._run_calibration_gate(
+                symbol, training_tfs if len(training_tfs) > 1 else [timeframe], config, start_date,
+                self._current_output_window,
+            )
+
         self._cgsa_force_fresh = force_regenerate
         self._cgsa_registry = self._prepare_cgsa_registry(symbol, timeframe, config_hash or "")
 
-        training_tfs = list(dict.fromkeys(config.timeframes.training))
         if len(training_tfs) > 1:
             from momentum.FeatureEngineering.timeframe import MultiTFGenerator
 
@@ -455,7 +519,7 @@ class FeatureFactory:
         return result
 
     @staticmethod
-    def _spill_to_memmap(df: pd.DataFrame, label: str) -> pd.DataFrame:
+    def _spill_to_memmap(df: pd.DataFrame, label: str, dir: Optional[str] = None) -> pd.DataFrame:
         """Convert a large DataFrame to a float32 memmap-backed DataFrame.
 
         Releases the original float64 data and replaces it with a
@@ -475,7 +539,7 @@ class FeatureFactory:
 
         t0 = time.perf_counter()
         n_rows, n_cols = df.shape
-        out = create_temp_memmap((n_rows, n_cols), prefix=f"spill_{label}_")
+        out = create_temp_memmap((n_rows, n_cols), prefix=f"spill_{label}_", dir=dir)
 
         # Row-block copy to avoid materialising full float32 array in memory.
         block_rows = 2048
@@ -712,7 +776,7 @@ class FeatureFactory:
             self._preprocessing_applied = True
             self._report_progress(layer_name, 1.0, f"{layer_name} completed: {result.shape[1]} features")
             return self._ensure_float32(result) if not result.empty else result
-        except StationarityProvenanceError:
+        except NON_DEGRADABLE_ERRORS:
             raise  # FFSTAT：平穩化來源缺漏不可降級為「未做 L6.5 照常輸出」
         except Exception as exc:
             self._preprocessing_applied = False
@@ -747,7 +811,7 @@ class FeatureFactory:
             )
             logger.info("%s done: %d cols, rss=%dMB", layer_name, result.shape[1], _PROC.memory_info().rss >> 20)
             return result
-        except StationarityProvenanceError:
+        except NON_DEGRADABLE_ERRORS:
             raise  # FFSTAT：平穩化來源缺漏不可降級為空結果
         except Exception as exc:
             logger.error("%s failed: %s", layer_name, exc, exc_info=True)
@@ -1691,6 +1755,9 @@ class FeatureFactory:
                 present_engines=0,
             )
         filtered_config = self._filter_rolling_config(config.rolling_aggregation)
+        if getattr(self, "_calibration_domain", False):
+            # FFSTAT Task 2.1：校準資料域不依資料剔欄（與公開域同一欄定義；見 RollingAggregator.keep_all_columns）
+            filtered_config = {**filtered_config, "keep_all_columns": True}
         aggregator = RollingAggregator(filtered_config)
 
         from momentum.FeatureEngineering.utils.hardware_utils import (
@@ -2088,7 +2155,223 @@ class FeatureFactory:
         校準資料域（只吃輸出起始日之前之前史切片、不寫 registry／resume、不落盤），回傳
         `{"output_start": 有效起始日, "output_start_source": ..., "packets": {timeframe: CalibrationPacket}}`；
         任一步驟錯誤拋 `CalibrationError`（不可降級）。`output_start` 為 None 時依 §C 未填起始日推算。"""
-        raise NotImplementedError("FFSTAT Task 2.1")
+        from momentum.FeatureEngineering.preprocessing import calibration as cal
+
+        if output_start is None:
+            raise CalibrationError(
+                f"平穩化開啟時須有輸出起始日：{symbol}（未填起始日之自動預留見 Task 2.3）", field="output_start",
+            )
+        start = self._normalize_calibration_ts(output_start)
+        packets: Dict[str, Any] = {}
+        self._calibration_config = config
+        try:
+            for timeframe in dict.fromkeys(str(t) for t in timeframes):
+                packets[timeframe] = self._calibrate_timeframe(cal, symbol, timeframe, config, start)
+        finally:
+            self._calibration_config = None
+        return {"output_start": start, "output_start_source": cal.OUTPUT_START_SOURCE_USER, "packets": packets}
+
+    @staticmethod
+    def _normalize_calibration_ts(value: Any) -> pd.Timestamp:
+        """校準域之時間基準：與公開域 L0（`_layer0_data_ingestion` 以 `_coerce_index_to_datetime` 之無時區時間戳直接比
+        起始日）同一換算——無時區之起始日視為 UTC；校準邊界因而與公開域起始邊界一致（無洩漏之前提）。
+        非 UTC 交易所（台股、美股、期貨）接入時，時區須於轉接器／L0 統一，本處沿用 L0 之換算，不另設時區。"""
+        ts = pd.Timestamp(value)
+        return ts.tz_localize("UTC") if ts.tz is None else ts.tz_convert("UTC")
+
+    def _calibrate_timeframe(self, cal: Any, symbol: str, timeframe: str, config: FactoryConfig,
+                             output_start: pd.Timestamp) -> Any:
+        """單一原生週期之校準：讀前史 → 前史深度切片 → 校準域 L1–L6 → 每欄起始日前最後 N 個有效值 → 封包。"""
+        n = int(config.preprocessing.calibration_bars_by_timeframe.get(timeframe, config.preprocessing.calibration_bars))
+        try:
+            klines = cal.load_calibration_klines(self, symbol, timeframe, None, output_start)
+        except CalibrationError:
+            raise
+        except Exception as exc:
+            raise CalibrationError(
+                f"校準前史讀取失敗：{symbol} 週期 {timeframe}：{exc}", timeframe=timeframe, field="read",
+            ) from exc
+        history = klines[np.asarray(self._calibration_datetime_index(klines.index) < output_start)]
+        if history.empty:
+            raise CalibrationError(
+                f"校準前史不足：{symbol} 週期 {timeframe} 於 {output_start} 之前無 K 線，需至少 {n} 根有效值",
+                timeframe=timeframe, field="n",
+            )
+        public_rows = self._public_row_count(symbol, timeframe, config)
+        # §C 前史深度：warmup（依原生週期）＋ N ＋首個有效值最大延遲。稀疏欄（值常為 NaN 者）於此深度內有效值
+        # 可能不足 N ⇒ 深度加倍重算，至不再有「將 fail-closed 之欄」或已達資料起點；實際前史短於深度時自資料起點
+        # 載入。硬條件為下方逐欄「起始日前有限值 ≥ N」（不縮窗、不退回輸出範圍）
+        depth = estimate_max_warmup_bars(config, timeframe, [timeframe]) + n + cal.CALIBRATION_FIRST_VALID_DELAY_BARS
+        while True:
+            before = history.iloc[max(0, len(history) - depth):]
+            try:
+                frame = cal.compute_calibration_domain(self, symbol, timeframe, config, before)
+            except CalibrationError:
+                raise
+            except Exception as exc:
+                raise CalibrationError(
+                    f"校準域計算失敗：{symbol} 週期 {timeframe}：{exc}", timeframe=timeframe, field="compute",
+                ) from exc
+            if len(before) >= len(history) or not self._calibration_short_columns(frame, n, public_rows):
+                break
+            del frame
+            depth *= 2
+        before_dt = self._calibration_datetime_index(before.index)
+        source_sha256 = cal.calibration_source_sha256(before.set_axis(before_dt, axis=0))
+        if len(frame.index) != len(before_dt):
+            raise CalibrationError(
+                f"校準域列數與前史切片不符：{symbol} 週期 {timeframe} {len(frame.index)} ≠ {len(before_dt)}",
+                timeframe=timeframe, field="compute",
+            )
+        frame = frame.set_axis(before_dt, axis=0)  # 校準值擷取依 UTC 時間戳
+        values: Dict[str, np.ndarray] = {}
+        last_ts: Dict[str, pd.Timestamp] = {}
+        first_ts: Dict[str, pd.Timestamp] = {}
+        empty: List[str] = []
+        shortfall: Dict[str, int] = {}
+        for column in frame.columns:
+            name = cal.tagged_column_name(str(column), timeframe)
+            column_values = frame[column].to_numpy(dtype=np.float64)
+            status = self._classify_calibration_column(column_values, n, public_rows)
+            if status != "ok":
+                # 起始日前（深度加倍後）仍無 N 個有效值之欄：不帶校準值（v19，使用者 2026-09-26 裁定）；L6.5 依公開序列
+                # 判定——公開亦全 NaN ⇒ 未檢定；否則該欄不做平穩化、記 `calibration_insufficient_history` 與缺少根數
+                empty.append(name)
+                shortfall[name] = n - int(np.isfinite(column_values).sum())
+                continue
+            try:
+                values[name], first_ts[name], last_ts[name] = cal.calibration_window_before(
+                    frame[column].rename(name), output_start, n,
+                )
+            except CalibrationError as exc:
+                raise CalibrationError(
+                    f"{symbol} 週期 {timeframe}：{exc}", timeframe=timeframe, column=name, field="n",
+                ) from exc
+        del frame
+        key = cal.CalibrationKey(
+            symbol=str(symbol), timeframe=timeframe, output_start=output_start,
+            config_hash=str(self._current_config_hash or ""), n=n,
+            column_set_digest=cal.column_set_digest(list(values)),
+        )
+        return cal.CalibrationPacket(
+            key=key, values=values, last_calibration_ts=last_ts, calibration_source_sha256=source_sha256,
+            extras={"first_calibration_ts": first_ts, "calibration_ingest_start": pd.Timestamp(before_dt[0]),
+                    "calibration_rows": int(len(before)), "empty_columns": sorted(empty),
+                    "calibration_shortfall": shortfall},
+        )
+
+    # 校準域中「死欄」之判準（同 L3 死欄過濾 RollingAggregator._variance_filter：NaN 率 > 0.9 或常數）
+    _CALIBRATION_DEAD_NAN_RATE = 0.9
+
+    @classmethod
+    def _classify_calibration_column(cls, values: np.ndarray, n: int, public_rows: int) -> str:
+        """校準域一欄之分類（FFSTAT Task 2.1）：
+        - `"ok"`：起始日前有效值 ≥ N ⇒ 取校準值；
+        - `"deferred"`：全無有效值；或不足 N 但首個有效值之延遲 ≥ 公開域載入列數（公開序列必全 NaN）；或不足 N 且於
+          校準域為死欄（NaN 率 > 0.9 或常數；校準域不依資料剔欄，此類欄於公開域多被 L3 剔除）⇒ 不帶校準值，交 L6.5
+          依公開序列覆核（公開亦全 NaN ⇒ 未檢定；公開有有效值 ⇒ fail-closed）；
+        - `"short"`：其餘不足 N 者 ⇒ 前置關卡即 fail-closed（零寫入）。"""
+        finite = np.isfinite(values)
+        n_finite = int(finite.sum())
+        if n_finite >= int(n):
+            return "ok"
+        if n_finite == 0 or int(finite.argmax()) >= int(public_rows):
+            return "deferred"
+        dead = (1.0 - n_finite / max(len(values), 1)) > cls._CALIBRATION_DEAD_NAN_RATE or float(
+            np.nanstd(values[finite])
+        ) == 0.0
+        return "deferred" if dead else "short"
+
+    @classmethod
+    def _calibration_short_columns(cls, frame: pd.DataFrame, n: int, public_rows: int) -> List[str]:
+        """校準域中分類為 `"short"`（前置關卡將 fail-closed）之欄。"""
+        short: List[str] = []
+        for column in frame.columns:
+            status = cls._classify_calibration_column(frame[column].to_numpy(dtype=np.float64), n, public_rows)
+            if status == "short":
+                short.append(str(column))
+        return short
+
+    def _public_row_count(self, symbol: str, timeframe: str, config: FactoryConfig) -> int:
+        """公開域該原生週期之載入列數（L0 起點＝warmup 開時之 ingest 起點、否則輸出起始日；至輸出結束日）。"""
+        window = getattr(self, "_calibration_public_window", None)
+        if window is None:
+            # 無公開域視窗 ⇒ 不做「公開必全 NaN」之推定（前史不足一律 fail-closed）
+            return int(np.iinfo(np.int64).max)
+        start = ingest_layer0_start_date(window, timeframe, config.timeframes.primary)
+        return int(len(self._layer0_data_ingestion(symbol, timeframe, config, start_date=start,
+                                                   end_date=window.output_end)))
+
+    def _load_calibration_klines(self, symbol: str, timeframe: str, start: Optional[pd.Timestamp],
+                                 end: pd.Timestamp) -> pd.DataFrame:
+        """校準前史 K 線 `[start, end)`（該原生週期；同 L0 之來源欄）。index 保持 L0 原樣（與公開域同表示，
+        L5 參考標的等依 index 對齊者方能對上）；時間比較以 UTC 時間戳進行。"""
+        config = getattr(self, "_calibration_config", None)
+        if config is None:
+            raise CalibrationError("校準前史讀取須於前置關卡內進行", timeframe=timeframe, field="read")
+        data = self._layer0_data_ingestion(symbol, timeframe, config, start_date=None, end_date=None)
+        index = self._calibration_datetime_index(data.index)
+        mask = index < self._normalize_calibration_ts(end)
+        if start is not None:
+            mask &= index >= self._normalize_calibration_ts(start)
+        return data[np.asarray(mask)]
+
+    def _calibration_datetime_index(self, index: pd.Index) -> pd.DatetimeIndex:
+        """L0 index（epoch 整數或時間戳）→ UTC `DatetimeIndex`（校準域之時間比較、來源紀錄與校準值擷取用；
+        換算同 L0，見 `_normalize_calibration_ts`）。"""
+        dt = pd.DatetimeIndex(self._coerce_index_to_datetime(index))
+        return dt.tz_localize("UTC") if dt.tz is None else dt.tz_convert("UTC")
+
+    def _compute_calibration_domain(self, symbol: str, timeframe: str, config: FactoryConfig,
+                                    klines: pd.DataFrame) -> pd.DataFrame:
+        """校準資料域：獨立 `FeatureFactory` 實例（不共用任何實例內快取，含 `_reference_data_cache`）以前史切片
+        算 L1–L6，再套 L6.5 平穩化之前之縮尾（與公開域 L6.5 同序），回傳各欄（未標記週期之欄名）。
+        不設 CGSA registry、不落盤；L2 之 memmap 寫在前綴 `ffstat_calib_` 之獨立暫存目錄，結束（含例外）即刪。"""
+        import shutil
+        import tempfile
+
+        from momentum.FeatureEngineering.preprocessing.calibration import CALIBRATION_TMP_PREFIX
+
+        calib = FeatureFactory(self._config_manager, self._adapter_registry)
+        calib._current_symbol = symbol
+        calib._current_timeframe = timeframe
+        calib._current_raw_data = klines
+        calib._calibration_domain = True  # L3 不依資料剔欄
+        tmp_dir = tempfile.mkdtemp(prefix=CALIBRATION_TMP_PREFIX)
+        try:
+            def _run(name: str, func: Callable, *args: Any) -> pd.DataFrame:
+                result = calib._execute_layer1_6(name, func, *args)
+                if result.status == LayerStatus.layer_failed:
+                    raise CalibrationError(
+                        f"校準域 {name} 失敗：{symbol} 週期 {timeframe}：{result.reason}",
+                        timeframe=timeframe, field="compute",
+                    )
+                return result.data
+
+            layer1 = _run("Layer 1", calib._layer1_atomic_indicators, klines, config)
+            layer2 = _run("Layer 2", calib._layer2_derived_features, layer1, klines, config)
+            layer2 = calib._spill_to_memmap(layer2, "calib_layer2", dir=tmp_dir)
+            layer3 = _run("Layer 3", calib._layer3_rolling_aggregation, layer1, layer2, config)
+            layer4 = _run("Layer 4", calib._layer4_lag_features, layer1, layer2, layer3, klines, config)
+            layer5 = _run("Layer 5", calib._layer5_cross_sectional, layer1, layer2, config)
+            layer6 = _run("Layer 6", calib._layer6_meta_features, layer1, layer2, klines, config)
+            frame = calib._combine_layers([layer1, layer2, layer3, layer4, layer5, layer6], context="calibration_domain")
+            del layer1, layer2, layer3, layer4, layer5, layer6
+            if len(frame.index) == len(klines.index):
+                frame = frame.set_axis(klines.index, axis=0)  # 同前史切片之 L0 index（呼叫端再換 UTC 時間戳）
+            if config.preprocessing.winsorization.enabled:
+                # 縮尾窗依原生週期縮放（與 L6.5 native-tf 子實例同一設定，見 _native_tf_helpers）
+                from momentum.FeatureEngineering.preprocessing._native_tf_helpers import (
+                    scale_preprocessing_config_for_native,
+                )
+
+                winsor_config = scale_preprocessing_config_for_native(
+                    self._build_l7_raw_preprocessing_config(config), timeframe, config.timeframes.primary,
+                )
+                frame = FeaturePreprocessor(winsor_config)._apply_winsorization(frame)
+            return frame
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def run_ic_first(
         self,
@@ -2116,7 +2399,28 @@ class FeatureFactory:
     ) -> FeatureGenerationResult:
         """Run IC-First while holding a lease when invoked independently."""
         resolved_hash = config_hash or self._current_config_hash or self._compute_config_hash(config, symbol, tf)
-        lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, tf, resolved_hash, timeout=0)
+        # FFSTAT Task 2.1：平穩化開啟時拒收呼叫端自帶之 raw_data／layers（生產端無此用法；層與校準須同源），
+        # 並於 run lease 與任何寫入之前跑校準前置關卡（涵蓋本次設定之全部原生週期）
+        self._calibration_result = None
+        if self._stationarity_config_enabled(config):
+            if raw_data is not None or layers is not None:
+                raise CalibrationError(
+                    f"平穩化開啟時 run_ic_first 不接受呼叫端自帶之 raw_data／layers：{symbol}/{tf}，請改用自算路徑"
+                    "（兩者皆不傳）",
+                    timeframe=str(tf), field="supplied_layers",
+                )
+            self._current_config_hash = resolved_hash
+            self._current_symbol = symbol
+            window = getattr(self, "_current_output_window", None)
+            self._run_calibration_gate(
+                symbol, list(dict.fromkeys([tf, *config.timeframes.training])), config,
+                window.output_start if window is not None else None, window,
+            )
+        try:
+            lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, tf, resolved_hash, timeout=0)
+        except BaseException:
+            self._calibration_result = None
+            raise
         retained = False
         try:
             result = self._run_ic_first_impl(
@@ -2132,6 +2436,7 @@ class FeatureFactory:
                 retained = True
             return result
         finally:
+            self._calibration_result = None  # 封包只在本次 run 內使用
             if not retained:
                 lease.release()
 
@@ -2679,6 +2984,7 @@ class FeatureFactory:
             column_layer_map=self._column_layer_map,
             column_timeframe_map=getattr(self, "_column_timeframe_map", None),
         )
+        self._attach_calibration(preprocessor)  # FFSTAT Task 2.1：三路校準值只取前置關卡之封包
 
         if self._cgsa_enabled() and self._cgsa_registry is not None:
             from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
@@ -3145,12 +3451,12 @@ class FeatureFactory:
         )
 
     def _stationarity_failure_reasons(self) -> List[str]:
-        """FFSTAT Task 3.1：本次 run 之 d* 三出口事件彙總為 `<事件>:<欄數>`（固定順序；無事件 ⇒ 空）。"""
-        from momentum.FeatureEngineering.preprocessing.feature_preprocessor import DSTAR_FAILURE_EVENTS
+        """FFSTAT Task 3.1／v19：本次 run 之 d* 三出口與前史不足事件彙總為 `<事件>:<欄數>`（固定順序；無事件 ⇒ 空）。"""
+        from momentum.FeatureEngineering.preprocessing.feature_preprocessor import STATIONARITY_FAILURE_EVENTS
 
         decisions = getattr(self, "last_stationarity_decisions", None) or {}
         reasons = []
-        for event in DSTAR_FAILURE_EVENTS:
+        for event in STATIONARITY_FAILURE_EVENTS:
             count = sum(1 for record in decisions.values() if event in record.get("events", []))
             if count:
                 reasons.append(f"{event}:{count}")
@@ -3307,6 +3613,7 @@ class FeatureFactory:
                 preprocessing_config = self._build_l7_raw_preprocessing_config(config)
                 context = self._build_preprocessing_context(raw_data, config)
                 preprocessor = FeaturePreprocessor(preprocessing_config, context=context)
+                self._attach_calibration(preprocessor)  # FFSTAT Task 2.1：三路校準值只取前置關卡之封包
 
             from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
 
@@ -3944,10 +4251,22 @@ class FeatureFactory:
         self.last_stationarity_decisions = merged
 
     def _stationarity_metadata(self) -> Dict[str, Any]:
-        """FFSTAT：結果 metadata 之 `stationarity_decisions`／`stationarity_summary`（無決策 ⇒ 空，metadata 不變）。"""
+        """FFSTAT：結果 metadata 之 `stationarity_decisions`／`stationarity_summary`，以及校準前置關卡之
+        `effective_output_start`、`output_start_source`、`calibration_source_sha256`（{原生週期: sha256}）；
+        平穩化關閉 ⇒ 空，metadata 不變。"""
+        calibration: Dict[str, Any] = {}
+        result = getattr(self, "_calibration_result", None)
+        if result is not None:
+            calibration = {
+                "effective_output_start": pd.Timestamp(result["output_start"]).isoformat(),
+                "output_start_source": str(result["output_start_source"]),
+                "calibration_source_sha256": {
+                    str(tf): str(packet.calibration_source_sha256) for tf, packet in result["packets"].items()
+                },
+            }
         decisions = getattr(self, "last_stationarity_decisions", None)
         if not decisions:
-            return {}
+            return calibration
         events = [event for record in decisions.values() for event in record.get("events", [])]
         summary = {
             # tested＝實際做了 ADF（有 p 值）之欄；untested＝進入步驟但校準窗有效值不足、以事件標示者
@@ -3960,10 +4279,12 @@ class FeatureFactory:
             "search_failed": events.count("fracdiff_search_failed"),
             "cache_read_failed": events.count("dstar_cache_read_failed"),
             "cache_write_failed": events.count("dstar_cache_write_failed"),
+            "calibration_insufficient": events.count("calibration_insufficient_history"),
         }
         return {
             "stationarity_decisions": {name: dict(record) for name, record in decisions.items()},
             "stationarity_summary": summary,
+            **calibration,
         }
 
     @staticmethod

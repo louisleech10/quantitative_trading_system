@@ -14,6 +14,7 @@ from momentum.FeatureEngineering.preprocessing._d_star_cache import (
     PreprocessingContext,
 )
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 
 
 BASE_CONTEXT = PreprocessingContext(
@@ -129,11 +130,16 @@ def test_pre_fix_explicit_pin50_cache_can_legally_hit(tmp_path: Path) -> None:
     assert fixed_auto_same_width.get("feature_fracdiff", values) == 0.4
 
 
-def test_find_min_d_short_clean_series_returns_one() -> None:
+def test_find_min_d_short_calibration_raises_no_default_d(monkeypatch: pytest.MonkeyPatch) -> None:
+    """FFSTAT b3b（取代 `test_find_min_d_short_clean_series_returns_one`：原斷言有效值 < 20 時回傳 d=1.0，
+    即 SPEC §C 禁止之預設 d）：判定值不足 20 ⇒ 拋錯（呼叫端走搜尋失敗出口），不以 d=1.0 替代。
+    封包保證 N（≥20）個有效值，故以替換判定序列模擬不可達之情形。"""
     preprocessor = _preprocessor()
-    short = pd.Series(np.arange(19, dtype=np.float64))
+    short = pd.Series(np.arange(19, dtype=np.float64), name="x")
+    monkeypatch.setattr(preprocessor, "_calibration_series", lambda series: short)
 
-    assert preprocessor._find_min_d(short, max_lag=50) == 1.0
+    with pytest.raises(ValueError):
+        preprocessor._find_min_d(short, max_lag=50)
 
 
 def test_short_dataframe_fracdiff_keeps_row_count(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -156,6 +162,8 @@ def test_short_dataframe_fracdiff_keeps_row_count(monkeypatch: pytest.MonkeyPatc
         return 1.0
 
     monkeypatch.setattr(preprocessor, "_find_min_d", _spy_find_min_d)
+    # FFSTAT b3b：判定值只取封包——以另一段 500 根（N）前史建（公開 frame 只 300 列）
+    attach_unit_calibration(preprocessor, pd.DataFrame({"L1_close": np.linspace(0.0, 1.0, 500, dtype=np.float64)}))
     result = preprocessor._apply_fractional_differencing(frame)
 
     assert len(result) == len(frame)

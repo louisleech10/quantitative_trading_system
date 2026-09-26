@@ -19,6 +19,7 @@ from momentum.FeatureEngineering.preprocessing._numba_transforms import (
     transform_array_fast,
 )
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import HAS_SCIPY, FeaturePreprocessor
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 
 try:
     from scipy.special import ndtri
@@ -125,11 +126,13 @@ def test_gaussian_rolling_pit() -> None:
 
 
 def test_fracdiff_warmup_freeze_no_leak(monkeypatch: pytest.MonkeyPatch) -> None:
+    # FFSTAT b3b：原「校準取輸出範圍前 500 根 ⇒ 尾段不同決策仍同」改為「校準值只取前史封包 ⇒ 公開序列
+    # 尾段不同決策仍同」：前 600 根為前史（建封包），兩公開序列只在尾段不同
     prefix = np.linspace(1.0, 600.0, 600)
     tail_a = np.linspace(601.0, 900.0, 300)
     tail_b = np.linspace(5000.0, 9000.0, 300)
-    s1 = pd.Series(np.r_[prefix, tail_a])
-    s2 = pd.Series(np.r_[prefix, tail_b])
+    s1 = pd.Series(np.r_[prefix, tail_a], name="x")
+    s2 = pd.Series(np.r_[prefix, tail_b], name="x")
     seen_lengths: list[int] = []
 
     original_hurst = _hurst_prior.estimate_hurst_rs
@@ -143,10 +146,12 @@ def test_fracdiff_warmup_freeze_no_leak(monkeypatch: pytest.MonkeyPatch) -> None
         {
             "causal_preprocessing": True,
             "calibration_bars": 500,
-            "fractional_differencing": {"precision": 0.5, "adf_threshold": 0.1, "weight_threshold": 1e-5},
-            "adf_differencing": {"sample_size": 500, "adf_threshold": 0.1},
+            # FFSTAT b3b：封包只在平穩化開啟時交付 ⇒ 明設 enabled；adf_differencing.sample_size 已刪（N＝calibration_bars）
+            "fractional_differencing": {"enabled": True, "precision": 0.5, "adf_threshold": 0.1, "weight_threshold": 1e-5},
+            "adf_differencing": {"enabled": True, "adf_threshold": 0.1},
         }
     )
+    attach_unit_calibration(pre, pd.DataFrame({"x": prefix}))
 
     assert pre._find_min_d(s1, precision=0.5, max_lag=20) == pre._find_min_d(s2, precision=0.5, max_lag=20)
     assert seen_lengths
@@ -310,6 +315,8 @@ def test_all_l65_entrypoints_causal(monkeypatch: pytest.MonkeyPatch) -> None:
         fracdiff_frame = pd.DataFrame(
             {"L1_alpha": np.r_[np.linspace(1.0, 600.0, 600), np.linspace(601.0, 620.0, 20)]}
         )
+        # FFSTAT b3b：判定值只取封包——以前 600 列（兩次轉換共用、未被擾動）為前史建封包
+        attach_unit_calibration(fracdiff_pre, fracdiff_frame.iloc[:600])
         fracdiff_result = fracdiff_pre.transform(fracdiff_frame)
         fracdiff_perturbed_frame = fracdiff_frame.copy()
         fracdiff_perturbed_frame.iloc[-1, 0] = -9999.0

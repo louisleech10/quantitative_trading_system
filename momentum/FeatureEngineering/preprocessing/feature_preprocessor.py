@@ -31,6 +31,15 @@ from momentum.FeatureEngineering.preprocessing._hurst_prior import (
     find_min_d_with_prior,
 )
 from momentum.FeatureEngineering.preprocessing._non_stationary_cache import NonStationaryCache
+from momentum.FeatureEngineering.preprocessing.calibration import (
+    CalibrationError,
+    CalibrationKey,
+    CalibrationPacket,
+    column_set_digest,
+    restrict_packet,
+    tagged_column_name,
+    verify_packet,
+)
 from momentum.FeatureEngineering.preprocessing._slow_path_parallel import (
     ParallelSlowPath,
     process_fracdiff_column_values,
@@ -73,6 +82,10 @@ EVENT_DSTAR_READ_FAILED = "dstar_cache_read_failed"
 EVENT_DSTAR_SEARCH_FAILED = "fracdiff_search_failed"
 EVENT_DSTAR_WRITE_FAILED = "dstar_cache_write_failed"
 DSTAR_FAILURE_EVENTS = (EVENT_DSTAR_SEARCH_FAILED, EVENT_DSTAR_READ_FAILED, EVENT_DSTAR_WRITE_FAILED)
+# FFSTAT v19（使用者 2026-09-26）：起始日前有效值不足 N 之欄不做平穩化、記此事件並使品質降為 partial
+EVENT_CALIBRATION_INSUFFICIENT = "calibration_insufficient_history"
+# 併入 failure_reasons（`<事件>:<欄數>`）之平穩化事件
+STATIONARITY_FAILURE_EVENTS = DSTAR_FAILURE_EVENTS + (EVENT_CALIBRATION_INSUFFICIENT,)
 
 
 class StationarityProvenanceError(ValueError):
@@ -82,6 +95,11 @@ class StationarityProvenanceError(ValueError):
 
 class StationarityIncompleteError(StationarityProvenanceError):
     """FFSTAT：平穩化開啟時有群組轉換失敗而未允許 partial ⇒ 決策不完整，同屬不可降級。"""
+
+
+# FFSTAT：不可降級之例外（L6.5 降級路徑、群組失敗容忍、native-tf 回退一律原樣上拋）；
+# 校準錯誤見 docs/FFSTAT_SPEC.md §C「校準域錯誤不可降級」
+NON_DEGRADABLE_ERRORS = (StationarityProvenanceError, CalibrationError)
 
 
 def _is_ratio_unsafe_column(col: str) -> bool:
@@ -176,6 +194,129 @@ class FeaturePreprocessor:
         self._dstar_failed_columns: set = set()
         # 各 d* 快取（以 id 區分）本次寫入之 (原生週期, 欄)；flush 失敗時據此標記（r1 codex P2-02）
         self._cache_pending_keys: Dict[int, set] = {}
+        # FFSTAT Task 2.1：前置關卡產生之校準封包（{原生週期: 封包}）與當次公開域身分；
+        # 轉換入口依本次輸入欄集合取子封包並核對後存於 `_calibration_packets`，三路校準值只由此取
+        self._calibration_source: Optional[Mapping[str, CalibrationPacket]] = None
+        self._calibration_identity: Optional[Dict[str, Any]] = None
+        self._calibration_packets: Optional[Dict[str, CalibrationPacket]] = None
+        # append 模式 fracdiff 衍生欄之校準值：{(原生週期, 標記後欄名): 值}（見 `_register_derived_calibration`）
+        self._derived_calibration: Dict[Tuple[str, str], np.ndarray] = {}
+
+    # ---------------------------------------------------------------- FFSTAT 校準封包（Task 2.1）
+
+    def set_calibration(
+        self,
+        packets: Mapping[str, CalibrationPacket],
+        *,
+        symbol: str,
+        output_start: pd.Timestamp,
+        config_hash: str,
+    ) -> None:
+        """交付前置關卡之封包與當次公開域之身分（symbol、輸出起始日、設定 hash）；各轉換入口據此核對。"""
+        self._calibration_source = dict(packets)
+        self._calibration_identity = {
+            "symbol": str(symbol), "output_start": pd.Timestamp(output_start), "config_hash": str(config_hash),
+        }
+        self._calibration_packets = None
+
+    def _inherit_calibration(self, parent: "FeaturePreprocessor") -> None:
+        """native-tf 子實例沿用父實例已核對之子封包（子實例只轉換父實例輸入欄之子集）。"""
+        self._calibration_source = parent._calibration_source
+        self._calibration_identity = parent._calibration_identity
+        self._calibration_packets = parent._calibration_packets
+
+    def _prepare_calibration(self, columns_by_timeframe: Mapping[str, Iterable[str]]) -> None:
+        """轉換入口：平穩化開啟時，依本次輸入欄（依原生週期分組、標記後欄名）取子封包並逐項核對身分鍵
+        （§C 校準封包）；缺封包、缺欄或身分不符 ⇒ `CalibrationError`，於任何轉換之前。"""
+        if not self._stationarity_enabled():
+            return
+        if self._calibration_source is None or self._calibration_identity is None:
+            raise CalibrationError("平穩化開啟但未取得校準封包（只由校準前置關卡產生）", field="packet")
+        identity = self._calibration_identity
+        verified: Dict[str, CalibrationPacket] = {}
+        for timeframe, columns in columns_by_timeframe.items():
+            timeframe = str(timeframe)
+            tagged = sorted({tagged_column_name(str(c), timeframe) for c in columns})
+            packet = self._calibration_source.get(timeframe)
+            if packet is None:
+                raise CalibrationError(f"缺校準封包：週期 {timeframe}", timeframe=timeframe, field="packet")
+            sub = restrict_packet(packet, tagged)
+            empty = set(sub.extras.get("empty_columns", ()))
+            calibrated = [c for c in tagged if c not in empty]
+            expected = CalibrationKey(
+                symbol=identity["symbol"], timeframe=timeframe, output_start=identity["output_start"],
+                config_hash=identity["config_hash"], n=self._stationarity_n_for(timeframe),
+                column_set_digest=column_set_digest(calibrated),
+            )
+            verify_packet(sub, expected, calibrated)
+            verified[timeframe] = sub
+        self._calibration_packets = verified
+
+    def _columns_by_timeframe(self, columns: Iterable[str]) -> Dict[str, List[str]]:
+        """frame 入口之輸入欄依原生週期分組（legacy 多週期之欄週期對照 → 前處理脈絡週期）。"""
+        grouped: Dict[str, List[str]] = {}
+        for column in columns:
+            grouped.setdefault(self._decision_timeframe_for(str(column)), []).append(str(column))
+        return grouped
+
+    def _prepare_calibration_for_groups(self, groups: Iterable[Any]) -> None:
+        """registry 入口：各群組之欄依群組原生週期分組後取子封包並核對。"""
+        grouped: Dict[str, List[str]] = {}
+        for group in groups:
+            grouped.setdefault(str(group.timeframe), []).extend(str(c) for c in group.columns)
+        self._prepare_calibration(grouped)
+
+    def _register_derived_calibration(self, column: str, d_star: float, *, max_lag: int,
+                                      weight_threshold: float) -> None:
+        """append 模式下 fracdiff 衍生欄（`<欄>_fracdiff`）之校準值＝對基底欄校準值以同一 `d` 做 fracdiff 之有效值
+        （全在輸出起始日之前）；供其後 ADF 差分步驟判定該衍生欄。replace 模式基底欄已被取代且不再進 ADF 差分。"""
+        if self.mode == "replace" or self._calibration_packets is None:
+            return
+        timeframe = self._decision_timeframe_for(str(column))
+        base = self._calibration_lookup(str(column))
+        derived = self._frac_diff_ffd(
+            pd.Series(base), float(d_star), threshold=weight_threshold, max_width=max_lag,
+        ).to_numpy(dtype=np.float64)
+        name = tagged_column_name(f"{column}_fracdiff", timeframe)
+        with self._decisions_lock:
+            self._derived_calibration[(timeframe, name)] = derived[np.isfinite(derived)]
+
+    def _calibration_lookup(self, column: str, public_values: Optional[np.ndarray] = None) -> np.ndarray:
+        """一欄之校準值（該欄原生週期封包中、輸出起始日前最後 N 個有效值）；並記入決策之校準時間範圍與 N。
+
+        校準域內全無有效值之欄（封包 `empty_columns`）：公開序列亦全無有效值 ⇒ 回傳空陣列（呼叫端記未檢定，
+        該欄無任何值可轉換）；公開序列有有效值（晚生於前史）⇒ `CalibrationError`，指名欄與缺少根數。"""
+        timeframe = self._decision_timeframe_for(str(column))
+        packets = self._calibration_packets
+        if packets is None:
+            raise CalibrationError("平穩化判定時未有已核對之校準封包", column=str(column), field="packet")
+        packet = packets.get(timeframe)
+        name = tagged_column_name(str(column), timeframe)
+        with self._decisions_lock:
+            derived = self._derived_calibration.get((timeframe, name))
+        if derived is not None:
+            return derived
+        if packet is not None and name in packet.extras.get("empty_columns", ()):
+            # 起始日前無 N 個有效值之欄：不做平穩化（回傳空陣列，呼叫端略過判定與轉換）。公開序列亦全 NaN ⇒ 只記未檢定；
+            # 否則記 `calibration_insufficient_history` 與缺少根數（v19，使用者 2026-09-26 裁定；品質經此事件降為 partial）
+            public = None if public_values is None else np.asarray(public_values, dtype=np.float64)
+            if public is None or np.isfinite(public).any():
+                shortfall = packet.extras.get("calibration_shortfall", {}).get(name, int(packet.key.n))
+                self._record_decision(str(column), events=[EVENT_CALIBRATION_INSUFFICIENT],
+                                      calibration_shortfall=int(shortfall))
+            return np.empty(0, dtype=np.float64)
+        if packet is None or name not in packet.values:
+            raise CalibrationError(
+                f"校準封包缺欄：週期 {timeframe} 欄 {name}", timeframe=timeframe, column=name, field="values",
+            )
+        first_ts = packet.extras.get("first_calibration_ts", {}).get(name)
+        self._record_decision(
+            str(column),
+            n=int(packet.key.n),
+            calibration_start=None if first_ts is None else pd.Timestamp(first_ts).isoformat(),
+            calibration_end=pd.Timestamp(packet.last_calibration_ts[name]).isoformat(),
+        )
+        return np.asarray(packet.values[name], dtype=np.float64)
 
     # ---------------------------------------------------------------- FFSTAT 逐欄決策紀錄
 
@@ -273,10 +414,10 @@ class FeaturePreprocessor:
             self._mark_event_on_keys(pending, EVENT_DSTAR_WRITE_FAILED)
 
     def stationarity_failure_reasons(self) -> List[str]:
-        """d* 三出口事件彙總為 `<事件>:<受影響欄數>`（固定順序；無事件之類不列）。"""
+        """d* 三出口與前史不足事件彙總為 `<事件>:<受影響欄數>`（固定順序；無事件之類不列）。"""
         decisions = self.stationarity_decisions()
         reasons = []
-        for event in DSTAR_FAILURE_EVENTS:
+        for event in STATIONARITY_FAILURE_EVENTS:
             count = sum(1 for record in decisions.values() if event in record["events"])
             if count:
                 reasons.append(f"{event}:{count}")
@@ -302,21 +443,27 @@ class FeaturePreprocessor:
     def _stationarity_n(self) -> int:
         """平穩化三路（ADF 差分候選、fracdiff 目標篩選、d* 搜尋）共用之樣本數 N（FFSTAT Task 2.2）：
         當次原生週期於 `calibration_bars_by_timeframe` 之值，未列者用 `calibration_bars`（預設 500）。"""
+        return self._stationarity_n_for(self._decision_scope()[0])
+
+    def _stationarity_n_for(self, timeframe: str) -> int:
+        """指定原生週期之 N（`calibration_bars_by_timeframe` 之值，未列者用 `calibration_bars`）。"""
         by_timeframe = self._config.get("calibration_bars_by_timeframe") or {}
-        timeframe = self._decision_scope()[0]
-        return int(by_timeframe.get(timeframe, self._config.get("calibration_bars", 500)))
+        return int(by_timeframe.get(str(timeframe), self._config.get("calibration_bars", 500)))
 
     def _calibration_bars(self) -> int:
         return self._stationarity_n()
 
     def _calibration_series(self, series: pd.Series) -> pd.Series:
-        bars = min(len(series), self._calibration_bars())
-        return series.iloc[:bars]
+        """三路（ADF 差分候選、fracdiff 目標篩選、d* 搜尋）之判定序列＝該欄校準值（§C 校準資料無洩漏；
+        不再取輸出範圍內之列）。"""
+        return pd.Series(
+            self._calibration_lookup(str(series.name), series.to_numpy(dtype=np.float64, copy=False)),
+            name=series.name, dtype=np.float64,
+        )
 
-    def _calibration_values(self, values: np.ndarray) -> np.ndarray:
-        arr = np.asarray(values)
-        bars = min(len(arr), self._calibration_bars())
-        return arr[:bars]
+    def _calibration_values(self, column: str) -> np.ndarray:
+        """d* 快取指紋與 parallel worker 之判定值＝該欄校準值。"""
+        return self._calibration_lookup(str(column))
 
     @staticmethod
     def _resolve_column_chunk_size() -> int:
@@ -345,6 +492,9 @@ class FeaturePreprocessor:
             features_df = features_df.drop(columns=unsafe)
             if features_df.empty:
                 return pd.DataFrame(index=features_df.index)
+
+        # FFSTAT Task 2.1：平穩化開啟時，於任何轉換前依本次輸入欄取子封包並核對
+        self._prepare_calibration(self._columns_by_timeframe(str(c) for c in features_df.columns))
 
         from momentum.FeatureEngineering.polars_adapter import polars_enabled
 
@@ -480,6 +630,7 @@ class FeaturePreprocessor:
         groups = [group for _, group in registry.iter_all() if group.n_cols > 0]
         if not groups:
             return 0
+        self._prepare_calibration_for_groups(groups)  # FFSTAT Task 2.1：轉換前取子封包並核對
 
         worker_count = max(1, int(n_workers))
         transform_context = self._build_registry_transform_context()
@@ -566,6 +717,7 @@ class FeaturePreprocessor:
         groups = [group for _, group in registry.iter_all() if group.n_cols > 0]
         if not groups:
             return 0
+        self._prepare_calibration_for_groups(groups)  # FFSTAT Task 2.1：轉換前取子封包並核對
 
         worker_count = max(1, int(n_workers))
         if worker_count > 1:
@@ -953,6 +1105,7 @@ class FeaturePreprocessor:
         # own d_star_cache scoped to the source timeframe.
         native_pp = FeaturePreprocessor(scaled_config, context=native_ctx)
         native_pp._fracdiff_apply_to_layers = self._fracdiff_apply_to_layers
+        native_pp._inherit_calibration(self)  # FFSTAT Task 2.1：子實例沿用父實例已核對之子封包
 
         native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
         try:
@@ -962,7 +1115,7 @@ class FeaturePreprocessor:
                 source_timeframe=self._group_timeframe(group),
             )
         except Exception as exc:  # noqa: BLE001
-            if isinstance(exc, StationarityProvenanceError):
+            if isinstance(exc, NON_DEGRADABLE_ERRORS):
                 raise  # FFSTAT：平穩化來源缺漏不可以 native-tf 回退吞下
             logger.warning(
                 "[L6.5] native-tf transform failed: group=%s err=%s, falling back",
@@ -1123,6 +1276,7 @@ class FeaturePreprocessor:
 
         native_pp = FeaturePreprocessor(scaled_config, context=native_ctx)
         native_pp._fracdiff_apply_to_layers = self._fracdiff_apply_to_layers
+        native_pp._inherit_calibration(self)  # FFSTAT Task 2.1：子實例沿用父實例已核對之子封包
 
         native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
         try:
@@ -1132,7 +1286,7 @@ class FeaturePreprocessor:
                 source_timeframe=self._group_timeframe(group),
             )
         except Exception as exc:  # noqa: BLE001
-            if isinstance(exc, StationarityProvenanceError):
+            if isinstance(exc, NON_DEGRADABLE_ERRORS):
                 raise  # FFSTAT：平穩化來源缺漏不可以 native-tf 回退吞下
             logger.warning(
                 "[L6.5] native-tf in-place transform failed: group=%s err=%s, "
@@ -1407,7 +1561,7 @@ class FeaturePreprocessor:
                     last_group_label = f"{gid} ({'slow' if slow_route_candidate else 'fast'})"
                 completed += 1
             except Exception as error:
-                if isinstance(error, StationarityProvenanceError):
+                if isinstance(error, NON_DEGRADABLE_ERRORS):
                     raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
                 self._failed_groups.append(str(gid))
                 failed += 1
@@ -1625,7 +1779,7 @@ class FeaturePreprocessor:
                             completed += 1
                             last_group_label = f"{gid} (split→merged)"
                 except Exception as error:
-                    if isinstance(error, StationarityProvenanceError):
+                    if isinstance(error, NON_DEGRADABLE_ERRORS):
                         raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
                     self._failed_groups.append(str(gid))
                     failed += 1
@@ -1678,7 +1832,7 @@ class FeaturePreprocessor:
                 completed += 1
                 last_group_label = f"{gid} (slow-chunked)"
             except Exception as error:
-                if isinstance(error, StationarityProvenanceError):
+                if isinstance(error, NON_DEGRADABLE_ERRORS):
                     raise  # FFSTAT：平穩化來源缺漏不可以群組失敗容忍
                 self._failed_groups.append(str(gid))
                 failed += 1
@@ -3152,7 +3306,7 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
-            cache_arr = self._calibration_values(col_arr)
+            cache_arr = self._calibration_values(column)
 
             # Task 3.1 d* 三出口：①讀失敗 ⇒ 視為未命中照常搜尋；②搜尋例外 ⇒ 保原值、不寫快取、排除於 ADF 差分；
             # ③寫失敗 ⇒ 值照常套用。三者皆記欄級事件，不以任何預設 d 替代
@@ -3199,6 +3353,7 @@ class FeaturePreprocessor:
                 max_width=max_lag,
             )
             self._assign_fracdiff_result(result, column, fracdiff_series, self.mode)
+            self._register_derived_calibration(column, float(d_star), max_lag=max_lag, weight_threshold=weight_threshold)
             self._fracdiff_processed_columns.add(column)
             self._record_decision(str(column), fracdiff=True, d=float(d_star),
                                   dstar_cache_hit=bool(cached_d_star is not None), events=events)
@@ -3229,9 +3384,10 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
-            cache_arr = self._calibration_values(col_arr)
-            col_input_arrays[column] = col_arr
-            value_key = _strong_col_value_fingerprint(col_arr)
+            cache_arr = self._calibration_values(column)
+            col_input_arrays[column] = cache_arr  # 寫快取之值指紋＝校準值
+            # 去重須公開值與校準值皆同（公開值同而前史不同之兩欄 d* 可不同）
+            value_key = f"{_strong_col_value_fingerprint(col_arr)}|{_strong_col_value_fingerprint(cache_arr)}"
             column_events[column] = [EVENT_DSTAR_READ_FAILED] if load_failed else []
             cached_d_star = None
             if cache is not None:
@@ -3261,6 +3417,7 @@ class FeaturePreprocessor:
                 "weight_threshold": weight_threshold,
                 "sample_size": sample_size,
                 "calibration_bars": self._calibration_bars(),
+                "calibration_values": cache_arr,  # FFSTAT Task 2.1：worker 以校準值搜尋 d*，不取輸出範圍之列
             }
             items.append((col_arr, metadata))
 
@@ -3284,6 +3441,9 @@ class FeaturePreprocessor:
             fracdiff_series = pd.Series(fracdiff_values, index=result.index)
             for target_column in duplicate_columns:
                 self._assign_fracdiff_result(result, target_column, fracdiff_series, self.mode)
+                self._register_derived_calibration(
+                    target_column, d_star, max_lag=max_lag, weight_threshold=weight_threshold,
+                )
                 self._fracdiff_processed_columns.add(target_column)
                 events = list(column_events.get(target_column, []))
 
@@ -3291,8 +3451,6 @@ class FeaturePreprocessor:
                     not bool(output.get("cache_hit", False)) or target_column != column
                 ):
                     target_values = col_input_arrays.get(target_column)
-                    if target_values is not None:
-                        target_values = self._calibration_values(target_values)
                     try:
                         cache.set(target_column, d_star, target_values)
                         self._note_cache_set(cache, target_column)
@@ -3382,9 +3540,12 @@ class FeaturePreprocessor:
                 weight_threshold=weight_threshold,
             )
 
-        # Precompute NaN rates once per chunk to avoid per-column scans.
-        nan_rates = result.loc[:, columns].isna().mean()
-        eligible_columns = [column for column in columns if float(nan_rates.get(column, 1.0)) <= 0.5]
+        # FFSTAT Task 2.1：是否檢定只依校準值（每欄已保證 N 個前史有效值），不以輸出範圍之 NaN 率免檢；
+        # 唯一例外＝校準域與公開序列皆全無有效值之欄（無值可判定亦無值可轉換，記未檢定）
+        eligible_columns = [
+            column for column in columns
+            if self._calibration_lookup(str(column), result[column].to_numpy(dtype=np.float64)).size > 0
+        ]
         skipped_high_nan: List[str] = [column for column in columns if column not in eligible_columns]
 
         if eligible_columns:
@@ -3437,8 +3598,11 @@ class FeaturePreprocessor:
                 )
 
         if skipped_high_nan:
+            # 校準與公開皆全無有效值之欄：無值可判定亦無值可轉換，以未檢定事件明示
+            for column in skipped_high_nan:
+                self._record_untested(str(column))
             logger.warning(
-                "FracDiff skipped for %d columns due to too many NaN. Sample: %s",
+                "FracDiff skipped for %d columns with no finite values (calibration and public). Sample: %s",
                 len(skipped_high_nan),
                 skipped_high_nan[:10],
             )
@@ -3483,20 +3647,19 @@ class FeaturePreprocessor:
         if not candidate_columns:
             return result
 
-        nan_rates = result.loc[:, candidate_columns].isna().mean()
-        eligible_columns = [
-            column for column in candidate_columns if float(nan_rates.get(column, 1.0)) <= 0.5
-        ]
-        skipped_high_nan: List[str] = [
-            column for column in candidate_columns if column not in eligible_columns
-        ]
-        for column in skipped_high_nan:
-            self._record_untested(str(column))  # 進入 ADF 差分步驟但校準窗有效值過少：未檢定
+        # FFSTAT Task 2.1：是否檢定只依校準值，不以輸出範圍之 NaN 率免檢；校準與公開皆全無有效值之欄
+        # 無值可判定亦無值可轉換，以未檢定事件明示
+        eligible_columns = list(candidate_columns)
+        skipped_high_nan: List[str] = []
 
         for column in eligible_columns:
             series = result[column].astype(float)
 
             decision_source = self._calibration_series(series)
+            if decision_source.empty:
+                skipped_high_nan.append(column)
+                self._record_untested(str(column))
+                continue
             decision_working = decision_source.copy()
             full_working = series.copy()
             chosen_diff = 0
@@ -3774,6 +3937,13 @@ class FeaturePreprocessor:
                     non_stationary.append(column)
                 continue
 
+            if len(decision_series) == 0:
+                # 校準域與公開序列皆全無有效值（見 `_calibration_lookup`）：無值可判定亦無值可轉換
+                self._non_stationary_cache.set(cache_key, False)
+                self._adf_pvalue_by_cache_key[cache_key] = None
+                self._record_untested(str(column))
+                continue
+
             if float(decision_series.isna().mean()) > 0.5:
                 self._non_stationary_cache.set(cache_key, False)
                 self._adf_pvalue_by_cache_key[cache_key] = None
@@ -3873,7 +4043,9 @@ class FeaturePreprocessor:
         decision_series = self._calibration_series(series)
         clean = decision_series.dropna()
         if len(clean) < 20:
-            return 1.0
+            # FFSTAT §C「不得以任何預設 d 替代」：原回傳 d=1.0；封包保證 N（≥20）個有效值，此處不可達，
+            # 若達即為搜尋失敗（呼叫端出口②：保原值、不寫快取、記事件）
+            raise ValueError(f"fracdiff d* search: calibration has {len(clean)} finite values (< 20) for {series.name}")
 
         left, right = float(d_range[0]), float(d_range[1])
         effective_precision = (

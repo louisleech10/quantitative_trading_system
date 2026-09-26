@@ -88,7 +88,8 @@ def test_golden_derived_consistent_with_decisions(baseline: Dict[str, Any], on_r
     assert summary["adf_diff_1"] == sum(1 for c in dec if f"{c}_diff1" in derived)
     assert summary["adf_diff_2"] == sum(1 for c in dec if f"{c}_diff2" in derived)
     for key, event in (("search_failed", "search_failed"), ("cache_read_failed", "cache_read_failed"),
-                       ("cache_write_failed", "cache_write_failed")):
+                       ("cache_write_failed", "cache_write_failed"),
+                       ("calibration_insufficient", "calibration_insufficient")):
         assert summary[key] == sum(1 for d in dec.values() if h.EVENTS[event] in d["events"])
 
 

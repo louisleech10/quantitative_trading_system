@@ -67,6 +67,7 @@ def create_temp_memmap(
     shape: tuple,
     dtype: np.dtype = np.float32,
     prefix: str = "ff_",
+    dir: Optional[str] = None,
 ) -> np.memmap:
     """Create a temporary file-backed memmap array (C-order).
 
@@ -89,13 +90,16 @@ def create_temp_memmap(
         Element data type.
     prefix : str
         Temp-file name prefix (for debug ``lsof``).
+    dir : str, optional
+        Directory for the temp file (default: system temp dir). FFSTAT calibration
+        domain passes its own ``ffstat_calib_*`` directory, deleted after use.
 
     Returns
     -------
     np.memmap
         Writable C-order memmap.
     """
-    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".dat", prefix=prefix)
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".dat", prefix=prefix, dir=dir)
     os.close(tmp_fd)
 
     arr = np.memmap(tmp_path, dtype=dtype, mode="w+", shape=shape, order="C")

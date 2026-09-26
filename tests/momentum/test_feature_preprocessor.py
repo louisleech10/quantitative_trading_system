@@ -8,6 +8,7 @@ import pytest
 
 from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fp_mod
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 
 
 def _base_df(n: int = 300) -> pd.DataFrame:
@@ -68,13 +69,20 @@ def test_adf_nan_heavy() -> None:
     pre = FeaturePreprocessor(
         {
             "causal_preprocessing": True,
+            "calibration_bars": 30,  # FFSTAT b3b：單元測試 fixture 短，N 取 30（封包見下）
             "adf_differencing": {"enabled": True, "apply_to": ["f1"], "max_diff": 2},
             "mode": "append",
         }
     )
+    # FFSTAT b3b：校準值只取封包（此處以 fixture 本身建，僅驗數值行為）；輸出範圍之 NaN 率不再免檢
+    attach_unit_calibration(pre, df)
     out = pre.transform(df)
-    assert "f1_diff1" not in out.columns
-    assert "f1_diff2" not in out.columns
+    record = next(r for (_, c), r in pre.stationarity_decisions().items() if c == "f1")
+    # 原斷言「高 NaN ⇒ 不差分」來自已刪之輸出範圍 NaN 率免檢閘（SPEC §C 逐欄檢定）；改為：高 NaN 之公開欄
+    # 仍以校準值檢定（有 p 值），且產出之差分欄與決策紀錄之階數一致
+    assert isinstance(record["adf_pvalue"], float)
+    order = int(record["adf_differenced"] or 0)
+    assert [k for k in (1, 2) if f"f1_diff{k}" in out.columns] == ([order] if order else [])
 
 
 def test_gaussian_boundary() -> None:
@@ -185,6 +193,7 @@ def test_fracdiff_convergence_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     pre = FeaturePreprocessor(
         {
             "causal_preprocessing": True,
+            "calibration_bars": 30,  # FFSTAT b3b：單元測試 fixture 短，N 取 30（封包見下）
             "fractional_differencing": {
                 "enabled": True,
                 "apply_to": ["L1_f2"],
@@ -204,6 +213,7 @@ def test_fracdiff_convergence_failure(monkeypatch: pytest.MonkeyPatch) -> None:
         raise RuntimeError("forced fail")
 
     monkeypatch.setattr(pre, "_find_min_d", _raise)
+    attach_unit_calibration(pre, df)  # FFSTAT b3b：校準值只取封包（以 fixture 本身建，僅驗數值行為）
     out = pre.transform(df)
     # FFSTAT Task 3.1（改寫：原斷言搜尋失敗仍以 d=1.0 產出 `L1_f2_fracdiff`）：搜尋失敗保原值、
     # 不產 fracdiff 衍生欄、原欄值不變，並記 `fracdiff_search_failed` 事件（SPEC §C「不得以任何預設 d 替代」）
@@ -227,6 +237,7 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
     pre = FeaturePreprocessor(
         {
             "causal_preprocessing": True,
+            "calibration_bars": 30,  # FFSTAT b3b：單元測試 fixture 短，N 取 30（封包見下）
             "fractional_differencing": {
                 "enabled": True,
                 "apply_to": ["L1_f2"],
@@ -244,6 +255,7 @@ def test_fracdiff_adf_coexist(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     monkeypatch.setattr(pre, "_find_min_d", lambda *_args, **_kwargs: 0.5)
+    attach_unit_calibration(pre, df)  # FFSTAT b3b：校準值只取封包（以 fixture 本身建，僅驗數值行為）
     out = pre.transform(df)
     assert "L1_f2_fracdiff" in out.columns
     assert "L1_f2_diff1" not in out.columns

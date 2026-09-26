@@ -100,6 +100,9 @@ class RollingAggregator:
             config_dict.get("skip_higher_moments_max_cardinality", 2)
         )
         self._skew_kurt_skip_cols: frozenset = frozenset()
+        # FFSTAT Task 2.1：校準資料域須與公開域同一欄定義；依資料剔欄（死欄過濾、低基數 skew/kurt 閘）為公開域之
+        # 輸出決策，校準域開此旗標保留全部欄（公開域之欄因而必在校準域；多出者由封包取子集時捨去）
+        self._keep_all_columns = bool(config_dict.get("keep_all_columns", False))
 
     def compute_all(
         self,
@@ -127,7 +130,9 @@ class RollingAggregator:
 
         # Layer 4: compute the skew/kurt skip-set ONCE here so every downstream
         # path (streaming/numba/pandas, CGSA & non-CGSA) gates identically.
-        self._skew_kurt_skip_cols = self._compute_low_cardinality_cols(features_df, columns)
+        self._skew_kurt_skip_cols = (
+            frozenset() if self._keep_all_columns else self._compute_low_cardinality_cols(features_df, columns)
+        )
 
         streaming = os.getenv("FFACT_L3_STREAMING", "1").strip() == "1"
 
@@ -280,7 +285,7 @@ class RollingAggregator:
                 del step_frames
 
                 n_before = step_result.shape[1]
-                step_result = self._variance_filter(step_result)
+                step_result = self._dead_filter(step_result)
                 n_after = step_result.shape[1]
                 n_dropped = n_before - n_after
                 total_generated += n_before
@@ -433,7 +438,7 @@ class RollingAggregator:
                 del step_frames
 
                 n_before = step_result.shape[1]
-                step_result = self._variance_filter(step_result)
+                step_result = self._dead_filter(step_result)
                 n_after = step_result.shape[1]
                 n_dropped = n_before - n_after
                 total_generated += n_before
@@ -795,6 +800,12 @@ class RollingAggregator:
             return [c for c in chunk_cols if str(c) not in self._skew_kurt_skip_cols]
         return list(chunk_cols)
 
+    def _dead_filter(self, df: pd.DataFrame, nan_threshold: float = 0.9) -> pd.DataFrame:
+        """死欄過濾；`keep_all_columns`（FFSTAT 校準資料域）時不剔欄。"""
+        if self._keep_all_columns:
+            return df
+        return self._variance_filter(df, nan_threshold=nan_threshold)
+
     @staticmethod
     def _variance_filter(df: pd.DataFrame, nan_threshold: float = 0.9) -> pd.DataFrame:
         """Remove dead features: constant columns, near-all-NaN, low effective N, or containing inf.
@@ -858,7 +869,7 @@ class RollingAggregator:
             return {}
 
         window_frame = pd.DataFrame(window_results, copy=False)
-        filtered_frame = self._variance_filter(window_frame, nan_threshold=nan_threshold)
+        filtered_frame = self._dead_filter(window_frame, nan_threshold=nan_threshold)
         filtered: Dict[str, np.ndarray] = {}
         for agg_name in filtered_frame.columns:
             filtered[agg_name] = filtered_frame[agg_name].to_numpy(dtype=np.float32, copy=False)

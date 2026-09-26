@@ -11,6 +11,7 @@ import momentum.FeatureEngineering.preprocessing.feature_preprocessor as fp_mod
 import momentum.FeatureEngineering.preprocessing._fast_adf_numba as fast_adf
 from momentum.FeatureEngineering.preprocessing._fast_adf_numba import adf_pvalue_fast
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
 from momentum.core.config import get_fast_adf_enabled
 
 
@@ -135,8 +136,10 @@ def test_feature_preprocessor_uses_fast_adf_when_enabled(monkeypatch: pytest.Mon
 
     frame = pd.DataFrame({"L1_alpha": np.arange(100.0)})
     preprocessor = FeaturePreprocessor(
-        {"adf_differencing": {"adf_threshold": 0.1, "sample_size": 80}}
+        # FFSTAT b3b：原 adf_differencing.sample_size（已刪）改為 calibration_bars；判定值只取封包（以 fixture 本身建）
+        {"calibration_bars": 80, "adf_differencing": {"enabled": True, "adf_threshold": 0.1}}
     )
 
+    attach_unit_calibration(preprocessor, frame)
     assert preprocessor._get_non_stationary_columns(frame) == ["L1_alpha"]
     assert calls["fast_adf"] == 1
