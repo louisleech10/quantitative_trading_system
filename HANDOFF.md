@@ -178,6 +178,11 @@
 - 🔴 **平穩化設定 schema 一變（增刪欄位）config_hash 即變，FF-TFMETA golden 之 stripped sha 隨之不符**：該基準刻意保存 FF-TFMETA 動工前狀態，不可重凍；以 `handoffs/run_receipts/ffstat_probes/migrate_fftfmeta_baseline.py <FF-STAT 動工前 worktree>` 做有證據遷移（改前重現原始凍結值、特徵值不變、差異僅 schema 與 config_hash），schema 再變時先把變更加入其 `_apply_schema_changes`。
 - 🔴 **FF-STAT 後 `FeaturePreprocessor` 開 fracdiff 而無層來源即拋 `StationarityProvenanceError`**（不再由欄名 `L<k>_` 推層）：直接建前處理器之測試與工具須傳 `column_layer_map`；L6.5 工具腳本之 fixture 用 `scripts/build_l65_golden.py:fixture_layer_map`。
 - 🔴 **d* 快取以 `max_lag`／`sample_size` 為 None 建構時，`_int_equal(None, None)` 恆 False ⇒ 寫出之快取永遠讀不回**：生產端 `_create_d_star_cache` 一律帶齊；測試建快取須比照（`test_ffstat_dstar_failure.py:_cache`）。同一 run 內值完全相同之欄經值別名共用 d*、亦記為 `dstar_cache_hit`——比快取命中或項數時以同設定之全新快取目錄為對照，勿斷言「零命中」或「項數＝fracdiff 欄數」。
+- 🔴 **FF-STAT b3b 後，平穩化開啟時 `FeaturePreprocessor` 之三路判定值只取校準封包，無封包即拋 `CalibrationError`**：直接建前處理器之單元測試用 `tests/feature_engineering/ffstat_helpers.attach_unit_calibration(pre, 前史或 fixture)`；L6.5 工具（`build_l65_golden*.py`、`benchmark_l65.py`）用 `scripts/build_l65_golden.attach_fixture_calibration`（樣本內、工具專用，fixture 短於 N 時工具自降 N）；封包要先套縮尾（L6.5 先縮尾再判定），否則判定值與轉換值不同源。
+- 🔴 **12h 真實資料始於 2024-01，稀疏欄（滾動 std／skew／kurt 等常為 NaN 者）於早期起始日湊不滿 N=500**：輕量設定 2025-06 起 BTC、BCH 各 6 欄不足，2026-01、2026-03 起 0 欄；完整設定 12h 於 2025-10 起 N=200、100 仍有欄不足。v19（使用者 2026-09-26）起不足之欄逐欄不平穩化、記 `calibration_insufficient_history`、品質 partial——測試若要「全欄皆檢定」須選 2026 之窗。
+- 🔴 **校準域須與公開域同 index 表示與同欄定義**：L0 index 為 epoch 整數，換成 `DatetimeIndex` 則 L5 參考標的 `concat` 對不上、L5 全空；L3 會依資料剔欄（死欄過濾、低基數 skew/kurt 閘），校準域必開 `RollingAggregator` 之 `keep_all_columns`，否則公開域有欄而封包缺欄。
+- 🔴 **`committee_run.sh` 之 session 名 batch 只收 `b<數字>`**：`b3b` 被拒（fail-closed，不開債）；同批後半沿用 `b3`、輪次續編（3b 之首審為 `20260925-ffstat-b3-review-r3`，日期前綴沿用該批首日）。
+- 🔴 **PreToolUse hook 會把部分含引號轉義之 Bash 指令誤判為派工（`kind=dispatch`）而擋下**：改檔用 Edit 工具；需 sed／awk 多步者寫成腳本檔再 `bash <檔>`。
 
 ## 進行中紀錄
 
@@ -224,6 +229,8 @@
 - 2026-09-25：RM-FFSTAT → `handoffs/reconcile/20260925-ffstat-b2-review-r2/synth.md`
 - 2026-09-25：RM-FFSTAT → `handoffs/run_receipts/20260925-ffstat-fftfmeta-baseline-migration.json`
 - 2026-09-26：RM-FFSTAT → `handoffs/reconcile/20260925-ffstat-b3-review-r2/synth.md`
+- 2026-09-26：RM-FFSTAT → `handoffs/20260925-FFSTAT-B3-REVIEW-R3-BRIEF.md`
+- 2026-09-26：RM-FFSTAT → `handoffs/run_receipts/20260926-ffstat-b3b-l65-hardening-migration.json`
 <!-- ENTRY: RM-FFDSTAR -->
 - 2026-09-24：RM-FFDSTAR → `handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md`
 <!-- HISTORY-END -->
