@@ -135,7 +135,7 @@
 <td>HP-ICFIRSTALIGN</td>
 <td>未開工</td>
 <td>docs/manifests/FFSTAT.json</td>
-<td>2026-09-24 FF-STAT r19 追查時發現：真實 kline 下 run_ic_first 之 IC 階段必拋 AlignmentViolationError（label 時間戳 index 對 L7 raw 讀回 RangeIndex；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 <code>78c85bb2</code>）。使用者 2026-09-26 裁定 run_ic_first 不刪（去留查證 handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md），本票改為 IC-First 管線合一：IC 頁套用後處理改用正式實作並修其未來洩漏（未勾 rank 時 Gaussian 全樣本排名）、run_ic_first 去除 factory 可變狀態依賴、修對齊；排 FF-STAT 之後立刻做（先於 FF-NAME、FFDSTAR）</td>
+<td>2026-09-24 FF-STAT r19 追查時發現：真實 kline 下 run_ic_first 之 IC 階段必拋 AlignmentViolationError（label 時間戳 index 對 L7 raw 讀回 RangeIndex；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 <code>78c85bb2</code>）。使用者 2026-09-26 裁定 run_ic_first 不刪（去留查證 handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md），本票改為 IC-First 管線合一：IC 頁套用後處理改用正式實作並修其未來洩漏（未勾 rank 時 Gaussian 全樣本排名）、run_ic_first 去除 factory 可變狀態依賴、修對齊；排 FF-STAT 之後立刻做（先於 FF-NAME、FFDSTAR）；另併 post-IC 排名／z 分數窗未滿即出值（使用者 2026-09-27 裁定，handoffs/20260927-ffstat-b4-redesign-rulings.md R7）</td>
 </tr>
 </tbody>
 </table></div>
