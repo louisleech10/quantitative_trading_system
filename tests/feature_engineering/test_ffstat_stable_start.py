@@ -11,7 +11,7 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -188,30 +188,136 @@ def test_nan_propagation_inventory_complete() -> None:
             # （同類 self.X／cls.X ⇒ module:Class.X；同模組 X ⇒ module:X）呼叫至少一個非自身之已列步驟
             called = _called_qualified(name)
             assert called & (set(steps) - {name}), name
+        if row["class"] in _NO_INLINE_CLASSES:
+            # r27 codex P1-01：宣稱不自行產生未穩定值之類別，函式體不得內聯「NaN／未滿窗→有限值」之運算；
+            # 有者須改列其非傳遞類（或列 _INLINE_ALLOWED 並附不產輸出值之理由）
+            hits = _inline_nan_filling_calls(_function_node(name))
+            assert not hits or name in _INLINE_ALLOWED, (name, hits)
+
+
+# r27 codex P1-01：會把 NaN 或不完整窗變成有限值之運算（方法名）；比較式直接 astype 亦屬之（NaN 比較為 False）
+_NAN_FILLING = frozenset({
+    "rolling", "ewm", "expanding", "fillna", "ffill", "bfill", "interpolate", "cumsum", "cumprod", "cummax", "cummin",
+    "nan_to_num", "where", "clip", "shift", "diff", "pct_change", "rank", "apply", "map_batches", "fill_null", "fill_nan",
+    "forward_fill", "backward_fill", "nanmean", "nanstd", "nanquantile", "quantile", "rolling_mean", "rolling_std",
+    "rolling_max", "rolling_min", "rolling_sum", "convolve", "lfilter",
+})
+# index_derived 之輸入為時間索引（無 NaN），由 test_index_derived_step_has_no_warmup 以真實切片驗證，不在此列
+_NO_INLINE_CLASSES = frozenset({"dispatcher", "helper", "column_filter"})
+# 函式體有上列運算但其結果不成為輸出特徵值者（限定名 → 理由）
+_INLINE_ALLOWED = {
+    "momentum.FeatureEngineering.preprocessing._hurst_prior:estimate_hurst_rs": "cumsum 算 Hurst 先驗純量（d* 搜尋用）",
+    "momentum.FeatureEngineering.preprocessing._non_stationary_cache:NonStationaryCache.make_key": "nan_to_num 只用於快取鍵雜湊",
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._find_min_d": "ffill 於校準值上搜尋 d*，產出 d",
+    "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._log_gap_source_if_any": "diff 於時間戳記判缺口並記日誌",
+}
+
+
+def _function_node(qualified: str) -> ast.FunctionDef:
+    module, qual = qualified.split(":")
+    path = REPO / Path(*module.split(".")).with_suffix(".py")
+    return _module_functions(ast.parse(path.read_text(encoding="utf-8")))[qual]
+
+
+def _inline_nan_filling_calls(node: ast.AST) -> List[str]:
+    """函式體內 `X.<_NAN_FILLING>(…)` 與 `(比較式).astype(…)` 之呼叫（`名稱@行`）。"""
+    hits = []
+    for call in ast.walk(node):
+        if isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute):
+            attr = call.func.attr
+            if attr in _NAN_FILLING or (attr == "astype" and isinstance(call.func.value, ast.Compare)):
+                hits.append(f"{attr}@{call.lineno}")
+    return hits
+
+
+def test_mutation_dispatcher_inline_rolling_is_caught() -> None:
+    """r27 codex P1-01 反例之可證偽版：派發函式先呼叫合法子步驟、再於函式體內以 min_periods=1 之 rolling 自原始
+    close 造欄 ⇒ 內聯檢查須命中；只原樣搬移原始欄（無暖機，首個有限值即穩定）不在遮罩語意內，不命中。"""
+    import inspect
+    import textwrap
+
+    from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
+
+    node = ast.parse(textwrap.dedent(inspect.getsource(DerivedOperatorEngine.compute_all))).body[0]
+    assert not _inline_nan_filling_calls(node)
+    injected = ast.parse("_inj = raw_data['close'].rolling(20, min_periods=1).mean()").body[0]
+    node.body.insert(0, injected)
+    assert _inline_nan_filling_calls(node) == [f"rolling@{injected.lineno}"]
+    node.body[0] = ast.parse("_inj = raw_data['close'].to_numpy()").body[0]
+    assert not _inline_nan_filling_calls(node)
+    node.body[0] = ast.parse("_inj = (raw_data['close'] > 0).astype(float)").body[0]
+    assert _inline_nan_filling_calls(node)
+
+
+def _step_source_files() -> List[Path]:
+    """盤點之 AST 來源檔：L2–L6.5 與多週期對齊之子套件，外加 polars_adapter.py。"""
+    base = REPO / "momentum" / "FeatureEngineering"
+    files: List[Path] = []
+    for root in ("operators", "cross_sectional", "meta_features", "preprocessing", "timeframe"):
+        files.extend(sorted((base / root).rglob("*.py")))
+    files.append(base / "polars_adapter.py")
+    return files
+
+
+def _import_map(tree: ast.AST, module: str) -> Dict[str, str]:
+    """模組內 `from X import name [as alias]` 之 alias → X（相對 import 依 module 解析）。"""
+    out: Dict[str, str] = {}
+    pkg = module.rsplit(".", 1)[0]
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module is not None or isinstance(node, ast.ImportFrom) and node.level:
+            src = node.module or ""
+            if node.level:
+                parts = pkg.split(".")
+                src = ".".join(parts[: len(parts) - node.level + 1] + ([src] if src else []))
+            for alias in node.names:
+                out[alias.asname or alias.name] = f"{src}:{alias.name}"
+    return out
+
+
+def _module_functions(tree: ast.AST) -> Dict[str, ast.FunctionDef]:
+    """模組內函式之限定名 → 節點：類別方法 `Class.f`；非類別、非巢狀於函式者 `f`（含定義於模組層
+    `if HAS_NUMBA:`／`try:` 區塊內者，如 `_worldquant_numba._ts_argmax_2d`）。"""
+    out: Dict[str, ast.FunctionDef] = {}
+
+    def visit(node: ast.AST, owner: Optional[str]) -> None:
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, ast.ClassDef):
+                visit(child, child.name)
+            elif isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                out[f"{owner}.{child.name}" if owner else child.name] = child
+            else:
+                visit(child, owner)
+
+    visit(tree, None)
+    return out
 
 
 def _called_qualified(qualified: str) -> set:
-    """函式體內呼叫之限定名集合（AST）：`self.X(`／`cls.X(` 綁定於同一類別，裸名 `X(` 綁定於同一模組。"""
+    """函式體內引用之限定名集合（AST；含呼叫與以值傳遞如 `executor.submit(self.f, …)`）：`self.X`／`cls.X`
+    綁定於同一類別；`Class.X`（同模組類別）綁定於該類別；裸名 `X` 依模組之 from-import 解析為來源限定名，
+    否則綁定於同一模組；`mod.X`（`from pkg import mod`）⇒ `pkg.mod:X`（r27 codex P1-01）。"""
     module, qual = qualified.split(":")
     path = REPO / Path(*module.split(".")).with_suffix(".py")
-    parts = qual.split(".")
-    owner, target = (parts[0], parts[-1]) if len(parts) > 1 else (None, parts[0])
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    scopes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == owner] if owner else [tree]
-    for scope in scopes:
-        for node in (scope.body if owner else ast.walk(scope)):
-            if isinstance(node, ast.FunctionDef) and node.name == target:
-                names = set()
-                for call in ast.walk(node):
-                    if not isinstance(call, ast.Call):
-                        continue
-                    fn = call.func
-                    if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) and fn.value.id in ("self", "cls") and owner:
-                        names.add(f"{module}:{owner}.{fn.attr}")
-                    elif isinstance(fn, ast.Name):
-                        names.add(f"{module}:{fn.id}")
-                return names
-    return set()
+    node = _module_functions(tree).get(qual)
+    if node is None:
+        return set()
+    owner = qual.split(".")[0] if "." in qual else None
+    imports = _import_map(tree, module)
+    classes = {n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)}
+    names = set()
+    for ref in ast.walk(node):
+        if isinstance(ref, ast.Attribute) and isinstance(ref.value, ast.Name):
+            base = ref.value.id
+            if base in ("self", "cls") and owner:
+                names.add(f"{module}:{owner}.{ref.attr}")
+            elif base in classes:
+                names.add(f"{module}:{base}.{ref.attr}")
+            elif base in imports:
+                names.add(imports[base].replace(":", ".") + f":{ref.attr}")
+        elif isinstance(ref, ast.Name) and isinstance(ref.ctx, ast.Load):
+            names.add(imports.get(ref.id, f"{module}:{ref.id}"))
+    return names
 
 
 def test_dispatcher_call_resolution_is_class_bound() -> None:
@@ -219,10 +325,25 @@ def test_dispatcher_call_resolution_is_class_bound() -> None:
     L3（RollingAggregator）同名，L3 派發函式之呼叫集合不得含 L2 之同名方法，反之亦然。"""
     base = "momentum.FeatureEngineering.operators"
     l3 = _called_qualified(f"{base}.rolling_aggregator:RollingAggregator.compute_all")
-    assert l3 and all(n.startswith(f"{base}.rolling_aggregator:") for n in l3)
-    assert f"{base}.derived_operators:DerivedOperatorEngine._rolling_last_rank_pct" not in l3
+    assert any(n.startswith(f"{base}.rolling_aggregator:RollingAggregator.") for n in l3)
+    assert not any("DerivedOperatorEngine." in n for n in l3)
     l2 = _called_qualified(f"{base}.derived_operators:DerivedOperatorEngine.compute_all")
-    assert l2 and all(n.startswith(f"{base}.derived_operators:") for n in l2)
+    assert any(n.startswith(f"{base}.derived_operators:DerivedOperatorEngine.") for n in l2)
+    assert not any("RollingAggregator." in n for n in l2)
+
+
+def test_inventory_closure_reaches_off_prefix_and_nested_steps() -> None:
+    """r27 codex P1-01：盤點為呼叫鏈遞移閉包——名稱不合前綴（縮尾核心）、模組層 `if HAS_NUMBA:` 內定義（WQ 核心）、
+    polars_adapter 經 import 呼叫、以及 L6.5 公開入口皆須入列。"""
+    got = _ast_step_functions()
+    fe = "momentum.FeatureEngineering"
+    for name in (f"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor._winsorize_2d_legacy_equivalent",
+                 f"{fe}.operators._worldquant_numba:_ts_argmax_2d",
+                 f"{fe}.polars_adapter:polars_l2_derived_momentum",
+                 f"{fe}.polars_adapter:polars_l65_winsorization",
+                 f"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor.transform_registry_groups_to_sink",
+                 f"{fe}.preprocessing._numba_transforms:transform_array_fast"):
+        assert name in got, name
 
 
 def test_index_derived_step_has_no_warmup() -> None:
@@ -238,23 +359,23 @@ def test_index_derived_step_has_no_warmup() -> None:
 def _ast_step_functions() -> set:
     """L2 operators、L3 rolling、L4 lag、L5 cross_sectional、L6 meta_features、L6.5 preprocessing、多週期 tf_aligner
     之公開計算函式（模組:限定名）。"""
-    roots = ["operators", "cross_sectional", "meta_features", "preprocessing", "timeframe"]
     # r24 codex P1-01：公開與私有之計算／對齊入口皆列（含 _compute_all_streaming、_searchsorted_align、_merge_asof_align）
+    # r27 codex P1-01：納入 polars_adapter.py（L2 Polars 批次與 L6.5 Polars 縮尾）與 L6.5 之 _transform* 執行入口
+    # 前綴只作種子；再取「種子所呼叫、且定義於來源檔之函式」之遞移閉包——名稱不合前綴之步驟
+    # （如 _winsorize_2d_legacy_equivalent、_gaussian_2d）只要在呼叫鏈上即入盤點
     prefixes = ("compute", "_compute", "apply", "_apply", "align", "_align", "_merge", "_searchsorted", "_rolling",
-                "_dead", "_variance")
-    out = set()
-    base = REPO / "momentum" / "FeatureEngineering"
-    for root in roots:
-        for path in sorted((base / root).rglob("*.py")):
-            tree = ast.parse(path.read_text(encoding="utf-8"))
-            module = ".".join(path.relative_to(REPO).with_suffix("").parts)
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ClassDef):
-                    for item in node.body:
-                        if isinstance(item, ast.FunctionDef) and item.name.startswith(prefixes):
-                            out.add(f"{module}:{node.name}.{item.name}")
-                elif isinstance(node, ast.FunctionDef) and node.col_offset == 0 and node.name.startswith(prefixes):
-                    out.add(f"{module}:{node.name}")
+                "_dead", "_variance", "polars_", "_transform")
+    defined = set()
+    for path in _step_source_files():
+        module = ".".join(path.relative_to(REPO).with_suffix("").parts)
+        defined |= {f"{module}:{q}" for q in _module_functions(ast.parse(path.read_text(encoding="utf-8")))}
+    # 種子＝一切公開函式（L6.5 之 transform／transform_registry_groups* 等入口不合前綴）＋合前綴之私有函式
+    out = {q for q in defined if not (n := q.split(":")[1].split(".")[-1]).startswith("_") or n.startswith(prefixes)}
+    frontier = set(out)
+    while frontier:
+        reached = set().union(*(_called_qualified(q) for q in frontier)) & defined
+        frontier = reached - out
+        out |= frontier
     return out
 
 
