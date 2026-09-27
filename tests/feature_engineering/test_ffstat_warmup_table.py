@@ -124,6 +124,47 @@ def test_boundary_29_measure_receipt_per_indicator() -> None:
     assert {r["timeframe"] for r in doc["rows"]} == timeframes
 
 
+def test_table_k_ge_every_converged_measurement() -> None:
+    """v47（r31 codex P1-01）：採用值不得低於收據中任一已收斂量測（含前史 < 2K 之不可信者）——逐筆比對
+    倍數表經 `stable_mask.instance_k` 規則所得之 K ≥ 該筆量得 K（DX／ADA／1d／144 實測 1,138 之反例）。"""
+    from momentum.FeatureEngineering.preprocessing import stable_mask as sm
+
+    receipts = sorted((REPO / "handoffs" / "run_receipts").glob("*-ffstat-warmup-measure.json"))
+    doc = json.loads(receipts[-1].read_text(encoding="utf-8"))
+    table = _entries()
+    low = []
+    for row in doc["rows"]:
+        if not row["converged"] or row["indicator"] not in table:
+            continue
+        entry = table[row["indicator"]]
+        if entry.get("warmup_class") == "cumulative":
+            continue
+        spec = sm.OutputPointSpec(engine="receipt", indicator=row["indicator"], column="x", params=row["params"],
+                                  period_keys=tuple(entry["period_keys"]))
+        k = sm.instance_k(spec, table)
+        if k < int(row["k"]):
+            low.append((row["indicator"], row["timeframe"], row["symbol"], row["params"], k, row["k"]))
+    assert not low, low[:10]
+
+
+def test_mutation_adopted_k_below_measurement_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """r31 codex P1-01 之可證偽版：把 DX timeperiod=144 之採用值改為 1 ⇒ 不變量測試必紅。"""
+    import yaml
+
+    original = yaml.safe_load
+
+    def lowered(text):
+        doc = original(text)
+        if isinstance(doc, dict) and "DX" in (doc.get("indicators") or {}):
+            table = doc["indicators"]["DX"]["k_by_params"]
+            table[next(k for k in table if "timeperiod=144" in k)] = 1
+        return doc
+
+    monkeypatch.setattr(yaml, "safe_load", lowered)
+    with pytest.raises(AssertionError):
+        test_table_k_ge_every_converged_measurement()
+
+
 def test_cdl_pattern_entry_named() -> None:
     """Task 2.4 CDL pattern 映射（v39）：raw CDL＊ 之 K 取表內具名條目（取代全域 pattern_default_warmup_bars）。"""
     import yaml

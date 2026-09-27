@@ -49,16 +49,22 @@ def _factor(indicator: str) -> float:
     return float(_table()[indicator]["recommended_factor"])
 
 
-def _params_key(params: Dict[str, Any], keys: Any) -> str:
-    """v46 `k_by_params` 之鍵：period_keys 各鍵值依鍵名升序以 `鍵=值` 逗號連接（值為整數字面）。"""
-    return ",".join(f"{k}={int(params[k])}" for k in sorted(keys))
+def _params_key(params: Dict[str, Any], defaults: Dict[str, Any]) -> str:
+    """v47 `k_by_params` 之鍵：條目 `param_defaults` 疊上呼叫參數，依鍵名升序以 `鍵=值` 逗號連接（整數寫整數字面）。"""
+    merged = {**defaults, **params}
+
+    def fmt(v: Any) -> str:
+        f = float(v)
+        return str(int(f)) if f.is_integer() else repr(f)
+
+    return ",".join(f"{k}={fmt(merged[k])}" for k in sorted(merged))
 
 
 def _expected_k(indicator: str, params: Dict[str, Any]) -> int:
-    """SPEC v46（R10）：表之 `k_by_params` 查得者取其值；查無才 ceil(max(period_keys 值)×係數)。"""
+    """SPEC v46／v47（R10）：表之 `k_by_params`（全參數鍵）查得者取其值；查無才 ceil(max(period_keys 值)×係數)。"""
     entry = _table()[indicator]
     keys = entry["period_keys"]
-    measured = (entry.get("k_by_params") or {}).get(_params_key(params, keys))
+    measured = (entry.get("k_by_params") or {}).get(_params_key(params, entry.get("param_defaults") or {}))
     if measured is not None:
         return int(measured)
     return math.ceil(max(float(params[k]) for k in keys) * float(entry["recommended_factor"]))
@@ -110,9 +116,19 @@ def test_l1_mask_stoch_combo_k_uses_max_period_key() -> None:
 def test_l1_mask_k_by_params_preferred_over_factor() -> None:
     """v46（R10 實測根數優先）：KAMA_233 之 K＝表 k_by_params 之實測值，且小於 ceil(233×係數)（比例公式高估）。"""
     params = {"timeperiod": 233}
-    measured = _table()["KAMA"]["k_by_params"][_params_key(params, ["timeperiod"])]
+    measured = _table()["KAMA"]["k_by_params"][_params_key(params, _table()["KAMA"].get("param_defaults") or {})]
     assert measured < math.ceil(233 * _factor("KAMA"))
     assert sm.instance_k(_spec("KAMA", "close_trend_KAMA_233", params), _table()) == measured
+
+
+def test_l1_mask_unmeasured_nonperiod_variant_fails_closed() -> None:
+    """v47（r31 codex P1-02）：非週期參數改變收斂（MA matype=4 實測 258 > 233）⇒ 未量測之變體於輸出前擋下；
+    預設變體（matype 0）照常。"""
+    assert sm.instance_k(_spec("MA", "close_trend_MA_233", {"timeperiod": 233}), _table()) == _expected_k(
+        "MA", {"timeperiod": 233})
+    with pytest.raises(sm.UnmeasuredVariantError) as exc:
+        sm.instance_k(_spec("MA", "close_trend_MA_4-233", {"timeperiod": 233, "matype": 4}), _table())
+    assert "matype=4" in str(exc.value) and "close_trend_MA_4-233" in str(exc.value)
 
 
 def test_derived_output_k_follows_upstream() -> None:
