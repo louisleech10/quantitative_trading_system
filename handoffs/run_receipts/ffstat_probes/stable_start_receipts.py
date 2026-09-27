@@ -34,7 +34,8 @@ def inventory() -> Dict[str, Any]:
             unclassified.append(name)
             continue
         steps.append({"function": name, **row})
-    return {"steps": steps, "unclassified": unclassified}
+    return {"schema_version": 1, "command": "venv/bin/python handoffs/run_receipts/ffstat_probes/stable_start_receipts.py inventory",
+            "exit_code": 1 if unclassified else 0, "steps": steps, "unclassified": unclassified}
 
 
 def output_points() -> Dict[str, Any]:

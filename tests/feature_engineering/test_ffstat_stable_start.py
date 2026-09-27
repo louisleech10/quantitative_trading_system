@@ -181,13 +181,16 @@ def test_nan_propagation_inventory_complete() -> None:
         assert row["evidence"], name
         if not row["propagates_nan"]:
             assert row["class"] in ("incomplete_window", "recursive", "cumulative", "pointwise_prefix",
-                                    "not_in_generation_path"), name
+                                    "not_in_generation_path", "not_a_data_step"), name
 
 
 def _ast_step_functions() -> set:
     """L2 operators、L3 rolling、L4 lag、L5 cross_sectional、L6 meta_features、L6.5 preprocessing、多週期 tf_aligner
     之公開計算函式（模組:限定名）。"""
     roots = ["operators", "cross_sectional", "meta_features", "preprocessing", "timeframe"]
+    # r24 codex P1-01：公開與私有之計算／對齊入口皆列（含 _compute_all_streaming、_searchsorted_align、_merge_asof_align）
+    prefixes = ("compute", "_compute", "apply", "_apply", "align", "_align", "_merge", "_searchsorted", "_rolling",
+                "_dead", "_variance")
     out = set()
     base = REPO / "momentum" / "FeatureEngineering"
     for root in roots:
@@ -197,9 +200,9 @@ def _ast_step_functions() -> set:
             for node in ast.walk(tree):
                 if isinstance(node, ast.ClassDef):
                     for item in node.body:
-                        if isinstance(item, ast.FunctionDef) and item.name.startswith(("compute", "_apply_", "apply", "align")):
+                        if isinstance(item, ast.FunctionDef) and item.name.startswith(prefixes):
                             out.add(f"{module}:{node.name}.{item.name}")
-                elif isinstance(node, ast.FunctionDef) and node.col_offset == 0 and node.name.startswith(("compute", "apply", "align")):
+                elif isinstance(node, ast.FunctionDef) and node.col_offset == 0 and node.name.startswith(prefixes):
                     out.add(f"{module}:{node.name}")
     return out
 
@@ -427,13 +430,22 @@ def test_multi_tf_mask_applied_before_alignment(tmp_path: Path, monkeypatch: pyt
     """Task 2.3 ⑧：1h＋12h 無起始日 ⇒ 12h 欄於對齊後之首個有效值時間＝其 12h stable_start 可被 1h 取用之時間。"""
     h.prepare_stat_env(monkeypatch, tmp_path)
     root, _factory, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], fracdiff=False, adf=False), start_date=None)
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
     stable = result.metadata[CONTRACT["stable_start_receipt_key"]]
     twelve = [c for c in stable if "12h" in c]
     assert twelve
+    idx_12h = h.kline_frame(timeframe="12h").index
+    idx_1h = h.kline_frame(timeframe="1h").index
     for column in twelve:
+        # 預期：12h 於其 stable_start 首個有效之列，經同一對齊器對到 1h 後之第一個有值時間（r24 codex P1-03：精確相等）
+        marker = pd.DataFrame({"m": np.where(idx_12h >= pd.Timestamp(stable[column]), 1.0, np.nan)}, index=idx_12h)
+        marker.index.name = "timestamp"
+        aligned = TimeframeAligner.align_to_primary(marker.reset_index(), "12h", pd.Series(idx_1h), "1h")
+        expected = aligned["m"].first_valid_index()
         series = _public_column(root, column)
-        first = series.first_valid_index()
-        assert first is not None and first >= pd.Timestamp(stable[column]), column
+        assert series.first_valid_index() == expected, column
+        assert series.loc[:expected - pd.Timedelta(microseconds=1)].isna().all(), column
 
 
 def test_config_hash_includes_warmup_policy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -520,12 +532,139 @@ def test_boundary_24_reference_symbol_origin(tmp_path: Path, monkeypatch: pytest
             assert pd.Timestamp(ts) >= ref_start, column
 
 
-def test_boundary_25_user_start_source_user(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 邊界④：帶 start_date ⇒ output_start_source == "user"、effective_output_start＝該日（v44）。"""
+# Task 2.3 邊界④（帶 start_date ⇒ output_start_source == "user"、effective_output_start＝該日）之唯一具名測試為既有
+# test_ffstat_calibration.py::test_boundary_11_user_start_source_is_user（r24 codex P2-05：不另建重複落點）；
+# per_column 不寫 effective_output_start 由 test_no_start_calibration_rows_masked_from_output 斷言。
+
+
+# ─────────────────────────────── ⑪ 四條執行路徑
+
+_PATHS = {
+    "frame": {"FFACT_USE_CGSA": "0"},
+    "cgsa_serial": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
+    "cgsa_parallel": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
+}
+
+
+def _path_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> Dict[str, Any]:
+    env = _PATHS["cgsa_serial" if mode == "resume" else mode]
+    h.prepare_stat_env(monkeypatch, tmp_path, **env)
+    payload = h.stat_payload(["1h", "12h"])
+    root, _factory, result = h.run_stat(tmp_path, payload, start_date=None)
+    if mode == "resume":
+        root, _factory, result = h.run_stat(tmp_path, payload, start_date=None, force_regenerate=False)
+    return {"root": root, "result": result}
+
+
+@pytest.mark.parametrize("mode", ["cgsa_serial", "cgsa_parallel", "resume"])
+def test_paths_same_stable_start_and_masks(mode: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑪（r24 codex P1-02）：frame、CGSA 序列、CGSA 平行、resume 之 stable_start、校準列與公開輸出全同。"""
+    key = CONTRACT["stable_start_receipt_key"]
+    base = _path_run(tmp_path / "frame", monkeypatch, "frame")
+    other = _path_run(tmp_path / mode, monkeypatch, mode)
+    assert other["result"].metadata[key] == base["result"].metadata[key]
+    strip = lambda d: {c: {k: v for k, v in r.items() if k != "dstar_cache_hit"} for c, r in d.items()}  # noqa: E731
+    assert strip(h.decisions(other["result"])) == strip(h.decisions(base["result"]))
+    assert h.base_fingerprints(other["root"]) == h.base_fingerprints(base["root"])
+
+
+# ─────────────────────────────── ⑫ run_ic_first（v29–v31）
+
+def _ic_first_kwargs(tmp_path: Path) -> Dict[str, Any]:
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    return {"storage": FeatureStorage(str(tmp_path / "ic_first")), "persist": True}
+
+
+def _factory_and_config():
+    from momentum.factories import create_feature_factory
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    return factory, factory._resolve_config(h.stat_payload())
+
+
+def test_run_ic_first_requires_start_date_when_stationarizing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑫（v29）：平穩化開啟而 start_date 為 None ⇒ CalibrationError（field＝output_start）、零寫入。"""
+    from momentum.FeatureEngineering.preprocessing.calibration import CalibrationError
+
     h.prepare_stat_env(monkeypatch, tmp_path)
-    _root, _factory, result = h.run_stat(tmp_path, h.stat_payload())
-    assert result.metadata[h.META["output_start_source"]] == "user"
-    assert pd.Timestamp(result.metadata[h.META["effective_output_start"]]) == pd.Timestamp(h.WINDOW[0], tz="UTC")
+    factory, config = _factory_and_config()
+    kwargs = _ic_first_kwargs(tmp_path)
+    before = h.snapshot_tree(tmp_path)
+    with pytest.raises(CalibrationError) as exc:
+        factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, config, start_date=None, end_date=h.WINDOW[1], **kwargs)
+    assert getattr(exc.value, "field", None) == "output_start"
+    assert h.snapshot_tree(tmp_path) == before
+
+
+def test_run_ic_first_rejects_config_hash_when_stationarizing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑫（v29）：平穩化開啟而傳入 config_hash ⇒ CalibrationError（field＝config_hash）、零寫入。"""
+    from momentum.FeatureEngineering.preprocessing.calibration import CalibrationError
+
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    factory, config = _factory_and_config()
+    kwargs = _ic_first_kwargs(tmp_path)
+    before = h.snapshot_tree(tmp_path)
+    with pytest.raises(CalibrationError) as exc:
+        factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, config, start_date=h.WINDOW[0], end_date=h.WINDOW[1],
+                             config_hash="deadbeef", **kwargs)
+    assert getattr(exc.value, "field", None) == "config_hash"
+    assert h.snapshot_tree(tmp_path) == before
+
+
+def test_run_ic_first_uses_own_window_not_previous(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑫（v29）：同一 factory 先生成 A 窗再生成 B 窗，run_ic_first 帶 A 之起訖 ⇒ 校準上界 < A 起始日、
+    lease hash＝以 A 起訖重算之設定 hash；預設不相干之 _current_output_window／_current_config_hash 亦同。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    factory, config = _factory_and_config()
+    a_start, a_end = h.WINDOW
+    b_start = (pd.Timestamp(a_end) + pd.Timedelta(days=30)).strftime("%Y-%m-%d")
+    b_end = (pd.Timestamp(a_end) + pd.Timedelta(days=60)).strftime("%Y-%m-%d")
+    factory._storage = FeatureStorage(str(tmp_path / "gen"))
+    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.stat_payload(), start_date=a_start, end_date=a_end)
+    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.stat_payload(), start_date=b_start, end_date=b_end)
+    expected_hash = factory._compute_config_hash(config, h.SYMBOL, h.PRIMARY_TF, start_date=a_start, end_date=a_end)
+    for preset in (False, True):
+        if preset:
+            factory._current_output_window = object()
+            factory._current_config_hash = "unrelated"
+        leases: List[Any] = []
+        h.ic_first_to_l65(factory, config, start_date=a_start, end_date=a_end, lease_sink=leases, **_ic_first_kwargs(tmp_path / str(preset)))
+        decisions = getattr(factory, CONTRACT["factory_decisions_attr"])
+        assert all(pd.Timestamp(d["calibration_end"]) < pd.Timestamp(a_start, tz="UTC")
+                   for d in decisions.values() if d.get("calibration_end")), preset
+        assert any(expected_hash in str(lease) for lease in leases), preset
+
+
+@pytest.mark.parametrize("ending", ["preflight_error", "l1_l6_error", "success"])
+def test_run_ic_first_restores_state_on_all_endings(ending: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑫（v30）：平穩化開啟之 run_ic_first 結束後（前置關卡失敗、L1–L6 失敗、成功）
+    `_current_output_window` 與 `_current_config_hash` 皆與呼叫前為同一物件（is）。"""
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+    from momentum.FeatureEngineering.preprocessing.calibration import CalibrationError
+
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    factory, config = _factory_and_config()
+    factory._storage = FeatureStorage(str(tmp_path / "gen"))
+    factory.generate_features(h.SYMBOL, h.PRIMARY_TF, config_override=h.stat_payload(), start_date=h.WINDOW[0], end_date=h.WINDOW[1])
+    window_before, hash_before = factory._current_output_window, factory._current_config_hash
+    w1_start = (pd.Timestamp(h.WINDOW[1]) + pd.Timedelta(days=30)).strftime("%Y-%m-%d")
+    w1_end = (pd.Timestamp(h.WINDOW[1]) + pd.Timedelta(days=60)).strftime("%Y-%m-%d")
+    if ending == "preflight_error":
+        monkeypatch.setattr(FeatureFactory, "run_calibration_preflight",
+                            lambda *a, **k: (_ for _ in ()).throw(CalibrationError("injected")))
+    elif ending == "l1_l6_error":
+        monkeypatch.setattr(FeatureFactory, "_run_l1_l6_for_ic_first",
+                            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("injected")))
+    try:
+        h.ic_first_to_l65(factory, config, start_date=w1_start, end_date=w1_end, **_ic_first_kwargs(tmp_path))
+    except (CalibrationError, RuntimeError):
+        assert ending != "success"
+    assert factory._current_output_window is window_before
+    assert factory._current_config_hash is hash_before
 
 
 def test_retired_tests_absent_and_replaced() -> None:
