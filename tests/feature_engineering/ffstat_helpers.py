@@ -366,6 +366,93 @@ def base_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
     return out
 
 
+def dual_start_report(tmp_path: Path, timeframe: str, payload: Dict[str, Any], source_kline_dir: str,
+                      symbol: str = SYMBOL) -> Dict[str, Any]:
+    """§G⑦（v33–v42）雙起點收斂對證之唯一實作（測試與收據腳本共用）。
+
+    單一原生週期（training=[tf]、primary=tf）、無起始日、平穩化關閉；A＝自資料起點，B＝刪去前 M_tf 列之複本。
+    M_tf＝K_max_tf（`warmup_window._collect_l1_warmup_bars`，倍數表齊全後之值；獨立於受測遮罩）。
+    以絕對時間戳對齊，每個非 start_dependent 基礎欄取 B 首個有限值起 A、B 皆有限之列，須 ≥ min_overlap 且
+    |A−B| ≤ tol × max(P75(|A|), std(A))。回傳資格、M、F_max、逐欄最大偏差、違規欄與不合資格欄。
+    """
+    import shutil
+
+    import h5py
+    import numpy as np
+    import pandas as pd
+    import pyarrow.parquet as pq
+
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.warmup_window import _collect_l1_warmup_bars
+
+    cfg = CONTRACT["dual_start"]
+    tol, min_overlap = float(cfg["tolerance"]), int(cfg["min_overlap_rows"])
+    body = dict(payload)
+    body["timeframes"] = {"primary": timeframe, "training": [timeframe]}
+    for pre in ("fractional_differencing", "adf_differencing"):
+        body.setdefault("preprocessing", {}).setdefault(pre, {})["enabled"] = False
+    config = create_feature_factory(cache_dir=source_kline_dir, validate_continuity=False)._resolve_config(body)
+    m = int(_collect_l1_warmup_bars(config))
+
+    def run(label: str, drop_rows: int) -> Tuple[Dict[str, pd.Series], Any]:
+        kdir = tmp_path / f"k_{label}"
+        kdir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(Path(source_kline_dir) / "kline_cache.h5", kdir / "kline_cache.h5")
+        if drop_rows:
+            with h5py.File(kdir / "kline_cache.h5", "r+") as f:
+                group = f[symbol][timeframe]
+                arr = group["data"][()]
+                attrs = dict(group["data"].attrs)
+                del group["data"]
+                ds = group.create_dataset("data", data=arr[drop_rows:], maxshape=(None,), chunks=True)
+                for key, value in attrs.items():
+                    ds.attrs[key] = value
+        root = tmp_path / f"features_{label}"
+        factory = create_feature_factory(cache_dir=str(kdir), validate_continuity=False)
+        factory._storage = FeatureStorage(str(root))
+        result = factory.generate_features(symbol, timeframe, config_override=body, force_regenerate=True,
+                                           start_date=None, end_date=None, persist=True)
+        cols: Dict[str, pd.Series] = {}
+        for p in sorted(root.rglob("*.parquet")):
+            if p.name.endswith("_L65.parquet"):
+                continue
+            frame = pq.read_table(p).to_pandas()
+            idx = pd.to_datetime(frame["timestamp"], unit="ms", utc=True) if "timestamp" in frame.columns else frame.index
+            for n in frame.columns:
+                if n not in ("timestamp", "__index_level_0__", "index"):
+                    cols[n] = pd.Series(frame[n].to_numpy(dtype=np.float64), index=idx)
+        return cols, result
+
+    a_cols, a_result = run("a", 0)
+    start_dependent = set(a_result.metadata.get(CONTRACT["start_dependent_key"], []))
+    first_rows = [int(np.argmax(np.isfinite(s.to_numpy()))) for s in a_cols.values() if np.isfinite(s.to_numpy()).any()]
+    f_max = max(first_rows) if first_rows else 0
+    n_rows = len(next(iter(a_cols.values()))) if a_cols else 0
+    report: Dict[str, Any] = {"timeframe": timeframe, "rows": n_rows, "m": m, "f_max": f_max,
+                              "margin": n_rows - (m + f_max + min_overlap), "violations": {}, "ineligible": [],
+                              "max_error": {}}
+    if report["margin"] < 0:
+        report["eligible"] = False
+        return report
+    b_cols, _ = run("b", m)
+    for name, b in b_cols.items():
+        if name in start_dependent or name not in a_cols:
+            continue
+        a = a_cols[name].reindex(b.index)
+        both = np.isfinite(a.to_numpy()) & np.isfinite(b.to_numpy())
+        if both.sum() < min_overlap:
+            report["ineligible"].append(name)
+            continue
+        av, bv = a.to_numpy()[both], b.to_numpy()[both]
+        scale = max(float(np.percentile(np.abs(av), 75)), float(np.std(av)), 1e-8)
+        err = float(np.max(np.abs(av - bv)) / scale)
+        report["max_error"][name] = err
+        if err > tol:
+            report["violations"][name] = err
+    report["eligible"] = not report["ineligible"]
+    return report
+
+
 def decision_change_report(baseline_decisions: Dict[str, Dict[str, Any]],
                            decisions_now: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
     """§G ②′ 與基準相比之決策改變（Task 4.1 golden 收據之唯一來源）：逐欄 (fracdiff, ADF 差分階數) 舊→新、

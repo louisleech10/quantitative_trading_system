@@ -1,0 +1,16 @@
+{
+  "spec": "docs/FFSTAT_SPEC.md",
+  "about": "FF-STAT Task 2.3 NaN 傳遞盤點之逐步驟分類（實作時補齊 AST 列舉之全部步驟；未分類者 stable_start_receipts.py inventory rc=1、test_nan_propagation_inventory_complete 紅）。class 值：propagating、incomplete_window、recursive、cumulative、pointwise_prefix、not_in_generation_path。",
+  "steps": {
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_winsorization": {
+      "propagates_nan": false,
+      "class": "incomplete_window",
+      "evidence": "utils/winsor_params.py：min_periods＝min(window, max(20, window//4))；界線未定之列保留原值（feature_preprocessor.py:3001-3040）"
+    },
+    "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_binary_signal": {
+      "propagates_nan": false,
+      "class": "pointwise_prefix",
+      "evidence": "derived_operators.py:418-433：比較後 astype(int)，NaN 比較為 False ⇒ 0"
+    }
+  }
+}

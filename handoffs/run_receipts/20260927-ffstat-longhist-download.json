@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "spec": "docs/FFSTAT_SPEC.md",
+  "command": "venv/bin/python handoffs/run_receipts/20260927-ffstat-longhist-download.py && venv/bin/python handoffs/run_receipts/20260927-ffstat-longhist-download.py 1d 5m",
+  "exit_code": 0,
+  "head": "38ca2137",
+  "result": {
+    "cache_dir": "data_cache/feature_klines_longhist",
+    "rows": {
+      "BTCUSDT": {"12h": 6656, "1d": 3329, "5m": 105260},
+      "ETHUSDT": {"12h": 6656, "1d": 3329, "5m": 105260},
+      "ADAUSDT": {"12h": 6171, "1d": 3086, "5m": 105260}
+    },
+    "first": {"BTCUSDT": "2017-08-17 00:00", "ETHUSDT": "2017-08-17 00:00", "ADAUSDT": "2018-04-17 00:00", "5m": "2025-09-27 00:00"},
+    "gaps": [{"symbols": ["BTCUSDT", "ETHUSDT"], "timeframe": "12h", "missing": "2018-02-08 12:00 UTC", "count": 1}],
+    "logs": ["handoffs/run_receipts/20260927-ffstat-longhist-download.log", "handoffs/run_receipts/20260927-ffstat-longhist-download-5m-1d.log"]
+  },
+  "honest_bounds": "以既有 K 線下載模組（Binance）寫入獨立目錄（不入 git）；12h 缺口為 Binance 2018-02-08 停機之真實缺口，儲存層連續性檢查記 POST-WRITE VERIFICATION FAILED 非資料損壞，依 SPEC 不補、以 validate_continuity=False 讀取；5m 只取最近一年（倍數量測只需數千根）。"
+}

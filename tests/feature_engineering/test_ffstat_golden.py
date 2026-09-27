@@ -71,6 +71,112 @@ def test_golden_base_values_unchanged_trim1(tmp_path: Path, monkeypatch: pytest.
     assert base_fingerprints(root_on) == base_fingerprints(root_off)
 
 
+def test_golden_base_values_unchanged_after_stable_start(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G ②（v32／v33）：無起始日全史、平穩化關閉 ⇒ stable_start 前全 NaN；鏈上無第②③類之欄 stable_start 後與
+    FF-STAT 動工前凍結之無起始日基準逐位元組相同（與 Task 2.3 ③ 同一判定，於此重用）。"""
+    from tests.feature_engineering.test_ffstat_stable_start import test_no_start_stationarity_off_stable_values_unchanged
+
+    test_no_start_stationarity_off_stable_values_unchanged(tmp_path, monkeypatch)
+
+
+def test_golden_public_values_unchanged_by_calibration_domain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G ②（v32）：有起始日、預熱恆開 ⇒ 平穩化開與關兩次之基礎欄四 hash 全等（公開域值不因校準域存在而變）。"""
+    h.prepare_stat_env(monkeypatch, tmp_path / "on")
+    root_on, _, _ = h.run_stat(tmp_path / "on", h.stat_payload())
+    h.prepare_stat_env(monkeypatch, tmp_path / "off")
+    root_off, _, _ = h.run_stat(tmp_path / "off", h.stat_payload(fracdiff=False, adf=False))
+    assert base_fingerprints(root_on) == base_fingerprints(root_off)
+
+
+@pytest.mark.parametrize("timeframe", ["1h", "4h", "12h"])
+def test_dual_start_convergence_default_config(timeframe: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G⑦（v40–v43）：預設全設定、單一原生週期、BTC；1h／4h 用 kline_cache，12h 用長歷史快取。
+    合資格且全部受驗欄在容差內；不合資格即紅並列實測數字（交使用者裁定，不得自行 blocked 收案）。"""
+    source = str(_REPO / h.CONTRACT["dual_start"]["timeframes"][timeframe])
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    report = h.dual_start_report(tmp_path, timeframe, {}, source)
+    assert report["margin"] >= 0, f"資格不足（交使用者裁定）：{ {k: report[k] for k in ('rows', 'm', 'f_max', 'margin')} }"
+    assert report["eligible"], report["ineligible"][:20]
+    assert not report["violations"], sorted(report["violations"].items(), key=lambda kv: -kv[1])[:10]
+
+
+def _small_dual_start_payload() -> Dict[str, Any]:
+    """§G⑦ mutant 用之小設定：RSI 14、ADXR 233（係數 mutant 固定目標）、binary_signal、L3 21 窗、縮尾預設。"""
+    payload = h.stat_payload(fracdiff=False, adf=False)
+    payload["atomic_indicators"] = {
+        "trend": {"enabled": False}, "volatility": {"enabled": False}, "volume": {"enabled": False},
+        "statistics": {"enabled": False}, "cycle": {"enabled": False}, "pattern": {"enabled": False},
+        "tail_risk": {"enabled": False}, "microstructure": {"enabled": False}, "entropy": {"enabled": False},
+        "momentum": {"enabled": True, "indicators": [
+            {"name": "RSI", "enabled": True, "periods": [14]},
+            {"name": "ADXR", "enabled": True, "periods": [h.CONTRACT["dual_start"]["coefficient_mutant"]["period"]]},
+        ]},
+    }
+    payload["operators"]["binary_signal"] = {"enabled": True}
+    payload["rolling_aggregation"] = {"enabled": True, "windows": [21]}
+    return payload
+
+
+def test_dual_start_small_config_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G⑦ mutant 之基準：小設定於真實 BTC 1h 通過雙起點對證。"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    report = h.dual_start_report(tmp_path, "1h", _small_dual_start_payload(), str(_REPO / "data_cache/feature_klines"))
+    assert report["margin"] >= 0 and report["eligible"]
+    assert not report["violations"], report["violations"]
+
+
+def test_mutation_dual_start_l1_mask_removed_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G⑦ mutant「刪 L1 遮罩」⇒ 必紅。"""
+    import numpy as np
+
+    from momentum.FeatureEngineering.preprocessing import stable_mask as sm
+
+    monkeypatch.setattr(sm, "apply_l1_mask", lambda values, origin, k: np.asarray(values, dtype=float).copy())
+    with pytest.raises(AssertionError):
+        test_dual_start_small_config_passes(tmp_path, monkeypatch)
+
+
+def test_mutation_dual_start_winsor_unmasked_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G⑦ mutant「縮尾不遮」⇒ 必紅。"""
+    import numpy as np
+
+    from momentum.FeatureEngineering.preprocessing import stable_mask as sm
+
+    monkeypatch.setattr(sm, "mask_incomplete_window", lambda output, input_values, window: np.asarray(output, dtype=float).copy())
+    with pytest.raises(AssertionError):
+        test_dual_start_small_config_passes(tmp_path, monkeypatch)
+
+
+def test_mutation_dual_start_pointwise_unmasked_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G⑦ mutant「第④類不遮」⇒ 必紅。"""
+    import numpy as np
+
+    from momentum.FeatureEngineering.preprocessing import stable_mask as sm
+
+    monkeypatch.setattr(sm, "mask_pointwise_prefix", lambda output, inputs: np.asarray(output, dtype=float).copy())
+    with pytest.raises(AssertionError):
+        test_dual_start_small_config_passes(tmp_path, monkeypatch)
+
+
+def test_mutation_dual_start_adxr_factor_one_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G⑦ mutant「倍數表 ADXR 係數改為 1.0」（v42 固定目標）⇒ 必紅（r22 codex：ADXR 233 normalized 0.1053）。"""
+    import math
+
+    from momentum.FeatureEngineering.preprocessing import stable_mask as sm
+
+    original = sm.instance_k
+    target = h.CONTRACT["dual_start"]["coefficient_mutant"]
+
+    def factor_one(spec, table, upstream_k=None):
+        if spec.indicator == target["indicator"] and not spec.upstream:
+            return math.ceil(max(float(spec.params[k]) for k in target["period_keys"]) * 1.0)
+        return original(spec, table, upstream_k)
+
+    monkeypatch.setattr(sm, "instance_k", factor_one)
+    with pytest.raises(AssertionError):
+        test_dual_start_small_config_passes(tmp_path, monkeypatch)
+
+
 def test_golden_derived_consistent_with_decisions(baseline: Dict[str, Any], on_run: Dict[str, Any]) -> None:
     """§G ②′：改後衍生欄集合與逐欄決策一致（有 `_fracdiff` ⇔ fracdiff、有 `_diffK` ⇔ ADF 差分 K 階）；
     摘要與逐欄重新計數一致。與基準相比之決策改變由 `test_golden_receipt_change_report` 驗。"""

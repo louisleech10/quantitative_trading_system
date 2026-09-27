@@ -1,0 +1,71 @@
+{
+  "spec": "docs/FFSTAT_SPEC.md",
+  "about": "FF-STAT SPEC v32 起取代 v21–v31 之自動有效起始日與 FFACT_WARMUP_TRIM 開關；下列既有測試所驗之行為被 SPEC 明文刪除，逐條退役並指名接替測試（§V 防假綠：不得靜默刪除）。test_ffstat_stable_start.py::test_retired_tests_absent_and_replaced 機械核對本表。",
+  "retired": [
+    {
+      "test": "tests/feature_engineering/test_ffstat_calibration.py::test_resolve_effective_output_start_exact_depth_rows_before",
+      "reason": "v32 刪 resolve_effective_output_start（共同有效起始日），改逐欄穩定點（§C 未填起始日、逐欄穩定點）",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_l1_mask_first_valid_is_origin_plus_k"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_calibration.py::test_boundary_10_effective_start_takes_latest_timeframe",
+      "reason": "v32 刪多週期共同起點；各原生週期各自依逐欄穩定點（§C 未填起始日・多週期）",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_multi_tf_mask_applied_before_alignment"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_calibration.py::test_resolve_effective_output_start_rejects_mixed_timezone",
+      "reason": "v32 刪 resolve_effective_output_start；時區換算之共同性仍由 test_verify_packet_rejects_mixed_timezone_last_ts 覆蓋",
+      "replacement": "tests/feature_engineering/test_ffstat_calibration.py::test_verify_packet_rejects_mixed_timezone_last_ts"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_calibration.py::test_auto_start_reserves_calibration_segment",
+      "reason": "v32 無起始日改為各欄穩定後最早 N 值校準並遮出輸出，不再預留共同校準段",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_no_start_calibration_rows_masked_from_output"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_calibration.py::test_auto_start_cache_does_not_skip_preflight",
+      "reason": "v32 無起始日不另建校準域、無前置關卡；快取失效改由設定 hash 納入 warmup_policy 保證",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_config_hash_includes_warmup_policy"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_calibration.py::test_auto_start_off_unchanged",
+      "reason": "v32 預熱恆開，平穩化關閉、無起始日時開頭未穩定段改為 NaN，不再與改前逐位元組相同；穩定後之值由 §G② 收窄版驗",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_no_start_stationarity_off_stable_values_unchanged"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_calibration.py::test_auto_start_history_too_short_fails",
+      "reason": "v32 刪保底主週期 N 根與其 fail-closed；有效值不足之欄依 v19 標 calibration_insufficient_history",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_no_start_insufficient_history_column_flagged"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_calibration.py::test_mutation_effective_start_not_reserved_is_caught",
+      "reason": "§V ⑦¹¹ 於 v32 改為「未填起始日時校準列未遮出公開輸出」",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_mutation_calibration_rows_not_masked_is_caught"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_golden.py::test_golden_base_values_unchanged_trim0",
+      "reason": "v32 刪 FFACT_WARMUP_TRIM；§G② 改為穩定後逐位元組（鏈上無第②③類之欄）",
+      "replacement": "tests/feature_engineering/test_ffstat_golden.py::test_golden_base_values_unchanged_after_stable_start"
+    },
+    {
+      "test": "tests/feature_engineering/test_ffstat_golden.py::test_golden_base_values_unchanged_trim1",
+      "reason": "v32 刪 FFACT_WARMUP_TRIM；公開域值不因校準域存在而變改以有起始日之平穩化開關兩次比對",
+      "replacement": "tests/feature_engineering/test_ffstat_golden.py::test_golden_public_values_unchanged_by_calibration_domain"
+    },
+    {
+      "test": "tests/feature_engineering/test_b6_warmup_trim.py::test_resolve_output_window_flag_off_is_strict",
+      "reason": "v32 刪 FFACT_WARMUP_TRIM 與 is_warmup_trim_enabled；預熱恆開",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_warmup_trim_switch_removed"
+    },
+    {
+      "test": "tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_flag_off_golden_baseline_check",
+      "reason": "v32 刪 FFACT_WARMUP_TRIM；開關關閉之 golden 路徑不復存在",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_warmup_trim_switch_removed"
+    },
+    {
+      "test": "tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_flag_off_preserves_config_hash",
+      "reason": "v32 設定 hash 改納入 warmup_policy，改前快取一律未命中",
+      "replacement": "tests/feature_engineering/test_ffstat_stable_start.py::test_config_hash_includes_warmup_policy"
+    }
+  ]
+}

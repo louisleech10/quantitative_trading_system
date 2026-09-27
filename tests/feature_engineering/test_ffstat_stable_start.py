@@ -1,0 +1,624 @@
+"""FF-STAT Task 2.3（SPEC v32–v44）：逐欄穩定點、公開域預熱恆開、未填起始日之逐欄校準、死欄純函式與欄集合差異。
+
+全部以真實 `data_cache/feature_klines/kline_cache.h5`（及長歷史快取）驗證，禁合成 fixture。
+實作前本檔應為紅（`stable_mask` 為 NotImplementedError 空殼、生成路徑尚未接線）；不得以 skip／xfail 暫避。
+"""
+
+from __future__ import annotations
+
+import ast
+import hashlib
+import json
+import math
+from pathlib import Path
+from typing import Any, Dict, List
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from momentum.FeatureEngineering.preprocessing import stable_mask as sm
+from tests.feature_engineering import ffstat_helpers as h
+
+CONTRACT = h.CONTRACT
+REPO = Path(__file__).resolve().parents[2]
+TABLE_PATH = REPO / CONTRACT["warmup_table"]["path"]
+
+
+def _table() -> Dict[str, Dict[str, Any]]:
+    import yaml
+
+    return dict(yaml.safe_load(TABLE_PATH.read_text(encoding="utf-8"))["indicators"])
+
+
+def _close(timeframe: str = "1h") -> np.ndarray:
+    return h.kline_frame(timeframe=timeframe)["close"].to_numpy(dtype=np.float64)
+
+
+def _hlc(timeframe: str = "1h") -> np.ndarray:
+    frame = h.kline_frame(timeframe=timeframe)
+    return frame[["high", "low", "close"]].to_numpy(dtype=np.float64)
+
+
+def _spec(indicator: str, column: str, params: Dict[str, Any], **kw: Any) -> sm.OutputPointSpec:
+    keys = tuple(_table()[indicator]["period_keys"]) if indicator in _table() else ()
+    return sm.OutputPointSpec(engine="talib", indicator=indicator, column=column, params=params, period_keys=keys, **kw)
+
+
+def _factor(indicator: str) -> float:
+    return float(_table()[indicator]["recommended_factor"])
+
+
+# ─────────────────────────────── ① L1 遮罩（逐呼叫 K）
+
+@pytest.mark.parametrize("timeframe", ["1h", "12h"])
+def test_l1_mask_first_valid_is_origin_plus_k(timeframe: str) -> None:
+    """Task 2.3 ①：EMA_233（recursive）、SMA_200（window_only）、ADX_14（多輸入）首個有效值之列＝origin＋K，之前全 NaN。"""
+    import talib
+
+    close = _close(timeframe)
+    hlc = _hlc(timeframe)
+    cases = [
+        ("EMA", "EMA_233", {"timeperiod": 233}, talib.EMA(close, timeperiod=233), close[:, None]),
+        ("SMA", "SMA_200", {"timeperiod": 200}, talib.SMA(close, timeperiod=200), close[:, None]),
+        ("ADX", "ADX_14", {"timeperiod": 14}, talib.ADX(hlc[:, 0], hlc[:, 1], hlc[:, 2], timeperiod=14), hlc),
+    ]
+    for indicator, column, params, raw, inputs in cases:
+        k = sm.instance_k(_spec(indicator, column, params), _table())
+        assert k == math.ceil(params["timeperiod"] * _factor(indicator)), column
+        origin = sm.l1_origin(inputs)
+        masked = sm.apply_l1_mask(raw, origin, k)
+        assert sm.first_finite_index(masked) == origin + k, column
+        assert np.isnan(masked[: origin + k]).all(), column
+        np.testing.assert_array_equal(masked[origin + k:], raw[origin + k:])
+
+
+def test_l1_mask_per_call_k_ema5_vs_ema233() -> None:
+    """Task 2.3 ①（v37）：同一指標之 EMA_5 與 EMA_233 之 K 分別依各自參數，不取整個指標之最大週期。"""
+    k5 = sm.instance_k(_spec("EMA", "EMA_5", {"timeperiod": 5}), _table())
+    k233 = sm.instance_k(_spec("EMA", "EMA_233", {"timeperiod": 233}), _table())
+    assert k5 == math.ceil(5 * _factor("EMA"))
+    assert k233 == math.ceil(233 * _factor("EMA"))
+    assert k5 < k233
+
+
+def test_l1_mask_stoch_combo_k_uses_max_period_key() -> None:
+    """Task 2.3 ①：STOCH 一組 combo 之 K＝ceil(max(fastk_period, slowk_period, slowd_period)×係數)。"""
+    params = {"fastk_period": 55, "slowk_period": 8, "slowk_matype": 0, "slowd_period": 5, "slowd_matype": 0}
+    k = sm.instance_k(_spec("STOCH", "STOCH_slowk", params), _table())
+    assert k == math.ceil(55 * _factor("STOCH"))
+
+
+def test_derived_output_k_follows_upstream() -> None:
+    """§C v39：同引擎衍生輸出之 K＝上游 K 最大者＋window−1（窗型）或上游 K 最大者（逐點聚合）。"""
+    windowed = sm.OutputPointSpec(engine="microstructure", indicator="VPIN_ZSCORE", column="ms_vpin_zscore_21",
+                                  params={"window": 21}, period_keys=(), upstream=("ms_vpin_30", "ms_sigma_50"), window=21)
+    assert sm.instance_k(windowed, _table(), upstream_k={"ms_vpin_30": 40, "ms_sigma_50": 60}) == 60 + 20
+    pointwise = sm.OutputPointSpec(engine="pattern", indicator="CDL_PATTERN", column="ohlc_pattern_Consensus",
+                                   params={}, period_keys=(), upstream=("ohlc_pattern_CDLDOJI", "ohlc_pattern_CDLENGULFING"))
+    assert sm.instance_k(pointwise, _table(), upstream_k={"ohlc_pattern_CDLDOJI": 5, "ohlc_pattern_CDLENGULFING": 7}) == 7
+
+
+def test_output_point_missing_period_key_fails_closed() -> None:
+    """§C 輸出點契約：參數字典缺登記之 period key ⇒ StableMaskError，訊息列引擎、輸出欄與缺少之鍵。"""
+    with pytest.raises(sm.StableMaskError) as exc:
+        sm.instance_k(_spec("STOCH", "STOCH_slowk", {"fastk_period": 55}), _table())
+    message = str(exc.value)
+    assert "talib" in message and "STOCH_slowk" in message and "slowk_period" in message
+
+
+def test_output_point_unregistered_indicator_fails_closed() -> None:
+    """§C／R5：倍數表查不到之指標 ⇒ StableMaskError（不得套後備係數）。"""
+    spec = sm.OutputPointSpec(engine="talib", indicator="NOT_IN_TABLE_XYZ", column="x", params={"timeperiod": 10},
+                              period_keys=("timeperiod",))
+    with pytest.raises(sm.StableMaskError):
+        sm.instance_k(spec, _table())
+
+
+def test_custom_indicator_outputs_declaration_required() -> None:
+    """§C v39②：`CustomIndicatorDef` 之 `outputs` 必填；缺即設定驗證失敗。"""
+    from pydantic import ValidationError
+
+    from momentum.FeatureEngineering.feature_config import CustomIndicatorDef
+
+    with pytest.raises(ValidationError):
+        CustomIndicatorDef(name="two_windows", module="tests.feature_engineering.test_ffstat_stable_start",
+                           function="_custom_two_windows", params={})
+
+
+def _custom_two_windows(data: pd.DataFrame) -> pd.DataFrame:
+    """r18 codex 反例：一次呼叫回傳兩個不同窗長之欄。"""
+    return pd.DataFrame({"short": data["close"].rolling(5).mean(), "long": data["close"].rolling(233).mean()})
+
+
+def test_custom_indicator_undeclared_output_fails_closed() -> None:
+    """§C v39②：回傳欄集合≠宣告集合 ⇒ concat 前 StableMaskError，訊息列引擎、輸出欄與缺少之鍵。"""
+    from momentum.FeatureEngineering.atomic.custom_indicators import CustomIndicatorEngine
+
+    data = h.kline_frame(timeframe="12h").iloc[:600]
+    definition = {"name": "two_windows", "module": __name__, "function": "_custom_two_windows", "params": {},
+                  "outputs": {"short": {"params": {"window": 5}, "period_keys": ["window"]}}}
+    with pytest.raises(sm.StableMaskError) as exc:
+        CustomIndicatorEngine().compute_all(data, [definition])
+    assert "long" in str(exc.value)
+
+
+# ─────────────────────────────── ② 不傳遞 NaN 之步驟
+
+def test_incomplete_window_mask_winsor_full_window() -> None:
+    """Task 2.3 ②：縮尾（第①類，window 252）⇒ 輸出首個有效值＝輸入首個有效值＋251；只遮罩、其後值不變。"""
+    import talib
+
+    rsi = talib.RSI(_close("1h"), timeperiod=14)
+    first = sm.first_finite_index(rsi)
+    fake_winsor_output = rsi.copy()  # 縮尾於界線未定時保留原值 ⇒ 以原值代表其開頭段
+    out = sm.mask_incomplete_window(fake_winsor_output, rsi, CONTRACT["non_propagating_steps"]["incomplete_window"]["winsorization"])
+    assert sm.first_finite_index(out) == first + 251
+    np.testing.assert_array_equal(out[first + 251:], fake_winsor_output[first + 251:])
+
+
+def test_pointwise_prefix_mask_binary_signal() -> None:
+    """Task 2.3 ②（第④類）：binary_signal 之輸出首個有效值＝輸入首個有效值；其後之間歇 NaN 處理不變。"""
+    import talib
+
+    rsi = sm.apply_l1_mask(talib.RSI(_close("1h"), timeperiod=14), 0, 50)
+    signal = (rsi > 70).astype(float)  # 現行 compute_binary_signal：NaN 比較為 False ⇒ 0
+    out = sm.mask_pointwise_prefix(signal, [rsi])
+    assert sm.first_finite_index(out) == sm.first_finite_index(rsi)
+    np.testing.assert_array_equal(out[50:], signal[50:])
+
+
+def test_nan_propagation_inventory_complete() -> None:
+    """Task 2.3 ②：盤點收據之步驟集合＝AST 列舉 L2–L6.5 與多週期對齊之步驟函式集合（少一即紅），且每步有碼證與分類。"""
+    receipts = sorted((REPO / "handoffs" / "run_receipts").glob("*-ffstat-nan-propagation-inventory.json"))
+    assert receipts, "缺盤點收據（SPEC Task 2.3 檔案段）"
+    inventory = json.loads(receipts[-1].read_text(encoding="utf-8"))
+    steps = {row["function"]: row for row in inventory["steps"]}
+    expected = _ast_step_functions()
+    assert expected <= set(steps), sorted(expected - set(steps))
+    for name, row in steps.items():
+        assert row["propagates_nan"] in (True, False), name
+        assert row["evidence"], name
+        if not row["propagates_nan"]:
+            assert row["class"] in ("incomplete_window", "recursive", "cumulative", "pointwise_prefix",
+                                    "not_in_generation_path"), name
+
+
+def _ast_step_functions() -> set:
+    """L2 operators、L3 rolling、L4 lag、L5 cross_sectional、L6 meta_features、L6.5 preprocessing、多週期 tf_aligner
+    之公開計算函式（模組:限定名）。"""
+    roots = ["operators", "cross_sectional", "meta_features", "preprocessing", "timeframe"]
+    out = set()
+    base = REPO / "momentum" / "FeatureEngineering"
+    for root in roots:
+        for path in sorted((base / root).rglob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            module = ".".join(path.relative_to(REPO).with_suffix("").parts)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    for item in node.body:
+                        if isinstance(item, ast.FunctionDef) and item.name.startswith(("compute", "_apply_", "apply", "align")):
+                            out.add(f"{module}:{node.name}.{item.name}")
+                elif isinstance(node, ast.FunctionDef) and node.col_offset == 0 and node.name.startswith(("compute", "apply", "align")):
+                    out.add(f"{module}:{node.name}")
+    return out
+
+
+# ─────────────────────────────── ③④ 無起始日
+
+def test_no_start_stationarity_off_stable_values_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ③：無起始日、平穩化關閉 ⇒ 各欄 stable_start 前全 NaN；鏈上無第②③類者 stable_start 後與凍結基準逐位元組相同。"""
+    baseline_path = REPO / CONTRACT["nostart_baseline"]
+    assert baseline_path.exists(), "缺無起始日凍結基準（§G：以 FF-STAT 動工前 commit 於獨立 worktree 重凍）"
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    block = int(baseline["block_rows"])
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=None)
+    stable = result.metadata[CONTRACT["stable_start_receipt_key"]]
+    exempt = set(baseline.get("chain_has_class_2_or_3", []))
+    compared = 0
+    for column, blocks in baseline["columns"].items():
+        series = _public_column(root, column)
+        start = pd.Timestamp(stable[column])
+        assert series.loc[:start - pd.Timedelta(microseconds=1)].isna().all(), column
+        if column in exempt:
+            continue
+        first_full_block = -(-int((series.index < start).sum()) // block)
+        values = series.to_numpy(dtype=np.float64)
+        for b in range(first_full_block, len(blocks)):
+            chunk = values[b * block:(b + 1) * block]
+            assert hashlib.sha256(chunk.tobytes()).hexdigest() == blocks[b], (column, b)
+            compared += 1
+    assert compared > 0
+
+
+def test_no_start_calibration_rows_masked_from_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ④：無起始日、平穩化開啟 ⇒ 校準值＝各欄最早 N 個有效值（spy）；該 N 列於公開輸出（含衍生欄）全 NaN。"""
+    calls: List[Any] = []
+    original = sm.calibration_rows_no_start
+
+    def spy(values: np.ndarray, n: int):
+        rows = original(values, n)
+        calls.append(rows)
+        return rows
+
+    monkeypatch.setattr(sm, "calibration_rows_no_start", spy)
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(), start_date=None)
+    assert calls, "未以 calibration_rows_no_start 取校準列"
+    assert result.metadata[h.META["output_start_source"]] == "per_column"
+    assert h.META["effective_output_start"] not in result.metadata  # v44：per_column 不寫
+    for column, record in h.decisions(result).items():
+        if record.get("calibration_end") is None:
+            continue
+        out = _public_column(root, column)
+        window = out.loc[:pd.Timestamp(record["calibration_end"])]
+        assert window.isna().all(), column
+
+
+def _public_column(root: Path, column: str) -> pd.Series:
+    import pyarrow.parquet as pq
+
+    for p in sorted(root.rglob("*.parquet")):
+        frame = pq.read_table(p).to_pandas()
+        if column in frame.columns:
+            idx = pd.to_datetime(frame["timestamp"], unit="ms", utc=True) if "timestamp" in frame.columns else frame.index
+            return pd.Series(frame[column].to_numpy(), index=idx)
+    raise AssertionError(f"找不到欄 {column}")
+
+
+def test_no_start_leak_after_calibration_rows_does_not_change_decisions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ④：改動校準列之後之 close（×1.5）⇒ 決策與 d 不變。"""
+    h.prepare_stat_env(monkeypatch, tmp_path / "a")
+    _r, _f, base = h.run_stat(tmp_path / "a", h.stat_payload(), start_date=None)
+    klines = h.kline_copy(tmp_path / "b")
+    latest_cal_end = max(pd.Timestamp(r["calibration_end"]) for r in h.decisions(base).values() if r.get("calibration_end"))
+    h.scale_kline_close(klines, (latest_cal_end + pd.Timedelta(hours=1)).isoformat(), "2100-01-01", 1.5)
+    h.prepare_stat_env(monkeypatch, tmp_path / "b")
+    _r2, _f2, moved = h.run_stat(tmp_path / "b", h.stat_payload(), start_date=None, kline_dir=str(klines))
+    for column, record in h.decisions(base).items():
+        other = h.decisions(moved)[column]
+        assert (record["fracdiff"], record["adf_differenced"], record["d"]) == (other["fracdiff"], other["adf_differenced"], other["d"]), column
+
+
+def test_no_start_change_inside_calibration_rows_changes_some_decision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ④：改動校準列內之 close ⇒ 至少一欄決策或 d 改變（證明確實讀校準列）。"""
+    h.prepare_stat_env(monkeypatch, tmp_path / "a")
+    _r, _f, base = h.run_stat(tmp_path / "a", h.stat_payload(), start_date=None)
+    klines = h.kline_copy(tmp_path / "b")
+    first = h.kline_frame().index[0]
+    h.scale_kline_close(klines, first.isoformat(), (first + pd.Timedelta(days=120)).isoformat(), 3.0)
+    h.prepare_stat_env(monkeypatch, tmp_path / "b")
+    _r2, _f2, moved = h.run_stat(tmp_path / "b", h.stat_payload(), start_date=None, kline_dir=str(klines))
+    changed = [c for c, r in h.decisions(base).items()
+               if (r["fracdiff"], r["d"]) != (h.decisions(moved)[c]["fracdiff"], h.decisions(moved)[c]["d"])]
+    assert changed
+
+
+def test_no_start_insufficient_history_column_flagged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ④：全史有效值不足 N 之欄 ⇒ calibration_insufficient_history、未平穩化、partial、有效值照常輸出。"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    klines = h.kline_copy(tmp_path)
+    last = h.kline_frame().index[-1]
+    h.drop_kline_rows_before(klines, (last - pd.Timedelta(hours=700)).isoformat(), symbol=h.SYMBOL)
+    payload = h.stat_payload()
+    payload["preprocessing"]["calibration_bars"] = 500
+    root, _factory, result = h.run_stat(tmp_path, payload, start_date=None, kline_dir=str(klines))
+    flagged = [c for c, r in h.decisions(result).items() if h.EVENTS["calibration_insufficient"] in " ".join(r["events"])]
+    assert flagged
+    assert result.metadata.get("quality_status") == "partial"
+    for column in flagged:
+        assert not h.decisions(result)[column]["fracdiff"]
+        assert _public_column(root, column).notna().any(), column
+
+
+# ─────────────────────────────── ⑤ 有起始日
+
+def test_with_start_far_no_warmup_insufficient(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑤：起始日離資料起點足夠遠 ⇒ 全部欄首個有效值 ≤ 起始日、無 warmup_insufficient_history。"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False))
+    assert h.EVENTS["warmup_insufficient"] not in json.dumps(result.metadata.get("failure_reasons", []))
+    start = pd.Timestamp(h.WINDOW[0], tz="UTC")
+    for column, ts in result.metadata[CONTRACT["stable_start_receipt_key"]].items():
+        assert pd.Timestamp(ts) <= start, column
+
+
+def test_with_start_near_data_start_flags_slow_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑤：起始日取資料起點後 100 列 ⇒ 慢欄記 warmup_insufficient_history、partial、起始日至首個有效值為 NaN，快欄照常。"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    index = h.kline_frame().index
+    start = index[100].isoformat()
+    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=start)
+    reasons = json.dumps(result.metadata.get("failure_reasons", []))
+    assert h.EVENTS["warmup_insufficient"] in reasons
+    assert result.metadata.get("quality_status") == "partial"
+    starts = {c: pd.Timestamp(t) for c, t in result.metadata[CONTRACT["stable_start_receipt_key"]].items()}
+    assert any(t > pd.Timestamp(start) for t in starts.values())
+    assert any(t <= pd.Timestamp(start) for t in starts.values())
+    receipt = result.metadata.get(CONTRACT["warmup_doubling"]["key"])
+    assert receipt and set(CONTRACT["warmup_doubling"]["fields"]) <= set(receipt)
+
+
+# ─────────────────────────────── ⑦ 死欄純函式與欄集合差異
+
+def test_dead_filter_mask_invariant_real_12h() -> None:
+    """Task 2.3 ⑦：真實 BTC 12h close 前 1,540 列設 NaN（r13 codex 反例）⇒ L3 門檻下不判死欄。"""
+    close = _close("12h")[:1696].copy()
+    close[:1540] = np.nan
+    decision = sm.dead_column_decision(close, nan_rate_threshold=CONTRACT["dead_filter_thresholds"]["l3_nan_rate"],
+                                       min_valid=CONTRACT["dead_filter_thresholds"]["l3_min_effective_n"])
+    assert not decision.dead
+    assert decision.nan_rate == 0.0 and decision.valid_count == 156
+
+
+@pytest.mark.parametrize("valid, threshold, dead", [(29, 30, True), (30, 30, False), (99, 100, True), (100, 100, False)])
+def test_dead_filter_threshold_boundaries(valid: int, threshold: int, dead: bool) -> None:
+    """Task 2.3 ⑦：L3 30、L7 100 之 29／30、99／100 邊界（真實 close 取段）。"""
+    values = _close("1h")[:valid].copy()
+    assert sm.dead_column_decision(values, nan_rate_threshold=None, min_valid=threshold).dead is dead
+
+
+def test_dead_filter_shared_by_l3_and_l7(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑦：L3 與 L7 皆呼叫同一死欄純函式（spy），門檻依呼叫端。"""
+    seen: List[Any] = []
+    original = sm.dead_column_decision
+
+    def spy(values, *, nan_rate_threshold, min_valid):
+        seen.append((nan_rate_threshold, min_valid))
+        return original(values, nan_rate_threshold=nan_rate_threshold, min_valid=min_valid)
+
+    monkeypatch.setattr(sm, "dead_column_decision", spy)
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False))
+    thresholds = CONTRACT["dead_filter_thresholds"]
+    assert (thresholds["l3_nan_rate"], thresholds["l3_min_effective_n"]) in seen
+    assert (None, thresholds["l7_min_valid_samples_default"]) in seen
+
+
+def test_column_set_delta_canonical_and_permutation_invariant() -> None:
+    """Task 2.3 ⑦（v35）：同一 delta 之鍵序與列序置換後 sha256 不變；欄名含非 ASCII 與 `,:"` 亦然；不同 delta 不同 digest。"""
+    before = ["close_trend_EMA_233", "ohlc_pattern_Consensus", "測試,欄:\"x\""]
+    after = ["close_trend_EMA_233", "新欄"]
+    reasons = {"ohlc_pattern_Consensus": "stable_samples_below_min", "測試,欄:\"x\"": "stable_samples_below_min",
+               "新欄": "nan_rate_rule"}
+    delta = sm.column_set_delta(before, after, reasons)
+    permuted = {"reasons": dict(reversed(list(delta["reasons"].items()))), "removed": list(reversed(delta["removed"])),
+                "added": list(delta["added"])}
+    assert sm.delta_sha256(sm.column_set_delta(after, before[::-1], {k: v for k, v in reasons.items()})) != sm.delta_sha256(delta)
+    assert sm.canonical_delta_bytes(delta) == json.dumps(delta, sort_keys=True, ensure_ascii=False,
+                                                         separators=(",", ":")).encode("utf-8")
+    assert sm.delta_sha256(sm.column_set_delta(before[::-1], after[::-1], reasons)) == sm.delta_sha256(delta)
+    assert sorted(permuted["removed"]) == delta["removed"]
+    empty = sm.column_set_delta(after, after, {})
+    assert empty == CONTRACT["column_set_delta"]["empty"]
+    joined = "\n".join(sorted(set(after), key=lambda s: s.encode("utf-8"))).encode("utf-8")
+    assert sm.column_set_sha256(after[::-1]) == hashlib.sha256(joined).hexdigest()
+
+
+def test_column_set_delta_unknown_reason_rejected() -> None:
+    """Task 2.3 ⑦（v36）：原因值不在封閉集合 ⇒ DeltaReasonError；差異欄缺原因亦同。"""
+    with pytest.raises(sm.DeltaReasonError):
+        sm.column_set_delta(["a", "b"], ["a"], {"b": "constant_rule"})
+    with pytest.raises(sm.DeltaReasonError):
+        sm.column_set_delta(["a", "b"], ["a"], {})
+    assert tuple(CONTRACT["column_set_delta"]["reasons"]) == sm.DELTA_REASONS
+
+
+def test_column_set_approval_matches_delta() -> None:
+    """Task 2.3 ⑦：核可紀錄之 delta sha256＝本次 delta sha256；delta 非空而無核可紀錄即紅。"""
+    rr = REPO / "handoffs" / "run_receipts"
+    deltas = sorted(rr.glob("*-ffstat-column-set-delta.json"))
+    assert deltas, "缺欄集合差異收據"
+    delta_doc = json.loads(deltas[-1].read_text(encoding="utf-8"))
+    digest = sm.delta_sha256(delta_doc["delta"])
+    assert digest == delta_doc["delta_sha256"]
+    if delta_doc["delta"] != CONTRACT["column_set_delta"]["empty"]:
+        approvals = sorted(rr.glob("*-ffstat-column-set-approval.json"))
+        assert approvals, "delta 非空而無使用者核可紀錄"
+        approval = json.loads(approvals[-1].read_text(encoding="utf-8"))
+        assert set(CONTRACT["column_set_delta"]["approval_fields"]) <= set(approval)
+        assert approval["delta_sha256"] == digest
+
+
+# ─────────────────────────────── ⑧⑨⑩ 多週期、快取、開關
+
+def test_multi_tf_mask_applied_before_alignment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑧：1h＋12h 無起始日 ⇒ 12h 欄於對齊後之首個有效值時間＝其 12h stable_start 可被 1h 取用之時間。"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], fracdiff=False, adf=False), start_date=None)
+    stable = result.metadata[CONTRACT["stable_start_receipt_key"]]
+    twelve = [c for c in stable if "12h" in c]
+    assert twelve
+    for column in twelve:
+        series = _public_column(root, column)
+        first = series.first_valid_index()
+        assert first is not None and first >= pd.Timestamp(stable[column]), column
+
+
+def test_config_hash_includes_warmup_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑨：設定 hash 納入 warmup_policy ⇒ 改動政策字串即改變 hash（改前快取未命中）。"""
+    from momentum.factories import create_feature_factory
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    config = factory._resolve_config(h.stat_payload())
+    base = factory._compute_config_hash(config, h.SYMBOL, h.PRIMARY_TF, start_date=None, end_date=None)
+    monkeypatch.setattr(sm, "WARMUP_POLICY", "per_column_stable_v0")
+    assert factory._compute_config_hash(config, h.SYMBOL, h.PRIMARY_TF, start_date=None, end_date=None) != base
+
+
+def test_warmup_trim_switch_removed() -> None:
+    """Task 2.3 ⑩：`FFACT_WARMUP_TRIM` 與 `is_warmup_trim_enabled` 於生產碼 0 命中。"""
+    hits = []
+    for root in ("momentum", "api"):
+        for path in (REPO / root).rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            if "FFACT_WARMUP_TRIM" in text or "is_warmup_trim_enabled" in text:
+                hits.append(str(path.relative_to(REPO)))
+    assert not hits, hits
+
+
+# ─────────────────────────────── 12h 逐輸出點、每個 L1 輸出皆經契約
+
+def test_every_l1_output_column_passes_output_point_contract(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ①（v38）：以真實 BTC 12h 跑預設全設定之 L1 ⇒ 每個 L1 輸出欄皆有一次 instance_k 呼叫（未驗即紅）。"""
+    seen: List[str] = []
+    original = sm.instance_k
+
+    def spy(spec, table, upstream_k=None):
+        seen.append(spec.column)
+        return original(spec, table, upstream_k)
+
+    monkeypatch.setattr(sm, "instance_k", spy)
+    from momentum.FeatureEngineering.config_manager import ConfigManager
+    from momentum.factories import create_feature_factory
+
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    config = ConfigManager().get_merged_config()
+    raw = factory._layer0_data_ingestion(h.SYMBOL, "12h", config)
+    layer1 = factory._layer1_atomic_indicators(raw, config).data
+    missing = sorted(set(layer1.columns) - set(seen))
+    assert not missing, missing[:20]
+    receipts = sorted((REPO / "handoffs" / "run_receipts").glob("*-ffstat-12h-output-points.json"))
+    assert receipts, "缺 12h 逐輸出點收據（列已驗與未驗之輸出點）"
+    doc = json.loads(receipts[-1].read_text(encoding="utf-8"))
+    assert not doc["unverified"], doc["unverified"][:20]
+
+
+# ─────────────────────────────── 邊界（Task 2.3 邊界①–④，接續既有編號 22–25）
+
+def test_boundary_22_sparse_column_calibrates_on_first_n_valid() -> None:
+    """Task 2.3 邊界①：稀疏欄之校準取遮罩後最早 N 個有效值（間歇 NaN 跳過）。"""
+    values = _close("1h")[:3000].copy()
+    values[::3] = np.nan
+    rows = sm.calibration_rows_no_start(values, 500)
+    finite_positions = np.flatnonzero(np.isfinite(values))
+    assert rows == (int(finite_positions[0]), int(finite_positions[499]))
+
+
+def test_boundary_23_cumulative_listed_start_dependent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 邊界②：累積型欄（OBV、AD）列入 start_dependent_columns。"""
+    payload = h.stat_payload(fracdiff=False, adf=False)
+    payload["atomic_indicators"]["volume"] = {"enabled": True, "indicators": [{"name": "OBV", "enabled": True}]}
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    _root, _factory, result = h.run_stat(tmp_path, payload)
+    listed = result.metadata[CONTRACT["start_dependent_key"]]
+    assert any("OBV" in c for c in listed)
+
+
+def test_boundary_24_reference_symbol_origin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 邊界③：參考標的起點晚於主標的 ⇒ cs 欄之 stable_start 不早於參考標的之首列。"""
+    klines = h.kline_copy(tmp_path)
+    ref_start = h.kline_frame(symbol="ETHUSDT").index[0] + pd.Timedelta(days=60)
+    h.drop_kline_rows_before(klines, ref_start.isoformat(), symbol="ETHUSDT")
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    _root, _factory, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False, cross_sectional=True),
+                                         start_date=None, kline_dir=str(klines))
+    for column, ts in result.metadata[CONTRACT["stable_start_receipt_key"]].items():
+        if column.startswith("cs_"):
+            assert pd.Timestamp(ts) >= ref_start, column
+
+
+def test_boundary_25_user_start_source_user(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 邊界④：帶 start_date ⇒ output_start_source == "user"、effective_output_start＝該日（v44）。"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    _root, _factory, result = h.run_stat(tmp_path, h.stat_payload())
+    assert result.metadata[h.META["output_start_source"]] == "user"
+    assert pd.Timestamp(result.metadata[h.META["effective_output_start"]]) == pd.Timestamp(h.WINDOW[0], tz="UTC")
+
+
+def test_retired_tests_absent_and_replaced() -> None:
+    """§V 防假綠：退役表中之舊測試已不在原檔，且其接替測試存在。"""
+    table = json.loads((REPO / CONTRACT["retired_tests_path"]).read_text(encoding="utf-8"))
+    for row in table["retired"]:
+        old_file, old_name = row["test"].split("::")
+        new_file, new_name = row["replacement"].split("::")
+        assert f"def {old_name}(" not in (REPO / old_file).read_text(encoding="utf-8"), row["test"]
+        assert f"def {new_name}(" in (REPO / new_file).read_text(encoding="utf-8"), row["replacement"]
+        assert row["reason"], row["test"]
+
+
+# ─────────────────────────────── §V mutants（v32–v42）
+
+def test_mutation_l1_mask_removed_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§V ⑦¹⁴：刪 L1 遮罩（apply_l1_mask 原樣回傳）⇒ ① 必紅。"""
+    monkeypatch.setattr(sm, "apply_l1_mask", lambda values, origin, k: np.asarray(values, dtype=float).copy())
+    with pytest.raises(AssertionError):
+        test_l1_mask_first_valid_is_origin_plus_k("1h")
+
+
+def test_mutation_whole_indicator_max_period_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """v37：K 改取整個指標之最大週期（EMA_5 亦 336）⇒ 逐呼叫測試必紅。"""
+    monkeypatch.setattr(sm, "instance_k", lambda spec, table, upstream_k=None: math.ceil(233 * _factor(spec.indicator)))
+    with pytest.raises(AssertionError):
+        test_l1_mask_per_call_k_ema5_vs_ema233()
+
+
+def test_mutation_winsor_unmasked_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§V ⑦¹⁵：縮尾輸出不遮 ⇒ ② 必紅。"""
+    monkeypatch.setattr(sm, "mask_incomplete_window", lambda output, input_values, window: np.asarray(output, dtype=float).copy())
+    with pytest.raises(AssertionError):
+        test_incomplete_window_mask_winsor_full_window()
+
+
+def test_mutation_pointwise_prefix_unmasked_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§V ⑦²⁰：第④類不遮 ⇒ ② 必紅。"""
+    monkeypatch.setattr(sm, "mask_pointwise_prefix", lambda output, inputs: np.asarray(output, dtype=float).copy())
+    with pytest.raises(AssertionError):
+        test_pointwise_prefix_mask_binary_signal()
+
+
+def test_mutation_calibration_rows_not_masked_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§V ⑦¹¹（v32）：校準列取法錯位（取最末 N 個）⇒ 邊界① 必紅。"""
+    monkeypatch.setattr(sm, "calibration_rows_no_start",
+                        lambda values, n: (int(np.flatnonzero(np.isfinite(values))[-n]), int(np.flatnonzero(np.isfinite(values))[-1])))
+    with pytest.raises(AssertionError):
+        test_boundary_22_sparse_column_calibrates_on_first_n_valid()
+
+
+def test_mutation_dead_filter_full_denominator_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§V ⑦¹⁸／⑦²²：死欄 NaN 率分母改回全列 ⇒ ⑦ 反例必紅。"""
+    def full_denominator(values, *, nan_rate_threshold, min_valid):
+        arr = np.asarray(values, dtype=float)
+        rate = float(np.isnan(arr).mean())
+        valid = int(np.isfinite(arr).sum())
+        dead = (nan_rate_threshold is not None and rate > nan_rate_threshold) or valid < min_valid
+        return sm.DeadDecision(dead=dead, reason=None, nan_rate=rate, valid_count=valid)
+
+    monkeypatch.setattr(sm, "dead_column_decision", full_denominator)
+    with pytest.raises(AssertionError):
+        test_dead_filter_mask_invariant_real_12h()
+
+
+def test_mutation_delta_non_canonical_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """v35：delta 序列化不排序鍵 ⇒ 置換不變測試必紅。"""
+    monkeypatch.setattr(sm, "canonical_delta_bytes", lambda delta: json.dumps(delta, ensure_ascii=False).encode("utf-8"))
+    with pytest.raises(AssertionError):
+        test_column_set_delta_canonical_and_permutation_invariant()
+
+
+def test_mutation_unknown_reason_accepted_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """v36：接受第三種原因值 ⇒ 必紅。"""
+    monkeypatch.setattr(sm, "DELTA_REASONS", ("nan_rate_rule", "stable_samples_below_min", "constant_rule"))
+    with pytest.raises(AssertionError):
+        test_column_set_delta_unknown_reason_rejected()
+
+
+def test_mutation_config_hash_without_policy_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """§V ⑦¹²（v32）：設定 hash 不含 warmup_policy ⇒ ⑨ 必紅。"""
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+
+    original = FeatureFactory._compute_config_hash
+
+    def hash_ignoring_policy(self, *a, **k):
+        saved = sm.WARMUP_POLICY
+        try:
+            sm.WARMUP_POLICY = "fixed"
+            return original(self, *a, **k)
+        finally:
+            sm.WARMUP_POLICY = saved
+
+    monkeypatch.setattr(FeatureFactory, "_compute_config_hash", hash_ignoring_policy)
+    with pytest.raises(AssertionError):
+        test_config_hash_includes_warmup_policy(monkeypatch)

@@ -4,7 +4,8 @@
     "cache_read_failed": "dstar_cache_read_failed",
     "search_failed": "fracdiff_search_failed",
     "cache_write_failed": "dstar_cache_write_failed",
-    "calibration_insufficient": "calibration_insufficient_history"
+    "calibration_insufficient": "calibration_insufficient_history",
+    "warmup_insufficient": "warmup_insufficient_history"
   },
   "event_reason_format": "<event>:<受影響欄數>",
   "stationarity_apply_to_allowed": [
@@ -35,8 +36,116 @@
   ],
   "output_start_sources": [
     "user",
-    "auto_reserved_calibration"
+    "per_column"
   ],
+  "warmup_policy": "per_column_stable_v1",
+  "stable_start_receipt_key": "stable_start",
+  "warmup_doubling": {
+    "key": "warmup_doubling",
+    "fields": [
+      "doublings",
+      "final_ingest_start"
+    ]
+  },
+  "twelve_h_output_points_receipt": "handoffs/run_receipts/<日期>-ffstat-12h-output-points.json",
+  "start_dependent_key": "start_dependent_columns",
+  "column_set_delta": {
+    "reasons": [
+      "nan_rate_rule",
+      "stable_samples_below_min"
+    ],
+    "fields": [
+      "added",
+      "removed",
+      "reasons"
+    ],
+    "empty": {
+      "added": [],
+      "removed": [],
+      "reasons": {}
+    },
+    "reasons_metadata_key": "column_set_reasons",
+    "delta_receipt": "handoffs/run_receipts/<日期>-ffstat-column-set-delta.json",
+    "approval_receipt": "handoffs/run_receipts/<日期>-ffstat-column-set-approval.json",
+    "approval_fields": [
+      "user_quote",
+      "date",
+      "session_id",
+      "delta_sha256"
+    ]
+  },
+  "dead_filter_thresholds": {
+    "l3_nan_rate": 0.9,
+    "l3_min_effective_n": 30,
+    "l7_min_valid_samples_default": 100
+  },
+  "non_propagating_steps": {
+    "incomplete_window": {
+      "winsorization": 252
+    },
+    "pointwise_prefix": [
+      "binary_signal",
+      "trend_consensus",
+      "momentum_divergence"
+    ],
+    "not_in_generation_path": [
+      "operators/state_counters.py"
+    ]
+  },
+  "longhist_cache_dir": "data_cache/feature_klines_longhist",
+  "warmup_table": {
+    "path": "momentum/FeatureEngineering/atomic/warmup_table.yaml",
+    "entry_fields": [
+      "family",
+      "warmup_class",
+      "period_keys",
+      "recommended_factor",
+      "factors_by_timeframe"
+    ],
+    "warmup_classes": [
+      "window_only",
+      "recursive",
+      "cumulative",
+      "pattern"
+    ],
+    "note": "SPEC §C 之「family（window_only／recursive／cumulative）」落於 warmup_class 封閉值；既有 family 欄（wilder、ema_seeded 等細類）保留不改",
+    "pattern_entry": "CDL_PATTERN"
+  },
+  "nostart_baseline": "tests/_golden/ffstat/baseline_nostart.json",
+  "nan_propagation_inventory": "handoffs/run_receipts/<日期>-ffstat-nan-propagation-inventory.json",
+  "warmup_measure_timeframes": [
+    "5m",
+    "1h",
+    "4h",
+    "12h",
+    "1d"
+  ],
+  "warmup_measure_symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "ADAUSDT"
+  ],
+  "dual_start": {
+    "tolerance": 0.005,
+    "min_overlap_rows": 500,
+    "timeframes": {
+      "1h": "data_cache/feature_klines",
+      "4h": "data_cache/feature_klines",
+      "12h": "data_cache/feature_klines_longhist"
+    },
+    "symbol": "BTCUSDT",
+    "coefficient_mutant": {
+      "indicator": "ADXR",
+      "period": 233,
+      "period_keys": [
+        "timeperiod"
+      ]
+    },
+    "coefficient_mutant_non_red_reference": {
+      "indicator": "EMA",
+      "period": 5
+    }
+  },
   "metadata_keys": {
     "decisions": "stationarity_decisions",
     "effective_output_start": "effective_output_start",
@@ -75,6 +184,7 @@
     "1h",
     "12h"
   ],
+  "retired_tests_path": "tests/_golden/ffstat/retired_tests.json",
   "min_memory_tier_gb": 8,
   "calibration_tmp_prefix": "ffstat_calib_",
   "dstar_cache_api": {
