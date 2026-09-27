@@ -49,6 +49,21 @@ def _factor(indicator: str) -> float:
     return float(_table()[indicator]["recommended_factor"])
 
 
+def _params_key(params: Dict[str, Any], keys: Any) -> str:
+    """v46 `k_by_params` 之鍵：period_keys 各鍵值依鍵名升序以 `鍵=值` 逗號連接（值為整數字面）。"""
+    return ",".join(f"{k}={int(params[k])}" for k in sorted(keys))
+
+
+def _expected_k(indicator: str, params: Dict[str, Any]) -> int:
+    """SPEC v46（R10）：表之 `k_by_params` 查得者取其值；查無才 ceil(max(period_keys 值)×係數)。"""
+    entry = _table()[indicator]
+    keys = entry["period_keys"]
+    measured = (entry.get("k_by_params") or {}).get(_params_key(params, keys))
+    if measured is not None:
+        return int(measured)
+    return math.ceil(max(float(params[k]) for k in keys) * float(entry["recommended_factor"]))
+
+
 # ─────────────────────────────── ① L1 遮罩（逐呼叫 K）
 
 @pytest.mark.parametrize("timeframe", ["1h", "12h"])
@@ -65,7 +80,7 @@ def test_l1_mask_first_valid_is_origin_plus_k(timeframe: str) -> None:
     ]
     for indicator, column, params, raw, inputs in cases:
         k = sm.instance_k(_spec(indicator, column, params), _table())
-        assert k == math.ceil(params["timeperiod"] * _factor(indicator)), column
+        assert k == _expected_k(indicator, params), column
         origin = sm.l1_origin(inputs)
         masked = sm.apply_l1_mask(raw, origin, k)
         assert sm.first_finite_index(masked) == origin + k, column
@@ -77,16 +92,27 @@ def test_l1_mask_per_call_k_ema5_vs_ema233() -> None:
     """Task 2.3 ①（v37）：同一指標之 EMA_5 與 EMA_233 之 K 分別依各自參數，不取整個指標之最大週期。"""
     k5 = sm.instance_k(_spec("EMA", "EMA_5", {"timeperiod": 5}), _table())
     k233 = sm.instance_k(_spec("EMA", "EMA_233", {"timeperiod": 233}), _table())
-    assert k5 == math.ceil(5 * _factor("EMA"))
-    assert k233 == math.ceil(233 * _factor("EMA"))
+    assert k5 == _expected_k("EMA", {"timeperiod": 5})
+    assert k233 == _expected_k("EMA", {"timeperiod": 233})
     assert k5 < k233
 
 
 def test_l1_mask_stoch_combo_k_uses_max_period_key() -> None:
-    """Task 2.3 ①：STOCH 一組 combo 之 K＝ceil(max(fastk_period, slowk_period, slowd_period)×係數)。"""
+    """Task 2.3 ①：STOCH 一組 combo 之 K 依其三個週期鍵（v46：k_by_params 查得者優先，否則 ceil(max×係數)）；
+    表外之組合（fastk 377）走比例公式。"""
     params = {"fastk_period": 55, "slowk_period": 8, "slowk_matype": 0, "slowd_period": 5, "slowd_matype": 0}
     k = sm.instance_k(_spec("STOCH", "STOCH_slowk", params), _table())
-    assert k == math.ceil(55 * _factor("STOCH"))
+    assert k == _expected_k("STOCH", params)
+    unmeasured = {"fastk_period": 377, "slowk_period": 8, "slowk_matype": 0, "slowd_period": 5, "slowd_matype": 0}
+    assert sm.instance_k(_spec("STOCH", "STOCH_slowk", unmeasured), _table()) == math.ceil(377 * _factor("STOCH"))
+
+
+def test_l1_mask_k_by_params_preferred_over_factor() -> None:
+    """v46（R10 實測根數優先）：KAMA_233 之 K＝表 k_by_params 之實測值，且小於 ceil(233×係數)（比例公式高估）。"""
+    params = {"timeperiod": 233}
+    measured = _table()["KAMA"]["k_by_params"][_params_key(params, ["timeperiod"])]
+    assert measured < math.ceil(233 * _factor("KAMA"))
+    assert sm.instance_k(_spec("KAMA", "close_trend_KAMA_233", params), _table()) == measured
 
 
 def test_derived_output_k_follows_upstream() -> None:
@@ -888,6 +914,15 @@ def test_mutation_l1_mask_removed_is_caught(monkeypatch: pytest.MonkeyPatch) -> 
         test_l1_mask_first_valid_is_origin_plus_k("1h")
 
 
+def test_mutation_k_by_params_ignored_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """v46：instance_k 忽略 k_by_params（一律比例公式）⇒ 實測根數優先測試必紅。"""
+    stripped = {name: {k: v for k, v in entry.items() if k != "k_by_params"} for name, entry in _table().items()}
+    original = sm.instance_k
+    monkeypatch.setattr(sm, "instance_k", lambda spec, table, upstream_k=None: original(spec, stripped, upstream_k))
+    with pytest.raises(AssertionError):
+        test_l1_mask_k_by_params_preferred_over_factor()
+
+
 def test_mutation_whole_indicator_max_period_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
     """v37：K 改取整個指標之最大週期（EMA_5 亦 336）⇒ 逐呼叫測試必紅。"""
     monkeypatch.setattr(sm, "instance_k", lambda spec, table, upstream_k=None: math.ceil(233 * _factor(spec.indicator)))
@@ -941,7 +976,8 @@ def test_mutation_delta_non_canonical_is_caught(monkeypatch: pytest.MonkeyPatch)
 def test_mutation_unknown_reason_accepted_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
     """v36：接受第三種原因值 ⇒ 必紅。"""
     monkeypatch.setattr(sm, "DELTA_REASONS", ("nan_rate_rule", "stable_samples_below_min", "constant_rule"))
-    with pytest.raises(AssertionError):
+    # 內層以 pytest.raises 斷言；mutant 下「未拋」為 pytest 之 Failed（非 AssertionError 子類），兩者皆算抓到
+    with pytest.raises((AssertionError, pytest.fail.Exception)):
         test_column_set_delta_unknown_reason_rejected()
 
 
