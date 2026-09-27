@@ -1,6 +1,7 @@
 # FF-STAT：平穩化處理之判定不得依欄名、校準不得用輸出範圍內資料（逐欄檢定、d\* 例外 fail-closed、刪 layer1_only）— SPEC
 
 > 來源 PLAN/診斷：研究輪 `handoffs/reconcile/20260924-ffnamestat-x-consult-r1/synth.md`；平穩化研究 `handoffs/reconcile/20260924-ffstatres-x-consult-r1/synth.md`、`handoffs/reconcile/20260924-ffstatres-x-consult-r2/synth.md`　|　日期：2026-09-24　|　對應 TODO：`docs/manifests/FFSTAT.json`（本 SPEC 定案後產出）
+> 版本：v45（TODO 審查 r25 composer P1-03 之措辭釐清：`stable_start` 於一切生成之 metadata 與 manifest 皆寫，平穩化開關皆然；無條文功能變更）
 > 版本：v44（寫 TODO 時主委讀碼之事實更正：`effective_output_start` 為 b3 已實作並受 `test_boundary_11_user_start_source_is_user` 斷言之鍵，於有起始日時仍有意義 ⇒ 改為保留、只於 `output_start_source == "user"` 時寫入，`per_column` 時不寫；v32 誤寫為刪除；由 TODO 審查輪核對）
 > 版本：v43（審查 r23 `handoffs/reconcile/20260926-ffstatauto-x-review-r23/synth.md`：兩家 proceed；§G⑦ 長歷史讀取明定 `validate_continuity=False` 並於收據記缺口）
 > 版本：v42（審查 r22 `handoffs/reconcile/20260926-ffstatauto-x-review-r22/synth.md`：§G⑦ 12h 資格以實測 F_max 收據判定，仍不合資格時交使用者三擇一裁定、不得自行 blocked 收案；係數 mutant 目標固定為 ADXR 233 並記 EMA 5 不紅之判準界線）
@@ -63,7 +64,7 @@
   - **L2 以後依 NaN 傳遞**：不為 L2–L6 另算穩定點；以窗湊滿才出值（min_periods＝window）之步驟，其輸出自然於輸入穩定後才出現。**不傳遞 NaN 之步驟**（對 NaN 或不完整窗仍輸出有限值者）須逐一盤點，每步驟登記於倍數表之運算子段：①固定窗而以不完整窗出值者 ⇒ 其輸出自該步驟輸入之首個有限值起 `window−1` 列設 NaN（只遮罩、不改計算）；②遞迴者 ⇒ 依 L1 同法量係數；③累積／expanding 者 ⇒ 依下方累積型；④逐點或跨欄運算而對 NaN 輸入給有限值者（比較後轉型、`np.where`、`skipna` 聚合、列內排名等；v33）⇒ 其輸出於「各輸入首個有效值之最大者」之前一律設 NaN，只作用於開頭段、不改其後之間歇 NaN 處理。已知：L6.5 縮尾屬①（預設 window 252 ⇒ 遮 251 列；R6 甲方案）；fracdiff FFD 傳遞 NaN（見 §A）；L2 `binary_signal`、L6 trend consensus、momentum divergence 屬④；`operators/state_counters.py` 屬①但不在生成路徑（盤點收據標明，日後接入即依①）。盤點範圍：L2 運算子、L3、L4、L5（含參考標的對齊）、L6、L6.5 各步驟、多週期對齊（次週期 ffill 至主週期）；盤點收據逐步驟記「是否傳遞 NaN」與碼證。
   - **累積型**：倍數表 family 為 cumulative 之指標（OBV、AD 等）及盤點所得之 cumsum／expanding 步驟，無收斂點——K＝該指標之首個有限值位置（不另遮）；manifest 與收據列為 `start_dependent_columns`，不入 §G 雙起點收斂對證；其上線持久化屬既有「上線須留存參數」（productionization），不在本票。
   - **倍數表完整性**（R5）：生成入口（設定 hash 與快取查詢之前）逐一查本次啟用之 L1 指標（含進階 atomic：microstructure／entropy／tail_risk，及 CDL pattern）；任一查不到 ⇒ 零寫入 fail-closed，訊息列出指標名與 max_period；刪 `warmup_lookup._FALLBACK_FACTOR`。倍數表每指標記 family（window_only／recursive／cumulative）、封閉之 `period_keys`（該指標計算呼叫之參數字典中構成 K 之鍵，如 STOCH：fastk_period、slowk_period、slowd_period；ULTOSC：timeperiod1–3；MACD 類：fastperiod、slowperiod、signalperiod；v37）、各週期量得之係數與採用值；查表時缺條目、或計算呼叫之參數字典缺任一登記鍵 ⇒ fail-closed；係數以 `scripts/verify_l1_warmup_requirements.py` 於 **5m、1h、4h、12h、1d** 各量（v40；1h、4h 用 `kline_cache.h5`，5m〔最近一年〕、12h〔全史〕、1d〔全史〕用長歷史快取 `data_cache/feature_klines_longhist/`；標的 BTC、ETH、ADA），跨週期、跨標的取最大為採用值。
-  - **紀錄**：收據逐欄記 `stable_start`（公開輸出中該欄第一個有限值之時間）；manifest 記摘要（欄數、最早與最晚 `stable_start`、`start_dependent_columns` 欄數）。
+  - **紀錄**：生成結果 metadata 與 manifest 逐欄記 `stable_start`（公開輸出中該欄第一個有限值之時間；**一切生成皆寫，平穩化開啟或關閉皆然**——R1 之遮罩適用一切生成，v45 措辭釐清）；manifest 記摘要（欄數、最早與最晚 `stable_start`、`start_dependent_columns` 欄數）。
 - **公開域預熱**（v32；R1——取代 B6 之 `FFACT_WARMUP_TRIM` 開關）：
   - **有起始日**：公開域載入起點＝起始日往前 D 根（依原生週期實際存在之列計）；初值 D₀＝`estimate_max_warmup_bars`（倍數表齊全後之值）；算完 L1–L6.5 後，若有欄（死欄〔NaN 率 > 0.9 或常數〕除外）之首個有限值晚於起始日且載入起點尚非資料起點 ⇒ D 加倍重算，至全部欄之首個有限值 ≤ 起始日或載入起點達資料起點為止。停止時仍晚於起始日之欄 ⇒ 公開輸出照常（起始日至其首個有限值之間為 NaN），記事件 `warmup_insufficient_history:<欄數>` 經 `apply_quality_degradation` 之 `extra_failure_reasons` 使品質降為 `partial`，收據列欄名與缺少根數。公開輸出裁至 `[起始日, 結束日]`。
   - **無起始日**：公開域自資料起點，無更早資料可預熱；各欄開頭依逐欄穩定點為 NaN。

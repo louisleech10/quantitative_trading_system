@@ -176,12 +176,45 @@ def test_nan_propagation_inventory_complete() -> None:
     steps = {row["function"]: row for row in inventory["steps"]}
     expected = _ast_step_functions()
     assert expected <= set(steps), sorted(expected - set(steps))
+    classes = {"propagating", "incomplete_window", "recursive", "cumulative", "pointwise_prefix",
+               "not_in_generation_path", "dispatcher", "index_derived", "helper", "column_filter", "mask"}
+    short_names = {n.split(":")[1].split(".")[-1] for n in steps}
     for name, row in steps.items():
         assert row["propagates_nan"] in (True, False), name
         assert row["evidence"], name
-        if not row["propagates_nan"]:
-            assert row["class"] in ("incomplete_window", "recursive", "cumulative", "pointwise_prefix",
-                                    "not_in_generation_path", "not_a_data_step"), name
+        assert row["class"] in classes, name
+        assert row["propagates_nan"] == (row["class"] == "propagating"), name
+        if row["class"] == "dispatcher":
+            # r25 codex P1-04：派發函式之輸出＝其所呼叫之已分類步驟之聯集 ⇒ 函式體須呼叫至少一個已列步驟
+            called = _called_names(name)
+            assert called & (short_names - {name.split(":")[1].split(".")[-1]}), name
+
+
+def _called_names(qualified: str) -> set:
+    """函式體內以 `self.X(`／`cls.X(`／`X(` 呼叫之名稱集合（AST）。"""
+    module, qual = qualified.split(":")
+    path = REPO / Path(*module.split(".")).with_suffix(".py")
+    target = qual.split(".")[-1]
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name == target:
+            names = set()
+            for call in ast.walk(node):
+                if isinstance(call, ast.Call):
+                    fn = call.func
+                    names.add(fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", ""))
+            return names
+    return set()
+
+
+def test_index_derived_step_has_no_warmup() -> None:
+    """r25 codex P1-04：index_derived（時間特徵）只由索引算出 ⇒ 真實 1h 切片第 0 列即有限值、與 L1 遮罩無關。"""
+    from momentum.FeatureEngineering.meta_features.time_features import TimeFeatureEngine
+
+    index = h.kline_frame(timeframe="1h").index[:500]
+    out = TimeFeatureEngine().compute_all(pd.Series(index, index=index))
+    assert not out.empty
+    assert out.iloc[0].notna().all()
 
 
 def _ast_step_functions() -> set:
@@ -547,12 +580,26 @@ _PATHS = {
 
 
 def _path_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> Dict[str, Any]:
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+
     env = _PATHS["cgsa_serial" if mode == "resume" else mode]
     h.prepare_stat_env(monkeypatch, tmp_path, **env)
     payload = h.stat_payload(["1h", "12h"])
     root, _factory, result = h.run_stat(tmp_path, payload, start_date=None)
     if mode == "resume":
+        # r25 codex P1-01：第二次須真走 CGSA 續跑——令快取探測落空，並斷言 resume_from_manifest 被呼叫
+        resumed: List[Any] = []
+        real_resume = ColumnGroupRegistry.resume_from_manifest  # classmethod（已綁定）
+
+        def spy_resume(cls, work_dir):
+            resumed.append(1)
+            return real_resume(work_dir)
+
+        monkeypatch.setattr(FeatureFactory, "_try_load_cache", lambda self, *a, **k: None)
+        monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(spy_resume))
         root, _factory, result = h.run_stat(tmp_path, payload, start_date=None, force_regenerate=False)
+        assert resumed, "resume 路徑未呼叫 ColumnGroupRegistry.resume_from_manifest"
     return {"root": root, "result": result}
 
 
@@ -631,11 +678,17 @@ def test_run_ic_first_uses_own_window_not_previous(tmp_path: Path, monkeypatch: 
             factory._current_output_window = object()
             factory._current_config_hash = "unrelated"
         leases: List[Any] = []
-        h.ic_first_to_l65(factory, config, start_date=a_start, end_date=a_end, lease_sink=leases, **_ic_first_kwargs(tmp_path / str(preset)))
-        decisions = getattr(factory, CONTRACT["factory_decisions_attr"])
-        assert all(pd.Timestamp(d["calibration_end"]) < pd.Timestamp(a_start, tz="UTC")
-                   for d in decisions.values() if d.get("calibration_end")), preset
-        assert any(expected_hash in str(lease) for lease in leases), preset
+        try:
+            h.ic_first_to_l65(factory, config, start_date=a_start, end_date=a_end, lease_sink=leases,
+                              **_ic_first_kwargs(tmp_path / str(preset)))
+            decisions = getattr(factory, CONTRACT["factory_decisions_attr"])
+            assert all(pd.Timestamp(d["calibration_end"]) < pd.Timestamp(a_start, tz="UTC")
+                       for d in decisions.values() if d.get("calibration_end")), preset
+            # r25 codex P1-02：RunLease 無 __str__，以 lease.path 之檔名比對設定 hash
+            assert leases and any(expected_hash in lease.path.name for lease in leases), preset
+        finally:
+            for lease in leases:  # r25 codex P1-03：釋放 exclusive lease，避免下一迭代 RunBusyError
+                lease.release()
 
 
 @pytest.mark.parametrize("ending", ["preflight_error", "l1_l6_error", "success"])

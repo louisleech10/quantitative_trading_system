@@ -54,7 +54,7 @@
   {
    "function": "momentum.FeatureEngineering.meta_features.time_features:TimeFeatureEngine.compute_all",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "index_derived",
    "evidence": "time_features.py:44 由 index 算時間欄，無 L1 輸入、無暖機"
   },
   {
@@ -102,7 +102,7 @@
   {
    "function": "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._compute_category_from_feature_info",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "dispatcher",
    "evidence": "derived_operators.py:330 依類別分派之派發函式"
   },
   {
@@ -114,13 +114,13 @@
   {
    "function": "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_all",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "dispatcher",
    "evidence": "derived_operators.py:62 派發函式"
   },
   {
    "function": "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_all_polars",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "dispatcher",
    "evidence": "derived_operators.py:89 Polars 派發路徑（同一組運算之批次版）"
   },
   {
@@ -132,7 +132,7 @@
   {
    "function": "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_category",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "dispatcher",
    "evidence": "derived_operators.py:311 派發函式"
   },
   {
@@ -174,19 +174,19 @@
   {
    "function": "momentum.FeatureEngineering.operators.numba_rolling:_compute_kurt",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "numba_rolling.py:171 單窗統計量之純量核心（由 fused_rolling_stats 於窗滿後呼叫）"
   },
   {
    "function": "momentum.FeatureEngineering.operators.numba_rolling:_compute_skew",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "numba_rolling.py:154 同上"
   },
   {
    "function": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_aggregator",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "dispatcher",
    "evidence": "rolling_aggregator.py:926 派發函式"
   },
   {
@@ -198,7 +198,7 @@
   {
    "function": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_vectorized_aggregators_chunked",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "dispatcher",
    "evidence": "rolling_aggregator.py:884 分塊派發"
   },
   {
@@ -216,7 +216,7 @@
   {
    "function": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_all_streaming_numba",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "dispatcher",
    "evidence": "rolling_aggregator.py:331 numba 串流派發"
   },
   {
@@ -240,7 +240,7 @@
   {
    "function": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_low_cardinality_cols",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "rolling_aggregator.py:778 挑選低基數欄之輔助"
   },
   {
@@ -324,7 +324,7 @@
   {
    "function": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._dead_filter",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "column_filter",
    "evidence": "rolling_aggregator.py:803 死欄列篩選（§C 死欄純函式處理，非值轉換）"
   },
   {
@@ -336,13 +336,13 @@
   {
    "function": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._variance_filter",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "column_filter",
    "evidence": "rolling_aggregator.py:810 死欄列篩選（§C 死欄純函式）"
   },
   {
    "function": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator.compute_all",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "dispatcher",
    "evidence": "rolling_aggregator.py:107 派發函式"
   },
   {
@@ -360,19 +360,19 @@
   {
    "function": "momentum.FeatureEngineering.preprocessing._d_star_cache:_compute_fracdiff_hash",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "_d_star_cache.py:206 快取鍵雜湊"
   },
   {
    "function": "momentum.FeatureEngineering.preprocessing._d_star_cache:compute_data_fingerprint",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "_d_star_cache.py:148 資料指紋"
   },
   {
    "function": "momentum.FeatureEngineering.preprocessing._d_star_cache:compute_feature_schema_hash",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "_d_star_cache.py:92 schema 雜湊"
   },
   {
@@ -390,14 +390,14 @@
   {
    "function": "momentum.FeatureEngineering.preprocessing._numba_transforms:_rolling_min_periods",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "_numba_transforms.py:119 門檻計算輔助"
   },
   {
    "function": "momentum.FeatureEngineering.preprocessing.calibration:compute_calibration_domain",
    "propagates_nan": false,
-   "class": "not_a_data_step",
-   "evidence": "calibration.py:279 校準域計算入口（委派 FeatureFactory）"
+   "class": "helper",
+   "evidence": "calibration.py:279 校準域計算入口：產生校準值而非公開特徵欄（其內部各層步驟已於本盤點分類）"
   },
   {
    "function": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_adaptive_zscore",
@@ -450,7 +450,7 @@
   {
    "function": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._merge_decisions_from",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "preprocessing/feature_preprocessor.py:430 決策紀錄合併"
   },
   {
@@ -462,7 +462,7 @@
   {
    "function": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_min_periods",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "preprocessing/feature_preprocessor.py:440 門檻計算輔助"
   },
   {
@@ -474,7 +474,7 @@
   {
    "function": "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_window",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "preprocessing/feature_preprocessor.py:435 窗長讀取輔助"
   },
   {
@@ -486,7 +486,7 @@
   {
    "function": "momentum.FeatureEngineering.preprocessing.stable_mask:apply_l1_mask",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "mask",
    "evidence": "stable_mask.py 本票遮罩函式本身"
   },
   {
@@ -504,25 +504,25 @@
   {
    "function": "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._alignment_params_or_raise",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "multi_tf_generator.py:1169 參數驗證"
   },
   {
    "function": "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._apply_timeframe_tag",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "multi_tf_generator.py:1701 欄名標籤"
   },
   {
    "function": "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._apply_total_layer_counts_to_result",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "multi_tf_generator.py:1659 計數寫回"
   },
   {
    "function": "momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._alignment_params",
    "propagates_nan": false,
-   "class": "not_a_data_step",
+   "class": "helper",
    "evidence": "tf_aligner.py:468 參數"
   },
   {

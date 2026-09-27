@@ -1,6 +1,6 @@
 {
   "spec": "docs/FFSTAT_SPEC.md",
-  "about": "FF-STAT Task 2.3 NaN 傳遞盤點之逐步驟分類（主委 2026-09-27 讀碼；r24 composer P1-01）。class：propagating、incomplete_window、pointwise_prefix、not_in_generation_path、not_a_data_step（派發、雜湊、參數、標籤、死欄列篩選等非值轉換）。",
+  "about": "FF-STAT Task 2.3 NaN 傳遞盤點之逐步驟分類（主委 2026-09-27 讀碼；r24 composer P1-01）。class：propagating、incomplete_window、pointwise_prefix、not_in_generation_path、dispatcher（派發：輸出＝其所呼叫之已分類步驟之聯集）、index_derived（只由時間索引算出、無 L1 輸入）、helper（不產生特徵值之雜湊／參數／標籤／計數輔助與窗內純量核心）、column_filter（死欄列篩選，由 §C 死欄純函式處理）、mask（本票遮罩函式）；r25 codex P1-04 拆分原 not_a_data_step。",
   "steps": {
     "momentum.FeatureEngineering.cross_sectional.relative_strength:RelativeStrengthProcessor.compute_beta": {
       "propagates_nan": true,
@@ -44,7 +44,7 @@
     },
     "momentum.FeatureEngineering.meta_features.time_features:TimeFeatureEngine.compute_all": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "index_derived",
       "evidence": "time_features.py:44 由 index 算時間欄，無 L1 輸入、無暖機"
     },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._align_pair_series": {
@@ -84,7 +84,7 @@
     },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._compute_category_from_feature_info": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "dispatcher",
       "evidence": "derived_operators.py:330 依類別分派之派發函式"
     },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine._rolling_last_rank_pct": {
@@ -94,12 +94,12 @@
     },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_all": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "dispatcher",
       "evidence": "derived_operators.py:62 派發函式"
     },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_all_polars": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "dispatcher",
       "evidence": "derived_operators.py:89 Polars 派發路徑（同一組運算之批次版）"
     },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_binary_signal": {
@@ -109,7 +109,7 @@
     },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_category": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "dispatcher",
       "evidence": "derived_operators.py:311 派發函式"
     },
     "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_cross": {
@@ -144,17 +144,17 @@
     },
     "momentum.FeatureEngineering.operators.numba_rolling:_compute_kurt": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "numba_rolling.py:171 單窗統計量之純量核心（由 fused_rolling_stats 於窗滿後呼叫）"
     },
     "momentum.FeatureEngineering.operators.numba_rolling:_compute_skew": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "numba_rolling.py:154 同上"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_aggregator": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "dispatcher",
       "evidence": "rolling_aggregator.py:926 派發函式"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_vectorized_aggregator": {
@@ -164,7 +164,7 @@
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_vectorized_aggregators_chunked": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "dispatcher",
       "evidence": "rolling_aggregator.py:884 分塊派發"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_vectorized_aggregators_with_cache": {
@@ -179,7 +179,7 @@
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_all_streaming_numba": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "dispatcher",
       "evidence": "rolling_aggregator.py:331 numba 串流派發"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_all_streaming_numba_multi_window": {
@@ -199,7 +199,7 @@
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_low_cardinality_cols": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "rolling_aggregator.py:778 挑選低基數欄之輔助"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_max": {
@@ -269,7 +269,7 @@
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._dead_filter": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "column_filter",
       "evidence": "rolling_aggregator.py:803 死欄列篩選（§C 死欄純函式處理，非值轉換）"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._rolling_last_rank_pct": {
@@ -279,12 +279,12 @@
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._variance_filter": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "column_filter",
       "evidence": "rolling_aggregator.py:810 死欄列篩選（§C 死欄純函式）"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator.compute_all": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "dispatcher",
       "evidence": "rolling_aggregator.py:107 派發函式"
     },
     "momentum.FeatureEngineering.operators.state_counters:_aligned": {
@@ -299,17 +299,17 @@
     },
     "momentum.FeatureEngineering.preprocessing._d_star_cache:_compute_fracdiff_hash": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "_d_star_cache.py:206 快取鍵雜湊"
     },
     "momentum.FeatureEngineering.preprocessing._d_star_cache:compute_data_fingerprint": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "_d_star_cache.py:148 資料指紋"
     },
     "momentum.FeatureEngineering.preprocessing._d_star_cache:compute_feature_schema_hash": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "_d_star_cache.py:92 schema 雜湊"
     },
     "momentum.FeatureEngineering.preprocessing._native_tf_helpers:apply_idx_map_to_array": {
@@ -324,13 +324,13 @@
     },
     "momentum.FeatureEngineering.preprocessing._numba_transforms:_rolling_min_periods": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "_numba_transforms.py:119 門檻計算輔助"
     },
     "momentum.FeatureEngineering.preprocessing.calibration:compute_calibration_domain": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
-      "evidence": "calibration.py:279 校準域計算入口（委派 FeatureFactory）"
+      "class": "helper",
+      "evidence": "calibration.py:279 校準域計算入口：產生校準值而非公開特徵欄（其內部各層步驟已於本盤點分類）"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_adaptive_zscore": {
       "propagates_nan": false,
@@ -374,7 +374,7 @@
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._merge_decisions_from": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py:430 決策紀錄合併"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_last_rank_pct_for_preprocess": {
@@ -384,7 +384,7 @@
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_min_periods": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py:440 門檻計算輔助"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_rank_2d_v2": {
@@ -394,7 +394,7 @@
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_window": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py:435 窗長讀取輔助"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._rolling_zscore_2d": {
@@ -404,7 +404,7 @@
     },
     "momentum.FeatureEngineering.preprocessing.stable_mask:apply_l1_mask": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "mask",
       "evidence": "stable_mask.py 本票遮罩函式本身"
     },
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._align_block_rows": {
@@ -419,22 +419,22 @@
     },
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._alignment_params_or_raise": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "multi_tf_generator.py:1169 參數驗證"
     },
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._apply_timeframe_tag": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "multi_tf_generator.py:1701 欄名標籤"
     },
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._apply_total_layer_counts_to_result": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "multi_tf_generator.py:1659 計數寫回"
     },
     "momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._alignment_params": {
       "propagates_nan": false,
-      "class": "not_a_data_step",
+      "class": "helper",
       "evidence": "tf_aligner.py:468 參數"
     },
     "momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._merge_asof_align": {
