@@ -175,7 +175,11 @@ def test_nan_propagation_inventory_complete() -> None:
     inventory = json.loads(receipts[-1].read_text(encoding="utf-8"))
     steps = {row["function"]: row for row in inventory["steps"]}
     expected = _ast_step_functions()
-    assert expected <= set(steps), sorted(expected - set(steps))
+    # r28 codex P1-01：三者須完全相等——AST 閉包、收據、golden 分類表；閉包意外縮小（漏列既有步驟）即紅
+    golden = set(json.loads((REPO / "tests" / "_golden" / "ffstat" / "nan_propagation_classes.json")
+                            .read_text(encoding="utf-8"))["steps"])
+    assert set(steps) == expected, (sorted(expected - set(steps)), sorted(set(steps) - expected))
+    assert set(steps) == golden, (sorted(golden - set(steps)), sorted(set(steps) - golden))
     classes = {"propagating", "incomplete_window", "recursive", "cumulative", "pointwise_prefix",
                "not_in_generation_path", "dispatcher", "index_derived", "helper", "column_filter", "mask"}
     for name, row in steps.items():
@@ -314,7 +318,10 @@ def _called_qualified(qualified: str) -> set:
             elif base in classes:
                 names.add(f"{module}:{base}.{ref.attr}")
             elif base in imports:
-                names.add(imports[base].replace(":", ".") + f":{ref.attr}")
+                # `from pkg import mod` ⇒ pkg.mod:X；`from pkg.mod import Class` ⇒ pkg.mod:Class.X（r28 codex P2-02）
+                src, imported = imports[base].split(":")
+                as_module = REPO / Path(*f"{src}.{imported}".split(".")).with_suffix(".py")
+                names.add(f"{src}.{imported}:{ref.attr}" if as_module.exists() else f"{src}:{imported}.{ref.attr}")
         elif isinstance(ref, ast.Name) and isinstance(ref.ctx, ast.Load):
             names.add(imports.get(ref.id, f"{module}:{ref.id}"))
     return names
@@ -342,7 +349,9 @@ def test_inventory_closure_reaches_off_prefix_and_nested_steps() -> None:
                  f"{fe}.polars_adapter:polars_l2_derived_momentum",
                  f"{fe}.polars_adapter:polars_l65_winsorization",
                  f"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor.transform_registry_groups_to_sink",
-                 f"{fe}.preprocessing._numba_transforms:transform_array_fast"):
+                 f"{fe}.preprocessing._numba_transforms:transform_array_fast",
+                 # r28 codex P2-02：`from … import TimeframeAligner` 後之 TimeframeAligner.X 解析為類別方法
+                 f"{fe}.timeframe.tf_aligner:TimeframeAligner._timeframe_seconds_keys"):
         assert name in got, name
 
 

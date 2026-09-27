@@ -2314,6 +2314,12 @@
    "evidence": "tf_aligner.py:90-512 時間索引換算／參數／洩漏驗證（不產值）"
   },
   {
+   "function": "momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._timeframe_seconds_keys",
+   "propagates_nan": false,
+   "class": "helper",
+   "evidence": "tf_aligner.py:513-517 週期名稱清單（r28 codex P2-02 補入）"
+  },
+  {
    "function": "momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._timeframe_to_seconds",
    "propagates_nan": false,
    "class": "helper",
