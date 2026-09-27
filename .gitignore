@@ -194,3 +194,14 @@ handoffs/ic1eb_newpath_freeze.bak.*/
 # Claude session 暫存輸出（勿 commit）
 .claude/tmp/
 .claude/gate/audit.log.bak-*
+
+# 2026-09-27 使用者裁定：gate 目錄之用完即廢狀態檔不入版控（VS Code 變更清單曾因此累積逾千項）
+# 同輪重派之 flock 鎖與租約（scripts/_redispatch_check.py，O_CREAT 需要時重建）
+.claude/gate/redispatch.*
+# 各批基準雜湊、commit 訊息草稿、探針輸出與操作 log（audit.log、verify_audit.log 仍入版控，見上方 ! 規則）
+.claude/gate/*_baseline.sha
+.claude/gate/*_baseline_sha.txt
+.claude/gate/*_msg.txt
+.claude/gate/*.out
+.claude/gate/*.last.log
+.claude/gate/ff_regen_payload.json
