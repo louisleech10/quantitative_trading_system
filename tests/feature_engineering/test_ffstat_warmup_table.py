@@ -147,6 +147,57 @@ def test_table_k_ge_every_converged_measurement() -> None:
     assert not low, low[:10]
 
 
+def test_variants_only_from_converged_measurements() -> None:
+    """v47（r32 codex P1-01）：條目登記之 `variants`＝收據中有已收斂量測之非週期變體（嘗試過而未收斂者不得放行）。"""
+    from momentum.FeatureEngineering.preprocessing import stable_mask as sm
+
+    receipts = sorted((REPO / "handoffs" / "run_receipts").glob("*-ffstat-warmup-measure.json"))
+    doc = json.loads(receipts[-1].read_text(encoding="utf-8"))
+    table = _entries()
+    seen: Dict[str, set] = {}
+    for row in doc["rows"]:
+        entry = table.get(row["indicator"])
+        if entry is None or not row["converged"]:
+            continue
+        seen.setdefault(row["indicator"], set()).add(
+            sm.variant_key(row["params"], entry["period_keys"], entry.get("param_defaults")))
+    for name, entry in table.items():
+        if entry.get("warmup_class") == "cumulative":
+            continue
+        assert set(entry.get("variants") or []) <= seen.get(name, set()), name
+
+
+def test_mutation_unmeasured_variant_registered_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """r32 codex P1-01 之可證偽版：把未量測之 MA matype=4 登記進 variants ⇒ 不變量測試必紅。"""
+    import yaml
+
+    original = yaml.safe_load
+
+    def widened(text):
+        doc = original(text)
+        if isinstance(doc, dict) and "MA" in (doc.get("indicators") or {}):
+            doc["indicators"]["MA"]["variants"] = list(doc["indicators"]["MA"]["variants"]) + ["matype=4"]
+        return doc
+
+    monkeypatch.setattr(yaml, "safe_load", widened)
+    with pytest.raises(AssertionError):
+        test_variants_only_from_converged_measurements()
+
+
+def test_depth_estimate_checks_variant_and_sequence_periods() -> None:
+    """v47（r32 codex P2-02／P2-03）：預熱估算之查表與遮罩同一變體檢查（MAMA 改 fastlimit ⇒ 拒）；
+    週期參數為序列（MAVP periods）時 K 取序列最大值，不拋原始 TypeError。"""
+    from momentum.FeatureEngineering.atomic import l1_output_points as l1op
+    from momentum.FeatureEngineering.preprocessing import stable_mask as sm
+
+    with pytest.raises(sm.UnmeasuredVariantError):
+        l1op._k_from_table("MAMA", {"fastlimit": 0.9, "slowlimit": 0.05})
+    entry = _entries()["MAVP"]
+    spec = sm.OutputPointSpec(engine="talib", indicator="MAVP", column="close_trend_MAVP_30", params={"periods": [5, 30]},
+                              period_keys=tuple(entry["period_keys"]))
+    assert sm.instance_k(spec, _entries()) == math.ceil(30 * float(entry["recommended_factor"]))
+
+
 def test_mutation_adopted_k_below_measurement_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
     """r31 codex P1-01 之可證偽版：把 DX timeperiod=144 之採用值改為 1 ⇒ 不變量測試必紅。"""
     import yaml
