@@ -178,33 +178,51 @@ def test_nan_propagation_inventory_complete() -> None:
     assert expected <= set(steps), sorted(expected - set(steps))
     classes = {"propagating", "incomplete_window", "recursive", "cumulative", "pointwise_prefix",
                "not_in_generation_path", "dispatcher", "index_derived", "helper", "column_filter", "mask"}
-    short_names = {n.split(":")[1].split(".")[-1] for n in steps}
     for name, row in steps.items():
         assert row["propagates_nan"] in (True, False), name
         assert row["evidence"], name
         assert row["class"] in classes, name
         assert row["propagates_nan"] == (row["class"] == "propagating"), name
         if row["class"] == "dispatcher":
-            # r25 codex P1-04：派發函式之輸出＝其所呼叫之已分類步驟之聯集 ⇒ 函式體須呼叫至少一個已列步驟
-            called = _called_names(name)
-            assert called & (short_names - {name.split(":")[1].split(".")[-1]}), name
+            # r25 codex P1-04／r26 codex P1-01：派發函式之輸出＝其所呼叫之已分類步驟之聯集 ⇒ 函式體須以限定名
+            # （同類 self.X／cls.X ⇒ module:Class.X；同模組 X ⇒ module:X）呼叫至少一個非自身之已列步驟
+            called = _called_qualified(name)
+            assert called & (set(steps) - {name}), name
 
 
-def _called_names(qualified: str) -> set:
-    """函式體內以 `self.X(`／`cls.X(`／`X(` 呼叫之名稱集合（AST）。"""
+def _called_qualified(qualified: str) -> set:
+    """函式體內呼叫之限定名集合（AST）：`self.X(`／`cls.X(` 綁定於同一類別，裸名 `X(` 綁定於同一模組。"""
     module, qual = qualified.split(":")
     path = REPO / Path(*module.split(".")).with_suffix(".py")
-    target = qual.split(".")[-1]
+    parts = qual.split(".")
+    owner, target = (parts[0], parts[-1]) if len(parts) > 1 else (None, parts[0])
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == target:
-            names = set()
-            for call in ast.walk(node):
-                if isinstance(call, ast.Call):
+    scopes = [n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == owner] if owner else [tree]
+    for scope in scopes:
+        for node in (scope.body if owner else ast.walk(scope)):
+            if isinstance(node, ast.FunctionDef) and node.name == target:
+                names = set()
+                for call in ast.walk(node):
+                    if not isinstance(call, ast.Call):
+                        continue
                     fn = call.func
-                    names.add(fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", ""))
-            return names
+                    if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name) and fn.value.id in ("self", "cls") and owner:
+                        names.add(f"{module}:{owner}.{fn.attr}")
+                    elif isinstance(fn, ast.Name):
+                        names.add(f"{module}:{fn.id}")
+                return names
     return set()
+
+
+def test_dispatcher_call_resolution_is_class_bound() -> None:
+    """r26 codex P1-01：派發檢查以限定名綁定類別——`_rolling_last_rank_pct` 於 L2（DerivedOperatorEngine）與
+    L3（RollingAggregator）同名，L3 派發函式之呼叫集合不得含 L2 之同名方法，反之亦然。"""
+    base = "momentum.FeatureEngineering.operators"
+    l3 = _called_qualified(f"{base}.rolling_aggregator:RollingAggregator.compute_all")
+    assert l3 and all(n.startswith(f"{base}.rolling_aggregator:") for n in l3)
+    assert f"{base}.derived_operators:DerivedOperatorEngine._rolling_last_rank_pct" not in l3
+    l2 = _called_qualified(f"{base}.derived_operators:DerivedOperatorEngine.compute_all")
+    assert l2 and all(n.startswith(f"{base}.derived_operators:") for n in l2)
 
 
 def test_index_derived_step_has_no_warmup() -> None:
