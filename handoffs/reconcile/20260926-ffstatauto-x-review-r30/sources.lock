@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "session_id": "20260926-ffstatauto-x-review-r30",
+  "expected_roster": [
+    "codex",
+    "composer"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260926-ffstatauto-x-review-r30/sources/20260926-ffstatauto-x-review-r30-codex.md",
+      "sha256": "69af342e5682d5eedde9f7b58d2d9bbff0250f237e79df6779a7b9193d7f6eb4",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20260926-ffstatauto-x-review-r30/sources/20260926-ffstatauto-x-review-r30-composer.md",
+      "sha256": "83fa3226ccd3f95c358ec7c82f9255fc7b3318109f8c5b77c5451460202fdd9c",
+      "family": "composer"
+    }
+  ],
+  "freeze_ts": "2026-09-27T16:19:48Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "5075c8fe-bdc3-4fbe-9352-2045ea827887"
+}
