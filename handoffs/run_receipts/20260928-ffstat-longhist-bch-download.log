@@ -1,0 +1,4 @@
+# 2026-09-28 補抓 BCHUSDT 12h 長歷史（Task 2.1 邊界⑧；R8）
+# 指令：LONGHIST_SYMBOLS=BCHUSDT LONGHIST_START=2019-11-01 venv/bin/python handoffs/run_receipts/20260927-ffstat-longhist-download.py 12h
+2026-09-28 14:59:06,230 - momentum.DataExtraction.kline_storage - WARNING - Dataset BCHUSDT/12h not available in storage or legacy cache
+RESULT BCHUSDT 12h rows=4993 first=2019-11-28 00:00 last=2026-09-28 00:00

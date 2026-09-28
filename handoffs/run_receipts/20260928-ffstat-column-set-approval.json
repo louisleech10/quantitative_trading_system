@@ -1,0 +1,12 @@
+{
+ "schema_version": 1,
+ "spec": "docs/FFSTAT_SPEC.md Task 2.3 ⑦（v34 機械核可；v49 原因 warmup_restored）",
+ "delta_receipt": "handoffs/run_receipts/20260928-ffstat-column-set-delta.json",
+ "delta_sha256": "2c70a816227392d4533112815584db0a27dcccfecb20cf5060559011142313f5",
+ "delta_summary": {"added": 60, "removed": 0, "reasons": {"warmup_restored": 60}},
+ "user_quote": "同意（建議）",
+ "question": "FF-STAT 改完後，同一份測試設定（BTC 1h、2026 年 1 月）輸出的特徵欄比改前多 60 欄、沒有少任何一欄……同意這個欄集合變化嗎？",
+ "date": "2026-09-28",
+ "session_id": "a31762f3-2a10-40d3-ae86-6327396fd650",
+ "recorded_by": "主委（AskUserQuestion 阻塞式提問作答後寫入；機器只能驗 digest 一致，原話與 session id 供稽核）"
+}
