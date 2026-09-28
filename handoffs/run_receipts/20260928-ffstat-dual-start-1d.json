@@ -1,0 +1,12 @@
+{
+ "timeframe": "1d",
+ "rows": 3329,
+ "m": 2049,
+ "f_max": 2533,
+ "margin": -1753,
+ "violations": {},
+ "ineligible": [],
+ "max_error": {},
+ "eligible": false,
+ "command": "venv/bin/python handoffs/run_receipts/ffstat_probes/dual_start_full_report.py 1d handoffs/run_receipts/20260928-ffstat-dual-start-1d.json"
+}
