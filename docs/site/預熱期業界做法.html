@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>指標預熱期：業界到底怎麼做</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">預熱期業界做法.md</span></nav>
+<main>
+<h1 id="指標預熱期業界到底怎麼做">指標預熱期：業界到底怎麼做</h1>
+<blockquote>
+<p>2026-09-30。你要我和委員先查清楚量化業界、金融業界、交易所怎麼處理指標的「預熱期」。三家委員（Codex、Composer、Grok）和我各自獨立查證，結論一致。這頁整理結果，最後有兩件事要你決定。</p>
+</blockquote>
+<h2 id="先講結論">先講結論</h2>
+<ol>
+<li><strong>業界把「有值」和「準確」分成兩件事</strong>：
+<ul>
+<li><strong>有值</strong>：過了指標本身的週期就開始出值。例如 RSI 14 在第 15 根就有值，RSI 144 在第 145 根就有值。</li>
+<li><strong>準確</strong>：想要和「用很長歷史算」的值一致，就要再多給一段預熱。多給幾根，用公式或固定倍數決定。</li>
+</ul>
+</li>
+<li><strong>沒有任何一家「試遍每個起點」</strong>。我們跑了十幾小時的逐起點驗證，業界沒人這樣做，你的質疑是對的。</li>
+<li><strong>我們預熱表的數字本身沒量錯</strong>，用公式算出來幾乎一樣：RSI 14 公式 87 根、表上 86 根；RSI 144 公式約 905 根、表上 856 根。以後直接用公式算即可。</li>
+<li><strong>真正的問題</strong>：我們把「要幾根才準確」拿來當「第一個值什麼時候出」。結果 RSI 144 要到約第 856 根才有第一個值，新上市的標的要等很久。</li>
+</ol>
+<h2 id="一量化業界回測與交易平台指標函式庫">一、量化業界（回測與交易平台、指標函式庫）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>平台／函式庫</th>
+<th>什麼時候算「可以用」</th>
+<th>有沒有保證準確</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>QuantConnect（美國量化平台）</td>
+<td>RSI 14 過 15 根就「就緒」</td>
+<td>沒有。官方說：有的平台用全部歷史暖機，我們只用固定根數</td>
+</tr>
+<tr>
+<td>Backtrader（Python 回測）</td>
+<td>滿足指標週期根數就開始</td>
+<td>沒有</td>
+</tr>
+<tr>
+<td>Zipline（Quantopian 開源）</td>
+<td>RSI 用 15 根的窗口</td>
+<td>沒有</td>
+</tr>
+<tr>
+<td>NautilusTrader</td>
+<td>收滿週期根數就「已初始化」</td>
+<td>沒有</td>
+</tr>
+<tr>
+<td>vectorbt</td>
+<td>窗口滿了才有值</td>
+<td>沒有</td>
+</tr>
+<tr>
+<td>MetaTrader 5</td>
+<td>回測時往前多載入一個週期的歷史</td>
+<td>沒有</td>
+</tr>
+<tr>
+<td>TA-Lib（我們用的指標庫）</td>
+<td>預設不處理，有值就給</td>
+<td>官方承認 RSI、EMA、ADX 等 20 多個指標前段會因起點不同而不同；建議使用者自己丟掉前段，說「丟 100 根對多數指標合理」</td>
+</tr>
+<tr>
+<td>TA4J（Java 指標庫）</td>
+<td>有「是否穩定」的判斷，RSI 14 以 14 根為門檻</td>
+<td>門檻是固定根數，不是驗證準確</td>
+</tr>
+<tr>
+<td>Skender（.NET 指標庫）</td>
+<td>有值就給，但<strong>明寫建議丟掉的根數</strong>：RSI 週期＋250、EMA 2 倍週期、ADX 2 倍週期＋100</td>
+<td>少數明確寫出「多少根才準」的函式庫，用固定倍數</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>量化業界的共通點</strong>：只等「有值」，準不準交給使用者自己判斷，或給一個固定的多抓根數。</p>
+<h2 id="二金融業界看盤網站資訊商">二、金融業界（看盤網站、資訊商）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>業者</th>
+<th>做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>StockCharts（美國看盤網站）</td>
+<td>官方寫明：RSI、EMA 都會先算圖表起點<strong>之前至少 250 根</strong>，所以值「準到小數點以下」；也承認「計算用的歷史長度不同，RSI 值會略有不同」</td>
+</tr>
+<tr>
+<td>TradingView</td>
+<td>用圖表上載入的全部歷史（通常幾千根）從頭算；官方說明值會隨載入的第一根而變，但「歷史有幾千根時，差異小到可忽略」</td>
+</tr>
+<tr>
+<td>Bloomberg 終端機</td>
+<td>官方公開講座的標題就是「彭博終端機上的 RSI 常與 Excel 算的不同」，原因是計算方法和使用的歷史長度不同。詳細預熱根數要訂閱才看得到，委員查不到</td>
+</tr>
+<tr>
+<td>Refinitiv（路孚特）</td>
+<td>查不到公開的官方說明</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>金融業界的共通點</strong>：往前多抓一大段固定長度的歷史（250 根以上，或全部），讓值和長歷史一致，並承認不同業者的值會有些微差異。</p>
+<h2 id="三交易所">三、交易所</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>交易所</th>
+<th>做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>幣安（Binance）</td>
+<td>看盤圖用的是 TradingView 元件，所以跟 TradingView 一樣用載入的歷史從頭算。官方教學只寫 RSI 預設 14 根，沒有說明預熱。<strong>這就是你之前比對一致的原因</strong>：雙方都用了夠長的歷史</td>
+</tr>
+<tr>
+<td>期貨交易所（CME 等）</td>
+<td>期貨近月合約常常比 200 日均線還短。業界做法是把前幾個合約的歷史<strong>接起來（連續合約）</strong>，讓長週期指標有足夠歷史，而不是等新合約交易滿 200 天</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="四那幾根才夠有公式嗎">四、那「幾根才夠」有公式嗎？</h2>
+<p>有。RSI、EMA 這類指標的「起點誤差」每多一根就按固定比例縮小，可以直接算出要幾根才能讓誤差小於某個標準。我用真實 BTC 資料驗證過：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>預熱根數</th>
+<th>RSI 14 最大誤差</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>14</td>
+<td>30.3 點</td>
+</tr>
+<tr>
+<td>70</td>
+<td>1.1 點</td>
+</tr>
+<tr>
+<td>94</td>
+<td>0.16 點</td>
+</tr>
+<tr>
+<td>200</td>
+<td>0.00006 點</td>
+</tr>
+<tr>
+<td>800</td>
+<td>0（完全相同）</td>
+</tr>
+</tbody>
+</table></div>
+<p>業界經驗法則（EMA 要 3.45×(週期+1) 根）換算到 RSI 14 約 97 根，和上表一致。</p>
+<h2 id="五我們現在的做法和業界比">五、我們現在的做法和業界比</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>我們</th>
+<th>業界</th>
+<th>判斷</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>要求準確</td>
+<td>要求第一個值就準確（誤差小於正常波動的 0.5%）</td>
+<td>回測平台不要求；資訊商靠多抓 250 根以上</td>
+<td>比業界嚴，對機器學習的一致性有價值</td>
+</tr>
+<tr>
+<td>決定根數</td>
+<td>實測量出</td>
+<td>公式或固定倍數</td>
+<td>我們量的數字與公式相符，改用公式即可</td>
+</tr>
+<tr>
+<td>驗證方法</td>
+<td>試遍 10 萬個起點</td>
+<td>沒人這樣做</td>
+<td><strong>過度，應停止</strong></td>
+</tr>
+<tr>
+<td>新上市標的</td>
+<td>長週期指標要等很久才有值</td>
+<td>過了週期就有值</td>
+<td><strong>這是要改的地方</strong></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="要你決定的兩件事">要你決定的兩件事</h2>
+<p><strong>1. 第一個值什麼時候出？</strong></p>
+<ul>
+<li><strong>A（建議）兩層</strong>：過了指標週期就出值，還沒準確的那段逐欄標記「未收斂」。機器學習、IC 分析、回測預設只用已準確的部分。新上市標的也能馬上看到值。</li>
+<li><strong>B 維持現狀</strong>：只在準確之後才出第一個值；歷史不夠的欄位照之前的裁定跳過並標記。</li>
+</ul>
+<p><strong>2.「準確」要多嚴？</strong></p>
+<ul>
+<li><strong>維持現行 0.5%，改用公式算（建議）</strong>：RSI 14 約 87 根，RSI 144 約 900 根。</li>
+<li><strong>放寬到 1%</strong>：根數少一些（RSI 14 約 77 根），和長歷史的差距稍大。</li>
+<li><strong>用業界固定倍數（Skender）</strong>：RSI 週期＋250、EMA 2 倍週期、ADX 2 倍週期＋100。簡單，但各指標的精確度不一致。</li>
+</ul>
+<h2 id="出處">出處</h2>
+<ul>
+<li>TA-Lib 不穩定期說明：https://ta-lib.org/api/unstable-period/ 、https://ta-lib.github.io/d_api/ta_setunstableperiod.html</li>
+<li>StockCharts RSI：https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/relative-strength-index-rsi</li>
+<li>StockCharts 移動平均：https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/moving-averages-simple-and-exponential</li>
+<li>QuantConnect 預熱：https://www.quantconnect.com/docs/v2/writing-algorithms/historical-data/warm-up-periods 、https://www.quantconnect.com/docs/v2/writing-algorithms/indicators/key-concepts</li>
+<li>QuantConnect RSI 原始碼：https://github.com/QuantConnect/Lean/blob/master/Indicators/RelativeStrengthIndex.cs</li>
+<li>Backtrader：https://backtrader.readthedocs.io/en/latest/advanced/architecture/phase-system.html</li>
+<li>NautilusTrader：https://docs.nautilustrader.io/api_reference/indicators.html</li>
+<li>TA4J：https://github.com/ta4j/ta4j/blob/master/ta4j-core/src/main/java/org/ta4j/core/indicators/RSIIndicator.java</li>
+<li>Skender：https://dotnet.stockindicators.dev/utilities/results</li>
+<li>MetaTrader 5：https://www.mql5.com/en/docs/indicators/irsi</li>
+<li>EMA 經驗法則：https://www.mql5.com/en/forum/142769</li>
+<li>TradingView RMA：https://www.tradingcode.net/tradingview/relative-moving-average/</li>
+<li>Bloomberg 講座：https://www.bloomberg.com/professional/insights/webinar/charts-of-the-month-what-is-the-rsi-and-how-to-use-it-in-trading-strategies/</li>
+<li>幣安 RSI 教學：https://www.binance.com/en/square/post/43083</li>
+</ul>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/預熱期業界做法.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
