@@ -125,6 +125,18 @@ def requires_kline_data() -> Callable[..., pd.DataFrame]:
     return _require
 
 
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config: Any) -> None:
+    """TESTSPEED（使用者 2026-09-29 裁定方向 B）：預設「上次失敗者先跑」（pytest 內建 --ff；不略過任何測試、
+    只調整順序，修完後先看到原失敗者之結果）。只在 cacheprovider 啟用時生效——治理腳本以 `-p no:cacheprovider`
+    呼叫者不受影響（寫入 addopts 會使其 `unrecognized arguments: --ff`）；使用者明示 --lf／--ff／--nf 時不覆寫。"""
+    if not config.pluginmanager.has_plugin("cacheprovider"):
+        return
+    option = config.option
+    if not any(getattr(option, name, False) for name in ("lf", "failedfirst", "newfirst")):
+        option.failedfirst = True
+
+
 def pytest_collection_modifyitems(config: Any, items: List[Any]) -> None:
     """Persist L6.5-related nodeids during the required collect-only gate."""
 
