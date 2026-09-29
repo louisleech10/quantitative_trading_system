@@ -87,9 +87,9 @@ Stack：FastAPI (`api/`) → 核心引擎 (`momentum/`) → Next.js 15 (`fronten
 ```bash
 source venv/bin/activate && python run_api.py  # backend :8000
 cd frontend && npm run dev                      # frontend :3000
-pytest                                          # 全部測試
+pytest                                          # 全部測試（含 tests/governance ⇒ 小時級；平時只跑受影響模組）
 pytest tests/api/ -v --tb=short
-./scripts/check_decoupling_phase4.sh            # 解耦驗證
+./scripts/check_decoupling_phase4.sh            # 窄版解耦驗證（只查 R1/R2/R3/R6，單跑會誤報全綠；見 CLAUDE.md Gotchas）
 ```
 
 ---
@@ -187,6 +187,6 @@ logger = get_logger(__name__)
 - [ ] tight loop 內無 log（只 log 摘要）
 - [ ] Type hints 完整（Python + TypeScript）
 - [ ] 解耦：`grep -r "from api\." momentum/` → 0 results
-- [ ] `pytest` 通過
+- [ ] 受影響模組之 `pytest`（明列路徑）通過；全套（含小時級之 `tests/governance`）不在每次提交跑
 - [ ] `npm run build` 通過（有前端改動時）
 - [ ] `docs/` 已更新（有 API/架構改動時）

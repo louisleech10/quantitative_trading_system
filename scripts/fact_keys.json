@@ -156,7 +156,7 @@
       "G-7",
       "測試套件"
     ],
-    "enforcement_note": "使用者 2026-08-13 定死之憲法級規則：治理的所有票（含已做、正在做、未來的實作）都要在產出端擋下才能當已完成，除非能說明為何不該放產出端（如 G-7 需要 commit 才有 endpoint 淨差、pytest 為十分鐘級）。🔴 本表即該規則的機械強制點，非文件宣告。🔴 檢查之**權威清單為 gen_fact_key_blocks.sh 之 _fk_validate_enforcement，本註記不重列道數**（原寫「四道」而實際已長到八道，CODEX-R2-P2-06 抓到此過期副本）。其中承重的兩條：強制側=產出端者，其掛載點須在 enforcement_settings_path 之 hooks 內實際存在（機械對證，禁自我宣稱）；以及 enforcement_ticket_roles.key（現值 governance-ticket-sot）所指之票 SoT 中，狀態屬 enforcement_completed_statuses 的每一張票必須在本表至少有一列——這條把「完成」與「產出端覆蓋」綁死。🔴 本註記**不得出現已作廢之 fact-key**（CODEX-R3-P2-01：主委首次修訂仍把作廢 key 留在歷史括註內，等於 grep 得到；歷史敘事屬 docs/GOV_ENFORCEMENT_REGISTRY.md，不屬此處），此條已由生成器機械強制。掛載點格式＝<event>:<matcher>:<command 片段>，三段以半形冒號分隔；matcher 段之多個工具名以**半形逗號**分隔（不用 `|`——render=table 之儲存格禁 `|`，會切碎表格；此限制由產出端守衛在寫檔當下實際擋下過）。⑤🔴 S1.1 封死幽靈票：對應票 欄之每個值，必須在**票全集（enforcement_ticket_roles.key 之 rows 票欄）∪ enforcement_ticket_allowlist** 之內，否則 fail-closed——防止登記表出現票表裡不存在的票號而無人察覺。allowlist＝**非票標的**之顯式白名單，以集合相等鎖死（比照 status_scope_grandfathered，禁靜默新增）；現含 G-7 與 測試套件 二者，其正當性來自使用者定死之鐵律原文明文點名（『除非像 G-7 和 pytest 等可以說明為何不該放在產出端』），非主委自行放行。🔴 開工前稽核更正：原設計以 B-38 為幽靈票實例，但 S0.4 已將其收入票 SoT，該實例失效；現存實例即上述兩個非票號值，故落法為白名單而非禁止",
+    "enforcement_note": "使用者 2026-08-13 定死之憲法級規則：治理的所有票（含已做、正在做、未來的實作）都要在產出端擋下才能當已完成，除非能說明為何不該放產出端（如 G-7 需要 commit 才有 endpoint 淨差、pytest 為小時級）。🔴 本表即該規則的機械強制點，非文件宣告。🔴 檢查之**權威清單為 gen_fact_key_blocks.sh 之 _fk_validate_enforcement，本註記不重列道數**（原寫「四道」而實際已長到八道，CODEX-R2-P2-06 抓到此過期副本）。其中承重的兩條：強制側=產出端者，其掛載點須在 enforcement_settings_path 之 hooks 內實際存在（機械對證，禁自我宣稱）；以及 enforcement_ticket_roles.key（現值 governance-ticket-sot）所指之票 SoT 中，狀態屬 enforcement_completed_statuses 的每一張票必須在本表至少有一列——這條把「完成」與「產出端覆蓋」綁死。🔴 本註記**不得出現已作廢之 fact-key**（CODEX-R3-P2-01：主委首次修訂仍把作廢 key 留在歷史括註內，等於 grep 得到；歷史敘事屬 docs/GOV_ENFORCEMENT_REGISTRY.md，不屬此處），此條已由生成器機械強制。掛載點格式＝<event>:<matcher>:<command 片段>，三段以半形冒號分隔；matcher 段之多個工具名以**半形逗號**分隔（不用 `|`——render=table 之儲存格禁 `|`，會切碎表格；此限制由產出端守衛在寫檔當下實際擋下過）。⑤🔴 S1.1 封死幽靈票：對應票 欄之每個值，必須在**票全集（enforcement_ticket_roles.key 之 rows 票欄）∪ enforcement_ticket_allowlist** 之內，否則 fail-closed——防止登記表出現票表裡不存在的票號而無人察覺。allowlist＝**非票標的**之顯式白名單，以集合相等鎖死（比照 status_scope_grandfathered，禁靜默新增）；現含 G-7 與 測試套件 二者，其正當性來自使用者定死之鐵律原文明文點名（『除非像 G-7 和 pytest 等可以說明為何不該放在產出端』），非主委自行放行。🔴 開工前稽核更正：原設計以 B-38 為幽靈票實例，但 S0.4 已將其收入票 SoT，該實例失效；現存實例即上述兩個非票號值，故落法為白名單而非禁止",
     "status_scope": [
       "HANDOFF.md",
       "docs/GOVERNANCE_EXECUTION_ORDER.md",
@@ -3264,7 +3264,7 @@
         "測試套件",
         "pre-push:gov_check.sh 第 5 段",
         "豁免",
-        "PreToolUse不可：全套 pytest 為十分鐘級，寫入前執行會使每次編輯停擺。PostToolUse不可：同上——此為**成本型**而非判定型限制，技術上跑得動、代價不可接受，兩者須誠實區分。部分閘：有——各票之承重判準已分散於本表其他列之產出端掛載，代表兩處為 scripts/factkey_write_guard.sh:119 與 scripts/doc_format_precheck.sh:151；測試子集化之提案見 HANDOFF 之「把測試選擇機械化」節（未開工）",
+        "PreToolUse不可：全套 pytest 為小時級，寫入前執行會使每次編輯停擺。PostToolUse不可：同上——此為**成本型**而非判定型限制，技術上跑得動、代價不可接受，兩者須誠實區分。部分閘：有——各票之承重判準已分散於本表其他列之產出端掛載，代表兩處為 scripts/factkey_write_guard.sh:119 與 scripts/doc_format_precheck.sh:151；測試子集化之提案見 HANDOFF 之「把測試選擇機械化」節（未開工）",
         "n/a"
       ],
       [

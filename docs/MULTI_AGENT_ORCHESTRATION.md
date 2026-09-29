@@ -70,7 +70,7 @@ agy                    # ⚠️ 無 login 子命令！首次直接跑 agy（互�
 | 003 | grok |
 <!-- END GENERATED: committee-roster -->
 
-**現行分工(2026-09-24 主委暫調,使用者離線期間 Grok CLI 再度 402):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Claude(Fable 5/Opus)主委自任**;**討論/code review/adversarial=Codex+Composer 兩家全員**(實作者不自審);委員會審查=兩家;簽核 quorum=兩家;小=Claude 自做。** 🔴 獨立之 `grok` CLI 家族**暫停中**:2026-09-24 FF-TFMETA review-r4 交件回 `API error (status 402 Payment Required): Grok Build usage balance exhausted`;使用者離線前授權「有問題你跟委員討論共識決定」,餘額非委員可解 ⇒ 主委比照 09-14、09-18 兩次使用者裁定之先例,暫移出 `active_stampers`(`review_families` 名冊不動,差集由 `gov_check.sh` 每次 push 印出)。**待使用者儲值或另行指示即恢復三家**。前次三家全員(2026-09-22 使用者調整)全文見 git log。🔴 **家族名≠模型名**:`composer` 指的是 `cursor-agent` 這個執行端,其背後模型由使用者在 Cursor 設定,現已切回 Composer;查型號看 CLI 設定檔,不寫死在本檔。 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-09-18 六調、2026-08-17 五調、2026-07-14 三調全文見 git log〕
+**現行分工(2026-09-29 16:11 起使用者指示恢復三家,「等下16:11後就開始回到三家委員, GROK可以用了」):SPEC/TODO 初稿=**Claude 主委一律起草**;**中/大實作=Claude(Fable 5/Opus)主委自任**;**討論/code review/adversarial=Codex+Composer+Grok 三家全員**(實作者不自審);委員會審查=三家;簽核 quorum=三家;小=Claude 自做。** 名冊機器版＝`scripts/governance_families.json` 之 `active_stampers`。前次兩家暫調(2026-09-24,Grok 402)全文見 git log。🔴 **家族名≠模型名**:`composer` 指的是 `cursor-agent` 這個執行端,其背後模型由使用者在 Cursor 設定,現已切回 Composer;查型號看 CLI 設定檔,不寫死在本檔。 選層為**動態**:一律以使用者最新指示為準(依 usage 切換;新執行端須先過 §8 T-D 對等性測試)。〔前版 2026-09-18 六調、2026-08-17 五調、2026-07-14 三調全文見 git log〕
 
 > 🔴 **本行是散文版,機器版才是判定依據**:`scripts/governance_roles.json`(`implementer`/`reviewers`,角色閘讀它)
 > 與 `scripts/governance_families.json`(`active_stampers`,戳記 quorum 讀它)。兩者不一致時**以機器版為準**,

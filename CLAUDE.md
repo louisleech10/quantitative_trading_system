@@ -41,7 +41,7 @@ All code must support this evolution via clean decoupling.
 - 🔴 **產出端覆蓋鐵律**（2026-08-13 使用者定死，適用**所有**治理 epic）：治理票的檢查
   **必須擋在產出端**（`PreToolUse`／`PostToolUse` hook，寫檔當下就報），**這才能算已完成**；
   擋不了者須在 `docs/GOV_ENFORCEMENT_REGISTRY.md` **具名寫出為什麼**（如 G-7 需 commit 才有
-  endpoint 淨差、全套 pytest 為十分鐘級）。理由：治理問題**全部在產出當下發生**，
+  endpoint 淨差、全套 pytest 為小時級）。理由：治理問題**全部在產出當下發生**，
   留到 push 才擋，中間的派工與回頭修全是純摩擦。
   **機器強制**：`gen_fact_key_blocks.sh` 之收案綁定檢查——票標「收案」而該票未登記
   產出端覆蓋即 fail-closed；且掛載點會與 `.claude/settings.json` **機械對證**，禁自我宣稱。
@@ -73,8 +73,8 @@ All code must support this evolution via clean decoupling.
 ```bash
 source venv/bin/activate && python run_api.py   # backend :8000
 cd frontend && npm run dev                       # frontend :3000
-pytest                                           # all tests
-./scripts/check_decoupling.sh                    # 完整 7 條（phase4 是窄版,見 Gotchas）
+pytest                                           # all tests（testpaths=tests，含 tests/governance ⇒ 小時級，一律丟背景；平時只跑受影響模組之測試）
+./scripts/check_decoupling.sh                    # R1–R5、R7 與 Rule 9；R6 只由 phase4 驗（見 Gotchas）
 ```
 
 ---
@@ -84,7 +84,7 @@ pytest                                           # all tests
 > 本節放「不知道會浪費時間或做出錯誤結論」的事實。規則在別節，這裡只放坑。
 
 **檢查工具會騙你**
-- `check_decoupling_phase4.sh` 是**窄版**（只查 R1/R2/R3/R6，**不查 R4**）→ 會誤報全綠。完整掃描用 `check_decoupling.sh`；實跑 R2/R3/R4 目前有紅（P2 triage 待辦）。
+- `check_decoupling_phase4.sh` 是**窄版**（只查 R1/R2/R3/R6，**不查 R4**）→ 會誤報全綠。R1–R5／R7 用 `check_decoupling.sh` 掃（它不查 R6）；實跑 R2/R3/R4 目前有紅（P2 triage 待辦）。
 - `cmd | tail; echo rc=$?` 讀到的是 **tail 的 rc**，不是 cmd 的。rc 一律**直接取**，禁經 pipe。此坑 Claude 與委員都犯過。
 - `gate_check.sh` 只驗 token 的 **mtime 新鮮度**，**不比對內容**：一個 token 900 秒內授權任意 task-id／任意 intent；固定檔名 `.claude/gate/dispatch.token` 無 session 區隔，跨 session 會互相**延長**有效期（fail-open）。代號 `GATE-TOKEN-BINDING`。
 
@@ -113,13 +113,9 @@ pytest                                           # all tests
 5. **改檔一律用 Edit 工具，別用 Bash 包 `python3 - <<'PY'` 做字串取代**。五個代價：①觸發分類器（2.3s 起跳、7% 變 600s——2026-07-26 那次 10 分鐘就是這樣來的）②`s.replace()` 找不到目標**不報錯、靜默無動作**，Edit 則會失敗 ③使用者看不到 diff，無從審查 ④token 貴很多 ⑤`open(p,'w')` 可蓋掉沒讀過的內容，Edit 強制先讀。**唯一例外**＝必須程式化操作結構化資料，且應 Write 成腳本檔再 `bash scripts/x.sh`，仍不用 heredoc。
 4. 複合／多行指令**不是**問題——只要每個成分都合規就快（實測 0.10s）
 
-**B 類（Claude 端慢）已實測的成因：大輸出回灌**
-- `git push` 會觸發 pre-push 跑全套測試，**整份 30KB 輸出回灌 Claude context** → 實測 Claude 端多花 **89.9 秒**才發出下一個動作。
-- **避法**：輸出量大的指令一律導檔再取尾，例如 `git push -q origin main > /tmp/push.log 2>&1; tail -3 /tmp/push.log`。`pytest` 全套同理。
-- 🔴 **本條前提已於 2026-08-14 消失**：`pre-push` 只跑 `gov_check.sh --fast`（實測 **0.83 秒**），
-  **不再跑全套**。2026-09-05 實測 `git push` 端到端 **2.6 秒**，前景可跑。
-  丟背景仍是好習慣（輸出回灌），但**不再是「前景一定 timeout」**。
-  原文（保留供理解舊 log）：「pre-push 委派 `gov_check.sh` 跑全套（十分鐘級）> Bash 前景上限 120 秒 ⇒ 前景一定 timeout」。
+**B 類（Claude 端慢）：大輸出回灌**
+- 大量輸出整份回灌 context 會明顯拖慢下一個動作 ⇒ 輸出量大的指令（`pytest` 全套等）一律導檔再取尾，例如 `git push -q origin main > /tmp/push.log 2>&1; tail -3 /tmp/push.log`。
+- `pre-push` 只跑 `gov_check.sh --fast`（秒級），`git push` 前景可跑。
 
 **時間哨兵已移除**（2026-09-23 使用者裁定）：原 `scripts/ts_stamp.sh`（Pre/PostToolUse＋UserPromptSubmit）以「單次呼叫 >10 秒」「呼叫間隔 >120 秒」判卡頓，但分不出「本來就要跑這麼久」（全套測試、提交檢查、等候委員之迴圈、等使用者回答）與分類器卡住——移除前一日所報 5 次全屬前者；每次呼叫另印兩行 T-IN／T-OUT 於使用者畫面。上方三條觸發條件與避法仍有效，照做即可，不再依賴事後偵測。
 
@@ -128,18 +124,18 @@ pytest                                           # all tests
   **本檔刻意不寫秒數與測試數**——那是會漂的值，寫進來就是下一個過期副本（歷史上已過期**五次**：
   「110 秒/287」「766/267s」「828/275s」「1151/330s」，以及「十分鐘級」本身——
   2026-09-05 實測 **3220s／1749 條**，是「十分鐘」的六倍）。要精確值就跑一次看輸出，或查
-  `handoffs/run_receipts/*.json`。只有動 `gate.sh`/`cx_run.sh` 這類共用控制流才需跑全套。
+  `handoffs/run_receipts/*.json`。只有動過 `gate.sh`/`cx_run.sh`/`gov_check.sh` 這類共用控制流，**且**到收 epic 前，才跑一次全套（丟背景）；平時與每次提交只跑受影響模組之測試（明列路徑）。
   🔴 **2026-09-05 事故**：本段自 2026-08-14（pre-push 改 `--fast`）起**從未被執行過**——
   手動路徑被 `gov_check` 第 4 段（G-7，結構性恆紅）的早退永久封住。
   首次跑通即發現 **8 條長期紅測試**（4 條 G-7、4 條 factkey pre-push 委派鏈），
   皆為前提過期而非本次改壞。⇒ **順序性 fail-stop 鏈中，先跑的段必須比後跑的段更該擋**；
   零價值的段排在高價值段前面會把它整個吃掉。
-- `scripts/govb1_final_gate.sh` 全跑**內含 `_g0_tests`（全套 pytest）** ⇒ 同屬十分鐘級，
+- `scripts/govb1_final_gate.sh` 全跑**內含 `_g0_tests`（`pytest tests/governance`）** ⇒ 同屬小時級，
   **前景必 timeout，一律丟背景**。只驗單條用 `--only <name>`（`g0_syntax`／`g1`…`g8`），秒級完成。
 - 🔴 **執行端跑驗收時，主控端不得動檔**：`test_t01_f3_g7_when_committed` 類斷言會比對「工作區 dirty 數前後不變」，主控端同時寫檔會使其 flaky；亦不得並行跑兩份會就地 mutate 檔案再還原的 pytest（會互相污染）。2026-08-07 實際踩到。
 - 跑完測試須 `bash scripts/restore_golden_inventory.sh` 還原 golden inventory 的副作用（否則 `tests/golden/l65/test_inventory.txt` 會髒）。
 - 🔴 **本專案已無 CI**（2026-08-13 使用者定，`.github/workflows/` 整個刪除）。`governance.yml` 連續五次全紅（42 failed / 1631 passed）、`verify_claim.yml` 亦紅，**無人查看＝零保護純噪音**，判準同 `l65_benchmark.yml`（2026-07-26 刪，連續 startup failure）。那 42 條經查證**無一為真實跨平台 bug**，全是 CI 環境配置（效能斷言在共用 runner 不可靠、shallow clone 讀不到 git 歷史、G-7 需 commit 範圍）。`scripts/ci_check_after_push.sh` 與其 hook 掛載一併移除（它正是為「CI 紅了沒人看」而做，卻因 CI 需 18 分鐘、hook 在 push 當下查到的永遠是 pending 而從未生效——**非同步結果用同步 hook 查**）。
-- 🔴 **本條已於 2026-08-14 由使用者裁定改寫**（原文：「全套 pytest 為唯一防線，不得移出 pre-push」）。**改寫理由是前提被實測推翻，不是放寬標準**：那 920 秒跑的是 `pytest tests/governance`，**只涵蓋治理腳本**；`tests/momentum`／`api`／`feature_engineering` 等 **2,445 條量化測試一條都沒跑**——它守的不是產品。同日使用者裁定回量化主線、治理不再擴建 ⇒ 治理腳本改動趨近零卻每次推送付 15 分鐘。使用者原話：「我只要 commit 和 push 是幾秒鐘內的事情」。**現行**：`pre-push` 只跑 `gov_check --fast`（秒級）。全套改為**明示的手動關卡**——動過 `scripts/`／`tests/governance/` 者，收 epic 前自行跑 `bash scripts/gov_check.sh --no-probe`（丟背景）。🔴 **誠實邊界**：這是降低防護換可用性的取捨，跨平台盲區（BSD/GNU `realpath`、`stat -f %m` vs `-c %Y`）**現在沒有任何東西擋**；日後若回頭大改治理，應把 `pre-push` 改回 `--no-probe`。`scripts/benchmark_l65.py` 保留，效能本機跑。
+- 🔴 **本條已於 2026-08-14 由使用者裁定改寫**（原文：「全套 pytest 為唯一防線，不得移出 pre-push」）。**改寫理由是前提被實測推翻，不是放寬標準**：那 920 秒跑的是 `pytest tests/governance`，**只涵蓋治理腳本**；`tests/momentum`／`api`／`feature_engineering` 等 **2,445 條量化測試一條都沒跑**——它守的不是產品。同日使用者裁定回量化主線、治理不再擴建 ⇒ 治理腳本改動趨近零卻每次推送付 15 分鐘。使用者原話：「我只要 commit 和 push 是幾秒鐘內的事情」。**現行**：`pre-push` 只跑 `gov_check --fast`（秒級）。全套改為**明示的手動關卡**——觸發條件同上（動過共用控制流**且**收 epic 前），跑 `bash scripts/gov_check.sh --no-probe`（丟背景）。🔴 **誠實邊界**：這是降低防護換可用性的取捨，跨平台盲區（BSD/GNU `realpath`、`stat -f %m` vs `-c %Y`）**現在沒有任何東西擋**；日後若回頭大改治理，應把 `pre-push` 改回 `--no-probe`。`scripts/benchmark_l65.py` 保留，效能本機跑。
 - 3 個既有測試檔探針空心（`test_verify_gate{,_b3,_b4}.py`）＝假綠，已在 `gov_check.sh` 具名排除。
 
 **資料與數值**
@@ -149,7 +145,7 @@ pytest                                           # all tests
 - 多 symbol 切片**禁用 positional index**（ML 孤島舊法）→ 會跨 symbol 洩漏；`SplitPlan` 須 per-symbol。
 
 **平台**
-- macOS 抓不到、只在 CI/linux 現形的坑：`stat -f %m` 在 linux 會失敗並把檔案系統資訊印到 stdout。跨平台取 mtime 須 `stat -c %Y` 前置（見 `gate_check.sh:70-74`）。
+- macOS 抓不到、只在 CI/linux 現形的坑：`stat -f %m` 在 linux 會失敗並把檔案系統資訊印到 stdout。跨平台取 mtime 須 `stat -c %Y` 前置（範例見 `gate_check.sh` 之「mtime 跨平台」註解）。
 - 反引號、`$`、`&` 手搓進 CLI 命令列會被 shell 吃掉 → 派委員一律走 `cx_run.sh`，brief 用 `new_brief.sh` 產骨架。
 
 ---
@@ -180,7 +176,7 @@ Feature Factory **資料正確性** scope：生成→計算→merge（多TF對�
 
 ## The 7 Decoupling Rules (Zero Tolerance)
 
-> **本表 = 7 條解耦規則的唯一權威(canonical single source)。** ARCHITECTURE.md / DEV_GUIDE.md 只得 pointer 回本節,不得自列不同版本。歷史上 ARCHITECTURE §162 曾把 R5/R6 寫成 singleton/callback(見下 Rule 8/9),為漂移,已改正(docdrift 2026-07-12)。
+> **本表 = 7 條解耦規則的唯一權威(canonical single source)。** `docs/ARCHITECTURE.md` / `docs/DEVELOPMENT_GUIDE.md` 只得 pointer 回本節,不得自列不同版本;singleton/callback 屬下方 Rule 8/9,不是 R5/R6。
 
 | # | Rule | Quick Check |
 |---|------|-------------|
@@ -193,7 +189,7 @@ Feature Factory **資料正確性** scope：生成→計算→merge（多TF對�
 | 7 | DTOs don't cross boundaries | `api/models/` ↔ `momentum/core/contracts.py` |
 
 **具名不變式(named invariants,非「7 條」之一,獨立追蹤)**:
-- **Rule 8 — 不得有 Mutable global singleton**:目標態;**現況仍有殘留**(`api/services/chart_signal_service.py`、`signal_analysis_service.py`、`data_source_registry.py` 等 `_instance` singleton),列為技術債追蹤,勿宣稱「已修復」。
+- **Rule 8 — 不得有 Mutable global singleton**:目標態;**現況仍有殘留**(`api/services/chart_signal_service.py`、`api/services/signal_analysis_service.py`、`momentum/FeatureEngineering/data_source_registry.py` 等 `_instance` singleton),列為技術債追蹤,勿宣稱「已修復」。
 - **Rule 9 — 無跨界 callback/closure/lambda monkeypatch bypass**:由 `scripts/check_decoupling.sh` 的 lambda-monkeypatch 檢查強制(該腳本內部標為「Rule 6」,語意=本 Rule 9,見腳本註解頭)。
 
 > **兩支 scanner 的編號語意不同,勿混淆**:`check_decoupling.sh` 內部「Rule 5」=Config(canonical R5)、「Rule 6」=callback bypass(=Rule 9);`check_decoupling_phase4.sh` 的「Rule 6」=獨立 pytest(canonical R6)。canonical 編號以本表為準。
@@ -206,7 +202,7 @@ Feature Factory **資料正確性** scope：生成→計算→merge（多TF對�
 **TypeScript/React**: typed props/state; Zustand; empty/loading/error; `<ResponsiveContainer>`。  
 **Git**: `feat:`/`fix:`/`docs:`/`refactor:`/`perf:`/`test:`/`chore:`
 
-Pre-Commit: no fake data; retryable errors; no hot-loop logs; type hints; decoupling grep=0; `pytest`; `npm run build`（前端改動）; `docs/`（API/架構改動）; `HANDOFF.md`
+Pre-Commit: no fake data; retryable errors; no hot-loop logs; type hints; decoupling grep=0; 受影響模組之 `pytest`（明列路徑；全套見 Gotchas「測試與 CI」）; `npm run build`（前端改動）; `docs/`（API/架構改動）; `HANDOFF.md`
 
 ---
 

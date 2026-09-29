@@ -153,7 +153,7 @@
     "check_decoupling.sh": {
       "node": "7-commit前",
       "mandatory": true,
-      "why": "完整 7 條解耦掃描(phase4 是窄版,會誤報全綠)",
+      "why": "解耦掃描 R1–R5、R7 與 Rule 9(R6 只由 phase4 驗;phase4 為窄版,單跑會誤報全綠)",
       "cmd": "bash scripts/check_decoupling.sh"
     },
     "check_decoupling_phase4.sh": {

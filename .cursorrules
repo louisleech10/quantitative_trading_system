@@ -24,7 +24,7 @@
 9. **絕不（實體紅線，Claude 用 `scripts/agent_preflight.sh`/`agent_postflight.sh` 前後快照比對驗 data_cache）**：刪/改 `data_cache/`、改 git 歷史、force push、改 `.git/`、跳過 Pre-Commit Checklist。`--force`/`--yolo` 是非互動用，**不是安全模式**。
 10. **留痕義務**：派工 prompt 帶 task-id 者，產出檔寫進 `handoffs/` 後由 Claude `register-output` 入帳；收尾報告須列出產出檔路徑，不得只寫在 log。
 11. **VERIFY claim 義務**：收尾報告/交接檔中「已驗/passed/確認正確」須附**實跑命令**+輸出摘要，否則標「未驗證」；空稱視為捏造（出處見 `docs/SCAR_LEDGER.md`）。
-12. **STAMP-BLOCKED（適用範圍以 `brief-kind` 判）**：**僅當 `brief-kind: impl`** 時,若 reconcile/SPEC 的 `RECONCILE-STAMP` 未全數 APPROVED → `STATUS: BLOCKED — reconcile 未核可`,不動工。`review`／`consult`／`closure`／`stamp` 之唯讀輪**不適用**,即使 `reconcile_stamps_check` rc=1 也須照常完成審查(重簽輪的前提就是舊戳記已失效;套上本條即永久死鎖)。逐字理由見 `AGENTS.md:40`。
+12. **STAMP-BLOCKED（適用範圍以 `brief-kind` 判）**：**僅當 `brief-kind: impl`** 時,若 reconcile/SPEC 的 `RECONCILE-STAMP` 未全數 APPROVED → `STATUS: BLOCKED — reconcile 未核可`,不動工。`review`／`consult`／`closure`／`stamp` 之唯讀輪**不適用**,即使 `reconcile_stamps_check` rc=1 也須照常完成審查(重簽輪的前提就是舊戳記已失效;套上本條即永久死鎖)。理由全文見 `AGENTS.md`「執行任務時」第 12 條。
 
 ---
 
@@ -63,9 +63,9 @@ Stack：FastAPI (`api/`) → 核心引擎 (`momentum/`) → Next.js 15 (`fronten
 ```bash
 source venv/bin/activate && python run_api.py  # backend :8000
 cd frontend && npm run dev                      # frontend :3000
-pytest                                          # 全部測試
+pytest                                          # 全部測試（含 tests/governance ⇒ 小時級；平時只跑受影響模組）
 grep -r "from api\." momentum/                 # 解耦驗證（必須 0 results）
-./scripts/check_decoupling_phase4.sh
+./scripts/check_decoupling_phase4.sh             # 窄版（只查 R1/R2/R3/R6，單跑會誤報全綠；見 CLAUDE.md Gotchas）
 ```
 
 ---
@@ -178,7 +178,7 @@ logger = get_logger(__name__)
 - [ ] tight loop 內無 log（只 log 摘要）
 - [ ] Type hints 完整（Python + TypeScript）
 - [ ] 解耦：`grep -r "from api\." momentum/` → 0 results
-- [ ] `pytest` 通過
+- [ ] 受影響模組之 `pytest`（明列路徑）通過；全套（含小時級之 `tests/governance`）不在每次提交跑
 - [ ] `npm run build` 通過（有前端改動時）
 - [ ] `docs/` 已更新（有 API/架構改動時）
-- [ ] `HANDOFF.md` 已更新
+- [ ] 交接已寫入 `handoffs/<YYYYMMDD>-<task-id>.md`（或已輸出 `HANDOFF_NOT_UPDATED: <原因>`）；根 `HANDOFF.md` 不動

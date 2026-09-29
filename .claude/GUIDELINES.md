@@ -6,13 +6,7 @@
 
 ## Handoff 協議
 
-`HANDOFF.md`（根目錄）是所有 agent 的共同交接文件，取代舊 SESSION 系統。
-
-**規則只有兩條**：
-1. **開始前**：SessionStart hook 已自動注入 HANDOFF.md，確認當前狀態
-2. **結束前**：更新 HANDOFF.md（≤ 30 行）
-
-**HANDOFF.md 格式**：正在做 / 待辦 / 阻塞 / 本次決策 / 踩坑提醒
+`HANDOFF.md`（根目錄）是所有 agent 的共同交接文件。更新規則見 `CLAUDE.md`「Multi-Agent 協作協議」（Claude 維護）與 `AGENTS.md`／`.cursorrules`（執行端寫 `handoffs/<YYYYMMDD>-<task-id>.md`，不改根 `HANDOFF.md`）。
 
 ---
 
@@ -21,9 +15,9 @@
 ```bash
 python run_api.py                    # 啟動後端
 cd frontend && npm run dev           # 啟動前端
-pytest tests/ -q                     # 跑測試
+pytest tests/ -q                     # 跑全部測試（含 tests/governance ⇒ 小時級，一律丟背景；平時只跑受影響模組）
 pytest --cov=momentum                # 覆蓋率
-./scripts/check_decoupling_phase4.sh # 解耦驗證
+./scripts/check_decoupling_phase4.sh # 窄版解耦驗證（只查 R1/R2/R3/R6；見 CLAUDE.md Gotchas）
 black . && isort .                   # 格式化
 ```
 
