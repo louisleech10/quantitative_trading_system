@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>測試加速票：要不要繼續做？</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">測試加速票裁定.md</span></nav>
+<main>
+<h1 id="測試加速票要不要繼續做">測試加速票：要不要繼續做？</h1>
+<blockquote>
+<p>2026-09-29。三家委員（Codex、Composer、Grok）審完規格，全部打回，共 19 條問題。這頁說明內容，請你決定方向。</p>
+</blockquote>
+<h2 id="這張票要解決什麼">這張票要解決什麼</h2>
+<p>每改一次程式，驗收測試就要重跑好幾個小時。其中很多時間花在<strong>重複生成同樣的特徵</strong>：不同測試用同一份資料、同一組設定，卻各自從頭算一次。</p>
+<h2 id="原本提的四個做法與委員結論">原本提的四個做法與委員結論</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>做法</th>
+<th>白話說明</th>
+<th>委員結論</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 結果共用</td>
+<td>同樣的資料＋設定＋程式版本，第一次算完存起來，之後的測試直接拿來用</td>
+<td>❌ 很難做安全（見下）</td>
+</tr>
+<tr>
+<td>② 只重跑失敗的測試</td>
+<td>修完只重跑剛才失敗的和受影響的，不整批重跑</td>
+<td>⚠️ 「受影響」很難判斷準確，漏判會少跑該跑的測試</td>
+</tr>
+<tr>
+<td>③ 收尾一定完整重跑</td>
+<td>提交前強制完整跑一次，保證品質</td>
+<td>⚠️ 現有提交檢查有「跳過開關」可繞過，要一併處理</td>
+</tr>
+<tr>
+<td>④ 精簡版設定</td>
+<td>日常用縮小的設定，跑得快</td>
+<td>❌ 已刪除：很多問題只在大規模或特定情況才出現，精簡版抓不到</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="①-為什麼難做安全">① 為什麼難做安全</h2>
+<ul>
+<li>有些測試會<strong>刻意把程式改壞</strong>，確認系統抓得到錯（叫「破壞測試」）。如果它拿到「正常程式」存下的結果，就不會失敗，變成<strong>假通過</strong>。</li>
+<li>委員發現現有的幾種判斷方法<strong>都有漏網</strong>：程式被改動的方式太多種（直接換掉函式、改外部套件、改輸出檔案）。</li>
+<li>共用結果會把第一個測試的檔案位置、狀態帶給下一個測試，可能互相干擾。</li>
+<li>一旦出錯，<strong>測試結果就不可信</strong>，比測試慢更糟。</li>
+</ul>
+<h2 id="可以選的方向">可以選的方向</h2>
+<p><strong>A. 暫停整張票</strong></p>
+<ul>
+<li>不做加速，專心主線。驗收時間維持現狀。</li>
+<li>縮短時間只靠改正做法（除錯用小測試），以及日後換機器。</li>
+<li>花費：0。</li>
+</ul>
+<p><strong>B. 只做零風險的部分（建議）</strong></p>
+<ol>
+<li>使用測試工具<strong>內建的「先重跑上次失敗的測試」</strong>。業界標準功能，不用開發，不影響正確性；修完後先看到之前失敗的有沒有過，不必等整批。</li>
+<li>今晚第 4 批收尾驗收本來就要跑，趁那次<strong>精確量出「真正重複的生成」佔多少時間</strong>。</li>
+<li>重複佔比大（例如超過三成）才帶數字問你要不要花力氣解決①的安全問題；比例小就直接結案。</li>
+</ol>
+<ul>
+<li>花費：幾乎為 0，不再占用委員審查時間。</li>
+</ul>
+<p><strong>C. 現在繼續完整設計</strong></p>
+<ul>
+<li>逐條解決委員的 19 條問題。估計還要好幾輪審查、至少一兩天，而且不確定能不能做到安全。</li>
+<li>風險：可能又是一件「花很多時間卻做不完」的事。</li>
+</ul>
+<h2 id="建議">建議</h2>
+<p><strong>B</strong>：先用數據確認值不值得，再決定要不要投入。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/測試加速票裁定.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
