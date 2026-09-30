@@ -15,7 +15,8 @@
     "tests/feature_engineering/test_ffstat_apply_to.py",
     "tests/feature_engineering/test_ffstat_golden.py",
     "tests/feature_engineering/test_ffstat_stable_start.py",
-    "tests/feature_engineering/test_ffstat_warmup_table.py"
+    "tests/feature_engineering/test_ffstat_warmup_table.py",
+    "tests/feature_engineering/test_warmup_verify_guards.py"
   ],
   "script_acceptance": [
     "handoffs/run_receipts/ffstat_probes/freeze_baseline.py",
@@ -134,7 +135,7 @@
       "docs/FFNAME_SPEC.md",
       "docs/FFDSTAR_SPEC.md"
     ],
-    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_ffstat_layer.py tests/feature_engineering/test_ffstat_all_tested.py tests/feature_engineering/test_ffstat_calibration.py tests/feature_engineering/test_ffstat_dstar_failure.py tests/feature_engineering/test_ffstat_apply_to.py tests/feature_engineering/test_ffstat_golden.py tests/feature_engineering/test_ffstat_stable_start.py tests/feature_engineering/test_ffstat_warmup_table.py",
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_ffstat_layer.py tests/feature_engineering/test_ffstat_all_tested.py tests/feature_engineering/test_ffstat_calibration.py tests/feature_engineering/test_ffstat_dstar_failure.py tests/feature_engineering/test_ffstat_apply_to.py tests/feature_engineering/test_ffstat_golden.py tests/feature_engineering/test_ffstat_stable_start.py tests/feature_engineering/test_ffstat_warmup_table.py tests/feature_engineering/test_warmup_verify_guards.py",
     "forbidden": [
       {
         "rule": "名稱不得參與任何平穩化判定（免檢、fracdiff 目標層、ADF 差分候選）",
