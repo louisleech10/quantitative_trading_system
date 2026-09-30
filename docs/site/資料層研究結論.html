@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>特徵「一次算完存起來」：研究結論</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">資料層研究結論.md</span></nav>
+<main>
+<h1 id="特徵一次算完存起來研究結論">特徵「一次算完存起來」：研究結論</h1>
+<blockquote>
+<p>2026-09-30。你裁定延續業界做法：特徵從最早的資料一次算好存著，後續重複使用；新指標只增算、新 K 線接著算；研究現在做，施工排在 FF-STAT 第 4 批之後。三家委員（Codex、Composer、Grok）和我各自研究完了。這頁是結論。<strong>現在不需要你決定任何事</strong>，施工前寫好規格會再請你逐條審。</p>
+</blockquote>
+<h2 id="一方向大家一致">一、方向：大家一致</h2>
+<ul>
+<li><strong>底層用 Parquet 檔案，讀寫規則自己定。</strong> 專案現在就用 Parquet 和 Polars，不用多裝東西。</li>
+<li><strong>不直接綁現成平台</strong>：
+<ul>
+<li><strong>Qlib</strong>（微軟，免費）：它的整套儲存和計算方式跟我們的系統差很多，綁上去要大改，只<strong>參考它的設計</strong>。</li>
+<li><strong>ArcticDB</strong>：正式使用要付費授權，不採用。</li>
+<li><strong>talipp</strong>（能接著算的指標庫）：算出來的值不一定跟 TA-Lib 一樣，沒驗證過不能用。</li>
+</ul>
+</li>
+</ul>
+<h2 id="二委員補抓到我漏掉的六件事">二、委員補抓到我漏掉的六件事</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>問題</th>
+<th>白話</th>
+<th>要怎麼處理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 特徵的「身分」會隨最後一根 K 線改變</td>
+<td>現在系統把「最後一根 K 線的時間」算進特徵的身分編號。每多一根 K 線就被當成全新的一批，只能整批重算</td>
+<td>拆成兩個編號：「算法身分」（指標、參數、程式版本）和「資料快照」（算到哪一根）。多了新 K 線只更新快照，不換身分</td>
+</tr>
+<tr>
+<td>2. 前處理的參數必須凍結</td>
+<td>縮尾範圍、分數差分的 d*、平穩化判定、剔除無效欄，這些是「看資料估出來的」。資料一變長就重估，已經存好的舊值會跟著變，還可能偷看到未來</td>
+<td>第一次估好就凍結、記錄下來；要重估就另存新版本，舊資料不動</td>
+</tr>
+<tr>
+<td>3. 加新指標會影響「跨欄」的東西</td>
+<td>有些特徵是多個指標組合出來的（共識類），剔除無效欄的名單也是整批一起判斷。加新欄可能動到這些</td>
+<td>這三類要各自記版本，只重算真正受影響的那幾欄</td>
+</tr>
+<tr>
+<td>4. 有些指標不能「接著算」</td>
+<td>SAR（拋物線轉向）、OBV（累計量）這類會一路累積的指標，從中間接著算，值就是不一樣（委員實測 SAR 差了 1.79）</td>
+<td>列出這類指標的固定清單；要嘛整段重算，要嘛保存完整狀態並驗證一致；沒有方法就擋下</td>
+</tr>
+<tr>
+<td>5. 交易日曆</td>
+<td>加密貨幣 24 小時，台股、美股有休市，期貨有換月。「接下一根」要看交易日曆，不能假設時間連續</td>
+<td>交易日曆和合約身分要記在資料裡；缺日曆就擋下</td>
+</tr>
+<tr>
+<td>6. 下游讀資料的方式不一致</td>
+<td>IC 分析、模型訓練、SHAP 解釋等，現在各自從「每次生成的資料夾」裡讀不同的檔案和紀錄</td>
+<td>先做一個統一的讀取介面，並保留每批資料的完整身分紀錄，再逐一把下游改成走這個介面</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="三預熱期在新做法下怎麼處理">三、預熱期在新做法下怎麼處理</h2>
+<ul>
+<li><strong>標的最前面</strong>：照預熱表丟掉前段，保證留下的第一根誤差在 0.5% 以內。這就是現在第 4 批在驗的東西。</li>
+<li><strong>新 K 線接著算</strong>：一般遞迴指標（RSI、EMA 這類）往回多抓一段重算尾巴，並檢查和已存的值一致；不一致就整欄重算。</li>
+<li><strong>會累積的指標</strong>（SAR、OBV）：見上表第 4 項。</li>
+<li><strong>往前補更早的歷史</strong>：視為新版本，受影響的欄位重算。</li>
+</ul>
+<h2 id="四施工分段第-4-批之後">四、施工分段（第 4 批之後）</h2>
+<ol>
+<li><strong>特徵工廠寫入新儲存＋統一讀取介面</strong>：舊的每批資料夾保留，不搬移。</li>
+<li><strong>IC 分析改走新介面</strong>。</li>
+<li><strong>機器學習、Optuna、回測</strong>：輪到它們的票時接上，照同一套讀取規則。</li>
+</ol>
+<p>每一段都要：規格 → 委員審 → 你逐條審 → 施工 → 委員審程式碼。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/資料層研究結論.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
