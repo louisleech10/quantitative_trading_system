@@ -15,7 +15,8 @@ FF-STAT Task 2.4（docs/FFSTAT_SPEC.md v32–v45；R4、R5、R9）
   快取 ``data_cache/feature_klines_longhist``（真實 Binance 資料，不做連續性檢查）。
 - 誤差：評估窗（末 ``eval_window`` 根）內 max|test−gt| / max(P75|gt|, std(gt))；評估窗內 ground truth
   有限而 test 非有限 ⇒ inf（finite guard，v33）。整數輸出（CDL、HT_TRENDMODE）任一不符即不收斂。
-- 可信度：量得 K 須 ≤ eval_start/2（ground truth 自身前史 ≥ 2K），否則該筆記 ``reliable: false``、不入採用值。
+- 可信度：量得 K 須 ≤ eval_start/2（ground truth 自身前史 ≥ 2K），否則該筆記 ``reliable: false``；可信度只作證據欄，
+  採用值依 SPEC v47 取「已收斂」量測（含不可信者，其為實測下界）。
 - 採用值：有參數者 ``recommended_factor``＝各週期各標的可信量測之 K/max(period_keys 值) 之最大（無條件進位
   至 0.01、下限 1.0）；無參數者 ``k``＝可信量測之 K 最大；累積型（OBV、AD）登記而不給係數；由元件組成之
   自訂欄（Keltner＝EMA＋ATR 等）之係數不得低於其元件之採用係數。
@@ -422,7 +423,10 @@ def verify_exhaustive(case: Case, frame: pd.DataFrame, k: int, eval_window: int,
         if fails == 0 or k >= cap:
             break
         k = bump(k)
-    return {"k": k, "passed": rounds[-1]["fails"] == 0, "fast_path": fast is not None, "rounds": rounds}
+    # b4 審碼 r1 codex P1-01：可採起點集合為空（2K > n−評估窗）⇒ 零次檢查不得記為通過
+    no_starts = rounds[-1].get("starts", 0) == 0
+    return {"k": k, "passed": (not no_starts) and rounds[-1]["fails"] == 0, "no_admissible_starts": no_starts,
+            "fast_path": fast is not None, "rounds": rounds}
 
 
 def _measure_window(case: Case, frame: pd.DataFrame, eval_end: int, eval_window: int, threshold: float, cap: int,
@@ -756,8 +760,8 @@ def _series_rows(task: Tuple[Any, ...]) -> List[Dict[str, Any]]:
                 res["k_multi_window"] = res["k"]
                 res["k"] = int(ex["k"])
                 res["exhaustive"] = ex
-                if not ex["passed"]:
-                    res["converged"] = False
+                if not ex["passed"] and not ex.get("no_admissible_starts"):
+                    res["converged"] = False  # 起點集合為空者保留多窗之已收斂量測（v47），但不計窮舉通過
             rows.append({"indicator": entry.name, "symbol": sym, "timeframe": tf, "params": case.params,
                          "source": case.source, "period": period, **res,
                          "ratio": (res["k"] / period) if (res.get("k") and period) else None})
@@ -954,14 +958,18 @@ def _compact_row(r: Dict[str, Any]) -> Dict[str, Any]:
     out = {k: r.get(k) for k in keep if k in r}
     ex = r.get("exhaustive")
     if ex:
-        if ex.get("skipped"):
-            out["exhaustive"] = dict(ex)
+        if ex.get("skipped") or "rounds" not in ex:
+            out["exhaustive"] = dict(ex)  # 純窗口解析列或已精簡之列
         else:
             last = (ex.get("rounds") or [{}])[-1]
             out["exhaustive"] = {"k": ex.get("k"), "passed": ex.get("passed"), "fast_path": ex.get("fast_path"),
                                  "starts": last.get("starts"), "worst": last.get("worst"),
                                  "worst_start": last.get("worst_start"),
                                  "scan_fails": (ex.get("rounds") or [{}])[0].get("fails")}
+        # b4 審碼 r1 codex P1-01：舊收據中起點集合為空而記 passed 者一律改記 no_admissible_starts
+        if not out["exhaustive"].get("skipped") and out["exhaustive"].get("starts") == 0:
+            out["exhaustive"]["passed"] = False
+            out["exhaustive"]["no_admissible_starts"] = True
     return out
 
 
@@ -1016,6 +1024,7 @@ def coverage_meta(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     for r in rows:
         ex = r.get("exhaustive") or {}
         kind = ("window_only_analytic" if ex.get("skipped") == "window_only_analytic"
+                else "exhaustive_no_admissible_starts" if ex.get("no_admissible_starts") or ex.get("starts") == 0
                 else "exhaustive_passed" if ex.get("passed") else "exhaustive_failed" if ex else "multi_window_only")
         slot = counts.setdefault(r["timeframe"], {}).setdefault(r["symbol"], {})
         slot[kind] = slot.get(kind, 0) + 1
@@ -1176,9 +1185,11 @@ def main() -> int:
                                   args.merge_partial_timeframes or [])
         # v55（審查 r40 codex P1-03）：合併輸入須涵蓋 --symbols × --timeframes 之每一格且每個條目皆有列，否則 fail-closed
         catalog = build_catalog()
-        present = {(r["indicator"], r["timeframe"], r["symbol"]) for r in rows}
-        missing_slots = sorted(f"{e.name} {tf} {sym}" for e in catalog if e.cases for tf in args.timeframes
-                               for sym in args.symbols if (e.name, tf, sym) not in present)
+        # b4 審碼 r1 codex P1-02：逐 catalog case 之完整鍵（指標、參數、來源）× 週期 × 標的比對，缺任一 case 即 fail-closed
+        present = {(_row_key(r["indicator"], r["params"], r["source"]), r["timeframe"], r["symbol"]) for r in rows}
+        missing_slots = sorted(f"{e.name} {c.params} {c.source} {tf} {sym}" for e in catalog for c in e.cases
+                               for tf in args.timeframes for sym in args.symbols
+                               if (_row_key(e.name, c.params, c.source), tf, sym) not in present)
         if missing_slots:
             print(f"[FINAL] MERGE_COVERAGE_MISSING {len(missing_slots)} 格：{missing_slots[:20]}；未寫表", flush=True)
             abort_receipt(5, "merge_coverage_missing", {"missing": missing_slots})

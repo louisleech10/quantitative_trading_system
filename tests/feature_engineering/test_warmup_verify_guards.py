@@ -115,3 +115,30 @@ def test_merge_fails_closed_on_missing_symbol_timeframe(tmp_path: Path) -> None:
     assert not (tmp_path / "m.yaml").exists()
     doc = json.loads((tmp_path / "m.json").read_text(encoding="utf-8"))
     assert doc["abort"] == "merge_coverage_missing" and all("ETHUSDT" in m for m in doc["missing"])
+
+
+def test_empty_admissible_starts_not_reported_as_passed() -> None:
+    """b4 審碼 r1 codex P1-01：可採起點集合為空（2K > n−評估窗）⇒ passed=False、no_admissible_starts=True（零次檢查不得記通過）。"""
+    sys.path.insert(0, str(ROOT))
+    import scripts.verify_l1_warmup_requirements as v
+
+    entry = next(e for e in v.build_catalog() if e.name == "RSI")
+    frame = v.load_frame("BTCUSDT", "1d")
+    k = (len(frame) - 1000) // 2 + 10
+    ex = v.verify_exhaustive(entry.cases[0], frame, k, 1000, 0.005, 4000)
+    assert ex["rounds"][-1]["starts"] == 0
+    assert ex["passed"] is False and ex["no_admissible_starts"] is True
+
+
+@pytest.mark.skipif(not RECEIPT.exists(), reason="需要倍數量測收據")
+def test_merge_fails_closed_on_missing_parameter_case(tmp_path: Path) -> None:
+    """b4 審碼 r1 codex P1-02：同一指標缺某一參數 case（TR_CVAR alpha=0.05）⇒ exit 5，不以「指標有列」放行。"""
+    rows = [r for r in json.loads(RECEIPT.read_text(encoding="utf-8"))["rows"]
+            if r["timeframe"] == "1d" and r["symbol"] == "BTCUSDT"
+            and not (r["indicator"] == "TR_CVAR" and float((r.get("params") or {}).get("alpha", 0)) == 0.05)]
+    a = tmp_path / "a.json"
+    a.write_text(json.dumps({"rows": rows}), encoding="utf-8")
+    proc = _merge(tmp_path, "m", [a], "--symbols", "BTCUSDT")
+    assert proc.returncode == 5, proc.stdout[-800:]
+    doc = json.loads((tmp_path / "m.json").read_text(encoding="utf-8"))
+    assert doc["missing"] and all("TR_CVAR" in m and "0.05" in m for m in doc["missing"])
