@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "source": "FFSTAT_GEN_LOG of FF-STAT b4 acceptance suite 2026-09-30 (17 test files, 16008s)",
+  "suite_seconds": 16008,
+  "calls": 127,
+  "gen_seconds_total": 14648.569999999994,
+  "mutant_calls": 52,
+  "clean_calls": 75,
+  "dup_seconds_clean": 1478.77,
+  "threshold_ratio": 0.30,
+  "dup_ratio_of_suite": 0.09237693653173414,
+  "decision": "close: below threshold"
+}
