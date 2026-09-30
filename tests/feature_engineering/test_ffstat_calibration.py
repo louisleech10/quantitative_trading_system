@@ -10,7 +10,8 @@ import hashlib
 import inspect
 import struct
 from pathlib import Path
-from typing import Any, Dict
+from types import SimpleNamespace
+from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
@@ -26,6 +27,7 @@ from momentum.FeatureEngineering.preprocessing.calibration import (
 from tests.feature_engineering import ffstat_helpers as h
 
 CONTRACT = h.CONTRACT
+REPO = Path(__file__).resolve().parents[2]
 OUT_START = pd.Timestamp(h.WINDOW[0], tz="UTC")
 
 
@@ -152,24 +154,6 @@ def test_calibration_ingest_start_counts_actual_rows_across_gap() -> None:
     assert int(((idx >= start) & (idx < out_start)).sum()) == 300
 
 
-def test_resolve_effective_output_start_exact_depth_rows_before() -> None:
-    """Task 2.3 驗證：有效起始日之前恰有 depth 根（0 起算之索引 depth），並對齊主週期 index。"""
-    idx_1h = h.kline_frame(timeframe="1h").index
-    eff = cal.resolve_effective_output_start({"1h": idx_1h}, {"1h": 700}, idx_1h)
-    assert eff == idx_1h[700]
-    assert int((idx_1h < eff).sum()) == 700
-
-
-def test_boundary_10_effective_start_takes_latest_timeframe() -> None:
-    """Task 2.3 邊界①：多週期時取各週期推算值之最晚者（較短歷史之週期決定起點），再對齊主週期 index。"""
-    idx_1h = h.kline_frame(timeframe="1h").index
-    idx_12h = h.kline_frame(timeframe="12h").index
-    eff = cal.resolve_effective_output_start({"1h": idx_1h, "12h": idx_12h}, {"1h": 700, "12h": 700}, idx_1h)
-    assert eff >= idx_12h[700] and eff >= idx_1h[700]
-    assert eff in set(idx_1h)
-    assert int((idx_12h < eff).sum()) >= 700 and int((idx_1h < eff).sum()) >= 700
-
-
 def _with_values(pkt: CalibrationPacket, values: Dict[str, Any], last_ts: Dict[str, Any] = None) -> CalibrationPacket:
     return CalibrationPacket(key=pkt.key, values=values,
                              last_calibration_ts=pkt.last_calibration_ts if last_ts is None else last_ts,
@@ -232,36 +216,26 @@ def test_verify_packet_accepts_exact_packet() -> None:
     cal.verify_packet(_packet(), _expected_key(), ["close_1h_x"])
 
 
-def test_resolve_effective_output_start_rejects_mixed_timezone() -> None:
-    """b3 審碼 r1 codex P2-03：主週期與 K 線 index 時區狀態不一（有 tz／無 tz）⇒ CalibrationError(field=timezone)。"""
-    idx_1h = h.kline_frame(timeframe="1h").index
-    naive = idx_1h.tz_localize(None) if idx_1h.tz is not None else idx_1h
-    aware = naive.tz_localize("UTC")
-    for klines, primary in ((aware, naive), (naive, aware)):
-        with pytest.raises(CalibrationError) as err:
-            cal.resolve_effective_output_start({"1h": klines}, {"1h": 700}, primary)
-        assert err.value.field == "timezone"
-    assert cal.resolve_effective_output_start({"1h": naive}, {"1h": 700}, naive) == naive[700]
-
-
 def test_warmup_converts_each_native_n_to_primary_bars() -> None:
-    """b3 審碼 r1 codex P1-01：warmup 之 N 逐原生週期換成主週期根數＝ceil(N_tf × 週期秒 ÷ 主週期秒)。
-    主 1h、訓練 [1h,12h]、calibration_bars=20、12h 分設 2000 ⇒ 12h 前史 2000 根＝24000 根 1h。"""
+    """b3 審碼 r1 codex P1-01（v32 改寫）：原意「warmup 之 N 逐原生週期換成主週期根數」隨 v32 校準資料域獨立而改——
+    公開域預熱 D₀（`estimate_max_warmup_bars`）不含 N（校準另於各原生週期以「該週期 warmup＋該週期 N」原生根數取前史，
+    `FeatureFactory._calibrate_timeframe`）⇒ 各週期 N 之設定不改變 D₀；且 D₀ 仍逐原生週期換算為主週期根數取最大。"""
     from momentum.factories import create_feature_factory
     from momentum.FeatureEngineering.warmup_window import estimate_max_warmup_bars
 
     factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
 
-    def warmup(by_tf: Dict[str, int]) -> int:
-        payload = h.stat_payload(["1h", "12h"])
+    def warmup(by_tf: Dict[str, int], training: List[str]) -> int:
+        payload = h.stat_payload(training)
         payload["preprocessing"]["calibration_bars"] = 20
         payload["preprocessing"]["calibration_bars_by_timeframe"] = by_tf
-        return estimate_max_warmup_bars(factory._resolve_config(payload), "1h", ["1h", "12h"])
+        return estimate_max_warmup_bars(factory._resolve_config(payload), "1h", training)
 
-    base = warmup({})
-    assert base >= 20 * 12  # 12h 之 N=20 ＝ 240 根 1h
-    assert warmup({"12h": 2000}) == max(base, 24000)
-    assert warmup({"1h": 2000}) == max(base, 2000)
+    base = warmup({}, ["1h", "12h"])
+    assert warmup({"12h": 2000}, ["1h", "12h"]) == base
+    assert warmup({"1h": 2000}, ["1h", "12h"]) == base
+    # 12h 原生鏈換成 1h 根數後大於 1h 自身鏈 ⇒ 多週期 D₀ 大於單 1h
+    assert base > warmup({}, ["1h"])
 
 
 def test_seams_exist_for_injection() -> None:
@@ -284,6 +258,13 @@ def test_l0_and_calibration_boundaries_share_utc(tz: Any, tmp_path: Path, monkey
     frame.index = utc.tz_localize(None) if tz is None else utc.tz_convert(tz)
 
     class _Registry:
+        # b4 v52：L0 對每個已註冊 adapter 查 `.market` 是否在倍數表量測範圍（本測試資料為真實 BTC ⇒ crypto）
+        def list_all(self) -> List[str]:
+            return ["binance"]
+
+        def get(self, name: str) -> Any:
+            return SimpleNamespace(market="crypto")
+
         def fetch_aligned(self, symbol: str, timeframe: str, sources: Any) -> pd.DataFrame:
             return frame.copy()
 
@@ -336,7 +317,7 @@ def test_calibration_domain_input_bounded_before_output_start(tmp_path: Path, mo
     available = int((to_dt(reads[0]) < OUT_START).sum())
     assert available == len(reads[0]), "讀取入口回傳含輸出起始日（含）之後之列"
     n = int(config.preprocessing.calibration_bars_by_timeframe.get(h.PRIMARY_TF, config.preprocessing.calibration_bars))
-    depth = estimate_max_warmup_bars(config, h.PRIMARY_TF, [h.PRIMARY_TF]) + n + cal.CALIBRATION_FIRST_VALID_DELAY_BARS
+    depth = estimate_max_warmup_bars(config, h.PRIMARY_TF, [h.PRIMARY_TF]) + n  # v32：延遲常數已刪
     assert depth < available, "前提：前史長於深度，截取確有作用"
     for k, idx in enumerate(inputs):
         assert to_dt(idx).max() < OUT_START, k
@@ -520,7 +501,8 @@ def test_three_entries_same_decisions(tmp_path: Path, monkeypatch: pytest.Monkey
     # run_ic_first 沿用同一 factory 於 generate_features 所設之輸出窗（比照 test_b6_warmup_trim 之用法），走自算路徑
     ic = h.ic_first_to_l65(factory, factory._resolve_config(h.stat_payload()),
                            ic_engine=ICEngine({"methods": ["spearman"]}), feature_reader=FeatureReader(str(root)),
-                           storage=factory._storage, ic_threshold=0.0, persist=True)
+                           storage=factory._storage, ic_threshold=0.0, persist=True,
+                           start_date=h.WINDOW[0], end_date=h.WINDOW[1])  # v29：平穩化開啟須自帶起訖
     i = getattr(factory, attr)
     assert i, "run_ic_first 未產生平穩化決策"
     if ic is not None:
@@ -556,11 +538,10 @@ def _fail_second_tf_compute(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cal, "compute_calibration_domain", _mutant)
 
 
-@pytest.mark.parametrize("path_env", [
-    {"FFACT_USE_CGSA": "0"},
+@pytest.mark.parametrize("path_env", [  # frame 臂移除：使用者 2026-09-28 裁定刪除 frame（RM-FRAMEPATH）
     {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
     {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
-], ids=["frame", "cgsa_serial", "cgsa_parallel"])
+], ids=["cgsa_serial", "cgsa_parallel"])
 @pytest.mark.parametrize("injection", ["read", "compute"])
 def test_second_tf_calibration_failure_zero_writes(path_env: Dict[str, str], injection: str, tmp_path: Path,
                                                    monkeypatch: pytest.MonkeyPatch) -> None:
@@ -578,11 +559,10 @@ def test_second_tf_calibration_failure_zero_writes(path_env: Dict[str, str], inj
     assert after == before
 
 
-@pytest.mark.parametrize("path_env", [
-    {"FFACT_USE_CGSA": "0"},
+@pytest.mark.parametrize("path_env", [  # frame 臂移除：使用者 2026-09-28 裁定刪除 frame（RM-FRAMEPATH）
     {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
     {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
-], ids=["frame", "cgsa_serial", "cgsa_parallel"])
+], ids=["cgsa_serial", "cgsa_parallel"])
 def test_second_tf_insufficient_history_column_skipped(path_env: Dict[str, str], tmp_path: Path,
                                                        monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 驗證（v19，使用者 2026-09-26 裁定）：第二原生週期（12h）前史有效值不足 N 之欄 ⇒ 生成完成；
@@ -590,9 +570,10 @@ def test_second_tf_insufficient_history_column_skipped(path_env: Dict[str, str],
     品質 `partial` 且 `failure_reasons` 含該事件；1h 欄照常以 N 個前史有效值檢定（mutant ⑦¹³ 之靶）。"""
     event = h.EVENTS["calibration_insufficient"]
     h.prepare_stat_env(monkeypatch, tmp_path, **path_env)
-    # 12h 真實 kline 始於 2024-01-01 ⇒ 2024-02-01 前僅約 62 根，所有有值之 12h 欄皆不足 N=500；1h 約 744 根
-    _, _, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]), start_date="2024-02-01",
-                              end_date="2024-03-31")
+    # 12h 真實 kline 始於 2024-01-01 ⇒ 2024-03-15 前僅約 148 根，所有有值之 12h 欄皆不足 N=500；1h 約 1,776 根
+    # （b4 後 1h 快欄亦須扣 L1 遮罩與縮尾完整窗 251 根：原 2024-02-01 之 744 根下 1h 亦全不足 ⇒ 起始日改 2024-03-15）
+    _, _, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]), start_date="2024-03-15",
+                              end_date="2024-04-30")
     dec = h.decisions(result)
     short = {c: d for c, d in dec.items() if event in d["events"]}
     # 12h 無任一欄可檢定；1h 之長週期欄（如首值約第 697 根之 TEMA_233）於 744 根前史內亦可能不足（主委實跑）
@@ -629,8 +610,11 @@ def _ic_first_kwargs(factory: Any, root: Path) -> Dict[str, Any]:
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
+    # v29：平穩化開啟時 run_ic_first 須自帶起訖（未帶 ⇒ CalibrationError(field=output_start)，會使本檔依賴
+    # 「其他原因之 CalibrationError」之測試假綠）
     return {"ic_engine": ICEngine({"methods": ["spearman"]}), "feature_reader": FeatureReader(str(root)),
-            "storage": factory._storage, "ic_threshold": 0.0, "persist": True}
+            "storage": factory._storage, "ic_threshold": 0.0, "persist": True,
+            "start_date": h.WINDOW[0], "end_date": h.WINDOW[1]}
 
 
 def test_ic_first_ignores_stale_cgsa_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -678,18 +662,23 @@ def test_ic_first_second_tf_failure_zero_writes(tmp_path: Path, monkeypatch: pyt
 
 def test_ic_first_supplied_layers_unchanged_when_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 驗證（r18 codex P1-01、r19 codex P1-01）：平穩化關閉時 run_ic_first 自帶 raw_data／layers 不被
-    FF-STAT 拒收，且其 L6.5 產物（經 `write_raw` 於 IC 階段前落盤之 L7 raw）與改前凍結之 `ic_first_supplied_off`
-    基準逐欄四 hash 全等——舊行為不變。IC 階段之既有 `AlignmentViolationError`（另立票，見
-    `ffstat_helpers.ic_first_to_l65`）只在 L7 raw 已落盤後容許；未過 L6.5 即失敗或拋 `CalibrationError` ⇒ 紅。"""
+    FF-STAT 拒收，且其 L6.5 產物（經 `write_raw` 於 IC 階段前落盤之 L7 raw）與同設定、同輸出窗而不帶自帶層之自算
+    路徑逐欄四 hash 全等（v49：原對改前凍結 `ic_first_supplied_off` 基準之逐位元組比對，隨 v32 R1 預熱恆開——有起始日時
+    值不再與改前逐位元組相同〔§G ②〕——改以自算路徑為對照；欄集合仍須等於改前基準）。IC 階段之既有
+    `AlignmentViolationError`（另立票，見 `ffstat_helpers.ic_first_to_l65`）只在 L7 raw 已落盤後容許；未過 L6.5 即
+    失敗或拋 `CalibrationError` ⇒ 紅。"""
     import json as _json
 
     baseline = _json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))["ic_first_supplied_off"]
-    h.prepare_stat_env(monkeypatch, tmp_path, **h.IC_FIRST_OFF_ENV)
-    result, raw_fp = h.ic_first_supplied_off(tmp_path)
+    h.prepare_stat_env(monkeypatch, tmp_path / "supplied", **h.IC_FIRST_OFF_ENV)
+    result, raw_fp = h.ic_first_supplied_off(tmp_path / "supplied")
+    h.prepare_stat_env(monkeypatch, tmp_path / "self", **h.IC_FIRST_OFF_ENV)
+    _, self_fp = h.ic_first_supplied_off(tmp_path / "self", supplied=False)
     assert raw_fp, "未見 L7 raw 產物"
-    assert set(raw_fp) == set(baseline)
-    diff = [c for c in baseline if raw_fp[c] != baseline[c]]
+    assert set(raw_fp) == set(self_fp)
+    diff = [c for c in self_fp if raw_fp[c] != self_fp[c]]
     assert diff == [], diff[:5]
+    assert set(raw_fp) == set(baseline), sorted(set(raw_fp) ^ set(baseline))[:5]  # IC-first raw 欄集合不變（實跑）
     if result is not None:
         assert list(result.metadata["feature_names"])
 
@@ -720,84 +709,6 @@ def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pyt
     with pytest.raises(CalibrationError):
         h.run_stat(tmp_path, h.stat_payload(["1h", "12h"]), force_regenerate=False)
     assert h.snapshot_tree(tmp_path) == before
-
-
-def test_auto_start_reserves_calibration_segment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 驗證：不帶 start_date、開平穩化 ⇒ 公開第一列＝有效起始日（已對齊主週期）、每欄校準早於它、
-    來源為 auto_reserved_calibration；同一有效起始日以 start_date 明示重跑，決策與 d 全同。"""
-    import json as _json
-
-    h.prepare_stat_env(monkeypatch, tmp_path / "auto")
-    root, _, auto = h.run_stat(tmp_path / "auto", h.stat_payload(["1h", "12h"]), start_date=None,
-                               end_date="2024-04-30")
-    meta = auto.metadata
-    eff = pd.Timestamp(meta[h.META["effective_output_start"]])
-    assert meta[h.META["output_start_source"]] == "auto_reserved_calibration"
-    manifest = _json.loads(Path(meta["manifest_path"]).read_text(encoding="utf-8"))
-    assert manifest[h.META["output_start_source"]] == "auto_reserved_calibration"
-    assert pd.Timestamp(manifest[h.META["effective_output_start"]]) == eff
-    assert eff in set(h.kline_frame().index)
-    # 落盤公開欄之第一列＝有效起始日（r18 codex P1-03）
-    assert h.first_output_timestamp(root) == eff
-    # 各原生週期於有效起始日之前之實際 K 線列數 ≥ N（前史深度含 N；依列計數）
-    n = CONTRACT["calibration_n_default"]
-    for tf in ("1h", "12h"):
-        idx = h.kline_frame(timeframe=tf).index
-        assert int((idx < eff).sum()) >= n, tf
-    for col, d in h.decisions(auto).items():
-        assert pd.Timestamp(d["calibration_end"]) < eff, col
-    h.prepare_stat_env(monkeypatch, tmp_path / "explicit")
-    root_x, _, explicit = h.run_stat(tmp_path / "explicit", h.stat_payload(["1h", "12h"]),
-                                     start_date=eff.isoformat(), end_date="2024-04-30")
-    assert h.decisions(explicit) == h.decisions(auto)
-    assert explicit.metadata[h.META["output_start_source"]] == "user"
-    # 公開輸出全同（r19 codex P1-02）：基礎欄逐欄四 hash、衍生欄逐欄值 hash
-    auto_base, explicit_base = h.base_fingerprints(root), h.base_fingerprints(root_x)
-    assert auto_base and set(auto_base) == set(explicit_base)
-    assert [c for c in auto_base if auto_base[c] != explicit_base[c]] == []
-    assert h.derived_fingerprints(root) == h.derived_fingerprints(root_x)
-
-
-def test_auto_start_cache_does_not_skip_preflight(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 驗證（r15）：先以同設定 start_date=None、平穩化關閉跑一次留下快取，再開平穩化重跑 ⇒
-    不命中舊結果、前置關卡確有執行（mutant ⑦¹² 之靶）。"""
-    h.prepare_stat_env(monkeypatch, tmp_path)
-    h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=None, end_date="2024-04-30",
-               force_regenerate=False)
-    calls: list = []
-    real = FeatureFactory.run_calibration_preflight
-
-    def _spy(self, *a, **k):
-        calls.append(1)
-        return real(self, *a, **k)
-
-    monkeypatch.setattr(FeatureFactory, "run_calibration_preflight", _spy)
-    _, _, result = h.run_stat(tmp_path, h.stat_payload(), start_date=None, end_date="2024-04-30",
-                              force_regenerate=False)
-    assert calls and result.metadata[h.META["output_start_source"]] == "auto_reserved_calibration"
-
-
-def test_auto_start_off_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 驗證：平穩化關閉、不帶 start_date ⇒ 基礎欄與改前凍結之 `auto_off` 基準逐欄四 hash 全等
-    （行為與改前逐位元組相同；r18 codex P1-03）。"""
-    import json as _json
-
-    from tests.feature_engineering.test_ffstat_golden import base_fingerprints
-
-    baseline = _json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))["auto_off"]
-    h.prepare_stat_env(monkeypatch, tmp_path)
-    root, _, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=None,
-                                 end_date=baseline["end_date"])
-    assert base_fingerprints(root) == baseline["base"]
-    assert result.metadata.get(h.META["output_start_source"]) is None
-
-
-def test_auto_start_history_too_short_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 驗證：可用歷史短於前史深度（結束日早於有效起始日）⇒ CalibrationError 指名缺少根數。"""
-    h.prepare_stat_env(monkeypatch, tmp_path)
-    with pytest.raises(CalibrationError) as err:
-        h.run_stat(tmp_path, h.stat_payload(), start_date=None, end_date="2024-01-10")
-    assert any(ch.isdigit() for ch in str(err.value))
 
 
 # ---------------------------------------------------------------- 邊界（Task 2.1）
@@ -883,12 +794,16 @@ def test_boundary_08_default_runs_no_column_short(symbol: str, timeframe: str, t
     """Task 2.1 邊界④：預設設定之 3 標的 × 2 週期真實輕量 run 無欄因前史不足而失敗（驗首個有效值延遲常數）。
     窗 2026-03-01～04-27（b3b 改；原 2025-06-01～07-31：真實 kline 12h 始於 2024-01，其前僅 1034 根，
     MIDPRICE_89_Std_W5 等稀疏欄前史有效值不足 N=500 ⇒ 該欄未平穩化（v19；原為 fail-closed）；主委實跑 BTC、BCH 各 6 欄、ETH 亦有，
-    本窗 BTC、BCH 皆 0 欄）。"""
+    本窗 BTC、BCH 皆 0 欄）。
+    b4（R1 預熱恆開、逐欄穩定點）後，12h 慢欄（DEMA／TEMA_233 之 Cross 等）穩定點延後，`kline_cache.h5` 之 12h
+    （2024-01 起、起始日前約 1,580 根）湊不滿 N ⇒ 12h 改讀長歷史快取（契約 `longhist_cache_dir`；BTC／ETH 2017 起、
+    BCH 2019-11 起，承 R8「資料不足以下載模組抓真實資料驗證」；BCH 收據 handoffs/run_receipts/20260928-ffstat-longhist-bch-download.log）。"""
     from momentum.factories import create_feature_factory
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
     h.prepare_stat_env(monkeypatch, tmp_path)
-    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    kline_dir = str(REPO / CONTRACT["longhist_cache_dir"]) if timeframe == "12h" else h.KLINE_DIR
+    factory = create_feature_factory(cache_dir=kline_dir, validate_continuity=False)
     factory._storage = FeatureStorage(str(tmp_path / "features"))
     payload = h.stat_payload([timeframe])
     payload["timeframes"]["primary"] = timeframe
@@ -1108,8 +1023,3 @@ def test_mutation_values_before_shrinks_window_is_caught(monkeypatch: pytest.Mon
         test_calibration_values_before_insufficient_raises_with_shortfall()
 
 
-def test_mutation_effective_start_not_reserved_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
-    """§V mutant ⑦¹¹：未填起始日時不預留（有效起始日＝第一根）⇒ 深度測試必紅。"""
-    monkeypatch.setattr(cal, "resolve_effective_output_start", lambda idx, depth, primary: primary[0])
-    with pytest.raises(AssertionError):
-        test_resolve_effective_output_start_exact_depth_rows_before()

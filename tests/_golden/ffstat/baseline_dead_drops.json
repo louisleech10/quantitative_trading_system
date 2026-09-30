@@ -1,0 +1,501 @@
+{
+ "commit": "5a148b8e8ad8cb281fd1f827b0cde8540423469d",
+ "symbol": "BTCUSDT",
+ "timeframe": "1h",
+ "window": [
+  "2026-01-01",
+  "2026-01-31"
+ ],
+ "payload": "tests/feature_engineering/ffstat_helpers.stat_payload()",
+ "quality_status": "complete",
+ "l3_dead_drops": {
+  "close_trend_T3_144_Kurt_W13": {
+   "low_cardinality_skip": true,
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Kurt_W5": {
+   "low_cardinality_skip": true,
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Max_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Max_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Mean_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Mean_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Min_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Min_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Range_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Range_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Rank_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Rank_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Skew_W13": {
+   "low_cardinality_skip": true,
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Skew_W5": {
+   "low_cardinality_skip": true,
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Slope_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Slope_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Std_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_Std_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_ZScore_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_144_ZScore_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Kurt_W13": {
+   "low_cardinality_skip": true,
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Kurt_W5": {
+   "low_cardinality_skip": true,
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Max_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Max_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Mean_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Mean_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Min_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Min_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Range_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Range_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Rank_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Rank_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Skew_W13": {
+   "low_cardinality_skip": true,
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Skew_W5": {
+   "low_cardinality_skip": true,
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Slope_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Slope_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Std_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_Std_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_ZScore_W13": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_T3_233_ZScore_W5": {
+   "rows": 721,
+   "leading_nan": 721,
+   "nan_rate": 1.0,
+   "valid": 0,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_TEMA_233_Kurt_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Kurt_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Max_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Max_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Mean_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Mean_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Min_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Min_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Range_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Range_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Rank_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_TEMA_233_Rank_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": true
+  },
+  "close_trend_TEMA_233_Skew_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Skew_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Slope_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Slope_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Std_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_Std_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_ZScore_W13": {
+   "rows": 721,
+   "leading_nan": 708,
+   "nan_rate": 0.9819694868238558,
+   "valid": 13,
+   "has_inf": false,
+   "constant": false
+  },
+  "close_trend_TEMA_233_ZScore_W5": {
+   "rows": 721,
+   "leading_nan": 700,
+   "nan_rate": 0.970873786407767,
+   "valid": 21,
+   "has_inf": false,
+   "constant": false
+  }
+ }
+}

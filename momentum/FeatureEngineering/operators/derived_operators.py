@@ -9,6 +9,7 @@ import pandas as pd
 
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.utils.numeric_guards import safe_denominator
+from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 
 
 logger = get_logger(__name__)
@@ -430,7 +431,11 @@ class DerivedOperatorEngine:
             mask = series == threshold
         else:
             mask = pd.Series(False, index=series.index)
-        return mask.astype(int)
+        # FFSTAT Task 2.3 第④類：NaN 比較為 False ⇒ 0；輸出於輸入首個有限值之前設 NaN（只遮開頭段）
+        return pd.Series(
+            _stable_mask.mask_pointwise_prefix(mask.astype(float).to_numpy(), [series.to_numpy(dtype=np.float64)]),
+            index=series.index,
+        )
 
     def ts_argmax(self, series: pd.Series, window: int) -> pd.Series:
         """Rolling window max position (0-based)."""

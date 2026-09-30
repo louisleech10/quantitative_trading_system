@@ -1,0 +1,144 @@
+{
+  "n": 500,
+  "records": {
+    "ADAUSDT_1h_baseline.json": {
+      "changed_leaves": 10,
+      "changed_columns": [
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_21"
+      ],
+      "aggregate_changed": [
+        "post_ic.sampled_value_hash",
+        "pre_ic.sampled_value_hash"
+      ],
+      "columns_with_nan_in_first_n": [
+        "L2_derived_close_return_1",
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_21",
+        "L2_derived_close_std_3",
+        "L2_derived_close_std_34",
+        "L2_derived_close_std_5",
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_8",
+        "L2_derived_close_std_89",
+        "L2_derived_volume_change_1"
+      ]
+    },
+    "ADAUSDT_4h_baseline.json": {
+      "changed_leaves": 8,
+      "changed_columns": [
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_89"
+      ],
+      "aggregate_changed": [
+        "pre_ic.nan_mask_hash",
+        "pre_ic.sampled_value_hash"
+      ],
+      "columns_with_nan_in_first_n": [
+        "L2_derived_close_return_1",
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_21",
+        "L2_derived_close_std_3",
+        "L2_derived_close_std_34",
+        "L2_derived_close_std_5",
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_8",
+        "L2_derived_close_std_89",
+        "L2_derived_volume_change_1"
+      ]
+    },
+    "BTCUSDT_1h_baseline.json": {
+      "changed_leaves": 19,
+      "changed_columns": [
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_34",
+        "L2_derived_close_std_5",
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_8"
+      ],
+      "aggregate_changed": [
+        "post_ic.sampled_value_hash",
+        "pre_ic.nan_mask_hash",
+        "pre_ic.sampled_value_hash"
+      ],
+      "columns_with_nan_in_first_n": [
+        "L2_derived_close_return_1",
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_21",
+        "L2_derived_close_std_3",
+        "L2_derived_close_std_34",
+        "L2_derived_close_std_5",
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_8",
+        "L2_derived_close_std_89",
+        "L2_derived_volume_change_1"
+      ]
+    },
+    "BTCUSDT_4h_baseline.json": {
+      "changed_leaves": 0,
+      "changed_columns": [],
+      "aggregate_changed": [],
+      "columns_with_nan_in_first_n": [
+        "L2_derived_close_return_1",
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_21",
+        "L2_derived_close_std_3",
+        "L2_derived_close_std_34",
+        "L2_derived_close_std_5",
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_8",
+        "L2_derived_close_std_89",
+        "L2_derived_volume_change_1"
+      ]
+    },
+    "ETHUSDT_1h_baseline.json": {
+      "changed_leaves": 22,
+      "changed_columns": [
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_21",
+        "L2_derived_close_std_3",
+        "L2_derived_close_std_34",
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_8"
+      ],
+      "aggregate_changed": [
+        "post_ic.sampled_value_hash",
+        "pre_ic.sampled_value_hash"
+      ],
+      "columns_with_nan_in_first_n": [
+        "L2_derived_close_return_1",
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_21",
+        "L2_derived_close_std_3",
+        "L2_derived_close_std_34",
+        "L2_derived_close_std_5",
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_8",
+        "L2_derived_close_std_89",
+        "L2_derived_volume_change_1"
+      ]
+    },
+    "ETHUSDT_4h_baseline.json": {
+      "changed_leaves": 3,
+      "changed_columns": [
+        "L2_derived_close_std_55"
+      ],
+      "aggregate_changed": [
+        "pre_ic.sampled_value_hash"
+      ],
+      "columns_with_nan_in_first_n": [
+        "L2_derived_close_return_1",
+        "L2_derived_close_std_13",
+        "L2_derived_close_std_21",
+        "L2_derived_close_std_3",
+        "L2_derived_close_std_34",
+        "L2_derived_close_std_5",
+        "L2_derived_close_std_55",
+        "L2_derived_close_std_8",
+        "L2_derived_close_std_89",
+        "L2_derived_volume_change_1"
+      ]
+    }
+  },
+  "violations": []
+}

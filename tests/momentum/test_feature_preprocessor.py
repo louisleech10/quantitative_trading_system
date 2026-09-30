@@ -194,6 +194,9 @@ def test_fracdiff_convergence_failure(monkeypatch: pytest.MonkeyPatch) -> None:
         {
             "causal_preprocessing": True,
             "calibration_bars": 30,  # FFSTAT b3b：單元測試 fixture 短，N 取 30（封包見下）
+            # FFSTAT v51：本測試之標的為 d* 搜尋失敗；縮尾預設開（窗 252）而 fixture 僅 160 列，R6 完整窗遮罩會使
+            # 全欄 NaN ⇒ 明示關縮尾以隔離標的（v51 修正縮尾開關於 legacy 路徑生效後方可關）
+            "winsorization": {"enabled": False},
             "fractional_differencing": {
                 "enabled": True,
                 "apply_to": ["L1_f2"],

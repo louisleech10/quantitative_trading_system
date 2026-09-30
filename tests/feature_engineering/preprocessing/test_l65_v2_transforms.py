@@ -152,6 +152,11 @@ def _expected_winsor_quantile(
     expected = selected.copy()
     valid = lowers.notna() & uppers.notna()
     expected = expected.where(~valid, expected.clip(lower=lowers, upper=uppers, axis=1))
+    # FFSTAT R6 甲（使用者 2026-09-27 裁定）：縮尾輸出自各欄首個有限值起 window−1 列（及其前）為 NaN（獨立重算）
+    for col in expected.columns:
+        finite = np.isfinite(expected[col].to_numpy())
+        first = int(np.argmax(finite)) if finite.any() else len(expected)
+        expected.iloc[: first + window - 1, expected.columns.get_loc(col)] = np.nan
     return expected.astype(np.float32, copy=False)
 
 
@@ -375,7 +380,8 @@ def test_winsorize_all_nan_column() -> None:
     result = FeaturePreprocessor(_winsor_quantile_config(causal=False))._apply_winsorization(frame)
 
     assert result["all_nan"].isna().all()
-    assert result["mixed"].isna().to_list() == [False, True, False, False]
+    # FFSTAT R6 甲：窗 2 ⇒ 首個有限值列（第 0 列）為窗未滿而遮為 NaN
+    assert result["mixed"].isna().to_list() == [True, True, False, False]
     assert result["mixed"].iloc[-1] < frame["mixed"].iloc[-1]
 
 

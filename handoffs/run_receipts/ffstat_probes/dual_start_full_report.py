@@ -23,6 +23,10 @@ with tempfile.TemporaryDirectory(prefix=f"ffstat_dual_{tf}_") as tmp:
         mp.undo()
 report["command"] = f"venv/bin/python handoffs/run_receipts/ffstat_probes/dual_start_full_report.py {tf} {out}"
 out.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8")
-print(tf, {k: report.get(k) for k in ("rows", "m", "f_max", "margin", "eligible")},
-      "violations", len(report.get("violations", {})), "ineligible", len(report.get("ineligible", [])),
-      "all_nan", len(report.get("all_nan", [])), "input_explained", len(report.get("input_explained", {})))
+print(tf, {k: report.get(k) for k in ("source_rows", "base_drop", "rows", "m", "f_max", "margin", "eligible")},
+      {k: len(report.get(k) or []) for k in ("violations", "l1_violations", "l1_ineligible", "l1_cumulative_skipped",
+                                             "exact_violations", "mask_violations", "injection_unmatched",
+                                             "missing_public_columns", "extra_public_columns", "column_set_explained",
+                                             "column_set_unexplained", "all_nan")})
+for name, value in list(report.get("violations", {}).items())[:30]:
+    print("  VIOLATION", name, value)

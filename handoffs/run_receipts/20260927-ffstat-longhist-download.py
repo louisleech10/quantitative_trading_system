@@ -23,7 +23,8 @@ SYMBOLS = os.environ.get("LONGHIST_SYMBOLS", "BTCUSDT,ETHUSDT,ADAUSDT").split(",
 # 週期 → 起點：12h、1d 取全史（2017-01-01＝最早預設）；5m 取最近一年（倍數量測只需數千根，
 # 全史近百萬根用不到）。使用者 2026-09-27 同意（R9）。以命令列參數選週期，預設 12h。
 END = datetime.utcnow()
-START_BY_TF = {"12h": datetime(2017, 1, 1), "1d": datetime(2017, 1, 1),
+# 4h：2026-09-29 v52 新倍數表使 M_4h＝2,253，`kline_cache.h5` 之 BTC 4h 5,088 根不足 §G⑦ 資格 ⇒ 同法補長歷史
+START_BY_TF = {"4h": datetime(2017, 1, 1), "12h": datetime(2017, 1, 1), "1d": datetime(2017, 1, 1),
                "5m": datetime(END.year - 1, END.month, END.day)}
 TIMEFRAMES = sys.argv[1:] or ["12h"]
 # 晚上市標的之起點覆寫（BCHUSDT 於 Binance 2019-11 上市；自 2017 起抓首頁為空、下載服務即停止）

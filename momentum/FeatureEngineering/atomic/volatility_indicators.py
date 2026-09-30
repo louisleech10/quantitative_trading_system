@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
@@ -44,10 +45,15 @@ class VolatilityIndicatorEngine:
             except Exception as exc:
                 guard_indicator_compute(name, exc, fail_open=self._fail_open)
 
-        frames.append(self._compute_keltner(data))
-        frames.append(self._compute_donchian(data))
-        frames.append(self._compute_parkinson(data))
-        frames.append(self._compute_garman_klass(data))
+        # FF-STAT Task 2.3：自訂欄之 L1 輸出點（倍數表條目、產生該欄之參數、全部輸入欄）
+        frames.append(l1op.mask_frame(self._compute_keltner(data), "volatility", "KELTNER", {"timeperiod": 20}, data,
+                                      ("high", "low", "close")))
+        frames.append(l1op.mask_frame(self._compute_donchian(data), "volatility", "DONCHIAN", {"timeperiod": 20}, data,
+                                      ("high", "low")))
+        frames.append(l1op.mask_frame(self._compute_parkinson(data), "volatility", "PARKINSON_VOL", {"timeperiod": 20},
+                                      data, ("high", "low")))
+        frames.append(l1op.mask_frame(self._compute_garman_klass(data), "volatility", "GARMANKLASS_VOL",
+                                      {"timeperiod": 20}, data, ("open", "high", "low", "close")))
 
         frames = [frame for frame in frames if frame is not None and not frame.empty]
         if not frames:

@@ -102,7 +102,7 @@ def _fail_first_parallel_search(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(spp, "find_min_d_with_prior", _mutant)
 
 
-@pytest.mark.parametrize("path", ["serial", "parallel", "frame"])
+@pytest.mark.parametrize("path", ["serial", "parallel"])  # frame 臂移除：使用者 2026-09-28 裁定刪除 frame（RM-FRAMEPATH）
 def test_search_failure_keeps_original_and_degrades(path: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 3.1 驗證：注入 d* 搜尋例外（ADF 差分同時開啟）⇒ 該欄無衍生欄、快取無該欄、manifest 與
     result.metadata 之 failure_reasons 皆含 `fracdiff_search_failed:1`、quality_status == partial。"""

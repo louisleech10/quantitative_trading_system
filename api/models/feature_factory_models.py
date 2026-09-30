@@ -137,6 +137,15 @@ class RunInfo(BaseModel):
     #  🔴 只改本 model 不夠：`response_model` 沒宣告的鍵會被**靜默濾掉**，
     #  service 那端亦須帶出（見 `feature_factory_service._browse_metadata_for_run`）。
     time_range: Optional[Dict[str, Optional[str]]] = None
+    #: FF-STAT §C 紀錄與顯示（逐欄穩定點）：`user`＝有起始日；`per_column`＝未填起始日、各欄依自身預熱期起算
+    output_start_source: Optional[str] = None
+    #: 各欄首個有效值（stable_start）之最早／最晚（ISO 字串；舊 run 無紀錄為 None）
+    stable_start_earliest: Optional[str] = None
+    stable_start_latest: Optional[str] = None
+    #: 有起始日而首個有效值晚於起始日之欄數（warmup_insufficient_history）
+    warmup_insufficient_count: Optional[int] = None
+    #: 未填起始日且開平穩化：每欄前 N 個穩定值保留供校準、不輸出
+    calibration_rows_withheld: Optional[bool] = None
 
 
 class EnsureBrowseResponse(BaseModel):

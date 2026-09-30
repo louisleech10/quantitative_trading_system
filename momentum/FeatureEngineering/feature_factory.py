@@ -10,6 +10,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 import json
+import math
 import time
 import threading
 import psutil
@@ -22,6 +23,7 @@ import pandas as pd
 
 from momentum.core.logging import get_logger
 from momentum.core.config import get_fracdiff_layers
+from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.core.contracts import LayerExecutionResult, LayerStatus, derive_status
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
@@ -55,6 +57,9 @@ from momentum.FeatureEngineering.atomic.custom_indicators import CustomIndicator
 from momentum.FeatureEngineering.atomic.microstructure_indicators import MicrostructureIndicatorEngine
 from momentum.FeatureEngineering.atomic.entropy_indicators import EntropyIndicatorEngine
 from momentum.FeatureEngineering.atomic.tail_risk_indicators import TailRiskIndicatorEngine
+from momentum.FeatureEngineering.atomic.l1_output_points import check_config_coverage as check_l1_warmup_coverage
+from momentum.FeatureEngineering.atomic import warmup_lookup as _warmup_lookup
+from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
 from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry, ColumnGroupRegistryError
 from momentum.FeatureEngineering.timeframe.tf_aligner import CURRENT_MTF_ALIGN_VERSION
@@ -80,7 +85,6 @@ from momentum.FeatureEngineering.warmup_window import (
     estimate_max_warmup_bars,
     compute_row_bounds,
     ingest_layer0_start_date,
-    is_warmup_trim_enabled,
     output_row_count,
     resolve_output_window,
     to_utc,
@@ -271,6 +275,8 @@ class FeatureFactory:
     ) -> FeatureGenerationResult:
         """Run the pipeline while holding the per-run lease."""
         config = self._resolve_config(config_override)
+        # FFSTAT Task 2.4（R5）：倍數表缺項於設定 hash 與快取查詢之前擋下（run 目錄零寫入）
+        check_l1_warmup_coverage(config)
         config_hash = self._compute_config_hash(config, symbol, timeframe, start_date=start_date, end_date=end_date)
         # FFSTAT Task 2.1：校準前置關卡為一次生成之第一步——先於 run lease、快取查詢、registry 與任何落盤
         # （任一週期失敗 ⇒ 整個 run 目錄與 registry 零寫入）
@@ -278,10 +284,14 @@ class FeatureFactory:
         if self._stationarity_config_enabled(config):
             training_tfs = list(dict.fromkeys(config.timeframes.training))
             self._current_config_hash = config_hash
-            self._run_calibration_gate(
-                symbol, training_tfs if len(training_tfs) > 1 else [timeframe], config, start_date,
-                resolve_output_window(config, timeframe, start_date, end_date),
-            )
+            if start_date is None:
+                # v32 §C 未填起始日：無校準域、無前置關卡；L6.5 逐欄以公開值最早 N 個有效值校準並遮出（Task 2.3 ④）
+                self._calibration_result = self._no_start_calibration_result(config, training_tfs)
+            else:
+                self._run_calibration_gate(
+                    symbol, training_tfs if len(training_tfs) > 1 else [timeframe], config, start_date,
+                    resolve_output_window(config, timeframe, start_date, end_date),
+                )
         try:
             lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, timeframe, config_hash, timeout=0)
         except BaseException:
@@ -334,10 +344,20 @@ class FeatureFactory:
             )
         self._calibration_result = result
 
+    def _no_start_calibration_result(self, config: "FactoryConfig", training_tfs: List[str]) -> Dict[str, Any]:
+        """未填起始日之逐欄校準（v32 §C、Task 2.3 ④）之本次 run 標記。frame 多週期（legacy）路徑由對齊時產生之
+        原生列對應（`_legacy_native_row_maps`）使 L6.5 以不同原生 K 棒計最早 N 個值；CGSA 走 native 子實例。"""
+        self._legacy_native_row_maps = {}
+        return {"output_start": None, "output_start_source": "per_column", "packets": None, "no_start": True}
+
     def _attach_calibration(self, preprocessor: FeaturePreprocessor) -> None:
         """把本次 run 之封包與公開域身分交給 L6.5 前處理器（平穩化關閉或非生成路徑 ⇒ 不交付）。"""
         result = getattr(self, "_calibration_result", None)
         if result is None:
+            return
+        if result.get("no_start"):
+            # Task 2.3 ④：逐欄以公開值最早 N 個有效值校準（frame 多週期帶原生列對應，數不同原生 K 棒）
+            preprocessor.set_no_start_calibration(getattr(self, "_legacy_native_row_maps", None))
             return
         preprocessor.set_calibration(
             result["packets"], symbol=str(self._current_symbol), output_start=result["output_start"],
@@ -364,6 +384,8 @@ class FeatureFactory:
         config = self._resolve_config(config_override)
         self.last_stationarity_decisions = None  # FFSTAT：每次生成重新累計
         self._stationarity_failed_groups = []
+        self._last_l3_aggregator = None  # FFSTAT Task 2.3 ⑦：死欄原因每次生成重新累計
+        self._l7_dead_reasons = None
         self._progress_callback = progress_callback
         self._current_symbol = symbol
         self._current_timeframe = timeframe
@@ -381,6 +403,7 @@ class FeatureFactory:
         )
         start_time = time.time()
 
+        check_l1_warmup_coverage(config)  # FFSTAT Task 2.4：先於設定 hash 與快取查詢
         config_hash = self._compute_config_hash(
             config,
             symbol,
@@ -394,13 +417,19 @@ class FeatureFactory:
             if cached:
                 return cached
 
+        # FFSTAT §C 公開域預熱之加倍規則：快取未命中後、任何 registry／落盤之前，以記憶體探測定案預熱深度
+        self._current_output_window = self._resolve_public_window(symbol, timeframe, config, start_date, end_date)
+
         training_tfs = list(dict.fromkeys(config.timeframes.training))
         if self._stationarity_config_enabled(config) and getattr(self, "_calibration_result", None) is None:
             # 未經 generate_features 入口（直接呼叫 impl）時之前置關卡；仍先於 registry 與任何落盤
-            self._run_calibration_gate(
-                symbol, training_tfs if len(training_tfs) > 1 else [timeframe], config, start_date,
-                self._current_output_window,
-            )
+            if start_date is None:
+                self._calibration_result = self._no_start_calibration_result(config, training_tfs)
+            else:
+                self._run_calibration_gate(
+                    symbol, training_tfs if len(training_tfs) > 1 else [timeframe], config, start_date,
+                    self._current_output_window,
+                )
 
         self._cgsa_force_fresh = force_regenerate
         self._cgsa_registry = self._prepare_cgsa_registry(symbol, timeframe, config_hash or "")
@@ -878,6 +907,11 @@ class FeatureFactory:
             + config.data_sources.enabled_sources
             + config.data_sources.synthetic_sources
         ))
+        # FFSTAT v52（審查 r35 codex P1-04）：L1 遮罩之 K 僅以倍數表所量測市場之真實資料量得 ⇒ 其他市場 fail-closed
+        from momentum.FeatureEngineering.atomic import warmup_lookup
+
+        for adapter_name in self._adapter_registry.list_all():
+            warmup_lookup.assert_market_measured(self._adapter_registry.get(adapter_name).market)
         data = self._adapter_registry.fetch_aligned(symbol, timeframe, sources)
         data = data.sort_index()
 
@@ -1762,6 +1796,7 @@ class FeatureFactory:
             # FFSTAT Task 2.1：校準資料域不依資料剔欄（與公開域同一欄定義；見 RollingAggregator.keep_all_columns）
             filtered_config = {**filtered_config, "keep_all_columns": True}
         aggregator = RollingAggregator(filtered_config)
+        self._last_l3_aggregator = aggregator  # FFSTAT Task 2.3 ⑦：L3 死欄原因（dead_reasons）供欄集合差異收據
 
         from momentum.FeatureEngineering.utils.hardware_utils import (
             get_l3_persist_mode,
@@ -2209,7 +2244,7 @@ class FeatureFactory:
         # §C 前史深度：warmup（依原生週期）＋ N ＋首個有效值最大延遲。稀疏欄（值常為 NaN 者）於此深度內有效值
         # 可能不足 N ⇒ 深度加倍重算，至不再有 `"short"` 欄或已達資料起點；實際前史短於深度時自資料起點載入。
         # 仍不足 N 之欄不帶校準值（v19 逐欄事件；不縮窗、不以不足 N 之值判定、不退回輸出範圍）
-        depth = estimate_max_warmup_bars(config, timeframe, [timeframe]) + n + cal.CALIBRATION_FIRST_VALID_DELAY_BARS
+        depth = estimate_max_warmup_bars(config, timeframe, [timeframe]) + n  # v32：首個有效值延遲常數已刪（遮罩＋加倍）
         while True:
             before = history.iloc[max(0, len(history) - depth):]
             try:
@@ -2311,6 +2346,62 @@ class FeatureFactory:
         return int(len(self._layer0_data_ingestion(symbol, timeframe, config, start_date=start,
                                                    end_date=window.output_end)))
 
+    def _resolve_public_window(self, symbol: str, timeframe: str, config: FactoryConfig,
+                               start_date: Optional[str], end_date: Optional[str]) -> OutputWindow:
+        """FFSTAT §C「公開域預熱」之加倍規則（v32 R1）：有起始日時以 D₀＝`estimate_max_warmup_bars` 起，於記憶體
+        計算各原生週期之 `[載入起點, 起始日＋探測尾段]`（同校準域之計算入口：獨立實例、不寫 registry、不落盤），
+        若有欄（探測段內有有限值者；全無有限值之欄屬死欄或延後過長，交公開輸出後逐欄事件）之首個有限值晚於起始日
+        且該週期載入起點尚非資料起點 ⇒ D 加倍重算，至全部欄之首個有限值 ≤ 起始日或各週期皆達資料起點。
+        回傳定案之 OutputWindow（`max_warmup_bars`＝D）；逐輪深度與晚到欄數記於 `self._public_warmup_probe`。"""
+        from momentum.FeatureEngineering.preprocessing import calibration as cal
+
+        window = resolve_output_window(config, timeframe, start_date, end_date)
+        self._public_warmup_probe: List[Dict[str, Any]] = []
+        self._public_warmup_late: Optional[Tuple[OutputWindow, frozenset]] = None
+        if not window.warmup_enabled:
+            return window
+        training = list(dict.fromkeys(config.timeframes.training))
+        primary = config.timeframes.primary if timeframe in training else timeframe
+        tfs = training if timeframe in training else [timeframe]
+        start_ts = to_utc(pd.Timestamp(start_date))
+        histories: Dict[str, Tuple[pd.DataFrame, pd.DatetimeIndex]] = {}
+        for tf in tfs:
+            data = self._layer0_data_ingestion(symbol, tf, config, start_date=None, end_date=end_date)
+            histories[tf] = (data, self._calibration_datetime_index(data.index))
+        depth = int(window.max_warmup_bars)
+        while True:
+            late_total, need_more = 0, False
+            late_names: set = set()
+            for tf, (data, idx) in histories.items():
+                lo = int(idx.searchsorted(to_utc(pd.Timestamp(window.ingest_start)), side="left"))
+                pos_start = int(idx.searchsorted(start_ts, side="left"))
+                native_depth = math.ceil(depth * TIMEFRAME_SECONDS[primary] / TIMEFRAME_SECONDS[tf])
+                hi = min(len(idx), pos_start + max(100, native_depth // 4))
+                if hi <= lo:
+                    continue
+                frame = cal.compute_calibration_domain(self, symbol, tf, config, data.iloc[lo:hi])
+                values = frame.to_numpy(dtype=np.float64)
+                finite = np.isfinite(values)
+                has = finite.any(axis=0)
+                first_row = np.argmax(finite, axis=0)
+                first_ts = idx[lo:hi][first_row]
+                late_mask = has & np.asarray(first_ts > start_ts)
+                late = int(late_mask.sum())
+                # 探測段內無有限值之欄（審查 r33 codex P1-03）：其首個有限值必晚於起始日（探測段含起始日前全部預熱列）
+                # ⇒ 計入晚到集合，公開輸出晚到者方記事件；不觸發加倍（無法與死欄區分，死欄之 stable_start 為 None 不入事件）
+                late_names.update(cal.tagged_column_name(str(c), tf) for c in frame.columns[late_mask | ~has])
+                del frame, values, finite
+                late_total += late
+                if late and lo > 0:
+                    need_more = True
+            self._public_warmup_probe.append({"depth": depth, "late_columns": late_total})
+            if not need_more:
+                # 末輪晚到欄（標記週期後之欄名）綁定本窗：只供同一窗之公開輸出判「預熱所致」之晚到
+                self._public_warmup_late = (window, frozenset(late_names))
+                return window
+            depth *= 2
+            window = resolve_output_window(config, timeframe, start_date, end_date, max_warmup_bars=depth)
+
     def _load_calibration_klines(self, symbol: str, timeframe: str, start: Optional[pd.Timestamp],
                                  end: pd.Timestamp) -> pd.DataFrame:
         """校準前史 K 線 `[start, end)`（該原生週期；同 L0 之來源欄）。index 保持 L0 原樣（與公開域同表示，
@@ -2404,14 +2495,58 @@ class FeatureFactory:
         split_id: Optional[str] = None,
         cleanup_raw: bool = False,
         lease_sink: Optional[list] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
     ) -> FeatureGenerationResult:
-        """Run IC-First while holding a lease when invoked independently."""
-        resolved_hash = config_hash or self._current_config_hash or self._compute_config_hash(config, symbol, tf)
+        """Run IC-First while holding a lease when invoked independently.
+
+        FFSTAT v29／v30（平穩化開啟時）：必帶 `start_date`（`end_date` 選填）；本次輸出窗以
+        `resolve_output_window(config, tf, start_date, end_date)` 自行解析、設定 hash 以本次設定與起訖計算，不讀前次
+        生成留下之 `_current_output_window`／`_current_config_hash`、拒收呼叫端 `config_hash`；兩者於入口保存、
+        結束（成功或任一失敗）一律還原。平穩化關閉時行為不變。"""
+        check_l1_warmup_coverage(config)  # FFSTAT Task 2.4：先於設定 hash 與任何寫入
+        stationarizing = self._stationarity_config_enabled(config)
+        if stationarizing:
+            if start_date is None:
+                raise CalibrationError(
+                    f"平穩化開啟時 run_ic_first 須帶 start_date：{symbol}/{tf}（未填起始日之逐欄校準歸 IC-First 管線合一票）",
+                    timeframe=str(tf), field="output_start",
+                )
+            if config_hash is not None:
+                raise CalibrationError(
+                    f"平穩化開啟時 run_ic_first 不接受呼叫端 config_hash（只由本次設定與起訖計算）：{symbol}/{tf}",
+                    timeframe=str(tf), field="config_hash",
+                )
+        saved_window = getattr(self, "_current_output_window", None)
+        saved_hash = getattr(self, "_current_config_hash", None)
+        try:
+            if stationarizing:
+                self._current_output_window = resolve_output_window(config, tf, start_date, end_date)
+                resolved_hash = self._compute_config_hash(config, symbol, tf, start_date=start_date, end_date=end_date)
+            else:
+                resolved_hash = config_hash or self._current_config_hash or self._compute_config_hash(config, symbol, tf)
+            return self._run_ic_first_leased(
+                symbol, tf, config, resolved_hash, stationarizing,
+                raw_data=raw_data, layers=layers, config_hash=resolved_hash if stationarizing else config_hash,
+                compute_warnings=compute_warnings, start_time=start_time, persist=persist,
+                label=label, ic_engine=ic_engine, feature_reader=feature_reader, storage=storage,
+                ic_threshold=ic_threshold, allow_partial_ic=allow_partial_ic,
+                label_horizon=label_horizon, selection_window=selection_window,
+                split_id=split_id, cleanup_raw=cleanup_raw, lease_sink=lease_sink,
+            )
+        finally:
+            if stationarizing:  # v30：平穩化開啟之 run_ic_first 對 factory 之窗與 hash 不留任何改變
+                self._current_output_window = saved_window
+                self._current_config_hash = saved_hash
+
+    def _run_ic_first_leased(self, symbol: str, tf: str, config: "FactoryConfig", resolved_hash: str,
+                             stationarizing: bool, *, lease_sink: Optional[list], **impl_kwargs: Any
+                             ) -> FeatureGenerationResult:
         # FFSTAT Task 2.1：平穩化開啟時拒收呼叫端自帶之 raw_data／layers（生產端無此用法；層與校準須同源），
         # 並於 run lease 與任何寫入之前跑校準前置關卡（涵蓋本次設定之全部原生週期）
         self._calibration_result = None
-        if self._stationarity_config_enabled(config):
-            if raw_data is not None or layers is not None:
+        if stationarizing:
+            if impl_kwargs.get("raw_data") is not None or impl_kwargs.get("layers") is not None:
                 raise CalibrationError(
                     f"平穩化開啟時 run_ic_first 不接受呼叫端自帶之 raw_data／layers：{symbol}/{tf}，請改用自算路徑"
                     "（兩者皆不傳）",
@@ -2419,30 +2554,21 @@ class FeatureFactory:
                 )
             self._current_config_hash = resolved_hash
             self._current_symbol = symbol
-            window = getattr(self, "_current_output_window", None)
+            window = self._current_output_window
             self._run_calibration_gate(
-                symbol, list(dict.fromkeys([tf, *config.timeframes.training])), config,
-                window.output_start if window is not None else None, window,
+                symbol, list(dict.fromkeys([tf, *config.timeframes.training])), config, window.output_start, window,
             )
         try:
             lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, tf, resolved_hash, timeout=0)
         except BaseException:
             self._calibration_result = None
             raise
-        retained = False
+        # lease_sink（測試觀測用）：取得即交出，成功或例外皆由呼叫端持有並釋放
+        retained = lease_sink is not None
+        if retained:
+            lease_sink.append(lease)
         try:
-            result = self._run_ic_first_impl(
-                symbol, tf, config, raw_data=raw_data, layers=layers, config_hash=config_hash,
-                compute_warnings=compute_warnings, start_time=start_time, persist=persist,
-                label=label, ic_engine=ic_engine, feature_reader=feature_reader, storage=storage,
-                ic_threshold=ic_threshold, allow_partial_ic=allow_partial_ic,
-                label_horizon=label_horizon, selection_window=selection_window,
-                split_id=split_id, cleanup_raw=cleanup_raw,
-            )
-            if lease_sink is not None:
-                lease_sink.append(lease)
-                retained = True
-            return result
+            return self._run_ic_first_impl(symbol, tf, config, **impl_kwargs)
         finally:
             self._calibration_result = None  # 封包只在本次 run 內使用
             if not retained:
@@ -2479,6 +2605,8 @@ class FeatureFactory:
         start = start_time if start_time is not None else time.time()
         self.last_stationarity_decisions = None  # FFSTAT：每次 IC-first 重新累計
         self._stationarity_failed_groups = []
+        self._last_l3_aggregator = None
+        self._l7_dead_reasons = None
         resolved_config_hash = config_hash or self._current_config_hash or self._compute_config_hash(
             config,
             symbol,
@@ -2528,6 +2656,12 @@ class FeatureFactory:
         all_features = self._combine_layers(layers, context="ic_first_l65_pre_input")
         pre_ic_frame = self._safe_execute("Layer 6.5 pre_ic", self._layer6_5_pre_ic, all_features, config)
         _, pre_ic_frame, _ = self._trim_for_public_output(ingest_raw, pre_ic_frame, labels_df)
+        # FFSTAT §C 紀錄：逐欄 stable_start（IC-First 之 L7_raw＝pre-IC 公開輸出）
+        from momentum.FeatureEngineering.warmup_window import stable_start_from_frame, warmup_late_columns
+
+        _ic_stable_start = stable_start_from_frame(pre_ic_frame.set_axis(raw_data_trimmed.index, axis=0)
+                                                   if len(pre_ic_frame) == len(raw_data_trimmed) else pre_ic_frame)
+        _ic_warmup_late = warmup_late_columns(_ic_stable_start, self._warmup_output_start(), self._warmup_probe_late())
         pre_ic_groups = self._frame_to_l7_groups(pre_ic_frame, "pre_ic")
         raw_feature_count = sum(len(frame.columns) for frame in pre_ic_groups.values())
         raw_path = storage_manager.write_raw(
@@ -2653,6 +2787,7 @@ class FeatureFactory:
             "raw_freed_gb": raw_freed_gb,
         }
         self._apply_warmup_metadata(metadata, config, ingest_raw)
+        metadata.update(self._stable_start_metadata(_ic_stable_start, _ic_warmup_late))
         logger.info(
             "[IC-First] post_ic done: symbol=%s tf=%s selected=%d processed_features=%d peak_rss_gb=%.2f",
             symbol,
@@ -2661,7 +2796,7 @@ class FeatureFactory:
             processed_feature_count,
             float(ic_memory.peak_rss_gb),
         )
-        metadata.update(self._stationarity_metadata())  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
+        metadata.update(self._stationarity_metadata(raw_data_trimmed.index))  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         return FeatureGenerationResult(
             features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
@@ -3091,6 +3226,10 @@ class FeatureFactory:
         dead, diag = find_dead_columns(frame, min_valid_samples=min_valid, enabled=enabled)
         if not dead:
             return frame
+        # FFSTAT Task 2.3 ⑦：L7 死欄原因（有效樣本不足優先於常數）供欄集合差異收據
+        reasons = {c: "constant" for c in diag.constant_cols}
+        reasons.update({c: "stable_samples_below_min" for c in diag.sparse_cols})
+        self._l7_dead_reasons = {**dict(getattr(self, "_l7_dead_reasons", None) or {}), **reasons}
         result = drop_dead_columns(frame, dead)
         logger.info(
             "[L7 Dead Drop] dropped %d cols (constant=%d, sparse=%d); examples: %s",
@@ -3459,6 +3598,82 @@ class FeatureFactory:
             extra_failure_reasons=self._stationarity_failure_reasons(),
         )
 
+    def _warmup_output_start(self) -> Optional[str]:
+        """有起始日（預熱開）時之公開輸出起始日；未填起始日回 None（不判 warmup_insufficient_history）。"""
+        window = getattr(self, "_current_output_window", None)
+        return window.output_start if window is not None and window.warmup_enabled else None
+
+    def _warmup_probe_late(self) -> Optional[frozenset]:
+        """現行窗經加倍探測時之末輪晚到欄（`warmup_late_columns` 之 `probe_late`）；窗不同（如 `run_ic_first` 自解析之窗）
+        或未探測 ⇒ None。"""
+        bound = getattr(self, "_public_warmup_late", None)
+        if bound is None or bound[0] is not getattr(self, "_current_output_window", None):
+            return None
+        return bound[1]
+
+    def _stable_start_metadata(self, stable_start: Dict[str, Optional[str]], late: List[str],
+                               l7_dead_reasons: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """FFSTAT §C 紀錄：逐欄 `stable_start`、`start_dependent_columns`、預熱加倍紀錄與歷史不足欄；
+        `column_set_reasons`＝本次 L3／L7 死欄過濾剔除之欄 → 原因（Task 2.3 ⑦ 欄集合差異收據之原因來源）。"""
+        probe = list(getattr(self, "_public_warmup_probe", None) or [])
+        window = getattr(self, "_current_output_window", None)
+        aggregator = getattr(self, "_last_l3_aggregator", None)
+        raw_reasons = {
+            **(dict(aggregator.dead_reasons) if aggregator is not None else {}),
+            **dict(getattr(self, "_l7_dead_reasons", None) or {}),
+            **dict(l7_dead_reasons or {}),
+        }
+        # 2026-09-30 §G⑦ v54 實跑：L3 剔除點之欄名尚未加週期標記（`taker-ratio_momentum_…`），公開欄名已加
+        # （`taker-ratio_1h_momentum_…`）⇒ 以公開欄名為鍵（同 `_apply_timeframe_tag` 規則，已標記者不動）。
+        timeframe = getattr(self, "_current_timeframe", None)
+        if timeframe:
+            from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+            tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
+            column_set_reasons = {self._timeframe_tagged_name(str(k), str(timeframe), tf_keys): v
+                                  for k, v in raw_reasons.items()}
+        else:
+            column_set_reasons = {str(k): v for k, v in raw_reasons.items()}
+        meta: Dict[str, Any] = {
+            "column_set_reasons": column_set_reasons,
+            "stable_start": dict(stable_start),
+            "start_dependent_columns": self._start_dependent_columns(list(stable_start)),
+            "warmup_policy": _stable_mask.WARMUP_POLICY,
+            # §C 紀錄與顯示：有起始日 ⇒ user；未填 ⇒ per_column（各欄依自身穩定點起算）
+            "output_start_source": "user" if window is not None and window.warmup_enabled else "per_column",
+        }
+        if window is not None and window.warmup_enabled:
+            meta["warmup_doubling"] = {
+                "doublings": max(0, len(probe) - 1),
+                "final_ingest_start": window.ingest_start,
+                "depth_bars": int(window.max_warmup_bars),
+                "rounds": probe,
+            }
+        if late:
+            meta["warmup_insufficient_columns"] = list(late)
+        return meta
+
+    @staticmethod
+    def _start_dependent_columns(columns: List[str]) -> List[str]:
+        """累積型（倍數表 warmup_class＝cumulative，如 OBV、AD）之 L1 欄及以其為輸入之衍生欄（欄名含該 L1 欄名）：
+        無收斂點、值依載入起點而異（SPEC §C「累積型」；只作紀錄，不影響遮罩）。"""
+        from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
+
+        cumulative = {
+            name for name, entry in _warmup_lookup.warmup_table().items() if entry.get("warmup_class") == "cumulative"
+        }
+        TALibWrapper.initialize()
+        tokens = set()
+        for name in cumulative:
+            spec = TALibWrapper.INDICATOR_REGISTRY.get(name)
+            if spec is not None:
+                tokens.add(f"_{spec.category}_{TALibWrapper.normalize_indicator_name(spec.name)}")
+        if not tokens:
+            return []
+        # 段界：token 後須為 `_` 或結尾（`_volume_AD` 不得命中 `_volume_ADOSC`）
+        pattern = re.compile("|".join(f"{re.escape(t)}(?:_|$)" for t in sorted(tokens)))
+        return sorted(c for c in columns if pattern.search(c))
+
     def _stationarity_failure_reasons(self) -> List[str]:
         """FFSTAT Task 3.1／v19：本次 run 之 d* 三出口與前史不足事件彙總為 `<事件>:<欄數>`（固定順序；無事件 ⇒ 空）。"""
         from momentum.FeatureEngineering.preprocessing.feature_preprocessor import STATIONARITY_FAILURE_EVENTS
@@ -3672,6 +3887,9 @@ class FeatureFactory:
                         self._resolve_quality_thresholds(config, symbol, timeframe),
                     ),
                     preprocessing_applied=None,  # CGSA 串流不經 _execute_l65_with_degradation，不臆造旗標
+                    # FFSTAT §C 公開域預熱：有起始日時首個有效值晚於起始日之欄 ⇒ warmup_insufficient_history
+                    warmup_output_start=self._warmup_output_start(),
+                    warmup_probe_late=self._warmup_probe_late(),
                 ),
                 extra_metadata={
                     **self._build_l7_raw_preprocessing_metadata(
@@ -3680,6 +3898,10 @@ class FeatureFactory:
                         l65_mode,
                     ),
                     "source_registry_manifest": str(self._cgsa_registry.manifest_path),
+                    # FFSTAT §C 紀錄與顯示：manifest 記 output_start_source 與預熱政策
+                    "output_start_source": "user" if self._warmup_output_start() is not None else "per_column",
+                    "warmup_policy": _stable_mask.WARMUP_POLICY,
+                    "stationarity_enabled": bool(self._stationarity_config_enabled(config)),
                 },
             )
             if preprocessor is not None:
@@ -3753,8 +3975,14 @@ class FeatureFactory:
         }
         self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
         self._apply_warmup_metadata(metadata, config, ingest_raw)
+        # FFSTAT §C 紀錄：逐欄 stable_start 等（CGSA：由串流寫入端逐欄首個有效值算出）
+        metadata.update(self._stable_start_metadata(
+            dict(stream_summary.get("stable_start") or {}),
+            list(stream_summary.get("warmup_insufficient_columns") or []),
+            dict(stream_summary.get("dead_drop_reasons") or {}),
+        ))
 
-        metadata.update(self._stationarity_metadata())  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
+        metadata.update(self._stationarity_metadata(trimmed_raw.index))  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         result = FeatureGenerationResult(
             features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
@@ -3916,8 +4144,10 @@ class FeatureFactory:
         )
         self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
         self._apply_warmup_metadata(metadata, config, raw_data)
+        # FFSTAT §C 紀錄：此路徑於現行呼叫圖不可達（CGSA 單／多週期皆走 L7_raw 串流、無 CGSA 走 frame）——只寫鍵
+        metadata.update(self._stable_start_metadata({}, []))
 
-        metadata.update(self._stationarity_metadata())  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
+        metadata.update(self._stationarity_metadata(trimmed_raw.index))  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         result = FeatureGenerationResult(
             features_df=pd.DataFrame(index=trimmed_raw.index),
             labels_df=labels_df,
@@ -4043,7 +4273,7 @@ class FeatureFactory:
         ingest_raw = self._current_raw_data if self._current_raw_data is not None else raw_data
         self._apply_warmup_metadata(metadata, config, ingest_raw)
 
-        metadata.update(self._stationarity_metadata())  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
+        metadata.update(self._stationarity_metadata(features_df.index))  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         result = FeatureGenerationResult(
             features_df=features_df,
             labels_df=labels_df,
@@ -4066,6 +4296,16 @@ class FeatureFactory:
         value_count = int(values.size)
         nan_ratio = float(self._abnormal_nan_count(values) / value_count) if value_count else 0.0
         inf_ratio = float(np.isinf(values).sum() / value_count) if value_count else 0.0
+        # FFSTAT §C 紀錄：逐欄 stable_start；有起始日而首個有效值晚於起始日之欄 ⇒ warmup_insufficient_history
+        from momentum.FeatureEngineering.warmup_window import (
+            WARMUP_INSUFFICIENT_EVENT,
+            stable_start_from_frame,
+            warmup_late_columns,
+        )
+
+        stable_start = stable_start_from_frame(result.features_df)
+        warmup_late = warmup_late_columns(stable_start, self._warmup_output_start(), self._warmup_probe_late())
+        metadata.update(self._stable_start_metadata(stable_start, warmup_late))
         # Task 2.3 ④：frame 路徑 L6.5 旗標與比率皆於 persist 前已知，以同一函式先判再存
         max_inf_ratio, max_nan_ratio = self._resolve_quality_thresholds(config, symbol, timeframe)
         completeness_meta = apply_quality_degradation(
@@ -4075,7 +4315,8 @@ class FeatureFactory:
             max_inf_ratio=max_inf_ratio,
             max_nan_ratio=max_nan_ratio,
             preprocessing_applied=getattr(self, "_preprocessing_applied", None),
-            extra_failure_reasons=self._stationarity_failure_reasons(),
+            extra_failure_reasons=self._stationarity_failure_reasons()
+            + ([f"{WARMUP_INSUFFICIENT_EVENT}:{len(warmup_late)}"] if warmup_late else []),
         )
         self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
         result.metadata = metadata
@@ -4168,9 +4409,9 @@ class FeatureFactory:
         # Explicitly include timeframe kwarg in hash to ensure 12h/1h results never share cache.
         config_payload["_timeframe"] = timeframe
         config_payload["_mtf_align_version"] = CURRENT_MTF_ALIGN_VERSION
-        # Warmup flag off must preserve pre-B6 strict cache keys; flag on splits cache.
-        if is_warmup_trim_enabled():
-            config_payload["_warmup_trim_enabled"] = True
+        # FFSTAT Task 2.3 ⑨：預熱政策（逐欄穩定點）與倍數表內容皆改變輸出值 ⇒ 納入快取鍵（改前快取一律未命中）
+        config_payload["_warmup_policy"] = _stable_mask.WARMUP_POLICY
+        config_payload["_warmup_table_sha256"] = _warmup_lookup.table_sha256()
         payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
@@ -4259,13 +4500,18 @@ class FeatureFactory:
             merged[name] = record
         self.last_stationarity_decisions = merged
 
-    def _stationarity_metadata(self) -> Dict[str, Any]:
+    def _stationarity_metadata(self, time_axis: Optional[pd.Index] = None) -> Dict[str, Any]:
         """FFSTAT：結果 metadata 之 `stationarity_decisions`／`stationarity_summary`，以及校準前置關卡之
         `effective_output_start`、`output_start_source`、`calibration_source_sha256`（{原生週期: sha256}）；
-        平穩化關閉 ⇒ 空，metadata 不變。"""
+        平穩化關閉 ⇒ 空，metadata 不變。
+
+        未填起始日之逐欄校準（Task 2.3 ④）：`output_start_source＝per_column`、不寫 `effective_output_start`
+        （v44）；決策之 `calibration_rows`（主週期公開列）以 `time_axis` 換成 `calibration_start`／`calibration_end`。"""
         calibration: Dict[str, Any] = {}
         result = getattr(self, "_calibration_result", None)
-        if result is not None:
+        if result is not None and result.get("no_start"):
+            calibration = {"output_start_source": "per_column"}
+        elif result is not None:
             calibration = {
                 "effective_output_start": pd.Timestamp(result["output_start"]).isoformat(),
                 "output_start_source": str(result["output_start_source"]),
@@ -4290,8 +4536,18 @@ class FeatureFactory:
             "cache_write_failed": events.count("dstar_cache_write_failed"),
             "calibration_insufficient": events.count("calibration_insufficient_history"),
         }
+        exported = {name: dict(record) for name, record in decisions.items()}
+        if time_axis is not None and len(time_axis):
+            from momentum.FeatureEngineering.warmup_window import coerce_index_to_datetime
+
+            stamps = to_utc(coerce_index_to_datetime(time_axis))  # UTC、帶時區（與 stable_start 同一表示）
+            for record in exported.values():
+                rows = record.get("calibration_rows")
+                if rows and 0 <= int(rows[0]) <= int(rows[1]) < len(stamps):
+                    record["calibration_start"] = pd.Timestamp(stamps.iloc[int(rows[0])]).isoformat()
+                    record["calibration_end"] = pd.Timestamp(stamps.iloc[int(rows[1])]).isoformat()
         return {
-            "stationarity_decisions": {name: dict(record) for name, record in decisions.items()},
+            "stationarity_decisions": exported,
             "stationarity_summary": summary,
             **calibration,
         }
@@ -4302,7 +4558,7 @@ class FeatureFactory:
         if column.startswith("label_"):
             return column
         parts = column.split("_")
-        if len(parts) < 2 or parts[1] in tf_keys:
+        if len(parts) < 2 or any(p in tf_keys for p in parts[1:]):
             return column
         return "_".join([parts[0], timeframe] + parts[1:])
 
@@ -4327,8 +4583,8 @@ class FeatureFactory:
             parts = col.split("_")
             if len(parts) < 2:
                 return col
-            if parts[1] in tf_keys:
-                return col  # already tagged
+            if any(p in tf_keys for p in parts[1:]):
+                return col  # already tagged（FFSTAT v55 審查 r40：任一段已為週期即不再加，同 MultiTFGenerator）
             return "_".join([parts[0], timeframe] + parts[1:])
 
         rename_map = {col: _rename(col) for col in features_df.columns}

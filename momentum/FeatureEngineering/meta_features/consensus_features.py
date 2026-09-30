@@ -25,6 +25,15 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
+
+
+def _prefix_masked(output: pd.Series, inputs: Iterable[pd.Series]) -> pd.Series:
+    """FFSTAT Task 2.3 第④類：逐點／跨欄運算對 NaN 給有限值 ⇒ 各輸入首個有限值之最大者之前設 NaN（只遮開頭段）。"""
+    values = _stable_mask.mask_pointwise_prefix(
+        output.to_numpy(dtype=np.float64), [s.to_numpy(dtype=np.float64) for s in inputs]
+    )
+    return pd.Series(values, index=output.index, name=output.name)
 
 logger = get_logger(__name__)
 
@@ -56,7 +65,8 @@ class ConsensusFeatureEngine:
 
         consensus = pd.concat(signals, axis=1).mean(axis=1, skipna=True)
         consensus.name = "meta_Trend_Consensus"
-        return consensus
+        inputs = [s for s in (ema_fast, ema_slow, macd_hist, adx) if s is not None]
+        return _prefix_masked(consensus, inputs)
 
     def compute_momentum_divergence(self, layer1: pd.DataFrame) -> pd.Series:
         """std(RSI_rank, CCI_rank, STOCH_rank)"""
@@ -76,7 +86,7 @@ class ConsensusFeatureEngine:
         ranked = stacked.rank(axis=1, pct=True)
         divergence = ranked.std(axis=1, ddof=0)
         divergence.name = "meta_Momentum_Divergence"
-        return divergence
+        return _prefix_masked(divergence, series_list)
 
     def compute_volume_price_divergence(self, layer1: pd.DataFrame, raw: pd.DataFrame) -> pd.Series:
         """sign(Price_Change) != sign(Volume_Change)"""
@@ -90,7 +100,7 @@ class ConsensusFeatureEngine:
         sign_volume = np.sign(volume_change)
         divergence = (sign_price * sign_volume < 0).astype(float)
         divergence.name = "meta_VolumePrice_Divergence"
-        return divergence
+        return _prefix_masked(divergence, [price_change, volume_change])
 
     def compute_volatility_regime(self, layer1: pd.DataFrame) -> pd.Series:
         """ATR_14 / ATR_55"""

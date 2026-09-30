@@ -49,7 +49,17 @@ def _rolling_quantile_oracle(frame: pd.DataFrame, window: int, lower_q: float, u
     clipped = frame.copy()
     valid = lower.notna() & upper.notna()
     clipped = clipped.where(~valid, clipped.clip(lower=lower, upper=upper, axis=1))
-    return clipped.astype(np.float32)
+    return _mask_incomplete_window(clipped, window).astype(np.float32)
+
+
+def _mask_incomplete_window(frame: pd.DataFrame, window: int) -> pd.DataFrame:
+    """FFSTAT R6 甲（使用者 2026-09-27 裁定）之獨立重算：縮尾輸出自各欄首個有限值起 window−1 列（及其前）為 NaN。"""
+    out = frame.astype(float).copy()
+    for col in out.columns:
+        finite = np.isfinite(out[col].to_numpy())
+        first = int(np.argmax(finite)) if finite.any() else len(out)
+        out.iloc[: first + window - 1, out.columns.get_loc(col)] = np.nan
+    return out
 
 
 def test_rolling_bounds_pit() -> None:
@@ -92,12 +102,14 @@ def test_rolling_sigma_bounds_pit() -> None:
     lower = rolling.mean() - rolling.std()
     upper = rolling.mean() + rolling.std()
     expected = frame.where(lower.isna() | upper.isna(), frame.clip(lower=lower, upper=upper, axis=1))
-    np.testing.assert_allclose(result.to_numpy(np.float32), expected.to_numpy(np.float32), atol=1e-6)
+    expected = _mask_incomplete_window(expected, window)
+    np.testing.assert_allclose(result.to_numpy(np.float32), expected.to_numpy(np.float32), atol=1e-6, equal_nan=True)
 
     perturbed = frame.copy()
     perturbed.loc[31, "alpha"] = -5000.0
     perturbed_result = FeaturePreprocessor(_config("sigma", window=window))._apply_winsorization(perturbed)
-    np.testing.assert_allclose(result.loc[:30].to_numpy(np.float32), perturbed_result.loc[:30].to_numpy(np.float32), atol=1e-6)
+    np.testing.assert_allclose(result.loc[:30].to_numpy(np.float32), perturbed_result.loc[:30].to_numpy(np.float32), atol=1e-6,
+                               equal_nan=True)
 
 
 def test_gaussian_rolling_pit() -> None:

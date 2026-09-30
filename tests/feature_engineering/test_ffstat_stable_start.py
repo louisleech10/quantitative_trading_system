@@ -10,6 +10,7 @@ import ast
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -210,6 +211,154 @@ def test_pointwise_prefix_mask_binary_signal() -> None:
     np.testing.assert_array_equal(out[50:], signal[50:])
 
 
+def _denominator_checks(mask_fn) -> None:
+    """v53（審查 r36 兩家一致）：分母近零遮罩為因果、窗滿後與起算點無關，pandas 與 Polars 兩路徑同一結果。
+    真實 BTC 1h STOCHRSI fastk（邊界常有 ~1e-14 噪音，即此守衛之用途）與 close。`mask_fn(values)` 為受測遮罩。"""
+    import talib
+
+    close = _close("1h")[:6000]
+    fastk, _ = talib.STOCHRSI(close, timeperiod=14, fastk_period=3, fastd_period=3, fastd_matype=0)
+    for series in (fastk, close):
+        base = np.asarray(mask_fn(series), dtype=bool)
+        # ①未來洩漏：尾端追加三倍長之「同一真實序列 ×1e9」（未來尺度劇變，使全欄中位數落入尾段），既有列之遮罩不變
+        tail = np.asarray(mask_fn(np.r_[series, np.tile(series * 1e9, 3)]), dtype=bool)[: len(series)]
+        assert np.array_equal(base, tail), "future"
+        # ②與起算點無關：刪前 1,000 列重算，窗滿後逐列相同
+        again = np.asarray(mask_fn(series[1000:]), dtype=bool)
+        assert np.array_equal(base[1000:][300:], again[300:]), "start"
+
+
+def test_denominator_mask_causal_and_start_independent() -> None:
+    """Task 2.3（v53）：`safe_denominator` 與 Polars `_safe_denom_expr` 之近零遮罩因果、與起算點無關、兩路徑相同。"""
+    import polars as pl
+
+    from momentum.FeatureEngineering.polars_adapter import _safe_denom_expr
+    from momentum.FeatureEngineering.utils.numeric_guards import safe_denominator
+
+    def pandas_mask(values: np.ndarray) -> np.ndarray:
+        return safe_denominator(pd.Series(values)).isna().to_numpy()
+
+    def polars_mask(values: np.ndarray) -> np.ndarray:
+        frame = pl.DataFrame({"d": values})
+        return frame.select(_safe_denom_expr(frame, "d").alias("d"))["d"].fill_nan(None).is_null().to_numpy()
+
+    _denominator_checks(pandas_mask)
+    _denominator_checks(polars_mask)
+    close = _close("1h")[:3000]
+    assert np.array_equal(pandas_mask(close), polars_mask(close))
+
+
+def test_mutation_denominator_full_column_median_is_caught() -> None:
+    """v53 mutant：改回以全欄非零絕對值中位數為尺度（改前實作）⇒ 追加未來極值改變既有列之遮罩 ⇒ 必紅。"""
+
+    def full_column(values: np.ndarray) -> np.ndarray:
+        abs_d = np.abs(np.asarray(values, dtype=np.float64))
+        nonzero = abs_d[np.isfinite(abs_d) & (abs_d > 0)]
+        threshold = np.median(nonzero) * 1e-6 if nonzero.size else 0.0
+        return ~np.isfinite(abs_d) | (abs_d == 0) | (abs_d < threshold)
+
+    with pytest.raises(AssertionError):
+        _denominator_checks(full_column)
+
+
+def test_noncausal_winsor_helpers_fail_closed() -> None:
+    """v53（審查 r36 codex P1-02）：`polars_l65_winsorization`、`transform_array_fast` 直接以
+    `causal_preprocessing=False` 呼叫即拋例外（改前走全欄統計量＝未來洩漏；sigma 分支另於實跑拋 IndexError）；
+    因果呼叫照常。"""
+    import polars as pl
+
+    from momentum.FeatureEngineering.polars_adapter import polars_l65_winsorization
+    from momentum.FeatureEngineering.preprocessing._numba_transforms import transform_array_fast
+
+    values = _close("1h")[:600].reshape(-1, 1).astype(np.float32)
+    frame = pl.DataFrame({"c": values[:, 0].astype(np.float64)})
+    for method in ("sigma", "quantile"):
+        with pytest.raises(ValueError):
+            polars_l65_winsorization(frame, columns=["c"], method=method, causal_preprocessing=False)
+        with pytest.raises(ValueError):
+            transform_array_fast(values, winsor_method=method, causal_preprocessing=False)
+        polars_l65_winsorization(frame, columns=["c"], method=method, causal_preprocessing=True)
+        transform_array_fast(values, winsor_method=method, causal_preprocessing=True)
+
+
+def _foreign_market_ingestion_raises() -> bool:
+    """以真實 BTC 1h 資料、但宣告市場為倍數表未量測者之 adapter 走 `_layer0_data_ingestion`；回傳是否 fail-closed。"""
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.adapters.crypto_spot_adapter import CryptoSpotAdapter
+    from momentum.FeatureEngineering.atomic.warmup_lookup import WarmupTableError
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    registry = factory._adapter_registry
+    real = registry.get("crypto_spot")
+
+    class ForeignMarket(CryptoSpotAdapter):
+        @property
+        def market(self) -> str:
+            return "tw_stock"
+
+    foreign = object.__new__(ForeignMarket)
+    foreign.__dict__.update(real.__dict__)
+    registry._adapters["crypto_spot"] = foreign
+    config = factory._resolve_config(h.stat_payload(fracdiff=False, adf=False))
+    try:
+        factory._layer0_data_ingestion(h.SYMBOL, h.PRIMARY_TF, config)
+    except WarmupTableError:
+        return True
+    finally:
+        registry._adapters["crypto_spot"] = real
+    return False
+
+
+def test_warmup_table_market_scope_fail_closed() -> None:
+    """v52（審查 r35 codex P1-04）：倍數表僅以其 `_meta.market_scopes` 所列市場之真實資料量得；未量測市場之資料
+    生成前即 fail-closed（不得把加密貨幣之 K 靜默套用於台股／美股／期貨）；已量測市場照常。"""
+    from momentum.FeatureEngineering.atomic import warmup_lookup
+
+    assert warmup_lookup.measured_market_scopes() == ("crypto",)
+    warmup_lookup.assert_market_measured("crypto")
+    with pytest.raises(warmup_lookup.WarmupTableError):
+        warmup_lookup.assert_market_measured("tw_stock")
+    assert _foreign_market_ingestion_raises()
+
+
+def test_mutation_market_scope_check_removed_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """v52 mutant：生成入口之市場檢查改為 no-op ⇒ 未量測市場之資料照常生成 ⇒ 必紅。"""
+    from momentum.FeatureEngineering.atomic import warmup_lookup
+
+    monkeypatch.setattr(warmup_lookup, "assert_market_measured", lambda market: None)
+    assert not _foreign_market_ingestion_raises()
+
+
+def _binary_signal_checks() -> None:
+    """第④類之生產呼叫端判定（審查 r34 codex P1-02）：以真實 BTC 1h RSI 14（L1 遮罩後）經
+    `DerivedOperatorEngine.compute_binary_signal` 實跑——輸入首個有限值前之輸出全為 NaN、其後與逐點比較結果相同。"""
+    import talib
+
+    from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
+
+    k = 50
+    rsi = pd.Series(sm.apply_l1_mask(talib.RSI(_close("1h"), timeperiod=14), 0, k))
+    first = sm.first_finite_index(rsi.to_numpy())
+    assert first == k
+    engine = DerivedOperatorEngine({})
+    for condition, expect in (("> 20", rsi > 20), ("< 30", rsi < 30), ("> 70", rsi > 70)):
+        out = engine.compute_binary_signal(rsi, condition, "close_1h_momentum_RSI_14").to_numpy()
+        assert not np.isfinite(out[:first]).any(), condition
+        np.testing.assert_array_equal(out[first:], expect.astype(float).to_numpy()[first:], err_msg=condition)
+
+
+def test_binary_signal_prefix_masked_on_production_caller() -> None:
+    """Task 2.3 ②（第④類，v51）：生產呼叫端 `compute_binary_signal` 之開頭段遮罩。"""
+    _binary_signal_checks()
+
+
+def test_mutation_binary_signal_prefix_unmasked_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """第④類 mutant（審查 r34 codex P1-02）：`mask_pointwise_prefix` 改為不遮 ⇒ 開頭段為 0 而非 NaN ⇒ 必紅。"""
+    monkeypatch.setattr(sm, "mask_pointwise_prefix", lambda output, inputs: np.asarray(output, dtype=float).copy())
+    with pytest.raises(AssertionError):
+        _binary_signal_checks()
+
+
 def test_nan_propagation_inventory_complete() -> None:
     """Task 2.3 ②：盤點收據之步驟集合＝AST 列舉 L2–L6.5 與多週期對齊之步驟函式集合（少一即紅），且每步有碼證與分類。"""
     receipts = sorted((REPO / "handoffs" / "run_receipts").glob("*-ffstat-nan-propagation-inventory.json"))
@@ -256,6 +405,7 @@ _INLINE_ALLOWED = {
     "momentum.FeatureEngineering.preprocessing._non_stationary_cache:NonStationaryCache.make_key": "nan_to_num 只用於快取鍵雜湊",
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._find_min_d": "ffill 於校準值上搜尋 d*，產出 d",
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._log_gap_source_if_any": "diff 於時間戳記判缺口並記日誌",
+    "momentum.FeatureEngineering.preprocessing.stable_mask:_dead_columns_2d": "np.where 算死欄判定統計量（NaN 率、有限值遮罩），只回判定、不產輸出值",
 }
 
 
@@ -439,9 +589,18 @@ def test_no_start_stationarity_off_stable_values_unchanged(tmp_path: Path, monke
     baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
     block = int(baseline["block_rows"])
     h.prepare_stat_env(monkeypatch, tmp_path)
-    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=None)
+    # 基準為全史（無起始日、無結束日，freeze_baseline_nostart.py）⇒ 本 run 亦不帶結束日（helper 預設結束日為 WINDOW 末，
+    # 會使末一區塊只含部分列而 hash 必不同）
+    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=None,
+                                        end_date=None)
+    assert int(baseline["rows"]) == len(_public_column(root, next(iter(baseline["columns"])))), "列數與基準不同"
     stable = result.metadata[CONTRACT["stable_start_receipt_key"]]
-    exempt = set(baseline.get("chain_has_class_2_or_3", []))
+    # v50（審查 r33）：L3 mean／std／zscore／skew／kurt 改為逐窗精確計算，改前基準之該類值帶增量實作之缺陷（常數窗
+    # std 非零、值依起算點而異）⇒ 不與改前基準逐位元組比，改由 ⑨′ 以 float64 逐窗 oracle 驗；其餘欄照常比
+    import re
+
+    v50_changed = re.compile(r"_(Mean|Std|ZScore|Skew|Kurt)_W\d+$")
+    exempt = set(baseline.get("chain_has_class_2_or_3", [])) | {c for c in baseline["columns"] if v50_changed.search(c)}
     compared = 0
     for column, blocks in baseline["columns"].items():
         series = _public_column(root, column)
@@ -482,15 +641,53 @@ def test_no_start_calibration_rows_masked_from_output(tmp_path: Path, monkeypatc
         assert window.isna().all(), column
 
 
+_COLUMN_INDEX: Dict[str, Dict[str, Path]] = {}
+_TIME_AXIS: Dict[str, Any] = {}
+
+
+def _column_index(root: Path) -> Dict[str, Path]:
+    """root 下公開輸出之欄名 → 所在 parquet（只讀檔頭 schema，一個 root 建一次）。逐欄呼叫 `_public_column` 時
+    避免每欄重讀全部檔案（多週期全史數千欄 × 數十檔之 I/O 於 8GB 機器可達數小時）。"""
+    import pyarrow.parquet as pq
+
+    key = str(root.resolve())
+    if key not in _COLUMN_INDEX:
+        index: Dict[str, Path] = {}
+        for p in sorted(root.rglob("*.parquet")):
+            if p.name == "timestamps.parquet":
+                continue
+            for n in pq.read_schema(p).names:
+                index.setdefault(n, p)
+        _COLUMN_INDEX[key] = index
+    return _COLUMN_INDEX[key]
+
+
 def _public_column(root: Path, column: str) -> pd.Series:
     import pyarrow.parquet as pq
 
-    for p in sorted(root.rglob("*.parquet")):
-        frame = pq.read_table(p).to_pandas()
-        if column in frame.columns:
-            idx = pd.to_datetime(frame["timestamp"], unit="ms", utc=True) if "timestamp" in frame.columns else frame.index
-            return pd.Series(frame[column].to_numpy(), index=idx)
-    raise AssertionError(f"找不到欄 {column}")
+    p = _column_index(root).get(column)
+    if p is None:
+        raise AssertionError(f"找不到欄 {column}")
+    names = pq.read_schema(p).names
+    frame = pq.read_table(p, columns=[column] + (["timestamp"] if "timestamp" in names else []))
+    if "timestamp" in names:
+        idx = pd.to_datetime(frame.column("timestamp").to_numpy(), unit="ms", utc=True)
+    else:
+        # L7 raw：群組 parquet 無時間欄，時間軸為 run 目錄之 timestamps.parquet（UTC epoch 秒）
+        stamps = next((q for q in [*p.parents] if (q / "timestamps.parquet").exists()), None)
+        assert stamps is not None, f"找不到 {p} 所屬 run 之 timestamps.parquet"
+        skey = str(stamps.resolve())
+        if skey not in _TIME_AXIS:
+            seconds = pq.read_table(stamps / "timestamps.parquet").column("timestamp").to_numpy()
+            _TIME_AXIS[skey] = pd.to_datetime(seconds, unit="s", utc=True)
+        idx = _TIME_AXIS[skey]
+    return pd.Series(frame.column(column).to_numpy(zero_copy_only=False), index=idx)
+
+
+def _utc(value: Any) -> pd.Timestamp:
+    """時間比較一律 UTC（metadata 之時間為帶時區 ISO；K 線 index 可能無時區——視為 UTC）。"""
+    ts = pd.Timestamp(value)
+    return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
 
 
 def test_no_start_leak_after_calibration_rows_does_not_change_decisions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -529,7 +726,9 @@ def test_no_start_insufficient_history_column_flagged(tmp_path: Path, monkeypatc
     h.drop_kline_rows_before(klines, (last - pd.Timedelta(hours=700)).isoformat(), symbol=h.SYMBOL)
     payload = h.stat_payload()
     payload["preprocessing"]["calibration_bars"] = 500
-    root, _factory, result = h.run_stat(tmp_path, payload, start_date=None, kline_dir=str(klines))
+    # 結束日取保留段之末（helper 預設 WINDOW 結束日早於保留之最後 700 小時 ⇒ 否則 L0 為空）
+    root, _factory, result = h.run_stat(tmp_path, payload, start_date=None, end_date=last.isoformat(),
+                                        kline_dir=str(klines))
     flagged = [c for c, r in h.decisions(result).items() if h.EVENTS["calibration_insufficient"] in " ".join(r["events"])]
     assert flagged
     assert result.metadata.get("quality_status") == "partial"
@@ -541,20 +740,371 @@ def test_no_start_insufficient_history_column_flagged(tmp_path: Path, monkeypatc
 # ─────────────────────────────── ⑤ 有起始日
 
 def test_with_start_far_no_warmup_insufficient(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 ⑤：起始日離資料起點足夠遠 ⇒ 全部欄首個有效值 ≤ 起始日、無 warmup_insufficient_history。"""
+    """Task 2.3 ⑤：起始日離資料起點足夠遠 ⇒ 全部欄首個有效值 ≤ 起始日、無 warmup_insufficient_history。
+
+    「首個有效值」指計算域（含起始日前之預熱列）之首個有限值。公開輸出首列為 NaN 而計算域更早已有有限值者屬資料
+    所致之間歇 NaN（真實 BTC 1h：2026-01-01 前 16 小時 MIDPOINT_144 恆定 ⇒ 13 根窗 Kurt 無定義），非預熱不足；
+    以獨立之第二次生成（起始日提前 30 日）驗此類欄於原起始日前確有有限值。"""
     h.prepare_stat_env(monkeypatch, tmp_path)
-    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False))
+    payload = h.stat_payload(fracdiff=False, adf=False)
+    root, _factory, result = h.run_stat(tmp_path, payload)
     assert h.EVENTS["warmup_insufficient"] not in json.dumps(result.metadata.get("failure_reasons", []))
+    assert not result.metadata.get("warmup_insufficient_columns")
     start = pd.Timestamp(h.WINDOW[0], tz="UTC")
-    for column, ts in result.metadata[CONTRACT["stable_start_receipt_key"]].items():
-        assert pd.Timestamp(ts) <= start, column
+    public_late = sorted(c for c, ts in result.metadata[CONTRACT["stable_start_receipt_key"]].items()
+                         if ts is not None and pd.Timestamp(ts) > start)
+    if not public_late:
+        return
+    earlier = (start - pd.Timedelta(days=30)).strftime("%Y-%m-%d")
+    root_b, _factory_b, result_b = h.run_stat(tmp_path / "earlier", payload, start_date=earlier)
+    starts_b = result_b.metadata[CONTRACT["stable_start_receipt_key"]]
+    for column in public_late:
+        assert starts_b.get(column) is not None and pd.Timestamp(starts_b[column]) < start, column
+        series = _public_column(root_b, column)
+        assert np.isfinite(series[series.index < start].to_numpy(dtype=np.float64)).any(), column
+
+
+def test_chunked_memmap_keeps_appended_columns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """⑪ 實跑所得（frame 路徑 L6.5 靜默降級）：欄分塊＋memmap 時，append 模式之衍生欄使 chunk 輸出寬於輸入
+    ⇒ 輸出欄名與值須與不走 memmap 之分塊結果相同（改前固定寬度 ⇒ broadcast 例外、整層降級）；另含 chunk 輸出
+    窄於輸入之情形（欄名不得錯位）。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    close = pd.Series(_close("1h")[:3000])
+    frame = pd.DataFrame({f"c_{w}": close.rolling(w).mean() for w in (2, 3, 5, 8, 13, 21, 34)})
+
+    def fake_single(self, chunk: pd.DataFrame) -> pd.DataFrame:
+        out = chunk.copy()
+        for name in chunk.columns:
+            if name.endswith(("_2", "_5", "_13")):
+                out[f"{name}_fracdiff"] = chunk[name].diff()  # append 模式衍生欄
+            if name.endswith("_34"):
+                out = out.drop(columns=[name])  # 窄於輸入
+        return out
+
+    monkeypatch.setattr(FeaturePreprocessor, "_transform_single", fake_single)
+    pre = FeaturePreprocessor({})
+    monkeypatch.setattr(FeaturePreprocessor, "_CHUNKED_MEMMAP_MIN_BYTES", 10 ** 18)
+    expected = pre._transform_chunked(frame, chunk_size=2)
+    monkeypatch.setattr(FeaturePreprocessor, "_CHUNKED_MEMMAP_MIN_BYTES", 0)
+    got = pre._transform_chunked(frame, chunk_size=2)
+    assert list(got.columns) == list(expected.columns)
+    assert len(expected.columns) == len(frame.columns) + 3 - 1
+    np.testing.assert_array_equal(got.to_numpy(), expected.to_numpy(dtype=np.float32))
+
+
+_WINSOR_PATHS = {
+    # 路徑名 → (FFACT_USE_POLARS, FFACT_L65_OPTIMIZATION_PROFILE, mode, 欄分塊大小〔0＝不分塊〕)
+    "polars": ("1", "optimized", "append", 0),
+    "legacy_append": ("0", "optimized", "append", 0),
+    "optimized_replace": ("0", "optimized", "replace", 0),
+    "legacy_replace": ("0", "legacy", "replace", 0),
+    "chunked": ("0", "optimized", "append", 2),
+}
+
+
+@pytest.mark.parametrize("path", sorted(_WINSOR_PATHS))
+def test_winsorization_switch_honoured_on_every_path(path: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """審查 r34 主委實跑所得（改前既有缺陷）：`winsorization.enabled=False` 時 L6.5 各轉換路徑須不縮尾、輸出＝輸入；
+    改前 `_transform_single_legacy`、`_transform_single_optimized_df`、`_transform_single_polars` 無視開關（其餘轉換皆有
+    `enabled` 判斷），關縮尾仍縮尾並遮開頭 251 列。同一路徑開縮尾須與輸入不同（證明本測試觀測得到縮尾）。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    polars, profile, mode, chunk = _WINSOR_PATHS[path]
+    monkeypatch.setenv("FFACT_USE_POLARS", polars)
+    monkeypatch.setenv("FFACT_L65_OPTIMIZATION_PROFILE", profile)
+    close = pd.Series(_close("1h")[:2000])
+    frame = pd.DataFrame({f"c_{w}": close.pct_change(w) for w in (1, 3, 8)}).astype(np.float32)
+
+    def run(enabled: bool) -> pd.DataFrame:
+        pre = FeaturePreprocessor({"enabled": True, "mode": mode, "causal_preprocessing": True,
+                                   "winsorization": {"enabled": enabled, "method": "quantile"},
+                                   "rank_transform": {"enabled": False}, "adaptive_zscore": {"enabled": False},
+                                   "gaussian_normalize": {"enabled": False},
+                                   "fractional_differencing": {"enabled": False},
+                                   "adf_differencing": {"enabled": False}})
+        if chunk:
+            return pre._transform_chunked(frame, chunk_size=chunk)
+        return pre.transform(frame)
+
+    off = run(False)
+    for name in frame.columns:
+        np.testing.assert_array_equal(off[name].to_numpy(dtype=np.float32), frame[name].to_numpy(), err_msg=name)
+    on = run(True)
+    assert not np.array_equal(np.isnan(on["c_1"].to_numpy()), np.isnan(frame["c_1"].to_numpy())), path
+
+
+def _l3_oracle(values: np.ndarray, window: int) -> np.ndarray:
+    """L3 滾動統計之獨立 float64 逐窗 oracle（numpy＋scipy）：mean、std(ddof=1)、zscore、skew（bias=False）、
+    kurt（Fisher、bias=False）；窗內任一 NaN ⇒ NaN。常數窗 std＝0、其餘 NaN。
+
+    v51（審查 r34 codex P1-03）：skew／kurt 之退化契約（canonical，`numba_rolling._compute_skew`／`_compute_kurt`
+    之既有守衛，此處以 numpy 獨立重算）——①相對退化：Σ(x−mean)² ≤ 1e-12 ×（Σ(x−mean)²＋n·mean²）⇒ NaN（例：真實
+    BTC 1h MIDPOINT 窗內僅 float32 末位之差）；②樣本界：|skew| > √n 或 kurt 超出 [−2(n−1)/(n−3), n]（容差 1e-9）⇒ NaN。"""
+    from scipy import stats
+
+    n = len(values)
+    out = np.full((n, 5), np.nan)
+    xs = np.lib.stride_tricks.sliding_window_view(values, window)
+    w = float(window)
+    for k, win in enumerate(xs):
+        i = k + window - 1
+        if not np.isfinite(win).all():
+            continue
+        mean = float(np.mean(win))
+        out[i, 0] = mean
+        if win.max() == win.min():
+            out[i, 1] = 0.0
+            continue
+        std = float(np.std(win, ddof=1))
+        out[i, 1] = std
+        out[i, 2] = (win[-1] - mean) / std
+        m2 = float(np.sum((win - mean) ** 2))
+        if m2 <= 1e-12 * (m2 + w * mean * mean):
+            continue
+        skew = float(stats.skew(win, bias=False))
+        kurt = float(stats.kurtosis(win, fisher=True, bias=False))
+        if window >= 3 and abs(skew) <= math.sqrt(w) * (1.0 + 1e-9):
+            out[i, 3] = skew
+        if window >= 4 and -2.0 * (w - 1.0) / (w - 3.0) * (1.0 + 1e-9) <= kurt <= w * (1.0 + 1e-9):
+            out[i, 4] = kurt
+    return out
+
+
+def _l3_exact_checks(fused, skew_kurt) -> None:
+    """⑨′ 之判定：真實 BTC 1h MIDPOINT_21（分段常數、常數窗多）與 EMA_34 之 L3 與 oracle 相等（float32 精度內）、
+    常數窗 std＝0、刪前 300 列重算重疊段逐位元組相同。`fused`／`skew_kurt` 為受測函式（mutant 以此注入）。"""
+    import talib
+
+    close = _close("1h")[:6000]
+    for series in (talib.MIDPOINT(close, 21), talib.EMA(close, 34)):
+        for window in (5, 13, 21):
+            got = np.column_stack([fused(series, window)[:, [0, 1, 5]], skew_kurt(series, window)]).astype(np.float64)
+            want = _l3_oracle(series, window)
+            for k in range(5):
+                # v51（審查 r34 codex P1-03）：先要求有限值位置全等（改前只比兩邊皆有限之列，NaN 可掩蓋有限值）
+                assert np.array_equal(np.isfinite(got[:, k]), np.isfinite(want[:, k])), ("mask", window, k)
+                both = np.isfinite(got[:, k]) & np.isfinite(want[:, k])
+                scale = np.maximum(np.abs(want[both, k]), 1.0)
+                assert np.all(np.abs(got[both, k] - want[both, k]) <= 1e-5 * scale), (window, k)
+            const = np.isfinite(want[:, 0]) & (want[:, 1] == 0.0)
+            assert np.all(got[const, 1] == 0.0) and not np.isfinite(got[const, 2]).any(), window
+            again = np.column_stack([fused(series[300:], window), skew_kurt(series[300:], window)])
+            first = np.column_stack([fused(series, window), skew_kurt(series, window)])[300:]
+            assert np.array_equal(first[window:], again[window:], equal_nan=True), window
+
+
+def test_l3_rolling_exact_and_start_independent() -> None:
+    """Task 2.3 ⑨′（v50，審查 r33 兩家一致）：L3 滾動 mean／std／zscore／skew／kurt 為與起算點無關之逐窗精確計算。"""
+    from momentum.FeatureEngineering.operators.numba_rolling import fused_rolling_stats, rolling_skew_kurt
+
+    _l3_exact_checks(fused_rolling_stats, rolling_skew_kurt)
+
+
+def test_mutation_l3_incremental_welford_is_caught() -> None:
+    """⑨′ mutant：改回 Welford 增量加入／移除（改前實作）⇒ 常數窗 std 非零、刪前列重算不同 ⇒ 必紅。"""
+    from momentum.FeatureEngineering.operators.numba_rolling import rolling_skew_kurt
+
+    def welford_fused(data: np.ndarray, window: int) -> np.ndarray:
+        out = np.full((len(data), 6), np.nan)
+        count, mean, m2 = 0, 0.0, 0.0
+        for i, value in enumerate(data):
+            if i >= window and np.isfinite(data[i - window]):
+                old = data[i - window]
+                count -= 1
+                if count:
+                    delta = old - mean
+                    mean -= delta / count
+                    m2 -= delta * (old - mean)
+                else:
+                    mean, m2 = 0.0, 0.0
+            if np.isfinite(value):
+                count += 1
+                delta = value - mean
+                mean += delta / count
+                m2 += delta * (value - mean)
+            if i >= window - 1 and count >= window:
+                std = np.sqrt(max(m2, 0.0) / (count - 1))
+                out[i, 0], out[i, 1] = mean, std
+                out[i, 5] = (value - mean) / std if std > 0 else np.nan
+        return out.astype(np.float32)
+
+    with pytest.raises(AssertionError):
+        _l3_exact_checks(welford_fused, rolling_skew_kurt)
+
+
+def _slope_checks(slope_fn) -> None:
+    """v51：L3 Slope 為逐窗精確（與 float64 最小平方 oracle 相等）且與起算點無關（刪前 2,049 列重算重疊段逐位元組
+    相同）。真實 BTC 1h close 與 STOCHRSI fastd（§G⑦ 分解判準實跑所得之不等欄）。"""
+    import talib
+
+    close = _close("1h")[:8000]
+    _, fastd = talib.STOCHRSI(close, timeperiod=14, fastk_period=3, fastd_period=3, fastd_matype=0)
+    for series in (close, fastd):
+        for window in (3, 5, 21):
+            got = np.asarray(slope_fn(series, window), dtype=np.float64)
+            xs = np.lib.stride_tricks.sliding_window_view(series, window)
+            x = np.arange(window, dtype=np.float64)
+            want = np.full(len(series), np.nan)
+            ok = np.isfinite(xs).all(axis=1)
+            want[window - 1:][ok] = [np.polyfit(x, win, 1)[0] for win in xs[ok]]
+            assert np.array_equal(np.isfinite(got), np.isfinite(want)), ("mask", window)
+            both = np.isfinite(want)
+            scale = np.maximum(np.abs(want[both]), np.nanstd(series) * 1e-3)
+            assert np.all(np.abs(got[both] - want[both]) <= 1e-5 * scale), ("value", window)
+            again = np.asarray(slope_fn(series[2049:], window))
+            assert np.array_equal(np.asarray(slope_fn(series, window))[2049:][window:], again[window:],
+                                  equal_nan=True), ("start", window)
+
+
+def test_l3_slope_exact_and_start_independent() -> None:
+    """Task 2.3 ⑨′（v51）：L3 Slope 逐窗精確、與起算點無關。"""
+    from momentum.FeatureEngineering.operators.numba_rolling import rolling_slope
+
+    _slope_checks(rolling_slope)
+
+
+def test_l3_slope_fallback_path_exact_and_start_independent() -> None:
+    """Task 2.3 ⑨′（v52，審查 r35 codex P1-06）：非預設路徑（non-streaming、chunked、pandas 備援）之
+    `RollingAggregator._compute_slope_vectorized` 與預設路徑同一契約。"""
+    from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
+
+    def via_fallback(series: np.ndarray, window: int) -> np.ndarray:
+        frame = pd.DataFrame({"x": np.asarray(series, dtype=np.float64)})
+        return RollingAggregator._compute_slope_vectorized(frame, window)["x"].to_numpy()
+
+    _slope_checks(via_fallback)
+
+
+def test_mutation_l3_slope_absolute_index_running_sums_is_caught() -> None:
+    """⑨′ mutant（v51）：改回以絕對列號累加之 running sums（改前實作）⇒ 刪前列重算之末位不同 ⇒ 必紅。"""
+
+    def running_sums(data: np.ndarray, window: int) -> np.ndarray:
+        n = len(data)
+        out = np.full(n, np.nan)
+        w = float(window)
+        sum_x = w * (w - 1.0) / 2.0
+        den = w * (w * (w - 1.0) * (2.0 * w - 1.0) / 6.0) - sum_x * sum_x
+        sum_y = sum_jy = 0.0
+        valid = 0
+        for i in range(n):
+            if i >= window and np.isfinite(data[i - window]):
+                sum_y -= data[i - window]
+                sum_jy -= float(i - window) * data[i - window]
+                valid -= 1
+            if np.isfinite(data[i]):
+                sum_y += data[i]
+                sum_jy += float(i) * data[i]
+                valid += 1
+            if i >= window - 1 and valid >= window:
+                out[i] = (w * (sum_jy - float(i - window + 1) * sum_y) - sum_x * sum_y) / den
+        return out.astype(np.float32)
+
+    with pytest.raises(AssertionError):
+        _slope_checks(running_sums)
+
+
+def test_mutation_l3_skew_kurt_all_nan_is_caught() -> None:
+    """⑨′ mutant（審查 r34 codex P1-03）：skew／kurt 全列回傳 NaN ⇒ 有限值位置與 oracle 不等 ⇒ 必紅。"""
+    from momentum.FeatureEngineering.operators.numba_rolling import fused_rolling_stats
+
+    with pytest.raises(AssertionError, match="mask"):
+        _l3_exact_checks(fused_rolling_stats, lambda data, window: np.full((len(data), 2), np.nan))
+
+
+def test_mutation_l3_degeneracy_guard_removed_is_caught() -> None:
+    """⑨′ mutant（審查 r34 codex P1-03）：刪相對退化守衛（窗內僅末位之差仍出 skew／kurt）⇒ 真實 BTC 1h MIDPOINT 之
+    近常數窗有限值位置與 oracle 不等 ⇒ 必紅。"""
+    from scipy import stats
+
+    from momentum.FeatureEngineering.operators.numba_rolling import fused_rolling_stats
+
+    def unguarded(data: np.ndarray, window: int) -> np.ndarray:
+        out = np.full((len(data), 2), np.nan)
+        for k, win in enumerate(np.lib.stride_tricks.sliding_window_view(data, window)):
+            if np.isfinite(win).all() and win.max() != win.min():
+                out[k + window - 1] = (stats.skew(win, bias=False), stats.kurtosis(win, fisher=True, bias=False))
+        return out
+
+    with pytest.raises(AssertionError, match="mask"):
+        _l3_exact_checks(fused_rolling_stats, unguarded)
+
+
+def test_chunked_memmap_all_chunks_empty_returns_zero_columns(monkeypatch: pytest.MonkeyPatch) -> None:
+    """審查 r33 codex P1-05：欄分塊＋memmap 時每個 chunk 皆回傳零欄 ⇒ 回傳與 index 對齊之零欄 DataFrame（改前零大小
+    memmap 拋 `ValueError: cannot mmap an empty file`）。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    close = pd.Series(_close("1h")[:500])
+    frame = pd.DataFrame({f"c_{w}": close.rolling(w).mean() for w in (2, 3, 5)})
+    monkeypatch.setattr(FeaturePreprocessor, "_transform_single", lambda self, chunk: pd.DataFrame(index=chunk.index))
+    monkeypatch.setattr(FeaturePreprocessor, "_CHUNKED_MEMMAP_MIN_BYTES", 0)
+    got = FeaturePreprocessor({})._transform_chunked(frame, chunk_size=2)
+    assert got.shape == (len(frame), 0) and got.index.equals(frame.index)
+
+
+def test_probe_columns_without_finite_values_counted_late(monkeypatch: pytest.MonkeyPatch) -> None:
+    """審查 r33 codex P1-03：探測段內無有限值之欄（首個有限值落在探測上界之後）須計入晚到集合，不得因 `has=False`
+    被當成未晚到而漏報。以真實 BTC 1h close 為探測域之一欄；另一欄為真實 TA-Lib SMA、週期＝探測域列數＋1（v51，審查
+    r34 codex P2-01：改前為全 NaN 常數欄）——探測段內無有限值，而同一指標於探測上界之後之真實資料確有有限值。"""
+    import talib
+
+    from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.preprocessing import calibration as cal
+
+    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
+    config = factory._resolve_config(h.stat_payload(fracdiff=False, adf=False))
+    probed: Dict[str, Any] = {}
+
+    def fake_domain(_factory, _symbol, _tf, _config, klines):
+        close = klines["close"].to_numpy(dtype=np.float64)
+        probed["start"], probed["end"], probed["period"] = klines.index[0], klines.index[-1], len(close) + 1
+        late = talib.SMA(close, timeperiod=probed["period"])
+        return pd.DataFrame({"close_trend_REAL": close, "close_trend_LATE": late}, index=klines.index)
+
+    monkeypatch.setattr(cal, "compute_calibration_domain", fake_domain)
+    window = factory._resolve_public_window(h.SYMBOL, h.PRIMARY_TF, config, *h.WINDOW)
+    bound_window, late = factory._public_warmup_late
+    assert bound_window is window
+    # 同一指標自同一起點延續至探測上界之後之真實資料：首個有限值恰在上界之後（真實延後出值，非恆 NaN）
+    full = h.kline_frame(timeframe=h.PRIMARY_TF)
+    tail = full[pd.DatetimeIndex(full.index) >= pd.to_datetime(probed["start"], utc=True)]
+    after = talib.SMA(tail["close"].to_numpy(dtype=np.float64), timeperiod=probed["period"])
+    first = int(np.argmax(np.isfinite(after)))
+    assert np.isfinite(after).any() and tail.index[first] > pd.to_datetime(probed["end"], utc=True)
+    assert cal.tagged_column_name("close_trend_LATE", h.PRIMARY_TF) in late
+    assert cal.tagged_column_name("close_trend_REAL", h.PRIMARY_TF) not in late
+
+
+def test_warmup_late_only_counts_probe_late_columns() -> None:
+    """Task 2.3 ⑤：歷史不足只計加倍探測末輪仍晚到之欄；資料所致之晚到不計；平穩化衍生欄依基礎欄判定；
+    未經探測（probe_late=None）時公開晚到全計。"""
+    from momentum.FeatureEngineering.warmup_window import warmup_late_columns
+
+    start = "2026-01-01T00:00:00+00:00"
+    stable = {
+        "a_1h_x": "2026-01-01T05:00:00+00:00",          # 探測晚到 ⇒ 計
+        "b_1h_kurt": "2026-01-01T16:00:00+00:00",       # 資料所致 ⇒ 不計
+        "c_1h_ok": "2025-12-31T00:00:00+00:00",         # 不晚
+        "a_1h_x_fracdiff": "2026-01-02T00:00:00+00:00",  # 基礎欄探測晚到 ⇒ 計
+        "c_1h_ok_diff1": "2026-01-01T03:00:00+00:00",   # 基礎欄不晚 ⇒ 晚到來自平穩化窗寬 ⇒ 計
+        "b_1h_kurt_fracdiff": "2026-01-02T00:00:00+00:00",  # 基礎欄資料所致晚到 ⇒ 不計
+        "d_1h_dead": None,
+    }
+    assert warmup_late_columns(stable, start, frozenset({"a_1h_x"})) == ["a_1h_x", "a_1h_x_fracdiff", "c_1h_ok_diff1"]
+    assert warmup_late_columns(stable, start, None) == sorted(
+        ["a_1h_x", "b_1h_kurt", "a_1h_x_fracdiff", "c_1h_ok_diff1", "b_1h_kurt_fracdiff"])
+    assert warmup_late_columns(stable, None, frozenset({"a_1h_x"})) == []
 
 
 def test_with_start_near_data_start_flags_slow_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 ⑤：起始日取資料起點後 100 列 ⇒ 慢欄記 warmup_insufficient_history、partial、起始日至首個有效值為 NaN，快欄照常。"""
+    """Task 2.3 ⑤：起始日取資料起點後 400 列 ⇒ 慢欄記 warmup_insufficient_history、partial、起始日至首個有效值為 NaN，快欄照常。
+
+    （原 100 列：R6 縮尾完整窗遮罩使每欄穩定點至少 +251 列，100 列內無快欄可驗；400 列時 EMA_5 類約 271 列即穩定、
+    EMA_233 類逾 1,000 列，快慢兩類皆在。）"""
     h.prepare_stat_env(monkeypatch, tmp_path)
     index = h.kline_frame().index
-    start = index[100].isoformat()
+    start = index[400].isoformat()
     root, _factory, result = h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False), start_date=start)
     reasons = json.dumps(result.metadata.get("failure_reasons", []))
     assert h.EVENTS["warmup_insufficient"] in reasons
@@ -596,7 +1146,10 @@ def test_dead_filter_shared_by_l3_and_l7(tmp_path: Path, monkeypatch: pytest.Mon
 
     monkeypatch.setattr(sm, "dead_column_decision", spy)
     h.prepare_stat_env(monkeypatch, tmp_path)
-    h.run_stat(tmp_path, h.stat_payload(fracdiff=False, adf=False))
+    payload = h.stat_payload(fracdiff=False, adf=False)
+    # 共用 helper 之輕量設定關閉 L7 死欄剔除（fftfmeta_golden_helpers）；本測試驗 L7 呼叫端 ⇒ 開啟（生產預設即開）
+    payload["nan_strategy"] = {**payload.get("nan_strategy", {}), "l7_dead_feature_drop": {"enabled": True}}
+    h.run_stat(tmp_path, payload)
     thresholds = CONTRACT["dead_filter_thresholds"]
     assert (thresholds["l3_nan_rate"], thresholds["l3_min_effective_n"]) in seen
     assert (None, thresholds["l7_min_valid_samples_default"]) in seen
@@ -631,6 +1184,81 @@ def test_column_set_delta_unknown_reason_rejected() -> None:
     assert tuple(CONTRACT["column_set_delta"]["reasons"]) == sm.DELTA_REASONS
 
 
+def _receipts_module():
+    import importlib.util
+
+    path = REPO / "handoffs" / "run_receipts" / "ffstat_probes" / "stable_start_receipts.py"
+    spec = importlib.util.spec_from_file_location("ffstat_stable_start_receipts", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_warmup_restored_evidence_frozen_from_prebase() -> None:
+    """Task 2.3 ⑦（v49）：改前 L3 剔除紀錄凍結於 b4 動工前原始碼 5a148b8e；每筆欄位齊全；
+    「開頭過長」判定：凍結檔全部紀錄（真實改前 run）皆判真；同一紀錄改為含 inf、開頭無 NaN、或低基數閘所剔而輸入非全 NaN ⇒ 判假。"""
+    receipts = _receipts_module()
+    frozen = json.loads(receipts.DEAD_DROPS_PATH.read_text(encoding="utf-8"))
+    assert frozen["commit"].startswith("5a148b8e") and frozen["quality_status"] == "complete"
+    records = frozen["l3_dead_drops"]
+    assert records
+    fields = {"rows", "leading_nan", "nan_rate", "valid", "has_inf", "constant"}
+    assert all(fields <= set(r) for r in records.values())
+    assert all(receipts.leading_caused(r) for r in records.values())
+    sample = next(r for r in records.values() if not r.get("low_cardinality_skip") and r["leading_nan"] < r["rows"])
+    assert not receipts.leading_caused({**sample, "has_inf": True})
+    assert not receipts.leading_caused({**sample, "leading_nan": 0, "valid": sample["rows"]})
+    assert not receipts.leading_caused({**sample, "low_cardinality_skip": True})
+
+
+def test_warmup_restored_classification_causal() -> None:
+    """Task 2.3 ⑦（v50，審查 r33 codex P1-01、composer P2-01）：`warmup_restored` 須因果配對——改前開頭過長被剔
+    （凍結檔真實紀錄）＋改後公開輸出於改前開頭段內有有限值＋stable_start ≤ 起始日；開頭段內無有限值 ⇒ 無原因；
+    未於起始日前穩定 ⇒ nan_rate_rule；含 inf 之改前剔除（非開頭所致）⇒ 無原因（mixed delta 負例）。
+    新值以真實 BTC 1h close 之 721 列充當改後欄值（只取其有限性），開頭段 NaN 版本以同一真實序列遮前段。"""
+    receipts = _receipts_module()
+    frozen = json.loads(receipts.DEAD_DROPS_PATH.read_text(encoding="utf-8"))["l3_dead_drops"]
+    rec = next(r for r in frozen.values() if not r.get("low_cardinality_skip") and 0 < r["leading_nan"] < r["rows"])
+    real = _close("1h")[:int(rec["rows"])].copy()
+    head_nan = real.copy()
+    head_nan[:int(rec["leading_nan"])] = np.nan
+    assert receipts.classify_added(rec, real, True) == "warmup_restored"
+    assert receipts.classify_added(rec, head_nan, True) is None
+    assert receipts.classify_added(rec, real, False) == "nan_rate_rule"
+    assert receipts.classify_added({**rec, "has_inf": True}, real, True) is None
+    assert receipts.classify_added(None, real, True) is None
+
+
+def test_mutation_leading_caused_always_true_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """v50 mutant：`leading_caused` 恆真（非開頭所致之改前剔除亦被接受）⇒ 因果配對測試必紅。"""
+    import importlib.util
+
+    path = REPO / "handoffs" / "run_receipts" / "ffstat_probes" / "stable_start_receipts.py"
+    spec = importlib.util.spec_from_file_location("ffstat_stable_start_receipts_mut1", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.leading_caused = lambda rec: True
+    monkeypatch.setattr(sys.modules[__name__], "_receipts_module", lambda: module)
+    with pytest.raises(AssertionError):
+        test_warmup_restored_classification_causal()
+
+
+def test_mutation_restored_always_true_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
+    """v50 mutant：凡改前開頭過長者一律判 `warmup_restored`（不看開頭段填回與起始日）⇒ 因果配對測試必紅。"""
+    import importlib.util
+
+    path = REPO / "handoffs" / "run_receipts" / "ffstat_probes" / "stable_start_receipts.py"
+    spec = importlib.util.spec_from_file_location("ffstat_stable_start_receipts_mut2", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    original = module.classify_added
+    module.classify_added = lambda rec, values, restored: (
+        "warmup_restored" if original(rec, values, True) is not None or original(rec, values, restored) else None)
+    monkeypatch.setattr(sys.modules[__name__], "_receipts_module", lambda: module)
+    with pytest.raises(AssertionError):
+        test_warmup_restored_classification_causal()
+
+
 def test_column_set_approval_matches_delta() -> None:
     """Task 2.3 ⑦：核可紀錄之 delta sha256＝本次 delta sha256；delta 非空而無核可紀錄即紅。"""
     rr = REPO / "handoffs" / "run_receipts"
@@ -650,25 +1278,56 @@ def test_column_set_approval_matches_delta() -> None:
 # ─────────────────────────────── ⑧⑨⑩ 多週期、快取、開關
 
 def test_multi_tf_mask_applied_before_alignment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 ⑧：1h＋12h 無起始日 ⇒ 12h 欄於對齊後之首個有效值時間＝其 12h stable_start 可被 1h 取用之時間。"""
+    """Task 2.3 ⑧：1h＋12h 無起始日 ⇒ 12h 欄於對齊後之首個有效值時間＝其 12h stable_start 可被 1h 取用之時間。
+
+    metadata 之 `stable_start` 依 §C 為「公開輸出中該欄第一個有限值之時間」——多週期時即 1h 格線上之時間；
+    12h 原生穩定點另以獨立之 12h 單週期生成（同設定、`training=[12h]`、`primary=12h`）取得，作為本測試之 oracle。"""
+    from momentum.FeatureEngineering.preprocessing._native_tf_helpers import scale_window_for_native
+
     h.prepare_stat_env(monkeypatch, tmp_path)
-    root, _factory, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], fracdiff=False, adf=False), start_date=None)
+    root, factory, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], fracdiff=False, adf=False), start_date=None)
+    # 多週期時 12h 欄之 L6.5 於原生週期子實例進行，縮尾窗由主週期根數換算為原生根數（252 根 1h ⇒ 21 根 12h）；
+    # 單週期 oracle 須用同一換算後之窗，方為同一計算
+    window_1h = int(factory._resolve_config(h.stat_payload(["1h", "12h"])).preprocessing.winsorization.window)
+    native_payload = h.stat_payload(["12h"], fracdiff=False, adf=False)
+    native_payload["preprocessing"]["winsorization"] = {
+        **native_payload["preprocessing"]["winsorization"], "window": scale_window_for_native(window_1h, "12h", "1h")}
+    native_payload["timeframes"] = {**native_payload["timeframes"], "primary": "12h"}
+    _root_n, _factory_n, native = h.run_stat(tmp_path / "native12h", native_payload, start_date=None, primary_tf="12h")
     from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 
     stable = result.metadata[CONTRACT["stable_start_receipt_key"]]
-    twelve = [c for c in stable if "12h" in c]
+    native_stable = native.metadata[CONTRACT["stable_start_receipt_key"]]
+    twelve = [c for c in stable if "_12h_" in c]
     assert twelve
+    assert set(twelve) <= set(native_stable), sorted(set(twelve) - set(native_stable))[:5]
     idx_12h = h.kline_frame(timeframe="12h").index
     idx_1h = h.kline_frame(timeframe="1h").index
+    # 12h K 棒序號經同一對齊器對到 1h 一次（原逐欄對齊數千次：每次新建物件並記一行 log，pytest 保留全部擷取之 log
+    # 於記憶體，8GB 機器上三度被系統砍掉）。對齊為「每個 1h 列取其時可用之最近 12h K 棒」⇒ 對齊後序號單調不減；
+    # 某欄 12h 原生穩定於第 p 根 ⇒ 1h 首個有值時間＝對齊後序號首次 ≥ p 之 1h 時間（與原逐欄標記法同義）。
+    ordinal = pd.DataFrame({"m": np.arange(len(idx_12h), dtype=np.float64)}, index=idx_12h)
+    ordinal.index.name = "timestamp"
+    aligned = TimeframeAligner.align_to_primary(ordinal.reset_index(), "12h", pd.Series(idx_1h), "1h")["m"]
+    aligned_times = pd.DatetimeIndex([_utc(t) for t in aligned.index])
+    aligned_ordinal = aligned.to_numpy(dtype=np.float64)
+    native_times = pd.DatetimeIndex([_utc(t) for t in idx_12h])
+    checked = 0
     for column in twelve:
-        # 預期：12h 於其 stable_start 首個有效之列，經同一對齊器對到 1h 後之第一個有值時間（r24 codex P1-03：精確相等）
-        marker = pd.DataFrame({"m": np.where(idx_12h >= pd.Timestamp(stable[column]), 1.0, np.nan)}, index=idx_12h)
-        marker.index.name = "timestamp"
-        aligned = TimeframeAligner.align_to_primary(marker.reset_index(), "12h", pd.Series(idx_1h), "1h")
-        expected = aligned["m"].first_valid_index()
         series = _public_column(root, column)
-        assert series.first_valid_index() == expected, column
+        if native_stable[column] is None:
+            # 原生週期於全史內無穩定值（如 12h T3_233：穩定點超出約 1,700 根）⇒ 對齊後亦須全 NaN
+            assert stable[column] is None and series.isna().all(), column
+            continue
+        checked += 1
+        # 預期：12h 於其原生 stable_start 首個有效之列，經同一對齊器對到 1h 後之第一個有值時間（r24 codex P1-03：精確相等）
+        p = int(native_times.searchsorted(_utc(native_stable[column]), side="left"))
+        reached = np.flatnonzero(np.nan_to_num(aligned_ordinal, nan=-1.0) >= p)
+        assert reached.size, column
+        expected = aligned_times[int(reached[0])]
+        assert _utc(series.first_valid_index()) == expected, column
         assert series.loc[:expected - pd.Timedelta(microseconds=1)].isna().all(), column
+    assert checked, len(twelve)
 
 
 def test_config_hash_includes_warmup_policy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -752,7 +1411,7 @@ def test_boundary_24_reference_symbol_origin(tmp_path: Path, monkeypatch: pytest
                                          start_date=None, kline_dir=str(klines))
     for column, ts in result.metadata[CONTRACT["stable_start_receipt_key"]].items():
         if column.startswith("cs_"):
-            assert pd.Timestamp(ts) >= ref_start, column
+            assert _utc(ts) >= _utc(ref_start), column
 
 
 # Task 2.3 邊界④（帶 start_date ⇒ output_start_source == "user"、effective_output_start＝該日）之唯一具名測試為既有
@@ -763,19 +1422,48 @@ def test_boundary_24_reference_symbol_origin(tmp_path: Path, monkeypatch: pytest
 # ─────────────────────────────── ⑪ 四條執行路徑
 
 _PATHS = {
-    "frame": {"FFACT_USE_CGSA": "0"},
     "cgsa_serial": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
     "cgsa_parallel": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
+    # 大記憶體機器之記憶體級距（共用 FIXED_ENV 固定 L3 為 streaming ⇒ 改回 auto 由級距決定：24gb＝hybrid、
+    # 32gb＝in_memory，並連帶該級距之 L6.5／L7 worker 數與分割門檻）
+    "tier_24gb": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0", "FFACT_MEMORY_TIER": "24gb",
+                  "FFACT_L3_PERSIST_MODE": "auto"},
+    "tier_32gb": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0", "FFACT_MEMORY_TIER": "32gb",
+                  "FFACT_L3_PERSIST_MODE": "auto"},
 }
+
+
+_EXPECTED_L3_MODE = {"cgsa_serial": "streaming", "resume": "streaming", "tier_24gb": "hybrid", "tier_32gb": "in_memory"}
 
 
 def _path_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> Dict[str, Any]:
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
     from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+    from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
+    from momentum.FeatureEngineering.utils import hardware_utils
 
     env = _PATHS["cgsa_serial" if mode == "resume" else mode]
     h.prepare_stat_env(monkeypatch, tmp_path, **env)
-    payload = h.stat_payload(["1h", "12h"])
+    # 審查 r33 codex P1-02：只比結果同值不足以證明級距路徑被執行 ⇒ 記錄 L3 persist mode 之解析值與 L3 實際分支
+    # （有 persist_callback＝邊算邊寫之 streaming／hybrid；無＝in_memory）。平行路徑之 worker 為子程序，主程序看不到。
+    observed: Dict[str, List[Any]] = {"modes": [], "callbacks": []}
+    real_mode, real_compute = hardware_utils.get_l3_persist_mode, RollingAggregator.compute_all
+
+    def spy_mode() -> str:
+        value = real_mode()
+        observed["modes"].append(value)
+        return value
+
+    def spy_compute(self, features_df, persist_callback=None):
+        observed["callbacks"].append(persist_callback is not None)
+        return real_compute(self, features_df, persist_callback=persist_callback)
+
+    monkeypatch.setattr(hardware_utils, "get_l3_persist_mode", spy_mode)
+    monkeypatch.setattr(RollingAggregator, "compute_all", spy_compute)
+    # 多週期取 1h＋4h：CGSA 續跑只接 complete 之前次 run（consumer_gate.is_run_status_cacheable），而真實 12h 資料
+    # （約 1,700 根）下 KAMA_233 等慢欄之穩定點晚至 2025-12，N＝500 缺 133 欄、N＝100 仍缺 20 欄 ⇒ partial、resume
+    # 永不觸發（主委實跑 2026-09-28）；4h 約 5,088 根，預設 N 下全部欄湊滿
+    payload = h.stat_payload(["1h", "4h"])
     root, _factory, result = h.run_stat(tmp_path, payload, start_date=None)
     if mode == "resume":
         # r25 codex P1-01：第二次須真走 CGSA 續跑——令快取探測落空，並斷言 resume_from_manifest 被呼叫
@@ -790,27 +1478,44 @@ def _path_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str) -> Dic
         monkeypatch.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(spy_resume))
         root, _factory, result = h.run_stat(tmp_path, payload, start_date=None, force_regenerate=False)
         assert resumed, "resume 路徑未呼叫 ColumnGroupRegistry.resume_from_manifest"
-    return {"root": root, "result": result}
+    if mode in _EXPECTED_L3_MODE:
+        expected = _EXPECTED_L3_MODE[mode]
+        assert observed["modes"] and set(observed["modes"]) == {expected}, (mode, observed["modes"])
+        assert observed["callbacks"] and set(observed["callbacks"]) == {expected != "in_memory"}, (mode, observed)
+    return {"root": root, "result": result, "observed": observed}
 
 
-@pytest.mark.parametrize("mode", ["cgsa_serial", "cgsa_parallel", "resume"])
+def _strip_cache_hit(decisions: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    return {c: {k: v for k, v in r.items() if k != "dstar_cache_hit"} for c, r in decisions.items()}
+
+
+@pytest.mark.parametrize("mode", ["cgsa_parallel", "resume", "tier_24gb", "tier_32gb"])
 def test_paths_same_stable_start_and_masks(mode: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 ⑪（r24 codex P1-02）：frame、CGSA 序列、CGSA 平行、resume 之 stable_start、校準列與公開輸出全同。"""
+    """Task 2.3 ⑪（v49 改寫；r24 codex P1-02）：生產路徑 CGSA 序列、CGSA 平行、resume、24gb（L3 hybrid）與 32gb（L3 in_memory）級距之 stable_start、決策與
+    公開輸出全部欄（基礎欄 parquet＋_L65 衍生欄）之 NaN mask 與 float32 值全同，且皆 complete。"""
     key = CONTRACT["stable_start_receipt_key"]
-    base = _path_run(tmp_path / "frame", monkeypatch, "frame")
+    base = _path_run(tmp_path / "cgsa_serial", monkeypatch, "cgsa_serial")
     other = _path_run(tmp_path / mode, monkeypatch, mode)
+    for run in (base, other):
+        assert run["result"].metadata.get("quality_status") == "complete", run["result"].metadata.get("failure_reasons")
     assert other["result"].metadata[key] == base["result"].metadata[key]
-    strip = lambda d: {c: {k: v for k, v in r.items() if k != "dstar_cache_hit"} for c, r in d.items()}  # noqa: E731
-    assert strip(h.decisions(other["result"])) == strip(h.decisions(base["result"]))
-    assert h.base_fingerprints(other["root"]) == h.base_fingerprints(base["root"])
+    assert _strip_cache_hit(h.decisions(other["result"])) == _strip_cache_hit(h.decisions(base["result"]))
+    base_fp, other_fp = h.public_fingerprints(base["root"]), h.public_fingerprints(other["root"])
+    assert base_fp and set(other_fp) == set(base_fp), sorted(set(other_fp) ^ set(base_fp))[:10]
+    assert [c for c in base_fp if base_fp[c] != other_fp[c]] == []
 
 
 # ─────────────────────────────── ⑫ run_ic_first（v29–v31）
 
 def _ic_first_kwargs(tmp_path: Path) -> Dict[str, Any]:
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
-    return {"storage": FeatureStorage(str(tmp_path / "ic_first")), "persist": True}
+    root = tmp_path / "ic_first"
+    # run_ic_first 須注入 IC 引擎（同 ffstat_helpers 之 IC-first 呼叫）；IC 階段既有之對齊例外由 ic_first_to_l65 處理
+    return {"storage": FeatureStorage(str(root)), "persist": True, "ic_engine": ICEngine({"methods": ["spearman"]}),
+            "feature_reader": FeatureReader(str(root)), "ic_threshold": 0.0}
 
 
 def _factory_and_config():
@@ -991,7 +1696,7 @@ def test_mutation_delta_non_canonical_is_caught(monkeypatch: pytest.MonkeyPatch)
 
 def test_mutation_unknown_reason_accepted_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
     """v36：接受第三種原因值 ⇒ 必紅。"""
-    monkeypatch.setattr(sm, "DELTA_REASONS", ("nan_rate_rule", "stable_samples_below_min", "constant_rule"))
+    monkeypatch.setattr(sm, "DELTA_REASONS", (*sm.DELTA_REASONS, "constant_rule"))
     # 內層以 pytest.raises 斷言；mutant 下「未拋」為 pytest 之 Failed（非 AssertionError 子類），兩者皆算抓到
     with pytest.raises((AssertionError, pytest.fail.Exception)):
         test_column_set_delta_unknown_reason_rejected()

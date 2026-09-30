@@ -52,7 +52,8 @@
   "column_set_delta": {
     "reasons": [
       "nan_rate_rule",
-      "stable_samples_below_min"
+      "stable_samples_below_min",
+      "warmup_restored"
     ],
     "fields": [
       "added",
@@ -130,8 +131,9 @@
     "min_overlap_rows": 500,
     "timeframes": {
       "1h": "data_cache/feature_klines",
-      "4h": "data_cache/feature_klines",
-      "12h": "data_cache/feature_klines_longhist"
+      "4h": "data_cache/feature_klines_longhist",
+      "12h": "data_cache/feature_klines_longhist",
+      "1d": "data_cache/feature_klines_longhist"
     },
     "symbol": "BTCUSDT",
     "coefficient_mutant": {

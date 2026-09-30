@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 
 
@@ -61,7 +62,29 @@ class TailRiskIndicatorEngine:
         if not frames:
             return pd.DataFrame(index=data.index)
 
-        return pd.concat(frames, axis=1)
+        return l1op.mask_engine_frame("tail_risk", pd.concat(frames, axis=1), self._output_points(), data)
+
+    def _output_points(self) -> Dict[str, Dict]:
+        """FF-STAT Task 2.3：逐輸出欄之參數契約（SPEC §C v38）；輸入皆為 close（報酬由 close 算出）。"""
+        p = l1op.point
+        close = ("close",)
+        points: Dict[str, Dict] = {}
+        for alpha in self.cvar_alphas:
+            alpha_name = int(round(float(alpha) * 100))
+            for w in self.windows:
+                points[f"tr_cvar_{alpha_name}pct_{w}"] = p("TR_CVAR", {"alpha": alpha, "window": w}, close)
+        for w in self.rv_windows:
+            points[f"tr_rv_up_{w}"] = p("TR_RV_UP", {"window": w}, close)
+            points[f"tr_rv_down_{w}"] = p("TR_RV_DOWN", {"window": w}, close)
+            points[f"tr_rsj_{w}"] = p("TR_RSJ", {"window": w}, close)
+            points[f"tr_ud_vol_ratio_{w}"] = p("TR_UD_VOL_RATIO", {"window": w}, close)
+        for w in self.windows:
+            points[f"tr_gpr_{w}"] = p("TR_GPR", {"window": w}, close)
+        for w in (55, 100):
+            points[f"tr_jb_{w}"] = p("TR_JB", {"window": w}, close)
+        for w in self.mdd_windows:
+            points[f"tr_mdd_{w}"] = p("TR_MDD", {"window": w}, close)
+        return points
 
     def get_feature_metadata(self) -> Dict[str, Dict]:
         metadata: Dict[str, Dict] = {}

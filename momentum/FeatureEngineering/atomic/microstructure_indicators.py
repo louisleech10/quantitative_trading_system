@@ -7,6 +7,7 @@ import pandas as pd
 from scipy.stats import norm
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 
 
@@ -88,7 +89,31 @@ class MicrostructureIndicatorEngine:
         frames = [frame for frame in frames if frame is not None and not frame.empty]
         if not frames:
             return pd.DataFrame(index=data.index)
-        return pd.concat(frames, axis=1)
+        return l1op.mask_engine_frame("microstructure", pd.concat(frames, axis=1), self._output_points(data), data)
+
+    def _output_points(self, data: pd.DataFrame) -> Dict[str, Dict]:
+        """FF-STAT Task 2.3：逐輸出欄之參數契約（完整遞移週期集合；SPEC §C v38／v39）。"""
+        p = l1op.point
+        volume_in = ("quote_volume",) if "quote_volume" in data.columns else ("close", "volume")
+        ofi_in = ("taker_ratio",) if "taker_ratio" in data.columns else ("taker_buy_volume", "volume")
+        sigma_window = max(self.vpin_n_buckets)
+        points: Dict[str, Dict] = {"ms_ofi_raw": p("MS_OFI_RAW", {}, ofi_in)}
+        for w in self.windows:
+            points[f"ms_amihud_illiq_{w}"] = p("MS_AMIHUD_ILLIQ", {"window": w}, ("close",) + volume_in)
+            points[f"ms_ofi_zscore_{w}"] = p("MS_OFI_ZSCORE", {"window": w}, ofi_in, upstream=("ms_ofi_raw",), window=w)
+        for w in self.kyle_lambda_windows:
+            points[f"ms_kyle_lambda_{w}"] = p("MS_KYLE_LAMBDA", {"window": w}, ("close", "volume"))
+            points[f"ms_roll_spread_{w}"] = p("MS_ROLL_SPREAD", {"window": w}, ("close",))
+            points[f"ms_large_trade_ratio_{w}"] = p("MS_LARGE_TRADE_RATIO", {"window": w}, ("trades",) + volume_in)
+        for w in self.cs_spread_smooth:
+            points[f"ms_cs_spread_{w}"] = p("MS_CS_SPREAD", {"window": w}, ("high", "low"))
+        for b in self.vpin_n_buckets:
+            points[f"ms_vpin_{b}"] = p("MS_VPIN", {"n_buckets": b, "sigma_window": sigma_window}, ("close", "volume"))
+        base = f"ms_vpin_{self.vpin_n_buckets[0]}"
+        for w in self.vpin_zscore_windows:
+            points[f"ms_vpin_zscore_{w}"] = p("MS_VPIN_ZSCORE", {"window": w}, ("close", "volume"),
+                                             upstream=(base,), window=w)
+        return points
 
     def get_feature_metadata(self) -> Dict[str, Dict]:
         metadata: Dict[str, Dict] = {}

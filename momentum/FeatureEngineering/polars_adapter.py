@@ -20,7 +20,7 @@ Risk mitigations (both risks resolved):
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -45,8 +45,8 @@ def _safe_denom_expr(
 ) -> "pl.Expr":
     """Polars 版近零分母守衛：回傳 denom 的 expr，將 exact-0 與相對近零設為 null。
 
-    門檻 = `rel_eps × median(|nonzero values|)`（per-column robust scale，與 pandas
-    `safe_denominator` 同邏輯）。擋 TA-Lib 振盪器邊界的 ~1e-14 浮點噪音、保留真實小值。
+    門檻 = `rel_eps × 因果尺度`（第 t 列之前固定窗之非零絕對值中位數，窗未滿 fail-closed；FFSTAT v53，
+    與 pandas `safe_denominator` 同一 `causal_near_zero_mask`）。擋 TA-Lib 振盪器邊界的 ~1e-14 浮點噪音、保留真實小值。
     """
     import polars as pl
 
@@ -54,11 +54,12 @@ def _safe_denom_expr(
     if rel_eps <= 0:
         return pl.when(d == 0.0).then(None).otherwise(d)
 
-    abs_col = pl_df.get_column(denom_col).abs()
-    nonzero = abs_col.filter(abs_col > 0)
-    scale = float(nonzero.median()) if nonzero.len() > 0 and nonzero.median() is not None else 0.0
-    threshold = scale * rel_eps
-    return pl.when((d.abs() < threshold) | (d == 0.0)).then(None).otherwise(d)
+    # FFSTAT v53：與 pandas `safe_denominator` 同一因果尺度（改前全欄中位數＝未來洩漏）
+    from momentum.FeatureEngineering.utils.numeric_guards import causal_near_zero_mask
+
+    values = pl_df.get_column(denom_col).cast(pl.Float64).to_numpy()  # Float64 之 null 轉 numpy 即 NaN
+    mask = pl.Series(causal_near_zero_mask(values, rel_eps))
+    return pl.when(pl.lit(mask)).then(None).otherwise(d)
 
 # Lazy import to avoid import error when polars not installed
 _polars_available: Optional[bool] = None
@@ -337,19 +338,24 @@ def polars_l2_derived_momentum(
     if not specs:
         return pl.DataFrame()
 
-    # Near-zero threshold uses the column's own robust scale (shift preserves the
-    # value distribution → same scale as the un-shifted column).
+    # FFSTAT v53：分母＝col[t−lag]，其近零遮罩＝col 之因果遮罩（`causal_near_zero_mask`，尺度只看 t−lag 之前之
+    # 固定窗）平移 lag 列；改前以全欄中位數為尺度＝未來洩漏
+    from momentum.FeatureEngineering.utils.numeric_guards import causal_near_zero_mask
+
     exprs = []
+    masks: Dict[str, np.ndarray] = {}
     for col_name, lag, output_name in specs:
         if col_name not in pl_df.columns:
             continue
         col = pl.col(col_name)
         shifted = col.shift(lag)
-        abs_col = pl_df.get_column(col_name).abs()
-        nonzero = abs_col.filter(abs_col > 0)
-        scale = float(nonzero.median()) if nonzero.len() > 0 and nonzero.median() is not None else 0.0
-        threshold = scale * DEFAULT_DENOM_REL_EPS
-        denom = pl.when((shifted.abs() < threshold) | (shifted == 0.0)).then(None).otherwise(shifted)
+        if col_name not in masks:
+            values = pl_df.get_column(col_name).cast(pl.Float64).to_numpy()  # Float64 之 null 轉 numpy 即 NaN
+            masks[col_name] = causal_near_zero_mask(values, DEFAULT_DENOM_REL_EPS)
+        base = masks[col_name]
+        lag_i = int(lag)
+        shifted_mask = np.concatenate([np.ones(min(lag_i, len(base)), dtype=bool), base[: max(len(base) - lag_i, 0)]])
+        denom = pl.when(pl.lit(pl.Series(shifted_mask))).then(None).otherwise(shifted)
         exprs.append(((col - shifted) / denom).alias(output_name))
 
     if not exprs:
@@ -398,6 +404,10 @@ def polars_l65_winsorization(
     if not valid_columns:
         return pl_df
 
+    if not causal_preprocessing:
+        # FFSTAT v53（審查 r36 codex P1-02）：全欄 mean／std／quantile 縮尾＝未來洩漏；生成路徑早已釘死因果
+        # （FeaturePreprocessor），直接呼叫亦 fail-closed，不再保留非因果分支
+        raise ValueError("非因果縮尾（causal_preprocessing=False）已移除：全欄統計量含未來資料")
     if causal_preprocessing:
         pdf = pl_df.to_pandas()
         arr = pdf.loc[:, valid_columns].to_numpy(dtype=np.float64, copy=True)
@@ -420,6 +430,10 @@ def polars_l65_winsorization(
         clipped = np.clip(arr, lower, upper)
         arr[valid_bounds] = clipped[valid_bounds]
         arr[nan_mask] = np.nan
+        # FFSTAT Task 2.3 第①類（R6 甲）：窗未湊滿之列遮為 NaN；計算本身不變
+        from momentum.FeatureEngineering.preprocessing.stable_mask import mask_incomplete_window_inplace
+
+        mask_incomplete_window_inplace(arr, int(window))
         pdf.loc[:, valid_columns] = arr.astype(np.float32, copy=False)
         return pl.from_pandas(pdf)
 

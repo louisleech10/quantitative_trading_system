@@ -8,6 +8,7 @@ import os
 
 import numpy as np
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 
 logger = get_logger(__name__)
 
@@ -386,6 +387,8 @@ def rolling_winsorize_array(
     clipped = np.clip(arr, lowers, uppers)
     arr[valid_bounds] = clipped[valid_bounds]
     arr[nan_mask] = np.nan
+    # FFSTAT Task 2.3 第①類（R6 甲）：窗未湊滿之列（自首個有限值起 window−1 列）遮為 NaN；計算本身不變
+    _stable_mask.mask_incomplete_window_inplace(arr, window)
     return arr
 
 
@@ -423,6 +426,10 @@ def transform_array_fast(
         eliminating those copies. Combined with the winsorize in-place
         change, peak per-group drops from ~7× to ~3× input.
     """
+    if not causal_preprocessing:
+        # FFSTAT v53（審查 r36 codex P1-02）：全欄 nanmean／nanstd／nanquantile 分支＝未來洩漏（且 sigma 分支之廣播
+        # 於實跑拋 IndexError）；生成路徑早已釘死因果，直接呼叫亦 fail-closed
+        raise ValueError("非因果前處理（causal_preprocessing=False）已移除：全欄統計量含未來資料")
     data = arr.astype(np.float32, copy=True)
 
     if winsorize:
@@ -440,6 +447,9 @@ def transform_array_fast(
             clipped = np.clip(data, lower, upper)
             data[valid_bounds] = clipped[valid_bounds]
             data[nan_mask] = np.nan
+            if causal_preprocessing:
+                # FFSTAT Task 2.3 第①類（R6 甲）：窗未湊滿之列遮為 NaN（quantile 分支於 rolling_winsorize_array 內）
+                _stable_mask.mask_incomplete_window_inplace(data, winsor_window)
         elif causal_preprocessing:
             data = rolling_winsorize_array(
                 data,

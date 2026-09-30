@@ -319,9 +319,16 @@ def test_v7_3_l65_polars_optimized_and_fracdiff_serial_paths(
     calls.update({"polars": 0, "optimized": 0, "fracdiff": 0})
     monkeypatch.setattr(polars_adapter, "polars_enabled", lambda: True)
     # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
-    _ = FeaturePreprocessor(
-        _l65_config(fracdiff=True), column_layer_map={column: "L1" for column in frame.columns}
-    ).transform(frame)
+    # FFSTAT b3b 起平穩化開啟須有校準封包（只由校準前置關卡產生）；本測試驗路徑互斥 sentinel，以 fixture 本身建封包
+    # （同 tests/momentum/test_feature_preprocessor.py 之單元測試作法；fixture 96 列 ⇒ N 取 30）
+    from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
+
+    fracdiff_pre = FeaturePreprocessor(
+        {**_l65_config(fracdiff=True), "calibration_bars": 30},
+        column_layer_map={column: "L1" for column in frame.columns},
+    )
+    attach_unit_calibration(fracdiff_pre, frame)
+    _ = fracdiff_pre.transform(frame)
     assert calls["fracdiff"] >= 1
     assert calls["polars"] == 0
 

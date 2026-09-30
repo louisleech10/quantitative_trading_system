@@ -25,6 +25,8 @@ from typing import Iterable
 import numpy as np
 import pandas as pd
 
+from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
+
 
 @dataclass(frozen=True)
 class DeadFeatureDiagnostic:
@@ -74,15 +76,29 @@ def find_dead_columns(
     if df is None or df.empty or len(df.columns) == 0:
         return frozenset(), DeadFeatureDiagnostic()
 
-    # 向量化：一次掃完所有欄位
-    nunique_per_col = df.nunique(dropna=True)
-    valid_count_per_col = df.notna().sum()
-
-    constant_mask = nunique_per_col < 2
-    sparse_mask = valid_count_per_col < min_valid_samples
-
-    constant_cols = tuple(str(c) for c in nunique_per_col.index[constant_mask])
-    sparse_cols = tuple(str(c) for c in valid_count_per_col.index[sparse_mask])
+    # FFSTAT Task 2.3 ⑦：與 L3 共用之死欄純函式（二維向量化；有效樣本＝有限值、只計穩定後之值）
+    # 數值欄逐 512 欄分塊（寬表整體轉 float64 之記憶體不可接受）；非數值欄（object 等）無 NaN 率／穩定點語意，
+    # 沿用相異值數與非空計數
+    constant_cols_l, sparse_cols_l = [], []
+    numeric = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+    for start in range(0, len(numeric), 512):
+        cols = numeric[start:start + 512]
+        decision = _stable_mask.dead_column_decision(
+            df[cols].to_numpy(dtype=np.float64), nan_rate_threshold=None, min_valid=min_valid_samples
+        )
+        for c, const, valid in zip(cols, np.asarray(decision.constant), np.asarray(decision.valid_count)):
+            if const:
+                constant_cols_l.append(str(c))
+            if valid < min_valid_samples:
+                sparse_cols_l.append(str(c))
+    others = [c for c in df.columns if c not in set(numeric)]
+    if others:
+        sub = df[others]
+        constant_cols_l += [str(c) for c in sub.columns[(sub.nunique(dropna=True) < 2).to_numpy()]]
+        sparse_cols_l += [str(c) for c in sub.columns[(sub.notna().sum() < min_valid_samples).to_numpy()]]
+    order = {str(c): i for i, c in enumerate(df.columns)}
+    constant_cols = tuple(sorted(constant_cols_l, key=order.__getitem__))
+    sparse_cols = tuple(sorted(sparse_cols_l, key=order.__getitem__))
 
     dead_set = frozenset(constant_cols) | frozenset(sparse_cols)
     diagnostic = DeadFeatureDiagnostic(
@@ -119,21 +135,11 @@ def dead_column_mask(
         n_cols = array.shape[1] if array.ndim == 2 else 0
         return np.zeros(n_cols, dtype=bool)
 
-    finite_mask = ~np.isnan(array)
-    valid_count = finite_mask.sum(axis=0)
-    sparse = valid_count < min_valid_samples
-    all_nan = valid_count == 0
-
-    # 常數判定：對非全 NaN 欄，nanmin == nanmax（all-NaN 欄的 nanmin/max 為 NaN，
-    # NaN == NaN 為 False，故用 all_nan 另行涵蓋）
-    # 抑制 all-NaN slice 的 RuntimeWarning（全 dead group 在生產會頻繁觸發）
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        col_min = np.nanmin(array, axis=0)
-        col_max = np.nanmax(array, axis=0)
-    constant = (~all_nan) & (col_min == col_max)
-
-    return sparse | constant | all_nan
+    # FFSTAT Task 2.3 ⑦：與 find_dead_columns、L3 同一死欄純函式（CGSA 串流寫入端）
+    decision = _stable_mask.dead_column_decision(
+        np.asarray(array, dtype=np.float64), nan_rate_threshold=None, min_valid=min_valid_samples
+    )
+    return np.asarray(decision.dead, dtype=bool)
 
 
 def drop_dead_columns(

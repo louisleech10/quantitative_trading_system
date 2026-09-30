@@ -32,7 +32,14 @@ def guard_indicator_compute(
     *,
     fail_open: bool,
 ) -> None:
-    """已登錄指標計算失敗時：fail-open 記 warning；correctness mode re-raise。"""
+    """已登錄指標計算失敗時：fail-open 記 warning；correctness mode re-raise。
+
+    FF-STAT §C（L1 輸出點契約）：`StableMaskError`（缺倍數表條目、缺 period key、未量測之參數變體等）屬契約不成立，
+    一律上拋、不得以 fail-open 吞掉（否則該指標靜默消失而層狀態仍為 ok）。"""
+    from momentum.FeatureEngineering.preprocessing.stable_mask import StableMaskError
+
+    if isinstance(exc, StableMaskError):
+        raise exc
     if fail_open:
         logger.warning("Indicator %s failed: %s", indicator_name, exc)
         return

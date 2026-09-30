@@ -20,7 +20,6 @@ from momentum.FeatureEngineering.warmup_window import (
     compute_row_bounds,
     compute_warmup_insufficient,
     estimate_max_warmup_bars,
-    is_warmup_trim_enabled,
     max_ingest_index_before_output_start,
     output_row_count,
     resolve_output_window,
@@ -232,17 +231,6 @@ def test_warmup_bars_estimate_l5_beta_when_enabled() -> None:
     assert on >= off
 
 
-def test_resolve_output_window_flag_off_is_strict() -> None:
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setenv("FFACT_WARMUP_TRIM", "0")
-    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
-    config = factory._resolve_config(_minimal_config())
-    window = resolve_output_window(config, "12h", "2024-06-01", "2024-12-01")
-    assert window.warmup_enabled is False
-    assert window.ingest_start == "2024-06-01"
-    monkeypatch.undo()
-
-
 # ── B6b: ingest / trim / insufficient ─────────────────────────────────────
 
 
@@ -394,27 +382,12 @@ def test_warmup_quality_gain_position_independent(
     on_sub = res_on.features_df[cols].iloc[:k]
     valid_off = float(off_sub.notna().mean().mean())
     valid_on = float(on_sub.notna().mean().mean())
+    # FFSTAT v32（使用者 2026-09-27 R1「預熱恆開」、刪 FFACT_WARMUP_TRIM）：環境變數不再能關預熱 ⇒ 兩次輸出開頭 k 列
+    # 之有效率相同，且位置無關欄於輸出開頭即全數有效（改前斷言「開啟比關閉多 5%」之前提已不存在）
+    assert valid_off == valid_on, f"FFACT_WARMUP_TRIM 仍影響結果：on={valid_on:.3f} off={valid_off:.3f}"
     if "warmup_insufficient" not in (res_on.metadata or {}):
-        assert valid_on >= valid_off + 0.05, f"on={valid_on:.3f} off={valid_off:.3f}"
+        assert valid_on >= 0.999, f"預熱恆開後輸出開頭仍有空值：on={valid_on:.3f}"
     _assert_data_cache_unchanged(before)
-
-
-@pytest.mark.requires_kline
-def test_warmup_flag_off_golden_baseline_check() -> None:
-    if not _kline_available():
-        pytest.fail("missing kline cache")
-    env = os.environ.copy()
-    env.pop("FFACT_WARMUP_TRIM", None)
-    env["FFACT_WARMUP_TRIM"] = "0"
-    proc = subprocess.run(
-        ["python", "scripts/build_l65_golden_baseline.py", "--check"],
-        cwd=Path(__file__).resolve().parents[2],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=600,
-    )
-    assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
 def test_trim_dataframe_preserves_values() -> None:
@@ -430,34 +403,6 @@ def test_trim_dataframe_preserves_values() -> None:
     trimmed = trim_dataframe_to_output_window(df, window)
     assert len(trimmed) == 3
     np.testing.assert_array_equal(trimmed["a"].to_numpy(), np.array([6.0, 7.0, 8.0]))
-
-
-def test_warmup_flag_off_preserves_config_hash(monkeypatch: pytest.MonkeyPatch) -> None:
-    """flag 關時 config_hash 與 B6 strict 一致；flag 開才分裂 cache key。"""
-    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
-    config = factory._resolve_config(_minimal_config())
-    start, end = _date_window(60)
-
-    monkeypatch.setenv("FFACT_WARMUP_TRIM", "0")
-    hash_strict_a = factory._compute_config_hash(
-        config, "BTCUSDT", "12h", start_date=start, end_date=end,
-    )
-    hash_strict_b = factory._compute_config_hash(
-        config, "BTCUSDT", "12h", start_date=start, end_date=end,
-    )
-    assert hash_strict_a == hash_strict_b
-
-    monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
-    hash_warmup = factory._compute_config_hash(
-        config, "BTCUSDT", "12h", start_date=start, end_date=end,
-    )
-    assert hash_warmup != hash_strict_a
-
-    monkeypatch.setenv("FFACT_WARMUP_TRIM", "0")
-    hash_strict_c = factory._compute_config_hash(
-        config, "BTCUSDT", "12h", start_date=start, end_date=end,
-    )
-    assert hash_strict_c == hash_strict_a
 
 
 def _run_cgsa_l1_l6_into_registry(

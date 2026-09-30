@@ -807,10 +807,13 @@ class FeatureFactoryService:
         #    那三欄多半已在 registry entry 裡，於是那個分支多數時候不會執行，
         #    `time_range` 就會**間歇性拿不到值**（有時有、有時沒有），比穩定拿不到更難查。
         time_range: Optional[Dict[str, Optional[str]]] = None
+        stable_summary: Dict[str, Any] = {}
         if browse_path:
-            raw = self._manifest_metadata(Path(browse_path)).get("time_range")
+            manifest_payload = self._manifest_metadata(Path(browse_path))
+            raw = manifest_payload.get("time_range")
             if isinstance(raw, dict):
                 time_range = {"start": raw.get("start"), "end": raw.get("end")}
+            stable_summary = self._stable_start_summary(manifest_payload)
 
         return {
             "browse_task_id": browse_task_id,
@@ -820,6 +823,37 @@ class FeatureFactoryService:
             "row_count": row_count,
             "quality_status": quality_status,
             "time_range": time_range,
+            **stable_summary,
+        }
+
+    @staticmethod
+    def _stable_start_summary(manifest: Dict[str, Any]) -> Dict[str, Any]:
+        """FF-STAT §C 紀錄與顯示：自 manifest（L7 raw 之 artifact metadata）取逐欄穩定點摘要——
+        `output_start_source`、最早／最晚 `stable_start`、歷史不足欄數、是否逐欄校準（平穩化開啟且未填起始日）。
+        舊 run 無此紀錄 ⇒ 空 dict（前端不顯示）。"""
+        def _find(node: Any, depth: int = 0) -> Optional[Dict[str, Any]]:
+            if not isinstance(node, dict) or depth > 4:
+                return None
+            if isinstance(node.get("stable_start"), dict):
+                return node
+            for value in node.values():
+                hit = _find(value, depth + 1)
+                if hit is not None:
+                    return hit
+            return None
+
+        meta = _find(manifest)
+        if meta is None:
+            return {}
+        starts = sorted(str(v) for v in meta["stable_start"].values() if v)
+        source = meta.get("output_start_source")
+        stationarizing = bool(meta.get("stationarity_enabled"))
+        return {
+            "output_start_source": source,
+            "stable_start_earliest": starts[0] if starts else None,
+            "stable_start_latest": starts[-1] if starts else None,
+            "warmup_insufficient_count": len(meta.get("warmup_insufficient_columns") or []),
+            "calibration_rows_withheld": bool(source == "per_column" and stationarizing),
         }
 
     def list_runs(self) -> List[Dict[str, Any]]:

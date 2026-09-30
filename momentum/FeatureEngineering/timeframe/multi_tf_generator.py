@@ -537,6 +537,12 @@ class MultiTFGenerator:
                     _worker_cache_dir = str(_storage.cache_dir)
                     break
 
+            # FFSTAT §C 公開域預熱：worker 沿用主程序加倍規則定案之預熱深度（不自行重估）
+            _main_window = getattr(self._factory, "_current_output_window", None)
+            _public_warmup_bars: Optional[int] = (
+                int(_main_window.max_warmup_bars) if _main_window is not None and _main_window.warmup_enabled else None
+            )
+
             # OOM Fix: drop primary-TF in-memory buffers before spawning so
             # the parent process gives RAM headroom back to workers.
             gc.collect()
@@ -551,6 +557,7 @@ class MultiTFGenerator:
                         start_date,
                         end_date,
                         _worker_cache_dir,
+                        _public_warmup_bars,
                     ): tf
                     for tf in non_primary_tfs
                 }
@@ -1373,10 +1380,21 @@ class MultiTFGenerator:
                 aligned = combined.copy(deep=False)
                 aligned.index = primary_timestamps
             else:
+                # FFSTAT Task 2.3 ④：原生列號隨同對齊 ⇒ 逐主週期列之原生列對應（未填起始日之逐欄校準數「不同原生
+                # K 棒」之最早 N 個值，不以 ffill 重複值充數；對齊前 NaN 之列為 NaN）
+                marker = "__ffstat_native_row__"
+                combined[marker] = np.arange(len(combined.index), dtype=np.float64)
                 aligned = TimeframeAligner.align_to_primary(
                     combined, timeframe, primary_timestamps,
                     self._primary_tf, self._config.timeframes.alignment_mode,
                 )
+                native_rows = aligned.pop(marker).to_numpy(dtype=np.float64)
+                combined.drop(columns=[marker], inplace=True)
+                maps = getattr(self._factory, "_legacy_native_row_maps", None)
+                if maps is None:
+                    maps = {}
+                    self._factory._legacy_native_row_maps = maps
+                maps[str(timeframe)] = native_rows
             aligned.attrs = {}
             untagged_columns = [str(column) for column in aligned.columns]
             aligned = self._apply_timeframe_tag(
@@ -1719,8 +1737,8 @@ class MultiTFGenerator:
             parts = col.split("_")
             if len(parts) < 2:
                 return col
-            if parts[1] in tf_keys:
-                return col
+            if any(p in tf_keys for p in parts[1:]):
+                return col  # 已含週期段（FFSTAT v55，審查 r40 codex P2-01：來源名含底線時週期段不在第二段，勿重複加）
             return "_".join([parts[0], timeframe] + parts[1:])
 
         rename_map = {col: _rename(col) for col in features_df.columns}
@@ -1765,6 +1783,7 @@ def _tf_worker_entry(
     start_date: Optional[str],
     end_date: Optional[str],
     cache_dir: Optional[str] = None,
+    public_warmup_bars: Optional[int] = None,
 ) -> Dict:
     """Process a single timeframe in a spawned worker process.
 
@@ -1809,6 +1828,7 @@ def _tf_worker_entry(
             primary_tf,
             start_date,
             end_date,
+            max_warmup_bars=public_warmup_bars,
         )
         load_start = (
             ingest_layer0_start_date(factory._current_output_window, timeframe, primary_tf)

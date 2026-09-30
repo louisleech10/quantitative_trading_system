@@ -1,387 +1,2543 @@
 _meta:
   generated_by: scripts/verify_l1_warmup_requirements.py
-  data_source: symbols=['ETHUSDT', 'BTCUSDT', 'ADAUSDT'] tf=1h
+  generated_at: '2026-09-30T08:12:18+00:00'
+  symbols:
+  - BTCUSDT
+  - ETHUSDT
+  - ADAUSDT
+  timeframes:
+  - 5m
+  - 1h
+  - 4h
+  - 12h
+  - 1d
+  data_source:
+    1h: data_cache/feature_klines
+    5m/4h/12h/1d: data_cache/feature_klines_longhist
   scale_normalized_error_threshold: 0.005
   eval_window_bars: 1000
-  test_periods:
-  - 13
-  - 55
-  - 233
-  consolidation: max ratio across symbols (worst case)
-  principle: Minimum warmup K (in bars at the indicator's native TF) such that max|test
-    - infinite_history_gt| over the eval window is less than THRESHOLD * robust_scale(gt),
-    where robust_scale = max(P75(|gt|), std(gt)).
-  usage: warmup_bars(indicator, period) = ceil(period * recommended_factor); see momentum/Analysis/warmup_lookup.py
+  eval_positions: 40
+  exhaustive_start_verification:
+    scope: 逐可採起點窮舉（verify_exhaustive）；純窗口型 WINDOW_ONLY_ANALYTIC 之 K＝窗口長度；採用值＝各實例量測取最大
+    window_only_analytic:
+    - ENT_APEN
+    - ENT_FRACTAL_DIM
+    - ENT_HURST
+    - ENT_PERM
+    - ENT_SAMPEN
+    - ENT_SHANNON
+    - TR_CVAR
+    counts:
+      12h:
+        ADAUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        BTCUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        ETHUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+      1d:
+        ADAUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        BTCUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        ETHUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+      1h:
+        ADAUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        BTCUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        ETHUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+      4h:
+        ADAUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        BTCUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        ETHUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+      5m:
+        ADAUSDT:
+          exhaustive_passed: 1214
+          multi_window_only: 128
+          window_only_analytic: 21
+        BTCUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+        ETHUSDT:
+          exhaustive_passed: 1342
+          window_only_analytic: 21
+  market_scopes:
+  - crypto
+  reliability: K <= eval_start/2（ground truth 前史 ≥ 2K）者方入採用值
+  principle: Minimum warmup K such that max|test - infinite_history_gt| over the eval
+    window is less than THRESHOLD * max(P75(|gt|), std(gt)); ground truth finite but
+    test non-finite = inf.
+  usage: K = ceil(max(params[k] for k in period_keys) * recommended_factor); period_keys
+    為空者取 k；cumulative 無收斂點（K＝0）。見 momentum/FeatureEngineering/atomic/warmup_lookup.py
+  elapsed_seconds: 4.0
 indicators:
-  ADX:
-    family: wilder
-    recommended_factor: 8.0
-    max_K_observed: 1863
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 6.609
-      BTCUSDT: 7.231
-      ADAUSDT: 7.996
-  ADXR:
-    family: wilder
-    recommended_factor: 8.8
-    max_K_observed: 2049
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 7.923
-      BTCUSDT: 7.923
-      ADAUSDT: 8.794
-  APO:
-    family: compound_ema
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  AROON:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  AROONOSC:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  ATR:
-    family: wilder
-    recommended_factor: 4.97
-    max_K_observed: 1158
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 4.112
-      BTCUSDT: 4.97
-      ADAUSDT: 4.112
-  CCI:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  CMO:
-    family: wilder
-    recommended_factor: 6.61
-    max_K_observed: 1540
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 5.673
-      BTCUSDT: 6.609
-      ADAUSDT: 6.609
-  DEMA:
-    family: compound_ema
-    recommended_factor: 1.2
-    max_K_observed: 256
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.2
-      BTCUSDT: 1.0
-      ADAUSDT: 1.091
-  DX:
-    family: wilder
-    recommended_factor: 6.61
-    max_K_observed: 1540
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 5.0
-      BTCUSDT: 6.609
-      ADAUSDT: 6.609
-  EMA:
-    family: ema_seeded
-    recommended_factor: 1.44
-    max_K_observed: 309
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.436
-      BTCUSDT: 1.206
-      ADAUSDT: 1.436
-  HT_DCPERIOD:
-    family: hilbert
-    recommended_factor: 1.58
-    max_K_observed: 99
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.302
-      BTCUSDT: 1.429
-      ADAUSDT: 1.571
-  HT_DCPHASE:
-    family: hilbert
-    recommended_factor: 2.05
-    max_K_observed: 129
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 2.048
-      BTCUSDT: 1.873
-      ADAUSDT: 2.0
-  HT_TRENDLINE:
-    family: hilbert
-    recommended_factor: 1.0
-    max_K_observed: 63
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  HT_TRENDMODE:
-    family: hilbert
-    recommended_factor: 1.88
-    max_K_observed: 118
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.714
-      BTCUSDT: 1.302
-      ADAUSDT: 1.873
-  KAMA:
-    family: adaptive_ema
-    recommended_factor: 1.57
-    max_K_observed: 339
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.455
-      BTCUSDT: 1.564
-      ADAUSDT: 1.564
-  MACD_line:
-    family: compound_ema
-    recommended_factor: 3.54
-    max_K_observed: 699
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 3.0
-      BTCUSDT: 3.0
-      ADAUSDT: 3.538
-  MACD_signal:
-    family: compound_ema
-    recommended_factor: 3.57
-    max_K_observed: 792
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 3.538
-      BTCUSDT: 3.0
-      ADAUSDT: 3.564
-  MFI:
-    family: wilder
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  MIDPOINT:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  MIDPRICE:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  MINUS_DI:
-    family: wilder
-    recommended_factor: 3.54
-    max_K_observed: 655
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 2.308
-      BTCUSDT: 2.811
-      ADAUSDT: 3.538
-  MINUS_DM:
-    family: wilder
-    recommended_factor: 3.85
-    max_K_observed: 596
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 2.538
-      BTCUSDT: 3.846
-      ADAUSDT: 2.964
-  MOM:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  NATR:
-    family: wilder
-    recommended_factor: 4.97
-    max_K_observed: 1158
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 4.112
-      BTCUSDT: 4.97
-      ADAUSDT: 4.112
-  PLUS_DI:
-    family: wilder
-    recommended_factor: 4.24
-    max_K_observed: 372
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 2.709
-      BTCUSDT: 3.846
-      ADAUSDT: 4.231
-  PLUS_DM:
-    family: wilder
-    recommended_factor: 4.97
-    max_K_observed: 1158
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 4.97
-      BTCUSDT: 4.97
-      ADAUSDT: 4.231
-  PPO:
-    family: compound_ema
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  ROC:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  RSI:
-    family: wilder
-    recommended_factor: 3.54
-    max_K_observed: 466
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 3.538
-      BTCUSDT: 2.538
-      ADAUSDT: 3.538
-  SAR:
-    family: stateful_pivot
-    recommended_factor: 19.0
-    max_K_observed: 19
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 12.0
-      BTCUSDT: 19.0
-      ADAUSDT: 6.0
-  SMA:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  T3:
-    family: compound_ema
-    recommended_factor: 1.76
-    max_K_observed: 409
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.755
-      BTCUSDT: 1.755
-      ADAUSDT: 1.755
-  TEMA:
-    family: compound_ema
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  TRIMA:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  TRIX:
-    family: compound_ema
-    recommended_factor: 5.47
-    max_K_observed: 1273
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 5.0
-      BTCUSDT: 5.0
-      ADAUSDT: 5.464
-  ULTOSC:
-    family: wilder
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  WILLR:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-  WMA:
-    family: window_only
-    recommended_factor: 1.0
-    max_K_observed: 233
-    all_periods_converged: true
-    per_symbol_max_ratio:
-      ETHUSDT: 1.0
-      BTCUSDT: 1.0
-      ADAUSDT: 1.0
-cumulative_special_cases:
-  OBV:
-    family: cumulative
-    strategy: burn_in_from_dataset_start
-    note: Cumulative sum; only relative changes are meaningful; differs from Binance
-      by a constant offset unless started at listing.
   AD:
     family: cumulative
-    strategy: burn_in_from_dataset_start
-    note: 'Same as OBV: pure accumulator; absolute level not comparable.'
+    warmup_class: cumulative
+    period_keys: []
   ADOSC:
     family: cumulative_diff_ema
-    strategy: burn_in_from_dataset_start_plus_5x_slow
-    note: EMA(fast) - EMA(slow) of AD; level differs but oscillator converges once
-      both EMAs settle (~5x slow period).
-  VWAP:
+    warmup_class: recursive
+    period_keys:
+    - fastperiod
+    - slowperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 5.0
+      1h: 4.6
+      4h: 5.0
+      12h: 4.6
+      1d: 4.6
+    recommended_factor: 5.0
+    k_by_params:
+      fastperiod=3,slowperiod=10: 50
+    max_K_observed: 50
+    measurements: 15
+    unreliable_or_unconverged: 0
+  ADX:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 11.2247
+      1h: 10.5238
+      4h: 10.6352
+      12h: 10.6352
+      1d: 10.2135
+    recommended_factor: 11.23
+    k_by_params:
+      timeperiod=13: 136
+      timeperiod=14: 148
+      timeperiod=144: 1513
+      timeperiod=21: 221
+      timeperiod=233: 2478
+      timeperiod=34: 354
+      timeperiod=55: 585
+      timeperiod=8: 79
+      timeperiod=89: 999
+    max_K_observed: 2478
+    measurements: 135
+    unreliable_or_unconverged: 2
+  ADXR:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 11.6953
+      1h: 11.5556
+      4h: 11.4412
+      12h: 11.2247
+      1d: 11.2247
+    recommended_factor: 11.7
+    k_by_params:
+      timeperiod=13: 136
+      timeperiod=14: 149
+      timeperiod=144: 1664
+      timeperiod=21: 243
+      timeperiod=233: 2725
+      timeperiod=34: 389
+      timeperiod=55: 605
+      timeperiod=8: 86
+      timeperiod=89: 999
+    max_K_observed: 2725
+    measurements: 135
+    unreliable_or_unconverged: 3
+  APO:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - fastperiod
+    - slowperiod
+    param_defaults:
+      matype: 0.0
+    variants:
+    - matype=0
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      fastperiod=12,matype=0,slowperiod=26: 26
+      fastperiod=13,matype=0,slowperiod=34: 34
+      fastperiod=13,matype=0,slowperiod=55: 55
+      fastperiod=21,matype=0,slowperiod=55: 55
+      fastperiod=21,matype=0,slowperiod=89: 89
+      fastperiod=34,matype=0,slowperiod=144: 144
+      fastperiod=34,matype=0,slowperiod=89: 89
+      fastperiod=5,matype=0,slowperiod=13: 13
+      fastperiod=5,matype=0,slowperiod=21: 21
+      fastperiod=55,matype=0,slowperiod=144: 144
+      fastperiod=55,matype=0,slowperiod=233: 233
+      fastperiod=8,matype=0,slowperiod=21: 21
+      fastperiod=8,matype=0,slowperiod=34: 34
+    max_K_observed: 233
+    measurements: 585
+    unreliable_or_unconverged: 0
+  AROON:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=14: 14
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=25: 25
+      timeperiod=34: 34
+      timeperiod=55: 55
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 135
+    unreliable_or_unconverged: 0
+  AROONOSC:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=14: 14
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=25: 25
+      timeperiod=34: 34
+      timeperiod=55: 55
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 135
+    unreliable_or_unconverged: 0
+  ATR:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 9.0
+      1h: 7.9231
+      4h: 7.5
+      12h: 7.2704
+      1d: 7.45
+    recommended_factor: 9.0
+    k_by_params:
+      timeperiod=13: 113
+      timeperiod=14: 124
+      timeperiod=144: 1035
+      timeperiod=20: 179
+      timeperiod=21: 182
+      timeperiod=233: 1694
+      timeperiod=34: 293
+      timeperiod=5: 42
+      timeperiod=55: 455
+      timeperiod=8: 72
+      timeperiod=89: 684
+    max_K_observed: 1694
+    measurements: 165
+    unreliable_or_unconverged: 0
+  BBANDS:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults:
+      nbdevup: 2.0
+      nbdevdn: 2.0
+      matype: 0.0
+    variants:
+    - matype=0,nbdevdn=2,nbdevup=2
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      matype=0,nbdevdn=2,nbdevup=2,timeperiod=13: 13
+      matype=0,nbdevdn=2,nbdevup=2,timeperiod=144: 144
+      matype=0,nbdevdn=2,nbdevup=2,timeperiod=20: 20
+      matype=0,nbdevdn=2,nbdevup=2,timeperiod=21: 21
+      matype=0,nbdevdn=2,nbdevup=2,timeperiod=233: 233
+      matype=0,nbdevdn=2,nbdevup=2,timeperiod=34: 34
+      matype=0,nbdevdn=2,nbdevup=2,timeperiod=55: 55
+      matype=0,nbdevdn=2,nbdevup=2,timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 360
+    unreliable_or_unconverged: 0
+  BETA:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 135
+    unreliable_or_unconverged: 0
+  BOP:
+    family: window_only
+    warmup_class: window_only
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 1
+      1h: 1
+      4h: 1
+      12h: 1
+      1d: 1
+    k: 1
+    max_K_observed: 1
+    measurements: 15
+    unreliable_or_unconverged: 0
+  CCI:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=14: 14
+      timeperiod=144: 144
+      timeperiod=20: 20
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 165
+    unreliable_or_unconverged: 0
+  CDL_PATTERN:
+    family: pattern
+    warmup_class: pattern
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 14
+      1h: 14
+      4h: 14
+      12h: 14
+      1d: 14
+    k: 14
+    max_K_observed: 14
+    measurements: 915
+    unreliable_or_unconverged: 0
+  CMO:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 12.7143
+      1h: 11.6953
+      4h: 10.75
+      12h: 10.6404
+      1d: 10.4118
+    recommended_factor: 12.72
+    k_by_params:
+      timeperiod=13: 150
+      timeperiod=14: 163
+      timeperiod=144: 1685
+      timeperiod=21: 267
+      timeperiod=233: 2725
+      timeperiod=34: 389
+      timeperiod=5: 55
+      timeperiod=55: 605
+      timeperiod=8: 94
+      timeperiod=89: 1041
+    max_K_observed: 2725
+    measurements: 450
+    unreliable_or_unconverged: 5
+  CORREL:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 135
+    unreliable_or_unconverged: 0
+  DEMA:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 6.25
+      1h: 5.75
+      4h: 5.4097
+      12h: 5.3824
+      1d: 5.4762
+    recommended_factor: 6.25
+    k_by_params:
+      timeperiod=13: 79
+      timeperiod=144: 779
+      timeperiod=21: 116
+      timeperiod=233: 1273
+      timeperiod=34: 201
+      timeperiod=5: 30
+      timeperiod=55: 312
+      timeperiod=8: 50
+      timeperiod=89: 515
+    max_K_observed: 1273
+    measurements: 405
+    unreliable_or_unconverged: 0
+  DONCHIAN:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=20: 20
+    max_K_observed: 20
+    measurements: 15
+    unreliable_or_unconverged: 0
+  DX:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 9.7143
+      1h: 9.0909
+      4h: 9.0909
+      12h: 9.5556
+      1d: 9.2921
+    recommended_factor: 9.72
+    k_by_params:
+      timeperiod=13: 124
+      timeperiod=14: 136
+      timeperiod=144: 1376
+      timeperiod=21: 201
+      timeperiod=233: 2049
+      timeperiod=34: 322
+      timeperiod=55: 500
+      timeperiod=8: 72
+      timeperiod=89: 827
+    max_K_observed: 2049
+    measurements: 135
+    unreliable_or_unconverged: 0
+  EASE_OF_MOVEMENT:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=14: 14
+    max_K_observed: 14
+    measurements: 15
+    unreliable_or_unconverged: 0
+  EMA:
+    family: ema_seeded
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 5.0
+      1h: 4.8
+      4h: 4.49
+      12h: 4.4706
+      1d: 4.3
+    recommended_factor: 5.0
+    k_by_params:
+      timeperiod=10: 50
+      timeperiod=100: 449
+      timeperiod=13: 60
+      timeperiod=144: 645
+      timeperiod=20: 94
+      timeperiod=200: 826
+      timeperiod=21: 97
+      timeperiod=233: 1020
+      timeperiod=34: 152
+      timeperiod=5: 24
+      timeperiod=50: 236
+      timeperiod=55: 259
+      timeperiod=8: 39
+      timeperiod=89: 389
+    max_K_observed: 1020
+    measurements: 630
+    unreliable_or_unconverged: 0
+  ENT_APEN:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=100: 100
+      window=55: 55
+    max_K_observed: 100
+    measurements: 30
+    unreliable_or_unconverged: 0
+  ENT_FRACTAL_DIM:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=100: 100
+      window=55: 55
+    max_K_observed: 100
+    measurements: 30
+    unreliable_or_unconverged: 0
+  ENT_HURST:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=100: 100
+      window=200: 200
+      window=55: 55
+    max_K_observed: 200
+    measurements: 45
+    unreliable_or_unconverged: 0
+  ENT_PERM:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=100: 100
+      window=21: 21
+      window=55: 55
+    max_K_observed: 100
+    measurements: 45
+    unreliable_or_unconverged: 0
+  ENT_SAMPEN:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=100: 100
+      window=55: 55
+    max_K_observed: 100
+    measurements: 30
+    unreliable_or_unconverged: 0
+  ENT_SHANNON:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=100: 100
+      window=21: 21
+      window=55: 55
+    max_K_observed: 100
+    measurements: 45
+    unreliable_or_unconverged: 0
+  FORCE_INDEX:
+    family: ema_seeded
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 6.6154
+      1h: 6.0769
+      4h: 6.0769
+      12h: 5.5385
+      1d: 5.0769
+    recommended_factor: 6.62
+    k_by_params:
+      timeperiod=13: 86
+    max_K_observed: 86
+    measurements: 15
+    unreliable_or_unconverged: 0
+  GARMANKLASS_VOL:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=20: 20
+    max_K_observed: 20
+    measurements: 15
+    unreliable_or_unconverged: 0
+  HT_DCPERIOD:
+    family: hilbert
+    warmup_class: recursive
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 259
+      1h: 259
+      4h: 259
+      12h: 215
+      1d: 215
+    k: 259
+    max_K_observed: 259
+    measurements: 45
+    unreliable_or_unconverged: 0
+  HT_DCPHASE:
+    family: hilbert
+    warmup_class: recursive
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 343
+      1h: 312
+      4h: 312
+      12h: 259
+      1d: 284
+    k: 343
+    max_K_observed: 343
+    measurements: 45
+    unreliable_or_unconverged: 0
+  HT_PHASOR:
+    family: hilbert
+    warmup_class: recursive
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 284
+      1h: 259
+      4h: 259
+      12h: 215
+      1d: 215
+    k: 284
+    max_K_observed: 284
+    measurements: 45
+    unreliable_or_unconverged: 0
+  HT_SINE:
+    family: hilbert
+    warmup_class: recursive
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 377
+      1h: 312
+      4h: 312
+      12h: 259
+      1d: 284
+    k: 377
+    max_K_observed: 377
+    measurements: 45
+    unreliable_or_unconverged: 0
+  HT_TRENDLINE:
+    family: hilbert
+    warmup_class: recursive
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 312
+      1h: 312
+      4h: 312
+      12h: 236
+      1d: 259
+    k: 312
+    max_K_observed: 312
+    measurements: 45
+    unreliable_or_unconverged: 0
+  HT_TRENDMODE:
+    family: hilbert
+    warmup_class: recursive
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 284
+      1h: 236
+      4h: 259
+      12h: 215
+      1d: 284
+    k: 284
+    max_K_observed: 284
+    measurements: 45
+    unreliable_or_unconverged: 0
+  KAMA:
+    family: adaptive_ema
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 38.4615
+      1h: 29.619
+      4h: 31.8462
+      12h: 35.0
+      1d: 26.875
+    recommended_factor: 38.47
+    k_by_params:
+      timeperiod=13: 500
+      timeperiod=144: 2038
+      timeperiod=21: 752
+      timeperiod=233: 2478
+      timeperiod=34: 1098
+      timeperiod=5: 163
+      timeperiod=55: 1421
+      timeperiod=8: 284
+      timeperiod=89: 1764
+    max_K_observed: 2478
+    measurements: 405
+    unreliable_or_unconverged: 0
+  KELTNER:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 8.95
+      1h: 7.45
+      4h: 6.8
+      12h: 6.8
+      1d: 6.2
+    recommended_factor: 9.0
+    k_by_params:
+      timeperiod=20: 179
+    max_K_observed: 179
+    measurements: 15
+    unreliable_or_unconverged: 0
+    measured_factor: 8.95
+    component_floor:
+    - EMA
+    - ATR
+  KLINGER_VOLUME_OSC:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 312
+      1h: 312
+      4h: 312
+      12h: 312
+      1d: 312
+    k: 312
+    max_K_observed: 312
+    measurements: 15
+    unreliable_or_unconverged: 0
+  LINEARREG:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=10: 10
+      timeperiod=13: 13
+      timeperiod=14: 14
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 495
+    unreliable_or_unconverged: 0
+  LINEARREG_ANGLE:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0
+  LINEARREG_INTERCEPT:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0
+  LINEARREG_SLOPE:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=10: 10
+      timeperiod=13: 13
+      timeperiod=14: 14
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 495
+    unreliable_or_unconverged: 0
+  MA:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults:
+      matype: 0.0
+    variants:
+    - matype=0
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      matype=0,timeperiod=13: 13
+      matype=0,timeperiod=144: 144
+      matype=0,timeperiod=21: 21
+      matype=0,timeperiod=233: 233
+      matype=0,timeperiod=34: 34
+      matype=0,timeperiod=5: 5
+      matype=0,timeperiod=55: 55
+      matype=0,timeperiod=8: 8
+      matype=0,timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0
+  MACD:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - fastperiod
+    - signalperiod
+    - slowperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 6.2692
+      1h: 5.7308
+      4h: 5.9444
+      12h: 5.7308
+      1d: 5.9118
+    recommended_factor: 6.27
+    k_by_params:
+      fastperiod=12,signalperiod=9,slowperiod=26: 163
+      fastperiod=13,signalperiod=13,slowperiod=55: 312
+      fastperiod=13,signalperiod=9,slowperiod=34: 201
+      fastperiod=21,signalperiod=13,slowperiod=89: 469
+      fastperiod=21,signalperiod=9,slowperiod=55: 312
+      fastperiod=34,signalperiod=13,slowperiod=89: 515
+      fastperiod=34,signalperiod=21,slowperiod=144: 779
+      fastperiod=5,signalperiod=3,slowperiod=13: 79
+      fastperiod=5,signalperiod=5,slowperiod=21: 116
+      fastperiod=55,signalperiod=21,slowperiod=144: 856
+      fastperiod=55,signalperiod=34,slowperiod=233: 1273
+      fastperiod=8,signalperiod=5,slowperiod=21: 127
+      fastperiod=8,signalperiod=9,slowperiod=34: 201
+    max_K_observed: 1273
+    measurements: 585
+    unreliable_or_unconverged: 0
+  MACDEXT:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - fastperiod
+    - signalperiod
+    - slowperiod
+    param_defaults:
+      fastmatype: 0.0
+      slowmatype: 0.0
+      signalmatype: 0.0
+    variants:
+    - fastmatype=0,signalmatype=0,slowmatype=0
+    factors_by_timeframe:
+      5m: 1.2941
+      1h: 1.2941
+      4h: 1.2941
+      12h: 1.2941
+      1d: 1.2941
+    recommended_factor: 1.3
+    k_by_params:
+      fastmatype=0,fastperiod=12,signalmatype=0,signalperiod=9,slowmatype=0,slowperiod=26: 33
+      fastmatype=0,fastperiod=13,signalmatype=0,signalperiod=13,slowmatype=0,slowperiod=55: 66
+      fastmatype=0,fastperiod=13,signalmatype=0,signalperiod=9,slowmatype=0,slowperiod=34: 44
+      fastmatype=0,fastperiod=21,signalmatype=0,signalperiod=13,slowmatype=0,slowperiod=89: 106
+      fastmatype=0,fastperiod=21,signalmatype=0,signalperiod=9,slowmatype=0,slowperiod=55: 66
+      fastmatype=0,fastperiod=34,signalmatype=0,signalperiod=13,slowmatype=0,slowperiod=89: 106
+      fastmatype=0,fastperiod=34,signalmatype=0,signalperiod=21,slowmatype=0,slowperiod=144: 173
+      fastmatype=0,fastperiod=5,signalmatype=0,signalperiod=3,slowmatype=0,slowperiod=13: 14
+      fastmatype=0,fastperiod=5,signalmatype=0,signalperiod=5,slowmatype=0,slowperiod=21: 25
+      fastmatype=0,fastperiod=55,signalmatype=0,signalperiod=21,slowmatype=0,slowperiod=144: 173
+      fastmatype=0,fastperiod=55,signalmatype=0,signalperiod=34,slowmatype=0,slowperiod=233: 281
+      fastmatype=0,fastperiod=8,signalmatype=0,signalperiod=5,slowmatype=0,slowperiod=21: 25
+      fastmatype=0,fastperiod=8,signalmatype=0,signalperiod=9,slowmatype=0,slowperiod=34: 44
+    max_K_observed: 281
+    measurements: 585
+    unreliable_or_unconverged: 0
+  MACDFIX:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - signalperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 49.6667
+      1h: 45.3333
+      4h: 45.3333
+      12h: 49.6667
+      1d: 49.6667
+    recommended_factor: 49.67
+    k_by_params:
+      signalperiod=13: 163
+      signalperiod=21: 183
+      signalperiod=3: 149
+      signalperiod=5: 149
+      signalperiod=8: 163
+      signalperiod=9: 163
+    max_K_observed: 183
+    measurements: 270
+    unreliable_or_unconverged: 0
+  MAMA:
+    family: adaptive_ema
+    warmup_class: recursive
+    period_keys: []
+    param_defaults:
+      fastlimit: 0.5
+      slowlimit: 0.05
+    variants:
+    - fastlimit=0.5,slowlimit=0.05
+    k_by_timeframe:
+      5m: 196
+      1h: 196
+      4h: 179
+      12h: 149
+      1d: 179
+    k: 196
+    max_K_observed: 196
+    measurements: 45
+    unreliable_or_unconverged: 0
+  MAVP:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - periods
+    param_defaults:
+      minperiod: 2.0
+      maxperiod: 30.0
+      matype: 0.0
+    variants:
+    - matype=0,maxperiod=30,minperiod=2
+    factors_by_timeframe:
+      5m: 6.0
+      1h: 6.0
+      4h: 6.0
+      12h: 6.0
+      1d: 6.0
+    recommended_factor: 6.0
+    k_by_params:
+      matype=0,maxperiod=30,minperiod=2,periods=13: 30
+      matype=0,maxperiod=30,minperiod=2,periods=144: 144
+      matype=0,maxperiod=30,minperiod=2,periods=21: 29
+      matype=0,maxperiod=30,minperiod=2,periods=233: 233
+      matype=0,maxperiod=30,minperiod=2,periods=34: 34
+      matype=0,maxperiod=30,minperiod=2,periods=5: 30
+      matype=0,maxperiod=30,minperiod=2,periods=55: 55
+      matype=0,maxperiod=30,minperiod=2,periods=8: 30
+      matype=0,maxperiod=30,minperiod=2,periods=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0
+  MFI:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=14: 14
+      timeperiod=21: 21
+      timeperiod=34: 34
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 89
+    measurements: 105
+    unreliable_or_unconverged: 0
+  MIDPOINT:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0
+  MIDPRICE:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 135
+    unreliable_or_unconverged: 0
+  MINUS_DI:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 8.8571
+      1h: 8.25
+      4h: 8.0714
+      12h: 7.125
+      1d: 7.5
+    recommended_factor: 8.86
+    k_by_params:
+      timeperiod=13: 113
+      timeperiod=14: 124
+      timeperiod=144: 1035
+      timeperiod=21: 183
+      timeperiod=233: 1694
+      timeperiod=34: 293
+      timeperiod=55: 455
+      timeperiod=8: 66
+      timeperiod=89: 684
+    max_K_observed: 1694
+    measurements: 135
+    unreliable_or_unconverged: 0
+  MINUS_DM:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 9.5385
+      1h: 8.6923
+      4h: 8.6923
+      12h: 7.9048
+      1d: 7.9524
+    recommended_factor: 9.54
+    k_by_params:
+      timeperiod=13: 124
+      timeperiod=14: 124
+      timeperiod=144: 1138
+      timeperiod=21: 183
+      timeperiod=233: 1694
+      timeperiod=34: 293
+      timeperiod=55: 455
+      timeperiod=8: 72
+      timeperiod=89: 752
+    max_K_observed: 1694
+    measurements: 135
+    unreliable_or_unconverged: 0
+  MOM:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0
+  MS_AMIHUD_ILLIQ:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=13: 13
+      window=21: 21
+      window=5: 5
+      window=55: 55
+    max_K_observed: 55
+    measurements: 60
+    unreliable_or_unconverged: 0
+  MS_CS_SPREAD:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=13: 13
+      window=21: 21
+      window=5: 5
+    max_K_observed: 21
+    measurements: 45
+    unreliable_or_unconverged: 0
+  MS_KYLE_LAMBDA:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=13: 13
+      window=21: 21
+      window=55: 55
+    max_K_observed: 55
+    measurements: 45
+    unreliable_or_unconverged: 0
+  MS_LARGE_TRADE_RATIO:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=13: 13
+      window=21: 21
+      window=55: 55
+    max_K_observed: 55
+    measurements: 45
+    unreliable_or_unconverged: 0
+  MS_OFI_RAW:
+    family: window_only
+    warmup_class: window_only
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 1
+      1h: 1
+      4h: 1
+      12h: 1
+      1d: 1
+    k: 1
+    max_K_observed: 1
+    measurements: 15
+    unreliable_or_unconverged: 0
+  MS_ROLL_SPREAD:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0952
+      1h: 1.0952
+      4h: 1.0952
+      12h: 1.0952
+      1d: 1.0952
+    recommended_factor: 1.1
+    k_by_params:
+      window=13: 14
+      window=21: 23
+      window=55: 60
+    max_K_observed: 60
+    measurements: 45
+    unreliable_or_unconverged: 0
+  MS_VPIN:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - n_buckets
+    - sigma_window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 2.0
+      1h: 2.0
+      4h: 2.0
+      12h: 2.0
+      1d: 2.0
+    recommended_factor: 2.0
+    k_by_params:
+      n_buckets=30,sigma_window=50: 79
+      n_buckets=50,sigma_window=50: 100
+    max_K_observed: 100
+    measurements: 30
+    unreliable_or_unconverged: 0
+  NATR:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 9.0
+      1h: 7.8
+      4h: 7.3571
+      12h: 7.2704
+      1d: 7.6854
+    recommended_factor: 9.0
+    k_by_params:
+      timeperiod=13: 113
+      timeperiod=14: 124
+      timeperiod=144: 1035
+      timeperiod=20: 179
+      timeperiod=21: 182
+      timeperiod=233: 1694
+      timeperiod=34: 293
+      timeperiod=5: 42
+      timeperiod=55: 455
+      timeperiod=8: 72
+      timeperiod=89: 684
+    max_K_observed: 1694
+    measurements: 165
+    unreliable_or_unconverged: 0
+  OBV:
     family: cumulative
-    strategy: session_reset_or_burn_in_from_dataset_start
-    note: Binance UI uses session resets (daily/weekly); for ML use consistent reset
-      rule across train/test/live.
-pattern_default_warmup_bars: 5
+    warmup_class: cumulative
+    period_keys: []
+  PARKINSON_VOL:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=20: 20
+    max_K_observed: 20
+    measurements: 15
+    unreliable_or_unconverged: 0
+  PLUS_DI:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 8.0714
+      1h: 7.9524
+      4h: 7.9286
+      12h: 7.5
+      1d: 7.1875
+    recommended_factor: 8.08
+    k_by_params:
+      timeperiod=13: 103
+      timeperiod=14: 113
+      timeperiod=144: 1035
+      timeperiod=21: 167
+      timeperiod=233: 1694
+      timeperiod=34: 267
+      timeperiod=55: 414
+      timeperiod=8: 62
+      timeperiod=89: 622
+    max_K_observed: 1694
+    measurements: 135
+    unreliable_or_unconverged: 0
+  PLUS_DM:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 8.6923
+      1h: 8.7143
+      4h: 8.25
+      12h: 8.25
+      1d: 7.9524
+    recommended_factor: 8.72
+    k_by_params:
+      timeperiod=13: 113
+      timeperiod=14: 122
+      timeperiod=144: 1035
+      timeperiod=21: 183
+      timeperiod=233: 1694
+      timeperiod=34: 267
+      timeperiod=55: 414
+      timeperiod=8: 68
+      timeperiod=89: 684
+    max_K_observed: 1694
+    measurements: 135
+    unreliable_or_unconverged: 0
+  PPO:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - fastperiod
+    - slowperiod
+    param_defaults:
+      matype: 0.0
+    variants:
+    - matype=0
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      fastperiod=12,matype=0,slowperiod=26: 26
+      fastperiod=13,matype=0,slowperiod=34: 34
+      fastperiod=13,matype=0,slowperiod=55: 55
+      fastperiod=21,matype=0,slowperiod=55: 55
+      fastperiod=21,matype=0,slowperiod=89: 89
+      fastperiod=34,matype=0,slowperiod=144: 144
+      fastperiod=34,matype=0,slowperiod=89: 89
+      fastperiod=5,matype=0,slowperiod=13: 13
+      fastperiod=5,matype=0,slowperiod=21: 21
+      fastperiod=55,matype=0,slowperiod=144: 144
+      fastperiod=55,matype=0,slowperiod=233: 233
+      fastperiod=8,matype=0,slowperiod=21: 21
+      fastperiod=8,matype=0,slowperiod=34: 34
+    max_K_observed: 233
+    measurements: 585
+    unreliable_or_unconverged: 0
+  ROC:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=12: 12
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+      timeperiod=9: 9
+    max_K_observed: 233
+    measurements: 495
+    unreliable_or_unconverged: 0
+  ROCP:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=12: 12
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+      timeperiod=9: 9
+    max_K_observed: 233
+    measurements: 495
+    unreliable_or_unconverged: 0
+  ROCR:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=12: 12
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+      timeperiod=9: 9
+    max_K_observed: 233
+    measurements: 495
+    unreliable_or_unconverged: 0
+  ROCR100:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=12: 12
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+      timeperiod=9: 9
+    max_K_observed: 233
+    measurements: 495
+    unreliable_or_unconverged: 0
+  RSI:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 10.0
+      1h: 9.1111
+      4h: 8.25
+      12h: 8.3333
+      1d: 7.6667
+    recommended_factor: 10.0
+    k_by_params:
+      timeperiod=13: 124
+      timeperiod=14: 136
+      timeperiod=144: 1035
+      timeperiod=21: 183
+      timeperiod=233: 1641
+      timeperiod=25: 221
+      timeperiod=34: 322
+      timeperiod=5: 48
+      timeperiod=55: 455
+      timeperiod=6: 60
+      timeperiod=7: 66
+      timeperiod=8: 79
+      timeperiod=89: 684
+      timeperiod=9: 86
+    max_K_observed: 1641
+    measurements: 630
+    unreliable_or_unconverged: 0
+  SAR:
+    family: stateful_pivot
+    warmup_class: recursive
+    period_keys: []
+    param_defaults:
+      acceleration: 0.02
+      maximum: 0.2
+    variants:
+    - acceleration=0.02,maximum=0.2
+    k_by_timeframe:
+      5m: 259
+      1h: 163
+      4h: 215
+      12h: 163
+      1d: 163
+    k: 259
+    max_K_observed: 259
+    measurements: 15
+    unreliable_or_unconverged: 0
+  SAREXT:
+    family: stateful_pivot
+    warmup_class: recursive
+    period_keys: []
+    param_defaults:
+      startvalue: 0.0
+      offsetonreverse: 0.0
+      accelerationinitlong: 0.02
+      accelerationlong: 0.02
+      accelerationmaxlong: 0.2
+      accelerationinitshort: 0.02
+      accelerationshort: 0.02
+      accelerationmaxshort: 0.2
+    variants:
+    - accelerationinitlong=0.02,accelerationinitshort=0.02,accelerationlong=0.02,accelerationmaxlong=0.2,accelerationmaxshort=0.2,accelerationshort=0.02,offsetonreverse=0,startvalue=0
+    k_by_timeframe:
+      5m: 259
+      1h: 163
+      4h: 215
+      12h: 163
+      1d: 163
+    k: 259
+    max_K_observed: 259
+    measurements: 15
+    unreliable_or_unconverged: 0
+  SMA:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=10: 10
+      timeperiod=100: 100
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=20: 20
+      timeperiod=200: 200
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=50: 50
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 630
+    unreliable_or_unconverged: 0
+  STDDEV:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults:
+      nbdev: 1.0
+    variants:
+    - nbdev=1
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      nbdev=1,timeperiod=13: 13
+      nbdev=1,timeperiod=14: 14
+      nbdev=1,timeperiod=144: 144
+      nbdev=1,timeperiod=20: 20
+      nbdev=1,timeperiod=21: 21
+      nbdev=1,timeperiod=233: 233
+      nbdev=1,timeperiod=34: 34
+      nbdev=1,timeperiod=5: 5
+      nbdev=1,timeperiod=55: 55
+      nbdev=1,timeperiod=8: 8
+      nbdev=1,timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 495
+    unreliable_or_unconverged: 0
+  STOCH:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - fastk_period
+    - slowd_period
+    - slowk_period
+    param_defaults:
+      slowk_matype: 0.0
+      slowd_matype: 0.0
+    variants:
+    - slowd_matype=0,slowk_matype=0
+    factors_by_timeframe:
+      5m: 1.6
+      1h: 1.6
+      4h: 1.6
+      12h: 1.6
+      1d: 1.6
+    recommended_factor: 1.6
+    k_by_params:
+      fastk_period=13,slowd_matype=0,slowd_period=3,slowk_matype=0,slowk_period=3: 16
+      fastk_period=13,slowd_matype=0,slowd_period=3,slowk_matype=0,slowk_period=5: 18
+      fastk_period=21,slowd_matype=0,slowd_period=3,slowk_matype=0,slowk_period=3: 25
+      fastk_period=21,slowd_matype=0,slowd_period=3,slowk_matype=0,slowk_period=5: 27
+      fastk_period=21,slowd_matype=0,slowd_period=5,slowk_matype=0,slowk_period=5: 29
+      fastk_period=34,slowd_matype=0,slowd_period=3,slowk_matype=0,slowk_period=5: 40
+      fastk_period=34,slowd_matype=0,slowd_period=5,slowk_matype=0,slowk_period=5: 44
+      fastk_period=5,slowd_matype=0,slowd_period=3,slowk_matype=0,slowk_period=3: 8
+      fastk_period=55,slowd_matype=0,slowd_period=5,slowk_matype=0,slowk_period=5: 66
+      fastk_period=55,slowd_matype=0,slowd_period=5,slowk_matype=0,slowk_period=8: 66
+      fastk_period=8,slowd_matype=0,slowd_period=3,slowk_matype=0,slowk_period=3: 11
+      fastk_period=89,slowd_matype=0,slowd_period=5,slowk_matype=0,slowk_period=8: 106
+    max_K_observed: 106
+    measurements: 180
+    unreliable_or_unconverged: 0
+  STOCHF:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - fastd_period
+    - fastk_period
+    param_defaults:
+      fastd_matype: 0.0
+    variants:
+    - fastd_matype=0
+    factors_by_timeframe:
+      5m: 1.2
+      1h: 1.2
+      4h: 1.2
+      12h: 1.2
+      1d: 1.2
+    recommended_factor: 1.2
+    k_by_params:
+      fastd_matype=0,fastd_period=3,fastk_period=13: 14
+      fastd_matype=0,fastd_period=3,fastk_period=21: 23
+      fastd_matype=0,fastd_period=3,fastk_period=5: 6
+      fastd_matype=0,fastd_period=3,fastk_period=8: 9
+      fastd_matype=0,fastd_period=5,fastk_period=21: 25
+      fastd_matype=0,fastd_period=5,fastk_period=34: 37
+      fastd_matype=0,fastd_period=5,fastk_period=55: 60
+      fastd_matype=0,fastd_period=8,fastk_period=89: 97
+    max_K_observed: 97
+    measurements: 120
+    unreliable_or_unconverged: 0
+  STOCHRSI:
+    family: wilder
+    warmup_class: recursive
+    period_keys:
+    - fastd_period
+    - fastk_period
+    - timeperiod
+    param_defaults:
+      fastd_matype: 0.0
+    variants:
+    - fastd_matype=0
+    factors_by_timeframe:
+      5m: 43.2143
+      1h: 39.2857
+      4h: 9.5714
+      12h: 39.2857
+      1d: 8.7778
+    recommended_factor: 43.22
+    k_by_params:
+      fastd_matype=0,fastd_period=3,fastk_period=3,timeperiod=14: 605
+      fastd_matype=0,fastd_period=3,fastk_period=5,timeperiod=14: 605
+      fastd_matype=0,fastd_period=3,fastk_period=5,timeperiod=21: 827
+      fastd_matype=0,fastd_period=3,fastk_period=5,timeperiod=9: 377
+      fastd_matype=0,fastd_period=5,fastk_period=8,timeperiod=21: 243
+      fastd_matype=0,fastd_period=5,fastk_period=8,timeperiod=34: 354
+      fastd_matype=0,fastd_period=5,fastk_period=8,timeperiod=55: 550
+    max_K_observed: 827
+    measurements: 315
+    unreliable_or_unconverged: 0
+  T3:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults:
+      vfactor: 0.7
+    variants:
+    - vfactor=0.7
+    factors_by_timeframe:
+      5m: 7.9524
+      1h: 7.6854
+      4h: 7.9957
+      12h: 7.9957
+      1d: 7.8529
+    recommended_factor: 8.0
+    k_by_params:
+      timeperiod=13,vfactor=0.7: 103
+      timeperiod=144,vfactor=0.7: 1138
+      timeperiod=21,vfactor=0.7: 167
+      timeperiod=233,vfactor=0.7: 1863
+      timeperiod=34,vfactor=0.7: 267
+      timeperiod=5,vfactor=0.7: 36
+      timeperiod=55,vfactor=0.7: 414
+      timeperiod=8,vfactor=0.7: 60
+      timeperiod=89,vfactor=0.7: 684
+    max_K_observed: 1863
+    measurements: 405
+    unreliable_or_unconverged: 9
+  TEMA:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 6.875
+      1h: 6.5714
+      4h: 6.2364
+      12h: 6.0769
+      1d: 6.0
+    recommended_factor: 6.88
+    k_by_params:
+      timeperiod=13: 86
+      timeperiod=144: 856
+      timeperiod=21: 139
+      timeperiod=233: 1400
+      timeperiod=34: 225
+      timeperiod=5: 33
+      timeperiod=55: 343
+      timeperiod=8: 55
+      timeperiod=89: 590
+    max_K_observed: 1400
+    measurements: 405
+    unreliable_or_unconverged: 0
+  TRANGE:
+    family: window_only
+    warmup_class: window_only
+    period_keys: []
+    param_defaults: {}
+    variants:
+    - ''
+    k_by_timeframe:
+      5m: 1
+      1h: 1
+      4h: 1
+      12h: 1
+      1d: 1
+    k: 1
+    max_K_observed: 1
+    measurements: 15
+    unreliable_or_unconverged: 0
+  TRIMA:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0
+  TRIX:
+    family: compound_ema
+    warmup_class: recursive
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 8.6923
+      1h: 8.25
+      4h: 7.9957
+      12h: 7.9524
+      1d: 7.9524
+    recommended_factor: 8.7
+    k_by_params:
+      timeperiod=13: 113
+      timeperiod=144: 1138
+      timeperiod=21: 167
+      timeperiod=233: 1863
+      timeperiod=34: 267
+      timeperiod=5: 42
+      timeperiod=55: 414
+      timeperiod=8: 66
+      timeperiod=89: 684
+    max_K_observed: 1863
+    measurements: 405
+    unreliable_or_unconverged: 2
+  TR_CVAR:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - alpha=0.01
+    - alpha=0.05
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      alpha=0.01,window=100: 100
+      alpha=0.01,window=21: 21
+      alpha=0.01,window=55: 55
+      alpha=0.05,window=100: 100
+      alpha=0.05,window=21: 21
+      alpha=0.05,window=55: 55
+    max_K_observed: 100
+    measurements: 90
+    unreliable_or_unconverged: 0
+  TR_GPR:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=100: 100
+      window=21: 21
+      window=55: 55
+    max_K_observed: 100
+    measurements: 45
+    unreliable_or_unconverged: 0
+  TR_JB:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=100: 100
+      window=55: 55
+    max_K_observed: 100
+    measurements: 30
+    unreliable_or_unconverged: 0
+  TR_MDD:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 2.0
+      1h: 2.0
+      4h: 2.0
+      12h: 2.0
+      1d: 2.0
+    recommended_factor: 2.0
+    k_by_params:
+      window=100: 200
+      window=21: 40
+      window=55: 110
+    max_K_observed: 200
+    measurements: 45
+    unreliable_or_unconverged: 0
+  TR_RSJ:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=13: 13
+      window=21: 21
+      window=55: 55
+    max_K_observed: 55
+    measurements: 45
+    unreliable_or_unconverged: 0
+  TR_RV_DOWN:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=13: 13
+      window=21: 21
+      window=55: 55
+    max_K_observed: 55
+    measurements: 45
+    unreliable_or_unconverged: 0
+  TR_RV_UP:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=13: 13
+      window=21: 21
+      window=55: 55
+    max_K_observed: 55
+    measurements: 45
+    unreliable_or_unconverged: 0
+  TR_UD_VOL_RATIO:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - window
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      window=13: 13
+      window=21: 21
+      window=55: 55
+    max_K_observed: 55
+    measurements: 45
+    unreliable_or_unconverged: 0
+  TSF:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0
+  ULTOSC:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod1
+    - timeperiod2
+    - timeperiod3
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod1=13,timeperiod2=21,timeperiod3=55: 55
+      timeperiod1=13,timeperiod2=34,timeperiod3=89: 89
+      timeperiod1=21,timeperiod2=34,timeperiod3=89: 89
+      timeperiod1=21,timeperiod2=55,timeperiod3=144: 144
+      timeperiod1=34,timeperiod2=55,timeperiod3=144: 144
+      timeperiod1=34,timeperiod2=89,timeperiod3=233: 233
+      timeperiod1=5,timeperiod2=10,timeperiod3=20: 20
+      timeperiod1=5,timeperiod2=13,timeperiod3=26: 26
+      timeperiod1=7,timeperiod2=14,timeperiod3=28: 28
+      timeperiod1=8,timeperiod2=21,timeperiod3=55: 55
+    max_K_observed: 233
+    measurements: 150
+    unreliable_or_unconverged: 0
+  VAR:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults:
+      nbdev: 1.0
+    variants:
+    - nbdev=1
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      nbdev=1,timeperiod=13: 13
+      nbdev=1,timeperiod=14: 14
+      nbdev=1,timeperiod=144: 144
+      nbdev=1,timeperiod=20: 20
+      nbdev=1,timeperiod=21: 21
+      nbdev=1,timeperiod=233: 233
+      nbdev=1,timeperiod=34: 34
+      nbdev=1,timeperiod=5: 5
+      nbdev=1,timeperiod=55: 55
+      nbdev=1,timeperiod=8: 8
+      nbdev=1,timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 495
+    unreliable_or_unconverged: 0
+  VOLUME_MA_RATIO:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=20: 20
+    max_K_observed: 20
+    measurements: 15
+    unreliable_or_unconverged: 0
+  VWAP:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=20: 20
+    max_K_observed: 20
+    measurements: 15
+    unreliable_or_unconverged: 0
+  WILLR:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=10: 10
+      timeperiod=13: 13
+      timeperiod=14: 14
+      timeperiod=144: 144
+      timeperiod=20: 20
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 180
+    unreliable_or_unconverged: 0
+  WMA:
+    family: window_only
+    warmup_class: window_only
+    period_keys:
+    - timeperiod
+    param_defaults: {}
+    variants:
+    - ''
+    factors_by_timeframe:
+      5m: 1.0
+      1h: 1.0
+      4h: 1.0
+      12h: 1.0
+      1d: 1.0
+    recommended_factor: 1.0
+    k_by_params:
+      timeperiod=13: 13
+      timeperiod=144: 144
+      timeperiod=21: 21
+      timeperiod=233: 233
+      timeperiod=34: 34
+      timeperiod=5: 5
+      timeperiod=55: 55
+      timeperiod=8: 8
+      timeperiod=89: 89
+    max_K_observed: 233
+    measurements: 405
+    unreliable_or_unconverged: 0

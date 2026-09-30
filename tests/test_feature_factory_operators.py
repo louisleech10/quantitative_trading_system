@@ -72,7 +72,13 @@ def test_derived_operators_distance_cross_ratio_momentum_binary():
     assert binary_overbought in derived.columns
     assert binary_oversold in derived.columns
 
-    idx = 50
+    # FFSTAT v53：比值類分母之近零尺度取前 252 列（因果），分母首個有限值起未滿窗之列為 NaN ⇒ 公式比對取窗滿後之列，
+    # 並斷言窗未滿之列為 NaN（改前以全欄中位數為尺度＝未來洩漏）
+    from momentum.FeatureEngineering.utils.numeric_guards import DEFAULT_DENOM_SCALE_WINDOW
+
+    assert np.isnan(derived[distance_col].iloc[50]) and np.isnan(derived[ratio_col].iloc[50])
+    idx = 40 + DEFAULT_DENOM_SCALE_WINDOW + 10
+    assert len(raw) > idx
     ema21_series = ema_21.iloc[:, 0]
     ema8_series = ema_8.iloc[:, 0]
     ema40_series = ema_40.iloc[:, 0]
@@ -194,13 +200,18 @@ def test_lag_processor_layer1_and_raw():
 
 
 def test_derived_distance_handles_duplicate_raw_index():
-    layer1 = pd.DataFrame(
-        {"close_trend_EMA_3": [10.0, 11.0, 12.0]},
-        index=pd.Index([1, 2, 3], name="ts"),
-    )
+    # FFSTAT v53：分母近零尺度需前 252 列（因果窗）⇒ fixture 延長至窗滿後，重複時間戳置於窗滿後之 ts=300
+    from momentum.FeatureEngineering.utils.numeric_guards import DEFAULT_DENOM_SCALE_WINDOW
+
+    n = DEFAULT_DENOM_SCALE_WINDOW + 60
+    ts = list(range(1, n + 1))
+    ema = [10.0 + 0.01 * i for i in range(n)]
+    layer1 = pd.DataFrame({"close_trend_EMA_3": ema}, index=pd.Index(ts, name="ts"))
+    closes = [e + 0.5 for e in ema]
+    dup_at = ts.index(300)
     raw_data = pd.DataFrame(
-        {"close": [10.0, 11.0, 11.5, 12.0]},
-        index=pd.Index([1, 2, 2, 3], name="ts"),
+        {"close": closes[: dup_at + 1] + [closes[dup_at] + 0.25] + closes[dup_at + 1:]},
+        index=pd.Index(ts[: dup_at + 1] + [300] + ts[dup_at + 1:], name="ts"),
     )
 
     engine = DerivedOperatorEngine(
@@ -219,8 +230,10 @@ def test_derived_distance_handles_duplicate_raw_index():
     distance_col = "close_trend_EMA_3_Distance"
     assert distance_col in derived.columns
     assert derived.index.equals(layer1.index)
-    expected_idx_2 = (11.5 - 11.0) / 11.0  # duplicate ts=2 should keep last raw value (11.5)
-    assert np.isclose(derived.loc[2, distance_col], expected_idx_2, equal_nan=True)
+    last_close = closes[dup_at] + 0.25  # duplicate ts=300 should keep last raw value
+    expected = (last_close - ema[dup_at]) / ema[dup_at]
+    assert np.isfinite(derived.loc[300, distance_col])
+    assert np.isclose(derived.loc[300, distance_col], expected)
 
 
 def test_derived_worldquant_tscorr_handles_duplicate_corr_index():

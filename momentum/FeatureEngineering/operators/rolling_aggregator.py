@@ -11,6 +11,7 @@ from scipy.stats import rankdata
 
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 from momentum.FeatureEngineering.operators.derived_operators import (
     RATIO_UNSAFE_CATEGORIES,
 )
@@ -537,7 +538,10 @@ class RollingAggregator:
                             continue
                         window_results[agg_name] = self._extract_multi_window_stat(fused_all[:, window_idx, :], agg_name)
 
-                    filtered_results = self._batch_variance_filter(window_results)
+                    filtered_results = self._batch_variance_filter(
+                        window_results,
+                        names={a: f"{col_name}_{self._format_agg_label(a)}_W{window}" for a in window_results},
+                    )
 
                     for agg_name in valid_aggs:
                         step_key = (window, agg_name)
@@ -697,82 +701,18 @@ class RollingAggregator:
 
     @staticmethod
     def _compute_slope_vectorized(data: pd.DataFrame, window: int) -> pd.DataFrame:
-        """Vectorized rolling OLS slope using cumulative sums.
+        """Rolling OLS slope（窗內 x＝0..w−1；窗內任一 NaN ⇒ NaN）。
 
-        Replaces ``rolling.apply(_slope_fn, raw=True)`` which invokes one
-        Python function call per window-position per column (O(n_rows × n_cols)
-        calls).  This version uses O(1) numpy vectorized operations via
-        cumulative sums — roughly 800× faster for W233 on 256-col chunks.
-
-        Formula:
-            slope = (w · Σ(i·y_i) − Σi · Σy_i) / (w · Σi² − (Σi)²)
-        where i is 0-based position within each rolling window.
-
-        NaN handling: if ANY value in a window is NaN, result is NaN
-        (matches pandas ``rolling.apply`` default behaviour).
+        FFSTAT v52（審查 r35 codex P1-06）：與預設路徑同一之逐窗精確 kernel
+        （`numba_rolling.rolling_slope`）。改前以「絕對列號」cumsum 計 Σ(j·y_j)，捨入誤差隨列號增長而依起算點而異。
         """
+        from momentum.FeatureEngineering.operators.numba_rolling import rolling_slope
+
         n_rows, n_cols = data.shape
-        w = window
-
-        # Denominator constants (same for all positions)
-        sum_x = w * (w - 1) / 2.0
-        sum_x2 = w * (w - 1) * (2 * w - 1) / 6.0
-        denom = w * sum_x2 - sum_x ** 2
-        if denom == 0:
-            return pd.DataFrame(np.nan, index=data.index, columns=data.columns)
-
-        vals = data.values
-        if vals.dtype != np.float64:
-            vals = vals.astype(np.float64)
-
-        # Replace NaN with 0 for cumsum; track NaN count separately
-        nan_mask = np.isnan(vals)
-        clean = np.where(nan_mask, 0.0, vals)
-
-        # Cumulative sum of y  (prepend zero row for easy windowing)
-        cs_y = np.empty((n_rows + 1, n_cols), dtype=np.float64)
-        cs_y[0] = 0
-        np.cumsum(clean, axis=0, out=cs_y[1:])
-
-        # Cumulative sum of j·y[j]  (j = absolute row index)
-        j = np.arange(n_rows, dtype=np.float64)
-        jy = clean * j[:, None]
-        cs_jy = np.empty((n_rows + 1, n_cols), dtype=np.float64)
-        cs_jy[0] = 0
-        np.cumsum(jy, axis=0, out=cs_jy[1:])
-        del jy, clean
-
-        # Cumulative NaN count for windowed NaN detection
-        cs_nan = np.empty((n_rows + 1, n_cols), dtype=np.int32)
-        cs_nan[0] = 0
-        np.cumsum(nan_mask.view(np.uint8), axis=0, out=cs_nan[1:])
-        del nan_mask
-
-        # Vectorised computation for all valid positions
-        # t indexes into cs arrays (1-based); window covers vals[t-w .. t-1]
-        t = np.arange(w, n_rows + 1)  # (n_valid,)
-        roll_y = cs_y[t] - cs_y[t - w]          # Σy_i
-        roll_jy = cs_jy[t] - cs_jy[t - w]       # Σ(j·y[j])
-        del cs_y, cs_jy
-
-        offset = (t - w).astype(np.float64)[:, None]  # (n_valid, 1)
-        roll_iy = roll_jy - offset * roll_y             # Σ(i·y_i), i=0..w-1
-        del roll_jy, offset
-
-        # Slope formula
-        raw_slopes = (w * roll_iy - sum_x * roll_y) / denom  # (n_valid, n_cols)
-        del roll_iy, roll_y
-
-        # Mask out windows that contain any NaN
-        nan_count = cs_nan[t] - cs_nan[t - w]
-        del cs_nan
-        raw_slopes[nan_count > 0] = np.nan
-        del nan_count
-
         slopes = np.full((n_rows, n_cols), np.nan, dtype=np.float32)
-        slopes[w - 1 :] = raw_slopes.astype(np.float32)
-        del raw_slopes
-
+        vals = data.to_numpy(dtype=np.float64)
+        for col_idx in range(n_cols):
+            slopes[:, col_idx] = rolling_slope(np.ascontiguousarray(vals[:, col_idx]), int(window))
         return pd.DataFrame(slopes, index=data.index, columns=data.columns)
 
     def _compute_low_cardinality_cols(
@@ -801,10 +741,21 @@ class RollingAggregator:
         return list(chunk_cols)
 
     def _dead_filter(self, df: pd.DataFrame, nan_threshold: float = 0.9) -> pd.DataFrame:
-        """死欄過濾；`keep_all_columns`（FFSTAT 校準資料域）時不剔欄。"""
+        """死欄過濾；`keep_all_columns`（FFSTAT 校準資料域）時不剔欄。剔除之欄與原因記於 `dead_reasons`
+        （FFSTAT Task 2.3 ⑦ 欄集合差異收據之原因來源）。"""
         if self._keep_all_columns:
             return df
-        return self._variance_filter(df, nan_threshold=nan_threshold)
+        filtered, reasons = self._variance_filter_with_reasons(df, nan_threshold=nan_threshold)
+        if reasons:
+            self.dead_reasons.update(reasons)
+        return filtered
+
+    @property
+    def dead_reasons(self) -> Dict[str, str]:
+        """本實例 L3 死欄過濾剔除之欄 → 原因（nan_rate_rule｜stable_samples_below_min｜constant｜has_inf）。"""
+        if not hasattr(self, "_dead_reasons"):
+            self._dead_reasons: Dict[str, str] = {}
+        return self._dead_reasons
 
     @staticmethod
     def _variance_filter(df: pd.DataFrame, nan_threshold: float = 0.9) -> pd.DataFrame:
@@ -813,29 +764,30 @@ class RollingAggregator:
         Only removes features that carry zero or statistically unreliable information.
         This is a safe, lossless filter — no Alpha is lost.
         """
+        return RollingAggregator._variance_filter_with_reasons(df, nan_threshold)[0]
+
+    @staticmethod
+    def _variance_filter_with_reasons(df: pd.DataFrame, nan_threshold: float = 0.9) -> tuple:
         if df.empty:
-            return df
+            return df, {}
 
-        # 1. Remove columns that are all NaN or have NaN rate > threshold
-        nan_rates = df.isna().mean()
-        high_nan = nan_rates > nan_threshold
-
-        # 1b. Remove columns with too few non-NaN samples (statistically unreliable)
-        effective_n = (~df.isna()).sum()
-        low_effective_n = effective_n < _VARIANCE_FILTER_MIN_EFFECTIVE_N
-
-        # 2. Remove columns containing inf
-        has_inf = df.isin([np.inf, -np.inf]).any()
-
-        # 3. Remove constant columns (std == 0, excluding NaN rows)
-        stds = df.std(skipna=True)
-        is_constant = (stds == 0) | stds.isna()
-
-        dead_mask = high_nan | low_effective_n | has_inf | is_constant
+        # FFSTAT Task 2.3 ⑦：NaN 率（分母自首個有限值起）、有效樣本數（有限值）與常數判定由 L3／L7 共用之
+        # 死欄純函式計算（逐欄穩定點遮罩只延長開頭 NaN 段，故 NaN 率與遮罩長度無關）
+        values = df.to_numpy(dtype=np.float64)
+        decision = _stable_mask.dead_column_decision(
+            values, nan_rate_threshold=nan_threshold, min_valid=_VARIANCE_FILTER_MIN_EFFECTIVE_N
+        )
+        # 另：含 inf 之欄（非 NaN 率／常數判定，沿用）
+        has_inf = np.isinf(values).any(axis=0)
+        dead_mask = np.asarray(decision.dead, dtype=bool) | has_inf
         if not dead_mask.any():
-            return df
-
-        return df.loc[:, ~dead_mask]
+            return df, {}
+        reasons = {
+            str(column): (str(reason) if reason else "has_inf")
+            for column, reason, dead in zip(df.columns, np.asarray(decision.reason, dtype=object), dead_mask)
+            if dead
+        }
+        return df.loc[:, ~dead_mask], reasons
 
     @staticmethod
     def _should_keep_output(data: np.ndarray, nan_threshold: float = 0.9) -> bool:
@@ -846,33 +798,32 @@ class RollingAggregator:
         if np.isinf(values).any():
             return False
 
-        nan_rate = float(np.isnan(values).mean())
-        if nan_rate > nan_threshold:
-            return False
-
-        valid_values = values[~np.isnan(values)]
-        if valid_values.size < _VARIANCE_FILTER_MIN_EFFECTIVE_N:
-            return False
-
-        std_value = float(np.std(valid_values, ddof=1))
-        if np.isnan(std_value) or std_value == 0.0:
-            return False
-
-        return True
+        # FFSTAT Task 2.3 ⑦：與 _variance_filter、L7 同一死欄純函式
+        decision = _stable_mask.dead_column_decision(
+            values.reshape(-1), nan_rate_threshold=nan_threshold, min_valid=_VARIANCE_FILTER_MIN_EFFECTIVE_N
+        )
+        return not decision.dead
 
     def _batch_variance_filter(
         self,
         window_results: Dict[str, np.ndarray],
         nan_threshold: float = 0.9,
+        names: Optional[Dict[str, str]] = None,
     ) -> Dict[str, np.ndarray]:
+        """`names`（agg → 完整輸出欄名）：FFSTAT v53——剔除原因以完整欄名記入 `dead_reasons`（改前以 agg 名為鍵，
+        逐欄互蓋，`column_set_reasons` 缺 L3 多窗路徑剔除之欄）。"""
         if not window_results:
             return {}
 
+        full = dict(names or {})
         window_frame = pd.DataFrame(window_results, copy=False)
+        if full:
+            window_frame = window_frame.rename(columns=full)
         filtered_frame = self._dead_filter(window_frame, nan_threshold=nan_threshold)
+        back = {v: k for k, v in full.items()}
         filtered: Dict[str, np.ndarray] = {}
-        for agg_name in filtered_frame.columns:
-            filtered[agg_name] = filtered_frame[agg_name].to_numpy(dtype=np.float32, copy=False)
+        for column in filtered_frame.columns:
+            filtered[back.get(column, column)] = filtered_frame[column].to_numpy(dtype=np.float32, copy=False)
         return filtered
 
     def _extract_multi_window_stat(self, fused_window: np.ndarray, agg_name: str) -> np.ndarray:

@@ -7,6 +7,7 @@ import pandas as pd
 import talib
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
@@ -45,11 +46,18 @@ class VolumeIndicatorEngine:
             except Exception as exc:
                 guard_indicator_compute(name, exc, fail_open=self._fail_open)
 
-        frames.append(self._compute_vwap(data))
-        frames.append(self._compute_volume_ma_ratio(data))
-        frames.append(self._compute_force_index(data))
-        frames.append(self._compute_klinger(data))
-        frames.append(self._compute_eom(data))
+        # FF-STAT Task 2.3：自訂欄之 L1 輸出點（倍數表條目、產生該欄之參數、全部輸入欄）
+        frames.append(l1op.mask_frame(self._compute_vwap(data), "volume", "VWAP", {"timeperiod": 20}, data,
+                                      ("high", "low", "close", "volume")))
+        frames.append(l1op.mask_frame(self._compute_volume_ma_ratio(data), "volume", "VOLUME_MA_RATIO",
+                                      {"timeperiod": 20}, data, ("volume",)))
+        frames.append(l1op.mask_frame(self._compute_force_index(data), "volume", "FORCE_INDEX", {"timeperiod": 13},
+                                      data, ("close", "volume")))
+        # Klinger 之 34／55 為引擎寫死、不可設定 ⇒ 無參數條目（K 取表內實測 k，SPEC Task 2.4 邊界①）
+        frames.append(l1op.mask_frame(self._compute_klinger(data), "volume", "KLINGER_VOLUME_OSC",
+                                      {}, data, ("high", "low", "close", "volume")))
+        frames.append(l1op.mask_frame(self._compute_eom(data), "volume", "EASE_OF_MOVEMENT", {"timeperiod": 14},
+                                      data, ("high", "low", "volume")))
 
         frames = [frame for frame in frames if frame is not None and not frame.empty]
         if not frames:

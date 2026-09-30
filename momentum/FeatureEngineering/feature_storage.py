@@ -1030,6 +1030,7 @@ class FeatureStorage:
         from momentum.FeatureEngineering.utils.nan_stats import ColumnNanAccumulator
 
         nan_accumulators: Dict[str, ColumnNanAccumulator] = {}
+        dead_drop_reasons: Dict[str, str] = {}  # FFSTAT Task 2.3 ⑦：L7 串流剔除欄 → 原因
 
         def _write_group(
             group_id: str,
@@ -1109,6 +1110,16 @@ class FeatureStorage:
 
                 _dmask = dead_column_mask(array, min_valid_samples=dead_drop_min_valid)
                 if _dmask.any():
+                    # FFSTAT Task 2.3 ⑦：剔除之欄與原因（同一死欄純函式；欄集合差異收據之原因來源）
+                    from momentum.FeatureEngineering.preprocessing import stable_mask as _sm
+
+                    _drop_idx = np.flatnonzero(_dmask)
+                    _dec = _sm.dead_column_decision(
+                        np.asarray(array[:, _drop_idx], dtype=np.float64), nan_rate_threshold=None,
+                        min_valid=dead_drop_min_valid,
+                    )
+                    for _i, _reason in zip(_drop_idx, np.asarray(_dec.reason, dtype=object)):
+                        dead_drop_reasons[str(columns_list[_i])] = str(_reason or "constant")
                     _keep = ~_dmask
                     dead_dropped_cols += int(_dmask.sum())
                     dead_affected_groups += 1
@@ -1336,6 +1347,27 @@ class FeatureStorage:
                 accumulator.abnormal() for accumulator in nan_accumulators.values()
             )
             nan_ratio = float(abnormal_nan / total_values) if total_values else 0.0
+            # FFSTAT §C 紀錄：逐欄 stable_start（公開輸出首個有效值之時間）；有起始日而首個有效值晚於起始日之欄
+            # ⇒ warmup_insufficient_history 事件（品質 partial）
+            from momentum.FeatureEngineering.warmup_window import (
+                WARMUP_INSUFFICIENT_EVENT,
+                stable_start_from_first_rows,
+                warmup_late_columns,
+            )
+
+            stable_start = (
+                stable_start_from_first_rows(
+                    {c: (acc.leading_nan if acc.seen_valid else None) for c, acc in nan_accumulators.items()},
+                    row_index,
+                )
+                if row_index is not None
+                else {}
+            )
+            warmup_late = warmup_late_columns(
+                stable_start,
+                (quality_gate or {}).get("warmup_output_start"),
+                (quality_gate or {}).get("warmup_probe_late"),
+            )
             validation_summary = {
                 "has_nan": bool(non_nan_values < total_values),
                 "has_inf": bool(total_inf > 0),
@@ -1355,6 +1387,8 @@ class FeatureStorage:
                 "transformed_groups": int(transformed_groups),
                 "dead_dropped_cols": int(dead_dropped_cols),
                 "dead_affected_groups": int(dead_affected_groups),
+                "stable_start": stable_start,
+                "warmup_insufficient_columns": warmup_late,
                 "dtype_summary": self._build_dtype_summary(
                     storage_dtype_counts,
                     float32_fallback_parts,
@@ -1385,7 +1419,7 @@ class FeatureStorage:
                         preprocessor.stationarity_failure_reasons()
                         if preprocessor is not None and hasattr(preprocessor, "stationarity_failure_reasons")
                         else ()
-                    ),
+                    ) + ((f"{WARMUP_INSUFFICIENT_EVENT}:{len(warmup_late)}",) if warmup_late else ()),
                 )
             # manifest 只收既有鍵（completeness 六欄＋quality_status＋failure_reasons）；
             # quality_thresholds／run_status 等降級細節只經 summary 回給 factory（§C 不新增 manifest 鍵）
@@ -1440,6 +1474,9 @@ class FeatureStorage:
                 "l65_mode": str(l65_mode),
                 "dead_dropped_cols": int(dead_dropped_cols),
                 "dead_affected_groups": int(dead_affected_groups),
+                "stable_start": stable_start,
+                "warmup_insufficient_columns": warmup_late,
+                "dead_drop_reasons": dict(dead_drop_reasons),
                 # 最終 completeness（含 Task 2.3 降級）；factory 以之寫 result.metadata（Task 2.2 同源）
                 "completeness": dict(completeness_meta),
             }

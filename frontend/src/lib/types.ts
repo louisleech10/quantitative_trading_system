@@ -625,6 +625,15 @@ export interface RunInfo extends RunIdentity {
    *    兩者後端都判 `feature_coverage_unknown_legacy_run` 而 fail-closed。
    */
   time_range?: { start: string | null; end: string | null } | null;
+  /** FF-STAT 逐欄穩定點：`user`＝有起始日；`per_column`＝各欄依自身預熱期起算（未填起始日）。舊 run 無此欄。 */
+  output_start_source?: 'user' | 'per_column' | null;
+  /** 各欄首個有效值（stable_start）之最早／最晚（ISO 字串）。 */
+  stable_start_earliest?: string | null;
+  stable_start_latest?: string | null;
+  /** 有起始日而歷史不足、開頭為空值之欄數。 */
+  warmup_insufficient_count?: number | null;
+  /** 未填起始日且開平穩化：每欄前 N 個穩定值保留供校準、不輸出。 */
+  calibration_rows_withheld?: boolean | null;
 }
 export interface EnsureBrowseResponse extends RunIdentity {
   browse_task_id: string;

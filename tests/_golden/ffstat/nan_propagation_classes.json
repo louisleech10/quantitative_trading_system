@@ -42,6 +42,11 @@
       "class": "pointwise_prefix",
       "evidence": "consensus_features.py:91 比較後 astype(float)；輸入為原始 close／volume，只首列 pct_change 為 NaN"
     },
+    "momentum.FeatureEngineering.meta_features.consensus_features:_prefix_masked": {
+      "propagates_nan": false,
+      "class": "mask",
+      "evidence": "consensus_features.py 第④類遮罩（mask_pointwise_prefix 包裝）"
+    },
     "momentum.FeatureEngineering.meta_features.interaction_features:InteractionFeatureEngine._find_column": {
       "propagates_nan": false,
       "class": "helper",
@@ -332,11 +337,6 @@
       "class": "propagating",
       "evidence": "lag_processor.py:40 shift"
     },
-    "momentum.FeatureEngineering.operators.numba_rolling:_batch_recompute_moments": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "numba_rolling.py:8-246 窗內純量／排序緩衝核心"
-    },
     "momentum.FeatureEngineering.operators.numba_rolling:_bisect_left": {
       "propagates_nan": false,
       "class": "helper",
@@ -362,27 +362,7 @@
       "class": "helper",
       "evidence": "numba_rolling.py:8-246 窗內純量／排序緩衝核心"
     },
-    "momentum.FeatureEngineering.operators.numba_rolling:_pebay_remove": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "numba_rolling.py:8-246 窗內純量／排序緩衝核心"
-    },
-    "momentum.FeatureEngineering.operators.numba_rolling:_pebay_update": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "numba_rolling.py:8-246 窗內純量／排序緩衝核心"
-    },
     "momentum.FeatureEngineering.operators.numba_rolling:_remove_sorted": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "numba_rolling.py:8-246 窗內純量／排序緩衝核心"
-    },
-    "momentum.FeatureEngineering.operators.numba_rolling:_welford_remove": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "numba_rolling.py:8-246 窗內純量／排序緩衝核心"
-    },
-    "momentum.FeatureEngineering.operators.numba_rolling:_welford_update": {
       "propagates_nan": false,
       "class": "helper",
       "evidence": "numba_rolling.py:8-246 窗內純量／排序緩衝核心"
@@ -592,10 +572,20 @@
       "class": "column_filter",
       "evidence": "rolling_aggregator.py:810 死欄列篩選（§C 死欄純函式）"
     },
+    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._variance_filter_with_reasons": {
+      "propagates_nan": false,
+      "class": "column_filter",
+      "evidence": "rolling_aggregator.py 死欄純函式＋剔除原因（Task 2.3 ⑦）"
+    },
     "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator.compute_all": {
       "propagates_nan": false,
       "class": "dispatcher",
       "evidence": "rolling_aggregator.py:107 派發函式"
+    },
+    "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator.dead_reasons": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "rolling_aggregator.py 剔除原因紀錄（不產特徵值）"
     },
     "momentum.FeatureEngineering.operators.rolling_aggregator:_is_ratio_unsafe_column": {
       "propagates_nan": false,
@@ -1122,11 +1112,6 @@
       "class": "helper",
       "evidence": "calibration.py 校準域（輸出以外）之值、時間與身分核對"
     },
-    "momentum.FeatureEngineering.preprocessing.calibration:resolve_effective_output_start": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "calibration.py 校準域（輸出以外）之值、時間與身分核對"
-    },
     "momentum.FeatureEngineering.preprocessing.calibration:restrict_packet": {
       "propagates_nan": false,
       "class": "helper",
@@ -1337,6 +1322,11 @@
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
     },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._mask_no_start_rows": {
+      "propagates_nan": false,
+      "class": "mask",
+      "evidence": "preprocessing/feature_preprocessor.py 逐欄校準列遮罩（Task 2.3 ④）"
+    },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._maybe_run_native_l65_inplace": {
       "propagates_nan": false,
       "class": "dispatcher",
@@ -1351,6 +1341,11 @@
       "propagates_nan": false,
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py:430 決策紀錄合併"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._no_start_lookup": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py 逐欄校準模式之校準值與列紀錄（不產特徵值）"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._note_cache_set": {
       "propagates_nan": false,
@@ -1562,10 +1557,20 @@
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
     },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.no_start_calibration_rows": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py 逐欄校準模式之校準值與列紀錄（不產特徵值）"
+    },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.set_calibration": {
       "propagates_nan": false,
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py 設定／校準值／決策紀錄／快取／選欄／排程（不產特徵值）"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.set_no_start_calibration": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py 逐欄校準模式之校準值與列紀錄（不產特徵值）"
     },
     "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor.stationarity_decisions": {
       "propagates_nan": false,
@@ -1607,6 +1612,31 @@
       "class": "helper",
       "evidence": "preprocessing/feature_preprocessor.py:105-114 欄名守衛"
     },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:_dead_columns_2d": {
+      "propagates_nan": false,
+      "class": "column_filter",
+      "evidence": "stable_mask.py 死欄純函式之二維形"
+    },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:_fmt_param": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "stable_mask.py 參數正規鍵／變體檢查／K 計算輔助（不產特徵值）"
+    },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:_k_error": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "stable_mask.py 參數正規鍵／變體檢查／K 計算輔助（不產特徵值）"
+    },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:_period_value": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "stable_mask.py 週期參數數值（序列取最大）"
+    },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:_utf8_sorted": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "stable_mask.py 參數正規鍵／變體檢查／K 計算輔助（不產特徵值）"
+    },
     "momentum.FeatureEngineering.preprocessing.stable_mask:apply_l1_mask": {
       "propagates_nan": false,
       "class": "mask",
@@ -1621,6 +1651,16 @@
       "propagates_nan": false,
       "class": "helper",
       "evidence": "stable_mask.py 雜湊／K／origin 計算（不產特徵值）"
+    },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:canonical_params": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "stable_mask.py 參數正規鍵／變體檢查／K 計算輔助（不產特徵值）"
+    },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:check_variant": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "stable_mask.py 參數正規鍵／變體檢查／K 計算輔助（不產特徵值）"
     },
     "momentum.FeatureEngineering.preprocessing.stable_mask:column_set_delta": {
       "propagates_nan": false,
@@ -1652,6 +1692,11 @@
       "class": "helper",
       "evidence": "stable_mask.py 雜湊／K／origin 計算（不產特徵值）"
     },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:k_for_params": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "stable_mask.py 參數正規鍵／變體檢查／K 計算輔助（不產特徵值）"
+    },
     "momentum.FeatureEngineering.preprocessing.stable_mask:l1_origin": {
       "propagates_nan": false,
       "class": "helper",
@@ -1662,10 +1707,20 @@
       "class": "mask",
       "evidence": "stable_mask.py 本票遮罩（FFSTAT Task 2.3）"
     },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:mask_incomplete_window_inplace": {
+      "propagates_nan": false,
+      "class": "mask",
+      "evidence": "stable_mask.py 第①類二維就地遮罩（縮尾）"
+    },
     "momentum.FeatureEngineering.preprocessing.stable_mask:mask_pointwise_prefix": {
       "propagates_nan": false,
       "class": "mask",
       "evidence": "stable_mask.py 本票遮罩（FFSTAT Task 2.3）"
+    },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:variant_key": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "stable_mask.py 參數正規鍵／變體檢查／K 計算輔助（不產特徵值）"
     },
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._align_block_rows": {
       "propagates_nan": true,
@@ -1956,6 +2011,11 @@
       "propagates_nan": false,
       "class": "helper",
       "evidence": "tf_aligner.py:90-512 時間索引換算／參數／洩漏驗證（不產值）"
+    },
+    "momentum.FeatureEngineering.operators.numba_rolling:_window_moments": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "numba_rolling.py:_window_moments 窗內純量核心（v50 逐窗精確；窗內任一 NaN ⇒ 全有效＝False，呼叫端 fused_rolling_stats／rolling_skew_kurt 據以出 NaN）"
     }
   }
 }

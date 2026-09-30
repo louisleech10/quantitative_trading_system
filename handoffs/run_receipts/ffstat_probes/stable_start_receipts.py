@@ -16,7 +16,7 @@ import json
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO))
@@ -85,18 +85,93 @@ def dual_start() -> Dict[str, Any]:
     return out
 
 
+DEAD_DROPS_PATH = REPO / "tests" / "_golden" / "ffstat" / "baseline_dead_drops.json"
+
+
+def leading_caused(rec: Dict[str, Any]) -> bool:
+    """SPEC v49：改前 L3 剔除是否因開頭過長（全無有限值，或非常數且開頭非有限值 > 0.9 或其後不足 30 列）；含 inf 者否。"""
+    if rec["has_inf"]:
+        return False
+    rows, lead = int(rec["rows"]), int(rec["leading_nan"])
+    if lead >= rows:
+        return True
+    if rec.get("low_cardinality_skip"):
+        return False  # 改前低基數閘所剔（統計取自輸入欄）：只有輸入全無有限值時屬開頭過長
+    # 改前過濾器為各條件之 OR：開頭段本身即足以判死（其後樣本過少時之常數判定不另計）
+    return lead / rows > 0.9 or rows - lead < 30
+
+
+def classify_added(rec: Optional[Dict[str, Any]], new_values: Any, restored_by_start: bool) -> Optional[str]:
+    """新增欄之原因（SPEC v50，審查 r33 codex P1-01 因果配對）：
+    - 凍結檔無此欄或改前剔除非開頭過長（`leading_caused` 假）⇒ None（無合法原因、blocked）；
+    - `warmup_restored` 須同時成立：改後公開輸出於改前開頭非有限值段（前 `leading_nan` 列）內已有有限值（證明新增
+      之有效值正是預熱填回之開頭段），且改後 `stable_start` ≤ 起始日（`restored_by_start`）；
+    - 改前因開頭過長被剔、而改後未於起始日前穩定 ⇒ `nan_rate_rule`（改由新分母保留）；
+    - 改前因開頭過長被剔、改後 stable_start ≤ 起始日但開頭段內仍無有限值 ⇒ None（因果不成立，不得標 restored）。"""
+    import numpy as np
+
+    if rec is None or not leading_caused(rec):
+        return None
+    if not restored_by_start:
+        return "nan_rate_rule"
+    values = np.asarray(new_values, dtype=np.float64)
+    lead = min(int(rec["leading_nan"]), len(values))
+    return "warmup_restored" if bool(np.isfinite(values[:lead]).any()) else None
+
+
 def column_delta() -> Dict[str, Any]:
     from momentum.FeatureEngineering.preprocessing import stable_mask as sm
     from tests.feature_engineering import ffstat_helpers as h
 
+    import pandas as pd
+
     baseline = json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))
     before = sorted(baseline["base"])
+    import pytest
+
     with tempfile.TemporaryDirectory(prefix="ffstat_delta_") as tmp:
-        root, factory, result = h.run_stat(Path(tmp), h.stat_payload())
+        # 同測試之隔離（d* 快取、cwd、系統暫存皆導向 tmp；不寫專案 data_cache）
+        mp = pytest.MonkeyPatch()
+        try:
+            h.prepare_stat_env(mp, Path(tmp))
+            root, factory, result = h.run_stat(Path(tmp), h.stat_payload())
+        finally:
+            mp.undo()  # 還原 cwd 等；產物仍在 tmp 內，下方讀取以絕對路徑進行
         after = sorted(h.base_fingerprints(root))
-        reasons = dict(result.metadata.get("column_set_reasons", {}))
-    delta = sm.column_set_delta(before, after, reasons)
-    return {"before_sha256": sm.column_set_sha256(before), "after_sha256": sm.column_set_sha256(after),
+        dropped = dict(result.metadata.get("column_set_reasons", {}))
+        stable_start = dict(result.metadata.get("stable_start", {}))
+        added_values = h.base_column_values(root, set(after) - set(before))
+    # 移除欄：本次 L3／L7 死欄過濾之原因（只收封閉集合內者；其餘如 constant／has_inf 留空 ⇒ delta 拒收）
+    reasons: Dict[str, str] = {}
+    for column in set(before) - set(after):
+        if dropped.get(column) in sm.DELTA_REASONS:
+            reasons[column] = dropped[column]
+    # 新增欄（SPEC v50）：查改前原始碼同設定同窗之 L3 剔除紀錄凍結檔，以 classify_added 做因果配對判定；
+    # 凍結檔無此欄、改前理由非開頭過長或因果不成立 ⇒ 無原因（blocked）
+    from momentum.FeatureEngineering.preprocessing.calibration import tagged_column_name
+
+    # 改前 L3 以未標記週期之欄名運算（close_trend_…），公開欄名已標記（close_1h_trend_…）⇒ 同一規則正規化
+    frozen = json.loads(DEAD_DROPS_PATH.read_text(encoding="utf-8"))
+    old = {tagged_column_name(c, frozen["timeframe"]): rec for c, rec in frozen["l3_dead_drops"].items()}
+    start = pd.Timestamp(h.WINDOW[0], tz="UTC")
+    for column in set(after) - set(before):
+        ts = stable_start.get(column)
+        reason = classify_added(old.get(column), added_values[column], ts is not None and pd.Timestamp(ts) <= start)
+        if reason is not None:
+            reasons[column] = reason
+    try:
+        delta = sm.column_set_delta(before, after, reasons)
+    except sm.DeltaReasonError as exc:
+        # SPEC Task 2.3 ⑦（v36）：原因不在封閉集合 ⇒ 拒收並出 blocked 收據（列每個無合法原因之差異欄與其原始原因）
+        unreasoned = [{"column": c, "side": "removed" if c in before else "added", "raw_reason": dropped.get(c)}
+                      for c in sorted(set(before) ^ set(after)) if c not in reasons]
+        return {"schema_version": 1, "status": "blocked", "error": str(exc),
+                "command": "venv/bin/python handoffs/run_receipts/ffstat_probes/stable_start_receipts.py column-delta",
+                "exit_code": 1, "added": len(set(after) - set(before)), "removed": len(set(before) - set(after)),
+                "unclassified": unreasoned}
+    return {"schema_version": 1,
+            "command": "venv/bin/python handoffs/run_receipts/ffstat_probes/stable_start_receipts.py column-delta",
+            "exit_code": 0, "before_sha256": sm.column_set_sha256(before), "after_sha256": sm.column_set_sha256(after),
             "delta": delta, "delta_sha256": sm.delta_sha256(delta)}
 
 

@@ -27,6 +27,22 @@ function runKey(run: RunInfo): string {
   return `${run.symbol}-${run.timeframe}-${run.config_hash}`;
 }
 
+/**
+ * FF-STAT §C 紀錄與顯示（逐欄穩定點）：未填起始日 ⇒「各欄依自身預熱期起算（最早 X、最晚 Y）」，開平穩化另註
+ * 「每欄前 N 個穩定值保留供校準、不輸出」；有起始日而有歷史不足之欄 ⇒「K 欄歷史不足，開頭為空值」。舊 run 無紀錄 ⇒ null。
+ */
+export function stableStartNote(run: RunInfo): string | null {
+  const day = (iso?: string | null) => (iso ? iso.slice(0, 10) : '—');
+  if (run.output_start_source === 'per_column') {
+    const base = `各欄依自身預熱期起算（最早 ${day(run.stable_start_earliest)}、最晚 ${day(run.stable_start_latest)}）`;
+    return run.calibration_rows_withheld ? `${base}；每欄前 N 個穩定值保留供校準、不輸出` : base;
+  }
+  if (run.output_start_source === 'user' && (run.warmup_insufficient_count ?? 0) > 0) {
+    return `${run.warmup_insufficient_count} 欄歷史不足，開頭為空值`;
+  }
+  return null;
+}
+
 type BulkDeleteTarget = {
   mode: 'selection' | 'batch';
   batchId?: string;
@@ -539,6 +555,11 @@ export default function RunManagerPanel() {
           {run.symbol}
           <span className="text-slate-500 mx-1">/</span>
           {run.timeframe}
+          {stableStartNote(run) && (
+            <span className="block font-sans text-[11px] text-slate-500" data-testid="stable-start-note">
+              {stableStartNote(run)}
+            </span>
+          )}
         </td>
         <td className={`${tdCls} text-slate-400 text-right tabular-nums`}>
           {formatBytes(run.size_bytes)}

@@ -37,7 +37,7 @@ def _layers_from_files(root: Path) -> Dict[str, str]:
     return out
 
 
-@pytest.mark.parametrize("cgsa", ["1", "0"], ids=["cgsa", "frame"])
+@pytest.mark.parametrize("cgsa", ["1"], ids=["cgsa"])  # frame 臂移除：使用者 2026-09-28 裁定刪除 frame（RM-FRAMEPATH）
 def test_boundary_01_target_layers_on_both_paths(cgsa: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 1.1 邊界①（CGSA 與 frame 兩路徑各一）＋驗證：真實輕量 run 之 fracdiff 目標集合等於 L1∪L2 欄，
     且逐欄決策之層與落盤層一致。層之正解一律由同設定之 CGSA run 落盤群組檔名讀得（frame 路徑不落群組
@@ -159,17 +159,8 @@ def test_provenance_error_not_degraded() -> None:
         factory._safe_execute("Layer 6.5 pre_ic", _missing)
 
 
-def test_legacy_multi_tf_uses_structured_layers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """b1 審碼 r1 codex P1-01：legacy 多週期 frame 路徑（CGSA 關閉、1h＋12h）以結構化層判 fracdiff 目標，
-    L6.5 確有執行（未降級）、決策含 12h 原生週期之欄且其 timeframe 欄為 12h、層皆為 L1／L2。"""
-    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
-    _, factory, result = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], adf=False))
-    assert factory._preprocessing_applied is True
-    dec = h.decisions(result)
-    assert dec and {d["layer"] for d in dec.values()} <= set(h.CONTRACT["fracdiff_target_layers"])
-    tf12 = {c: d for c, d in dec.items() if "_12h_" in c}
-    assert tf12 and all(d["timeframe"] == "12h" for d in tf12.values())
-    assert all(d["timeframe"] == "1h" for c, d in dec.items() if "_1h_" in c)
+# （b1 之 test_legacy_multi_tf_uses_structured_layers 已移除：只驗 frame 多週期路徑；使用者 2026-09-28 裁定刪除 frame，
+#   RM-FRAMEPATH；CGSA 多週期之結構化層判定由上方參數化測試之 cgsa 臂與 test_ffstat_stable_start ⑪ 涵蓋）
 
 
 def test_ic_first_fresh_path_uses_structured_layers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -189,6 +180,7 @@ def test_ic_first_fresh_path_uses_structured_layers(tmp_path: Path, monkeypatch:
     factory._current_output_window = resolve_output_window(config, h.PRIMARY_TF, *h.WINDOW)
     h.ic_first_to_l65(factory, config, ic_engine=ICEngine({"methods": ["spearman"]}),
                       feature_reader=FeatureReader(str(root)), storage=factory._storage,
-                      ic_threshold=0.0, persist=False)
+                      ic_threshold=0.0, persist=False,
+                      start_date=h.WINDOW[0], end_date=h.WINDOW[1])  # v29：平穩化開啟須自帶起訖
     dec = factory.last_stationarity_decisions
     assert dec and {d["layer"] for d in dec.values()} <= set(h.CONTRACT["fracdiff_target_layers"])

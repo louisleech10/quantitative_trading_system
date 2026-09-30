@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic import l1_output_points as l1op
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.compute_guard import resolve_fail_open
 
@@ -83,7 +84,25 @@ class EntropyIndicatorEngine:
         if not frames:
             return pd.DataFrame(index=data.index)
 
-        return pd.concat(frames, axis=1)
+        return l1op.mask_engine_frame("entropy", pd.concat(frames, axis=1), self._output_points(), data)
+
+    def _output_points(self) -> Dict[str, Dict]:
+        """FF-STAT Task 2.3：逐輸出欄之參數契約（SPEC §C v38）；close_return 之輸入為 close。"""
+        p = l1op.point
+        points: Dict[str, Dict] = {}
+        for source in self.apply_to:
+            inputs = ("close",) if source == "close_return" else (source,)
+            for w in self.shannon_windows:
+                points[f"ent_shannon_{source}_{w}"] = p("ENT_SHANNON", {"window": w}, inputs)
+        for w in self.windows:
+            points[f"ent_apen_{w}"] = p("ENT_APEN", {"window": w}, ("close",))
+            points[f"ent_sampen_{w}"] = p("ENT_SAMPEN", {"window": w}, ("close",))
+            points[f"ent_fractal_dim_{w}"] = p("ENT_FRACTAL_DIM", {"window": w}, ("close",))
+        for w in self.hurst_windows:
+            points[f"ent_hurst_{w}"] = p("ENT_HURST", {"window": w}, ("close",))
+        for w in self.perm_windows:
+            points[f"ent_perm_{w}"] = p("ENT_PERM", {"window": w}, ("close",))
+        return points
 
     def get_feature_metadata(self) -> Dict[str, Dict]:
         metadata: Dict[str, Dict] = {}

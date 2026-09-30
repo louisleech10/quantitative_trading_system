@@ -448,12 +448,21 @@ class LabelConfig(BaseModel):
     regression: RegressionLabelConfig = Field(default_factory=RegressionLabelConfig)
 
 
+class CustomIndicatorOutput(BaseModel):
+    """自訂指標之單一輸出欄宣告（FF-STAT SPEC §C v39②）：產生該欄之已解析參數與倍數表 period_keys。"""
+    params: Dict[str, Any] = Field(default_factory=dict)
+    period_keys: List[str] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+
 class CustomIndicatorDef(BaseModel):
     name: str
     module: str
     function: str
     params: Dict[str, Any] = Field(default_factory=dict)
     data_sources: Optional[List[str]] = None
+    # FF-STAT v39②：必填——輸出欄名 → 宣告；compute_all 於 concat 前驗回傳欄集合＝宣告集合
+    outputs: Dict[str, CustomIndicatorOutput]
     model_config = ConfigDict(extra="allow")
 
 

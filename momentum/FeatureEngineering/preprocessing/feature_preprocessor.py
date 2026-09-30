@@ -31,6 +31,7 @@ from momentum.FeatureEngineering.preprocessing._hurst_prior import (
     find_min_d_with_prior,
 )
 from momentum.FeatureEngineering.preprocessing._non_stationary_cache import NonStationaryCache
+from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 from momentum.FeatureEngineering.preprocessing.calibration import (
     CalibrationError,
     CalibrationKey,
@@ -144,6 +145,9 @@ except Exception:
 class FeaturePreprocessor:
     """Layer 6.5: 特徵前處理與正規化。"""
 
+    # 欄分塊時改以 memmap 收集輸出之門檻（rows × cols × 4 bytes）
+    _CHUNKED_MEMMAP_MIN_BYTES = 500_000_000
+
     def __init__(
         self,
         config: Dict,
@@ -201,6 +205,11 @@ class FeaturePreprocessor:
         self._calibration_packets: Optional[Dict[str, CalibrationPacket]] = None
         # append 模式 fracdiff 衍生欄之校準值：{(原生週期, 標記後欄名): 值}（見 `_register_derived_calibration`）
         self._derived_calibration: Dict[Tuple[str, str], np.ndarray] = {}
+        # FFSTAT Task 2.3 ④（v32 未填起始日）：逐欄校準模式——校準值＝該欄公開值（遮罩後）最早 N 個有效值；
+        # 校準列（首個有效值之列至第 N 個有效值之列，本次轉換之列空間）於輸出遮為 NaN
+        self._no_start_calibration = False
+        self._no_start_rows: Dict[Tuple[str, str], Tuple[int, int]] = {}
+        self._no_start_values: Dict[Tuple[str, str], np.ndarray] = {}
 
     # ---------------------------------------------------------------- FFSTAT 校準封包（Task 2.1）
 
@@ -219,16 +228,33 @@ class FeaturePreprocessor:
         }
         self._calibration_packets = None
 
+    def set_no_start_calibration(self, native_maps: Optional[Mapping[str, np.ndarray]] = None) -> None:
+        """未填起始日之逐欄校準（FFSTAT Task 2.3 ④，v32）：不經前置關卡與封包；各欄於轉換時以公開值（逐欄穩定點
+        遮罩後）最早 N 個有效值校準，校準列於輸出遮為 NaN（`_mask_no_start_rows`）。
+
+        `native_maps`：frame 多週期（legacy）路徑之 {次週期: 逐主週期列之原生列號（對齊前為 NaN）}——該週期之欄
+        於主週期列空間轉換、值為 ffill，最早 N 個值以「不同原生 K 棒」計（不以重複值充數），校準列含顯示這些
+        K 棒之全部主週期列。"""
+        self._no_start_calibration = True
+        self._no_start_native_maps = {str(k): np.asarray(v, dtype=np.float64) for k, v in (native_maps or {}).items()}
+        self._calibration_source = None
+        self._calibration_identity = None
+        self._calibration_packets = {}
+
     def _inherit_calibration(self, parent: "FeaturePreprocessor") -> None:
         """native-tf 子實例沿用父實例已核對之子封包（子實例只轉換父實例輸入欄之子集）。"""
         self._calibration_source = parent._calibration_source
         self._calibration_identity = parent._calibration_identity
         self._calibration_packets = parent._calibration_packets
+        self._no_start_calibration = parent._no_start_calibration  # 子實例於其原生列空間各自取校準列
 
     def _prepare_calibration(self, columns_by_timeframe: Mapping[str, Iterable[str]]) -> None:
         """轉換入口：平穩化開啟時，依本次輸入欄（依原生週期分組、標記後欄名）取子封包並逐項核對身分鍵
         （§C 校準封包）；缺封包、缺欄或身分不符 ⇒ `CalibrationError`，於任何轉換之前。"""
         if not self._stationarity_enabled():
+            return
+        if self._no_start_calibration:
+            self._calibration_packets = {}  # 逐欄校準模式：無封包，校準值於判定時由公開值取（Task 2.3 ④）
             return
         if self._calibration_source is None or self._calibration_identity is None:
             raise CalibrationError("平穩化開啟但未取得校準封包（只由校準前置關卡產生）", field="packet")
@@ -287,6 +313,8 @@ class FeaturePreprocessor:
         起始日前有效值不足 N 之欄（封包 `empty_columns`）：回傳空陣列（呼叫端略過判定與轉換，保留原值）；公開序列
         亦全無有效值 ⇒ 只記未檢定，否則另記 `calibration_insufficient_history` 與缺少根數（v19）。"""
         timeframe = self._decision_timeframe_for(str(column))
+        if self._no_start_calibration:
+            return self._no_start_lookup(str(column), timeframe, public_values)
         packets = self._calibration_packets
         if packets is None:
             raise CalibrationError("平穩化判定時未有已核對之校準封包", column=str(column), field="packet")
@@ -317,6 +345,86 @@ class FeaturePreprocessor:
             calibration_end=pd.Timestamp(packet.last_calibration_ts[name]).isoformat(),
         )
         return np.asarray(packet.values[name], dtype=np.float64)
+
+    def _no_start_lookup(self, column: str, timeframe: str, public_values: Optional[np.ndarray]) -> np.ndarray:
+        """逐欄校準模式之校準值（v32 §C 未填起始日）：公開值（逐欄穩定點遮罩後）最早 N 個有效值；記校準列
+        （本次轉換之列空間，0 起算）供輸出遮罩與收據。全史有效值不足 N ⇒ 不平穩化（空陣列）、有效值存在時記
+        `calibration_insufficient_history` 與缺少根數（v19）。"""
+        name = tagged_column_name(column, timeframe)
+        key = (timeframe, name)
+        with self._decisions_lock:
+            derived = self._derived_calibration.get(key)
+            cached = self._no_start_values.get(key)
+        if derived is not None:
+            return derived
+        if public_values is None:
+            if cached is not None:
+                return cached
+            raise CalibrationError(f"逐欄校準須有公開值：週期 {timeframe} 欄 {name}", timeframe=timeframe,
+                                   column=name, field="values")
+        values = np.asarray(public_values, dtype=np.float64)
+        n = self._stationarity_n_for(timeframe)
+        native = getattr(self, "_no_start_native_maps", {}).get(timeframe)
+        if native is not None and len(native) == len(values):
+            # frame 多週期：值為原生 K 棒 ffill 至主週期 ⇒ 每個原生 K 棒只取其首次出現之列
+            finite = np.isfinite(values) & np.isfinite(native)
+            positions = np.flatnonzero(finite)
+            ids = native[positions]
+            firsts = positions[np.r_[True, ids[1:] != ids[:-1]]] if positions.size else positions
+            if firsts.size < n:
+                if firsts.size:
+                    self._record_decision(column, events=[EVENT_CALIBRATION_INSUFFICIENT],
+                                          calibration_shortfall=int(n - firsts.size))
+                return np.empty(0, dtype=np.float64)
+            _stable_mask.calibration_rows_no_start(values[firsts], n)  # 同一純函式（spy 可觀測）
+            first = int(firsts[0])
+            last = int(np.flatnonzero(native == native[firsts[n - 1]])[-1])
+            calibration = values[firsts[:n]]
+            with self._decisions_lock:
+                self._no_start_rows[key] = (first, last)
+                self._no_start_values[key] = calibration
+            self._record_decision(column, n=int(n), calibration_rows=[first, last])
+            return calibration
+        rows = _stable_mask.calibration_rows_no_start(values, n)
+        if rows is None:
+            finite = int(np.isfinite(values).sum())
+            if finite:
+                self._record_decision(column, events=[EVENT_CALIBRATION_INSUFFICIENT],
+                                      calibration_shortfall=int(n - finite))
+            return np.empty(0, dtype=np.float64)
+        first, last = rows
+        window = values[first:last + 1]
+        calibration = window[np.isfinite(window)]
+        with self._decisions_lock:
+            self._no_start_rows[key] = (int(first), int(last))
+            self._no_start_values[key] = calibration
+        self._record_decision(column, n=int(n), calibration_rows=[int(first), int(last)])
+        return calibration
+
+    _DERIVED_SUFFIX_RE = re.compile(r"(?:_fracdiff|_diff\d+)+$")
+
+    def _mask_no_start_rows(self, frame: pd.DataFrame, timeframe: Optional[str] = None) -> pd.DataFrame:
+        """逐欄校準模式：各欄（含其平穩化衍生欄 `_fracdiff`／`_diffK`）之校準列於輸出設 NaN（v32 §C 未填起始日）。
+        列空間＝本次轉換之列空間（native 子實例為其原生列；對齊至主週期前套用）。"""
+        if not self._no_start_calibration or frame is None or frame.empty or not self._no_start_rows:
+            return frame
+        out = frame
+        for column in frame.columns:
+            base = self._DERIVED_SUFFIX_RE.sub("", str(column))
+            tf = timeframe or self._decision_timeframe_for(base)
+            rows = self._no_start_rows.get((tf, tagged_column_name(base, tf)))
+            if rows is None:
+                continue
+            if out is frame:
+                out = frame.copy()
+            position = out.columns.get_loc(column)
+            out.iloc[rows[0]:rows[1] + 1, position] = np.nan
+        return out
+
+    def no_start_calibration_rows(self) -> Dict[Tuple[str, str], Tuple[int, int]]:
+        """逐欄校準列（本實例之列空間）；native 包裝層據此換成主週期列。"""
+        with self._decisions_lock:
+            return dict(self._no_start_rows)
 
     # ---------------------------------------------------------------- FFSTAT 逐欄決策紀錄
 
@@ -427,10 +535,19 @@ class FeaturePreprocessor:
         """本實例 registry 轉換中失敗而被容忍之群組 id。"""
         return list(self._failed_groups)
 
-    def _merge_decisions_from(self, other: "FeaturePreprocessor") -> None:
+    def _merge_decisions_from(self, other: "FeaturePreprocessor", idx_map: Optional[np.ndarray] = None) -> None:
+        """併回 native-tf 子實例之決策；逐欄校準模式之校準列（子實例之原生列）以對齊映射換成主週期列
+        （`calibration_rows`＝映射至原生校準列之主週期列範圍；原值另存 `calibration_rows_native`）。"""
         for key, value in other.stationarity_decisions().items():
+            record = dict(value)
+            native_rows = record.get("calibration_rows")
+            if native_rows is not None and idx_map is not None:
+                mapped = np.asarray(idx_map)
+                hit = np.flatnonzero((mapped >= int(native_rows[0])) & (mapped <= int(native_rows[1])))
+                record["calibration_rows_native"] = list(native_rows)
+                record["calibration_rows"] = [int(hit[0]), int(hit[-1])] if hit.size else None
             with self._decisions_lock:
-                self._decisions[key] = value
+                self._decisions[key] = record
 
     def _rolling_window(self) -> int:
         window = int(self.winsor_config.get("window", self.rank_config.get("window", 252)))
@@ -461,9 +578,9 @@ class FeaturePreprocessor:
             name=series.name, dtype=np.float64,
         )
 
-    def _calibration_values(self, column: str) -> np.ndarray:
-        """d* 快取指紋與 parallel worker 之判定值＝該欄校準值。"""
-        return self._calibration_lookup(str(column))
+    def _calibration_values(self, column: str, public_values: Optional[np.ndarray] = None) -> np.ndarray:
+        """d* 快取指紋與 parallel worker 之判定值＝該欄校準值（逐欄校準模式須帶公開值，Task 2.3 ④）。"""
+        return self._calibration_lookup(str(column), public_values)
 
     @staticmethod
     def _resolve_column_chunk_size() -> int:
@@ -505,7 +622,8 @@ class FeaturePreprocessor:
 
         if use_polars and not self.fracdiff_config.get("enabled", False):
             # Polars path: fracdiff not supported in Polars (requires scipy/statsmodels)
-            return self._transform_single_polars(features_df)
+            # FFSTAT Task 2.3 ④：ADF 差分之逐欄校準列同樣遮罩
+            return self._mask_no_start_rows(self._transform_single_polars(features_df))
 
         if chunk_size > 0 and num_cols > chunk_size:
             return self._transform_chunked(features_df, chunk_size)
@@ -1183,7 +1301,7 @@ class FeaturePreprocessor:
             primary_n_rows,
             len(outputs),
         )
-        self._merge_decisions_from(native_pp)  # FFSTAT：native-tf 子實例之決策併回
+        self._merge_decisions_from(native_pp, idx_map)  # FFSTAT：native-tf 子實例之決策併回（校準列換主週期列）
         return len(outputs)
 
     def _maybe_run_native_l65_inplace(
@@ -1366,7 +1484,7 @@ class FeaturePreprocessor:
             source_n_rows,
             primary_n_rows,
         )
-        self._merge_decisions_from(native_pp)  # FFSTAT：native-tf 子實例之決策併回
+        self._merge_decisions_from(native_pp, idx_map)  # FFSTAT：native-tf 子實例之決策併回（校準列換主週期列）
         return True
 
     def _warmup_numba_if_needed(self) -> None:
@@ -2639,6 +2757,8 @@ class FeaturePreprocessor:
             clipped = np.clip(result_array, lowers, uppers)
             result_array[valid_bounds] = clipped[valid_bounds]
             result_array[nan_mask] = np.nan
+            # FFSTAT Task 2.3 第①類（R6 甲）：窗未湊滿之列遮為 NaN；計算本身不變
+            _stable_mask.mask_incomplete_window_inplace(result_array, window)
             return result_array
 
         if method == "quantile":
@@ -2660,6 +2780,7 @@ class FeaturePreprocessor:
             clipped = np.clip(result_array, lowers, uppers)
             result_array[valid_bounds] = clipped[valid_bounds]
             result_array[nan_mask] = np.nan
+            _stable_mask.mask_incomplete_window_inplace(result_array, window)  # FFSTAT 第①類（R6 甲）
             return result_array.astype(np.float32, copy=False)
 
         raise ValueError(f"Unsupported winsorization method: {method}")
@@ -2720,7 +2841,9 @@ class FeaturePreprocessor:
                 self.winsor_config.get("apply_to", "all"),
             ),
         )
-        if winsor_positions:
+        # FFSTAT r34：縮尾開關須生效（改前本路徑與 `_transform_single_legacy` 無視 `winsorization.enabled`，
+        # 關閉縮尾仍縮尾；預設值與 `_transform_context` 同為 True）
+        if winsor_positions and self.winsor_config.get("enabled", True):
             working_values[:, winsor_positions] = self._winsorize_2d_legacy_equivalent(
                 working_values[:, winsor_positions]
             )
@@ -2804,7 +2927,10 @@ class FeaturePreprocessor:
         tls.layer = source_layer if source_layer else saved[1]
         tls.input_columns = frozenset(str(c) for c in features_df.columns)
         try:
-            return self._transform_single_legacy(features_df, source_layer=source_layer)
+            # FFSTAT Task 2.3 ④：逐欄校準模式之校準列於本次轉換之列空間遮為 NaN（對齊至主週期之前）
+            return self._mask_no_start_rows(
+                self._transform_single_legacy(features_df, source_layer=source_layer), tls.timeframe
+            )
         finally:
             tls.timeframe, tls.layer, tls.input_columns = saved
 
@@ -2818,7 +2944,8 @@ class FeaturePreprocessor:
         self._fracdiff_processed_columns = set()
         self._dstar_failed_columns = set()
 
-        transformed = self._apply_winsorization(transformed)
+        if self.winsor_config.get("enabled", True):  # FFSTAT r34：縮尾開關須生效（見 `_transform_single_optimized_df`）
+            transformed = self._apply_winsorization(transformed)
 
         if self.fracdiff_config.get("enabled", False):
             transformed = self._apply_fractional_differencing(
@@ -2860,7 +2987,7 @@ class FeaturePreprocessor:
         # Winsorization
         winsor_apply_to = self.winsor_config.get("apply_to", "all")
         winsor_columns = self._select_columns(features_df, winsor_apply_to)
-        if winsor_columns:
+        if winsor_columns and self.winsor_config.get("enabled", True):  # FFSTAT r34：縮尾開關須生效
             method = self.winsor_config.get("method", "sigma")
             sigma_k = float(self.winsor_config.get("sigma_k", 3.0))
             quantile_range = self.winsor_config.get("quantile_range", [0.01, 0.99])
@@ -2939,7 +3066,7 @@ class FeaturePreprocessor:
         )
 
         result_chunks: List[pd.DataFrame] = []
-        use_memmap = (len(features_df.index) * len(all_columns) * 4) >= 500_000_000
+        use_memmap = (len(features_df.index) * len(all_columns) * 4) >= self._CHUNKED_MEMMAP_MIN_BYTES
 
         use_shared_dstar_cache = bool(
             self.fracdiff_config.get("enabled", False)
@@ -2955,9 +3082,12 @@ class FeaturePreprocessor:
             from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
             import numpy as _np
 
+            # 輸出欄數可多於輸入：append 模式之平穩化衍生欄（`_fracdiff`／`_diffK`）附加於各 chunk 之後
+            # ⇒ 欄名逐 chunk 收集、容量不足時加倍重配（FFSTAT b4 實跑：固定寬度曾使 L6.5 整層靜默降級）
             out_arr = create_temp_memmap(
                 (len(features_df.index), len(all_columns)), prefix="l65_"
             )
+            out_columns: List[str] = []
             col_offset = 0
 
         try:
@@ -2971,6 +3101,14 @@ class FeaturePreprocessor:
 
                 if use_memmap:
                     n = processed_chunk.shape[1]
+                    if col_offset + n > out_arr.shape[1]:
+                        grown = create_temp_memmap(
+                            (len(features_df.index), max(2 * out_arr.shape[1], col_offset + n)), prefix="l65_"
+                        )
+                        grown[:, :col_offset] = out_arr[:, :col_offset]
+                        del out_arr
+                        out_arr = grown
+                    out_columns.extend(str(c) for c in processed_chunk.columns)
                     out_arr[:, col_offset : col_offset + n] = _np.asarray(
                         processed_chunk.values, dtype=_np.float32
                     )
@@ -2989,8 +3127,18 @@ class FeaturePreprocessor:
             self._d_star_cache_shared = previous_shared_cache
 
         if use_memmap:
+            if col_offset == 0:
+                # 全部 chunk 皆零欄（審查 r33 codex P1-05）：零大小 memmap 會拋例外 ⇒ 回傳與 index 對齊之零欄結果
+                del out_arr
+                return pd.DataFrame(index=features_df.index)
+            if col_offset < out_arr.shape[1]:
+                # 容量加倍後之多餘欄：改寫入剛好大小之 memmap（C-order 切片非連續，交 pandas 會實體化）
+                exact = create_temp_memmap((len(features_df.index), col_offset), prefix="l65_")
+                exact[:, :] = out_arr[:, :col_offset]
+                del out_arr
+                out_arr = exact
             return pd.DataFrame(
-                data=out_arr, index=features_df.index, columns=all_columns, copy=False,
+                data=out_arr, index=features_df.index, columns=out_columns, copy=False,
             )
 
         if not result_chunks:
@@ -3022,6 +3170,7 @@ class FeaturePreprocessor:
             clipped = np.clip(arr, lowers, uppers)
             arr[valid_bounds] = clipped[valid_bounds]
             arr[nan_mask] = np.nan
+            _stable_mask.mask_incomplete_window_inplace(arr, window)  # FFSTAT 第①類（R6 甲）
             result.loc[:, columns] = pd.DataFrame(
                 arr.astype(np.float32, copy=False),
                 index=selected.index,
@@ -3046,6 +3195,7 @@ class FeaturePreprocessor:
             clipped = np.clip(selected_array, lowers, uppers)
             selected_array[valid_bounds] = clipped[valid_bounds]
             selected_array[nan_mask] = np.nan
+            _stable_mask.mask_incomplete_window_inplace(selected_array, window)  # FFSTAT 第①類（R6 甲）
             clipped_array = selected_array
             clipped = pd.DataFrame(
                 clipped_array.astype(np.float32, copy=False),
@@ -3306,7 +3456,7 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
-            cache_arr = self._calibration_values(column)
+            cache_arr = self._calibration_values(column, col_arr)
 
             # Task 3.1 d* 三出口：①讀失敗 ⇒ 視為未命中照常搜尋；②搜尋例外 ⇒ 保原值、不寫快取、排除於 ADF 差分；
             # ③寫失敗 ⇒ 值照常套用。三者皆記欄級事件，不以任何預設 d 替代
@@ -3384,7 +3534,7 @@ class FeaturePreprocessor:
         for column in eligible_columns:
             series = result[column].astype(float)
             col_arr = series.to_numpy(dtype=np.float64, copy=False)
-            cache_arr = self._calibration_values(column)
+            cache_arr = self._calibration_values(column, col_arr)
             col_input_arrays[column] = cache_arr  # 寫快取之值指紋＝校準值
             # 去重須公開值與校準值皆同（公開值同而前史不同之兩欄 d* 可不同）
             value_key = f"{_strong_col_value_fingerprint(col_arr)}|{_strong_col_value_fingerprint(cache_arr)}"

@@ -319,7 +319,11 @@ class TALibWrapper:
         data: pd.DataFrame | pd.Series,
         params: Dict,
         data_source: str = "close",
+        *,
+        stable_mask: bool = False,
     ) -> pd.DataFrame:
+        """``stable_mask``：True ⇒ 各輸出欄於 L1 輸出點套逐欄穩定點遮罩（FF-STAT Task 2.3；L1 引擎經
+        ``compute_batch`` 一律開啟）；False 供引擎內之中間量（如 Keltner 之 EMA／ATR）於未遮罩之值上計算。"""
         cls.initialize()
         spec = cls.get_indicator_spec(indicator_name)
 
@@ -341,6 +345,7 @@ class TALibWrapper:
             source_label=source_label,
             spec=spec,
             params=params_for_naming,
+            mask_inputs=inputs if stable_mask else None,
         )
 
     @classmethod
@@ -358,10 +363,10 @@ class TALibWrapper:
         if spec.input_type == "single":
             for source in data_sources:
                 for params in params_list:
-                    frames.append(cls.compute(indicator_name, data, params, source))
+                    frames.append(cls.compute(indicator_name, data, params, source, stable_mask=True))
         else:
             for params in params_list:
-                frames.append(cls.compute(indicator_name, data, params, "close"))
+                frames.append(cls.compute(indicator_name, data, params, "close", stable_mask=True))
 
         if not frames:
             return pd.DataFrame(index=data.index)
@@ -473,6 +478,7 @@ class TALibWrapper:
         source_label: str,
         spec: IndicatorSpec,
         params: Dict,
+        mask_inputs: Optional[List[np.ndarray]] = None,
     ) -> pd.DataFrame:
         if isinstance(output, tuple):
             arrays = output
@@ -481,6 +487,13 @@ class TALibWrapper:
 
         frames = []
         param_str = cls._format_params(spec.name, params)
+        if mask_inputs is not None:
+            # FF-STAT Task 2.3：TA-Lib L1 輸出點（多輸出指標之各欄共用本次呼叫之參數字典）
+            from momentum.FeatureEngineering.atomic import l1_output_points as l1op
+
+            origin = l1op.origin_of(mask_inputs)
+            # 別名（Beta_CloseVolume 等）查其 TA-Lib 函式之條目：同一計算、同一收斂行為
+            table_name = l1op.table_indicator(spec.talib_func, spec.category)
         for idx, array in enumerate(arrays):
             name_suffix = spec.output_names[idx] if len(spec.output_names) > idx else str(idx)
             if len(spec.output_names) == 1:
@@ -493,6 +506,8 @@ class TALibWrapper:
             if param_str:
                 parts.append(param_str)
             col_name = "_".join(parts)
+            if mask_inputs is not None:
+                array, _k = l1op.mask_output("talib", table_name, col_name, array, params, origin=origin)
             frames.append(pd.Series(array, index=index, name=col_name))
 
         return pd.concat(frames, axis=1)

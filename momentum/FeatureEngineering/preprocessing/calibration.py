@@ -27,12 +27,6 @@ CANONICAL_NAN_BITS = 0x7FF8000000000000
 # 校準域暫存目錄前綴（contract.json `calibration_tmp_prefix`；Task 2.1 邊界③）
 CALIBRATION_TMP_PREFIX = "ffstat_calib_"
 
-# §C 前史深度之「首個有效值最大延遲」（根）：輕量真實 run（BTC 1h、ffstat_helpers.stat_payload、至 2025-06-01
-# 之全部前史）中有效值 ≥ 500 之欄，其首個有效值位置之最大值＝1404（主委實跑 2026-09-26）。
-# 較重設定可能更長；硬條件仍為逐欄「起始日前有限值 ≥ N」（見 FeatureFactory._calibrate_timeframe）
-CALIBRATION_FIRST_VALID_DELAY_BARS = 1404
-
-
 class CalibrationError(RuntimeError):
     """校準域任一步驟之錯誤：不可降級之生成失敗（§C「校準域錯誤不可降級」）。
 
@@ -180,37 +174,6 @@ def calibration_ingest_start(kline_index: pd.DatetimeIndex, output_start: pd.Tim
             field="depth",
         )
     return pd.Timestamp(before[-int(depth)])
-
-
-def resolve_effective_output_start(
-    kline_indexes: Mapping[str, pd.DatetimeIndex],
-    depth_by_tf: Mapping[str, int],
-    primary_index: pd.DatetimeIndex,
-) -> pd.Timestamp:
-    """未填起始日時之有效起始日（§C 未填起始日）：各原生週期取實際 K 線列以 0 起算之索引 `depth` 那一列之時間，
-    取最晚者，再對齊為 `primary_index` 中第一個不早於它之時間戳；歷史不足 ⇒ 拋 `CalibrationError`。Task 2.3。"""
-    # b3 審碼 r1 codex P2-03：各 index 之時區狀態須一致（全有 tz 或全無），混用即拒收，不隱式轉換
-    tz_aware = {name: getattr(idx, "tz", None) is not None
-                for name, idx in [("primary", primary_index), *kline_indexes.items()]}
-    if len(set(tz_aware.values())) > 1:
-        raise CalibrationError(
-            f"時間索引時區狀態不一致（有 tz＝True）：{tz_aware}", field="timezone",
-        )
-    candidates = []
-    for timeframe, index in kline_indexes.items():
-        depth = int(depth_by_tf[timeframe])
-        if len(index) <= depth:
-            raise CalibrationError(
-                f"可用歷史不足以預留校準段：週期 {timeframe} 實際 K 線 {len(index)} 根，需多於 {depth} 根，"
-                f"缺少 {depth + 1 - len(index)} 根",
-                timeframe=str(timeframe), field="depth",
-            )
-        candidates.append(pd.Timestamp(index[depth]))
-    latest = max(candidates)
-    aligned = primary_index[primary_index >= latest]
-    if len(aligned) == 0:
-        raise CalibrationError(f"有效起始日 {latest} 晚於主週期資料末端", field="depth")
-    return pd.Timestamp(aligned[0])
 
 
 def calibration_window_before(

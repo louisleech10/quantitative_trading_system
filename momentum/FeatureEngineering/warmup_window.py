@@ -1,25 +1,22 @@
 """B6 warmup-then-trim：OutputWindow 解析與 max_warmup 估算。
 
 選項 1：載入 [ingest_start, end] 因果計算，公開輸出 trim 到 [output_start, end]。
-flag ``FFACT_WARMUP_TRIM`` 預設關閉（= B5 strict-window）。
+FF-STAT v32（R1）：預熱恆開——有起始日即預熱（原預熱環境變數開關已刪）；未填起始日時自資料起點
+載入、不裁切，逐欄穩定點由遮罩保證。
 """
 
 from __future__ import annotations
 
-import os
+import math
+import re
 from dataclasses import dataclass
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
 from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
-from momentum.FeatureEngineering.atomic.warmup_lookup import (
-    get_max_warmup_bars,
-    get_pattern_default_bars,
-)
-from momentum.FeatureEngineering.preprocessing._native_tf_helpers import scale_window_for_native
 
 if TYPE_CHECKING:
     from momentum.FeatureEngineering.feature_config import FactoryConfig
@@ -75,12 +72,6 @@ class WarmupInsufficient:
             "available": int(self.available),
             "affected_bars": int(self.affected_bars),
         }
-
-
-def is_warmup_trim_enabled() -> bool:
-    """``FFACT_WARMUP_TRIM`` 環境變數；預設 ``0`` = strict-window (B5)。"""
-    raw = os.getenv("FFACT_WARMUP_TRIM", "0").strip().lower()
-    return raw in ("1", "true", "yes", "on")
 
 
 def _max_positive(*values: int) -> int:
@@ -149,58 +140,12 @@ def _resolve_indicator_max_period(indicator: Mapping[str, Any]) -> int:
 
 
 def _collect_l1_warmup_bars(config: "FactoryConfig") -> int:
-    """L1：get_max_warmup_bars + CDL pattern + advanced atomic 獨立窗。"""
-    indicator_periods: Dict[str, int] = {}
-    ai = config.atomic_indicators
-    category_models = [
-        ai.trend,
-        ai.momentum,
-        ai.volatility,
-        ai.volume,
-        ai.cycle,
-        ai.statistics,
-    ]
+    """L1：設定啟用之全部 L1 輸出點之 K 最大者（原生週期根數；倍數表 v46 規則，含同引擎衍生輸出之窗）。
 
-    for cat in category_models:
-        if not cat.enabled:
-            continue
-        for ind in cat.indicators:
-            if not ind.enabled:
-                continue
-            name = str(ind.name).upper()
-            period = _resolve_indicator_max_period(ind.model_dump())
-            indicator_periods[name] = max(indicator_periods.get(name, 0), period)
+    FF-STAT Task 2.4：取代舊式「指標名 × 最大週期」（combos 為 list 時退回 26、進階 atomic 只取窗長）。"""
+    from momentum.FeatureEngineering.atomic.l1_output_points import max_l1_k
 
-    l1_talib = get_max_warmup_bars(indicator_periods) if indicator_periods else 0
-
-    pattern_bars = 0
-    if ai.pattern.enabled:
-        pattern_bars = get_pattern_default_bars()
-
-    advanced_windows: List[int] = []
-    if ai.microstructure.enabled:
-        ms = ai.microstructure
-        advanced_windows.extend(ms.windows)
-        advanced_windows.extend(ms.cs_spread_smooth)
-        advanced_windows.extend(ms.kyle_lambda_windows)
-        advanced_windows.extend(ms.vpin_zscore_windows)
-        advanced_windows.extend(ms.vpin_n_buckets)
-    if ai.entropy.enabled:
-        ent = ai.entropy
-        advanced_windows.extend(ent.windows)
-        advanced_windows.extend(ent.hurst_windows)
-        advanced_windows.extend(ent.perm_windows)
-        advanced_windows.extend(ent.shannon_windows)
-        advanced_windows.append(ent.perm_m)
-        advanced_windows.append(ent.apen_m)
-        advanced_windows.append(ent.fractal_kmax)
-    if ai.tail_risk.enabled:
-        tr = ai.tail_risk
-        advanced_windows.extend(tr.windows)
-        advanced_windows.extend(tr.rv_windows)
-        advanced_windows.extend(tr.mdd_windows)
-
-    return _max_positive(l1_talib, pattern_bars, _max_from_lists(advanced_windows))
+    return max_l1_k(config)
 
 
 def _collect_l2_warmup_bars(config: "FactoryConfig") -> int:
@@ -269,76 +214,54 @@ def _collect_l6_warmup_bars(config: "FactoryConfig") -> int:
     return 0
 
 
-def _collect_l65_warmup_bars(
-    config: "FactoryConfig",
-    primary_tf: str,
-    training_tfs: Sequence[str],
-) -> int:
-    """L6.5 + native-tf 放大 + validator winsor fallback。"""
-    pp = config.preprocessing
-    base_windows: List[int] = []
-
-    if pp.enabled:
-        if pp.winsorization.enabled:
-            base_windows.append(int(pp.winsorization.window))
-        else:
-            base_windows.append(_VALIDATOR_WINSOR_FALLBACK)
-        if pp.rank_transform.enabled:
-            base_windows.append(int(pp.rank_transform.window))
-        if pp.adaptive_zscore.enabled:
-            base_windows.extend(int(w) for w in pp.adaptive_zscore.windows)
-        if pp.fractional_differencing.enabled:
-            max_lag = int(pp.fractional_differencing.model_dump().get("max_lag", 0) or 0)
-            if max_lag <= 0:
-                # docs/FRACDIFF_MAXLAG_SPEC.md: value path auto max_lag is
-                # calibration-derived; warmup keeps the conservative 252
-                # fallback because it only extends preheat, not feature values.
-                max_lag = 252
-            base_windows.append(max_lag)
-    # FFSTAT Task 2.2（b3 審碼 r1 codex P1-01）：N 為各原生週期之「原生列數」，換成主週期根數＝
-    # ceil(N_tf × 週期秒數 ÷ 主週期秒數)，逐原生週期計（不先取全域最大、不用 primary→source 之縮放）
-    n_primary_bars = 0
-    if pp.enabled:
-        primary_sec = TIMEFRAME_SECONDS[primary_tf]
-        for tf in training_tfs:
-            n_tf = int(pp.calibration_bars_by_timeframe.get(tf, pp.calibration_bars))
-            tf_sec = TIMEFRAME_SECONDS[tf]
-            n_primary_bars = max(n_primary_bars, -(-n_tf * tf_sec // primary_sec))
-
-    if not base_windows:
-        return 0
-
-    max_primary = max(base_windows)
-    max_scaled = max_primary
-    for tf in training_tfs:
-        if tf == primary_tf:
-            continue
-        for window in base_windows:
-            scaled = scale_window_for_native(int(window), tf, primary_tf)
-            max_scaled = max(max_scaled, scaled)
-    return max(max_scaled, int(n_primary_bars))
-
-
 def estimate_max_warmup_bars(
     config: "FactoryConfig",
     primary_tf: str,
     training_tfs: Optional[Sequence[str]] = None,
 ) -> int:
-    """primary TF bars：各層 warmup 來源取 max（排除 cumulative/fracdiff d*/ADF order/post-IC/labels）。"""
+    """公開域預熱初值 D₀（主週期根數；FF-STAT §C「公開域預熱」）：逐欄穩定點之堆疊上界。
+
+    各原生週期之 L1–L6 於該週期原生列計算，一欄之穩定點延遲 ≤ L1 輸出點 K 最大＋L2＋L3＋L4＋L5＋L6 各層窗長
+    （原生根數），換成主週期根數＝ceil(原生根數 × 週期秒數 ÷ 主週期秒數) 取各週期最大；L6.5（縮尾完整窗、
+    fracdiff 寬度，皆以主週期根數設定、native 路徑按時長縮放）再相加。資料相依之延後（稀疏輸入、缺口、參考
+    標的晚起）由呼叫端之加倍規則補（排除 cumulative、post-IC 步驟與標籤）。"""
     tfs = list(training_tfs) if training_tfs else list(config.timeframes.training)
     if primary_tf not in tfs:
         tfs = [primary_tf, *tfs]
 
-    sources = [
-        _collect_l1_warmup_bars(config),
-        _collect_l2_warmup_bars(config),
-        _collect_l3_warmup_bars(config),
-        _collect_l4_warmup_bars(config),
-        _collect_l5_warmup_bars(config),
-        _collect_l6_warmup_bars(config),
-        _collect_l65_warmup_bars(config, primary_tf, tfs),
-    ]
-    return _max_positive(*sources)
+    chain_native = sum(
+        int(v)
+        for v in (
+            _collect_l1_warmup_bars(config),
+            _collect_l2_warmup_bars(config),
+            _collect_l3_warmup_bars(config),
+            _collect_l4_warmup_bars(config),
+            _collect_l5_warmup_bars(config),
+            _collect_l6_warmup_bars(config),
+        )
+        if v and int(v) > 0
+    )
+    primary_sec = TIMEFRAME_SECONDS[primary_tf]
+    chain_primary = max(math.ceil(chain_native * TIMEFRAME_SECONDS[tf] / primary_sec) for tf in tfs)
+    return int(chain_primary + _collect_l65_stack_bars(config))
+
+
+def _collect_l65_stack_bars(config: "FactoryConfig") -> int:
+    """L6.5 生成路徑（pre-IC：縮尾、fracdiff／ADF 差分；rank／zscore／gaussian 於 pre-IC 強制關閉）之堆疊窗長
+    （主週期根數）：縮尾完整窗（R6 甲）＋ fracdiff 權重寬度上限（auto 模式以 252 保守估）。
+
+    fracdiff 寬度**不依 fracdiff 開關**一律計入（SPEC v49）：同設定開／關平穩化之公開域載入起點須相同，否則
+    以累計和實作之滾動統計（L3 Std／Skew／Kurt 等）之浮點誤差依起算點而異，基礎欄值不再逐位元組相同（§G ②；
+    主委實跑 2026-09-28：MIDPRICE／MIDPOINT 之 Kurt 欄開關兩次 hash 不同）。"""
+    pp = config.preprocessing
+    if not pp.enabled:
+        return 0
+    total = 0
+    if pp.winsorization.enabled:
+        total += int(pp.winsorization.window)
+    max_lag = int(pp.fractional_differencing.model_dump().get("max_lag", 0) or 0)
+    total += max_lag if max_lag > 0 else 252
+    return total
 
 
 def _estimate_ingest_start_iso(
@@ -359,12 +282,16 @@ def resolve_output_window(
     timeframe: str,
     start_date: Optional[str],
     end_date: Optional[str],
+    max_warmup_bars: Optional[int] = None,
 ) -> OutputWindow:
-    """generate 入口算一次 OutputWindow。"""
-    if not is_warmup_trim_enabled() or start_date is None:
+    """generate 入口算一次 OutputWindow（FF-STAT v32 R1：有起始日恆預熱）。
+
+    ``max_warmup_bars``：呼叫端已定之預熱深度（公開域加倍規則之結果；多週期 worker 沿用主程序之值）；
+    None ⇒ 取 ``estimate_max_warmup_bars`` 之初值 D₀。未填起始日 ⇒ 自資料起點載入、不裁切。"""
+    if start_date is None:
         return OutputWindow(
-            ingest_start=start_date,
-            output_start=start_date,
+            ingest_start=None,
+            output_start=None,
             output_end=end_date,
             max_warmup_bars=0,
             warmup_enabled=False,
@@ -372,7 +299,10 @@ def resolve_output_window(
 
     primary_tf = config.timeframes.primary if timeframe in config.timeframes.training else timeframe
     training_tfs = list(dict.fromkeys(config.timeframes.training))
-    max_warmup = estimate_max_warmup_bars(config, primary_tf, training_tfs)
+    max_warmup = (
+        int(max_warmup_bars) if max_warmup_bars is not None
+        else estimate_max_warmup_bars(config, primary_tf, training_tfs)
+    )
     ingest_start = _estimate_ingest_start_iso(start_date, max_warmup, primary_tf)
 
     return OutputWindow(
@@ -490,6 +420,73 @@ def build_warmup_metadata(
     return meta
 
 
+WARMUP_INSUFFICIENT_EVENT = "warmup_insufficient_history"
+
+
+def stable_start_from_first_rows(first_rows: Mapping[str, Optional[int]], index: pd.Index) -> Dict[str, Optional[str]]:
+    """逐欄 `stable_start`（FF-STAT §C 紀錄）：公開輸出中該欄首個有效值之時間（ISO）；全無有效值者 None。
+
+    `first_rows`：欄名 → 公開輸出列索引（0 起算）之首個有效值位置；`index`：公開輸出之時間軸。"""
+    stamps = to_utc(coerce_index_to_datetime(index))  # 一律 UTC、帶時區之 ISO（各路徑同一表示）
+    out: Dict[str, Optional[str]] = {}
+    for column, row in first_rows.items():
+        out[str(column)] = (
+            pd.Timestamp(stamps.iloc[int(row)]).isoformat() if row is not None and 0 <= int(row) < len(stamps)
+            else None
+        )
+    return out
+
+
+def stable_start_from_frame(frame: pd.DataFrame) -> Dict[str, Optional[str]]:
+    """frame 路徑之逐欄 `stable_start`。"""
+    if frame is None or frame.empty:
+        return {}
+    finite = np.isfinite(frame.to_numpy(dtype=np.float64))
+    has = finite.any(axis=0)
+    first = np.argmax(finite, axis=0)
+    rows = {str(c): (int(first[i]) if has[i] else None) for i, c in enumerate(frame.columns)}
+    return stable_start_from_first_rows(rows, frame.index)
+
+
+_STATIONARIZED_SUFFIX = re.compile(r"^(?P<base>.+)_(?:fracdiff|diff\d+)$")
+
+
+def warmup_late_columns(stable_start: Mapping[str, Optional[str]], output_start: Optional[str],
+                        probe_late: Optional[Collection[str]] = None) -> List[str]:
+    """有起始日時首個有效值晚於起始日之欄（FF-STAT §C 公開域預熱：`warmup_insufficient_history`）。
+    全無有效值之欄不在此列（死欄由 L3／L7 處理）。
+
+    `probe_late`＝加倍探測末輪於計算域（含起始日前之預熱列）首個有限值仍晚於起始日、或探測段內全無有限值之欄
+    （標記週期後之欄名；後者之首個有限值必晚於起始日，v50）。
+    給定時只計「預熱所致」之晚到：公開輸出首個有效值晚於起始日、而計算域於起始日前已有有限值者，屬資料所致之
+    間歇 NaN（如常數窗使 Kurt／ZScore 無定義），非歷史不足，不計。平穩化衍生欄（`_fracdiff`／`_diffK`）不在
+    探測域內 ⇒ 其基礎欄屬 `probe_late`，或基礎欄公開首個有效值 ≤ 起始日（晚到只能來自平穩化之窗寬）時計入。
+    未給（該窗未經加倍探測，如 `run_ic_first`）⇒ 公開輸出晚到者全計（保守）。"""
+    if output_start is None:
+        return []
+    start = to_utc(pd.Timestamp(output_start))
+
+    def late(column: str) -> bool:
+        ts = stable_start.get(column)
+        return ts is not None and to_utc(pd.Timestamp(ts)) > start
+
+    candidates = [c for c in stable_start if late(c)]
+    if probe_late is None:
+        return sorted(candidates)
+    probe = set(probe_late)
+
+    def warmup_caused(column: str) -> bool:
+        if column in probe:
+            return True
+        derived = _STATIONARIZED_SUFFIX.match(column)
+        if derived is None:
+            return False
+        base = derived.group("base")
+        return base in probe or (base in stable_start and stable_start[base] is not None and not late(base))
+
+    return sorted(c for c in candidates if warmup_caused(c))
+
+
 def trim_dataframe_to_output_window(
     frame: pd.DataFrame,
     window: OutputWindow,
@@ -565,7 +562,6 @@ __all__ = [
     "to_utc",
     "estimate_max_warmup_bars",
     "ingest_layer0_start_date",
-    "is_warmup_trim_enabled",
     "max_ingest_index_before_output_start",
     "output_row_count",
     "output_time_range_dict",

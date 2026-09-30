@@ -1,0 +1,385 @@
+2026-09-29 07:18:09,154 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-09-29 07:18:09,261] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-29 07:18:09,261 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+2026-09-29 07:18:10,529 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines_longhist/kline_cache.h5
+2026-09-29 07:18:10,529 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-29 07:18:10,529 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-29 07:18:10,532 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.binance.com:443
+2026-09-29 07:18:10,597 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-29 07:18:10,597 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-29 07:18:10,597 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-29 07:18:10,597 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-29 07:18:10,639 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-29 07:18:10,639 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Binance API ping successful
+2026-09-29 07:18:10,639 - momentum.DataExtraction.kline_download_service.KlineDownloadService - DEBUG - Provider 'binance' health check OK
+2026-09-29 07:18:10,640 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Downloading BTCUSDT 4h from binance (2017-08-17 00:00:00 to 2026-09-28 23:18:10.529252)
+2026-09-29 07:18:10,640 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Starting download: BTCUSDT 4h from 2017-08-17 00:00:00 to 2026-09-28 23:18:10.529252 (estimated ~19979 klines in ~20 batches)
+2026-09-29 07:18:10,640 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [5%] Batch 1/20: 2017-08-17 00:00 to 2018-01-30 16:00
+2026-09-29 07:18:10,640 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:10,701 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1517328000000&interval=4h&limit=1000&startTime=1502928000000&symbol=BTCUSDT HTTP/1.1" 200 57728
+2026-09-29 07:18:10,709 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:10,709 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [5%] Batch 1: downloaded 1000 klines, total: 1000 | 最後K線(UTC): 2018-01-30 16:00, 下一批次(UTC): 2018-01-30 20:00
+2026-09-29 07:18:10,709 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [10%] Batch 2/20: 2018-01-30 20:00 to 2018-07-16 12:00
+2026-09-29 07:18:10,709 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:10,772 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1531742400000&interval=4h&limit=1000&startTime=1517342400000&symbol=BTCUSDT HTTP/1.1" 200 59880
+2026-09-29 07:18:10,777 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 991 klines from Binance API
+2026-09-29 07:18:10,777 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [10%] Batch 2: downloaded 991 klines, total: 1991 | 最後K線(UTC): 2018-07-16 12:00, 下一批次(UTC): 2018-07-16 16:00
+2026-09-29 07:18:10,778 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [15%] Batch 3/20: 2018-07-16 16:00 to 2018-12-30 08:00
+2026-09-29 07:18:10,778 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:10,840 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1546156800000&interval=4h&limit=1000&startTime=1531756800000&symbol=BTCUSDT HTTP/1.1" 200 60102
+2026-09-29 07:18:10,847 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:10,847 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [15%] Batch 3: downloaded 1000 klines, total: 2991 | 最後K線(UTC): 2018-12-30 08:00, 下一批次(UTC): 2018-12-30 12:00
+2026-09-29 07:18:10,847 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [20%] Batch 4/20: 2018-12-30 12:00 to 2019-06-15 04:00
+2026-09-29 07:18:10,847 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:10,909 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1560571200000&interval=4h&limit=1000&startTime=1546171200000&symbol=BTCUSDT HTTP/1.1" 200 59925
+2026-09-29 07:18:10,913 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 998 klines from Binance API
+2026-09-29 07:18:10,913 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [20%] Batch 4: downloaded 998 klines, total: 3989 | 最後K線(UTC): 2019-06-15 04:00, 下一批次(UTC): 2019-06-15 08:00
+2026-09-29 07:18:10,914 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [25%] Batch 5/20: 2019-06-15 08:00 to 2019-11-29 00:00
+2026-09-29 07:18:10,914 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:10,978 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1574985600000&interval=4h&limit=1000&startTime=1560585600000&symbol=BTCUSDT HTTP/1.1" 200 61675
+2026-09-29 07:18:10,983 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:10,983 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [25%] Batch 5: downloaded 1000 klines, total: 4989 | 最後K線(UTC): 2019-11-29 00:00, 下一批次(UTC): 2019-11-29 04:00
+2026-09-29 07:18:10,983 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [30%] Batch 6/20: 2019-11-29 04:00 to 2020-05-13 20:00
+2026-09-29 07:18:10,983 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,042 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1589400000000&interval=4h&limit=1000&startTime=1575000000000&symbol=BTCUSDT HTTP/1.1" 200 61712
+2026-09-29 07:18:11,044 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,044 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [30%] Batch 6: downloaded 1000 klines, total: 5989 | 最後K線(UTC): 2020-05-13 20:00, 下一批次(UTC): 2020-05-14 00:00
+2026-09-29 07:18:11,045 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [35%] Batch 7/20: 2020-05-14 00:00 to 2020-10-27 16:00
+2026-09-29 07:18:11,045 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,108 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1603814400000&interval=4h&limit=1000&startTime=1589414400000&symbol=BTCUSDT HTTP/1.1" 200 61220
+2026-09-29 07:18:11,111 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,111 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [35%] Batch 7: downloaded 1000 klines, total: 6989 | 最後K線(UTC): 2020-10-27 12:00, 下一批次(UTC): 2020-10-27 16:00
+2026-09-29 07:18:11,111 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [40%] Batch 8/20: 2020-10-27 16:00 to 2021-04-12 08:00
+2026-09-29 07:18:11,111 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,181 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1618214400000&interval=4h&limit=1000&startTime=1603814400000&symbol=BTCUSDT HTTP/1.1" 200 63714
+2026-09-29 07:18:11,187 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,188 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [40%] Batch 8: downloaded 1000 klines, total: 7989 | 最後K線(UTC): 2021-04-12 04:00, 下一批次(UTC): 2021-04-12 08:00
+2026-09-29 07:18:11,188 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [45%] Batch 9/20: 2021-04-12 08:00 to 2021-09-26 00:00
+2026-09-29 07:18:11,188 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,252 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1632614400000&interval=4h&limit=1000&startTime=1618214400000&symbol=BTCUSDT HTTP/1.1" 200 63623
+2026-09-29 07:18:11,257 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,257 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [45%] Batch 9: downloaded 1000 klines, total: 8989 | 最後K線(UTC): 2021-09-25 20:00, 下一批次(UTC): 2021-09-26 00:00
+2026-09-29 07:18:11,257 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [50%] Batch 10/20: 2021-09-26 00:00 to 2022-03-11 16:00
+2026-09-29 07:18:11,257 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,321 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1647014400000&interval=4h&limit=1000&startTime=1632614400000&symbol=BTCUSDT HTTP/1.1" 200 61631
+2026-09-29 07:18:11,326 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,326 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [50%] Batch 10: downloaded 1000 klines, total: 9989 | 最後K線(UTC): 2022-03-11 12:00, 下一批次(UTC): 2022-03-11 16:00
+2026-09-29 07:18:11,326 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [55%] Batch 11/20: 2022-03-11 16:00 to 2022-08-25 08:00
+2026-09-29 07:18:11,326 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,394 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1661414400000&interval=4h&limit=1000&startTime=1647014400000&symbol=BTCUSDT HTTP/1.1" 200 61890
+2026-09-29 07:18:11,399 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,400 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [55%] Batch 11: downloaded 1000 klines, total: 10989 | 最後K線(UTC): 2022-08-25 04:00, 下一批次(UTC): 2022-08-25 08:00
+2026-09-29 07:18:11,400 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [60%] Batch 12/20: 2022-08-25 08:00 to 2023-02-08 00:00
+2026-09-29 07:18:11,400 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,462 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1675814400000&interval=4h&limit=1000&startTime=1661414400000&symbol=BTCUSDT HTTP/1.1" 200 62599
+2026-09-29 07:18:11,467 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,468 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [60%] Batch 12: downloaded 1000 klines, total: 11989 | 最後K線(UTC): 2023-02-07 20:00, 下一批次(UTC): 2023-02-08 00:00
+2026-09-29 07:18:11,468 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [65%] Batch 13/20: 2023-02-08 00:00 to 2023-07-24 16:00
+2026-09-29 07:18:11,468 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,531 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1690214400000&interval=4h&limit=1000&startTime=1675814400000&symbol=BTCUSDT HTTP/1.1" 200 61411
+2026-09-29 07:18:11,563 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,563 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [65%] Batch 13: downloaded 1000 klines, total: 12989 | 最後K線(UTC): 2023-07-24 12:00, 下一批次(UTC): 2023-07-24 16:00
+2026-09-29 07:18:11,563 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [70%] Batch 14/20: 2023-07-24 16:00 to 2024-01-07 08:00
+2026-09-29 07:18:11,563 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,637 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1704614400000&interval=4h&limit=1000&startTime=1690214400000&symbol=BTCUSDT HTTP/1.1" 200 60173
+2026-09-29 07:18:11,672 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,673 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [70%] Batch 14: downloaded 1000 klines, total: 13989 | 最後K線(UTC): 2024-01-07 04:00, 下一批次(UTC): 2024-01-07 08:00
+2026-09-29 07:18:11,673 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [75%] Batch 15/20: 2024-01-07 08:00 to 2024-06-22 00:00
+2026-09-29 07:18:11,673 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,737 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1719014400000&interval=4h&limit=1000&startTime=1704614400000&symbol=BTCUSDT HTTP/1.1" 200 61221
+2026-09-29 07:18:11,743 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,743 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [75%] Batch 15: downloaded 1000 klines, total: 14989 | 最後K線(UTC): 2024-06-21 20:00, 下一批次(UTC): 2024-06-22 00:00
+2026-09-29 07:18:11,743 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [80%] Batch 16/20: 2024-06-22 00:00 to 2024-12-05 16:00
+2026-09-29 07:18:11,743 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,811 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1733414400000&interval=4h&limit=1000&startTime=1719014400000&symbol=BTCUSDT HTTP/1.1" 200 61227
+2026-09-29 07:18:11,821 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,821 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [80%] Batch 16: downloaded 1000 klines, total: 15989 | 最後K線(UTC): 2024-12-05 12:00, 下一批次(UTC): 2024-12-05 16:00
+2026-09-29 07:18:11,821 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [85%] Batch 17/20: 2024-12-05 16:00 to 2025-05-21 08:00
+2026-09-29 07:18:11,821 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,882 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1747814400000&interval=4h&limit=1000&startTime=1733414400000&symbol=BTCUSDT HTTP/1.1" 200 61843
+2026-09-29 07:18:11,889 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,889 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [85%] Batch 17: downloaded 1000 klines, total: 16989 | 最後K線(UTC): 2025-05-21 04:00, 下一批次(UTC): 2025-05-21 08:00
+2026-09-29 07:18:11,889 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [90%] Batch 18/20: 2025-05-21 08:00 to 2025-11-04 00:00
+2026-09-29 07:18:11,889 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:11,956 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1762214400000&interval=4h&limit=1000&startTime=1747814400000&symbol=BTCUSDT HTTP/1.1" 200 61365
+2026-09-29 07:18:11,963 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:11,963 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [90%] Batch 18: downloaded 1000 klines, total: 17989 | 最後K線(UTC): 2025-11-03 20:00, 下一批次(UTC): 2025-11-04 00:00
+2026-09-29 07:18:11,963 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [95%] Batch 19/20: 2025-11-04 00:00 to 2026-04-19 16:00
+2026-09-29 07:18:11,963 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:12,024 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1776614400000&interval=4h&limit=1000&startTime=1762214400000&symbol=BTCUSDT HTTP/1.1" 200 61617
+2026-09-29 07:18:12,090 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 07:18:12,090 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [95%] Batch 19: downloaded 1000 klines, total: 18989 | 最後K線(UTC): 2026-04-19 12:00, 下一批次(UTC): 2026-04-19 16:00
+2026-09-29 07:18:12,090 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [100%] Batch 20/20: 2026-04-19 16:00 to 2026-09-28 23:18
+2026-09-29 07:18:12,090 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 07:18:12,153 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1790637490000&interval=4h&limit=1000&startTime=1776614400000&symbol=BTCUSDT HTTP/1.1" 200 59077
+2026-09-29 07:18:12,157 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 974 klines from Binance API
+2026-09-29 07:18:12,157 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [100%] Batch 20: downloaded 974 klines, total: 19963 | 最後K線(UTC): 2026-09-28 20:00, 下一批次(UTC): 2026-09-29 00:00
+2026-09-29 07:18:12,201 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Download completed: 19963 klines in 20 batches
+2026-09-29 07:18:12,203 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - DataFrame validation passed: 19963 rows, 10 columns
+2026-09-29 07:18:12,209 - momentum.DataExtraction.kline_storage - DEBUG - Legacy cache not found for BTCUSDT/4h in data_cache
+2026-09-29 07:18:12,209 - momentum.DataExtraction.kline_storage - WARNING - Dataset BTCUSDT/4h not available in storage or legacy cache
+2026-09-29 07:18:12,235 - momentum.DataExtraction.kline_storage - DEBUG - Atomically renamed temp dataset to 'data'
+2026-09-29 07:18:12,235 - h5py._conv - DEBUG - Creating converter from 5 to 3
+2026-09-29 07:18:12,262 - momentum.DataExtraction.kline_storage - ERROR - 數據不連續: BTCUSDT/4h 發現 8 處缺口，缺少 16 根K線。 缺失時間點（前10個）: 2018-02-08 04:00:00 UTC, 2018-02-08 08:00:00 UTC, 2018-02-08 12:00:00 UTC, 2018-02-08 16:00:00 UTC, 2018-02-08 20:00:00 UTC, 2018-02-09 00:00:00 UTC, 2018-02-09 04:00:00 UTC, 2018-06-26 04:00:00 UTC, 2018-06-26 08:00:00 UTC, 2018-07-04 04:00:00 UTC ...等共 16 根。建議：若為多區間append或分段回填，請在讀取時傳 validate_continuity=False，或只針對需要的時間範圍做連續性驗證
+2026-09-29 07:18:12,262 - momentum.DataExtraction.kline_storage - ERROR - Verification failed with exception for BTCUSDT/4h: 數據不連續: BTCUSDT/4h 發現 8 處缺口，缺少 16 根K線。 缺失時間點（前10個）: 2018-02-08 04:00:00 UTC, 2018-02-08 08:00:00 UTC, 2018-02-08 12:00:00 UTC, 2018-02-08 16:00:00 UTC, 2018-02-08 20:00:00 UTC, 2018-02-09 00:00:00 UTC, 2018-02-09 04:00:00 UTC, 2018-06-26 04:00:00 UTC, 2018-06-26 08:00:00 UTC, 2018-07-04 04:00:00 UTC ...等共 16 根。建議：若為多區間append或分段回填，請在讀取時傳 validate_continuity=False，或只針對需要的時間範圍做連續性驗證
+2026-09-29 07:18:12,262 - momentum.DataExtraction.kline_storage - ERROR - ❌ POST-WRITE VERIFICATION FAILED for BTCUSDT/4h
+2026-09-29 07:18:12,262 - momentum.DataExtraction.kline_storage - ERROR -    Data was written but verification failed - data may be corrupted!
+2026-09-29 07:18:12,262 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Saved 19963 klines to storage (symbol=BTCUSDT, timeframe=4h)
+2026-09-29 07:18:12,262 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Successfully downloaded 19963 klines in 1.56s (12770.7 klines/s)
+2026-09-29 07:18:12,268 - momentum.DataExtraction.kline_storage - INFO - Read 19963 klines from BTCUSDT/4h in 0.006s
+RESULT BTCUSDT 4h rows=19963 first=2017-08-17 04:00 last=2026-09-28 20:00
+2026-09-29 09:32:26,788 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-09-29 09:32:26,909] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-29 09:32:26,909 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+2026-09-29 09:32:28,396 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines_longhist/kline_cache.h5
+2026-09-29 09:32:28,396 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-29 09:32:28,396 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-29 09:32:28,425 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.binance.com:443
+2026-09-29 09:32:28,489 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-29 09:32:28,489 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-29 09:32:28,489 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-29 09:32:28,489 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-29 09:32:28,532 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-29 09:32:28,532 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Binance API ping successful
+2026-09-29 09:32:28,532 - momentum.DataExtraction.kline_download_service.KlineDownloadService - DEBUG - Provider 'binance' health check OK
+2026-09-29 09:32:28,532 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Downloading ETHUSDT 4h from binance (2017-08-17 00:00:00 to 2026-09-29 01:32:28.396130)
+2026-09-29 09:32:28,532 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Starting download: ETHUSDT 4h from 2017-08-17 00:00:00 to 2026-09-29 01:32:28.396130 (estimated ~19980 klines in ~20 batches)
+2026-09-29 09:32:28,532 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [5%] Batch 1/20: 2017-08-17 00:00 to 2018-01-30 16:00
+2026-09-29 09:32:28,532 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:28,592 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1517328000000&interval=4h&limit=1000&startTime=1502928000000&symbol=ETHUSDT HTTP/1.1" 200 53957
+2026-09-29 09:32:28,599 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:28,599 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [5%] Batch 1: downloaded 1000 klines, total: 1000 | 最後K線(UTC): 2018-01-30 16:00, 下一批次(UTC): 2018-01-30 20:00
+2026-09-29 09:32:28,599 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [10%] Batch 2/20: 2018-01-30 20:00 to 2018-07-16 12:00
+2026-09-29 09:32:28,599 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:28,658 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1531742400000&interval=4h&limit=1000&startTime=1517342400000&symbol=ETHUSDT HTTP/1.1" 200 56594
+2026-09-29 09:32:28,660 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 991 klines from Binance API
+2026-09-29 09:32:28,660 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [10%] Batch 2: downloaded 991 klines, total: 1991 | 最後K線(UTC): 2018-07-16 12:00, 下一批次(UTC): 2018-07-16 16:00
+2026-09-29 09:32:28,660 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [15%] Batch 3/20: 2018-07-16 16:00 to 2018-12-30 08:00
+2026-09-29 09:32:28,660 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:28,721 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1546156800000&interval=4h&limit=1000&startTime=1531756800000&symbol=ETHUSDT HTTP/1.1" 200 56392
+2026-09-29 09:32:28,722 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:28,722 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [15%] Batch 3: downloaded 1000 klines, total: 2991 | 最後K線(UTC): 2018-12-30 08:00, 下一批次(UTC): 2018-12-30 12:00
+2026-09-29 09:32:28,722 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [20%] Batch 4/20: 2018-12-30 12:00 to 2019-06-15 04:00
+2026-09-29 09:32:28,722 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:28,784 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1560571200000&interval=4h&limit=1000&startTime=1546171200000&symbol=ETHUSDT HTTP/1.1" 200 56120
+2026-09-29 09:32:28,786 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 998 klines from Binance API
+2026-09-29 09:32:28,786 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [20%] Batch 4: downloaded 998 klines, total: 3989 | 最後K線(UTC): 2019-06-15 04:00, 下一批次(UTC): 2019-06-15 08:00
+2026-09-29 09:32:28,786 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [25%] Batch 5/20: 2019-06-15 08:00 to 2019-11-29 00:00
+2026-09-29 09:32:28,786 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:28,846 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1574985600000&interval=4h&limit=1000&startTime=1560585600000&symbol=ETHUSDT HTTP/1.1" 200 56430
+2026-09-29 09:32:28,847 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:28,847 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [25%] Batch 5: downloaded 1000 klines, total: 4989 | 最後K線(UTC): 2019-11-29 00:00, 下一批次(UTC): 2019-11-29 04:00
+2026-09-29 09:32:28,847 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [30%] Batch 6/20: 2019-11-29 04:00 to 2020-05-13 20:00
+2026-09-29 09:32:28,848 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:28,909 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1589400000000&interval=4h&limit=1000&startTime=1575000000000&symbol=ETHUSDT HTTP/1.1" 200 56939
+2026-09-29 09:32:28,911 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:28,911 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [30%] Batch 6: downloaded 1000 klines, total: 5989 | 最後K線(UTC): 2020-05-13 20:00, 下一批次(UTC): 2020-05-14 00:00
+2026-09-29 09:32:28,911 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [35%] Batch 7/20: 2020-05-14 00:00 to 2020-10-27 16:00
+2026-09-29 09:32:28,911 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:28,973 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1603814400000&interval=4h&limit=1000&startTime=1589414400000&symbol=ETHUSDT HTTP/1.1" 200 57484
+2026-09-29 09:32:28,975 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:28,975 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [35%] Batch 7: downloaded 1000 klines, total: 6989 | 最後K線(UTC): 2020-10-27 12:00, 下一批次(UTC): 2020-10-27 16:00
+2026-09-29 09:32:28,975 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [40%] Batch 8/20: 2020-10-27 16:00 to 2021-04-12 08:00
+2026-09-29 09:32:28,975 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,036 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1618214400000&interval=4h&limit=1000&startTime=1603814400000&symbol=ETHUSDT HTTP/1.1" 200 60261
+2026-09-29 09:32:29,040 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,040 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [40%] Batch 8: downloaded 1000 klines, total: 7989 | 最後K線(UTC): 2021-04-12 04:00, 下一批次(UTC): 2021-04-12 08:00
+2026-09-29 09:32:29,040 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [45%] Batch 9/20: 2021-04-12 08:00 to 2021-09-26 00:00
+2026-09-29 09:32:29,040 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,099 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1632614400000&interval=4h&limit=1000&startTime=1618214400000&symbol=ETHUSDT HTTP/1.1" 200 61135
+2026-09-29 09:32:29,101 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,101 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [45%] Batch 9: downloaded 1000 klines, total: 8989 | 最後K線(UTC): 2021-09-25 20:00, 下一批次(UTC): 2021-09-26 00:00
+2026-09-29 09:32:29,101 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [50%] Batch 10/20: 2021-09-26 00:00 to 2022-03-11 16:00
+2026-09-29 09:32:29,101 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,160 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1647014400000&interval=4h&limit=1000&startTime=1632614400000&symbol=ETHUSDT HTTP/1.1" 200 59003
+2026-09-29 09:32:29,162 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,162 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [50%] Batch 10: downloaded 1000 klines, total: 9989 | 最後K線(UTC): 2022-03-11 12:00, 下一批次(UTC): 2022-03-11 16:00
+2026-09-29 09:32:29,162 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [55%] Batch 11/20: 2022-03-11 16:00 to 2022-08-25 08:00
+2026-09-29 09:32:29,162 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,222 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1661414400000&interval=4h&limit=1000&startTime=1647014400000&symbol=ETHUSDT HTTP/1.1" 200 58750
+2026-09-29 09:32:29,224 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,224 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [55%] Batch 11: downloaded 1000 klines, total: 10989 | 最後K線(UTC): 2022-08-25 04:00, 下一批次(UTC): 2022-08-25 08:00
+2026-09-29 09:32:29,224 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [60%] Batch 12/20: 2022-08-25 08:00 to 2023-02-08 00:00
+2026-09-29 09:32:29,224 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,282 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1675814400000&interval=4h&limit=1000&startTime=1661414400000&symbol=ETHUSDT HTTP/1.1" 200 57583
+2026-09-29 09:32:29,285 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,285 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [60%] Batch 12: downloaded 1000 klines, total: 11989 | 最後K線(UTC): 2023-02-07 20:00, 下一批次(UTC): 2023-02-08 00:00
+2026-09-29 09:32:29,285 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [65%] Batch 13/20: 2023-02-08 00:00 to 2023-07-24 16:00
+2026-09-29 09:32:29,285 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,347 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1690214400000&interval=4h&limit=1000&startTime=1675814400000&symbol=ETHUSDT HTTP/1.1" 200 57307
+2026-09-29 09:32:29,349 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,349 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [65%] Batch 13: downloaded 1000 klines, total: 12989 | 最後K線(UTC): 2023-07-24 12:00, 下一批次(UTC): 2023-07-24 16:00
+2026-09-29 09:32:29,349 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [70%] Batch 14/20: 2023-07-24 16:00 to 2024-01-07 08:00
+2026-09-29 09:32:29,349 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,409 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1704614400000&interval=4h&limit=1000&startTime=1690214400000&symbol=ETHUSDT HTTP/1.1" 200 56760
+2026-09-29 09:32:29,411 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,411 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [70%] Batch 14: downloaded 1000 klines, total: 13989 | 最後K線(UTC): 2024-01-07 04:00, 下一批次(UTC): 2024-01-07 08:00
+2026-09-29 09:32:29,411 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [75%] Batch 15/20: 2024-01-07 08:00 to 2024-06-22 00:00
+2026-09-29 09:32:29,411 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,471 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1719014400000&interval=4h&limit=1000&startTime=1704614400000&symbol=ETHUSDT HTTP/1.1" 200 58447
+2026-09-29 09:32:29,473 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,473 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [75%] Batch 15: downloaded 1000 klines, total: 14989 | 最後K線(UTC): 2024-06-21 20:00, 下一批次(UTC): 2024-06-22 00:00
+2026-09-29 09:32:29,473 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [80%] Batch 16/20: 2024-06-22 00:00 to 2024-12-05 16:00
+2026-09-29 09:32:29,473 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,533 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1733414400000&interval=4h&limit=1000&startTime=1719014400000&symbol=ETHUSDT HTTP/1.1" 200 58281
+2026-09-29 09:32:29,536 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,536 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [80%] Batch 16: downloaded 1000 klines, total: 15989 | 最後K線(UTC): 2024-12-05 12:00, 下一批次(UTC): 2024-12-05 16:00
+2026-09-29 09:32:29,536 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [85%] Batch 17/20: 2024-12-05 16:00 to 2025-05-21 08:00
+2026-09-29 09:32:29,536 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,596 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1747814400000&interval=4h&limit=1000&startTime=1733414400000&symbol=ETHUSDT HTTP/1.1" 200 58879
+2026-09-29 09:32:29,599 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,599 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [85%] Batch 17: downloaded 1000 klines, total: 16989 | 最後K線(UTC): 2025-05-21 04:00, 下一批次(UTC): 2025-05-21 08:00
+2026-09-29 09:32:29,599 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [90%] Batch 18/20: 2025-05-21 08:00 to 2025-11-04 00:00
+2026-09-29 09:32:29,599 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,660 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1762214400000&interval=4h&limit=1000&startTime=1747814400000&symbol=ETHUSDT HTTP/1.1" 200 59236
+2026-09-29 09:32:29,663 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,663 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [90%] Batch 18: downloaded 1000 klines, total: 17989 | 最後K線(UTC): 2025-11-03 20:00, 下一批次(UTC): 2025-11-04 00:00
+2026-09-29 09:32:29,663 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [95%] Batch 19/20: 2025-11-04 00:00 to 2026-04-19 16:00
+2026-09-29 09:32:29,663 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,724 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1776614400000&interval=4h&limit=1000&startTime=1762214400000&symbol=ETHUSDT HTTP/1.1" 200 58815
+2026-09-29 09:32:29,727 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:29,727 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [95%] Batch 19: downloaded 1000 klines, total: 18989 | 最後K線(UTC): 2026-04-19 12:00, 下一批次(UTC): 2026-04-19 16:00
+2026-09-29 09:32:29,727 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [100%] Batch 20/20: 2026-04-19 16:00 to 2026-09-29 01:32
+2026-09-29 09:32:29,727 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:29,787 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1790645548000&interval=4h&limit=1000&startTime=1776614400000&symbol=ETHUSDT HTTP/1.1" 200 56195
+2026-09-29 09:32:29,789 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 975 klines from Binance API
+2026-09-29 09:32:29,789 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [100%] Batch 20: downloaded 975 klines, total: 19964 | 最後K線(UTC): 2026-09-29 00:00, 下一批次(UTC): 2026-09-29 04:00
+2026-09-29 09:32:29,819 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Download completed: 19964 klines in 20 batches
+2026-09-29 09:32:29,822 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - DataFrame validation passed: 19964 rows, 10 columns
+2026-09-29 09:32:29,826 - momentum.DataExtraction.kline_storage - DEBUG - Legacy cache not found for ETHUSDT/4h in data_cache
+2026-09-29 09:32:29,826 - momentum.DataExtraction.kline_storage - WARNING - Dataset ETHUSDT/4h not available in storage or legacy cache
+2026-09-29 09:32:29,853 - momentum.DataExtraction.kline_storage - DEBUG - Atomically renamed temp dataset to 'data'
+2026-09-29 09:32:29,854 - h5py._conv - DEBUG - Creating converter from 5 to 3
+2026-09-29 09:32:29,880 - momentum.DataExtraction.kline_storage - ERROR - 數據不連續: ETHUSDT/4h 發現 8 處缺口，缺少 16 根K線。 缺失時間點（前10個）: 2018-02-08 04:00:00 UTC, 2018-02-08 08:00:00 UTC, 2018-02-08 12:00:00 UTC, 2018-02-08 16:00:00 UTC, 2018-02-08 20:00:00 UTC, 2018-02-09 00:00:00 UTC, 2018-02-09 04:00:00 UTC, 2018-06-26 04:00:00 UTC, 2018-06-26 08:00:00 UTC, 2018-07-04 04:00:00 UTC ...等共 16 根。建議：若為多區間append或分段回填，請在讀取時傳 validate_continuity=False，或只針對需要的時間範圍做連續性驗證
+2026-09-29 09:32:29,880 - momentum.DataExtraction.kline_storage - ERROR - Verification failed with exception for ETHUSDT/4h: 數據不連續: ETHUSDT/4h 發現 8 處缺口，缺少 16 根K線。 缺失時間點（前10個）: 2018-02-08 04:00:00 UTC, 2018-02-08 08:00:00 UTC, 2018-02-08 12:00:00 UTC, 2018-02-08 16:00:00 UTC, 2018-02-08 20:00:00 UTC, 2018-02-09 00:00:00 UTC, 2018-02-09 04:00:00 UTC, 2018-06-26 04:00:00 UTC, 2018-06-26 08:00:00 UTC, 2018-07-04 04:00:00 UTC ...等共 16 根。建議：若為多區間append或分段回填，請在讀取時傳 validate_continuity=False，或只針對需要的時間範圍做連續性驗證
+2026-09-29 09:32:29,880 - momentum.DataExtraction.kline_storage - ERROR - ❌ POST-WRITE VERIFICATION FAILED for ETHUSDT/4h
+2026-09-29 09:32:29,880 - momentum.DataExtraction.kline_storage - ERROR -    Data was written but verification failed - data may be corrupted!
+2026-09-29 09:32:29,880 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Saved 19964 klines to storage (symbol=ETHUSDT, timeframe=4h)
+2026-09-29 09:32:29,880 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Successfully downloaded 19964 klines in 1.29s (15485.7 klines/s)
+2026-09-29 09:32:29,887 - momentum.DataExtraction.kline_storage - INFO - Read 19964 klines from ETHUSDT/4h in 0.006s
+RESULT ETHUSDT 4h rows=19964 first=2017-08-17 04:00 last=2026-09-29 00:00
+2026-09-29 09:32:30,873 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+[2026-09-29 09:32:30,959] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-09-29 09:32:30,959 - momentum.FeatureEngineering.strategy_registry - INFO - ✅ 成功註冊 EMAExtractor
+2026-09-29 09:32:32,077 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines_longhist/kline_cache.h5
+2026-09-29 09:32:32,079 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - KlineDownloadService initialized
+2026-09-29 09:32:32,079 - asyncio - DEBUG - Using selector: KqueueSelector
+2026-09-29 09:32:32,082 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.binance.com:443
+2026-09-29 09:32:32,144 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-29 09:32:32,144 - momentum.DataExtraction.providers.binance_provider.RateLimiter - INFO - Rate limiter initialized: 1000 req/min
+2026-09-29 09:32:32,144 - momentum.DataExtraction.kline_provider_base.Binance - INFO - BinanceProvider initialized
+2026-09-29 09:32:32,144 - momentum.DataExtraction.kline_download_service.ProviderRegistry - INFO - Registered provider: binance (rate_limit=1000/min)
+2026-09-29 09:32:32,186 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/ping HTTP/1.1" 200 2
+2026-09-29 09:32:32,186 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Binance API ping successful
+2026-09-29 09:32:32,186 - momentum.DataExtraction.kline_download_service.KlineDownloadService - DEBUG - Provider 'binance' health check OK
+2026-09-29 09:32:32,186 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Downloading ADAUSDT 4h from binance (2018-04-17 00:00:00 to 2026-09-29 01:32:32.077484)
+2026-09-29 09:32:32,186 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Starting download: ADAUSDT 4h from 2018-04-17 00:00:00 to 2026-09-29 01:32:32.077484 (estimated ~18522 klines in ~19 batches)
+2026-09-29 09:32:32,186 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [5%] Batch 1/19: 2018-04-17 00:00 to 2018-09-30 16:00
+2026-09-29 09:32:32,186 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,246 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1538323200000&interval=4h&limit=1000&startTime=1523923200000&symbol=ADAUSDT HTTP/1.1" 200 53150
+2026-09-29 09:32:32,253 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 997 klines from Binance API
+2026-09-29 09:32:32,253 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [5%] Batch 1: downloaded 997 klines, total: 997 | 最後K線(UTC): 2018-09-30 16:00, 下一批次(UTC): 2018-09-30 20:00
+2026-09-29 09:32:32,253 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [10%] Batch 2/19: 2018-09-30 20:00 to 2019-03-16 12:00
+2026-09-29 09:32:32,253 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,312 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1552737600000&interval=4h&limit=1000&startTime=1538337600000&symbol=ADAUSDT HTTP/1.1" 200 50450
+2026-09-29 09:32:32,314 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 999 klines from Binance API
+2026-09-29 09:32:32,314 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [10%] Batch 2: downloaded 999 klines, total: 1996 | 最後K線(UTC): 2019-03-16 12:00, 下一批次(UTC): 2019-03-16 16:00
+2026-09-29 09:32:32,314 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [15%] Batch 3/19: 2019-03-16 16:00 to 2019-08-30 08:00
+2026-09-29 09:32:32,314 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,375 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1567152000000&interval=4h&limit=1000&startTime=1552752000000&symbol=ADAUSDT HTTP/1.1" 200 51179
+2026-09-29 09:32:32,377 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 998 klines from Binance API
+2026-09-29 09:32:32,377 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [15%] Batch 3: downloaded 998 klines, total: 2994 | 最後K線(UTC): 2019-08-30 08:00, 下一批次(UTC): 2019-08-30 12:00
+2026-09-29 09:32:32,377 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [21%] Batch 4/19: 2019-08-30 12:00 to 2020-02-13 04:00
+2026-09-29 09:32:32,377 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,438 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1581566400000&interval=4h&limit=1000&startTime=1567166400000&symbol=ADAUSDT HTTP/1.1" 200 50119
+2026-09-29 09:32:32,440 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,440 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [21%] Batch 4: downloaded 1000 klines, total: 3994 | 最後K線(UTC): 2020-02-13 00:00, 下一批次(UTC): 2020-02-13 04:00
+2026-09-29 09:32:32,440 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [26%] Batch 5/19: 2020-02-13 04:00 to 2020-07-28 20:00
+2026-09-29 09:32:32,440 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,499 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1595966400000&interval=4h&limit=1000&startTime=1581566400000&symbol=ADAUSDT HTTP/1.1" 200 52181
+2026-09-29 09:32:32,501 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,501 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [26%] Batch 5: downloaded 1000 klines, total: 4994 | 最後K線(UTC): 2020-07-28 20:00, 下一批次(UTC): 2020-07-29 00:00
+2026-09-29 09:32:32,501 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [31%] Batch 6/19: 2020-07-29 00:00 to 2021-01-11 16:00
+2026-09-29 09:32:32,501 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,561 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1610380800000&interval=4h&limit=1000&startTime=1595980800000&symbol=ADAUSDT HTTP/1.1" 200 53295
+2026-09-29 09:32:32,563 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,563 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [31%] Batch 6: downloaded 1000 klines, total: 5994 | 最後K線(UTC): 2021-01-11 12:00, 下一批次(UTC): 2021-01-11 16:00
+2026-09-29 09:32:32,563 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [36%] Batch 7/19: 2021-01-11 16:00 to 2021-06-27 08:00
+2026-09-29 09:32:32,563 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,624 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1624780800000&interval=4h&limit=1000&startTime=1610380800000&symbol=ADAUSDT HTTP/1.1" 200 56964
+2026-09-29 09:32:32,626 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,626 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [36%] Batch 7: downloaded 1000 klines, total: 6994 | 最後K線(UTC): 2021-06-27 04:00, 下一批次(UTC): 2021-06-27 08:00
+2026-09-29 09:32:32,626 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [42%] Batch 8/19: 2021-06-27 08:00 to 2021-12-11 00:00
+2026-09-29 09:32:32,626 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,685 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1639180800000&interval=4h&limit=1000&startTime=1624780800000&symbol=ADAUSDT HTTP/1.1" 200 52677
+2026-09-29 09:32:32,688 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,688 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [42%] Batch 8: downloaded 1000 klines, total: 7994 | 最後K線(UTC): 2021-12-10 20:00, 下一批次(UTC): 2021-12-11 00:00
+2026-09-29 09:32:32,688 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [47%] Batch 9/19: 2021-12-11 00:00 to 2022-05-26 16:00
+2026-09-29 09:32:32,688 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,779 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1653580800000&interval=4h&limit=1000&startTime=1639180800000&symbol=ADAUSDT HTTP/1.1" 200 50026
+2026-09-29 09:32:32,811 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,811 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [47%] Batch 9: downloaded 1000 klines, total: 8994 | 最後K線(UTC): 2022-05-26 12:00, 下一批次(UTC): 2022-05-26 16:00
+2026-09-29 09:32:32,811 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [52%] Batch 10/19: 2022-05-26 16:00 to 2022-11-09 08:00
+2026-09-29 09:32:32,811 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,869 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1667980800000&interval=4h&limit=1000&startTime=1653580800000&symbol=ADAUSDT HTTP/1.1" 200 51299
+2026-09-29 09:32:32,871 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,871 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [52%] Batch 10: downloaded 1000 klines, total: 9994 | 最後K線(UTC): 2022-11-09 04:00, 下一批次(UTC): 2022-11-09 08:00
+2026-09-29 09:32:32,871 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [57%] Batch 11/19: 2022-11-09 08:00 to 2023-04-25 00:00
+2026-09-29 09:32:32,871 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,933 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1682380800000&interval=4h&limit=1000&startTime=1667980800000&symbol=ADAUSDT HTTP/1.1" 200 50117
+2026-09-29 09:32:32,935 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,935 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [57%] Batch 11: downloaded 1000 klines, total: 10994 | 最後K線(UTC): 2023-04-24 20:00, 下一批次(UTC): 2023-04-25 00:00
+2026-09-29 09:32:32,935 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [63%] Batch 12/19: 2023-04-25 00:00 to 2023-10-08 16:00
+2026-09-29 09:32:32,935 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:32,994 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1696780800000&interval=4h&limit=1000&startTime=1682380800000&symbol=ADAUSDT HTTP/1.1" 200 49063
+2026-09-29 09:32:32,996 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:32,996 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [63%] Batch 12: downloaded 1000 klines, total: 11994 | 最後K線(UTC): 2023-10-08 12:00, 下一批次(UTC): 2023-10-08 16:00
+2026-09-29 09:32:32,996 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [68%] Batch 13/19: 2023-10-08 16:00 to 2024-03-23 08:00
+2026-09-29 09:32:32,996 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:33,053 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1711180800000&interval=4h&limit=1000&startTime=1696780800000&symbol=ADAUSDT HTTP/1.1" 200 51179
+2026-09-29 09:32:33,055 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:33,055 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [68%] Batch 13: downloaded 1000 klines, total: 12994 | 最後K線(UTC): 2024-03-23 04:00, 下一批次(UTC): 2024-03-23 08:00
+2026-09-29 09:32:33,055 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [73%] Batch 14/19: 2024-03-23 08:00 to 2024-09-06 00:00
+2026-09-29 09:32:33,055 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 998.99
+2026-09-29 09:32:33,116 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1725580800000&interval=4h&limit=1000&startTime=1711180800000&symbol=ADAUSDT HTTP/1.1" 200 50183
+2026-09-29 09:32:33,118 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:33,118 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [73%] Batch 14: downloaded 1000 klines, total: 13994 | 最後K線(UTC): 2024-09-05 20:00, 下一批次(UTC): 2024-09-06 00:00
+2026-09-29 09:32:33,118 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [78%] Batch 15/19: 2024-09-06 00:00 to 2025-02-19 16:00
+2026-09-29 09:32:33,118 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:33,184 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1739980800000&interval=4h&limit=1000&startTime=1725580800000&symbol=ADAUSDT HTTP/1.1" 200 52006
+2026-09-29 09:32:33,209 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:33,209 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [78%] Batch 15: downloaded 1000 klines, total: 14994 | 最後K線(UTC): 2025-02-19 12:00, 下一批次(UTC): 2025-02-19 16:00
+2026-09-29 09:32:33,209 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [84%] Batch 16/19: 2025-02-19 16:00 to 2025-08-05 08:00
+2026-09-29 09:32:33,209 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:33,270 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1754380800000&interval=4h&limit=1000&startTime=1739980800000&symbol=ADAUSDT HTTP/1.1" 200 52046
+2026-09-29 09:32:33,273 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:33,273 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [84%] Batch 16: downloaded 1000 klines, total: 15994 | 最後K線(UTC): 2025-08-05 04:00, 下一批次(UTC): 2025-08-05 08:00
+2026-09-29 09:32:33,273 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [89%] Batch 17/19: 2025-08-05 08:00 to 2026-01-19 00:00
+2026-09-29 09:32:33,273 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:33,333 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1768780800000&interval=4h&limit=1000&startTime=1754380800000&symbol=ADAUSDT HTTP/1.1" 200 51529
+2026-09-29 09:32:33,399 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:33,399 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [89%] Batch 17: downloaded 1000 klines, total: 16994 | 最後K線(UTC): 2026-01-18 20:00, 下一批次(UTC): 2026-01-19 00:00
+2026-09-29 09:32:33,399 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [94%] Batch 18/19: 2026-01-19 00:00 to 2026-07-04 16:00
+2026-09-29 09:32:33,399 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:33,457 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1783180800000&interval=4h&limit=1000&startTime=1768780800000&symbol=ADAUSDT HTTP/1.1" 200 49786
+2026-09-29 09:32:33,488 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 1000 klines from Binance API
+2026-09-29 09:32:33,488 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [94%] Batch 18: downloaded 1000 klines, total: 17994 | 最後K線(UTC): 2026-07-04 12:00, 下一批次(UTC): 2026-07-04 16:00
+2026-09-29 09:32:33,488 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [100%] Batch 19/19: 2026-07-04 16:00 to 2026-09-29 01:32
+2026-09-29 09:32:33,488 - momentum.DataExtraction.providers.binance_provider.RateLimiter - DEBUG - Acquired 1 tokens, remaining: 999.00
+2026-09-29 09:32:33,543 - urllib3.connectionpool - DEBUG - https://api.binance.com:443 "GET /api/v3/klines?endTime=1790645552000&interval=4h&limit=1000&startTime=1783180800000&symbol=ADAUSDT HTTP/1.1" 200 25849
+2026-09-29 09:32:33,544 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - Fetched 519 klines from Binance API
+2026-09-29 09:32:33,544 - momentum.DataExtraction.kline_provider_base.Binance - INFO - [100%] Batch 19: downloaded 519 klines, total: 18513 | 最後K線(UTC): 2026-09-29 00:00, 下一批次(UTC): 2026-09-29 04:00
+2026-09-29 09:32:33,570 - momentum.DataExtraction.kline_provider_base.Binance - INFO - Download completed: 18513 klines in 19 batches
+2026-09-29 09:32:33,572 - momentum.DataExtraction.kline_provider_base.Binance - DEBUG - DataFrame validation passed: 18513 rows, 10 columns
+2026-09-29 09:32:33,574 - momentum.DataExtraction.kline_storage - DEBUG - Legacy cache not found for ADAUSDT/4h in data_cache
+2026-09-29 09:32:33,574 - momentum.DataExtraction.kline_storage - WARNING - Dataset ADAUSDT/4h not available in storage or legacy cache
+2026-09-29 09:32:33,596 - momentum.DataExtraction.kline_storage - DEBUG - Atomically renamed temp dataset to 'data'
+2026-09-29 09:32:33,596 - h5py._conv - DEBUG - Creating converter from 5 to 3
+2026-09-29 09:32:33,618 - momentum.DataExtraction.kline_storage - ERROR - 數據不連續: ADAUSDT/4h 發現 7 處缺口，缺少 9 根K線。 缺失時間點（前9個）: 2018-06-26 04:00:00 UTC, 2018-06-26 08:00:00 UTC, 2018-07-04 04:00:00 UTC, 2018-11-14 04:00:00 UTC, 2019-03-12 04:00:00 UTC, 2019-05-15 04:00:00 UTC, 2019-05-15 08:00:00 UTC, 2019-08-15 04:00:00 UTC, 2020-02-19 12:00:00 UTC。建議：若為多區間append或分段回填，請在讀取時傳 validate_continuity=False，或只針對需要的時間範圍做連續性驗證
+2026-09-29 09:32:33,618 - momentum.DataExtraction.kline_storage - ERROR - Verification failed with exception for ADAUSDT/4h: 數據不連續: ADAUSDT/4h 發現 7 處缺口，缺少 9 根K線。 缺失時間點（前9個）: 2018-06-26 04:00:00 UTC, 2018-06-26 08:00:00 UTC, 2018-07-04 04:00:00 UTC, 2018-11-14 04:00:00 UTC, 2019-03-12 04:00:00 UTC, 2019-05-15 04:00:00 UTC, 2019-05-15 08:00:00 UTC, 2019-08-15 04:00:00 UTC, 2020-02-19 12:00:00 UTC。建議：若為多區間append或分段回填，請在讀取時傳 validate_continuity=False，或只針對需要的時間範圍做連續性驗證
+2026-09-29 09:32:33,618 - momentum.DataExtraction.kline_storage - ERROR - ❌ POST-WRITE VERIFICATION FAILED for ADAUSDT/4h
+2026-09-29 09:32:33,618 - momentum.DataExtraction.kline_storage - ERROR -    Data was written but verification failed - data may be corrupted!
+2026-09-29 09:32:33,618 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Saved 18513 klines to storage (symbol=ADAUSDT, timeframe=4h)
+2026-09-29 09:32:33,618 - momentum.DataExtraction.kline_download_service.KlineDownloadService - INFO - Successfully downloaded 18513 klines in 1.39s (13363.3 klines/s)
+2026-09-29 09:32:33,624 - momentum.DataExtraction.kline_storage - INFO - Read 18513 klines from ADAUSDT/4h in 0.006s
+RESULT ADAUSDT 4h rows=18513 first=2018-04-17 04:00 last=2026-09-29 00:00

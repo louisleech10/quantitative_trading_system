@@ -1,0 +1,18 @@
+{
+ "timeframe": "4h",
+ "auto": {
+  "columns_float16": 180729,
+  "columns_float32": 28553,
+  "parquet_bytes": 1579877085,
+  "total_seconds": 663.4,
+  "dtype_select_seconds": 11.39
+ },
+ "all_float32": {
+  "columns_float16": 0,
+  "columns_float32": 209282,
+  "parquet_bytes": 2667152896,
+  "total_seconds": 650.8,
+  "dtype_select_seconds": 0.57
+ },
+ "size_ratio": 1.688
+}

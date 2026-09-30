@@ -44,7 +44,7 @@ def test_every_column_entering_step_has_pvalue(stat_run: Dict[str, Any]) -> None
     """Task 1.2 驗證：開啟平穩化之真實輕量 run 中，進入步驟之每欄皆有 ADF p 值紀錄（欄集合＝基礎欄集合）。"""
     baseline = json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))
     dec = stat_run["decisions"]
-    assert set(dec) == set(baseline["base"])
+    assert set(dec) == h.approved_base_columns(baseline["base"])  # v49：改前基準＋使用者核可之欄集合差異
     _assert_pvalue_or_explicitly_empty(dec)
 
 
@@ -66,7 +66,7 @@ def test_boundary_04_adf_apply_to_all_tests_each_column(tmp_path: Path, monkeypa
     _, _, result = h.run_stat(tmp_path, payload)
     dec = h.decisions(result)
     baseline = json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))
-    assert set(dec) == set(baseline["base"])
+    assert set(dec) == h.approved_base_columns(baseline["base"])  # v49：改前基準＋使用者核可之欄集合差異
     _assert_pvalue_or_explicitly_empty(dec)
 
 

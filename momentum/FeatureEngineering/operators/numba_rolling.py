@@ -247,8 +247,46 @@ def _remove_sorted(sorted_buf: np.ndarray, buf_len: int, value: float) -> int:
 
 
 @numba.njit(cache=True)
+def _window_moments(data: np.ndarray, end: int, window: int) -> tuple[bool, float, float, float, float, float, float]:
+    """`data[end-window+1 .. end]` 之逐窗精確統計（FFSTAT v50）：固定由左至右之順序、float64 二遍法。
+
+    回傳 (全有效, mean, m2, m3, m4, min, max)；窗內任一 NaN ⇒ 全有效＝False。常數窗（max＝min）之 m2／m3／m4
+    明定為 0（二遍法於相同值之和仍可能有末位誤差而使 x−mean≠0）。每列只讀該窗之值 ⇒ 與起算點無關。"""
+    start = end - window + 1
+    total = 0.0
+    vmin = data[start]
+    vmax = vmin
+    for j in range(start, end + 1):
+        v = data[j]
+        if np.isnan(v):
+            return False, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+        total += v
+        if v < vmin:
+            vmin = v
+        if v > vmax:
+            vmax = v
+    mean = total / window
+    if vmax == vmin:
+        return True, mean, 0.0, 0.0, 0.0, vmin, vmax
+    m2 = 0.0
+    m3 = 0.0
+    m4 = 0.0
+    for j in range(start, end + 1):
+        d = data[j] - mean
+        d2 = d * d
+        m2 += d2
+        m3 += d2 * d
+        m4 += d2 * d2
+    return True, mean, m2, m3, m4, vmin, vmax
+
+
+@numba.njit(cache=True)
 def fused_rolling_stats(data: np.ndarray, window: int) -> np.ndarray:
-    """Single-pass rolling stats with pandas-compatible min_periods=window semantics."""
+    """Rolling mean／std／min／max／range／zscore with pandas-compatible min_periods=window semantics.
+
+    FFSTAT v50：逐窗精確計算（`_window_moments`），取代 Welford 增量加入／移除——後者之捨入誤差依首個有限值之
+    位置累積（值依起算點而異），且常數窗算出非零 std（真實 BTC 1h `MIDPOINT_21` W5 之 4,546 個常數窗全數非零）。
+    常數窗 std＝0、zscore＝NaN；窗內任一 NaN ⇒ 該列全 NaN（同改前）。"""
     if window <= 0:
         raise ValueError("window must be positive")
 
@@ -257,76 +295,20 @@ def fused_rolling_stats(data: np.ndarray, window: int) -> np.ndarray:
     if n_rows == 0:
         return output.astype(np.float32)
 
-    ring_values = np.empty(window, dtype=np.float64)
-    ring_valid = np.zeros(window, dtype=np.uint8)
-
-    min_deque = np.empty(n_rows, dtype=np.int64)
-    max_deque = np.empty(n_rows, dtype=np.int64)
-    min_head = 0
-    min_tail = 0
-    max_head = 0
-    max_tail = 0
-
-    count = 0
-    mean = 0.0
-    m2 = 0.0
-
-    for row_idx in range(n_rows):
-        slot = row_idx % window
-
-        if row_idx >= window:
-            old_idx = row_idx - window
-            if ring_valid[slot] == 1:
-                old_value = ring_values[slot]
-                count, mean, m2 = _welford_remove(count, mean, m2, old_value)
-
-            while min_head < min_tail and min_deque[min_head] <= old_idx:
-                min_head += 1
-            while max_head < max_tail and max_deque[max_head] <= old_idx:
-                max_head += 1
-
-        value = data[row_idx]
-        if np.isnan(value):
-            ring_valid[slot] = 0
-            ring_values[slot] = np.nan
+    for row_idx in range(window - 1, n_rows):
+        valid, mean, m2, _m3, _m4, min_value, max_value = _window_moments(data, row_idx, window)
+        if not valid:
+            continue
+        output[row_idx, 0] = mean
+        std_value = np.sqrt(m2 / (window - 1)) if window > 1 else np.nan
+        output[row_idx, 1] = std_value
+        output[row_idx, 2] = min_value
+        output[row_idx, 3] = max_value
+        output[row_idx, 4] = max_value - min_value
+        if np.isnan(std_value) or std_value <= 0.0:
+            output[row_idx, 5] = np.nan
         else:
-            ring_valid[slot] = 1
-            ring_values[slot] = value
-            count, mean, m2 = _welford_update(count, mean, m2, value)
-
-            while min_head < min_tail and data[min_deque[min_tail - 1]] >= value:
-                min_tail -= 1
-            min_deque[min_tail] = row_idx
-            min_tail += 1
-
-            while max_head < max_tail and data[max_deque[max_tail - 1]] <= value:
-                max_tail -= 1
-            max_deque[max_tail] = row_idx
-            max_tail += 1
-
-        if row_idx >= window - 1 and count >= window:
-            min_value = data[min_deque[min_head]]
-            max_value = data[max_deque[max_head]]
-
-            output[row_idx, 0] = mean
-
-            if count > 1:
-                variance = m2 / (count - 1)
-                if variance < 0.0 and variance > -1e-12:
-                    variance = 0.0
-                std_value = np.sqrt(variance) if variance >= 0.0 else np.nan
-            else:
-                std_value = np.nan
-
-            output[row_idx, 1] = std_value
-            output[row_idx, 2] = min_value
-            output[row_idx, 3] = max_value
-            output[row_idx, 4] = max_value - min_value
-
-            if np.isnan(std_value) or std_value <= 0.0:
-                output[row_idx, 5] = np.nan
-            else:
-                output[row_idx, 5] = (value - mean) / std_value
+            output[row_idx, 5] = (data[row_idx] - mean) / std_value
 
     return output.astype(np.float32)
 
@@ -373,61 +355,50 @@ def rolling_rank(data: np.ndarray, window: int) -> np.ndarray:
 
 @numba.njit(cache=True)
 def rolling_slope(data: np.ndarray, window: int) -> np.ndarray:
-    """Rolling OLS slope using running sums and 0-based x positions."""
+    """Rolling OLS slope（窗內 x＝0..w−1）。
+
+    FFSTAT v51（審查 r35 前主委實跑 §G⑦ 分解判準所得）：逐窗精確計算——窗內固定由左至右之 float64 二遍法
+    Σ(j−x̄)(y_j−ȳ)／Σ(j−x̄)²，取代以「絕對列號」累加之 running sums（`sum_jy += row_idx*value`，其捨入誤差隨列號
+    增長、值依起算點而異：真實 BTC 4h STOCHRSI-fastd 之 Slope 於刪前 2,049 列重算時末位不同）。窗內任一 NaN ⇒ NaN。"""
     if window <= 0:
         raise ValueError("window must be positive")
 
     n_rows = len(data)
     output = np.full(n_rows, np.nan, dtype=np.float64)
-    if n_rows == 0:
+    if n_rows == 0 or window < 2:
         return output.astype(np.float32)
 
     w = float(window)
-    sum_x = w * (w - 1.0) / 2.0
-    sum_x2 = w * (w - 1.0) * (2.0 * w - 1.0) / 6.0
-    denominator = w * sum_x2 - sum_x * sum_x
-    if denominator == 0.0:
-        return output.astype(np.float32)
+    x_mean = (w - 1.0) / 2.0
+    sxx = w * (w * w - 1.0) / 12.0  # Σ(j−x̄)²
 
-    ring_values = np.empty(window, dtype=np.float64)
-    ring_valid = np.zeros(window, dtype=np.uint8)
-
-    sum_y = 0.0
-    sum_jy = 0.0
-    valid_count = 0
-
-    for row_idx in range(n_rows):
-        slot = row_idx % window
-
-        if row_idx >= window and ring_valid[slot] == 1:
-            old_value = ring_values[slot]
-            old_index = row_idx - window
-            sum_y -= old_value
-            sum_jy -= float(old_index) * old_value
-            valid_count -= 1
-
-        value = data[row_idx]
-        if np.isnan(value):
-            ring_valid[slot] = 0
-            ring_values[slot] = np.nan
-        else:
-            ring_valid[slot] = 1
-            ring_values[slot] = value
-            sum_y += value
-            sum_jy += float(row_idx) * value
-            valid_count += 1
-
-        if row_idx >= window - 1 and valid_count >= window and not np.isnan(value):
-            start_idx = row_idx - window + 1
-            sum_xy = sum_jy - float(start_idx) * sum_y
-            output[row_idx] = (w * sum_xy - sum_x * sum_y) / denominator
+    for row_idx in range(window - 1, n_rows):
+        start = row_idx - window + 1
+        total = 0.0
+        valid = True
+        for j in range(start, row_idx + 1):
+            value = data[j]
+            if np.isnan(value):
+                valid = False
+                break
+            total += value
+        if not valid:
+            continue
+        y_mean = total / w
+        sxy = 0.0
+        for j in range(window):
+            sxy += (float(j) - x_mean) * (data[start + j] - y_mean)
+        output[row_idx] = sxy / sxx
 
     return output.astype(np.float32)
 
 
 @numba.njit(cache=True)
 def rolling_skew_kurt(data: np.ndarray, window: int, recalc_interval: int = 50) -> np.ndarray:
-    """Rolling skew/kurt with Pebay updates and periodic exact recalibration."""
+    """Rolling skew/kurt（樣本偏態／超額峰度，公式與退化防護同 `_compute_skew`／`_compute_kurt`）。
+
+    FFSTAT v50：逐窗精確計算（`_window_moments`），取代 Pebay 增量＋依絕對列位每 `recalc_interval` 列重算——後者之值
+    依起算點（首列位置與重算相位）而異。`recalc_interval` 保留為相容參數、不再使用。"""
     if window <= 0:
         raise ValueError("window must be positive")
 
@@ -436,43 +407,12 @@ def rolling_skew_kurt(data: np.ndarray, window: int, recalc_interval: int = 50) 
     if n_rows == 0:
         return output.astype(np.float32)
 
-    ring_values = np.empty(window, dtype=np.float64)
-    ring_valid = np.zeros(window, dtype=np.uint8)
-
-    if recalc_interval <= 0:
-        effective_recalc = window
-    elif recalc_interval < window:
-        effective_recalc = recalc_interval
-    else:
-        effective_recalc = window
-
-    count = 0
-    mean = 0.0
-    m2 = 0.0
-    m3 = 0.0
-    m4 = 0.0
-
-    for row_idx in range(n_rows):
-        slot = row_idx % window
-
-        if row_idx >= window and ring_valid[slot] == 1:
-            count, mean, m2, m3, m4 = _pebay_remove(count, mean, m2, m3, m4, ring_values[slot])
-
-        value = data[row_idx]
-        if np.isnan(value):
-            ring_valid[slot] = 0
-            ring_values[slot] = np.nan
-        else:
-            ring_valid[slot] = 1
-            ring_values[slot] = value
-            count, mean, m2, m3, m4 = _pebay_update(count, mean, m2, m3, m4, value)
-
-        if (row_idx + 1) % effective_recalc == 0:
-            count, mean, m2, m3, m4 = _batch_recompute_moments(ring_values, ring_valid)
-
-        if row_idx >= window - 1 and count >= window:
-            output[row_idx, 0] = _compute_skew(m2, m3, count, mean)
-            output[row_idx, 1] = _compute_kurt(m2, m4, count, mean)
+    for row_idx in range(window - 1, n_rows):
+        valid, mean, m2, m3, m4, _vmin, _vmax = _window_moments(data, row_idx, window)
+        if not valid:
+            continue
+        output[row_idx, 0] = _compute_skew(m2, m3, window, mean)
+        output[row_idx, 1] = _compute_kurt(m2, m4, window, mean)
 
     return output.astype(np.float32)
 

@@ -249,17 +249,22 @@ class TestPolarsDivisionByZero:
             polars_to_pandas,
         )
 
-        # Create data with zeros in denominator
-        n_rows = 20
+        # Create data with zeros in denominator（FFSTAT v53：分母近零尺度為因果 252 列窗 ⇒ 延長至窗滿後，
+        # 並於窗內與窗滿後各置 exact 0）
+        n_rows = 300
         index = pd.date_range("2024-01-01", periods=n_rows, freq="1h")
+        denominator = np.arange(1, n_rows + 1, dtype=np.float32)
+        denominator[[3, 280]] = 0.0
         df = pd.DataFrame({
             "numerator": np.arange(n_rows, dtype=np.float32),
-            "denominator": np.array([0.0] * 5 + list(range(1, 16)), dtype=np.float32),
+            "denominator": denominator,
         }, index=index)
 
-        # Pandas: A / B where B has zeros → NaN (via replace(0, nan))
-        pd_denom = df["denominator"].replace(0, np.nan)
-        pd_ratio = df["numerator"] / pd_denom
+        # Pandas oracle：同一因果近零守衛（exact 0 與窗未滿皆 NaN）
+        from momentum.FeatureEngineering.utils.numeric_guards import safe_denominator
+
+        pd_ratio = df["numerator"] / safe_denominator(df["denominator"].astype(np.float64))
+        assert np.isnan(pd_ratio.iloc[280]) and np.isfinite(pd_ratio.iloc[290])
 
         # Polars path
         pairs = [("numerator", "denominator", "ratio_result")]

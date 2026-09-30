@@ -21,14 +21,17 @@ from momentum.FeatureEngineering.utils.numeric_guards import (
 # ── Layer A2: safe_denominator ────────────────────────────────────────────────
 
 def test_safe_denominator_nulls_exact_zero_and_float_noise():
-    """Exact 0 and relative-near-zero (float noise) → NaN; real values kept."""
-    # scale (median |nonzero|) ≈ 30 → threshold ≈ 3e-5
-    s = pd.Series([0.5, 30.0, 0.0, -1.06e-14, 50.0, 0.3, 20.0])
-    out = safe_denominator(s)
-    assert np.isnan(out.iloc[2])  # exact 0
-    assert np.isnan(out.iloc[3])  # 1e-14 float noise
+    """Exact 0 and relative-near-zero (float noise) → NaN; real values kept.
+
+    FFSTAT v53：尺度＝第 t 列（含）之前 `window` 列之非零絕對值中位數（因果）；窗未滿之列 fail-closed 為 NaN。
+    window＝3：第 0、1 列窗未滿；第 5 列窗 (0.5, 0, -1.06e-14) 之非零中位數≈0.25 ⇒ 門檻≈2.5e-7 ⇒ 噪音遮掉。"""
+    s = pd.Series([30.0, 50.0, 20.0, 0.5, 0.0, -1.06e-14, 0.3])
+    out = safe_denominator(s, window=3)
+    assert np.isnan(out.iloc[0]) and np.isnan(out.iloc[1])  # 窗未滿（fail-closed）
+    assert np.isnan(out.iloc[4])  # exact 0
+    assert np.isnan(out.iloc[5])  # 1e-14 float noise
     # genuine small/large values preserved
-    for i in (0, 1, 4, 5, 6):
+    for i in (2, 3, 6):
         assert out.iloc[i] == s.iloc[i]
 
 
@@ -49,20 +52,22 @@ def test_safe_denominator_prevents_momentum_explosion():
 def test_safe_denominator_scale_invariant():
     """A genuinely tiny-scale column keeps its tiny values (threshold scales down)."""
     s = pd.Series([1e-8, 2e-8, 3e-8, 5e-9, 1e-8])  # all genuine, scale ~1e-8
-    out = safe_denominator(s)
-    # none are float-noise relative to a 1e-8 scale → all preserved
-    assert out.notna().all()
+    out = safe_denominator(s, window=3)
+    # none are float-noise relative to a 1e-8 scale → all preserved（窗滿後；v53 因果窗）
+    assert out.iloc[:2].isna().all()
+    assert out.iloc[2:].notna().all()
 
 
 def test_safe_denominator_dataframe_per_column():
-    """DataFrame path applies the threshold per-column."""
+    """DataFrame path applies the threshold per-column（v53：各欄各自之因果窗）。"""
     df = pd.DataFrame({
-        "osc": [30.0, 0.0, -1e-14, 50.0],     # scale ~40 → 1e-14 nulled
-        "tiny": [1e-8, 2e-8, 3e-8, 4e-8],      # scale ~2.5e-8 → all kept
+        "osc": [30.0, 50.0, 40.0, 0.0, -1e-14],   # 第 4 列窗 (40, 0, -1e-14) 非零中位數≈20 ⇒ 1e-14 遮掉
+        "tiny": [1e-8, 2e-8, 3e-8, 4e-8, 5e-8],    # scale ~3e-8 → all kept
     })
-    out = safe_denominator(df)
-    assert np.isnan(out.loc[1, "osc"]) and np.isnan(out.loc[2, "osc"])
-    assert out["tiny"].notna().all()
+    out = safe_denominator(df, window=3)
+    assert np.isnan(out.loc[3, "osc"]) and np.isnan(out.loc[4, "osc"])
+    assert out.loc[2, "osc"] == 40.0
+    assert out["tiny"].iloc[2:].notna().all()
 
 
 def test_safe_denominator_rel_eps_zero_is_exact_only():

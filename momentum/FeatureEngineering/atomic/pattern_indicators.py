@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering.atomic import l1_output_points as l1op
+from momentum.FeatureEngineering.atomic import warmup_lookup
 from momentum.FeatureEngineering.atomic.compute_guard import guard_indicator_compute, resolve_fail_open
 from momentum.FeatureEngineering.atomic.talib_wrapper import TALibWrapper
 
@@ -46,8 +48,30 @@ class PatternIndicatorEngine:
         freq_df = self.compute_pattern_frequency(pattern_df)
         consensus = self.compute_pattern_consensus(pattern_df)
         consensus_df = pd.DataFrame({"ohlc_pattern_Consensus": consensus}, index=data.index)
+        freq_df, consensus_df = self._mask_derived(data, pattern_df, freq_df, consensus_df)
 
         return pd.concat([pattern_df, freq_df, consensus_df], axis=1)
+
+    @staticmethod
+    def _mask_derived(data: pd.DataFrame, pattern_df: pd.DataFrame, freq_df: pd.DataFrame,
+                      consensus_df: pd.DataFrame) -> tuple:
+        """FF-STAT Task 2.3（SPEC §C v39）：同引擎衍生輸出之 L1 輸出點——frequency（窗型）K＝上游 raw K＋window−1、
+        Consensus（逐點聚合）K＝上游 raw K 之最大者；上游＝全部 raw CDL 欄（各欄 K 取表內 ``CDL_PATTERN`` 條目）。"""
+        upstream = tuple(str(c) for c in pattern_df.columns)
+        upstream_k = {c: warmup_lookup.get_pattern_default_bars() for c in upstream}
+        origin = l1op.origin_of([data[c].to_numpy(dtype=float) for c in ("open", "high", "low", "close")])
+        freq = {}
+        for column in freq_df.columns:
+            window = int(str(column).rsplit("_W", 1)[1])
+            freq[column] = l1op.mask_output("pattern", warmup_lookup.PATTERN_ENTRY, str(column), freq_df[column].to_numpy(),
+                                            {"window": window}, origin=origin, upstream=upstream, window=window,
+                                            upstream_k=upstream_k)[0]
+        consensus = {
+            column: l1op.mask_output("pattern", warmup_lookup.PATTERN_ENTRY, str(column), consensus_df[column].to_numpy(),
+                                     {}, origin=origin, upstream=upstream, upstream_k=upstream_k)[0]
+            for column in consensus_df.columns
+        }
+        return (pd.DataFrame(freq, index=freq_df.index), pd.DataFrame(consensus, index=consensus_df.index))
 
     def compute_pattern_frequency(
         self,
