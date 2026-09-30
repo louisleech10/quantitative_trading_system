@@ -212,3 +212,24 @@ def test_infinite_values_in_eval_window_never_pass() -> None:
     assert v.scale_normalized_error(np.array([1.0, 1.0, 2.0]), gt, False) == np.inf
     assert v.scale_normalized_error(np.array([1.0, -np.inf]), np.array([1.0, 2.0]), False) == np.inf
     assert v.scale_normalized_error(np.array([1.0, 2.0]), np.array([1.0, 2.0]), False) == 0.0
+
+
+def test_resume_refuses_partial_log_with_other_market(tmp_path: Path) -> None:
+    """b5 審碼 r1 codex P1-02：續跑檔沿用與正式合併同一判準核對——同腳本、同任務改 `--market` 即不沿用舊紀錄
+    （改前鍵不含市場、讀取不核對 criteria，改市場仍 reused 並被本次 metadata 重標）；同市場重跑則沿用。"""
+    log = tmp_path / "partial.jsonl"
+    env = dict(os.environ, PYTHONPATH=str(ROOT))
+
+    def run(market: str) -> str:
+        cmd = [sys.executable, str(SCRIPT), "--symbols", "BTCUSDT", "--timeframes", "1d", "--only", "RSI",
+               "--eval-positions", "2", "--workers", "1", "--partial-log", str(log), "--no-write",
+               "--market", market]
+        proc = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
+        assert proc.returncode == 0, proc.stdout[-800:] + proc.stderr[-800:]
+        return proc.stdout
+
+    run("crypto")
+    assert log.exists() and log.read_text(encoding="utf-8").strip()
+    assert "[resume] reused 1/1" in run("crypto")
+    other = run("tw_stock")
+    assert "[resume] reused 0/1" in other, other[-800:]

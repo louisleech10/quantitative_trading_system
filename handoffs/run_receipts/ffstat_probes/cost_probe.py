@@ -41,11 +41,10 @@ LONGHIST_DIR = "data_cache/feature_klines_longhist"
 # 逐週期之資料來源與輸出窗（b5；見模組說明）
 WINDOWS = {"1h": (KLINE_DIR, "2025-10-01", "2025-12-31"), "12h": (LONGHIST_DIR, "2024-01-01", "2025-12-31")}
 BEFORE_COMMIT = "5a148b8e"  # FF-STAT 生產碼改動前（SPEC v49「改前原始碼」同一 commit）
-ADF_ALPHA = 0.05
 LATE_MIN_VALUES = 100  # 後段有限值少於此數之欄不計入後段一致率
 
 
-STAGES = ("calibration", "handoff", "public")
+STAGES = ("calibration", "handoff", "public_warmup", "public")  # public_warmup：公開域預熱探測（b5 審碼 r1 codex P2-04）
 SAMPLE_INTERVAL_S = 0.05  # 每筆取樣完成後之睡眠秒數；實際起點間隔＝取樣耗時＋此值，逐 run 實測最大值記 max_sample_gap_seconds
 
 
@@ -179,11 +178,13 @@ def child(symbol: str, timeframe: str, n: int, mode: str, kline_dir: str, start:
     real_window = FeatureFactory._resolve_public_window
 
     def _window(self, *a, **k):
+        sampler.stage = "public_warmup"
         t = time.perf_counter()
         try:
             return real_window(self, *a, **k)
         finally:
             timers["public_warmup"] += time.perf_counter() - t
+            sampler.stage = "public"
 
     FeatureFactory._resolve_public_window = _window
 
@@ -245,20 +246,24 @@ def child(symbol: str, timeframe: str, n: int, mode: str, kline_dir: str, start:
         result = factory.generate_features(symbol, timeframe, config_override=payload, force_regenerate=True,
                                            start_date=start, end_date=end, persist=True)
     total = time.perf_counter() - t0
+    kernel = kernel_peaks()  # 生成一結束即取（其後之後段 ADF 讀檔不計入）
     import tempfile
 
     leftover = len(list(Path(tempfile.gettempdir()).glob(CONTRACT["calibration_tmp_prefix"] + "*")))
     dec = h.decisions(result) if mode != "off" else {}
     doubling = (result.metadata or {}).get("warmup_doubling") or {}
+    alpha = effective_alpha(payload) if mode != "off" else None
     late = {} if mode == "off" else late_agreement(
-        dec, h.base_column_values(root / "features", list(dec)), lambda v: real_adf(v, sample_size=len(v)))
+        dec, h.base_column_values(root / "features", list(dec)), lambda v: real_adf(v, sample_size=len(v)), alpha)
     print("RESULT " + json.dumps({
         "seconds_total": round(total, 2), "seconds_calibration": round(timers["calibration"], 2),
         "seconds_adf": round(timers["adf"], 2), "seconds_dstar": round(timers["dstar"], 2),
         "seconds_public_warmup": round(timers["public_warmup"], 2),
         "warmup_doublings": doubling.get("doublings"), "warmup_depth_bars": doubling.get("depth_bars"),
+        **domain_overlap(dec, doubling, start, timeframe),
         **peaks_for_result(sampler.peaks),
         "workers_submitted": handoff["submitted"],
+        **kernel,
         "calibration_tmp_leftover": leftover,
         **late,
         "decisions": {c: [bool(d["fracdiff"]), int(d["adf_differenced"] or 0)] for c, d in dec.items()},
@@ -274,10 +279,49 @@ def build_payload(h, timeframe: str, n: int, mode: str) -> dict:
     return payload
 
 
-def late_agreement(dec: dict, late_values: dict, adf_pvalue) -> dict:
-    """校準判定對獨立後段之一致率（SPEC v41）。校準判定＝決策 `adf_pvalue`>α（無 p 值之欄不計）；後段判定＝
-    公開輸出該基礎欄之有限值以 `adf_pvalue`（生產核心、全長）檢定 >α；後段有限值 < LATE_MIN_VALUES 之欄不計。
-    回傳一致率、危險方向比例（校準判平穩而後段不平穩；此方向不處理非平穩欄）、計入欄數與略過欄數。"""
+def effective_alpha(payload: dict) -> float:
+    """該次生成實際用之 ADF 門檻（合併設定後；生產以 `pvalue > adf_threshold` 判不平穩）。fracdiff 與 ADF 差分
+    兩段門檻不同即拋錯（一致率之校準端無單一判準；b5 審碼 r1 codex P1-01：改前寫死 0.05，有效值為 0.10）。"""
+    from momentum.FeatureEngineering.config_manager import ConfigManager
+
+    pre = ConfigManager().get_merged_config(payload).preprocessing
+    a, b = float(pre.adf_differencing.adf_threshold), float(pre.fractional_differencing.adf_threshold)
+    if a != b:
+        raise ValueError(f"ADF 差分門檻 {a} ≠ fracdiff 門檻 {b}")
+    return a
+
+
+def domain_overlap(dec: dict, doubling: dict, start: str, timeframe: str) -> dict:
+    """兩域區間（SPEC v32「兩域重疊」）：校準域取各欄決策之校準起訖之聯集範圍，公開域預熱取
+    `[warmup_doubling.final_ingest_start, 起始日)`；重疊＝兩者交集，根數以週期長度換算（不扣資料缺口）。
+    兩域依序計算（校準域先、釋放後才算公開域），故無同時存活之峰值，峰值見各自階段（calibration／public_warmup）。"""
+    import pandas as pd
+
+    def ts(x):  # 無時區者依本專案 K 線時間戳之儲存慣例視為 UTC；有時區者換算至 UTC
+        t = pd.Timestamp(x)
+        return t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+
+    cal = [(d.get("calibration_start"), d.get("calibration_end")) for d in dec.values()]
+    cal = [(ts(a), ts(b)) for a, b in cal if a and b]
+    ingest = doubling.get("final_ingest_start")
+    out = {"calibration_range": None, "public_warmup_range": None, "domain_overlap_bars": None}
+    if ingest:
+        w0, w1 = ts(ingest), ts(start)
+        out["public_warmup_range"] = [str(w0), str(w1)]
+    if cal:
+        c0, c1 = min(a for a, _ in cal), max(b for _, b in cal)
+        out["calibration_range"] = [str(c0), str(c1)]
+        if ingest:
+            lo, hi = max(c0, w0), min(c1, w1)
+            out["domain_overlap_bars"] = max(0, int((hi - lo) / pd.Timedelta(timeframe))) if hi > lo else 0
+    return out
+
+
+def late_agreement(dec: dict, late_values: dict, adf_pvalue, alpha: float) -> dict:
+    """校準判定對獨立後段之一致率（SPEC v41）。校準判定＝決策 `adf_pvalue`>`alpha`（`alpha`＝該次生成之有效門檻，
+    與生產判定同式；無 p 值之欄不計）；後段判定＝公開輸出該基礎欄之有限值以 `adf_pvalue`（生產核心、全長）檢定
+    >`alpha`；後段有限值 < LATE_MIN_VALUES 之欄不計。回傳一致率、危險方向比例（校準判平穩而後段不平穩；此方向
+    不處理非平穩欄）、計入欄數、略過欄數與所用門檻。"""
     import numpy as np
 
     agree = danger = counted = skipped = 0
@@ -292,12 +336,12 @@ def late_agreement(dec: dict, late_values: dict, adf_pvalue) -> dict:
         if finite.size < LATE_MIN_VALUES:
             skipped += 1
             continue
-        cal_nonstat = float(p_cal) > ADF_ALPHA
-        late_nonstat = float(adf_pvalue(finite)) > ADF_ALPHA
+        cal_nonstat = float(p_cal) > alpha
+        late_nonstat = float(adf_pvalue(finite)) > alpha
         counted += 1
         agree += cal_nonstat == late_nonstat
         danger += (not cal_nonstat) and late_nonstat
-    return {"late_columns_counted": counted, "late_columns_skipped": skipped,
+    return {"late_columns_counted": counted, "late_columns_skipped": skipped, "late_alpha": alpha,
             "agreement_vs_late": None if not counted else round(agree / counted, 4),
             "danger_rate_vs_late": None if not counted else round(danger / counted, 4)}
 
@@ -342,7 +386,22 @@ def child_before(worktree: str, payload_file: str, symbol: str, timeframe: str, 
         factory.generate_features(symbol, timeframe, config_override=payload, force_regenerate=True,
                                   start_date=start, end_date=end, persist=True)
     total = time.perf_counter() - t0
-    print("RESULT " + json.dumps({"seconds_total": round(total, 2), **peaks_for_result(sampler.peaks)}))
+    print("RESULT " + json.dumps({"seconds_total": round(total, 2), **peaks_for_result(sampler.peaks),
+                                  **kernel_peaks(), "workers_submitted": 0}))
+
+
+def kernel_peaks() -> dict:
+    """核心記錄之最高 RSS（`getrusage`；無取樣間隔）：本程序自啟動以來、已結束子程序之單一最大者。
+    用以核對取樣器是否漏峰值（取樣執行緒於持 GIL 之計算期間無法取樣，實測間隔可達數秒）。macOS 單位為位元組、
+    Linux 為 KiB。"""
+    import resource
+
+    unit = 1 if sys.platform == "darwin" else 1024
+    return {"kernel_max_rss_self_bytes": int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) * unit,
+            "kernel_max_rss_children_bytes": int(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss) * unit}
+
+
+SAMPLING_MISS_TOLERANCE = 1.10  # 單程序 run：核心最高 RSS 超過取樣最高 RSS 之 10% 即判取樣漏峰值
 
 
 def peaks_for_result(peaks: dict) -> dict:
@@ -367,6 +426,25 @@ def verdict(rows: list, tier: dict) -> list:
                 f"{' before=' + r['commit'] if r.get('commit') else ''}" for r in rows if r.get("rc") != 0]
     problems += [f"tmp leftover: {r.get('symbol')} {r.get('timeframe')} N={r.get('n')}"
                  for r in rows if r.get("calibration_tmp_leftover")]
+    # b5 審碼 r1 codex P1-03：每列（開／關平穩化、改前）皆驗取樣完整與其適用階段之判定峰值——開平穩化（新版）須有
+    # 校準、公開域預熱、公開；關平穩化須有公開域預熱、公開；改前（無校準域與預熱）須有公開
+    for r in rows:
+        if r.get("rc") != 0:
+            continue
+        label = f"{r.get('symbol')} {r.get('timeframe')} N={r.get('n')} mode={r.get('mode', 'on')}" \
+                f"{' before=' + r['commit'] if r.get('commit') else ''}"
+        if r.get("samples_incomplete"):
+            problems.append(f"sampling incomplete: {label}")
+        need = ("public",) if r.get("commit") else \
+            ("public_warmup", "public") if r.get("mode") == "off" else ("calibration", "public_warmup", "public")
+        problems += [f"missing {s} peak: {label}" for s in need if f"peak_judged_{s}_bytes" not in r]
+        # 取樣漏峰值核對（單程序 run 才可比：核心值為單一程序、取樣值為本程序＋子程序合計）
+        sampled = max((v for k, v in r.items() if k.startswith("peak_rss_") and k.endswith("_bytes")), default=0)
+        kernel = r.get("kernel_max_rss_self_bytes")
+        if kernel is None:
+            problems.append(f"missing kernel peak: {label}")
+        elif r.get("workers_submitted") == 0 and kernel > SAMPLING_MISS_TOLERANCE * sampled:
+            problems.append(f"sampling missed peak: {label} kernel={kernel} sampled={sampled}")
     limit = CONTRACT["min_memory_tier_gb"] * GIB
     if tier.get("rc") != 0:
         problems.append("tier run failed")

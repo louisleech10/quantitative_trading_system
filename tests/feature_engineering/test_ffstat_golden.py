@@ -452,7 +452,10 @@ def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
     之 USS 合計峰值 9 GiB 且 rc=0 ⇒ 失敗；tier run 缺交接階段峰值 ⇒ 失敗；RSS 合計超過而 USS 未超過 ⇒ 不失敗
     （共享頁不重計）；暫存殘留 ⇒ 失敗；皆正常 ⇒ 通過。"""
     probe = _cost_probe()
-    ok_row = {"symbol": "BTCUSDT", "timeframe": "1h", "n": 500, "rc": 0, "calibration_tmp_leftover": 0}
+    ok_row = {"symbol": "BTCUSDT", "timeframe": "1h", "n": 500, "rc": 0, "calibration_tmp_leftover": 0,
+              **{f"peak_judged_{s}_bytes": probe.GIB for s in ("calibration", "public_warmup", "public")},
+              "peak_rss_public_bytes": 2 * probe.GIB, "kernel_max_rss_self_bytes": 2 * probe.GIB,
+              "workers_submitted": 0}
     ok_tier = {"rc": 0, **{f"peak_{m}_{s}_bytes": 3 * probe.GIB for m in ("rss", "uss", "judged")
                            for s in probe.STAGES}}
     assert probe.verdict([ok_row], ok_tier) == []
@@ -470,6 +473,27 @@ def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
     before_fail = probe.verdict([{"symbol": "BTCUSDT", "timeframe": "1h", "mode": "on", "commit": "5a148b8e",
                                   "rc": 1}], ok_tier)
     assert before_fail and "before=5a148b8e" in before_fail[0]
+    # b5 審碼 r1 codex P1-03：每列皆驗取樣完整與適用階段之判定峰值（改前只須公開；關平穩化須預熱＋公開）
+    before_ok = {"symbol": "BTCUSDT", "timeframe": "1h", "mode": "on", "commit": "5a148b8e", "rc": 0,
+                 "peak_judged_public_bytes": probe.GIB, "peak_rss_public_bytes": probe.GIB,
+                 "kernel_max_rss_self_bytes": probe.GIB, "workers_submitted": 0}
+    off_ok = {"symbol": "BTCUSDT", "timeframe": "1h", "mode": "off", "rc": 0,
+              "peak_judged_public_warmup_bytes": probe.GIB, "peak_judged_public_bytes": probe.GIB,
+              "peak_rss_public_bytes": probe.GIB, "kernel_max_rss_self_bytes": probe.GIB, "workers_submitted": 0}
+    assert probe.verdict([ok_row, before_ok, off_ok], ok_tier) == []
+    for row in (ok_row, before_ok, off_ok):
+        assert probe.verdict([{**row, "samples_incomplete": 1}], ok_tier), row
+        assert probe.verdict([{k: v for k, v in row.items() if k != "peak_judged_public_bytes"}], ok_tier), row
+    assert probe.verdict([{k: v for k, v in off_ok.items() if k != "peak_judged_public_warmup_bytes"}], ok_tier)
+    assert probe.verdict([{k: v for k, v in ok_row.items() if k != "peak_judged_calibration_bytes"}], ok_tier)
+    # 取樣漏峰值（核心最高 RSS 由 getrusage 取、無取樣間隔）：單程序 run 超過取樣最高 RSS 之 10% ⇒ 失敗；
+    # 10% 內不判；有子程序之 run 不比（核心值為單一程序）；缺核心值 ⇒ 失敗
+    gib = probe.GIB
+    assert probe.verdict([{**before_ok, "kernel_max_rss_self_bytes": int(1.2 * gib)}], ok_tier)
+    assert probe.verdict([{**before_ok, "kernel_max_rss_self_bytes": int(1.05 * gib)}], ok_tier) == []
+    assert probe.verdict([{**before_ok, "kernel_max_rss_self_bytes": int(1.2 * gib), "workers_submitted": 2}],
+                         ok_tier) == []
+    assert probe.verdict([{k: v for k, v in off_ok.items() if k != "kernel_max_rss_self_bytes"}], ok_tier)
 
 
 def test_cost_probe_late_agreement_counts_and_danger() -> None:
@@ -483,16 +507,17 @@ def test_cost_probe_late_agreement_counts_and_danger() -> None:
     nonstat, stat = np.full(m, 1.0), np.full(m, 0.0)  # 假 ADF：均值 1 ⇒ p=0.9（不平穩）、均值 0 ⇒ p=0.01
     fake = lambda v: 0.9 if float(np.mean(v)) > 0.5 else 0.01  # noqa: E731
     dec = {"agree_ns": {"adf_pvalue": 0.2}, "agree_s": {"adf_pvalue": 0.01}, "danger": {"adf_pvalue": 0.01},
-           "danger2": {"adf_pvalue": 0.04},
+           "danger2": {"adf_pvalue": 0.07},  # 介於 0.05 與有效門檻 0.10 之間（審碼 r1 codex P1-01）
            "miss": {"adf_pvalue": 0.5}, "nop": {"adf_pvalue": None}, "short": {"adf_pvalue": 0.5},
            "nan_padded": {"adf_pvalue": 0.01}}
     late = {"agree_ns": nonstat, "agree_s": stat, "danger": nonstat, "danger2": nonstat, "miss": stat, "nop": stat,
             "short": np.full(m - 1, 1.0), "nan_padded": np.concatenate([np.full(50, np.nan), stat[: m - 10]])}
-    got = probe.late_agreement(dec, late, fake)
+    got = probe.late_agreement(dec, late, fake, 0.10)
     assert got["late_columns_counted"] == 5 and got["late_columns_skipped"] == 3, got
     assert got["agreement_vs_late"] == round(2 / 5, 4), got
     assert got["danger_rate_vs_late"] == round(2 / 5, 4), got  # 兩個危險方向、一個反方向（miss）：方向寫反即紅
-    assert probe.late_agreement({}, {}, fake)["agreement_vs_late"] is None
+    assert got["late_alpha"] == 0.10
+    assert probe.late_agreement({}, {}, fake, 0.10)["agreement_vs_late"] is None
 
 
 def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:
@@ -620,3 +645,19 @@ def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:
     finally:
         real.kill()
         real.wait()
+
+
+def test_cost_probe_domain_overlap_mixed_timezones() -> None:
+    """b5 審碼 r1 codex P2-04：兩域區間與重疊根數——校準起訖（決策，可能無時區）與公開域預熱起點（可能有時區）
+    混合時不得拋錯；重疊＝交集換算週期根數；無交集＝0；無預熱紀錄或無校準紀錄 ⇒ 重疊為 None。"""
+    probe = _cost_probe()
+    dec = {"a": {"calibration_start": "2025-06-01 00:00:00", "calibration_end": "2025-09-30 23:00:00"},
+           "b": {"calibration_start": "2025-05-01 00:00:00+00:00", "calibration_end": "2025-09-01 00:00:00+00:00"},
+           "c": {"calibration_start": None, "calibration_end": None}}
+    got = probe.domain_overlap(dec, {"final_ingest_start": "2025-09-01 00:00:00+00:00"}, "2025-10-01", "1h")
+    assert got["calibration_range"][0].startswith("2025-05-01") and got["calibration_range"][1].startswith("2025-09-30")
+    assert got["domain_overlap_bars"] == 29 * 24 + 23  # 2025-09-01 00:00 至 2025-09-30 23:00
+    none = probe.domain_overlap(dec, {"final_ingest_start": "2025-09-30 23:00:00"}, "2025-10-01", "1h")
+    assert none["domain_overlap_bars"] == 0
+    assert probe.domain_overlap(dec, {}, "2025-10-01", "1h")["domain_overlap_bars"] is None
+    assert probe.domain_overlap({}, {"final_ingest_start": "2025-09-01"}, "2025-10-01", "1h")["domain_overlap_bars"] is None

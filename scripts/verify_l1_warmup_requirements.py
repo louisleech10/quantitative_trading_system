@@ -894,13 +894,22 @@ def run(symbols: Sequence[str], timeframes: Sequence[str], eval_window: int, thr
 
     def task_key(t: Tuple[Any, ...]) -> str:
         payload = [script_sha, t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[8],
-                   json.dumps(t[7], sort_keys=True, default=str) if t[7] else None]
+                   json.dumps(t[7], sort_keys=True, default=str) if t[7] else None, market]
         return hashlib.sha256(json.dumps(payload, default=str).encode()).hexdigest()
 
+    # b5 審碼 r1 codex P1-02：續跑沿用與正式合併同一判準核對——紀錄之 criteria 須與本次全等（缺或不符不沿用），
+    # 且鍵含市場（改市場即不同鍵）
+    criteria = measurement_criteria(threshold, eval_window, positions, market)
     if partial_log is not None and partial_log.exists():
+        refused = 0
         for line in partial_log.read_text(encoding="utf-8").splitlines():
             rec = json.loads(line)
+            if rec.get("criteria") != criteria:
+                refused += 1
+                continue
             done_rows[rec["key"]] = rec["rows"]
+        if refused:
+            print(f"[resume] 判準不符或無從核對之續跑紀錄 {refused} 筆不沿用", flush=True)
     pending = []
     for t in tasks:
         if task_key(t) in done_rows:
