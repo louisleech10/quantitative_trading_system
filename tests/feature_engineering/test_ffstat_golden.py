@@ -275,6 +275,37 @@ def test_mutation_dual_start_column_set_is_caught(mutator: Any, tmp_path: Path,
     assert any(k.startswith("column_set:") for k in report["violations"])  # v53：未記原因之集合差異即違規
 
 
+def _drop_rsi14_public_column(root: Path) -> None:
+    """刪 B′ 已落盤之第一個 `_RSI_14` 公開欄（1d 小設定下其 L1 上游於 B′ 有效列 > 0 而 < 500）。"""
+    import pyarrow.parquet as pq
+
+    for p in sorted(root.rglob("*.parquet")):
+        if p.name == "timestamps.parquet":
+            continue
+        table = pq.read_table(p)
+        names = [n for n in table.column_names if n.endswith("_RSI_14")]
+        if names:
+            if len(table.column_names) == 1:
+                p.unlink()
+            else:
+                pq.write_table(table.drop([names[0]]), p)
+            return
+    raise AssertionError("B′ 無 _RSI_14 欄")
+
+
+def test_mutation_dual_start_1d_generated_column_missing_is_caught(tmp_path: Path,
+                                                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """§G⑦ 逐欄資格（b5；b4 評測 gpt-6.1-sol 反例）：B′ 已生成而遺失之欄不得以「上游有效列不足」開脫——只有上游
+    於 B′ 全無有效值才證明其不可能有值。真實 BTC 1d（長歷史，B′ 約 604 列、RSI 14 上游有效約 468 列）刪 B′ 之
+    RSI 14 公開欄 ⇒ 必有該欄之 column_set 違規（改前：記為 column_ineligible、violations 空）。"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    report = h.dual_start_report(tmp_path, "1d", _small_dual_start_payload(),
+                                 str(_REPO / "data_cache/feature_klines_longhist"), b_mutator=_drop_rsi14_public_column)
+    missing = [k for k in report["violations"] if k.startswith("column_set:") and k.endswith("_RSI_14")]
+    assert missing, (report["violations"], {k: v for k, v in report["column_set_explained"].items()
+                                            if k.endswith("_RSI_14")})
+
+
 def _small_no_winsor_payload() -> Dict[str, Any]:
     """小設定關縮尾：縮尾之完整窗遮罩（251 列）涵蓋第④類之開頭段（RSI 14 之 K 遠小於 251），開縮尾時「第④類不遮」
     於最終輸出不可觀測 ⇒ 第④類 mutant 以關縮尾之同一小設定驗（主委實跑 2026-09-28：開縮尾時該 mutant 恆綠）。"""
@@ -433,6 +464,35 @@ def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
     assert probe.verdict([ok_row], {**ok_tier, "samples_incomplete": 1})
     assert probe.verdict([{**ok_row, "calibration_tmp_leftover": 1}], ok_tier)
     assert probe.verdict([{**ok_row, "rc": 1}], ok_tier)
+    # b5：平穩化關閉列與改前列失敗亦判失敗（且標出模式與改前 commit）
+    off_fail = probe.verdict([ok_row, {"symbol": "BTCUSDT", "timeframe": "12h", "mode": "off", "rc": 1}], ok_tier)
+    assert off_fail and "mode=off" in off_fail[0]
+    before_fail = probe.verdict([{"symbol": "BTCUSDT", "timeframe": "1h", "mode": "on", "commit": "5a148b8e",
+                                  "rc": 1}], ok_tier)
+    assert before_fail and "before=5a148b8e" in before_fail[0]
+
+
+def test_cost_probe_late_agreement_counts_and_danger() -> None:
+    """Task 4.1 v41（b5）：對獨立後段之一致率——校準判定取決策 `adf_pvalue`>0.05、後段取傳入之 ADF 函式 >0.05；
+    危險方向＝校準判平穩而後段不平穩；無 p 值、無後段值、後段有限值不足 LATE_MIN_VALUES 之欄略過（不計入分母）；
+    後段只以有限值計數與檢定（總長足而有限值不足者略過）。以假 ADF（依序列均值定 p）驗四種組合。"""
+    import numpy as np
+
+    probe = _cost_probe()
+    m = probe.LATE_MIN_VALUES
+    nonstat, stat = np.full(m, 1.0), np.full(m, 0.0)  # 假 ADF：均值 1 ⇒ p=0.9（不平穩）、均值 0 ⇒ p=0.01
+    fake = lambda v: 0.9 if float(np.mean(v)) > 0.5 else 0.01  # noqa: E731
+    dec = {"agree_ns": {"adf_pvalue": 0.2}, "agree_s": {"adf_pvalue": 0.01}, "danger": {"adf_pvalue": 0.01},
+           "danger2": {"adf_pvalue": 0.04},
+           "miss": {"adf_pvalue": 0.5}, "nop": {"adf_pvalue": None}, "short": {"adf_pvalue": 0.5},
+           "nan_padded": {"adf_pvalue": 0.01}}
+    late = {"agree_ns": nonstat, "agree_s": stat, "danger": nonstat, "danger2": nonstat, "miss": stat, "nop": stat,
+            "short": np.full(m - 1, 1.0), "nan_padded": np.concatenate([np.full(50, np.nan), stat[: m - 10]])}
+    got = probe.late_agreement(dec, late, fake)
+    assert got["late_columns_counted"] == 5 and got["late_columns_skipped"] == 3, got
+    assert got["agreement_vs_late"] == round(2 / 5, 4), got
+    assert got["danger_rate_vs_late"] == round(2 / 5, 4), got  # 兩個危險方向、一個反方向（miss）：方向寫反即紅
+    assert probe.late_agreement({}, {}, fake)["agreement_vs_late"] is None
 
 
 def test_cost_probe_sampler_counts_child_when_uss_denied() -> None:

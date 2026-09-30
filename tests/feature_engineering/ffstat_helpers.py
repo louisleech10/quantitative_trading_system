@@ -800,7 +800,9 @@ def dual_start_report(tmp_path: Path, timeframe: str, payload: Dict[str, Any], s
         entry = spy_absent.dropped.get(name)
         if absent == "b":
             # v55：B′ 內可驗之有效列 < min_overlap ⇒ 逐欄 blocked（非違規）。證據須機械：①過濾點紀錄之 B′ 首個
-            # 有效列 ⇒ 有效列＝n_b−首列；②未生成（無紀錄）⇒ 其 L1 上游於 B′ 遮罩後有效列數。證明不了即落回下方判定。
+            # 有效列 ⇒ 有效列＝n_b−首列；②未生成（無紀錄）⇒ 只於其 L1 上游於 B′ 遮罩後**全無有效值**時成立（上游全 NaN
+            # ⇒ 該欄於 B′ 不可能有值）；上游有效列 > 0 不能證明缺席正當（B′ 已生成而遺失之欄會被開脫；b4 評測
+            # gpt-6.1-sol 反例：1d 刪 B′ 已落盤之 RSI_14 欄，上游 468 列即被放過），落回下方判定。
             valid_b: Optional[int] = None
             evidence = ""
             if entry is not None:
@@ -810,7 +812,7 @@ def dual_start_report(tmp_path: Path, timeframe: str, payload: Dict[str, Any], s
                 evidence = "valid_rows_at_drop_site"
             elif not recorded:
                 up = upstream_l1(name)
-                if up is not None:
+                if up is not None and b_l1_valid[up] == 0:
                     valid_b = b_l1_valid[up]
                     evidence = f"upstream_l1:{up}"
             if valid_b is not None and valid_b < min_overlap:

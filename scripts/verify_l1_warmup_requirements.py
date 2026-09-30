@@ -796,6 +796,31 @@ class TaskBudgetExceeded(RuntimeError):
         return (TaskBudgetExceeded, (str(self), self.context))
 
 
+class MergeCriteriaMismatch(RuntimeError):
+    """正式合併之輸入量測判準（容差、評估窗、評估位置、市場）與本次參數不同或無從核對（b5；b4 評測 gpt-6.1-sol
+    反例：合併不重量卻以 CLI `--threshold 0.0001` 把 0.005 之收據重標為較嚴容差且 exit 0）。"""
+
+    def __init__(self, mismatches: List[str]):
+        super().__init__("; ".join(mismatches[:20]))
+        self.mismatches = list(mismatches)
+
+
+def measurement_criteria(threshold: float, eval_window: int, positions: int, market: str) -> Dict[str, Any]:
+    """量測判準（收據 meta 與續跑檔每筆共用之正規形）：合併只接受與本次完全相同者。"""
+    return {"threshold": float(threshold), "eval_window": int(eval_window), "positions": int(positions),
+            "market": str(market)}
+
+
+def _receipt_criteria(meta: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """收據 meta → 量測判準；缺任一鍵或市場非單一 ⇒ None（無從核對）。"""
+    scopes = meta.get("market_scopes")
+    keys = ("scale_normalized_error_threshold", "eval_window_bars", "eval_positions")
+    if any(meta.get(k) is None for k in keys) or not isinstance(scopes, list) or len(scopes) != 1:
+        return None
+    return measurement_criteria(meta["scale_normalized_error_threshold"], meta["eval_window_bars"],
+                                meta["eval_positions"], scopes[0])
+
+
 # 純窗口型：輸出只依固定窗內之值（`rolling(w).apply(f, raw=True)`、f 無跨窗狀態、輸入為報酬或來源欄之局部轉換）⇒
 # 所需預熱＝窗口長度，與起點無關，不做逐起點窮舉（諮詢 r37 三家；五週期三標的多窗量測值皆等於窗口長度）。
 # 具名封閉清單：新條目未列入者一律照窮舉（未知歸帶狀態型）；機械歸類器屬 FFSTORE 接續計算分類（SPEC §N）。
@@ -843,7 +868,7 @@ def preflight_estimate(tasks: Sequence[Tuple[Any, ...]], eval_window: int) -> Li
 def run(symbols: Sequence[str], timeframes: Sequence[str], eval_window: int, threshold: float, cap: int,
         only: Optional[Sequence[str]] = None, positions: int = 1, *, seed_rows: Optional[List[Dict[str, Any]]] = None,
         exhaustive: bool = False, workers: int = 1, partial_log: Optional[Path] = None,
-        max_task_cpu_s: float = 7200.0, max_stall_s: float = 1800.0
+        max_task_cpu_s: float = 7200.0, max_stall_s: float = 1800.0, market: str = "crypto"
         ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     entries = [e for e in build_catalog() if not only or e.name in only]
     seeds: Dict[Tuple[str, str], Dict[str, Any]] = {}
@@ -901,7 +926,8 @@ def run(symbols: Sequence[str], timeframes: Sequence[str], eval_window: int, thr
         finished_tasks.append(label(t))
         if partial_log is not None:
             with open(partial_log, "a", encoding="utf-8") as fh:
-                fh.write(json.dumps({"key": task_key(t), "task": [t[0], t[1], t[2][0]], "rows": got},
+                fh.write(json.dumps({"key": task_key(t), "task": [t[0], t[1], t[2][0]], "rows": got,
+                                    "criteria": measurement_criteria(t[4], t[3], t[6], market)},
                                     default=str) + "\n")
         print(f"[progress] {len(finished_tasks)}/{len(pending)} {label(t)} elapsed={time.time() - started:.0f}s",
               flush=True)
@@ -974,10 +1000,26 @@ def _compact_row(r: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def merge_measurements(receipts: Sequence[Path], partial_logs: Sequence[Path],
-                       partial_timeframes: Sequence[str]) -> List[Dict[str, Any]]:
+                       partial_timeframes: Sequence[str],
+                       criteria: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """正式合併（v55，審查 r39 codex P1-05：表不得依賴外部合併步驟）：多份量測收據＋續跑檔（限列名週期）之列，
     同一實例（指標、參數、來源、週期、標的）有窮舉結果者取窮舉列（窮舉 K ≥ 多窗 K），否則取多窗列；
-    同類多列衝突時取 K 最大者（保守），K 同則取內容序最小者——結果與輸入順序無關（v55，審查 r40 codex P1-02）。"""
+    同類多列衝突時取 K 最大者（保守），K 同則取內容序最小者——結果與輸入順序無關（v55，審查 r40 codex P1-02）。
+    `criteria`（b5）：每份收據之 meta 與續跑檔每筆之 `criteria` 須與之全等，否則拋 `MergeCriteriaMismatch`（不讀列）；
+    無 `criteria` 之續跑檔紀錄（b5 前寫入者）無從核對、一律拒收。"""
+    if criteria is not None:
+        mismatches = []
+        for path in receipts:
+            got = _receipt_criteria(json.loads(Path(path).read_text(encoding="utf-8")).get("meta") or {})
+            if got != criteria:
+                mismatches.append(f"{path}: {got} != {criteria}")
+        for path in partial_logs:
+            for n, line in enumerate(Path(path).read_text(encoding="utf-8").splitlines(), 1):
+                rec = json.loads(line)
+                if rec["task"][0] in set(partial_timeframes) and rec.get("criteria") != criteria:
+                    mismatches.append(f"{path}:{n}: {rec.get('criteria')} != {criteria}")
+        if mismatches:
+            raise MergeCriteriaMismatch(mismatches)
     best: Dict[str, Dict[str, Any]] = {}
 
     def rank(row: Dict[str, Any]) -> Tuple[int, int]:
@@ -1181,8 +1223,16 @@ def main() -> int:
                                                ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
     if args.merge_receipts:
-        rows = merge_measurements(args.merge_receipts, args.merge_partial_logs or [],
-                                  args.merge_partial_timeframes or [])
+        try:
+            rows = merge_measurements(args.merge_receipts, args.merge_partial_logs or [],
+                                      args.merge_partial_timeframes or [],
+                                      criteria=measurement_criteria(args.threshold, args.eval_window,
+                                                                    args.eval_positions, args.market))
+        except MergeCriteriaMismatch as exc:
+            print(f"[FINAL] MERGE_CRITERIA_MISMATCH {len(exc.mismatches)} 份／筆輸入之量測判準與本次參數不同或無從核對；"
+                  "未寫表", flush=True)
+            abort_receipt(6, "merge_criteria_mismatch", {"mismatches": exc.mismatches})
+            return 6
         # v55（審查 r40 codex P1-03）：合併輸入須涵蓋 --symbols × --timeframes 之每一格且每個條目皆有列，否則 fail-closed
         catalog = build_catalog()
         # b4 審碼 r1 codex P1-02：逐 catalog case 之完整鍵（指標、參數、來源）× 週期 × 標的比對，缺任一 case 即 fail-closed
@@ -1206,7 +1256,8 @@ def main() -> int:
             table, rows = run(args.symbols, args.timeframes, args.eval_window, args.threshold, args.max_K_cap,
                               args.only, args.eval_positions, seed_rows=seed_rows, exhaustive=args.exhaustive,
                               workers=args.workers, partial_log=args.partial_log,
-                              max_task_cpu_s=args.max_task_cpu_hours * 3600, max_stall_s=args.max_stall_minutes * 60)
+                              max_task_cpu_s=args.max_task_cpu_hours * 3600, max_stall_s=args.max_stall_minutes * 60,
+                              market=args.market)
         except PreflightRefused as exc:
             print(f"[FINAL] PREFLIGHT_REFUSED {len(exc.refused)} 項預估超過每項上限 {args.max_task_cpu_hours} CPU 小時；"
                   "未計算、未寫表", flush=True)

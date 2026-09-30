@@ -75,10 +75,19 @@ def test_task_budget_exceeded_raises_during_scan() -> None:
 RECEIPT = ROOT / "handoffs" / "run_receipts" / "20260930-ffstat-warmup-measure.json"
 
 
+def _meta() -> dict:
+    """真實量測收據之 meta（判準：容差 0.005、評估窗、評估位置、市場）；合併輸入沿用以通過判準核對（b5）。"""
+    return json.loads(RECEIPT.read_text(encoding="utf-8"))["meta"]
+
+
 def _merge(tmp_path: Path, name: str, receipts: list, *extra: str) -> subprocess.CompletedProcess:
     env = dict(os.environ, PYTHONPATH=str(ROOT))
+    meta = _meta()  # 本次判準取真實收據之值（b5：合併核對判準；`extra` 在後可覆寫，argparse 取最後一個）
+    criteria = ["--eval-window", str(meta["eval_window_bars"]), "--eval-positions", str(meta["eval_positions"]),
+                "--threshold", str(meta["scale_normalized_error_threshold"])]
     cmd = [sys.executable, str(SCRIPT), "--merge-receipts", *[str(p) for p in receipts], "--timeframes", "1d",
-           "--output", str(tmp_path / f"{name}.yaml"), "--receipt", str(tmp_path / f"{name}.json"), *extra]
+           "--output", str(tmp_path / f"{name}.yaml"), "--receipt", str(tmp_path / f"{name}.json"), *criteria,
+           *extra]
     return subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=180)
 
 
@@ -89,8 +98,8 @@ def test_merge_is_order_independent_and_conservative(tmp_path: Path) -> None:
             if r["timeframe"] == "1d" and r["symbol"] == "BTCUSDT"]
     bumped = [dict(r, k=int(r["k"]) + 7) for r in rows if r["indicator"] == "RSI" and r.get("converged")][:3]
     a, b = tmp_path / "a.json", tmp_path / "b.json"
-    a.write_text(json.dumps({"rows": rows}), encoding="utf-8")
-    b.write_text(json.dumps({"rows": bumped}), encoding="utf-8")
+    a.write_text(json.dumps({"meta": _meta(), "rows": rows}), encoding="utf-8")
+    b.write_text(json.dumps({"meta": _meta(), "rows": bumped}), encoding="utf-8")
     p1 = _merge(tmp_path, "ab", [a, b], "--symbols", "BTCUSDT")
     p2 = _merge(tmp_path, "ba", [b, a], "--symbols", "BTCUSDT")
     assert p1.returncode == 0 and p2.returncode == 0, (p1.stdout[-800:], p2.stdout[-800:])
@@ -109,7 +118,7 @@ def test_merge_fails_closed_on_missing_symbol_timeframe(tmp_path: Path) -> None:
     rows = [r for r in json.loads(RECEIPT.read_text(encoding="utf-8"))["rows"]
             if r["timeframe"] == "1d" and r["symbol"] == "BTCUSDT"]
     a = tmp_path / "a.json"
-    a.write_text(json.dumps({"rows": rows}), encoding="utf-8")
+    a.write_text(json.dumps({"meta": _meta(), "rows": rows}), encoding="utf-8")
     proc = _merge(tmp_path, "m", [a], "--symbols", "BTCUSDT", "ETHUSDT")
     assert proc.returncode == 5, proc.stdout[-800:]
     assert not (tmp_path / "m.yaml").exists()
@@ -137,8 +146,42 @@ def test_merge_fails_closed_on_missing_parameter_case(tmp_path: Path) -> None:
             if r["timeframe"] == "1d" and r["symbol"] == "BTCUSDT"
             and not (r["indicator"] == "TR_CVAR" and float((r.get("params") or {}).get("alpha", 0)) == 0.05)]
     a = tmp_path / "a.json"
-    a.write_text(json.dumps({"rows": rows}), encoding="utf-8")
+    a.write_text(json.dumps({"meta": _meta(), "rows": rows}), encoding="utf-8")
     proc = _merge(tmp_path, "m", [a], "--symbols", "BTCUSDT")
     assert proc.returncode == 5, proc.stdout[-800:]
     doc = json.loads((tmp_path / "m.json").read_text(encoding="utf-8"))
     assert doc["missing"] and all("TR_CVAR" in m and "0.05" in m for m in doc["missing"])
+
+
+@pytest.mark.skipif(not RECEIPT.exists(), reason="需要倍數量測收據")
+def test_merge_rejects_criteria_mismatch_and_uncheckable_partial_log(tmp_path: Path) -> None:
+    """b5（b4 評測 gpt-6.1-sol 反例）：合併不重量，故輸入之量測判準須與本次參數全等——①本次 `--threshold 0.0001`
+    而收據為 0.005 ⇒ exit 6、不寫表、收據列不符項；②收據市場與 `--market` 不同 ⇒ exit 6；③收據缺 meta ⇒ exit 6；
+    ④續跑檔紀錄無 `criteria`（無從核對）⇒ exit 6；⑤判準全等（含帶 `criteria` 之續跑檔）⇒ exit 0。"""
+    rows = [r for r in json.loads(RECEIPT.read_text(encoding="utf-8"))["rows"]
+            if r["timeframe"] == "1d" and r["symbol"] == "BTCUSDT"]
+    good, other_market, no_meta = tmp_path / "good.json", tmp_path / "market.json", tmp_path / "nometa.json"
+    good.write_text(json.dumps({"meta": _meta(), "rows": rows}), encoding="utf-8")
+    other_market.write_text(json.dumps({"meta": dict(_meta(), market_scopes=["tw_stock"]), "rows": rows}),
+                            encoding="utf-8")
+    no_meta.write_text(json.dumps({"rows": rows}), encoding="utf-8")
+    cases = {"threshold": ([good], ("--threshold", "0.0001")), "market": ([other_market], ()),
+             "no_meta": ([no_meta], ())}
+    for name, (inputs, extra) in cases.items():
+        proc = _merge(tmp_path, name, inputs, "--symbols", "BTCUSDT", *extra)
+        assert proc.returncode == 6, (name, proc.stdout[-800:])
+        assert not (tmp_path / f"{name}.yaml").exists(), name
+        doc = json.loads((tmp_path / f"{name}.json").read_text(encoding="utf-8"))
+        assert doc["abort"] == "merge_criteria_mismatch" and doc["mismatches"], name
+    crit = {"threshold": float(_meta()["scale_normalized_error_threshold"]), "eval_window": _meta()["eval_window_bars"],
+            "positions": _meta()["eval_positions"], "market": _meta()["market_scopes"][0]}
+    legacy, checked = tmp_path / "legacy.jsonl", tmp_path / "checked.jsonl"
+    legacy.write_text(json.dumps({"key": "k", "task": ["1d", "BTCUSDT", "RSI"], "rows": []}) + "\n", encoding="utf-8")
+    checked.write_text(json.dumps({"key": "k", "task": ["1d", "BTCUSDT", "RSI"], "rows": [],
+                                   "criteria": crit}) + "\n", encoding="utf-8")
+    proc = _merge(tmp_path, "legacy", [good], "--symbols", "BTCUSDT", "--merge-partial-logs", str(legacy),
+                  "--merge-partial-timeframes", "1d")
+    assert proc.returncode == 6, proc.stdout[-800:]
+    proc = _merge(tmp_path, "ok", [good], "--symbols", "BTCUSDT", "--merge-partial-logs", str(checked),
+                  "--merge-partial-timeframes", "1d")
+    assert proc.returncode == 0, proc.stdout[-800:]
