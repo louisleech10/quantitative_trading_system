@@ -17,8 +17,8 @@ FF-STAT Task 2.4（docs/FFSTAT_SPEC.md v32–v45；R4、R5、R9）
   有限而 test 非有限 ⇒ inf（finite guard，v33）。整數輸出（CDL、HT_TRENDMODE）任一不符即不收斂。
 - 可信度：量得 K 須 ≤ eval_start/2（ground truth 自身前史 ≥ 2K），否則該筆記 ``reliable: false``；可信度只作證據欄，
   採用值依 SPEC v47 取「已收斂」量測（含不可信者，其為實測下界）。
-- 採用值：有參數者 ``recommended_factor``＝各週期各標的可信量測之 K/max(period_keys 值) 之最大（無條件進位
-  至 0.01、下限 1.0）；無參數者 ``k``＝可信量測之 K 最大；累積型（OBV、AD）登記而不給係數；由元件組成之
+- 採用值：有參數者 ``recommended_factor``＝各週期各標的已收斂量測之 K/max(period_keys 值) 之最大（無條件進位
+  至 0.01、下限 1.0）；無參數者 ``k``＝已收斂量測之 K 最大；累積型（OBV、AD）登記而不給係數；由元件組成之
   自訂欄（Keltner＝EMA＋ATR 等）之係數不得低於其元件之採用係數。
 - 收據：逐（指標、參數、來源、標的、週期）記量得 K、test／ground truth 有限值數、誤差、可信與否。
 
