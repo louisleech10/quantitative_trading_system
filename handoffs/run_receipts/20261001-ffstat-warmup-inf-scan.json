@@ -1,0 +1,141 @@
+{
+ "spec": "docs/FFSTAT_SPEC.md v57（倍數表 ±inf 判定）",
+ "total_inf_hits": 0,
+ "results": [
+  {
+   "timeframe": "5m",
+   "symbol": "ADAUSDT",
+   "rows": 105260,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 3.2
+  },
+  {
+   "timeframe": "5m",
+   "symbol": "BTCUSDT",
+   "rows": 105260,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 4.9
+  },
+  {
+   "timeframe": "5m",
+   "symbol": "ETHUSDT",
+   "rows": 105260,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 4.9
+  },
+  {
+   "timeframe": "1h",
+   "symbol": "ADAUSDT",
+   "rows": 20352,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.9
+  },
+  {
+   "timeframe": "1h",
+   "symbol": "BTCUSDT",
+   "rows": 20352,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.9
+  },
+  {
+   "timeframe": "1h",
+   "symbol": "ETHUSDT",
+   "rows": 20352,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.9
+  },
+  {
+   "timeframe": "4h",
+   "symbol": "ADAUSDT",
+   "rows": 18513,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.9
+  },
+  {
+   "timeframe": "4h",
+   "symbol": "BTCUSDT",
+   "rows": 19963,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.9
+  },
+  {
+   "timeframe": "4h",
+   "symbol": "ETHUSDT",
+   "rows": 19964,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.9
+  },
+  {
+   "timeframe": "12h",
+   "symbol": "ADAUSDT",
+   "rows": 6171,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.5
+  },
+  {
+   "timeframe": "12h",
+   "symbol": "BTCUSDT",
+   "rows": 6656,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.6
+  },
+  {
+   "timeframe": "12h",
+   "symbol": "ETHUSDT",
+   "rows": 6656,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.6
+  },
+  {
+   "timeframe": "1d",
+   "symbol": "ADAUSDT",
+   "rows": 3086,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.4
+  },
+  {
+   "timeframe": "1d",
+   "symbol": "BTCUSDT",
+   "rows": 3329,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.5
+  },
+  {
+   "timeframe": "1d",
+   "symbol": "ETHUSDT",
+   "rows": 3329,
+   "cases": 1342,
+   "inf_hits": [],
+   "errors": [],
+   "seconds": 0.5
+  }
+ ]
+}

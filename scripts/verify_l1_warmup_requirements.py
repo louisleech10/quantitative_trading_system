@@ -139,6 +139,8 @@ def scale_normalized_error(test: np.ndarray, gt: np.ndarray, integer: bool) -> f
     """
     # FF-STAT v33 finite guard：評估窗內 ground truth 有限而 test 非有限 ⇒ 尚未收斂，誤差為 inf
     # （原以 NaN 遮除後計算，r13 真實 12h 探針顯示 DEMA／TEMA／T3 於 test 尚有 NaN 時被接受）
+    if bool(np.isinf(gt).any() or np.isinf(test).any()):  # b5（評測 luna max 反例）：±inf 不得以 NaN 遮除或被捷徑吞下
+        return np.inf
     if bool((np.isfinite(gt) & ~np.isfinite(test)).any()):
         return np.inf
     mask = ~(np.isnan(gt) | np.isnan(test))
@@ -344,6 +346,8 @@ def verify_exhaustive(case: Case, frame: pd.DataFrame, k: int, eval_window: int,
             if case.integer:
                 worst = max(worst, scale_normalized_error(t, g, True))
                 continue
+            if bool(np.isinf(g).any() or np.isinf(t).any()):  # b5：±inf 未收斂（P75／std 捷徑之前）
+                return float("inf")
             if bool((np.isfinite(g) & ~np.isfinite(t)).any()):
                 return float("inf")
             mask = ~(np.isnan(g) | np.isnan(t))

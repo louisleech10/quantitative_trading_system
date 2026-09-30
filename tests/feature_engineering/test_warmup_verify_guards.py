@@ -185,3 +185,30 @@ def test_merge_rejects_criteria_mismatch_and_uncheckable_partial_log(tmp_path: P
     proc = _merge(tmp_path, "ok", [good], "--symbols", "BTCUSDT", "--merge-partial-logs", str(checked),
                   "--merge-partial-timeframes", "1d")
     assert proc.returncode == 0, proc.stdout[-800:]
+
+
+def test_infinite_values_in_eval_window_never_pass() -> None:
+    """b5（Codex 模型評測 gpt-5.6-luna max 反例）：評估窗內 ground truth 或 test 含 ±inf ⇒ 未收斂——
+    ①`verify_exhaustive`：P75 下界為 0 時，std 捷徑曾以 inf 尺度把誤差上界算成 0 而回報通過；
+    ②`scale_normalized_error`：inf−inf＝NaN 曾經 max 吞掉。兩處皆須回 inf／不通過。
+    mutant 紀錄（主委實跑）：拿掉 ② 之判定即紅；拿掉 `error_at` 內之判定仍綠——捷徑未通過時落回 ②，已由 ② 擋下
+    （等價 mutant；`error_at` 之判定為捷徑前之防線，保留）。"""
+    import numpy as np
+    import pandas as pd
+
+    sys.path.insert(0, str(ROOT))
+    from scripts import verify_l1_warmup_requirements as v
+
+    def fn(frame):
+        if len(frame) == 7:
+            return [np.array([1.0, 1.0, np.inf, 1.0, 1.0, 1.0, 1.0])]
+        return [np.array([np.nan] + [1.0] * (len(frame) - 1))]
+
+    case = v.Case(params={}, fn=fn, integer=False)
+    out = v.verify_exhaustive(case, pd.DataFrame({"x": np.arange(7)}), 1, 5, 0.005, 2)
+    assert out["passed"] is False, out
+    gt = np.array([1.0, np.inf, 2.0])
+    assert v.scale_normalized_error(gt.copy(), gt, False) == np.inf
+    assert v.scale_normalized_error(np.array([1.0, 1.0, 2.0]), gt, False) == np.inf
+    assert v.scale_normalized_error(np.array([1.0, -np.inf]), np.array([1.0, 2.0]), False) == np.inf
+    assert v.scale_normalized_error(np.array([1.0, 2.0]), np.array([1.0, 2.0]), False) == 0.0
