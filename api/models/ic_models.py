@@ -416,9 +416,18 @@ class ApplyTransformsRequest(BaseModel):
     selected_features: List[str] = Field(..., description="IC 篩選後的特徵名稱清單")
     rank: bool = Field(default=True, description="套用 Rank Transform")
     zscore: bool = Field(default=True, description="套用 Adaptive Z-Score")
-    gaussian: bool = Field(default=False, description="套用 Gaussian Normalize（在 rank/zscore 之後執行）")
-    rank_window: int = Field(default=252, ge=2, description="Rank Transform 滾動窗口（天）")
-    zscore_windows: List[int] = Field(default_factory=lambda: [100, 252], description="Adaptive Z-Score 窗口清單")
+    gaussian: bool = Field(default=False, description="套用 Gaussian Normalize（正式順序 rank → gaussian → zscore）")
+    rank_window: int = Field(default=252, ge=2, description="Rank Transform 滾動窗口（K 線根數）")
+    zscore_windows: List[int] = Field(
+        default_factory=lambda: [100, 252], description="Adaptive Z-Score 窗口清單（K 線根數；主窗＝最小窗）"
+    )
+
+
+class ExcludedFeature(BaseModel):
+    """ICPOSTLEAK Task 2.2：未轉換、未寫入輸出之選中欄。"""
+
+    name: str
+    reason: str = Field(..., description="ratio_unsafe:<category>（L6.5 入口不轉換此類欄）")
 
 
 class ApplyTransformsResponse(BaseModel):
@@ -438,6 +447,10 @@ class ApplyTransformsResponse(BaseModel):
     oos_guarantees: Optional[bool] = Field(
         default=None,
         description="root 鏡像；False 表示無 OOS 保證",
+    )
+    excluded_features: Optional[List[ExcludedFeature]] = Field(
+        default=None,
+        description="ICPOSTLEAK Task 2.2：被排除（未轉換、未寫入輸出）之選中欄與原因",
     )
 
 

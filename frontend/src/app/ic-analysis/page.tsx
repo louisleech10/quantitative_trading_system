@@ -55,6 +55,7 @@ import { buildEventScanRequest } from '@/lib/api';
 import { reshapeGroupedForFeature } from '@/lib/icGrouped';
 import type { GroupedICData, ICDecayData, ICReportLight, QuantileReturnData, SectionStatusObject, SummaryPageParams, TurnoverFeatureData } from '@/lib/types';
 import { useFeatureFactoryStore } from '@/store/featureFactoryStore';
+import ApplyTransformsResult, { type ApplyTransformsResultData } from '@/components/ic-analysis/ApplyTransformsResult';
 
 const EXPORT_TARGET_ID = 'ic-analysis-export';
 
@@ -146,13 +147,7 @@ function ICAnalysisPageContent() {
   const [applyTransformZscore, setApplyTransformZscore] = useState(true);
   const [applyTransformGaussian, setApplyTransformGaussian] = useState(false);
   const [isApplyingTransforms, setIsApplyingTransforms] = useState(false);
-  const [applyTransformsResult, setApplyTransformsResult] = useState<{
-    selected_feature_count: number;
-    transforms_applied: string[];
-    output_path: string;
-    output_rows: number;
-    output_cols: number;
-  } | null>(null);
+  const [applyTransformsResult, setApplyTransformsResult] = useState<ApplyTransformsResultData | null>(null);
 
   // ICRESULT_PAGING Task 2.2：表格改吃伺服器分頁（light 報告不含 summary_table）
   const summaryTable = useMemo(() => summaryPage?.rows ?? [], [summaryPage]);
@@ -903,18 +898,7 @@ function ICAnalysisPageContent() {
                       ? `套用後處理（${selectedFeatures.length} 個特徵）`
                       : '套用後處理（請先選擇特徵）'}
                   </button>
-                  {applyTransformsResult && (
-                    <span className="text-xs text-emerald-300 flex flex-col gap-0.5">
-                      <span>
-                        ✓ 完成 <strong>{applyTransformsResult.selected_feature_count}</strong> 個特徵 ·{' '}
-                        {applyTransformsResult.output_rows} 行 · {applyTransformsResult.output_cols} 欄
-                      </span>
-                      <span>套用：{applyTransformsResult.transforms_applied.join(' → ')}</span>
-                      {applyTransformsResult.output_path && (
-                        <span className="text-slate-400 text-[10px] break-all">{applyTransformsResult.output_path}</span>
-                      )}
-                    </span>
-                  )}
+                  {applyTransformsResult && <ApplyTransformsResult result={applyTransformsResult} />}
                 </div>
               </div>
 

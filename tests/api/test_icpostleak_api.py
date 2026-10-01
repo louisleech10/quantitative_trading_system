@@ -281,5 +281,8 @@ def test_mutation_dedup_removed_is_caught(tmp_path: Path, monkeypatch: pytest.Mo
 
     monkeypatch.setattr(service_module, "_dedupe_preserve_order", lambda names: list(names))
     monkeypatch.chdir(tmp_path)
-    got = _run(tmp_path, _real_frame(), ["rank"], selected=["volume", "close", "volume"])
+    try:
+        got = _run(tmp_path, _real_frame(), ["rank"], selected=["volume", "close", "volume"])
+    except Exception:  # noqa: BLE001 — 改壞後下游拒收重複欄（如 Polars DuplicateError）亦為判準翻轉
+        return
     assert list(got["frame"].columns) != ["volume", "close"] or got["result"]["selected_feature_count"] != 2

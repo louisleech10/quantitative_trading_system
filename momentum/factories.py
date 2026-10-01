@@ -233,6 +233,40 @@ def create_feature_preprocessor(
     return FeaturePreprocessor(config, context=context)
 
 
+def create_post_ic_transform_config(
+    *,
+    rank: bool,
+    rank_window: int,
+    zscore: bool,
+    zscore_windows: List[int],
+    gaussian: bool,
+) -> Any:
+    """ICPOSTLEAK Task 2.1：IC 頁「套用後處理」之正式 post-IC 轉換設定（縮尾／fracdiff／ADF 關、replace 模式；
+    轉換順序由正式實作決定＝rank→gaussian→zscore）。`zscore_windows` 由呼叫端先正規化（主窗＝清單第一個）。"""
+    from momentum.FeatureEngineering.feature_config import PreprocessingConfig
+
+    return PreprocessingConfig(
+        enabled=True,
+        mode="replace",
+        winsorization={"enabled": False},
+        fractional_differencing={"enabled": False},
+        adf_differencing={"enabled": False},
+        rank_transform={"enabled": bool(rank), "window": int(rank_window), "apply_to": "all"},
+        adaptive_zscore={"enabled": bool(zscore), "windows": [int(w) for w in zscore_windows], "apply_to": "all"},
+        gaussian_normalize={"enabled": bool(gaussian), "apply_to": "all"},
+    )
+
+
+def ratio_unsafe_category(feature_name: str) -> Optional[str]:
+    """ICPOSTLEAK Task 2.2：L6.5 入口會丟棄之 ratio-unsafe 欄之類別（非該類回 None）。判定委由
+    `feature_preprocessor._is_ratio_unsafe_column`（以模組屬性呼叫，判定之單一真相源）。"""
+    from momentum.FeatureEngineering.preprocessing import feature_preprocessor as _fp
+
+    if not _fp._is_ratio_unsafe_column(str(feature_name)):
+        return None
+    return str(feature_name).split("_", 2)[1]
+
+
 def create_feature_factory(
     cache_dir: Optional[str] = None,
     validate_continuity: bool = True,

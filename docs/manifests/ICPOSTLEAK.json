@@ -18,7 +18,8 @@
     "handoffs/run_receipts/icpostleak_probes/probe_icpage_leak.py",
     "handoffs/run_receipts/icpostleak_probes/probe_formal_postic.py",
     "handoffs/run_receipts/icpostleak_probes/probe_order_clip.py",
-    "handoffs/run_receipts/icpostleak_probes/probe_oracle_unmasked.py"
+    "handoffs/run_receipts/icpostleak_probes/probe_oracle_unmasked.py",
+    "handoffs/run_receipts/icpostleak_probes/probe_change_report.py"
   ],
   "run_receipts": [
     {
@@ -44,23 +45,32 @@
       "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_oracle_unmasked.py",
       "rc": 0,
       "honest_bounds": "遮罩 identity 之 oracle 對現行未遮罩生產逐位元組：38/44 全等；6 例＝registry 系列 × 含 zscore＋gaussian，肇因現行 registry 順序 rank→zscore→gaussian（即 SPEC 要求之改序）；只驗 dtype／核心建模，不驗遮罩本身"
+    },
+    {
+      "path": "handoffs/run_receipts/20261002-icpostleak-change-report.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_change_report.py report <改前.npz> <改後.npz> <out>",
+      "rc": 0,
+      "honest_bounds": "改前＝HEAD worktree＋最新測試輔助；49 例中 35 例遮罩後區段 0 格差異（legacy／optimized／Polars 全部）；14 例 registry 系列差異＝改序、numba 累積式 zscore 核心、切片並行補 gaussian"
     }
   ],
   "batch_card": {
     "depends": [],
     "touches": [
-      "docs/ICPOSTLEAK_SPEC.md",
-      "momentum/FeatureEngineering/preprocessing/stable_mask.py",
-      "momentum/FeatureEngineering/preprocessing/time_order.py",
-      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
-      "momentum/FeatureEngineering/preprocessing/_numba_transforms.py",
-      "momentum/FeatureEngineering/polars_adapter.py",
-      "api/services/ic_analysis_service.py",
       "api/models/ic_models.py",
       "api/routes/ic_analysis.py",
-      "frontend/src/hooks/useICAnalysis.ts",
+      "api/services/ic_analysis_service.py",
+      "docs/ICPOSTLEAK_SPEC.md",
       "frontend/src/app/ic-analysis/page.tsx",
       "frontend/src/components/ic-analysis/ApplyTransformsResult.tsx",
+      "frontend/src/hooks/useICAnalysis.ts",
+      "handoffs/run_receipts/20261002-icpostleak-branch-inventory.txt",
+      "handoffs/run_receipts/20261002-icpostleak-change-report.json",
+      "momentum/FeatureEngineering/polars_adapter.py",
+      "momentum/FeatureEngineering/preprocessing/_numba_transforms.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/preprocessing/stable_mask.py",
+      "momentum/FeatureEngineering/preprocessing/time_order.py",
+      "momentum/factories.py",
       "tests/_golden/icpostleak/contract.json"
     ],
     "callers_now": [

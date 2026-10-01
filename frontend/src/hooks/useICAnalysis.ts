@@ -767,6 +767,8 @@ export function useICAnalysis() {
         output_path: string;
         output_rows: number;
         output_cols: number;
+        // ICPOSTLEAK Task 2.2：被排除（未轉換、未寫入輸出）之選中欄
+        excluded_features?: { name: string; reason: string }[];
       }>(`/apply-transforms/${taskId}`, {
         method: 'POST',
         body: JSON.stringify(payload),

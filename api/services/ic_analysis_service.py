@@ -29,11 +29,14 @@ from api.models.ic_models import (
 )
 from momentum.factories import (
     create_feature_library,
+    create_feature_preprocessor,
     create_feature_reader,
     create_ic_analyzer,
     create_ic_artifact_writer,
     create_ic_reporter,
     create_kline_storage_manager,
+    create_post_ic_transform_config,
+    ratio_unsafe_category,
     resolve_run_feature_count,
     sanitize_factor_returns,
 )
@@ -100,6 +103,23 @@ from momentum.factories import (  # noqa: E402
 check_feature_run_coverage, FeatureRunCoverage, FeatureRunCoverageError = (
     create_feature_run_coverage_checker()
 )
+
+
+def _normalize_zscore_windows(windows: List[int]) -> List[int]:
+    """ICPOSTLEAK Task 2.1：IC 頁 zscore 窗正規化——遞增排序，使 replace 模式之主窗（清單第一個）＝最小窗，
+    保留改前手寫版以最小窗為主窗之語意（使用者傳 [252, 100] 與 [100, 252] 同義）。"""
+    return sorted(int(w) for w in windows)
+
+
+def _dedupe_preserve_order(names: List[str]) -> List[str]:
+    """ICPOSTLEAK Task 2.1：selected_features 保序去重（改前未去重，重複名使輸出欄重複）。"""
+    seen: set = set()
+    out: List[str] = []
+    for name in names:
+        if name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
 
 
 def _find_event_filter_info(node: Any) -> Optional[Dict[str, Any]]:
@@ -2811,7 +2831,8 @@ class ICAnalysisService:
         Intended for the IC-First workflow:
           Feature Factory (IC-First mode) → IC Gatekeeper → *here* → downstream ML
 
-        Transform order: rank → zscore → gaussian (Gaussian always last).
+        Transform order: rank → gaussian → zscore（正式 post-IC 實作 FeaturePreprocessor.transform_selected；
+        ICPOSTLEAK：窗未滿之列為 NaN、ratio-unsafe 欄明示排除並列於 excluded_features）。
         """
         return await asyncio.to_thread(
             self._apply_transforms_sync,
@@ -2862,47 +2883,51 @@ class ICAnalysisService:
         )
         logger.info("[apply_transforms] Loaded features: %d rows x %d cols", len(df), len(df.columns))
 
-        # --- 3. Filter to selected_features (only those actually present) ---
-        valid_cols = [c for c in selected_features if c in df.columns]
-        missing = set(selected_features) - set(valid_cols)
+        # --- 3. Filter to selected_features（ICPOSTLEAK：保序去重、只取存在者、ratio-unsafe 欄明示排除）---
+        requested = _dedupe_preserve_order([str(c) for c in selected_features])
+        valid_cols = [c for c in requested if c in df.columns]
+        missing = [c for c in requested if c not in df.columns]
         if missing:
-            logger.warning("[apply_transforms] %d requested features not found: %s…", len(missing), list(missing)[:5])
+            logger.warning("[apply_transforms] %d requested features not found: %s…", len(missing), missing[:5])
         if not valid_cols:
             raise ValueError("None of the selected_features exist in the loaded feature data")
-        df = df[valid_cols].copy()
+        excluded_features: List[Dict[str, str]] = []
+        kept_cols: List[str] = []
+        for column in valid_cols:
+            category = ratio_unsafe_category(column)
+            if category is None:
+                kept_cols.append(column)
+            else:
+                excluded_features.append({"name": column, "reason": f"ratio_unsafe:{category}"})
+        if excluded_features:
+            logger.warning(
+                "[apply_transforms] %d ratio-unsafe features excluded (L6.5 不轉換此類欄): %s",
+                len(excluded_features), [e["name"] for e in excluded_features],
+            )
+        if not kept_cols:
+            raise ValueError(
+                "All selected features are ratio-unsafe and cannot be transformed: "
+                + ", ".join(f"{e['name']}（{e['reason']}）" for e in excluded_features)
+            )
+        df = df[kept_cols].copy()
 
-        transforms_applied: List[str] = []
-
-        # --- 4a. Rank Transform ---
-        if rank:
-            df = df.rolling(rank_window, min_periods=max(rank_window // 2, 1)).rank(pct=True)
-            transforms_applied.append("rank")
-            logger.info("[apply_transforms] Applied rank transform (window=%d)", rank_window)
-
-        # --- 4b. Adaptive Z-Score ---
-        if zscore:
-            primary_window = min(zscore_windows)
-            rolling = df.rolling(primary_window, min_periods=max(primary_window // 2, 1))
-            mu = rolling.mean()
-            sigma = rolling.std().fillna(0.0).clip(lower=1e-8)
-            df = (df - mu) / sigma
-            transforms_applied.append("zscore")
-            logger.info("[apply_transforms] Applied adaptive zscore (window=%d)", primary_window)
-
-        # --- 4c. Gaussian Normalize (always last) ---
-        if gaussian:
-            try:
-                from scipy.stats import norm as _norm
-                clip_lo, clip_hi = 0.001, 0.999
-                # Gaussian is meaningful only if input is already rank-like (0-1).
-                # If rank was not applied, coerce to empirical CDF first.
-                if not rank:
-                    df = df.rank(pct=True, axis=0)
-                df = df.clip(lower=clip_lo, upper=clip_hi).apply(lambda col: _norm.ppf(col))
-                transforms_applied.append("gaussian")
-                logger.info("[apply_transforms] Applied gaussian normalize")
-            except ImportError:
-                logger.error("[apply_transforms] scipy not available, skipping gaussian")
+        # --- 4. Post-IC transforms：正式實作（ICPOSTLEAK Task 2.1；順序 rank→gaussian→zscore、窗未滿之列為 NaN、
+        #     時間序非嚴格遞增 fail-closed）；改前之手寫版含全樣本排名之未來洩漏與錯誤順序，已刪除 ---
+        windows = _normalize_zscore_windows(zscore_windows)
+        transform_config = create_post_ic_transform_config(
+            rank=rank, rank_window=rank_window, zscore=zscore, zscore_windows=windows, gaussian=gaussian,
+        )
+        preprocessor = create_feature_preprocessor(transform_config.model_dump())
+        transformed = preprocessor.transform_selected(kept_cols, {"ic_page": df}, config=transform_config)
+        if "ic_page" not in transformed:
+            raise ValueError("post-IC transforms produced no output")
+        df = transformed["ic_page"].loc[:, kept_cols]
+        transforms_applied = [
+            name for name, enabled in (("rank", rank), ("gaussian", gaussian), ("zscore", zscore)) if enabled
+        ]
+        logger.info(
+            "[apply_transforms] Applied %s (rank_window=%d, zscore_windows=%s)", transforms_applied, rank_window, windows,
+        )
 
         # --- 5. Persist result（含 LA-1 B3 analysis_status attr）---
         result_report = task_info.get("result") if isinstance(task_info, dict) else None
@@ -2950,13 +2975,14 @@ class ICAnalysisService:
 
         return {
             "task_id": task_id,
-            "selected_feature_count": len(valid_cols),
+            "selected_feature_count": len(kept_cols),
             "transforms_applied": transforms_applied,
             "output_path": str(output_path),
             "output_rows": len(df),
             "output_cols": len(df.columns),
             "analysis_status": analysis_status,
             "oos_guarantees": oos_guarantees,
+            "excluded_features": excluded_features,
         }
 
     def _load_features_for_transforms(

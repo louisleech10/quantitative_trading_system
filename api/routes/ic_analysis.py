@@ -747,7 +747,8 @@ async def apply_transforms(task_id: str, request: ApplyTransformsRequest):
       2. IC Gatekeeper filters to the best features.
       3. Call this endpoint to apply rank/zscore/gaussian to those features.
 
-    Transform order is always: rank → zscore → gaussian.
+    Transform order is always: rank → gaussian → zscore（正式 post-IC 實作；窗未滿之列為 NaN；
+    ratio-unsafe 欄不轉換並列於 excluded_features）。
     """
     try:
         result = await ic_analysis_service.apply_transforms(
