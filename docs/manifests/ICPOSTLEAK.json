@@ -118,7 +118,8 @@
       "實作批必產收據：handoffs/run_receipts/<日期>-icpostleak-branch-inventory.txt（分支盤點）、<日期>-icpostleak-branch-diff.json（跨分支量級）、<日期>-icpostleak-change-report.json（改前→改後首個有限值列與遮罩後區段差異）；tests/_golden/icpostleak/baseline.npz 與 baseline.json 於動工前以 HEAD 產",
       "測試時長：Phase 1 每組合為 3000 列×3 欄之轉換（秒級）；registry 分支含落盤；全檔預估數分鐘（實作後實測記收據）",
       "實作前紅之預期原因：stable_mask.mask_incomplete_window_by_input_2d／time_order.assert_strictly_increasing_time_index 為 NotImplementedError 空殼；ApplyTransformsResult 拋錯；IC 頁仍為手寫版（excluded_features 缺、順序舊、未去重）",
-      "r5 修補：Polars oracle 經 pandas_to_polars（float32＋NaN→null，同生產入口）；append 驗收改全陣列 oracle（_rolling_zscore_2d append＋各窗輸入錨點遮罩）；§G 輸入加 3 個真實 L1 特徵欄（TA-Lib EMA21／RSI14／ATR14 於真實 kline）；收集 89＋31 項"
+      "r5 修補：Polars oracle 經 pandas_to_polars（float32＋NaN→null，同生產入口）；append 驗收改全陣列 oracle（_rolling_zscore_2d append＋各窗輸入錨點遮罩）；§G 輸入加 3 個真實 L1 特徵欄（TA-Lib EMA21／RSI14／ATR14 於真實 kline）；收集 89＋31 項",
+      "r6 修補：Polars oracle 重放轉換序（每步 float32 往返）；registry_sink_sharded 以 monkeypatch get_cgsa_shard_bytes＋分片前提＋spy；chunked 改 test_phase1_registry_chunked_append_masked（append＋split 門檻 2＋spy＋legacy append oracle）；收集 81＋31 項"
     ],
     "lifecycle": "keep",
     "not_executable": [

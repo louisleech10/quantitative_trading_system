@@ -19,7 +19,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -77,21 +77,40 @@ def _set_branch_env(monkeypatch: pytest.MonkeyPatch, branch: str) -> None:
 
 
 def _run_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, branch: str, steps: List[str],
-                frame: pd.DataFrame, mode: str = "replace") -> pd.DataFrame:
-    """以指定分支跑一次生產轉換，回傳輸出（欄序同輸入；append 模式含衍生欄）。"""
-    _set_branch_env(monkeypatch, branch)
+                frame: pd.DataFrame, mode: str = "replace", spec_override: Optional[dict] = None) -> pd.DataFrame:
+    """以指定分支跑一次生產轉換，回傳輸出（replace 模式欄序同輸入；append 模式含衍生欄、依欄名排序）。
+    `spec_override`：非逐組合分支（如 chunked）之設定，形同契約 branches 之一項。"""
+    spec_all = dict(BRANCHES.get(branch, {}), **(spec_override or {}))
+    for key, value in spec_all.get("env", {}).items():
+        monkeypatch.setenv(key, value)
     pre = FeaturePreprocessor(_config(steps, mode))
-    if BRANCHES[branch]["entry"] == "transform":
+    if spec_all["entry"] == "transform":
         return pre.transform(frame.copy())
     from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource
     from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 
+    spec = spec_all
+    if "patch_shard_bytes" in spec:  # 繞過 get_cgsa_shard_bytes 之 32 MiB 下限，使小群組亦分片
+        from momentum.FeatureEngineering.utils import hardware_utils
+
+        monkeypatch.setattr(hardware_utils, "get_cgsa_shard_bytes", lambda: int(spec["patch_shard_bytes"]))
+    calls: List[str] = []
+    if spec.get("spy"):  # 具名分支須真的執行該待測物
+        real = getattr(FeaturePreprocessor, spec["spy"])
+
+        def _spy(self, *args, **kwargs):
+            calls.append(spec["spy"])
+            return real(self, *args, **kwargs)
+
+        monkeypatch.setattr(FeaturePreprocessor, spec["spy"], _spy)
     registry = ColumnGroupRegistry(work_dir=tmp_path / f"registry_{branch}_{'_'.join(steps)}")
     group = ColumnGroup(group_id="1h_L1_icpostleak", layer=LayerSource.L1, timeframe="1h", data_source="close",
                         indicator="ICPOSTLEAK", columns=tuple(frame.columns), shape=(0, 0), dtype="float32",
                         disk_path=None)
-    registry.save_data(group, frame.to_numpy(dtype=np.float32))
-    if BRANCHES[branch]["entry"] == "transform_registry_groups":
+    group = registry.save_data(group, frame.to_numpy(dtype=np.float32))
+    if "patch_shard_bytes" in spec:
+        assert getattr(group, "shards", ()), "前提：群組已分片"
+    if spec_all["entry"] == "transform_registry_groups":
         pre.transform_registry_groups(registry, n_workers=1)
         return pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
     # sink 入口（一般／sharded／chunked 由契約 env 切換）：收集各輸出部分，依欄名重組
@@ -103,8 +122,11 @@ def _run_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, branch: str, st
             parts[str(name)] = arr[:, i].copy()
 
     pre.transform_registry_groups_to_sink(registry, _sink, n_workers=1)
-    assert set(parts) == {str(c) for c in frame.columns}, sorted(parts)
-    return pd.DataFrame({c: parts[str(c)] for c in frame.columns}, index=frame.index)
+    if spec.get("spy"):
+        assert calls, f"具名分支 {branch} 未執行 {spec['spy']}"
+    names = [str(c) for c in frame.columns] if mode == "replace" else sorted(parts)
+    assert set(names) <= set(parts), sorted(parts)
+    return pd.DataFrame({c: parts[c] for c in names}, index=frame.index)
 
 
 # ---------------------------------------------------------------- 獨立遮罩與 oracle
@@ -161,14 +183,27 @@ def _step_window(pre: FeaturePreprocessor, step: str) -> int:
     return RANK_W if step == "rank" else (_gaussian_window(pre) if step == "gaussian" else Z_WINDOWS[0])
 
 
+def _polars_roundtrip(values: np.ndarray, columns: List[str]) -> np.ndarray:
+    """Polars 臂之每次 pandas↔polars 往返（`pandas_to_polars`：float32＋NaN→null；`polars_to_pandas`）。"""
+    from momentum.FeatureEngineering.polars_adapter import pandas_to_polars, polars_to_pandas
+
+    return polars_to_pandas(pandas_to_polars(pd.DataFrame(values, columns=columns)))[columns].to_numpy(dtype=np.float64)
+
+
 def _oracle(branch: str, steps: List[str], frame: pd.DataFrame) -> np.ndarray:
+    """逐步驟 oracle。Polars 分支重放 `_transform_single_polars` 之轉換序：入口 `pandas_to_polars`（float32＋null）、
+    gaussian 前後各一次 pandas↔polars 往返（`_apply_gaussian_normalize` 回落）、出口 `polars_to_pandas`。"""
     pre = FeaturePreprocessor(_config(steps))
     columns = [str(c) for c in frame.columns]
     values = frame.to_numpy(dtype=np.float64)
+    if branch == "polars":
+        values = _polars_roundtrip(values, columns)
     for step in ORDER:
         if step not in steps:
             continue
         values = _oracle_mask(_kernel_step(branch, pre, step, values, columns), values, _step_window(pre, step))
+        if branch == "polars":
+            values = _polars_roundtrip(values, columns)  # 每步結果回存 polars（float32）
     return values
 
 
@@ -219,16 +254,39 @@ def test_phase1_append_mode_each_window_masked(branch: str, tmp_path: Path, monk
     """§G ②（append）：zscore 窗 [100, 252] 之每個衍生欄各自自輸入首個有限值起遮 `窗−1` 列。"""
     frame = _real_frame()
     got = _run_branch(monkeypatch, tmp_path, branch, ["zscore"], frame, mode="append")
+    columns = [str(c) for c in frame.columns]
     values = frame.to_numpy(dtype=np.float64)
+    if branch == "polars":  # append 回落 pandas：入口與回存各一次 float32 往返
+        values = _polars_roundtrip(values, columns)
     by_window = FeaturePreprocessor(_config(["zscore"], "append"))._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8,
                                                                                        mode="append")
     for window in Z_WINDOWS:
         cols = [f"{c}_zscore_{window}" for c in frame.columns]
         assert all(c in got.columns for c in cols), (window, list(got.columns))
         want = _oracle_mask(np.asarray(by_window[window], dtype=np.float64), values, window)
+        if branch == "polars":
+            want = _polars_roundtrip(want, cols)
         actual = got[cols].to_numpy(dtype=np.float64)
         assert _first_finite(actual) == [f + window - 1 for f in _first_finite(values)], window
         assert np.array_equal(actual, want, equal_nan=True), window  # 全陣列：成熟區段之值亦逐位元組比
+
+
+def test_phase1_registry_chunked_append_masked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 1.1（registry chunked）：`_stream_single_group_chunked_to_sink` 只於 requires_slow（append 模式）觸發，
+    每塊呼叫 `_transform_single`（legacy；append 停用 optimized）⇒ 以 append＋split 門檻 2 實跑，spy 證明執行該待測物，
+    各窗衍生欄與 legacy append oracle 全陣列逐位元組相同。"""
+    cfg = CONTRACT["registry_chunked_append"]
+    frame = _real_frame()
+    got = _run_branch(monkeypatch, tmp_path, "registry_chunked", cfg["steps"], frame, mode=cfg["mode"],
+                      spec_override={"env": cfg["env"], "entry": "transform_registry_groups_to_sink", "spy": cfg["spy"]})
+    values = frame.to_numpy(dtype=np.float64)
+    by_window = FeaturePreprocessor(_config(cfg["steps"], "append"))._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8,
+                                                                                         mode="append")
+    for window in Z_WINDOWS:
+        cols = [f"{c}_zscore_{window}" for c in frame.columns]
+        assert all(c in got.columns for c in cols), (window, list(got.columns))
+        want = _oracle_mask(np.asarray(by_window[window], dtype=np.float64), values, window)
+        assert np.array_equal(got[cols].to_numpy(dtype=np.float64), want, equal_nan=True), window
 
 
 @pytest.mark.parametrize("branch", list(BRANCHES))

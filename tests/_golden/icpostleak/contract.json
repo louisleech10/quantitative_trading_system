@@ -111,19 +111,14 @@
     },
     "registry_sink": {
       "env": {},
-      "entry": "transform_registry_groups_to_sink"
+      "entry": "transform_registry_groups_to_sink",
+      "spy": "_transform_single_group_to_arrays"
     },
     "registry_sink_sharded": {
-      "env": {
-        "FFACT_CGSA_SHARD_BYTES": "4096"
-      },
-      "entry": "transform_registry_groups_to_sink"
-    },
-    "registry_sink_chunked": {
-      "env": {
-        "FFACT_L65_SPLIT_THRESHOLD": "2"
-      },
-      "entry": "transform_registry_groups_to_sink"
+      "env": {},
+      "entry": "transform_registry_groups_to_sink",
+      "patch_shard_bytes": 4096,
+      "spy": "_stream_sharded_group_to_sink"
     }
   },
   "perturb": {
@@ -248,5 +243,16 @@
     "assert_regex_ere": "^\\s*assert |np\\.testing\\.assert|pd\\.testing\\.assert|pytest\\.raises",
     "skip_regex_ere": "pytest\\.mark\\.(skip|xfail)|pytest\\.(skip|xfail)\\(",
     "frozen_at": "HEAD d31c170e（主委 2026-10-01）"
+  },
+  "registry_chunked_append": {
+    "env": {
+      "FFACT_L65_SPLIT_THRESHOLD": "2"
+    },
+    "mode": "append",
+    "steps": [
+      "zscore"
+    ],
+    "spy": "_stream_single_group_chunked_to_sink",
+    "note": "chunked 僅於 requires_slow（append 模式或 ADF／fracdiff）時觸發；每塊呼叫 _transform_single（legacy，append 停用 optimized）"
   }
 }
