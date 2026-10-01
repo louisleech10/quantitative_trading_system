@@ -299,12 +299,24 @@ def test_legacy_equivalent_no_extra_copy_quantile():
 # 12. End-to-end: transform_single pipeline output equivalence
 # ---------------------------------------------------------------------------
 
+def _oracle_mask_incomplete_window(expected: np.ndarray, window: int) -> np.ndarray:
+    """FFSTAT b4（SPEC v32 逐欄穩定點第①類）：縮尾輸出逐欄自首個有限值起 window−1 列（及其前）不穩定 ⇒ NaN。
+    獨立於生產 `stable_mask.mask_incomplete_window_inplace` 之逐欄迴圈實作；其後各值仍須與 oracle 逐值相等。"""
+    out = expected.copy()
+    for j in range(out.shape[1]):
+        finite = np.flatnonzero(np.isfinite(expected[:, j]))
+        cut = out.shape[0] if finite.size == 0 else min(int(finite[0]) + int(window) - 1, out.shape[0])
+        out[:cut, j] = np.nan
+    return out
+
+
 def test_transform_single_optimized_df_end_to_end():
     """因果模式與 rolling PIT oracle 一致，且不受未來值擾動。"""
     pp = _make_preprocessor(winsor_method="quantile", quantile_range=[0.01, 0.99])
 
     rng = np.random.default_rng(314)
-    n_rows, n_cols = 150, 15
+    # FFSTAT b4：縮尾窗 252 之不完整窗遮罩 ⇒ 列數須 > 20＋251 方有可比之值（原 150 列遮罩後全 NaN）
+    n_rows, n_cols = 400, 15
     arr_f64 = rng.standard_normal((n_rows, n_cols)).astype(np.float64)
     arr_f64[:20, :] = np.nan  # warmup NaN
 
@@ -319,6 +331,8 @@ def test_transform_single_optimized_df_end_to_end():
     clipped = np.clip(arr_f64, lower, upper)
     expected[valid] = clipped[valid]
     expected[np.isnan(arr_f64)] = np.nan
+    expected = _oracle_mask_incomplete_window(expected, window)
+    assert np.isfinite(expected).sum() > 0, "前提：遮罩後仍有可比之有限值"
     original = arr_f64.copy()
     result = pp._winsorize_2d_legacy_equivalent(arr_f64)
 
@@ -358,7 +372,7 @@ def test_transform_single_optimized_df_noncausal_matches_full_sample() -> None:
     assert forced_pp.causal_preprocessing is True
 
     rng = np.random.default_rng(314)
-    arr_f64 = rng.standard_normal((150, 15)).astype(np.float64)
+    arr_f64 = rng.standard_normal((400, 15)).astype(np.float64)  # FFSTAT b4：同上，須 > 20＋251 列
     arr_f64[:20, :] = np.nan
 
     # causal 釘死後，外部 False 不再代表 full-sample quantile 分支。
@@ -376,6 +390,8 @@ def test_transform_single_optimized_df_noncausal_matches_full_sample() -> None:
     clipped = np.clip(arr_f64, lower, upper)
     expected[valid] = clipped[valid]
     expected[np.isnan(arr_f64)] = np.nan
+    expected = _oracle_mask_incomplete_window(expected, window)
+    assert np.isfinite(expected).sum() > 0, "前提：遮罩後仍有可比之有限值"
 
     forced_result = forced_pp._winsorize_2d_legacy_equivalent(arr_f64.copy())
     causal_result = causal_pp._winsorize_2d_legacy_equivalent(arr_f64.copy())

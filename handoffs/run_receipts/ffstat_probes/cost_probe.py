@@ -22,7 +22,7 @@
 量峰值與耗時須獨占機器（委員審碼、評測、其他重測試期間不跑）。
 
 用法：venv/bin/python handoffs/run_receipts/ffstat_probes/cost_probe.py [--only-one]
-（`--only-one`：只跑 BTC 1h N＝500 一列供估時，不寫收據）
+（`--only-one`：只跑 BTC 1h、v58 預設 N（日內 1000）一列供估時，不寫收據）
 """
 
 from __future__ import annotations
@@ -495,7 +495,9 @@ def main(only_one: bool = False) -> int:
     rows, off_rows, before_rows = [], [], []
     symbols = CONTRACT["cost_measure_symbols"][:1] if only_one else CONTRACT["cost_measure_symbols"]
     tfs = ["1h"] if only_one else CONTRACT["cost_measure_timeframes"]
-    ns = [CONTRACT["calibration_n_default"]] if only_one else CONTRACT["cost_measure_n"]
+    # --only-one 量 v58 預設 N（1h 屬日內）；off／改前列之 N 仍用 calibration_n_default（改前 5a148b8e 之預設 500；
+    # off 不做平穩化判定，N 不入計算）
+    ns = [CONTRACT["calibration_n_default_by_length"]["intraday"]] if only_one else CONTRACT["cost_measure_n"]
     for symbol in symbols:
         for tf in tfs:
             kline_dir, start, end = WINDOWS[tf]

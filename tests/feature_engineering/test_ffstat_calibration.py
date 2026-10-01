@@ -339,7 +339,8 @@ def test_calibration_domain_input_bounded_before_output_start(tmp_path: Path, mo
     assert len(reads) == 1 and inputs
     available = int((to_dt(reads[0]) < OUT_START).sum())
     assert available == len(reads[0]), "讀取入口回傳含輸出起始日（含）之後之列"
-    n = int(config.preprocessing.calibration_bars_by_timeframe.get(h.PRIMARY_TF, config.preprocessing.calibration_bars))
+    pre = config.preprocessing  # v58：N 之期望值獨立於生產決定函式（週期分設 → 明示值 → 依週期長度預設）
+    n = int(pre.calibration_bars_by_timeframe.get(h.PRIMARY_TF) or pre.calibration_bars or _default_n(h.PRIMARY_TF))
     depth = estimate_max_warmup_bars(config, h.PRIMARY_TF, [h.PRIMARY_TF]) + n  # v32：延遲常數已刪
     assert depth < available, "前提：前史長於深度，截取確有作用"
     for k, idx in enumerate(inputs):
@@ -820,7 +821,10 @@ def test_boundary_08_default_runs_no_column_short(symbol: str, timeframe: str, t
     本窗 BTC、BCH 皆 0 欄）。
     b4（R1 預熱恆開、逐欄穩定點）後，12h 慢欄（DEMA／TEMA_233 之 Cross 等）穩定點延後，`kline_cache.h5` 之 12h
     （2024-01 起、起始日前約 1,580 根）湊不滿 N ⇒ 12h 改讀長歷史快取（契約 `longhist_cache_dir`；BTC／ETH 2017 起、
-    BCH 2019-11 起，承 R8「資料不足以下載模組抓真實資料驗證」；BCH 收據 handoffs/run_receipts/20260928-ffstat-longhist-bch-download.log）。"""
+    BCH 2019-11 起，承 R8「資料不足以下載模組抓真實資料驗證」；BCH 收據 handoffs/run_receipts/20260928-ffstat-longhist-bch-download.log）。
+    v58（日內 N＝1000）後 12h 窗改 2026-06-01～07-27（同長 57 日；長歷史快取至 2026-09）：舊窗下 BCH 12h 之
+    MIDPRICE_233 之 Kurt／Skew／ZScore_W5（窗內常數致稀疏）各缺 12 個有效值（主委探針 2026-10-01；BCH 2019-11 始上市之資料
+    長度上限，非深度估算誤差）；新窗 0 欄。1h 快取止於 2026-04-27 ⇒ 1h 維持舊窗。"""
     from momentum.factories import create_feature_factory
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
@@ -830,8 +834,9 @@ def test_boundary_08_default_runs_no_column_short(symbol: str, timeframe: str, t
     factory._storage = FeatureStorage(str(tmp_path / "features"))
     payload = h.stat_payload([timeframe])
     payload["timeframes"]["primary"] = timeframe
+    start, end = ("2026-06-01", "2026-07-27") if timeframe == "12h" else ("2026-03-01", "2026-04-27")
     result = factory.generate_features(symbol, timeframe, config_override=payload, force_regenerate=True,
-                                       start_date="2026-03-01", end_date="2026-04-27", persist=True)
+                                       start_date=start, end_date=end, persist=True)
     dec = h.decisions(result)
     assert dec
     # v19：前史不足改為逐欄不平穩化 ⇒ 本邊界驗「無欄因前史不足而未平穩化」
@@ -970,7 +975,9 @@ def test_boundary_12_n_change_misses_dstar_cache(tmp_path: Path, monkeypatch: py
     _, _, fresh = h.run_stat(tmp_path / "fresh", payload)
     fresh_hits = {c: d["dstar_cache_hit"] for c, d in h.decisions(fresh).items() if d["fracdiff"]}
     dstar = h.prepare_stat_env(monkeypatch, tmp_path / "warm")
-    h.run_stat(tmp_path / "warm", h.stat_payload())
+    payload_500 = h.stat_payload()
+    payload_500["preprocessing"]["calibration_bars"] = 500  # v58：1h 預設 N 已為 1000，舊 N 須明示
+    h.run_stat(tmp_path / "warm", payload_500)
     files_n500 = set(dstar.iterdir())
     _, _, result = h.run_stat(tmp_path / "warm", payload)
     hits = {c: d["dstar_cache_hit"] for c, d in h.decisions(result).items() if d["fracdiff"]}

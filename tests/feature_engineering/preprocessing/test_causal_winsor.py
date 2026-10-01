@@ -312,6 +312,8 @@ def test_all_l65_entrypoints_causal(monkeypatch: pytest.MonkeyPatch) -> None:
                     "apply_to": "all",
                     "precision": 0.5,
                 },
+                # FFSTAT v58：無週期脈絡之單元前處理器不得依週期推預設 N（fail-closed）⇒ 明示；前史 600 列足 500
+                "calibration_bars": 500,
             },
             # FFSTAT Task 1.1：fracdiff 目標層只取自結構化層來源（不再由欄名 `L1_` 前綴推層）
             column_layer_map={"L1_alpha": "L1"},

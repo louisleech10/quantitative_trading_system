@@ -151,7 +151,9 @@ class TestFindMinDPrecomputedMatchesOriginal:
         # FFSTAT b3b：判定值只取封包（以 fixture 本身建，僅驗決定性與精度）；封包只在平穩化開啟時交付，
         # 而 `_make_preprocessor` 之設定巢在 "preprocessing" 之下、前處理器讀不到（fracdiff 實為關閉），故此處明設開啟
         pp = FeaturePreprocessor(
-            {"fractional_differencing": {"enabled": True, "precision": 0.02, "cache_d_star": False}}
+            # FFSTAT v58：無週期脈絡之單元前處理器不得依週期推預設 N（fail-closed）⇒ 明示 N
+            {"fractional_differencing": {"enabled": True, "precision": 0.02, "cache_d_star": False},
+             "calibration_bars": 500}
         )
         attach_unit_calibration(pp, series.to_frame())
         d_star_new = pp._find_min_d(series, max_lag=50)

@@ -567,6 +567,10 @@ def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("FFACT_USE_POLARS", "0")
     factory = _make_factory()
     config = _make_config()
+    # FFSTAT Task 2.4：run_ic_first 入口之倍數表覆蓋檢查讀 atomic_indicators ⇒ 給真實預設指標設定（檢查照實執行，不略過）
+    from momentum.FeatureEngineering.feature_config import AtomicIndicatorConfig
+
+    config.atomic_indicators = AtomicIndicatorConfig()
     config.ic_gate_required_available_gb = 0.0
     config.tier_peak_budget_gb = 999.0
     storage = FeatureStorage(str(tmp_path / "features"))

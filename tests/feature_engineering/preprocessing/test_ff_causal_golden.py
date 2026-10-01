@@ -24,10 +24,22 @@ def _real_numeric_frame() -> pd.DataFrame:
     if not REAL_BASELINE.exists():
         pytest.skip("missing real ETHUSDT L6.5 baseline parquet")
     frame = pd.read_parquet(REAL_BASELINE)
-    numeric = frame.select_dtypes(include=[np.number]).iloc[:320, :3]
+    # FFSTAT b4：縮尾窗 252 之不完整窗遮罩後 rank 再需暖身 ⇒ 320 列無可比值，改 640 列（基準共 2000 列）
+    numeric = frame.select_dtypes(include=[np.number]).iloc[:640, :3]
     if numeric.empty or len(numeric) < 260:
         pytest.skip("real baseline does not have enough numeric rows")
     return numeric.astype(float)
+
+
+def _mask_incomplete_window(frame: pd.DataFrame, window: int) -> pd.DataFrame:
+    """FFSTAT b4（SPEC v32 逐欄穩定點第①類）：縮尾輸出逐欄自首個有限值起 window−1 列（及其前）為 NaN。
+    獨立於生產 `stable_mask.mask_incomplete_window_inplace` 之逐欄實作（只施於縮尾；rank／gaussian 不另遮）。"""
+    out = frame.copy()
+    for col in out.columns:
+        finite = np.flatnonzero(np.isfinite(frame[col].to_numpy(np.float64)))
+        cut = len(out) if finite.size == 0 else min(int(finite[0]) + int(window) - 1, len(out))
+        out.iloc[:cut, out.columns.get_loc(col)] = np.nan
+    return out
 
 
 def test_causal_preprocessing_changes_legacy_values_on_real_baseline() -> None:
@@ -56,6 +68,7 @@ def test_causal_preprocessing_changes_legacy_values_on_real_baseline() -> None:
         lower.isna() | upper.isna(),
         frame.clip(lower=lower, upper=upper, axis=1),
     )
+    clipped = _mask_incomplete_window(clipped, window)  # FFSTAT b4：縮尾之不完整窗遮罩先於 rank
     ranked = pd.DataFrame(
         _rolling_rank_numba(clipped.to_numpy(dtype=np.float64, copy=False), window, min_periods),
         index=frame.index,
@@ -67,6 +80,7 @@ def test_causal_preprocessing_changes_legacy_values_on_real_baseline() -> None:
         columns=frame.columns,
     )
 
+    assert np.isfinite(expected.to_numpy(np.float64)).sum() > 0, "前提：遮罩後仍有可比之有限值"
     assert list(forced.columns) == list(causal.columns)
     assert list(forced.shape) == list(causal.shape)
     np.testing.assert_allclose(
@@ -108,6 +122,8 @@ def test_rolling_quantile_oracle_on_real_baseline() -> None:
     expected = frame.copy()
     valid = lower.notna() & upper.notna()
     expected = expected.where(~valid, expected.clip(lower=lower, upper=upper, axis=1))
+    expected = _mask_incomplete_window(expected, window)  # FFSTAT b4
+    assert np.isfinite(expected.to_numpy(np.float64)).sum() > 0, "前提：遮罩後仍有可比之有限值"
     np.testing.assert_allclose(result.to_numpy(np.float32), expected.to_numpy(np.float32), atol=1e-6, equal_nan=True)
 
     perturbed = frame.copy()

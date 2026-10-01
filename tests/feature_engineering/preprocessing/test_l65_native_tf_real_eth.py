@@ -279,13 +279,17 @@ class TestRealEthStatisticalDivergence:
 
         legacy_prefix = _warmup_prefix(legacy_nan)
         native_prefix = _warmup_prefix(native_nan)
-        assert 40 <= legacy_prefix <= 120, (
+        # FFSTAT b4（SPEC v32 逐欄穩定點第①類）：縮尾輸出另遮不完整窗 window−1 列（縮尾窗取 rank 窗 240）⇒
+        # legacy 前綴＋239（實測 71→310）；native 於 12h 格縮尾窗約 20 根、遮 19–20 根 × 12 列≈228–240（實測 240→480）。
+        # 區間寬度同原式，只平移遮罩長度；穩態 NaN 全等與 native > legacy 不變（主委探針 2026-10-01）。
+        mask_rows = 240 - 1
+        assert 40 + mask_rows <= legacy_prefix <= 120 + mask_rows, (
             f"legacy warmup prefix {legacy_prefix} outside expected causal range "
-            f"(winsor/rank/zscore min_periods on 1h step-series; measured=71)"
+            f"(winsor/rank/zscore min_periods on 1h step-series + b4 incomplete-window mask; measured=310)"
         )
-        assert 200 <= native_prefix <= 280, (
+        assert 200 + 228 <= native_prefix <= 280 + 240, (
             f"native warmup prefix {native_prefix} outside expected causal range "
-            f"(scaled rank/zscore min_periods on 12h grid × ffill; measured=240)"
+            f"(scaled rank/zscore min_periods on 12h grid × ffill + b4 mask; measured=480)"
         )
         assert native_prefix > legacy_prefix, (
             f"native prefix {native_prefix} should exceed legacy {legacy_prefix} "

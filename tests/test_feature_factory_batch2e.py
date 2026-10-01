@@ -361,9 +361,16 @@ def test_t2b8_l65_fracdiff_per_group_feasible(tmp_path, monkeypatch):
                 "enabled": True,
                 "apply_to": "all",
                 "cache_d_star": False,
-            }
+            },
+            "calibration_bars": 20,  # FFSTAT：ADF 最少樣本數；本測試只驗逐群派發
         }
     )
+    # FFSTAT b3b：平穩化開啟時判定值只取校準封包（缺封包 fail-closed）⇒ 以 30 列前史建封包（封包本身另由 FF-STAT 驗收）
+    from tests.feature_engineering.ffstat_helpers import attach_unit_calibration
+
+    rng = np.random.default_rng(7)
+    pre_history = pd.DataFrame(np.cumsum(rng.standard_normal((30, 3)), axis=0), columns=["f_a_1", "f_a_2", "f_b_1"])
+    attach_unit_calibration(preprocessor, pre_history, timeframe="1h")
 
     calls = {"count": 0}
 

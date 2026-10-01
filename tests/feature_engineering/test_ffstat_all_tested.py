@@ -111,8 +111,10 @@ def test_untested_column_marked_and_not_counted_as_tested() -> None:
     klines = h.kline_frame().iloc[:800][["close", "volume"]].copy()
     klines["volume"] = np.nan
     pre_history, frame = klines.iloc[:600], klines.iloc[600:]
+    # v58：無週期脈絡之單元前處理器不得依週期推預設 N（fail-closed）⇒ 明示；前史 600 列足 500
     pre = FeaturePreprocessor({"fractional_differencing": {"enabled": False},
-                               "adf_differencing": {"enabled": True, "apply_to": "non_stationary"}})
+                               "adf_differencing": {"enabled": True, "apply_to": "non_stationary"},
+                               "calibration_bars": 500})
     h.attach_unit_calibration(pre, pre_history, ["close", "volume"])
     pre._get_non_stationary_columns(frame)
     dec = {col: d for (_, col), d in pre.stationarity_decisions().items()}
