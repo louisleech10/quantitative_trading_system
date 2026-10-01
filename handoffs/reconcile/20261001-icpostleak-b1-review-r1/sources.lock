@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "session_id": "20261001-icpostleak-b1-review-r1",
+  "expected_roster": [
+    "codex",
+    "composer",
+    "grok"
+  ],
+  "sources": [
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20261001-icpostleak-b1-review-r1/sources/20261001-icpostleak-b1-review-r1-codex.md",
+      "sha256": "b7d5b8056e31be2a6513c6c4a360761b3f859084167b794e90ddd62d91e56850",
+      "family": "codex"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20261001-icpostleak-b1-review-r1/sources/20261001-icpostleak-b1-review-r1-composer.md",
+      "sha256": "1ada2d2d5636db55c27416450565f79e8502a36b873e884d316338a533e117f7",
+      "family": "composer"
+    },
+    {
+      "realpath": "/Users/louis/Desktop/quantitative_trading_system/handoffs/reconcile/20261001-icpostleak-b1-review-r1/sources/20261001-icpostleak-b1-review-r1-grok.md",
+      "sha256": "cec58fceca2f590b281cc3a159cf1652ed57ea269d57a40f8b13d636970069b8",
+      "family": "grok"
+    }
+  ],
+  "freeze_ts": "2026-10-01T18:44:48Z",
+  "closure_state": "FROZEN",
+  "mode": "review",
+  "round_id": "4d45deef-1ff6-418f-8768-055d2ee7d2e6"
+}

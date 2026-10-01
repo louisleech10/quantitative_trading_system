@@ -366,14 +366,23 @@ def _dt_frame(index: pd.DatetimeIndex) -> pd.DataFrame:
     return pd.DataFrame({"close": real}, index=index)
 
 
-@pytest.mark.parametrize("case", ["reverse", "duplicate", "single_disorder"])
+@pytest.mark.parametrize("case", ["reverse", "duplicate", "single_disorder", "nat_after_valid", "nat_first"])
 def test_time_order_non_increasing_raises(case: str) -> None:
-    """Task 1.2：倒序／重複／單點亂序 ⇒ ValueError，訊息含首個違規位置。"""
+    """Task 1.2：倒序／重複／單點亂序／NaT ⇒ ValueError，訊息含首個違規位置。
+    NaT 兩例（審碼 r1）：int64 差分下「有效 → NaT」溢位成正值、「NaT → 有效」為正值，皆會漏擋。"""
     idx = pd.date_range("2026-01-01", periods=300, freq="h", tz="UTC")
     if case == "reverse":
         idx, pos = idx[::-1], 1
     elif case == "duplicate":
         idx, pos = idx.insert(150, idx[149]), 150
+    elif case == "nat_after_valid":
+        values = list(idx)
+        values[150] = pd.NaT
+        idx, pos = pd.DatetimeIndex(values), 150
+    elif case == "nat_first":
+        values = list(idx)
+        values[0] = pd.NaT
+        idx, pos = pd.DatetimeIndex(values), 0
     else:
         values = list(idx)
         values[200], values[201] = values[201], values[200]

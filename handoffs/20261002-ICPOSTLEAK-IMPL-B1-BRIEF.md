@@ -30,6 +30,7 @@ EXPECTED-DELTA:
 - api/services/ic_analysis_service.py、api/models/ic_models.py、api/routes/ic_analysis.py：IC 頁改經正式 `transform_selected`；`excluded_features`。
 - frontend/src/components/ic-analysis/ApplyTransformsResult.tsx、frontend/src/app/ic-analysis/page.tsx、frontend/src/hooks/useICAnalysis.ts：結果區元件與型別。
 - 測試：tests/feature_engineering/test_icpostleak.py、tests/api/test_icpostleak_api.py、tests/_golden/icpostleak/contract.json、既有三檔改寫（l65_v2_transforms、ff_causal_golden、native_tf_real_eth；只更新因遮罩而過期之期望，mutant 驗證改寫後仍會紅）。
+- 審碼 r1 修補：time_order.py 直接比較＋NaT 違規；test_icpostleak 之 NaT 兩例；handoffs/run_receipts/icpostleak_probes/probe_change_report.py（branchdiff）、probe_branch_diff_locate.py 與收據 20261002-icpostleak-branch-diff{,-locate}.json；盤點收據更正（詳見末段追加）。
 
 ## 已知既有問題（非本批引入）
 - 全新 checkout 之 `npm run build` 失敗：git 追蹤 `Select.tsx`／`Card.tsx` 而 import 為小寫（本機 core.ignorecase=true 遮蔽）；主樹 build rc=0。
@@ -37,3 +38,11 @@ EXPECTED-DELTA:
 
 ## 產出
 兩個 commit（Phase 1、Phase 2）；審碼 r1 由三家全面審。完成訊號逐字 `STATUS: DONE`。
+
+## 追加（審碼 r1 修補；`handoffs/reconcile/20261001-icpostleak-b1-review-r1/synth.md`）
+（以下各項同屬上方 EXPECTED-DELTA 段之範圍，於審碼 r1 後追加）
+- momentum/FeatureEngineering/preprocessing/time_order.py：相鄰直接比較（不相減）＋NaT 視為違規（審碼 r1 codex 第一條：int64 差分溢位使「有效→NaT」漏擋）。
+- tests/feature_engineering/test_icpostleak.py：`test_time_order_non_increasing_raises` 增 `nat_after_valid`、`nat_first`（改回 `np.diff` 寫法之 mutant 兩例紅）。
+- handoffs/run_receipts/icpostleak_probes/probe_change_report.py：`branchdiff` 子命令；收據 `handoffs/run_receipts/20261002-icpostleak-branch-diff.json`（SPEC Task 1.1 數值基準；42 對；殘留觸發成立）。
+- handoffs/run_receipts/icpostleak_probes/probe_branch_diff_locate.py＋收據 `handoffs/run_receipts/20261002-icpostleak-branch-diff-locate.json`：最大差異格定位。
+- handoffs/run_receipts/20261002-icpostleak-branch-inventory.txt：更正 sharded 進入條件之誤述（分派端另要求 not requires_slow）。

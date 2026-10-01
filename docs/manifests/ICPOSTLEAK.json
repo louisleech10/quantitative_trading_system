@@ -19,7 +19,8 @@
     "handoffs/run_receipts/icpostleak_probes/probe_formal_postic.py",
     "handoffs/run_receipts/icpostleak_probes/probe_order_clip.py",
     "handoffs/run_receipts/icpostleak_probes/probe_oracle_unmasked.py",
-    "handoffs/run_receipts/icpostleak_probes/probe_change_report.py"
+    "handoffs/run_receipts/icpostleak_probes/probe_change_report.py",
+    "handoffs/run_receipts/icpostleak_probes/probe_branch_diff_locate.py"
   ],
   "run_receipts": [
     {
@@ -51,6 +52,18 @@
       "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_change_report.py report <改前.npz> <改後.npz> <out>",
       "rc": 0,
       "honest_bounds": "改前＝HEAD worktree＋最新測試輔助；49 例中 35 例遮罩後區段 0 格差異（legacy／optimized／Polars 全部）；14 例 registry 系列差異＝改序、numba 累積式 zscore 核心、切片並行補 gaussian"
+    },
+    {
+      "path": "handoffs/run_receipts/20261002-icpostleak-branch-diff.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_change_report.py branchdiff <改後.npz> <out>",
+      "rc": 0,
+      "honest_bounds": "改後 npz 以主樹 HEAD 程式碼 dump（49 例）；42 對各分支對同組合 legacy；不排除格、legacy 為 0 之格另列；最大相對差 58.8（registry 系 rank+zscore，近零 z 值）、最大絕對差 0.0975（polars rank+zscore）⇒ SPEC §N 殘留觸發成立"
+    },
+    {
+      "path": "handoffs/run_receipts/20261002-icpostleak-branch-diff-locate.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_branch_diff_locate.py <改後.npz> <out>",
+      "rc": 0,
+      "honest_bounds": "每對只列最大絕對差一格；zscore 步之 float64 精確值以 legacy 前一步輸出重建（窗＝主窗、ddof=1）"
     }
   ],
   "batch_card": {
@@ -63,6 +76,8 @@
       "frontend/src/app/ic-analysis/page.tsx",
       "frontend/src/components/ic-analysis/ApplyTransformsResult.tsx",
       "frontend/src/hooks/useICAnalysis.ts",
+      "handoffs/run_receipts/20261002-icpostleak-branch-diff-locate.json",
+      "handoffs/run_receipts/20261002-icpostleak-branch-diff.json",
       "handoffs/run_receipts/20261002-icpostleak-branch-inventory.txt",
       "handoffs/run_receipts/20261002-icpostleak-change-report.json",
       "momentum/FeatureEngineering/polars_adapter.py",

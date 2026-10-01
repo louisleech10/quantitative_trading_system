@@ -20,8 +20,10 @@ ICPOSTLEAK Task 1.1 分支盤點收據（主委 2026-10-02；實作 worktree 基
 實作期發現之既有缺陷（一併修正，交實作審查）：
  a. _transform_array_slice（切片並行）漏做 gaussian：只有單群組路徑有 gaussian 後置，大群組被切片時 gaussian 被靜默略過
     → helper 統一含 gaussian；新測試 registry_parallel_split 分支＋mutant「回到改前切片實作」紅
- b. _stream_sharded_group_to_sink 之進入條件只看 can_use_numba_fast（replace），gaussian apply_to 非 all 時改前靜默略過
-    gaussian → helper 於該組合 fail-closed（ValueError）；生產不可達（FF L6.5 強制關 gaussian、post-IC 不經 registry）
+ b. _stream_sharded_group_to_sink 本身（改前）於 gaussian apply_to 非 all 時靜默略過 gaussian；分派端 can_shard_stream
+    （feature_preprocessor.py transform_registry_groups_to_sink）另要求 not _group_requires_slow_transform，而 gaussian
+    apply_to 非 all 即判 requires_slow ⇒ 經正式分派不可達（審碼 r1 codex 更正本行原「進入條件只看 can_use_numba_fast」之誤述）
+    → helper 於該組合 fail-closed（ValueError），作為直接呼叫時之防線；FF L6.5 生成設定另關 gaussian、post-IC 不經 registry
  c. 空 zscore 窗清單：新遮罩取 windows[0] 會 IndexError（由既有 test_zscore_empty_windows 抓出）→ 空清單用窗 1（遮罩無作用）
 
 API 層新增（momentum/factories.py，膨脹升級訊號檔，交實作審查）：
