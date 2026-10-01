@@ -278,7 +278,8 @@ def build_payload(h, timeframe: str, n: int, mode: str) -> dict:
     tfs = ["1h", "12h"] if mode == "multi" else [timeframe]
     payload = h.stat_payload(tfs, fracdiff=mode != "off", adf=mode != "off")
     payload["timeframes"]["primary"] = timeframe
-    payload["preprocessing"]["calibration_bars"] = n
+    if n > 0:  # 0＝不明示，依 FFSTAT v58 週期預設（日內 1000、一日以上 500）
+        payload["preprocessing"]["calibration_bars"] = n
     return payload
 
 
@@ -535,9 +536,7 @@ def main(only_one: bool = False) -> int:
         return 0 if all(r.get("rc") == 0 for r in rows) else 1
     _log("tier multi")
     tier_dir, tier_start, tier_end = WINDOWS["1h"]
-    tier = run_child([CONTRACT["cost_measure_symbols"][0], "1h", str(CONTRACT["calibration_n_default"]), "multi",
-                      tier_dir, tier_start, tier_end],
-                     {"FFACT_MEMORY_TIER": f"{CONTRACT['min_memory_tier_gb']}gb", "FFACT_MULTI_TF_PARALLEL": "1"})
+    tier = run_tier(tier_dir, tier_start, tier_end)
     tier.pop("decisions", None)
     problems = verdict(rows + off_rows + before_rows, tier)
     out = REPO / "handoffs" / "run_receipts" / f"{_dt.date.today():%Y%m%d}-ffstat-cost.json"
@@ -550,7 +549,30 @@ def main(only_one: bool = False) -> int:
     return 1 if problems else 0
 
 
+def run_tier(tier_dir: str, tier_start: str, tier_end: str) -> dict:
+    """8GB tier 多週期平行 run：N 不明示（依 v58 週期預設，即使用者裁定之預設設定）。"""
+    return run_child([CONTRACT["cost_measure_symbols"][0], "1h", "0", "multi", tier_dir, tier_start, tier_end],
+                     {"FFACT_MEMORY_TIER": f"{CONTRACT['min_memory_tier_gb']}gb", "FFACT_MULTI_TF_PARALLEL": "1"})
+
+
+def main_tier_only() -> int:
+    """只跑 8GB tier（v58 預設 N），寫 `<日期>-ffstat-cost-tier-v58.json`；problems 同 verdict 之 tier 部分。"""
+    tier_dir, tier_start, tier_end = WINDOWS["1h"]
+    tier = run_tier(tier_dir, tier_start, tier_end)
+    tier.pop("decisions", None)
+    problems = verdict([], tier)
+    out = REPO / "handoffs" / "run_receipts" / f"{_dt.date.today():%Y%m%d}-ffstat-cost-tier-v58.json"
+    out.write_text(json.dumps({"spec": "docs/FFSTAT_SPEC.md Task 4.1（v58 預設 N 之 8GB tier 重量）",
+                               "sleep_after_sample_seconds": SAMPLE_INTERVAL_S, "window": WINDOWS["1h"],
+                               "min_tier_multi_tf": tier, "problems": problems},
+                              ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(out)
+    return 1 if problems else 0
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--tier-only":
+        raise SystemExit(main_tier_only())
     if len(sys.argv) > 1 and sys.argv[1] == "--child":
         child(sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8])
     elif len(sys.argv) > 1 and sys.argv[1] == "--payload":

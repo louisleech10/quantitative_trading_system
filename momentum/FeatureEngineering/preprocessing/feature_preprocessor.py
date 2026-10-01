@@ -559,13 +559,15 @@ class FeaturePreprocessor:
 
     def _stationarity_n(self) -> int:
         """平穩化三路（ADF 差分候選、fracdiff 目標篩選、d* 搜尋）共用之樣本數 N（FFSTAT Task 2.2）：
-        當次原生週期於 `calibration_bars_by_timeframe` 之值，未列者用 `calibration_bars`（預設 500）。"""
+        當次原生週期之 N，決定規則見 `feature_config.resolve_calibration_bars`（FFSTAT v58）。"""
         return self._stationarity_n_for(self._decision_scope()[0])
 
     def _stationarity_n_for(self, timeframe: str) -> int:
-        """指定原生週期之 N（`calibration_bars_by_timeframe` 之值，未列者用 `calibration_bars`）。"""
-        by_timeframe = self._config.get("calibration_bars_by_timeframe") or {}
-        return int(by_timeframe.get(str(timeframe), self._config.get("calibration_bars", 500)))
+        """指定原生週期之 N（`feature_config.resolve_calibration_bars`：週期分設 → 明示值 → 依週期長度預設）。"""
+        from momentum.FeatureEngineering.feature_config import resolve_calibration_bars
+
+        return resolve_calibration_bars(str(timeframe), self._config.get("calibration_bars"),
+                                        self._config.get("calibration_bars_by_timeframe") or {})
 
     def _calibration_bars(self) -> int:
         return self._stationarity_n()

@@ -1,0 +1,51 @@
+{
+ "spec": "docs/FFSTAT_SPEC.md Task 4.1（v58 預設 N 之 8GB tier 重量）",
+ "sleep_after_sample_seconds": 0.05,
+ "window": [
+  "data_cache/feature_klines",
+  "2025-10-01",
+  "2025-12-31"
+ ],
+ "min_tier_multi_tf": {
+  "rc": 0,
+  "seconds_total": 263.38,
+  "seconds_calibration": 19.52,
+  "seconds_adf": 168.54,
+  "seconds_dstar": 37.69,
+  "seconds_public_warmup": 26.79,
+  "warmup_doublings": 0,
+  "warmup_depth_bars": 31056,
+  "calibration_range": [
+   "2024-03-27 00:00:00+00:00",
+   "2025-09-30 23:00:00+00:00"
+  ],
+  "public_warmup_range": [
+   "2021-11-07 14:24:00+00:00",
+   "2025-10-01 00:00:00+00:00"
+  ],
+  "domain_overlap_bars": 13271,
+  "peak_rss_public_bytes": 1472331776,
+  "peak_uss_public_bytes": 1372176384,
+  "peak_judged_public_bytes": 1372176384,
+  "max_sample_gap_seconds": 20.2493,
+  "peak_rss_calibration_bytes": 1755791360,
+  "peak_uss_calibration_bytes": 1654505472,
+  "peak_judged_calibration_bytes": 1654505472,
+  "peak_rss_public_warmup_bytes": 2143272960,
+  "peak_uss_public_warmup_bytes": 2039169024,
+  "peak_judged_public_warmup_bytes": 2039169024,
+  "samples_rss_fallback": 2433,
+  "peak_rss_handoff_bytes": 1365934080,
+  "peak_judged_handoff_bytes": 1365934080,
+  "workers_submitted": 1,
+  "kernel_max_rss_self_bytes": 2145320960,
+  "kernel_max_rss_children_bytes": 367820800,
+  "calibration_tmp_leftover": 0,
+  "late_columns_counted": 6219,
+  "late_columns_skipped": 952,
+  "late_alpha": 0.1,
+  "agreement_vs_late": 0.8847,
+  "danger_rate_vs_late": 0.0717
+ },
+ "problems": []
+}

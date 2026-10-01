@@ -170,6 +170,10 @@
   ],
   "canonical_nan_bits_hex": "7ff8000000000000",
   "calibration_n_default": 500,
+  "calibration_n_default_by_length": {
+    "intraday": 1000,
+    "daily_and_above": 500
+  },
   "n_config_key": "preprocessing.calibration_bars",
   "n_by_timeframe_config_key": "preprocessing.calibration_bars_by_timeframe",
   "cost_measure_n": [

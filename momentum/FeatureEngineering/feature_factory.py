@@ -2224,7 +2224,10 @@ class FeatureFactory:
     def _calibrate_timeframe(self, cal: Any, symbol: str, timeframe: str, config: FactoryConfig,
                              output_start: pd.Timestamp) -> Any:
         """單一原生週期之校準：讀前史 → 前史深度切片 → 校準域 L1–L6 → 每欄起始日前最後 N 個有效值 → 封包。"""
-        n = int(config.preprocessing.calibration_bars_by_timeframe.get(timeframe, config.preprocessing.calibration_bars))
+        from momentum.FeatureEngineering.feature_config import resolve_calibration_bars
+
+        n = resolve_calibration_bars(timeframe, config.preprocessing.calibration_bars,
+                                     config.preprocessing.calibration_bars_by_timeframe)
         try:
             klines = cal.load_calibration_klines(self, symbol, timeframe, None, output_start)
         except CalibrationError:

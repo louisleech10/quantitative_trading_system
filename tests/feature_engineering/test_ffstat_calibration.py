@@ -31,6 +31,29 @@ REPO = Path(__file__).resolve().parents[2]
 OUT_START = pd.Timestamp(h.WINDOW[0], tz="UTC")
 
 
+def _default_n(timeframe: str) -> int:
+    """契約之 N 預設（FFSTAT v58：未明示時短於一日 1000、一日以上 500）；獨立於生產決定函式之期望值。"""
+    by_length = CONTRACT["calibration_n_default_by_length"]
+    return by_length["intraday"] if pd.Timedelta(timeframe) < pd.Timedelta("1d") else by_length["daily_and_above"]
+
+
+def test_calibration_n_default_by_timeframe_and_precedence() -> None:
+    """FFSTAT v58（使用者 2026-10-01 裁定）：N 之決定順序——週期分設最優先；否則明示 `calibration_bars` 全週期
+    適用；否則依週期長度預設（5m／1h／12h＝1000、1d／1w＝500）；無法換算之週期拋錯。設定預設 `calibration_bars`
+    為 None（未明示）。"""
+    from momentum.FeatureEngineering.feature_config import PreprocessingConfig, resolve_calibration_bars
+
+    for tf in ("5m", "15m", "1h", "4h", "12h", "1d", "1w"):
+        assert resolve_calibration_bars(tf, None, {}) == _default_n(tf), tf
+    assert _default_n("1h") == 1000 and _default_n("12h") == 1000 and _default_n("1d") == 500
+    assert resolve_calibration_bars("1h", 300, {}) == 300 and resolve_calibration_bars("1d", 300, {}) == 300
+    assert resolve_calibration_bars("1h", 300, {"1h": 700}) == 700
+    assert resolve_calibration_bars("12h", None, {"1h": 700}) == 1000
+    with pytest.raises(ValueError):
+        resolve_calibration_bars("bogus", None, {})
+    assert PreprocessingConfig().calibration_bars is None
+
+
 # ---------------------------------------------------------------- 純函式（真實 kline 切片）
 
 def _independent_sha(frame: pd.DataFrame) -> str:
@@ -350,7 +373,7 @@ def test_every_column_calibrated_before_output_start(user_run: Dict[str, Any]) -
             assert d["adf_pvalue"] is None and d["n"] is None, col
             continue
         assert pd.Timestamp(d["calibration_end"]) < OUT_START, col
-        assert d["n"] == CONTRACT["calibration_n_default"], col
+        assert d["n"] == _default_n(d["timeframe"]), col
 
 
 def test_boundary_11_user_start_source_is_user(user_run: Dict[str, Any]) -> None:
@@ -581,9 +604,9 @@ def test_second_tf_insufficient_history_column_skipped(path_env: Dict[str, str],
     assert not [c for c, d in dec.items() if d["timeframe"] == "12h" and d["adf_pvalue"] is not None]
     for col, d in short.items():
         assert d["adf_pvalue"] is None and not d["fracdiff"] and not d["adf_differenced"], col
-        assert 0 < int(d["calibration_shortfall"]) <= CONTRACT["calibration_n_default"], col
+        assert 0 < int(d["calibration_shortfall"]) <= _default_n(d["timeframe"]), col
     tested_1h = [d for d in dec.values() if d["timeframe"] == "1h" and d["adf_pvalue"] is not None]
-    assert tested_1h and all(d["n"] == CONTRACT["calibration_n_default"] for d in tested_1h)
+    assert tested_1h and all(d["n"] == _default_n("1h") for d in tested_1h)
     assert result.metadata["quality_status"] == "partial"
     assert f"{event}:{len(short)}" in result.metadata["failure_reasons"]
     assert result.metadata[h.META["summary"]]["calibration_insufficient"] == len(short)
@@ -746,7 +769,7 @@ def test_boundary_06_late_born_column_fails_with_name_and_shortfall(tmp_path: Pa
     assert short
     for col, d in short.items():
         assert d["adf_pvalue"] is None and not d["fracdiff"] and not d["adf_differenced"], col
-        assert 0 < int(d["calibration_shortfall"]) <= CONTRACT["calibration_n_default"], col
+        assert 0 < int(d["calibration_shortfall"]) <= _default_n(d["timeframe"]), col
     assert result.metadata["quality_status"] == "partial"
     assert f"{event}:{len(short)}" in result.metadata["failure_reasons"]
 

@@ -196,6 +196,27 @@ def _reject_step_sample_size(data: Any, step: str) -> Any:
 
 # FFSTAT Task 2.2：ADF 最少樣本數（少於此數之校準窗無法做 ADF）
 MIN_CALIBRATION_BARS = 20
+# FFSTAT v58（使用者 2026-10-01 裁定）：未明示 N 時依原生週期長度預設——短於一日 1000、一日以上 500
+CALIBRATION_BARS_INTRADAY_DEFAULT = 1000
+CALIBRATION_BARS_DAILY_DEFAULT = 500
+
+
+def resolve_calibration_bars(timeframe: str, calibration_bars: Optional[int],
+                             by_timeframe: Optional[Dict[str, int]]) -> int:
+    """平穩化校準長度 N（FFSTAT v58 §C）之唯一決定處：`calibration_bars_by_timeframe` 列有該週期者用之；否則
+    `calibration_bars` 有明示值者全週期用之；否則依週期長度預設（短於一日 1000、一日以上 500）。週期長度由週期字串
+    換算（`pd.Timedelta`），不依市場交易時數；無法換算之週期 fail-closed。"""
+    import pandas as pd
+
+    if by_timeframe and str(timeframe) in by_timeframe:
+        return int(by_timeframe[str(timeframe)])
+    if calibration_bars is not None:
+        return int(calibration_bars)
+    try:
+        length = pd.Timedelta(str(timeframe))
+    except ValueError as exc:
+        raise ValueError(f"無法由週期 {timeframe!r} 換算長度以決定校準長度預設") from exc
+    return CALIBRATION_BARS_INTRADAY_DEFAULT if length < pd.Timedelta("1d") else CALIBRATION_BARS_DAILY_DEFAULT
 
 
 class ADFDifferencingConfig(BaseModel):
@@ -262,9 +283,10 @@ class PreprocessingConfig(BaseModel):
     enabled: bool = True
     # ⚠️必須 True,False=look-ahead 洩漏,禁關,變更需委員會
     causal_preprocessing: bool = True
-    # FFSTAT Task 2.2：平穩化校準窗長 N（三路 ADF 同一樣本數；預設 500，最終預設待 Task 4.1 實測後使用者裁定）
-    calibration_bars: int = Field(default=500, ge=MIN_CALIBRATION_BARS)
-    # 依原生週期分設 N（未列之週期用 calibration_bars）；N 為觀測筆數，不隨週期縮放
+    # FFSTAT Task 2.2／v58：平穩化校準窗長 N（三路 ADF 同一樣本數）；None＝依週期預設（日內 1000、一日以上 500），
+    # 明示值則全週期適用；決定處唯一：`resolve_calibration_bars`
+    calibration_bars: Optional[int] = Field(default=None, ge=MIN_CALIBRATION_BARS)
+    # 依原生週期分設 N（最優先）；N 為觀測筆數，不隨週期縮放
     calibration_bars_by_timeframe: Dict[str, int] = Field(default_factory=dict)
     # replace：原地覆蓋，確保跨標的欄位名稱一致（業界標準）
     # append 會產生 _diff1/_diff2/_fracdiff，不同標的欄位名可能不同 → 多標的訓練 schema 錯誤
