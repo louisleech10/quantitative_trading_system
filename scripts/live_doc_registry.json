@@ -510,6 +510,10 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/ICPOSTLEAK_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/ICRESULT_PAGING_SPEC.md",
       "LIVE-SPEC"
     ],

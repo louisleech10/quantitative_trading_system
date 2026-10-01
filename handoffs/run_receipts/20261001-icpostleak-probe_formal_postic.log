@@ -1,0 +1,4 @@
+gaussian               cols=['close', 'volume'] 前 2999 列值改變格數=0；首個有限值列=[62, 62]
+rank                   cols=['close', 'volume'] 前 2999 列值改變格數=0；首個有限值列=[62, 62]
+zscore                 cols=['close', 'volume'] 前 2999 列值改變格數=0；首個有限值列=[0, 0]
+rank_zscore_gaussian   cols=['close', 'volume'] 前 2999 列值改變格數=0；首個有限值列=[124, 124]
