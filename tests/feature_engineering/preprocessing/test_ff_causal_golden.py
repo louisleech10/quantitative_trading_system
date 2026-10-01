@@ -24,8 +24,9 @@ def _real_numeric_frame() -> pd.DataFrame:
     if not REAL_BASELINE.exists():
         pytest.skip("missing real ETHUSDT L6.5 baseline parquet")
     frame = pd.read_parquet(REAL_BASELINE)
-    # FFSTAT b4：縮尾窗 252 之不完整窗遮罩後 rank 再需暖身 ⇒ 320 列無可比值，改 640 列（基準共 2000 列）
-    numeric = frame.select_dtypes(include=[np.number]).iloc[:640, :3]
+    # FFSTAT b4：縮尾窗 252 之不完整窗遮罩後 rank 再需暖身 ⇒ 320 列無可比值，改 640 列；ICPOSTLEAK：gaussian 另遮
+    # 窗未滿（基準首個有限值於第 199 列 ⇒ 縮尾後 450、gaussian 後 701）⇒ 改 1000 列（基準共 2000 列）
+    numeric = frame.select_dtypes(include=[np.number]).iloc[:1000, :3]
     if numeric.empty or len(numeric) < 260:
         pytest.skip("real baseline does not have enough numeric rows")
     return numeric.astype(float)
@@ -79,6 +80,11 @@ def test_causal_preprocessing_changes_legacy_values_on_real_baseline() -> None:
         index=frame.index,
         columns=frame.columns,
     )
+    # ICPOSTLEAK Task 1.1：gaussian 輸出另遮窗未滿之列（錨點＝gaussian 之輸入 clipped 之逐欄首個有限值、窗 252）
+    for column in expected.columns:
+        finite = np.flatnonzero(np.isfinite(clipped[column].to_numpy(dtype=np.float64)))
+        cut = len(expected) if finite.size == 0 else min(int(finite[0]) + window - 1, len(expected))
+        expected.iloc[:cut, expected.columns.get_loc(column)] = np.nan
 
     assert np.isfinite(expected.to_numpy(np.float64)).sum() > 0, "前提：遮罩後仍有可比之有限值"
     assert list(forced.columns) == list(causal.columns)

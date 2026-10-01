@@ -1,0 +1,28 @@
+ICPOSTLEAK Task 1.1 分支盤點收據（主委 2026-10-02；實作 worktree 基於 7a8629e7）
+
+盤點命令（於實作前 HEAD 7a8629e7 之 momentum/FeatureEngineering/preprocessing/feature_preprocessor.py）：
+  grep -nE "_rolling_rank_2d_v2\(|_gaussian_2d\(|_rolling_zscore_2d\(|polars_l65_rank_transform\(|polars_l65_adaptive_zscore\(|transform_array_fast = transform_context" feature_preprocessor.py
+
+三項轉換之實作分支與本票處置：
+① legacy  _apply_rank_transform／_apply_gaussian_normalize／_apply_adaptive_zscore（replace 與 append）
+   → 各核心之呼叫點外套 stable_mask.mask_incomplete_window_by_input_2d（錨點＝步驟輸入）
+② optimized  _transform_single_optimized_df 之 rank／gaussian／zscore 三呼叫點 → 同上
+③ Polars  _transform_single_polars：rank／zscore 之 Polars 核心後經 _polars_mask_columns 遮罩並回存（float32＋null）；
+   gaussian 與 append 回落之 pandas 經 ①
+④ registry 快速路徑——SPEC §A 列三處，實作盤點得**四處**呼叫融合核心 transform_array_fast：
+   _transform_array_slice（大群組切片並行，ThreadPool）← SPEC 未列，盤點補入
+   _transform_single_group、_transform_single_group_to_arrays、_stream_sharded_group_to_sink
+   → 四處統一改呼叫新 helper _registry_fast_transform：縮尾 → rank → gaussian → zscore（正式順序，同 legacy），
+     每步遮罩；改前順序為 rank→zscore（融合）再後置 gaussian
+⑤ chunked  _stream_single_group_chunked_to_sink：僅 requires_slow（append 或 ADF／fracdiff）時觸發，每塊呼叫
+   _transform_single（① legacy）⇒ 由 ① 涵蓋
+
+實作期發現之既有缺陷（一併修正，交實作審查）：
+ a. _transform_array_slice（切片並行）漏做 gaussian：只有單群組路徑有 gaussian 後置，大群組被切片時 gaussian 被靜默略過
+    → helper 統一含 gaussian；新測試 registry_parallel_split 分支＋mutant「回到改前切片實作」紅
+ b. _stream_sharded_group_to_sink 之進入條件只看 can_use_numba_fast（replace），gaussian apply_to 非 all 時改前靜默略過
+    gaussian → helper 於該組合 fail-closed（ValueError）；生產不可達（FF L6.5 強制關 gaussian、post-IC 不經 registry）
+ c. 空 zscore 窗清單：新遮罩取 windows[0] 會 IndexError（由既有 test_zscore_empty_windows 抓出）→ 空清單用窗 1（遮罩無作用）
+
+API 層新增（momentum/factories.py，膨脹升級訊號檔，交實作審查）：
+  create_post_ic_transform_config、ratio_unsafe_category（以模組屬性呼叫 feature_preprocessor._is_ratio_unsafe_column）

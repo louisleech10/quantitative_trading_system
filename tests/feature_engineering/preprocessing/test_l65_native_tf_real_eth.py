@@ -279,22 +279,22 @@ class TestRealEthStatisticalDivergence:
 
         legacy_prefix = _warmup_prefix(legacy_nan)
         native_prefix = _warmup_prefix(native_nan)
-        # FFSTAT b4（SPEC v32 逐欄穩定點第①類）：縮尾輸出另遮不完整窗 window−1 列（縮尾窗取 rank 窗 240）⇒
-        # legacy 前綴＋239（實測 71→310）；native 於本固定 fixture 之 native→primary 映射下實測位移 240 列（240→480）。
-        # 兩者各以單一位移平移、區間寬度同原式（legacy 80、native 80）；穩態 NaN 全等與 native > legacy 不變（主委探針 2026-10-01）。
-        mask_rows = 240 - 1
-        native_shift = 240
-        assert 40 + mask_rows <= legacy_prefix <= 120 + mask_rows, (
+        # FFSTAT b4 縮尾＋ICPOSTLEAK rank／zscore 之窗未滿遮罩（各步錨點＝步驟輸入首個有限值、遮 窗−1）：
+        # legacy（1h 列）下界＝縮尾 239＋rank 239＋zscore 主窗 119＝597（實測 609）；native（12h 根，窗 240→20、
+        # zscore 120→10）下界＝(19＋19＋9)×12＝564（實測 588）。遮罩主導前綴後，改前「native > legacy」（源於 min_periods
+        # 經 ffill 放大）不再成立，改以各自遮罩下界斷言；區間寬度同原式 80；穩態 NaN 全等不變（主委探針 2026-10-02）。
+        legacy_floor = 239 + 239 + 119
+        native_floor = (19 + 19 + 9) * 12
+        assert legacy_floor <= legacy_prefix <= legacy_floor + 80, (
             f"legacy warmup prefix {legacy_prefix} outside expected causal range "
-            f"(winsor/rank/zscore min_periods on 1h step-series + b4 incomplete-window mask; measured=310)"
+            f"(winsor/rank/zscore incomplete-window masks on 1h step-series; measured=609)"
         )
-        assert 200 + native_shift <= native_prefix <= 280 + native_shift, (
+        assert native_floor <= native_prefix <= native_floor + 80, (
             f"native warmup prefix {native_prefix} outside expected causal range "
-            f"(scaled rank/zscore min_periods on 12h grid × ffill + b4 mask; measured=480)"
+            f"(scaled winsor/rank/zscore masks on 12h grid × ffill; measured=588)"
         )
-        assert native_prefix > legacy_prefix, (
-            f"native prefix {native_prefix} should exceed legacy {legacy_prefix} "
-            f"(coarse-grid min_periods upscaled via forward-fill)"
+        assert legacy_prefix >= legacy_floor and native_prefix >= native_floor, (
+            f"prefixes {legacy_prefix}/{native_prefix} below their mask floors {legacy_floor}/{native_floor}"
         )
 
         # Steady-state (past the longer warmup) must share identical NaN positions.

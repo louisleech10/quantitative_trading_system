@@ -1,0 +1,2710 @@
+{
+ "schema_version": 1,
+ "command": "probe_change_report.py report",
+ "exit_code": 0,
+ "spec": "docs/ICPOSTLEAK_SPEC.md §G 改前對照收據（資訊性）",
+ "summary": {
+  "cases": 49,
+  "suffix_identical_cases": [
+   "legacy|gaussian",
+   "legacy|rank",
+   "legacy|rank+gaussian",
+   "legacy|rank+zscore",
+   "legacy|rank+zscore+gaussian",
+   "legacy|zscore",
+   "legacy|zscore+gaussian",
+   "optimized|gaussian",
+   "optimized|rank",
+   "optimized|rank+gaussian",
+   "optimized|rank+zscore",
+   "optimized|rank+zscore+gaussian",
+   "optimized|zscore",
+   "optimized|zscore+gaussian",
+   "polars|gaussian",
+   "polars|rank",
+   "polars|rank+gaussian",
+   "polars|rank+zscore",
+   "polars|rank+zscore+gaussian",
+   "polars|zscore",
+   "polars|zscore+gaussian",
+   "registry_parallel_split|rank",
+   "registry_parallel_split|zscore",
+   "registry_sink_sharded|gaussian",
+   "registry_sink_sharded|rank",
+   "registry_sink_sharded|rank+gaussian",
+   "registry_sink_sharded|zscore",
+   "registry_sink|gaussian",
+   "registry_sink|rank",
+   "registry_sink|rank+gaussian",
+   "registry_sink|zscore",
+   "registry|gaussian",
+   "registry|rank",
+   "registry|rank+gaussian",
+   "registry|zscore"
+  ],
+  "suffix_changed_cases": [
+   "registry_parallel_split|gaussian",
+   "registry_parallel_split|rank+gaussian",
+   "registry_parallel_split|rank+zscore",
+   "registry_parallel_split|rank+zscore+gaussian",
+   "registry_parallel_split|zscore+gaussian",
+   "registry_sink_sharded|rank+zscore",
+   "registry_sink_sharded|rank+zscore+gaussian",
+   "registry_sink_sharded|zscore+gaussian",
+   "registry_sink|rank+zscore",
+   "registry_sink|rank+zscore+gaussian",
+   "registry_sink|zscore+gaussian",
+   "registry|rank+zscore",
+   "registry|rank+zscore+gaussian",
+   "registry|zscore+gaussian"
+  ]
+ },
+ "rows": [
+  {
+   "case": "legacy|gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 522,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 902,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 621,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|rank+zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 1001,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 119,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 499,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "legacy|zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 522,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 902,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 621,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|rank+zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 1001,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 119,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 499,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "optimized|zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 522,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 902,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 621,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|rank+zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 1001,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 119,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 499,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "polars|zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|gaussian",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 251,
+   "masked_rows_added": 251,
+   "suffix_diff_cells": 2749,
+   "suffix_max_abs_diff": 73574.26133012772
+  },
+  {
+   "case": "registry_parallel_split|gaussian",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 251,
+   "masked_rows_added": 251,
+   "suffix_diff_cells": 2749,
+   "suffix_max_abs_diff": 23216.646095752716
+  },
+  {
+   "case": "registry_parallel_split|gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 271,
+   "masked_rows_added": 251,
+   "suffix_diff_cells": 2729,
+   "suffix_max_abs_diff": 73027.19101762772
+  },
+  {
+   "case": "registry_parallel_split|gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 265,
+   "masked_rows_added": 251,
+   "suffix_diff_cells": 2735,
+   "suffix_max_abs_diff": 85.50056505203247
+  },
+  {
+   "case": "registry_parallel_split|gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 265,
+   "masked_rows_added": 251,
+   "suffix_diff_cells": 2735,
+   "suffix_max_abs_diff": 1628.2548604011536
+  },
+  {
+   "case": "registry_parallel_split|gaussian",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 651,
+   "masked_rows_added": 251,
+   "suffix_diff_cells": 2349,
+   "suffix_max_abs_diff": 73574.26133012772
+  },
+  {
+   "case": "registry_parallel_split|rank",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|rank",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|rank",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|rank",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|rank",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|rank",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|rank+gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 502,
+   "masked_rows_added": 440,
+   "suffix_diff_cells": 2498,
+   "suffix_max_abs_diff": 3.325393855571747
+  },
+  {
+   "case": "registry_parallel_split|rank+gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 502,
+   "masked_rows_added": 440,
+   "suffix_diff_cells": 2498,
+   "suffix_max_abs_diff": 2.7222192510962486
+  },
+  {
+   "case": "registry_parallel_split|rank+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 522,
+   "masked_rows_added": 440,
+   "suffix_diff_cells": 2478,
+   "suffix_max_abs_diff": 3.4880922436714172
+  },
+  {
+   "case": "registry_parallel_split|rank+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 516,
+   "masked_rows_added": 440,
+   "suffix_diff_cells": 2484,
+   "suffix_max_abs_diff": 2.6706319469958544
+  },
+  {
+   "case": "registry_parallel_split|rank+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 516,
+   "masked_rows_added": 440,
+   "suffix_diff_cells": 2484,
+   "suffix_max_abs_diff": 2.9325367212295532
+  },
+  {
+   "case": "registry_parallel_split|rank+gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 902,
+   "masked_rows_added": 440,
+   "suffix_diff_cells": 2098,
+   "suffix_max_abs_diff": 3.325393855571747
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2638,
+   "suffix_max_abs_diff": 0.00044608116149902344
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2613,
+   "suffix_max_abs_diff": 3.337860107421875e-06
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2621,
+   "suffix_max_abs_diff": 0.046239376068115234
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2564,
+   "suffix_max_abs_diff": 5.9604644775390625e-06
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2553,
+   "suffix_max_abs_diff": 1.9550323486328125e-05
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2234,
+   "suffix_max_abs_diff": 0.0006358623504638672
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 601,
+   "masked_rows_added": 539,
+   "suffix_diff_cells": 2399,
+   "suffix_max_abs_diff": 2.6827075481414795
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 601,
+   "masked_rows_added": 539,
+   "suffix_diff_cells": 2399,
+   "suffix_max_abs_diff": 1.7406830787658691
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 621,
+   "masked_rows_added": 539,
+   "suffix_diff_cells": 2379,
+   "suffix_max_abs_diff": 3.455490954220295
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 615,
+   "masked_rows_added": 539,
+   "suffix_diff_cells": 2385,
+   "suffix_max_abs_diff": 1.6068367958068848
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 615,
+   "masked_rows_added": 539,
+   "suffix_diff_cells": 2385,
+   "suffix_max_abs_diff": 2.781865358352661
+  },
+  {
+   "case": "registry_parallel_split|rank+zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 1001,
+   "masked_rows_added": 539,
+   "suffix_diff_cells": 1999,
+   "suffix_max_abs_diff": 2.6827454566955566
+  },
+  {
+   "case": "registry_parallel_split|zscore",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|zscore",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 119,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|zscore",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 499,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_parallel_split|zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 350,
+   "masked_rows_added": 350,
+   "suffix_diff_cells": 2650,
+   "suffix_max_abs_diff": 2.7230656147003174
+  },
+  {
+   "case": "registry_parallel_split|zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 350,
+   "masked_rows_added": 350,
+   "suffix_diff_cells": 2650,
+   "suffix_max_abs_diff": 5.009443044662476
+  },
+  {
+   "case": "registry_parallel_split|zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 370,
+   "masked_rows_added": 350,
+   "suffix_diff_cells": 2630,
+   "suffix_max_abs_diff": 4.9465943574905396
+  },
+  {
+   "case": "registry_parallel_split|zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 364,
+   "masked_rows_added": 350,
+   "suffix_diff_cells": 2636,
+   "suffix_max_abs_diff": 1.199974775314331
+  },
+  {
+   "case": "registry_parallel_split|zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 364,
+   "masked_rows_added": 350,
+   "suffix_diff_cells": 2636,
+   "suffix_max_abs_diff": 2.4094865322113037
+  },
+  {
+   "case": "registry_parallel_split|zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 750,
+   "masked_rows_added": 350,
+   "suffix_diff_cells": 2250,
+   "suffix_max_abs_diff": 2.726914405822754
+  },
+  {
+   "case": "registry_sink_sharded|gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 522,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 902,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2638,
+   "suffix_max_abs_diff": 0.00044608116149902344
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2613,
+   "suffix_max_abs_diff": 3.337860107421875e-06
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2621,
+   "suffix_max_abs_diff": 0.046239376068115234
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2564,
+   "suffix_max_abs_diff": 5.9604644775390625e-06
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2553,
+   "suffix_max_abs_diff": 1.9550323486328125e-05
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2234,
+   "suffix_max_abs_diff": 0.0006358623504638672
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2399,
+   "suffix_max_abs_diff": 2.389391303062439
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2399,
+   "suffix_max_abs_diff": 1.8036305904388428
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 621,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2379,
+   "suffix_max_abs_diff": 3.433451309800148
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2385,
+   "suffix_max_abs_diff": 1.914608120918274
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2385,
+   "suffix_max_abs_diff": 3.3103522062301636
+  },
+  {
+   "case": "registry_sink_sharded|rank+zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 1001,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 1999,
+   "suffix_max_abs_diff": 2.3893851041793823
+  },
+  {
+   "case": "registry_sink_sharded|zscore",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|zscore",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 119,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|zscore",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 499,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink_sharded|zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2650,
+   "suffix_max_abs_diff": 3.2686233520507812
+  },
+  {
+   "case": "registry_sink_sharded|zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2650,
+   "suffix_max_abs_diff": 1.4199170470237732
+  },
+  {
+   "case": "registry_sink_sharded|zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2630,
+   "suffix_max_abs_diff": 3.9394227862358093
+  },
+  {
+   "case": "registry_sink_sharded|zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2636,
+   "suffix_max_abs_diff": 1.2211300134658813
+  },
+  {
+   "case": "registry_sink_sharded|zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2636,
+   "suffix_max_abs_diff": 2.210118293762207
+  },
+  {
+   "case": "registry_sink_sharded|zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2250,
+   "suffix_max_abs_diff": 3.26859712600708
+  },
+  {
+   "case": "registry_sink|gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 522,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 902,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|rank+zscore",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2638,
+   "suffix_max_abs_diff": 0.00044608116149902344
+  },
+  {
+   "case": "registry_sink|rank+zscore",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2613,
+   "suffix_max_abs_diff": 3.337860107421875e-06
+  },
+  {
+   "case": "registry_sink|rank+zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2621,
+   "suffix_max_abs_diff": 0.046239376068115234
+  },
+  {
+   "case": "registry_sink|rank+zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2564,
+   "suffix_max_abs_diff": 5.9604644775390625e-06
+  },
+  {
+   "case": "registry_sink|rank+zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2553,
+   "suffix_max_abs_diff": 1.9550323486328125e-05
+  },
+  {
+   "case": "registry_sink|rank+zscore",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2234,
+   "suffix_max_abs_diff": 0.0006358623504638672
+  },
+  {
+   "case": "registry_sink|rank+zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2399,
+   "suffix_max_abs_diff": 2.389391303062439
+  },
+  {
+   "case": "registry_sink|rank+zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2399,
+   "suffix_max_abs_diff": 1.8036305904388428
+  },
+  {
+   "case": "registry_sink|rank+zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 621,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2379,
+   "suffix_max_abs_diff": 3.433451309800148
+  },
+  {
+   "case": "registry_sink|rank+zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2385,
+   "suffix_max_abs_diff": 1.914608120918274
+  },
+  {
+   "case": "registry_sink|rank+zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2385,
+   "suffix_max_abs_diff": 3.3103522062301636
+  },
+  {
+   "case": "registry_sink|rank+zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 1001,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 1999,
+   "suffix_max_abs_diff": 2.3893851041793823
+  },
+  {
+   "case": "registry_sink|zscore",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|zscore",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 119,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|zscore",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 499,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry_sink|zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2650,
+   "suffix_max_abs_diff": 3.2686233520507812
+  },
+  {
+   "case": "registry_sink|zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2650,
+   "suffix_max_abs_diff": 1.4199170470237732
+  },
+  {
+   "case": "registry_sink|zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2630,
+   "suffix_max_abs_diff": 3.9394227862358093
+  },
+  {
+   "case": "registry_sink|zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2636,
+   "suffix_max_abs_diff": 1.2211300134658813
+  },
+  {
+   "case": "registry_sink|zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2636,
+   "suffix_max_abs_diff": 2.210118293762207
+  },
+  {
+   "case": "registry_sink|zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2250,
+   "suffix_max_abs_diff": 3.26859712600708
+  },
+  {
+   "case": "registry|gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 251,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 271,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 265,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 651,
+   "masked_rows_added": 189,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 502,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 522,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 516,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 902,
+   "masked_rows_added": 378,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|rank+zscore",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2638,
+   "suffix_max_abs_diff": 0.00044608116149902344
+  },
+  {
+   "case": "registry|rank+zscore",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2613,
+   "suffix_max_abs_diff": 3.337860107421875e-06
+  },
+  {
+   "case": "registry|rank+zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2621,
+   "suffix_max_abs_diff": 0.046239376068115234
+  },
+  {
+   "case": "registry|rank+zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2564,
+   "suffix_max_abs_diff": 5.9604644775390625e-06
+  },
+  {
+   "case": "registry|rank+zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2553,
+   "suffix_max_abs_diff": 1.9550323486328125e-05
+  },
+  {
+   "case": "registry|rank+zscore",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2234,
+   "suffix_max_abs_diff": 0.0006358623504638672
+  },
+  {
+   "case": "registry|rank+zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2399,
+   "suffix_max_abs_diff": 2.389391303062439
+  },
+  {
+   "case": "registry|rank+zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 124,
+   "first_finite_after": 601,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2399,
+   "suffix_max_abs_diff": 1.8036305904388428
+  },
+  {
+   "case": "registry|rank+zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 144,
+   "first_finite_after": 621,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2379,
+   "suffix_max_abs_diff": 3.433451309800148
+  },
+  {
+   "case": "registry|rank+zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2385,
+   "suffix_max_abs_diff": 1.914608120918274
+  },
+  {
+   "case": "registry|rank+zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 138,
+   "first_finite_after": 615,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 2385,
+   "suffix_max_abs_diff": 3.3103522062301636
+  },
+  {
+   "case": "registry|rank+zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 524,
+   "first_finite_after": 1001,
+   "masked_rows_added": 477,
+   "suffix_diff_cells": 1999,
+   "suffix_max_abs_diff": 2.3893851041793823
+  },
+  {
+   "case": "registry|zscore",
+   "column": "close",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|zscore",
+   "column": "volume",
+   "first_finite_before": 0,
+   "first_finite_after": 99,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|zscore",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 20,
+   "first_finite_after": 119,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|zscore",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|zscore",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 14,
+   "first_finite_after": 113,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|zscore",
+   "column": "close_late",
+   "first_finite_before": 400,
+   "first_finite_after": 499,
+   "masked_rows_added": 99,
+   "suffix_diff_cells": 0,
+   "suffix_max_abs_diff": 0.0
+  },
+  {
+   "case": "registry|zscore+gaussian",
+   "column": "close",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2650,
+   "suffix_max_abs_diff": 3.2686233520507812
+  },
+  {
+   "case": "registry|zscore+gaussian",
+   "column": "volume",
+   "first_finite_before": 62,
+   "first_finite_after": 350,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2650,
+   "suffix_max_abs_diff": 1.4199170470237732
+  },
+  {
+   "case": "registry|zscore+gaussian",
+   "column": "close_trend_EMA_21",
+   "first_finite_before": 82,
+   "first_finite_after": 370,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2630,
+   "suffix_max_abs_diff": 3.9394227862358093
+  },
+  {
+   "case": "registry|zscore+gaussian",
+   "column": "close_momentum_RSI_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2636,
+   "suffix_max_abs_diff": 1.2211300134658813
+  },
+  {
+   "case": "registry|zscore+gaussian",
+   "column": "hlc_volatility_ATR_14",
+   "first_finite_before": 76,
+   "first_finite_after": 364,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2636,
+   "suffix_max_abs_diff": 2.210118293762207
+  },
+  {
+   "case": "registry|zscore+gaussian",
+   "column": "close_late",
+   "first_finite_before": 462,
+   "first_finite_after": 750,
+   "masked_rows_added": 288,
+   "suffix_diff_cells": 2250,
+   "suffix_max_abs_diff": 3.26859712600708
+  }
+ ]
+}

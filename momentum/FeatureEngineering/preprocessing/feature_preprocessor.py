@@ -32,6 +32,7 @@ from momentum.FeatureEngineering.preprocessing._hurst_prior import (
 )
 from momentum.FeatureEngineering.preprocessing._non_stationary_cache import NonStationaryCache
 from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
+from momentum.FeatureEngineering.preprocessing import time_order as _time_order
 from momentum.FeatureEngineering.preprocessing.calibration import (
     CalibrationError,
     CalibrationKey,
@@ -597,6 +598,8 @@ class FeaturePreprocessor:
     def transform(self, features_df: pd.DataFrame) -> pd.DataFrame:
         if features_df is None or features_df.empty:
             return pd.DataFrame(index=features_df.index if features_df is not None else None)
+        # ICPOSTLEAK Task 1.2：依列序之 rolling 須時間嚴格遞增（倒序／重複／亂序 fail-closed，不靜默排序）
+        _time_order.assert_strictly_increasing_time_index(features_df.index, where="FeaturePreprocessor.transform")
 
         # Belt-and-suspenders: drop ratio-unsafe (pattern) columns at L6.5 entry.
         # In normal pipelines L3 already filters these out, but L6.5 may receive
@@ -668,6 +671,9 @@ class FeaturePreprocessor:
                 continue
 
             missing_columns.difference_update(available_columns)
+            _time_order.assert_strictly_increasing_time_index(
+                group_df.index, where=f"FeaturePreprocessor.transform_selected[{group_id}]"
+            )
             selected_frame = group_df.loc[:, available_columns].copy()
             transformed = post_ic_preprocessor.transform(selected_frame)
             if not transformed.empty:
@@ -2162,6 +2168,64 @@ class FeaturePreprocessor:
             del new_merged
             gc.collect()
 
+    def _registry_fast_transform(self, group_array: np.ndarray, transform_context: Dict[str, object]) -> np.ndarray:
+        """registry 快速路徑之單一實作（ICPOSTLEAK Task 1.1）：縮尾 → rank → gaussian → zscore（正式順序，同
+        `_transform_single_legacy`），rank／gaussian／zscore 每步之後以輸入錨點遮窗未滿之列。
+
+        改前四處（`_transform_array_slice`、`_transform_single_group`、`_transform_single_group_to_arrays`、
+        `_stream_sharded_group_to_sink`）各自呼叫融合核心（rank→zscore）再後置 gaussian，順序與正式路徑不同，且切片
+        並行路徑漏做 gaussian；本函式統一之。各步數值核心不變（numba `transform_array_fast` 單步、`_gaussian_2d`）。"""
+        transform_array_fast = transform_context["transform_array_fast"]
+        values = group_array
+        if not values.flags["C_CONTIGUOUS"] or values.dtype != np.float32:
+            values = np.ascontiguousarray(values, dtype=np.float32)
+        common = dict(
+            winsor_method=str(transform_context.get("winsor_method", "quantile")),
+            winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
+            winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
+            winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
+            rank_window=int(transform_context.get("rank_window", 252)),
+            zscore_window=int(transform_context.get("zscore_window", 100)),
+            zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
+            causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
+            winsor_window=int(transform_context.get("winsor_window", 252)),
+            winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
+        )
+        # 縮尾步一律經核心（縮尾關時為複製）：保留改前「快速路徑必呼叫核心」之可觀測路由（數值不變）
+        values = transform_array_fast(
+            values, winsorize=bool(transform_context.get("do_winsorize", True)), rank=False, zscore=False, **common
+        )
+        if bool(transform_context.get("do_rank", False)):
+            step_input = values
+            values = _stable_mask.mask_incomplete_window_by_input_2d(
+                transform_array_fast(step_input, winsorize=False, rank=True, zscore=False, **common),
+                step_input, common["rank_window"],
+            ).astype(np.float32, copy=False)
+        if bool(transform_context.get("do_gaussian", False)) and HAS_SCIPY:
+            if transform_context.get("gaussian_apply_to", "all") != "all":
+                # 快速路徑以整個陣列為單位；部分欄 gaussian 須走慢路徑（改前 sharded 路徑於此靜默略過 gaussian）
+                raise ValueError("registry 快速路徑不支援 gaussian_normalize.apply_to 非 all（須走慢路徑）")
+            step_input = values
+            gaussian_window = int(transform_context.get("winsor_window", 252))
+            values = _stable_mask.mask_incomplete_window_by_input_2d(
+                self._gaussian_2d(
+                    step_input.astype(np.float64, copy=False),
+                    lower=float(transform_context.get("gaussian_clip_lower", 0.001)),
+                    upper=float(transform_context.get("gaussian_clip_upper", 0.999)),
+                    causal=bool(transform_context.get("causal_preprocessing", True)),
+                    window=gaussian_window,
+                    min_periods=int(transform_context.get("winsor_min_periods", 63)),
+                ),
+                step_input, gaussian_window,
+            ).astype(np.float32, copy=False)
+        if bool(transform_context.get("do_zscore", False)):
+            step_input = np.ascontiguousarray(values, dtype=np.float32)
+            values = _stable_mask.mask_incomplete_window_by_input_2d(
+                transform_array_fast(step_input, winsorize=False, rank=False, zscore=True, **common),
+                step_input, common["zscore_window"],
+            ).astype(np.float32, copy=False)
+        return values
+
     def _transform_array_slice(
         self,
         array_slice: np.ndarray,
@@ -2174,26 +2238,8 @@ class FeaturePreprocessor:
         slice results and writes back. Operations are column-wise so slicing is
         safe (winsor / rolling rank / rolling zscore each operate per column).
         """
-        transform_array_fast = transform_context["transform_array_fast"]
-        # Ensure contiguous float32 to satisfy numba layout assumptions.
-        if not array_slice.flags["C_CONTIGUOUS"] or array_slice.dtype != np.float32:
-            array_slice = np.ascontiguousarray(array_slice, dtype=np.float32)
-        return transform_array_fast(
-            array_slice,
-            winsorize=bool(transform_context.get("do_winsorize", True)),
-            winsor_method=str(transform_context.get("winsor_method", "quantile")),
-            winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
-            winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
-            winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
-            rank=bool(transform_context.get("do_rank", False)),
-            rank_window=int(transform_context.get("rank_window", 252)),
-            zscore=bool(transform_context.get("do_zscore", False)),
-            zscore_window=int(transform_context.get("zscore_window", 100)),
-            zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
-            causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
-            winsor_window=int(transform_context.get("winsor_window", 252)),
-            winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
-        )
+        # ICPOSTLEAK Task 1.1：同其他 registry 路徑之單一實作（含 gaussian；改前此路徑漏做 gaussian）
+        return self._registry_fast_transform(array_slice, transform_context)
 
     def _transform_single_group(
         self,
@@ -2217,35 +2263,8 @@ class FeaturePreprocessor:
         requires_slow = self._group_requires_slow_transform(group, transform_context)
 
         if use_fast and not requires_slow:
-            transform_array_fast = transform_context["transform_array_fast"]
-            processed_array = transform_array_fast(
-                group_array,
-                winsorize=bool(transform_context.get("do_winsorize", True)),
-                winsor_method=str(transform_context.get("winsor_method", "quantile")),
-                winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
-                winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
-                winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
-                rank=bool(transform_context.get("do_rank", False)),
-                rank_window=int(transform_context.get("rank_window", 252)),
-                zscore=bool(transform_context.get("do_zscore", False)),
-                zscore_window=int(transform_context.get("zscore_window", 100)),
-                zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
-                causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
-                winsor_window=int(transform_context.get("winsor_window", 252)),
-                winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
-            )
-            # Gaussian post-step: apply_to="all" can be vectorised directly on the
-            # numpy array without needing column names, so we handle it here instead
-            # of forcing the entire group through pandas slow path.
-            if bool(transform_context.get("do_gaussian", False)) and HAS_SCIPY:
-                processed_array = self._gaussian_2d(
-                    processed_array.astype(np.float64, copy=False),
-                    lower=float(transform_context.get("gaussian_clip_lower", 0.001)),
-                    upper=float(transform_context.get("gaussian_clip_upper", 0.999)),
-                    causal=bool(transform_context.get("causal_preprocessing", True)),
-                    window=int(transform_context.get("winsor_window", 252)),
-                    min_periods=int(transform_context.get("winsor_min_periods", 63)),
-                )
+            # ICPOSTLEAK Task 1.1：registry 快速路徑單一實作（正式順序＋各步遮罩）
+            processed_array = self._registry_fast_transform(group_array, transform_context)
             registry.overwrite_data(group_id, processed_array)
             return
 
@@ -2304,32 +2323,8 @@ class FeaturePreprocessor:
         requires_slow = self._group_requires_slow_transform(group, transform_context)
 
         if use_fast and not requires_slow:
-            transform_array_fast = transform_context["transform_array_fast"]
-            processed_array = transform_array_fast(
-                group_array,
-                winsorize=bool(transform_context.get("do_winsorize", True)),
-                winsor_method=str(transform_context.get("winsor_method", "quantile")),
-                winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
-                winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
-                winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
-                rank=bool(transform_context.get("do_rank", False)),
-                rank_window=int(transform_context.get("rank_window", 252)),
-                zscore=bool(transform_context.get("do_zscore", False)),
-                zscore_window=int(transform_context.get("zscore_window", 100)),
-                zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
-                causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
-                winsor_window=int(transform_context.get("winsor_window", 252)),
-                winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
-            )
-            if bool(transform_context.get("do_gaussian", False)) and HAS_SCIPY:
-                processed_array = self._gaussian_2d(
-                    processed_array.astype(np.float64, copy=False),
-                    lower=float(transform_context.get("gaussian_clip_lower", 0.001)),
-                    upper=float(transform_context.get("gaussian_clip_upper", 0.999)),
-                    causal=bool(transform_context.get("causal_preprocessing", True)),
-                    window=int(transform_context.get("winsor_window", 252)),
-                    min_periods=int(transform_context.get("winsor_min_periods", 63)),
-                )
+            # ICPOSTLEAK Task 1.1：registry 快速路徑單一實作（正式順序＋各步遮罩）
+            processed_array = self._registry_fast_transform(group_array, transform_context)
             return [(group_id, columns, np.asarray(processed_array, dtype=np.float32))]
 
         if self._can_use_optimized_dataframe_path():
@@ -2456,11 +2451,6 @@ class FeaturePreprocessor:
         if n_shards == 0:
             return 0
 
-        transform_array_fast = transform_context["transform_array_fast"]
-        do_gaussian = bool(transform_context.get("do_gaussian", False))
-        gaussian_apply_to = transform_context.get("gaussian_apply_to", "all")
-        gaussian_clip_lower = float(transform_context.get("gaussian_clip_lower", 0.001))
-        gaussian_clip_upper = float(transform_context.get("gaussian_clip_upper", 0.999))
 
         outputs_written = 0
         width = max(2, len(str(n_shards - 1)))
@@ -2470,32 +2460,9 @@ class FeaturePreprocessor:
         ):
             is_last = shard_pos == n_shards - 1
             arr_in = np.asarray(shard_arr, dtype=np.float32)
-            processed = transform_array_fast(
-                arr_in,
-                winsorize=bool(transform_context.get("do_winsorize", True)),
-                winsor_method=str(transform_context.get("winsor_method", "quantile")),
-                winsor_lower_q=float(transform_context.get("winsor_lower_q", 0.01)),
-                winsor_upper_q=float(transform_context.get("winsor_upper_q", 0.99)),
-                winsor_sigma_k=float(transform_context.get("winsor_sigma_k", 3.0)),
-                rank=bool(transform_context.get("do_rank", False)),
-                rank_window=int(transform_context.get("rank_window", 252)),
-                zscore=bool(transform_context.get("do_zscore", False)),
-                zscore_window=int(transform_context.get("zscore_window", 100)),
-                zscore_epsilon=float(transform_context.get("zscore_epsilon", 1e-8)),
-                causal_preprocessing=bool(transform_context.get("causal_preprocessing", True)),
-                winsor_window=int(transform_context.get("winsor_window", 252)),
-                winsor_min_periods=int(transform_context.get("winsor_min_periods", 63)),
-            )
-            if do_gaussian and HAS_SCIPY and gaussian_apply_to == "all":
-                processed = self._gaussian_2d(
-                    processed.astype(np.float64, copy=False),
-                    lower=gaussian_clip_lower,
-                    upper=gaussian_clip_upper,
-                    causal=bool(transform_context.get("causal_preprocessing", True)),
-                    window=int(transform_context.get("winsor_window", 252)),
-                    min_periods=int(transform_context.get("winsor_min_periods", 63)),
-                )
-            processed = np.asarray(processed, dtype=np.float32)
+            # ICPOSTLEAK Task 1.1：同其他 registry 路徑之單一實作（正式順序＋各步遮罩；gaussian 之 apply_to 非 all
+            # 時 helper fail-closed——改前此處靜默略過 gaussian）
+            processed =np.asarray(self._registry_fast_transform(arr_in, transform_context), dtype=np.float32)
 
             output_group_id = (
                 group_id if n_shards == 1 else f"{group_id}_shard{shard_meta.shard_idx:0{width}d}"
@@ -2860,9 +2827,10 @@ class FeaturePreprocessor:
             )
             if rank_positions:
                 rank_window = int(self.rank_config.get("window", 252))
-                working_values[:, rank_positions] = self._rolling_rank_2d_v2(
-                    working_values[:, rank_positions],
-                    rank_window,
+                rank_input = working_values[:, rank_positions]
+                # ICPOSTLEAK Task 1.1：窗未滿之列遮為 NaN（錨點＝本步驟輸入）
+                working_values[:, rank_positions] = _stable_mask.mask_incomplete_window_by_input_2d(
+                    self._rolling_rank_2d_v2(rank_input, rank_window), rank_input, rank_window
                 )
 
         if self.gaussian_config.get("enabled", False):
@@ -2876,13 +2844,19 @@ class FeaturePreprocessor:
                 )
                 if gaussian_positions:
                     clip_range = self.gaussian_config.get("clip_range", [0.001, 0.999])
-                    working_values[:, gaussian_positions] = self._gaussian_2d(
-                        working_values[:, gaussian_positions],
-                        lower=float(clip_range[0]),
-                        upper=float(clip_range[1]),
-                        causal=self.causal_preprocessing,
-                        window=self._rolling_window(),
-                        min_periods=self._rolling_min_periods(self._rolling_window()),
+                    gaussian_input = working_values[:, gaussian_positions]
+                    gaussian_window = self._rolling_window()
+                    working_values[:, gaussian_positions] = _stable_mask.mask_incomplete_window_by_input_2d(
+                        self._gaussian_2d(
+                            gaussian_input,
+                            lower=float(clip_range[0]),
+                            upper=float(clip_range[1]),
+                            causal=self.causal_preprocessing,
+                            window=gaussian_window,
+                            min_periods=self._rolling_min_periods(gaussian_window),
+                        ),
+                        gaussian_input,
+                        gaussian_window,
                     )
             else:
                 logger.warning("Gaussian normalization skipped: scipy unavailable")
@@ -2898,11 +2872,11 @@ class FeaturePreprocessor:
             if zscore_positions:
                 windows = [int(window) for window in self.zscore_config.get("windows", [100, 252])]
                 epsilon = float(self.zscore_config.get("epsilon", 1e-8))
-                zscore_values = self._rolling_zscore_2d(
-                    working_values[:, zscore_positions],
-                    windows,
-                    epsilon,
-                    mode="replace",
+                zscore_input = working_values[:, zscore_positions]
+                zscore_values = _stable_mask.mask_incomplete_window_by_input_2d(
+                    self._rolling_zscore_2d(zscore_input, windows, epsilon, mode="replace"),
+                    zscore_input,
+                    int(windows[0]) if windows else 1,  # 空窗清單＝不做 zscore（窗 1＝遮罩無作用）
                 )
                 working_values[:, zscore_positions] = zscore_values
 
@@ -2969,6 +2943,20 @@ class FeaturePreprocessor:
 
         return transformed
 
+    @staticmethod
+    def _polars_mask_columns(pl_df: Any, columns: List[str], step_input: np.ndarray, window: int,
+                             index: pd.Index) -> Any:
+        """ICPOSTLEAK Task 1.1：Polars 臂單步核心之後，對 `columns` 套輸入錨點遮罩並回存 polars（float32＋null）。"""
+        from momentum.FeatureEngineering.polars_adapter import pandas_to_polars, polars_to_pandas
+
+        frame = polars_to_pandas(pl_df, index=index)
+        masked = _stable_mask.mask_incomplete_window_by_input_2d(
+            frame[columns].to_numpy(dtype=np.float64), step_input, window
+        )
+        frame = frame.astype({column: np.float64 for column in columns})
+        frame.loc[:, columns] = masked
+        return pandas_to_polars(frame)
+
     def _transform_single_polars(self, features_df: pd.DataFrame) -> pd.DataFrame:
         """Polars-based L6.5 transform (Task 4.3).
 
@@ -3017,9 +3005,11 @@ class FeaturePreprocessor:
             rank_columns = self._select_columns(features_df, rank_apply_to)
             rank_window = int(self.rank_config.get("window", 252))
             if rank_columns and self.mode == "replace":
+                rank_input = polars_to_pandas(pl_df, index=features_df.index)[rank_columns].to_numpy(dtype=np.float64)
                 pl_df = polars_l65_rank_transform(
                     pl_df, columns=rank_columns, window=rank_window
                 )
+                pl_df = self._polars_mask_columns(pl_df, rank_columns, rank_input, rank_window, features_df.index)
             else:
                 # append mode or empty column list: fall back to pandas
                 pd_temp = polars_to_pandas(pl_df, index=features_df.index)
@@ -3040,9 +3030,11 @@ class FeaturePreprocessor:
             epsilon = float(self.zscore_config.get("epsilon", 1e-8))
             primary_window = int(windows[0]) if windows else 100
             if zscore_columns and self.mode == "replace":
+                zscore_input = polars_to_pandas(pl_df, index=features_df.index)[zscore_columns].to_numpy(dtype=np.float64)
                 pl_df = polars_l65_adaptive_zscore(
                     pl_df, columns=zscore_columns, window=primary_window, epsilon=epsilon
                 )
+                pl_df = self._polars_mask_columns(pl_df, zscore_columns, zscore_input, primary_window, features_df.index)
             elif zscore_columns:
                 # append mode: fall back to pandas
                 pd_temp = polars_to_pandas(pl_df, index=features_df.index)
@@ -3876,11 +3868,12 @@ class FeaturePreprocessor:
 
         result = df.copy()
         selected = result.loc[:, columns].astype(float)
+        selected_values = selected.to_numpy(dtype=np.float64, copy=False)
 
         ranked_df = pd.DataFrame(
-            self._rolling_rank_2d_v2(
-                selected.to_numpy(dtype=np.float64, copy=False),
-                window,
+            # ICPOSTLEAK Task 1.1：窗未滿之列遮為 NaN（錨點＝本步驟輸入之首個有限值）
+            _stable_mask.mask_incomplete_window_by_input_2d(
+                self._rolling_rank_2d_v2(selected_values, window), selected_values, window
             ),
             index=selected.index,
             columns=columns,
@@ -3968,14 +3961,21 @@ class FeaturePreprocessor:
 
         result = df.copy()
         selected = result.loc[:, columns].astype(float)
+        selected_values = selected.to_numpy(dtype=np.float64, copy=False)
+        gaussian_window = self._rolling_window()
         gaussian_df = pd.DataFrame(
-            self._gaussian_2d(
-                selected.to_numpy(dtype=np.float64, copy=False),
-                lower=lower,
-                upper=upper,
-                causal=self.causal_preprocessing,
-                window=self._rolling_window(),
-                min_periods=self._rolling_min_periods(self._rolling_window()),
+            # ICPOSTLEAK Task 1.1：gaussian 之因果排名窗＝_rolling_window()；窗未滿之列遮為 NaN
+            _stable_mask.mask_incomplete_window_by_input_2d(
+                self._gaussian_2d(
+                    selected_values,
+                    lower=lower,
+                    upper=upper,
+                    causal=self.causal_preprocessing,
+                    window=gaussian_window,
+                    min_periods=self._rolling_min_periods(gaussian_window),
+                ),
+                selected_values,
+                gaussian_window,
             ),
             index=selected.index,
             columns=columns,
@@ -4000,13 +4000,19 @@ class FeaturePreprocessor:
 
         result = df.copy()
         selected = result.loc[:, columns].astype(float)
+        selected_values = selected.to_numpy(dtype=np.float64, copy=False)
 
         if self.mode == "replace":
-            zscore_values = self._rolling_zscore_2d(
-                selected.to_numpy(dtype=np.float64, copy=False),
-                [int(window) for window in windows],
-                epsilon,
-                mode="replace",
+            # ICPOSTLEAK Task 1.1：replace 模式輸出主窗（windows[0]）；窗未滿之列遮為 NaN
+            zscore_values = _stable_mask.mask_incomplete_window_by_input_2d(
+                self._rolling_zscore_2d(
+                    selected_values,
+                    [int(window) for window in windows],
+                    epsilon,
+                    mode="replace",
+                ),
+                selected_values,
+                int(windows[0]) if windows else 1,  # 空窗清單＝不做 zscore（窗 1＝遮罩無作用）
             )
             zscore = pd.DataFrame(
                 zscore_values,
@@ -4017,7 +4023,7 @@ class FeaturePreprocessor:
         else:
             append_frames: List[pd.DataFrame] = []
             zscore_by_window = self._rolling_zscore_2d(
-                selected.to_numpy(dtype=np.float64, copy=False),
+                selected_values,
                 [int(window) for window in windows],
                 epsilon,
                 mode="append",
@@ -4027,7 +4033,10 @@ class FeaturePreprocessor:
                 if window_int not in zscore_by_window:
                     continue
                 zscore = pd.DataFrame(
-                    zscore_by_window[window_int],
+                    # ICPOSTLEAK Task 1.1：append 模式每個窗各自遮
+                    _stable_mask.mask_incomplete_window_by_input_2d(
+                        zscore_by_window[window_int], selected_values, window_int
+                    ),
                     index=selected.index,
                     columns=columns,
                 )

@@ -168,6 +168,11 @@ def _expected_zscore(frame: pd.DataFrame, window: int, epsilon: float = 1e-8) ->
     zscore = (selected - mean) / (std + epsilon)
     zscore = zscore.where(std > 0.0, 0.0)
     zscore = zscore.where(~selected.isna(), np.nan)
+    # ICPOSTLEAK Task 1.1：窗未滿之列遮為 NaN（錨點＝輸入逐欄首個有限值；測試端獨立實作，不呼叫生產 stable_mask）
+    for column in zscore.columns:
+        finite = np.flatnonzero(np.isfinite(selected[column].to_numpy(dtype=np.float64)))
+        cut = len(zscore) if finite.size == 0 else min(int(finite[0]) + int(window) - 1, len(zscore))
+        zscore.iloc[:cut, zscore.columns.get_loc(column)] = np.nan
     return zscore.astype(np.float32, copy=False)
 
 
@@ -482,10 +487,11 @@ def test_zscore_constant_window_legacy_equivalence() -> None:
     result = FeaturePreprocessor(_zscore_config([3]))._apply_adaptive_zscore(frame)
     expected = _expected_zscore(frame, window=3)
 
-    assert result["constant"].eq(0.0).all()
-    assert result["single_then_trend"].iloc[0] == 0.0
+    # ICPOSTLEAK Task 1.1：窗 3 未滿之列（逐欄首個有限值起 2 列及其前）為 NaN；滿窗後常數窗仍為 0.0
+    assert result["constant"].iloc[2:].eq(0.0).all() and result["constant"].iloc[:2].isna().all()
+    assert result["single_then_trend"].iloc[:2].isna().all() and np.isfinite(result["single_then_trend"].iloc[2])
     assert np.isnan(result["nan_prefixed"].iloc[0])
-    assert result["nan_prefixed"].iloc[1] == 0.0
+    assert result["nan_prefixed"].iloc[:3].isna().all() and np.isfinite(result["nan_prefixed"].iloc[3])
     np.testing.assert_allclose(
         result.to_numpy(dtype=np.float32),
         expected.to_numpy(dtype=np.float32),

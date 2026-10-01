@@ -111,7 +111,9 @@ def _run_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, branch: str, st
     if "patch_shard_bytes" in spec:
         assert getattr(group, "shards", ()), "前提：群組已分片"
     if spec_all["entry"] == "transform_registry_groups":
-        pre.transform_registry_groups(registry, n_workers=1)
+        pre.transform_registry_groups(registry, n_workers=int(spec.get("n_workers", 1)))
+        if spec.get("spy"):
+            assert calls, f"具名分支 {branch} 未執行 {spec['spy']}"
         return pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
     # sink 入口（一般／sharded／chunked 由契約 env 切換）：收集各輸出部分，依欄名重組
     parts: Dict[str, np.ndarray] = {}
@@ -474,6 +476,28 @@ def test_mutation_append_masks_first_window_only_is_caught(tmp_path: Path, monke
     cols = [c for c in got.columns if str(c).endswith(f"_zscore_{Z_WINDOWS[1]}")]
     inputs = _first_finite(frame.to_numpy(dtype=np.float64))
     assert _first_finite(got[cols].to_numpy(dtype=np.float64)) != [f + Z_WINDOWS[1] - 1 for f in inputs]
+
+
+def test_mutation_parallel_slice_skips_gaussian_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：切片並行路徑回到改前（融合核心、無 gaussian 後置、無遮罩）⇒ registry_parallel_split 輸出 ≠ oracle。"""
+
+    def _old_slice(self, array_slice, transform_context):
+        fast = transform_context["transform_array_fast"]
+        return fast(np.ascontiguousarray(array_slice, dtype=np.float32),
+                    winsorize=bool(transform_context.get("do_winsorize", True)),
+                    rank=bool(transform_context.get("do_rank", False)),
+                    rank_window=int(transform_context.get("rank_window", 252)),
+                    zscore=bool(transform_context.get("do_zscore", False)),
+                    zscore_window=int(transform_context.get("zscore_window", 100)))
+
+    monkeypatch.setattr(FeaturePreprocessor, "_transform_array_slice", _old_slice)
+    frame = _real_frame()
+    steps = ["gaussian"]
+    spec = dict(BRANCHES["registry_parallel_split"])
+    spec.pop("spy", None)
+    got = _run_branch(monkeypatch, tmp_path, "registry_parallel_split", steps, frame,
+                      spec_override=spec).to_numpy(dtype=np.float64)
+    assert not np.array_equal(got, _oracle("registry_parallel_split", steps, frame), equal_nan=True)
 
 
 def test_mutation_time_order_check_removed_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:

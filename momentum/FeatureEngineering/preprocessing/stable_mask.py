@@ -218,7 +218,19 @@ def mask_incomplete_window_by_input_2d(output: np.ndarray, step_input: np.ndarra
     逐欄 `cut = step_input 該欄首個有限值列 + window − 1`，回傳 `output` 之副本並將 `[0, cut)` 設 NaN；
     `step_input` 該欄全無有限值 ⇒ 該欄全 NaN；`cut` 超過列數 ⇒ 全欄 NaN。`output`／`step_input` 須同形二維。
     不改 `output` 本身（回傳新陣列，dtype 同 `output`）。"""
-    raise NotImplementedError("ICPOSTLEAK Task 1.1")
+    out = np.array(output, copy=True)
+    src = np.asarray(step_input)
+    if out.ndim != 2 or src.shape != out.shape:
+        raise ValueError(f"mask_incomplete_window_by_input_2d：output {out.shape} 與 step_input {src.shape} 須同形二維")
+    rows = out.shape[0]
+    if out.size == 0:
+        return out
+    finite = np.isfinite(src)
+    has = finite.any(axis=0)
+    first = np.where(has, np.argmax(finite, axis=0), rows)
+    cut = np.minimum(first + max(int(window) - 1, 0), rows)
+    out[np.arange(rows)[:, None] < cut[None, :]] = np.nan
+    return out
 
 
 def mask_incomplete_window_inplace(values: np.ndarray, window: int) -> np.ndarray:
