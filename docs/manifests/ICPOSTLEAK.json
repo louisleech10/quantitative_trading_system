@@ -103,7 +103,9 @@
       "feature_preprocessor.py ← Task 1.1 分支①②③④⑤逐一接遮罩（legacy :2962-2968、optimized :2863/:2879/:2901、Polars :3020/:3043 與其 gaussian 回落、registry :2198/:2293/:2436＋numba 後之 gaussian 後置）；registry 改正式順序；以模組屬性 _stable_mask.mask_incomplete_window_by_input_2d 呼叫（mutant 依此 monkeypatch）",
       "ic_analysis_service.py ← Task 2.1／2.2 刪手寫三項（:2873-2905）、改經 factories 取前處理器呼叫 transform_selected、保序去重、ratio-unsafe 經 feature_preprocessor._is_ratio_unsafe_column 判定並填 excluded_features、docstring 改正式順序",
       "frontend ← Task 2.2 結果區抽為 components/ic-analysis/ApplyTransformsResult.tsx（page.tsx:906-915 改為使用之；:149 本地型別與 hook 型別加選填 excluded_features）；不改其他元件與流程",
-      "解耦：bash scripts/check_decoupling.sh 於實作批跑並附收據"
+      "解耦：bash scripts/check_decoupling.sh 於實作批跑並附收據",
+      "ic_analysis_service.py ← Task 2.1：zscore 窗正規化與保序去重須為模組層函式 _normalize_zscore_windows(windows)、_dedupe_preserve_order(names)，_apply_transforms_sync 經模組屬性呼叫（test_mutation_unsorted_zscore_windows_is_caught／test_mutation_dedup_removed_is_caught 依此 monkeypatch）",
+      "feature_preprocessor.py ← Task 1.1 registry 分支含 transform_registry_groups（in-place）與 transform_registry_groups_to_sink 之三路（_transform_single_group_to_arrays、_stream_sharded_group_to_sink、_stream_single_group_chunked_to_sink），契約 branches 以 FFACT_CGSA_SHARD_BYTES／FFACT_L65_SPLIT_THRESHOLD 切換"
     ],
     "coverage_risk": [
       "邊界 15 條：01–05 Task 1.1、06–07 Task 1.2、08–09 Task 1.3（tests/feature_engineering/test_icpostleak.py）；10–13 Task 2.1、14–15 Task 2.2（tests/api/test_icpostleak_api.py）；Task 2.2 前端兩條邊界見 ApplyTransformsResult.test.tsx 兩支 it",
@@ -115,7 +117,8 @@
       "Task 1.3：18 檔清單與凍結計數於 contract.json（oracle_update_files、oracle_update_counts_frozen）；實作批逐檔改 oracle 並記處置於 brief；退役斷言須登記 oracle_update_retired 並附理由",
       "實作批必產收據：handoffs/run_receipts/<日期>-icpostleak-branch-inventory.txt（分支盤點）、<日期>-icpostleak-branch-diff.json（跨分支量級）、<日期>-icpostleak-change-report.json（改前→改後首個有限值列與遮罩後區段差異）；tests/_golden/icpostleak/baseline.npz 與 baseline.json 於動工前以 HEAD 產",
       "測試時長：Phase 1 每組合為 3000 列×3 欄之轉換（秒級）；registry 分支含落盤；全檔預估數分鐘（實作後實測記收據）",
-      "實作前紅之預期原因：stable_mask.mask_incomplete_window_by_input_2d／time_order.assert_strictly_increasing_time_index 為 NotImplementedError 空殼；ApplyTransformsResult 拋錯；IC 頁仍為手寫版（excluded_features 缺、順序舊、未去重）"
+      "實作前紅之預期原因：stable_mask.mask_incomplete_window_by_input_2d／time_order.assert_strictly_increasing_time_index 為 NotImplementedError 空殼；ApplyTransformsResult 拋錯；IC 頁仍為手寫版（excluded_features 缺、順序舊、未去重）",
+      "r5 修補：Polars oracle 經 pandas_to_polars（float32＋NaN→null，同生產入口）；append 驗收改全陣列 oracle（_rolling_zscore_2d append＋各窗輸入錨點遮罩）；§G 輸入加 3 個真實 L1 特徵欄（TA-Lib EMA21／RSI14／ATR14 於真實 kline）；收集 89＋31 項"
     ],
     "lifecycle": "keep",
     "not_executable": [

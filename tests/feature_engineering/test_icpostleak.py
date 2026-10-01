@@ -41,10 +41,16 @@ Z_WINDOWS: List[int] = [int(w) for w in CONTRACT["zscore_windows"]]
 # ---------------------------------------------------------------- 輸入與設定
 
 def _real_frame() -> pd.DataFrame:
-    """真實 BTCUSDT 1h 前 3000 根 close、volume，另加晚生欄（close 前 400 列 NaN）。"""
+    """§G 輸入集：真實 BTCUSDT 1h 前 3000 根之 close、volume、3 個真實 L1 特徵欄（TA-Lib 於真實 kline 計算，首段 NaN
+    為自然暖身），另加人工晚生欄（close 前 400 列 NaN，驗錨點非 0）。"""
+    import talib
+
     k = CONTRACT["kline"]
     base = h.kline_frame(symbol=k["symbol"], timeframe=k["timeframe"]).iloc[: k["rows"]]
     frame = base[k["columns"]].astype(np.float64).copy()
+    for spec in k["l1_features"]:
+        args = [base[c].to_numpy(dtype=np.float64) for c in spec["inputs"]]
+        frame[spec["name"]] = getattr(talib, spec["fn"])(*args, **spec["args"])
     late = frame[k["columns"][0]].copy()
     late.iloc[: k["late_born_nan_rows"]] = np.nan
     frame[k["late_born_column"]] = late
@@ -85,8 +91,20 @@ def _run_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, branch: str, st
                         indicator="ICPOSTLEAK", columns=tuple(frame.columns), shape=(0, 0), dtype="float32",
                         disk_path=None)
     registry.save_data(group, frame.to_numpy(dtype=np.float32))
-    pre.transform_registry_groups(registry, n_workers=1)
-    return pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
+    if BRANCHES[branch]["entry"] == "transform_registry_groups":
+        pre.transform_registry_groups(registry, n_workers=1)
+        return pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
+    # sink 入口（一般／sharded／chunked 由契約 env 切換）：收集各輸出部分，依欄名重組
+    parts: Dict[str, np.ndarray] = {}
+
+    def _sink(group_id, columns, data, source_group_id, source_disk_path, cleanup_source) -> None:
+        arr = np.asarray(data, dtype=np.float64)
+        for i, name in enumerate(columns):
+            parts[str(name)] = arr[:, i].copy()
+
+    pre.transform_registry_groups_to_sink(registry, _sink, n_workers=1)
+    assert set(parts) == {str(c) for c in frame.columns}, sorted(parts)
+    return pd.DataFrame({c: parts[str(c)] for c in frame.columns}, index=frame.index)
 
 
 # ---------------------------------------------------------------- 獨立遮罩與 oracle
@@ -118,15 +136,15 @@ def _kernel_step(branch: str, pre: FeaturePreprocessor, step: str, values: np.nd
             return np.asarray(pre._rolling_rank_2d_v2(values, RANK_W), dtype=np.float64)
         return np.asarray(pre._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8, mode="replace"), dtype=np.float64)
     if branch == "polars":
-        import polars as pl
-
         from momentum.FeatureEngineering.polars_adapter import (
+            pandas_to_polars,
             polars_l65_adaptive_zscore,
             polars_l65_rank_transform,
             polars_to_pandas,
         )
 
-        pl_df = pl.DataFrame({c: values[:, i] for i, c in enumerate(columns)})
+        # 同生產入口之轉換（float32＋NaN→null；`_transform_single_polars` 經 pandas_to_polars）
+        pl_df = pandas_to_polars(pd.DataFrame(values, columns=columns))
         if step == "rank":
             pl_df = polars_l65_rank_transform(pl_df, columns=columns, window=RANK_W)
         else:
@@ -201,12 +219,16 @@ def test_phase1_append_mode_each_window_masked(branch: str, tmp_path: Path, monk
     """§G ②（append）：zscore 窗 [100, 252] 之每個衍生欄各自自輸入首個有限值起遮 `窗−1` 列。"""
     frame = _real_frame()
     got = _run_branch(monkeypatch, tmp_path, branch, ["zscore"], frame, mode="append")
+    values = frame.to_numpy(dtype=np.float64)
+    by_window = FeaturePreprocessor(_config(["zscore"], "append"))._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8,
+                                                                                       mode="append")
     for window in Z_WINDOWS:
-        cols = [c for c in got.columns if str(c).endswith(f"_zscore_{window}")]
-        assert len(cols) == len(frame.columns), (window, list(got.columns))
-        firsts = _first_finite(got[cols].to_numpy(dtype=np.float64))
-        inputs = _first_finite(frame.to_numpy(dtype=np.float64))
-        assert firsts == [f + window - 1 for f in inputs], (window, firsts)
+        cols = [f"{c}_zscore_{window}" for c in frame.columns]
+        assert all(c in got.columns for c in cols), (window, list(got.columns))
+        want = _oracle_mask(np.asarray(by_window[window], dtype=np.float64), values, window)
+        actual = got[cols].to_numpy(dtype=np.float64)
+        assert _first_finite(actual) == [f + window - 1 for f in _first_finite(values)], window
+        assert np.array_equal(actual, want, equal_nan=True), window  # 全陣列：成熟區段之值亦逐位元組比
 
 
 @pytest.mark.parametrize("branch", list(BRANCHES))

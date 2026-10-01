@@ -252,21 +252,16 @@ def test_mutation_gaussian_last_order_is_caught(tmp_path: Path, monkeypatch: pyt
     assert not np.array_equal(got.to_numpy(dtype=np.float64), want.to_numpy(dtype=np.float64), equal_nan=True)
 
 
-def test_mutation_unsorted_zscore_windows_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：不排序 zscore 窗 ⇒ [252, 100] 與 [100, 252] 之 transform_selected 輸出不同（③之判準有鑑別力）。"""
+def test_mutation_unsorted_zscore_windows_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：服務之 zscore 窗正規化改為不排序（服務須經模組層 `_normalize_zscore_windows` 處理）⇒ ③之判準翻轉。"""
+    import api.services.ic_analysis_service as service_module
+
+    monkeypatch.setattr(service_module, "_normalize_zscore_windows", lambda windows: list(windows))
+    monkeypatch.chdir(tmp_path)
     frame = _real_frame()
-
-    def _unsorted(windows: List[int]) -> np.ndarray:
-        cfg = PreprocessingConfig(
-            enabled=True, mode="replace",
-            winsorization={"enabled": False}, fractional_differencing={"enabled": False}, adf_differencing={"enabled": False},
-            rank_transform={"enabled": False}, gaussian_normalize={"enabled": False},
-            adaptive_zscore={"enabled": True, "windows": windows, "apply_to": "all"},
-        )
-        return FeaturePreprocessor(cfg.model_dump()).transform_selected(list(frame.columns), {"g": frame}, config=cfg)[
-            "g"].to_numpy(dtype=np.float64)
-
-    assert not np.array_equal(_unsorted([252, 100]), _unsorted([100, 252]), equal_nan=True)
+    a = _run(tmp_path, frame, ["zscore"], zscore_windows=[100, 252], tag="u1")["frame"].to_numpy(dtype=np.float64)
+    b = _run(tmp_path, frame, ["zscore"], zscore_windows=[252, 100], tag="u2")["frame"].to_numpy(dtype=np.float64)
+    assert not np.array_equal(a, b, equal_nan=True)
 
 
 def test_mutation_excluded_features_not_filled_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -281,13 +276,10 @@ def test_mutation_excluded_features_not_filled_is_caught(tmp_path: Path, monkeyp
 
 
 def test_mutation_dedup_removed_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：移除去重（以 transform_selected 直接吃重複清單）⇒ 輸出欄重複（⑦之判準有鑑別力）。"""
-    frame = _real_frame()
-    cfg = PreprocessingConfig(
-        enabled=True, mode="replace",
-        winsorization={"enabled": False}, fractional_differencing={"enabled": False}, adf_differencing={"enabled": False},
-        rank_transform={"enabled": True, "window": RANK_W, "apply_to": "all"},
-        adaptive_zscore={"enabled": False}, gaussian_normalize={"enabled": False},
-    )
-    out = FeaturePreprocessor(cfg.model_dump()).transform_selected(["volume", "close", "volume"], {"g": frame}, config=cfg)
-    assert list(out["g"].columns) != ["volume", "close"]
+    """mutant：服務之保序去重失效（服務須經模組層 `_dedupe_preserve_order` 處理）⇒ ⑦之判準翻轉。"""
+    import api.services.ic_analysis_service as service_module
+
+    monkeypatch.setattr(service_module, "_dedupe_preserve_order", lambda names: list(names))
+    monkeypatch.chdir(tmp_path)
+    got = _run(tmp_path, _real_frame(), ["rank"], selected=["volume", "close", "volume"])
+    assert list(got["frame"].columns) != ["volume", "close"] or got["result"]["selected_feature_count"] != 2

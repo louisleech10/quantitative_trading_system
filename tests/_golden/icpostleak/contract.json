@@ -9,7 +9,42 @@
       "volume"
     ],
     "late_born_column": "close_late",
-    "late_born_nan_rows": 400
+    "late_born_nan_rows": 400,
+    "l1_features": [
+      {
+        "name": "close_trend_EMA_21",
+        "fn": "EMA",
+        "inputs": [
+          "close"
+        ],
+        "args": {
+          "timeperiod": 21
+        }
+      },
+      {
+        "name": "close_momentum_RSI_14",
+        "fn": "RSI",
+        "inputs": [
+          "close"
+        ],
+        "args": {
+          "timeperiod": 14
+        }
+      },
+      {
+        "name": "hlc_volatility_ATR_14",
+        "fn": "ATR",
+        "inputs": [
+          "high",
+          "low",
+          "close"
+        ],
+        "args": {
+          "timeperiod": 14
+        }
+      }
+    ],
+    "l1_features_note": "§G「3 個真實 L1 特徵欄」：以 TA-Lib（生產 L1 同一程式庫）於真實 kline 計算；首段 NaN 為各指標自然暖身（晚生欄）；另保留人工晚生欄 close_late 驗錨點非 0"
   },
   "rank_window": 252,
   "zscore_windows": [
@@ -73,6 +108,22 @@
     "registry": {
       "env": {},
       "entry": "transform_registry_groups"
+    },
+    "registry_sink": {
+      "env": {},
+      "entry": "transform_registry_groups_to_sink"
+    },
+    "registry_sink_sharded": {
+      "env": {
+        "FFACT_CGSA_SHARD_BYTES": "4096"
+      },
+      "entry": "transform_registry_groups_to_sink"
+    },
+    "registry_sink_chunked": {
+      "env": {
+        "FFACT_L65_SPLIT_THRESHOLD": "2"
+      },
+      "entry": "transform_registry_groups_to_sink"
     }
   },
   "perturb": {
