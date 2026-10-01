@@ -571,6 +571,9 @@ def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
     from momentum.FeatureEngineering.feature_config import AtomicIndicatorConfig
 
     config.atomic_indicators = AtomicIndicatorConfig()
+    # FFSTAT b4：縮尾輸出遮不完整窗 window−1 列；預設窗 252 於本 6 列 fixture 全遮成 NaN ⇒ IC 無可選。
+    # 本測試驗 raw 落盤後之記憶體預算 metadata ⇒ 局部設縮尾窗 3（同 fixture 之 rank／zscore 窗）；全鏈長窗由 b4 回歸測試負責
+    config.preprocessing.winsorization.window = 3
     config.ic_gate_required_available_gb = 0.0
     config.tier_peak_budget_gb = 999.0
     storage = FeatureStorage(str(tmp_path / "features"))
