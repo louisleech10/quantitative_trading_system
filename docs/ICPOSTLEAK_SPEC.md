@@ -1,7 +1,7 @@
 # ICPOSTLEAK：IC 頁「套用後處理」之未來洩漏與 rank／zscore／gaussian 窗未滿即出值 — SPEC
 
 > 來源 PLAN/診斷：`docs/ROADMAP.md` RM-ICFIRSTALIGN（「甲」部分）；`handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md`；`handoffs/20260927-ffstat-b4-redesign-rulings.md` R7　|　日期：2026-10-01　|　對應 TODO：`docs/manifests/ICPOSTLEAK.json`（SPEC 凍結後依 `templates/TODO_GENERATION_PROMPT.md` 生成；本版尚不存在）
-> 版本：v2（審查 r1 `handoffs/reconcile/20261001-icpostleak-x-review-r1/synth.md` 全數採納：遮罩錨定步驟輸入、全分支盤點＋路徑一致性、IC 頁順序改正式順序、ratio-unsafe 欄明示排除、時間序 fail-closed、append 多窗、golden 存值、測試清單、gaussian 排名窗、zscore 主窗）
+> 版本：v3（審查 r2 `handoffs/reconcile/20261001-icpostleak-x-review-r2/synth.md`：數值基準改逐分支自比＋跨分支既有差異凍結、順序文案全落點、保序去重、前端顯示被排除欄）；v2（審查 r1 `handoffs/reconcile/20261001-icpostleak-x-review-r1/synth.md` 全數採納：遮罩錨定步驟輸入、全分支盤點＋路徑一致性、IC 頁順序改正式順序、ratio-unsafe 欄明示排除、時間序 fail-closed、append 多窗、golden 存值、測試清單、gaussian 排名窗、zscore 主窗）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（CLAUDE.md 任務分派規則：命中 (b)(d)）。
@@ -29,7 +29,7 @@
 - **窗未滿之定義**：沿用 FF-STAT b4 第①類之語意（窗內未滿 `window` 個觀測之輸出不公開），**錨點＝該步驟之輸入**：逐欄 `cut = 步驟輸入首個有限值列 + window − 1`，`[0, cut)` 設 NaN。b4 縮尾之 `mask_incomplete_window_inplace` 以輸出首個有限值為錨點，僅因縮尾輸出之 NaN 位置＝輸入（`stable_mask.py:216-219`）而等價；rank／gaussian 之 min_periods > 1 使輸出首個有限值晚於輸入，故不得沿用輸出錨點。新增 `stable_mask` 純函式以輸入錨點實作，縮尾之既有呼叫不改。
 - **各步驟之 window**：rank＝`rank_config.window`；gaussian＝其因果排名窗 `_rolling_window()`（`winsor_config.window`，未設則 `rank_config.window`，再未設 252；`feature_preprocessor.py:552-554`）；zscore＝每個實際輸出之窗（replace 模式＝`windows[0]`，append 模式＝每個窗各自）。
 - **時間序**：三項皆為依列序之 rolling ⇒ 輸入 index 若為時間戳，須嚴格遞增；非嚴格遞增（倒序、重複、亂序）⇒ fail-closed（`ValueError` 列出違規位置），不靜默排序。
-- 本任務特別注意：`transform_selected` 之 caller `feature_factory.py:2730`（`run_ic_first`）；API 回應 schema（`api/models/ic_models.py:413-440`）只得**新增**選填欄；h5 `analysis_status`／`oos_guarantees` attrs 寫入契約（B3-XFORM-01）不變。
+- 本任務特別注意：前端只動 Task 2.2 之型別與結果區；`transform_selected` 之 caller `feature_factory.py:2730`（`run_ic_first`）；API 回應 schema（`api/models/ic_models.py:413-440`）只得**新增**選填欄；h5 `analysis_status`／`oos_guarantees` attrs 寫入契約（B3-XFORM-01）不變。
 - 不得侷限加密貨幣：窗口單位為「根」（`ic_models.py:420` 現寫「天」，改正）。
 
 ## §G Golden / Baseline
@@ -44,7 +44,8 @@
 **Task 1.1 — 輸入錨點遮罩與全分支套用**
 - 目標：rank／zscore／gaussian 之輸出於各自窗未滿之列為 NaN，於 §A 分支盤點之每一分支。　檔案：`stable_mask.py` 新增輸入錨點遮罩純函式；`feature_preprocessor.py` 之分支①–⑤。既有 caller：`transform`、`transform_selected`、`transform_registry_groups`／`transform_registry_groups_to_sink`。
 - 改法：第一步以 `grep` 盤點收據（`handoffs/run_receipts/<日期>-icpostleak-branch-inventory.txt`）確認 §A 分支清單、補漏；每分支於每個步驟產出後，以「該步驟輸入之首個有限值」與 §C 之窗呼叫新純函式；不改三項之數值公式與 min_periods。分支間之步驟順序若與 legacy（rank→gaussian→zscore）不同，改為同序。
-- **驗證（可證偽）**：`pytest tests/feature_engineering/test_icpostleak.py -k "phase1"` 綠——①§G 四條件於七組合、append 多窗、晚生欄全符；②**路徑一致性**：同一輸入於分支①②③④（以 `FFACT_USE_POLARS`、optimized 條件、registry 群組入口切換）之輸出逐位元組相同；③擾動最後一列 ⇒ 前 2999 列逐位元組不變；mutant 各自使具名測試紅：遮罩 identity、遮罩錨點改用輸出首個有限值、遮罩窗 `window−2`、任一分支漏遮（逐分支各一）、append 只遮第一窗。
+- **數值基準**（各分支之 zscore 數值核心於完整窗之後即已不同：pandas float64〔`_rolling_zscore_2d`〕、numba／bottleneck float32〔`_numba_transforms.py`〕、Polars 表達式〔`polars_adapter.py`〕；本票不改公式）：動工前**逐分支**凍結完整輸出至 `tests/_golden/icpostleak/branch_<分支>.npz`；改後每分支對**自己**之改前值於遮罩後區段逐位元組相同；跨分支既有差異逐格凍結於 `tests/_golden/icpostleak/branch_diff.npz`（兩側值），改後同格仍各自等於原值；量級另入收據 `handoffs/run_receipts/<日期>-icpostleak-branch-diff.json`（逐分支對 legacy 之最大絕對差、最大相對差、差異格數）。
+- **驗證（可證偽）**：`pytest tests/feature_engineering/test_icpostleak.py -k "phase1"` 綠——①§G 四條件於七組合、append 多窗、晚生欄全符；②**路徑一致性**：同一輸入於分支①②③④（以 `FFACT_USE_POLARS`、optimized 條件、registry 群組入口切換）之**遮罩位置（逐欄首個有限值列）、步驟順序、參數**逐分支完全相同；數值依上列「數值基準」比對（不加 atol、不刪格）；③擾動最後一列 ⇒ 前 2999 列逐位元組不變；mutant 各自使具名測試紅：遮罩 identity、遮罩錨點改用輸出首個有限值、遮罩窗 `window−2`、任一分支漏遮（逐分支各一）、append 只遮第一窗。
 - **邊界（≥2）**：①全 NaN 欄 ⇒ 全 NaN、不拋錯；②晚生欄 ⇒ 錨點自該欄首個有限值；③列數 < window ⇒ 全 NaN、不拋錯；④三項鏈式 ⇒ 首個有限值逐步累加；⑤zscore 常數窗沿用現行 `where(std > 0, 0)`。
 - **存活至**：永久。**覆蓋風險**：無。
 - 不可做：不得改三項之數值公式；不得以放寬比較範圍換綠；不得另立與 §C 不同之窗未滿定義。
@@ -66,17 +67,17 @@
 ### Phase 2 — IC 頁改用正式實作（依賴：Phase 1）
 **Task 2.1 — `_apply_transforms_sync` 改呼叫正式 post-IC 轉換**
 - 目標：刪除 `ic_analysis_service.py:2873-2905` 手寫三項；以 `momentum.factories` 取得前處理器，組 `PreprocessingConfig`（縮尾、fracdiff、ADF 關閉，mode＝replace；`rank_transform.window`＝`rank_window`；`adaptive_zscore.windows`＝`sorted(zscore_windows)`〔保留手寫版以最小窗為主窗之語意〕；`gaussian_normalize.enabled`＝`gaussian`），呼叫 `transform_selected(kept_cols, {"ic_page": df}, config=…)`。
-- 改法：轉換順序改為正式順序 rank→gaussian→zscore（§A 第 3 條收據：手寫順序 74.1% 裁切）；`transforms_applied` 依實際順序填；`ApplyTransformsRequest` 之 `gaussian` 欄說明「在 rank/zscore 之後執行」改為正式順序，`rank_window` 說明「（天）」改「（根）」；落盤、attrs 不變。
-- **驗證（可證偽）**：`pytest tests/api/test_icpostleak_api.py` 綠——①七組合下改最後一列 ⇒ 前段逐位元組不變（改前 gaussian 4039 格之反例轉綠）；②輸出與同映射之 `transform_selected` 逐位元組相同；③`zscore_windows=[252, 100]` 與 `[100, 252]` 輸出相同（主窗＝100）；④`grep -c "rank(pct=True, axis=0)" api/services/ic_analysis_service.py` == 0；⑤`tests/api/test_ic_la1_degraded_gate.py` 之 apply_transforms 節點綠；mutant「恢復全樣本排名」使①紅、「改回 gaussian 最後」使②紅、「不排序 zscore 窗」使③紅。
+- 改法：轉換順序改為正式順序 rank→gaussian→zscore（§A 第 3 條收據：手寫順序 74.1% 裁切）；`transforms_applied` 依實際順序填；所有宣稱舊順序之文案同步改為正式順序——`api/models/ic_models.py:419`（`gaussian` 欄說明）、`api/services/ic_analysis_service.py:2814`（`apply_transforms` docstring）、`api/routes/ic_analysis.py:750`（route docstring，即 OpenAPI 敘述）；`ic_models.py:420` `rank_window` 說明「（天）」改「（根）」；落盤、attrs 不變。`selected_features` 於入口**保序去重**（現行未去重：`ic_analysis_service.py:2865-2871` 與 `transform_selected` 皆保留重複），去重後之清單同時用於 kept_cols、excluded_features 與各計數。
+- **驗證（可證偽）**：`pytest tests/api/test_icpostleak_api.py` 綠——①七組合下改最後一列 ⇒ 前段逐位元組不變（改前 gaussian 4039 格之反例轉綠）；②輸出與同映射之 `transform_selected` 逐位元組相同；③`zscore_windows=[252, 100]` 與 `[100, 252]` 輸出相同（主窗＝100）；④`grep -c "rank(pct=True, axis=0)" api/services/ic_analysis_service.py` == 0；⑤`tests/api/test_ic_la1_degraded_gate.py` 之 apply_transforms 節點綠；⑥`grep -c "rank → zscore → gaussian\|rank/zscore 之後" api/models/ic_models.py api/services/ic_analysis_service.py api/routes/ic_analysis.py` 各 == 0；⑦`selected_features` 含重複名 ⇒ 輸出欄不重複、`selected_feature_count`＝去重後數；mutant「恢復全樣本排名」使①紅、「改回 gaussian 最後」使②紅、「不排序 zscore 窗」使③紅、「移除去重」使⑦紅。
 - **邊界（≥2）**：①selected_features 部分不存在 ⇒ 維持 warning＋只轉存在者；全不存在 ⇒ 維持 ValueError；②三開關全關 ⇒ 維持 ValueError；③請求窗 > 資料列數 ⇒ 全 NaN、不拋錯；④檔案輸入 index 倒序 ⇒ Task 1.2 之 ValueError 經 API 回 4xx／5xx 而非靜默輸出。
 - **存活至**：永久。**覆蓋風險**：無。
-- 不可做：不改 API 路由；不改前端。
+- 不可做：不改 API 路由路徑與既有回應欄位。
 
 **Task 2.2 — ratio-unsafe 欄明示排除**
 - 目標：`transform` 入口丟棄 `_is_ratio_unsafe_column` 欄（`feature_preprocessor.py:600-612`），IC 頁改接後不得**靜默**少欄（審查 r1 三家）。
-- 改法：IC 頁於呼叫前以同一判定函式分出 ratio-unsafe 欄，不送轉換、不寫入輸出；回應新增選填欄 `excluded_features: List[{"name", "reason"}]`（reason＝`ratio_unsafe:<category>`），並 warning log；選中欄全為 ratio-unsafe ⇒ `ValueError`（訊息列欄名與原因）。`ApplyTransformsResponse` 只新增選填欄。
-- **驗證**：`pytest tests/api/test_icpostleak_api.py -k "ratio_unsafe"` 綠——混入 1 個 pattern 欄 ⇒ 輸出欄數＝選中數−1、`excluded_features` 恰列該欄；全為 pattern 欄 ⇒ ValueError；mutant「不填 excluded_features」使前者紅。
-- **邊界**：①無 ratio-unsafe 欄 ⇒ `excluded_features == []`；②同名欄重複選取 ⇒ 沿用現行去重。
+- 改法：IC 頁於呼叫前以同一判定函式分出 ratio-unsafe 欄，不送轉換、不寫入輸出；回應新增選填欄 `excluded_features: List[{"name", "reason"}]`（reason＝`ratio_unsafe:<category>`），並 warning log；選中欄全為 ratio-unsafe ⇒ `ValueError`（訊息列欄名與原因）。`ApplyTransformsResponse` 只新增選填欄。前端顯示：`frontend/src/hooks/useICAnalysis.ts:751` 之回應型別加選填 `excluded_features`；`frontend/src/app/ic-analysis/page.tsx:906-915` 結果區於非空時列出被排除之欄名與原因。
+- **驗證**：`pytest tests/api/test_icpostleak_api.py -k "ratio_unsafe"` 綠——混入 1 個 pattern 欄 ⇒ 輸出欄數＝選中數−1、`excluded_features` 恰列該欄；全為 pattern 欄 ⇒ ValueError；mutant「不填 excluded_features」使前者紅；前端 `cd frontend && npm run build` rc=0，且 `vitest` 對結果區之元件測試：`excluded_features` 非空時渲染欄名與原因、為空時不渲染（mutant「不渲染」使之紅）。
+- **邊界**：①無 ratio-unsafe 欄 ⇒ `excluded_features == []`、前端不顯示；②同名欄重複選取（numeric 與 ratio-unsafe 各一例）⇒ 依 Task 2.1 保序去重後只計一次。
 - **存活至**：永久。**覆蓋風險**：無。
 - 不可做：不得改 `_is_ratio_unsafe_column` 之判定；不得把 ratio-unsafe 欄未轉換即寫入輸出。
 
@@ -91,5 +92,7 @@
 
 ## §N N/A 登記
 - (a)、(c) 不命中：不改三項之數值公式（只遮窗未滿列、改 IC 頁順序為正式順序）；兩 Phase、可回退。
-- 前端：不改——回應只新增選填欄 `excluded_features`；前端未讀之不影響顯示。
-- 殘留：無（ICFIRSTALIGN 乙部分〔不可變 run context、L7 raw 讀回時間軸〕不屬本票，依使用者 2026-10-01 裁定交全票細項排序諮詢定序）。
+- 前端：只改 Task 2.2 之型別與結果區顯示被排除欄；不改流程與其他元件。
+- 殘留：
+  - 各分支 zscore 數值核心不一致（pandas float64／numba float32／Polars）——`為何現在不做: needs-research:差異量級是否超出 float32 精度與下游是否依賴分支一致（Task 1.1 量級收據為輸入）`；觸發：量級收據之最大相對差 > 1e-3（`FLOAT16_MAX_REL_ERROR` 同級）或任一下游以分支切換比對數值；登記處：`docs/ROADMAP.md` 本票列之 pointer 與本 SPEC。
+  - ICFIRSTALIGN 乙部分（不可變 run context、L7 raw 讀回時間軸）——`為何現在不做: user-ruling:2026-10-01 使用者裁定 IC 頁洩漏修完後開全票細項排序諮詢定序`；觸發：該諮詢定案；登記處：`docs/ROADMAP.md` RM-ICFIRSTALIGN。

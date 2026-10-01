@@ -1,0 +1,238 @@
+Thu Oct  1 22:29:10 CST 2026
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/louis/Desktop/quantitative_trading_system/venv/bin/python
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 3 items
+
+tests/feature_engineering/test_ff_fullchain_truncation_mr.py::test_c2_1_fullchain_bar_truncation_invariant 
+-------------------------------- live log setup --------------------------------
+22:29:12 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:29:12 [INFO] Read 20352 klines from BTCUSDT/1h in 0.016s
+22:29:12 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:29:12 [INFO] Registered adapter: crypto_spot
+22:29:12 [INFO] Loaded feature registry with 31 entries
+22:29:12 [INFO] Loaded 134 TA-Lib indicators
+22:29:13 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+22:29:13 [INFO] Registered adapter: crypto_spot
+22:29:13 [INFO] Loaded feature registry with 31 entries
+22:29:13 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [INFO] Fetching spot data: BTCUSDT/1h
+22:29:13 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+22:29:13 [INFO] Aligned data for BTCUSDT/1h: 20352 rows, 10 columns
+22:29:13 [INFO] Loaded feature registry with 31 entries
+22:29:13 [INFO] [Layer 1] 0% - Starting Layer 1...
+22:29:13 [INFO] Layer 1 starting, rss=270MB
+22:29:13 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:13 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:13 [WARNING] trades missing, large trade ratio set to NaN
+22:29:31 [INFO] [Layer 1] 100% - Layer 1 completed: 1683 features
+22:29:31 [INFO] Layer 1 done: 1683 cols, status=ok, rss=503MB
+22:29:31 [INFO] [Layer 2] 0% - Starting Layer 2...
+22:29:31 [INFO] Layer 2 starting, rss=503MB
+22:29:31 [INFO] [L2] Starting derived features: 1683 L1 cols
+22:29:31 [INFO] [NaN Blacklist][L2_input] stripped 64 cols (e.g. ['ohlc_pattern_CDLINNECK', 'ohlc_pattern_CDLTAKURI', 'volume_cycle_HT-DCPHASE'])
+22:29:31 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+22:29:32 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:32 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:32 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:32 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+22:29:32 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:32 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:32 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+22:29:32 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+22:29:32 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:32 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:32 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+22:29:32 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+22:29:32 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:32 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:29:32 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+22:30:05 [INFO] [L2] Completed: 46741 cols in 33.19s
+22:30:09 [INFO] [Layer 2] 100% - Layer 2 completed: 46741 features
+22:30:09 [INFO] Layer 2 done: 46741 cols, status=ok, rss=1601MB
+22:30:09 [INFO] [memmap] created: shape=(5108, 46741), dtype=<class 'numpy.float32'>, est=0.96 GB  (file auto-unlinked)
+22:30:11 [INFO] [spill] calib_layer2: 5108×46741 → float32 memmap in 2.4s (freed ~1.9 GB float64)
+22:30:11 [INFO] [Layer 3] 0% - Starting Layer 3...
+22:30:11 [INFO] Layer 3 starting, rss=2203MB
+22:30:11 [INFO] [NaN Blacklist][L3_input] stripped 64 cols (e.g. ['ohlc_pattern_CDLINNECK', 'ohlc_pattern_CDLTAKURI', 'volume_cycle_HT-DCPHASE'])
+22:31:00 [INFO] [L3 streaming][numba][multi] step 10/100 (W3_range): 1612→1612 cols (-0 dead)
+22:31:01 [INFO] [L3 streaming][numba][multi] step 20/100 (W5_range): 1612→1612 cols (-0 dead)
+22:31:01 [INFO] [L3 streaming][numba][multi] step 30/100 (W8_range): 1612→1612 cols (-0 dead)
+22:31:02 [INFO] [L3 streaming][numba][multi] step 40/100 (W13_range): 1612→1612 cols (-0 dead)
+22:31:04 [INFO] [L3 streaming][numba][multi] step 50/100 (W21_range): 1612→1612 cols (-0 dead)
+22:31:05 [INFO] [L3 streaming][numba][multi] step 60/100 (W34_range): 1612→1612 cols (-0 dead)
+22:31:07 [INFO] [L3 streaming][numba][multi] step 70/100 (W55_range): 1612→1612 cols (-0 dead)
+22:31:09 [INFO] [L3 streaming][numba][multi] step 80/100 (W89_range): 1612→1612 cols (-0 dead)
+22:31:11 [INFO] [L3 streaming][numba][multi] step 90/100 (W144_range): 1612→1612 cols (-0 dead)
+22:31:13 [INFO] [L3 streaming][numba][multi] step 100/100 (W233_range): 1612→1612 cols (-0 dead)
+22:31:13 [INFO] [L3 streaming][numba][multi] complete: 161200 total generated, 0 dead dropped, 161200 survivors
+22:32:12 [INFO] [Layer 3] 100% - Layer 3 completed: 161200 features
+22:32:12 [INFO] Layer 3 done: 161200 cols, status=ok, rss=757MB
+22:32:12 [INFO] [Layer 4] 0% - Starting Layer 4...
+22:32:12 [INFO] Layer 4 starting, rss=757MB
+22:32:12 [INFO] [NaN Blacklist][L4_input[layer1_and_raw]] stripped 64 cols (e.g. ['ohlc_pattern_CDLINNECK', 'ohlc_pattern_CDLTAKURI', 'volume_cycle_HT-DCPHASE'])
+22:32:13 [INFO] [Layer 4] 100% - Layer 4 completed: 12976 features
+22:32:13 [INFO] Layer 4 done: 12976 cols, status=ok, rss=709MB
+22:32:13 [INFO] [Layer 5] 0% - Starting Layer 5...
+22:32:13 [INFO] Layer 5 starting, rss=709MB
+22:32:13 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+22:32:13 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=709MB
+22:32:13 [INFO] [Layer 6] 0% - Starting Layer 6...
+22:32:13 [INFO] Layer 6 starting, rss=709MB
+22:32:13 [INFO] [Layer 6] 100% - Layer 6 completed: 11 features
+22:32:13 [INFO] Layer 6 done: 11 cols, status=ok, rss=712MB
+22:32:13 [INFO] [memmap concat] 5 DFs → 222611 cols × 5108 rows ≈ 4.55 GB → disk-backed
+22:32:13 [INFO] [memmap] created: shape=(5108, 222611), dtype=<class 'numpy.float32'>, est=4.55 GB  (file auto-unlinked)
+22:32:13 [INFO] [memmap concat] copying DF 1/5 (1683 cols)
+22:32:14 [INFO] [memmap concat] copying DF 2/5 (46741 cols)
+22:32:19 [INFO] [memmap concat] copying DF 3/5 (161200 cols)
+23:02:41 [INFO] [memmap concat] copying DF 4/5 (12976 cols)
+23:03:04 [INFO] [memmap concat] copying DF 5/5 (11 cols)
+PYTEST_RC=137
+Thu Oct  1 23:07:28 CST 2026

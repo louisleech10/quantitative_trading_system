@@ -1,0 +1,400 @@
+20:34:41 [INFO] [L6.5] raw-sink heartbeat: tasks 336/421 (79.8%), groups 336/421, elapsed=94.1s, rate=3.57/s, ETA=24s, rss=837MB, last=12h_L1_momentum_ULTOSC_5-13-26 (full)
+20:34:45 [INFO] [L6.5] raw-sink heartbeat: tasks 357/421 (84.8%), groups 357/421, elapsed=98.1s, rate=3.64/s, ETA=18s, rss=837MB, last=12h_L1_pattern_CDLCONCEALBABYSWALL (full)
+20:34:49 [INFO] [L6.5] raw-sink heartbeat: tasks 378/421 (89.8%), groups 378/421, elapsed=102.2s, rate=3.70/s, ETA=12s, rss=837MB, last=12h_L1_pattern_CDLINVERTEDHAMMER (full)
+20:34:53 [INFO] [L6.5] raw-sink heartbeat: tasks 399/421 (94.8%), groups 399/421, elapsed=106.3s, rate=3.76/s, ETA=6s, rss=837MB, last=12h_L1_pattern_CDLTAKURI (full)
+20:34:58 [INFO] [L6.5] raw-sink heartbeat: tasks 420/421 (99.8%), groups 420/421, elapsed=110.6s, rate=3.80/s, ETA=0s, rss=802MB, last=12h_L1_volume_VWAP (full)
+20:34:58 [INFO] [L6.5] raw-sink heartbeat: tasks 421/421 (100.0%), groups 421/421, elapsed=110.8s, rate=3.80/s, ETA=0s, rss=802MB, last=12h_L1_volume_VolumeMA_Ratio (full)
+20:34:58 [INFO] [L6.5] raw-sink complete: 421/421 groups in 111.00s rss=802MB
+20:34:58 [INFO] [L7 Dead Drop][CGSA] dropped 40975 cols across 194 groups (min_valid=100); final features=154955
+20:34:58 [INFO] [Layer B Sanitize][CGSA] nulled 26293023 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+20:35:00 [INFO] [L7_raw] registry stream persist done: symbol=BTCUSDT tf=12h groups=356 features=154955 npy_freed=0.49 GiB dtype=mixed
+20:35:01 [INFO] Loaded feature registry with 1 entries
+PASSED                                                                   [  1%]
+tests/feature_engineering/test_batch2d_dstar_align.py::test_t4_value_parity_inventory_record_only PASSED [  2%]
+tests/feature_engineering/test_batch2d_dstar_align.py::test_t4_value_parity_exact_blocked SKIPPED [  3%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_path_symbol_collision_is_rejected_by_payload_symbol PASSED [  4%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_path_timeframe_collision_is_rejected_by_payload_timeframe PASSED [  5%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_fracdiff_hash_without_max_lag_is_rejected PASSED [  6%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_fracdiff_hash_without_calibration_bars_is_rejected PASSED [  8%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_payload_row_count_mismatch_is_rejected 
+-------------------------------- live log call ---------------------------------
+20:35:17 [WARNING] [d_star_cache] stale cache field=row_count path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-165/test_mutation_payload_row_coun0/d_star_BTCUSDT_1h_a75b067e20c1.json
+PASSED                                                                   [  9%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_payload_time_range_mismatch_is_rejected 
+-------------------------------- live log call ---------------------------------
+20:35:17 [WARNING] [d_star_cache] stale cache field=time_range path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-165/test_mutation_payload_time_ran0/d_star_BTCUSDT_1h_a75b067e20c1.json
+PASSED                                                                   [ 10%]
+tests/feature_engineering/test_dstar_cache_key_mutation.py::test_mutation_strong_value_fingerprint_mismatch_is_rejected PASSED [ 11%]
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_4_run_and_cgsa_paths_are_symbol_scoped PASSED [ 12%]
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_2_dstar_path_payload_and_alias_are_symbol_isolated PASSED [ 13%]
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_2_shared_dstar_cache_is_reset_after_chunked_transform 
+-------------------------------- live log call ---------------------------------
+20:35:17 [INFO] [L6.5] symbol=BTCUSDT tf=12h d_star_cache_hit=0/2 path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-165/test_v5_2_shared_dstar_cache_i0/dstar/d_star_BTCUSDT_12h_b7a76701c491.json
+PASSED                                                                   [ 14%]
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_reference_cache_source_uses_tuple_key_and_effective_ref_symbol PASSED [ 16%]
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_mutation_m5_1_shared_dstar_path_fails_isolation 
+-------------------------------- live log call ---------------------------------
+20:35:17 [WARNING] [d_star_cache] stale cache field=symbol path=/private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-165/test_mutation_m5_1_shared_dsta0/dstar/d_star_shared.json
+PASSED                                                                   [ 17%]
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_mutation_m5_2_reference_cache_static_key_drop_is_detected PASSED [ 18%]
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_mutation_m5_3_dstar_payload_wrong_symbol_fails_alias_guard PASSED [ 19%]
+tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_4_runtime_cgsa_paths_are_symbol_scoped 
+-------------------------------- live log call ---------------------------------
+20:35:17 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+20:35:17 [INFO] Read 1696 klines from BTCUSDT/12h in 0.002s
+20:35:17 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+20:35:17 [INFO] Registered adapter: crypto_spot
+20:35:17 [INFO] Fetching spot data: ETHUSDT/12h
+20:35:17 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+20:35:17 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 5 columns
+20:35:17 [INFO] [Layer 1] 0% - Starting Layer 1...
+20:35:17 [INFO] Layer 1 starting, rss=1241MB
+20:35:17 [INFO] [Layer 1] 100% - Layer 1 completed: 2 features
+20:35:17 [INFO] Layer 1 done: 2 cols, status=ok, rss=1241MB
+20:35:17 [INFO] [Layer 2] 0% - Starting Layer 2...
+20:35:17 [INFO] Layer 2 starting, rss=1241MB
+20:35:17 [INFO] [L2] Starting derived features: 2 L1 cols
+20:35:17 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+20:35:17 [INFO] Layer 2 done: 0 cols, status=empty_disabled, rss=1241MB
+20:35:17 [INFO] [Layer 3] 0% - Starting Layer 3...
+20:35:17 [INFO] Layer 3 starting, rss=1241MB
+20:35:17 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+20:35:17 [INFO] Layer 3 done: 0 cols, status=empty_not_applicable, rss=1241MB
+20:35:17 [INFO] [Layer 4] 0% - Starting Layer 4...
+20:35:17 [INFO] Layer 4 starting, rss=1241MB
+20:35:17 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+20:35:17 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=1241MB
+20:35:17 [INFO] [Layer 5] 0% - Starting Layer 5...
+20:35:17 [INFO] Layer 5 starting, rss=1241MB
+20:35:17 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+20:35:17 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1241MB
+20:35:17 [INFO] [Layer 6] 0% - Starting Layer 6...
+20:35:17 [INFO] Layer 6 starting, rss=1241MB
+20:35:17 [INFO] [Layer 6] 100% - Layer 6 completed: 0 features
+20:35:17 [INFO] Layer 6 done: 0 cols, status=empty_disabled, rss=1241MB
+20:35:17 [INFO] [CGSA] Initialized ColumnGroupRegistry at /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-165/test_v5_4_runtime_cgsa_paths_a0/cgsa (tier=8gb, buffer_groups=0)
+20:35:17 [INFO] Fetching spot data: ETHUSDT/12h
+20:35:17 [INFO] Read 1696 klines from ETHUSDT/12h in 0.002s
+20:35:17 [INFO] Aligned data for ETHUSDT/12h: 1696 rows, 5 columns
+20:35:17 [INFO] [Layer 1] 0% - Starting Layer 1...
+20:35:17 [INFO] Layer 1 starting, rss=1241MB
+20:35:17 [INFO] [Layer 1] 100% - Layer 1 completed: 2 features
+20:35:17 [INFO] Layer 1 done: 2 cols, status=ok, rss=1241MB
+20:35:17 [INFO] [Layer 2] 0% - Starting Layer 2...
+20:35:17 [INFO] Layer 2 starting, rss=1241MB
+20:35:17 [INFO] [L2] Starting derived features: 2 L1 cols
+20:35:17 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+20:35:17 [INFO] Layer 2 done: 0 cols, status=empty_disabled, rss=1241MB
+20:35:17 [INFO] [Layer 3] 0% - Starting Layer 3...
+20:35:17 [INFO] Layer 3 starting, rss=1241MB
+20:35:17 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+20:35:17 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+20:35:17 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=1217MB
+20:35:17 [INFO] [Layer 4] 0% - Starting Layer 4...
+20:35:17 [INFO] Layer 4 starting, rss=1217MB
+20:35:17 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+20:35:17 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=1217MB
+20:35:17 [INFO] [Layer 5] 0% - Starting Layer 5...
+20:35:17 [INFO] Layer 5 starting, rss=1217MB
+20:35:17 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+20:35:17 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1217MB
+20:35:17 [INFO] [Layer 6] 0% - Starting Layer 6...
+20:35:17 [INFO] Layer 6 starting, rss=1217MB
+20:35:17 [INFO] [Layer 6] 100% - Layer 6 completed: 0 features
+20:35:17 [INFO] Layer 6 done: 0 cols, status=empty_disabled, rss=1217MB
+20:35:17 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.5439, non_nan=62/114
+20:35:17 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L1_trend_EMA, reserve_floor=2.00 GiB, free=27.29 GiB, groups=2
+20:35:17 [INFO] [L7_raw] registry stream persist done: symbol=ETHUSDT tf=12h groups=2 features=2 npy_freed=0.00 GiB dtype=float16
+20:35:17 [INFO] Fetching spot data: BTCUSDT/12h
+20:35:17 [INFO] Read 1696 klines from BTCUSDT/12h in 0.002s
+20:35:17 [INFO] Aligned data for BTCUSDT/12h: 1696 rows, 5 columns
+20:35:17 [INFO] Loaded feature registry with 1 entries
+20:35:17 [INFO] [Layer 1] 0% - Starting Layer 1...
+20:35:17 [INFO] Layer 1 starting, rss=1217MB
+20:35:17 [INFO] [Layer 1] 100% - Layer 1 completed: 2 features
+20:35:17 [INFO] Layer 1 done: 2 cols, status=ok, rss=1217MB
+20:35:17 [INFO] [Layer 2] 0% - Starting Layer 2...
+20:35:17 [INFO] Layer 2 starting, rss=1217MB
+20:35:17 [INFO] [L2] Starting derived features: 2 L1 cols
+20:35:17 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+20:35:17 [INFO] Layer 2 done: 0 cols, status=empty_disabled, rss=1217MB
+20:35:17 [INFO] [Layer 3] 0% - Starting Layer 3...
+20:35:17 [INFO] Layer 3 starting, rss=1217MB
+20:35:17 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+20:35:17 [INFO] Layer 3 done: 0 cols, status=empty_not_applicable, rss=1217MB
+20:35:17 [INFO] [Layer 4] 0% - Starting Layer 4...
+20:35:17 [INFO] Layer 4 starting, rss=1217MB
+20:35:17 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+20:35:17 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=1217MB
+20:35:17 [INFO] [Layer 5] 0% - Starting Layer 5...
+20:35:17 [INFO] Layer 5 starting, rss=1217MB
+20:35:17 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+20:35:17 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1217MB
+20:35:17 [INFO] [Layer 6] 0% - Starting Layer 6...
+20:35:17 [INFO] Layer 6 starting, rss=1217MB
+20:35:17 [INFO] [Layer 6] 100% - Layer 6 completed: 0 features
+20:35:17 [INFO] Layer 6 done: 0 cols, status=empty_disabled, rss=1217MB
+20:35:17 [INFO] [CGSA] Initialized ColumnGroupRegistry at /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-165/test_v5_4_runtime_cgsa_paths_a0/cgsa (tier=8gb, buffer_groups=0)
+20:35:17 [INFO] Fetching spot data: BTCUSDT/12h
+20:35:17 [INFO] Read 1696 klines from BTCUSDT/12h in 0.002s
+20:35:17 [INFO] Aligned data for BTCUSDT/12h: 1696 rows, 5 columns
+20:35:17 [INFO] [Layer 1] 0% - Starting Layer 1...
+20:35:17 [INFO] Layer 1 starting, rss=1217MB
+20:35:17 [INFO] [Layer 1] 100% - Layer 1 completed: 2 features
+20:35:17 [INFO] Layer 1 done: 2 cols, status=ok, rss=1217MB
+20:35:17 [INFO] [Layer 2] 0% - Starting Layer 2...
+20:35:17 [INFO] Layer 2 starting, rss=1217MB
+20:35:17 [INFO] [L2] Starting derived features: 2 L1 cols
+20:35:17 [INFO] [Layer 2] 100% - Layer 2 completed: 0 features
+20:35:17 [INFO] Layer 2 done: 0 cols, status=empty_disabled, rss=1217MB
+20:35:17 [INFO] [Layer 3] 0% - Starting Layer 3...
+20:35:17 [INFO] Layer 3 starting, rss=1217MB
+20:35:17 [INFO] [L3] streaming persist (mode=streaming) complete: 0 cols persisted in 0 groups
+20:35:17 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+20:35:17 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=1217MB
+20:35:17 [INFO] [Layer 4] 0% - Starting Layer 4...
+20:35:17 [INFO] Layer 4 starting, rss=1217MB
+20:35:17 [INFO] [Layer 4] 100% - Layer 4 completed: 0 features
+20:35:17 [INFO] Layer 4 done: 0 cols, status=empty_not_applicable, rss=1217MB
+20:35:17 [INFO] [Layer 5] 0% - Starting Layer 5...
+20:35:17 [INFO] Layer 5 starting, rss=1217MB
+20:35:17 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+20:35:17 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1217MB
+20:35:17 [INFO] [Layer 6] 0% - Starting Layer 6...
+20:35:17 [INFO] Layer 6 starting, rss=1217MB
+20:35:17 [INFO] [Layer 6] 100% - Layer 6 completed: 0 features
+20:35:17 [INFO] Layer 6 done: 0 cols, status=empty_disabled, rss=1217MB
+20:35:17 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.5439, non_nan=62/114
+20:35:17 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=0.00 GiB, reclaimable_npy=0.00 GiB, net_growth=0.00 GiB, max_inflight_part=0.00 GiB, largest_part_source=12h_L1_trend_EMA, reserve_floor=2.00 GiB, free=27.29 GiB, groups=2
+20:35:17 [INFO] [L7_raw] registry stream persist done: symbol=BTCUSDT tf=12h groups=2 features=2 npy_freed=0.00 GiB dtype=float32
+20:35:17 [INFO] Loaded feature registry with 1 entries
+PASSED                                                                   [ 20%]
+tests/feature_engineering/test_ff_fullchain_truncation_mr.py::test_c2_1_fullchain_bar_truncation_invariant 
+-------------------------------- live log setup --------------------------------
+20:35:17 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+20:35:17 [INFO] Read 20352 klines from BTCUSDT/1h in 0.007s
+20:35:17 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+20:35:17 [INFO] Registered adapter: crypto_spot
+20:35:17 [INFO] Loaded feature registry with 31 entries
+20:35:17 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:17 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+20:35:17 [INFO] Registered adapter: crypto_spot
+20:35:17 [INFO] Loaded feature registry with 31 entries
+20:35:17 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:17 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:17 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [INFO] Fetching spot data: BTCUSDT/1h
+20:35:18 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+20:35:18 [INFO] Aligned data for BTCUSDT/1h: 20352 rows, 10 columns
+20:35:18 [INFO] Loaded feature registry with 31 entries
+20:35:18 [INFO] [Layer 1] 0% - Starting Layer 1...
+20:35:18 [INFO] Layer 1 starting, rss=1218MB
+20:35:18 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:18 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:18 [WARNING] trades missing, large trade ratio set to NaN
+20:35:36 [INFO] [Layer 1] 100% - Layer 1 completed: 1683 features
+20:35:36 [INFO] Layer 1 done: 1683 cols, status=ok, rss=830MB
+20:35:36 [INFO] [Layer 2] 0% - Starting Layer 2...
+20:35:36 [INFO] Layer 2 starting, rss=830MB
+20:35:36 [INFO] [L2] Starting derived features: 1683 L1 cols
+20:35:36 [INFO] [NaN Blacklist][L2_input] stripped 64 cols (e.g. ['volume_cycle_HT-DCPHASE', 'ohlc_pattern_CDLDRAGONFLYDOJI', 'ohlc_pattern_CDLBREAKAWAY'])
+20:35:36 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+20:35:36 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:36 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:36 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:36 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+20:35:36 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:36 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:36 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+20:35:36 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+20:35:36 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:36 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:36 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+20:35:36 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+20:35:36 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:36 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:35:36 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+20:36:08 [INFO] [L2] Completed: 46741 cols in 31.08s
+20:36:11 [INFO] [Layer 2] 100% - Layer 2 completed: 46741 features
+20:36:11 [INFO] Layer 2 done: 46741 cols, status=ok, rss=1618MB
+20:36:11 [INFO] [memmap] created: shape=(5108, 46741), dtype=<class 'numpy.float32'>, est=0.96 GB  (file auto-unlinked)
+20:36:14 [INFO] [spill] calib_layer2: 5108×46741 → float32 memmap in 2.6s (freed ~1.9 GB float64)
+20:36:14 [INFO] [Layer 3] 0% - Starting Layer 3...
+20:36:14 [INFO] Layer 3 starting, rss=2250MB
+20:36:14 [INFO] [NaN Blacklist][L3_input] stripped 64 cols (e.g. ['volume_cycle_HT-DCPHASE', 'ohlc_pattern_CDLDRAGONFLYDOJI', 'ohlc_pattern_CDLBREAKAWAY'])
+20:37:02 [INFO] [L3 streaming][numba][multi] step 10/100 (W3_range): 1612→1612 cols (-0 dead)
+20:37:03 [INFO] [L3 streaming][numba][multi] step 20/100 (W5_range): 1612→1612 cols (-0 dead)
+20:37:03 [INFO] [L3 streaming][numba][multi] step 30/100 (W8_range): 1612→1612 cols (-0 dead)
+20:37:04 [INFO] [L3 streaming][numba][multi] step 40/100 (W13_range): 1612→1612 cols (-0 dead)
+20:37:05 [INFO] [L3 streaming][numba][multi] step 50/100 (W21_range): 1612→1612 cols (-0 dead)
+20:37:06 [INFO] [L3 streaming][numba][multi] step 60/100 (W34_range): 1612→1612 cols (-0 dead)
+20:37:08 [INFO] [L3 streaming][numba][multi] step 70/100 (W55_range): 1612→1612 cols (-0 dead)
+20:37:10 [INFO] [L3 streaming][numba][multi] step 80/100 (W89_range): 1612→1612 cols (-0 dead)
+20:37:12 [INFO] [L3 streaming][numba][multi] step 90/100 (W144_range): 1612→1612 cols (-0 dead)
+20:37:14 [INFO] [L3 streaming][numba][multi] step 100/100 (W233_range): 1612→1612 cols (-0 dead)
+20:37:14 [INFO] [L3 streaming][numba][multi] complete: 161200 total generated, 0 dead dropped, 161200 survivors
+20:38:17 [INFO] [Layer 3] 100% - Layer 3 completed: 161200 features
+20:38:17 [INFO] Layer 3 done: 161200 cols, status=ok, rss=719MB
+20:38:17 [INFO] [Layer 4] 0% - Starting Layer 4...
+20:38:17 [INFO] Layer 4 starting, rss=719MB
+20:38:17 [INFO] [NaN Blacklist][L4_input[layer1_and_raw]] stripped 64 cols (e.g. ['volume_cycle_HT-DCPHASE', 'ohlc_pattern_CDLDRAGONFLYDOJI', 'ohlc_pattern_CDLBREAKAWAY'])
+20:38:18 [INFO] [Layer 4] 100% - Layer 4 completed: 12976 features
+20:38:18 [INFO] Layer 4 done: 12976 cols, status=ok, rss=1582MB
+20:38:18 [INFO] [Layer 5] 0% - Starting Layer 5...
+20:38:18 [INFO] Layer 5 starting, rss=1582MB
+20:38:18 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+20:38:18 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1582MB
+20:38:18 [INFO] [Layer 6] 0% - Starting Layer 6...
+20:38:18 [INFO] Layer 6 starting, rss=1582MB
+20:38:18 [INFO] [Layer 6] 100% - Layer 6 completed: 11 features
+20:38:18 [INFO] Layer 6 done: 11 cols, status=ok, rss=1585MB
+20:38:18 [INFO] [memmap concat] 5 DFs → 222611 cols × 5108 rows ≈ 4.55 GB → disk-backed
+20:38:18 [INFO] [memmap] created: shape=(5108, 222611), dtype=<class 'numpy.float32'>, est=4.55 GB  (file auto-unlinked)
+20:38:18 [INFO] [memmap concat] copying DF 1/5 (1683 cols)
+20:38:19 [INFO] [memmap concat] copying DF 2/5 (46741 cols)
+20:38:24 [INFO] [memmap concat] copying DF 3/5 (161200 cols)
+21:40:06 [INFO] [concat_memmap] DF 3/5: 5108/5108 rows copied, RSS=1515 MB
+21:40:07 [INFO] [memmap concat] copying DF 4/5 (12976 cols)
+21:40:11 [INFO] [memmap concat] copying DF 5/5 (11 cols)
+PYTEST_RC=137
+Thu Oct  1 21:43:57 CST 2026
