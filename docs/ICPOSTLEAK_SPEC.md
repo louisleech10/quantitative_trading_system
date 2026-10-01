@@ -1,7 +1,7 @@
 # ICPOSTLEAK：IC 頁「套用後處理」之未來洩漏與 rank／zscore／gaussian 窗未滿即出值 — SPEC
 
 > 來源 PLAN/診斷：`docs/ROADMAP.md` RM-ICFIRSTALIGN（「甲」部分）；`handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md`；`handoffs/20260927-ffstat-b4-redesign-rulings.md` R7　|　日期：2026-10-01　|　對應 TODO：`docs/manifests/ICPOSTLEAK.json`（SPEC 凍結後依 `templates/TODO_GENERATION_PROMPT.md` 生成；本版尚不存在）
-> 版本：v3（審查 r2 `handoffs/reconcile/20261001-icpostleak-x-review-r2/synth.md`：數值基準改逐分支自比＋跨分支既有差異凍結、順序文案全落點、保序去重、前端顯示被排除欄）；v2（審查 r1 `handoffs/reconcile/20261001-icpostleak-x-review-r1/synth.md` 全數採納：遮罩錨定步驟輸入、全分支盤點＋路徑一致性、IC 頁順序改正式順序、ratio-unsafe 欄明示排除、時間序 fail-closed、append 多窗、golden 存值、測試清單、gaussian 排名窗、zscore 主窗）
+> 版本：v4（審查 r3 `handoffs/reconcile/20261001-icpostleak-x-review-r3/synth.md`：通過條件改逐步驟 oracle〔該分支生產核心＋測試端獨立遮罩，逐位元組〕、改前 golden 降為對照收據、前端本地 state 型別）；v3（審查 r2 `handoffs/reconcile/20261001-icpostleak-x-review-r2/synth.md`：數值基準改逐分支自比＋跨分支既有差異凍結、順序文案全落點、保序去重、前端顯示被排除欄）；v2（審查 r1 `handoffs/reconcile/20261001-icpostleak-x-review-r1/synth.md` 全數採納：遮罩錨定步驟輸入、全分支盤點＋路徑一致性、IC 頁順序改正式順序、ratio-unsafe 欄明示排除、時間序 fail-closed、append 多窗、golden 存值、測試清單、gaussian 排名窗、zscore 主窗）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（CLAUDE.md 任務分派規則：命中 (b)(d)）。
@@ -34,8 +34,10 @@
 
 ## §G Golden / Baseline
 - **feature/kline 條件**：適用——真實 `data_cache/feature_klines/kline_cache.h5`（`ffstat_helpers.kline_frame()`）；禁合成 fixture。
-- **凍結時機 / reference 設定**：動工前以 HEAD 跑「真實 BTCUSDT 1h 前 3000 根之 close、volume 與 3 個真實 L1 特徵欄（含 1 欄前段 NaN 之晚生欄）」：①`transform_selected` × 七種開關組合（rank、zscore、gaussian 之非空子集）；②`transform`（mode＝append）× zscore 窗 [100, 252] × 開 rank 與否；**存值**於 `tests/_golden/icpostleak/baseline.npz`（逐組合之 float64 陣列＋欄名＋index），另存 `baseline.json`（名稱集合 sha256、列數、逐欄 nan_ratio、逐欄首個有限值列）。
-- **通過條件（可證偽）**：改後每欄 ①首個有限值列＝測試端獨立計算之期望值（依 §C 之錨點與窗，按正式順序 rank→gaussian→zscore 逐步累加；不呼叫生產 `stable_mask`）；②該列（含）之後之值與 `baseline.npz` **逐位元組相同**；③該列之前全 NaN；④列數、欄名、欄數同改前。任一不符即列出欄名與差異＝FAIL。
+- **輸入集**：「真實 BTCUSDT 1h 前 3000 根之 close、volume 與 3 個真實 L1 特徵欄（含 1 欄前段 NaN 之晚生欄）」：①`transform_selected` × 七種開關組合（rank、zscore、gaussian 之非空子集）；②`transform`（mode＝append）× zscore 窗 [100, 252] × 開 rank 與否；③各分支（§A 分支盤點①–④）× 同上組合。
+- **逐步驟 oracle**（通過條件之參照；測試端實作）：對每分支、每組合，依正式順序 rank→gaussian→zscore 逐步：取上一步之 oracle 輸出（首步取原輸入）→ 呼叫**該分支之生產數值核心**（本票不改之函式：`_rolling_rank_2d_v2`／`_gaussian_2d`／`_rolling_zscore_2d`、numba `transform_array_fast` 之對應單步、Polars `polars_l65_rank_transform`／`polars_l65_adaptive_zscore` 等，Task 1.1 盤點收據列全）→ 以**測試端獨立實作**之輸入錨點遮罩（§C 定義；不呼叫生產 `stable_mask`）遮之。累積式核心（pandas／bottleneck 滾動 mean、std）之後段末位元依前段輸入而變，故參照必以「遮罩後之步驟輸入」實算，不得以改前全輸出代之。
+- **通過條件（可證偽）**：改後每欄 ①首個有限值列＝oracle 之首個有限值列（等價於依 §C 錨點與窗逐步累加之期望，測試另以純整數公式獨立核對）；②全陣列與 oracle **逐位元組相同**（含 NaN 位置）；③列數、欄名、欄數同改前。任一不符即列出分支、欄名與差異＝FAIL。
+- **改前對照收據**（資訊性，非通過條件）：動工前以 HEAD 存 `tests/_golden/icpostleak/baseline.npz`（逐組合、逐分支之 float64 陣列＋欄名＋index）與 `baseline.json`（名稱集合 sha256、列數、逐欄首個有限值列；③之欄名欄數比對以此 sha256 為準）；改後產 `handoffs/run_receipts/<日期>-icpostleak-change-report.json`：逐分支、逐欄之首個有限值列（改前→改後）、遮罩後區段與改前之差異格數與最大絕對差（窗內純函式核心預期 0，累積式核心與改序之 registry 分支預期非 0 並具名列出）。
 - IC 頁：改後 `_apply_transforms_sync` 之輸出與同參數（§P Task 2.1 之映射）`transform_selected` 輸出**逐位元組相同**（同欄序）。
 
 ## §P Phase 與依賴
@@ -44,8 +46,8 @@
 **Task 1.1 — 輸入錨點遮罩與全分支套用**
 - 目標：rank／zscore／gaussian 之輸出於各自窗未滿之列為 NaN，於 §A 分支盤點之每一分支。　檔案：`stable_mask.py` 新增輸入錨點遮罩純函式；`feature_preprocessor.py` 之分支①–⑤。既有 caller：`transform`、`transform_selected`、`transform_registry_groups`／`transform_registry_groups_to_sink`。
 - 改法：第一步以 `grep` 盤點收據（`handoffs/run_receipts/<日期>-icpostleak-branch-inventory.txt`）確認 §A 分支清單、補漏；每分支於每個步驟產出後，以「該步驟輸入之首個有限值」與 §C 之窗呼叫新純函式；不改三項之數值公式與 min_periods。分支間之步驟順序若與 legacy（rank→gaussian→zscore）不同，改為同序。
-- **數值基準**（各分支之 zscore 數值核心於完整窗之後即已不同：pandas float64〔`_rolling_zscore_2d`〕、numba／bottleneck float32〔`_numba_transforms.py`〕、Polars 表達式〔`polars_adapter.py`〕；本票不改公式）：動工前**逐分支**凍結完整輸出至 `tests/_golden/icpostleak/branch_<分支>.npz`；改後每分支對**自己**之改前值於遮罩後區段逐位元組相同；跨分支既有差異逐格凍結於 `tests/_golden/icpostleak/branch_diff.npz`（兩側值），改後同格仍各自等於原值；量級另入收據 `handoffs/run_receipts/<日期>-icpostleak-branch-diff.json`（逐分支對 legacy 之最大絕對差、最大相對差、差異格數）。
-- **驗證（可證偽）**：`pytest tests/feature_engineering/test_icpostleak.py -k "phase1"` 綠——①§G 四條件於七組合、append 多窗、晚生欄全符；②**路徑一致性**：同一輸入於分支①②③④（以 `FFACT_USE_POLARS`、optimized 條件、registry 群組入口切換）之**遮罩位置（逐欄首個有限值列）、步驟順序、參數**逐分支完全相同；數值依上列「數值基準」比對（不加 atol、不刪格）；③擾動最後一列 ⇒ 前 2999 列逐位元組不變；mutant 各自使具名測試紅：遮罩 identity、遮罩錨點改用輸出首個有限值、遮罩窗 `window−2`、任一分支漏遮（逐分支各一）、append 只遮第一窗。
+- **數值基準**：各分支之數值核心本即不同（pandas float64〔`_rolling_zscore_2d`〕、numba／bottleneck float32〔`_numba_transforms.py`〕、Polars 表達式〔`polars_adapter.py`〕；本票不改公式）⇒ 每分支之通過條件為對**該分支之 §G 逐步驟 oracle** 逐位元組相同；跨分支數值不要求相等，其量級入收據 `handoffs/run_receipts/<日期>-icpostleak-branch-diff.json`（逐分支對 legacy 之最大絕對差、最大相對差、差異格數），作 §N 殘留之輸入。
+- **驗證（可證偽）**：`pytest tests/feature_engineering/test_icpostleak.py -k "phase1"` 綠——①§G 通過條件於七組合、append 多窗、晚生欄、各分支全符；②**路徑一致性**：同一輸入於分支①②③④（以 `FFACT_USE_POLARS`、optimized 條件、registry 群組入口切換）之**遮罩位置（逐欄首個有限值列）、步驟順序、參數**逐分支完全相同；數值依上列「數值基準」比對（不加 atol、不刪格）；③擾動最後一列 ⇒ 前 2999 列逐位元組不變；mutant 各自使具名測試紅：遮罩 identity、遮罩錨點改用輸出首個有限值、遮罩窗 `window−2`、任一分支漏遮（逐分支各一）、append 只遮第一窗。
 - **邊界（≥2）**：①全 NaN 欄 ⇒ 全 NaN、不拋錯；②晚生欄 ⇒ 錨點自該欄首個有限值；③列數 < window ⇒ 全 NaN、不拋錯；④三項鏈式 ⇒ 首個有限值逐步累加；⑤zscore 常數窗沿用現行 `where(std > 0, 0)`。
 - **存活至**：永久。**覆蓋風險**：無。
 - 不可做：不得改三項之數值公式；不得以放寬比較範圍換綠；不得另立與 §C 不同之窗未滿定義。
@@ -75,7 +77,7 @@
 
 **Task 2.2 — ratio-unsafe 欄明示排除**
 - 目標：`transform` 入口丟棄 `_is_ratio_unsafe_column` 欄（`feature_preprocessor.py:600-612`），IC 頁改接後不得**靜默**少欄（審查 r1 三家）。
-- 改法：IC 頁於呼叫前以同一判定函式分出 ratio-unsafe 欄，不送轉換、不寫入輸出；回應新增選填欄 `excluded_features: List[{"name", "reason"}]`（reason＝`ratio_unsafe:<category>`），並 warning log；選中欄全為 ratio-unsafe ⇒ `ValueError`（訊息列欄名與原因）。`ApplyTransformsResponse` 只新增選填欄。前端顯示：`frontend/src/hooks/useICAnalysis.ts:751` 之回應型別加選填 `excluded_features`；`frontend/src/app/ic-analysis/page.tsx:906-915` 結果區於非空時列出被排除之欄名與原因。
+- 改法：IC 頁於呼叫前以同一判定函式分出 ratio-unsafe 欄，不送轉換、不寫入輸出；回應新增選填欄 `excluded_features: List[{"name", "reason"}]`（reason＝`ratio_unsafe:<category>`），並 warning log；選中欄全為 ratio-unsafe ⇒ `ValueError`（訊息列欄名與原因）。`ApplyTransformsResponse` 只新增選填欄。前端顯示：`frontend/src/hooks/useICAnalysis.ts:751` 之回應型別加選填 `excluded_features`；`frontend/src/app/ic-analysis/page.tsx` 之本地 state 型別（:149 `applyTransformsResult`）加選填 `excluded_features`，結果區（:906-915）於非空時列出被排除之欄名與原因。
 - **驗證**：`pytest tests/api/test_icpostleak_api.py -k "ratio_unsafe"` 綠——混入 1 個 pattern 欄 ⇒ 輸出欄數＝選中數−1、`excluded_features` 恰列該欄；全為 pattern 欄 ⇒ ValueError；mutant「不填 excluded_features」使前者紅；前端 `cd frontend && npm run build` rc=0，且 `vitest` 對結果區之元件測試：`excluded_features` 非空時渲染欄名與原因、為空時不渲染（mutant「不渲染」使之紅）。
 - **邊界**：①無 ratio-unsafe 欄 ⇒ `excluded_features == []`、前端不顯示；②同名欄重複選取（numeric 與 ratio-unsafe 各一例）⇒ 依 Task 2.1 保序去重後只計一次。
 - **存活至**：永久。**覆蓋風險**：無。
