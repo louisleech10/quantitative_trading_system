@@ -457,7 +457,8 @@ def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
               "peak_rss_public_bytes": 2 * probe.GIB, "kernel_max_rss_self_bytes": 2 * probe.GIB,
               "workers_submitted": 0}
     ok_tier = {"rc": 0, **{f"peak_{m}_{s}_bytes": 3 * probe.GIB for m in ("rss", "uss", "judged")
-                           for s in probe.STAGES}}
+                           for s in probe.STAGES}, "kernel_max_rss_self_bytes": 2 * probe.GIB,
+               "kernel_max_rss_children_bytes": 2 * probe.GIB}
     assert probe.verdict([ok_row], ok_tier) == []
     for stage in probe.STAGES:
         assert probe.verdict([ok_row], {**ok_tier, f"peak_judged_{stage}_bytes": 9 * probe.GIB}), stage
@@ -486,14 +487,19 @@ def test_cost_probe_verdict_flags_over_tier_and_leftover() -> None:
         assert probe.verdict([{k: v for k, v in row.items() if k != "peak_judged_public_bytes"}], ok_tier), row
     assert probe.verdict([{k: v for k, v in off_ok.items() if k != "peak_judged_public_warmup_bytes"}], ok_tier)
     assert probe.verdict([{k: v for k, v in ok_row.items() if k != "peak_judged_calibration_bytes"}], ok_tier)
-    # 取樣漏峰值（核心最高 RSS 由 getrusage 取、無取樣間隔）：單程序 run 超過取樣最高 RSS 之 10% ⇒ 失敗；
-    # 10% 內不判；有子程序之 run 不比（核心值為單一程序）；缺核心值 ⇒ 失敗
+    # 取樣漏峰值（核心最高 RSS 由 getrusage 取、無取樣間隔；任一單一程序超過取樣合計之 10% ⇒ 必漏）：
+    # 本程序或子程序超過 ⇒ 失敗；10% 內不判；多程序列與 tier 亦核對（b5 審碼 r2 兩家 P1）；缺核心值 ⇒ 失敗
     gib = probe.GIB
     assert probe.verdict([{**before_ok, "kernel_max_rss_self_bytes": int(1.2 * gib)}], ok_tier)
     assert probe.verdict([{**before_ok, "kernel_max_rss_self_bytes": int(1.05 * gib)}], ok_tier) == []
     assert probe.verdict([{**before_ok, "kernel_max_rss_self_bytes": int(1.2 * gib), "workers_submitted": 2}],
-                         ok_tier) == []
+                         ok_tier)
+    assert probe.verdict([{**before_ok, "kernel_max_rss_children_bytes": int(1.2 * gib), "workers_submitted": 2}],
+                         ok_tier)
     assert probe.verdict([{k: v for k, v in off_ok.items() if k != "kernel_max_rss_self_bytes"}], ok_tier)
+    assert probe.verdict([ok_row], {**ok_tier, "kernel_max_rss_self_bytes": 9 * gib})  # tier：核心 9 對取樣 3
+    assert probe.verdict([ok_row], {**ok_tier, "kernel_max_rss_children_bytes": 9 * gib})
+    assert probe.verdict([ok_row], {k: v for k, v in ok_tier.items() if k != "kernel_max_rss_self_bytes"})
 
 
 def test_cost_probe_late_agreement_counts_and_danger() -> None:

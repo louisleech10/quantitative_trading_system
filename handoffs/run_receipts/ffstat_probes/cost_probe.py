@@ -8,8 +8,11 @@
 - 暫存清理：run 後隔離系統 tmp 下校準暫存前綴（契約 `calibration_tmp_prefix`）之殘留數；
 - 各 N 與最大 N 之決策一致率；
 - （b5，SPEC v41）各 N 與獨立後段之一致率：公開輸出之基礎欄（輸出窗在校準窗之後、不重疊）以生產 ADF 核心全長檢定
-  （p>0.05＝不平穩），對照校準判定（決策之 `adf_pvalue`>0.05）；另記危險方向比例（校準判平穩、後段不平穩）；
-- （b5，SPEC v32）公開域預熱耗時（`FeatureFactory._resolve_public_window` 累計）與加倍次數（metadata `warmup_doubling`）。
+  （p>門檻＝不平穩），對照校準判定（決策之 `adf_pvalue`>門檻）；門檻＝該次合併設定之有效 ADF 門檻（`effective_alpha`，
+  記於 `late_alpha`）；另記危險方向比例（校準判平穩、後段不平穩）；
+- （b5，SPEC v32）公開域預熱耗時（`FeatureFactory._resolve_public_window` 累計）與加倍次數（metadata `warmup_doubling`）、
+  其取樣階段 `public_warmup` 之峰值，兩域區間與重疊根數（`domain_overlap`）；
+- 取樣漏峰值核對：任一單一程序之核心最高 RSS（`getrusage`）超過取樣最高合計之 10% 即判失敗（全部列與 tier）。
 資料與窗（b5）：1h 讀 `kline_cache.h5`、輸出 2025-10-01～2025-12-31；12h 讀長歷史快取（`kline_cache.h5` 之 12h 於
 2025-10-01 前只 1,278 根，N＝2000 前史不足）、輸出 2024-01-01～2025-12-31（獨立後段約 1,460 根）。
 另跑（b5，SPEC v32）：①平穩化關閉（每標的×週期一次；預熱恆開對其為新增成本）；②改前（`BEFORE_COMMIT` 之 git worktree，
@@ -401,7 +404,22 @@ def kernel_peaks() -> dict:
             "kernel_max_rss_children_bytes": int(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss) * unit}
 
 
-SAMPLING_MISS_TOLERANCE = 1.10  # 單程序 run：核心最高 RSS 超過取樣最高 RSS 之 10% 即判取樣漏峰值
+SAMPLING_MISS_TOLERANCE = 1.10  # 任一單一程序之核心最高 RSS 超過取樣最高 RSS（全部程序合計）之 10% 即判漏峰值
+
+
+def sampling_miss(r: dict, label: str) -> list:
+    """取樣漏峰值之下界核對（b5 審碼 r2 codex／grok P1：多程序列與 tier 不得略過）：取樣值為本程序＋全部子程序之
+    RSS 合計，必 ≥ 任一單一程序於同時刻之 RSS；故本程序（RUSAGE_SELF）或任一已結束子程序（RUSAGE_CHILDREN，
+    取單一最大者）之核心最高 RSS 超過取樣最高合計之 10% ⇒ 取樣必漏峰值。缺核心值 ⇒ 無從核對、亦判失敗。
+    誠實邊界：多程序各自峰值不同時發生時，合計之漏峰不可由此下界察覺。"""
+    sampled = max((v for k, v in r.items() if k.startswith("peak_rss_") and k.endswith("_bytes")), default=0)
+    kernel = r.get("kernel_max_rss_self_bytes")
+    if kernel is None:
+        return [f"missing kernel peak: {label}"]
+    worst = max(int(kernel), int(r.get("kernel_max_rss_children_bytes") or 0))
+    if worst > SAMPLING_MISS_TOLERANCE * sampled:
+        return [f"sampling missed peak: {label} kernel={worst} sampled={sampled}"]
+    return []
 
 
 def peaks_for_result(peaks: dict) -> dict:
@@ -438,17 +456,12 @@ def verdict(rows: list, tier: dict) -> list:
         need = ("public",) if r.get("commit") else \
             ("public_warmup", "public") if r.get("mode") == "off" else ("calibration", "public_warmup", "public")
         problems += [f"missing {s} peak: {label}" for s in need if f"peak_judged_{s}_bytes" not in r]
-        # 取樣漏峰值核對（單程序 run 才可比：核心值為單一程序、取樣值為本程序＋子程序合計）
-        sampled = max((v for k, v in r.items() if k.startswith("peak_rss_") and k.endswith("_bytes")), default=0)
-        kernel = r.get("kernel_max_rss_self_bytes")
-        if kernel is None:
-            problems.append(f"missing kernel peak: {label}")
-        elif r.get("workers_submitted") == 0 and kernel > SAMPLING_MISS_TOLERANCE * sampled:
-            problems.append(f"sampling missed peak: {label} kernel={kernel} sampled={sampled}")
+        problems += sampling_miss(r, label)
     limit = CONTRACT["min_memory_tier_gb"] * GIB
     if tier.get("rc") != 0:
         problems.append("tier run failed")
         return problems
+    problems += sampling_miss(tier, "tier")
     if tier.get("samples_incomplete"):
         problems.append(f"tier sampling incomplete: {tier['samples_incomplete']} samples")
     for stage in STAGES:

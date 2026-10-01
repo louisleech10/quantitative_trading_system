@@ -220,9 +220,9 @@ def test_resume_refuses_partial_log_with_other_market(tmp_path: Path) -> None:
     log = tmp_path / "partial.jsonl"
     env = dict(os.environ, PYTHONPATH=str(ROOT))
 
-    def run(market: str) -> str:
+    def run(market: str, path: Path = log) -> str:
         cmd = [sys.executable, str(SCRIPT), "--symbols", "BTCUSDT", "--timeframes", "1d", "--only", "RSI",
-               "--eval-positions", "2", "--workers", "1", "--partial-log", str(log), "--no-write",
+               "--eval-positions", "2", "--workers", "1", "--partial-log", str(path), "--no-write",
                "--market", market]
         proc = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
         assert proc.returncode == 0, proc.stdout[-800:] + proc.stderr[-800:]
@@ -233,3 +233,20 @@ def test_resume_refuses_partial_log_with_other_market(tmp_path: Path) -> None:
     assert "[resume] reused 1/1" in run("crypto")
     other = run("tw_stock")
     assert "[resume] reused 0/1" in other, other[-800:]
+
+    # 兩處修補各自可證偽（b5 審碼 r2 grok P2-01：改前只有兩處一併還原才紅）
+    first = log.read_text(encoding="utf-8").splitlines()[0]
+
+    def forged(name: str, edit) -> Path:
+        rec = json.loads(first)
+        edit(rec)
+        path = tmp_path / name
+        path.write_text(json.dumps(rec) + "\n", encoding="utf-8")
+        return path
+
+    # ①只靠 criteria 核對：同鍵（同市場）而紀錄無 criteria ⇒ 不沿用
+    no_criteria = forged("no_criteria.jsonl", lambda rec: rec.pop("criteria"))
+    assert "[resume] reused 0/1" in run("crypto", no_criteria)
+    # ②只靠鍵含市場：紀錄 criteria 偽改為 tw_stock（與本次相符）而鍵為 crypto 之鍵 ⇒ 不沿用
+    forged_market = forged("forged_market.jsonl", lambda rec: rec["criteria"].update(market="tw_stock"))
+    assert "[resume] reused 0/1" in run("tw_stock", forged_market)
