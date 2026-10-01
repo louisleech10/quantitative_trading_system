@@ -1,6 +1,6 @@
 # ICPOSTLEAK：IC 頁「套用後處理」之未來洩漏與 rank／zscore／gaussian 窗未滿即出值 — SPEC
 
-> 來源 PLAN/診斷：`docs/ROADMAP.md` RM-ICFIRSTALIGN（「甲」部分）；`handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md`；`handoffs/20260927-ffstat-b4-redesign-rulings.md` R7　|　日期：2026-10-01　|　對應 TODO：`docs/manifests/ICPOSTLEAK.json`（SPEC 凍結後依 `templates/TODO_GENERATION_PROMPT.md` 生成；本版尚不存在）
+> 來源 PLAN/診斷：`docs/ROADMAP.md` RM-ICFIRSTALIGN（「甲」部分）；`handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md`；`handoffs/20260927-ffstat-b4-redesign-rulings.md` R7　|　日期：2026-10-01　|　對應 TODO：`docs/manifests/ICPOSTLEAK.json`（依 `templates/TODO_GENERATION_PROMPT.md` 生成）
 > 版本：v4（審查 r3 `handoffs/reconcile/20261001-icpostleak-x-review-r3/synth.md`：通過條件改逐步驟 oracle〔該分支生產核心＋測試端獨立遮罩，逐位元組〕、改前 golden 降為對照收據、前端本地 state 型別）；v3（審查 r2 `handoffs/reconcile/20261001-icpostleak-x-review-r2/synth.md`：數值基準改逐分支自比＋跨分支既有差異凍結、順序文案全落點、保序去重、前端顯示被排除欄）；v2（審查 r1 `handoffs/reconcile/20261001-icpostleak-x-review-r1/synth.md` 全數採納：遮罩錨定步驟輸入、全分支盤點＋路徑一致性、IC 頁順序改正式順序、ratio-unsafe 欄明示排除、時間序 fail-closed、append 多窗、golden 存值、測試清單、gaussian 排名窗、zscore 主窗）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）

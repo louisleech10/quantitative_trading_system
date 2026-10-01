@@ -1,0 +1,201 @@
+{
+  "_spec": "docs/ICPOSTLEAK_SPEC.md v4（§C 窗未滿定義、§G 輸入集與逐步驟 oracle、§P、§V）；測試引用本檔，不在測試內另抄",
+  "kline": {
+    "symbol": "BTCUSDT",
+    "timeframe": "1h",
+    "rows": 3000,
+    "columns": [
+      "close",
+      "volume"
+    ],
+    "late_born_column": "close_late",
+    "late_born_nan_rows": 400
+  },
+  "rank_window": 252,
+  "zscore_windows": [
+    100,
+    252
+  ],
+  "order": [
+    "rank",
+    "gaussian",
+    "zscore"
+  ],
+  "combos": [
+    [
+      "rank"
+    ],
+    [
+      "zscore"
+    ],
+    [
+      "gaussian"
+    ],
+    [
+      "rank",
+      "zscore"
+    ],
+    [
+      "rank",
+      "gaussian"
+    ],
+    [
+      "zscore",
+      "gaussian"
+    ],
+    [
+      "rank",
+      "zscore",
+      "gaussian"
+    ]
+  ],
+  "branches": {
+    "polars": {
+      "env": {
+        "FFACT_USE_POLARS": "1"
+      },
+      "entry": "transform"
+    },
+    "optimized": {
+      "env": {
+        "FFACT_USE_POLARS": "0",
+        "FFACT_L65_OPTIMIZATION_PROFILE": "optimized"
+      },
+      "entry": "transform"
+    },
+    "legacy": {
+      "env": {
+        "FFACT_USE_POLARS": "0",
+        "FFACT_L65_OPTIMIZATION_PROFILE": "legacy"
+      },
+      "entry": "transform"
+    },
+    "registry": {
+      "env": {},
+      "entry": "transform_registry_groups"
+    }
+  },
+  "perturb": {
+    "row": -1,
+    "factor": 50.0
+  },
+  "excluded_reason_prefix": "ratio_unsafe:",
+  "old_order_phrases": [
+    "rank → zscore → gaussian",
+    "rank/zscore 之後"
+  ],
+  "full_sample_rank_literal": "rank(pct=True, axis=0)",
+  "leak_receipt_before": {
+    "gaussian_changed_cells": 4039,
+    "receipt": "handoffs/run_receipts/20261001-icpostleak-probe_icpage_leak.log"
+  },
+  "oracle_update_files": [
+    "tests/feature_engineering/ff_truncation_mr_helpers.py",
+    "tests/feature_engineering/preprocessing/test_causal_winsor.py",
+    "tests/feature_engineering/preprocessing/test_ff_causal_golden.py",
+    "tests/feature_engineering/preprocessing/test_l65_native_tf_real_eth.py",
+    "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py",
+    "tests/feature_engineering/preprocessing/test_native_tf_helpers.py",
+    "tests/feature_engineering/test_ff_wrapper_path_correctness.py",
+    "tests/feature_engineering/test_ffstat_stable_start.py",
+    "tests/feature_engineering/test_ic_first_pipeline.py",
+    "tests/feature_engineering/test_l7_raw_streaming.py",
+    "tests/momentum/test_feature_factory_optimization_e2e.py",
+    "tests/momentum/test_feature_factory_optimization_perf.py",
+    "tests/momentum/test_feature_preprocessor.py",
+    "tests/performance/test_memory_pressure.py",
+    "tests/test_feature_factory_batch2c.py",
+    "tests/test_feature_factory_config.py",
+    "tests/test_l65_parallel.py",
+    "tests/test_polars_phase4.py"
+  ],
+  "oracle_update_files_note": "§A 第 4 條收據之 grep 產出（主委 2026-10-01）；Task 1.3 逐檔處置，test_boundary_08 以同一 grep 重產並核對本清單",
+  "oracle_update_grep": {
+    "regex_ere": "rank_transform[\"']?\\s*[:=]\\s*\\{[^}]*enabled[\"']?\\s*[:=]\\s*True|adaptive_zscore[\"']?\\s*[:=]\\s*\\{[^}]*enabled[\"']?\\s*[:=]\\s*True|gaussian_normalize[\"']?\\s*[:=]\\s*\\{[^}]*enabled[\"']?\\s*[:=]\\s*True|_apply_rank_transform|_apply_adaptive_zscore|_apply_gaussian_normalize|_rolling_zscore_2d|_gaussian_2d|_rolling_rank_2d_v2|polars_l65_rank_transform|polars_l65_adaptive_zscore|transform_selected",
+    "root": "tests",
+    "include": "*.py",
+    "exclude_self": [
+      "tests/feature_engineering/test_icpostleak.py",
+      "tests/api/test_icpostleak_api.py"
+    ]
+  },
+  "oracle_update_counts_frozen": {
+    "tests/feature_engineering/ff_truncation_mr_helpers.py": {
+      "assert_like": 13,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/preprocessing/test_causal_winsor.py": {
+      "assert_like": 30,
+      "skip_xfail": 1
+    },
+    "tests/feature_engineering/preprocessing/test_ff_causal_golden.py": {
+      "assert_like": 13,
+      "skip_xfail": 4
+    },
+    "tests/feature_engineering/preprocessing/test_l65_native_tf_real_eth.py": {
+      "assert_like": 29,
+      "skip_xfail": 2
+    },
+    "tests/feature_engineering/preprocessing/test_l65_v2_transforms.py": {
+      "assert_like": 54,
+      "skip_xfail": 4
+    },
+    "tests/feature_engineering/preprocessing/test_native_tf_helpers.py": {
+      "assert_like": 63,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_ff_wrapper_path_correctness.py": {
+      "assert_like": 33,
+      "skip_xfail": 1
+    },
+    "tests/feature_engineering/test_ffstat_stable_start.py": {
+      "assert_like": 190,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_ic_first_pipeline.py": {
+      "assert_like": 79,
+      "skip_xfail": 0
+    },
+    "tests/feature_engineering/test_l7_raw_streaming.py": {
+      "assert_like": 91,
+      "skip_xfail": 0
+    },
+    "tests/momentum/test_feature_factory_optimization_e2e.py": {
+      "assert_like": 22,
+      "skip_xfail": 1
+    },
+    "tests/momentum/test_feature_factory_optimization_perf.py": {
+      "assert_like": 16,
+      "skip_xfail": 1
+    },
+    "tests/momentum/test_feature_preprocessor.py": {
+      "assert_like": 25,
+      "skip_xfail": 3
+    },
+    "tests/performance/test_memory_pressure.py": {
+      "assert_like": 0,
+      "skip_xfail": 0
+    },
+    "tests/test_feature_factory_batch2c.py": {
+      "assert_like": 5,
+      "skip_xfail": 0
+    },
+    "tests/test_feature_factory_config.py": {
+      "assert_like": 48,
+      "skip_xfail": 0
+    },
+    "tests/test_l65_parallel.py": {
+      "assert_like": 40,
+      "skip_xfail": 0
+    },
+    "tests/test_polars_phase4.py": {
+      "assert_like": 40,
+      "skip_xfail": 4
+    }
+  },
+  "oracle_update_counts_rule": {
+    "assert_regex_ere": "^\\s*assert |np\\.testing\\.assert|pd\\.testing\\.assert|pytest\\.raises",
+    "skip_regex_ere": "pytest\\.mark\\.(skip|xfail)|pytest\\.(skip|xfail)\\(",
+    "frozen_at": "HEAD d31c170e（主委 2026-10-01）"
+  }
+}

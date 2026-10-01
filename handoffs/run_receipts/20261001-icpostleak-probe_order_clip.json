@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "command": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_order_clip.py",
+  "exit_code": 0,
+  "run_date": "2026-10-01",
+  "stdout": [
+    "gaussian 輸入（z 分數）有限值 5652 格，其中落在 [0.001, 0.999] 外而被裁切 4190 格（74.1%）；被裁切者 ppf 後只剩 ±3.09 兩值"
+  ]
+}

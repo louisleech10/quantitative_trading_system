@@ -1,0 +1,136 @@
+{
+  "spec_path": "docs/ICPOSTLEAK_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [
+    "momentum/FeatureEngineering/preprocessing/stable_mask.py",
+    "momentum/FeatureEngineering/preprocessing/time_order.py",
+    "frontend/src/components/ic-analysis/ApplyTransformsResult.tsx"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_icpostleak.py",
+    "tests/api/test_icpostleak_api.py",
+    "frontend/src/components/ic-analysis/ApplyTransformsResult.test.tsx"
+  ],
+  "contract_jsons": [
+    "tests/_golden/icpostleak/contract.json"
+  ],
+  "script_acceptance": [
+    "handoffs/run_receipts/icpostleak_probes/probe_icpage_leak.py",
+    "handoffs/run_receipts/icpostleak_probes/probe_formal_postic.py",
+    "handoffs/run_receipts/icpostleak_probes/probe_order_clip.py"
+  ],
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20261001-icpostleak-probe_icpage_leak.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_icpage_leak.py",
+      "rc": 0,
+      "honest_bounds": "真實 BTCUSDT 1h 前 3000 根 close、volume；經 ic_analysis_service._apply_transforms_sync 真服務路徑（假任務、parquet 特徵檔、chdir tmp）；只勾 gaussian 時最後一列 ×50 ⇒ 前 2999 列 4039 格改變；未測事件型與其他標的"
+    },
+    {
+      "path": "handoffs/run_receipts/20261001-icpostleak-probe_formal_postic.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_formal_postic.py",
+      "rc": 0,
+      "honest_bounds": "同輸入；FeaturePreprocessor.transform_selected 預設分支（Polars）；四組合 0 格改變、首個有限值列 rank／gaussian 62、zscore 0；未逐分支量"
+    },
+    {
+      "path": "handoffs/run_receipts/20261001-icpostleak-probe_order_clip.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_order_clip.py",
+      "rc": 0,
+      "honest_bounds": "重放手寫版 rank→zscore 公式（非呼叫服務）；gaussian 輸入 74.1% 落於 [0.001, 0.999] 外"
+    }
+  ],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "docs/ICPOSTLEAK_SPEC.md",
+      "momentum/FeatureEngineering/preprocessing/stable_mask.py",
+      "momentum/FeatureEngineering/preprocessing/time_order.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/preprocessing/_numba_transforms.py",
+      "momentum/FeatureEngineering/polars_adapter.py",
+      "api/services/ic_analysis_service.py",
+      "api/models/ic_models.py",
+      "api/routes/ic_analysis.py",
+      "frontend/src/hooks/useICAnalysis.ts",
+      "frontend/src/app/ic-analysis/page.tsx",
+      "frontend/src/components/ic-analysis/ApplyTransformsResult.tsx",
+      "tests/_golden/icpostleak/contract.json"
+    ],
+    "callers_now": [
+      "momentum/FeatureEngineering/feature_factory.py",
+      "api/services/ic_analysis_service.py",
+      "api/routes/ic_analysis.py",
+      "frontend/src/hooks/useICAnalysis.ts",
+      "frontend/src/app/ic-analysis/page.tsx"
+    ],
+    "callers_later": [
+      "docs/ROADMAP.md"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider tests/feature_engineering/test_icpostleak.py tests/api/test_icpostleak_api.py tests/api/test_ic_la1_degraded_gate.py && (cd frontend && npx vitest run src/components/ic-analysis/ApplyTransformsResult.test.tsx && npm run build)",
+    "forbidden": [
+      {
+        "rule": "不得改 rank／zscore／gaussian 之數值公式與 min_periods；遮罩只施於核心之呼叫點",
+        "observable": true
+      },
+      {
+        "rule": "不得以放寬比較範圍、atol 或刪格換綠；不得另立與 SPEC §C 不同之窗未滿定義",
+        "observable": true
+      },
+      {
+        "rule": "時間序非嚴格遞增不得靜默排序",
+        "observable": true
+      },
+      {
+        "rule": "API 服務取前處理器經 momentum.factories（解耦 Rule 3）；momentum 不得 import api（Rule 1）",
+        "observable": true
+      },
+      {
+        "rule": "不改 API 路由路徑與既有回應欄位；回應只新增選填欄 excluded_features",
+        "observable": true
+      },
+      {
+        "rule": "不得放寬或刪除既有測試斷言；受影響 18 檔不得新增 skip／xfail",
+        "observable": true
+      },
+      {
+        "rule": "不弱化 NaN／inf 閘；不改輸出列數",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "stable_mask.py ← Task 1.1 新增 mask_incomplete_window_by_input_2d（輸入錨點、逐欄）；既有 mask_incomplete_window_inplace（縮尾）不改",
+      "time_order.py ← Task 1.2 新模組 assert_strictly_increasing_time_index；入口須以模組屬性呼叫（test_mutation_time_order_check_removed_is_caught 依此 monkeypatch）",
+      "feature_preprocessor.py ← Task 1.1 分支①②③④⑤逐一接遮罩（legacy :2962-2968、optimized :2863/:2879/:2901、Polars :3020/:3043 與其 gaussian 回落、registry :2198/:2293/:2436＋numba 後之 gaussian 後置）；registry 改正式順序；以模組屬性 _stable_mask.mask_incomplete_window_by_input_2d 呼叫（mutant 依此 monkeypatch）",
+      "ic_analysis_service.py ← Task 2.1／2.2 刪手寫三項（:2873-2905）、改經 factories 取前處理器呼叫 transform_selected、保序去重、ratio-unsafe 經 feature_preprocessor._is_ratio_unsafe_column 判定並填 excluded_features、docstring 改正式順序",
+      "frontend ← Task 2.2 結果區抽為 components/ic-analysis/ApplyTransformsResult.tsx（page.tsx:906-915 改為使用之；:149 本地型別與 hook 型別加選填 excluded_features）；不改其他元件與流程",
+      "解耦：bash scripts/check_decoupling.sh 於實作批跑並附收據"
+    ],
+    "coverage_risk": [
+      "邊界 15 條：01–05 Task 1.1、06–07 Task 1.2、08–09 Task 1.3（tests/feature_engineering/test_icpostleak.py）；10–13 Task 2.1、14–15 Task 2.2（tests/api/test_icpostleak_api.py）；Task 2.2 前端兩條邊界見 ApplyTransformsResult.test.tsx 兩支 it",
+      "Task 1.1 驗證：test_phase1_stepwise_oracle_bytes_equal[分支×七組合]、test_phase1_branch_parity_mask_positions[七組合]、test_phase1_append_mode_each_window_masked[polars／legacy]、test_phase1_causal_perturb_last_row[四分支]",
+      "Task 1.2 驗證：test_time_order_non_increasing_raises[reverse／duplicate／single_disorder]、test_time_order_strictly_increasing_ok",
+      "Task 2.1 驗證：test_phase2_perturb_last_row_prefix_unchanged[七組合]、test_phase2_output_equals_formal_transform_selected[七組合]、test_phase2_zscore_window_order_insensitive、test_phase2_no_full_sample_rank_and_no_old_order_text、test_phase2_selected_features_deduplicated；既有 tests/api/test_ic_la1_degraded_gate.py 之 apply_transforms 節點列入 gate_cmd",
+      "Task 2.2 驗證：test_phase2_ratio_unsafe_excluded_and_reported、test_phase2_all_ratio_unsafe_raises、test_phase2_response_model_accepts_excluded_features；前端 vitest 三支",
+      "§V mutant 對應：遮罩 identity（逐分支）→test_mutation_mask_identity_is_caught[四分支]；錨點改輸出、窗 window−2→test_mutation_mask_anchor_or_window_is_caught；append 只遮第一窗→test_mutation_append_masks_first_window_only_is_caught；移除時間序檢查→test_mutation_time_order_check_removed_is_caught；恢復全樣本排名→test_mutation_full_sample_rank_restored_is_caught；gaussian 改回最後→test_mutation_gaussian_last_order_is_caught；zscore 窗不排序→test_mutation_unsorted_zscore_windows_is_caught；不填 excluded_features→test_mutation_excluded_features_not_filled_is_caught；移除去重→test_mutation_dedup_removed_is_caught",
+      "Task 1.3：18 檔清單與凍結計數於 contract.json（oracle_update_files、oracle_update_counts_frozen）；實作批逐檔改 oracle 並記處置於 brief；退役斷言須登記 oracle_update_retired 並附理由",
+      "實作批必產收據：handoffs/run_receipts/<日期>-icpostleak-branch-inventory.txt（分支盤點）、<日期>-icpostleak-branch-diff.json（跨分支量級）、<日期>-icpostleak-change-report.json（改前→改後首個有限值列與遮罩後區段差異）；tests/_golden/icpostleak/baseline.npz 與 baseline.json 於動工前以 HEAD 產",
+      "測試時長：Phase 1 每組合為 3000 列×3 欄之轉換（秒級）；registry 分支含落盤；全檔預估數分鐘（實作後實測記收據）",
+      "實作前紅之預期原因：stable_mask.mask_incomplete_window_by_input_2d／time_order.assert_strictly_increasing_time_index 為 NotImplementedError 空殼；ApplyTransformsResult 拋錯；IC 頁仍為手寫版（excluded_features 缺、順序舊、未去重）"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "各分支 zscore 數值核心不一致之統一（pandas float64／numba float32／Polars）",
+        "reason": "needs-research",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "ICFIRSTALIGN 乙部分（不可變 run context、L7 raw 讀回時間軸）",
+        "reason": "user-ruling",
+        "owner": "claude",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

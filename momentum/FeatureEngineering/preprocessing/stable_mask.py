@@ -212,6 +212,15 @@ def mask_incomplete_window(output: np.ndarray, input_values: np.ndarray, window:
     return out
 
 
+def mask_incomplete_window_by_input_2d(output: np.ndarray, step_input: np.ndarray, window: int) -> np.ndarray:
+    """ICPOSTLEAK Task 1.1（docs/ICPOSTLEAK_SPEC.md §C）：rank／zscore／gaussian 之第①類遮罩，錨點＝**步驟輸入**。
+
+    逐欄 `cut = step_input 該欄首個有限值列 + window − 1`，回傳 `output` 之副本並將 `[0, cut)` 設 NaN；
+    `step_input` 該欄全無有限值 ⇒ 該欄全 NaN；`cut` 超過列數 ⇒ 全欄 NaN。`output`／`step_input` 須同形二維。
+    不改 `output` 本身（回傳新陣列，dtype 同 `output`）。"""
+    raise NotImplementedError("ICPOSTLEAK Task 1.1")
+
+
 def mask_incomplete_window_inplace(values: np.ndarray, window: int) -> np.ndarray:
     """第①類之二維（列×欄）就地形：逐欄自首個有限值起 `window−1` 列（及其前）設 NaN；回傳同一陣列。
 
