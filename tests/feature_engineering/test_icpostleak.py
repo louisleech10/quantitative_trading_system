@@ -198,13 +198,22 @@ def _oracle(branch: str, steps: List[str], frame: pd.DataFrame) -> np.ndarray:
     values = frame.to_numpy(dtype=np.float64)
     if branch == "polars":
         values = _polars_roundtrip(values, columns)
+    elif branch.startswith("registry"):
+        values = _f32(values)  # registry `save_data(..., float32)` 入口
     for step in ORDER:
         if step not in steps:
             continue
         values = _oracle_mask(_kernel_step(branch, pre, step, values, columns), values, _step_window(pre, step))
         if branch == "polars":
             values = _polars_roundtrip(values, columns)  # 每步結果回存 polars（float32）
+        elif branch.startswith("registry"):
+            values = _f32(values)  # registry 群組陣列為 float32，每步結果回存（sink 出口亦 cast float32）
     return values
+
+
+def _f32(values: np.ndarray) -> np.ndarray:
+    """float32 取整後回 float64 比較（registry 落盤／群組陣列之 dtype）。"""
+    return np.asarray(values, dtype=np.float32).astype(np.float64)
 
 
 def _first_finite(arr: np.ndarray) -> List[int]:
@@ -279,13 +288,13 @@ def test_phase1_registry_chunked_append_masked(tmp_path: Path, monkeypatch: pyte
     frame = _real_frame()
     got = _run_branch(monkeypatch, tmp_path, "registry_chunked", cfg["steps"], frame, mode=cfg["mode"],
                       spec_override={"env": cfg["env"], "entry": "transform_registry_groups_to_sink", "spy": cfg["spy"]})
-    values = frame.to_numpy(dtype=np.float64)
+    values = _f32(frame.to_numpy(dtype=np.float64))  # registry `save_data(..., float32)` 入口
     by_window = FeaturePreprocessor(_config(cfg["steps"], "append"))._rolling_zscore_2d(values, list(Z_WINDOWS), 1e-8,
                                                                                          mode="append")
     for window in Z_WINDOWS:
         cols = [f"{c}_zscore_{window}" for c in frame.columns]
         assert all(c in got.columns for c in cols), (window, list(got.columns))
-        want = _oracle_mask(np.asarray(by_window[window], dtype=np.float64), values, window)
+        want = _f32(_oracle_mask(np.asarray(by_window[window], dtype=np.float64), values, window))  # sink 出口 float32
         assert np.array_equal(got[cols].to_numpy(dtype=np.float64), want, equal_nan=True), window
 
 

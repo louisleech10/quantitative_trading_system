@@ -17,7 +17,8 @@
   "script_acceptance": [
     "handoffs/run_receipts/icpostleak_probes/probe_icpage_leak.py",
     "handoffs/run_receipts/icpostleak_probes/probe_formal_postic.py",
-    "handoffs/run_receipts/icpostleak_probes/probe_order_clip.py"
+    "handoffs/run_receipts/icpostleak_probes/probe_order_clip.py",
+    "handoffs/run_receipts/icpostleak_probes/probe_oracle_unmasked.py"
   ],
   "run_receipts": [
     {
@@ -37,6 +38,12 @@
       "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_order_clip.py",
       "rc": 0,
       "honest_bounds": "重放手寫版 rank→zscore 公式（非呼叫服務）；gaussian 輸入 74.1% 落於 [0.001, 0.999] 外"
+    },
+    {
+      "path": "handoffs/run_receipts/20261002-icpostleak-oracle-unmasked.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/icpostleak_probes/probe_oracle_unmasked.py",
+      "rc": 0,
+      "honest_bounds": "遮罩 identity 之 oracle 對現行未遮罩生產逐位元組：38/44 全等；6 例＝registry 系列 × 含 zscore＋gaussian，肇因現行 registry 順序 rank→zscore→gaussian（即 SPEC 要求之改序）；只驗 dtype／核心建模，不驗遮罩本身"
     }
   ],
   "batch_card": {
