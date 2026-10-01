@@ -1,7 +1,7 @@
 # ICPOSTLEAK：IC 頁「套用後處理」之未來洩漏與 rank／zscore／gaussian 窗未滿即出值 — SPEC
 
 > 來源 PLAN/診斷：`docs/ROADMAP.md` RM-ICFIRSTALIGN（「甲」部分）；`handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md`；`handoffs/20260927-ffstat-b4-redesign-rulings.md` R7　|　日期：2026-10-01　|　對應 TODO：`docs/manifests/ICPOSTLEAK.json`（依 `templates/TODO_GENERATION_PROMPT.md` 生成）
-> 版本：v4（審查 r3 `handoffs/reconcile/20261001-icpostleak-x-review-r3/synth.md`：通過條件改逐步驟 oracle〔該分支生產核心＋測試端獨立遮罩，逐位元組〕、改前 golden 降為對照收據、前端本地 state 型別）；v3（審查 r2 `handoffs/reconcile/20261001-icpostleak-x-review-r2/synth.md`：數值基準改逐分支自比＋跨分支既有差異凍結、順序文案全落點、保序去重、前端顯示被排除欄）；v2（審查 r1 `handoffs/reconcile/20261001-icpostleak-x-review-r1/synth.md` 全數採納：遮罩錨定步驟輸入、全分支盤點＋路徑一致性、IC 頁順序改正式順序、ratio-unsafe 欄明示排除、時間序 fail-closed、append 多窗、golden 存值、測試清單、gaussian 排名窗、zscore 主窗）
+> 版本：v5（實作審碼 r2 `handoffs/reconcile/20261001-icpostleak-b1-review-r2/synth.md`：§N 殘留第一條依量級收據改寫——觸發已成立、待研究項具名、registry 改核心不足以清除觸發）；v4（審查 r3 `handoffs/reconcile/20261001-icpostleak-x-review-r3/synth.md`：通過條件改逐步驟 oracle〔該分支生產核心＋測試端獨立遮罩，逐位元組〕、改前 golden 降為對照收據、前端本地 state 型別）；v3（審查 r2 `handoffs/reconcile/20261001-icpostleak-x-review-r2/synth.md`：數值基準改逐分支自比＋跨分支既有差異凍結、順序文案全落點、保序去重、前端顯示被排除欄）；v2（審查 r1 `handoffs/reconcile/20261001-icpostleak-x-review-r1/synth.md` 全數採納：遮罩錨定步驟輸入、全分支盤點＋路徑一致性、IC 頁順序改正式順序、ratio-unsafe 欄明示排除、時間序 fail-closed、append 多窗、golden 存值、測試清單、gaussian 排名窗、zscore 主窗）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（CLAUDE.md 任務分派規則：命中 (b)(d)）。
@@ -96,5 +96,5 @@
 - (a)、(c) 不命中：不改三項之數值公式（只遮窗未滿列、改 IC 頁順序為正式順序）；兩 Phase、可回退。
 - 前端：只改 Task 2.2 之型別與結果區顯示被排除欄；不改流程與其他元件。
 - 殘留：
-  - 各分支 zscore 數值核心不一致（pandas float64／numba float32／Polars）——`為何現在不做: needs-research:差異量級是否超出 float32 精度與下游是否依賴分支一致（Task 1.1 量級收據為輸入）`；觸發：量級收據之最大相對差 > 1e-3（`FLOAT16_MAX_REL_ERROR` 同級）或任一下游以分支切換比對數值；登記處：`docs/ROADMAP.md` 本票列之 pointer 與本 SPEC。
+  - 各分支 zscore 數值核心不一致（pandas float64／numba float32 累積式／Polars）——`為何現在不做: needs-research:觸發已成立（量級收據 handoffs/run_receipts/20261002-icpostleak-branch-diff.json 最大相對差 58.8 位於 legacy 近零之 z 值格〔絕對差約 2e-6〕、最大絕對差 0.0975；registry 單步 zscore 最大 0.038、p99 0.009，與改前逐格相同；Polars 單步 zscore 最大 4.7e-5，同 float32 輸入下仍非零）；待研究＝①registry 改 float64 累積或同 legacy 核心（候選已實證七組合全等）於大群組之記憶體與耗時（float64 pandas 核心單次微探針約 9–10 倍時間、3 倍配置）②Polars 臂之剩餘差是否影響下游 IC／ML 排序；rank 同值差屬 float32 輸入量化（同 float32 輸入時為 0），不列缺陷`；生產可達性：registry 帶 rank／zscore／gaussian 經現行分派不可達（pre-IC 與 L7 raw 設定強制關閉、帶選欄之 post-IC 無生產呼叫者），Polars 臂為 IC 頁與 `run_ic_first` 預設臂；觸發（研究啟動）：已觸發 ⇒ 列入使用者 2026-10-01 裁定之全票細項排序諮詢定序；登記處：`docs/ROADMAP.md` 本票列之 pointer 與本 SPEC。
   - ICFIRSTALIGN 乙部分（不可變 run context、L7 raw 讀回時間軸）——`為何現在不做: user-ruling:2026-10-01 使用者裁定 IC 頁洩漏修完後開全票細項排序諮詢定序`；觸發：該諮詢定案；登記處：`docs/ROADMAP.md` RM-ICFIRSTALIGN。
