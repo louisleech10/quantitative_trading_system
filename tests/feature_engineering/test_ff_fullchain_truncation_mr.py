@@ -3,7 +3,7 @@
 主 MR（三方收斂 B2 設計，見 handoffs/20260629-FF-B2-CAUSALITY-SIGNOFF-RECONCILE.md §二）：
 - columns gate：交集；不對稱掉欄 > max(100, 0.1%×|union|) 才 fail
 - values gate：交集欄 × [warmup:n_trunc) × both-non-NaN，allclose(rtol=2e-3, atol=1e-12)
-- NaN mask 分層：fill_rate≥95% 共同欄 exact mask；低 fill_rate informational
+- NaN mask：比較窗內共同欄雙方向全等（FFSTAT v61 取消原「低 fill_rate 只 informational」——該旁路放過 L3 置中窗洩漏）
 - 覆蓋率守衛：≥95% 共同欄有 post-warmup both-non-NaN cell
 明確全開 atomic + preprocessing（含 gaussian），排除 fracdiff/adf。
 fracdiff 專屬 MR 維持嚴格（columns equality、d-star、atol=1e-8、exact NaN mask）。
@@ -168,9 +168,8 @@ def test_mutation_fracdiff_maxlag_len_coupling_truncation_fails(monkeypatch, tmp
     run_control_fracdiff_maxlag_len_coupling(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_fracdiff_maxlag_len_coupling_tail_fails(monkeypatch, tmp_path, kline_df_module) -> None:
-    """fracdiff mutant：max_lag 依當次長度 → 尾端擾動 MR 必 FAIL（只承認值 gate 之前之失敗）。"""
-    run_control_fracdiff_maxlag_len_coupling(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module, tail_perturb=True)
+# （v61 撤除 test_mutation_fracdiff_maxlag_len_coupling_tail_fails：尾擾動 fracdiff 基線為 codec 既有 strict xfail，
+#  mutant 只於值 gate 現形 ⇒ 無可辨認之失敗出口；同一 mutant 由截斷版與並行版承接。）
 
 
 def test_mutation_fracdiff_maxlag_len_coupling_parallel_fails(monkeypatch, tmp_path, kline_df_module) -> None:

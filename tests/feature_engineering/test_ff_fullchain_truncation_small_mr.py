@@ -97,8 +97,8 @@ def test_small_mutation_fracdiff_maxlag_len_coupling_truncation_fails(monkeypatc
     run_control_fracdiff_maxlag_len_coupling(SMALL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_small_mutation_fracdiff_maxlag_len_coupling_tail_fails(monkeypatch, tmp_path, kline_df_module) -> None:
-    run_control_fracdiff_maxlag_len_coupling(SMALL_SCOPE, monkeypatch, tmp_path, kline_df_module, tail_perturb=True)
+# （v61 撤除尾擾動版長度耦合控制：實跑〔第 1 段〕mutant 只於值 gate 現形〔rel 4.2e-4〕，而尾擾動 fracdiff 基線本即因
+#  codec 於值 gate 失敗 ⇒ 不可判別；同一 mutant 由截斷版與並行版承接。）
 
 
 def test_small_mutation_fracdiff_maxlag_len_coupling_parallel_fails(monkeypatch, tmp_path, kline_df_module) -> None:

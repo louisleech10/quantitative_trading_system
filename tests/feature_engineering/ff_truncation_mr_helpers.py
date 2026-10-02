@@ -51,9 +51,9 @@ FLOAT16_ATOL = 1e-12
 # 主 MR columns gate：不對稱掉欄門檻 max(100, 0.1%×|union|)（三方收斂 B2 設計）
 COLUMNS_ASYMMETRIC_MIN = 100
 COLUMNS_ASYMMETRIC_PCT = 0.001
-# NaN mask 分層：高 fill_rate 欄須 exact mask；低 fill_rate 僅 informational
+# NaN mask：比較窗內共同欄雙方向全等（FFSTAT v61 取消低 fill_rate 之 informational 旁路）；常數保留供報告用
 HIGH_FILL_RATE_THRESHOLD = 0.95
-# 覆蓋率守衛：防全欄歸 informational 空轉
+# 覆蓋率守衛：防全欄無可比格而空轉
 COVERAGE_COLUMN_FRACTION = 0.95
 # B2 比對效能：分層抽樣（見 handoffs/20260629-FF-B2-PERF-RECONCILE.md）
 B2_SAMPLE_K_DEFAULT = 40
@@ -802,22 +802,19 @@ def _assert_nan_mask_layered(
     fill_rate_left: float,
     fill_rate_right: float,
 ) -> None:
-    """高 fill_rate(≥95%) 共同欄 → NaN mask exact；否則 informational。"""
+    """比較窗內共同欄之 NaN mask 須雙方向全等（不論 fill_rate）。
+
+    FFSTAT SPEC v61（諮詢 `handoffs/reconcile/20260926-ffstat-b6-consult-r1/synth.md`）：改前「任一側 fill_rate < 95%
+    只印 informational」使「full 有限、trunc 尾端轉 NaN」之洩漏（L3 置中窗需未來 6 根：full=1.000、trunc=0.700）
+    整段通過；因果管線下同欄同時點之缺值與否不得依後綴而變。兩側缺在同位置之稀疏欄照常通過。"""
     lnan = np.isnan(left)
     rnan = np.isnan(right)
     if np.array_equal(lnan, rnan):
         return
-    if (
-        fill_rate_left >= HIGH_FILL_RATE_THRESHOLD
-        and fill_rate_right >= HIGH_FILL_RATE_THRESHOLD
-    ):
-        raise AssertionError(
-            f"{context} high-fill-rate NaN mask mismatch "
-            f"(fill_rate full={fill_rate_left:.3f} trunc={fill_rate_right:.3f})"
-        )
-    print(
-        f"NaN mask informational {context}: "
-        f"fill_rate full={fill_rate_left:.3f} trunc={fill_rate_right:.3f}"
+    raise AssertionError(
+        f"{context} NaN mask mismatch "
+        f"(fill_rate full={fill_rate_left:.3f} trunc={fill_rate_right:.3f}; "
+        f"full有限trunc缺={int(np.sum(~lnan & rnan))} full缺trunc有限={int(np.sum(lnan & ~rnan))})"
     )
 
 
@@ -1698,8 +1695,9 @@ def run_control_align_lookahead_with_tail_perturb(scope: MRScope, monkeypatch, t
     return _run_align_lookahead_control(scope, monkeypatch, tmp_path, kline_df, tail_perturb=True)
 
 
-# fracdiff 尾擾動基線（既有 strict xfail：storage codec 依值域選型使跨 run 精度不可比）於值 gate 失敗 ⇒ 以尾擾動為底之
-# 控制只承認發生在值 gate 之前之失敗（strict 欄集合、d*），不得以 codec 既有失敗冒充抓到。
+# 只承認值 gate 之前之失敗（strict 欄集合、d*）：校準擾動與全量 d* 兩控制之目標即校準。
+# （v61 撤除「尾擾動版長度耦合」：其基線為 storage codec 既有 strict xfail、值 gate 本即失敗，mutant 只於值 gate 現形
+#  ⇒ 無可辨認之失敗出口；同一 mutant 由截斷版與並行版承接。諮詢 handoffs/reconcile/20260926-ffstat-b6-consult-r1/synth.md）
 _FRACDIFF_PRE_VALUES_GATES = frozenset({"_assert_columns_gate", "_assert_d_star_gate"})
 
 
@@ -1708,7 +1706,7 @@ def _fracdiff_check(pair: TruncationPair) -> Callable[[], None]:
 
 
 def run_control_fracdiff_maxlag_len_coupling(scope: MRScope, monkeypatch, tmp_path: Path, kline_df, *,
-                                             tail_perturb: bool = False, parallel: bool = False) -> str:
+                                             parallel: bool = False) -> str:
     """mutant：fracdiff max_lag 改依當次資料長度（`max(2, len(df)//10)`，**不設上限**——改前寫法之 252 上限於現行必要窗
     兩邊皆飽和而未注入差異）⇒ fracdiff MR 必紅。seam 證據：兩次 run 實際解析之 max_lag 不同；parallel 版另證並行路徑被走。"""
     original_apply = FeaturePreprocessor._apply_fractional_differencing
@@ -1731,17 +1729,13 @@ def run_control_fracdiff_maxlag_len_coupling(scope: MRScope, monkeypatch, tmp_pa
 
         monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self: 2)
         monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing_parallel", _parallel_spy)
-    extra: Dict[str, Any] = {}
-    if tail_perturb:
-        extra["patch_fetch"] = lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA)
     pair = _build_scope_pair(scope, tmp_path / "features", kline_df, fracdiff=True, monkeypatch=monkeypatch,
-                             d_star_parent=tmp_path / "dstar", **extra)
+                             d_star_parent=tmp_path / "dstar")
     lags = {lag for _, lag in resolved}
     assert len(lags) >= 2, f"長度耦合未注入差異（兩 run 之 max_lag 相同）：{sorted(set(resolved))}"
     if parallel:
         assert parallel_calls and max(parallel_calls) > 1, "fracdiff 並行路徑未被走"
-    allowed = _FRACDIFF_PRE_VALUES_GATES if tail_perturb else _CAUSAL_GATE_FUNCS
-    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_gates=allowed)
+    return _expect_causal_gate_failure(pair, _fracdiff_check(pair))
 
 
 def run_control_fracdiff_calibration_perturb(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:

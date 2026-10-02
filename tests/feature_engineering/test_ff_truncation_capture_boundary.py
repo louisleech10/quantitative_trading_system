@@ -121,3 +121,31 @@ def test_pre_start_rows_selects_only_before_start() -> None:
     out = h._patch_kline_pre_start_ohlcv(df, start_iso="2025-12-01 05:00:00", bars=100, delta=1e6)
     assert (out["close"].to_numpy()[5:] == df["close"].to_numpy()[5:]).all()
     assert (out["close"].to_numpy()[:5] != df["close"].to_numpy()[:5]).all()
+
+
+def _mask_pair(tmp_path: Path, full_vals: np.ndarray, trunc_vals: np.ndarray) -> h.TruncationPair:
+    return _pair(tmp_path, {"close_trend_EMA_5_Mean_W13": full_vals.astype(np.float32)},
+                 {"close_trend_EMA_5_Mean_W13": trunc_vals.astype(np.float32)})
+
+
+@pytest.mark.parametrize("direction", ["trunc_tail_nan", "full_tail_nan"])
+def test_main_values_gate_rejects_mask_only_asymmetry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                     direction: str) -> None:
+    """v61：比較窗內 NaN mask 不對稱（低 fill_rate 亦然）必為主值 gate 之因果失敗（改前只印 informational ⇒ L3 置中窗洩漏存活）。"""
+    base = np.arange(21.0)
+    tail = np.r_[np.arange(14.0), [np.nan] * 6]
+    full, trunc = (np.r_[base[:20], 99.0], tail) if direction == "trunc_tail_nan" else (np.r_[tail, 99.0], base[:20])
+    pair = _mask_pair(tmp_path, full, trunc)
+    monkeypatch.setattr(h, "_assert_mutation_layer_coverage", lambda *a, **k: None)
+    check = lambda: h._assert_values_gate_main(pair.full.raw_dir, pair.trunc.raw_dir, warmup=0, n_trunc=20)  # noqa: E731
+    got = h._expect_causal_gate_failure(pair, check)
+    assert got.startswith("_assert_values_gate_main:") and "NaN mask mismatch" in got
+
+
+def test_main_values_gate_accepts_equal_sparse_mask(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """兩側缺在同位置之稀疏欄（fill 50%）照常通過（v61 不誤殺）。"""
+    sparse = np.where(np.arange(21) % 2, np.nan, np.arange(21.0))
+    pair = _mask_pair(tmp_path, sparse, sparse[:20])
+    monkeypatch.setattr(h, "_assert_mutation_layer_coverage", lambda *a, **k: None)
+    monkeypatch.setattr(h, "COVERAGE_COLUMN_FRACTION", 0.0)
+    h._assert_values_gate_main(pair.full.raw_dir, pair.trunc.raw_dir, warmup=0, n_trunc=20)
