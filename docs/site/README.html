@@ -135,7 +135,7 @@
 <td>HP-ICFIRSTALIGN</td>
 <td>未開工</td>
 <td>docs/manifests/FFSTAT.json</td>
-<td>2026-09-24 FF-STAT r19 追查時發現：真實 kline 下 run_ic_first 之 IC 階段必拋 AlignmentViolationError（label 時間戳 index 對 L7 raw 讀回 RangeIndex；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 <code>78c85bb2</code>）。使用者 2026-09-26 裁定 run_ic_first 不刪（去留查證 handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md），本票改為 IC-First 管線合一：IC 頁套用後處理改用正式實作並修其未來洩漏（未勾 rank 時 Gaussian 全樣本排名）、run_ic_first 去除 factory 可變狀態依賴、修對齊；排 FF-STAT 之後立刻做（先於 FF-NAME、FFDSTAR）；另併 post-IC 排名／z 分數窗未滿即出值（使用者 2026-09-27 裁定，handoffs/20260927-ffstat-b4-redesign-rulings.md R7）</td>
+<td>只剩乙部分：run_ic_first 去除 factory 可變狀態依賴（不可變 run context，含選窗介面）、修 L7 raw 讀回時間軸之 IC 對齊（真實 kline 下 IC 階段必拋 AlignmentViolationError；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 <code>78c85bb2</code>）。甲部分（IC 頁套用後處理改正式實作、post-IC 排名／z 分數窗未滿即出值）已由 ICPOSTLEAK 於 2026-10-02 交付（docs/ICPOSTLEAK_SPEC.md）。順序由全票細項排序諮詢（HP-TICKETORDER）定</td>
 </tr>
 <tr>
 <td>043</td>
@@ -147,9 +147,9 @@
 <tr>
 <td>044</td>
 <td>HP-TESTSPEED</td>
-<td>未開工</td>
+<td>停手</td>
 <td>HANDOFF.md</td>
-<td>2026-09-28 使用者裁定「你跟委員討論，你們覺得可以加速又不會影響品質，那就可以」；下一步＝FF-STAT r33 銷帳後：量測重複生成＋諮詢輪（三方皆認可才實作）；驗收見 RM-TESTSPEED</td>
+<td>2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（&lt; 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。是否以重測試快速版重開，交全票細項排序諮詢（HP-TICKETORDER）；詳見 RM-TESTSPEED</td>
 </tr>
 <tr>
 <td>045</td>

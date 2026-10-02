@@ -450,10 +450,10 @@
       [
         "330",
         "RM-ICFIRSTALIGN",
-        "ICFIRSTALIGN：IC-First 管線合一（頁面第三步改用正式實作並修其未來洩漏、run_ic_first 去除 factory 可變狀態依賴、修真實資料 IC 對齊）",
+        "ICFIRSTALIGN：IC-First 管線合一（乙部分：run_ic_first 去除 factory 可變狀態依賴、修真實資料 IC 對齊；甲部分已由 RM-ICPOSTLEAK 交付）",
         "未開工",
         "docs/manifests/FFSTAT.json",
-        "2026-09-24 FF-STAT TODO 審查 r19 追查時發現（主委實跑）：真實 kline 下 `run_ic_first` 於 IC 階段必拋 `AlignmentViolationError: label/group index mismatch with equal length`——label 為時間戳 index、自 L7 raw 讀回之群組為 RangeIndex；`tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_trim_ic_first` 於 main 同紅；拒絕按位置對齊之防呆由 commit `78c85bb2`（IC 1-align B3）引入，防呆本身正確，缺的是讀回時接回時間軸。影響：IC-first 路徑對真實資料目前無法產出選特徵結果。另（FF-STAT 審查 r9 codex，handoffs/reconcile/20260926-ffstatauto-x-review-r9/synth.md）：平穩化關閉時 `run_ic_first` 無起訖參數、沿用同一 factory 最近一次生成之輸出窗，先後生成 A、B 窗只能讀 B（FF-STAT 動工前即如此；FF-STAT v29 只於平穩化開啟時改為自帶起訖）⇒ 本票一併定其選窗介面。去留查證（handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md，主委＋codex＋composer）：`run_ic_first` 源自 `db19af76` L6.5 V2「IC-First 兩段式管線」，無任何生產呼叫者，但為特徵工廠正式 transform_selected 與 write_processed 之唯一呼叫者；頁面第三步（IC 頁 apply-transforms，`api/services/ic_analysis_service.py:2877-2903`）為 API 內手寫簡化版，未勾 rank 時 Gaussian 以全樣本排名＝**現行可觸發之未來洩漏**；IC 對齊錯誤於 raw 讀回路徑同樣觸發、不因刪除而消失。🔴 使用者 2026-09-26 裁定：**不刪**；本票改為「IC-First 管線合一」——頁面第三步改用正式實作並淘汰手寫版與其洩漏、以不可變 run context 取代 factory 可變狀態（含 FF-STAT r11 所指 layer_results 等）、修對齊；排程＝**FF-STAT 之後立刻做（先於 FF-NAME、FFDSTAR）**。規模＝大（ML 正確性 d、跨模組 b）。另（使用者 2026-09-27 裁定登記，handoffs/20260927-ffstat-b4-redesign-rulings.md R7）：post-IC 之排名轉換與自適應 z 分數窗未滿即出值（z 分數 `rolling(window, min_periods=1)`，`feature_preprocessor.py:2690`），本票一併處理。"
+        "🔴 2026-10-02 範圍更正：頁面第三步改正式實作與 post-IC 排名／z 分數窗未滿即出值（下文所述之甲部分）已由 RM-ICPOSTLEAK 交付；本票只剩乙部分（不可變 run context 含選窗介面、L7 raw 讀回時間軸之 IC 對齊），順序由全票細項排序諮詢定。以下為原始紀錄——2026-09-24 FF-STAT TODO 審查 r19 追查時發現（主委實跑）：真實 kline 下 `run_ic_first` 於 IC 階段必拋 `AlignmentViolationError: label/group index mismatch with equal length`——label 為時間戳 index、自 L7 raw 讀回之群組為 RangeIndex；`tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_trim_ic_first` 於 main 同紅；拒絕按位置對齊之防呆由 commit `78c85bb2`（IC 1-align B3）引入，防呆本身正確，缺的是讀回時接回時間軸。影響：IC-first 路徑對真實資料目前無法產出選特徵結果。另（FF-STAT 審查 r9 codex，handoffs/reconcile/20260926-ffstatauto-x-review-r9/synth.md）：平穩化關閉時 `run_ic_first` 無起訖參數、沿用同一 factory 最近一次生成之輸出窗，先後生成 A、B 窗只能讀 B（FF-STAT 動工前即如此；FF-STAT v29 只於平穩化開啟時改為自帶起訖）⇒ 本票一併定其選窗介面。去留查證（handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md，主委＋codex＋composer）：`run_ic_first` 源自 `db19af76` L6.5 V2「IC-First 兩段式管線」，無任何生產呼叫者，但為特徵工廠正式 transform_selected 與 write_processed 之唯一呼叫者；頁面第三步（IC 頁 apply-transforms，`api/services/ic_analysis_service.py:2877-2903`）為 API 內手寫簡化版，未勾 rank 時 Gaussian 以全樣本排名＝**現行可觸發之未來洩漏**；IC 對齊錯誤於 raw 讀回路徑同樣觸發、不因刪除而消失。🔴 使用者 2026-09-26 裁定：**不刪**；本票改為「IC-First 管線合一」——頁面第三步改用正式實作並淘汰手寫版與其洩漏、以不可變 run context 取代 factory 可變狀態（含 FF-STAT r11 所指 layer_results 等）、修對齊；排程＝**FF-STAT 之後立刻做（先於 FF-NAME、FFDSTAR）**。規模＝大（ML 正確性 d、跨模組 b）。另（使用者 2026-09-27 裁定登記，handoffs/20260927-ffstat-b4-redesign-rulings.md R7）：post-IC 之排名轉換與自適應 z 分數窗未滿即出值（z 分數 `rolling(window, min_periods=1)`，`feature_preprocessor.py:2690`），本票一併處理。"
       ],
       [
         "331",
@@ -486,6 +486,14 @@
         "未開工",
         "HANDOFF.md",
         "🔴 使用者 2026-09-28 裁定開發路線：「中小量真實資料日常開發＋收案前／換機後做完整驗證」（「反正現在的機器也跑不了大規模量產和大機器的設定，所以也不知那樣的生產模式會有什麼問題，到時候也是要測試驗證才能修正」）。三條件：架構一律按完整資料量設計（串流、不假設整表進記憶體）；本機跑得動之完整驗證照跑不延後；跑不動者逐項 blocked-by 硬體列入本票。🔴 使用者同日限定：「這是大規模生產和大機器路線才這樣，現在該做的驗收和測試不能少，嚴謹度和品質還是要維持盡量高」——SPEC／TODO 所列驗收、測試、mutant、委員審查一項都不得以本路線為由延後或縮小。完整驗證通過前，研究結論（IC、回測）不作真實交易決策。清單（隨各票增補）：①FF-STAT §G⑦ 5m 雙起點對證（SPEC §N）②記憶體級距 24／32GB 之效能與記憶體上限（SPEC §N；正確性已於 8GB 以覆寫驗）③預設全設定多標的並行生成之峰值④FF 全鏈截斷 MR 完整版 tests/feature_engineering/test_ff_fullchain_truncation_mr.py 13 項（本機兩度 SIGKILL；諮詢 r4；執行條件：記憶體 ≥ 24GB、磁碟 ≥ 40GB、TMPDIR 指向大磁碟；本機以 FF-STAT SPEC v59 Task 4.2 縮小版代驗具名缺陷）⑤FF 多週期截斷 MR 完整版 tests/feature_engineering/test_ff_multitf_truncation_mr.py 9 項（1h＋4h＋12h；另需 BTCUSDT 1h ≥ 34,302 根真實長歷史，本機僅 20,352 根）。觸發＝取得 ≥32GB 機器（使用者評估 Mac mini M6 32GB）"
+      ],
+      [
+        "338",
+        "RM-FFSTORE",
+        "FFSTORE：特徵一次算完存起來、新 K 線與新欄只增算（不可變快照＋manifest）",
+        "未開工",
+        "handoffs/reconcile/20260930-ffstore-x-consult-r1/synth.md",
+        "使用者 2026-09-30 逐字「反正以後我就拉儘可能長的時間算好存著，後續繼續用？」⇒ 開票、研究先行；研究 r1（主委＋三家）已收斂：Parquet＋自訂契約、身分鍵拆 algorithm_id 與 snapshot、校準與死欄凍結、接續計算分三類（可存狀態／回溯收斂／路徑相依）、交易日曆進快照、下游讀取矩陣先行。另承接 FF-STAT §N 純窗口型機械歸類（needs-research）與「各週期約一年之 N＋定期重校準」實測（使用者 2026-10-01）。順序由全票細項排序諮詢（HP-TICKETORDER）定"
       ],
       [
         "290",
@@ -1809,7 +1817,7 @@
         "HP-ICFIRSTALIGN",
         "未開工",
         "docs/manifests/FFSTAT.json",
-        "2026-09-24 FF-STAT r19 追查時發現：真實 kline 下 run_ic_first 之 IC 階段必拋 AlignmentViolationError（label 時間戳 index 對 L7 raw 讀回 RangeIndex；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 `78c85bb2`）。使用者 2026-09-26 裁定 run_ic_first 不刪（去留查證 handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md），本票改為 IC-First 管線合一：IC 頁套用後處理改用正式實作並修其未來洩漏（未勾 rank 時 Gaussian 全樣本排名）、run_ic_first 去除 factory 可變狀態依賴、修對齊；排 FF-STAT 之後立刻做（先於 FF-NAME、FFDSTAR）；另併 post-IC 排名／z 分數窗未滿即出值（使用者 2026-09-27 裁定，handoffs/20260927-ffstat-b4-redesign-rulings.md R7）"
+        "只剩乙部分：run_ic_first 去除 factory 可變狀態依賴（不可變 run context，含選窗介面）、修 L7 raw 讀回時間軸之 IC 對齊（真實 kline 下 IC 階段必拋 AlignmentViolationError；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 `78c85bb2`）。甲部分（IC 頁套用後處理改正式實作、post-IC 排名／z 分數窗未滿即出值）已由 ICPOSTLEAK 於 2026-10-02 交付（docs/ICPOSTLEAK_SPEC.md）。順序由全票細項排序諮詢（HP-TICKETORDER）定"
       ],
       [
         "043",
@@ -1821,9 +1829,9 @@
       [
         "044",
         "HP-TESTSPEED",
-        "未開工",
+        "停手",
         "HANDOFF.md",
-        "2026-09-28 使用者裁定「你跟委員討論，你們覺得可以加速又不會影響品質，那就可以」；下一步＝FF-STAT r33 銷帳後：量測重複生成＋諮詢輪（三方皆認可才實作）；驗收見 RM-TESTSPEED"
+        "2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（< 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。是否以重測試快速版重開，交全票細項排序諮詢（HP-TICKETORDER）；詳見 RM-TESTSPEED"
       ],
       [
         "041",
