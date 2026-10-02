@@ -1453,16 +1453,19 @@ def _patch_kline_calibration_ohlcv(
 # ③校準擾動改的是起始日之後之公開域前 500 根，FF-STAT 後校準只讀起始日之前之前史 ⇒ 校準域零列被擾動。
 # ---------------------------------------------------------------------------
 
-# 因果 gate 之失敗訊息前綴（封閉集合）；不在其中者（覆蓋守衛、抽樣設計錯誤、align oracle 前提缺失等）不算抓到
-_CAUSAL_GATE_PREFIXES = (
-    "columns gate failed",
-    "values ",
-    "warmup NaN mask",
-    "metadata gate",
-    "d_star mismatch",
-    "fracdiff ",
-    "align lookahead oracle: no coarse column mismatch",
-)
+# 判定「由哪個 gate 拋出」以 traceback 之函式名（封閉集合）為準，不以訊息前綴（v60 審查 r2：warmup 之訊息以
+# `warmup <檔>::<欄>` 開頭、fracdiff atol 值 gate 為 numpy `Not equal to tolerance`、metadata 為裸 assert——前綴判定誤拒）。
+# 因果 gate 函式：
+_CAUSAL_GATE_FUNCS = frozenset({
+    "_assert_columns_gate",
+    "_assert_values_gate_main",
+    "_assert_values_gate",
+    "_assert_warmup_nan_masks_equal",
+    "_assert_metadata_gate",
+    "_assert_d_star_gate",
+})
+# 非因果：traceback 經過抽樣層覆蓋守衛，或訊息為覆蓋／抽樣守衛（`_assert_values_gate_main` 內之 coverage guard）
+_NON_CAUSAL_FUNCS = frozenset({"_assert_mutation_layer_coverage"})
 _NON_CAUSAL_MARKERS = ("sampling design error", "coverage guard failed", "sampling guard failed")
 
 
@@ -1508,17 +1511,20 @@ def _expect_causal_gate_failure(
     check: Callable[[], None],
     *,
     align_coarse_tfs: Optional[List[str]] = None,
-    allowed_prefixes: Tuple[str, ...] = _CAUSAL_GATE_PREFIXES,
+    allowed_gates: frozenset = _CAUSAL_GATE_FUNCS,
 ) -> str:
-    """先驗準備（捕獲區外），再只捕獲 `check()` 之 AssertionError，且其訊息須為因果 gate 之失敗；回傳訊息供收據。"""
+    """先驗準備（捕獲區外），再只捕獲 `check()` 之 AssertionError；拋出路徑須經 `allowed_gates` 之一、不經非因果守衛、
+    訊息不含覆蓋／抽樣守衛字樣。回傳「gate 名：訊息前段」供收據。"""
     _assert_mr_preparation(pair, align_coarse_tfs=align_coarse_tfs)
     with pytest.raises(AssertionError) as excinfo:
         check()
     message = str(excinfo.value)
-    head = message.lstrip()
+    frames = {entry.name for entry in excinfo.traceback}
+    assert not (frames & _NON_CAUSAL_FUNCS), f"失敗經過抽樣覆蓋守衛，不算抓到：{message[:500]}"
     assert not any(marker in message for marker in _NON_CAUSAL_MARKERS), f"非因果 gate 之失敗不算抓到：{message[:500]}"
-    assert head.startswith(allowed_prefixes), f"失敗不屬因果 gate（{allowed_prefixes}）：{message[:500]}"
-    return message
+    hit = sorted(frames & allowed_gates)
+    assert hit, f"失敗不由允許之 gate 拋出（允許 {sorted(allowed_gates)}；路徑 {sorted(frames)}）：{message[:500]}"
+    return f"{'/'.join(hit)}: {message.strip()[:300]}"
 
 
 def _pre_start_rows(df: pd.DataFrame, start_iso: str, bars: int) -> np.ndarray:
@@ -1694,7 +1700,7 @@ def run_control_align_lookahead_with_tail_perturb(scope: MRScope, monkeypatch, t
 
 # fracdiff 尾擾動基線（既有 strict xfail：storage codec 依值域選型使跨 run 精度不可比）於值 gate 失敗 ⇒ 以尾擾動為底之
 # 控制只承認發生在值 gate 之前之失敗（strict 欄集合、d*），不得以 codec 既有失敗冒充抓到。
-_FRACDIFF_PRE_VALUES_PREFIXES = ("columns gate failed", "d_star mismatch")
+_FRACDIFF_PRE_VALUES_GATES = frozenset({"_assert_columns_gate", "_assert_d_star_gate"})
 
 
 def _fracdiff_check(pair: TruncationPair) -> Callable[[], None]:
@@ -1734,8 +1740,8 @@ def run_control_fracdiff_maxlag_len_coupling(scope: MRScope, monkeypatch, tmp_pa
     assert len(lags) >= 2, f"長度耦合未注入差異（兩 run 之 max_lag 相同）：{sorted(set(resolved))}"
     if parallel:
         assert parallel_calls and max(parallel_calls) > 1, "fracdiff 並行路徑未被走"
-    allowed = _FRACDIFF_PRE_VALUES_PREFIXES if tail_perturb else _CAUSAL_GATE_PREFIXES
-    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_prefixes=allowed)
+    allowed = _FRACDIFF_PRE_VALUES_GATES if tail_perturb else _CAUSAL_GATE_FUNCS
+    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_gates=allowed)
 
 
 def run_control_fracdiff_calibration_perturb(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
@@ -1763,7 +1769,7 @@ def run_control_fracdiff_calibration_perturb(scope: MRScope, monkeypatch, tmp_pa
                              d_star_parent=tmp_path / "dstar", patch_fetch_full_only=_patch)
     assert calibration_calls[0] > 0, "fracdiff 校準取值未被呼叫"
     assert perturbed_rows and max(perturbed_rows) > 0, "起始日之前無前史列被擾動"
-    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_prefixes=_FRACDIFF_PRE_VALUES_PREFIXES)
+    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_gates=_FRACDIFF_PRE_VALUES_GATES)
 
 
 def run_control_fracdiff_full_fit_d_star(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
@@ -1778,4 +1784,4 @@ def run_control_fracdiff_full_fit_d_star(scope: MRScope, monkeypatch, tmp_path: 
     pair = _build_scope_pair(scope, tmp_path / "features", kline_df, fracdiff=True, monkeypatch=monkeypatch,
                              d_star_parent=tmp_path / "dstar")
     assert calls[0] > 0, "fracdiff 校準取值 seam 未被呼叫"
-    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_prefixes=_FRACDIFF_PRE_VALUES_PREFIXES)
+    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_gates=_FRACDIFF_PRE_VALUES_GATES)

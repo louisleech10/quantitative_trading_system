@@ -18,7 +18,8 @@
     "tests/feature_engineering/test_ffstat_warmup_table.py",
     "tests/feature_engineering/test_warmup_verify_guards.py",
     "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py",
-    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py"
+    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py",
+    "tests/feature_engineering/test_ff_truncation_capture_boundary.py"
   ],
   "script_acceptance": [
     "handoffs/run_receipts/ffstat_probes/freeze_baseline.py",
@@ -132,6 +133,7 @@
       "tests/feature_engineering/test_b6_warmup_trim.py",
       "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py",
       "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py",
+      "tests/feature_engineering/test_ff_truncation_capture_boundary.py",
       "tests/feature_engineering/test_ffstat_all_tested.py",
       "tests/feature_engineering/test_ffstat_apply_to.py",
       "tests/feature_engineering/test_ffstat_calibration.py",
