@@ -33,11 +33,6 @@
 <td>🔴 <strong>暫停中</strong>：SPEC 審至第 12 輪、未凍結、仍剩 11 條 P1；排序第 15 步（FF-NAME、ICPATH、FFSTORE 之後一次做完）</td>
 </tr>
 <tr>
-<td><strong>FKPERF 收尾</strong></td>
-<td>存檔檢查已改快（40 倍規模下 10.7 秒 → 0.56 秒）；只剩收尾前一次全套治理測試</td>
-<td>要找沒在改檔的空檔跑（小時級，跑的時候不能改檔）</td>
-</tr>
-<tr>
 <td><strong>「IC 優先」選特徵路徑用真實資料必定報錯</strong>（ICFIRSTALIGN）</td>
 <td>最後算 IC 那步對不上時間標籤；既有測試在主線上本來就紅</td>
 <td>舊問題、不是 FF-STAT 弄壞的；排序第 4 步</td>
@@ -110,15 +105,9 @@
 </thead>
 <tbody>
 <tr>
-<td>1</td>
-<td><strong>FKPERF 收尾</strong></td>
-<td>跑一次全套治理測試（約 2 小時，挑過夜空檔）</td>
-<td>不改程式；越晚跑越難分辨是誰弄紅的</td>
-</tr>
-<tr>
 <td>2</td>
 <td><strong>既有紅測試查原因</strong></td>
-<td>9 支早就紅的測試逐支查清楚，建立「原本就紅」名單</td>
+<td>9 支早就紅的特徵工廠測試，加上 12 項治理測試（已查到是 9/24 FF-TFMETA 與 9/29 設定檔修正弄紅的），逐支查清楚該修測試還是該修程式，建立「原本就紅」名單</td>
 <td>之後每張票都靠它分辨新錯和舊錯</td>
 </tr>
 <tr>
