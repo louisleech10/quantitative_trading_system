@@ -72,6 +72,12 @@
       "cmd": "venv/bin/python -m pytest -q -p no:cacheprovider <4 node ids，兩段串行>",
       "rc": 1,
       "honest_bounds": "v59 版測試本體之前置實跑：分母尺度 mutant 存活（撤除）、fracdiff 截斷基線 XPASS（改一般測試）；負控制尚未改共用本體，非 Task 4.2 驗收收據"
+    },
+    {
+      "path": "handoffs/run_receipts/20261002-ffstat-small-mr.json",
+      "cmd": "zsh run_ids.sh <段名> <node ids>（六段串行、獨占）",
+      "rc": 0,
+      "honest_bounds": "見收據 honest_bounds；s1／s2／m1 以 v60 碼執行，v61 置中 mutant 於 m2 重跑；單週期 10 過 1 xfail、多週期 7 過"
     }
   ],
   "batch_card": {

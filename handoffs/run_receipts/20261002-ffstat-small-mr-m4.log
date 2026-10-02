@@ -1,0 +1,1560 @@
+Fri Oct  2 13:43:52 CST 2026
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/louis/Desktop/quantitative_trading_system/venv/bin/python
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails 
+-------------------------------- live log setup --------------------------------
+13:43:54 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+13:43:54 [INFO] Read 20352 klines from BTCUSDT/1h in 0.009s
+-------------------------------- live log call ---------------------------------
+13:43:54 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+13:43:54 [INFO] Registered adapter: crypto_spot
+13:43:54 [INFO] Loaded 134 TA-Lib indicators
+13:43:55 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [INFO] KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+13:43:55 [INFO] Registered adapter: crypto_spot
+13:43:55 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [INFO] Fetching spot data: BTCUSDT/1h
+13:43:55 [INFO] Read 20352 klines from BTCUSDT/1h in 0.006s
+13:43:55 [INFO] Aligned data for BTCUSDT/1h: 20352 rows, 5 columns
+13:43:55 [INFO] Fetching spot data: BTCUSDT/4h
+13:43:55 [INFO] Read 5088 klines from BTCUSDT/4h in 0.003s
+13:43:55 [INFO] Aligned data for BTCUSDT/4h: 5088 rows, 5 columns
+13:43:55 [INFO] [Layer 1] 0% - Starting Layer 1...
+13:43:55 [INFO] Layer 1 starting, rss=284MB
+13:43:55 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [INFO] [Layer 1] 100% - Layer 1 completed: 898 features
+13:43:55 [INFO] Layer 1 done: 898 cols, status=ok, rss=590MB
+13:43:55 [INFO] [Layer 2] 0% - Starting Layer 2...
+13:43:55 [INFO] Layer 2 starting, rss=590MB
+13:43:55 [INFO] [L2] Starting derived features: 898 L1 cols
+13:43:55 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:43:55 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:43:55 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:44:03 [INFO] [L2] Completed: 11621 cols in 7.72s
+13:44:04 [INFO] [Layer 2] 100% - Layer 2 completed: 11621 features
+13:44:04 [INFO] Layer 2 done: 11621 cols, status=ok, rss=1924MB
+13:44:04 [INFO] [memmap] created: shape=(10752, 11621), dtype=<class 'numpy.float32'>, est=0.50 GB  (file auto-unlinked)
+13:44:05 [INFO] [spill] calib_layer2: 10752×11621 → float32 memmap in 0.8s (freed ~1.0 GB float64)
+13:44:05 [INFO] [Layer 3] 0% - Starting Layer 3...
+13:44:05 [INFO] Layer 3 starting, rss=1953MB
+13:44:09 [INFO] [L3 streaming][numba][multi] step 10/20 (W5_range): 898→898 cols (-0 dead)
+13:44:09 [INFO] [L3 streaming][numba][multi] step 20/20 (W13_range): 898→898 cols (-0 dead)
+13:44:09 [INFO] [L3 streaming][numba][multi] complete: 17960 total generated, 0 dead dropped, 17960 survivors
+13:44:11 [INFO] [Layer 3] 100% - Layer 3 completed: 17960 features
+13:44:11 [INFO] Layer 3 done: 17960 cols, status=ok, rss=1365MB
+13:44:11 [INFO] [Layer 4] 0% - Starting Layer 4...
+13:44:11 [INFO] Layer 4 starting, rss=1365MB
+13:44:11 [INFO] [Layer 4] 100% - Layer 4 completed: 7224 features
+13:44:11 [INFO] Layer 4 done: 7224 cols, status=ok, rss=2336MB
+13:44:11 [INFO] [Layer 5] 0% - Starting Layer 5...
+13:44:11 [INFO] Layer 5 starting, rss=2336MB
+13:44:11 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+13:44:11 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=2336MB
+13:44:11 [INFO] [Layer 6] 0% - Starting Layer 6...
+13:44:11 [INFO] Layer 6 starting, rss=2336MB
+13:44:12 [INFO] [Layer 6] 100% - Layer 6 completed: 10 features
+13:44:12 [INFO] Layer 6 done: 10 cols, status=ok, rss=2338MB
+13:44:12 [INFO] [memmap concat] 5 DFs → 37713 cols × 10752 rows ≈ 1.62 GB → disk-backed
+13:44:12 [INFO] [memmap] created: shape=(10752, 37713), dtype=<class 'numpy.float32'>, est=1.62 GB  (file auto-unlinked)
+13:44:12 [INFO] [memmap concat] copying DF 1/5 (898 cols)
+13:44:12 [INFO] [memmap concat] copying DF 2/5 (11621 cols)
+13:44:12 [INFO] [memmap concat] copying DF 3/5 (17960 cols)
+13:44:15 [INFO] [memmap concat] copying DF 4/5 (7224 cols)
+13:44:17 [INFO] [memmap concat] copying DF 5/5 (10 cols)
+13:54:06 [INFO] [Layer 1] 0% - Starting Layer 1...
+13:54:06 [INFO] Layer 1 starting, rss=1062MB
+13:54:06 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:06 [INFO] [Layer 1] 100% - Layer 1 completed: 898 features
+13:54:06 [INFO] Layer 1 done: 898 cols, status=ok, rss=145MB
+13:54:06 [INFO] [Layer 2] 0% - Starting Layer 2...
+13:54:06 [INFO] Layer 2 starting, rss=145MB
+13:54:06 [INFO] [L2] Starting derived features: 898 L1 cols
+13:54:06 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:06 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:06 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:10 [INFO] [L2] Completed: 11621 cols in 3.69s
+13:54:11 [INFO] [Layer 2] 100% - Layer 2 completed: 11621 features
+13:54:11 [INFO] Layer 2 done: 11621 cols, status=ok, rss=911MB
+13:54:11 [INFO] [Layer 3] 0% - Starting Layer 3...
+13:54:11 [INFO] Layer 3 starting, rss=911MB
+13:54:12 [INFO] [L3 streaming][numba][multi] step 10/20 (W5_range): 898→898 cols (-0 dead)
+13:54:12 [INFO] [L3 streaming][numba][multi] step 20/20 (W13_range): 898→898 cols (-0 dead)
+13:54:12 [INFO] [L3 streaming][numba][multi] complete: 17960 total generated, 0 dead dropped, 17960 survivors
+13:54:13 [INFO] [Layer 3] 100% - Layer 3 completed: 17960 features
+13:54:13 [INFO] Layer 3 done: 17960 cols, status=ok, rss=1638MB
+13:54:13 [INFO] [Layer 4] 0% - Starting Layer 4...
+13:54:13 [INFO] Layer 4 starting, rss=1638MB
+13:54:13 [INFO] [Layer 4] 100% - Layer 4 completed: 7224 features
+13:54:13 [INFO] Layer 4 done: 7224 cols, status=ok, rss=1895MB
+13:54:13 [INFO] [Layer 5] 0% - Starting Layer 5...
+13:54:13 [INFO] Layer 5 starting, rss=1895MB
+13:54:13 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+13:54:13 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1895MB
+13:54:13 [INFO] [Layer 6] 0% - Starting Layer 6...
+13:54:13 [INFO] Layer 6 starting, rss=1895MB
+13:54:13 [INFO] [Layer 6] 100% - Layer 6 completed: 10 features
+13:54:13 [INFO] Layer 6 done: 10 cols, status=ok, rss=1896MB
+13:54:33 [INFO] [CGSA] Initialized ColumnGroupRegistry at /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-16/test_small_mutation_l4_lag_shi0/cgsa_work (tier=8gb, buffer_groups=0)
+13:54:33 [INFO] Fetching spot data: BTCUSDT/1h
+13:54:33 [INFO] Read 20352 klines from BTCUSDT/1h in 0.053s
+13:54:33 [INFO] Aligned data for BTCUSDT/1h: 20352 rows, 5 columns
+13:54:33 [INFO] [multi_tf:multi_tf] 35% - [CGSA] Processing timeframe 1h (1/2)
+13:54:33 [INFO] [Layer 1] 0% - Starting Layer 1...
+13:54:33 [INFO] Layer 1 starting, rss=1265MB
+13:54:34 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:34 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:34 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:34 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:34 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:34 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:34 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:34 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:34 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:54:34 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:34 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:34 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:54:34 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:34 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:34 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:34 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:35 [INFO] [Layer 1] 100% - Layer 1 completed: 898 features
+13:54:35 [INFO] Layer 1 done: 898 cols, status=ok, rss=1801MB
+13:54:35 [INFO] [Layer 2] 0% - Starting Layer 2...
+13:54:35 [INFO] Layer 2 starting, rss=1801MB
+13:54:35 [INFO] [L2] Starting derived features: 898 L1 cols
+13:54:35 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:54:35 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:35 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:35 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:35 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:54:35 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:35 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:35 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:54:35 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:54:35 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:35 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:35 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:54:35 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:54:35 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:35 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:35 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:54:53 [INFO] [CGSA] L2 persisted group=1h_L2_Cross shards=1 total_bytes=88.0 MiB
+13:54:59 [INFO] [CGSA] L2 persisted group=1h_L2_Ratio shards=1 total_bytes=88.0 MiB
+13:55:48 [INFO] [CGSA] L2 persisted group=1h_L2_Momentum shards=8 total_bytes=697.2 MiB
+13:55:48 [INFO] [L2] Completed: 11621 cols in 73.46s
+13:55:48 [INFO] [Layer 2] 100% - Layer 2 completed: 11621 features
+13:55:48 [INFO] Layer 2 done: 11621 cols, status=ok, rss=3147MB
+13:55:48 [INFO] [memmap] created: shape=(20352, 11621), dtype=<class 'numpy.float32'>, est=0.95 GB  (file auto-unlinked)
+13:55:54 [INFO] [spill] layer2: 20352×11621 → float32 memmap in 6.0s (freed ~1.9 GB float64)
+13:55:54 [INFO] [Layer 3] 0% - Starting Layer 3...
+13:55:54 [INFO] Layer 3 starting, rss=1453MB
+13:56:02 [INFO] [L3 streaming][numba][multi][persist] step 10/20 (W5_range): 898→898 cols (-0 dead)
+13:56:02 [INFO] [L3 streaming][numba][multi][persist] step 20/20 (W13_range): 898→898 cols (-0 dead)
+13:56:02 [INFO] [L3 streaming][numba][multi][persist] complete: 17960 generated, 4 dropped, 17956 survivors persisted via callback
+13:56:06 [INFO] [L3] streaming persist (mode=streaming) complete: 17956 cols persisted in 20 groups
+13:56:06 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+13:56:06 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=1810MB
+13:56:06 [INFO] [Layer 4] 0% - Starting Layer 4...
+13:56:06 [INFO] Layer 4 starting, rss=1810MB
+13:56:08 [INFO] [Layer 4] 100% - Layer 4 completed: 7224 features
+13:56:08 [INFO] Layer 4 done: 7224 cols, status=ok, rss=1787MB
+13:56:08 [INFO] [Layer 5] 0% - Starting Layer 5...
+13:56:08 [INFO] Layer 5 starting, rss=1787MB
+13:56:08 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+13:56:08 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1766MB
+13:56:08 [INFO] [Layer 6] 0% - Starting Layer 6...
+13:56:08 [INFO] Layer 6 starting, rss=1765MB
+13:56:08 [INFO] [Layer 6] 100% - Layer 6 completed: 10 features
+13:56:08 [INFO] Layer 6 done: 10 cols, status=ok, rss=1771MB
+13:56:08 [INFO] [CGSA] Disk pre-check OK: layer=L4_lag symbol=BTCUSDT tf=1h need=2.74 GiB (planned_new=0.55 GiB, max_inflight_tmp×2=0.19 GiB, reserve=2.00 GiB) free=23.80 GiB shape=(20352, 7224)
+13:56:10 [INFO] [CGSA] L4_lag persisted group=1h_L4_lag_1 shards=5 total_bytes=388.2 MiB
+13:56:10 [INFO] [CGSA] L4_lag persisted group=1h_L4_lag_2 shards=2 total_bytes=172.7 MiB
+13:56:10 [INFO] [CGSA] Persisted L4_lag: 7224 cols → 2 groups (tf=1h)
+13:56:10 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=BTCUSDT tf=1h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=24.13 GiB shape=(20352, 10)
+13:56:10 [INFO] [CGSA] Persisted L6_meta: 10 cols → 1 groups (tf=1h)
+13:56:10 [INFO] [CGSA][multi_tf] Primary TF 1h: 241 groups registered (no alignment needed)
+13:56:10 [INFO] [multi_tf:multi_tf] 70% - [CGSA] Processing timeframe 4h (2/2)
+13:56:10 [INFO] Fetching spot data: BTCUSDT/4h
+13:56:10 [INFO] Read 5088 klines from BTCUSDT/4h in 0.032s
+13:56:10 [INFO] Aligned data for BTCUSDT/4h: 5088 rows, 5 columns
+13:56:10 [INFO] [Layer 1] 0% - Starting Layer 1...
+13:56:10 [INFO] Layer 1 starting, rss=2949MB
+13:56:11 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:11 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:56:11 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:56:11 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:56:11 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:56:11 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:56:11 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:56:11 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:56:11 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:56:11 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:56:11 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:56:11 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:56:11 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:56:11 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:56:11 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:56:11 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:56:16 [INFO] [Layer 1] 100% - Layer 1 completed: 898 features
+13:56:16 [INFO] Layer 1 done: 898 cols, status=ok, rss=3045MB
+13:56:16 [INFO] [Layer 2] 0% - Starting Layer 2...
+13:56:16 [INFO] Layer 2 starting, rss=3045MB
+13:56:16 [INFO] [L2] Starting derived features: 898 L1 cols
+13:56:16 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+13:56:16 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:56:16 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:56:16 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:56:16 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+13:56:16 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:56:16 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:56:16 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+13:56:16 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+13:56:16 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:56:16 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:56:16 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+13:56:16 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+13:56:16 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:56:16 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:56:16 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+13:56:35 [INFO] [CGSA] L2 persisted group=4h_L2_Momentum shards=2 total_bytes=174.3 MiB
+13:56:35 [INFO] [L2] Completed: 11621 cols in 19.35s
+13:56:35 [INFO] [Layer 2] 100% - Layer 2 completed: 11621 features
+13:56:35 [INFO] Layer 2 done: 11621 cols, status=ok, rss=1233MB
+13:56:35 [INFO] [Layer 3] 0% - Starting Layer 3...
+13:56:35 [INFO] Layer 3 starting, rss=1233MB
+13:56:39 [INFO] [L3 streaming][numba][multi][persist] step 10/20 (W5_range): 898→898 cols (-0 dead)
+13:56:39 [INFO] [L3 streaming][numba][multi][persist] step 20/20 (W13_range): 898→897 cols (-1 dead)
+13:56:39 [INFO] [L3 streaming][numba][multi][persist] complete: 17960 generated, 6 dropped, 17954 survivors persisted via callback
+13:56:41 [INFO] [L3] streaming persist (mode=streaming) complete: 17954 cols persisted in 20 groups
+13:56:41 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+13:56:41 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=1616MB
+13:56:41 [INFO] [Layer 4] 0% - Starting Layer 4...
+13:56:41 [INFO] Layer 4 starting, rss=1616MB
+13:56:41 [INFO] [Layer 4] 100% - Layer 4 completed: 7224 features
+13:56:41 [INFO] Layer 4 done: 7224 cols, status=ok, rss=2208MB
+13:56:41 [INFO] [Layer 5] 0% - Starting Layer 5...
+13:56:41 [INFO] Layer 5 starting, rss=2208MB
+13:56:41 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+13:56:41 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=2208MB
+13:56:41 [INFO] [Layer 6] 0% - Starting Layer 6...
+13:56:41 [INFO] Layer 6 starting, rss=2208MB
+13:56:41 [INFO] [Layer 6] 100% - Layer 6 completed: 10 features
+13:56:41 [INFO] Layer 6 done: 10 cols, status=ok, rss=2209MB
+13:56:41 [INFO] [CGSA] Disk pre-check OK: layer=L4_lag symbol=BTCUSDT tf=4h need=2.32 GiB (planned_new=0.14 GiB, max_inflight_tmp×2=0.19 GiB, reserve=2.00 GiB) free=23.55 GiB shape=(5088, 7224)
+13:56:42 [INFO] [CGSA] L4_lag persisted group=4h_L4_lag_1 shards=2 total_bytes=97.0 MiB
+13:56:42 [INFO] [CGSA] Persisted L4_lag: 7224 cols → 2 groups (tf=4h)
+13:56:43 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=BTCUSDT tf=4h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=23.41 GiB shape=(5088, 10)
+13:56:43 [INFO] [CGSA] Persisted L6_meta: 10 cols → 1 groups (tf=4h)
+13:56:43 [INFO] [CGSA][multi_tf] Compact-aligned 241 groups from 4h → 1h (source_rows=5088 logical_rows=20352)
+13:56:43 [INFO] [CGSA][multi_tf] All TFs done: 482 total groups in registry
+13:56:43 [INFO] [multi_tf:persist] 90% - [CGSA] Running Layer 6.5 → L7_raw streaming persist
+13:56:56 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.9550, non_nan=1465759070/1534866432
+13:56:57 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=2.86 GiB, reclaimable_npy=3.57 GiB, net_growth=0.00 GiB, max_inflight_part=0.38 GiB, largest_part_source=1h_L2_Momentum, reserve_floor=2.00 GiB, free=25.41 GiB, groups=482
+13:56:57 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+13:56:57 [INFO] [L6.5] Registry raw-sink config: groups=482 requested_workers=2 effective_workers=1 mode=append use_fast=False can_use_numba_fast=False winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+13:56:57 [INFO] [L6.5] Raw-sink start: 476 full groups (fast=0, slow=476) + 6 big-group splits → 496 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=6, max_group_cols=8980, schedule=largest_first, rss=1833MB)
+13:56:59 [INFO] [L6.5] raw-sink chunk stream start: group=1h_L2_Momentum cols=8980 chunks=5 chunk_size=2000 rss=1169MB
+13:58:06 [INFO] [L6.5] raw-sink chunk stream complete: group=1h_L2_Momentum chunks=5 outputs=5 rss=1232MB
+13:58:06 [INFO] [L6.5] raw-sink heartbeat: tasks 5/496 (1.0%), groups 1/482, elapsed=69.4s, rate=0.07/s, ETA=6819s, rss=1232MB, last=1h_L2_Momentum (slow-chunked, parts=5)
+13:58:07 [INFO] [L6.5] raw-sink chunk stream start: group=1h_L4_lag_1 cols=5000 chunks=3 chunk_size=2000 rss=1619MB
+13:58:45 [INFO] [L6.5] raw-sink chunk stream complete: group=1h_L4_lag_1 chunks=3 outputs=3 rss=1977MB
+13:58:45 [INFO] [L6.5] raw-sink heartbeat: tasks 8/496 (1.6%), groups 2/482, elapsed=108.2s, rate=0.07/s, ETA=6601s, rss=1977MB, last=1h_L4_lag_1 (slow-chunked, parts=3)
+13:59:00 [INFO] [L6.5] native-tf path completed: group=4h_L2_Momentum src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+13:59:00 [INFO] [L6.5] raw-sink chunk stream start: group=1h_L4_lag_2 cols=2224 chunks=2 chunk_size=2000 rss=1814MB
+13:59:17 [INFO] [L6.5] raw-sink chunk stream complete: group=1h_L4_lag_2 chunks=2 outputs=2 rss=952MB
+13:59:17 [INFO] [L6.5] raw-sink heartbeat: tasks 15/496 (3.0%), groups 4/482, elapsed=140.3s, rate=0.11/s, ETA=4499s, rss=953MB, last=1h_L4_lag_2 (slow-chunked, parts=2)
+13:59:25 [INFO] [L6.5] native-tf path completed: group=4h_L4_lag_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+13:59:47 [INFO] [L6.5] raw-sink heartbeat: tasks 21/496 (4.2%), groups 8/482, elapsed=170.4s, rate=0.12/s, ETA=3855s, rss=1715MB, last=1h_L3_rolling_W13_Kurt_1 (full)
+14:00:20 [INFO] [L6.5] raw-sink heartbeat: tasks 26/496 (5.2%), groups 13/482, elapsed=203.0s, rate=0.13/s, ETA=3670s, rss=1377MB, last=1h_L3_rolling_W13_Skew_1 (full)
+14:00:52 [INFO] [L6.5] raw-sink heartbeat: tasks 31/496 (6.2%), groups 18/482, elapsed=235.2s, rate=0.13/s, ETA=3529s, rss=1379MB, last=1h_L3_rolling_W5_Mean_1 (full)
+14:01:25 [INFO] [L6.5] raw-sink heartbeat: tasks 36/496 (7.3%), groups 23/482, elapsed=267.6s, rate=0.13/s, ETA=3420s, rss=1381MB, last=1h_L3_rolling_W5_Std_1 (full)
+14:01:53 [INFO] [L6.5] native-tf path completed: group=4h_L4_lag_2 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:01:54 [INFO] [L6.5] native-tf path completed: group=4h_L2_Cross src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:01:56 [INFO] [L6.5] native-tf path completed: group=4h_L2_Ratio src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:01:56 [INFO] [L6.5] raw-sink heartbeat: tasks 44/496 (8.9%), groups 30/482, elapsed=298.6s, rate=0.15/s, ETA=3067s, rss=1648MB, last=4h_L2_Ratio (native-tf, parts=1)
+14:01:59 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Kurt_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:00 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Mean_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:01 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Rank_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:02 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Skew_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:03 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Slope_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:04 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Std_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:05 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_ZScore_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:06 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Max_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:07 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Mean_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:08 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Min_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:09 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Range_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:10 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Rank_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:11 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Slope_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:13 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Std_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:14 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Max_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:14 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Min_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:16 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Range_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:17 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Kurt_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:18 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Skew_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:19 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_ZScore_1 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:20 [INFO] [L6.5] native-tf path completed: group=4h_L2_Distance src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:20 [INFO] [L6.5] raw-sink heartbeat: tasks 68/496 (13.7%), groups 54/482, elapsed=323.1s, rate=0.21/s, ETA=2034s, rss=767MB, last=1h_L1_momentum_RSI (full)
+14:02:21 [INFO] [L6.5] native-tf path completed: group=4h_L2_BinarySignal src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:25 [INFO] [L6.5] raw-sink heartbeat: tasks 92/496 (18.5%), groups 78/482, elapsed=328.0s, rate=0.28/s, ETA=1440s, rss=787MB, last=1h_L1_momentum_MACDFIX-Line (full)
+14:02:27 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_RSI src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:27 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_EMA src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_SMA src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ROC src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ROCP src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ROCR src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ROCR100 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_CMO src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] raw-sink heartbeat: tasks 116/496 (23.4%), groups 102/482, elapsed=331.1s, rate=0.35/s, ETA=1084s, rss=788MB, last=4h_L1_momentum_CMO (native-tf, parts=1)
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MOM src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_TRIX src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_DEMA src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_KAMA src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:28 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MA src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MAVP src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MIDPOINT src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_T3 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_TEMA src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_TRIMA src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_WMA src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_BBANDS-Lower src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_BBANDS-Middle src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_BBANDS-Upper src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:29 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDFIX-Hist src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDFIX-Line src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDFIX-Signal src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_WILLR src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_CCI src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L6_meta src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ADX src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ADXR src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_AROON-aroondown src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_AROON-aroonup src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] raw-sink heartbeat: tasks 140/496 (28.2%), groups 126/482, elapsed=333.2s, rate=0.42/s, ETA=847s, rss=788MB, last=4h_L1_momentum_AROON-aroonup (native-tf, parts=1)
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_AROONOSC src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_DX src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:30 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MINUS-DI src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:31 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MINUS-DM src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:31 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PLUS-DI src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:31 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PLUS-DM src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:31 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MIDPRICE src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:32 [INFO] [L6.5] raw-sink heartbeat: tasks 164/496 (33.1%), groups 150/482, elapsed=335.3s, rate=0.49/s, ETA=679s, rss=788MB, last=1h_L1_momentum_MACD-Hist_21-55-9 (full)
+14:02:34 [INFO] [L6.5] raw-sink heartbeat: tasks 188/496 (37.9%), groups 174/482, elapsed=337.4s, rate=0.56/s, ETA=553s, rss=788MB, last=1h_L1_momentum_MACD-Signal_13-34-9 (full)
+14:02:37 [INFO] [L6.5] raw-sink heartbeat: tasks 212/496 (42.7%), groups 198/482, elapsed=339.6s, rate=0.62/s, ETA=455s, rss=788MB, last=1h_L1_momentum_MACDEXT-Hist_8-34-9 (full)
+14:02:39 [INFO] [L6.5] raw-sink heartbeat: tasks 236/496 (47.6%), groups 222/482, elapsed=341.7s, rate=0.69/s, ETA=376s, rss=788MB, last=1h_L1_momentum_MACDEXT-Signal_55-233-34 (full)
+14:02:41 [INFO] [L6.5] raw-sink heartbeat: tasks 260/496 (52.4%), groups 246/482, elapsed=343.8s, rate=0.76/s, ETA=312s, rss=789MB, last=1h_L1_momentum_STOCHRSI-fastk_14-5-3-0 (full)
+14:02:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MFI src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:43 [INFO] [L6.5] raw-sink heartbeat: tasks 284/496 (57.3%), groups 270/482, elapsed=345.8s, rate=0.82/s, ETA=258s, rss=794MB, last=1h_L1_momentum_STOCH-slowk_13-5-0-3-0 (full)
+14:02:45 [INFO] [L6.5] raw-sink heartbeat: tasks 308/496 (62.1%), groups 294/482, elapsed=347.8s, rate=0.89/s, ETA=212s, rss=794MB, last=1h_L1_momentum_STOCHF-fastk_55-5-0 (full)
+14:02:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_12-26-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_13-34-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_13-55-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_21-55-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_21-89-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_34-144-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_34-89-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_5-13-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_5-21-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_55-144-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] raw-sink heartbeat: tasks 332/496 (66.9%), groups 318/482, elapsed=349.7s, rate=0.95/s, ETA=173s, rss=794MB, last=4h_L1_momentum_APO_55-144-0 (native-tf, parts=1)
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_55-233-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_8-21-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_8-34-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_12-26-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_13-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_13-55-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_21-55-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_21-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_34-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_34-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_5-13-3 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_5-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_55-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_55-233-34 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_8-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_8-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_12-26-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_13-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_13-55-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_21-55-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_21-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_34-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_34-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_5-13-3 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] raw-sink heartbeat: tasks 356/496 (71.8%), groups 342/482, elapsed=351.5s, rate=1.01/s, ETA=138s, rss=794MB, last=4h_L1_momentum_MACD-Line_5-13-3 (native-tf, parts=1)
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_5-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_55-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_55-233-34 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_8-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_8-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_12-26-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_13-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_13-55-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_21-55-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_21-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_34-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_34-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_5-13-3 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_5-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_55-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_55-233-34 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_8-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_8-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_12-26-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_13-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_13-55-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_21-55-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_21-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_34-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:50 [INFO] [L6.5] raw-sink heartbeat: tasks 380/496 (76.6%), groups 366/482, elapsed=353.4s, rate=1.08/s, ETA=108s, rss=794MB, last=4h_L1_momentum_MACDEXT-Hist_34-144-21 (native-tf, parts=1)
+14:02:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_34-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_5-13-3 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_5-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_55-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_55-233-34 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_8-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_8-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_12-26-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_13-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_13-55-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_21-55-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_21-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_34-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_34-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_5-13-3 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_5-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_55-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_55-233-34 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_8-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_8-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_12-26-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_13-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_13-55-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_21-55-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] raw-sink heartbeat: tasks 404/496 (81.5%), groups 390/482, elapsed=355.2s, rate=1.14/s, ETA=81s, rss=794MB, last=4h_L1_momentum_MACDEXT-Signal_21-55-9 (native-tf, parts=1)
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_21-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_34-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_34-89-13 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_5-13-3 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_5-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_55-144-21 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_55-233-34 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_8-21-5 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_8-34-9 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_12-26-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_13-34-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_13-55-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_21-55-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_21-89-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_34-144-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_34-89-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_5-13-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_5-21-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_55-144-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_55-233-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_8-21-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_8-34-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_14-3-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_14-5-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] raw-sink heartbeat: tasks 428/496 (86.3%), groups 414/482, elapsed=357.1s, rate=1.20/s, ETA=57s, rss=794MB, last=4h_L1_momentum_STOCHRSI-fastd_14-5-3-0 (native-tf, parts=1)
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_21-5-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_21-8-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_34-8-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_55-8-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_9-5-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_14-3-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_14-5-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_21-5-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_21-8-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_34-8-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_55-8-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_9-5-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_HT-TRENDLINE src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MAMA-FAMA_0.5-0.05 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MAMA_0.5-0.05 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_BOP src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_13-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_13-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_21-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_21-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_21-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_34-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_34-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_5-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] raw-sink heartbeat: tasks 452/496 (91.1%), groups 438/482, elapsed=358.9s, rate=1.26/s, ETA=35s, rss=794MB, last=4h_L1_momentum_STOCH-slowd_5-3-0-3-0 (native-tf, parts=1)
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_55-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_55-8-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_8-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_89-8-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_13-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_13-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:56 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_21-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_21-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_21-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_34-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_34-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_5-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_55-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_55-8-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_8-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_89-8-0-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_13-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_21-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_21-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_34-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:57 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_5-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_55-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_8-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_89-8-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] raw-sink heartbeat: tasks 476/496 (96.0%), groups 462/482, elapsed=360.8s, rate=1.32/s, ETA=15s, rss=794MB, last=4h_L1_momentum_STOCHF-fastd_89-8-0 (native-tf, parts=1)
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_13-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_21-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_21-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_34-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_5-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_55-5-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_8-3-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_89-8-0 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_13-21-55 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:58 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_13-34-89 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_21-34-89 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_21-55-144 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_34-55-144 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_34-89-233 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_5-10-20 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_5-13-26 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_7-14-28 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_8-21-55 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_SAREXT_0-0-0.02-0.02-0.2-0.02-0.02-0.2 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_SAR_0.02-0.2 src_tf=4h primary_tf=1h native_rows=5088 primary_rows=20352 outputs=1
+14:02:59 [INFO] [L6.5] raw-sink heartbeat: tasks 496/496 (100.0%), groups 482/482, elapsed=362.3s, rate=1.37/s, ETA=0s, rss=794MB, last=4h_L1_trend_SAR_0.02-0.2 (native-tf, parts=1)
+14:02:59 [INFO] [L6.5] raw-sink complete: 482/482 groups in 362.33s rss=794MB
+14:02:59 [INFO] [Layer B Sanitize][CGSA] nulled 4896659 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+14:03:00 [INFO] [L7_raw] registry stream persist done: symbol=BTCUSDT tf=1h groups=490 features=75416 npy_freed=3.57 GiB dtype=mixed
+14:03:00 [INFO] [multi_tf:complete] 100% - [CGSA] MultiTF generation completed (507.16s)
+14:03:01 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [INFO] Fetching spot data: BTCUSDT/1h
+14:03:01 [INFO] Read 20352 klines from BTCUSDT/1h in 0.008s
+14:03:01 [INFO] Aligned data for BTCUSDT/1h: 20352 rows, 5 columns
+14:03:01 [INFO] Fetching spot data: BTCUSDT/4h
+14:03:01 [INFO] Read 5088 klines from BTCUSDT/4h in 0.003s
+14:03:01 [INFO] Aligned data for BTCUSDT/4h: 5088 rows, 5 columns
+14:03:01 [INFO] Loaded feature registry with 1 entries
+14:03:01 [INFO] [Layer 1] 0% - Starting Layer 1...
+14:03:01 [INFO] Layer 1 starting, rss=866MB
+14:03:01 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [INFO] [Layer 1] 100% - Layer 1 completed: 898 features
+14:03:01 [INFO] Layer 1 done: 898 cols, status=ok, rss=996MB
+14:03:01 [INFO] [Layer 2] 0% - Starting Layer 2...
+14:03:01 [INFO] Layer 2 starting, rss=996MB
+14:03:01 [INFO] [L2] Starting derived features: 898 L1 cols
+14:03:01 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:03:01 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:01 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:03:10 [INFO] [L2] Completed: 11621 cols in 8.57s
+14:03:11 [INFO] [Layer 2] 100% - Layer 2 completed: 11621 features
+14:03:11 [INFO] Layer 2 done: 11621 cols, status=ok, rss=1281MB
+14:03:11 [INFO] [memmap] created: shape=(10752, 11621), dtype=<class 'numpy.float32'>, est=0.50 GB  (file auto-unlinked)
+14:03:11 [INFO] [spill] calib_layer2: 10752×11621 → float32 memmap in 0.8s (freed ~1.0 GB float64)
+14:03:11 [INFO] [Layer 3] 0% - Starting Layer 3...
+14:03:11 [INFO] Layer 3 starting, rss=2011MB
+14:03:15 [INFO] [L3 streaming][numba][multi] step 10/20 (W5_range): 898→898 cols (-0 dead)
+14:03:16 [INFO] [L3 streaming][numba][multi] step 20/20 (W13_range): 898→898 cols (-0 dead)
+14:03:16 [INFO] [L3 streaming][numba][multi] complete: 17960 total generated, 0 dead dropped, 17960 survivors
+14:03:17 [INFO] [Layer 3] 100% - Layer 3 completed: 17960 features
+14:03:17 [INFO] Layer 3 done: 17960 cols, status=ok, rss=1312MB
+14:03:17 [INFO] [Layer 4] 0% - Starting Layer 4...
+14:03:17 [INFO] Layer 4 starting, rss=1312MB
+14:03:18 [INFO] [Layer 4] 100% - Layer 4 completed: 7224 features
+14:03:18 [INFO] Layer 4 done: 7224 cols, status=ok, rss=2277MB
+14:03:18 [INFO] [Layer 5] 0% - Starting Layer 5...
+14:03:18 [INFO] Layer 5 starting, rss=2277MB
+14:03:18 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+14:03:18 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=2277MB
+14:03:18 [INFO] [Layer 6] 0% - Starting Layer 6...
+14:03:18 [INFO] Layer 6 starting, rss=2277MB
+14:03:18 [INFO] [Layer 6] 100% - Layer 6 completed: 10 features
+14:03:18 [INFO] Layer 6 done: 10 cols, status=ok, rss=2279MB
+14:03:18 [INFO] [memmap concat] 5 DFs → 37713 cols × 10752 rows ≈ 1.62 GB → disk-backed
+14:03:18 [INFO] [memmap] created: shape=(10752, 37713), dtype=<class 'numpy.float32'>, est=1.62 GB  (file auto-unlinked)
+14:03:18 [INFO] [memmap concat] copying DF 1/5 (898 cols)
+14:03:19 [INFO] [memmap concat] copying DF 2/5 (11621 cols)
+14:03:20 [INFO] [memmap concat] copying DF 3/5 (17960 cols)
+14:03:22 [INFO] [memmap concat] copying DF 4/5 (7224 cols)
+14:03:24 [INFO] [memmap concat] copying DF 5/5 (10 cols)
+14:12:54 [INFO] Loaded feature registry with 1 entries
+14:12:54 [INFO] [Layer 1] 0% - Starting Layer 1...
+14:12:54 [INFO] Layer 1 starting, rss=1316MB
+14:12:55 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:12:55 [INFO] [Layer 1] 100% - Layer 1 completed: 898 features
+14:12:55 [INFO] Layer 1 done: 898 cols, status=ok, rss=1255MB
+14:12:55 [INFO] [Layer 2] 0% - Starting Layer 2...
+14:12:55 [INFO] Layer 2 starting, rss=1255MB
+14:12:55 [INFO] [L2] Starting derived features: 898 L1 cols
+14:12:55 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:12:55 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:12:55 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:12:59 [INFO] [L2] Completed: 11621 cols in 4.32s
+14:13:00 [INFO] [Layer 2] 100% - Layer 2 completed: 11621 features
+14:13:00 [INFO] Layer 2 done: 11621 cols, status=ok, rss=1293MB
+14:13:00 [INFO] [Layer 3] 0% - Starting Layer 3...
+14:13:00 [INFO] Layer 3 starting, rss=1293MB
+14:13:02 [INFO] [L3 streaming][numba][multi] step 10/20 (W5_range): 898→898 cols (-0 dead)
+14:13:02 [INFO] [L3 streaming][numba][multi] step 20/20 (W13_range): 898→898 cols (-0 dead)
+14:13:02 [INFO] [L3 streaming][numba][multi] complete: 17960 total generated, 0 dead dropped, 17960 survivors
+14:13:02 [INFO] [Layer 3] 100% - Layer 3 completed: 17960 features
+14:13:02 [INFO] Layer 3 done: 17960 cols, status=ok, rss=2021MB
+14:13:02 [INFO] [Layer 4] 0% - Starting Layer 4...
+14:13:02 [INFO] Layer 4 starting, rss=2021MB
+14:13:02 [INFO] [Layer 4] 100% - Layer 4 completed: 7224 features
+14:13:02 [INFO] Layer 4 done: 7224 cols, status=ok, rss=2278MB
+14:13:02 [INFO] [Layer 5] 0% - Starting Layer 5...
+14:13:02 [INFO] Layer 5 starting, rss=2278MB
+14:13:02 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+14:13:02 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=2278MB
+14:13:02 [INFO] [Layer 6] 0% - Starting Layer 6...
+14:13:02 [INFO] Layer 6 starting, rss=2278MB
+14:13:02 [INFO] [Layer 6] 100% - Layer 6 completed: 10 features
+14:13:02 [INFO] Layer 6 done: 10 cols, status=ok, rss=2280MB
+14:13:22 [INFO] [CGSA] Initialized ColumnGroupRegistry at /private/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/pytest-of-louis/pytest-16/test_small_mutation_l4_lag_shi0/cgsa_work (tier=8gb, buffer_groups=0)
+14:13:22 [INFO] Fetching spot data: BTCUSDT/1h
+14:13:22 [INFO] Read 20352 klines from BTCUSDT/1h in 0.058s
+14:13:22 [INFO] Aligned data for BTCUSDT/1h: 20352 rows, 5 columns
+14:13:22 [INFO] [multi_tf:multi_tf] 35% - [CGSA] Processing timeframe 1h (1/2)
+14:13:22 [INFO] [Layer 1] 0% - Starting Layer 1...
+14:13:22 [INFO] Layer 1 starting, rss=1361MB
+14:13:23 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:13:23 [INFO] [Layer 1] 100% - Layer 1 completed: 898 features
+14:13:23 [INFO] Layer 1 done: 898 cols, status=ok, rss=759MB
+14:13:23 [INFO] [Layer 2] 0% - Starting Layer 2...
+14:13:23 [INFO] Layer 2 starting, rss=759MB
+14:13:23 [INFO] [L2] Starting derived features: 898 L1 cols
+14:13:23 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:13:23 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:13:23 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:13:40 [INFO] [CGSA] L2 persisted group=1h_L2_Cross shards=1 total_bytes=88.0 MiB
+14:13:46 [INFO] [CGSA] L2 persisted group=1h_L2_Ratio shards=1 total_bytes=88.0 MiB
+14:14:37 [INFO] [CGSA] L2 persisted group=1h_L2_Momentum shards=8 total_bytes=696.8 MiB
+14:14:37 [INFO] [L2] Completed: 11621 cols in 73.91s
+14:14:37 [INFO] [Layer 2] 100% - Layer 2 completed: 11621 features
+14:14:37 [INFO] Layer 2 done: 11621 cols, status=ok, rss=1945MB
+14:14:38 [INFO] [memmap] created: shape=(20342, 11621), dtype=<class 'numpy.float32'>, est=0.95 GB  (file auto-unlinked)
+14:14:42 [INFO] [spill] layer2: 20342×11621 → float32 memmap in 4.9s (freed ~1.9 GB float64)
+14:14:42 [INFO] [Layer 3] 0% - Starting Layer 3...
+14:14:42 [INFO] Layer 3 starting, rss=1746MB
+14:14:51 [INFO] [L3 streaming][numba][multi][persist] step 10/20 (W5_range): 898→898 cols (-0 dead)
+14:14:51 [INFO] [L3 streaming][numba][multi][persist] step 20/20 (W13_range): 898→898 cols (-0 dead)
+14:14:51 [INFO] [L3 streaming][numba][multi][persist] complete: 17960 generated, 4 dropped, 17956 survivors persisted via callback
+14:14:54 [INFO] [L3] streaming persist (mode=streaming) complete: 17956 cols persisted in 20 groups
+14:14:54 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+14:14:54 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=1436MB
+14:14:54 [INFO] [Layer 4] 0% - Starting Layer 4...
+14:14:54 [INFO] Layer 4 starting, rss=1436MB
+14:14:56 [INFO] [Layer 4] 100% - Layer 4 completed: 7224 features
+14:14:56 [INFO] Layer 4 done: 7224 cols, status=ok, rss=1905MB
+14:14:56 [INFO] [Layer 5] 0% - Starting Layer 5...
+14:14:56 [INFO] Layer 5 starting, rss=1905MB
+14:14:56 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+14:14:56 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1910MB
+14:14:56 [INFO] [Layer 6] 0% - Starting Layer 6...
+14:14:56 [INFO] Layer 6 starting, rss=1910MB
+14:14:56 [INFO] [Layer 6] 100% - Layer 6 completed: 10 features
+14:14:56 [INFO] Layer 6 done: 10 cols, status=ok, rss=1933MB
+14:14:56 [INFO] [CGSA] Disk pre-check OK: layer=L4_lag symbol=BTCUSDT tf=1h need=2.73 GiB (planned_new=0.55 GiB, max_inflight_tmp×2=0.19 GiB, reserve=2.00 GiB) free=21.42 GiB shape=(20342, 7224)
+14:14:59 [INFO] [CGSA] L4_lag persisted group=1h_L4_lag_1 shards=5 total_bytes=388.0 MiB
+14:14:59 [INFO] [CGSA] L4_lag persisted group=1h_L4_lag_2 shards=2 total_bytes=172.6 MiB
+14:14:59 [INFO] [CGSA] Persisted L4_lag: 7224 cols → 2 groups (tf=1h)
+14:14:59 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=BTCUSDT tf=1h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=20.75 GiB shape=(20342, 10)
+14:15:00 [INFO] [CGSA] Persisted L6_meta: 10 cols → 1 groups (tf=1h)
+14:15:00 [INFO] [CGSA][multi_tf] Primary TF 1h: 241 groups registered (no alignment needed)
+14:15:00 [INFO] [multi_tf:multi_tf] 70% - [CGSA] Processing timeframe 4h (2/2)
+14:15:00 [INFO] Fetching spot data: BTCUSDT/4h
+14:15:00 [INFO] Read 5088 klines from BTCUSDT/4h in 0.034s
+14:15:00 [INFO] Aligned data for BTCUSDT/4h: 5088 rows, 5 columns
+14:15:00 [INFO] [Layer 1] 0% - Starting Layer 1...
+14:15:00 [INFO] Layer 1 starting, rss=2983MB
+14:15:01 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:01 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:15:01 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:15:01 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:15:01 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:15:01 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:15:01 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:15:01 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:15:01 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:15:01 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:15:01 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:15:01 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:15:01 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:15:01 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:15:01 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:15:01 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:15:06 [INFO] [Layer 1] 100% - Layer 1 completed: 898 features
+14:15:06 [INFO] Layer 1 done: 898 cols, status=ok, rss=3079MB
+14:15:06 [INFO] [Layer 2] 0% - Starting Layer 2...
+14:15:06 [INFO] Layer 2 starting, rss=3079MB
+14:15:06 [INFO] [L2] Starting derived features: 898 L1 cols
+14:15:06 [WARNING] STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+14:15:06 [WARNING] STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:15:06 [WARNING] STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:15:06 [WARNING] STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:15:06 [WARNING] STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+14:15:06 [WARNING] STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:15:06 [WARNING] STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:15:06 [WARNING] STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+14:15:06 [WARNING] STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+14:15:06 [WARNING] STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:15:06 [WARNING] STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:15:06 [WARNING] STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+14:15:06 [WARNING] STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+14:15:06 [WARNING] STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:15:06 [WARNING] STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:15:06 [WARNING] STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+14:15:25 [INFO] [CGSA] L2 persisted group=4h_L2_Momentum shards=2 total_bytes=174.2 MiB
+14:15:25 [INFO] [L2] Completed: 11621 cols in 19.50s
+14:15:25 [INFO] [Layer 2] 100% - Layer 2 completed: 11621 features
+14:15:25 [INFO] Layer 2 done: 11621 cols, status=ok, rss=1434MB
+14:15:25 [INFO] [Layer 3] 0% - Starting Layer 3...
+14:15:25 [INFO] Layer 3 starting, rss=1434MB
+14:15:29 [INFO] [L3 streaming][numba][multi][persist] step 10/20 (W5_range): 898→898 cols (-0 dead)
+14:15:29 [INFO] [L3 streaming][numba][multi][persist] step 20/20 (W13_range): 898→897 cols (-1 dead)
+14:15:29 [INFO] [L3 streaming][numba][multi][persist] complete: 17960 generated, 6 dropped, 17954 survivors persisted via callback
+14:15:31 [INFO] [L3] streaming persist (mode=streaming) complete: 17954 cols persisted in 20 groups
+14:15:31 [INFO] [Layer 3] 100% - Layer 3 completed: 0 features
+14:15:31 [INFO] Layer 3 done: 0 cols, status=offloaded_to_registry, rss=1059MB
+14:15:31 [INFO] [Layer 4] 0% - Starting Layer 4...
+14:15:31 [INFO] Layer 4 starting, rss=1059MB
+14:15:32 [INFO] [Layer 4] 100% - Layer 4 completed: 7224 features
+14:15:32 [INFO] Layer 4 done: 7224 cols, status=ok, rss=1961MB
+14:15:32 [INFO] [Layer 5] 0% - Starting Layer 5...
+14:15:32 [INFO] Layer 5 starting, rss=1961MB
+14:15:32 [INFO] [Layer 5] 100% - Layer 5 completed: 0 features
+14:15:32 [INFO] Layer 5 done: 0 cols, status=empty_disabled, rss=1961MB
+14:15:32 [INFO] [Layer 6] 0% - Starting Layer 6...
+14:15:32 [INFO] Layer 6 starting, rss=1961MB
+14:15:32 [INFO] [Layer 6] 100% - Layer 6 completed: 10 features
+14:15:32 [INFO] Layer 6 done: 10 cols, status=ok, rss=1962MB
+14:15:32 [INFO] [CGSA] Disk pre-check OK: layer=L4_lag symbol=BTCUSDT tf=4h need=2.32 GiB (planned_new=0.14 GiB, max_inflight_tmp×2=0.19 GiB, reserve=2.00 GiB) free=23.83 GiB shape=(5086, 7224)
+14:15:32 [INFO] [CGSA] L4_lag persisted group=4h_L4_lag_1 shards=2 total_bytes=97.0 MiB
+14:15:33 [INFO] [CGSA] Persisted L4_lag: 7224 cols → 2 groups (tf=4h)
+14:15:33 [INFO] [CGSA] Disk pre-check OK: layer=L6_meta symbol=BTCUSDT tf=4h need=2.00 GiB (planned_new=0.00 GiB, max_inflight_tmp×2=0.00 GiB, reserve=2.00 GiB) free=23.69 GiB shape=(5086, 10)
+14:15:33 [INFO] [CGSA] Persisted L6_meta: 10 cols → 1 groups (tf=4h)
+14:15:33 [INFO] [CGSA][multi_tf] Compact-aligned 241 groups from 4h → 1h (source_rows=5086 logical_rows=20342)
+14:15:33 [INFO] [CGSA][multi_tf] All TFs done: 482 total groups in registry
+14:15:33 [INFO] [multi_tf:persist] 90% - [CGSA] Running Layer 6.5 → L7_raw streaming persist
+14:15:50 [INFO] [L7][CGSA] Quality summary: inf_count=0, coverage=0.9550, non_nan=1465019465/1534112272
+14:15:50 [INFO] [L7_raw] Disk pre-check OK: required=2.00 GiB (safety x1.50), estimated_final=2.86 GiB, reclaimable_npy=3.57 GiB, net_growth=0.00 GiB, max_inflight_part=0.38 GiB, largest_part_source=1h_L2_Momentum, reserve_floor=2.00 GiB, free=23.69 GiB, groups=482
+14:15:50 [INFO] [L6.5] raw-sink path uses serial group streaming for disk safety (requested_workers=2)
+14:15:50 [INFO] [L6.5] Registry raw-sink config: groups=482 requested_workers=2 effective_workers=1 mode=append use_fast=False can_use_numba_fast=False winsor=True rank=False zscore=False fracdiff=False fracdiff_apply_to=non_stationary fracdiff_layers=['L1', 'L2'] adf=False gaussian=False
+14:15:50 [INFO] [L6.5] Raw-sink start: 476 full groups (fast=0, slow=476) + 6 big-group splits → 496 sub-tasks (requested_workers=2, effective_workers=1, split_threshold=2000, slow_chunked=6, max_group_cols=8980, schedule=largest_first, rss=2054MB)
+14:15:53 [INFO] [L6.5] raw-sink chunk stream start: group=1h_L2_Momentum cols=8980 chunks=5 chunk_size=2000 rss=1116MB
+14:17:01 [INFO] [L6.5] raw-sink chunk stream complete: group=1h_L2_Momentum chunks=5 outputs=5 rss=961MB
+14:17:01 [INFO] [L6.5] raw-sink heartbeat: tasks 5/496 (1.0%), groups 1/482, elapsed=70.6s, rate=0.07/s, ETA=6931s, rss=961MB, last=1h_L2_Momentum (slow-chunked, parts=5)
+14:17:02 [INFO] [L6.5] raw-sink chunk stream start: group=1h_L4_lag_1 cols=5000 chunks=3 chunk_size=2000 rss=959MB
+14:17:40 [INFO] [L6.5] raw-sink chunk stream complete: group=1h_L4_lag_1 chunks=3 outputs=3 rss=1675MB
+14:17:40 [INFO] [L6.5] raw-sink heartbeat: tasks 8/496 (1.6%), groups 2/482, elapsed=109.9s, rate=0.07/s, ETA=6705s, rss=1675MB, last=1h_L4_lag_1 (slow-chunked, parts=3)
+14:17:54 [INFO] [L6.5] native-tf path completed: group=4h_L2_Momentum src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:17:55 [INFO] [L6.5] raw-sink chunk stream start: group=1h_L4_lag_2 cols=2224 chunks=2 chunk_size=2000 rss=1228MB
+14:18:12 [INFO] [L6.5] raw-sink chunk stream complete: group=1h_L4_lag_2 chunks=2 outputs=2 rss=909MB
+14:18:12 [INFO] [L6.5] raw-sink heartbeat: tasks 15/496 (3.0%), groups 4/482, elapsed=141.3s, rate=0.11/s, ETA=4532s, rss=909MB, last=1h_L4_lag_2 (slow-chunked, parts=2)
+14:18:19 [INFO] [L6.5] native-tf path completed: group=4h_L4_lag_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:18:42 [INFO] [L6.5] raw-sink heartbeat: tasks 21/496 (4.2%), groups 8/482, elapsed=171.5s, rate=0.12/s, ETA=3880s, rss=1868MB, last=1h_L3_rolling_W13_Kurt_1 (full)
+14:19:14 [INFO] [L6.5] raw-sink heartbeat: tasks 26/496 (5.2%), groups 13/482, elapsed=204.2s, rate=0.13/s, ETA=3692s, rss=1305MB, last=1h_L3_rolling_W13_Skew_1 (full)
+14:19:47 [INFO] [L6.5] raw-sink heartbeat: tasks 31/496 (6.2%), groups 18/482, elapsed=236.9s, rate=0.13/s, ETA=3554s, rss=1459MB, last=1h_L3_rolling_W5_Mean_1 (full)
+14:20:20 [INFO] [L6.5] raw-sink heartbeat: tasks 36/496 (7.3%), groups 23/482, elapsed=269.3s, rate=0.13/s, ETA=3441s, rss=1464MB, last=1h_L3_rolling_W5_Std_1 (full)
+14:20:48 [INFO] [L6.5] native-tf path completed: group=4h_L4_lag_2 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:20:49 [INFO] [L6.5] native-tf path completed: group=4h_L2_Cross src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:20:50 [INFO] [L6.5] native-tf path completed: group=4h_L2_Ratio src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:20:50 [INFO] [L6.5] raw-sink heartbeat: tasks 44/496 (8.9%), groups 30/482, elapsed=300.1s, rate=0.15/s, ETA=3083s, rss=1890MB, last=4h_L2_Ratio (native-tf, parts=1)
+14:20:53 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Kurt_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:20:54 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Mean_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:20:55 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Rank_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:20:56 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Skew_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:20:58 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Slope_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:20:59 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Std_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:00 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_ZScore_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:01 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Max_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:02 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Mean_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:03 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Min_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:04 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Range_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:05 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Rank_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:06 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Slope_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:07 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Std_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:08 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Max_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:09 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Min_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:10 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W13_Range_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:11 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Kurt_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:12 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_Skew_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:13 [INFO] [L6.5] native-tf path completed: group=4h_L3_rolling_W5_ZScore_1 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:14 [INFO] [L6.5] native-tf path completed: group=4h_L2_Distance src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:14 [INFO] [L6.5] raw-sink heartbeat: tasks 68/496 (13.7%), groups 54/482, elapsed=324.2s, rate=0.21/s, ETA=2041s, rss=1537MB, last=1h_L1_momentum_RSI (full)
+14:21:15 [INFO] [L6.5] native-tf path completed: group=4h_L2_BinarySignal src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:19 [INFO] [L6.5] raw-sink heartbeat: tasks 92/496 (18.5%), groups 78/482, elapsed=329.2s, rate=0.28/s, ETA=1446s, rss=1557MB, last=1h_L1_momentum_MACDFIX-Line (full)
+14:21:22 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_RSI src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:22 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_EMA src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:22 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_SMA src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:22 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ROC src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:22 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ROCP src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:22 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ROCR src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:22 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ROCR100 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_CMO src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] raw-sink heartbeat: tasks 116/496 (23.4%), groups 102/482, elapsed=332.4s, rate=0.35/s, ETA=1089s, rss=1557MB, last=4h_L1_momentum_CMO (native-tf, parts=1)
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MOM src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_TRIX src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_DEMA src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_KAMA src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MA src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MAVP src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MIDPOINT src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_T3 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:23 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_TEMA src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_TRIMA src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_WMA src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_BBANDS-Lower src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_BBANDS-Middle src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_BBANDS-Upper src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDFIX-Hist src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDFIX-Line src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDFIX-Signal src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_WILLR src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_CCI src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:24 [INFO] [L6.5] native-tf path completed: group=4h_L6_meta src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ADX src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ADXR src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_AROON-aroondown src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_AROON-aroonup src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] raw-sink heartbeat: tasks 140/496 (28.2%), groups 126/482, elapsed=334.6s, rate=0.42/s, ETA=851s, rss=1553MB, last=4h_L1_momentum_AROON-aroonup (native-tf, parts=1)
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_AROONOSC src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_DX src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MINUS-DI src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MINUS-DM src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PLUS-DI src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PLUS-DM src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:25 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MIDPRICE src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:27 [INFO] [L6.5] raw-sink heartbeat: tasks 164/496 (33.1%), groups 150/482, elapsed=336.8s, rate=0.49/s, ETA=682s, rss=1554MB, last=1h_L1_momentum_MACD-Hist_21-55-9 (full)
+14:21:29 [INFO] [L6.5] raw-sink heartbeat: tasks 188/496 (37.9%), groups 174/482, elapsed=339.0s, rate=0.55/s, ETA=555s, rss=1554MB, last=1h_L1_momentum_MACD-Signal_13-34-9 (full)
+14:21:31 [INFO] [L6.5] raw-sink heartbeat: tasks 212/496 (42.7%), groups 198/482, elapsed=341.2s, rate=0.62/s, ETA=457s, rss=1554MB, last=1h_L1_momentum_MACDEXT-Hist_8-34-9 (full)
+14:21:34 [INFO] [L6.5] raw-sink heartbeat: tasks 236/496 (47.6%), groups 222/482, elapsed=343.4s, rate=0.69/s, ETA=378s, rss=1554MB, last=1h_L1_momentum_MACDEXT-Signal_55-233-34 (full)
+14:21:36 [INFO] [L6.5] raw-sink heartbeat: tasks 260/496 (52.4%), groups 246/482, elapsed=345.6s, rate=0.75/s, ETA=314s, rss=1554MB, last=1h_L1_momentum_STOCHRSI-fastk_14-5-3-0 (full)
+14:21:37 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MFI src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:38 [INFO] [L6.5] raw-sink heartbeat: tasks 284/496 (57.3%), groups 270/482, elapsed=347.7s, rate=0.82/s, ETA=260s, rss=1554MB, last=1h_L1_momentum_STOCH-slowk_13-5-0-3-0 (full)
+14:21:40 [INFO] [L6.5] raw-sink heartbeat: tasks 308/496 (62.1%), groups 294/482, elapsed=349.7s, rate=0.88/s, ETA=213s, rss=1554MB, last=1h_L1_momentum_STOCHF-fastk_55-5-0 (full)
+14:21:41 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_12-26-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:41 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_13-34-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:41 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_13-55-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:41 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_21-55-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_21-89-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_34-144-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_34-89-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_5-13-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_5-21-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_55-144-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] raw-sink heartbeat: tasks 332/496 (66.9%), groups 318/482, elapsed=351.7s, rate=0.94/s, ETA=174s, rss=1554MB, last=4h_L1_momentum_APO_55-144-0 (native-tf, parts=1)
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_55-233-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_8-21-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_APO_8-34-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_12-26-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_13-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:42 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_13-55-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_21-55-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_21-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_34-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_34-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_5-13-3 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_5-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_55-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_55-233-34 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_8-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Hist_8-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_12-26-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_13-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:43 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_13-55-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_21-55-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_21-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_34-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_34-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_5-13-3 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] raw-sink heartbeat: tasks 356/496 (71.8%), groups 342/482, elapsed=353.7s, rate=1.01/s, ETA=139s, rss=1554MB, last=4h_L1_momentum_MACD-Line_5-13-3 (native-tf, parts=1)
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_5-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_55-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_55-233-34 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_8-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Line_8-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_12-26-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:44 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_13-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_13-55-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_21-55-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_21-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_34-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_34-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_5-13-3 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_5-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_55-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_55-233-34 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_8-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACD-Signal_8-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:45 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_12-26-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_13-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_13-55-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_21-55-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_21-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_34-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] raw-sink heartbeat: tasks 380/496 (76.6%), groups 366/482, elapsed=355.6s, rate=1.07/s, ETA=109s, rss=1188MB, last=4h_L1_momentum_MACDEXT-Hist_34-144-21 (native-tf, parts=1)
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_34-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_5-13-3 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_5-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_55-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_55-233-34 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_8-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Hist_8-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:46 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_12-26-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_13-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_13-55-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_21-55-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_21-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_34-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_34-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_5-13-3 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_5-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_55-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_55-233-34 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_8-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:47 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Line_8-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_12-26-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_13-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_13-55-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_21-55-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] raw-sink heartbeat: tasks 404/496 (81.5%), groups 390/482, elapsed=357.6s, rate=1.13/s, ETA=81s, rss=1187MB, last=4h_L1_momentum_MACDEXT-Signal_21-55-9 (native-tf, parts=1)
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_21-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_34-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_34-89-13 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_5-13-3 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_5-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_55-144-21 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_55-233-34 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_8-21-5 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:48 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_MACDEXT-Signal_8-34-9 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_12-26-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_13-34-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_13-55-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_21-55-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_21-89-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_34-144-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_34-89-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_5-13-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_5-21-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_55-144-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_55-233-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:49 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_8-21-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_PPO_8-34-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_14-3-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_14-5-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] raw-sink heartbeat: tasks 428/496 (86.3%), groups 414/482, elapsed=359.5s, rate=1.19/s, ETA=57s, rss=1178MB, last=4h_L1_momentum_STOCHRSI-fastd_14-5-3-0 (native-tf, parts=1)
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_21-5-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_21-8-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_34-8-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_55-8-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastd_9-5-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_14-3-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_14-5-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_21-5-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:50 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_21-8-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_34-8-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_55-8-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHRSI-fastk_9-5-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_HT-TRENDLINE src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MAMA-FAMA_0.5-0.05 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_MAMA_0.5-0.05 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_BOP src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_13-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_13-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_21-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_21-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_21-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:51 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_34-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_34-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_5-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] raw-sink heartbeat: tasks 452/496 (91.1%), groups 438/482, elapsed=361.4s, rate=1.25/s, ETA=35s, rss=1175MB, last=4h_L1_momentum_STOCH-slowd_5-3-0-3-0 (native-tf, parts=1)
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_55-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_55-8-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_8-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowd_89-8-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_13-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_13-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_21-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_21-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_21-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_34-5-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:52 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_34-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_5-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_55-5-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_55-8-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_8-3-0-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCH-slowk_89-8-0-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_13-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_21-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_21-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_34-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_5-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_55-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:53 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_8-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastd_89-8-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] raw-sink heartbeat: tasks 476/496 (96.0%), groups 462/482, elapsed=363.3s, rate=1.31/s, ETA=15s, rss=1175MB, last=4h_L1_momentum_STOCHF-fastd_89-8-0 (native-tf, parts=1)
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_13-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_21-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_21-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_34-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_5-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_55-5-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_8-3-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_STOCHF-fastk_89-8-0 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_13-21-55 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_13-34-89 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_21-34-89 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:54 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_21-55-144 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_34-55-144 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_34-89-233 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_5-10-20 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_5-13-26 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_7-14-28 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_momentum_ULTOSC_8-21-55 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_SAREXT_0-0-0.02-0.02-0.2-0.02-0.02-0.2 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] native-tf path completed: group=4h_L1_trend_SAR_0.02-0.2 src_tf=4h primary_tf=1h native_rows=5086 primary_rows=20342 outputs=1
+14:21:55 [INFO] [L6.5] raw-sink heartbeat: tasks 496/496 (100.0%), groups 482/482, elapsed=364.9s, rate=1.36/s, ETA=0s, rss=1174MB, last=4h_L1_trend_SAR_0.02-0.2 (native-tf, parts=1)
+14:21:55 [INFO] [L6.5] raw-sink complete: 482/482 groups in 364.94s rss=1174MB
+14:21:55 [INFO] [Layer B Sanitize][CGSA] nulled 4882104 non-finite/over-cap values (finite_cap=1e+18) across all streamed features
+14:21:56 [INFO] [L7_raw] registry stream persist done: symbol=BTCUSDT tf=1h groups=490 features=75416 npy_freed=3.57 GiB dtype=mixed
+14:21:56 [INFO] Loaded feature registry with 1 entries
+14:21:56 [INFO] [multi_tf:complete] 100% - [CGSA] MultiTF generation completed (514.36s)
+PASSED                                                                   [100%]
+
+=============================== warnings summary ===============================
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+  /Users/louis/Desktop/quantitative_trading_system/tests/feature_engineering/ff_truncation_mr_helpers.py:1420: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '[1077746.7421875 1077815.2578125 1076793.1015625 1076618.59375
+   1076743.2265625 1076834.046875  1076878.2265625 1076960.4296875
+   1076786.8125    1077066.421875 ]' has dtype incompatible with float32, please explicitly cast to a compatible dtype first.
+    out.iloc[-k:, out.columns.get_loc(col)] = out.iloc[-k:][col].astype(float).to_numpy() + delta
+
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+  /Users/louis/Desktop/quantitative_trading_system/tests/feature_engineering/ff_truncation_mr_helpers.py:1420: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '[1078265.34375   1077827.171875  1076868.0078125 1076990.4296875
+   1076890.9921875 1076894.703125  1077067.796875  1076981.53125
+   1077082.78125   1077450.       ]' has dtype incompatible with float32, please explicitly cast to a compatible dtype first.
+    out.iloc[-k:, out.columns.get_loc(col)] = out.iloc[-k:][col].astype(float).to_numpy() + delta
+
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+  /Users/louis/Desktop/quantitative_trading_system/tests/feature_engineering/ff_truncation_mr_helpers.py:1420: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '[1077680.        1076564.328125  1076546.        1076618.59375
+   1076668.5234375 1076459.640625  1076844.15625   1076786.796875
+   1076763.7109375 1077018.5625   ]' has dtype incompatible with float32, please explicitly cast to a compatible dtype first.
+    out.iloc[-k:, out.columns.get_loc(col)] = out.iloc[-k:][col].astype(float).to_numpy() + delta
+
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+  /Users/louis/Desktop/quantitative_trading_system/tests/feature_engineering/ff_truncation_mr_helpers.py:1420: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '[1077815.25      1076793.09375   1076618.59375   1076743.2421875
+   1076834.0625    1076878.0703125 1076960.4296875 1076786.8125
+   1077066.421875  1077371.3203125]' has dtype incompatible with float32, please explicitly cast to a compatible dtype first.
+    out.iloc[-k:, out.columns.get_loc(col)] = out.iloc[-k:][col].astype(float).to_numpy() + delta
+
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails
+  /Users/louis/Desktop/quantitative_trading_system/tests/feature_engineering/ff_truncation_mr_helpers.py:1420: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise an error in a future version of pandas. Value '[1000744.42828369 1001882.1706543  1000809.46496582 1000874.80560303
+   1000361.97329712 1000598.68005371 1000310.80764771 1000223.94467163
+   1000364.86358643 1000438.27301025]' has dtype incompatible with float32, please explicitly cast to a compatible dtype first.
+    out.iloc[-k:, out.columns.get_loc(col)] = out.iloc[-k:][col].astype(float).to_numpy() + delta
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 1 passed, 20 warnings in 2311.42s (0:38:31) ==================
+PYTEST_RC=0
+Fri Oct  2 14:22:27 CST 2026

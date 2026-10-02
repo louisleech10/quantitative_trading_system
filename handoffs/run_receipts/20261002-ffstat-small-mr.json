@@ -1,0 +1,67 @@
+{
+ "schema_version": 1,
+ "command": "zsh run_ids.sh <段名> <node id 清單>（python -m pytest <node ids> -rfE -p no:cacheprovider；六段串行、獨占機器）",
+ "exit_code": 0,
+ "spec": "docs/FFSTAT_SPEC.md v61 Task 4.2（本機縮小版全鏈截斷 MR）",
+ "host": "8GB／8 核本機；BTCUSDT data_cache/feature_klines/kline_cache.h5（1h 20,352 根）",
+ "logs": "handoffs/run_receipts/20261002-ffstat-small-mr-{s1,s2,m1,m2,m3,m4}.log",
+ "code_versions": {
+  "s1、s2、m1": "commit 1d09aaa4／2fe07ae3 之測試碼（v60：NaN mask 仍為分層規則；尾擾動版長度耦合控制仍在）",
+  "m2、m3、m4": "commit ab94ec28 之測試碼（v61：NaN mask 雙方向全等；尾擾動版長度耦合控制已撤除）"
+ },
+ "segments": [
+  {"name": "s1", "start": "2026-10-02 08:37:33", "seconds": 2697.21, "summary": "1 failed, 5 passed, 1 xfailed",
+   "nodes": {
+    "tests/feature_engineering/test_ff_truncation_capture_boundary.py::test_fracdiff_atol_values_gate_failure_is_accepted": "PASSED",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_c2_1_fullchain_bar_truncation_invariant": "PASSED",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_c2_2_tail_perturbation_prefix_invariant": "PASSED",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_fracdiff_truncation_invariant": "PASSED（v60 起一般測試；既有檔為 strict xfail）",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_fracdiff_tail_perturbation_invariant": "XFAIL（既有 storage codec 原因；strict）",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_fracdiff_maxlag_len_coupling_truncation_fails": "PASSED（mutant 被抓到）",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_fracdiff_maxlag_len_coupling_tail_fails": "FAILED：失敗只由 _assert_values_gate 拋出（rel 4.2e-4；d* 與欄集合不變），而尾擾動基線本即 codec 值 gate 失敗 ⇒ 不可判別；v61 撤除（諮詢 r1 三家共識）"
+   },
+   "nan_mask_informational_lines": 0},
+  {"name": "s2", "start": "2026-10-02 09:23:22", "seconds": 2647.97, "summary": "1 failed, 5 passed",
+   "nodes": {
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_fracdiff_maxlag_len_coupling_parallel_fails": "PASSED（mutant 被抓到；並行路徑被走）",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_numba_rolling_center_true_fails": "FAILED：DID NOT RAISE——舊 NaN mask 分層規則只印 informational（full=1.000、trunc=0.700）⇒ 洩漏漏測；v61 收緊 gate 後於 m2 重跑 PASSED",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_causal_winsor_full_fit_fails": "PASSED（mutant 被抓到）",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails": "PASSED（mutant 被抓到）",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_fracdiff_calibration_perturb_fails": "PASSED（起始日之前前史被擾動；失敗屬 strict 欄集合或 d*）",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_fracdiff_full_fit_d_star_fails": "PASSED（失敗屬 strict 欄集合或 d*）"
+   },
+   "nan_mask_informational_lines": 236, "nan_mask_informational_note": "全數來自置中窗 mutant（L3 W13 Mean 欄）"},
+  {"name": "m1", "start": "2026-10-02 10:09:22", "seconds": 4582.34, "summary": "2 passed",
+   "nodes": {
+    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_c3_multitf_truncation_invariant": "PASSED",
+    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_c3_multitf_tail_perturbation_prefix_invariant": "PASSED"
+   },
+   "nan_mask_informational_lines": 0, "note": "以舊分層規則執行；informational 0 行 ⇒ v61 雙方向全等規則下同樣通過（舊規則只在 mask 不同時印此行）"},
+  {"name": "m2", "start": "2026-10-02 11:26:25", "seconds": 5054.17, "summary": "3 passed",
+   "nodes": {
+    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_align_lookahead_fails": "PASSED（oracle 偵測到粗週期邊界差異；mutant 被抓到）",
+    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_align_lookahead_with_tail_perturb_fails": "PASSED（同上，含尾擾動）",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_numba_rolling_center_true_fails": "PASSED（v61 gate 下重跑；s2 之存活已閉合）"
+   }},
+  {"name": "m3", "start": "2026-10-02 12:51:08", "seconds": 3142.87, "summary": "2 passed",
+   "nodes": {
+    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_numba_rolling_center_true_fails": "PASSED（mutant 被抓到）",
+    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_causal_winsor_full_fit_fails": "PASSED（mutant 被抓到）"
+   }},
+  {"name": "m4", "start": "2026-10-02 13:43:52", "seconds": 2311.42, "summary": "1 passed",
+   "nodes": {
+    "tests/feature_engineering/test_ff_multitf_truncation_small_mr.py::test_small_mutation_l4_lag_shift_minus_one_fails": "PASSED（mutant 被抓到）"
+   }}
+ ],
+ "final_status_by_v61_node": {
+  "single_tf_total": 11, "single_tf_passed": 10, "single_tf_xfail": 1,
+  "multi_tf_total": 7, "multi_tf_passed": 7,
+  "capture_boundary": "tests/feature_engineering/test_ff_truncation_capture_boundary.py 12 passed（秒級；舊分層規則 mutant 下 mask 不對稱兩例紅）"
+ },
+ "honest_bounds": [
+  "s1、s2、m1 以 v60 測試碼執行；其中 v61 仍存在之 node 之結果於 v61 下不變之依據：基線之 informational 行數為 0（v61 只把 informational 改為失敗）；被抓到之 mutant 於較嚴 gate 下仍被抓到（捕獲判定之允許 gate 集合未縮）。v61 之置中窗 mutant 於 m2 以 v61 碼重跑。",
+  "每個負控制之「失敗由允許之因果 gate 拋出」由測試內 `_expect_causal_gate_failure` 斷言保證（不成立即 FAILED）；各 node 之確切拋出 gate 名與訊息未逐一寫入 log（測試以 -rfE 執行，回傳值未列印）。",
+  "縮小設定（L1 trend＋momentum、close＋volume、L3 5／13）：證具名缺陷集合之鑑別力；不證未選指標／參數、跨來源、12h 對齊與全設定等價；既有兩檔完整版登 RM-FULLSCALE ④⑤。",
+  "分母尺度全欄中位數 mutant 不在本 MR（v60 撤除；前置收據 20261002-ffstat-small-mr-prerun.json），由 tests/feature_engineering/test_ffstat_stable_start.py::test_mutation_denominator_full_column_median_is_caught 承接。"
+ ]
+}
