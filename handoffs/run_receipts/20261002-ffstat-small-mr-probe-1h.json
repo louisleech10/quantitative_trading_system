@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "command": "small_mr_probe.py trend_momentum_cv",
+  "exit_code": 0,
+  "candidate": "trend_momentum_cv",
+  "payload": {
+    "timeframes": {
+      "primary": "1h",
+      "training": [
+        "1h"
+      ],
+      "alignment_mode": "open_minus"
+    },
+    "cross_sectional": {
+      "enabled": false
+    },
+    "atomic_indicators": {
+      "trend": {
+        "enabled": true
+      },
+      "momentum": {
+        "enabled": true
+      },
+      "volatility": {
+        "enabled": false
+      },
+      "volume": {
+        "enabled": false
+      },
+      "statistics": {
+        "enabled": false
+      },
+      "cycle": {
+        "enabled": false
+      },
+      "pattern": {
+        "enabled": false
+      },
+      "tail_risk": {
+        "enabled": false
+      },
+      "microstructure": {
+        "enabled": false
+      },
+      "entropy": {
+        "enabled": false
+      }
+    },
+    "preprocessing": {
+      "enabled": true,
+      "mode": "append",
+      "causal_preprocessing": true,
+      "winsorization": {
+        "enabled": true
+      },
+      "rank_transform": {
+        "enabled": true
+      },
+      "adaptive_zscore": {
+        "enabled": true,
+        "windows": [
+          20,
+          30,
+          40,
+          50,
+          60,
+          70,
+          80,
+          90,
+          100,
+          120,
+          140,
+          160,
+          180,
+          200,
+          220,
+          240,
+          260,
+          280,
+          320,
+          360
+        ]
+      },
+      "gaussian_normalize": {
+        "enabled": true
+      },
+      "adf_differencing": {
+        "enabled": false
+      },
+      "fractional_differencing": {
+        "enabled": false
+      }
+    },
+    "nan_strategy": {
+      "l7_dead_feature_drop": {
+        "enabled": false
+      }
+    },
+    "data_sources": {
+      "enabled_sources": [
+        "close",
+        "volume"
+      ],
+      "synthetic_sources": []
+    },
+    "rolling_aggregation": {
+      "enabled": true,
+      "windows": [
+        5,
+        13
+      ]
+    },
+    "operators": {
+      "enabled": true,
+      "worldquant": {
+        "enabled": false
+      }
+    },
+    "lag_features": {
+      "enabled": true
+    }
+  },
+  "window_bars": 3594,
+  "status": "pass",
+  "error": null,
+  "seconds_generation_pair": 519.9,
+  "seconds_total": 528.6,
+  "full_columns_by_layer": {
+    "L1": 898,
+    "L2": 11621,
+    "L3": 17956,
+    "L4": 7224,
+    "L6": 10
+  },
+  "full_rows": 3594,
+  "warmup": 3564,
+  "n_trunc": 3584,
+  "peak_rss_bytes": 3013869568,
+  "wall_seconds": 534.83,
+  "measured_by": "/usr/bin/time -l（外層，獨占機器）",
+  "host": "8GB／8 核本機"
+}

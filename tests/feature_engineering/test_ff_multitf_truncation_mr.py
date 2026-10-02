@@ -13,12 +13,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from momentum.FeatureEngineering.operators.lag_processor import LagProcessor
-from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
-from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 from momentum.factories import create_kline_storage_manager
 
 from tests.feature_engineering.ff_truncation_mr_helpers import (
+    MRScope,
+    run_control_align_lookahead,
+    run_control_align_lookahead_with_tail_perturb,
+    run_control_causal_winsor_full_fit,
+    run_control_l4_lag_shift_minus_one,
+    run_control_numba_rolling_center_true,
     ALIGN_MARGIN,
     GenerationArtifacts,
     KLINE_CACHE_DIR,
@@ -31,13 +34,11 @@ from tests.feature_engineering.ff_truncation_mr_helpers import (
     _assert_truncation_invariants,
     _assert_values_gate_main,
     _assert_warmup_nan_masks_equal,
-    _bar_window_dates_at_12h_boundary,
     _build_column_frame_map,
     _build_sampled_columns,
     _build_truncation_pair,
     _coarse_tf_from_column,
     _ensure_module_env,
-    _ORIGINAL_BUILD_ASOF_INDEX_MAP,
     _patch_kline_tail_ohlcv,
     _required_window_bars,
     _values_gate_mr_config_payload,
@@ -140,203 +141,38 @@ def test_c3_multitf_tail_perturbation_prefix_invariant(
     )
 
 
-def test_mutation_align_lookahead_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-    multitf_window_bars: int,
-) -> None:
+# FFSTAT SPEC v60 Task 4.2：負控制本體移入 ff_truncation_mr_helpers（與縮小版共用；寬捕獲於共用本體修正）。
+# 本檔以全設定 1h＋4h＋12h 呼叫；本機 1h 資料長度不足（需 ≥ 34,302 根）且記憶體不足，完整版登大機器驗證清單。
+FULL_MULTITF_SCOPE = MRScope(
+    values_payload=lambda: _multitf_config_payload(),
+    fracdiff_payload=lambda: _multitf_config_payload(),
+    primary_tf=PRIMARY_TF,
+    training_tfs=tuple(TRAINING_TFS),
+    align_coarse_tfs=tuple(ALIGN_COARSE_TFS),
+    align_margin=ALIGN_MARGIN,
+)
+
+
+def test_mutation_align_lookahead_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """M3-1：對齊 build_asof_index_map +1 forward 偏置（僅 trunc 側）→ MR/oracle 必 FAIL。"""
-    # 靜態探針錨：顯式觸碰對齊層；實際注入由 align_lookahead_side 不對稱切換
-    monkeypatch.setattr(
-        TimeframeAligner,
-        "build_asof_index_map",
-        staticmethod(_ORIGINAL_BUILD_ASOF_INDEX_MAP),
-    )
-    pair = _build_truncation_pair(
-        tmp_path / "features",
-        kline_df_module,
-        config_payload=_multitf_config_payload(),
-        primary_tf=PRIMARY_TF,
-        training_tfs=TRAINING_TFS,
-        window_bars=multitf_window_bars,
-        align_margin=ALIGN_MARGIN,
-        window_date_fn=_bar_window_dates_at_12h_boundary,
-        align_lookahead_side="trunc",
-        monkeypatch=monkeypatch,
-    )
-    _assert_align_coarse_boundary_lookahead_detected(
-        pair, align_coarse_tfs=ALIGN_COARSE_TFS
-    )
-    with pytest.raises(AssertionError):
-        _assert_truncation_invariants(
-            pair,
-            align_coarse_tfs=ALIGN_COARSE_TFS,
-            expected_training_tfs=EXPECTED_TRAINING_TFS,
-        )
+    run_control_align_lookahead(FULL_MULTITF_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_align_lookahead_with_tail_perturb_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-    multitf_window_bars: int,
-) -> None:
+def test_mutation_align_lookahead_with_tail_perturb_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """M3-2：align lookahead（僅 trunc 側）+ 尾 k OHLCV ±1e6 → MR/oracle 必 FAIL。"""
-    monkeypatch.setattr(
-        TimeframeAligner,
-        "build_asof_index_map",
-        staticmethod(_ORIGINAL_BUILD_ASOF_INDEX_MAP),
-    )
-    pair = _build_truncation_pair(
-        tmp_path / "features",
-        kline_df_module,
-        config_payload=_multitf_config_payload(),
-        primary_tf=PRIMARY_TF,
-        training_tfs=TRAINING_TFS,
-        window_bars=multitf_window_bars,
-        align_margin=ALIGN_MARGIN,
-        window_date_fn=_bar_window_dates_at_12h_boundary,
-        patch_fetch=lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA),
-        align_lookahead_side="trunc",
-        monkeypatch=monkeypatch,
-    )
-    _assert_align_coarse_boundary_lookahead_detected(
-        pair, align_coarse_tfs=ALIGN_COARSE_TFS
-    )
-    with pytest.raises(AssertionError):
-        _assert_truncation_invariants(
-            pair,
-            align_coarse_tfs=ALIGN_COARSE_TFS,
-            expected_training_tfs=EXPECTED_TRAINING_TFS,
-        )
+    run_control_align_lookahead_with_tail_perturb(FULL_MULTITF_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_numba_rolling_center_true_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-    multitf_window_bars: int,
-) -> None:
-    """B2 mutant①（multi-TF config）：L3 center=True → 截斷 MR 必 FAIL。"""
-    import momentum.FeatureEngineering.operators.numba_rolling as numba_rolling
-
-    original_multi = numba_rolling.fused_rolling_stats_multi_window
-
-    def _centered_multi(values: np.ndarray, windows: np.ndarray) -> np.ndarray:
-        output = original_multi(values, windows)
-        series = pd.Series(np.asarray(values, dtype=np.float64))
-        for widx in range(windows.shape[0]):
-            window = int(windows[widx])
-            if window <= 0:
-                continue
-            output[:, widx, 0] = series.rolling(window, center=True, min_periods=window).mean().to_numpy()
-        return output
-
-    monkeypatch.setattr(numba_rolling, "fused_rolling_stats_multi_window", _centered_multi)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_multitf_config_payload(),
-            primary_tf=PRIMARY_TF,
-            training_tfs=TRAINING_TFS,
-            window_bars=multitf_window_bars,
-            align_margin=ALIGN_MARGIN,
-            monkeypatch=monkeypatch,
-        )
-        _assert_truncation_invariants(
-            pair,
-            align_coarse_tfs=ALIGN_COARSE_TFS,
-            expected_training_tfs=EXPECTED_TRAINING_TFS,
-        )
+def test_mutation_numba_rolling_center_true_fails(monkeypatch, tmp_path, kline_df_module) -> None:
+    run_control_numba_rolling_center_true(FULL_MULTITF_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_causal_winsor_full_fit_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-    multitf_window_bars: int,
-) -> None:
-    """B2 mutant②（multi-TF config）：causal winsor 全量 fit → 截斷 MR 必 FAIL。"""
-    def _full_fit_winsor(self: FeaturePreprocessor, df: pd.DataFrame) -> pd.DataFrame:
-        apply_to = self.winsor_config.get("apply_to", "all")
-        columns = self._select_columns(df, apply_to)
-        if not columns:
-            return df
-        result = df.copy()
-        selected = result.loc[:, columns].astype(float)
-        mean = selected.mean()
-        std = selected.std()
-        lower = mean - float(self.winsor_config.get("sigma_k", 3.0)) * std
-        upper = mean + float(self.winsor_config.get("sigma_k", 3.0)) * std
-        result.loc[:, columns] = selected.clip(lower=lower, upper=upper, axis=1).astype(np.float32)
-        return result
-
-    monkeypatch.setattr(FeaturePreprocessor, "_apply_winsorization", _full_fit_winsor)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_multitf_config_payload(),
-            primary_tf=PRIMARY_TF,
-            training_tfs=TRAINING_TFS,
-            window_bars=multitf_window_bars,
-            align_margin=ALIGN_MARGIN,
-            monkeypatch=monkeypatch,
-        )
-        _assert_truncation_invariants(
-            pair,
-            align_coarse_tfs=ALIGN_COARSE_TFS,
-            expected_training_tfs=EXPECTED_TRAINING_TFS,
-        )
+def test_mutation_causal_winsor_full_fit_fails(monkeypatch, tmp_path, kline_df_module) -> None:
+    run_control_causal_winsor_full_fit(FULL_MULTITF_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_l4_lag_shift_minus_one_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-    multitf_window_bars: int,
-) -> None:
-    """B2 mutant③（multi-TF config）：L4 shift(-lag) → 尾端擾動前綴 MR 必 FAIL。"""
-    original_compute_all = LagProcessor.compute_all
-    original_shift = pd.DataFrame.shift
-
-    def _lookahead_compute_all(self: LagProcessor, features_df: pd.DataFrame) -> pd.DataFrame:
-        def _inverted_shift(
-            df: pd.DataFrame,
-            periods: int = 1,
-            *args: Any,
-            **kwargs: Any,
-        ) -> pd.DataFrame:
-            if isinstance(periods, int) and periods > 0:
-                return original_shift(df, -periods, *args, **kwargs)
-            return original_shift(df, periods, *args, **kwargs)
-
-        pd.DataFrame.shift = _inverted_shift  # type: ignore[method-assign]
-        try:
-            return original_compute_all(self, features_df)
-        finally:
-            pd.DataFrame.shift = original_shift  # type: ignore[method-assign]
-
-    monkeypatch.setattr(LagProcessor, "compute_all", _lookahead_compute_all)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_multitf_config_payload(),
-            primary_tf=PRIMARY_TF,
-            training_tfs=TRAINING_TFS,
-            window_bars=multitf_window_bars,
-            align_margin=ALIGN_MARGIN,
-            patch_fetch=lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA),
-            monkeypatch=monkeypatch,
-        )
-        _assert_truncation_invariants(
-            pair,
-            align_coarse_tfs=ALIGN_COARSE_TFS,
-            expected_training_tfs=EXPECTED_TRAINING_TFS,
-        )
+def test_mutation_l4_lag_shift_minus_one_fails(monkeypatch, tmp_path, kline_df_module) -> None:
+    run_control_l4_lag_shift_minus_one(FULL_MULTITF_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
 def test_multitf_sampling_helper_smoke(tmp_path: Path) -> None:

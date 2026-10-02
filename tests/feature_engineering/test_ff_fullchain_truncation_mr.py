@@ -13,23 +13,20 @@ L7 dead_drop 在測試 config 關閉：其 min_valid 依總列數，非因果計
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, List
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from momentum.FeatureEngineering.operators.lag_processor import LagProcessor
-from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 from momentum.factories import create_kline_storage_manager
 
 from tests.feature_engineering.ff_truncation_mr_helpers import (
-    FRACDIFF_ATOL,
     KLINE_CACHE_DIR,
     PERTURB_DELTA,
     SYMBOL,
     TIMEFRAME,
     TRUNC_K,
+    MRScope,
     TruncationPair,
     _assert_fracdiff_truncation_invariants,
     _assert_mutation_layer_coverage,
@@ -42,10 +39,15 @@ from tests.feature_engineering.ff_truncation_mr_helpers import (
     _ensure_module_env,
     _fracdiff_mr_config_payload,
     _fracdiff_window_bars,
-    _patch_kline_calibration_ohlcv,
     _patch_kline_tail_ohlcv,
     _required_window_bars,
     _values_gate_mr_config_payload,
+    run_control_causal_winsor_full_fit,
+    run_control_fracdiff_calibration_perturb,
+    run_control_fracdiff_full_fit_d_star,
+    run_control_fracdiff_maxlag_len_coupling,
+    run_control_l4_lag_shift_minus_one,
+    run_control_numba_rolling_center_true,
 )
 
 pytestmark = [pytest.mark.requires_kline, pytest.mark.slow]
@@ -156,305 +158,49 @@ def test_fracdiff_tail_perturbation_invariant(
     _assert_fracdiff_truncation_invariants(pair)
 
 
-def test_mutation_fracdiff_maxlag_len_coupling_truncation_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-) -> None:
-    """fracdiff mutant：max_lag 回到 len(df)//10 → 截斷 MR 必 FAIL。"""
-    original_apply = FeaturePreprocessor._apply_fractional_differencing
-    lengths_seen: List[int] = []
-
-    def _mutant_apply(
-        self: FeaturePreprocessor,
-        df: pd.DataFrame,
-        source_layer: str | None = None,
-    ) -> pd.DataFrame:
-        lengths_seen.append(len(df))
-        monkeypatch.setattr(
-            self,
-            "_resolve_fracdiff_max_lag",
-            lambda: min(max(2, len(df) // 10), 252),
-        )
-        return original_apply(self, df, source_layer=source_layer)
-
-    monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing", _mutant_apply)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_fracdiff_mr_config_payload(),
-            window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
-            d_star_parent=tmp_path / "dstar_mut_len",
-            monkeypatch=monkeypatch,
-        )
-        _assert_fracdiff_truncation_invariants(pair)
-    window_bars = _fracdiff_window_bars(_fracdiff_mr_config_payload())
-    assert {window_bars - TRUNC_K, window_bars}.issubset(set(lengths_seen))
+# FFSTAT SPEC v60 Task 4.2：負控制本體移入 ff_truncation_mr_helpers（與縮小版共用；改前寫法之寬捕獲、max_lag 252 飽和、
+# 校準擾動落在公開域三缺陷於共用本體修正）。本檔以全設定呼叫；本機 8GB 無法執行，完整版登大機器驗證清單。
+FULL_SCOPE = MRScope(values_payload=_values_gate_mr_config_payload, fracdiff_payload=_fracdiff_mr_config_payload)
 
 
-def test_mutation_fracdiff_maxlag_len_coupling_tail_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-) -> None:
-    """fracdiff mutant：max_lag 回到 len(df)//10 → 尾端擾動 MR 必 FAIL。"""
-    original_apply = FeaturePreprocessor._apply_fractional_differencing
-    lengths_seen: List[int] = []
-
-    def _mutant_apply(
-        self: FeaturePreprocessor,
-        df: pd.DataFrame,
-        source_layer: str | None = None,
-    ) -> pd.DataFrame:
-        lengths_seen.append(len(df))
-        monkeypatch.setattr(
-            self,
-            "_resolve_fracdiff_max_lag",
-            lambda: min(max(2, len(df) // 10), 252),
-        )
-        return original_apply(self, df, source_layer=source_layer)
-
-    monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing", _mutant_apply)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_fracdiff_mr_config_payload(),
-            window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
-            d_star_parent=tmp_path / "dstar_mut_len_tail",
-            patch_fetch=lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA),
-            monkeypatch=monkeypatch,
-        )
-        _assert_fracdiff_truncation_invariants(pair)
-    window_bars = _fracdiff_window_bars(_fracdiff_mr_config_payload())
-    assert {window_bars - TRUNC_K, window_bars}.issubset(set(lengths_seen))
+def test_mutation_fracdiff_maxlag_len_coupling_truncation_fails(monkeypatch, tmp_path, kline_df_module) -> None:
+    """fracdiff mutant：max_lag 依當次長度（不設上限）→ 截斷 MR 必 FAIL。"""
+    run_control_fracdiff_maxlag_len_coupling(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_fracdiff_maxlag_len_coupling_parallel_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-) -> None:
+def test_mutation_fracdiff_maxlag_len_coupling_tail_fails(monkeypatch, tmp_path, kline_df_module) -> None:
+    """fracdiff mutant：max_lag 依當次長度 → 尾端擾動 MR 必 FAIL（只承認值 gate 之前之失敗）。"""
+    run_control_fracdiff_maxlag_len_coupling(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module, tail_perturb=True)
+
+
+def test_mutation_fracdiff_maxlag_len_coupling_parallel_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """fracdiff mutant：parallel slow path 也必須吃到 resolver seam。"""
-    original_apply = FeaturePreprocessor._apply_fractional_differencing
-    parallel_calls: List[int] = []
-    lengths_seen: List[int] = []
-
-    def _mutant_apply(
-        self: FeaturePreprocessor,
-        df: pd.DataFrame,
-        source_layer: str | None = None,
-    ) -> pd.DataFrame:
-        lengths_seen.append(len(df))
-        monkeypatch.setattr(
-            self,
-            "_resolve_fracdiff_max_lag",
-            lambda: min(max(2, len(df) // 10), 252),
-        )
-        return original_apply(self, df, source_layer=source_layer)
-
-    def _force_parallel(self: FeaturePreprocessor) -> int:
-        return 2
-
-    original_parallel = FeaturePreprocessor._apply_fractional_differencing_parallel
-
-    def _parallel_spy(self: FeaturePreprocessor, *args: Any, **kwargs: Any) -> pd.DataFrame:
-        parallel_calls.append(int(kwargs.get("n_jobs", 0)))
-        return original_parallel(self, *args, **kwargs)
-
-    monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing", _mutant_apply)
-    monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", _force_parallel)
-    monkeypatch.setattr(
-        FeaturePreprocessor,
-        "_apply_fractional_differencing_parallel",
-        _parallel_spy,
-    )
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_fracdiff_mr_config_payload(),
-            window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
-            d_star_parent=tmp_path / "dstar_mut_len_parallel",
-            monkeypatch=monkeypatch,
-        )
-        _assert_fracdiff_truncation_invariants(pair)
-    window_bars = _fracdiff_window_bars(_fracdiff_mr_config_payload())
-    assert {window_bars - TRUNC_K, window_bars}.issubset(set(lengths_seen))
-    assert parallel_calls and max(parallel_calls) > 1
+    run_control_fracdiff_maxlag_len_coupling(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module, parallel=True)
 
 
-def test_mutation_numba_rolling_center_true_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-) -> None:
+def test_mutation_numba_rolling_center_true_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """C2 mutant①：L3 numba rolling 改 center=True → 截斷 MR 必 FAIL。"""
-    import momentum.FeatureEngineering.operators.numba_rolling as numba_rolling
-
-    original_multi = numba_rolling.fused_rolling_stats_multi_window
-
-    def _centered_multi(values: np.ndarray, windows: np.ndarray) -> np.ndarray:
-        output = original_multi(values, windows)
-        series = pd.Series(np.asarray(values, dtype=np.float64))
-        for widx in range(windows.shape[0]):
-            window = int(windows[widx])
-            if window <= 0:
-                continue
-            output[:, widx, 0] = series.rolling(window, center=True, min_periods=window).mean().to_numpy()
-        return output
-
-    monkeypatch.setattr(numba_rolling, "fused_rolling_stats_multi_window", _centered_multi)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_values_gate_mr_config_payload(),
-            monkeypatch=monkeypatch,
-        )
-        _assert_truncation_invariants(pair)
+    run_control_numba_rolling_center_true(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_causal_winsor_full_fit_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-) -> None:
+def test_mutation_causal_winsor_full_fit_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """C2 mutant②：causal winsor 改全量 fit → 截斷 MR 必 FAIL。"""
-    original = FeaturePreprocessor._apply_winsorization
-
-    def _full_fit_winsor(self: FeaturePreprocessor, df: pd.DataFrame) -> pd.DataFrame:
-        apply_to = self.winsor_config.get("apply_to", "all")
-        columns = self._select_columns(df, apply_to)
-        if not columns:
-            return df
-        result = df.copy()
-        selected = result.loc[:, columns].astype(float)
-        method = self.winsor_config.get("method", "sigma")
-        if method == "quantile":
-            qrange = self.winsor_config.get("quantile_range", [0.01, 0.99])
-            lower = selected.quantile(float(qrange[0]))
-            upper = selected.quantile(float(qrange[1]))
-            clipped = selected.clip(lower=lower, upper=upper, axis=1)
-        else:
-            mean = selected.mean()
-            std = selected.std()
-            lower = mean - float(self.winsor_config.get("sigma_k", 3.0)) * std
-            upper = mean + float(self.winsor_config.get("sigma_k", 3.0)) * std
-            clipped = selected.clip(lower=lower, upper=upper, axis=1)
-        result.loc[:, columns] = clipped.astype(np.float32)
-        return result
-
-    monkeypatch.setattr(FeaturePreprocessor, "_apply_winsorization", _full_fit_winsor)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_values_gate_mr_config_payload(),
-            monkeypatch=monkeypatch,
-        )
-        _assert_truncation_invariants(pair)
+    run_control_causal_winsor_full_fit(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_l4_lag_shift_minus_one_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-) -> None:
+def test_mutation_l4_lag_shift_minus_one_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """C2 mutant③：L4 lag shift(-lag)（含 fast path）→ 尾端擾動前綴 MR 必 FAIL。"""
-    original_compute_all = LagProcessor.compute_all
-    original_shift = pd.DataFrame.shift
-
-    def _lookahead_compute_all(self: LagProcessor, features_df: pd.DataFrame) -> pd.DataFrame:
-        """覆蓋 fast path 與 chunked path：所有 lag 產出走 shift(-lag)。"""
-
-        def _inverted_shift(
-            df: pd.DataFrame,
-            periods: int = 1,
-            *args: Any,
-            **kwargs: Any,
-        ) -> pd.DataFrame:
-            if isinstance(periods, int) and periods > 0:
-                return original_shift(df, -periods, *args, **kwargs)
-            return original_shift(df, periods, *args, **kwargs)
-
-        pd.DataFrame.shift = _inverted_shift  # type: ignore[method-assign]
-        try:
-            return original_compute_all(self, features_df)
-        finally:
-            pd.DataFrame.shift = original_shift  # type: ignore[method-assign]
-
-    monkeypatch.setattr(LagProcessor, "compute_all", _lookahead_compute_all)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_values_gate_mr_config_payload(),
-            patch_fetch=lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA),
-            monkeypatch=monkeypatch,
-        )
-        _assert_truncation_invariants(pair)
+    run_control_l4_lag_shift_minus_one(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_fracdiff_calibration_perturb_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-) -> None:
-    """fracdiff negative control：擾動 calibration 窗內 → fracdiff MR 必 FAIL。
-
-    合法觸發路徑有兩種：
-    1. columns gate failed (strict)：校準擾動改變 ADF/d* 搜尋，進而改變 fracdiff 適格欄集合。
-    2. d_star mismatch：欄集合尚相同時，直接由 d* 值 gate 攔截。
-    """
-    original_calibration = FeaturePreprocessor._calibration_series
-    calibration_calls: List[int] = [0]
-
-    def _calibration_spy(self: FeaturePreprocessor, series: pd.Series) -> pd.Series:
-        calibration_calls[0] += 1
-        return original_calibration(self, series)
-
-    monkeypatch.setattr(FeaturePreprocessor, "_calibration_series", _calibration_spy)
-    with pytest.raises(AssertionError, match=r"columns gate failed \(strict\)|d_star"):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_fracdiff_mr_config_payload(),
-            window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
-            d_star_parent=tmp_path / "dstar_mut_cal",
-            patch_fetch_full_only=lambda df: _patch_kline_calibration_ohlcv(
-                df,
-                window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
-                calibration_bars=500,
-                delta=PERTURB_DELTA,
-            ),
-            monkeypatch=monkeypatch,
-        )
-        _assert_fracdiff_truncation_invariants(pair)
-    assert calibration_calls[0] > 0, "fracdiff calibration path must be exercised"
+def test_mutation_fracdiff_calibration_perturb_fails(monkeypatch, tmp_path, kline_df_module) -> None:
+    """fracdiff negative control：擾動 full 側起始日之前之前史 → strict 欄集合或 d* gate 必 FAIL。"""
+    run_control_fracdiff_calibration_perturb(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
-def test_mutation_fracdiff_full_fit_d_star_fails(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-    kline_df_module: pd.DataFrame,
-) -> None:
+def test_mutation_fracdiff_full_fit_d_star_fails(monkeypatch, tmp_path, kline_df_module) -> None:
     """fracdiff negative control：d-star 改全量 fit → fracdiff MR 必 FAIL。"""
-    def _full_series(self: FeaturePreprocessor, series: pd.Series) -> pd.Series:
-        return series
-
-    monkeypatch.setattr(FeaturePreprocessor, "_calibration_series", _full_series)
-    with pytest.raises(AssertionError):
-        pair = _build_truncation_pair(
-            tmp_path / "features",
-            kline_df_module,
-            config_payload=_fracdiff_mr_config_payload(),
-            window_bars=_fracdiff_window_bars(_fracdiff_mr_config_payload()),
-            d_star_parent=tmp_path / "dstar_mut_full",
-            monkeypatch=monkeypatch,
-        )
-        _assert_fracdiff_truncation_invariants(pair)
+    run_control_fracdiff_full_fit_d_star(FULL_SCOPE, monkeypatch, tmp_path, kline_df_module)
 
 
 def test_b2_sampling_helper_smoke(tmp_path: Path) -> None:

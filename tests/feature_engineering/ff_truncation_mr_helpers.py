@@ -234,6 +234,32 @@ def _fracdiff_mr_config_payload() -> Dict[str, Any]:
     }
 
 
+_SMALL_MR_CATEGORIES = ("trend", "momentum")
+_SMALL_MR_SOURCES = ("close", "volume")
+_SMALL_MR_L3_WINDOWS = (5, 13)
+
+
+def _apply_small_mr_scope(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """FFSTAT SPEC v59 Task 4.2：只縮生成範圍（L1 類別、資料源、L3 窗），其餘沿用既有 payload。
+    L2 operators 開（worldquant 關）、L3 聚合器全部、L4 開——使 L3 center／L4 shift mutant 之 seam 在場。"""
+    payload["atomic_indicators"] = {c: {"enabled": c in _SMALL_MR_CATEGORIES} for c in _ALL_ATOMIC_CATEGORIES}
+    payload["data_sources"] = {"enabled_sources": list(_SMALL_MR_SOURCES), "synthetic_sources": []}
+    payload["operators"] = {"enabled": True, "worldquant": {"enabled": False}}
+    payload["rolling_aggregation"] = {"enabled": True, "windows": list(_SMALL_MR_L3_WINDOWS)}
+    payload["lag_features"] = {"enabled": True}
+    return payload
+
+
+def _small_values_gate_mr_config_payload(*, training_tfs: Optional[List[str]] = None) -> Dict[str, Any]:
+    """本機縮小版主 MR 設定（SPEC v59 Task 4.2）：既有 `_values_gate_mr_config_payload` ＋縮小生成範圍。"""
+    return _apply_small_mr_scope(_values_gate_mr_config_payload(training_tfs=training_tfs))
+
+
+def _small_fracdiff_mr_config_payload() -> Dict[str, Any]:
+    """本機縮小版 fracdiff MR 設定（SPEC v59 Task 4.2）：既有 `_fracdiff_mr_config_payload` ＋縮小生成範圍。"""
+    return _apply_small_mr_scope(_fracdiff_mr_config_payload())
+
+
 def _bar_window_dates(
     kline_df: pd.DataFrame,
     *,
@@ -1418,3 +1444,338 @@ def _patch_kline_calibration_ohlcv(
             )
     return out
 
+
+
+# ---------------------------------------------------------------------------
+# FFSTAT SPEC v60 Task 4.2：截斷 MR 負控制之共用寫法（既有兩檔與縮小版兩檔共用同一函式本體，只差設定）。
+# 改前寫法（既有檔）之三個缺陷（b6 審查 r1）：①生成與準備檢查包在 `pytest.raises(AssertionError)` 內，準備／覆蓋錯誤
+# 可冒充「抓到」；②fracdiff 長度耦合 mutant 之 `min(len//10, 252)` 於現行必要窗（數千根）兩邊皆飽和為 252，未注入差異；
+# ③校準擾動改的是起始日之後之公開域前 500 根，FF-STAT 後校準只讀起始日之前之前史 ⇒ 校準域零列被擾動。
+# ---------------------------------------------------------------------------
+
+# 因果 gate 之失敗訊息前綴（封閉集合）；不在其中者（覆蓋守衛、抽樣設計錯誤、align oracle 前提缺失等）不算抓到
+_CAUSAL_GATE_PREFIXES = (
+    "columns gate failed",
+    "values ",
+    "warmup NaN mask",
+    "metadata gate",
+    "d_star mismatch",
+    "fracdiff ",
+    "align lookahead oracle: no coarse column mismatch",
+)
+_NON_CAUSAL_MARKERS = ("sampling design error", "coverage guard failed", "sampling guard failed")
+
+
+@dataclass(frozen=True)
+class MRScope:
+    """一組截斷 MR 之設定與週期（既有全設定或縮小版）。"""
+
+    values_payload: Callable[[], Dict[str, Any]]
+    fracdiff_payload: Callable[[], Dict[str, Any]]
+    primary_tf: str = DEFAULT_PRIMARY_TF
+    training_tfs: Optional[Tuple[str, ...]] = None
+    align_coarse_tfs: Optional[Tuple[str, ...]] = None
+    align_margin: int = 0
+
+    @property
+    def tfs(self) -> List[str]:
+        return list(self.training_tfs or (self.primary_tf,))
+
+    @property
+    def coarse(self) -> Optional[List[str]]:
+        return list(self.align_coarse_tfs) if self.align_coarse_tfs else None
+
+    @property
+    def expected_training_tfs(self) -> Optional[List[str]]:
+        return self.tfs if self.training_tfs else None
+
+
+def _assert_mr_preparation(pair: TruncationPair, *, align_coarse_tfs: Optional[List[str]] = None) -> None:
+    """負控制之準備證據（須在捕獲區之外）：有可比後綴列、full／trunc 有共同欄、抽樣覆蓋各 mutant 所在層。
+    任一不成立 ⇒ 以原錯誤傳出（測試紅），不得被當作 mutant 被抓到。"""
+    if pair.warmup >= pair.n_trunc:
+        pytest.fail("no post-warmup rows in truncation window")
+    common = sorted(set(_collect_column_names(pair.full.raw_dir)) & set(_collect_column_names(pair.trunc.raw_dir)))
+    if not common:
+        pytest.fail("no common columns between full and trunc")
+    full_map = _build_column_frame_map(pair.full.raw_dir)
+    sampled, _ = _build_sampled_columns(common, full_map, align_coarse_tfs=align_coarse_tfs)
+    _assert_mutation_layer_coverage(sampled, full_map, align_coarse_tfs=align_coarse_tfs)
+
+
+def _expect_causal_gate_failure(
+    pair: TruncationPair,
+    check: Callable[[], None],
+    *,
+    align_coarse_tfs: Optional[List[str]] = None,
+    allowed_prefixes: Tuple[str, ...] = _CAUSAL_GATE_PREFIXES,
+) -> str:
+    """先驗準備（捕獲區外），再只捕獲 `check()` 之 AssertionError，且其訊息須為因果 gate 之失敗；回傳訊息供收據。"""
+    _assert_mr_preparation(pair, align_coarse_tfs=align_coarse_tfs)
+    with pytest.raises(AssertionError) as excinfo:
+        check()
+    message = str(excinfo.value)
+    head = message.lstrip()
+    assert not any(marker in message for marker in _NON_CAUSAL_MARKERS), f"非因果 gate 之失敗不算抓到：{message[:500]}"
+    assert head.startswith(allowed_prefixes), f"失敗不屬因果 gate（{allowed_prefixes}）：{message[:500]}"
+    return message
+
+
+def _pre_start_rows(df: pd.DataFrame, start_iso: str, bars: int) -> np.ndarray:
+    """fetch 資料中時間戳 < 輸出起始日之最後 `bars` 列之位置（index 或 timestamp 欄；epoch 秒或時間戳）。"""
+    raw = df["timestamp"].to_numpy() if "timestamp" in df.columns else np.asarray(df.index)
+    if np.issubdtype(np.asarray(raw).dtype, np.number):
+        ts = pd.to_datetime(np.asarray(raw, dtype=np.int64), unit="s", utc=True)
+    else:
+        ts = pd.to_datetime(raw, utc=True)
+    before = np.flatnonzero(np.asarray(ts < pd.Timestamp(start_iso, tz="UTC")))
+    return before[-int(bars):] if before.size else before
+
+
+def _patch_kline_pre_start_ohlcv(df: pd.DataFrame, *, start_iso: str, bars: int, delta: float) -> pd.DataFrame:
+    """擾動輸出起始日之前最後 `bars` 根（FF-STAT 之校準前史；校準域與公開域預熱同讀此段）。"""
+    out = df.copy()
+    rows = _pre_start_rows(out, start_iso, bars)
+    for col in ("open", "high", "low", "close", "volume"):
+        if col in out.columns and rows.size:
+            loc = out.columns.get_loc(col)
+            out.iloc[rows, loc] = out.iloc[rows, loc].astype(float).to_numpy() + delta
+    return out
+
+
+def _build_scope_pair(scope: MRScope, root: Path, kline_df: pd.DataFrame, *, fracdiff: bool = False,
+                      monkeypatch: Optional[pytest.MonkeyPatch] = None, d_star_parent: Optional[Path] = None,
+                      window_date_fn: Optional[Callable[..., Tuple[str, str, str]]] = None,
+                      **kwargs: Any) -> TruncationPair:
+    payload = scope.fracdiff_payload() if fracdiff else scope.values_payload()
+    window_bars = (_fracdiff_window_bars(payload) if fracdiff else
+                   _required_window_bars(payload, primary_tf=scope.primary_tf, training_tfs=scope.tfs,
+                                         align_margin=scope.align_margin))
+    return _build_truncation_pair(
+        root, kline_df, config_payload=payload, primary_tf=scope.primary_tf, training_tfs=scope.tfs,
+        window_bars=window_bars, align_margin=scope.align_margin,
+        # 選窗同正常基線（_bar_window_dates）；只有對齊 look-ahead 控制顯式改用 12h 收盤邊界選窗（同既有寫法）
+        window_date_fn=window_date_fn or _bar_window_dates,
+        d_star_parent=d_star_parent, monkeypatch=monkeypatch, **kwargs)
+
+
+def _values_check(scope: MRScope, pair: TruncationPair) -> Callable[[], None]:
+    return lambda: _assert_truncation_invariants(pair, align_coarse_tfs=scope.coarse,
+                                                 expected_training_tfs=scope.expected_training_tfs)
+
+
+def run_control_numba_rolling_center_true(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
+    """mutant：L3 numba rolling 改 center=True ⇒ 截斷 MR 必紅（因果 gate）。seam 證據：mutant 被呼叫。"""
+    import momentum.FeatureEngineering.operators.numba_rolling as numba_rolling
+
+    original_multi = numba_rolling.fused_rolling_stats_multi_window
+    calls = [0]
+
+    def _centered_multi(values: np.ndarray, windows: np.ndarray) -> np.ndarray:
+        calls[0] += 1
+        output = original_multi(values, windows)
+        series = pd.Series(np.asarray(values, dtype=np.float64))
+        for widx in range(windows.shape[0]):
+            window = int(windows[widx])
+            if window > 0:
+                output[:, widx, 0] = series.rolling(window, center=True, min_periods=window).mean().to_numpy()
+        return output
+
+    monkeypatch.setattr(numba_rolling, "fused_rolling_stats_multi_window", _centered_multi)
+    pair = _build_scope_pair(scope, tmp_path / "features", kline_df, monkeypatch=monkeypatch)
+    assert calls[0] > 0, "L3 rolling seam 未被呼叫"
+    return _expect_causal_gate_failure(pair, _values_check(scope, pair), align_coarse_tfs=scope.coarse)
+
+
+def run_control_causal_winsor_full_fit(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
+    """mutant：縮尾改全量擬合 ⇒ 截斷 MR 必紅（因果 gate）。seam 證據：mutant 被呼叫且有選中欄。"""
+    calls = [0]
+
+    def _full_fit_winsor(self: FeaturePreprocessor, df: pd.DataFrame) -> pd.DataFrame:
+        columns = self._select_columns(df, self.winsor_config.get("apply_to", "all"))
+        if not columns:
+            return df
+        calls[0] += 1
+        result = df.copy()
+        selected = result.loc[:, columns].astype(float)
+        if self.winsor_config.get("method", "sigma") == "quantile":
+            qrange = self.winsor_config.get("quantile_range", [0.01, 0.99])
+            clipped = selected.clip(lower=selected.quantile(float(qrange[0])),
+                                    upper=selected.quantile(float(qrange[1])), axis=1)
+        else:
+            k = float(self.winsor_config.get("sigma_k", 3.0))
+            mean, std = selected.mean(), selected.std()
+            clipped = selected.clip(lower=mean - k * std, upper=mean + k * std, axis=1)
+        result.loc[:, columns] = clipped.astype(np.float32)
+        return result
+
+    monkeypatch.setattr(FeaturePreprocessor, "_apply_winsorization", _full_fit_winsor)
+    pair = _build_scope_pair(scope, tmp_path / "features", kline_df, monkeypatch=monkeypatch)
+    assert calls[0] > 0, "縮尾 seam 未被呼叫（或無選中欄）"
+    return _expect_causal_gate_failure(pair, _values_check(scope, pair), align_coarse_tfs=scope.coarse)
+
+
+def run_control_l4_lag_shift_minus_one(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
+    """mutant：L4 lag shift(-lag)（含 fast path）＋尾擾動 ⇒ 前綴 MR 必紅（因果 gate）。seam 證據：反向 shift 被呼叫。"""
+    original_compute_all = LagProcessor.compute_all
+    original_shift = pd.DataFrame.shift
+    calls = [0]
+
+    def _lookahead_compute_all(self: LagProcessor, features_df: pd.DataFrame) -> pd.DataFrame:
+        def _inverted_shift(df: pd.DataFrame, periods: int = 1, *args: Any, **kwargs: Any) -> pd.DataFrame:
+            if isinstance(periods, int) and periods > 0:
+                calls[0] += 1
+                return original_shift(df, -periods, *args, **kwargs)
+            return original_shift(df, periods, *args, **kwargs)
+
+        pd.DataFrame.shift = _inverted_shift  # type: ignore[method-assign]
+        try:
+            return original_compute_all(self, features_df)
+        finally:
+            pd.DataFrame.shift = original_shift  # type: ignore[method-assign]
+
+    monkeypatch.setattr(LagProcessor, "compute_all", _lookahead_compute_all)
+    pair = _build_scope_pair(scope, tmp_path / "features", kline_df, monkeypatch=monkeypatch,
+                             patch_fetch=lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA))
+    assert calls[0] > 0, "L4 lag seam 未被呼叫"
+    return _expect_causal_gate_failure(pair, _values_check(scope, pair), align_coarse_tfs=scope.coarse)
+
+
+def run_control_denominator_scale_full_column(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
+    """mutant：分母近零門檻之尺度改回全欄非零絕對值中位數（FFSTAT v53 前之未來洩漏）⇒ 截斷 MR 必紅（因果 gate）。"""
+    import momentum.FeatureEngineering.utils.numeric_guards as numeric_guards
+
+    calls = [0]
+
+    def _full_column_scale(values: np.ndarray, window: int = numeric_guards.DEFAULT_DENOM_SCALE_WINDOW) -> np.ndarray:
+        calls[0] += 1
+        arr = np.abs(np.asarray(values, dtype=np.float64))
+        nonzero = arr[np.isfinite(arr) & (arr > 0)]
+        return np.full(arr.shape, float(np.median(nonzero)) if nonzero.size else 0.0)
+
+    monkeypatch.setattr(numeric_guards, "causal_denominator_scale", _full_column_scale)
+    pair = _build_scope_pair(scope, tmp_path / "features", kline_df, monkeypatch=monkeypatch)
+    assert calls[0] > 0, "分母尺度 seam 未被呼叫"
+    return _expect_causal_gate_failure(pair, _values_check(scope, pair), align_coarse_tfs=scope.coarse)
+
+
+def _run_align_lookahead_control(scope: MRScope, monkeypatch, tmp_path: Path, kline_df, *, tail_perturb: bool) -> str:
+    """mutant：對齊 build_asof_index_map +1 forward 偏置（僅 trunc 側）⇒ 粗週期邊界 oracle 必見差異且 MR 必紅。
+    seam 證據：偏置函式被呼叫。oracle 為正向檢查（須偵測到差異），在捕獲區外。"""
+    import sys
+
+    module = sys.modules[__name__]
+    original = module._lookahead_build_asof_index_map
+    calls = [0]
+
+    def _counting(*args: Any, **kwargs: Any) -> np.ndarray:
+        calls[0] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, "_lookahead_build_asof_index_map", _counting)
+    monkeypatch.setattr(TimeframeAligner, "build_asof_index_map", staticmethod(_ORIGINAL_BUILD_ASOF_INDEX_MAP))
+    extra: Dict[str, Any] = {"align_lookahead_side": "trunc"}
+    if tail_perturb:
+        extra["patch_fetch"] = lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA)
+    pair = _build_scope_pair(scope, tmp_path / "features", kline_df, monkeypatch=monkeypatch,
+                             window_date_fn=_bar_window_dates_at_12h_boundary, **extra)
+    assert calls[0] > 0, "對齊 look-ahead seam 未被呼叫"
+    _assert_align_coarse_boundary_lookahead_detected(pair, align_coarse_tfs=scope.coarse)
+    return _expect_causal_gate_failure(pair, _values_check(scope, pair), align_coarse_tfs=scope.coarse)
+
+
+def run_control_align_lookahead(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
+    return _run_align_lookahead_control(scope, monkeypatch, tmp_path, kline_df, tail_perturb=False)
+
+
+def run_control_align_lookahead_with_tail_perturb(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
+    return _run_align_lookahead_control(scope, monkeypatch, tmp_path, kline_df, tail_perturb=True)
+
+
+# fracdiff 尾擾動基線（既有 strict xfail：storage codec 依值域選型使跨 run 精度不可比）於值 gate 失敗 ⇒ 以尾擾動為底之
+# 控制只承認發生在值 gate 之前之失敗（strict 欄集合、d*），不得以 codec 既有失敗冒充抓到。
+_FRACDIFF_PRE_VALUES_PREFIXES = ("columns gate failed", "d_star mismatch")
+
+
+def _fracdiff_check(pair: TruncationPair) -> Callable[[], None]:
+    return lambda: _assert_fracdiff_truncation_invariants(pair)
+
+
+def run_control_fracdiff_maxlag_len_coupling(scope: MRScope, monkeypatch, tmp_path: Path, kline_df, *,
+                                             tail_perturb: bool = False, parallel: bool = False) -> str:
+    """mutant：fracdiff max_lag 改依當次資料長度（`max(2, len(df)//10)`，**不設上限**——改前寫法之 252 上限於現行必要窗
+    兩邊皆飽和而未注入差異）⇒ fracdiff MR 必紅。seam 證據：兩次 run 實際解析之 max_lag 不同；parallel 版另證並行路徑被走。"""
+    original_apply = FeaturePreprocessor._apply_fractional_differencing
+    resolved: List[Tuple[int, int]] = []
+    parallel_calls: List[int] = []
+
+    def _mutant_apply(self: FeaturePreprocessor, df: pd.DataFrame, source_layer: Optional[str] = None) -> pd.DataFrame:
+        lag = max(2, len(df) // 10)
+        resolved.append((len(df), lag))
+        monkeypatch.setattr(self, "_resolve_fracdiff_max_lag", lambda: lag)
+        return original_apply(self, df, source_layer=source_layer)
+
+    monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing", _mutant_apply)
+    if parallel:
+        original_parallel = FeaturePreprocessor._apply_fractional_differencing_parallel
+
+        def _parallel_spy(self: FeaturePreprocessor, *args: Any, **kwargs: Any) -> pd.DataFrame:
+            parallel_calls.append(int(kwargs.get("n_jobs", 0)))
+            return original_parallel(self, *args, **kwargs)
+
+        monkeypatch.setattr(FeaturePreprocessor, "_resolve_slowpath_n_jobs", lambda self: 2)
+        monkeypatch.setattr(FeaturePreprocessor, "_apply_fractional_differencing_parallel", _parallel_spy)
+    extra: Dict[str, Any] = {}
+    if tail_perturb:
+        extra["patch_fetch"] = lambda df: _patch_kline_tail_ohlcv(df, k=TRUNC_K, delta=PERTURB_DELTA)
+    pair = _build_scope_pair(scope, tmp_path / "features", kline_df, fracdiff=True, monkeypatch=monkeypatch,
+                             d_star_parent=tmp_path / "dstar", **extra)
+    lags = {lag for _, lag in resolved}
+    assert len(lags) >= 2, f"長度耦合未注入差異（兩 run 之 max_lag 相同）：{sorted(set(resolved))}"
+    if parallel:
+        assert parallel_calls and max(parallel_calls) > 1, "fracdiff 並行路徑未被走"
+    allowed = _FRACDIFF_PRE_VALUES_PREFIXES if tail_perturb else _CAUSAL_GATE_PREFIXES
+    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_prefixes=allowed)
+
+
+def run_control_fracdiff_calibration_perturb(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
+    """負控制：只擾動 full 側**輸出起始日之前**之前史（FF-STAT 之校準資料所在；改前寫法擾動起始日之後之公開域、
+    校準域零列被改）⇒ d* 或 fracdiff 適格欄集合必變。seam 證據：校準取值被呼叫且被擾動之前史列數 > 0。"""
+    payload = scope.fracdiff_payload()
+    window_bars = _fracdiff_window_bars(payload)
+    start, _, _ = _bar_window_dates(kline_df, window_bars=window_bars, trunc_k=TRUNC_K)
+    perturbed_rows: List[int] = []
+
+    def _patch(df: pd.DataFrame) -> pd.DataFrame:
+        rows = _pre_start_rows(df, start, len(df))
+        perturbed_rows.append(int(rows.size))
+        return _patch_kline_pre_start_ohlcv(df, start_iso=start, bars=len(df), delta=PERTURB_DELTA)
+
+    original_calibration = FeaturePreprocessor._calibration_series
+    calibration_calls = [0]
+
+    def _calibration_spy(self: FeaturePreprocessor, series: pd.Series) -> pd.Series:
+        calibration_calls[0] += 1
+        return original_calibration(self, series)
+
+    monkeypatch.setattr(FeaturePreprocessor, "_calibration_series", _calibration_spy)
+    pair = _build_scope_pair(scope, tmp_path / "features", kline_df, fracdiff=True, monkeypatch=monkeypatch,
+                             d_star_parent=tmp_path / "dstar", patch_fetch_full_only=_patch)
+    assert calibration_calls[0] > 0, "fracdiff 校準取值未被呼叫"
+    assert perturbed_rows and max(perturbed_rows) > 0, "起始日之前無前史列被擾動"
+    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_prefixes=_FRACDIFF_PRE_VALUES_PREFIXES)
+
+
+def run_control_fracdiff_full_fit_d_star(scope: MRScope, monkeypatch, tmp_path: Path, kline_df) -> str:
+    """負控制：d* 改以全量序列擬合（含輸出範圍）⇒ full 與 trunc 之 d* 必不同。seam 證據：全量取值被呼叫。"""
+    calls = [0]
+
+    def _full_series(self: FeaturePreprocessor, series: pd.Series) -> pd.Series:
+        calls[0] += 1
+        return series
+
+    monkeypatch.setattr(FeaturePreprocessor, "_calibration_series", _full_series)
+    pair = _build_scope_pair(scope, tmp_path / "features", kline_df, fracdiff=True, monkeypatch=monkeypatch,
+                             d_star_parent=tmp_path / "dstar")
+    assert calls[0] > 0, "fracdiff 校準取值 seam 未被呼叫"
+    return _expect_causal_gate_failure(pair, _fracdiff_check(pair), allowed_prefixes=_FRACDIFF_PRE_VALUES_PREFIXES)

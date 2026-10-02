@@ -1,0 +1,33 @@
+{
+ "schema_version": 1,
+ "command": "venv/bin/python -m pytest -q -p no:cacheprovider --durations=0 <node ids 如下>（/usr/bin/time -l 外層；兩段串行）",
+ "exit_code": 1,
+ "spec": "docs/FFSTAT_SPEC.md v60 Task 4.2（實跑前置證據；測試本體為 v59 版，負控制尚未改共用本體）",
+ "host": "8GB／8 核本機",
+ "runs": [
+  {
+   "nodes": [
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_c2_1_fullchain_bar_truncation_invariant",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_mutation_denominator_scale_full_column_fails"
+   ],
+   "result": "1 failed, 1 passed in 979.12s",
+   "peak_rss_bytes": 3520020480,
+   "detail": {
+    "test_small_c2_1_fullchain_bar_truncation_invariant": "PASSED（setup 506.02s、call 8.72s）",
+    "test_small_mutation_denominator_scale_full_column_fails": "FAILED：DID NOT RAISE AssertionError（call 464.09s）＝mutant 存活；trunc 只少 10 根，全欄非零絕對值中位數穩健幾不變 ⇒ 近零遮罩不變；v60 撤除，由 tests/feature_engineering/test_ffstat_stable_start.py::test_mutation_denominator_full_column_median_is_caught 承接"
+   }
+  },
+  {
+   "nodes": [
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_fracdiff_truncation_invariant",
+    "tests/feature_engineering/test_ff_fullchain_truncation_small_mr.py::test_small_fracdiff_tail_perturbation_invariant"
+   ],
+   "result": "1 failed, 1 xfailed in 906.29s",
+   "peak_rss_bytes": 2895527936,
+   "detail": {
+    "test_small_fracdiff_truncation_invariant": "XPASS(strict)＝縮小設定下截斷基線綠；v60 改為一般測試",
+    "test_small_fracdiff_tail_perturbation_invariant": "XFAIL（既有 storage codec 原因）；v60 保留 strict xfail，以其為底之控制只承認值 gate 之前之失敗"
+   }
+  }
+ ]
+}
