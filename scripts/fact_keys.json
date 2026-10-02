@@ -365,7 +365,7 @@
         "GLOBALH 多 horizon 全算＋逐列標 h／k＋可篩（中票）",
         "未開工",
         "白話說明/接下來要做的票.md",
-        "排序 4（委員會共識：與 ICPATH 分開、排其後，理由＝兩者資料層不同，合併會返工）"
+        "全票排序第 12 步（docs/TICKET_ORDER.md）：於 ICPATH 後；硬前置＝第 10 步 GLOBALH 前置包（√h 夏普、ICIR 重疊窗、有效 N、horizon 子字串選欄、結果列結構與倖存者契約一次遷移、試驗帳）；含 IC 頁報酬量法 h 預覽；與 ICPATH 分開（資料層不同，合併會返工）"
       ],
       [
         "210",
@@ -389,7 +389,7 @@
         "EVENTSCAN 條件掃描→持有 N 根報酬 vs 隨機對照報酬（大票，單標的）",
         "停手",
         "白話說明/EVENTSCAN方向與做法.md",
-        "🔴 **2026-09-22 起暫停**（使用者裁定先做 SPEC／TODO 流程優化；其中 TODO 改格式已於 2026-09-23 由 RM-TODOFMT 完工，何時復工待使用者決定；復工時先依新格式產出本票 manifest）。停手時：SPEC 經兩家對抗審至 R12 收斂、未凍結，R12 末仍 11×P1。以下為停手前之沿革——🔴 **現況＝SPEC 已起草，兩家對抗審至 R8，尚未凍結**（下一步＝收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO；**不是實作**）。大票完整管線：①寫 SPEC →②兩家對抗審→收斂→凍結 →③寫 TODO →④兩家對抗審→收斂→凍結 →⑤分批實作 →⑥每批審碼→收斂，目前在②。方向與做法已定案（偵察 r1 十一條＋量化方法 consult r2 十四條皆收斂銷帳；使用者九項裁定；方向書 v10 經逐章稽核），但那是 SPEC 之**前置**不是替代。權威＝白話說明/EVENTSCAN方向與做法.md（使用者要的數字、九項裁定、十步做法、八個缺口）。做法十步含：條件引擎吃 FF 欄且欄名打錯要報錯／欄位選擇器（該 run 欄名規模見 SPEC 之 `eventscan-column-selector` 100）／掃描函式接 API／統一持有時鐘／連續成立只進場一次／報酬表補標準差與最好最差／隨機批參數由觸發批帶入＋抽樣四修／比較端點改比報酬＋Δ 之 bootstrap 區間／前端含硬性橫幅／事件版成本歸零點。單標的先做，多標的併 GAP-4 🔴 **使用者 2026-09-21 追加裁定**：寫 SPEC 時**同步建「同一事實只寫一次」（代號 B）**——凡會被 TODO／測試／白話再抄一次的**值**（時鐘定義、first-of-run、隨機對照抽樣四條、報酬欄主顯示、統計欄、breakeven 公式、失敗原因碼、欄名打錯要報錯、使用者七項裁定…約 40–60 條），於寫到該格的**當下**改為 `fact_keys` 生成區塊，不手打；不是獨立的票、不新建工具、不延後 SPEC。BEFORE 基線已記於 handoffs/run_receipts/20260921-eventscan-b-baseline.json（69 輪、251 條 canonical、doc-sync 55 條＝21.9%、每輪 1.00 條），AFTER 用同一支 docrot2_round_metric 比。🔴 **誠實邊界**：B 只管可列舉的**值**（零件型號表），**不管架構對不對、零件怎麼接、為什麼這樣設計**；同一份文件內前後矛盾與論述寫錯外部無解、本專案亦無解，只能靠兩家對抗審且會漏。🔴 **已知洞**：手寫偵測之 status_scope 只含 HANDOFF.md／docs/GOVERNANCE_EXECUTION_ORDER.md／白話說明/，**docs/ 其餘檔不在內** ⇒ SPEC 內貼了標記的格會同步，但在別段落手打同一個值不會被擋；補洞代價未查。🔴 **2026-09-21 進度**：SPEC v1 已寫並經**五輪**兩家對抗審（R1 21 條／R2 19／R3 14／R4 14／R5 10，**全數採納、零駁回**），fact-key 15 組約 130 列。🔴 **R5 曾揭露前提崩塌並已修復**：舊 run 之特徵欄被 fracdiff 轉換且逐週期 d 不同，故 `EMA_5 > EMA_10` 恆為真、1 段。使用者裁定重跑無轉換 FF run。🔴 **第一次重跑（`654bd63b…`）被 R6 抓到漏了全部 12h 欄，該 run 不可用**；主委補 `timeframes.training` 重發後完成，**reference 定版為 `d9935491…`**（規模見 SPEC 之 `eventscan-column-selector` 100；EMA 欄 corr 全 1.0000、該條件 956 段）⇒ **凍結硬前置已解除**。🔴 **R7 推翻主委之欄位選擇器設計本體**：原「以欄名底線切五層」只涵蓋 0.77%，且切分不可靠（來源欄名含底線、指標可多參數）⇒ 改以 manifest `groups` 為結構來源、全程不解析欄名。🔴 **R8 複查該改動，findings 回升至 14 條，回升全數由 R7 之改動引入**：R7 在 020 把不存在的 `timeframe`／`layer`／`category`／`indicator` 寫成 group 物件之結構化欄位（944 個物件中各出現 0 次），050 之群內不變式被否證，分頁只有 smoke 無完整性契約，選擇器與 PIT 成員資格不一致。週期來源改採 `task_record.json`（兩家提案皆不採，見 K-10 030）。🔴 **R9（findings 數自 R1 起 21→19→14→14→10→7→7→14→10）：R8 之十四條 13 CLOSED、1 STILL-OPEN**；主委在 R8 之兩處「與委員提案相左」之裁定**皆被判成立**（週期來源、fixture 不列凍結前置），但兩者契約不完整已補。R9 最重之一條是**主委在 R8 自己製造的邏輯矛盾**——同一輪採納「樹＝PIT 子集」與「守恆＝manifest 全量聯集」，兩者在 allowlist 非整份 944 時不可能同時為真，已改守恆右端為已核准子集。另**主委自改之 `spec_xref_check.sh` 被抓到兩個 fail-open 洞**（未閉合 marker、fence 內 marker），已改為結構驗證並把回歸測試自 18 增至 22。本輪新增 §P **Phase 0**（三個 Task：fixture 產出、055 之 hash 閘、PIT allowlist 產生器）承載原本無處可掛之回填閘。R9 之 10 條全數採納、零駁回，**SPEC 仍未凍結**，待 R10 複查。"
+        "全票排序第 15 步、一次做完（docs/TICKET_ORDER.md；使用者 2026-10-02 定）：於 FF-NAME、ICPATH、FFSTORE 後以新 run 重選 reference 一次（現 reference `d9935491` 早於 FF-STAT，現行程式不可重現）；補試驗帳。以下為停手沿革——🔴 **2026-09-22 起暫停**（使用者裁定先做 SPEC／TODO 流程優化；其中 TODO 改格式已於 2026-09-23 由 RM-TODOFMT 完工，何時復工待使用者決定；復工時先依新格式產出本票 manifest）。停手時：SPEC 經兩家對抗審至 R12 收斂、未凍結，R12 末仍 11×P1。以下為停手前之沿革——🔴 **現況＝SPEC 已起草，兩家對抗審至 R8，尚未凍結**（下一步＝收斂 R8 → 逐條白話解釋並由使用者放行 → 凍結 SPEC → 寫 TODO；**不是實作**）。大票完整管線：①寫 SPEC →②兩家對抗審→收斂→凍結 →③寫 TODO →④兩家對抗審→收斂→凍結 →⑤分批實作 →⑥每批審碼→收斂，目前在②。方向與做法已定案（偵察 r1 十一條＋量化方法 consult r2 十四條皆收斂銷帳；使用者九項裁定；方向書 v10 經逐章稽核），但那是 SPEC 之**前置**不是替代。權威＝白話說明/EVENTSCAN方向與做法.md（使用者要的數字、九項裁定、十步做法、八個缺口）。做法十步含：條件引擎吃 FF 欄且欄名打錯要報錯／欄位選擇器（該 run 欄名規模見 SPEC 之 `eventscan-column-selector` 100）／掃描函式接 API／統一持有時鐘／連續成立只進場一次／報酬表補標準差與最好最差／隨機批參數由觸發批帶入＋抽樣四修／比較端點改比報酬＋Δ 之 bootstrap 區間／前端含硬性橫幅／事件版成本歸零點。單標的先做，多標的併 GAP-4 🔴 **使用者 2026-09-21 追加裁定**：寫 SPEC 時**同步建「同一事實只寫一次」（代號 B）**——凡會被 TODO／測試／白話再抄一次的**值**（時鐘定義、first-of-run、隨機對照抽樣四條、報酬欄主顯示、統計欄、breakeven 公式、失敗原因碼、欄名打錯要報錯、使用者七項裁定…約 40–60 條），於寫到該格的**當下**改為 `fact_keys` 生成區塊，不手打；不是獨立的票、不新建工具、不延後 SPEC。BEFORE 基線已記於 handoffs/run_receipts/20260921-eventscan-b-baseline.json（69 輪、251 條 canonical、doc-sync 55 條＝21.9%、每輪 1.00 條），AFTER 用同一支 docrot2_round_metric 比。🔴 **誠實邊界**：B 只管可列舉的**值**（零件型號表），**不管架構對不對、零件怎麼接、為什麼這樣設計**；同一份文件內前後矛盾與論述寫錯外部無解、本專案亦無解，只能靠兩家對抗審且會漏。🔴 **已知洞**：手寫偵測之 status_scope 只含 HANDOFF.md／docs/GOVERNANCE_EXECUTION_ORDER.md／白話說明/，**docs/ 其餘檔不在內** ⇒ SPEC 內貼了標記的格會同步，但在別段落手打同一個值不會被擋；補洞代價未查。🔴 **2026-09-21 進度**：SPEC v1 已寫並經**五輪**兩家對抗審（R1 21 條／R2 19／R3 14／R4 14／R5 10，**全數採納、零駁回**），fact-key 15 組約 130 列。🔴 **R5 曾揭露前提崩塌並已修復**：舊 run 之特徵欄被 fracdiff 轉換且逐週期 d 不同，故 `EMA_5 > EMA_10` 恆為真、1 段。使用者裁定重跑無轉換 FF run。🔴 **第一次重跑（`654bd63b…`）被 R6 抓到漏了全部 12h 欄，該 run 不可用**；主委補 `timeframes.training` 重發後完成，**reference 定版為 `d9935491…`**（規模見 SPEC 之 `eventscan-column-selector` 100；EMA 欄 corr 全 1.0000、該條件 956 段）⇒ **凍結硬前置已解除**。🔴 **R7 推翻主委之欄位選擇器設計本體**：原「以欄名底線切五層」只涵蓋 0.77%，且切分不可靠（來源欄名含底線、指標可多參數）⇒ 改以 manifest `groups` 為結構來源、全程不解析欄名。🔴 **R8 複查該改動，findings 回升至 14 條，回升全數由 R7 之改動引入**：R7 在 020 把不存在的 `timeframe`／`layer`／`category`／`indicator` 寫成 group 物件之結構化欄位（944 個物件中各出現 0 次），050 之群內不變式被否證，分頁只有 smoke 無完整性契約，選擇器與 PIT 成員資格不一致。週期來源改採 `task_record.json`（兩家提案皆不採，見 K-10 030）。🔴 **R9（findings 數自 R1 起 21→19→14→14→10→7→7→14→10）：R8 之十四條 13 CLOSED、1 STILL-OPEN**；主委在 R8 之兩處「與委員提案相左」之裁定**皆被判成立**（週期來源、fixture 不列凍結前置），但兩者契約不完整已補。R9 最重之一條是**主委在 R8 自己製造的邏輯矛盾**——同一輪採納「樹＝PIT 子集」與「守恆＝manifest 全量聯集」，兩者在 allowlist 非整份 944 時不可能同時為真，已改守恆右端為已核准子集。另**主委自改之 `spec_xref_check.sh` 被抓到兩個 fail-open 洞**（未閉合 marker、fence 內 marker），已改為結構驗證並把回歸測試自 18 增至 22。本輪新增 §P **Phase 0**（三個 Task：fixture 產出、055 之 hash 閘、PIT allowlist 產生器）承載原本無處可掛之回填閘。R9 之 10 條全數採納、零駁回，**SPEC 仍未凍結**，待 R10 複查。"
       ],
       [
         "230",
@@ -397,7 +397,7 @@
         "ICPATH 已完成項兩路支援＋區分＋改正（含盤點）",
         "未開工",
         "docs/IC_QUANT_GAP_REGISTRY.md「兩路涵蓋宣告」節",
-        "排序 3（使用者 2026-09-20 裁定：SEARCH2EVENT 與白話整理完成後，另開新 session 起）；盤點為其規格第一段不另開票，粒度六欄；含邊際 IC 事件型補驗收為其 Task"
+        "全票排序第 11 步（docs/TICKET_ORDER.md）：硬依賴第 9 步縮尾、第 10 步 GLOBALH 前置包、第 7 步 PRE-PROV（平穩化標記之讀取來源）；盤點為其規格第一段不另開票，粒度六欄；含邊際 IC 事件型補驗收為其 Task"
       ],
       [
         "240",
@@ -429,7 +429,7 @@
         "FF-NAME：衍生層欄名未經來源／指標正規化（3,596 欄／0.859%）",
         "進行中",
         "docs/FFNAME_SPEC.md",
-        "起因＝使用者 2026-09-21 問「FF 的名稱中不能有 `_`，taker_ratio 應該要是 taker-ratio？」🔴 定性輪 codex＋composer **獨立同判為真缺陷**。命名規則明文於 `talib_wrapper.py:36-37`。根因＝`derived_operators.py:816-831` 之 **metadata-hit 分支取 raw、fallback 分支 `:833-851` 取 normalized**（**不是**主委原判之「L2 一律從 raw 重建」——實測 Distance 272／Momentum 8,700／Abs 870／TsRank 2,610 皆用連字號，只有 Cross 1,194／Ratio 1,194／Lag 16 用底線）。週期標記器**不是**缺陷（本 run 走 CGSA 之 `feature_storage.py:862-873`，對合規名行為正確）。修法＝只改 `derived_operators.py:303-306` 與 pandas 路徑 `:549-552` 兩處造名 f-string，**不得改 `FeatureInfo.source` 或 atomic metadata**（`info.source` 是查 kline 欄名之鍵，kline 實有 `taker_ratio` 無 `taker-ratio`；另 entropy 之 `close_return` 與 `ic_analysis_service.py:2472` 之 `data_source` 外送前端皆依賴 raw）。相容性＝**只對新 run 生效**（依使用者 2026-08-05「面向未來不溯及既往」既有裁定；選項 B／C 皆與之相斥），加 manifest `naming_version` 機械防護。**排序＝後於 FF-TFMETA**。不併入 FFDSTAR。2026-09-24 SPEC v1 起草（docs/FFNAME_SPEC.md，主委實測）：更正決策檔三處——①`tests/_golden/batch2d/` 三檔為 legacy「不得相等」oracle，**不重簽**（重簽會使斷言轉紅）；②Lag 16 欄是 raw kline `taker_ratio` 之 lag（1h、12h 各 8），修 L2 修不到，另列 Task；③改名後 ADF 白名單（名稱子字串）會讓 132 欄多組件有界指標之 Ratio 改走 safe-skip，與已被跳過之 349 欄單組件同類欄一致，列驗收。另加 config hash 命名世代鹽與跨世代合併 fail-closed。SPEC 經 r1–r5 收斂至 v6（commit `bdc9388a`，handoffs/reconcile/20260924-ffname-x-review-r5/synth.md）。🔴 使用者 2026-09-24 白話審閱時提四點、擴大範圍：單一指標層與 `ms_`／`tr_`／`ent_` 三族名稱一併處理；舊資料可刪除重生（刪跨世代防混用，保留 config hash 鹽）；依名稱決定平穩化須盡早處理。研究輪（handoffs/reconcile/20260924-ffnamestat-x-consult-r1/synth.md）裁定拆票：**平穩化判定（RM-FFSTAT）先、本票後**；本票 SPEC 待 FF-STAT 定案後重寫。"
+        "全票排序第 6 步（docs/TICKET_ORDER.md）：於 FRAMEPATH 後；Task 0＝SPEC 重寫（v6 之 Task 1.4 ADF 白名單、1.5 layer1_only 已因 FF-STAT 失效，2.1 frame 臂、2.2 HDF5 世代閘與 FRAMEPATH 衝突）；含週期標記器統一與單一名稱解析器；failopen 基準於此重凍一次。以下為沿革——起因＝使用者 2026-09-21 問「FF 的名稱中不能有 `_`，taker_ratio 應該要是 taker-ratio？」🔴 定性輪 codex＋composer **獨立同判為真缺陷**。命名規則明文於 `talib_wrapper.py:36-37`。根因＝`derived_operators.py:816-831` 之 **metadata-hit 分支取 raw、fallback 分支 `:833-851` 取 normalized**（**不是**主委原判之「L2 一律從 raw 重建」——實測 Distance 272／Momentum 8,700／Abs 870／TsRank 2,610 皆用連字號，只有 Cross 1,194／Ratio 1,194／Lag 16 用底線）。週期標記器**不是**缺陷（本 run 走 CGSA 之 `feature_storage.py:862-873`，對合規名行為正確）。修法＝只改 `derived_operators.py:303-306` 與 pandas 路徑 `:549-552` 兩處造名 f-string，**不得改 `FeatureInfo.source` 或 atomic metadata**（`info.source` 是查 kline 欄名之鍵，kline 實有 `taker_ratio` 無 `taker-ratio`；另 entropy 之 `close_return` 與 `ic_analysis_service.py:2472` 之 `data_source` 外送前端皆依賴 raw）。相容性＝**只對新 run 生效**（依使用者 2026-08-05「面向未來不溯及既往」既有裁定；選項 B／C 皆與之相斥），加 manifest `naming_version` 機械防護。**排序＝後於 FF-TFMETA**。不併入 FFDSTAR。2026-09-24 SPEC v1 起草（docs/FFNAME_SPEC.md，主委實測）：更正決策檔三處——①`tests/_golden/batch2d/` 三檔為 legacy「不得相等」oracle，**不重簽**（重簽會使斷言轉紅）；②Lag 16 欄是 raw kline `taker_ratio` 之 lag（1h、12h 各 8），修 L2 修不到，另列 Task；③改名後 ADF 白名單（名稱子字串）會讓 132 欄多組件有界指標之 Ratio 改走 safe-skip，與已被跳過之 349 欄單組件同類欄一致，列驗收。另加 config hash 命名世代鹽與跨世代合併 fail-closed。SPEC 經 r1–r5 收斂至 v6（commit `bdc9388a`，handoffs/reconcile/20260924-ffname-x-review-r5/synth.md）。🔴 使用者 2026-09-24 白話審閱時提四點、擴大範圍：單一指標層與 `ms_`／`tr_`／`ent_` 三族名稱一併處理；舊資料可刪除重生（刪跨世代防混用，保留 config hash 鹽）；依名稱決定平穩化須盡早處理。研究輪（handoffs/reconcile/20260924-ffnamestat-x-consult-r1/synth.md）裁定拆票：**平穩化判定（RM-FFSTAT）先、本票後**；本票 SPEC 待 FF-STAT 定案後重寫。"
       ],
       [
         "260",
@@ -437,7 +437,7 @@
         "FFDSTAR 每個 FF run 自帶 d* 收據（可追溯性，中票）",
         "進行中",
         "docs/FFDSTAR_SPEC.md",
-        "起因＝EVENTSCAN R5 追查時發現共用之 d* 快取檔跨 run 覆寫。🔴 **使用者 2026-09-21 裁定「先確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」**⇒ 已先跑唯讀定性輪（handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md）：主委原判之四型中，**兩型經委員以本 run 實跑判為設計意圖、一型因主委配對錯誤而不成立**，僅 provenance 一項為真缺陷。該裁定直接擋下一次針對非缺陷的修改。⇒ 本票範圍限縮為單一議題：共用 d* 快取跨 run 覆寫、無 per-column 收據 ⇒ 無法追溯任一 run 當下所用之 d*。SPEC v1 已寫（RISK-HIT: none，不改任何數值只加收據）。🔴 **否決點**：本票會讓每個 run 多產一個檔，CLAUDE.md 明訂輸出大小不得未經核可變更 ⇒ 須實作後量出絕對位元組與佔比、**帶數字請使用者核可才能交付**；否決即整票回退。技術選擇（落點／覆蓋率／既有 7 個共用檔處置）依既有裁定交委員會。2026-09-24 依使用者排序（FKPERF → FF-TFMETA → FF-NAME → FFDSTAR）復工：r3 修入（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md）——K-1 來源加 `search_error_default`、K-2 原因碼須合 `^[a-z][a-z0-9_]*$`、Phase 1 依賴 FF-NAME 實作完成。🔴 d* 搜尋例外之行為將由 RM-FFSTAT 改為 fail-closed，本票收據欄位須隨之對齊。下一步：FF-NAME 定案後 R4。"
+        "全票排序第 7 步（docs/TICKET_ORDER.md）：改寫為 PRE-PROV（run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態、失敗群組、轉換臂別；IC 讀取保留 manifest、ingest cache 依身分鍵失效）；逐欄 d 之收集已由 FF-STAT 完成、K-1 `search_error_default` 已失效；輸出增量須使用者核可。以下為沿革——起因＝EVENTSCAN R5 追查時發現共用之 d* 快取檔跨 run 覆寫。🔴 **使用者 2026-09-21 裁定「先確認是真的是 bug 還是特殊原因才這樣定義，不要直接修掉」**⇒ 已先跑唯讀定性輪（handoffs/reconcile/20260921-ffdstar-x-consult-r1/synth.md）：主委原判之四型中，**兩型經委員以本 run 實跑判為設計意圖、一型因主委配對錯誤而不成立**，僅 provenance 一項為真缺陷。該裁定直接擋下一次針對非缺陷的修改。⇒ 本票範圍限縮為單一議題：共用 d* 快取跨 run 覆寫、無 per-column 收據 ⇒ 無法追溯任一 run 當下所用之 d*。SPEC v1 已寫（RISK-HIT: none，不改任何數值只加收據）。🔴 **否決點**：本票會讓每個 run 多產一個檔，CLAUDE.md 明訂輸出大小不得未經核可變更 ⇒ 須實作後量出絕對位元組與佔比、**帶數字請使用者核可才能交付**；否決即整票回退。技術選擇（落點／覆蓋率／既有 7 個共用檔處置）依既有裁定交委員會。2026-09-24 依使用者排序（FKPERF → FF-TFMETA → FF-NAME → FFDSTAR）復工：r3 修入（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md）——K-1 來源加 `search_error_default`、K-2 原因碼須合 `^[a-z][a-z0-9_]*$`、Phase 1 依賴 FF-NAME 實作完成。🔴 d* 搜尋例外之行為將由 RM-FFSTAT 改為 fail-closed，本票收據欄位須隨之對齊。下一步：FF-NAME 定案後 R4。"
       ],
       [
         "320",
@@ -469,7 +469,7 @@
         "FRAMEPATH：刪除非 CGSA 舊引擎（frame，`FFACT_USE_CGSA=0`）與舊特徵 h5 讀取",
         "未開工",
         "handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md",
-        "2026-09-28 FF-STAT b4 實跑發現 frame 與 CGSA（預設）之既有差異——多週期 L6.5 於主週期展開格線而非原生週期（1h＋12h 實測 3,599 個 12h 欄平穩化決策不同）、float32 計算、欄集合不同（改前原始碼即 CGSA 多 29 欄）。查證輪 r1（codex、composer＋主委獨立版，synth 已銷帳）三方一致：生產無 frame 執行入口（API、批次、前端皆預設 CGSA；記憶體級距不切換）、frame 多週期平穩化屬正確性錯誤、修正後保留約兩倍維護且交叉驗證只及組裝層。🔴 使用者 2026-09-28 裁定：「若是frame都不需要，那不就不要花時間在任何跟frame有關的部份和測試上？」「舊的h5什麼的也可以刪除，這樣可以專注在把現行的模組做好吧？」；使用者未曾手動設 `FFACT_USE_CGSA=0`。待做：刪 frame 產生路徑（`_cgsa_enabled` 兩處與全部分支、legacy 組裝與落 `*_factory.h5`、`_legacy_native_row_maps`）、刪舊特徵 h5 讀取（`FeatureStorage.load_factory_output` 與其呼叫端 `feature_library.py`、`_try_load_cache`，API 之舊 HDF5 分支）、遷移或刪除依 frame 之測試（約 45 處）與腳本（`scripts/golden_multi_symbol_c3.py`、`freeze_batch2d_baseline.py`、`profile_v6v7_comparison.py`）；K 線資料 `kline_cache.h5` 不在此列；既存舊特徵 h5 檔依「面向未來不溯及既往」封存（刪檔指令交使用者）。FF-STAT v49 已先移除本票範圍內之 frame 驗收臂"
+        "全票排序第 5 步（docs/TICKET_ORDER.md）：於 ICFIRSTALIGN 乙之後（run_ic_first 現走記憶體 L1–L6 路徑，查證輪 r1 未涵蓋；乙先改走 CGSA 再刪）；不含 IC 服務內部 h5。以下為沿革——2026-09-28 FF-STAT b4 實跑發現 frame 與 CGSA（預設）之既有差異——多週期 L6.5 於主週期展開格線而非原生週期（1h＋12h 實測 3,599 個 12h 欄平穩化決策不同）、float32 計算、欄集合不同（改前原始碼即 CGSA 多 29 欄）。查證輪 r1（codex、composer＋主委獨立版，synth 已銷帳）三方一致：生產無 frame 執行入口（API、批次、前端皆預設 CGSA；記憶體級距不切換）、frame 多週期平穩化屬正確性錯誤、修正後保留約兩倍維護且交叉驗證只及組裝層。🔴 使用者 2026-09-28 裁定：「若是frame都不需要，那不就不要花時間在任何跟frame有關的部份和測試上？」「舊的h5什麼的也可以刪除，這樣可以專注在把現行的模組做好吧？」；使用者未曾手動設 `FFACT_USE_CGSA=0`。待做：刪 frame 產生路徑（`_cgsa_enabled` 兩處與全部分支、legacy 組裝與落 `*_factory.h5`、`_legacy_native_row_maps`）、刪舊特徵 h5 讀取（`FeatureStorage.load_factory_output` 與其呼叫端 `feature_library.py`、`_try_load_cache`，API 之舊 HDF5 分支）、遷移或刪除依 frame 之測試（約 45 處）與腳本（`scripts/golden_multi_symbol_c3.py`、`freeze_batch2d_baseline.py`、`profile_v6v7_comparison.py`）；K 線資料 `kline_cache.h5` 不在此列；既存舊特徵 h5 檔依「面向未來不溯及既往」封存（刪檔指令交使用者）。FF-STAT v49 已先移除本票範圍內之 frame 驗收臂"
       ],
       [
         "336",
@@ -477,7 +477,7 @@
         "TESTSPEED：FF 驗收測試加速（🔴 第一主項：每個重測試須有數分鐘內之快速版——各指標／運算路徑各取代表，以「重測試能抓之 mutant 快速版全抓」證明鑑別力不降；其次：生成結果依輸入指紋共用、只重跑失敗與受影響者、收批須完整重跑之機械閘）",
         "停手",
         "HANDOFF.md",
-        "2026-09-30 依使用者門檻結案：FF-STAT b4 整批驗收（17 檔、4 時 27 分／16,008 秒）開量測器實測——生成 127 次共 14,649 秒，其中 mutant 嫌疑 52 次不得共用；其餘 75 次之完全相同重複生成可省 1,479 秒＝整批 9.2% < 三成 ⇒ 不實作結果共用（收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）；已上線之「上次失敗者先跑」與量測器保留。以下為歷史：2026-09-28 起因：FF-STAT b4 七檔驗收一批 3 時 19 分、修一處即重跑整批、8GB 無法並行。使用者 2026-09-28 問「當你忘記…還是會做一樣的事」⇒ 只准機械解；使用者同日裁定開發路線「中小量真實資料日常開發＋收案前／換機後做完整驗證」（見 RM-FULLSCALE），本票負責把日常／收批兩層寫成機械規則；實測線索：pytest 擷取 INFO log 於記憶體會撐爆 8GB（⑧ 改只對齊一次並把擷取層級調為 WARNING 後，自逾 1 小時被系統砍掉降為 55 秒）；「測試只跑剛改過的地方，重跑也只在失敗處重跑，做完才跑整批…有違反軟體工程嗎」（答：業界標準，前提＝最後完整重跑機械強制、快取指紋完整）；🔴 使用者 2026-09-28 裁定：「你跟委員討論，你們覺得可以加速又不會影響品質，那就可以」。待做：①量測（helper 記錄每次生成之輸入指紋，整批一次統計重複與可省時間）②諮詢輪（codex、composer＋主委獨立版）③三方皆認可加速且不降品質才實作；可證偽驗收：mutant 測試（替換產品碼）必不取快取、指紋任一成分變動必重算、整批重跑自失敗處接續、收批須附晚於最後改碼之完整全綠收據。排 FF-STAT b4 之 r33 銷帳後（主委未依排程啟動，2026-09-29 經使用者追問補啟動）。2026-09-29 步驟①量測器已就位：`tests/feature_engineering/conftest.py::_testspeed_generation_log`（設 FFSTAT_GEN_LOG 才啟用、只記錄不快取），搭 FF-STAT b4 整批驗收收集重複生成統計；諮詢 r1 已派（handoffs/20260929-TESTSPEED-X-CONSULT-R1-BRIEF.md）。🔴 使用者 2026-09-29 定：①「我要的是真的能加速又維持品質，不要給我看沒用的統計數字」⇒ 驗收＝同一套驗收加速前後實際耗時對比＋結果全同＋mutant 全紅，對使用者只報真實縮短時間；②「做好你要確保會用」⇒ 預設生效（接必經路徑）；③「如果真的無法縮短就不要做下去」⇒ TODO 第 0 項＝小規模實測可省比例之收據，整批驗收省不到三成即結案不實作（派工閘以此收據為實作許可前提）、動工後一天內無實際縮短即停手回報。🔴 2026-09-29 使用者否決「重測試限額閘」（「限額管制只是你蓋起來不看但問題還是在」），要的是測試本身變快 ⇒ 本票第一主項改為重測試之快速版（各運算路徑取代表、mutant 全抓為鑑別力證明），與 FF-STAT b4 平行：規格與委員審查即做、實作待倍數表窮舉驗證釋出 CPU。SPEC v1 審查 r1 三家皆 blocked（19 條，已銷帳；刪精簡設定）→ 使用者 2026-09-29「看起來只能選B」：只做零風險部分——pytest「上次失敗者先跑」已預設生效（tests/conftest.py::pytest_configure）；量測器已改完整指紋＋mutant 嫌疑標記（實測 mutant 與正常測試指紋相同 ⇒ 盲目共用必假綠）；於 FF-STAT b4 收尾整批驗收時量非 mutant 真正重複佔比，≥ 三成才帶數字請使用者裁定，否則結案"
+        "結案、不再排程：快速代表版經全票排序諮詢與使用者 2026-10-02 拍板作廢（與 2026-09-29「不挑代表、不接受專項專用」衝突；docs/TICKET_ORDER.md）。以下為沿革——2026-09-30 依使用者門檻結案：FF-STAT b4 整批驗收（17 檔、4 時 27 分／16,008 秒）開量測器實測——生成 127 次共 14,649 秒，其中 mutant 嫌疑 52 次不得共用；其餘 75 次之完全相同重複生成可省 1,479 秒＝整批 9.2% < 三成 ⇒ 不實作結果共用（收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）；已上線之「上次失敗者先跑」與量測器保留。以下為歷史：2026-09-28 起因：FF-STAT b4 七檔驗收一批 3 時 19 分、修一處即重跑整批、8GB 無法並行。使用者 2026-09-28 問「當你忘記…還是會做一樣的事」⇒ 只准機械解；使用者同日裁定開發路線「中小量真實資料日常開發＋收案前／換機後做完整驗證」（見 RM-FULLSCALE），本票負責把日常／收批兩層寫成機械規則；實測線索：pytest 擷取 INFO log 於記憶體會撐爆 8GB（⑧ 改只對齊一次並把擷取層級調為 WARNING 後，自逾 1 小時被系統砍掉降為 55 秒）；「測試只跑剛改過的地方，重跑也只在失敗處重跑，做完才跑整批…有違反軟體工程嗎」（答：業界標準，前提＝最後完整重跑機械強制、快取指紋完整）；🔴 使用者 2026-09-28 裁定：「你跟委員討論，你們覺得可以加速又不會影響品質，那就可以」。待做：①量測（helper 記錄每次生成之輸入指紋，整批一次統計重複與可省時間）②諮詢輪（codex、composer＋主委獨立版）③三方皆認可加速且不降品質才實作；可證偽驗收：mutant 測試（替換產品碼）必不取快取、指紋任一成分變動必重算、整批重跑自失敗處接續、收批須附晚於最後改碼之完整全綠收據。排 FF-STAT b4 之 r33 銷帳後（主委未依排程啟動，2026-09-29 經使用者追問補啟動）。2026-09-29 步驟①量測器已就位：`tests/feature_engineering/conftest.py::_testspeed_generation_log`（設 FFSTAT_GEN_LOG 才啟用、只記錄不快取），搭 FF-STAT b4 整批驗收收集重複生成統計；諮詢 r1 已派（handoffs/20260929-TESTSPEED-X-CONSULT-R1-BRIEF.md）。🔴 使用者 2026-09-29 定：①「我要的是真的能加速又維持品質，不要給我看沒用的統計數字」⇒ 驗收＝同一套驗收加速前後實際耗時對比＋結果全同＋mutant 全紅，對使用者只報真實縮短時間；②「做好你要確保會用」⇒ 預設生效（接必經路徑）；③「如果真的無法縮短就不要做下去」⇒ TODO 第 0 項＝小規模實測可省比例之收據，整批驗收省不到三成即結案不實作（派工閘以此收據為實作許可前提）、動工後一天內無實際縮短即停手回報。🔴 2026-09-29 使用者否決「重測試限額閘」（「限額管制只是你蓋起來不看但問題還是在」），要的是測試本身變快 ⇒ 本票第一主項改為重測試之快速版（各運算路徑取代表、mutant 全抓為鑑別力證明），與 FF-STAT b4 平行：規格與委員審查即做、實作待倍數表窮舉驗證釋出 CPU。SPEC v1 審查 r1 三家皆 blocked（19 條，已銷帳；刪精簡設定）→ 使用者 2026-09-29「看起來只能選B」：只做零風險部分——pytest「上次失敗者先跑」已預設生效（tests/conftest.py::pytest_configure）；量測器已改完整指紋＋mutant 嫌疑標記（實測 mutant 與正常測試指紋相同 ⇒ 盲目共用必假綠）；於 FF-STAT b4 收尾整批驗收時量非 mutant 真正重複佔比，≥ 三成才帶數字請使用者裁定，否則結案"
       ],
       [
         "337",
@@ -485,7 +485,7 @@
         "FULLSCALE：完整規模驗證（換機後照單執行本機 8GB 跑不動之驗證）",
         "未開工",
         "HANDOFF.md",
-        "🔴 使用者 2026-09-28 裁定開發路線：「中小量真實資料日常開發＋收案前／換機後做完整驗證」（「反正現在的機器也跑不了大規模量產和大機器的設定，所以也不知那樣的生產模式會有什麼問題，到時候也是要測試驗證才能修正」）。三條件：架構一律按完整資料量設計（串流、不假設整表進記憶體）；本機跑得動之完整驗證照跑不延後；跑不動者逐項 blocked-by 硬體列入本票。🔴 使用者同日限定：「這是大規模生產和大機器路線才這樣，現在該做的驗收和測試不能少，嚴謹度和品質還是要維持盡量高」——SPEC／TODO 所列驗收、測試、mutant、委員審查一項都不得以本路線為由延後或縮小。完整驗證通過前，研究結論（IC、回測）不作真實交易決策。清單（隨各票增補）：①FF-STAT §G⑦ 5m 雙起點對證（SPEC §N）②記憶體級距 24／32GB 之效能與記憶體上限（SPEC §N；正確性已於 8GB 以覆寫驗）③預設全設定多標的並行生成之峰值④FF 全鏈截斷 MR 完整版 tests/feature_engineering/test_ff_fullchain_truncation_mr.py 13 項（本機兩度 SIGKILL；諮詢 r4；執行條件：記憶體 ≥ 24GB、磁碟 ≥ 40GB、TMPDIR 指向大磁碟；本機以 FF-STAT SPEC v59 Task 4.2 縮小版代驗具名缺陷）⑤FF 多週期截斷 MR 完整版 tests/feature_engineering/test_ff_multitf_truncation_mr.py 9 項（1h＋4h＋12h；另需 BTCUSDT 1h ≥ 34,302 根真實長歷史，本機僅 20,352 根）。觸發＝取得 ≥32GB 機器（使用者評估 Mac mini M6 32GB）"
+        "全票排序第 16 步（docs/TICKET_ORDER.md）：④⑤ 於 FFSTORE 後、≥32GB 機器；PRE-DL（下載 BTCUSDT 1h 長歷史）隨時可做。以下為沿革——🔴 使用者 2026-09-28 裁定開發路線：「中小量真實資料日常開發＋收案前／換機後做完整驗證」（「反正現在的機器也跑不了大規模量產和大機器的設定，所以也不知那樣的生產模式會有什麼問題，到時候也是要測試驗證才能修正」）。三條件：架構一律按完整資料量設計（串流、不假設整表進記憶體）；本機跑得動之完整驗證照跑不延後；跑不動者逐項 blocked-by 硬體列入本票。🔴 使用者同日限定：「這是大規模生產和大機器路線才這樣，現在該做的驗收和測試不能少，嚴謹度和品質還是要維持盡量高」——SPEC／TODO 所列驗收、測試、mutant、委員審查一項都不得以本路線為由延後或縮小。完整驗證通過前，研究結論（IC、回測）不作真實交易決策。清單（隨各票增補）：①FF-STAT §G⑦ 5m 雙起點對證（SPEC §N）②記憶體級距 24／32GB 之效能與記憶體上限（SPEC §N；正確性已於 8GB 以覆寫驗）③預設全設定多標的並行生成之峰值④FF 全鏈截斷 MR 完整版 tests/feature_engineering/test_ff_fullchain_truncation_mr.py 13 項（本機兩度 SIGKILL；諮詢 r4；執行條件：記憶體 ≥ 24GB、磁碟 ≥ 40GB、TMPDIR 指向大磁碟；本機以 FF-STAT SPEC v59 Task 4.2 縮小版代驗具名缺陷）⑤FF 多週期截斷 MR 完整版 tests/feature_engineering/test_ff_multitf_truncation_mr.py 9 項（1h＋4h＋12h；另需 BTCUSDT 1h ≥ 34,302 根真實長歷史，本機僅 20,352 根）。觸發＝取得 ≥32GB 機器（使用者評估 Mac mini M6 32GB）"
       ],
       [
         "338",
@@ -493,7 +493,47 @@
         "FFSTORE：特徵一次算完存起來、新 K 線與新欄只增算（不可變快照＋manifest）",
         "未開工",
         "handoffs/reconcile/20260930-ffstore-x-consult-r1/synth.md",
-        "使用者 2026-09-30 逐字「反正以後我就拉儘可能長的時間算好存著，後續繼續用？」⇒ 開票、研究先行；研究 r1（主委＋三家）已收斂：Parquet＋自訂契約、身分鍵拆 algorithm_id 與 snapshot、校準與死欄凍結、接續計算分三類（可存狀態／回溯收斂／路徑相依）、交易日曆進快照、下游讀取矩陣先行。另承接 FF-STAT §N 純窗口型機械歸類（needs-research）與「各週期約一年之 N＋定期重校準」實測（使用者 2026-10-01）。順序由全票細項排序諮詢（HP-TICKETORDER）定"
+        "使用者 2026-09-30 逐字「反正以後我就拉儘可能長的時間算好存著，後續繼續用？」⇒ 開票、研究先行；研究 r1（主委＋三家）已收斂：Parquet＋自訂契約、身分鍵拆 algorithm_id 與 snapshot、校準與死欄凍結、接續計算分三類（可存狀態／回溯收斂／路徑相依）、交易日曆進快照、下游讀取矩陣先行。另承接 FF-STAT §N 純窗口型機械歸類（needs-research）與「各週期約一年之 N＋定期重校準」實測（使用者 2026-10-01）。全票排序第 14 步（docs/TICKET_ORDER.md），數值與 view 契約先於第 8 步 NUMVIEW 定；使用者 2026-10-02：死欄判斷方法不變、每快照版本記下當次去留；開發階段資料可重產，不需相容或遷移舊資料"
+      ],
+      [
+        "339",
+        "RM-PRERED",
+        "PRE-RED：9 支既有紅測試逐支歸因＋FF 測試紅名單基線",
+        "未開工",
+        "docs/TICKET_ORDER.md",
+        "全票排序第 2 步：L1 凍結基準五支（基準凍於 06-10／06-18，早於 06-27 BETA／CORREL 修正，頭號嫌疑未證）、resume 二支、走 frame 之 test_failopen_producer／test_failopen_manifest、API alias 一支分開歸因；刻意修正則附證據重凍（須使用者核可），否則當缺陷修；產出名稱集合供後續各票以差集判回歸"
+      ],
+      [
+        "340",
+        "RM-RATIOUNSAFE",
+        "RATIOUNSAFE：ratio-unsafe 判定對落盤帶週期欄名失效",
+        "未開工",
+        "docs/TICKET_ORDER.md",
+        "全票排序第 3 步：`_is_ratio_unsafe_column` 取欄名第二段當類別，落盤名 `ohlc_12h_pattern_*` 第二段為 `12h` ⇒ IC 頁排除失效（codex 以真實 BCHUSDT 12h manifest 實測 43／43 漏判）；改讀結構化類別，IC 頁與 L6.5 共用，補真實帶週期欄名測試"
+      ],
+      [
+        "341",
+        "RM-NUMVIEW",
+        "NUMVIEW：post-IC 正式轉換臂政策＋來源精度量測＋臂／算法 fingerprint 入不可變 view 身分",
+        "未開工",
+        "docs/TICKET_ORDER.md",
+        "全票排序第 8 步（PRE-PROV 後、縮尾前）：承接 ICPOSTLEAK §N 各分支 zscore 核心差研究、來源→計算→float32→實際 codec→讀回之誤差與比較翻轉量測（不重議使用者 2026-09-29 dtype 裁定）；若改正式核心，實修與兩路 oracle 於此步完成，以免 ICPATH／GLOBALH 重驗"
+      ],
+      [
+        "342",
+        "RM-GHPRE",
+        "GLOBALH 前置包：重疊持有期統計與結果列身分",
+        "未開工",
+        "docs/TICKET_ORDER.md",
+        "全票排序第 10 步：因子擇時夏普 √h 高估（修法二擇一交使用者）、深度報酬時鐘與年化不寫死 365×24、ICIR 重疊窗查證、有效 N helper、horizon 子字串選欄修正、IC 結果列結構（模式／k／h／切分／選拔角色）＋倖存者契約一次遷移、研究試驗帳、Spearman 理由文件"
+      ],
+      [
+        "343",
+        "RM-MARKETDATA",
+        "PRE-MARKET-DATA：非加密市場（台股／美股／期貨）資料與 adapter",
+        "未開工",
+        "docs/TICKET_ORDER.md",
+        "具名 blocked（使用者 2026-10-02：先不接）：資料來源與取得、adapter.market、日曆／換月 lineage、warmup 分市場量測；現行生成入口對未量測市場 fail-closed（warmup_lookup）⇒ 未到位前各票跨市場驗收列 blocked-by 資料、不宣稱完成；設計不得寫死加密貨幣假設"
       ],
       [
         "290",
@@ -517,7 +557,7 @@
         "FKPERF：fact-key 生成器之存檔檢查不隨登記規模變慢",
         "進行中",
         "docs/FKPERF_SPEC.md",
-        "2026-09-23 使用者裁定開票（「這會膨脹很快……這無法接受」）。存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq。方向：核心移入單一 Python 程序、行為逐位元組不變、以外部程序數與開檔數之規模不變性驗收並寫實測秒數。SPEC v3（r1 十三條、r2 兩條已收斂；使用者裁定比例型時間門檻：規模 10 倍最多慢 20 倍）；SPEC v5（r3 收斂）、r4 三家 proceed；使用者 2026-09-23 白話審閱回「ok」⇒ SPEC 定案（v6 僅更正 NaN 描述）。施工清單經 r5–r11 收斂並三家蓋章；Phase 0（比對工具與基準量測）已完成並送審，審查抓出三個測試工具漏洞（寫檔只看部分檔、鑑別力測試沒先證零差異、既有沙箱情境未逐一列入），已修補並經第 2 輪兩家放行（commit `31d8adbf`）。生成器核心已用 Python 寫好（scripts/_gen_fact_key_blocks.py），與舊版逐位元組比對 409 筆全同（含 268 筆錄製之既有沙箱情境）；SPEC v8 加一條例外（jq 自己印的內部錯誤行只在舊版那側略過）；核心已提交（commit `44596806`）。另修比對工具：遇讀不到的檔不再崩潰、比對完即刪沙箱（先前暫存累積把磁碟塞滿）。2026-09-24 切換完成（commit `5afe7595`）：入口改薄殼、存檔檢查改走 Python 核心；40 倍規模下存檔檢查 10.73 秒 → 0.56 秒、守衛 10.3 秒 → 0.77 秒，外部程式數與規模無關（收據 handoffs/run_receipts/20260924-fkperf-scale.json）。提交當下抓出一個漏網處（活文件守衛快照模式未帶核心）並補測試。第 3 批審碼三輪修掉三個真 bug（同一宿主不同寫法會互蓋、大小寫別名、取檔案身分失敗會中斷），皆有回歸測試，兩家放行（commit `bcb04a5b`）。下一步：收案前全套治理測試（背景）——2026-09-24 已開跑一次，因中途須改 FF-STAT 規格而停掉（該測試會比對工作區，跑的期間不能改檔），待無人改檔之空檔重跑。"
+        "全票排序第 1 步（docs/TICKET_ORDER.md）：Task 4.5 於首個不改檔空檔背景跑。以下為沿革——2026-09-23 使用者裁定開票（「這會膨脹很快……這無法接受」）。存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq。方向：核心移入單一 Python 程序、行為逐位元組不變、以外部程序數與開檔數之規模不變性驗收並寫實測秒數。SPEC v3（r1 十三條、r2 兩條已收斂；使用者裁定比例型時間門檻：規模 10 倍最多慢 20 倍）；SPEC v5（r3 收斂）、r4 三家 proceed；使用者 2026-09-23 白話審閱回「ok」⇒ SPEC 定案（v6 僅更正 NaN 描述）。施工清單經 r5–r11 收斂並三家蓋章；Phase 0（比對工具與基準量測）已完成並送審，審查抓出三個測試工具漏洞（寫檔只看部分檔、鑑別力測試沒先證零差異、既有沙箱情境未逐一列入），已修補並經第 2 輪兩家放行（commit `31d8adbf`）。生成器核心已用 Python 寫好（scripts/_gen_fact_key_blocks.py），與舊版逐位元組比對 409 筆全同（含 268 筆錄製之既有沙箱情境）；SPEC v8 加一條例外（jq 自己印的內部錯誤行只在舊版那側略過）；核心已提交（commit `44596806`）。另修比對工具：遇讀不到的檔不再崩潰、比對完即刪沙箱（先前暫存累積把磁碟塞滿）。2026-09-24 切換完成（commit `5afe7595`）：入口改薄殼、存檔檢查改走 Python 核心；40 倍規模下存檔檢查 10.73 秒 → 0.56 秒、守衛 10.3 秒 → 0.77 秒，外部程式數與規模無關（收據 handoffs/run_receipts/20260924-fkperf-scale.json）。提交當下抓出一個漏網處（活文件守衛快照模式未帶核心）並補測試。第 3 批審碼三輪修掉三個真 bug（同一宿主不同寫法會互蓋、大小寫別名、取檔案身分失敗會中斷），皆有回歸測試，兩家放行（commit `bcb04a5b`）。下一步：收案前全套治理測試（背景）——2026-09-24 已開跑一次，因中途須改 FF-STAT 規格而停掉（該測試會比對工作區，跑的期間不能改檔），待無人改檔之空檔重跑。"
       ]
     ]
   },
@@ -1782,7 +1822,7 @@
         "HP-EVENTSCAN",
         "停手",
         "白話說明/EVENTSCAN方向與做法.md",
-        "🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀"
+        "全票排序第 15 步、一次做完（docs/TICKET_ORDER.md；使用者 2026-10-02 定）：於 FF-NAME、ICPATH、FFSTORE 後以新 run 重選 reference 一次。以下為停手時紀錄——🔴 **R13 暫停**（使用者 2026-09-22 裁定先處理 SPEC/TODO 流程優化，見 HP-PROCOPT）。SPEC 已起草（docs/EVENTSCAN_SPEC.md），兩家對抗審至 **R12 收斂**、**未凍結**；R12 末仍 11×P1。流程優化中之 TODO 改格式已於 2026-09-23 完工（HP-TODOFMT）；何時復工待使用者決定——復工時先依新格式產出本票 manifest，並依屆時之停輪條件重定續審形狀"
       ],
       [
         "033",
@@ -1803,35 +1843,35 @@
         "HP-FKPERF",
         "進行中",
         "docs/FKPERF_SPEC.md",
-        "2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票（大任務：共用路徑 b、多 phase c）。偵察：存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq（收據 handoffs/run_receipts/20260923-fkperf-recon.json）。SPEC r1 三家皆 blocked、皆認方案 A（核心移入單一 Python 程序）可採；13 條採納 12、部分採納 1（handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md 已銷帳），SPEC 改 v2：路徑字面型消費端列入核心、oracle 改兩個同形完整沙箱＋預期分支標籤、驗收加開檔數之規模不變性並回填實測秒數、`--help` 位元組保留；另更正 v1 誤稱使用者定「禁秒數門檻」（原文為「每次都跑的檢查須秒級、SPEC 寫實測秒數」），耗時上限測試列 §A 待使用者確認。r1 銷帳時發現帳本 dump 1.04MB 超過 ARG_MAX 致 debt_clear 起不來，經使用者選「直接修，交第 2 輪委員一起審」，已改經 fd 3 傳遞（行數不變）＋回歸測試。r2（composer 網路中斷經同輪重派）：r1 十三條中十二條由原提出方列 CLOSED；codex／composer 各以「每 key 對整份註冊表做 JSON 往返」反例（35 key 0.024s → 350 key 2.48s，程序數與開檔數皆不變）證明純 CPU 退化抓不到；使用者 2026-09-23 裁定比例型門檻「規模放大 10 倍最多慢 20 倍」，寫入 SPEC v3 C-6 ②與 Task 4.4；帳本修正三家皆判正確（handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md 已銷帳，即以修正後之 debt_clear 銷成）。v4 主委自查：固定開銷約 0.1s 稀釋 1×／10× 比例，端點改 4×／40×。r3：前輪 ID 全數由原提出方閉合；codex／composer 同抓「只複製純內容 key，總數比僅 8.28」，grok 兩 P2（規模數未對齊、端點改動不得混入使用者已確認結果）；四條採納改 v5：規模以總 fact-key 數 35／140／350／1400 定義、端點列 §A 待使用者確認（handoffs/reconcile/20260923-fkperf-x-review-r3/synth.md 已銷帳）。r4 三家 proceed 已銷帳；使用者 2026-09-23 白話審閱 SPEC 回「ok」（含端點 140／1400）⇒ SPEC 定案；寫 TODO 時主委實測推翻「jq 不接受 NaN」（jq 1.7.1 接受，由 rows 型別檢查拒絕）⇒ v6 更正 C-5 與 Task 1.1 邊界③。TODO＝五類落點 manifest docs/manifests/FKPERF.json（commits `89bfaf5d`、`5855f551`）。r5 三家皆 blocked、13 條全採納（量測 helper 快速失敗即拋、注入可達性契約與行為測試、對照表逐列必紅、語料逐筆新舊比對、出口清單獨立錨；commit `037a670f`；handoffs/reconcile/20260923-fkperf-x-review-r5/synth.md 已銷帳）。r6–r10 共閉合 26 條，r10 三家 proceed；r11（SPEC v7：oracle 內部子程序失敗之 24 處出口歸 tool_failure、C-1 改具名例外封閉集四項）後戳記輪三家蓋章、領實作許可 b1。Phase 0 已實作（commit `cb604963`：差分 harness、119 筆出口語料、187 行出口歸類、規模探針、bash 程序數基準收據）。b1 審碼 r1（兩家）：codex 擋三條 P1（寫檔語料只監看手列宿主檔、一位元組 mutation 測試無零差異基線、語料②未逐一列入既有沙箱）＋三條 P2，composer 放行；修補中——寫後改全樹快照、mutation 先證零差異基線、語料②改錄製重播（跑既有兩檔測試時攔截每次生成器呼叫並快照沙箱，以 AST 呼叫圖閉包對證每支建沙箱之測試皆有錄製）。b1 r1 七條修補於 commit `31d8adbf`，r2 兩家 proceed 已銷帳（handoffs/reconcile/20260923-fkperf-b1-review-r2/synth.md）。領 b2 實作許可後 Phase 1–3 核心實作完成（scripts/_gen_fact_key_blocks.py，逐函式對應 bash），差分語料 409／409 逐位元組一致（含錄製之沙箱情境 268 筆）；SPEC v8 增 C-1 例外⑤（jq 自身 `jq: error (at …)` 行僅於 oracle 側剔除）。核心提交於 commit `44596806`（含比對工具修正：不可讀檔快照不崩潰、全等即刪沙箱、錄製目錄 atexit 刪）。b2 審碼收批。Phase 4 切換於 commit `5afe7595`（薄殼、守衛與 pre-commit 納管核心、mutation 對照 11 列＋正向性質測試、規模修正〔每路徑一次切行＋標記索引、--write 每宿主一次寫出〕、R-GOVTEST-5 關閉）；完整差分 51／52（唯一紅為錄製器新略過原因未列入允許集合，已補）；提交時 pre-commit 揭露活文件守衛快照模式未物化核心 ⇒ 補並加回歸測試。b3 審碼 r1–r3（handoffs/reconcile/20260924-fkperf-b3-review-r{1,2,3}/synth.md 皆已銷帳）：codex 依序抓出批次寫入之別名互蓋（`./`）、大小寫別名、取實體身分失敗中斷，改以裝置號＋inode 比對並失敗即退回逐 key，三者皆有拿掉修正即紅之回歸測試；Task 4.4 收據 handoffs/run_receipts/20260924-fkperf-scale.json 並回填 SPEC §A（commit `bcb04a5b`）。下一步：Task 4.5 全套治理測試（背景，小時級；2026-09-24 首跑因須改檔而中止，待不改檔之空檔重跑）"
+        "2026-09-23 使用者逐字「這會膨脹很快，兩三分鐘很快就更久吧，這無法接受」⇒ 開票（大任務：共用路徑 b、多 phase c）。偵察：存檔一次之產出端檢查開 4,322 個外部程式、約 10 秒，隨 fact-key 數線性成長（兩天 17→35）；根因＝bash 3.2 無關聯陣列、逐 key 重查 jq（收據 handoffs/run_receipts/20260923-fkperf-recon.json）。SPEC r1 三家皆 blocked、皆認方案 A（核心移入單一 Python 程序）可採；13 條採納 12、部分採納 1（handoffs/reconcile/20260923-fkperf-x-review-r1/synth.md 已銷帳），SPEC 改 v2：路徑字面型消費端列入核心、oracle 改兩個同形完整沙箱＋預期分支標籤、驗收加開檔數之規模不變性並回填實測秒數、`--help` 位元組保留；另更正 v1 誤稱使用者定「禁秒數門檻」（原文為「每次都跑的檢查須秒級、SPEC 寫實測秒數」），耗時上限測試列 §A 待使用者確認。r1 銷帳時發現帳本 dump 1.04MB 超過 ARG_MAX 致 debt_clear 起不來，經使用者選「直接修，交第 2 輪委員一起審」，已改經 fd 3 傳遞（行數不變）＋回歸測試。r2（composer 網路中斷經同輪重派）：r1 十三條中十二條由原提出方列 CLOSED；codex／composer 各以「每 key 對整份註冊表做 JSON 往返」反例（35 key 0.024s → 350 key 2.48s，程序數與開檔數皆不變）證明純 CPU 退化抓不到；使用者 2026-09-23 裁定比例型門檻「規模放大 10 倍最多慢 20 倍」，寫入 SPEC v3 C-6 ②與 Task 4.4；帳本修正三家皆判正確（handoffs/reconcile/20260923-fkperf-x-review-r2/synth.md 已銷帳，即以修正後之 debt_clear 銷成）。v4 主委自查：固定開銷約 0.1s 稀釋 1×／10× 比例，端點改 4×／40×。r3：前輪 ID 全數由原提出方閉合；codex／composer 同抓「只複製純內容 key，總數比僅 8.28」，grok 兩 P2（規模數未對齊、端點改動不得混入使用者已確認結果）；四條採納改 v5：規模以總 fact-key 數 35／140／350／1400 定義、端點列 §A 待使用者確認（handoffs/reconcile/20260923-fkperf-x-review-r3/synth.md 已銷帳）。r4 三家 proceed 已銷帳；使用者 2026-09-23 白話審閱 SPEC 回「ok」（含端點 140／1400）⇒ SPEC 定案；寫 TODO 時主委實測推翻「jq 不接受 NaN」（jq 1.7.1 接受，由 rows 型別檢查拒絕）⇒ v6 更正 C-5 與 Task 1.1 邊界③。TODO＝五類落點 manifest docs/manifests/FKPERF.json（commits `89bfaf5d`、`5855f551`）。r5 三家皆 blocked、13 條全採納（量測 helper 快速失敗即拋、注入可達性契約與行為測試、對照表逐列必紅、語料逐筆新舊比對、出口清單獨立錨；commit `037a670f`；handoffs/reconcile/20260923-fkperf-x-review-r5/synth.md 已銷帳）。r6–r10 共閉合 26 條，r10 三家 proceed；r11（SPEC v7：oracle 內部子程序失敗之 24 處出口歸 tool_failure、C-1 改具名例外封閉集四項）後戳記輪三家蓋章、領實作許可 b1。Phase 0 已實作（commit `cb604963`：差分 harness、119 筆出口語料、187 行出口歸類、規模探針、bash 程序數基準收據）。b1 審碼 r1（兩家）：codex 擋三條 P1（寫檔語料只監看手列宿主檔、一位元組 mutation 測試無零差異基線、語料②未逐一列入既有沙箱）＋三條 P2，composer 放行；修補中——寫後改全樹快照、mutation 先證零差異基線、語料②改錄製重播（跑既有兩檔測試時攔截每次生成器呼叫並快照沙箱，以 AST 呼叫圖閉包對證每支建沙箱之測試皆有錄製）。b1 r1 七條修補於 commit `31d8adbf`，r2 兩家 proceed 已銷帳（handoffs/reconcile/20260923-fkperf-b1-review-r2/synth.md）。領 b2 實作許可後 Phase 1–3 核心實作完成（scripts/_gen_fact_key_blocks.py，逐函式對應 bash），差分語料 409／409 逐位元組一致（含錄製之沙箱情境 268 筆）；SPEC v8 增 C-1 例外⑤（jq 自身 `jq: error (at …)` 行僅於 oracle 側剔除）。核心提交於 commit `44596806`（含比對工具修正：不可讀檔快照不崩潰、全等即刪沙箱、錄製目錄 atexit 刪）。b2 審碼收批。Phase 4 切換於 commit `5afe7595`（薄殼、守衛與 pre-commit 納管核心、mutation 對照 11 列＋正向性質測試、規模修正〔每路徑一次切行＋標記索引、--write 每宿主一次寫出〕、R-GOVTEST-5 關閉）；完整差分 51／52（唯一紅為錄製器新略過原因未列入允許集合，已補）；提交時 pre-commit 揭露活文件守衛快照模式未物化核心 ⇒ 補並加回歸測試。b3 審碼 r1–r3（handoffs/reconcile/20260924-fkperf-b3-review-r{1,2,3}/synth.md 皆已銷帳）：codex 依序抓出批次寫入之別名互蓋（`./`）、大小寫別名、取實體身分失敗中斷，改以裝置號＋inode 比對並失敗即退回逐 key，三者皆有拿掉修正即紅之回歸測試；Task 4.4 收據 handoffs/run_receipts/20260924-fkperf-scale.json 並回填 SPEC §A（commit `bcb04a5b`）。🔴 下一個 session 從這裡開始：全票排序第 1 步（docs/TICKET_ORDER.md）＝Task 4.5 全套治理測試（背景，約 2 小時；跑時不改檔、不派委員；2026-09-24 首跑因須改檔而中止，待不改檔之空檔〔建議過夜〕重跑），完成後第 2 步 PRE-RED"
       ],
       [
         "040",
         "HP-FFDSTAR",
-        "進行中",
+        "停手",
         "docs/FFDSTAR_SPEC.md",
-        "使用者 2026-09-23 睡前排序「FKPERF 收完→FF-TFMETA→FF-NAME→FFDSTAR 依序做完」⇒ 復工。停手前 R2 十三條待閉合；2026-09-24 R3 兩家（codex blocked 兩 P1＋一 P2、composer proceed 兩 P2）五條全採納修入 SPEC（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md 已銷帳）：K-1 來源加 `search_error_default`、K-2 原因碼樣式封閉、Phase 1 依賴 FF-NAME、Task 1.1 驗證③。R4 待 FF-NAME 規格重寫定案後一併複查；輸出大小仍須實作後帶數字請使用者核可"
+        "全票排序第 7 步（docs/TICKET_ORDER.md）：本票改寫為 PRE-PROV——逐欄 d 之收集已由 FF-STAT 完成、K-1 `search_error_default` 已失效（d* 搜尋失敗保原值），剩 run manifest 寫逐欄平穩化決策、d*、各步驟實際執行狀態、失敗群組、轉換臂別，IC 讀取保留 manifest；SPEC 於 FF-NAME 後重寫；輸出增量須使用者核可。以下為舊紀錄——使用者 2026-09-23 睡前排序「FKPERF 收完→FF-TFMETA→FF-NAME→FFDSTAR 依序做完」⇒ 復工。停手前 R2 十三條待閉合；2026-09-24 R3 兩家（codex blocked 兩 P1＋一 P2、composer proceed 兩 P2）五條全採納修入 SPEC（handoffs/reconcile/20260924-ffdstar-x-review-r3/synth.md 已銷帳）：K-1 來源加 `search_error_default`、K-2 原因碼樣式封閉、Phase 1 依賴 FF-NAME、Task 1.1 驗證③。R4 待 FF-NAME 規格重寫定案後一併複查；輸出大小仍須實作後帶數字請使用者核可"
       ],
       [
         "042",
         "HP-ICFIRSTALIGN",
         "未開工",
         "docs/manifests/FFSTAT.json",
-        "只剩乙部分：run_ic_first 去除 factory 可變狀態依賴（不可變 run context，含選窗介面）、修 L7 raw 讀回時間軸之 IC 對齊（真實 kline 下 IC 階段必拋 AlignmentViolationError；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 `78c85bb2`）。甲部分（IC 頁套用後處理改正式實作、post-IC 排名／z 分數窗未滿即出值）已由 ICPOSTLEAK 於 2026-10-02 交付（docs/ICPOSTLEAK_SPEC.md）。順序由全票細項排序諮詢（HP-TICKETORDER）定"
+        "只剩乙部分：run_ic_first 去除 factory 可變狀態依賴（不可變 run context，含選窗介面）、修 L7 raw 讀回時間軸之 IC 對齊（真實 kline 下 IC 階段必拋 AlignmentViolationError；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 `78c85bb2`）。甲部分（IC 頁套用後處理改正式實作、post-IC 排名／z 分數窗未滿即出值）已由 ICPOSTLEAK 於 2026-10-02 交付（docs/ICPOSTLEAK_SPEC.md）。全票排序第 4 步（docs/TICKET_ORDER.md，先於 FRAMEPATH）：自第一行鎖 CGSA（run_ic_first 現於 feature_factory.py 將 `_cgsa_registry` 設 None、走記憶體路徑）、三處時間軸、FU-2、MEM-RSS 對照量測併入"
       ],
       [
         "043",
         "HP-FRAMEPATH",
         "未開工",
         "handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md",
-        "查證輪 r1 已銷帳（三方一致：生產無 frame 入口、frame 多週期平穩化錯誤）；使用者 2026-09-28 裁定刪除 frame 產生路徑與舊特徵 h5 讀取、不再花時間在 frame 測試（K 線 kline_cache.h5 不在此列）；下一步＝開刪除票之 SPEC（改共用路徑屬大任務，走完整管線），排 FF-STAT 收案後；FF-STAT b4 已先移除 frame 驗收臂"
+        "查證輪 r1 已銷帳（三方一致：生產無 frame 入口、frame 多週期平穩化錯誤）；使用者 2026-09-28 裁定刪除 frame 產生路徑與舊特徵 h5 讀取、不再花時間在 frame 測試（K 線 kline_cache.h5 不在此列）；全票排序第 5 步（docs/TICKET_ORDER.md）：於 ICFIRSTALIGN 乙之後（run_ic_first 現走記憶體路徑，查證輪 r1 未涵蓋）；刪除票 SPEC 走完整管線；FF-STAT b4 已先移除 frame 驗收臂"
       ],
       [
         "044",
         "HP-TESTSPEED",
         "停手",
         "HANDOFF.md",
-        "2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（< 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。是否以重測試快速版重開，交全票細項排序諮詢（HP-TICKETORDER）；詳見 RM-TESTSPEED"
+        "2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（< 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。「各運算路徑取代表之快速版」經全票排序諮詢與使用者 2026-10-02 拍板作廢（與 2026-09-29「不挑代表、不接受專項專用」衝突；docs/TICKET_ORDER.md）；本票不再排程"
       ],
       [
         "041",
@@ -1850,9 +1890,9 @@
       [
         "046",
         "HP-TICKETORDER",
-        "進行中",
-        "HANDOFF.md",
-        "🔴 下一個 session 從這裡開始。使用者 2026-10-01 逐字：「FF-STAT完成後，IC 頁洩漏要先修，完成後開一輪委員諮詢（我＋三家，各自全面看）將接下來每張票的細項都逐個討論研究訂出排序，這排序很重要，要確實定下，有發現有什麼要前置處理的也要加進去，不能中間又說要重來。」前兩步 2026-10-02 皆完成（HP-ICPOSTLEAK、HP-FFSTAT 已完成）；使用者 2026-10-02 指示排序諮詢「另一個 Session 乾淨的做」。範圍（委員可增補）：FFSTORE、ICFIRSTALIGN 乙部分（不可變 run context、L7 raw 讀回時間軸之 IC 對齊）、FRAMEPATH、FF-NAME、FFDSTAR、ICPATH、GLOBALH、縮尾重複、FKPERF 剩 Task 4.5、TESTSPEED、EVENTSCAN（停手中）；另須帶入：ICPOSTLEAK SPEC §N 之各分支 zscore 數值核心差（needs-research，收據 handoffs/run_receipts/20261002-icpostleak-branch-diff.json）、多市場（台股／美股／期貨）非 float32 落盤之精度邊界、RM-FULLSCALE ④⑤（截斷 MR 完整兩檔；多週期需 BTCUSDT 1h ≥ 34,302 根長歷史）。做法：主委先寫獨立版，三家各自全面看（不分角度），逐細項讀碼核依賴與返工風險（不憑票名）、標已排除／我沒查，前置處理一併納入；收斂後白話給使用者審閱拍板，收斂前不動工任何一張。產出後整段改寫 白話說明/還沒做的事.md 第二節排序表"
+        "已完成",
+        "docs/TICKET_ORDER.md",
+        "2026-10-02 定案：主委獨立版＋三家三輪收斂（r1 二十五條、r2 七條、r3 零條，全數閉合；handoffs/reconcile/20261002-ticketorder-x-consult-r{1,2,3}/synth.md 已銷帳），使用者拍板（逐字「你跟委員確定就可以，不要我問一次，你又改口就好」）；全序 17 步＋具名 blocked 之 PRE-MARKET-DATA 見 docs/TICKET_ORDER.md。以下為開票紀錄——使用者 2026-10-01 逐字：「FF-STAT完成後，IC 頁洩漏要先修，完成後開一輪委員諮詢（我＋三家，各自全面看）將接下來每張票的細項都逐個討論研究訂出排序，這排序很重要，要確實定下，有發現有什麼要前置處理的也要加進去，不能中間又說要重來。」前兩步 2026-10-02 皆完成（HP-ICPOSTLEAK、HP-FFSTAT 已完成）；使用者 2026-10-02 指示排序諮詢「另一個 Session 乾淨的做」。範圍（委員可增補）：FFSTORE、ICFIRSTALIGN 乙部分（不可變 run context、L7 raw 讀回時間軸之 IC 對齊）、FRAMEPATH、FF-NAME、FFDSTAR、ICPATH、GLOBALH、縮尾重複、FKPERF 剩 Task 4.5、TESTSPEED、EVENTSCAN（停手中）；另須帶入：ICPOSTLEAK SPEC §N 之各分支 zscore 數值核心差（needs-research，收據 handoffs/run_receipts/20261002-icpostleak-branch-diff.json）、多市場（台股／美股／期貨）非 float32 落盤之精度邊界、RM-FULLSCALE ④⑤（截斷 MR 完整兩檔；多週期需 BTCUSDT 1h ≥ 34,302 根長歷史）。做法：主委先寫獨立版，三家各自全面看（不分角度），逐細項讀碼核依賴與返工風險（不憑票名）、標已排除／我沒查，前置處理一併納入；收斂後白話給使用者審閱拍板，收斂前不動工任何一張。產出後整段改寫 白話說明/還沒做的事.md 第二節排序表"
       ]
     ]
   },
