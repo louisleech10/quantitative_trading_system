@@ -364,7 +364,7 @@
         "RM-GLOBALH",
         "GLOBALH 多 horizon 全算＋逐列標 h／k＋可篩（中票）",
         "未開工",
-        "白話說明/接下來要做的票.md",
+        "docs/TICKET_ORDER.md",
         "全票排序第 12 步（docs/TICKET_ORDER.md）：於 ICPATH 後；硬前置＝第 10 步 GLOBALH 前置包（√h 夏普、ICIR 重疊窗、有效 N、horizon 子字串選欄、結果列結構與倖存者契約一次遷移、試驗帳）；含 IC 頁報酬量法 h 預覽；與 ICPATH 分開（資料層不同，合併會返工）"
       ],
       [
