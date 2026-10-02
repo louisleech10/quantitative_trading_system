@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FF-STAT 平穩化與校準 — 結論</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">FF-STAT結論.md</span></nav>
+<main>
+<h1 id="ff-stat-平穩化與校準-結論">FF-STAT 平穩化與校準 — 結論</h1>
+<blockquote>
+<p><strong>這份回答三個問題：這票做了什麼、對你產出的特徵有什麼影響、還剩什麼。</strong></p>
+<p>🔴 <strong>只寫結論，不寫過程。</strong> 審查輪次與修補紀錄在 git log 與 <code>handoffs/reconcile/</code> 的收斂檔裡，你不需要看。
+2026-10-02 收案。</p>
+</blockquote>
+<hr />
+<h2 id="這票做了什麼">這票做了什麼</h2>
+<p><strong>特徵工廠決定「這欄要不要做平穩化」，不再看欄名猜，改成逐欄用統計檢定；而且決定時只用開始日期之前的資料。</strong></p>
+<ol>
+<li><strong>逐欄檢定</strong>：每一欄自己跑檢定（ADF），決定要不要做分數差分（d*）或一般差分。以前依欄名判斷，同一類欄名一律處理或一律跳過。</li>
+<li><strong>校準只用開始日期之前的資料</strong>：檢定、d*、縮尾門檻都只用你選的開始日期之前那段資料（預設日內週期 1000 根、一日以上 500 根）。輸出區間內的資料一律不拿來訂參數，所以不會偷看到未來。</li>
+<li><strong>預熱一律做</strong>：每個指標先往前多算一段，等算出來的值穩定了才開始輸出。第一個公開值的誤差限制在 0.5% 以內，不夠穩的就不輸出。</li>
+<li><strong>出錯就停，不默默用預設值</strong>：d* 搜尋失敗不再偷偷套 d=1，而是保留原值並記下原因；某欄前段資料不夠，就只有那一欄不做平穩化並加標記，整批標為「部分完成」。</li>
+<li><strong>刪掉舊的依欄名選欄設定</strong>（<code>layer1_only</code>）。</li>
+</ol>
+<h2 id="對你產出的特徵有什麼影響">對你產出的特徵有什麼影響</h2>
+<ul>
+<li><strong>平穩化預設仍是關閉</strong>：不開就和以前一樣，不受影響。</li>
+<li><strong>開啟時</strong>：每欄的處理方式依檢定結果而定，記錄在當次產出的任務紀錄裡。</li>
+<li><strong>輸出的開始點可能比以前晚一點</strong>：預熱不夠的列不輸出。</li>
+<li><strong>校準長度預設</strong>：日內週期 1000 根、一日以上 500 根（你 10/01 定）。你也可以自己指定。</li>
+<li><strong>落盤精度</strong>：維持你 9/29 的裁定，依數值大小自動選 float16 或 float32。最大相對誤差 0.1%。</li>
+</ul>
+<h2 id="你做的裁定">你做的裁定</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>日期</th>
+<th>裁定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>09-24</td>
+<td>窗長先實測再定；沒填開始日期時自動預留校準段</td>
+</tr>
+<tr>
+<td>09-26</td>
+<td>某欄前段資料不夠：只那欄不平穩化並標記，不整批停</td>
+</tr>
+<tr>
+<td>09-29</td>
+<td>落盤型別維持自動選；日線深欄資料不夠就先維持「不驗」</td>
+</tr>
+<tr>
+<td>09-30</td>
+<td>第一個公開值要準到 0.5%；5m 窮舉先不做（機器承受不了）；「一次算完存起來」另開 FFSTORE</td>
+</tr>
+<tr>
+<td>10-01</td>
+<td>死欄依整段資料判斷；校準長度日內 1000、一日以上 500</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="還剩什麼">還剩什麼</h2>
+<p>全部都有位置，追蹤看<a href="還沒做的事.html">還沒做的事.md</a>：</p>
+<ul>
+<li><strong>換大機器才能做的驗證</strong>：5m 雙起點對證、24／32GB 記憶體上限、完整版截斷測試兩檔，排序第 16 步。本機只跑了縮小版，所以完整版還不能算已通過。</li>
+<li><strong>台股／美股／期貨的預熱量測</strong>：要等資料接進來（你定先不接）。在那之前，程式遇到沒量測過的市場會直接擋下，不會偷用加密貨幣的數字。</li>
+<li><strong>「純窗口型」指標的自動分類</strong>：併入 FFSTORE，排序第 14 步。</li>
+<li><strong>OBV、AD 這類累積型欄的值取決於從哪一天開始算</strong>：要到上線時存下累積狀態才能根治，屬於還沒開的「上線須留存參數」工作。</li>
+<li><strong>特徵數預覽和實際產欄數對不上</strong>：FF-STAT 之前就存在，屬於還沒開的 preset 盤點工作。</li>
+</ul>
+<h2 id="技術文件在哪">技術文件在哪</h2>
+<p>規格書 <code>docs/FFSTAT_SPEC.md</code>（含全部殘留與理由）、施工清單 <code>docs/manifests/FFSTAT.json</code>、縮小版截斷測試收據 <code>handoffs/run_receipts/20261002-ffstat-small-mr.json</code>。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/FF-STAT結論.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

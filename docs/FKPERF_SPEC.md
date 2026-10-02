@@ -22,7 +22,7 @@ RISK-HIT: b,c
   - FACT-RECEIPT: `grep -rno 'gen_fact_key_blocks\.sh:[0-9][0-9-]*' docs scripts tests` → 生產引用僅 `scripts/fact_keys.json` E-028 列之 `gen_fact_key_blocks.sh:1863`（生成至 `docs/GOV_ENFORCEMENT_REGISTRY.md`、`docs/GOV_TICKET_SOT.md` 與兩組 fixture）（主委 實跑 2026-09-23）
   - FACT-RECEIPT: `printf '{"x": NaN}' | jq -e 'type == "object"'` → rc=0（jq-1.7.1-apple）；`printf '{"x": Infinity}' | jq -c .` → `{"x":1.7976931348623157e+308}`；最小沙箱 `{"x": NaN}` 經現行生成器 → rc=1 `key x 之 rows 型別不符（須為字串陣列之陣列）`（主委 實跑 2026-09-23，寫 TODO 時推翻 v5 C-5 之「jq 不接受 NaN」，收據 `handoffs/run_receipts/20260923-fkperf-todo-exit-probes.json`）
 - **待確認：無**（原待確認之量測端點，已於 2026-09-23 白話審閱獲使用者確認，見下）
-- **白話審閱**：`白話說明/FKPERF規格審閱.md`；使用者 2026-09-23 逐問「量測點數字不同有什麼差異」「以後會越來越大、很多地方用到會不會拖慢」，經說明後回「ok」⇒ SPEC 定案、端點依下條：
+- **白話審閱**：`白話說明/Archived/FKPERF規格審閱.md`；使用者 2026-09-23 逐問「量測點數字不同有什麼差異」「以後會越來越大、很多地方用到會不會拖慢」，經說明後回「ok」⇒ SPEC 定案、端點依下條：
   - 量測端點取總 fact-key 數 140 與 1400（35 之 4 倍與 40 倍，仍相差 10 倍、門檻仍 20 倍），不取使用者選項說明中之 1 倍與 10 倍——主委自查：每次呼叫之固定開銷約 0.1s（`python3` 啟動 0.022s、`ticket_universe.sh --check` 0.03s，另 git 與包裝層），1×／10× 直接相除會被稀釋，r2 反例之比例僅約 13.5 倍而漏抓；grok r3 以純內容夾具實測 4×／40× 同型反例純 CPU 52 倍、含固定開銷 31 倍，且冪次成長下不存在「1×／10× 會紅而 4×／40× 不紅」之情形（此改動為收緊，非放寬）。
   - FACT-RECEIPT: `bash scripts/ticket_universe.sh --check`（計時三次）→ 印出 `0.04s`、`0.03s`、`0.03s`；`python3 -c pass` → `0.022s`（主委 實跑 2026-09-23）
 - **切換後實測**（Task 4.4，C-6）：
