@@ -499,17 +499,17 @@
         "339",
         "RM-PRERED",
         "PRE-RED：9 支既有紅測試逐支歸因＋FF 測試紅名單基線",
-        "進行中",
+        "已完成",
         "docs/PRERED_SPEC.md",
-        "2026-10-03 進度：SPEC 凍結（三家戳記）、實作 Phase 1–3 完成、三單元重凍完成、允許仍紅 40 列（審碼 r1 後由 44 減 4：IC 停止閘四支改判測試前提過期並修）；已提交 2e9ded51，審碼 r1 兩家擋已修、待 r2（詳 HANDOFF HP-PRERED）。原始範圍——全票排序第 2 步：治理全套 12 項與特徵工廠 9 支既有紅逐支判「測試前提過期」或「真缺陷」後修（結果：21 支全屬前提過期）；刻意修正附證據重凍（已獲使用者核可）；產出名稱集合供後續各票以差集判回歸"
+        "2026-10-03 收案：21 支既有紅全屬測試前提過期並修、三單元重凍、允許仍紅 40 列、全套治理測試 0 failed（詳 HANDOFF HP-PRERED）。原始範圍——全票排序第 2 步：治理全套 12 項與特徵工廠 9 支既有紅逐支判「測試前提過期」或「真缺陷」後修；刻意修正附證據重凍（使用者核可）；產出名稱集合供後續各票以差集判回歸"
       ],
       [
         "340",
         "RM-RATIOUNSAFE",
         "RATIOUNSAFE：ratio-unsafe 判定對落盤帶週期欄名失效",
-        "未開工",
+        "進行中",
         "docs/TICKET_ORDER.md",
-        "全票排序第 3 步：`_is_ratio_unsafe_column` 取欄名第二段當類別，落盤名 `ohlc_12h_pattern_*` 第二段為 `12h` ⇒ IC 頁排除失效（codex 以真實 BCHUSDT 12h manifest 實測 43／43 漏判）；改讀結構化類別，IC 頁與 L6.5 共用，補真實帶週期欄名測試"
+        "2026-10-03 主委預查（SPEC 起草中，未送審）：①以生產命名規則造名，各週期帶標記之 pattern 名 0／183 被判 ratio-unsafe（收據 handoffs/run_receipts/20261003-ratiounsafe-tagged-names.json）；②主路徑（CGSA registry）L6.5 不呼叫任何 ratio-unsafe 判定——真實 BTCUSDT 12h 1695 根、只開 pattern，前處理開／關對照：62／62 欄被改寫、13 欄訊號抹為 0、非零格 5137→4286（收據 handoffs/run_receipts/20261003-ratiounsafe-registry-l65-pattern.json）；③週期標記規則三種不一致（factory／MultiTF、calibration、storage CGSA 寫檔；storage 對 1w 不標）；④落盤無逐欄結構化類別 ⇒「改讀結構化類別」無資料來源，改名稱解析單一真相源、結構化類別列殘留。範圍擴及 L6.5 registry 全分支，依 CLAUDE.md 重判為大。原始描述——全票排序第 3 步：`_is_ratio_unsafe_column` 取欄名第二段當類別，落盤名 `ohlc_12h_pattern_*` 第二段為 `12h` ⇒ IC 頁排除失效（codex 以真實 BCHUSDT 12h manifest 實測 43／43 漏判）；改讀結構化類別，IC 頁與 L6.5 共用，補真實帶週期欄名測試"
       ],
       [
         "341",
@@ -1890,9 +1890,16 @@
       [
         "047",
         "HP-PRERED",
+        "已完成",
+        "docs/TICKET_ORDER.md",
+        "2026-10-03 收案（全票排序第 2 步）：SPEC v7（docs/PRERED_SPEC.md）；實作 2e9ded51＋審碼修補 6a2242c2、203023c8；審碼 r1–r3 全部 finding 由原提出方 CLOSED（handoffs/reconcile/20261003-prered-b1-review-r{1,2,3}/synth.md）。21 支既有紅全屬測試前提過期並修；審碼後另鑑別 IC 停止閘 4 支（39377e29 起 fixture 注入被 registry 重讀洗掉）改判前提過期並修；單週期三單元基準重凍；允許仍紅精確集合 tests/_golden/prered/allowed_red.json 40 列（FRAMEPATH 1、ICFIRSTALIGN 9〔含 F-2 擋之 v6 五 node〕、FFSTORE 30〔使用者核可刪除舊特徵 run 所致，逐支失敗訊息收據 handoffs/run_receipts/20261003-prered-ffstore-messages.json〕）；F-2 分段記憶體收據移交第 4 步。收案前全套治理測試 2,771 passed／0 failed／9 xfailed／0 xpassed（三段，收據 handoffs/run_receipts/20261003-prered-govsuite.json；FKPERF 之 12 紅全數轉綠）。下一步＝第 3 步 RATIOUNSAFE（見 RM-RATIOUNSAFE）"
+      ],
+      [
+        "048",
+        "HP-RATIOUNSAFE",
         "進行中",
         "docs/TICKET_ORDER.md",
-        "SPEC v7（docs/PRERED_SPEC.md；v5 經審查 r1–r4 與戳記輪三家 APPROVED，handoffs/reconcile/20261003-prered-x-review-r4/synth.md；v6＝實作期修正，送審碼輪一併審）、TODO manifest docs/manifests/PRERED.json（TODOFMT PASS）。r4 債卡死已解：使用者裁定「讓那一家重做」⇒ 新增同輪重派條件③′（29b25f55，該家無結果列且產出缺或 0 byte、開輪逾 3600 秒）。實作 Phase 1–3 完成：治理 12 支、alias、resume、v7、L1／全量基準逐支修（全屬測試前提過期）；使用者核可後單週期 BTCUSDT/12h、ETHUSDT/12h、ETHUSDT/1h 三單元重凍（A／B 確定性相等，收據 handoffs/run_receipts/20261003-prered-refreeze.json）；直跑 L3 存活欄數 65483→59962 逐欄歸因未解釋 0（Task 2.7）；允許仍紅精確集合 tests/_golden/prered/allowed_red.json 40 列（FRAMEPATH 1、ICFIRSTALIGN 9＝IC-first 2＋多週期基準與 config_hash 釘值 2＋v6 三支五 node id 受 F-2 擋〔HEAD 峰值約 71 GB vs d229336e^ 0.80 GB〕、FFSTORE 30＝使用者核可刪除全部舊特徵 run 所致〔逐支失敗訊息鑑別；原 34 中 IC 停止閘 4 支實為 39377e29 致 fixture 注入被 registry 重讀洗掉，已修〕）。BTCUSDT/1h 與多週期單元未重凍。已提交 2e9ded51 並推送。　審碼 b1 r1（round ccbd8d36）：composer proceed；codex 擋 P1（已核模式 11 節點同一行程）、grok 擋 P1（Task 2.5 F-2 分段收據與 ROADMAP 指標未交付）＋P3（census 檔數敘述）——三條已修（逐節點迴圈、收據 handoffs/run_receipts/20261003-prered-f2-memory.json 與 RM-ICFIRSTALIGN 指標、SPEC Task 3.1 改寫），待 r2 原提出方閉合驗證。待辦：審碼 r2 → 第 3 步 RATIOUNSAFE（唯讀預查已證 43／43 漏判，判定兩份逐字重複實作）"
+        "全票排序第 3 步（PRE-RED 已於 2026-10-03 收案）：SPEC 起草中（主委草稿，尚未送審）。預查收據與範圍見 ROADMAP RM-RATIOUNSAFE：帶週期標記 pattern 名 0／183 被判、主路徑 L6.5 改寫 62／62 pattern 欄且 13 欄訊號抹為 0、三種週期標記規則不一致。下一步：SPEC 落檔 → 三家審查 → 白話逐條閘（含「主路徑 pattern 欄改為原值通過」之落盤值語意變更，須使用者核可）→ TODO manifest → 實作"
       ],
       [
         "046",

@@ -6,7 +6,7 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
-| 04-013 | HP-PRERED | 進行中 | docs/TICKET_ORDER.md | SPEC v7（docs/PRERED_SPEC.md；v5 經審查 r1–r4 與戳記輪三家 APPROVED，handoffs/reconcile/20261003-prered-x-review-r4/synth.md；v6＝實作期修正，送審碼輪一併審）、TODO manifest docs/manifests/PRERED.json（TODOFMT PASS）。r4 債卡死已解：使用者裁定「讓那一家重做」⇒ 新增同輪重派條件③′（29b25f55，該家無結果列且產出缺或 0 byte、開輪逾 3600 秒）。實作 Phase 1–3 完成：治理 12 支、alias、resume、v7、L1／全量基準逐支修（全屬測試前提過期）；使用者核可後單週期 BTCUSDT/12h、ETHUSDT/12h、ETHUSDT/1h 三單元重凍（A／B 確定性相等，收據 handoffs/run_receipts/20261003-prered-refreeze.json）；直跑 L3 存活欄數 65483→59962 逐欄歸因未解釋 0（Task 2.7）；允許仍紅精確集合 tests/_golden/prered/allowed_red.json 40 列（FRAMEPATH 1、ICFIRSTALIGN 9＝IC-first 2＋多週期基準與 config_hash 釘值 2＋v6 三支五 node id 受 F-2 擋〔HEAD 峰值約 71 GB vs d229336e^ 0.80 GB〕、FFSTORE 30＝使用者核可刪除全部舊特徵 run 所致〔逐支失敗訊息鑑別；原 34 中 IC 停止閘 4 支實為 39377e29 致 fixture 注入被 registry 重讀洗掉，已修〕）。BTCUSDT/1h 與多週期單元未重凍。已提交 2e9ded51 並推送。　審碼 b1 r1（round ccbd8d36）：composer proceed；codex 擋 P1（已核模式 11 節點同一行程）、grok 擋 P1（Task 2.5 F-2 分段收據與 ROADMAP 指標未交付）＋P3（census 檔數敘述）——三條已修（逐節點迴圈、收據 handoffs/run_receipts/20261003-prered-f2-memory.json 與 RM-ICFIRSTALIGN 指標、SPEC Task 3.1 改寫），待 r2 原提出方閉合驗證。待辦：審碼 r2 → 第 3 步 RATIOUNSAFE（唯讀預查已證 43／43 漏判，判定兩份逐字重複實作） |
+| 04-014 | HP-RATIOUNSAFE | 進行中 | docs/TICKET_ORDER.md | 全票排序第 3 步（PRE-RED 已於 2026-10-03 收案）：SPEC 起草中（主委草稿，尚未送審）。預查收據與範圍見 ROADMAP RM-RATIOUNSAFE：帶週期標記 pattern 名 0／183 被判、主路徑 L6.5 改寫 62／62 pattern 欄且 13 欄訊號抹為 0、三種週期標記規則不一致。下一步：SPEC 落檔 → 三家審查 → 白話逐條閘（含「主路徑 pattern 欄改為原值通過」之落盤值語意變更，須使用者核可）→ TODO manifest → 實作 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -29,7 +29,7 @@
 | 04-008 | HP-ICFIRSTALIGN | 未開工 | docs/manifests/FFSTAT.json | 只剩乙部分：run_ic_first 去除 factory 可變狀態依賴（不可變 run context，含選窗介面）、修 L7 raw 讀回時間軸之 IC 對齊（真實 kline 下 IC 階段必拋 AlignmentViolationError；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 `78c85bb2`）。甲部分（IC 頁套用後處理改正式實作、post-IC 排名／z 分數窗未滿即出值）已由 ICPOSTLEAK 於 2026-10-02 交付（docs/ICPOSTLEAK_SPEC.md）。全票排序第 4 步（docs/TICKET_ORDER.md，先於 FRAMEPATH）：自第一行鎖 CGSA（run_ic_first 現於 feature_factory.py 將 `_cgsa_registry` 設 None、走記憶體路徑）、三處時間軸、FU-2、MEM-RSS 對照量測併入 |
 | 04-009 | HP-FRAMEPATH | 未開工 | handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md | 查證輪 r1 已銷帳（三方一致：生產無 frame 入口、frame 多週期平穩化錯誤）；使用者 2026-09-28 裁定刪除 frame 產生路徑與舊特徵 h5 讀取、不再花時間在 frame 測試（K 線 kline_cache.h5 不在此列）；全票排序第 5 步（docs/TICKET_ORDER.md）：於 ICFIRSTALIGN 乙之後（run_ic_first 現走記憶體路徑，查證輪 r1 未涵蓋）；刪除票 SPEC 走完整管線；FF-STAT b4 已先移除 frame 驗收臂 |
 | 04-010 | HP-TESTSPEED | 停手 | HANDOFF.md | 2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（< 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。「各運算路徑取代表之快速版」經全票排序諮詢與使用者 2026-10-02 拍板作廢（與 2026-09-29「不挑代表、不接受專項專用」衝突；docs/TICKET_ORDER.md）；本票不再排程 |
-| 04-013 | HP-PRERED | 進行中 | docs/TICKET_ORDER.md | SPEC v7（docs/PRERED_SPEC.md；v5 經審查 r1–r4 與戳記輪三家 APPROVED，handoffs/reconcile/20261003-prered-x-review-r4/synth.md；v6＝實作期修正，送審碼輪一併審）、TODO manifest docs/manifests/PRERED.json（TODOFMT PASS）。r4 債卡死已解：使用者裁定「讓那一家重做」⇒ 新增同輪重派條件③′（29b25f55，該家無結果列且產出缺或 0 byte、開輪逾 3600 秒）。實作 Phase 1–3 完成：治理 12 支、alias、resume、v7、L1／全量基準逐支修（全屬測試前提過期）；使用者核可後單週期 BTCUSDT/12h、ETHUSDT/12h、ETHUSDT/1h 三單元重凍（A／B 確定性相等，收據 handoffs/run_receipts/20261003-prered-refreeze.json）；直跑 L3 存活欄數 65483→59962 逐欄歸因未解釋 0（Task 2.7）；允許仍紅精確集合 tests/_golden/prered/allowed_red.json 40 列（FRAMEPATH 1、ICFIRSTALIGN 9＝IC-first 2＋多週期基準與 config_hash 釘值 2＋v6 三支五 node id 受 F-2 擋〔HEAD 峰值約 71 GB vs d229336e^ 0.80 GB〕、FFSTORE 30＝使用者核可刪除全部舊特徵 run 所致〔逐支失敗訊息鑑別；原 34 中 IC 停止閘 4 支實為 39377e29 致 fixture 注入被 registry 重讀洗掉，已修〕）。BTCUSDT/1h 與多週期單元未重凍。已提交 2e9ded51 並推送。　審碼 b1 r1（round ccbd8d36）：composer proceed；codex 擋 P1（已核模式 11 節點同一行程）、grok 擋 P1（Task 2.5 F-2 分段收據與 ROADMAP 指標未交付）＋P3（census 檔數敘述）——三條已修（逐節點迴圈、收據 handoffs/run_receipts/20261003-prered-f2-memory.json 與 RM-ICFIRSTALIGN 指標、SPEC Task 3.1 改寫），待 r2 原提出方閉合驗證。待辦：審碼 r2 → 第 3 步 RATIOUNSAFE（唯讀預查已證 43／43 漏判，判定兩份逐字重複實作） |
+| 04-014 | HP-RATIOUNSAFE | 進行中 | docs/TICKET_ORDER.md | 全票排序第 3 步（PRE-RED 已於 2026-10-03 收案）：SPEC 起草中（主委草稿，尚未送審）。預查收據與範圍見 ROADMAP RM-RATIOUNSAFE：帶週期標記 pattern 名 0／183 被判、主路徑 L6.5 改寫 62／62 pattern 欄且 13 欄訊號抹為 0、三種週期標記規則不一致。下一步：SPEC 落檔 → 三家審查 → 白話逐條閘（含「主路徑 pattern 欄改為原值通過」之落盤值語意變更，須使用者核可）→ TODO manifest → 實作 |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑
@@ -218,6 +218,9 @@
 - 🔴 **`cd` 絕對路徑被權限擋**：只有相對路徑（如 `cd ../..`）可過；腳本內要換目錄改寫成 `(cd $WT && …)` 放進腳本檔再 `zsh` 執行。
 - 🔴 **`pytest --collect-only` 要用 `-qq` 才是一行一個 node id**；別用 `-o addopts=` 覆寫——會讓 conftest 匯入失敗而整批收集錯。
 - 🔴 **多個特徵工廠重節點放同一 pytest 行程會累積記憶體被系統終止**：correctness 類一律一個節點一個行程（範例 `handoffs/run_receipts/prered_probes/nodes_watched.sh`）。
+- 🔴 **「允許仍紅」名單不得以「非固定列一律歸某票」產生**（2026-10-03 PRE-RED 審碼 r1）：首版把 34 支全歸「刪舊 run 所致」，逐支取失敗訊息（`--junitxml`）並於**同一資料狀態**之 worktree 對 commit 對實跑後，4 支實為 `39377e29` 致 fixture 失效。鑑別腳本 `handoffs/run_receipts/prered_probes/ffstore_messages.sh`、`files_at_commit.sh`（複製 `data_cache/features`、kline 唯讀連結，使 commit 間差異只來自程式碼）。
+- 🔴 **測試注入 registry 須落檔**：IC service 自 `39377e29` 起每次解析前 `reload_registry()` 重讀磁碟，只改記憶體 `_entries` 之注入會被洗掉；改把 registry `_path` 指向暫存檔並寫入（範例 `tests/api/test_gap3_ic_stop_gate.py::inject_latest_run`）。
+- 🔴 **CGSA 生成 `persist=False` 回傳之 `features_df` 為空**（資料在 registry）；L6.5 經 raw-sink 寫入 `raw` 成品（無獨立 `processed`）。要比前處理效果須「前處理開／關」各生成一次並落盤至暫存目錄讀 `raw`（範例 `handoffs/run_receipts/ratiounsafe_probes/registry_l65_pattern_probe.py`）。
 - 🔴 **bisect 時把現行測試檔疊到舊 commit 會無限 skip**（舊碼缺新 fixture／符號）：改對「計算值」bisect（如算 config_hash、存活欄數），範例 `handoffs/run_receipts/prered_probes/mtf_count_at.sh`。
 
 ## 進行中紀錄
