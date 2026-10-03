@@ -1,0 +1,3814 @@
+{
+ "stage": "after",
+ "spec": "docs/RATIOUNSAFE_SPEC.md v5",
+ "s1_off": {
+  "names_sha256": "992a9269ab5951ad53c2293695068f289c57f2dea76f379e72c7aefaa77c4b76",
+  "names": [
+   "close_12h_Lag_1",
+   "close_12h_Lag_13",
+   "close_12h_Lag_2",
+   "close_12h_Lag_21",
+   "close_12h_Lag_3",
+   "close_12h_Lag_34",
+   "close_12h_Lag_5",
+   "close_12h_Lag_8",
+   "close_12h_trend_EMA_8",
+   "close_12h_trend_EMA_8_Abs",
+   "close_12h_trend_EMA_8_Clip",
+   "close_12h_trend_EMA_8_DecayLinear_W13",
+   "close_12h_trend_EMA_8_DecayLinear_W21",
+   "close_12h_trend_EMA_8_DecayLinear_W5",
+   "close_12h_trend_EMA_8_Distance",
+   "close_12h_trend_EMA_8_Kurt_W13",
+   "close_12h_trend_EMA_8_Kurt_W144",
+   "close_12h_trend_EMA_8_Kurt_W21",
+   "close_12h_trend_EMA_8_Kurt_W233",
+   "close_12h_trend_EMA_8_Kurt_W34",
+   "close_12h_trend_EMA_8_Kurt_W5",
+   "close_12h_trend_EMA_8_Kurt_W55",
+   "close_12h_trend_EMA_8_Kurt_W8",
+   "close_12h_trend_EMA_8_Kurt_W89",
+   "close_12h_trend_EMA_8_Lag_1",
+   "close_12h_trend_EMA_8_Lag_13",
+   "close_12h_trend_EMA_8_Lag_2",
+   "close_12h_trend_EMA_8_Lag_21",
+   "close_12h_trend_EMA_8_Lag_3",
+   "close_12h_trend_EMA_8_Lag_34",
+   "close_12h_trend_EMA_8_Lag_5",
+   "close_12h_trend_EMA_8_Lag_8",
+   "close_12h_trend_EMA_8_Log1p",
+   "close_12h_trend_EMA_8_Max_W13",
+   "close_12h_trend_EMA_8_Max_W144",
+   "close_12h_trend_EMA_8_Max_W21",
+   "close_12h_trend_EMA_8_Max_W233",
+   "close_12h_trend_EMA_8_Max_W3",
+   "close_12h_trend_EMA_8_Max_W34",
+   "close_12h_trend_EMA_8_Max_W5",
+   "close_12h_trend_EMA_8_Max_W55",
+   "close_12h_trend_EMA_8_Max_W8",
+   "close_12h_trend_EMA_8_Max_W89",
+   "close_12h_trend_EMA_8_Mean_W13",
+   "close_12h_trend_EMA_8_Mean_W144",
+   "close_12h_trend_EMA_8_Mean_W21",
+   "close_12h_trend_EMA_8_Mean_W233",
+   "close_12h_trend_EMA_8_Mean_W3",
+   "close_12h_trend_EMA_8_Mean_W34",
+   "close_12h_trend_EMA_8_Mean_W5",
+   "close_12h_trend_EMA_8_Mean_W55",
+   "close_12h_trend_EMA_8_Mean_W8",
+   "close_12h_trend_EMA_8_Mean_W89",
+   "close_12h_trend_EMA_8_Min_W13",
+   "close_12h_trend_EMA_8_Min_W144",
+   "close_12h_trend_EMA_8_Min_W21",
+   "close_12h_trend_EMA_8_Min_W233",
+   "close_12h_trend_EMA_8_Min_W3",
+   "close_12h_trend_EMA_8_Min_W34",
+   "close_12h_trend_EMA_8_Min_W5",
+   "close_12h_trend_EMA_8_Min_W55",
+   "close_12h_trend_EMA_8_Min_W8",
+   "close_12h_trend_EMA_8_Min_W89",
+   "close_12h_trend_EMA_8_Momentum_L13",
+   "close_12h_trend_EMA_8_Momentum_L144",
+   "close_12h_trend_EMA_8_Momentum_L21",
+   "close_12h_trend_EMA_8_Momentum_L233",
+   "close_12h_trend_EMA_8_Momentum_L3",
+   "close_12h_trend_EMA_8_Momentum_L34",
+   "close_12h_trend_EMA_8_Momentum_L5",
+   "close_12h_trend_EMA_8_Momentum_L55",
+   "close_12h_trend_EMA_8_Momentum_L8",
+   "close_12h_trend_EMA_8_Momentum_L89",
+   "close_12h_trend_EMA_8_Range_W13",
+   "close_12h_trend_EMA_8_Range_W144",
+   "close_12h_trend_EMA_8_Range_W21",
+   "close_12h_trend_EMA_8_Range_W233",
+   "close_12h_trend_EMA_8_Range_W3",
+   "close_12h_trend_EMA_8_Range_W34",
+   "close_12h_trend_EMA_8_Range_W5",
+   "close_12h_trend_EMA_8_Range_W55",
+   "close_12h_trend_EMA_8_Range_W8",
+   "close_12h_trend_EMA_8_Range_W89",
+   "close_12h_trend_EMA_8_Rank_W13",
+   "close_12h_trend_EMA_8_Rank_W144",
+   "close_12h_trend_EMA_8_Rank_W21",
+   "close_12h_trend_EMA_8_Rank_W233",
+   "close_12h_trend_EMA_8_Rank_W3",
+   "close_12h_trend_EMA_8_Rank_W34",
+   "close_12h_trend_EMA_8_Rank_W5",
+   "close_12h_trend_EMA_8_Rank_W55",
+   "close_12h_trend_EMA_8_Rank_W8",
+   "close_12h_trend_EMA_8_Rank_W89",
+   "close_12h_trend_EMA_8_Sign",
+   "close_12h_trend_EMA_8_Skew_W13",
+   "close_12h_trend_EMA_8_Skew_W144",
+   "close_12h_trend_EMA_8_Skew_W21",
+   "close_12h_trend_EMA_8_Skew_W233",
+   "close_12h_trend_EMA_8_Skew_W3",
+   "close_12h_trend_EMA_8_Skew_W34",
+   "close_12h_trend_EMA_8_Skew_W5",
+   "close_12h_trend_EMA_8_Skew_W55",
+   "close_12h_trend_EMA_8_Skew_W8",
+   "close_12h_trend_EMA_8_Skew_W89",
+   "close_12h_trend_EMA_8_Slope_W13",
+   "close_12h_trend_EMA_8_Slope_W144",
+   "close_12h_trend_EMA_8_Slope_W21",
+   "close_12h_trend_EMA_8_Slope_W233",
+   "close_12h_trend_EMA_8_Slope_W3",
+   "close_12h_trend_EMA_8_Slope_W34",
+   "close_12h_trend_EMA_8_Slope_W5",
+   "close_12h_trend_EMA_8_Slope_W55",
+   "close_12h_trend_EMA_8_Slope_W8",
+   "close_12h_trend_EMA_8_Slope_W89",
+   "close_12h_trend_EMA_8_Std_W13",
+   "close_12h_trend_EMA_8_Std_W144",
+   "close_12h_trend_EMA_8_Std_W21",
+   "close_12h_trend_EMA_8_Std_W233",
+   "close_12h_trend_EMA_8_Std_W3",
+   "close_12h_trend_EMA_8_Std_W34",
+   "close_12h_trend_EMA_8_Std_W5",
+   "close_12h_trend_EMA_8_Std_W55",
+   "close_12h_trend_EMA_8_Std_W8",
+   "close_12h_trend_EMA_8_Std_W89",
+   "close_12h_trend_EMA_8_TsArgmax_W13",
+   "close_12h_trend_EMA_8_TsArgmax_W21",
+   "close_12h_trend_EMA_8_TsArgmax_W5",
+   "close_12h_trend_EMA_8_TsArgmin_W13",
+   "close_12h_trend_EMA_8_TsArgmin_W21",
+   "close_12h_trend_EMA_8_TsArgmin_W5",
+   "close_12h_trend_EMA_8_TsRank_W13",
+   "close_12h_trend_EMA_8_TsRank_W21",
+   "close_12h_trend_EMA_8_TsRank_W5",
+   "close_12h_trend_EMA_8_ZScore_W13",
+   "close_12h_trend_EMA_8_ZScore_W144",
+   "close_12h_trend_EMA_8_ZScore_W21",
+   "close_12h_trend_EMA_8_ZScore_W233",
+   "close_12h_trend_EMA_8_ZScore_W3",
+   "close_12h_trend_EMA_8_ZScore_W34",
+   "close_12h_trend_EMA_8_ZScore_W5",
+   "close_12h_trend_EMA_8_ZScore_W55",
+   "close_12h_trend_EMA_8_ZScore_W8",
+   "close_12h_trend_EMA_8_ZScore_W89",
+   "close_12h_trend_SMA_13",
+   "close_12h_trend_SMA_13_Abs",
+   "close_12h_trend_SMA_13_Clip",
+   "close_12h_trend_SMA_13_DecayLinear_W13",
+   "close_12h_trend_SMA_13_DecayLinear_W21",
+   "close_12h_trend_SMA_13_DecayLinear_W5",
+   "close_12h_trend_SMA_13_Distance",
+   "close_12h_trend_SMA_13_Kurt_W13",
+   "close_12h_trend_SMA_13_Kurt_W144",
+   "close_12h_trend_SMA_13_Kurt_W21",
+   "close_12h_trend_SMA_13_Kurt_W233",
+   "close_12h_trend_SMA_13_Kurt_W34",
+   "close_12h_trend_SMA_13_Kurt_W5",
+   "close_12h_trend_SMA_13_Kurt_W55",
+   "close_12h_trend_SMA_13_Kurt_W8",
+   "close_12h_trend_SMA_13_Kurt_W89",
+   "close_12h_trend_SMA_13_Lag_1",
+   "close_12h_trend_SMA_13_Lag_13",
+   "close_12h_trend_SMA_13_Lag_2",
+   "close_12h_trend_SMA_13_Lag_21",
+   "close_12h_trend_SMA_13_Lag_3",
+   "close_12h_trend_SMA_13_Lag_34",
+   "close_12h_trend_SMA_13_Lag_5",
+   "close_12h_trend_SMA_13_Lag_8",
+   "close_12h_trend_SMA_13_Log1p",
+   "close_12h_trend_SMA_13_Max_W13",
+   "close_12h_trend_SMA_13_Max_W144",
+   "close_12h_trend_SMA_13_Max_W21",
+   "close_12h_trend_SMA_13_Max_W233",
+   "close_12h_trend_SMA_13_Max_W3",
+   "close_12h_trend_SMA_13_Max_W34",
+   "close_12h_trend_SMA_13_Max_W5",
+   "close_12h_trend_SMA_13_Max_W55",
+   "close_12h_trend_SMA_13_Max_W8",
+   "close_12h_trend_SMA_13_Max_W89",
+   "close_12h_trend_SMA_13_Mean_W13",
+   "close_12h_trend_SMA_13_Mean_W144",
+   "close_12h_trend_SMA_13_Mean_W21",
+   "close_12h_trend_SMA_13_Mean_W233",
+   "close_12h_trend_SMA_13_Mean_W3",
+   "close_12h_trend_SMA_13_Mean_W34",
+   "close_12h_trend_SMA_13_Mean_W5",
+   "close_12h_trend_SMA_13_Mean_W55",
+   "close_12h_trend_SMA_13_Mean_W8",
+   "close_12h_trend_SMA_13_Mean_W89",
+   "close_12h_trend_SMA_13_Min_W13",
+   "close_12h_trend_SMA_13_Min_W144",
+   "close_12h_trend_SMA_13_Min_W21",
+   "close_12h_trend_SMA_13_Min_W233",
+   "close_12h_trend_SMA_13_Min_W3",
+   "close_12h_trend_SMA_13_Min_W34",
+   "close_12h_trend_SMA_13_Min_W5",
+   "close_12h_trend_SMA_13_Min_W55",
+   "close_12h_trend_SMA_13_Min_W8",
+   "close_12h_trend_SMA_13_Min_W89",
+   "close_12h_trend_SMA_13_Momentum_L13",
+   "close_12h_trend_SMA_13_Momentum_L144",
+   "close_12h_trend_SMA_13_Momentum_L21",
+   "close_12h_trend_SMA_13_Momentum_L233",
+   "close_12h_trend_SMA_13_Momentum_L3",
+   "close_12h_trend_SMA_13_Momentum_L34",
+   "close_12h_trend_SMA_13_Momentum_L5",
+   "close_12h_trend_SMA_13_Momentum_L55",
+   "close_12h_trend_SMA_13_Momentum_L8",
+   "close_12h_trend_SMA_13_Momentum_L89",
+   "close_12h_trend_SMA_13_Range_W13",
+   "close_12h_trend_SMA_13_Range_W144",
+   "close_12h_trend_SMA_13_Range_W21",
+   "close_12h_trend_SMA_13_Range_W233",
+   "close_12h_trend_SMA_13_Range_W3",
+   "close_12h_trend_SMA_13_Range_W34",
+   "close_12h_trend_SMA_13_Range_W5",
+   "close_12h_trend_SMA_13_Range_W55",
+   "close_12h_trend_SMA_13_Range_W8",
+   "close_12h_trend_SMA_13_Range_W89",
+   "close_12h_trend_SMA_13_Rank_W13",
+   "close_12h_trend_SMA_13_Rank_W144",
+   "close_12h_trend_SMA_13_Rank_W21",
+   "close_12h_trend_SMA_13_Rank_W233",
+   "close_12h_trend_SMA_13_Rank_W3",
+   "close_12h_trend_SMA_13_Rank_W34",
+   "close_12h_trend_SMA_13_Rank_W5",
+   "close_12h_trend_SMA_13_Rank_W55",
+   "close_12h_trend_SMA_13_Rank_W8",
+   "close_12h_trend_SMA_13_Rank_W89",
+   "close_12h_trend_SMA_13_Sign",
+   "close_12h_trend_SMA_13_Skew_W13",
+   "close_12h_trend_SMA_13_Skew_W144",
+   "close_12h_trend_SMA_13_Skew_W21",
+   "close_12h_trend_SMA_13_Skew_W233",
+   "close_12h_trend_SMA_13_Skew_W3",
+   "close_12h_trend_SMA_13_Skew_W34",
+   "close_12h_trend_SMA_13_Skew_W5",
+   "close_12h_trend_SMA_13_Skew_W55",
+   "close_12h_trend_SMA_13_Skew_W8",
+   "close_12h_trend_SMA_13_Skew_W89",
+   "close_12h_trend_SMA_13_Slope_W13",
+   "close_12h_trend_SMA_13_Slope_W144",
+   "close_12h_trend_SMA_13_Slope_W21",
+   "close_12h_trend_SMA_13_Slope_W233",
+   "close_12h_trend_SMA_13_Slope_W3",
+   "close_12h_trend_SMA_13_Slope_W34",
+   "close_12h_trend_SMA_13_Slope_W5",
+   "close_12h_trend_SMA_13_Slope_W55",
+   "close_12h_trend_SMA_13_Slope_W8",
+   "close_12h_trend_SMA_13_Slope_W89",
+   "close_12h_trend_SMA_13_Std_W13",
+   "close_12h_trend_SMA_13_Std_W144",
+   "close_12h_trend_SMA_13_Std_W21",
+   "close_12h_trend_SMA_13_Std_W233",
+   "close_12h_trend_SMA_13_Std_W3",
+   "close_12h_trend_SMA_13_Std_W34",
+   "close_12h_trend_SMA_13_Std_W5",
+   "close_12h_trend_SMA_13_Std_W55",
+   "close_12h_trend_SMA_13_Std_W8",
+   "close_12h_trend_SMA_13_Std_W89",
+   "close_12h_trend_SMA_13_TsArgmax_W13",
+   "close_12h_trend_SMA_13_TsArgmax_W21",
+   "close_12h_trend_SMA_13_TsArgmax_W5",
+   "close_12h_trend_SMA_13_TsArgmin_W13",
+   "close_12h_trend_SMA_13_TsArgmin_W21",
+   "close_12h_trend_SMA_13_TsArgmin_W5",
+   "close_12h_trend_SMA_13_TsRank_W13",
+   "close_12h_trend_SMA_13_TsRank_W21",
+   "close_12h_trend_SMA_13_TsRank_W5",
+   "close_12h_trend_SMA_13_ZScore_W13",
+   "close_12h_trend_SMA_13_ZScore_W144",
+   "close_12h_trend_SMA_13_ZScore_W21",
+   "close_12h_trend_SMA_13_ZScore_W233",
+   "close_12h_trend_SMA_13_ZScore_W3",
+   "close_12h_trend_SMA_13_ZScore_W34",
+   "close_12h_trend_SMA_13_ZScore_W5",
+   "close_12h_trend_SMA_13_ZScore_W55",
+   "close_12h_trend_SMA_13_ZScore_W8",
+   "close_12h_trend_SMA_13_ZScore_W89",
+   "high_12h_Lag_1",
+   "high_12h_Lag_13",
+   "high_12h_Lag_2",
+   "high_12h_Lag_21",
+   "high_12h_Lag_3",
+   "high_12h_Lag_34",
+   "high_12h_Lag_5",
+   "high_12h_Lag_8",
+   "low_12h_Lag_1",
+   "low_12h_Lag_13",
+   "low_12h_Lag_2",
+   "low_12h_Lag_21",
+   "low_12h_Lag_3",
+   "low_12h_Lag_34",
+   "low_12h_Lag_5",
+   "low_12h_Lag_8",
+   "meta_12h_Momentum_Divergence",
+   "meta_12h_Time_DayOfWeek",
+   "meta_12h_Time_HourOfDay",
+   "meta_12h_Time_IsWeekend",
+   "meta_12h_Time_MonthOfYear",
+   "meta_12h_Trend_Consensus",
+   "meta_12h_Volatility_Regime",
+   "meta_12h_VolumePrice_Divergence",
+   "meta_12h_Volume_PriceChange",
+   "ohlc_12h_pattern_BearishCount_W13",
+   "ohlc_12h_pattern_BearishCount_W21",
+   "ohlc_12h_pattern_BearishCount_W5",
+   "ohlc_12h_pattern_BullishCount_W13",
+   "ohlc_12h_pattern_BullishCount_W21",
+   "ohlc_12h_pattern_BullishCount_W5",
+   "ohlc_12h_pattern_CDL2CROWS",
+   "ohlc_12h_pattern_CDL3BLACKCROWS",
+   "ohlc_12h_pattern_CDL3INSIDE",
+   "ohlc_12h_pattern_CDL3LINESTRIKE",
+   "ohlc_12h_pattern_CDL3OUTSIDE",
+   "ohlc_12h_pattern_CDL3STARSINSOUTH",
+   "ohlc_12h_pattern_CDL3WHITESOLDIERS",
+   "ohlc_12h_pattern_CDLABANDONEDBABY",
+   "ohlc_12h_pattern_CDLADVANCEBLOCK",
+   "ohlc_12h_pattern_CDLBELTHOLD",
+   "ohlc_12h_pattern_CDLBREAKAWAY",
+   "ohlc_12h_pattern_CDLCLOSINGMARUBOZU",
+   "ohlc_12h_pattern_CDLCONCEALBABYSWALL",
+   "ohlc_12h_pattern_CDLCOUNTERATTACK",
+   "ohlc_12h_pattern_CDLDARKCLOUDCOVER",
+   "ohlc_12h_pattern_CDLDOJI",
+   "ohlc_12h_pattern_CDLDOJISTAR",
+   "ohlc_12h_pattern_CDLDRAGONFLYDOJI",
+   "ohlc_12h_pattern_CDLENGULFING",
+   "ohlc_12h_pattern_CDLEVENINGDOJISTAR",
+   "ohlc_12h_pattern_CDLEVENINGSTAR",
+   "ohlc_12h_pattern_CDLGAPSIDESIDEWHITE",
+   "ohlc_12h_pattern_CDLGRAVESTONEDOJI",
+   "ohlc_12h_pattern_CDLHAMMER",
+   "ohlc_12h_pattern_CDLHANGINGMAN",
+   "ohlc_12h_pattern_CDLHARAMI",
+   "ohlc_12h_pattern_CDLHARAMICROSS",
+   "ohlc_12h_pattern_CDLHIGHWAVE",
+   "ohlc_12h_pattern_CDLHIKKAKE",
+   "ohlc_12h_pattern_CDLHIKKAKEMOD",
+   "ohlc_12h_pattern_CDLHOMINGPIGEON",
+   "ohlc_12h_pattern_CDLIDENTICAL3CROWS",
+   "ohlc_12h_pattern_CDLINNECK",
+   "ohlc_12h_pattern_CDLINVERTEDHAMMER",
+   "ohlc_12h_pattern_CDLKICKING",
+   "ohlc_12h_pattern_CDLKICKINGBYLENGTH",
+   "ohlc_12h_pattern_CDLLADDERBOTTOM",
+   "ohlc_12h_pattern_CDLLONGLEGGEDDOJI",
+   "ohlc_12h_pattern_CDLLONGLINE",
+   "ohlc_12h_pattern_CDLMARUBOZU",
+   "ohlc_12h_pattern_CDLMATCHINGLOW",
+   "ohlc_12h_pattern_CDLMATHOLD",
+   "ohlc_12h_pattern_CDLMORNINGDOJISTAR",
+   "ohlc_12h_pattern_CDLMORNINGSTAR",
+   "ohlc_12h_pattern_CDLONNECK",
+   "ohlc_12h_pattern_CDLPIERCING",
+   "ohlc_12h_pattern_CDLRICKSHAWMAN",
+   "ohlc_12h_pattern_CDLRISEFALL3METHODS",
+   "ohlc_12h_pattern_CDLSEPARATINGLINES",
+   "ohlc_12h_pattern_CDLSHOOTINGSTAR",
+   "ohlc_12h_pattern_CDLSHORTLINE",
+   "ohlc_12h_pattern_CDLSPINNINGTOP",
+   "ohlc_12h_pattern_CDLSTALLEDPATTERN",
+   "ohlc_12h_pattern_CDLSTICKSANDWICH",
+   "ohlc_12h_pattern_CDLTAKURI",
+   "ohlc_12h_pattern_CDLTASUKIGAP",
+   "ohlc_12h_pattern_CDLTHRUSTING",
+   "ohlc_12h_pattern_CDLTRISTAR",
+   "ohlc_12h_pattern_CDLUNIQUE3RIVER",
+   "ohlc_12h_pattern_CDLUPSIDEGAP2CROWS",
+   "ohlc_12h_pattern_CDLXSIDEGAP3METHODS",
+   "ohlc_12h_pattern_Consensus",
+   "ohlc_12h_pattern_Consensus_Lag_1",
+   "ohlc_12h_pattern_Consensus_Lag_13",
+   "ohlc_12h_pattern_Consensus_Lag_2",
+   "ohlc_12h_pattern_Consensus_Lag_21",
+   "ohlc_12h_pattern_Consensus_Lag_3",
+   "ohlc_12h_pattern_Consensus_Lag_34",
+   "ohlc_12h_pattern_Consensus_Lag_5",
+   "ohlc_12h_pattern_Consensus_Lag_8",
+   "open_12h_Lag_1",
+   "open_12h_Lag_13",
+   "open_12h_Lag_2",
+   "open_12h_Lag_21",
+   "open_12h_Lag_3",
+   "open_12h_Lag_34",
+   "open_12h_Lag_5",
+   "open_12h_Lag_8",
+   "volume_12h_Lag_1",
+   "volume_12h_Lag_13",
+   "volume_12h_Lag_2",
+   "volume_12h_Lag_21",
+   "volume_12h_Lag_3",
+   "volume_12h_Lag_34",
+   "volume_12h_Lag_5",
+   "volume_12h_Lag_8"
+  ],
+  "n_columns": 395,
+  "n_rows": 1695,
+  "parquet_bytes": 1230585,
+  "columns": {
+   "ohlc_12h_pattern_BearishCount_W13": {
+    "value_sha256": "1a32a83d654f14439d021975b6e5113ed88e114a2b1eb9997ad9f7265b21a3eb",
+    "nan_mask_sha256": "3997cd9ab6291242d4ed0d1e3b49924b1e33d8ff104630f953057f5ec63c0f51"
+   },
+   "ohlc_12h_pattern_BearishCount_W21": {
+    "value_sha256": "63b6d565a839143b42c1d16e723ba50fa0f1e5f9ca7e804e6232497897b38c51",
+    "nan_mask_sha256": "b428a1e0e2d40d413fcaaec7e96e17effc16b633c6b6afae5c56776df0fa1303"
+   },
+   "ohlc_12h_pattern_BearishCount_W5": {
+    "value_sha256": "51b162835e06a16b63c0336c0cd86dfba4077cb63e1616135aa60ffc869ceaff",
+    "nan_mask_sha256": "60aa3117d682d05c0e2a8e22a26e8ab0035c91c7556c9c1d23c2215ff8b58a80"
+   },
+   "ohlc_12h_pattern_BullishCount_W13": {
+    "value_sha256": "33a56fd452552f8ca6b00a5b080642f6a80d535e8dc46cc162f658933c7ea70c",
+    "nan_mask_sha256": "3997cd9ab6291242d4ed0d1e3b49924b1e33d8ff104630f953057f5ec63c0f51"
+   },
+   "ohlc_12h_pattern_BullishCount_W21": {
+    "value_sha256": "00bc43fcb246ca2a60f8623c46a8ecde9f356e1c497f443925511d4b063dd953",
+    "nan_mask_sha256": "b428a1e0e2d40d413fcaaec7e96e17effc16b633c6b6afae5c56776df0fa1303"
+   },
+   "ohlc_12h_pattern_BullishCount_W5": {
+    "value_sha256": "daefb044e5d0833881697eac617f310c6161549eebf2ba147f6e9e1ee448ae92",
+    "nan_mask_sha256": "60aa3117d682d05c0e2a8e22a26e8ab0035c91c7556c9c1d23c2215ff8b58a80"
+   },
+   "ohlc_12h_pattern_CDL2CROWS": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3BLACKCROWS": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3INSIDE": {
+    "value_sha256": "3268cfec49a6d712509c8d33c0c1930663ae39c5598fecc92deb153b758ee195",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3LINESTRIKE": {
+    "value_sha256": "32848376b7dc89684c22bb33e9d49ccb4833db6fd3df1b6500f5cd2c3211a794",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3OUTSIDE": {
+    "value_sha256": "4ab7f324f5d5b3dcee9972e2261bba91bdb2ed150bd0f8bdf309cabbd4b340ce",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3STARSINSOUTH": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3WHITESOLDIERS": {
+    "value_sha256": "98e4e877a9076689af7a2ec52f7a5bcb62e0455bceecca12c9ffcf228a2079b0",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLABANDONEDBABY": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLADVANCEBLOCK": {
+    "value_sha256": "888969173dddf0632e042ef3bdd808fe77022c8e2e09ec3668dce606a6dfdfac",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLBELTHOLD": {
+    "value_sha256": "f661da87dd310f2acb2059d5cbc4d5674e697c2f8bcd08506545e9934aabafed",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLBREAKAWAY": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLCLOSINGMARUBOZU": {
+    "value_sha256": "de72aead3f240899a91a5315dc12139a1cb3279ef31ac0dfe0030711911b4aca",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLCONCEALBABYSWALL": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLCOUNTERATTACK": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLDARKCLOUDCOVER": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLDOJI": {
+    "value_sha256": "f11ee4472cf1a9725a1c01a457271c9c8a5d6ad2bf5ccd88bc54866c0cee09c9",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLDOJISTAR": {
+    "value_sha256": "2201500c6bccb5ccc5e4464e19b4dc2a146e75fdb18480b6fd0e1c30b1274e91",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLDRAGONFLYDOJI": {
+    "value_sha256": "9299a479f31ab62468c2cd01a16171d70080b50202fdffbe0869a666422dd0e4",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLENGULFING": {
+    "value_sha256": "911df05afc3f98652520adfb8e975ce71c529bb442908ec15d939a384c4b7d70",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLEVENINGDOJISTAR": {
+    "value_sha256": "a5b352254934cb7c2b2d002e8c40b615818b081c701ecc1eaffe5cbdd9ee9b73",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLEVENINGSTAR": {
+    "value_sha256": "06fbd84001277fb88359c794dcff67d13af4a05b1ff2c08b00d1530a34dacce7",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLGAPSIDESIDEWHITE": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLGRAVESTONEDOJI": {
+    "value_sha256": "15458b012e2a378565a569c3b4d03068d5d100986b7b5e974b74f9a40861b0ce",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHAMMER": {
+    "value_sha256": "a09d084aa90b0180381f577784f566df584212bb82b017a9620a3808a02d11ee",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHANGINGMAN": {
+    "value_sha256": "e55be87ba73af15885a137c1df94d10257026d1d8220464ed59e7ad79caa7adc",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHARAMI": {
+    "value_sha256": "7738e96280bbd65d53a784575117f2c5cab930f8891a985331752d069d6a0513",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHARAMICROSS": {
+    "value_sha256": "54b1839ae8f29f4e5ea17029882981b536e540f094351efac8917fca397b0976",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHIGHWAVE": {
+    "value_sha256": "a0b83ae4cd91e20dda7aad9cf787dafc68225519a8b19c4d491e656e2405e402",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHIKKAKE": {
+    "value_sha256": "106af063684869b53660c341a0044308a943e54876ba999b9a9521abad9ac460",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHIKKAKEMOD": {
+    "value_sha256": "72df407606fc6438b93f45ce1f34d7ddfde14210a48df4996adde169590da5e0",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHOMINGPIGEON": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLIDENTICAL3CROWS": {
+    "value_sha256": "ce6942311a3066d961e54953dde99e360b1d7d42ea1cd830a850e28385983fbf",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLINNECK": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLINVERTEDHAMMER": {
+    "value_sha256": "6e9f33c85fe476dc7b3218df7a083c6d45ebe7fec8ba27d27a65766d2d229146",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLKICKING": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLKICKINGBYLENGTH": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLLADDERBOTTOM": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLLONGLEGGEDDOJI": {
+    "value_sha256": "cd464f64fed990a963295b73a75e9c9f75ede43f733a9a895886de14046b9bf2",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLLONGLINE": {
+    "value_sha256": "608f0fc7418f33d9a3dfbb3beac6db15abc1c011b163da7cb97ce783c981e4bd",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLMARUBOZU": {
+    "value_sha256": "e336a3ed9a63f9b7710f746d0fb9c0a0bf622139028c90a0b08dcfc3c3dfacfc",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLMATCHINGLOW": {
+    "value_sha256": "ed8c5c051300ff356823762d425dcb56c26f5d91d3d234aee0ca762f990c710a",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLMATHOLD": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLMORNINGDOJISTAR": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLMORNINGSTAR": {
+    "value_sha256": "7d22d540897eb981dc596aa8ceb65c125ca6e9db057121d3cf5ad0bffc6d452f",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLONNECK": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLPIERCING": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLRICKSHAWMAN": {
+    "value_sha256": "f30bc9c881ce58626bff9df74f568376ff07797eb7fe73db342c836252feab3d",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLRISEFALL3METHODS": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSEPARATINGLINES": {
+    "value_sha256": "a966b8e25907cc676fb8ff8a272bb06d2768bd4951c7bc4ebbd37e1824ffead1",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSHOOTINGSTAR": {
+    "value_sha256": "5af20475a1f6437dbb15f37d6298afae7157bdd51e667f939e9bf383c95768b5",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSHORTLINE": {
+    "value_sha256": "731da2d612feca939e212d0f9722b6f7fe52706f20912dbafa2c772c3bd74d7c",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSPINNINGTOP": {
+    "value_sha256": "8af42e4de0d0b2d82f443b174e71995c9b6169a0989906fce78861b4e9b2f762",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSTALLEDPATTERN": {
+    "value_sha256": "a2a4fa8a0eda75057fbb6b350eecf6042d3bdafb271939b292a6552286b328a7",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSTICKSANDWICH": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLTAKURI": {
+    "value_sha256": "e5030a1a8e3ed0f5723ad4d32338e1b568f375e6d5169b3469612724b58c6c86",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLTASUKIGAP": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLTHRUSTING": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLTRISTAR": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLUNIQUE3RIVER": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLUPSIDEGAP2CROWS": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLXSIDEGAP3METHODS": {
+    "value_sha256": "22beccd93f8867c7b0ab9538f0af8f2cebf59d076a17e4773f64a299904ee8b2",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_Consensus": {
+    "value_sha256": "70f8652cfae244a89deeb506def125023e2fcb0218d135f76eee98bc9b90e23c",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "close_12h_trend_EMA_8": {
+    "value_sha256": "986dc2fb1d7bc9169a4fad49c5796c68ca8a717b3646263e1d641a7880fb550e",
+    "nan_mask_sha256": "fc93dffbbbd29fbe637921283a086d34523cbd2f70e8e4397f3600cedd85345f"
+   },
+   "close_12h_trend_SMA_13": {
+    "value_sha256": "c0670924a7ecb12304dea929ae3035f0a810f5f7d29ec5ad9c3dd187455be78b",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_EMA_8_Distance": {
+    "value_sha256": "012c954435579b0faf455e2ce09bdf6f6bceeb295f885cbe4ad0686c786aa855",
+    "nan_mask_sha256": "2161fc1c09693a3e353294e1151d1b7f920740a8b95801b77992b9ee12786d53"
+   },
+   "close_12h_trend_SMA_13_Distance": {
+    "value_sha256": "a66c9bbc44a0fe7af8692c2cc7a491db96e6769c81cf465d16777b84959c0658",
+    "nan_mask_sha256": "6fa2d412d50c76c26b55c9741e19c46c5e5620cb1e280e58603d5a074f45915e"
+   },
+   "close_12h_trend_EMA_8_Momentum_L3": {
+    "value_sha256": "ae4a9b5f51054baadd45f3f989934ea870189629b19776be1e4c3523e64f146a",
+    "nan_mask_sha256": "4ba80519b08c35e16566aaef34694f4b0a77dfeab6e282ec06cc1a1077b73f51"
+   },
+   "close_12h_trend_EMA_8_Momentum_L5": {
+    "value_sha256": "c09fa4017cef9d7e2c48d6ec08e19367da4db23ea3f9547aa3ea393053cda7e3",
+    "nan_mask_sha256": "3a7381cb013f9d0760401bb4bc49fcd6e15095155f43eff1f4cf2772270d261d"
+   },
+   "close_12h_trend_EMA_8_Momentum_L8": {
+    "value_sha256": "8be857b04576b63d57094d636fcee75a55266c32c9335bd5ead2cf2db22f3dfc",
+    "nan_mask_sha256": "e31cc9f68534f64e0dfe3c293570eb36f5ce6f1ccd87d730c2ab16e19d8acd5d"
+   },
+   "close_12h_trend_EMA_8_Momentum_L13": {
+    "value_sha256": "4818aad6853e036f47009ae7f2272205540c2075d972353206dab5d15c651c4b",
+    "nan_mask_sha256": "fff21ef330964585bd00370fc72b5d0a156e9dec09fbbbb7ec3702cf2857cd3e"
+   },
+   "close_12h_trend_EMA_8_Momentum_L21": {
+    "value_sha256": "94f44489598d50ad66236e1ba9590f64b29b74d749458c62f16805ed2f653329",
+    "nan_mask_sha256": "d0bd2f8454f40ddb1628ebe13bfc0b9dea5a96986c08e6e83d25b351049d0e37"
+   },
+   "close_12h_trend_EMA_8_Momentum_L34": {
+    "value_sha256": "1c212cac92e9e678ef472d247a6d0aecca45720e4382724068634ea2fa3e4d30",
+    "nan_mask_sha256": "2d242de4c8aebaad0f94d1f3e7e022c843f419eac63ddad27c9f592b385cb63c"
+   },
+   "close_12h_trend_EMA_8_Momentum_L55": {
+    "value_sha256": "0bb275064217cf6aeca623496ec2b15a277415d2cc84323de30c8cb816c2e05f",
+    "nan_mask_sha256": "75b6aca84129f73a76c6fea021a54f177bb5347de151e48c2c61c72919850102"
+   },
+   "close_12h_trend_EMA_8_Momentum_L89": {
+    "value_sha256": "683afda19e82749962721f869f9107dfc05f1dce225d04c1ffc87f2bc2161150",
+    "nan_mask_sha256": "7a9931b3a40bc968f0ef7823a3303bdd2bf7c6fdd5712ec80040163092ed0360"
+   },
+   "close_12h_trend_EMA_8_Momentum_L144": {
+    "value_sha256": "c3799b03e5e22d4e935afcefd0c0aa2e1c91036b54f7b5e2c1ec8f251c6eac32",
+    "nan_mask_sha256": "73111fd860c5d29012692357ba561896f818f453451ed6d497445efac02953ce"
+   },
+   "close_12h_trend_EMA_8_Momentum_L233": {
+    "value_sha256": "8f8f04c4be03ebc1ce17a7464bf9037b051defc9a7c2a38e3fa111d3f5149f92",
+    "nan_mask_sha256": "383850273c516293c4e1b397eaca0aa22efb9a6d27523253735334cb4753da78"
+   },
+   "close_12h_trend_SMA_13_Momentum_L3": {
+    "value_sha256": "a1564cc91829d2a2a4ae166e06672fced4fddf525bc129f44f8b32c3ebb81e14",
+    "nan_mask_sha256": "eab23db8c930e0fb01a9fc8c63bf62f0958d2513860120adb82c04abf7de70c2"
+   },
+   "close_12h_trend_SMA_13_Momentum_L5": {
+    "value_sha256": "caab6c5e05d7b5072d76cc59fa8f0fdac851b9490dad9963b50a796789d751cc",
+    "nan_mask_sha256": "1ce72eb4d586afc94da91ea1fb2091eb8e8ed796f8beeb802a1ed5c79a359b1c"
+   },
+   "close_12h_trend_SMA_13_Momentum_L8": {
+    "value_sha256": "277e2534d7c4127b0e742bfc6fce9b9ab34372979151d00d1111d308e131d19a",
+    "nan_mask_sha256": "ea7e3ea8c91bfdb77086f33c5c61e1f24884a39e50f28d591a7b70fade864268"
+   },
+   "close_12h_trend_SMA_13_Momentum_L13": {
+    "value_sha256": "29743fe8884fdc4970dc0524ee30ddffd279edbaeee33328129beed1f833eff7",
+    "nan_mask_sha256": "97e49c806e1e26cb7f1f5b07f465ffe06d09a198327d640c21cee120b175970d"
+   },
+   "close_12h_trend_SMA_13_Momentum_L21": {
+    "value_sha256": "f6d86207b3e25d15f189cfa74f6920e1a3e0a9551daeeda6545d93d7a1e78a7c",
+    "nan_mask_sha256": "34430763582c7f76c210137202283c1cb45cc50bed72637f95b26a104d0406e7"
+   },
+   "close_12h_trend_SMA_13_Momentum_L34": {
+    "value_sha256": "0ce284a7709a3e0d25800bac6ac2f14b4757f13a8bcbf8d41fedd2b33bd3bc4d",
+    "nan_mask_sha256": "e31cc9f68534f64e0dfe3c293570eb36f5ce6f1ccd87d730c2ab16e19d8acd5d"
+   },
+   "close_12h_trend_SMA_13_Momentum_L55": {
+    "value_sha256": "9b2e6eafacd657dcb158776a6595870bd308d3f2511f31e0c49cf974b9dca3f9",
+    "nan_mask_sha256": "863942ae397d08282a6a4f2812856082acf5c95438e2c19cf32abfcc9725c03f"
+   },
+   "close_12h_trend_SMA_13_Momentum_L89": {
+    "value_sha256": "ca946294b3a311b6546382fb1106b37acf6d2e8bf0ab7cd0cd9e973aee9c6bb7",
+    "nan_mask_sha256": "8356edb589b39c2deccd973d3452a0bef63e08bf92ef092cb1741f29af141a01"
+   },
+   "close_12h_trend_SMA_13_Momentum_L144": {
+    "value_sha256": "7e75204b252f3f08b380a9f6efb35a4f5394f1c154500f67831d8304a55eab5a",
+    "nan_mask_sha256": "efb2fab924e50044704c719c7a7152993852fcb98d4220d526ecbfa0d42a2b14"
+   },
+   "close_12h_trend_SMA_13_Momentum_L233": {
+    "value_sha256": "0289fe9beff9fe14e4d4b9a20484b6940d10e48a3370e9d075132eb4f0e08c54",
+    "nan_mask_sha256": "b999c307d758169bf4f0873098b18245312e1fe48b5ac69025884eb1a6513dbf"
+   },
+   "close_12h_trend_EMA_8_TsArgmax_W5": {
+    "value_sha256": "17af7833a822d2b8c6f03c5f5d67873765f9de845c118fe15f83365231e89634",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_EMA_8_TsArgmin_W5": {
+    "value_sha256": "80ebc7dc36a5502c53c80b161da8e437c171c768a8db41286df101819f0b5cfa",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_EMA_8_TsRank_W5": {
+    "value_sha256": "420af6c1742850a7d0d0547a6bdb8fab6df4f326a0f60a9da1f1fe3ee887b784",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_EMA_8_DecayLinear_W5": {
+    "value_sha256": "7759ae0340d540c0de9cdf7307e2f61e98c7b197816f1963583e513fe7f579aa",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_EMA_8_TsArgmax_W13": {
+    "value_sha256": "d9757cbdc6d8cbd2bf293f1fb530959dc0d05b9bbca9a9b44774f58d06446c28",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_EMA_8_TsArgmin_W13": {
+    "value_sha256": "a3f9b1e6643083b2ebff2a947c79affaf4a67869e1c345928e64d4c41c4fc743",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_EMA_8_TsRank_W13": {
+    "value_sha256": "c8452065d6b4016880579c2b80528023e704604d4a7ce3dc0b6a4848e04867ea",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_EMA_8_DecayLinear_W13": {
+    "value_sha256": "de12b6b3b68df5254fdefbcf81f36f1f8267cfe39c06ca98963742dfaea5b727",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_EMA_8_TsArgmax_W21": {
+    "value_sha256": "ab2d341591f37c5ad102684cb4db9523e64bf96640b0fe5db27cac896f1b2c54",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_EMA_8_TsArgmin_W21": {
+    "value_sha256": "1be80207726012aada1761a5daa932b09539549103d3a37e1d2f9a7829d28f0c",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_EMA_8_TsRank_W21": {
+    "value_sha256": "9f21ef27bd02c6f5b7463d9afebbff223d9937b47582fbc8c0feb8cab6d95f26",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_EMA_8_DecayLinear_W21": {
+    "value_sha256": "5a667e81fc3103d05c2c948e2b2fa2561c71246985db0714e922d6eaf68b9f9a",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_EMA_8_Sign": {
+    "value_sha256": "8ede4c168ab441dba0f3d8c35ed98b942f090dcb05d9b29aabe0a9d9553fb588",
+    "nan_mask_sha256": "fc93dffbbbd29fbe637921283a086d34523cbd2f70e8e4397f3600cedd85345f"
+   },
+   "close_12h_trend_EMA_8_Log1p": {
+    "value_sha256": "be59b09530f51f9e773a1ffab4024a6249533aae9de34defd245748939f9bc2c",
+    "nan_mask_sha256": "fc93dffbbbd29fbe637921283a086d34523cbd2f70e8e4397f3600cedd85345f"
+   },
+   "close_12h_trend_EMA_8_Abs": {
+    "value_sha256": "986dc2fb1d7bc9169a4fad49c5796c68ca8a717b3646263e1d641a7880fb550e",
+    "nan_mask_sha256": "fc93dffbbbd29fbe637921283a086d34523cbd2f70e8e4397f3600cedd85345f"
+   },
+   "close_12h_trend_EMA_8_Clip": {
+    "value_sha256": "3366c441b362458f15985b66705c7a1a05dccebed6c4b9e9bf51ba7bae0d6121",
+    "nan_mask_sha256": "fc93dffbbbd29fbe637921283a086d34523cbd2f70e8e4397f3600cedd85345f"
+   },
+   "close_12h_trend_SMA_13_TsArgmax_W5": {
+    "value_sha256": "c34f1ea18212362e3ab8b44986851a7f8dcd197ab92f46b38c89f29bf00b42c1",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_SMA_13_TsArgmin_W5": {
+    "value_sha256": "b678405b554afe2894bbd120bc5fcdcb27f6e3d69bf2a3f4724e7817b50fe673",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_SMA_13_TsRank_W5": {
+    "value_sha256": "ec02459718401d15666051f9cb1175b68d8647ecd80cd1cd005b2c9bae459d41",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_SMA_13_DecayLinear_W5": {
+    "value_sha256": "ec675534e535ada6c251f76aabb0e6790e6758a72d61f58f7e65fe0d4f99e0cb",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_SMA_13_TsArgmax_W13": {
+    "value_sha256": "02e01c384f71752e75e7f2c1e4d85f423843db3125b308fd99ceb490b27b6818",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_SMA_13_TsArgmin_W13": {
+    "value_sha256": "91605d739d5b6c2d6e82f100beb6d8af6be48d67ec211bca7e4b5f5cdde2f1d4",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_SMA_13_TsRank_W13": {
+    "value_sha256": "45dab4eed2c17ce851532dde15b3bc222df3c29ab2ccf87a63fe0d7588dbbfc6",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_SMA_13_DecayLinear_W13": {
+    "value_sha256": "67abd0d0bc742c0086ec649f8aa740ead0d98bbc83488b4ac8b37f10665f5fd7",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_SMA_13_TsArgmax_W21": {
+    "value_sha256": "39c7f10bbe693ad8fca0fd6d0a051ace4fb0781c4c68bbcc046287f4d56ed62e",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_SMA_13_TsArgmin_W21": {
+    "value_sha256": "3b442bd2a91dfeb942de8171ee7d002db24c51116024a7ad4c50765874f719a1",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_SMA_13_TsRank_W21": {
+    "value_sha256": "4270fb771c280c157474fdee58ca73ca531bd415cdbce923ef18727b0c59e510",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_SMA_13_DecayLinear_W21": {
+    "value_sha256": "9366d18cddcecbc9af727315bfb563bf61575f18bdd78fae9eac0b6a38a3f880",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_SMA_13_Sign": {
+    "value_sha256": "f451de5a265c23ce5aa8098273dfbede2064c1219deec27d1b792ea4dc5e36d0",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_SMA_13_Log1p": {
+    "value_sha256": "633539975c0bdbd78370d5eeb1aae237a5a55d57b76d63ed3718954c4afe39bc",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_SMA_13_Abs": {
+    "value_sha256": "c0670924a7ecb12304dea929ae3035f0a810f5f7d29ec5ad9c3dd187455be78b",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_SMA_13_Clip": {
+    "value_sha256": "081c8d6c81eb61e2bfa386c33fddadf82048abdf10d27cf3c3ad4d434d4aea75",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_EMA_8_Kurt_W13": {
+    "value_sha256": "4fcdbd56ed3902444bf822d909e600ebdabf981eef5bb5c46b21ba89269907dc",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Kurt_W13": {
+    "value_sha256": "479797a4fd7c0d59f1d7f16afb184123b627e507819e4a268b899fe2cf22a1f5",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Max_W13": {
+    "value_sha256": "566941f9c1c05a6adb1292e5ee575077b0fe4b6a849b06be8025539a834e87b1",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Max_W13": {
+    "value_sha256": "4966b6e412b82c2e92f6af65fb2bae26bead720cb599fdb46e3fea57a883b270",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Mean_W13": {
+    "value_sha256": "294c23f56148e248adc75618b864f6cf537eb1e0a150fcc12206b52a54b47226",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Mean_W13": {
+    "value_sha256": "dd64efcca006f7ff48c61d7b7e1a61ab473d791262cd60d13c3853acc7347fce",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Min_W13": {
+    "value_sha256": "363785109869570eefb1e73e8909cfb63fc06e501daff6322c4c15d9a311b1f4",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Min_W13": {
+    "value_sha256": "9a1f61a52ed7d3053fd02c3976f468575dfb09fbb9671518ff232bb2f82115c0",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Range_W13": {
+    "value_sha256": "447c060f93bed6d52731d1d8313bf343e425a0d227767fc1c3469c38686cfa79",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Range_W13": {
+    "value_sha256": "9fe13fb3b5d0d4434b2fa8b6969d4f00bef1448c0028a6aec1ffa95bb42fe1e2",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Rank_W13": {
+    "value_sha256": "c8452065d6b4016880579c2b80528023e704604d4a7ce3dc0b6a4848e04867ea",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Rank_W13": {
+    "value_sha256": "45dab4eed2c17ce851532dde15b3bc222df3c29ab2ccf87a63fe0d7588dbbfc6",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Skew_W13": {
+    "value_sha256": "b96d01f8474d2e6c8479b543fe0b42533a71020651af838097107c67b12cae6e",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Skew_W13": {
+    "value_sha256": "17784c5a001174a05275bef7c26e3177cd9c4e3dc8c85b9298f08ae9c25b9a72",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Slope_W13": {
+    "value_sha256": "fbefca9f75bc3dd1bf2ed6f5bb829913ce6180b2ab7aa89e0483dcf9c7fc52c0",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Slope_W13": {
+    "value_sha256": "3d9ed27eb45fef0fe4842b9738f91bad0705b94b3ce114832c1d3a3ac0ac8836",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Std_W13": {
+    "value_sha256": "c2e9501a3e7c8875907667e4dde3a2884f6850f78c827ff9bb1f3b718b8cedee",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Std_W13": {
+    "value_sha256": "0bb31ed2b80ae4200c053c22ac86c6589f1b638e83a70fb167b91b90f549dc72",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_ZScore_W13": {
+    "value_sha256": "7d717b33f0272efc579a1ed38084b07ea5a44f2af2206b414ad94d07f79e292f",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_ZScore_W13": {
+    "value_sha256": "ffe5a0846faf391f95672b8747a09981a0ff5bbf6a53262fed93d63cdecbfc6a",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Kurt_W144": {
+    "value_sha256": "404aed155b649061067d79cab08fb33c1c0515aa66dfe89328064c56f1db1f62",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Kurt_W144": {
+    "value_sha256": "849eefe7734217b9470d5f6747e5dd5f207642421e3bdca8b3fb47abb2739f46",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Max_W144": {
+    "value_sha256": "01eb128a3d504a5476a350b3bf7229b318590675bd6e3148e8e586ab3e4b2861",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Max_W144": {
+    "value_sha256": "6c0659828b496809628c237c93250ab19f3e673de7e0194bc1f7eea46d736dde",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Mean_W144": {
+    "value_sha256": "8820dcbd0753dd1922381840e2517de23e86d6db6eaefcd603d67d6282e7221c",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Mean_W144": {
+    "value_sha256": "bd7d1d65ab30ae7ef9549c4e1b82c0f5506dc0f6ae70083453bfd820aaf7635a",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Min_W144": {
+    "value_sha256": "10ea802b1ffc034dadc2d49b6c153c0003456fc871576798d29dbc1226b9984c",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Min_W144": {
+    "value_sha256": "11bf35112d931ea3603fb63eb5621ebcb377199d42ad2342fe2bbcb4527e81d2",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Range_W144": {
+    "value_sha256": "4aa71f4fbb57ab49792242707da9641f6961e21350b4a826c127f83a9befaa25",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Range_W144": {
+    "value_sha256": "0a245379c2a95459de2882a354dd248642d218f5300734be38033ad95ac4c312",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Rank_W144": {
+    "value_sha256": "744f36f55716cc6ca76ff3d4ed37e32bfd3e6072d52d53d5f92ba3622fc80946",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Rank_W144": {
+    "value_sha256": "478eac96a66855e5bfe887a441b9aef67b43c95fcd07093ef8677f57ce2c87dc",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Skew_W144": {
+    "value_sha256": "ac9564c4a215db2d606a5aa65a11c99c1820ba3ad5bb3fe7df064c5f23de2b85",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Skew_W144": {
+    "value_sha256": "ce6a0b2d04d50f418e531a1b186e98180e370add2d0cd4d1ae2665670a2dc1a7",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Slope_W144": {
+    "value_sha256": "8bb6dc04f8fb8b3a5de4efb403e67ee5435657981581b7dd2e4b78f85f407d9b",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Slope_W144": {
+    "value_sha256": "6ddb4e8dffdea58e78c76f62f90b38262173529a5cea4840419ffa4b0e30442f",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Std_W144": {
+    "value_sha256": "417287587d583cba0f25c15f37a704233b395a3c76d756f32150fdcf686da5c6",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Std_W144": {
+    "value_sha256": "c33b3136c428b1aa8e5c45eb4ad493a3178137e7e301aa5d7085007f988d09e9",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_ZScore_W144": {
+    "value_sha256": "12a254c1e09f4bc163556965364979434d930f9440efbc0baa2078e5b0f99554",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_ZScore_W144": {
+    "value_sha256": "bd8a5128fd4f70e6215ebadbc68b5787ea04f12c0b4f2d3280046495fc9997be",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Kurt_W21": {
+    "value_sha256": "3c9cc12f8601951dfb66fd77324494dd650d7fee46608a6c6cb30584c07e6c9a",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Kurt_W21": {
+    "value_sha256": "a3e7dfdae17cf2c83805e3a3ab877e5c9097240b267cddeeb7c0e62ea6fb80a8",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Max_W21": {
+    "value_sha256": "c21f8f4ab3bff57a9f626fbda288b0a62638c54b86e6644fd486551a87cd631c",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Max_W21": {
+    "value_sha256": "76db62f906bea28eb6932808ec3f428a9b59d9956d51632eb4dac42d52231cbd",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Mean_W21": {
+    "value_sha256": "bf574ab7e0556500c965a3cd8f2085f391368969cc56fefd2a6442c54a903f2c",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Mean_W21": {
+    "value_sha256": "e6ef47b68e1107b1b3fd5b3368df8ca9392e6599a25932f5e71e845566107dc2",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Min_W21": {
+    "value_sha256": "9ea55949e269ee2926962b806eec84ffd7ee2284b70668862c2baaea0ea3cd28",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Min_W21": {
+    "value_sha256": "328ec2fb5718ebfd97c7bd46bb2093da69495d4fcae135991184848e05e73468",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Range_W21": {
+    "value_sha256": "81431d01bc1f2197be247707c31936ce8b6c57d39e24a353339c2bcd56b4f20c",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Range_W21": {
+    "value_sha256": "bf79a53d97ebdf30e35fabeb458a0aaa25d48d2c90d417e145783e2ab491eb06",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Rank_W21": {
+    "value_sha256": "9f21ef27bd02c6f5b7463d9afebbff223d9937b47582fbc8c0feb8cab6d95f26",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Rank_W21": {
+    "value_sha256": "4270fb771c280c157474fdee58ca73ca531bd415cdbce923ef18727b0c59e510",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Skew_W21": {
+    "value_sha256": "973a3b136ffe7070e1ff9033073a4a429ee11c1654637158f5455a1621ddb47d",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Skew_W21": {
+    "value_sha256": "176fffe53b2dcb499eaefe7159e139e98c1aa4341f97a2ce19a76ac58387573f",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Slope_W21": {
+    "value_sha256": "7fcfac85bd3e449d7d02bba864df9f9b73d7d21504612e6f2487765d534a8e41",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Slope_W21": {
+    "value_sha256": "a50e510e95f669640b6aa0c0b481b4c8cc4cacaa905d8ef33684deeb5e151fac",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Std_W21": {
+    "value_sha256": "0e3304fc8afcf5d6e7d00abc2a4f5732c5ab25cbf1f77b971d7c044ce82d3a01",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Std_W21": {
+    "value_sha256": "199c5194bea4443047479378db386cbdce9f26c93e86a475bb885f1a92a5b43c",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_ZScore_W21": {
+    "value_sha256": "bdd2f7683c9744135154e46918942750c4e9c748d434c6fdcf73f102090c63a0",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_ZScore_W21": {
+    "value_sha256": "c9ebbf9d1eeaebfbb6bff6fa18a16e12ac4c53bdb4073392df20e2de425f9ab5",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Kurt_W233": {
+    "value_sha256": "1c9ca2e45db10dc7a2d81dac929718f7607ca38c429c1831a15e99fe3ee7ebba",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Kurt_W233": {
+    "value_sha256": "99e1cf5215baccffb3be08b8cabd33776a104ba0eff931cec563fb35cf5109b4",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Max_W233": {
+    "value_sha256": "aad52167ff053162268008e16338484cf6c37f14a5b525120c9cacd712be985e",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Max_W233": {
+    "value_sha256": "aeb431a71de6f9871cebea87dad8a2c54d496e6606911018dd4f9380650ecb6c",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Mean_W233": {
+    "value_sha256": "62ba2603be4ac4b170f094f2749af734f5f888d12616eacf7098c3dbba642253",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Mean_W233": {
+    "value_sha256": "6db037a33786ad2c192bc32997bc8a4d5e4fcaafcded863af832249eaf838727",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Min_W233": {
+    "value_sha256": "62e88fe283e0567dda6a018958ca73a93ec6fe451fdf41b807ee9465d13ac729",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Min_W233": {
+    "value_sha256": "11a8490a147e3947683c2ca3aa4aaf8ffa83f75c49122da9bfd120dd7408c0a2",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Range_W233": {
+    "value_sha256": "1377fc7182591142ca10eea21e3a600639878368dcfb69997439f7bf9c384ab2",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Range_W233": {
+    "value_sha256": "06dc1b24f500c4266e923baf300a5b3141c36dbb558373aec26085a3d90dadb0",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Rank_W233": {
+    "value_sha256": "3d85b2158a2f19c78184c07599ee9738813bfdad9dd4b126398477073befa659",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Rank_W233": {
+    "value_sha256": "21304b6a13692e5685074d2dbe0a844eedd0ad2e898165038dd45bd61de502e7",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Skew_W233": {
+    "value_sha256": "5cca64e62a9399fc139e3ca52454c3ffc0801046b7acccc475dbb77113964c6b",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Skew_W233": {
+    "value_sha256": "f6b4d0cce3968c1e253d2b8d538eb07e2dec62803dca36e5c1817a299aaff293",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Slope_W233": {
+    "value_sha256": "c7e7b3a143db21b302269749c6985d1a8f6aa5c7245625bfde1d097779b15177",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Slope_W233": {
+    "value_sha256": "2df9b4336c24313f566e71356237a1f94d98d5e6b6fa10b1c2cd313f5f634eca",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Std_W233": {
+    "value_sha256": "df2367c04484a2c281361bc6d1d0e17624e9242cd3c97cd917f1b282d16d2031",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Std_W233": {
+    "value_sha256": "7b21edb5cbe820beb68123354c59cb4f50c7a2bc73b9a81fa3fa56f64ebc8259",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_ZScore_W233": {
+    "value_sha256": "6c4a267b93590801e6556f3a560c02c25059da4df7b3f0fb756c50329df36e47",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_ZScore_W233": {
+    "value_sha256": "629f33854d51144d88c84ddc3c222d7f1e513d530c22cd5b750898f474b70202",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Kurt_W34": {
+    "value_sha256": "99edace03ad66c89cf84279d94133700817a55d0e3fc328a3807c56f15c39f32",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Kurt_W34": {
+    "value_sha256": "4911c4685939229f21cc575b5b3074c623b5d73efdc16220f742091b00c4f542",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Max_W34": {
+    "value_sha256": "feeedd3f44bfabaa678249957af0acd83e6e41fe2066a9771fb81d9412b39309",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Max_W34": {
+    "value_sha256": "1cba4670dea9b88bbd52cbe438865395da35af7ef831f2eca72a4edc0596c337",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Mean_W34": {
+    "value_sha256": "a7e422bc74e59e2db440a955e81135bcd054ed4dd6f1359db3be857ec4db75d8",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Mean_W34": {
+    "value_sha256": "4c9ba51834d7a86123700aef14666f84a2a47f56515ed691fbd5bbb922eabbb8",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Min_W34": {
+    "value_sha256": "54ee234af07d2aa4a2ab145ca5e4d75c28362b7b16954e53f3b12de139477289",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Min_W34": {
+    "value_sha256": "5e3b8ee219984b55c0636ad820794835b0ca605fcb786a8215517b381efa016c",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Range_W34": {
+    "value_sha256": "a13d26511d59bf8a6ae69a50c5d4c4c9599ba6d731e5422f42ab93ccfa28a0f9",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Range_W34": {
+    "value_sha256": "69fe689298be536e6a681c6b0e537f329708a4eeb0ede74cdbbee5d3b6845464",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Rank_W34": {
+    "value_sha256": "58e1a9419a912c550f9b499ee069ddeee1bf1d4de201cf5e77b4c1b28a67de85",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Rank_W34": {
+    "value_sha256": "8b2caf32730919f504c84ace7464fc19c4984df333fc78cdbb01a299f8339bde",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Skew_W34": {
+    "value_sha256": "f9e034f400313cb228cb67167a41648a7a6b51e378cb123d7dc78fb783edf072",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Skew_W34": {
+    "value_sha256": "bf30d4f3e6d6536bcc532b6448bc6519372feb9193ac201c6625e0626b573b88",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Slope_W34": {
+    "value_sha256": "b7467155220d1a4cc1f499b463763da625dff3f1c560418ab118dcfef42c870c",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Slope_W34": {
+    "value_sha256": "0cf8398519d6ccff0e1ee303189f5c64d53a1958ff4cd4863eb5a4b043586501",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Std_W34": {
+    "value_sha256": "0f4889ecba43ad93bec1636ed74c91202f7a5dacb71fb373dc052ef828eab496",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Std_W34": {
+    "value_sha256": "36dcb91c947b83c3dd608580924114b0c614727c8a5a4748113bd04083086182",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_ZScore_W34": {
+    "value_sha256": "14504e52cef23657351b82c09013970a61a1587be90020892e839c864a8bb148",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_ZScore_W34": {
+    "value_sha256": "d33c8f7522ebe56846472efda4b776ba122ab6e59ce9e9be99427c326da5d21c",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Max_W3": {
+    "value_sha256": "a3b5cce5dc91103ff828d931889e4965d881e5a3614016f4d83b21ccbe896b3d",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Max_W3": {
+    "value_sha256": "52f6cf106a5fb1c993e7503a8c6f999723295936372e87418cbe295a6d7282d2",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Mean_W3": {
+    "value_sha256": "f5a0917a07eadfc5d00fc9f77fd11a7dcf02146ce262203e4e58f9a521c12731",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Mean_W3": {
+    "value_sha256": "05e2e664f29d0eb57bc60c3b20a6f8802f230b2fc8e555332b98952cc48d7dcf",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Min_W3": {
+    "value_sha256": "3734ed6d8876f7f15f9195eced66ab7313d4ff9552d203c892ade921b98cf222",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Min_W3": {
+    "value_sha256": "ab0c8bdc95d34b9a99027b57b8ff1b5a3c77a15b64ec51dfca6a481a235ea42a",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Range_W3": {
+    "value_sha256": "571e362c065957c29403e271f753f03f8f8072ca3615ac526a5073d4bfce26f2",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Range_W3": {
+    "value_sha256": "326a68a5dec5551df809946f3e2a3b93188c66105af04d1912a41e1b530ab43c",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Rank_W3": {
+    "value_sha256": "63f1adaae83b766fdede8973637798a9bd76c5f07d0888cda1ad85ebf25e13de",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Rank_W3": {
+    "value_sha256": "21924561f7f385f2a260412ad7a8f0685144b9a5b8b9bf235c1e596556d1ab94",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Skew_W3": {
+    "value_sha256": "a376bfa472080669a24284b479382e53b36b1b501a7c7042537addddfae5d08f",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Skew_W3": {
+    "value_sha256": "327005b6c8e48573c34e0424390a5f506db299ec2f7d49b7e9c80ecad245be06",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Slope_W3": {
+    "value_sha256": "1195404aee42ba3f4b4e48a455aa46a8602b6cdc33487796aac156adf6adfb0e",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Slope_W3": {
+    "value_sha256": "c18ce55ba31afbe80e075d63b876990d968099db51491af8d2077dd63eaf1d05",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Std_W3": {
+    "value_sha256": "58be5b3b6b7ef0d6c5951b3fe6409a380405b54cb65df728b897c55c63435231",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Std_W3": {
+    "value_sha256": "ce08e5578d99bf963be74efead60671ddea6ce99ea42267be27b0922ad13cef0",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_ZScore_W3": {
+    "value_sha256": "d61a198f1abec399c30bfa058380be71e6ef0f777774c64ac999faed5774072e",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_ZScore_W3": {
+    "value_sha256": "0570f46453cb08d4fe1b7d938d4aed2b109beeb9d21f9e2c84b384480c3de30b",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Kurt_W55": {
+    "value_sha256": "e6d2b4ef8afab4692d6cc3ded4cb850e40ea72edf1a121497547bdc7f810b9b1",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Kurt_W55": {
+    "value_sha256": "7b7027479ea62eb15052b3b1738f42866551ef0c31f221983a90a578a3a78cfa",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Max_W55": {
+    "value_sha256": "b2b8afad65bc55ba566b8d186644b8f798c071944b386ca4253c4d7c7f03bbc9",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Max_W55": {
+    "value_sha256": "43f3c1ddd807f124f657120ade847f4bc1fd35d3810bff5f42c2104e76b523a4",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Mean_W55": {
+    "value_sha256": "bba1000a0ee54780ba4337148e1a42e9331f836d79acc17ad7a87da18c6f6cdf",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Mean_W55": {
+    "value_sha256": "6440bc7765c36f2da6fd32f60563fc777a1ae5a9961d34234da4f8c3905dc8eb",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Min_W55": {
+    "value_sha256": "8ce9db2f54dd7b3acfa47bca5ab60cabccc52f11532154fb66904cba18a03fc1",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Min_W55": {
+    "value_sha256": "9c1c67c057af671e5b1bec090fe804e5f1134e9f0b9c3a8dc2afeacdde1a3a8d",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Range_W55": {
+    "value_sha256": "393b372e63a1607c6f9ec8cca5debbe169eb4b11a7f2b5be2da38c795c0cf823",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Range_W55": {
+    "value_sha256": "f40c3fa4ed98d01a9dd85a715657bc136c2d734383cbedb87c7d2fbfdde039fb",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Rank_W55": {
+    "value_sha256": "2083109db4eae1754f104b492af2af03c01f3b380658ab3230d686dff23f5023",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Rank_W55": {
+    "value_sha256": "8f22fa2490b610d5be3570617fae3fc4f7f220526cd938ee815992d72dbf322a",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Skew_W55": {
+    "value_sha256": "1827d6360f9627964b51363f77a9480c52740dd7feebdb0f610731c26090e893",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Skew_W55": {
+    "value_sha256": "1c7ea6d998f8f0f6247fae4ee7acb63d670c27e6fd28a28caa794fa34a33e83c",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Slope_W55": {
+    "value_sha256": "45529df75ffd46f349572bc565d6eabad39c17a4b80aa5908741d54a8c2773e9",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Slope_W55": {
+    "value_sha256": "ee4acb2326271133b2232cd76095961979846749112aa9810fbb9ec2f5a45eee",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Std_W55": {
+    "value_sha256": "6603bf0cfa67cbd063d809ff12812a9a2fb7380cf2bfcafb6a35c194fa90d11b",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Std_W55": {
+    "value_sha256": "2c3688c675c0d139bd90e59ceb6735d47db116bec64b4ea7c2d0898e35050e80",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_ZScore_W55": {
+    "value_sha256": "b7b79419ed19a9ba774ac87fb0afaab15778a0321dc17aae53dd034df99a7327",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_ZScore_W55": {
+    "value_sha256": "a2aec6a14ccd4997dcfbd1e6be38137cfd01b3adf657ffb66598ef82af3899b1",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Kurt_W5": {
+    "value_sha256": "45e28f993e50be08082dcdba91c905efca6a86b22cf4914e5d1ad7b515fc3cc0",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Kurt_W5": {
+    "value_sha256": "489fa06e31d38c0c343a02c7f1675826a58652fd84aac851cab9051731bca9a2",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Max_W5": {
+    "value_sha256": "1d8414eb45e6fb8aac9201383419bca33a0190ffa922d70cf342a9d17469afc5",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Max_W5": {
+    "value_sha256": "e0b8c22cbc3fdc0bb749cc9558c51207b49e178e9ced248e6c4be944ae014697",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Mean_W5": {
+    "value_sha256": "283d3ce905a3391bc3775e0940262b1db36415f2f9259be666efe487a74d0b9f",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Mean_W5": {
+    "value_sha256": "73e9040c902a60d6fe79871e65f7f7482e2e0a4bc499b98677cdc1e10cfe8de0",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Min_W5": {
+    "value_sha256": "964e8efa74592f79db736e2c9dc47c67b944aedc3b8328efd994c4403207cf3b",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Min_W5": {
+    "value_sha256": "0318c446a7510ae48177a2b62c8ec85f710de8205dab913864519e9abd5a5d09",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Range_W5": {
+    "value_sha256": "2cdca29eccf74e7e382bd42f355c5a628ca9c31fe22fbde5f1b3af882f5777c5",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Range_W5": {
+    "value_sha256": "4c0752170ea374094a83b6c286c67d1123f486a66cd89e02d1b52465a21ed324",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Rank_W5": {
+    "value_sha256": "420af6c1742850a7d0d0547a6bdb8fab6df4f326a0f60a9da1f1fe3ee887b784",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Rank_W5": {
+    "value_sha256": "ec02459718401d15666051f9cb1175b68d8647ecd80cd1cd005b2c9bae459d41",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Skew_W5": {
+    "value_sha256": "72f75150db2e8b4d150b54c2a681a3acc84faa659abf369b353c01b253b47e4f",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Skew_W5": {
+    "value_sha256": "c5a76e73864453c0f96d9fa4e6a7130da446408fb8bd58626d35258b35adde3d",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Slope_W5": {
+    "value_sha256": "a66eaca889d76b04a9b65ebdded71c0515da3b803f19a38d01469953d979ae9b",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Slope_W5": {
+    "value_sha256": "6df7672eb9da5bf35470d493bcd6bf66881497123eb98bc192db41a4799b9de2",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Std_W5": {
+    "value_sha256": "df0396c666a829b746574f89be4b66408258ce0e793dfcf7c072665556ed5f8e",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Std_W5": {
+    "value_sha256": "d47d101562402c33ee018f08e1e26df5374df3d961e8578da725a04a35ec65cc",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_ZScore_W5": {
+    "value_sha256": "da52baf2d5a4330d56813934b0f4b42d506cd58d165070d8536abb5a81b9f048",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_ZScore_W5": {
+    "value_sha256": "cbc17175004b640df579279f53baa65ef07ab2b5ee111226745993ccd4ee4ca9",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Kurt_W89": {
+    "value_sha256": "034fa790ea74c03e5a4811270300920eb53b21857f8e64352e09549a9efc9990",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Kurt_W89": {
+    "value_sha256": "b1682efcb8bf9fa3eebe37cfe4ec27a174495414b56771590f8f26a021ec97c2",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Max_W89": {
+    "value_sha256": "ab05852ac42f15f69e524cc1163790e911a5dfecbafe15dcde5562403691bdfe",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Max_W89": {
+    "value_sha256": "3f041a6f93d963c47801d14e9d7090470d12b8425bcb9da5c457b0a2b12315f6",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Mean_W89": {
+    "value_sha256": "a7a535661218e3b686a5b92029a110b0150591d1e9e2bd872aeebfcc30505087",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Mean_W89": {
+    "value_sha256": "2bc009c592c88d9692105f63375e8263087ff42a5334efbb45d5b0161c035eec",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Min_W89": {
+    "value_sha256": "d7ab7ebb0dc2bd4d892fed8b88aadccf6063ae8fc2b997c4072d567c8863888a",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Min_W89": {
+    "value_sha256": "6cfff6a7fa9058e4e57a6feb0c42db2f2b6b05de0dc9e1a594398fe8743afd95",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Range_W89": {
+    "value_sha256": "209eb2ea5ca95d8a12ea5d085dc722d82e8d26536417decbf1d5a53e336d3f83",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Range_W89": {
+    "value_sha256": "08e93d1f52ec0c5db2c4707af4539347f3f74c3876920504661596d5b08394b7",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Rank_W89": {
+    "value_sha256": "8f561fc66c8e044bc3c26baf3a30dff3325bee1f401418c88271f8d9adbb56cf",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Rank_W89": {
+    "value_sha256": "b7f1c6c9a416ce86155fa15853b5c23949d5971cf2e6bf06a7fa110aeb74912e",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Skew_W89": {
+    "value_sha256": "11b579531f1332bee6ac32ca7ff157859cedacdf7a1280ba9c99fa80f835ae47",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Skew_W89": {
+    "value_sha256": "fcd655ba96aac73d41f09ae33574be70461c3c663440aea2aaa06540f4e59961",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Slope_W89": {
+    "value_sha256": "2ee5d2d75a51198bb9664527388273c52ab54f1b849daf5b9c3b05ed7b360315",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Slope_W89": {
+    "value_sha256": "1c57821100b4266c6f5a964b8f1bc5ad3fb7bfac4f374a1d4d7e49eee564bf17",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Std_W89": {
+    "value_sha256": "2a6ca9b526c63fa83d3f3173657634e4a55e2a36b1d3c9b7abf7c8ac0a2bfc8a",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Std_W89": {
+    "value_sha256": "3c22e592cffa6c7613d7992b429bfc7cd174c31d21ce8a9633975c64c070e68c",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_ZScore_W89": {
+    "value_sha256": "efa8147354dc09ae3c4d9e680b8e0406e71e08f8c0899e69f7ec7d84e76d6009",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_ZScore_W89": {
+    "value_sha256": "1d1ea86c663a72b55d79048f23f283354b3c89750a82e52c3c34a96d37cbd728",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Kurt_W8": {
+    "value_sha256": "295c661f65d47cd0952600f6c1982e5c3d13252179d5352212b327b4f0a994ee",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Kurt_W8": {
+    "value_sha256": "f8d806d976a23a87f5265cb33e7212f06b2abcf26028382bf0128f9e0b067d57",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Max_W8": {
+    "value_sha256": "2287d15af9c4ee97b10f2a328263a944c89a071703713481c5746f6cf1ecf9f3",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Max_W8": {
+    "value_sha256": "22089eaab0c1b867ba4d663d49d24398d18b11465c782c3b2a1ba201dbf08a13",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Mean_W8": {
+    "value_sha256": "71f37c1b3fc94545f94ae7eea7b809b603536617e91fd5a07ac8fc63d643d29a",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Mean_W8": {
+    "value_sha256": "3dfa1339454a748300fc7f24d24262f760f009cceb1f0f1413762908255ef97c",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Min_W8": {
+    "value_sha256": "4ec897041ee04764211c8ab61513074d70102635889cd73d64709b2bd6695b08",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Min_W8": {
+    "value_sha256": "b21ca1983dfb41ad099262bec77fe1634c0d64beebdd9468cad98069fee309b9",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Range_W8": {
+    "value_sha256": "dc6786d54e066250a15674a2b429eeef9a84acbdad6f2b9b9caeb767fca8fa07",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Range_W8": {
+    "value_sha256": "3771d94ee098422dd415b052a797f86826db33e4c80148730e1b58cd4c2927f9",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Rank_W8": {
+    "value_sha256": "b61c1e61a1e95427a2774a09d30347583e8a2697fdfddea45d4406c54e51f9ea",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Rank_W8": {
+    "value_sha256": "8cbdb2cc442d938f49aa780a2ac6e4ec8f993d49147b7d435d5e2ae6fb24eb26",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Skew_W8": {
+    "value_sha256": "b35f3245f24b250c437e464b06b1f3bdaae4aef09b0a102fea607bc1855bbc00",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Skew_W8": {
+    "value_sha256": "7b4599882f4c0d461bac69255b6dba45f4d8c90ca29384c6800019d69b69ff42",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Slope_W8": {
+    "value_sha256": "e800636e2e821c4cadf294f575c2349dab3af40fac3029ee25d23ad3c106b2d2",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Slope_W8": {
+    "value_sha256": "047b5920c095f49c3066c8ebcd1b6d56446c3707df02d6be0bef7b25069705ab",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Std_W8": {
+    "value_sha256": "22b9b5594637b327d59b669552638bb4f1e3537e4ffb371ee6e37b50297cd7c2",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Std_W8": {
+    "value_sha256": "f1bcab966a1470ac31e9c33ecb1913dd0d933c67baf82f2ae64e678fb6234593",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_ZScore_W8": {
+    "value_sha256": "fc9b19350f9a45d4f7b825968b8e34fd305fe93d740bf6b19e3b9bfdf3b95b6f",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_ZScore_W8": {
+    "value_sha256": "d5305b6ba3bb1ab1789a458f6c06ef7c73611f72dd5843d574a72133522dba8c",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "open_12h_Lag_1": {
+    "value_sha256": "7099a685311b2734052887ab5184dad170d0a70f6938c57a8c6cf9fa3e93c15b",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "high_12h_Lag_1": {
+    "value_sha256": "1b4dc8bb455ca2fb0bb68daf0a85dd98bfd59a88f6ec143ab5b618b05bfdbbbe",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "low_12h_Lag_1": {
+    "value_sha256": "608493ef66d08f4117480107b3f986b2897770d519f1293c1f97ba9efd08fb5c",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "close_12h_Lag_1": {
+    "value_sha256": "361120ce1f2b5fa1558145dba8576b4ff66140fcca667e8965e12f2c96f55fae",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "volume_12h_Lag_1": {
+    "value_sha256": "f31313446e8a585e5b945679aef5cca6ed0bf7ac9602bad7ecb5464b5ebb14de",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "close_12h_trend_EMA_8_Lag_1": {
+    "value_sha256": "f61beff1c3dfe4dd8273b629dabb4833d1b716013d69ff83e982b0ee16605698",
+    "nan_mask_sha256": "7f2d8040edb72c5e28942256ef8d55a4103d52ccde5c7984e342afc1f33b1e85"
+   },
+   "close_12h_trend_SMA_13_Lag_1": {
+    "value_sha256": "b8cf4c712d5c0a92ba474f63edc303d1fad6354f69d7489fa662e63e75428cd5",
+    "nan_mask_sha256": "2ce4dec701a58a2c9e92104171b4aed2d10d7711f5b89d7fcbf4143d89b35366"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_1": {
+    "value_sha256": "17cd735b41345c1d2b9bbb063fa2e0c3f0d52ad59fb5137892c1bdc695198952",
+    "nan_mask_sha256": "eb6182e4888bff29436bc1b09cb36eaf6057dde8c3a4adeb24fe05e81b7efaaf"
+   },
+   "open_12h_Lag_2": {
+    "value_sha256": "2fbc984b89dea76417f6a9bb6db81adcd1abc155c26c6b810ea49728289b63c5",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "high_12h_Lag_2": {
+    "value_sha256": "1723c89ca046a8a13637fb3254742b22b70beb0f39f78f20c273f86bbcd93480",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "low_12h_Lag_2": {
+    "value_sha256": "bfc96d1045cbffb23767abbfff6ae5ef7d12588e1e424f7af6672fba61ac3ce7",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "close_12h_Lag_2": {
+    "value_sha256": "84c7e5cc351ee5cc85d2c5712fc8c4ce0dea087b248a9b77ff0bc7fbb31fd947",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "volume_12h_Lag_2": {
+    "value_sha256": "ae06d6ae22884710e00c323419deb6e995694d3364f7d3947de4b95e8c3e97d9",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "close_12h_trend_EMA_8_Lag_2": {
+    "value_sha256": "b11e8c66fcb2e75f7f31aee903ed0285b1d458db41c240f269c90f8955946257",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Lag_2": {
+    "value_sha256": "dc11ab6b1d1522a83353014fd9405e5a334ce1e918b7b347ef2a902827271797",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_2": {
+    "value_sha256": "445e80537382ba13bdbd6c993241d63953017c49239cc1f10576c69ffd958cdb",
+    "nan_mask_sha256": "ca79f5d98f94b4d644ec4066863dd2c0becb3d4498a700afd55985ef37527f7f"
+   },
+   "open_12h_Lag_3": {
+    "value_sha256": "41ce41e16b812026c05b4f5fa76e988dff5cd1eaf4626e4309c94510f0670495",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "high_12h_Lag_3": {
+    "value_sha256": "a2766604bc4d64ff890e6898d9d5f3774c0373b7ff003c6f60331d51434b531e",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "low_12h_Lag_3": {
+    "value_sha256": "b7872cfd228e1caacf9d7dd94d8e881a5cc33afda3151ec086b45ffb43192db6",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "close_12h_Lag_3": {
+    "value_sha256": "dffdfd63e29d81f40608512c45bc849061d0c2f6c1e57dd61675f3aa19ee6900",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "volume_12h_Lag_3": {
+    "value_sha256": "f4c988424732f9fcc11a6e97128a4421c45de1dff1736ac24669982ce09dc028",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "close_12h_trend_EMA_8_Lag_3": {
+    "value_sha256": "56a5e397a77337bbc11f6f133e6ca62a94a8e7e22278be9d6d366128c60d3dda",
+    "nan_mask_sha256": "9e3b0d60ec68262ab0e51ddea55652b5a8ff0f588021bc8f65ef6cdeab004652"
+   },
+   "close_12h_trend_SMA_13_Lag_3": {
+    "value_sha256": "a5296aca2b06827c38b32b54bc35f9a4bf7ce3e46dce4a7673f9484de8c38fd1",
+    "nan_mask_sha256": "bd237df1103956782c56bc6a834c1ffb10e2e27043afa058f40f1a969e852f4e"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_3": {
+    "value_sha256": "5f8d39a96ecec249f2d36dfa9acb5545e1777d54df1be3602a197171eb7d0f5d",
+    "nan_mask_sha256": "1952246f0494fa9c29a2e3956dd90fbf42255466694cfc210903a9e742369094"
+   },
+   "open_12h_Lag_5": {
+    "value_sha256": "21ba0931c80071aa7b36c3fe6db74153cffc41366c9cfab3b3c35a5cfc98ab79",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "high_12h_Lag_5": {
+    "value_sha256": "6fdeb679d3bd1c40d0abdd21b5015994e610928bac4443bc407350068651c711",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "low_12h_Lag_5": {
+    "value_sha256": "6ded895e53ee9533c280dc8840c841908dcc42bd6d52e4e36cceb20e12cead84",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "close_12h_Lag_5": {
+    "value_sha256": "0cd916206a0ecfc944780e214baa1e553d65994d00e8aa158eb5d91bac052e9b",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "volume_12h_Lag_5": {
+    "value_sha256": "e2f0b5066eb59880637f36cc55d6647dee6463c79bc719c17dfffc918826eb24",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "close_12h_trend_EMA_8_Lag_5": {
+    "value_sha256": "e20096873751c907a42065e66d10a6e7615336bc1eadda5dbe62744b26efb020",
+    "nan_mask_sha256": "95f9e751625c21519e22f1a91b2076ca7daafe248a64f8ac9ee9dafa206f6e27"
+   },
+   "close_12h_trend_SMA_13_Lag_5": {
+    "value_sha256": "6eccc6c1df761f48e6125d4bcd91ee3d91578e3f122b075312f42e03a9226a39",
+    "nan_mask_sha256": "0e5a52e4b93d9ba120ea2782a86910e4819d7181d504d6b797a243e9d3699489"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_5": {
+    "value_sha256": "4db7b67a6382a035e86b6265e390635802396ac7304ee1f40285336ef238b702",
+    "nan_mask_sha256": "ebf03df55eb681bd3aaea17d5f85c29fbf753b30985eee09e44e966b48799f82"
+   },
+   "open_12h_Lag_8": {
+    "value_sha256": "85a623a224f99adf0090e2e6d9dba7e0cc9e65f19cd2ee7d0f918d562248d138",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "high_12h_Lag_8": {
+    "value_sha256": "6fa30240137495874993dbe7b8d0bd75bd24015301ed57d34fe6df0d507b004f",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "low_12h_Lag_8": {
+    "value_sha256": "797f9550ad8dd5a736bf55e8470eb86ab15d128883bce96643ee3a19282d8e74",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "close_12h_Lag_8": {
+    "value_sha256": "819214ee21fa2e425cb70572f901f261041c35f741a93f785dbf116249c0230d",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "volume_12h_Lag_8": {
+    "value_sha256": "0eeb2deec7a58a06fb49d56cdce00ba2088cadd67922977abbe65ca07a73b24d",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "close_12h_trend_EMA_8_Lag_8": {
+    "value_sha256": "ffee7393a1eb33ef47c6facdcc726e669ea1836b4912bea12daf2eea49803665",
+    "nan_mask_sha256": "863b74a82ea858b74c55dc1a6346ba1ac6625efda28b10b6d8cb0ab263c49b3c"
+   },
+   "close_12h_trend_SMA_13_Lag_8": {
+    "value_sha256": "38c383a5b4d6ebe42f43c4daef20573c6e509560c13f543ca735b05a9172935c",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_8": {
+    "value_sha256": "9bcb6d87584b4e979f85bae5910ce8d9dccfb69a3bef14b5ae5ac144bd63feb1",
+    "nan_mask_sha256": "84e7748fa2c7960ddb7c24aa6514e8494c46f75cdd1920d2d8fa200014780b01"
+   },
+   "open_12h_Lag_13": {
+    "value_sha256": "7a464572f847eac2afd3e3522357f07569a06d540576a734ab24039d08a0b9d0",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "high_12h_Lag_13": {
+    "value_sha256": "8df7c1aad0fc648e0a1be378de8845ae31cb42092b3566bd0da89f6fd9cc1ab7",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "low_12h_Lag_13": {
+    "value_sha256": "4464401e998ed7dca019d0a60fab2f21f718eb191e26784098ae7934c9f2b832",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_Lag_13": {
+    "value_sha256": "f66623e705565d39b149736c2f9707f354ebce2aeab9920e37dc135531d14eb5",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "volume_12h_Lag_13": {
+    "value_sha256": "448850b529a3da72eef1e7bd4cd2602ea9e189cf8acf012b74f1145b71ba91c4",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_EMA_8_Lag_13": {
+    "value_sha256": "4ad4693b72ba25c2d032c167700ea540a7fa1fa891f08626f90380acc26db44a",
+    "nan_mask_sha256": "f08a20bbd54e8de853127ca925c6c1aca48ed853f2af397530b7184fc5248bbd"
+   },
+   "close_12h_trend_SMA_13_Lag_13": {
+    "value_sha256": "76ec3b58d4bebee4bfb0d54e0a52cb71ebe9ce481f2e420bcbd68378a7f4bbfe",
+    "nan_mask_sha256": "2ba88072e0252ce0d20219038a78571103d014148f0323063046f52a1dd9a6b4"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_13": {
+    "value_sha256": "9df37ff672aabde09d56e427ad13194b1b12f09c2e2408d0fbb8ab01a422b015",
+    "nan_mask_sha256": "fd8f7a9f42f154b0f91c79db244ab594039e71301bc5568d19f0a2e8c58e4801"
+   },
+   "open_12h_Lag_21": {
+    "value_sha256": "1c0f5daf53eedc2a35b7e5c9aa5708612d3ee4af6c623117453cd577bf93dcbf",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "high_12h_Lag_21": {
+    "value_sha256": "7e090763ce5fa9feca8b27f803cf46c92d281ccfc5814e2573f376ad070ab2b0",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "low_12h_Lag_21": {
+    "value_sha256": "5b1463ae39240473a43d00cfea297e5e5e3d27c35be1da7f97c677c0c8860d3e",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "close_12h_Lag_21": {
+    "value_sha256": "a18c69996e634953d35ab1d6032a12f9a90b1f619f977463ce9696fe7069996c",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "volume_12h_Lag_21": {
+    "value_sha256": "0136581f3b9215ba3903c31054481ba2fe6ea3c919243c5e938e58cb54d7d39d",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "close_12h_trend_EMA_8_Lag_21": {
+    "value_sha256": "c3b73098e88684582a877ba147259aae26c85a048d53a51fe6f39db79cb7bb55",
+    "nan_mask_sha256": "fdb658660977032158f0ab93e602cfc2581204eb865cdaf0d6b3f62525a896a1"
+   },
+   "close_12h_trend_SMA_13_Lag_21": {
+    "value_sha256": "191bd3e1a9962fd88cb20d9598bdbaedcbfc99310c63d9d37b9ce17e2b9a909c",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_21": {
+    "value_sha256": "610df2329d5cbfe1b2522cd805a15a8fa06c25e87912d685efaa602b06ca721c",
+    "nan_mask_sha256": "1c49bcf04cec648ba9ceca763ef24edbf92b18766d0c3cd97b6f144466700f47"
+   },
+   "open_12h_Lag_34": {
+    "value_sha256": "220ab2d4a382cb3cff2ecfb39e18c2bf497fcc6702d6ca73248c8fcda1a479e2",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "high_12h_Lag_34": {
+    "value_sha256": "275bd6732c29d9abbc71411434071b4613229e8596c9882ac485bdfaa1d35fa3",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "low_12h_Lag_34": {
+    "value_sha256": "c568c88637e1b45cd8c35e05fba2303e152d7b7f109f5809edfc4b10b19f3c01",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "close_12h_Lag_34": {
+    "value_sha256": "4a1ee073059a6202917bc3dd998f634eafd0daa01d92017cbd46b0926ee69955",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "volume_12h_Lag_34": {
+    "value_sha256": "ab2377995400876f2af26a83d6322d03e57c3761142b1f1f86b3a72b2b855b89",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "close_12h_trend_EMA_8_Lag_34": {
+    "value_sha256": "24521beeec2034a0b82e69ac708338b0e05e828b9ed41af40b0ffd1a71ec243a",
+    "nan_mask_sha256": "a167818b61e81bf72f2507c6e84f7aa5f15bf5c0fd518627436116c005c794d3"
+   },
+   "close_12h_trend_SMA_13_Lag_34": {
+    "value_sha256": "351011b3bfa48c417e9d9483a3c5c3314ee27ae8c2d054e95fb794d0f91fced2",
+    "nan_mask_sha256": "863b74a82ea858b74c55dc1a6346ba1ac6625efda28b10b6d8cb0ab263c49b3c"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_34": {
+    "value_sha256": "8615ddc89541a92bd1ff04a5aa838fd0741fa48514aa6f037e02dcfc305203bd",
+    "nan_mask_sha256": "e84d46bc575691cc6bb781cddd9b20e6496b3b6c1f84f5c19fe52493dbfed36e"
+   },
+   "meta_12h_Trend_Consensus": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "4a1bfffa128ccb68d1d45f2f20d187747285b32e2c1e8404df8e7e10aead9134"
+   },
+   "meta_12h_Momentum_Divergence": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "4a1bfffa128ccb68d1d45f2f20d187747285b32e2c1e8404df8e7e10aead9134"
+   },
+   "meta_12h_VolumePrice_Divergence": {
+    "value_sha256": "3fb90d90b7aff5198fc28a23864222ae359dc50a2be9a61846de4389dabb351c",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "meta_12h_Volatility_Regime": {
+    "value_sha256": "8c9f95213174f0bb0699b3c6160fd1df64fc006a599dac8c8f753853b8819272",
+    "nan_mask_sha256": "4a1bfffa128ccb68d1d45f2f20d187747285b32e2c1e8404df8e7e10aead9134"
+   },
+   "meta_12h_Volume_PriceChange": {
+    "value_sha256": "c510e48f41d1a7f7ea1bddc88a024f8ee5399de55d9d42ce4b5517ca2f6223cf",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "meta_12h_Time_HourOfDay": {
+    "value_sha256": "99783d7376ca2dc43efeb8b9bd0eb299792418b22060b48fd10ead6590da45fe",
+    "nan_mask_sha256": "8599bd52962296ce2cbdf0f9e6477fbc71b5e03ab8fe5b59fa2ef902bb803c11"
+   },
+   "meta_12h_Time_DayOfWeek": {
+    "value_sha256": "b520371e26ae3326a46a4142ad204b3ac017e5118d1506ad4d1deb18f863d8a3",
+    "nan_mask_sha256": "8599bd52962296ce2cbdf0f9e6477fbc71b5e03ab8fe5b59fa2ef902bb803c11"
+   },
+   "meta_12h_Time_IsWeekend": {
+    "value_sha256": "522a1e9b75180d280ad672cc9ca2c615b97b4004ff09b8ce45a5353bfac8c95a",
+    "nan_mask_sha256": "8599bd52962296ce2cbdf0f9e6477fbc71b5e03ab8fe5b59fa2ef902bb803c11"
+   },
+   "meta_12h_Time_MonthOfYear": {
+    "value_sha256": "ef9428ccb681e95bed1a69224e080db7ae2f4d25975095b1359073be4fe3d2a2",
+    "nan_mask_sha256": "8599bd52962296ce2cbdf0f9e6477fbc71b5e03ab8fe5b59fa2ef902bb803c11"
+   }
+  }
+ },
+ "s1_on": {
+  "names_sha256": "b8fc759f02c30c41e9810847b6569e1d3a1e90ebeb0606dad9d5a44157c4c498",
+  "names": [
+   "close_12h_Lag_1",
+   "close_12h_Lag_13",
+   "close_12h_Lag_2",
+   "close_12h_Lag_21",
+   "close_12h_Lag_3",
+   "close_12h_Lag_34",
+   "close_12h_Lag_5",
+   "close_12h_Lag_8",
+   "close_12h_trend_EMA_8",
+   "close_12h_trend_EMA_8_Abs",
+   "close_12h_trend_EMA_8_DecayLinear_W13",
+   "close_12h_trend_EMA_8_DecayLinear_W21",
+   "close_12h_trend_EMA_8_DecayLinear_W5",
+   "close_12h_trend_EMA_8_Distance",
+   "close_12h_trend_EMA_8_Kurt_W13",
+   "close_12h_trend_EMA_8_Kurt_W144",
+   "close_12h_trend_EMA_8_Kurt_W21",
+   "close_12h_trend_EMA_8_Kurt_W233",
+   "close_12h_trend_EMA_8_Kurt_W34",
+   "close_12h_trend_EMA_8_Kurt_W5",
+   "close_12h_trend_EMA_8_Kurt_W55",
+   "close_12h_trend_EMA_8_Kurt_W8",
+   "close_12h_trend_EMA_8_Kurt_W89",
+   "close_12h_trend_EMA_8_Lag_1",
+   "close_12h_trend_EMA_8_Lag_13",
+   "close_12h_trend_EMA_8_Lag_2",
+   "close_12h_trend_EMA_8_Lag_21",
+   "close_12h_trend_EMA_8_Lag_3",
+   "close_12h_trend_EMA_8_Lag_34",
+   "close_12h_trend_EMA_8_Lag_5",
+   "close_12h_trend_EMA_8_Lag_8",
+   "close_12h_trend_EMA_8_Log1p",
+   "close_12h_trend_EMA_8_Max_W13",
+   "close_12h_trend_EMA_8_Max_W144",
+   "close_12h_trend_EMA_8_Max_W21",
+   "close_12h_trend_EMA_8_Max_W233",
+   "close_12h_trend_EMA_8_Max_W3",
+   "close_12h_trend_EMA_8_Max_W34",
+   "close_12h_trend_EMA_8_Max_W5",
+   "close_12h_trend_EMA_8_Max_W55",
+   "close_12h_trend_EMA_8_Max_W8",
+   "close_12h_trend_EMA_8_Max_W89",
+   "close_12h_trend_EMA_8_Mean_W13",
+   "close_12h_trend_EMA_8_Mean_W144",
+   "close_12h_trend_EMA_8_Mean_W21",
+   "close_12h_trend_EMA_8_Mean_W233",
+   "close_12h_trend_EMA_8_Mean_W3",
+   "close_12h_trend_EMA_8_Mean_W34",
+   "close_12h_trend_EMA_8_Mean_W5",
+   "close_12h_trend_EMA_8_Mean_W55",
+   "close_12h_trend_EMA_8_Mean_W8",
+   "close_12h_trend_EMA_8_Mean_W89",
+   "close_12h_trend_EMA_8_Min_W13",
+   "close_12h_trend_EMA_8_Min_W144",
+   "close_12h_trend_EMA_8_Min_W21",
+   "close_12h_trend_EMA_8_Min_W233",
+   "close_12h_trend_EMA_8_Min_W3",
+   "close_12h_trend_EMA_8_Min_W34",
+   "close_12h_trend_EMA_8_Min_W5",
+   "close_12h_trend_EMA_8_Min_W55",
+   "close_12h_trend_EMA_8_Min_W8",
+   "close_12h_trend_EMA_8_Min_W89",
+   "close_12h_trend_EMA_8_Momentum_L13",
+   "close_12h_trend_EMA_8_Momentum_L144",
+   "close_12h_trend_EMA_8_Momentum_L21",
+   "close_12h_trend_EMA_8_Momentum_L233",
+   "close_12h_trend_EMA_8_Momentum_L3",
+   "close_12h_trend_EMA_8_Momentum_L34",
+   "close_12h_trend_EMA_8_Momentum_L5",
+   "close_12h_trend_EMA_8_Momentum_L55",
+   "close_12h_trend_EMA_8_Momentum_L8",
+   "close_12h_trend_EMA_8_Momentum_L89",
+   "close_12h_trend_EMA_8_Range_W13",
+   "close_12h_trend_EMA_8_Range_W144",
+   "close_12h_trend_EMA_8_Range_W21",
+   "close_12h_trend_EMA_8_Range_W233",
+   "close_12h_trend_EMA_8_Range_W3",
+   "close_12h_trend_EMA_8_Range_W34",
+   "close_12h_trend_EMA_8_Range_W5",
+   "close_12h_trend_EMA_8_Range_W55",
+   "close_12h_trend_EMA_8_Range_W8",
+   "close_12h_trend_EMA_8_Range_W89",
+   "close_12h_trend_EMA_8_Rank_W13",
+   "close_12h_trend_EMA_8_Rank_W144",
+   "close_12h_trend_EMA_8_Rank_W21",
+   "close_12h_trend_EMA_8_Rank_W233",
+   "close_12h_trend_EMA_8_Rank_W3",
+   "close_12h_trend_EMA_8_Rank_W34",
+   "close_12h_trend_EMA_8_Rank_W5",
+   "close_12h_trend_EMA_8_Rank_W55",
+   "close_12h_trend_EMA_8_Rank_W8",
+   "close_12h_trend_EMA_8_Rank_W89",
+   "close_12h_trend_EMA_8_Skew_W13",
+   "close_12h_trend_EMA_8_Skew_W144",
+   "close_12h_trend_EMA_8_Skew_W21",
+   "close_12h_trend_EMA_8_Skew_W233",
+   "close_12h_trend_EMA_8_Skew_W3",
+   "close_12h_trend_EMA_8_Skew_W34",
+   "close_12h_trend_EMA_8_Skew_W5",
+   "close_12h_trend_EMA_8_Skew_W55",
+   "close_12h_trend_EMA_8_Skew_W8",
+   "close_12h_trend_EMA_8_Skew_W89",
+   "close_12h_trend_EMA_8_Slope_W13",
+   "close_12h_trend_EMA_8_Slope_W144",
+   "close_12h_trend_EMA_8_Slope_W21",
+   "close_12h_trend_EMA_8_Slope_W233",
+   "close_12h_trend_EMA_8_Slope_W3",
+   "close_12h_trend_EMA_8_Slope_W34",
+   "close_12h_trend_EMA_8_Slope_W5",
+   "close_12h_trend_EMA_8_Slope_W55",
+   "close_12h_trend_EMA_8_Slope_W8",
+   "close_12h_trend_EMA_8_Slope_W89",
+   "close_12h_trend_EMA_8_Std_W13",
+   "close_12h_trend_EMA_8_Std_W144",
+   "close_12h_trend_EMA_8_Std_W21",
+   "close_12h_trend_EMA_8_Std_W233",
+   "close_12h_trend_EMA_8_Std_W3",
+   "close_12h_trend_EMA_8_Std_W34",
+   "close_12h_trend_EMA_8_Std_W5",
+   "close_12h_trend_EMA_8_Std_W55",
+   "close_12h_trend_EMA_8_Std_W8",
+   "close_12h_trend_EMA_8_Std_W89",
+   "close_12h_trend_EMA_8_TsArgmax_W13",
+   "close_12h_trend_EMA_8_TsArgmax_W21",
+   "close_12h_trend_EMA_8_TsArgmax_W5",
+   "close_12h_trend_EMA_8_TsArgmin_W13",
+   "close_12h_trend_EMA_8_TsArgmin_W21",
+   "close_12h_trend_EMA_8_TsArgmin_W5",
+   "close_12h_trend_EMA_8_TsRank_W13",
+   "close_12h_trend_EMA_8_TsRank_W21",
+   "close_12h_trend_EMA_8_TsRank_W5",
+   "close_12h_trend_EMA_8_ZScore_W13",
+   "close_12h_trend_EMA_8_ZScore_W144",
+   "close_12h_trend_EMA_8_ZScore_W21",
+   "close_12h_trend_EMA_8_ZScore_W233",
+   "close_12h_trend_EMA_8_ZScore_W3",
+   "close_12h_trend_EMA_8_ZScore_W34",
+   "close_12h_trend_EMA_8_ZScore_W5",
+   "close_12h_trend_EMA_8_ZScore_W55",
+   "close_12h_trend_EMA_8_ZScore_W8",
+   "close_12h_trend_EMA_8_ZScore_W89",
+   "close_12h_trend_SMA_13",
+   "close_12h_trend_SMA_13_Abs",
+   "close_12h_trend_SMA_13_DecayLinear_W13",
+   "close_12h_trend_SMA_13_DecayLinear_W21",
+   "close_12h_trend_SMA_13_DecayLinear_W5",
+   "close_12h_trend_SMA_13_Distance",
+   "close_12h_trend_SMA_13_Kurt_W13",
+   "close_12h_trend_SMA_13_Kurt_W144",
+   "close_12h_trend_SMA_13_Kurt_W21",
+   "close_12h_trend_SMA_13_Kurt_W233",
+   "close_12h_trend_SMA_13_Kurt_W34",
+   "close_12h_trend_SMA_13_Kurt_W5",
+   "close_12h_trend_SMA_13_Kurt_W55",
+   "close_12h_trend_SMA_13_Kurt_W8",
+   "close_12h_trend_SMA_13_Kurt_W89",
+   "close_12h_trend_SMA_13_Lag_1",
+   "close_12h_trend_SMA_13_Lag_13",
+   "close_12h_trend_SMA_13_Lag_2",
+   "close_12h_trend_SMA_13_Lag_21",
+   "close_12h_trend_SMA_13_Lag_3",
+   "close_12h_trend_SMA_13_Lag_34",
+   "close_12h_trend_SMA_13_Lag_5",
+   "close_12h_trend_SMA_13_Lag_8",
+   "close_12h_trend_SMA_13_Log1p",
+   "close_12h_trend_SMA_13_Max_W13",
+   "close_12h_trend_SMA_13_Max_W144",
+   "close_12h_trend_SMA_13_Max_W21",
+   "close_12h_trend_SMA_13_Max_W233",
+   "close_12h_trend_SMA_13_Max_W3",
+   "close_12h_trend_SMA_13_Max_W34",
+   "close_12h_trend_SMA_13_Max_W5",
+   "close_12h_trend_SMA_13_Max_W55",
+   "close_12h_trend_SMA_13_Max_W8",
+   "close_12h_trend_SMA_13_Max_W89",
+   "close_12h_trend_SMA_13_Mean_W13",
+   "close_12h_trend_SMA_13_Mean_W144",
+   "close_12h_trend_SMA_13_Mean_W21",
+   "close_12h_trend_SMA_13_Mean_W233",
+   "close_12h_trend_SMA_13_Mean_W3",
+   "close_12h_trend_SMA_13_Mean_W34",
+   "close_12h_trend_SMA_13_Mean_W5",
+   "close_12h_trend_SMA_13_Mean_W55",
+   "close_12h_trend_SMA_13_Mean_W8",
+   "close_12h_trend_SMA_13_Mean_W89",
+   "close_12h_trend_SMA_13_Min_W13",
+   "close_12h_trend_SMA_13_Min_W144",
+   "close_12h_trend_SMA_13_Min_W21",
+   "close_12h_trend_SMA_13_Min_W233",
+   "close_12h_trend_SMA_13_Min_W3",
+   "close_12h_trend_SMA_13_Min_W34",
+   "close_12h_trend_SMA_13_Min_W5",
+   "close_12h_trend_SMA_13_Min_W55",
+   "close_12h_trend_SMA_13_Min_W8",
+   "close_12h_trend_SMA_13_Min_W89",
+   "close_12h_trend_SMA_13_Momentum_L13",
+   "close_12h_trend_SMA_13_Momentum_L144",
+   "close_12h_trend_SMA_13_Momentum_L21",
+   "close_12h_trend_SMA_13_Momentum_L233",
+   "close_12h_trend_SMA_13_Momentum_L3",
+   "close_12h_trend_SMA_13_Momentum_L34",
+   "close_12h_trend_SMA_13_Momentum_L5",
+   "close_12h_trend_SMA_13_Momentum_L55",
+   "close_12h_trend_SMA_13_Momentum_L8",
+   "close_12h_trend_SMA_13_Momentum_L89",
+   "close_12h_trend_SMA_13_Range_W13",
+   "close_12h_trend_SMA_13_Range_W144",
+   "close_12h_trend_SMA_13_Range_W21",
+   "close_12h_trend_SMA_13_Range_W233",
+   "close_12h_trend_SMA_13_Range_W3",
+   "close_12h_trend_SMA_13_Range_W34",
+   "close_12h_trend_SMA_13_Range_W5",
+   "close_12h_trend_SMA_13_Range_W55",
+   "close_12h_trend_SMA_13_Range_W8",
+   "close_12h_trend_SMA_13_Range_W89",
+   "close_12h_trend_SMA_13_Rank_W13",
+   "close_12h_trend_SMA_13_Rank_W144",
+   "close_12h_trend_SMA_13_Rank_W21",
+   "close_12h_trend_SMA_13_Rank_W233",
+   "close_12h_trend_SMA_13_Rank_W3",
+   "close_12h_trend_SMA_13_Rank_W34",
+   "close_12h_trend_SMA_13_Rank_W5",
+   "close_12h_trend_SMA_13_Rank_W55",
+   "close_12h_trend_SMA_13_Rank_W8",
+   "close_12h_trend_SMA_13_Rank_W89",
+   "close_12h_trend_SMA_13_Skew_W13",
+   "close_12h_trend_SMA_13_Skew_W144",
+   "close_12h_trend_SMA_13_Skew_W21",
+   "close_12h_trend_SMA_13_Skew_W233",
+   "close_12h_trend_SMA_13_Skew_W3",
+   "close_12h_trend_SMA_13_Skew_W34",
+   "close_12h_trend_SMA_13_Skew_W5",
+   "close_12h_trend_SMA_13_Skew_W55",
+   "close_12h_trend_SMA_13_Skew_W8",
+   "close_12h_trend_SMA_13_Skew_W89",
+   "close_12h_trend_SMA_13_Slope_W13",
+   "close_12h_trend_SMA_13_Slope_W144",
+   "close_12h_trend_SMA_13_Slope_W21",
+   "close_12h_trend_SMA_13_Slope_W233",
+   "close_12h_trend_SMA_13_Slope_W3",
+   "close_12h_trend_SMA_13_Slope_W34",
+   "close_12h_trend_SMA_13_Slope_W5",
+   "close_12h_trend_SMA_13_Slope_W55",
+   "close_12h_trend_SMA_13_Slope_W8",
+   "close_12h_trend_SMA_13_Slope_W89",
+   "close_12h_trend_SMA_13_Std_W13",
+   "close_12h_trend_SMA_13_Std_W144",
+   "close_12h_trend_SMA_13_Std_W21",
+   "close_12h_trend_SMA_13_Std_W233",
+   "close_12h_trend_SMA_13_Std_W3",
+   "close_12h_trend_SMA_13_Std_W34",
+   "close_12h_trend_SMA_13_Std_W5",
+   "close_12h_trend_SMA_13_Std_W55",
+   "close_12h_trend_SMA_13_Std_W8",
+   "close_12h_trend_SMA_13_Std_W89",
+   "close_12h_trend_SMA_13_TsArgmax_W13",
+   "close_12h_trend_SMA_13_TsArgmax_W21",
+   "close_12h_trend_SMA_13_TsArgmax_W5",
+   "close_12h_trend_SMA_13_TsArgmin_W13",
+   "close_12h_trend_SMA_13_TsArgmin_W21",
+   "close_12h_trend_SMA_13_TsArgmin_W5",
+   "close_12h_trend_SMA_13_TsRank_W13",
+   "close_12h_trend_SMA_13_TsRank_W21",
+   "close_12h_trend_SMA_13_TsRank_W5",
+   "close_12h_trend_SMA_13_ZScore_W13",
+   "close_12h_trend_SMA_13_ZScore_W144",
+   "close_12h_trend_SMA_13_ZScore_W21",
+   "close_12h_trend_SMA_13_ZScore_W233",
+   "close_12h_trend_SMA_13_ZScore_W3",
+   "close_12h_trend_SMA_13_ZScore_W34",
+   "close_12h_trend_SMA_13_ZScore_W5",
+   "close_12h_trend_SMA_13_ZScore_W55",
+   "close_12h_trend_SMA_13_ZScore_W8",
+   "close_12h_trend_SMA_13_ZScore_W89",
+   "high_12h_Lag_1",
+   "high_12h_Lag_13",
+   "high_12h_Lag_2",
+   "high_12h_Lag_21",
+   "high_12h_Lag_3",
+   "high_12h_Lag_34",
+   "high_12h_Lag_5",
+   "high_12h_Lag_8",
+   "low_12h_Lag_1",
+   "low_12h_Lag_13",
+   "low_12h_Lag_2",
+   "low_12h_Lag_21",
+   "low_12h_Lag_3",
+   "low_12h_Lag_34",
+   "low_12h_Lag_5",
+   "low_12h_Lag_8",
+   "meta_12h_Time_DayOfWeek",
+   "meta_12h_Time_HourOfDay",
+   "meta_12h_Time_IsWeekend",
+   "meta_12h_Time_MonthOfYear",
+   "meta_12h_VolumePrice_Divergence",
+   "meta_12h_Volume_PriceChange",
+   "ohlc_12h_pattern_BearishCount_W13",
+   "ohlc_12h_pattern_BearishCount_W21",
+   "ohlc_12h_pattern_BearishCount_W5",
+   "ohlc_12h_pattern_BullishCount_W13",
+   "ohlc_12h_pattern_BullishCount_W21",
+   "ohlc_12h_pattern_BullishCount_W5",
+   "ohlc_12h_pattern_CDL3INSIDE",
+   "ohlc_12h_pattern_CDL3LINESTRIKE",
+   "ohlc_12h_pattern_CDL3OUTSIDE",
+   "ohlc_12h_pattern_CDL3WHITESOLDIERS",
+   "ohlc_12h_pattern_CDLADVANCEBLOCK",
+   "ohlc_12h_pattern_CDLBELTHOLD",
+   "ohlc_12h_pattern_CDLCLOSINGMARUBOZU",
+   "ohlc_12h_pattern_CDLDOJI",
+   "ohlc_12h_pattern_CDLDOJISTAR",
+   "ohlc_12h_pattern_CDLDRAGONFLYDOJI",
+   "ohlc_12h_pattern_CDLENGULFING",
+   "ohlc_12h_pattern_CDLEVENINGDOJISTAR",
+   "ohlc_12h_pattern_CDLEVENINGSTAR",
+   "ohlc_12h_pattern_CDLGRAVESTONEDOJI",
+   "ohlc_12h_pattern_CDLHAMMER",
+   "ohlc_12h_pattern_CDLHANGINGMAN",
+   "ohlc_12h_pattern_CDLHARAMI",
+   "ohlc_12h_pattern_CDLHARAMICROSS",
+   "ohlc_12h_pattern_CDLHIGHWAVE",
+   "ohlc_12h_pattern_CDLHIKKAKE",
+   "ohlc_12h_pattern_CDLHIKKAKEMOD",
+   "ohlc_12h_pattern_CDLIDENTICAL3CROWS",
+   "ohlc_12h_pattern_CDLINVERTEDHAMMER",
+   "ohlc_12h_pattern_CDLLONGLEGGEDDOJI",
+   "ohlc_12h_pattern_CDLLONGLINE",
+   "ohlc_12h_pattern_CDLMARUBOZU",
+   "ohlc_12h_pattern_CDLMATCHINGLOW",
+   "ohlc_12h_pattern_CDLMORNINGSTAR",
+   "ohlc_12h_pattern_CDLRICKSHAWMAN",
+   "ohlc_12h_pattern_CDLSEPARATINGLINES",
+   "ohlc_12h_pattern_CDLSHOOTINGSTAR",
+   "ohlc_12h_pattern_CDLSHORTLINE",
+   "ohlc_12h_pattern_CDLSPINNINGTOP",
+   "ohlc_12h_pattern_CDLSTALLEDPATTERN",
+   "ohlc_12h_pattern_CDLTAKURI",
+   "ohlc_12h_pattern_CDLXSIDEGAP3METHODS",
+   "ohlc_12h_pattern_Consensus",
+   "ohlc_12h_pattern_Consensus_Lag_1",
+   "ohlc_12h_pattern_Consensus_Lag_13",
+   "ohlc_12h_pattern_Consensus_Lag_2",
+   "ohlc_12h_pattern_Consensus_Lag_21",
+   "ohlc_12h_pattern_Consensus_Lag_3",
+   "ohlc_12h_pattern_Consensus_Lag_34",
+   "ohlc_12h_pattern_Consensus_Lag_5",
+   "ohlc_12h_pattern_Consensus_Lag_8",
+   "open_12h_Lag_1",
+   "open_12h_Lag_13",
+   "open_12h_Lag_2",
+   "open_12h_Lag_21",
+   "open_12h_Lag_3",
+   "open_12h_Lag_34",
+   "open_12h_Lag_5",
+   "open_12h_Lag_8",
+   "volume_12h_Lag_1",
+   "volume_12h_Lag_13",
+   "volume_12h_Lag_2",
+   "volume_12h_Lag_21",
+   "volume_12h_Lag_3",
+   "volume_12h_Lag_34",
+   "volume_12h_Lag_5",
+   "volume_12h_Lag_8"
+  ],
+  "n_columns": 363,
+  "n_rows": 1695,
+  "parquet_bytes": 1192548,
+  "columns": {
+   "ohlc_12h_pattern_BearishCount_W13": {
+    "value_sha256": "1a32a83d654f14439d021975b6e5113ed88e114a2b1eb9997ad9f7265b21a3eb",
+    "nan_mask_sha256": "3997cd9ab6291242d4ed0d1e3b49924b1e33d8ff104630f953057f5ec63c0f51"
+   },
+   "ohlc_12h_pattern_BearishCount_W21": {
+    "value_sha256": "63b6d565a839143b42c1d16e723ba50fa0f1e5f9ca7e804e6232497897b38c51",
+    "nan_mask_sha256": "b428a1e0e2d40d413fcaaec7e96e17effc16b633c6b6afae5c56776df0fa1303"
+   },
+   "ohlc_12h_pattern_BearishCount_W5": {
+    "value_sha256": "51b162835e06a16b63c0336c0cd86dfba4077cb63e1616135aa60ffc869ceaff",
+    "nan_mask_sha256": "60aa3117d682d05c0e2a8e22a26e8ab0035c91c7556c9c1d23c2215ff8b58a80"
+   },
+   "ohlc_12h_pattern_BullishCount_W13": {
+    "value_sha256": "33a56fd452552f8ca6b00a5b080642f6a80d535e8dc46cc162f658933c7ea70c",
+    "nan_mask_sha256": "3997cd9ab6291242d4ed0d1e3b49924b1e33d8ff104630f953057f5ec63c0f51"
+   },
+   "ohlc_12h_pattern_BullishCount_W21": {
+    "value_sha256": "00bc43fcb246ca2a60f8623c46a8ecde9f356e1c497f443925511d4b063dd953",
+    "nan_mask_sha256": "b428a1e0e2d40d413fcaaec7e96e17effc16b633c6b6afae5c56776df0fa1303"
+   },
+   "ohlc_12h_pattern_BullishCount_W5": {
+    "value_sha256": "daefb044e5d0833881697eac617f310c6161549eebf2ba147f6e9e1ee448ae92",
+    "nan_mask_sha256": "60aa3117d682d05c0e2a8e22a26e8ab0035c91c7556c9c1d23c2215ff8b58a80"
+   },
+   "ohlc_12h_pattern_CDL3INSIDE": {
+    "value_sha256": "3268cfec49a6d712509c8d33c0c1930663ae39c5598fecc92deb153b758ee195",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3LINESTRIKE": {
+    "value_sha256": "32848376b7dc89684c22bb33e9d49ccb4833db6fd3df1b6500f5cd2c3211a794",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3OUTSIDE": {
+    "value_sha256": "4ab7f324f5d5b3dcee9972e2261bba91bdb2ed150bd0f8bdf309cabbd4b340ce",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDL3WHITESOLDIERS": {
+    "value_sha256": "98e4e877a9076689af7a2ec52f7a5bcb62e0455bceecca12c9ffcf228a2079b0",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLADVANCEBLOCK": {
+    "value_sha256": "888969173dddf0632e042ef3bdd808fe77022c8e2e09ec3668dce606a6dfdfac",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLBELTHOLD": {
+    "value_sha256": "f661da87dd310f2acb2059d5cbc4d5674e697c2f8bcd08506545e9934aabafed",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLCLOSINGMARUBOZU": {
+    "value_sha256": "de72aead3f240899a91a5315dc12139a1cb3279ef31ac0dfe0030711911b4aca",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLDOJI": {
+    "value_sha256": "f11ee4472cf1a9725a1c01a457271c9c8a5d6ad2bf5ccd88bc54866c0cee09c9",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLDOJISTAR": {
+    "value_sha256": "2201500c6bccb5ccc5e4464e19b4dc2a146e75fdb18480b6fd0e1c30b1274e91",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLDRAGONFLYDOJI": {
+    "value_sha256": "9299a479f31ab62468c2cd01a16171d70080b50202fdffbe0869a666422dd0e4",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLENGULFING": {
+    "value_sha256": "911df05afc3f98652520adfb8e975ce71c529bb442908ec15d939a384c4b7d70",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLEVENINGDOJISTAR": {
+    "value_sha256": "a5b352254934cb7c2b2d002e8c40b615818b081c701ecc1eaffe5cbdd9ee9b73",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLEVENINGSTAR": {
+    "value_sha256": "06fbd84001277fb88359c794dcff67d13af4a05b1ff2c08b00d1530a34dacce7",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLGRAVESTONEDOJI": {
+    "value_sha256": "15458b012e2a378565a569c3b4d03068d5d100986b7b5e974b74f9a40861b0ce",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHAMMER": {
+    "value_sha256": "a09d084aa90b0180381f577784f566df584212bb82b017a9620a3808a02d11ee",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHANGINGMAN": {
+    "value_sha256": "e55be87ba73af15885a137c1df94d10257026d1d8220464ed59e7ad79caa7adc",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHARAMI": {
+    "value_sha256": "7738e96280bbd65d53a784575117f2c5cab930f8891a985331752d069d6a0513",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHARAMICROSS": {
+    "value_sha256": "54b1839ae8f29f4e5ea17029882981b536e540f094351efac8917fca397b0976",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHIGHWAVE": {
+    "value_sha256": "a0b83ae4cd91e20dda7aad9cf787dafc68225519a8b19c4d491e656e2405e402",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHIKKAKE": {
+    "value_sha256": "106af063684869b53660c341a0044308a943e54876ba999b9a9521abad9ac460",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLHIKKAKEMOD": {
+    "value_sha256": "72df407606fc6438b93f45ce1f34d7ddfde14210a48df4996adde169590da5e0",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLIDENTICAL3CROWS": {
+    "value_sha256": "ce6942311a3066d961e54953dde99e360b1d7d42ea1cd830a850e28385983fbf",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLINVERTEDHAMMER": {
+    "value_sha256": "6e9f33c85fe476dc7b3218df7a083c6d45ebe7fec8ba27d27a65766d2d229146",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLLONGLEGGEDDOJI": {
+    "value_sha256": "cd464f64fed990a963295b73a75e9c9f75ede43f733a9a895886de14046b9bf2",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLLONGLINE": {
+    "value_sha256": "608f0fc7418f33d9a3dfbb3beac6db15abc1c011b163da7cb97ce783c981e4bd",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLMARUBOZU": {
+    "value_sha256": "e336a3ed9a63f9b7710f746d0fb9c0a0bf622139028c90a0b08dcfc3c3dfacfc",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLMATCHINGLOW": {
+    "value_sha256": "ed8c5c051300ff356823762d425dcb56c26f5d91d3d234aee0ca762f990c710a",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLMORNINGSTAR": {
+    "value_sha256": "7d22d540897eb981dc596aa8ceb65c125ca6e9db057121d3cf5ad0bffc6d452f",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLRICKSHAWMAN": {
+    "value_sha256": "f30bc9c881ce58626bff9df74f568376ff07797eb7fe73db342c836252feab3d",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSEPARATINGLINES": {
+    "value_sha256": "a966b8e25907cc676fb8ff8a272bb06d2768bd4951c7bc4ebbd37e1824ffead1",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSHOOTINGSTAR": {
+    "value_sha256": "5af20475a1f6437dbb15f37d6298afae7157bdd51e667f939e9bf383c95768b5",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSHORTLINE": {
+    "value_sha256": "731da2d612feca939e212d0f9722b6f7fe52706f20912dbafa2c772c3bd74d7c",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSPINNINGTOP": {
+    "value_sha256": "8af42e4de0d0b2d82f443b174e71995c9b6169a0989906fce78861b4e9b2f762",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLSTALLEDPATTERN": {
+    "value_sha256": "a2a4fa8a0eda75057fbb6b350eecf6042d3bdafb271939b292a6552286b328a7",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLTAKURI": {
+    "value_sha256": "e5030a1a8e3ed0f5723ad4d32338e1b568f375e6d5169b3469612724b58c6c86",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_CDLXSIDEGAP3METHODS": {
+    "value_sha256": "22beccd93f8867c7b0ab9538f0af8f2cebf59d076a17e4773f64a299904ee8b2",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "ohlc_12h_pattern_Consensus": {
+    "value_sha256": "70f8652cfae244a89deeb506def125023e2fcb0218d135f76eee98bc9b90e23c",
+    "nan_mask_sha256": "99c6925608c5bb4d94726737f50aa4f7aae7b9948018fa595a0aa1281f874c2e"
+   },
+   "close_12h_trend_EMA_8": {
+    "value_sha256": "986dc2fb1d7bc9169a4fad49c5796c68ca8a717b3646263e1d641a7880fb550e",
+    "nan_mask_sha256": "fc93dffbbbd29fbe637921283a086d34523cbd2f70e8e4397f3600cedd85345f"
+   },
+   "close_12h_trend_SMA_13": {
+    "value_sha256": "c0670924a7ecb12304dea929ae3035f0a810f5f7d29ec5ad9c3dd187455be78b",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_EMA_8_Distance": {
+    "value_sha256": "012c954435579b0faf455e2ce09bdf6f6bceeb295f885cbe4ad0686c786aa855",
+    "nan_mask_sha256": "2161fc1c09693a3e353294e1151d1b7f920740a8b95801b77992b9ee12786d53"
+   },
+   "close_12h_trend_SMA_13_Distance": {
+    "value_sha256": "a66c9bbc44a0fe7af8692c2cc7a491db96e6769c81cf465d16777b84959c0658",
+    "nan_mask_sha256": "6fa2d412d50c76c26b55c9741e19c46c5e5620cb1e280e58603d5a074f45915e"
+   },
+   "close_12h_trend_EMA_8_Momentum_L3": {
+    "value_sha256": "ae4a9b5f51054baadd45f3f989934ea870189629b19776be1e4c3523e64f146a",
+    "nan_mask_sha256": "4ba80519b08c35e16566aaef34694f4b0a77dfeab6e282ec06cc1a1077b73f51"
+   },
+   "close_12h_trend_EMA_8_Momentum_L5": {
+    "value_sha256": "c09fa4017cef9d7e2c48d6ec08e19367da4db23ea3f9547aa3ea393053cda7e3",
+    "nan_mask_sha256": "3a7381cb013f9d0760401bb4bc49fcd6e15095155f43eff1f4cf2772270d261d"
+   },
+   "close_12h_trend_EMA_8_Momentum_L8": {
+    "value_sha256": "8be857b04576b63d57094d636fcee75a55266c32c9335bd5ead2cf2db22f3dfc",
+    "nan_mask_sha256": "e31cc9f68534f64e0dfe3c293570eb36f5ce6f1ccd87d730c2ab16e19d8acd5d"
+   },
+   "close_12h_trend_EMA_8_Momentum_L13": {
+    "value_sha256": "4818aad6853e036f47009ae7f2272205540c2075d972353206dab5d15c651c4b",
+    "nan_mask_sha256": "fff21ef330964585bd00370fc72b5d0a156e9dec09fbbbb7ec3702cf2857cd3e"
+   },
+   "close_12h_trend_EMA_8_Momentum_L21": {
+    "value_sha256": "94f44489598d50ad66236e1ba9590f64b29b74d749458c62f16805ed2f653329",
+    "nan_mask_sha256": "d0bd2f8454f40ddb1628ebe13bfc0b9dea5a96986c08e6e83d25b351049d0e37"
+   },
+   "close_12h_trend_EMA_8_Momentum_L34": {
+    "value_sha256": "1c212cac92e9e678ef472d247a6d0aecca45720e4382724068634ea2fa3e4d30",
+    "nan_mask_sha256": "2d242de4c8aebaad0f94d1f3e7e022c843f419eac63ddad27c9f592b385cb63c"
+   },
+   "close_12h_trend_EMA_8_Momentum_L55": {
+    "value_sha256": "0bb275064217cf6aeca623496ec2b15a277415d2cc84323de30c8cb816c2e05f",
+    "nan_mask_sha256": "75b6aca84129f73a76c6fea021a54f177bb5347de151e48c2c61c72919850102"
+   },
+   "close_12h_trend_EMA_8_Momentum_L89": {
+    "value_sha256": "683afda19e82749962721f869f9107dfc05f1dce225d04c1ffc87f2bc2161150",
+    "nan_mask_sha256": "7a9931b3a40bc968f0ef7823a3303bdd2bf7c6fdd5712ec80040163092ed0360"
+   },
+   "close_12h_trend_EMA_8_Momentum_L144": {
+    "value_sha256": "c3799b03e5e22d4e935afcefd0c0aa2e1c91036b54f7b5e2c1ec8f251c6eac32",
+    "nan_mask_sha256": "73111fd860c5d29012692357ba561896f818f453451ed6d497445efac02953ce"
+   },
+   "close_12h_trend_EMA_8_Momentum_L233": {
+    "value_sha256": "8f8f04c4be03ebc1ce17a7464bf9037b051defc9a7c2a38e3fa111d3f5149f92",
+    "nan_mask_sha256": "383850273c516293c4e1b397eaca0aa22efb9a6d27523253735334cb4753da78"
+   },
+   "close_12h_trend_SMA_13_Momentum_L3": {
+    "value_sha256": "a1564cc91829d2a2a4ae166e06672fced4fddf525bc129f44f8b32c3ebb81e14",
+    "nan_mask_sha256": "eab23db8c930e0fb01a9fc8c63bf62f0958d2513860120adb82c04abf7de70c2"
+   },
+   "close_12h_trend_SMA_13_Momentum_L5": {
+    "value_sha256": "caab6c5e05d7b5072d76cc59fa8f0fdac851b9490dad9963b50a796789d751cc",
+    "nan_mask_sha256": "1ce72eb4d586afc94da91ea1fb2091eb8e8ed796f8beeb802a1ed5c79a359b1c"
+   },
+   "close_12h_trend_SMA_13_Momentum_L8": {
+    "value_sha256": "277e2534d7c4127b0e742bfc6fce9b9ab34372979151d00d1111d308e131d19a",
+    "nan_mask_sha256": "ea7e3ea8c91bfdb77086f33c5c61e1f24884a39e50f28d591a7b70fade864268"
+   },
+   "close_12h_trend_SMA_13_Momentum_L13": {
+    "value_sha256": "29743fe8884fdc4970dc0524ee30ddffd279edbaeee33328129beed1f833eff7",
+    "nan_mask_sha256": "97e49c806e1e26cb7f1f5b07f465ffe06d09a198327d640c21cee120b175970d"
+   },
+   "close_12h_trend_SMA_13_Momentum_L21": {
+    "value_sha256": "f6d86207b3e25d15f189cfa74f6920e1a3e0a9551daeeda6545d93d7a1e78a7c",
+    "nan_mask_sha256": "34430763582c7f76c210137202283c1cb45cc50bed72637f95b26a104d0406e7"
+   },
+   "close_12h_trend_SMA_13_Momentum_L34": {
+    "value_sha256": "0ce284a7709a3e0d25800bac6ac2f14b4757f13a8bcbf8d41fedd2b33bd3bc4d",
+    "nan_mask_sha256": "e31cc9f68534f64e0dfe3c293570eb36f5ce6f1ccd87d730c2ab16e19d8acd5d"
+   },
+   "close_12h_trend_SMA_13_Momentum_L55": {
+    "value_sha256": "9b2e6eafacd657dcb158776a6595870bd308d3f2511f31e0c49cf974b9dca3f9",
+    "nan_mask_sha256": "863942ae397d08282a6a4f2812856082acf5c95438e2c19cf32abfcc9725c03f"
+   },
+   "close_12h_trend_SMA_13_Momentum_L89": {
+    "value_sha256": "ca946294b3a311b6546382fb1106b37acf6d2e8bf0ab7cd0cd9e973aee9c6bb7",
+    "nan_mask_sha256": "8356edb589b39c2deccd973d3452a0bef63e08bf92ef092cb1741f29af141a01"
+   },
+   "close_12h_trend_SMA_13_Momentum_L144": {
+    "value_sha256": "7e75204b252f3f08b380a9f6efb35a4f5394f1c154500f67831d8304a55eab5a",
+    "nan_mask_sha256": "efb2fab924e50044704c719c7a7152993852fcb98d4220d526ecbfa0d42a2b14"
+   },
+   "close_12h_trend_SMA_13_Momentum_L233": {
+    "value_sha256": "0289fe9beff9fe14e4d4b9a20484b6940d10e48a3370e9d075132eb4f0e08c54",
+    "nan_mask_sha256": "b999c307d758169bf4f0873098b18245312e1fe48b5ac69025884eb1a6513dbf"
+   },
+   "close_12h_trend_EMA_8_TsArgmax_W5": {
+    "value_sha256": "17af7833a822d2b8c6f03c5f5d67873765f9de845c118fe15f83365231e89634",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_EMA_8_TsArgmin_W5": {
+    "value_sha256": "80ebc7dc36a5502c53c80b161da8e437c171c768a8db41286df101819f0b5cfa",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_EMA_8_TsRank_W5": {
+    "value_sha256": "420af6c1742850a7d0d0547a6bdb8fab6df4f326a0f60a9da1f1fe3ee887b784",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_EMA_8_DecayLinear_W5": {
+    "value_sha256": "7759ae0340d540c0de9cdf7307e2f61e98c7b197816f1963583e513fe7f579aa",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_EMA_8_TsArgmax_W13": {
+    "value_sha256": "d9757cbdc6d8cbd2bf293f1fb530959dc0d05b9bbca9a9b44774f58d06446c28",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_EMA_8_TsArgmin_W13": {
+    "value_sha256": "a3f9b1e6643083b2ebff2a947c79affaf4a67869e1c345928e64d4c41c4fc743",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_EMA_8_TsRank_W13": {
+    "value_sha256": "c8452065d6b4016880579c2b80528023e704604d4a7ce3dc0b6a4848e04867ea",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_EMA_8_DecayLinear_W13": {
+    "value_sha256": "de12b6b3b68df5254fdefbcf81f36f1f8267cfe39c06ca98963742dfaea5b727",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_EMA_8_TsArgmax_W21": {
+    "value_sha256": "ab2d341591f37c5ad102684cb4db9523e64bf96640b0fe5db27cac896f1b2c54",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_EMA_8_TsArgmin_W21": {
+    "value_sha256": "1be80207726012aada1761a5daa932b09539549103d3a37e1d2f9a7829d28f0c",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_EMA_8_TsRank_W21": {
+    "value_sha256": "9f21ef27bd02c6f5b7463d9afebbff223d9937b47582fbc8c0feb8cab6d95f26",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_EMA_8_DecayLinear_W21": {
+    "value_sha256": "5a667e81fc3103d05c2c948e2b2fa2561c71246985db0714e922d6eaf68b9f9a",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_EMA_8_Log1p": {
+    "value_sha256": "be59b09530f51f9e773a1ffab4024a6249533aae9de34defd245748939f9bc2c",
+    "nan_mask_sha256": "fc93dffbbbd29fbe637921283a086d34523cbd2f70e8e4397f3600cedd85345f"
+   },
+   "close_12h_trend_EMA_8_Abs": {
+    "value_sha256": "986dc2fb1d7bc9169a4fad49c5796c68ca8a717b3646263e1d641a7880fb550e",
+    "nan_mask_sha256": "fc93dffbbbd29fbe637921283a086d34523cbd2f70e8e4397f3600cedd85345f"
+   },
+   "close_12h_trend_SMA_13_TsArgmax_W5": {
+    "value_sha256": "c34f1ea18212362e3ab8b44986851a7f8dcd197ab92f46b38c89f29bf00b42c1",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_SMA_13_TsArgmin_W5": {
+    "value_sha256": "b678405b554afe2894bbd120bc5fcdcb27f6e3d69bf2a3f4724e7817b50fe673",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_SMA_13_TsRank_W5": {
+    "value_sha256": "ec02459718401d15666051f9cb1175b68d8647ecd80cd1cd005b2c9bae459d41",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_SMA_13_DecayLinear_W5": {
+    "value_sha256": "ec675534e535ada6c251f76aabb0e6790e6758a72d61f58f7e65fe0d4f99e0cb",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_SMA_13_TsArgmax_W13": {
+    "value_sha256": "02e01c384f71752e75e7f2c1e4d85f423843db3125b308fd99ceb490b27b6818",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_SMA_13_TsArgmin_W13": {
+    "value_sha256": "91605d739d5b6c2d6e82f100beb6d8af6be48d67ec211bca7e4b5f5cdde2f1d4",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_SMA_13_TsRank_W13": {
+    "value_sha256": "45dab4eed2c17ce851532dde15b3bc222df3c29ab2ccf87a63fe0d7588dbbfc6",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_SMA_13_DecayLinear_W13": {
+    "value_sha256": "67abd0d0bc742c0086ec649f8aa740ead0d98bbc83488b4ac8b37f10665f5fd7",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_SMA_13_TsArgmax_W21": {
+    "value_sha256": "39c7f10bbe693ad8fca0fd6d0a051ace4fb0781c4c68bbcc046287f4d56ed62e",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_SMA_13_TsArgmin_W21": {
+    "value_sha256": "3b442bd2a91dfeb942de8171ee7d002db24c51116024a7ad4c50765874f719a1",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_SMA_13_TsRank_W21": {
+    "value_sha256": "4270fb771c280c157474fdee58ca73ca531bd415cdbce923ef18727b0c59e510",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_SMA_13_DecayLinear_W21": {
+    "value_sha256": "9366d18cddcecbc9af727315bfb563bf61575f18bdd78fae9eac0b6a38a3f880",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_SMA_13_Log1p": {
+    "value_sha256": "633539975c0bdbd78370d5eeb1aae237a5a55d57b76d63ed3718954c4afe39bc",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_SMA_13_Abs": {
+    "value_sha256": "c0670924a7ecb12304dea929ae3035f0a810f5f7d29ec5ad9c3dd187455be78b",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_EMA_8_Kurt_W13": {
+    "value_sha256": "4fcdbd56ed3902444bf822d909e600ebdabf981eef5bb5c46b21ba89269907dc",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Kurt_W13": {
+    "value_sha256": "479797a4fd7c0d59f1d7f16afb184123b627e507819e4a268b899fe2cf22a1f5",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Max_W13": {
+    "value_sha256": "566941f9c1c05a6adb1292e5ee575077b0fe4b6a849b06be8025539a834e87b1",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Max_W13": {
+    "value_sha256": "4966b6e412b82c2e92f6af65fb2bae26bead720cb599fdb46e3fea57a883b270",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Mean_W13": {
+    "value_sha256": "294c23f56148e248adc75618b864f6cf537eb1e0a150fcc12206b52a54b47226",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Mean_W13": {
+    "value_sha256": "dd64efcca006f7ff48c61d7b7e1a61ab473d791262cd60d13c3853acc7347fce",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Min_W13": {
+    "value_sha256": "363785109869570eefb1e73e8909cfb63fc06e501daff6322c4c15d9a311b1f4",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Min_W13": {
+    "value_sha256": "9a1f61a52ed7d3053fd02c3976f468575dfb09fbb9671518ff232bb2f82115c0",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Range_W13": {
+    "value_sha256": "447c060f93bed6d52731d1d8313bf343e425a0d227767fc1c3469c38686cfa79",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Range_W13": {
+    "value_sha256": "9fe13fb3b5d0d4434b2fa8b6969d4f00bef1448c0028a6aec1ffa95bb42fe1e2",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Rank_W13": {
+    "value_sha256": "c8452065d6b4016880579c2b80528023e704604d4a7ce3dc0b6a4848e04867ea",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Rank_W13": {
+    "value_sha256": "45dab4eed2c17ce851532dde15b3bc222df3c29ab2ccf87a63fe0d7588dbbfc6",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Skew_W13": {
+    "value_sha256": "b96d01f8474d2e6c8479b543fe0b42533a71020651af838097107c67b12cae6e",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Skew_W13": {
+    "value_sha256": "17784c5a001174a05275bef7c26e3177cd9c4e3dc8c85b9298f08ae9c25b9a72",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Slope_W13": {
+    "value_sha256": "fbefca9f75bc3dd1bf2ed6f5bb829913ce6180b2ab7aa89e0483dcf9c7fc52c0",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Slope_W13": {
+    "value_sha256": "3d9ed27eb45fef0fe4842b9738f91bad0705b94b3ce114832c1d3a3ac0ac8836",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Std_W13": {
+    "value_sha256": "c2e9501a3e7c8875907667e4dde3a2884f6850f78c827ff9bb1f3b718b8cedee",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_Std_W13": {
+    "value_sha256": "0bb31ed2b80ae4200c053c22ac86c6589f1b638e83a70fb167b91b90f549dc72",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_ZScore_W13": {
+    "value_sha256": "7d717b33f0272efc579a1ed38084b07ea5a44f2af2206b414ad94d07f79e292f",
+    "nan_mask_sha256": "461024eb98f11323a6fe86c5ace25e790db07715a158d6cdc5fafd94033638d4"
+   },
+   "close_12h_trend_SMA_13_ZScore_W13": {
+    "value_sha256": "ffe5a0846faf391f95672b8747a09981a0ff5bbf6a53262fed93d63cdecbfc6a",
+    "nan_mask_sha256": "8b0e8acd0f573458cb3942c3c50c877c76ea5c2451d3e1c3ee89509d33f19aa7"
+   },
+   "close_12h_trend_EMA_8_Kurt_W144": {
+    "value_sha256": "404aed155b649061067d79cab08fb33c1c0515aa66dfe89328064c56f1db1f62",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Kurt_W144": {
+    "value_sha256": "849eefe7734217b9470d5f6747e5dd5f207642421e3bdca8b3fb47abb2739f46",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Max_W144": {
+    "value_sha256": "01eb128a3d504a5476a350b3bf7229b318590675bd6e3148e8e586ab3e4b2861",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Max_W144": {
+    "value_sha256": "6c0659828b496809628c237c93250ab19f3e673de7e0194bc1f7eea46d736dde",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Mean_W144": {
+    "value_sha256": "8820dcbd0753dd1922381840e2517de23e86d6db6eaefcd603d67d6282e7221c",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Mean_W144": {
+    "value_sha256": "bd7d1d65ab30ae7ef9549c4e1b82c0f5506dc0f6ae70083453bfd820aaf7635a",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Min_W144": {
+    "value_sha256": "10ea802b1ffc034dadc2d49b6c153c0003456fc871576798d29dbc1226b9984c",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Min_W144": {
+    "value_sha256": "11bf35112d931ea3603fb63eb5621ebcb377199d42ad2342fe2bbcb4527e81d2",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Range_W144": {
+    "value_sha256": "4aa71f4fbb57ab49792242707da9641f6961e21350b4a826c127f83a9befaa25",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Range_W144": {
+    "value_sha256": "0a245379c2a95459de2882a354dd248642d218f5300734be38033ad95ac4c312",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Rank_W144": {
+    "value_sha256": "744f36f55716cc6ca76ff3d4ed37e32bfd3e6072d52d53d5f92ba3622fc80946",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Rank_W144": {
+    "value_sha256": "478eac96a66855e5bfe887a441b9aef67b43c95fcd07093ef8677f57ce2c87dc",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Skew_W144": {
+    "value_sha256": "ac9564c4a215db2d606a5aa65a11c99c1820ba3ad5bb3fe7df064c5f23de2b85",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Skew_W144": {
+    "value_sha256": "ce6a0b2d04d50f418e531a1b186e98180e370add2d0cd4d1ae2665670a2dc1a7",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Slope_W144": {
+    "value_sha256": "8bb6dc04f8fb8b3a5de4efb403e67ee5435657981581b7dd2e4b78f85f407d9b",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Slope_W144": {
+    "value_sha256": "6ddb4e8dffdea58e78c76f62f90b38262173529a5cea4840419ffa4b0e30442f",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Std_W144": {
+    "value_sha256": "417287587d583cba0f25c15f37a704233b395a3c76d756f32150fdcf686da5c6",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_Std_W144": {
+    "value_sha256": "c33b3136c428b1aa8e5c45eb4ad493a3178137e7e301aa5d7085007f988d09e9",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_ZScore_W144": {
+    "value_sha256": "12a254c1e09f4bc163556965364979434d930f9440efbc0baa2078e5b0f99554",
+    "nan_mask_sha256": "e4339621bc33906fc408a9e542c5426e45e9f89a2027d47e8baa9261affc0cca"
+   },
+   "close_12h_trend_SMA_13_ZScore_W144": {
+    "value_sha256": "bd8a5128fd4f70e6215ebadbc68b5787ea04f12c0b4f2d3280046495fc9997be",
+    "nan_mask_sha256": "554711ef6a47a2a48a614ffc87ec663f8d8e5e06be9909a2ab66e4d34ebd9d31"
+   },
+   "close_12h_trend_EMA_8_Kurt_W21": {
+    "value_sha256": "3c9cc12f8601951dfb66fd77324494dd650d7fee46608a6c6cb30584c07e6c9a",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Kurt_W21": {
+    "value_sha256": "a3e7dfdae17cf2c83805e3a3ab877e5c9097240b267cddeeb7c0e62ea6fb80a8",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Max_W21": {
+    "value_sha256": "c21f8f4ab3bff57a9f626fbda288b0a62638c54b86e6644fd486551a87cd631c",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Max_W21": {
+    "value_sha256": "76db62f906bea28eb6932808ec3f428a9b59d9956d51632eb4dac42d52231cbd",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Mean_W21": {
+    "value_sha256": "bf574ab7e0556500c965a3cd8f2085f391368969cc56fefd2a6442c54a903f2c",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Mean_W21": {
+    "value_sha256": "e6ef47b68e1107b1b3fd5b3368df8ca9392e6599a25932f5e71e845566107dc2",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Min_W21": {
+    "value_sha256": "9ea55949e269ee2926962b806eec84ffd7ee2284b70668862c2baaea0ea3cd28",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Min_W21": {
+    "value_sha256": "328ec2fb5718ebfd97c7bd46bb2093da69495d4fcae135991184848e05e73468",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Range_W21": {
+    "value_sha256": "81431d01bc1f2197be247707c31936ce8b6c57d39e24a353339c2bcd56b4f20c",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Range_W21": {
+    "value_sha256": "bf79a53d97ebdf30e35fabeb458a0aaa25d48d2c90d417e145783e2ab491eb06",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Rank_W21": {
+    "value_sha256": "9f21ef27bd02c6f5b7463d9afebbff223d9937b47582fbc8c0feb8cab6d95f26",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Rank_W21": {
+    "value_sha256": "4270fb771c280c157474fdee58ca73ca531bd415cdbce923ef18727b0c59e510",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Skew_W21": {
+    "value_sha256": "973a3b136ffe7070e1ff9033073a4a429ee11c1654637158f5455a1621ddb47d",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Skew_W21": {
+    "value_sha256": "176fffe53b2dcb499eaefe7159e139e98c1aa4341f97a2ce19a76ac58387573f",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Slope_W21": {
+    "value_sha256": "7fcfac85bd3e449d7d02bba864df9f9b73d7d21504612e6f2487765d534a8e41",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Slope_W21": {
+    "value_sha256": "a50e510e95f669640b6aa0c0b481b4c8cc4cacaa905d8ef33684deeb5e151fac",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Std_W21": {
+    "value_sha256": "0e3304fc8afcf5d6e7d00abc2a4f5732c5ab25cbf1f77b971d7c044ce82d3a01",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_Std_W21": {
+    "value_sha256": "199c5194bea4443047479378db386cbdce9f26c93e86a475bb885f1a92a5b43c",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_ZScore_W21": {
+    "value_sha256": "bdd2f7683c9744135154e46918942750c4e9c748d434c6fdcf73f102090c63a0",
+    "nan_mask_sha256": "7505dd51af0842af3fcb3a2593ab68461b3132728c8f3fe88e0864a4fa293c5e"
+   },
+   "close_12h_trend_SMA_13_ZScore_W21": {
+    "value_sha256": "c9ebbf9d1eeaebfbb6bff6fa18a16e12ac4c53bdb4073392df20e2de425f9ab5",
+    "nan_mask_sha256": "8d9f578619ba084a916e1816b8008f687f783af6b2728ddfdb3e924c4442064f"
+   },
+   "close_12h_trend_EMA_8_Kurt_W233": {
+    "value_sha256": "1c9ca2e45db10dc7a2d81dac929718f7607ca38c429c1831a15e99fe3ee7ebba",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Kurt_W233": {
+    "value_sha256": "99e1cf5215baccffb3be08b8cabd33776a104ba0eff931cec563fb35cf5109b4",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Max_W233": {
+    "value_sha256": "aad52167ff053162268008e16338484cf6c37f14a5b525120c9cacd712be985e",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Max_W233": {
+    "value_sha256": "aeb431a71de6f9871cebea87dad8a2c54d496e6606911018dd4f9380650ecb6c",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Mean_W233": {
+    "value_sha256": "62ba2603be4ac4b170f094f2749af734f5f888d12616eacf7098c3dbba642253",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Mean_W233": {
+    "value_sha256": "6db037a33786ad2c192bc32997bc8a4d5e4fcaafcded863af832249eaf838727",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Min_W233": {
+    "value_sha256": "62e88fe283e0567dda6a018958ca73a93ec6fe451fdf41b807ee9465d13ac729",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Min_W233": {
+    "value_sha256": "11a8490a147e3947683c2ca3aa4aaf8ffa83f75c49122da9bfd120dd7408c0a2",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Range_W233": {
+    "value_sha256": "1377fc7182591142ca10eea21e3a600639878368dcfb69997439f7bf9c384ab2",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Range_W233": {
+    "value_sha256": "06dc1b24f500c4266e923baf300a5b3141c36dbb558373aec26085a3d90dadb0",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Rank_W233": {
+    "value_sha256": "3d85b2158a2f19c78184c07599ee9738813bfdad9dd4b126398477073befa659",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Rank_W233": {
+    "value_sha256": "21304b6a13692e5685074d2dbe0a844eedd0ad2e898165038dd45bd61de502e7",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Skew_W233": {
+    "value_sha256": "5cca64e62a9399fc139e3ca52454c3ffc0801046b7acccc475dbb77113964c6b",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Skew_W233": {
+    "value_sha256": "f6b4d0cce3968c1e253d2b8d538eb07e2dec62803dca36e5c1817a299aaff293",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Slope_W233": {
+    "value_sha256": "c7e7b3a143db21b302269749c6985d1a8f6aa5c7245625bfde1d097779b15177",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Slope_W233": {
+    "value_sha256": "2df9b4336c24313f566e71356237a1f94d98d5e6b6fa10b1c2cd313f5f634eca",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Std_W233": {
+    "value_sha256": "df2367c04484a2c281361bc6d1d0e17624e9242cd3c97cd917f1b282d16d2031",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_Std_W233": {
+    "value_sha256": "7b21edb5cbe820beb68123354c59cb4f50c7a2bc73b9a81fa3fa56f64ebc8259",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_ZScore_W233": {
+    "value_sha256": "6c4a267b93590801e6556f3a560c02c25059da4df7b3f0fb756c50329df36e47",
+    "nan_mask_sha256": "2f28d92c130f424d528ceab8e196ca9a35d00aaca526dc015c5bfcccfc60f651"
+   },
+   "close_12h_trend_SMA_13_ZScore_W233": {
+    "value_sha256": "629f33854d51144d88c84ddc3c222d7f1e513d530c22cd5b750898f474b70202",
+    "nan_mask_sha256": "af56eeff944dddbc9238bad0fd33cff550b31d36770b5f6f8a5ec679202c0670"
+   },
+   "close_12h_trend_EMA_8_Kurt_W34": {
+    "value_sha256": "99edace03ad66c89cf84279d94133700817a55d0e3fc328a3807c56f15c39f32",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Kurt_W34": {
+    "value_sha256": "4911c4685939229f21cc575b5b3074c623b5d73efdc16220f742091b00c4f542",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Max_W34": {
+    "value_sha256": "feeedd3f44bfabaa678249957af0acd83e6e41fe2066a9771fb81d9412b39309",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Max_W34": {
+    "value_sha256": "1cba4670dea9b88bbd52cbe438865395da35af7ef831f2eca72a4edc0596c337",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Mean_W34": {
+    "value_sha256": "a7e422bc74e59e2db440a955e81135bcd054ed4dd6f1359db3be857ec4db75d8",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Mean_W34": {
+    "value_sha256": "4c9ba51834d7a86123700aef14666f84a2a47f56515ed691fbd5bbb922eabbb8",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Min_W34": {
+    "value_sha256": "54ee234af07d2aa4a2ab145ca5e4d75c28362b7b16954e53f3b12de139477289",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Min_W34": {
+    "value_sha256": "5e3b8ee219984b55c0636ad820794835b0ca605fcb786a8215517b381efa016c",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Range_W34": {
+    "value_sha256": "a13d26511d59bf8a6ae69a50c5d4c4c9599ba6d731e5422f42ab93ccfa28a0f9",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Range_W34": {
+    "value_sha256": "69fe689298be536e6a681c6b0e537f329708a4eeb0ede74cdbbee5d3b6845464",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Rank_W34": {
+    "value_sha256": "58e1a9419a912c550f9b499ee069ddeee1bf1d4de201cf5e77b4c1b28a67de85",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Rank_W34": {
+    "value_sha256": "8b2caf32730919f504c84ace7464fc19c4984df333fc78cdbb01a299f8339bde",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Skew_W34": {
+    "value_sha256": "f9e034f400313cb228cb67167a41648a7a6b51e378cb123d7dc78fb783edf072",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Skew_W34": {
+    "value_sha256": "bf30d4f3e6d6536bcc532b6448bc6519372feb9193ac201c6625e0626b573b88",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Slope_W34": {
+    "value_sha256": "b7467155220d1a4cc1f499b463763da625dff3f1c560418ab118dcfef42c870c",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Slope_W34": {
+    "value_sha256": "0cf8398519d6ccff0e1ee303189f5c64d53a1958ff4cd4863eb5a4b043586501",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Std_W34": {
+    "value_sha256": "0f4889ecba43ad93bec1636ed74c91202f7a5dacb71fb373dc052ef828eab496",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_Std_W34": {
+    "value_sha256": "36dcb91c947b83c3dd608580924114b0c614727c8a5a4748113bd04083086182",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_ZScore_W34": {
+    "value_sha256": "14504e52cef23657351b82c09013970a61a1587be90020892e839c864a8bb148",
+    "nan_mask_sha256": "dc8d273a77629eb362f267680da3ea6d20867100988667ff3ac1e30baeb261e8"
+   },
+   "close_12h_trend_SMA_13_ZScore_W34": {
+    "value_sha256": "d33c8f7522ebe56846472efda4b776ba122ab6e59ce9e9be99427c326da5d21c",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_EMA_8_Max_W3": {
+    "value_sha256": "a3b5cce5dc91103ff828d931889e4965d881e5a3614016f4d83b21ccbe896b3d",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Max_W3": {
+    "value_sha256": "52f6cf106a5fb1c993e7503a8c6f999723295936372e87418cbe295a6d7282d2",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Mean_W3": {
+    "value_sha256": "f5a0917a07eadfc5d00fc9f77fd11a7dcf02146ce262203e4e58f9a521c12731",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Mean_W3": {
+    "value_sha256": "05e2e664f29d0eb57bc60c3b20a6f8802f230b2fc8e555332b98952cc48d7dcf",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Min_W3": {
+    "value_sha256": "3734ed6d8876f7f15f9195eced66ab7313d4ff9552d203c892ade921b98cf222",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Min_W3": {
+    "value_sha256": "ab0c8bdc95d34b9a99027b57b8ff1b5a3c77a15b64ec51dfca6a481a235ea42a",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Range_W3": {
+    "value_sha256": "571e362c065957c29403e271f753f03f8f8072ca3615ac526a5073d4bfce26f2",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Range_W3": {
+    "value_sha256": "326a68a5dec5551df809946f3e2a3b93188c66105af04d1912a41e1b530ab43c",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Rank_W3": {
+    "value_sha256": "63f1adaae83b766fdede8973637798a9bd76c5f07d0888cda1ad85ebf25e13de",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Rank_W3": {
+    "value_sha256": "21924561f7f385f2a260412ad7a8f0685144b9a5b8b9bf235c1e596556d1ab94",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Skew_W3": {
+    "value_sha256": "a376bfa472080669a24284b479382e53b36b1b501a7c7042537addddfae5d08f",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Skew_W3": {
+    "value_sha256": "327005b6c8e48573c34e0424390a5f506db299ec2f7d49b7e9c80ecad245be06",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Slope_W3": {
+    "value_sha256": "1195404aee42ba3f4b4e48a455aa46a8602b6cdc33487796aac156adf6adfb0e",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Slope_W3": {
+    "value_sha256": "c18ce55ba31afbe80e075d63b876990d968099db51491af8d2077dd63eaf1d05",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Std_W3": {
+    "value_sha256": "58be5b3b6b7ef0d6c5951b3fe6409a380405b54cb65df728b897c55c63435231",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Std_W3": {
+    "value_sha256": "ce08e5578d99bf963be74efead60671ddea6ce99ea42267be27b0922ad13cef0",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_ZScore_W3": {
+    "value_sha256": "d61a198f1abec399c30bfa058380be71e6ef0f777774c64ac999faed5774072e",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_ZScore_W3": {
+    "value_sha256": "0570f46453cb08d4fe1b7d938d4aed2b109beeb9d21f9e2c84b384480c3de30b",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "close_12h_trend_EMA_8_Kurt_W55": {
+    "value_sha256": "e6d2b4ef8afab4692d6cc3ded4cb850e40ea72edf1a121497547bdc7f810b9b1",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Kurt_W55": {
+    "value_sha256": "7b7027479ea62eb15052b3b1738f42866551ef0c31f221983a90a578a3a78cfa",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Max_W55": {
+    "value_sha256": "b2b8afad65bc55ba566b8d186644b8f798c071944b386ca4253c4d7c7f03bbc9",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Max_W55": {
+    "value_sha256": "43f3c1ddd807f124f657120ade847f4bc1fd35d3810bff5f42c2104e76b523a4",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Mean_W55": {
+    "value_sha256": "bba1000a0ee54780ba4337148e1a42e9331f836d79acc17ad7a87da18c6f6cdf",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Mean_W55": {
+    "value_sha256": "6440bc7765c36f2da6fd32f60563fc777a1ae5a9961d34234da4f8c3905dc8eb",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Min_W55": {
+    "value_sha256": "8ce9db2f54dd7b3acfa47bca5ab60cabccc52f11532154fb66904cba18a03fc1",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Min_W55": {
+    "value_sha256": "9c1c67c057af671e5b1bec090fe804e5f1134e9f0b9c3a8dc2afeacdde1a3a8d",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Range_W55": {
+    "value_sha256": "393b372e63a1607c6f9ec8cca5debbe169eb4b11a7f2b5be2da38c795c0cf823",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Range_W55": {
+    "value_sha256": "f40c3fa4ed98d01a9dd85a715657bc136c2d734383cbedb87c7d2fbfdde039fb",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Rank_W55": {
+    "value_sha256": "2083109db4eae1754f104b492af2af03c01f3b380658ab3230d686dff23f5023",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Rank_W55": {
+    "value_sha256": "8f22fa2490b610d5be3570617fae3fc4f7f220526cd938ee815992d72dbf322a",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Skew_W55": {
+    "value_sha256": "1827d6360f9627964b51363f77a9480c52740dd7feebdb0f610731c26090e893",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Skew_W55": {
+    "value_sha256": "1c7ea6d998f8f0f6247fae4ee7acb63d670c27e6fd28a28caa794fa34a33e83c",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Slope_W55": {
+    "value_sha256": "45529df75ffd46f349572bc565d6eabad39c17a4b80aa5908741d54a8c2773e9",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Slope_W55": {
+    "value_sha256": "ee4acb2326271133b2232cd76095961979846749112aa9810fbb9ec2f5a45eee",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Std_W55": {
+    "value_sha256": "6603bf0cfa67cbd063d809ff12812a9a2fb7380cf2bfcafb6a35c194fa90d11b",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_Std_W55": {
+    "value_sha256": "2c3688c675c0d139bd90e59ceb6735d47db116bec64b4ea7c2d0898e35050e80",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_ZScore_W55": {
+    "value_sha256": "b7b79419ed19a9ba774ac87fb0afaab15778a0321dc17aae53dd034df99a7327",
+    "nan_mask_sha256": "5898d6073c9801996149898887647cf9d2b072f5c9254586e9f2ebffa925e9e3"
+   },
+   "close_12h_trend_SMA_13_ZScore_W55": {
+    "value_sha256": "a2aec6a14ccd4997dcfbd1e6be38137cfd01b3adf657ffb66598ef82af3899b1",
+    "nan_mask_sha256": "0b4ed8047ef9e0123488091e750356739ecd9d1d02b61646f7a4bb97bfa23f36"
+   },
+   "close_12h_trend_EMA_8_Kurt_W5": {
+    "value_sha256": "45e28f993e50be08082dcdba91c905efca6a86b22cf4914e5d1ad7b515fc3cc0",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Kurt_W5": {
+    "value_sha256": "489fa06e31d38c0c343a02c7f1675826a58652fd84aac851cab9051731bca9a2",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Max_W5": {
+    "value_sha256": "1d8414eb45e6fb8aac9201383419bca33a0190ffa922d70cf342a9d17469afc5",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Max_W5": {
+    "value_sha256": "e0b8c22cbc3fdc0bb749cc9558c51207b49e178e9ced248e6c4be944ae014697",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Mean_W5": {
+    "value_sha256": "283d3ce905a3391bc3775e0940262b1db36415f2f9259be666efe487a74d0b9f",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Mean_W5": {
+    "value_sha256": "73e9040c902a60d6fe79871e65f7f7482e2e0a4bc499b98677cdc1e10cfe8de0",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Min_W5": {
+    "value_sha256": "964e8efa74592f79db736e2c9dc47c67b944aedc3b8328efd994c4403207cf3b",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Min_W5": {
+    "value_sha256": "0318c446a7510ae48177a2b62c8ec85f710de8205dab913864519e9abd5a5d09",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Range_W5": {
+    "value_sha256": "2cdca29eccf74e7e382bd42f355c5a628ca9c31fe22fbde5f1b3af882f5777c5",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Range_W5": {
+    "value_sha256": "4c0752170ea374094a83b6c286c67d1123f486a66cd89e02d1b52465a21ed324",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Rank_W5": {
+    "value_sha256": "420af6c1742850a7d0d0547a6bdb8fab6df4f326a0f60a9da1f1fe3ee887b784",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Rank_W5": {
+    "value_sha256": "ec02459718401d15666051f9cb1175b68d8647ecd80cd1cd005b2c9bae459d41",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Skew_W5": {
+    "value_sha256": "72f75150db2e8b4d150b54c2a681a3acc84faa659abf369b353c01b253b47e4f",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Skew_W5": {
+    "value_sha256": "c5a76e73864453c0f96d9fa4e6a7130da446408fb8bd58626d35258b35adde3d",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Slope_W5": {
+    "value_sha256": "a66eaca889d76b04a9b65ebdded71c0515da3b803f19a38d01469953d979ae9b",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Slope_W5": {
+    "value_sha256": "6df7672eb9da5bf35470d493bcd6bf66881497123eb98bc192db41a4799b9de2",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Std_W5": {
+    "value_sha256": "df0396c666a829b746574f89be4b66408258ce0e793dfcf7c072665556ed5f8e",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_Std_W5": {
+    "value_sha256": "d47d101562402c33ee018f08e1e26df5374df3d961e8578da725a04a35ec65cc",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_ZScore_W5": {
+    "value_sha256": "da52baf2d5a4330d56813934b0f4b42d506cd58d165070d8536abb5a81b9f048",
+    "nan_mask_sha256": "be5bc208102a68bb05fe848427f2f7ab03238d9d5a4fa736145dd1250aab9704"
+   },
+   "close_12h_trend_SMA_13_ZScore_W5": {
+    "value_sha256": "cbc17175004b640df579279f53baa65ef07ab2b5ee111226745993ccd4ee4ca9",
+    "nan_mask_sha256": "888890731e8e6bc8271268f80acd2e5b7dd5fd960d53d0ce2fdbf3ec0b4b1ab2"
+   },
+   "close_12h_trend_EMA_8_Kurt_W89": {
+    "value_sha256": "034fa790ea74c03e5a4811270300920eb53b21857f8e64352e09549a9efc9990",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Kurt_W89": {
+    "value_sha256": "b1682efcb8bf9fa3eebe37cfe4ec27a174495414b56771590f8f26a021ec97c2",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Max_W89": {
+    "value_sha256": "ab05852ac42f15f69e524cc1163790e911a5dfecbafe15dcde5562403691bdfe",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Max_W89": {
+    "value_sha256": "3f041a6f93d963c47801d14e9d7090470d12b8425bcb9da5c457b0a2b12315f6",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Mean_W89": {
+    "value_sha256": "a7a535661218e3b686a5b92029a110b0150591d1e9e2bd872aeebfcc30505087",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Mean_W89": {
+    "value_sha256": "2bc009c592c88d9692105f63375e8263087ff42a5334efbb45d5b0161c035eec",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Min_W89": {
+    "value_sha256": "d7ab7ebb0dc2bd4d892fed8b88aadccf6063ae8fc2b997c4072d567c8863888a",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Min_W89": {
+    "value_sha256": "6cfff6a7fa9058e4e57a6feb0c42db2f2b6b05de0dc9e1a594398fe8743afd95",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Range_W89": {
+    "value_sha256": "209eb2ea5ca95d8a12ea5d085dc722d82e8d26536417decbf1d5a53e336d3f83",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Range_W89": {
+    "value_sha256": "08e93d1f52ec0c5db2c4707af4539347f3f74c3876920504661596d5b08394b7",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Rank_W89": {
+    "value_sha256": "8f561fc66c8e044bc3c26baf3a30dff3325bee1f401418c88271f8d9adbb56cf",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Rank_W89": {
+    "value_sha256": "b7f1c6c9a416ce86155fa15853b5c23949d5971cf2e6bf06a7fa110aeb74912e",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Skew_W89": {
+    "value_sha256": "11b579531f1332bee6ac32ca7ff157859cedacdf7a1280ba9c99fa80f835ae47",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Skew_W89": {
+    "value_sha256": "fcd655ba96aac73d41f09ae33574be70461c3c663440aea2aaa06540f4e59961",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Slope_W89": {
+    "value_sha256": "2ee5d2d75a51198bb9664527388273c52ab54f1b849daf5b9c3b05ed7b360315",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Slope_W89": {
+    "value_sha256": "1c57821100b4266c6f5a964b8f1bc5ad3fb7bfac4f374a1d4d7e49eee564bf17",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Std_W89": {
+    "value_sha256": "2a6ca9b526c63fa83d3f3173657634e4a55e2a36b1d3c9b7abf7c8ac0a2bfc8a",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_Std_W89": {
+    "value_sha256": "3c22e592cffa6c7613d7992b429bfc7cd174c31d21ce8a9633975c64c070e68c",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_ZScore_W89": {
+    "value_sha256": "efa8147354dc09ae3c4d9e680b8e0406e71e08f8c0899e69f7ec7d84e76d6009",
+    "nan_mask_sha256": "d2f70a65c9911ccfca71b91f771b2fd5dd211f2b44cb0c839c06d5cc27c292a1"
+   },
+   "close_12h_trend_SMA_13_ZScore_W89": {
+    "value_sha256": "1d1ea86c663a72b55d79048f23f283354b3c89750a82e52c3c34a96d37cbd728",
+    "nan_mask_sha256": "f2647363468c59b1eb64ddfebc2e517507a340bf020cab53f9316ed1638f5a1c"
+   },
+   "close_12h_trend_EMA_8_Kurt_W8": {
+    "value_sha256": "295c661f65d47cd0952600f6c1982e5c3d13252179d5352212b327b4f0a994ee",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Kurt_W8": {
+    "value_sha256": "f8d806d976a23a87f5265cb33e7212f06b2abcf26028382bf0128f9e0b067d57",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Max_W8": {
+    "value_sha256": "2287d15af9c4ee97b10f2a328263a944c89a071703713481c5746f6cf1ecf9f3",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Max_W8": {
+    "value_sha256": "22089eaab0c1b867ba4d663d49d24398d18b11465c782c3b2a1ba201dbf08a13",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Mean_W8": {
+    "value_sha256": "71f37c1b3fc94545f94ae7eea7b809b603536617e91fd5a07ac8fc63d643d29a",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Mean_W8": {
+    "value_sha256": "3dfa1339454a748300fc7f24d24262f760f009cceb1f0f1413762908255ef97c",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Min_W8": {
+    "value_sha256": "4ec897041ee04764211c8ab61513074d70102635889cd73d64709b2bd6695b08",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Min_W8": {
+    "value_sha256": "b21ca1983dfb41ad099262bec77fe1634c0d64beebdd9468cad98069fee309b9",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Range_W8": {
+    "value_sha256": "dc6786d54e066250a15674a2b429eeef9a84acbdad6f2b9b9caeb767fca8fa07",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Range_W8": {
+    "value_sha256": "3771d94ee098422dd415b052a797f86826db33e4c80148730e1b58cd4c2927f9",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Rank_W8": {
+    "value_sha256": "b61c1e61a1e95427a2774a09d30347583e8a2697fdfddea45d4406c54e51f9ea",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Rank_W8": {
+    "value_sha256": "8cbdb2cc442d938f49aa780a2ac6e4ec8f993d49147b7d435d5e2ae6fb24eb26",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Skew_W8": {
+    "value_sha256": "b35f3245f24b250c437e464b06b1f3bdaae4aef09b0a102fea607bc1855bbc00",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Skew_W8": {
+    "value_sha256": "7b4599882f4c0d461bac69255b6dba45f4d8c90ca29384c6800019d69b69ff42",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Slope_W8": {
+    "value_sha256": "e800636e2e821c4cadf294f575c2349dab3af40fac3029ee25d23ad3c106b2d2",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Slope_W8": {
+    "value_sha256": "047b5920c095f49c3066c8ebcd1b6d56446c3707df02d6be0bef7b25069705ab",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_Std_W8": {
+    "value_sha256": "22b9b5594637b327d59b669552638bb4f1e3537e4ffb371ee6e37b50297cd7c2",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_Std_W8": {
+    "value_sha256": "f1bcab966a1470ac31e9c33ecb1913dd0d933c67baf82f2ae64e678fb6234593",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "close_12h_trend_EMA_8_ZScore_W8": {
+    "value_sha256": "fc9b19350f9a45d4f7b825968b8e34fd305fe93d740bf6b19e3b9bfdf3b95b6f",
+    "nan_mask_sha256": "48b5de1403b3eed14763136ec6f7f72fae1b770ebd7924768d4f217e345a56e8"
+   },
+   "close_12h_trend_SMA_13_ZScore_W8": {
+    "value_sha256": "d5305b6ba3bb1ab1789a458f6c06ef7c73611f72dd5843d574a72133522dba8c",
+    "nan_mask_sha256": "2d1224ddd7e3d7d0ea84caff5db4304bb89a01a719934316195efc018ad52854"
+   },
+   "open_12h_Lag_1": {
+    "value_sha256": "7099a685311b2734052887ab5184dad170d0a70f6938c57a8c6cf9fa3e93c15b",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "high_12h_Lag_1": {
+    "value_sha256": "1b4dc8bb455ca2fb0bb68daf0a85dd98bfd59a88f6ec143ab5b618b05bfdbbbe",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "low_12h_Lag_1": {
+    "value_sha256": "608493ef66d08f4117480107b3f986b2897770d519f1293c1f97ba9efd08fb5c",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "close_12h_Lag_1": {
+    "value_sha256": "361120ce1f2b5fa1558145dba8576b4ff66140fcca667e8965e12f2c96f55fae",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "volume_12h_Lag_1": {
+    "value_sha256": "f31313446e8a585e5b945679aef5cca6ed0bf7ac9602bad7ecb5464b5ebb14de",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "close_12h_trend_EMA_8_Lag_1": {
+    "value_sha256": "f61beff1c3dfe4dd8273b629dabb4833d1b716013d69ff83e982b0ee16605698",
+    "nan_mask_sha256": "7f2d8040edb72c5e28942256ef8d55a4103d52ccde5c7984e342afc1f33b1e85"
+   },
+   "close_12h_trend_SMA_13_Lag_1": {
+    "value_sha256": "b8cf4c712d5c0a92ba474f63edc303d1fad6354f69d7489fa662e63e75428cd5",
+    "nan_mask_sha256": "2ce4dec701a58a2c9e92104171b4aed2d10d7711f5b89d7fcbf4143d89b35366"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_1": {
+    "value_sha256": "17cd735b41345c1d2b9bbb063fa2e0c3f0d52ad59fb5137892c1bdc695198952",
+    "nan_mask_sha256": "eb6182e4888bff29436bc1b09cb36eaf6057dde8c3a4adeb24fe05e81b7efaaf"
+   },
+   "open_12h_Lag_2": {
+    "value_sha256": "2fbc984b89dea76417f6a9bb6db81adcd1abc155c26c6b810ea49728289b63c5",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "high_12h_Lag_2": {
+    "value_sha256": "1723c89ca046a8a13637fb3254742b22b70beb0f39f78f20c273f86bbcd93480",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "low_12h_Lag_2": {
+    "value_sha256": "bfc96d1045cbffb23767abbfff6ae5ef7d12588e1e424f7af6672fba61ac3ce7",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "close_12h_Lag_2": {
+    "value_sha256": "84c7e5cc351ee5cc85d2c5712fc8c4ce0dea087b248a9b77ff0bc7fbb31fd947",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "volume_12h_Lag_2": {
+    "value_sha256": "ae06d6ae22884710e00c323419deb6e995694d3364f7d3947de4b95e8c3e97d9",
+    "nan_mask_sha256": "21ed561188b07b5387c1bc4fd9cda3652fd357207e006550bcc8fa36e1f039b7"
+   },
+   "close_12h_trend_EMA_8_Lag_2": {
+    "value_sha256": "b11e8c66fcb2e75f7f31aee903ed0285b1d458db41c240f269c90f8955946257",
+    "nan_mask_sha256": "b057f6afe716f85660d8f54e82c828de923a1accd6bb9581f39d70f801545833"
+   },
+   "close_12h_trend_SMA_13_Lag_2": {
+    "value_sha256": "dc11ab6b1d1522a83353014fd9405e5a334ce1e918b7b347ef2a902827271797",
+    "nan_mask_sha256": "748d32f9f751e7a7889c1e09f06ea902952ef53f3cedf151ae91230c2023bf6d"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_2": {
+    "value_sha256": "445e80537382ba13bdbd6c993241d63953017c49239cc1f10576c69ffd958cdb",
+    "nan_mask_sha256": "ca79f5d98f94b4d644ec4066863dd2c0becb3d4498a700afd55985ef37527f7f"
+   },
+   "open_12h_Lag_3": {
+    "value_sha256": "41ce41e16b812026c05b4f5fa76e988dff5cd1eaf4626e4309c94510f0670495",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "high_12h_Lag_3": {
+    "value_sha256": "a2766604bc4d64ff890e6898d9d5f3774c0373b7ff003c6f60331d51434b531e",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "low_12h_Lag_3": {
+    "value_sha256": "b7872cfd228e1caacf9d7dd94d8e881a5cc33afda3151ec086b45ffb43192db6",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "close_12h_Lag_3": {
+    "value_sha256": "dffdfd63e29d81f40608512c45bc849061d0c2f6c1e57dd61675f3aa19ee6900",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "volume_12h_Lag_3": {
+    "value_sha256": "f4c988424732f9fcc11a6e97128a4421c45de1dff1736ac24669982ce09dc028",
+    "nan_mask_sha256": "9427d54e52d65f0485f8c6586336286c61bab8b0bc760f0fecd941d8fb25db96"
+   },
+   "close_12h_trend_EMA_8_Lag_3": {
+    "value_sha256": "56a5e397a77337bbc11f6f133e6ca62a94a8e7e22278be9d6d366128c60d3dda",
+    "nan_mask_sha256": "9e3b0d60ec68262ab0e51ddea55652b5a8ff0f588021bc8f65ef6cdeab004652"
+   },
+   "close_12h_trend_SMA_13_Lag_3": {
+    "value_sha256": "a5296aca2b06827c38b32b54bc35f9a4bf7ce3e46dce4a7673f9484de8c38fd1",
+    "nan_mask_sha256": "bd237df1103956782c56bc6a834c1ffb10e2e27043afa058f40f1a969e852f4e"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_3": {
+    "value_sha256": "5f8d39a96ecec249f2d36dfa9acb5545e1777d54df1be3602a197171eb7d0f5d",
+    "nan_mask_sha256": "1952246f0494fa9c29a2e3956dd90fbf42255466694cfc210903a9e742369094"
+   },
+   "open_12h_Lag_5": {
+    "value_sha256": "21ba0931c80071aa7b36c3fe6db74153cffc41366c9cfab3b3c35a5cfc98ab79",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "high_12h_Lag_5": {
+    "value_sha256": "6fdeb679d3bd1c40d0abdd21b5015994e610928bac4443bc407350068651c711",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "low_12h_Lag_5": {
+    "value_sha256": "6ded895e53ee9533c280dc8840c841908dcc42bd6d52e4e36cceb20e12cead84",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "close_12h_Lag_5": {
+    "value_sha256": "0cd916206a0ecfc944780e214baa1e553d65994d00e8aa158eb5d91bac052e9b",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "volume_12h_Lag_5": {
+    "value_sha256": "e2f0b5066eb59880637f36cc55d6647dee6463c79bc719c17dfffc918826eb24",
+    "nan_mask_sha256": "30620213cda60855f8dc1ccf0cf9de6bd8d5bf50531e7668d64415a07169b288"
+   },
+   "close_12h_trend_EMA_8_Lag_5": {
+    "value_sha256": "e20096873751c907a42065e66d10a6e7615336bc1eadda5dbe62744b26efb020",
+    "nan_mask_sha256": "95f9e751625c21519e22f1a91b2076ca7daafe248a64f8ac9ee9dafa206f6e27"
+   },
+   "close_12h_trend_SMA_13_Lag_5": {
+    "value_sha256": "6eccc6c1df761f48e6125d4bcd91ee3d91578e3f122b075312f42e03a9226a39",
+    "nan_mask_sha256": "0e5a52e4b93d9ba120ea2782a86910e4819d7181d504d6b797a243e9d3699489"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_5": {
+    "value_sha256": "4db7b67a6382a035e86b6265e390635802396ac7304ee1f40285336ef238b702",
+    "nan_mask_sha256": "ebf03df55eb681bd3aaea17d5f85c29fbf753b30985eee09e44e966b48799f82"
+   },
+   "open_12h_Lag_8": {
+    "value_sha256": "85a623a224f99adf0090e2e6d9dba7e0cc9e65f19cd2ee7d0f918d562248d138",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "high_12h_Lag_8": {
+    "value_sha256": "6fa30240137495874993dbe7b8d0bd75bd24015301ed57d34fe6df0d507b004f",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "low_12h_Lag_8": {
+    "value_sha256": "797f9550ad8dd5a736bf55e8470eb86ab15d128883bce96643ee3a19282d8e74",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "close_12h_Lag_8": {
+    "value_sha256": "819214ee21fa2e425cb70572f901f261041c35f741a93f785dbf116249c0230d",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "volume_12h_Lag_8": {
+    "value_sha256": "0eeb2deec7a58a06fb49d56cdce00ba2088cadd67922977abbe65ca07a73b24d",
+    "nan_mask_sha256": "8c30ec1bd4b44e8ac6d24c1319253a13d02d7d52ee0de678a8f88edea85f6a55"
+   },
+   "close_12h_trend_EMA_8_Lag_8": {
+    "value_sha256": "ffee7393a1eb33ef47c6facdcc726e669ea1836b4912bea12daf2eea49803665",
+    "nan_mask_sha256": "863b74a82ea858b74c55dc1a6346ba1ac6625efda28b10b6d8cb0ab263c49b3c"
+   },
+   "close_12h_trend_SMA_13_Lag_8": {
+    "value_sha256": "38c383a5b4d6ebe42f43c4daef20573c6e509560c13f543ca735b05a9172935c",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_8": {
+    "value_sha256": "9bcb6d87584b4e979f85bae5910ce8d9dccfb69a3bef14b5ae5ac144bd63feb1",
+    "nan_mask_sha256": "84e7748fa2c7960ddb7c24aa6514e8494c46f75cdd1920d2d8fa200014780b01"
+   },
+   "open_12h_Lag_13": {
+    "value_sha256": "7a464572f847eac2afd3e3522357f07569a06d540576a734ab24039d08a0b9d0",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "high_12h_Lag_13": {
+    "value_sha256": "8df7c1aad0fc648e0a1be378de8845ae31cb42092b3566bd0da89f6fd9cc1ab7",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "low_12h_Lag_13": {
+    "value_sha256": "4464401e998ed7dca019d0a60fab2f21f718eb191e26784098ae7934c9f2b832",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_Lag_13": {
+    "value_sha256": "f66623e705565d39b149736c2f9707f354ebce2aeab9920e37dc135531d14eb5",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "volume_12h_Lag_13": {
+    "value_sha256": "448850b529a3da72eef1e7bd4cd2602ea9e189cf8acf012b74f1145b71ba91c4",
+    "nan_mask_sha256": "20322a837ca628b037c4664d435f1d174950162d90d384413b236a33875c5a48"
+   },
+   "close_12h_trend_EMA_8_Lag_13": {
+    "value_sha256": "4ad4693b72ba25c2d032c167700ea540a7fa1fa891f08626f90380acc26db44a",
+    "nan_mask_sha256": "f08a20bbd54e8de853127ca925c6c1aca48ed853f2af397530b7184fc5248bbd"
+   },
+   "close_12h_trend_SMA_13_Lag_13": {
+    "value_sha256": "76ec3b58d4bebee4bfb0d54e0a52cb71ebe9ce481f2e420bcbd68378a7f4bbfe",
+    "nan_mask_sha256": "2ba88072e0252ce0d20219038a78571103d014148f0323063046f52a1dd9a6b4"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_13": {
+    "value_sha256": "9df37ff672aabde09d56e427ad13194b1b12f09c2e2408d0fbb8ab01a422b015",
+    "nan_mask_sha256": "fd8f7a9f42f154b0f91c79db244ab594039e71301bc5568d19f0a2e8c58e4801"
+   },
+   "open_12h_Lag_21": {
+    "value_sha256": "1c0f5daf53eedc2a35b7e5c9aa5708612d3ee4af6c623117453cd577bf93dcbf",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "high_12h_Lag_21": {
+    "value_sha256": "7e090763ce5fa9feca8b27f803cf46c92d281ccfc5814e2573f376ad070ab2b0",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "low_12h_Lag_21": {
+    "value_sha256": "5b1463ae39240473a43d00cfea297e5e5e3d27c35be1da7f97c677c0c8860d3e",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "close_12h_Lag_21": {
+    "value_sha256": "a18c69996e634953d35ab1d6032a12f9a90b1f619f977463ce9696fe7069996c",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "volume_12h_Lag_21": {
+    "value_sha256": "0136581f3b9215ba3903c31054481ba2fe6ea3c919243c5e938e58cb54d7d39d",
+    "nan_mask_sha256": "c32ccfb1eb71c6bb16705e1098ac00c61fcf2579cc997f8cce95a1d4e61a6834"
+   },
+   "close_12h_trend_EMA_8_Lag_21": {
+    "value_sha256": "c3b73098e88684582a877ba147259aae26c85a048d53a51fe6f39db79cb7bb55",
+    "nan_mask_sha256": "fdb658660977032158f0ab93e602cfc2581204eb865cdaf0d6b3f62525a896a1"
+   },
+   "close_12h_trend_SMA_13_Lag_21": {
+    "value_sha256": "191bd3e1a9962fd88cb20d9598bdbaedcbfc99310c63d9d37b9ce17e2b9a909c",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_21": {
+    "value_sha256": "610df2329d5cbfe1b2522cd805a15a8fa06c25e87912d685efaa602b06ca721c",
+    "nan_mask_sha256": "1c49bcf04cec648ba9ceca763ef24edbf92b18766d0c3cd97b6f144466700f47"
+   },
+   "open_12h_Lag_34": {
+    "value_sha256": "220ab2d4a382cb3cff2ecfb39e18c2bf497fcc6702d6ca73248c8fcda1a479e2",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "high_12h_Lag_34": {
+    "value_sha256": "275bd6732c29d9abbc71411434071b4613229e8596c9882ac485bdfaa1d35fa3",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "low_12h_Lag_34": {
+    "value_sha256": "c568c88637e1b45cd8c35e05fba2303e152d7b7f109f5809edfc4b10b19f3c01",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "close_12h_Lag_34": {
+    "value_sha256": "4a1ee073059a6202917bc3dd998f634eafd0daa01d92017cbd46b0926ee69955",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "volume_12h_Lag_34": {
+    "value_sha256": "ab2377995400876f2af26a83d6322d03e57c3761142b1f1f86b3a72b2b855b89",
+    "nan_mask_sha256": "2746f1e5cf759597e32bee0ac8f47022e4736496812ff84a71afa8f4656f9582"
+   },
+   "close_12h_trend_EMA_8_Lag_34": {
+    "value_sha256": "24521beeec2034a0b82e69ac708338b0e05e828b9ed41af40b0ffd1a71ec243a",
+    "nan_mask_sha256": "a167818b61e81bf72f2507c6e84f7aa5f15bf5c0fd518627436116c005c794d3"
+   },
+   "close_12h_trend_SMA_13_Lag_34": {
+    "value_sha256": "351011b3bfa48c417e9d9483a3c5c3314ee27ae8c2d054e95fb794d0f91fced2",
+    "nan_mask_sha256": "863b74a82ea858b74c55dc1a6346ba1ac6625efda28b10b6d8cb0ab263c49b3c"
+   },
+   "ohlc_12h_pattern_Consensus_Lag_34": {
+    "value_sha256": "8615ddc89541a92bd1ff04a5aa838fd0741fa48514aa6f037e02dcfc305203bd",
+    "nan_mask_sha256": "e84d46bc575691cc6bb781cddd9b20e6496b3b6c1f84f5c19fe52493dbfed36e"
+   },
+   "meta_12h_VolumePrice_Divergence": {
+    "value_sha256": "3fb90d90b7aff5198fc28a23864222ae359dc50a2be9a61846de4389dabb351c",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "meta_12h_Volume_PriceChange": {
+    "value_sha256": "c510e48f41d1a7f7ea1bddc88a024f8ee5399de55d9d42ce4b5517ca2f6223cf",
+    "nan_mask_sha256": "64984e43e48d94db3791b4090720e9b4915ce9d9fab502791dfe000a317c1b0f"
+   },
+   "meta_12h_Time_HourOfDay": {
+    "value_sha256": "99783d7376ca2dc43efeb8b9bd0eb299792418b22060b48fd10ead6590da45fe",
+    "nan_mask_sha256": "8599bd52962296ce2cbdf0f9e6477fbc71b5e03ab8fe5b59fa2ef902bb803c11"
+   },
+   "meta_12h_Time_DayOfWeek": {
+    "value_sha256": "b520371e26ae3326a46a4142ad204b3ac017e5118d1506ad4d1deb18f863d8a3",
+    "nan_mask_sha256": "8599bd52962296ce2cbdf0f9e6477fbc71b5e03ab8fe5b59fa2ef902bb803c11"
+   },
+   "meta_12h_Time_IsWeekend": {
+    "value_sha256": "522a1e9b75180d280ad672cc9ca2c615b97b4004ff09b8ce45a5353bfac8c95a",
+    "nan_mask_sha256": "8599bd52962296ce2cbdf0f9e6477fbc71b5e03ab8fe5b59fa2ef902bb803c11"
+   },
+   "meta_12h_Time_MonthOfYear": {
+    "value_sha256": "ef9428ccb681e95bed1a69224e080db7ae2f4d25975095b1359073be4fe3d2a2",
+    "nan_mask_sha256": "8599bd52962296ce2cbdf0f9e6477fbc71b5e03ab8fe5b59fa2ef902bb803c11"
+   }
+  }
+ }
+}

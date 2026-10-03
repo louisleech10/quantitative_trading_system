@@ -33,6 +33,7 @@ except ImportError:
     pq = None
 
 from momentum.FeatureEngineering.core.column_group_registry import FailureType
+from momentum.FeatureEngineering import feature_naming
 from momentum.core.config import get_l7_codec_upgrade_enabled
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.core.logging import get_logger
@@ -1056,19 +1057,11 @@ class FeatureStorage:
             # name segment (matching legacy _apply_timeframe_tag format):
             #   "close_trend_EMA_20"  →  "close_1h_trend_EMA_20"  (group 1h_L1_trend_EMA)
             #   "close_trend_EMA_20"  →  "close_12h_trend_EMA_20" (group 12h_L1_trend_EMA)
-            _gid_tf = str(group_id).split("_", 1)[0]  # e.g. "1h", "12h", "4h"
-            # Valid TF: digits + one of m/h/d  (e.g. "1m", "1h", "4h", "12h", "1d")
-            if _gid_tf and _gid_tf[-1] in ("m", "h", "d") and _gid_tf[:-1].isdigit():
-                _tf_guard = _gid_tf + "_"
-                _tagged: List[str] = []
-                for _c in columns_list:
-                    _cp = _c.split("_", 1)
-                    # Idempotent: skip if already tagged with this exact tf
-                    if len(_cp) == 2 and not _cp[1].startswith(_tf_guard):
-                        _tagged.append(f"{_cp[0]}_{_gid_tf}_{_cp[1]}")
-                    else:
-                        _tagged.append(_c)
-                columns_list = _tagged
+            _gid_tf = str(group_id).split("_", 1)[0]  # e.g. "1h", "12h", "4h", "1w"
+            # RATIOUNSAFE Task 1.3：合法週期＝feature_naming.timeframe_keys()（含 1w；不寫死後綴規則）；
+            # 標記規則單一真相源 feature_naming.tag_timeframe（群組週期身分、冪等、label_ 不標）
+            if _gid_tf in feature_naming.timeframe_keys():
+                columns_list = [feature_naming.tag_timeframe(_c, _gid_tf) for _c in columns_list]
 
             array = _coerce_persistence_array(data)
             if row_slice is not None:

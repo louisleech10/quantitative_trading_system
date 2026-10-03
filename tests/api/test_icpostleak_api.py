@@ -26,7 +26,7 @@ CONTRACT = json.loads((REPO / "tests/_golden/icpostleak/contract.json").read_tex
 COMBOS: List[List[str]] = CONTRACT["combos"]
 RANK_W = int(CONTRACT["rank_window"])
 Z_WINDOWS: List[int] = [int(w) for w in CONTRACT["zscore_windows"]]
-UNSAFE = "ohlc_pattern_CDLDOJI"  # `_is_ratio_unsafe_column`：第二段為 pattern 類
+UNSAFE = "ohlc_pattern_CDLDOJI"  # `feature_naming.is_ratio_unsafe_column`：去週期標記後第二段為 pattern 類
 
 
 def _real_frame(extra_unsafe: bool = False) -> pd.DataFrame:
@@ -265,11 +265,11 @@ def test_mutation_unsorted_zscore_windows_is_caught(tmp_path: Path, monkeypatch:
 
 
 def test_mutation_excluded_features_not_filled_is_caught(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：ratio-unsafe 判定失效（IC 頁須經 `feature_preprocessor._is_ratio_unsafe_column` 判定）⇒ excluded_features
-    不再列出該欄（Task 2.2 之判準翻轉）。"""
-    from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fp
+    """mutant：ratio-unsafe 判定失效（IC 頁經共同核心 `feature_naming.ratio_unsafe_category` 判定；RATIOUNSAFE Task 1.2
+    改破壞點）⇒ excluded_features 不再列出該欄（Task 2.2 之判準翻轉）。"""
+    from momentum.FeatureEngineering import feature_naming
 
-    monkeypatch.setattr(fp, "_is_ratio_unsafe_column", lambda col: False)
+    monkeypatch.setattr(feature_naming, "ratio_unsafe_category", lambda column: None)
     monkeypatch.chdir(tmp_path)
     got = _run(tmp_path, _real_frame(extra_unsafe=True), ["rank"])
     assert [e["name"] for e in got["result"].get("excluded_features", [])] != [UNSAFE]

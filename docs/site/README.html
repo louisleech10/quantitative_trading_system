@@ -187,7 +187,7 @@
 <td>HP-RATIOUNSAFE</td>
 <td>進行中</td>
 <td>docs/TICKET_ORDER.md</td>
-<td>全票排序第 3 步（PRE-RED 已於 2026-10-03 收案）：SPEC 起草中（主委草稿，尚未送審）。預查收據與範圍見 ROADMAP RM-RATIOUNSAFE：帶週期標記 pattern 名 0／183 被判、主路徑 L6.5 改寫 62／62 pattern 欄且 13 欄訊號抹為 0、三種週期標記規則不一致。下一步：SPEC 落檔 → 三家審查 → 白話逐條閘（含「主路徑 pattern 欄改為原值通過」之落盤值語意變更，須使用者核可）→ TODO manifest → 實作</td>
+<td>全票排序第 3 步：SPEC v5 經審查 r1–r4、使用者 2026-10-03 白話逐條核可 §A①–④；TODO manifest 經審查 r5–r7、戳記輪三家 APPROVED（handoffs/reconcile/20261003-ratiounsafe-x-review-r7/synth.md）。實作 Phase 1–3 完成（未提交時記此行，見進行中紀錄）：feature_naming 單一真相源（判定、群組週期身分標記，含 1w）；L3／L6.5 入口／factories／calibration／storage 改接；L6.5 registry 兩入口九分支呼叫點切片（ratio-unsafe 原值通過、校準先排除）。驗證：RATIOUNSAFE 四檔 109 passed；§G⑥ S1-on 350→363 欄（+13 全 pattern）、bytes +1.8%；12h＋4h 精簡 698→717（+19 全 pattern、無刪減）；failopen contract／layers 27＋v3 兩節點＋L3 存活欄數節點綠、基準未動；ICPOSTLEAK／native／FF-STAT 盤點綠（盤點補登 ICPOSTLEAK 新增 4 函式，本票前即紅）。另發現 PRE-RED census 外之既有紅：tests/feature_engineering/test_batch1_followup.py 5 支（HEAD 285aeb8f 同紅；凍結雜湊不符與 partial），待歸因。下一步：提交 → 三家審碼 b1 → 推送 → 第 4 步 ICFIRSTALIGN 乙</td>
 </tr>
 </tbody>
 </table></div>

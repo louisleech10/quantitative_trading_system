@@ -188,18 +188,13 @@ def calibration_window_before(
 
 
 def tagged_column_name(column: str, timeframe: str) -> str:
-    """欄名加週期標記（與 `FeatureFactory._apply_timeframe_tag` 同規則：`label_` 開頭或第二段已為任一週期則不動）。
+    """欄名加週期標記（群組週期身分規則＝`feature_naming.tag_timeframe`：`label_` 開頭、少於 2 段或第二段已為本週期則不動）。
 
     封包以標記後之欄名為鍵；L6.5 各路徑所見欄名（單週期未標記、多週期已標記）經此正規化後查封包。"""
-    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+    from momentum.FeatureEngineering import feature_naming
 
-    name = str(column)
-    if name.startswith("label_"):
-        return name
-    parts = name.split("_")
-    if len(parts) < 2 or parts[1] in set(TimeframeAligner._timeframe_seconds_keys()):
-        return name
-    return "_".join([parts[0], str(timeframe)] + parts[1:])
+    # RATIOUNSAFE Task 1.3：與生產落盤（feature_storage CGSA 寫檔）同一規則（群組週期身分），單一真相源 feature_naming
+    return feature_naming.tag_timeframe(str(column), str(timeframe))
 
 
 def restrict_packet(packet: CalibrationPacket, columns: Sequence[str]) -> CalibrationPacket:

@@ -259,12 +259,11 @@ def create_post_ic_transform_config(
 
 def ratio_unsafe_category(feature_name: str) -> Optional[str]:
     """ICPOSTLEAK Task 2.2：L6.5 入口會丟棄之 ratio-unsafe 欄之類別（非該類回 None）。判定委由
-    `feature_preprocessor._is_ratio_unsafe_column`（以模組屬性呼叫，判定之單一真相源）。"""
-    from momentum.FeatureEngineering.preprocessing import feature_preprocessor as _fp
+    `feature_naming.ratio_unsafe_category`（以模組屬性呼叫，判定之單一真相源；含週期標記之落盤欄名，
+    RATIOUNSAFE Task 1.2）。"""
+    from momentum.FeatureEngineering import feature_naming as _naming
 
-    if not _fp._is_ratio_unsafe_column(str(feature_name)):
-        return None
-    return str(feature_name).split("_", 2)[1]
+    return _naming.ratio_unsafe_category(str(feature_name))
 
 
 def create_feature_factory(

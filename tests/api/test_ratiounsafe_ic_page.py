@@ -80,5 +80,9 @@ def test_mutation_factories_reverted_to_old_rule(tmp_path: Path, monkeypatch: py
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(svc_mod, "ratio_unsafe_category", _old)
-    got = icp._run(tmp_path, _frame(), ["zscore"], tag="ru_wire")
-    assert got["result"]["excluded_features"] == []
+    # 服務端漏判 ⇒ 帶標記欄進入正式轉換後被剔除，服務取欄即 KeyError；或回應未列排除——兩者皆與正確行為不同
+    try:
+        got = icp._run(tmp_path, _frame(), ["zscore"], tag="ru_wire")
+    except KeyError:
+        return
+    assert [e["name"] for e in got["result"]["excluded_features"]] != TAGGED_UNSAFE

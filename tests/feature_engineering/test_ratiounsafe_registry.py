@@ -315,9 +315,13 @@ def test_boundary_02_labels_not_routed_through_storage_tagging(monkeypatch: pyte
 
 
 def test_multi_tf_names_unchanged(before: dict) -> None:
-    """Task 1.3：12h＋4h 精簡設定之落盤欄名集合改前改後相同。"""
-    names = freeze.multi_tf_names()
-    assert names == before["multi_tf_names"]["names"]
+    """Task 1.3：12h＋4h 精簡設定之落盤欄名，非 ratio-unsafe 欄改前改後相同、無刪減；新增者只准 ratio-unsafe 欄
+    （該設定 dead-drop 預設開，§C 例外：改前被 L6.5 抹 0 而判死之 ratio-unsafe 欄恢復；實作期實測 +19、全屬 pattern）。"""
+    got = set(freeze.multi_tf_names())
+    want = set(before["multi_tf_names"]["names"])
+    assert {c for c in got if not _is_unsafe(c)} == {c for c in want if not _is_unsafe(c)}
+    assert want - got == set()
+    assert all(_is_unsafe(c) for c in got - want), sorted(c for c in got - want if not _is_unsafe(c))
 
 
 def test_after_baseline_regression() -> None:

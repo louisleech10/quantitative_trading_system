@@ -32,12 +32,12 @@ from momentum.FeatureEngineering.operators.derived_operators import (
 from momentum.FeatureEngineering.operators.rolling_aggregator import (
     RATIO_UNSAFE_CATEGORIES as RAG_UNSAFE,
     RollingAggregator,
-    _is_ratio_unsafe_column,
+    is_ratio_unsafe_column as _is_ratio_unsafe_column,
 )
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
     RATIO_UNSAFE_CATEGORIES as PP_UNSAFE,
     FeaturePreprocessor,
-    _is_ratio_unsafe_column as pp_is_unsafe,
+    is_ratio_unsafe_column as pp_is_unsafe,
 )
 
 KLINE_PATH = Path("data_cache/feature_klines/kline_cache.h5")

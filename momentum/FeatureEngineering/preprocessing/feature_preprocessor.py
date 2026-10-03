@@ -10,7 +10,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 import psutil
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -53,8 +53,9 @@ from momentum.FeatureEngineering.preprocessing._numba_transforms import (
 )
 from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
 from momentum.FeatureEngineering.utils.winsor_params import resolve_winsor_min_periods
-from momentum.FeatureEngineering.operators.derived_operators import (
+from momentum.FeatureEngineering.feature_naming import (
     RATIO_UNSAFE_CATEGORIES,
+    is_ratio_unsafe_column,
 )
 from momentum.core.config import (
     MomentumConfig,
@@ -102,18 +103,6 @@ class StationarityIncompleteError(StationarityProvenanceError):
 # FFSTAT：不可降級之例外（L6.5 降級路徑、群組失敗容忍、native-tf 回退一律原樣上拋）；
 # 校準錯誤見 docs/FFSTAT_SPEC.md §C「校準域錯誤不可降級」
 NON_DEGRADABLE_ERRORS = (StationarityProvenanceError, CalibrationError)
-
-
-def _is_ratio_unsafe_column(col: str) -> bool:
-    """Belt-and-suspenders pattern guard for L6.5 entry.
-
-    L1 atomic naming convention: `<source>_<category>_<rest>` (e.g.
-    `ohlc_pattern_CDLDOJI`). Ratio-unsafe categories propagate to derived names
-    (`ohlc_pattern_CDLDOJI_Momentum_L5`) so the same positional check works for
-    L1 / L2 / L3 outputs alike. See docs/NAN_POISONING_INVESTIGATION.md § 7B / Q11.2.
-    """
-    parts = str(col).split("_", 2)
-    return len(parts) >= 2 and parts[1] in RATIO_UNSAFE_CATEGORIES
 
 
 try:
@@ -287,10 +276,12 @@ class FeaturePreprocessor:
         return grouped
 
     def _prepare_calibration_for_groups(self, groups: Iterable[Any]) -> None:
-        """registry 入口：各群組之欄依群組原生週期分組後取子封包並核對。"""
+        """registry 入口：各群組之欄依群組原生週期分組後取子封包並核對。ratio-unsafe 欄於此先行排除（RATIOUNSAFE
+        Task 2.1：分類先於校準準備；此類欄 L6.5 不轉換，不進公開域欄集合與指紋）。"""
         grouped: Dict[str, List[str]] = {}
         for group in groups:
-            grouped.setdefault(str(group.timeframe), []).extend(str(c) for c in group.columns)
+            grouped.setdefault(str(group.timeframe), []).extend(
+                str(c) for c in group.columns if not is_ratio_unsafe_column(str(c)))
         self._prepare_calibration(grouped)
 
     def _register_derived_calibration(self, column: str, d_star: float, *, max_lag: int,
@@ -605,7 +596,7 @@ class FeaturePreprocessor:
         # In normal pipelines L3 already filters these out, but L6.5 may receive
         # registry-loaded historical data, post-IC selections, or other paths
         # that bypass L3. See docs/NAN_POISONING_INVESTIGATION.md § 7B / Q11.2.
-        unsafe = [c for c in features_df.columns if _is_ratio_unsafe_column(str(c))]
+        unsafe = [c for c in features_df.columns if is_ratio_unsafe_column(str(c))]
         if unsafe:
             logger.info(
                 "[L6.5] dropping %d ratio-unsafe columns (categories=%s) at preprocessor entry",
@@ -1235,7 +1226,7 @@ class FeaturePreprocessor:
 
         native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
         try:
-            processed_df = native_pp._transform_single(
+            processed_df = native_pp._transform_single_passthrough(
                 native_df,
                 source_layer=self._group_layer_name(group),
                 source_timeframe=self._group_timeframe(group),
@@ -1406,7 +1397,7 @@ class FeaturePreprocessor:
 
         native_df = pd.DataFrame(native_arr, columns=columns, copy=False)
         try:
-            processed_df = native_pp._transform_single(
+            processed_df = native_pp._transform_single_passthrough(
                 native_df,
                 source_layer=self._group_layer_name(group),
                 source_timeframe=self._group_timeframe(group),
@@ -1872,7 +1863,8 @@ class FeaturePreprocessor:
                 group_array = info["array"]
                 for (start, end) in info["slices"]:
                     slice_view = group_array[:, start:end]
-                    fut = pool.submit(self._transform_array_slice, slice_view, transform_context)
+                    fut = pool.submit(self._transform_array_slice, slice_view, transform_context,
+                                      list(getattr(info["group"], "columns"))[start:end])
                     futures[fut] = ("slice", info["group"], (start, end))
 
             split_completed_groups: set[str] = set()
@@ -2100,7 +2092,7 @@ class FeaturePreprocessor:
                 chunk_view = full_array[:, chunk_start:chunk_end]
                 chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
 
-                processed_df = self._transform_single(
+                processed_df = self._transform_single_passthrough(
                     chunk_df,
                     source_layer=self._group_layer_name(group),
                     source_timeframe=self._group_timeframe(group),
@@ -2226,10 +2218,57 @@ class FeaturePreprocessor:
             ).astype(np.float32, copy=False)
         return values
 
+    def _registry_fast_transform_passthrough(
+        self,
+        group_array: np.ndarray,
+        columns: Sequence[str],
+        transform_context: Dict[str, object],
+    ) -> np.ndarray:
+        """RATIOUNSAFE Task 2.1：呼叫點切片——只把非 ratio-unsafe 欄送入無欄名之 `_registry_fast_transform`，
+        ratio-unsafe 欄原值拼回（欄序不變）。無 ratio-unsafe 欄 ⇒ 行為與改前逐位元組相同。"""
+        unsafe = np.fromiter((is_ratio_unsafe_column(str(c)) for c in columns), dtype=bool, count=len(columns))
+        if not unsafe.any():
+            return self._registry_fast_transform(group_array, transform_context)
+        out = np.array(group_array, dtype=np.float32, copy=True)
+        if (~unsafe).any():
+            safe_in = np.ascontiguousarray(np.asarray(group_array)[:, ~unsafe])
+            out[:, ~unsafe] = np.asarray(self._registry_fast_transform(safe_in, transform_context), dtype=np.float32)
+        return out
+
+    def _apply_dataframe_passthrough(
+        self,
+        frame: pd.DataFrame,
+        transform: Callable[[pd.DataFrame], pd.DataFrame],
+    ) -> pd.DataFrame:
+        """RATIOUNSAFE Task 2.1：DataFrame 呼叫點切片——只把非 ratio-unsafe 欄交 `transform`；輸出＝原始欄依輸入欄序
+        （ratio-unsafe 原值、非 ratio-unsafe 取轉換結果，轉換剔除者照剔除）＋非 ratio-unsafe 來源之衍生欄（append）。
+        ratio-unsafe 來源不產任何衍生欄。無 ratio-unsafe 欄 ⇒ 直接呼叫 `transform`（行為不變）。"""
+        unsafe = {c for c in frame.columns if is_ratio_unsafe_column(str(c))}
+        if not unsafe:
+            return transform(frame)
+        safe = [c for c in frame.columns if c not in unsafe]
+        if not safe:
+            return frame.copy()
+        processed = transform(frame[safe])
+        originals = [c for c in frame.columns if c in unsafe or c in processed.columns]
+        merged = pd.DataFrame(
+            {c: (frame[c] if c in unsafe else processed[c]) for c in originals},
+            index=processed.index,
+        )
+        derived = [c for c in processed.columns if c not in set(safe)]
+        if derived:
+            merged = pd.concat([merged, processed[derived]], axis=1)
+        return merged
+
+    def _transform_single_passthrough(self, frame: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        """RATIOUNSAFE Task 2.1：`_transform_single` 之呼叫點切片版（registry 各分支與 native 子實例使用）。"""
+        return self._apply_dataframe_passthrough(frame, lambda part: self._transform_single(part, **kwargs))
+
     def _transform_array_slice(
         self,
         array_slice: np.ndarray,
         transform_context: Dict[str, object],
+        columns: Optional[Sequence[str]] = None,
     ) -> np.ndarray:
         """Run the fast Numba transform pipeline on a column slice.
 
@@ -2239,7 +2278,10 @@ class FeaturePreprocessor:
         safe (winsor / rolling rank / rolling zscore each operate per column).
         """
         # ICPOSTLEAK Task 1.1：同其他 registry 路徑之單一實作（含 gaussian；改前此路徑漏做 gaussian）
-        return self._registry_fast_transform(array_slice, transform_context)
+        if columns is None:
+            return self._registry_fast_transform(array_slice, transform_context)
+        # RATIOUNSAFE Task 2.1：切片欄名由呼叫端給，於此依欄名切出非 ratio-unsafe 子矩陣
+        return self._registry_fast_transform_passthrough(array_slice, columns, transform_context)
 
     def _transform_single_group(
         self,
@@ -2264,7 +2306,7 @@ class FeaturePreprocessor:
 
         if use_fast and not requires_slow:
             # ICPOSTLEAK Task 1.1：registry 快速路徑單一實作（正式順序＋各步遮罩）
-            processed_array = self._registry_fast_transform(group_array, transform_context)
+            processed_array = self._registry_fast_transform_passthrough(group_array, list(getattr(group, "columns")), transform_context)
             registry.overwrite_data(group_id, processed_array)
             return
 
@@ -2274,7 +2316,7 @@ class FeaturePreprocessor:
 
         is_append = self.mode == "append"
         group_df = pd.DataFrame(group_array, columns=list(getattr(group, "columns")), copy=False)
-        processed_df = self._transform_single(
+        processed_df = self._transform_single_passthrough(
             group_df,
             source_layer=self._group_layer_name(group),
             source_timeframe=self._group_timeframe(group),
@@ -2324,17 +2366,17 @@ class FeaturePreprocessor:
 
         if use_fast and not requires_slow:
             # ICPOSTLEAK Task 1.1：registry 快速路徑單一實作（正式順序＋各步遮罩）
-            processed_array = self._registry_fast_transform(group_array, transform_context)
+            processed_array = self._registry_fast_transform_passthrough(group_array, list(getattr(group, "columns")), transform_context)
             return [(group_id, columns, np.asarray(processed_array, dtype=np.float32))]
 
         if self._can_use_optimized_dataframe_path():
             group_df = pd.DataFrame(group_array, columns=columns, copy=False)
-            processed_df = self._transform_single_optimized_df(group_df)
+            processed_df = self._apply_dataframe_passthrough(group_df, self._transform_single_optimized_df)
             return [(group_id, list(processed_df.columns), processed_df.to_numpy(dtype=np.float32, copy=False))]
 
         is_append = self.mode == "append"
         group_df = pd.DataFrame(group_array, columns=columns, copy=False)
-        processed_df = self._transform_single(
+        processed_df = self._transform_single_passthrough(
             group_df,
             source_layer=self._group_layer_name(group),
             source_timeframe=self._group_timeframe(group),
@@ -2391,7 +2433,7 @@ class FeaturePreprocessor:
                 chunk_cols = col_names[chunk_start:chunk_end]
                 chunk_view = full_array[:, chunk_start:chunk_end]
                 chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
-                processed_df = self._transform_single(
+                processed_df = self._transform_single_passthrough(
                     chunk_df,
                     source_layer=self._group_layer_name(group),
                     source_timeframe=self._group_timeframe(group),
@@ -2462,7 +2504,7 @@ class FeaturePreprocessor:
             arr_in = np.asarray(shard_arr, dtype=np.float32)
             # ICPOSTLEAK Task 1.1：同其他 registry 路徑之單一實作（正式順序＋各步遮罩；gaussian 之 apply_to 非 all
             # 時 helper fail-closed——改前此處靜默略過 gaussian）
-            processed =np.asarray(self._registry_fast_transform(arr_in, transform_context), dtype=np.float32)
+            processed = np.asarray(self._registry_fast_transform_passthrough(arr_in, list(shard_cols), transform_context), dtype=np.float32)
 
             output_group_id = (
                 group_id if n_shards == 1 else f"{group_id}_shard{shard_meta.shard_idx:0{width}d}"
@@ -2546,7 +2588,7 @@ class FeaturePreprocessor:
                 chunk_cols = col_names[chunk_start:chunk_end]
                 chunk_view = full_array[:, chunk_start:chunk_end]
                 chunk_df = pd.DataFrame(chunk_view, columns=chunk_cols, copy=False)
-                processed_df = self._transform_single(
+                processed_df = self._transform_single_passthrough(
                     chunk_df,
                     source_layer=self._group_layer_name(group),
                     source_timeframe=self._group_timeframe(group),
@@ -2621,7 +2663,7 @@ class FeaturePreprocessor:
             columns=list(getattr(group, "columns")),
             copy=False,
         )
-        processed_df = self._transform_single_optimized_df(group_df)
+        processed_df = self._apply_dataframe_passthrough(group_df, self._transform_single_optimized_df)
         processed_array = processed_df.to_numpy(dtype=np.float32, copy=False)
         registry.overwrite_data(group_id, processed_array)
 

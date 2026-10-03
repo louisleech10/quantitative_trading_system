@@ -155,6 +155,7 @@
     "tests/feature_engineering/test_ffstat_stable_start.py",
     "tests/feature_engineering/test_ic_first_pipeline.py",
     "tests/feature_engineering/test_l7_raw_streaming.py",
+    "tests/feature_engineering/test_ratiounsafe_registry.py",
     "tests/momentum/test_feature_factory_optimization_e2e.py",
     "tests/momentum/test_feature_factory_optimization_perf.py",
     "tests/momentum/test_feature_preprocessor.py",
@@ -246,6 +247,11 @@
     "tests/test_polars_phase4.py": {
       "assert_like": 40,
       "skip_xfail": 4
+    },
+    "tests/feature_engineering/test_ratiounsafe_registry.py": {
+      "assert_like": 47,
+      "note": "RATIOUNSAFE（2026-10-03）新增：開 zscore／winsorization 之 registry 分支強制測試；safe 欄比對 HEAD 凍結之 tests/_golden/ratiounsafe/branch_oracle.json",
+      "skip_xfail": 0
     }
   },
   "oracle_update_counts_rule": {

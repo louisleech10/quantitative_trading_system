@@ -12,8 +12,9 @@ from scipy.stats import rankdata
 from momentum.core.logging import get_logger
 from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
 from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
-from momentum.FeatureEngineering.operators.derived_operators import (
+from momentum.FeatureEngineering.feature_naming import (
     RATIO_UNSAFE_CATEGORIES,
+    is_ratio_unsafe_column,
 )
 
 
@@ -25,16 +26,6 @@ logger = get_logger(__name__)
 # std/skew/kurt on <30 effective samples are unreliable even if NaN rate is below 90%.
 # See docs/NAN_POISONING_INVESTIGATION.md § 2.3 / Q11.3.
 _VARIANCE_FILTER_MIN_EFFECTIVE_N: int = 30
-
-
-def _is_ratio_unsafe_column(col: str) -> bool:
-    """Return True if `col` is named like an L1 atomic from a ratio-unsafe category.
-
-    L1 atomic naming convention: `<source>_<category>_<rest>` (e.g.
-    `ohlc_pattern_CDLDOJI`). Inspect the second underscore-separated segment.
-    """
-    parts = col.split("_", 2)
-    return len(parts) >= 2 and parts[1] in RATIO_UNSAFE_CATEGORIES
 
 
 # Plan A streaming persist callback: receives (step_label, chunk_df) and is
@@ -1052,7 +1043,7 @@ class RollingAggregator:
         # L3 doesn't have feature_info plumbed through; pattern L1 cols are named
         # `<src>_pattern_<rest>` so a positional check on the second segment is reliable.
         # See docs/NAN_POISONING_INVESTIGATION.md § 7B / Q11.2.
-        candidates = [col for col in columns if not _is_ratio_unsafe_column(col)]
+        candidates = [col for col in columns if not is_ratio_unsafe_column(col)]
         if self._apply_to == "all" or self._apply_to is None:
             return candidates
         if isinstance(self._apply_to, list):

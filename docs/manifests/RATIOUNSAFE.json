@@ -18,6 +18,7 @@
   ],
   "contract_jsons": [
     "tests/_golden/ratiounsafe/baseline.json",
+    "tests/_golden/ratiounsafe/baseline_after.json",
     "tests/_golden/ratiounsafe/branch_oracle.json",
     "tests/_golden/ratiounsafe/contract.json"
   ],
@@ -39,23 +40,33 @@
       "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/ratiounsafe_probes/deaddrop_probe.py",
       "rc": 0,
       "honest_bounds": "以前處理關之 pattern 欄近似修後原值通過；bytes 差含非 pattern 欄之編碼差；修後實際增量於實作後以 §G S1-on 實測"
+    },
+    {
+      "path": "handoffs/run_receipts/20261003-ratiounsafe-ffstat-nan-propagation-inventory.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/ffstat_probes/stable_start_receipts.py inventory --out handoffs/run_receipts/20261003-ratiounsafe-ffstat-nan-propagation-inventory.json",
+      "rc": 0,
+      "honest_bounds": "AST 閉包＋golden 分類；補登 ICPOSTLEAK 新增 4 函式（本票前即缺）"
     }
   ],
   "batch_card": {
     "depends": [],
     "touches": [
+      "docs/RATIOUNSAFE_SPEC.md",
+      "docs/manifests/RATIOUNSAFE.json",
       "momentum/FeatureEngineering/feature_naming.py",
+      "momentum/FeatureEngineering/feature_storage.py",
       "momentum/FeatureEngineering/operators/derived_operators.py",
       "momentum/FeatureEngineering/operators/rolling_aggregator.py",
-      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
       "momentum/FeatureEngineering/preprocessing/calibration.py",
-      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
       "momentum/factories.py",
-      "tests/api/test_icpostleak_api.py",
-      "tests/_golden/ffstat/nan_propagation_classes.json",
       "scripts/verify_nan_poisoning_fix.py",
-      "docs/RATIOUNSAFE_SPEC.md",
-      "docs/manifests/RATIOUNSAFE.json"
+      "tests/_golden/ffstat/nan_propagation_classes.json",
+      "tests/_golden/icpostleak/contract.json",
+      "tests/_golden/ratiounsafe/baseline_after.json",
+      "tests/api/test_icpostleak_api.py",
+      "tests/api/test_ratiounsafe_ic_page.py",
+      "tests/feature_engineering/test_ratiounsafe_registry.py"
     ],
     "callers_now": [
       "api/services/ic_analysis_service.py",

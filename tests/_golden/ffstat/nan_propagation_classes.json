@@ -587,11 +587,6 @@
       "class": "helper",
       "evidence": "rolling_aggregator.py 剔除原因紀錄（不產特徵值）"
     },
-    "momentum.FeatureEngineering.operators.rolling_aggregator:_is_ratio_unsafe_column": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "rolling_aggregator.py 選欄／標籤"
-    },
     "momentum.FeatureEngineering.operators.state_counters:_aligned": {
       "propagates_nan": false,
       "class": "not_in_generation_path",
@@ -1607,11 +1602,6 @@
       "class": "propagating",
       "evidence": "preprocessing/feature_preprocessor.py:127-133 valid 卷積（輸出短於輸入 width−1）"
     },
-    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:_is_ratio_unsafe_column": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "preprocessing/feature_preprocessor.py:105-114 欄名守衛"
-    },
     "momentum.FeatureEngineering.preprocessing.stable_mask:_dead_columns_2d": {
       "propagates_nan": false,
       "class": "column_filter",
@@ -2016,6 +2006,41 @@
       "propagates_nan": false,
       "class": "helper",
       "evidence": "numba_rolling.py:_window_moments 窗內純量核心（v50 逐窗精確；窗內任一 NaN ⇒ 全有效＝False，呼叫端 fused_rolling_stats／rolling_skew_kurt 據以出 NaN）"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._registry_fast_transform_passthrough": {
+      "propagates_nan": false,
+      "class": "dispatcher",
+      "evidence": "preprocessing/feature_preprocessor.py RATIOUNSAFE Task 2.1：呼叫點切片——非 ratio-unsafe 子矩陣交 _registry_fast_transform（已列步驟），ratio-unsafe 欄原值拼回"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._transform_single_passthrough": {
+      "propagates_nan": false,
+      "class": "dispatcher",
+      "evidence": "preprocessing/feature_preprocessor.py RATIOUNSAFE Task 2.1：_transform_single 之呼叫點切片版，經 _apply_dataframe_passthrough 派發至 _transform_single（已列步驟）"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._apply_dataframe_passthrough": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/feature_preprocessor.py RATIOUNSAFE Task 2.1：依欄名切片與重組；輸出值來自呼叫端傳入之已列轉換步驟之結果或 ratio-unsafe 欄原值，自身不產生值"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._registry_fast_transform": {
+      "propagates_nan": false,
+      "class": "dispatcher",
+      "evidence": "preprocessing/feature_preprocessor.py ICPOSTLEAK Task 1.1：registry 快速路徑單一實作，依正式順序派發縮尾／rank／gaussian／zscore 已列核心並以 mask_incomplete_window_by_input_2d 遮窗未滿列（RATIOUNSAFE 補登：ICPOSTLEAK 新增後未入盤點）"
+    },
+    "momentum.FeatureEngineering.preprocessing.feature_preprocessor:FeaturePreprocessor._polars_mask_columns": {
+      "propagates_nan": false,
+      "class": "mask",
+      "evidence": "preprocessing/feature_preprocessor.py ICPOSTLEAK：Polars 分支之輸入錨點窗未滿遮罩（RATIOUNSAFE 補登）"
+    },
+    "momentum.FeatureEngineering.preprocessing.stable_mask:mask_incomplete_window_by_input_2d": {
+      "propagates_nan": false,
+      "class": "mask",
+      "evidence": "preprocessing/stable_mask.py ICPOSTLEAK Task 1.1：以步驟輸入首個有限值＋window−1 為界遮窗未滿列（RATIOUNSAFE 補登）"
+    },
+    "momentum.FeatureEngineering.preprocessing.time_order:assert_strictly_increasing_time_index": {
+      "propagates_nan": false,
+      "class": "helper",
+      "evidence": "preprocessing/time_order.py ICPOSTLEAK Task 1.2：時間戳非嚴格遞增即拋錯，不產生輸出值（RATIOUNSAFE 補登）"
     }
   }
 }

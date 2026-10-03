@@ -21,9 +21,9 @@ logger = get_logger(__name__)
 # x.shift.replace(0, nan)` collapses to ~99.77% NaN and the L3 cascade then
 # multiplies that into ~120k garbage features. See docs/NAN_POISONING_INVESTIGATION.md.
 #
-# Single source of truth. rolling_aggregator and feature_preprocessor import this
-# to enforce the same blacklist at L3 / L6.5 entry.
-RATIO_UNSAFE_CATEGORIES: frozenset[str] = frozenset({"pattern"})
+# Single source of truth＝`feature_naming.RATIO_UNSAFE_CATEGORIES`（RATIOUNSAFE Task 1.1）；本模組 re-export 同一物件，
+# rolling_aggregator 與 feature_preprocessor 經 `feature_naming.is_ratio_unsafe_column` 於 L3／L6.5 判定。
+from momentum.FeatureEngineering.feature_naming import RATIO_UNSAFE_CATEGORIES  # noqa: E402
 
 
 @dataclass
