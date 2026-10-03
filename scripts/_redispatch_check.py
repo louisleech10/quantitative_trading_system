@@ -411,8 +411,21 @@ def issue_violations(repo: Path, events: Sequence[dict], rounds: Dict[str, dict]
     if fam not in participants or fam not in expected:
         v.append(f"②家族不在該輪 participants／expected_outputs：{fam}")
     latest = latest_result(events, rid, fam)
-    if latest is None or (latest.get("result_state") or "") not in NON_SUCCESS:
-        v.append(f"③該家最新結果須為 {sorted(NON_SUCCESS)}（實得 {latest and latest.get('result_state')}）")
+    # ③′（使用者 2026-10-03 裁定「讓那一家重做」；PRE-RED r4 實例：主機記憶體耗盡致換頁檔塞滿磁碟，codex 交件失敗
+    #   且 committee_family_result 本身寫不進 audit ⇒ 無結果列）：該家**無任何結果列**時，下列全成立亦准重派——
+    #   (a) 該輪 committee_round_open 唯一且距今 ≥ redispatch_absent_result_min_age_seconds（避免與仍在跑之首次派工並行）；
+    #   (b) 登記產出路徑不存在，或為非 symlink 之 0 byte 一般檔（有任何內容 ⇒ 不准，出路為修檔後 register-output）。
+    #   交件（④）、執行中派工器（⑪）、上限與間隔（⑦⑧）等其餘條件照常判定。
+    absent_ok = False
+    if latest is None and len(opens) == 1 and expected.get(fam):
+        min_age = float(consts.get("redispatch_absent_result_min_age_seconds", 3600))
+        q = repo / expected[fam]
+        out_absent = (not q.exists() and not q.is_symlink()) or (
+            q.is_file() and not q.is_symlink() and q.stat().st_size == 0)
+        opened = epoch_of(opens[0])
+        absent_ok = opened > 0 and (now_epoch - opened) >= min_age and out_absent  # ts 不可解析 ⇒ fail-closed
+    if not absent_ok and (latest is None or (latest.get("result_state") or "") not in NON_SUCCESS):
+        v.append(f"③該家最新結果須為 {sorted(NON_SUCCESS)}，或無結果列且符合 ③′（實得 {latest and latest.get('result_state')}）")
     if delivered(repo, events, rounds, rid, fam):
         v.append("④該家已交件（出路為既有銷帳，不得重派）")
     out_rel = expected.get(fam) or ""

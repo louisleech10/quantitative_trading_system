@@ -80,17 +80,50 @@
     ],
     "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/governance/test_mutation_scope_extension.py tests/governance/test_todofmt_sample_fftfmeta.py tests/governance/test_todofmt_constitution_sync.py tests/governance/test_prered_allowed_red.py tests/api/test_batch_alias.py tests/test_cgsa_resume.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_correctness.py::test_v7_cgsa_resume_matches_fresh",
     "forbidden": [
-      {"rule": "不得改 momentum／api／frontend 生產碼", "observable": true},
-      {"rule": "不得刪除或放寬斷言換綠；不得新增 skip／xfail", "observable": true},
-      {"rule": "基準 JSON 只能由凍結腳本本體產生，禁手改", "observable": true},
-      {"rule": "使用者核可前不得重凍 tests/_golden/failopen/baseline.json", "observable": true},
-      {"rule": "測試內不得寫死 commit sha 作為錨點（取版一律由 git 內容機械推導）", "observable": true},
-      {"rule": "不得改 scripts/mutation_probe_static.py、docs/manifests/FFTFMETA.json、.cursorrules、momentum/FeatureEngineering/feature_registry.py", "observable": true},
-      {"rule": "FF 重測試不得並行兩組", "observable": false},
-      {"rule": "FF 驗證只用真實 data_cache/feature_klines/kline_cache.h5，禁合成 fixture", "observable": true},
-      {"rule": "探針與測試不得寫入 data_cache（registry、cgsa_work、d* 快取一律導 tmp）", "observable": true},
-      {"rule": "不弱化 NaN／inf 閘與品質判定；不得以 stub 品質判定或續跑閘換綠", "observable": true},
-      {"rule": "F-2 不得以精簡設定之結果代替原設定之驗收", "observable": true}
+      {
+        "rule": "不得改 momentum／api／frontend 生產碼",
+        "observable": true
+      },
+      {
+        "rule": "不得刪除或放寬斷言換綠；不得新增 skip／xfail",
+        "observable": true
+      },
+      {
+        "rule": "基準 JSON 只能由凍結腳本本體產生，禁手改",
+        "observable": true
+      },
+      {
+        "rule": "使用者核可前不得重凍 tests/_golden/failopen/baseline.json",
+        "observable": true
+      },
+      {
+        "rule": "測試內不得寫死 commit sha 作為錨點（取版一律由 git 內容機械推導）",
+        "observable": true
+      },
+      {
+        "rule": "不得改 scripts/mutation_probe_static.py、docs/manifests/FFTFMETA.json、.cursorrules、momentum/FeatureEngineering/feature_registry.py",
+        "observable": true
+      },
+      {
+        "rule": "FF 重測試不得並行兩組",
+        "observable": false
+      },
+      {
+        "rule": "FF 驗證只用真實 data_cache/feature_klines/kline_cache.h5，禁合成 fixture",
+        "observable": true
+      },
+      {
+        "rule": "探針與測試不得寫入 data_cache（registry、cgsa_work、d* 快取一律導 tmp）",
+        "observable": true
+      },
+      {
+        "rule": "不弱化 NaN／inf 閘與品質判定；不得以 stub 品質判定或續跑閘換綠",
+        "observable": true
+      },
+      {
+        "rule": "F-2 不得以精簡設定之結果代替原設定之驗收",
+        "observable": true
+      }
     ],
     "risk_mitigation": [
       "test_mutation_scope_extension.py ← Task 1.1：量化層集合限縮為 W 時樹中存在之 <檔>::<函式>（_todofmt_anchor.effective_commit 與 git show）",
@@ -101,7 +134,7 @@
       "test_failopen_correctness.py ← Task 2.3：v7 改精簡 L1 設定、加種子品質前置斷言與續跑期間 12h L1 計算次數觀測",
       "freeze_failopen_baseline.py ← Task 2.4：_single_tf_record 之 registry 雜湊取公開輸出窗切片；新增 l1_direct 記錄；預熱未啟用時行為逐位元組不變",
       "test_failopen_contract.py ← Task 2.4：L1 oracle 改比對 l1_direct",
-      "已核模式（重凍後）＝gate_cmd 加：venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_correctness.py（單組串行）",
+      "已核模式（重凍後）＝gate_cmd 加（單組串行）：venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_correctness.py::test_v3_healthy_full_run_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_ethusdt_1h_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor tests/feature_engineering/test_failopen_correctness.py::test_v5_prefix_no_leakage_after_warmup tests/feature_engineering/test_failopen_correctness.py::test_v5_l5_cross_sectional_prefix_no_leakage tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns tests/feature_engineering/test_failopen_correctness.py::test_v6_asof_oracle_boundary_cases tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_isolation tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_same_factory_no_cache_pollution tests/feature_engineering/test_failopen_correctness.py::test_v7_symbol_order_permutation_invariant tests/feature_engineering/test_failopen_correctness.py::test_v7_cache_cold_hot_identical tests/feature_engineering/test_failopen_correctness.py::test_v7_cgsa_resume_matches_fresh；test_v3_multi_tf_btc_matches_frozen_baseline 不入必綠集合（允許仍紅，ICFIRSTALIGN／blocked-by F-2；戳記輪 R1 codex）",
       "Task 2.0 ← 多週期分段與 L2–L6 消融歸類收據，U 未解釋欄＝0 才組重凍批准包",
       "Task 2.5 ← F-2 分段記憶體收據；修復歸 ICFIRSTALIGN 乙 MEM-RSS",
       "解耦：本票不改 momentum／api 生產碼，七條解耦規則不受影響（check_decoupling.sh 於實作批跑一次附收據）"
@@ -114,14 +147,24 @@
       "Task 2.1 驗證：test_patch_batch_alias_deleting_returns_409；mutant set_batch_alias 刪 deleting 檢查",
       "Task 2.2 驗證：test_cgsa_config_hash_passed_correctly；mutant 傳空字串 config_hash",
       "Task 2.3 驗證：test_v7_cgsa_resume_matches_fresh（峰值記憶體 < 2 GB 收據）；續跑期間 12h 之 L1 計算次數＝0；mutant is_run_status_cacheable 恆 False、MultiTFGenerator._has_resume_checkpoint_for_timeframe 恆 False",
-      "Task 2.4 驗證：test_l1_baseline_hash_matches_frozen、test_required_fail_returns_result、test_v3_healthy_full_run_matches_frozen_baseline、test_v3_ethusdt_1h_matches_frozen_baseline、test_v3_multi_tf_btc_matches_frozen_baseline、test_layer_golden_matches_baseline；mutant BETA 輸入改回 close,volume",
+      "Task 2.4 驗證：重凍後必綠五支＝test_l1_baseline_hash_matches_frozen、test_required_fail_returns_result、test_v3_healthy_full_run_matches_frozen_baseline、test_v3_ethusdt_1h_matches_frozen_baseline、test_layer_golden_matches_baseline；test_v3_multi_tf_btc_matches_frozen_baseline 歸允許仍紅（blocked-by F-2）；mutant BETA 輸入改回 close,volume、L3 滾動統計乘 1.01",
       "Task 3.1 驗證：test_prered_allowed_red.py 精確集合比對；mutant 清空列表、加入合法 metadata 之綠節點、加入不存在之 node、參數化 id 改為不存在之參數",
       "走 frame 兩支與 IC-first 兩支不在本票修正範圍，列入 allowed_red.json"
     ],
     "lifecycle": "keep",
     "not_executable": [
-      {"item": "stub_modules", "reason": "user-ruling", "owner": "PRE-RED", "expiry": "2026-12-31"},
-      {"item": "FF 重測試不得並行兩組", "reason": "user-ruling", "owner": "PRE-RED", "expiry": "2026-12-31"}
+      {
+        "item": "stub_modules",
+        "reason": "user-ruling",
+        "owner": "PRE-RED",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "FF 重測試不得並行兩組",
+        "reason": "user-ruling",
+        "owner": "PRE-RED",
+        "expiry": "2026-12-31"
+      }
     ]
   }
 }

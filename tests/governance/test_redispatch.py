@@ -212,6 +212,84 @@ def test_issue_latest_success_rc1(repo: Repo) -> None:
     assert repo.redispatch(rid, "codex").returncode == 1
 
 
+# ── ③′：該家無任何結果列（2026-10-03 PRE-RED r4：結果列本身因磁碟滿寫不進 audit）──────────
+def _set_const(r: Repo, key: str, value: int) -> None:
+    p = r.scripts / "audit_events.json"
+    reg = json.loads(p.read_text(encoding="utf-8"))
+    reg["constants"][key] = value
+    p.write_text(json.dumps(reg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _absent_round(r: Repo, min_age: int | None = 0) -> tuple[str, dict]:
+    if min_age is not None:
+        _set_const(r, "redispatch_absent_result_min_age_seconds", min_age)
+    rid = str(uuid.uuid4())
+    expected = open_round(r, rid)
+    family_result(r, rid, "composer", "success", expected["composer"], sha=sha256_text("x\n"))
+    r.write(expected["composer"], "x\n")
+    return rid, expected
+
+
+def test_issue_absent_result_output_missing_rc0(repo: Repo) -> None:
+    """無結果列＋產出檔不存在＋開輪已逾最低時間 ⇒ 准重派，前次產出記 none。"""
+    rid, _ = _absent_round(repo, 0)
+    proc = repo.redispatch(rid, "codex")
+    assert proc.returncode == 0, proc.stderr
+    issued = repo.events("redispatch_token_issued")
+    assert len(issued) == 1 and issued[0]["prev_output_sha256"] == "none"
+
+
+def test_issue_absent_result_output_zero_byte_rc0(repo: Repo) -> None:
+    rid, expected = _absent_round(repo, 0)
+    repo.write(expected["codex"], "")
+    assert repo.redispatch(rid, "codex").returncode == 0
+
+
+def test_issue_absent_result_round_too_young_rc1(repo: Repo) -> None:
+    """預設最低時間（3600 秒）內 ⇒ 拒（避免與仍在跑之首次派工並行）。"""
+    rid, _ = _absent_round(repo, None)
+    proc = repo.redispatch(rid, "codex")
+    assert proc.returncode == 1 and "③" in proc.stderr
+
+
+def test_issue_absent_result_output_has_content_rc1(repo: Repo) -> None:
+    """產出檔有內容 ⇒ 拒（出路為修檔後 register-output，不得重派覆蓋）。"""
+    rid, expected = _absent_round(repo, 0)
+    repo.write(expected["codex"], "partial findings\n")
+    proc = repo.redispatch(rid, "codex")
+    assert proc.returncode == 1 and "③" in proc.stderr
+
+
+def test_issue_absent_result_output_symlink_rc1(repo: Repo) -> None:
+    rid, expected = _absent_round(repo, 0)
+    target = repo.write("handoffs/elsewhere.md", "")
+    (repo.root / expected["codex"]).symlink_to(target)
+    assert repo.redispatch(rid, "codex").returncode == 1
+
+
+def test_absent_result_age_condition_discriminates(repo: Repo) -> None:
+    """鑑別力：把 ③′ 之年齡條件改為恆真 ⇒ 開輪未逾最低時間之重派被放行（本測試以改壞副本斷言其會放行）。"""
+    p = repo.scripts / "_redispatch_check.py"
+    src = p.read_text(encoding="utf-8")
+    anchor = "(now_epoch - opened) >= min_age"
+    assert anchor in src
+    p.write_text(src.replace(anchor, "True"), encoding="utf-8")
+    rid, _ = _absent_round(repo, None)
+    assert repo.redispatch(rid, "codex").returncode == 0
+
+
+def test_absent_result_content_condition_discriminates(repo: Repo) -> None:
+    """鑑別力：把產出檔不存在／0 byte 條件改為恆真 ⇒ 有內容之產出檔亦被放行。"""
+    p = repo.scripts / "_redispatch_check.py"
+    src = p.read_text(encoding="utf-8")
+    anchor = "and out_absent  # ts"
+    assert anchor in src
+    p.write_text(src.replace(anchor, "and True  # ts"), encoding="utf-8")
+    rid, expected = _absent_round(repo, 0)
+    repo.write(expected["codex"], "partial findings\n")
+    assert repo.redispatch(rid, "codex").returncode == 0
+
+
 def test_issue_format_failed_archives_rc0(repo: Repo) -> None:
     rid = str(uuid.uuid4())
     expected = open_round(repo, rid)

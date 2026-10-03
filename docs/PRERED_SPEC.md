@@ -117,10 +117,10 @@
 - **邊界**：①種子品質非 complete ⇒ 前置斷言紅並印 failure_reasons；②中斷 run 之 checkpoint 只含 12h 群組（既有斷言）。
 - **存活至**：永久。**覆蓋風險**：無。　不可做：不得 stub 品質判定或續跑閘；不得放寬 hash 相等。
 
-**Task 2.4 — fail-open 凍結基準：雜湊範圍、直跑 L1 記錄、重凍（6 支：contract ×2、correctness v3 ×3、layers golden ×1）**
+**Task 2.4 — fail-open 凍結基準：雜湊範圍、直跑 L1 記錄、重凍（涉 6 支：contract ×2、correctness v3 ×3、layers golden ×1；重凍後必綠者為其中五支單週期，多週期一支歸允許仍紅）**
 - 判定：測試前提過期——自凍結起只有 `2247c394`（三方簽核之 BUG-1／BUG-2 修正）與 `d229336e`（FF-STAT 第 4 批，已核准）兩改變點，逐欄歸因見 §A；另凍結工具之單週期雜湊範圍與 contract 直跑比對於 FF-STAT 後過期。
 - 改法：①`scripts/freeze_failopen_baseline.py` 之 `_single_tf_record`（生成後）：(1) 取 `window = factory._current_output_window`；(2) `window is not None and window.warmup_enabled` ⇒ 以 `factory._layer0_data_ingestion(symbol, timeframe, config, start_date=window.ingest_start, end_date=<現行 end>)` 取 **ingest index**（＝生成時 registry 之原生時間軸），否則 ingest index＝現行公開 `raw.index`；(3) 每個 group 斷言 `load_data_native(...).shape[0] == len(ingest index)`，不等即拋錯；(4) `row_slice = factory._output_row_slice(ingest index)`，斷言 `ingest_index[row_slice]` 與公開 `raw.index` 逐元素相等；(5) `_hash_registry_table` 增 `row_slice` 參數，只雜湊 `data[row_slice]`，`index` 用公開 `raw.index`；(6) `row_slice is None` 時行為與修前逐位元組相同。②基準增 `single_tf.<sym>.<tf>.l1_direct`：由凍結腳本內新增之函式錄製（鏡像 `tests/feature_engineering/test_failopen_contract.py` 之 `_compute_l1_canonical_sha256` 流程；腳本不得 import `tests/`），contract 兩支改比對之。**`l1_direct` 與 `layers.L1` 為兩獨立 oracle**：直跑 L1 不經公開域預熱，與全量 run 之 L1（預熱後公開窗）可長期不等（§A：`4f457390` vs `02ae6fa3`）；禁止任何驗收要求兩者相等。③凍結 CLI 增 `--out-dir`（預設仍為 `tests/_golden/failopen/`），供 §G ③ 兩次獨立凍結；④Task 2.0 完成且使用者核可後，以 HEAD 重凍單週期 BTCUSDT/12h、ETHUSDT/12h、ETHUSDT/1h 三單元（`--no-resume`；凍結 CLI 增 `--units <sym>/<tf>,…`，未列單元〔BTCUSDT/1h、多週期兩單元〕之記錄原樣保留，基準 `environment` 逐單元記錄凍結 commit）並寫重凍收據；`test_v3_multi_tf_btc_matches_frozen_baseline` 轉為允許仍紅（owner ICFIRSTALIGN，blocked-by F-2）。
-- **驗證**：①②③完成後於未重凍狀態，`pytest tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py tests/feature_engineering/test_failopen_correctness.py -k "baseline or golden"` 之 6 支仍紅且失敗訊息之差異分量與 §A 一致（證明修工具未改變判讀）；④後 6 支綠；§G ③④；mutant「步驟 (2) 改用公開 `raw.index`」⇒ (3) 拋錯。
+- **驗證**：①②③完成後於未重凍狀態，五支單週期基準測試（`test_failopen_contract.py::test_l1_baseline_hash_matches_frozen`、`::test_required_fail_returns_result`、`test_failopen_correctness.py::test_v3_healthy_full_run_matches_frozen_baseline`、`::test_v3_ethusdt_1h_matches_frozen_baseline`、`test_failopen_layers.py::test_layer_golden_matches_baseline`，逐節點明列、單組串行）仍紅且失敗訊息之差異分量與 §A 一致（證明修工具未改變判讀）；④後此五支綠；`test_v3_multi_tf_btc_matches_frozen_baseline` 不在必綠集合——其多週期基準不重凍、於本機受 F-2 擋，依 Task 3.1 列允許仍紅（ICFIRSTALIGN，blocked-by），不改其測試本體、不加 skip／xfail；§G ③④；mutant「步驟 (2) 改用公開 `raw.index`」⇒ (3) 拋錯。
 - **邊界**：①預熱未啟用之設定 ⇒ 雜湊與修前逐位元組相同（以 `d829754a` 版設定重放驗）；②registry 列數不等於 ingest index ⇒ 拋錯；③ingest index 切片後與公開 index 有任一元素不同 ⇒ 拋錯。
 - **存活至**：永久（FF-NAME 再依其票重凍一次）。**覆蓋風險**：FF-NAME 改欄名會再改 `column_order_sha256`，屬該票之已登記重凍。
 - 不可做：不得手改基準 JSON；不得移除任何分量比對。
@@ -138,7 +138,7 @@
 - 回歸（逐檔明列、單組串行）：`tests/feature_engineering/test_failopen_contract.py`、`test_failopen_correctness.py`、`test_failopen_layers.py`、`tests/test_cgsa_resume.py`、`tests/api/test_batch_alias.py`、Phase 1 三檔整檔、`tests/governance/test_prered_allowed_red.py`。
 - 測試設計審：mutant 清單列入審碼 brief，由委員確認未變弱。
 
-- 兩種驗收模式：**待核模式**（重凍未核可；manifest `gate_cmd`）＝治理三檔、`test_prered_allowed_red.py`、alias、resume config_hash、v7 全綠，另 6 支基準測試不在此命令內（其狀態由 allowed_red 之 `pending-approval` 列與 Task 2.4 驗證之失敗分量對照收據承擔）；**已核模式**（重凍後）＝待核模式加 6 支基準測試全綠（命令見 manifest `risk_mitigation`）。
+- 兩種驗收模式：**待核模式**（重凍未核可；manifest `gate_cmd`）＝治理三檔、`test_prered_allowed_red.py`、alias、resume config_hash、v7 全綠，另 6 支基準測試不在此命令內（其狀態由 allowed_red 之 `pending-approval` 列與 Task 2.4 驗證之失敗分量對照收據承擔）；**已核模式**（重凍後）＝待核模式加五支單週期基準測試全綠，並逐節點跑 `test_failopen_correctness.py` 中除 `test_v3_multi_tf_btc_matches_frozen_baseline` 外之其餘 14 個節點全綠（命令見 manifest `risk_mitigation`）；`test_v3_multi_tf_btc_matches_frozen_baseline` 屬允許仍紅（Task 3.1），以具名仍紅報告承擔、不入必綠集合（審查 codex 戳記輪 R1）。
 
 ## §R 回退
 - Phase 1、Phase 2（Task 2.1–2.3）、Task 2.4①②、Task 2.4③重凍、Phase 3 各自獨立 commit；重凍可單獨 revert 回舊基準。

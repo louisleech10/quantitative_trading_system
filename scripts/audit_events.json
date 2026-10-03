@@ -358,7 +358,8 @@
     "redispatch_max_attempts": 6,
     "redispatch_min_interval_seconds": 600,
     "redispatch_token_ttl_seconds": 900,
-    "redispatch_launch_grace_seconds": 120
+    "redispatch_launch_grace_seconds": 120,
+    "redispatch_absent_result_min_age_seconds": 3600
   },
   "spec_non_event_tokens": [
     "debt_events",
