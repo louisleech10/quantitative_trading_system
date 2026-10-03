@@ -682,6 +682,10 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/RATIOUNSAFE_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/REDISPATCH_SPEC.md",
       "LIVE-SPEC"
     ],
