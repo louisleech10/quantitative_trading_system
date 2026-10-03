@@ -82,7 +82,7 @@
       "path": "handoffs/run_receipts/20261003-prered-f2-memory.json",
       "cmd": "zsh handoffs/run_receipts/prered_probes/f2_memory_receipt.sh handoffs/run_receipts/20261003-prered-v7seed-HEAD.log <out>",
       "rc": 0,
-      "honest_bounds": "原設定（12h＋1h、14 天窗、全史預熱）於 HEAD 實跑被系統終止；各段 RSS 取自生產碼 log 行；最後完成段＝1h memmap 合併複製 5/5；其後段未量測"
+      "honest_bounds": "原設定（12h＋1h、14 天窗、全史預熱）於 HEAD 實跑被系統終止；各段 RSS 取自生產碼 log 行；最後 log 明示完成段＝1h Layer 6（rss 356 MB），之後於 memmap 合併（最後觀測＝開始複製 DF 5/5、最後一筆 rss＝DF 3/5 複製中 871 MB）被終止，終止點 RSS 無證據；其後段未量測"
     },
     {
       "path": "handoffs/run_receipts/20261003-prered-ffstore-messages.json",
