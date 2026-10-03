@@ -507,9 +507,9 @@
         "340",
         "RM-RATIOUNSAFE",
         "RATIOUNSAFE：ratio-unsafe 判定對落盤帶週期欄名失效",
-        "進行中",
+        "已完成",
         "docs/TICKET_ORDER.md",
-        "2026-10-03 實作完成待審碼（詳 HANDOFF HP-RATIOUNSAFE）：判定與週期標記收斂 feature_naming；主路徑 L6.5 對 ratio-unsafe（pattern）欄原值通過（改前 62／62 欄被縮尾改寫、13 欄抹 0 並被 dead-drop 剔除）；使用者核可 dead-drop 恢復欄（S1 +13）、append 不產 ratio-unsafe 衍生欄、落盤路徑改後基準永久化 tests/_golden/ratiounsafe/baseline_after.json。殘留：結構化類別落盤→FFSTORE；自訂名第二段為週期鍵之歧義與 L2 Cross／Ratio 命名→FF-NAME；failopen oracle 不經落盤路徑→FFSTORE。原始描述——全票排序第 3 步：`_is_ratio_unsafe_column` 取欄名第二段當類別，落盤名 `ohlc_12h_pattern_*` 第二段為 `12h` ⇒ IC 頁排除失效"
+        "2026-10-04 收案：判定與週期標記收斂 feature_naming；主路徑 L6.5 對 ratio-unsafe 欄原值通過；dead-drop 恢復欄（S1 +13）、append 不產 ratio-unsafe 衍生欄、落盤路徑改後基準永久化（使用者核可）。殘留：結構化類別落盤→FFSTORE；自訂名第二段為週期鍵之歧義與 L2 Cross／Ratio 命名→FF-NAME；failopen oracle 不經落盤路徑→FFSTORE（詳 HANDOFF HP-RATIOUNSAFE）"
       ],
       [
         "341",
@@ -1897,9 +1897,9 @@
       [
         "048",
         "HP-RATIOUNSAFE",
-        "進行中",
+        "已完成",
         "docs/TICKET_ORDER.md",
-        "全票排序第 3 步：SPEC v5 經審查 r1–r4、使用者 2026-10-03 白話逐條核可 §A①–④；TODO manifest 經審查 r5–r7、戳記輪三家 APPROVED（handoffs/reconcile/20261003-ratiounsafe-x-review-r7/synth.md）。實作 Phase 1–3 完成（未提交時記此行，見進行中紀錄）：feature_naming 單一真相源（判定、群組週期身分標記，含 1w）；L3／L6.5 入口／factories／calibration／storage 改接；L6.5 registry 兩入口九分支呼叫點切片（ratio-unsafe 原值通過、校準先排除）。驗證：RATIOUNSAFE 四檔 109 passed；§G⑥ S1-on 350→363 欄（+13 全 pattern）、bytes +1.8%；12h＋4h 精簡 698→717（+19 全 pattern、無刪減）；failopen contract／layers 27＋v3 兩節點＋L3 存活欄數節點綠、基準未動；ICPOSTLEAK／native／FF-STAT 盤點綠（盤點補登 ICPOSTLEAK 新增 4 函式，本票前即紅）。另發現 PRE-RED census 外之既有紅：tests/feature_engineering/test_batch1_followup.py 5 支（HEAD 285aeb8f 同紅；凍結雜湊不符與 partial），待歸因。下一步：提交 → 三家審碼 b1 → 推送 → 第 4 步 ICFIRSTALIGN 乙"
+        "2026-10-04 收案（全票排序第 3 步）：SPEC v5（使用者 2026-10-03 白話逐條核可 §A①–④）；TODO 審查 r5–r7＋戳記輪三家 APPROVED；實作 c6c93b84＋審碼修補 c4592d20；審碼 r1–r2 全部 finding 由原提出方 CLOSED（handoffs/reconcile/20261003-ratiounsafe-b1-review-r{1,2}/synth.md；r2 grok 402 交件失敗、使用者裁定暫停 grok）。成果：feature_naming 單一真相源；主路徑 L6.5 對 ratio-unsafe（pattern）欄原值通過（改前 62／62 欄被縮尾改寫、13 欄抹 0 後遭 dead-drop 剔除）；S1-on 350→363 欄、bytes +1.8%；落盤路徑改後基準 tests/_golden/ratiounsafe/baseline_after.json 永久化。驗證：RATIOUNSAFE＋ICPOSTLEAK＋native＋盤點 255 passed；failopen 基準未動。下一步＝第 4 步 ICFIRSTALIGN 乙（見 HP-ICFIRSTALIGN）"
       ],
       [
         "046",
@@ -1907,6 +1907,13 @@
         "已完成",
         "docs/TICKET_ORDER.md",
         "2026-10-02 定案：主委獨立版＋三家三輪收斂（r1 二十五條、r2 七條、r3 零條，全數閉合；handoffs/reconcile/20261002-ticketorder-x-consult-r{1,2,3}/synth.md 已銷帳），使用者拍板（逐字「你跟委員確定就可以，不要我問一次，你又改口就好」）；全序 17 步＋具名 blocked 之 PRE-MARKET-DATA 見 docs/TICKET_ORDER.md。以下為開票紀錄——使用者 2026-10-01 逐字：「FF-STAT完成後，IC 頁洩漏要先修，完成後開一輪委員諮詢（我＋三家，各自全面看）將接下來每張票的細項都逐個討論研究訂出排序，這排序很重要，要確實定下，有發現有什麼要前置處理的也要加進去，不能中間又說要重來。」前兩步 2026-10-02 皆完成（HP-ICPOSTLEAK、HP-FFSTAT 已完成）；使用者 2026-10-02 指示排序諮詢「另一個 Session 乾淨的做」。範圍（委員可增補）：FFSTORE、ICFIRSTALIGN 乙部分（不可變 run context、L7 raw 讀回時間軸之 IC 對齊）、FRAMEPATH、FF-NAME、FFDSTAR、ICPATH、GLOBALH、縮尾重複、FKPERF 剩 Task 4.5、TESTSPEED、EVENTSCAN（停手中）；另須帶入：ICPOSTLEAK SPEC §N 之各分支 zscore 數值核心差（needs-research，收據 handoffs/run_receipts/20261002-icpostleak-branch-diff.json）、多市場（台股／美股／期貨）非 float32 落盤之精度邊界、RM-FULLSCALE ④⑤（截斷 MR 完整兩檔；多週期需 BTCUSDT 1h ≥ 34,302 根長歷史）。做法：主委先寫獨立版，三家各自全面看（不分角度），逐細項讀碼核依賴與返工風險（不憑票名）、標已排除／我沒查，前置處理一併納入；收斂後白話給使用者審閱拍板，收斂前不動工任何一張。產出後整段改寫 白話說明/還沒做的事.md 第二節排序表"
+      ],
+      [
+        "049",
+        "HP-PREREDGAP",
+        "未開工",
+        "docs/PRERED_SPEC.md",
+        "PRE-RED census 外之既有紅（RATIOUNSAFE 回歸時發現，2026-10-03）：tests/feature_engineering/test_batch1_followup.py 5 支（TestGolden::test_golden_default_winsor_matches_public_validator、TestN3 三支、test_real_kline_stream_nan_ratio_matches_written_arrays），於實作前 HEAD 285aeb8f 以同一資料狀態 worktree 同紅；失敗為凍結雜湊不符與 partial／complete。歸因（測試前提過期或缺陷）未做；PRE-RED §N 已註 census 非窮舉。歸屬待全票排序下一次重排或 FFSTORE 重產資料時一併處理"
       ]
     ]
   },

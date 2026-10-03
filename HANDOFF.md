@@ -6,7 +6,6 @@
 | 序 | 識別碼 | 狀態 | 權威路徑 | 下一步 |
 |---|---|---|---|---|
 | 03-011 | SU-RESID-1 | 部分完成 | docs/SPLITUNIFY_TODO.md §E | 待觸發：出現可由收斂檔附錄證明之處置掛錯意見事故 |
-| 04-014 | HP-RATIOUNSAFE | 進行中 | docs/TICKET_ORDER.md | 全票排序第 3 步：SPEC v5 經審查 r1–r4、使用者 2026-10-03 白話逐條核可 §A①–④；TODO manifest 經審查 r5–r7、戳記輪三家 APPROVED（handoffs/reconcile/20261003-ratiounsafe-x-review-r7/synth.md）。實作 Phase 1–3 完成（未提交時記此行，見進行中紀錄）：feature_naming 單一真相源（判定、群組週期身分標記，含 1w）；L3／L6.5 入口／factories／calibration／storage 改接；L6.5 registry 兩入口九分支呼叫點切片（ratio-unsafe 原值通過、校準先排除）。驗證：RATIOUNSAFE 四檔 109 passed；§G⑥ S1-on 350→363 欄（+13 全 pattern）、bytes +1.8%；12h＋4h 精簡 698→717（+19 全 pattern、無刪減）；failopen contract／layers 27＋v3 兩節點＋L3 存活欄數節點綠、基準未動；ICPOSTLEAK／native／FF-STAT 盤點綠（盤點補登 ICPOSTLEAK 新增 4 函式，本票前即紅）。另發現 PRE-RED census 外之既有紅：tests/feature_engineering/test_batch1_followup.py 5 支（HEAD 285aeb8f 同紅；凍結雜湊不符與 partial），待歸因。下一步：提交 → 三家審碼 b1 → 推送 → 第 4 步 ICFIRSTALIGN 乙 |
 <!-- END GENERATED: handoff-current -->
 
 ## 待辦
@@ -29,7 +28,7 @@
 | 04-008 | HP-ICFIRSTALIGN | 未開工 | docs/manifests/FFSTAT.json | 只剩乙部分：run_ic_first 去除 factory 可變狀態依賴（不可變 run context，含選窗介面）、修 L7 raw 讀回時間軸之 IC 對齊（真實 kline 下 IC 階段必拋 AlignmentViolationError；test_b6_warmup_trim::test_warmup_trim_ic_first 於 main 同紅；防呆引入於 `78c85bb2`）。甲部分（IC 頁套用後處理改正式實作、post-IC 排名／z 分數窗未滿即出值）已由 ICPOSTLEAK 於 2026-10-02 交付（docs/ICPOSTLEAK_SPEC.md）。全票排序第 4 步（docs/TICKET_ORDER.md，先於 FRAMEPATH）：自第一行鎖 CGSA（run_ic_first 現於 feature_factory.py 將 `_cgsa_registry` 設 None、走記憶體路徑）、三處時間軸、FU-2、MEM-RSS 對照量測併入 |
 | 04-009 | HP-FRAMEPATH | 未開工 | handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md | 查證輪 r1 已銷帳（三方一致：生產無 frame 入口、frame 多週期平穩化錯誤）；使用者 2026-09-28 裁定刪除 frame 產生路徑與舊特徵 h5 讀取、不再花時間在 frame 測試（K 線 kline_cache.h5 不在此列）；全票排序第 5 步（docs/TICKET_ORDER.md）：於 ICFIRSTALIGN 乙之後（run_ic_first 現走記憶體路徑，查證輪 r1 未涵蓋）；刪除票 SPEC 走完整管線；FF-STAT b4 已先移除 frame 驗收臂 |
 | 04-010 | HP-TESTSPEED | 停手 | HANDOFF.md | 2026-09-30 依使用者門檻結案：結果共用之可省比例實測 9.2%（< 三成，收據 handoffs/run_receipts/20260930-testspeed-duplicate-ratio.json）⇒ 不實作；「上次失敗者先跑」與量測器保留。「各運算路徑取代表之快速版」經全票排序諮詢與使用者 2026-10-02 拍板作廢（與 2026-09-29「不挑代表、不接受專項專用」衝突；docs/TICKET_ORDER.md）；本票不再排程 |
-| 04-014 | HP-RATIOUNSAFE | 進行中 | docs/TICKET_ORDER.md | 全票排序第 3 步：SPEC v5 經審查 r1–r4、使用者 2026-10-03 白話逐條核可 §A①–④；TODO manifest 經審查 r5–r7、戳記輪三家 APPROVED（handoffs/reconcile/20261003-ratiounsafe-x-review-r7/synth.md）。實作 Phase 1–3 完成（未提交時記此行，見進行中紀錄）：feature_naming 單一真相源（判定、群組週期身分標記，含 1w）；L3／L6.5 入口／factories／calibration／storage 改接；L6.5 registry 兩入口九分支呼叫點切片（ratio-unsafe 原值通過、校準先排除）。驗證：RATIOUNSAFE 四檔 109 passed；§G⑥ S1-on 350→363 欄（+13 全 pattern）、bytes +1.8%；12h＋4h 精簡 698→717（+19 全 pattern、無刪減）；failopen contract／layers 27＋v3 兩節點＋L3 存活欄數節點綠、基準未動；ICPOSTLEAK／native／FF-STAT 盤點綠（盤點補登 ICPOSTLEAK 新增 4 函式，本票前即紅）。另發現 PRE-RED census 外之既有紅：tests/feature_engineering/test_batch1_followup.py 5 支（HEAD 285aeb8f 同紅；凍結雜湊不符與 partial），待歸因。下一步：提交 → 三家審碼 b1 → 推送 → 第 4 步 ICFIRSTALIGN 乙 |
+| 04-016 | HP-PREREDGAP | 未開工 | docs/PRERED_SPEC.md | PRE-RED census 外之既有紅（RATIOUNSAFE 回歸時發現，2026-10-03）：tests/feature_engineering/test_batch1_followup.py 5 支（TestGolden::test_golden_default_winsor_matches_public_validator、TestN3 三支、test_real_kline_stream_nan_ratio_matches_written_arrays），於實作前 HEAD 285aeb8f 以同一資料狀態 worktree 同紅；失敗為凍結雜湊不符與 partial／complete。歸因（測試前提過期或缺陷）未做；PRE-RED §N 已註 census 非窮舉。歸屬待全票排序下一次重排或 FFSTORE 重產資料時一併處理 |
 <!-- END GENERATED: handoff-todo -->
 
 ## 坑
