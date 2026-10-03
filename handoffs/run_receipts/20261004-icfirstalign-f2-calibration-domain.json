@@ -1,0 +1,160 @@
+{
+ "schema_version": 1,
+ "command": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_calibration_domain_probe.py",
+ "exit_code": 0,
+ "config": {
+  "days": 14,
+  "training": [
+   "12h",
+   "1h"
+  ],
+  "full_l1": false
+ },
+ "wall_seconds": 45.1,
+ "error": null,
+ "raw_total_features": 638,
+ "calibration_domain_calls": [
+  {
+   "caller": [
+    "compute_calibration_domain",
+    "_resolve_public_window",
+    "_generate_features_impl",
+    "generate_features"
+   ],
+   "timeframe": "12h",
+   "rows_in": 1236,
+   "out_shape": [
+    1236,
+    321
+   ],
+   "seconds": 0.48
+  },
+  {
+   "caller": [
+    "compute_calibration_domain",
+    "_resolve_public_window",
+    "_generate_features_impl",
+    "generate_features"
+   ],
+   "timeframe": "1h",
+   "rows_in": 14830,
+   "out_shape": [
+    14830,
+    321
+   ],
+   "seconds": 12.97
+  }
+ ],
+ "memmap_concats": [
+  {
+   "n_dfs": 1,
+   "rows": 1236,
+   "cols": 2,
+   "est_bytes": 9888,
+   "callers": [
+    "_combine_layers",
+    "_layer3_rolling_aggregation",
+    "_execute_layer1_6"
+   ]
+  },
+  {
+   "n_dfs": 2,
+   "rows": 1236,
+   "cols": 7,
+   "est_bytes": 34608,
+   "callers": [
+    "_combine_layers",
+    "_layer4_lag_features",
+    "_execute_layer1_6"
+   ]
+  },
+  {
+   "n_dfs": 5,
+   "rows": 1236,
+   "cols": 321,
+   "est_bytes": 1587024,
+   "callers": [
+    "_combine_layers",
+    "_compute_calibration_domain",
+    "_cal"
+   ]
+  },
+  {
+   "n_dfs": 1,
+   "rows": 14830,
+   "cols": 2,
+   "est_bytes": 118640,
+   "callers": [
+    "_combine_layers",
+    "_layer3_rolling_aggregation",
+    "_execute_layer1_6"
+   ]
+  },
+  {
+   "n_dfs": 2,
+   "rows": 14830,
+   "cols": 7,
+   "est_bytes": 415240,
+   "callers": [
+    "_combine_layers",
+    "_layer4_lag_features",
+    "_execute_layer1_6"
+   ]
+  },
+  {
+   "n_dfs": 5,
+   "rows": 14830,
+   "cols": 321,
+   "est_bytes": 19041720,
+   "callers": [
+    "_combine_layers",
+    "_compute_calibration_domain",
+    "_cal"
+   ]
+  },
+  {
+   "n_dfs": 1,
+   "rows": 1236,
+   "cols": 2,
+   "est_bytes": 9888,
+   "callers": [
+    "_combine_layers",
+    "_layer3_rolling_aggregation",
+    "_execute_layer1_6"
+   ]
+  },
+  {
+   "n_dfs": 2,
+   "rows": 1236,
+   "cols": 7,
+   "est_bytes": 34608,
+   "callers": [
+    "_combine_layers",
+    "_layer4_lag_features",
+    "_execute_layer1_6"
+   ]
+  },
+  {
+   "n_dfs": 1,
+   "rows": 14830,
+   "cols": 2,
+   "est_bytes": 118640,
+   "callers": [
+    "_combine_layers",
+    "_layer3_rolling_aggregation",
+    "_execute_layer1_6"
+   ]
+  },
+  {
+   "n_dfs": 2,
+   "rows": 14830,
+   "cols": 7,
+   "est_bytes": 415240,
+   "callers": [
+    "_combine_layers",
+    "_layer4_lag_features",
+    "_execute_layer1_6"
+   ]
+  }
+ ]
+}

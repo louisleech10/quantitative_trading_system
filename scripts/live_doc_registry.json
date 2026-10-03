@@ -510,6 +510,10 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/ICFIRSTALIGN_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/ICPOSTLEAK_SPEC.md",
       "LIVE-SPEC"
     ],
