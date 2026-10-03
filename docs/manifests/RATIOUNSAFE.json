@@ -17,8 +17,9 @@
     "handoffs/run_receipts/ratiounsafe_probes/deaddrop_probe.py"
   ],
   "contract_jsons": [
-    "tests/_golden/ratiounsafe/contract.json",
-    "tests/_golden/ratiounsafe/baseline.json"
+    "tests/_golden/ratiounsafe/baseline.json",
+    "tests/_golden/ratiounsafe/branch_oracle.json",
+    "tests/_golden/ratiounsafe/contract.json"
   ],
   "run_receipts": [
     {
@@ -114,13 +115,14 @@
       "calibration.tagged_column_name、feature_storage CGSA 寫檔標記段 ← Task 1.3：呼叫 feature_naming.tag_timeframe",
       "feature_preprocessor 兩 registry 入口與九分支 ← Task 2.1：分類先於 _prepare_calibration_for_groups、呼叫點依欄名切片",
       "tests/_golden/ratiounsafe/baseline.json ← §G 改前基準（HEAD 實跑，已產出）；baseline_after.json ← Task 2.2（Task 2.1 驗收後寫出）",
-      "test_icpostleak_api.py:272 mutant 改破壞 feature_naming.ratio_unsafe_category；nan_propagation_classes.json 兩鍵改名；verify_nan_poisoning_fix.py 改引用新模組"
+      "test_icpostleak_api.py:272 mutant 改破壞 feature_naming.ratio_unsafe_category；nan_propagation_classes.json 兩鍵改名；verify_nan_poisoning_fix.py 改引用新模組",
+      "tests/_golden/ratiounsafe/branch_oracle.json ← 審查 r5 codex P1-02：safe 欄改前凍結 oracle（scripts/freeze_ratiounsafe_baseline.py --stage branch-oracle，HEAD、未改生產碼）"
     ],
     "coverage_risk": [
       "Task 1.1 驗證：test_feature_naming.py（257 名 × 9 週期鍵、互逆定義域、具名案例、常數同一性；mutant strip 恆原值、any-segment 規則）",
       "Task 1.2 驗證：test_ratiounsafe_wiring.py（重複實作 grep、L3／transform／factories、共同核心 mutant、接線 mutant）＋test_ratiounsafe_ic_page.py（excluded＋reason、共同核心與接線 mutant）",
-      "Task 1.3 驗證：test_ratiounsafe_wiring.py（calibration＝naming、storage 1w 與 ret_1d_x）＋test_ratiounsafe_registry.py::test_multi_tf_names_unchanged",
-      "Task 2.1 驗證：test_ratiounsafe_registry.py 逐分支（registry／parallel_split／sink／sharded／chunked）混合與全 unsafe、native 強制臂、shard 結構、append 臂、校準 spy 與 safe-only 子封包、mutant②③；mutant①④⑥⑦⑧⑨ 由逐分支混合群組測試鑑別",
+      "Task 1.3 驗證：test_ratiounsafe_wiring.py（calibration＝naming、storage 1w 與 ret_1d_x）＋test_ratiounsafe_registry.py::test_multi_tf_names_unchanged、::test_boundary_02_labels_not_routed_through_storage_tagging（S1 實際生成時 spy storage 寫檔段收到之 registry 欄）",
+      "Task 2.1 驗證：test_ratiounsafe_registry.py 逐分支（registry／parallel_split〔閾值 1〕／sink／sharded／chunked〔append 強制臂〕）之混合群組：ratio-unsafe 原值、safe 欄＝改前凍結 oracle（tests/_golden/ratiounsafe/branch_oracle.json，HEAD 產）、無 ratio-unsafe 衍生欄；只含 safe 群組＝oracle；全 unsafe 群組原值且不要求 spy；native 強制臂（spy 非 None＋oracle）；shard 結構；append 臂；校準 spy 與 safe-only 子封包；mutant②③、分支轉換恆等（凍結 oracle 鑑別）；mutant①④⑥⑦⑧⑨ 由逐分支混合群組＋凍結 oracle 鑑別",
       "§G 驗證：test_g_s1_off_conservation（①②③）、test_g_s1_on_column_set_and_values（④⑤）；⑥ 欄數與 bytes 寫入完工收據",
       "Task 2.2 驗證：test_after_baseline_regression、boundary_01 failopen 不變、boundary_02、mutant 回復舊判定",
       "Task 3.1 驗證：IC 頁 test_ratiounsafe_ic_page.py、IC-first test_transform_selected_*"

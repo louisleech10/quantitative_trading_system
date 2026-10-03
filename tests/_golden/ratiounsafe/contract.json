@@ -51,11 +51,12 @@
   },
   "branches": {
     "registry": {"env": {}, "entry": "transform_registry_groups"},
-    "registry_parallel_split": {"env": {"FFACT_L65_SPLIT_THRESHOLD": "2"}, "entry": "transform_registry_groups", "n_workers": 2, "spy": "_transform_array_slice"},
+    "registry_parallel_split": {"env": {"FFACT_L65_SPLIT_THRESHOLD": "1"}, "entry": "transform_registry_groups", "n_workers": 2, "spy": "_transform_array_slice", "note": "閾值 1：只含 2 欄之對照群組亦須切片（n_cols > threshold）"},
     "registry_sink": {"env": {}, "entry": "transform_registry_groups_to_sink", "spy": "_transform_single_group_to_arrays"},
     "registry_sink_sharded": {"env": {}, "entry": "transform_registry_groups_to_sink", "patch_shard_bytes": 4096, "spy": "_stream_sharded_group_to_sink"},
-    "registry_chunked": {"env": {"FFACT_L65_SPLIT_THRESHOLD": "2"}, "entry": "transform_registry_groups_to_sink", "spy": "_stream_single_group_chunked_to_sink"}
+    "registry_chunked": {"env": {"FFACT_L65_SPLIT_THRESHOLD": "1"}, "entry": "transform_registry_groups_to_sink", "spy": "_stream_single_group_chunked_to_sink", "mode": "append", "zscore_windows": [100, 252], "note": "replace 快速路徑不分塊（需 requires_slow）；沿用 ICPOSTLEAK 之 append 強制臂"}
   },
+  "branch_oracle_path": "tests/_golden/ratiounsafe/branch_oracle.json",
   "append_arm": {"branch": "registry_chunked", "mode": "append", "zscore_windows": [100, 252]},
   "native_arm": {"source_tf": "12h", "primary_tf": "1h", "ratio": 12, "env": {"FFACT_L65_NATIVE_TF": "1"}}
 }

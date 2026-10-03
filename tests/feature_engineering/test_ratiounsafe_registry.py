@@ -37,34 +37,17 @@ freeze = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(freeze)
 
 
-# ---------------------------------------------------------------- 輸入與分支執行
+# ---------------------------------------------------------------- 輸入與分支執行（共用 scripts/freeze_ratiounsafe_baseline.py）
+
+ORACLE = json.loads((REPO / CONTRACT["branch_oracle_path"]).read_text(encoding="utf-8"))
+
 
 def _branch_frame(columns: Optional[List[str]] = None) -> pd.DataFrame:
-    import talib
-
-    k = CONTRACT["branch_kline"]
-    base = h.kline_frame(symbol=k["symbol"], timeframe=k["timeframe"]).iloc[: k["rows"]]
-    o, hi, lo, c = (base[x].to_numpy(dtype=np.float64) for x in ("open", "high", "low", "close"))
-    data = {}
-    for spec in CONTRACT["branch_columns"]["unsafe"]:
-        data[spec["name"]] = getattr(talib, spec["fn"])(o, hi, lo, c).astype(np.float64)
-    for spec in CONTRACT["branch_columns"]["safe"]:
-        data[spec["name"]] = getattr(talib, spec["fn"])(c, **spec["args"])
-    frame = pd.DataFrame(data, index=base.index)
-    return frame[columns] if columns else frame
+    return freeze.branch_frame(columns)
 
 
 def _config(mode: str = "replace", zscore: Optional[List[int]] = None, fracdiff: bool = False) -> dict:
-    return {
-        "enabled": True, "mode": mode, "causal_preprocessing": True,
-        "winsorization": {"enabled": True, "method": "quantile", "quantile_range": [0.01, 0.99], "window": 252,
-                          "apply_to": "all"},
-        "fractional_differencing": {"enabled": bool(fracdiff)},
-        "adf_differencing": {"enabled": False},
-        "rank_transform": {"enabled": False},
-        "adaptive_zscore": {"enabled": bool(zscore), "windows": list(zscore or [100]), "apply_to": "all"},
-        "gaussian_normalize": {"enabled": False},
-    }
+    return freeze.l65_config(mode, zscore, fracdiff)
 
 
 def _registry_with(tmp_path: Path, frame: pd.DataFrame, group_id: str, tf: str = "12h"):
@@ -79,50 +62,25 @@ def _registry_with(tmp_path: Path, frame: pd.DataFrame, group_id: str, tf: str =
     return registry, group
 
 
-def _run_branch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, branch: str, frame: pd.DataFrame,
-                cfg: Optional[dict] = None, mode: str = "replace", tag: str = "g",
-                sink_log: Optional[list] = None) -> pd.DataFrame:
-    spec = BRANCHES[branch]
-    for key, value in spec.get("env", {}).items():
-        monkeypatch.setenv(key, value)
-    if "patch_shard_bytes" in spec:
-        from momentum.FeatureEngineering.utils import hardware_utils
-
-        monkeypatch.setattr(hardware_utils, "get_cgsa_shard_bytes", lambda: int(spec["patch_shard_bytes"]))
+def _run(branch: str, frame: pd.DataFrame, tmp_path: Path, tag: str, require_spy: bool = True,
+         cfg: Optional[dict] = None, sink_log: Optional[list] = None) -> pd.DataFrame:
     calls: List[str] = []
-    if spec.get("spy"):
-        real = getattr(FeaturePreprocessor, spec["spy"])
-
-        def _spy(self, *args, **kwargs):
-            calls.append(spec["spy"])
-            return real(self, *args, **kwargs)
-
-        monkeypatch.setattr(FeaturePreprocessor, spec["spy"], _spy)
-    pre = FeaturePreprocessor(cfg or _config(mode))
-    registry, group = _registry_with(tmp_path / f"{branch}_{tag}", frame, f"12h_L1_ratiounsafe_{tag}")
-    if spec["entry"] == "transform_registry_groups":
-        pre.transform_registry_groups(registry, n_workers=int(spec.get("n_workers", 1)))
-        out = pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
-    else:
-        parts: Dict[str, np.ndarray] = {}
-
-        def _sink(group_id, columns, data, source_group_id, source_disk_path, cleanup_source) -> None:
-            if sink_log is not None:
-                sink_log.append((str(group_id), tuple(str(c) for c in columns)))
-            arr = np.asarray(data, dtype=np.float64)
-            for i, name in enumerate(columns):
-                parts[str(name)] = arr[:, i].copy()
-
-        pre.transform_registry_groups_to_sink(registry, _sink, n_workers=1)
-        names = list(frame.columns) if mode == "replace" else sorted(parts)
-        out = pd.DataFrame({c: parts[c] for c in names}, index=frame.index)
-    if spec.get("spy"):
-        assert calls, f"具名分支 {branch} 未執行 {spec['spy']}"
+    out = freeze.run_branch(branch, frame, tmp_path, cfg=cfg, tag=tag, sink_log=sink_log, spy_calls=calls)
+    spy = BRANCHES[branch].get("spy")
+    if require_spy and spy:
+        assert calls, f"具名分支 {branch} 未執行 {spy}"
     return out
 
 
 def _as_stored(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.astype(np.float32).astype(np.float64)
+
+
+def _assert_matches_oracle(out: pd.DataFrame, oracle: Dict[str, Dict[str, str]]) -> None:
+    """safe 欄（含 append 衍生欄）逐欄＝改前 oracle（HEAD 產之只含 safe 欄群組輸出）。"""
+    assert set(oracle) <= set(out.columns), sorted(set(oracle) - set(out.columns))
+    for col, want in oracle.items():
+        assert freeze.column_digest(out[col]) == want, col
 
 
 BRANCH_IDS = sorted(BRANCHES)
@@ -131,101 +89,74 @@ BRANCH_IDS = sorted(BRANCHES)
 # ---------------------------------------------------------------- Task 2.1：逐分支
 
 @pytest.mark.parametrize("branch", BRANCH_IDS)
-def test_mixed_group_unsafe_passthrough_safe_unchanged(branch: str, tmp_path: Path,
-                                                      monkeypatch: pytest.MonkeyPatch) -> None:
-    mixed = _run_branch(monkeypatch, tmp_path, branch, _branch_frame(), tag="mixed")
-    safe_only = _run_branch(monkeypatch, tmp_path, branch, _branch_frame(SAFE), tag="safe")
+def test_mixed_group_unsafe_passthrough_safe_matches_frozen_oracle(branch: str, tmp_path: Path) -> None:
+    mixed = _run(branch, _branch_frame(), tmp_path, tag="mixed")
     stored = _as_stored(_branch_frame())
     for col in UNSAFE:
         assert np.array_equal(mixed[col].to_numpy(), stored[col].to_numpy(), equal_nan=True), col
-    for col in SAFE:
-        assert np.array_equal(mixed[col].to_numpy(), safe_only[col].to_numpy(), equal_nan=True), col
+    _assert_matches_oracle(mixed, ORACLE[branch])
+    derived_unsafe = [c for c in mixed.columns if any(c.startswith(u + "_") for u in UNSAFE)]
+    assert derived_unsafe == []
 
 
 @pytest.mark.parametrize("branch", BRANCH_IDS)
-def test_boundary_01_all_unsafe_group_passthrough_and_sink_complete(branch: str, tmp_path: Path,
-                                                                  monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 邊界①：全 ratio-unsafe 群組 ⇒ 無轉換、run 完成且輸出收齊全部欄。"""
+def test_safe_only_group_matches_frozen_oracle(branch: str, tmp_path: Path) -> None:
+    """非 ratio-unsafe 群組之行為不變（改前 oracle 逐位元組）。"""
+    _assert_matches_oracle(_run(branch, _branch_frame(SAFE), tmp_path, tag="safe"), ORACLE[branch])
+
+
+@pytest.mark.parametrize("branch", BRANCH_IDS)
+def test_boundary_01_all_unsafe_group_passthrough_and_sink_complete(branch: str, tmp_path: Path) -> None:
+    """Task 2.1 邊界①：全 ratio-unsafe 群組 ⇒ 無轉換（正確實作可不呼叫轉換 helper，故不要求 spy）、run 完成、
+    輸出收齊全部原始欄且無衍生欄。"""
     frame = _branch_frame(UNSAFE)
-    out = _run_branch(monkeypatch, tmp_path, branch, frame, tag="allunsafe")
+    out = _run(branch, frame, tmp_path, tag="allunsafe", require_spy=False)
     assert list(out.columns) == UNSAFE
     assert np.array_equal(out.to_numpy(), _as_stored(frame).to_numpy(), equal_nan=True)
 
 
-def test_boundary_02_compact_native_passthrough_expands_to_primary_rows(tmp_path: Path,
-                                                                       monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 邊界②＋native 強制臂：compact-aligned 混合群組經 to_sink，確實走 native；ratio-unsafe 欄展開後＝原值展開，
-    列數＝主週期列數；非 ratio-unsafe 欄＝同設定只含非 ratio-unsafe 欄之 native 輸出。"""
-    from tests.feature_engineering.preprocessing.test_l65_native_tf import _make_compact_registry, _make_idx_map_uniform
-
-    arm = CONTRACT["native_arm"]
-    for key, value in arm["env"].items():
-        monkeypatch.setenv(key, value)
+def test_boundary_02_compact_native_passthrough_expands_to_primary_rows(tmp_path: Path) -> None:
+    """Task 2.1 邊界②＋native 強制臂：compact-aligned 混合群組經 to_sink、確實走 native；ratio-unsafe 欄展開後＝原值展開、
+    列數＝主週期列數；safe 欄＝改前 oracle。"""
     calls: List[object] = []
-    real_native = FeaturePreprocessor._maybe_run_native_l65_to_sink
-
-    def _spy(self, *args, **kwargs):
-        result = real_native(self, *args, **kwargs)
-        calls.append(result)
-        return result
-
-    monkeypatch.setattr(FeaturePreprocessor, "_maybe_run_native_l65_to_sink", _spy)
-
-    def _run(columns: List[str], sub: str) -> Dict[str, np.ndarray]:
-        frame = _branch_frame(columns)
-        source = frame.to_numpy(dtype=np.float32)
-        idx_map = _make_idx_map_uniform(source.shape[0], int(arm["ratio"]))
-        registry = _make_compact_registry(tmp_path / sub, source=source, idx_map=idx_map, columns=tuple(columns))
-        parts: Dict[str, np.ndarray] = {}
-
-        def _sink(group_id, cols, data, *rest) -> None:
-            arr = np.asarray(data, dtype=np.float64)
-            for i, name in enumerate(cols):
-                parts[str(name)] = arr[:, i].copy()
-
-        FeaturePreprocessor(_config()).transform_registry_groups_to_sink(registry, _sink, n_workers=1)
-        return {"parts": parts, "idx_map": idx_map, "source": source}
-
-    mixed = _run(UNSAFE + SAFE, "mixed")
+    mixed = freeze.run_native(UNSAFE + SAFE, tmp_path / "mixed", native_calls=calls)
     assert calls and calls[-1] is not None, "未走 native 分支"
-    safe_only = _run(SAFE, "safe")
     n_primary = len(mixed["idx_map"])
     for j, col in enumerate(UNSAFE):
         expanded = mixed["source"][mixed["idx_map"], j].astype(np.float64)
         assert mixed["parts"][col].shape[0] == n_primary
         assert np.array_equal(mixed["parts"][col], expanded, equal_nan=True), col
-    for col in SAFE:
-        assert np.array_equal(mixed["parts"][col], safe_only["parts"][col], equal_nan=True), col
+    for col, want in ORACLE["native_arm"].items():
+        assert freeze.column_digest(mixed["parts"][col]) == want, col
 
 
 @pytest.mark.parametrize("branch", ["registry_sink_sharded", "registry_chunked"])
-def test_boundary_03_shard_structure_unchanged(branch: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 邊界③：全 ratio-unsafe 群組之 sink 呼叫結構（輸出群組名序列、各次欄名）＝同形非 ratio-unsafe 群組。"""
+def test_boundary_03_shard_structure_unchanged(branch: str, tmp_path: Path) -> None:
+    """Task 2.1 邊界③：全 ratio-unsafe 群組之 sink 呼叫結構（輸出群組名序列、各次欄數）＝同形非 ratio-unsafe 群組。"""
     log_u: list = []
     log_s: list = []
-    unsafe_frame = _branch_frame(UNSAFE)
     safe_frame = _branch_frame(SAFE)
     safe_frame.columns = [f"close_trend_SHAPE_{i}" for i in range(len(SAFE))]
-    _run_branch(monkeypatch, tmp_path, branch, unsafe_frame, tag="shape", sink_log=log_u)
-    _run_branch(monkeypatch, tmp_path / "s", branch, safe_frame, tag="shape", sink_log=log_s)
+    _run(branch, _branch_frame(UNSAFE), tmp_path, tag="shape", require_spy=False, sink_log=log_u)
+    _run(branch, safe_frame, tmp_path / "s", tag="shape", require_spy=False, sink_log=log_s)
+    if BRANCHES[branch].get("mode") == "append":  # append：衍生欄另以 `<group>_L65_chunk*` 送出，只比原始欄之輸出
+        log_u = [(g, c) for g, c in log_u if "_L65" not in g]
+        log_s = [(g, c) for g, c in log_s if "_L65" not in g]
+    assert log_u, "sink 未收到原始欄輸出"
     assert [g for g, _ in log_u] == [g for g, _ in log_s]
     assert [len(c) for _, c in log_u] == [len(c) for _, c in log_s]
 
 
-def test_append_arm_no_unsafe_derivatives(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_append_arm_no_unsafe_derivatives(tmp_path: Path) -> None:
     arm = CONTRACT["append_arm"]
     cfg = _config(mode="append", zscore=arm["zscore_windows"])
-    mixed = _run_branch(monkeypatch, tmp_path, arm["branch"], _branch_frame(), cfg=cfg, mode="append", tag="app")
-    safe_only = _run_branch(monkeypatch, tmp_path, arm["branch"], _branch_frame(SAFE), cfg=cfg, mode="append",
-                            tag="appsafe")
+    mixed = _run(arm["branch"], _branch_frame(), tmp_path, tag="app", cfg=cfg)
     derived_unsafe = [c for c in mixed.columns if any(c.startswith(u + "_") for u in UNSAFE)]
     assert derived_unsafe == []
     stored = _as_stored(_branch_frame())
     for col in UNSAFE:
         assert np.array_equal(mixed[col].to_numpy(), stored[col].to_numpy(), equal_nan=True), col
-    assert set(safe_only.columns) <= set(mixed.columns)
-    for col in safe_only.columns:
-        assert np.array_equal(mixed[col].to_numpy(), safe_only[col].to_numpy(), equal_nan=True), col
+    _assert_matches_oracle(mixed, ORACLE["append_arm"])
 
 
 # ---------------------------------------------------------------- 校準順序
@@ -302,17 +233,26 @@ def test_mutation_late_classification_fails_with_safe_only_packet(tmp_path: Path
 def test_mutation_skip_never_alters_unsafe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """mutant②：跳過判定恆 False ⇒ ratio-unsafe 欄被轉換（與輸入不等）。"""
     monkeypatch.setattr(fn, "ratio_unsafe_category", lambda column: None)
-    out = _run_branch(monkeypatch, tmp_path, "registry_sink", _branch_frame(), tag="mutF")
+    out = _run("registry_sink", _branch_frame(), tmp_path, tag="mutF")
     stored = _as_stored(_branch_frame())
     assert not all(np.array_equal(out[c].to_numpy(), stored[c].to_numpy(), equal_nan=True) for c in UNSAFE)
 
 
 def test_mutation_skip_always_leaves_safe_untransformed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant③：跳過判定恆 True ⇒ 非 ratio-unsafe 欄亦原值（與只含非 ratio-unsafe 欄之轉換輸出不等）。"""
-    safe_only = _run_branch(monkeypatch, tmp_path, "registry_sink", _branch_frame(SAFE), tag="mutTs")
+    """mutant③：跳過判定恆 True ⇒ 非 ratio-unsafe 欄亦原值，與改前 oracle 不等。"""
     monkeypatch.setattr(fn, "ratio_unsafe_category", lambda column: "pattern")
-    out = _run_branch(monkeypatch, tmp_path, "registry_sink", _branch_frame(), tag="mutT")
-    assert not all(np.array_equal(out[c].to_numpy(), safe_only[c].to_numpy(), equal_nan=True) for c in SAFE)
+    out = _run("registry_sink", _branch_frame(), tmp_path, tag="mutT", require_spy=False)
+    assert any(freeze.column_digest(out[c]) != ORACLE["registry_sink"][c] for c in SAFE)
+
+
+def test_mutation_branch_transform_disabled_caught_by_frozen_oracle(tmp_path: Path,
+                                                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant（審查 r5 codex P1-02）：sharded 分支之快速轉換改為恆等 ⇒ ratio-unsafe 原值與全 unsafe 斷言可綠，
+    但 safe 欄與改前 oracle 不等（凍結 oracle 有鑑別力；混合 vs 只含 safe 之即時對照會被同一 mutant 騙過）。"""
+    monkeypatch.setattr(FeaturePreprocessor, "_registry_fast_transform",
+                        lambda self, arr, ctx, *a, **k: np.array(arr, copy=True))
+    out = _run("registry_sink_sharded", _branch_frame(SAFE), tmp_path, tag="mutId")
+    assert any(freeze.column_digest(out[c]) != ORACLE["registry_sink_sharded"][c] for c in SAFE)
 
 
 # ---------------------------------------------------------------- §G S1 落盤路徑（生產入口，經 generate_features）
@@ -349,6 +289,25 @@ def test_g_s1_on_column_set_and_values(before: dict) -> None:
     expected_new = {c for c in raw["names"] if _is_unsafe(c)} - before_names
     assert got_names - before_names == expected_new
     assert before_names - got_names == set()
+
+
+def test_boundary_02_labels_not_routed_through_storage_tagging(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 1.3 邊界②：S1 實際生成時，storage 寫檔段（`write_raw_from_registry_stream`）收到之 registry 群組欄不含任何
+    `label_` 欄（labels 走獨立 labels_df，不經標記段）；且寫檔段確實被呼叫。"""
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    seen: List[str] = []
+    real = FeatureStorage.write_raw_from_registry_stream
+
+    def _spy(self, symbol, tf, config_hash, registry, *args, **kwargs):
+        for _, group in registry.iter_all():
+            seen.extend(str(c) for c in group.columns)
+        return real(self, symbol, tf, config_hash, registry, *args, **kwargs)
+
+    monkeypatch.setattr(FeatureStorage, "write_raw_from_registry_stream", _spy)
+    freeze.s1_record("off", True)
+    assert seen, "storage 寫檔段未被呼叫"
+    assert not [c for c in seen if c.startswith("label_")]
 
 
 def test_multi_tf_names_unchanged(before: dict) -> None:

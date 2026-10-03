@@ -1,0 +1,104 @@
+{
+ "registry": {
+  "close_trend_EMA_8": {
+   "value_sha256": "06aabb2acd754f7dddf5968bb2263c6fe70523a512bac3a399aafbf1b8101f07",
+   "nan_mask_sha256": "8675622f5559ff47a2ad42f50c5f487fb50ad4957e7b1346f0b5138c89e7ca7b"
+  },
+  "close_trend_SMA_13": {
+   "value_sha256": "3bc6c71f81f9b478f30c19ee6093658ec9749007c1542a27d0cd98d79e241dd3",
+   "nan_mask_sha256": "7dc5e06687faa6dbf5ef4e66eeaaca291de89fdae970945e900b3bf9e80bf48a"
+  }
+ },
+ "registry_chunked": {
+  "close_trend_EMA_8": {
+   "value_sha256": "06aabb2acd754f7dddf5968bb2263c6fe70523a512bac3a399aafbf1b8101f07",
+   "nan_mask_sha256": "8675622f5559ff47a2ad42f50c5f487fb50ad4957e7b1346f0b5138c89e7ca7b"
+  },
+  "close_trend_EMA_8_zscore_100": {
+   "value_sha256": "e3c7bc97e655dc1b8359154fbcc7debf8bf669fe84466fb0bcda621b2107bf0c",
+   "nan_mask_sha256": "bd7dd52c4bfdae6cd3b8ed110e2bae3f59eaf97e8be846f2d7ce1a5541477f95"
+  },
+  "close_trend_EMA_8_zscore_252": {
+   "value_sha256": "f4088d7cbf6390fd9b531abbb170e37fbf45d140295cd8e79465670038da7802",
+   "nan_mask_sha256": "cd06a24131cf4b04248f111a5d492adc2494fad8dbdd776eba5efd49eb03ff85"
+  },
+  "close_trend_SMA_13": {
+   "value_sha256": "3bc6c71f81f9b478f30c19ee6093658ec9749007c1542a27d0cd98d79e241dd3",
+   "nan_mask_sha256": "7dc5e06687faa6dbf5ef4e66eeaaca291de89fdae970945e900b3bf9e80bf48a"
+  },
+  "close_trend_SMA_13_zscore_100": {
+   "value_sha256": "5b309245da86ba9ffd78cf8191c8b3208eeef0cfc69765786c9c8648cb243f8c",
+   "nan_mask_sha256": "f3a5a61c8a5ccaa13f825f8a1cd143d55bd805162340323441dec2c57753b6d7"
+  },
+  "close_trend_SMA_13_zscore_252": {
+   "value_sha256": "220dce60a1a1082da45ec0c6845c7479701856e8a72569150faad450653c405f",
+   "nan_mask_sha256": "2c42e3c0f3c89e0daa0afe0485377a2cc0fcbd5e491a42d1b57eae041e1d00b2"
+  }
+ },
+ "registry_parallel_split": {
+  "close_trend_EMA_8": {
+   "value_sha256": "06aabb2acd754f7dddf5968bb2263c6fe70523a512bac3a399aafbf1b8101f07",
+   "nan_mask_sha256": "8675622f5559ff47a2ad42f50c5f487fb50ad4957e7b1346f0b5138c89e7ca7b"
+  },
+  "close_trend_SMA_13": {
+   "value_sha256": "3bc6c71f81f9b478f30c19ee6093658ec9749007c1542a27d0cd98d79e241dd3",
+   "nan_mask_sha256": "7dc5e06687faa6dbf5ef4e66eeaaca291de89fdae970945e900b3bf9e80bf48a"
+  }
+ },
+ "registry_sink": {
+  "close_trend_EMA_8": {
+   "value_sha256": "06aabb2acd754f7dddf5968bb2263c6fe70523a512bac3a399aafbf1b8101f07",
+   "nan_mask_sha256": "8675622f5559ff47a2ad42f50c5f487fb50ad4957e7b1346f0b5138c89e7ca7b"
+  },
+  "close_trend_SMA_13": {
+   "value_sha256": "3bc6c71f81f9b478f30c19ee6093658ec9749007c1542a27d0cd98d79e241dd3",
+   "nan_mask_sha256": "7dc5e06687faa6dbf5ef4e66eeaaca291de89fdae970945e900b3bf9e80bf48a"
+  }
+ },
+ "registry_sink_sharded": {
+  "close_trend_EMA_8": {
+   "value_sha256": "06aabb2acd754f7dddf5968bb2263c6fe70523a512bac3a399aafbf1b8101f07",
+   "nan_mask_sha256": "8675622f5559ff47a2ad42f50c5f487fb50ad4957e7b1346f0b5138c89e7ca7b"
+  },
+  "close_trend_SMA_13": {
+   "value_sha256": "3bc6c71f81f9b478f30c19ee6093658ec9749007c1542a27d0cd98d79e241dd3",
+   "nan_mask_sha256": "7dc5e06687faa6dbf5ef4e66eeaaca291de89fdae970945e900b3bf9e80bf48a"
+  }
+ },
+ "append_arm": {
+  "close_trend_EMA_8": {
+   "value_sha256": "06aabb2acd754f7dddf5968bb2263c6fe70523a512bac3a399aafbf1b8101f07",
+   "nan_mask_sha256": "8675622f5559ff47a2ad42f50c5f487fb50ad4957e7b1346f0b5138c89e7ca7b"
+  },
+  "close_trend_EMA_8_zscore_100": {
+   "value_sha256": "e3c7bc97e655dc1b8359154fbcc7debf8bf669fe84466fb0bcda621b2107bf0c",
+   "nan_mask_sha256": "bd7dd52c4bfdae6cd3b8ed110e2bae3f59eaf97e8be846f2d7ce1a5541477f95"
+  },
+  "close_trend_EMA_8_zscore_252": {
+   "value_sha256": "f4088d7cbf6390fd9b531abbb170e37fbf45d140295cd8e79465670038da7802",
+   "nan_mask_sha256": "cd06a24131cf4b04248f111a5d492adc2494fad8dbdd776eba5efd49eb03ff85"
+  },
+  "close_trend_SMA_13": {
+   "value_sha256": "3bc6c71f81f9b478f30c19ee6093658ec9749007c1542a27d0cd98d79e241dd3",
+   "nan_mask_sha256": "7dc5e06687faa6dbf5ef4e66eeaaca291de89fdae970945e900b3bf9e80bf48a"
+  },
+  "close_trend_SMA_13_zscore_100": {
+   "value_sha256": "5b309245da86ba9ffd78cf8191c8b3208eeef0cfc69765786c9c8648cb243f8c",
+   "nan_mask_sha256": "f3a5a61c8a5ccaa13f825f8a1cd143d55bd805162340323441dec2c57753b6d7"
+  },
+  "close_trend_SMA_13_zscore_252": {
+   "value_sha256": "220dce60a1a1082da45ec0c6845c7479701856e8a72569150faad450653c405f",
+   "nan_mask_sha256": "2c42e3c0f3c89e0daa0afe0485377a2cc0fcbd5e491a42d1b57eae041e1d00b2"
+  }
+ },
+ "native_arm": {
+  "close_trend_EMA_8": {
+   "value_sha256": "995e4d288f0564c6a744ce4a1b6c41631c80fec7a66f823ea111e14c1a9821e9",
+   "nan_mask_sha256": "8f258f058d28354a5b08919b9bef70065f5bb7422209b8e158b77696be734122"
+  },
+  "close_trend_SMA_13": {
+   "value_sha256": "8e185d22c60aa706c159c01d59e54062c84fcaa4b0d66c4a4be20ffb984b9e61",
+   "nan_mask_sha256": "8c7c76ce5a789febfb56d3c4663c770499250afc45ae9b91ada7e462abbb5056"
+  }
+ }
+}

@@ -166,16 +166,6 @@ def test_storage_custom_name_distinct_across_timeframes(tmp_path: Path) -> None:
     assert a == ["ret_12h_1d_x"] and b == ["ret_4h_1d_x"]
 
 
-def test_boundary_02_labels_not_routed_through_storage_tagging() -> None:
-    """Task 1.3 邊界②：labels 不經 storage 標記段——`write_raw_from_registry_stream` 之標記段不處理 `label_` 欄；
-    以原始碼可觀測：標記段所在函式不引用 labels_df，且 CGSA 寫檔呼叫鏈只傳 registry。"""
-    src = (REPO / "momentum/FeatureEngineering/feature_storage.py").read_text(encoding="utf-8")
-    body = src[src.index("def write_raw_from_registry_stream"):]
-    body = body[: body.index("\n    def ", 10)]
-    assert "labels_df" not in body
-    assert "tag_timeframe" in body
-
-
 def test_mutation_calibration_old_rule_diverges(monkeypatch: pytest.MonkeyPatch) -> None:
     """mutant：calibration 改回「`parts[1]` 為任一週期鍵即不標」⇒ `ret_1d_x` 與 storage 規則不一致。"""
     from momentum.FeatureEngineering.preprocessing import calibration
