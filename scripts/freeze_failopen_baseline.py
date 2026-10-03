@@ -190,7 +190,15 @@ def _ordered_groups(registry: Any, groups: Iterable[Any]) -> list[Any]:
     )
 
 
-def _hash_registry_table(registry: Any, groups: Iterable[Any], index: Any) -> dict[str, Any]:
+def _hash_registry_table(
+    registry: Any,
+    groups: Iterable[Any],
+    index: Any,
+    row_slice: Any = None,
+    native_rows: Any = None,
+) -> dict[str, Any]:
+    """`row_slice`（PRE-RED Task 2.4，預熱啟用時）：registry 為含預熱之原生時間軸（列數＝`native_rows`），只雜湊
+    公開輸出窗切片；`index` 為公開 index。`row_slice is None` ⇒ 與修前逐位元組相同（全列、index 列數即 registry 列數）。"""
     import numpy as np
 
     ordered_groups = _ordered_groups(registry, groups)
@@ -212,6 +220,14 @@ def _hash_registry_table(registry: Any, groups: Iterable[Any], index: Any) -> di
         data = np.asarray(registry.load_data_native(group.group_id))
         if data.shape != tuple(group.shape):
             raise ValueError(f"Registry shape mismatch for {group.group_id}: {data.shape} != {group.shape}")
+        if row_slice is not None:
+            if data.shape[0] != int(native_rows):
+                raise ValueError(
+                    f"Registry rows {data.shape[0]} != native ingest rows {native_rows} for {group.group_id}"
+                )
+            data = data[row_slice]
+            if data.shape[0] != int(len(index)):
+                raise ValueError(f"Sliced rows {data.shape[0]} != public rows {len(index)} for {group.group_id}")
         for column_index in range(data.shape[1]):
             values = data[:, column_index]
             mask = np.asarray(np.isnan(values), dtype=np.uint8)
@@ -481,9 +497,20 @@ def _single_tf_record(symbol: str, timeframe: str, temp_root: Path) -> dict[str,
         symbol, [timeframe], timeframe, temp_root, persist=False
     )
     _start, _end = _window_dates()
-    raw = factory._layer0_data_ingestion(
-        symbol, timeframe, factory._resolve_config(payload), start_date=_start, end_date=_end
-    )
+    resolved = factory._resolve_config(payload)
+    raw = factory._layer0_data_ingestion(symbol, timeframe, resolved, start_date=_start, end_date=_end)
+    # PRE-RED Task 2.4：預熱啟用時 registry 為含預熱之原生時間軸 ⇒ 以生成時之 L0 載入起點重取 ingest index，
+    # 斷言切片後與公開 index 逐元素相等，只雜湊公開窗；未啟用時 row_slice＝None、行為與修前逐位元組相同。
+    row_slice, native_rows = None, None
+    window = getattr(factory, "_current_output_window", None)
+    if window is not None and getattr(window, "warmup_enabled", False):
+        ingest = factory._layer0_data_ingestion(
+            symbol, timeframe, resolved, start_date=window.ingest_start, end_date=_end
+        )
+        row_slice = factory._output_row_slice(ingest.index)
+        if row_slice is None or not ingest.index[row_slice].equals(raw.index):
+            raise RuntimeError(f"ingest index 之公開切片與公開 index 不相等：{symbol}/{timeframe}")
+        native_rows = len(ingest.index)
     _hash_start = _time.perf_counter()
     layers: dict[str, Any] = {}
     for layer_number, layer_source in enumerate(
@@ -491,10 +518,10 @@ def _single_tf_record(symbol: str, timeframe: str, temp_root: Path) -> dict[str,
         start=1,
     ):
         layers[f"L{layer_number}"] = _hash_registry_table(
-            registry, registry.list_by_layer(layer_source), raw.index
+            registry, registry.list_by_layer(layer_source), raw.index, row_slice, native_rows
         )
     all_groups = _all_registry_groups(registry)
-    final = _hash_registry_table(registry, all_groups, raw.index)
+    final = _hash_registry_table(registry, all_groups, raw.index, row_slice, native_rows)
     perf = _perf_record(
         result,
         perf["generation_wall_seconds"],
@@ -516,7 +543,45 @@ def _single_tf_record(symbol: str, timeframe: str, temp_root: Path) -> dict[str,
         "perf": perf,
     }
     shutil.rmtree(work_dir.parent, ignore_errors=True)
+    record["l1_direct"] = _l1_direct_record(symbol, timeframe, temp_root)
     return record
+
+
+def _l1_direct_record(symbol: str, timeframe: str, temp_root: Path) -> dict[str, Any]:
+    """PRE-RED Task 2.4：直跑 L1（不經 generate_features 之公開域預熱）之 registry 雜湊，鏡像
+    tests/feature_engineering/test_failopen_contract.py 之 `_compute_l1_canonical_sha256` 流程（本腳本不 import tests/）。
+    與 `layers.L1`（全量 run、預熱後公開窗）為兩獨立 oracle，可長期不等。"""
+    from momentum.FeatureEngineering.core.column_group import LayerSource
+    from momentum.factories import create_feature_factory
+
+    work_dir = temp_root / f"{symbol}_{timeframe}_l1_direct" / "registry"
+    shutil.rmtree(work_dir.parent, ignore_errors=True)
+    previous = os.environ.get("FFACT_CGSA_WORK_DIR")
+    os.environ["FFACT_CGSA_WORK_DIR"] = str(work_dir)
+    try:
+        factory = create_feature_factory(cache_dir=str(KLINE_PATH.parent), validate_continuity=False)
+        payload = _fixed_config_payload([timeframe], timeframe)
+        config = factory._resolve_config(payload)
+        start_date, end_date = _window_dates()
+        config_hash = factory._compute_config_hash(
+            config, symbol, timeframe, start_date=start_date, end_date=end_date
+        )
+        factory._cgsa_force_fresh = True
+        factory._current_symbol = symbol
+        factory._current_timeframe = timeframe
+        factory._cgsa_registry = factory._prepare_cgsa_registry(symbol, timeframe, config_hash)
+        raw = factory._layer0_data_ingestion(symbol, timeframe, config, start_date=start_date, end_date=end_date)
+        factory._execute_layer1_6("Layer 1", factory._layer1_atomic_indicators, raw, config)
+        registry = factory._cgsa_registry
+        if registry is None:
+            raise RuntimeError(f"CGSA registry missing for l1_direct {symbol}/{timeframe}")
+        return _hash_registry_table(registry, registry.list_by_layer(LayerSource.L1), raw.index)
+    finally:
+        if previous is None:
+            os.environ.pop("FFACT_CGSA_WORK_DIR", None)
+        else:
+            os.environ["FFACT_CGSA_WORK_DIR"] = previous
+        shutil.rmtree(work_dir.parent, ignore_errors=True)
 
 
 def _multi_tf_record(symbol: str, temp_root: Path) -> dict[str, Any]:
@@ -675,13 +740,52 @@ def freeze(symbols: Sequence[str], resume: bool, max_units: int = 0) -> None:
     )
 
 
+def freeze_units(units: Sequence[str], out_dir: Path) -> None:
+    """PRE-RED Task 2.4：只重凍列出之單元（`<SYM>/<TF>` 為單週期、`<SYM>/multi` 為多週期），其餘記錄原樣保留；
+    一律全新生成（不沿用既有記錄）。`out_dir` 無 baseline.json 時以空骨架起算（供 §G③ 兩次獨立凍結比對）。
+    逐單元記錄凍結 commit 於 `environment.unit_commits`；不改寫 max_nan_ratio.json（生產門檻另在
+    momentum/FeatureEngineering/_resources，非本工具範圍）。"""
+    _require_fixed_environment()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    temp_root = Path(tempfile.gettempdir()) / "ff_failopen_baseline"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    manifest_path = out_dir / "baseline.json"
+    if manifest_path.exists():
+        baseline = json.loads(manifest_path.read_text(encoding="utf-8"))
+    else:
+        start_date, end_date = _window_dates()
+        env = _environment_manifest()
+        env["window"] = {"days": WINDOW_DAYS, "start_date": start_date, "end_date": end_date}
+        baseline = {"schema_version": 1, "canonical_hash_version": 1, "symbols": list(SYMBOLS),
+                    "timeframes": list(TIMEFRAMES), "environment": env, "single_tf": {}, "multi_tf": {}}
+    commits = baseline["environment"].setdefault("unit_commits", {})
+    for unit in units:
+        symbol, _, kind = unit.partition("/")
+        if symbol not in SYMBOLS or kind not in (*TIMEFRAMES, "multi"):
+            raise SystemExit(f"--units 不合法：{unit}")
+        if kind == "multi":
+            baseline["multi_tf"][symbol] = _multi_tf_record(symbol, temp_root)
+        else:
+            baseline["single_tf"].setdefault(symbol, {})[kind] = _single_tf_record(symbol, kind, temp_root)
+        commits[unit] = _git_sha()
+        _write_json(manifest_path, baseline)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--symbols", nargs="+", choices=SYMBOLS, default=list(SYMBOLS))
     parser.add_argument("--no-resume", action="store_true")
     parser.add_argument("--max-units", type=int, default=0,
                         help="本次 invocation 最多做 N 個生成單元就停(配 shell loop 做 process 隔離);0=不限")
+    parser.add_argument("--units", default="",
+                        help="PRE-RED：只重凍列出之單元，逗號分隔，例 BTCUSDT/12h,ETHUSDT/1h,BTCUSDT/multi")
+    parser.add_argument("--out-dir", default=str(GOLDEN_DIR), help="輸出目錄（預設 tests/_golden/failopen）")
     args = parser.parse_args()
+    if args.units:
+        freeze_units([u.strip() for u in args.units.split(",") if u.strip()], Path(args.out_dir))
+        return 0
+    if Path(args.out_dir) != GOLDEN_DIR:
+        raise SystemExit("--out-dir 只與 --units 併用")
     freeze(args.symbols, resume=not args.no_resume, max_units=args.max_units)
     return 0
 

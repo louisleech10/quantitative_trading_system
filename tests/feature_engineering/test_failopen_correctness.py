@@ -35,7 +35,10 @@ GATE_A_WORKER_ENV = "_FAILOPEN_CORRECTNESS_GATE_A"
 GATE_A_ETH_WORKER_ENV = "_FAILOPEN_CORRECTNESS_GATE_A_ETH"
 GATE_A_MULTI_TF_WORKER_ENV = "_FAILOPEN_CORRECTNESS_GATE_A_MULTI_TF"
 # Codex L1-L3 判別實驗：Batch0 direct caller 12h L3 survivor count（365d 窗）。
-MTF_12H_L3_SURVIVOR_COUNT = 65483
+# PRE-RED（SPEC v6 Task 2.7）：d229336e（FF-STAT 第 4 批 L3 剔欄規則與逐窗精確）由 65483 變 59962——只舊 5524 欄＝
+# dead_reasons 4603（nan_rate_rule 4376、stable_samples_below_min 160、constant 67）＋低基數閘 921（上游非 NaN 相異值 ≤2）；
+# 只新 3 欄（233 期 Skew_W3）經 _l3_oracle 驗算相符（收據 handoffs/run_receipts/20261003-prered-mtf-l3-count.json）。
+MTF_12H_L3_SURVIVOR_COUNT = 59962
 # CGSA/L7 manifest 含 run 時間等非決定性 metadata；數值檔 hash 仍須 byte 一致。
 ARTIFACT_METADATA_BASENAMES = frozenset({"manifest.json", "feature_manifest.json"})
 
@@ -1103,6 +1106,15 @@ def test_v7_cgsa_resume_matches_fresh(
     work_dir = tmp_path / "shared_cgsa"
     start, end = _short_window_dates(14)
     config = _multi_tf_payload()
+    # PRE-RED Task 2.3：種子須為品質 complete 之 run（續跑閘只認 complete，consumer_gate.is_run_status_cacheable）。
+    # 完整 L1 於 14 天窗 nan_ratio 超門檻（cb53ff19 起如實記 partial），且 d229336e 後 1h 全史預熱於 8GB 本機被系統
+    # 終止（F-2）⇒ 改精簡 L1（同 ff_artifact_compare_helpers.fast_config_payload 之指標），L2–L4 維持預設。
+    config["atomic_indicators"] = {
+        "trend": {"enabled": True, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}},
+                                                  {"name": "SMA", "params": {"timeperiod": 13}}]},
+        **{c: {"enabled": False} for c in ("momentum", "volatility", "volume", "cycle", "pattern", "statistics",
+                                           "microstructure", "entropy", "tail_risk")},
+    }
 
     # 先在 shared storage/work_dir 完成一次，作為 one-shot oracle 並建立合法 L7 gate；
     # 再由真實 fail-closed run 覆寫 work_dir，於 1h 中斷留下 12h checkpoint。
@@ -1121,6 +1133,18 @@ def test_v7_cgsa_resume_matches_fresh(
     assert seed_factory._cgsa_registry is not None
     oneshot_group_hash = _freeze_baseline_module()._sha256_json(
         sorted(seed_factory._cgsa_registry._groups)
+    )
+    # PRE-RED Task 2.3 前置：種子 run 之 L7 manifest 須為 complete（否則續跑閘依設計拒絕，本測試前提不成立）
+    from momentum.FeatureEngineering.feature_storage import resolve_run_status
+
+    seed_manifest_path = (
+        seed_factory._storage.feature_run_dir(BASELINE_SYMBOL, BASELINE_TIMEFRAME, oneshot.metadata["config_hash"])
+        / seed_factory._storage.L7_V2_MANIFEST_NAME
+    )
+    seed_manifest = json.loads(seed_manifest_path.read_text(encoding="utf-8"))
+    assert resolve_run_status(seed_manifest) == "complete", (
+        "種子 run 品質非 complete：",
+        {k: a.get("failure_reasons") for k, a in (seed_manifest.get("artifacts") or {}).items()},
     )
 
     partial_factory = _make_factory(monkeypatch, tmp_path / "partial", feature_root=shared_storage)
@@ -1164,6 +1188,17 @@ def test_v7_cgsa_resume_matches_fresh(
     )
 
     resume_factory = _make_factory(monkeypatch, tmp_path, feature_root=shared_storage)
+    # PRE-RED Task 2.3 觀測：續跑時已完成之 12h 不得重算 L1（checkpoint 真被重用），1h 須計算
+    l1_calls = {BASELINE_TIMEFRAME: 0, ETH_TIMEFRAME: 0}
+    original_resume_l1 = resume_factory._layer1_atomic_indicators
+
+    def _counting_l1(self, data, factory_config):  # noqa: ANN001
+        tf = str(getattr(self, "_current_timeframe", ""))
+        if tf in l1_calls:
+            l1_calls[tf] += 1
+        return original_resume_l1(data, factory_config)
+
+    resume_factory._layer1_atomic_indicators = types.MethodType(_counting_l1, resume_factory)
     resumed = resume_factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
@@ -1174,6 +1209,8 @@ def test_v7_cgsa_resume_matches_fresh(
         persist=True,
     )
     assert resume_hits["count"] >= 1, "CGSA resume_from_manifest was not invoked"
+    assert l1_calls[BASELINE_TIMEFRAME] == 0, f"續跑重算了已完成之 12h L1：{l1_calls}"
+    assert l1_calls[ETH_TIMEFRAME] >= 1, f"續跑未計算 1h L1：{l1_calls}"
     assert _hash_dataframe_canonical(resumed.features_df) == oneshot_hash
     assert resume_factory._cgsa_registry is not None
     resumed_group_hash = _freeze_baseline_module()._sha256_json(

@@ -346,7 +346,14 @@ def test_quality_gate_max_ratios_do_not_change_config_hash() -> None:
     )
 
     assert default_hash == gated_hash
-    assert default_hash == "1dbe534ed08793b0ea2f80b3748fa1a0"
+    # PRE-RED（SPEC v6 Task 2.6）：釘住值之唯一來源＝凍結基準同設定（多週期 BTCUSDT：primary 1h、training 1h＋12h）
+    # 所記之 config_hash（原寫死之 1dbe534e… 即該值）。config_hash 依設計隨設定結構變動，多週期單元重凍（blocked-by F-2）
+    # 後本斷言隨之更新，不再手寫字面值。
+    from tests.feature_engineering.test_failopen_correctness import BASELINE_PATH
+
+    multi = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))["multi_tf"]["BTCUSDT"]
+    assert multi["primary_timeframe"] == "1h" and list(multi["training_timeframes"]) == ["1h", "12h"]
+    assert default_hash == multi["config_hash"]
 
 
 def test_l65_failure_records_effective_config_and_continues() -> None:

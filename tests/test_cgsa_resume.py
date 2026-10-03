@@ -123,7 +123,11 @@ def test_cgsa_config_hash_passed_correctly(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """測試 generate_features：config_hash 應正確傳入 _prepare_cgsa_registry。"""
-    config = SimpleNamespace(timeframes=SimpleNamespace(training=["1h"]))
+    # PRE-RED Task 2.2：04176c18 起 _prepare_cgsa_registry 之前之輸出窗解析、預熱覆蓋檢查與校準關卡讀取 config
+    # 其他欄位 ⇒ 改用真實 FactoryConfig（於 monkeypatch 前取得，不 stub check_l1_warmup_coverage／resolve_output_window）
+    from momentum.FeatureEngineering.config_manager import ConfigManager
+
+    config = ConfigManager().get_merged_config({"timeframes": {"primary": "1h", "training": ["1h"]}})
     captured: dict[str, str] = {}
 
     monkeypatch.setattr(feature_factory, "_resolve_config", lambda override: config)

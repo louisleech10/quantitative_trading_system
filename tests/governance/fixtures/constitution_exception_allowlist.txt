@@ -1,2 +1,4 @@
 # TODOFMT Task 2.2 步驟 1b：四份憲法檔相對 L 之新增行中，同時命中審查類與例外類關鍵詞而經裁決放行者。
 # 每行一個 sha256（該新增行之 UTF-8 位元組）；# 開頭為註解。初始為空（docs/TODOFMT_SPEC.md Task 2.2）。
+# .cursorrules 第 12 條 STAMP-BLOCKED：條款於 L 已存在，7cdbca15 只把句尾指標「逐字理由見 AGENTS.md:40」改為「理由全文見 AGENTS.md「執行任務時」第 12 條」，語意與適用範圍不變（PRE-RED Task 1.3；審查 handoffs/reconcile/20261003-prered-x-review-r1..r4 三家收斂、戳記輪 APPROVED）
+dc472c1ca02428daf452b84d3524d21d8a748dee2053636d866bf4583e4518aa

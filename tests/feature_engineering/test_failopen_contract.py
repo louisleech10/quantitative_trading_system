@@ -262,7 +262,9 @@ def test_failed_engines_tuple_is_immutable() -> None:
 
 def _assert_l1_baseline_hash(monkeypatch: pytest.MonkeyPatch) -> None:
     baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
-    expected_l1_hash = baseline["single_tf"][BASELINE_SYMBOL][BASELINE_TIMEFRAME]["layers"]["L1"][
+    # PRE-RED Task 2.4：直跑 L1（不經公開域預熱）之 oracle＝基準之 l1_direct；與 layers.L1（全量 run、預熱後公開窗）
+    # 為兩獨立 oracle，FF-STAT 第 4 批後可長期不等，禁止要求兩者相等
+    expected_l1_hash = baseline["single_tf"][BASELINE_SYMBOL][BASELINE_TIMEFRAME]["l1_direct"][
         "canonical_sha256"
     ]
     actual_l1_hash = _compute_l1_canonical_sha256(monkeypatch)

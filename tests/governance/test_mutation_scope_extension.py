@@ -94,10 +94,35 @@ def _mini_repo(tmp_path: Path, probes: dict[str, str]) -> Path:
     return root
 
 
-def test_true_positive_i_quant_fatal_set_is_the_named_12() -> None:
-    _, names, out = _run_entry()
+_QUANT_DIRS = ("tests/momentum", "tests/api", "tests/feature_engineering")
+
+
+def _w_snapshot_repo(tmp_path: Path) -> Path:
+    """PRE-RED Task 1.1（SPEC v6）：以**現行**入口與靜態器、掃 W（`_todofmt_anchor.effective_commit()`）時之量化三層
+    測試檔（git 內容逐檔取出，含 `def test_mutation_` 者）。比較對象固定為 TODOFMT 定案時之輸入，W 後之新增或重構
+    （例：FF-STAT 把 truncation MR 之 mutant 本體移入 `run_control_*` helper 而被啟發式誤判）不影響本快照；
+    入口或靜態器被改壞時結果仍會變。"""
+    w = anchor.effective_commit()
+    assert w is not None, "W 未成立"
+    root = _mini_repo(tmp_path, {})
+    listing = subprocess.run(["git", "ls-tree", "-r", "--name-only", w, "--", *_QUANT_DIRS], cwd=REPO_ROOT,
+                             capture_output=True, text=True, check=True).stdout.split()
+    for rel in listing:
+        if not rel.endswith(".py"):
+            continue
+        src = anchor.show(w, rel)
+        if src and "def test_mutation_" in src:
+            p = root / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(src, encoding="utf-8")
+    return root
+
+
+def test_true_positive_i_quant_fatal_set_is_the_named_12(tmp_path: Path) -> None:
+    _, names, out = _run_entry(_w_snapshot_repo(tmp_path))
     quant = {n for n in names if not n.startswith("tests/governance/")}
-    assert quant == QUANT_FATAL, out
+    assert len(QUANT_FATAL) == 12
+    assert quant == QUANT_FATAL, (sorted(QUANT_FATAL - quant), sorted(quant - QUANT_FATAL), out)
 
 
 def test_true_positive_ii_governance_fatal_set_is_the_named_27() -> None:

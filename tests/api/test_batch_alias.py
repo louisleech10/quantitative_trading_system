@@ -280,7 +280,11 @@ async def test_patch_batch_alias_deleting_returns_409(
     )
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "run_busy"
-    assert "batch_alias" not in registry.get("BTCUSDT", "12h", "cfg_a")
+    # PRE-RED Task 2.1：28596e1e 起公開 get 對 deleting 條目回 None（刻意隱藏）⇒ 以 get_internal 驗「未寫入 alias」
+    assert registry.get("BTCUSDT", "12h", "cfg_a") is None
+    entry = registry.get_internal("BTCUSDT", "12h", "cfg_a")
+    assert entry is not None and entry.get("deleting")
+    assert "batch_alias" not in entry
 
 
 @pytest.mark.asyncio

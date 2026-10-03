@@ -11,32 +11,45 @@
     "tests/feature_engineering/test_failopen_correctness.py",
     "tests/feature_engineering/test_failopen_contract.py",
     "tests/feature_engineering/test_failopen_layers.py",
-    "tests/governance/test_prered_allowed_red.py"
+    "tests/governance/test_prered_allowed_red.py",
+    "tests/feature_engineering/test_failopen_producer.py"
   ],
   "script_acceptance": [
-    "handoffs/run_receipts/prered_probes/l1_components.py",
-    "handoffs/run_receipts/prered_probes/l1_segments.sh",
-    "handoffs/run_receipts/prered_probes/full_record.py",
-    "handoffs/run_receipts/prered_probes/full_at_commits.sh",
-    "handoffs/run_receipts/prered_probes/full_coldiff.py",
-    "handoffs/run_receipts/prered_probes/full_suffix.py",
-    "handoffs/run_receipts/prered_probes/l1_prefix_only.py",
-    "handoffs/run_receipts/prered_probes/l1_tolerance.py",
-    "handoffs/run_receipts/prered_probes/multi_record.py",
-    "handoffs/run_receipts/prered_probes/multi_at_commits.sh",
-    "handoffs/run_receipts/prered_probes/v7_seed_manifest.py",
-    "handoffs/run_receipts/prered_probes/bisect_light.sh",
-    "handoffs/run_receipts/prered_probes/light_at_commit.sh",
-    "handoffs/run_receipts/prered_probes/node_at_commit.sh",
-    "handoffs/run_receipts/prered_probes/v7_seed_at.sh",
-    "handoffs/run_receipts/prered_probes/dump_layer.sh",
-    "handoffs/run_receipts/prered_probes/suffix_pair.sh",
-    "handoffs/run_receipts/prered_probes/l1_head.sh",
-    "handoffs/run_receipts/prered_probes/one_node.sh",
-    "handoffs/run_receipts/prered_probes/l1_at_commit.sh",
     "handoffs/run_receipts/prered_probes/ablation.py",
     "handoffs/run_receipts/prered_probes/ablation_classify.py",
-    "handoffs/run_receipts/prered_probes/ablation_pair.sh"
+    "handoffs/run_receipts/prered_probes/ablation_pair.sh",
+    "handoffs/run_receipts/prered_probes/bisect_light.sh",
+    "handoffs/run_receipts/prered_probes/build_allowed_red.py",
+    "handoffs/run_receipts/prered_probes/dump_layer.sh",
+    "handoffs/run_receipts/prered_probes/full_at_commits.sh",
+    "handoffs/run_receipts/prered_probes/full_coldiff.py",
+    "handoffs/run_receipts/prered_probes/full_record.py",
+    "handoffs/run_receipts/prered_probes/full_suffix.py",
+    "handoffs/run_receipts/prered_probes/l1_at_commit.sh",
+    "handoffs/run_receipts/prered_probes/l1_components.py",
+    "handoffs/run_receipts/prered_probes/l1_head.sh",
+    "handoffs/run_receipts/prered_probes/l1_prefix_only.py",
+    "handoffs/run_receipts/prered_probes/l1_segments.sh",
+    "handoffs/run_receipts/prered_probes/l1_tolerance.py",
+    "handoffs/run_receipts/prered_probes/light_at_commit.sh",
+    "handoffs/run_receipts/prered_probes/mtf_count_at.sh",
+    "handoffs/run_receipts/prered_probes/mtf_l3_cols.py",
+    "handoffs/run_receipts/prered_probes/mtf_l3_cols_at.sh",
+    "handoffs/run_receipts/prered_probes/mtf_l3_diff.py",
+    "handoffs/run_receipts/prered_probes/mtf_l3_newcols_c2.py",
+    "handoffs/run_receipts/prered_probes/multi_at_commits.sh",
+    "handoffs/run_receipts/prered_probes/multi_record.py",
+    "handoffs/run_receipts/prered_probes/node_at_commit.sh",
+    "handoffs/run_receipts/prered_probes/node_at_commit_watched.sh",
+    "handoffs/run_receipts/prered_probes/nodes_watched.sh",
+    "handoffs/run_receipts/prered_probes/one_node.sh",
+    "handoffs/run_receipts/prered_probes/red_census.sh",
+    "handoffs/run_receipts/prered_probes/refreeze_ab.sh",
+    "handoffs/run_receipts/prered_probes/refreeze_compare.py",
+    "handoffs/run_receipts/prered_probes/suffix_pair.sh",
+    "handoffs/run_receipts/prered_probes/v7_seed_at.sh",
+    "handoffs/run_receipts/prered_probes/v7_seed_manifest.py",
+    "handoffs/run_receipts/prered_probes/watch_run.sh"
   ],
   "contract_jsons": [
     "tests/_golden/prered/allowed_red.json"
@@ -47,6 +60,18 @@
       "cmd": "handoffs/run_receipts/prered_probes/*.sh（逐項見收據 items[].cmd）",
       "rc": 0,
       "honest_bounds": "治理 12 項首紅沿用 FKPERF 收據；d229336e 之數值差只對 L1 做逐格容差分段，L2–L6 只做逐欄雜湊與尾段比對；多週期 BTC 分段收據執行中（SPEC §A 註明，重凍不得早於之）"
+    },
+    {
+      "path": "handoffs/run_receipts/20261003-prered-refreeze.json",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/refreeze_ab.sh <S>; venv/bin/python handoffs/run_receipts/prered_probes/refreeze_compare.py …",
+      "rc": 0,
+      "honest_bounds": "單週期三單元；A／B 確定性投影相等（資料檔排除 manifest 與 .lock，同測試規則）；BTCUSDT/1h 與多週期原樣"
+    },
+    {
+      "path": "handoffs/run_receipts/20261003-prered-mtf-l3-count.json",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/mtf_count_at.sh <S> d229336e^ d229336e; zsh handoffs/run_receipts/prered_probes/mtf_l3_cols_at.sh <S> d229336e^ d229336e; venv/bin/python handoffs/run_receipts/prered_probes/mtf_l3_diff.py …; venv/bin/python handoffs/run_receipts/prered_probes/mtf_l3_newcols_c2.py …",
+      "rc": 0,
+      "honest_bounds": "只歸因 BTCUSDT 12h 直跑 L3 存活欄集合差；只新 3 欄以 _l3_oracle 驗算，只舊欄依 dead_reasons 與上游相異值逐欄驗；未驗其他標的／週期"
     }
   ],
   "batch_card": {
@@ -68,7 +93,10 @@
       "tests/feature_engineering/test_failopen_correctness.py",
       "tests/feature_engineering/test_failopen_contract.py",
       "tests/feature_engineering/test_failopen_layers.py",
-      "handoffs/run_receipts/20261003-prered-attribution.json"
+      "handoffs/run_receipts/20261003-prered-attribution.json",
+      "tests/feature_engineering/test_failopen_producer.py",
+      "handoffs/run_receipts/20261003-prered-red-census.txt",
+      "handoffs/run_receipts/20261003-prered-refreeze.json"
     ],
     "callers_now": [
       "tests/feature_engineering/test_failopen_contract.py",
@@ -134,7 +162,7 @@
       "test_failopen_correctness.py ← Task 2.3：v7 改精簡 L1 設定、加種子品質前置斷言與續跑期間 12h L1 計算次數觀測",
       "freeze_failopen_baseline.py ← Task 2.4：_single_tf_record 之 registry 雜湊取公開輸出窗切片；新增 l1_direct 記錄；預熱未啟用時行為逐位元組不變",
       "test_failopen_contract.py ← Task 2.4：L1 oracle 改比對 l1_direct",
-      "已核模式（重凍後）＝gate_cmd 加（單組串行）：venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_correctness.py::test_v3_healthy_full_run_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_ethusdt_1h_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor tests/feature_engineering/test_failopen_correctness.py::test_v5_prefix_no_leakage_after_warmup tests/feature_engineering/test_failopen_correctness.py::test_v5_l5_cross_sectional_prefix_no_leakage tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns tests/feature_engineering/test_failopen_correctness.py::test_v6_asof_oracle_boundary_cases tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_isolation tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_same_factory_no_cache_pollution tests/feature_engineering/test_failopen_correctness.py::test_v7_symbol_order_permutation_invariant tests/feature_engineering/test_failopen_correctness.py::test_v7_cache_cold_hot_identical tests/feature_engineering/test_failopen_correctness.py::test_v7_cgsa_resume_matches_fresh；test_v3_multi_tf_btc_matches_frozen_baseline 不入必綠集合（允許仍紅，ICFIRSTALIGN／blocked-by F-2；戳記輪 R1 codex）",
+      "已核模式（重凍後）＝gate_cmd 加（單組串行；correctness 各節點各自獨立行程逐一跑，同行程連跑會累積記憶體被系統終止）：venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_correctness.py::test_v3_healthy_full_run_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_ethusdt_1h_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor tests/feature_engineering/test_failopen_correctness.py::test_v5_prefix_no_leakage_after_warmup tests/feature_engineering/test_failopen_correctness.py::test_v5_l5_cross_sectional_prefix_no_leakage tests/feature_engineering/test_failopen_correctness.py::test_v6_asof_oracle_boundary_cases tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_isolation tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_same_factory_no_cache_pollution tests/feature_engineering/test_failopen_correctness.py::test_v7_symbol_order_permutation_invariant tests/feature_engineering/test_failopen_correctness.py::test_v7_cache_cold_hot_identical tests/feature_engineering/test_failopen_correctness.py::test_v7_cgsa_resume_matches_fresh；test_v3_multi_tf_btc_matches_frozen_baseline 與 v6 三支（test_v6_independent_asof_oracle_matches_multi_tf_columns、test_v6_backend_output_matches_independent_oracle、test_v6_close_time_oracle_matches_pipeline）不入必綠集合（允許仍紅，ICFIRSTALIGN／blocked-by F-2；戳記輪 R1 codex、實作期 v6 峰值約 71 GB 收據）",
       "Task 2.0 ← 多週期分段與 L2–L6 消融歸類收據，U 未解釋欄＝0 才組重凍批准包",
       "Task 2.5 ← F-2 分段記憶體收據；修復歸 ICFIRSTALIGN 乙 MEM-RSS",
       "解耦：本票不改 momentum／api 生產碼，七條解耦規則不受影響（check_decoupling.sh 於實作批跑一次附收據）"
@@ -149,7 +177,10 @@
       "Task 2.3 驗證：test_v7_cgsa_resume_matches_fresh（峰值記憶體 < 2 GB 收據）；續跑期間 12h 之 L1 計算次數＝0；mutant is_run_status_cacheable 恆 False、MultiTFGenerator._has_resume_checkpoint_for_timeframe 恆 False",
       "Task 2.4 驗證：重凍後必綠五支＝test_l1_baseline_hash_matches_frozen、test_required_fail_returns_result、test_v3_healthy_full_run_matches_frozen_baseline、test_v3_ethusdt_1h_matches_frozen_baseline、test_layer_golden_matches_baseline；test_v3_multi_tf_btc_matches_frozen_baseline 歸允許仍紅（blocked-by F-2）；mutant BETA 輸入改回 close,volume、L3 滾動統計乘 1.01",
       "Task 3.1 驗證：test_prered_allowed_red.py 精確集合比對；mutant 清空列表、加入合法 metadata 之綠節點、加入不存在之 node、參數化 id 改為不存在之參數",
-      "走 frame 兩支與 IC-first 兩支不在本票修正範圍，列入 allowed_red.json"
+      "走 frame 兩支與 IC-first 兩支不在本票修正範圍，列入 allowed_red.json",
+      "Task 2.6 驗證：test_quality_gate_max_ratios_do_not_change_config_hash 釘值改讀基準多週期 config_hash；多週期未重凍前歸允許仍紅（ICFIRSTALIGN）",
+      "Task 3.1 終態 44 列由 red census 機械產生；census 只涵蓋直接引用被刪 run 之檔（誠實邊界）",
+      "Task 2.7 驗證：test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor 存活欄數 59962；逐欄歸因收據 handoffs/run_receipts/20261003-prered-mtf-l3-count.json 未解釋＝0"
     ],
     "lifecycle": "keep",
     "not_executable": [

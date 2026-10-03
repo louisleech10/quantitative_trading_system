@@ -33,17 +33,51 @@ PENDING = "（待 FF-TFMETA 新增）"
 _NODE = re.compile(r"(tests/\S+?\.py)::(test_\w+)")
 
 
+SAMPLE_SPEC_PATH = "docs/FFDEFECT_DECISION.md"
+_MANIFEST_REL = "docs/manifests/FFTFMETA.json"
+
+
+def _git_show(commit: str, rel: str) -> str | None:
+    r = subprocess.run(["git", "show", f"{commit}:{rel}"], cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+    return r.stdout if r.returncode == 0 else None
+
+
+def _sample_commit() -> str:
+    """PRE-RED Task 1.2：TODOFMT 樣本版＝`git log -- docs/manifests/FFTFMETA.json` 中最新一個 spec_path 為
+    `docs/FFDEFECT_DECISION.md` 之 commit（5156d074 起該檔改為 FF-TFMETA 正式施工清單）。找不到 ⇒ fail-closed。"""
+    log = subprocess.run(["git", "log", "--format=%H", "--", _MANIFEST_REL], cwd=REPO_ROOT,
+                         capture_output=True, text=True, check=True).stdout.split()
+    for c in log:
+        text = _git_show(c, _MANIFEST_REL)
+        try:
+            if text and json.loads(text).get("spec_path") == SAMPLE_SPEC_PATH:
+                return c
+        except json.JSONDecodeError:
+            continue
+    raise AssertionError(f"找不到 spec_path＝{SAMPLE_SPEC_PATH} 之樣本版 manifest")
+
+
 def _m() -> dict:
+    """樣本版 manifest（TODOFMT Task 3.2 所驗之對象）。"""
+    return json.loads(_git_show(_sample_commit(), _MANIFEST_REL) or "")
+
+
+def _m_current() -> dict:
+    """工作樹現行 manifest（FF-TFMETA 正式施工清單）；用於 gate 路由與其改壞之鑑別。"""
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
 
-def _assert_declared_test_truthful(line: str) -> None:
-    """該行所宣告之測試函式：存在 ⇔ 未標「待新增」。"""
+def _assert_declared_test_truthful(line: str, commit: str | None = None) -> None:
+    """該行所宣告之測試函式：存在 ⇔ 未標「待新增」。commit 給定時以該 commit 之樹判定（樣本版），否則以工作樹。"""
     m = _NODE.search(line)
     assert m, f"未宣告具名測試（path::test_*）：{line}"
     path, name = m.groups()
-    src = REPO_ROOT / path
-    exists = src.is_file() and re.search(rf"^\s*def {name}\(", src.read_text(encoding="utf-8"), re.M) is not None
+    if commit is not None:
+        text = _git_show(commit, path)
+    else:
+        src = REPO_ROOT / path
+        text = src.read_text(encoding="utf-8") if src.is_file() else None
+    exists = text is not None and re.search(rf"^\s*def {name}\(", text, re.M) is not None
     assert exists != (PENDING in line), (
         f"已存在卻仍標{PENDING}：{line}" if exists else f"不存在卻未標{PENDING}：{line}"
     )
@@ -81,14 +115,14 @@ def test_boundary_05_lifecycle_legal() -> None:
 def test_boundary_06_each_case_has_named_test(case: str) -> None:
     lines = [ln for ln in _m()["batch_card"]["coverage_risk"] if ln.startswith(f"情況「{case}」")]
     assert len(lines) == 1, lines
-    _assert_declared_test_truthful(lines[0])
+    _assert_declared_test_truthful(lines[0], commit=_sample_commit())
 
 
 @pytest.mark.parametrize("eq", FIVE_EQUATIONS)
 def test_coverage_risk_lists_each_equation_with_named_test(eq: str) -> None:
     lines = [ln for ln in _m()["batch_card"]["coverage_risk"] if ln.startswith(f"等式「{eq}」")]
     assert len(lines) == 1, lines
-    _assert_declared_test_truthful(lines[0])
+    _assert_declared_test_truthful(lines[0], commit=_sample_commit())
 
 
 def test_declared_test_truthfulness_discriminates() -> None:
@@ -125,7 +159,7 @@ def test_gate_routes_manifest_to_todofmt_path(tmp_path: Path) -> None:
 def test_mutation_breaking_manifest_is_rejected_by_gate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """把樣本之 lifecycle 改成非法值 ⇒ 經 gate 路由即被拒（證路由真的執行了 todofmt 檢查）。"""
     bad = tmp_path / "FFTFMETA.json"
-    data = _m()
+    data = _m_current()
     data["batch_card"]["lifecycle"] = "forever"
     bad.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setattr(sys.modules[__name__], "MANIFEST", bad)
