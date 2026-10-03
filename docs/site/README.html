@@ -180,7 +180,7 @@
 <td>HP-PRERED</td>
 <td>進行中</td>
 <td>docs/TICKET_ORDER.md</td>
-<td>🔴 下一個 session 從這裡開始：全票排序第 2 步 PRE-RED（第 1 步 FKPERF 已收案）。範圍＝治理全套 12 項既有紅（已 bisect，見 RM-PRERED）＋FF 9 支既有紅（L1 凍結基準五支、resume 二支、API alias 一支、走 frame 之二支另歸 FRAMEPATH）；第 2–4 步唯讀預調查草稿（嫌疑 commit、canonical hash 五分量、ratio-unsafe 失效範圍、ICFIRSTALIGN 乙候選設計）見 handoffs/20261003-ticketorder-prework-steps2-4.md；FF 重測試一律單組串行。之後第 3 步 RATIOUNSAFE、第 4 步 ICFIRSTALIGN 乙（候選設計：run_ic_first 改呼叫 generate_features 之 CGSA 路徑產 L7 raw）</td>
+<td>🔴 卡住待使用者裁定兩件：①審查 r4 之債卡死（磁碟滿致 codex 交件失敗且 committee_family_result 未寫入 ⇒ gate.sh redispatch 要求該家有 failed 紀錄、debt_clear --abandon 因另兩家已 success 被 C-9 擋、audit_append 之 origin 白名單擋補記；round 8863d04a-9317-4a22-9720-5d56f5d14fd9）⇒ 一扇門擋住所有派工與實作許可，解法須改治理工具；②單週期 BTCUSDT/12h、ETHUSDT/12h、ETHUSDT/1h 三單元基準重凍（證據：docs/PRERED_SPEC.md §A 與 handoffs/run_receipts/20261003-prered-attribution.json，消融 U＝0）。已完成：SPEC v1→v5（docs/PRERED_SPEC.md；審查 r1–r3 二十四條全採納，r4 兩家 proceed）、TODO manifest docs/manifests/PRERED.json（TODOFMT PASS）；21 支既有紅逐支歸因——全屬測試前提過期（治理 12、alias <code>28596e1e</code>、resume config_hash <code>04176c18</code>、v7 <code>cb53ff19</code>、L1／全量基準六支＝<code>2247c394</code> 深稽修正＋<code>d229336e</code> FF-STAT 第 4 批）；新發現 F-2（12h＋1h 生成於 8 GB 本機被系統終止而非 fail-closed，修復歸第 4 步 MEM-RSS）、F-1（12h 深週期正常 run 恆 partial ⇒ 永不快取／續跑，歸 FFSTORE）、F-3（低基數 skew／kurt 剔除不記原因，歸 FFSTORE）。BTCUSDT/1h 與多週期兩單元受 F-2 擋。實作（Phase 1–3）未開工。第 3 步 RATIOUNSAFE 唯讀預查已證 43／43 漏判（handoffs/run_receipts/prered_probes/ratio_unsafe_names.py）且判定有兩份逐字重複實作</td>
 </tr>
 </tbody>
 </table></div>

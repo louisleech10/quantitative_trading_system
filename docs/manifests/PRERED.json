@@ -1,0 +1,127 @@
+{
+  "spec_path": "docs/PRERED_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [],
+  "test_files": [
+    "tests/governance/test_mutation_scope_extension.py",
+    "tests/governance/test_todofmt_sample_fftfmeta.py",
+    "tests/governance/test_todofmt_constitution_sync.py",
+    "tests/api/test_batch_alias.py",
+    "tests/test_cgsa_resume.py",
+    "tests/feature_engineering/test_failopen_correctness.py",
+    "tests/feature_engineering/test_failopen_contract.py",
+    "tests/feature_engineering/test_failopen_layers.py",
+    "tests/governance/test_prered_allowed_red.py"
+  ],
+  "script_acceptance": [
+    "handoffs/run_receipts/prered_probes/l1_components.py",
+    "handoffs/run_receipts/prered_probes/l1_segments.sh",
+    "handoffs/run_receipts/prered_probes/full_record.py",
+    "handoffs/run_receipts/prered_probes/full_at_commits.sh",
+    "handoffs/run_receipts/prered_probes/full_coldiff.py",
+    "handoffs/run_receipts/prered_probes/full_suffix.py",
+    "handoffs/run_receipts/prered_probes/l1_prefix_only.py",
+    "handoffs/run_receipts/prered_probes/l1_tolerance.py",
+    "handoffs/run_receipts/prered_probes/multi_record.py",
+    "handoffs/run_receipts/prered_probes/multi_at_commits.sh",
+    "handoffs/run_receipts/prered_probes/v7_seed_manifest.py",
+    "handoffs/run_receipts/prered_probes/bisect_light.sh",
+    "handoffs/run_receipts/prered_probes/light_at_commit.sh",
+    "handoffs/run_receipts/prered_probes/node_at_commit.sh",
+    "handoffs/run_receipts/prered_probes/v7_seed_at.sh",
+    "handoffs/run_receipts/prered_probes/dump_layer.sh",
+    "handoffs/run_receipts/prered_probes/suffix_pair.sh",
+    "handoffs/run_receipts/prered_probes/l1_head.sh",
+    "handoffs/run_receipts/prered_probes/one_node.sh",
+    "handoffs/run_receipts/prered_probes/l1_at_commit.sh",
+    "handoffs/run_receipts/prered_probes/ablation.py",
+    "handoffs/run_receipts/prered_probes/ablation_classify.py",
+    "handoffs/run_receipts/prered_probes/ablation_pair.sh"
+  ],
+  "contract_jsons": [
+    "tests/_golden/prered/allowed_red.json"
+  ],
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20261003-prered-attribution.json",
+      "cmd": "handoffs/run_receipts/prered_probes/*.sh（逐項見收據 items[].cmd）",
+      "rc": 0,
+      "honest_bounds": "治理 12 項首紅沿用 FKPERF 收據；d229336e 之數值差只對 L1 做逐格容差分段，L2–L6 只做逐欄雜湊與尾段比對；多週期 BTC 分段收據執行中（SPEC §A 註明，重凍不得早於之）"
+    }
+  ],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "docs/PRERED_SPEC.md",
+      "docs/manifests/PRERED.json",
+      "scripts/freeze_failopen_baseline.py",
+      "tests/_golden/failopen/baseline.json",
+      "tests/_golden/failopen/max_nan_ratio.json",
+      "tests/_golden/prered/allowed_red.json",
+      "tests/governance/fixtures/constitution_exception_allowlist.txt",
+      "tests/governance/test_mutation_scope_extension.py",
+      "tests/governance/test_todofmt_sample_fftfmeta.py",
+      "tests/governance/test_todofmt_constitution_sync.py",
+      "tests/governance/test_prered_allowed_red.py",
+      "tests/api/test_batch_alias.py",
+      "tests/test_cgsa_resume.py",
+      "tests/feature_engineering/test_failopen_correctness.py",
+      "tests/feature_engineering/test_failopen_contract.py",
+      "tests/feature_engineering/test_failopen_layers.py",
+      "handoffs/run_receipts/20261003-prered-attribution.json"
+    ],
+    "callers_now": [
+      "tests/feature_engineering/test_failopen_contract.py",
+      "tests/feature_engineering/test_failopen_correctness.py",
+      "tests/feature_engineering/test_failopen_layers.py"
+    ],
+    "callers_later": [
+      "docs/ROADMAP.md"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/governance/test_mutation_scope_extension.py tests/governance/test_todofmt_sample_fftfmeta.py tests/governance/test_todofmt_constitution_sync.py tests/governance/test_prered_allowed_red.py tests/api/test_batch_alias.py tests/test_cgsa_resume.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_correctness.py::test_v7_cgsa_resume_matches_fresh",
+    "forbidden": [
+      {"rule": "不得改 momentum／api／frontend 生產碼", "observable": true},
+      {"rule": "不得刪除或放寬斷言換綠；不得新增 skip／xfail", "observable": true},
+      {"rule": "基準 JSON 只能由凍結腳本本體產生，禁手改", "observable": true},
+      {"rule": "使用者核可前不得重凍 tests/_golden/failopen/baseline.json", "observable": true},
+      {"rule": "測試內不得寫死 commit sha 作為錨點（取版一律由 git 內容機械推導）", "observable": true},
+      {"rule": "不得改 scripts/mutation_probe_static.py、docs/manifests/FFTFMETA.json、.cursorrules、momentum/FeatureEngineering/feature_registry.py", "observable": true},
+      {"rule": "FF 重測試不得並行兩組", "observable": false},
+      {"rule": "FF 驗證只用真實 data_cache/feature_klines/kline_cache.h5，禁合成 fixture", "observable": true},
+      {"rule": "探針與測試不得寫入 data_cache（registry、cgsa_work、d* 快取一律導 tmp）", "observable": true},
+      {"rule": "不弱化 NaN／inf 閘與品質判定；不得以 stub 品質判定或續跑閘換綠", "observable": true},
+      {"rule": "F-2 不得以精簡設定之結果代替原設定之驗收", "observable": true}
+    ],
+    "risk_mitigation": [
+      "test_mutation_scope_extension.py ← Task 1.1：量化層集合限縮為 W 時樹中存在之 <檔>::<函式>（_todofmt_anchor.effective_commit 與 git show）",
+      "test_todofmt_sample_fftfmeta.py ← Task 1.2：樣本版＝git log 中最新 spec_path 為 docs/FFDEFECT_DECISION.md 之 commit；宣告真實性對該 commit 之樹判定",
+      "constitution_exception_allowlist.txt ← Task 1.3：只增 .cursorrules 第 12 條現行行之 sha256 一列並附註解",
+      "test_batch_alias.py ← Task 2.1：:283 改 get_internal 並加前置斷言",
+      "test_cgsa_resume.py ← Task 2.2：:126 改真實 FactoryConfig",
+      "test_failopen_correctness.py ← Task 2.3：v7 改精簡 L1 設定、加種子品質前置斷言與續跑期間 12h L1 計算次數觀測",
+      "freeze_failopen_baseline.py ← Task 2.4：_single_tf_record 之 registry 雜湊取公開輸出窗切片；新增 l1_direct 記錄；預熱未啟用時行為逐位元組不變",
+      "test_failopen_contract.py ← Task 2.4：L1 oracle 改比對 l1_direct",
+      "已核模式（重凍後）＝gate_cmd 加：venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_correctness.py（單組串行）",
+      "Task 2.0 ← 多週期分段與 L2–L6 消融歸類收據，U 未解釋欄＝0 才組重凍批准包",
+      "Task 2.5 ← F-2 分段記憶體收據；修復歸 ICFIRSTALIGN 乙 MEM-RSS",
+      "解耦：本票不改 momentum／api 生產碼，七條解耦規則不受影響（check_decoupling.sh 於實作批跑一次附收據）"
+    ],
+    "coverage_risk": [
+      "Task 1.1 驗證：test_true_positive_i_quant_fatal_set_is_the_named_12；mutant 三支（靜態器恆不報、W 判定恆真、W 時已存在之非 fatal 函式改空心）",
+      "Task 2.0 驗證：消融收據 U＝0；mutant 新版待判產物之具名 L3 欄有限值乘 1.01 ⇒ 落入 U；mutant 舊版不注入視窗 ⇒ 列數或時間戳斷言拋錯；負控制 mutant 改壞已用之上游前史一格並重算下游 ⇒ 上游非 C1-full、下游入 U；探針交付 C1-public／C1-full／C2／C3／U 與 summary.U；reference 對照 test_l3_rolling_exact_and_start_independent、test_l3_slope_exact_and_start_independent、test_l3_slope_fallback_path_exact_and_start_independent 綠",
+      "Task 1.2 驗證：test_todofmt_sample_fftfmeta.py 整檔；mutant 取版規則改取最新 commit",
+      "Task 1.3 驗證：test_step1b_no_new_exception_clause_outside_allowlist；mutant 白名單移除該雜湊、該行再改一字",
+      "Task 2.1 驗證：test_patch_batch_alias_deleting_returns_409；mutant set_batch_alias 刪 deleting 檢查",
+      "Task 2.2 驗證：test_cgsa_config_hash_passed_correctly；mutant 傳空字串 config_hash",
+      "Task 2.3 驗證：test_v7_cgsa_resume_matches_fresh（峰值記憶體 < 2 GB 收據）；續跑期間 12h 之 L1 計算次數＝0；mutant is_run_status_cacheable 恆 False、MultiTFGenerator._has_resume_checkpoint_for_timeframe 恆 False",
+      "Task 2.4 驗證：test_l1_baseline_hash_matches_frozen、test_required_fail_returns_result、test_v3_healthy_full_run_matches_frozen_baseline、test_v3_ethusdt_1h_matches_frozen_baseline、test_v3_multi_tf_btc_matches_frozen_baseline、test_layer_golden_matches_baseline；mutant BETA 輸入改回 close,volume",
+      "Task 3.1 驗證：test_prered_allowed_red.py 精確集合比對；mutant 清空列表、加入合法 metadata 之綠節點、加入不存在之 node、參數化 id 改為不存在之參數",
+      "走 frame 兩支與 IC-first 兩支不在本票修正範圍，列入 allowed_red.json"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {"item": "stub_modules", "reason": "user-ruling", "owner": "PRE-RED", "expiry": "2026-12-31"},
+      {"item": "FF 重測試不得並行兩組", "reason": "user-ruling", "owner": "PRE-RED", "expiry": "2026-12-31"}
+    ]
+  }
+}

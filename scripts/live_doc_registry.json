@@ -678,6 +678,10 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/PRERED_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/REDISPATCH_SPEC.md",
       "LIVE-SPEC"
     ],
