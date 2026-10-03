@@ -1,7 +1,7 @@
 # RATIOUNSAFE：ratio-unsafe（pattern）欄之判定對帶週期欄名失效、主路徑 L6.5 未跳過 — SPEC
 
 > 來源 PLAN/診斷：`docs/TICKET_ORDER.md` 第 3 步；`handoffs/20261003-ticketorder-prework-steps2-4.md`　|　日期：2026-10-03　|　對應 TODO：`docs/manifests/RATIOUNSAFE.json`
-> 版本：v2（審查 r1 `handoffs/reconcile/20261003-ratiounsafe-x-review-r1/synth.md` 全數採納：Task 2.1 改以生產落盤入口 `transform_registry_groups_to_sink` 與其 native／分片／分塊分支為主、混合群組逐欄處置、分類先於校準子封包；L7 dead-drop 預設開致落盤欄數增加之實測與核可；週期標記規則改以 storage 之群組週期身分為準、定義加剝互逆之定義域；mutant 改置共同核心並分接線鑑別；pattern 值域敘述更正；`transform_selected` 全 pattern 回空 dict；路徑更正）；v1（主委起草）
+> 版本：v3（審查 r2 `handoffs/reconcile/20261003-ratiounsafe-x-review-r2/synth.md` 全數採納：append 模式 ratio-unsafe 衍生欄不再產生之明示與驗收、新增 Task 2.2 failopen 單週期基準重凍與核可、切片位置釘在各呼叫點、校準順序以 spy 與 safe-only 子封包鑑別、mutant ⑥⑦⑧）；v2（審查 r1 `handoffs/reconcile/20261003-ratiounsafe-x-review-r1/synth.md` 全數採納：Task 2.1 改以生產落盤入口 `transform_registry_groups_to_sink` 與其 native／分片／分塊分支為主、混合群組逐欄處置、分類先於校準子封包；L7 dead-drop 預設開致落盤欄數增加之實測與核可；週期標記規則改以 storage 之群組週期身分為準、定義加剝互逆之定義域；mutant 改置共同核心並分接線鑑別；pattern 值域敘述更正；`transform_selected` 全 pattern 回空 dict；路徑更正）；v1（主委起草）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大。`docs/TICKET_ORDER.md` 標「小」；依 CLAUDE.md 任務分派規則重判：命中 (a)(b)(d)，且觸「膨脹升級」訊號（碰 `momentum/factories.py`、測試面擴大）。預查另證主路徑資料品質缺陷（§A FACT-RECEIPT 2、3），範圍擴及特徵工廠 L6.5 registry 兩入口全分支。
@@ -18,14 +18,14 @@
   - 宣告——週期標記規則：①`FeatureFactory._timeframe_tagged_name`／`_apply_timeframe_tag`（feature_factory.py:4559／4569）與 `MultiTFGenerator._apply_timeframe_tag`（`momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1719`）：`parts[1:]` 任一為週期鍵即不標——僅 frame 路徑使用，FRAMEPATH（第 5 步）刪除；②`calibration.tagged_column_name`（`momentum/FeatureEngineering/preprocessing/calibration.py:190`）：`parts[1]` 為任一週期鍵即不標；③`feature_storage` CGSA L7 寫檔（feature_storage.py:1059–1071，生產落盤欄名之唯一來源）：週期取自 group_id 前綴（群組週期身分）、只認 `m／h／d` 結尾（`1w` 永不標）、只在「其後已以同一週期起頭」時不標（冪等）、labels 不經此段（審查 r1 grok 實查：labels 走獨立 `labels_df`）。週期鍵＝`TimeframeAligner._timeframe_seconds_keys()`＝{1m, 5m, 15m, 30m, 1h, 4h, 12h, 1d, 1w}。②與③對「第二段為他週期鍵」或「第三段起含週期鍵」之名不一致（例自訂 `ret_1d_x`：③於 12h／4h 群組產 `ret_12h_1d_x`／`ret_4h_1d_x`，②查封包用 `ret_1d_x`）。
   - 宣告——結構化類別之可得性：落盤 manifest 之 `groups` 無逐欄類別；`FeatureInfo` 只供 L2 使用、不落盤；`ColumnGroup` 無類別欄位；L1 group_id `{tf}_L1_{category}_{indicator}` 由 `_parse_l1_column_identity`（feature_factory.py:1276）以位置解析產生。⇒ `docs/TICKET_ORDER.md` 所寫「改讀結構化類別」於 IC 頁與 L6.5 現無資料來源；本票改為**名稱解析之單一真相源**，結構化類別列 §N。
   - 宣告——生成期順序與 IC 兩路：生成期 L6.5 所見欄名未標記（標記於 storage `_write_group`）；帶標記欄名進入判定之路徑＝IC 頁「套用後處理」與 `run_ic_first` 之 `transform_selected`（皆讀落盤成品）。**全域序列型**：涵蓋（轉換排除、落盤特徵值與欄集合修正）；**事件型**：事件型 IC 不呼叫 L6.5 轉換，但讀同一落盤特徵 ⇒ Phase 2 之落盤修正同時涵蓋；本票不改事件型程式碼。
-- **待使用者確認**：待確認：無（以下語意變更於 SPEC 白話逐條閘請使用者核可，未核可不得進 TODO）——①主路徑 L6.5 對 ratio-unsafe 欄之處置＝**原值通過、不做任何 L6.5 轉換**，而非自輸出刪除；涵蓋全部 pattern 類欄：L1 原始 K 線型態訊號（`CDL*`，值域如 {−100, 0, 100}，`CDLHIKKAKE` 為 [−200, 200]）、型態計數（例 `BullishCount_W21`，實測 [11, 61]）、`Consensus`（[−1, 1]）及其 L4 lag 衍生欄。理由：自 `docs/NAN_POISONING_INVESTIGATION.md` § 7B／Q11.2 起整類列為 ratio-unsafe 之既有分類契約（L2、L3 已據此跳過），L6.5 入口防線原設計意圖即「不轉換此類欄」；此類欄為離散事件訊號或計數，滾動縮尾會把稀有事件裁掉（FACT-RECEIPT 2）。②連帶之**落盤欄數增加**：L7 dead-drop 預設開時，現行被抹 0 而判死之 pattern 欄恢復落盤（FACT-RECEIPT 3：該設定下 +13 欄）；修後實際欄集合與 bytes 於實作後以同設定實測，列入完工收據。
+- **待使用者確認**：待確認：無（以下語意變更於 SPEC 白話逐條閘請使用者核可，未核可不得進 TODO）——①主路徑 L6.5 對 ratio-unsafe 欄之處置＝**原值通過、不做任何 L6.5 轉換**，而非自輸出刪除；涵蓋全部 pattern 類欄：L1 原始 K 線型態訊號（`CDL*`，值域如 {−100, 0, 100}，`CDLHIKKAKE` 為 [−200, 200]）、型態計數（例 `BullishCount_W21`，實測 [11, 61]）、`Consensus`（[−1, 1]）及其 L4 lag 衍生欄。理由：自 `docs/NAN_POISONING_INVESTIGATION.md` § 7B／Q11.2 起整類列為 ratio-unsafe 之既有分類契約（L2、L3 已據此跳過），L6.5 入口防線原設計意圖即「不轉換此類欄」；此類欄為離散事件訊號或計數，滾動縮尾會把稀有事件裁掉（FACT-RECEIPT 2）。②連帶之**落盤欄數增加**：L7 dead-drop 預設開時，現行被抹 0 而判死之 pattern 欄恢復落盤（FACT-RECEIPT 3：該設定下 +13 欄）；修後實際欄集合與 bytes 於實作後以同設定實測，列入完工收據。③`preprocessing.mode=append`（非預設，生產預設 `replace`）時，ratio-unsafe 來源欄**不再產生** L6.5 衍生欄（例 `ohlc_pattern_CDLDOJI_zscore_100`、`_zscore_252`、`_fracdiff`；審查 r2 codex 以真實 CDLDOJI＋EMA8、zscore 窗 [100, 252] 實跑：改前原始 2 欄＋衍生 4 欄、改後原始 2 欄＋safe 衍生 2 欄）⇒ append 設定下落盤欄數**減少**；實際縮減欄集合與 bytes 於實作後以 append 設定實測，列入完工收據。④failopen 單週期基準（`tests/_golden/failopen/baseline.json` 之 BTCUSDT/12h、ETHUSDT/12h、ETHUSDT/1h；凍結設定 winsorization 開、含 pattern）之 `final_L7` 雜湊於 Phase 2 後必變，須依 Task 2.2 重凍。
 - **已確認結果**：
   - `2026-10-02 使用者`：全票排序 17 步定案，第 3 步 RATIOUNSAFE（`docs/TICKET_ORDER.md`）；「照表做不另問」。
   - `2026-09-26 使用者`：不得侷限加密貨幣——週期鍵一律取自 `TimeframeAligner`，不寫死。
 
 ## §C 約束（不重抄，引用 + 只列本任務相關）
 - 解耦：API 取判定一律經 `momentum.factories`（Rule 3）；`momentum/` 不 import `api/`；新命名模組為純函式、無狀態。
-- 不弱化 NaN／inf 閘；L7 dead-drop 之閘與閾值不改。L6.5 不刪 ratio-unsafe 欄；L7 dead-drop 依修後之值重判 ⇒ 落盤欄數之變動**只限**「現行被 L6.5 改壞而判死、原值不死」之 ratio-unsafe 欄恢復（§A 待確認②）；非 ratio-unsafe 欄之欄名、欄數、落盤值逐位元組不變；欄名變更只限 Task 1.3 之 `1w` 標記。
+- 不弱化 NaN／inf 閘；L7 dead-drop 之閘與閾值不改。L6.5 不刪 ratio-unsafe 欄；L7 dead-drop 依修後之值重判 ⇒ 落盤欄集合之變動**只限**：「現行被 L6.5 改壞而判死、原值不死」之 ratio-unsafe 欄恢復（§A 待確認②），及 append 模式下 ratio-unsafe 來源之 L6.5 衍生欄不再產生（§A 待確認③）；ratio-unsafe 原始輸入欄之原值與欄序保留；非 ratio-unsafe 欄（含其 L6.5 衍生欄）之欄名、欄數、落盤值逐位元組不變；欄名變更只限 Task 1.3 之 `1w` 標記。
 - `RATIO_UNSAFE_CATEGORIES` 仍為單一常數；各模組以 re-export 引用，`is` 同一物件。
 - 不得侷限加密貨幣：週期鍵集合取自 `TimeframeAligner._timeframe_seconds_keys()`；不寫死週期清單或正則。
 - 嚴禁慢閘：新增測試皆為單元或輕量真實資料（pattern＋精簡 L1 單週期，秒級）。
@@ -62,10 +62,17 @@
 ### Phase 2 — 主路徑 L6.5 跳過 ratio-unsafe 欄（依賴：Phase 1）
 **Task 2.1 — registry 兩入口全分支跳過**
 - 目標：L6.5 不改寫 ratio-unsafe 欄。　檔案：`feature_preprocessor.py`——生產入口 `transform_registry_groups_to_sink`（:805）與其分支 `_maybe_run_native_l65_to_sink`（:1147）、`_transform_single_group_to_arrays`（:2312）、`_stream_sharded_group_to_sink`（:2431）、`_stream_single_group_chunked_to_sink`（:2497）；inplace 入口 `transform_registry_groups`（:747）與其分支 `_maybe_run_native_l65_inplace`、`_registry_fast_transform`、`_transform_single_group_optimized`、`_transform_single_group`；`_prepare_calibration_for_groups`（:289）。第一步以收據盤點兩入口之分派與實際落點（以 `feature_storage.py:1267` 呼叫鏈為權威）。
-- 改法：兩入口於 `_prepare_calibration_for_groups` **之前**逐群組逐欄分類；公開域欄集合（校準子封包、指紋）不含 ratio-unsafe 欄（`restrict_packet` 允許校準域多出欄）。群組處置：全為 ratio-unsafe ⇒ to_sink 入口以**原值陣列**送 sink（欄名、形狀、shard 命名、來源清理、compact 對齊展開與 `preprocessor=None` 之既有原值串流一致），inplace 入口不覆寫 registry；混合群組 ⇒ 只對非 ratio-unsafe 子矩陣轉換、ratio-unsafe 欄原值保留、欄序不變（native-tf 分支以原生子矩陣經既有 `apply_idx_map_to_array` 展開）；全為非 ratio-unsafe ⇒ 行為不變。`transform`（DataFrame 路徑）維持既有「入口剔除」語意不變。
-- **驗證**：`pytest tests/feature_engineering/test_ratiounsafe_registry.py` 綠：§G ①–⑥（經 `generate_features(persist=True)` 讀 `raw`）；逐分支單元（沿用 `tests/_golden/icpostleak/contract.json` 之 `registry_sink`／`registry_sink_sharded` 等強制分支設定，與 `tests/feature_engineering/test_icpostleak.py` 同 harness）：ratio-unsafe 欄 `np.array_equal(輸出, 輸入, equal_nan=True)`、非 ratio-unsafe 欄與改前逐位元組相同、sink 收到之列數／欄名／shard 名與改前相同；平穩化開＋pattern 群組 ⇒ 不拋 `CalibrationError` 且 pattern 輸出＝輸入。mutant：①「只改 inplace 入口、to_sink 不改」⇒ §G ③紅；②「跳過判定恆 False」⇒ §G ③紅；③「跳過判定恆 True」⇒ §G ②紅；④「混合群組整群跳過」⇒ 混合群組內非 ratio-unsafe 欄之 §G ②紅；⑤「分類移至 `_prepare_calibration_for_groups` 之後」⇒ 平穩化開之單元紅。
+- 改法：兩入口於 `_prepare_calibration_for_groups` **之前**逐群組逐欄分類；公開域欄集合（校準子封包、指紋）不含 ratio-unsafe 欄（`restrict_packet` 允許校準域多出欄）。群組處置：全為 ratio-unsafe ⇒ to_sink 入口以**原值陣列**送 sink（欄名、形狀、shard 命名、來源清理、compact 對齊展開與 `preprocessor=None` 之既有原值串流一致），inplace 入口不覆寫 registry；混合群組 ⇒ 只對非 ratio-unsafe 子矩陣轉換、ratio-unsafe 欄原值保留、欄序不變（native-tf 分支以原生子矩陣經既有 `apply_idx_map_to_array` 展開）；全為非 ratio-unsafe ⇒ 行為不變。**切片位置**：分類表於兩入口建立；`_registry_fast_transform` 維持無欄名介面、其內不加判定；凡呼叫 `_registry_fast_transform`、`native_pp._transform_single`、`_transform_single` 或寫入 sink 之點（含 sharded 每個 shard 依 `shard_cols`、chunked 每個 chunk、inplace 依 `group.columns`），先依該點之欄名清單切出非 ratio-unsafe 子矩陣再呼叫、ratio-unsafe 欄原值拼回。**append 模式**：輸出＝原始輸入欄（ratio-unsafe 原值、非 ratio-unsafe 依既有語意）＋非 ratio-unsafe 來源之衍生欄；ratio-unsafe 來源不產生任何衍生欄（§A 待確認③）。`transform`（DataFrame 路徑）維持既有「入口剔除」語意不變。
+- **驗證**：`pytest tests/feature_engineering/test_ratiounsafe_registry.py` 綠：§G ①–⑥（經 `generate_features(persist=True)` 讀 `raw`）；逐分支單元（沿用 `tests/_golden/icpostleak/contract.json` 之 `registry_sink`／`registry_sink_sharded` 等強制分支設定，與 `tests/feature_engineering/test_icpostleak.py` 同 harness）：ratio-unsafe 原始欄 `np.array_equal(輸出, 輸入, equal_nan=True)`、非 ratio-unsafe 欄（含其衍生欄）之值與名稱與改前逐位元組相同、sink 收到之列數與原始欄名／shard 名與改前相同；append 臂（`registry_chunked_append` 等既有 contract 鍵）：ratio-unsafe 來源之衍生欄不存在、非 ratio-unsafe 衍生欄與改前相同；平穩化開＋pattern 群組 ⇒ 不拋 `CalibrationError`、pattern 輸出＝輸入，且以 spy 觀測 `_prepare_calibration` 收到之 `columns_by_timeframe` 不含任何 ratio-unsafe 欄；另以真實封包經生產 `restrict_packet` 取**只含非 ratio-unsafe 欄**之子封包作來源，生成須成功。mutant：①「只改 inplace 入口、to_sink 不改」⇒ §G ③紅；②「跳過判定恆 False」⇒ §G ③紅；③「跳過判定恆 True」⇒ §G ②紅；④「混合群組整群跳過」⇒ 混合群組內非 ratio-unsafe 欄之 §G ②紅；⑤「分類移至 `_prepare_calibration_for_groups` 之後」⇒ spy 斷言紅、safe-only 子封包來源拋 `CalibrationError`；⑥「全 ratio-unsafe 之 sharded 群組仍整 shard 進 `_registry_fast_transform`」⇒ sharded 強制分支之 ratio-unsafe 原值斷言紅；⑦「混合群組之 shard／chunk 未依欄名切片」⇒ 該群 ratio-unsafe 欄原值斷言紅；⑧「append 仍對 ratio-unsafe 來源產衍生欄」⇒ append 臂衍生欄不存在斷言紅。
 - **邊界**：①全群組皆 ratio-unsafe ⇒ L6.5 無轉換、run 正常完成且 sink 收齊；②compact-aligned 群組原值展開後列數＝主週期列數；③chunked／sharded 之 shard 數與命名不變。
 - **存活至**：永久。**覆蓋風險**：無。　不可做：不得自落盤成品刪除 ratio-unsafe 欄；不得以關閉 winsorization 全域代替；不得改 L7 dead-drop 閘。
+
+**Task 2.2 — failopen 單週期基準重凍（依賴：Task 2.1）**
+- 目標：既有 failopen Gate-A 基準反映修後落盤值。　檔案：`tests/_golden/failopen/baseline.json`（BTCUSDT/12h、ETHUSDT/12h、ETHUSDT/1h 三單元）；工具沿用 `scripts/freeze_failopen_baseline.py --units`（PRE-RED 交付）。
+- 改法：Task 2.1 合併後以 `--units BTCUSDT/12h,ETHUSDT/12h,ETHUSDT/1h` 兩次全新重凍（A／B），比對確定性投影相等後寫回；BTCUSDT/1h 與多週期單元維持原樣（受 F-2 擋，允許仍紅，歸 ICFIRSTALIGN）。重凍收據逐單元列：`l1_direct`、`layers.L1`–`L6` 雜湊改前改後**相等**；`final_L7` 之差異欄集合**只含** ratio-unsafe 欄（值變更與 dead-drop 恢復欄），非 ratio-unsafe 欄之逐欄 sha256 相等。重凍為使用者核可事項，與 §A 待確認②③④ 同一白話閘核可。
+- **驗證**：`pytest tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py` 綠；`test_failopen_correctness.py` 之 `test_v3_healthy_full_run_matches_frozen_baseline`、`::test_v3_ethusdt_1h_matches_frozen_baseline` 逐節點獨立行程綠；收據 `handoffs/run_receipts/<日期>-ratiounsafe-failopen-refreeze.json` 含 A==B 與差異欄集合；mutant「Task 2.1 改為非 ratio-unsafe 欄也跳過」⇒ 收據之非 ratio-unsafe 差異欄非空 ⇒ 不得寫回。
+- **邊界**：①Phase 1 合併後、Phase 2 前：failopen 全部雜湊不變（任一變動＝Phase 1 越界）；②重凍不改 `max_nan_ratio.json`。
+- **存活至**：永久。**覆蓋風險**：ICFIRSTALIGN 乙重凍 BTCUSDT/1h 與多週期時沿用修後語意。　不可做：不得於核可前寫回基準；不得重凍未列單元。
 
 ### Phase 3 — 讀落盤成品之消費端（依賴：Phase 1）
 **Task 3.1 — IC 頁與 IC-first 之排除對帶標記欄名生效**
@@ -77,11 +84,11 @@
 ## §V 驗證策略與邊界測試目錄
 - mutation：Task 1.1／1.2／1.3／2.1 各具名 mutant（見各 Task）；共同核心鑑別＝改壞 `ratio_unsafe_category` 使 IC 頁、L3、兩 registry 入口四處同時紅；接線鑑別＝逐 consumer 改回舊判定使該處紅。
 - 測試層級：單元（命名模組）、真實資料輕量整合（S1 單週期，秒級）、分支強制（ICPOSTLEAK contract harness）、Golden 對照（§G）。可獨立 `pytest` 執行。
-- 防假綠：既有測試斷言 diff 逐處說明；L3 存活欄數、failopen 單週期基準不得變（Task 1.2 邊界①）。
-- 邊界目錄：空 DF、全 NaN 欄、單段欄名、`label_`、`1w`、自訂名含週期鍵、混合群組、compact-aligned 群組、sharded／chunked、平穩化開。
+- 防假綠：既有測試斷言 diff 逐處說明；Phase 1 後 L3 存活欄數（Task 1.2 邊界①）與 failopen 全部雜湊不變；Phase 2 後 failopen 單週期基準只准 `final_L7` 之 ratio-unsafe 欄變動並依 Task 2.2 重凍（核可後）。
+- 邊界目錄：空 DF、全 NaN 欄、單段欄名、`label_`、`1w`、自訂名含週期鍵、混合群組、compact-aligned 群組、sharded／chunked、append 模式、平穩化開。
 
 ## §R 回退
-- 每 Phase 獨立 commit；Phase 2 為落盤值與欄集合之語意變更，回退＝revert 該 commit。
+- 每 Phase 獨立 commit；Phase 2（含 Task 2.2 重凍）為落盤值與欄集合之語意變更，回退＝revert 該 commit（基準一併回復）。
 
 ## §N N/A 登記
 - 結構化類別落盤（逐欄 category 寫入 manifest）— `為何現在不做: blocked-by:FFSTORE（第 14 步）快照契約定義 manifest 逐欄 metadata schema`；觸發：FFSTORE SPEC 定案時改由結構化類別判定並刪名稱解析；登記處：`docs/ROADMAP.md` RM-FFSTORE。
