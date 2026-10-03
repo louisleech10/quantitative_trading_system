@@ -402,3 +402,78 @@ def test_mutation_extra_safe_derivative_rejected_by_exact_column_set(tmp_path: P
     assert {f"{c}_unexpected" for c in SAFE} <= set(out.columns), "前提：mutant 確實增欄"
     with pytest.raises(AssertionError):
         _assert_matches_oracle(out, ORACLE["append_arm"])
+
+
+# ---------------------------------------------------------------- 審碼 r1 修補（全 ratio-unsafe 群組之校準與 inplace 不覆寫）
+
+def _all_unsafe_with_stationarity(tmp_path: Path, entry: str):
+    """全 ratio-unsafe 群組、平穩化開（fracdiff）、無任何校準封包 ⇒ 兩入口皆須原值完成（審碼 r1 codex P1-01）。"""
+    frame = _branch_frame(UNSAFE)
+    pre = FeaturePreprocessor(_config(fracdiff=True))
+    pre.set_calibration({}, symbol="BTCUSDT", output_start=frame.index[-1], config_hash="ratiounsafe")
+    registry, group = _registry_with(tmp_path, frame, f"12h_L1_ratiounsafe_stat_{entry}")
+    if entry == "inplace":
+        done = pre.transform_registry_groups(registry, n_workers=1)
+        out = pd.DataFrame(registry.load_data(group.group_id), columns=list(frame.columns), index=frame.index)
+    else:
+        parts: Dict[str, np.ndarray] = {}
+
+        def _sink(group_id, columns, data, *rest) -> None:
+            arr = np.asarray(data, dtype=np.float64)
+            for i, name in enumerate(columns):
+                parts[str(name)] = arr[:, i].copy()
+
+        done = pre.transform_registry_groups_to_sink(registry, _sink, n_workers=1)
+        out = pd.DataFrame({c: parts[c] for c in frame.columns}, index=frame.index)
+    return frame, out, done
+
+
+@pytest.mark.parametrize("entry", ["inplace", "sink"])
+def test_all_unsafe_group_with_stationarity_needs_no_packet(entry: str, tmp_path: Path) -> None:
+    frame, out, done = _all_unsafe_with_stationarity(tmp_path, entry)
+    assert done == 1
+    assert np.array_equal(out.to_numpy(), _as_stored(frame).to_numpy(), equal_nan=True)
+
+
+def _overwrites_for_all_unsafe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> List[str]:
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+
+    seen: List[str] = []
+    real = ColumnGroupRegistry.overwrite_data
+
+    def _spy(self, group_id, *args, **kwargs):
+        seen.append(str(group_id))
+        return real(self, group_id, *args, **kwargs)
+
+    monkeypatch.setattr(ColumnGroupRegistry, "overwrite_data", _spy)
+    frame = _branch_frame(UNSAFE)
+    registry, group = _registry_with(tmp_path, frame, "12h_L1_ratiounsafe_noow")
+    FeaturePreprocessor(_config()).transform_registry_groups(registry, n_workers=1)
+    out = registry.load_data(group.group_id)
+    assert np.array_equal(np.asarray(out, dtype=np.float64), _as_stored(frame).to_numpy(), equal_nan=True)
+    return seen
+
+
+def test_inplace_all_unsafe_group_not_overwritten(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.1 改法：inplace 入口不覆寫全 ratio-unsafe 群組（審碼 r1 codex P2-02）。"""
+    assert _overwrites_for_all_unsafe(tmp_path, monkeypatch) == []
+
+
+def test_mutation_inplace_skip_removed_overwrites(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：入口之全 ratio-unsafe 判定失效（consumer 判定恆 False）⇒ 群組被派發並覆寫（不覆寫斷言有鑑別力）。"""
+    from momentum.FeatureEngineering.preprocessing import feature_preprocessor as fp_mod
+
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+
+    monkeypatch.setattr(fp_mod, "is_ratio_unsafe_column", lambda column: False)
+    seen: List[str] = []
+    real = ColumnGroupRegistry.overwrite_data
+
+    def _spy(self, group_id, *args, **kwargs):
+        seen.append(str(group_id))
+        return real(self, group_id, *args, **kwargs)
+
+    monkeypatch.setattr(ColumnGroupRegistry, "overwrite_data", _spy)
+    registry, _ = _registry_with(tmp_path, _branch_frame(UNSAFE), "12h_L1_ratiounsafe_mutow")
+    FeaturePreprocessor(_config()).transform_registry_groups(registry, n_workers=1)
+    assert seen == ["12h_L1_ratiounsafe_mutow"]

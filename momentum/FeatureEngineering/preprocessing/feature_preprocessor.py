@@ -280,8 +280,13 @@ class FeaturePreprocessor:
         Task 2.1：分類先於校準準備；此類欄 L6.5 不轉換，不進公開域欄集合與指紋）。"""
         grouped: Dict[str, List[str]] = {}
         for group in groups:
-            grouped.setdefault(str(group.timeframe), []).extend(
-                str(c) for c in group.columns if not is_ratio_unsafe_column(str(c)))
+            safe = [str(c) for c in group.columns if not is_ratio_unsafe_column(str(c))]
+            if safe:  # 只含 ratio-unsafe 欄之週期無校準工作（審碼 r1 codex P1-01：不得要求其封包）
+                grouped.setdefault(str(group.timeframe), []).extend(safe)
+        if not grouped:
+            if self._stationarity_enabled():
+                self._calibration_packets = {}  # 整次皆 ratio-unsafe：無公開域欄、無子封包，原值通過
+            return
         self._prepare_calibration(grouped)
 
     def _register_derived_calibration(self, column: str, d_star: float, *, max_lag: int,
@@ -748,6 +753,15 @@ class FeaturePreprocessor:
         if not groups:
             return 0
         self._prepare_calibration_for_groups(groups)  # FFSTAT Task 2.1：轉換前取子封包並核對
+        # RATIOUNSAFE Task 2.1：全為 ratio-unsafe 之群組於 inplace 入口不派發、不覆寫 registry（原值即輸出）
+        all_unsafe = [g for g in groups
+                      if all(is_ratio_unsafe_column(str(c)) for c in getattr(g, "columns", ()))]
+        if all_unsafe:
+            skip_ids = {str(getattr(g, "group_id")) for g in all_unsafe}
+            groups = [g for g in groups if str(getattr(g, "group_id")) not in skip_ids]
+            logger.info("[L6.5] ratio-unsafe passthrough: %d group(s) left untouched", len(all_unsafe))
+            if not groups:
+                return len(all_unsafe)
 
         worker_count = max(1, int(n_workers))
         transform_context = self._build_registry_transform_context()
@@ -791,7 +805,7 @@ class FeaturePreprocessor:
             completed = _execute()
 
         self._log_registry_io_summary(registry, io_stats_before)
-        return completed
+        return completed + len(all_unsafe)
 
     def transform_registry_groups_to_sink(
         self,
