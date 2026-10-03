@@ -3,16 +3,17 @@
   "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
   "stub_modules": [],
   "test_files": [
-    "tests/governance/test_mutation_scope_extension.py",
-    "tests/governance/test_todofmt_sample_fftfmeta.py",
-    "tests/governance/test_todofmt_constitution_sync.py",
     "tests/api/test_batch_alias.py",
-    "tests/test_cgsa_resume.py",
-    "tests/feature_engineering/test_failopen_correctness.py",
+    "tests/api/test_gap3_ic_stop_gate.py",
     "tests/feature_engineering/test_failopen_contract.py",
+    "tests/feature_engineering/test_failopen_correctness.py",
     "tests/feature_engineering/test_failopen_layers.py",
+    "tests/feature_engineering/test_failopen_producer.py",
+    "tests/governance/test_mutation_scope_extension.py",
     "tests/governance/test_prered_allowed_red.py",
-    "tests/feature_engineering/test_failopen_producer.py"
+    "tests/governance/test_todofmt_constitution_sync.py",
+    "tests/governance/test_todofmt_sample_fftfmeta.py",
+    "tests/test_cgsa_resume.py"
   ],
   "script_acceptance": [
     "handoffs/run_receipts/prered_probes/ablation.py",
@@ -21,6 +22,9 @@
     "handoffs/run_receipts/prered_probes/bisect_light.sh",
     "handoffs/run_receipts/prered_probes/build_allowed_red.py",
     "handoffs/run_receipts/prered_probes/dump_layer.sh",
+    "handoffs/run_receipts/prered_probes/f2_memory_receipt.sh",
+    "handoffs/run_receipts/prered_probes/ffstore_messages.sh",
+    "handoffs/run_receipts/prered_probes/files_at_commit.sh",
     "handoffs/run_receipts/prered_probes/full_at_commits.sh",
     "handoffs/run_receipts/prered_probes/full_coldiff.py",
     "handoffs/run_receipts/prered_probes/full_record.py",
@@ -46,6 +50,7 @@
     "handoffs/run_receipts/prered_probes/red_census.sh",
     "handoffs/run_receipts/prered_probes/refreeze_ab.sh",
     "handoffs/run_receipts/prered_probes/refreeze_compare.py",
+    "handoffs/run_receipts/prered_probes/stopgate_mutant.sh",
     "handoffs/run_receipts/prered_probes/suffix_pair.sh",
     "handoffs/run_receipts/prered_probes/v7_seed_at.sh",
     "handoffs/run_receipts/prered_probes/v7_seed_manifest.py",
@@ -72,6 +77,18 @@
       "cmd": "zsh handoffs/run_receipts/prered_probes/mtf_count_at.sh <S> d229336e^ d229336e; zsh handoffs/run_receipts/prered_probes/mtf_l3_cols_at.sh <S> d229336e^ d229336e; venv/bin/python handoffs/run_receipts/prered_probes/mtf_l3_diff.py …; venv/bin/python handoffs/run_receipts/prered_probes/mtf_l3_newcols_c2.py …",
       "rc": 0,
       "honest_bounds": "只歸因 BTCUSDT 12h 直跑 L3 存活欄集合差；只新 3 欄以 _l3_oracle 驗算，只舊欄依 dead_reasons 與上游相異值逐欄驗；未驗其他標的／週期"
+    },
+    {
+      "path": "handoffs/run_receipts/20261003-prered-f2-memory.json",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/f2_memory_receipt.sh handoffs/run_receipts/20261003-prered-v7seed-HEAD.log <out>",
+      "rc": 0,
+      "honest_bounds": "原設定（12h＋1h、14 天窗、全史預熱）於 HEAD 實跑被系統終止；各段 RSS 取自生產碼 log 行；最後完成段＝1h memmap 合併複製 5/5；其後段未量測"
+    },
+    {
+      "path": "handoffs/run_receipts/20261003-prered-ffstore-messages.json",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/ffstore_messages.sh <S> <out>",
+      "rc": 0,
+      "honest_bounds": "Task 2.8 修補前之 34 支逐支失敗訊息（junitxml message 前 200 字）；修補後其中 4 支轉綠"
     }
   ],
   "batch_card": {
@@ -79,24 +96,25 @@
     "touches": [
       "docs/PRERED_SPEC.md",
       "docs/manifests/PRERED.json",
+      "handoffs/run_receipts/20261003-prered-attribution.json",
+      "handoffs/run_receipts/20261003-prered-red-census.txt",
+      "handoffs/run_receipts/20261003-prered-refreeze.json",
       "scripts/freeze_failopen_baseline.py",
       "tests/_golden/failopen/baseline.json",
       "tests/_golden/failopen/max_nan_ratio.json",
       "tests/_golden/prered/allowed_red.json",
+      "tests/api/test_batch_alias.py",
+      "tests/api/test_gap3_ic_stop_gate.py",
+      "tests/feature_engineering/test_failopen_contract.py",
+      "tests/feature_engineering/test_failopen_correctness.py",
+      "tests/feature_engineering/test_failopen_layers.py",
+      "tests/feature_engineering/test_failopen_producer.py",
       "tests/governance/fixtures/constitution_exception_allowlist.txt",
       "tests/governance/test_mutation_scope_extension.py",
-      "tests/governance/test_todofmt_sample_fftfmeta.py",
-      "tests/governance/test_todofmt_constitution_sync.py",
       "tests/governance/test_prered_allowed_red.py",
-      "tests/api/test_batch_alias.py",
-      "tests/test_cgsa_resume.py",
-      "tests/feature_engineering/test_failopen_correctness.py",
-      "tests/feature_engineering/test_failopen_contract.py",
-      "tests/feature_engineering/test_failopen_layers.py",
-      "handoffs/run_receipts/20261003-prered-attribution.json",
-      "tests/feature_engineering/test_failopen_producer.py",
-      "handoffs/run_receipts/20261003-prered-red-census.txt",
-      "handoffs/run_receipts/20261003-prered-refreeze.json"
+      "tests/governance/test_todofmt_constitution_sync.py",
+      "tests/governance/test_todofmt_sample_fftfmeta.py",
+      "tests/test_cgsa_resume.py"
     ],
     "callers_now": [
       "tests/feature_engineering/test_failopen_contract.py",
@@ -162,7 +180,7 @@
       "test_failopen_correctness.py ← Task 2.3：v7 改精簡 L1 設定、加種子品質前置斷言與續跑期間 12h L1 計算次數觀測",
       "freeze_failopen_baseline.py ← Task 2.4：_single_tf_record 之 registry 雜湊取公開輸出窗切片；新增 l1_direct 記錄；預熱未啟用時行為逐位元組不變",
       "test_failopen_contract.py ← Task 2.4：L1 oracle 改比對 l1_direct",
-      "已核模式（重凍後）＝gate_cmd 加（單組串行；correctness 各節點各自獨立行程逐一跑，同行程連跑會累積記憶體被系統終止）：venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py && venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_correctness.py::test_v3_healthy_full_run_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_ethusdt_1h_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor tests/feature_engineering/test_failopen_correctness.py::test_v5_prefix_no_leakage_after_warmup tests/feature_engineering/test_failopen_correctness.py::test_v5_l5_cross_sectional_prefix_no_leakage tests/feature_engineering/test_failopen_correctness.py::test_v6_asof_oracle_boundary_cases tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_isolation tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_same_factory_no_cache_pollution tests/feature_engineering/test_failopen_correctness.py::test_v7_symbol_order_permutation_invariant tests/feature_engineering/test_failopen_correctness.py::test_v7_cache_cold_hot_identical tests/feature_engineering/test_failopen_correctness.py::test_v7_cgsa_resume_matches_fresh；test_v3_multi_tf_btc_matches_frozen_baseline 與 v6 三支（test_v6_independent_asof_oracle_matches_multi_tf_columns、test_v6_backend_output_matches_independent_oracle、test_v6_close_time_oracle_matches_pipeline）不入必綠集合（允許仍紅，ICFIRSTALIGN／blocked-by F-2；戳記輪 R1 codex、實作期 v6 峰值約 71 GB 收據）",
+      "已核模式（重凍後）＝gate_cmd 加（單組串行；correctness 各節點各自獨立行程逐一跑，同行程連跑會累積記憶體被系統終止）：venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_layers.py && for n in tests/feature_engineering/test_failopen_correctness.py::test_v3_healthy_full_run_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_v3_ethusdt_1h_matches_frozen_baseline tests/feature_engineering/test_failopen_correctness.py::test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor tests/feature_engineering/test_failopen_correctness.py::test_v5_prefix_no_leakage_after_warmup tests/feature_engineering/test_failopen_correctness.py::test_v5_l5_cross_sectional_prefix_no_leakage tests/feature_engineering/test_failopen_correctness.py::test_v6_asof_oracle_boundary_cases tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_isolation tests/feature_engineering/test_failopen_correctness.py::test_v7_cross_symbol_same_factory_no_cache_pollution tests/feature_engineering/test_failopen_correctness.py::test_v7_symbol_order_permutation_invariant tests/feature_engineering/test_failopen_correctness.py::test_v7_cache_cold_hot_identical tests/feature_engineering/test_failopen_correctness.py::test_v7_cgsa_resume_matches_fresh; do venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING \"$n\" || exit 1; done；test_v3_multi_tf_btc_matches_frozen_baseline 與 v6 三支（test_v6_independent_asof_oracle_matches_multi_tf_columns、test_v6_backend_output_matches_independent_oracle、test_v6_close_time_oracle_matches_pipeline）不入必綠集合（允許仍紅，ICFIRSTALIGN／blocked-by F-2；戳記輪 R1 codex、實作期 v6 峰值約 71 GB 收據）",
       "Task 2.0 ← 多週期分段與 L2–L6 消融歸類收據，U 未解釋欄＝0 才組重凍批准包",
       "Task 2.5 ← F-2 分段記憶體收據；修復歸 ICFIRSTALIGN 乙 MEM-RSS",
       "解耦：本票不改 momentum／api 生產碼，七條解耦規則不受影響（check_decoupling.sh 於實作批跑一次附收據）"
@@ -179,8 +197,9 @@
       "Task 3.1 驗證：test_prered_allowed_red.py 精確集合比對；mutant 清空列表、加入合法 metadata 之綠節點、加入不存在之 node、參數化 id 改為不存在之參數",
       "走 frame 兩支與 IC-first 兩支不在本票修正範圍，列入 allowed_red.json",
       "Task 2.6 驗證：test_quality_gate_max_ratios_do_not_change_config_hash 釘值改讀基準多週期 config_hash；多週期未重凍前歸允許仍紅（ICFIRSTALIGN）",
-      "Task 3.1 終態 44 列由 red census 機械產生；census 只涵蓋直接引用被刪 run 之檔（誠實邊界）",
-      "Task 2.7 驗證：test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor 存活欄數 59962；逐欄歸因收據 handoffs/run_receipts/20261003-prered-mtf-l3-count.json 未解釋＝0"
+      "Task 3.1 終態 40 列由 red census 機械產生（審碼 r1 後重產：FF 三檔沿用首輪、其餘 19 檔於 Task 2.8 後重跑）；census 22 檔為主委選取之資料依賴檔、非窮舉；FFSTORE 30 支分屬 8 檔，逐支失敗訊息見 handoffs/run_receipts/20261003-prered-ffstore-messages.json，其中 test_gap3_ic_progress_fields.py 為讀 registry 最新 run 之間接依賴（誠實邊界）",
+      "Task 2.7 驗證：test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor 存活欄數 59962；逐欄歸因收據 handoffs/run_receipts/20261003-prered-mtf-l3-count.json 未解釋＝0",
+      "Task 2.8 驗證：test_gap3_ic_stop_gate.py 之四支注入型測試綠；mutant resolve_planned_feature_count 恆回 None ⇒ 四支紅；歸因收據 files_at_commit.sh 於 39377e29^ 綠、39377e29 紅（同一已刪資料狀態）"
     ],
     "lifecycle": "keep",
     "not_executable": [

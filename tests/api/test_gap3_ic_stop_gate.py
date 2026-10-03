@@ -52,10 +52,19 @@ def inject_latest_run(tmp_path):
          都會因此在單跑時綠、全套時紅。**測試不得依賴會被測試自己改動的環境狀態。**
 
     manifest 由本 fixture 現寫（`total_features` 自訂），故 `is_materialized` 為真且數字可控。
+
+    🔴 **注入落在暫存 registry 檔，而非只改記憶體快照**（PRE-RED 審碼 r1 歸因）：`39377e29`
+       起 service 於每次解析 run 前 `reload_registry()` 重讀磁碟，只改 `_entries` 之注入會被洗掉
+       ⇒ 閘門看不到大 run 而放行（四支「繞過了閘門」紅之根因，非刪檔）。改為把 registry 之
+       `_path` 指向暫存檔並把「原快照＋注入」寫入，重讀走真實 `_load` 而注入存活。
     """
     library = svc_mod.ic_analysis_service._feature_library  # noqa: SLF001
     registry = library._registry  # noqa: SLF001
     original = list(registry._entries)  # noqa: SLF001
+    original_path = registry._path  # noqa: SLF001
+    staged = tmp_path / "registry.json"
+    staged.write_text(json.dumps(original), encoding="utf-8")
+    registry._path = staged  # noqa: SLF001
     counter = {"n": 0}
 
     def _inject(symbol: str, feature_count: int, *, timeframe: str = "12h"):
@@ -71,9 +80,11 @@ def inject_latest_run(tmp_path):
             "last_generated_at": 1_900_000_000 + counter["n"],
         }
         registry._entries = list(registry._entries) + [entry]  # noqa: SLF001
+        staged.write_text(json.dumps(registry._entries), encoding="utf-8")  # noqa: SLF001
         return entry
 
     yield _inject
+    registry._path = original_path  # noqa: SLF001
     registry._entries = original  # noqa: SLF001
 
 
