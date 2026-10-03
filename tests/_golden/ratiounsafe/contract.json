@@ -1,0 +1,61 @@
+{
+  "_spec": "docs/RATIOUNSAFE_SPEC.md v5（§A、§G、Task 1.1–3.1）；本檔為測試參數之單一落點",
+  "ratio_unsafe_categories": ["pattern"],
+  "excluded_reason": "ratio_unsafe:pattern",
+  "tagging_cases": [
+    {"column": "ret_1d_x", "timeframe": "12h", "tagged": "ret_12h_1d_x"},
+    {"column": "ret_1d_x", "timeframe": "4h", "tagged": "ret_4h_1d_x"},
+    {"column": "close_12h_trend_EMA_8", "timeframe": "12h", "tagged": "close_12h_trend_EMA_8"},
+    {"column": "ohlc_pattern_CDLDOJI", "timeframe": "1w", "tagged": "ohlc_1w_pattern_CDLDOJI"},
+    {"column": "ohlc_pattern_CDLDOJI", "timeframe": "12h", "tagged": "ohlc_12h_pattern_CDLDOJI"},
+    {"column": "label_fwd_ret_1", "timeframe": "12h", "tagged": "label_fwd_ret_1"},
+    {"column": "singleword", "timeframe": "12h", "tagged": "singleword"}
+  ],
+  "invalid_timeframes": ["2h", "", "12H", "pattern"],
+  "s1": {
+    "symbol": "BTCUSDT",
+    "timeframe": "12h",
+    "days": 1000,
+    "payload": {
+      "data_sources": {"enabled_sources": ["close"], "synthetic_sources": []},
+      "atomic_indicators": {
+        "pattern": {"enabled": true},
+        "trend": {"enabled": true, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}}, {"name": "SMA", "params": {"timeperiod": 13}}]},
+        "momentum": {"enabled": false}, "volatility": {"enabled": false}, "volume": {"enabled": false},
+        "cycle": {"enabled": false}, "statistics": {"enabled": false}, "microstructure": {"enabled": false},
+        "entropy": {"enabled": false}, "tail_risk": {"enabled": false}
+      }
+    },
+    "arms": {
+      "off": {"nan_strategy": {"l7_dead_feature_drop": {"enabled": false}}},
+      "on": {}
+    }
+  },
+  "multi_tf_names": {
+    "symbol": "BTCUSDT",
+    "primary": "12h",
+    "training": ["12h", "4h"],
+    "days": 200,
+    "atomic_indicators": {
+      "trend": {"enabled": true, "indicators": [{"name": "EMA", "params": {"timeperiod": 8}}, {"name": "SMA", "params": {"timeperiod": 13}}]},
+      "pattern": {"enabled": true},
+      "momentum": {"enabled": false}, "volatility": {"enabled": false}, "volume": {"enabled": false},
+      "cycle": {"enabled": false}, "statistics": {"enabled": false}, "microstructure": {"enabled": false},
+      "entropy": {"enabled": false}, "tail_risk": {"enabled": false}
+    }
+  },
+  "branch_kline": {"symbol": "BTCUSDT", "timeframe": "12h", "rows": 1500},
+  "branch_columns": {
+    "unsafe": [{"name": "ohlc_pattern_CDLDOJI", "fn": "CDLDOJI"}, {"name": "ohlc_pattern_CDLENGULFING", "fn": "CDLENGULFING"}],
+    "safe": [{"name": "close_trend_EMA_8", "fn": "EMA", "args": {"timeperiod": 8}}, {"name": "close_trend_SMA_13", "fn": "SMA", "args": {"timeperiod": 13}}]
+  },
+  "branches": {
+    "registry": {"env": {}, "entry": "transform_registry_groups"},
+    "registry_parallel_split": {"env": {"FFACT_L65_SPLIT_THRESHOLD": "2"}, "entry": "transform_registry_groups", "n_workers": 2, "spy": "_transform_array_slice"},
+    "registry_sink": {"env": {}, "entry": "transform_registry_groups_to_sink", "spy": "_transform_single_group_to_arrays"},
+    "registry_sink_sharded": {"env": {}, "entry": "transform_registry_groups_to_sink", "patch_shard_bytes": 4096, "spy": "_stream_sharded_group_to_sink"},
+    "registry_chunked": {"env": {"FFACT_L65_SPLIT_THRESHOLD": "2"}, "entry": "transform_registry_groups_to_sink", "spy": "_stream_single_group_chunked_to_sink"}
+  },
+  "append_arm": {"branch": "registry_chunked", "mode": "append", "zscore_windows": [100, 252]},
+  "native_arm": {"source_tf": "12h", "primary_tf": "1h", "ratio": 12, "env": {"FFACT_L65_NATIVE_TF": "1"}}
+}

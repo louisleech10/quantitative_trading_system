@@ -1,0 +1,138 @@
+{
+  "spec_path": "docs/RATIOUNSAFE_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [
+    "momentum/FeatureEngineering/feature_naming.py"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_feature_naming.py",
+    "tests/feature_engineering/test_ratiounsafe_wiring.py",
+    "tests/api/test_ratiounsafe_ic_page.py",
+    "tests/feature_engineering/test_ratiounsafe_registry.py"
+  ],
+  "script_acceptance": [
+    "scripts/freeze_ratiounsafe_baseline.py",
+    "handoffs/run_receipts/ratiounsafe_probes/tagged_names_probe.py",
+    "handoffs/run_receipts/ratiounsafe_probes/registry_l65_pattern_probe.py",
+    "handoffs/run_receipts/ratiounsafe_probes/deaddrop_probe.py"
+  ],
+  "contract_jsons": [
+    "tests/_golden/ratiounsafe/contract.json",
+    "tests/_golden/ratiounsafe/baseline.json"
+  ],
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20261003-ratiounsafe-tagged-names.json",
+      "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/ratiounsafe_probes/tagged_names_probe.py",
+      "rc": 0,
+      "honest_bounds": "名稱依生產命名規則造（L1 pattern 61、L2 衍生 122、非 pattern 74），非自落盤 run 讀取；兩套標記規則各算一次"
+    },
+    {
+      "path": "handoffs/run_receipts/20261003-ratiounsafe-registry-l65-pattern.json",
+      "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/ratiounsafe_probes/registry_l65_pattern_probe.py",
+      "rc": 0,
+      "honest_bounds": "只 BTCUSDT 12h、近 1000 天、只開 pattern、dead-drop 關；前處理開／關對照"
+    },
+    {
+      "path": "handoffs/run_receipts/20261003-ratiounsafe-deaddrop.json",
+      "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/ratiounsafe_probes/deaddrop_probe.py",
+      "rc": 0,
+      "honest_bounds": "以前處理關之 pattern 欄近似修後原值通過；bytes 差含非 pattern 欄之編碼差；修後實際增量於實作後以 §G S1-on 實測"
+    }
+  ],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "momentum/FeatureEngineering/feature_naming.py",
+      "momentum/FeatureEngineering/operators/derived_operators.py",
+      "momentum/FeatureEngineering/operators/rolling_aggregator.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/preprocessing/calibration.py",
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/factories.py",
+      "tests/api/test_icpostleak_api.py",
+      "tests/_golden/ffstat/nan_propagation_classes.json",
+      "scripts/verify_nan_poisoning_fix.py",
+      "docs/RATIOUNSAFE_SPEC.md",
+      "docs/manifests/RATIOUNSAFE.json"
+    ],
+    "callers_now": [
+      "api/services/ic_analysis_service.py",
+      "momentum/FeatureEngineering/feature_factory.py",
+      "tests/api/test_icpostleak_api.py",
+      "tests/feature_engineering/test_icpostleak.py",
+      "tests/feature_engineering/preprocessing/test_l65_native_tf.py",
+      "tests/feature_engineering/test_failopen_correctness.py"
+    ],
+    "callers_later": [
+      "docs/ROADMAP.md"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_feature_naming.py tests/feature_engineering/test_ratiounsafe_wiring.py tests/api/test_ratiounsafe_ic_page.py tests/feature_engineering/test_ratiounsafe_registry.py tests/api/test_icpostleak_api.py tests/feature_engineering/test_icpostleak.py tests/feature_engineering/preprocessing/test_l65_native_tf.py",
+    "forbidden": [
+      {
+        "rule": "momentum／ 不得 import api／；API 取判定一律經 momentum.factories",
+        "observable": true
+      },
+      {
+        "rule": "不得刪除或放寬既有測試斷言換綠；不得新增 skip／xfail",
+        "observable": true
+      },
+      {
+        "rule": "不得弱化 NaN／inf 閘、不得改 L7 dead-drop 閘與閾值",
+        "observable": true
+      },
+      {
+        "rule": "落盤欄集合之變動只限 SPEC §C 兩例外（dead-drop 恢復之 ratio-unsafe 欄、append 模式 ratio-unsafe 衍生欄不產生）與 1w 標記",
+        "observable": true
+      },
+      {
+        "rule": "不得改 tests/_golden/failopen/baseline.json 與 scripts/freeze_failopen_baseline.py 之 oracle 路徑",
+        "observable": true
+      },
+      {
+        "rule": "不得以關閉 winsorization 全域代替跳過判定；不得自落盤成品刪除 ratio-unsafe 欄",
+        "observable": true
+      },
+      {
+        "rule": "不得改 frame 路徑標記器（FeatureFactory._timeframe_tagged_name／_apply_timeframe_tag、MultiTFGenerator._apply_timeframe_tag）",
+        "observable": true
+      },
+      {
+        "rule": "不得於 _registry_fast_transform 內加判定（保持無欄名介面）",
+        "observable": true
+      },
+      {
+        "rule": "不得以正則代替週期鍵集合；不得寫死週期清單",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "解耦：本票只新增 momentum 內模組並改 momentum 內 caller；factories 委由 feature_naming；實作批跑 scripts/check_decoupling.sh 附收據",
+      "feature_naming.py ← Task 1.1（空殼已建，NotImplementedError）",
+      "derived_operators／rolling_aggregator／feature_preprocessor ← Task 1.1／1.2：RATIO_UNSAFE_CATEGORIES re-export；刪重複判定；consumer 以模組層名 is_ratio_unsafe_column 引用 feature_naming",
+      "factories.ratio_unsafe_category ← Task 1.2：委由 feature_naming.ratio_unsafe_category",
+      "calibration.tagged_column_name、feature_storage CGSA 寫檔標記段 ← Task 1.3：呼叫 feature_naming.tag_timeframe",
+      "feature_preprocessor 兩 registry 入口與九分支 ← Task 2.1：分類先於 _prepare_calibration_for_groups、呼叫點依欄名切片",
+      "tests/_golden/ratiounsafe/baseline.json ← §G 改前基準（HEAD 實跑，已產出）；baseline_after.json ← Task 2.2（Task 2.1 驗收後寫出）",
+      "test_icpostleak_api.py:272 mutant 改破壞 feature_naming.ratio_unsafe_category；nan_propagation_classes.json 兩鍵改名；verify_nan_poisoning_fix.py 改引用新模組"
+    ],
+    "coverage_risk": [
+      "Task 1.1 驗證：test_feature_naming.py（257 名 × 9 週期鍵、互逆定義域、具名案例、常數同一性；mutant strip 恆原值、any-segment 規則）",
+      "Task 1.2 驗證：test_ratiounsafe_wiring.py（重複實作 grep、L3／transform／factories、共同核心 mutant、接線 mutant）＋test_ratiounsafe_ic_page.py（excluded＋reason、共同核心與接線 mutant）",
+      "Task 1.3 驗證：test_ratiounsafe_wiring.py（calibration＝naming、storage 1w 與 ret_1d_x）＋test_ratiounsafe_registry.py::test_multi_tf_names_unchanged",
+      "Task 2.1 驗證：test_ratiounsafe_registry.py 逐分支（registry／parallel_split／sink／sharded／chunked）混合與全 unsafe、native 強制臂、shard 結構、append 臂、校準 spy 與 safe-only 子封包、mutant②③；mutant①④⑥⑦⑧⑨ 由逐分支混合群組測試鑑別",
+      "§G 驗證：test_g_s1_off_conservation（①②③）、test_g_s1_on_column_set_and_values（④⑤）；⑥ 欄數與 bytes 寫入完工收據",
+      "Task 2.2 驗證：test_after_baseline_regression、boundary_01 failopen 不變、boundary_02、mutant 回復舊判定",
+      "Task 3.1 驗證：IC 頁 test_ratiounsafe_ic_page.py、IC-first test_transform_selected_*"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "FF 重測試不得並行兩組",
+        "reason": "user-ruling",
+        "owner": "RATIOUNSAFE",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}

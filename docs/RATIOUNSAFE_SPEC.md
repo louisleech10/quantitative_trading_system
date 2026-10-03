@@ -20,6 +20,7 @@
   - 宣告——生成期順序與 IC 兩路：生成期 L6.5 所見欄名未標記（標記於 storage `_write_group`）；帶標記欄名進入判定之路徑＝IC 頁「套用後處理」與 `run_ic_first` 之 `transform_selected`（皆讀落盤成品）。**全域序列型**：涵蓋（轉換排除、落盤特徵值與欄集合修正）；**事件型**：事件型 IC 不呼叫 L6.5 轉換，但讀同一落盤特徵 ⇒ Phase 2 之落盤修正同時涵蓋；本票不改事件型程式碼。
 - **待使用者確認**：待確認：無（以下語意變更於 SPEC 白話逐條閘請使用者核可，未核可不得進 TODO）——①主路徑 L6.5 對 ratio-unsafe 欄之處置＝**原值通過、不做任何 L6.5 轉換**，而非自輸出刪除；涵蓋全部 pattern 類欄：L1 原始 K 線型態訊號（`CDL*`，值域如 {−100, 0, 100}，`CDLHIKKAKE` 為 [−200, 200]）、型態計數（例 `BullishCount_W21`，實測 [11, 61]）、`Consensus`（[−1, 1]）及其 L4 lag 衍生欄。理由：自 `docs/NAN_POISONING_INVESTIGATION.md` § 7B／Q11.2 起整類列為 ratio-unsafe 之既有分類契約（L2、L3 已據此跳過），L6.5 入口防線原設計意圖即「不轉換此類欄」；此類欄為離散事件訊號或計數，滾動縮尾會把稀有事件裁掉（FACT-RECEIPT 2）。②連帶之**落盤欄數增加**：L7 dead-drop 預設開時，現行被抹 0 而判死之 pattern 欄恢復落盤（FACT-RECEIPT 3：該設定下 +13 欄）；修後實際欄集合與 bytes 於實作後以同設定實測，列入完工收據。③`preprocessing.mode=append`（非預設，生產預設 `replace`）時，ratio-unsafe 來源欄**不再產生** L6.5 衍生欄（例 `ohlc_pattern_CDLDOJI_zscore_100`、`_zscore_252`、`_fracdiff`；審查 r2 codex 以真實 CDLDOJI＋EMA8、zscore 窗 [100, 252] 實跑：改前原始 2 欄＋衍生 4 欄、改後原始 2 欄＋safe 衍生 2 欄）⇒ append 設定下落盤欄數**減少**；實際縮減欄集合與 bytes 於實作後以 append 設定實測，列入完工收據。④落盤路徑之改後基準（§G S1 兩臂）由 Task 2.2 寫出並永久作回歸基準；failopen 單週期基準以 registry 為 oracle、不經 L6.5 落盤路徑，本票前後不變、不重凍。
 - **已確認結果**：
+  - `2026-10-03 使用者`：逐條聽取 SPEC v5 白話後核可 §A 待確認①–④（ratio-unsafe 欄原值通過、dead-drop 恢復欄落盤、append 模式不產 ratio-unsafe 衍生欄、落盤路徑改後基準永久化），答「全部核可，開工」。
   - `2026-10-02 使用者`：全票排序 17 步定案，第 3 步 RATIOUNSAFE（`docs/TICKET_ORDER.md`）；「照表做不另問」。
   - `2026-09-26 使用者`：不得侷限加密貨幣——週期鍵一律取自 `TimeframeAligner`，不寫死。
 
