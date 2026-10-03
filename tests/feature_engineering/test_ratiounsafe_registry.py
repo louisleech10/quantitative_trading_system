@@ -76,9 +76,12 @@ def _as_stored(frame: pd.DataFrame) -> pd.DataFrame:
     return frame.astype(np.float32).astype(np.float64)
 
 
-def _assert_matches_oracle(out: pd.DataFrame, oracle: Dict[str, Dict[str, str]]) -> None:
-    """safe 欄（含 append 衍生欄）逐欄＝改前 oracle（HEAD 產之只含 safe 欄群組輸出）。"""
-    assert set(oracle) <= set(out.columns), sorted(set(oracle) - set(out.columns))
+def _assert_matches_oracle(out: pd.DataFrame, oracle: Dict[str, Dict[str, str]],
+                           allowed_original: List[str] = ()) -> None:
+    """safe 欄（含 append 衍生欄）逐欄＝改前 oracle（HEAD 產之只含 safe 欄群組輸出）；輸出欄集合**恰為**
+    oracle 鍵 ∪ `allowed_original`（混合群組之 ratio-unsafe 原始欄；其值另有原值斷言）——多欄或缺欄皆紅（審查 r6 codex P1-01）。"""
+    assert set(out.columns) == set(oracle) | set(allowed_original), (
+        sorted(set(out.columns) ^ (set(oracle) | set(allowed_original))))
     for col, want in oracle.items():
         assert freeze.column_digest(out[col]) == want, col
 
@@ -94,7 +97,7 @@ def test_mixed_group_unsafe_passthrough_safe_matches_frozen_oracle(branch: str, 
     stored = _as_stored(_branch_frame())
     for col in UNSAFE:
         assert np.array_equal(mixed[col].to_numpy(), stored[col].to_numpy(), equal_nan=True), col
-    _assert_matches_oracle(mixed, ORACLE[branch])
+    _assert_matches_oracle(mixed, ORACLE[branch], UNSAFE)
     derived_unsafe = [c for c in mixed.columns if any(c.startswith(u + "_") for u in UNSAFE)]
     assert derived_unsafe == []
 
@@ -126,6 +129,7 @@ def test_boundary_02_compact_native_passthrough_expands_to_primary_rows(tmp_path
         expanded = mixed["source"][mixed["idx_map"], j].astype(np.float64)
         assert mixed["parts"][col].shape[0] == n_primary
         assert np.array_equal(mixed["parts"][col], expanded, equal_nan=True), col
+    assert set(mixed["parts"]) == set(ORACLE["native_arm"]) | set(UNSAFE), sorted(mixed["parts"])
     for col, want in ORACLE["native_arm"].items():
         assert freeze.column_digest(mixed["parts"][col]) == want, col
 
@@ -156,7 +160,7 @@ def test_append_arm_no_unsafe_derivatives(tmp_path: Path) -> None:
     stored = _as_stored(_branch_frame())
     for col in UNSAFE:
         assert np.array_equal(mixed[col].to_numpy(), stored[col].to_numpy(), equal_nan=True), col
-    _assert_matches_oracle(mixed, ORACLE["append_arm"])
+    _assert_matches_oracle(mixed, ORACLE["append_arm"], UNSAFE)
 
 
 # ---------------------------------------------------------------- 校準順序
@@ -372,3 +376,25 @@ def test_boundary_01_transform_selected_all_unsafe_returns_empty() -> None:
     frame = _branch_frame(UNSAFE)
     frame.columns = [fn.tag_timeframe(c, "12h") for c in frame.columns]
     assert FeaturePreprocessor(_config()).transform_selected(list(frame.columns), {"g": frame}, None) == {}
+
+
+def test_mutation_extra_safe_derivative_rejected_by_exact_column_set(tmp_path: Path,
+                                                                     monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant（審查 r6 codex P1-01）：append 分支多產一個 safe 衍生欄 ⇒ 精確欄集合比對紅（子集比對會放過）。"""
+    real = FeaturePreprocessor._transform_single
+
+    def _extra(self, df, *args, **kwargs):
+        out = real(self, df, *args, **kwargs)
+        if self.mode == "append":
+            out = out.copy()
+            for col in [c for c in df.columns if c in SAFE]:
+                out[f"{col}_unexpected"] = out[col]
+        return out
+
+    monkeypatch.setattr(FeaturePreprocessor, "_transform_single", _extra)
+    arm = CONTRACT["append_arm"]
+    out = _run(arm["branch"], _branch_frame(SAFE), tmp_path, tag="mutExtra",
+               cfg=_config(mode="append", zscore=arm["zscore_windows"]))
+    assert {f"{c}_unexpected" for c in SAFE} <= set(out.columns), "前提：mutant 確實增欄"
+    with pytest.raises(AssertionError):
+        _assert_matches_oracle(out, ORACLE["append_arm"])
