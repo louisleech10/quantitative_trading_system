@@ -1,4 +1,4 @@
-"""ICFIRSTALIGN 乙 Task 4.1：校準域改走正式 CGSA 層產出、逐群組歸約（docs/ICFIRSTALIGN_SPEC.md v21）。
+"""ICFIRSTALIGN 乙 Task 4.1：校準域改走正式 CGSA 層產出、逐群組歸約（docs/ICFIRSTALIGN_SPEC.md v22）。
 
 oracle：HEAD 凍結之 tests/_golden/icfirstalign/probe_baseline.json、calibration_baseline.json（甲＝HEAD 加兩處測試端替換；
 乙＝HEAD 預設；所測設定甲＝乙，收據 handoffs/run_receipts/20261004-icfirstalign-freeze-baselines.json）。
@@ -323,16 +323,21 @@ def test_mutation_winsor_skipped_changes_first_finite(tmp_path: Path, monkeypatc
 
 
 def test_mutation_reduction_accumulates_all_groups(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant (a)：歸約前把全部群組累積成一表（讀回陣列全數持有）⇒ 縮尾輸入端存活數 > 1。"""
-    st = _spy_calibration(monkeypatch)
-    spied_iter = ff.FeatureFactory._iter_calibration_domain_groups
+    """mutant (a)：歸約前把全部群組累積成一表（讀回陣列全數持有）⇒ 縮尾輸入端存活數 > 1。
+
+    安裝順序：mutant 先裝於原 iterator、spy 後裝於最外層，使 spy 之歸約期涵蓋累積後之整段消費
+    （r21：反序時 `list()` 先耗盡 spy 包裝器、歸約期提前結束而觀測全停）。
+    """
+    real_iter = ff.FeatureFactory._iter_calibration_domain_groups
 
     def accumulate(self: Any, *a: Any, **k: Any) -> Any:
-        groups = list(spied_iter(self, *a, **k))
+        groups = list(real_iter(self, *a, **k))
         yield from groups
 
     monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", accumulate)
+    st = _spy_calibration(monkeypatch)
     _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
+    assert st["winsor_calls"] > 0
     assert st["live_max"] > 1
 
 
