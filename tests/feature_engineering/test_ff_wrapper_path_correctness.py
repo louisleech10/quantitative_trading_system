@@ -348,7 +348,9 @@ def test_v7_4_float16_error_bound_contract_is_explicit(
     )
     storage = FeatureStorage(str(tmp_path / "features"))
     reader = FeatureReader(str(storage.base_path))
-    processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_p1ff57_codec", {"selected": source})
+    # ICFIRSTALIGN Task 1.3：write_processed 之 row_index 必填（本測試只驗 codec，軸值不影響斷言）
+    processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_p1ff57_codec", {"selected": source},
+                                            row_index=pd.date_range("2024-01-01", periods=len(source), freq="h"))
 
     schema = pq.read_schema(str(processed_dir / "selected.parquet"))
     registry = json.loads(schema.metadata[L7_ENCODING_REGISTRY_METADATA_KEY.encode("utf-8")])

@@ -281,6 +281,7 @@ def _run_concurrent_raw_processed_merge(
                 tf,
                 config_hash,
                 processed_groups,
+                row_index=row_index,  # ICFIRSTALIGN Task 1.3：row_index 必填
                 layer_results=layer_results,
             )
         except BaseException as exc:  # pragma: no cover - surfaced via errors list
@@ -831,6 +832,7 @@ def test_writer_timeframe_completeness_ic_first_rewrite_preserves_root(tmp_path:
     )
     storage.write_processed(
         "BTCUSDT", "1h", "cfg_tfmeta_icfirst", _sample_groups(_IDX3),
+        row_index=_IDX3,  # ICFIRSTALIGN Task 1.3
         layer_results=_healthy_layer_results(_IDX3),
     )
     path = storage.feature_run_dir("BTCUSDT", "1h", "cfg_tfmeta_icfirst") / FeatureStorage.L7_V2_MANIFEST_NAME
@@ -873,6 +875,7 @@ def test_boundary_12_writer_timeframe_completeness_empty_selection_keeps_canonic
     storage = FeatureStorage(str(tmp_path / "features"))
     storage.write_processed(
         "BTCUSDT", "1h", "cfg_tfmeta_empty", {},
+        row_index=pd.DatetimeIndex([]),  # ICFIRSTALIGN Task 1.3：空選擇之 processed 軸長度 0
         layer_results=_healthy_layer_results(_IDX3),
         timeframe_completeness=build_timeframe_completeness(_MULTI, []),
     )
@@ -989,6 +992,7 @@ def test_writer_timeframe_completeness_ic_first_rewrite_preserves_quality_degrad
     storage.write_raw("BTCUSDT", "1h", config_hash, _sample_groups(_IDX3), row_index=_IDX3,
                       layer_results=_healthy_layer_results(_IDX3))
     storage.write_processed("BTCUSDT", "1h", config_hash, _sample_groups(_IDX3),
+                            row_index=_IDX3,  # ICFIRSTALIGN Task 1.3
                             layer_results=_healthy_layer_results(_IDX3))
     after = fg.l7_manifest(root, "1h", result)
     for key in ("quality_status", "run_status", "failure_reasons") + COMPLETENESS_FIELD_NAMES:
@@ -1077,6 +1081,7 @@ def test_writer_ic_first_rewrite_keeps_artifact_and_run_status(tmp_path: Path) -
     storage.write_raw("BTCUSDT", "1h", "cfg_tfmeta_runstatus", _sample_groups(_IDX3), row_index=_IDX3,
                       layer_results=_healthy_layer_results(_IDX3))
     storage.write_processed("BTCUSDT", "1h", "cfg_tfmeta_runstatus", _sample_groups(_IDX3),
+                            row_index=_IDX3,  # ICFIRSTALIGN Task 1.3
                             layer_results=_healthy_layer_results(_IDX3))
     path = storage.feature_run_dir("BTCUSDT", "1h", "cfg_tfmeta_runstatus") / FeatureStorage.L7_V2_MANIFEST_NAME
     manifest = json.loads(path.read_text(encoding="utf-8"))

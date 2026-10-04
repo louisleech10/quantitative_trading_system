@@ -226,7 +226,9 @@ def test_close_carrier_via_production_stage4_not_ad_hoc_ic_cache() -> None:
 
     # 源端有效 close（C3）；本測試**從未**執行 orch._ic_cache['close_series'] = ...
     assert not bool(source_close.isna().all())
-    # 模組仍應可完成（production 僅拒 None，不拒 reindex 後 NaN）
+    # ICFIRSTALIGN Task 3.1：carrier 有限且等於 kline close（改前註解「production 不拒 reindex 後 NaN」——
+    # 當時 carrier 以 RangeIndex reindex 恆全 NaN；改後依時間戳取值，全 NaN ⇒ CloseCarrierInvalidError）
+    assert bool(np.isfinite(close_series.to_numpy(dtype=np.float64)).all())
     assert report.module_summary.get("factor_exposure") != "skipped"
 
 

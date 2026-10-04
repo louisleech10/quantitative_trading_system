@@ -183,20 +183,35 @@ def test_align_label_to_group_rejects_equal_length_misalignment():
         name="return_1",
     )
 
-    with pytest.raises(AlignmentViolationError, match="equal length"):
+    # ICFIRSTALIGN Task 1.1：仍拒用（例外型別不變）；訊息改為時間戳涵蓋語意，不再含 "equal length"
+    with pytest.raises(AlignmentViolationError, match="拒絕"):
         ICEngine._align_label_to_group(label, group_df)
 
 
-def test_align_label_to_group_reindexes_subset_labels():
-    """不同長度時保留既有 reindex 語義。"""
+def test_align_label_to_group_rejects_subset_labels():
+    """ICFIRSTALIGN Task 1.1（SPEC v27）：label 時間戳未涵蓋群組（label 為子集）⇒ 拒用。
+
+    改前斷言為「不同長度時 reindex、缺列為 NaN」——該 reindex 分支於時間戳無交集時會靜默產出全 NaN 之 IC，
+    SPEC 刪除之；label 只准與群組同一索引或為其超集。
+    """
     index = pd.date_range("2024-01-01", periods=3, freq="D")
     group_df = pd.DataFrame({"feature": [1.0, 2.0, 3.0]}, index=index)
     label = pd.Series([0.1, 0.3], index=index[[0, 2]], name="return_1")
 
+    with pytest.raises(AlignmentViolationError):
+        ICEngine._align_label_to_group(label, group_df)
+
+
+def test_align_label_to_group_superset_label_takes_group_timestamps():
+    """label 為群組索引之超集 ⇒ 依時間戳取子集（值逐一對應、名稱保留）。"""
+    index = pd.date_range("2024-01-01", periods=5, freq="D")
+    group_df = pd.DataFrame({"feature": [1.0, 2.0, 3.0]}, index=index[[1, 2, 4]])
+    label = pd.Series([0.1, 0.2, 0.3, 0.4, 0.5], index=index, name="return_1")
+
     aligned = ICEngine._align_label_to_group(label, group_df)
 
     assert aligned.index.equals(group_df.index)
-    assert np.isnan(aligned.iloc[1])
+    assert aligned.tolist() == [0.2, 0.3, 0.5]
     assert aligned.name == "return_1"
 
 

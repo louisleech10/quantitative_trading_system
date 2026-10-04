@@ -78,7 +78,9 @@ def test_mixed_encoding_metadata_roundtrip(monkeypatch, tmp_path) -> None:
         }
     )
 
-    processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_codec", {"selected": frame})
+    # ICFIRSTALIGN Task 1.3：row_index 必填（本測試只驗 codec，軸值不影響斷言）
+    processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_codec", {"selected": frame},
+                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"))
 
     schema = pq.read_schema(str(processed_dir / "selected.parquet"))
     registry = json.loads(schema.metadata[L7_ENCODING_REGISTRY_METADATA_KEY.encode("utf-8")])
@@ -113,7 +115,8 @@ def test_codec_upgrade_disabled_fallback(monkeypatch, tmp_path) -> None:
         {"alpha_rank_4": np.array([0.25, 0.5, 1.0, np.nan], dtype=np.float32)}
     )
 
-    processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_disabled", {"selected": frame})
+    processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_disabled", {"selected": frame},
+                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"))
 
     schema = pq.read_schema(str(processed_dir / "selected.parquet"))
     metadata = schema.metadata or {}
@@ -149,7 +152,8 @@ def test_zscore_overflow_fallback_float32(monkeypatch, tmp_path) -> None:
         {"overflow_zscore": np.array([0.0, 40.0, np.nan], dtype=np.float32)}
     )
 
-    processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_overflow", {"selected": frame})
+    processed_dir = storage.write_processed("SYNTHETIC", "1h", "cfg_overflow", {"selected": frame},
+                                            row_index=pd.date_range("2024-01-01", periods=len(frame), freq="h"))
 
     schema = pq.read_schema(str(processed_dir / "selected.parquet"))
     metadata = schema.metadata or {}

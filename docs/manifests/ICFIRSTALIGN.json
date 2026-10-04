@@ -4,7 +4,8 @@
   "stub_modules": [
     "momentum/core/icfirstalign_errors.py",
     "momentum/FeatureEngineering/ic_first_context.py",
-    "momentum/FeatureEngineering/memory_budget.py"
+    "momentum/FeatureEngineering/memory_budget.py",
+    "momentum/FeatureEngineering/memory_guard.py"
   ],
   "test_files": [
     "tests/feature_engineering/test_icfirstalign_timeaxis.py",
@@ -123,7 +124,8 @@
       "tests/api/test_batch_status_layer.py",
       "tests/api/test_b4_bulk_delete_orphan.py",
       "tests/api/test_batch_date.py",
-      "tests/api/test_worker_logging.py"
+      "tests/api/test_worker_logging.py",
+      "momentum/FeatureEngineering/memory_guard.py"
     ],
     "callers_now": [
       "api/services/feature_factory_service.py",

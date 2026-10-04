@@ -24,12 +24,74 @@ from momentum.FeatureEngineering.consumer_gate import (
     is_source_run_status_reusable,
 )
 from momentum.core.contracts import AlignmentViolationError
+from momentum.core.icfirstalign_errors import (
+    ICCacheRawUnavailableError,
+    RowIndexArtifactMissingError,
+    RowIndexLengthMismatchError,
+)
 from momentum.core.exceptions import InvalidInputError
 from momentum.core.logging import get_logger
 from momentum.core.protocols import IFeatureReader
 
 
 logger = get_logger(__name__)
+
+# ICFIRSTALIGN Task 1.4：IC cache 重用之完整計算身分（只容 threshold 不同；任一不同或缺欄 ⇒ 拒用、需 raw 重算）
+CACHE_IDENTITY_FIELDS = (
+    "symbol",
+    "tf",
+    "config_hash",
+    "method",
+    "label_horizon",
+    "selection_window_start",
+    "selection_window_end",
+    "split_id",
+    "feature_axis_sha256",
+    "label_sha256",
+)
+
+
+def _utc_epoch_seconds(index: Any) -> np.ndarray:
+    """時間戳 → UTC int64 epoch 秒：tz-aware 任一時區轉 UTC 時刻；tz-naive 依 §C 資料契約視為 UTC；整數視為 epoch 秒。"""
+    if isinstance(index, pd.DatetimeIndex):
+        dt = index.tz_convert("UTC").tz_localize(None) if index.tz is not None else index
+        return (np.asarray(dt.asi8, dtype=np.int64) // 1_000_000_000).astype(np.int64)
+    values = np.asarray(index)
+    if np.issubdtype(values.dtype, np.integer):
+        return values.astype(np.int64)
+    return _utc_epoch_seconds(pd.DatetimeIndex(pd.to_datetime(values)))
+
+
+def label_fingerprint(label: pd.Series) -> str:
+    """label 指紋（SPEC Task 1.4）：sha256 依序吃 列數（int64 LE）、UTC epoch 秒（int64 LE）、NaN 遮罩（uint8）、
+    有限值位置之 float64 LE。同一 UTC 時刻之不同表示（任一時區 tz-aware、UTC tz-naive、epoch 秒）得同一指紋。"""
+    import hashlib
+
+    series = label if isinstance(label, pd.Series) else pd.Series(label)
+    seconds = _utc_epoch_seconds(series.index).astype("<i8")
+    values = np.asarray(series.to_numpy(dtype=np.float64), dtype="<f8")
+    mask = ~np.isfinite(values)
+    digest = hashlib.sha256()
+    digest.update(np.asarray([len(values)], dtype="<i8").tobytes())
+    digest.update(seconds.tobytes())
+    digest.update(mask.astype(np.uint8).tobytes())
+    digest.update(values[~mask].tobytes())
+    return digest.hexdigest()
+
+
+def _axis_fingerprint(row_index: Optional[pd.DatetimeIndex]) -> Optional[str]:
+    """特徵軸指紋：raw sidecar 之 UTC epoch 秒（int64 LE）之 sha256；無軸 ⇒ None（身分不完整）。"""
+    import hashlib
+
+    if row_index is None:
+        return None
+    return hashlib.sha256(_utc_epoch_seconds(row_index).astype("<i8").tobytes()).hexdigest()
+
+
+def _window_bound(value: Any) -> Optional[int]:
+    if value is None or value == "":
+        return None
+    return int(_utc_epoch_seconds(pd.DatetimeIndex([pd.Timestamp(value)]))[0])
 
 
 class ICReadError(RuntimeError):
@@ -160,6 +222,7 @@ class ICEngine:
         a different threshold only requires loading that JSON — no raw parquet reads.
         """
 
+        self._reject_positional_selection(selection_window)
         self._validate_selection_metadata(label_horizon, selection_window, split_id)
         resolved_method = method or (self._methods[0] if self._methods else "spearman")
         resolved_threshold = float(
@@ -186,6 +249,15 @@ class ICEngine:
         # If raw/ was cleaned up but the JSON cache exists, re-apply the new
         # threshold to previously computed IC scores without reading raw parquet.
         if not raw_dir.exists() and selected_path.exists():
+            try:
+                axis_for_identity = feature_reader.load_row_index_v2(symbol, tf, config_hash, artifact_kind="raw")
+            except (RowIndexArtifactMissingError, ValueError):
+                axis_for_identity = None  # 特徵軸不可得 ⇒ 身分不完整 ⇒ 拒用
+            request_identity = self._request_identity(
+                symbol=symbol, tf=tf, config_hash=config_hash, method=resolved_method,
+                label_horizon=label_horizon, selection_window=selection_window, split_id=split_id,
+                row_index=axis_for_identity, label=label,
+            )
             cache_result = self._try_reuse_cached_ic_scores(
                 selected_path=selected_path,
                 symbol=symbol,
@@ -195,12 +267,14 @@ class ICEngine:
                 merged_ic_params=merged_ic_params,
                 resolved_threshold=resolved_threshold,
                 allow_partial_ic=allow_partial_ic,
+                request_identity=request_identity,
             )
             if cache_result is not None:
                 return cache_result
-            raise ICReadError(
-                f"raw/ artifact not found at {raw_dir} and cached IC scores are "
-                f"stale or missing. Re-run the IC-First pipeline to regenerate raw/."
+            raise ICCacheRawUnavailableError(
+                f"raw/ artifact not found at {raw_dir} and cached IC scores do not match the requested "
+                f"computation identity (only ic_threshold may differ). Re-run the IC-First pipeline to "
+                f"regenerate raw/."
             )
         # ── Full recompute path (raw/ must exist) ───────────────────────────────
 
@@ -221,6 +295,8 @@ class ICEngine:
         )
         base_dir = self._resolve_l7_raw_base_dir(run_dir, manifest, config_hash)
 
+        # ICFIRSTALIGN Task 1.1：群組讀回接 raw sidecar 時間軸（缺 ⇒ 具名錯誤；不得以位置對齊）
+        row_index = self._load_raw_row_index(feature_reader, symbol, tf, config_hash)
         data_fingerprint = self._build_data_fingerprint(
             symbol=symbol,
             tf=tf,
@@ -229,6 +305,12 @@ class ICEngine:
             raw_artifact=raw_artifact,
             ic_params=merged_ic_params,
         )
+        # ICFIRSTALIGN Task 1.4：fingerprint 寫入完整計算身分（供日後 cache 重用之逐欄比對）
+        data_fingerprint.update(self._request_identity(
+            symbol=symbol, tf=tf, config_hash=config_hash, method=resolved_method,
+            label_horizon=label_horizon, selection_window=selection_window, split_id=split_id,
+            row_index=row_index, label=label,
+        ))
 
         ic_scores: Dict[str, float] = {}
         skipped_groups: List[str] = []
@@ -243,6 +325,7 @@ class ICEngine:
                 skipped_groups.append(str(parquet_path))
                 logger.warning("[IC-First] skipped corrupted group: %s", parquet_path)
                 continue
+            group_df = self._attach_row_index(group_df, row_index)
 
             try:
                 group_ic = self._compute_l7_raw_group_ic(
@@ -635,17 +718,85 @@ class ICEngine:
             return {str(column): np.nan for column in numeric_df.columns}
         return self.compute_ic(numeric_df, aligned_label, method=method)
 
+    POSITIONAL_SELECTION_KEYS = ("start_pos", "end_pos", "start_index", "end_index")
+
+    @staticmethod
+    def _reject_positional_selection(selection_window: Optional[Dict[str, Any]]) -> None:
+        """ICFIRSTALIGN Task 1.1：選窗只收時間戳；位置鍵（含與時間鍵混用）⇒ ValueError。"""
+        if not selection_window:
+            return
+        found = [key for key in ICEngine.POSITIONAL_SELECTION_KEYS if key in selection_window]
+        if found:
+            raise ValueError(
+                f"selection_window 不接受位置鍵 {found}；請以時間戳 start／end 指定（位置對齊會錯位）"
+            )
+
+    @staticmethod
+    def _request_identity(
+        *,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        method: str,
+        label_horizon: Optional[str],
+        selection_window: Optional[Dict[str, Any]],
+        split_id: Optional[str],
+        row_index: Optional[pd.DatetimeIndex],
+        label: pd.Series,
+    ) -> Dict[str, Any]:
+        """本次請求之計算身分（Task 1.4）：選窗起訖正規化為 UTC epoch 秒；特徵軸與 label 以指紋表示。"""
+        window = selection_window or {}
+        return {
+            "symbol": symbol,
+            "tf": tf,
+            "config_hash": config_hash,
+            "method": method,
+            "label_horizon": None if label_horizon is None else str(label_horizon),
+            "selection_window_start": _window_bound(window.get("start") or window.get("start_time")),
+            "selection_window_end": _window_bound(window.get("end") or window.get("end_time")),
+            "split_id": split_id,
+            "feature_axis_sha256": _axis_fingerprint(row_index),
+            "label_sha256": label_fingerprint(label),
+        }
+
+    @staticmethod
+    def _load_raw_row_index(feature_reader: IFeatureReader, symbol: str, tf: str,
+                            config_hash: str) -> pd.DatetimeIndex:
+        """raw 成品之 sidecar 時間軸；未宣告或檔案缺 ⇒ `RowIndexArtifactMissingError`。"""
+        row_index = feature_reader.load_row_index_v2(symbol, tf, config_hash, artifact_kind="raw")
+        if row_index is None:
+            raise RowIndexArtifactMissingError(
+                f"raw 成品未宣告時間軸 sidecar（{symbol}/{tf}/{config_hash}）；拒絕以位置對齊計算 IC"
+            )
+        return row_index
+
+    @staticmethod
+    def _attach_row_index(group_df: pd.DataFrame, row_index: pd.DatetimeIndex) -> pd.DataFrame:
+        """群組讀回之 RangeIndex 換為 sidecar 時間戳；列數不符 ⇒ `RowIndexLengthMismatchError`。"""
+        if len(group_df) != len(row_index):
+            raise RowIndexLengthMismatchError(
+                f"L7 raw 群組列數 {len(group_df)} 與 sidecar 列數 {len(row_index)} 不符"
+            )
+        return group_df.set_axis(row_index, axis=0)
+
     @staticmethod
     def _align_label_to_group(label: pd.Series, group_df: pd.DataFrame) -> pd.Series:
+        """label 只能與群組同一時間戳索引，或為群組索引之超集（依時間戳取子集）；其餘一律拒用。
+
+        ICFIRSTALIGN Task 1.1：刪除不等長時之 `reindex` 靜默 NaN 分支（時間戳無交集時曾產出全 NaN 之 IC）。
+        """
         label_series = label if isinstance(label, pd.Series) else pd.Series(label)
         label_name = label_series.name or "label"
         if label_series.index.equals(group_df.index):
             return label_series.rename(label_name)
-        if len(label_series) == len(group_df):
-            raise AlignmentViolationError(
-                "label/group index mismatch with equal length; refusing positional alignment"
-            )
-        return label_series.reindex(group_df.index).rename(label_name)
+        if (
+            label_series.index.is_unique
+            and bool(group_df.index.isin(label_series.index).all())
+        ):
+            return label_series.reindex(group_df.index).rename(label_name)
+        raise AlignmentViolationError(
+            "label 時間戳未涵蓋群組時間戳（非同一索引、亦非其超集）；拒絕位置或部分對齊"
+        )
 
     @staticmethod
     def _apply_selection_window(
@@ -655,14 +806,6 @@ class ICEngine:
     ) -> Tuple[pd.DataFrame, pd.Series]:
         if not selection_window:
             return features_df, label
-
-        start_pos = selection_window.get("start_pos", selection_window.get("start_index"))
-        end_pos = selection_window.get("end_pos", selection_window.get("end_index"))
-        if isinstance(start_pos, int) or isinstance(end_pos, int):
-            start = max(int(start_pos or 0), 0)
-            end = int(end_pos) if isinstance(end_pos, int) else len(features_df)
-            end = max(min(end, len(features_df)), start)
-            return features_df.iloc[start:end], label.iloc[start:end]
 
         start_value = selection_window.get("start") or selection_window.get("start_time")
         end_value = selection_window.get("end") or selection_window.get("end_time")
@@ -760,13 +903,16 @@ class ICEngine:
         merged_ic_params: Dict[str, Any],
         resolved_threshold: float,
         allow_partial_ic: bool = False,
+        request_identity: Optional[Dict[str, Any]] = None,
     ) -> Optional["ICSelectionResult"]:
         """Re-apply a new IC threshold using previously cached IC scores.
 
         Called when raw/ has been deleted (cleanup_raw=True) but the JSON cache
-        written by an earlier pipeline run still exists.  Only validates data
-        identity (symbol/tf/config_hash/row_count); the IC threshold in ic_params
-        is intentionally allowed to differ — that is the whole point of re-runs.
+        written by an earlier pipeline run still exists.
+
+        ICFIRSTALIGN Task 1.4：只容 threshold 不同——`CACHE_IDENTITY_FIELDS` 之每一欄（symbol、tf、config_hash、
+        方法、label_horizon、選窗起訖〔UTC〕、split_id、特徵軸指紋、label 指紋）須於 cache 內存在且與本次請求
+        完全相等（不以容差、不以有效列數代替值指紋）；任一缺或不同 ⇒ 拒用（回 None）。
 
         Returns ICSelectionResult on cache hit, None on cache miss.
         """
@@ -784,27 +930,19 @@ class ICEngine:
 
         fp: Dict[str, Any] = cached.get("data_fingerprint") or {}
 
-        # Validate data identity (NOT ic_params — threshold is allowed to change).
-        if (
-            fp.get("symbol") != symbol
-            or fp.get("tf") != tf
-            or fp.get("config_hash") != config_hash
-        ):
-            logger.warning(
-                "[IC-First] cache fingerprint mismatch (symbol/tf/config_hash) — raw/ required"
-            )
+        # Validate full computation identity (NOT ic_threshold — threshold is allowed to change).
+        if request_identity is None:
+            logger.warning("[IC-First] no request identity supplied — raw/ required")
             return None
-
-        # Row count: allow ±10-row tolerance for label alignment trimming.
-        cache_row_count = fp.get("row_count")
-        if cache_row_count is not None:
-            label_rows = len(label.dropna()) if hasattr(label, "dropna") else len(label)
-            if abs(int(cache_row_count) - label_rows) > 10:
-                logger.warning(
-                    "[IC-First] cache row_count mismatch: cached=%s label=%d — raw/ required",
-                    cache_row_count,
-                    label_rows,
-                )
+        for field in CACHE_IDENTITY_FIELDS:
+            if field not in fp or field not in request_identity:
+                logger.warning("[IC-First] cache fingerprint lacks identity field %s — raw/ required", field)
+                return None
+            if request_identity[field] is None and field == "feature_axis_sha256":
+                logger.warning("[IC-First] feature axis unavailable — raw/ required")
+                return None
+            if fp[field] != request_identity[field]:
+                logger.warning("[IC-First] cache identity mismatch on %s — raw/ required", field)
                 return None
 
         source_run_status = (

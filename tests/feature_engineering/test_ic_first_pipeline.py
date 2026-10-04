@@ -73,10 +73,14 @@ def _assert_frame_allclose(left: pd.DataFrame, right: pd.DataFrame) -> None:
     )
 
 
+# ICFIRSTALIGN Task 1.1：選窗只收時間戳（與 _ic_fixture 之 row_index 同一範圍）
+_TIME_WINDOW = {"start": "2026-01-01 00:00:00", "end": "2026-01-01 05:00:00"}
+
+
 def _selection_metadata() -> Dict[str, Any]:
     return {
         "label_horizon": "1_bar_forward_return",
-        "selection_window": {"start_pos": 0, "end_pos": 6},
+        "selection_window": dict(_TIME_WINDOW),  # ICFIRSTALIGN Task 1.1：位置鍵選窗已禁用，改時間戳
         "split_id": "train_fold_0",
     }
 
@@ -134,6 +138,7 @@ def _ic_fixture(
     label = pd.Series(
         np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32),
         name="forward_return",
+        index=row_index,  # ICFIRSTALIGN Task 1.1：label 須帶時間戳（與 raw sidecar 同軸）
     )
     return {
         "storage": storage,
@@ -281,7 +286,8 @@ def test_ic_empty_selection(tmp_path) -> None:
 
     storage = FeatureStorage(str(tmp_path / "features"))
     reader = FeatureReader(str(tmp_path / "features"))
-    storage.write_processed("SYNTHETIC", "1h", "cfg_empty_selection", processed_groups)
+    storage.write_processed("SYNTHETIC", "1h", "cfg_empty_selection", processed_groups,
+                            row_index=pd.DatetimeIndex([]))  # ICFIRSTALIGN Task 1.3：row_index 必填
     manifest = reader.load_manifest_v2(
         "SYNTHETIC",
         "1h",
@@ -316,7 +322,8 @@ def test_l7_schema_version_metadata(tmp_path) -> None:
     }
 
     raw_dir = storage.write_raw(symbol, tf, config_hash, raw_groups)
-    processed_dir = storage.write_processed(symbol, tf, config_hash, processed_groups)
+    processed_dir = storage.write_processed(symbol, tf, config_hash, processed_groups,  # ICFIRSTALIGN Task 1.3
+                                            row_index=pd.date_range("2024-01-01", periods=3, freq="h"))
 
     assert raw_dir == tmp_path / "features" / symbol / tf / config_hash / "raw"
     assert processed_dir == tmp_path / "features" / symbol / tf / config_hash / "processed"
@@ -385,7 +392,8 @@ def test_feature_run_dir_and_manifest_atomicity(tmp_path) -> None:
     with pytest.raises(ValueError, match="write_raw requires non-empty"):
         storage.write_raw(symbol, tf, "cfg_empty_raw", {})
 
-    processed_dir = storage.write_processed(symbol, tf, "cfg_empty_processed", {})
+    processed_dir = storage.write_processed(symbol, tf, "cfg_empty_processed", {},
+                                            row_index=pd.DatetimeIndex([]))  # ICFIRSTALIGN Task 1.3
     assert processed_dir.exists()
     processed_manifest = reader.load_manifest_v2(
         symbol,
@@ -522,10 +530,10 @@ def test_ic_selection_no_oos_leakage(tmp_path) -> None:
     payload = _load_selected_payload(result)
 
     assert payload["ic_params"]["label_horizon"] == "1_bar_forward_return"
-    assert payload["ic_params"]["selection_window"] == {"start_pos": 0, "end_pos": 6}
+    assert payload["ic_params"]["selection_window"] == _TIME_WINDOW
     assert payload["ic_params"]["split_id"] == "train_fold_0"
     assert payload["data_fingerprint"]["label_horizon"] == "1_bar_forward_return"
-    assert payload["data_fingerprint"]["selection_window"] == {"start_pos": 0, "end_pos": 6}
+    assert payload["data_fingerprint"]["selection_window"] == _TIME_WINDOW
     assert payload["data_fingerprint"]["split_id"] == "train_fold_0"
 
     engine = ICEngine({"methods": ["spearman"]})
@@ -537,7 +545,7 @@ def test_ic_selection_no_oos_leakage(tmp_path) -> None:
             fixture["label"],
             feature_reader=fixture["reader"],
             ic_threshold=0.95,
-            selection_window={"start_pos": 0, "end_pos": 6},
+            selection_window=dict(_TIME_WINDOW),
             split_id="train_fold_0",
         )
 
@@ -594,6 +602,7 @@ def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
     ]
     label = pd.Series(
         np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32),
+        index=row_index,  # ICFIRSTALIGN Task 1.1：label 須帶時間戳（與 raw sidecar 同軸）
         name="forward_return",
     )
 
@@ -611,7 +620,7 @@ def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
         storage=storage,
         ic_threshold=0.95,
         label_horizon="1_bar_forward_return",
-        selection_window={"start_pos": 0, "end_pos": 6},
+        selection_window=dict(_TIME_WINDOW),
         split_id="train_fold_0",
     )
 

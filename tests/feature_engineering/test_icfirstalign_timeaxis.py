@@ -379,17 +379,24 @@ def test_write_processed_requires_row_index(fresh_s2: Dict[str, Any]) -> None:
 
 def test_mutation_processed_overwrites_root_time_range(fresh_s2: Dict[str, Any],
                                                         monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：恢復 HEAD 之 `write_processed`（無 row_index、以群組索引覆寫根）⇒ 根欄位改變而被斷言抓到。"""
-    def head_write_processed(self: FeatureStorage, symbol: str, tf: str, config_hash: str,
-                             groups: Dict[str, pd.DataFrame], **_: Any) -> Path:
-        return self._write_l7_v2_artifact(symbol=symbol, tf=tf, config_hash=config_hash, groups=groups,
-                                          artifact_kind="processed",
-                                          schema_version=self.L7_PROCESSED_SCHEMA_VERSION, allow_empty=True,
-                                          quality_status="empty_selection" if not groups else "complete")
+    """mutant：恢復 HEAD 之「processed 寫入覆寫 manifest 根之 row_count／time_range」（實作之保護位於
+    `_build_feature_manifest_v2`，故 mutant 於該處還原 HEAD 行為）⇒ 根欄位改變而被斷言抓到。
+
+    實作後修訂（b1）：原 mutant 只替換 `write_processed`，而根欄位保護實作於 manifest 合併層，替換上層
+    函式已無法還原 HEAD 行為；processed 軸亦改與 raw 列數不同（drop_head=10），使覆寫可觀測。
+    """
+    real_build = FeatureStorage._build_feature_manifest_v2
+
+    def head_build(self: FeatureStorage, **kw: Any) -> Dict[str, Any]:
+        manifest = real_build(self, **kw)
+        if kw.get("artifact_kind") == "processed":
+            manifest["row_count"] = kw["row_count"]
+            manifest["time_range"] = kw["time_range"]
+        return manifest
 
     before = _root_fields(fresh_s2)
-    monkeypatch.setattr(FeatureStorage, "write_processed", head_write_processed)
-    groups, axis = _processed_groups(fresh_s2)
+    monkeypatch.setattr(FeatureStorage, "_build_feature_manifest_v2", head_build)
+    groups, axis = _processed_groups(fresh_s2, drop_head=10)
     _write_processed(fresh_s2, groups, axis)
     assert _root_fields(fresh_s2) != before
 

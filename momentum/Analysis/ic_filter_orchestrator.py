@@ -65,6 +65,7 @@ from momentum.core.exceptions import (
     InvalidInputError,
     ModuleUnavailableError,
 )
+from momentum.core.icfirstalign_errors import CloseCarrierInvalidError
 from momentum.core.logging import get_logger
 from momentum.core.contracts import (
     EventIsolationRows,
@@ -296,6 +297,50 @@ def _normalize_frame_time_index(frame: pd.DataFrame, role: str) -> pd.DatetimeIn
     if "timestamp" in frame.columns:
         return _normalize_ic_time_index(pd.Index(frame["timestamp"], name="timestamp"), role)
     return _normalize_ic_time_index(frame.index, role)
+
+
+def _utc_instant_key(index: pd.Index) -> pd.DatetimeIndex:
+    """比對鍵：同一 UTC 時刻之統一表示（tz-aware 轉 UTC 後去時區；tz-naive 依 §C 視為 UTC）。"""
+    idx = pd.DatetimeIndex(index)
+    return idx.tz_convert("UTC").tz_localize(None) if idx.tz is not None else idx
+
+
+def _validate_close_carrier(close: pd.Series) -> None:
+    """close carrier 守衛（ICFIRSTALIGN Task 3.1）：長度 0 或全 NaN ⇒ `CloseCarrierInvalidError`（不得以填值代替）。"""
+    values = pd.to_numeric(close, errors="coerce").to_numpy(dtype=np.float64) if len(close) else np.array([])
+    if values.size == 0 or not bool(np.isfinite(values).any()):
+        raise CloseCarrierInvalidError(
+            "close carrier 對齊特徵時間戳後為空或全 NaN（市場代理不可用）；拒絕以空值計算 factor_exposure"
+        )
+
+
+def _rekey_close_carrier(close: pd.Series, feature_index: pd.Index) -> pd.Series:
+    """既有時間索引之 close 依 UTC 時刻取 `feature_index` 之值；回傳保持原 `feature_index`，並經守衛。"""
+    keyed = pd.Series(
+        pd.to_numeric(close, errors="coerce").to_numpy(dtype=np.float64),
+        index=_utc_instant_key(close.index),
+    )
+    carrier = pd.Series(
+        keyed.reindex(_utc_instant_key(feature_index)).to_numpy(dtype=np.float64),
+        index=feature_index,
+        name="close",
+    )
+    _validate_close_carrier(carrier)
+    return carrier
+
+
+def _build_close_carrier(raw_data: pd.DataFrame, feature_index: pd.Index) -> pd.Series:
+    """FU-2 close carrier（ICFIRSTALIGN Task 3.1，單一實作）：kline 之 `timestamp` 欄（或時間索引）正規化為時間軸，
+    依同一 UTC 時刻取特徵時間戳之 close；回傳保持原 `feature_index`；全 NaN 或長度 0 ⇒ 具名錯誤。
+
+    改前以 kline 之 RangeIndex 直接 `reindex(features_df.index)`，無一列對上（carrier 恆全 NaN）。
+    """
+    source_index = _normalize_frame_time_index(raw_data, "raw_data")
+    close = pd.Series(
+        pd.to_numeric(raw_data["close"], errors="coerce").to_numpy(dtype=np.float64),
+        index=source_index,
+    )
+    return _rekey_close_carrier(close, feature_index)
 
 
 def _numeric_payload_sha256(data: pd.Series | pd.DataFrame) -> str:
@@ -4255,13 +4300,12 @@ class ICFilterOrchestrator:
             )
 
         # LA-2 B3 close carrier：對齊 features_df index
+        # ICFIRSTALIGN Task 3.1：經單一實作接時間軸（改前以 RangeIndex 直接 reindex，恆全 NaN）
         close_series_out: Optional[pd.Series] = None
         if raw_data_for_ic is not None and "close" in getattr(raw_data_for_ic, "columns", []):
-            close_series_out = pd.to_numeric(raw_data_for_ic["close"], errors="coerce")
-            close_series_out = close_series_out.reindex(features_df.index)
+            close_series_out = _build_close_carrier(raw_data_for_ic, features_df.index)
         elif raw_data is not None and "close" in getattr(raw_data, "columns", []):
-            close_series_out = pd.to_numeric(raw_data["close"], errors="coerce")
-            close_series_out = close_series_out.reindex(features_df.index)
+            close_series_out = _build_close_carrier(raw_data, features_df.index)
 
         ic_results = {
             "label_series": label_series,
@@ -4748,9 +4792,10 @@ class ICFilterOrchestrator:
         # LA-2 B3：close carrier 進 _ic_cache（index 對齊 features_df；factor proxy 用）
         close_series: Optional[pd.Series] = None
         if isinstance(ic_results, dict) and ic_results.get("close_series") is not None:
-            close_series = pd.to_numeric(ic_results["close_series"], errors="coerce")
+            close_series = ic_results["close_series"]
             if isinstance(close_series, pd.Series):
-                close_series = close_series.reindex(features_df.index)
+                # ICFIRSTALIGN Task 3.1：依 UTC 時刻取值並經守衛（不得以位置 reindex）
+                close_series = _rekey_close_carrier(close_series, features_df.index)
 
         self._ic_cache = {
             "features_df": features_df,

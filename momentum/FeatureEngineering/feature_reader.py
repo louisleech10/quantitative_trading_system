@@ -33,6 +33,7 @@ from momentum.FeatureEngineering.feature_storage import (
     decode_zscore_from_int16,
     resolve_run_status as merge_manifest_run_status,
 )
+from momentum.core.icfirstalign_errors import RowIndexArtifactMissingError, RowIndexLengthMismatchError
 from momentum.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -122,8 +123,14 @@ class FeatureReader:
         *,
         consumer: ConsumerPolicy = "browse",
         allow_partial: bool = False,
+        attach_row_index: bool = False,
     ) -> pd.DataFrame:
-        """Column projection for V2 raw/processed artifacts with legacy fallback."""
+        """Column projection for V2 raw/processed artifacts with legacy fallback.
+
+        `attach_row_index=True`（ICFIRSTALIGN Task 1.2）：回傳以該 artifact_kind 之 sidecar 時間戳為索引；
+        sidecar 缺 ⇒ `RowIndexArtifactMissingError`；無符合欄 ⇒ 空 DataFrame 帶長度 0 之 DatetimeIndex。
+        預設 False 維持既有 caller 行為（RangeIndex，逐位元組不變）。
+        """
         manifest, base_dir, is_legacy = self._resolve_manifest_v2(
             symbol=symbol,
             tf=tf,
@@ -133,7 +140,14 @@ class FeatureReader:
             allow_partial=allow_partial,
         )
         if is_legacy:
+            if attach_row_index:
+                raise RowIndexArtifactMissingError(
+                    f"legacy 成品無時間軸 sidecar（{symbol}/{tf}/{config_hash}）；不得以位置對齊讀回"
+                )
             return self.load_columns(symbol, config_hash, columns)
+        row_index = (
+            self._require_row_index(symbol, tf, config_hash, artifact_kind) if attach_row_index else None
+        )
 
         artifact = self._get_v2_artifact(manifest, artifact_kind)
         col_to_group: Dict[str, List[str]] = {}
@@ -145,7 +159,7 @@ class FeatureReader:
 
         if not col_to_group:
             logger.warning("No V2 columns matched in any group: %s...", columns[:5])
-            return pd.DataFrame()
+            return pd.DataFrame(index=pd.DatetimeIndex([])) if attach_row_index else pd.DataFrame()
 
         frames: List[pd.DataFrame] = []
         for group_name, needed_cols in col_to_group.items():
@@ -157,7 +171,23 @@ class FeatureReader:
             table = self._decode_l7_encoded_table(table)
             frames.append(table.to_pandas())
 
-        return pd.concat(frames, axis=1) if frames else pd.DataFrame()
+        result = pd.concat(frames, axis=1) if frames else pd.DataFrame()
+        if row_index is None:
+            return result
+        if len(result) != len(row_index):
+            raise RowIndexLengthMismatchError(
+                f"選欄讀回列數 {len(result)} 與 {artifact_kind} sidecar 列數 {len(row_index)} 不符"
+            )
+        return result.set_axis(row_index, axis=0)
+
+    def _require_row_index(self, symbol: str, tf: str, config_hash: str, artifact_kind: str) -> pd.DatetimeIndex:
+        """嚴格讀回時間軸：未宣告或檔案缺 ⇒ `RowIndexArtifactMissingError`（經 `load_row_index_v2`，供 mutant 替換）。"""
+        row_index = self.load_row_index_v2(symbol, tf, config_hash, artifact_kind=artifact_kind)
+        if row_index is None:
+            raise RowIndexArtifactMissingError(
+                f"{artifact_kind} 成品未宣告時間軸 sidecar（{symbol}/{tf}/{config_hash}）"
+            )
+        return row_index
 
     def load_row_index_v2(
         self,
@@ -166,10 +196,13 @@ class FeatureReader:
         config_hash: str,
         artifact_kind: str = "raw",
     ) -> Optional[pd.DatetimeIndex]:
-        """Load the persisted V2 primary timestamp axis.
+        """Load the persisted V2 timestamp axis of the given artifact kind.
 
-        Manifest without ``row_index`` is treated as an old run.  A declared
-        row_index must be readable and length-consistent.
+        raw：manifest 根之 ``row_index``；未宣告視為舊 run（回 None）。
+        processed（ICFIRSTALIGN Task 1.3）：只讀 processed artifact 節點之 ``row_index``；
+        未宣告即 `RowIndexArtifactMissingError`，不得退回根軸。
+        已宣告之 sidecar 檔缺 ⇒ `RowIndexArtifactMissingError`（ValueError 子類，與既有 caller 相容）；
+        列數須與宣告相符。
         """
         manifest, base_dir, _is_legacy = self._resolve_manifest_v2(
             symbol=symbol,
@@ -177,16 +210,24 @@ class FeatureReader:
             config_hash=config_hash,
             artifact_kind=artifact_kind,
         )
-        row_index = manifest.get("row_index")
-        if row_index is None:
-            return None
+        if artifact_kind == "processed":
+            node = (manifest.get("artifacts") or {}).get("processed") or {}
+            row_index = node.get("row_index")
+            if row_index is None:
+                raise RowIndexArtifactMissingError(
+                    f"processed 成品未宣告自身時間軸 sidecar（{symbol}/{tf}/{config_hash}）；不得退回 raw 根軸"
+                )
+        else:
+            row_index = manifest.get("row_index")
+            if row_index is None:
+                return None
         if not isinstance(row_index, dict):
             raise ValueError("row_index metadata must be a dictionary")
 
         raw_path = row_index.get("path")
         path = self._resolve_manifest_relative_path(base_dir, raw_path)
         if not path.exists():
-            raise ValueError(f"row_index declared but file missing: {path}")
+            raise RowIndexArtifactMissingError(f"row_index declared but file missing: {path}")
 
         try:
             table = pq.read_table(str(path), columns=["timestamp"])

@@ -36,6 +36,7 @@ from momentum.FeatureEngineering.core.column_group_registry import FailureType
 from momentum.FeatureEngineering import feature_naming
 from momentum.core.config import get_l7_codec_upgrade_enabled
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
+from momentum.core.icfirstalign_errors import RowIndexLengthMismatchError
 from momentum.core.logging import get_logger
 
 if TYPE_CHECKING:
@@ -1512,12 +1513,17 @@ class FeatureStorage:
         config_hash: str,
         groups: Dict[str, pd.DataFrame],
         *,
+        row_index: pd.DatetimeIndex,
         layer_results: Optional[Dict[str, LayerExecutionResult]] = None,
         timeframe_completeness: Optional[Dict[str, List[str]]] = None,
         cross_tf_layer_failures: Sequence[str] = (),
         layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
     ) -> Path:
-        """Write IC-First processed L7 groups to the canonical V2 processed path."""
+        """Write IC-First processed L7 groups to the canonical V2 processed path.
+
+        ICFIRSTALIGN Task 1.3：`row_index` 必填；processed 寫自身 sidecar（`processed_timestamps.parquet`），
+        位置與時間範圍、列數記於 processed artifact 節點；manifest 根之 time_range／row_count／row_index 只屬 raw。
+        """
         quality_status = "empty_selection" if not groups else "complete"
         return self._write_l7_v2_artifact(
             symbol=symbol,
@@ -1528,6 +1534,7 @@ class FeatureStorage:
             schema_version=self.L7_PROCESSED_SCHEMA_VERSION,
             allow_empty=True,
             quality_status=quality_status,
+            row_index=row_index,
             layer_results=layer_results,
             timeframe_completeness=timeframe_completeness,
             cross_tf_layer_failures=cross_tf_layer_failures,
@@ -1579,12 +1586,20 @@ class FeatureStorage:
             group_items=group_items,
         )
         row_count = self._resolve_l7_v2_row_count(group_items)
+        if artifact_kind == "processed" and not group_items and row_index is not None:
+            row_count = int(len(row_index))  # 空選擇：列數依 processed 軸（長度 0）
         row_index_manifest = self._write_row_index_artifact(
             run_dir=run_dir,
             row_index=row_index,
             row_count=row_count,
+            filename="processed_timestamps.parquet" if artifact_kind == "processed" else "timestamps.parquet",
         )
         time_range = self._resolve_l7_v2_time_range(group_items)
+        if artifact_kind == "processed" and row_index is not None:
+            time_range = {
+                "start": self._format_manifest_value(row_index[0]) if len(row_index) else None,
+                "end": self._format_manifest_value(row_index[-1]) if len(row_index) else None,
+            }
 
         temp_root = run_dir / f".tmp-{artifact_kind}-{uuid.uuid4().hex}"
         temp_artifact_dir = temp_root / artifact_kind
@@ -1737,21 +1752,22 @@ class FeatureStorage:
         run_dir: Path,
         row_index: Optional[pd.DatetimeIndex],
         row_count: int,
+        filename: str = "timestamps.parquet",
     ) -> Optional[Dict[str, Any]]:
-        """Persist the primary timestamp axis as UTC epoch seconds."""
+        """Persist a timestamp axis as UTC epoch seconds（raw＝`timestamps.parquet`；processed 另檔，格式相同）。"""
         if row_index is None:
             return None
         if len(row_index) != row_count:
-            raise ValueError(f"row_index {len(row_index)} != row_count {row_count}")
+            raise RowIndexLengthMismatchError(f"row_index {len(row_index)} != row_count {row_count}")
         if not isinstance(row_index, pd.DatetimeIndex):
             raise TypeError("row_index must be a pandas DatetimeIndex")
 
         pa_module, pq_module = _require_pyarrow()
-        epoch_s = (row_index.view("int64") // 1_000_000_000).astype("int64")
-        table = pa_module.table({"timestamp": epoch_s})
-        pq_module.write_table(table, run_dir / "timestamps.parquet")
+        epoch_s = (np.asarray(row_index.view("int64"), dtype=np.int64) // 1_000_000_000).astype("int64")
+        table = pa_module.table({"timestamp": pa_module.array(epoch_s, type=pa_module.int64())})
+        pq_module.write_table(table, run_dir / filename)
         return {
-            "path": "timestamps.parquet",
+            "path": filename,
             "count": int(len(row_index)),
             "unit": "s",
             "tz": "UTC",
@@ -2121,14 +2137,23 @@ class FeatureStorage:
         manifest["updated_at"] = datetime.utcnow().isoformat()
         manifest["schema_version"] = schema_version
         manifest["feature_schema_hash"] = feature_schema_hash
-        manifest["row_count"] = row_count
-        manifest["time_range"] = time_range
         manifest["total_features"] = total_features
         manifest["groups"] = group_manifest
-        if row_index is not None:
-            manifest["row_index"] = dict(row_index)
-        elif artifact_kind == "raw":
-            manifest.pop("row_index", None)
+        if artifact_kind == "processed":
+            # ICFIRSTALIGN Task 1.3：processed 之時間軸、列數、時間範圍只寫入其 artifact 節點；
+            # 根之 time_range／row_count／row_index 只屬 raw（既存者不覆寫；無 raw 時亦不寫根 row_index）
+            if row_index is not None:
+                artifact_manifest["row_index"] = dict(row_index)
+            if not existing_manifest:
+                manifest["row_count"] = row_count
+                manifest["time_range"] = time_range
+        else:
+            manifest["row_count"] = row_count
+            manifest["time_range"] = time_range
+            if row_index is not None:
+                manifest["row_index"] = dict(row_index)
+            elif artifact_kind == "raw":
+                manifest.pop("row_index", None)
         if extra_metadata:
             manifest["generation_metadata"] = dict(extra_metadata)
         manifest.setdefault("artifacts", {})[artifact_kind] = artifact_manifest

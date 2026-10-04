@@ -25,6 +25,7 @@ from momentum.core.logging import get_logger
 from momentum.core.config import get_fracdiff_layers
 from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.core.contracts import LayerExecutionResult, LayerStatus, derive_status
+from momentum.core.icfirstalign_errors import RowIndexArtifactMissingError
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
@@ -2650,7 +2651,12 @@ class FeatureFactory:
         raw_data_trimmed = trimmed_raw
 
         if selection_window is None and split_id is None:
-            selection_window = {"start_pos": 0, "end_pos": int(len(label))}
+            # ICFIRSTALIGN Task 1.1：預設全窗改為 label 時間戳之起訖（位置鍵選窗已禁用）
+            label_index = pd.DatetimeIndex(label.index)
+            selection_window = {
+                "start": str(label_index.min()) if len(label_index) else None,
+                "end": str(label_index.max()) if len(label_index) else None,
+            }
             split_id = "ic_first_full_window"
 
         # FFSTAT Task 1.1：fracdiff 目標層之結構化來源與標準 frame 路徑同一 helper（本次 layers 建）
@@ -2717,6 +2723,7 @@ class FeatureFactory:
                 resolved_config_hash,
                 selected_features,
                 artifact_kind="raw",
+                attach_row_index=True,  # ICFIRSTALIGN Task 1.2：post-IC 轉換之輸入帶時間戳（時間序守衛生效）
             )
             raw_selected_groups = self._frame_to_l7_groups(selected_raw, "selected")
         else:
@@ -2740,6 +2747,7 @@ class FeatureFactory:
             tf,
             resolved_config_hash,
             processed_groups,
+            row_index=self._processed_row_index(processed_groups),
             layer_results=self.layer_results,
         )
 
@@ -3740,6 +3748,19 @@ class FeatureFactory:
             self._persist_layer_output_groups(layer5, LayerSource.L5, "L5_cross")
         if layer6 is not None and not layer6.empty:
             self._persist_layer_output_groups(layer6, LayerSource.L6, "L6_meta")
+
+    @staticmethod
+    def _processed_row_index(processed_groups: Dict[str, pd.DataFrame]) -> pd.DatetimeIndex:
+        """processed 成品之時間軸（ICFIRSTALIGN Task 1.3）：各群組索引須為同一 DatetimeIndex；空選擇 ⇒ 長度 0。"""
+        indexes = [frame.index for frame in processed_groups.values()]
+        if not indexes:
+            return pd.DatetimeIndex([])
+        first = indexes[0]
+        if not isinstance(first, pd.DatetimeIndex) or any(not idx.equals(first) for idx in indexes[1:]):
+            raise RowIndexArtifactMissingError(
+                "processed 群組未帶一致之時間戳索引；不得以位置湊 processed 時間軸"
+            )
+        return first
 
     def _derive_row_index_for_artifact(self, raw_data: pd.DataFrame) -> Optional[pd.DatetimeIndex]:
         """萃取 primary 時間軸供 timestamps sidecar（V2 持久化）使用。

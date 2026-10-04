@@ -262,7 +262,19 @@ class IFeatureReader(Protocol):
         config_hash: str,
         columns: List[str],
         artifact_kind: str = "raw",
+        *,
+        attach_row_index: bool = False,
     ) -> Any:
+        ...
+
+    def load_row_index_v2(
+        self,
+        symbol: str,
+        tf: str,
+        config_hash: str,
+        artifact_kind: str = "raw",
+    ) -> Any:
+        """該 artifact_kind 之 sidecar 時間軸（raw 未宣告回 None；processed 未宣告或檔缺 ⇒ 具名錯誤）。"""
         ...
 
     def list_features(self, symbol: str, config_hash: str) -> List[str]:

@@ -23,13 +23,15 @@ class _RegistryReader:
     def list_features_v2(self, symbol: str, timeframe: str, config_hash: str) -> list[str]:
         return list(reversed(FEATURES))
 
+    # ICFIRSTALIGN Task 1.2：替身簽名同步 IFeatureReader（artifact_kind、attach_row_index）；回傳值與改前相同
     def load_row_index_v2(
-        self, symbol: str, timeframe: str, config_hash: str
+        self, symbol: str, timeframe: str, config_hash: str, artifact_kind: str = "raw"
     ) -> None:
         return None
 
     def load_columns_v2(
-        self, symbol: str, timeframe: str, config_hash: str, selected: list[str]
+        self, symbol: str, timeframe: str, config_hash: str, selected: list[str],
+        artifact_kind: str = "raw", *, attach_row_index: bool = False,
     ) -> pd.DataFrame:
         return pd.DataFrame([[1.0, 2.0], [3.0, 4.0]], columns=selected)
 
