@@ -112,21 +112,20 @@ def classify(name: str, old: Any, new: Any, sanitize_cap: float) -> str:
 
     o = np.asarray(old, dtype=np.float64)
     n = np.asarray(new, dtype=np.float64)
-    both = np.isfinite(o) & np.isfinite(n)
-    nan_only_new = np.isfinite(o) & ~np.isfinite(n)
-    nan_only_old = ~np.isfinite(o) & np.isfinite(n)
+    # 遮罩以 NaN 定義（inf 為有值；inf→NaN 屬 numeric_sanitize 之來源）
+    both = ~np.isnan(o) & ~np.isnan(n)
+    nan_only_new = ~np.isnan(o) & np.isnan(n)
+    nan_only_old = np.isnan(o) & ~np.isnan(n)
+    # 只認「新值精確等於對舊值施作具名轉換之結果」；不以大小容差歸類（審碼 b2 r1 codex P2-01：容差會吸收真實漂移）
     if not nan_only_old.any() and nan_only_new.any() and np.array_equal(o[both], n[both]):
         if np.all(~np.isfinite(o[nan_only_new]) | (np.abs(o[nan_only_new]) > sanitize_cap)):
-            return "numeric_sanitize"  # CGSA 串流之 Layer B：inf／|v|>cap → NaN
-        return "nan_mask_new_only"
+            return "numeric_sanitize"  # CGSA 串流之 Layer B：inf／|v|>cap → NaN（逐值精確）
+        return "unexplained"
     if not (nan_only_new.any() or nan_only_old.any()):
         with np.errstate(over="ignore"):
             as_f16 = o[both].astype(np.float16).astype(np.float64)
         if np.array_equal(as_f16, n[both]):
             return "cgsa_storage_float16"  # CGSA 落盤逐欄 dtype 政策（manifest storage_dtype=mixed）：新值＝舊值轉 float16
-        diff = np.abs(o[both] - n[both])
-        if diff.size and float(np.max(diff)) <= float(np.max(np.abs(o[both]))) * 2.0 ** -23 * 4:
-            return "float32_rounding"
     return "unexplained"
 
 
