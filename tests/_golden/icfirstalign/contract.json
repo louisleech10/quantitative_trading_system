@@ -67,6 +67,40 @@
     "IC.group_read", "IC.selected_read", "PostIC.transform_selected",
     "Calib.group_reduce"
   ],
+  "branch_components": {
+    "L1.serial": ["indicator_tables", "merged_return", "persist_cast"],
+    "L1.parallel": ["engine_tables", "merged_return", "persist_cast"],
+    "L2.polars": ["return_table", "max_category", "category_cast", "spill:mapped"],
+    "L2.pandas_serial": ["category_tables_sum", "merge_return", "persist_cast", "spill:mapped"],
+    "L2.pandas_parallel": ["category_tables_sum", "merge_return", "persist_cast", "spill:mapped"],
+    "L3.numba_multi_callback": ["fused_x2", "kernel_scratch", "step_results", "step_buffers", "flush_overshoot"],
+    "L3.numba_multi_nocallback": ["fused_x2", "kernel_scratch", "accumulated_steps", "final_concat", "persist_cast"],
+    "L3.vectorized_chunked": ["chunk_cache", "chunk_outputs", "final_concat", "persist_cast"],
+    "L3.vectorized_unchunked": ["chunk_cache", "chunk_outputs", "final_concat", "persist_cast"],
+    "L3.numba_single": ["chunk_cache", "current_chunk", "six_stat", "six_stat_return", "persist_cast", "output_memmap:mapped"],
+    "L3.pandas_fallback": ["rolling_intermediate", "persist_cast", "return_table:mapped"],
+    "L4": ["input_merge", "output", "persist_cast"],
+    "L5": ["input_merge", "output", "persist_cast"],
+    "L6": ["input_merge", "output", "persist_cast"],
+    "IC.group_read": ["read", "cast"],
+    "IC.selected_read": ["read", "cast"],
+    "PostIC.transform_selected": ["selected_copy", "group_output", "accumulated_processed"],
+    "Calib.group_reduce": ["group", "winsor_copy", "packet_accumulated", "shard_map:mapped"]
+  },
+  "arm_functions": {
+    "L1.serial": "momentum.FeatureEngineering.feature_factory:FeatureFactory._layer1_atomic_indicators",
+    "L1.parallel": "momentum.FeatureEngineering.feature_factory:FeatureFactory._layer1_atomic_indicators",
+    "L2.polars": "momentum.FeatureEngineering.operators.derived_operators:DerivedOperatorEngine.compute_all_polars",
+    "L2.pandas_serial": "momentum.FeatureEngineering.feature_factory:FeatureFactory._layer2_derived_pandas",
+    "L2.pandas_parallel": "momentum.FeatureEngineering.feature_factory:FeatureFactory._layer2_derived_pandas",
+    "L3.numba_multi_callback": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_all_streaming_numba_multi_window",
+    "L3.numba_multi_nocallback": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_all_streaming_numba_multi_window",
+    "L3.numba_single": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_all_streaming_numba_single_window",
+    "L3.pandas_fallback": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._compute_all_streaming_pandas",
+    "L3.vectorized_chunked": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_vectorized_aggregators_chunked",
+    "L3.vectorized_unchunked": "momentum.FeatureEngineering.operators.rolling_aggregator:RollingAggregator._apply_vectorized_aggregators_with_cache"
+  },
+  "guard_test_readings_env": "ICFA_GUARD_READINGS_FILE",
   "mapping_entries": {
     "writable": [
       {"file": "momentum/FeatureEngineering/memmap_utils.py", "call": "np.memmap"},
