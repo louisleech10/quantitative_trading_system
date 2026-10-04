@@ -1,0 +1,133 @@
+{
+ "jia": {
+  "P1": {
+   "domain_calls": [
+    {
+     "columns": 161,
+     "first_finite_sha256": "b9ba3bf23931f2c3f07c940b4649d57c7af6ff908d425b7e9d22a086a02b207d",
+     "rows": 994,
+     "timeframe": "12h"
+    },
+    {
+     "columns": 161,
+     "first_finite_sha256": "a7f2333541585b3e0b425602da5127f3f45234e1958d88305f9aacc65f8164ba",
+     "rows": 11926,
+     "timeframe": "1h"
+    }
+   ],
+   "late_names_sha256": "58ebe6e31d1b982943fd565c0743aff5d64ee02b5940b64f39d17cdd6dda3351",
+   "rounds": [
+    {
+     "depth": 878,
+     "late_columns": 0
+    }
+   ],
+   "window": {
+    "ingest_start": "2024-12-16T02:24:00",
+    "max_warmup_bars": "878",
+    "output_end": "2026-04-27",
+    "output_start": "2026-04-13",
+    "warmup_enabled": "True"
+   }
+  },
+  "P2": {
+   "domain_calls": [
+    {
+     "columns": 8806,
+     "first_finite_sha256": "26e3a59dfb67b13fe0f419a333ee89762c9569a7e508e1c109be8b9c6ac87587",
+     "rows": 1641,
+     "timeframe": "12h"
+    }
+   ],
+   "late_names_sha256": "03e031d7ccdfb34f1f1caaed1c9ab6822ac4798670e35ec8251d3272e3b98465",
+   "rounds": [
+    {
+     "depth": 3317,
+     "late_columns": 378
+    }
+   ],
+   "window": {
+    "ingest_start": "2020-07-02T15:36:00",
+    "max_warmup_bars": "3317",
+    "output_end": "2026-03-31",
+    "output_start": "2025-07-01",
+    "warmup_enabled": "True"
+   }
+  }
+ },
+ "schema_version": 1,
+ "settings": {
+  "P1": [
+   "12h",
+   "1h",
+   [
+    "2026-04-13",
+    "2026-04-27"
+   ]
+  ],
+  "P2": [
+   "12h",
+   "trend",
+   [
+    "2025-07-01",
+    "2026-03-31"
+   ]
+  ]
+ },
+ "yi": {
+  "P1": {
+   "domain_calls": [
+    {
+     "columns": 161,
+     "first_finite_sha256": "b9ba3bf23931f2c3f07c940b4649d57c7af6ff908d425b7e9d22a086a02b207d",
+     "rows": 994,
+     "timeframe": "12h"
+    },
+    {
+     "columns": 161,
+     "first_finite_sha256": "a7f2333541585b3e0b425602da5127f3f45234e1958d88305f9aacc65f8164ba",
+     "rows": 11926,
+     "timeframe": "1h"
+    }
+   ],
+   "late_names_sha256": "58ebe6e31d1b982943fd565c0743aff5d64ee02b5940b64f39d17cdd6dda3351",
+   "rounds": [
+    {
+     "depth": 878,
+     "late_columns": 0
+    }
+   ],
+   "window": {
+    "ingest_start": "2024-12-16T02:24:00",
+    "max_warmup_bars": "878",
+    "output_end": "2026-04-27",
+    "output_start": "2026-04-13",
+    "warmup_enabled": "True"
+   }
+  },
+  "P2": {
+   "domain_calls": [
+    {
+     "columns": 8806,
+     "first_finite_sha256": "26e3a59dfb67b13fe0f419a333ee89762c9569a7e508e1c109be8b9c6ac87587",
+     "rows": 1641,
+     "timeframe": "12h"
+    }
+   ],
+   "late_names_sha256": "03e031d7ccdfb34f1f1caaed1c9ab6822ac4798670e35ec8251d3272e3b98465",
+   "rounds": [
+    {
+     "depth": 3317,
+     "late_columns": 378
+    }
+   ],
+   "window": {
+    "ingest_start": "2020-07-02T15:36:00",
+    "max_warmup_bars": "3317",
+    "output_end": "2026-03-31",
+    "output_start": "2025-07-01",
+    "warmup_enabled": "True"
+   }
+  }
+ }
+}

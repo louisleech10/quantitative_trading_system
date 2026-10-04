@@ -1,0 +1,51 @@
+{
+ "schema_version": 1,
+ "commands": [
+  "env PYTHONPATH=. PYTHONHASHSEED=0 /usr/bin/time -l venv/bin/python scripts/freeze_icfirstalign_baseline.py calibration",
+  "env PYTHONPATH=. PYTHONHASHSEED=0 /usr/bin/time -l venv/bin/python scripts/freeze_icfirstalign_baseline.py probe",
+  "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/l2_arm_pipeline_probe.py"
+ ],
+ "calibration": {
+  "wall_s": 17.2,
+  "peak_footprint_bytes": 241730736,
+  "packet_columns": 158,
+  "jia_vs_yi_value_diff_columns": {
+   "S3_winsor_off": 0,
+   "S3_winsor_on": 0
+  }
+ },
+ "probe": {
+  "wall_s": 68.6,
+  "peak_footprint_bytes": 1601915040,
+  "P1_domain_calls": [
+   [
+    "12h",
+    994,
+    161
+   ],
+   [
+    "1h",
+    11926,
+    161
+   ]
+  ],
+  "P2_domain_calls": [
+   [
+    "12h",
+    1641,
+    8806
+   ]
+  ],
+  "jia_eq_yi_first_finite": {
+   "P1": true,
+   "P2": true
+  },
+  "P2_rejected_candidate": {
+   "setting": "trend+momentum",
+   "peak_footprint_bytes": 4179660856,
+   "columns": 31325
+  }
+ },
+ "l2_arms_in_pipeline": "[{'l1_dtypes': ['float32'], 'ret_dtypes': ['float32', 'float64'], 'cols': 54, 'f64diff': 0, 'f32diff': 0}]",
+ "honest_bounds": "只 BTCUSDT 12h（P1 加 1h）、精簡或 trend 預設 L1；L2 兩臂於真實管線（L1 已 float32）逐位元組相同之結論限於所測設定"
+}
