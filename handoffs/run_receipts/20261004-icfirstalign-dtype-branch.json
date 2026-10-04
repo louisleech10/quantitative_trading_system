@@ -1,38 +1,39 @@
 {
- "schema_version": 1,
- "command": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/dtype_branch_probe.py",
- "platform": "macOS-27.0.1-arm64-arm-64bit",
- "dtypes": {
-  "small_branch": [
-   "float64",
-   "float64"
-  ],
-  "large_branch": [
-   "float32",
-   "float32"
-  ]
- },
- "winsor_on": {
-  "finite_value_diffs": 1,
-  "sha256_large_then_winsor": "7c2d462e4b02c2aeda477d946afdc7c506b6f20a0e07b797c7ca86d740747c44",
-  "sha256_float64_per_column": "2142880ba197da2e0044338bd941321025b3bea299079c3934c81fa19298a4ca",
-  "first_finite_large": [
-   251,
-   252
-  ],
-  "first_finite_float64": [
-   251,
-   252
-  ],
-  "small_branch_equals_float64_per_column": true
- },
- "winsor_off": {
-  "finite_value_diffs": 799
- },
- "rusage": {
-  "rc": 0,
-  "resident_bytes": 250232832,
-  "phys_footprint_bytes": 167642168,
-  "call_ms": 0.0305
- }
+  "schema_version": 1,
+  "command": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/dtype_branch_probe.py",
+  "platform": "macOS-27.0.1-arm64-arm-64bit",
+  "dtypes": {
+    "small_branch": [
+      "float64",
+      "float64"
+    ],
+    "large_branch": [
+      "float32",
+      "float32"
+    ]
+  },
+  "winsor_on": {
+    "finite_value_diffs": 1,
+    "sha256_large_then_winsor": "7c2d462e4b02c2aeda477d946afdc7c506b6f20a0e07b797c7ca86d740747c44",
+    "sha256_float64_per_column": "2142880ba197da2e0044338bd941321025b3bea299079c3934c81fa19298a4ca",
+    "first_finite_large": [
+      251,
+      252
+    ],
+    "first_finite_float64": [
+      251,
+      252
+    ],
+    "small_branch_equals_float64_per_column": true
+  },
+  "winsor_off": {
+    "finite_value_diffs": 799
+  },
+  "rusage": {
+    "rc": 0,
+    "resident_bytes": 250232832,
+    "phys_footprint_bytes": 167642168,
+    "call_ms": 0.0305
+  },
+  "exit_code": 0
 }

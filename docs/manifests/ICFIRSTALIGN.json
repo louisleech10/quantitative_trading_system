@@ -1,0 +1,142 @@
+{
+  "spec_path": "docs/ICFIRSTALIGN_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [
+    "momentum/core/icfirstalign_errors.py",
+    "momentum/FeatureEngineering/ic_first_context.py",
+    "momentum/FeatureEngineering/memory_budget.py"
+  ],
+  "test_files": [
+    "tests/feature_engineering/test_icfirstalign_timeaxis.py",
+    "tests/momentum/Analysis/test_icfirstalign_cache.py",
+    "tests/feature_engineering/test_icfirstalign_context.py",
+    "tests/feature_engineering/test_icfirstalign_icfirst.py",
+    "tests/momentum/Analysis/test_icfirstalign_fu2.py",
+    "tests/feature_engineering/test_icfirstalign_l3_arms.py",
+    "tests/feature_engineering/test_icfirstalign_calibration_domain.py",
+    "tests/feature_engineering/test_icfirstalign_memory.py"
+  ],
+  "script_acceptance": [
+    "scripts/freeze_icfirstalign_baseline.py",
+    "handoffs/run_receipts/icfirstalign_probes/f2_calibration_domain_probe.py",
+    "handoffs/run_receipts/icfirstalign_probes/dtype_branch_probe.py",
+    "handoffs/run_receipts/icfirstalign_probes/l2_arm_probe.py",
+    "handoffs/run_receipts/icfirstalign_probes/l2_arm_pipeline_probe.py",
+    "handoffs/run_receipts/icfirstalign_probes/interval_peak_probe.py",
+    "handoffs/run_receipts/icfirstalign_probes/fu2_close_carrier_probe.py"
+  ],
+  "contract_jsons": [
+    "tests/_golden/icfirstalign/contract.json",
+    "tests/_golden/icfirstalign/l3_default_arm.json",
+    "tests/_golden/icfirstalign/probe_baseline.json",
+    "tests/_golden/icfirstalign/calibration_baseline.json"
+  ],
+  "run_receipts": [
+    {"path": "handoffs/run_receipts/20261004-icfirstalign-f2-calibration-domain.json", "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_calibration_domain_probe.py", "rc": 0, "honest_bounds": "精簡 L1（EMA8／SMA13）、BTCUSDT 12h＋[12h, 1h]、14 天窗；完整 L1 之量以 PRE-RED 收據外推"},
+    {"path": "handoffs/run_receipts/20261004-icfirstalign-dtype-branch.json", "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/dtype_branch_probe.py", "rc": 0, "honest_bounds": "微型 800 根兩欄；只覆寫 threshold_bytes 以觸發既有分支"},
+    {"path": "handoffs/run_receipts/20261004-icfirstalign-l2-arm.json", "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/l2_arm_probe.py", "rc": 0, "honest_bounds": "以 pandas 自算 float64 L1 餵入；真實管線 L1 為 float32 時不發生（見 freeze-baselines 收據）"},
+    {"path": "handoffs/run_receipts/20261004-icfirstalign-interval-peak.json", "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/interval_peak_probe.py", "rc": 0, "honest_bounds": "macOS 本機；rusage_info_v4 欄位以實測辨認（第 33 欄）"},
+    {"path": "handoffs/run_receipts/20261004-icfirstalign-fu2-close-carrier.json", "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/fu2_close_carrier_probe.py", "rc": 0, "honest_bounds": "scripts/ic1d_baseline_freeze 之 production 路徑一組設定（ETHUSDT 12h）"},
+    {"path": "handoffs/run_receipts/20261004-icfirstalign-freeze-baselines.json", "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 /usr/bin/time -l venv/bin/python scripts/freeze_icfirstalign_baseline.py calibration && ... probe", "rc": 0, "honest_bounds": "只 BTCUSDT 12h（P1 加 1h）；甲＝乙與 L2 兩臂相同之結論限於所測設定"}
+  ],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "docs/ICFIRSTALIGN_SPEC.md",
+      "docs/manifests/ICFIRSTALIGN.json",
+      "momentum/Analysis/ic_engine.py",
+      "momentum/Analysis/ic_filter_orchestrator.py",
+      "momentum/core/protocols.py",
+      "momentum/core/icfirstalign_errors.py",
+      "momentum/FeatureEngineering/feature_reader.py",
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/ic_first_context.py",
+      "momentum/FeatureEngineering/memory_budget.py",
+      "momentum/FeatureEngineering/memmap_utils.py",
+      "momentum/FeatureEngineering/polars_adapter.py",
+      "momentum/FeatureEngineering/arrow_ipc_utils.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/preprocessing/calibration.py",
+      "momentum/FeatureEngineering/operators/rolling_aggregator.py",
+      "momentum/FeatureEngineering/operators/derived_operators.py",
+      "momentum/FeatureEngineering/utils/hardware_utils.py",
+      "momentum/FeatureEngineering/core/column_group_registry.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "tests/feature_engineering/test_b6_warmup_trim.py",
+      "tests/feature_engineering/ffstat_helpers.py",
+      "tests/feature_engineering/test_ffstat_calibration.py",
+      "tests/feature_engineering/test_ffstat_stable_start.py",
+      "tests/feature_engineering/test_ic_first_pipeline.py",
+      "tests/feature_engineering/test_l7_codec.py",
+      "tests/feature_engineering/test_failopen_manifest.py",
+      "tests/feature_engineering/test_ff_wrapper_path_correctness.py",
+      "tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py",
+      "tests/momentum/Analysis/test_ic1d_baseline.py",
+      "tests/_golden/failopen/baseline.json",
+      "tests/_golden/prered/allowed_red.json",
+      "tests/governance/test_prered_allowed_red.py"
+    ],
+    "callers_now": [
+      "api/services/feature_factory_service.py",
+      "api/services/feature_factory_batch_service.py",
+      "api/services/ic_analysis_service.py",
+      "momentum/Analysis/coverage_analyzer.py",
+      "momentum/Analysis/event_samples/feature_materialization.py",
+      "momentum/FeatureEngineering/feature_library.py",
+      "momentum/FeatureEngineering/mcp/feature_factory_mcp.py",
+      "momentum/factories.py"
+    ],
+    "callers_later": [
+      "docs/ROADMAP.md",
+      "docs/TICKET_ORDER.md"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_icfirstalign_timeaxis.py tests/momentum/Analysis/test_icfirstalign_cache.py tests/feature_engineering/test_icfirstalign_context.py tests/feature_engineering/test_icfirstalign_icfirst.py tests/momentum/Analysis/test_icfirstalign_fu2.py tests/feature_engineering/test_icfirstalign_l3_arms.py tests/feature_engineering/test_icfirstalign_calibration_domain.py tests/feature_engineering/test_icfirstalign_memory.py",
+    "forbidden": [
+      {"rule": "momentum／ 不得 import api／；服務取工廠一律經 momentum.factories", "observable": true},
+      {"rule": "不得刪除或放寬既有測試斷言換綠；不得新增 skip／xfail；既有斷言 diff 逐處說明", "observable": true},
+      {"rule": "不得弱化 NaN／inf 閘、時間序守衛、AlignmentViolationError；不得以 reindex 靜默補 NaN 或以位置對齊", "observable": true},
+      {"rule": "不得以容差比較 IC cache 指紋；不得以有效列數代替值指紋", "observable": true},
+      {"rule": "不得保留記憶體 L1–L6 第二引擎作回退；不得另造第二套鎖或重入鎖", "observable": true},
+      {"rule": "不得改 raw artifact 之 sidecar 格式；不得以根軸湊 processed 長度", "observable": true},
+      {"rule": "不得改加倍規則、晚到語意、封包格式；不得降低探測欄集合；不得以縮小設定或關閉預熱代替有界化", "observable": true},
+      {"rule": "不得以 RSS／resident 代替致 OOM 之量；不得於配置後才判定而宣稱配置前保護；producer 讀臂選擇子須經 memory_budget.selector", "observable": true},
+      {"rule": "不得於使用者核可前寫回 failopen 基準；不得把「只 fail-closed」記為重凍完成", "observable": true},
+      {"rule": "特徵工廠重測試一律單組串行；委員輪進行中不跑重型生成", "observable": false},
+      {"rule": "不得侷限加密貨幣：週期、交易時段、標的數不寫死；時間比對一律 UTC 時刻", "observable": true}
+    ],
+    "risk_mitigation": [
+      "解耦：新模組皆在 momentum 內；momentum/core/icfirstalign_errors.py 供 Analysis 與 FeatureEngineering 共用；實作批跑 scripts/check_decoupling.sh 附收據",
+      "測試接縫（實作須照名提供）：ICEngine._attach_row_index、ICEngine._reject_positional_selection、ic_engine.CACHE_IDENTITY_FIELDS、ic_engine.label_fingerprint、ic_filter_orchestrator._build_close_carrier／_validate_close_carrier／_utc_instant_key、FeatureFactory._persist_l3_returned_table、FeatureFactory._iter_calibration_domain_groups、FeatureFactory._public_warmup_first_finite、FeatureFactory._try_load_cache(require_raw=)、FeaturePreprocessor.transform_selected(arm=)、RollingAggregator._compute_all_streaming_pandas、memory_budget._read_rusage／_pressure_ok／_current_usage_bytes 與 sampler_override／budget_override／vm_snapshot_override／check_recorder；producer 一律以模組屬性呼叫 memory_budget.check（測試以 monkeypatch 攔截）",
+      "memory_guard.py 空殼因 small 累計生產檔上限（3）延至第一個實作批之首 commit（見 not_executable）",
+      "§G 基準：HEAD 甲／乙由 scripts/freeze_icfirstalign_baseline.py 產（calibration 17 秒 0.24 GB、probe 69 秒 1.60 GB），實作後以同腳本之新實作分支重產差異收據",
+      "記憶體：test_icfirstalign_memory 之守護子行程案例與 P2 為本檔最重者，逐節點單行程串行",
+      "分批：b1＝Phase 1（Task 1.1–1.4）＋Task 3.1；b2＝Phase 2（Task 2.0–2.4）＋Task 3.2；b3＝Task 4.0–4.2；b4＝Task 4.3–4.4（含使用者核可之重凍）"
+    ],
+    "coverage_risk": [
+      "Task 1.1：test_icfirstalign_timeaxis（oracle、讀回軸 exact、邊界①–④、位置鍵四鍵與混用、mutant 不設軸／恢復 reindex／收 start_pos）",
+      "Task 1.2：test_icfirstalign_timeaxis（選欄軸 exact、邊界①–③、倒序守衛、mutant 平移軸）",
+      "Task 1.3：test_icfirstalign_timeaxis（根欄位不變、processed sidecar、不同列數、cleanup 後讀、邊界①–③、必填 row_index、mutant 覆寫根／讀根軸）",
+      "Task 1.4：test_icfirstalign_cache（七身分欄單改、特徵軸、十欄缺欄、舊 cache、時間戳不同、threshold 重用、五種同一 UTC 表示、六組移除比對 mutant）",
+      "Task 2.0：test_icfirstalign_context（必填、深凍結、容器賦值、補完、邊界①②、兩次呼叫〔平穩化開關〕、例外隔離、metadata output_window、兩 mutant）",
+      "Task 2.1／2.2／2.4／3.2：test_icfirstalign_icfirst（簽名、oracle S2、S2m、不經記憶體合併、lease 三案例、cleanup 重生單 lease、require_raw 開關、legacy H5、邊界①–③、L6.5 三案例＋mutant、遷移 AST、helper 不吞錯、Polars 臂三案例＋mutant）",
+      "Task 3.1：test_icfirstalign_fu2（正常 carrier＝kline close、全 NaN／不相交拒絕、四組 UTC 表示等價、事件型、邊界①②、三 mutant）",
+      "Task 4.0：test_icfirstalign_l3_arms（三非預設臂＋numba 例外後備、預設臂＝HEAD 凍結、邊界①②、mutant 丟表）",
+      "Task 4.1：test_icfirstalign_calibration_domain（P1／P2 對甲與乙、S3 封包對甲〔縮尾開關〕、不合併、單群組存活與 float32、L2 來自 registry、邊界①–⑤、五 mutant）",
+      "Task 4.2／4.3：test_icfirstalign_memory（151 支：預算量、系統條件、平台、選擇子與 AST、分支表、組合母體宣告完整性與覆蓋、十個安全間隙＋mutant、配置前拒絕、磁碟後援、映射入口與標記核對、守護生命週期與核心期間終止、恢復、量測停損）",
+      "Task 2.3、4.4、§G 差異收據與記憶體驗收：一次性收據，見 not_executable"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {"item": "momentum/FeatureEngineering/memory_guard.py 空殼（small 累計生產檔上限；第一個實作批首 commit 建立）", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
+      {"item": "Task 2.3 pre-IC 差異收據（handoffs/run_receipts/<日期>-icfirstalign-preic-diff.json，unexplained＝0）", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
+      {"item": "Task 3.1 factor_exposure 改前改後差異收據（待確認⑦）", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
+      {"item": "Task 4.1 對 HEAD 乙之 dtype 差異收據與 P1 peak footprint 對照收據", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
+      {"item": "Task 4.2 (ii) 逐分支不低估一次性收據（handoffs/run_receipts/<日期>-icfirstalign-branch-estimates.json）與其探針", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
+      {"item": "Task 4.3 記憶體量測序列探針 handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py 與收據", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
+      {"item": "Task 4.4 F-2 原設定驗收與重凍（使用者核可③）", "reason": "user-ruling", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
+      {"item": "特徵工廠重測試一律單組串行；委員輪進行中不跑重型生成", "reason": "user-ruling", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
+      {"item": "linux 平台之生成支援（Task 4.2 於 linux 具名拒絕；§N）", "reason": "needs-research", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"}
+    ]
+  }
+}
