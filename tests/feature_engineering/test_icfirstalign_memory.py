@@ -827,6 +827,22 @@ def test_mapped_tags_match_observed_allocations(tmp_path: Path, monkeypatch: pyt
         assert any(n in per_seg.values() for n in multi), "某段之逐片映射次數須等於該群組分片數"
 
 
+def test_mutation_run_mapping_released_after_run_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """(p) mutant「L2 spill 映射延後至 run 結束界線之後才釋放」（測試端持有 spill 映射至案例結束）⇒ 生命期斷言紅。"""
+    held: List[Any] = []
+    real_memmap_new = np.memmap.__new__
+
+    def hold(cls: Any, *a: Any, **k: Any) -> Any:
+        out = real_memmap_new(cls, *a, **k)
+        held.append(out)
+        return out
+
+    monkeypatch.setattr(np.memmap, "__new__", staticmethod(hold))
+    _observe_mappings("l2_spill", tmp_path, monkeypatch)
+    assert _lifetime_violations()
+    held.clear()
+
+
 def test_mutation_mapping_released_next_segment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """mutant（r24）：分片映射延後至下一段才釋放（測試端持有每片映射至下一次 check）⇒ 生命期斷言紅。"""
     held: List[Any] = []
@@ -984,6 +1000,12 @@ def _lifetime_violations() -> List[Any]:
             pool.remove(life)
         if life == "segment" and release_seg != rec[0]:
             bad.append((rec, release_seg))
+        if life == "run":
+            # r25：`run` 須於 producer 之 run 結束界線（`mb.layer_end("run")` 記為 "LAYER_END:run"）之前釋放
+            recorded = getattr(_observe_mappings, "recorded", [])
+            ends = [i for i, (branch, _) in enumerate(recorded) if branch == "LAYER_END:run" and i > rec[0]]
+            if not ends or release_seg is None or release_seg >= ends[0]:
+                bad.append((rec, release_seg))
     return bad
 
 

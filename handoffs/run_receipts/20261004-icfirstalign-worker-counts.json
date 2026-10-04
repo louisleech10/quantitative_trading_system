@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "command": "env PYTHONPATH=. PYTHONHASHSEED=0 /usr/bin/time -l venv/bin/python scripts/freeze_icfirstalign_baseline.py worker-counts",
+  "exit_code": 0,
+  "head": "c7cd0fb8",
+  "output": "tests/_golden/icfirstalign/worker_counts.json",
+  "peak_memory_footprint_bytes": 225477712,
+  "max_rss_bytes": 308772864,
+  "setting": "S2m 之 4h worker（_tf_worker_entry 行程內呼叫）、真實 kline、BTCUSDT、2025-07-01..2026-03-31",
+  "purpose": "Task 4.2 層結果存活修碼之行為不變 oracle（counts、群組層與欄集合摘要）",
+  "observed": "HEAD：Layer 4 開始時 Layer 3 之資料表仍由 LayerResult.data 持有（test_worker_last_holder_and_metadata_conserved 紅之原因）"
+}

@@ -260,9 +260,35 @@ def stage_calibration() -> Dict[str, Any]:
     return out
 
 
+def worker_record(result: Dict[str, Any]) -> Dict[str, Any]:
+    """`_tf_worker_entry` 回傳之 counts／群組（層、欄集合）摘要；值不入（值守恆由 Task 4.0／4.1 基準另驗）。"""
+    groups = sorted((str(g["layer"]), _sha(sorted(g["columns"]))) for g in result.get("groups", []))
+    return {"error": result.get("error"), "layer_counts": result.get("layer_counts"),
+            "groups_sha256": _sha(groups), "group_count": len(groups)}
+
+
+def stage_worker_counts() -> Dict[str, Any]:
+    """多週期 worker（S2m 之 4h）於 HEAD 之 layer_counts 與群組摘要（Task 4.2 層結果存活修碼之行為不變 oracle）。"""
+    import pytest
+
+    from momentum.FeatureEngineering.timeframe.multi_tf_generator import _tf_worker_entry
+    from tests.feature_engineering import icfirstalign_helpers as h
+
+    mp = pytest.MonkeyPatch()
+    try:
+        root = h.isolated(mp, Path(tempfile.mkdtemp(prefix="icfa_freeze_worker_")))
+        mp.setenv("NUMBA_NUM_THREADS", os.environ.get("NUMBA_NUM_THREADS", "1"))
+        payload = h.make_factory(root)._resolve_config(h.s2_payload(["12h", "4h"])).model_dump(by_alias=True)
+        result = _tf_worker_entry(h.SYMBOL, "4h", payload, h.S2_WINDOW[0], h.S2_WINDOW[1], cache_dir=str(h.KLINE_DIR))
+        return {"schema_version": 1, "setting": ["S2m", "4h", list(h.S2_WINDOW)], "worker": worker_record(result)}
+    finally:
+        mp.undo()
+
+
 STAGES = {"l3-default": ("l3_default_arm.json", stage_l3_default),
           "probe": ("probe_baseline.json", stage_probe),
-          "calibration": ("calibration_baseline.json", stage_calibration)}
+          "calibration": ("calibration_baseline.json", stage_calibration),
+          "worker-counts": ("worker_counts.json", stage_worker_counts)}
 
 
 def main(argv: Any = None) -> int:

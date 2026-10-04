@@ -72,7 +72,8 @@
       "last_checkpoint",
       "owned_paths",
       "run_id"
-    ]
+    ],
+    "estimate_exceeded_log": "memory_estimate_exceeded.jsonl"
   },
   "guard_script": "momentum/FeatureEngineering/memory_guard.py",
   "selectors": {

@@ -134,7 +134,7 @@ def selector(name: str) -> str:
 
 
 def check(branch_id: str, components: Sequence[Component], *, label: Optional[str] = None,
-          run_dir: Optional[Path] = None) -> None:
+          run_dir: Optional[Path] = None, domain: Optional["DomainDescriptor"] = None) -> None:
     """配置前判定。分支 ID 不在分支表 ⇒ `UnknownBudgetBranchError`；停止旗標已立或三條件任一不成立 ⇒
     `GenerationMemoryBudgetExceeded`（reason 為契約 budget_messages 之一）。"""
     raise NotImplementedError("ICFIRSTALIGN Task 4.2")
@@ -221,6 +221,118 @@ def check_recorder() -> Any:
     raise NotImplementedError("ICFIRSTALIGN Task 4.2")
 
 
+def layer_end(label: str) -> None:
+    """producer 於每層結束（及整個 run 結束，label＝"run"）時呼叫；`check_recorder` 記為 ("LAYER_END:<label>", [])。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
+# ---------------------------------------------------------------- 子行程預算域（SPEC v25–v27）
+
+@dataclass(frozen=True)
+class DomainDescriptor:
+    """顯式、可 pickle 之域描述（作為 worker 入口參數；不經行程全域環境變數）。"""
+
+    root_pid: int
+    domain_dir: Path
+    budget: int
+    task_id: str
+    envelope: int  # 本任務峰值 E（worker 配置點以之判估算低估）
+
+
+@dataclass(frozen=True)
+class Member:
+    """成員：以 (pid, start_time) 去重；envelope＝活動任務／根階段之 E，無則 None。"""
+
+    pid: int
+    start_time: float
+    footprint: int
+    envelope: Optional[int] = None
+    role: str = "task"  # task | root | guard | tracker
+
+
+@dataclass(frozen=True)
+class Slot:
+    """尚無 pid 之啟動槽（任務槽或輔助槽）。"""
+
+    slot_id: str
+    envelope: int
+    kind: str = "task"  # task | aux
+
+
+@dataclass(frozen=True)
+class AdmissionState:
+    budget: int
+    members: Sequence[Member]
+    slots: Sequence[Slot]
+    absorbable: int
+    pressure_level: int
+    stop_flag: bool
+
+
+@dataclass(frozen=True)
+class Admission:
+    ok: bool
+    reason: str  # ok | budget | absorbable | pressure | stop_flag
+
+
+def commitment(member: Member) -> int:
+    """U＝max(F, E)（有活動承諾）；否則 F。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
+def admit(state: AdmissionState, new_envelope: int) -> Admission:
+    """准入合取：Σ U（去重）＋Σ 槽 E＋E_new ≤ B，且 Σ max(E−F,0)＋Σ 槽 E＋E_new ≤ 可吸收量，且壓力非危急、無停止旗標。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
+def measured_total(members: Sequence[Member]) -> int:
+    """守護讀數：成員實測 footprint 以 (pid, start_time) 去重求和一次（不用 U／E）。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
+def guard_should_stop(members: Sequence[Member], budget: int, pressure_level: int,
+                      swap_volume_free: int, disk_reserve: int) -> Optional[str]:
+    """守護第一段判定：回停止原因或 None；只依實測（`measured_total`）。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
+@dataclass(frozen=True)
+class Task:
+    task_id: str
+    envelope: Optional[int]  # None＝形狀不可得 ⇒ 不准入並行，走串行臂
+    payload: Any = None
+
+
+class MemoryBudgetScheduler:
+    """有限波次排程器（三個 pool 共用；經 `momentum.factories.create_memory_budget_scheduler` 建立）。
+
+    依賴注入（測試接縫）：`executor_factory(max_workers)` 建立 executor；`read_system()` 回
+    (absorbable, pressure_level, stop_flag, root_footprint, aux_members)；`read_task_footprint(task_id)` 回該任務行程之 F；
+    `aux_startup_envelope` 為輔助行程（resource tracker）啟動上界（None＝無收據 ⇒ 不准入並行）。
+    `trace` 記事件 (event, task_id)：queued／admitted／starting／running／completed／failed／joined／serial／
+    wave_joined／aux_slot／executor_created／refused。
+    """
+
+    def __init__(self, budget: int, *, domain_dir: Path, max_workers: int,
+                 executor_factory: Callable[[int], Any], read_system: Callable[[], Any],
+                 read_task_footprint: Callable[[str], int], aux_startup_envelope: Optional[int]) -> None:
+        raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+    def run(self, tasks: Sequence[Task], worker_fn: Callable[[DomainDescriptor, Any], Any],
+            serial_fn: Callable[[Any], Any], on_wave_joined: Callable[[List[Any]], None]) -> List[Any]:
+        """依序准入有限波次；不足只排隊；無可准入走 `serial_fn`（根行程內）；每波 join 後呼叫 `on_wave_joined`。"""
+        raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+    def snapshot(self) -> AdmissionState:
+        raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+    def mark_starting(self, task_id: str) -> None:
+        raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+    def bind_pid(self, task_id: str, pid: int, start_time: float) -> None:
+        raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
 __all__ = [
     "GenerationMemoryBudgetExceeded", "MemoryMeasurementUnavailable", "UnknownBudgetBranchError", "Component", "VMSnapshot",
     "SELECTORS", "NON_ARM_FFACT_KEYS", "BRANCH_TABLE", "STOP_FLAG_NAME", "ABORT_RECEIPT_NAME", "OWNED_PATHS_NAME",
@@ -228,5 +340,7 @@ __all__ = [
     "disk_reserve_bytes", "budget_bytes", "planned_bytes", "normalize_selectors", "selector", "check",
     "reset_interval_peak", "read_interval_peak", "backing_bus_protocol", "assert_disk_backed", "mapping_root",
     "GuardHandle", "start_guard", "stop_flag_set", "register_owned_path", "recover_aborted_run",
-    "sampler_override", "budget_override", "vm_snapshot_override", "check_recorder",
+    "sampler_override", "budget_override", "vm_snapshot_override", "check_recorder", "layer_end",
+    "DomainDescriptor", "Member", "Slot", "AdmissionState", "Admission", "commitment", "admit", "measured_total",
+    "guard_should_stop", "Task", "MemoryBudgetScheduler",
 ]

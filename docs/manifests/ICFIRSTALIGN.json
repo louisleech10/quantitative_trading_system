@@ -14,7 +14,8 @@
     "tests/momentum/Analysis/test_icfirstalign_fu2.py",
     "tests/feature_engineering/test_icfirstalign_l3_arms.py",
     "tests/feature_engineering/test_icfirstalign_calibration_domain.py",
-    "tests/feature_engineering/test_icfirstalign_memory.py"
+    "tests/feature_engineering/test_icfirstalign_memory.py",
+    "tests/feature_engineering/test_icfirstalign_domain.py"
   ],
   "script_acceptance": [
     "scripts/freeze_icfirstalign_baseline.py",
@@ -29,7 +30,8 @@
     "tests/_golden/icfirstalign/contract.json",
     "tests/_golden/icfirstalign/l3_default_arm.json",
     "tests/_golden/icfirstalign/probe_baseline.json",
-    "tests/_golden/icfirstalign/calibration_baseline.json"
+    "tests/_golden/icfirstalign/calibration_baseline.json",
+    "tests/_golden/icfirstalign/worker_counts.json"
   ],
   "run_receipts": [
     {
@@ -67,6 +69,12 @@
       "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 /usr/bin/time -l venv/bin/python scripts/freeze_icfirstalign_baseline.py calibration && ... probe",
       "rc": 0,
       "honest_bounds": "只 BTCUSDT 12h（P1 加 1h）；甲＝乙與 L2 兩臂相同之結論限於所測設定"
+    },
+    {
+      "path": "handoffs/run_receipts/20261004-icfirstalign-worker-counts.json",
+      "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python scripts/freeze_icfirstalign_baseline.py worker-counts",
+      "rc": 0,
+      "honest_bounds": "單一 worker（S2m 之 4h）行程內呼叫、精簡 L1（close EMA8／SMA13）；只摘要 counts 與群組欄集合，值守恆另由 Task 4.0／4.1 基準驗"
     }
   ],
   "batch_card": {
@@ -179,7 +187,7 @@
       "分批：b1＝Phase 1（Task 1.1–1.4）＋Task 3.1；b2＝Phase 2（Task 2.0–2.4）＋Task 3.2；b3＝Task 4.0–4.2；b4＝Task 4.3–4.4（含使用者核可之重凍）",
       "b1 內順序 Task 1.1→1.2→1.3→1.4→3.1；Task 1.4 之 cache fixture 自 r23 起於測試端接 sidecar 軸寫 cache，不依賴 1.1 已落地（實作前紅＝身分未比對，非 fixture 錯）",
       "測試接縫（r23 增）：呼叫端經 memory_budget 模組屬性呼叫 check／start_guard／recover_aborted_run（不得 from-import 綁名）；_iter_calibration_domain_groups 交出（群組 ID, 欄名, float32 陣列＝registry 讀回物件或其 view, 索引）且消費端零複製建 frame；子行程經環境變數 ICFA_BUDGET_DOMAIN 加入預算域",
-      "SPEC v25 子行程（consult r2 收斂：任務承諾准入、有限波次、串行臂、三 pool 共用排程器）之具名驗收測試（v25 驗證 (a)–(p)）待 SPEC v25 審查收斂後補入 test_icfirstalign_memory.py 與 API 批次受影響測試；(q) MTF 映射與 (r) 覆蓋母體已寫；測試接縫 ICFA_CHECK_LOG；API 批次改動經 factory＋Protocol，守 R1／R3／R4"
+      "SPEC v27 子行程（凍結於 r28）之具名驗收測試：tests/feature_engineering/test_icfirstalign_domain.py（v27 驗證 (a)–(o)、(t)、(u)；排程器以行程內執行緒池與事件控制、讀數注入；(l) 以 HEAD 凍結之 tests/_golden/icfirstalign/worker_counts.json 為 counts oracle）與 test_icfirstalign_memory.py 之 (p)(q)(r)。測試接縫：memory_budget 之 DomainDescriptor／Member／Slot／AdmissionState／Admission／commitment／admit／measured_total／guard_should_stop／Task／MemoryBudgetScheduler（trace 事件名見其 docstring）、check(domain=)、layer_end(label)；factory 出口 create_memory_budget_scheduler、Protocol IMemoryBudgetScheduler；契約 guard_files.estimate_exceeded_log；ICFA_CHECK_LOG"
     ],
     "coverage_risk": [
       "Task 1.1：test_icfirstalign_timeaxis（oracle、讀回軸 exact、邊界①–④、位置鍵四鍵與混用、mutant 不設軸／恢復 reindex／收 start_pos）",

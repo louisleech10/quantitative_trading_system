@@ -1,0 +1,24 @@
+{
+ "schema_version": 1,
+ "setting": [
+  "S2m",
+  "4h",
+  [
+   "2025-07-01",
+   "2026-03-31"
+  ]
+ ],
+ "worker": {
+  "error": null,
+  "group_count": 27,
+  "groups_sha256": "59497f647871a0f3efef7464d713091a9160a5ed89ff54a8f64bc0acbbcd1393",
+  "layer_counts": {
+   "layer1": 2,
+   "layer2": 54,
+   "layer3": 40,
+   "layer4": 56,
+   "layer5": 0,
+   "layer6": 9
+  }
+ }
+}
