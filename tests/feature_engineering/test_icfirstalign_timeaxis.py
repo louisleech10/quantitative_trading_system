@@ -334,6 +334,51 @@ def test_processed_with_different_row_count_reads_own_sidecar(fresh_s2: Dict[str
     assert len(got) != len(_sidecar(fresh_s2, "raw"))
 
 
+def _browse(run: Dict[str, Any], monkeypatch: pytest.MonkeyPatch):
+    """Feature Factory 正式瀏覽接縫：`_load_task_context`（經 `get_result` 取 manifest 路徑）→ schema／欄／時間軸。"""
+    from api.services.feature_factory_service import FeatureFactoryService
+
+    service = FeatureFactoryService.__new__(FeatureFactoryService)
+    manifest_path = run["run_dir"] / "feature_manifest.json"
+    monkeypatch.setattr(service, "get_result", lambda task_id: {
+        "hdf5_path": str(manifest_path),
+        "metadata": {"symbol": h.SYMBOL, "timeframe": h.PRIMARY, "config_hash": run["config_hash"]}})
+    context = service._load_task_context("probe-task")
+    schema = service._load_hdf5_schema(context)
+    df = service._load_cgsa_features_df(context)
+    service._attach_cgsa_row_index(context, df)
+    return schema, df
+
+
+def test_browse_processed_columns_rows_and_axis_from_same_artifact(fresh_s2: Dict[str, Any],
+                                                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    """審碼 b1 r1 codex P1-02：processed 列數異於 raw 時，正式瀏覽之欄、列數與時間軸皆取自 processed 節點
+    （不得 processed 欄配 raw 列數／raw 軸）。"""
+    groups, axis = _processed_groups(fresh_s2, drop_head=10)
+    _write_processed(fresh_s2, groups, axis)
+    schema, df = _browse(fresh_s2, monkeypatch)
+    processed_cols = [c for frame in groups.values() for c in frame.columns]
+    assert schema["row_count"] == len(axis) != len(_sidecar(fresh_s2, "raw"))
+    assert sorted(schema["feature_names"]) == sorted(processed_cols)
+    assert len(df) == len(axis)
+    pd.testing.assert_index_equal(pd.DatetimeIndex(df.index), axis, check_names=False, exact=True)
+
+
+def test_mutation_browse_reads_mixed_root(fresh_s2: Dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：瀏覽不投影（直接用根）⇒ processed 欄配 raw 列數（上一測試之列數斷言翻轉）。"""
+    from api.services.feature_factory_service import FeatureFactoryService
+
+    groups, axis = _processed_groups(fresh_s2, drop_head=10)
+    _write_processed(fresh_s2, groups, axis)
+    monkeypatch.setattr(FeatureFactoryService, "_select_l7_v2_artifact", classmethod(lambda cls, m: (m, "raw")))
+    service = FeatureFactoryService.__new__(FeatureFactoryService)
+    monkeypatch.setattr(service, "get_result", lambda task_id: {
+        "hdf5_path": str(fresh_s2["run_dir"] / "feature_manifest.json"),
+        "metadata": {"symbol": h.SYMBOL, "timeframe": h.PRIMARY}})
+    schema = service._load_hdf5_schema(service._load_task_context("probe-task"))
+    assert schema["row_count"] == len(_sidecar(fresh_s2, "raw")) != len(axis)
+
+
 def test_processed_axis_readable_after_cleanup_raw(fresh_s2: Dict[str, Any]) -> None:
     groups, axis = _processed_groups(fresh_s2)
     _write_processed(fresh_s2, groups, axis)

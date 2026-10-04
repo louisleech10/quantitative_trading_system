@@ -4745,6 +4745,7 @@ class FeatureFactoryService:
 
             manifest_dir = file_path.parent
 
+        manifest, artifact_kind = self._select_l7_v2_artifact(manifest)
         return {
             "task_id": task_id,
             "task_result": task_result,
@@ -4757,7 +4758,34 @@ class FeatureFactoryService:
             "is_cgsa": is_cgsa,
             "manifest": manifest,
             "manifest_dir": manifest_dir,
+            "artifact_kind": artifact_kind,
         }
+
+    _L7_V2_ARTIFACT_FIELDS = (
+        "groups", "group_count", "row_count", "time_range", "schema_version", "feature_schema_hash", "total_features",
+    )
+
+    @classmethod
+    def _select_l7_v2_artifact(cls, manifest: Optional[Dict[str, Any]]) -> Tuple[Optional[Dict[str, Any]], str]:
+        """l7_v2 manifest 投影為單一 artifact（有 processed 取 processed，否則 raw）：欄、列數、時間範圍與時間軸
+        皆取自同一節點（ICFIRSTALIGN 審碼 b1 r1 codex P1-02：根之列數／時間軸只屬 raw，與 processed 欄混用即錯配）。
+        processed 節點未宣告時間軸 ⇒ 投影不帶 `row_index`（舊 run，不以 raw 軸湊）。非 l7_v2 ⇒ 原樣、kind＝raw。"""
+        artifacts = manifest.get("artifacts") if isinstance(manifest, dict) else None
+        if not isinstance(manifest, dict) or manifest.get("version") != "l7_v2" or not isinstance(artifacts, dict):
+            return manifest, "raw"
+        kind = "processed" if isinstance(artifacts.get("processed"), dict) else "raw"
+        node = artifacts.get(kind)
+        if not isinstance(node, dict):
+            return manifest, "raw"
+        projected = dict(manifest)
+        for key in cls._L7_V2_ARTIFACT_FIELDS:
+            if key in node:
+                projected[key] = node[key]
+        if kind == "processed":
+            projected.pop("row_index", None)
+            if "row_index" in node:
+                projected["row_index"] = node["row_index"]
+        return projected, kind
 
     def _load_hdf5_features_df(self, context: Dict[str, Any]) -> pd.DataFrame:
         """Materialize a features DataFrame from a legacy single-TF HDF5 file."""
@@ -5507,6 +5535,7 @@ class FeatureFactoryService:
             str(context["symbol"]),
             str(context["timeframe"]),
             config_hash,
+            artifact_kind=str(context.get("artifact_kind") or "raw"),  # 與欄同一 artifact 之時間軸
         )
 
     def _attach_cgsa_row_index(self, context: Dict[str, Any], df: pd.DataFrame) -> None:

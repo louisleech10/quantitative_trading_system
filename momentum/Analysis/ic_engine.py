@@ -51,47 +51,49 @@ CACHE_IDENTITY_FIELDS = (
 )
 
 
-def _utc_epoch_seconds(index: Any) -> np.ndarray:
-    """時間戳 → UTC int64 epoch 秒：tz-aware 任一時區轉 UTC 時刻；tz-naive 依 §C 資料契約視為 UTC；整數視為 epoch 秒。"""
+def _utc_epoch_ns(index: Any) -> np.ndarray:
+    """時間戳 → UTC int64 epoch 奈秒（完整精度，不截至整秒；審碼 b1 r1 codex P1-01：截秒使次秒不同之選窗身分碰撞）：
+    tz-aware 任一時區轉 UTC 時刻；tz-naive 依 §C 資料契約視為 UTC；整數依 §C 視為 epoch 秒並換算為奈秒。"""
     if isinstance(index, pd.DatetimeIndex):
         dt = index.tz_convert("UTC").tz_localize(None) if index.tz is not None else index
-        return (np.asarray(dt.asi8, dtype=np.int64) // 1_000_000_000).astype(np.int64)
+        return np.asarray(dt.as_unit("ns").asi8, dtype=np.int64)
     values = np.asarray(index)
     if np.issubdtype(values.dtype, np.integer):
-        return values.astype(np.int64)
-    return _utc_epoch_seconds(pd.DatetimeIndex(pd.to_datetime(values)))
+        return values.astype(np.int64) * np.int64(1_000_000_000)
+    return _utc_epoch_ns(pd.DatetimeIndex(pd.to_datetime(values)))
 
 
 def label_fingerprint(label: pd.Series) -> str:
-    """label 指紋（SPEC Task 1.4）：sha256 依序吃 列數（int64 LE）、UTC epoch 秒（int64 LE）、NaN 遮罩（uint8）、
+    """label 指紋（SPEC Task 1.4）：sha256 依序吃 列數（int64 LE）、UTC epoch 奈秒（int64 LE）、NaN 遮罩（uint8）、
     有限值位置之 float64 LE。同一 UTC 時刻之不同表示（任一時區 tz-aware、UTC tz-naive、epoch 秒）得同一指紋。"""
     import hashlib
 
     series = label if isinstance(label, pd.Series) else pd.Series(label)
-    seconds = _utc_epoch_seconds(series.index).astype("<i8")
+    instants = _utc_epoch_ns(series.index).astype("<i8")
     values = np.asarray(series.to_numpy(dtype=np.float64), dtype="<f8")
     mask = ~np.isfinite(values)
     digest = hashlib.sha256()
     digest.update(np.asarray([len(values)], dtype="<i8").tobytes())
-    digest.update(seconds.tobytes())
+    digest.update(instants.tobytes())
     digest.update(mask.astype(np.uint8).tobytes())
     digest.update(values[~mask].tobytes())
     return digest.hexdigest()
 
 
 def _axis_fingerprint(row_index: Optional[pd.DatetimeIndex]) -> Optional[str]:
-    """特徵軸指紋：raw sidecar 之 UTC epoch 秒（int64 LE）之 sha256；無軸 ⇒ None（身分不完整）。"""
+    """特徵軸指紋：raw sidecar 之 UTC epoch 奈秒（int64 LE）之 sha256；無軸 ⇒ None（身分不完整）。"""
     import hashlib
 
     if row_index is None:
         return None
-    return hashlib.sha256(_utc_epoch_seconds(row_index).astype("<i8").tobytes()).hexdigest()
+    return hashlib.sha256(_utc_epoch_ns(row_index).astype("<i8").tobytes()).hexdigest()
 
 
 def _window_bound(value: Any) -> Optional[int]:
+    """選窗端點之身分值：UTC epoch 奈秒（與 `_apply_selection_window` 之 Timestamp 比較同精度）；舊秒制 cache 因值不同而拒用。"""
     if value is None or value == "":
         return None
-    return int(_utc_epoch_seconds(pd.DatetimeIndex([pd.Timestamp(value)]))[0])
+    return int(_utc_epoch_ns(pd.DatetimeIndex([pd.Timestamp(value)]))[0])
 
 
 class ICReadError(RuntimeError):

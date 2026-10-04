@@ -181,6 +181,42 @@ def test_boundary_02_same_values_different_timestamps_rejected(c: Dict[str, Any]
         _request(c, label)
 
 
+def _subsecond_window(c: Dict[str, Any]) -> Dict[str, str]:
+    """起點晚 0.5 秒之選窗（真實軸上即少選首列；審碼 b1 r1 codex P1-01 之反例）。"""
+    return {"start": str(c["axis"][0] + pd.Timedelta(milliseconds=500)), "end": str(c["axis"][-1])}
+
+
+def test_subsecond_window_change_rejected(c: Dict[str, Any]) -> None:
+    """選窗端點只差次秒（實際選列不同）⇒ 身分不同、拒用（身分不得截至整秒）。"""
+    with pytest.raises(ICCacheRawUnavailableError):
+        _request(c, c["label0"], selection_window=_subsecond_window(c))
+
+
+def test_subsecond_label_index_change_rejected(c: Dict[str, Any]) -> None:
+    """label 值同而時間戳只差次秒 ⇒ label 指紋不同、拒用。"""
+    label = c["label0"].copy()
+    label.index = label.index + pd.Timedelta(milliseconds=500)
+    assert ice.label_fingerprint(label) != ice.label_fingerprint(c["label0"])
+    with pytest.raises(ICCacheRawUnavailableError):
+        _request(c, label)
+
+
+def test_mutation_window_bound_truncated_to_seconds(c: Dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：選窗身分改回截至整秒 ⇒ 次秒不同之選窗被重用（`test_subsecond_window_change_rejected` 翻轉）。"""
+    def truncated(value: Any) -> Any:
+        if value is None or value == "":
+            return None
+        return int(pd.Timestamp(value).floor("s").value)
+
+    monkeypatch.setattr(ice, "_window_bound", truncated)
+    payload = json.loads(c["selected"].read_text(encoding="utf-8"))
+    for key in ("selection_window_start", "selection_window_end"):  # 舊 cache 之身分改寫為同一截秒表示，只留次秒差
+        payload["data_fingerprint"][key] = truncated(_window(c["axis"])[key.rsplit("_", 1)[1]])
+    c["selected"].write_text(json.dumps(payload), encoding="utf-8")
+    result = _request(c, c["label0"], selection_window=_subsecond_window(c))
+    assert result.data_fingerprint["cache_status"] == "reused_from_cache"
+
+
 def test_boundary_03_threshold_only_reuses_and_reselects(c: Dict[str, Any]) -> None:
     """Task 1.4 邊界③：只改 threshold ⇒ 重用並只重選。"""
     payload = json.loads(c["selected"].read_text(encoding="utf-8"))
