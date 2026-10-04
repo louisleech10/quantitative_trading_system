@@ -273,8 +273,13 @@ class FeatureFactory:
         persist: bool = True,
         lease_sink: Optional[list] = None,
         batch_id: Optional[str] = None,
+        require_raw: bool = False,
     ) -> FeatureGenerationResult:
-        """Run the pipeline while holding the per-run lease."""
+        """Run the pipeline while holding the per-run lease.
+
+        `require_raw`（ICFIRSTALIGN Task 2.1）：True ⇒ 快取命中須 raw 成品仍在（否則視同未命中、同一 lease 內續行生成）；
+        既有 caller 預設 False 行為不變。生成結果 metadata 帶本次定案之 `output_window`（Task 2.0；快取命中者沿用其 metadata）。
+        """
         config = self._resolve_config(config_override)
         # FFSTAT Task 2.4（R5）：倍數表缺項於設定 hash 與快取查詢之前擋下（run 目錄零寫入）
         check_l1_warmup_coverage(config)
@@ -310,7 +315,9 @@ class FeatureFactory:
                 end_date,
                 persist,
                 batch_id=batch_id,
+                require_raw=require_raw,
             )
+            self._attach_output_window_metadata(result)
             if lease_sink is not None:
                 lease_sink.append(lease)
                 retained = True
@@ -319,6 +326,22 @@ class FeatureFactory:
             self._calibration_result = None  # 封包只在本次 run 內使用
             if not retained:
                 lease.release()
+
+    def _attach_output_window_metadata(self, result: "FeatureGenerationResult") -> None:
+        """生成結果 metadata 帶本次定案之 OutputWindow（ICFIRSTALIGN Task 2.0）。快取命中者不以本實例之窗補寫
+        （該窗屬前一次 run，補寫即洩漏狀態）；其 metadata 若無 `output_window` 即維持無。"""
+        if getattr(self, "_last_generation_from_cache", False):
+            return
+        window = getattr(self, "_current_output_window", None)
+        if window is None or not isinstance(getattr(result, "metadata", None), dict):
+            return
+        result.metadata["output_window"] = {
+            "output_start": None if window.output_start is None else str(window.output_start),
+            "output_end": None if window.output_end is None else str(window.output_end),
+            "ingest_start": None if window.ingest_start is None else str(window.ingest_start),
+            "max_warmup_bars": int(window.max_warmup_bars),
+            "warmup_enabled": bool(window.warmup_enabled),
+        }
 
     @staticmethod
     def _stationarity_config_enabled(config: "FactoryConfig") -> bool:
@@ -376,6 +399,7 @@ class FeatureFactory:
         end_date: Optional[str] = None,
         persist: bool = True,
         batch_id: Optional[str] = None,
+        require_raw: bool = False,
     ) -> FeatureGenerationResult:
         """Run the seven-layer pipeline.
 
@@ -413,9 +437,11 @@ class FeatureFactory:
             end_date=end_date,
         )
         self._current_config_hash = config_hash
+        self._last_generation_from_cache = False
         if not force_regenerate:
-            cached = self._try_load_cache(symbol, timeframe, config_hash)
+            cached = self._try_load_cache(symbol, timeframe, config_hash, require_raw=require_raw)
             if cached:
+                self._last_generation_from_cache = True
                 return cached
 
         # FFSTAT §C 公開域預熱之加倍規則：快取未命中後、任何 registry／落盤之前，以記憶體探測定案預熱深度
@@ -2482,12 +2508,8 @@ class FeatureFactory:
         tf: str,
         config: "FactoryConfig",
         *,
-        raw_data: Optional[pd.DataFrame] = None,
-        layers: Optional[List[pd.DataFrame]] = None,
-        config_hash: Optional[str] = None,
-        compute_warnings: Optional[List[str]] = None,
-        start_time: Optional[float] = None,
-        persist: bool = True,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         label: Optional[pd.Series] = None,
         ic_engine: Optional[Any] = None,
         feature_reader: Optional[Any] = None,
@@ -2499,159 +2521,120 @@ class FeatureFactory:
         split_id: Optional[str] = None,
         cleanup_raw: bool = False,
         lease_sink: Optional[list] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        compute_warnings: Optional[List[str]] = None,
+        start_time: Optional[float] = None,
+        persist: bool = True,
     ) -> FeatureGenerationResult:
-        """Run IC-First while holding a lease when invoked independently.
+        """IC-first：正式生成（CGSA、多週期、預熱、校準）→ IC → 選欄讀回 → post-IC（Polars 臂）→ processed。
 
-        FFSTAT v29／v30（平穩化開啟時）：必帶 `start_date`（`end_date` 選填）；本次輸出窗以
-        `resolve_output_window(config, tf, start_date, end_date)` 自行解析、設定 hash 以本次設定與起訖計算，不讀前次
-        生成留下之 `_current_output_window`／`_current_config_hash`、拒收呼叫端 `config_hash`；兩者於入口保存、
-        結束（成功或任一失敗）一律還原。平穩化關閉時行為不變。"""
-        check_l1_warmup_coverage(config)  # FFSTAT Task 2.4：先於設定 hash 與任何寫入
-        stationarizing = self._stationarity_config_enabled(config)
-        if stationarizing:
-            if start_date is None:
-                raise CalibrationError(
-                    f"平穩化開啟時 run_ic_first 須帶 start_date：{symbol}/{tf}（未填起始日之逐欄校準歸 IC-First 管線合一票）",
-                    timeframe=str(tf), field="output_start",
-                )
-            if config_hash is not None:
-                raise CalibrationError(
-                    f"平穩化開啟時 run_ic_first 不接受呼叫端 config_hash（只由本次設定與起訖計算）：{symbol}/{tf}",
-                    timeframe=str(tf), field="config_hash",
-                )
-        saved_window = getattr(self, "_current_output_window", None)
-        saved_hash = getattr(self, "_current_config_hash", None)
-        try:
-            if stationarizing:
-                self._current_output_window = resolve_output_window(config, tf, start_date, end_date)
-                resolved_hash = self._compute_config_hash(config, symbol, tf, start_date=start_date, end_date=end_date)
-            else:
-                resolved_hash = config_hash or self._current_config_hash or self._compute_config_hash(config, symbol, tf)
-            return self._run_ic_first_leased(
-                symbol, tf, config, resolved_hash, stationarizing,
-                raw_data=raw_data, layers=layers, config_hash=resolved_hash if stationarizing else config_hash,
-                compute_warnings=compute_warnings, start_time=start_time, persist=persist,
-                label=label, ic_engine=ic_engine, feature_reader=feature_reader, storage=storage,
-                ic_threshold=ic_threshold, allow_partial_ic=allow_partial_ic,
-                label_horizon=label_horizon, selection_window=selection_window,
-                split_id=split_id, cleanup_raw=cleanup_raw, lease_sink=lease_sink,
-            )
-        finally:
-            if stationarizing:  # v30：平穩化開啟之 run_ic_first 對 factory 之窗與 hash 不留任何改變
-                self._current_output_window = saved_window
-                self._current_config_hash = saved_hash
+        ICFIRSTALIGN Task 2.0／2.1／2.2／3.2：raw 只由 `generate_features(persist=True, require_raw=True)` 產出，
+        一次 run 由該次生成交出之同一 lease 持有至 IC、processed、cleanup 結束（finally 釋放；呼叫端傳 `lease_sink`
+        者改由呼叫端持有並釋放）；不再自取 lease、不自跑校準閘、無記憶體 L1–L6 第二引擎。本次身分（輸出窗、
+        config_hash）只取自本次生成結果之 metadata，經 `ic_first_context` 凍結後全程只讀；生成失敗（含 L6.5）⇒
+        `ICFirstGenerationError`（NON_DEGRADABLE 照原樣上拋），不回空表。結束後 factory 之 `_current_output_window`／
+        `_current_config_hash` 還原為入口值。`persist` 僅記入 metadata（IC-first 之 raw 一律落盤）。"""
+        from momentum.FeatureEngineering import ic_first_context as icc
 
-    def _run_ic_first_leased(self, symbol: str, tf: str, config: "FactoryConfig", resolved_hash: str,
-                             stationarizing: bool, *, lease_sink: Optional[list], **impl_kwargs: Any
-                             ) -> FeatureGenerationResult:
-        # FFSTAT Task 2.1：平穩化開啟時拒收呼叫端自帶之 raw_data／layers（生產端無此用法；層與校準須同源），
-        # 並於 run lease 與任何寫入之前跑校準前置關卡（涵蓋本次設定之全部原生週期）
-        self._calibration_result = None
-        if stationarizing:
-            if impl_kwargs.get("raw_data") is not None or impl_kwargs.get("layers") is not None:
-                raise CalibrationError(
-                    f"平穩化開啟時 run_ic_first 不接受呼叫端自帶之 raw_data／layers：{symbol}/{tf}，請改用自算路徑"
-                    "（兩者皆不傳）",
-                    timeframe=str(tf), field="supplied_layers",
-                )
-            self._current_config_hash = resolved_hash
-            self._current_symbol = symbol
-            window = self._current_output_window
-            self._run_calibration_gate(
-                symbol, list(dict.fromkeys([tf, *config.timeframes.training])), config, window.output_start, window,
-            )
-        try:
-            lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, tf, resolved_hash, timeout=0)
-        except BaseException:
-            self._calibration_result = None
-            raise
-        # lease_sink（測試觀測用）：取得即交出，成功或例外皆由呼叫端持有並釋放
-        retained = lease_sink is not None
-        if retained:
-            lease_sink.append(lease)
-        try:
-            return self._run_ic_first_impl(symbol, tf, config, **impl_kwargs)
-        finally:
-            self._calibration_result = None  # 封包只在本次 run 內使用
-            if not retained:
-                lease.release()
-
-    run_ic_first_pipeline = run_ic_first
-
-    def _run_ic_first_impl(
-        self,
-        symbol: str,
-        tf: str,
-        config: "FactoryConfig",
-        *, raw_data: Optional[pd.DataFrame] = None, layers: Optional[List[pd.DataFrame]] = None,
-        config_hash: Optional[str] = None, compute_warnings: Optional[List[str]] = None,
-        start_time: Optional[float] = None, persist: bool = True, label: Optional[pd.Series] = None,
-        ic_engine: Optional[Any] = None, feature_reader: Optional[Any] = None,
-        storage: Optional[FeatureStorage] = None, ic_threshold: Optional[float] = None,
-        allow_partial_ic: bool = False, label_horizon: str = "1_bar_forward_return",
-        selection_window: Optional[Dict[str, Any]] = None, split_id: Optional[str] = None,
-        cleanup_raw: bool = False,
-    ) -> FeatureGenerationResult:
-        """Run the IC-First pipeline with raw persist, GC gate, IC, and processed persist.
-
-        Parameters
-        ----------
-        cleanup_raw:
-            When *True* the ``raw/`` artifact directory is deleted immediately
-            after ``processed/`` is successfully written.  Default is *False*
-            because this is a research platform: re-running IC with a different
-            method or window requires raw/ to be present, and regenerating 100+
-            symbols takes hours.  Set *True* only in production ETL pipelines
-            where disk space is the bottleneck and re-generation is acceptable.
-        """
         start = start_time if start_time is not None else time.time()
-        self.last_stationarity_decisions = None  # FFSTAT：每次 IC-first 重新累計
-        self._stationarity_failed_groups = []
-        self._last_l3_aggregator = None
-        self._l7_dead_reasons = None
-        resolved_config_hash = config_hash or self._current_config_hash or self._compute_config_hash(
-            config,
-            symbol,
-            tf,
+        training = list(dict.fromkeys(config.timeframes.training)) or [tf]
+        ctx = icc.begin_context(
+            symbol=symbol, timeframe=tf, training=training, start=start_date, end=end_date,
+            selection_window=selection_window, split_id=split_id,
+            label_spec={"kind": "explicit" if label is not None else "close_forward_return", "horizon": label_horizon},
         )
-        self._current_symbol = symbol
-        self._current_timeframe = tf
-        self._current_config_hash = resolved_config_hash
-        if not hasattr(self, "_progress_callback"):
-            self._progress_callback = None
-        # IC-first 從不建 CGSA registry：非 None 必為前次 generate_features 之殘留，沿用會使 L6.5 處理舊 registry
-        # 而非本次 frame（FFSTAT b3 r3）⇒ 每次一律重置
-        self._cgsa_registry = None
-        if not hasattr(self, "_reference_data_cache"):
-            self._reference_data_cache = {}
-
-        storage_manager = storage or getattr(self, "_storage", None) or FeatureStorage()
+        if not self._cgsa_enabled():
+            raise icc.ICFirstGenerationError(
+                f"IC-first 之 raw 只由 CGSA 正式生成產出（Task 2.1），FFACT_USE_CGSA 關閉時拒跑：{symbol}/{tf}"
+            )
+        storage_manager = storage or self._storage
+        if Path(storage_manager.base_path).resolve() != Path(self._storage.base_path).resolve():
+            raise ValueError(
+                f"run_ic_first 之 storage（{storage_manager.base_path}）須與生成之 run 目錄同一根（{self._storage.base_path}）"
+            )
         resolved_reader = feature_reader or self._build_feature_reader_for_storage(storage_manager)
         resolved_ic_engine = ic_engine or getattr(self, "_ic_engine", None)
         if resolved_ic_engine is None:
             raise ValueError("run_ic_first requires an injected ic_engine")
 
-        if raw_data is None or layers is None:
-            raw_data, layers = self._run_l1_l6_for_ic_first(symbol, tf, config)
-        ingest_raw = raw_data
-        self._current_raw_data = ingest_raw
+        saved_window = getattr(self, "_current_output_window", None)
+        saved_hash = getattr(self, "_current_config_hash", None)
+        sink: list = []
+        try:
+            try:
+                generation = self.generate_features(
+                    symbol, tf, config_override=config.model_dump(by_alias=True),
+                    start_date=ctx.start, end_date=ctx.end, persist=True, lease_sink=sink, require_raw=True,
+                )
+            except NON_DEGRADABLE_ERRORS:
+                raise
+            except Exception as exc:
+                raise icc.ICFirstGenerationError(f"IC-first 正式生成失敗：{symbol}/{tf}：{exc}") from exc
+            failed_groups = list(getattr(self, "_stationarity_failed_groups", None) or [])
+            if failed_groups:  # Task 2.2 邊界②：單一群組 L6.5 失敗 ⇒ 整次失敗
+                raise icc.ICFirstGenerationError(f"IC-first 生成之 L6.5 群組失敗：{symbol}/{tf}：{failed_groups}")
+            ctx = icc.complete_context(ctx, generation.metadata)
+            return self._run_ic_first_post_generation(
+                ctx, config, generation, label=label, ic_engine=resolved_ic_engine, feature_reader=resolved_reader,
+                storage=storage_manager, ic_threshold=ic_threshold, allow_partial_ic=allow_partial_ic,
+                label_horizon=label_horizon, cleanup_raw=cleanup_raw, compute_warnings=compute_warnings,
+                start=start, persist=persist,
+            )
+        finally:
+            if lease_sink is not None:
+                lease_sink.extend(sink)
+            else:
+                for lease in sink:
+                    lease.release()
+            self._current_output_window = saved_window
+            self._current_config_hash = saved_hash
 
-        if label is None:
-            label = self._build_default_ic_label(ingest_raw)
+    run_ic_first_pipeline = run_ic_first
 
-        labels_df = label.to_frame(name=label.name or "label")
-        trimmed_raw, _, labels_df = self._trim_for_public_output(
-            ingest_raw,
-            pd.DataFrame(index=ingest_raw.index),
-            labels_df,
+    def _run_ic_first_post_generation(
+        self,
+        ctx: Any,
+        config: "FactoryConfig",
+        generation: FeatureGenerationResult,
+        *,
+        label: Optional[pd.Series],
+        ic_engine: Any,
+        feature_reader: Any,
+        storage: FeatureStorage,
+        ic_threshold: Optional[float],
+        allow_partial_ic: bool,
+        label_horizon: str,
+        cleanup_raw: bool,
+        compute_warnings: Optional[List[str]],
+        start: float,
+        persist: bool,
+    ) -> FeatureGenerationResult:
+        """生成之後之 IC-first 步驟（lease 由 `run_ic_first` 持有）；身分一律讀凍結之 ctx。"""
+        from momentum.FeatureEngineering import ic_first_context as icc
+
+        symbol, tf, config_hash = ctx.symbol, ctx.timeframe, ctx.config_hash
+        run_dir = storage.feature_run_dir(symbol, tf, config_hash)
+        reader_dir = feature_reader.feature_run_dir(symbol, tf, config_hash)
+        if Path(reader_dir).resolve() != Path(run_dir).resolve():  # Task 2.1：reader 綁同一生成之 run 目錄
+            raise ValueError(f"run_ic_first 之 feature_reader 指向 {reader_dir}，非本次生成之 run 目錄 {run_dir}")
+        window = ctx.output_window
+        kline = self._layer0_data_ingestion(
+            symbol, tf, config, start_date=window["ingest_start"] or window["output_start"] or ctx.start,
+            end_date=window["output_end"] or ctx.end,
         )
-        label = labels_df.iloc[:, 0] if not labels_df.empty else label
-        raw_data_trimmed = trimmed_raw
+        kline_index = self._derive_row_index_for_artifact(kline)
+        if kline_index is None:
+            raise icc.ICFirstContextError(f"IC-first 取不到 kline 時間軸：{symbol}/{tf}")
+        public_mask = self._utc_window_mask(kline_index, window["output_start"], window["output_end"])
+        if label is None:
+            # 預設 label 語意不變：close 之 h=1 forward return，依 kline 時間戳（h 參數化屬 GLOBALH）
+            close = pd.Series(kline["close"].to_numpy(dtype=float), index=kline_index)
+            label = close.pct_change().shift(-1).rename("forward_return")[public_mask]
+        labels_df = label.to_frame(name=label.name or "label")
 
+        selection_window = dict(ctx.selection_window) if ctx.selection_window is not None else None
+        split_id = ctx.split_id
         if selection_window is None and split_id is None:
-            # ICFIRSTALIGN Task 1.1：預設全窗改為 label 時間戳之起訖（位置鍵選窗已禁用）
+            # ICFIRSTALIGN Task 1.1：預設全窗＝本次公開窗之 label 時間戳起訖（位置鍵選窗已禁用）
             label_index = pd.DatetimeIndex(label.index)
             selection_window = {
                 "start": str(label_index.min()) if len(label_index) else None,
@@ -2659,49 +2642,21 @@ class FeatureFactory:
             }
             split_id = "ic_first_full_window"
 
-        # FFSTAT Task 1.1：fracdiff 目標層之結構化來源與標準 frame 路徑同一 helper（本次 layers 建）
-        self._column_layer_map = _build_column_layer_map(layers)
-        self._column_timeframe_map = None
-        all_features = self._combine_layers(layers, context="ic_first_l65_pre_input")
-        pre_ic_frame = self._safe_execute("Layer 6.5 pre_ic", self._layer6_5_pre_ic, all_features, config)
-        _, pre_ic_frame, _ = self._trim_for_public_output(ingest_raw, pre_ic_frame, labels_df)
-        # FFSTAT §C 紀錄：逐欄 stable_start（IC-First 之 L7_raw＝pre-IC 公開輸出）
-        from momentum.FeatureEngineering.warmup_window import stable_start_from_frame, warmup_late_columns
-
-        _ic_stable_start = stable_start_from_frame(pre_ic_frame.set_axis(raw_data_trimmed.index, axis=0)
-                                                   if len(pre_ic_frame) == len(raw_data_trimmed) else pre_ic_frame)
-        _ic_warmup_late = warmup_late_columns(_ic_stable_start, self._warmup_output_start(), self._warmup_probe_late())
-        pre_ic_groups = self._frame_to_l7_groups(pre_ic_frame, "pre_ic")
-        raw_feature_count = sum(len(frame.columns) for frame in pre_ic_groups.values())
-        raw_path = storage_manager.write_raw(
-            symbol,
-            tf,
-            resolved_config_hash,
-            pre_ic_groups,
-            row_index=self._derive_row_index_for_artifact(raw_data_trimmed),
-            layer_results=self.layer_results,
-        )
-
+        raw_path = run_dir / "raw"
+        raw_feature_count = int(generation.feature_count)
         rss_before_gc_gb = _current_rss_gb()
-        del pre_ic_groups
-        del pre_ic_frame
-        del all_features
-        del layers
         gc.collect()
-        memory_snapshot = self._check_ic_memory_budget_after_raw_persist(
-            rss_before_gc_gb,
-            config,
-        )
+        memory_snapshot = self._check_ic_memory_budget_after_raw_persist(rss_before_gc_gb, config)
 
         peak_budget_gb = self._resolve_tier_peak_budget_gb(config)
         memory_profiler = getattr(self, "_memory_profiler", _MemoryProfiler())
         with memory_profiler.track("run_ic_gate") as ic_memory:
-            ic_result = resolved_ic_engine.compute_ic_from_l7_raw(
+            ic_result = ic_engine.compute_ic_from_l7_raw(
                 symbol,
                 tf,
-                resolved_config_hash,
+                config_hash,
                 label,
-                feature_reader=resolved_reader,
+                feature_reader=feature_reader,
                 ic_threshold=ic_threshold,
                 allow_partial_ic=allow_partial_ic,
                 method=None,
@@ -2717,10 +2672,10 @@ class FeatureFactory:
 
         selected_features = self._extract_ic_selected_features(ic_result)
         if selected_features:
-            selected_raw = resolved_reader.load_columns_v2(
+            selected_raw = feature_reader.load_columns_v2(
                 symbol,
                 tf,
-                resolved_config_hash,
+                config_hash,
                 selected_features,
                 artifact_kind="raw",
                 attach_row_index=True,  # ICFIRSTALIGN Task 1.2：post-IC 轉換之輸入帶時間戳（時間序守衛生效）
@@ -2730,45 +2685,40 @@ class FeatureFactory:
             logger.warning("[IC-First] IC selection is empty; writing empty processed artifact")
             raw_selected_groups = {}
 
+        self._current_raw_data = kline
         preprocessor = FeaturePreprocessor(
             self._preprocessing_config_dict(config),
-            context=self._build_preprocessing_context(raw_data, config),
+            context=self._build_preprocessing_context(kline, config),
         )
         processed_groups = preprocessor.transform_selected(
             selected_features,
             raw_selected_groups,
             config.preprocessing,
+            arm=ctx.post_ic_arm,  # Task 3.2：固定 Polars 正式臂，不讀環境
         )
         del raw_selected_groups
         gc.collect()
 
-        processed_path = storage_manager.write_processed(
+        processed_path = storage.write_processed(
             symbol,
             tf,
-            resolved_config_hash,
+            config_hash,
             processed_groups,
             row_index=self._processed_row_index(processed_groups),
             layer_results=self.layer_results,
+            post_ic_arm=ctx.post_ic_arm,
         )
 
-        # IC-First raw/ cleanup: raw/ was needed only for the IC gate step.
-        # After processed/ is safely on disk, reclaim that space immediately.
-        # The IC metadata (selected features, scores) is preserved in the
-        # returned FeatureGenerationResult so re-analysis does not need raw/.
+        # IC-First raw/ cleanup：raw/ 只供 IC 閘；processed/ 落盤後即可回收（IC 選欄與分數保留於回傳 metadata）
         raw_freed_gb = 0.0
         if cleanup_raw and raw_path.exists():
             try:
-                raw_size_bytes = sum(
-                    f.stat().st_size for f in raw_path.rglob("*") if f.is_file()
-                )
+                raw_size_bytes = sum(f.stat().st_size for f in raw_path.rglob("*") if f.is_file())
                 import shutil as _ic_shutil
+
                 _ic_shutil.rmtree(raw_path)
                 raw_freed_gb = raw_size_bytes / 1_073_741_824
-                logger.info(
-                    "[IC-First] Cleaned up raw/ artifact (%.2f GB freed): %s",
-                    raw_freed_gb,
-                    raw_path,
-                )
+                logger.info("[IC-First] Cleaned up raw/ artifact (%.2f GB freed): %s", raw_freed_gb, raw_path)
             except Exception as _cleanup_exc:
                 logger.warning(
                     "[IC-First] raw/ cleanup failed (non-fatal, disk will not be reclaimed): %s",
@@ -2778,12 +2728,15 @@ class FeatureFactory:
         del processed_groups
         gc.collect()
 
-        metadata = {
+        public_kline = kline[public_mask]
+        metadata = dict(generation.metadata)
+        metadata.update({
             "symbol": symbol,
             "timeframe": tf,
-            "config_hash": resolved_config_hash,
-            "data_range": self._data_range(trimmed_raw),
+            "config_hash": config_hash,
+            "data_range": self._data_range(public_kline),
             "ic_first_pipeline": True,  # metadata backward compatibility
+            "artifact_kind": "processed",
             "raw_path": str(raw_path),
             "processed_path": str(processed_path),
             "selected_features": selected_features,
@@ -2796,9 +2749,9 @@ class FeatureFactory:
             "persist_requested": bool(persist),
             "raw_cleaned_up": cleanup_raw and not raw_path.exists(),
             "raw_freed_gb": raw_freed_gb,
-        }
-        self._apply_warmup_metadata(metadata, config, ingest_raw)
-        metadata.update(self._stable_start_metadata(_ic_stable_start, _ic_warmup_late))
+            "post_ic_arm": ctx.post_ic_arm,
+            "ic_first_context": icc.context_to_metadata(ctx),
+        })
         logger.info(
             "[IC-First] post_ic done: symbol=%s tf=%s selected=%d processed_features=%d peak_rss_gb=%.2f",
             symbol,
@@ -2807,9 +2760,8 @@ class FeatureFactory:
             processed_feature_count,
             float(ic_memory.peak_rss_gb),
         )
-        metadata.update(self._stationarity_metadata(raw_data_trimmed.index))  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
         return FeatureGenerationResult(
-            features_df=pd.DataFrame(index=trimmed_raw.index),
+            features_df=pd.DataFrame(index=generation.features_df.index),  # 與本次生成之公開索引同一表示
             labels_df=labels_df,
             metadata=metadata,
             feature_count=processed_feature_count,
@@ -2820,36 +2772,21 @@ class FeatureFactory:
             },
             config_used=self._config_payload(config),
             hdf5_path=str(processed_path),
-            compute_warnings=compute_warnings or [],
+            compute_warnings=list(compute_warnings or []) + list(generation.compute_warnings or []),
         )
 
-    def _run_l1_l6_for_ic_first(
-        self,
-        symbol: str,
-        tf: str,
-        config: "FactoryConfig",
-    ) -> Tuple[pd.DataFrame, List[pd.DataFrame]]:
-        window = getattr(self, "_current_output_window", None)
-        end_date = window.output_end if window is not None else None
-        ingest_start = self._layer0_ingest_start_date_for_tf(tf, config.timeframes.primary)
-        if ingest_start is None and window is not None:
-            ingest_start = window.output_start
-        raw_data = self._layer0_data_ingestion(
-            symbol,
-            tf,
-            config,
-            start_date=ingest_start,
-            end_date=end_date,
-        )
-        self._current_raw_data = raw_data
-        layer1 = self._execute_layer1_6("Layer 1", self._layer1_atomic_indicators, raw_data, config).data
-        layer2 = self._execute_layer1_6("Layer 2", self._layer2_derived_features, layer1, raw_data, config).data
-        layer2 = self._spill_to_memmap(layer2, "layer2")
-        layer3 = self._execute_layer1_6("Layer 3", self._layer3_rolling_aggregation, layer1, layer2, config).data
-        layer4 = self._execute_layer1_6("Layer 4", self._layer4_lag_features, layer1, layer2, layer3, raw_data, config).data
-        layer5 = self._execute_layer1_6("Layer 5", self._layer5_cross_sectional, layer1, layer2, config).data
-        layer6 = self._execute_layer1_6("Layer 6", self._layer6_meta_features, layer1, layer2, raw_data, config).data
-        return raw_data, [layer1, layer2, layer3, layer4, layer5, layer6]
+    @staticmethod
+    def _utc_window_mask(index: pd.DatetimeIndex, start: Optional[str], end: Optional[str]) -> np.ndarray:
+        """時間軸落在 [start, end]（皆換為 UTC 時刻比較；無時區視為 UTC）之遮罩；端點缺 ⇒ 該側不限。"""
+        from momentum.FeatureEngineering.ic_first_context import _as_timestamp
+
+        naive = index.tz_convert("UTC").tz_localize(None) if index.tz is not None else index
+        mask = np.ones(len(naive), dtype=bool)
+        if start is not None:
+            mask &= np.asarray(naive >= _as_timestamp(start))
+        if end is not None:
+            mask &= np.asarray(naive <= _as_timestamp(end))
+        return mask
 
     @staticmethod
     def _frame_to_l7_groups(frame: pd.DataFrame, group_id: str) -> Dict[str, pd.DataFrame]:
@@ -2862,12 +2799,6 @@ class FeatureFactory:
         from momentum.FeatureEngineering.feature_reader import FeatureReader
 
         return FeatureReader(str(storage.base_path))
-
-    @staticmethod
-    def _build_default_ic_label(raw_data: pd.DataFrame) -> pd.Series:
-        if raw_data is None or raw_data.empty or "close" not in raw_data.columns:
-            raise ValueError("IC-First requires an explicit label or raw_data with close column")
-        return raw_data["close"].astype(float).pct_change().shift(-1).rename("forward_return")
 
     @staticmethod
     def _extract_ic_selected_features(ic_result: Any) -> List[str]:
@@ -4439,7 +4370,8 @@ class FeatureFactory:
         payload = json.dumps(config_payload, sort_keys=True, default=str)
         return hashlib.md5(payload.encode("utf-8")).hexdigest()
 
-    def _try_load_cache(self, symbol: str, timeframe: str, config_hash: str) -> Optional[FeatureGenerationResult]:
+    def _try_load_cache(self, symbol: str, timeframe: str, config_hash: str,
+                        require_raw: bool = False) -> Optional[FeatureGenerationResult]:
         from momentum.FeatureEngineering.consumer_gate import (
             effective_run_status_from_metadata,
             is_run_status_cacheable,
@@ -4494,6 +4426,16 @@ class FeatureFactory:
                 manifest_status,
             )
             return None
+        if require_raw:
+            # ICFIRSTALIGN Task 2.1：IC-first 需 raw 成品；H5 命中而 raw 不存在（如前次 cleanup_raw）或缺本次
+            # 生成之 output_window ⇒ 視同未命中，於同一 lease 內續行生成（不把 H5 命中當 raw 可用）
+            raw_dir = self._storage.feature_run_dir(symbol, timeframe, config_hash) / "raw"
+            if not raw_dir.exists() or "output_window" not in metadata:
+                logger.info(
+                    "Cache miss for %s/%s [hash=%s]: require_raw（raw=%s, output_window=%s）",
+                    symbol, timeframe, config_hash[:8], raw_dir.exists(), "output_window" in metadata,
+                )
+                return None
         logger.info("Cache hit for %s/%s [hash=%s]", symbol, timeframe, config_hash[:8])
         return cached
 

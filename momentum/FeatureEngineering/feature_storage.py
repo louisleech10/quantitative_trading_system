@@ -1518,6 +1518,7 @@ class FeatureStorage:
         timeframe_completeness: Optional[Dict[str, List[str]]] = None,
         cross_tf_layer_failures: Sequence[str] = (),
         layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
+        post_ic_arm: Optional[str] = None,
     ) -> Path:
         """Write IC-First processed L7 groups to the canonical V2 processed path.
 
@@ -1539,6 +1540,7 @@ class FeatureStorage:
             timeframe_completeness=timeframe_completeness,
             cross_tf_layer_failures=cross_tf_layer_failures,
             layer_status_by_tf=layer_status_by_tf,
+            post_ic_arm=post_ic_arm,
         )
 
     def _write_l7_v2_artifact(
@@ -1556,6 +1558,7 @@ class FeatureStorage:
         timeframe_completeness: Optional[Dict[str, List[str]]] = None,
         cross_tf_layer_failures: Sequence[str] = (),
         layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
+        post_ic_arm: Optional[str] = None,
     ) -> Path:
         pa_module, pq_module = _require_pyarrow()
         run_dir = self.feature_run_dir(symbol, tf, config_hash)
@@ -1652,6 +1655,7 @@ class FeatureStorage:
                 row_index=row_index_manifest,
                 completeness_meta=completeness_meta,
                 preserve_root_completeness=preserve_root,
+                post_ic_arm=post_ic_arm,
             )
 
             if backup_dir is not None and backup_dir.exists():
@@ -2036,6 +2040,7 @@ class FeatureStorage:
         row_index: Optional[Dict[str, Any]] = None,
         completeness_meta: Optional[Dict[str, Any]] = None,
         preserve_root_completeness: bool = False,
+        post_ic_arm: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Locked read-modify-write so raw/processed writers cannot clobber each other."""
         with self._manifest_v2_lock(run_dir):
@@ -2057,6 +2062,7 @@ class FeatureStorage:
                 row_index=row_index,
                 completeness_meta=completeness_meta,
                 preserve_root_completeness=preserve_root_completeness,
+                post_ic_arm=post_ic_arm,
             )
             self._write_feature_manifest_v2_unlocked(run_dir, manifest)
             return manifest
@@ -2080,6 +2086,7 @@ class FeatureStorage:
         row_index: Optional[Dict[str, Any]] = None,
         completeness_meta: Optional[Dict[str, Any]] = None,
         preserve_root_completeness: bool = False,
+        post_ic_arm: Optional[str] = None,
     ) -> Dict[str, Any]:
         if existing_manifest:
             for key, expected in (("symbol", symbol), ("tf", tf), ("config_hash", config_hash)):
@@ -2125,6 +2132,8 @@ class FeatureStorage:
                 artifact_manifest["quality_status"] = str(preserved_root["quality_status"])
         if extra_metadata:
             artifact_manifest["metadata"] = dict(extra_metadata)
+        if post_ic_arm is not None:  # ICFIRSTALIGN Task 3.2：processed 節點記 post-IC 臂名
+            artifact_manifest["post_ic_arm"] = str(post_ic_arm)
         manifest = existing_manifest or {
             "version": "l7_v2",
             "symbol": symbol,

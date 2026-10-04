@@ -1507,15 +1507,14 @@ def test_paths_same_stable_start_and_masks(mode: str, tmp_path: Path, monkeypatc
 
 # ─────────────────────────────── ⑫ run_ic_first（v29–v31）
 
-def _ic_first_kwargs(tmp_path: Path) -> Dict[str, Any]:
+def _ic_first_kwargs(factory: Any) -> Dict[str, Any]:
+    """run_ic_first 須注入 IC 引擎；feature_reader 綁 factory 之 storage（ICFIRSTALIGN Task 2.1：storage／reader
+    皆綁本次生成之 run 目錄，異根 ⇒ ValueError）。"""
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
-    from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
-    root = tmp_path / "ic_first"
-    # run_ic_first 須注入 IC 引擎（同 ffstat_helpers 之 IC-first 呼叫）；IC 階段既有之對齊例外由 ic_first_to_l65 處理
-    return {"storage": FeatureStorage(str(root)), "persist": True, "ic_engine": ICEngine({"methods": ["spearman"]}),
-            "feature_reader": FeatureReader(str(root)), "ic_threshold": 0.0}
+    return {"ic_engine": ICEngine({"methods": ["spearman"]}),
+            "feature_reader": FeatureReader(str(factory._storage.base_path)), "ic_threshold": 0.0}
 
 
 def _factory_and_config():
@@ -1525,32 +1524,39 @@ def _factory_and_config():
     return factory, factory._resolve_config(h.stat_payload())
 
 
-def test_run_ic_first_requires_start_date_when_stationarizing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 ⑫（v29）：平穩化開啟而 start_date 為 None ⇒ CalibrationError（field＝output_start）、零寫入。"""
-    from momentum.FeatureEngineering.preprocessing.calibration import CalibrationError
+@pytest.mark.parametrize("missing", ["start", "end"])
+def test_run_ic_first_requires_start_date_when_stationarizing(missing: str, tmp_path: Path,
+                                                              monkeypatch: pytest.MonkeyPatch) -> None:
+    """Task 2.3 ⑫（v29；ICFIRSTALIGN Task 2.0 收緊）：start_date 或 end_date 為 None ⇒ `ICFirstContextError`
+    （ValueError；context 建立失敗，先於生成與任何寫入）、零寫入。"""
+    from momentum.FeatureEngineering.ic_first_context import ICFirstContextError
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
 
     h.prepare_stat_env(monkeypatch, tmp_path)
     factory, config = _factory_and_config()
-    kwargs = _ic_first_kwargs(tmp_path)
+    factory._storage = FeatureStorage(str(tmp_path / "ic_first"))
+    start, end = (None, h.WINDOW[1]) if missing == "start" else (h.WINDOW[0], None)
     before = h.snapshot_tree(tmp_path)
-    with pytest.raises(CalibrationError) as exc:
-        factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, config, start_date=None, end_date=h.WINDOW[1], **kwargs)
-    assert getattr(exc.value, "field", None) == "output_start"
+    with pytest.raises(ICFirstContextError):
+        factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, config, start_date=start, end_date=end, **_ic_first_kwargs(factory))
     assert h.snapshot_tree(tmp_path) == before
 
 
 def test_run_ic_first_rejects_config_hash_when_stationarizing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.3 ⑫（v29）：平穩化開啟而傳入 config_hash ⇒ CalibrationError（field＝config_hash）、零寫入。"""
-    from momentum.FeatureEngineering.preprocessing.calibration import CalibrationError
+    """Task 2.3 ⑫（v29；ICFIRSTALIGN Task 2.1）：介面無 `config_hash`（身分只取自本次生成結果）；傳入 ⇒ TypeError、零寫入。"""
+    import inspect
 
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    assert "config_hash" not in inspect.signature(FeatureFactory.run_ic_first).parameters
     h.prepare_stat_env(monkeypatch, tmp_path)
     factory, config = _factory_and_config()
-    kwargs = _ic_first_kwargs(tmp_path)
+    factory._storage = FeatureStorage(str(tmp_path / "ic_first"))
     before = h.snapshot_tree(tmp_path)
-    with pytest.raises(CalibrationError) as exc:
+    with pytest.raises(TypeError):
         factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, config, start_date=h.WINDOW[0], end_date=h.WINDOW[1],
-                             config_hash="deadbeef", **kwargs)
-    assert getattr(exc.value, "field", None) == "config_hash"
+                             config_hash="deadbeef", **_ic_first_kwargs(factory))
     assert h.snapshot_tree(tmp_path) == before
 
 
@@ -1575,7 +1581,7 @@ def test_run_ic_first_uses_own_window_not_previous(tmp_path: Path, monkeypatch: 
         leases: List[Any] = []
         try:
             h.ic_first_to_l65(factory, config, start_date=a_start, end_date=a_end, lease_sink=leases,
-                              **_ic_first_kwargs(tmp_path / str(preset)))
+                              **_ic_first_kwargs(factory))
             decisions = getattr(factory, CONTRACT["factory_decisions_attr"])
             assert all(pd.Timestamp(d["calibration_end"]) < pd.Timestamp(a_start, tz="UTC")
                        for d in decisions.values() if d.get("calibration_end")), preset
@@ -1589,7 +1595,9 @@ def test_run_ic_first_uses_own_window_not_previous(tmp_path: Path, monkeypatch: 
 @pytest.mark.parametrize("ending", ["preflight_error", "l1_l6_error", "success"])
 def test_run_ic_first_restores_state_on_all_endings(ending: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.3 ⑫（v30）：平穩化開啟之 run_ic_first 結束後（前置關卡失敗、L1–L6 失敗、成功）
-    `_current_output_window` 與 `_current_config_hash` 皆與呼叫前為同一物件（is）。"""
+    `_current_output_window` 與 `_current_config_hash` 皆與呼叫前為同一物件（is）。
+    （ICFIRSTALIGN Task 2.4：L1–L6 失敗改注入於正式生成之 L1——第二引擎 `_run_l1_l6_for_ic_first` 已刪——
+    以 `ICFirstGenerationError`〔RuntimeError 子類〕上拋。）"""
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
     from momentum.FeatureEngineering.preprocessing.calibration import CalibrationError
@@ -1605,10 +1613,10 @@ def test_run_ic_first_restores_state_on_all_endings(ending: str, tmp_path: Path,
         monkeypatch.setattr(FeatureFactory, "run_calibration_preflight",
                             lambda *a, **k: (_ for _ in ()).throw(CalibrationError("injected")))
     elif ending == "l1_l6_error":
-        monkeypatch.setattr(FeatureFactory, "_run_l1_l6_for_ic_first",
+        monkeypatch.setattr(FeatureFactory, "_layer1_atomic_indicators",
                             lambda *a, **k: (_ for _ in ()).throw(RuntimeError("injected")))
     try:
-        h.ic_first_to_l65(factory, config, start_date=w1_start, end_date=w1_end, **_ic_first_kwargs(tmp_path))
+        h.ic_first_to_l65(factory, config, start_date=w1_start, end_date=w1_end, **_ic_first_kwargs(factory))
     except (CalibrationError, RuntimeError):
         assert ending != "success"
     assert factory._current_output_window is window_before

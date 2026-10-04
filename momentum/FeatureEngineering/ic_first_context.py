@@ -60,18 +60,85 @@ def begin_context(
     label_spec: Mapping[str, Any],
 ) -> ICFirstRunContext:
     """以呼叫參數建立 context 前半（深複本凍結）；start／end 缺 ⇒ `ICFirstContextError`。Task 2.0。"""
-    raise NotImplementedError("ICFIRSTALIGN Task 2.0")
+    if start in (None, "") or end in (None, ""):
+        raise ICFirstContextError(f"IC-first 須帶 start 與 end（{symbol}/{timeframe}）：start={start!r} end={end!r}")
+    return ICFirstRunContext(
+        symbol=str(symbol),
+        timeframe=str(timeframe),
+        training=tuple(str(tf) for tf in training),
+        start=str(start),
+        end=str(end),
+        selection_window=freeze_mapping(selection_window),
+        split_id=None if split_id is None else str(split_id),
+        label_spec=freeze_mapping(label_spec) or MappingProxyType({}),
+    )
+
+
+def _as_timestamp(value: Any) -> Any:
+    import pandas as pd
+
+    ts = pd.Timestamp(value)
+    return ts.tz_convert("UTC").tz_localize(None) if ts.tzinfo is not None else ts
 
 
 def complete_context(partial: ICFirstRunContext, generation_metadata: Mapping[str, Any]) -> ICFirstRunContext:
     """以生成結果 metadata 之 `output_window`、`config_hash` 補完並凍結；缺 `output_window` ⇒ `ICFirstContextError`；
     selection_window 超出公開窗 ⇒ `ICFirstContextError`。Task 2.0。"""
-    raise NotImplementedError("ICFIRSTALIGN Task 2.0")
+    from dataclasses import replace
+
+    window = generation_metadata.get("output_window") if generation_metadata else None
+    if not window or any(key not in window for key in OUTPUT_WINDOW_KEYS):
+        raise ICFirstContextError(
+            f"生成結果缺 output_window（或缺欄 {OUTPUT_WINDOW_KEYS}）；IC-first 之窗只取自本次生成結果"
+        )
+    config_hash = generation_metadata.get("config_hash")
+    if not config_hash:
+        raise ICFirstContextError("生成結果缺 config_hash；IC-first 之身分只取自本次生成結果")
+    selection = partial.selection_window
+    if selection:
+        out_start = window.get("output_start")
+        out_end = window.get("output_end")
+        sel_start = selection.get("start")
+        sel_end = selection.get("end")
+        if sel_start is not None and out_start is not None and _as_timestamp(sel_start) < _as_timestamp(out_start):
+            raise ICFirstContextError(f"selection_window 起 {sel_start} 早於公開窗起 {out_start}")
+        if sel_end is not None and out_end is not None and _as_timestamp(sel_end) > _as_timestamp(out_end):
+            raise ICFirstContextError(f"selection_window 訖 {sel_end} 晚於公開窗訖 {out_end}")
+    return replace(partial, output_window=freeze_mapping(dict(window)), config_hash=str(config_hash), complete=True)
+
+
+def _freeze(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(k): _freeze(v) for k, v in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze(v) for v in value)
+    if isinstance(value, set):
+        return frozenset(_freeze(v) for v in value)
+    return value
 
 
 def freeze_mapping(value: Optional[Mapping[str, Any]]) -> Optional[Mapping[str, Any]]:
     """dict 之深凍結複本（巢狀 dict ⇒ MappingProxyType、list ⇒ tuple）。Task 2.0。"""
-    raise NotImplementedError("ICFIRSTALIGN Task 2.0")
+    if value is None:
+        return None
+    return _freeze(dict(value))
+
+
+def context_to_metadata(ctx: ICFirstRunContext) -> Mapping[str, Any]:
+    """context 之可序列化快照（寫入生成結果 metadata["ic_first_context"]；容器還原為 dict／list 複本）。"""
+    def thaw(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {k: thaw(v) for k, v in value.items()}
+        if isinstance(value, (tuple, frozenset)):
+            return [thaw(v) for v in value]
+        return value
+
+    return {
+        "symbol": ctx.symbol, "timeframe": ctx.timeframe, "training": list(ctx.training),
+        "start": ctx.start, "end": ctx.end, "selection_window": thaw(ctx.selection_window),
+        "split_id": ctx.split_id, "label_spec": thaw(ctx.label_spec), "post_ic_arm": ctx.post_ic_arm,
+        "output_window": thaw(ctx.output_window), "config_hash": ctx.config_hash, "complete": ctx.complete,
+    }
 
 
 __all__ = [
@@ -84,5 +151,6 @@ __all__ = [
     "begin_context",
     "complete_context",
     "freeze_mapping",
+    "context_to_metadata",
     "MappingProxyType",
 ]

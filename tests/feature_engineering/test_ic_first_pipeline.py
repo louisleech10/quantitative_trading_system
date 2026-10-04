@@ -177,7 +177,6 @@ def _load_selected_payload(result) -> Dict[str, Any]:
 
 
 def test_routing(monkeypatch) -> None:
-    monkeypatch.setenv("FFACT_USE_POLARS", "0")
     factory = _make_factory()
     config = _make_config()
     frame = pd.DataFrame(
@@ -205,7 +204,6 @@ def test_routing(monkeypatch) -> None:
 
 
 def test_generation_routes_to_pre_ic_without_env(monkeypatch) -> None:
-    monkeypatch.setenv("FFACT_USE_POLARS", "0")
     factory = _make_factory()
     config = _make_config()
     frame = pd.DataFrame(
@@ -222,7 +220,6 @@ def test_generation_routes_to_pre_ic_without_env(monkeypatch) -> None:
 
 
 def test_selected_features_route_to_post_ic(monkeypatch) -> None:
-    monkeypatch.setenv("FFACT_USE_POLARS", "0")
     factory = _make_factory()
     config = _make_config()
     frame = pd.DataFrame(
@@ -243,7 +240,6 @@ def test_selected_features_route_to_post_ic(monkeypatch) -> None:
 
 
 def test_transform_selected_only_processes_ic_features(monkeypatch) -> None:
-    monkeypatch.setenv("FFACT_USE_POLARS", "0")
     config = _make_config()
     preprocessor = FeaturePreprocessor(config.preprocessing.model_dump())
     groups = {
@@ -572,72 +568,45 @@ def test_ic_analysis_service_l7_raw_integration(tmp_path) -> None:
 
 
 def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("FFACT_USE_POLARS", "0")
-    factory = _make_factory()
-    config = _make_config()
-    # FFSTAT Task 2.4：run_ic_first 入口之倍數表覆蓋檢查讀 atomic_indicators ⇒ 給真實預設指標設定（檢查照實執行，不略過）
-    from momentum.FeatureEngineering.feature_config import AtomicIndicatorConfig
+    """raw 落盤後之記憶體預算 metadata（ICFIRSTALIGN Task 2.4 遷移：改經正式 CGSA 生成之真實 kline S2，
+    不再以呼叫端自帶之 raw_data／layers 走記憶體第二引擎）。預算門檻以 monkeypatch 設為 0／999 GB
+    （本測試驗 metadata 之形成與 raw／processed 落盤，不驗本機記憶體量）。"""
+    from tests.feature_engineering import icfirstalign_helpers as h
 
-    config.atomic_indicators = AtomicIndicatorConfig()
-    # FFSTAT b4：縮尾輸出遮不完整窗 window−1 列；預設窗 252 於本 6 列 fixture 全遮成 NaN ⇒ IC 無可選。
-    # 本測試驗 raw 落盤後之記憶體預算 metadata ⇒ 局部設縮尾窗 3（同 fixture 之 rank／zscore 窗）；全鏈長窗由 b4 回歸測試負責
-    config.preprocessing.winsorization.window = 3
-    config.ic_gate_required_available_gb = 0.0
-    config.tier_peak_budget_gb = 999.0
-    storage = FeatureStorage(str(tmp_path / "features"))
-    reader = FeatureReader(str(tmp_path / "features"))
-    row_index = pd.date_range("2026-01-01", periods=6, freq="h")
-    raw_data = pd.DataFrame(
-        {"close": np.array([10.0, 11.0, 12.0, 13.0, 14.0, 15.0], dtype=np.float32)},
-        index=row_index,
-    )
-    factory.layer_results = _healthy_layer_results(row_index)
-    layers = [
-        pd.DataFrame(
-            {
-                "alpha": np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32),
-                "beta": np.array([1.0, 3.0, 2.0, 5.0, 4.0, 6.0], dtype=np.float32),
-            }
-        )
-    ]
-    label = pd.Series(
-        np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=np.float32),
-        index=row_index,  # ICFIRSTALIGN Task 1.1：label 須帶時間戳（與 raw sidecar 同軸）
-        name="forward_return",
-    )
-
-    factory._storage = storage
+    root = h.isolated(monkeypatch, tmp_path)
+    factory = h.make_factory(root)
+    monkeypatch.setattr(FeatureFactory, "_resolve_required_available_gb", lambda self, config: 0.0)
+    monkeypatch.setattr(FeatureFactory, "_resolve_tier_peak_budget_gb", lambda self, config: 999.0)
+    config = factory._resolve_config(h.s2_payload())
+    reader = FeatureReader(str(root))
     result = factory.run_ic_first(
-        "SYNTHETIC",
-        "1h",
+        h.SYMBOL,
+        h.PRIMARY,
         config,
-        raw_data=raw_data,
-        layers=layers,
-        config_hash="cfg_pipeline",
-        label=label,
+        start_date=h.S2_WINDOW[0],
+        end_date=h.S2_WINDOW[1],
         ic_engine=ICEngine({"methods": ["spearman"]}),
         feature_reader=reader,
-        storage=storage,
-        ic_threshold=0.95,
+        ic_threshold=0.02,
         label_horizon="1_bar_forward_return",
-        selection_window=dict(_TIME_WINDOW),
+        selection_window={"start": h.S2_WINDOW[0], "end": h.S2_WINDOW[1]},
         split_id="train_fold_0",
     )
 
-    assert result.metadata["raw_feature_count"] == 2
-    assert result.metadata["selected_features"] == ["alpha"]
-    assert result.metadata["processed_feature_count"] == 1
+    config_hash = str(result.metadata["config_hash"])
+    manifest = reader.load_manifest_v2(h.SYMBOL, h.PRIMARY, config_hash, artifact_kind="raw")
+    raw_columns = [c for g in manifest["artifacts"]["raw"]["groups"].values() for c in g.get("columns", [])]
+    selected = list(result.metadata["selected_features"])
+    assert result.metadata["raw_feature_count"] == len(raw_columns) > 0
+    assert selected and set(selected) <= set(raw_columns)
+    assert result.metadata["processed_feature_count"] == len(selected)
     assert result.metadata["memory_budget"]["available_after_gb"] >= 0.0
+    assert result.metadata["memory_budget"]["required_available_gb"] == 0.0
     assert result.metadata["run_ic_gate_peak_rss_gb"] <= 999.0
+    assert result.metadata["tier_peak_budget_gb"] == 999.0
 
-    run_dir = storage.feature_run_dir("SYNTHETIC", "1h", "cfg_pipeline")
+    run_dir = h.run_dir(root, config_hash)
     assert (run_dir / "raw").exists()
     assert (run_dir / "processed").exists()
-    processed = reader.load_columns_v2(
-        "SYNTHETIC",
-        "1h",
-        "cfg_pipeline",
-        ["alpha"],
-        artifact_kind="processed",
-    )
-    assert list(processed.columns) == ["alpha"]
+    processed = reader.load_columns_v2(h.SYMBOL, h.PRIMARY, config_hash, selected, artifact_kind="processed")
+    assert list(processed.columns) == selected

@@ -183,21 +183,33 @@ def test_mutation_context_reads_stale_output_window(tmp_path: Any, monkeypatch: 
         return real(partial, {**dict(metadata), "output_window": first_ow})
 
     monkeypatch.setattr(icc, "complete_context", stale)
-    second = _ctx(_run(shared, W2, h.s2_payload()))
-    assert second["output_window"] == first_ow  # 斷言「只由第二次參數決定」因而翻轉
+    _assert_mutant_flips(lambda: _ctx(_run(shared, W2, h.s2_payload()))["output_window"] == first_ow)
 
 
 def test_mutation_context_reads_stale_config_hash(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：context 之 config_hash 改取前一次 run 留下之值（模擬讀 `_current_config_hash`）。"""
+    """mutant：context 之 config_hash 改取前一次 run 留下之值（模擬讀 `_current_config_hash`）⇒ 第二次之 hash
+    等於第一次（≠ 以第二次參數之 fresh 值），或於讀回時被時間軸守衛具名擋下。"""
     root = h.isolated(monkeypatch, tmp_path)
     shared = h.make_factory(root)
     first_hash = _ctx(_run(shared, W1, h.s2_payload()))["config_hash"]
+    fresh_hash = _ctx(_run(h.make_factory(root), W2, h.s2_payload()))["config_hash"]  # mutant 未裝前之正確值
+    assert fresh_hash != first_hash
     real = icc.complete_context
 
     def stale(partial: Any, metadata: Any) -> Any:
         return real(partial, {**dict(metadata), "config_hash": first_hash})
 
     monkeypatch.setattr(icc, "complete_context", stale)
-    second = _ctx(_run(shared, W2, h.s2_payload()))
-    fresh = _ctx(_run(h.make_factory(root), W2, h.s2_payload()))
-    assert second["config_hash"] != fresh["config_hash"]
+    _assert_mutant_flips(lambda: _ctx(_run(shared, W2, h.s2_payload()))["config_hash"] != fresh_hash)
+
+
+def _assert_mutant_flips(observe: Any) -> None:
+    """mutant 下正常測試之判定翻轉：run 完成而觀測值錯（`observe()` 為 True），或 run 被下游時間軸守衛
+    以具名錯誤擋下（陳舊窗／hash 使選窗超出公開窗或 label 未涵蓋群組軸）——兩者皆使正常測試紅。
+    （ICFIRSTALIGN b2 實作期調整：Task 1.1／2.0 之守衛使陳舊身分多半於讀回時即 fail-closed。）"""
+    from momentum.core.contracts import AlignmentViolationError
+
+    try:
+        assert observe()
+    except (icc.ICFirstContextError, AlignmentViolationError):
+        pass

@@ -72,6 +72,11 @@ def test_run_ic_first_signature_has_no_second_engine_inputs() -> None:
     assert "require_raw" in inspect.signature(FeatureFactory.generate_features).parameters
 
 
+def _floats(scores: Dict[str, Any], keys: List[str]) -> np.ndarray:
+    """分數依 keys 取值為 float64；IC JSON 以 null 表 NaN ⇒ 轉回 NaN（比對以 equal_nan，不吸收任何差異）。"""
+    return np.asarray([np.nan if scores[k] is None else scores[k] for k in keys], dtype=np.float64)
+
+
 def _is_tf_col(name: str, tf: str) -> bool:
     return f"_{tf}_" in name or name.endswith(f"_{tf}")
 
@@ -95,12 +100,12 @@ def test_ic_first_scores_match_independent_oracle(tmp_path: Path, monkeypatch: p
     cols = [c for g in manifest["artifacts"]["raw"]["groups"].values() for c in g.get("columns", [])]
     features = reader.load_columns_v2(h.SYMBOL, h.PRIMARY, config_hash, cols)
     features.index = axis
-    expected = h.oracle_spearman(features, h.forward_return_label())
+    expected = h.oracle_spearman(features, h.forward_return_label(end=W[1]))  # 預設 label 以 end_date 為界（同 HEAD）
     payload = _ic_json(root, config_hash)
     got = payload["ic_scores"]
     assert set(got) == set(expected)
     keys = sorted(expected)
-    assert np.allclose([got[k] for k in keys], [expected[k] for k in keys], rtol=0, atol=1e-12, equal_nan=True)
+    assert np.allclose(_floats(got, keys), _floats(expected, keys), rtol=0, atol=1e-12, equal_nan=True)
     for tf in training:
         assert any(_is_tf_col(k, tf) and np.isfinite(expected[k]) for k in keys), f"{tf} 無有限 oracle 分數"
     expected_selected = {k for k, v in expected.items() if np.isfinite(v) and abs(v) >= threshold}
@@ -404,10 +409,13 @@ def test_mutation_require_raw_ignored(tmp_path: Path, monkeypatch: pytest.Monkey
 def test_boundary_01_generation_failure_raises_named(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.1 邊界①：生成失敗 ⇒ `ICFirstGenerationError` 上拋（不回空表）。"""
     root = h.isolated(monkeypatch, tmp_path)
-    monkeypatch.setattr(FeatureFactory, "_layer1_atomic_indicators",
-                        lambda self, *a, **k: (_ for _ in ()).throw(RuntimeError("injected L1")))
-    with pytest.raises(icc.ICFirstGenerationError):
+    # 實作期調整：注入點由 L1 改為只屬正式生成之 L3–L6 落盤（L1 亦於預熱探測之校準域執行，於該處失敗即以
+    # NON_DEGRADABLE 之 CalibrationError 原樣上拋——Task 2.2 邊界①，由下方 non_degradable 測試涵蓋）
+    monkeypatch.setattr(FeatureFactory, "_persist_single_tf_l3_l6_to_cgsa",
+                        lambda self, *a, **k: (_ for _ in ()).throw(RuntimeError("injected generation")))
+    with pytest.raises(icc.ICFirstGenerationError) as info:
         _run(h.make_factory(root))
+    assert _chain_has(info.value, "injected generation")
 
 
 def test_boundary_02_label_outside_window_not_used(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -416,13 +424,13 @@ def test_boundary_02_label_outside_window_not_used(tmp_path: Path, monkeypatch: 
     window = {"start": "2025-10-01", "end": W[1]}
     base = _run(h.make_factory(root), selection_window=window)
     base_scores = _ic_json(root, str(base.metadata["config_hash"]))["ic_scores"]
-    label = h.forward_return_label()
+    label = h.forward_return_label(end=W[1])  # 窗內值與預設 label 相同（以 end_date 為界）
     label.loc[label.index < pd.Timestamp(window["start"])] = 1e6
     shutil.rmtree(h.run_dir(root, str(base.metadata["config_hash"])))
     again = _run(h.make_factory(root), selection_window=window, label=label)
     scores = _ic_json(root, str(again.metadata["config_hash"]))["ic_scores"]
     keys = sorted(base_scores)
-    assert np.allclose([scores[k] for k in keys], [base_scores[k] for k in keys], rtol=0, atol=0, equal_nan=True)
+    assert np.allclose(_floats(scores, keys), _floats(base_scores, keys), rtol=0, atol=0, equal_nan=True)
 
 
 def test_boundary_03_h5_overwritten_other_hash_misses_not_misused(tmp_path: Path,
@@ -448,13 +456,26 @@ def _l65_raises(exc: BaseException):
     return raiser
 
 
+def _chain_has(exc: Any, text: str) -> bool:
+    """例外鏈（`__cause__`／`__context__`）中任一節之訊息含 `text`。"""
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if text in str(exc):
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
 def test_l65_failure_raises_named_not_write_raw_empty(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """L6.5 拋例外 ⇒ `ICFirstGenerationError`，且其例外鏈帶 L6.5 之原始失敗（非 `write_raw requires non-empty`）。"""
     root = h.isolated(monkeypatch, tmp_path)
     monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups_to_sink", _l65_raises(RuntimeError("l65 boom")))
     monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", _l65_raises(RuntimeError("l65 boom")))
     with pytest.raises(icc.ICFirstGenerationError) as info:
         _run(h.make_factory(root))
     assert "requires non-empty" not in str(info.value)
+    assert _chain_has(info.value, "l65 boom")
 
 
 def test_boundary_01_non_degradable_errors_reraised_as_is(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -472,32 +493,46 @@ def test_boundary_01_non_degradable_errors_reraised_as_is(tmp_path: Path, monkey
 def test_boundary_02_single_group_failure_fails_whole_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 2.2 邊界②：單一群組 L6.5 失敗 ⇒ 整次失敗（不得只略過該群組）。"""
     root = h.isolated(monkeypatch, tmp_path)
-    real = FeaturePreprocessor._registry_fast_transform
+    # 實作期調整：注入點改為 raw-sink 路徑之逐群組分派 `_transform_single_group_to_arrays`（S2 之群組不走 numba
+    # 快路徑，原注入點 `_registry_fast_transform` 從未被呼叫 ⇒ 測不到群組失敗）
+    real = FeaturePreprocessor._transform_single_group_to_arrays
     calls = {"n": 0}
 
-    def fail_second(self: FeaturePreprocessor, arr: Any, ctx: Any, *a: Any, **k: Any) -> Any:
+    def fail_second(self: FeaturePreprocessor, *a: Any, **k: Any) -> Any:
         calls["n"] += 1
         if calls["n"] == 2:
             raise RuntimeError("one group fails")
-        return real(self, arr, ctx, *a, **k)
+        return real(self, *a, **k)
 
-    monkeypatch.setattr(FeaturePreprocessor, "_registry_fast_transform", fail_second)
-    with pytest.raises(icc.ICFirstGenerationError):
+    monkeypatch.setattr(FeaturePreprocessor, "_transform_single_group_to_arrays", fail_second)
+    with pytest.raises(icc.ICFirstGenerationError) as info:
         _run(h.make_factory(root))
+    assert calls["n"] == 2 and _chain_has(info.value, "one group fails")
 
 
 def test_mutation_l65_failure_degrades_to_empty(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：L6.5 失敗被吞成空表（`_safe_execute` 式降級）⇒ 不再是具名錯誤。"""
+    """mutant：L6.5 拋 `l65 boom` 而被吞成空表（`_safe_execute` 式降級）⇒ run 之結果（成功或其他錯誤）之例外鏈
+    不帶 L6.5 原始失敗，正常案例之判定（具名錯誤且鏈帶 `l65 boom`）因而紅。
+
+    （v27 實作期調整：生成之一切非 NON_DEGRADABLE 失敗皆包為 `ICFirstGenerationError`，降級後之下游錯誤
+    〔如 `write_raw requires non-empty`〕亦具名 ⇒ 以 isinstance 判定 mutant 不再可區分；改以例外鏈判定。）"""
     root = h.isolated(monkeypatch, tmp_path)
-    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups_to_sink",
-                        lambda self, *a, **k: {})
-    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", lambda self, *a, **k: 0)
+    boom = _l65_raises(RuntimeError("l65 boom"))
+
+    def swallowed(self: FeaturePreprocessor, *a: Any, **k: Any) -> Any:
+        try:
+            return boom(self, *a, **k)
+        except RuntimeError:
+            return 0
+
+    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups_to_sink", swallowed)
+    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", swallowed)
     try:
         _run(h.make_factory(root))
         raised: Any = None
     except Exception as exc:  # noqa: BLE001
         raised = exc
-    assert not isinstance(raised, icc.ICFirstGenerationError)
+    assert not (isinstance(raised, icc.ICFirstGenerationError) and _chain_has(raised, "l65 boom"))
 
 
 # ---------------------------------------------------------------- Task 2.4 測試遷移

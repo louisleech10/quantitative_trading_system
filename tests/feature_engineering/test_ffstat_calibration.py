@@ -510,27 +510,25 @@ def test_decisions_attr_is_instance_level() -> None:
 
 
 def test_three_entries_same_decisions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 驗證：同 symbol／週期／起始日／設定下，generate_features、run_ic_first（自算路徑）、
+    """Task 2.1 驗證：同 symbol／週期／起始日／設定下，generate_features、run_ic_first、
     多週期 worker（parallel）之 1h 欄校準時間上界、N、決策與 d 全同。run_ic_first 之決策讀 factory 之
-    `factory_decisions_attr`（契約；L6.5 形成、先於 IC 階段；呼叫前清空以防讀到 generate_features 之殘值），
-    IC 階段既有之 `AlignmentViolationError` 見 `ffstat_helpers.ic_first_to_l65`。"""
+    `factory_decisions_attr`（契約；L6.5 形成、先於 IC 階段；呼叫前清空以防讀到 generate_features 之殘值）。
+    ICFIRSTALIGN Task 2.4：generate_features 改走 CGSA（frame 已刪，RM-FRAMEPATH），run_ic_first 經正式 CGSA
+    生成（不再於 IC 階段拋 AlignmentViolationError ⇒ 結果恆在、決策恆比對）。"""
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
     attr = CONTRACT["factory_decisions_attr"]
-    h.prepare_stat_env(monkeypatch, tmp_path / "gen", FFACT_USE_CGSA="0")
+    h.prepare_stat_env(monkeypatch, tmp_path / "gen")
     root, factory, gen = h.run_stat(tmp_path / "gen", h.stat_payload())
     assert getattr(factory, attr) == h.decisions(gen)  # 同一物件為 metadata 之來源
     setattr(factory, attr, None)
-    # run_ic_first 沿用同一 factory 於 generate_features 所設之輸出窗（比照 test_b6_warmup_trim 之用法），走自算路徑
     ic = h.ic_first_to_l65(factory, factory._resolve_config(h.stat_payload()),
                            ic_engine=ICEngine({"methods": ["spearman"]}), feature_reader=FeatureReader(str(root)),
-                           storage=factory._storage, ic_threshold=0.0, persist=True,
-                           start_date=h.WINDOW[0], end_date=h.WINDOW[1])  # v29：平穩化開啟須自帶起訖
+                           ic_threshold=0.0, start_date=h.WINDOW[0], end_date=h.WINDOW[1])
     i = getattr(factory, attr)
     assert i, "run_ic_first 未產生平穩化決策"
-    if ic is not None:
-        assert h.decisions(ic) == i
+    assert h.decisions(ic) == i
     h.prepare_stat_env(monkeypatch, tmp_path / "par", FFACT_MULTI_TF_PARALLEL="1")
     _, _, par = h.run_stat(tmp_path / "par", h.stat_payload(["1h", "12h"]))
     keys = ("calibration_end", "n", "fracdiff", "d", "adf_differenced")
@@ -614,67 +612,83 @@ def test_second_tf_insufficient_history_column_skipped(path_env: Dict[str, str],
 
 
 def test_ic_first_rejects_supplied_layers_when_stationarizing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 驗證：平穩化開啟時 run_ic_first 自帶 raw_data／layers ⇒ 零寫入拒收；介面無校準值參數。"""
-    params = set(inspect.signature(FeatureFactory.run_ic_first).parameters)
+    """Task 2.1 驗證：run_ic_first 無自帶 raw_data／layers 之介面（ICFIRSTALIGN Task 2.1 刪第二引擎輸入；
+    呼叫端無從帶入，零寫入由介面保證），且無任何可變長關鍵字參數可夾帶；介面無校準值參數。"""
+    sig = inspect.signature(FeatureFactory.run_ic_first)
+    params = set(sig.parameters)
     assert not any("calib" in p for p in params)
-    h.prepare_stat_env(monkeypatch, tmp_path)
-    from momentum.factories import create_feature_factory
-    from momentum.FeatureEngineering.feature_storage import FeatureStorage
-
-    factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
-    factory._storage = FeatureStorage(str(tmp_path / "features"))
-    before = h.snapshot_tree(tmp_path)
-    with pytest.raises(CalibrationError):
-        factory.run_ic_first(h.SYMBOL, h.PRIMARY_TF, factory._resolve_config(h.stat_payload()),
-                             raw_data=h.kline_frame().iloc[:1000], layers=[pd.DataFrame()])
-    assert h.snapshot_tree(tmp_path) == before
+    assert "raw_data" not in params and "layers" not in params
+    assert not any(p.kind is inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
 
 
 def _ic_first_kwargs(factory: Any, root: Path) -> Dict[str, Any]:
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
-    # v29：平穩化開啟時 run_ic_first 須自帶起訖（未帶 ⇒ CalibrationError(field=output_start)，會使本檔依賴
-    # 「其他原因之 CalibrationError」之測試假綠）
+    # v29：run_ic_first 須自帶起訖（ICFIRSTALIGN Task 2.0：未帶 ⇒ ICFirstContextError）
     return {"ic_engine": ICEngine({"methods": ["spearman"]}), "feature_reader": FeatureReader(str(root)),
-            "storage": factory._storage, "ic_threshold": 0.0, "persist": True,
-            "start_date": h.WINDOW[0], "end_date": h.WINDOW[1]}
+            "ic_threshold": 0.0, "start_date": h.WINDOW[0], "end_date": h.WINDOW[1]}
 
 
 def test_ic_first_ignores_stale_cgsa_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """b3 r3（CODEX-R3-P1-02）：同一 factory 先以 CGSA 生成（留下 registry）、再 IC-first 自算 ⇒ L6.5 處理本次
-    frame（`transform` 有呼叫、產生平穩化決策），不碰前次 registry（`transform_registry_groups` 零呼叫）。
-    拿掉 run_ic_first 之 registry 重置 ⇒ 走 registry 分支 ⇒ 紅。"""
+    """b3 r3（CODEX-R3-P1-02）：同一 factory 先以 CGSA 生成（留下 registry）、再 IC-first ⇒ L6.5 只處理本次
+    生成所建之 registry（ICFIRSTALIGN Task 2.1 後 IC-first 經正式 CGSA 生成：`transform_registry_groups_to_sink`
+    所收之 registry 皆為本次 `_prepare_cgsa_registry` 之產物，無一為前次殘留），並產生平穩化決策。
+    mutant「沿用前次 registry」⇒ 收到殘留物件 ⇒ 紅（見下一支）。"""
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
     attr = CONTRACT["factory_decisions_attr"]
     h.prepare_stat_env(monkeypatch, tmp_path)  # FFACT_USE_CGSA 預設開
     root, factory, _ = h.run_stat(tmp_path, h.stat_payload())
-    assert factory._cgsa_registry is not None, "前提：CGSA 生成後 registry 殘留於 factory"
-    calls = {"registry": 0, "frame": 0}
-    real_registry, real_frame = FeaturePreprocessor.transform_registry_groups, FeaturePreprocessor.transform
-
-    def _registry(self, *args, **kwargs):
-        calls["registry"] += 1
-        return real_registry(self, *args, **kwargs)
-
-    def _frame(self, *args, **kwargs):
-        calls["frame"] += 1
-        return real_frame(self, *args, **kwargs)
-
-    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", _registry)
-    monkeypatch.setattr(FeaturePreprocessor, "transform", _frame)
+    stale = factory._cgsa_registry
+    assert stale is not None, "前提：CGSA 生成後 registry 殘留於 factory"
+    seen = _spy_registries(monkeypatch, factory)
     setattr(factory, attr, None)
     h.ic_first_to_l65(factory, factory._resolve_config(h.stat_payload()), **_ic_first_kwargs(factory, root))
-    assert calls == {"registry": 0, "frame": calls["frame"]} and calls["frame"] >= 1, calls
+    assert seen["sink"] and all(r is not stale for r in seen["sink"]), seen
+    assert all(any(r is p for p in seen["prepared"]) for r in seen["sink"]), "L6.5 收到非本次建立之 registry"
     assert getattr(factory, attr), "run_ic_first 未產生平穩化決策"
 
 
+def _spy_registries(monkeypatch: pytest.MonkeyPatch, factory: Any) -> Dict[str, list]:
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    seen: Dict[str, list] = {"sink": [], "prepared": []}
+    real_sink = FeaturePreprocessor.transform_registry_groups_to_sink
+    real_prepare = FeatureFactory._prepare_cgsa_registry
+
+    def _sink(self, registry, *args, **kwargs):
+        seen["sink"].append(registry)
+        return real_sink(self, registry, *args, **kwargs)
+
+    def _prepare(self, *args, **kwargs):
+        registry = real_prepare(self, *args, **kwargs)
+        seen["prepared"].append(registry)
+        return registry
+
+    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups_to_sink", _sink)
+    monkeypatch.setattr(FeatureFactory, "_prepare_cgsa_registry", _prepare)
+    return seen
+
+
+def test_mutation_ic_first_reuses_stale_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：`_prepare_cgsa_registry` 回傳前次殘留之 registry ⇒ L6.5 收到殘留物件（上一支之判定翻轉）。"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
+    root, factory, _ = h.run_stat(tmp_path, h.stat_payload())
+    stale = factory._cgsa_registry
+    seen = _spy_registries(monkeypatch, factory)
+    monkeypatch.setattr(FeatureFactory, "_prepare_cgsa_registry", lambda self, *a, **k: stale)
+    try:
+        h.ic_first_to_l65(factory, factory._resolve_config(h.stat_payload()), **_ic_first_kwargs(factory, root))
+    except Exception:  # noqa: BLE001 — 殘留 registry 已 finalize／清理，下游可失敗；判定只看 L6.5 收到之物件
+        pass
+    assert not seen["sink"] or any(r is stale for r in seen["sink"])
+
+
 def test_ic_first_second_tf_failure_zero_writes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 驗證（r18 codex P1-01）：IC-first 自算路徑，第二原生週期校準讀取錯 ⇒ CalibrationError，
-    呼叫前後整個 tmp 樹（run 目錄、registry、CGSA 工作目錄）快照相同。"""
-    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
-    # 先以平穩化關閉跑一次，使 factory 具輸出窗（比照 test_b6_warmup_trim 之 run_ic_first 用法）
+    """Task 2.1 驗證（r18 codex P1-01）：IC-first，第二原生週期校準讀取錯 ⇒ CalibrationError，
+    呼叫前後整個 tmp 樹（run 目錄、registry、CGSA 工作目錄）快照相同。（ICFIRSTALIGN Task 2.4：前置生成改走 CGSA。）"""
+    h.prepare_stat_env(monkeypatch, tmp_path)
     root, factory, _ = h.run_stat(tmp_path, h.stat_payload(["1h", "12h"], fracdiff=False, adf=False))
     _fail_second_tf_read(monkeypatch)
     before = h.snapshot_tree(tmp_path)
@@ -685,26 +699,20 @@ def test_ic_first_second_tf_failure_zero_writes(tmp_path: Path, monkeypatch: pyt
 
 
 def test_ic_first_supplied_layers_unchanged_when_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 2.1 驗證（r18 codex P1-01、r19 codex P1-01）：平穩化關閉時 run_ic_first 自帶 raw_data／layers 不被
-    FF-STAT 拒收，且其 L6.5 產物（經 `write_raw` 於 IC 階段前落盤之 L7 raw）與同設定、同輸出窗而不帶自帶層之自算
-    路徑逐欄四 hash 全等（v49：原對改前凍結 `ic_first_supplied_off` 基準之逐位元組比對，隨 v32 R1 預熱恆開——有起始日時
-    值不再與改前逐位元組相同〔§G ②〕——改以自算路徑為對照；欄集合仍須等於改前基準）。IC 階段之既有
-    `AlignmentViolationError`（另立票，見 `ffstat_helpers.ic_first_to_l65`）只在 L7 raw 已落盤後容許；未過 L6.5 即
-    失敗或拋 `CalibrationError` ⇒ 紅。"""
-    import json as _json
-
-    baseline = _json.loads(h.BASELINE_PATH.read_text(encoding="utf-8"))["ic_first_supplied_off"]
-    h.prepare_stat_env(monkeypatch, tmp_path / "supplied", **h.IC_FIRST_OFF_ENV)
-    result, raw_fp = h.ic_first_supplied_off(tmp_path / "supplied")
-    h.prepare_stat_env(monkeypatch, tmp_path / "self", **h.IC_FIRST_OFF_ENV)
-    _, self_fp = h.ic_first_supplied_off(tmp_path / "self", supplied=False)
-    assert raw_fp, "未見 L7 raw 產物"
-    assert set(raw_fp) == set(self_fp)
-    diff = [c for c in self_fp if raw_fp[c] != self_fp[c]]
+    """Task 2.1 驗證（r18 codex P1-01、r19 codex P1-01；ICFIRSTALIGN Task 2.4 遷移）：平穩化關閉時 run_ic_first
+    不被 FF-STAT 拒收，且其 L7 raw 與同設定、同輸出窗之 generate_features（正式 CGSA）逐欄四 hash 全等——
+    設計 A：IC-first 之 raw 即正式生成之 raw。原「自帶 raw_data／layers」臂隨第二引擎刪除；原對改前凍結
+    `ic_first_supplied_off` 欄集合之比對（記憶體 L1–L6 之欄集合）由 Task 2.3 新舊 pre-IC 差異收據逐欄說明取代。"""
+    h.prepare_stat_env(monkeypatch, tmp_path / "ic", **h.IC_FIRST_OFF_ENV)
+    result, ic_fp = h.ic_first_off(tmp_path / "ic")
+    h.prepare_stat_env(monkeypatch, tmp_path / "gen", **h.IC_FIRST_OFF_ENV)
+    gen_root, _, _ = h.run_stat(tmp_path / "gen", h.stat_payload(fracdiff=False, adf=False))
+    gen_fp = h.raw_artifact_fingerprints(gen_root)
+    assert ic_fp, "未見 L7 raw 產物"
+    assert set(ic_fp) == set(gen_fp), sorted(set(ic_fp) ^ set(gen_fp))[:5]
+    diff = [c for c in gen_fp if ic_fp[c] != gen_fp[c]]
     assert diff == [], diff[:5]
-    assert set(raw_fp) == set(baseline), sorted(set(raw_fp) ^ set(baseline))[:5]  # IC-first raw 欄集合不變（實跑）
-    if result is not None:
-        assert list(result.metadata["feature_names"])
+    assert result.metadata["selected_count"] == len(result.metadata["selected_features"])
 
 
 def test_resume_calibrates_completed_timeframes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

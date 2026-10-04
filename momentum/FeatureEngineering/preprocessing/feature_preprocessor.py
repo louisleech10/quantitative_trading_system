@@ -616,7 +616,8 @@ class FeaturePreprocessor:
 
         from momentum.FeatureEngineering.polars_adapter import polars_enabled
 
-        use_polars = polars_enabled()
+        # ICFIRSTALIGN Task 3.2：IC-first 之 post-IC 臂為 run 契約（明示 Polars，不讀環境）；其餘 caller 依環境
+        use_polars = True if getattr(self, "_forced_arm", None) == "polars" else polars_enabled()
 
         num_cols = len(features_df.columns)
         chunk_size = self._column_chunk_size
@@ -636,8 +637,21 @@ class FeaturePreprocessor:
         selected: List[str],
         groups: Dict[str, pd.DataFrame],
         config: Optional[Any] = None,
+        arm: Optional[str] = None,
     ) -> Dict[str, pd.DataFrame]:
-        """Post-IC transform for selected features only."""
+        """Post-IC transform for selected features only.
+
+        `arm`（ICFIRSTALIGN Task 3.2）：None ⇒ 依環境（既有 caller 行為不變）；"polars" ⇒ 固定 Polars 正式臂，
+        polars 不可用 ⇒ `PostICArmUnavailableError`。
+        """
+        if arm is not None:
+            if arm != "polars":
+                raise ValueError(f"未知之 post-IC 臂：{arm!r}（只支援 'polars'）")
+            from momentum.FeatureEngineering import polars_adapter
+            from momentum.FeatureEngineering.ic_first_context import PostICArmUnavailableError
+
+            if not polars_adapter._check_polars_available():
+                raise PostICArmUnavailableError("IC-first 之 post-IC 正式臂（Polars）不可用；不得退回 pandas 臂")
         selected_columns = [str(feature) for feature in selected]
         if not selected_columns:
             logger.warning("[IC-First] post_ic received empty IC selection")
@@ -655,6 +669,7 @@ class FeaturePreprocessor:
             context=self._preprocessing_context,
             column_layer_map=self._column_layer_map,
         )
+        post_ic_preprocessor._forced_arm = arm
 
         processed_groups: Dict[str, pd.DataFrame] = {}
         missing_columns = set(selected_columns)

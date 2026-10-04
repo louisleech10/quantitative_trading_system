@@ -171,18 +171,16 @@ def test_ic_first_fresh_path_uses_structured_layers(tmp_path: Path, monkeypatch:
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
     from momentum.FeatureEngineering.feature_storage import FeatureStorage
-    from momentum.FeatureEngineering.warmup_window import resolve_output_window
     from momentum.factories import create_feature_factory
 
-    h.prepare_stat_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
+    # ICFIRSTALIGN Task 2.4：IC-first 只經 CGSA 正式生成（不再關 CGSA、不再預設 factory 之輸出窗）
+    h.prepare_stat_env(monkeypatch, tmp_path)
     root = tmp_path / "features"
     factory = create_feature_factory(cache_dir=h.KLINE_DIR, validate_continuity=False)
     factory._storage = FeatureStorage(str(root))
     config = factory._resolve_config(h.stat_payload(adf=False))
-    factory._current_output_window = resolve_output_window(config, h.PRIMARY_TF, *h.WINDOW)
     h.ic_first_to_l65(factory, config, ic_engine=ICEngine({"methods": ["spearman"]}),
-                      feature_reader=FeatureReader(str(root)), storage=factory._storage,
-                      ic_threshold=0.0, persist=False,
-                      start_date=h.WINDOW[0], end_date=h.WINDOW[1])  # v29：平穩化開啟須自帶起訖
+                      feature_reader=FeatureReader(str(root)), ic_threshold=0.0,
+                      start_date=h.WINDOW[0], end_date=h.WINDOW[1])  # v29：須自帶起訖
     dec = factory.last_stationarity_decisions
     assert dec and {d["layer"] for d in dec.values()} <= set(h.CONTRACT["fracdiff_target_layers"])

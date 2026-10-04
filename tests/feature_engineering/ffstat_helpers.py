@@ -214,25 +214,15 @@ def derived_fingerprints(root: Path) -> Dict[str, str]:
             mask = np.isnan(arr)
             out[n] = hashlib.sha256(mask.tobytes() + np.where(mask, 0.0, arr).tobytes()).hexdigest()
     return out
-IC_FIRST_OFF_ENV = {"FFACT_WARMUP_TRIM": "1", "FFACT_USE_CGSA": "0"}
+IC_FIRST_OFF_ENV = {"FFACT_WARMUP_TRIM": "1"}  # ICFIRSTALIGN Task 2.4：IC-first 只經 CGSA（不再關 CGSA）
 
 
-def ic_first_to_l65(factory: Any, config: Any, **kwargs: Any) -> Optional[Any]:
-    """呼叫 `run_ic_first`；回傳結果，或於 IC 階段既有之 `AlignmentViolationError` 時回傳 None。
+def ic_first_to_l65(factory: Any, config: Any, **kwargs: Any) -> Any:
+    """呼叫 `run_ic_first` 並回傳結果；任何例外（含 IC 階段之 `AlignmentViolationError`）一律上拋。
 
-    既有退化（主委實跑 2026-09-24，與本票無關、另立票）：真實 kline 下 `ICEngine._align_label_to_group`
-    之 label 為時間戳 index、自 L7 raw 讀回之群組為 RangeIndex ⇒ IC 階段必拋（`test_b6_warmup_trim.py::
-    test_warmup_trim_ic_first` 於 main 同紅）。FF-STAT 之決策與平穩化產出皆於 L6.5 形成、經 `write_raw`
-    於 IC 階段之前落盤 ⇒ 驗收改在 L6.5 產物觀測。只吞此一型且須 L7 raw 已落盤（證明已過 L6.5）；
-    其他例外（含 `CalibrationError`）一律上拋。"""
-    from momentum.core.contracts import AlignmentViolationError
-
-    root = Path(kwargs["storage"].base_path)
-    try:
-        return factory.run_ic_first(SYMBOL, PRIMARY_TF, config, **kwargs)
-    except AlignmentViolationError:
-        assert raw_artifact_fingerprints(root), "IC 階段前未見 L7 raw 產物：失敗發生於 L6.5 之前"
-        return None
+    ICFIRSTALIGN Task 2.4：IC-first 改經正式 CGSA 生成且 IC 讀回帶 raw 時間軸後，原「IC 階段必拋
+    `AlignmentViolationError`」之既有退化已修；本 helper 不再吞該例外（吞即掩蓋時間軸錯位）。"""
+    return factory.run_ic_first(SYMBOL, PRIMARY_TF, config, **kwargs)
 
 
 def raw_artifact_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:
@@ -265,34 +255,20 @@ def column_fingerprint(values: Any) -> Dict[str, Any]:
             "values": hashlib.sha256(np.ascontiguousarray(filled).tobytes()).hexdigest()}
 
 
-def ic_first_supplied_off(tmp_path: Path, *, supplied: bool = True) -> Tuple[Optional[Any], Dict[str, Dict[str, Any]]]:
-    """平穩化關閉、`run_ic_first` 自帶 raw_data／layers（比照 `test_b6_warmup_trim` 之 IC-first 用法：先設輸出窗、
-    以含前史之 ingest 起點讀原始資料、帶 config_hash）；呼叫端須先設 `IC_FIRST_OFF_ENV`。
-    `supplied=False`：同設定、同輸出窗，不帶 raw_data／layers（自算路徑）——v49 之對照組。
-    回傳 (結果或 None, L7 raw 四 hash)——Task 2.1 舊行為守衛與 §G 凍結同源。"""
+def ic_first_off(tmp_path: Path) -> Tuple[Any, Dict[str, Dict[str, Any]]]:
+    """平穩化關閉、`run_ic_first`（正式 CGSA 生成；ICFIRSTALIGN Task 2.1 後無自帶 raw_data／layers 之路徑）；
+    呼叫端須先設 `IC_FIRST_OFF_ENV`。回傳 (結果, L7 raw 四 hash)。"""
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
-    from momentum.FeatureEngineering.warmup_window import resolve_output_window
 
     root = tmp_path / "features"
     factory = create_feature_factory(cache_dir=KLINE_DIR, validate_continuity=False)
     factory._storage = FeatureStorage(str(root))
     config = factory._resolve_config(stat_payload(fracdiff=False, adf=False))
-    start, end = WINDOW
-    window = resolve_output_window(config, PRIMARY_TF, start, end)
-    factory._current_output_window = window
-    extra: Dict[str, Any] = {}
-    if supplied:
-        extra["raw_data"] = factory._layer0_data_ingestion(
-            SYMBOL, PRIMARY_TF, config,
-            start_date=window.ingest_start if window.warmup_enabled else start, end_date=end,
-        )
-        _, extra["layers"] = factory._run_l1_l6_for_ic_first(SYMBOL, PRIMARY_TF, config)
     result = ic_first_to_l65(
-        factory, config, **extra,
-        config_hash=factory._compute_config_hash(config, SYMBOL, PRIMARY_TF, start_date=start, end_date=end),
+        factory, config, start_date=WINDOW[0], end_date=WINDOW[1],
         ic_engine=ICEngine({"methods": ["spearman"]}), feature_reader=FeatureReader(str(root)),
-        storage=factory._storage, ic_threshold=0.0, persist=False,
+        ic_threshold=0.0,
     )
     return result, raw_artifact_fingerprints(root)
 

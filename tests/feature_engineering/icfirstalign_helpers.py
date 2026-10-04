@@ -86,9 +86,12 @@ def kline_close(timeframe: str = PRIMARY) -> pd.Series:
     return pd.Series(np.asarray(rec["close"], dtype=np.float64), index=idx, name="close")
 
 
-def forward_return_label(timeframe: str = PRIMARY) -> pd.Series:
-    """h=1 forward return，依 kline 時間戳（label 預設語意）。"""
+def forward_return_label(timeframe: str = PRIMARY, end: Optional[str] = None) -> pd.Series:
+    """h=1 forward return，依 kline 時間戳。`end`：只用 ≤ end 之 close（label 預設語意——與 HEAD 同，
+    最後一根之 forward return 不取 end 之後之價格而為 NaN，不跨切分邊界；b2 實作期實測補）。"""
     close = kline_close(timeframe)
+    if end is not None:
+        close = close[close.index <= pd.Timestamp(end)]
     return (close.shift(-1) / close - 1.0).rename("label")
 
 

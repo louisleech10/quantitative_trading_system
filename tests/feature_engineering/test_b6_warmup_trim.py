@@ -492,30 +492,17 @@ def _assert_warmup_trim_artifact(
         from momentum.Analysis.ic_engine import ICEngine
         from momentum.FeatureEngineering.feature_reader import FeatureReader
 
-        factory._current_output_window = window
-        raw_data = factory._layer0_data_ingestion(
-            symbol,
-            timeframe,
-            config,
-            start_date=window.ingest_start if window.warmup_enabled else start,
-            end_date=end,
-        )
-        _, layers = factory._run_l1_l6_for_ic_first(symbol, timeframe, config)
+        # ICFIRSTALIGN Task 2.4：run_ic_first 經正式 CGSA 生成，以本次起訖自行定窗（無自帶 raw_data／layers）
         reader = FeatureReader(str(features_root))
         result = factory.run_ic_first(
             symbol,
             timeframe,
             config,
-            raw_data=raw_data,
-            layers=layers,
-            config_hash=factory._compute_config_hash(
-                config, symbol, timeframe, start_date=start, end_date=end,
-            ),
+            start_date=start,
+            end_date=end,
             ic_engine=ICEngine({"methods": ["spearman"]}),
             feature_reader=reader,
-            storage=factory._storage,
             ic_threshold=0.0,
-            persist=True,
         )
     else:
         result = factory.generate_features(
@@ -639,7 +626,7 @@ def test_warmup_trim_ic_first(
         monkeypatch,
         tmp_path,
         path_name="ic_first",
-        env={"FFACT_WARMUP_TRIM": "1", "FFACT_USE_CGSA": "0"},
+        env={"FFACT_WARMUP_TRIM": "1"},  # ICFIRSTALIGN Task 2.4：IC-first 只經 CGSA
         config_override=_minimal_config(),
         ic_first=True,
     )
@@ -649,7 +636,8 @@ def test_warmup_trim_ic_first(
 def test_warmup_trim_ic_first_public_window_init(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
-    """public generate_features 初始化 B6 window；run_ic_first 不手設 window 仍 trim。"""
+    """public generate_features 初始化 B6 window；run_ic_first 以本次起訖自行定窗（ICFIRSTALIGN Task 2.0）仍 trim，
+    且結束後 factory 之窗還原為呼叫前同一物件。（Task 2.4：IC-first 只經 CGSA。）"""
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
@@ -657,7 +645,6 @@ def test_warmup_trim_ic_first_public_window_init(
     before = _snapshot_production_features()
     features_root = _isolate_feature_output(monkeypatch, tmp_path / "ic_first_public")
     monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
 
     start, end = _date_window(90)
     factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
@@ -684,13 +671,14 @@ def test_warmup_trim_ic_first_public_window_init(
         "BTCUSDT",
         "12h",
         config,
+        start_date=start,
+        end_date=end,
         ic_engine=ICEngine({"methods": ["spearman"]}),
         feature_reader=FeatureReader(str(features_root)),
-        storage=factory._storage,
         ic_threshold=0.0,
-        persist=True,
     )
     assert factory._current_output_window is window
+    assert ic_result.metadata["output_window"]["output_start"] == str(window.output_start)
     assert len(ic_result.features_df) == expected_rows
     _assert_trimmed_first_row_is_start(ic_result.features_df.index, start, window)
     _assert_data_cache_unchanged(before)
