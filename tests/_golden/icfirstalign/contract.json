@@ -1,0 +1,83 @@
+{
+  "contract": "icfirstalign",
+  "spec": "docs/ICFIRSTALIGN_SPEC.md",
+  "spec_version": "v17",
+  "errors": {
+    "alignment": "AlignmentViolationError",
+    "sidecar_missing": "RowIndexArtifactMissingError",
+    "row_index_length": "RowIndexLengthMismatchError",
+    "positional_selection": "ValueError",
+    "cache_raw_missing": "ICCacheRawUnavailableError",
+    "context_missing_window": "ICFirstContextError",
+    "context_selection_outside": "ICFirstContextError",
+    "generation_failed": "ICFirstGenerationError",
+    "l65_failed": "ICFirstGenerationError",
+    "close_all_nan": "CloseCarrierInvalidError",
+    "post_ic_arm_unavailable": "PostICArmUnavailableError",
+    "l3_double_write": "L3PersistConflictError",
+    "budget_exceeded": "GenerationMemoryBudgetExceeded",
+    "measurement_unavailable": "MemoryMeasurementUnavailable"
+  },
+  "budget_messages": {
+    "own_cap": "本程式超上限",
+    "pressure_critical": "系統記憶體壓力已達危急",
+    "system_insufficient": "系統可用不足，請關閉其他程式"
+  },
+  "positional_selection_keys": ["start_pos", "end_pos", "start_index", "end_index"],
+  "cache_identity_fields": [
+    "symbol", "tf", "config_hash", "method", "label_horizon",
+    "selection_window_start", "selection_window_end", "split_id",
+    "feature_axis_sha256", "label_sha256"
+  ],
+  "cache_identity_tolerated": ["ic_threshold"],
+  "output_window_keys": ["output_start", "output_end", "ingest_start", "max_warmup_bars", "warmup_enabled"],
+  "post_ic_arm": "polars",
+  "budget": {
+    "ratio_default": 0.75,
+    "disk_reserve_min_bytes": 4294967296,
+    "disk_reserve_fraction": 0.05,
+    "pressure_critical_level": 4,
+    "pressure_warn_level": 2,
+    "guard_interval_seconds": 0.5,
+    "guard_consecutive_for_kill": 2
+  },
+  "guard_files": {
+    "stop_flag": "memory_guard_stop.flag",
+    "abort_receipt": "memory_guard_abort.json",
+    "owned_paths": "owned_paths.json",
+    "abort_receipt_keys": ["time", "trigger", "readings", "last_checkpoint", "owned_paths", "run_id"]
+  },
+  "guard_script": "momentum/FeatureEngineering/memory_guard.py",
+  "selectors": {
+    "FFACT_USE_POLARS": ["0", "1"],
+    "FFACT_LAYER1_PARALLEL": ["0", "1"],
+    "FFACT_L2_CATEGORY_WORKERS": "auto|positive_int",
+    "FFACT_L3_PERSIST_MODE": ["auto", "streaming", "hybrid", "in_memory"],
+    "FFACT_L3_STREAMING": ["0", "1"],
+    "FFACT_L3_MULTI_WINDOW": ["0", "1"],
+    "FFACT_USE_NUMBA_ROLLING": ["0", "1"],
+    "FFACT_MEMORY_TIER": ["auto", "8gb", "16gb", "24gb", "32gb"]
+  },
+  "branch_ids": [
+    "L1.serial", "L1.parallel",
+    "L2.polars", "L2.pandas_serial", "L2.pandas_parallel",
+    "L3.numba_multi_callback", "L3.numba_multi_nocallback", "L3.vectorized_chunked", "L3.vectorized_unchunked",
+    "L3.numba_single", "L3.pandas_fallback",
+    "L4", "L5", "L6",
+    "IC.group_read", "IC.selected_read", "PostIC.transform_selected",
+    "Calib.group_reduce"
+  ],
+  "mapping_entries": {
+    "writable": [
+      {"file": "momentum/FeatureEngineering/memmap_utils.py", "call": "np.memmap"},
+      {"file": "momentum/FeatureEngineering/timeframe/multi_tf_generator.py", "call": "np.lib.format.open_memmap"}
+    ],
+    "readonly": [
+      {"file": "momentum/FeatureEngineering/core/column_group_registry.py", "call": "np.load(mmap_mode)"},
+      {"file": "momentum/FeatureEngineering/timeframe/multi_tf_generator.py", "call": "np.load(mmap_mode)"},
+      {"file": "momentum/FeatureEngineering/arrow_ipc_utils.py", "call": "pa.memory_map"}
+    ]
+  },
+  "disk_backing_rejected_bus_protocols": ["Disk Image"],
+  "allowed_red_rows_to_remove": 9
+}
