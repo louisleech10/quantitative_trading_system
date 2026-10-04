@@ -585,17 +585,15 @@ def test_worker_last_holder_and_metadata_conserved(tmp_path: Path, monkeypatch: 
     tails: List[List[str]] = []
 
     def checkpoint() -> None:
-        # r29：L6 開始之後（L6 已產出並落盤）、worker 整理回傳 metadata／群組 payload 時，L3–L6 資料表皆已無持有者
+        # r30：觀測點只在群組 payload 整理階段（`ColumnGroupRegistry.get`；位於 metadata 快照之後），且只以**最後一次**
+        # 觀測判定——SPEC 合法順序為「L6 落盤 → 以仍存活之資料保存 counts／status／failed → 清除持有者 → 收集群組
+        # metadata」，metadata 快照前之存活不得判紅（r29 版於快照前觀測會誤紅正確實作）。
         refs = holder.get("refs", [])
         if holder.get("l6_persisted"):
             gc.collect()
             tails.append([lab for lab, r in refs if r() is not None
                           and lab in ("Layer 3", "Layer 4", "Layer 5", "Layer 6")])
 
-    for name in ("_collect_layer_counts", "_collect_failed_layer_ids", "_layer_statuses"):
-        real_fn = getattr(MultiTFGenerator, name)
-        monkeypatch.setattr(MultiTFGenerator, name,
-                            staticmethod(lambda *a, _f=real_fn, **k: (checkpoint(), _f(*a, **k))[1]))
     real_get = ColumnGroupRegistry.get
     monkeypatch.setattr(ColumnGroupRegistry, "get", lambda self, gid: (checkpoint(), real_get(self, gid))[1])
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
@@ -612,8 +610,8 @@ def test_worker_last_holder_and_metadata_conserved(tmp_path: Path, monkeypatch: 
     out = _run_worker_inprocess(tmp_path, monkeypatch, on_start)
     assert out["record"] == WORKER_GOLD["worker"]  # counts、failed_layers、layer_statuses、來源時間戳、群組摘要
     assert alive_at.get("Layer 4") == [] and alive_at.get("Layer 5") == [] and alive_at.get("Layer 6") == []
-    assert tails, "須於 L6 之後觀測到 metadata／群組 payload 整理點"
-    assert all(t == [] for t in tails)
+    assert tails, "須於 L6 落盤後觀測到群組 payload 整理點"
+    assert tails[-1] == []  # 群組 payload 整理之最後一點：L3–L6 資料表皆已無持有者
 
 
 def test_mutation_only_del_local_layer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -773,8 +771,10 @@ def test_run_multi_symbol_entry_joins_domain(tmp_path: Path, monkeypatch: pytest
     log = tmp_path / "check_log.jsonl"
     monkeypatch.setenv("ICFA_CHECK_LOG", str(log))
     factory = h.make_factory(root)
-    factory.run_multi_symbol(["BTCUSDT", "ETHUSDT"], config_override=h.s2_payload(["12h", "4h"]), max_workers=2,
-                             cache_dir=str(h.KLINE_DIR))
+    results, errors = factory.run_multi_symbol(["BTCUSDT", "ETHUSDT"], config_override=h.s2_payload(["12h", "4h"]),
+                                               max_workers=2, cache_dir=str(h.KLINE_DIR))
+    assert errors == {} and sorted(results) == ["BTCUSDT", "ETHUSDT"]  # r30：兩標的皆須生成成功，不得只有入域紀錄
+    assert all(results[s].get("config_hash") for s in results)
     lines = _log_lines(log)
     root_pid = os.getpid()
     assert [x["pid"] for x in lines if x["event"] == "start_guard"] == [root_pid]
@@ -789,14 +789,154 @@ def test_ic_page_single_process_mode(tmp_path: Path, monkeypatch: pytest.MonkeyP
     from momentum.Analysis.ic_engine import ICEngine
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
+    import pandas as pd
+
     root = h.isolated(monkeypatch, tmp_path)
-    _, result = h.generate_s2(root)
+    _, result = h.generate_s2(root)  # 正式生成不清 raw（cleanup 屬 run_ic_first）
     config_hash = str(result.metadata["config_hash"])
     guards = {"n": 0}
     monkeypatch.setattr(mb, "start_guard", lambda *a, **k: guards.__setitem__("n", guards["n"] + 1))
-    with mb.check_recorder() as recorded:
-        ICEngine({"methods": ["spearman"]}).compute_ic_from_l7_raw(
-            h.SYMBOL, h.PRIMARY, config_hash, h.forward_return_label(), feature_reader=FeatureReader(str(root)),
-            ic_threshold=0.02, label_horizon="1", selection_window={"start": h.S2_WINDOW[0], "end": h.S2_WINDOW[1]})
-    assert any(branch == "IC.group_read" for branch, _ in recorded)
-    assert guards["n"] == 0
+    domains: List[Any] = []
+    real_check = mb.check
+
+    def check_spy(branch_id: str, components: Any, **kw: Any) -> None:
+        domains.append((branch_id, kw.get("domain")))
+        return real_check(branch_id, components, **kw)
+
+    monkeypatch.setattr(mb, "check", check_spy)
+    reads = {"n": 0}
+    real_read = pd.read_parquet
+    monkeypatch.setattr(pd, "read_parquet", lambda *a, **k: (reads.__setitem__("n", reads["n"] + 1), real_read(*a, **k))[1])
+    footprint = 100 << 20
+    snapshot = mb.VMSnapshot(free_bytes=64 << 30, file_backed_bytes=0, swap_free_bytes=0, pressure_level=1,
+                             swap_volume_free_bytes=75 << 30, swap_volume_capacity_bytes=228 << 30)
+
+    def run_ic(budget: int) -> Any:
+        with mb.sampler_override(lambda: {"resident": footprint, "phys_footprint": footprint}), \
+                mb.budget_override(budget), mb.vm_snapshot_override(snapshot), mb.check_recorder() as recorded:
+            ICEngine({"methods": ["spearman"]}).compute_ic_from_l7_raw(
+                h.SYMBOL, h.PRIMARY, config_hash, h.forward_return_label(), feature_reader=FeatureReader(str(root)),
+                ic_threshold=0.02, label_horizon="1",
+                selection_window={"start": h.S2_WINDOW[0], "end": h.S2_WINDOW[1]})
+        return recorded
+
+    recorded = run_ic(64 << 30)  # 放行：單行程規則 F＋planned ≤ B
+    group_reads = [comps for branch, comps in recorded if branch == "IC.group_read"]
+    assert group_reads and guards["n"] == 0
+    assert all(d is None for b, d in domains if b.startswith("IC."))  # 未收到顯式域描述
+    first_planned = mb.planned_bytes(group_reads[0])
+    reads["n"] = 0
+    with pytest.raises(mb.GenerationMemoryBudgetExceeded):
+        run_ic(footprint + first_planned - 1)  # 拒絕：B 介於 F 與 F＋planned 之間 ⇒ 第一個群組讀回前即拒
+    assert reads["n"] == 0 and guards["n"] == 0
+
+
+def _multi_symbol_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **spy_overrides: Any) -> Dict[str, Any]:
+    """`run_multi_symbol` 兩標的、精簡單週期（全史，worker 無起訖）；子行程 cwd＝測試根 ⇒ 特徵寫於測試根之 data_cache/features。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    root = h.isolated(monkeypatch, tmp_path)
+    log = tmp_path / "check_log.jsonl"
+    monkeypatch.setenv("ICFA_CHECK_LOG", str(log))
+    pools = _pool_constructions(monkeypatch)
+    _scheduler_spy(monkeypatch, **spy_overrides)
+    results, errors = h.make_factory(root).run_multi_symbol(["BTCUSDT", "ETHUSDT"], config_override=h.s2_payload(),
+                                                            max_workers=2, cache_dir=str(h.KLINE_DIR))
+    store = tmp_path / "data_cache" / "features"
+    digests: Dict[str, Dict[str, str]] = {}
+    import scripts.freeze_icfirstalign_baseline as frz
+
+    for sym, meta in results.items():
+        reader = FeatureReader(str(store))
+        manifest = reader.load_manifest_v2(sym, h.PRIMARY, meta["config_hash"], artifact_kind="raw")
+        cols = sorted(c for g in manifest["artifacts"]["raw"]["groups"].values() for c in g.get("columns", []))
+        frame = reader.load_columns_v2(sym, h.PRIMARY, meta["config_hash"], cols)
+        digests[sym] = {c: frz.column_digest(frame[c].to_numpy()) for c in cols}
+    return {"results": results, "errors": errors, "log": _log_lines(log), "pools": pools["n"], "digests": digests}
+
+
+def test_run_multi_symbol_serial_arm_byte_equal(tmp_path: Path) -> None:
+    """(g) 第三入口：`run_multi_symbol` 無可准入（無輔助啟動上界收據）⇒ 根行程內依序呼叫 `generate_features`、
+    pool 建構 0 次、兩標的皆成功、check 皆於根 pid；各標的 raw 全欄與並行逐位元組相等。"""
+    with pytest.MonkeyPatch.context() as mp:
+        serial = _multi_symbol_run(tmp_path / "serial", mp, aux_startup_envelope=None)
+    assert serial["errors"] == {} and sorted(serial["results"]) == ["BTCUSDT", "ETHUSDT"]
+    assert serial["pools"] == 0 and any(x["event"] == "serial" for x in serial["log"])
+    assert all(x["pid"] == os.getpid() for x in serial["log"] if x["event"] == "check")
+    with pytest.MonkeyPatch.context() as mp:
+        parallel = _multi_symbol_run(tmp_path / "parallel", mp)
+    assert parallel["errors"] == {} and parallel["pools"] >= 1
+    assert serial["digests"] == parallel["digests"]
+
+
+_ALIGN_SHAPES: Dict[str, int] = {}
+
+
+def _aligner_shapes(tmp_path: Path) -> Dict[str, int]:
+    """以寬鬆預算實跑一次 S2m，記 `build_asof_index_map` 實際之主列數 n_p 與來源列數 n_s（模組內快取）。"""
+    if _ALIGN_SHAPES:
+        return _ALIGN_SHAPES
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+    with pytest.MonkeyPatch.context() as mp:
+        root = h.isolated(mp, tmp_path / "shapes")
+        mp.setenv("FFACT_MULTI_TF_PARALLEL", "1")
+        real_build = TimeframeAligner.build_asof_index_map
+
+        def spy(primary_s: Any, source_s: Any, *a: Any, **k: Any) -> Any:
+            _ALIGN_SHAPES.setdefault("n_p", int(len(primary_s)))
+            _ALIGN_SHAPES.setdefault("n_s", int(len(source_s)))
+            return real_build(primary_s, source_s, *a, **k)
+
+        mp.setattr(TimeframeAligner, "build_asof_index_map", staticmethod(spy))
+        h.generate_s2(root, h.s2_payload(["12h", "4h"]))
+    return _ALIGN_SHAPES
+
+
+def _align_gap_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Dict[str, Any]:
+    """`MTF.align_index` 之 check 於注入讀數下判定：F 固定、B＝F＋3 × 主列 × 8 B（介於「只計主列」與完整 aligner 工作區之間）。"""
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+    shapes = _aligner_shapes(tmp_path)
+    root = h.isolated(monkeypatch, tmp_path / "gap")
+    monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1")
+    calls = {"aligner": 0}
+    real_build = TimeframeAligner.build_asof_index_map
+    monkeypatch.setattr(TimeframeAligner, "build_asof_index_map",
+                        staticmethod(lambda *a, **k: (calls.__setitem__("aligner", calls["aligner"] + 1),
+                                                      real_build(*a, **k))[1]))
+    footprint = 100 << 20
+    snapshot = mb.VMSnapshot(free_bytes=64 << 30, file_backed_bytes=0, swap_free_bytes=0, pressure_level=1,
+                             swap_volume_free_bytes=75 << 30, swap_volume_capacity_bytes=228 << 30)
+    real_check = mb.check
+
+    def gap_check(branch_id: str, components: Any, **kw: Any) -> None:
+        if branch_id != "MTF.align_index":
+            return real_check(branch_id, components, **kw)
+        with mb.sampler_override(lambda: {"resident": footprint, "phys_footprint": footprint}), \
+                mb.budget_override(footprint + 3 * 8 * shapes["n_p"]), mb.vm_snapshot_override(snapshot):
+            return real_check(branch_id, components, **kw)
+
+    monkeypatch.setattr(mb, "check", gap_check)
+    raised = None
+    try:
+        h.generate_s2(root, h.s2_payload(["12h", "4h"]))
+    except mb.GenerationMemoryBudgetExceeded as exc:
+        raised = exc
+    return {"raised": raised, "aligner": calls["aligner"], "shapes": shapes}
+
+
+def test_mtf_align_index_budget_gap_refuses_before_aligner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """(q) 預算置於「主列 × 8 B」與 `build_asof_index_map` 同時存活工作區之間 ⇒ 於 aligner 呼叫前具名拒絕（aligner 0 次）。"""
+    run = _align_gap_run(tmp_path, monkeypatch)
+    assert run["shapes"]["n_p"] > 0
+    assert run["raised"] is not None and run["aligner"] == 0
+
+
+def test_mutation_align_index_planned_primary_only(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """(q) mutant「`MTF.align_index` 之 planned 只計主列 × 8 B」⇒ 同一預算間隙放行並呼叫 aligner。"""
+    shapes = _aligner_shapes(tmp_path)
+    monkeypatch.setitem(mb.BRANCH_TABLE, "MTF.align_index",
+                        lambda params: [mb.Component("primary_seconds", "anon", 8 * shapes["n_p"])])
+    run = _align_gap_run(tmp_path, monkeypatch)
+    assert run["raised"] is None and run["aligner"] >= 1
