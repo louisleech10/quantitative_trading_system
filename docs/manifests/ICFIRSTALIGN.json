@@ -15,7 +15,8 @@
     "tests/feature_engineering/test_icfirstalign_l3_arms.py",
     "tests/feature_engineering/test_icfirstalign_calibration_domain.py",
     "tests/feature_engineering/test_icfirstalign_memory.py",
-    "tests/feature_engineering/test_icfirstalign_domain.py"
+    "tests/feature_engineering/test_icfirstalign_domain.py",
+    "tests/api/test_icfirstalign_batch_domain.py"
   ],
   "script_acceptance": [
     "scripts/freeze_icfirstalign_baseline.py",
@@ -115,7 +116,14 @@
       "tests/_golden/prered/allowed_red.json",
       "tests/governance/test_prered_allowed_red.py",
       "momentum/factories.py",
-      "api/services/feature_factory_batch_service.py"
+      "api/services/feature_factory_batch_service.py",
+      "tests/api/test_feature_factory_batch_step4.py",
+      "tests/api/test_batch_retention.py",
+      "tests/api/test_feature_factory_batch_resume.py",
+      "tests/api/test_batch_status_layer.py",
+      "tests/api/test_b4_bulk_delete_orphan.py",
+      "tests/api/test_batch_date.py",
+      "tests/api/test_worker_logging.py"
     ],
     "callers_now": [
       "api/services/feature_factory_service.py",
@@ -131,7 +139,7 @@
       "docs/ROADMAP.md",
       "docs/TICKET_ORDER.md"
     ],
-    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_icfirstalign_timeaxis.py tests/momentum/Analysis/test_icfirstalign_cache.py tests/feature_engineering/test_icfirstalign_context.py tests/feature_engineering/test_icfirstalign_icfirst.py tests/momentum/Analysis/test_icfirstalign_fu2.py tests/feature_engineering/test_icfirstalign_l3_arms.py tests/feature_engineering/test_icfirstalign_calibration_domain.py tests/feature_engineering/test_icfirstalign_memory.py",
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_icfirstalign_timeaxis.py tests/momentum/Analysis/test_icfirstalign_cache.py tests/feature_engineering/test_icfirstalign_context.py tests/feature_engineering/test_icfirstalign_icfirst.py tests/momentum/Analysis/test_icfirstalign_fu2.py tests/feature_engineering/test_icfirstalign_l3_arms.py tests/feature_engineering/test_icfirstalign_calibration_domain.py tests/feature_engineering/test_icfirstalign_memory.py tests/feature_engineering/test_icfirstalign_domain.py tests/api/test_icfirstalign_batch_domain.py",
     "forbidden": [
       {
         "rule": "momentum／ 不得 import api／；服務取工廠一律經 momentum.factories",
@@ -186,8 +194,10 @@
       "記憶體：test_icfirstalign_memory 之守護子行程案例與 P2 為本檔最重者，逐節點單行程串行",
       "分批：b1＝Phase 1（Task 1.1–1.4）＋Task 3.1；b2＝Phase 2（Task 2.0–2.4）＋Task 3.2；b3＝Task 4.0–4.2；b4＝Task 4.3–4.4（含使用者核可之重凍）",
       "b1 內順序 Task 1.1→1.2→1.3→1.4→3.1；Task 1.4 之 cache fixture 自 r23 起於測試端接 sidecar 軸寫 cache，不依賴 1.1 已落地（實作前紅＝身分未比對，非 fixture 錯）",
-      "測試接縫（r23 增）：呼叫端經 memory_budget 模組屬性呼叫 check／start_guard／recover_aborted_run（不得 from-import 綁名）；_iter_calibration_domain_groups 交出（群組 ID, 欄名, float32 陣列＝registry 讀回物件或其 view, 索引）且消費端零複製建 frame；子行程經環境變數 ICFA_BUDGET_DOMAIN 加入預算域",
-      "SPEC v27 子行程（凍結於 r28）之具名驗收測試：tests/feature_engineering/test_icfirstalign_domain.py（v27 驗證 (a)–(o)、(t)、(u)；排程器以行程內執行緒池與事件控制、讀數注入；(l) 以 HEAD 凍結之 tests/_golden/icfirstalign/worker_counts.json 為 counts oracle）與 test_icfirstalign_memory.py 之 (p)(q)(r)。測試接縫：memory_budget 之 DomainDescriptor／Member／Slot／AdmissionState／Admission／commitment／admit／measured_total／guard_should_stop／Task／MemoryBudgetScheduler（trace 事件名見其 docstring）、check(domain=)、layer_end(label)；factory 出口 create_memory_budget_scheduler、Protocol IMemoryBudgetScheduler；契約 guard_files.estimate_exceeded_log；ICFA_CHECK_LOG"
+      "測試接縫（r23 增）：呼叫端經 memory_budget 模組屬性呼叫 check／start_guard／recover_aborted_run（不得 from-import 綁名）；_iter_calibration_domain_groups 交出（群組 ID, 欄名, float32 陣列＝registry 讀回物件或其 view, 索引）且消費端零複製建 frame；子行程經顯式 DomainDescriptor（worker 入口參數）加入預算域，不以環境變數傳域（SPEC v27）",
+      "SPEC v27 子行程（凍結於 r28）之具名驗收測試：tests/feature_engineering/test_icfirstalign_domain.py（v27 驗證 (a)–(o)、(t)、(u)；排程器以行程內執行緒池與事件控制、讀數注入；(l) 以 HEAD 凍結之 tests/_golden/icfirstalign/worker_counts.json 為 counts oracle）與 test_icfirstalign_memory.py 之 (p)(q)(r)。測試接縫：memory_budget 之 DomainDescriptor／Member／Slot／AdmissionState／Admission／commitment／admit／measured_total／guard_should_stop／Task／MemoryBudgetScheduler（trace 事件名見其 docstring）、check(domain=)、layer_end(label)；factory 出口 create_memory_budget_scheduler、Protocol IMemoryBudgetScheduler；契約 guard_files.estimate_exceeded_log；ICFA_CHECK_LOG",
+      "測試接縫（r29 增）：MemoryBudgetScheduler(task_identity=) 綁定成員身分；create_memory_budget_scheduler 以關鍵字參數建立（domain_dir、max_workers、executor_factory、aux_startup_envelope、task_identity、read_system、read_task_footprint；未給者取正式預設），呼叫端於呼叫時解析（函式內 import 或模組屬性）；API 批次 worker 本體 _compute_single 以關鍵字 domain 接收描述；ICFA_CHECK_LOG 每行 JSON：event（check／admit／start_guard／executor_created／serial）、pid、root_pid、task_id、branch、F、planned、U、E、result（僅測試紀錄，不傳域）",
+      "既有 API 批次測試以 monkeypatch 替換 api.services.feature_factory_batch_service.ProcessPoolExecutor（tests/api 下 7 檔），wave 改經排程器後須遷移為注入 executor_factory（斷言逐處 diff 說明，不得放寬）"
     ],
     "coverage_risk": [
       "Task 1.1：test_icfirstalign_timeaxis（oracle、讀回軸 exact、邊界①–④、位置鍵四鍵與混用、mutant 不設軸／恢復 reindex／收 start_pos）",
@@ -199,7 +209,7 @@
       "Task 3.1：test_icfirstalign_fu2（正常 carrier＝kline close、全 NaN／不相交拒絕、四組 UTC 表示等價、事件型、邊界①②、三 mutant）",
       "Task 4.0：test_icfirstalign_l3_arms（三非預設臂＋numba 例外後備、預設臂＝HEAD 凍結、邊界①②、mutant 丟表）",
       "Task 4.1：test_icfirstalign_calibration_domain（P1／P2 對甲與乙、S3 封包對甲〔縮尾開關〕、不合併、縮尾輸入端單群組存活與 float32、L2 寫入來源與消費來源、邊界①–⑤、六 mutant）",
-      "Task 4.2／4.3：test_icfirstalign_memory（151 支：預算量、系統條件、平台、選擇子與 AST、分支表、組合母體宣告完整性與覆蓋、十個安全間隙＋mutant、配置前拒絕、磁碟後援、映射入口與標記核對、守護生命週期與核心期間終止、恢復、量測停損）",
+      "Task 4.2／4.3：test_icfirstalign_memory（預算量、系統條件、平台、選擇子與 AST、分支表、組合母體宣告完整性與覆蓋〔含真實多週期 dense／compact〕、安全間隙＋mutant、配置前拒絕、磁碟後援、映射入口〔函式＋數量〕與標記核對〔逐段＋生命期〕、守護生命週期與核心期間終止、恢復、量測停損）＋test_icfirstalign_domain（子行程 v27 (a)–(o)(q)(s)(t)(u)：承諾量與准入、波次、串行臂、槽／pid、守護去重、估算低估、請求隔離、三入口真實接線、層結果最後持有者〔worker_counts HEAD 基準〕、MTF.align_index 檢查先於 aligner、IC 分析頁單行程）＋tests/api/test_icfirstalign_batch_domain（API 批次 wave：顯式描述、父守護 1 次、心跳、根內串行臂、mutant）",
       "Task 2.3、4.4、§G 差異收據與記憶體驗收：一次性收據，見 not_executable"
     ],
     "lifecycle": "keep",

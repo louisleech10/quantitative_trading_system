@@ -25,6 +25,11 @@ pytestmark = pytest.mark.timeout(120)
 GiB = 1 << 30
 
 
+def _thread_identity() -> Tuple[int, float]:
+    """行程內執行緒池測試之任務身分：以執行緒識別代 pid（避免與根同 pid 而被去重）。"""
+    return (10 ** 9 + threading.get_ident() % 10 ** 6, 0.0)
+
+
 def _m(pid: int, footprint: int, envelope: Optional[int] = None, role: str = "task") -> mb.Member:
     return mb.Member(pid=pid, start_time=float(pid), footprint=footprint, envelope=envelope, role=role)
 
@@ -212,7 +217,8 @@ class _Harness:
         self.scheduler = mb.MemoryBudgetScheduler(
             budget, domain_dir=domain_dir, max_workers=max_workers, executor_factory=factory,
             read_system=lambda: (self.absorbable, 1, False, self.root, ()),
-            read_task_footprint=lambda tid: self.footprints.get(tid, 0), aux_startup_envelope=aux)
+            read_task_footprint=lambda tid: self.footprints.get(tid, 0), aux_startup_envelope=aux,
+            task_identity=_thread_identity)
 
     def worker(self, domain: mb.DomainDescriptor, payload: Any) -> Any:
         tid = domain.task_id
@@ -294,6 +300,32 @@ def test_idle_allocator_reclaimed_before_serial_decision(tmp_path: Path) -> None
     assert trace.index(("joined", "A")) < trace.index(("admitted", "B"))
 
 
+def test_completed_task_counts_footprint_only_before_join(tmp_path: Path) -> None:
+    """(c)(f) 實際生命週期：同波 A（E 200）完成而 B 仍運行時，A 之成員承諾＝其實測 F（200，allocator 未歸還），
+    envelope 已撤（None）；join 後 A 移出成員。"""
+    hz = _Harness(10 ** 6, 10, domain_dir=tmp_path, max_workers=2)
+    hz.footprints["A"] = 200
+    hz.footprints["B"] = 30
+    seen: Dict[str, Any] = {}
+
+    def observe() -> None:
+        hz.events.setdefault("A", threading.Event()).set()
+        for _ in range(500):
+            if ("completed", "A") in hz.scheduler.trace:
+                seen["mid"] = hz.scheduler.snapshot()
+                break
+            threading.Event().wait(0.01)
+        hz.events.setdefault("B", threading.Event()).set()
+
+    threading.Thread(target=observe, daemon=True).start()
+    hz.run([mb.Task("A", 200), mb.Task("B", 50)])
+    task_members = [m for m in seen["mid"].members if m.role == "task"]
+    a = [m for m in task_members if m.footprint == 200]
+    assert len(a) == 1 and a[0].envelope is None and mb.commitment(a[0]) == 200
+    assert [m.envelope for m in task_members if m.footprint == 30] == [50]
+    assert not [m for m in hz.scheduler.snapshot().members if m.role == "task"]
+
+
 def test_empty_wave_falls_back_to_formal_serial(tmp_path: Path) -> None:
     """(g) 任務 E 100 加根 20 > B 75 ⇒ 根行程內走串行臂、executor 建立 0 次、無拒絕。"""
     hz = _Harness(75, 20, domain_dir=tmp_path)
@@ -310,20 +342,46 @@ def test_task_without_shape_goes_serial(tmp_path: Path) -> None:
 
 
 def test_start_slot_pid_transition_exactly_once(tmp_path: Path) -> None:
-    """(h) 槽→pid 替換前後承諾不變（不兩份、不零份）。"""
-    sched = mb.MemoryBudgetScheduler(100, domain_dir=tmp_path, max_workers=2, executor_factory=ThreadPoolExecutor,
+    """(h) 經 `run` 之真實任務生命週期：任務 A（E 100、F 5）於 starting（執行器尚未啟動其本體）時以啟動槽計 E；
+    worker 本體開始後（已綁 pid）以成員 max(F, E) 計；兩側承諾皆＝根 10＋100（不兩份、不零份、不以 F 代 E）。"""
+    gate = threading.Event()
+    seen: Dict[str, Any] = {}
+
+    class DelayedStartExecutor(ThreadPoolExecutor):
+        def submit(self, fn: Any, *a: Any, **k: Any) -> Any:
+            def delayed() -> Any:
+                gate.wait(10)
+                return fn(*a, **k)
+            return super().submit(delayed)
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=DelayedStartExecutor,
                                      read_system=lambda: (10 ** 9, 1, False, 10, ()),
-                                     read_task_footprint=lambda tid: 5, aux_startup_envelope=0)
-    sched.mark_starting("A")
-    before = sched.snapshot()
-    sched.bind_pid("A", 4242, 1.0)
-    after = sched.snapshot()
+                                     read_task_footprint=lambda tid: 5, aux_startup_envelope=0,
+                                     task_identity=_thread_identity)
 
     def total(s: mb.AdmissionState) -> int:
         return sum(mb.commitment(m) for m in s.members) + sum(sl.envelope for sl in s.slots)
 
-    assert [sl.slot_id for sl in before.slots] == ["A"] and not after.slots
-    assert total(before) == total(after)
+    def worker(domain: mb.DomainDescriptor, payload: Any) -> Any:
+        seen["after"] = sched.snapshot()
+        return domain.task_id
+
+    def observe() -> None:
+        for _ in range(200):
+            snap = sched.snapshot()
+            if any(sl.slot_id == "A" for sl in snap.slots):
+                seen["before"] = snap
+                break
+            threading.Event().wait(0.01)
+        gate.set()
+
+    threading.Thread(target=observe, daemon=True).start()
+    assert sched.run([mb.Task("A", 100)], worker, lambda p: p, lambda r: None) == ["A"]
+    before, after = seen["before"], seen["after"]
+    assert [sl.envelope for sl in before.slots if sl.slot_id == "A"] == [100]
+    assert not [sl for sl in after.slots if sl.slot_id == "A"]
+    assert [m.envelope for m in after.members if m.role == "task"] == [100]
+    assert total(before) == total(after) == 10 + 100
 
 
 def test_root_alignment_after_wave_join(tmp_path: Path) -> None:
@@ -398,7 +456,8 @@ def test_api_domain_descriptor_is_request_local(tmp_path: Path) -> None:
         sched = mb.MemoryBudgetScheduler(10 ** 9, domain_dir=tmp_path / tag, max_workers=2,
                                          executor_factory=ThreadPoolExecutor,
                                          read_system=lambda: (10 ** 9, 1, False, 1, ()),
-                                         read_task_footprint=lambda tid: 1, aux_startup_envelope=0)
+                                         read_task_footprint=lambda tid: 1, aux_startup_envelope=0,
+                                         task_identity=_thread_identity)
         return sched.run([mb.Task(f"{tag}{i}", 10) for i in range(3)],
                          lambda d, p: seen[tag].append(d.task_id) or d.task_id, lambda p: p, lambda r: None)
 
@@ -432,9 +491,24 @@ def test_three_generation_pools_join_same_domain(path: str, func: str) -> None:
     """(j) 三個生成 pool 之函式內不再直接建立 `ProcessPoolExecutor`，改經 `create_memory_budget_scheduler`。"""
     tree = ast.parse((h.REPO / path).read_text(encoding="utf-8"))
     fn = next(n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == func)
+    # r29：任何形式之引用皆不准（呼叫、別名賦值、函式內 import），別名繞過即紅；另由執行期案例核建構次數
+    refs = [ast.unparse(n) for n in ast.walk(fn)
+            if (isinstance(n, ast.Name) and n.id == "ProcessPoolExecutor")
+            or (isinstance(n, ast.Attribute) and n.attr == "ProcessPoolExecutor")
+            or (isinstance(n, ast.alias) and n.name == "ProcessPoolExecutor")]
+    assert refs == [], f"{func} 仍引用 ProcessPoolExecutor：{refs}"
     calls = {ast.unparse(n.func) for n in ast.walk(fn) if isinstance(n, ast.Call)}
-    assert not any(c.endswith("ProcessPoolExecutor") for c in calls), f"{func} 仍直接建立 ProcessPoolExecutor"
     assert any("create_memory_budget_scheduler" in c for c in calls)
+
+
+def test_module_level_pool_alias_not_used_by_entries() -> None:
+    """(j) 三入口所在模組之模組層 `ProcessPoolExecutor` 名稱不得被三入口以外之別名間接取用（模組內其他函式之別名指派亦禁）。"""
+    for path in POOL_SITES:
+        tree = ast.parse((h.REPO / path).read_text(encoding="utf-8"))
+        aliases = [ast.unparse(n) for n in ast.walk(tree) if isinstance(n, ast.Assign)
+                   and isinstance(n.value, (ast.Name, ast.Attribute))
+                   and ast.unparse(n.value).endswith("ProcessPoolExecutor")]
+        assert aliases == [], f"{path} 有 ProcessPoolExecutor 別名：{aliases}"
 
 
 def test_factory_and_protocol_expose_scheduler() -> None:
@@ -497,13 +571,49 @@ def test_worker_last_holder_and_metadata_conserved(tmp_path: Path, monkeypatch: 
 
     alive_at: Dict[str, List[str]] = {}
 
+    from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
+
+    holder: Dict[str, Any] = {}
+
     def on_start(label: str, refs: List[Tuple[str, Any]]) -> None:
+        holder["refs"] = refs
         gc.collect()
         alive_at[label] = [lab for lab, r in refs if r() is not None and lab in ("Layer 3", "Layer 4", "Layer 5")]
 
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+
+    tails: List[List[str]] = []
+
+    def checkpoint() -> None:
+        # r29：L6 開始之後（L6 已產出並落盤）、worker 整理回傳 metadata／群組 payload 時，L3–L6 資料表皆已無持有者
+        refs = holder.get("refs", [])
+        if holder.get("l6_persisted"):
+            gc.collect()
+            tails.append([lab for lab, r in refs if r() is not None
+                          and lab in ("Layer 3", "Layer 4", "Layer 5", "Layer 6")])
+
+    for name in ("_collect_layer_counts", "_collect_failed_layer_ids", "_layer_statuses"):
+        real_fn = getattr(MultiTFGenerator, name)
+        monkeypatch.setattr(MultiTFGenerator, name,
+                            staticmethod(lambda *a, _f=real_fn, **k: (checkpoint(), _f(*a, **k))[1]))
+    real_get = ColumnGroupRegistry.get
+    monkeypatch.setattr(ColumnGroupRegistry, "get", lambda self, gid: (checkpoint(), real_get(self, gid))[1])
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+
+    real_persist = FeatureFactory._persist_layer_output_groups
+
+    def persist(self: Any, frame: Any, *a: Any, **k: Any) -> Any:
+        out = real_persist(self, frame, *a, **k)
+        if "L6_meta" in [str(x) for x in a] + [str(v) for v in k.values()]:
+            holder["l6_persisted"] = True
+        return out
+
+    monkeypatch.setattr(FeatureFactory, "_persist_layer_output_groups", persist)
     out = _run_worker_inprocess(tmp_path, monkeypatch, on_start)
-    assert out["record"] == WORKER_GOLD["worker"]
+    assert out["record"] == WORKER_GOLD["worker"]  # counts、failed_layers、layer_statuses、來源時間戳、群組摘要
     assert alive_at.get("Layer 4") == [] and alive_at.get("Layer 5") == [] and alive_at.get("Layer 6") == []
+    assert tails, "須於 L6 之後觀測到 metadata／群組 payload 整理點"
+    assert all(t == [] for t in tails)
 
 
 def test_mutation_only_del_local_layer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -533,3 +643,160 @@ def test_mutation_only_del_local_layer(tmp_path: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(FeatureFactory, "_persist_layer_output_groups", persist_and_hold)
     _run_worker_inprocess(tmp_path, monkeypatch, on_start)
     assert alive.get("L3") is True
+
+
+# ---------------------------------------------------------------- 真實入口接線（(g)(j)(q)(s)；精簡真實 kline，單組串行）
+# 測試接縫：`ICFA_CHECK_LOG`（測試專用，spawn 子行程繼承）每行 JSON：event（check／admit／start_guard／executor_created／
+# serial）、pid、root_pid、task_id、branch、F、planned、U、E、result。呼叫端於呼叫時解析
+# `momentum.factories.create_memory_budget_scheduler`（函式內 import 或模組屬性），不得模組層綁名。
+
+def _log_lines(path: Path) -> List[Dict[str, Any]]:
+    import json as _json
+
+    return [_json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()] if path.exists() else []
+
+
+def _pool_constructions(monkeypatch: pytest.MonkeyPatch) -> Dict[str, int]:
+    """計 `ProcessPoolExecutor` 之實際建構次數（任何別名皆經此 __init__）。"""
+    from concurrent.futures import process as cfp
+
+    count = {"n": 0}
+    real_init = cfp.ProcessPoolExecutor.__init__
+
+    def init(self: Any, *a: Any, **k: Any) -> None:
+        count["n"] += 1
+        real_init(self, *a, **k)
+
+    monkeypatch.setattr(cfp.ProcessPoolExecutor, "__init__", init)
+    return count
+
+
+def _scheduler_spy(monkeypatch: pytest.MonkeyPatch, **overrides: Any) -> List[Any]:
+    from momentum import factories
+
+    created: List[Any] = []
+    real = factories.create_memory_budget_scheduler
+
+    def spy(**kw: Any) -> Any:
+        kw.update(overrides)
+        sched = real(**kw)
+        created.append(sched)
+        return sched
+
+    monkeypatch.setattr(factories, "create_memory_budget_scheduler", spy)
+    return created
+
+
+def _raw_digests(root: Path, config_hash: str) -> Dict[str, str]:
+    import scripts.freeze_icfirstalign_baseline as frz
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    reader = FeatureReader(str(root))
+    manifest = reader.load_manifest_v2(h.SYMBOL, h.PRIMARY, config_hash, artifact_kind="raw")
+    cols = sorted(c for g in manifest["artifacts"]["raw"]["groups"].values() for c in g.get("columns", []))
+    frame = reader.load_columns_v2(h.SYMBOL, h.PRIMARY, config_hash, cols)
+    return {c: frz.column_digest(frame[c].to_numpy()) for c in cols}
+
+
+def _mtf_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **spy_overrides: Any) -> Dict[str, Any]:
+    from momentum.FeatureEngineering import memory_budget as _mb
+
+    root = h.isolated(monkeypatch, tmp_path)
+    log = tmp_path / "check_log.jsonl"
+    monkeypatch.setenv("ICFA_CHECK_LOG", str(log))
+    monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1")
+    monkeypatch.setenv("FFACT_MULTI_TF_MAX_WORKERS", "2")
+    pools = _pool_constructions(monkeypatch)
+    created = _scheduler_spy(monkeypatch, **spy_overrides)
+    guards = {"n": 0}
+    real_start = _mb.start_guard
+    monkeypatch.setattr(_mb, "start_guard", lambda *a, **k: (guards.__setitem__("n", guards["n"] + 1), real_start(*a, **k))[1])
+    _, result = h.generate_s2(root, h.s2_payload(["12h", "4h"]))
+    return {"root": root, "config_hash": str(result.metadata["config_hash"]), "log": _log_lines(log),
+            "pools": pools["n"], "schedulers": created, "guards": guards["n"]}
+
+
+def test_mtf_entry_parallel_joins_domain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """(j) 多週期入口：經排程器、worker 之 check 帶根 pid、父守護 1 次、worker 0 次、pool 建構次數＝排程器 executor_created 次數。"""
+    run = _mtf_run(tmp_path, monkeypatch)
+    root_pid = os.getpid()
+    assert len(run["schedulers"]) == 1
+    worker_checks = [x for x in run["log"] if x["event"] == "check" and x["pid"] != root_pid]
+    assert worker_checks and all(x["root_pid"] == root_pid for x in worker_checks)
+    assert [x["pid"] for x in run["log"] if x["event"] == "start_guard"] == [root_pid]
+    created = [x for x in run["log"] if x["event"] == "executor_created"]
+    assert run["pools"] == len(created) and all(x["pid"] == root_pid for x in created)
+
+
+def test_mtf_entry_serial_arm_byte_equal(tmp_path: Path) -> None:
+    """(g) 多週期入口無可准入（無輔助啟動上界收據）⇒ 根行程內串行臂、pool 建構 0 次；raw 全欄與並行逐位元組相等。
+    兩次 run 各自獨立之 monkeypatch context（串行之覆寫不得滲入並行 run）。"""
+    with pytest.MonkeyPatch.context() as mp:
+        serial = _mtf_run(tmp_path / "serial", mp, aux_startup_envelope=None)
+    assert serial["pools"] == 0
+    assert any(x["event"] == "serial" for x in serial["log"])
+    assert all(x["pid"] == os.getpid() for x in serial["log"] if x["event"] == "check")
+    with pytest.MonkeyPatch.context() as mp:
+        parallel = _mtf_run(tmp_path / "parallel", mp)
+    assert parallel["pools"] >= 1
+    assert parallel["config_hash"] == serial["config_hash"]
+    assert _raw_digests(serial["root"], serial["config_hash"]) == _raw_digests(parallel["root"], parallel["config_hash"])
+
+
+def test_mtf_align_index_check_precedes_aligner(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """(q)／(m) `MTF.align_index` 之 check 於 `build_asof_index_map` 之前：該 check 拒絕 ⇒ aligner 呼叫 0 次、具名錯誤上拋。"""
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
+
+    root = h.isolated(monkeypatch, tmp_path)
+    monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1")
+    calls = {"aligner": 0}
+    real_build = TimeframeAligner.build_asof_index_map
+    monkeypatch.setattr(TimeframeAligner, "build_asof_index_map",
+                        staticmethod(lambda *a, **k: (calls.__setitem__("aligner", calls["aligner"] + 1), real_build(*a, **k))[1]))
+    real_check = mb.check
+
+    def refuse_align(branch_id: str, components: Any, **kw: Any) -> None:
+        if branch_id == "MTF.align_index":
+            raise mb.GenerationMemoryBudgetExceeded("MTF.align_index", 0, 0, 0, "budget")
+        return real_check(branch_id, components, **kw)
+
+    monkeypatch.setattr(mb, "check", refuse_align)
+    with pytest.raises(mb.GenerationMemoryBudgetExceeded):
+        h.generate_s2(root, h.s2_payload(["12h", "4h"]))
+    assert calls["aligner"] == 0
+
+
+def test_run_multi_symbol_entry_joins_domain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """(j) `run_multi_symbol` 兩標的（BTCUSDT、ETHUSDT；精簡 S2m）：父守護 1 次、worker 0 次；worker 之 check 帶根 pid；
+    worker 內多週期串行（worker pid 之 executor_created 0 次）。"""
+    root = h.isolated(monkeypatch, tmp_path)
+    log = tmp_path / "check_log.jsonl"
+    monkeypatch.setenv("ICFA_CHECK_LOG", str(log))
+    factory = h.make_factory(root)
+    factory.run_multi_symbol(["BTCUSDT", "ETHUSDT"], config_override=h.s2_payload(["12h", "4h"]), max_workers=2,
+                             cache_dir=str(h.KLINE_DIR))
+    lines = _log_lines(log)
+    root_pid = os.getpid()
+    assert [x["pid"] for x in lines if x["event"] == "start_guard"] == [root_pid]
+    worker_checks = [x for x in lines if x["event"] == "check" and x["pid"] != root_pid]
+    assert worker_checks and all(x["root_pid"] == root_pid for x in worker_checks)
+    assert not [x for x in lines if x["event"] == "executor_created" and x["pid"] != root_pid]
+
+
+def test_ic_page_single_process_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """(s) IC 分析頁路徑：未收到域描述且無受保護 run 時呼叫 `compute_ic_from_l7_raw` ⇒ 其 `IC.group_read` 等 check 以單行程規則執行、
+    不啟動守護。"""
+    from momentum.Analysis.ic_engine import ICEngine
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    root = h.isolated(monkeypatch, tmp_path)
+    _, result = h.generate_s2(root)
+    config_hash = str(result.metadata["config_hash"])
+    guards = {"n": 0}
+    monkeypatch.setattr(mb, "start_guard", lambda *a, **k: guards.__setitem__("n", guards["n"] + 1))
+    with mb.check_recorder() as recorded:
+        ICEngine({"methods": ["spearman"]}).compute_ic_from_l7_raw(
+            h.SYMBOL, h.PRIMARY, config_hash, h.forward_return_label(), feature_reader=FeatureReader(str(root)),
+            ic_threshold=0.02, label_horizon="1", selection_window={"start": h.S2_WINDOW[0], "end": h.S2_WINDOW[1]})
+    assert any(branch == "IC.group_read" for branch, _ in recorded)
+    assert guards["n"] == 0

@@ -308,14 +308,17 @@ class MemoryBudgetScheduler:
 
     依賴注入（測試接縫）：`executor_factory(max_workers)` 建立 executor；`read_system()` 回
     (absorbable, pressure_level, stop_flag, root_footprint, aux_members)；`read_task_footprint(task_id)` 回該任務行程之 F；
-    `aux_startup_envelope` 為輔助行程（resource tracker）啟動上界（None＝無收據 ⇒ 不准入並行）。
+    `aux_startup_envelope` 為輔助行程（resource tracker）啟動上界（None＝無收據 ⇒ 不准入並行）；
+    `task_identity()` 於 worker 本體開始時回 (pid, start_time) 以綁定成員（預設＝作業系統 pid 與行程啟動時間；
+    行程內執行緒池之測試注入執行緒識別，避免與根同 pid 而被去重）。
     `trace` 記事件 (event, task_id)：queued／admitted／starting／running／completed／failed／joined／serial／
     wave_joined／aux_slot／executor_created／refused。
     """
 
     def __init__(self, budget: int, *, domain_dir: Path, max_workers: int,
                  executor_factory: Callable[[int], Any], read_system: Callable[[], Any],
-                 read_task_footprint: Callable[[str], int], aux_startup_envelope: Optional[int]) -> None:
+                 read_task_footprint: Callable[[str], int], aux_startup_envelope: Optional[int],
+                 task_identity: Optional[Callable[[], Any]] = None) -> None:
         raise NotImplementedError("ICFIRSTALIGN Task 4.2")
 
     def run(self, tasks: Sequence[Task], worker_fn: Callable[[DomainDescriptor, Any], Any],

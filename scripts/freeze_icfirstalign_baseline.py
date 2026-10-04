@@ -261,9 +261,12 @@ def stage_calibration() -> Dict[str, Any]:
 
 
 def worker_record(result: Dict[str, Any]) -> Dict[str, Any]:
-    """`_tf_worker_entry` 回傳之 counts／群組（層、欄集合）摘要；值不入（值守恆由 Task 4.0／4.1 基準另驗）。"""
+    """`_tf_worker_entry` 回傳之 counts／failed／status／來源時間戳／群組（層、欄集合）摘要；值不入（值守恆由 Task 4.0／4.1 基準另驗）。"""
     groups = sorted((str(g["layer"]), _sha(sorted(g["columns"]))) for g in result.get("groups", []))
     return {"error": result.get("error"), "layer_counts": result.get("layer_counts"),
+            "failed_layers": result.get("failed_layers"), "layer_statuses": result.get("layer_statuses"),
+            "source_timestamps_sha256": hashlib.sha256(np.ascontiguousarray(np.asarray(
+                result.get("source_timestamps_ms", []), dtype=np.int64)).tobytes()).hexdigest(),
             "groups_sha256": _sha(groups), "group_count": len(groups)}
 
 

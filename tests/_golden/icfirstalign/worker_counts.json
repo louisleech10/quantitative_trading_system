@@ -10,6 +10,7 @@
  ],
  "worker": {
   "error": null,
+  "failed_layers": [],
   "group_count": 27,
   "groups_sha256": "59497f647871a0f3efef7464d713091a9160a5ed89ff54a8f64bc0acbbcd1393",
   "layer_counts": {
@@ -19,6 +20,33 @@
    "layer4": 56,
    "layer5": 0,
    "layer6": 9
-  }
+  },
+  "layer_statuses": {
+   "L1": [
+    "ok",
+    ""
+   ],
+   "L2": [
+    "ok",
+    ""
+   ],
+   "L3": [
+    "offloaded_to_registry",
+    ""
+   ],
+   "L4": [
+    "ok",
+    ""
+   ],
+   "L5": [
+    "empty_disabled",
+    ""
+   ],
+   "L6": [
+    "ok",
+    ""
+   ]
+  },
+  "source_timestamps_sha256": "e982ba17d9da5e82d50919e4675a08d0f120c849dcc4a3d6f3d38b659382b276"
  }
 }
