@@ -32,12 +32,42 @@
     "tests/_golden/icfirstalign/calibration_baseline.json"
   ],
   "run_receipts": [
-    {"path": "handoffs/run_receipts/20261004-icfirstalign-f2-calibration-domain.json", "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_calibration_domain_probe.py", "rc": 0, "honest_bounds": "精簡 L1（EMA8／SMA13）、BTCUSDT 12h＋[12h, 1h]、14 天窗；完整 L1 之量以 PRE-RED 收據外推"},
-    {"path": "handoffs/run_receipts/20261004-icfirstalign-dtype-branch.json", "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/dtype_branch_probe.py", "rc": 0, "honest_bounds": "微型 800 根兩欄；只覆寫 threshold_bytes 以觸發既有分支"},
-    {"path": "handoffs/run_receipts/20261004-icfirstalign-l2-arm.json", "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/l2_arm_probe.py", "rc": 0, "honest_bounds": "以 pandas 自算 float64 L1 餵入；真實管線 L1 為 float32 時不發生（見 freeze-baselines 收據）"},
-    {"path": "handoffs/run_receipts/20261004-icfirstalign-interval-peak.json", "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/interval_peak_probe.py", "rc": 0, "honest_bounds": "macOS 本機；rusage_info_v4 欄位以實測辨認（第 33 欄）"},
-    {"path": "handoffs/run_receipts/20261004-icfirstalign-fu2-close-carrier.json", "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/fu2_close_carrier_probe.py", "rc": 0, "honest_bounds": "scripts/ic1d_baseline_freeze 之 production 路徑一組設定（ETHUSDT 12h）"},
-    {"path": "handoffs/run_receipts/20261004-icfirstalign-freeze-baselines.json", "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 /usr/bin/time -l venv/bin/python scripts/freeze_icfirstalign_baseline.py calibration && ... probe", "rc": 0, "honest_bounds": "只 BTCUSDT 12h（P1 加 1h）；甲＝乙與 L2 兩臂相同之結論限於所測設定"}
+    {
+      "path": "handoffs/run_receipts/20261004-icfirstalign-f2-calibration-domain.json",
+      "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_calibration_domain_probe.py",
+      "rc": 0,
+      "honest_bounds": "精簡 L1（EMA8／SMA13）、BTCUSDT 12h＋[12h, 1h]、14 天窗；完整 L1 之量以 PRE-RED 收據外推"
+    },
+    {
+      "path": "handoffs/run_receipts/20261004-icfirstalign-dtype-branch.json",
+      "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/dtype_branch_probe.py",
+      "rc": 0,
+      "honest_bounds": "微型 800 根兩欄；只覆寫 threshold_bytes 以觸發既有分支"
+    },
+    {
+      "path": "handoffs/run_receipts/20261004-icfirstalign-l2-arm.json",
+      "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/l2_arm_probe.py",
+      "rc": 0,
+      "honest_bounds": "以 pandas 自算 float64 L1 餵入；真實管線 L1 為 float32 時不發生（見 freeze-baselines 收據）"
+    },
+    {
+      "path": "handoffs/run_receipts/20261004-icfirstalign-interval-peak.json",
+      "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/interval_peak_probe.py",
+      "rc": 0,
+      "honest_bounds": "macOS 本機；rusage_info_v4 欄位以實測辨認（第 33 欄）"
+    },
+    {
+      "path": "handoffs/run_receipts/20261004-icfirstalign-fu2-close-carrier.json",
+      "cmd": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/fu2_close_carrier_probe.py",
+      "rc": 0,
+      "honest_bounds": "scripts/ic1d_baseline_freeze 之 production 路徑一組設定（ETHUSDT 12h）"
+    },
+    {
+      "path": "handoffs/run_receipts/20261004-icfirstalign-freeze-baselines.json",
+      "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 /usr/bin/time -l venv/bin/python scripts/freeze_icfirstalign_baseline.py calibration && ... probe",
+      "rc": 0,
+      "honest_bounds": "只 BTCUSDT 12h（P1 加 1h）；甲＝乙與 L2 兩臂相同之結論限於所測設定"
+    }
   ],
   "batch_card": {
     "depends": [],
@@ -93,17 +123,50 @@
     ],
     "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_icfirstalign_timeaxis.py tests/momentum/Analysis/test_icfirstalign_cache.py tests/feature_engineering/test_icfirstalign_context.py tests/feature_engineering/test_icfirstalign_icfirst.py tests/momentum/Analysis/test_icfirstalign_fu2.py tests/feature_engineering/test_icfirstalign_l3_arms.py tests/feature_engineering/test_icfirstalign_calibration_domain.py tests/feature_engineering/test_icfirstalign_memory.py",
     "forbidden": [
-      {"rule": "momentum／ 不得 import api／；服務取工廠一律經 momentum.factories", "observable": true},
-      {"rule": "不得刪除或放寬既有測試斷言換綠；不得新增 skip／xfail；既有斷言 diff 逐處說明", "observable": true},
-      {"rule": "不得弱化 NaN／inf 閘、時間序守衛、AlignmentViolationError；不得以 reindex 靜默補 NaN 或以位置對齊", "observable": true},
-      {"rule": "不得以容差比較 IC cache 指紋；不得以有效列數代替值指紋", "observable": true},
-      {"rule": "不得保留記憶體 L1–L6 第二引擎作回退；不得另造第二套鎖或重入鎖", "observable": true},
-      {"rule": "不得改 raw artifact 之 sidecar 格式；不得以根軸湊 processed 長度", "observable": true},
-      {"rule": "不得改加倍規則、晚到語意、封包格式；不得降低探測欄集合；不得以縮小設定或關閉預熱代替有界化", "observable": true},
-      {"rule": "不得以 RSS／resident 代替致 OOM 之量；不得於配置後才判定而宣稱配置前保護；producer 讀臂選擇子須經 memory_budget.selector", "observable": true},
-      {"rule": "不得於使用者核可前寫回 failopen 基準；不得把「只 fail-closed」記為重凍完成", "observable": true},
-      {"rule": "特徵工廠重測試一律單組串行；委員輪進行中不跑重型生成", "observable": false},
-      {"rule": "不得侷限加密貨幣：週期、交易時段、標的數不寫死；時間比對一律 UTC 時刻", "observable": true}
+      {
+        "rule": "momentum／ 不得 import api／；服務取工廠一律經 momentum.factories",
+        "observable": true
+      },
+      {
+        "rule": "不得刪除或放寬既有測試斷言換綠；不得新增 skip／xfail；既有斷言 diff 逐處說明",
+        "observable": true
+      },
+      {
+        "rule": "不得弱化 NaN／inf 閘、時間序守衛、AlignmentViolationError；不得以 reindex 靜默補 NaN 或以位置對齊",
+        "observable": true
+      },
+      {
+        "rule": "不得以容差比較 IC cache 指紋；不得以有效列數代替值指紋",
+        "observable": true
+      },
+      {
+        "rule": "不得保留記憶體 L1–L6 第二引擎作回退；不得另造第二套鎖或重入鎖",
+        "observable": true
+      },
+      {
+        "rule": "不得改 raw artifact 之 sidecar 格式；不得以根軸湊 processed 長度",
+        "observable": true
+      },
+      {
+        "rule": "不得改加倍規則、晚到語意、封包格式；不得降低探測欄集合；不得以縮小設定或關閉預熱代替有界化",
+        "observable": true
+      },
+      {
+        "rule": "不得以 RSS／resident 代替致 OOM 之量；不得於配置後才判定而宣稱配置前保護；producer 讀臂選擇子須經 memory_budget.selector",
+        "observable": true
+      },
+      {
+        "rule": "不得於使用者核可前寫回 failopen 基準；不得把「只 fail-closed」記為重凍完成",
+        "observable": true
+      },
+      {
+        "rule": "特徵工廠重測試一律單組串行；委員輪進行中不跑重型生成",
+        "observable": false
+      },
+      {
+        "rule": "不得侷限加密貨幣：週期、交易時段、標的數不寫死；時間比對一律 UTC 時刻",
+        "observable": true
+      }
     ],
     "risk_mitigation": [
       "解耦：新模組皆在 momentum 內；momentum/core/icfirstalign_errors.py 供 Analysis 與 FeatureEngineering 共用；實作批跑 scripts/check_decoupling.sh 附收據",
@@ -111,7 +174,10 @@
       "memory_guard.py 空殼因 small 累計生產檔上限（3）延至第一個實作批之首 commit（見 not_executable）",
       "§G 基準：HEAD 甲／乙由 scripts/freeze_icfirstalign_baseline.py 產（calibration 17 秒 0.24 GB、probe 69 秒 1.60 GB），實作後以同腳本之新實作分支重產差異收據",
       "記憶體：test_icfirstalign_memory 之守護子行程案例與 P2 為本檔最重者，逐節點單行程串行",
-      "分批：b1＝Phase 1（Task 1.1–1.4）＋Task 3.1；b2＝Phase 2（Task 2.0–2.4）＋Task 3.2；b3＝Task 4.0–4.2；b4＝Task 4.3–4.4（含使用者核可之重凍）"
+      "分批：b1＝Phase 1（Task 1.1–1.4）＋Task 3.1；b2＝Phase 2（Task 2.0–2.4）＋Task 3.2；b3＝Task 4.0–4.2；b4＝Task 4.3–4.4（含使用者核可之重凍）",
+      "b1 內順序 Task 1.1→1.2→1.3→1.4→3.1；Task 1.4 之 cache fixture 自 r23 起於測試端接 sidecar 軸寫 cache，不依賴 1.1 已落地（實作前紅＝身分未比對，非 fixture 錯）",
+      "測試接縫（r23 增）：呼叫端經 memory_budget 模組屬性呼叫 check／start_guard／recover_aborted_run（不得 from-import 綁名）；_iter_calibration_domain_groups 交出（群組 ID, 欄名, float32 陣列＝registry 讀回物件或其 view, 索引）且消費端零複製建 frame；子行程經環境變數 ICFA_BUDGET_DOMAIN 加入預算域",
+      "SPEC v23 子行程（預算域）之具名驗收測試待 SPEC v23 審查收斂後補入 test_icfirstalign_memory.py（v23 驗證 (a)–(e)）；(f) 之 MTF 映射案例已寫"
     ],
     "coverage_risk": [
       "Task 1.1：test_icfirstalign_timeaxis（oracle、讀回軸 exact、邊界①–④、位置鍵四鍵與混用、mutant 不設軸／恢復 reindex／收 start_pos）",
@@ -128,15 +194,60 @@
     ],
     "lifecycle": "keep",
     "not_executable": [
-      {"item": "momentum/FeatureEngineering/memory_guard.py 空殼（small 累計生產檔上限；第一個實作批首 commit 建立）", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
-      {"item": "Task 2.3 pre-IC 差異收據（handoffs/run_receipts/<日期>-icfirstalign-preic-diff.json，unexplained＝0）", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
-      {"item": "Task 3.1 factor_exposure 改前改後差異收據（待確認⑦）", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
-      {"item": "Task 4.1 對 HEAD 乙之 dtype 差異收據與 P1 peak footprint 對照收據", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
-      {"item": "Task 4.2 (ii) 逐分支不低估一次性收據（handoffs/run_receipts/<日期>-icfirstalign-branch-estimates.json）與其探針", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
-      {"item": "Task 4.3 記憶體量測序列探針 handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py 與收據", "reason": "blocked-by", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
-      {"item": "Task 4.4 F-2 原設定驗收與重凍（使用者核可③）", "reason": "user-ruling", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
-      {"item": "特徵工廠重測試一律單組串行；委員輪進行中不跑重型生成", "reason": "user-ruling", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"},
-      {"item": "linux 平台之生成支援（Task 4.2 於 linux 具名拒絕；§N）", "reason": "needs-research", "owner": "ICFIRSTALIGN", "expiry": "2026-12-31"}
+      {
+        "item": "momentum/FeatureEngineering/memory_guard.py 空殼（small 累計生產檔上限；第一個實作批首 commit 建立）",
+        "reason": "blocked-by",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 2.3 pre-IC 差異收據（handoffs/run_receipts/<日期>-icfirstalign-preic-diff.json，unexplained＝0）",
+        "reason": "blocked-by",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 3.1 factor_exposure 改前改後差異收據（待確認⑦）",
+        "reason": "blocked-by",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 4.1 對 HEAD 乙之 dtype 差異收據與 P1 peak footprint 對照收據",
+        "reason": "blocked-by",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 4.2 (ii) 逐分支不低估一次性收據（handoffs/run_receipts/<日期>-icfirstalign-branch-estimates.json）與其探針",
+        "reason": "blocked-by",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 4.3 記憶體量測序列探針 handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py 與收據",
+        "reason": "blocked-by",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 4.4 F-2 原設定驗收與重凍（使用者核可③）",
+        "reason": "user-ruling",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "特徵工廠重測試一律單組串行；委員輪進行中不跑重型生成",
+        "reason": "user-ruling",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "linux 平台之生成支援（Task 4.2 於 linux 具名拒絕；§N）",
+        "reason": "needs-research",
+        "owner": "ICFIRSTALIGN",
+        "expiry": "2026-12-31"
+      }
     ]
   }
 }

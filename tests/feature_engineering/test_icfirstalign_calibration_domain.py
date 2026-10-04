@@ -284,17 +284,36 @@ def test_boundary_03_row_count_mismatch_raises_named(tmp_path: Path, monkeypatch
 
 
 def test_boundary_04_disk_precheck_insufficient_raises_named(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Task 4.1 邊界④：暫存 registry 落盤前之累計磁碟預檢不足 ⇒ 具名錯誤（沿用 registry 既有預檢）。"""
+    """Task 4.1 邊界④：暫存 registry 落盤前之累計磁碟預檢不足 ⇒ 具名錯誤（沿用 registry 既有預檢）。
+
+    r23：不替換預檢本身；只令校準暫存目錄（前綴 `CALIBRATION_TMP_PREFIX`）之可用空間為 0，
+    由既有 `_precheck_cgsa_cumulative_disk` 拋 `ColumnGroupRegistryError(IO_ERROR)`；暫存目錄於例外後仍刪除。
+    """
+    import tempfile
+
     from momentum.FeatureEngineering.core import column_group_registry as cgr
 
-    def insufficient(self: Any, *a: Any, **k: Any) -> None:
-        raise cgr.CGSAPersistenceError("disk insufficient", cgr.FailureType.DISK_FULL) \
-            if hasattr(cgr, "FailureType") else RuntimeError("disk insufficient")
+    monkeypatch.setenv("FFACT_CGSA_DISK_PRECHECK", "1")
+    tmp_root = tmp_path / "sys_tmp"
+    tmp_root.mkdir()
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_root))
+    real_free = ColumnGroupRegistry._disk_free_bytes
+    hits = {"calibration": 0}
 
-    monkeypatch.setattr(ColumnGroupRegistry, "_precheck_cgsa_cumulative_disk", insufficient)
-    with pytest.raises(Exception) as info:
+    def free(path: Path) -> Any:
+        if cal.CALIBRATION_TMP_PREFIX in str(path):
+            hits["calibration"] += 1
+            return 0
+        return real_free(path)
+
+    monkeypatch.setattr(ColumnGroupRegistry, "_disk_free_bytes", staticmethod(free))
+    with pytest.raises(cgr.ColumnGroupRegistryError) as info:
         _generate(tmp_path, monkeypatch, frz.p1_payload(), frz.P1_WINDOW)
-    assert "disk" in str(info.value).lower()
+    assert info.value.failure_type == cgr.FailureType.IO_ERROR
+    assert "Insufficient disk space" in str(info.value)
+    assert hits["calibration"] > 0
+    assert not [p for p in tmp_root.iterdir() if p.name.startswith(cal.CALIBRATION_TMP_PREFIX)]
+    assert hasattr(ff.FeatureFactory, "_iter_calibration_domain_groups")
 
 
 def test_boundary_05_history_shorter_than_n_keeps_empty_columns_semantics(tmp_path: Path,

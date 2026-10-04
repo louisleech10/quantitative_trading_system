@@ -110,9 +110,14 @@ def oracle_spearman(features: pd.DataFrame, label: pd.Series) -> Dict[str, float
 
 
 def isolated(monkeypatch: Any, tmp_path: Path, **env: str) -> Path:
-    """prepare_env 隔離；回傳 features 根目錄。"""
+    """prepare_env 隔離＋d* 快取根重導至本根（r23：d* 路徑取自專案 data_cache、與 cwd 無關）；回傳 features 根目錄。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
     tmp_path.mkdir(parents=True, exist_ok=True)
     prepare_env(monkeypatch, tmp_path, **env)
+    d_star_dir = tmp_path / "d_star_cache"
+    d_star_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(FeaturePreprocessor, "_d_star_cache_dir", staticmethod(lambda: d_star_dir))
     root = tmp_path / "features"
     root.mkdir(parents=True, exist_ok=True)
     return root

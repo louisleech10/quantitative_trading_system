@@ -46,9 +46,21 @@ def cached(tmp_path_factory: pytest.TempPathFactory) -> Dict[str, Any]:
     label0 = h.forward_return_label()
     nan_ts = axis[len(axis) // 2]
     label0.loc[nan_ts] = np.nan  # 窗內一個 NaN（供「NaN 位置互換」案例）
-    ICEngine({"methods": ["spearman"]}).compute_ic_from_l7_raw(
-        h.SYMBOL, h.PRIMARY, config_hash, label0, feature_reader=reader, ic_threshold=0.02,
-        label_horizon="1", selection_window=_window(axis))
+    # r23：本檔驗 Task 1.4，不得依賴 Task 1.1。寫 cache 時測試端把 raw 群組讀回接上 sidecar 時間軸
+    # （HEAD 之 pd.read_parquet 讀回為 RangeIndex，時間字串選窗會 TypeError）；Task 1.1 落地後讀回已帶同一軸，此包裝不改值。
+    real_read = pd.read_parquet
+
+    def read_with_axis(*a: Any, **k: Any) -> pd.DataFrame:
+        frame = real_read(*a, **k)
+        if len(frame) == len(axis) and not isinstance(frame.index, pd.DatetimeIndex):
+            frame.index = axis
+        return frame
+
+    with pytest.MonkeyPatch.context() as rp:
+        rp.setattr(pd, "read_parquet", read_with_axis)
+        ICEngine({"methods": ["spearman"]}).compute_ic_from_l7_raw(
+            h.SYMBOL, h.PRIMARY, config_hash, label0, feature_reader=reader, ic_threshold=0.02,
+            label_horizon="1", selection_window=_window(axis))
     run = h.run_dir(root, config_hash)
     selected = run / f"ic_selected_features_{h.SYMBOL}_{h.PRIMARY}.json"
     backup = tmp / "ic_selected.backup.json"
@@ -194,15 +206,57 @@ def test_same_utc_instant_representations_reuse(c: Dict[str, Any], tz: str) -> N
     assert result.data_fingerprint["cache_status"] == "reused_from_cache"
 
 
-@pytest.mark.parametrize("kind", ["method", "selection_window_start", "selection_window_end", "split_id",
-                                  "label_swap_finite", "label_swap_nan"])
+@pytest.mark.parametrize("kind", ["method", "label_horizon", "selection_window_start", "selection_window_end",
+                                  "split_id", "label_swap_finite", "label_swap_nan"])
 def test_mutation_identity_field_comparison_removed(c: Dict[str, Any], monkeypatch: pytest.MonkeyPatch,
                                                     kind: str) -> None:
     """mutant：自 `CACHE_IDENTITY_FIELDS` 移除對應欄之比對 ⇒ 該改動被重用（拒用斷言翻轉）。"""
-    field = {"method": "method", "selection_window_start": "selection_window_start",
+    field = {"method": "method", "label_horizon": "label_horizon",
+             "selection_window_start": "selection_window_start",
              "selection_window_end": "selection_window_end", "split_id": "split_id",
              "label_swap_finite": "label_sha256", "label_swap_nan": "label_sha256"}[kind]
     monkeypatch.setattr(ice, "CACHE_IDENTITY_FIELDS", tuple(f for f in ice.CACHE_IDENTITY_FIELDS if f != field))
     label, kw = _variant(c, kind)
     result = _request(c, label, **kw)
     assert result.data_fingerprint["cache_status"] == "reused_from_cache"
+
+
+def _shift_feature_axis(c: Dict[str, Any]) -> Any:
+    manifest = json.loads((c["run"] / "feature_manifest.json").read_text(encoding="utf-8"))
+    path = c["run"] / manifest["row_index"]["path"]
+    original = path.read_bytes()
+    table = pq.read_table(str(path))
+    pq.write_table(table.set_column(0, "timestamp", pa.array(table.column("timestamp").to_numpy() + 3600)), str(path))
+    return lambda: path.write_bytes(original)
+
+
+def test_mutation_feature_axis_comparison_removed(c: Dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant（r23）：移除 `feature_axis_sha256` 之比對 ⇒ 特徵軸改變仍被重用（`test_feature_axis_change_rejected` 翻轉）。"""
+    monkeypatch.setattr(ice, "CACHE_IDENTITY_FIELDS",
+                        tuple(f for f in ice.CACHE_IDENTITY_FIELDS if f != "feature_axis_sha256"))
+    restore = _shift_feature_axis(c)
+    try:
+        assert _request(c, c["label0"]).data_fingerprint["cache_status"] == "reused_from_cache"
+    finally:
+        restore()
+
+
+@pytest.mark.parametrize("field", ["symbol", "tf", "config_hash"])
+def test_fingerprint_identity_value_tampered_rejected(c: Dict[str, Any], field: str) -> None:
+    """r23：cache 內 fingerprint 之 symbol／tf／config_hash 與請求不等 ⇒ 拒用（值比對，不只存在性）。"""
+    payload = json.loads(c["selected"].read_text(encoding="utf-8"))
+    payload["data_fingerprint"][field] = str(payload["data_fingerprint"][field]) + "_other"
+    c["selected"].write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ICCacheRawUnavailableError):
+        _request(c, c["label0"])
+
+
+@pytest.mark.parametrize("field", ["symbol", "tf", "config_hash"])
+def test_mutation_identity_value_comparison_removed(c: Dict[str, Any], monkeypatch: pytest.MonkeyPatch,
+                                                   field: str) -> None:
+    """mutant（r23）：移除該欄之比對 ⇒ 竄改後仍被重用。"""
+    monkeypatch.setattr(ice, "CACHE_IDENTITY_FIELDS", tuple(f for f in ice.CACHE_IDENTITY_FIELDS if f != field))
+    payload = json.loads(c["selected"].read_text(encoding="utf-8"))
+    payload["data_fingerprint"][field] = str(payload["data_fingerprint"][field]) + "_other"
+    c["selected"].write_text(json.dumps(payload), encoding="utf-8")
+    assert _request(c, c["label0"]).data_fingerprint["cache_status"] == "reused_from_cache"

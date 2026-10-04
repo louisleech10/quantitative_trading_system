@@ -103,9 +103,12 @@ def test_numba_exception_fallback_persists_returned_l3_table(tmp_path: Path, mon
     monkeypatch.setattr(numba_rolling, "fused_rolling_stats_multi_window", boom)
     run = _run_recording(monkeypatch, tmp_path, {})
     raw = _raw_l3(run)
+    assert run["returned"], "後備臂應回傳非空 L3 表"
     assert not raw.empty
     expected = _expected_from_returned(run, raw.index)
     assert sorted(raw.columns) == sorted(expected.columns)
+    for col in raw.columns:  # r23：逐欄值與 NaN 位置（同一般非預設臂）
+        np.testing.assert_array_equal(raw[col].to_numpy(dtype=np.float32), expected[col].to_numpy(dtype=np.float32))
 
 
 def test_default_arm_l3_groups_bytes_equal_head(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

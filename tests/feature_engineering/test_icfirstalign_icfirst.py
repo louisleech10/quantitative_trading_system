@@ -72,11 +72,22 @@ def test_run_ic_first_signature_has_no_second_engine_inputs() -> None:
     assert "require_raw" in inspect.signature(FeatureFactory.generate_features).parameters
 
 
-def test_ic_first_s2_scores_match_independent_oracle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """§G IC-first oracle（S2，經 run_ic_first）。"""
+def _is_tf_col(name: str, tf: str) -> bool:
+    return f"_{tf}_" in name or name.endswith(f"_{tf}")
+
+
+@pytest.mark.parametrize("training", [["12h"], ["12h", "4h"]], ids=["S2", "S2m"])
+def test_ic_first_scores_match_independent_oracle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                  training: List[str]) -> None:
+    """§G IC-first oracle（S2、S2m，經 run_ic_first）：全部欄之分數與相同 threshold 之選欄集合皆等於測試端獨立 oracle。
+
+    軸由 raw sidecar 獨立讀取；S2m 另要求兩週期皆有有限 oracle 分數（r23：只驗欄名存在時，
+    把 4h 欄分數改 NaN 之破壞不會紅）。
+    """
     root = h.isolated(monkeypatch, tmp_path)
     factory = h.make_factory(root)
-    result = _run(factory)
+    threshold = 0.02
+    result = _run(factory, h.s2_payload(training), ic_threshold=threshold)
     config_hash = str(result.metadata["config_hash"])
     reader = FeatureReader(str(root))
     axis = reader.load_row_index_v2(h.SYMBOL, h.PRIMARY, config_hash)
@@ -85,20 +96,15 @@ def test_ic_first_s2_scores_match_independent_oracle(tmp_path: Path, monkeypatch
     features = reader.load_columns_v2(h.SYMBOL, h.PRIMARY, config_hash, cols)
     features.index = axis
     expected = h.oracle_spearman(features, h.forward_return_label())
-    got = _ic_json(root, config_hash)["ic_scores"]
+    payload = _ic_json(root, config_hash)
+    got = payload["ic_scores"]
     assert set(got) == set(expected)
     keys = sorted(expected)
     assert np.allclose([got[k] for k in keys], [expected[k] for k in keys], rtol=0, atol=1e-12, equal_nan=True)
-
-
-def test_ic_first_s2m_includes_both_timeframe_columns(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """S2m（12h＋4h）：IC 欄含兩週期標記欄。"""
-    root = h.isolated(monkeypatch, tmp_path)
-    factory = h.make_factory(root)
-    result = _run(factory, h.s2_payload(["12h", "4h"]))
-    scores = _ic_json(root, str(result.metadata["config_hash"]))["ic_scores"]
-    assert any("_4h_" in c or c.endswith("_4h") for c in scores)
-    assert any("_12h_" in c or c.endswith("_12h") for c in scores)
+    for tf in training:
+        assert any(_is_tf_col(k, tf) and np.isfinite(expected[k]) for k in keys), f"{tf} 無有限 oracle 分數"
+    expected_selected = {k for k, v in expected.items() if np.isfinite(v) and abs(v) >= threshold}
+    assert set(payload["selected"]) == expected_selected
 
 
 def test_run_ic_first_never_uses_memory_combine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -154,6 +160,172 @@ def test_lease_released_after_ic_exception(tmp_path: Path, monkeypatch: pytest.M
     with pytest.raises(RuntimeError):
         _run(factory)
     RunLease.acquire(_locks(root), h.SYMBOL, h.PRIMARY, _config_hash(factory), timeout=0).release()
+
+
+# ---------------------------------------------------------------- Task 4.2 守護與恢復之正式入口接線（r23）
+
+def _guard_alive(pid: int) -> bool:
+    import psutil
+
+    try:
+        return psutil.Process(pid).status() != psutil.STATUS_ZOMBIE
+    except psutil.NoSuchProcess:
+        return False
+
+
+def _spy_guard(monkeypatch: pytest.MonkeyPatch, root: Path) -> Dict[str, Any]:
+    """正式入口之守護／恢復／lease 事件序（呼叫端經 `memory_budget` 模組屬性呼叫，SPEC Task 4.2）。
+
+    只記錄、不改行為；斷言以效果為準（守護行程於 run 出口後已不存在、恢復後暫存已刪）。
+    """
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    st: Dict[str, Any] = {"events": [], "pids": [], "alive_during_ic": []}
+    real_start, real_recover = mb.start_guard, mb.recover_aborted_run
+    real_acquire, real_release = RunLease.acquire, RunLease.release
+
+    def start(run_dir: Path, run_id: str, **k: Any) -> Any:
+        handle = real_start(run_dir, run_id, **k)
+        st["events"].append(("start_guard", str(run_dir)))
+        st["pids"].append(handle.pid)
+        return handle
+
+    def recover(run_dir: Path) -> Any:
+        st["events"].append(("recover", str(run_dir)))
+        return real_recover(run_dir)
+
+    def acquire(*a: Any, **k: Any) -> Any:
+        lease = real_acquire(*a, **k)
+        st["events"].append(("acquire", ""))
+        return lease
+
+    def release(self: RunLease) -> None:
+        st["events"].append(("release", ""))
+        return real_release(self)
+
+    real_ic = ICEngine.compute_ic_from_l7_raw
+
+    def during_ic(self: ICEngine, *a: Any, **k: Any) -> Any:
+        st["alive_during_ic"].append([_guard_alive(p) for p in st["pids"]])
+        return real_ic(self, *a, **k)
+
+    monkeypatch.setattr(mb, "start_guard", start)
+    monkeypatch.setattr(mb, "recover_aborted_run", recover)
+    monkeypatch.setattr(RunLease, "acquire", acquire)
+    monkeypatch.setattr(RunLease, "release", release)
+    monkeypatch.setattr(ICEngine, "compute_ic_from_l7_raw", during_ic)
+    return st
+
+
+def _kinds(st: Dict[str, Any]) -> List[str]:
+    return [e[0] for e in st["events"]]
+
+
+def _inject(monkeypatch: pytest.MonkeyPatch, where: str) -> None:
+    if where == "generation":
+        monkeypatch.setattr(FeatureFactory, "_layer3_rolling_aggregation",
+                            lambda self, *a, **k: (_ for _ in ()).throw(RuntimeError("injected")))
+    elif where == "ic":
+        monkeypatch.setattr(ICEngine, "compute_ic_from_l7_raw",
+                            lambda self, *a, **k: (_ for _ in ()).throw(RuntimeError("injected ic failure")))
+
+
+@pytest.mark.parametrize("entry,failure", [("generate", None), ("generate", "generation"), ("ic_first", None),
+                                           ("ic_first", "generation"), ("ic_first", "ic")])
+def test_formal_run_guard_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, entry: str, failure: Any) -> None:
+    """正式入口（`generate_features`、`run_ic_first`〔經 `lease_sink` 移交〕）之正常與例外出口：
+    恰一個守護、恢復於取得 lease 後且於守護啟動前、守護於 lease 釋放前停止且行程已回收；
+    `run_ic_first` 之守護於 IC 期間仍存活（隨 lease 移交至持有者，不於生成返回時停止）。"""
+    root = h.isolated(monkeypatch, tmp_path)
+    factory = h.make_factory(root)
+    _inject(monkeypatch, failure)  # 先注入、spy 後裝：IC 例外案例之 spy 包住注入之 IC，仍記錄 IC 期間守護存活
+    st = _spy_guard(monkeypatch, root)
+    call = (lambda: _run(factory)) if entry == "ic_first" else (lambda: h.generate_s2(root))
+    if failure:
+        with pytest.raises(Exception):
+            call()
+    else:
+        call()
+    kinds = _kinds(st)
+    assert kinds.count("start_guard") == 1 and len(st["pids"]) == 1
+    assert kinds.index("acquire") < kinds.index("recover") < kinds.index("start_guard")
+    assert not _guard_alive(st["pids"][0]), "run 出口後守護行程仍存活"
+    assert "release" in kinds and kinds.count("acquire") == kinds.count("release")
+    if entry == "ic_first" and failure != "generation":
+        assert st["alive_during_ic"] and all(all(a) for a in st["alive_during_ic"])
+        assert kinds.count("acquire") == 1
+
+
+def test_mutation_formal_run_guard_not_stopped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：正式 run 出口不停止守護（`GuardHandle.stop` 改為無動作）⇒ 守護行程於出口後仍存活而紅。"""
+    import os
+    import signal
+
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    root = h.isolated(monkeypatch, tmp_path)
+    factory = h.make_factory(root)
+    st = _spy_guard(monkeypatch, root)
+    monkeypatch.setattr(mb.GuardHandle, "stop", lambda self: None)
+    try:
+        _run(factory)
+        assert st["pids"] and _guard_alive(st["pids"][0])
+    finally:
+        for pid in st["pids"]:
+            if _guard_alive(pid):
+                os.kill(pid, signal.SIGKILL)
+
+
+def _seed_abort(root: Path, factory: FeatureFactory, tmp_path: Path) -> Tuple[Path, Path, Path]:
+    """於同 key 之 run 目錄放前次 abort 收據、停止旗標與已登記之暫存；另放一個不屬本 run 之暫存。"""
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    run = h.run_dir(root, _config_hash(factory))
+    run.mkdir(parents=True, exist_ok=True)
+    owned = tmp_path / "owned_tmp"
+    owned.mkdir()
+    (owned / "x.bin").write_bytes(b"0" * 1024)
+    other = tmp_path / "other_run_tmp"
+    other.mkdir()
+    files = h.CONTRACT["guard_files"]
+    (run / files["owned_paths"]).write_text(json.dumps([str(owned)]), encoding="utf-8")
+    (run / files["abort_receipt"]).write_text(json.dumps({
+        "time": "t", "trigger": "pressure_critical", "readings": {}, "last_checkpoint": "L3", "run_id": "R",
+        "owned_paths": [str(owned)]}), encoding="utf-8")
+    (run / files["stop_flag"]).write_text("x", encoding="utf-8")
+    assert callable(mb.recover_aborted_run)
+    return run, owned, other
+
+
+@pytest.mark.parametrize("entry", ["generate", "ic_first"])
+def test_formal_run_recovers_previous_abort(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, entry: str) -> None:
+    """同 key 下一次正式 run 取得 lease 後之恢復：前次登記之暫存被刪、舊停止旗標清除（run 因而不被誤停）、
+    abort 收據保留、他 run 暫存不變。"""
+    root = h.isolated(monkeypatch, tmp_path)
+    factory = h.make_factory(root)
+    run, owned, other = _seed_abort(root, factory, tmp_path)
+    if entry == "ic_first":
+        _run(factory)
+    else:
+        h.generate_s2(root)
+    files = h.CONTRACT["guard_files"]
+    assert not owned.exists() and other.exists()
+    assert (run / files["abort_receipt"]).exists()
+
+
+def test_mutation_formal_run_skips_recovery(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：正式入口不呼叫恢復（`recover_aborted_run` 改為無動作）⇒ 前次暫存殘留、或舊停止旗標使 run 被具名停止而紅。"""
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    root = h.isolated(monkeypatch, tmp_path)
+    factory = h.make_factory(root)
+    _, owned, _ = _seed_abort(root, factory, tmp_path)
+    monkeypatch.setattr(mb, "recover_aborted_run", lambda run_dir: {})
+    try:
+        _run(factory)
+    except mb.GenerationMemoryBudgetExceeded:
+        return
+    assert owned.exists()
 
 
 def _seed_legacy_h5(root: Path, factory: FeatureFactory, config_hash: str) -> None:

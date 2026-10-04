@@ -39,6 +39,7 @@ PRODUCER_MODULES = [
     "momentum/FeatureEngineering/operators/derived_operators.py",
     "momentum/FeatureEngineering/utils/hardware_utils.py",
     "momentum/FeatureEngineering/polars_adapter.py",
+    "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",  # v23：多週期子行程之分派
 ]
 GUARD = h.REPO / C["guard_script"]
 
@@ -261,8 +262,11 @@ def test_normalize_selectors_rejects_illegal_values(env: Dict[str, str]) -> None
 
 
 def test_mutation_unknown_tier_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(mb, "normalize_selectors", lambda env: dict(env))
-    assert mb.normalize_selectors({"FFACT_MEMORY_TIER": "12gb"}) == {"FFACT_MEMORY_TIER": "12gb"}
+    """mutant（r23 改）：正規化表（`mb.SELECTORS`，同檔唯一一份）之 tier 值域放入未知值 ⇒ 正規化放行，
+    `test_normalize_selectors_rejects_illegal_values[tier]` 之拒絕斷言翻轉（正規化須由該表驅動）。"""
+    monkeypatch.setitem(mb.SELECTORS, "FFACT_MEMORY_TIER", tuple(mb.SELECTORS["FFACT_MEMORY_TIER"]) + ("12gb",))
+    with pytest.raises(pytest.fail.Exception):
+        test_normalize_selectors_rejects_illegal_values({"FFACT_MEMORY_TIER": "12gb"})
 
 
 def _ffact_env_reads(source: str) -> List[str]:
@@ -303,8 +307,11 @@ def test_static_scan_selector_single_entry_and_registered_keys() -> None:
 
 
 def test_mutation_selector_list_drops_numba_key_is_detected(monkeypatch: pytest.MonkeyPatch) -> None:
-    trimmed = {k: v for k, v in mb.SELECTORS.items() if k != "FFACT_USE_NUMBA_ROLLING"}
-    assert set(trimmed) != set(C["selectors"])  # 封閉名集合斷言翻轉
+    """mutant（r23 改）：自正規化清單（`mb.SELECTORS` 本身）刪 `FFACT_USE_NUMBA_ROLLING` ⇒ 封閉名集合斷言與
+    靜態掃描（producer 讀該鍵而清單無之）皆翻轉。"""
+    monkeypatch.setattr(mb, "SELECTORS", {k: v for k, v in mb.SELECTORS.items() if k != "FFACT_USE_NUMBA_ROLLING"})
+    with pytest.raises(AssertionError):
+        test_selectors_closed_name_set_matches_contract()
 
 
 def test_mutation_producer_getenv_bypass_detected() -> None:
@@ -321,7 +328,8 @@ def test_branch_table_keys_equal_contract() -> None:
 def _shape_params() -> Dict[str, Any]:
     return {"rows": 1000, "input_cols": 2, "output_cols": 40, "windows": 2, "steps": 7, "buffer_cols": 64,
             "chunk_cols": 256, "workers": 4, "categories": 6, "max_category_cols": 20, "category_cols_sum": 52,
-            "group_cols": 10, "selected_cols": 5, "n_calibration": 500, "accumulated_cols": 5}
+            "group_cols": 10, "selected_cols": 5, "n_calibration": 500, "accumulated_cols": 5,
+            "primary_rows": 1200, "source_shards": 3, "align_block_rows": 1024}
 
 
 @pytest.mark.parametrize("branch", C["branch_ids"])
@@ -514,19 +522,29 @@ def test_branch_table_coverage_over_population(tmp_path: Path, monkeypatch: pyte
     assert missing == set(), f"未被組合母體命中之分支 ID：{sorted(missing)}"
 
 
-def test_mutation_dispatch_point_without_check(monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：某分派點不呼叫 check（以 check 包裝丟棄該 ID 模擬）⇒ 臂前無對應 check 而斷言紅。"""
+@pytest.mark.parametrize("branch,env", [("L3.numba_multi_callback", {"FFACT_USE_NUMBA_ROLLING": "1"}),
+                                        ("L3.vectorized_chunked", {"FFACT_L3_STREAMING": "0"}),
+                                        ("L3.numba_single", {"FFACT_L3_MULTI_WINDOW": "0"})])
+def test_mutation_dispatch_point_without_check(monkeypatch: pytest.MonkeyPatch, branch: str, env: Dict[str, str]) -> None:
+    """mutant（r23 改）：producer 之某分派點不呼叫 check——於 producer 實跑期間，該分支 ID 之 `check` 呼叫
+    不抵達 `memory_budget.check`（等同刪去該分派點之呼叫；外層 recorder 不變）⇒ 同一完整性斷言紅。
+    （舊版事後刪 events 列表只測斷言輔助函式本身，不是 producer mutant。）"""
     from momentum.FeatureEngineering.operators.rolling_aggregator import RollingAggregator
 
-    monkeypatch.setenv("FFACT_USE_NUMBA_ROLLING", "1")
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
     events = _record_events(monkeypatch)
+    recorded_check = mb.check
+    monkeypatch.setattr(mb, "check",
+                        lambda branch_id, components, **kw: None if branch_id == branch
+                        else recorded_check(branch_id, components, **kw))
     with ExitStack() as stack:
         _ctx(stack, budget=64 * GiB, snapshot=_snapshot(free_bytes=64 * GiB))
         RollingAggregator({"enabled": True, "windows": [5, 13], "aggregators": ["mean"], "keep_all_columns": True}) \
             .compute_all(_l3_base(), persist_callback=lambda label, frame: None)
-    stripped = [e for e in events if e != ("check", "L3.numba_multi_callback")]
+    assert ("arm", C["arm_functions"][branch]) in events, "該分派點之臂須於本組合實際被呼叫"
     with pytest.raises(AssertionError):
-        _assert_arms_preceded_by_check(stripped)
+        _assert_arms_preceded_by_check(events)
 
 
 # ---------------------------------------------------------------- 工作區安全間隙（配置前拒絕；mutant＝刪去該成分）
@@ -701,33 +719,54 @@ def test_temp_memmap_created_under_mapping_root(tmp_path: Path, monkeypatch: pyt
 _MAP_CALLS = {"memmap", "open_memmap", "memory_map", "mmap"}
 
 
-def _mapping_call_sites(sources: Dict[str, str]) -> List[Tuple[str, str]]:
-    sites: List[Tuple[str, str]] = []
+def _mapping_call_sites(sources: Dict[str, str]) -> Dict[Tuple[str, str, str], int]:
+    """（檔案, 所在函式〔類別.函式，模組層為 <module>〕, 建構子）→ 呼叫點數。r23：保留呼叫點身分與數量。"""
+    sites: Dict[Tuple[str, str, str], int] = {}
     for path, src in sources.items():
-        for node in ast.walk(ast.parse(src)):
+        tree = ast.parse(src)
+        parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+        for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
             name = getattr(node.func, "attr", "") or getattr(node.func, "id", "")
             kw = {k.arg for k in node.keywords}
             if name in _MAP_CALLS:
-                sites.append((path, ast.unparse(node.func)))
+                call = ast.unparse(node.func)
             elif name == "load" and "mmap_mode" in kw:
-                sites.append((path, "np.load(mmap_mode)"))
+                call = "np.load(mmap_mode)"
             elif name in {"read_parquet", "read_table"} and "memory_map" in kw:
-                sites.append((path, f"{name}(memory_map)"))
+                call = f"{name}(memory_map)"
+            else:
+                continue
+            chain, cur = [], node
+            while cur in parents:
+                cur = parents[cur]
+                if isinstance(cur, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    chain.append(cur.name)
+            key = (path, ".".join(reversed(chain)) or "<module>", call)
+            sites[key] = sites.get(key, 0) + 1
     return sites
 
 
-def _registered(path: str, call: str) -> bool:
+def _registered_sites() -> Dict[Tuple[str, str, str], int]:
     entries = C["mapping_entries"]["writable"] + C["mapping_entries"]["readonly"]
-    return any(e["file"] == path and (call == e["call"] or call.endswith(e["call"].split(".")[-1])) for e in entries)
+    return {(e["file"], e["function"], e["call"]): int(e["count"]) for e in entries}
+
+
+def _unregistered(sites: Dict[Tuple[str, str, str], int]) -> List[Tuple[Tuple[str, str, str], int]]:
+    """未登記之（檔案, 函式, 建構子），或同一處之呼叫點數超過登記數 ⇒ 列出。"""
+    registered = _registered_sites()
+    return [(k, n) for k, n in sites.items() if n > registered.get(k, 0)]
+
+
+def _momentum_sources() -> Dict[str, str]:
+    return {str(p.relative_to(h.REPO)): p.read_text(encoding="utf-8") for p in (h.REPO / "momentum").rglob("*.py")}
 
 
 def test_mapping_entry_points_closed() -> None:
-    sources = {str(p.relative_to(h.REPO)): p.read_text(encoding="utf-8")
-               for p in (h.REPO / "momentum").rglob("*.py")}
-    unregistered = [s for s in _mapping_call_sites(sources) if not _registered(*s)]
-    assert unregistered == []
+    sites = _mapping_call_sites(_momentum_sources())
+    assert _unregistered(sites) == []
+    assert set(sites) == set(_registered_sites()), "登記清單有已不存在之呼叫點（清單須與碼同步）"
 
 
 def test_mutation_unregistered_open_memmap_detected() -> None:
@@ -738,16 +777,56 @@ def test_mutation_unregistered_open_memmap_detected() -> None:
 
     src = inspect.getsource(memmap_utils) + \
         "\n\ndef _injected():\n    return np.lib.format.open_memmap('f.npy', mode='w+', dtype='f4', shape=(1,))\n"
-    sites = _mapping_call_sites({"momentum/FeatureEngineering/memmap_utils.py": src})
-    assert [s for s in sites if not _registered(*s)]
+    assert _unregistered(_mapping_call_sites({"momentum/FeatureEngineering/memmap_utils.py": src}))
 
 
-@pytest.mark.parametrize("case", ["l3_pandas_fallback", "l2_spill", "registry_multi_shard"])
+def test_mutation_same_constructor_new_call_site_detected() -> None:
+    """mutant（r23）：同檔另一函式新增已登記建構子（`np.memmap`）之呼叫 ⇒ 依（函式, 數量）判未登記。"""
+    import inspect
+
+    from momentum.FeatureEngineering import memmap_utils
+
+    src = inspect.getsource(memmap_utils) + \
+        "\n\ndef _injected():\n    return np.memmap('f.dat', mode='w+', dtype='f4', shape=(1,))\n"
+    assert _unregistered(_mapping_call_sites({"momentum/FeatureEngineering/memmap_utils.py": src}))
+    real_fn = inspect.getsource(memmap_utils.create_temp_memmap)
+    doubled = real_fn.rstrip() + "\n    _extra = np.memmap(path, mode='w+', dtype='f4', shape=(1,))\n"
+    assert _unregistered(_mapping_call_sites({"momentum/FeatureEngineering/memmap_utils.py": doubled})), \
+        "登記之函式內呼叫點數增加 ⇒ 須判未登記"
+
+
+@pytest.mark.parametrize("case", ["l3_pandas_fallback", "l2_spill", "registry_multi_shard", "mtf_align_dense",
+                                  "mtf_align_sharded"])
 def test_mapped_tags_match_observed_allocations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str) -> None:
-    """標記核對：段內觀測之映射配置與該段 `mapped` 成分逐項一一對應（入口、容量）。"""
+    """標記核對：逐 check 段，觀測之映射配置與該段 `mapped` 成分逐項一一對應（段、入口、容量）；
+    入口屬登記之建構子名；案例結束時全部映射已釋放。"""
     observed = _observe_mappings(case, tmp_path, monkeypatch)
     declared = _declared_mapped(case)
+    assert observed, "案例須實際觸及映射入口"
+    assert {e for _, e, _ in declared} <= set(C["mapping_constructors"])
     assert sorted(observed) == sorted(declared)
+    assert _observe_mappings.leaks == []  # type: ignore[attr-defined]
+    if case == "mtf_align_dense":
+        assert any(e == "np.lib.format.open_memmap" for _, e, _ in observed)
+    if case == "mtf_align_sharded":
+        per_seg: Dict[int, int] = {}
+        for seg, e, _ in observed:
+            if e == "np.load(mmap_mode)":
+                per_seg[seg] = per_seg.get(seg, 0) + 1
+        assert per_seg and max(per_seg.values()) > 1, "分片來源須逐片映射"
+
+
+def test_mutation_mtf_aligned_output_tagged_anon(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant（v23 (f)）：對齊輸出之 mapped 成分改標 anon 並自匿名扣同量 ⇒ 逐項對應紅。"""
+    full_estimator = mb.BRANCH_TABLE["MTF.align_persist"]
+
+    def mislabel(params: Any) -> List[mb.Component]:
+        return [mb.Component(c.name, "anon", c.nbytes, None, c.count) if c.name == "aligned_output" else c
+                for c in full_estimator(params)]
+
+    monkeypatch.setitem(mb.BRANCH_TABLE, "MTF.align_persist", mislabel)
+    observed = _observe_mappings("mtf_align_dense", tmp_path, monkeypatch)
+    assert sorted(observed) != sorted(_declared_mapped("mtf_align_dense"))
 
 
 def test_mutation_mapped_component_tagged_anon(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -770,36 +849,79 @@ def test_mutation_mapped_component_tagged_anon(tmp_path: Path, monkeypatch: pyte
     assert sorted(observed) != sorted(declared)
 
 
-def _observe_mappings(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> List[Tuple[str, int]]:
-    from momentum.FeatureEngineering import memmap_utils
+def _observe_mappings(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> List[Tuple[int, str, int]]:
+    """包住登記清單之全部映射建構子（r23），逐次記（建立時之 check 段, 入口, 容量）與釋放段。
 
-    seen: List[Tuple[str, int]] = []
-    real_tmp = memmap_utils.create_temp_memmap
-    monkeypatch.setattr(memmap_utils, "create_temp_memmap",
-                        lambda shape, dtype=np.float32, *a, **k: (seen.append(("create_temp_memmap", int(np.prod(shape)) * np.dtype(dtype).itemsize)),
-                                                                  real_tmp(shape, dtype, *a, **k))[1])
+    check 段＝建立當下 `check_recorder` 已記錄之 check 數 − 1（第 k 次 check 之後、第 k+1 次之前為段 k）。
+    釋放以 weakref.finalize 記；案例結束（gc 後）仍未釋放之映射記為洩漏。
+    """
+    import gc
+    import weakref
+
+    import pyarrow as pa
+
+    seen: List[Tuple[int, str, int]] = []
+    leaks: List[Tuple[int, str, int]] = []
+    state: Dict[str, Any] = {"recorded": [], "depth": 0}
+
+    def nested(fn: Callable[..., Any], entry: str, size: Callable[[Any], int]) -> Callable[..., Any]:
+        """只記最外層入口（np.load(mmap_mode) 內部經 open_memmap → np.memmap，不重複記）。"""
+        def wrapper(*a: Any, **k: Any) -> Any:
+            state["depth"] += 1
+            try:
+                out = fn(*a, **k)
+            finally:
+                state["depth"] -= 1
+            if state["depth"] == 0 and out is not None:
+                note(entry, out, size(out))
+            return out
+        return wrapper
+
+    def note(entry: str, obj: Any, nbytes: int) -> Any:
+        rec = (len(state["recorded"]) - 1, entry, int(nbytes))
+        seen.append(rec)
+        alive = {"v": True}
+        try:
+            weakref.finalize(obj, alive.__setitem__, "v", False)
+        except TypeError:  # 不支援 weakref 之物件（例 pyarrow 檔案）：以 close 記釋放
+            real_close = obj.close
+            obj.close = lambda *a, **k: (alive.__setitem__("v", False), real_close(*a, **k))[1]  # type: ignore[method-assign]
+        state.setdefault("alive", []).append((rec, alive))
+        return obj
+
+    real_memmap_new = np.memmap.__new__
     real_load = np.load
 
     def load(path: Any, *a: Any, mmap_mode: Any = None, **k: Any) -> Any:
-        out = real_load(path, *a, mmap_mode=mmap_mode, **k)
-        if mmap_mode:
-            seen.append(("np.load(mmap_mode)", int(out.nbytes)))
-        return out
+        if not mmap_mode:
+            return real_load(path, *a, **k)
+        return nested(lambda: real_load(path, *a, mmap_mode=mmap_mode, **k), "np.load(mmap_mode)",
+                      lambda o: o.nbytes)()
 
-    monkeypatch.setattr(np, "load", load)
     with mb.check_recorder() as recorded:
-        _run_mapping_case(case, tmp_path, monkeypatch)
-    _observe_mappings.recorded = recorded  # type: ignore[attr-defined]
+        state["recorded"] = recorded
+        with monkeypatch.context() as mp:
+            mp.setattr(np.memmap, "__new__", staticmethod(nested(real_memmap_new, "np.memmap", lambda o: o.nbytes)))
+            mp.setattr(np.lib.format, "open_memmap",
+                       nested(np.lib.format.open_memmap, "np.lib.format.open_memmap", lambda o: o.nbytes))
+            mp.setattr(np, "load", load)
+            mp.setattr(pa, "memory_map", nested(pa.memory_map, "pa.memory_map", lambda o: o.size()))
+            _run_mapping_case(case, tmp_path, monkeypatch)
+        gc.collect()
+    leaks.extend(rec for rec, alive in state.get("alive", []) if alive["v"])
+    _observe_mappings.recorded = list(recorded)  # type: ignore[attr-defined]
+    _observe_mappings.leaks = leaks  # type: ignore[attr-defined]
     return seen
 
 
-def _declared_mapped(case: str) -> List[Tuple[str, int]]:
+def _declared_mapped(case: str) -> List[Tuple[int, str, int]]:
+    """分支表於各 check 段宣告之 mapped 成分：（段, 入口, 容量）× 次數。"""
     recorded = getattr(_observe_mappings, "recorded", [])
-    out: List[Tuple[str, int]] = []
-    for _, comps in recorded:
+    out: List[Tuple[int, str, int]] = []
+    for seg, (_, comps) in enumerate(recorded):
         for c in comps:
             if c.kind == "mapped":
-                out.extend([(c.entry, c.nbytes)] * c.count)
+                out.extend([(seg, c.entry, c.nbytes)] * c.count)
     return out
 
 
@@ -814,6 +936,16 @@ def _run_mapping_case(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     root = h.isolated(monkeypatch, tmp_path)
     if case == "l2_spill":
         h.generate_s2(root, h.s2_payload(rolling_aggregation={"enabled": False}))
+        return
+    if case in ("mtf_align_dense", "mtf_align_sharded"):
+        # 真實 kline [12h, 4h]、子行程生成、根行程逐群組 dense 對齊落盤（compact 關）；分片案例以小分片目標
+        # （環境變數，spawn 子行程繼承）使 worker 輸出多片、根行程逐片 np.load(mmap_mode)。
+        monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1")
+        monkeypatch.setenv("FFACT_MULTI_TF_MAX_WORKERS", "1")
+        monkeypatch.setenv("FFACT_MULTI_TF_COMPACT_ALIGNMENT", "0")
+        if case == "mtf_align_sharded":
+            monkeypatch.setenv("FFACT_CGSA_SHARD_BYTES", str(256 * 1024))
+        h.generate_s2(root, h.s2_payload(["12h", "4h"], rolling_aggregation={"enabled": False}))
         return
     if case == "registry_multi_shard":
         # 真實 kline 之 L3 型輸入落 registry、以小分片目標強制多片；於「校準歸約」段內逐片讀回

@@ -25,6 +25,22 @@ W2: Tuple[str, str] = ("2025-09-01", "2026-03-31")
 OW_KEYS = tuple(h.CONTRACT["output_window_keys"])
 
 
+def test_isolated_redirects_d_star_cache_per_root(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """隔離前提（r23）：兩個測試根之 d* 快取根互異、各在其根內、且不落專案 data_cache（不生成，秒級）。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
+    project = (h.REPO / "data_cache").resolve()
+    seen = []
+    for name in ("a", "b"):
+        with monkeypatch.context() as mp:
+            h.isolated(mp, tmp_path / name)
+            path = FeaturePreprocessor._d_star_cache_dir().resolve()
+        seen.append(path)
+        assert (tmp_path / name).resolve() in path.parents
+        assert project not in path.parents
+    assert seen[0] != seen[1]
+
+
 def _begin(**over: Any) -> icc.ICFirstRunContext:
     kw: Dict[str, Any] = dict(symbol=h.SYMBOL, timeframe=h.PRIMARY, training=["12h"], start=W1[0], end=W1[1],
                               selection_window={"start": W1[0], "end": W1[1]}, split_id=None,

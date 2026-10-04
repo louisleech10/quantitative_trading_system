@@ -70,6 +70,9 @@ SELECTORS: Dict[str, Any] = {
     "FFACT_L3_MULTI_WINDOW": ("0", "1"),
     "FFACT_USE_NUMBA_ROLLING": ("0", "1"),
     "FFACT_MEMORY_TIER": ("auto", "8gb", "16gb", "24gb", "32gb"),
+    "FFACT_MULTI_TF_PARALLEL": ("0", "1"),
+    "FFACT_MULTI_TF_MAX_WORKERS": "auto|positive_int",
+    "FFACT_MULTI_TF_COMPACT_ALIGNMENT": ("0", "1"),
 }
 
 # 非臂選擇之 FFACT_ 鍵（具名排除清單；AST 掃描未列於兩清單之任一鍵 ⇒ 紅）。實作時逐一登記。
