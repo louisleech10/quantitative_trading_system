@@ -1,7 +1,7 @@
 # ICFIRSTALIGN 乙：IC-first 時間軸、CGSA 合一、不可變 run context 與預熱探測記憶體失控（F-2） — SPEC
 
 > 來源 PLAN/診斷：`docs/TICKET_ORDER.md` 第 4 步；偵察收斂 `handoffs/reconcile/20261004-icfirstalign-x-consult-r1/synth.md`（兩家＋主委獨立版 `handoffs/20261004-icfirstalign-recon-claude.md`）；SPEC 審查第一輪收斂 `handoffs/reconcile/20261004-icfirstalign-x-review-r1/synth.md`；PRE-RED 移交 F-2（`handoffs/run_receipts/20261003-prered-f2-memory.json`）　|　日期：2026-10-04　|　對應 TODO：`docs/manifests/ICFIRSTALIGN.json`
-> 版本：v3（主委依第二輪審查修訂：校準域 L2 取公開落盤之同一計算臂、L3 非串流臂不得丟表、配置前預算按實際工作集計、cleanup 後重生於同一 lease 內、時區與共用 H5 契約）
+> 版本：v4（主委依第三輪審查修訂：生成記憶體預算改為封閉分支表＋完整性與不低估之機械核對，補單窗、無 callback、L2 平行、L1 平行四臂；前版 v3 修訂：校準域 L2 取公開落盤之同一計算臂、L3 非串流臂不得丟表、配置前預算按實際工作集計、cleanup 後重生於同一 lease 內、時區與共用 H5 契約）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大。命中 (a)(b)(c)(d)。
@@ -152,21 +152,22 @@
 - 目標：生成前段至 post-IC 之大配置前皆有預算判定，量測值不低估。　檔案：新增 `momentum/FeatureEngineering/memory_budget.py`（取樣與預算判定之唯一實作）；`feature_factory.py` 之各層起點（正式生成與 Task 4.1 校準域共用）、Task 4.1 歸約之群組讀回前；`ic_engine.compute_ic_from_l7_raw` 之群組讀回前；`run_ic_first` 之選欄讀回前與 `transform_selected` 各群組前；**取代**既有 RSS 閘（FF:2685、:2706、:2872 及 `_PeakRssTracker` 之判定用途），不並存兩套。
 - 改法：
   - 取樣 `sample_memory_bytes()`：macOS＝`proc_pid_rusage(getpid(), RUSAGE_INFO_V0)` 之 `max(ri_resident_size, ri_phys_footprint)`；linux＝`/proc/self/smaps_rollup` 之 `Rss:`＋`Swap:`（kB × 1024）；其他平台或呼叫失敗 ⇒ `MemoryMeasurementUnavailable` 具名錯誤，不得靜默略過。
-  - 預算判定 `check(label, planned_bytes)`：`sample_memory_bytes() + planned_bytes > budget` ⇒ 拋 `GenerationMemoryBudgetExceeded(label, current, planned, budget)`，**於配置之前**。planned_bytes＝該分支「新增之最大同時存活工作區＋輸出＋落盤轉型」，依實際執行臂與計算前已知之形狀（列數、設定展開之欄數上界〔不依資料〕、窗數、step 數、chunk、buffer、硬體 tier）計，不得只以輸出容量代替：
-    - L1：各指標結果表＋合併後回傳表＋落盤 float32 轉型（輸出 × (8＋8＋4) B）。
-    - L2：回傳表（`_estimate_l2_output_cols` × 列 × 8 B）＋逐類別結果之最大類別表＋其 float32 轉型＋spill 之 float32 複本。
-    - L3 numba 多窗臂：每輸入欄 fused 工作區（列 × 窗數 × 10 × 8 B，`numba_rolling.py:429` 之固定形狀）＋chunk 內全部 step 結果＋全部 step 之 persister 緩衝同時存活（step 數 × 列 × buffer 欄 × 8 B）＋單次 flush 之超量（一個 step 結果）；非串流臂：完整回傳表（列 × L3 欄上界 × 8 B）＋Task 4.0 落盤轉型。
+  - 預算判定 `check(label, planned_bytes)`：`sample_memory_bytes() + planned_bytes > budget` ⇒ 拋 `GenerationMemoryBudgetExceeded(label, current, planned, budget)`，**於配置之前**。planned_bytes＝該分支「新增之最大同時存活工作區＋輸出＋落盤轉型」，依實際執行臂與計算前已知之形狀（列數、設定展開之欄數上界〔不依資料〕、窗數、step 數、chunk、buffer、workers、硬體 tier）計，不得只以輸出容量代替。
+  - **封閉分支表**（`memory_budget.py` 內唯一一份）：每一 producer 之執行臂以「計算前可得之選擇子」（環境旗標、硬體 tier、設定、workers）解析為具名分支 ID，每一分支 ID 對應一個估算函式；解析不出分支 ID 或該 ID 無估算函式 ⇒ 配置前具名拒絕。執行中之後備切換（numba 例外落入 pandas 等）於後備配置前以後備分支 ID 重判。初始分支與估算式（同時存活量；「輸出」皆指設定展開之欄數上界 × 列）：
+    - L1 串列：各指標結果表＋合併回傳表＋落盤 float32 轉型。L1 平行（`FFACT_LAYER1_PARALLEL=1`，FF:1046–1051、:1111–1115）：全部引擎之結果表同時存活＋合併回傳表＋轉型。
+    - L2 Polars（預設）：回傳表（`_estimate_l2_output_cols` × 列 × 8 B）＋逐類別串列之最大類別表＋其轉型＋spill 之 float32 複本。L2 pandas 串列：同左。L2 pandas 平行（`category_workers>1`，FF:1695–1724）：`computed_frames` 於串列落盤前持有全部類別表 ⇒ 全部類別表之和＋最大類別之轉型＋spill 複本。
+    - L3 numba 多窗＋callback（串流／hybrid）：每輸入欄 fused 工作區（列 × 窗數 × 10 × 8 B，`numba_rolling.py:429` 固定形狀，與所選統計量數無關）＋chunk 內全部 step 結果＋全部 step 之 persister 緩衝（step 數 × 列 × buffer 欄 × 8 B）＋單次 flush 超量。L3 numba 多窗無 callback（`in_memory` tier 或 `FFACT_L3_STREAMING=0`，`rolling_aggregator.py:497–565`、:594）：fused 工作區＋累積之全部 step 結果表（完整輸出 × 8 B）＋最末合併＋Task 4.0 落盤轉型。L3 numba 單窗（`FFACT_L3_MULTI_WINDOW=0`，`rolling_aggregator.py:330–395`）：輸出 memmap（輸出 × 4 B）＋全部 chunk 之 `agg_arrays`／`cached_results`＋當前 chunk 複本＋六統計 float64 工作區（列 × 6 × 8 B，`numba_rolling.py:294`）及其 float32 回傳（:313）＋落盤轉型。L3 pandas 後備（`rolling_aggregator.py:190–321`）：逐欄 rolling 中間量之最大者＋完整回傳表＋落盤轉型。
     - L4／L5／L6：輸入合併表（如 `layer4_input`）＋輸出表＋落盤轉型。
     - IC 群組讀回、選欄讀回：manifest 之群組形狀 × (4＋8) B（讀檔與轉型）。
     - `transform_selected`：依其實作（`feature_preprocessor.py:675–685`）之選欄複本＋單群組轉換輸出＋已累積之 processed 群組，以實際選欄形狀計。
-    - 無法於計算前證明上界之分支 ⇒ 配置前具名拒絕，不得放行。
+  - **估算不低估之機械核對**：(i) 完整性——測試列舉各選擇子之封閉值域之笛卡兒積（環境旗標之合法值、全部 tier、workers 1 與 > 1），每一組合皆解析為有估算函式之分支 ID；新增選擇子值而未登記分支 ⇒ 測試紅。(ii) 不低估——每一分支 ID 以真實 kline 之縮小設定（工作集 100 MB–1 GB，使各估算成分大於取樣雜訊）實跑一次，取樣執行緒以 `sample_memory_bytes` 記該 producer 期間之峰值增量，斷言峰值增量 ≤ planned_bytes；結果記於一次性收據 `handoffs/run_receipts/<日期>-icfirstalign-branch-estimates.json`（不入每次跑之測試；分支估算式或該 producer 改動時重跑），任一分支違反 ⇒ 修該分支估算式後重跑。
   - 預算：設定欄 `memory_budget_ratio`（預設依待確認④）× 實體記憶體（`psutil.virtual_memory().total`）；可由設定覆寫為絕對位元組。
-- **驗證**：`pytest tests/feature_engineering/test_icfirstalign_memory.py` 綠：注入取樣器回傳（resident, footprint）＝（低, 高）使 resident＋planned ≤ 預算 < footprint＋planned ⇒ 拋具名錯誤；（高, 低）之對稱案例亦拋；mutant「只取 resident」、「只取 footprint」各使對應案例紅；配置前拒絕：以低於某層 planned_bytes 之預算跑精簡 P1 ⇒ 具名錯誤於該層函式被呼叫之前（spy 該層函式 0 次）；mutant「改為層後檢查」⇒ 紅；工作區安全間隙：真實 close 單欄、L3 只選 mean、多窗，注入目前取樣值 C，預算置於「C＋輸出 bytes」與「C＋fused 工作區 bytes」之間 ⇒ 於 fused 配置函式被呼叫前具名拒絕（allocator spy 0 次），mutant「L3 只計輸出容量」⇒ 通過並進配置而紅；同型安全間隙案例各一：L3 step 緩衝全數同時存活、`transform_selected` 已累積群組；linux 解析以 smaps_rollup 文字樣本（含 Swap 非 0）驗算；不支援平台 ⇒ 具名錯誤；真實取樣於本機回正整數。
+- **驗證**：`pytest tests/feature_engineering/test_icfirstalign_memory.py` 綠：注入取樣器回傳（resident, footprint）＝（低, 高）使 resident＋planned ≤ 預算 < footprint＋planned ⇒ 拋具名錯誤；（高, 低）之對稱案例亦拋；mutant「只取 resident」、「只取 footprint」各使對應案例紅；配置前拒絕：以低於某層 planned_bytes 之預算跑精簡 P1 ⇒ 具名錯誤於該層函式被呼叫之前（spy 該層函式 0 次）；mutant「改為層後檢查」⇒ 紅；工作區安全間隙：真實 close 單欄、L3 只選 mean、多窗，注入目前取樣值 C，預算置於「C＋輸出 bytes」與「C＋fused 工作區 bytes」之間 ⇒ 於 fused 配置函式被呼叫前具名拒絕（allocator spy 0 次），mutant「L3 只計輸出容量」⇒ 通過並進配置而紅；同型安全間隙案例各一（皆真實資料、注入取樣器、配置函式 spy，mutant 為「刪去該成分」）：L3 step 緩衝全數同時存活、L3 單窗六統計工作區與全 chunk 快取、L3 無 callback 之累積 step 表、L2 pandas 平行之全部類別表（`FFACT_USE_POLARS=0`、`FFACT_L2_CATEGORY_WORKERS=4`，預算置於「最大類別」與「全部類別和」之間 ⇒ 提交 ThreadPool 前拒絕）、L1 平行之全部引擎表、`transform_selected` 已累積群組；分支表完整性測試（上述 (i)）與 mutant「刪一分支估算函式」⇒ 紅；後備切換重判：numba 注入例外 ⇒ 後備配置前以後備分支重判（spy）；linux 解析以 smaps_rollup 文字樣本（含 Swap 非 0）驗算；不支援平台 ⇒ 具名錯誤；真實取樣於本機回正整數。
 - **邊界**：①planned_bytes 為 0 ⇒ 仍判現值；②預算由設定讀，不寫死機器大小；③超出時已落盤之暫存 registry 於例外路徑刪除。
 - **存活至**：永久。**覆蓋風險**：RM-FULLSCALE 換機時調比例。　不可做：不得以關閉預熱代替；不得以單一 RSS 或單一 footprint 代替雙取；不得於配置後才判定而宣稱配置前保護。
 
 **Task 4.3 — 記憶體量測序列（安全漸增）**
-- 目標：取得 resident 與 footprint 同時序列，供待確認④之比例，並核對 Task 4.2 之 planned_bytes 不低於各檢查點後之實測增量（任一檢查點實測增量 > planned ⇒ 回報並修該分支之計算式）；不重現 OOM。　檔案：探針 `handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py`；收據 `handoffs/run_receipts/<日期>-icfirstalign-memory-series.json`。
+- 目標：取得 resident 與 footprint 同時序列，供待確認④之比例；並以 Task 4.2 (ii) 之逐分支實跑收據為基礎，於漸增序列各步再核 planned_bytes 不低於各檢查點後之實測增量（任一檢查點實測增量 > planned ⇒ 回報並修該分支之計算式）；不重現 OOM。　檔案：探針 `handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py`；收據 `handoffs/run_receipts/<日期>-icfirstalign-memory-series.json`。
 - 改法：主證據沿用既有 PRE-RED 收據（不重跑）。探針於 Task 4.1、4.2 落地後，以精簡 L1 起、逐步增加 L1 類別與列數（每步工作集估計不超過前一步 2 倍），行程內取樣執行緒每 0.2 秒以 `sample_memory_bytes` 之同一 API 記（時間、resident、footprint、目前檢查點），逐筆寫檔；footprint 達實體記憶體 50% 即停止加步，任何時刻達 75% 即寫出部分時序並以具名 rc 結束；外部看門狗保留磁碟剩 < 4 GiB 終止。無「resident < footprint」之歧視樣本時，收據誠實記「未取得歧視樣本」，不據以宣稱 RSS 漏擋已重證。
 - **驗證**：收據含逐步之 resident／footprint 時序、各步峰值、停止原因；`test_icfirstalign_memory.py` 以注入取樣器驗停損：取樣值越過 75% ⇒ 部分時序檔存在且 rc 為具名值；mutant「移除停損」⇒ 紅。
 - **邊界**：①第一步即越過 50% ⇒ 停止並回報；②linux 未實跑 ⇒ 收據標明平台。
