@@ -34,6 +34,7 @@
 
 ## 坑
 - 🔴 **主委自任實作之提交閘**（2026-10-04 實測）：`gate.sh dispatch --impl-self` 須同帶 `--brief handoffs/...IMPL-B<N>-BRIEF.md`、`--spec`、`--todo <manifest>`、`--reconcile <戳記 synth>`、`--risk high --adversarial "waived:impl-self"` 與 intent／facts-asked／review-role／template；commit 訊息末段須同時帶 `Ticket-Batch: <日期>-<EPIC>/b<N>` 與 `Governance-Scope: out-of-epic ...`（缺後者 G-7 只警告，push 前須 amend）。同批審碼修補提交亦須重領（token 900 秒）。
+- **cca3d079 缺 `Governance-Scope` trailer（已知、刻意不改）**：2026-10-04 docs 提交漏帶，已推送；pre-push 只查 `@{u}..HEAD` 故不再觸發；只會出現在手動 G-7 全套（本已結構性恆紅）。使用者 2026-10-05 同意不強推改寫歷史——日後 G-7 紅勿誤判為新回歸。
 - 🔴 **ICFIRSTALIGN 期間之既有紅（HEAD 同紅、非本票造成，未列 allowed_red）**：`test_failopen_consumer.py::test_training_rejects_partial`、`::test_legacy_reader_strict_rejects_ic_and_training`、`test_ff_wrapper_path_correctness.py::test_v7_3_l65_polars_optimized_and_fracdiff_serial_paths`、`tests/api/test_ic_analysis_service.py` 三項 `append_cross_sectional_labels`、`tests/momentum/test_ic_cross_sectional_cut2.py::test_cross_sectional_e2e_real_path_append_and_analyze`、`tests/momentum/test_la2_lookahead.py::test_winsorized_disabled`、`::test_config_theater`；`check_decoupling.sh` 之 Rule 2/3/4 import scanner 亦於 HEAD 紅（`decouple_allowlist.md` 戳記驗證）。
 - 🔴 **小提交累計生產檔上限 3**（2026-10-04 實測）：pre-push 閘計算「自上次消耗 token 以來」不同生產檔數；TODO 空殼超過 3 檔須等 `--impl-self` token（需 SPEC＋合格 manifest）。ICFIRSTALIGN 之 `memory_guard.py` 空殼因此延至 b1 首批 commit。
 - 🔴 **真實資料之 FF 重測試一律單組串行**（2026-10-01 實測）：兩組並行（含「輕量」但有真實 CGSA run 者）時 numba 各吃滿 8 核＋置換數 GB ⇒ 同一測試慢 8–38 倍（`test_every_column_calibrated_before_output_start` 67 秒→42 分），總時長遠長於串行。委員審碼期間亦不另開。
