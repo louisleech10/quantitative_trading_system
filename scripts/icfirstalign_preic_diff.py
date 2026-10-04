@@ -117,9 +117,15 @@ def classify(name: str, old: Any, new: Any, sanitize_cap: float) -> str:
     nan_only_new = ~np.isnan(o) & np.isnan(n)
     nan_only_old = np.isnan(o) & ~np.isnan(n)
     # 只認「新值精確等於對舊值施作具名轉換之結果」；不以大小容差歸類（審碼 b2 r1 codex P2-01：容差會吸收真實漂移）
-    if not nan_only_old.any() and nan_only_new.any() and np.array_equal(o[both], n[both]):
-        if np.all(~np.isfinite(o[nan_only_new]) | (np.abs(o[nan_only_new]) > sanitize_cap)):
-            return "numeric_sanitize"  # CGSA 串流之 Layer B：inf／|v|>cap → NaN（逐值精確）
+    if not nan_only_old.any() and nan_only_new.any():
+        # CGSA 串流之 Layer B：以正式 `sanitize_array_inplace` 對舊值全欄淨化，新值須與之逐位置精確相等
+        # （審碼 b2 r2 codex P2-01：只核新增 NaN 合法會放過部分淨化）
+        from momentum.FeatureEngineering.utils.numeric_guards import sanitize_array_inplace
+
+        expected = o.copy()
+        sanitize_array_inplace(expected, finite_cap=sanitize_cap)
+        if np.array_equal(expected, n, equal_nan=True):
+            return "numeric_sanitize"
         return "unexplained"
     if not (nan_only_new.any() or nan_only_old.any()):
         with np.errstate(over="ignore"):

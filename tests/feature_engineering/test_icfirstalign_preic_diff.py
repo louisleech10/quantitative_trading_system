@@ -50,3 +50,15 @@ def test_sanitize_exact_classified() -> None:
     new = old.copy()
     new[7] = np.nan
     assert diff.classify("c", old, new, CAP) == "numeric_sanitize"
+
+
+def test_partial_sanitize_is_unexplained() -> None:
+    """codex r2 反例：同欄 +inf、-inf、超 cap 各一，只淨化其一 ⇒ 不等於正式全欄淨化 ⇒ unexplained；全淨化 ⇒ 具名。"""
+    old = _old()
+    old[1], old[2], old[3] = np.inf, -np.inf, 5e18
+    partial = old.copy()
+    partial[1] = np.nan
+    assert diff.classify("c", old, partial, CAP) == "unexplained"
+    full = old.copy()
+    full[[1, 2, 3]] = np.nan
+    assert diff.classify("c", old, full, CAP) == "numeric_sanitize"
