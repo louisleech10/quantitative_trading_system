@@ -1,9 +1,10 @@
-"""ICFIRSTALIGN 乙 Task 4.1：校準域改走正式 CGSA 層產出、逐群組歸約（docs/ICFIRSTALIGN_SPEC.md v20）。
+"""ICFIRSTALIGN 乙 Task 4.1：校準域改走正式 CGSA 層產出、逐群組歸約（docs/ICFIRSTALIGN_SPEC.md v21）。
 
 oracle：HEAD 凍結之 tests/_golden/icfirstalign/probe_baseline.json、calibration_baseline.json（甲＝HEAD 加兩處測試端替換；
 乙＝HEAD 預設；所測設定甲＝乙，收據 handoffs/run_receipts/20261004-icfirstalign-freeze-baselines.json）。
 新實作之介面（測試接縫）：`FeatureFactory._iter_calibration_domain_groups(symbol, tf, config, klines)` 逐群組產出
-（欄名、float32 陣列、索引），`FeatureFactory._public_warmup_first_finite`（末輪各週期「標記欄名→首個有限值時間」）。
+（群組 ID、欄名、float32 陣列＝registry 讀回陣列本身或其 view、索引），消費端以零複製建 frame 交
+`FeaturePreprocessor._apply_winsorization`；`FeatureFactory._public_warmup_first_finite`（末輪各週期「標記欄名→首個有限值時間」）。
 實作前應為紅：上述接縫不存在、校準域仍經 `_combine_layers(context="calibration_domain")`。
 """
 
@@ -131,68 +132,134 @@ def test_calibration_domain_never_merges_full_table(tmp_path: Path, monkeypatch:
     assert concat_calls["n"] == 0
 
 
-def _spy_group_reads(monkeypatch: pytest.MonkeyPatch) -> Dict[str, Any]:
-    state: Dict[str, Any] = {"live_max": 0, "refs": [], "dtypes": set(), "ids": []}
-    real = ColumnGroupRegistry.load_data
+def _spy_calibration(monkeypatch: pytest.MonkeyPatch) -> Dict[str, Any]:
+    """Task 4.1 驗證 (a)–(d) 之觀測接縫（不依值差；所測設定兩臂值相等）。
+
+    (a) 存活：對 `load_data` 實際回傳之陣列直接建 weakref（不經中介物件），只計校準歸約期之讀回；
+        計數點＝縮尾輸入端（消費端已把迴圈變數換成當前群組，前一群組應已無參照）。
+    (b) dtype：縮尾輸入 frame 之 dtype（讀回 dtype 另記，作落盤格式檢查）。
+    (c) L2 寫入來源：`_persist_layer2_category_group` 收到之 frame 須為當次 `compute_category` 回傳物件
+        （同一物件或逐欄共用記憶體）。
+    (d) L2 消費來源：縮尾輸入 frame 須與某個仍存活之校準期 registry 讀回陣列共用記憶體（零複製交接）。
+    """
+    from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
+
+    st: Dict[str, Any] = {"active": 0, "reads": [], "ids": [], "read_dtypes": set(), "live_max": 0,
+                          "winsor_calls": 0, "winsor_dtypes": set(), "unmatched": 0, "matched_ids": [],
+                          "category_out": {}, "category_calls": 0, "category_during_domain": 0,
+                          "l2_writes_active": 0, "l2_write_violations": 0}
+    real_load = ColumnGroupRegistry.load_data
 
     def load(self: ColumnGroupRegistry, group_id: str) -> np.ndarray:
-        arr = real(self, group_id)
-        state["ids"].append(group_id)
-        state["dtypes"].add(str(arr.dtype))
-        state["refs"] = [r for r in state["refs"] if r() is not None]
-        gc.collect()
-        state["refs"] = [r for r in state["refs"] if r() is not None]
-        holder = _Holder(arr)
-        state["refs"].append(weakref.ref(holder))
-        state["live_max"] = max(state["live_max"], len(state["refs"]))
-        return holder.array
+        arr = real_load(self, group_id)
+        st["ids"].append(group_id)
+        st["read_dtypes"].add(str(arr.dtype))
+        if st["active"]:
+            st["reads"].append((group_id, weakref.ref(arr)))
+        return arr
+
+    real_iter = ff.FeatureFactory._iter_calibration_domain_groups
+
+    def iter_groups(self: Any, *a: Any, **k: Any) -> Any:
+        st["active"] += 1
+        before = st["category_calls"]
+        try:
+            yield from real_iter(self, *a, **k)
+        finally:
+            st["active"] -= 1
+            st["category_during_domain"] += st["category_calls"] - before
+
+    real_winsor = FeaturePreprocessor._apply_winsorization
+
+    def winsor(self: FeaturePreprocessor, df: Any) -> Any:
+        if st["active"]:
+            gc.collect()
+            live = [(gid, r()) for gid, r in st["reads"]]
+            live = [(gid, arr) for gid, arr in live if arr is not None]
+            st["live_max"] = max(st["live_max"], len(live))
+            st["winsor_calls"] += 1
+            st["winsor_dtypes"].update(str(t) for t in df.dtypes.unique())
+            values = df.to_numpy()
+            hit = [gid for gid, arr in live if np.shares_memory(values, arr)]
+            if hit:
+                st["matched_ids"].extend(hit)
+            else:
+                st["unmatched"] += 1
+            del live, values
+        return real_winsor(self, df)
+
+    real_category = DerivedOperatorEngine.compute_category
+
+    def category(self: Any, layer1_df: Any, raw_data: Any, indicator_specs: Any, category: str) -> Any:
+        out = real_category(self, layer1_df, raw_data, indicator_specs, category)
+        st["category_calls"] += 1
+        st["category_out"][category] = weakref.ref(out) if out is not None else None
+        return out
+
+    real_persist = ff.FeatureFactory._persist_layer2_category_group
+
+    def persist(self: Any, category: str, frame: Any) -> None:
+        ref = st["category_out"].get(category)
+        src = ref() if ref is not None else None
+        same = src is not None and (frame is src or all(
+            np.shares_memory(frame[c].to_numpy(), src[c].to_numpy()) for c in frame.columns if c in src.columns
+        ) and set(frame.columns) <= set(src.columns))
+        if not same:
+            st["l2_write_violations"] += 1
+        if st["active"]:
+            st["l2_writes_active"] += 1
+        del src
+        return real_persist(self, category, frame)
 
     monkeypatch.setattr(ColumnGroupRegistry, "load_data", load)
-    return state
+    monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", iter_groups)
+    monkeypatch.setattr(FeaturePreprocessor, "_apply_winsorization", winsor)
+    monkeypatch.setattr(DerivedOperatorEngine, "compute_category", category)
+    monkeypatch.setattr(ff.FeatureFactory, "_persist_layer2_category_group", persist)
+    return st
 
 
-class _Holder:
-    __slots__ = ("array", "__weakref__")
+def _capture_returned_l2(monkeypatch: pytest.MonkeyPatch) -> Dict[str, Any]:
+    """mutant 用：記錄最近一次 `compute_all_polars` 回傳表（L2 回傳表臂）。"""
+    from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
 
-    def __init__(self, array: np.ndarray) -> None:
-        self.array = array
+    last: Dict[str, Any] = {}
+    real_all = DerivedOperatorEngine.compute_all_polars
+
+    def compute_all(self: Any, *a: Any, **k: Any) -> Any:
+        last["ret"] = real_all(self, *a, **k)
+        return last["ret"]
+
+    monkeypatch.setattr(DerivedOperatorEngine, "compute_all_polars", compute_all)
+    return last
 
 
 def test_reduction_holds_at_most_one_group_and_float32(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    state = _spy_group_reads(monkeypatch)
-    _generate(tmp_path, monkeypatch, frz.p1_payload(), frz.P1_WINDOW)
-    assert state["ids"], "校準域須逐群組自暫存 registry 讀回"
-    assert state["live_max"] <= 1
-    assert state["dtypes"] == {"float32"}
+    """(a)(b)：縮尾輸入端同時存活之校準期讀回陣列恰 1、縮尾輸入 dtype 恆 float32。"""
+    st = _spy_calibration(monkeypatch)
+    _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
+    assert st["ids"], "校準域須逐群組自暫存 registry 讀回"
+    assert st["winsor_calls"] > 0
+    assert st["live_max"] == 1
+    assert st["read_dtypes"] == {"float32"}
+    assert st["winsor_dtypes"] == {"float32"}
 
 
 def test_calibration_l2_values_from_registry_category_groups(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    state = _spy_group_reads(monkeypatch)
-    from momentum.FeatureEngineering.operators.derived_operators import DerivedOperatorEngine
-
-    calls = {"category": 0}
-    real = DerivedOperatorEngine.compute_category
-    monkeypatch.setattr(DerivedOperatorEngine, "compute_category",
-                        lambda self, *a, **k: (calls.__setitem__("category", calls["category"] + 1), real(self, *a, **k))[1])
-    real_iter = ff.FeatureFactory._iter_calibration_domain_groups
-    in_domain = {"category_during_domain": 0}
-
-    def iter_groups(self: Any, *a: Any, **k: Any) -> Any:
-        before = calls["category"]
-        yield from real_iter(self, *a, **k)
-        in_domain["category_during_domain"] += calls["category"] - before
-
-    monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", iter_groups)
-    _generate(tmp_path, monkeypatch, frz.p1_payload(), frz.P1_WINDOW)
-    assert any("_L2_" in gid for gid in state["ids"])
-    assert in_domain["category_during_domain"] > 0
+    """(c)(d)：L2 群組由 `compute_category` 回傳物件寫入；縮尾輸入零複製來自 registry 讀回（含 L2 群組）。"""
+    st = _spy_calibration(monkeypatch)
+    _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
+    assert st["category_during_domain"] > 0
+    assert st["l2_writes_active"] > 0 and st["l2_write_violations"] == 0
+    assert st["winsor_calls"] > 0 and st["unmatched"] == 0
+    assert any("_L2_" in gid for gid in st["matched_ids"])
 
 
 # ---------------------------------------------------------------- 邊界
 
 def test_boundary_01_empty_layer_yields_no_groups(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 4.1 邊界①：某層為空（L3 關）⇒ 無該層群組、探測照常完成。"""
-    state = _spy_group_reads(monkeypatch)
+    state = _spy_calibration(monkeypatch)
     payload = frz.p1_payload()
     payload["rolling_aggregation"] = {"enabled": False}
     factory = _generate(tmp_path, monkeypatch, payload, frz.P1_WINDOW)
@@ -256,43 +323,63 @@ def test_mutation_winsor_skipped_changes_first_finite(tmp_path: Path, monkeypatc
 
 
 def test_mutation_reduction_accumulates_all_groups(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：歸約前把全部群組累積成一表 ⇒ 同時存活群組數 > 1。"""
-    state = _spy_group_reads(monkeypatch)
-    real_iter = ff.FeatureFactory._iter_calibration_domain_groups
+    """mutant (a)：歸約前把全部群組累積成一表（讀回陣列全數持有）⇒ 縮尾輸入端存活數 > 1。"""
+    st = _spy_calibration(monkeypatch)
+    spied_iter = ff.FeatureFactory._iter_calibration_domain_groups
 
     def accumulate(self: Any, *a: Any, **k: Any) -> Any:
-        groups = list(real_iter(self, *a, **k))
+        groups = list(spied_iter(self, *a, **k))
         yield from groups
 
     monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", accumulate)
-    _generate(tmp_path, monkeypatch, frz.p1_payload(), frz.P1_WINDOW)
-    assert state["live_max"] > 1
+    _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
+    assert st["live_max"] > 1
 
 
 def test_mutation_group_cast_float64_before_winsor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：群組讀回後先轉 float64 ⇒ dtype 斷言翻轉。"""
-    real = ColumnGroupRegistry.load_data
-    monkeypatch.setattr(ColumnGroupRegistry, "load_data", lambda self, gid: real(self, gid).astype(np.float64))
-    state = _spy_group_reads(monkeypatch)
-    _generate(tmp_path, monkeypatch, frz.p1_payload(), frz.P1_WINDOW)
-    assert "float64" in state["dtypes"]
+    """mutant (b)：群組讀回、交出後先轉 float64 再縮尾（reader 本身不變）⇒ 縮尾輸入 dtype 斷言翻轉。"""
+    st = _spy_calibration(monkeypatch)
+    spied_iter = ff.FeatureFactory._iter_calibration_domain_groups
+
+    def cast(self: Any, *a: Any, **k: Any) -> Any:
+        for gid, names, arr, idx in spied_iter(self, *a, **k):
+            yield gid, names, arr.astype(np.float64), idx
+
+    monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", cast)
+    _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
+    assert st["read_dtypes"] == {"float32"}
+    assert "float64" in st["winsor_dtypes"]
 
 
-def test_mutation_l2_from_returned_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：校準域 L2 改取回傳表（不讀 registry L2 群組）⇒ 讀回之群組 ID 不含 L2。"""
-    state = _spy_group_reads(monkeypatch)
-    real_iter = ff.FeatureFactory._iter_calibration_domain_groups
+def test_mutation_l2_written_from_returned_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant (c)：仍呼叫 `compute_category`，但以 `compute_all_polars` 回傳表之該類別欄寫入 L2 群組 ⇒ 寫入來源斷言紅。"""
+    st = _spy_calibration(monkeypatch)
+    last = _capture_returned_l2(monkeypatch)
+    spied_persist = ff.FeatureFactory._persist_layer2_category_group
+    monkeypatch.setattr(ff.FeatureFactory, "_persist_layer2_category_group",
+                        lambda self, category, frame: spied_persist(self, category,
+                                                                    last["ret"].reindex(columns=frame.columns)))
+    _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
+    assert st["category_during_domain"] > 0
+    assert st["l2_write_violations"] > 0
 
-    def without_l2(self: Any, *a: Any, **k: Any) -> Any:
-        for item in real_iter(self, *a, **k):
-            if "_L2_" not in str(item[0]):
-                yield item
 
-    monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", without_l2)
-    monkeypatch.setattr(ColumnGroupRegistry, "load_data",
-                        lambda self, gid, _real=ColumnGroupRegistry.load_data: _real(self, gid))
-    _generate(tmp_path, monkeypatch, frz.p1_payload(), frz.P1_WINDOW)
-    assert not any("_L2_" in gid for gid in state["ids"] if state["ids"])
+def test_mutation_l2_handed_from_returned_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant (d)：保留 `compute_category` 與 registry L2 讀回，但交出回傳表值（值相等）⇒ 消費來源斷言紅。"""
+    st = _spy_calibration(monkeypatch)
+    last = _capture_returned_l2(monkeypatch)
+    spied_iter = ff.FeatureFactory._iter_calibration_domain_groups
+
+    def swap(self: Any, *a: Any, **k: Any) -> Any:
+        for gid, names, arr, idx in spied_iter(self, *a, **k):
+            if "_L2_" in str(gid):
+                arr = last["ret"].reindex(index=idx, columns=names).to_numpy(np.float32)
+            yield gid, names, arr, idx
+
+    monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", swap)
+    _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
+    assert any("_L2_" in gid for gid in st["ids"])
+    assert st["unmatched"] > 0
 
 
 def test_mutation_missing_group_changes_column_set_digest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
