@@ -139,8 +139,9 @@
     "IC.selected_read",
     "PostIC.transform_selected",
     "Calib.group_reduce",
-    "MTF.align_persist",
-    "MTF.align_compact"
+    "MTF.align_index",
+    "MTF.align_compact",
+    "MTF.align_persist"
   ],
   "branch_components": {
     "L1.serial": [
@@ -247,11 +248,24 @@
     "MTF.align_persist": [
       "source_dense",
       "source_map:mapped",
+      "legacy_cast",
       "aligned_output:mapped",
-      "block_scratch"
+      "block_valid",
+      "block_gather_idx",
+      "block_gather",
+      "block_cast"
     ],
     "MTF.align_compact": [
-      "idx_map"
+      "idx_map_int32"
+    ],
+    "MTF.align_index": [
+      "primary_seconds",
+      "source_seconds",
+      "decision_ns",
+      "source_close_ns",
+      "idx",
+      "valid_positions",
+      "mismatch_mask"
     ]
   },
   "arm_functions": {
@@ -349,5 +363,13 @@
     "np.lib.format.open_memmap",
     "np.load(mmap_mode)",
     "pa.memory_map"
-  ]
+  ],
+  "mapped_lifetimes": {
+    "spill": "run",
+    "return_table": "run",
+    "output_memmap": "run",
+    "shard_map": "segment",
+    "source_map": "segment",
+    "aligned_output": "segment"
+  }
 }

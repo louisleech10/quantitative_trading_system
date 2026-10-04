@@ -46,6 +46,8 @@ class Component:
     nbytes: int
     entry: Optional[str] = None
     count: int = 1
+    # mapped 成分之生命期：`segment`＝於下一次 check 前釋放；`run`＝於該 run 之層結束前釋放（例 L2 spill）。
+    lifetime: str = "segment"
 
 
 @dataclass(frozen=True)

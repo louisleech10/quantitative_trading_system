@@ -329,7 +329,7 @@ def _shape_params() -> Dict[str, Any]:
     return {"rows": 1000, "input_cols": 2, "output_cols": 40, "windows": 2, "steps": 7, "buffer_cols": 64,
             "chunk_cols": 256, "workers": 4, "categories": 6, "max_category_cols": 20, "category_cols_sum": 52,
             "group_cols": 10, "selected_cols": 5, "n_calibration": 500, "accumulated_cols": 5,
-            "primary_rows": 1200, "source_shards": 3, "align_block_rows": 1024}
+            "primary_rows": 1200, "source_rows": 400, "source_shards": 3, "align_block_rows": 1024}
 
 
 @pytest.mark.parametrize("branch", C["branch_ids"])
@@ -510,6 +510,13 @@ def test_branch_table_coverage_over_population(tmp_path: Path, monkeypatch: pyte
                 mp.setenv("FFACT_L2_CATEGORY_WORKERS", workers)
                 mp.setenv("FFACT_LAYER1_PARALLEL", parallel)
                 h.generate_s2(root, h.s2_payload(rolling_aggregation={"enabled": False}))
+        for compact in ("0", "1"):  # r24：真實多週期 [12h, 4h] 之 dense／compact 兩臂（`MTF.align_*` 只在此命中）
+            with pytest.MonkeyPatch.context() as mp:
+                root = h.isolated(mp, tmp_path / f"mtf_compact{compact}")
+                mp.setenv("FFACT_MULTI_TF_PARALLEL", "1")
+                mp.setenv("FFACT_MULTI_TF_MAX_WORKERS", "1")
+                mp.setenv("FFACT_MULTI_TF_COMPACT_ALIGNMENT", compact)
+                h.generate_s2(root, h.s2_payload(["12h", "4h"], rolling_aggregation={"enabled": False}))
         with pytest.MonkeyPatch.context() as mp:
             root = h.isolated(mp, tmp_path / "icfirst")
             factory = h.make_factory(root)
@@ -796,24 +803,52 @@ def test_mutation_same_constructor_new_call_site_detected() -> None:
 
 
 @pytest.mark.parametrize("case", ["l3_pandas_fallback", "l2_spill", "registry_multi_shard", "mtf_align_dense",
-                                  "mtf_align_sharded"])
+                                  "mtf_align_sharded", "mtf_align_compact"])
 def test_mapped_tags_match_observed_allocations(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str) -> None:
     """標記核對：逐 check 段，觀測之映射配置與該段 `mapped` 成分逐項一一對應（段、入口、容量）；
-    入口屬登記之建構子名；案例結束時全部映射已釋放。"""
+    入口屬登記之建構子名；釋放段合於宣告之生命期（r24）；案例結束時全部映射已釋放。"""
     observed = _observe_mappings(case, tmp_path, monkeypatch)
     declared = _declared_mapped(case)
     assert observed, "案例須實際觸及映射入口"
     assert {e for _, e, _ in declared} <= set(C["mapping_constructors"])
     assert sorted(observed) == sorted(declared)
+    assert _lifetime_violations() == []
     assert _observe_mappings.leaks == []  # type: ignore[attr-defined]
     if case == "mtf_align_dense":
         assert any(e == "np.lib.format.open_memmap" for _, e, _ in observed)
     if case == "mtf_align_sharded":
+        groups = getattr(_run_mapping_case, "source_groups", [])
+        multi = [n for _, n in groups if n > 1]
+        assert multi, "須有同一來源群組分片數 > 1"
         per_seg: Dict[int, int] = {}
         for seg, e, _ in observed:
             if e == "np.load(mmap_mode)":
                 per_seg[seg] = per_seg.get(seg, 0) + 1
-        assert per_seg and max(per_seg.values()) > 1, "分片來源須逐片映射"
+        assert any(n in per_seg.values() for n in multi), "某段之逐片映射次數須等於該群組分片數"
+
+
+def test_mutation_mapping_released_next_segment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant（r24）：分片映射延後至下一段才釋放（測試端持有每片映射至下一次 check）⇒ 生命期斷言紅。"""
+    held: List[Any] = []
+    real_check = mb.check
+
+    def check_then_drop(branch_id: str, components: Any, **kw: Any) -> None:
+        out = real_check(branch_id, components, **kw)
+        held.clear()  # 於下一次 check 之後才放手
+        return out
+
+    real_load = np.load
+
+    def load_and_hold(path: Any, *a: Any, mmap_mode: Any = None, **k: Any) -> Any:
+        out = real_load(path, *a, mmap_mode=mmap_mode, **k)
+        if mmap_mode:
+            held.append(out)
+        return out
+
+    monkeypatch.setattr(mb, "check", check_then_drop)
+    monkeypatch.setattr(np, "load", load_and_hold)
+    _observe_mappings("registry_multi_shard", tmp_path, monkeypatch)
+    assert _lifetime_violations()
 
 
 def test_mutation_mtf_aligned_output_tagged_anon(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -880,12 +915,17 @@ def _observe_mappings(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     def note(entry: str, obj: Any, nbytes: int) -> Any:
         rec = (len(state["recorded"]) - 1, entry, int(nbytes))
         seen.append(rec)
-        alive = {"v": True}
+        alive: Dict[str, Any] = {"v": True, "release_seg": None}
+
+        def released() -> None:  # r24：記釋放當下之 check 段
+            alive["v"] = False
+            alive["release_seg"] = len(state["recorded"]) - 1
+
         try:
-            weakref.finalize(obj, alive.__setitem__, "v", False)
+            weakref.finalize(obj, released)
         except TypeError:  # 不支援 weakref 之物件（例 pyarrow 檔案）：以 close 記釋放
             real_close = obj.close
-            obj.close = lambda *a, **k: (alive.__setitem__("v", False), real_close(*a, **k))[1]  # type: ignore[method-assign]
+            obj.close = lambda *a, **k: (released(), real_close(*a, **k))[1]  # type: ignore[method-assign]
         state.setdefault("alive", []).append((rec, alive))
         return obj
 
@@ -911,18 +951,40 @@ def _observe_mappings(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     leaks.extend(rec for rec, alive in state.get("alive", []) if alive["v"])
     _observe_mappings.recorded = list(recorded)  # type: ignore[attr-defined]
     _observe_mappings.leaks = leaks  # type: ignore[attr-defined]
+    _observe_mappings.intervals = [(rec, alive["release_seg"]) for rec, alive in state.get("alive", [])]  # type: ignore[attr-defined]
     return seen
 
 
 def _declared_mapped(case: str) -> List[Tuple[int, str, int]]:
     """分支表於各 check 段宣告之 mapped 成分：（段, 入口, 容量）× 次數。"""
+    return [(seg, entry, nbytes) for seg, entry, nbytes, _ in _declared_mapped_with_lifetime()]
+
+
+def _declared_mapped_with_lifetime() -> List[Tuple[int, str, int, str]]:
     recorded = getattr(_observe_mappings, "recorded", [])
-    out: List[Tuple[int, str, int]] = []
+    out: List[Tuple[int, str, int, str]] = []
     for seg, (_, comps) in enumerate(recorded):
         for c in comps:
             if c.kind == "mapped":
-                out.extend([(seg, c.entry, c.nbytes)] * c.count)
+                assert c.lifetime == C["mapped_lifetimes"][c.name], f"{c.name} 生命期須依契約"
+                out.extend([(seg, c.entry, c.nbytes, c.lifetime)] * c.count)
     return out
+
+
+def _lifetime_violations() -> List[Any]:
+    """`segment` 生命期之映射須於建立段內釋放（釋放段＝建立段）；`run` 者只須於案例結束前釋放（洩漏另核）。"""
+    lifetimes: Dict[Tuple[int, str, int], List[str]] = {}
+    for seg, entry, nbytes, life in _declared_mapped_with_lifetime():
+        lifetimes.setdefault((seg, entry, nbytes), []).append(life)
+    bad = []
+    for rec, release_seg in sorted(getattr(_observe_mappings, "intervals", []), key=lambda x: x[0]):
+        pool = lifetimes.get(rec, [])
+        life = "segment" if "segment" in pool else (pool[0] if pool else None)
+        if life in pool:
+            pool.remove(life)
+        if life == "segment" and release_seg != rec[0]:
+            bad.append((rec, release_seg))
+    return bad
 
 
 def _run_mapping_case(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -937,14 +999,49 @@ def _run_mapping_case(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     if case == "l2_spill":
         h.generate_s2(root, h.s2_payload(rolling_aggregation={"enabled": False}))
         return
-    if case in ("mtf_align_dense", "mtf_align_sharded"):
-        # 真實 kline [12h, 4h]、子行程生成、根行程逐群組 dense 對齊落盤（compact 關）；分片案例以小分片目標
-        # （環境變數，spawn 子行程繼承）使 worker 輸出多片、根行程逐片 np.load(mmap_mode)。
+    if case in ("mtf_align_dense", "mtf_align_sharded", "mtf_align_compact"):
+        # 真實 kline [12h, 4h]；根行程逐群組對齊（dense＝compact 關，compact＝compact 開）。
         monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "1")
         monkeypatch.setenv("FFACT_MULTI_TF_MAX_WORKERS", "1")
-        monkeypatch.setenv("FFACT_MULTI_TF_COMPACT_ALIGNMENT", "0")
+        monkeypatch.setenv("FFACT_MULTI_TF_COMPACT_ALIGNMENT", "1" if case == "mtf_align_compact" else "0")
         if case == "mtf_align_sharded":
-            monkeypatch.setenv("FFACT_CGSA_SHARD_BYTES", str(256 * 1024))
+            # r24：`FFACT_CGSA_SHARD_BYTES` 有 32 MiB 下限（hardware_utils），小環境值無法強制多片；
+            # 改以行程內執行器代替 spawn、於同一行程覆寫分片目標 helper，worker 輸出多片，根行程逐片映射。
+            import concurrent.futures as cf
+
+            from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
+            from momentum.FeatureEngineering.utils import hardware_utils
+
+            class InProcessExecutor:
+                def __init__(self, *a: Any, **k: Any) -> None:
+                    pass
+
+                def __enter__(self) -> "InProcessExecutor":
+                    return self
+
+                def __exit__(self, *exc: Any) -> None:
+                    return None
+
+                def submit(self, fn: Callable[..., Any], *a: Any, **k: Any) -> cf.Future:
+                    fut: cf.Future = cf.Future()
+                    try:
+                        fut.set_result(fn(*a, **k))
+                    except BaseException as exc:  # noqa: BLE001 — 與 pool 語意同：例外交由 result() 拋
+                        fut.set_exception(exc)
+                    return fut
+
+            monkeypatch.setenv("NUMBA_NUM_THREADS", os.environ.get("NUMBA_NUM_THREADS", "1"))  # worker 會改寫，結束還原
+            monkeypatch.setattr(cf, "ProcessPoolExecutor", InProcessExecutor)
+            monkeypatch.setattr(hardware_utils, "get_cgsa_shard_bytes", lambda: 256 * 1024)
+            groups: List[Tuple[str, int]] = []
+            real_src = MultiTFGenerator._load_worker_group_source_array
+
+            def src(group_data: Dict) -> Any:
+                groups.append((str(group_data.get("group_id")), len(group_data.get("shards") or [])))
+                return real_src(group_data)
+
+            monkeypatch.setattr(MultiTFGenerator, "_load_worker_group_source_array", staticmethod(src))
+            _run_mapping_case.source_groups = groups  # type: ignore[attr-defined]
         h.generate_s2(root, h.s2_payload(["12h", "4h"], rolling_aggregation={"enabled": False}))
         return
     if case == "registry_multi_shard":

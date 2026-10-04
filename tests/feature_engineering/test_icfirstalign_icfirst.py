@@ -200,7 +200,9 @@ def _spy_guard(monkeypatch: pytest.MonkeyPatch, root: Path) -> Dict[str, Any]:
         return lease
 
     def release(self: RunLease) -> None:
+        # r24：於實際釋放鎖之前記錄守護是否已回收（先釋放 lease 再停守護之實作 ⇒ 此處為 True）
         st["events"].append(("release", ""))
+        st.setdefault("guard_alive_at_release", []).append(any(_guard_alive(p) for p in st["pids"]))
         return real_release(self)
 
     real_ic = ICEngine.compute_ic_from_l7_raw
@@ -251,6 +253,7 @@ def test_formal_run_guard_lifecycle(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert kinds.index("acquire") < kinds.index("recover") < kinds.index("start_guard")
     assert not _guard_alive(st["pids"][0]), "run 出口後守護行程仍存活"
     assert "release" in kinds and kinds.count("acquire") == kinds.count("release")
+    assert st["guard_alive_at_release"] and not any(st["guard_alive_at_release"]), "守護須於 lease 釋放前停止並回收"
     if entry == "ic_first" and failure != "generation":
         assert st["alive_during_ic"] and all(all(a) for a in st["alive_during_ic"])
         assert kinds.count("acquire") == 1

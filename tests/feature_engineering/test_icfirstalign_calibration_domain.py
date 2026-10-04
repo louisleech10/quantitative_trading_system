@@ -298,11 +298,12 @@ def test_boundary_04_disk_precheck_insufficient_raises_named(tmp_path: Path, mon
     tmp_root.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_root))
     real_free = ColumnGroupRegistry._disk_free_bytes
-    hits = {"calibration": 0}
+    hits: Dict[str, Any] = {"calibration": 0, "paths": set()}
 
     def free(path: Path) -> Any:
         if cal.CALIBRATION_TMP_PREFIX in str(path):
             hits["calibration"] += 1
+            hits["paths"].add(Path(path))
             return 0
         return real_free(path)
 
@@ -313,6 +314,9 @@ def test_boundary_04_disk_precheck_insufficient_raises_named(tmp_path: Path, mon
     assert "Insufficient disk space" in str(info.value)
     assert hits["calibration"] > 0
     assert not [p for p in tmp_root.iterdir() if p.name.startswith(cal.CALIBRATION_TMP_PREFIX)]
+    # r24：暫存目錄可能落於映射根而非 TMPDIR——以預檢實際看到之路徑核其校準暫存根已刪
+    roots = {next((a for a in [p, *p.parents] if a.name.startswith(cal.CALIBRATION_TMP_PREFIX)), p) for p in hits["paths"]}
+    assert roots and not [r for r in roots if r.exists()]
     assert hasattr(ff.FeatureFactory, "_iter_calibration_domain_groups")
 
 
