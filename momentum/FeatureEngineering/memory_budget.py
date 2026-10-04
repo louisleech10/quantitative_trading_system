@@ -194,6 +194,28 @@ def recover_aborted_run(run_dir: Path) -> Dict[str, Any]:
     raise NotImplementedError("ICFIRSTALIGN Task 4.2")
 
 
+# ---------------------------------------------------------------- 測試接縫（只供驗收測試注入；生產不呼叫）
+
+def sampler_override(fn: Callable[[], Mapping[str, int]]) -> Any:
+    """context manager：以 `fn()` 回傳之 {"resident": B, "phys_footprint": B} 取代 `_read_rusage`。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
+def budget_override(nbytes: int) -> Any:
+    """context manager：本 context 內上限改為 `nbytes`（絕對位元組）。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
+def vm_snapshot_override(snapshot: VMSnapshot) -> Any:
+    """context manager：本 context 內 `sample_vm_snapshot` 回傳 `snapshot`。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
+def check_recorder() -> Any:
+    """context manager：記錄本 context 內每次 `check` 之 (branch_id, components)；回傳 list。"""
+    raise NotImplementedError("ICFIRSTALIGN Task 4.2")
+
+
 __all__ = [
     "GenerationMemoryBudgetExceeded", "MemoryMeasurementUnavailable", "UnknownBudgetBranchError", "Component", "VMSnapshot",
     "SELECTORS", "NON_ARM_FFACT_KEYS", "BRANCH_TABLE", "STOP_FLAG_NAME", "ABORT_RECEIPT_NAME", "OWNED_PATHS_NAME",
@@ -201,4 +223,5 @@ __all__ = [
     "disk_reserve_bytes", "budget_bytes", "planned_bytes", "normalize_selectors", "selector", "check",
     "reset_interval_peak", "read_interval_peak", "backing_bus_protocol", "assert_disk_backed", "mapping_root",
     "GuardHandle", "start_guard", "stop_flag_set", "register_owned_path", "recover_aborted_run",
+    "sampler_override", "budget_override", "vm_snapshot_override", "check_recorder",
 ]
