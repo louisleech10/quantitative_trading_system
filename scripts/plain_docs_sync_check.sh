@@ -78,6 +78,8 @@ _watched_for() {
     # 樣式分派：`<票名>結論.md` 一律盯 ROADMAP 與缺口登記；新票之結論書自動取得 WATCHED。
     *結論.md)                         echo "docs/ROADMAP.md docs/IC_QUANT_GAP_REGISTRY.md" ;;
     "EVENTSCAN方向與做法.md")        echo "momentum/Analysis/event_samples/ momentum/DataExtraction/case_search_engine.py momentum/Analysis/net_ic_analyzer.py docs/ROADMAP.md" ;;
+    # 2026-10-04 ICFIRSTALIGN：使用者核可閘之逐點白話（待確認①–⑥）；盯 SPEC 本體——規格一改，說明必須跟著重講。
+    "ICFIRSTALIGN待你核可的6點.md")  echo "docs/ICFIRSTALIGN_SPEC.md" ;;
     # 2026-09-22 PROCOPT：一次性審閱文件（使用者逐條裁決 D1–D8 後封存）。
     #   盯其所描述之三個權威來源：決策紀錄、流程憲法、編排手冊——
     #   任一改動代表「文中所寫的現行條文或結論已非現況」，該檔必須同步。
