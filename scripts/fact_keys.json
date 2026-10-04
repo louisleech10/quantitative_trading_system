@@ -517,7 +517,7 @@
         "NUMVIEW：post-IC 正式轉換臂政策＋來源精度量測＋臂／算法 fingerprint 入不可變 view 身分",
         "未開工",
         "docs/TICKET_ORDER.md",
-        "全票排序第 8 步（PRE-PROV 後、縮尾前）：承接 ICPOSTLEAK §N 各分支 zscore 核心差研究、來源→計算→float32→實際 codec→讀回之誤差與比較翻轉量測（不重議使用者 2026-09-29 dtype 裁定）；若改正式核心，實修與兩路 oracle 於此步完成，以免 ICPATH／GLOBALH 重驗"
+        "全票排序第 8 步（PRE-PROV 後、縮尾前）：承接 ICPOSTLEAK §N 各分支 zscore 核心差研究、來源→計算→float32→實際 codec→讀回之誤差與比較翻轉量測（不重議使用者 2026-09-29 dtype 裁定）；若改正式核心，實修與兩路 oracle 於此步完成，以免 ICPATH／GLOBALH 重驗；另承接 ICFIRSTALIGN §N：正式生成 L2 兩計算臂（公開落盤＝逐類別 compute_category、L5／L6 吃 compute_all_polars 回傳表，差異為浮點捨入量級，收據 handoffs/run_receipts/20261004-icfirstalign-l2-arm.json）之統一"
       ],
       [
         "342",

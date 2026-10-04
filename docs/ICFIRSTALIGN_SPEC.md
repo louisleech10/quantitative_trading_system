@@ -1,7 +1,7 @@
 # ICFIRSTALIGN 乙：IC-first 時間軸、CGSA 合一、不可變 run context 與預熱探測記憶體失控（F-2） — SPEC
 
 > 來源 PLAN/診斷：`docs/TICKET_ORDER.md` 第 4 步；偵察收斂 `handoffs/reconcile/20261004-icfirstalign-x-consult-r1/synth.md`（兩家＋主委獨立版 `handoffs/20261004-icfirstalign-recon-claude.md`）；SPEC 審查第一輪收斂 `handoffs/reconcile/20261004-icfirstalign-x-review-r1/synth.md`；PRE-RED 移交 F-2（`handoffs/run_receipts/20261003-prered-f2-memory.json`）　|　日期：2026-10-04　|　對應 TODO：`docs/manifests/ICFIRSTALIGN.json`
-> 版本：v2（主委改寫：第 4 階段改走正式 CGSA 層產出、配置前預算、lease 單一擁有者、cache 身分逐欄可證偽、介面與時間軸辨識力補齊）
+> 版本：v3（主委依第二輪審查修訂：校準域 L2 取公開落盤之同一計算臂、L3 非串流臂不得丟表、配置前預算按實際工作集計、cleanup 後重生於同一 lease 內、時區與共用 H5 契約）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大。命中 (a)(b)(c)(d)。
@@ -9,7 +9,7 @@
 - RISK-HIT: a,b,c,d
 
 ## §A 假設與待使用者確認（事故：拿推論代替問人）
-- **已驗證事實**（6 條 FACT-RECEIPT＋9 條宣告）：
+- **已驗證事實**（7 條 FACT-RECEIPT＋11 條宣告）：
   - FACT-RECEIPT: `env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_calibration_domain_probe.py`（收據 `handoffs/run_receipts/20261004-icfirstalign-f2-calibration-domain.json`；BTCUSDT 12h＋[12h, 1h]、14 天公開窗、精簡 L1＝EMA8／SMA13、L2–L6 預設、dead-drop 關、CGSA、persist=True）→ 印出校準域計算 2 次，呼叫鏈皆 `generate_features → _generate_features_impl → _resolve_public_window → compute_calibration_domain`；12h 輸入 1,236 列 → 1,236×321，1h 輸入 14,830 列 → 14,830×321；各經 5-DF `concat_with_memmap`；全程 45 秒、max RSS 0.51 GB、peak footprint 0.50 GB（主委 實跑 2026-10-04）。
   - FACT-RECEIPT: `zsh handoffs/run_receipts/prered_probes/f2_memory_receipt.sh handoffs/run_receipts/20261003-prered-v7seed-HEAD.log <out>`（收據 `handoffs/run_receipts/20261003-prered-f2-memory.json`；完整 L1 原設定）→ 印出被系統終止、918 秒、max RSS 3.17 GB、peak footprint 29.0 GB；最後明示完成段＝1h Layer 6，其後 `[memmap concat] 5 DFs → 92617 cols × 20329 rows ≈ 7.53 GB`（主委 實跑 2026-10-03）。⇒ 生成前段之預熱探測校準域即 F-2 落點；該段無任何記憶體檢查點（現行 RSS 閘只在 IC-first 之 FF:2685、:2706），且 RSS 遠小於 footprint——此收據即「生成缺保護、RSS 低估」之主證據，不重現。
   - FACT-RECEIPT: `bash handoffs/run_receipts/prered_probes/node_at_commit_watched.sh <S> <commit> tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline`（PRE-RED 收據）→ HEAD peak footprint 約 71 GB 被終止；`d229336e^` 1 passed、0.80 GB（主委 實跑 2026-10-03）。⇒ F-2 由 `d229336e`（FF-STAT 第 4 批，預熱恆開）引入。
@@ -22,10 +22,13 @@
   - 宣告——lease：`generate_features`（FF:296–320）自取 `RunLease.acquire(..., timeout=0)`，`lease_sink` 給定時**只在成功後**把 lease 交呼叫端持有（例外時自行釋放）；`run_ic_first` 另自取同 key 之 lease（FF:2565）。同 key 巢狀 acquire 實跑得 `RunBusyError`（審查 r1 兩家皆實跑）。`generate_features` 未命中 H5 cache 時才生成（FF:414–417 `_try_load_cache`），命中時不核 raw 成品是否尚存。
   - FACT-RECEIPT: `grep -n 'dtype="float32"' momentum/FeatureEngineering/feature_factory.py` → 印出 :1342、:1365、:1411（L1、L2、L3–L6 之 CGSA 群組宣告）（主委 實跑 2026-10-04）。⇒ CGSA 層產出（正式生成，registry 已設時）：L1 依（類別, 指標）落 float32 群組（FF:1311–1344）；L2 以 Polars 算全表供後層、另逐類別重算落 float32 群組（:1755–1777），全表隨後 `_spill_to_memmap` 為 float32 memmap（:476–483）；L3 於 persist mode 為 streaming／hybrid 時經 `_StreamingL3Persister` 逐批落盤、回空表（:1806–1840）；L4 於 CGSA 強制 `apply_to="layer1_and_raw"`，只吃 raw＋L1（:1869–1878）；L3–L6 於層末經 `_persist_single_tf_l3_l6_to_cgsa`（:3725–3742）落 float32 群組。`ColumnGroupRegistry(work_dir)`（`momentum/FeatureEngineering/core/column_group_registry.py:104`）支援逐群組 `load_data`（:296）、`iter_shards`（:352）、`cleanup`（:1281），落盤前有累計磁碟預檢（:992）。
   - FACT-RECEIPT: `env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/dtype_branch_probe.py`（收據 `handoffs/run_receipts/20261004-icfirstalign-dtype-branch.json`；真實 BTCUSDT 12h 尾 800 根 close 與單棒 return，只把 `threshold_bytes` 設 1 觸發既有分支）→ 印出小分支 dtype float64、大分支 float32；縮尾開：「float32 分支後縮尾」vs「float64 逐欄縮尾」有限值差異 1 個、首個有限值列兩邊皆 [251, 252]、小分支後縮尾＝float64 逐欄縮尾；縮尾關：兩分支有限值差異 799 個；`proc_pid_rusage` rc=0、單次 0.03 ms、resident 250,232,832 B、phys_footprint 167,642,168 B（主委 實跑 2026-10-04；與審查 r1 codex 微型對照結果相同）。⇒ `concat_with_memmap`（`memmap_utils.py:157–167`、:204）依估計大小選 float32 memmap 或保 float64，縮尾在合併之後：同一設定之校準值隨規模改變表示，而公開域 L6.5 一律讀 registry 之 float32 群組。macOS 行程內可秒級取 resident 與 footprint，兩量互有高低（本例 resident 較大；PRE-RED 收據 footprint 較大），單取其一皆可漏擋；linux `/proc/self/smaps_rollup` 之 `Rss:`、`Swap:` 欄（kB）未實跑。
+  - FACT-RECEIPT: `env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/l2_arm_probe.py`（收據 `handoffs/run_receipts/20261004-icfirstalign-l2-arm.json`；真實 BTCUSDT 12h 尾 800 根、L1＝EMA8／SMA13、設定取 ConfigManager 真值）→ 印出兩臂皆 52 欄、欄集合相同、NaN 位置差異 0；有限值差異 float64 9,650 個、float32 8,842 個（20 欄，集中於 Momentum 類）；最大絕對差 1.17e-7、最大相對差 7.7%（出現於近 0 之值）（主委 實跑 2026-10-04；與審查 r2 codex 實跑之 8,842 相同）。⇒ 正式 CGSA 生成之 L2 有兩個計算臂：後層（L5、L6）與現行校準域吃 `compute_all_polars` 回傳表（FF:1755），registry 落盤（＝公開 L2 特徵）為逐類別 `compute_category`（FF:1768–1774）；兩臂差異為浮點捨入量級，但逐位元組不等。
+  - 宣告——L3 非串流臂丟表：正式生成 L3 串流分支（FF:1806–1840）以 `_ = aggregator.compute_all(..., persist_callback=persister)` 呼叫後一律回空表；`RollingAggregator` 於 `FFACT_L3_STREAMING=0`（`operators/rolling_aggregator.py:134–144`）、`FFACT_L3_MULTI_WINDOW=0`（:334–338）、pandas 後備（:190–321，含 numba 例外後落入）不呼叫 callback 而回傳完整結果表 ⇒ 該表被丟棄、L3 欄靜默消失（審查 r2 codex 以 `FFACT_USE_NUMBA_ROLLING=0`、真實 close、windows [5, 13]、mean／std 實跑：回傳 4 欄、callback 0 次）。L3 fused 核心 `fused_rolling_stats_multi_window`（`operators/numba_rolling.py:429`）每輸入欄配置（列 × 窗數 × 10）之 8 B 工作區，與所選統計量數無關；persister 依 step 各留緩衝（FF:4974）。
+  - 宣告——legacy H5：`save_factory_output` 之檔名只鍵 `{symbol}_{timeframe}_factory.h5`（`feature_storage.py:2386–2388`），不含 config_hash；`_try_load_cache`（FF:4421–4477）核 H5 metadata 之 config_hash、manifest 存在與 run_status，不核 raw 成品；`cleanup_raw`（FF:2751–2757）只刪 `raw/`。
   - 宣告——FU-2 未完成半：`ic_filter_orchestrator.py` 之 close carrier `reindex(features_df.index)` 後全 NaN 未 fail-closed（label 有，:3366）；`tests/momentum/Analysis/test_ic1d_baseline.py:228` 釘現行行為。
   - 宣告——post-IC 臂：`transform_selected`（feature_preprocessor.py:634–686）臂由 `FFACT_USE_POLARS` 與 polars 可用性決定（`polars_adapter.py:82`），`tests/feature_engineering/test_ic_first_pipeline.py` 多處強制 pandas 臂。
   - 宣告——IC 兩路涵蓋：**全域序列型**：涵蓋（IC-first 之 IC 計算與 post-IC 轉換、IC cache 身分、FU-2 之 IC 篩選流程）；**事件型**：事件型 IC 不經 IC-first 與 FU-2 之 close carrier；Phase 4 之生成記憶體修復與校準值表示統一同時作用於事件型所讀之落盤特徵；本票不改事件型程式碼。
-- **待使用者確認**：待確認：無（以下於 SPEC 白話逐條閘請使用者核可，未核可不得進 TODO）——①IC-first 改經正式生成（CGSA、持久化、多週期、預熱、dead-drop）產 raw，IC-first 之特徵集合與 IC 分數因此與現行記憶體路徑不同（現行對真實資料必拋錯）；②IC cache 重用改為「除 threshold 外計算身分全同才重用」，其餘一律重算；舊 cache 一律不重用；③Phase 4 完成後重凍 failopen 之 BTCUSDT/1h 單週期與多週期基準（PRE-RED 時受 F-2 擋），並刪 `tests/_golden/prered/allowed_red.json` 之 ICFIRSTALIGN 9 列；④生成記憶體預算＝實體記憶體 × r，建議 r＝0.75；Task 4.3 收據若顯示 0.75 不足以在系統終止前擋下，回報並重提；⑤校準域（預熱探測與平穩化校準值）一律以 float32 群組計算（與公開域 L6.5 所讀表示同一）；現行小規模設定以 float64 計算之校準值因此改變，差異列收據（Task 4.1）。
+- **待使用者確認**：待確認：無（以下於 SPEC 白話逐條閘請使用者核可，未核可不得進 TODO）——①IC-first 改經正式生成（CGSA、持久化、多週期、預熱、dead-drop）產 raw，IC-first 之特徵集合與 IC 分數因此與現行記憶體路徑不同（現行對真實資料必拋錯）；②IC cache 重用改為「除 threshold 外計算身分全同才重用」，其餘一律重算；舊 cache 一律不重用；③Phase 4 完成後重凍 failopen 之 BTCUSDT/1h 單週期與多週期基準（PRE-RED 時受 F-2 擋），並刪 `tests/_golden/prered/allowed_red.json` 之 ICFIRSTALIGN 9 列；④生成記憶體預算＝實體記憶體 × r，建議 r＝0.75；Task 4.3 收據若顯示 0.75 不足以在系統終止前擋下，回報並重提；⑤校準域（預熱探測與平穩化校準值）一律以公開域實際落盤之同一值計算——L2 取逐類別計算臂（現行校準域取另一臂，兩臂差異為浮點捨入量級）、全部以 float32 群組（現行小規模設定以 float64）；校準值因此有少量改變，差異列收據（Task 4.1）；⑥L3 於非預設計算臂（關 numba、關串流、關多窗、numba 例外後備）時，現行正式生成靜默丟棄全部 L3 欄，改為落盤（預設臂之輸出不變，非預設臂之欄數因此增加）（Task 4.0）。
 - **已確認結果**：
   - `2026-10-02 使用者`：全票排序 17 步定案，第 4 步 ICFIRSTALIGN 乙（`docs/TICKET_ORDER.md`）；「照表做不另問」。
   - `2026-10-04 使用者`：grok 額度用罄，「暫停 grok，先用兩家」。
@@ -35,7 +38,7 @@
 ## §C 約束（不重抄，引用 + 只列本任務相關）
 - 解耦：`momentum/` 不 import `api/`；服務取工廠一律經 `momentum.factories`。
 - 不弱化 NaN／inf 閘、時間序守衛、禁位置對齊防呆（`AlignmentViolationError`）；不得以 reindex 靜默補 NaN 代替對齊。
-- 不得侷限加密貨幣：週期、交易時段、標的數不寫死；時間軸一律以 sidecar 之 UTC 時間戳為準；記憶體預算以實體記憶體比例表示，不寫死機器大小。
+- 不得侷限加密貨幣：週期、交易時段、標的數不寫死；時間軸一律以 sidecar 之 UTC 時間戳為準（資料契約：L0 擷取須交出 UTC 時刻；交易所本地時區於擷取端以 tz-aware 轉 UTC，不得以本地牆鐘之 tz-naive 值進入本票任一時間比對）；記憶體預算以實體記憶體比例表示，不寫死機器大小。
 - 記憶體安全：任何測試、量測與驗收不得重現整機 OOM。完整 L1 多週期生成只准於 Task 4.1、4.2 落地後執行，且以行程內停損（footprint 達實體記憶體 75% 即寫出部分時序並結束）＋外部看門狗（磁碟剩 < 4 GiB 即終止）執行；委員輪進行中不跑。
 - 嚴禁慢閘：新增測試以單週期或精簡 L1 為主（秒～分鐘級）；完整設定之量測為一次性收據，不入每次跑之測試。
 - 範圍邊界：frame 路徑（`FFACT_USE_CGSA=0`）之刪除屬 FRAMEPATH（第 5 步）；post-IC 臂之長期政策與核心統一屬 NUMVIEW（第 8 步）；label 之 h 參數化屬 GLOBALH（第 12 步）；落盤格式重定與 legacy H5 cache 之刪除屬 FRAMEPATH／FFSTORE。
@@ -45,10 +48,10 @@
 - **IC-first 正確性 oracle**（Phase 1–3）：設定 S2＝BTCUSDT 12h、精簡 L1、持久化至暫存目錄；S2m＝BTCUSDT 12h＋[12h, 4h]、精簡 L1。測試端獨立實作：自 raw sidecar 讀時間戳、以 kline 依時間戳算 forward return（h=1）、依時間戳交集對齊後逐欄 Spearman；通過條件＝引擎 IC 分數與 oracle 逐欄相等（`np.allclose(rtol=0, atol=1e-12)`），選欄集合相等；IC 讀回群組、選欄讀回、processed 讀回之索引分別與對應 sidecar 時間戳 `pd.testing.assert_index_equal(exact=True)`。
 - **預熱探測與校準封包 oracle**（Task 4.1；動工前以 HEAD 產 `tests/_golden/icfirstalign/probe_baseline.json`、`calibration_baseline.json`）：
   - 設定：P1＝BTCUSDT 12h＋[12h, 1h]、精簡 L1；P2＝BTCUSDT 12h 單週期、預設 L1 子集（峰值 < 2 GB 之設定，產 golden 前實測選定並記於收據）；S3＝BTCUSDT 12h 單週期、精簡 L1、fracdiff 開，縮尾開與關各一。
-  - 兩份 HEAD 基準：**甲**＝HEAD 強制 float32 合併分支（測試端把 `concat_with_memmap` 之門檻覆寫為 1 byte，只改分支選擇、不改生產門檻）；**乙**＝HEAD 預設。
+  - 兩份 HEAD 基準：**甲**＝HEAD 校準域加兩處測試端替換（不改生產碼）：(i) 校準域之 L2 以逐類別 `compute_category` 之結果（即公開 registry 所落之值）取代回傳表——只替換校準域之 L2 欄值，後層（L5、L6）仍吃回傳表，同正式生成；(ii) 只對 `context="calibration_domain"` 之最末合併強制 `concat_with_memmap` 之 float32 分支（測試端 wrapper 依 context 限定門檻覆寫為 1 byte，不改生產門檻；`layer4_input` 等其他合併不受影響）。L3 於預設串流臂（numba 多窗）產生。**乙**＝HEAD 預設。
   - 記錄：探測逐輪深度與晚到欄數、定案 OutputWindow、晚到欄名集合 sha256、「欄名→首個有限值時間戳」對照（依欄名排序）sha256；校準封包之 values（欄名→float64 bytes）、first／last 校準時間、empty_columns、shortfall、column_set_digest、source_sha256。
   - 通過條件：新實作與**甲**逐位元組相等（全部欄位、P1／P2／S3 縮尾開關）。新實作 vs **乙**之差異寫入收據 `handoffs/run_receipts/<日期>-icfirstalign-calibration-dtype-diff.json`（逐欄差異數、最大絕對差、首個有限值時間差異欄），供待確認⑤；首個有限值時間或晚到集合對**乙**有任何差異 ⇒ 停下回報，不得自行吸收。
-- **記憶體驗收**（Task 4.4）：完整 L1 之 BTCUSDT 12h＋[12h, 1h] 原設定（F-2 原設定）須完成，或於超出預算前以具名錯誤 `GenerationMemoryBudgetExceeded` fail-closed；被系統終止不算通過。收據記 peak footprint、max resident、各檢查點之預算判定。
+- **記憶體驗收**（Task 4.4）：完整 L1 之 BTCUSDT 12h＋[12h, 1h] 原設定（F-2 原設定）須完成，或於超出預算前以具名錯誤 `GenerationMemoryBudgetExceeded` fail-closed；被系統終止或被磁碟看門狗終止皆不算完成。開跑前置：磁碟剩餘 ≥ 暫存校準 registry＋L2 memmap＋正式 registry 之預估最大共存量＋4 GiB，不足即不開跑並回報。收據記 peak footprint、max resident、各檢查點之預算判定、磁碟最大共存量與停止原因。
 
 ## §P Phase 與依賴
 
@@ -75,24 +78,24 @@
 
 **Task 1.4 — IC cache 重用之計算身分**
 - 目標：消除跨窗重用之未來洩漏。　檔案：`ic_engine.py` 之 `_build_data_fingerprint`（寫入）與 `_try_reuse_cached_ic_scores`（:785–865，比對）。
-- 改法：fingerprint 寫入並比對完整計算身分——symbol、timeframe、config_hash、方法、label_horizon、selection_window（UTC 起訖時間戳）、split_id、特徵軸指紋（raw sidecar 時間戳之 sha256）、label 指紋；**只容 threshold 不同**；任一不同或舊 fingerprint 缺任一欄 ⇒ 拒用、需 raw 重算；raw 不存在 ⇒ 具名錯誤 fail-closed。label 指紋正規化：索引轉 UTC int64 epoch 秒（tz-naive 視為 UTC，與 sidecar 同換算）、值轉 float64、NaN 遮罩為 uint8 位元組；sha256 依序吃「列數（int64 little-endian）、時間戳位元組、遮罩位元組、有限值位置之 float64 little-endian 位元組」；同一語意之不同索引表示（tz-aware DatetimeIndex、tz-naive DatetimeIndex、epoch 整數）得同一指紋。
-- **驗證**：`pytest tests/momentum/Analysis/test_icfirstalign_cache.py` 綠，於同一精簡真實 CGSA complete run（`source_run_status=complete`，確保拒用不是由未知來源閘造成）共用 setup，逐次保存與還原 cache：參數化對每一身分欄單獨改動 ⇒ 拒用（方法、label_horizon、selection_window 起、selection_window 訖、split_id、特徵軸、label 兩有限值互換、一有限值與一 NaN 位置互換〔有效列數不變〕）；舊 fingerprint 逐一刪除每一必要欄 ⇒ 拒用；只改 threshold ⇒ 重用（正向）；三種索引表示之同一 label ⇒ 重用；清 raw 後身分不同之請求 ⇒ 具名錯誤；每一身分欄之 mutant「移除該欄比對」⇒ 對應參數案例紅。既有 `tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py` 綠（斷言 diff 逐處說明）。
+- 改法：fingerprint 寫入並比對完整計算身分——symbol、timeframe、config_hash、方法、label_horizon、selection_window（UTC 起訖時間戳）、split_id、特徵軸指紋（raw sidecar 時間戳之 sha256）、label 指紋；**只容 threshold 不同**；任一不同或舊 fingerprint 缺任一欄 ⇒ 拒用、需 raw 重算；raw 不存在 ⇒ 具名錯誤 fail-closed。label 指紋正規化：索引轉 UTC int64 epoch 秒（與 sidecar 同一時區政策：tz-aware 任一時區轉 UTC 時刻；tz-naive 依 §C 資料契約視為 UTC 時刻）、值轉 float64、NaN 遮罩為 uint8 位元組；sha256 依序吃「列數（int64 little-endian）、時間戳位元組、遮罩位元組、有限值位置之 float64 little-endian 位元組」；**同一 UTC 時刻**之不同表示（任一時區之 tz-aware DatetimeIndex、UTC 之 tz-naive DatetimeIndex、epoch 秒整數）得同一指紋。本地牆鐘之 tz-naive 值屬違反 §C 資料契約之輸入，不在等價範圍。
+- **驗證**：`pytest tests/momentum/Analysis/test_icfirstalign_cache.py` 綠，於同一精簡真實 CGSA complete run（`source_run_status=complete`，確保拒用不是由未知來源閘造成）共用 setup，逐次保存與還原 cache：參數化對每一身分欄單獨改動 ⇒ 拒用（方法、label_horizon、selection_window 起、selection_window 訖、split_id、特徵軸、label 兩有限值互換、一有限值與一 NaN 位置互換〔有效列數不變〕）；舊 fingerprint 逐一刪除每一必要欄 ⇒ 拒用；只改 threshold ⇒ 重用（正向）；同一 UTC 時刻之三種表示（含 `Asia/Taipei`、`America/New_York` tz-aware）之同一 label ⇒ 重用；清 raw 後身分不同之請求 ⇒ 具名錯誤；每一身分欄之 mutant「移除該欄比對」⇒ 對應參數案例紅。既有 `tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py` 綠（斷言 diff 逐處說明）。
 - **邊界**：①舊 cache 無新欄 ⇒ 拒用；②label 值同而時間戳不同 ⇒ 拒用；③threshold 不同而其餘同 ⇒ 重用並只重選。
 - **存活至**：永久。**覆蓋風險**：GLOBALH 擴 label 規格時身分欄同步擴。　不可做：不得以容差比較指紋；不得以有效列數代替值指紋。
 
 ### Phase 2 — IC-first 改經正式 CGSA 生成（依賴：Phase 1）
 **Task 2.0 — 不可變 run context**
 - 目標：IC-first 一次執行之身分單一來源（Phase 2 前置，解 Task 2.1 與 context 之依賴環）。　檔案：新增 frozen dataclass `momentum/FeatureEngineering/ic_first_context.py`；`FeatureGenerationResult.metadata` 加唯讀 `output_window`（定案 OutputWindow 之序列化：output_start、output_end、ingest_start、max_warmup_bars、warmup_enabled）。
-- 改法：欄位＝symbol、timeframe、training（tuple 快照）、start／end（必填）、OutputWindow（取自生成結果之 `metadata["output_window"]`）、config_hash（取自生成結果之 metadata）、selection_window（時間戳）、split_id、label 規格、post-IC 臂；`run_ic_first` 入口以呼叫參數建立前半、生成後以結果補完並凍結，全程只讀之；不讀 factory 之 `_current_output_window`／`_current_config_hash`；start／end 缺 ⇒ `ValueError`。
-- **驗證**：`pytest tests/feature_engineering/test_icfirstalign_context.py` 綠：同一 factory 連續兩次以不同起訖呼叫 ⇒ 第二次之 OutputWindow 與 config_hash 只由第二次參數決定（分驗兩欄）；平穩化開、關各一；第一次中途拋例外後第二次之 context 不受影響；呼叫後修改傳入之 training list 不改 context；mutant「改讀 `_current_output_window`」、「改讀 `_current_config_hash`」各紅。
+- 改法：欄位＝symbol、timeframe、training（tuple 快照）、start／end（必填）、OutputWindow（取自生成結果之 `metadata["output_window"]`）、config_hash（取自生成結果之 metadata）、selection_window（時間戳）、split_id、label 規格、post-IC 臂；`run_ic_first` 入口以呼叫參數建立前半、生成後以結果補完並凍結，全程只讀之；容器欄位深凍結（selection_window、label 規格等以 `types.MappingProxyType` 包裝之複本或 tuple 存放，不持有呼叫端可變物件之參照）；不讀 factory 之 `_current_output_window`／`_current_config_hash`；start／end 缺 ⇒ `ValueError`。
+- **驗證**：`pytest tests/feature_engineering/test_icfirstalign_context.py` 綠：同一 factory 連續兩次以不同起訖呼叫 ⇒ 第二次之 OutputWindow 與 config_hash 只由第二次參數決定（分驗兩欄）；平穩化開、關各一；第一次中途拋例外後第二次之 context 不受影響；呼叫後修改傳入之 training list、selection_window dict、label 規格 dict 皆不改 context，且對 context 容器欄位賦值或改項皆拋例外；mutant「改讀 `_current_output_window`」、「改讀 `_current_config_hash`」各紅。
 - **邊界**：①選窗超出公開窗 ⇒ 具名錯誤；②生成結果缺 `output_window` ⇒ 具名錯誤。
 - **存活至**：永久。**覆蓋風險**：GLOBALH 擴 label 規格。　不可做：不得以全域狀態傳遞 context。
 
 **Task 2.1 — 設計 A：刪第二引擎，lease 單一擁有者**
-- 目標：IC-first 之 raw 由正式生成產出，一次 run 由同一 lease 自生成持有至 IC、processed、cleanup 結束。　檔案：`feature_factory.py::run_ic_first`（:2478）；刪 `_run_l1_l6_for_ic_first`（:2818）、`_layer6_5_pre_ic`（:2968）及其專用分支、`run_ic_first` 自取 lease（:2565）與自跑校準閘之分支；刪 `raw_data`、`layers` 參數（第二引擎之輸入）。
-- 改法：`run_ic_first` 以 `generate_features(persist=True, lease_sink=sink)` 生成（CGSA、多週期、預熱、校準皆沿用正式路徑）；成功後持有 `sink` 中之 lease，於 IC、選欄讀回、`transform_selected`、`write_processed(row_index=...)`、`cleanup_raw` 全部完成後於 finally 釋放；不得再自取 lease。storage／feature_reader／config_hash 皆綁同一生成之 run 目錄。raw 可用性以 manifest 之 raw 成品存在判定：生成回 H5 cache 命中而 raw 成品不存在（例如前次 `cleanup_raw`）⇒ 以 `force_regenerate=True` 重生 raw，不把 H5 命中當 raw 可用。label 預設語意不變（close 之 h=1 forward return，依 kline 時間戳），h 參數化留 GLOBALH。
-- **驗證**：§G IC-first oracle（S2、S2m，S2m 之 IC 欄含兩週期標記欄）；`run_ic_first` 不再呼叫 `_combine_layers(context="ic_first_l65_pre_input")`（spy 0 次）；lease 測試：run 進行中（IC 階段以 hook 暫停）另一行程同 key 取 lease ⇒ `RunBusyError`，run 結束後可取；生成拋例外 ⇒ lease 已釋放；IC 階段拋例外 ⇒ lease 已釋放；`cleanup_raw` 後再跑同設定 ⇒ raw 重生且結果與首跑相等。
-- **邊界**：①生成失敗 ⇒ 具名錯誤上拋（不回空表）；②選窗外之 label 不參與 IC。
+- 目標：IC-first 之 raw 由正式生成產出，一次 run 由同一 lease 自生成持有至 IC、processed、cleanup 結束。　檔案：`feature_factory.py::run_ic_first`（:2478）；刪 `_run_l1_l6_for_ic_first`（:2818）、`_layer6_5_pre_ic`（:2968）及其專用分支、`run_ic_first` 自取 lease（:2565）與自跑校準閘之分支；刪 `raw_data`、`layers` 參數（第二引擎之輸入）；`generate_features`（FF:265）加 `require_raw`、`_try_load_cache`（FF:4421）依之判定。
+- 改法：`run_ic_first` 以 `generate_features(persist=True, lease_sink=sink)` 生成（CGSA、多週期、預熱、校準皆沿用正式路徑）；成功後持有 `sink` 中之 lease，於 IC、選欄讀回、`transform_selected`、`write_processed(row_index=...)`、`cleanup_raw` 全部完成後於 finally 釋放；不得再自取 lease。storage／feature_reader／config_hash 皆綁同一生成之 run 目錄。raw 可用性以 run 目錄之 raw 成品存在判定，判定在**同一次** `generate_features` 之 cache 查詢內完成：`generate_features` 加 `require_raw: bool = False` 參數（既有 caller 預設不變），`run_ic_first` 傳 `require_raw=True`；`_try_load_cache` 於 `require_raw=True` 且 H5 命中而 raw 成品不存在（例如前次 `cleanup_raw`）時視同未命中，於同一 lease 內續行生成，不把 H5 命中當 raw 可用；不得於持有 sink 中之 lease 時再呼叫 `generate_features`。label 預設語意不變（close 之 h=1 forward return，依 kline 時間戳），h 參數化留 GLOBALH。
+- **驗證**：§G IC-first oracle（S2、S2m，S2m 之 IC 欄含兩週期標記欄）；`run_ic_first` 不再呼叫 `_combine_layers(context="ic_first_l65_pre_input")`（spy 0 次）；lease 測試：run 進行中（IC 階段以 hook 暫停）另一行程同 key 取 lease ⇒ `RunBusyError`，run 結束後可取；生成拋例外 ⇒ lease 已釋放；IC 階段拋例外 ⇒ lease 已釋放；`cleanup_raw` 後再跑同設定 ⇒ raw 重生、結果與首跑相等，且該次 run 之 `RunLease.acquire` 恰 1 次、release 恰 1 次（spy）；mutant「`require_raw` 被忽略、H5 命中直接回傳」⇒ raw 不存在而紅；`require_raw=False`（既有 caller）於 raw 已清時仍回 H5 命中（行為不變）。
+- **邊界**：①生成失敗 ⇒ 具名錯誤上拋（不回空表）；②選窗外之 label 不參與 IC；③legacy H5 為 symbol／timeframe 級之盡力快取（檔名不含 config_hash），重生會覆寫之並使其他 config_hash 之 H5 查詢變未命中（讀取仍核 config_hash，不致錯用）；本票不依賴 H5 為 raw 可用性之依據，H5 之刪除屬 FRAMEPATH／FFSTORE。
 - **存活至**：永久。**覆蓋風險**：FRAMEPATH 刪 frame 路徑時無影響（本 Task 後 IC-first 不經 frame）。　不可做：不得保留記憶體 L1–L6 作回退；不得另造第二套鎖或重入鎖。
 
 **Task 2.2 — L6.5 失敗語意**
@@ -127,14 +130,21 @@
 - **邊界**：①非 IC-first 之 `transform_selected` caller 行為不變；②臂之核心差異研究屬 NUMVIEW。
 - **存活至**：至 NUMVIEW（第 8 步）定長期政策。**覆蓋風險**：NUMVIEW 可能改臂政策，屆時沿用 run context 之臂欄位。　不可做：不改 Polars 臂之數值核心。
 
-### Phase 4 — 校準域與預熱探測記憶體有界化、生成記憶體預算（F-2）（依賴：Task 4.1、4.2、4.3 無，可與 Phase 1 並行；Task 4.4 依賴 Phase 1–3 與 Task 4.1–4.3）
+### Phase 4 — 校準域與預熱探測記憶體有界化、生成記憶體預算（F-2）（依賴：Task 4.0 無；Task 4.1 依賴 Task 4.0；Task 4.2 依賴 Task 4.1；Task 4.3 依賴 Task 4.1、4.2；以上可與 Phase 1–3 並行；Task 4.4 依賴 Phase 1–3 與 Task 4.0–4.3）
+**Task 4.0 — L3 非串流臂不得丟表**
+- 目標：正式生成 L3 串流分支之全部執行臂皆把 L3 欄交 registry。　檔案：`feature_factory.py::_layer3_rolling_aggregation`（FF:1806–1840）。
+- 改法：串流分支保留 `compute_all(..., persist_callback=persister)` 之回傳表；回傳表非空（不支援 callback 之臂：`FFACT_L3_STREAMING=0`、`FFACT_L3_MULTI_WINDOW=0`、pandas 後備含 numba 例外後落入）⇒ 經既有 `_persist_layer_output_groups(…, LayerSource.L3, "L3_rolling")` 落盤（落盤前經 Task 4.2 預算判定，該表已於臂內配置，判定用以拒絕後續落盤轉型之追加配置）；回傳表非空**且** callback 亦已收到欄 ⇒ 具名錯誤（不得雙寫）。
+- **驗證**：`pytest tests/feature_engineering/test_icfirstalign_l3_arms.py` 綠：真實 BTCUSDT 12h 精簡 L1，`FFACT_USE_NUMBA_ROLLING=0`、`FFACT_L3_STREAMING=0`、`FFACT_L3_MULTI_WINDOW=0`、numba 核心注入例外各一：registry 之 L3 欄集合與值等於同設定非 CGSA `compute_all(base)` 之結果轉 float32（逐位元組）；預設臂之 registry L3 群組與改前逐位元組相等；mutant「丟棄回傳表」⇒ 各非預設臂案例紅。
+- **邊界**：①回傳空表且 callback 0 次 ⇒ 無 L3 欄（設定未啟用）；②回傳非空且 callback 有欄 ⇒ 具名錯誤。
+- **存活至**：永久。**覆蓋風險**：NUMVIEW 統一計算臂時沿用。　不可做：不得把後備臂之結果當成功空表；不得改各臂數值核心。
+
 **Task 4.1 — 校準域改走正式 CGSA 層產出、逐群組歸約**
 - 目標：預熱探測與校準閘之校準域，記憶體輪廓與正式生成同一套層產出；不建全欄合併、不轉 float64 全表、dtype 不隨規模分支。　檔案：`feature_factory.py` 之 `_compute_calibration_domain`（FF:2427–2476）改為逐群組產出之介面、`_resolve_public_window`（FF:2352–2406）與 `_calibrate_timeframe`（FF:2226–2300）改為逐群組消費；`preprocessing/calibration.py::compute_calibration_domain`（:237）同步（測試注入點保留）。
 - 改法：
-  - 產出：獨立 `FeatureFactory` 實例（不共用實例內快取，同現行）、`_calibration_domain=True`（L3 不依資料剔欄，同現行），設暫存 `ColumnGroupRegistry`（work_dir 於前綴 `CALIBRATION_TMP_PREFIX` 之暫存目錄，結束含例外即刪），以正式單週期生成之同一組層函式產出：L1 落 float32 群組（記憶體內 L1 保留至 L6 結束，供 L2–L6）；L2 全表算出後即 `_spill_to_memmap`，逐類別落 float32 群組；L3 經 `_StreamingL3Persister` 逐批落盤（persist mode 依正式生成之同一判定）；L4（raw＋L1）、L5、L6 依序算出、各自落 float32 群組後即釋放該層記憶體表。不經 `_combine_layers(context="calibration_domain")`。
+  - 產出：獨立 `FeatureFactory` 實例（不共用實例內快取，同現行）、`_calibration_domain=True`（L3 不依資料剔欄，同現行），設暫存 `ColumnGroupRegistry`（work_dir 於前綴 `CALIBRATION_TMP_PREFIX` 之暫存目錄，結束含例外即刪），以正式單週期生成之同一組層函式產出：L1 落 float32 群組（記憶體內 L1 保留至 L6 結束，供 L2–L6）；L2 同正式生成：回傳表（`compute_all_polars` 等臂）供後層並即 `_spill_to_memmap`，registry 之 L2 群組為逐類別 `compute_category` 之結果——校準域之 L2 值因而與公開落盤之 L2 值同源（待確認⑤）；L3 經 Task 4.0 後之同一分支落盤（串流臂經 `_StreamingL3Persister`、非串流臂經回傳表落盤；persist mode 依正式生成之同一判定）；L4（raw＋L1）、L5、L6 依序算出、各自落 float32 群組後即釋放該層記憶體表。不經 `_combine_layers(context="calibration_domain")`。
   - 歸約：逐群組讀回 float32 陣列（一次至多一個群組在記憶體），以現行同一縮尾設定（`scale_preprocessing_config_for_native` 之 winsor 設定、`FeaturePreprocessor._apply_winsorization`）對該群組縮尾，再交消費端：探測求每欄首個有限值時間戳與有無有限值（晚到判定、加倍規則、晚到欄名集合語意不變）；校準閘做逐欄分類與起始日前最後 N 個有效值擷取（封包格式不變）。群組陣列用畢即釋放。
-  - 各層依賴與 in-flight 上界（Task 4.2 配置前估算之依據）：L1 記憶體表（列 × L1 欄 × 8 B）全程；L2 計算期全表（列 × L2 欄 × 8 B），落 memmap 後僅頁快取；L3 串流緩衝（列 × buffer 欄 × 8 B）；L4／L5／L6 各自輸出表（列 × 該層欄 × 8 B），落盤後釋放；歸約期一個群組（列 × 群組欄 × 4 B）＋其縮尾複本（× 8 B）；校準封包累積值（N × 欄 × 8 B）。
-- **驗證**：§G 預熱探測與校準封包 oracle（與 HEAD 甲逐位元組相等；P1、P2、S3 縮尾開與關）；dtype 差異收據（vs HEAD 乙）產出；P1 之 peak footprint 不高於 HEAD（收據）；spy：`_combine_layers(context="calibration_domain")` 0 次、`concat_with_memmap` 於校準域 0 次；歸約期同時存活之群組陣列數 ≤ 1（以 weakref 計數之 spy registry）；mutant「縮尾漏套」⇒ 首個有限值對照不等而紅；mutant「歸約前把全部群組累積成一表」⇒ 存活群組數斷言紅；mutant「校準域改回 float64 小分支」⇒ S3 封包 values 對甲不等而紅（縮尾開與關各一）；mutant「漏一個群組」⇒ column_set_digest 不等而紅。
+  - 各層依賴與生命週期：L1 記憶體表全程（供 L2–L6）；L2 回傳表於 spill 後僅頁快取，逐類別結果落盤即釋放；L3 依臂（串流緩衝或回傳表）；L4／L5／L6 輸出表落盤後釋放；歸約期一個群組＋其縮尾複本；校準封包累積值（N × 欄 × 8 B）至封包交出。各分支同時存活工作集之計算式見 Task 4.2。
+- **驗證**：§G 預熱探測與校準封包 oracle（與 HEAD 甲逐位元組相等；P1、P2、S3 縮尾開與關）；dtype 差異收據（vs HEAD 乙）產出；P1 之 peak footprint 不高於 HEAD（收據）；spy：`_combine_layers(context="calibration_domain")` 0 次、`concat_with_memmap` 於校準域 0 次；歸約期同時存活之群組陣列數 ≤ 1（以 weakref 計數之 spy registry）；mutant「縮尾漏套」⇒ 首個有限值對照不等而紅；mutant「歸約前把全部群組累積成一表」⇒ 存活群組數斷言紅；mutant「校準域改回 float64 小分支」⇒ S3 封包 values 對甲不等而紅（縮尾開與關各一）；mutant「校準域 L2 改取回傳表」⇒ S3 封包 values 對甲不等而紅（以收據 `20261004-icfirstalign-l2-arm.json` 之差異欄驗證 S3 設定確含差異欄，否則改選含差異欄之設定）；mutant「漏一個群組」⇒ column_set_digest 不等而紅。
 - **邊界**：①某層為空 ⇒ 無群組；②探測段無有限值之欄 ⇒ 計入晚到集合（同現行）；③校準域列數與前史切片不符 ⇒ 既有具名錯誤；④暫存 registry 落盤前之累計磁碟預檢不足 ⇒ 具名錯誤（沿用 registry 既有預檢）；⑤前史不足 N ⇒ 既有 empty_columns 語意。
 - **存活至**：永久。**覆蓋風險**：FFSTORE 改預熱存取與校準狀態儲存時沿用。　不可做：不得改加倍規則與晚到語意；不得降低探測欄集合；不得改封包格式；不得以縮小設定或關閉預熱代替有界化。
 
@@ -142,14 +152,21 @@
 - 目標：生成前段至 post-IC 之大配置前皆有預算判定，量測值不低估。　檔案：新增 `momentum/FeatureEngineering/memory_budget.py`（取樣與預算判定之唯一實作）；`feature_factory.py` 之各層起點（正式生成與 Task 4.1 校準域共用）、Task 4.1 歸約之群組讀回前；`ic_engine.compute_ic_from_l7_raw` 之群組讀回前；`run_ic_first` 之選欄讀回前與 `transform_selected` 各群組前；**取代**既有 RSS 閘（FF:2685、:2706、:2872 及 `_PeakRssTracker` 之判定用途），不並存兩套。
 - 改法：
   - 取樣 `sample_memory_bytes()`：macOS＝`proc_pid_rusage(getpid(), RUSAGE_INFO_V0)` 之 `max(ri_resident_size, ri_phys_footprint)`；linux＝`/proc/self/smaps_rollup` 之 `Rss:`＋`Swap:`（kB × 1024）；其他平台或呼叫失敗 ⇒ `MemoryMeasurementUnavailable` 具名錯誤，不得靜默略過。
-  - 預算判定 `check(label, planned_bytes)`：`sample_memory_bytes() + planned_bytes > budget` ⇒ 拋 `GenerationMemoryBudgetExceeded(label, current, planned, budget)`，**於配置之前**。planned_bytes 依 Task 4.1 各層 in-flight 式計算：L2 以既有 `_estimate_l2_output_cols`；其餘層以該層設定之輸出欄數上界（由設定展開計數，不依資料）× 列數 × 8 B；IC 群組與選欄讀回以 manifest 之群組形狀；`transform_selected` 以群組輸入 bytes × k（k＝S2 實測之峰值／輸入比，記於收據並寫為常數）。
+  - 預算判定 `check(label, planned_bytes)`：`sample_memory_bytes() + planned_bytes > budget` ⇒ 拋 `GenerationMemoryBudgetExceeded(label, current, planned, budget)`，**於配置之前**。planned_bytes＝該分支「新增之最大同時存活工作區＋輸出＋落盤轉型」，依實際執行臂與計算前已知之形狀（列數、設定展開之欄數上界〔不依資料〕、窗數、step 數、chunk、buffer、硬體 tier）計，不得只以輸出容量代替：
+    - L1：各指標結果表＋合併後回傳表＋落盤 float32 轉型（輸出 × (8＋8＋4) B）。
+    - L2：回傳表（`_estimate_l2_output_cols` × 列 × 8 B）＋逐類別結果之最大類別表＋其 float32 轉型＋spill 之 float32 複本。
+    - L3 numba 多窗臂：每輸入欄 fused 工作區（列 × 窗數 × 10 × 8 B，`numba_rolling.py:429` 之固定形狀）＋chunk 內全部 step 結果＋全部 step 之 persister 緩衝同時存活（step 數 × 列 × buffer 欄 × 8 B）＋單次 flush 之超量（一個 step 結果）；非串流臂：完整回傳表（列 × L3 欄上界 × 8 B）＋Task 4.0 落盤轉型。
+    - L4／L5／L6：輸入合併表（如 `layer4_input`）＋輸出表＋落盤轉型。
+    - IC 群組讀回、選欄讀回：manifest 之群組形狀 × (4＋8) B（讀檔與轉型）。
+    - `transform_selected`：依其實作（`feature_preprocessor.py:675–685`）之選欄複本＋單群組轉換輸出＋已累積之 processed 群組，以實際選欄形狀計。
+    - 無法於計算前證明上界之分支 ⇒ 配置前具名拒絕，不得放行。
   - 預算：設定欄 `memory_budget_ratio`（預設依待確認④）× 實體記憶體（`psutil.virtual_memory().total`）；可由設定覆寫為絕對位元組。
-- **驗證**：`pytest tests/feature_engineering/test_icfirstalign_memory.py` 綠：注入取樣器回傳（resident, footprint）＝（低, 高）使 resident＋planned ≤ 預算 < footprint＋planned ⇒ 拋具名錯誤；（高, 低）之對稱案例亦拋；mutant「只取 resident」、「只取 footprint」各使對應案例紅；配置前拒絕：以低於某層 planned_bytes 之預算跑精簡 P1 ⇒ 具名錯誤於該層函式被呼叫之前（spy 該層函式 0 次）；mutant「改為層後檢查」⇒ 紅；linux 解析以 smaps_rollup 文字樣本（含 Swap 非 0）驗算；不支援平台 ⇒ 具名錯誤；真實取樣於本機回正整數。
+- **驗證**：`pytest tests/feature_engineering/test_icfirstalign_memory.py` 綠：注入取樣器回傳（resident, footprint）＝（低, 高）使 resident＋planned ≤ 預算 < footprint＋planned ⇒ 拋具名錯誤；（高, 低）之對稱案例亦拋；mutant「只取 resident」、「只取 footprint」各使對應案例紅；配置前拒絕：以低於某層 planned_bytes 之預算跑精簡 P1 ⇒ 具名錯誤於該層函式被呼叫之前（spy 該層函式 0 次）；mutant「改為層後檢查」⇒ 紅；工作區安全間隙：真實 close 單欄、L3 只選 mean、多窗，注入目前取樣值 C，預算置於「C＋輸出 bytes」與「C＋fused 工作區 bytes」之間 ⇒ 於 fused 配置函式被呼叫前具名拒絕（allocator spy 0 次），mutant「L3 只計輸出容量」⇒ 通過並進配置而紅；同型安全間隙案例各一：L3 step 緩衝全數同時存活、`transform_selected` 已累積群組；linux 解析以 smaps_rollup 文字樣本（含 Swap 非 0）驗算；不支援平台 ⇒ 具名錯誤；真實取樣於本機回正整數。
 - **邊界**：①planned_bytes 為 0 ⇒ 仍判現值；②預算由設定讀，不寫死機器大小；③超出時已落盤之暫存 registry 於例外路徑刪除。
 - **存活至**：永久。**覆蓋風險**：RM-FULLSCALE 換機時調比例。　不可做：不得以關閉預熱代替；不得以單一 RSS 或單一 footprint 代替雙取；不得於配置後才判定而宣稱配置前保護。
 
 **Task 4.3 — 記憶體量測序列（安全漸增）**
-- 目標：取得 resident 與 footprint 同時序列，供待確認④之比例與 k 常數；不重現 OOM。　檔案：探針 `handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py`；收據 `handoffs/run_receipts/<日期>-icfirstalign-memory-series.json`。
+- 目標：取得 resident 與 footprint 同時序列，供待確認④之比例，並核對 Task 4.2 之 planned_bytes 不低於各檢查點後之實測增量（任一檢查點實測增量 > planned ⇒ 回報並修該分支之計算式）；不重現 OOM。　檔案：探針 `handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py`；收據 `handoffs/run_receipts/<日期>-icfirstalign-memory-series.json`。
 - 改法：主證據沿用既有 PRE-RED 收據（不重跑）。探針於 Task 4.1、4.2 落地後，以精簡 L1 起、逐步增加 L1 類別與列數（每步工作集估計不超過前一步 2 倍），行程內取樣執行緒每 0.2 秒以 `sample_memory_bytes` 之同一 API 記（時間、resident、footprint、目前檢查點），逐筆寫檔；footprint 達實體記憶體 50% 即停止加步，任何時刻達 75% 即寫出部分時序並以具名 rc 結束；外部看門狗保留磁碟剩 < 4 GiB 終止。無「resident < footprint」之歧視樣本時，收據誠實記「未取得歧視樣本」，不據以宣稱 RSS 漏擋已重證。
 - **驗證**：收據含逐步之 resident／footprint 時序、各步峰值、停止原因；`test_icfirstalign_memory.py` 以注入取樣器驗停損：取樣值越過 75% ⇒ 部分時序檔存在且 rc 為具名值；mutant「移除停損」⇒ 紅。
 - **邊界**：①第一步即越過 50% ⇒ 停止並回報；②linux 未實跑 ⇒ 收據標明平台。
@@ -157,7 +174,7 @@
 
 **Task 4.4 — F-2 原設定驗收、基準重凍與允許仍紅清理**
 - 目標：F-2 關閉。　檔案：`tests/_golden/failopen/baseline.json`（BTCUSDT/1h 單週期、multi_tf；`scripts/freeze_failopen_baseline.py --units`）、`tests/_golden/prered/allowed_red.json`、`tests/governance/test_prered_allowed_red.py`。
-- 改法：Task 4.1–4.3 後，以停損與看門狗跑 F-2 原設定（§G 記憶體驗收）。結果分兩種，分開記錄：**完成**＝原設定生成跑完 ⇒ 經使用者核可（待確認③）重凍兩單元（A／B 確定性相等）、刪 allowed_red 之 ICFIRSTALIGN 9 列並同步 EXPECTED；**只 fail-closed**＝於預算前以具名錯誤停止 ⇒ 只記「F-2 不再整機 OOM」已關閉，重凍與 9 列清理**仍未完成**，本票不得收案，回報使用者（原設定於本機預算內不可完成之事實與量測）。
+- 改法：Task 4.0–4.3 後，先核 §G 之磁碟開跑前置，再以停損與看門狗跑 F-2 原設定（§G 記憶體驗收）。結果分兩種，分開記錄（被磁碟看門狗終止者同「只 fail-closed」處置並記停止原因）：**完成**＝原設定生成跑完 ⇒ 經使用者核可（待確認③）重凍兩單元（A／B 確定性相等）、刪 allowed_red 之 ICFIRSTALIGN 9 列並同步 EXPECTED；**只 fail-closed**＝於預算前以具名錯誤停止 ⇒ 只記「F-2 不再整機 OOM」已關閉，重凍與 9 列清理**仍未完成**，本票不得收案，回報使用者（原設定於本機預算內不可完成之事實與量測）。
 - **驗證**：§G 記憶體驗收收據；完成時 `test_failopen_correctness.py` 之 `test_v3_multi_tf_btc_matches_frozen_baseline`、`test_v6_*` 五 node 逐節點綠；`test_failopen_producer.py::test_quality_gate_max_ratios_do_not_change_config_hash` 綠；`test_prered_allowed_red.py` 綠。
 - **邊界**：①任一 v6 節點超預算 ⇒ 不得重凍，具名回報；②重凍不改 `max_nan_ratio.json`。
 - **存活至**：永久。**覆蓋風險**：FFSTORE 重定格式時再凍。　不可做：不得於核可前寫回基準；不得以縮小設定代替原設定驗收；不得把「只 fail-closed」記為重凍完成。
@@ -168,12 +185,13 @@
 - 受影響既有回歸（逐檔明列，重節點逐節點單行程串行）：`tests/feature_engineering/test_ff_cross_symbol_value_isolation.py`、`test_failopen_contract.py`、`test_failopen_layers.py`、`test_failopen_manifest.py`、`test_failopen_matrix.py`、`test_failopen_producer.py`、`test_failopen_correctness.py`（重節點依 §C）、`test_ffstat_calibration.py`、`test_ffstat_stable_start.py`、`test_ffstat_layer.py`、`test_ffstat_dstar_failure.py`、`test_b6_warmup_trim.py`、`test_ic_first_pipeline.py`、`test_multi_symbol_ic_first.py`、`test_feature_reader.py`、`test_l7_codec.py`、`test_ff_wrapper_path_correctness.py`、`test_v2_timestamp_golden.py`；`tests/test_cgsa_resume.py`、`tests/test_cgsa_multi_tf.py`、`tests/test_multi_symbol_parallel.py`；`tests/momentum/test_feature_library_row_index.py`、`tests/momentum/Analysis/test_ic_1a_freeze_reuse_guard.py`、`tests/momentum/Analysis/test_ic1d_baseline.py`；`tests/api/test_ic_analysis_service.py`。
 - 防假綠：既有測試斷言 diff 逐處說明；`test_ic1d_baseline.py:228` 之釘值改為 fail-closed 斷言須說明理由；IC-first 測試遷移不得放寬斷言。
 - 記憶體紀律：完整設定只於 Task 4.1、4.2 後、停損與看門狗下單組串行；委員輪進行中不跑。
-- 邊界目錄：sidecar 缺、時間戳無交集、位置鍵與混用鍵、空選擇、raw／processed 列數不同、cleanup_raw 後讀 processed、倒序時間戳、全 NaN close、平穩化開／關、多週期、cache 各身分欄單改、舊 fingerprint 缺欄、lease 於生成／IC 階段例外、H5 命中而 raw 已清、預算超出（resident 高／footprint 高）、配置前拒絕、平台不支援取樣、量測停損。
+- 邊界目錄：sidecar 缺、時間戳無交集、位置鍵與混用鍵、空選擇、raw／processed 列數不同、cleanup_raw 後讀 processed、倒序時間戳、全 NaN close、平穩化開／關、多週期、cache 各身分欄單改、舊 fingerprint 缺欄、lease 於生成／IC 階段例外、H5 命中而 raw 已清（require_raw 開／關）、同一 UTC 時刻之多時區表示、context 容器事後修改、L3 各非預設臂、L2 兩計算臂、預算超出（resident 高／footprint 高）、配置前拒絕與工作區安全間隙、平台不支援取樣、量測停損、磁碟開跑前置不足。
 
 ## §R 回退
-- 每 Phase 獨立 commit；Phase 2 刪第二引擎，回退＝revert 該 commit；Task 4.1 回退＝revert（校準值回到 HEAD 之規模分支）；Task 4.4 之基準重凍與 allowed_red 清理一併回退。
+- 每 Phase 獨立 commit；Phase 2 刪第二引擎，回退＝revert 該 commit；Task 4.0 回退＝revert（非預設 L3 臂回到丟表）；Task 4.1 回退＝revert（校準值回到 HEAD 之規模分支與回傳表臂）；Task 4.4 之基準重凍與 allowed_red 清理一併回退。
 
 ## §N N/A 登記
 - frame 路徑（`FFACT_USE_CGSA=0`）之其餘測試與產生路徑刪除 — `為何現在不做: user-ruling:2026-09-28 使用者裁定刪 frame 路徑，排於全票排序第 5 步 FRAMEPATH`；觸發：FRAMEPATH 開工；登記處：`docs/ROADMAP.md` RM-FRAMEPATH。
 - post-IC 臂之長期政策（統一或具名保留）與各臂 zscore 核心差異 — `為何現在不做: blocked-by:NUMVIEW（第 8 步）數值與 view 契約`；觸發：NUMVIEW 開工；登記處：`docs/ROADMAP.md` RM-NUMVIEW。
 - label 之 h 參數化與 purge 換算 — `為何現在不做: blocked-by:GLOBALH（第 12 步）`；觸發：GLOBALH 開工；登記處：`docs/ROADMAP.md` RM-GLOBALH。
+- 正式生成 L2 之兩計算臂統一（公開落盤用逐類別 `compute_category`、L5／L6 吃 `compute_all_polars` 回傳表，差異為浮點捨入量級，收據 `handoffs/run_receipts/20261004-icfirstalign-l2-arm.json`）——統一會改公開 L2 或 L5／L6 之值，須先定哪一臂為正式臂 — `為何現在不做: blocked-by:NUMVIEW（第 8 步）計算臂與數值契約`；本票之校準域已改取公開落盤之同一臂（Task 4.1），不受此殘留影響；觸發：NUMVIEW 開工；登記處：`docs/ROADMAP.md` RM-NUMVIEW。

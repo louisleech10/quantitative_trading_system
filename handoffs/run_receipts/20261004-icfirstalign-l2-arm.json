@@ -1,0 +1,50 @@
+{
+ "schema_version": 1,
+ "command": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/l2_arm_probe.py",
+ "rows": 800,
+ "cols_polars": 52,
+ "cols_category": 52,
+ "cols_common": 52,
+ "only_polars": [],
+ "only_category": [],
+ "nan_mask_diffs": 0,
+ "float64_finite_diffs": 9650,
+ "float32_finite_diffs": 8842,
+ "max_abs_diff": 1.1725453086253168e-07,
+ "max_rel_diff": 0.0769230086754309,
+ "cols_with_float32_diffs": 20,
+ "top_cols": [
+  [
+   "EMA_8_Momentum_L5",
+   540
+  ],
+  [
+   "EMA_8_Momentum_L3",
+   538
+  ],
+  [
+   "EMA_8_Momentum_L8",
+   529
+  ],
+  [
+   "EMA_8_Momentum_L13",
+   511
+  ],
+  [
+   "SMA_13_Momentum_L5",
+   502
+  ],
+  [
+   "EMA_8_Momentum_L21",
+   499
+  ],
+  [
+   "SMA_13_Momentum_L8",
+   496
+  ],
+  [
+   "SMA_13_Momentum_L13",
+   494
+  ]
+ ]
+}
