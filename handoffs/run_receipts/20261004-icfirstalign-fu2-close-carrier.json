@@ -1,0 +1,30 @@
+{
+ "close_len": 512,
+ "close_all_nan": true,
+ "close_nan_count": 512,
+ "features_index_type": "DatetimeIndex",
+ "features_index_head": [
+  "2024-04-10 00:00:00",
+  "2024-04-10 12:00:00"
+ ],
+ "close_index_head": [
+  "2024-04-10 00:00:00",
+  "2024-04-10 12:00:00"
+ ],
+ "raw_index_type": "RangeIndex",
+ "raw_index_head": [
+  "0",
+  "1"
+ ],
+ "raw_cols": [
+  "timestamp",
+  "open",
+  "high",
+  "low",
+  "close",
+  "volume",
+  "taker_buy_volume",
+  "taker_ratio"
+ ],
+ "source_close_all_nan": false
+}
