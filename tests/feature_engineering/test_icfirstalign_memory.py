@@ -1061,6 +1061,10 @@ def _run_mapping_case(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
                 def __exit__(self, *exc: Any) -> None:
                     return None
 
+                def shutdown(self, wait: bool = True) -> None:
+                    # 排程器於 shutdown 成功後才標 joined（SPEC v30）；同步執行者提交時已完成
+                    return None
+
                 def submit(self, fn: Callable[..., Any], *a: Any, **k: Any) -> cf.Future:
                     fut: cf.Future = cf.Future()
                     try:
@@ -1364,3 +1368,65 @@ def test_mutation_probe_series_written_at_end_only(tmp_path: Path, monkeypatch: 
                               + [{"pressure_level": 1, "swap_volume_free_bytes": 75 << 30, "footprint": int(phys * 0.8)}] * 50)
     proc, out = _run_probe(tmp_path, {C["guard_test_readings_env"]: str(readings), "ICFA_SERIES_BUFFERED": "1"})
     assert not out.exists() or out.read_text(encoding="utf-8").strip() == ""
+
+
+# ---------------------------------------------------------------- 守護第二段逐條件計數（SPEC v30；審碼 b3 r1 codex P2-04）
+
+def _guard_run(readings: List[Dict[str, Any]], budget: int = 100) -> Dict[str, Any]:
+    """以注入讀數序列跑守護主迴圈（旗標寫入與終止皆攔截，不送任何訊號）；回傳終止原因與耗用之取樣數。"""
+    from unittest.mock import patch
+
+    from momentum.FeatureEngineering import memory_guard as mg
+
+    consumed: List[int] = []
+    killed: List[str] = []
+
+    class Readings:
+        def __init__(self, *a: Any) -> None:
+            self.pos = 0
+
+        def sample(self) -> Dict[str, Any]:
+            value = readings[min(self.pos, len(readings) - 1)]
+            self.pos += 1
+            consumed.append(self.pos)
+            return dict(value)
+
+    def abort(args: Any, system: Any, reason: str, history: Any) -> None:
+        killed.append(reason)
+
+    alive = iter(range(len(readings) + 1))
+
+    def is_alive(pid: int) -> bool:  # 讀數用盡後令本行程「已死」以結束迴圈（無終止時）
+        return next(alive, None) is not None and len(consumed) < len(readings)
+
+    with patch.object(mg, "_System", lambda: object()), patch.object(mg, "_Readings", Readings), \
+            patch.object(mg, "_alive", is_alive), patch.object(mg, "_write_atomic", lambda *a: None), \
+            patch.object(mg, "_abort", abort):
+        mg._STOP = False
+        mg.main(["--pid", "123456", "--run-dir", "/nonexistent", "--run-id", "probe", "--budget", str(budget),
+                 "--interval", "0.01"])
+    return {"killed": killed, "samples": len(consumed)}
+
+
+def _r(pressure: int = 1, swap_free: int = 10 ** 20, footprint: int = 0) -> Dict[str, Any]:
+    return {"pressure_level": pressure, "swap_volume_free_bytes": swap_free, "swap_volume_capacity_bytes": 0,
+            "footprint": footprint, "failed": []}
+
+
+def test_guard_alternating_conditions_do_not_accumulate() -> None:
+    """旗標後三種不同條件輪替各成立 1 次 ⇒ 不終止（改前：任一非空即累加 ⇒ 第 3 次取樣即終止而紅）。"""
+    out = _guard_run([_r(pressure=4), _r(swap_free=10 ** 9), _r(footprint=101), _r()])
+    assert out["killed"] == []
+
+
+def test_guard_same_condition_twice_after_flag_kills() -> None:
+    """同一條件於旗標後連續 2 次成立 ⇒ 終止（第 3 次取樣），原因＝該條件。"""
+    out = _guard_run([_r(footprint=101), _r(footprint=101), _r(footprint=101), _r()])
+    assert out["killed"] == ["footprint_over_budget"] and out["samples"] == 3
+
+
+def test_guard_persistent_condition_counted_despite_priority_flicker() -> None:
+    """footprint 持續超上限、壓力危急時有時無（優先序較高）⇒ footprint 仍連續計數而終止；只依「最優先原因」
+    計數之實作會因原因切換歸零而漏殺。"""
+    out = _guard_run([_r(pressure=4, footprint=101), _r(footprint=101), _r(pressure=4, footprint=101), _r()])
+    assert out["killed"] == ["footprint_over_budget"] and out["samples"] == 3

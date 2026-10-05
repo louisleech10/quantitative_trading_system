@@ -944,3 +944,111 @@ def test_mutation_align_index_planned_primary_only(tmp_path: Path, monkeypatch: 
                         lambda params: [mb.Component("primary_seconds", "anon", 8 * shapes["n_p"])])
     run = _align_gap_run(tmp_path, monkeypatch)
     assert run["raised"] is None and run["aligner"] >= 1
+
+
+# ---------------------------------------------------------------- 例外出口與串行臂錯誤語意（SPEC v30；審碼 b3 r1 codex P1-02／P1-03）
+
+def _exception_exit_run(tmp_path: Path) -> Dict[str, Any]:
+    """A 已進 worker；B 之 executor 建構拋 OSError（並行合法：兩任務 E 100、根 10、B 1000、輔助槽 1）。
+    A 之 worker 於 0.5 秒後自行完成（執行緒無法強殺；排程器須等其退出才返回）。"""
+    started, release = threading.Event(), threading.Event()
+    executors: List[Any] = []
+    shutdowns: List[bool] = []
+
+    class Executor(ThreadPoolExecutor):
+        def shutdown(self, *a: Any, **k: Any) -> None:
+            shutdowns.append(True)
+            super().shutdown(*a, **k)
+
+    def factory(n: int) -> Any:
+        if executors:
+            assert started.wait(2)
+            raise OSError("injected second executor creation failure")
+        executor = Executor(n)
+        executors.append(executor)
+        return executor
+
+    def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:
+        started.set()
+        release.wait(5)
+        return payload
+
+    timer = threading.Timer(0.5, release.set)
+    timer.start()
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=2, executor_factory=factory,
+                                     read_system=lambda: (1000, 1, False, 10, ()),
+                                     read_task_footprint=lambda tid: 10, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    out: Dict[str, Any] = {}
+    try:
+        with pytest.raises(OSError, match="injected second executor"):
+            sched.run([mb.Task("A", 100, 1), mb.Task("B", 100, 2)], worker, lambda p: p, lambda w: None)
+        out = {"shutdowns": len(shutdowns),
+               "worker_alive": any(t.is_alive() for ex in executors for t in ex._threads),
+               "A_status": sched._tasks["A"].status}
+    finally:
+        release.set()
+        timer.cancel()
+        for executor in executors:
+            executor.shutdown(wait=True)
+    return out
+
+
+def test_exception_exit_joins_started_executors(tmp_path: Path) -> None:
+    """v30：波次中途之 executor 建構失敗 ⇒ 原例外上拋前，已啟動之 A 之 executor 已 shutdown、worker 已退出、
+    狀態 joined（外層隨即關閉域與守護，不得留下未受保護之 worker）。"""
+    out = _exception_exit_run(tmp_path)
+    assert out == {"shutdowns": 1, "worker_alive": False, "A_status": "joined"}
+
+
+def test_mutation_exception_exit_skips_join(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：例外出口不回收（`_join_unjoined` 無動作）⇒ 返回時 A 之 worker 仍存活而紅。"""
+    monkeypatch.setattr(mb.MemoryBudgetScheduler, "_join_unjoined", lambda self: None)
+    out = _exception_exit_run(tmp_path)
+    assert out["worker_alive"] is True and out["A_status"] != "joined"
+
+
+def test_join_failure_not_marked_joined(tmp_path: Path) -> None:
+    """v30：shutdown 失敗者不標 joined（無退出證據），錯誤上拋。"""
+
+    class BrokenShutdown(ThreadPoolExecutor):
+        def shutdown(self, *a: Any, **k: Any) -> None:
+            super().shutdown(*a, **k)
+            raise RuntimeError("injected shutdown failure")
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=BrokenShutdown,
+                                     read_system=lambda: (1000, 1, False, 10, ()),
+                                     read_task_footprint=lambda tid: 10, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    with pytest.raises(RuntimeError, match="injected shutdown failure"):
+        sched.run([mb.Task("A", 100, 1)], lambda d, p: p, lambda p: p, lambda w: None)
+    assert sched._tasks["A"].status != "joined"
+
+
+@pytest.mark.parametrize("allow_partial", [False, True])
+def test_serial_arm_budget_error_not_degraded(allow_partial: bool, tmp_path: Path) -> None:
+    """v30：根內串行臂之週期 producer 遇預算具名錯誤 ⇒ rollback／discard 後原樣上拋（同一物件），不論
+    `allow_partial_timeframes`；與並行臂之結果處理相同。改前：False ⇒ RuntimeError、True ⇒ 吞掉並記 skipped。"""
+    from unittest.mock import MagicMock, patch
+
+    from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
+
+    factory = h.make_factory(tmp_path / "features")
+    raw = h.kline_close().iloc[-800:].to_frame()
+    config = factory._resolve_config(h.s2_payload(["12h", "4h"], allow_partial_timeframes=allow_partial))
+    gen = MultiTFGenerator(factory, config)
+    err = mb.GenerationMemoryBudgetExceeded("Layer 3", 100, 200, 250, "本程式超上限")
+    registry = MagicMock()
+    registry._groups = {}
+    skipped: List[str] = []
+    with patch.object(factory, "_layer0_data_ingestion", return_value=raw), \
+            patch.object(gen, "_run_tf_l1_l6_results", side_effect=err):
+        with pytest.raises(mb.GenerationMemoryBudgetExceeded) as info:
+            gen._process_timeframe_inroot(h.SYMBOL, "4h", raw, raw.index, None, None, registry, skipped, {}, {},
+                                          {"dual_tf_l1_l6": 0, "alignment": 0})
+    assert info.value is err and skipped == []
+    registry.rollback_timeframe.assert_called_once_with("4h")
+    registry.discard_layer_status.assert_called_once_with("4h")
+    with pytest.raises(mb.GenerationMemoryBudgetExceeded) as parallel:
+        gen._accept_worker_result(err, registry, raw.index, [], {}, {}, {"alignment": 0})
+    assert parallel.value is err

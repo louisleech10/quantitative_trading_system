@@ -195,7 +195,11 @@ def install_inprocess_mtf_pool(monkeypatch: Any) -> None:
 
     ICFIRSTALIGN b3：行程內執行器之 worker 讀數即整個測試行程之 footprint（非獨立子行程）⇒ 任務峰值 E 加上當下
     footprint（正式估算之資料與 runtime 項不變），否則 worker 被判「任務峰值估算低估」——同
-    `test_icfirstalign_memory.py` 之 `mtf_align_sharded` 案例。"""
+    `test_icfirstalign_memory.py` 之 `mtf_align_sharded` 案例。准入式之根成員亦為同一行程 ⇒ 該 footprint 於准入
+    計兩次（根 F＋任務 E∋F）；排程器之 B 同加當下 footprint，使准入等價於單行程之「F＋估算 ≤ B」（否則前序測試
+    使行程膨脹時任務不准入、改走串行臂，並行臂案例測錯分支）；同理 E 內之當下 footprint 已配置、非新增量 ⇒
+    可吸收量同加之（否則系統當下可用較少時任務不准入）。"""
+    from momentum import factories
     from momentum.FeatureEngineering import memory_budget as mb
 
     monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
@@ -206,6 +210,26 @@ def install_inprocess_mtf_pool(monkeypatch: Any) -> None:
         return None if base is None else base + mb.sample_memory_bytes()
 
     monkeypatch.setattr(MultiTFGenerator, "_estimate_worker_envelope", envelope)
+    real_scheduler = factories.create_memory_budget_scheduler
+
+    def scheduler(**kw: Any) -> Any:
+        if kw.get("budget") is None:
+            kw["budget"] = mb.configured_budget_bytes() + mb.sample_memory_bytes()
+        return real_scheduler(**kw)
+
+    monkeypatch.setattr(factories, "create_memory_budget_scheduler", scheduler)
+    real_read_system = mb.default_read_system
+
+    def read_system(*a: Any, **k: Any) -> Any:
+        inner = real_read_system(*a, **k)
+
+        def read() -> Any:
+            absorbable, *rest = inner()
+            return (absorbable + mb.sample_memory_bytes(), *rest)
+
+        return read
+
+    monkeypatch.setattr(mb, "default_read_system", read_system)
 
 
 def _build_mtf_generator(

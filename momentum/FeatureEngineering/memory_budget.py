@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import contextvars
 import ctypes
+import hashlib
 import json
 import os
 import plistlib
@@ -1067,6 +1068,99 @@ def begin_protected_run(run_dir: Path, run_id: str) -> ProtectedRun:
     return ProtectedRun(run_dir, run_id).start()
 
 
+PRE_LEASE_SCOPE_PREFIX = ".icfa_prelease_"
+SCOPE_OWNER_NAME = "scope_owner.json"
+
+
+def _scope_key(run_id: str) -> str:
+    return hashlib.sha256(str(run_id).encode("utf-8")).hexdigest()[:16]
+
+
+class PreLeaseScope(ProtectedRun):
+    """FFSTAT 校準前置關卡（先於 run lease、run 目錄零寫入）之受保護情境：同一 `generate_features` 之守護自此
+    啟動，lease 後之 run 以巢狀沿用（恰一守護）；根目錄為成品根下之獨立暫存目錄（與 run 目錄同掛載、已核磁碟
+    後援），`close()` 連同本身建立之上層目錄全數刪除（校準失敗 ⇒ 樹前後相同）。強制終止後之殘留由同 key 下一次
+    run 取得 lease 後以 `recover_orphan_pre_lease_scopes` 清理（擁有者行程仍存活者不動）。"""
+
+    def __init__(self, scope_dir: Path, run_id: str, created: Sequence[Path]) -> None:
+        super().__init__(scope_dir, run_id)
+        self._created = [Path(p) for p in created]
+
+    def close(self) -> None:
+        try:
+            super().close()
+        finally:
+            shutil.rmtree(self.run_dir, ignore_errors=True)
+            for parent in self._created:  # 由深至淺；只刪本 scope 為建立而新增且已空之上層
+                with contextlib.suppress(OSError):
+                    parent.rmdir()
+
+
+def begin_pre_lease_scope(base_dir: Path, run_id: str) -> PreLeaseScope:
+    """校準前置關卡之受保護情境入口（generate_features 於呼叫校準關卡前）。"""
+    base_dir = Path(base_dir)
+    created: List[Path] = []
+    probe = base_dir
+    while not probe.exists():
+        created.append(probe)
+        probe = probe.parent
+    base_dir.mkdir(parents=True, exist_ok=True)
+    scope_dir = Path(tempfile.mkdtemp(prefix=f"{PRE_LEASE_SCOPE_PREFIX}{_scope_key(run_id)}_", dir=str(base_dir)))
+    scope = PreLeaseScope(scope_dir, run_id, created)
+    try:
+        pid = os.getpid()
+        owner = {"pid": pid, "start_time": process_start_time(pid) if sys.platform == "darwin" else 0.0}
+        (scope_dir / SCOPE_OWNER_NAME).write_text(json.dumps(owner), encoding="utf-8")
+        return scope.start()
+    except BaseException:
+        scope.close()
+        raise
+
+
+def _scope_owner_alive(scope_dir: Path) -> bool:
+    try:
+        owner = json.loads((scope_dir / SCOPE_OWNER_NAME).read_text(encoding="utf-8"))
+        pid = int(owner["pid"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    if sys.platform != "darwin":
+        return True
+    try:
+        return abs(process_start_time(pid) - float(owner.get("start_time", 0.0))) < 1e-3
+    except Exception:  # noqa: BLE001 — 讀不到起始時間 ⇒ 視為仍存活（不刪他人暫存）
+        return True
+
+
+def recover_orphan_pre_lease_scopes(base_dir: Path, run_id: str, run_dir: Path,
+                                    keep: Optional[Path] = None) -> List[str]:
+    """同 key 前次被強制終止之校準前置情境殘留：擁有者已不存在者，刪其登記暫存與整個目錄；abort 收據保留至
+    run 目錄（`memory_guard_abort.prelease-<目錄名>.json`）。回傳已清理之目錄。"""
+    base_dir = Path(base_dir)
+    removed: List[str] = []
+    if not base_dir.is_dir():
+        return removed
+    for scope_dir in sorted(base_dir.glob(f"{PRE_LEASE_SCOPE_PREFIX}{_scope_key(run_id)}_*")):
+        if not scope_dir.is_dir() or (keep is not None and scope_dir.resolve() == Path(keep).resolve()):
+            continue
+        if _scope_owner_alive(scope_dir):
+            continue
+        receipt = scope_dir / ABORT_RECEIPT_NAME
+        if receipt.exists():
+            Path(run_dir).mkdir(parents=True, exist_ok=True)
+            with contextlib.suppress(OSError):
+                shutil.copy2(receipt, Path(run_dir) / f"memory_guard_abort.prelease-{scope_dir.name}.json")
+        recover_aborted_run(scope_dir)
+        shutil.rmtree(scope_dir, ignore_errors=True)
+        removed.append(str(scope_dir))
+    return removed
+
+
 # ---------------------------------------------------------------- 測試接縫（只供驗收測試注入；生產不呼叫）
 
 @contextlib.contextmanager
@@ -1361,8 +1455,6 @@ class MemoryBudgetScheduler:
     def run(self, tasks: Sequence[Task], worker_fn: Callable[[DomainDescriptor, Any], Any],
             serial_fn: Callable[[Any], Any], on_wave_joined: Callable[[List[Any]], None]) -> List[Any]:
         """依序准入有限波次；不足只排隊；無可准入走 `serial_fn`（根行程內）；每波 join 後呼叫 `on_wave_joined`。"""
-        import concurrent.futures as cf
-
         results: List[Any] = [None] * len(tasks)
         queue: Deque[_TaskState] = deque()
         for index, task in enumerate(tasks):
@@ -1371,6 +1463,37 @@ class MemoryBudgetScheduler:
                 self._tasks[task.task_id] = state
             queue.append(state)
             self._event("queued", task.task_id)
+        try:
+            parallel_ever = self._run_waves(queue, results, worker_fn, serial_fn, on_wave_joined)
+        except BaseException:
+            # 例外出口（executor 建構／submit／量測／結果處理失敗）：已建立之 executor 一律 shutdown 並確認回收後才
+            # 返回外層（外層隨即關閉域與守護）；回收失敗者保留其狀態，不標 joined
+            self._join_unjoined()
+            raise
+        if parallel_ever < min(self.max_workers, len(tasks)):
+            self.degraded = {"configured": self.max_workers, "actual": parallel_ever,
+                             "reason": "memory_budget_admission"}
+        return results
+
+    def _join_state(self, state: _TaskState) -> None:
+        """shutdown(wait=True) 成功（worker 已退出）後才標 joined；失敗原樣上拋、狀態不變。"""
+        state.executor.shutdown(wait=True)
+        with self._lock:
+            state.status = "joined"
+        self._event("joined", state.task.task_id)
+
+    def _join_unjoined(self) -> None:
+        for state in list(self._tasks.values()):
+            if state.executor is None or state.status == "joined":
+                continue
+            with contextlib.suppress(Exception):  # 例外出口之盡力回收：原例外優先上拋，失敗者狀態保留未 joined
+                self._join_state(state)
+
+    def _run_waves(self, queue: "Deque[_TaskState]", results: List[Any],
+                   worker_fn: Callable[[DomainDescriptor, Any], Any], serial_fn: Callable[[Any], Any],
+                   on_wave_joined: Callable[[List[Any]], None]) -> int:
+        import concurrent.futures as cf
+
         parallel_ever = 0
         while queue:
             wave: List[_TaskState] = []
@@ -1410,21 +1533,14 @@ class MemoryBudgetScheduler:
                     self._event(state.status, state.task.task_id)
             wave_results: List[Any] = []
             for state in wave:
-                with contextlib.suppress(Exception):
-                    state.executor.shutdown(wait=True)
-                with self._lock:
-                    state.status = "joined"
-                self._event("joined", state.task.task_id)
+                self._join_state(state)
                 exc = state.future.exception()
                 value = exc if exc is not None else state.future.result()
                 results[state.index] = value
                 wave_results.append(value)
             self._event("wave_joined", "")
             on_wave_joined(wave_results)
-        if parallel_ever < min(self.max_workers, len(tasks)):
-            self.degraded = {"configured": self.max_workers, "actual": parallel_ever,
-                             "reason": "memory_budget_admission"}
-        return results
+        return parallel_ever
 
     def _submit(self, state: _TaskState, worker_fn: Callable[[DomainDescriptor, Any], Any]) -> None:
         executor = self._executor_factory(1)

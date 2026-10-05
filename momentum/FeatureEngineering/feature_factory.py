@@ -252,6 +252,8 @@ class FeatureFactory:
         # FFSTAT Task 2.1：校準前置關卡為一次生成之第一步——先於 run lease、快取查詢、registry 與任何落盤
         # （任一週期失敗 ⇒ 整個 run 目錄與 registry 零寫入）
         self._calibration_result = None
+        run_key = f"{symbol}/{timeframe}/{config_hash}"
+        scope: Optional[Any] = None
         if self._stationarity_config_enabled(config):
             training_tfs = list(dict.fromkeys(config.timeframes.training))
             self._current_config_hash = config_hash
@@ -259,23 +261,38 @@ class FeatureFactory:
                 # v32 §C 未填起始日：無校準域、無前置關卡；L6.5 逐欄以公開值最早 N 個有效值校準並遮出（Task 2.3 ④）
                 self._calibration_result = self._no_start_calibration_result(config, training_tfs)
             else:
-                self._run_calibration_gate(
-                    symbol, training_tfs if len(training_tfs) > 1 else [timeframe], config, start_date,
-                    resolve_output_window(config, timeframe, start_date, end_date),
-                )
+                # ICFIRSTALIGN Task 4.2（v30）：校準前置關卡之 L1–L6 亦受同一守護與映射根保護——守護自此啟動
+                # （成品根下之獨立暫存目錄；校準失敗 ⇒ 全數刪除、run 目錄零寫入），lease 後之 run 巢狀沿用
+                scope = _memory_budget.begin_pre_lease_scope(Path(self._storage.base_path), run_key)
+                try:
+                    self._run_calibration_gate(
+                        symbol, training_tfs if len(training_tfs) > 1 else [timeframe], config, start_date,
+                        resolve_output_window(config, timeframe, start_date, end_date),
+                    )
+                except BaseException:
+                    _memory_budget.layer_end("run")
+                    scope.close()
+                    raise
         try:
             lease = RunLease.acquire(Path(self._storage.base_path) / ".locks", symbol, timeframe, config_hash, timeout=0)
         except BaseException:
             self._calibration_result = None
+            if scope is not None:
+                _memory_budget.layer_end("run")
+                scope.close()
             raise
         retained = False
         protected: Optional[Any] = None
         holder = getattr(self, "_protected_run_holder", None)
         try:
-            # ICFIRSTALIGN Task 4.2：取得 lease 後——恢復前次強制停止之殘留，再啟動本次之獨立守護（域內任務不另起）
-            protected = _memory_budget.begin_protected_run(
-                self._storage.feature_run_dir(symbol, timeframe, config_hash), f"{symbol}/{timeframe}/{config_hash}",
+            run_dir = self._storage.feature_run_dir(symbol, timeframe, config_hash)
+            # 同 key 前次被強制終止之校準前置殘留（擁有者已不存在者）
+            _memory_budget.recover_orphan_pre_lease_scopes(
+                Path(self._storage.base_path), run_key, run_dir, keep=None if scope is None else scope.run_dir,
             )
+            # ICFIRSTALIGN Task 4.2：取得 lease 後——恢復前次強制停止之殘留，再啟動本次之獨立守護（域內任務不另起；
+            # 校準前置已啟動者巢狀沿用）
+            protected = _memory_budget.begin_protected_run(run_dir, run_key)
             result = self._generate_features_impl(
                 symbol,
                 timeframe,
@@ -297,10 +314,16 @@ class FeatureFactory:
             self._calibration_result = None  # 封包只在本次 run 內使用
             if holder is not None and retained and protected is not None:
                 holder.append(protected)  # run_ic_first：守護隨 lease 持有至 IC、processed、cleanup 結束
+                if scope is not None:
+                    holder.append(scope)  # 守護持有者（巢狀之外層）後關
             else:
                 _memory_budget.layer_end("run")
-                if protected is not None:
-                    protected.close()  # 守護於 lease 釋放前停止並回收
+                try:
+                    if protected is not None:
+                        protected.close()  # 守護於 lease 釋放前停止並回收
+                finally:
+                    if scope is not None:
+                        scope.close()
             if not retained:
                 lease.release()
 

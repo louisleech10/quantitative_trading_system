@@ -144,17 +144,19 @@ def _alive(pid: int) -> bool:
     return True
 
 
-def _trigger(reading: Dict[str, Any], budget: int) -> Optional[str]:
+def _conditions(reading: Dict[str, Any], budget: int) -> List[str]:
+    """本次讀數成立之全部停止條件（依優先序）。"""
     reserve = max(DISK_RESERVE_MIN_BYTES, int(int(reading["swap_volume_capacity_bytes"]) * DISK_RESERVE_FRACTION))
+    found: List[str] = []
     if int(reading["pressure_level"]) >= PRESSURE_CRITICAL_LEVEL:
-        return "pressure_critical"
+        found.append("pressure_critical")
     if int(reading["swap_volume_free_bytes"]) < reserve:
-        return "swap_volume_low"
+        found.append("swap_volume_low")
     if reading.get("failed"):
-        return "measurement_failed"
+        found.append("measurement_failed")
     if int(reading["footprint"]) > int(budget):
-        return "footprint_over_budget"
-    return None
+        found.append("footprint_over_budget")
+    return found
 
 
 def _write_atomic(path: str, text: str) -> None:
@@ -231,7 +233,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     sys.stdout.flush()
     history: List[Dict[str, Any]] = []
     flag_written = False
-    consecutive = 0
+    streaks: Dict[str, int] = {}
     reading: Optional[Dict[str, Any]] = first
     parent = os.getppid()
     while not _STOP:
@@ -243,19 +245,21 @@ def main(argv: Optional[List[str]] = None) -> int:
                            "footprint": 0, "failed": [f"error:{exc}"]}
         history.append(reading)
         history = history[-20:]
-        trigger = _trigger(reading, args.budget)
-        if trigger is not None:
+        found = _conditions(reading, args.budget)
+        if found:
             if not flag_written:
-                _write_atomic(os.path.join(args.run_dir, STOP_FLAG_NAME), trigger)
+                _write_atomic(os.path.join(args.run_dir, STOP_FLAG_NAME), found[0])
                 flag_written = True
-                consecutive = 0
+                streaks = {}
             else:
-                consecutive += 1
-                if consecutive >= CONSECUTIVE_FOR_KILL:
-                    _abort(args, system, trigger, history)
+                # 第二段：旗標後「同一條件」連續成立 CONSECUTIVE_FOR_KILL 次才終止（逐條件計數，未成立者歸零）
+                streaks = {name: streaks.get(name, 0) + 1 for name in found}
+                held = [name for name in found if streaks[name] >= CONSECUTIVE_FOR_KILL]
+                if held:
+                    _abort(args, system, held[0], history)
                     return 0
         else:
-            consecutive = 0
+            streaks = {}
         reading = None
         deadline = time.monotonic() + max(args.interval, 0.05)
         while not _STOP and time.monotonic() < deadline:

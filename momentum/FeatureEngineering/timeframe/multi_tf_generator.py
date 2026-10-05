@@ -295,6 +295,11 @@ class MultiTFGenerator:
             fresh_failed[timeframe] = self._collect_failed_layer_ids(layer_results, timeframe)
             # Task 1.3 ②：六層狀態（含非失敗）於 write_manifest 前記錄；stale 重跑者整組取代
             registry.record_layer_status(timeframe, self._layer_statuses(layer_results))
+        except (_memory_budget.GenerationMemoryBudgetExceeded, _memory_budget.MemoryMeasurementUnavailable):
+            # ICFIRSTALIGN Task 4.2：預算錯誤不降級為週期失敗（與並行臂 `_accept_worker_result` 同：原樣上拋）
+            registry.rollback_timeframe(timeframe)
+            registry.discard_layer_status(timeframe)
+            raise
         except Exception as exc:
             logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
             registry.rollback_timeframe(timeframe)

@@ -465,3 +465,144 @@ def test_mutation_missing_group_changes_column_set_digest(tmp_path: Path, monkey
         _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
     got = frz._packet_record(captured["12h"])
     assert got["column_set_digest"] != CALIB["jia"]["S3_winsor_on"]["12h"]["column_set_digest"]
+
+
+# ---------------------------------------------------------------- 校準前置關卡之受保護情境（SPEC v30；審碼 b3 r1 codex P1-01）
+
+def _pid_alive(pid: int) -> bool:
+    import os
+
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _tree(root: Path) -> List[str]:
+    return sorted(str(p.relative_to(root)) for p in root.rglob("*"))
+
+
+def _spy_pre_lease(monkeypatch: pytest.MonkeyPatch) -> Dict[str, Any]:
+    """守護啟動、lease 取得／釋放、前置殘留清理與校準關卡當下之情境（只記錄、不改行為）。"""
+    from momentum.FeatureEngineering import memory_budget as mb
+    from momentum.FeatureEngineering.run_locks import RunLease
+
+    st: Dict[str, Any] = {"events": [], "pids": [], "gate": {}}
+    real_start, real_orphan = mb.start_guard, mb.recover_orphan_pre_lease_scopes
+    real_acquire, real_release = RunLease.acquire, RunLease.release
+    real_gate = ff.FeatureFactory._run_calibration_gate
+
+    def start(run_dir: Path, run_id: str, **k: Any) -> Any:
+        handle = real_start(run_dir, run_id, **k)
+        st["events"].append("start_guard")
+        st["pids"].append(handle.pid)
+        return handle
+
+    def orphan(*a: Any, **k: Any) -> Any:
+        st["events"].append("orphan_sweep")
+        return real_orphan(*a, **k)
+
+    def acquire(*a: Any, **k: Any) -> Any:
+        lease = real_acquire(*a, **k)
+        st["events"].append("acquire")
+        return lease
+
+    def release(self: Any) -> None:
+        st["events"].append("release")
+        st.setdefault("guard_alive_at_release", []).append(any(_pid_alive(p) for p in st["pids"]))
+        return real_release(self)
+
+    def gate(self: Any, *a: Any, **k: Any) -> Any:
+        ctx = mb.active_context()
+        st["gate"] = {"guard_pid": None if ctx is None else ctx.guard_pid, "mapping_root": mb.current_mapping_root()}
+        return real_gate(self, *a, **k)
+
+    monkeypatch.setattr(mb, "start_guard", start)
+    monkeypatch.setattr(mb, "recover_orphan_pre_lease_scopes", orphan)
+    monkeypatch.setattr(RunLease, "acquire", acquire)
+    monkeypatch.setattr(RunLease, "release", release)
+    monkeypatch.setattr(ff.FeatureFactory, "_run_calibration_gate", gate)
+    return st
+
+
+def test_calibration_gate_runs_under_single_guard_and_mapping_root(tmp_path: Path,
+                                                                   monkeypatch: pytest.MonkeyPatch) -> None:
+    """v30：開平穩化且有起始日 ⇒ 校準前置關卡執行時已在本次守護之下、映射根為成品根下之 `.icfa_prelease_*`；
+    整個 run 恰一守護（先於 lease 啟動、lease 後巢狀沿用）、前置殘留清理於取得 lease 後、守護於 lease 釋放前停止；
+    結束後無前置目錄殘留。改前：關卡當下無情境、映射根 None（校準暫存落 TMPDIR）而紅。"""
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    root = h.isolated(monkeypatch, tmp_path)
+    factory = h.make_factory(root)
+    st = _spy_pre_lease(monkeypatch)
+    factory.generate_features(h.SYMBOL, h.PRIMARY, config_override=frz.s3_payload(True), force_regenerate=True,
+                              start_date=h.S2_WINDOW[0], end_date=h.S2_WINDOW[1], persist=True)
+    events = st["events"]
+    assert events.count("start_guard") == 1 and len(st["pids"]) == 1
+    assert events.index("start_guard") < events.index("acquire") < events.index("orphan_sweep")
+    assert st["gate"]["guard_pid"] == st["pids"][0]
+    base = Path(factory._storage.base_path)
+    scope_root = st["gate"]["mapping_root"]
+    assert scope_root is not None and scope_root.parent.parent == base
+    assert scope_root.parent.name.startswith(mb.PRE_LEASE_SCOPE_PREFIX)
+    assert st["guard_alive_at_release"] and not any(st["guard_alive_at_release"])
+    assert not _pid_alive(st["pids"][0])
+    assert not list(base.glob(f"{mb.PRE_LEASE_SCOPE_PREFIX}*"))
+
+
+def test_calibration_gate_failure_leaves_tree_unchanged_and_guard_stopped(tmp_path: Path,
+                                                                          monkeypatch: pytest.MonkeyPatch) -> None:
+    """v30：校準前置關卡失敗 ⇒ 守護停止、前置目錄全數刪除（樹前後相同，FFSTAT 零寫入不變）、未取得 lease。"""
+    root = h.isolated(monkeypatch, tmp_path)
+    factory = h.make_factory(root)
+    st = _spy_pre_lease(monkeypatch)
+
+    def fail(self: Any, *a: Any, **k: Any) -> Any:
+        raise cal.CalibrationError("injected calibration failure")
+
+    monkeypatch.setattr(ff.FeatureFactory, "_run_calibration_gate", fail)
+    before = _tree(tmp_path)
+    with pytest.raises(cal.CalibrationError, match="injected"):
+        factory.generate_features(h.SYMBOL, h.PRIMARY, config_override=frz.s3_payload(True), force_regenerate=True,
+                                  start_date=h.S2_WINDOW[0], end_date=h.S2_WINDOW[1], persist=True)
+    assert _tree(tmp_path) == before
+    assert st["events"] == ["start_guard"] and not _pid_alive(st["pids"][0])
+
+
+def test_orphan_pre_lease_scope_recovered_only_when_owner_dead(tmp_path: Path) -> None:
+    """v30：同 key 之前置目錄，擁有者已不存在者刪其登記暫存與整個目錄、abort 收據複製至 run 目錄；擁有者存活者
+    與他 key 者不動。"""
+    import os
+    import subprocess
+    import sys
+
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    base = tmp_path / "features"
+    base.mkdir(exist_ok=True)
+    key = "BTCUSDT/1h/abc"
+    proc = subprocess.Popen([sys.executable, "-c", "pass"])
+    proc.wait()
+
+    def scope(name: str, run_id: str, pid: int, start_time: float) -> Path:
+        d = base / f"{mb.PRE_LEASE_SCOPE_PREFIX}{mb._scope_key(run_id)}_{name}"
+        d.mkdir()
+        (d / mb.SCOPE_OWNER_NAME).write_text(json.dumps({"pid": pid, "start_time": start_time}), encoding="utf-8")
+        return d
+
+    orphan = scope("dead", key, proc.pid, 1.0)
+    owned = tmp_path / "owned_tmp"
+    owned.mkdir()
+    (orphan / mb.OWNED_PATHS_NAME).write_text(json.dumps([str(owned)]), encoding="utf-8")
+    (orphan / mb.ABORT_RECEIPT_NAME).write_text(json.dumps({"trigger": "footprint_over_budget"}), encoding="utf-8")
+    live = scope("live", key, os.getpid(), mb.process_start_time(os.getpid()))
+    other = scope("other", "ETHUSDT/1h/abc", proc.pid, 1.0)
+    run_dir = tmp_path / "run"
+    removed = mb.recover_orphan_pre_lease_scopes(base, key, run_dir)
+    assert removed == [str(orphan)]
+    assert not orphan.exists() and not owned.exists()
+    assert live.exists() and other.exists()
+    assert (run_dir / f"memory_guard_abort.prelease-{orphan.name}.json").exists()
