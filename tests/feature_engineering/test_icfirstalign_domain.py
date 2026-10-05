@@ -948,10 +948,14 @@ def test_mutation_align_index_planned_primary_only(tmp_path: Path, monkeypatch: 
 
 # ---------------------------------------------------------------- 例外出口與串行臂錯誤語意（SPEC v30；審碼 b3 r1 codex P1-02／P1-03）
 
-def _exception_exit_run(tmp_path: Path, transient_shutdown_failure: bool = False) -> Dict[str, Any]:
-    """A 已進 worker；B 之 executor 建構拋 OSError（並行合法：兩任務 E 100、根 10、B 1000、輔助槽 1）。
+def _exception_exit_run(tmp_path: Path, transient_shutdown_failure: bool = False,
+                        shutdown_interrupt: bool = False,
+                        creation_error: BaseException = OSError("injected second executor creation failure"),
+                        expect: Any = OSError) -> Dict[str, Any]:
+    """A 已進 worker；B 之 executor 建構拋 `creation_error`（並行合法：兩任務 E 100、根 10、B 1000、輔助槽 1）。
     A 之 worker 於 0.5 秒後自行完成（執行緒無法強殺；排程器須等其退出才返回）。`transient_shutdown_failure` ⇒
-    A 之第一次 shutdown 於 join 前拋 OSError（審碼 b3 r2 codex P1-03 之序列）。"""
+    A 之第一次 shutdown 於 join 前拋 OSError（審碼 b3 r2 codex P1-03 之序列）；`shutdown_interrupt` ⇒ 第一次
+    shutdown 於 join 前拋 KeyboardInterrupt（回收期間之使用者中斷，審碼 b3 r3 codex P1-01 之序列）。"""
     started, release = threading.Event(), threading.Event()
     executors: List[Any] = []
     shutdowns: List[bool] = []
@@ -961,12 +965,14 @@ def _exception_exit_run(tmp_path: Path, transient_shutdown_failure: bool = False
             shutdowns.append(True)
             if transient_shutdown_failure and len(shutdowns) == 1:
                 raise OSError("transient shutdown failure")
+            if shutdown_interrupt and len(shutdowns) == 1:
+                raise KeyboardInterrupt
             super().shutdown(*a, **k)
 
     def factory(n: int) -> Any:
         if executors:
             assert started.wait(2)
-            raise OSError("injected second executor creation failure")
+            raise creation_error
         executor = Executor(n)
         executors.append(executor)
         return executor
@@ -984,8 +990,9 @@ def _exception_exit_run(tmp_path: Path, transient_shutdown_failure: bool = False
                                      task_identity=_thread_identity)
     out: Dict[str, Any] = {}
     try:
-        with pytest.raises(OSError, match="injected second executor"):
+        with pytest.raises(expect) as raised:
             sched.run([mb.Task("A", 100, 1), mb.Task("B", 100, 2)], worker, lambda p: p, lambda w: None)
+        assert raised.value is creation_error, "回收完成後須上拋觸發清理之原例外"
         out = {"shutdowns": len(shutdowns),
                "worker_alive": any(t.is_alive() for ex in executors for t in ex._threads),
                "A_status": sched._tasks["A"].status}
@@ -1015,6 +1022,20 @@ def test_transient_join_failure_still_confirms_exit(tmp_path: Path) -> None:
     """v31（審碼 b3 r2 codex P1-03）：例外出口之 shutdown 第一次於 join 前失敗 ⇒ 不吞掉返回，同一 shutdown 再試至
     確認退出；原例外（executor 建構失敗）於回收完成後上拋。改前：suppress 後返回、A 之 worker 仍存活而紅。"""
     out = _exception_exit_run(tmp_path, transient_shutdown_failure=True)
+    assert out == {"shutdowns": 2, "worker_alive": False, "A_status": "joined"}
+
+
+def test_interrupt_during_cleanup_deferred_until_exit_confirmed(tmp_path: Path) -> None:
+    """v32（審碼 b3 r3 codex P1-01）：executor 建構失敗之例外出口回收期間收到 KeyboardInterrupt ⇒ 中斷延後，
+    A 確認退出、joined 後才上拋原 OSError（外層隨即關閉域與守護）。改前：中斷直穿回收、A 仍存活而紅。"""
+    out = _exception_exit_run(tmp_path, shutdown_interrupt=True)
+    assert out == {"shutdowns": 2, "worker_alive": False, "A_status": "joined"}
+
+
+def test_repeated_interrupt_during_cleanup_keeps_first(tmp_path: Path) -> None:
+    """v32：首次中斷觸發清理、清理中再次中斷 ⇒ 仍確認 A 退出後才上拋首次之 KeyboardInterrupt。"""
+    first = KeyboardInterrupt("first interrupt")
+    out = _exception_exit_run(tmp_path, shutdown_interrupt=True, creation_error=first, expect=KeyboardInterrupt)
     assert out == {"shutdowns": 2, "worker_alive": False, "A_status": "joined"}
 
 

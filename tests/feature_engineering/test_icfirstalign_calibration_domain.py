@@ -646,3 +646,25 @@ def test_pre_lease_scope_owner_known_from_creation(tmp_path: Path, monkeypatch: 
     finally:
         scope.close()
     assert not list(base.glob(f"{mb.PRE_LEASE_SCOPE_PREFIX}*"))
+
+
+@pytest.mark.parametrize("unknown_at", ["sweep", "creation"])
+def test_pre_lease_scope_unknown_start_time_counts_as_alive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                                                            unknown_at: str) -> None:
+    """v32（審碼 b3 r3 codex P1-02）：pid 存在而啟動時刻未知（驗活時讀取失敗、或建立時讀取失敗而名稱記 0）⇒
+    無死亡證據、視為存活不刪。改前：0 與已知啟動時刻比較不等 ⇒ 活擁有者之目錄被刪而紅。"""
+    import os
+
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    base = tmp_path / "features"
+    base.mkdir(exist_ok=True)
+    key = "BTCUSDT/1h/unknown"
+    me = os.getpid()
+    start = 0 if unknown_at == "creation" else int(mb.process_start_time(me))
+    live = base / f"{mb.PRE_LEASE_SCOPE_PREFIX}{mb._scope_key(key)}_{me}-{start}_x"
+    live.mkdir()
+    if unknown_at == "sweep":
+        monkeypatch.setattr(mb, "process_start_time", lambda pid: 0.0)
+    assert mb.recover_orphan_pre_lease_scopes(base, key, tmp_path / "run") == []
+    assert live.exists()

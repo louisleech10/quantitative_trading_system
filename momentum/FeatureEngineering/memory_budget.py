@@ -1140,7 +1140,10 @@ def _scope_owner_alive(scope_dir: Path, key: str) -> bool:
     if sys.platform != "darwin":
         return True
     try:
-        return int(process_start_time(pid)) == start
+        current = int(process_start_time(pid))
+        # 啟動時刻未知（建立時或驗活時讀取失敗 ⇒ 0）＝無死亡證據 ⇒ 存活；只有兩個已知身分不同才判 pid 重用
+        # （v32，審碼 b3 r3 codex P1-02）
+        return start == 0 or current == 0 or current == start
     except Exception:  # noqa: BLE001 — 讀不到起始時間 ⇒ 視為仍存活（不刪他人暫存）
         return True
 
@@ -1516,10 +1519,14 @@ class MemoryBudgetScheduler:
                 time.sleep(min(0.05 * attempts, 1.0))
 
     def _join_unjoined(self) -> None:
+        """例外出口：全部確認退出後，原例外才由呼叫端上拋。回收期間之中斷（KeyboardInterrupt 等，含 shutdown、
+        future 等待與重試間隔中）一律延後——未確認退出前不交還持有者（v32，審碼 b3 r3 codex P1-01）。"""
         for state in list(self._tasks.values()):
-            if state.executor is None or state.status == "joined":
-                continue
-            self._join_confirmed(state)  # 例外出口：全部確認退出後，原例外才上拋
+            while state.executor is not None and state.status != "joined":
+                try:
+                    self._join_confirmed(state)
+                except BaseException:  # noqa: BLE001 — 中斷延後：原例外優先，回收完成前不放手
+                    self._event("interrupt_deferred", state.task.task_id)
 
     def _run_waves(self, queue: "Deque[_TaskState]", results: List[Any],
                    worker_fn: Callable[[DomainDescriptor, Any], Any], serial_fn: Callable[[Any], Any],
