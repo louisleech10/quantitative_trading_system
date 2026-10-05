@@ -1,0 +1,131 @@
+{
+  "schema_version": 1,
+  "probe": "handoffs/run_receipts/icfirstalign_probes/swap_timeline_probe.py",
+  "tree": "HEAD f13a9635 worktree",
+  "machine": {
+    "physical_gib": 8,
+    "swap_volume": "/System/Volumes/VM 228 GB"
+  },
+  "cases": [
+    {
+      "schema_version": 1,
+      "nodes": [
+        "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[legacy-healthy]"
+      ],
+      "rc": 1,
+      "elapsed_seconds": 121.0,
+      "stopped_reason": null,
+      "footprint_max_gib": 8.482,
+      "swap_used_max_gib": 8.272,
+      "swap_total_max_gib": 9.0,
+      "swap_volume_free_min_gib": 53.704,
+      "pressure_max": 4,
+      "pressure_counts": {
+        "1": 37,
+        "2": 200,
+        "4": 1
+      },
+      "pytest_tail": [
+        "tests/test_multi_tf_generator.py F                                       [100%]",
+        "=================================== FAILURES ===================================",
+        "/private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/faea09ef-e9ae-469c-a7f6-2997b3073cf4/scratchpad/head_wt/tests/test_multi_tf_generator.py:543: AssertionError: ('legacy', 'healthy')",
+        "=========================== short test summary info ============================",
+        "FAILED tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[legacy-healthy]",
+        "======================== 1 failed in 117.21s (0:01:57) ========================="
+      ]
+    },
+    {
+      "schema_version": 1,
+      "nodes": [
+        "tests/test_feature_factory_e2e.py::test_standard_preset_btcusdt"
+      ],
+      "rc": 0,
+      "elapsed_seconds": 562.2,
+      "stopped_reason": null,
+      "footprint_max_gib": 5.016,
+      "swap_used_max_gib": 6.193,
+      "swap_total_max_gib": 7.0,
+      "swap_volume_free_min_gib": 53.673,
+      "pressure_max": 2,
+      "pressure_counts": {
+        "1": 205,
+        "2": 908
+      },
+      "pytest_tail": [
+        "configfile: pytest.ini",
+        "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+        "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+        "collected 1 item",
+        "tests/test_feature_factory_e2e.py .                                      [100%]",
+        "======================== 1 passed in 556.71s (0:09:16) ========================="
+      ]
+    },
+    {
+      "schema_version": 1,
+      "nodes": [
+        "tests/feature_engineering/test_ffstat_golden.py::test_dual_start_convergence_default_config[12h]"
+      ],
+      "rc": 0,
+      "elapsed_seconds": 1562.5,
+      "stopped_reason": null,
+      "footprint_max_gib": 9.221,
+      "swap_used_max_gib": 9.906,
+      "swap_total_max_gib": 11.0,
+      "swap_volume_free_min_gib": 46.466,
+      "pressure_max": 2,
+      "pressure_counts": {
+        "1": 1810,
+        "2": 1283
+      },
+      "pytest_tail": [
+        "configfile: pytest.ini",
+        "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+        "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+        "collected 1 item",
+        "tests/feature_engineering/test_ffstat_golden.py .                        [100%]",
+        "======================== 1 passed in 1558.38s (0:25:58) ========================"
+      ]
+    },
+    {
+      "schema_version": 1,
+      "nodes": [
+        "tests/feature_engineering/test_ffstat_golden.py::test_dual_start_convergence_default_config[4h]"
+      ],
+      "rc": 0,
+      "elapsed_seconds": 2307.3,
+      "stopped_reason": null,
+      "footprint_max_gib": 16.742,
+      "swap_used_max_gib": 13.738,
+      "swap_total_max_gib": 14.0,
+      "swap_volume_free_min_gib": 35.311,
+      "pressure_max": 2,
+      "pressure_counts": {
+        "1": 2158,
+        "2": 2402
+      },
+      "pytest_tail": [
+        "configfile: pytest.ini",
+        "plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0",
+        "asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function",
+        "collected 1 item",
+        "tests/feature_engineering/test_ffstat_golden.py .                        [100%]",
+        "======================== 1 passed in 2302.89s (0:38:22) ========================"
+      ]
+    }
+  ],
+  "incomplete": [
+    {
+      "nodes": [
+        "tests/feature_engineering/test_batch2d_dstar_align.py::TestP4Parity::test_t3_d_star_parity_exact_on_l12_intersection"
+      ],
+      "status": "未跑完：背景 2 小時上限於第 4892 秒前後終止（含前序 dual_4h 2307 秒）；觀測至 t=4891.7 s：footprint 5.97 GB、換頁已用 7.45 GB、壓力 2",
+      "series": "9639 筆"
+    },
+    {
+      "nodes": [
+        "tests/feature_engineering/test_ffstat_golden.py::test_dual_start_convergence_default_config[1h]"
+      ],
+      "status": "未跑（同一背景任務時限內未輪到）"
+    }
+  ]
+}
