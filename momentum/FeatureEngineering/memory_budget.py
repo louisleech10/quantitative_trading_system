@@ -1390,6 +1390,7 @@ class MemoryBudgetScheduler:
         self._lock = threading.RLock()
         self._tasks: Dict[str, _TaskState] = {}
         self._stop_requested = threading.Event()
+        self._interrupt_pending = False
         self._aux_slot: Optional[Slot] = None
         self.degraded: Optional[Dict[str, Any]] = None
 
@@ -1476,17 +1477,51 @@ class MemoryBudgetScheduler:
                 self._tasks[task.task_id] = state
             queue.append(state)
             self._event("queued", task.task_id)
-        try:
-            parallel_ever = self._run_waves(queue, results, worker_fn, serial_fn, on_wave_joined)
-        except BaseException:
-            # 例外出口（executor 建構／submit／量測／結果處理失敗）：已建立之 executor 一律 shutdown 並確認回收後才
-            # 返回外層（外層隨即關閉域與守護）；回收失敗者保留其狀態，不標 joined
-            self._join_unjoined()
-            raise
+        with self._interrupt_deferral():
+            try:
+                parallel_ever = self._run_waves(queue, results, worker_fn, serial_fn, on_wave_joined)
+            except BaseException:
+                # 例外出口（executor 建構／submit／量測／結果處理失敗）：已建立之 executor 一律 shutdown 並確認回收後才
+                # 返回外層（外層隨即關閉域與守護）；回收失敗者保留其狀態，不標 joined
+                self._join_unjoined()
+                raise
+        if self._interrupt_pending:
+            raise KeyboardInterrupt("排程器執行中收到中斷：已停止准入、已啟動之 worker 皆確認退出後上拋")
         if parallel_ever < min(self.max_workers, len(tasks)):
             self.degraded = {"configured": self.max_workers, "actual": parallel_ever,
                              "reason": "memory_budget_admission"}
         return results
+
+    def _has_unjoined(self) -> bool:
+        return any(state.executor is not None and state.status != "joined" for state in list(self._tasks.values()))
+
+    @contextlib.contextmanager
+    def _interrupt_deferral(self) -> Iterator[None]:
+        """（v33，審碼 b3 r4 codex P1-01）中斷於訊號層延後：本排程器於主執行緒執行期間，SIGINT 到達時若仍有未確認
+        退出之 executor ⇒ 只記錄並停止准入（不拋例外，任何位元組碼時點皆同）；無未 joined 者 ⇒ 交原處理器（預設即
+        KeyboardInterrupt）。結束後還原處理器；期間記錄之中斷於全部回收後由 `run` 上拋（另有原例外者以原例外為準）。
+        非主執行緒（API 經 executor 執行緒）不受 SIGINT 例外影響，不安裝。"""
+        self._interrupt_pending = False
+        if threading.current_thread() is not threading.main_thread():
+            yield
+            return
+        previous = signal.getsignal(signal.SIGINT)
+        if not callable(previous):  # SIG_IGN／SIG_DFL／非 Python 安裝者：不介入
+            yield
+            return
+
+        def handler(signum: int, frame: Any) -> None:
+            if self._has_unjoined():
+                self._interrupt_pending = True
+                self.request_stop()
+                return
+            previous(signum, frame)
+
+        signal.signal(signal.SIGINT, handler)
+        try:
+            yield
+        finally:
+            signal.signal(signal.SIGINT, previous)
 
     def request_stop(self) -> None:
         """呼叫端取消（可由其他執行緒呼叫）：佇列中未准入之任務不再執行（結果為 `SchedulerStopped`）；已啟動者照常
@@ -1522,11 +1557,15 @@ class MemoryBudgetScheduler:
         """例外出口：全部確認退出後，原例外才由呼叫端上拋。回收期間之中斷（KeyboardInterrupt 等，含 shutdown、
         future 等待與重試間隔中）一律延後——未確認退出前不交還持有者（v32，審碼 b3 r3 codex P1-01）。"""
         for state in list(self._tasks.values()):
+            deferred = 0
             while state.executor is not None and state.status != "joined":
                 try:
+                    if deferred:  # 記錄與重試間隔皆在保護區內（v33，審碼 b3 r4 codex P1-01／P2-02）
+                        self._event("interrupt_deferred", state.task.task_id)
+                        time.sleep(min(0.05 * deferred, 1.0))
                     self._join_confirmed(state)
-                except BaseException:  # noqa: BLE001 — 中斷延後：原例外優先，回收完成前不放手
-                    self._event("interrupt_deferred", state.task.task_id)
+                except BaseException:  # noqa: BLE001 — 中斷延後：原例外優先，回收完成前不放手；except 體只計數
+                    deferred += 1
 
     def _run_waves(self, queue: "Deque[_TaskState]", results: List[Any],
                    worker_fn: Callable[[DomainDescriptor, Any], Any], serial_fn: Callable[[Any], Any],

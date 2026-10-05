@@ -103,18 +103,40 @@ def test_real_file_mapping_not_counted(tmp_path: Path) -> None:
             del arr
 
 
-def test_mutation_metric_max_resident_footprint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """mutant：預算量改取 max(resident, footprint) ⇒ 上案例誤拋。"""
-    monkeypatch.setattr(mb, "sample_memory_bytes",
-                        lambda: max(mb._read_rusage()["resident"], mb._read_rusage()["phys_footprint"]))
-    now = mb.sample_memory_bytes()
-    with mb.budget_override(now + 64 * MiB), mb.vm_snapshot_override(_snapshot()):
-        arr = _touched_memmap(tmp_path, 256 * MiB)
-        try:
-            with pytest.raises(mb.GenerationMemoryBudgetExceeded):
-                mb.check("IC.selected_read", _anon(MiB))
-        finally:
-            del arr
+_MAX_METRIC_PROBE = """
+import sys
+from pathlib import Path
+
+import numpy as np
+
+from momentum.FeatureEngineering import memory_budget as mb
+
+MiB, GiB = 1 << 20, 1 << 30
+mb.sample_memory_bytes = lambda: max(mb._read_rusage()["resident"], mb._read_rusage()["phys_footprint"])
+snapshot = mb.VMSnapshot(free_bytes=8 * GiB, file_backed_bytes=0, swap_free_bytes=0, pressure_level=1,
+                         swap_volume_free_bytes=75 * GiB, swap_volume_capacity_bytes=228 * GiB)
+now = mb.sample_memory_bytes()
+with mb.budget_override(now + 64 * MiB), mb.vm_snapshot_override(snapshot):
+    arr = np.memmap(Path(sys.argv[1]) / "touched.bin", dtype=np.uint8, mode="w+", shape=(256 * MiB,))
+    arr[::4096] = 1
+    try:
+        mb.check("IC.selected_read", [mb.Component(name="read", kind="anon", nbytes=MiB)])
+        print("RESULT passed")
+    except mb.GenerationMemoryBudgetExceeded:
+        print("RESULT raised")
+"""
+
+
+def test_mutation_metric_max_resident_footprint(tmp_path: Path) -> None:
+    """mutant：預算量改取 max(resident, footprint) ⇒ 上案例誤拋。
+
+    b3 實作期（測試調整 25）：於新子行程執行——長 session 後段本行程 footprint 遠大於 resident（壓縮／換出頁），
+    觸頁 256 MiB 映射使 resident 上升仍不超過 footprint，mutant 之讀數不變而不拋（全套後段實測兩次）；新行程之
+    resident≈footprint，mutant 判定與環境無關。案例本體（mutant、上限、觸頁量、斷言）不變。"""
+    proc = subprocess.run([sys.executable, "-c", _MAX_METRIC_PROBE, str(tmp_path)], cwd=str(h.REPO),
+                          env={**os.environ, "PYTHONPATH": str(h.REPO)}, capture_output=True, text=True, timeout=300)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    assert "RESULT raised" in proc.stdout, proc.stdout[-2000:]
 
 
 # ---------------------------------------------------------------- 系統條件
@@ -1399,12 +1421,20 @@ def _guard_run(readings: List[Dict[str, Any]], budget: int = 100) -> Dict[str, A
     def is_alive(pid: int) -> bool:  # 讀數用盡後令本行程「已死」以結束迴圈（無終止時）
         return next(alive, None) is not None and len(consumed) < len(readings)
 
-    with patch.object(mg, "_System", lambda: object()), patch.object(mg, "_Readings", Readings), \
-            patch.object(mg, "_alive", is_alive), patch.object(mg, "_write_atomic", lambda *a: None), \
-            patch.object(mg, "_abort", abort):
-        mg._STOP = False
-        mg.main(["--pid", "123456", "--run-dir", "/nonexistent", "--run-id", "probe", "--budget", str(budget),
-                 "--interval", "0.01"])
+    import signal
+
+    # 守護主程式會安裝 SIGTERM／SIGINT 處理器（獨立行程中正確）；行程內呼叫時須還原，否則遺留至同 session 之後續測試
+    saved = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+    try:
+        with patch.object(mg, "_System", lambda: object()), patch.object(mg, "_Readings", Readings), \
+                patch.object(mg, "_alive", is_alive), patch.object(mg, "_write_atomic", lambda *a: None), \
+                patch.object(mg, "_abort", abort):
+            mg._STOP = False
+            mg.main(["--pid", "123456", "--run-dir", "/nonexistent", "--run-id", "probe", "--budget", str(budget),
+                     "--interval", "0.01"])
+    finally:
+        for sig, handler in saved.items():
+            signal.signal(sig, handler)
     return {"killed": killed, "samples": len(consumed)}
 
 

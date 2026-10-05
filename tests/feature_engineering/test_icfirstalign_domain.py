@@ -11,6 +11,7 @@ from __future__ import annotations
 import ast
 import os
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -1037,6 +1038,163 @@ def test_repeated_interrupt_during_cleanup_keeps_first(tmp_path: Path) -> None:
     first = KeyboardInterrupt("first interrupt")
     out = _exception_exit_run(tmp_path, shutdown_interrupt=True, creation_error=first, expect=KeyboardInterrupt)
     assert out == {"shutdowns": 2, "worker_alive": False, "A_status": "joined"}
+
+
+@pytest.fixture
+def default_sigint() -> Any:
+    """SIGINT 案例之前提：本行程之 SIGINT 處理器為 Python 預設（KeyboardInterrupt）。全套同一 session 之前序測試
+    可能已安裝其他處理器（實測：全套跑時預設行為不成立），故本 fixture 明設預設並於結束還原。"""
+    import signal
+
+    previous = signal.signal(signal.SIGINT, signal.default_int_handler)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGINT, previous)
+
+
+def _sigint_run(tmp_path: Path, mode: str) -> Dict[str, Any]:
+    """真實 SIGINT（只發給本測試行程自身）於排程器執行中到達（v33，審碼 b3 r4 codex P1-01）：
+    - `cleanup_entry`：B 之 executor 建構拋 OSError ⇒ 例外出口；於 `_join_unjoined` 被呼叫之瞬間（任何 try 之前，
+      以 `sys.settrace` 固定交錯點）送出 SIGINT。
+    - `wave`：A 執行中（max_workers 1、B 排隊）由另一執行緒送出 SIGINT。
+    A 之 worker 於 0.5 秒後自行完成。回傳上拋之例外、回收狀態；任何例外皆於此捕捉（不讓中斷穿出測試）。"""
+    import signal
+    import sys
+
+    started, release = threading.Event(), threading.Event()
+    executors: List[Any] = []
+    original = OSError("injected second executor creation failure")
+
+    def factory(n: int) -> Any:
+        if executors and mode == "cleanup_entry":
+            assert started.wait(2)
+            raise original
+        executor = ThreadPoolExecutor(n)
+        executors.append(executor)
+        return executor
+
+    def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:
+        started.set()
+        release.wait(5)
+        return payload
+
+    target = mb.MemoryBudgetScheduler._join_unjoined.__code__
+
+    def tracer(frame: Any, event: str, arg: Any) -> Any:
+        if event == "call" and frame.f_code is target:
+            os.kill(os.getpid(), signal.SIGINT)
+        return None
+
+    def kick() -> None:
+        assert started.wait(2)
+        time.sleep(0.1)
+        os.kill(os.getpid(), signal.SIGINT)
+
+    timer = threading.Timer(0.5, release.set)
+    timer.start()
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=2 if mode == "cleanup_entry" else 1,
+                                     executor_factory=factory, read_system=lambda: (1000, 1, False, 10, ()),
+                                     read_task_footprint=lambda tid: 10, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    raised: Optional[BaseException] = None
+    kicker = threading.Thread(target=kick) if mode == "wave" else None
+    try:
+        if kicker is not None:
+            kicker.start()
+        if mode == "cleanup_entry":
+            sys.settrace(tracer)
+        try:
+            sched.run([mb.Task("A", 100, 1), mb.Task("B", 100, 2)], worker, lambda p: p, lambda w: None)
+        except BaseException as exc:  # noqa: BLE001 — 測試自行分類；中斷不得穿出
+            raised = exc
+        finally:
+            sys.settrace(None)
+        out = {"raised": raised, "worker_alive": any(t.is_alive() for ex in executors for t in ex._threads),
+               "A_status": sched._tasks["A"].status, "B_status": sched._tasks["B"].status,
+               "original": original}
+    finally:
+        release.set()
+        timer.cancel()
+        if kicker is not None:
+            kicker.join(5)
+        for executor in executors:
+            executor.shutdown(wait=True)
+    return out
+
+
+def test_sigint_at_cleanup_entry_deferred(tmp_path: Path, default_sigint: Any) -> None:
+    """v33：例外出口進入回收之瞬間（任何 try 之前）收到 SIGINT ⇒ 訊號層延後，A 確認退出、joined 後才上拋原 OSError。
+    改前（只在 try 內延後）：中斷於回收前穿出、A 仍存活而紅。"""
+    out = _sigint_run(tmp_path, "cleanup_entry")
+    assert out["raised"] is out["original"]
+    assert out["worker_alive"] is False and out["A_status"] == "joined"
+
+
+def test_mutation_sigint_deferral_removed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, default_sigint: Any) -> None:
+    """mutant：移除訊號層延後（`_interrupt_deferral` 改為無動作）⇒ 同序列下中斷於回收前穿出、A 未 joined 而紅。"""
+    import contextlib
+
+    monkeypatch.setattr(mb.MemoryBudgetScheduler, "_interrupt_deferral", lambda self: contextlib.nullcontext())
+    out = _sigint_run(tmp_path, "cleanup_entry")
+    assert isinstance(out["raised"], KeyboardInterrupt) and out["A_status"] != "joined"
+
+
+def test_sigint_during_wave_stops_admission_and_waits(tmp_path: Path, default_sigint: Any) -> None:
+    """v33：A 執行中收到 SIGINT ⇒ 停止准入（B 不執行）、A 確認退出並 joined 後才上拋 KeyboardInterrupt。"""
+    out = _sigint_run(tmp_path, "wave")
+    assert isinstance(out["raised"], KeyboardInterrupt)
+    assert out["worker_alive"] is False and out["A_status"] == "joined" and out["B_status"] == "queued"
+
+
+def test_sigint_without_outstanding_worker_raises_promptly(tmp_path: Path, default_sigint: Any) -> None:
+    """v33：無未確認退出之 worker（串行臂於根內執行中）⇒ SIGINT 照原處理器即時拋 KeyboardInterrupt（不延後）。"""
+    import signal
+
+    def serial(payload: Any) -> Any:
+        os.kill(os.getpid(), signal.SIGINT)
+        time.sleep(2)
+        return payload
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (1000, 1, False, 10, ()),
+                                     read_task_footprint=lambda tid: 10, aux_startup_envelope=None,
+                                     task_identity=_thread_identity)
+    began = time.monotonic()
+    raised: Optional[BaseException] = None
+    try:
+        sched.run([mb.Task("A", 100, 1)], lambda d, p: p, serial, lambda w: None)
+    except BaseException as exc:  # noqa: BLE001
+        raised = exc
+    assert isinstance(raised, KeyboardInterrupt) and time.monotonic() - began < 1.5
+
+
+def test_repeated_interrupts_in_cleanup_keep_retry_spacing(tmp_path: Path) -> None:
+    """v33（審碼 b3 r4 codex P2-02）：shutdown 連續 4 次以中斷失敗（第 1 次於正常波次 ⇒ 進例外出口；其後 3 次於回收
+    中）⇒ 回收中每次重試前仍有間隔（0.05＋0.10＋0.15 秒）、記 3 次 `interrupt_deferred`，第 5 次成功 joined；不忙迴圈。"""
+    attempts: List[float] = []
+
+    class InterruptedShutdown(ThreadPoolExecutor):
+        def shutdown(self, *a: Any, **k: Any) -> None:
+            attempts.append(time.monotonic())
+            if len(attempts) <= 4:
+                raise KeyboardInterrupt
+            super().shutdown(*a, **k)
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1,
+                                     executor_factory=InterruptedShutdown,
+                                     read_system=lambda: (1000, 1, False, 10, ()),
+                                     read_task_footprint=lambda tid: 10, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    raised: Optional[BaseException] = None
+    try:
+        sched.run([mb.Task("A", 100, 1)], lambda d, p: p, lambda p: p, lambda w: None)
+    except BaseException as exc:  # noqa: BLE001
+        raised = exc
+    assert isinstance(raised, KeyboardInterrupt)  # 正常波次之 join 中斷 ⇒ 例外出口回收完成後上拋原中斷
+    assert sched._tasks["A"].status == "joined" and len(attempts) == 5
+    assert sum(1 for e, _ in sched.trace if e == "interrupt_deferred") == 3
+    assert attempts[-1] - attempts[1] >= 0.28
 
 
 def test_persistent_join_failure_keeps_ownership(tmp_path: Path) -> None:
