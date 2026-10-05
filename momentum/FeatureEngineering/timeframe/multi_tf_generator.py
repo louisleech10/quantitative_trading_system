@@ -5,6 +5,7 @@ from __future__ import annotations
 import gc
 import os
 import shutil
+import tempfile
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -17,6 +18,7 @@ from momentum.FeatureEngineering.utils.layer_ids import qualify_failed_layer_ids
 
 from momentum.core.contracts import LayerExecutionResult, LayerStatus
 from momentum.core.logging import get_logger
+from momentum.FeatureEngineering import memory_budget as _memory_budget
 from momentum.FeatureEngineering.core.column_group_registry import normalize_npy_persistence_float32
 from momentum.FeatureEngineering.feature_storage import (
     FAILOPEN_LAYER_FAILURE_STATUSES,
@@ -122,7 +124,10 @@ class MultiTFGenerator:
         from momentum.FeatureEngineering.feature_config import AlignmentMode
 
         # Task 1.5: parallel mode dispatches non-primary TFs to spawned workers
-        if self._multi_tf_parallel_enabled() and len(self._training_tfs) > 1:
+        # ICFIRSTALIGN Task 4.2：預算域內之任務（多標的／API 批次 worker）多週期一律串行（不得巢狀 pool）
+        if _memory_budget.in_domain_worker() and len(self._training_tfs) > 1:
+            self._multi_tf_serial_in_domain = True
+        elif self._multi_tf_parallel_enabled() and len(self._training_tfs) > 1:
             return self._generate_multi_tf_cgsa_parallel(
                 symbol, primary_raw, primary_timestamps, start_time,
                 start_date=start_date, end_date=end_date, persist=persist,
@@ -168,146 +173,10 @@ class MultiTFGenerator:
                     tf_layer_counts[timeframe] = self._collect_layer_counts_from_registry(registry, timeframe)
                     continue
 
-            try:
-                raw_data = (
-                    primary_raw
-                    if timeframe == self._primary_tf
-                    else self._factory._layer0_data_ingestion(
-                        symbol, timeframe, self._config,
-                        start_date=self._multi_tf_layer0_start(timeframe, start_date),
-                        end_date=end_date,
-                    )
-                )
-            except FileNotFoundError:
-                logger.warning("MultiTF: missing data for %s/%s, skipping timeframe", symbol, timeframe)
-                skipped_tfs.append(timeframe)
-                self._raise_for_failed_timeframe(timeframe, "missing data")
-                continue
-            except Exception as exc:
-                logger.error("MultiTF: load failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
-                skipped_tfs.append(timeframe)
-                self._raise_for_failed_timeframe(timeframe, str(exc))
-                continue
-
-            if raw_data is None or raw_data.empty:
-                logger.warning("MultiTF: empty data for %s/%s, skipping timeframe", symbol, timeframe)
-                skipped_tfs.append(timeframe)
-                self._raise_for_failed_timeframe(timeframe, "empty data")
-                continue
-
-            # Record groups before this TF runs so we know which were added.
-            groups_before = set(registry._groups.keys())
-
-            # Set current timeframe so CGSA group IDs use the correct TF prefix.
-            self._factory._current_timeframe = timeframe
-
-            l1_l6_start = time.perf_counter()
-            try:
-                layer_results = self._run_tf_l1_l6_results(raw_data)
-                layer1, layer2, layer3, layer4, layer5, layer6 = [
-                    self._factory.layer_data(item) for item in layer_results
-                ]
-                fresh_failed[timeframe] = self._collect_failed_layer_ids(layer_results, timeframe)
-                # Task 1.3 ②：六層狀態（含非失敗）於 write_manifest 前記錄；stale 重跑者整組取代
-                registry.record_layer_status(timeframe, self._layer_statuses(layer_results))
-            except Exception as exc:
-                logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
-                registry.rollback_timeframe(timeframe)
-                registry.discard_layer_status(timeframe)
-                skipped_tfs.append(timeframe)
-                self._raise_for_failed_timeframe(timeframe, str(exc))
-                continue
-
-            # Persist L3/L4/L5/L6 to CGSA registry (L1/L2 are persisted inside their layer methods).
-            if layer_results[2].status != LayerStatus.offloaded_to_registry and layer3 is not None and not layer3.empty:
-                self._factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
-            if layer4 is not None and not layer4.empty:
-                self._factory._persist_layer_output_groups(layer4, _LS.L4, "L4_lag")
-            if layer5 is not None and not layer5.empty:
-                self._factory._persist_layer_output_groups(layer5, _LS.L5, "L5_cross")
-            if layer6 is not None and not layer6.empty:
-                self._factory._persist_layer_output_groups(layer6, _LS.L6, "L6_meta")
-
-            stage_seconds["dual_tf_l1_l6"] += time.perf_counter() - l1_l6_start
-
-            tf_layer_counts[timeframe] = self._collect_layer_counts(
-                layer_results, registry=registry, timeframe=timeframe
+            self._process_timeframe_inroot(
+                symbol, timeframe, primary_raw, primary_timestamps, start_date, end_date, registry,
+                skipped_tfs, fresh_failed, tf_layer_counts, stage_seconds,
             )
-            del layer1, layer2, layer3, layer4, layer5, layer6
-            gc.collect()
-
-            new_group_ids = sorted(set(registry._groups.keys()) - groups_before)
-
-            if timeframe == self._primary_tf:
-                logger.info(
-                    "[CGSA][multi_tf] Primary TF %s: %d groups registered (no alignment needed)",
-                    timeframe, len(new_group_ids),
-                )
-            else:
-                # Align each new group from source TF rows to primary TF rows.
-                align_start = time.perf_counter()
-                source_index, _ = TimeframeAligner._split_timestamp_index(raw_data)
-                source_dt = TimeframeAligner._to_datetime_index(source_index)
-
-                alignment_mode = self._config.timeframes.alignment_mode
-                source_dur_ns, primary_dur_ns, mode = self._alignment_params_or_raise(timeframe)
-                self._log_gap_source_if_any(timeframe, source_dt, source_dur_ns)
-
-                source_s = TimeframeAligner._datetime_index_to_epoch_seconds(source_dt)
-                primary_s = TimeframeAligner._datetime_index_to_epoch_seconds(primary_timestamps)
-                idx_map = TimeframeAligner.build_asof_index_map(
-                    primary_s,
-                    source_s,
-                    source_dur_ns=source_dur_ns,
-                    primary_dur_ns=primary_dur_ns,
-                    mode=mode,
-                )
-
-                n_primary = len(primary_timestamps)
-                if self._compact_alignment_enabled():
-                    idx_map_path = self._persist_alignment_idx_map(
-                        registry.work_dir,
-                        source_tf=timeframe,
-                        primary_tf=self._primary_tf,
-                        alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
-                        idx_map=idx_map,
-                    )
-                    compact_count = self._mark_existing_groups_compact_aligned(
-                        registry=registry,
-                        group_ids=new_group_ids,
-                        source_tf=timeframe,
-                        n_source=len(source_dt),
-                        n_primary=n_primary,
-                        idx_map_path=idx_map_path,
-                        alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
-                        source_dur_ns=source_dur_ns,
-                        primary_dur_ns=primary_dur_ns,
-                        mode=mode,
-                    )
-                    logger.info(
-                        "[CGSA][multi_tf] Compact-aligned %d groups from %s → %s "
-                        "(source_rows=%d logical_rows=%d)",
-                        compact_count,
-                        timeframe,
-                        self._primary_tf,
-                        len(source_dt),
-                        n_primary,
-                    )
-                else:
-                    aligned_count = 0
-                    for gid in new_group_ids:
-                        src_data = np.asarray(registry.load_data(gid), dtype=np.float32)
-                        aligned_arr = self._align_group_array(src_data, idx_map, n_primary)
-                        registry.overwrite_data(gid, aligned_arr)
-                        aligned_count += 1
-
-                    logger.info(
-                        "[CGSA][multi_tf] Aligned %d groups from %s → %s (idx_map built once)",
-                        aligned_count, timeframe, self._primary_tf,
-                    )
-                stage_seconds["alignment"] += time.perf_counter() - align_start
-
-            registry.write_manifest()
 
         if self._primary_tf in skipped_tfs:
             raise ValueError(f"Primary timeframe data missing for {symbol}/{self._primary_tf}")
@@ -358,9 +227,197 @@ class MultiTFGenerator:
         # Task 3.1：completeness／quality 由 persist 前之 canonical 物件定案，此處不再覆寫；
         # skipped_timeframes 僅為 diagnostic 鍵，值＝failed_timeframes
         result.metadata["skipped_timeframes"] = list(canonical["timeframe_completeness"]["failed_timeframes"])
+        if getattr(self, "_multi_tf_serial_in_domain", False):
+            result.metadata["multi_tf_serial_in_budget_domain"] = True  # ICFIRSTALIGN Task 4.2：域內多週期串行
 
         self._report_progress("complete", 1.0, f"[CGSA] MultiTF generation completed ({total_elapsed:.2f}s)")
         return result
+
+    def _process_timeframe_inroot(
+        self,
+        symbol: str,
+        timeframe: str,
+        primary_raw: pd.DataFrame,
+        primary_timestamps: pd.DatetimeIndex,
+        start_date: Optional[str],
+        end_date: Optional[str],
+        registry: object,
+        skipped_tfs: List[str],
+        fresh_failed: Dict[str, List[str]],
+        tf_layer_counts: Dict[str, Dict[str, int]],
+        stage_seconds: Dict[str, Any],
+    ) -> None:
+        """單一週期之根行程內正式生成（FFACT_MULTI_TF_PARALLEL=0 之同一 producer：L0 → L1–L6 → 落盤 → 對齊）。
+
+        ICFIRSTALIGN Task 4.2：串列多週期之逐週期本體，亦為並行路徑之串行臂（無可准入時於根行程內執行，
+        不經任何 ProcessPoolExecutor）；實測 S2m 串列與並行 raw 322 欄逐位元組相同。"""
+        from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
+
+        try:
+            raw_data = (
+                primary_raw
+                if timeframe == self._primary_tf
+                else self._factory._layer0_data_ingestion(
+                    symbol, timeframe, self._config,
+                    start_date=self._multi_tf_layer0_start(timeframe, start_date),
+                    end_date=end_date,
+                )
+            )
+        except FileNotFoundError:
+            logger.warning("MultiTF: missing data for %s/%s, skipping timeframe", symbol, timeframe)
+            skipped_tfs.append(timeframe)
+            self._raise_for_failed_timeframe(timeframe, "missing data")
+            return
+        except Exception as exc:
+            logger.error("MultiTF: load failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
+            skipped_tfs.append(timeframe)
+            self._raise_for_failed_timeframe(timeframe, str(exc))
+            return
+
+        if raw_data is None or raw_data.empty:
+            logger.warning("MultiTF: empty data for %s/%s, skipping timeframe", symbol, timeframe)
+            skipped_tfs.append(timeframe)
+            self._raise_for_failed_timeframe(timeframe, "empty data")
+            return
+
+        # Record groups before this TF runs so we know which were added.
+        groups_before = set(registry._groups.keys())
+
+        # Set current timeframe so CGSA group IDs use the correct TF prefix.
+        self._factory._current_timeframe = timeframe
+
+        l1_l6_start = time.perf_counter()
+        try:
+            layer_results = self._run_tf_l1_l6_results(raw_data)
+            layer1, layer2, layer3, layer4, layer5, layer6 = [
+                self._factory.layer_data(item) for item in layer_results
+            ]
+            fresh_failed[timeframe] = self._collect_failed_layer_ids(layer_results, timeframe)
+            # Task 1.3 ②：六層狀態（含非失敗）於 write_manifest 前記錄；stale 重跑者整組取代
+            registry.record_layer_status(timeframe, self._layer_statuses(layer_results))
+        except Exception as exc:
+            logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
+            registry.rollback_timeframe(timeframe)
+            registry.discard_layer_status(timeframe)
+            skipped_tfs.append(timeframe)
+            self._raise_for_failed_timeframe(timeframe, str(exc))
+            return
+
+        # Persist L3/L4/L5/L6 to CGSA registry (L1/L2 are persisted inside their layer methods).
+        if layer_results[2].status != LayerStatus.offloaded_to_registry and layer3 is not None and not layer3.empty:
+            self._factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
+        if layer4 is not None and not layer4.empty:
+            self._factory._persist_layer_output_groups(layer4, _LS.L4, "L4_lag")
+        if layer5 is not None and not layer5.empty:
+            self._factory._persist_layer_output_groups(layer5, _LS.L5, "L5_cross")
+        if layer6 is not None and not layer6.empty:
+            self._factory._persist_layer_output_groups(layer6, _LS.L6, "L6_meta")
+
+        # 並行路徑之 dual_tf_l1_l6 記為 None（父行程量不到 worker）；串行臂於根行程內執行之週期仍不計入，維持 None 語意
+        if stage_seconds.get("dual_tf_l1_l6") is not None:
+            stage_seconds["dual_tf_l1_l6"] += time.perf_counter() - l1_l6_start
+
+        tf_layer_counts[timeframe] = self._collect_layer_counts(
+            layer_results, registry=registry, timeframe=timeframe
+        )
+        del layer1, layer2, layer3, layer4, layer5, layer6
+        gc.collect()
+
+        new_group_ids = sorted(set(registry._groups.keys()) - groups_before)
+
+        if timeframe == self._primary_tf:
+            logger.info(
+                "[CGSA][multi_tf] Primary TF %s: %d groups registered (no alignment needed)",
+                timeframe, len(new_group_ids),
+            )
+        else:
+            # Align each new group from source TF rows to primary TF rows.
+            align_start = time.perf_counter()
+            source_index, _ = TimeframeAligner._split_timestamp_index(raw_data)
+            source_dt = TimeframeAligner._to_datetime_index(source_index)
+
+            alignment_mode = self._config.timeframes.alignment_mode
+            source_dur_ns, primary_dur_ns, mode = self._alignment_params_or_raise(timeframe)
+            self._log_gap_source_if_any(timeframe, source_dt, source_dur_ns)
+
+            # ICFIRSTALIGN Task 4.2：軸轉換與 build_asof_index_map 之前判定其同時存活工作區
+            _memory_budget.check_estimate(
+                "MTF.align_index", {"primary_rows": len(primary_timestamps), "source_rows": len(source_dt)},
+                label=f"MTF.align_index:{timeframe}",
+            )
+            source_s = TimeframeAligner._datetime_index_to_epoch_seconds(source_dt)
+            primary_s = TimeframeAligner._datetime_index_to_epoch_seconds(primary_timestamps)
+            idx_map = TimeframeAligner.build_asof_index_map(
+                primary_s,
+                source_s,
+                source_dur_ns=source_dur_ns,
+                primary_dur_ns=primary_dur_ns,
+                mode=mode,
+            )
+
+            n_primary = len(primary_timestamps)
+            if self._compact_alignment_enabled():
+                _memory_budget.check_estimate("MTF.align_compact", {"primary_rows": n_primary},
+                                              label=f"MTF.align_compact:{timeframe}")
+                idx_map_path = self._persist_alignment_idx_map(
+                    registry.work_dir,
+                    source_tf=timeframe,
+                    primary_tf=self._primary_tf,
+                    alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
+                    idx_map=idx_map,
+                )
+                _memory_budget.layer_end("MTF.align_compact")
+                compact_count = self._mark_existing_groups_compact_aligned(
+                    registry=registry,
+                    group_ids=new_group_ids,
+                    source_tf=timeframe,
+                    n_source=len(source_dt),
+                    n_primary=n_primary,
+                    idx_map_path=idx_map_path,
+                    alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
+                    source_dur_ns=source_dur_ns,
+                    primary_dur_ns=primary_dur_ns,
+                    mode=mode,
+                )
+                logger.info(
+                    "[CGSA][multi_tf] Compact-aligned %d groups from %s → %s "
+                    "(source_rows=%d logical_rows=%d)",
+                    compact_count,
+                    timeframe,
+                    self._primary_tf,
+                    len(source_dt),
+                    n_primary,
+                )
+            else:
+                aligned_count = 0
+                for gid in new_group_ids:
+                    group = registry.get(gid)
+                    shards = list(getattr(group, "shards", ()) or ())
+                    n_src, n_cols = int(group.shape[0]), int(group.shape[1])
+                    # ICFIRSTALIGN Task 4.2：根行程內 dense 對齊（整組一次 gather；輸出為匿名陣列）之配置前判定
+                    _memory_budget.check_estimate(
+                        "MTF.align_persist",
+                        {"primary_rows": n_primary, "source_rows": n_src, "group_cols": n_cols,
+                         "align_block_rows": n_primary, "source_kind": "sharded" if shards else "single",
+                         "source_shard_sizes": ([n_src * (int(s.col_end) - int(s.col_start)) * 4 for s in shards]
+                                                if shards else [n_src * n_cols * 4]),
+                         "aligned_output_anon": True},
+                        label=f"MTF.align_persist:{gid}",
+                    )
+                    src_data = np.asarray(registry.load_data(gid), dtype=np.float32)
+                    aligned_arr = self._align_group_array(src_data, idx_map, n_primary)
+                    registry.overwrite_data(gid, aligned_arr)
+                    del src_data, aligned_arr
+                    aligned_count += 1
+                _memory_budget.layer_end("MTF.align_persist")
+
+                logger.info(
+                    "[CGSA][multi_tf] Aligned %d groups from %s → %s (idx_map built once)",
+                    aligned_count, timeframe, self._primary_tf,
+                )
+            stage_seconds["alignment"] += time.perf_counter() - align_start
+
+        registry.write_manifest()
 
     @staticmethod
     def _align_group_array(
@@ -391,9 +448,6 @@ class MultiTFGenerator:
         batch_id: Optional[str] = None,
     ) -> "FeatureGenerationResult":
         """CGSA multi-TF with ProcessPoolExecutor + spawn for non-primary TFs."""
-        import multiprocessing as mp
-        from concurrent.futures import ProcessPoolExecutor, as_completed
-
         from momentum.FeatureEngineering.feature_factory import _warmup_numba_functions
         from momentum.FeatureEngineering.core.column_group import LayerSource as _LS
 
@@ -508,12 +562,11 @@ class MultiTFGenerator:
         if non_primary_tfs:
             _warmup_numba_functions()
             config_payload = self._config.model_dump(by_alias=True)
-            ctx = mp.get_context("spawn")
             # FFACT_MULTI_TF_MAX_WORKERS caps worker count.
             # Set to a number to override; "auto" or unset → tier-based auto-detection.
             # Tier defaults: 8 GB=2, 16 GB=3, 24/32 GB=4.
-            _env_raw = os.getenv("FFACT_MULTI_TF_MAX_WORKERS", "auto").strip().lower()
-            if _env_raw in {"", "auto"}:
+            _env_raw = _memory_budget.selector("FFACT_MULTI_TF_MAX_WORKERS")  # ICFIRSTALIGN Task 4.2：正規化
+            if _env_raw == "auto":
                 from momentum.FeatureEngineering.utils.hardware_utils import (
                     get_memory_tier,
                     get_tier_config,
@@ -547,79 +600,45 @@ class MultiTFGenerator:
             # the parent process gives RAM headroom back to workers.
             gc.collect()
 
-            with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as pool:
-                futures = {
-                    pool.submit(
-                        _tf_worker_entry,
-                        symbol,
-                        tf,
-                        config_payload,
-                        start_date,
-                        end_date,
-                        _worker_cache_dir,
-                        _public_warmup_bars,
-                    ): tf
-                    for tf in non_primary_tfs
-                }
-                for future in as_completed(futures):
-                    tf = futures[future]
-                    try:
-                        result = future.result(timeout=None)  # No timeout; worker may use Python fallback (slow)
-                    except Exception as exc:
-                        logger.error("TF worker %s failed: %s", tf, exc, exc_info=True)
-                        skipped_tfs.append(tf)
-                        self._raise_for_failed_timeframe(tf, str(exc))
-                        continue
+            # ICFIRSTALIGN Task 4.2（v25）：worker 經根之預算域排程器以有限波次准入（任務承諾量 E）；一波全部 join 後
+            # 根才對齊（`_register_worker_groups`）；無可准入之任務於根行程內走正式串行臂（同 PARALLEL=0 之 producer）。
+            from momentum import factories as _factories  # 呼叫時解析（測試以模組屬性攔截）
 
-                    if "error" in result:
-                        logger.warning("TF worker %s returned error: %s", tf, result["error"])
-                        skipped_tfs.append(tf)
-                        self._raise_for_failed_timeframe(tf, str(result["error"]))
-                        continue
+            root_dir = _memory_budget.current_mapping_root()
+            domain_dir = Path(tempfile.mkdtemp(prefix="icfa_mtf_domain_", dir=None if root_dir is None else str(root_dir)))
+            scheduler = _factories.create_memory_budget_scheduler(domain_dir=domain_dir, max_workers=max_workers)
+            tasks = [
+                _memory_budget.Task(
+                    task_id=f"mtf:{tf}",
+                    envelope=self._estimate_worker_envelope(symbol, tf, start_date, end_date, _public_warmup_bars),
+                    payload={"symbol": symbol, "timeframe": tf, "config_payload": config_payload,
+                             "start_date": start_date, "end_date": end_date, "cache_dir": _worker_cache_dir,
+                             "public_warmup_bars": _public_warmup_bars},
+                )
+                for tf in non_primary_tfs
+            ]
 
-                    # Register groups from worker into main registry.
-                    # OOM Fix: result now carries only metadata + npy paths,
-                    # so the pickle payload is KB rather than GB.
-                    tf_layer_counts[tf] = result.get("layer_counts", {})
-                    worker_failed = qualify_failed_layer_ids(result.get("failed_layers", []), tf)
-                    worker_statuses = {
-                        str(layer_id): (str(pair[0]), str(pair[1]))
-                        for layer_id, pair in (result.get("layer_statuses") or {}).items()
-                    }
-                    groups_data = result.get("groups", [])
-                    source_ts_ms = result.get("source_timestamps_ms")
-                    align_start = time.perf_counter()
-                    try:
-                        self._register_worker_groups(
-                            registry, groups_data, tf,
-                            primary_timestamps, self._config.timeframes.alignment_mode,
-                            source_timestamps_ms=source_ts_ms,
-                        )
-                    except Exception as exc:
-                        registry.rollback_timeframe(tf)
-                        registry.discard_layer_status(tf)
-                        skipped_tfs.append(tf)
-                        self._raise_for_failed_timeframe(tf, str(exc))
-                        continue
-                    # Task 1.3 ③：群組註冊成功後、write_manifest 前記錄該週期六層狀態
-                    fresh_failed[tf] = worker_failed
-                    registry.record_layer_status(tf, worker_statuses)
-                    stage_seconds["alignment"] += time.perf_counter() - align_start
-                    # Resume support: persist worker progress to manifest now,
-                    # so a SIGKILL during the next worker / L6.5 leaves a
-                    # resumable state. `register()` only updates in-memory
-                    # registry; manifest must be flushed explicitly.
-                    try:
-                        registry.write_manifest()
-                    except Exception as exc:
-                        logger.warning(
-                            "[CGSA-parallel:resume] manifest flush after TF %s failed: %s",
-                            tf, exc,
-                        )
-                    # Drop the worker payload immediately so accumulated
-                    # paths/columns lists do not grow unchecked.
-                    del result, groups_data, source_ts_ms
-                    gc.collect()
+            def _on_wave_joined(results: List[Any]) -> None:
+                for result in results:
+                    self._accept_worker_result(result, registry, primary_timestamps, skipped_tfs, fresh_failed,
+                                               tf_layer_counts, stage_seconds)
+
+            def _serial_arm(payload: Dict[str, Any]) -> Dict[str, Any]:
+                self._process_timeframe_inroot(
+                    symbol, payload["timeframe"], primary_raw, primary_timestamps, start_date, end_date, registry,
+                    skipped_tfs, fresh_failed, tf_layer_counts, stage_seconds,
+                )
+                self._factory._current_timeframe = self._primary_tf
+                return {"timeframe": payload["timeframe"], "serial": True}
+
+            try:
+                outcomes = scheduler.run(tasks, _tf_worker_domain_entry, _serial_arm, _on_wave_joined)
+            finally:
+                shutil.rmtree(domain_dir, ignore_errors=True)
+            for outcome in outcomes:
+                if isinstance(outcome, BaseException):
+                    raise outcome  # 串行臂之例外（並行臂之例外已於 join 後分類）
+            self._memory_degraded_workers = getattr(scheduler, "degraded", None)
 
         self._report_progress("multi_tf", 0.7, "[CGSA-parallel] All TFs done")
 
@@ -672,9 +691,118 @@ class MultiTFGenerator:
         # Task 3.1：completeness／quality 由 persist 前之 canonical 物件定案，此處不再覆寫；
         # skipped_timeframes 僅為 diagnostic 鍵，值＝failed_timeframes
         result.metadata["skipped_timeframes"] = list(canonical["timeframe_completeness"]["failed_timeframes"])
+        degraded = getattr(self, "_memory_degraded_workers", None)
+        if degraded:
+            result.metadata["memory_degraded_workers"] = degraded  # ICFIRSTALIGN Task 4.2：實際並行數少於設定
 
         self._report_progress("complete", 1.0, f"[CGSA-parallel] MultiTF completed ({total_elapsed:.2f}s)")
         return result
+
+    def _accept_worker_result(
+        self,
+        result: Any,
+        registry: object,
+        primary_timestamps: pd.DatetimeIndex,
+        skipped_tfs: List[str],
+        fresh_failed: Dict[str, List[str]],
+        tf_layer_counts: Dict[str, Dict[str, int]],
+        stage_seconds: Dict[str, Any],
+    ) -> None:
+        """一波 join 後之 worker 結果處理（ICFIRSTALIGN Task 4.2：根對齊不與 worker 生成重疊）：註冊並對齊群組、
+        記錄六層狀態、寫 manifest。worker 之預算具名錯誤原樣上拋；其他失敗同改前（該週期失敗即具名 RuntimeError）。"""
+        if isinstance(result, (_memory_budget.GenerationMemoryBudgetExceeded, _memory_budget.MemoryMeasurementUnavailable)):
+            raise result
+        if isinstance(result, BaseException):
+            logger.error("TF worker failed: %s", result, exc_info=result)
+            raise RuntimeError(f"Timeframe worker failed: {result}") from result
+        tf = str(result.get("timeframe"))
+        if "error" in result:
+            logger.warning("TF worker %s returned error: %s", tf, result["error"])
+            skipped_tfs.append(tf)
+            self._raise_for_failed_timeframe(tf, str(result["error"]))
+            return
+        # Register groups from worker into main registry.
+        # OOM Fix: result now carries only metadata + npy paths,
+        # so the pickle payload is KB rather than GB.
+        tf_layer_counts[tf] = result.get("layer_counts", {})
+        worker_failed = qualify_failed_layer_ids(result.get("failed_layers", []), tf)
+        worker_statuses = {
+            str(layer_id): (str(pair[0]), str(pair[1]))
+            for layer_id, pair in (result.get("layer_statuses") or {}).items()
+        }
+        groups_data = result.get("groups", [])
+        source_ts_ms = result.get("source_timestamps_ms")
+        align_start = time.perf_counter()
+        try:
+            self._register_worker_groups(
+                registry, groups_data, tf,
+                primary_timestamps, self._config.timeframes.alignment_mode,
+                source_timestamps_ms=source_ts_ms,
+            )
+        except (_memory_budget.GenerationMemoryBudgetExceeded, _memory_budget.MemoryMeasurementUnavailable):
+            registry.rollback_timeframe(tf)
+            registry.discard_layer_status(tf)
+            raise
+        except Exception as exc:
+            registry.rollback_timeframe(tf)
+            registry.discard_layer_status(tf)
+            skipped_tfs.append(tf)
+            self._raise_for_failed_timeframe(tf, str(exc))
+            return
+        # Task 1.3 ③：群組註冊成功後、write_manifest 前記錄該週期六層狀態
+        fresh_failed[tf] = worker_failed
+        registry.record_layer_status(tf, worker_statuses)
+        stage_seconds["alignment"] += time.perf_counter() - align_start
+        # Resume support: persist worker progress to manifest now,
+        # so a SIGKILL during the next worker / L6.5 leaves a
+        # resumable state. `register()` only updates in-memory
+        # registry; manifest must be flushed explicitly.
+        try:
+            registry.write_manifest()
+        except Exception as exc:
+            logger.warning("[CGSA-parallel:resume] manifest flush after TF %s failed: %s", tf, exc)
+        del groups_data, source_ts_ms
+        gc.collect()
+
+    def _align_persist_params(self, group_data: Dict, n_primary: int, n_cols: int) -> Dict[str, Any]:
+        """`MTF.align_persist` 之形狀參數（來源三分：分片＝dense 合併＋逐片映射；單檔＝來源映射；legacy `data`＝轉型複本）。"""
+        shape = group_data.get("shape") or [0, n_cols]
+        n_source = int(shape[0])
+        params: Dict[str, Any] = {"primary_rows": int(n_primary), "source_rows": n_source, "group_cols": int(n_cols),
+                                  "align_block_rows": self._align_block_rows(),
+                                  "source_float32": str(group_data.get("dtype", "float32")) == "float32"}
+        shards = group_data.get("shards") or []
+        if shards:
+            params["source_kind"] = "sharded"
+            params["source_shard_sizes"] = [
+                n_source * (int(s.get("col_end", 0)) - int(s.get("col_start", 0))) * 4 for s in shards
+            ]
+        elif "npy_path" in group_data:
+            params["source_kind"] = "single"
+            params["source_shard_sizes"] = [n_source * int(n_cols) * 4]
+        else:
+            params["source_kind"] = "legacy"
+        return params
+
+    def _estimate_worker_envelope(self, symbol: str, timeframe: str, start_date: Optional[str],
+                                  end_date: Optional[str], public_warmup_bars: Optional[int]) -> Optional[int]:
+        """多週期 worker（`_tf_worker_entry`）之任務峰值 E（ICFIRSTALIGN Task 4.2 v25）：以 worker 同一 L0 載入之實際列數
+        與設定展開之欄數上界，經分支表同一估算函式（取全部可達後備臂之最大者）推導；形狀不可得 ⇒ None（走串行臂）。"""
+        from momentum.FeatureEngineering.warmup_window import ingest_layer0_start_date, resolve_output_window
+
+        try:
+            window = resolve_output_window(self._config, self._primary_tf, start_date, end_date,
+                                           max_warmup_bars=public_warmup_bars)
+            load_start = (ingest_layer0_start_date(window, timeframe, self._primary_tf)
+                          if window.warmup_enabled else start_date)
+            raw = self._factory._layer0_data_ingestion(symbol, timeframe, self._config, start_date=load_start,
+                                                       end_date=end_date)
+        except Exception as exc:  # noqa: BLE001 — 形狀不可得即不准入並行（串行臂於根行程內照常生成與報錯）
+            logger.warning("[CGSA-parallel] worker envelope unavailable for %s/%s: %s", symbol, timeframe, exc)
+            return None
+        if raw is None or raw.empty:
+            return None
+        return self._factory.estimate_generation_envelope(self._config, int(len(raw)), int(raw.shape[1]))
 
     def _register_worker_groups(
         self,
@@ -690,6 +818,13 @@ class MultiTFGenerator:
         from momentum.FeatureEngineering.feature_config import AlignmentMode
 
         n_primary = len(primary_timestamps)
+        # ICFIRSTALIGN Task 4.2：`MTF.align_index` 於軸轉換與 build_asof_index_map 之前（主軸秒、來源秒、aligner 同時存活工作區）
+        _memory_budget.check_estimate(
+            "MTF.align_index",
+            {"primary_rows": n_primary,
+             "source_rows": 0 if source_timestamps_ms is None else int(len(source_timestamps_ms))},
+            label=f"MTF.align_index:{source_tf}",
+        )
         primary_s = TimeframeAligner._datetime_index_to_epoch_seconds(primary_timestamps)
 
         # Build alignment index map from source → primary timestamps
@@ -711,6 +846,8 @@ class MultiTFGenerator:
         compact_alignment = self._compact_alignment_enabled() and idx_map is not None
         idx_map_path: Optional[Path] = None
         if compact_alignment:
+            _memory_budget.check_estimate("MTF.align_compact", {"primary_rows": n_primary},
+                                          label=f"MTF.align_compact:{source_tf}")
             idx_map_path = self._persist_alignment_idx_map(
                 registry.work_dir,
                 source_tf=source_tf,
@@ -718,6 +855,7 @@ class MultiTFGenerator:
                 alignment_mode=str(getattr(alignment_mode, "value", alignment_mode)),
                 idx_map=idx_map,
             )
+            _memory_budget.layer_end("MTF.align_compact")
 
         aligned_count = 0
         worker_dirs_to_cleanup: set[Path] = set()
@@ -747,6 +885,11 @@ class MultiTFGenerator:
                 aligned_count += 1
                 continue
 
+            # ICFIRSTALIGN Task 4.2：`MTF.align_persist`（逐 worker 群組、於來源讀回前；來源依分片／單檔／legacy 三分）
+            _memory_budget.check_estimate(
+                "MTF.align_persist", self._align_persist_params(gd, n_primary, n_cols),
+                label=f"MTF.align_persist:{gd.get('group_id')}",
+            )
             # OOM Fix: mmap-read the worker's .npy instead of receiving a
             # full ndarray over pickle. Backwards compatible: if a worker
             # returned the legacy "data" payload, fall back to it.
@@ -814,6 +957,7 @@ class MultiTFGenerator:
                         )
             aligned_count += 1
 
+        _memory_budget.layer_end("MTF.align_persist")
         if not keep_worker_npy:
             self._cleanup_worker_dirs(worker_dirs_to_cleanup, registry.work_dir)
         elif worker_dirs_to_cleanup:
@@ -1169,9 +1313,8 @@ class MultiTFGenerator:
 
     @staticmethod
     def _compact_alignment_enabled() -> bool:
-        """Honor FFACT_MULTI_TF_COMPACT_ALIGNMENT for non-primary TF groups."""
-        raw = os.getenv("FFACT_MULTI_TF_COMPACT_ALIGNMENT", "1").strip().lower()
-        return raw not in {"0", "false", "no", "off"}
+        """Honor FFACT_MULTI_TF_COMPACT_ALIGNMENT for non-primary TF groups（ICFIRSTALIGN Task 4.2：選擇子唯一入口）."""
+        return _memory_budget.selector_flag("FFACT_MULTI_TF_COMPACT_ALIGNMENT")
 
     def _alignment_params_or_raise(
         self,
@@ -1756,8 +1899,7 @@ class MultiTFGenerator:
         Enabled by default because multi-TF is the primary research mode.
         Set FFACT_MULTI_TF_PARALLEL=0 to force serial execution.
         """
-        raw = os.getenv("FFACT_MULTI_TF_PARALLEL", "1").strip().lower()
-        return raw not in {"0", "false", "no", "off"}
+        return _memory_budget.selector_flag("FFACT_MULTI_TF_PARALLEL")  # ICFIRSTALIGN Task 4.2：選擇子唯一入口
 
     def _ensure_primary(self, training_tfs: List[str]) -> List[str]:
         deduped = list(dict.fromkeys(training_tfs))
@@ -1776,6 +1918,27 @@ if TYPE_CHECKING:
 # Must be at module level for ProcessPoolExecutor pickling.
 # ------------------------------------------------------------------
 
+def _tf_worker_domain_entry(domain: "_memory_budget.DomainDescriptor", payload: Dict[str, Any]) -> Dict:
+    """預算域內之多週期 worker 本體（ICFIRSTALIGN Task 4.2：顯式域描述為入口參數，不經行程全域環境變數）。"""
+    return _tf_worker_entry(domain=domain, **payload)
+
+
+def _non_offloaded_count(result: LayerExecutionResult) -> Optional[int]:
+    """層之欄數（同 `_collect_layer_counts` 之 in-memory 臂）；offloaded 層回 None（由 registry 計）。"""
+    if result.status == LayerStatus.offloaded_to_registry:
+        return None
+    return 0 if result.data is None else int(result.data.shape[1])
+
+
+def _release_layer_result(factory: Any, name: str, result: LayerExecutionResult) -> LayerExecutionResult:
+    """層結果之最後持有者（ICFIRSTALIGN Task 4.2 行為不變型修碼）：落盤後清除 `LayerResult.data` 與
+    `factory.layer_results` 之資料表持有者，只留 counts／status／failed 等輕量 metadata（status 不改寫）。"""
+    light = replace(result, data=pd.DataFrame())
+    if getattr(factory, "layer_results", None) is not None and name in factory.layer_results:
+        factory.layer_results[name] = light
+    return light
+
+
 def _tf_worker_entry(
     symbol: str,
     timeframe: str,
@@ -1784,6 +1947,7 @@ def _tf_worker_entry(
     end_date: Optional[str],
     cache_dir: Optional[str] = None,
     public_warmup_bars: Optional[int] = None,
+    domain: Optional["_memory_budget.DomainDescriptor"] = None,
 ) -> Dict:
     """Process a single timeframe in a spawned worker process.
 
@@ -1806,6 +1970,10 @@ def _tf_worker_entry(
     _os.environ["NUMBA_NUM_THREADS"] = "1"
     from momentum.factories import create_feature_factory
 
+    # ICFIRSTALIGN Task 4.2：顯式域描述 ⇒ 本 worker 之 check 以域規則（候選 F＋planned ≤ E）判定
+    domain_token = (_memory_budget.enter_worker_domain(domain)
+                    if domain is not None and not _memory_budget.in_domain_worker() else None)
+    saved_counts: Dict[str, Optional[int]] = {}
     try:
         # Bug #1 fix: pass cache_dir so the worker uses the same kline cache.
         factory = create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
@@ -1874,6 +2042,9 @@ def _tf_worker_entry(
         layer3 = r3.data
         if r3.status != LayerStatus.offloaded_to_registry and layer3 is not None and not layer3.empty:
             factory._persist_layer_output_groups(layer3, _LS.L3, "L3_rolling")
+        # ICFIRSTALIGN Task 4.2：落盤後先保存輕量 counts，再清除層結果之全部持有者（r3.data、factory.layer_results、局部）
+        saved_counts["layer3"] = _non_offloaded_count(r3)
+        r3 = _release_layer_result(factory, "Layer 3", r3)
         del layer3
         _gc.collect()
 
@@ -1884,6 +2055,8 @@ def _tf_worker_entry(
         layer4 = r4.data
         if layer4 is not None and not layer4.empty:
             factory._persist_layer_output_groups(layer4, _LS.L4, "L4_lag")
+        saved_counts["layer4"] = _non_offloaded_count(r4)
+        r4 = _release_layer_result(factory, "Layer 4", r4)
         del layer4
         _gc.collect()
 
@@ -1894,6 +2067,8 @@ def _tf_worker_entry(
         layer5 = r5.data
         if layer5 is not None and not layer5.empty:
             factory._persist_layer_output_groups(layer5, _LS.L5, "L5_cross")
+        saved_counts["layer5"] = _non_offloaded_count(r5)
+        r5 = _release_layer_result(factory, "Layer 5", r5)
         del layer5
         _gc.collect()
 
@@ -1904,7 +2079,10 @@ def _tf_worker_entry(
         layer6 = r6.data
         if layer6 is not None and not layer6.empty:
             factory._persist_layer_output_groups(layer6, _LS.L6, "L6_meta")
+        saved_counts["layer6"] = _non_offloaded_count(r6)
+        r6 = _release_layer_result(factory, "Layer 6", r6)
         del layer6
+        _gc.collect()
 
         registry = getattr(factory, "_cgsa_registry", None)
         layer_counts = MultiTFGenerator._collect_layer_counts(
@@ -1912,6 +2090,8 @@ def _tf_worker_entry(
             registry=registry,
             timeframe=timeframe,
         )
+        # 已清除資料之層：counts 取落盤前保存之實際形狀（offloaded 層仍由 registry 計，同改前）
+        layer_counts.update({key: value for key, value in saved_counts.items() if value is not None})
         del layer1, layer2
         _gc.collect()
 
@@ -1990,5 +2170,9 @@ def _tf_worker_entry(
                 for layer_id, pair in MultiTFGenerator._layer_statuses([r1, r2, r3, r4, r5, r6]).items()
             },
         }
+    except (_memory_budget.GenerationMemoryBudgetExceeded, _memory_budget.MemoryMeasurementUnavailable):
+        raise  # ICFIRSTALIGN Task 4.2：預算具名錯誤不轉為一般 error 字串（根於 join 後原樣上拋）
     except Exception as exc:
         return {"timeframe": timeframe, "error": str(exc)}
+    finally:
+        _memory_budget.exit_worker_domain(domain_token)

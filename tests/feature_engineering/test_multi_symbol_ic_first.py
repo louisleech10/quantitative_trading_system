@@ -663,14 +663,12 @@ class TestBenchmark10SymbolDryrun:
         Then:  concurrent_symbols 固定 1，任務完成且沒有 OOM/failed item
         """
         from api.services.feature_factory_batch_service import FeatureFactoryBatchService
-        import api.services.feature_factory_batch_service as batch_service_module
+        from tests.api.batch_wave_helpers import use_thread_wave
 
         symbols = _real_kline_symbols(2)
-        monkeypatch.setattr(
-            batch_service_module,
-            "ProcessPoolExecutor",
-            _InlineProcessPoolExecutor,
-        )
+        # ICFIRSTALIGN Task 4.2：wave 經預算域排程器（改前替換模組之 ProcessPoolExecutor）；本案例真實生成於行程內
+        # ⇒ 走串行臂（同一 `_compute_single` 本體；行程內 executor 之 worker 讀數即整個測試行程，E 判定無意義）
+        use_thread_wave(monkeypatch, executor_factory=_InlineProcessPoolExecutor, serial=True)
         monkeypatch.setenv("FFACT_BATCH_NESTED", "0")
         monkeypatch.setenv("FFACT_USE_CGSA", "1")
         monkeypatch.setenv("FFACT_USE_POLARS", "1")

@@ -73,15 +73,26 @@ def _raw_l3(run: Dict[str, Any]) -> pd.DataFrame:
 
 
 def _expected_from_returned(run: Dict[str, Any], axis: pd.DatetimeIndex) -> pd.DataFrame:
-    """oracle：回傳表 → 欄名標記 12h、index 轉 UTC 時間、取 raw 軸之列、轉 float32。"""
-    table = pd.concat(run["returned"], axis=1)
+    """oracle：回傳表 → 欄名標記 12h、index 轉 UTC 時間、取 raw 軸之列、轉 float32。
+
+    b3 實作期：同一 run 內之預熱探測（校準域，Task 4.1 起走同一 L3 分支）先於正式 L1–L6 呼叫 `compute_all`，
+    故正式生成之 L3 回傳表為本 run 最後一次之回傳（S2 單週期）；先前者屬探測之校準域，不入 raw。"""
+    table = run["returned"][-1]
     idx = table.index
     if not isinstance(idx, pd.DatetimeIndex):
         ints = np.asarray(idx, dtype=np.int64)
         idx = pd.DatetimeIndex(pd.to_datetime(ints, unit="ms" if ints.max() > 10**11 else "s"))
     table = table.set_axis(idx, axis=0)
     table.columns = [fn.tag_timeframe(str(c), h.PRIMARY) for c in table.columns]
-    return table.reindex(axis).astype(np.float32)
+    out = table.reindex(axis).astype(np.float32)
+    # b3 實作期：raw 成品以 L7 既有逐欄儲存政策落 parquet（roundtrip 安全即 float16，b2 Task 2.3 收據同一政策），
+    # oracle 以同一政策編碼後讀回，比較仍逐位元組
+    from momentum.FeatureEngineering.feature_storage import FeatureStorage
+
+    for col in out.columns:
+        stored, _ = FeatureStorage._select_parquet_storage_array(out[col].to_numpy(dtype=np.float32))
+        out[col] = np.asarray(stored).astype(np.float32)
+    return out
 
 
 @pytest.mark.parametrize("arm", sorted(ARMS))

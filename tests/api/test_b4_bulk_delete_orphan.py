@@ -17,6 +17,7 @@ import pytest_asyncio
 from fastapi import FastAPI
 
 import api.services.feature_factory_service as feature_service_module
+from tests.api.batch_wave_helpers import use_thread_wave
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.routes.feature_factory import get_batch_service, router as feature_factory_router
 from api.services.feature_factory_batch_service import (
@@ -97,10 +98,7 @@ def _create_run(
 
 @pytest.fixture(autouse=True)
 def _thread_pool_batch(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
 
 
 @pytest_asyncio.fixture

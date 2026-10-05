@@ -575,8 +575,10 @@ def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
 
     root = h.isolated(monkeypatch, tmp_path)
     factory = h.make_factory(root)
-    monkeypatch.setattr(FeatureFactory, "_resolve_required_available_gb", lambda self, config: 0.0)
-    monkeypatch.setattr(FeatureFactory, "_resolve_tier_peak_budget_gb", lambda self, config: 999.0)
+    # ICFIRSTALIGN Task 4.2：RSS 閘（_resolve_required_available_gb／_resolve_tier_peak_budget_gb 與其 metadata）已由
+    # 致 OOM 之量（phys_footprint）之配置前判定取代、不並存；本測試改驗新 memory_budget metadata 之形成
+    from momentum.FeatureEngineering import memory_budget as mb
+
     config = factory._resolve_config(h.s2_payload())
     reader = FeatureReader(str(root))
     result = factory.run_ic_first(
@@ -600,10 +602,11 @@ def test_memory_budget_after_raw_persist(tmp_path, monkeypatch) -> None:
     assert result.metadata["raw_feature_count"] == len(raw_columns) > 0
     assert selected and set(selected) <= set(raw_columns)
     assert result.metadata["processed_feature_count"] == len(selected)
-    assert result.metadata["memory_budget"]["available_after_gb"] >= 0.0
-    assert result.metadata["memory_budget"]["required_available_gb"] == 0.0
-    assert result.metadata["run_ic_gate_peak_rss_gb"] <= 999.0
-    assert result.metadata["tier_peak_budget_gb"] == 999.0
+    budget = result.metadata["memory_budget"]
+    assert budget["metric"] == "phys_footprint"
+    assert budget["budget_bytes"] == mb.configured_budget_bytes() > 0
+    assert budget["guarded"] is True  # IC 階段仍在本次受保護 run（守護隨 lease 持有至 IC、processed 結束）
+    assert "run_ic_gate_peak_rss_gb" not in result.metadata and "tier_peak_budget_gb" not in result.metadata
 
     run_dir = h.run_dir(root, config_hash)
     assert (run_dir / "raw").exists()

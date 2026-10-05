@@ -309,6 +309,81 @@ class DerivedOperatorEngine:
 
         return specs
 
+    def output_column_counts(
+        self,
+        layer1_columns: Iterable[str],
+        raw_columns: Iterable[str],
+        indicator_specs: Optional[Dict[str, Dict]] = None,
+    ) -> Dict[str, int]:
+        """各類別之輸出欄數（ICFIRSTALIGN Task 4.2 配置前預算之形狀參數）：與 `_apply_*`／`_collect_*` 同一選欄規則，
+        只依欄名與設定、不計算值。momentum 之 lags 取 pandas 臂與 polars 臂預設之較多者（上界）。"""
+        feature_info = self._build_feature_info(list(layer1_columns), indicator_specs)
+        raw_set = set(raw_columns)
+        counts: Dict[str, int] = {category: 0 for category in self.OPERATOR_CATEGORIES}
+
+        def _selected(cfg: Dict) -> List[str]:
+            apply_to = cfg.get("apply_to", "all")
+            return [col for col, info in feature_info.items()
+                    if info.category not in RATIO_UNSAFE_CATEGORIES and self._matches_apply_to(info, apply_to)]
+
+        def _key(name: str) -> Optional[str]:
+            normalized = name.replace("_", "").lower()
+            return next((c for c in counts if c.replace("_", "").lower() == normalized), None)
+
+        distance_cfg = self._get_section("distance")
+        if distance_cfg.get("enabled", False) and _key("distance"):
+            apply_to = distance_cfg.get("apply_to", "all")
+            counts[_key("distance")] = sum(
+                1 for col, info in feature_info.items()
+                if info.category not in RATIO_UNSAFE_CATEGORIES and self._matches_apply_to(info, apply_to)
+                and info.source in raw_set
+            )
+        grouped: Dict[tuple, List[float]] = {}
+        for info in feature_info.values():
+            if info.category in RATIO_UNSAFE_CATEGORIES or not info.params or len(info.params) != 1:
+                continue
+            grouped.setdefault((info.source, info.category, info.indicator), []).append(info.params[0])
+        pairs = 0
+        for params in grouped.values():
+            seen: set = set()
+            for x in params:
+                for m in self._PAIR_MULTIPLIERS:
+                    candidates = [p for p in params if p >= m * x]
+                    if candidates:
+                        seen.add((x, min(candidates)))
+            pairs += len(seen)
+        for name in ("cross", "ratio"):
+            if self._get_section(name).get("enabled", False) and _key(name):
+                counts[_key(name)] = pairs
+        momentum_cfg = self._get_section("momentum") or self._get_section("momentum_change")
+        if momentum_cfg.get("enabled", False) and _key("momentum"):
+            lags = momentum_cfg.get("lags")
+            n_lags = len(lags) if lags else max(len([3, 5, 8]), len([1, 5, 10, 21]))
+            counts[_key("momentum")] = len(_selected(momentum_cfg)) * n_lags
+        binary_cfg = self._get_section("binary_signal")
+        if binary_cfg.get("enabled", False) and _key("binary_signal"):
+            total = 0
+            for rule in binary_cfg.get("rules", []):
+                indicator = rule.get("indicator")
+                if not indicator or not rule.get("condition"):
+                    continue
+                total += sum(1 for info in feature_info.values() if info.indicator
+                             and (info.indicator == indicator or info.indicator.startswith(f"{indicator}_")))
+            counts[_key("binary_signal")] = total
+        signed_cfg = self._get_section("signed_strength")
+        if signed_cfg.get("enabled", False) and _key("signed_strength"):
+            counts[_key("signed_strength")] = len(_selected(signed_cfg))
+        wq_cfg = self._get_section("worldquant")
+        if wq_cfg.get("enabled", False) and _key("worldquant"):
+            windows = wq_cfg.get("windows", [5, 13, 21])
+            operators = set(wq_cfg.get("operators", ["ts_argmax", "ts_argmin", "ts_rank", "decay_linear"]))
+            transforms = set(wq_cfg.get("transforms", ["sign", "log1p", "abs", "clip"]))
+            has_corr = "ts_corr" in operators and wq_cfg.get("corr_with") in raw_set
+            per_window = len(operators & {"ts_argmax", "ts_argmin", "ts_rank", "decay_linear"}) + int(has_corr)
+            per_col = len(windows) * per_window + len(transforms & {"sign", "log1p", "abs", "clip"})
+            counts[_key("worldquant")] = len(_selected(wq_cfg)) * per_col
+        return counts
+
     def compute_category(
         self,
         layer1_df: pd.DataFrame,

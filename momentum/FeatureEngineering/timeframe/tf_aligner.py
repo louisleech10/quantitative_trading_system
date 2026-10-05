@@ -11,13 +11,20 @@ import pandas as pd
 from momentum.core.logging import get_logger
 from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.FeatureEngineering.feature_config import AlignmentMode, SUPPORTED_TIMEFRAMES
-from momentum.FeatureEngineering.memmap_utils import (
-    create_temp_memmap,
-    MEMMAP_THRESHOLD_BYTES,
-)
+from momentum.FeatureEngineering import memmap_utils
+from momentum.FeatureEngineering import memory_budget as _memory_budget
+from momentum.FeatureEngineering.memmap_utils import MEMMAP_THRESHOLD_BYTES
 
 
 logger = get_logger(__name__)
+
+
+def create_temp_memmap(shape: tuple, dtype: np.dtype = np.float32, prefix: str = "ff_") -> np.memmap:
+    """對齊輸出之暫存 memmap：一律建於本 run 之映射根（ICFIRSTALIGN Task 4.2 磁碟後援）；經 `memmap_utils`
+    模組屬性呼叫（測試接縫）。"""
+    return memmap_utils.create_temp_memmap(shape, dtype=dtype, prefix=prefix,
+                                           dir=_memory_budget.current_mapping_root())
+
 
 CURRENT_MTF_ALIGN_VERSION = 2
 _NS_PER_SECOND = np.int64(1_000_000_000)

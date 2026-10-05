@@ -432,6 +432,10 @@ class TestMultiSymbolReferenceIpcCleanup:
         monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))  # 失敗時殘留只落在本測試目錄
         monkeypatch.setattr(ff_mod, "_warmup_numba_functions", lambda: None)
         monkeypatch.setattr(cf, "ProcessPoolExecutor", pool_cls)
+        # ICFIRSTALIGN Task 4.2：run_multi_symbol 經預算域排程器；完整預設設定之全史 E 不可准入（走串行臂、不經 pool）
+        # ⇒ 注入固定 E 使任務准入假 pool（本類只驗 IPC 目錄生命週期，不驗估算）
+        monkeypatch.setattr(ff_mod.FeatureFactory, "_estimate_symbol_envelope",
+                            lambda self, symbol, config, end_date=None: 64 * 1024 * 1024)
         created: list = []
         real_write = arrow_ipc_utils.write_reference_data_ipc
 
@@ -464,7 +468,12 @@ class TestMultiSymbolReferenceIpcCleanup:
             def __exit__(self, *exc):
                 return False
 
-            def submit(self, fn, sym, config_payload, cache_dir, ref_ipc_path):
+            def shutdown(self, wait=True):
+                pass
+
+            def submit(self, fn, descriptor, worker_fn, payload, identity):
+                # 排程器以 `_trampoline(descriptor, worker_fn, payload, identity)` 派工；payload 同改前之 worker 參數
+                ref_ipc_path = payload["ref_ipc_path"]
                 assert ref_ipc_path and os.path.exists(ref_ipc_path)  # 派工當下 IPC 仍在
                 future = cf.Future()
                 future.set_result({"ok": True})

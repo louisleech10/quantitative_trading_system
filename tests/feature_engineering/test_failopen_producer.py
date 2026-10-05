@@ -7,6 +7,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -187,6 +188,24 @@ class _ThreadPoolAsProcessPool(ThreadPoolExecutor):
     def __init__(self, max_workers=None, mp_context=None) -> None:
         del mp_context
         super().__init__(max_workers=max_workers)
+
+
+def install_inprocess_mtf_pool(monkeypatch: Any) -> None:
+    """以 ThreadPool 取代多週期並行之 ProcessPool（真實 kline 案例用）。
+
+    ICFIRSTALIGN b3：行程內執行器之 worker 讀數即整個測試行程之 footprint（非獨立子行程）⇒ 任務峰值 E 加上當下
+    footprint（正式估算之資料與 runtime 項不變），否則 worker 被判「任務峰值估算低估」——同
+    `test_icfirstalign_memory.py` 之 `mtf_align_sharded` 案例。"""
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
+    real_envelope = MultiTFGenerator._estimate_worker_envelope
+
+    def envelope(self: Any, *a: Any, **k: Any) -> Any:
+        base = real_envelope(self, *a, **k)
+        return None if base is None else base + mb.sample_memory_bytes()
+
+    monkeypatch.setattr(MultiTFGenerator, "_estimate_worker_envelope", envelope)
 
 
 def _build_mtf_generator(

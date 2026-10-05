@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "command": "calibration_dtype_diff_probe.py peak <tree> <out>（HEAD f13a9635 worktree 與本樹各一）",
+  "head": {
+    "rc": 0,
+    "lifetime_peak_footprint_bytes": 391398672,
+    "lifetime_peak_footprint_gib": 0.365,
+    "stderr_tail": ""
+  },
+  "new": {
+    "rc": 0,
+    "lifetime_peak_footprint_bytes": 288834808,
+    "lifetime_peak_footprint_gib": 0.269,
+    "stderr_tail": ""
+  }
+}

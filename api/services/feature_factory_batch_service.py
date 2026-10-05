@@ -11,7 +11,7 @@ import re
 import shutil
 import time
 import uuid
-from concurrent.futures import ProcessPoolExecutor
+import contextvars
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -518,18 +518,6 @@ class FeatureFactoryBatchService:
             timeframe = str(item["timeframe"])
             rss_before_by_item[(symbol, timeframe)] = self._rss_mb()
 
-        async def _wait_one(
-            item: Dict[str, str],
-            future: asyncio.Future,
-        ) -> Tuple[Dict[str, str], ComputeSingleResult, Optional[BaseException]]:
-            try:
-                result = await future
-                return item, _normalize_compute_single_result(result), None
-            except Exception as exc:  # pragma: no cover - exercised through callers
-                return item, ComputeSingleResult("", None), exc
-
-        wrapped_futures = []
-        compute_fn = self._compute_single
         stop_layer_tick = asyncio.Event()
 
         async def _layer_metrics_tick() -> None:
@@ -590,72 +578,94 @@ class FeatureFactoryBatchService:
                     wave_env_restored = True
 
                 try:
-                    with ProcessPoolExecutor(max_workers=max(1, len(item_wave))) as executor:
-                        try:
-                            for item in item_wave:
-                                symbol = str(item["symbol"])
-                                timeframe = str(item["timeframe"])
-                                task["current_symbol"] = symbol
-                                task["current_timeframe"] = timeframe
-                                self._notify_progress(task_id)
-                                future = loop.run_in_executor(
-                                    executor,
-                                    compute_fn,
-                                    symbol,
-                                    timeframe,
-                                    request.config_override,
-                                    request.force_regenerate,
-                                    batch_cache_dir,
-                                    str(checkpoint.get("batch_id") or ""),
-                                    request.start_date,
-                                    request.end_date,
-                                )
-                                wrapped_futures.append(_wait_one(item, future))
-                        finally:
-                            _restore_wave_env()
+                    # ICFIRSTALIGN Task 4.2（v25）：wave 經預算域排程器（`momentum.factories` 取得、呼叫時解析）；
+                    # 父行程為域根、恰一守護；worker `_compute_single` 以關鍵字 `domain` 接收顯式域描述；無可准入者於
+                    # 根行程之專用執行緒依序呼叫同一本體（串行臂）；join 於專用執行緒等待，不阻塞事件迴圈。
+                    from momentum import factories as _factories
 
-                        oom_seen = False
-                        for wrapped_future in asyncio.as_completed(wrapped_futures):
-                            item, compute_result, error = await wrapped_future
+                    budget = _factories.get_memory_budget()
+                    domain = _factories.open_memory_budget_domain(run_id=f"batch:{task_id}")
+                    try:
+                        scheduler = _factories.create_memory_budget_scheduler(
+                            domain_dir=domain.domain_dir, max_workers=wave_concurrency, guard=domain.guard_handle,
+                        )
+                        batch_id = str(checkpoint.get("batch_id") or "")
+                        wave_tasks = []
+                        for item in item_wave:
                             symbol = str(item["symbol"])
                             timeframe = str(item["timeframe"])
-                            hdf5_path = compute_result.hdf5_path
-                            rss_before = rss_before_by_item[(symbol, timeframe)]
-                            rss_peak = max(rss_before, self._rss_mb())
-                            gc.collect()
-                            rss_after = self._rss_mb()
-                            wave_parent_peak_mb = max(wave_parent_peak_mb, rss_peak, rss_after)
-                            wave_child_peak_mb = max(wave_child_peak_mb, rss_peak)
-                            failure_type = self._classify_failure(error) if error else None
-                            oom_seen = oom_seen or failure_type == BatchFailureType.OOM
-
-                            self._record_item_result(
-                                task,
-                                checkpoint,
-                                symbol,
-                                timeframe,
-                                hdf5_path or "",
-                                error,
-                                failure_type,
-                                rss_before,
-                                rss_peak,
-                                rss_after,
-                                warmup_insufficient=compute_result.warmup_insufficient,
-                            )
-                            self._append_child_metrics_if_missing(
-                                child_metrics_path,
-                                symbol,
-                                timeframe,
-                                {
-                                    "symbol": symbol,
-                                    "timeframe": timeframe,
-                                    "pid": os.getpid(),
-                                    "peak_rss_mb": rss_peak,
-                                    "duration_s": 0.0,
-                                    "status": "failed" if error else "ok",
-                                },
-                            )
+                            task["current_symbol"] = symbol
+                            task["current_timeframe"] = timeframe
                             self._notify_progress(task_id)
+                            args = (symbol, timeframe, request.config_override, request.force_regenerate,
+                                    batch_cache_dir, batch_id, request.start_date, request.end_date)
+                            envelope = _factories.estimate_symbol_envelope(
+                                symbol=symbol, timeframe=timeframe, config_override=request.config_override,
+                                cache_dir=batch_cache_dir, end_date=request.end_date,
+                            )
+                            wave_tasks.append(budget.Task(task_id=f"{symbol}|{timeframe}", envelope=envelope,
+                                                          payload=args))
+                        run_in_context = contextvars.copy_context().run
+                        outcomes = await loop.run_in_executor(
+                            None,
+                            lambda: run_in_context(
+                                scheduler.run, wave_tasks, _compute_single_domain_entry,
+                                lambda args: FeatureFactoryBatchService._compute_single(*args), lambda wave: None,
+                            ),
+                        )
+                    finally:
+                        _restore_wave_env()
+                        domain.close()
+
+                    async def _completed(item: Dict[str, str], outcome: Any) -> Tuple[
+                            Dict[str, str], ComputeSingleResult, Optional[BaseException]]:
+                        if isinstance(outcome, BaseException):
+                            return item, ComputeSingleResult("", None), outcome
+                        return item, _normalize_compute_single_result(outcome), None
+
+                    wrapped_futures = [_completed(item, outcome) for item, outcome in zip(item_wave, outcomes)]
+                    oom_seen = False
+                    for wrapped_future in asyncio.as_completed(wrapped_futures):
+                        item, compute_result, error = await wrapped_future
+                        symbol = str(item["symbol"])
+                        timeframe = str(item["timeframe"])
+                        hdf5_path = compute_result.hdf5_path
+                        rss_before = rss_before_by_item[(symbol, timeframe)]
+                        rss_peak = max(rss_before, self._rss_mb())
+                        gc.collect()
+                        rss_after = self._rss_mb()
+                        wave_parent_peak_mb = max(wave_parent_peak_mb, rss_peak, rss_after)
+                        wave_child_peak_mb = max(wave_child_peak_mb, rss_peak)
+                        failure_type = self._classify_failure(error) if error else None
+                        oom_seen = oom_seen or failure_type == BatchFailureType.OOM
+
+                        self._record_item_result(
+                            task,
+                            checkpoint,
+                            symbol,
+                            timeframe,
+                            hdf5_path or "",
+                            error,
+                            failure_type,
+                            rss_before,
+                            rss_peak,
+                            rss_after,
+                            warmup_insufficient=compute_result.warmup_insufficient,
+                        )
+                        self._append_child_metrics_if_missing(
+                            child_metrics_path,
+                            symbol,
+                            timeframe,
+                            {
+                                "symbol": symbol,
+                                "timeframe": timeframe,
+                                "pid": os.getpid(),
+                                "peak_rss_mb": rss_peak,
+                                "duration_s": 0.0,
+                                "status": "failed" if error else "ok",
+                            },
+                        )
+                        self._notify_progress(task_id)
                 finally:
                     _restore_wave_env()
         finally:
@@ -1321,8 +1331,37 @@ class FeatureFactoryBatchService:
         batch_id: str = "",
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        *,
+        domain: Optional[Any] = None,
     ) -> ComputeSingleResult:
-        """在子進程中執行單一標的特徵計算。"""
+        """在子進程中執行單一標的特徵計算。
+
+        `domain`（ICFIRSTALIGN Task 4.2）：預算域之顯式描述；於建立 factory 前加入域（worker 之配置點以任務峰值
+        E 判定、不另起守護）；串行臂（根行程內）為 None，沿用域根之情境。"""
+        from momentum.factories import get_memory_budget
+
+        budget = get_memory_budget()
+        domain_token = (budget.enter_worker_domain(domain)
+                        if domain is not None and not budget.in_domain_worker() else None)
+        try:
+            return FeatureFactoryBatchService._compute_single_body(
+                symbol, timeframe, config_override, force_regenerate, cache_dir, batch_id, start_date, end_date,
+            )
+        finally:
+            budget.exit_worker_domain(domain_token)
+
+    @staticmethod
+    def _compute_single_body(
+        symbol: str,
+        timeframe: str,
+        config_override: Optional[Dict[str, Any]],
+        force_regenerate: bool,
+        cache_dir: Optional[str] = None,
+        batch_id: str = "",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+    ) -> ComputeSingleResult:
+        """`_compute_single` 之本體（並行 worker 與根行程串行臂同一實作）。"""
         api_log_path = os.environ.get("FFACT_API_LOG_PATH")
         if api_log_path:
             from api.core.logging import init_worker_logging
@@ -2230,6 +2269,11 @@ class FeatureFactoryBatchService:
 
 
 _feature_factory_batch_service: Optional[FeatureFactoryBatchService] = None
+
+
+def _compute_single_domain_entry(domain: Any, args: Tuple[Any, ...]) -> ComputeSingleResult:
+    """API 批次 wave 之 worker 本體（ICFIRSTALIGN Task 4.2：模組層、可 pickle；以關鍵字 `domain` 交顯式域描述）。"""
+    return FeatureFactoryBatchService._compute_single(*args, domain=domain)
 
 
 def set_feature_factory_batch_service(service: FeatureFactoryBatchService) -> None:

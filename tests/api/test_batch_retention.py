@@ -17,6 +17,7 @@ import pytest_asyncio
 from fastapi import FastAPI
 
 import api.services.feature_factory_service as feature_service_module
+from tests.api.batch_wave_helpers import use_thread_wave
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.routes.feature_factory import get_batch_service, router as feature_factory_router
 from api.services.feature_factory_batch_adapters import FeatureFactoryBrowseAdapter
@@ -37,10 +38,7 @@ from momentum.FeatureEngineering.run_lifecycle import RunLifecycleManager
 def use_thread_pool_for_batch(monkeypatch) -> None:
     """Avoid ProcessPoolExecutor pickling test stubs in child processes."""
 
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
 
 
 @pytest.fixture(autouse=True)
@@ -143,6 +141,7 @@ def _compute_success(
     _batch_id: str = "",
     _start_date: Optional[str] = None,
     _end_date: Optional[str] = None,
+    **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
 ) -> str:
     base = Path(cache_dir).parent if cache_dir else Path("/tmp")
     run_dir = base / "features" / symbol / timeframe / "cfg_batch_ret"
@@ -167,6 +166,7 @@ def _compute_tracked_nonblock(
     batch_id: str = "",
     _start_date: Optional[str] = None,
     _end_date: Optional[str] = None,
+    **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
 ) -> str:
     _NONBLOCK_COMPLETION_ORDER.append(symbol)
     if symbol == "BTCUSDT":

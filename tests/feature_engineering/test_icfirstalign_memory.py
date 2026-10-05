@@ -545,10 +545,12 @@ def test_mutation_dispatch_point_without_check(monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr(mb, "check",
                         lambda branch_id, components, **kw: None if branch_id == branch
                         else recorded_check(branch_id, components, **kw))
+    # b3 實作期：chunked 臂須輸入欄數 > chunk（真實兩欄、預設 chunk 256 走 unchunked）⇒ 該案例顯式 chunk＝1
+    chunk = {"column_chunk_size": 1} if branch == "L3.vectorized_chunked" else {}
     with ExitStack() as stack:
         _ctx(stack, budget=64 * GiB, snapshot=_snapshot(free_bytes=64 * GiB))
-        RollingAggregator({"enabled": True, "windows": [5, 13], "aggregators": ["mean"], "keep_all_columns": True}) \
-            .compute_all(_l3_base(), persist_callback=lambda label, frame: None)
+        RollingAggregator({"enabled": True, "windows": [5, 13], "aggregators": ["mean"], "keep_all_columns": True,
+                           **chunk}).compute_all(_l3_base(), persist_callback=lambda label, frame: None)
     assert ("arm", C["arm_functions"][branch]) in events, "該分派點之臂須於本組合實際被呼叫"
     with pytest.raises(AssertionError):
         _assert_arms_preceded_by_check(events)
@@ -599,8 +601,6 @@ def _gap_run(branch: str, component: str, env: Dict[str, str], kind: str, tmp_pa
              monkeypatch: pytest.MonkeyPatch) -> int:
     """預算置於「planned（不含該成分）」與「planned（含該成分）」之中點（目前用量注入為 100 MiB）；
     回傳該分支之臂被呼叫次數。完整估算式 ⇒ 超預算、臂 0 次；估算式漏該成分（mutant）⇒ 中點即其 planned、放行。"""
-    for k, v in env.items():
-        monkeypatch.setenv(k, v)
     real_check = mb.check
 
     def check(branch_id: str, components: Any, **kw: Any) -> None:
@@ -618,6 +618,9 @@ def _gap_run(branch: str, component: str, env: Dict[str, str], kind: str, tmp_pa
     real_arm = getattr(owner, name)
     monkeypatch.setattr(owner, name, lambda *a, **k: (calls.__setitem__("n", calls["n"] + 1), real_arm(*a, **k))[1])
     run = _producer(kind, tmp_path, monkeypatch)
+    # b3 實作期：選擇子須於 `_producer` 之隔離環境（prepare_env 重設 FFACT_ 固定值）之後設定，否則被覆寫回預設臂
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
     with ExitStack() as stack:
         stack.enter_context(mb.sampler_override(lambda: {"resident": 100 * MiB, "phys_footprint": 100 * MiB}))
         stack.enter_context(mb.vm_snapshot_override(_snapshot(free_bytes=64 * GiB)))
@@ -707,6 +710,9 @@ def test_temp_memmap_created_under_mapping_root(tmp_path: Path, monkeypatch: pyt
     from momentum.FeatureEngineering import memmap_utils
 
     root = h.isolated(monkeypatch, tmp_path / "run")
+    # b3 實作期：S2 規模下 spill／concat／對齊之 memmap 皆在 500 MB 門檻下不觸發；pandas L3 臂無條件建 memmap，
+    # 故本案例關 numba 使正式生成確有 create_temp_memmap 呼叫可驗（斷言不變）
+    monkeypatch.setenv("FFACT_USE_NUMBA_ROLLING", "0")
     other = tmp_path / "other_tmp"
     other.mkdir()
     monkeypatch.setenv("TMPDIR", str(other))
@@ -885,11 +891,14 @@ def test_mutation_mapped_component_tagged_anon(tmp_path: Path, monkeypatch: pyte
     full_estimator = mb.BRANCH_TABLE["Calib.group_reduce"]
 
     def mislabel(params: Any) -> List[mb.Component]:
-        out = []
+        # b3 實作期：分片大小不必相等（真實 64 欄 × 256 KiB 目標 ⇒ 38＋26 欄兩片，估算式依片大小分列、各 count 1），
+        # 故 mutant 改為「第一個 mapped 成分之一片」誤標 anon（count−1，同量計入匿名）——語意同原「一片誤標」
+        out, done = [], False
         for c in full_estimator(params):
-            if c.kind == "mapped" and c.count > 1:
-                out.append(mb.Component(c.name, "mapped", c.nbytes, c.entry, c.count - 1))
+            if not done and c.kind == "mapped" and c.count >= 1:
+                out.append(mb.Component(c.name, "mapped", c.nbytes, c.entry, c.count - 1, c.lifetime))
                 out.append(mb.Component(c.name + "_as_anon", "anon", c.nbytes, None, 1))
+                done = True
             else:
                 out.append(c)
         return out
@@ -968,7 +977,11 @@ def _observe_mappings(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     _observe_mappings.recorded = list(recorded)  # type: ignore[attr-defined]
     _observe_mappings.leaks = leaks  # type: ignore[attr-defined]
     _observe_mappings.intervals = [(rec, alive["release_seg"]) for rec, alive in state.get("alive", [])]  # type: ignore[attr-defined]
-    return seen
+    # b3 實作期：SPEC (ii) 之「段」＝自一次 check 至下一次 check 或該臂結束；臂結束（`layer_end`）後至下一次 check 之間、
+    # 及首次 check 之前不屬任何 check 段（例：L6.5／L7 之 registry 讀回，SPEC 檢查點清單不含），不入逐項對應
+    recorded_list = list(recorded)
+    return [rec for rec in seen
+            if rec[0] >= 0 and not str(recorded_list[rec[0]][0]).startswith("LAYER_END:")]
 
 
 def _declared_mapped(case: str) -> List[Tuple[int, str, int]]:
@@ -1014,8 +1027,12 @@ def _run_mapping_case(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
     if case == "l3_pandas_fallback":
         monkeypatch.setenv("FFACT_USE_NUMBA_ROLLING", "0")
-        RollingAggregator({"enabled": True, "windows": [5, 13], "aggregators": ["mean"], "keep_all_columns": True}) \
-            .compute_all(_l3_base(), persist_callback=lambda label, frame: None)
+        out = RollingAggregator({"enabled": True, "windows": [5, 13], "aggregators": ["mean"],
+                                 "keep_all_columns": True}).compute_all(_l3_base(),
+                                                                         persist_callback=lambda label, frame: None)
+        # b3 實作期：單獨呼叫 producer 無 run 界線——由本 harness 於消費端放手回傳表後補記 run 結束界線
+        del out
+        mb.layer_end("run")
         return
     root = h.isolated(monkeypatch, tmp_path)
     if case == "l2_spill":
@@ -1063,6 +1080,15 @@ def _run_mapping_case(case: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
                 return real_src(group_data)
 
             monkeypatch.setattr(MultiTFGenerator, "_load_worker_group_source_array", staticmethod(src))
+            # b3 實作期：行程內執行器之 worker 讀數即整個測試行程之 footprint（非獨立子行程）⇒ 任務峰值 E 加上當下
+            # footprint（正式估算之資料與 runtime 項不變），否則全套後段行程已膨脹時 worker 被判「估算低估」
+            real_envelope = MultiTFGenerator._estimate_worker_envelope
+
+            def envelope(self: Any, *a: Any, **k: Any) -> Any:
+                base = real_envelope(self, *a, **k)
+                return None if base is None else base + mb.sample_memory_bytes()
+
+            monkeypatch.setattr(MultiTFGenerator, "_estimate_worker_envelope", envelope)
             _run_mapping_case.source_groups = groups  # type: ignore[attr-defined]
         h.generate_s2(root, h.s2_payload(["12h", "4h"], rolling_aggregation={"enabled": False}))
         return
@@ -1100,14 +1126,47 @@ def test_guard_script_imports_only_stdlib() -> None:
         elif isinstance(node, ast.ImportFrom) and node.module:
             mods.add(node.module.split(".")[0])
     assert not mods & {"momentum", "pandas", "numpy", "polars", "pyarrow"}
-    assert mods <= set(sys.stdlib_module_names) | {"__future__"}
+    assert mods <= _stdlib_module_names() | {"__future__"}
+
+
+def _stdlib_module_names() -> set:
+    """標準函式庫模組名（`sys.stdlib_module_names` 自 3.10 起才有；3.9 以 stdlib 目錄與內建模組列出）。"""
+    names = getattr(sys, "stdlib_module_names", None)
+    if names is not None:
+        return set(names)
+    import sysconfig
+
+    stdlib = Path(sysconfig.get_paths()["stdlib"])
+    found = set(sys.builtin_module_names)
+    for p in stdlib.iterdir():
+        if p.name == "site-packages":
+            continue
+        if p.suffix == ".py":
+            found.add(p.stem)
+        elif p.is_dir() and (p / "__init__.py").exists():
+            found.add(p.name)
+    dynload = stdlib / "lib-dynload"
+    if dynload.is_dir():
+        found.update(p.name.split(".")[0] for p in dynload.iterdir())
+    return found
 
 
 def test_guard_start_failure_refuses_generation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = h.isolated(monkeypatch, tmp_path)
-    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: (_ for _ in ()).throw(OSError("cannot spawn")))
-    with pytest.raises(mb.MemoryMeasurementUnavailable):
+    # b3 實作期：磁碟後援查詢（diskutil）亦經 subprocess；只令守護腳本之啟動失敗，使拒絕確由守護啟動造成
+    real_popen = subprocess.Popen
+    spawned = {"guard": 0}
+
+    def popen(args: Any, *a: Any, **k: Any) -> Any:
+        if any(str(x).endswith("memory_guard.py") for x in (args if isinstance(args, (list, tuple)) else [args])):
+            spawned["guard"] += 1
+            raise OSError("cannot spawn")
+        return real_popen(args, *a, **k)
+
+    monkeypatch.setattr(subprocess, "Popen", popen)
+    with pytest.raises(mb.MemoryMeasurementUnavailable, match="守護"):
         h.generate_s2(root)
+    assert spawned["guard"] == 1
 
 
 def test_guard_footprint_counted_in_current_usage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

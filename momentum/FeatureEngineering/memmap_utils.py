@@ -172,7 +172,9 @@ def concat_with_memmap(
         est_bytes / 1e9,
     )
 
-    out_arr = create_temp_memmap((n_rows, total_cols), prefix="concat_")
+    from momentum.FeatureEngineering import memory_budget as _memory_budget  # ICFIRSTALIGN Task 4.2：run 之映射根
+
+    out_arr = create_temp_memmap((n_rows, total_cols), prefix="concat_", dir=_memory_budget.current_mapping_root())
     col_names: List[str] = []
     col_offset = 0
     block_rows = _resolve_copy_block_rows()

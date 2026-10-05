@@ -488,8 +488,8 @@ _CASES = {
 
 
 def _thread_pool(monkeypatch: pytest.MonkeyPatch) -> None:
-    from tests.feature_engineering.test_failopen_producer import _ThreadPoolAsProcessPool
-    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
+    from tests.feature_engineering.test_failopen_producer import install_inprocess_mtf_pool
+    install_inprocess_mtf_pool(monkeypatch)
 
 
 def _inject_12h_load(monkeypatch: pytest.MonkeyPatch, exc: Exception) -> None:

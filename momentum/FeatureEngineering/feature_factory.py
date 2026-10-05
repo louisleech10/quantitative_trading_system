@@ -16,7 +16,7 @@ import threading
 import psutil
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence, TYPE_CHECKING, Tuple, Union
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, TYPE_CHECKING, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -25,7 +25,8 @@ from momentum.core.logging import get_logger
 from momentum.core.config import get_fracdiff_layers
 from momentum.core.constants import TIMEFRAME_SECONDS
 from momentum.core.contracts import LayerExecutionResult, LayerStatus, derive_status
-from momentum.core.icfirstalign_errors import RowIndexArtifactMissingError
+from momentum.core.icfirstalign_errors import L3PersistConflictError, RowIndexArtifactMissingError
+from momentum.FeatureEngineering import memory_budget as _memory_budget
 from momentum.FeatureEngineering.adapters.adapter_registry import AdapterRegistry
 from momentum.FeatureEngineering.config_manager import ConfigManager
 from momentum.FeatureEngineering.feature_registry import FeatureRegistry
@@ -165,55 +166,17 @@ class FeatureGenerationResult:
             self.compute_warnings = []
 
 
-@dataclass
-class MemoryBudgetSnapshot:
-    rss_before_gb: float
-    rss_after_gb: float
-    released_gb: float
-    available_after_gb: float
-    required_available_gb: float
+def _is_non_degradable_layer_error(exc: BaseException) -> bool:
+    """ICFIRSTALIGN Task 4.0／4.1／4.2：層內不得降級為 layer_failed 之錯誤——記憶體預算具名錯誤、量測不可得、
+    L3 雙寫、registry 磁碟（IO_ERROR，含累計磁碟預檢）。資源性失敗須以具名錯誤 fail-closed，不得以「該層失敗」續行。"""
+    if isinstance(exc, (_memory_budget.GenerationMemoryBudgetExceeded, _memory_budget.MemoryMeasurementUnavailable,
+                        L3PersistConflictError)):
+        return True
+    if isinstance(exc, ColumnGroupRegistryError):
+        from momentum.FeatureEngineering.core.column_group_registry import FailureType
 
-
-class _PeakRssTracker:
-    def __init__(self, label: str, interval_seconds: float = 0.02) -> None:
-        self.label = label
-        self.interval_seconds = interval_seconds
-        self.peak_rss_gb = 0.0
-        self._stop_event = threading.Event()
-        self._thread: Optional[threading.Thread] = None
-
-    def __enter__(self) -> "_PeakRssTracker":
-        self.peak_rss_gb = _current_rss_gb()
-        self._thread = threading.Thread(target=self._sample, daemon=True)
-        self._thread.start()
-        return self
-
-    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> None:
-        self._stop_event.set()
-        if self._thread is not None:
-            self._thread.join(timeout=1.0)
-        self.peak_rss_gb = max(self.peak_rss_gb, _current_rss_gb())
-
-    def _sample(self) -> None:
-        while not self._stop_event.wait(self.interval_seconds):
-            self.peak_rss_gb = max(self.peak_rss_gb, _current_rss_gb())
-
-
-class _MemoryProfiler:
-    def track(self, label: str) -> _PeakRssTracker:
-        return _PeakRssTracker(label)
-
-
-def _current_rss_gb() -> float:
-    import psutil
-
-    return psutil.Process().memory_info().rss / float(1024**3)
-
-
-def _available_ram_gb() -> float:
-    import psutil
-
-    return psutil.virtual_memory().available / float(1024**3)
+        return exc.failure_type == FailureType.IO_ERROR
+    return False
 
 
 class FeatureFactory:
@@ -244,7 +207,6 @@ class FeatureFactory:
         self._reference_data_cache: Dict[Tuple[str, str, Optional[str], Optional[str]], Optional[pd.DataFrame]] = {}
         self._cgsa_registry: Optional[ColumnGroupRegistry] = None
         self._cgsa_force_fresh: bool = False
-        self._memory_profiler = _MemoryProfiler()
         self._ic_engine: Optional[Any] = None
         self.layer_results: Dict[str, LayerExecutionResult] = {}
         self._preprocessing_applied: Optional[bool] = None
@@ -284,6 +246,9 @@ class FeatureFactory:
         # FFSTAT Task 2.4（R5）：倍數表缺項於設定 hash 與快取查詢之前擋下（run 目錄零寫入）
         check_l1_warmup_coverage(config)
         config_hash = self._compute_config_hash(config, symbol, timeframe, start_date=start_date, end_date=end_date)
+        # ICFIRSTALIGN Task 4.2：生成開始、任何配置之前——致 OOM 之量可取得（linux 等具名拒絕）、
+        # 映射與成品目錄之磁碟後援確認（RAM disk／磁碟映像拒絕）
+        self._assert_generation_memory_preconditions(symbol, timeframe, config_hash)
         # FFSTAT Task 2.1：校準前置關卡為一次生成之第一步——先於 run lease、快取查詢、registry 與任何落盤
         # （任一週期失敗 ⇒ 整個 run 目錄與 registry 零寫入）
         self._calibration_result = None
@@ -304,7 +269,13 @@ class FeatureFactory:
             self._calibration_result = None
             raise
         retained = False
+        protected: Optional[Any] = None
+        holder = getattr(self, "_protected_run_holder", None)
         try:
+            # ICFIRSTALIGN Task 4.2：取得 lease 後——恢復前次強制停止之殘留，再啟動本次之獨立守護（域內任務不另起）
+            protected = _memory_budget.begin_protected_run(
+                self._storage.feature_run_dir(symbol, timeframe, config_hash), f"{symbol}/{timeframe}/{config_hash}",
+            )
             result = self._generate_features_impl(
                 symbol,
                 timeframe,
@@ -324,8 +295,26 @@ class FeatureFactory:
             return result
         finally:
             self._calibration_result = None  # 封包只在本次 run 內使用
+            if holder is not None and retained and protected is not None:
+                holder.append(protected)  # run_ic_first：守護隨 lease 持有至 IC、processed、cleanup 結束
+            else:
+                _memory_budget.layer_end("run")
+                if protected is not None:
+                    protected.close()  # 守護於 lease 釋放前停止並回收
             if not retained:
                 lease.release()
+
+    def _assert_generation_memory_preconditions(self, symbol: str, timeframe: str, config_hash: str) -> None:
+        """ICFIRSTALIGN Task 4.2：量測可得（`sample_memory_bytes`；linux／其他平台具名拒絕）且映射根（run 目錄下）、
+        成品目錄與 CGSA work_dir 之掛載皆經 `diskutil` 確認為實體磁碟後援。"""
+        _memory_budget.sample_memory_bytes()
+        work_root = os.getenv("FFACT_CGSA_WORK_DIR", "").strip()
+        run_dir = self._storage.feature_run_dir(symbol, timeframe, config_hash)
+        _memory_budget.assert_disk_backed([
+            _memory_budget.mapping_root(run_dir),
+            Path(self._storage.base_path),
+            Path.cwd() / "data_cache" / "cgsa_work" if not work_root else Path(work_root).expanduser(),
+        ])
 
     def _attach_output_window_metadata(self, result: "FeatureGenerationResult") -> None:
         """生成結果 metadata 帶本次定案之 OutputWindow（ICFIRSTALIGN Task 2.0）。快取命中者不以本實例之窗補寫
@@ -593,11 +582,12 @@ class FeatureFactory:
             return df
 
         import gc
-        from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+        from momentum.FeatureEngineering import memmap_utils
 
         t0 = time.perf_counter()
         n_rows, n_cols = df.shape
-        out = create_temp_memmap((n_rows, n_cols), prefix=f"spill_{label}_", dir=dir)
+        out = memmap_utils.create_temp_memmap((n_rows, n_cols), prefix=f"spill_{label}_",
+                                              dir=dir or _memory_budget.current_mapping_root())
 
         # Row-block copy to avoid materialising full float32 array in memory.
         block_rows = 2048
@@ -698,9 +688,13 @@ class FeatureFactory:
         self._report_progress(layer_name, 0.0, f"Starting {layer_name}...")
         logger.info("%s starting, rss=%dMB", layer_name, _PROC.memory_info().rss >> 20)
         index = self._infer_layer_index(args)
+        # ICFIRSTALIGN Task 4.2：層起點之配置前預算判定（L1／L2 依實際分派之臂、L4–L6）；預算錯誤不可降級
+        self._budget_check_layer(layer_name, func, args)
         try:
             raw = func(*args)
         except Exception as exc:
+            if _is_non_degradable_layer_error(exc):
+                raise
             result = self._build_layer_result(
                 data=pd.DataFrame(index=index),
                 configured_engines=1,
@@ -783,7 +777,25 @@ class FeatureFactory:
                 final.status.value,
                 _PROC.memory_info().rss >> 20,
             )
+        _memory_budget.layer_end(layer_name)
         return final
+
+    def _budget_check_layer(self, layer_name: str, func: Callable, args: tuple) -> None:
+        """ICFIRSTALIGN Task 4.2：L1／L2／L4–L6 之分派點宣告分支並於層函式被呼叫前判定（L3 之臂於
+        `RollingAggregator` 分派點判定）。形狀依實際輸入與設定展開之欄數上界（不依資料）。"""
+        config = next((a for a in args if hasattr(a, "atomic_indicators")), None)
+        frames = [a for a in args if isinstance(a, pd.DataFrame)]
+        rows = max((len(f.index) for f in frames), default=0)
+        if layer_name == "Layer 1":
+            branch = "L1.parallel" if self._layer1_parallel_enabled() else "L1.serial"
+            _memory_budget.check_estimate(branch, {"rows": rows, "output_cols": self._estimate_l1_output_cols(config)},
+                                          label=f"{layer_name}:{branch}")
+        elif layer_name in ("Layer 4", "Layer 5", "Layer 6"):
+            # L2 之臂於 `_layer2_derived_features` 之分派點判定（polars 可否 import 須於該處決定）；L3 見 RollingAggregator
+            branch = {"Layer 4": "L4", "Layer 5": "L5", "Layer 6": "L6"}[layer_name]
+            input_cols, output_cols = self._estimate_layer_cols(branch, args, config)
+            _memory_budget.check_estimate(branch, {"rows": rows, "input_cols": input_cols, "output_cols": output_cols},
+                                          label=f"{layer_name}:{branch}")
 
     @staticmethod
     def _runtime_config_value(config: "FactoryConfig", name: str, default: Any) -> Any:
@@ -1086,6 +1098,8 @@ class FeatureFactory:
                     try:
                         frame = future.result()
                     except Exception as exc:
+                        if _is_non_degradable_layer_error(exc):
+                            raise
                         if required:
                             frames_so_far = [
                                 ordered_results[i]
@@ -1112,6 +1126,8 @@ class FeatureFactory:
                     frames.append(frame)
                     self._persist_layer1_indicator_groups(frame, category_hint=task_name)
                 except Exception as exc:
+                    if _is_non_degradable_layer_error(exc):
+                        raise
                     if required:
                         return self._layer1_required_failure_result(
                             data, tasks, task_name, str(exc), frames
@@ -1138,8 +1154,7 @@ class FeatureFactory:
     def _layer1_parallel_enabled() -> bool:
         # Default off to preserve strict deterministic behavior against golden baseline.
         # Can be enabled explicitly via FFACT_LAYER1_PARALLEL=1 for controlled experiments.
-        raw = os.getenv("FFACT_LAYER1_PARALLEL", "0").strip().lower()
-        return raw not in {"0", "false", "no", "off"}
+        return _memory_budget.selector_flag("FFACT_LAYER1_PARALLEL")  # ICFIRSTALIGN Task 4.2：選擇子唯一入口
 
     @staticmethod
     def _layer1_max_workers() -> int:
@@ -1211,6 +1226,10 @@ class FeatureFactory:
                 ).resolve()
 
         work_dir.mkdir(parents=True, exist_ok=True)
+        owner_run_dir = _memory_budget.current_run_dir()
+        if owner_run_dir is not None:
+            # ICFIRSTALIGN Task 4.2：CGSA work_dir 登記為本 run 之 owned path（強制停止後之恢復刪除）
+            _memory_budget.register_owned_path(owner_run_dir, work_dir)
 
         manifest_path = work_dir / "manifest.json"
         force_fresh = bool(getattr(self, "_cgsa_force_fresh", False))
@@ -1469,6 +1488,136 @@ class FeatureFactory:
             total_bytes / (1024 * 1024),
         )
 
+    # ICFIRSTALIGN Task 4.2：L6 之輸出欄數上界（consensus 4＋interaction 3＋time 4 之固定子引擎，留倍數餘裕）；
+    # L5 之參考標的輸入與輸出欄數上界（相對價格／beta／特異動能）
+    _L6_OUTPUT_COLS_BOUND = 32
+    _L5_COLS_BOUND = 8
+
+    def _estimate_l1_output_cols(self, config: Optional["FactoryConfig"]) -> int:
+        """L1 輸出欄數上界（設定展開、不依資料；Task 4.2 L1 分支之形狀參數）：每指標之參數組合 × 輸出數
+        （`ConfigManager._estimate_indicator_params`）× 單序列來源數（多輸入指標亦乘，取上界）。"""
+        if config is None:
+            return 0
+        sources = max(len(self._select_single_series_sources(config)), 1)
+        atomic = config.atomic_indicators.model_dump(by_alias=True)
+        total = 0
+        for category in ("trend", "momentum", "volatility", "volume", "cycle", "pattern", "statistics"):
+            cfg = atomic.get(category) or {}
+            if not cfg.get("enabled", True):
+                continue
+            indicators = [i for i in (cfg.get("indicators") or []) if isinstance(i, dict) and i.get("enabled", True)]
+            if not indicators:
+                total += {"pattern": 61, "cycle": 5}.get(category, 0) * sources
+                continue
+            total += sum(self._config_manager._estimate_indicator_params(i) for i in indicators) * sources
+        for category, estimator in (("microstructure", "_estimate_microstructure_features"),
+                                    ("entropy", "_estimate_entropy_features"),
+                                    ("tail_risk", "_estimate_tail_risk_features")):
+            sub = getattr(config.atomic_indicators, category)
+            if sub.enabled:
+                total += int(getattr(ConfigManager, estimator)(sub)) * sources
+        total += len(config.custom_indicators or []) * 16
+        return int(total)
+
+    def _estimate_layer_cols(self, branch: str, args: tuple, config: Optional["FactoryConfig"]) -> Tuple[int, int]:
+        """L4／L5／L6 之（輸入欄數, 輸出欄數）上界（Task 4.2）：L4＝raw＋L1（CGSA 強制 layer1_and_raw）× lag 數。"""
+        frames = [a for a in args if isinstance(a, pd.DataFrame)]
+        if branch == "L4":
+            data = frames[-1] if frames else pd.DataFrame()
+            layer1 = frames[0] if frames else pd.DataFrame()
+            inputs = int(data.shape[1] + layer1.shape[1])
+            lags = 0
+            if config is not None:
+                processor = LagProcessor(config)
+                from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
+
+                steps = ParameterGenerator.generate_lag_sequence(
+                    processor._sequence_length, processor._max_lag_ratio, processor._lag_strategy,
+                    processor._custom_lags,
+                )
+                lags = len(processor._normalize_lags(steps)) if processor._enabled else 0
+            return inputs, inputs * lags
+        if branch == "L5":
+            return self._L5_COLS_BOUND, self._L5_COLS_BOUND
+        raw_cols = int(frames[-1].shape[1]) if frames else 0
+        return raw_cols, self._L6_OUTPUT_COLS_BOUND
+
+    def estimate_generation_envelope(self, config: "FactoryConfig", rows: int, raw_cols: int) -> int:
+        """單一週期一次生成之任務峰值 E（ICFIRSTALIGN Task 4.2 v25；子行程准入與 worker 配置點「估算低估」之上界）。
+
+        E＝runtime／import／JIT 之已核上界（`memory_budget.WORKER_RUNTIME_ENVELOPE_BYTES`，收據）＋raw 存活量＋
+        max over 層（前層仍被參照之匿名集合＋該層 planned）。各層 planned 經分支表同一估算函式；L3 取全部可達臂之最大者
+        （含 pandas 後備）。L1 存活至 L6；L2 回傳表（未 spill 時為匿名）存活至 L6。"""
+        mb = _memory_budget
+        rows = int(rows)
+        raw_bytes = rows * int(raw_cols) * 8
+        l1_cols = self._estimate_l1_output_cols(config)
+        l2_cols = self._l2_output_cols_upper_bound(l1_cols, self._filter_operators_config(config.operators))
+        l1_bytes = rows * l1_cols * 8
+        l2_bytes = 0 if rows * l2_cols * 8 >= mb.L2_SPILL_THRESHOLD_BYTES else rows * l2_cols * 8
+
+        def planned(branch: str, params: Dict[str, Any]) -> int:
+            return mb.planned_bytes(mb.estimate(branch, params))
+
+        l1_peak = max(planned(b, {"rows": rows, "output_cols": l1_cols}) for b in ("L1.serial", "L1.parallel"))
+        l2_params = {"rows": rows, "output_cols": l2_cols, "max_category_cols": l2_cols, "category_cols_sum": l2_cols}
+        l2_peak = max(planned(b, l2_params) for b in ("L2.polars", "L2.pandas_serial", "L2.pandas_parallel"))
+        rolling = config.rolling_aggregation
+        windows = max(len(getattr(rolling, "windows", None) or [5, 13, 21]), 1)
+        aggs = max(len(getattr(rolling, "aggregators", None) or RollingAggregator.AGGREGATORS), 1)
+        l3_out = l1_cols * windows * aggs
+        l3_params = {"rows": rows, "input_cols": l1_cols, "output_cols": l3_out, "max_out_cols": l3_out,
+                     "windows": windows, "steps": windows * aggs, "chunk_cols": max(min(256, l1_cols), 1),
+                     "buffer_cols": max(min(5000, l1_cols), 1)}
+        l3_peak = max(planned(b, l3_params) for b in (
+            "L3.numba_multi_callback", "L3.numba_multi_nocallback", "L3.vectorized_chunked",
+            "L3.vectorized_unchunked", "L3.numba_single", "L3.pandas_fallback"))
+        lag_inputs = int(raw_cols) + l1_cols
+        lags = 0
+        if config.lag_features.enabled:
+            from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
+
+            processor = LagProcessor(config)
+            lags = len(processor._normalize_lags(ParameterGenerator.generate_lag_sequence(
+                processor._sequence_length, processor._max_lag_ratio, processor._lag_strategy, processor._custom_lags)))
+        l4_peak = planned("L4", {"rows": rows, "input_cols": lag_inputs, "output_cols": lag_inputs * lags})
+        l5_peak = planned("L5", {"rows": rows, "input_cols": self._L5_COLS_BOUND, "output_cols": self._L5_COLS_BOUND})
+        l6_peak = planned("L6", {"rows": rows, "input_cols": int(raw_cols), "output_cols": self._L6_OUTPUT_COLS_BOUND})
+        peak = max(l1_peak, l1_bytes + l2_peak, l1_bytes + l2_bytes + max(l3_peak, l4_peak, l5_peak, l6_peak))
+        return int(mb.WORKER_RUNTIME_ENVELOPE_BYTES + raw_bytes + peak)
+
+    @staticmethod
+    def _l2_output_cols_upper_bound(l1_col_count: int, operators_config: Dict[str, Any]) -> int:
+        """L2 輸出欄數上界（ICFIRSTALIGN Task 4.2 預算估算；不依資料）：配對運算子（cross／ratio）於同一（來源, 類別,
+        指標）家族內、每個 fast 參數最多取 `_PAIR_MULTIPLIERS` 個 slow ⇒ ≤ L1 欄數 × 倍數個數（非全體兩兩配對）；
+        momentum ≤ L1 × lags；distance／signed ≤ L1；binary ≤ L1 × rules；WorldQuant ≤ L1 ×（窗 × 運算子＋變換）。"""
+        if l1_col_count <= 0:
+            return 0
+        engine_cls = _derived_operator_engine_cls()
+        multipliers = max(len(getattr(engine_cls, "_PAIR_MULTIPLIERS", ()) or ()), 1)
+        n = int(l1_col_count)
+        total = 0
+        if (operators_config.get("distance") or {}).get("enabled", False):
+            total += n
+        for key in ("cross", "ratio"):
+            if (operators_config.get(key) or {}).get("enabled", False):
+                total += n * multipliers
+        momentum_cfg = operators_config.get("momentum") or operators_config.get("momentum_change") or {}
+        if momentum_cfg.get("enabled", False):
+            total += n * max(len(momentum_cfg.get("lags") or [1, 5, 10, 21]), 1)
+        binary_cfg = operators_config.get("binary_signal") or {}
+        if binary_cfg.get("enabled", False):
+            total += n * max(len(binary_cfg.get("rules") or []), 1)
+        if (operators_config.get("signed_strength") or {}).get("enabled", False):
+            total += n
+        wq = operators_config.get("worldquant") or {}
+        if wq.get("enabled", False):
+            windows = wq.get("windows", [5, 13, 21])
+            operators = wq.get("operators", ["ts_argmax", "ts_argmin", "ts_rank", "decay_linear"])
+            transforms = wq.get("transforms", ["sign", "log1p", "abs", "clip"])
+            total += n * max(len(windows) * len(operators) + len(transforms), 1)
+        return int(total)
+
     @staticmethod
     def _estimate_l2_output_cols(l1_col_count: int, operators_config: Dict[str, Any]) -> int:
         if l1_col_count <= 0:
@@ -1637,6 +1786,7 @@ class FeatureFactory:
             from momentum.FeatureEngineering.polars_adapter import polars_enabled
 
             use_polars = polars_enabled()
+            self._budget_check_l2(layer1_for_l2, data.columns, config, use_polars)
             if use_polars:
                 result_df, failed_engines, present = self._layer2_derived_polars(
                     layer1_for_l2, data, config
@@ -1654,6 +1804,27 @@ class FeatureFactory:
             present_engines=present,
             failed_engines=failed_engines,
         )
+
+    def _budget_check_l2(self, layer1: pd.DataFrame, raw_columns: Any, config: "FactoryConfig",
+                         use_polars: bool) -> None:
+        """ICFIRSTALIGN Task 4.2：L2 臂之分派點（polars 可否 import 已決定）宣告分支並判定。pandas 臂依實際
+        category workers 分串列／平行；無 registry 時 pandas 一次算全表（同串列估算）。"""
+        filtered_ops = self._filter_operators_config(config.operators)
+        # 依實際 L1 欄與運算子之同一選欄規則逐類別計欄數（只依欄名與設定、不計算值）
+        engine = _derived_operator_engine_cls()(filtered_ops)
+        counts = engine.output_column_counts(layer1.columns, raw_columns,
+                                             self._build_indicator_specs(layer1, config))
+        out = int(sum(counts.values()))
+        if use_polars:
+            branch = "L2.polars"
+        else:
+            from momentum.FeatureEngineering.utils.hardware_utils import get_l2_category_workers
+
+            parallel = self._cgsa_registry is not None and get_l2_category_workers() > 1
+            branch = "L2.pandas_parallel" if parallel else "L2.pandas_serial"
+        params = {"rows": int(layer1.shape[0]), "output_cols": out,
+                  "max_category_cols": max(counts.values(), default=0), "category_cols_sum": out}
+        _memory_budget.check_estimate(branch, params, label=f"Layer 2:{branch}")
 
     def _layer2_derived_pandas(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
@@ -1838,8 +2009,10 @@ class FeatureFactory:
                 buffer_cols=get_l3_streaming_buffer_cols(),
             )
             try:
-                _ = aggregator.compute_all(base, persist_callback=persister)
+                returned = aggregator.compute_all(base, persist_callback=persister)
             except Exception as exc:
+                if _is_non_degradable_layer_error(exc):
+                    raise
                 logger.error("[L3] streaming persist failed: %s", exc, exc_info=True)
                 return self._build_layer_result(
                     data=pd.DataFrame(index=index),
@@ -1850,6 +2023,15 @@ class FeatureFactory:
                 )
             finally:
                 persister.flush_all()
+            if returned is not None and not returned.empty:
+                # ICFIRSTALIGN Task 4.0：不支援 callback 之臂（關串流、關多窗、關 numba、numba 例外後備）回傳完整表 ⇒ 落盤；
+                # 回傳非空且 callback 亦收到欄 ⇒ 具名錯誤（不得雙寫）
+                if persister.received_cols > 0:
+                    raise L3PersistConflictError(
+                        f"L3 串流分支同時收到 callback 欄（{persister.received_cols}）與非空回傳表（{returned.shape[1]}）"
+                    )
+                self._persist_l3_returned_table(returned, getattr(aggregator, "last_branch", None))
+            del returned
             logger.info(
                 "[L3] streaming persist (mode=%s) complete: %d cols persisted in %d groups",
                 persist_mode, persister.total_cols, persister.total_groups,
@@ -1864,6 +2046,8 @@ class FeatureFactory:
         try:
             result = aggregator.compute_all(base)
         except Exception as exc:
+            if _is_non_degradable_layer_error(exc):
+                raise
             logger.error("[L3] compute_all failed: %s", exc, exc_info=True)
             return self._build_layer_result(
                 data=pd.DataFrame(index=index),
@@ -1878,6 +2062,15 @@ class FeatureFactory:
             configured_engines=1,
             present_engines=present,
         )
+
+    def _persist_l3_returned_table(self, returned: pd.DataFrame, branch: Optional[str]) -> None:
+        """ICFIRSTALIGN Task 4.0：L3 回傳表經既有群組落盤（落盤轉型前以該臂分支 ID 判定轉型之追加配置）。"""
+        if returned is None or returned.empty:
+            return
+        if branch in _memory_budget.BRANCH_TABLE:
+            cast = _memory_budget.Component("persist_cast", "anon", int(returned.shape[0]) * int(returned.shape[1]) * 4)
+            _memory_budget.check(branch, [cast], label="L3:persist_returned")
+        self._persist_layer_output_groups(returned, LayerSource.L3, "L3_rolling")
 
     def _layer4_lag_features(
         self,
@@ -2275,52 +2468,59 @@ class FeatureFactory:
         # 可能不足 N ⇒ 深度加倍重算，至不再有 `"short"` 欄或已達資料起點；實際前史短於深度時自資料起點載入。
         # 仍不足 N 之欄不帶校準值（v19 逐欄事件；不縮窗、不以不足 N 之值判定、不退回輸出範圍）
         depth = estimate_max_warmup_bars(config, timeframe, [timeframe]) + n  # v32：首個有效值延遲常數已刪（遮罩＋加倍）
+        winsor = self._calibration_winsorizer(config, timeframe)
         while True:
             before = history.iloc[max(0, len(history) - depth):]
+            before_dt = self._calibration_datetime_index(before.index)
+            values: Dict[str, np.ndarray] = {}
+            last_ts: Dict[str, pd.Timestamp] = {}
+            first_ts: Dict[str, pd.Timestamp] = {}
+            empty: List[str] = []
+            shortfall: Dict[str, int] = {}
+            short = False
+            # ICFIRSTALIGN Task 4.1：校準域逐群組歸約（一次至多一個群組在記憶體）；每欄分類與起始日前最後 N 個有效值擷取
+            # 同改前（封包格式不變）；不足 N 之欄驅動深度加倍
+            self._calibration_reduce_n = int(n)
             try:
-                frame = cal.compute_calibration_domain(self, symbol, timeframe, config, before)
-            except CalibrationError:
+                groups = cal.compute_calibration_domain(self, symbol, timeframe, config, before)
+                for _group_id, names, arr, _index in groups:
+                    frame = pd.DataFrame(arr, index=before_dt, columns=list(names), copy=False)
+                    if winsor is not None:
+                        frame = winsor._apply_winsorization(frame)
+                    for column in frame.columns:
+                        name = cal.tagged_column_name(str(column), timeframe)
+                        column_values = frame[column].to_numpy(dtype=np.float64)
+                        status = self._classify_calibration_column(column_values, n, public_rows)
+                        short = short or status == "short"
+                        if status != "ok":
+                            # 起始日前（深度加倍後）仍無 N 個有效值之欄：不帶校準值（v19，使用者 2026-09-26 裁定）；
+                            # L6.5 依公開序列判定——公開亦全 NaN ⇒ 未檢定；否則該欄不做平穩化、記
+                            # `calibration_insufficient_history` 與缺少根數
+                            empty.append(name)
+                            shortfall[name] = n - int(np.isfinite(column_values).sum())
+                            continue
+                        try:
+                            values[name], first_ts[name], last_ts[name] = cal.calibration_window_before(
+                                frame[column].rename(name), output_start, n,
+                            )
+                        except CalibrationError as exc:
+                            raise CalibrationError(
+                                f"{symbol} 週期 {timeframe}：{exc}", timeframe=timeframe, column=name, field="n",
+                            ) from exc
+                    del _group_id, names, arr, _index, frame  # 群組陣列用畢即釋放（先於下一群組之 check 與讀回）
+            except (CalibrationError, _memory_budget.GenerationMemoryBudgetExceeded,
+                    _memory_budget.MemoryMeasurementUnavailable):
                 raise
             except Exception as exc:
                 raise CalibrationError(
                     f"校準域計算失敗：{symbol} 週期 {timeframe}：{exc}", timeframe=timeframe, field="compute",
                 ) from exc
-            if len(before) >= len(history) or not self._calibration_short_columns(frame, n, public_rows):
+            finally:
+                self._calibration_reduce_n = 0
+            if len(before) >= len(history) or not short:
                 break
-            del frame
             depth *= 2
-        before_dt = self._calibration_datetime_index(before.index)
         source_sha256 = cal.calibration_source_sha256(before.set_axis(before_dt, axis=0))
-        if len(frame.index) != len(before_dt):
-            raise CalibrationError(
-                f"校準域列數與前史切片不符：{symbol} 週期 {timeframe} {len(frame.index)} ≠ {len(before_dt)}",
-                timeframe=timeframe, field="compute",
-            )
-        frame = frame.set_axis(before_dt, axis=0)  # 校準值擷取依 UTC 時間戳
-        values: Dict[str, np.ndarray] = {}
-        last_ts: Dict[str, pd.Timestamp] = {}
-        first_ts: Dict[str, pd.Timestamp] = {}
-        empty: List[str] = []
-        shortfall: Dict[str, int] = {}
-        for column in frame.columns:
-            name = cal.tagged_column_name(str(column), timeframe)
-            column_values = frame[column].to_numpy(dtype=np.float64)
-            status = self._classify_calibration_column(column_values, n, public_rows)
-            if status != "ok":
-                # 起始日前（深度加倍後）仍無 N 個有效值之欄：不帶校準值（v19，使用者 2026-09-26 裁定）；L6.5 依公開序列
-                # 判定——公開亦全 NaN ⇒ 未檢定；否則該欄不做平穩化、記 `calibration_insufficient_history` 與缺少根數
-                empty.append(name)
-                shortfall[name] = n - int(np.isfinite(column_values).sum())
-                continue
-            try:
-                values[name], first_ts[name], last_ts[name] = cal.calibration_window_before(
-                    frame[column].rename(name), output_start, n,
-                )
-            except CalibrationError as exc:
-                raise CalibrationError(
-                    f"{symbol} 週期 {timeframe}：{exc}", timeframe=timeframe, column=name, field="n",
-                ) from exc
-        del frame
         key = cal.CalibrationKey(
             symbol=str(symbol), timeframe=timeframe, output_start=output_start,
             config_hash=str(self._current_config_hash or ""), n=n,
@@ -2388,6 +2588,8 @@ class FeatureFactory:
         window = resolve_output_window(config, timeframe, start_date, end_date)
         self._public_warmup_probe: List[Dict[str, Any]] = []
         self._public_warmup_late: Optional[Tuple[OutputWindow, frozenset]] = None
+        # ICFIRSTALIGN Task 4.1：末輪各週期「標記欄名 → 首個有限值時間（str；探測段無有限值 ⇒ None）」
+        self._public_warmup_first_finite: Dict[str, Dict[str, Optional[str]]] = {}
         if not window.warmup_enabled:
             return window
         training = list(dict.fromkeys(config.timeframes.training))
@@ -2402,6 +2604,7 @@ class FeatureFactory:
         while True:
             late_total, need_more = 0, False
             late_names: set = set()
+            first_finite: Dict[str, Dict[str, Optional[str]]] = {}
             for tf, (data, idx) in histories.items():
                 lo = int(idx.searchsorted(to_utc(pd.Timestamp(window.ingest_start)), side="left"))
                 pos_start = int(idx.searchsorted(start_ts, side="left"))
@@ -2409,25 +2612,38 @@ class FeatureFactory:
                 hi = min(len(idx), pos_start + max(100, native_depth // 4))
                 if hi <= lo:
                     continue
-                frame = cal.compute_calibration_domain(self, symbol, tf, config, data.iloc[lo:hi])
-                values = frame.to_numpy(dtype=np.float64)
-                finite = np.isfinite(values)
-                has = finite.any(axis=0)
-                first_row = np.argmax(finite, axis=0)
-                first_ts = idx[lo:hi][first_row]
-                late_mask = has & np.asarray(first_ts > start_ts)
-                late = int(late_mask.sum())
-                # 探測段內無有限值之欄（審查 r33 codex P1-03）：其首個有限值必晚於起始日（探測段含起始日前全部預熱列）
-                # ⇒ 計入晚到集合，公開輸出晚到者方記事件；不觸發加倍（無法與死欄區分，死欄之 stable_start 為 None 不入事件）
-                late_names.update(cal.tagged_column_name(str(c), tf) for c in frame.columns[late_mask | ~has])
-                del frame, values, finite
-                late_total += late
-                if late and lo > 0:
+                probe_idx = idx[lo:hi]
+                winsor = self._calibration_winsorizer(config, tf)
+                tf_first: Dict[str, Optional[str]] = {}
+                tf_late = 0
+                # ICFIRSTALIGN Task 4.1：逐群組歸約（同一縮尾設定，群組陣列用畢即釋放）；晚到判定與加倍規則不變
+                for _group_id, names, arr, index in cal.compute_calibration_domain(self, symbol, tf, config,
+                                                                                    data.iloc[lo:hi]):
+                    frame = pd.DataFrame(arr, index=index, columns=list(names), copy=False)
+                    if winsor is not None:
+                        frame = winsor._apply_winsorization(frame)
+                    values = frame.to_numpy(dtype=np.float64)
+                    finite = np.isfinite(values)
+                    has = finite.any(axis=0)
+                    first_row = np.argmax(finite, axis=0)
+                    first_ts = probe_idx[first_row]
+                    late_mask = has & np.asarray(first_ts > start_ts)
+                    tagged = [cal.tagged_column_name(str(c), tf) for c in frame.columns]
+                    # 探測段內無有限值之欄（審查 r33 codex P1-03）：其首個有限值必晚於起始日（探測段含起始日前全部預熱列）
+                    # ⇒ 計入晚到集合，公開輸出晚到者方記事件；不觸發加倍（無法與死欄區分，死欄之 stable_start 為 None 不入事件）
+                    late_names.update(t for t, m in zip(tagged, late_mask | ~has) if m)
+                    tf_first.update((t, str(ts) if h else None) for t, h, ts in zip(tagged, has, first_ts))
+                    tf_late += int(late_mask.sum())
+                    del _group_id, names, arr, index, frame, values, finite  # 先於下一群組之 check 與讀回
+                first_finite[tf] = tf_first
+                late_total += tf_late
+                if tf_late and lo > 0:
                     need_more = True
             self._public_warmup_probe.append({"depth": depth, "late_columns": late_total})
             if not need_more:
                 # 末輪晚到欄（標記週期後之欄名）綁定本窗：只供同一窗之公開輸出判「預熱所致」之晚到
                 self._public_warmup_late = (window, frozenset(late_names))
+                self._public_warmup_first_finite = first_finite
                 return window
             depth *= 2
             window = resolve_output_window(config, timeframe, start_date, end_date, max_warmup_bars=depth)
@@ -2451,23 +2667,48 @@ class FeatureFactory:
         換算同 L0，見 `_normalize_calibration_ts`）。"""
         return to_utc(pd.DatetimeIndex(self._coerce_index_to_datetime(index)))
 
-    def _compute_calibration_domain(self, symbol: str, timeframe: str, config: FactoryConfig,
-                                    klines: pd.DataFrame) -> pd.DataFrame:
-        """校準資料域：獨立 `FeatureFactory` 實例（不共用任何實例內快取，含 `_reference_data_cache`）以前史切片
-        算 L1–L6，再套 L6.5 平穩化之前之縮尾（與公開域 L6.5 同序），回傳各欄（未標記週期之欄名）。
-        不設 CGSA registry、不落盤；L2 之 memmap 寫在前綴 `ffstat_calib_` 之獨立暫存目錄，結束（含例外）即刪。"""
+    def _calibration_winsorizer(self, config: FactoryConfig, timeframe: str) -> Optional[FeaturePreprocessor]:
+        """校準域之縮尾器（與公開域 L6.5 native-tf 子實例同一設定：窗依原生週期縮放）；縮尾關 ⇒ None。"""
+        if not config.preprocessing.winsorization.enabled:
+            return None
+        from momentum.FeatureEngineering.preprocessing._native_tf_helpers import scale_preprocessing_config_for_native
+
+        winsor_config = scale_preprocessing_config_for_native(
+            self._build_l7_raw_preprocessing_config(config), timeframe, config.timeframes.primary,
+        )
+        return FeaturePreprocessor(winsor_config)
+
+    def _iter_calibration_domain_groups(self, symbol: str, timeframe: str, config: FactoryConfig,
+                                        klines: pd.DataFrame) -> Iterator[Tuple[str, List[str], np.ndarray, pd.Index]]:
+        """校準資料域（ICFIRSTALIGN Task 4.1）：獨立 `FeatureFactory` 實例（不共用實例內快取，含
+        `_reference_data_cache`）以前史切片、經正式單週期生成之同一組層函式產出 L1–L6，各層落暫存 CGSA registry
+        之 float32 群組（L2 registry 群組為逐類別 `compute_category` 之結果＝公開落盤之同一臂；L3 經 Task 4.0 後之同一
+        分支；L4／L5／L6 落盤後即釋放該層記憶體表），再逐群組讀回交出 (群組 ID, 欄名, float32 陣列＝`load_data`
+        回傳物件, 前史切片之 L0 index)。不建全欄合併、不轉 float64 全表、dtype 不隨規模分支。
+
+        暫存目錄（前綴 `CALIBRATION_TMP_PREFIX`）建於受保護 run 之映射根並登記為 owned path；結束（含例外）即刪。
+        每群組讀回前經 `Calib.group_reduce` 預算判定；一次至多一個群組在記憶體（呼叫端用畢即釋放）。"""
         import shutil
         import tempfile
 
         from momentum.FeatureEngineering.preprocessing.calibration import CALIBRATION_TMP_PREFIX
 
+        root = _memory_budget.current_mapping_root()
+        if root is not None:
+            root.mkdir(parents=True, exist_ok=True)
+        tmp_dir = Path(tempfile.mkdtemp(prefix=CALIBRATION_TMP_PREFIX, dir=None if root is None else str(root)))
+        run_dir = _memory_budget.current_run_dir()
+        if run_dir is not None:
+            _memory_budget.register_owned_path(run_dir, tmp_dir)
         calib = FeatureFactory(self._config_manager, self._adapter_registry)
         calib._current_symbol = symbol
         calib._current_timeframe = timeframe
         calib._current_raw_data = klines
         calib._calibration_domain = True  # L3 不依資料剔欄
-        tmp_dir = tempfile.mkdtemp(prefix=CALIBRATION_TMP_PREFIX)
         try:
+            registry = ColumnGroupRegistry(work_dir=tmp_dir / "registry", memory_buffer_groups=0)
+            calib._cgsa_registry = registry
+
             def _run(name: str, func: Callable, *args: Any) -> pd.DataFrame:
                 result = calib._execute_layer1_6(name, func, *args)
                 if result.status == LayerStatus.layer_failed:
@@ -2477,29 +2718,57 @@ class FeatureFactory:
                     )
                 return result.data
 
+            def _persist_and_release(name: str, frame: pd.DataFrame, layer: LayerSource, label: str) -> None:
+                if frame is not None and not frame.empty:
+                    calib._persist_layer_output_groups(frame, layer, label)
+                calib.layer_results.pop(name, None)  # 層結果之最後持有者（落盤後即釋放）
+
             layer1 = _run("Layer 1", calib._layer1_atomic_indicators, klines, config)
             layer2 = _run("Layer 2", calib._layer2_derived_features, layer1, klines, config)
-            layer2 = calib._spill_to_memmap(layer2, "calib_layer2", dir=tmp_dir)
+            layer2 = calib._spill_to_memmap(layer2, "calib_layer2", dir=str(tmp_dir))
             layer3 = _run("Layer 3", calib._layer3_rolling_aggregation, layer1, layer2, config)
-            layer4 = _run("Layer 4", calib._layer4_lag_features, layer1, layer2, layer3, klines, config)
+            _persist_and_release("Layer 3", layer3, LayerSource.L3, "L3_rolling")  # in_memory tier 之回傳表
+            del layer3
+            layer4 = _run("Layer 4", calib._layer4_lag_features, layer1, layer2, pd.DataFrame(index=layer1.index),
+                          klines, config)
+            _persist_and_release("Layer 4", layer4, LayerSource.L4, "L4_lag")
+            del layer4
             layer5 = _run("Layer 5", calib._layer5_cross_sectional, layer1, layer2, config)
+            _persist_and_release("Layer 5", layer5, LayerSource.L5, "L5_cross")
+            del layer5
             layer6 = _run("Layer 6", calib._layer6_meta_features, layer1, layer2, klines, config)
-            frame = calib._combine_layers([layer1, layer2, layer3, layer4, layer5, layer6], context="calibration_domain")
-            del layer1, layer2, layer3, layer4, layer5, layer6
-            if len(frame.index) == len(klines.index):
-                frame = frame.set_axis(klines.index, axis=0)  # 同前史切片之 L0 index（呼叫端再換 UTC 時間戳）
-            if config.preprocessing.winsorization.enabled:
-                # 縮尾窗依原生週期縮放（與 L6.5 native-tf 子實例同一設定，見 _native_tf_helpers）
-                from momentum.FeatureEngineering.preprocessing._native_tf_helpers import (
-                    scale_preprocessing_config_for_native,
-                )
+            _persist_and_release("Layer 6", layer6, LayerSource.L6, "L6_meta")
+            del layer6
+            calib.layer_results.clear()
+            del layer1, layer2
+            registry.finalize()
 
-                winsor_config = scale_preprocessing_config_for_native(
-                    self._build_l7_raw_preprocessing_config(config), timeframe, config.timeframes.primary,
+            # 歸約：逐群組讀回（一次至多一個群組在記憶體）
+            accumulated = 0
+            n_calibration = int(getattr(self, "_calibration_reduce_n", 0) or 0)
+            for group_id, group in list(registry.iter_all()):
+                rows, cols = int(group.shape[0]), int(group.shape[1])
+                shards = list(getattr(group, "shards", ()) or ())
+                shard_sizes = ([rows * (int(s.col_end) - int(s.col_start)) * 4 for s in shards] if shards
+                               else [rows * cols * 4])
+                accumulated += cols
+                _memory_budget.check_estimate(
+                    "Calib.group_reduce",
+                    {"rows": rows, "group_cols": cols, "shard_sizes": shard_sizes, "n_calibration": n_calibration,
+                     "accumulated_cols": accumulated},
+                    label=f"Calib.group_reduce:{group_id}",
                 )
-                frame = FeaturePreprocessor(winsor_config)._apply_winsorization(frame)
-            return frame
+                arr = registry.load_data(group_id)
+                if arr.shape[0] != len(klines.index):
+                    raise CalibrationError(
+                        f"校準域列數與前史切片不符：{symbol} 週期 {timeframe} {arr.shape[0]} ≠ {len(klines.index)}",
+                        timeframe=timeframe, field="compute",
+                    )
+                yield group_id, list(group.columns), arr, klines.index
+                del arr
+            _memory_budget.layer_end("Calib.group_reduce")
         finally:
+            calib._cgsa_registry = None
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
     def run_ic_first(
@@ -2559,7 +2828,9 @@ class FeatureFactory:
         saved_window = getattr(self, "_current_output_window", None)
         saved_hash = getattr(self, "_current_config_hash", None)
         sink: list = []
+        protected_runs: list = []
         try:
+            self._protected_run_holder = protected_runs  # Task 4.2：守護隨 lease 持有至 IC、processed、cleanup 結束
             try:
                 generation = self.generate_features(
                     symbol, tf, config_override=config.model_dump(by_alias=True),
@@ -2569,6 +2840,8 @@ class FeatureFactory:
                 raise
             except Exception as exc:
                 raise icc.ICFirstGenerationError(f"IC-first 正式生成失敗：{symbol}/{tf}：{exc}") from exc
+            finally:
+                self._protected_run_holder = None
             failed_groups = list(getattr(self, "_stationarity_failed_groups", None) or [])
             if failed_groups:  # Task 2.2 邊界②：單一群組 L6.5 失敗 ⇒ 整次失敗
                 raise icc.ICFirstGenerationError(f"IC-first 生成之 L6.5 群組失敗：{symbol}/{tf}：{failed_groups}")
@@ -2580,6 +2853,9 @@ class FeatureFactory:
                 start=start, persist=persist,
             )
         finally:
+            _memory_budget.layer_end("run")
+            for protected in protected_runs:
+                protected.close()  # 守護於 lease 釋放前停止並回收
             if lease_sink is not None:
                 lease_sink.extend(sink)
             else:
@@ -2644,34 +2920,30 @@ class FeatureFactory:
 
         raw_path = run_dir / "raw"
         raw_feature_count = int(generation.feature_count)
-        rss_before_gc_gb = _current_rss_gb()
         gc.collect()
-        memory_snapshot = self._check_ic_memory_budget_after_raw_persist(rss_before_gc_gb, config)
-
-        peak_budget_gb = self._resolve_tier_peak_budget_gb(config)
-        memory_profiler = getattr(self, "_memory_profiler", _MemoryProfiler())
-        with memory_profiler.track("run_ic_gate") as ic_memory:
-            ic_result = ic_engine.compute_ic_from_l7_raw(
-                symbol,
-                tf,
-                config_hash,
-                label,
-                feature_reader=feature_reader,
-                ic_threshold=ic_threshold,
-                allow_partial_ic=allow_partial_ic,
-                method=None,
-                label_horizon=label_horizon,
-                selection_window=selection_window,
-                split_id=split_id,
-            )
-        if float(ic_memory.peak_rss_gb) > peak_budget_gb:
-            raise MemoryError(
-                "IC-First: run_ic_gate peak RSS "
-                f"{ic_memory.peak_rss_gb:.2f} GB > tier budget {peak_budget_gb:.2f} GB"
-            )
+        # ICFIRSTALIGN Task 4.2：取代 RSS 閘——IC 群組讀回、選欄讀回、transform_selected 各群組前皆以致 OOM 之量
+        # （phys_footprint）配置前判定（IC.group_read 於 compute_ic_from_l7_raw 內）
+        ic_result = ic_engine.compute_ic_from_l7_raw(
+            symbol,
+            tf,
+            config_hash,
+            label,
+            feature_reader=feature_reader,
+            ic_threshold=ic_threshold,
+            allow_partial_ic=allow_partial_ic,
+            method=None,
+            label_horizon=label_horizon,
+            selection_window=selection_window,
+            split_id=split_id,
+        )
 
         selected_features = self._extract_ic_selected_features(ic_result)
         if selected_features:
+            _memory_budget.check_estimate(
+                "IC.selected_read",
+                {"rows": int(len(kline_index)), "selected_cols": len(selected_features)},
+                label="IC-first:selected_read",
+            )
             selected_raw = feature_reader.load_columns_v2(
                 symbol,
                 tf,
@@ -2743,9 +3015,7 @@ class FeatureFactory:
             "selected_count": len(selected_features),
             "raw_feature_count": raw_feature_count,
             "processed_feature_count": processed_feature_count,
-            "memory_budget": memory_snapshot.__dict__,
-            "run_ic_gate_peak_rss_gb": float(ic_memory.peak_rss_gb),
-            "tier_peak_budget_gb": peak_budget_gb,
+            "memory_budget": self._memory_budget_metadata(),
             "persist_requested": bool(persist),
             "raw_cleaned_up": cleanup_raw and not raw_path.exists(),
             "raw_freed_gb": raw_freed_gb,
@@ -2753,12 +3023,11 @@ class FeatureFactory:
             "ic_first_context": icc.context_to_metadata(ctx),
         })
         logger.info(
-            "[IC-First] post_ic done: symbol=%s tf=%s selected=%d processed_features=%d peak_rss_gb=%.2f",
+            "[IC-First] post_ic done: symbol=%s tf=%s selected=%d processed_features=%d",
             symbol,
             tf,
             len(selected_features),
             processed_feature_count,
-            float(ic_memory.peak_rss_gb),
         )
         return FeatureGenerationResult(
             features_df=pd.DataFrame(index=generation.features_df.index),  # 與本次生成之公開索引同一表示
@@ -2808,48 +3077,12 @@ class FeatureFactory:
             selected = getattr(ic_result, "selected", [])
         return [str(feature) for feature in selected]
 
-    def _check_ic_memory_budget_after_raw_persist(
-        self,
-        rss_before_gc_gb: float,
-        config: "FactoryConfig",
-    ) -> MemoryBudgetSnapshot:
-        rss_after_gc_gb = _current_rss_gb()
-        available_after_gc_gb = _available_ram_gb()
-        required_available_gb = self._resolve_required_available_gb(config)
-        released_gb = rss_before_gc_gb - rss_after_gc_gb
-        if available_after_gc_gb < required_available_gb:
-            logger.error(
-                "[IC-First] available RAM insufficient before run_ic_gate: %.2f GB < %.2f GB",
-                available_after_gc_gb,
-                required_available_gb,
-            )
-            raise MemoryError("IC-First: insufficient available RAM before run_ic_gate")
-        logger.info(
-            "[IC-First] gc diagnostic: released_gb=%.2f rss_after_gb=%.2f available_after_gb=%.2f required_available_gb=%.2f",
-            released_gb,
-            rss_after_gc_gb,
-            available_after_gc_gb,
-            required_available_gb,
-        )
-        return MemoryBudgetSnapshot(
-            rss_before_gb=float(rss_before_gc_gb),
-            rss_after_gb=float(rss_after_gc_gb),
-            released_gb=float(released_gb),
-            available_after_gb=float(available_after_gc_gb),
-            required_available_gb=float(required_available_gb),
-        )
-
-    def _resolve_required_available_gb(self, config: "FactoryConfig") -> float:
-        return self._resolve_config_float(config, "ic_gate_required_available_gb", 1.0)
-
-    def _resolve_tier_peak_budget_gb(self, config: "FactoryConfig") -> float:
-        try:
-            from momentum.FeatureEngineering.utils.hardware_utils import get_current_tier_gb
-
-            default_budget = max(float(get_current_tier_gb()) - 1.0, 1.0)
-        except Exception:
-            default_budget = 7.0
-        return self._resolve_config_float(config, "tier_peak_budget_gb", default_budget)
+    @staticmethod
+    def _memory_budget_metadata() -> Dict[str, Any]:
+        """ICFIRSTALIGN Task 4.2：本次 run 之記憶體預算（致 OOM 之量 phys_footprint；上限＝實體記憶體 × 比例或設定絕對值）。
+        取代改前之 RSS 閘 metadata（rss_*／run_ic_gate_peak_rss_gb／tier_peak_budget_gb）。"""
+        return {"metric": "phys_footprint", "budget_bytes": int(_memory_budget.configured_budget_bytes()),
+                "guarded": _memory_budget.active_context() is not None}
 
     @staticmethod
     def _resolve_config_float(config: "FactoryConfig", field_name: str, default: float) -> float:
@@ -4593,12 +4826,13 @@ class FeatureFactory:
             est_bytes = combined.shape[0] * int(keep_mask.sum()) * 4
             if est_bytes >= 500_000_000:
                 import numpy as _np
-                from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+                from momentum.FeatureEngineering import memmap_utils
 
                 keep_idx = _np.where(keep_mask)[0]
                 n_keep = len(keep_idx)
                 n_rows = combined.shape[0]
-                out = create_temp_memmap((n_rows, n_keep), prefix="dedup_")
+                out = memmap_utils.create_temp_memmap((n_rows, n_keep), prefix="dedup_",
+                                                      dir=_memory_budget.current_mapping_root())
                 src = combined.values  # underlying memmap or array
 
                 # Copy in contiguous ranges (typically ~12 ranges for 11 dups)
@@ -4795,16 +5029,29 @@ class FeatureFactory:
     ) -> Tuple[Dict[str, Any], Dict[str, str]]:
         """Run the feature pipeline for multiple symbols in parallel.
 
-        Uses ProcessPoolExecutor with spawn context to avoid fork-related
-        issues with TA-Lib C globals and Numba JIT.
+        ICFIRSTALIGN Task 4.2（v25）：父行程為預算域根（於 numba warmup／reference IPC 準備前建立、恰一守護）；
+        各標的經域排程器以任務承諾量 E 准入有限波次（spawn 子行程，worker 以顯式域描述加入域、不另起守護、
+        域內多週期一律串行）；無可准入之標的於根行程內依序呼叫同一 `_worker_entry`（每標的獨立 factory／registry／
+        run lease，不經任何 ProcessPoolExecutor）。`timeout_per_symbol` 保留於簽名（排程由 future 完成驅動，不設固定逾時）。
 
         Returns:
             (results, errors) where results maps symbol → metadata dict,
             and errors maps symbol → error message string.
         """
-        import multiprocessing as mp
-        from concurrent.futures import ProcessPoolExecutor, as_completed
+        from momentum import factories as _factories  # 呼叫時解析（測試以模組屬性攔截）
 
+        domain = _memory_budget.BudgetDomain(run_id=f"multi_symbol:{','.join(symbols)}").start()
+        try:
+            scheduler = _factories.create_memory_budget_scheduler(
+                domain_dir=domain.domain_dir, max_workers=max(min(max_workers, len(symbols)), 1),
+                guard=domain.guard_handle,
+            )
+            return self._run_multi_symbol_in_domain(symbols, config_override, ref_symbol, cache_dir, scheduler)
+        finally:
+            domain.close()
+
+    def _run_multi_symbol_in_domain(self, symbols: List[str], config_override: Optional[dict], ref_symbol: str,
+                                    cache_dir: Optional[str], scheduler: Any) -> Tuple[Dict[str, Any], Dict[str, str]]:
         # Step 1: Numba warm-up in main process (cache compiled functions)
         _warmup_numba_functions()
 
@@ -4831,32 +5078,27 @@ class FeatureFactory:
         except Exception as exc:
             logger.warning("Reference data IPC preparation failed: %s", exc)
 
-        # Step 4: spawn context (mandatory on macOS for TA-Lib safety)
-        ctx = mp.get_context("spawn")
-        effective_workers = min(max_workers, len(symbols))
-
+        # Step 4: 預算域排程（spawn 子行程，mandatory on macOS for TA-Lib safety；executor 由排程器建立）
         results: Dict[str, Any] = {}
         errors: Dict[str, str] = {}
 
         try:
-            with ProcessPoolExecutor(max_workers=effective_workers, mp_context=ctx) as pool:
-                futures = {
-                    pool.submit(
-                        _worker_entry,
-                        sym,
-                        config_payload,
-                        cache_dir,
-                        ref_ipc_path,
-                    ): sym
-                    for sym in symbols
-                }
-                for future in as_completed(futures):
-                    sym = futures[future]
-                    try:
-                        results[sym] = future.result(timeout=timeout_per_symbol)
-                    except Exception as exc:
-                        errors[sym] = str(exc)
-                        logger.error("Symbol %s failed: %s", sym, exc)
+            tasks = [
+                _memory_budget.Task(
+                    task_id=f"symbol:{sym}", envelope=self._estimate_symbol_envelope(sym, config),
+                    payload={"symbol": sym, "config_payload": config_payload, "cache_dir": cache_dir,
+                             "ref_ipc_path": ref_ipc_path},
+                )
+                for sym in symbols
+            ]
+            outcomes = scheduler.run(tasks, _worker_domain_entry, lambda payload: _worker_entry(**payload),
+                                     lambda wave: None)
+            for sym, outcome in zip(symbols, outcomes):
+                if isinstance(outcome, BaseException):
+                    errors[sym] = str(outcome)
+                    logger.error("Symbol %s failed: %s", sym, outcome)
+                else:
+                    results[sym] = outcome
         finally:
             if work_dir is not None:
                 # 參考資料 IPC 暫存目錄：所有出口（成功、worker 失敗、pool 例外）皆刪，避免重複執行累積（FFSTAT b3 r5）
@@ -4870,6 +5112,24 @@ class FeatureFactory:
             len(errors),
         )
         return results, errors
+
+    def _estimate_symbol_envelope(self, symbol: str, config: "FactoryConfig",
+                                  end_date: Optional[str] = None) -> Optional[int]:
+        """一標的一次正式生成之任務峰值 E（ICFIRSTALIGN Task 4.2 v25；多標的／API 批次 worker 之准入承諾）。
+
+        列數取各訓練週期自資料起點至 `end_date` 之 L0 列數（預熱最終深度未定時之上界：預熱不得早於資料起點）；
+        域內多週期一律串行 ⇒ E＝各週期 E 之最大者。取不到形狀 ⇒ None（不准入並行、走串行臂）。"""
+        envelopes: List[int] = []
+        for tf in dict.fromkeys(config.timeframes.training or [config.timeframes.primary]):
+            try:
+                raw = self._layer0_data_ingestion(symbol, tf, config, start_date=None, end_date=end_date)
+            except Exception as exc:  # noqa: BLE001 — 形狀不可得即走串行臂（該臂照常生成並具名報錯）
+                logger.warning("[budget] envelope unavailable for %s/%s: %s", symbol, tf, exc)
+                return None
+            if raw is None or raw.empty:
+                return None
+            envelopes.append(self.estimate_generation_envelope(config, int(len(raw)), int(raw.shape[1])))
+        return max(envelopes) if envelopes else None
 
     def _load_reference_if_available(
         self,
@@ -4911,7 +5171,7 @@ class _StreamingL3Persister:
     __slots__ = (
         "factory", "layer", "label_prefix", "buffer_cols",
         "_buffers", "_buffer_col_count", "_flushed_chunks",
-        "total_cols", "total_groups",
+        "total_cols", "total_groups", "received_cols",
     )
 
     def __init__(
@@ -4930,10 +5190,12 @@ class _StreamingL3Persister:
         self._flushed_chunks: Dict[str, int] = {}
         self.total_cols = 0
         self.total_groups = 0
+        self.received_cols = 0  # ICFIRSTALIGN Task 4.0：callback 收到之欄數（與非空回傳表並存 ⇒ 雙寫錯誤）
 
     def __call__(self, step_label: str, chunk_frame: pd.DataFrame) -> None:
         if chunk_frame is None or chunk_frame.empty:
             return
+        self.received_cols += int(chunk_frame.shape[1])
         bufs = self._buffers.setdefault(step_label, [])
         bufs.append(chunk_frame)
         new_count = self._buffer_col_count.get(step_label, 0) + chunk_frame.shape[1]
@@ -4994,6 +5256,16 @@ class _StreamingL3Persister:
             self._flush(sl)
         import gc as _gc
         _gc.collect()
+
+
+def _worker_domain_entry(domain: "_memory_budget.DomainDescriptor", payload: Dict[str, Any]) -> dict:
+    """預算域內之多標的 worker 本體（ICFIRSTALIGN Task 4.2：顯式域描述為入口參數；於建立 factory 前加入域）。"""
+    token = (_memory_budget.enter_worker_domain(domain)
+             if domain is not None and not _memory_budget.in_domain_worker() else None)
+    try:
+        return _worker_entry(**payload)
+    finally:
+        _memory_budget.exit_worker_domain(token)
 
 
 def _worker_entry(

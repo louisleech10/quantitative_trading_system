@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 
 import api.services.feature_factory_service as feature_service_module
+from tests.api.batch_wave_helpers import use_thread_wave
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.services.feature_factory_batch_service import FeatureFactoryBatchService
 from momentum import factories as momentum_factories
@@ -258,14 +259,12 @@ async def test_batch_date_threading_via_run_in_executor(
         _batch_id: str = "",
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
     ) -> str:
         captured.append((start_date, end_date))
         return f"/tmp/{symbol}_{timeframe}.h5"
 
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
     monkeypatch.setattr(
         FeatureFactoryBatchService,
         "_compute_single",
@@ -303,10 +302,7 @@ async def test_batch_date_applied_row_count_primary_12h(
 
     monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch, serial=True)  # ICFIRSTALIGN Task 4.2：真實生成於行程內執行緒 ⇒ 走串行臂（同一本體）
 
     service = batch_service_factory(tmp_path)
     request = BatchGenerateRequest(
@@ -347,10 +343,7 @@ async def test_batch_date_applied_row_count_primary_1h(
 
     monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
     monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch, serial=True)  # ICFIRSTALIGN Task 4.2：真實生成於行程內執行緒 ⇒ 走串行臂（同一本體）
 
     service = batch_service_factory(tmp_path)
     request = BatchGenerateRequest(
@@ -403,10 +396,7 @@ async def test_batch_vs_single_row_count_and_hash_consistency(
     single_row_count = _manifest_row_count_from_result(single_result)
     single_hash = str(single_result.metadata["config_hash"])
 
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch, serial=True)  # ICFIRSTALIGN Task 4.2：真實生成於行程內執行緒 ⇒ 走串行臂（同一本體）
 
     service = batch_service_factory(tmp_path)
     request = BatchGenerateRequest(
@@ -450,14 +440,12 @@ async def test_batch_date_resume_preserves_dates(
         _batch_id: str = "",
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
     ) -> str:
         captured.append((start_date, end_date))
         return f"/tmp/{symbol}_{timeframe}.h5"
 
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
     monkeypatch.setattr(
         FeatureFactoryBatchService,
         "_compute_single",

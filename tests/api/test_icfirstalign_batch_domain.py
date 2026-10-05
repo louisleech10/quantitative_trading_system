@@ -55,6 +55,9 @@ def _spy(monkeypatch: pytest.MonkeyPatch, **overrides: Any) -> List[Any]:
         return sched
 
     monkeypatch.setattr(factories, "create_memory_budget_scheduler", spy)
+    # b3 實作期：任務峰值 E 依 kline 形狀估算（`factories.estimate_symbol_envelope`）；本檔不生成特徵、批次 cache 為
+    # 空暫存目錄（形狀不可得 ⇒ 依 SPEC 走串行臂），故注入固定 E 使准入判定可驗（串行臂案例另以無輔助上界驅動）
+    monkeypatch.setattr(factories, "estimate_symbol_envelope", lambda **kw: 64 << 20)
     return created
 
 

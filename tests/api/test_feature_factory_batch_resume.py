@@ -7,7 +7,7 @@ import json
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pytest
 from fastapi import HTTPException
@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 import api.services.feature_factory_batch_service as batch_service_module
 import api.services.feature_factory_service as feature_service_module
+from tests.api.batch_wave_helpers import use_thread_wave
 from api.models.feature_factory_models import BatchGenerateRequest
 from api.routes.feature_factory import get_batch_service
 from api.services.feature_factory_batch_service import (
@@ -68,6 +69,7 @@ def _compute_success(
     _batch_id: str = "",
     _start_date: Optional[str] = None,
     _end_date: Optional[str] = None,
+    **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
 ) -> str:
     return f"/tmp/{symbol}_{timeframe}.h5"
 
@@ -177,14 +179,12 @@ async def test_batch_resume_skips_completed_items(monkeypatch, tmp_path, batch_s
         _batch_id: str = "",
         _start_date: Optional[str] = None,
         _end_date: Optional[str] = None,
+        **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
     ) -> str:
         calls.append(symbol)
         return f"/tmp/{symbol}_{timeframe}.h5"
 
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
     monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(_compute_tracking))
 
     service = batch_service_factory(tmp_path)
@@ -217,10 +217,7 @@ async def test_batch_resume_skips_completed_items(monkeypatch, tmp_path, batch_s
 
 @pytest.mark.asyncio
 async def test_current_symbol_updates_on_submit_before_item_completes(monkeypatch, tmp_path, batch_service_factory):
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
     monkeypatch.setattr(
         "api.services.feature_factory_batch_service.get_tier_concurrent_symbols",
         lambda _tier_gb: 1,
@@ -239,6 +236,7 @@ async def test_current_symbol_updates_on_submit_before_item_completes(monkeypatc
         _batch_id: str = "",
         _start_date: Optional[str] = None,
         _end_date: Optional[str] = None,
+        **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
     ) -> str:
         if symbol == "ETHUSDT":
             second_started.set()
@@ -284,10 +282,7 @@ async def test_child_metrics_jsonl_records_each_symbol(
     batch_service_factory,
     mock_browse_registrar,
 ):
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
     monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(_compute_success))
 
     service = batch_service_factory(tmp_path)
@@ -327,10 +322,7 @@ async def test_child_metrics_jsonl_records_each_symbol(
 
 @pytest.mark.asyncio
 async def test_parent_records_failed_child_metrics_when_compute_raises(monkeypatch, tmp_path, batch_service_factory):
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
 
     def _compute_fail(
         symbol: str,
@@ -341,6 +333,7 @@ async def test_parent_records_failed_child_metrics_when_compute_raises(monkeypat
         _batch_id: str = "",
         _start_date: Optional[str] = None,
         _end_date: Optional[str] = None,
+        **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
     ) -> str:
         raise RuntimeError(f"{symbol} failed")
 
@@ -368,10 +361,7 @@ async def test_rss_soft_limit_downgrades_future_waves(
     batch_service_factory,
 ):
     monkeypatch.setenv("FFACT_PARALLEL_BUDGET", "1")
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
     monkeypatch.setattr(
         FeatureFactoryBatchService,
         "_compute_single",
@@ -431,10 +421,7 @@ async def test_ram_gate(monkeypatch, tmp_path, batch_service_factory):
 
 @pytest.mark.asyncio
 async def test_checkpoint_failure(monkeypatch, tmp_path, batch_service_factory):
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
     monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(_compute_success))
 
     service = batch_service_factory(tmp_path)

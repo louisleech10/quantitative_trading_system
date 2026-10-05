@@ -31,6 +31,7 @@ from momentum.FeatureEngineering.preprocessing._hurst_prior import (
     find_min_d_with_prior,
 )
 from momentum.FeatureEngineering.preprocessing._non_stationary_cache import NonStationaryCache
+from momentum.FeatureEngineering import memory_budget as _memory_budget_errors
 from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 from momentum.FeatureEngineering.preprocessing import time_order as _time_order
 from momentum.FeatureEngineering.preprocessing.calibration import (
@@ -102,7 +103,11 @@ class StationarityIncompleteError(StationarityProvenanceError):
 
 # FFSTAT：不可降級之例外（L6.5 降級路徑、群組失敗容忍、native-tf 回退一律原樣上拋）；
 # 校準錯誤見 docs/FFSTAT_SPEC.md §C「校準域錯誤不可降級」
-NON_DEGRADABLE_ERRORS = (StationarityProvenanceError, CalibrationError)
+NON_DEGRADABLE_ERRORS = (
+    StationarityProvenanceError, CalibrationError,
+    # ICFIRSTALIGN Task 4.2：記憶體預算之具名錯誤與量測不可得——不得降級（L6.5、IC-first 生成皆原樣上拋）
+    _memory_budget_errors.GenerationMemoryBudgetExceeded, _memory_budget_errors.MemoryMeasurementUnavailable,
+)
 
 
 try:
@@ -684,6 +689,15 @@ class FeaturePreprocessor:
             missing_columns.difference_update(available_columns)
             _time_order.assert_strictly_increasing_time_index(
                 group_df.index, where=f"FeaturePreprocessor.transform_selected[{group_id}]"
+            )
+            # ICFIRSTALIGN Task 4.2：各群組之選欄複本與轉換前之配置前預算判定（已累積之 processed 取全部選欄上界）
+            from momentum.FeatureEngineering import memory_budget as _memory_budget
+
+            _memory_budget.check_estimate(
+                "PostIC.transform_selected",
+                {"rows": int(len(group_df.index)), "selected_cols": len(available_columns),
+                 "group_cols": len(available_columns), "accumulated_cols": len(selected_columns)},
+                label=f"PostIC.transform_selected:{group_id}",
             )
             selected_frame = group_df.loc[:, available_columns].copy()
             transformed = post_ic_preprocessor.transform(selected_frame)
@@ -3144,13 +3158,14 @@ class FeaturePreprocessor:
             self._d_star_cache = None
 
         if use_memmap:
-            from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+            from momentum.FeatureEngineering import memmap_utils
+            from momentum.FeatureEngineering import memory_budget as _memory_budget
             import numpy as _np
 
             # 輸出欄數可多於輸入：append 模式之平穩化衍生欄（`_fracdiff`／`_diffK`）附加於各 chunk 之後
             # ⇒ 欄名逐 chunk 收集、容量不足時加倍重配（FFSTAT b4 實跑：固定寬度曾使 L6.5 整層靜默降級）
-            out_arr = create_temp_memmap(
-                (len(features_df.index), len(all_columns)), prefix="l65_"
+            out_arr = memmap_utils.create_temp_memmap(
+                (len(features_df.index), len(all_columns)), prefix="l65_", dir=_memory_budget.current_mapping_root()
             )
             out_columns: List[str] = []
             col_offset = 0
@@ -3167,8 +3182,9 @@ class FeaturePreprocessor:
                 if use_memmap:
                     n = processed_chunk.shape[1]
                     if col_offset + n > out_arr.shape[1]:
-                        grown = create_temp_memmap(
-                            (len(features_df.index), max(2 * out_arr.shape[1], col_offset + n)), prefix="l65_"
+                        grown = memmap_utils.create_temp_memmap(
+                            (len(features_df.index), max(2 * out_arr.shape[1], col_offset + n)), prefix="l65_",
+                            dir=_memory_budget.current_mapping_root(),
                         )
                         grown[:, :col_offset] = out_arr[:, :col_offset]
                         del out_arr
@@ -3198,7 +3214,8 @@ class FeaturePreprocessor:
                 return pd.DataFrame(index=features_df.index)
             if col_offset < out_arr.shape[1]:
                 # 容量加倍後之多餘欄：改寫入剛好大小之 memmap（C-order 切片非連續，交 pandas 會實體化）
-                exact = create_temp_memmap((len(features_df.index), col_offset), prefix="l65_")
+                exact = memmap_utils.create_temp_memmap((len(features_df.index), col_offset), prefix="l65_",
+                                                        dir=_memory_budget.current_mapping_root())
                 exact[:, :] = out_arr[:, :col_offset]
                 del out_arr
                 out_arr = exact

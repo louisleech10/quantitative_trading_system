@@ -456,6 +456,7 @@ from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGene
 from tests.feature_engineering.test_failopen_producer import (  # noqa: E402
     _CgsaStubFactory,
     _ThreadPoolAsProcessPool,
+    install_inprocess_mtf_pool,
 )
 
 _SIX_OK = {f"L{i}": ("ok", "") for i in range(1, 7)}
@@ -687,7 +688,7 @@ def test_layer_status_parallel_rollback_clears_entry(monkeypatch: pytest.MonkeyP
     from tests.feature_engineering import fftfmeta_golden_helpers as fg
 
     fg.prepare_env(monkeypatch, tmp_path, FFACT_USE_CGSA="1", FFACT_MULTI_TF_PARALLEL="1")
-    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _ThreadPoolAsProcessPool)
+    install_inprocess_mtf_pool(monkeypatch)
 
     def _fail_register(self, registry, groups_data, tf, *args, **kwargs):
         raise RuntimeError(f"injected registration failure for {tf}")

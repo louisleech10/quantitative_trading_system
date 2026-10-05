@@ -1060,7 +1060,9 @@ def test_probe_columns_without_finite_values_counted_late(monkeypatch: pytest.Mo
         close = klines["close"].to_numpy(dtype=np.float64)
         probed["start"], probed["end"], probed["period"] = klines.index[0], klines.index[-1], len(close) + 1
         late = talib.SMA(close, timeperiod=probed["period"])
-        return pd.DataFrame({"close_trend_REAL": close, "close_trend_LATE": late}, index=klines.index)
+        # ICFIRSTALIGN Task 4.1：校準域入口改為逐群組產出（群組 ID, 欄名, float32 陣列, L0 index）；同兩欄、同值
+        values = np.column_stack([close, late]).astype(np.float32)
+        return iter([("fake_group", ["close_trend_REAL", "close_trend_LATE"], values, klines.index)])
 
     monkeypatch.setattr(cal, "compute_calibration_domain", fake_domain)
     window = factory._resolve_public_window(h.SYMBOL, h.PRIMARY_TF, config, *h.WINDOW)

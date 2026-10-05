@@ -64,6 +64,9 @@ class ColumnGroupRegistryError(RuntimeError):
         super().__init__(message)
         self.failure_type = failure_type
 
+    def __reduce__(self) -> Any:  # 跨行程（spawn worker → 根）保留分類（ICFIRSTALIGN Task 4.2：IO_ERROR 不降級而上拋）
+        return (ColumnGroupRegistryError, (str(self), self.failure_type))
+
 
 class ColumnGroupRegistry:
     """In-memory registry tracking all column groups for a single symbol run."""

@@ -1,0 +1,34 @@
+{
+ "schema_version": 1,
+ "command": "... calibration_dtype_diff_probe.py diff handoffs/run_receipts/20261005-icfirstalign-calibration-dtype-diff.json",
+ "baseline": "HEAD 乙（tests/_golden/icfirstalign/*_baseline.json 之 yi）",
+ "probe": {
+  "P1": {
+   "late_names_equal_yi": true,
+   "first_finite_timeframes_differing": []
+  },
+  "P2": {
+   "late_names_equal_yi": true,
+   "first_finite_timeframes_differing": []
+  }
+ },
+ "packets": {
+  "S3_winsor_on/12h": {
+   "columns": 158,
+   "value_columns_differing": 0,
+   "max_abs_diff": 0.0,
+   "first_calibration_ts_differing": [],
+   "empty_columns_equal": true,
+   "column_set_digest_equal": true
+  },
+  "S3_winsor_off/12h": {
+   "columns": 158,
+   "value_columns_differing": 0,
+   "max_abs_diff": 0.0,
+   "first_calibration_ts_differing": [],
+   "empty_columns_equal": true,
+   "column_set_digest_equal": true
+  }
+ },
+ "elapsed_seconds": 48.8
+}

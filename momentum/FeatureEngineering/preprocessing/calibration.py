@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
-from typing import Dict, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Iterator, List, Mapping, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
@@ -235,7 +235,10 @@ def load_calibration_klines(factory: object, symbol: str, timeframe: str,
 
 
 def compute_calibration_domain(factory: object, symbol: str, timeframe: str, config: object,
-                               klines: pd.DataFrame) -> pd.DataFrame:
+                               klines: pd.DataFrame) -> Iterator[Tuple[str, List[str], np.ndarray, pd.Index]]:
     """以獨立 `FeatureFactory` 實例對前史切片計算進入 L6.5 之各層特徵（校準資料域之唯一計算入口；
-    不寫 registry／resume、不落盤、暫存目錄算完即刪）。測試以之注入計算錯誤。Task 2.1。"""
-    return factory._compute_calibration_domain(symbol, timeframe, config, klines)  # type: ignore[attr-defined]
+    不寫 run 之 registry／resume、暫存 registry 算完即刪）。測試以之注入計算錯誤。Task 2.1。
+
+    ICFIRSTALIGN Task 4.1：回傳逐群組之產出（群組 ID, 欄名, float32 陣列, 前史切片之 L0 index），
+    見 `FeatureFactory._iter_calibration_domain_groups`；呼叫端逐群組歸約、不建全欄合併。"""
+    return factory._iter_calibration_domain_groups(symbol, timeframe, config, klines)  # type: ignore[attr-defined]

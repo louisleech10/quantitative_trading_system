@@ -125,7 +125,18 @@
       "tests/api/test_b4_bulk_delete_orphan.py",
       "tests/api/test_batch_date.py",
       "tests/api/test_worker_logging.py",
-      "momentum/FeatureEngineering/memory_guard.py"
+      "momentum/FeatureEngineering/memory_guard.py",
+      "momentum/FeatureEngineering/timeframe/tf_aligner.py",
+      "tests/api/batch_wave_helpers.py",
+      "tests/feature_engineering/test_multi_symbol_ic_first.py",
+      "tests/_golden/ffstat/nan_propagation_classes.json",
+      "handoffs/run_receipts/icfirstalign_probes/runtime_envelope_probe.py",
+      "handoffs/run_receipts/icfirstalign_probes/calibration_dtype_diff_probe.py",
+      "tests/feature_engineering/test_failopen_producer.py",
+      "tests/test_multi_tf_generator.py",
+      "tests/test_cgsa_resume.py",
+      "tests/test_golden_output_generation.py",
+      "tests/test_multi_symbol_parallel.py"
     ],
     "callers_now": [
       "api/services/feature_factory_service.py",

@@ -85,8 +85,9 @@ def polars_enabled() -> bool:
     Default is ON ("1"). Phase 4 is completed and active as of V7 baseline.
     Use FFACT_USE_POLARS=0 to force fallback to pandas path.
     """
-    raw = os.getenv("FFACT_USE_POLARS", "1").strip().lower()
-    enabled = raw in {"1", "true", "yes", "on"}
+    from momentum.FeatureEngineering import memory_budget as _memory_budget  # ICFIRSTALIGN Task 4.2：選擇子唯一入口
+
+    enabled = _memory_budget.selector_flag("FFACT_USE_POLARS")
     if enabled and not _check_polars_available():
         return False
     return enabled

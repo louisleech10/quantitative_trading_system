@@ -11,6 +11,7 @@ import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from momentum.core.config import get_concurrent_symbols_override
+from momentum.FeatureEngineering import memory_budget as _memory_budget
 
 try:
     import psutil as _psutil
@@ -190,8 +191,8 @@ _CONCURRENT_SYMBOLS_BY_TIER_GB: Dict[int, int] = {
 
 def get_memory_tier() -> str:
     """Return the current memory tier using env override or psutil auto-detection."""
-    override = os.getenv("FFACT_MEMORY_TIER", "auto").strip().lower()
-    if override and override != "auto":
+    override = _memory_budget.selector("FFACT_MEMORY_TIER")  # ICFIRSTALIGN Task 4.2：臂選擇子唯一入口（非法值具名拒絕）
+    if override != "auto":
         return override
 
     if _psutil is None:
@@ -261,10 +262,9 @@ def get_l3_persist_mode() -> str:
 
     Returns one of: "streaming", "hybrid", "in_memory".
     """
-    raw = os.getenv("FFACT_L3_PERSIST_MODE", "auto").strip().lower()
-    if raw not in {"", "auto"}:
-        if raw in {"streaming", "hybrid", "in_memory"}:
-            return raw
+    raw = _memory_budget.selector("FFACT_L3_PERSIST_MODE")  # ICFIRSTALIGN Task 4.2：正規化（非法值具名拒絕）
+    if raw != "auto":
+        return raw
     return get_tier_config(get_memory_tier())["l3_persist_mode"]
 
 
@@ -297,13 +297,9 @@ def get_l65_split_threshold() -> int:
 
 def get_l2_category_workers() -> int:
     """Resolve L2 derived-category ThreadPool workers: env override > tier auto."""
-    raw = os.getenv("FFACT_L2_CATEGORY_WORKERS", "auto").strip().lower()
-    if raw not in {"", "auto"}:
-        try:
-            value = int(raw)
-            return max(1, value)
-        except ValueError:
-            pass
+    raw = _memory_budget.selector("FFACT_L2_CATEGORY_WORKERS")  # ICFIRSTALIGN Task 4.2：正規化（非整數具名拒絕）
+    if raw != "auto":
+        return max(1, int(raw))
     return get_tier_config(get_memory_tier())["l2_category_workers"]
 
 

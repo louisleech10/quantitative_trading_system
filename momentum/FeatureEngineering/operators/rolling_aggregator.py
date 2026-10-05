@@ -10,7 +10,8 @@ import pandas as pd
 from scipy.stats import rankdata
 
 from momentum.core.logging import get_logger
-from momentum.FeatureEngineering.memmap_utils import create_temp_memmap
+from momentum.FeatureEngineering import memmap_utils
+from momentum.FeatureEngineering import memory_budget as _memory_budget
 from momentum.FeatureEngineering.preprocessing import stable_mask as _stable_mask
 from momentum.FeatureEngineering.feature_naming import (
     RATIO_UNSAFE_CATEGORIES,
@@ -83,7 +84,13 @@ class RollingAggregator:
         self._windows = [int(window) for window in config_dict.get("windows", [5, 13, 21])]
         self._enabled_aggregators = config_dict.get("aggregators", list(self.AGGREGATORS.keys()))
         self._apply_to = config_dict.get("apply_to", "all")
-        self._column_chunk_size = self._resolve_chunk_size()
+        # ICFIRSTALIGN Task 4.2：設定可顯式指定 chunk（0 ⇒ 不分 chunk）；未給 ⇒ 環境／硬體 tier（同改前）
+        explicit_chunk = config_dict.get("column_chunk_size")
+        if explicit_chunk is None:
+            self._column_chunk_size = self._resolve_chunk_size()
+        else:
+            self._column_chunk_size = int(explicit_chunk) if int(explicit_chunk) > 0 else None
+        self.last_branch: Optional[str] = None
         # Layer 4 pipeline gate: skip skew/kurt for columns with at most this many
         # distinct non-NaN values (default 2 = binary/near-binary). 0/negative
         # disables the gate (no-op). Computed once per compute_all into
@@ -126,7 +133,7 @@ class RollingAggregator:
             frozenset() if self._keep_all_columns else self._compute_low_cardinality_cols(features_df, columns)
         )
 
-        streaming = os.getenv("FFACT_L3_STREAMING", "1").strip() == "1"
+        streaming = _memory_budget.selector_flag("FFACT_L3_STREAMING")
 
         if streaming:
             return self._compute_all_streaming(features_df, columns, persist_callback)
@@ -137,11 +144,30 @@ class RollingAggregator:
                 "[L3] persist_callback ignored: requires FFACT_L3_STREAMING=1 path",
             )
 
+        valid_aggs = [agg for agg in self._enabled_aggregators if agg in self.AGGREGATORS]
         if self._column_chunk_size and len(columns) > self._column_chunk_size:
+            self._budget_check("L3.vectorized_chunked", features_df, columns, valid_aggs, self._column_chunk_size)
             return self._apply_vectorized_aggregators_chunked(features_df, columns)
 
+        self._budget_check("L3.vectorized_unchunked", features_df, columns, valid_aggs, len(columns))
         data = features_df[columns]
         return self._apply_vectorized_aggregators_with_cache(data)
+
+    def _budget_check(self, branch_id: str, features_df: pd.DataFrame, columns: List[str], valid_aggs: List[str],
+                      chunk_cols: int, *, callback: bool = False) -> None:
+        """ICFIRSTALIGN Task 4.2：實際選定執行臂之分派點、首個配置之前宣告分支並預算判定（形狀依實際輸入）。"""
+        n_aggs = max(len(valid_aggs), 1)
+        n_windows = max(len(self._windows), 1)
+        max_out = len(columns) * n_aggs * n_windows
+        params = {"rows": int(features_df.shape[0]), "input_cols": len(columns), "output_cols": max_out,
+                  "max_out_cols": max_out, "windows": n_windows, "steps": n_aggs * n_windows,
+                  "chunk_cols": int(max(min(chunk_cols, len(columns)), 1))}
+        if callback:
+            from momentum.FeatureEngineering.utils.hardware_utils import get_l3_streaming_buffer_cols
+
+            params["buffer_cols"] = min(int(get_l3_streaming_buffer_cols()), len(columns))
+        self.last_branch = branch_id
+        _memory_budget.check_estimate(branch_id, params)
 
     def _compute_all_streaming(
         self,
@@ -173,10 +199,26 @@ class RollingAggregator:
         if not valid_aggs:
             return pd.DataFrame(index=features_df.index)
 
-        use_numba = os.getenv("FFACT_USE_NUMBA_ROLLING", "1").strip() == "1"
-        if use_numba:
+        if _memory_budget.selector_flag("FFACT_USE_NUMBA_ROLLING"):
+            multi = _memory_budget.selector_flag("FFACT_L3_MULTI_WINDOW")
+            if multi:
+                branch = "L3.numba_multi_callback" if persist_callback is not None else "L3.numba_multi_nocallback"
+                chunk = min(self._column_chunk_size or 256, 64)
+            else:
+                branch, chunk = "L3.numba_single", self._column_chunk_size or 256
+            self._budget_check(branch, features_df, columns, valid_aggs, chunk, callback=persist_callback is not None)
             try:
-                return self._compute_all_streaming_numba(features_df, columns, valid_aggs, persist_callback)
+                if multi:
+                    return self._compute_all_streaming_numba_multi_window(
+                        features_df, columns, valid_aggs, persist_callback,
+                    )
+                if persist_callback is not None:
+                    logger.warning(
+                        "[L3] single-window numba path does not support persist_callback; using in-memory result",
+                    )
+                return self._compute_all_streaming_numba_single_window(features_df, columns, valid_aggs)
+            except (_memory_budget.GenerationMemoryBudgetExceeded, _memory_budget.MemoryMeasurementUnavailable):
+                raise
             except Exception as exc:
                 logger.error(
                     "[L3 streaming] Numba rolling path failed, fallback to pandas path: %s",
@@ -184,6 +226,18 @@ class RollingAggregator:
                     exc_info=True,
                 )
 
+        # 後備切換重判（Task 4.2）：pandas 臂之配置前以後備分支 ID 再判一次
+        self._budget_check("L3.pandas_fallback", features_df, columns, valid_aggs, self._column_chunk_size or 256)
+        return self._compute_all_streaming_pandas(features_df, columns, valid_aggs)
+
+    def _compute_all_streaming_pandas(
+        self,
+        features_df: pd.DataFrame,
+        columns: List[str],
+        valid_aggs: List[str],
+    ) -> pd.DataFrame:
+        """pandas 後備臂（numba 關或 numba 例外後落入；不呼叫 persist_callback，回傳完整表——ICFIRSTALIGN Task 4.0
+        由呼叫端落盤）。"""
         chunk_size = self._column_chunk_size or 256
         n_rows = features_df.shape[0]
         total_generated = 0
@@ -197,7 +251,8 @@ class RollingAggregator:
         # np.memmap allocates file-backed pages → OS loads only accessed pages,
         # evicts cleanly (no swap write for clean pages).
         # C-order matches pandas source arrays → fast row-by-row memcpy on write.
-        out_arr = create_temp_memmap((n_rows, max_out_cols), prefix="l3_stream_")
+        out_arr = memmap_utils.create_temp_memmap((n_rows, max_out_cols), prefix="l3_stream_",
+                                                  dir=_memory_budget.current_mapping_root())
         out_col_names: List[str] = []
         col_offset = 0
 
@@ -320,22 +375,6 @@ class RollingAggregator:
             copy=False,
         )
 
-    def _compute_all_streaming_numba(
-        self,
-        features_df: pd.DataFrame,
-        columns: List[str],
-        valid_aggs: List[str],
-        persist_callback: Optional["PersistCallback"] = None,
-    ) -> pd.DataFrame:
-        use_multi_window = os.getenv("FFACT_L3_MULTI_WINDOW", "1").strip() != "0"
-        if use_multi_window:
-            return self._compute_all_streaming_numba_multi_window(features_df, columns, valid_aggs, persist_callback)
-        if persist_callback is not None:
-            logger.warning(
-                "[L3] single-window numba path does not support persist_callback; using in-memory result",
-            )
-        return self._compute_all_streaming_numba_single_window(features_df, columns, valid_aggs)
-
     def _compute_all_streaming_numba_single_window(
         self,
         features_df: pd.DataFrame,
@@ -353,7 +392,8 @@ class RollingAggregator:
         total_dropped = 0
 
         max_out_cols = len(columns) * len(valid_aggs) * len(self._windows)
-        out_arr = create_temp_memmap((n_rows, max_out_cols), prefix="l3_stream_numba_")
+        out_arr = memmap_utils.create_temp_memmap((n_rows, max_out_cols), prefix="l3_stream_numba_",
+                                                  dir=_memory_budget.current_mapping_root())
         out_col_names: List[str] = []
         col_offset = 0
 

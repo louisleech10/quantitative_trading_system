@@ -318,7 +318,18 @@ class ICEngine:
         skipped_groups: List[str] = []
         group_count = 0
 
+        groups_meta = raw_artifact.get("groups", {}) or {}
+        from momentum.factories import get_memory_budget  # R2：跨域經 factory 取 IMemoryBudget（呼叫時解析）
+
+        budget = get_memory_budget()
         for group_name, parquet_path in self._iter_l7_raw_group_paths(base_dir, raw_artifact):
+            # ICFIRSTALIGN Task 4.2：群組讀回前之配置前預算判定（讀檔＋轉型；受保護 run 外為單行程模式）
+            budget.check_estimate(
+                "IC.group_read",
+                {"rows": int(len(row_index)),
+                 "group_cols": len((groups_meta.get(group_name) or {}).get("columns") or [])},
+                label=f"IC.group_read:{group_name}",
+            )
             try:
                 group_df = pd.read_parquet(parquet_path)
             except Exception as exc:

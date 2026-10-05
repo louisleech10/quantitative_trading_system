@@ -21,6 +21,10 @@ class _DummyDerivedOperatorEngine:
     def compute_all(self, layer1, _data, _indicator_specs):
         return pd.DataFrame({"derived": layer1.iloc[:, 0].astype(float)}, index=layer1.index)
 
+    def output_column_counts(self, layer1_columns, _raw_columns, _indicator_specs):
+        # ICFIRSTALIGN Task 4.2：L2 分派點 check 依引擎之逐類別欄數（同 compute_all 之輸出）
+        return {"dummy": 1 if len(layer1_columns) else 0}
+
 
 class _DummyProcess:
     def memory_info(self):

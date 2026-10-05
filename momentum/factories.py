@@ -25,6 +25,7 @@ from momentum.Indicators.types import DataSourceEnum
 
 
 if TYPE_CHECKING:
+    from momentum.core.protocols import IMemoryBudget, IMemoryBudgetScheduler
     from momentum.Analysis.adversarial_validator import AdversarialValidator
     from momentum.Analysis.strategy_validation.reporter import StrategyValidationReporter
     from momentum.Analysis.analysis_exporter import AnalysisExporter
@@ -312,6 +313,61 @@ def create_feature_reader(
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
     return FeatureReader(feature_base_path or "data_cache/features")
+
+
+def get_memory_budget() -> "IMemoryBudget":
+    """生成記憶體預算之唯一實作（ICFIRSTALIGN Task 4.2）。跨域呼叫端（Analysis、api）經此取得、經 Protocol 使用，
+    不直接 import FeatureEngineering（R2／R3）；回傳模組本身，故測試對其屬性之攔截於呼叫時生效。"""
+    from momentum.FeatureEngineering import memory_budget
+
+    return memory_budget  # type: ignore[return-value]
+
+
+def create_memory_budget_scheduler(
+    *,
+    domain_dir: Path,
+    max_workers: int,
+    executor_factory: Optional[Any] = None,
+    aux_startup_envelope: Any = "default",
+    task_identity: Optional[Any] = None,
+    read_system: Optional[Any] = None,
+    read_task_footprint: Optional[Any] = None,
+    guard: Optional[Any] = None,
+    budget: Optional[int] = None,
+) -> "IMemoryBudgetScheduler":
+    """子行程預算域之有限波次排程器（ICFIRSTALIGN Task 4.2 v25–v27；三個生成 pool 共用之唯一實作）。
+
+    關鍵字參數建立；未給者取正式預設（spawn 之 ProcessPoolExecutor、VM 快照與域成員實測讀數、resource tracker
+    啟動上界收據值）。呼叫端於呼叫時解析本函式（函式內 import 或模組屬性），不得模組層綁名。"""
+    from momentum.FeatureEngineering import memory_budget
+
+    return memory_budget.create_scheduler(
+        domain_dir=Path(domain_dir), max_workers=max_workers, executor_factory=executor_factory,
+        aux_startup_envelope=aux_startup_envelope, task_identity=task_identity, read_system=read_system,
+        read_task_footprint=read_task_footprint, guard=guard, budget=budget,
+    )
+
+
+def open_memory_budget_domain(*, run_id: str, domain_dir: Optional[Path] = None) -> Any:
+    """開啟一個預算域根（ICFIRSTALIGN Task 4.2：多標的／API 批次 wave 之父行程；恰一守護）。回傳具
+    `domain_dir`、`guard_handle`、`close()` 之域物件；呼叫端於全部波次 join 後、結束前 `close()`。"""
+    from momentum.FeatureEngineering import memory_budget
+
+    return memory_budget.BudgetDomain(domain_dir=domain_dir, run_id=run_id).start()
+
+
+def estimate_symbol_envelope(
+    *,
+    symbol: str,
+    timeframe: str,
+    config_override: Optional[Dict[str, Any]] = None,
+    cache_dir: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> Optional[int]:
+    """一標的一次正式生成之任務峰值 E（ICFIRSTALIGN Task 4.2 v25）；形狀不可得 ⇒ None（呼叫端改走串行臂）。"""
+    factory = create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
+    config = factory._resolve_config(dict(config_override or {}))  # 同 generate_features：訓練週期取自設定
+    return factory._estimate_symbol_envelope(symbol, config, end_date=end_date)
 
 
 def create_feature_library() -> "FeatureLibrary":

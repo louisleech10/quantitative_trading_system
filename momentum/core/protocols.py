@@ -287,3 +287,35 @@ class IFeatureReader(Protocol):
         columns: List[str],
     ) -> Any:
         ...
+
+
+@runtime_checkable
+class IMemoryBudget(Protocol):
+    """生成記憶體預算（ICFIRSTALIGN Task 4.2）：分派點之配置前判定與層界線（實作＝`momentum.factories.get_memory_budget`）。"""
+
+    def check_estimate(self, branch_id: str, params: Dict[str, Any], **kwargs: Any) -> List[Any]:
+        """以分支表估算並判定；不通過 ⇒ `GenerationMemoryBudgetExceeded`（配置之前）。"""
+        ...
+
+    def configured_budget_bytes(self) -> int:
+        """目前生效之上限（實體記憶體 × 比例或設定絕對值）。"""
+        ...
+
+
+@runtime_checkable
+class IMemoryBudgetScheduler(Protocol):
+    """子行程預算域之有限波次排程器（ICFIRSTALIGN Task 4.2 v25–v27；`momentum.factories.create_memory_budget_scheduler`）。"""
+
+    def run(
+        self,
+        tasks: Any,
+        worker_fn: Callable[[Any, Any], Any],
+        serial_fn: Callable[[Any], Any],
+        on_wave_joined: Callable[[List[Any]], None],
+    ) -> List[Any]:
+        """依序准入有限波次；不足只排隊；無可准入走根行程內之串行臂；每波 join 後呼叫 `on_wave_joined`。"""
+        ...
+
+    def snapshot(self) -> Any:
+        """目前之准入狀態（成員、啟動槽、可吸收量、壓力、停止旗標）。"""
+        ...

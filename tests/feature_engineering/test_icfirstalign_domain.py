@@ -630,17 +630,15 @@ def test_mutation_only_del_local_layer(tmp_path: Path, monkeypatch: pytest.Monke
         if label == "Layer 4":
             alive["L3"] = any(lab == "Layer 3" and r() is not None for lab, r in refs)
 
-    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    # b3 實作期：S2m 之 4h L3 為串流 offloaded（不經 `_persist_layer_output_groups`），原以「持有落盤之 frame」模擬
+    # r3.data 殘留對 L3 無作用；改以實作之最後持有者清除接縫 `_release_layer_result` 還原為恆等（即 HEAD 之
+    # 「只 del layerN、LayerResult.data 與 factory.layer_results 仍持有」）
+    from momentum.FeatureEngineering.timeframe import multi_tf_generator as mtf
 
-    real = FeatureFactory._persist_layer_output_groups
-
-    def persist_and_hold(self: Any, frame: Any, *a: Any, **k: Any) -> Any:
-        keep.append(frame)  # 模擬 r3.data 之殘留持有者
-        return real(self, frame, *a, **k)
-
-    monkeypatch.setattr(FeatureFactory, "_persist_layer_output_groups", persist_and_hold)
+    monkeypatch.setattr(mtf, "_release_layer_result", lambda factory, name, result: result)
     _run_worker_inprocess(tmp_path, monkeypatch, on_start)
     assert alive.get("L3") is True
+    assert keep == []
 
 
 # ---------------------------------------------------------------- 真實入口接線（(g)(j)(q)(s)；精簡真實 kline，單組串行）
@@ -768,6 +766,9 @@ def test_run_multi_symbol_entry_joins_domain(tmp_path: Path, monkeypatch: pytest
     """(j) `run_multi_symbol` 兩標的（BTCUSDT、ETHUSDT；精簡 S2m）：父守護 1 次、worker 0 次；worker 之 check 帶根 pid；
     worker 內多週期串行（worker pid 之 executor_created 0 次）。"""
     root = h.isolated(monkeypatch, tmp_path)
+    # b3 實作期：prepare_env 於非多週期並行時把 FFACT_CGSA_WORK_DIR 釘為單一目錄 ⇒ 兩標的並行 worker 共用同一
+    # CGSA 工作目錄而互刪群組檔（先完成者之 cleanup）；多標的案例改回各 run 依標的分目錄（cwd 已在 tmp）
+    monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
     log = tmp_path / "check_log.jsonl"
     monkeypatch.setenv("ICFA_CHECK_LOG", str(log))
     factory = h.make_factory(root)
@@ -836,6 +837,9 @@ def _multi_symbol_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **spy_ove
     from momentum.FeatureEngineering.feature_reader import FeatureReader
 
     root = h.isolated(monkeypatch, tmp_path)
+    # b3 實作期：prepare_env 於非多週期並行時把 FFACT_CGSA_WORK_DIR 釘為單一目錄 ⇒ 兩標的並行 worker 共用同一
+    # CGSA 工作目錄而互刪群組檔（先完成者之 cleanup）；多標的案例改回各 run 依標的分目錄（cwd 已在 tmp）
+    monkeypatch.delenv("FFACT_CGSA_WORK_DIR", raising=False)
     log = tmp_path / "check_log.jsonl"
     monkeypatch.setenv("ICFA_CHECK_LOG", str(log))
     pools = _pool_constructions(monkeypatch)

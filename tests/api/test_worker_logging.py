@@ -14,6 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from tests.api.batch_wave_helpers import use_thread_wave
 from api.core.config import settings
 from api.core.logging import init_worker_logging
 from api.models.feature_factory_models import BatchGenerateRequest
@@ -189,6 +190,7 @@ def _compute_capture_env(
     _batch_id: str = "",
     _start_date: Optional[str] = None,
     _end_date: Optional[str] = None,
+    **_kw: Any,  # ICFIRSTALIGN Task 4.2：worker 本體以關鍵字 domain 接收域描述
 ) -> str:
     return json.dumps(
         {
@@ -204,10 +206,7 @@ async def _run_single_wave(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> Dict[str, Any]:
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ThreadPoolExecutor,
-    )
+    use_thread_wave(monkeypatch)  # ICFIRSTALIGN Task 4.2：wave 經排程器（改前替換 ProcessPoolExecutor）
     monkeypatch.setattr(
         FeatureFactoryBatchService,
         "_compute_single",
@@ -303,10 +302,7 @@ async def test_worker_log_env_restores_on_processpool_init_failure(
         def __exit__(self, exc_type, exc, tb) -> bool:
             return False
 
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ExplodingExecutor,
-    )
+    use_thread_wave(monkeypatch, executor_factory=ExplodingExecutor)  # ICFIRSTALIGN Task 4.2：經排程器之 executor
 
     task = {
         "task_id": "pool-fail-env",

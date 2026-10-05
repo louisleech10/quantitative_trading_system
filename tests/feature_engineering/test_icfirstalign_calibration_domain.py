@@ -112,24 +112,54 @@ def test_calibration_packets_bytes_equal_head_jia(tmp_path: Path, monkeypatch: p
 # ---------------------------------------------------------------- 結構
 
 def test_calibration_domain_never_merges_full_table(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """spy：`_combine_layers(context="calibration_domain")` 0 次、`concat_with_memmap` 於校準域 0 次。
+
+    b3 實作期：校準域以正式單週期生成之同一組層函式產出，L3／L4 之層輸入合併（`layer3_input`／`layer4_input`，
+    正式生成同用、只含 raw＋L1）經 `_combine_layers` 內之 `concat_with_memmap`——非全欄合併；故「於校準域」之計數
+    限校準域期間（`_iter_calibration_domain_groups` 消費區間）**不經 `_combine_layers`** 之直接呼叫，且校準域期間之
+    `_combine_layers` 情境只得為層輸入合併（全欄合併之情境或直接呼叫任一出現即紅）。"""
     from momentum.FeatureEngineering import memmap_utils
 
-    contexts: List[str] = []
+    st: Dict[str, Any] = {"active": 0, "combine_depth": 0, "contexts": [], "domain_contexts": [], "direct": 0,
+                          "domain_calls": 0}
     real_combine = ff.FeatureFactory._combine_layers
-    monkeypatch.setattr(ff.FeatureFactory, "_combine_layers",
-                        staticmethod(lambda layers, context="unknown": (contexts.append(context), real_combine(layers, context=context))[1]))
-    concat_calls = {"n": 0}
+
+    def combine(layers: Any, context: str = "unknown") -> Any:
+        st["contexts"].append(context)
+        if st["active"]:
+            st["domain_contexts"].append(context)
+        st["combine_depth"] += 1
+        try:
+            return real_combine(layers, context=context)
+        finally:
+            st["combine_depth"] -= 1
+
+    monkeypatch.setattr(ff.FeatureFactory, "_combine_layers", staticmethod(combine))
     real_concat = memmap_utils.concat_with_memmap
 
     def concat(*a: Any, **k: Any) -> Any:
-        concat_calls["n"] += 1
+        if st["active"] and st["combine_depth"] == 0:
+            st["direct"] += 1
         return real_concat(*a, **k)
 
     monkeypatch.setattr(memmap_utils, "concat_with_memmap", concat)
     monkeypatch.setattr(ff, "concat_with_memmap", concat, raising=False)
+    real_iter = ff.FeatureFactory._iter_calibration_domain_groups
+
+    def iter_groups(self: Any, *a: Any, **k: Any) -> Any:
+        st["active"] += 1
+        st["domain_calls"] += 1
+        try:
+            yield from real_iter(self, *a, **k)
+        finally:
+            st["active"] -= 1
+
+    monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", iter_groups)
     _generate(tmp_path, monkeypatch, frz.p1_payload(), frz.P1_WINDOW)
-    assert "calibration_domain" not in contexts
-    assert concat_calls["n"] == 0
+    assert st["domain_calls"] > 0
+    assert "calibration_domain" not in st["contexts"]
+    assert st["direct"] == 0
+    assert set(st["domain_contexts"]) <= {"layer3_input", "layer4_input"}
 
 
 def _spy_calibration(monkeypatch: pytest.MonkeyPatch) -> Dict[str, Any]:
@@ -420,5 +450,18 @@ def test_mutation_missing_group_changes_column_set_digest(tmp_path: Path, monkey
         yield from items
 
     monkeypatch.setattr(ff.FeatureFactory, "_iter_calibration_domain_groups", drop_first)
-    got = _packets(tmp_path, monkeypatch, True)
-    assert got["12h"]["column_set_digest"] != CALIB["jia"]["S3_winsor_on"]["12h"]["column_set_digest"]
+    # b3 實作期：漏群組之封包於 L6.5 取子封包時被既有 fail-closed（公開域之欄在校準域缺欄）擋下 ⇒ 生成具名失敗；
+    # 封包本身（前置關卡已交出）之 column_set_digest 亦與 HEAD 甲不等——兩者皆斷言
+    captured: Dict[str, Any] = {}
+    real = ff.FeatureFactory.run_calibration_preflight
+
+    def preflight(self: Any, *a: Any, **k: Any) -> Any:
+        out = real(self, *a, **k)
+        captured.update(out.get("packets", {}))
+        return out
+
+    monkeypatch.setattr(ff.FeatureFactory, "run_calibration_preflight", preflight)
+    with pytest.raises(cal.CalibrationError, match="缺欄"):
+        _generate(tmp_path, monkeypatch, frz.s3_payload(True), h.S2_WINDOW)
+    got = frz._packet_record(captured["12h"])
+    assert got["column_set_digest"] != CALIB["jia"]["S3_winsor_on"]["12h"]["column_set_digest"]

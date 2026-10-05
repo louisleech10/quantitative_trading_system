@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 
 import pytest
 
+from tests.api.batch_wave_helpers import use_thread_wave
 from api.models.feature_factory_models import BatchGenerateRequest, BatchTaskStatusResponse
 from api.services.feature_factory_batch_service import FeatureFactoryBatchService
 from api.websocket.feature_factory_ws import map_batch_progress_ws_data
@@ -250,10 +251,7 @@ async def test_layer_metrics_tick_cancelled_on_wave_exception(
         def __exit__(self, exc_type, exc, tb) -> bool:
             return False
 
-    monkeypatch.setattr(
-        "api.services.feature_factory_batch_service.ProcessPoolExecutor",
-        ExplodingExecutor,
-    )
+    use_thread_wave(monkeypatch, executor_factory=ExplodingExecutor)  # ICFIRSTALIGN Task 4.2：經排程器之 executor
 
     task = {
         "task_id": "batch-tick-cancel",

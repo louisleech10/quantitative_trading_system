@@ -1,0 +1,49 @@
+{
+ "schema_version": 1,
+ "command": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/icfirstalign_probes/runtime_envelope_probe.py handoffs/run_receipts/20261005-icfirstalign-runtime-envelope.json",
+ "platform": "darwin",
+ "physical_bytes": 8589934592,
+ "measurements": {
+  "empty_worker": {
+   "pid": 81121,
+   "lifetime_peak": 168297528
+  },
+  "tf_worker_S2m_4h": {
+   "pid": 81123,
+   "lifetime_peak": 225150032,
+   "error": null
+  },
+  "symbol_worker_S2": {
+   "pid": 81128,
+   "lifetime_peak": 222676120,
+   "config_hash": "1f70edefad07b4f0f9d7506681c7cf77"
+  },
+  "resource_tracker": {
+   "pid": 81094,
+   "lifetime_peak": 8585576
+  }
+ },
+ "runtime_peak_bytes": 225150032,
+ "worker_runtime_envelope_bytes": 338690048,
+ "aux_tracker_startup_envelope_bytes": 13631488,
+ "code_constants_at_run": {
+  "WORKER_RUNTIME_ENVELOPE_BYTES": 671088640,
+  "AUX_TRACKER_STARTUP_ENVELOPE_BYTES": 25165824
+ },
+ "envelope_check": {
+  "tf_worker": {
+   "data_estimate_bytes": 10353784,
+   "estimate_with_new_const": 349043832,
+   "measured_peak": 225150032,
+   "covers": true
+  },
+  "symbol_worker": {
+   "data_estimate_bytes": 3554816,
+   "estimate_with_new_const": 342244864,
+   "measured_peak": 222676120,
+   "covers": true
+  }
+ },
+ "honest_bounds": "精簡 L1（EMA8／SMA13）；runtime 常數以三種 spawn worker 之生涯峰值最大者 × 1.5；完整 L1 之資料項由分支表估算，其不低估另由 Task 4.2 (ii) 逐分支收據與 Task 4.3 序列核對",
+ "elapsed_seconds": 12.7
+}
