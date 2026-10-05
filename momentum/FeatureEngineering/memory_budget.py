@@ -1512,13 +1512,12 @@ class MemoryBudgetScheduler:
 
         def handler(signum: int, frame: Any) -> None:
             if self._has_unjoined():
-                self._interrupt_pending = True
-                self.request_stop()
+                self._interrupt_pending = True  # 只發布旗標：處理器內不取任何鎖（v34，審碼 b3 r5 codex P1-01）
                 return
             previous(signum, frame)
 
-        signal.signal(signal.SIGINT, handler)
         try:
+            signal.signal(signal.SIGINT, handler)  # 安裝於 try 內：安裝後即中斷亦還原（v34，審碼 b3 r5 codex P2-02）
             yield
         finally:
             signal.signal(signal.SIGINT, previous)
@@ -1576,7 +1575,7 @@ class MemoryBudgetScheduler:
         while queue:
             wave: List[_TaskState] = []
             while queue and len(wave) < self.max_workers:
-                if self._stop_requested.is_set():  # 呼叫端取消：不再准入／串行執行新任務（已啟動者照常確認退出）
+                if self._stop_requested.is_set() or self._interrupt_pending:  # 取消或延後之中斷：不再准入／串行執行新任務（已啟動者照常確認退出）
                     for pending_state in queue:
                         results[pending_state.index] = SchedulerStopped(pending_state.task.task_id)
                     queue.clear()

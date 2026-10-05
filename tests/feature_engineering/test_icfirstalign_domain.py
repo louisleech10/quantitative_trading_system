@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import ast
 import os
+import subprocess
+import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -1145,6 +1147,102 @@ def test_sigint_during_wave_stops_admission_and_waits(tmp_path: Path, default_si
     out = _sigint_run(tmp_path, "wave")
     assert isinstance(out["raised"], KeyboardInterrupt)
     assert out["worker_alive"] is False and out["A_status"] == "joined" and out["B_status"] == "queued"
+
+
+_REENTRANT_SIGINT_PROBE = """
+import os, signal, sys, threading, time
+from concurrent.futures import ThreadPoolExecutor
+from momentum.FeatureEngineering import memory_budget as mb
+
+signal.signal(signal.SIGINT, signal.default_int_handler)
+started, release = threading.Event(), threading.Event()
+sent = []
+
+def worker(desc, payload):
+    started.set()
+    release.wait(5)
+    return payload
+
+def kick():
+    started.wait(2)
+    time.sleep(0.1)
+    sent.append("first")
+    os.kill(os.getpid(), signal.SIGINT)
+    time.sleep(0.25)
+    release.set()
+
+main = threading.main_thread()
+
+def tracer(frame, event, arg):
+    # 主執行緒任一 Condition.notify_all 入口（原實作之處理器內 Event.set 持鎖點）再送第二次 SIGINT
+    if event == "call" and frame.f_code is threading.Condition.notify_all.__code__ and sent == ["first"] \\
+            and threading.current_thread() is main:
+        sent.append("second")
+        os.kill(os.getpid(), signal.SIGINT)
+    return None
+
+sched = mb.MemoryBudgetScheduler(1000, domain_dir=sys.argv[1], max_workers=1, executor_factory=ThreadPoolExecutor,
+                                 read_system=lambda: (1000, 1, False, 10, ()), read_task_footprint=lambda tid: 10,
+                                 aux_startup_envelope=1, task_identity=lambda: (10 ** 9 + threading.get_ident() % 10 ** 6, 0.0))
+threading.Thread(target=kick).start()
+sys.settrace(tracer)
+threading.settrace(lambda *a: None)
+try:
+    sched.run([mb.Task("A", 100, 1), mb.Task("B", 100, 2)], worker, lambda p: p, lambda w: None)
+    outcome = "returned"
+except KeyboardInterrupt:
+    outcome = "KeyboardInterrupt"
+finally:
+    sys.settrace(None)
+print("RESULT", outcome, sched._tasks["A"].status, sched._tasks["B"].status,
+      signal.getsignal(signal.SIGINT) is signal.default_int_handler)
+"""
+
+
+def test_double_sigint_during_wave_no_deadlock(tmp_path: Path) -> None:
+    """v34（審碼 b3 r5 codex P1-01）：波次中兩次 SIGINT（第二次固定於主執行緒 `Condition.notify_all` 入口——原實作之
+    處理器內 `Event.set` 持鎖點）⇒ 不死結：A 確認退出並 joined、B 不執行、上拋 KeyboardInterrupt、處理器還原。
+    於新子行程執行（死結時以逾時判紅，不掛住測試行程）。"""
+    proc = subprocess.run([sys.executable, "-c", _REENTRANT_SIGINT_PROBE, str(tmp_path)], cwd=str(h.REPO),
+                          env={**os.environ, "PYTHONPATH": str(h.REPO)}, capture_output=True, text=True, timeout=60)
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    assert "RESULT KeyboardInterrupt joined queued True" in proc.stdout, proc.stdout[-2000:]
+
+
+def test_sigint_right_after_handler_install_restores_handler(tmp_path: Path, default_sigint: Any) -> None:
+    """v34（審碼 b3 r5 codex P2-02）：處理器安裝後之第一個執行行即收到 SIGINT（無未確認退出者 ⇒ 原處理器拋
+    KeyboardInterrupt）⇒ 排程器結束後 SIGINT 處理器仍還原為原處理器。改前：安裝在 try 外 ⇒ 遺留排程器之處理器。"""
+    import linecache
+    import signal
+
+    code = mb.MemoryBudgetScheduler._interrupt_deferral.__wrapped__.__code__
+    state = {"after_install": False, "sent": False}
+
+    def tracer(frame: Any, event: str, arg: Any) -> Any:
+        if frame.f_code is not code:
+            return tracer if event == "call" and frame.f_code is code else None
+        if event == "line" and not state["sent"]:
+            if state["after_install"]:
+                state["sent"] = True
+                os.kill(os.getpid(), signal.SIGINT)
+            elif "signal.signal(signal.SIGINT, handler)" in linecache.getline(code.co_filename, frame.f_lineno):
+                state["after_install"] = True
+        return tracer
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (1000, 1, False, 10, ()),
+                                     read_task_footprint=lambda tid: 10, aux_startup_envelope=None,
+                                     task_identity=_thread_identity)
+    raised: Optional[BaseException] = None
+    sys.settrace(tracer)
+    try:
+        sched.run([mb.Task("A", 100, 1)], lambda d, p: p, lambda p: p, lambda w: None)
+    except BaseException as exc:  # noqa: BLE001
+        raised = exc
+    finally:
+        sys.settrace(None)
+    assert state["sent"] and isinstance(raised, KeyboardInterrupt)
+    assert signal.getsignal(signal.SIGINT) is signal.default_int_handler
 
 
 def test_sigint_without_outstanding_worker_raises_promptly(tmp_path: Path, default_sigint: Any) -> None:
