@@ -319,3 +319,7 @@ class IMemoryBudgetScheduler(Protocol):
     def snapshot(self) -> Any:
         """目前之准入狀態（成員、啟動槽、可吸收量、壓力、停止旗標）。"""
         ...
+
+    def request_stop(self) -> None:
+        """呼叫端取消：未准入之任務不再執行；已啟動者確認退出後 `run` 才返回（SPEC v30）。"""
+        ...

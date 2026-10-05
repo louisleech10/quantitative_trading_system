@@ -948,9 +948,10 @@ def test_mutation_align_index_planned_primary_only(tmp_path: Path, monkeypatch: 
 
 # ---------------------------------------------------------------- 例外出口與串行臂錯誤語意（SPEC v30；審碼 b3 r1 codex P1-02／P1-03）
 
-def _exception_exit_run(tmp_path: Path) -> Dict[str, Any]:
+def _exception_exit_run(tmp_path: Path, transient_shutdown_failure: bool = False) -> Dict[str, Any]:
     """A 已進 worker；B 之 executor 建構拋 OSError（並行合法：兩任務 E 100、根 10、B 1000、輔助槽 1）。
-    A 之 worker 於 0.5 秒後自行完成（執行緒無法強殺；排程器須等其退出才返回）。"""
+    A 之 worker 於 0.5 秒後自行完成（執行緒無法強殺；排程器須等其退出才返回）。`transient_shutdown_failure` ⇒
+    A 之第一次 shutdown 於 join 前拋 OSError（審碼 b3 r2 codex P1-03 之序列）。"""
     started, release = threading.Event(), threading.Event()
     executors: List[Any] = []
     shutdowns: List[bool] = []
@@ -958,6 +959,8 @@ def _exception_exit_run(tmp_path: Path) -> Dict[str, Any]:
     class Executor(ThreadPoolExecutor):
         def shutdown(self, *a: Any, **k: Any) -> None:
             shutdowns.append(True)
+            if transient_shutdown_failure and len(shutdowns) == 1:
+                raise OSError("transient shutdown failure")
             super().shutdown(*a, **k)
 
     def factory(n: int) -> Any:
@@ -1008,21 +1011,41 @@ def test_mutation_exception_exit_skips_join(tmp_path: Path, monkeypatch: pytest.
     assert out["worker_alive"] is True and out["A_status"] != "joined"
 
 
-def test_join_failure_not_marked_joined(tmp_path: Path) -> None:
-    """v30：shutdown 失敗者不標 joined（無退出證據），錯誤上拋。"""
+def test_transient_join_failure_still_confirms_exit(tmp_path: Path) -> None:
+    """v31（審碼 b3 r2 codex P1-03）：例外出口之 shutdown 第一次於 join 前失敗 ⇒ 不吞掉返回，同一 shutdown 再試至
+    確認退出；原例外（executor 建構失敗）於回收完成後上拋。改前：suppress 後返回、A 之 worker 仍存活而紅。"""
+    out = _exception_exit_run(tmp_path, transient_shutdown_failure=True)
+    assert out == {"shutdowns": 2, "worker_alive": False, "A_status": "joined"}
 
-    class BrokenShutdown(ThreadPoolExecutor):
+
+def test_persistent_join_failure_keeps_ownership(tmp_path: Path) -> None:
+    """v31：shutdown 持續失敗 ⇒ `run` 不返回（持有者不得回收域與守護）、狀態未 joined；失敗解除後才返回並標
+    joined。不以固定逾時放手。"""
+    healthy = threading.Event()
+    attempts: List[bool] = []
+
+    class FlakyShutdown(ThreadPoolExecutor):
         def shutdown(self, *a: Any, **k: Any) -> None:
+            attempts.append(True)
+            if not healthy.is_set():
+                raise RuntimeError("injected shutdown failure")
             super().shutdown(*a, **k)
-            raise RuntimeError("injected shutdown failure")
 
-    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=BrokenShutdown,
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=FlakyShutdown,
                                      read_system=lambda: (1000, 1, False, 10, ()),
                                      read_task_footprint=lambda tid: 10, aux_startup_envelope=1,
                                      task_identity=_thread_identity)
-    with pytest.raises(RuntimeError, match="injected shutdown failure"):
-        sched.run([mb.Task("A", 100, 1)], lambda d, p: p, lambda p: p, lambda w: None)
-    assert sched._tasks["A"].status != "joined"
+    done: Dict[str, Any] = {}
+    runner = threading.Thread(target=lambda: done.update(
+        result=sched.run([mb.Task("A", 100, 1)], lambda d, p: p, lambda p: p, lambda w: None)))
+    runner.start()
+    try:
+        runner.join(1.0)
+        assert runner.is_alive() and len(attempts) >= 2 and sched._tasks["A"].status != "joined"
+    finally:
+        healthy.set()
+        runner.join(10)
+    assert not runner.is_alive() and done["result"] == [1] and sched._tasks["A"].status == "joined"
 
 
 @pytest.mark.parametrize("allow_partial", [False, True])

@@ -573,8 +573,8 @@ def test_calibration_gate_failure_leaves_tree_unchanged_and_guard_stopped(tmp_pa
 
 
 def test_orphan_pre_lease_scope_recovered_only_when_owner_dead(tmp_path: Path) -> None:
-    """v30：同 key 之前置目錄，擁有者已不存在者刪其登記暫存與整個目錄、abort 收據複製至 run 目錄；擁有者存活者
-    與他 key 者不動。"""
+    """v30／v31：同 key 之前置目錄，目錄名所載擁有者已不存在（pid 不存在或啟動時刻不符）者刪其登記暫存與整個
+    目錄、abort 收據複製至 run 目錄；擁有者存活者、名稱無法解析者、他 key 者不動。"""
     import os
     import subprocess
     import sys
@@ -586,23 +586,63 @@ def test_orphan_pre_lease_scope_recovered_only_when_owner_dead(tmp_path: Path) -
     key = "BTCUSDT/1h/abc"
     proc = subprocess.Popen([sys.executable, "-c", "pass"])
     proc.wait()
+    me = os.getpid()
+    my_start = int(mb.process_start_time(me))
 
-    def scope(name: str, run_id: str, pid: int, start_time: float) -> Path:
-        d = base / f"{mb.PRE_LEASE_SCOPE_PREFIX}{mb._scope_key(run_id)}_{name}"
+    def scope(run_id: str, owner: str, suffix: str) -> Path:
+        d = base / f"{mb.PRE_LEASE_SCOPE_PREFIX}{mb._scope_key(run_id)}_{owner}_{suffix}"
         d.mkdir()
-        (d / mb.SCOPE_OWNER_NAME).write_text(json.dumps({"pid": pid, "start_time": start_time}), encoding="utf-8")
         return d
 
-    orphan = scope("dead", key, proc.pid, 1.0)
+    orphan = scope(key, f"{proc.pid}-1", "dead")
     owned = tmp_path / "owned_tmp"
     owned.mkdir()
     (orphan / mb.OWNED_PATHS_NAME).write_text(json.dumps([str(owned)]), encoding="utf-8")
     (orphan / mb.ABORT_RECEIPT_NAME).write_text(json.dumps({"trigger": "footprint_over_budget"}), encoding="utf-8")
-    live = scope("live", key, os.getpid(), mb.process_start_time(os.getpid()))
-    other = scope("other", "ETHUSDT/1h/abc", proc.pid, 1.0)
+    reused = scope(key, f"{me}-{my_start + 1}", "pidreuse")  # 同 pid、啟動時刻不符 ⇒ 前一擁有者已死
+    live = scope(key, f"{me}-{my_start}", "live")
+    unknown = scope(key, "garbled", "x")
+    other = scope("ETHUSDT/1h/abc", f"{proc.pid}-1", "other")
     run_dir = tmp_path / "run"
     removed = mb.recover_orphan_pre_lease_scopes(base, key, run_dir)
-    assert removed == [str(orphan)]
-    assert not orphan.exists() and not owned.exists()
-    assert live.exists() and other.exists()
+    assert sorted(removed) == sorted([str(orphan), str(reused)])
+    assert not orphan.exists() and not reused.exists() and not owned.exists()
+    assert live.exists() and unknown.exists() and other.exists()
     assert (run_dir / f"memory_guard_abort.prelease-{orphan.name}.json").exists()
+
+
+def test_pre_lease_scope_owner_known_from_creation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """v31（審碼 b3 r2 codex P1-02）：前置目錄自可見之第一刻即可驗活——於 `mkdtemp` 返回、情境啟動前插入同 key
+    之殘留清理 ⇒ 不刪（擁有者存活），情境照常啟動並關閉。改前：擁有者檔尚未寫入 ⇒ 判已死而刪、啟動失敗而紅。"""
+    import tempfile
+
+    from momentum.FeatureEngineering import memory_budget as mb
+
+    base = tmp_path / "features"
+    base.mkdir(exist_ok=True)
+    key = "BTCUSDT/1h/race"
+    swept: List[List[str]] = []
+    real_mkdtemp = tempfile.mkdtemp
+
+    def mkdtemp_then_sweep(*a: Any, **k: Any) -> str:
+        path = real_mkdtemp(*a, **k)
+        if Path(k.get("dir", "")) == base:
+            swept.append(mb.recover_orphan_pre_lease_scopes(base, key, tmp_path / "run"))
+        return path
+
+    class Handle:
+        pid = None
+        extra: Dict[str, Any] = {}
+
+        def stop(self) -> None:
+            pass
+
+    monkeypatch.setattr(mb.tempfile, "mkdtemp", mkdtemp_then_sweep)
+    monkeypatch.setattr(mb, "start_guard", lambda *a, **k: Handle())
+    scope = mb.begin_pre_lease_scope(base, key)
+    try:
+        assert swept == [[]]
+        assert scope.run_dir.exists() and mb.current_mapping_root() == mb.mapping_root(scope.run_dir)
+    finally:
+        scope.close()
+    assert not list(base.glob(f"{mb.PRE_LEASE_SCOPE_PREFIX}*"))

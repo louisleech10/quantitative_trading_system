@@ -606,13 +606,21 @@ class FeatureFactoryBatchService:
                             wave_tasks.append(budget.Task(task_id=f"{symbol}|{timeframe}", envelope=envelope,
                                                           payload=args))
                         run_in_context = contextvars.copy_context().run
-                        outcomes = await loop.run_in_executor(
+                        scheduler_future = loop.run_in_executor(
                             None,
                             lambda: run_in_context(
                                 scheduler.run, wave_tasks, _compute_single_domain_entry,
                                 lambda args: FeatureFactoryBatchService._compute_single(*args), lambda wave: None,
                             ),
                         )
+                        try:
+                            outcomes = await asyncio.shield(scheduler_future)
+                        except asyncio.CancelledError:
+                            # ICFIRSTALIGN Task 4.2（v30）：取消只作用於本 await；排程器仍持有已啟動之 worker——
+                            # 停止准入新任務並等其確認退出後，才關閉域與守護，再傳遞原取消
+                            scheduler.request_stop()
+                            await _await_owned(scheduler_future)
+                            raise
                     finally:
                         _restore_wave_env()
                         domain.close()
@@ -2269,6 +2277,19 @@ class FeatureFactoryBatchService:
 
 
 _feature_factory_batch_service: Optional[FeatureFactoryBatchService] = None
+
+
+async def _await_owned(future: "asyncio.Future[Any]") -> None:
+    """取消出口：持續持有並等待 executor future 完成（期間之再次取消不放手），其結果或例外不再傳遞。"""
+    while not future.done():
+        try:
+            await asyncio.shield(future)
+        except asyncio.CancelledError:
+            continue
+        except Exception:  # noqa: BLE001 — 排程器例外於取消出口不改變「取消」之結果
+            break
+    if future.done() and not future.cancelled():
+        future.exception()  # 取用以免未取用例外之警告
 
 
 def _compute_single_domain_entry(domain: Any, args: Tuple[Any, ...]) -> ComputeSingleResult:

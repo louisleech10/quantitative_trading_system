@@ -141,3 +141,50 @@ async def test_mutation_api_worker_without_descriptor(monkeypatch, batch_service
     monkeypatch.setattr(mb.MemoryBudgetScheduler, "run", run_without_descriptor)
     await _run_wave(batch_service_factory(tmp_path), tmp_path)
     assert record and not all(isinstance(r["domain"], mb.DomainDescriptor) for r in record)
+
+
+@pytest.mark.asyncio
+async def test_api_wave_cancel_waits_for_started_workers(monkeypatch, batch_service_factory, tmp_path) -> None:
+    """v31（審碼 b3 r2 codex P1-01）：wave 之 asyncio 取消只作用於等待者 ⇒ 排程器停止准入新任務（佇列中之
+    ETHUSDT 不執行）、已啟動之 BTCUSDT worker 完成並 joined 後，域（與守護）才關閉，再傳遞取消。改前：取消即進
+    finally 關閉域，worker 仍在執行而紅。"""
+    started, release = threading.Event(), threading.Event()
+    finished: List[str] = []
+
+    def compute(symbol: str, timeframe: str, *_a: Any, domain: Optional[mb.DomainDescriptor] = None) -> str:
+        started.set()
+        release.wait(5)
+        finished.append(symbol)
+        return json.dumps({"symbol": symbol})
+
+    monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(compute))
+    created = _spy(monkeypatch, max_workers=1)
+    monkeypatch.setattr(mb, "start_guard", lambda *a, **k: None)
+    closes: List[List[str]] = []
+    real_close = mb.BudgetDomain.close
+
+    def close(self: Any) -> None:
+        closes.append(list(finished))
+        real_close(self)
+
+    monkeypatch.setattr(mb.BudgetDomain, "close", close)
+    task = {"task_id": "icfa-cancel", "concurrent_symbols": 2, "total": 2, "completed": 0, "failed": 0,
+            "results": {}, "errors": {}}
+    checkpoint = {"batch_id": "icfa-cancel", "queued_items": list(ITEMS)}
+    request = BatchGenerateRequest(symbols=["BTCUSDT", "ETHUSDT"], timeframe="12h")
+    service = batch_service_factory(tmp_path)
+    wave = asyncio.create_task(service._process_item_wave(task, checkpoint, list(ITEMS), request, str(tmp_path)))
+    assert await asyncio.get_running_loop().run_in_executor(None, started.wait, 5)
+    wave.cancel()
+    timer = threading.Timer(0.3, release.set)
+    timer.start()
+    try:
+        with pytest.raises(asyncio.CancelledError):
+            await wave
+    finally:
+        release.set()
+        timer.cancel()
+    assert closes == [["BTCUSDT"]], "域須於已啟動之 worker 完成後才關閉"
+    assert finished == ["BTCUSDT"]
+    statuses = {tid: st.status for tid, st in created[0]._tasks.items()}
+    assert statuses == {"BTCUSDT|12h": "joined", "ETHUSDT|12h": "queued"}

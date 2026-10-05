@@ -56,6 +56,10 @@ class UnknownBudgetBranchError(KeyError):
     """分派點宣告之分支 ID 不在分支表或無估算函式（配置前具名拒絕）。"""
 
 
+class SchedulerStopped(RuntimeError):
+    """呼叫端已要求排程器停止（例：API wave 被取消）；該任務未准入、未執行。"""
+
+
 ComponentKind = Literal["anon", "mapped"]
 
 GiB = 1 << 30
@@ -1069,18 +1073,23 @@ def begin_protected_run(run_dir: Path, run_id: str) -> ProtectedRun:
 
 
 PRE_LEASE_SCOPE_PREFIX = ".icfa_prelease_"
-SCOPE_OWNER_NAME = "scope_owner.json"
 
 
 def _scope_key(run_id: str) -> str:
     return hashlib.sha256(str(run_id).encode("utf-8")).hexdigest()[:16]
 
 
+def _owner_token(pid: int) -> str:
+    """擁有者身分（pid 與啟動時刻）；寫入目錄名，使目錄可見之第一刻即可驗活（無發布間隙）。"""
+    start = int(process_start_time(pid)) if sys.platform == "darwin" else 0
+    return f"{pid}-{start}"
+
+
 class PreLeaseScope(ProtectedRun):
     """FFSTAT 校準前置關卡（先於 run lease、run 目錄零寫入）之受保護情境：同一 `generate_features` 之守護自此
     啟動，lease 後之 run 以巢狀沿用（恰一守護）；根目錄為成品根下之獨立暫存目錄（與 run 目錄同掛載、已核磁碟
-    後援），`close()` 連同本身建立之上層目錄全數刪除（校準失敗 ⇒ 樹前後相同）。強制終止後之殘留由同 key 下一次
-    run 取得 lease 後以 `recover_orphan_pre_lease_scopes` 清理（擁有者行程仍存活者不動）。"""
+    後援；目錄名含擁有者 pid 與啟動時刻），`close()` 連同本身建立之上層目錄全數刪除（校準失敗 ⇒ 樹前後相同）。
+    強制終止後之殘留由同 key 下一次 run 取得 lease 後以 `recover_orphan_pre_lease_scopes` 清理（擁有者存活者不動）。"""
 
     def __init__(self, scope_dir: Path, run_id: str, created: Sequence[Path]) -> None:
         super().__init__(scope_dir, run_id)
@@ -1105,24 +1114,23 @@ def begin_pre_lease_scope(base_dir: Path, run_id: str) -> PreLeaseScope:
         created.append(probe)
         probe = probe.parent
     base_dir.mkdir(parents=True, exist_ok=True)
-    scope_dir = Path(tempfile.mkdtemp(prefix=f"{PRE_LEASE_SCOPE_PREFIX}{_scope_key(run_id)}_", dir=str(base_dir)))
-    scope = PreLeaseScope(scope_dir, run_id, created)
+    prefix = f"{PRE_LEASE_SCOPE_PREFIX}{_scope_key(run_id)}_{_owner_token(os.getpid())}_"
+    scope = PreLeaseScope(Path(tempfile.mkdtemp(prefix=prefix, dir=str(base_dir))), run_id, created)
     try:
-        pid = os.getpid()
-        owner = {"pid": pid, "start_time": process_start_time(pid) if sys.platform == "darwin" else 0.0}
-        (scope_dir / SCOPE_OWNER_NAME).write_text(json.dumps(owner), encoding="utf-8")
         return scope.start()
     except BaseException:
         scope.close()
         raise
 
 
-def _scope_owner_alive(scope_dir: Path) -> bool:
+def _scope_owner_alive(scope_dir: Path, key: str) -> bool:
+    """目錄名之擁有者身分驗活：pid 不存在或啟動時刻不符 ⇒ 已死；名稱無法解析 ⇒ 視為存活（不刪不明者）。"""
+    rest = scope_dir.name[len(f"{PRE_LEASE_SCOPE_PREFIX}{key}_"):]
     try:
-        owner = json.loads((scope_dir / SCOPE_OWNER_NAME).read_text(encoding="utf-8"))
-        pid = int(owner["pid"])
-    except (OSError, ValueError, KeyError, TypeError):
-        return False
+        pid_text, start_text = rest.split("_", 1)[0].split("-", 1)
+        pid, start = int(pid_text), int(start_text)
+    except ValueError:
+        return True
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -1132,7 +1140,7 @@ def _scope_owner_alive(scope_dir: Path) -> bool:
     if sys.platform != "darwin":
         return True
     try:
-        return abs(process_start_time(pid) - float(owner.get("start_time", 0.0))) < 1e-3
+        return int(process_start_time(pid)) == start
     except Exception:  # noqa: BLE001 — 讀不到起始時間 ⇒ 視為仍存活（不刪他人暫存）
         return True
 
@@ -1145,10 +1153,11 @@ def recover_orphan_pre_lease_scopes(base_dir: Path, run_id: str, run_dir: Path,
     removed: List[str] = []
     if not base_dir.is_dir():
         return removed
-    for scope_dir in sorted(base_dir.glob(f"{PRE_LEASE_SCOPE_PREFIX}{_scope_key(run_id)}_*")):
+    key = _scope_key(run_id)
+    for scope_dir in sorted(base_dir.glob(f"{PRE_LEASE_SCOPE_PREFIX}{key}_*")):
         if not scope_dir.is_dir() or (keep is not None and scope_dir.resolve() == Path(keep).resolve()):
             continue
-        if _scope_owner_alive(scope_dir):
+        if _scope_owner_alive(scope_dir, key):
             continue
         receipt = scope_dir / ABORT_RECEIPT_NAME
         if receipt.exists():
@@ -1377,6 +1386,7 @@ class MemoryBudgetScheduler:
         self.trace: List[Tuple[str, str]] = []
         self._lock = threading.RLock()
         self._tasks: Dict[str, _TaskState] = {}
+        self._stop_requested = threading.Event()
         self._aux_slot: Optional[Slot] = None
         self.degraded: Optional[Dict[str, Any]] = None
 
@@ -1475,6 +1485,11 @@ class MemoryBudgetScheduler:
                              "reason": "memory_budget_admission"}
         return results
 
+    def request_stop(self) -> None:
+        """呼叫端取消（可由其他執行緒呼叫）：佇列中未准入之任務不再執行（結果為 `SchedulerStopped`）；已啟動者照常
+        確認退出，`run` 於其全部回收後才返回。"""
+        self._stop_requested.set()
+
     def _join_state(self, state: _TaskState) -> None:
         """shutdown(wait=True) 成功（worker 已退出）後才標 joined；失敗原樣上拋、狀態不變。"""
         state.executor.shutdown(wait=True)
@@ -1482,12 +1497,29 @@ class MemoryBudgetScheduler:
             state.status = "joined"
         self._event("joined", state.task.task_id)
 
+    def _join_confirmed(self, state: _TaskState) -> None:
+        """確認退出才返回（SPEC v30）：shutdown 失敗 ⇒ 狀態保留未 joined、記 `join_retry`，等該任務之 future 完成後
+        以同一 shutdown 再試，直到成功。持續失敗即持續等待——持有者（域／守護）不得於確認退出前回收，亦不以固定
+        逾時強殺未超上限之 worker；守護於此期間照常監看全樹。"""
+        import concurrent.futures as cf
+
+        attempts = 0
+        while True:
+            try:
+                self._join_state(state)
+                return
+            except Exception:  # noqa: BLE001 — 未確認退出：不標 joined、不交還持有者
+                attempts += 1
+                self._event("join_retry", state.task.task_id)
+                if state.future is not None:
+                    cf.wait([state.future])
+                time.sleep(min(0.05 * attempts, 1.0))
+
     def _join_unjoined(self) -> None:
         for state in list(self._tasks.values()):
             if state.executor is None or state.status == "joined":
                 continue
-            with contextlib.suppress(Exception):  # 例外出口之盡力回收：原例外優先上拋，失敗者狀態保留未 joined
-                self._join_state(state)
+            self._join_confirmed(state)  # 例外出口：全部確認退出後，原例外才上拋
 
     def _run_waves(self, queue: "Deque[_TaskState]", results: List[Any],
                    worker_fn: Callable[[DomainDescriptor, Any], Any], serial_fn: Callable[[Any], Any],
@@ -1498,6 +1530,11 @@ class MemoryBudgetScheduler:
         while queue:
             wave: List[_TaskState] = []
             while queue and len(wave) < self.max_workers:
+                if self._stop_requested.is_set():  # 呼叫端取消：不再准入／串行執行新任務（已啟動者照常確認退出）
+                    for pending_state in queue:
+                        results[pending_state.index] = SchedulerStopped(pending_state.task.task_id)
+                    queue.clear()
+                    break
                 head = queue[0]
                 if head.task.envelope is None or self.aux_startup_envelope is None:
                     if wave:
@@ -1533,7 +1570,7 @@ class MemoryBudgetScheduler:
                     self._event(state.status, state.task.task_id)
             wave_results: List[Any] = []
             for state in wave:
-                self._join_state(state)
+                self._join_confirmed(state)
                 exc = state.future.exception()
                 value = exc if exc is not None else state.future.result()
                 results[state.index] = value
