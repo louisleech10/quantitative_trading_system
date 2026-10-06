@@ -1609,6 +1609,32 @@ class FeatureFactory:
         peak = max(l1_peak, l1_bytes + l2_peak, l1_bytes + l2_bytes + max(l3_peak, l4_peak, l5_peak, l6_peak))
         return int(mb.WORKER_RUNTIME_ENVELOPE_BYTES + raw_bytes + peak)
 
+    # 檔案寫入上界之倍數（SPEC v37）：CGSA 群組 float32 一份＋L7 raw 一份＋atomic replace 之新舊並存一份
+    _DISK_COPIES_BOUND = 3
+
+    def estimate_generation_disk(self, config: "FactoryConfig", rows: int, raw_cols: int) -> int:
+        """單一週期一次生成之同容器檔案寫入上界 D（ICFIRSTALIGN SPEC v37；子行程並行准入之磁碟判定）：
+        列數 × 各層設定展開欄數上界（不依資料；同 `estimate_generation_envelope` 之欄數式）× 落盤 float32 4 位元組
+        × `_DISK_COPIES_BOUND`。"""
+        rows = int(rows)
+        l1_cols = self._estimate_l1_output_cols(config)
+        l2_cols = self._l2_output_cols_upper_bound(l1_cols, self._filter_operators_config(config.operators))
+        rolling = config.rolling_aggregation
+        windows = max(len(getattr(rolling, "windows", None) or [5, 13, 21]), 1)
+        aggs = max(len(getattr(rolling, "aggregators", None) or RollingAggregator.AGGREGATORS), 1)
+        l3_cols = l1_cols * windows * aggs if getattr(rolling, "enabled", True) else 0
+        lag_cols = 0
+        if config.lag_features.enabled:
+            from momentum.FeatureEngineering.atomic.parameter_generator import ParameterGenerator
+
+            processor = LagProcessor(config)
+            lags = len(processor._normalize_lags(ParameterGenerator.generate_lag_sequence(
+                processor._sequence_length, processor._max_lag_ratio, processor._lag_strategy, processor._custom_lags)))
+            lag_cols = (int(raw_cols) + l1_cols) * lags
+        total_cols = int(raw_cols) + l1_cols + l2_cols + l3_cols + lag_cols + self._L5_COLS_BOUND + \
+            self._L6_OUTPUT_COLS_BOUND
+        return int(rows * total_cols * 4 * self._DISK_COPIES_BOUND)
+
     @staticmethod
     def _l2_output_cols_upper_bound(l1_col_count: int, operators_config: Dict[str, Any]) -> int:
         """L2 輸出欄數上界（ICFIRSTALIGN Task 4.2 預算估算；不依資料）：配對運算子（cross／ratio）於同一（來源, 類別,
@@ -1809,7 +1835,8 @@ class FeatureFactory:
             from momentum.FeatureEngineering.polars_adapter import polars_enabled
 
             use_polars = polars_enabled()
-            self._budget_check_l2(layer1_for_l2, data.columns, config, use_polars)
+            # ICFIRSTALIGN SPEC v35：分派點經選路（白名單等價臂）；回傳實際選定之臂
+            use_polars = self._budget_check_l2(layer1_for_l2, data.columns, config, use_polars) == "L2.polars"
             if use_polars:
                 result_df, failed_engines, present = self._layer2_derived_polars(
                     layer1_for_l2, data, config
@@ -1828,26 +1855,42 @@ class FeatureFactory:
             failed_engines=failed_engines,
         )
 
+    # L2 選路白名單（SPEC v35：polars ↔ pandas 限已有逐位元收據之設定）：設定指紋集合（`_l2_route_fingerprint`）。
+    # 本批登錄為空——SPEC v20 所測 P1／P2／S3 為測試設定，正式設定無相符者；追加須附逐位元收據。
+    L2_ROUTE_CERTIFIED: frozenset = frozenset()
+
+    def _l2_route_fingerprint(self, layer1: pd.DataFrame, config: "FactoryConfig") -> str:
+        """L2 選路白名單之設定指紋：運算子設定（已過濾）＋L1 欄名集合（決定 L2 選欄與配對）。"""
+        payload = {"operators": self._filter_operators_config(config.operators), "l1": sorted(map(str, layer1.columns))}
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+
     def _budget_check_l2(self, layer1: pd.DataFrame, raw_columns: Any, config: "FactoryConfig",
-                         use_polars: bool) -> None:
-        """ICFIRSTALIGN Task 4.2：L2 臂之分派點（polars 可否 import 已決定）宣告分支並判定。pandas 臂依實際
-        category workers 分串列／平行；無 registry 時 pandas 一次算全表（同串列估算）。"""
+                         use_polars: bool) -> str:
+        """ICFIRSTALIGN Task 4.2：L2 臂之分派點（polars 可否 import 已決定）宣告分支並判定，回傳實際選定之分支。
+        pandas 臂依實際 category workers 分串列／平行；無 registry 時 pandas 一次算全表（同串列估算）。SPEC v35：
+        原臂不可容或有同規模速度收據時，經 `memory_budget.route` 改走白名單之逐位元等價臂（polars ↔ pandas 限
+        `L2_ROUTE_CERTIFIED` 所登錄之設定）。"""
         filtered_ops = self._filter_operators_config(config.operators)
         # 依實際 L1 欄與運算子之同一選欄規則逐類別計欄數（只依欄名與設定、不計算值）
         engine = _derived_operator_engine_cls()(filtered_ops)
         counts = engine.output_column_counts(layer1.columns, raw_columns,
                                              self._build_indicator_specs(layer1, config))
         out = int(sum(counts.values()))
-        if use_polars:
-            branch = "L2.polars"
-        else:
-            from momentum.FeatureEngineering.utils.hardware_utils import get_l2_category_workers
+        from momentum.FeatureEngineering.utils.hardware_utils import get_l2_category_workers
 
-            parallel = self._cgsa_registry is not None and get_l2_category_workers() > 1
-            branch = "L2.pandas_parallel" if parallel else "L2.pandas_serial"
+        parallel = self._cgsa_registry is not None and get_l2_category_workers() > 1
+        pandas_branch = "L2.pandas_parallel" if parallel else "L2.pandas_serial"
+        branch = "L2.polars" if use_polars else pandas_branch
         params = {"rows": int(layer1.shape[0]), "output_cols": out,
                   "max_category_cols": max(counts.values(), default=0), "category_cols_sum": out}
-        _memory_budget.check_estimate(branch, params, label=f"Layer 2:{branch}")
+        candidates = [(branch, params)]
+        if use_polars and self._l2_route_fingerprint(layer1, config) in type(self).L2_ROUTE_CERTIFIED:
+            candidates.append((pandas_branch, params))
+        if len(candidates) == 1:
+            _memory_budget.check_estimate(branch, params, label=f"Layer 2:{branch}")
+            return branch
+        return _memory_budget.route("Layer 2", candidates, label="Layer 2",
+                                    scale_key=f"rows={params['rows']}:cols={out}")
 
     def _layer2_derived_pandas(
         self, layer1: pd.DataFrame, data: pd.DataFrame, config: "FactoryConfig"
@@ -5111,6 +5154,7 @@ class FeatureFactory:
                     task_id=f"symbol:{sym}", envelope=self._estimate_symbol_envelope(sym, config),
                     payload={"symbol": sym, "config_payload": config_payload, "cache_dir": cache_dir,
                              "ref_ipc_path": ref_ipc_path},
+                    disk_bytes=self._estimate_symbol_disk(sym, config),
                 )
                 for sym in symbols
             ]
@@ -5142,17 +5186,37 @@ class FeatureFactory:
 
         列數取各訓練週期自資料起點至 `end_date` 之 L0 列數（預熱最終深度未定時之上界：預熱不得早於資料起點）；
         域內多週期一律串行 ⇒ E＝各週期 E 之最大者。取不到形狀 ⇒ None（不准入並行、走串行臂）。"""
-        envelopes: List[int] = []
-        for tf in dict.fromkeys(config.timeframes.training or [config.timeframes.primary]):
+        shapes = self._symbol_shapes(symbol, config, end_date)
+        if not shapes:
+            return None
+        return max(self.estimate_generation_envelope(config, rows, cols) for rows, cols in shapes)
+
+    def _symbol_shapes(self, symbol: str, config: "FactoryConfig",
+                       end_date: Optional[str]) -> Optional[List[Tuple[int, int]]]:
+        """各訓練週期自資料起點至 `end_date` 之 L0（列數, raw 欄數）；任一不可得 ⇒ None。同參數只載入一次（E 與 D 共用）。"""
+        key = (symbol, tuple(dict.fromkeys(config.timeframes.training or [config.timeframes.primary])), end_date)
+        cache = self.__dict__.setdefault("_symbol_shape_cache", {})
+        if key in cache:
+            return cache[key]
+        shapes: Optional[List[Tuple[int, int]]] = []
+        for tf in key[1]:
             try:
                 raw = self._layer0_data_ingestion(symbol, tf, config, start_date=None, end_date=end_date)
             except Exception as exc:  # noqa: BLE001 — 形狀不可得即走串行臂（該臂照常生成並具名報錯）
-                logger.warning("[budget] envelope unavailable for %s/%s: %s", symbol, tf, exc)
-                return None
+                logger.warning("[budget] shape unavailable for %s/%s: %s", symbol, tf, exc)
+                shapes = None
+                break
             if raw is None or raw.empty:
-                return None
-            envelopes.append(self.estimate_generation_envelope(config, int(len(raw)), int(raw.shape[1])))
-        return max(envelopes) if envelopes else None
+                shapes = None
+                break
+            shapes.append((int(len(raw)), int(raw.shape[1])))
+        cache[key] = shapes
+        return shapes
+
+    def _estimate_symbol_disk(self, symbol: str, config: "FactoryConfig", end_date: Optional[str] = None) -> int:
+        """一標的一次正式生成之同容器檔案寫入上界 D（SPEC v37；各訓練週期之和）；形狀不可得 ⇒ 0（E 亦為 None）。"""
+        shapes = self._symbol_shapes(symbol, config, end_date)
+        return 0 if not shapes else int(sum(self.estimate_generation_disk(config, r, c) for r, c in shapes))
 
     def _load_reference_if_available(
         self,

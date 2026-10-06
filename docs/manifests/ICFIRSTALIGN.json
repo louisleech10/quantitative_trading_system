@@ -136,7 +136,10 @@
       "tests/test_multi_tf_generator.py",
       "tests/test_cgsa_resume.py",
       "tests/test_golden_output_generation.py",
-      "tests/test_multi_symbol_parallel.py"
+      "tests/test_multi_symbol_parallel.py",
+      "tests/feature_engineering/test_cgsa_disk_precheck.py",
+      "handoffs/run_receipts/icfirstalign_probes/swap_timeline_probe.py",
+      "handoffs/run_receipts/icfirstalign_probes/speed_verdict.py"
     ],
     "callers_now": [
       "api/services/feature_factory_service.py",

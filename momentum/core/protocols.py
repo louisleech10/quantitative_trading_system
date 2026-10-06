@@ -298,8 +298,13 @@ class IMemoryBudget(Protocol):
         ...
 
     def configured_budget_bytes(self) -> int:
-        """目前生效之上限（實體記憶體 × 比例或設定絕對值）。"""
+        """快區 R（實體記憶體 × 比例或設定絕對值；SPEC v35：只管並行准入與選路，不作拒絕理由）。"""
         ...
+
+    # 具名例外（SPEC v35）：`GenerationMemoryBudgetExceeded`（機器可用量不足／停止旗標）、
+    # `MemoryRerouteNeeded`（域內 worker 估算低估 ⇒ 根串行重試，前者之子類）
+    GenerationMemoryBudgetExceeded: type
+    MemoryRerouteNeeded: type
 
 
 @runtime_checkable

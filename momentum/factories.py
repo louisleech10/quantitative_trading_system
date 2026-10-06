@@ -370,6 +370,20 @@ def estimate_symbol_envelope(
     return factory._estimate_symbol_envelope(symbol, config, end_date=end_date)
 
 
+def estimate_symbol_disk(
+    *,
+    symbol: str,
+    timeframe: str,
+    config_override: Optional[Dict[str, Any]] = None,
+    cache_dir: Optional[str] = None,
+    end_date: Optional[str] = None,
+) -> int:
+    """一標的一次正式生成之同容器檔案寫入上界 D（ICFIRSTALIGN SPEC v37；子行程並行准入之磁碟判定）；形狀不可得 ⇒ 0。"""
+    factory = create_feature_factory(cache_dir=cache_dir, validate_continuity=False)
+    config = factory._resolve_config(dict(config_override or {}))
+    return factory._estimate_symbol_disk(symbol, config, end_date=end_date)
+
+
 def create_feature_library() -> "FeatureLibrary":
     """Create a FeatureLibrary instance with V7 FeatureReader."""
     from momentum.FeatureEngineering.feature_library import FeatureLibrary

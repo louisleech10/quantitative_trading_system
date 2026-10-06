@@ -619,6 +619,7 @@ class MultiTFGenerator:
                     payload={"symbol": symbol, "timeframe": tf, "config_payload": config_payload,
                              "start_date": start_date, "end_date": end_date, "cache_dir": _worker_cache_dir,
                              "public_warmup_bars": _public_warmup_bars},
+                    disk_bytes=self._estimate_worker_disk(symbol, tf, start_date, end_date, _public_warmup_bars),
                 )
                 for tf in non_primary_tfs
             ]
@@ -789,12 +790,16 @@ class MultiTFGenerator:
             params["source_kind"] = "legacy"
         return params
 
-    def _estimate_worker_envelope(self, symbol: str, timeframe: str, start_date: Optional[str],
-                                  end_date: Optional[str], public_warmup_bars: Optional[int]) -> Optional[int]:
-        """多週期 worker（`_tf_worker_entry`）之任務峰值 E（ICFIRSTALIGN Task 4.2 v25）：以 worker 同一 L0 載入之實際列數
-        與設定展開之欄數上界，經分支表同一估算函式（取全部可達後備臂之最大者）推導；形狀不可得 ⇒ None（走串行臂）。"""
+    def _worker_shape(self, symbol: str, timeframe: str, start_date: Optional[str], end_date: Optional[str],
+                      public_warmup_bars: Optional[int]) -> Optional[Tuple[int, int]]:
+        """worker 同一 L0 載入之（列數, raw 欄數）；形狀不可得 ⇒ None。同一呼叫參數只載入一次（E 與 D 共用）。"""
         from momentum.FeatureEngineering.warmup_window import ingest_layer0_start_date, resolve_output_window
 
+        key = (symbol, timeframe, start_date, end_date, public_warmup_bars)
+        cache = self.__dict__.setdefault("_worker_shape_cache", {})
+        if key in cache:
+            return cache[key]
+        shape: Optional[Tuple[int, int]] = None
         try:
             window = resolve_output_window(self._config, self._primary_tf, start_date, end_date,
                                            max_warmup_bars=public_warmup_bars)
@@ -802,12 +807,27 @@ class MultiTFGenerator:
                           if window.warmup_enabled else start_date)
             raw = self._factory._layer0_data_ingestion(symbol, timeframe, self._config, start_date=load_start,
                                                        end_date=end_date)
+            if raw is not None and not raw.empty:
+                shape = (int(len(raw)), int(raw.shape[1]))
         except Exception as exc:  # noqa: BLE001 — 形狀不可得即不准入並行（串行臂於根行程內照常生成與報錯）
-            logger.warning("[CGSA-parallel] worker envelope unavailable for %s/%s: %s", symbol, timeframe, exc)
+            logger.warning("[CGSA-parallel] worker shape unavailable for %s/%s: %s", symbol, timeframe, exc)
+        cache[key] = shape
+        return shape
+
+    def _estimate_worker_envelope(self, symbol: str, timeframe: str, start_date: Optional[str],
+                                  end_date: Optional[str], public_warmup_bars: Optional[int]) -> Optional[int]:
+        """多週期 worker（`_tf_worker_entry`）之任務峰值 E（ICFIRSTALIGN Task 4.2 v25）：以 worker 同一 L0 載入之實際列數
+        與設定展開之欄數上界，經分支表同一估算函式（取全部可達後備臂之最大者）推導；形狀不可得 ⇒ None（走串行臂）。"""
+        shape = self._worker_shape(symbol, timeframe, start_date, end_date, public_warmup_bars)
+        if shape is None:
             return None
-        if raw is None or raw.empty:
-            return None
-        return self._factory.estimate_generation_envelope(self._config, int(len(raw)), int(raw.shape[1]))
+        return self._factory.estimate_generation_envelope(self._config, shape[0], shape[1])
+
+    def _estimate_worker_disk(self, symbol: str, timeframe: str, start_date: Optional[str],
+                              end_date: Optional[str], public_warmup_bars: Optional[int]) -> int:
+        """多週期 worker 之同容器檔案寫入上界 D（SPEC v37）；形狀不可得 ⇒ 0（該任務 E 亦為 None、不准入並行）。"""
+        shape = self._worker_shape(symbol, timeframe, start_date, end_date, public_warmup_bars)
+        return 0 if shape is None else self._factory.estimate_generation_disk(self._config, shape[0], shape[1])
 
     def _register_worker_groups(
         self,
@@ -2176,7 +2196,13 @@ def _tf_worker_entry(
             },
         }
     except (_memory_budget.GenerationMemoryBudgetExceeded, _memory_budget.MemoryMeasurementUnavailable):
-        raise  # ICFIRSTALIGN Task 4.2：預算具名錯誤不轉為一般 error 字串（根於 join 後原樣上拋）
+        # ICFIRSTALIGN Task 4.2：預算具名錯誤不轉為一般 error 字串（根於 join 後原樣上拋）；SPEC v35：本 worker 之
+        # 未完成暫存（worker registry 工作目錄）於上拋前刪除——估算低估之任務由根以正式串行臂重試
+        registry = getattr(locals().get("factory"), "_cgsa_registry", None)
+        work_dir = getattr(registry, "work_dir", None)
+        if work_dir is not None:
+            shutil.rmtree(work_dir, ignore_errors=True)
+        raise
     except Exception as exc:
         return {"timeframe": timeframe, "error": str(exc)}
     finally:

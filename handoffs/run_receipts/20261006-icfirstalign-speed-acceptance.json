@@ -1,0 +1,498 @@
+{
+  "rule": "ICFIRSTALIGN SPEC v40 速度驗收",
+  "constants": {
+    "same_ratio": 1.03
+  },
+  "cases": [
+    {
+      "input": {
+        "name": "dual_start_4h",
+        "timing_source": "wall_clock_full_entry",
+        "pairs": [
+          {
+            "order": "new_first",
+            "head_s": 2096.2,
+            "new_s": 2086.7,
+            "method": "probe_wall",
+            "tag": "dual4_r1"
+          }
+        ]
+      },
+      "result": {
+        "name": "dual_start_4h",
+        "pairs": 1,
+        "r": 0.9954679896956398,
+        "median_head_s": 2096.2,
+        "median_new_s": 2086.7,
+        "verdict": "pass",
+        "reason": "r＝0.9955 ≤ 1.03（視為相同）"
+      }
+    },
+    {
+      "input": {
+        "name": "e2e_standard_12h",
+        "timing_source": "wall_clock_full_entry",
+        "pairs": [
+          {
+            "order": "new_first",
+            "head_s": 499.5,
+            "new_s": 507.7,
+            "method": "probe_wall",
+            "tag": "e2e"
+          },
+          {
+            "order": "new_first",
+            "head_s": 501.2,
+            "new_s": 506.2,
+            "method": "probe_wall",
+            "tag": "e2e_r2"
+          },
+          {
+            "order": "new_first",
+            "head_s": 503.2,
+            "new_s": 503.5,
+            "method": "probe_wall",
+            "tag": "e2e_r3"
+          },
+          {
+            "order": "new_first",
+            "head_s": 501.89,
+            "new_s": 500.81,
+            "method": "pytest_session",
+            "tag": "stage"
+          },
+          {
+            "order": "head_first",
+            "head_s": 514.1,
+            "new_s": 505.4,
+            "method": "probe_wall",
+            "tag": "e2e_rev1"
+          },
+          {
+            "order": "head_first",
+            "head_s": 501.6,
+            "new_s": 504.9,
+            "method": "probe_wall",
+            "tag": "e2e_rev2"
+          },
+          {
+            "order": "head_first",
+            "head_s": 512.9,
+            "new_s": 502.54,
+            "method": "pytest_session",
+            "tag": "stage_e2e_hf"
+          }
+        ],
+        "attribution_s": 0.34079446100000005,
+        "stage_pairs": [
+          {
+            "order": "new_first",
+            "tag": "stage",
+            "head": {
+              "start→layer_start1#1": 1.408000000003085,
+              "layer_start1#1→layer_done1#1": 9.976000000002387,
+              "layer_done1#1→layer_start2#1": 0.000999999996565748,
+              "layer_start2#1→layer_done2#1": 86.93600000000151,
+              "layer_done2#1→layer_start3#1": 2.642999999996391,
+              "layer_start3#1→layer_done3#1": 51.06999999999971,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 2.7380000000048312,
+              "layer_done4#1→layer_start5#1": 0.010999999998603016,
+              "layer_start5#1→layer_done5#1": 0.0,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.023999999997613486,
+              "layer_done6#1→rawsink_start#1": 9.842000000004191,
+              "rawsink_start#1→rawsink_done#1": 333.5040000000008,
+              "rawsink_done#1→l7_persist#1": 2.764999999999418,
+              "l7_persist#1→end": 0.24099999999452848
+            },
+            "new": {
+              "start→layer_start1#1": 1.7439999999987776,
+              "layer_start1#1→layer_done1#1": 10.099000000001979,
+              "layer_done1#1→layer_start2#1": 0.0020000000004074536,
+              "layer_start2#1→layer_done2#1": 87.5089999999982,
+              "layer_done2#1→layer_start3#1": 2.650999999998021,
+              "layer_start3#1→layer_done3#1": 50.663000000000466,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 2.9199999999982538,
+              "layer_done4#1→layer_start5#1": 0.011000000005878974,
+              "layer_start5#1→layer_done5#1": 0.000999999996565748,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.021000000000640284,
+              "layer_done6#1→rawsink_start#1": 10.004000000000815,
+              "rawsink_start#1→rawsink_done#1": 331.40499999999884,
+              "rawsink_done#1→l7_persist#1": 2.709999999999127,
+              "l7_persist#1→end": 0.2430000000022119
+            }
+          },
+          {
+            "order": "head_first",
+            "tag": "stage_e2e_hf",
+            "head": {
+              "start→layer_start1#1": 1.4979999999995925,
+              "layer_start1#1→layer_done1#1": 12.118999999998778,
+              "layer_done1#1→layer_start2#1": 0.0020000000004074536,
+              "layer_start2#1→layer_done2#1": 90.73399999999674,
+              "layer_done2#1→layer_start3#1": 3.297000000005937,
+              "layer_start3#1→layer_done3#1": 52.66599999999744,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 2.826999999997497,
+              "layer_done4#1→layer_start5#1": 0.010999999998603016,
+              "layer_start5#1→layer_done5#1": 0.0010000000038417056,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.027000000001862645,
+              "layer_done6#1→rawsink_start#1": 10.119999999995343,
+              "rawsink_start#1→rawsink_done#1": 335.7320000000036,
+              "rawsink_done#1→l7_persist#1": 2.8660000000018044,
+              "l7_persist#1→end": 0.2449999999953434
+            },
+            "new": {
+              "start→layer_start1#1": 1.694999999999709,
+              "layer_start1#1→layer_done1#1": 9.94600000000355,
+              "layer_done1#1→layer_start2#1": 0.0020000000004074536,
+              "layer_start2#1→layer_done2#1": 87.52399999999761,
+              "layer_done2#1→layer_start3#1": 2.4760000000023865,
+              "layer_start3#1→layer_done3#1": 50.91399999999703,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 2.849000000001979,
+              "layer_done4#1→layer_start5#1": 0.010999999998603016,
+              "layer_start5#1→layer_done5#1": 0.0,
+              "layer_done5#1→layer_start6#1": 0.000999999996565748,
+              "layer_start6#1→layer_done6#1": 0.02200000000448199,
+              "layer_done6#1→rawsink_start#1": 9.305000000000291,
+              "rawsink_start#1→rawsink_done#1": 333.98599999999715,
+              "rawsink_done#1→l7_persist#1": 2.745999999999185,
+              "l7_persist#1→end": 0.2400000000052387
+            }
+          }
+        ]
+      },
+      "result": {
+        "name": "e2e_standard_12h",
+        "pairs": 7,
+        "r": 1.0059973300922513,
+        "median_head_s": 501.89,
+        "median_new_s": 504.9,
+        "verdict": "pass",
+        "reason": "r＝1.0060 ≤ 1.03（視為相同）"
+      }
+    },
+    {
+      "input": {
+        "name": "dual_start_12h",
+        "timing_source": "wall_clock_full_entry",
+        "pairs": [
+          {
+            "order": "new_first",
+            "head_s": 1421.2,
+            "new_s": 1425.7,
+            "method": "probe_wall",
+            "tag": "dual12"
+          },
+          {
+            "order": "new_first",
+            "head_s": 1424.0,
+            "new_s": 1428.4,
+            "method": "probe_wall",
+            "tag": "dual12_r2"
+          },
+          {
+            "order": "head_first",
+            "head_s": 1475.47,
+            "new_s": 1422.3,
+            "method": "pytest_session",
+            "tag": "stage12"
+          },
+          {
+            "order": "new_first",
+            "head_s": 1420.82,
+            "new_s": 1420.87,
+            "method": "pytest_session",
+            "tag": "stage_d12_nf"
+          },
+          {
+            "order": "head_first",
+            "head_s": 1427.38,
+            "new_s": 1427.21,
+            "method": "pytest_session",
+            "tag": "stage_d12_hf2"
+          }
+        ],
+        "attribution_s": 0.5233988360000001,
+        "stage_pairs": [
+          {
+            "order": "head_first",
+            "tag": "stage12",
+            "head": {
+              "start→layer_start1#1": 0.4389999999984866,
+              "layer_start1#1→layer_done1#1": 2.2129999999961,
+              "layer_done1#1→layer_start2#1": 0.0010000000038417056,
+              "layer_start2#1→layer_done2#1": 109.2609999999986,
+              "layer_done2#1→layer_start3#1": 5.758999999998196,
+              "layer_start3#1→layer_done3#1": 120.73099999999977,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 1.1310000000012224,
+              "layer_done4#1→layer_start5#1": 0.0,
+              "layer_start5#1→layer_done5#1": 0.0010000000038417056,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.05199999999604188,
+              "layer_done6#1→rawsink_start#1": 17.79699999999866,
+              "rawsink_start#1→rawsink_done#1": 604.4650000000038,
+              "rawsink_done#1→l7_persist#1": 2.5230000000010477,
+              "l7_persist#1→layer_start1#2": 19.388999999995576,
+              "layer_start1#2→layer_done1#2": 2.5489999999990687,
+              "layer_done1#2→layer_start2#2": 0.0020000000004074536,
+              "layer_start2#2→layer_done2#2": 63.300999999999476,
+              "layer_done2#2→layer_start3#2": 1.5339999999996508,
+              "layer_start3#2→layer_done3#2": 70.28399999999965,
+              "layer_done3#2→layer_start4#2": 0.0,
+              "layer_start4#2→layer_done4#2": 0.5869999999995343,
+              "layer_done4#2→layer_start5#2": 0.0,
+              "layer_start5#2→layer_done5#2": 0.0010000000038417056,
+              "layer_done5#2→layer_start6#2": 0.0,
+              "layer_start6#2→layer_done6#2": 0.02599999999802094,
+              "layer_done6#2→rawsink_start#2": 9.385999999998603,
+              "rawsink_start#2→rawsink_done#2": 364.3110000000015,
+              "rawsink_done#2→l7_persist#2": 2.529999999998836,
+              "l7_persist#2→end": 0.19700000000011642
+            },
+            "new": {
+              "start→layer_start1#1": 0.6559999999954016,
+              "layer_start1#1→layer_done1#1": 2.173000000002503,
+              "layer_done1#1→layer_start2#1": 0.000999999996565748,
+              "layer_start2#1→layer_done2#1": 102.61100000000442,
+              "layer_done2#1→layer_start3#1": 4.7039999999979045,
+              "layer_start3#1→layer_done3#1": 100.28499999999622,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 0.8670000000056461,
+              "layer_done4#1→layer_start5#1": 0.0,
+              "layer_start5#1→layer_done5#1": 0.000999999996565748,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.0290000000022701,
+              "layer_done6#1→rawsink_start#1": 15.676999999996042,
+              "rawsink_start#1→rawsink_done#1": 578.5160000000033,
+              "rawsink_done#1→l7_persist#1": 2.5060000000012224,
+              "l7_persist#1→layer_start1#2": 18.56300000000192,
+              "layer_start1#2→layer_done1#2": 2.9839999999967404,
+              "layer_done1#2→layer_start2#2": 0.000999999996565748,
+              "layer_start2#2→layer_done2#2": 64.76000000000204,
+              "layer_done2#2→layer_start3#2": 2.0449999999982538,
+              "layer_start3#2→layer_done3#2": 71.81400000000576,
+              "layer_done3#2→layer_start4#2": 0.0,
+              "layer_start4#2→layer_done4#2": 0.6429999999963911,
+              "layer_done4#2→layer_start5#2": 0.0,
+              "layer_start5#2→layer_done5#2": 0.0010000000038417056,
+              "layer_done5#2→layer_start6#2": 0.000999999996565748,
+              "layer_start6#2→layer_done6#2": 0.023999999997613486,
+              "layer_done6#2→rawsink_start#2": 10.252000000000407,
+              "rawsink_start#2→rawsink_done#2": 362.3220000000001,
+              "rawsink_done#2→l7_persist#2": 2.5469999999986612,
+              "l7_persist#2→end": 0.19300000000657747
+            }
+          },
+          {
+            "order": "new_first",
+            "tag": "stage_d12_nf",
+            "head": {
+              "start→layer_start1#1": 0.4320000000006985,
+              "layer_start1#1→layer_done1#1": 2.172999999995227,
+              "layer_done1#1→layer_start2#1": 0.0010000000038417056,
+              "layer_start2#1→layer_done2#1": 103.93899999999849,
+              "layer_done2#1→layer_start3#1": 4.624000000003434,
+              "layer_start3#1→layer_done3#1": 99.6559999999954,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 0.8220000000001164,
+              "layer_done4#1→layer_start5#1": 0.0,
+              "layer_start5#1→layer_done5#1": 0.0010000000038417056,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.029999999998835847,
+              "layer_done6#1→rawsink_start#1": 15.413999999997031,
+              "rawsink_start#1→rawsink_done#1": 575.2400000000052,
+              "rawsink_done#1→l7_persist#1": 2.4679999999934807,
+              "l7_persist#1→layer_start1#2": 19.135000000002037,
+              "layer_start1#2→layer_done1#2": 2.595000000001164,
+              "layer_done1#2→layer_start2#2": 0.000999999996565748,
+              "layer_start2#2→layer_done2#2": 62.75,
+              "layer_done2#2→layer_start3#2": 1.3410000000003492,
+              "layer_start3#2→layer_done3#2": 70.78399999999965,
+              "layer_done3#2→layer_start4#2": 0.0,
+              "layer_start4#2→layer_done4#2": 0.5230000000010477,
+              "layer_done4#2→layer_start5#2": 0.0,
+              "layer_start5#2→layer_done5#2": 0.0010000000038417056,
+              "layer_done5#2→layer_start6#2": 0.0,
+              "layer_start6#2→layer_done6#2": 0.02599999999802094,
+              "layer_done6#2→rawsink_start#2": 10.644000000000233,
+              "rawsink_start#2→rawsink_done#2": 363.66799999999785,
+              "rawsink_done#2→l7_persist#2": 2.5129999999990105,
+              "l7_persist#2→end": 0.20500000000174623
+            },
+            "new": {
+              "start→layer_start1#1": 0.6599999999962165,
+              "layer_start1#1→layer_done1#1": 2.2050000000017462,
+              "layer_done1#1→layer_start2#1": 0.0010000000038417056,
+              "layer_start2#1→layer_done2#1": 101.93799999999464,
+              "layer_done2#1→layer_start3#1": 4.302999999999884,
+              "layer_start3#1→layer_done3#1": 99.36700000000565,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 1.1669999999940046,
+              "layer_done4#1→layer_start5#1": 0.0,
+              "layer_start5#1→layer_done5#1": 0.0020000000004074536,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.02800000000570435,
+              "layer_done6#1→rawsink_start#1": 15.632999999994354,
+              "rawsink_start#1→rawsink_done#1": 576.2530000000042,
+              "rawsink_done#1→l7_persist#1": 2.495999999999185,
+              "l7_persist#1→layer_start1#2": 19.364999999997963,
+              "layer_start1#2→layer_done1#2": 2.5860000000029686,
+              "layer_done1#2→layer_start2#2": 0.000999999996565748,
+              "layer_start2#2→layer_done2#2": 63.6510000000053,
+              "layer_done2#2→layer_start3#2": 1.4909999999945285,
+              "layer_start3#2→layer_done3#2": 72.4230000000025,
+              "layer_done3#2→layer_start4#2": 0.000999999996565748,
+              "layer_start4#2→layer_done4#2": 0.6589999999996508,
+              "layer_done4#2→layer_start5#2": 0.0,
+              "layer_start5#2→layer_done5#2": 0.0020000000004074536,
+              "layer_done5#2→layer_start6#2": 0.0,
+              "layer_start6#2→layer_done6#2": 0.027000000001862645,
+              "layer_done6#2→rawsink_start#2": 11.09100000000035,
+              "rawsink_start#2→rawsink_done#2": 363.10199999999895,
+              "rawsink_done#2→l7_persist#2": 2.486000000004424,
+              "l7_persist#2→end": 0.19399999999586726
+            }
+          },
+          {
+            "order": "head_first",
+            "tag": "stage_d12_hf2",
+            "head": {
+              "start→layer_start1#1": 0.4279999999998836,
+              "layer_start1#1→layer_done1#1": 2.2070000000021537,
+              "layer_done1#1→layer_start2#1": 0.000999999996565748,
+              "layer_start2#1→layer_done2#1": 109.40000000000146,
+              "layer_done2#1→layer_start3#1": 6.5239999999976135,
+              "layer_start3#1→layer_done3#1": 102.71399999999994,
+              "layer_done3#1→layer_start4#1": 0.0,
+              "layer_start4#1→layer_done4#1": 0.9070000000065193,
+              "layer_done4#1→layer_start5#1": 0.0,
+              "layer_start5#1→layer_done5#1": 0.0,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.029999999998835847,
+              "layer_done6#1→rawsink_start#1": 15.677999999999884,
+              "rawsink_start#1→rawsink_done#1": 574.2869999999966,
+              "rawsink_done#1→l7_persist#1": 2.5650000000023283,
+              "l7_persist#1→layer_start1#2": 18.90899999999965,
+              "layer_start1#2→layer_done1#2": 2.5270000000018626,
+              "layer_done1#2→layer_start2#2": 0.000999999996565748,
+              "layer_start2#2→layer_done2#2": 62.62600000000384,
+              "layer_done2#2→layer_start3#2": 1.4589999999952852,
+              "layer_start3#2→layer_done3#2": 71.55600000000413,
+              "layer_done3#2→layer_start4#2": 0.0,
+              "layer_start4#2→layer_done4#2": 0.6559999999954016,
+              "layer_done4#2→layer_start5#2": 0.0,
+              "layer_start5#2→layer_done5#2": 0.0010000000038417056,
+              "layer_done5#2→layer_start6#2": 0.0,
+              "layer_start6#2→layer_done6#2": 0.0319999999992433,
+              "layer_done6#2→rawsink_start#2": 10.48399999999674,
+              "rawsink_start#2→rawsink_done#2": 363.7610000000059,
+              "rawsink_done#2→l7_persist#2": 2.5389999999970314,
+              "l7_persist#2→end": 0.19999999999708962
+            },
+            "new": {
+              "start→layer_start1#1": 0.6889999999984866,
+              "layer_start1#1→layer_done1#1": 2.1960000000035507,
+              "layer_done1#1→layer_start2#1": 0.000999999996565748,
+              "layer_start2#1→layer_done2#1": 103.55099999999948,
+              "layer_done2#1→layer_start3#1": 4.983000000000175,
+              "layer_start3#1→layer_done3#1": 100.08800000000338,
+              "layer_done3#1→layer_start4#1": 0.000999999996565748,
+              "layer_start4#1→layer_done4#1": 0.8689999999987776,
+              "layer_done4#1→layer_start5#1": 0.0010000000038417056,
+              "layer_start5#1→layer_done5#1": 0.000999999996565748,
+              "layer_done5#1→layer_start6#1": 0.0,
+              "layer_start6#1→layer_done6#1": 0.03900000000430737,
+              "layer_done6#1→rawsink_start#1": 15.570999999996275,
+              "rawsink_start#1→rawsink_done#1": 579.4570000000022,
+              "rawsink_done#1→l7_persist#1": 2.5049999999973807,
+              "l7_persist#1→layer_start1#2": 18.393000000003667,
+              "layer_start1#2→layer_done1#2": 2.5800000000017462,
+              "layer_done1#2→layer_start2#2": 0.001999999993131496,
+              "layer_start2#2→layer_done2#2": 63.08899999999994,
+              "layer_done2#2→layer_start3#2": 1.2450000000026193,
+              "layer_start3#2→layer_done3#2": 71.12800000000425,
+              "layer_done3#2→layer_start4#2": 0.0,
+              "layer_start4#2→layer_done4#2": 0.6389999999955762,
+              "layer_done4#2→layer_start5#2": 0.0,
+              "layer_start5#2→layer_done5#2": 0.0010000000038417056,
+              "layer_done5#2→layer_start6#2": 0.000999999996565748,
+              "layer_start6#2→layer_done6#2": 0.023999999997613486,
+              "layer_done6#2→rawsink_start#2": 9.722000000001572,
+              "rawsink_start#2→rawsink_done#2": 364.45900000000256,
+              "rawsink_done#2→l7_persist#2": 2.5389999999970314,
+              "l7_persist#2→end": 0.20200000000477303
+            }
+          }
+        ]
+      },
+      "result": {
+        "name": "dual_start_12h",
+        "pairs": 5,
+        "r": 1.001193820224719,
+        "median_head_s": 1424.0,
+        "median_new_s": 1425.7,
+        "verdict": "pass",
+        "reason": "r＝1.0012 ≤ 1.03（視為相同）"
+      }
+    },
+    {
+      "input": {
+        "name": "dual_1h",
+        "timing_source": "wall_clock_full_entry",
+        "censored": true,
+        "new_outcome": "completed",
+        "new_s": 2284.6,
+        "new_rc": 0,
+        "stopped_reason": null,
+        "footprint_max_gib": 18.38,
+        "head_note": "HEAD 未跑（時限內未輪到）"
+      },
+      "result": {
+        "name": "dual_1h",
+        "verdict": "censored",
+        "reason": "HEAD 未完成；新碼 completed",
+        "new_s": 2284.6
+      }
+    }
+  ],
+  "all_pass": true,
+  "head_commit": "f13a9635",
+  "machine": "本機 8 GiB（macOS）",
+  "frame_reference": [
+    {
+      "name": "canonical_legacy_healthy",
+      "pairs": [
+        {
+          "order": "new_first",
+          "head_s": 108.0,
+          "new_s": 107.5,
+          "method": "probe_wall",
+          "tag": "legacy"
+        }
+      ],
+      "note": "frame 臂；兩臂 rc=1，同一 HEAD 既有紅斷言"
+    },
+    {
+      "name": "batch2d_t3",
+      "new_s": 3937.5,
+      "new_rc": 0,
+      "footprint_max_gib": 7.943,
+      "swap_used_max_gib": 8.907,
+      "note": "frame 臂（與 CGSA 對照）；HEAD 於背景 2 小時上限終止（約 43 分未完）"
+    }
+  ],
+  "diagnostics": {
+    "attribution_s": {
+      "e2e_standard_12h": 0.341,
+      "dual_start_12h": 0.523
+    },
+    "note": "cProfile 根行程之新增程式累計耗時與逐段表為診斷，不作判定條件（SPEC v40）"
+  }
+}

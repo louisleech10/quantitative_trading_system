@@ -34,7 +34,7 @@ from typing import Any, Callable, Deque, Dict, Iterator, List, Literal, Mapping,
 
 
 class GenerationMemoryBudgetExceeded(RuntimeError):
-    """配置前預算判定不通過（本程式超上限／壓力危急／系統可用不足／任務峰值估算低估），或守護停止旗標已立。"""
+    """配置前判定不通過（機器可用量不足〔選路後新增量 G 仍 > 剩餘可用量 A〕），或守護停止旗標已立。"""
 
     def __init__(self, label: str, current: int, planned: int, budget: int, reason: str) -> None:
         super().__init__(f"{reason}：{label} 目前 {current} B＋計畫 {planned} B，上限 {budget} B")
@@ -46,6 +46,15 @@ class GenerationMemoryBudgetExceeded(RuntimeError):
 
     def __reduce__(self) -> Any:  # 跨行程（worker → 根）保留具名欄位
         return (GenerationMemoryBudgetExceeded, (self.label, self.current, self.planned, self.budget, self.reason))
+
+
+class MemoryRerouteNeeded(GenerationMemoryBudgetExceeded):
+    """域內 worker 配置前發現 `F_self + planned > E` 且原 E 內無白名單較小臂（SPEC v35）：尚未配置、未發布
+    complete；根於該波次 join 後 rollback 並以正式串行 producer 重試一次。為 `GenerationMemoryBudgetExceeded` 之
+    子類，使既有「預算錯誤原樣上拋、不降級」之各層路徑一律傳遞之。"""
+
+    def __reduce__(self) -> Any:
+        return (MemoryRerouteNeeded, (self.label, self.current, self.planned, self.budget, self.reason))
 
 
 class MemoryMeasurementUnavailable(RuntimeError):
@@ -68,14 +77,20 @@ MiB = 1 << 20
 # 契約 tests/_golden/icfirstalign/contract.json 之 budget／budget_messages（同值）
 RATIO_DEFAULT = 0.75
 DISK_RESERVE_MIN_BYTES = 4 * GiB
-DISK_RESERVE_FRACTION = 0.05
+# 磁碟保留量之換頁檔數（SPEC v36）：守護自首次觸發至終止之取樣數（旗標 1＋確認 2），每取樣最大磁碟下降實測為
+# 一個換頁檔（收據 20261005-icfirstalign-swap-timeline-head.json 之逐筆序列）
+DISK_RESERVE_SWAPFILES = 3
 PRESSURE_CRITICAL_LEVEL = 4
 GUARD_INTERVAL_SECONDS = 0.5
 GUARD_CONSECUTIVE_FOR_KILL = 2
 MSG_OWN_CAP = "本程式超上限"
-MSG_PRESSURE_CRITICAL = "系統記憶體壓力已達危急"
-MSG_SYSTEM_INSUFFICIENT = "系統可用不足，請關閉其他程式"
+MSG_MACHINE_INSUFFICIENT = "機器可用量不足"
+MSG_SWAP_VOLUME_LOW = "換頁卷剩餘不足（磁碟將滿）"
+MSG_MEASUREMENT_FAILED = "記憶體量測失敗"
 MSG_ESTIMATE_EXCEEDED = "任務峰值估算低估"
+# 換頁擴充上限之 sysctl（SPEC v35；讀不到 ⇒ 擴充計 0、記 memory_swap_expand_unreadable）
+SWAPFILE_SYSCTLS = ("vm.compressor.swapper.swapfile_limit", "vm.compressor.swapper.swapfile_cnt",
+                    "vm.compressor.swapper.swapfile_size_max")
 REJECTED_BUS_PROTOCOLS = ("Disk Image",)
 SWAP_VOLUME = "/System/Volumes/VM"
 L2_SPILL_THRESHOLD_BYTES = 500_000_000  # FeatureFactory._spill_to_memmap 之 float64 估計門檻（同值）
@@ -109,6 +124,11 @@ class VMSnapshot:
     pressure_level: int
     swap_volume_free_bytes: int
     swap_volume_capacity_bytes: int
+    # 換頁擴充上限（SPEC v35）：三者任一為 None ⇒ 讀不到、擴充計 0
+    swapfile_limit: Optional[int] = None
+    swapfile_count: Optional[int] = None
+    swapfile_size_max: Optional[int] = None
+    page_size: int = 16384
 
 
 # 選擇子正規化（唯一一份；Task 4.2）：鍵 → 合法值。workers 為 "auto" 或正整數。
@@ -352,6 +372,7 @@ def sample_vm_snapshot() -> VMSnapshot:
     volume = SWAP_VOLUME if os.path.isdir(SWAP_VOLUME) else "/"
     st = os.statvfs(volume)
     free_pages = max(int(stats.free_count) - int(stats.speculative_count), 0)
+    limit, count, size_max = _swapfile_params()
     return VMSnapshot(
         free_bytes=free_pages * page,
         file_backed_bytes=int(stats.external_page_count) * page,
@@ -359,22 +380,45 @@ def sample_vm_snapshot() -> VMSnapshot:
         pressure_level=int(pressure),
         swap_volume_free_bytes=int(st.f_bavail) * int(st.f_frsize),
         swap_volume_capacity_bytes=int(st.f_blocks) * int(st.f_frsize),
+        swapfile_limit=limit, swapfile_count=count, swapfile_size_max=size_max, page_size=int(page),
     )
 
 
+def _swapfile_params() -> Tuple[Optional[int], Optional[int], Optional[int]]:
+    """換頁檔數上限、目前檔數、單檔上限（SPEC v35）；任一讀不到 ⇒ 三者皆 None（擴充計 0）。"""
+    try:
+        return tuple(_sysctl_int(name) for name in SWAPFILE_SYSCTLS)  # type: ignore[return-value]
+    except MemoryMeasurementUnavailable:
+        return None, None, None
+
+
+def swap_expansion_readable(snapshot: VMSnapshot) -> bool:
+    return None not in (snapshot.swapfile_limit, snapshot.swapfile_count, snapshot.swapfile_size_max)
+
+
+def disk_reserve_bytes(swapfile_size_max: Optional[int] = None) -> int:
+    """磁碟保留量（SPEC v36）＝max(4 GiB, 3 × 換頁檔單檔上限)；單檔上限讀不到 ⇒ 4 GiB。"""
+    return max(DISK_RESERVE_MIN_BYTES, DISK_RESERVE_SWAPFILES * int(swapfile_size_max or 0))
+
+
+def swap_expansion_bytes(snapshot: VMSnapshot) -> int:
+    """可證換頁擴充 X＝min（剩餘檔數 × 單檔上限，換頁卷可用 − 磁碟保留量）；讀不到 ⇒ 0（SPEC v35／v36）。"""
+    if not swap_expansion_readable(snapshot):
+        return 0
+    slots = max(int(snapshot.swapfile_limit) - int(snapshot.swapfile_count), 0) * int(snapshot.swapfile_size_max)
+    room = max(int(snapshot.swap_volume_free_bytes) - disk_reserve_bytes(snapshot.swapfile_size_max), 0)
+    return int(min(slots, room))
+
+
+def available_bytes(snapshot: VMSnapshot) -> int:
+    """剩餘可用量 A（SPEC v35）＝free＋file-backed＋現有換頁剩餘＋可證換頁擴充 X；匿名與壓縮器頁不計。"""
+    return (int(snapshot.free_bytes) + int(snapshot.file_backed_bytes) + int(snapshot.swap_free_bytes)
+            + swap_expansion_bytes(snapshot))
+
+
 def system_absorbable_bytes(snapshot: VMSnapshot) -> int:
-    """free＋file-backed＋現有換頁剩餘（換頁擴充計 0；匿名與壓縮器頁不計）。"""
-    return int(snapshot.free_bytes) + int(snapshot.file_backed_bytes) + int(snapshot.swap_free_bytes)
-
-
-def _pressure_ok(snapshot: VMSnapshot) -> bool:
-    """核心壓力等級非危急（警告 2 不擋）。"""
-    return int(snapshot.pressure_level) < PRESSURE_CRITICAL_LEVEL
-
-
-def disk_reserve_bytes(volume_capacity_bytes: int) -> int:
-    """磁碟保留量＝max(4 GiB, 卷容量 × 5%)。"""
-    return max(DISK_RESERVE_MIN_BYTES, int(int(volume_capacity_bytes) * DISK_RESERVE_FRACTION))
+    """准入之可吸收量＝剩餘可用量 A（SPEC v35 取代「換頁擴充計 0」）。"""
+    return available_bytes(snapshot)
 
 
 def physical_memory_bytes() -> int:
@@ -702,8 +746,8 @@ def _stop_flag_reason(stop_dir: Optional[Path]) -> Optional[str]:
         return "stop"
 
 
-_TRIGGER_MESSAGES = {"pressure_critical": MSG_PRESSURE_CRITICAL, "footprint_over_budget": MSG_OWN_CAP,
-                     "swap_volume_low": MSG_SYSTEM_INSUFFICIENT}
+_TRIGGER_MESSAGES = {"swap_volume_low": MSG_SWAP_VOLUME_LOW, "paging_exhausted": MSG_MACHINE_INSUFFICIENT,
+                     "measurement_failed": MSG_MEASUREMENT_FAILED}
 
 
 def _check_log(event: Dict[str, Any]) -> None:
@@ -719,8 +763,10 @@ def _check_log(event: Dict[str, Any]) -> None:
 
 def check(branch_id: str, components: Sequence[Component], *, label: Optional[str] = None,
           run_dir: Optional[Path] = None, domain: Optional["DomainDescriptor"] = None) -> None:
-    """配置前判定。分支 ID 不在分支表 ⇒ `UnknownBudgetBranchError`；停止旗標已立或條件任一不成立 ⇒
-    `GenerationMemoryBudgetExceeded`（reason 為契約 budget_messages 之一，域內任務之估算低估另具名）。"""
+    """配置前判定（SPEC v35–v39「記憶體上限與選路」）：本段新增量 G（anon planned）≤ 剩餘可用量 A ⇒ 放行；
+    不以 `F + planned` 與比例上限比較（R 只管並行准入與選路）、壓力等級只記錄。分支 ID 不在分支表 ⇒
+    `UnknownBudgetBranchError`；停止旗標已立 ⇒ 具名停止；G > A ⇒ `GenerationMemoryBudgetExceeded`（機器可用量
+    不足；呼叫端可先經 `route` 嘗試白名單等價臂）；域內 worker 之 `F_self + G > E` ⇒ `MemoryRerouteNeeded`。"""
     if branch_id not in BRANCH_TABLE:
         raise UnknownBudgetBranchError(branch_id)
     components = list(components)
@@ -733,8 +779,9 @@ def check(branch_id: str, components: Sequence[Component], *, label: Optional[st
     name = label or branch_id
     planned = planned_bytes(components)
     if ctx is not None and ctx.checkpoint_file is not None:
-        try:
-            ctx.checkpoint_file.write_text(name, encoding="utf-8")
+        try:  # 只供收據定位（v38：G 不作守護之停止條件）
+            ctx.checkpoint_file.write_text(json.dumps({"label": name, "G": planned, "time": time.time()},
+                                                      ensure_ascii=False), encoding="utf-8")
         except OSError:
             pass
     log: Dict[str, Any] = {"event": "check", "pid": os.getpid(),
@@ -744,33 +791,73 @@ def check(branch_id: str, components: Sequence[Component], *, label: Optional[st
     try:
         trigger = _stop_flag_reason(stop_dir)
         if trigger is not None:
-            raise GenerationMemoryBudgetExceeded(name, 0, planned, 0, _TRIGGER_MESSAGES.get(trigger, MSG_OWN_CAP))
+            raise GenerationMemoryBudgetExceeded(name, 0, planned, 0, _TRIGGER_MESSAGES.get(trigger, trigger))
         snapshot = sample_vm_snapshot()
+        available = available_bytes(snapshot)
+        log.update({"A": available, "pressure": int(snapshot.pressure_level),
+                    "swap_expand_readable": swap_expansion_readable(snapshot)})
+        current = 0
         if domain is not None:
             current = sample_memory_bytes()
-            candidate = current + planned
-            log.update({"F": current, "U": candidate})
-            if candidate > int(domain.envelope):
-                _record_estimate_exceeded(domain, name, current, planned)
-                raise GenerationMemoryBudgetExceeded(name, current, planned, int(domain.envelope), MSG_ESTIMATE_EXCEEDED)
-            budget = int(domain.budget)
-        else:
-            current = _current_usage_bytes()
-            budget = configured_budget_bytes()
             log.update({"F": current, "U": current + planned})
-            if current + planned > budget:
-                raise GenerationMemoryBudgetExceeded(name, current, planned, budget, MSG_OWN_CAP)
-        if not _pressure_ok(snapshot):
-            raise GenerationMemoryBudgetExceeded(name, current, planned, budget, MSG_PRESSURE_CRITICAL)
-        if planned > system_absorbable_bytes(snapshot):
-            raise GenerationMemoryBudgetExceeded(name, current, planned, system_absorbable_bytes(snapshot),
-                                                 MSG_SYSTEM_INSUFFICIENT)
+            if current + planned > int(domain.envelope):
+                _record_estimate_exceeded(domain, name, current, planned)
+                raise MemoryRerouteNeeded(name, current, planned, int(domain.envelope), MSG_ESTIMATE_EXCEEDED)
+        else:
+            override = _BUDGET_OVERRIDE.get()
+            if override is not None:
+                # 測試接縫：以「上限 − 目前用量」作剩餘（只作用於本判定；與 A 取小），驗配置前時點與成分計量
+                current = _current_usage_bytes()
+                log.update({"F": current, "U": current + planned})
+                if current + planned > int(override):
+                    raise GenerationMemoryBudgetExceeded(name, current, planned, int(override), MSG_OWN_CAP)
+        if planned > available:
+            raise GenerationMemoryBudgetExceeded(name, current, planned, available, MSG_MACHINE_INSUFFICIENT)
     except GenerationMemoryBudgetExceeded as exc:
         log["result"] = exc.reason
         _check_log(log)
         raise
     log["result"] = "ok"
     _check_log(log)
+
+
+# 選路白名單之速度收據（SPEC v35：同規模實測收據證明候選較快才於 G ≤ A 時切換）：
+# {(分派點, 原分支, 候選分支): [規模鍵, …]}；預設空（無收據 ⇒ 保留原臂）。
+ROUTE_SPEED_RECEIPTS: Dict[Tuple[str, str, str], Sequence[str]] = {}
+
+
+def _is_capacity_refusal(exc: GenerationMemoryBudgetExceeded) -> bool:
+    return exc.reason in (MSG_MACHINE_INSUFFICIENT, MSG_OWN_CAP, MSG_ESTIMATE_EXCEEDED)
+
+
+def route(point: str, candidates: Sequence[Tuple[str, Mapping[str, Any]]], *, label: Optional[str] = None,
+          scale_key: Optional[str] = None) -> str:
+    """選路（SPEC v35）：`candidates[0]` 為原臂，其後為該分派點白名單之逐位元等價臂（呼叫端負責只列已登錄者）。
+    同規模速度收據證明某候選較快 ⇒ 先試之；否則先試原臂。容量不足（機器可用量不足／worker 估算低估）⇒ 依序
+    試其餘候選；皆不可 ⇒ 上拋原臂之錯誤。停止旗標等非容量原因不換路。回傳實際選定之分支 ID，並記入
+    `ICFA_CHECK_LOG` 之 `memory_route` 事件。"""
+    original = candidates[0][0]
+    ordered = list(candidates)
+    for index, (branch, _params) in enumerate(candidates[1:], start=1):
+        if scale_key is not None and scale_key in ROUTE_SPEED_RECEIPTS.get((point, original, branch), ()):
+            ordered.insert(0, ordered.pop(index))
+            break
+    first_error: Optional[GenerationMemoryBudgetExceeded] = None
+    for branch, params in ordered:
+        try:
+            check_estimate(branch, params, label=f"{label or point}:{branch}")
+        except GenerationMemoryBudgetExceeded as exc:
+            if not _is_capacity_refusal(exc):
+                raise
+            first_error = first_error or exc
+            continue
+        if branch != original:
+            reason = "speed_receipt" if branch == ordered[0][0] and first_error is None else "capacity"
+            _check_log({"event": "memory_route", "point": point, "from": original, "to": branch, "reason": reason,
+                        "pid": os.getpid()})
+        return branch
+    assert first_error is not None
+    raise first_error
 
 
 def check_estimate(branch_id: str, params: Mapping[str, Any], **kwargs: Any) -> List[Component]:
@@ -1258,14 +1345,18 @@ class AdmissionState:
     members: Sequence[Member]
     slots: Sequence[Slot]
     absorbable: int
-    pressure_level: int
+    pressure_level: int  # 只記錄（v36：不再為准入條件）
     stop_flag: bool
+    # 同容器檔案寫入（SPEC v37）：換頁卷可用空間、磁碟保留量、已准入未 join 任務之寫入上界總和；None ⇒ 不判
+    disk_free: Optional[int] = None
+    disk_reserve: int = 0
+    disk_committed: int = 0
 
 
 @dataclass(frozen=True)
 class Admission:
     ok: bool
-    reason: str  # ok | budget | absorbable | pressure | stop_flag
+    reason: str  # ok | budget | absorbable | disk | stop_flag
 
 
 def _dedup(members: Sequence[Member]) -> List[Member]:
@@ -1282,13 +1373,15 @@ def commitment(member: Member) -> int:
     return max(int(member.footprint), int(member.envelope))
 
 
-def admit(state: AdmissionState, new_envelope: int) -> Admission:
-    """准入合取：Σ U（去重）＋Σ 槽 E＋E_new ≤ B，且 Σ max(E−F,0)＋Σ 槽 E＋E_new ≤ 可吸收量，且壓力非危急、無停止旗標。"""
+def admit(state: AdmissionState, new_envelope: int, new_disk: int = 0) -> Admission:
+    """准入合取（SPEC v35–v37）：Σ U（去重）＋Σ 槽 E＋E_new ≤ B（＝R，快區），且 Σ max(E−F,0)＋Σ 槽 E＋E_new ≤ 剩餘
+    可用量 A，且同容器之已准入寫入上界＋新任務寫入上界＋磁碟保留量 ≤ 換頁卷可用空間，且無停止旗標；壓力只記錄。"""
     module = sys.modules[__name__]
     if state.stop_flag:
         return Admission(False, "stop_flag")
-    if int(state.pressure_level) >= PRESSURE_CRITICAL_LEVEL:
-        return Admission(False, "pressure")
+    if state.disk_free is not None and \
+            int(state.disk_committed) + int(new_disk) + int(state.disk_reserve) > int(state.disk_free):
+        return Admission(False, "disk")
     members = _dedup(state.members)
     slots_total = sum(int(s.envelope) for s in state.slots)
     total = sum(module.commitment(m) for m in members) + slots_total + int(new_envelope)
@@ -1305,16 +1398,14 @@ def measured_total(members: Sequence[Member]) -> int:
     return int(sum(int(m.footprint) for m in _dedup(members)))
 
 
-def guard_should_stop(members: Sequence[Member], budget: int, pressure_level: int,
-                      swap_volume_free: int, disk_reserve: int) -> Optional[str]:
-    """守護第一段判定：回停止原因或 None；只依實測（`measured_total`）。"""
-    module = sys.modules[__name__]
-    if int(pressure_level) >= PRESSURE_CRITICAL_LEVEL:
-        return "pressure_critical"
+def guard_should_stop(swap_volume_free: int, disk_reserve: int, available: Optional[int] = None,
+                      page_size: int = 16384) -> Optional[str]:
+    """守護第一段判定（SPEC v35–v39；與 `memory_guard._conditions` 同義之純函式）：換頁卷剩餘 < 磁碟保留量 ⇒
+    `swap_volume_low`；剩餘可用量 A < 一頁 ⇒ `paging_exhausted`；壓力等級與 footprint 對上限不再為停止條件。"""
     if int(swap_volume_free) < int(disk_reserve):
         return "swap_volume_low"
-    if module.measured_total(members) > int(budget):
-        return "footprint_over_budget"
+    if available is not None and int(available) < int(page_size):
+        return "paging_exhausted"
     return None
 
 
@@ -1323,6 +1414,7 @@ class Task:
     task_id: str
     envelope: Optional[int]  # None＝形狀不可得 ⇒ 不准入並行，走串行臂
     payload: Any = None
+    disk_bytes: int = 0  # 同容器檔案寫入上界 D（SPEC v37；形狀推導，准入發布、join 撤銷）
 
 
 def _default_identity() -> Tuple[int, float]:
@@ -1391,6 +1483,7 @@ class MemoryBudgetScheduler:
         self._tasks: Dict[str, _TaskState] = {}
         self._stop_requested = threading.Event()
         self._interrupt_pending = False
+        self._reroute_seen = False
         self._aux_slot: Optional[Slot] = None
         self.degraded: Optional[Dict[str, Any]] = None
 
@@ -1418,7 +1511,11 @@ class MemoryBudgetScheduler:
     def snapshot(self) -> AdmissionState:
         with self._lock:
             self._refresh_bindings()
-            absorbable, pressure, stop, root_footprint, aux_members = self._read_system()
+            reading = tuple(self._read_system())
+            absorbable, pressure, stop, root_footprint, aux_members = reading[:5]
+            # 第 6、7 項（選填，SPEC v37）：換頁卷可用空間、磁碟保留量 ⇒ 准入判同容器寫入上界
+            disk_free = int(reading[5]) if len(reading) > 5 and reading[5] is not None else None
+            disk_reserve = int(reading[6]) if len(reading) > 6 else 0
             aux_members = list(aux_members or ())
             members: List[Member] = [Member(pid=os.getpid(), start_time=_root_start_time(), footprint=int(root_footprint),
                                             envelope=None, role="root")]
@@ -1434,8 +1531,11 @@ class MemoryBudgetScheduler:
                                           envelope=int(state.task.envelope) if active else None, role="task"))
             if self._aux_slot is not None and not any(m.role == "tracker" for m in aux_members):
                 slots.append(self._aux_slot)
+            disk_committed = sum(int(state.task.disk_bytes) for state in self._tasks.values()
+                                 if state.status in ("starting", "running", "completed", "failed"))
             return AdmissionState(budget=self.budget, members=tuple(members), slots=tuple(slots),
-                                  absorbable=int(absorbable), pressure_level=int(pressure), stop_flag=bool(stop))
+                                  absorbable=int(absorbable), pressure_level=int(pressure), stop_flag=bool(stop),
+                                  disk_free=disk_free, disk_reserve=disk_reserve, disk_committed=disk_committed)
 
     def mark_starting(self, task_id: str) -> None:
         with self._lock:
@@ -1581,7 +1681,7 @@ class MemoryBudgetScheduler:
                     queue.clear()
                     break
                 head = queue[0]
-                if head.task.envelope is None or self.aux_startup_envelope is None:
+                if head.task.envelope is None or self.aux_startup_envelope is None or self._reroute_seen:
                     if wave:
                         break
                     queue.popleft()
@@ -1589,7 +1689,7 @@ class MemoryBudgetScheduler:
                     continue
                 if not wave:
                     self._register_aux_slot()
-                decision = admit(self.snapshot(), int(head.task.envelope))
+                decision = admit(self.snapshot(), int(head.task.envelope), int(head.task.disk_bytes))
                 if not decision.ok:
                     if wave:
                         break
@@ -1614,14 +1714,22 @@ class MemoryBudgetScheduler:
                         state.status = "failed" if failed else "completed"
                     self._event(state.status, state.task.task_id)
             wave_results: List[Any] = []
+            rerouted: List[_TaskState] = []
             for state in wave:
                 self._join_confirmed(state)
                 exc = state.future.exception()
+                if isinstance(exc, MemoryRerouteNeeded):
+                    rerouted.append(state)  # SPEC v35：該波 join 後於根之正式串行 producer 重試一次
+                    continue
                 value = exc if exc is not None else state.future.result()
                 results[state.index] = value
                 wave_results.append(value)
             self._event("wave_joined", "")
             on_wave_joined(wave_results)
+            for state in rerouted:
+                self._reroute_seen = True  # 根停止新准入：其後任務一律正式串行臂
+                self._event("reroute", state.task.task_id)
+                results[state.index] = self._run_serial(state, serial_fn)
         return parallel_ever
 
     def _submit(self, state: _TaskState, worker_fn: Callable[[DomainDescriptor, Any], Any]) -> None:
@@ -1674,7 +1782,8 @@ def default_read_system(stop_dir: Path, guard_pid: Optional[int]) -> Callable[[]
             aux.append(Member(pid=tracker, start_time=process_start_time(tracker),
                               footprint=sample_footprint_of(tracker), role="tracker"))
         return (system_absorbable_bytes(snapshot), snapshot.pressure_level, stop_flag_set(stop_dir),
-                sample_memory_bytes(), tuple(aux))
+                sample_memory_bytes(), tuple(aux), snapshot.swap_volume_free_bytes,
+                disk_reserve_bytes(snapshot.swapfile_size_max))
 
     return read
 
@@ -1811,7 +1920,8 @@ def in_domain_worker() -> bool:
 
 
 __all__ = [
-    "GenerationMemoryBudgetExceeded", "MemoryMeasurementUnavailable", "UnknownBudgetBranchError", "Component", "VMSnapshot",
+    "GenerationMemoryBudgetExceeded", "MemoryRerouteNeeded", "MemoryMeasurementUnavailable", "UnknownBudgetBranchError",
+    "SchedulerStopped", "Component", "VMSnapshot", "available_bytes", "swap_expansion_bytes", "route",
     "SELECTORS", "NON_ARM_FFACT_KEYS", "BRANCH_TABLE", "STOP_FLAG_NAME", "ABORT_RECEIPT_NAME", "OWNED_PATHS_NAME",
     "sample_memory_bytes", "sample_footprint_of", "sample_vm_snapshot", "system_absorbable_bytes",
     "disk_reserve_bytes", "budget_bytes", "planned_bytes", "normalize_selectors", "selector", "check",

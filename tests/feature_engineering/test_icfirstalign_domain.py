@@ -26,6 +26,7 @@ from tests.feature_engineering import icfirstalign_helpers as h
 pytestmark = pytest.mark.timeout(120)
 
 GiB = 1 << 30
+MiB = 1 << 20
 
 
 def _thread_identity() -> Tuple[int, float]:
@@ -95,17 +96,53 @@ def test_starting_slots_counted_in_absorbable() -> None:
 def test_mutation_absorbable_ignores_slots(monkeypatch: pytest.MonkeyPatch) -> None:
     """(t) mutant「系統式漏啟動槽」⇒ 放行而紅（以去槽之狀態代入同一判定）。"""
     real = mb.admit
-    monkeypatch.setattr(mb, "admit", lambda state, e: real(
+    monkeypatch.setattr(mb, "admit", lambda state, e, d=0: real(
         mb.AdmissionState(state.budget, state.members, (), state.absorbable, state.pressure_level, state.stop_flag), e))
     state = _state(200, [_m(1, 20, role="root")], slots=[mb.Slot("A", 60)], absorbable=90)
     assert mb.admit(state, 60).ok is True
 
 
-@pytest.mark.parametrize("pressure,stop,reason", [(4, False, "pressure"), (1, True, "stop_flag")])
-def test_pressure_and_stop_flag_are_admission_conjuncts(pressure: int, stop: bool, reason: str) -> None:
-    """r27：壓力危急、停止旗標與 B 式同一准入合取（一般並行准入亦受約束）。"""
-    state = _state(10 ** 6, [_m(1, 10, role="root")], pressure=pressure, stop=stop)
-    assert mb.admit(state, 1) == mb.Admission(ok=False, reason=reason)
+def test_stop_flag_is_admission_conjunct() -> None:
+    """r27：停止旗標與 B 式同一准入合取（一般並行准入亦受約束）。"""
+    state = _state(10 ** 6, [_m(1, 10, role="root")], stop=True)
+    assert mb.admit(state, 1) == mb.Admission(ok=False, reason="stop_flag")
+
+
+def test_pressure_not_admission_conjunct() -> None:
+    """SPEC v36（審碼 r32 composer P1-02）：壓力等級 4 而新增量 ≤ A ⇒ 准入（壓力只記錄）。"""
+    state = _state(10 ** 6, [_m(1, 10, role="root")], pressure=4)
+    assert mb.admit(state, 1) == mb.Admission(ok=True, reason="ok")
+
+
+def test_mutation_admission_refuses_on_pressure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「准入仍因壓力 4 拒絕」⇒ 上案例紅。"""
+    real = mb.admit
+    monkeypatch.setattr(mb, "admit", lambda state, e, d=0: mb.Admission(False, "pressure")
+                        if state.pressure_level >= 4 else real(state, e, d))
+    state = _state(10 ** 6, [_m(1, 10, role="root")], pressure=4)
+    assert mb.admit(state, 1).ok is False
+
+
+def test_disk_admission_counts_concurrent_writers() -> None:
+    """SPEC v37（審碼 r33 codex P1-02）：同容器已准入任務之寫入上界 D＋新任務 D＋保留量 ≤ 換頁卷可用空間；兩任務各
+    D＝4 GiB、可用 8 GiB、保留 4 GiB ⇒ 第二任務不准入；單任務 ⇒ 准入。"""
+    base = dict(budget=10 ** 15, members=(_m(1, 10, role="root"),), slots=(), absorbable=10 ** 15, pressure_level=1,
+                stop_flag=False, disk_free=8 * GiB, disk_reserve=4 * GiB)
+    assert mb.admit(mb.AdmissionState(**base, disk_committed=0), 1, 4 * GiB).ok is True
+    assert mb.admit(mb.AdmissionState(**base, disk_committed=4 * GiB), 1, 4 * GiB) == \
+        mb.Admission(ok=False, reason="disk")
+
+
+def test_mutation_admission_ignores_disk(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「准入不判 D」⇒ 第二任務准入、合計超額而紅。"""
+    real = mb.admit
+    monkeypatch.setattr(mb, "admit", lambda state, e, d=0: real(
+        mb.AdmissionState(state.budget, state.members, state.slots, state.absorbable, state.pressure_level,
+                          state.stop_flag), e))
+    state = mb.AdmissionState(budget=10 ** 15, members=(_m(1, 10, role="root"),), slots=(), absorbable=10 ** 15,
+                              pressure_level=1, stop_flag=False, disk_free=8 * GiB, disk_reserve=4 * GiB,
+                              disk_committed=4 * GiB)
+    assert mb.admit(state, 1, 4 * GiB).ok is True
 
 
 def test_members_deduplicated_by_pid_and_start_time() -> None:
@@ -117,34 +154,25 @@ def test_members_deduplicated_by_pid_and_start_time() -> None:
 
 
 def test_guard_tracker_counted_once() -> None:
-    """(i) 根 40、worker 50、守護 6、B 100 ⇒ 96 不停。"""
+    """(i) 根 40、worker 50、守護 6 ⇒ 實測合計 96（以 (pid, start_time) 去重，守護與 tracker 只計一次；收據用）。"""
     members = [_m(1, 40, role="root"), _m(2, 50), _m(3, 6, role="guard")]
     assert mb.measured_total(members) == 96
-    assert mb.guard_should_stop(members, 100, 1, 75 * GiB, 4 * GiB) is None
 
 
-def test_mutation_guard_added_twice(monkeypatch: pytest.MonkeyPatch) -> None:
-    """(i) mutant「守護另加一次」⇒ 102 > 100 誤停。"""
-    real = mb.measured_total
-    monkeypatch.setattr(mb, "measured_total",
-                        lambda ms: real(ms) + sum(m.footprint for m in ms if m.role == "guard"))
-    members = [_m(1, 40, role="root"), _m(2, 50), _m(3, 6, role="guard")]
-    assert mb.guard_should_stop(members, 100, 1, 75 * GiB, 4 * GiB) is not None
+def test_guard_stop_conditions_are_disk_and_paging_only() -> None:
+    """SPEC v35–v39：守護停止條件只看換頁卷剩餘 < 保留量、A < 一頁；footprint 與承諾量不作停止條件（v35 起，原
+    「以 F 對 B 判停」之 (i) 案例與其 mutant 隨之取代）。"""
+    assert mb.guard_should_stop(75 * GiB, 4 * GiB, available=10 * GiB) is None
+    assert mb.guard_should_stop(GiB, 4 * GiB, available=10 * GiB) == "swap_volume_low"
+    assert mb.guard_should_stop(75 * GiB, 4 * GiB, available=0) == "paging_exhausted"
+    assert mb.guard_should_stop(75 * GiB, 4 * GiB, available=512 * MiB) is None  # 正餘裕（v38）
 
 
-def test_guard_uses_measured_not_commitment() -> None:
-    """(i) Σ U > B 而 Σ F < B ⇒ 不寫旗標（承諾量不是量測值）；Σ F > B ⇒ 停止。"""
-    members = [_m(1, 20, role="root"), _m(2, 30, 90)]
-    assert sum(mb.commitment(m) for m in members) > 100
-    assert mb.guard_should_stop(members, 100, 1, 75 * GiB, 4 * GiB) is None
-    assert mb.guard_should_stop([_m(1, 60, role="root"), _m(2, 50, 90)], 100, 1, 75 * GiB, 4 * GiB) is not None
-
-
-def test_mutation_guard_uses_commitment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """(i) mutant「以 U 判」⇒ 同狀態誤停。"""
-    monkeypatch.setattr(mb, "measured_total", lambda ms: sum(mb.commitment(m) for m in ms))
-    members = [_m(1, 20, role="root"), _m(2, 30, 90)]
-    assert mb.guard_should_stop(members, 100, 1, 75 * GiB, 4 * GiB) is not None
+def test_mutation_guard_paging_floor(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「A 小於一個換頁檔即停」（v37 前之地板）⇒ 正餘裕 512 MiB 誤停而紅。"""
+    monkeypatch.setattr(mb, "guard_should_stop", lambda free, reserve, available=None, page_size=16384:
+                        "paging_exhausted" if available is not None and available < GiB else None)
+    assert mb.guard_should_stop(75 * GiB, 4 * GiB, available=512 * MiB) == "paging_exhausted"
 
 
 def test_guard_script_does_not_import_psutil() -> None:
@@ -171,6 +199,7 @@ def test_worker_estimate_exceeded_refuses_without_wait(tmp_path: Path, room: boo
             mb.check("L3.numba_multi_callback", [mb.Component("fused_x2", "anon", 200)],
                      domain=_descriptor(tmp_path, envelope=250))
     assert "估算低估" in str(info.value)
+    assert isinstance(info.value, mb.MemoryRerouteNeeded)  # SPEC v35：交根於波次 join 後以正式串行臂重試
     assert (tmp_path / h.CONTRACT["guard_files"]["estimate_exceeded_log"]).exists()
 
 
@@ -727,11 +756,21 @@ def test_mtf_entry_parallel_joins_domain(tmp_path: Path, monkeypatch: pytest.Mon
     assert run["pools"] == len(created) and all(x["pid"] == root_pid for x in created)
 
 
-def test_mtf_entry_serial_arm_byte_equal(tmp_path: Path) -> None:
-    """(g) 多週期入口無可准入（無輔助啟動上界收據）⇒ 根行程內串行臂、pool 建構 0 次；raw 全欄與並行逐位元組相等。
-    兩次 run 各自獨立之 monkeypatch context（串行之覆寫不得滲入並行 run）。"""
+def _no_room_read_system() -> Any:
+    """准入之剩餘可用量 A＝0（SPEC v35：新增量 > A ⇒ 不准入並行、改走正式串行臂）；根 footprint 取實測。"""
+    return (0, 1, False, mb.sample_memory_bytes(), ())
+
+
+_SERIAL_DRIVERS = {"aux_without_receipt": {"aux_startup_envelope": None},
+                   "available_insufficient": {"read_system": _no_room_read_system}}
+
+
+@pytest.mark.parametrize("driver", list(_SERIAL_DRIVERS))
+def test_mtf_entry_serial_arm_byte_equal(tmp_path: Path, driver: str) -> None:
+    """(g) 多週期入口無可准入（無輔助啟動上界收據；或 v35 剩餘可用量不足）⇒ 根行程內串行臂、pool 建構 0 次；raw 全欄
+    與並行逐位元組相等。兩次 run 各自獨立之 monkeypatch context（串行之覆寫不得滲入並行 run）。"""
     with pytest.MonkeyPatch.context() as mp:
-        serial = _mtf_run(tmp_path / "serial", mp, aux_startup_envelope=None)
+        serial = _mtf_run(tmp_path / "serial", mp, **_SERIAL_DRIVERS[driver])
     assert serial["pools"] == 0
     assert any(x["event"] == "serial" for x in serial["log"])
     assert all(x["pid"] == os.getpid() for x in serial["log"] if x["event"] == "check")
@@ -862,11 +901,12 @@ def _multi_symbol_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **spy_ove
     return {"results": results, "errors": errors, "log": _log_lines(log), "pools": pools["n"], "digests": digests}
 
 
-def test_run_multi_symbol_serial_arm_byte_equal(tmp_path: Path) -> None:
-    """(g) 第三入口：`run_multi_symbol` 無可准入（無輔助啟動上界收據）⇒ 根行程內依序呼叫 `generate_features`、
-    pool 建構 0 次、兩標的皆成功、check 皆於根 pid；各標的 raw 全欄與並行逐位元組相等。"""
+@pytest.mark.parametrize("driver", list(_SERIAL_DRIVERS))
+def test_run_multi_symbol_serial_arm_byte_equal(tmp_path: Path, driver: str) -> None:
+    """(g) 第三入口：`run_multi_symbol` 無可准入（無輔助啟動上界收據；或 v35 剩餘可用量不足）⇒ 根行程內依序呼叫
+    `generate_features`、pool 建構 0 次、兩標的皆成功、check 皆於根 pid；各標的 raw 全欄與並行逐位元組相等。"""
     with pytest.MonkeyPatch.context() as mp:
-        serial = _multi_symbol_run(tmp_path / "serial", mp, aux_startup_envelope=None)
+        serial = _multi_symbol_run(tmp_path / "serial", mp, **_SERIAL_DRIVERS[driver])
     assert serial["errors"] == {} and sorted(serial["results"]) == ["BTCUSDT", "ETHUSDT"]
     assert serial["pools"] == 0 and any(x["event"] == "serial" for x in serial["log"])
     assert all(x["pid"] == os.getpid() for x in serial["log"] if x["event"] == "check")
@@ -1352,3 +1392,101 @@ def test_serial_arm_budget_error_not_degraded(allow_partial: bool, tmp_path: Pat
     with pytest.raises(mb.GenerationMemoryBudgetExceeded) as parallel:
         gen._accept_worker_result(err, registry, raw.index, [], {}, {}, {"alignment": 0})
     assert parallel.value is err
+
+
+# ---------------------------------------------------------------- 估算低估之根串行重試、可用量不足之串行臂（SPEC v35）
+
+def test_reroute_needed_retried_serially_after_wave_join(tmp_path: Path) -> None:
+    """worker 回 `MemoryRerouteNeeded` ⇒ 該波 join 後於根以正式串行臂重試一次；其後佇列任務一律串行（根停止新准入）；
+    重試之任務不交 `on_wave_joined`。純狀態反例 root 20／E 40／E 40：兩 worker 各需擴至 60 ⇒ 皆回 reroute、無超額。"""
+    serial_calls: List[Any] = []
+    waves: List[List[Any]] = []
+    executors: List[Any] = []
+
+    def factory(n: int) -> Any:
+        executor = ThreadPoolExecutor(n)
+        executors.append(executor)
+        return executor
+
+    def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:
+        raise mb.MemoryRerouteNeeded(desc.task_id, 20, 40, int(desc.envelope), mb.MSG_ESTIMATE_EXCEEDED)
+
+    def serial(payload: Any) -> Any:
+        serial_calls.append(payload)
+        return ("serial", payload)
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=2, executor_factory=factory,
+                                     read_system=lambda: (1000, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 20, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    out = sched.run([mb.Task("A", 40, 1), mb.Task("B", 40, 2), mb.Task("C", 40, 3)], worker, serial, waves.append)
+    assert out == [("serial", 1), ("serial", 2), ("serial", 3)]
+    assert serial_calls == [1, 2, 3] and waves == [[]] and len(executors) == 2
+    assert [t for e, t in sched.trace if e == "reroute"] == ["A", "B"]
+
+
+def test_mutation_reroute_not_retried(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「低估錯誤當一般失敗回傳（不重試）」⇒ 結果為例外物件而紅。"""
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (1000, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 20, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    monkeypatch.setattr(mb, "MemoryRerouteNeeded", type("NotReroute", (Exception,), {}))
+    out = sched.run([mb.Task("A", 40, 1)],
+                    lambda d, p: (_ for _ in ()).throw(mb.GenerationMemoryBudgetExceeded("A", 0, 0, 0, "x")),
+                    lambda p: ("serial", p), lambda w: None)
+    assert isinstance(out[0], mb.GenerationMemoryBudgetExceeded)
+
+
+def test_available_insufficient_falls_back_to_serial_without_pool(tmp_path: Path) -> None:
+    """SPEC v35：新增量 > 剩餘可用量 A（准入之可吸收量）⇒ 不准入並行、於根以正式串行臂執行，executor 建立 0 次
+    （多週期、多標的、API 批次三入口共用之排程器）。"""
+    created: List[int] = []
+    sched = mb.MemoryBudgetScheduler(10 ** 6, domain_dir=tmp_path, max_workers=2,
+                                     executor_factory=lambda n: created.append(n) or ThreadPoolExecutor(n),
+                                     read_system=lambda: (10, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 0, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    out = sched.run([mb.Task("A", 100, 1), mb.Task("B", 100, 2)], lambda d, p: ("parallel", p),
+                    lambda p: ("serial", p), lambda w: None)
+    assert out == [("serial", 1), ("serial", 2)] and created == []
+
+
+class _AnyScale(tuple):
+    """測試用速度收據：任一規模鍵皆相符。"""
+
+    def __contains__(self, item: object) -> bool:
+        return True
+
+
+def test_l2_speed_receipt_route_byte_equal(tmp_path: Path) -> None:
+    """SPEC v35／v36：L2 設定指紋於白名單且有相符速度收據 ⇒ 分派點改走 pandas 臂；raw 全欄與 polars 臂逐位元組相等
+    （S2 真實 kline）。容量面 pandas 之 planned 恆 ≥ polars（估算式），故本白名單之切換只經速度收據觸發。"""
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+
+    chosen: List[str] = []
+    real = FeatureFactory._budget_check_l2
+
+    def spy(self: Any, *a: Any, **k: Any) -> str:
+        branch = real(self, *a, **k)
+        chosen.append(branch)
+        return branch
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(FeatureFactory, "_budget_check_l2", spy)
+        base_root = h.isolated(mp, tmp_path / "polars")
+        _, base = h.generate_s2(base_root)
+    polars_choices, chosen[:] = list(chosen), []
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(FeatureFactory, "_budget_check_l2", spy)
+        mp.setattr(FeatureFactory, "_l2_route_fingerprint", lambda self, layer1, config: "certified")
+        mp.setattr(FeatureFactory, "L2_ROUTE_CERTIFIED", frozenset({"certified"}))
+        for alt in ("L2.pandas_serial", "L2.pandas_parallel"):
+            mp.setitem(mb.ROUTE_SPEED_RECEIPTS, ("Layer 2", "L2.polars", alt), _AnyScale())
+        switched_root = h.isolated(mp, tmp_path / "switched")
+        _, switched = h.generate_s2(switched_root)
+    assert polars_choices and set(polars_choices) == {"L2.polars"}
+    assert chosen and all(c.startswith("L2.pandas") for c in chosen)
+    assert base.metadata["config_hash"] == switched.metadata["config_hash"]
+    assert _raw_digests(base_root, base.metadata["config_hash"]) == \
+        _raw_digests(switched_root, switched.metadata["config_hash"])

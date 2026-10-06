@@ -982,15 +982,20 @@ class ColumnGroupRegistry:
 
     @staticmethod
     def _resolve_cgsa_disk_reserve_bytes() -> int:
-        """CGSA persist 預檢保留空間下限（GiB env → bytes）。"""
-        raw = os.getenv("FFACT_CGSA_DISK_RESERVE_GIB", "2.0").strip()
+        """CGSA persist 預檢保留空間下限（ICFIRSTALIGN SPEC v37）：不低於生成守護之磁碟保留量
+        max(4 GiB, 3 × 換頁檔單檔上限)——通過預檢之寫入不會使守護觸發；`FFACT_CGSA_DISK_RESERVE_GIB` 只得調高。"""
+        from momentum.FeatureEngineering import memory_budget as _memory_budget
+
         try:
-            value = float(raw)
+            guard_reserve = _memory_budget.disk_reserve_bytes(_memory_budget.sample_vm_snapshot().swapfile_size_max)
+        except _memory_budget.MemoryMeasurementUnavailable:
+            guard_reserve = _memory_budget.DISK_RESERVE_MIN_BYTES
+        raw = os.getenv("FFACT_CGSA_DISK_RESERVE_GIB", "").strip()
+        try:
+            value = float(raw) if raw else 0.0
         except ValueError:
-            value = 2.0
-        if value < 0:
-            value = 2.0
-        return int(value * (1024 ** 3))
+            value = 0.0
+        return max(guard_reserve, int(max(value, 0.0) * (1024 ** 3)))
 
     def _precheck_cgsa_cumulative_disk(
         self,

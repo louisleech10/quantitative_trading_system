@@ -142,8 +142,16 @@ def test_cgsa_disk_precheck_non_dataframe_returns_without_raise(
 def test_cgsa_disk_precheck_reserve_env_default(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # ICFIRSTALIGN SPEC v37：預設＝生成守護之磁碟保留量 max(4 GiB, 3 × 換頁檔單檔上限)；環境變數只得調高
+    from momentum.FeatureEngineering import memory_budget as mb
+
     monkeypatch.delenv("FFACT_CGSA_DISK_RESERVE_GIB", raising=False)
-    assert ColumnGroupRegistry._resolve_cgsa_disk_reserve_bytes() == int(2.0 * 1024 ** 3)
+    expected = mb.disk_reserve_bytes(mb.sample_vm_snapshot().swapfile_size_max)
+    assert ColumnGroupRegistry._resolve_cgsa_disk_reserve_bytes() == expected >= 4 * 1024 ** 3
+    monkeypatch.setenv("FFACT_CGSA_DISK_RESERVE_GIB", "1.0")
+    assert ColumnGroupRegistry._resolve_cgsa_disk_reserve_bytes() == expected
+    monkeypatch.setenv("FFACT_CGSA_DISK_RESERVE_GIB", "64.0")
+    assert ColumnGroupRegistry._resolve_cgsa_disk_reserve_bytes() == 64 * 1024 ** 3
 
 
 def test_cgsa_disk_precheck_env_disable_skips_guard(

@@ -603,8 +603,12 @@ class FeatureFactoryBatchService:
                                 symbol=symbol, timeframe=timeframe, config_override=request.config_override,
                                 cache_dir=batch_cache_dir, end_date=request.end_date,
                             )
+                            disk_bytes = _factories.estimate_symbol_disk(
+                                symbol=symbol, timeframe=timeframe, config_override=request.config_override,
+                                cache_dir=batch_cache_dir, end_date=request.end_date,
+                            ) if envelope is not None else 0
                             wave_tasks.append(budget.Task(task_id=f"{symbol}|{timeframe}", envelope=envelope,
-                                                          payload=args))
+                                                          payload=args, disk_bytes=int(disk_bytes)))
                         run_in_context = contextvars.copy_context().run
                         scheduler_future = loop.run_in_executor(
                             None,
@@ -1461,6 +1465,10 @@ class FeatureFactoryBatchService:
                 )
             raise RuntimeError(f"{symbol} ({timeframe}): 資料檔不存在 - {exc}") from exc
         except Exception as exc:
+            from momentum import factories as _factories
+
+            if isinstance(exc, _factories.get_memory_budget().MemoryRerouteNeeded):
+                raise  # ICFIRSTALIGN SPEC v35：交排程器於波次 join 後改走根之正式串行臂重試（不包裝為一般失敗）
             if metrics_path:
                 FeatureFactoryBatchService._append_child_metrics_jsonl(
                     Path(metrics_path),

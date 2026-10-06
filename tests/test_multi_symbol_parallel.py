@@ -436,6 +436,9 @@ class TestMultiSymbolReferenceIpcCleanup:
         # ⇒ 注入固定 E 使任務准入假 pool（本類只驗 IPC 目錄生命週期，不驗估算）
         monkeypatch.setattr(ff_mod.FeatureFactory, "_estimate_symbol_envelope",
                             lambda self, symbol, config, end_date=None: 64 * 1024 * 1024)
+        # SPEC v37：准入另判同容器檔案寫入上界 D（完整預設設定之全史 D 遠超可用磁碟 ⇒ 不准入）；本類不驗估算 ⇒ 注入 0
+        monkeypatch.setattr(ff_mod.FeatureFactory, "_estimate_symbol_disk",
+                            lambda self, symbol, config, end_date=None: 0)
         created: list = []
         real_write = arrow_ipc_utils.write_reference_data_ipc
 

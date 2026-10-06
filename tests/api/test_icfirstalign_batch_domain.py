@@ -105,15 +105,21 @@ async def test_api_wave_joins_domain_with_explicit_descriptor(monkeypatch, batch
     assert out["beats"] >= 4
 
 
+_SERIAL_DRIVERS = {"aux_without_receipt": {"aux_startup_envelope": None},
+                   "available_insufficient": {"read_system": lambda: (0, 1, False, 0, ())}}
+
+
 @pytest.mark.asyncio
-async def test_api_wave_serial_arm_in_root_without_pool(monkeypatch, batch_service_factory, tmp_path) -> None:
-    """(g) 無可准入（無輔助啟動上界收據）⇒ 根行程內依序呼叫同一 `_compute_single` 本體、`ProcessPoolExecutor` 建構 0 次、
-    兩項皆完成；串行亦不阻塞事件迴圈。"""
+@pytest.mark.parametrize("driver", list(_SERIAL_DRIVERS))
+async def test_api_wave_serial_arm_in_root_without_pool(monkeypatch, batch_service_factory, tmp_path,
+                                                        driver) -> None:
+    """(g) 無可准入（無輔助啟動上界收據；或 SPEC v35 剩餘可用量 A 不足）⇒ 根行程內依序呼叫同一 `_compute_single` 本體、
+    `ProcessPoolExecutor` 建構 0 次、兩項皆完成；串行亦不阻塞事件迴圈。"""
     from concurrent.futures import process as cfp
 
     record: List[Dict[str, Any]] = []
     monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(_capture(record)))
-    _spy(monkeypatch, aux_startup_envelope=None)
+    _spy(monkeypatch, **_SERIAL_DRIVERS[driver])
     pools = {"n": 0}
     real_init = cfp.ProcessPoolExecutor.__init__
     monkeypatch.setattr(cfp.ProcessPoolExecutor, "__init__",
@@ -188,3 +194,23 @@ async def test_api_wave_cancel_waits_for_started_workers(monkeypatch, batch_serv
     assert finished == ["BTCUSDT"]
     statuses = {tid: st.status for tid, st in created[0]._tasks.items()}
     assert statuses == {"BTCUSDT|12h": "joined", "ETHUSDT|12h": "queued"}
+
+
+@pytest.mark.parametrize("error,passthrough", [(mb.MemoryRerouteNeeded("L1", 20, 40, 50, mb.MSG_ESTIMATE_EXCEEDED), True),
+                                               (RuntimeError("boom"), False)])
+def test_compute_single_passes_reroute_through(monkeypatch, error, passthrough) -> None:
+    """SPEC v35：worker 本體遇 `MemoryRerouteNeeded` ⇒ 原樣上拋（交排程器於波次 join 後改走根之正式串行臂），不包裝
+    為一般「計算失敗」；其他例外照舊包裝。"""
+    import momentum.factories as factories_module
+
+    class _Factory:
+        def generate_features(self, **_kw: Any) -> Any:
+            raise error
+
+    monkeypatch.setattr(factories_module, "create_feature_factory", lambda **_kw: _Factory())
+    with pytest.raises(Exception) as info:
+        FeatureFactoryBatchService._compute_single_body("BTCUSDT", "12h", None, False)
+    if passthrough:
+        assert info.value is error
+    else:
+        assert isinstance(info.value, RuntimeError) and "計算失敗" in str(info.value)

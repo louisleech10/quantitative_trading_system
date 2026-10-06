@@ -17,7 +17,7 @@ import sys
 import time
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -141,62 +141,138 @@ def test_mutation_metric_max_resident_footprint(tmp_path: Path) -> None:
 
 # ---------------------------------------------------------------- 系統條件
 
-def test_system_insufficient_raises_named() -> None:
-    snap = _snapshot(free_bytes=GiB // 2, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=75 * GiB)
+def _swapfiles(limit: int = 100, count: int = 5, size: int = GiB) -> Dict[str, int]:
+    return {"swapfile_limit": limit, "swapfile_count": count, "swapfile_size_max": size}
+
+
+def test_machine_insufficient_raises_named() -> None:
+    """SPEC v35：新增量 G > 剩餘可用量 A（free＋file-backed＋換頁剩餘＋可證擴充 X；換頁卷僅剩保留量 ⇒ X＝0）⇒
+    具名停止「機器可用量不足」。"""
+    snap = _snapshot(free_bytes=GiB // 2, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=4 * GiB,
+                     **_swapfiles())
     with ExitStack() as stack:
         _ctx(stack, snapshot=snap)
         with pytest.raises(mb.GenerationMemoryBudgetExceeded) as info:
             mb.check("IC.selected_read", _anon(int(1.5 * GiB)))
-    assert info.value.reason == MSG["system_insufficient"]
+    assert info.value.reason == MSG["machine_insufficient"]
 
 
-def test_system_sufficient_passes() -> None:
-    snap = _snapshot(free_bytes=GiB // 2, file_backed_bytes=0, swap_free_bytes=0)
-    with ExitStack() as stack:
-        _ctx(stack, snapshot=snap)
-        mb.check("IC.selected_read", _anon(GiB // 4))
-
-
-def test_absorbable_is_free_file_backed_swap_free() -> None:
-    snap = _snapshot(free_bytes=3, file_backed_bytes=5, swap_free_bytes=7, swap_volume_free_bytes=1000)
-    assert mb.system_absorbable_bytes(snap) == 15
-
-
-@pytest.mark.parametrize("mutant", ["anon_included", "swap_volume_included"])
-def test_mutation_absorbable_definition(monkeypatch: pytest.MonkeyPatch, mutant: str) -> None:
-    """mutant：可吸收量改含匿名頁、或加入換頁卷剩餘空間 ⇒ 系統不足案例放行。"""
-    extra = {"anon_included": lambda s: 10 * GiB, "swap_volume_included": lambda s: s.swap_volume_free_bytes}[mutant]
-    monkeypatch.setattr(mb, "system_absorbable_bytes",
-                        lambda s: s.free_bytes + s.file_backed_bytes + s.swap_free_bytes + extra(s))
-    snap = _snapshot(free_bytes=GiB // 2, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=75 * GiB)
+def test_swap_expansion_counts_toward_available() -> None:
+    """SPEC v35：G 介於「free＋file-backed＋換頁剩餘」與 A 之間（換頁可擴充）⇒ 放行——以前靠換頁跑完者不卡死。"""
+    snap = _snapshot(free_bytes=GiB // 2, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=75 * GiB,
+                     **_swapfiles())
     with ExitStack() as stack:
         _ctx(stack, snapshot=snap)
         mb.check("IC.selected_read", _anon(int(1.5 * GiB)))
 
 
-@pytest.mark.parametrize("level,raises", [(B["pressure_critical_level"], True), (B["pressure_warn_level"], False)])
-def test_pressure_level_condition(level: int, raises: bool) -> None:
+def test_mutation_swap_expansion_counted_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「擴充計 0」（v35 前之舊定義）⇒ 上案例誤拒而紅。"""
+    monkeypatch.setattr(mb, "swap_expansion_bytes", lambda snapshot: 0)
+    snap = _snapshot(free_bytes=GiB // 2, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=75 * GiB,
+                     **_swapfiles())
+    with ExitStack() as stack:
+        _ctx(stack, snapshot=snap)
+        with pytest.raises(mb.GenerationMemoryBudgetExceeded):
+            mb.check("IC.selected_read", _anon(int(1.5 * GiB)))
+
+
+def test_available_definition() -> None:
+    """A＝free＋file-backed＋換頁剩餘＋min（剩餘檔數 × 單檔上限，換頁卷可用 − 保留量）；擴充上限讀不到 ⇒ X＝0。"""
+    snap = _snapshot(free_bytes=3, file_backed_bytes=5, swap_free_bytes=7, swap_volume_free_bytes=10 * GiB,
+                     **_swapfiles(limit=10, count=8, size=GiB))
+    assert mb.swap_expansion_bytes(snap) == 2 * GiB  # min(2 個檔, 10 − 4 GiB)
+    assert mb.available_bytes(snap) == 15 + 2 * GiB
+    roomy = _snapshot(free_bytes=3, file_backed_bytes=5, swap_free_bytes=7, swap_volume_free_bytes=5 * GiB,
+                      **_swapfiles(limit=100, count=8, size=GiB))
+    assert mb.swap_expansion_bytes(roomy) == GiB  # min(92 個檔, 5 − 4 GiB)
+    unreadable = _snapshot(free_bytes=3, file_backed_bytes=5, swap_free_bytes=7, swap_volume_free_bytes=10 * GiB)
+    assert mb.available_bytes(unreadable) == 15
+
+
+def test_expansion_bounded_by_swapfile_slots() -> None:
+    """X 取 min：換頁卷剩 150 GiB 而換頁檔僅剩 1 個 ⇒ G＝10 GiB 具名停止。"""
+    snap = _snapshot(free_bytes=0, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=150 * GiB,
+                     **_swapfiles(limit=6, count=5, size=GiB))
+    with ExitStack() as stack:
+        _ctx(stack, snapshot=snap, budget=10 ** 15)
+        with pytest.raises(mb.GenerationMemoryBudgetExceeded):
+            mb.check("IC.selected_read", _anon(10 * GiB))
+
+
+def test_mutation_expansion_not_bounded_by_slots(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「X 只用換頁卷剩餘（不取檔數 min）」⇒ 上案例誤放行而紅。"""
+    monkeypatch.setattr(mb, "swap_expansion_bytes", lambda s: max(
+        s.swap_volume_free_bytes - mb.disk_reserve_bytes(s.swapfile_size_max), 0))
+    snap = _snapshot(free_bytes=0, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=150 * GiB,
+                     **_swapfiles(limit=6, count=5, size=GiB))
+    with ExitStack() as stack:
+        _ctx(stack, snapshot=snap, budget=10 ** 15)
+        mb.check("IC.selected_read", _anon(10 * GiB))
+
+
+@pytest.mark.parametrize("level", [B["pressure_critical_level"], B["pressure_warn_level"]])
+def test_pressure_level_only_recorded(level: int) -> None:
+    """SPEC v35／v36：壓力等級只記錄、不拒絕（HEAD 框架臂壓力 4 一次取樣仍跑完）。"""
     with ExitStack() as stack:
         _ctx(stack, snapshot=_snapshot(pressure_level=level))
-        if raises:
-            with pytest.raises(mb.GenerationMemoryBudgetExceeded) as info:
-                mb.check("IC.selected_read", _anon(MiB))
-            assert info.value.reason == MSG["pressure_critical"]
-        else:
-            mb.check("IC.selected_read", _anon(MiB))
-
-
-def test_mutation_pressure_condition_removed(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(mb, "_pressure_ok", lambda snapshot: True)
-    with ExitStack() as stack:
-        _ctx(stack, snapshot=_snapshot(pressure_level=B["pressure_critical_level"]))
         mb.check("IC.selected_read", _anon(MiB))
 
 
-@pytest.mark.parametrize("capacity_gb,expected_gb", [(50, 4.0), (100, 5.0), (228, 11.4), (2000, 100.0)])
-def test_disk_reserve_bytes(capacity_gb: int, expected_gb: float) -> None:
-    assert mb.disk_reserve_bytes(int(capacity_gb * 1e9)) == max(B["disk_reserve_min_bytes"], int(capacity_gb * 1e9 * B["disk_reserve_fraction"]))
-    assert abs(mb.disk_reserve_bytes(int(capacity_gb * 1e9)) / 1e9 - max(4 * GiB / 1e9, expected_gb)) < 0.01
+def test_mutation_pressure_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「壓力 ≥ 4 拒絕」⇒ 上案例（等級 4）誤拒而紅。"""
+    real = mb.check
+
+    def mutant(branch_id: str, components: Any, **kw: Any) -> None:
+        if mb.sample_vm_snapshot().pressure_level >= B["pressure_critical_level"]:
+            raise mb.GenerationMemoryBudgetExceeded(branch_id, 0, 0, 0, "pressure")
+        real(branch_id, components, **kw)
+
+    monkeypatch.setattr(mb, "check", mutant)
+    with ExitStack() as stack:
+        _ctx(stack, snapshot=_snapshot(pressure_level=B["pressure_critical_level"]))
+        with pytest.raises(mb.GenerationMemoryBudgetExceeded):
+            mb.check("IC.selected_read", _anon(MiB))
+
+
+def test_footprint_far_above_ratio_but_fits_available_passes() -> None:
+    """SPEC v35：F ≫ R（實體 75%）而 G ≤ A ⇒ 放行——R 不作拒絕理由。"""
+    snap = _snapshot(free_bytes=GiB, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=75 * GiB,
+                     **_swapfiles())
+    with mb.sampler_override(lambda: {"resident": 4 * GiB, "phys_footprint": 50 * GiB}), \
+            mb.vm_snapshot_override(snap):
+        mb.check("IC.selected_read", _anon(2 * GiB))
+
+
+def test_mutation_ratio_cap_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「F＋planned > R 即拒」⇒ 上案例誤拒而紅；硬判定不得隨比例縮放。"""
+    real = mb.check
+
+    def mutant(branch_id: str, components: Any, **kw: Any) -> None:
+        current = mb.sample_memory_bytes()
+        if current + mb.planned_bytes(components) > mb.configured_budget_bytes():
+            raise mb.GenerationMemoryBudgetExceeded(branch_id, current, 0, 0, "ratio")
+        real(branch_id, components, **kw)
+
+    monkeypatch.setattr(mb, "check", mutant)
+    snap = _snapshot(free_bytes=GiB, file_backed_bytes=0, swap_free_bytes=0, swap_volume_free_bytes=75 * GiB,
+                     **_swapfiles())
+    with mb.sampler_override(lambda: {"resident": 4 * GiB, "phys_footprint": 50 * GiB}), \
+            mb.vm_snapshot_override(snap), pytest.raises(mb.GenerationMemoryBudgetExceeded):
+        mb.check("IC.selected_read", _anon(2 * GiB))
+
+
+@pytest.mark.parametrize("size_max,expected", [(None, 4 * GiB), (GiB, 4 * GiB), (2 * GiB, 6 * GiB)])
+def test_disk_reserve_bytes(size_max: Any, expected: int) -> None:
+    """SPEC v36：磁碟保留量＝max(4 GiB, 3 × 換頁檔單檔上限)；與卷容量無關。"""
+    assert mb.disk_reserve_bytes(size_max) == expected == max(B["disk_reserve_min_bytes"],
+                                                              B["disk_reserve_swapfiles"] * int(size_max or 0))
+
+
+def test_mutation_reserve_capacity_fraction() -> None:
+    """mutant「保留量取卷容量 × 5%」⇒ 大容量卷（2000 GiB、剩 90 GiB）誤停；正確保留量 4 GiB 不停。"""
+    assert mb.guard_should_stop(90 * GiB, mb.disk_reserve_bytes(GiB)) is None
+    assert mb.guard_should_stop(90 * GiB, int(2000 * GiB * 0.05)) == "swap_volume_low"
 
 
 @pytest.mark.parametrize("physical_gb", [8, 32, 64])
@@ -1219,22 +1295,31 @@ def _readings_file(tmp_path: Path, rows: List[Dict[str, Any]]) -> Path:
     return path
 
 
+_SWAP_LOW_ROW = {"pressure_level": 1, "swap_volume_free_bytes": 1 << 30, "footprint": 1 << 20}  # 1 GiB < 保留量
+_NORMAL_ROW = {"pressure_level": 1, "swap_volume_free_bytes": 75 << 30, "footprint": 1 << 20}
+
+
 def test_guard_lifecycle_two_runs_old_guard_has_no_power(tmp_path: Path) -> None:
-    """同一父行程先後 run A（小上限）、B（大上限）：A 結束後 A 之守護已回收；B 之讀數超 A 上限而未超 B ⇒ B 完成、無 A 收據。"""
+    """同一父行程先後 run A、B（SPEC v35：以換頁卷剩餘之注入讀數驅動——A 之守護讀到換頁卷不足、B 之守護讀到
+    正常）：A 結束後 A 之守護已回收 ⇒ B 完成、無 A 收據。"""
+    a_rows = _readings_file(tmp_path, [_SWAP_LOW_ROW] * 200)
+    b_rows = tmp_path / "readings_b.jsonl"
+    b_rows.write_text("\n".join(json.dumps(_NORMAL_ROW) for _ in range(200)) + "\n", encoding="utf-8")
     body = """
 from momentum.FeatureEngineering import memory_budget as mb
 from pathlib import Path
 base = Path(sys.argv[1])
 a, b = base / "A", base / "B"
 a.mkdir(); b.mkdir()
-ga = mb.start_guard(a, "A", budget=1 << 20)
+os.environ[%r] = %r
+ga = mb.start_guard(a, "A", budget=64 << 30)
 ga.stop()
+os.environ[%r] = %r
 gb = mb.start_guard(b, "B", budget=64 << 30)
-x = bytearray(64 << 20)
 time.sleep(2.0)
 gb.stop()
 print(json.dumps({"a_abort": (a / "memory_guard_abort.json").exists(), "alive": os.getpid()}))
-"""
+""" % (C["guard_test_readings_env"], str(a_rows), C["guard_test_readings_env"], str(b_rows))
     child = _child_script(tmp_path, body)
     proc = subprocess.run([sys.executable, str(child), str(tmp_path)], capture_output=True, text=True, timeout=120)
     assert proc.returncode == 0, proc.stderr[-2000:]
@@ -1243,18 +1328,19 @@ print(json.dumps({"a_abort": (a / "memory_guard_abort.json").exists(), "alive": 
 
 
 def test_mutation_guard_not_stopped_at_run_exit_kills_next_run(tmp_path: Path) -> None:
-    """mutant：A 出口不停止守護（子行程內不呼叫 `GuardHandle.stop`）⇒ A 之守護（小上限）終止父行程。"""
+    """mutant：A 出口不停止守護（子行程內不呼叫 `GuardHandle.stop`）⇒ A 之守護（讀到換頁卷不足）終止父行程。"""
     assert callable(mb.GuardHandle.stop) and callable(mb.start_guard)  # 被測符號：mutant 即略過其 stop
+    a_rows = _readings_file(tmp_path, [_SWAP_LOW_ROW] * 200)
     body = """
+os.environ[%r] = %r
 from momentum.FeatureEngineering import memory_budget as mb
 from pathlib import Path
 base = Path(sys.argv[1])
 a = base / "A"; a.mkdir()
-ga = mb.start_guard(a, "A", budget=1 << 20)
-x = bytearray(64 << 20)
+ga = mb.start_guard(a, "A", budget=64 << 30)
 time.sleep(5.0)
 print("survived")
-"""
+""" % (C["guard_test_readings_env"], str(a_rows))
     child = _child_script(tmp_path, body)
     proc = subprocess.run([sys.executable, str(child), str(tmp_path)], capture_output=True, text=True, timeout=120)
     assert proc.returncode != 0 and "survived" not in proc.stdout
@@ -1262,8 +1348,7 @@ print("survived")
 
 def test_guard_stops_main_during_compiled_numba_kernel(tmp_path: Path) -> None:
     """主行程於真實 compiled numba 核心執行中、守護讀數持續越界 ⇒ abort 收據齊全、主行程以 SIGKILL 結束。"""
-    readings = _readings_file(tmp_path, [{"pressure_level": 4, "swap_volume_free_bytes": 75 << 30,
-                                          "footprint": 1 << 20}] * 200)
+    readings = _readings_file(tmp_path, [_SWAP_LOW_ROW] * 200)  # SPEC v35：以換頁卷不足驅動（壓力不再為條件）
     body = """
 os.environ[%r] = %r
 from momentum.FeatureEngineering import memory_budget as mb
@@ -1286,7 +1371,7 @@ print("finished")
 
 def test_guard_stop_flag_then_check_stops_named(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """第一段：守護寫停止旗標 ⇒ 主行程下一個 check 具名停止。"""
-    (tmp_path / C["guard_files"]["stop_flag"]).write_text("pressure_critical", encoding="utf-8")
+    (tmp_path / C["guard_files"]["stop_flag"]).write_text("swap_volume_low", encoding="utf-8")
     with ExitStack() as stack:
         _ctx(stack)
         with pytest.raises(mb.GenerationMemoryBudgetExceeded):
@@ -1295,8 +1380,7 @@ def test_guard_stop_flag_then_check_stops_named(tmp_path: Path, monkeypatch: pyt
 
 def test_guard_single_reading_does_not_kill(tmp_path: Path) -> None:
     """第二段需連續 2 次越界：單次越界後恢復 ⇒ 不終止（mutant「只 1 次即終止」下此案例紅）。"""
-    readings = _readings_file(tmp_path, [{"pressure_level": 4, "swap_volume_free_bytes": 75 << 30, "footprint": 1 << 20}]
-                              + [{"pressure_level": 1, "swap_volume_free_bytes": 75 << 30, "footprint": 1 << 20}] * 50)
+    readings = _readings_file(tmp_path, [_SWAP_LOW_ROW] + [_NORMAL_ROW] * 50)
     body = """
 os.environ[%r] = %r
 from momentum.FeatureEngineering import memory_budget as mb
@@ -1438,25 +1522,253 @@ def _guard_run(readings: List[Dict[str, Any]], budget: int = 100) -> Dict[str, A
     return {"killed": killed, "samples": len(consumed)}
 
 
-def _r(pressure: int = 1, swap_free: int = 10 ** 20, footprint: int = 0) -> Dict[str, Any]:
-    return {"pressure_level": pressure, "swap_volume_free_bytes": swap_free, "swap_volume_capacity_bytes": 0,
-            "footprint": footprint, "failed": []}
+def _r(pressure: int = 1, swap_free: int = 10 ** 20, available: Optional[int] = 10 ** 12,
+       failed: bool = False, footprint: int = 0, swapfiles_full: bool = True) -> Dict[str, Any]:
+    """守護讀數（SPEC v35–v39 之條件：換頁卷剩餘、剩餘可用量 A、量測失敗）；`available` 置於 free（其餘 A 成分 0）。"""
+    row: Dict[str, Any] = {"pressure_level": pressure, "swap_volume_free_bytes": swap_free,
+                           "swap_volume_capacity_bytes": 0, "footprint": footprint, "failed": [1] if failed else []}
+    if available is not None:
+        row.update({"free_bytes": available, "file_backed_bytes": 0, "swap_avail_bytes": 0, "page_size": 16384,
+                    "swapfile_limit": 100, "swapfile_count": 100 if swapfiles_full else 5,
+                    "swapfile_size_max": 1 << 30})
+    return row
 
 
 def test_guard_alternating_conditions_do_not_accumulate() -> None:
     """旗標後三種不同條件輪替各成立 1 次 ⇒ 不終止（改前：任一非空即累加 ⇒ 第 3 次取樣即終止而紅）。"""
-    out = _guard_run([_r(pressure=4), _r(swap_free=10 ** 9), _r(footprint=101), _r()])
+    out = _guard_run([_r(swap_free=10 ** 9), _r(available=0), _r(failed=True), _r()])
     assert out["killed"] == []
 
 
 def test_guard_same_condition_twice_after_flag_kills() -> None:
     """同一條件於旗標後連續 2 次成立 ⇒ 終止（第 3 次取樣），原因＝該條件。"""
-    out = _guard_run([_r(footprint=101), _r(footprint=101), _r(footprint=101), _r()])
-    assert out["killed"] == ["footprint_over_budget"] and out["samples"] == 3
+    out = _guard_run([_r(available=0), _r(available=0), _r(available=0), _r()])
+    assert out["killed"] == ["paging_exhausted"] and out["samples"] == 3
 
 
 def test_guard_persistent_condition_counted_despite_priority_flicker() -> None:
-    """footprint 持續超上限、壓力危急時有時無（優先序較高）⇒ footprint 仍連續計數而終止；只依「最優先原因」
-    計數之實作會因原因切換歸零而漏殺。"""
-    out = _guard_run([_r(pressure=4, footprint=101), _r(footprint=101), _r(pressure=4, footprint=101), _r()])
-    assert out["killed"] == ["footprint_over_budget"] and out["samples"] == 3
+    """換頁耗盡持續、換頁卷不足時有時無（優先序較高）⇒ 換頁耗盡仍連續計數而終止；只依「最優先原因」計數之實作
+    會因原因切換歸零而漏殺。"""
+    out = _guard_run([_r(swap_free=10 ** 9, available=0), _r(available=0), _r(swap_free=10 ** 9, available=0), _r()])
+    assert out["killed"] == ["paging_exhausted"] and out["samples"] == 3
+
+
+def test_guard_pressure_critical_never_stops() -> None:
+    """SPEC v35：壓力等級 4 連續成立而其餘正常 ⇒ 不立旗、不終止（mutant「壓力 ≥ 4 立旗」⇒ 誤殺而紅）。"""
+    out = _guard_run([_r(pressure=4)] * 4 + [_r()])
+    assert out["killed"] == []
+
+
+def test_guard_footprint_over_ratio_never_stops() -> None:
+    """SPEC v35：全樹 footprint 遠大於 R（上限參數）而 A 與換頁卷充裕 ⇒ 不終止（mutant「守護以 F 對 R 判停」⇒ 紅）。"""
+    out = _guard_run([_r(footprint=1 << 40)] * 4 + [_r()], budget=100)
+    assert out["killed"] == []
+
+
+def test_guard_positive_available_with_full_swapfiles_does_not_stop() -> None:
+    """SPEC v38：換頁檔數達上限、free 與換頁剩餘各 512 MiB（各小於一個換頁檔）⇒ A ≥ 一頁、不立旗（mutant
+    「各項小於一個換頁檔即立旗」⇒ 誤殺而紅）；段內動態：A 自 8 GiB 降至 3 GiB（段內已實現配置）⇒ 不終止，
+    同段 A 降至 0 ⇒ 立旗並經連續 2 次終止。"""
+    assert _guard_run([_r(available=1 << 30)] * 4 + [_r()])["killed"] == []
+    assert _guard_run([_r(available=8 << 30), _r(available=3 << 30), _r(available=3 << 30),
+                       _r(available=3 << 30), _r()])["killed"] == []
+    out = _guard_run([_r(available=8 << 30), _r(available=0), _r(available=0), _r(available=0), _r()])
+    assert out["killed"] == ["paging_exhausted"] and out["samples"] == 4
+
+
+def test_guard_available_counts_swap_expansion() -> None:
+    """換頁檔數未達上限、換頁卷充裕 ⇒ 即使 free 與換頁剩餘為 0，A 含可證擴充 ⇒ 不立旗。"""
+    assert _guard_run([_r(available=0, swapfiles_full=False, swap_free=50 << 30)] * 4 + [_r()])["killed"] == []
+
+
+def test_guard_first_observation_after_exhaustion_timing() -> None:
+    """SPEC v39 時序：首筆觀測前即耗盡 ⇒ 首筆立旗、第三筆終止；零值後一筆回復 ⇒ 不終止。驗收只斷言觀測後之反應
+    順序，不斷言早於系統終止。"""
+    assert _guard_run([_r(available=0)] * 4 + [_r()])["samples"] == 3
+    assert _guard_run([_r(available=0), _r(), _r(available=0), _r()])["killed"] == []
+
+
+# ---------------------------------------------------------------- 選路（SPEC v35–v39：白名單等價臂、預設保留原臂）
+
+def _route_table(monkeypatch: pytest.MonkeyPatch, original_bytes: int, alt_bytes: int) -> None:
+    """注入兩個分支之估算：原臂（L2.polars）與白名單候選（L2.pandas_serial）各一 anon 成分。"""
+    monkeypatch.setitem(mb.BRANCH_TABLE, "L2.polars", lambda p: [mb.Component("orig", "anon", original_bytes)])
+    monkeypatch.setitem(mb.BRANCH_TABLE, "L2.pandas_serial", lambda p: [mb.Component("alt", "anon", alt_bytes)])
+
+
+def _route_ctx(stack: ExitStack, available: int) -> None:
+    stack.enter_context(mb.vm_snapshot_override(_snapshot(free_bytes=available, file_backed_bytes=0, swap_free_bytes=0,
+                                                          swap_volume_free_bytes=75 * GiB)))
+
+
+_CANDS = [("L2.polars", {}), ("L2.pandas_serial", {})]
+
+
+def test_route_keeps_original_when_fits_without_receipt(monkeypatch: pytest.MonkeyPatch) -> None:
+    """原臂 G ≤ A 且無收據 ⇒ 保留原臂（即使候選 planned 較小）。"""
+    _route_table(monkeypatch, original_bytes=2 * GiB, alt_bytes=GiB)
+    with ExitStack() as stack:
+        _route_ctx(stack, available=4 * GiB)
+        assert mb.route("Layer 2", _CANDS, scale_key="s") == "L2.polars"
+
+
+def test_mutation_route_by_smallest_planned(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「依 planned 最小選」⇒ 上案例選到候選（較小者未證較快）而紅。"""
+    _route_table(monkeypatch, original_bytes=2 * GiB, alt_bytes=GiB)
+    chosen = min(_CANDS, key=lambda c: mb.planned_bytes(mb.estimate(c[0], c[1])))[0]
+    assert chosen == "L2.pandas_serial"  # mutant 之選擇 ≠ 正確之「保留原臂」
+
+
+def test_route_switches_when_original_exceeds_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    """原臂 G > A 而白名單候選可容 ⇒ 改走候選。"""
+    _route_table(monkeypatch, original_bytes=6 * GiB, alt_bytes=GiB)
+    with ExitStack() as stack:
+        _route_ctx(stack, available=4 * GiB)
+        assert mb.route("Layer 2", _CANDS, scale_key="s") == "L2.pandas_serial"
+
+
+def test_route_raises_when_no_candidate_fits(monkeypatch: pytest.MonkeyPatch) -> None:
+    """全部候選皆 G > A ⇒ 具名停止（原臂之錯誤）。"""
+    _route_table(monkeypatch, original_bytes=6 * GiB, alt_bytes=5 * GiB)
+    with ExitStack() as stack:
+        _route_ctx(stack, available=4 * GiB)
+        with pytest.raises(mb.GenerationMemoryBudgetExceeded) as info:
+            mb.route("Layer 2", _CANDS, scale_key="s")
+    assert info.value.reason == MSG["machine_insufficient"] and info.value.planned == 6 * GiB
+
+
+@pytest.mark.parametrize("receipt_scale,expected", [("s", "L2.pandas_serial"), ("other", "L2.polars")])
+def test_route_speed_receipt_switch_only_on_matching_scale(monkeypatch: pytest.MonkeyPatch, receipt_scale: str,
+                                                           expected: str) -> None:
+    """原臂 G ≤ A：有相符規模之收據證明候選較快 ⇒ 切換；收據規模不符 ⇒ 保留原臂（SPEC v36，審碼 r32 codex P2-01）。"""
+    _route_table(monkeypatch, original_bytes=GiB, alt_bytes=2 * GiB)
+    monkeypatch.setitem(mb.ROUTE_SPEED_RECEIPTS, ("Layer 2", "L2.polars", "L2.pandas_serial"), (receipt_scale,))
+    with ExitStack() as stack:
+        _route_ctx(stack, available=8 * GiB)
+        assert mb.route("Layer 2", _CANDS, scale_key="s") == expected
+
+
+def test_route_does_not_switch_on_stop_flag(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """停止旗標已立 ⇒ 具名停止、不試候選（非容量原因不換路）。"""
+    _route_table(monkeypatch, original_bytes=GiB, alt_bytes=GiB)
+    (tmp_path / C["guard_files"]["stop_flag"]).write_text("swap_volume_low", encoding="utf-8")
+    real = mb.check_estimate
+    tried: List[str] = []
+
+    def spy(branch: str, params: Any, **kw: Any) -> Any:
+        tried.append(branch)
+        return real(branch, params, run_dir=tmp_path, **kw)
+
+    monkeypatch.setattr(mb, "check_estimate", spy)
+    with ExitStack() as stack:
+        _route_ctx(stack, available=8 * GiB)
+        with pytest.raises(mb.GenerationMemoryBudgetExceeded) as info:
+            mb.route("Layer 2", _CANDS)
+    assert tried == ["L2.polars"] and info.value.reason == MSG["swap_volume_low"]
+
+
+# ── 速度驗收判定（SPEC v40）──────────────────────────────────────────────────
+
+_SPEED_VERDICT = Path(__file__).resolve().parents[2] / "handoffs/run_receipts/icfirstalign_probes/speed_verdict.py"
+
+
+def _speed_module(mutation: Optional[Tuple[str, str]] = None) -> Any:
+    """載入判定程式；mutation＝(原字串, 置換字串)，須恰命中一次。"""
+    import types
+
+    src = _SPEED_VERDICT.read_text(encoding="utf-8")
+    if mutation is not None:
+        assert src.count(mutation[0]) == 1, mutation[0]
+        src = src.replace(mutation[0], mutation[1])
+    mod = types.ModuleType("speed_verdict_under_test")
+    exec(compile(src, str(_SPEED_VERDICT), "exec"), mod.__dict__)
+    return mod
+
+
+def _pair(order: str, head: float, new: float) -> Dict[str, Any]:
+    return {"order": order, "head_s": head, "new_s": new}
+
+
+def _case(name: str, pairs: List[Dict[str, Any]], **kw: Any) -> Dict[str, Any]:
+    return {"name": name, "timing_source": "wall_clock_full_entry", "pairs": pairs, **kw}
+
+
+# (案例, 正確判定)；每個 mutant 至少使其中一案例判定改變。
+_SPEED_BATTERY: List[Tuple[Dict[str, Any], str]] = [
+    (_case("single_faster", [_pair("new_first", 100.0, 99.5)]), "pass"),
+    (_case("single_within_3pct", [_pair("new_first", 100.0, 102.5)]), "pass"),
+    # r＝1.04 > 1.03 ⇒ 不過（容許改 5% 會誤過）
+    (_case("single_over_3pct", [_pair("head_first", 100.0, 104.0)]), "fail"),
+    (_case("no_pairs", []), "insufficient"),
+    (_case("censored_done", [], censored=True, new_outcome="completed", new_s=4000.0), "censored"),
+    (_case("censored_unknown", [], censored=True, new_outcome=None), "fail"),
+    # 新碼一快兩慢：中位 104 ⇒ 不過（取最快一次會誤過）
+    (_case("median_not_min", [_pair("new_first", 100.0, 101.0), _pair("head_first", 100.0, 104.0),
+                              _pair("new_first", 100.0, 104.5)]), "fail"),
+    # 四對中兩對新碼大幅較慢：中位 106 ⇒ 不過（剔除差距最大之對會改判過）
+    (_case("all_pairs_kept", [_pair("new_first", 100.0, 102.0), _pair("head_first", 100.0, 102.0),
+                              _pair("new_first", 100.0, 110.0), _pair("head_first", 100.0, 110.0)]), "fail"),
+]
+
+
+def _speed_battery_failures(sv: Any) -> List[str]:
+    failures = []
+    for case, expected in _SPEED_BATTERY:
+        got = sv.judge(case)["verdict"]
+        if got != expected:
+            failures.append(f"{case['name']}: {got} != {expected}")
+    try:
+        sv.judge({**_SPEED_BATTERY[0][0], "timing_source": "generation_only"})
+        failures.append("timing_source 未拒")
+    except ValueError:
+        pass
+    return failures
+
+
+def test_speed_verdict_contract() -> None:
+    """SPEC v40 速度驗收判定：已跑之對中位比 ≤ 1.03 視為相同、censored 永不判過、計時來源須為完整入口牆鐘。"""
+    sv = _speed_module()
+    assert _speed_battery_failures(sv) == []
+    receipt = sv.build_receipt([c for c, _ in _SPEED_BATTERY if c["name"] in ("single_faster", "censored_done")])
+    assert receipt["all_pass"] is True
+    receipt = sv.build_receipt([c for c, _ in _SPEED_BATTERY if c["name"] in ("single_faster", "median_not_min")])
+    assert receipt["all_pass"] is False and receipt["cases"][1]["input"]["pairs"][2]["new_s"] == 104.5
+
+
+_SPEED_MUTANTS = {
+    "censored_counted_as_pass": ('"verdict": "censored", "reason"', '"verdict": "pass", "reason"'),
+    "timing_excludes_calibration": ('if case.get("timing_source") != TIMING_SOURCE:', "if False:"),
+    "tolerance_5pct": ("SAME_RATIO = 1.03", "SAME_RATIO = 1.05"),
+    "fastest_new_run": ("statistics.median(t_n)", "min(t_n)"),
+    "drop_largest_gap_pair": (
+        '    t_h = [float(p["head_s"]) for p in pairs]',
+        '    pairs = sorted(pairs, key=lambda p: abs(float(p["new_s"]) - float(p["head_s"])))[:-1] if len(pairs) >= 3 else pairs\n'
+        '    t_h = [float(p["head_s"]) for p in pairs]'),
+}
+
+
+@pytest.mark.parametrize("mutant", sorted(_SPEED_MUTANTS))
+def test_mutation_speed_verdict(mutant: str) -> None:
+    """每個判定規則 mutant 至少使一個契約案例判定改變（SPEC v40）。"""
+    assert _speed_battery_failures(_speed_module(_SPEED_MUTANTS[mutant])) != []
+
+
+def test_speed_stage_parser_segments_and_midnight() -> None:
+    """逐段切分：首段自第一筆時間戳、重複標記帶序號、跨午夜續算。"""
+    sv = _speed_module()
+    lines = [
+        "23:59:58.000 x start\n",
+        "23:59:59.000 f Layer 1 starting, rss=1MB\n",
+        "no timestamp line\n",
+        "00:00:01.500 f Layer 1 done: 3 cols\n",
+        "00:00:02.000 f Layer 1 starting, rss=1MB\n",
+        "00:00:05.000 f Layer 1 done: 3 cols\n",
+        "00:00:06.000 x tail\n",
+    ]
+    assert sv.parse_stage_log(lines) == {
+        "start→layer_start1#1": 1.0,
+        "layer_start1#1→layer_done1#1": 2.5,
+        "layer_done1#1→layer_start1#2": 0.5,
+        "layer_start1#2→layer_done1#2": 3.0,
+        "layer_done1#2→end": 1.0,
+    }

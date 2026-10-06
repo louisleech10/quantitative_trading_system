@@ -20,8 +20,10 @@
   },
   "budget_messages": {
     "own_cap": "本程式超上限",
-    "pressure_critical": "系統記憶體壓力已達危急",
-    "system_insufficient": "系統可用不足，請關閉其他程式"
+    "machine_insufficient": "機器可用量不足",
+    "swap_volume_low": "換頁卷剩餘不足（磁碟將滿）",
+    "measurement_failed": "記憶體量測失敗",
+    "estimate_exceeded": "任務峰值估算低估"
   },
   "positional_selection_keys": [
     "start_pos",
@@ -55,7 +57,7 @@
   "budget": {
     "ratio_default": 0.75,
     "disk_reserve_min_bytes": 4294967296,
-    "disk_reserve_fraction": 0.05,
+    "disk_reserve_swapfiles": 3,
     "pressure_critical_level": 4,
     "pressure_warn_level": 2,
     "guard_interval_seconds": 0.5,
