@@ -1505,6 +1505,40 @@ def test_scheduler_serial_route_records_reasons(tmp_path: Path) -> None:
     assert sched.routes == []
 
 
+def _root_serial_generation_routes(tmp_path: Path) -> Dict[str, List[str]]:
+    """域根下兩次串行生成，各自先校準前置 scope、再正式 run，各記一筆；回各次正式 run 所見之紀錄點。"""
+    got: Dict[str, List[str]] = {}
+    token = mb._ACTIVE.set(mb._RunContext(mode="root", stop_dir=tmp_path))
+    try:
+        for sym in ("A", "B"):
+            scope = mb.ProtectedRun(tmp_path / f"{sym}_scope", sym).start()
+            mb.record_route({"point": "calibration", "sym": sym})
+            run = mb.ProtectedRun(tmp_path / f"{sym}_run", sym).start()
+            mb.record_route({"point": "public", "sym": sym})
+            got[sym] = [f"{r['point']}:{r['sym']}" for r in mb.route_records()]
+            run.close()
+            scope.close()
+    finally:
+        mb._ACTIVE.reset(token)
+    return got
+
+
+def test_root_serial_generation_keeps_calibration_routes(tmp_path: Path) -> None:
+    """審碼 b3 r7 codex P2-02：自域根進入之一次生成內，校準前置與正式 run 共用紀錄（正式結果含校準階段之選路）；
+    兩次生成之紀錄互不累積。"""
+    assert _root_serial_generation_routes(tmp_path) == {"A": ["calibration:A", "public:A"],
+                                                       "B": ["calibration:B", "public:B"]}
+
+
+def test_mutation_root_nested_run_resets_routes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「自域根進入後仍保留 root 身分」（改前）⇒ 正式 run 再次清空、校準前置之紀錄遺失 ⇒ 上案斷言紅。"""
+    import dataclasses
+
+    real = dataclasses.replace
+    monkeypatch.setattr(mb, "replace", lambda obj, **kw: real(obj, **{k: v for k, v in kw.items() if k != "mode"}))
+    assert _root_serial_generation_routes(tmp_path)["A"] == ["public:A"]
+
+
 def test_worker_route_records_reach_root_run(tmp_path: Path) -> None:
     """worker 內之選路紀錄經域目錄交根：根之受保護 run 紀錄含之（帶 task_id 與 worker pid）。"""
     def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:

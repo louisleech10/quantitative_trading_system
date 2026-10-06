@@ -80,7 +80,7 @@ async def _run_wave(service: FeatureFactoryBatchService, tmp_path: Path) -> Dict
     finally:
         stop.set()
         await hb
-    return {"task": task, "beats": beats["n"]}
+    return {"task": task, "beats": beats["n"], "checkpoint": checkpoint, "request": request}
 
 
 @pytest.mark.asyncio
@@ -135,6 +135,31 @@ async def test_api_wave_serial_arm_in_root_without_pool(monkeypatch, batch_servi
     assert sorted(r["task_id"].split("|")[0] for r in routes) == ["BTCUSDT", "ETHUSDT"]
     assert all(r["point"] == "scheduler" and r["to"] == "serial" and r["reason"] == _SERIAL_ROUTE_REASON[driver]
                and {"G", "A", "F", "R"} <= set(r) for r in routes)
+    # 審碼 b3 r7 codex P2-01：紀錄隨各完成項存入 checkpoint；恢復重建 task 狀態時原樣取回（不遺失、不重加）
+    completed = out["checkpoint"]["completed_items"]
+    assert sorted(len(item["memory_route"]) for item in completed) == [1, 1]
+    service = batch_service_factory(tmp_path / "resume")
+    resumed = service._build_task_state("icfa-domain", out["request"], out["checkpoint"], "paused")
+    assert resumed["memory_route"] == routes
+
+
+@pytest.mark.asyncio
+async def test_api_wave_worker_route_records_reach_task(monkeypatch, batch_service_factory, tmp_path) -> None:
+    """審碼 b3 r7 codex P2-01：各項生成內之選路紀錄（`ComputeSingleResult.memory_route`，含並行 worker 交回者）
+    併入批次任務與其 checkpoint 完成項；並行准入者無排程器紀錄。"""
+    from api.services.feature_factory_batch_service import ComputeSingleResult
+
+    def compute(symbol: str, timeframe: str, *a: Any, domain: Optional[mb.DomainDescriptor] = None) -> Any:
+        return ComputeSingleResult(f"/tmp/{symbol}.h5", None, [{"point": "Layer 2", "to": "L2.pandas_serial",
+                                                                 "symbol": symbol}])
+
+    monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(compute))
+    _spy(monkeypatch)
+    out = await _run_wave(batch_service_factory(tmp_path), tmp_path)
+    assert sorted(r["symbol"] for r in out["task"]["memory_route"]) == ["BTCUSDT", "ETHUSDT"]
+    assert all(r["point"] == "Layer 2" for r in out["task"]["memory_route"])
+    assert sorted(item["memory_route"][0]["symbol"] for item in out["checkpoint"]["completed_items"]) == \
+        ["BTCUSDT", "ETHUSDT"]
 
 
 _SERIAL_ROUTE_REASON = {"aux_without_receipt": "no_aux_receipt", "available_insufficient": "admission:absorbable"}
@@ -222,3 +247,24 @@ def test_compute_single_passes_reroute_through(monkeypatch, error, passthrough) 
         assert info.value is error
     else:
         assert isinstance(info.value, RuntimeError) and "計算失敗" in str(info.value)
+
+
+def test_compute_single_carries_memory_route(monkeypatch) -> None:
+    """審碼 b3 r7 codex P2-01：worker 本體將生成結果 metadata 之 `memory_route` 帶入 `ComputeSingleResult`（並行 worker
+    之紀錄經此交回根）；無紀錄 ⇒ None。"""
+    import momentum.factories as factories_module
+
+    routes = [{"point": "Layer 2", "from": "L2.polars", "to": "L2.pandas_serial"}]
+
+    class _Result:
+        def __init__(self, metadata: Dict[str, Any]) -> None:
+            self.hdf5_path = "/tmp/x.h5"
+            self.metadata = metadata
+
+    for metadata, expected in (({"memory_route": routes}, routes), ({"memory_route": []}, None), ({}, None)):
+        class _Factory:
+            def generate_features(self, **_kw: Any) -> Any:
+                return _Result(metadata)
+
+        monkeypatch.setattr(factories_module, "create_feature_factory", lambda **_kw: _Factory())
+        assert FeatureFactoryBatchService._compute_single_body("BTCUSDT", "12h", None, False).memory_route == expected

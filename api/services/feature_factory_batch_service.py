@@ -77,6 +77,8 @@ class ComputeSingleResult(NamedTuple):
 
     hdf5_path: str
     warmup_insufficient: Optional[Dict[str, int]]
+    # 該項生成之選路紀錄（生成結果 metadata `memory_route`；ICFIRSTALIGN SPEC v35，審碼 b3 r7 codex P2-01）
+    memory_route: Optional[List[Dict[str, Any]]] = None
 
 
 def _normalize_compute_single_result(raw: Any) -> ComputeSingleResult:
@@ -619,8 +621,6 @@ class FeatureFactoryBatchService:
                         )
                         try:
                             outcomes = await asyncio.shield(scheduler_future)
-                            # 排程器之並行→串行決定記入批次任務 metadata（各項生成內之換臂在其生成結果；SPEC v35）
-                            task.setdefault("memory_route", []).extend(scheduler.routes)
                         except asyncio.CancelledError:
                             # ICFIRSTALIGN Task 4.2（v30）：取消只作用於本 await；排程器仍持有已啟動之 worker——
                             # 停止准入新任務並等其確認退出後，才關閉域與守護，再傳遞原取消
@@ -638,6 +638,10 @@ class FeatureFactoryBatchService:
                         return item, _normalize_compute_single_result(outcome), None
 
                     wrapped_futures = [_completed(item, outcome) for item, outcome in zip(item_wave, outcomes)]
+                    # 排程器之並行→串行決定依 task_id 配至各項（各項生成內之換臂隨其結果；SPEC v35）
+                    scheduler_routes: Dict[str, List[Dict[str, Any]]] = {}
+                    for record in scheduler.routes:
+                        scheduler_routes.setdefault(str(record.get("task_id")), []).append(record)
                     oom_seen = False
                     for wrapped_future in asyncio.as_completed(wrapped_futures):
                         item, compute_result, error = await wrapped_future
@@ -665,6 +669,8 @@ class FeatureFactoryBatchService:
                             rss_peak,
                             rss_after,
                             warmup_insufficient=compute_result.warmup_insufficient,
+                            memory_route=scheduler_routes.get(f"{symbol}|{timeframe}", [])
+                            + list(compute_result.memory_route or []),
                         )
                         self._append_child_metrics_if_missing(
                             child_metrics_path,
@@ -718,8 +724,14 @@ class FeatureFactoryBatchService:
         rss_peak_mb: int,
         rss_after_gc_mb: int,
         warmup_insufficient: Optional[Dict[str, int]] = None,
+        memory_route: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
-        """Record one completed or failed item in memory and checkpoint state."""
+        """Record one completed or failed item in memory and checkpoint state.
+
+        `memory_route`（ICFIRSTALIGN SPEC v35）：該項之選路紀錄存於其 completed／failed 項並併入 task；恢復時由
+        checkpoint 重建（已完成項不重跑、不重加）。"""
+        if memory_route:
+            task.setdefault("memory_route", []).extend(memory_route)
 
         browse_task_id: Optional[str] = None
         effective_error = error
@@ -760,6 +772,7 @@ class FeatureFactoryBatchService:
                     if warmup_insufficient is not None
                     else {}
                 ),
+                **({"memory_route": list(memory_route)} if memory_route else {}),
             })
             if self._is_batch_retention_enabled():
                 run_hash = self._resolve_completed_run_hash({
@@ -785,6 +798,7 @@ class FeatureFactoryBatchService:
                 "timeframe": timeframe,
                 "reason": str(effective_error),
                 "failure_type": resolved_failure_type.value,
+                **({"memory_route": list(memory_route)} if memory_route else {}),
             })
             logger.error(
                 "[L6.5] Batch task %s failed for %s %s: %s",
@@ -1091,6 +1105,9 @@ class FeatureFactoryBatchService:
             "concurrent_symbols": checkpoint.get("concurrent_symbols", 1),
             "memory_sanity_failed": bool(checkpoint.get("memory_sanity_failed", False)),
             "last_item_metrics": None,
+            # 選路紀錄（ICFIRSTALIGN SPEC v35）：由 checkpoint 之已記錄項重建（恢復後不遺失、不重加）
+            "memory_route": [record for item in (checkpoint.get("completed_items", []) + checkpoint.get("failed_items", []))
+                             for record in (item.get("memory_route") or [])],
         }
 
     def _build_task_state_from_checkpoint(
@@ -1448,10 +1465,12 @@ class FeatureFactoryBatchService:
                     },
                 )
             warmup_insufficient = None
+            memory_route: Optional[List[Dict[str, Any]]] = None
             metadata = getattr(result, "metadata", None)
             if isinstance(metadata, dict):
                 warmup_insufficient = coerce_warmup_insufficient(metadata.get("warmup_insufficient"))
-            return ComputeSingleResult(result.hdf5_path or "", warmup_insufficient)
+                memory_route = list(metadata.get("memory_route") or []) or None
+            return ComputeSingleResult(result.hdf5_path or "", warmup_insufficient, memory_route)
         except FileNotFoundError as exc:
             if metrics_path:
                 FeatureFactoryBatchService._append_child_metrics_jsonl(

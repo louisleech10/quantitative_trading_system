@@ -1166,9 +1166,13 @@ class ProtectedRun:
         if outer is not None:
             # 域內任務／域根之串行臂：守護與停止旗標沿用外層（不另起守護、不另建預算）；映射根與 owned paths 屬本 run
             self.nested = True
-            # 選路紀錄：域根之串行臂（每任務一次生成）各自一份；同一生成之巢狀（校準前置→run）與 worker 共用外層
-            routes = [] if outer.mode == "root" else outer.routes
-            self._token = _ACTIVE.set(replace(outer, mapping_root=root, run_dir=self.run_dir, routes=routes))
+            # 選路紀錄：自域根進入之一次生成（串行臂）另起一份並改為 run 身分，其內之巢狀（校準前置→正式 run）共用；
+            # worker 與單行程 run 之巢狀共用外層（審碼 b3 r7 codex P2-02：避免正式 run 再次清空校準前置之紀錄）
+            if outer.mode == "root":
+                ctx = replace(outer, mode="run", mapping_root=root, run_dir=self.run_dir, routes=[])
+            else:
+                ctx = replace(outer, mapping_root=root, run_dir=self.run_dir)
+            self._token = _ACTIVE.set(ctx)
             module.register_owned_path(self.run_dir, root)
             return self
         self.guard = module.start_guard(self.run_dir, self.run_id, budget=configured_budget_bytes(include_override=False))
