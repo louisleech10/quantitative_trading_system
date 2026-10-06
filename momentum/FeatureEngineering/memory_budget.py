@@ -1830,6 +1830,9 @@ class MemoryBudgetScheduler:
         return parallel_ever
 
     def _submit(self, state: _TaskState, worker_fn: Callable[[DomainDescriptor, Any], Any]) -> None:
+        # 本次嘗試前撤同 task_id 之舊 worker 紀錄檔（同一 domain_dir 重跑時不得誤讀前次紀錄；審碼 b3 r9 codex P2-01）
+        with contextlib.suppress(FileNotFoundError):
+            (self.domain_dir / ROUTES_DIR_NAME / f"{state.task.task_id}.json").unlink()
         executor = self._executor_factory(1)
         self._event("executor_created", "")
         state.executor = executor

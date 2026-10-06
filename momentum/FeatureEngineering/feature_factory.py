@@ -5174,10 +5174,15 @@ class FeatureFactory:
                     logger.error("Symbol %s failed: %s", sym, outcome)
                 else:
                     results[sym] = outcome
-                    # 排程器之並行→串行決定併入該標的 run metadata（worker 內換臂已在其結果 metadata；SPEC v35）
-                    decided = [r for r in scheduler.routes if r.get("task_id") == f"symbol:{sym}"]
-                    if decided and isinstance(outcome, dict):
-                        outcome.setdefault("memory_route", []).extend(decided)
+                    # 該標的之選路歷史（SPEC v35；審碼 b3 r9 codex P2-02）：排程器之並行→串行決定＋各次嘗試之生成內紀錄
+                    # （task_routes：worker 經域目錄、根之串行臂取自根情境；含估算低估後串行重試前之失敗嘗試），依時序；
+                    # 取代結果自帶之本次紀錄（同一筆已在 task_routes，避免重複）；全無紀錄（如快取命中）則不加欄
+                    task_id = f"symbol:{sym}"
+                    history = sorted([r for r in scheduler.routes if r.get("task_id") == task_id]
+                                     + list(scheduler.task_routes.get(task_id, [])),
+                                     key=lambda r: float(r.get("time") or 0.0))
+                    if history and isinstance(outcome, dict):
+                        outcome["memory_route"] = history
         finally:
             if work_dir is not None:
                 # 參考資料 IPC 暫存目錄：所有出口（成功、worker 失敗、pool 例外）皆刪，避免重複執行累積（FFSTAT b3 r5）

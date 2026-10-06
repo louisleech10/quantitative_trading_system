@@ -1566,6 +1566,61 @@ def test_root_serial_failed_generation_routes_attributed_to_task(tmp_path: Path)
     assert [(r["task_id"], r["reason"]) for r in sched.routes] == [("A", "no_aux_receipt"), ("B", "no_aux_receipt")]
 
 
+def test_rerun_same_task_does_not_replay_stale_worker_routes(tmp_path: Path) -> None:
+    """審碼 b3 r9 codex P2-01：同一 domain_dir 重跑同一 task_id，第二次 worker 無選路 ⇒ 不得讀到第一次之紀錄檔。"""
+    def make() -> mb.MemoryBudgetScheduler:
+        return mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=ThreadPoolExecutor,
+                                        read_system=lambda: (1000, 1, False, 20, ()),
+                                        read_task_footprint=lambda tid: 20, aux_startup_envelope=1,
+                                        task_identity=_thread_identity)
+
+    def first(desc: mb.DomainDescriptor, payload: Any) -> Any:
+        mb.record_route({"point": "worker", "attempt": "first"})
+        return payload
+
+    one = make()
+    one.run([mb.Task("A", 40, 1)], first, lambda p: p, lambda w: None)
+    assert [r["attempt"] for r in one.task_routes["A"]] == ["first"]
+    two = make()
+    two.run([mb.Task("A", 40, 2)], lambda d, p: p, lambda p: p, lambda w: None)
+    assert two.task_routes == {}
+
+
+def test_multi_symbol_reroute_keeps_failed_attempt_routes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """審碼 b3 r9 codex P2-02：多標的入口 worker 記選路後估算低估（`MemoryRerouteNeeded`）、根串行重試成功 ⇒ 該標的
+    metadata 之 `memory_route` 依時序含：失敗之 worker 嘗試、排程器決定（estimate_exceeded）、串行嘗試；不重複。"""
+    from momentum.FeatureEngineering import feature_factory as ff
+
+    root = h.isolated(monkeypatch, tmp_path)
+
+    def worker_entry(symbol: str, config_payload: Any, cache_dir: Any, ref_ipc_path: Any) -> dict:
+        if mb.in_domain_worker():
+            mb.record_route({"point": "Layer 2", "attempt": "worker", "symbol": symbol})
+            raise mb.MemoryRerouteNeeded("L2", 20, 40, 30, mb.MSG_ESTIMATE_EXCEEDED)
+        run = mb.ProtectedRun(tmp_path / f"run_{symbol}", symbol).start()
+        try:
+            mb.record_route({"point": "Layer 2", "attempt": "serial", "symbol": symbol})
+            return {"config_hash": "x", "memory_route": mb.route_records()}
+        finally:
+            run.close()
+
+    monkeypatch.setattr(ff, "_worker_entry", worker_entry)
+    sched = mb.MemoryBudgetScheduler(10 ** 12, domain_dir=tmp_path / "dom", max_workers=1,
+                                     executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (10 ** 12, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 20, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    token = mb._ACTIVE.set(mb._RunContext(mode="root", stop_dir=tmp_path))
+    try:
+        results, errors = h.make_factory(root)._run_multi_symbol_in_domain(
+            ["BTCUSDT"], h.s2_payload(), "BTCUSDT", str(h.KLINE_DIR), sched)
+    finally:
+        mb._ACTIVE.reset(token)
+    assert errors == {}
+    steps = [(r["point"], r.get("attempt") or r.get("reason")) for r in results["BTCUSDT"]["memory_route"]]
+    assert steps == [("Layer 2", "worker"), ("scheduler", "estimate_exceeded"), ("Layer 2", "serial")]
+
+
 def test_worker_route_records_reach_root_run(tmp_path: Path) -> None:
     """worker 內之選路紀錄經域目錄交根：根之受保護 run 紀錄含之（帶 task_id 與 worker pid）。"""
     def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:
