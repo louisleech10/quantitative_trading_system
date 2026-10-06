@@ -77,8 +77,6 @@ class ComputeSingleResult(NamedTuple):
 
     hdf5_path: str
     warmup_insufficient: Optional[Dict[str, int]]
-    # 該項生成之選路紀錄（生成結果 metadata `memory_route`；ICFIRSTALIGN SPEC v35，審碼 b3 r7 codex P2-01）
-    memory_route: Optional[List[Dict[str, Any]]] = None
 
 
 def _normalize_compute_single_result(raw: Any) -> ComputeSingleResult:
@@ -638,10 +636,13 @@ class FeatureFactoryBatchService:
                         return item, _normalize_compute_single_result(outcome), None
 
                     wrapped_futures = [_completed(item, outcome) for item, outcome in zip(item_wave, outcomes)]
-                    # 排程器之並行→串行決定依 task_id 配至各項（各項生成內之換臂隨其結果；SPEC v35）
+                    # 各項之選路紀錄（SPEC v35；審碼 b3 r7／r8 codex）：排程器之並行→串行決定，加上該項生成內之紀錄
+                    # （worker 經域目錄交回、根之串行臂取自根情境；成功或失敗皆有、各次嘗試依序）
                     scheduler_routes: Dict[str, List[Dict[str, Any]]] = {}
                     for record in scheduler.routes:
                         scheduler_routes.setdefault(str(record.get("task_id")), []).append(record)
+                    for routed_task, records in scheduler.task_routes.items():
+                        scheduler_routes.setdefault(str(routed_task), []).extend(records)
                     oom_seen = False
                     for wrapped_future in asyncio.as_completed(wrapped_futures):
                         item, compute_result, error = await wrapped_future
@@ -669,8 +670,7 @@ class FeatureFactoryBatchService:
                             rss_peak,
                             rss_after,
                             warmup_insufficient=compute_result.warmup_insufficient,
-                            memory_route=scheduler_routes.get(f"{symbol}|{timeframe}", [])
-                            + list(compute_result.memory_route or []),
+                            memory_route=scheduler_routes.get(f"{symbol}|{timeframe}", []),
                         )
                         self._append_child_metrics_if_missing(
                             child_metrics_path,
@@ -1465,12 +1465,10 @@ class FeatureFactoryBatchService:
                     },
                 )
             warmup_insufficient = None
-            memory_route: Optional[List[Dict[str, Any]]] = None
             metadata = getattr(result, "metadata", None)
             if isinstance(metadata, dict):
                 warmup_insufficient = coerce_warmup_insufficient(metadata.get("warmup_insufficient"))
-                memory_route = list(metadata.get("memory_route") or []) or None
-            return ComputeSingleResult(result.hdf5_path or "", warmup_insufficient, memory_route)
+            return ComputeSingleResult(result.hdf5_path or "", warmup_insufficient)
         except FileNotFoundError as exc:
             if metrics_path:
                 FeatureFactoryBatchService._append_child_metrics_jsonl(

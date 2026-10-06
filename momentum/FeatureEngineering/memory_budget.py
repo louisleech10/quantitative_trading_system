@@ -1156,6 +1156,8 @@ class ProtectedRun:
         self._token: Optional[contextvars.Token] = None
         self.nested = False
         self.recovery: Dict[str, Any] = {}
+        self._ctx: Optional[_RunContext] = None
+        self._root_routes: Optional[List[Dict[str, Any]]] = None
 
     def start(self) -> "ProtectedRun":
         module = sys.modules[__name__]
@@ -1170,8 +1172,10 @@ class ProtectedRun:
             # worker 與單行程 run 之巢狀共用外層（審碼 b3 r7 codex P2-02：避免正式 run 再次清空校準前置之紀錄）
             if outer.mode == "root":
                 ctx = replace(outer, mode="run", mapping_root=root, run_dir=self.run_dir, routes=[])
+                self._root_routes = outer.routes  # close 時交回域根（成功或失敗皆保留，排程器依任務歸屬）
             else:
                 ctx = replace(outer, mapping_root=root, run_dir=self.run_dir)
+            self._ctx = ctx
             self._token = _ACTIVE.set(ctx)
             module.register_owned_path(self.run_dir, root)
             return self
@@ -1193,6 +1197,9 @@ class ProtectedRun:
                 with contextlib.suppress(ValueError):
                     _ACTIVE.reset(self._token)
                 self._token = None
+            if self._root_routes is not None and self._ctx is not None:
+                self._root_routes.extend(self._ctx.routes)  # 自域根進入之一次生成：紀錄交回域根（審碼 b3 r8 codex P2-01）
+                self._root_routes = None
             shutil.rmtree(mapping_root(self.run_dir), ignore_errors=True)
             with contextlib.suppress(OSError):
                 (self.run_dir / OWNED_PATHS_NAME).unlink()  # 正常結束：暫存皆已刪，登記清單一併移除
@@ -1538,6 +1545,8 @@ class MemoryBudgetScheduler:
         self.degraded: Optional[Dict[str, Any]] = None
         # 本排程器之選路決定（並行→串行；SPEC v35 `memory_route`）；呼叫端併入各任務之 run metadata
         self.routes: List[Dict[str, Any]] = []
+        # 各任務生成內之選路紀錄（worker 經域目錄交回、根之串行臂取自根情境；成功或失敗皆保留、各次嘗試依序）
+        self.task_routes: Dict[str, List[Dict[str, Any]]] = {}
 
     def _record_serial(self, state: _TaskState, reason: str, admission: Optional[AdmissionState] = None) -> None:
         """並行→正式串行之選路紀錄（分派點、臂、理由、G＝任務承諾 E、A、F＝成員實測合計、R）。"""
@@ -1564,8 +1573,10 @@ class MemoryBudgetScheduler:
         except (OSError, ValueError):
             return
         for entry in payload.get("routes", []):
-            record_route({**{k: v for k, v in entry.items() if k not in ("event", "pid", "time")},
-                          "task_id": state.task.task_id, "worker_pid": entry.get("pid")})
+            record = record_route({**{k: v for k, v in entry.items() if k not in ("event", "pid", "time")},
+                                   "task_id": state.task.task_id, "worker_pid": entry.get("pid")})
+            with self._lock:
+                self.task_routes.setdefault(state.task.task_id, []).append(record)
 
     # -- 狀態
     def _event(self, event: str, task_id: str = "") -> None:
@@ -1833,6 +1844,8 @@ class MemoryBudgetScheduler:
         with self._lock:
             state.status = "serial"
         self._event("serial", state.task.task_id)
+        ctx = _ACTIVE.get()
+        before = 0 if ctx is None else len(ctx.routes)
         try:
             return serial_fn(state.task.payload)
         except Exception as exc:  # noqa: BLE001 — 與並行臂同：失敗以值交呼叫端分類
@@ -1840,6 +1853,8 @@ class MemoryBudgetScheduler:
         finally:
             with self._lock:
                 state.status = "joined"
+                if ctx is not None and len(ctx.routes) > before:  # 根之串行臂：本次生成交回根情境之紀錄
+                    self.task_routes.setdefault(state.task.task_id, []).extend(ctx.routes[before:])
 
 
 _ROOT_START: Dict[int, float] = {}

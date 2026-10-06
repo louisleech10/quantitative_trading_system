@@ -1539,6 +1539,33 @@ def test_mutation_root_nested_run_resets_routes(tmp_path: Path, monkeypatch: pyt
     assert _root_serial_generation_routes(tmp_path)["A"] == ["public:A"]
 
 
+def test_root_serial_failed_generation_routes_attributed_to_task(tmp_path: Path) -> None:
+    """審碼 b3 r8 codex P2-01：域根之串行臂——生成（受保護 run）記選路後拋錯 ⇒ run 關閉時紀錄交回域根，排程器依任務
+    歸屬（`task_routes`），排程器決定在前；成功之另一任務亦同；不同任務不混。"""
+    def serial(payload: Any) -> Any:
+        run = mb.ProtectedRun(tmp_path / f"run_{payload}", str(payload)).start()
+        try:
+            mb.record_route({"point": "Layer 2", "to": "L2.pandas_serial", "payload": payload})
+            if payload == 1:
+                raise ValueError("after route")
+            return payload
+        finally:
+            run.close()
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path / "d", max_workers=2, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (1000, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 20, aux_startup_envelope=None,
+                                     task_identity=_thread_identity)
+    token = mb._ACTIVE.set(mb._RunContext(mode="root", stop_dir=tmp_path))
+    try:
+        out = sched.run([mb.Task("A", 40, 1), mb.Task("B", 40, 2)], lambda d, p: p, serial, lambda w: None)
+    finally:
+        mb._ACTIVE.reset(token)
+    assert isinstance(out[0], ValueError) and out[1] == 2
+    assert {tid: [r["payload"] for r in records] for tid, records in sched.task_routes.items()} == {"A": [1], "B": [2]}
+    assert [(r["task_id"], r["reason"]) for r in sched.routes] == [("A", "no_aux_receipt"), ("B", "no_aux_receipt")]
+
+
 def test_worker_route_records_reach_root_run(tmp_path: Path) -> None:
     """worker 內之選路紀錄經域目錄交根：根之受保護 run 紀錄含之（帶 task_id 與 worker pid）。"""
     def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:
