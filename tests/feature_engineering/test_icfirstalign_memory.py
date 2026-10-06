@@ -1627,6 +1627,42 @@ def test_route_switches_when_original_exceeds_available(monkeypatch: pytest.Monk
         assert mb.route("Layer 2", _CANDS, scale_key="s") == "L2.pandas_serial"
 
 
+def test_route_switch_recorded_in_run_metadata(monkeypatch: pytest.MonkeyPatch) -> None:
+    """審碼 b3 r6 codex P2-02：容量切換記入受保護 run 之 `memory_route`（分派點、臂、理由、G、A、F、R），不只選填 log；
+    未切換 ⇒ 無紀錄。"""
+    _route_table(monkeypatch, original_bytes=6 * GiB, alt_bytes=GiB)
+    monkeypatch.delenv(mb.CHECK_LOG_ENV, raising=False)
+    token = mb._ACTIVE.set(mb._RunContext(mode="run", stop_dir=None))
+    try:
+        with ExitStack() as stack:
+            _route_ctx(stack, available=4 * GiB)
+            assert mb.route("Layer 2", _CANDS) == "L2.pandas_serial"
+            assert mb.route("Layer 2", [("L2.pandas_serial", {}), ("L2.polars", {})]) == "L2.pandas_serial"
+        records = mb.route_records()
+    finally:
+        mb._ACTIVE.reset(token)
+    assert len(records) == 1
+    r = records[0]
+    assert (r["point"], r["from"], r["to"], r["reason"]) == ("Layer 2", "L2.polars", "L2.pandas_serial", "capacity")
+    assert (r["G"], r["G_from"], r["A"]) == (GiB, 6 * GiB, 4 * GiB)
+    assert r["refusal"] == MSG["machine_insufficient"] and r["F"] > 0 and r["R"] == mb.configured_budget_bytes(
+        include_override=False)
+
+
+def test_mutation_route_switch_not_recorded(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant「切換只寫選填 log（改前）」⇒ 受保護 run 之紀錄為空 ⇒ 上案斷言紅。"""
+    _route_table(monkeypatch, original_bytes=6 * GiB, alt_bytes=GiB)
+    monkeypatch.setattr(mb, "record_route", lambda entry: mb._check_log(dict(entry)))
+    token = mb._ACTIVE.set(mb._RunContext(mode="run", stop_dir=None))
+    try:
+        with ExitStack() as stack:
+            _route_ctx(stack, available=4 * GiB)
+            mb.route("Layer 2", _CANDS)
+        assert mb.route_records() == []
+    finally:
+        mb._ACTIVE.reset(token)
+
+
 def test_route_raises_when_no_candidate_fits(monkeypatch: pytest.MonkeyPatch) -> None:
     """全部候選皆 G > A ⇒ 具名停止（原臂之錯誤）。"""
     _route_table(monkeypatch, original_bytes=6 * GiB, alt_bytes=5 * GiB)
@@ -1665,6 +1701,124 @@ def test_route_does_not_switch_on_stop_flag(monkeypatch: pytest.MonkeyPatch, tmp
         with pytest.raises(mb.GenerationMemoryBudgetExceeded) as info:
             mb.route("Layer 2", _CANDS)
     assert tried == ["L2.polars"] and info.value.reason == MSG["swap_volume_low"]
+
+
+# ── 守護必要讀數失敗（審碼 b3 r6 codex P1-01）────────────────────────────────
+
+def _stub_guard_system(fail: Callable[[int], Optional[str]]) -> Any:
+    """真實 `_System.available_parts`／`_Readings.sample` 之下層讀數樁；fail(第幾次取樣) 回失敗之必要項或 None。"""
+    from momentum.FeatureEngineering import memory_guard as mg
+
+    state = {"n": 0}
+
+    class Libc:
+        def __init__(self) -> None:
+            self.mach_host_self = lambda: 1  # 函式物件可設 restype
+
+        def host_statistics64(self, host: Any, flavor: Any, stats: Any, count: Any) -> int:
+            if fail(state["n"]) == "host_statistics64":
+                return 1
+            stats._obj.free_count = 1 << 18  # 正常讀數：可用量充裕（不觸發近零）
+            return 0
+
+        def sysctlbyname(self, name: bytes, buf: Any, *a: Any) -> int:
+            if name == b"vm.swapusage":
+                if fail(state["n"]) == "vm.swapusage":
+                    return -1
+                buf._obj.avail = 1 << 30
+            return 0
+
+    system = object.__new__(mg._System)
+    system.libc = Libc()
+
+    def sysctl_int(name: bytes) -> Optional[int]:
+        if name == b"hw.pagesize":
+            state["n"] += 1  # 每次 available_parts 先讀頁大小 ⇒ 以此計取樣序
+            return None if fail(state["n"]) == "hw.pagesize" else 16384
+        return 0
+
+    system._sysctl_int = sysctl_int
+    system.swap_volume = lambda: (90 << 30, 200 << 30)
+    system.pressure = lambda: 1
+    system.tree = lambda root: [root]
+    system.rusage = lambda pid: (100, 1)
+    return system
+
+
+def _guard_main_with(system: Any, samples: int) -> Dict[str, Any]:
+    """以樁系統跑守護主迴圈 `samples` 次取樣（旗標、終止攔截）；回傳 rc、是否 ready、旗標與終止原因。"""
+    import io
+    import signal
+    from unittest.mock import patch
+
+    from momentum.FeatureEngineering import memory_guard as mg
+
+    flags: List[str] = []
+    aborts: List[str] = []
+    out = io.StringIO()
+    count = {"n": 0}
+    real_sample = mg._Readings.sample
+
+    def sample(self: Any) -> Dict[str, Any]:
+        count["n"] += 1
+        return real_sample(self)
+
+    saved = {sig: signal.getsignal(sig) for sig in (signal.SIGTERM, signal.SIGINT)}
+    try:
+        with patch.object(mg, "_System", lambda: system), patch.object(mg._Readings, "sample", sample), \
+                patch.object(mg, "_write_atomic", lambda path, text: flags.append(text)), \
+                patch.object(mg, "_abort", lambda args, sys_, reason, history: aborts.append(reason)), \
+                patch.object(mg, "_alive", lambda pid: count["n"] < samples), patch.object(sys, "stdout", out):
+            mg._STOP = False
+            rc = mg.main(["--pid", "123456", "--run-dir", "/nonexistent", "--run-id", "probe", "--budget", "100",
+                          "--interval", "0.01"])
+    finally:
+        for sig, handler in saved.items():
+            signal.signal(sig, handler)
+    return {"rc": rc, "ready": "ready" in out.getvalue(), "flags": flags, "aborts": aborts}
+
+
+@pytest.mark.parametrize("item", ["hw.pagesize", "host_statistics64", "vm.swapusage"])
+def test_guard_required_vm_read_failure_is_measurement_failed(item: str) -> None:
+    """必要讀數讀不到：取樣拋 OSError；首讀即失敗 ⇒ rc=3 且不回報 ready；執行中失敗 ⇒ measurement_failed 立旗並經
+    同條件連續 2 次終止（審碼 b3 r6 codex P1-01）。"""
+    from momentum.FeatureEngineering import memory_guard as mg
+
+    with pytest.raises(OSError):
+        mg._Readings(_stub_guard_system(lambda n: item), 123).sample()
+    first = _guard_main_with(_stub_guard_system(lambda n: item), samples=3)
+    assert first["rc"] == 3 and not first["ready"] and first["flags"] == [] and first["aborts"] == []
+    later = _guard_main_with(_stub_guard_system(lambda n: item if n >= 2 else None), samples=6)
+    assert later["ready"] and later["flags"] == ["measurement_failed"] and later["aborts"] == ["measurement_failed"]
+
+
+def test_guard_optional_swapfile_sysctls_unreadable_not_failure() -> None:
+    """換頁檔三項讀不到仍為可選（擴充計 0）：取樣成功、含基本三項、無停止條件。"""
+    from momentum.FeatureEngineering import memory_guard as mg
+
+    system = _stub_guard_system(lambda n: None)
+    real = system._sysctl_int
+    system._sysctl_int = lambda name: real(name) if name == b"hw.pagesize" else None
+    row = mg._Readings(system, 123).sample()
+    assert {"free_bytes", "file_backed_bytes", "swap_avail_bytes"} <= set(row) and "swapfile_limit" not in row
+    assert mg._conditions(row, 100) == []
+
+
+def test_mutation_guard_required_read_failure_omitted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """mutant：必要讀數失敗只省略基本三項（改前行為）⇒ 首讀回報 ready、執行中不立旗 ⇒ 上案斷言紅。"""
+    from momentum.FeatureEngineering import memory_guard as mg
+
+    real = mg._System.available_parts
+
+    def omitting(self: Any) -> Dict[str, Any]:
+        try:
+            return real(self)
+        except OSError:
+            return {}
+
+    monkeypatch.setattr(mg._System, "available_parts", omitting)
+    first = _guard_main_with(_stub_guard_system(lambda n: "vm.swapusage"), samples=3)
+    assert first["ready"] and first["flags"] == []
 
 
 # ── 速度驗收判定（SPEC v40）──────────────────────────────────────────────────

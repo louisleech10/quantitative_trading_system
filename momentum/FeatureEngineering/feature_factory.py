@@ -306,6 +306,7 @@ class FeatureFactory:
                 require_raw=require_raw,
             )
             self._attach_output_window_metadata(result)
+            self._attach_memory_route_metadata(result)
             if lease_sink is not None:
                 lease_sink.append(lease)
                 retained = True
@@ -338,6 +339,13 @@ class FeatureFactory:
             Path(self._storage.base_path),
             Path.cwd() / "data_cache" / "cgsa_work" if not work_root else Path(work_root).expanduser(),
         ])
+
+    def _attach_memory_route_metadata(self, result: "FeatureGenerationResult") -> None:
+        """生成結果 metadata 帶本次受保護 run 之選路紀錄 `memory_route`（SPEC v35；審碼 b3 r6 codex P2-02）：
+        L2 等單行程換臂、多週期並行→串行與 worker 內換臂（經域目錄交根）。快取命中者不補寫（紀錄屬前一次 run）。"""
+        if getattr(self, "_last_generation_from_cache", False) or not isinstance(getattr(result, "metadata", None), dict):
+            return
+        result.metadata["memory_route"] = _memory_budget.route_records()
 
     def _attach_output_window_metadata(self, result: "FeatureGenerationResult") -> None:
         """生成結果 metadata 帶本次定案之 OutputWindow（ICFIRSTALIGN Task 2.0）。快取命中者不以本實例之窗補寫
@@ -5166,6 +5174,10 @@ class FeatureFactory:
                     logger.error("Symbol %s failed: %s", sym, outcome)
                 else:
                     results[sym] = outcome
+                    # 排程器之並行→串行決定併入該標的 run metadata（worker 內換臂已在其結果 metadata；SPEC v35）
+                    decided = [r for r in scheduler.routes if r.get("task_id") == f"symbol:{sym}"]
+                    if decided and isinstance(outcome, dict):
+                        outcome.setdefault("memory_route", []).extend(decided)
         finally:
             if work_dir is not None:
                 # 參考資料 IPC 暫存目錄：所有出口（成功、worker 失敗、pool 例外）皆刪，避免重複執行累積（FFSTAT b3 r5）

@@ -741,7 +741,8 @@ def _mtf_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **spy_overrides: A
     monkeypatch.setattr(_mb, "start_guard", lambda *a, **k: (guards.__setitem__("n", guards["n"] + 1), real_start(*a, **k))[1])
     _, result = h.generate_s2(root, h.s2_payload(["12h", "4h"]))
     return {"root": root, "config_hash": str(result.metadata["config_hash"]), "log": _log_lines(log),
-            "pools": pools["n"], "schedulers": created, "guards": guards["n"]}
+            "pools": pools["n"], "schedulers": created, "guards": guards["n"],
+            "memory_route": result.metadata.get("memory_route")}
 
 
 def test_mtf_entry_parallel_joins_domain(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -763,6 +764,21 @@ def _no_room_read_system() -> Any:
 
 _SERIAL_DRIVERS = {"aux_without_receipt": {"aux_startup_envelope": None},
                    "available_insufficient": {"read_system": _no_room_read_system}}
+# 各驅動之 run metadata `memory_route` 理由（SPEC v35；審碼 b3 r6 codex P2-02）
+_SERIAL_ROUTE_REASON = {"aux_without_receipt": "no_aux_receipt", "available_insufficient": "admission:absorbable"}
+
+
+def _scheduler_routes(records: Any) -> List[Dict[str, Any]]:
+    return [r for r in (records or []) if r.get("point") == "scheduler"]
+
+
+def _assert_serial_route_records(records: Any, driver: str, tasks: int) -> None:
+    """串行臂之選路紀錄：每任務一筆、理由對應驅動、含 G、A、F、R 四欄（值可為 None 者僅限讀數不可得）。"""
+    sched = _scheduler_routes(records)
+    assert len(sched) == tasks, records
+    for r in sched:
+        assert r["from"] == "parallel" and r["to"] == "serial" and r["reason"] == _SERIAL_ROUTE_REASON[driver]
+        assert {"G", "A", "F", "R"} <= set(r) and isinstance(r["R"], int)
 
 
 @pytest.mark.parametrize("driver", list(_SERIAL_DRIVERS))
@@ -774,9 +790,13 @@ def test_mtf_entry_serial_arm_byte_equal(tmp_path: Path, driver: str) -> None:
     assert serial["pools"] == 0
     assert any(x["event"] == "serial" for x in serial["log"])
     assert all(x["pid"] == os.getpid() for x in serial["log"] if x["event"] == "check")
+    # 主週期於根行程計算，排程器任務只有非主週期（S2m＝4h）⇒ 一筆
+    _assert_serial_route_records(serial["memory_route"], driver, tasks=1)
+    assert _scheduler_routes(serial["memory_route"])[0]["task_id"] == "mtf:4h"
     with pytest.MonkeyPatch.context() as mp:
         parallel = _mtf_run(tmp_path / "parallel", mp)
     assert parallel["pools"] >= 1
+    assert _scheduler_routes(parallel["memory_route"]) == [] and isinstance(parallel["memory_route"], list)
     assert parallel["config_hash"] == serial["config_hash"]
     assert _raw_digests(serial["root"], serial["config_hash"]) == _raw_digests(parallel["root"], parallel["config_hash"])
 
@@ -910,9 +930,13 @@ def test_run_multi_symbol_serial_arm_byte_equal(tmp_path: Path, driver: str) -> 
     assert serial["errors"] == {} and sorted(serial["results"]) == ["BTCUSDT", "ETHUSDT"]
     assert serial["pools"] == 0 and any(x["event"] == "serial" for x in serial["log"])
     assert all(x["pid"] == os.getpid() for x in serial["log"] if x["event"] == "check")
+    for sym, meta in serial["results"].items():
+        _assert_serial_route_records(meta.get("memory_route"), driver, tasks=1)
+        assert _scheduler_routes(meta["memory_route"])[0]["task_id"] == f"symbol:{sym}"
     with pytest.MonkeyPatch.context() as mp:
         parallel = _multi_symbol_run(tmp_path / "parallel", mp)
     assert parallel["errors"] == {} and parallel["pools"] >= 1
+    assert all(_scheduler_routes(meta.get("memory_route")) == [] for meta in parallel["results"].values())
     assert serial["digests"] == parallel["digests"]
 
 
@@ -1452,6 +1476,57 @@ def test_available_insufficient_falls_back_to_serial_without_pool(tmp_path: Path
     assert out == [("serial", 1), ("serial", 2)] and created == []
 
 
+def test_scheduler_serial_route_records_reasons(tmp_path: Path) -> None:
+    """審碼 b3 r6 codex P2-02：並行→串行之選路紀錄（分派點、臂、理由、G、A、F、R）——准入不足、估算低估重試、
+    其後強制串行三種理由；並行准入者無紀錄。"""
+    sched = mb.MemoryBudgetScheduler(10 ** 6, domain_dir=tmp_path / "a", max_workers=2, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (10, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 0, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    sched.run([mb.Task("A", 100, 1)], lambda d, p: p, lambda p: p, lambda w: None)
+    assert [(r["task_id"], r["reason"], r["G"], r["A"], r["F"], r["R"]) for r in sched.routes] == \
+        [("A", "admission:absorbable", 100, 10, 20, 10 ** 6)]
+
+    def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:
+        raise mb.MemoryRerouteNeeded(desc.task_id, 20, 40, int(desc.envelope), mb.MSG_ESTIMATE_EXCEEDED)
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path / "b", max_workers=2, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (1000, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 20, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    sched.run([mb.Task("A", 40, 1), mb.Task("B", 40, 2), mb.Task("C", 40, 3)], worker, lambda p: p, lambda w: None)
+    assert [(r["task_id"], r["reason"]) for r in sched.routes] == \
+        [("A", "estimate_exceeded"), ("B", "estimate_exceeded"), ("C", "after_reroute")]
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path / "c", max_workers=2, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (1000, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 20, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    sched.run([mb.Task("A", 40, 1)], lambda d, p: p, lambda p: p, lambda w: None)
+    assert sched.routes == []
+
+
+def test_worker_route_records_reach_root_run(tmp_path: Path) -> None:
+    """worker 內之選路紀錄經域目錄交根：根之受保護 run 紀錄含之（帶 task_id 與 worker pid）。"""
+    def worker(desc: mb.DomainDescriptor, payload: Any) -> Any:
+        mb.record_route({"point": "Layer 2", "from": "L2.polars", "to": "L2.pandas_serial", "reason": "capacity",
+                         "G": 1, "A": 2, "F": 3, "R": 4})
+        return payload
+
+    sched = mb.MemoryBudgetScheduler(1000, domain_dir=tmp_path, max_workers=1, executor_factory=ThreadPoolExecutor,
+                                     read_system=lambda: (1000, 1, False, 20, ()),
+                                     read_task_footprint=lambda tid: 20, aux_startup_envelope=1,
+                                     task_identity=_thread_identity)
+    token = mb._ACTIVE.set(mb._RunContext(mode="run", stop_dir=None))
+    try:
+        sched.run([mb.Task("4h", 40, 1)], worker, lambda p: p, lambda w: None)
+        records = mb.route_records()
+    finally:
+        mb._ACTIVE.reset(token)
+    assert [(r["point"], r["task_id"], r["to"], r["G"], r["A"], r["F"], r["R"]) for r in records] == \
+        [("Layer 2", "4h", "L2.pandas_serial", 1, 2, 3, 4)]
+    assert records[0]["worker_pid"] is not None
+
+
 class _AnyScale(tuple):
     """測試用速度收據：任一規模鍵皆相符。"""
 
@@ -1487,6 +1562,12 @@ def test_l2_speed_receipt_route_byte_equal(tmp_path: Path) -> None:
         _, switched = h.generate_s2(switched_root)
     assert polars_choices and set(polars_choices) == {"L2.polars"}
     assert chosen and all(c.startswith("L2.pandas") for c in chosen)
+    # 審碼 b3 r6 codex P2-02：切換記入生成結果 metadata `memory_route`（G、A、F、R）；未切換者為空
+    assert base.metadata["memory_route"] == []
+    routes = switched.metadata["memory_route"]
+    assert routes and all(r["point"] == "Layer 2" and r["from"] == "L2.polars" and r["to"].startswith("L2.pandas")
+                          and r["reason"] == "speed_receipt" and {"G", "G_from", "A", "F", "R"} <= set(r)
+                          for r in routes)
     assert base.metadata["config_hash"] == switched.metadata["config_hash"]
     assert _raw_digests(base_root, base.metadata["config_hash"]) == \
         _raw_digests(switched_root, switched.metadata["config_hash"])

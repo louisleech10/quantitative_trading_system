@@ -130,6 +130,14 @@ async def test_api_wave_serial_arm_in_root_without_pool(monkeypatch, batch_servi
     assert all(r["pid"] == os.getpid() for r in record)
     assert json.loads(out["task"]["results"]["BTCUSDT"]) == {"symbol": "BTCUSDT"}
     assert out["beats"] >= 4
+    # 審碼 b3 r6 codex P2-02：並行→串行之決定記入批次任務 metadata `memory_route`（每項一筆、含 G、A、F、R）
+    routes = out["task"]["memory_route"]
+    assert sorted(r["task_id"].split("|")[0] for r in routes) == ["BTCUSDT", "ETHUSDT"]
+    assert all(r["point"] == "scheduler" and r["to"] == "serial" and r["reason"] == _SERIAL_ROUTE_REASON[driver]
+               and {"G", "A", "F", "R"} <= set(r) for r in routes)
+
+
+_SERIAL_ROUTE_REASON = {"aux_without_receipt": "no_aux_receipt", "available_insufficient": "admission:absorbable"}
 
 
 @pytest.mark.asyncio

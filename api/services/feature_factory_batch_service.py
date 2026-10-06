@@ -619,6 +619,8 @@ class FeatureFactoryBatchService:
                         )
                         try:
                             outcomes = await asyncio.shield(scheduler_future)
+                            # 排程器之並行→串行決定記入批次任務 metadata（各項生成內之換臂在其生成結果；SPEC v35）
+                            task.setdefault("memory_route", []).extend(scheduler.routes)
                         except asyncio.CancelledError:
                             # ICFIRSTALIGN Task 4.2（v30）：取消只作用於本 await；排程器仍持有已啟動之 worker——
                             # 停止准入新任務並等其確認退出後，才關閉域與守護，再傳遞原取消

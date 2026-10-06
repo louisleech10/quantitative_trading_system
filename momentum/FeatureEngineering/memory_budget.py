@@ -183,6 +183,7 @@ ABORT_RECEIPT_NAME = "memory_guard_abort.json"
 OWNED_PATHS_NAME = "owned_paths.json"
 ESTIMATE_EXCEEDED_LOG_NAME = "memory_estimate_exceeded.jsonl"
 MEMBERS_DIR_NAME = "members"
+ROUTES_DIR_NAME = "routes"
 GUARD_SCRIPT = Path(__file__).with_name("memory_guard.py")
 GUARD_READINGS_ENV = "ICFA_GUARD_READINGS_FILE"
 CHECK_LOG_ENV = "ICFA_CHECK_LOG"
@@ -204,9 +205,11 @@ class _RunContext:
     mapping_root: Optional[Path] = None
     domain: Optional["DomainDescriptor"] = None
     run_dir: Optional[Path] = None
+    # 選路紀錄（SPEC v35：切換與理由記入 run metadata `memory_route`）；巢狀情境以 `replace` 共用同一串列
+    routes: List[Dict[str, Any]] = field(default_factory=list)
 
 
-_ACTIVE: "contextvars.ContextVar[Optional[_RunContext]]" = contextvars.ContextVar("icfa_memory_context", default=None)
+_ACTIVE:"contextvars.ContextVar[Optional[_RunContext]]" = contextvars.ContextVar("icfa_memory_context", default=None)
 _SAMPLER_OVERRIDE: "contextvars.ContextVar[Optional[Callable[[], Mapping[str, int]]]]" = contextvars.ContextVar(
     "icfa_sampler_override", default=None)
 _BUDGET_OVERRIDE: "contextvars.ContextVar[Optional[int]]" = contextvars.ContextVar("icfa_budget_override", default=None)
@@ -230,6 +233,23 @@ def current_run_dir() -> Optional[Path]:
     """本執行緒受保護 run 之 run 目錄（登記 owned paths 用）；無 ⇒ None。"""
     ctx = _ACTIVE.get()
     return None if ctx is None else ctx.run_dir
+
+
+def record_route(entry: Mapping[str, Any]) -> Dict[str, Any]:
+    """選路紀錄（SPEC v35「切換與理由記入 run metadata `memory_route`：分派點、臂、理由、G、A、F、R」；審碼 b3 r6
+    codex P2-02）：附入本執行緒受保護 run 之紀錄（生成結果 metadata 由 `route_records` 取用），並寫選填診斷 log。"""
+    record = {"event": "memory_route", "pid": os.getpid(), "time": time.time(), **dict(entry)}
+    ctx = _ACTIVE.get()
+    if ctx is not None:
+        ctx.routes.append(record)
+    _check_log(record)
+    return record
+
+
+def route_records() -> List[Dict[str, Any]]:
+    """本執行緒受保護 run 至今之選路紀錄（無受保護 run ⇒ 空）。"""
+    ctx = _ACTIVE.get()
+    return [] if ctx is None else [dict(r) for r in ctx.routes]
 
 
 # ---------------------------------------------------------------- 取樣（macOS libproc／mach）
@@ -853,11 +873,29 @@ def route(point: str, candidates: Sequence[Tuple[str, Mapping[str, Any]]], *, la
             continue
         if branch != original:
             reason = "speed_receipt" if branch == ordered[0][0] and first_error is None else "capacity"
-            _check_log({"event": "memory_route", "point": point, "from": original, "to": branch, "reason": reason,
-                        "pid": os.getpid()})
+            _record_route_switch(point, original, candidates[0][1], branch, params, reason, first_error)
         return branch
     assert first_error is not None
     raise first_error
+
+
+def _record_route_switch(point: str, original: str, original_params: Mapping[str, Any], branch: str,
+                         params: Mapping[str, Any], reason: str,
+                         refusal: Optional[GenerationMemoryBudgetExceeded]) -> None:
+    """單行程選路之紀錄：G（選定臂）、G_from（原臂）、A、F、R；原臂被拒時附其拒絕理由。量測失敗不改變選路結果。"""
+    entry: Dict[str, Any] = {"point": point, "from": original, "to": branch, "reason": reason,
+                             "G": planned_bytes(estimate(branch, params)),
+                             "G_from": planned_bytes(estimate(original, original_params)),
+                             "R": configured_budget_bytes(include_override=False)}
+    try:
+        entry["A"] = available_bytes(sample_vm_snapshot())
+        entry["F"] = _current_usage_bytes()
+    except MemoryMeasurementUnavailable:
+        entry.setdefault("A", None)
+        entry["F"] = None
+    if refusal is not None:
+        entry["refusal"] = refusal.reason
+    record_route(entry)
 
 
 def check_estimate(branch_id: str, params: Mapping[str, Any], **kwargs: Any) -> List[Component]:
@@ -1128,7 +1166,9 @@ class ProtectedRun:
         if outer is not None:
             # 域內任務／域根之串行臂：守護與停止旗標沿用外層（不另起守護、不另建預算）；映射根與 owned paths 屬本 run
             self.nested = True
-            self._token = _ACTIVE.set(replace(outer, mapping_root=root, run_dir=self.run_dir))
+            # 選路紀錄：域根之串行臂（每任務一次生成）各自一份；同一生成之巢狀（校準前置→run）與 worker 共用外層
+            routes = [] if outer.mode == "root" else outer.routes
+            self._token = _ACTIVE.set(replace(outer, mapping_root=root, run_dir=self.run_dir, routes=routes))
             module.register_owned_path(self.run_dir, root)
             return self
         self.guard = module.start_guard(self.run_dir, self.run_id, budget=configured_budget_bytes(include_override=False))
@@ -1429,11 +1469,17 @@ def _trampoline(descriptor: DomainDescriptor, worker_fn: Callable[[DomainDescrip
     members.mkdir(parents=True, exist_ok=True)
     _write_json_atomic(members / f"{descriptor.task_id}.json", {"pid": int(pid), "start_time": float(start_time),
                                                                "os_pid": os.getpid()})
-    token = _ACTIVE.set(_RunContext(mode="worker", stop_dir=Path(descriptor.stop_dir or descriptor.domain_dir), domain=descriptor))
+    ctx = _RunContext(mode="worker", stop_dir=Path(descriptor.stop_dir or descriptor.domain_dir), domain=descriptor)
+    token = _ACTIVE.set(ctx)
     try:
         return worker_fn(descriptor, payload)
     finally:
         _ACTIVE.reset(token)
+        if ctx.routes:  # worker 內之選路紀錄經域目錄交根（根 join 後併入其 run metadata；審碼 b3 r6 codex P2-02）
+            with contextlib.suppress(OSError):
+                routes_dir = Path(descriptor.domain_dir) / ROUTES_DIR_NAME
+                routes_dir.mkdir(parents=True, exist_ok=True)
+                _write_json_atomic(routes_dir / f"{descriptor.task_id}.json", {"routes": ctx.routes})
 
 
 @dataclass
@@ -1486,6 +1532,36 @@ class MemoryBudgetScheduler:
         self._reroute_seen = False
         self._aux_slot: Optional[Slot] = None
         self.degraded: Optional[Dict[str, Any]] = None
+        # 本排程器之選路決定（並行→串行；SPEC v35 `memory_route`）；呼叫端併入各任務之 run metadata
+        self.routes: List[Dict[str, Any]] = []
+
+    def _record_serial(self, state: _TaskState, reason: str, admission: Optional[AdmissionState] = None) -> None:
+        """並行→正式串行之選路紀錄（分派點、臂、理由、G＝任務承諾 E、A、F＝成員實測合計、R）。"""
+        if admission is None:
+            try:
+                admission = self.snapshot()
+            except Exception:  # noqa: BLE001 — 紀錄不得改變選路結果；讀不到即記 None
+                admission = None
+        record = record_route({
+            "point": "scheduler", "task_id": state.task.task_id, "from": "parallel", "to": "serial", "reason": reason,
+            "G": None if state.task.envelope is None else int(state.task.envelope),
+            "A": None if admission is None else int(admission.absorbable),
+            "F": None if admission is None else measured_total(admission.members),
+            "R": self.budget,
+        })
+        with self._lock:
+            self.routes.append(record)
+
+    def _collect_worker_routes(self, state: _TaskState) -> None:
+        """worker 內之選路紀錄（`_trampoline` 經域目錄交出）併入根之受保護 run 紀錄。"""
+        path = self.domain_dir / ROUTES_DIR_NAME / f"{state.task.task_id}.json"
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        for entry in payload.get("routes", []):
+            record_route({**{k: v for k, v in entry.items() if k not in ("event", "pid", "time")},
+                          "task_id": state.task.task_id, "worker_pid": entry.get("pid")})
 
     # -- 狀態
     def _event(self, event: str, task_id: str = "") -> None:
@@ -1685,15 +1761,19 @@ class MemoryBudgetScheduler:
                     if wave:
                         break
                     queue.popleft()
+                    self._record_serial(head, "no_envelope" if head.task.envelope is None else (
+                        "no_aux_receipt" if self.aux_startup_envelope is None else "after_reroute"))
                     results[head.index] = self._run_serial(head, serial_fn)
                     continue
                 if not wave:
                     self._register_aux_slot()
-                decision = admit(self.snapshot(), int(head.task.envelope), int(head.task.disk_bytes))
+                admission_state = self.snapshot()
+                decision = admit(admission_state, int(head.task.envelope), int(head.task.disk_bytes))
                 if not decision.ok:
                     if wave:
                         break
                     queue.popleft()
+                    self._record_serial(head, f"admission:{decision.reason}", admission_state)
                     results[head.index] = self._run_serial(head, serial_fn)
                     continue
                 queue.popleft()
@@ -1717,6 +1797,7 @@ class MemoryBudgetScheduler:
             rerouted: List[_TaskState] = []
             for state in wave:
                 self._join_confirmed(state)
+                self._collect_worker_routes(state)
                 exc = state.future.exception()
                 if isinstance(exc, MemoryRerouteNeeded):
                     rerouted.append(state)  # SPEC v35：該波 join 後於根之正式串行 producer 重試一次
@@ -1729,6 +1810,7 @@ class MemoryBudgetScheduler:
             for state in rerouted:
                 self._reroute_seen = True  # 根停止新准入：其後任務一律正式串行臂
                 self._event("reroute", state.task.task_id)
+                self._record_serial(state, "estimate_exceeded")
                 results[state.index] = self._run_serial(state, serial_fn)
         return parallel_ever
 
@@ -1922,6 +2004,7 @@ def in_domain_worker() -> bool:
 __all__ = [
     "GenerationMemoryBudgetExceeded", "MemoryRerouteNeeded", "MemoryMeasurementUnavailable", "UnknownBudgetBranchError",
     "SchedulerStopped", "Component", "VMSnapshot", "available_bytes", "swap_expansion_bytes", "route",
+    "record_route", "route_records",
     "SELECTORS", "NON_ARM_FFACT_KEYS", "BRANCH_TABLE", "STOP_FLAG_NAME", "ABORT_RECEIPT_NAME", "OWNED_PATHS_NAME",
     "sample_memory_bytes", "sample_footprint_of", "sample_vm_snapshot", "system_absorbable_bytes",
     "disk_reserve_bytes", "budget_bytes", "planned_bytes", "normalize_selectors", "selector", "check",

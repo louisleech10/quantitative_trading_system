@@ -105,21 +105,24 @@ class _System:
         return int(ctypes.c_int32(value.value & 0xFFFFFFFF).value) if size.value == 4 else int(value.value)
 
     def available_parts(self) -> Dict[str, Any]:
-        """剩餘可用量 A 之成分（SPEC v35）；host_statistics64／vm.swapusage 讀不到 ⇒ 該次不含基本三項（不判近零），
-        換頁檔三項讀不到 ⇒ None（擴充計 0）。"""
+        """剩餘可用量 A 之成分（SPEC v35）；必要讀數（hw.pagesize、host_statistics64、vm.swapusage）讀不到 ⇒ OSError
+        （首讀 ⇒ 啟動失敗 rc=3；執行中 ⇒ measurement_failed；審碼 b3 r6 codex P1-01），換頁檔三項讀不到 ⇒ None（擴充計 0）。"""
         parts: Dict[str, Any] = {}
         page = self._sysctl_int(b"hw.pagesize")
+        if not page:
+            raise OSError("hw.pagesize 讀不到")
         stats = _VMStatistics64()
         count = ctypes.c_uint32(ctypes.sizeof(_VMStatistics64) // 4)
         self.libc.mach_host_self.restype = ctypes.c_uint32
+        if self.libc.host_statistics64(self.libc.mach_host_self(), 4, ctypes.byref(stats), ctypes.byref(count)) != 0:
+            raise OSError("host_statistics64 讀不到")
         swap = _XswUsage()
         size = ctypes.c_size_t(ctypes.sizeof(swap))
-        if page and self.libc.host_statistics64(self.libc.mach_host_self(), 4, ctypes.byref(stats),
-                                                ctypes.byref(count)) == 0 \
-                and self.libc.sysctlbyname(b"vm.swapusage", ctypes.byref(swap), ctypes.byref(size), None, 0) == 0:
-            parts.update({"free_bytes": max(int(stats.free_count) - int(stats.speculative_count), 0) * page,
-                          "file_backed_bytes": int(stats.external_page_count) * page,
-                          "swap_avail_bytes": int(swap.avail), "page_size": page})
+        if self.libc.sysctlbyname(b"vm.swapusage", ctypes.byref(swap), ctypes.byref(size), None, 0) != 0:
+            raise OSError("vm.swapusage 讀不到")
+        parts.update({"free_bytes": max(int(stats.free_count) - int(stats.speculative_count), 0) * page,
+                      "file_backed_bytes": int(stats.external_page_count) * page,
+                      "swap_avail_bytes": int(swap.avail), "page_size": page})
         values = [self._sysctl_int(name) for name in SWAPFILE_SYSCTLS]
         if None not in values:
             parts.update({"swapfile_limit": values[0], "swapfile_count": values[1], "swapfile_size_max": values[2]})
