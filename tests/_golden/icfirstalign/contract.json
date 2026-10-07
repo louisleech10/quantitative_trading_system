@@ -150,56 +150,83 @@
     "L1.serial": [
       "indicator_tables",
       "merged_return",
-      "persist_cast"
+      "persist_cast",
+      "segment_constant",
+      "persist_chunk",
+      "persist_shard"
     ],
     "L1.parallel": [
       "engine_tables",
       "merged_return",
-      "persist_cast"
+      "persist_cast",
+      "segment_constant",
+      "persist_chunk",
+      "persist_shard"
     ],
     "L2.polars": [
+      "polars_inputs",
+      "polars_frames",
+      "polars_to_pandas",
+      "fallback_frames",
+      "category_transient",
       "return_table",
-      "max_category",
-      "category_cast",
-      "spill:mapped"
+      "persist_cast",
+      "persist_chunk",
+      "persist_shard",
+      "spill:mapped",
+      "polars_runtime",
+      "segment_constant"
     ],
     "L2.pandas_serial": [
       "category_tables_sum",
       "merge_return",
       "persist_cast",
-      "spill:mapped"
+      "spill:mapped",
+      "segment_constant",
+      "category_transient",
+      "persist_chunk",
+      "persist_shard"
     ],
     "L2.pandas_parallel": [
       "category_tables_sum",
       "merge_return",
       "persist_cast",
-      "spill:mapped"
+      "spill:mapped",
+      "segment_constant",
+      "category_transient",
+      "persist_chunk",
+      "persist_shard"
     ],
     "L3.numba_multi_callback": [
       "fused_x2",
       "kernel_scratch",
       "step_results",
       "step_buffers",
-      "flush_overshoot"
+      "flush_overshoot",
+      "segment_constant"
     ],
     "L3.numba_multi_nocallback": [
       "fused_x2",
       "kernel_scratch",
       "accumulated_steps",
       "final_concat",
-      "persist_cast"
+      "persist_cast",
+      "segment_constant"
     ],
     "L3.vectorized_chunked": [
       "chunk_cache",
       "chunk_outputs",
       "final_concat",
-      "persist_cast"
+      "persist_cast",
+      "ordered_concat",
+      "segment_constant"
     ],
     "L3.vectorized_unchunked": [
       "chunk_cache",
       "chunk_outputs",
       "final_concat",
-      "persist_cast"
+      "persist_cast",
+      "segment_constant"
     ],
     "L3.numba_single": [
       "chunk_cache",
@@ -207,46 +234,70 @@
       "six_stat",
       "six_stat_return",
       "persist_cast",
-      "output_memmap:mapped"
+      "output_memmap:mapped",
+      "segment_constant"
     ],
     "L3.pandas_fallback": [
       "rolling_intermediate",
       "persist_cast",
-      "return_table:mapped"
+      "return_table:mapped",
+      "segment_constant"
     ],
     "L4": [
       "input_merge",
       "output",
-      "persist_cast"
+      "persist_cast",
+      "segment_constant",
+      "input_select",
+      "shift_transient",
+      "output_frames",
+      "persist_chunk",
+      "persist_shard"
     ],
     "L5": [
       "input_merge",
       "output",
-      "persist_cast"
+      "persist_cast",
+      "segment_constant",
+      "input_select",
+      "shift_transient",
+      "output_frames",
+      "persist_chunk",
+      "persist_shard"
     ],
     "L6": [
       "input_merge",
       "output",
-      "persist_cast"
+      "persist_cast",
+      "segment_constant",
+      "input_select",
+      "shift_transient",
+      "output_frames",
+      "persist_chunk",
+      "persist_shard"
     ],
     "IC.group_read": [
       "read",
-      "cast"
+      "cast",
+      "segment_constant"
     ],
     "IC.selected_read": [
       "read",
-      "cast"
+      "cast",
+      "segment_constant"
     ],
     "PostIC.transform_selected": [
       "selected_copy",
       "group_output",
-      "accumulated_processed"
+      "accumulated_processed",
+      "segment_constant"
     ],
     "Calib.group_reduce": [
       "group",
       "winsor_copy",
       "packet_accumulated",
-      "shard_map:mapped"
+      "shard_map:mapped",
+      "segment_constant"
     ],
     "MTF.align_persist": [
       "source_dense",
@@ -256,10 +307,12 @@
       "block_valid",
       "block_gather_idx",
       "block_gather",
-      "block_cast"
+      "block_cast",
+      "segment_constant"
     ],
     "MTF.align_compact": [
-      "idx_map_int32"
+      "idx_map_int32",
+      "segment_constant"
     ],
     "MTF.align_index": [
       "primary_seconds",
@@ -268,7 +321,8 @@
       "source_close_ns",
       "idx",
       "valid_positions",
-      "mismatch_mask"
+      "mismatch_mask",
+      "segment_constant"
     ]
   },
   "arm_functions": {

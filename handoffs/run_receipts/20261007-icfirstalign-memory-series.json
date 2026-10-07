@@ -1,0 +1,1028 @@
+{
+ "probe": "handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py",
+ "spec": "docs/ICFIRSTALIGN_SPEC.md v40 Task 4.3",
+ "time": "2026-10-07T04:49:39+0800",
+ "rc": -9,
+ "platform": {
+  "system": "Darwin",
+  "release": "27.0.0",
+  "machine": "arm64"
+ },
+ "physical_bytes": 8589934592,
+ "half_bytes": 4294967296,
+ "probe_stop_bytes": 6442450944,
+ "series_file": "/Users/louis/Desktop/quantitative_trading_system/handoffs/run_receipts/20261007-icfirstalign-memory-series.series.jsonl",
+ "samples": 6896,
+ "max_footprint": 7432199176,
+ "max_resident": 2449817600,
+ "discriminating_samples_resident_lt_footprint": 6654,
+ "plan": [
+  {
+   "name": "reduced/3d",
+   "days": 3,
+   "rows": 72,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 41472
+  },
+  {
+   "name": "reduced/5d",
+   "days": 5,
+   "rows": 120,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 69120
+  },
+  {
+   "name": "reduced/10d",
+   "days": 10,
+   "rows": 240,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 138240
+  },
+  {
+   "name": "reduced/14d",
+   "days": 14,
+   "rows": 336,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 193536
+  },
+  {
+   "name": "reduced/21d",
+   "days": 21,
+   "rows": 504,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 290304
+  },
+  {
+   "name": "reduced/30d",
+   "days": 30,
+   "rows": 720,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 414720
+  },
+  {
+   "name": "reduced/60d",
+   "days": 60,
+   "rows": 1440,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 829440
+  },
+  {
+   "name": "reduced/120d",
+   "days": 120,
+   "rows": 2880,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 1658880
+  },
+  {
+   "name": "reduced/240d",
+   "days": 240,
+   "rows": 5760,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 3317760
+  },
+  {
+   "name": "reduced/480d",
+   "days": 480,
+   "rows": 11520,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 6635520
+  },
+  {
+   "name": "reduced/850d",
+   "days": 850,
+   "rows": 20400,
+   "l1_cols": 2,
+   "l2_cols": 70,
+   "work_bytes": 11750400
+  },
+  {
+   "name": "trend/3d",
+   "days": 3,
+   "rows": 72,
+   "l1_cols": 147,
+   "l2_cols": 26460,
+   "work_bytes": 15325632
+  },
+  {
+   "name": "trend/5d",
+   "days": 5,
+   "rows": 120,
+   "l1_cols": 147,
+   "l2_cols": 26460,
+   "work_bytes": 25542720
+  },
+  {
+   "name": "trend/10d",
+   "days": 10,
+   "rows": 240,
+   "l1_cols": 147,
+   "l2_cols": 26460,
+   "work_bytes": 51085440
+  },
+  {
+   "name": "trend/14d",
+   "days": 14,
+   "rows": 336,
+   "l1_cols": 147,
+   "l2_cols": 26460,
+   "work_bytes": 71519616
+  },
+  {
+   "name": "trend/21d",
+   "days": 21,
+   "rows": 504,
+   "l1_cols": 147,
+   "l2_cols": 26460,
+   "work_bytes": 107279424
+  },
+  {
+   "name": "trend+momentum+volatility+volume/3d",
+   "days": 3,
+   "rows": 72,
+   "l1_cols": 575,
+   "l2_cols": 349600,
+   "work_bytes": 201700800
+  },
+  {
+   "name": "trend+momentum+volatility+volume/5d",
+   "days": 5,
+   "rows": 120,
+   "l1_cols": 575,
+   "l2_cols": 349600,
+   "work_bytes": 336168000
+  },
+  {
+   "name": "trend+momentum+volatility+volume/10d",
+   "days": 10,
+   "rows": 240,
+   "l1_cols": 575,
+   "l2_cols": 349600,
+   "work_bytes": 672336000
+  },
+  {
+   "name": "trend+momentum/21d",
+   "days": 21,
+   "rows": 504,
+   "l1_cols": 540,
+   "l2_cols": 309420,
+   "work_bytes": 1249758720
+  },
+  {
+   "name": "trend/480d",
+   "days": 480,
+   "rows": 11520,
+   "l1_cols": 147,
+   "l2_cols": 26460,
+   "work_bytes": 2452101120
+  },
+  {
+   "name": "trend/850d",
+   "days": 850,
+   "rows": 20400,
+   "l1_cols": 147,
+   "l2_cols": 26460,
+   "work_bytes": 4342262400
+  },
+  {
+   "name": "trend+momentum+volatility+volume/120d",
+   "days": 120,
+   "rows": 2880,
+   "l1_cols": 575,
+   "l2_cols": 349600,
+   "work_bytes": 8068032000
+  },
+  {
+   "name": "trend+momentum+volatility+volume/240d",
+   "days": 240,
+   "rows": 5760,
+   "l1_cols": 575,
+   "l2_cols": 349600,
+   "work_bytes": 16136064000
+  },
+  {
+   "name": "trend+momentum+volatility+volume/480d",
+   "days": 480,
+   "rows": 11520,
+   "l1_cols": 575,
+   "l2_cols": 349600,
+   "work_bytes": 32272128000
+  },
+  {
+   "name": "trend+momentum+volatility+volume/850d",
+   "days": 850,
+   "rows": 20400,
+   "l1_cols": 575,
+   "l2_cols": 349600,
+   "work_bytes": 57148560000
+  }
+ ],
+ "steps": [
+  {
+   "name": "reduced/3d",
+   "days": 3,
+   "rows_est": 72,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 41472,
+   "start": "2026-03-28",
+   "end": "2026-03-31",
+   "elapsed_s": 4.13,
+   "footprint_before": 206734416,
+   "footprint_after": 251184592,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 18251824,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 245318880,
+    "interval_peak": 251249888,
+    "increase": 5931008,
+    "elapsed_s": 1.42
+   }
+  },
+  {
+   "name": "reduced/5d",
+   "days": 5,
+   "rows_est": 120,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 69120,
+   "start": "2026-03-26",
+   "end": "2026-03-31",
+   "elapsed_s": 4.09,
+   "footprint_before": 251184592,
+   "footprint_after": 258393552,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 655360,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 257967568,
+    "interval_peak": 258393552,
+    "increase": 425984,
+    "elapsed_s": 1.37
+   }
+  },
+  {
+   "name": "reduced/10d",
+   "days": 10,
+   "rows_est": 240,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 138240,
+   "start": "2026-03-21",
+   "end": "2026-03-31",
+   "elapsed_s": 4.13,
+   "footprint_before": 258393552,
+   "footprint_after": 259507664,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 229376,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 259130832,
+    "interval_peak": 259507664,
+    "increase": 376832,
+    "elapsed_s": 1.35
+   }
+  },
+  {
+   "name": "reduced/14d",
+   "days": 14,
+   "rows_est": 336,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 193536,
+   "start": "2026-03-17",
+   "end": "2026-03-31",
+   "elapsed_s": 4.0,
+   "footprint_before": 259507664,
+   "footprint_after": 262505936,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 1523712,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 261637584,
+    "interval_peak": 262505936,
+    "increase": 868352,
+    "elapsed_s": 1.34
+   }
+  },
+  {
+   "name": "reduced/21d",
+   "days": 21,
+   "rows_est": 504,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 290304,
+   "start": "2026-03-10",
+   "end": "2026-03-31",
+   "elapsed_s": 4.17,
+   "footprint_before": 262505936,
+   "footprint_after": 263521744,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 360448,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 262948304,
+    "interval_peak": 263521744,
+    "increase": 573440,
+    "elapsed_s": 1.35
+   }
+  },
+  {
+   "name": "reduced/30d",
+   "days": 30,
+   "rows_est": 720,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 414720,
+   "start": "2026-03-01",
+   "end": "2026-03-31",
+   "elapsed_s": 4.09,
+   "footprint_before": 263521744,
+   "footprint_after": 267093456,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 2179072,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 266208720,
+    "interval_peak": 267093456,
+    "increase": 884736,
+    "elapsed_s": 1.36
+   }
+  },
+  {
+   "name": "reduced/60d",
+   "days": 60,
+   "rows_est": 1440,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 829440,
+   "start": "2026-01-30",
+   "end": "2026-03-31",
+   "elapsed_s": 4.63,
+   "footprint_before": 267093456,
+   "footprint_after": 271631824,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 950272,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 270616016,
+    "interval_peak": 271697360,
+    "increase": 1081344,
+    "elapsed_s": 1.5
+   }
+  },
+  {
+   "name": "reduced/120d",
+   "days": 120,
+   "rows_est": 2880,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 1658880,
+   "start": "2025-12-01",
+   "end": "2026-03-31",
+   "elapsed_s": 4.57,
+   "footprint_before": 271631824,
+   "footprint_after": 282527184,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 2277376,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 281101776,
+    "interval_peak": 283051472,
+    "increase": 1949696,
+    "elapsed_s": 1.49
+   }
+  },
+  {
+   "name": "reduced/240d",
+   "days": 240,
+   "rows_est": 5760,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 3317760,
+   "start": "2025-08-03",
+   "end": "2026-03-31",
+   "elapsed_s": 4.44,
+   "footprint_before": 282527184,
+   "footprint_after": 288343528,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 5046272,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 284198376,
+    "interval_peak": 288343528,
+    "increase": 4145152,
+    "elapsed_s": 1.46
+   }
+  },
+  {
+   "name": "reduced/480d",
+   "days": 480,
+   "rows_est": 11520,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 6635520,
+   "start": "2024-12-06",
+   "end": "2026-03-31",
+   "elapsed_s": 5.56,
+   "footprint_before": 288343528,
+   "footprint_after": 319079912,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 4145152,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 27,
+    "features": 161,
+    "footprint_at_start": 304530920,
+    "interval_peak": 319079912,
+    "increase": 14548992,
+    "elapsed_s": 1.66
+   }
+  },
+  {
+   "name": "reduced/850d",
+   "days": 850,
+   "rows_est": 20400,
+   "l1_cols": 2,
+   "l2_cols_est": 70,
+   "work_bytes_est": 11750400,
+   "start": "2023-12-02",
+   "end": "2026-03-31",
+   "elapsed_s": 5.43,
+   "footprint_before": 319079912,
+   "footprint_after": 395183688,
+   "feature_count": 161,
+   "segments": 39,
+   "max_segment_increase": 15220784,
+   "violations": [],
+   "ic_page": {
+    "status": "error:TrainingReadError:run_status='partial' is not consumable for strict consumer (allow_partial=False)",
+    "groups": 0,
+    "features": 0,
+    "footprint_at_start": 395183688,
+    "interval_peak": 395183688,
+    "increase": 0,
+    "elapsed_s": 0.0
+   }
+  },
+  {
+   "name": "trend/3d",
+   "days": 3,
+   "rows_est": 72,
+   "l1_cols": 147,
+   "l2_cols_est": 26460,
+   "work_bytes_est": 15325632,
+   "start": "2026-03-28",
+   "end": "2026-03-31",
+   "elapsed_s": 37.82,
+   "footprint_before": 395183688,
+   "footprint_after": 498272008,
+   "feature_count": 8806,
+   "segments": 59,
+   "max_segment_increase": 467075552,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 48,
+    "features": 8806,
+    "footprint_at_start": 562513840,
+    "interval_peak": 562530224,
+    "increase": 16384,
+    "elapsed_s": 10.87
+   }
+  },
+  {
+   "name": "trend/5d",
+   "days": 5,
+   "rows_est": 120,
+   "l1_cols": 147,
+   "l2_cols_est": 26460,
+   "work_bytes_est": 25542720,
+   "start": "2026-03-26",
+   "end": "2026-03-31",
+   "elapsed_s": 38.32,
+   "footprint_before": 490669832,
+   "footprint_after": 561628960,
+   "feature_count": 8806,
+   "segments": 59,
+   "max_segment_increase": 365642064,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 48,
+    "features": 8806,
+    "footprint_at_start": 509806368,
+    "interval_peak": 561628960,
+    "increase": 51822592,
+    "elapsed_s": 11.03
+   }
+  },
+  {
+   "name": "trend/10d",
+   "days": 10,
+   "rows_est": 240,
+   "l1_cols": 147,
+   "l2_cols_est": 26460,
+   "work_bytes_est": 51085440,
+   "start": "2026-03-21",
+   "end": "2026-03-31",
+   "elapsed_s": 40.14,
+   "footprint_before": 555599648,
+   "footprint_after": 486115128,
+   "feature_count": 8806,
+   "segments": 59,
+   "max_segment_increase": 346554656,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 48,
+    "features": 8806,
+    "footprint_at_start": 527255376,
+    "interval_peak": 543262544,
+    "increase": 16007168,
+    "elapsed_s": 11.14
+   }
+  },
+  {
+   "name": "trend/14d",
+   "days": 14,
+   "rows_est": 336,
+   "l1_cols": 147,
+   "l2_cols_est": 26460,
+   "work_bytes_est": 71519616,
+   "start": "2026-03-17",
+   "end": "2026-03-31",
+   "elapsed_s": 40.19,
+   "footprint_before": 481134392,
+   "footprint_after": 524388176,
+   "feature_count": 8806,
+   "segments": 59,
+   "max_segment_increase": 345260320,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 48,
+    "features": 8806,
+    "footprint_at_start": 578520960,
+    "interval_peak": 585238400,
+    "increase": 6717440,
+    "elapsed_s": 11.18
+   }
+  },
+  {
+   "name": "trend/21d",
+   "days": 21,
+   "rows_est": 504,
+   "l1_cols": 147,
+   "l2_cols_est": 26460,
+   "work_bytes_est": 107279424,
+   "start": "2026-03-10",
+   "end": "2026-03-31",
+   "elapsed_s": 41.67,
+   "footprint_before": 520456016,
+   "footprint_after": 541099928,
+   "feature_count": 8806,
+   "segments": 59,
+   "max_segment_increase": 386941240,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 48,
+    "features": 8806,
+    "footprint_at_start": 520767384,
+    "interval_peak": 542705560,
+    "increase": 21938176,
+    "elapsed_s": 11.41
+   }
+  },
+  {
+   "name": "trend+momentum+volatility+volume/3d",
+   "days": 3,
+   "rows_est": 72,
+   "l1_cols": 575,
+   "l2_cols_est": 349600,
+   "work_bytes_est": 201700800,
+   "start": "2026-03-28",
+   "end": "2026-03-31",
+   "elapsed_s": 164.38,
+   "footprint_before": 538216344,
+   "footprint_after": 1330563688,
+   "feature_count": 33339,
+   "segments": 268,
+   "max_segment_increase": 1687127264,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 264,
+    "features": 33339,
+    "footprint_at_start": 1304726120,
+    "interval_peak": 1331235432,
+    "increase": 26509312,
+    "elapsed_s": 53.41
+   }
+  },
+  {
+   "name": "trend+momentum+volatility+volume/5d",
+   "days": 5,
+   "rows_est": 120,
+   "l1_cols": 575,
+   "l2_cols_est": 349600,
+   "work_bytes_est": 336168000,
+   "start": "2026-03-26",
+   "end": "2026-03-31",
+   "elapsed_s": 164.99,
+   "footprint_before": 1039108472,
+   "footprint_after": 1238600224,
+   "feature_count": 33339,
+   "segments": 268,
+   "max_segment_increase": 1411007424,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 264,
+    "features": 33339,
+    "footprint_at_start": 1219791392,
+    "interval_peak": 1239255584,
+    "increase": 19464192,
+    "elapsed_s": 53.07
+   }
+  },
+  {
+   "name": "trend+momentum+volatility+volume/10d",
+   "days": 10,
+   "rows_est": 240,
+   "l1_cols": 575,
+   "l2_cols_est": 349600,
+   "work_bytes_est": 672336000,
+   "start": "2026-03-21",
+   "end": "2026-03-31",
+   "elapsed_s": 170.15,
+   "footprint_before": 1203472928,
+   "footprint_after": 1366559384,
+   "feature_count": 33339,
+   "segments": 268,
+   "max_segment_increase": 1629422768,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 264,
+    "features": 33339,
+    "footprint_at_start": 1354877592,
+    "interval_peak": 1372719768,
+    "increase": 17842176,
+    "elapsed_s": 54.07
+   }
+  },
+  {
+   "name": "trend+momentum/21d",
+   "days": 21,
+   "rows_est": 504,
+   "l1_cols": 540,
+   "l2_cols_est": 309420,
+   "work_bytes_est": 1249758720,
+   "start": "2026-03-10",
+   "end": "2026-03-31",
+   "elapsed_s": 167.76,
+   "footprint_before": 1327762072,
+   "footprint_after": 1362676448,
+   "feature_count": 31325,
+   "segments": 253,
+   "max_segment_increase": 1433338864,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 249,
+    "features": 31325,
+    "footprint_at_start": 1327500000,
+    "interval_peak": 1367018208,
+    "increase": 39518208,
+    "elapsed_s": 52.77
+   }
+  },
+  {
+   "name": "trend/480d",
+   "days": 480,
+   "rows_est": 11520,
+   "l1_cols": 147,
+   "l2_cols_est": 26460,
+   "work_bytes_est": 2452101120,
+   "start": "2024-12-06",
+   "end": "2026-03-31",
+   "elapsed_s": 95.42,
+   "footprint_before": 1330940640,
+   "footprint_after": 1511443216,
+   "feature_count": 8806,
+   "segments": 59,
+   "max_segment_increase": 1218659264,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 48,
+    "features": 8806,
+    "footprint_at_start": 1340656328,
+    "interval_peak": 1830521832,
+    "increase": 489865504,
+    "elapsed_s": 24.49
+   }
+  },
+  {
+   "name": "trend/850d",
+   "days": 850,
+   "rows_est": 20400,
+   "l1_cols": 147,
+   "l2_cols_est": 26460,
+   "work_bytes_est": 4342262400,
+   "start": "2023-12-02",
+   "end": "2026-03-31",
+   "elapsed_s": 103.89,
+   "footprint_before": 1508559632,
+   "footprint_after": 1641024464,
+   "feature_count": 8806,
+   "segments": 59,
+   "max_segment_increase": 1879328088,
+   "violations": [],
+   "ic_page": {
+    "status": "error:TrainingReadError:run_status='partial' is not consumable for strict consumer (allow_partial=False)",
+    "groups": 0,
+    "features": 0,
+    "footprint_at_start": 1642875856,
+    "interval_peak": 1642875856,
+    "increase": 0,
+    "elapsed_s": 0.01
+   }
+  },
+  {
+   "name": "trend+momentum+volatility+volume/120d",
+   "days": 120,
+   "rows_est": 2880,
+   "l1_cols": 575,
+   "l2_cols_est": 349600,
+   "work_bytes_est": 8068032000,
+   "start": "2025-12-01",
+   "end": "2026-03-31",
+   "elapsed_s": 231.9,
+   "footprint_before": 1640762320,
+   "footprint_after": 1899351616,
+   "feature_count": 33339,
+   "segments": 268,
+   "max_segment_increase": 1961248352,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 264,
+    "features": 33339,
+    "footprint_at_start": 1860062736,
+    "interval_peak": 1908084288,
+    "increase": 48021552,
+    "elapsed_s": 68.21
+   }
+  },
+  {
+   "name": "trend+momentum+volatility+volume/240d",
+   "days": 240,
+   "rows_est": 5760,
+   "l1_cols": 575,
+   "l2_cols_est": 349600,
+   "work_bytes_est": 16136064000,
+   "start": "2025-08-03",
+   "end": "2026-03-31",
+   "elapsed_s": 282.45,
+   "footprint_before": 1866878528,
+   "footprint_after": 2783678304,
+   "feature_count": 33339,
+   "segments": 268,
+   "max_segment_increase": 2479621872,
+   "violations": [],
+   "ic_page": {
+    "status": "ok",
+    "groups": 264,
+    "features": 33339,
+    "footprint_at_start": 2665369368,
+    "interval_peak": 2805010272,
+    "increase": 139640904,
+    "elapsed_s": 80.79
+   }
+  }
+ ],
+ "stop_reason": {
+  "reason": "guard_abort",
+  "trigger": "probe_footprint_over",
+  "abort_time": "2026-10-07T04:52:28+0800",
+  "killed_during": "step25:L1.serial",
+  "readings": [
+   {
+    "pressure_level": 2,
+    "swap_volume_free_bytes": 51469217792,
+    "swap_volume_capacity_bytes": 245107195904,
+    "footprint": 5841853280,
+    "members": [
+     {
+      "pid": 96348,
+      "start": 9143877024569,
+      "footprint": 5822699664
+     },
+     {
+      "pid": 96361,
+      "start": 9143920084918,
+      "footprint": 9535848
+     },
+     {
+      "pid": 98763,
+      "start": 9194064233920,
+      "footprint": 9617768
+     }
+    ],
+    "failed": [],
+    "free_bytes": 15368192,
+    "file_backed_bytes": 765362176,
+    "swap_avail_bytes": 1156841472,
+    "page_size": 16384,
+    "swapfile_limit": 100,
+    "swapfile_count": 8,
+    "swapfile_size_max": 1073741824
+   },
+   {
+    "pressure_level": 2,
+    "swap_volume_free_bytes": 51469213696,
+    "swap_volume_capacity_bytes": 245107195904,
+    "footprint": 6404660448,
+    "members": [
+     {
+      "pid": 96348,
+      "start": 9143877024569,
+      "footprint": 6385506832
+     },
+     {
+      "pid": 96361,
+      "start": 9143920084918,
+      "footprint": 9535848
+     },
+     {
+      "pid": 98763,
+      "start": 9194064233920,
+      "footprint": 9617768
+     }
+    ],
+    "failed": [],
+    "free_bytes": 65519616,
+    "file_backed_bytes": 765329408,
+    "swap_avail_bytes": 846266368,
+    "page_size": 16384,
+    "swapfile_limit": 100,
+    "swapfile_count": 8,
+    "swapfile_size_max": 1073741824
+   },
+   {
+    "pressure_level": 2,
+    "swap_volume_free_bytes": 51469213696,
+    "swap_volume_capacity_bytes": 245107195904,
+    "footprint": 6637968608,
+    "members": [
+     {
+      "pid": 96348,
+      "start": 9143877024569,
+      "footprint": 6618814992
+     },
+     {
+      "pid": 96361,
+      "start": 9143920084918,
+      "footprint": 9535848
+     },
+     {
+      "pid": 98763,
+      "start": 9194064233920,
+      "footprint": 9617768
+     }
+    ],
+    "failed": [],
+    "free_bytes": 64094208,
+    "file_backed_bytes": 764395520,
+    "swap_avail_bytes": 675807232,
+    "page_size": 16384,
+    "swapfile_limit": 100,
+    "swapfile_count": 8,
+    "swapfile_size_max": 1073741824
+   },
+   {
+    "pressure_level": 2,
+    "swap_volume_free_bytes": 51469205504,
+    "swap_volume_capacity_bytes": 245107195904,
+    "footprint": 7085596136,
+    "members": [
+     {
+      "pid": 96348,
+      "start": 9143877024569,
+      "footprint": 7066442520
+     },
+     {
+      "pid": 96361,
+      "start": 9143920084918,
+      "footprint": 9535848
+     },
+     {
+      "pid": 98763,
+      "start": 9194064233920,
+      "footprint": 9617768
+     }
+    ],
+    "failed": [],
+    "free_bytes": 62308352,
+    "file_backed_bytes": 764346368,
+    "swap_avail_bytes": 307036160,
+    "page_size": 16384,
+    "swapfile_limit": 100,
+    "swapfile_count": 8,
+    "swapfile_size_max": 1073741824
+   },
+   {
+    "pressure_level": 2,
+    "swap_volume_free_bytes": 49992896512,
+    "swap_volume_capacity_bytes": 245107195904,
+    "footprint": 6896115056,
+    "members": [
+     {
+      "pid": 96348,
+      "start": 9143877024569,
+      "footprint": 6876961440
+     },
+     {
+      "pid": 96361,
+      "start": 9143920084918,
+      "footprint": 9535848
+     },
+     {
+      "pid": 98763,
+      "start": 9194064233920,
+      "footprint": 9617768
+     }
+    ],
+    "failed": [],
+    "free_bytes": 132481024,
+    "file_backed_bytes": 1189707776,
+    "swap_avail_bytes": 945487872,
+    "page_size": 16384,
+    "swapfile_limit": 100,
+    "swapfile_count": 9,
+    "swapfile_size_max": 1073741824
+   }
+  ]
+ },
+ "estimate_violations": [],
+ "estimate_violation_count": 0,
+ "ic_page_max_increase": 489865504,
+ "ic_page_max_peak": 2805010272,
+ "main_evidence": "handoffs/run_receipts/20261003-prered-f2-memory.json（主證據沿用 PRE-RED，不重跑）",
+ "finalized_from_series": true,
+ "honest_bounds": "單一 macOS 8 GB 本機、BTCUSDT 1h、同一行程逐步累積（前步配置器保留之量計入後步起點）；時序為 0.2 秒取樣之觀測下界，逐段區間峰值為硬上界之實測；探針自身停損（75%／壓力危急）由守護執行，達之即終止（被終止之步無逐步收據，其段讀數只見時序）；IC 分析頁峰值以同一入口讀各步成品（單行程模式）——窗延至資料起點之步預熱不足而 run_status＝partial，IC 頁依設計拒讀（TrainingReadError），該步無 IC 頁讀數；linux 未實跑。",
+ "schema_version": 1,
+ "command": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py --receipt <收據> --run-root <暫存>；被守護終止後 … --finalize --receipt <收據> --run-root <暫存>",
+ "exit_code": -9
+}

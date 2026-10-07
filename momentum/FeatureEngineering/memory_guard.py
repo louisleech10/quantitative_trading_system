@@ -12,6 +12,9 @@ file-backed、vm.swapusage 之 avail、換頁檔數上限／目前檔數／單�
 依序對本域生成子行程、再對根行程 SIGKILL。收到停止訊號或根行程不存在 ⇒ 結束。保證界線：觀測到即依計數規則
 反應並留收據；取樣間耗盡而系統先行終止時不保證先停（v39）。
 啟動後第一次讀數成功即於 stdout 印 `ready`（啟動端據以確認首讀；失敗即非 0 結束）。
+量測探針專用參數（Task 4.3；正式生成不傳）：`--probe-footprint-ratio`／`--probe-physical-bytes`（footprint 合計達比例即
+為停止條件 `probe_footprint_over`）、`--probe-pressure-stop`（壓力危急為停止條件）、`--probe-latest-file`（每次取樣後
+寫最近讀數，供探針加步判定；首讀於 `ready` 前即寫）。
 測試接縫：環境變數 `ICFA_GUARD_READINGS_FILE`（JSONL；每次取樣依序取一列，用盡沿用末列）取代系統讀數；
 列之鍵：pressure_level／swap_volume_free_bytes／footprint，及選填之 free_bytes／file_backed_bytes／
 swap_avail_bytes／swapfile_limit／swapfile_count／swapfile_size_max／page_size（缺 A 之基本三項 ⇒ 不判近零）。
@@ -227,10 +230,20 @@ def _available(reading: Dict[str, Any]) -> Optional[int]:
     return base + min(slots, room)
 
 
-def _conditions(reading: Dict[str, Any], budget: int) -> List[str]:  # noqa: ARG001 — budget 只入收據（v35）
+def _conditions(reading: Dict[str, Any], budget: int,  # noqa: ARG001 — budget 只入收據（v35）
+                probe: Optional[Dict[str, Any]] = None) -> List[str]:
     """本次讀數成立之全部停止條件（SPEC v35–v39）：換頁卷剩餘 < 磁碟保留量、剩餘可用量 A < 一頁（實際近零）、
-    量測失敗；壓力等級與 footprint 對上限不再為停止條件（只記錄於讀數）。"""
+    量測失敗；壓力等級與 footprint 對上限不再為停止條件（只記錄於讀數）。
+    `probe`（只供量測探針，Task 4.3：「本探針之 75％／壓力停損為量測探針自身之停損條件，以探針專用之守護參數實施；
+    正式生成之守護不含此條件」）：`footprint_ratio`×`physical_bytes` ⇒ `probe_footprint_over`；`pressure_stop` 且
+    壓力等級 ≥ 危急 ⇒ `probe_pressure_critical`。正式生成（`memory_budget.start_guard` 未傳 probe）不經此二條件。"""
     found: List[str] = []
+    if probe:
+        ratio, physical = probe.get("footprint_ratio"), probe.get("physical_bytes")
+        if ratio is not None and physical and int(reading.get("footprint") or 0) >= float(ratio) * int(physical):
+            found.append("probe_footprint_over")
+        if probe.get("pressure_stop") and int(reading.get("pressure_level") or 0) >= PRESSURE_CRITICAL_LEVEL:
+            found.append("probe_pressure_critical")
     if int(reading["swap_volume_free_bytes"]) < _reserve(reading):
         found.append("swap_volume_low")
     available = _available(reading)
@@ -248,6 +261,18 @@ def _write_atomic(path: str, text: str) -> None:
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(tmp, path)
+
+
+def _publish_latest(path: Optional[str], reading: Dict[str, Any], found: List[str]) -> None:
+    """量測探針專用：最近一筆讀數（域成員 footprint 合計、壓力、條件）供探針之加步判定；正式生成不傳路徑。"""
+    if not path:
+        return
+    try:
+        _write_atomic(path, json.dumps({"time": time.time(), "footprint": int(reading.get("footprint") or 0),
+                                        "pressure_level": int(reading.get("pressure_level") or 0),
+                                        "conditions": list(found)}))
+    except OSError:
+        pass
 
 
 def _read_text(path: Optional[str]) -> Optional[str]:
@@ -298,7 +323,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--budget", type=int, required=True)
     parser.add_argument("--checkpoint-file", default=None)
     parser.add_argument("--interval", type=float, default=0.5)
+    # 量測探針專用（Task 4.3）；正式生成不傳
+    parser.add_argument("--probe-footprint-ratio", type=float, default=None)
+    parser.add_argument("--probe-physical-bytes", type=int, default=None)
+    parser.add_argument("--probe-pressure-stop", action="store_true")
+    parser.add_argument("--probe-latest-file", default=None)
     args = parser.parse_args(argv)
+    probe: Optional[Dict[str, Any]] = None
+    if args.probe_footprint_ratio is not None or args.probe_pressure_stop:
+        probe = {"footprint_ratio": args.probe_footprint_ratio, "physical_bytes": args.probe_physical_bytes,
+                 "pressure_stop": bool(args.probe_pressure_stop)}
     signal.signal(signal.SIGTERM, _handle_term)
     signal.signal(signal.SIGINT, _handle_term)
     if sys.platform != "darwin":
@@ -311,6 +345,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     except Exception as exc:  # noqa: BLE001 — 首讀失敗即具名結束（啟動端拒絕生成）
         print(f"first reading failed: {exc}", file=sys.stderr)
         return 3
+    _publish_latest(args.probe_latest_file, first, [])
     sys.stdout.write("ready\n")
     sys.stdout.flush()
     history: List[Dict[str, Any]] = []
@@ -327,7 +362,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                            "footprint": 0, "failed": [f"error:{exc}"]}
         history.append(reading)
         history = history[-20:]
-        found = _conditions(reading, args.budget)
+        found = _conditions(reading, args.budget, probe)
         if found:
             if not flag_written:
                 _write_atomic(os.path.join(args.run_dir, STOP_FLAG_NAME), found[0])
@@ -342,6 +377,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                     return 0
         else:
             streaks = {}
+        _publish_latest(args.probe_latest_file, reading, found)  # 旗標寫入之後（探針見讀數時旗標已立）
         reading = None
         deadline = time.monotonic() + max(args.interval, 0.05)
         while not _STOP and time.monotonic() < deadline:

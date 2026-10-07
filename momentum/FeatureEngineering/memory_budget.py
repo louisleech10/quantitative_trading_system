@@ -100,6 +100,18 @@ L2_SPILL_THRESHOLD_BYTES = 500_000_000  # FeatureFactory._spill_to_memmap 之 fl
 WORKER_RUNTIME_ENVELOPE_BYTES = 323 * MiB
 AUX_TRACKER_STARTUP_ENVELOPE_BYTES = 13 * MiB
 
+# Task 4.2 (ii) 每段固定常數項（SPEC：「各分支 planned 含一具名之每段固定常數項，其值以『check 後立即結束』之空段
+# 實測區間增量定之」）：收據 handoffs/run_receipts/20261007-icfirstalign-branch-estimates.json——空段（reset 後立即讀）
+# 實測 0；比例項近 0 之段（planned < 2 MiB）實測超出量最大 2.16 MiB（IC 首個群組讀回之 parquet reader 初始化）⇒
+# 4 MiB（上取整並留餘裕）。全部分支同一常數（成分名 `segment_constant`）。
+SEGMENT_CONSTANT_BYTES = 4 * MiB
+# L2 Polars 臂之行程內首次使用固定成本（Polars 執行緒池與配置器 arena 初始化）：收據
+# handoffs/run_receipts/20261007-icfirstalign-memory-series.json 首步（精簡 L1、744 列）實測該段增量 18.1 MB，其中
+# 比例項 2.9 MB ⇒ 固定約 15.2 MB；× 1.5 上取整 ⇒ 24 MiB（成分名 `polars_runtime`）
+POLARS_RUNTIME_BYTES = 24 * MiB
+# 落盤（`_persist_layer_output_groups`／`_persist_layer2_category_group`）逐 chunk 欄數（同 FeatureFactory 預設）
+PERSIST_CHUNK_COLS = 5000
+
 
 @dataclass(frozen=True)
 class Component:
@@ -534,10 +546,21 @@ def _mapped(name: str, nbytes: int, entry: str, lifetime: str, count: int = 1) -
                      lifetime=lifetime)
 
 
+def persist_components(rows: int, cols: int, chunk_cols: int = PERSIST_CHUNK_COLS) -> List[Component]:
+    """落盤（`FeatureFactory._persist_layer_output_groups`／`_persist_layer2_category_group`）之同時存活成分
+    （Task 4.2 (ii) 收據實測補列）：① `_ensure_float32` 以欄名→dtype 映射之 `astype`（逐欄 float32 再合併區塊，
+    列 × 欄 × 8）；② 逐 chunk（≤ `chunk_cols` 欄）`to_numpy`＋`np.asarray(float32)` 之合併複本；③ registry 多片之
+    `np.ascontiguousarray` 片複本（≤ 一個 chunk）。"""
+    rows, cols = int(rows), int(cols)
+    per_chunk = rows * min(cols, int(chunk_cols)) * 4
+    return [_anon("persist_cast", rows * cols * 8), _anon("persist_chunk", per_chunk),
+            _anon("persist_shard", per_chunk)]
+
+
 def _l1(params: Mapping[str, Any], *, parallel: bool) -> List[Component]:
     rows, out = _i(params, "rows"), _i(params, "output_cols")
     tables = "engine_tables" if parallel else "indicator_tables"
-    return [_anon(tables, rows * out * 8), _anon("merged_return", rows * out * 8), _anon("persist_cast", rows * out * 4)]
+    return [_anon(tables, rows * out * 8), _anon("merged_return", rows * out * 8), *persist_components(rows, out)]
 
 
 def _l2_spill(params: Mapping[str, Any]) -> Component:
@@ -547,17 +570,33 @@ def _l2_spill(params: Mapping[str, Any]) -> Component:
 
 
 def _l2_polars(params: Mapping[str, Any]) -> List[Component]:
+    """L2 Polars 臂（`DerivedOperatorEngine.compute_all_polars`＋CGSA 逐類別重算落盤；收據實測補列）：
+    Polars 側（其配置器所釋放者不供 numpy 重用 ⇒ 與 numpy 側相加）＝L1／raw 轉 Polars＋Polars 類別結果（運算中間量
+    與結果，實測約 12.8 B／格，計 16）；numpy 側＝Polars 結果轉回 pandas（float32）＋pandas 後備類別（BinarySignal／
+    SignedStrength／WorldQuant）之保留結果＋最末 `pd.concat` 回傳表；類別計算暫存（WorldQuant 之 frames、concat 與
+    重排三份，扣保留之一份 ⇒ 最大類別 × 2；CGSA 落盤階段之重算另需該類別本身一份 ⇒ 計 3）＋落盤三成分。"""
     rows, out, max_cat = _i(params, "rows"), _i(params, "output_cols"), _i(params, "max_category_cols")
-    return [_anon("return_table", rows * out * 8), _anon("max_category", rows * max_cat * 8),
-            _anon("category_cast", rows * max_cat * 4), _l2_spill(params)]
+    fallback = _i(params, "fallback_cols_sum", 0)
+    polars_cols = _i(params, "polars_cols", max(out - fallback, 0))
+    max_fallback = _i(params, "max_fallback_category_cols", max_cat)
+    l1, raw = _i(params, "input_cols", 0), _i(params, "raw_cols", 0)
+    return [_anon("polars_inputs", rows * (l1 * 4 + raw * 8)), _anon("polars_frames", rows * polars_cols * 16),
+            _anon("polars_to_pandas", rows * polars_cols * 4), _anon("fallback_frames", rows * fallback * 8),
+            _anon("category_transient", rows * max(max_cat, max_fallback) * 8 * 3),
+            _anon("return_table", rows * out * 8), *persist_components(rows, max_cat), _l2_spill(params),
+            _anon("polars_runtime", POLARS_RUNTIME_BYTES)]
 
 
 def _l2_pandas(params: Mapping[str, Any]) -> List[Component]:
+    """L2 pandas 臂（串列／平行）：全部類別表持有至最末 `pd.concat`＋合併回傳表；逐類別計算暫存（WorldQuant 之 frames、
+    concat、重排三份扣保留一份 ⇒ 最大類別 × 2；平行時至多 `workers` 個類別同時計算）＋落盤三成分（收據實測補列）。"""
     rows, out = _i(params, "rows"), _i(params, "output_cols")
     cat_sum = _i(params, "category_cols_sum", out)
     max_cat = _i(params, "max_category_cols", out)
+    workers = max(_i(params, "workers", 1), 1)
     return [_anon("category_tables_sum", rows * cat_sum * 8), _anon("merge_return", rows * out * 8),
-            _anon("persist_cast", rows * max_cat * 4), _l2_spill(params)]
+            _anon("category_transient", rows * max_cat * 8 * 2 * workers),
+            *persist_components(rows, max_cat), _l2_spill(params)]
 
 
 def _l3_fused(params: Mapping[str, Any]) -> List[Component]:
@@ -593,6 +632,13 @@ def _l3_vectorized(params: Mapping[str, Any]) -> List[Component]:
             _anon("final_concat", rows * out * 8), _anon("persist_cast", rows * out * 4)]
 
 
+def _l3_vectorized_chunked(params: Mapping[str, Any]) -> List[Component]:
+    """L3 關串流 chunked（`_apply_vectorized_aggregators_chunked`）：逐 chunk 結果切入 (agg, 窗) 桶之複本、各桶
+    `pd.concat` 之結果與最末 `pd.concat` 同時存活 ⇒ 較 unchunked 多一份輸出（`ordered_concat`；收據實測補列）。"""
+    rows, out = _i(params, "rows"), _i(params, "output_cols")
+    return [*_l3_vectorized(params), _anon("ordered_concat", rows * out * 8)]
+
+
 def _l3_numba_single(params: Mapping[str, Any]) -> List[Component]:
     rows, out, chunk = _i(params, "rows"), _i(params, "output_cols"), _i(params, "chunk_cols", _i(params, "input_cols"))
     inputs = _i(params, "input_cols", chunk)
@@ -614,13 +660,20 @@ def _l3_pandas(params: Mapping[str, Any]) -> List[Component]:
 
 
 def _l4_l6(params: Mapping[str, Any]) -> List[Component]:
+    """L4–L6：層輸入合併表＋選欄複本（`features_df[columns]`）＋逐 lag 之位移暫存（`shift` 後 `add_suffix` 複製前之
+    一份輸入）＋各輸出 frame 與最末 `pd.concat` 輸出＋落盤三成分（收據實測補列；L5／L6 同式為上界）。"""
     rows, inputs, out = _i(params, "rows"), _i(params, "input_cols"), _i(params, "output_cols")
-    return [_anon("input_merge", rows * inputs * 8), _anon("output", rows * out * 8), _anon("persist_cast", rows * out * 4)]
+    return [_anon("input_merge", rows * inputs * 8), _anon("input_select", rows * inputs * 8),
+            _anon("shift_transient", rows * inputs * 8), _anon("output_frames", rows * out * 8),
+            _anon("output", rows * out * 8), *persist_components(rows, out)]
 
 
 def _read(params: Mapping[str, Any]) -> List[Component]:
+    """群組讀回（IC 群組／選欄）：`read`＝parquet 之 Arrow 緩衝＋pandas 表（列 × 欄 × 8）；`cast`＝`select_dtypes().copy()`、
+    接時間軸、選窗切片各一份 float32（12）＋缺值遮罩（2）＋無缺值時向量化 IC 之 float64 排名兩份（16）＝列 × 欄 × 30
+    （收據實測補列：原式 12 B／格，實測至 23 B／格）。"""
     rows, cols = _i(params, "rows"), _i(params, "group_cols", _i(params, "selected_cols"))
-    return [_anon("read", rows * cols * 4), _anon("cast", rows * cols * 8)]
+    return [_anon("read", rows * cols * 8), _anon("cast", rows * cols * 30)]
 
 
 def _post_ic(params: Mapping[str, Any]) -> List[Component]:
@@ -664,8 +717,11 @@ def _calib_reduce(params: Mapping[str, Any]) -> List[Component]:
     sizes = [int(s) for s in sizes]
     sharded = len(sizes) > 1
     # 多片 ⇒ load_data 配置 dense（float32）並逐片映射拷貝；單片 ⇒ 映射本身交出（不另配置）
+    # 縮尾（`FeaturePreprocessor._apply_winsorization`，sigma 法為兩法之大者）同時存活：結果複本 4＋`astype(float)` 8＋
+    # float64 工作陣列 8＋均值／標準差 float32 各 4＋上下界 float64 各 8＋計算上下界時之 float64 轉型與縮放暫存 24＋
+    # 遮罩 2＋clip 結果 8 ⇒ 至多約 76 B／格，計 80（收據實測補列：原式 24 B／格，實測至 52 B／格）
     return [_anon("group", rows * cols * 4 if sharded else 0),
-            _anon("winsor_copy", rows * cols * 8 * 3),
+            _anon("winsor_copy", rows * cols * 80),
             _anon("packet_accumulated", _i(params, "n_calibration") * _i(params, "accumulated_cols") * 8),
             *_grouped_mapped("shard_map", sizes, "np.load(mmap_mode)", "segment")]
 
@@ -710,11 +766,12 @@ def _align_persist(params: Mapping[str, Any]) -> List[Component]:
                              "segment"),
             _anon("legacy_cast", n_s * cols * 4 if source_kind == "legacy" else 0),
             aligned,
-            _anon("block_valid", block), _anon("block_gather_idx", block * 8), _anon("block_gather", block * cols * 4),
+            # gather：`src[block_idx[valid]]` 之結果＋自映射來源 fancy indexing 之中間複本（收據實測 2.2 份區塊）
+            _anon("block_valid", block), _anon("block_gather_idx", block * 8), _anon("block_gather", block * cols * 4 * 2),
             _anon("block_cast", 0 if source_float32 else block * cols * 4)]
 
 
-BRANCH_TABLE: Dict[str, Callable[[Mapping[str, Any]], List[Component]]] = {
+_BRANCH_FUNCTIONS: Dict[str, Callable[[Mapping[str, Any]], List[Component]]] = {
     "L1.serial": lambda p: _l1(p, parallel=False),
     "L1.parallel": lambda p: _l1(p, parallel=True),
     "L2.polars": _l2_polars,
@@ -722,7 +779,7 @@ BRANCH_TABLE: Dict[str, Callable[[Mapping[str, Any]], List[Component]]] = {
     "L2.pandas_parallel": _l2_pandas,
     "L3.numba_multi_callback": _l3_multi_callback,
     "L3.numba_multi_nocallback": _l3_multi_nocallback,
-    "L3.vectorized_chunked": _l3_vectorized,
+    "L3.vectorized_chunked": _l3_vectorized_chunked,
     "L3.vectorized_unchunked": _l3_vectorized,
     "L3.numba_single": _l3_numba_single,
     "L3.pandas_fallback": _l3_pandas,
@@ -736,6 +793,22 @@ BRANCH_TABLE: Dict[str, Callable[[Mapping[str, Any]], List[Component]]] = {
     "MTF.align_index": _align_index,
     "MTF.align_compact": _align_compact,
     "MTF.align_persist": _align_persist,
+}
+
+
+def _with_segment_constant(fn: Callable[[Mapping[str, Any]], List[Component]]
+                           ) -> Callable[[Mapping[str, Any]], List[Component]]:
+    """每段固定常數項（`SEGMENT_CONSTANT_BYTES`，成分名 `segment_constant`）附於各分支估算之末。"""
+
+    def wrapped(params: Mapping[str, Any]) -> List[Component]:
+        return [*fn(params), _anon("segment_constant", SEGMENT_CONSTANT_BYTES)]
+
+    return wrapped
+
+
+# 分支表（唯一一份）：各分支估算＋每段固定常數項
+BRANCH_TABLE: Dict[str, Callable[[Mapping[str, Any]], List[Component]]] = {
+    branch: _with_segment_constant(fn) for branch, fn in _BRANCH_FUNCTIONS.items()
 }
 
 
@@ -1042,8 +1115,11 @@ class GuardHandle:
         self.extra["process"] = None
 
 
-def start_guard(run_dir: Path, run_id: str, *, budget: int) -> GuardHandle:
-    """以檔案路徑啟動 `memory_guard.py`；首讀失敗 ⇒ `MemoryMeasurementUnavailable`。"""
+def start_guard(run_dir: Path, run_id: str, *, budget: int,
+                probe: Optional[Mapping[str, Any]] = None) -> GuardHandle:
+    """以檔案路徑啟動 `memory_guard.py`；首讀失敗 ⇒ `MemoryMeasurementUnavailable`。
+    `probe` 只供量測探針（Task 4.3）：`footprint_ratio`、`physical_bytes`、`pressure_stop`、`latest_file`——探針自身之
+    75%／壓力停損與最近讀數發布；正式生成之呼叫端一律不傳（守護停止條件維持 v35–v39）。"""
     run_dir = Path(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
     fd, checkpoint = tempfile.mkstemp(prefix="icfa_guard_ckpt_", suffix=".txt")
@@ -1051,6 +1127,14 @@ def start_guard(run_dir: Path, run_id: str, *, budget: int) -> GuardHandle:
     command = [sys.executable, str(GUARD_SCRIPT), "--pid", str(os.getpid()), "--run-dir", str(run_dir),
                "--run-id", str(run_id), "--budget", str(int(budget)), "--checkpoint-file", checkpoint,
                "--interval", str(GUARD_INTERVAL_SECONDS)]
+    if probe:
+        if probe.get("footprint_ratio") is not None:
+            command += ["--probe-footprint-ratio", str(float(probe["footprint_ratio"])),
+                        "--probe-physical-bytes", str(int(probe.get("physical_bytes") or physical_memory_bytes()))]
+        if probe.get("pressure_stop"):
+            command.append("--probe-pressure-stop")
+        if probe.get("latest_file"):
+            command += ["--probe-latest-file", str(probe["latest_file"])]
     try:
         proc = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 close_fds=True)

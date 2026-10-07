@@ -77,6 +77,18 @@
       "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python scripts/freeze_icfirstalign_baseline.py worker-counts",
       "rc": 0,
       "honest_bounds": "單一 worker（S2m 之 4h）行程內呼叫、精簡 L1（close EMA8／SMA13）；只摘要 counts 與群組欄集合，值守恆另由 Task 4.0／4.1 基準驗"
+    },
+    {
+      "path": "handoffs/run_receipts/20261007-icfirstalign-branch-estimates.json",
+      "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/branch_estimates_probe.py --out handoffs/run_receipts/20261007-icfirstalign-branch-estimates.json",
+      "rc": 0,
+      "honest_bounds": "macOS 8 GB 本機；BTCUSDT 1h、trend 預設指標兩規模（4368／9168 列量級，含全史預熱）；組合母體 21 組合（L1／L2 選擇子併入 L3 組合之各次生成）；多週期並行之 worker 段在子行程內不經本探針攔截（根行程之對齊段有）；linux 未跑（§N）"
+    },
+    {
+      "path": "handoffs/run_receipts/20261007-icfirstalign-memory-series.json",
+      "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py --receipt handoffs/run_receipts/20261007-icfirstalign-memory-series.json --run-root <暫存> && … --finalize",
+      "rc": -9,
+      "honest_bounds": "探針自身 75% 停損由守護於第 25 步終止（設計所定之停止）；同一行程逐步累積；850 天之步 run_status partial、IC 頁依設計拒讀；linux 未跑"
     }
   ],
   "batch_card": {
@@ -139,7 +151,11 @@
       "tests/test_multi_symbol_parallel.py",
       "tests/feature_engineering/test_cgsa_disk_precheck.py",
       "handoffs/run_receipts/icfirstalign_probes/swap_timeline_probe.py",
-      "handoffs/run_receipts/icfirstalign_probes/speed_verdict.py"
+      "handoffs/run_receipts/icfirstalign_probes/speed_verdict.py",
+      "handoffs/run_receipts/icfirstalign_probes/segment_tracker.py",
+      "handoffs/run_receipts/icfirstalign_probes/branch_estimates_probe.py",
+      "handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py",
+      "handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py"
     ],
     "callers_now": [
       "api/services/feature_factory_service.py",

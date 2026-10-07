@@ -1889,8 +1889,14 @@ class FeatureFactory:
         parallel = self._cgsa_registry is not None and get_l2_category_workers() > 1
         pandas_branch = "L2.pandas_parallel" if parallel else "L2.pandas_serial"
         branch = "L2.polars" if use_polars else pandas_branch
+        # Polars 臂之 pandas 後備類別（`compute_all_polars` 之 pandas_fallback_categories；其餘類別經 Polars 批次）
+        fallback_counts = [int(counts.get(c, 0)) for c in ("BinarySignal", "SignedStrength", "WorldQuant")]
         params = {"rows": int(layer1.shape[0]), "output_cols": out,
-                  "max_category_cols": max(counts.values(), default=0), "category_cols_sum": out}
+                  "max_category_cols": max(counts.values(), default=0), "category_cols_sum": out,
+                  "fallback_cols_sum": sum(fallback_counts), "max_fallback_category_cols": max(fallback_counts),
+                  "polars_cols": out - sum(fallback_counts), "input_cols": int(layer1.shape[1]),
+                  "raw_cols": len(list(raw_columns)),
+                  "workers": get_l2_category_workers() if parallel else 1}
         candidates = [(branch, params)]
         if use_polars and self._l2_route_fingerprint(layer1, config) in type(self).L2_ROUTE_CERTIFIED:
             candidates.append((pandas_branch, params))
@@ -2142,8 +2148,9 @@ class FeatureFactory:
         if returned is None or returned.empty:
             return
         if branch in _memory_budget.BRANCH_TABLE:
-            cast = _memory_budget.Component("persist_cast", "anon", int(returned.shape[0]) * int(returned.shape[1]) * 4)
-            _memory_budget.check(branch, [cast], label="L3:persist_returned")
+            persist = [*_memory_budget.persist_components(int(returned.shape[0]), int(returned.shape[1])),
+                       _memory_budget.Component("segment_constant", "anon", _memory_budget.SEGMENT_CONSTANT_BYTES)]
+            _memory_budget.check(branch, persist, label="L3:persist_returned")
         self._persist_layer_output_groups(returned, LayerSource.L3, "L3_rolling")
 
     def _layer4_lag_features(
