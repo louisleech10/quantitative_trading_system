@@ -1,0 +1,64 @@
+ready
+{
+  "all_four_closed": true,
+  "nest_st_dev": {
+    "abort_copy_exists": true,
+    "guard_pid_stable": true,
+    "live_kept": true,
+    "mapping_is_run": true,
+    "nested_true": true,
+    "orphan_removed": true,
+    "st_dev_equal": true,
+    "stop_dir_still_prelease": true
+  },
+  "p1_01_closed": true,
+  "p1_01_preflight": {
+    "active": true,
+    "guard_run_dir": "/tmp/icfa_b3r2_w1/probe_state/features/.icfa_prelease_41e5db51bd19eeec_pc04t0rw",
+    "guard_start_calls": 1,
+    "mapping_root": "/tmp/icfa_b3r2_w1/probe_state/features/.icfa_prelease_41e5db51bd19eeec_pc04t0rw/.icfa_mmap",
+    "run_dir": "/tmp/icfa_b3r2_w1/probe_state/features/.icfa_prelease_41e5db51bd19eeec_pc04t0rw",
+    "stop_dir": "/tmp/icfa_b3r2_w1/probe_state/features/.icfa_prelease_41e5db51bd19eeec_pc04t0rw"
+  },
+  "p1_02_closed": true,
+  "p1_02_scheduler": {
+    "A_status": "joined",
+    "error": "injected second executor creation failure",
+    "shutdowns_at_exit": 1,
+    "started": true,
+    "worker_alive_at_exit": false
+  },
+  "p1_03_closed": true,
+  "p1_03_serial": [
+    {
+      "allow_partial": false,
+      "parallel": "GenerationMemoryBudgetExceeded",
+      "serial": "GenerationMemoryBudgetExceeded",
+      "serial_same_object": true,
+      "skipped": []
+    },
+    {
+      "allow_partial": true,
+      "parallel": "GenerationMemoryBudgetExceeded",
+      "serial": "GenerationMemoryBudgetExceeded",
+      "serial_same_object": true,
+      "skipped": []
+    }
+  ],
+  "p2_04_closed": true,
+  "p2_04_guard": {
+    "abort": [],
+    "closed_as_no_kill": true,
+    "sample_condition_lists": [
+      [
+        "pressure_critical"
+      ],
+      [
+        "swap_volume_low"
+      ],
+      [
+        "footprint_over_budget"
+      ]
+    ]
+  }
+}

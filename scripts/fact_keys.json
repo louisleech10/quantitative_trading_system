@@ -469,7 +469,7 @@
         "FRAMEPATH：刪除非 CGSA 舊引擎（frame，`FFACT_USE_CGSA=0`）與舊特徵 h5 讀取",
         "未開工",
         "handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md",
-        "全票排序第 5 步（docs/TICKET_ORDER.md）：於 ICFIRSTALIGN 乙之後（run_ic_first 現走記憶體 L1–L6 路徑，查證輪 r1 未涵蓋；乙先改走 CGSA 再刪）；不含 IC 服務內部 h5。以下為沿革——2026-09-28 FF-STAT b4 實跑發現 frame 與 CGSA（預設）之既有差異——多週期 L6.5 於主週期展開格線而非原生週期（1h＋12h 實測 3,599 個 12h 欄平穩化決策不同）、float32 計算、欄集合不同（改前原始碼即 CGSA 多 29 欄）。查證輪 r1（codex、composer＋主委獨立版，synth 已銷帳）三方一致：生產無 frame 執行入口（API、批次、前端皆預設 CGSA；記憶體級距不切換）、frame 多週期平穩化屬正確性錯誤、修正後保留約兩倍維護且交叉驗證只及組裝層。🔴 使用者 2026-09-28 裁定：「若是frame都不需要，那不就不要花時間在任何跟frame有關的部份和測試上？」「舊的h5什麼的也可以刪除，這樣可以專注在把現行的模組做好吧？」；使用者未曾手動設 `FFACT_USE_CGSA=0`。待做：刪 frame 產生路徑（`_cgsa_enabled` 兩處與全部分支、legacy 組裝與落 `*_factory.h5`、`_legacy_native_row_maps`）、刪舊特徵 h5 讀取（`FeatureStorage.load_factory_output` 與其呼叫端 `feature_library.py`、`_try_load_cache`，API 之舊 HDF5 分支）、遷移或刪除依 frame 之測試（約 45 處）與腳本（`scripts/golden_multi_symbol_c3.py`、`freeze_batch2d_baseline.py`、`profile_v6v7_comparison.py`）；K 線資料 `kline_cache.h5` 不在此列；既存舊特徵 h5 檔依「面向未來不溯及既往」封存（刪檔指令交使用者）。FF-STAT v49 已先移除本票範圍內之 frame 驗收臂"
+        "全票排序第 5 步（docs/TICKET_ORDER.md）：前置第 4 步 ICFIRSTALIGN 乙已於 2026-10-08 收案（run_ic_first 已改走 CGSA、CGSA 關閉時具名拒跑）⇒ 依賴已滿足，下一張開工；不含 IC 服務內部 h5。以下為沿革——2026-09-28 FF-STAT b4 實跑發現 frame 與 CGSA（預設）之既有差異——多週期 L6.5 於主週期展開格線而非原生週期（1h＋12h 實測 3,599 個 12h 欄平穩化決策不同）、float32 計算、欄集合不同（改前原始碼即 CGSA 多 29 欄）。查證輪 r1（codex、composer＋主委獨立版，synth 已銷帳）三方一致：生產無 frame 執行入口（API、批次、前端皆預設 CGSA；記憶體級距不切換）、frame 多週期平穩化屬正確性錯誤、修正後保留約兩倍維護且交叉驗證只及組裝層。🔴 使用者 2026-09-28 裁定：「若是frame都不需要，那不就不要花時間在任何跟frame有關的部份和測試上？」「舊的h5什麼的也可以刪除，這樣可以專注在把現行的模組做好吧？」；使用者未曾手動設 `FFACT_USE_CGSA=0`。待做：刪 frame 產生路徑（`_cgsa_enabled` 兩處與全部分支、legacy 組裝與落 `*_factory.h5`、`_legacy_native_row_maps`）、刪舊特徵 h5 讀取（`FeatureStorage.load_factory_output` 與其呼叫端 `feature_library.py`、`_try_load_cache`，API 之舊 HDF5 分支）、遷移或刪除依 frame 之測試（約 45 處）與腳本（`scripts/golden_multi_symbol_c3.py`、`freeze_batch2d_baseline.py`、`profile_v6v7_comparison.py`）；K 線資料 `kline_cache.h5` 不在此列；既存舊特徵 h5 檔依「面向未來不溯及既往」封存（刪檔指令交使用者）。FF-STAT v49 已先移除本票範圍內之 frame 驗收臂"
       ],
       [
         "336",
@@ -1864,7 +1864,7 @@
         "HP-FRAMEPATH",
         "未開工",
         "handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md",
-        "查證輪 r1 已銷帳（三方一致：生產無 frame 入口、frame 多週期平穩化錯誤）；使用者 2026-09-28 裁定刪除 frame 產生路徑與舊特徵 h5 讀取、不再花時間在 frame 測試（K 線 kline_cache.h5 不在此列）；全票排序第 5 步（docs/TICKET_ORDER.md）：於 ICFIRSTALIGN 乙之後（run_ic_first 現走記憶體路徑，查證輪 r1 未涵蓋）；刪除票 SPEC 走完整管線；FF-STAT b4 已先移除 frame 驗收臂"
+        "查證輪 r1 已銷帳（三方一致：生產無 frame 入口、frame 多週期平穩化錯誤）；使用者 2026-09-28 裁定刪除 frame 產生路徑與舊特徵 h5 讀取、不再花時間在 frame 測試（K 線 kline_cache.h5 不在此列）；全票排序第 5 步（docs/TICKET_ORDER.md）：前置第 4 步 ICFIRSTALIGN 乙已於 2026-10-08 收案（run_ic_first 已改走 CGSA，CGSA 關閉時具名拒跑）⇒ 依賴已滿足，下一張開工；allowed_red 之 FRAMEPATH 1 列（test_failopen_manifest::test_persist_false_generate_features_metadata）於本票收案時刪；刪除票 SPEC 走完整管線；FF-STAT b4 已先移除 frame 驗收臂"
       ],
       [
         "044",

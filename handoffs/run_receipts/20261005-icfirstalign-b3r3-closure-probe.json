@@ -1,0 +1,45 @@
+{
+  "commit": "96fd5746",
+  "owner_race": {
+    "swept": [
+      []
+    ],
+    "alive_after_sweep": true,
+    "token_in_name": true,
+    "closed_clean": true
+  },
+  "join_transient": {
+    "error": "injected second executor creation failure",
+    "shutdowns": 2,
+    "worker_alive": false,
+    "A_status": "joined",
+    "join_retry_events": [
+      [
+        "join_retry",
+        "A"
+      ]
+    ]
+  },
+  "cancel_stop": {
+    "results": [
+      "ok-a",
+      "SchedulerStopped"
+    ],
+    "statuses": {
+      "A": "joined",
+      "B": "queued"
+    },
+    "joined_waves": [
+      1
+    ],
+    "thread_alive": false
+  },
+  "await_owned": {
+    "order": [
+      "future_done",
+      "await_returned"
+    ],
+    "future_before_return": true
+  },
+  "all_closed": true
+}
