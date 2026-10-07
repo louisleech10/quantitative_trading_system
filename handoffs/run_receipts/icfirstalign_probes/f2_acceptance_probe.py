@@ -41,6 +41,50 @@ COMMAND = ("env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_recei
            "--receipt handoffs/run_receipts/<日期>-icfirstalign-f2-acceptance.json；之後 … --annotate --receipt <同>")
 
 
+# 成品品質 partial 之可接受原因（封閉集合）：FF-STAT §C 公開域預熱——預熱已延至資料起點、首個有效值仍晚於起始日之欄
+# （資料真相，非記憶體；SPEC v41 §G）。其餘 partial 原因一律不算 Task 4.4 完成。
+ALLOWED_PARTIAL_REASONS = ("warmup_insufficient_history",)
+
+
+def classify(rc: int, *, disk_watchdog: bool, guard_abort: bool, child: Dict[str, Any],
+             failure_reasons: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Task 4.4 完成判定（純函式；審碼 b4 r1 codex P1-01／P1-02）。
+
+    行程結局先於子行程自述：磁碟看門狗、守護 abort、rc ≠ 0（含被訊號終止之負值）任一成立 ⇒ 非完成，不論子行程是否已
+    寫 `completed`。行程完成後另判成品品質：run_status 與 quality_status 皆 complete ⇒ `completed`；partial 且全部
+    failure_reasons 之原因名屬 `ALLOWED_PARTIAL_REASONS` ⇒ `completed_partial_allowed`；其餘 ⇒ `completed_partial_other`
+    （不算完成）。回傳 process_outcome、artifact_quality、outcome、accepted。"""
+    child_outcome = child.get("outcome")
+    if disk_watchdog:
+        process = "killed_disk_watchdog"
+    elif guard_abort:
+        process = "killed_by_guard"
+    elif rc < 0:
+        process = f"killed_signal_{-rc}"
+    elif child_outcome in ("fail_closed", "error"):
+        process = child_outcome
+    elif rc != 0 or child_outcome != "completed":
+        process = f"inconsistent_rc_{rc}_child_{child_outcome}"
+    else:
+        process = "completed"
+    run_status, quality_status = child.get("run_status"), child.get("quality_status")
+    reasons = [str(r) for r in (failure_reasons or [])]
+    if run_status == "complete" and quality_status == "complete":
+        quality = "complete"
+    elif reasons and all(r.split(":", 1)[0] in ALLOWED_PARTIAL_REASONS for r in reasons):
+        quality = "partial_allowed"
+    else:
+        quality = "partial_other"
+    if process != "completed":
+        outcome = process
+    else:
+        outcome = {"complete": "completed", "partial_allowed": "completed_partial_allowed"}.get(
+            quality, "completed_partial_other")
+    return {"process_outcome": process, "artifact_quality": quality, "run_status": run_status,
+            "quality_status": quality_status, "failure_reasons": reasons, "outcome": outcome,
+            "accepted": outcome in ("completed", "completed_partial_allowed")}
+
+
 def _freeze_module() -> Any:
     spec = importlib.util.spec_from_file_location("freeze_failopen_baseline", REPO / "scripts/freeze_failopen_baseline.py")
     module = importlib.util.module_from_spec(spec)
@@ -95,6 +139,7 @@ def _child(work: Path, result_path: Path) -> int:
         out.update({"outcome": "completed", "feature_count": int(res.feature_count),
                     "config_hash": str(meta.get("config_hash")),
                     "run_status": meta.get("run_status"), "quality_status": meta.get("quality_status"),
+                    "failure_reasons": meta.get("failure_reasons"),
                     "memory_route": meta.get("memory_route"), "memory_budget": meta.get("memory_budget")})
     except (mb.GenerationMemoryBudgetExceeded, mb.MemoryMeasurementUnavailable) as exc:
         out.update({"outcome": "fail_closed", "error_type": type(exc).__name__, "error": str(exc)[:4000]})
@@ -177,6 +222,16 @@ def annotate(receipt_path: Path) -> int:
         receipt["manifests"].append({"path": str(path.relative_to(receipt["work_dir"])),
                                      "run_status": data.get("run_status"), "quality_status": data.get("quality_status"),
                                      "failure_reasons": data.get("failure_reasons")})
+    # 完成判定一律經 classify（記錄之行程結局＋成品 manifest 之品質原因；不重跑）
+    reasons = receipt["child"].get("failure_reasons")
+    if reasons is None and receipt["manifests"]:
+        reasons = receipt["manifests"][0].get("failure_reasons")
+    verdict = classify(int(receipt.get("rc") if receipt.get("rc") is not None else -1),
+                       disk_watchdog=receipt.get("stop_reason") == "disk_watchdog",
+                       guard_abort=bool(receipt.get("guard_abort_receipts")), child=receipt.get("child") or {},
+                       failure_reasons=reasons)
+    receipt.update({"outcome": verdict["outcome"], "classification": verdict,
+                    "exit_code": 0 if verdict["accepted"] else 1})
     receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8")
     print(json.dumps(receipt["manifests"], ensure_ascii=False))
     return 0
@@ -275,17 +330,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         return None
 
     guard_abort = sorted(str(p) for p in work.rglob("memory_guard_abort.json"))
-    if stop_reason is None:
-        if child.get("outcome"):
-            stop_reason = child["outcome"]
-        elif guard_abort:
-            stop_reason = "killed_by_guard"
-        else:
-            stop_reason = f"killed_rc_{rc}"
+    verdict = classify(rc, disk_watchdog=stop_reason == "disk_watchdog", guard_abort=bool(guard_abort), child=child,
+                       failure_reasons=child.get("failure_reasons"))
+    stop_reason = stop_reason or verdict["process_outcome"]
     receipt.update({
-        "outcome": child.get("outcome") or ("killed" if stop_reason.startswith("killed") or stop_reason == "disk_watchdog"
-                                             else "unknown"),
-        "stop_reason": stop_reason, "rc": rc, "exit_code": rc, "wall_seconds": round(wall, 2), "child": child,
+        "outcome": verdict["outcome"], "classification": verdict,
+        "stop_reason": stop_reason, "rc": rc, "exit_code": 0 if verdict["accepted"] else 1,
+        "wall_seconds": round(wall, 2), "child": child,
         "peak_footprint_bytes_time_l": _time_field("peak memory footprint"),
         "max_resident_bytes_time_l": _time_field("maximum resident set size"),
         "sampled_peaks": peaks, "pressure_histogram": pressure_hist,
@@ -297,7 +348,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8")
     print(json.dumps({"outcome": receipt["outcome"], "stop_reason": stop_reason, "wall_s": receipt["wall_seconds"],
                       "peak_footprint": receipt["peak_footprint_bytes_time_l"]}, ensure_ascii=False))
-    return 0 if receipt["outcome"] == "completed" else 1
+    return 0 if verdict["accepted"] else 1
 
 
 if __name__ == "__main__":

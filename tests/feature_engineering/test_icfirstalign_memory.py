@@ -1926,3 +1926,83 @@ def test_speed_stage_parser_segments_and_midnight() -> None:
         "layer_start1#2→layer_done1#2": 3.0,
         "layer_done1#2→end": 1.0,
     }
+
+
+# ---------------------------------------------------------------- Task 4.4 完成判定（審碼 b4 r1 codex P1-01／P1-02）
+
+_F2_PROBE = Path(__file__).resolve().parents[2] / "handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py"
+
+
+def _f2_module(mutation: Optional[Tuple[str, str]] = None) -> Any:
+    """載入 F-2 驗收探針（模組層只 import 標準函式庫）；mutation＝(原字串, 置換字串)，須恰命中一次。"""
+    import types
+
+    src = _F2_PROBE.read_text(encoding="utf-8")
+    if mutation is not None:
+        assert src.count(mutation[0]) == 1, mutation[0]
+        src = src.replace(mutation[0], mutation[1])
+    mod = types.ModuleType("f2_acceptance_under_test")
+    mod.__dict__["__file__"] = str(_F2_PROBE)
+    exec(compile(src, str(_F2_PROBE), "exec"), mod.__dict__)
+    return mod
+
+
+_COMPLETE = {"outcome": "completed", "run_status": "complete", "quality_status": "complete"}
+_PARTIAL = {"outcome": "completed", "run_status": "partial", "quality_status": "partial"}
+# (名, rc, disk_watchdog, guard_abort, child, failure_reasons, 期望 outcome, 期望 accepted)
+_F2_CASES = [
+    ("complete", 0, False, False, _COMPLETE, [], "completed", True),
+    ("child_completed_then_sigkill", -9, False, False, _COMPLETE, [], "killed_signal_9", False),
+    ("child_completed_guard_abort", 0, False, True, _COMPLETE, [], "killed_by_guard", False),
+    ("child_completed_disk_watchdog", -9, True, False, _COMPLETE, [], "killed_disk_watchdog", False),
+    ("no_child_record", -9, False, False, {}, [], "killed_signal_9", False),
+    ("fail_closed_named", 1, False, False, {"outcome": "fail_closed"}, [], "fail_closed", False),
+    ("rc_nonzero_child_completed", 1, False, False, _COMPLETE, [], "inconsistent_rc_1_child_completed", False),
+    ("partial_warmup_only", 0, False, False, _PARTIAL, ["warmup_insufficient_history:111"],
+     "completed_partial_allowed", True),
+    ("partial_other_reason", 0, False, False, _PARTIAL, ["layer_failed:L3"], "completed_partial_other", False),
+    ("partial_mixed_reasons", 0, False, False, _PARTIAL, ["warmup_insufficient_history:3", "layer_failed:L2"],
+     "completed_partial_other", False),
+    ("partial_no_reason", 0, False, False, _PARTIAL, [], "completed_partial_other", False),
+]
+
+
+def _f2_battery_failures(mod: Any) -> List[str]:
+    out = []
+    for name, rc, disk, guard, child, reasons, outcome, accepted in _F2_CASES:
+        got = mod.classify(rc, disk_watchdog=disk, guard_abort=guard, child=child, failure_reasons=reasons)
+        if (got["outcome"], got["accepted"]) != (outcome, accepted):
+            out.append(f"{name}: {got['outcome']}/{got['accepted']}")
+    return out
+
+
+def test_f2_acceptance_classification_contract() -> None:
+    """行程結局先於子行程自述（被訊號／守護／看門狗終止者不算完成）；成品 partial 只接受封閉原因
+    `warmup_insufficient_history`（SPEC v41 §G），其餘 partial 不算完成。"""
+    assert _f2_battery_failures(_f2_module()) == []
+    assert _f2_module().ALLOWED_PARTIAL_REASONS == ("warmup_insufficient_history",)
+
+
+_F2_MUTANTS = {
+    # 子行程自述優先（審碼 r1 codex P1-01 之原缺陷）：子行程 completed 即算完成
+    "child_outcome_first": ('    if disk_watchdog:\n        process = "killed_disk_watchdog"',
+                            '    if child_outcome == "completed":\n        process = "completed"\n'
+                            '    elif disk_watchdog:\n        process = "killed_disk_watchdog"'),
+    # 忽略 rc（被訊號終止仍完成）
+    "ignore_signal_rc": ("    elif rc < 0:\n", "    elif False:\n"),
+    # 成品品質不入判定（審碼 r1 codex P1-02 之原缺陷）：行程完成即 completed
+    "quality_ignored": ('        outcome = {"complete": "completed", "partial_allowed": "completed_partial_allowed"}.get(\n'
+                        '            quality, "completed_partial_other")',
+                        '        outcome = "completed"'),
+    # 允許清單變成「任一原因屬之即可」
+    "any_reason_allowed": ("all(r.split(\":\", 1)[0] in ALLOWED_PARTIAL_REASONS for r in reasons)",
+                           "any(r.split(\":\", 1)[0] in ALLOWED_PARTIAL_REASONS for r in reasons)"),
+    # 無原因之 partial 視為允許
+    "empty_reasons_allowed": ("    elif reasons and all(", "    elif all("),
+}
+
+
+@pytest.mark.parametrize("mutant", sorted(_F2_MUTANTS))
+def test_mutation_f2_acceptance_classification(mutant: str) -> None:
+    """每個完成判定 mutant 至少使一個契約案例判定改變。"""
+    assert _f2_battery_failures(_f2_module(_F2_MUTANTS[mutant])) != []

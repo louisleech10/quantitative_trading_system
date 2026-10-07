@@ -46,7 +46,7 @@
   "ok": true
  },
  "time_start": "2026-10-07T11:37:51+0800",
- "outcome": "completed",
+ "outcome": "completed_partial_allowed",
  "stop_reason": "completed",
  "rc": 0,
  "wall_seconds": 5732.7,
@@ -196,5 +196,16 @@
  ],
  "schema_version": 1,
  "command": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py --receipt handoffs/run_receipts/<日期>-icfirstalign-f2-acceptance.json；之後 … --annotate --receipt <同>",
- "exit_code": 0
+ "exit_code": 0,
+ "classification": {
+  "process_outcome": "completed",
+  "artifact_quality": "partial_allowed",
+  "run_status": "partial",
+  "quality_status": "partial",
+  "failure_reasons": [
+   "warmup_insufficient_history:111"
+  ],
+  "outcome": "completed_partial_allowed",
+  "accepted": true
+ }
 }
