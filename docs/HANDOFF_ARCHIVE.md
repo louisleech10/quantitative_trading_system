@@ -510,3 +510,5 @@
 - 2026-09-24：RM-FKPERF → `handoffs/run_receipts/20260924-fkperf-scale.json`
 - 2026-09-24：RM-FKPERF → `handoffs/reconcile/20260924-fkperf-b3-review-r3/synth.md`
 - 2026-10-03：RM-FKPERF → `handoffs/run_receipts/20261003-fkperf-govsuite.json`
+- 2026-09-26：RM-ICFIRSTALIGN → `handoffs/reconcile/20260926-icfirstneed-x-consult-r1/synth.md`
+- 2026-09-26：RM-ICFIRSTALIGN → `handoffs/20260926-icfirstneed-x-consult-r1-claude.md`

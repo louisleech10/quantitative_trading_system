@@ -33,11 +33,6 @@
 <td>🔴 <strong>暫停中</strong>：SPEC 審至第 12 輪、未凍結、仍剩 11 條 P1；排序第 15 步（FF-NAME、ICPATH、FFSTORE 之後一次做完）</td>
 </tr>
 <tr>
-<td><strong>「IC 優先」選特徵路徑用真實資料必定報錯</strong>（ICFIRSTALIGN）</td>
-<td>最後算 IC 那步對不上時間標籤；既有測試在主線上本來就紅</td>
-<td>舊問題、不是 FF-STAT 弄壞的；排序第 4 步</td>
-</tr>
-<tr>
 <td><strong>GAP-3 的 UAT 驗收</strong></td>
 <td>事件型分析你自己實機驗一次</td>
 <td>排最後；要含「改過 k／h 的事件批」</td>
@@ -59,8 +54,8 @@
 </tr>
 <tr>
 <td><strong>「IC 篩完 → 正規化 → 交給訓練」這半段沒接通</strong></td>
-<td>IC First 當初的用意是：Rank／Zscore／Gaussian 對幾萬欄算太久，所以只對 IC 選中的欄做。現況是「IC 前不算」這半已生效，但「選中的欄正規化後交給訓練」還沒有能用的路：IC First 入口沒有正式呼叫端、而且真實資料必定報錯（見 ICFIRSTALIGN），IC 頁「套用轉換」的輸出也沒人讀。（IC 頁偷看未來、窗沒湊滿就出值這兩件，已由 ICPOSTLEAK 修好）</td>
-<td>併 ICFIRSTALIGN 剩下的部分（排序第 4 步）；IC First 入口你 2026-09-26 裁定不刪（它是正式轉換程式的唯一使用者）；不要把三種轉換搬回 IC 之前（會回到全量生成太慢）</td>
+<td>IC First 當初的用意是：Rank／Zscore／Gaussian 對幾萬欄算太久，所以只對 IC 選中的欄做。現況是「IC 前不算」這半已生效；IC First 這條路 2026-10-08 起改走正式引擎、真實資料不再報錯（ICFIRSTALIGN 已收案）。還沒有的是「選中的欄正規化後交給訓練」：IC First 入口沒有正式呼叫端，IC 頁「套用轉換」的輸出也沒人讀。（IC 頁偷看未來、窗沒湊滿就出值這兩件，已由 ICPOSTLEAK 修好）</td>
+<td>等訓練（ML）開票：訓練該吃哪份資料、從哪接，要在那張票定（同第 9 步縮尾重複的「ML 該吃哪份資料」）；IC First 入口你 2026-09-26 裁定不刪；不要把三種轉換搬回 IC 之前（會回到全量生成太慢）</td>
 </tr>
 <tr>
 <td><strong>IC 畫面上的 IC 是「選拔分數」，不是沒看過的成績</strong>（2026-09-26 外部稽核提出、主委查證）</td>
@@ -118,9 +113,9 @@
 </tr>
 <tr>
 <td>4</td>
-<td><strong>ICFIRSTALIGN 剩下的部分</strong></td>
-<td>「IC 選完特徵再轉換」這條路改走正式引擎、修時間軸對不上（真實資料必報錯）、轉換後產物補時間軸</td>
-<td>這條路現在走的是要刪的舊引擎，先搬走才能刪</td>
+<td><strong>ICFIRSTALIGN 剩下的部分</strong>（✅ 2026-10-08 已收案）</td>
+<td>「IC 選完特徵再轉換」這條路改走正式引擎、修好時間軸；另修好以前會把記憶體撐爆的設定（現在靠搬到硬碟撐住、跑得完）</td>
+<td>見 <a href="做過什麼.html">做過什麼.md</a></td>
 </tr>
 <tr>
 <td>5</td>
