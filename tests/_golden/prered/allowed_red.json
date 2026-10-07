@@ -7,69 +7,6 @@
   "trigger": "FFACT_USE_CGSA=0 之 frame 路徑；2026-09-28 使用者裁定刪除 frame 產生路徑；FRAMEPATH（第 5 步）收案時刪本列"
  },
  {
-  "node": "tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_trim_ic_first",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "run_ic_first 之 IC 階段讀回時間軸對齊（AlignmentViolationError）；ICFIRSTALIGN 乙（第 4 步）修復後刪本列"
- },
- {
-  "node": "tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_trim_ic_first_public_window_init",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "同上；ICFIRSTALIGN 乙收案時刪本列"
- },
- {
-  "node": "tests/feature_engineering/test_failopen_correctness.py::test_v3_multi_tf_btc_matches_frozen_baseline",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "多週期基準於本機受 F-2（12h＋1h 全史預熱被系統終止）擋、未重凍；ICFIRSTALIGN 乙 MEM-RSS 修復後重凍多週期單元並刪本列"
- },
- {
-  "node": "tests/feature_engineering/test_failopen_producer.py::test_quality_gate_max_ratios_do_not_change_config_hash",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "釘值改讀多週期基準之 config_hash（PRE-RED Task 2.6）；多週期單元重凍後轉綠並刪本列"
- },
- {
-  "node": "tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "多週期 12h＋1h 於 d229336e 後全史預熱致峰值 footprint 約 71 GB、本機被系統終止（d229336e^ 同測試 1 passed、峰值 0.80 GB）＝F-2；ICFIRSTALIGN 乙 MEM-RSS 修復後刪本列"
- },
- {
-  "node": "tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[False]",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "多週期 12h＋1h 於 d229336e 後全史預熱致峰值 footprint 約 71 GB、本機被系統終止（d229336e^ 同測試 1 passed、峰值 0.80 GB）＝F-2；ICFIRSTALIGN 乙 MEM-RSS 修復後刪本列"
- },
- {
-  "node": "tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[True]",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "多週期 12h＋1h 於 d229336e 後全史預熱致峰值 footprint 約 71 GB、本機被系統終止（d229336e^ 同測試 1 passed、峰值 0.80 GB）＝F-2；ICFIRSTALIGN 乙 MEM-RSS 修復後刪本列"
- },
- {
-  "node": "tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[False]",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "多週期 12h＋1h 於 d229336e 後全史預熱致峰值 footprint 約 71 GB、本機被系統終止（d229336e^ 同測試 1 passed、峰值 0.80 GB）＝F-2；ICFIRSTALIGN 乙 MEM-RSS 修復後刪本列"
- },
- {
-  "node": "tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]",
-  "owner_ticket": "ICFIRSTALIGN",
-  "reason": "blocked-by",
-  "state": "owned-by-later-ticket",
-  "trigger": "多週期 12h＋1h 於 d229336e 後全史預熱致峰值 footprint 約 71 GB、本機被系統終止（d229336e^ 同測試 1 passed、峰值 0.80 GB）＝F-2；ICFIRSTALIGN 乙 MEM-RSS 修復後刪本列"
- },
- {
   "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values",
   "owner_ticket": "FFSTORE",
   "reason": "user-ruling",

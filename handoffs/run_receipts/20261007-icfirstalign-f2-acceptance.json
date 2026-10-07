@@ -1,0 +1,200 @@
+{
+ "probe": "handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py",
+ "spec": "docs/ICFIRSTALIGN_SPEC.md v40 §G 記憶體驗收／Task 4.4",
+ "setting": {
+  "symbol": "BTCUSDT",
+  "primary": "12h",
+  "training": [
+   "12h",
+   "1h"
+  ],
+  "public_window_days": 14,
+  "warmup": "全史（預設）",
+  "l1": "完整預設",
+  "payload": {
+   "timeframes": {
+    "primary": "12h",
+    "training": [
+     "12h",
+     "1h"
+    ],
+    "alignment_mode": "open_minus"
+   },
+   "data_sources": {
+    "enabled_sources": [
+     "close"
+    ],
+    "synthetic_sources": []
+   },
+   "preprocessing": {
+    "enabled": false
+   },
+   "nan_strategy": {
+    "l7_dead_feature_drop": {
+     "enabled": false
+    }
+   }
+  }
+ },
+ "disk_precheck": {
+  "per_tf_D_bytes": {
+   "12h": 3090675072,
+   "1h": 37088100864
+  },
+  "required_bytes": 44473743232,
+  "free_bytes": 45147009024,
+  "ok": true
+ },
+ "time_start": "2026-10-07T11:37:51+0800",
+ "outcome": "completed",
+ "stop_reason": "completed",
+ "rc": 0,
+ "wall_seconds": 5732.7,
+ "child": {
+  "window": {
+   "start": "2026-04-13",
+   "end": "2026-04-27"
+  },
+  "payload": {
+   "timeframes": {
+    "primary": "12h",
+    "training": [
+     "12h",
+     "1h"
+    ],
+    "alignment_mode": "open_minus"
+   },
+   "data_sources": {
+    "enabled_sources": [
+     "close"
+    ],
+    "synthetic_sources": []
+   },
+   "preprocessing": {
+    "enabled": false
+   },
+   "nan_strategy": {
+    "l7_dead_feature_drop": {
+     "enabled": false
+    }
+   }
+  },
+  "outcome": "completed",
+  "feature_count": 181736,
+  "config_hash": "7786043a973dc4d84111b3afc3c1a85c",
+  "run_status": "partial",
+  "quality_status": "partial",
+  "memory_route": [],
+  "memory_budget": null,
+  "elapsed_s": 5730.13
+ },
+ "peak_footprint_bytes_time_l": 13728738368,
+ "max_resident_bytes_time_l": 3562586112,
+ "sampled_peaks": {
+  "tree_footprint": 13522267632,
+  "swap_used": 0,
+  "work_dir_bytes": 8083017728,
+  "min_swap_volume_free": 27928944640
+ },
+ "pressure_histogram": {
+  "1": 7275,
+  "2": 3992,
+  "4": 2
+ },
+ "guard_abort_receipts": [],
+ "checks": {
+  "events": 869,
+  "by_branch": {
+   "L1.serial": {
+    "checks": 4,
+    "max_planned": 649518080,
+    "min_A": 40072560640,
+    "results": {
+     "ok": 4
+    }
+   },
+   "L2.polars": {
+    "checks": 4,
+    "max_planned": 16319963620,
+    "min_A": 40036851712,
+    "results": {
+     "ok": 4
+    }
+   },
+   "L3.numba_multi_callback": {
+    "checks": 4,
+    "max_planned": 7689694728,
+    "min_A": 38671409152,
+    "results": {
+     "ok": 4
+    }
+   },
+   "L4": {
+    "checks": 4,
+    "max_planned": 4084305920,
+    "min_A": 32184893440,
+    "results": {
+     "ok": 4
+    }
+   },
+   "L5": {
+    "checks": 4,
+    "max_planned": 13301696,
+    "min_A": 29987807232,
+    "results": {
+     "ok": 4
+    }
+   },
+   "L6": {
+    "checks": 4,
+    "max_planned": 27450680,
+    "min_A": 29987381248,
+    "results": {
+     "ok": 4
+    }
+   },
+   "Calib.group_reduce": {
+    "checks": 842,
+    "max_planned": 18310052224,
+    "min_A": 26411421696,
+    "results": {
+     "ok": 842
+    }
+   },
+   "MTF.align_index": {
+    "checks": 1,
+    "max_planned": 4589063,
+    "min_A": 31312986112,
+    "results": {
+     "ok": 1
+    }
+   },
+   "MTF.align_compact": {
+    "checks": 1,
+    "max_planned": 4201084,
+    "min_A": 31312527360,
+    "results": {
+     "ok": 1
+    }
+   }
+  },
+  "refusals": [],
+  "routes": []
+ },
+ "timeline_file": "handoffs/run_receipts/20261007-icfirstalign-f2-acceptance.timeline.jsonl",
+ "work_dir": "/var/folders/_c/3xdf41hd3tvgxpx63mrml2c00000gn/T/icfa_f2_i3ojnv3l",
+ "time_end": "2026-10-07T13:13:24+0800",
+ "manifests": [
+  {
+   "path": "features/BTCUSDT/12h/7786043a973dc4d84111b3afc3c1a85c/feature_manifest.json",
+   "run_status": "partial",
+   "quality_status": "partial",
+   "failure_reasons": [
+    "warmup_insufficient_history:111"
+   ]
+  }
+ ],
+ "schema_version": 1,
+ "command": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py --receipt handoffs/run_receipts/<日期>-icfirstalign-f2-acceptance.json；之後 … --annotate --receipt <同>",
+ "exit_code": 0
+}

@@ -37,6 +37,8 @@ SYMBOL = "BTCUSDT"
 PRIMARY = "12h"
 TRAINING = ["12h", "1h"]
 DAYS = 14
+COMMAND = ("env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py "
+           "--receipt handoffs/run_receipts/<日期>-icfirstalign-f2-acceptance.json；之後 … --annotate --receipt <同>")
 
 
 def _freeze_module() -> Any:
@@ -164,13 +166,32 @@ def _summarize_checks(path: Path) -> Dict[str, Any]:
     return {"events": total, "by_branch": by, "refusals": refusals[:50], "routes": routes[:50]}
 
 
+def annotate(receipt_path: Path) -> int:
+    """以工作目錄內成品 manifest 補收據之品質狀態（run_status／quality_status／failure_reasons；讀檔、不重跑）。"""
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    receipt.update({"schema_version": 1, "command": COMMAND, "exit_code": receipt.get("rc")})
+    manifests = sorted(Path(receipt["work_dir"]).rglob("feature_manifest.json"))
+    receipt["manifests"] = []
+    for path in manifests:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        receipt["manifests"].append({"path": str(path.relative_to(receipt["work_dir"])),
+                                     "run_status": data.get("run_status"), "quality_status": data.get("quality_status"),
+                                     "failure_reasons": data.get("failure_reasons")})
+    receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8")
+    print(json.dumps(receipt["manifests"], ensure_ascii=False))
+    return 0
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--annotate", action="store_true", help="以工作目錄內成品 manifest 補收據品質狀態")
     parser.add_argument("--child", action="store_true")
     parser.add_argument("--work")
     parser.add_argument("--result")
     parser.add_argument("--receipt")
     args = parser.parse_args(argv)
+    if args.annotate:
+        return annotate(Path(args.receipt))
     if args.child:
         return _child(Path(args.work), Path(args.result))
 
@@ -179,6 +200,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     work = Path(tempfile.mkdtemp(prefix="icfa_f2_"))
     precheck = _disk_precheck(work)
     receipt: Dict[str, Any] = {
+        "schema_version": 1, "command": COMMAND, "exit_code": None,
         "probe": "handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py",
         "spec": "docs/ICFIRSTALIGN_SPEC.md v40 §G 記憶體驗收／Task 4.4",
         "setting": {"symbol": SYMBOL, "primary": PRIMARY, "training": TRAINING, "public_window_days": DAYS,
@@ -263,7 +285,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     receipt.update({
         "outcome": child.get("outcome") or ("killed" if stop_reason.startswith("killed") or stop_reason == "disk_watchdog"
                                              else "unknown"),
-        "stop_reason": stop_reason, "rc": rc, "wall_seconds": round(wall, 2), "child": child,
+        "stop_reason": stop_reason, "rc": rc, "exit_code": rc, "wall_seconds": round(wall, 2), "child": child,
         "peak_footprint_bytes_time_l": _time_field("peak memory footprint"),
         "max_resident_bytes_time_l": _time_field("maximum resident set size"),
         "sampled_peaks": peaks, "pressure_histogram": pressure_hist,

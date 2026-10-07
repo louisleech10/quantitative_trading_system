@@ -89,6 +89,12 @@
       "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/memory_series_probe.py --receipt handoffs/run_receipts/20261007-icfirstalign-memory-series.json --run-root <暫存> && … --finalize",
       "rc": -9,
       "honest_bounds": "探針自身 75% 停損由守護於第 25 步終止（設計所定之停止）；同一行程逐步累積；850 天之步 run_status partial、IC 頁依設計拒讀；linux 未跑"
+    },
+    {
+      "path": "handoffs/run_receipts/20261007-icfirstalign-f2-acceptance.json",
+      "cmd": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/icfirstalign_probes/f2_acceptance_probe.py --receipt handoffs/run_receipts/20261007-icfirstalign-f2-acceptance.json && … --annotate",
+      "rc": 0,
+      "honest_bounds": "macOS 8 GB 本機單次；多週期串列（FIXED_ENV）；成品 run_status partial（warmup_insufficient_history:111，資料起點限制）；HEAD 對照沿用 PRE-RED 收據不重跑"
     }
   ],
   "batch_card": {

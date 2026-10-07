@@ -21,19 +21,11 @@ TICKET_ORDER = REPO_ROOT / "docs" / "TICKET_ORDER.md"
 REASONS = {"blocked-by", "user-ruling", "needs-research"}
 STATES = {"pending-approval", "owned-by-later-ticket"}
 
+# ICFIRSTALIGN b4（2026-10-08）：F-2 原設定跑完、BTCUSDT/1h 與多週期重凍（使用者 2026-10-04 核可③）後 9 列實跑全綠而刪；
 # 重凍（使用者 2026-10-03 核可）後之狀態：五支 pending 列已刪；多週期基準與 config_hash 釘值歸 F-2；
 # 刪除舊特徵 run（使用者 2026-10-03 核可）所致之紅經 red census 實跑列入（收據 handoffs/run_receipts/20261003-prered-red-census.txt）
 EXPECTED = {
     ("tests/feature_engineering/test_failopen_manifest.py::test_persist_false_generate_features_metadata", "FRAMEPATH", "user-ruling", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_trim_ic_first", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_trim_ic_first_public_window_init", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_failopen_correctness.py::test_v3_multi_tf_btc_matches_frozen_baseline", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_failopen_producer.py::test_quality_gate_max_ratios_do_not_change_config_hash", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[False]", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[True]", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[False]", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
-    ("tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]", "ICFIRSTALIGN", "blocked-by", "owned-by-later-ticket"),
     ("tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values", "FFSTORE", "user-ruling", "owned-by-later-ticket"),
     ("tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_10i_prepare_called_once", "FFSTORE", "user-ruling", "owned-by-later-ticket"),
     ("tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly", "FFSTORE", "user-ruling", "owned-by-later-ticket"),

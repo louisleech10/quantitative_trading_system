@@ -1,0 +1,37 @@
+{
+  "rule": "ICFIRSTALIGN SPEC v40 速度驗收",
+  "constants": {
+    "same_ratio": 1.03
+  },
+  "cases": [
+    {
+      "input": {
+        "name": "failopen_unit_BTCUSDT_1h",
+        "timing_source": "wall_clock_full_entry",
+        "source": "scripts/freeze_failopen_baseline.py --units BTCUSDT/1h 之 perf.wall_seconds（生成＋hash 之完整入口）；新碼＝b4 重凍 A／B（ef966e74 樹），HEAD＝f13a9635 worktree 同命令兩次；同機串行；feature_count 皆 91765",
+        "pairs": [
+          {
+            "order": "new_first",
+            "new_s": 423.19,
+            "head_s": 984.183
+          },
+          {
+            "order": "new_first",
+            "new_s": 416.365,
+            "head_s": 1024.171
+          }
+        ]
+      },
+      "result": {
+        "name": "failopen_unit_BTCUSDT_1h",
+        "pairs": 2,
+        "r": 0.41803138291357006,
+        "median_head_s": 1004.177,
+        "median_new_s": 419.77750000000003,
+        "verdict": "pass",
+        "reason": "r＝0.4180 ≤ 1.03（視為相同）"
+      }
+    }
+  ],
+  "all_pass": true
+}

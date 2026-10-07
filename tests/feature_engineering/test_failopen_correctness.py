@@ -314,7 +314,9 @@ def _run_gate_a_subprocess(test_name: str, worker_env: str) -> None:
         env=env,
         capture_output=True,
         text=True,
-        timeout=1800,
+        # ICFIRSTALIGN b4：多週期單元之生成實測 2132 秒（改前基準記錄 4841 秒），原 1800 秒於比對前即逾時；
+        # 逾時只決定子行程等待上限，不改任何比對斷言
+        timeout=7200,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
