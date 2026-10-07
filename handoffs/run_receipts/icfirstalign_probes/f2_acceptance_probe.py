@@ -28,7 +28,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 REPO = Path(__file__).resolve().parents[3]
 DISK_FLOOR = 4 << 30
@@ -71,7 +71,9 @@ def classify(rc: int, *, disk_watchdog: bool, guard_abort: bool, child: Dict[str
     reasons = [str(r) for r in (failure_reasons or [])]
     if run_status == "complete" and quality_status == "complete":
         quality = "complete"
-    elif reasons and all(r.split(":", 1)[0] in ALLOWED_PARTIAL_REASONS for r in reasons):
+    elif (run_status == "partial" and quality_status == "partial" and reasons
+          and all(r.split(":", 1)[0] in ALLOWED_PARTIAL_REASONS for r in reasons)):
+        # 兩狀態皆須明確為 partial（缺席、未知、互相矛盾者不接受；審碼 b4 r2 codex／grok P2-01）
         quality = "partial_allowed"
     else:
         quality = "partial_other"
@@ -83,6 +85,25 @@ def classify(rc: int, *, disk_watchdog: bool, guard_abort: bool, child: Dict[str
     return {"process_outcome": process, "artifact_quality": quality, "run_status": run_status,
             "quality_status": quality_status, "failure_reasons": reasons, "outcome": outcome,
             "accepted": outcome in ("completed", "completed_partial_allowed")}
+
+
+def merge_quality(child: Dict[str, Any], manifest: Optional[Dict[str, Any]]) -> Tuple[Dict[str, Any], Optional[List[str]]]:
+    """補完判定之品質輸入（審碼 b4 r2 codex P2-01）：子行程紀錄缺之 run_status／quality_status／failure_reasons 由成品
+    manifest 補；兩者皆有而不同 ⇒ 該狀態記為 `mismatch:<子行程>|<manifest>`（非 complete、非 partial ⇒ 不接受）。"""
+    merged = dict(child)
+    manifest = manifest or {}
+    for key in ("run_status", "quality_status"):
+        a, b = child.get(key), manifest.get(key)
+        if a is None:
+            merged[key] = b
+        elif b is not None and a != b:
+            merged[key] = f"mismatch:{a}|{b}"
+    reasons = child.get("failure_reasons")
+    if reasons is None:
+        reasons = manifest.get("failure_reasons")
+    elif manifest.get("failure_reasons") is not None and list(reasons) != list(manifest["failure_reasons"]):
+        merged["quality_status"] = "mismatch:failure_reasons"
+    return merged, reasons
 
 
 def _freeze_module() -> Any:
@@ -222,14 +243,11 @@ def annotate(receipt_path: Path) -> int:
         receipt["manifests"].append({"path": str(path.relative_to(receipt["work_dir"])),
                                      "run_status": data.get("run_status"), "quality_status": data.get("quality_status"),
                                      "failure_reasons": data.get("failure_reasons")})
-    # 完成判定一律經 classify（記錄之行程結局＋成品 manifest 之品質原因；不重跑）
-    reasons = receipt["child"].get("failure_reasons")
-    if reasons is None and receipt["manifests"]:
-        reasons = receipt["manifests"][0].get("failure_reasons")
+    # 完成判定一律經 classify（記錄之行程結局＋成品品質；不重跑）
+    child, reasons = merge_quality(receipt.get("child") or {}, receipt["manifests"][0] if receipt["manifests"] else None)
     verdict = classify(int(receipt.get("rc") if receipt.get("rc") is not None else -1),
                        disk_watchdog=receipt.get("stop_reason") == "disk_watchdog",
-                       guard_abort=bool(receipt.get("guard_abort_receipts")), child=receipt.get("child") or {},
-                       failure_reasons=reasons)
+                       guard_abort=bool(receipt.get("guard_abort_receipts")), child=child, failure_reasons=reasons)
     receipt.update({"outcome": verdict["outcome"], "classification": verdict,
                     "exit_code": 0 if verdict["accepted"] else 1})
     receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, indent=1, default=str) + "\n", encoding="utf-8")

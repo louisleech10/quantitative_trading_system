@@ -1964,6 +1964,15 @@ _F2_CASES = [
     ("partial_mixed_reasons", 0, False, False, _PARTIAL, ["warmup_insufficient_history:3", "layer_failed:L2"],
      "completed_partial_other", False),
     ("partial_no_reason", 0, False, False, _PARTIAL, [], "completed_partial_other", False),
+    # 審碼 b4 r2 codex／grok P2-01：允許原因須配兩狀態皆明確 partial
+    ("status_absent_allowed_reason", 0, False, False, {"outcome": "completed"}, ["warmup_insufficient_history:111"],
+     "completed_partial_other", False),
+    ("status_unknown_allowed_reason", 0, False, False,
+     {"outcome": "completed", "run_status": "unknown", "quality_status": "error"}, ["warmup_insufficient_history:1"],
+     "completed_partial_other", False),
+    ("status_mismatch_allowed_reason", 0, False, False,
+     {"outcome": "completed", "run_status": "partial", "quality_status": "complete"}, ["warmup_insufficient_history:1"],
+     "completed_partial_other", False),
 ]
 
 
@@ -1998,8 +2007,31 @@ _F2_MUTANTS = {
     "any_reason_allowed": ("all(r.split(\":\", 1)[0] in ALLOWED_PARTIAL_REASONS for r in reasons)",
                            "any(r.split(\":\", 1)[0] in ALLOWED_PARTIAL_REASONS for r in reasons)"),
     # 無原因之 partial 視為允許
-    "empty_reasons_allowed": ("    elif reasons and all(", "    elif all("),
+    "empty_reasons_allowed": ("quality_status == \"partial\" and reasons\n", "quality_status == \"partial\"\n"),
+    # 允許原因不要求明確 partial 狀態（審碼 b4 r2 P2-01 之原缺陷）
+    "status_not_required": ('    elif (run_status == "partial" and quality_status == "partial" and reasons\n',
+                            "    elif (reasons\n"),
 }
+
+
+def test_f2_merge_quality_fills_and_flags_mismatch() -> None:
+    """`--annotate` 之品質輸入：子行程缺欄由 manifest 補；兩者皆有而不同 ⇒ mismatch（不接受）。"""
+    mod = _f2_module()
+    manifest = {"run_status": "partial", "quality_status": "partial",
+                "failure_reasons": ["warmup_insufficient_history:111"]}
+    child, reasons = mod.merge_quality({"outcome": "completed"}, manifest)
+    assert mod.classify(0, disk_watchdog=False, guard_abort=False, child=child, failure_reasons=reasons)["accepted"]
+    child, reasons = mod.merge_quality({"outcome": "completed"}, {"run_status": "complete", "quality_status": "complete"})
+    assert mod.classify(0, disk_watchdog=False, guard_abort=False, child=child,
+                        failure_reasons=reasons)["outcome"] == "completed"
+    child, reasons = mod.merge_quality({"outcome": "completed", "run_status": "complete", "quality_status": "complete"},
+                                       manifest)
+    got = mod.classify(0, disk_watchdog=False, guard_abort=False, child=child, failure_reasons=reasons)
+    assert not got["accepted"] and child["run_status"].startswith("mismatch:")
+    child, reasons = mod.merge_quality({"outcome": "completed", **manifest, "failure_reasons": ["layer_failed:L3"]},
+                                       manifest)
+    assert not mod.classify(0, disk_watchdog=False, guard_abort=False, child=child,
+                            failure_reasons=reasons)["accepted"]
 
 
 @pytest.mark.parametrize("mutant", sorted(_F2_MUTANTS))
