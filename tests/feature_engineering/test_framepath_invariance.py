@@ -70,6 +70,25 @@ def test_boundary_03_memory_gates_in_frozen_baseline(baseline):
     assert baseline["cells"]["C6"]["memory"]["non_root_member_seen"] is True
 
 
+_HEALTHY_MEMORY = {"peak_bytes": 512 * 1024 ** 2, "readings": 30, "seconds": 3.0, "failed": [], "injected": False,
+                   "non_root_member_seen": True}
+
+
+@pytest.mark.parametrize("cell,override", [
+    ("C1", {"failed": [12345]}),
+    ("C1", {"injected": True}),
+    ("C1", {"readings": 0}),
+    ("C1", {"peak_bytes": fb.PEAK_LIMIT_BYTES}),
+    ("C6", {"non_root_member_seen": False}),
+])
+def test_boundary_08_memory_gate_rejects_each_fail_condition(cell, override):
+    """§G 記憶體閘五種 FAIL 條件逐一（審查 r16 CODEX-R16-P1-02）：讀數 failed 非空、injected、無讀數、峰值 ≥ 2 GB、
+    C6 無根以外成員；健康讀數兩格皆無錯。"""
+    assert fb.memory_gate_errors("C1", _HEALTHY_MEMORY) == []
+    assert fb.memory_gate_errors("C6", _HEALTHY_MEMORY) == []
+    assert fb.memory_gate_errors(cell, {**_HEALTHY_MEMORY, **override}) != []
+
+
 def test_boundary_04_c9_preconditions_recorded(baseline):
     receipt = baseline["cells"]["C9"]["receipt"]
     assert receipt["legacy_kline_dir"] and receipt["deleted_readback"] == "missing"
@@ -77,7 +96,11 @@ def test_boundary_04_c9_preconditions_recorded(baseline):
 
 def test_boundary_05_compare_domain_rejects_forbidden_and_non_scalar(tmp_path):
     domain = json.loads((REPO / fb.COMPARE_DOMAIN_REL).read_text(encoding="utf-8"))
-    for key in ("run_status", "quality_status", "failure_reasons", "config_hash", *COMPLETENESS_FIELD_NAMES):
+    # 契約明列之禁排除鍵全部（審查 r16 CODEX-R16-P1-01：原只餵子集）＋ COMPLETENESS_FIELD_NAMES
+    forbidden = tuple(domain["forbidden_exclusions"]["keys"])
+    assert {"run_status", "quality_status", "failure_reasons", "feature_names", "columns", "config_hash",
+            "skipped_timeframes"} <= set(forbidden)
+    for key in (*forbidden, *COMPLETENESS_FIELD_NAMES):
         bad = copy.deepcopy(domain)
         bad["exclude"].append({"path": key, "category": "timestamp", "source": "t"})
         p = tmp_path / f"bad_{key}.json"

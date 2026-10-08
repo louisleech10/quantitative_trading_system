@@ -5,6 +5,8 @@
 
 本批 Phase 由環境變數 `FRAMEPATH_PHASE`（1／2／3）給定；未設 ⇒ 3（收案後之常態＝全表已執行）。
 E＝處置表中 `phase` ≤ 本批 Phase 之列。
+`new_files[].phase`＝「自哪一批起允許存在」（⑤(a)）；TODO 落點（具名驗收測試、契約 JSON）依 TODOFMT 於 TODO
+提交即已存在 ⇒ 一律 phase 1，與其所屬 SPEC Task 之 Phase 無關；某批是否「執行」該測由 manifest gate_cmd 決定。
 
 雜湊與正規化之唯一定義在本檔（產生器 `handoffs/run_receipts/framepath_probes/build_disposition.py` 匯入本檔之函式），
 處置表 `hash_algorithms` 段為其文字說明：
@@ -137,8 +139,11 @@ def _strip_stmt(stmt: ast.stmt) -> bool:
     if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
         call = stmt.value
         func = call.func
-        # (a) <x>.setenv("FFACT_USE_CGSA", …)／<x>.delenv("FFACT_USE_CGSA", …)
-        if isinstance(func, ast.Attribute) and func.attr in {"setenv", "delenv"} and call.args and _is_key(call.args[0]):
+        # (a) monkeypatch.setenv("FFACT_USE_CGSA", …)／monkeypatch.delenv("FFACT_USE_CGSA", …)（receiver 限名稱
+        # `monkeypatch`；HEAD 母體實測全為此形，其他 receiver 之同鍵敘述一律判不等——審查 r16 GROK-R16-P1-01）
+        if (isinstance(func, ast.Attribute) and func.attr in {"setenv", "delenv"}
+                and isinstance(func.value, ast.Name) and func.value.id == "monkeypatch"
+                and call.args and _is_key(call.args[0])):
             return True
         # (b) os.environ.pop("FFACT_USE_CGSA", …)
         if (isinstance(func, ast.Attribute) and func.attr == "pop" and _is_os_environ(func.value)
@@ -907,7 +912,8 @@ def git_changed_paths() -> Set[str]:
 
 LIVE_DOC_REGISTRY_REL = "scripts/live_doc_registry.json"
 # SPEC v16 ⑦：活文件登記表只准本票文件之 `exact` 列增刪（SPEC／TODO manifest 之生命週期登記）
-LIVE_DOC_ROW_RE = re.compile(r"^docs/(FRAMEPATH_[A-Z0-9_]+\.md|manifests/FRAMEPATH\.json)$")
+# 只准本票之 SPEC 與 TODO manifest 兩列（審查 r16 CODEX-R16-P1-03：原 FRAMEPATH_* 萬用過寬）
+LIVE_DOC_ROW_RE = re.compile(r"^docs/(FRAMEPATH_SPEC\.md|manifests/FRAMEPATH\.json)$")
 
 
 def _live_doc_without_ticket_rows(doc: Dict[str, Any]) -> Dict[str, Any]:
@@ -1018,8 +1024,10 @@ def test_mutation_live_doc_registry_foreign_row_is_red():
     ok = {"exact": [["docs/A_SPEC.md", "LIVE-SPEC"], ["docs/FRAMEPATH_SPEC.md", "LIVE-SPEC"],
                     ["docs/manifests/FRAMEPATH.json", "LIVE-TODO"]], "prefix": []}
     bad = {"exact": [["docs/A_SPEC.md", "ARCHIVED"]], "prefix": []}
+    other = {"exact": [["docs/A_SPEC.md", "LIVE-SPEC"], ["docs/FRAMEPATH_OTHER.md", "FOREIGN"]], "prefix": []}
     assert check_7_live_doc(head, ok) == []
     assert check_7_live_doc(head, bad) != []
+    assert check_7_live_doc(head, other) != []
 
 
 def test_compare_domain_sha_recorded():
@@ -1255,6 +1263,14 @@ def test_mutation_schema_rejects_unlisted_new_file_task_and_foreign_row(ctx):
     errs = schema_errors(disp, ctx["spec"])
     assert any("unlisted_probe" in e for e in errs)
     assert any("RM-FFNAME" in e for e in errs)
+
+
+def test_mutation_non_monkeypatch_receiver_setenv_is_not_stripped():
+    """SPEC (a) 只限 `monkeypatch.setenv／delenv`：其他 receiver（helper、mp 別名）之同鍵敘述不得被正規化吃掉。"""
+    base = "def t(monkeypatch, other):\n    x = 1\n"
+    for added in ('    other.setenv("FFACT_USE_CGSA", "1")\n', '    mp.delenv("FFACT_USE_CGSA")\n'):
+        assert not _eq(base, base + added, [])
+    assert _eq(base, base + '    monkeypatch.setenv("FFACT_USE_CGSA", "1")\n', [])
 
 
 def test_mutation_strip_does_not_touch_other_keys():

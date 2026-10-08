@@ -256,18 +256,54 @@ def test_boundary_11_uppercase_json_suffix_treated_as_manifest(tmp_path):
     assert task_id.startswith(f"browse_{SYMBOL}_{PRIMARY_TF}_")
 
 
-@pytest.mark.asyncio
-async def test_mutation_register_unhandled_error_is_not_400(client, monkeypatch, tmp_path):
-    """route 未把 service 之 ValueError 轉 400（如刪 `except ValueError`）時會落到 500 ⇒ `_is_h5_rejection` 為 False。"""
-    h5 = _write_factory_h5(tmp_path / f"{SYMBOL}_{PRIMARY_TF}_factory.h5")
-    service = _service_with_tasks({})
+ROUTES_PATH = REPO / "api" / "routes" / "feature_factory.py"
 
-    def _boom(symbol, timeframe, hdf5_path):
-        raise RuntimeError(f"{H5_REJECT}: {hdf5_path}")
 
-    monkeypatch.setattr(service, "register_hdf5_for_browse", _boom)
-    monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
-    resp = await client.post("/api/v1/features/browse/register",
-                             json={"symbol": SYMBOL, "timeframe": PRIMARY_TF, "hdf5_path": str(h5)})
-    assert resp.status_code == 500
-    assert not _is_h5_rejection(resp, h5)
+def route_maps_value_error_to_400(src: str, route: str = "register_hdf5_for_browse") -> bool:
+    """route 函式內有 `except ValueError` 分支、其本體 raise HTTPException(status_code=400)，且排在任何
+    `except Exception` 之前（否則 broad handler 先吞成 500）。"""
+    import ast
+
+    for node in ast.walk(ast.parse(src)):
+        if not (isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)) and node.name == route):
+            continue
+        for tr in ast.walk(node):
+            if not isinstance(tr, ast.Try):
+                continue
+            for handler in tr.handlers:
+                name = getattr(handler.type, "id", None)
+                if name == "Exception":
+                    break
+                if name != "ValueError":
+                    continue
+                for sub in ast.walk(handler):
+                    if isinstance(sub, ast.Call) and getattr(sub.func, "id", None) == "HTTPException" and any(
+                            kw.arg == "status_code" and getattr(kw.value, "value", None) == 400 for kw in sub.keywords):
+                        return True
+    return False
+
+
+def test_boundary_12_register_route_maps_value_error_to_400():
+    assert route_maps_value_error_to_400(ROUTES_PATH.read_text(encoding="utf-8"))
+
+
+def test_mutation_register_route_without_value_error_handler_is_detected():
+    """刪 route 之 `except ValueError` 分支（SPEC Task 2.3 mutation）⇒ 檢查翻轉；另驗 handler 排在 broad
+    `except Exception` 之後亦判失敗（broad 先吞成 500）。"""
+    good = (
+        "async def register_hdf5_for_browse(request):\n"
+        "    try:\n        return f(request)\n"
+        "    except FileNotFoundError as exc:\n        raise HTTPException(status_code=404, detail=str(exc))\n"
+        "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n"
+        "    except Exception as exc:\n        raise HTTPException(status_code=500, detail=str(exc))\n"
+    )
+    removed = good.replace(
+        "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n", "")
+    reordered = good.replace(
+        "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n"
+        "    except Exception as exc:\n        raise HTTPException(status_code=500, detail=str(exc))\n",
+        "    except Exception as exc:\n        raise HTTPException(status_code=500, detail=str(exc))\n"
+        "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n")
+    assert route_maps_value_error_to_400(good)
+    assert not route_maps_value_error_to_400(removed)
+    assert not route_maps_value_error_to_400(reordered)
