@@ -1061,6 +1061,58 @@ def test_check_0_frozen_acceptance_tests_unchanged():
     assert frozen_file_errors(manifest_contract_shas(), FROZEN_ACCEPTANCE_TESTS) == []
 
 
+PRODUCTION_ROOTS = ("momentum", "api", "config")
+BASELINE_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
+
+
+def history_errors(commits_after_anchor: Sequence[Tuple[str, Set[str]]], frozen: Sequence[str],
+                   baseline: str = BASELINE_REL) -> List[str]:
+    """git 歷史之凍結次序（審查 r23 CODEX-R23-P1-01／P1-02）。`commits_after_anchor`＝錨點之後依時間序之
+    (commit, 該提交改動之路徑集合)。規則：①首個改動生產碼（momentum／api／config）之提交之後，不得再有改動
+    `frozen`（四支驗收測試與 manifest）之提交；②基準檔須於生產碼尚未改動前之提交加入，且之後不得再改。"""
+    errs: List[str] = []
+    first_prod = next((i for i, (_, paths) in enumerate(commits_after_anchor)
+                       if any(_in_roots(p, PRODUCTION_ROOTS) for p in paths)), None)
+    if first_prod is not None:
+        for c, paths in commits_after_anchor[first_prod + 1:] + commits_after_anchor[first_prod:first_prod + 1]:
+            touched = sorted(set(paths) & set(frozen))
+            if touched:
+                errs.append(f"⓪ 生產碼改動開始後之提交 {c[:8]} 仍改動凍結檔：{touched}")
+    base_idx = [i for i, (_, paths) in enumerate(commits_after_anchor) if baseline in paths]
+    if base_idx:
+        if first_prod is not None and base_idx[0] >= first_prod:
+            errs.append(f"⓪ 基準 {baseline} 於生產碼改動開始後才加入")
+        if len(base_idx) > 1:
+            errs.append(f"⓪ 基準 {baseline} 加入後又被改動（{len(base_idx) - 1} 次）")
+    return errs
+
+
+def git_commits_after_anchor() -> List[Tuple[str, Set[str]]]:
+    out = _git("log", "--reverse", "--format=@%H", "--name-only", f"{HEAD_SHORT}..HEAD").decode().splitlines()
+    commits: List[Tuple[str, Set[str]]] = []
+    for line in out:
+        if line.startswith("@"):
+            commits.append((line[1:], set()))
+        elif line.strip() and commits:
+            commits[-1][1].add(line.strip())
+    return commits
+
+
+def test_check_0_history_freeze_order():
+    assert history_errors(git_commits_after_anchor(), (*FROZEN_ACCEPTANCE_TESTS, MANIFEST_REL)) == []
+
+
+def test_mutation_history_freeze_order_violations_are_red():
+    t, m, b, prod = FROZEN_ACCEPTANCE_TESTS[0], MANIFEST_REL, BASELINE_REL, "momentum/x.py"
+    ok = [("a" * 40, {t, m}), ("b" * 40, {b}), ("c" * 40, {prod})]
+    assert history_errors(ok, (t, m)) == []
+    assert history_errors(ok + [("d" * 40, {t})], (t, m)) != []            # 生產碼後改驗收測試
+    assert history_errors(ok + [("d" * 40, {m})], (t, m)) != []            # 生產碼後改 manifest
+    assert history_errors([("c" * 40, {prod, t})], (t, m)) != []           # 同一提交混改
+    assert history_errors([("c" * 40, {prod}), ("d" * 40, {b})], (t, m)) != []  # 基準於生產碼後加入
+    assert history_errors(ok + [("d" * 40, {b})], (t, m)) != []            # 基準被改寫
+
+
 def test_mutation_weakened_acceptance_test_is_red():
     recorded = {"t.py": sha256_bytes(b"assert x == 1\n")}
     assert frozen_file_errors(recorded, ["t.py"], lambda p: b"assert x == 1\n") == []
