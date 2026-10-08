@@ -1187,12 +1187,14 @@
   {
    "phase": 1,
    "kind": "rewrite",
+   "frame_basis": "非 frame 臂；OP-079 之補件（v17 Task 2.5：FeatureStorage.persist_registry_to_parquet 刪，HEAD:209 與 OP-079 new_source 之打樁失效）｜承接：意圖原地承接於 _layer7_raw_from_cgsa_pipeline（persist=False）；persist=True 路由由 tests/feature_engineering/test_l7_raw_streaming.py::test_feature_factory_cgsa_generation_routes_to_l7_raw_writer 驗",
+   "deleted_nodeids": [],
    "locator": {
     "category": "def",
     "qualname": "test_task210_layer7_cgsa_per_group_validate_without_materialize"
    },
    "rewrite": {
-    "reason": "被測入口 _layer7_validate_and_persist（及其 CGSA 體 _layer7_validate_and_persist_cgsa）整刪；CGSA 之 L7 唯一入口為 _layer7_raw_from_cgsa_pipeline，其 validation 亦取自 _scan_cgsa_registry_validation。改呼叫該入口（persist=False，參數名與值同 HEAD，去除已不接受之 layers 參數），config 補 preprocessing.enabled=False 以滿足 Mode 分派；另把 storage.write_raw_from_registry_stream 打樁為拋 AssertionError，使「persist=False 不落盤」對新入口同樣可證偽。輸入資料、registry 群組、materialize 打樁與全部斷言逐字保留。",
+    "reason": "沿用 OP-079 全部效果（改走唯一 CGSA L7 入口 _layer7_raw_from_cgsa_pipeline、persist=False、去 layers 參數、config 補 preprocessing.enabled=False、去 FFACT_USE_CGSA env、輸入／群組／materialize 打樁與全部斷言逐字保留），另因 Task 2.5 刪 persist_registry_to_parquet：刪其打樁（否則 monkeypatch AttributeError），persist_called 旗標改由 write_raw_from_registry_stream 打樁設定（設 True 後拋 AssertionError），使 :224 persist_called['value'] is False 對新入口仍可證偽。",
     "preserved_assertion_lines": [
      224,
      225,
@@ -1203,11 +1205,9 @@
      232,
      233
     ],
-    "new_source": "def test_task210_layer7_cgsa_per_group_validate_without_materialize(tmp_path: Path, monkeypatch):\n    \"\"\"Task 2.10（FRAMEPATH：改走唯一 CGSA L7 入口 `_layer7_raw_from_cgsa_pipeline`）：per-group validate，且不在 validate 階段 materialize、persist=False 不落盤。\"\"\"\n    from types import SimpleNamespace\n\n    factory = FeatureFactory(config_manager=Mock(), adapter_registry=Mock())\n    registry = ColumnGroupRegistry(work_dir=tmp_path / \"registry\")\n    factory._cgsa_registry = registry\n\n    group_nan = _make_group(\n        group_id=\"1h_L3_nan_group\",\n        layer=LayerSource.L3,\n        timeframe=\"1h\",\n        columns=(\"close_1h_trend_EMA_5_mean\",),\n        indicator=\"EMA\",\n    )\n    group_inf = _make_group(\n        group_id=\"1h_L3_inf_group\",\n        layer=LayerSource.L3,\n        timeframe=\"1h\",\n        columns=(\"close_1h_trend_EMA_5_std\",),\n        indicator=\"EMA\",\n    )\n\n    registry.save_data(group_nan, np.array([[np.nan], [np.nan], [np.nan]], dtype=np.float32))\n    registry.save_data(group_inf, np.array([[1.0], [np.inf], [2.0]], dtype=np.float32))\n\n    # 若被呼叫代表違反 Task 2.10（validate 階段不應 materialize）。\n    monkeypatch.setattr(\n        registry,\n        \"materialize_wide_df\",\n        lambda: (_ for _ in ()).throw(AssertionError(\"materialize_wide_df should not be called\")),\n    )\n\n    persist_called = {\"value\": False}\n\n    def _fake_persist_registry_to_parquet(*args, **kwargs):\n        del args, kwargs\n        persist_called[\"value\"] = True\n        return []\n\n    def _fake_write_raw_from_registry_stream(*args, **kwargs):\n        del args, kwargs\n        raise AssertionError(\"persist=False 不得呼叫 write_raw_from_registry_stream\")\n\n    monkeypatch.setattr(factory._storage, \"persist_registry_to_parquet\", _fake_persist_registry_to_parquet)\n    monkeypatch.setattr(factory._storage, \"write_raw_from_registry_stream\", _fake_write_raw_from_registry_stream)\n\n    config = _DummyConfig()\n    config.preprocessing = SimpleNamespace(enabled=False)\n    raw_data = pd.DataFrame({\"close\": [100.0, 101.0, 102.0]})\n    result = factory._layer7_raw_from_cgsa_pipeline(\n        symbol=\"ETHUSDT\",\n        timeframe=\"1h\",\n        raw_data=raw_data,\n        config=config,\n        elapsed=1.23,\n        config_hash=\"cfg_batch2d\",\n        compute_warnings=[\"pre-existing warning\"],\n        persist=False,\n    )\n\n    assert persist_called[\"value\"] is False\n    assert result.features_df.empty\n    assert result.feature_count == registry.total_columns()\n    assert result.hdf5_path == \"\"\n\n    validation = result.metadata[\"validation\"]\n    assert validation[\"has_inf\"] is True\n    assert validation[\"has_nan\"] is True\n    assert any(\"NaN ratio\" in warning for warning in validation[\"warnings\"])\n    assert Path(result.metadata[\"manifest_path\"]).exists()\n"
+    "new_source": "def test_task210_layer7_cgsa_per_group_validate_without_materialize(tmp_path: Path, monkeypatch):\n    \"\"\"Task 2.10（FRAMEPATH：改走唯一 CGSA L7 入口 `_layer7_raw_from_cgsa_pipeline`）：per-group validate，且不在 validate 階段 materialize、persist=False 不落盤（V1 版面寫入 persist_registry_to_parquet 已刪，落盤探針改掛 V2 串流寫入）。\"\"\"\n    from types import SimpleNamespace\n\n    factory = FeatureFactory(config_manager=Mock(), adapter_registry=Mock())\n    registry = ColumnGroupRegistry(work_dir=tmp_path / \"registry\")\n    factory._cgsa_registry = registry\n\n    group_nan = _make_group(\n        group_id=\"1h_L3_nan_group\",\n        layer=LayerSource.L3,\n        timeframe=\"1h\",\n        columns=(\"close_1h_trend_EMA_5_mean\",),\n        indicator=\"EMA\",\n    )\n    group_inf = _make_group(\n        group_id=\"1h_L3_inf_group\",\n        layer=LayerSource.L3,\n        timeframe=\"1h\",\n        columns=(\"close_1h_trend_EMA_5_std\",),\n        indicator=\"EMA\",\n    )\n\n    registry.save_data(group_nan, np.array([[np.nan], [np.nan], [np.nan]], dtype=np.float32))\n    registry.save_data(group_inf, np.array([[1.0], [np.inf], [2.0]], dtype=np.float32))\n\n    # 若被呼叫代表違反 Task 2.10（validate 階段不應 materialize）。\n    monkeypatch.setattr(\n        registry,\n        \"materialize_wide_df\",\n        lambda: (_ for _ in ()).throw(AssertionError(\"materialize_wide_df should not be called\")),\n    )\n\n    persist_called = {\"value\": False}\n\n    def _fake_write_raw_from_registry_stream(*args, **kwargs):\n        del args, kwargs\n        persist_called[\"value\"] = True\n        raise AssertionError(\"persist=False 不得呼叫 write_raw_from_registry_stream\")\n\n    monkeypatch.setattr(factory._storage, \"write_raw_from_registry_stream\", _fake_write_raw_from_registry_stream)\n\n    config = _DummyConfig()\n    config.preprocessing = SimpleNamespace(enabled=False)\n    raw_data = pd.DataFrame({\"close\": [100.0, 101.0, 102.0]})\n    result = factory._layer7_raw_from_cgsa_pipeline(\n        symbol=\"ETHUSDT\",\n        timeframe=\"1h\",\n        raw_data=raw_data,\n        config=config,\n        elapsed=1.23,\n        config_hash=\"cfg_batch2d\",\n        compute_warnings=[\"pre-existing warning\"],\n        persist=False,\n    )\n\n    assert persist_called[\"value\"] is False\n    assert result.features_df.empty\n    assert result.feature_count == registry.total_columns()\n    assert result.hdf5_path == \"\"\n\n    validation = result.metadata[\"validation\"]\n    assert validation[\"has_inf\"] is True\n    assert validation[\"has_nan\"] is True\n    assert any(\"NaN ratio\" in warning for warning in validation[\"warnings\"])\n    assert Path(result.metadata[\"manifest_path\"]).exists()\n",
+    "removed_assertion_lines": {}
    },
-   "frame_basis": "非 frame 臂；補件模型：L7 舊分派入口（frame L7＋其 CGSA 委派體）整刪，CGSA 測試改指唯一入口｜承接：意圖原地承接於 _layer7_raw_from_cgsa_pipeline（persist=False）；persist=True 路由另由 tests/feature_engineering/test_l7_raw_streaming.py::test_feature_factory_cgsa_generation_routes_to_l7_raw_writer 驗",
-   "deleted_nodeids": [],
-   "renamed_nodeids": {},
    "path": "tests/test_feature_factory_batch2d.py"
   },
   {
@@ -2160,12 +2160,14 @@
   {
    "phase": 3,
    "kind": "rewrite",
+   "frame_basis": "OP-147 之 frame 依據（HEAD :162 FFACT_USE_CGSA 印出、:214／:257-268 引用 Phase 1 整刪方法）＋HEAD :330 V1 stream_groups（Task 2.5 刪）｜承接：n/a（profiling 腳本）",
+   "deleted_nodeids": [],
    "locator": {
     "category": "def",
     "qualname": "main"
    },
    "rewrite": {
-    "reason": "SPEC Task 3.1「只刪 env 設定與印出」＋主委補件（Phase 1 整刪 _layer6_5_preprocessing、_layer7_validate_and_persist）：FFACT_USE_CGSA 之印出來自函式內 list 元素（HEAD :162），stmt 級刪除 flag_names 會使 :166 NameError；layer_methods list 元素同樣無法定位 ⇒ 整函式改寫。差異僅三處：flag_names 去 \"FFACT_USE_CGSA\"；layer_methods 去 \"_layer6_5_preprocessing\"；刪 :256-268 之 _layer7_validate_and_persist 包裝（含其註解與 3 個敘述）；code_defaults 去該鍵（亦屬正規化 (c)）。",
+    "reason": "取代 OP-147：保留其全部差異（flag_names 去 \"FFACT_USE_CGSA\"；layer_methods 去 \"_layer6_5_preprocessing\"；刪 HEAD :256-268 _layer7_validate_and_persist 包裝；code_defaults 去 FFACT_USE_CGSA 鍵），另將 HEAD :330 V1 stream_groups(\"ETHUSDT\", config_hash) 改為 V2 stream_groups_v2(\"ETHUSDT\", \"1h\", config_hash, artifact_kind=\"raw\")（Task 2.5 刪 V1 讀端；Task 2.8 指名）。讀回結果欄集合＝V2 run 欄集合（SPEC Task 2.8 邊界）。",
     "preserved_assertion_lines": [
      166,
      178,
@@ -2178,11 +2180,9 @@
      419,
      423
     ],
-    "new_source": "def main() -> None:\n    # Feature flag snapshot\n    flag_names = [\n        \"FFACT_USE_SEARCHSORTED\", \"FFACT_USE_NUMBA_ROLLING\",\n        \"FFACT_USE_POLARS\", \"FFACT_LAYER1_PARALLEL\", \"FFACT_L3_STREAMING\",\n        \"FFACT_L65_CHUNK_SIZE\", \"MAX_L2_ESTIMATED_COLS\",\n    ]\n    flag_snapshot = {name: os.environ.get(name, \"<unset (code default)>\") for name in flag_names}\n    print(\"=\" * 70)\n    print(\"Feature Factory Multi-TF Profiled Baseline\")\n    print(\"=\" * 70)\n    print(f\"Symbol: ETHUSDT | Primary: 1h | Training: [1h, 12h]\")\n    print(f\"Time:   {datetime.now().isoformat()}\")\n    print()\n    print(\"Feature Flags:\")\n    for k, v in flag_snapshot.items():\n        print(f\"  {k} = {v}\")\n    print()\n\n    from momentum.factories import create_feature_factory\n    from momentum.FeatureEngineering.feature_reader import FeatureReader\n\n    # Use feature_klines cache which has full ETHUSDT 1h (17928 rows) + 12h (1494 rows)\n    factory = create_feature_factory(\n        cache_dir=\"data_cache/feature_klines\",\n        validate_continuity=False,\n    )\n    profiler = LayerProfiler()\n\n    # Config override: primary=1h, training=[1h, 12h]\n    config_override = {\n        \"preset\": \"full\",\n        \"timeframes\": {\n            \"primary\": \"1h\",\n            \"training\": [\"1h\", \"12h\"],\n        },\n    }\n\n    print(\"Starting generation with per-layer profiling...\")\n    print(\"-\" * 70)\n\n    tracemalloc.start()\n    overall_start = time.perf_counter()\n\n    # We intercept generate_features to wrap layer methods.\n    # Since multi-TF CGSA calls factory layer methods directly,\n    # we patch them on the factory instance.\n    layer_methods = [\n        \"_layer0_data_ingestion\",\n        \"_layer1_atomic_indicators\",\n        \"_layer2_derived_features\",\n        \"_layer3_rolling_aggregation\",\n        \"_layer4_lag_features\",\n        \"_layer5_cross_sectional\",\n        \"_layer6_meta_features\",\n    ]\n\n    # Save originals\n    originals = {}\n    for method_name in layer_methods:\n        if hasattr(factory, method_name):\n            originals[method_name] = getattr(factory, method_name)\n\n    # Dynamic wrapping: We need to know which TF is being processed.\n    # We'll wrap using a mutable label reference.\n    current_tf_label = [\"init\"]\n\n    def make_wrapper(method_name: str, orig_fn):\n        @functools.wraps(orig_fn)\n        def wrapper(*args, **kwargs):\n            layer_key = f\"{current_tf_label[0]}/{method_name}\"\n            profiler.start(layer_key)\n            result = orig_fn(*args, **kwargs)\n            cols = 0\n            if isinstance(result, pd.DataFrame) and not result.empty:\n                cols = result.shape[1]\n            profiler.end(layer_key, feature_count=cols)\n            print(f\"  [{current_tf_label[0]}] {method_name}: {cols} cols, \"\n                  f\"{profiler.records[layer_key]['elapsed_s']:.2f}s, \"\n                  f\"RSS={profiler.records[layer_key]['rss_after_mb']:.0f} MB\")\n            return result\n        return wrapper\n\n    for method_name, orig_fn in originals.items():\n        setattr(factory, method_name, make_wrapper(method_name, orig_fn))\n\n    # Intercept _current_timeframe setter to track TF label\n    _orig_setattr = factory.__class__.__setattr__\n\n    def _tracked_setattr(self, name, value):\n        _orig_setattr(self, name, value)\n        if name == \"_current_timeframe\" and isinstance(value, str):\n            current_tf_label[0] = value\n\n    factory.__class__.__setattr__ = _tracked_setattr\n\n    # Also wrap _spill_to_memmap\n    orig_spill = factory._spill_to_memmap\n    @functools.wraps(orig_spill)\n    def wrapped_spill(df, label):\n        layer_key = f\"{current_tf_label[0]}/_spill_to_memmap({label})\"\n        profiler.start(layer_key)\n        result = orig_spill(df, label)\n        profiler.end(layer_key)\n        rec = profiler.records[layer_key]\n        print(f\"  [{current_tf_label[0]}] _spill_to_memmap({label}): \"\n              f\"{rec['elapsed_s']:.2f}s, RSS={rec['rss_after_mb']:.0f} MB\")\n        return result\n    factory._spill_to_memmap = wrapped_spill\n\n    # Run generation\n    try:\n        result = factory.generate_features(\n            symbol=\"ETHUSDT\",\n            timeframe=\"1h\",\n            config_override=config_override,\n            force_regenerate=True,\n        )\n    except Exception as exc:\n        print(f\"\\n*** GENERATION FAILED: {exc}\")\n        import traceback\n        traceback.print_exc()\n        # Cleanup CGSA temp dir on failure\n        _cleanup_cgsa_temp(factory)\n        return\n    finally:\n        # Restore __setattr__\n        factory.__class__.__setattr__ = _orig_setattr\n        # Restore originals\n        for method_name, orig_fn in originals.items():\n            setattr(factory, method_name, orig_fn)\n\n    overall_elapsed = time.perf_counter() - overall_start\n    tm_current, tm_peak = tracemalloc.get_traced_memory()\n    tracemalloc.stop()\n\n    peak_rss = _rss_mb()\n\n    print()\n    print(\"=\" * 70)\n    print(\"GENERATION COMPLETE\")\n    print(\"=\" * 70)\n    print(f\"Total elapsed:       {overall_elapsed:.2f}s\")\n    print(f\"Peak RSS:            {peak_rss:.0f} MB\")\n    print(f\"tracemalloc peak:    {tm_peak / (1024*1024):.1f} MB\")\n    print(f\"Feature count:       {result.feature_count}\")\n    print(f\"Generation time:     {result.generation_time:.2f}s\")\n    print()\n\n    # Load features from CGSA if needed\n    features_df = result.features_df\n    cgsa_mode = features_df.empty and result.feature_count > 0\n    if cgsa_mode:\n        config_hash = str(result.metadata.get(\"config_hash\", \"\"))\n        reader = FeatureReader(\"data_cache/features\")\n        frames: List[pd.DataFrame] = []\n        for _group_name, group_df in reader.stream_groups(\"ETHUSDT\", config_hash):\n            frames.append(group_df)\n        if frames:\n            features_df = pd.concat(frames, axis=1)\n        print(f\"[CGSA] Loaded {features_df.shape[1]} features from per-group Parquet\")\n\n    print(f\"Final shape: {features_df.shape[0]} rows × {features_df.shape[1]} cols\")\n    print()\n\n    # Collect CGSA file sizes\n    features_dir = Path(\"data_cache/features\")\n    parquet_sizes = _collect_parquet_sizes(features_dir)\n    features_total_mb = _dir_size_mb(features_dir)\n\n    # Per-layer summary table\n    print(\"-\" * 70)\n    print(f\"{'Layer':<50} {'Time(s)':>8} {'Cols':>6} {'RSS(MB)':>8} {'ΔRSS':>8}\")\n    print(\"-\" * 70)\n    total_layer_time = 0.0\n    for layer_key, rec in profiler.records.items():\n        elapsed = rec.get(\"elapsed_s\", 0)\n        cols = rec.get(\"feature_count\", 0)\n        rss = rec.get(\"rss_after_mb\", 0)\n        delta = rec.get(\"rss_delta_mb\", 0)\n        total_layer_time += elapsed\n        print(f\"{layer_key:<50} {elapsed:>8.2f} {cols:>6} {rss:>8.0f} {delta:>+8.0f}\")\n    print(\"-\" * 70)\n    print(f\"{'TOTAL layer time':<50} {total_layer_time:>8.2f}\")\n    print(f\"{'Overall wall-clock':<50} {overall_elapsed:>8.2f}\")\n    print()\n\n    # File sizes\n    print(\"CGSA Parquet file sizes:\")\n    if parquet_sizes:\n        for pq in parquet_sizes:\n            print(f\"  {pq['path']}: {pq['size_mb']:.3f} MB\")\n    print(f\"  TOTAL features dir: {features_total_mb:.2f} MB\")\n    print()\n\n    # Layer counts from result\n    layer_counts = result.layer_counts or {}\n    print(\"Layer counts:\", json.dumps(layer_counts, indent=2))\n    print()\n\n    # Write full report\n    report_dir = Path(\"results/profiled_baselines\")\n    report_id = datetime.utcnow().strftime(\"%Y%m%dT%H%M%SZ\") + \"_ETHUSDT_1h_multi_tf\"\n    report_path = report_dir / f\"{report_id}.json\"\n\n    report = {\n        \"report_id\": report_id,\n        \"created_at\": datetime.utcnow().isoformat() + \"Z\",\n        \"symbol\": \"ETHUSDT\",\n        \"primary_tf\": \"1h\",\n        \"training_tfs\": [\"1h\", \"12h\"],\n        \"feature_flags\": flag_snapshot,\n        \"code_defaults\": {\n            \"FFACT_USE_SEARCHSORTED\": \"1\",\n            \"FFACT_USE_NUMBA_ROLLING\": \"1\",\n            \"FFACT_USE_POLARS\": \"1\",\n            \"FFACT_L3_STREAMING\": \"1\",\n        },\n        \"performance\": {\n            \"overall_elapsed_s\": round(overall_elapsed, 3),\n            \"factory_generation_time_s\": round(result.generation_time, 3),\n            \"peak_rss_mb\": round(peak_rss, 1),\n            \"tracemalloc_current_mb\": round(tm_current / (1024 * 1024), 1),\n            \"tracemalloc_peak_mb\": round(tm_peak / (1024 * 1024), 1),\n        },\n        \"features\": {\n            \"feature_count\": result.feature_count,\n            \"rows\": features_df.shape[0],\n            \"columns\": features_df.shape[1],\n            \"cgsa_mode\": cgsa_mode,\n        },\n        \"layer_counts\": layer_counts,\n        \"per_layer_profile\": dict(profiler.records),\n        \"file_sizes\": {\n            \"features_dir_total_mb\": round(features_total_mb, 2),\n            \"parquet_files\": parquet_sizes,\n        },\n        \"metadata\": {\n            \"skipped_timeframes\": result.metadata.get(\"skipped_timeframes\", []),\n            \"present_timeframes\": result.metadata.get(\"present_timeframes\", []),\n            \"config_hash\": str(result.metadata.get(\"config_hash\", \"\")),\n        },\n    }\n\n    _write_json(report_path, report)\n    print(f\"Full report written to: {report_path}\")\n\n    # Cleanup CGSA temp dir to free disk space\n    _cleanup_cgsa_temp(factory)\n    print(\"Done.\")\n"
+    "new_source": "def main() -> None:\n    # Feature flag snapshot\n    flag_names = [\n        \"FFACT_USE_SEARCHSORTED\", \"FFACT_USE_NUMBA_ROLLING\",\n        \"FFACT_USE_POLARS\", \"FFACT_LAYER1_PARALLEL\", \"FFACT_L3_STREAMING\",\n        \"FFACT_L65_CHUNK_SIZE\", \"MAX_L2_ESTIMATED_COLS\",\n    ]\n    flag_snapshot = {name: os.environ.get(name, \"<unset (code default)>\") for name in flag_names}\n    print(\"=\" * 70)\n    print(\"Feature Factory Multi-TF Profiled Baseline\")\n    print(\"=\" * 70)\n    print(f\"Symbol: ETHUSDT | Primary: 1h | Training: [1h, 12h]\")\n    print(f\"Time:   {datetime.now().isoformat()}\")\n    print()\n    print(\"Feature Flags:\")\n    for k, v in flag_snapshot.items():\n        print(f\"  {k} = {v}\")\n    print()\n\n    from momentum.factories import create_feature_factory\n    from momentum.FeatureEngineering.feature_reader import FeatureReader\n\n    # Use feature_klines cache which has full ETHUSDT 1h (17928 rows) + 12h (1494 rows)\n    factory = create_feature_factory(\n        cache_dir=\"data_cache/feature_klines\",\n        validate_continuity=False,\n    )\n    profiler = LayerProfiler()\n\n    # Config override: primary=1h, training=[1h, 12h]\n    config_override = {\n        \"preset\": \"full\",\n        \"timeframes\": {\n            \"primary\": \"1h\",\n            \"training\": [\"1h\", \"12h\"],\n        },\n    }\n\n    print(\"Starting generation with per-layer profiling...\")\n    print(\"-\" * 70)\n\n    tracemalloc.start()\n    overall_start = time.perf_counter()\n\n    # We intercept generate_features to wrap layer methods.\n    # Since multi-TF CGSA calls factory layer methods directly,\n    # we patch them on the factory instance.\n    layer_methods = [\n        \"_layer0_data_ingestion\",\n        \"_layer1_atomic_indicators\",\n        \"_layer2_derived_features\",\n        \"_layer3_rolling_aggregation\",\n        \"_layer4_lag_features\",\n        \"_layer5_cross_sectional\",\n        \"_layer6_meta_features\",\n    ]\n\n    # Save originals\n    originals = {}\n    for method_name in layer_methods:\n        if hasattr(factory, method_name):\n            originals[method_name] = getattr(factory, method_name)\n\n    # Dynamic wrapping: We need to know which TF is being processed.\n    # We'll wrap using a mutable label reference.\n    current_tf_label = [\"init\"]\n\n    def make_wrapper(method_name: str, orig_fn):\n        @functools.wraps(orig_fn)\n        def wrapper(*args, **kwargs):\n            layer_key = f\"{current_tf_label[0]}/{method_name}\"\n            profiler.start(layer_key)\n            result = orig_fn(*args, **kwargs)\n            cols = 0\n            if isinstance(result, pd.DataFrame) and not result.empty:\n                cols = result.shape[1]\n            profiler.end(layer_key, feature_count=cols)\n            print(f\"  [{current_tf_label[0]}] {method_name}: {cols} cols, \"\n                  f\"{profiler.records[layer_key]['elapsed_s']:.2f}s, \"\n                  f\"RSS={profiler.records[layer_key]['rss_after_mb']:.0f} MB\")\n            return result\n        return wrapper\n\n    for method_name, orig_fn in originals.items():\n        setattr(factory, method_name, make_wrapper(method_name, orig_fn))\n\n    # Intercept _current_timeframe setter to track TF label\n    _orig_setattr = factory.__class__.__setattr__\n\n    def _tracked_setattr(self, name, value):\n        _orig_setattr(self, name, value)\n        if name == \"_current_timeframe\" and isinstance(value, str):\n            current_tf_label[0] = value\n\n    factory.__class__.__setattr__ = _tracked_setattr\n\n    # Also wrap _spill_to_memmap\n    orig_spill = factory._spill_to_memmap\n    @functools.wraps(orig_spill)\n    def wrapped_spill(df, label):\n        layer_key = f\"{current_tf_label[0]}/_spill_to_memmap({label})\"\n        profiler.start(layer_key)\n        result = orig_spill(df, label)\n        profiler.end(layer_key)\n        rec = profiler.records[layer_key]\n        print(f\"  [{current_tf_label[0]}] _spill_to_memmap({label}): \"\n              f\"{rec['elapsed_s']:.2f}s, RSS={rec['rss_after_mb']:.0f} MB\")\n        return result\n    factory._spill_to_memmap = wrapped_spill\n\n    # Run generation\n    try:\n        result = factory.generate_features(\n            symbol=\"ETHUSDT\",\n            timeframe=\"1h\",\n            config_override=config_override,\n            force_regenerate=True,\n        )\n    except Exception as exc:\n        print(f\"\\n*** GENERATION FAILED: {exc}\")\n        import traceback\n        traceback.print_exc()\n        # Cleanup CGSA temp dir on failure\n        _cleanup_cgsa_temp(factory)\n        return\n    finally:\n        # Restore __setattr__\n        factory.__class__.__setattr__ = _orig_setattr\n        # Restore originals\n        for method_name, orig_fn in originals.items():\n            setattr(factory, method_name, orig_fn)\n\n    overall_elapsed = time.perf_counter() - overall_start\n    tm_current, tm_peak = tracemalloc.get_traced_memory()\n    tracemalloc.stop()\n\n    peak_rss = _rss_mb()\n\n    print()\n    print(\"=\" * 70)\n    print(\"GENERATION COMPLETE\")\n    print(\"=\" * 70)\n    print(f\"Total elapsed:       {overall_elapsed:.2f}s\")\n    print(f\"Peak RSS:            {peak_rss:.0f} MB\")\n    print(f\"tracemalloc peak:    {tm_peak / (1024*1024):.1f} MB\")\n    print(f\"Feature count:       {result.feature_count}\")\n    print(f\"Generation time:     {result.generation_time:.2f}s\")\n    print()\n\n    # Load features from CGSA if needed\n    features_df = result.features_df\n    cgsa_mode = features_df.empty and result.feature_count > 0\n    if cgsa_mode:\n        config_hash = str(result.metadata.get(\"config_hash\", \"\"))\n        reader = FeatureReader(\"data_cache/features\")\n        frames: List[pd.DataFrame] = []\n        for _group_name, group_df in reader.stream_groups_v2(\"ETHUSDT\", \"1h\", config_hash, artifact_kind=\"raw\"):\n            frames.append(group_df)\n        if frames:\n            features_df = pd.concat(frames, axis=1)\n        print(f\"[CGSA] Loaded {features_df.shape[1]} features from per-group Parquet\")\n\n    print(f\"Final shape: {features_df.shape[0]} rows × {features_df.shape[1]} cols\")\n    print()\n\n    # Collect CGSA file sizes\n    features_dir = Path(\"data_cache/features\")\n    parquet_sizes = _collect_parquet_sizes(features_dir)\n    features_total_mb = _dir_size_mb(features_dir)\n\n    # Per-layer summary table\n    print(\"-\" * 70)\n    print(f\"{'Layer':<50} {'Time(s)':>8} {'Cols':>6} {'RSS(MB)':>8} {'ΔRSS':>8}\")\n    print(\"-\" * 70)\n    total_layer_time = 0.0\n    for layer_key, rec in profiler.records.items():\n        elapsed = rec.get(\"elapsed_s\", 0)\n        cols = rec.get(\"feature_count\", 0)\n        rss = rec.get(\"rss_after_mb\", 0)\n        delta = rec.get(\"rss_delta_mb\", 0)\n        total_layer_time += elapsed\n        print(f\"{layer_key:<50} {elapsed:>8.2f} {cols:>6} {rss:>8.0f} {delta:>+8.0f}\")\n    print(\"-\" * 70)\n    print(f\"{'TOTAL layer time':<50} {total_layer_time:>8.2f}\")\n    print(f\"{'Overall wall-clock':<50} {overall_elapsed:>8.2f}\")\n    print()\n\n    # File sizes\n    print(\"CGSA Parquet file sizes:\")\n    if parquet_sizes:\n        for pq in parquet_sizes:\n            print(f\"  {pq['path']}: {pq['size_mb']:.3f} MB\")\n    print(f\"  TOTAL features dir: {features_total_mb:.2f} MB\")\n    print()\n\n    # Layer counts from result\n    layer_counts = result.layer_counts or {}\n    print(\"Layer counts:\", json.dumps(layer_counts, indent=2))\n    print()\n\n    # Write full report\n    report_dir = Path(\"results/profiled_baselines\")\n    report_id = datetime.utcnow().strftime(\"%Y%m%dT%H%M%SZ\") + \"_ETHUSDT_1h_multi_tf\"\n    report_path = report_dir / f\"{report_id}.json\"\n\n    report = {\n        \"report_id\": report_id,\n        \"created_at\": datetime.utcnow().isoformat() + \"Z\",\n        \"symbol\": \"ETHUSDT\",\n        \"primary_tf\": \"1h\",\n        \"training_tfs\": [\"1h\", \"12h\"],\n        \"feature_flags\": flag_snapshot,\n        \"code_defaults\": {\n            \"FFACT_USE_SEARCHSORTED\": \"1\",\n            \"FFACT_USE_NUMBA_ROLLING\": \"1\",\n            \"FFACT_USE_POLARS\": \"1\",\n            \"FFACT_L3_STREAMING\": \"1\",\n        },\n        \"performance\": {\n            \"overall_elapsed_s\": round(overall_elapsed, 3),\n            \"factory_generation_time_s\": round(result.generation_time, 3),\n            \"peak_rss_mb\": round(peak_rss, 1),\n            \"tracemalloc_current_mb\": round(tm_current / (1024 * 1024), 1),\n            \"tracemalloc_peak_mb\": round(tm_peak / (1024 * 1024), 1),\n        },\n        \"features\": {\n            \"feature_count\": result.feature_count,\n            \"rows\": features_df.shape[0],\n            \"columns\": features_df.shape[1],\n            \"cgsa_mode\": cgsa_mode,\n        },\n        \"layer_counts\": layer_counts,\n        \"per_layer_profile\": dict(profiler.records),\n        \"file_sizes\": {\n            \"features_dir_total_mb\": round(features_total_mb, 2),\n            \"parquet_files\": parquet_sizes,\n        },\n        \"metadata\": {\n            \"skipped_timeframes\": result.metadata.get(\"skipped_timeframes\", []),\n            \"present_timeframes\": result.metadata.get(\"present_timeframes\", []),\n            \"config_hash\": str(result.metadata.get(\"config_hash\", \"\")),\n        },\n    }\n\n    _write_json(report_path, report)\n    print(f\"Full report written to: {report_path}\")\n\n    # Cleanup CGSA temp dir to free disk space\n    _cleanup_cgsa_temp(factory)\n    print(\"Done.\")\n\n",
+    "removed_assertion_lines": {}
    },
-   "frame_basis": "HEAD :162 列印 FFACT_USE_CGSA 旗標值（生產碼零讀取後誤導）；HEAD :214、:257-268 以名稱引用 Phase 1 整刪之 _layer6_5_preprocessing／_layer7_validate_and_persist（後者 :257 屬性存取將 AttributeError），且兩者於 HEAD 僅在 frame／legacy 路徑被呼叫｜承接：n/a（profiling 腳本）",
-   "deleted_nodeids": [],
-   "renamed_nodeids": {},
    "path": "scripts/profile_multi_tf_baseline.py"
   },
   {
@@ -2291,6 +2291,796 @@
    },
    "frame_basis": "斷言範例依賴 frame／legacy 多週期 tagger 之呼叫鏈（審查 r20 CODEX-R20-P1-01 實證：刪後 test_inventory_closure_reaches_off_prefix_and_nested_steps 於試作工作樹紅）",
    "deleted_nodeids": []
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "整類只驗 V1 版面產物：HEAD:144 manifest.json、:148/:166/:171 columns.json.gz、:161 version==\"7.0\"、:179-187 V1 manifest groups；V1 寫端與 _write_v7_manifest／_write_columns_json_gz 於 Task 2.5 刪，V2 無 columns.json.gz｜承接：V2 manifest 結構與 parquet 存在由 tests/feature_engineering/test_l7_raw_streaming.py::test_raw_streaming_transforms_without_registry_overwrite 驗；欄數／groups 對應由本檔改寫後之 TestT50cMaxGroupSplit（V2 feature_manifest.json groups／total_features）承接",
+   "deleted_nodeids": [
+    "tests/test_multi_symbol_parallel.py::TestT50aManifestWritten::test_manifest_exists",
+    "tests/test_multi_symbol_parallel.py::TestT50aManifestWritten::test_columns_gz_exists",
+    "tests/test_multi_symbol_parallel.py::TestT50aManifestWritten::test_manifest_total_features",
+    "tests/test_multi_symbol_parallel.py::TestT50aManifestWritten::test_manifest_version",
+    "tests/test_multi_symbol_parallel.py::TestT50aManifestWritten::test_columns_gz_size",
+    "tests/test_multi_symbol_parallel.py::TestT50aManifestWritten::test_columns_gz_content",
+    "tests/test_multi_symbol_parallel.py::TestT50aManifestWritten::test_manifest_groups_match_parquet"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT50aManifestWritten"
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "HEAD:315 FeatureReader.list_features、:324 FeatureReader.load_manifest（V1 讀端，Task 2.5 ② 整刪；斷言 :325 version==\"7.0\" 為 V1 manifest 專屬）｜承接：V2 對應 list_features_v2 由 tests/api/test_ic_list_features.py::test_list_features_v2_matches_load_columns 驗；load_manifest_v2 由 tests/feature_engineering/test_ic_first_pipeline.py::test_l7_schema_version_metadata 驗",
+   "deleted_nodeids": [
+    "tests/test_multi_symbol_parallel.py::TestT50dReaderMetadata::test_list_features_count",
+    "tests/test_multi_symbol_parallel.py::TestT50dReaderMetadata::test_load_manifest"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT50dReaderMetadata"
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "HEAD:344 FeatureReader.load_columns(symbol, config_hash, …)（V1 讀端，Task 2.5 ② 整刪），讀 fixture persisted_output 之 V1 版面｜承接：V2 選欄 load_columns_v2 由 tests/feature_engineering/test_l7_codec.py（load_columns_v2 多處）與 tests/api/test_ic_list_features.py::test_list_features_v2_matches_load_columns 驗；float16 讀回值由本檔改寫後之 TestT50bFloat16Precision::test_relative_diff_within_tolerance（load_columns_v2）承接",
+   "deleted_nodeids": [
+    "tests/test_multi_symbol_parallel.py::TestT50eReaderColumnProjection::test_column_projection_values"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT50eReaderColumnProjection"
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "HEAD:369 FeatureReader.stream_groups(symbol, config_hash)（V1 讀端，Task 2.5 ② 整刪）｜承接：V2 stream_groups_v2 由 tests/feature_engineering/test_ic_first_pipeline.py::test_l7_schema_version_metadata（:339 dict(reader.stream_groups_v2(...))）與 tests/feature_engineering/test_ratiounsafe_wiring.py 驗",
+   "deleted_nodeids": [
+    "tests/test_multi_symbol_parallel.py::TestT50fReaderStreamGroups::test_total_columns_match"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT50fReaderStreamGroups"
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "HEAD:590-602 手寫 V1 manifest.json（version 7.0）＋columns.json.gz，:605 FeatureReader.load_cross_symbol（Task 2.5 ② 整刪，生產零呼叫者）｜承接：n/a（load_cross_symbol 無 V2 對應、生產零呼叫者；跨 symbol 隔離另由 TestT52NoCrosstalk 與 tests/feature_engineering/test_ic_first_pipeline.py::test_ic_cross_symbol_isolation 驗）",
+   "deleted_nodeids": [
+    "tests/test_multi_symbol_parallel.py::TestT53dReaderCrossSymbol::test_cross_symbol_basic"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT53dReaderCrossSymbol"
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "fixture 本體 HEAD:129 呼叫 persist_registry_to_parquet（Task 2.5 刪）；其使用者（TestT50a/T50d/T50e/T50f 與 test_relative_diff_within_tolerance）均已刪或改寫不再使用 ⇒ 殘留為呼叫已刪符號之死碼",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "persisted_output"
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:200 用 persisted_output（V1 寫）、:203 reader.load_columns（V1 讀）｜承接：float16 精度意圖原地承接於 V2 串流寫入＋load_columns_v2",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT50bFloat16Precision.test_relative_diff_within_tolerance"
+   },
+   "rewrite": {
+    "reason": "原經 fixture persisted_output（V1 persist_registry_to_parquet）寫、V1 load_columns 讀；兩者 Task 2.5 刪。float16 儲存精度屬 V2 共用 helper（_select_parquet_storage_columns），不得少驗：改以 sample_registry＋tmp_output_dir 直接呼叫 write_raw_from_registry_stream 寫入、FeatureReader.load_columns_v2 讀回；容差斷言逐字保留，另補形狀斷言。",
+    "preserved_assertion_lines": [
+     206
+    ],
+    "new_source": "def test_relative_diff_within_tolerance(self, tmp_output_dir, sample_registry):\n    \"\"\"FRAMEPATH Task 2.5：V1 版面寫讀已刪；改以 V2 串流寫入（write_raw_from_registry_stream）寫、load_columns_v2 讀回，驗 float16 精度。\"\"\"\n    from momentum.FeatureEngineering.feature_reader import FeatureReader\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    registry, data_small, _ = sample_registry\n    symbol, tf, config_hash = \"TESTUSDT\", \"1h\", \"abc123\"\n    storage = FeatureStorage(base_path=str(tmp_output_dir))\n    storage.write_raw_from_registry_stream(symbol, tf, config_hash, registry)\n\n    reader = FeatureReader(str(tmp_output_dir))\n    selected = [f\"feat_small_{index}\" for index in range(data_small.shape[1])]\n    loaded = reader.load_columns_v2(symbol, tf, config_hash, selected).values.astype(np.float32)\n\n    assert loaded.shape == data_small.shape\n    expected_f16 = data_small.astype(np.float16).astype(np.float32)\n    np.testing.assert_allclose(\n        loaded,\n        expected_f16,\n        atol=np.finfo(np.float16).eps * 10,\n        rtol=0,\n    )\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:241 V1 persist_registry_to_parquet；:243 V1 版面路徑｜承接：NaN 保留意圖原地承接於 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT50bFloat16Precision.test_nan_preserved"
+   },
+   "rewrite": {
+    "reason": "HEAD:241 persist_registry_to_parquet、:243 讀 V1 路徑 <base>/TEST/h1/nan_group.parquet；V1 寫端刪。NaN 經 float16 往返保留屬 V2 共用 helper，改呼叫 write_raw_from_registry_stream，讀其回傳 raw 目錄下同名 parquet；NaN 遮罩斷言逐字保留。",
+    "preserved_assertion_lines": [
+     246
+    ],
+    "new_source": "def test_nan_preserved(self, tmp_path):\n    \"\"\"NaN positions must be preserved through float16 round-trip. FRAMEPATH Task 2.5：V1 版面寫入已刪；改走 V2 串流寫入 write_raw_from_registry_stream。\"\"\"\n    from momentum.FeatureEngineering.core.column_group import ColumnGroup, LayerSource\n    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    work_dir = tmp_path / \"nan_test\"\n    work_dir.mkdir()\n    registry = ColumnGroupRegistry(work_dir=work_dir)\n\n    data = np.array([[1.0, np.nan, 3.0], [np.nan, 5.0, 6.0]], dtype=np.float32)\n    npy_path = work_dir / \"nan_group.npy\"\n    np.save(npy_path, data)\n    group = ColumnGroup(\n        group_id=\"nan_group\",\n        layer=LayerSource.L1,\n        timeframe=\"1h\",\n        data_source=\"close\",\n        indicator=\"nan_test\",\n        columns=(\"a\", \"b\", \"c\"),\n        shape=data.shape,\n        dtype=\"float32\",\n        disk_path=npy_path,\n    )\n    registry.register(group)\n\n    output_dir = tmp_path / \"out\"\n    storage = FeatureStorage(base_path=str(output_dir))\n    raw_dir, _summary = storage.write_raw_from_registry_stream(\"TEST\", \"1h\", \"h1\", registry)\n\n    loaded = pq.read_table(raw_dir / \"nan_group.parquet\").to_pandas()\n    original_nan_mask = np.isnan(data)\n    loaded_nan_mask = loaded.isna().values\n    np.testing.assert_array_equal(original_nan_mask, loaded_nan_mask)\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:262 V1 寫；:265 V1 manifest.json｜承接：拆分意圖原地承接於 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT50cMaxGroupSplit.test_split_creates_parts"
+   },
+   "rewrite": {
+    "reason": "HEAD:262 persist_registry_to_parquet、:265 讀 V1 manifest.json；V1 寫端刪。>5000 欄拆分由 V2 共用之 _split_large_group 執行，改呼叫 write_raw_from_registry_stream、讀 V2 feature_manifest.json（根 groups 即逐 part 清單，part id 同 huge_part1／huge_part2）；拆分斷言逐字保留，另補兩 part parquet 存在。",
+    "preserved_assertion_lines": [
+     269,
+     271,
+     272
+    ],
+    "new_source": "def test_split_creates_parts(self, tmp_path, large_registry):\n    \"\"\"FRAMEPATH Task 2.5：V1 版面寫入已刪；改驗 V2 串流寫入（共用 _split_large_group）之拆分結果。\"\"\"\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    registry, data = large_registry\n    output_dir = tmp_path / \"split_out\"\n    storage = FeatureStorage(base_path=str(output_dir))\n    raw_dir, _summary = storage.write_raw_from_registry_stream(\"SPLITUSDT\", \"1h\", \"s1\", registry)\n\n    out = raw_dir.parent\n    with open(out / \"feature_manifest.json\") as f:\n        manifest = json.load(f)\n\n    # Should have 2 parts: 5000 + 3\n    assert len(manifest[\"groups\"]) == 2\n    group_ids = sorted(manifest[\"groups\"].keys())\n    assert \"huge_part1\" in group_ids[0]\n    assert \"huge_part2\" in group_ids[1]\n    assert (raw_dir / \"huge_part1.parquet\").exists()\n    assert (raw_dir / \"huge_part2.parquet\").exists()\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:280 V1 寫；:283 V1 manifest.json｜承接：逐 part 欄數意圖原地承接於 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT50cMaxGroupSplit.test_split_column_count_correct"
+   },
+   "rewrite": {
+    "reason": "HEAD:280 persist_registry_to_parquet、:283 V1 manifest.json；改呼叫 write_raw_from_registry_stream、讀 V2 feature_manifest.json（groups[part].column_count 與根 total_features 同名同義）；三條斷言逐字保留。",
+    "preserved_assertion_lines": [
+     288,
+     289,
+     290
+    ],
+    "new_source": "def test_split_column_count_correct(self, tmp_path, large_registry):\n    \"\"\"FRAMEPATH Task 2.5：V1 版面寫入已刪；改驗 V2 串流寫入（共用 _split_large_group）之逐 part 欄數。\"\"\"\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    registry, data = large_registry\n    output_dir = tmp_path / \"split_out2\"\n    storage = FeatureStorage(base_path=str(output_dir))\n    raw_dir, _summary = storage.write_raw_from_registry_stream(\"SPLITUSDT\", \"1h\", \"s2\", registry)\n\n    out = raw_dir.parent\n    with open(out / \"feature_manifest.json\") as f:\n        manifest = json.load(f)\n\n    part1 = manifest[\"groups\"][\"huge_part1\"]\n    part2 = manifest[\"groups\"][\"huge_part2\"]\n    assert part1[\"column_count\"] == 5000\n    assert part2[\"column_count\"] == 3\n    assert manifest[\"total_features\"] == 5003\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:661 V1 寫；:664-666 V1 版面路徑與 .staging_ 前綴｜承接：失敗清暫存意圖改由 V2 串流寫入承接（V2 暫存根 .tmp-raw-*）",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "TestT5B3DiskFullMidPersist.test_staging_cleanup_on_error"
+   },
+   "rewrite": {
+    "reason": "HEAD:661 persist_registry_to_parquet、:664-666 斷言 V1 版面 <base>/FAILSYM/f1/.staging_*；V1 寫端刪。寫入中途失敗須清暫存為 V2 也該有之意圖（V2 無既有測試直接驗 .tmp-raw-* 失敗清除），改呼叫 write_raw_from_registry_stream（cleanup_intermediate=False：未刪來源，不進保留暫存之復原分支），同樣以第 2 次 os.replace 拋 OSError；斷言暫存根 .tmp-raw-* 已清、raw 與 feature_manifest.json 未安裝；原斷言 :667 逐字保留（原 if sym_dir.exists() 條件改為無條件斷言 run_dir 存在，較嚴）。",
+    "preserved_assertion_lines": [
+     667
+    ],
+    "new_source": "def test_staging_cleanup_on_error(self, tmp_path, sample_registry):\n    \"\"\"FRAMEPATH Task 2.5：V1 版面寫入（.staging_*）已刪；改驗 V2 串流寫入 write_raw_from_registry_stream 於寫入中途失敗（尚未刪任何來源 .npy，cleanup_intermediate=False）時清除暫存根 .tmp-raw-*，且不安裝 raw／manifest。\"\"\"\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    registry, _, _ = sample_registry\n    output_dir = tmp_path / \"fail_out\"\n    storage = FeatureStorage(base_path=str(output_dir))\n\n    # Patch os.replace to simulate write failure\n    original_replace = os.replace\n\n    call_count = [0]\n\n    def failing_replace(src, dst):\n        call_count[0] += 1\n        if call_count[0] > 1:\n            raise OSError(\"No space left on device\")\n        return original_replace(src, dst)\n\n    with patch(\"momentum.FeatureEngineering.feature_storage.os.replace\", side_effect=failing_replace):\n        with pytest.raises(OSError, match=\"No space\"):\n            storage.write_raw_from_registry_stream(\"FAILSYM\", \"1h\", \"f1\", registry, cleanup_intermediate=False)\n\n    # Staging directory should have been cleaned up\n    run_dir = output_dir / \"FAILSYM\" / \"1h\" / \"f1\"\n    assert call_count[0] == 2\n    assert run_dir.exists()\n    staging_dirs = [d for d in run_dir.iterdir() if d.is_dir() and d.name.startswith(\".tmp-raw-\")]\n    assert len(staging_dirs) == 0, \"Staging directory should be cleaned up\"\n    assert not (run_dir / \"raw\").exists()\n    assert not (run_dir / \"feature_manifest.json\").exists()\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_multi_symbol_parallel.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-file",
+   "frame_basis": "全檔驗 V1 並行寫入／compactor／L7 並行度（Task 2.5 ① 刪之 AsyncParquetCompactor、_persist_parts_parallel、persist_registry_to_parquet、FFACT_L7_WORKERS、FFACT_L7_COMPACTOR_*）｜承接：n/a（V1 專屬機制；V2 串流寫入單執行緒逐組寫、無 compactor）；寫入失敗不靜默之意圖由 tests/test_multi_symbol_parallel.py::TestT5B3DiskFullMidPersist::test_staging_cleanup_on_error 與 tests/test_feature_factory_batch2e.py::test_t2b5_disk_full_raises_ioerror_and_cleans_staging（皆改寫為 V2）承接",
+   "deleted_nodeids": [
+    "tests/test_l7_parallel_persist.py::test_parallel_persist_matches_serial",
+    "tests/test_l7_parallel_persist.py::test_parallel_persist_atomic_write",
+    "tests/test_l7_parallel_persist.py::test_tier_auto_selects_l7_workers",
+    "tests/test_l7_parallel_persist.py::test_async_compactor_merges_small_files_into_large_parts",
+    "tests/test_l7_parallel_persist.py::test_async_compactor_manifest_tracks_sources",
+    "tests/test_l7_parallel_persist.py::test_parallel_persist_empty_queue",
+    "tests/test_l7_parallel_persist.py::test_parallel_persist_single_part",
+    "tests/test_l7_parallel_persist.py::test_parallel_persist_disk_full",
+    "tests/test_l7_parallel_persist.py::test_l7_workers_env_override",
+    "tests/test_l7_parallel_persist.py::test_async_compactor_disabled_bypasses_merge",
+    "tests/test_l7_parallel_persist.py::test_async_compactor_finalize_flushes_remaining_files",
+    "tests/test_l7_parallel_persist.py::test_async_compactor_crash_preserves_staging_files"
+   ],
+   "locator": null,
+   "path": "tests/test_l7_parallel_persist.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-file",
+   "frame_basis": "全檔驗 V1 並行寫入效能與 AsyncParquetCompactor（Task 2.5 ① 刪）｜承接：n/a（V1 專屬效能機制）",
+   "deleted_nodeids": [
+    "tests/performance/test_l7_persist_perf.py::test_l7_parallel_speedup",
+    "tests/performance/test_l7_persist_perf.py::test_async_compactor_controls_file_explosion"
+   ],
+   "locator": null,
+   "path": "tests/performance/test_l7_persist_perf.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:250 V1 persist_registry_to_parquet；:252-254 V1 版面路徑與 manifest.json｜承接：共用 helper 驗證原地遷至 V2 串流寫入（SPEC Task 2.5 驗證末句）",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_cgsa_parquet_uses_float32_when_values_exceed_float16"
+   },
+   "rewrite": {
+    "reason": "V1 寫端刪；float16 overflow 退回 float32 屬 V2 共用 helper，改呼叫 write_raw_from_registry_stream（tf=12h 同群組週期），讀 raw/<group>.parquet 與 V2 feature_manifest.json。",
+    "preserved_assertion_lines": [
+     256,
+     257,
+     258,
+     260
+    ],
+    "new_source": "def test_cgsa_parquet_uses_float32_when_values_exceed_float16(tmp_path):\n    \"\"\"測試 BTC 價格尺度特徵不會因 float16 overflow 變成 inf。\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入\n    write_raw_from_registry_stream（共用 _select_parquet_storage_columns 之 float16→float32 退回）。\n    \"\"\"\n    registry = ColumnGroupRegistry(tmp_path / \"work\", memory_buffer_groups=0)\n    data = np.array(\n        [\n            [60000.0, 1.0],\n            [70000.0, 2.0],\n            [80000.0, 3.0],\n        ],\n        dtype=np.float32,\n    )\n    registry.save_data(\n        ColumnGroup(\n            group_id=\"test_high_price\",\n            layer=LayerSource.L1,\n            timeframe=\"12h\",\n            data_source=\"close\",\n            indicator=\"TEST\",\n            columns=(\"btc_price_feature\", \"small_feature\"),\n            shape=data.shape,\n        ),\n        data,\n    )\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    raw_dir, stream_summary = storage.write_raw_from_registry_stream(\"BTCUSDT\", \"12h\", \"hash\", registry)\n\n    df = pd.read_parquet(raw_dir / \"test_high_price.parquet\")\n    manifest = json.loads((raw_dir.parent / \"feature_manifest.json\").read_text())\n\n    assert str(df[\"btc_price_feature\"].dtype) == \"float32\"\n    assert np.isinf(df[\"btc_price_feature\"].to_numpy()).sum() == 0\n    assert df[\"btc_price_feature\"].tolist() == [60000.0, 70000.0, 80000.0]\n    assert stream_summary[\"storage_dtype\"] == \"mixed\"\n    assert manifest[\"groups\"][\"test_high_price\"][\"dtype\"] == \"mixed\"\n",
+    "removed_assertion_lines": {
+     "259": "V2 feature_manifest.json 根無 dtype 欄；同值（_summarize_storage_dtype）改斷言於 write_raw_from_registry_stream 回傳之 stream_summary['storage_dtype'] == 'mixed'"
+    }
+   },
+   "path": "tests/momentum/test_feature_storage.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:288 V1 persist_registry_to_parquet；:290-292 V1 版面路徑與 manifest.json｜承接：float16 下溢驗證原地遷至 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_cgsa_parquet_uses_float32_when_float16_underflows_tiny_values"
+   },
+   "rewrite": {
+    "reason": "V1 寫端刪；float16 underflow 退回 float32 屬 V2 共用 helper，改呼叫 write_raw_from_registry_stream。",
+    "preserved_assertion_lines": [
+     294,
+     295,
+     296,
+     298
+    ],
+    "new_source": "def test_cgsa_parquet_uses_float32_when_float16_underflows_tiny_values(tmp_path):\n    \"\"\"測試極小價格尺度特徵不會因 float16 underflow 變成 0。\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入\n    write_raw_from_registry_stream（共用 _select_parquet_storage_columns 之 underflow 退回 float32）。\n    \"\"\"\n    registry = ColumnGroupRegistry(tmp_path / \"work\", memory_buffer_groups=0)\n    data = np.array(\n        [\n            [1.0e-8, -1.0e-8],\n            [2.0e-8, -2.0e-8],\n            [5.0e-8, -5.0e-8],\n        ],\n        dtype=np.float32,\n    )\n    registry.save_data(\n        ColumnGroup(\n            group_id=\"test_tiny_price\",\n            layer=LayerSource.L1,\n            timeframe=\"12h\",\n            data_source=\"close\",\n            indicator=\"TEST\",\n            columns=(\"tiny_positive\", \"tiny_negative\"),\n            shape=data.shape,\n        ),\n        data,\n    )\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    raw_dir, stream_summary = storage.write_raw_from_registry_stream(\"TINYUSDT\", \"12h\", \"hash\", registry)\n\n    df = pd.read_parquet(raw_dir / \"test_tiny_price.parquet\")\n    manifest = json.loads((raw_dir.parent / \"feature_manifest.json\").read_text())\n\n    assert str(df[\"tiny_positive\"].dtype) == \"float32\"\n    np.testing.assert_allclose(df[\"tiny_positive\"].to_numpy(), data[:, 0], rtol=1e-7, atol=0)\n    np.testing.assert_allclose(df[\"tiny_negative\"].to_numpy(), data[:, 1], rtol=1e-7, atol=0)\n    assert stream_summary[\"storage_dtype\"] == \"float32\"\n    assert manifest[\"groups\"][\"test_tiny_price\"][\"dtype\"] == \"float32\"\n",
+    "removed_assertion_lines": {
+     "297": "V2 feature_manifest.json 根無 dtype 欄；同值改斷言 stream_summary['storage_dtype'] == 'float32'"
+    }
+   },
+   "path": "tests/momentum/test_feature_storage.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:319 V1 persist_registry_to_parquet；:321-323 V1 manifest.json；:329 V1 根 dtype_summary｜承接：dtype_summary 驗證原地遷至 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_cgsa_parquet_keeps_float16_when_safe"
+   },
+   "rewrite": {
+    "reason": "V1 寫端刪；float16 保留與 dtype_summary 結構屬 V2 共用 helper，改呼叫 write_raw_from_registry_stream；summary 改取 manifest['generation_metadata']['dtype_summary']（非斷言敘述），三條 summary 斷言逐字保留，另補 stream_summary['dtype_summary'] 與 manifest 記錄相等。",
+    "preserved_assertion_lines": [
+     325,
+     327,
+     330,
+     331,
+     332
+    ],
+    "new_source": "def test_cgsa_parquet_keeps_float16_when_safe(tmp_path):\n    \"\"\"測試一般尺度特徵仍保留 float16 壓縮。\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入\n    write_raw_from_registry_stream（dtype_summary 由共用 _build_dtype_summary 產生，記於\n    feature_manifest.json 之 generation_metadata）。\n    \"\"\"\n    registry = ColumnGroupRegistry(tmp_path / \"work\", memory_buffer_groups=0)\n    data = np.array([[100.0, 1.0], [200.0, 2.0]], dtype=np.float32)\n    registry.save_data(\n        ColumnGroup(\n            group_id=\"test_small\",\n            layer=LayerSource.L1,\n            timeframe=\"12h\",\n            data_source=\"close\",\n            indicator=\"TEST\",\n            columns=(\"small_price\", \"small_feature\"),\n            shape=data.shape,\n        ),\n        data,\n    )\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    raw_dir, stream_summary = storage.write_raw_from_registry_stream(\"ETHUSDT\", \"12h\", \"hash\", registry)\n\n    df = pd.read_parquet(raw_dir / \"test_small.parquet\")\n    manifest = json.loads((raw_dir.parent / \"feature_manifest.json\").read_text())\n\n    assert str(df[\"small_price\"].dtype) == \"float16\"\n    assert stream_summary[\"storage_dtype\"] == \"float16\"\n    assert manifest[\"groups\"][\"test_small\"][\"dtype\"] == \"float16\"\n    # Task 1: dtype_summary structured payload always present.\n    summary = manifest[\"generation_metadata\"][\"dtype_summary\"]\n    assert summary[\"counts\"] == {\"float16\": 1}\n    assert summary[\"float32_fallback_count\"] == 0\n    assert summary[\"float32_fallback_parts\"] == []\n    assert stream_summary[\"dtype_summary\"] == summary\n",
+    "removed_assertion_lines": {
+     "326": "V2 feature_manifest.json 根無 dtype 欄；同值改斷言 stream_summary['storage_dtype'] == 'float16'"
+    }
+   },
+   "path": "tests/momentum/test_feature_storage.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:369 V1 persist_registry_to_parquet；:371-373 V1 manifest.json；:376 V1 根 dtype_summary｜承接：混合 dtype／dtype_summary 驗證原地遷至 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_cgsa_manifest_dtype_summary_records_mixed_dtype"
+   },
+   "rewrite": {
+    "reason": "V1 寫端刪；混合 dtype 之 dtype_summary（counts／column_counts／fallback 清單）屬 V2 共用 _build_dtype_summary，改呼叫 write_raw_from_registry_stream；summary 改取 generation_metadata，四條 summary 斷言逐字保留。",
+    "preserved_assertion_lines": [
+     377,
+     378,
+     379,
+     380
+    ],
+    "new_source": "def test_cgsa_manifest_dtype_summary_records_mixed_dtype(tmp_path):\n    \"\"\"Mixed-dtype runs must surface per-dtype counts + the fallback group list.\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入\n    write_raw_from_registry_stream（dtype_summary 記於 feature_manifest.json 之 generation_metadata）。\n    \"\"\"\n    registry = ColumnGroupRegistry(tmp_path / \"work\", memory_buffer_groups=0)\n    safe = np.array([[100.0, 1.0], [200.0, 2.0], [300.0, 3.0]], dtype=np.float32)\n    overflow = np.array(\n        [[60000.0, 1.0], [70000.0, 2.0], [80000.0, 3.0]],\n        dtype=np.float32,\n    )\n    registry.save_data(\n        ColumnGroup(\n            group_id=\"grp_safe\",\n            layer=LayerSource.L1,\n            timeframe=\"12h\",\n            data_source=\"close\",\n            indicator=\"TEST\",\n            columns=(\"safe_a\", \"safe_b\"),\n            shape=safe.shape,\n        ),\n        safe,\n    )\n    registry.save_data(\n        ColumnGroup(\n            group_id=\"grp_overflow\",\n            layer=LayerSource.L1,\n            timeframe=\"12h\",\n            data_source=\"close\",\n            indicator=\"TEST\",\n            columns=(\"big_a\", \"big_b\"),\n            shape=overflow.shape,\n        ),\n        overflow,\n    )\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    raw_dir, stream_summary = storage.write_raw_from_registry_stream(\"MIXEDUSDT\", \"12h\", \"hash\", registry)\n\n    manifest = json.loads(\n        (raw_dir.parent / \"feature_manifest.json\").read_text()\n    )\n\n    assert stream_summary[\"storage_dtype\"] == \"mixed\"\n    summary = manifest[\"generation_metadata\"][\"dtype_summary\"]\n    assert summary[\"counts\"] == {\"float16\": 1, \"mixed\": 1}\n    assert summary[\"column_counts\"] == {\"float16\": 3, \"float32\": 1}\n    assert summary[\"float32_fallback_count\"] == 1\n    assert summary[\"float32_fallback_parts\"] == [\"grp_overflow\"]\n",
+    "removed_assertion_lines": {
+     "375": "V2 feature_manifest.json 根無 dtype 欄；同值改斷言 stream_summary['storage_dtype'] == 'mixed'"
+    }
+   },
+   "path": "tests/momentum/test_feature_storage.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:404 V1 persist_registry_to_parquet；:406-408 V1 manifest.json；:414-415 V1 根 dtype_summary｜承接：逐欄混合退回驗證原地遷至 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_cgsa_parquet_mixed_part_falls_back_per_column"
+   },
+   "rewrite": {
+    "reason": "V1 寫端刪；同 part 逐欄 float16/float32 退回屬 V2 共用 _select_parquet_storage_columns，改呼叫 write_raw_from_registry_stream；dtype_summary 改讀 generation_metadata，另補 V2 groups[part].float32_columns == ['unsafe_big']。",
+    "preserved_assertion_lines": [
+     410,
+     411,
+     413
+    ],
+    "new_source": "def test_cgsa_parquet_mixed_part_falls_back_per_column(tmp_path):\n    \"\"\"同一 parquet part 內只有不安全欄位應退回 float32。\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改驗 V2 串流寫入\n    write_raw_from_registry_stream（共用 _select_parquet_storage_columns 之逐欄退回）。\n    \"\"\"\n    registry = ColumnGroupRegistry(tmp_path / \"work\", memory_buffer_groups=0)\n    data = np.array(\n        [[100.0, 60000.0], [200.0, 70000.0], [300.0, 80000.0]],\n        dtype=np.float32,\n    )\n    registry.save_data(\n        ColumnGroup(\n            group_id=\"grp_mixed_columns\",\n            layer=LayerSource.L1,\n            timeframe=\"12h\",\n            data_source=\"close\",\n            indicator=\"TEST\",\n            columns=(\"safe_small\", \"unsafe_big\"),\n            shape=data.shape,\n        ),\n        data,\n    )\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    raw_dir, stream_summary = storage.write_raw_from_registry_stream(\"MIXCOLUSDT\", \"12h\", \"hash\", registry)\n\n    df = pd.read_parquet(raw_dir / \"grp_mixed_columns.parquet\")\n    manifest = json.loads((raw_dir.parent / \"feature_manifest.json\").read_text())\n\n    assert str(df[\"safe_small\"].dtype) == \"float16\"\n    assert str(df[\"unsafe_big\"].dtype) == \"float32\"\n    assert stream_summary[\"storage_dtype\"] == \"mixed\"\n    assert manifest[\"groups\"][\"grp_mixed_columns\"][\"dtype\"] == \"mixed\"\n    assert manifest[\"generation_metadata\"][\"dtype_summary\"][\"counts\"] == {\"mixed\": 1}\n    assert manifest[\"generation_metadata\"][\"dtype_summary\"][\"column_counts\"] == {\"float16\": 1, \"float32\": 1}\n    assert manifest[\"groups\"][\"grp_mixed_columns\"][\"float32_columns\"] == [\"unsafe_big\"]\n",
+    "removed_assertion_lines": {
+     "412": "V2 feature_manifest.json 根無 dtype 欄；同值改斷言 stream_summary['storage_dtype'] == 'mixed'",
+     "414": "V2 之 dtype_summary 置於 manifest['generation_metadata']（非根）；同值斷言改讀 manifest['generation_metadata']['dtype_summary']['counts'] == {'mixed': 1}",
+     "415": "同 414；改斷言 manifest['generation_metadata']['dtype_summary']['column_counts'] == {'float16': 1, 'float32': 1}"
+    }
+   },
+   "path": "tests/momentum/test_feature_storage.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:439 V1 persist_registry_to_parquet；:443 V1 預檢訊息字面｜承接：磁碟預檢驗證原地遷至 V2 串流寫入入口（另有 tests/feature_engineering/test_l7_raw_streaming.py::test_raw_streaming_disk_precheck_* 直測 helper）",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_l7_disk_precheck_raises_when_estimate_exceeds_free_space"
+   },
+   "rewrite": {
+    "reason": "V1 寫端與其預檢 _precheck_l7_disk_space 刪；入口磁碟預檢屬 V2 也有之 guard（write_raw_from_registry_stream 入口 _precheck_l7_raw_stream_disk_space），改呼叫 write_raw_from_registry_stream（同樣 _safe_disk_free_bytes→1）；訊息前綴改 V2 字面，safety_factor 斷言與 assert False 逐字保留，另補失敗後未安裝 raw。",
+    "preserved_assertion_lines": [
+     440,
+     444
+    ],
+    "new_source": "def test_l7_disk_precheck_raises_when_estimate_exceeds_free_space(monkeypatch, tmp_path):\n    \"\"\"L7 entry guard fails fast when aggregate estimate exceeds free disk.\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）與其預檢已刪；改驗 V2 串流寫入\n    write_raw_from_registry_stream 之入口磁碟預檢（_precheck_l7_raw_stream_disk_space），且失敗時不安裝 raw。\n    \"\"\"\n    registry = ColumnGroupRegistry(tmp_path / \"work\", memory_buffer_groups=0)\n    data = np.ones((4, 2), dtype=np.float32)\n    registry.save_data(\n        ColumnGroup(\n            group_id=\"grp_one\",\n            layer=LayerSource.L1,\n            timeframe=\"12h\",\n            data_source=\"close\",\n            indicator=\"TEST\",\n            columns=(\"a\", \"b\"),\n            shape=data.shape,\n        ),\n        data,\n    )\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    monkeypatch.setattr(storage, \"_safe_disk_free_bytes\", lambda _path: 1)\n\n    try:\n        storage.write_raw_from_registry_stream(\"DISKFULL\", \"12h\", \"hash\", registry)\n        assert False, \"Expected aggregate L7 disk pre-check to fail\"\n    except OSError as exc:\n        message = str(exc)\n        assert \"Insufficient disk space for L7_raw streaming persist\" in message\n        assert \"safety_factor\" in message\n    assert not (tmp_path / \"features\" / \"DISKFULL\" / \"12h\" / \"hash\" / \"raw\").exists()\n",
+    "removed_assertion_lines": {
+     "443": "V2 入口預檢訊息為 'Insufficient disk space for L7_raw streaming persist'（V1 字面 'Insufficient disk space for L7 persist' 非其子字串）；改斷言 V2 訊息前綴"
+    }
+   },
+   "path": "tests/momentum/test_feature_storage.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:471 V1 _precheck_l7_disk_space（Task 2.5 ① 刪）｜承接：可回收 .npy 扣抵驗證遷至 V2 入口預檢",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_l7_disk_precheck_accounts_for_reclaimable_npy"
+   },
+   "rewrite": {
+    "reason": "HEAD:471 呼叫之 _precheck_l7_disk_space（V1，batch_limit 參數）刪；可回收 .npy 扣抵為 V2 入口預檢 _precheck_l7_raw_stream_disk_space 同有之邏輯，改呼叫之（write_raw_from_registry_stream 入口唯一預檢；以假群組 1000×(1000×1000) 直測 helper，避免實寫 4GB）。V2 另有預留下限（預設 2 GiB > 假可用 1 GiB）會蓋過扣抵邏輯 ⇒ 設 FFACT_L7_MIN_FREE_GIB=0 隔離；safety factor 清環境取預設 1.5。可證偽：不扣抵時需 (2e9+4e6)×1.5≈2.8 GiB > 1 GiB ⇒ 拋錯；扣抵後需 6e6 bytes ⇒ 通過。原函式無斷言敘述。",
+    "preserved_assertion_lines": [],
+    "new_source": "def test_l7_disk_precheck_accounts_for_reclaimable_npy(monkeypatch, tmp_path):\n    \"\"\"L7 precheck 應用 streaming budget，不因可回收 .npy 總量誤判失敗。\n\n    FRAMEPATH Task 2.5：V1 預檢（_precheck_l7_disk_space）隨 persist_registry_to_parquet 刪除；改驗\n    V2 串流寫入 write_raw_from_registry_stream 入口所呼叫之 _precheck_l7_raw_stream_disk_space。\n    預留下限設 0 以單獨驗可回收 .npy 之扣抵（不扣抵 ⇒ 需約 2.8 GiB > 可用 1 GiB ⇒ 拋錯）。\n    \"\"\"\n    monkeypatch.setenv(\"FFACT_L7_MIN_FREE_GIB\", \"0\")\n    monkeypatch.delenv(\"FFACT_L7_DISK_SAFETY_FACTOR\", raising=False)\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    one_gib = 1024 ** 3\n    group_count = 1000\n    group_bytes = 1000 * 1000 * np.dtype(np.float32).itemsize\n\n    class _FakeDiskPath:\n        def exists(self) -> bool:\n            return True\n\n        def stat(self) -> SimpleNamespace:\n            return SimpleNamespace(st_size=group_bytes)\n\n    groups = [\n        (\n            f\"grp_{index}\",\n            SimpleNamespace(shape=(1000, 1000), disk_path=_FakeDiskPath()),\n        )\n        for index in range(group_count)\n    ]\n\n    monkeypatch.setattr(storage, \"_safe_disk_free_bytes\", lambda _path: one_gib)\n\n    storage._precheck_l7_raw_stream_disk_space(\n        tmp_path / \"features\" / \"STREAM\" / \"12h\" / \"hash\",\n        groups,\n    )\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/momentum/test_feature_storage.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:122 V1 persist_registry_to_parquet；:130 V1 版面路徑｜承接：DuckDB 可讀性與總欄數守恆原地遷至 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_t215_per_group_parquet_duckdb_readable"
+   },
+   "rewrite": {
+    "reason": "V1 寫端與 compactor 刪；改呼叫 write_raw_from_registry_stream（cleanup_intermediate=False 同 HEAD），輸出路徑取其 raw 目錄下 *.parquet；expected_parent 改 V2 版面 <base>/ETHUSDT/1h/cfg_hash_001/raw；三條斷言逐字保留；去掉無作用之 FFACT_L7_COMPACTOR_ENABLED 與 monkeypatch 參數。",
+    "preserved_assertion_lines": [
+     129,
+     131,
+     143
+    ],
+    "new_source": "def test_t215_per_group_parquet_duckdb_readable(tmp_path: Path):\n    \"\"\"T2.15: per-group parquet should be DuckDB-readable and preserve total columns.\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet，含 compactor）已刪；改驗 V2 串流寫入\n    write_raw_from_registry_stream 之逐組 parquet（共用 _write_parquet_with_codec）可被 DuckDB 讀取，\n    總欄數守恆仍為完整性不變式。\n    \"\"\"\n    duckdb = pytest.importorskip(\"duckdb\")\n\n    registry = ColumnGroupRegistry(work_dir=tmp_path / \"registry\")\n    group_a_cols = (\"f_a_1\", \"f_a_2\")\n    group_b_cols = (\"f_b_1\",)\n\n    registry.save_data(\n        _make_group(\"1h_L3_group_a\", group_a_cols),\n        np.array(\n            [\n                [1.0, 2.0],\n                [3.0, 4.0],\n                [5.0, 6.0],\n            ],\n            dtype=np.float32,\n        ),\n    )\n    registry.save_data(\n        _make_group(\"1h_L3_group_b\", group_b_cols),\n        np.array(\n            [\n                [10.0],\n                [11.0],\n                [12.0],\n            ],\n            dtype=np.float32,\n        ),\n    )\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    raw_dir, _summary = storage.write_raw_from_registry_stream(\n        symbol=\"ETHUSDT\",\n        tf=\"1h\",\n        config_hash=\"cfg_hash_001\",\n        registry=registry,\n        cleanup_intermediate=False,\n    )\n    output_paths = sorted(str(path) for path in raw_dir.glob(\"*.parquet\"))\n\n    assert len(output_paths) == 2\n    expected_parent = tmp_path / \"features\" / \"ETHUSDT\" / \"1h\" / \"cfg_hash_001\" / \"raw\"\n    assert all(Path(path).parent == expected_parent for path in output_paths)\n\n    conn = duckdb.connect(database=\":memory:\")\n    total_columns = 0\n    for parquet_path in sorted(output_paths):\n        escaped = str(parquet_path).replace(\"'\", \"''\")\n        schema_rows = conn.execute(\n            f\"DESCRIBE SELECT * FROM read_parquet('{escaped}')\"\n        ).fetchall()\n        total_columns += len(schema_rows)\n\n    conn.close()\n    assert total_columns == registry.total_columns()\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_feature_factory_batch2c.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:210 V1 persist_registry_to_parquet｜承接：全 NaN 群組落盤原地遷至 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_t2b3_all_nan_group_register_and_persist"
+   },
+   "rewrite": {
+    "reason": "V1 寫端刪；改呼叫 write_raw_from_registry_stream（cleanup_intermediate=False 同 HEAD；未開 dead-drop ⇒ 全 NaN 欄照常落盤），paths 取 raw 目錄下 *.parquet；兩條斷言逐字保留，另補形狀 (4, 2)。",
+    "preserved_assertion_lines": [
+     217,
+     219
+    ],
+    "new_source": "def test_t2b3_all_nan_group_register_and_persist(tmp_path):\n    \"\"\"T2.B3: 全 NaN group 應可正常 register + parquet persist。\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet）已刪；改走 V2 串流寫入\n    write_raw_from_registry_stream（未開 dead-drop 時全 NaN 欄照常落盤）。\n    \"\"\"\n    registry = ColumnGroupRegistry(work_dir=tmp_path / \"registry\")\n    group = _make_group(\n        group_id=\"1h_L3_nan_group\",\n        layer=LayerSource.L3,\n        timeframe=\"1h\",\n        columns=(\"close_1h_trend_EMA_5_mean\", \"close_1h_trend_EMA_5_std\"),\n        indicator=\"EMA\",\n    )\n    nan_matrix = np.full((4, 2), np.nan, dtype=np.float32)\n    registry.save_data(group, nan_matrix)\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n    raw_dir, _summary = storage.write_raw_from_registry_stream(\n        symbol=\"ETHUSDT\",\n        tf=\"1h\",\n        config_hash=\"cfg_nan\",\n        registry=registry,\n        cleanup_intermediate=False,\n    )\n    paths = sorted(str(path) for path in raw_dir.glob(\"*.parquet\"))\n\n    assert len(paths) == 1\n    persisted = pd.read_parquet(paths[0])\n    assert persisted.shape == (4, 2)\n    assert persisted.isna().all().all()\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_feature_factory_batch2e.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:238 FFACT_L7_WORKERS；:262 V1 persist_registry_to_parquet；:269 V1 版面路徑｜承接：磁碟滿拋錯與清暫存意圖原地遷至 V2 串流寫入",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_t2b5_disk_full_raises_ioerror_and_cleans_staging"
+   },
+   "rewrite": {
+    "reason": "V1 寫端與 FFACT_L7_WORKERS 刪；改呼叫 write_raw_from_registry_stream（cleanup_intermediate=False），同樣 patch pyarrow.parquet.write_table 拋 OSError（V2 經 _write_parquet_zstd／_require_pyarrow 取同一模組屬性）；output_dir 改 V2 run 目錄；:273 斷言逐字保留於同一 if 區塊，另補 raw／feature_manifest.json 未安裝與 .tmp-raw-* 已清（V1 保留 staging，V2 未刪來源時清暫存根）。",
+    "preserved_assertion_lines": [
+     273
+    ],
+    "new_source": "def test_t2b5_disk_full_raises_ioerror_and_cleans_staging(tmp_path, monkeypatch):\n    \"\"\"T2.B5: 磁碟空間不足時應拋錯，且 staging 目錄需被清理。\n\n    FRAMEPATH Task 2.5：V1 版面寫入（persist_registry_to_parquet，含 FFACT_L7_WORKERS 並行）已刪；改驗\n    V2 串流寫入 write_raw_from_registry_stream：parquet 寫入拋 OSError 時錯誤上拋、暫存根 .tmp-raw-* 清除\n    （cleanup_intermediate=False ⇒ 尚未刪來源，不進保留暫存之復原分支），且不安裝 raw／manifest。\n    \"\"\"\n    registry = ColumnGroupRegistry(work_dir=tmp_path / \"registry\")\n    group = _make_group(\n        group_id=\"1h_L3_group_a\",\n        layer=LayerSource.L3,\n        timeframe=\"1h\",\n        columns=(\"f_a_1\", \"f_a_2\"),\n        indicator=\"EMA\",\n    )\n    registry.save_data(group, np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32))\n\n    storage = FeatureStorage(base_path=str(tmp_path / \"features\"))\n\n    def _raise_no_space(*args, **kwargs):\n        del args, kwargs\n        raise OSError(\"No space left on device\")\n\n    # The persist path uses pyarrow.parquet.write_table directly (not\n    # pd.DataFrame.to_parquet); patch the real call site.\n    import pyarrow.parquet as pq_module\n    monkeypatch.setattr(pq_module, \"write_table\", _raise_no_space)\n\n    with pytest.raises(OSError, match=\"No space left on device\"):\n        storage.write_raw_from_registry_stream(\n            symbol=\"ETHUSDT\",\n            tf=\"1h\",\n            config_hash=\"cfg_diskfull\",\n            registry=registry,\n            cleanup_intermediate=False,\n        )\n\n    output_dir = tmp_path / \"features\" / \"ETHUSDT\" / \"1h\" / \"cfg_diskfull\"\n    if output_dir.exists():\n        # Final parquet must not appear (the contract that matters: no\n        # half-written corrupt output is exposed to consumers).\n        assert list(output_dir.glob(\"*.parquet\")) == []\n    assert not (output_dir / \"raw\").exists()\n    assert not (output_dir / \"feature_manifest.json\").exists()\n    assert [path for path in output_dir.iterdir() if path.name.startswith(\".tmp-raw-\")] == []\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_feature_factory_batch2e.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD:430、:485 V1 寫端符號 persist_registry_to_parquet（Task 2.5 ① 刪）｜承接：路由至 V2 writer 之斷言逐字保留；V1 不執行改為符號不存在",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_feature_factory_cgsa_generation_routes_to_l7_raw_writer"
+   },
+   "rewrite": {
+    "reason": ":430 之 V1 探針設定改為 assert not hasattr(FeatureStorage, 'persist_registry_to_parquet') 與 assert not hasattr(storage, …)（spec Mock 不得提供已刪符號）；:485 assert_not_called 隨之移除（符號不存在已更強地涵蓋「舊 L7 persist 不得執行」）；其餘逐字不變。",
+    "preserved_assertion_lines": [
+     483,
+     484,
+     488,
+     489,
+     490,
+     491,
+     492
+    ],
+    "new_source": "def test_feature_factory_cgsa_generation_routes_to_l7_raw_writer(tmp_path) -> None:\n    registry = _make_registry(tmp_path)\n    raw_path = tmp_path / \"features\" / \"SYNTHETIC\" / \"1h\" / \"cfg_raw\" / \"raw\"\n    storage = Mock(spec=FeatureStorage)\n    storage.write_raw_from_registry_stream.return_value = (\n        raw_path,\n        {\n            \"raw_path\": str(raw_path),\n            \"manifest_path\": str(raw_path.parent / \"feature_manifest.json\"),\n            \"feature_count\": 3,\n            \"row_count\": 4,\n            \"group_count\": 1,\n            \"npy_freed_bytes\": 128,\n            \"storage_dtype\": \"float16\",\n            \"dtype_summary\": {\"counts\": {\"float16\": 1}},\n            \"validation\": {\n                \"has_nan\": False,\n                \"has_inf\": False,\n                \"coverage\": 1.0,\n                \"inf_count\": 0,\n                \"inf_ratio\": 0.0,\n                \"groups_with_inf\": 0,\n                \"warnings\": [],\n            },\n            \"l65_mode\": \"ic_first_pre\",\n        },\n    )\n    # FRAMEPATH Task 2.5：V1 版面寫端（舊 L7 persist）已刪 ⇒ 符號不存在，spec Mock 亦不得提供\n    assert not hasattr(FeatureStorage, \"persist_registry_to_parquet\")\n    assert not hasattr(storage, \"persist_registry_to_parquet\")\n\n    preprocessing = PreprocessingConfig(\n        enabled=True,\n        mode=\"replace\",\n        winsorization={\"enabled\": True},\n        fractional_differencing={\"enabled\": True},\n        adf_differencing={\"enabled\": True},\n        rank_transform={\"enabled\": True},\n        adaptive_zscore={\"enabled\": True},\n        gaussian_normalize={\"enabled\": True},\n    )\n\n    class _Config(SimpleNamespace):\n        def model_dump(self, by_alias: bool = False):\n            return {\n                \"preprocessing\": self.preprocessing.model_dump(),\n                \"timeframes\": {\"training\": [\"1h\"], \"primary\": \"1h\"},\n                \"labels\": {},\n            }\n\n    config = _Config(\n        preprocessing=preprocessing,\n        labels=SimpleNamespace(model_dump=lambda: {}),\n        timeframes=SimpleNamespace(training=[\"1h\"], primary=\"1h\"),\n    )\n\n    factory = FeatureFactory.__new__(FeatureFactory)\n    factory._cgsa_registry = registry\n    factory._storage = storage\n    factory._registry = Mock()\n    factory._current_symbol = \"SYNTHETIC\"\n    factory._current_timeframe = \"1h\"\n    factory._current_config_hash = \"cfg_raw\"\n    factory._current_raw_data = None\n    factory._reference_data_cache = {}\n    factory._progress_callback = None\n    factory.layer_results = {}\n\n    raw_data = pd.DataFrame(\n        {\"close\": np.array([10.0, 11.0, 12.0, 13.0], dtype=np.float32)},\n        index=pd.date_range(\"2026-01-01\", periods=4, freq=\"h\"),\n    )\n\n    result = factory._layer7_raw_from_cgsa_pipeline(\n        symbol=\"SYNTHETIC\",\n        timeframe=\"1h\",\n        raw_data=raw_data,\n        config=config,\n        elapsed=1.25,\n        config_hash=\"cfg_raw\",\n    )\n\n    storage.write_raw_from_registry_stream.assert_called_once()\n    assert storage.write_raw_from_registry_stream.call_args.kwargs[\"row_index\"].equals(raw_data.index)\n    # hdf5_path now stores the manifest JSON path (not the raw directory) so\n    # that service-layer routing detects the .json suffix and loads CGSA format.\n    assert result.hdf5_path == str(raw_path.parent / \"feature_manifest.json\")\n    assert result.metadata[\"artifact_kind\"] == \"raw\"\n    assert result.metadata[\"schema_version\"] == \"raw_v2\"\n    assert result.metadata[\"l65_mode\"] == \"ic_first_pre\"\n    assert result.metadata[\"npy_freed_bytes\"] == 128\n",
+    "removed_assertion_lines": {
+     "485": "persist_registry_to_parquet 已刪，spec Mock 存取即 AttributeError；「舊 L7 persist 不得執行」改由函式前段 assert not hasattr(FeatureStorage／storage, 'persist_registry_to_parquet') 承接（SPEC Task 2.8）"
+    }
+   },
+   "path": "tests/feature_engineering/test_l7_raw_streaming.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "整函式只驗 V1 版面經 V2 讀者退回讀取（HEAD:436 V1 manifest.json、:443 legacy_format），即 Task 2.5 ② 刪除之 _adapt_legacy_manifest_v2／is_legacy 分支｜承接：反向行為（V2 manifest 缺而有 V1 manifest.json ⇒ load_manifest_v2 拋 FileNotFoundError 且不讀 V1）依 SPEC Task 2.5 由新斷言置 tests/api/test_framepath_api_h5.py 承接",
+   "deleted_nodeids": [
+    "tests/feature_engineering/test_ic_first_pipeline.py::test_old_parquet_no_metadata"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "test_old_parquet_no_metadata"
+   },
+   "path": "tests/feature_engineering/test_ic_first_pipeline.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "被測方法 _load_features_df（library:／parquet:／.csv 分派）為 Task 2.6 刪除之生產零呼叫者讀者分支｜承接：n/a（死碼路徑；FeatureLibrary.load 本身之 V2 行為由 tests/api/test_framepath_api_h5.py::test_boundary_03_library_h5_only_raises_feature_not_found 等驗）",
+   "deleted_nodeids": [
+    "tests/feature_library/test_phase4.py::test_feature_browser_load_features_library_prefix"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "test_feature_browser_load_features_library_prefix"
+   },
+   "path": "tests/feature_library/test_phase4.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-file",
+   "frame_basis": "V1 讀回（:761 stream_groups）＝Task 2.5 刪除之 API；基準比對鏈於 CGSA 下不可達、其他功能由 profile_multi_tf_baseline.py 承接（使用者 2026-10-08「之後不會用到也就刪掉」）｜承接：n/a（腳本不被 pytest 收集）；多週期逐層效能 profiling 由 scripts/profile_multi_tf_baseline.py 承接",
+   "deleted_nodeids": [],
+   "locator": null,
+   "path": "scripts/benchmark_ethusdt_multitf.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-file",
+   "frame_basis": "V1 讀回（:202 stream_groups）＝Task 2.5 刪除之 API；persist=False 使任何讀回不成立，腳本自 CGSA 預設起恆 FAIL｜承接：n/a（腳本不被 pytest 收集）",
+   "deleted_nodeids": [],
+   "locator": null,
+   "path": "scripts/smoke_test_pipeline.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-file",
+   "frame_basis": "SPEC Task 2.7 ④：scripts/migrate_d_star_cache.py 整檔刪（一次性遷移，磁碟只剩 v3）｜承接：n/a（腳本不被 pytest 收集）；d* 讀端容錯 _d_star_cache.py:398-410 保留",
+   "deleted_nodeids": [],
+   "locator": null,
+   "path": "scripts/migrate_d_star_cache.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-file",
+   "frame_basis": "只驗 Task 2.7 ④ 刪除之一次性遷移腳本｜承接：n/a（驗證對象＝被刪之遷移腳本；保留之 d* 讀端容錯不由此檔測）",
+   "deleted_nodeids": [
+    "tests/feature_engineering/preprocessing/test_d_star_legacy_migration_audit.py::test_d_star_legacy_migration_audit_quarantines_default_cache",
+    "tests/feature_engineering/preprocessing/test_d_star_legacy_migration_audit.py::test_d_star_legacy_migration_audit_skips_v2_cache"
+   ],
+   "locator": null,
+   "path": "tests/feature_engineering/preprocessing/test_d_star_legacy_migration_audit.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "整函式只驗 Task 2.7 ① 刪除之 FeatureStorage.feature_file_exists／list_feature_files／delete_features（HEAD :163-184）；其中 save_features_to_hdf5（:166）為前置｜承接：case h5 存讀（保留之 save_features_to_hdf5／load_features_from_hdf5）由 tests/momentum/test_feature_storage.py::test_feature_storage_hdf5 承接；被刪三 helper 無生產呼叫者，無需承接",
+   "deleted_nodeids": [
+    "tests/momentum/test_feature_storage.py::test_feature_file_operations"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "test_feature_file_operations"
+   },
+   "path": "tests/momentum/test_feature_storage.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD api/services/ic_analysis_service.py:2416-2438 data-group h5 枝（Task 2.6 刪除；features_path ⇒ 400）｜承接：改寫後即三元組 V2 版承接 /ic/features/list 路由層之列出驗證（repo 內原無路由層三元組測試；tests/api/test_ic_list_features.py 為 service 層且依真實 registry 可能 skip）。features_path ⇒ 400 之新契約由 tests/api/test_framepath_api_h5.py（Task 2.6 新斷言）承擔。",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_list_available_features_success"
+   },
+   "rewrite": {
+    "reason": "原測試以 features_path（data-group h5）列特徵；Task 2.6 刪 ic_analysis_service.list_features 之 parquet:／data-group h5 枝，給 features_path ⇒ ValueError ⇒ 400。改以同一份真實 kline 特徵（fixture 回傳之 features DataFrame）經正式 FeatureStorage.write_raw 寫 V2 run，monkeypatch ic_analysis_service.create_feature_reader 指向 tmp base（具名函式，非 lambda），以三元組呼叫同一路由；三條斷言逐字保留。",
+    "preserved_assertion_lines": [
+     149,
+     151,
+     152
+    ],
+    "new_source": "def test_list_available_features_success(\n    sample_paths: dict[str, str],\n    tmp_path: Path,\n    monkeypatch: pytest.MonkeyPatch,\n) -> None:\n    \"\"\"IC `/features/list` 只收 (symbol, timeframe, config_hash)（FRAMEPATH Task 2.6：`features_path`〔舊 `data/` group h5、\n    `parquet:`〕已回 400）。以同一份真實 kline 特徵（`sample_paths[\"features\"]`）經正式 `FeatureStorage.write_raw`\n    寫成 V2 run，承接原「API 列出特徵數與名稱」之驗證。\"\"\"\n    import api.services.ic_analysis_service as ic_service_module\n    from momentum.factories import create_feature_reader\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n    from tests.fixtures.ic_api_real_kline import SYMBOL, TIMEFRAME\n\n    feature_base = tmp_path / \"features\"\n    FeatureStorage(str(feature_base)).write_raw(\n        SYMBOL,\n        TIMEFRAME,\n        \"cfg_ic_list_v2\",\n        {\"group_ic_list\": sample_paths[\"features\"].reset_index(drop=True)},\n    )\n\n    def _tmp_feature_reader(*_args: object, **_kwargs: object):\n        return create_feature_reader(str(feature_base))\n\n    monkeypatch.setattr(ic_service_module, \"create_feature_reader\", _tmp_feature_reader)\n\n    response = client.get(\n        \"/api/v1/ic/features/list\",\n        params={\n            \"symbol\": SYMBOL,\n            \"timeframe\": TIMEFRAME,\n            \"config_hash\": \"cfg_ic_list_v2\",\n            \"meta_path\": sample_paths[\"meta_path\"],\n        },\n    )\n    assert response.status_code == 200\n    data = response.json()\n    assert data[\"total\"] == len(sample_paths[\"feature_names\"])\n    assert data[\"features\"][0][\"feature_name\"] in sample_paths[\"feature_names\"]\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/api/test_ic_deep_analysis.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD api/services/ic_analysis_service.py:2417-2419 data-group h5 枝之 FileNotFoundError（Task 2.6 刪；features_path ⇒ 400）｜承接：改寫後承接路由『來源不存在 ⇒ 404』語意（三元組）；n/a 其他",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_list_available_features_not_found"
+   },
+   "rewrite": {
+    "reason": "原測試驗『features_path 指向不存在檔 ⇒ 404』；Task 2.6 後 features_path 一律 400，404 語意只剩三元組之 V2 run 不存在（_resolve_manifest_v2 拋 FileNotFoundError）。改以三元組指向空 tmp base 之不存在 run；斷言逐字保留。HEAD 下（V1 退回 load_manifest 亦拋 FileNotFoundError）與 Phase 2 後皆 404。",
+    "preserved_assertion_lines": [
+     160
+    ],
+    "new_source": "def test_list_available_features_not_found(\n    tmp_path: Path,\n    monkeypatch: pytest.MonkeyPatch,\n) -> None:\n    \"\"\"三元組指向不存在之 V2 run ⇒ 404（FRAMEPATH Task 2.6：`features_path` 已不收、回 400；「來源不存在 ⇒ 404」改由三元組承接）。\"\"\"\n    import api.services.ic_analysis_service as ic_service_module\n    from momentum.factories import create_feature_reader\n\n    empty_base = tmp_path / \"features\"\n    empty_base.mkdir()\n\n    def _tmp_feature_reader(*_args: object, **_kwargs: object):\n        return create_feature_reader(str(empty_base))\n\n    monkeypatch.setattr(ic_service_module, \"create_feature_reader\", _tmp_feature_reader)\n\n    response = client.get(\n        \"/api/v1/ic/features/list\",\n        params={\"symbol\": \"ETHUSDT\", \"timeframe\": \"12h\", \"config_hash\": \"cfg_not_exists\"},\n    )\n    assert response.status_code == 404\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/api/test_ic_deep_analysis.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "整支只驗 V1 版面（manifest.json）經 legacy 轉接之拒絕行為（HEAD :257 用 V1 fixture；:260/:269/:295 match=\"legacy\"）；Task 2.5 刪 FeatureReader V1 退回與 _adapt_legacy_manifest_v2，legacy 狀態不再有產生者｜承接：strict consumer 拒非 complete 之意圖由同檔 V2 測試承接：tests/feature_engineering/test_failopen_consumer.py::test_ic_rejects_partial_and_unknown、::test_training_rejects_partial；『V2 缺而有 V1 manifest ⇒ FileNotFoundError 且不讀 V1』由 tests/api/test_framepath_api_h5.py（Task 2.5 新斷言）承擔",
+   "deleted_nodeids": [
+    "tests/feature_engineering/test_failopen_consumer.py::test_legacy_reader_strict_rejects_ic_and_training"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "test_legacy_reader_strict_rejects_ic_and_training"
+   },
+   "path": "tests/feature_engineering/test_failopen_consumer.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "只服務上列已刪測試（HEAD :257 為唯一呼叫處）之 V1 版面 fixture；殘留即寫 V1 manifest.json 之死碼",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "_legacy_reader_fixture"
+   },
+   "path": "tests/feature_engineering/test_failopen_consumer.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "呼叫 Task 2.5 刪除之 FeatureReader._adapt_legacy_manifest_v2（V1 manifest 轉接）｜承接：n/a（legacy 狀態已無產生者）；同函式其餘偏序斷言保留",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "stmt",
+    "qualname": "test_status_model",
+    "lineno": 366,
+    "end_lineno": 372
+   },
+   "path": "tests/feature_engineering/test_failopen_manifest.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "斷言 V1 轉接 manifest 之 run_status == legacy（依 :366 已刪物件）",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "stmt",
+    "qualname": "test_status_model",
+    "lineno": 373,
+    "end_lineno": 373
+   },
+   "path": "tests/feature_engineering/test_failopen_manifest.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "斷言 V1 轉接 manifest 之 quality_status == legacy（依 :366 已刪物件）",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "stmt",
+    "qualname": "test_status_model",
+    "lineno": 374,
+    "end_lineno": 374
+   },
+   "path": "tests/feature_engineering/test_failopen_manifest.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "建構 V1 專屬 schema_version legacy_v7 之 artifact；Task 2.5 ④ 刪 legacy 狀態後不再被迴圈呼叫（死碼、字面誤導）｜承接：偏序成對可證偽仍由同函式 :435-444 對現行 QUALITY_STATUS_PRECEDENCE 全對驗證",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "stmt",
+    "qualname": "test_merge_quality_status_full_precedence",
+    "lineno": 420,
+    "end_lineno": 430
+   },
+   "path": "tests/feature_engineering/test_failopen_manifest.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD hardware_info_service.py:112、:141-142 與 hardware_utils.py:218 之 l7_workers（Task 2.5 刪 V1 並行寫入後無作用，Task 2.7 ⑤ 刪）｜承接：改寫後即承接硬體 API 其餘欄位驗證，並新增『回應不含 l7_workers』（BRIEF_V17 判斷補充）",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_hardware_endpoint_returns_valid_json"
+   },
+   "rewrite": {
+    "reason": "Task 2.7 ⑤ 移除 L7 並行度欄位：recommended_settings 全等改為四鍵版（同時證明兩鍵不在）、新增 applied_settings 與 tier_table 各 tier 不含 l7_workers；替身 get_tier_config 移除 l7_workers=6 覆寫（real_tier_config 已無此鍵）。其餘斷言逐字保留。",
+    "preserved_assertion_lines": [
+     63,
+     65,
+     69,
+     70,
+     75,
+     80,
+     89,
+     90
+    ],
+    "new_source": "def test_hardware_endpoint_returns_valid_json(client: TestClient, monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:\n    \"\"\"測試硬體 endpoint 回傳正確 JSON 結構與建議設定（FRAMEPATH Task 2.7：L7 並行度 `l7_workers`／\n    `FFACT_L7_WORKERS`／`FFACT_L7_COMPACTOR_ENABLED` 已移除，回應不得再含）。\"\"\"\n    monkeypatch.setattr(hardware_info_service, \"psutil\", FakePsutil)\n    monkeypatch.setattr(hardware_info_service, \"get_memory_tier\", lambda: \"16gb\")\n    monkeypatch.setattr(\n        hardware_info_service,\n        \"get_tier_config\",\n        lambda tier: _tier_config(\n            tier,\n            l65_workers=6,\n            cgsa_memory_buffer=0,\n            chunk_bars=100_000,\n        ),\n    )\n    monkeypatch.setattr(settings, \"data_cache_path\", tmp_path)\n\n    response = client.get(\"/api/v1/config/hardware\")\n\n    assert response.status_code == 200\n    payload = response.json()\n    assert set(payload.keys()) == {\n        \"memory_tier\", \"cpu\", \"memory\", \"disk\", \"recommended_settings\",\n        \"applied_settings\", \"tier_table\", \"tier_thresholds_gb\",\n    }\n    assert payload[\"memory_tier\"] == \"16gb\"\n    assert payload[\"cpu\"] == {\n        \"logical_cores\": 8,\n        \"physical_cores\": 4,\n        \"usage_pct\": 23.0,\n    }\n    assert payload[\"memory\"] == {\n        \"total_gb\": 16.0,\n        \"available_gb\": 6.0,\n        \"used_pct\": 62.5,\n    }\n    assert payload[\"disk\"][\"path\"] == str(tmp_path.resolve())\n    assert payload[\"recommended_settings\"] == {\n        \"FFACT_L65_WORKERS\": 6,\n        \"FFACT_CGSA_MEMORY_BUFFER\": 0,\n        \"FFACT_MULTI_TF_MAX_WORKERS\": 2,\n        \"FFACT_LAYER3_CHUNK_SIZE\": 512,\n    }\n    assert payload[\"applied_settings\"][\"l65_workers\"][\"value\"] == 6\n    assert set(payload[\"tier_table\"]) == {\"8gb\", \"16gb\", \"24gb\", \"32gb\"}\n    assert \"l7_workers\" not in payload[\"applied_settings\"]\n    assert all(\"l7_workers\" not in tier_config for tier_config in payload[\"tier_table\"].values())\n",
+    "removed_assertion_lines": {
+     "81": "全等字典含已刪之 FFACT_L7_WORKERS／FFACT_L7_COMPACTOR_ENABLED（hardware_info_service.py:141-142，Task 2.7 ⑤ 使用者核可移除）；改為不含兩鍵之全等（其餘四鍵值不變），並另加 applied_settings／tier_table 不含 l7_workers 之斷言，未放寬"
+    }
+   },
+   "path": "tests/test_hardware_api.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD hardware_utils.py:218 l7_workers（只供已刪之 V1 並行寫入 persist_registry_to_parquet；Task 2.7 ⑤ 刪）｜承接：改寫後即承接 tier 設定鍵完整性驗證（含不含 l7_workers）；chunk_bars 同理（只由 V1 寫入讀取，Task 2.7 ⑤ 一併移除）",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_get_tier_config_returns_valid_dict"
+   },
+   "rewrite": {
+    "reason": "expected_keys 移除 l7_workers（其餘 15 鍵不變），:43 全等斷言逐字保留（同時證明 l7_workers 不在），另加 `assert \"l7_workers\" not in ...` 明示。",
+    "preserved_assertion_lines": [
+     43
+    ],
+    "new_source": "def test_get_tier_config_returns_valid_dict() -> None:\n    \"\"\"測試 get_tier_config：所有 tier 都應回傳完整設定鍵（FRAMEPATH Task 2.7：`l7_workers`、`chunk_bars` 已移除（只由已刪之 V1 寫入讀取），不得再出現）。\"\"\"\n    expected_keys = {\n        \"l65_workers\", \"cgsa_memory_buffer\",\n        \"multi_tf_max_workers\", \"layer3_chunk_size\", \"l3_persist_mode\",\n        \"l3_streaming_buffer_cols\", \"l65_split_threshold\", \"l2_category_workers\",\n        \"cgsa_shard_bytes\", \"concurrent_symbols\", \"l7_zstd_level\",\n        \"cgsa_stats_sync_cap\", \"cgsa_stats_q_sample\", \"cgsa_stats_warmup_workers\",\n    }\n\n    for tier in (\"8gb\", \"16gb\", \"24gb\", \"32gb\"):\n        assert set(hardware_utils.get_tier_config(tier).keys()) == expected_keys\n        assert \"l7_workers\" not in hardware_utils.get_tier_config(tier)\n        assert \"chunk_bars\" not in hardware_utils.get_tier_config(tier)\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/test_hardware_utils.py"
+  },
+  {
+   "phase": 2,
+   "kind": "replace-file",
+   "frame_basis": "L7 並行度只作用於 Task 2.5 刪除之 V1 並行寫入（persist_registry_to_parquet／AsyncParquetCompactor）；使用者 2026-10-08 核可移除該列（§C 可見差異第三項）；另移除 V1 寫入刪除後不再成立之「Compactor=ON（永久啟用）」說明文字｜承接：驗證：npm run build（SPEC Task 2.7）；無受影響 vitest；另移除只由已刪 V1 寫入讀取之 Chunk_Bars 列與型別欄",
+   "deleted_nodeids": [],
+   "new_content": "'use client';\n\nimport { useCallback, useEffect, useState } from 'react';\nimport { AlertCircle, ChevronDown, ChevronUp, Cpu, RefreshCw, Server } from 'lucide-react';\n\ntype TierKey = '8gb' | '16gb' | '24gb' | '32gb';\n\ninterface TierConfig {\n  l65_workers: number;\n  cgsa_memory_buffer: number;\n  multi_tf_max_workers: number;\n  layer3_chunk_size: number;\n  l3_persist_mode: string;\n  l3_streaming_buffer_cols: number;\n  l65_split_threshold: number;\n  l2_category_workers: number;\n}\n\ninterface AppliedSetting {\n  value: number | string | null;\n  source: 'auto' | 'env';\n  env_var: string;\n  env_raw: string | null;\n}\n\ninterface HardwareInfo {\n  memory_tier: TierKey;\n  cpu: {\n    logical_cores: number;\n    physical_cores: number;\n    usage_pct: number;\n  };\n  memory: {\n    total_gb: number;\n    available_gb: number;\n    used_pct: number;\n  };\n  disk: {\n    path: string;\n    free_gb: number;\n    total_gb: number;\n    used_pct: number;\n  };\n  // Backward-compat (still emitted by backend).\n  recommended_settings: {\n    FFACT_L65_WORKERS: number;\n    FFACT_CGSA_MEMORY_BUFFER: number;\n    FFACT_MULTI_TF_MAX_WORKERS: number;\n    FFACT_LAYER3_CHUNK_SIZE: number;\n  };\n  // New fields from v8fix13 optimization (single source of truth).\n  applied_settings?: Record<string, AppliedSetting>;\n  tier_table?: Record<TierKey, TierConfig>;\n}\n\n// All optimization parameters surfaced in the UI.\n// `key` matches `tier_table[tier][key]` and `applied_settings[key]`.\n// `desc` 提供 hover tooltip，說明此參數對效能 / 記憶體的影響。\nconst PARAM_ROWS: Array<{\n  key: keyof TierConfig;\n  label: string;\n  highlight?: boolean;\n  format?: (val: unknown) => string;\n  desc?: string;\n}> = [\n  {\n    key: 'l65_workers',\n    label: 'L65_WORKERS',\n    desc:\n      'Layer 6.5 預處理 ThreadPool worker 數。8GB tier 預設 2（OOM 修正：4 會在 Multi-TF + 大 group 時讓 RSS 衝破 6GB）。可由 FFACT_L65_WORKERS 覆寫。',\n  },\n  {\n    key: 'cgsa_memory_buffer',\n    label: 'CGSA_BUFFER',\n    desc: 'CGSA registry 在記憶體中緩衝的 group 數量；0 = 立即落盤（8/16GB 預設）。',\n  },\n  {\n    key: 'multi_tf_max_workers',\n    label: 'MultiTF_Workers',\n    highlight: true,\n    desc:\n      'Multi-TF 平行子進程上限。8GB 必為 1（主進程 + 1 worker 已飽和）；其他 tier 隨 RAM 增加。',\n  },\n  {\n    key: 'layer3_chunk_size',\n    label: 'L3_Chunk',\n    highlight: true,\n    desc: 'Layer 3 rolling 計算的欄位 chunk 大小，平衡 CPU cache 與 RAM。',\n  },\n  {\n    key: 'l3_persist_mode',\n    label: 'L3_Persist',\n    desc:\n      'Layer 3 持久化模式：streaming = 每個 chunk 算完即落盤（8/16GB 必須）；hybrid / in_memory 適用大 RAM。',\n  },\n  {\n    key: 'l3_streaming_buffer_cols',\n    label: 'L3_Stream_Buf',\n    desc: 'Streaming 模式下每次 flush 累積的欄位數；越小峰值越低、寫入越多。',\n  },\n  {\n    key: 'l65_split_threshold',\n    label: 'L65_Split_Thr',\n    desc:\n      '單一 group 欄位數超過此值時拆成多個 sub-task 平衡 worker。8GB 預設 2000（OOM 修正：原 4000 易在 WorldQuant 等大 group 觸發峰值）。可由 FFACT_L65_SPLIT_THRESHOLD 覆寫。',\n  },\n  {\n    key: 'l2_category_workers',\n    label: 'L2_Cat_Workers',\n    highlight: true,\n    desc:\n      'Layer 2 derived feature 各 category 並行 worker。8GB 必為 1（Multi-TF 同時跑時記憶體會疊加）。',\n  },\n];\n\nconst ALL_TIERS: TierKey[] = ['8gb', '16gb', '24gb', '32gb'];\n\nfunction getMemoryTextColor(availableGb: number): string {\n  if (availableGb < 1) return 'text-rose-300';\n  if (availableGb < 2) return 'text-amber-300';\n  return 'text-emerald-300';\n}\n\nfunction getDiskTextColor(freeGb: number): string {\n  if (freeGb < 5) return 'text-rose-300';\n  if (freeGb < 10) return 'text-amber-300';\n  return 'text-slate-200';\n}\n\nfunction formatCell(val: unknown, format?: (val: unknown) => string): string {\n  if (format) return format(val);\n  if (val == null) return '—';\n  return String(val);\n}\n\nfunction LoadingSkeleton() {\n  return (\n    <div className=\"space-y-3 animate-pulse\">\n      <div className=\"h-4 rounded bg-white/10\" />\n      <div className=\"h-4 rounded bg-white/10\" />\n      <div className=\"h-4 rounded bg-white/10\" />\n      <div className=\"h-10 rounded bg-white/10\" />\n    </div>\n  );\n}\n\nexport function HardwareStatusPanel() {\n  const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | null>(null);\n  const [isLoading, setIsLoading] = useState(true);\n  const [error, setError] = useState<string | null>(null);\n  const [isExpanded, setIsExpanded] = useState(false);\n\n  const loadHardwareInfo = useCallback(async () => {\n    setIsLoading(true);\n    setError(null);\n\n    try {\n      const response = await fetch('/api/v1/config/hardware', {\n        cache: 'no-store',\n      });\n\n      if (!response.ok) {\n        throw new Error(`HTTP ${response.status}`);\n      }\n\n      const data = (await response.json()) as HardwareInfo;\n      setHardwareInfo(data);\n    } catch {\n      setHardwareInfo(null);\n      setError('無法取得系統資訊');\n    } finally {\n      setIsLoading(false);\n    }\n  }, []);\n\n  useEffect(() => {\n    loadHardwareInfo();\n  }, [loadHardwareInfo]);\n\n  return (\n    <div className={isExpanded ? \"glass-panel rounded-2xl border border-white/10 p-5 space-y-4\" : \"glass-panel rounded-xl border border-white/10 px-4 py-2\"}>\n      <div className=\"flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between\">\n        <button\n          type=\"button\"\n          onClick={() => setIsExpanded((current) => !current)}\n          className=\"flex items-center gap-3 text-left\"\n        >\n          <div className=\"inline-flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-200\">\n            <Server className=\"h-5 w-5\" />\n          </div>\n          <div>\n            <div className=\"text-sm font-medium text-slate-100\">系統資源</div>\n            <div className=\"text-xs text-slate-400\">\n              {hardwareInfo\n                ? `Tier: ${hardwareInfo.memory_tier.toUpperCase()} · 自動偵測 / 自動套用`\n                : '讀取硬體資訊中'}\n            </div>\n          </div>\n          {isExpanded ? (\n            <ChevronUp className=\"h-4 w-4 text-slate-400\" />\n          ) : (\n            <ChevronDown className=\"h-4 w-4 text-slate-400\" />\n          )}\n        </button>\n\n        <button\n          type=\"button\"\n          onClick={loadHardwareInfo}\n          disabled={isLoading}\n          className=\"inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60\"\n        >\n          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />\n          重新整理\n        </button>\n      </div>\n\n      {isExpanded && (\n        <div className=\"space-y-4\">\n          {isLoading ? (\n            <LoadingSkeleton />\n          ) : error ? (\n            <div className=\"rounded-xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-200 flex items-center gap-2\">\n              <AlertCircle className=\"h-4 w-4 shrink-0\" />\n              <span>{error}</span>\n            </div>\n          ) : hardwareInfo ? (\n            <>\n              {/* 硬體概況：三格縮小版 */}\n              <div className=\"grid gap-2 md:grid-cols-3\">\n                <div className=\"rounded-lg border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-3\">\n                  <Cpu className=\"h-4 w-4 shrink-0 text-slate-400\" />\n                  <div>\n                    <div className=\"text-xs text-slate-200\">\n                      {hardwareInfo.cpu.logical_cores} 核（{hardwareInfo.cpu.physical_cores} 實體）\n                    </div>\n                    <div className=\"text-xs text-slate-500\">使用率 {hardwareInfo.cpu.usage_pct}%</div>\n                  </div>\n                </div>\n\n                <div className=\"rounded-lg border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-3\">\n                  <div className=\"h-4 w-4 shrink-0 text-slate-400 text-xs font-bold leading-4\">RAM</div>\n                  <div>\n                    <div className=\"text-xs text-slate-200\">{hardwareInfo.memory.total_gb.toFixed(1)} GB</div>\n                    <div className={`text-xs ${getMemoryTextColor(hardwareInfo.memory.available_gb)}`}>\n                      可用 {hardwareInfo.memory.available_gb.toFixed(1)} GB · 已用 {hardwareInfo.memory.used_pct}%\n                    </div>\n                  </div>\n                </div>\n\n                <div className=\"rounded-lg border border-white/10 bg-white/5 px-3 py-2 flex items-center gap-3\">\n                  <div className=\"h-4 w-4 shrink-0 text-slate-400 text-xs font-bold leading-4\">SSD</div>\n                  <div>\n                    <div className=\"text-xs text-slate-200\">{hardwareInfo.disk.total_gb.toFixed(1)} GB</div>\n                    <div className={`text-xs ${getDiskTextColor(hardwareInfo.disk.free_gb)}`}>\n                      可用 {hardwareInfo.disk.free_gb.toFixed(1)} GB · 已用 {hardwareInfo.disk.used_pct}%\n                    </div>\n                  </div>\n                </div>\n              </div>\n\n              {/* 套用中的設定（單一資料源 = backend tier_table[memory_tier]） */}\n              <div className=\"rounded-xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 space-y-2\">\n                <div className=\"flex items-center justify-between\">\n                  <div className=\"text-xs uppercase tracking-[0.18em] text-cyan-100/70\">\n                    套用中的設定（自動）\n                  </div>\n                  <div className=\"text-[10px] text-cyan-200/60\">\n                    來源：{hardwareInfo.applied_settings ? 'tier auto-detect / env override' : 'auto-tier'}\n                  </div>\n                </div>\n                <div className=\"grid grid-cols-2 gap-x-5 gap-y-1 text-xs text-cyan-50 sm:grid-cols-3 lg:grid-cols-4\">\n                  {PARAM_ROWS.map(({ key, label, highlight, format, desc }) => {\n                    const tierVal = hardwareInfo.tier_table?.[hardwareInfo.memory_tier]?.[key];\n                    const applied = hardwareInfo.applied_settings?.[key];\n                    const isOverride = applied?.source === 'env';\n                    const displayVal = formatCell(applied?.value ?? tierVal, format);\n                    return (\n                      <div\n                        key={String(key)}\n                        className={`flex items-baseline gap-1 ${\n                          highlight ? 'text-cyan-200' : ''\n                        }`}\n                        title={desc}\n                      >\n                        <span className=\"font-mono text-[11px] text-cyan-100/60 cursor-help\">{label}=</span>\n                        <span className=\"font-mono\">{displayVal}</span>\n                        {isOverride && (\n                          <span\n                            className=\"text-[9px] uppercase tracking-wide rounded px-1 bg-amber-400/20 text-amber-200\"\n                            title={`Overridden by env var ${applied?.env_var}=${applied?.env_raw}`}\n                          >\n                            env\n                          </span>\n                        )}\n                      </div>\n                    );\n                  })}\n                </div>\n                <div className=\"text-[10px] text-cyan-100/50\">\n                  設定可由 <code className=\"font-mono\">FFACT_*</code> 環境變數覆寫· 滑鼠移入參數名可查看說明\n                </div>\n                <div className=\"text-[10px] text-amber-200/80 leading-relaxed\">\n                  ⚠️ 8GB OOM 修正 (2026-04-25)：<code className=\"font-mono\">L65_WORKERS</code> 4→2、<code className=\"font-mono\">L65_Split_Thr</code> 4000→2000。\n                  與前端 <code>npm run dev</code> 同時跑時，可避免 L6.5 階段被 macOS SIGKILL；L6.5 時間增加 ~30-40%，交換可穩定完成。\n                </div>\n              </div>\n\n              {/* Tier 對照表（資料來自 backend tier_table，無前端硬編碼） */}\n              <div className=\"rounded-xl border border-white/10 bg-white/5 overflow-hidden\">\n                <div className=\"px-3 py-2 text-xs uppercase tracking-[0.18em] text-slate-500 border-b border-white/10\">\n                  各 Tier 參數對照（來源：hardware_utils.py，自動同步）\n                </div>\n                <div className=\"overflow-x-auto\">\n                  <table className=\"w-full text-xs\">\n                    <thead>\n                      <tr className=\"border-b border-white/10\">\n                        <th className=\"px-3 py-2 text-left font-medium text-slate-400\">參數</th>\n                        {ALL_TIERS.map((tier) => (\n                          <th\n                            key={tier}\n                            className={`px-3 py-2 text-center font-medium ${\n                              hardwareInfo.memory_tier === tier\n                                ? 'text-cyan-300 bg-cyan-400/10'\n                                : 'text-slate-400'\n                            }`}\n                          >\n                            {tier.toUpperCase()}\n                            {hardwareInfo.memory_tier === tier && (\n                              <span className=\"ml-1 text-cyan-400\">◀</span>\n                            )}\n                          </th>\n                        ))}\n                      </tr>\n                    </thead>\n                    <tbody className=\"divide-y divide-white/5\">\n                      {PARAM_ROWS.map(({ key, label, highlight, format, desc }) => (\n                        <tr key={String(key)} className=\"hover:bg-white/5\">\n                          <td\n                            className={`px-3 py-1.5 font-mono ${highlight ? 'text-cyan-200' : 'text-slate-300'} cursor-help`}\n                            title={desc}\n                          >\n                            {label}\n                          </td>\n                          {ALL_TIERS.map((tier) => {\n                            const isCurrent = hardwareInfo.memory_tier === tier;\n                            const val = hardwareInfo.tier_table?.[tier]?.[key];\n                            return (\n                              <td\n                                key={tier}\n                                className={`px-3 py-1.5 text-center font-mono ${\n                                  isCurrent\n                                    ? 'text-cyan-300 font-semibold bg-cyan-400/10'\n                                    : 'text-slate-400'\n                                }`}\n                              >\n                                {formatCell(val, format)}\n                              </td>\n                            );\n                          })}\n                        </tr>\n                      ))}\n                    </tbody>\n                  </table>\n                </div>\n              </div>\n            </>\n          ) : null}\n        </div>\n      )}\n    </div>\n  );\n}\n\nexport default HardwareStatusPanel;",
+   "path": "frontend/src/components/feature-factory/HardwareStatusPanel.tsx"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD feature_factory_service.py 清單格式瀏覽枝（:4862-4880 等，Task 2.6 刪：舊 cgsa_work 瀏覽格式）｜承接：改寫後四支 test_batch_quality_* 即以 l7_v2 承接真實 NaN／dq_v4 快取失效／暖機拆分／mid-hole 之品質彙整驗證，斷言零變動",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "_write_cgsa_manifest"
+   },
+   "rewrite": {
+    "reason": "清單格式（CGSA registry list＋parquet_path）之瀏覽讀取枝於 Task 2.6 刪除；helper 改以正式 FeatureStorage.write_raw 寫 l7_v2 run（row_index＝小時軸、同 tmp_path/features/<sym>/<tf>/<hash>）並回傳 feature_manifest.json，呼叫端與值不變。helper 無斷言。",
+    "preserved_assertion_lines": [],
+    "new_source": "def _write_cgsa_manifest(\n    tmp_path,\n    *,\n    symbol: str,\n    timeframe: str,\n    config_hash: str,\n    frame: pd.DataFrame,\n):\n    \"\"\"以正式 `FeatureStorage.write_raw` 寫 l7_v2 run 並回傳其 `feature_manifest.json`（FRAMEPATH Task 2.6：\n    CGSA registry 清單格式〔groups＝list＋parquet_path〕之瀏覽讀取分支已刪）；位置同前\n    （`features/<symbol>/<timeframe>/<config_hash>/`）、欄名與值同前。\"\"\"\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    storage = FeatureStorage(str(tmp_path / \"features\"))\n    row_index = pd.date_range(\"2026-01-01\", periods=len(frame), freq=\"h\")\n    raw_dir = storage.write_raw(\n        symbol,\n        timeframe,\n        config_hash,\n        {f\"{timeframe}_L1_{config_hash}\": frame.set_axis(row_index, axis=0)},\n        row_index=row_index,\n    )\n    return raw_dir.parent / \"feature_manifest.json\"\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/api/test_feature_factory_batch_quality.py"
+  },
+  {
+   "phase": 2,
+   "kind": "rewrite",
+   "frame_basis": "HEAD feature_factory_service.py 清單格式瀏覽枝（:4862-4880、:5241-5259 等，Task 2.6 刪）｜承接：改寫後即 l7_v2 版承接品質 adapter 真 parquet 計算驗證",
+   "deleted_nodeids": [],
+   "locator": {
+    "category": "def",
+    "qualname": "test_quality_adapter_computes_from_real_parquet_manifest"
+   },
+   "rewrite": {
+    "reason": "清單格式（CGSA registry list＋parquet_path）之瀏覽讀取枝於 Task 2.6 刪除；改以正式 FeatureStorage.write_raw 寫 ETHUSDT/1h/cfg_adapter 之 l7_v2 run（同 500 列、同兩欄同值、小時軸 row_index），compute 呼叫與五條斷言逐字保留。",
+    "preserved_assertion_lines": [
+     525,
+     526,
+     527,
+     528,
+     529
+    ],
+    "new_source": "def test_quality_adapter_computes_from_real_parquet_manifest(monkeypatch, tmp_path):\n    \"\"\"品質 adapter 經瀏覽路徑讀真 parquet run（FRAMEPATH Task 2.6：CGSA registry 清單格式之瀏覽讀取分支已刪，\n    改以正式 `FeatureStorage.write_raw` 寫 l7_v2 run；位置、欄名與值同前）。\"\"\"\n    import numpy as np\n    import pandas as pd\n\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    monkeypatch.setattr(feature_service_module.settings, \"data_cache_path\", tmp_path)\n    service = FeatureFactoryService()\n    row_index = pd.date_range(\"2026-01-01\", periods=500, freq=\"h\")\n    raw_dir = FeatureStorage(str(tmp_path / \"features\")).write_raw(\n        \"ETHUSDT\",\n        \"1h\",\n        \"cfg_adapter\",\n        {\n            \"1h_L1_adapter\": pd.DataFrame(\n                {\n                    \"feature_a\": np.arange(500, dtype=float),\n                    \"feature_b\": np.arange(500, dtype=float) + 1.0,\n                },\n                index=row_index,\n            )\n        },\n        row_index=row_index,\n    )\n    manifest_path = raw_dir.parent / \"feature_manifest.json\"\n\n    result = FeatureFactoryQualityAdapter(service).compute(str(manifest_path))\n\n    assert result[\"symbol\"] == \"ETHUSDT\"\n    assert result[\"bar_count\"] == 500\n    assert result[\"feature_count\"] == 2\n    assert result[\"constant_feature_count\"] == 0\n    assert result[\"grade\"] == \"pass\"\n",
+    "removed_assertion_lines": {}
+   },
+   "path": "tests/api/test_feature_factory_batch_resume.py"
+  },
+  {
+   "phase": 2,
+   "kind": "delete-node",
+   "frame_basis": "整支只驗 V1 版面（manifest.json＋逐組 parquet）經 legacy 轉接讀回（HEAD :209-224、:229-234）；Task 2.5 刪 V1 讀端｜承接：『parquet 無 l7_encoding_registry metadata ⇒ 原樣讀回』之 V2 解碼直通由同檔 tests/feature_engineering/test_l7_codec.py::test_codec_upgrade_disabled_fallback（:108-133，V2 processed 無 registry metadata 經 load_columns_v2 讀回）承接；raw 群組本即無 registry metadata，所有 V2 raw 讀取亦走同一直通（feature_reader.py:529-533）",
+   "deleted_nodeids": [
+    "tests/feature_engineering/test_l7_codec.py::test_old_parquet_no_metadata"
+   ],
+   "locator": {
+    "category": "def",
+    "qualname": "test_old_parquet_no_metadata"
+   },
+   "path": "tests/feature_engineering/test_l7_codec.py"
+  },
+  {
+   "phase": 2,
+   "path": "tests/feature_library/test_phase4.py",
+   "kind": "delete-node",
+   "locator": {
+    "category": "def",
+    "qualname": "test_feature_browser_service_has_feature_library"
+   },
+   "frame_basis": "Task 2.6：FeatureBrowserService 之 _load_features_df 刪後 _feature_library／_feature_reader 屬性已無用而一併刪；本測試只斷言該屬性存在",
+   "deleted_nodeids": [
+    "tests/feature_library/test_phase4.py::test_feature_browser_service_has_feature_library"
+   ]
+  },
+  {
+   "phase": 2,
+   "path": "tests/feature_engineering/test_icfirstalign_timeaxis.py",
+   "kind": "rewrite",
+   "locator": {
+    "category": "def",
+    "qualname": "_head_load_row_index_v2"
+   },
+   "rewrite": {
+    "reason": "Task 2.5：FeatureReader._resolve_manifest_v2 刪 V1 退回後改回傳 (manifest, run_dir) 兩元（不留恆假之 is_legacy 旗標）；本 mutant helper 之解包同步，突變語意不變",
+    "preserved_assertion_lines": [],
+    "removed_assertion_lines": {},
+    "new_source": "def _head_load_row_index_v2(self: FeatureReader, symbol: str, tf: str, config_hash: str,\n                            artifact_kind: str = \"raw\") -> Optional[pd.DatetimeIndex]:\n    manifest, base_dir = self._resolve_manifest_v2(symbol=symbol, tf=tf, config_hash=config_hash,\n                                                    artifact_kind=artifact_kind)\n    row_index = manifest.get(\"row_index\")\n    if row_index is None:\n        return None\n    path = self._resolve_manifest_relative_path(base_dir, row_index.get(\"path\"))\n    values = pq.read_table(str(path), columns=[\"timestamp\"]).column(\"timestamp\").to_numpy()\n    return pd.DatetimeIndex(pd.to_datetime(values, unit=\"s\"))\n"
+   },
+   "frame_basis": "非 frame；Task 2.5 私有方法回傳形狀改變之機械同步",
+   "deleted_nodeids": []
   }
  ],
  "nodeid_reasons": {},
@@ -2334,6 +3124,21 @@
    "path": "tests/api/test_framepath_api_h5.py",
    "phase": 1,
    "task": "2.3"
+  },
+  {
+   "path": "tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/manifest.json",
+   "phase": 1,
+   "task": "2.5"
+  },
+  {
+   "path": "tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/columns.json.gz",
+   "phase": 1,
+   "task": "2.5"
+  },
+  {
+   "path": "tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/g1.parquet",
+   "phase": 1,
+   "task": "2.5"
   }
  ],
  "fact_key_rows": [

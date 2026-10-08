@@ -59,7 +59,16 @@
     "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_parallel-failed]",
     "tests/test_multi_tf_generator.py::test_boundary_19_canonical_completeness_parallel_error_fail_closed",
     "tests/feature_engineering/test_batch1_followup.py 之 5 支（golden／N3／perf／real_kline_stream；模擬補丁與試作皆紅、未改其碼，HEAD 對照未單獨跑）",
-    "tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_reference_cache_source_uses_tuple_key_and_effective_ref_symbol（試作與 6e07e0ad 皆紅，審查 r20 期間補驗）"
+    "tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_reference_cache_source_uses_tuple_key_and_effective_ref_symbol（試作與 6e07e0ad 皆紅，審查 r20 期間補驗）",
+    "tests/feature_engineering/test_l7_raw_streaming.py::test_feature_factory_cgsa_generation_routes_to_l7_raw_writer（HEAD 6e07e0ad 乾淨 worktree 實跑同錯：以 __new__ 建構之 FeatureFactory 缺 _current_output_window，feature_factory.py:3859；v17 試作發現）"
   ],
-  "head_red_verification": "上列除 batch1_followup 外皆於乾淨 6e07e0ad worktree（wt0）逐支實跑同紅；lifecycle／failopen_consumer／inventory 另於主工作樹實跑同紅"
+  "head_red_verification": "上列除 batch1_followup 外皆於乾淨 6e07e0ad worktree（wt0）逐支實跑同紅；lifecycle／failopen_consumer／inventory 另於主工作樹實跑同紅",
+  "v17_trial": {
+    "date": "2026-10-08",
+    "scope": "SPEC v17 Task 2.5–2.7 生產碼試作於暫存工作樹（Phase 1＋2 試作之上），處置表 v17（203 操作）以 text_apply 套用 phase≤3，80 檔 mismatch=0",
+    "greps": "Task 2.5 A 組 0；B 組 3 命中皆非 V1（IC 三元組 list_features、IC cube store load_manifest）；Task 2.6 parquet: 0；Task 2.7 0",
+    "pytest_serial": "29 檔逐檔串行：22 檔全過；失敗 5 項＝HEAD 既有紅 4（failopen_consumer::test_training_rejects_partial、run_lifecycle 兩項、l7_raw_streaming 一項〔新列入本清單〕）＋試作引起 1（icfirstalign_timeaxis mutant helper 解包，已以處置表 rewrite 修正並重跑）",
+    "frontend_tsc": "試作與主工作樹同為既有 8 錯（FactorReturnChart.test、useFeatureFactory.batchDate.test）＋2 條暫存路徑大小寫之環境假錯；HardwareStatusPanel 變更零型別錯",
+    "behavior_probe": "只有 V1 之目錄 ⇒ *_v2 讀取皆 FileNotFoundError 且訊息不提 V1；coverage 無資料；V2 往返不變；IC /features/list 帶 parquet:／.h5 ⇒ 400"
+  }
 }

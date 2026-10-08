@@ -411,3 +411,122 @@ def test_mutation_register_route_without_value_error_handler_is_detected():
     for bad in (nested, not_400, call_outside, handler_nested, handler_cond, inner_500, wrong_receiver, in_if_false,
                 in_with):
         assert not route_maps_value_error_to_400(bad)
+
+
+# ---------------------------------------------------------------- Task 2.5–2.7（SPEC v17：V1 版面與已無用舊格式）
+
+V1_REMOVED_SYMBOLS = (
+    "persist_registry_to_parquet", "AsyncParquetCompactor", "_write_v7_manifest", "_write_columns_json_gz",
+    "FFACT_L7_WORKERS", "FFACT_L7_COMPACTOR", "_adapt_legacy_manifest_v2", "_list_features_from_parquet",
+    "legacy_v7", "FFACT_HDF5_CHUNK", "FFACT_HDF5_GZIP", "_build_2d_chunks", "_build_1d_chunks",
+    "feature_file_exists", "list_feature_files", "export_for_ml", "FFACT_DSTAR_CACHE_MIGRATE_LEGACY",
+    "migrate_d_star_cache", "l7_workers", "hdf5_cache_compression",
+)
+V1_READER_CALLS = ("load_manifest", "list_features", "load_columns", "stream_groups", "load_cross_symbol")
+
+
+V1_READER_CLASSES = (("momentum/FeatureEngineering/feature_reader.py", "FeatureReader"),
+                     ("momentum/core/protocols.py", "IFeatureReader"))
+
+
+def v1_symbol_hits(sources) -> list:
+    """Task 2.5–2.7 刪除之符號殘留（字面）。V1 讀取方法另由 `v1_reader_methods` 以 AST 判（同名之他類 API——如 IC
+    cube store 之 `load_manifest`、IC 服務三元組 `list_features`——不在刪除範圍，不以字面判）。"""
+    return [(path, s) for path, src in sources for s in V1_REMOVED_SYMBOLS if s in src]
+
+
+def v1_reader_methods(class_sources) -> list:
+    """`FeatureReader`／`IFeatureReader` 類別本體內定義之 V1 讀取方法（`*_v2` 不計）。"""
+    import ast
+
+    hits = []
+    for (path, cls), src in class_sources:
+        for node in ast.walk(ast.parse(src)):
+            if isinstance(node, ast.ClassDef) and node.name == cls:
+                hits += [(path, n.name) for n in node.body
+                         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in V1_READER_CALLS]
+    return hits
+
+
+def test_boundary_13_v1_and_dead_format_symbols_absent():
+    """SPEC v17 Task 2.5／2.7 驗證之符號清零（momentum／api／scripts）；`frontend/src` 另驗 `l7_workers`。"""
+    assert v1_symbol_hits(_py_sources(("momentum", "api", "scripts"))) == []
+    assert v1_reader_methods([(pc, (REPO / pc[0]).read_text(encoding="utf-8")) for pc in V1_READER_CLASSES]) == []
+    tsx = [p for p in (REPO / "frontend" / "src").rglob("*.ts*") if "l7_workers" in p.read_text(encoding="utf-8")]
+    assert tsx == []
+
+
+def test_mutation_v1_symbol_scan_detects_residue():
+    """符號清零檢查可證偽：殘留已刪符號 ⇒ 命中；FeatureReader／IFeatureReader 留 V1 讀取方法 ⇒ 命中；`*_v2` 方法、
+    他類同名 API（IC cube store `load_manifest`）不命中。"""
+    assert v1_symbol_hits([("m.py", "x = 'persist_registry_to_parquet'\n")]) != []
+    assert v1_symbol_hits([("m.py", "store.load_manifest(root, tid)\n")]) == []
+    key = ("momentum/FeatureEngineering/feature_reader.py", "FeatureReader")
+    residue = "class FeatureReader:\n    def stream_groups(self, s, h):\n        pass\n"
+    clean = "class FeatureReader:\n    def stream_groups_v2(self, s, t, h):\n        pass\n"
+    other = "class CubeStore:\n    def load_manifest(self, r, t):\n        pass\n"
+    assert v1_reader_methods([(key, residue)]) == [(key[0], "stream_groups")]
+    assert v1_reader_methods([(key, clean)]) == [] and v1_reader_methods([(key, other)]) == []
+
+
+V1_FIXTURE = REPO / "tests" / "_golden" / "framepath" / "v1_layout"
+V1_SYMBOL, V1_HASH, V1_TF = "FPV1USDT", "cfgv1fixture", "1h"
+
+
+def _v1_only_root(tmp_path: Path) -> Path:
+    """只有 V1 版面之 base_path：複製錨點碼態 V1 寫入器產出之真 fixture（handoffs/run_receipts/framepath_probes/
+    make_v1_fixture.py）；錨點碼態下 V2 讀者會退回讀出它、coverage V7 枝會讀出它 ⇒ 下列驗收於錨點紅、實作後綠。"""
+    import shutil
+
+    root = tmp_path / "v1only"
+    shutil.copytree(V1_FIXTURE, root)
+    return root
+
+
+def test_boundary_14_v2_reader_does_not_fall_back_to_v1(tmp_path):
+    """Task 2.5：V2 manifest 缺而同目錄有 V1 版面 ⇒ `load_manifest_v2` 拋 `FileNotFoundError`（訊息含 V2
+    `feature_manifest.json` 路徑），FeatureLibrary 同情境拋 `FeatureNotFoundError`；不讀 V1。"""
+    root = _v1_only_root(tmp_path)
+    with pytest.raises(FileNotFoundError) as exc:
+        FeatureReader(str(root)).load_manifest_v2(V1_SYMBOL, V1_TF, V1_HASH)
+    assert "feature_manifest.json" in str(exc.value)
+    lib = _library(root, tmp_path / "v1only_registry.json")
+    with pytest.raises(FeatureNotFoundError):
+        lib.load(V1_SYMBOL, V1_TF, config_hash=V1_HASH)
+
+
+def test_boundary_15_coverage_ignores_v1_layout(tmp_path):
+    """Task 2.6：只有 V1 目錄之 symbol ⇒ coverage 回無資料（V7 掃描枝已刪）。"""
+    root = _v1_only_root(tmp_path)
+    assert create_coverage_analyzer()._load_symbol_features(V1_SYMBOL, V1_TF, str(root)) is None
+
+
+@pytest.fixture
+def ic_app() -> FastAPI:
+    from api.routes.ic_analysis import router as ic_router
+
+    test_app = FastAPI()
+    test_app.include_router(ic_router)
+    return test_app
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("features_path", ["parquet:BTCUSDT:abc123", "/tmp/legacy_features.h5"])
+async def test_boundary_16_ic_feature_list_old_address_is_400(ic_app, features_path):
+    """Task 2.6：IC `/features/list` 帶 `features_path`（舊 `parquet:` 位址或 h5 檔）⇒ HTTP 400，訊息指向
+    symbol／timeframe／config_hash；不再讀 V1 或舊 h5。"""
+    transport = httpx.ASGITransport(app=ic_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        resp = await c.get("/api/v1/ic/features/list", params={"features_path": features_path})
+    assert resp.status_code == 400
+    assert "config_hash" in resp.text
+
+
+def test_mutation_ic_list_old_address_branch_restored_is_detected(monkeypatch):
+    """還原 IC `parquet:` 枝（帶 features_path 時讀出清單）⇒ service 不再拋 ValueError（驗收之前提翻轉）。"""
+    from api.services.ic_analysis_service import ICAnalysisService
+
+    monkeypatch.setattr(ICAnalysisService, "list_features",
+                        lambda self, features_path=None, meta_path=None, **kw: [{"name": "framepath_v1"}])
+    service = ICAnalysisService.__new__(ICAnalysisService)
+    assert service.list_features(features_path="parquet:BTCUSDT:abc123") == [{"name": "framepath_v1"}]

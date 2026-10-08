@@ -1,0 +1,31 @@
+{
+  "version": "7.0",
+  "symbol": "FPV1USDT",
+  "config_hash": "cfgv1fixture",
+  "created_at": "2026-10-08T14:40:37.583865",
+  "total_features": 3,
+  "total_rows": 4,
+  "dtype": "float16",
+  "groups": {
+    "g1": {
+      "file": "g1.parquet",
+      "column_count": 3,
+      "columns": [
+        "fpv1_a",
+        "fpv1_b",
+        "fpv1_c"
+      ],
+      "dtype": "float16"
+    }
+  },
+  "dtype_summary": {
+    "counts": {
+      "float16": 1
+    },
+    "column_counts": {
+      "float16": 3
+    },
+    "float32_fallback_count": 0,
+    "float32_fallback_parts": []
+  }
+}

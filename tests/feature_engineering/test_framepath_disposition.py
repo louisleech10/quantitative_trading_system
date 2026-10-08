@@ -918,6 +918,11 @@ def preserved_position_errors(head_func: ast.AST, new_def: ast.AST,
     return errs
 
 
+def multiline_str_lines(node: ast.AST) -> List[int]:
+    return [n.lineno for n in ast.walk(node)
+            if isinstance(n, ast.Constant) and isinstance(n.value, str) and "\n" in n.value]
+
+
 def check_3(disp: Dict[str, Any], phase: int, head: HeadReader) -> List[str]:
     errs = []
     for op in ops_in(disp, phase):
@@ -931,6 +936,10 @@ def check_3(disp: Dict[str, Any], phase: int, head: HeadReader) -> List[str]:
             continue
         if sha256_text(ast_dump(new_def)) != rw["new_source_ast_sha256"]:
             errs.append(f"③ {op['id']} 改寫後全文 AST 雜湊不符")
+        if "." in op["locator"].get("qualname", "") and multiline_str_lines(new_def):
+            # v17 試作實證：類別方法之凍結全文縮排自 0 起，實作時須縮排入類別，多行字串（docstring 等）之內容隨之
+            # 改變 ⇒ ② 之整模組 AST 必不等；凍結全文不得含多行字串常數
+            errs.append(f"③ {op['id']} 類別方法改寫全文含多行字串常數（L{multiline_str_lines(new_def)}），縮排後值會變")
         head_src = (head.read(op["path"]) or b"").decode("utf-8")
         try:
             pres = preserved_assertion_dumps(head_src, rw["preserved_assertions"])
@@ -1704,6 +1713,22 @@ def test_mutation_check_3_removed_assertion_residue_and_same_line_are_red():
     assert run(two, "def test_r():\n    assert a()\n", [2], [3]) == []
     assert run(two, "def test_r():\n    assert a()\n    return\n    assert b()\n", [2], [3]) != []
     assert run(two, "def test_r():\n    assert a()\n    assert b()\n", [2], [3]) != []
+
+
+def test_mutation_check_3_method_rewrite_multiline_string_is_red():
+    """v17 試作：類別方法改寫全文含多行 docstring ⇒ ③紅（縮排入類別後字串值改變，② 必不等）；單行 ⇒ 綠。"""
+    head = "class TestK:\n    def test_m(self):\n        assert a()\n"
+    item = [{"lineno": 3, "ast_sha256": sha256_text(ast_dump(ast.parse("assert a()").body[0]))}]
+
+    def errs(new_src: str) -> List[str]:
+        rw = {"reason": "r", "preserved_assertions": item, "removed_assertions": [], "new_source": new_src,
+              "new_source_ast_sha256": sha256_text(ast_dump(parse_rewrite_source(new_src)))}
+        op = {"id": "OP-K", "phase": 1, "kind": "rewrite", "path": "t.py",
+              "locator": {"category": "def", "qualname": "TestK.test_m"}, "rewrite": rw}
+        return check_3({"operations": [op]}, 1, _SrcHead(head))
+
+    assert errs('def test_m(self):\n    """one line."""\n    assert a()\n') == []
+    assert errs('def test_m(self):\n    """two\n    lines."""\n    assert a()\n') != []
 
 
 def test_mutation_check_3_duplicate_preserved_assertions_need_one_to_one_match():
