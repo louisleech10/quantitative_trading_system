@@ -292,6 +292,13 @@ def _defs(src: str) -> List[str]:
 
 
 def _referenced_names(sources: Iterable[Tuple[str, str]]) -> Dict[str, int]:
+    """引用計數：`ast.Name`、`ast.Attribute` 之名稱，加上封閉之動態 lookup 形式中之字串常數（審查 r25
+    CODEX-R25-P1-02：任意識別字字串不計，否則文件字串、fixture label 即可讓死碼消失）——
+    呼叫名 ∈ {getattr, hasattr, setattr, delattr, object}（含 `monkeypatch.setattr`、`patch.object`）之第 2 個位置
+    引數為字串常數 ⇒ 計該字串；呼叫名 ∈ {setattr, delattr, patch} 之第 1 個位置引數為含 `.` 之字串常數 ⇒ 計其最後一段
+    （`monkeypatch.setattr("a.b._x", …)`、`patch("a.b._x")`）。"""
+    second_arg_calls = {"getattr", "hasattr", "setattr", "delattr", "object"}
+    dotted_first_arg_calls = {"setattr", "delattr", "patch"}
     counts: Dict[str, int] = {}
     for _path, src in sources:
         try:
@@ -299,21 +306,30 @@ def _referenced_names(sources: Iterable[Tuple[str, str]]) -> Dict[str, int]:
         except SyntaxError:
             continue
         for node in ast.walk(tree):
-            name = None
+            names: List[str] = []
             if isinstance(node, ast.Name):
-                name = node.id
+                names.append(node.id)
             elif isinstance(node, ast.Attribute):
-                name = node.attr
-            elif isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.isidentifier():
-                name = node.value
-            if name:
-                counts[name] = counts.get(name, 0) + 1
+                names.append(node.attr)
+            elif isinstance(node, ast.Call):
+                func = node.func
+                call = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
+                args = node.args
+                if call in second_arg_calls and len(args) >= 2 and isinstance(args[1], ast.Constant) \
+                        and isinstance(args[1].value, str):
+                    names.append(args[1].value)
+                if call in dotted_first_arg_calls and args and isinstance(args[0], ast.Constant) \
+                        and isinstance(args[0].value, str) and "." in args[0].value:
+                    names.append(args[0].value.rsplit(".", 1)[-1])
+            for name in names:
+                if name:
+                    counts[name] = counts.get(name, 0) + 1
     return counts
 
 
 def dead_defs(scan_sources: Iterable[Tuple[str, str]], ref_sources: Iterable[Tuple[str, str]]) -> Set[str]:
     """`scan_sources` 內之 def（模組層函式與類別方法）中，非公開入口（名稱以單底線起、非 dunder）且於
-    `ref_sources` 全部 .py 之 Name／Attribute／識別字字串常數零出現者（qualname 集合）。"""
+    `ref_sources` 全部 .py 之 Name／Attribute／封閉動態 lookup 字串（見 `_referenced_names`）零出現者（qualname 集合）。"""
     refs = _referenced_names(ref_sources)
     out: Set[str] = set()
     for _path, src in scan_sources:
@@ -376,3 +392,13 @@ def test_mutation_dead_scan_counts_added_zero_reference_def():
     nested = [("m.py", "def outer():\n    def _orphan_nested_probe():\n        pass\n    return 1\n\n"
                        "class B:\n    class C:\n        def _orphan_inner_method(self):\n            pass\n")]
     assert dead_defs(nested, [("n.py", "outer()\nB.C\n")]) == {"outer._orphan_nested_probe", "B.C._orphan_inner_method"}
+    # 審查 r25 CODEX-R25-P1-02：同名字串（label、文件字串、dict 鍵、非 lookup 呼叫）不算引用
+    orphan = [("m.py", "def _orphan():\n    pass\n")]
+    for ref in ("label = '_orphan'\n", "'''_orphan'''\n", "d = {'_orphan': 1}\n", "log('_orphan')\n",
+                "getattr(obj)\n", "patch('_orphan')\n"):
+        assert dead_defs(orphan, [("n.py", ref)]) == {"_orphan"}, ref
+    # 封閉動態 lookup 形式仍算引用
+    for ref in ("getattr(m, '_orphan')()\n", "hasattr(m, '_orphan')\n", "monkeypatch.setattr(m, '_orphan', f)\n",
+                "monkeypatch.setattr('pkg.m._orphan', f)\n", "patch('pkg.m._orphan')\n",
+                "patch.object(m, '_orphan')\n", "delattr(m, '_orphan')\n"):
+        assert dead_defs(orphan, [("n.py", ref)]) == set(), ref

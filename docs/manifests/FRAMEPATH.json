@@ -193,11 +193,11 @@
       }
     ],
     "risk_mitigation": [
-      "contract_sha256 tests/_golden/framepath/test_disposition.json 5948e00f8c0d4a48cad43bc00f0055b2c609cf1c5f23cdb1ac522d63a3938db9",
+      "contract_sha256 tests/_golden/framepath/test_disposition.json 8f68f161077e1835e055dfe6363ee1a84ce8fffb33a91068c71c2b3257f5e76b",
       "contract_sha256 tests/_golden/framepath/compare_domain.json 9a36f3467ae7246e2768ec23efcc2fff64f43277ac0944da44553fde1aa70b50",
       "contract_sha256 tests/feature_engineering/test_framepath_invariance.py 36860b3af122cda77d9a5fe71599c2d08a56e5c71babbb200e0c7ba455a01ca3",
-      "contract_sha256 tests/feature_engineering/test_framepath_cgsa_only.py 5412e9b4a9e23574e212d81f1345456a3661546762c2432634cb94ee033d2c2a",
-      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py e4a59f051c69e1fdf968c86ed0317f84fa6174283058bd974779f1e0dcce27e8",
+      "contract_sha256 tests/feature_engineering/test_framepath_cgsa_only.py 343cf56d746b53ca79674475d648f7045504a88bee973dd71dafb4ce71fb7ed1",
+      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py 3d2f79e0dffb3b4dd0bb1310cf19333e6a24848197db76833a4049ac14c42b5e",
       "contract_sha256 tests/api/test_framepath_api_h5.py ce7ddfc8bb1e8b3aca2a65b5fa0e382d0454a4a71a841361367e9ad5ca66f1b3",
       "分批：b1＝Phase 1（Task 1.1→1.2→1.3→1.4→1.5；處置表 phase=1 之列，含 scripts/fix_spec_v1_to_v1_1.py 刪檔與 scripts/freeze_batch2d_baseline.py::_registry_layer_map 改寫）；b2＝Phase 2（Task 2.1–2.4，phase=2 之列）；b3＝Phase 3（Task 3.1–3.2，phase=3 之列）；b4＝Phase 4（Task 4.1–4.2 收案）。每批收尾以 FRAMEPATH_PHASE=<批 Phase> 跑 test_framepath_disposition.py（E＝phase ≤ 本批）",
       "b1 首步＝Task 1.1：於 HEAD 6e07e0ad 碼態實作並執行 scripts/freeze_framepath_baseline.py freeze（任何生產碼改動之前），產 tests/_golden/framepath/cgsa_fingerprint.json；凍結腳本與 test_framepath_invariance.py 之比對器、記憶體閘、compare_domain 驗證於此實作（TODO 只凍結介面與斷言）",
@@ -213,7 +213,8 @@
       "處置閘⑤(b)與⑦皆不判路徑含 `__pycache__/` 者（repo 內已追蹤之 numba／位元組碼快取，任一測試執行即改寫；SPEC v16 補充）",
       "Task 1.1 凍結（審查 r17–r21）：freeze 先以 code_state_errors 實核 momentum／api／config 與 6e07e0ad 逐位元相同，否則不產輸出；基準之 code_anchor／head_commit 由 resolve_commits 兩次獨立解析；每格 receipt 記 resume_entered（resume_from_manifest 對本格 work dir 之實際呼叫，C5 須 True、其餘 False；SPEC v16 A10：已完成 run 之 resume 回傳空 registry、L1–L6 重算，C5 驗輸出不變）",
       "四支具名驗收測試之 sha256 記於本 manifest 之 contract_sha256 列，處置驗證器 ⓪（test_check_0_frozen_acceptance_tests_unchanged）機檢；實作期需改測試者回 TODO 重審並更新 manifest（審查 r22）；HEAD_DEAD 須等於收據 20261008-framepath-dead-scan-head.json",
-      "git 歷史凍結次序（審查 r23，test_check_0_history_freeze_order 機檢）：錨點後首個改動 momentum／api／config 之提交起，不得再有改動四支驗收測試或本 manifest 之提交；cgsa_fingerprint.json 須於生產碼改動前之提交加入且之後不得改寫——b1 須先提交凍結基準、再提交生產碼；實作期如需改 TODO 落點，須回 TODO 重審並於生產碼改動前完成"
+      "git 歷史凍結次序（審查 r23，test_check_0_history_freeze_order 機檢）：錨點後首個改動 momentum／api／config 之提交起，不得再有改動四支驗收測試或本 manifest 之提交；cgsa_fingerprint.json 須於生產碼改動前之提交加入且之後不得改寫——b1 須先提交凍結基準、再提交生產碼；實作期如需改 TODO 落點，須回 TODO 重審並於生產碼改動前完成",
+      "審查 r25（SPEC v16 A11）：處置閘③ 以 preserved_position_errors 判保留斷言位置等價（祖先鏈子序列、不在終止敘述後、不新增 skip／xfail 裝飾器）；⑤(b) 以 ignored_since_anchor 只計 mtime 不早於錨點提交時間之被忽略檔，ignored_baseline 由 build_disposition.py --clean-worktree 於乾淨 detached worktree 凍結（＝[]）；Task 1.4 之 _referenced_names 只計 Name／Attribute 與封閉動態 lookup 字串（getattr／hasattr／setattr／delattr／patch.object 第 2 引數、setattr／delattr／patch 之點分第 1 引數），HEAD_DEAD 重算不變"
     ],
     "coverage_risk": [
       "Task 1.1：test_framepath_invariance（C1–C9 逐格無容差、C5＝C1、run_status、記憶體閘、C9 前置條件、compare_domain 禁排除鍵與非純量、注入讀數拒跑、比對器無週期／標的字面、兩 mutant）；M1–M4 worktree mutation 收據",

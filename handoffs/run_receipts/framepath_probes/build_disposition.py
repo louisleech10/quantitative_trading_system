@@ -9,8 +9,10 @@
 - collect 檔集合＝母體與操作表 path 中位於 tests/ 之 .py；nodeid 表＝其於 HEAD 碼態之 `pytest --collect-only`
   （主工作樹之 .py 與 6e07e0ad 相同，收據記錄核對）；
 - 摘錄、摘錄雜湊、保留斷言雜湊、改寫後全文雜湊、replace-file 新檔雜湊：一律呼叫驗證器同一函式；
-- ignored_baseline：主工作樹以 SPEC ⑤(b) 同一命令與過濾凍結。
-用法：PYTHONPATH=. venv/bin/python handoffs/run_receipts/framepath_probes/build_disposition.py --decisions <檔> --out <檔>
+- ignored_baseline：於 `--clean-worktree`（當前提交之乾淨 detached worktree，非主工作樹）以 SPEC ⑤(b) 同一命令與
+  副檔名／__pycache__ 過濾凍結（審查 r25 GROK-R25-P1-01；主工作樹之本機被忽略檔不得進基線）。
+用法：PYTHONPATH=. venv/bin/python handoffs/run_receipts/framepath_probes/build_disposition.py --decisions <檔> --out <檔> \
+      --clean-worktree <git worktree add --detach 之路徑>
 """
 
 from __future__ import annotations
@@ -49,10 +51,19 @@ def population(head: str) -> list:
     return sorted(files - set(EXCLUDED))
 
 
+def clean_ignored(wt: Path) -> list:
+    if subprocess.run(["git", "-C", str(wt), "status", "--porcelain"], capture_output=True, text=True, check=True).stdout:
+        raise SystemExit(f"--clean-worktree 非乾淨：{wt}")
+    out = subprocess.run(["git", "-C", str(wt), "ls-files", "--others", "--ignored", "--exclude-standard", "--", *V.R_ROOTS],
+                         capture_output=True, text=True, check=True).stdout
+    return V._filter_ignored(out.splitlines())
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--decisions", required=True)
     ap.add_argument("--out", required=True)
+    ap.add_argument("--clean-worktree", required=True)
     args = ap.parse_args()
     dec = json.loads(Path(args.decisions).read_text(encoding="utf-8"))
     head = git("rev-parse", V.HEAD_SHORT).strip()
@@ -152,7 +163,7 @@ def main() -> int:
         "operations": ops,
         "new_files": dec["new_files"],
         "fact_key_rows": dec["fact_key_rows"],
-        "ignored_baseline": V.git_ignored(),
+        "ignored_baseline": clean_ignored(Path(args.clean_worktree)),
     }
     Path(args.out).write_text(json.dumps(disp, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(f"population={len(pop)} collect_files={len(collect_files)} nodeids={len(rows)} ops={len(ops)} "

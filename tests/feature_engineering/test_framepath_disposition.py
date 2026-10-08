@@ -783,6 +783,115 @@ def check_2(disp: Dict[str, Any], phase: int, head: HeadReader,
     return errs
 
 
+# 審查 r25 CODEX-R25-P1-01：保留斷言須「位置等價」，不只語法存在。封閉規則（白名單）：
+# (i) 改寫後該斷言之祖先鏈（函式內各層複合節點之標頭傾印＋下一層所在欄位）須為 HEAD 祖先鏈之子序列——
+#     只准拿掉外層（如刪 frame 分支後縮排上移），不准新增任何外層（`if False`、try、with、內層 def 等皆紅）；
+# (ii) 沿途每一層區塊中，位於其前之兄弟敘述不得為終止敘述（return／raise／continue／break，或呼叫名為
+#     skip／xfail／exit／_exit 之運算式敘述）；
+# (iii) 改寫後函式不得新增 HEAD 所無之 skip／skipif／xfail 裝飾器。
+_TERMINAL_CALL_NAMES = frozenset({"skip", "xfail", "exit", "_exit"})
+_SKIP_MARKER_NAMES = frozenset({"skip", "skipif", "xfail"})
+_BODY_FIELDS = ("body", "orelse", "finalbody", "handlers", "cases")
+
+
+def _header_node(node: ast.AST) -> ast.AST:
+    shallow = copy.copy(node)
+    for field in _BODY_FIELDS:
+        if isinstance(getattr(shallow, field, None), list):
+            setattr(shallow, field, [])
+    return shallow
+
+
+def _call_name(node: ast.AST) -> Optional[str]:
+    func = node.func if isinstance(node, ast.Call) else node
+    if isinstance(func, ast.Call):
+        func = func.func
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
+
+
+def _is_terminal(stmt: ast.stmt) -> bool:
+    if isinstance(stmt, (ast.Return, ast.Raise, ast.Continue, ast.Break)):
+        return True
+    return isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call) \
+        and _call_name(stmt.value) in _TERMINAL_CALL_NAMES
+
+
+Link = Tuple[ast.AST, str]  # (祖先節點之標頭〔區塊欄位清空〕, 下一層所在欄位)
+
+
+def _stmt_paths(func: ast.AST) -> List[Tuple[str, List[Link], bool]]:
+    """func 內每個敘述 → (傾印, 祖先鏈〔不含 func 本身〕, 沿途是否位於前置終止敘述之後)。"""
+    out: List[Tuple[str, List[Link], bool]] = []
+
+    def walk(owner: ast.AST, chain: List[Link], blocked: bool) -> None:
+        for field, val in ast.iter_fields(owner):
+            if field not in _BODY_FIELDS or not isinstance(val, list):
+                continue
+            here = chain if owner is func else chain + [(_header_node(owner), field)]
+            seen_terminal = blocked
+            for child in val:
+                if not isinstance(child, ast.AST):
+                    continue
+                if isinstance(child, ast.stmt):
+                    out.append((ast_dump(child), here, seen_terminal))
+                walk(child, here, seen_terminal)
+                if isinstance(child, ast.stmt) and _is_terminal(child):
+                    seen_terminal = True
+
+    walk(func, [], False)
+    return out
+
+
+def _literal_elts(node: ast.AST) -> Optional[List[str]]:
+    return [ast_dump(e) for e in node.elts] if isinstance(node, (ast.Tuple, ast.List)) else None
+
+
+def _link_matches(new: Link, head: Link) -> bool:
+    """同種類、同欄位且標頭傾印相等；唯一放寬：for 迴圈之 iter 為 tuple／list 字面且新元素為 HEAD 元素之非空子集
+    （刪 frame 迭代元素），target 須相等。"""
+    (nn, nf), (hn, hf) = new, head
+    if type(nn) is not type(hn) or nf != hf:
+        return False
+    if ast_dump(nn) == ast_dump(hn):
+        return True
+    if isinstance(nn, (ast.For, ast.AsyncFor)) and ast_dump(nn.target) == ast_dump(hn.target):
+        ne, he = _literal_elts(nn.iter), _literal_elts(hn.iter)
+        if ne is not None and he is not None and ne and set(ne) <= set(he):
+            rest_n, rest_h = copy.copy(nn), copy.copy(hn)
+            rest_n.iter = rest_h.iter = ast.Tuple(elts=[], ctx=ast.Load())
+            return ast_dump(rest_n) == ast_dump(rest_h)
+    return False
+
+
+def _is_subsequence(sub: Sequence[Link], seq: Sequence[Link]) -> bool:
+    it = iter(seq)
+    return all(any(_link_matches(x, y) for y in it) for x in sub)
+
+
+def _skip_markers(func: ast.AST) -> Set[str]:
+    return {ast_dump(d) for d in getattr(func, "decorator_list", []) if _call_name(d) in _SKIP_MARKER_NAMES}
+
+
+def preserved_position_errors(head_func: ast.AST, new_def: ast.AST, dump: str) -> Optional[str]:
+    """保留斷言（HEAD 傾印＝dump）於改寫後函式之位置等價判定；None＝合格。"""
+    head_hits = [(c, b) for d, c, b in _stmt_paths(head_func) if d == dump]
+    if not head_hits:
+        return "不在 HEAD 被改寫函式內"
+    new_hits = [(c, b) for d, c, b in _stmt_paths(new_def) if d == dump]
+    if not new_hits:
+        return "未出現於改寫後全文"
+    for new_chain, new_blocked in new_hits:
+        if new_blocked:
+            continue
+        if any(_is_subsequence(new_chain, head_chain) for head_chain, _ in head_hits):
+            return None
+    return "改寫後位置不等價（新增外層控制結構或位於終止敘述之後）"
+
+
 def check_3(disp: Dict[str, Any], phase: int, head: HeadReader) -> List[str]:
     errs = []
     for op in ops_in(disp, phase):
@@ -796,18 +905,21 @@ def check_3(disp: Dict[str, Any], phase: int, head: HeadReader) -> List[str]:
             continue
         if sha256_text(ast_dump(new_def)) != rw["new_source_ast_sha256"]:
             errs.append(f"③ {op['id']} 改寫後全文 AST 雜湊不符")
-        new_dumps = {ast_dump(n) for n in ast.walk(new_def) if isinstance(n, ast.stmt)}
         head_src = (head.read(op["path"]) or b"").decode("utf-8")
         try:
             pres = preserved_assertion_dumps(head_src, rw["preserved_assertions"])
-        except LocatorError as exc:
+            head_func = resolve_locator(ast.parse(head_src), "rewrite", op["locator"]).node
+        except (SyntaxError, LocatorError) as exc:
             errs.append(f"③ {op['id']}：{exc}")
             continue
+        if _skip_markers(new_def) - _skip_markers(head_func):
+            errs.append(f"③ {op['id']} 改寫後函式新增 skip／skipif／xfail 裝飾器")
         for (lineno, dump), item in zip(pres, rw["preserved_assertions"]):
             if sha256_text(dump) != item["ast_sha256"]:
                 errs.append(f"③ {op['id']} 保留斷言 L{lineno} 之 HEAD 雜湊不符")
-            if dump not in new_dumps:
-                errs.append(f"③ {op['id']} 保留斷言 L{lineno} 未出現於改寫後全文")
+            why = preserved_position_errors(head_func, new_def, dump)
+            if why:
+                errs.append(f"③ {op['id']} 保留斷言 L{lineno}：{why}")
     return errs
 
 
@@ -865,9 +977,21 @@ def git_added_and_untracked() -> Set[str]:
     return out
 
 
+def anchor_commit_time() -> int:
+    return int(_git("show", "-s", "--format=%ct", HEAD_SHORT).decode().strip())
+
+
+def ignored_since_anchor(paths: Iterable[str], anchor_ct: int,
+                         mtime=lambda p: (REPO / p).stat().st_mtime) -> List[str]:
+    """⑤(b) 之計入集合（SPEC v16 A11；審查 r25 GROK-R25-P1-01）：過濾後之被忽略檔中，mtime 不早於錨點 6e07e0ad
+    提交時間者。錨點之前即存在之本機被忽略檔（非本票產物，乾淨 worktree 不存在）不計，使⑤(b) 於主工作樹與乾淨
+    worktree 同義；以保留舊 mtime 之複製或 `touch` 回撥時間屬蓄意繞過，不在本閘防範範圍。"""
+    return sorted(p for p in _filter_ignored(paths) if mtime(p) >= anchor_ct)
+
+
 def git_ignored() -> List[str]:
-    return _filter_ignored(_git("ls-files", "--others", "--ignored", "--exclude-standard", "--", *R_ROOTS)
-                           .decode().splitlines())
+    return ignored_since_anchor(_git("ls-files", "--others", "--ignored", "--exclude-standard", "--", *R_ROOTS)
+                                .decode().splitlines(), anchor_commit_time())
 
 
 def check_5(disp: Dict[str, Any], phase: int, added: Set[str], ignored: List[str],
@@ -1308,6 +1432,69 @@ def test_mutation_rewrite_differs_from_frozen_text_is_red():
     assert not _eq(_SAMPLE, bad, ops)
 
 
+class _SrcHead:
+    def __init__(self, src: str) -> None:
+        self.src = src
+
+    def read(self, path: str) -> bytes:
+        return self.src.encode("utf-8")
+
+
+_POS_HEAD = (
+    "def test_p():\n"
+    "    for name in ('frame', 'cgsa'):\n"
+    "        if name == 'frame':\n"
+    "            run_frame()\n"
+    "        else:\n"
+    "            assert ok(name)\n"
+    "    assert done()\n"
+)
+
+
+def _pos_errs(new_src: str) -> List[str]:
+    tree = ast.parse(_POS_HEAD)
+    items = [{"lineno": n.lineno, "ast_sha256": sha256_text(ast_dump(n))}
+             for n in ast.walk(tree) if isinstance(n, ast.Assert)]
+    rw = {"reason": "r", "preserved_assertions": items, "new_source": new_src,
+          "new_source_ast_sha256": sha256_text(ast_dump(parse_rewrite_source(new_src)))}
+    op = {"id": "OP-X", "phase": 1, "kind": "rewrite", "path": "t.py",
+          "locator": {"category": "def", "qualname": "test_p"}, "rewrite": rw}
+    return check_3({"operations": [op]}, 1, _SrcHead(_POS_HEAD))
+
+
+def test_mutation_check_3_preserved_assertion_position():
+    """審查 r25 CODEX-R25-P1-01：保留斷言移入永不執行之分支、終止敘述之後、新外層或新 skip 裝飾器 ⇒ ③紅；
+    只拿掉 frame 外層（縮排上移）或刪 for 字面中之 frame 元素 ⇒ ③綠。"""
+    ok = "def test_p():\n    for name in ('cgsa',):\n        assert ok(name)\n    assert done()\n"
+    assert _pos_errs(ok) == []
+    kept_if = ("def test_p():\n    for name in ('cgsa',):\n        if name == 'frame':\n            pass\n"
+               "        else:\n            assert ok(name)\n    assert done()\n")
+    assert _pos_errs(kept_if) == []
+    bad = {
+        "if False": "def test_p():\n    for name in ('cgsa',):\n        assert ok(name)\n"
+                    "    if False:\n        assert done()\n",
+        "after return": "def test_p():\n    for name in ('cgsa',):\n        assert ok(name)\n"
+                        "    return\n    assert done()\n",
+        "after skip": "def test_p():\n    pytest.skip('x')\n    for name in ('cgsa',):\n        assert ok(name)\n"
+                      "    assert done()\n",
+        "new try": "def test_p():\n    for name in ('cgsa',):\n        assert ok(name)\n"
+                    "    try:\n        assert done()\n    except AssertionError:\n        pass\n",
+        "empty loop": "def test_p():\n    for name in ():\n        assert ok(name)\n    assert done()\n",
+        "foreign loop item": "def test_p():\n    for name in ('other',):\n        assert ok(name)\n"
+                             "    assert done()\n",
+        "while False": "def test_p():\n    while False:\n        for name in ('cgsa',):\n            assert ok(name)\n"
+                       "    assert done()\n",
+        "inner def": "def test_p():\n    def _never():\n        for name in ('cgsa',):\n            assert ok(name)\n"
+                     "    assert done()\n",
+        "else to body": ("def test_p():\n    for name in ('cgsa',):\n        if name == 'frame':\n"
+                         "            assert ok(name)\n    assert done()\n"),
+        "skip marker": "@pytest.mark.skip\ndef test_p():\n    for name in ('cgsa',):\n        assert ok(name)\n"
+                       "    assert done()\n",
+    }
+    for label, src in bad.items():
+        assert _pos_errs(src) != [], label
+
+
 def test_mutation_rename_with_changed_fixture_is_red():
     ops = [_op("rename", {"category": "def", "qualname": "test_frame_only"}, new_name="test_cgsa_only")]
     good = _SAMPLE.replace("def test_frame_only():", "def test_cgsa_only():")
@@ -1393,6 +1580,25 @@ def test_mutation_new_file_outside_list_is_red_in_check_5():
     assert check_5(disp, 1, {"tests/feature_engineering/test_framepath_disposition.py"}, ["a.py"]) == []
     # 列於 new_files（phase ≤ 本批）而缺檔 ⇒ 紅（審查 r24 CODEX-R24-P2-01）
     assert check_5(disp, 1, set(), ["a.py"], exists=lambda p: False) != []
+
+
+def test_mutation_ignored_set_counts_only_files_since_anchor():
+    """審查 r25 GROK-R25-P1-01（SPEC v16 A11）：錨點前即存在之本機被忽略檔不計；錨點後新增之被忽略 .py 計入
+    ⇒ 與凍結基線（乾淨 worktree＝[]）不等即紅；*.bak 與 __pycache__ 仍不判。"""
+    anchor = 1_000
+    mt = {"frontend/src/components/results/Old.tsx": 10, "tests/x/ignored_new.py": 2_000,
+          "tests/x/new.bak": 2_000, "tests/x/__pycache__/m.py": 2_000, "tests/x/at_anchor.json": anchor}
+    got = ignored_since_anchor(mt, anchor, mtime=mt.__getitem__)
+    assert got == ["tests/x/at_anchor.json", "tests/x/ignored_new.py"]
+    disp = {"new_files": [], "ignored_baseline": []}
+    assert check_5(disp, 1, set(), got) != []
+    assert check_5(disp, 1, set(), ignored_since_anchor(["frontend/src/components/results/Old.tsx"], anchor,
+                                                         mtime=mt.__getitem__)) == []
+
+
+def test_ignored_baseline_frozen_from_clean_worktree():
+    """乾淨 HEAD worktree 之過濾後被忽略集合為空 ⇒ 凍結基線須為 []（GROK-R25-P1-01）。"""
+    assert load_json(DISPOSITION_REL)["ignored_baseline"] == []
 
 
 def test_mutation_fact_keys_other_row_change_is_red_in_check_6():

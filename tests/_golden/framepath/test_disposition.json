@@ -14277,17 +14277,5 @@
    "phase": 3
   }
  ],
- "ignored_baseline": [
-  "frontend/src/components/results/BestParamsCard.tsx",
-  "frontend/src/components/results/ComparisonTool.tsx",
-  "frontend/src/components/results/CustomTooltip.tsx",
-  "frontend/src/components/results/DensityComparisonChart.tsx",
-  "frontend/src/components/results/ExportButton.tsx",
-  "frontend/src/components/results/MetricsPanel.tsx",
-  "frontend/src/components/results/OptimizationHistoryChart.tsx",
-  "frontend/src/components/results/ParameterImportanceChart.tsx",
-  "frontend/src/components/results/StabilityChart.tsx",
-  "frontend/src/components/results/TrialHistoryTable.tsx",
-  "frontend/src/components/results/index.ts"
- ]
+ "ignored_baseline": []
 }
