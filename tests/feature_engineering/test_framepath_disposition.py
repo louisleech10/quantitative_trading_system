@@ -1210,6 +1210,67 @@ def test_check_0_frozen_acceptance_tests_unchanged():
     assert frozen_file_errors(manifest_contract_shas(), FROZEN_ACCEPTANCE_TESTS) == []
 
 
+# 審查 r28 CODEX-R28-P1-01：manifest 之 contract_sha256 由 manifest 自我宣告，首個生產碼提交前可整批同步改寫
+# 而自洽。外部錨點＝gate 於核可後發 FRAMEPATH 實作許可時寫入已提交審計紀錄之 `round_start_head`（gate.sh
+# impl_token_issued；manifest 無從改寫）：自該提交起，下列核定檔之位元組不得再變。
+AUDIT_REL = ".claude/gate/audit.log"
+APPROVAL_FROZEN = FROZEN_ACCEPTANCE_TESTS + (MANIFEST_REL, DISPOSITION_REL, COMPARE_DOMAIN_REL)
+TICKET_ROOT_SUFFIX = "-FRAMEPATH"
+
+
+def approval_anchor(audit_lines: Iterable[str]) -> Optional[str]:
+    """審計紀錄中最早一筆本票（root 以 -FRAMEPATH 結尾）`impl_token_issued` 之 round_start_head；無則 None。"""
+    for line in audit_lines:
+        if '"impl_token_issued"' not in line:
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if ev.get("event") == "impl_token_issued" and str(ev.get("root", "")).endswith(TICKET_ROOT_SUFFIX) \
+                and re.fullmatch(r"[0-9a-f]{40}", str(ev.get("round_start_head", ""))):
+            return ev["round_start_head"]
+    return None
+
+
+def approval_errors(anchor: Optional[str], production_changed: bool, paths: Sequence[str],
+                    read_at, reader=current_bytes) -> List[str]:
+    """有錨點 ⇒ 每個核定檔之現行位元組須等於錨點提交之版本；無錨點而生產碼已改動（提交或工作樹）⇒ 紅
+    （實作須先經 gate 領許可）；無錨點且生產碼未動（TODO 階段）⇒ 不判。"""
+    if anchor is None:
+        return ["⓪ 生產碼已改動但審計無本票實作許可（impl_token_issued）之 round_start_head"] if production_changed else []
+    return [f"⓪ {p} 與實作許可時（{anchor[:8]}）核定之版本不等" for p in paths if reader(p) != read_at(anchor, p)]
+
+
+def _git_show_bytes(commit: str, path: str) -> Optional[bytes]:
+    proc = subprocess.run(["git", "show", f"{commit}:{path}"], cwd=REPO, capture_output=True)
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def test_check_0_frozen_since_approval_anchor():
+    lines = (REPO / AUDIT_REL).read_text(encoding="utf-8", errors="replace").splitlines()
+    prod_changed = any("__pycache__/" not in p for p in
+                       _git("diff", "--name-only", HEAD_SHORT, "--", *PRODUCTION_ROOTS).decode().splitlines() if p)
+    assert approval_errors(approval_anchor(lines), prod_changed, APPROVAL_FROZEN, _git_show_bytes) == []
+
+
+def test_mutation_self_consistent_rewrite_after_approval_is_red():
+    """manifest 與驗收測試於許可後同步改寫（自洽之 sha256）⇒ 紅；生產碼已改而無許可紀錄 ⇒ 紅；TODO 階段不判。"""
+    p = "tests/feature_engineering/test_framepath_invariance.py"
+    approved = {p: b"assert real()\n", MANIFEST_REL: b'{"sha": "A"}'}
+    weakened = {p: b"assert True\n", MANIFEST_REL: b'{"sha": "B"}'}
+    anchor = "a" * 40
+    ev = json.dumps({"event": "impl_token_issued", "root": "20260928-FRAMEPATH", "round_start_head": anchor})
+    other = json.dumps({"event": "impl_token_issued", "root": "20261004-OTHER", "round_start_head": "b" * 40})
+    assert approval_anchor(["=== text ===", other, ev]) == anchor
+    assert approval_anchor([other]) is None
+    read_at = lambda c, path: approved[path]  # noqa: E731
+    assert approval_errors(anchor, True, list(approved), read_at, reader=approved.get) == []
+    assert approval_errors(anchor, True, list(approved), read_at, reader=weakened.get) != []
+    assert approval_errors(None, True, list(approved), read_at, reader=weakened.get) != []
+    assert approval_errors(None, False, list(approved), read_at, reader=weakened.get) == []
+
+
 PRODUCTION_ROOTS = ("momentum", "api", "config")
 BASELINE_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
 

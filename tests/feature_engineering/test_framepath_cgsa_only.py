@@ -5,7 +5,8 @@
   `_combine_layers(` 呼叫 context 為白名單字面；`FFACT_USE_CGSA` 生產碼零讀取、殘留 `=0` 無作用；`persist=False`
   走 CGSA 且 completeness 照寫；L3 `in_memory` 非串流分支保留。
 - Task 1.3：legacy 多週期與 frame 列對應之符號於 momentum 零出現；`set_no_start_calibration()` 無參數；
-  `MultiTFGenerator._apply_timeframe_tag` registry 為 None ⇒ 具名例外、非 None ⇒ 原樣回傳。
+  legacy tagger `MultiTFGenerator._apply_timeframe_tag` 整刪（SPEC v16 A2；審查 r28 CODEX-R28-P2-01），單欄週期標記保留
+  `_timeframe_tagged_name` 規則。
 - Task 1.4：三檔之「零引用且非公開入口、且非 HEAD 既有死碼、且未具名保留」之 def 數 == 0。
 
 真實 kline（`data_cache/feature_klines/kline_cache.h5`）之生成案例沿用 `ffstat_helpers` 輕量設定，單組串行。

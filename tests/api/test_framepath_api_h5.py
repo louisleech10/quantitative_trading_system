@@ -9,8 +9,10 @@
 - Task 2.3：register／task context／schema（features 列表）／selected rows／CSV 對 `.h5` 皆 HTTP 400，body 含
   「舊 factory h5 已不支援」與路徑；CGSA manifest 路徑之 feature list、selected rows、CSV 匯出 200；
   `hdf5_path` 空字串之既有行為與 `.JSON` 大寫副檔名之判定不變。
-生成案例用真實 kline（`ffstat_helpers` 輕量設定，單組串行）；API 讀取路徑沿用 `tests/api/test_feature_export.py`
-之 `FeatureStorage.write_raw` V2 run 建法。
+Task 2.1／2.2 之生成案例用真實 kline（`ffstat_helpers` 輕量設定，單組串行）。Task 2.3 之 API 路由案例所讀 manifest 由
+`_cgsa_run` 以正式 `FeatureStorage.write_raw` 寫入合成小表（同 `tests/api/test_feature_export.py`）——屬 API 讀取／schema
+單元 fixture，不作 CGSA 生成正確性之證據（生成正確性由 Task 1.1 不變基準與 Task 2.1／2.2 真實 kline 案例承擔；審查 r28
+CODEX-R28-P2-02）。
 """
 
 from __future__ import annotations
@@ -178,6 +180,7 @@ def _task(hdf5_path: str, config_hash: str = "cfg_framepath") -> Dict[str, Any]:
 
 
 def _cgsa_run(tmp_path: Path) -> Path:
+    """API 讀取／schema 單元 fixture：以正式 write_raw 寫合成小表之 V2 run（非 CGSA 生成正確性證據）。"""
     storage = FeatureStorage(str(tmp_path / "features"))
     row_index = pd.date_range("2026-04-01", periods=4, freq="h")
     groups = {"g": pd.DataFrame({"feat_a": np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
@@ -267,27 +270,35 @@ async def test_boundary_11_uppercase_json_suffix_treated_as_manifest(client, mon
 ROUTES_PATH = REPO / "api" / "routes" / "feature_factory.py"
 
 
-def route_maps_value_error_to_400(src: str, route: str = "register_hdf5_for_browse") -> bool:
-    """route 函式內有 `except ValueError` 分支、其本體 raise HTTPException(status_code=400)，且排在任何
-    `except Exception` 之前（否則 broad handler 先吞成 500）。"""
+def route_maps_value_error_to_400(src: str, route: str = "register_hdf5_for_browse",
+                                  call_attr: str = "register_hdf5_for_browse") -> bool:
+    """route 函式本體之頂層 `try`（不得被其他 try 包住；審查 r28 CODEX-R28-P1-02）其本體含 service 呼叫
+    `<x>.<call_attr>(...)`，且其 handlers 中 `except ValueError` 之本體 raise HTTPException(status_code=400)，
+    並排在任何 `except Exception` 之前（否則 broad handler 先吞成 500）。巢狀 try 內之 ValueError 分支不算。"""
     import ast
+
+    def has_call(stmts: list) -> bool:
+        return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == call_attr
+                   for s in stmts for n in ast.walk(s))
+
+    def raises_400(handler: ast.ExceptHandler) -> bool:
+        return any(isinstance(sub, ast.Raise) and isinstance(sub.exc, ast.Call)
+                   and getattr(sub.exc.func, "id", None) == "HTTPException"
+                   and any(kw.arg == "status_code" and getattr(kw.value, "value", None) == 400 for kw in sub.exc.keywords)
+                   for sub in ast.walk(handler))
 
     for node in ast.walk(ast.parse(src)):
         if not (isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)) and node.name == route):
             continue
-        for tr in ast.walk(node):
-            if not isinstance(tr, ast.Try):
+        for tr in node.body:
+            if not (isinstance(tr, ast.Try) and has_call(tr.body)):
                 continue
             for handler in tr.handlers:
                 name = getattr(handler.type, "id", None)
-                if name == "Exception":
+                if name in {"Exception", "BaseException"} or handler.type is None:
                     break
-                if name != "ValueError":
-                    continue
-                for sub in ast.walk(handler):
-                    if isinstance(sub, ast.Call) and getattr(sub.func, "id", None) == "HTTPException" and any(
-                            kw.arg == "status_code" and getattr(kw.value, "value", None) == 400 for kw in sub.keywords):
-                        return True
+                if name == "ValueError":
+                    return raises_400(handler)
     return False
 
 
@@ -300,7 +311,7 @@ def test_mutation_register_route_without_value_error_handler_is_detected():
     `except Exception` 之後亦判失敗（broad 先吞成 500）。"""
     good = (
         "async def register_hdf5_for_browse(request):\n"
-        "    try:\n        return f(request)\n"
+        "    try:\n        return feature_factory_service.register_hdf5_for_browse(request)\n"
         "    except FileNotFoundError as exc:\n        raise HTTPException(status_code=404, detail=str(exc))\n"
         "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n"
         "    except Exception as exc:\n        raise HTTPException(status_code=500, detail=str(exc))\n"
@@ -315,3 +326,22 @@ def test_mutation_register_route_without_value_error_handler_is_detected():
     assert route_maps_value_error_to_400(good)
     assert not route_maps_value_error_to_400(removed)
     assert not route_maps_value_error_to_400(reordered)
+    # 審查 r28 CODEX-R28-P1-02：巢狀 try 之 ValueError→400 被外層 broad→500 包住、ValueError 分支不回 400、
+    # service 呼叫不在該 try 內 ⇒ 皆判失敗
+    nested = (
+        "async def register_hdf5_for_browse(request):\n"
+        "    try:\n"
+        "        try:\n            return feature_factory_service.register_hdf5_for_browse(request)\n"
+        "        except ValueError:\n            raise HTTPException(status_code=400)\n"
+        "    except Exception:\n        raise HTTPException(status_code=500)\n"
+    )
+    not_400 = good.replace("raise HTTPException(status_code=400, detail=str(exc))",
+                           "raise HTTPException(status_code=500, detail=str(exc))")
+    call_outside = (
+        "async def register_hdf5_for_browse(request):\n"
+        "    task_id = feature_factory_service.register_hdf5_for_browse(request)\n"
+        "    try:\n        return respond(task_id)\n"
+        "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n"
+    )
+    for bad in (nested, not_400, call_outside):
+        assert not route_maps_value_error_to_400(bad)
