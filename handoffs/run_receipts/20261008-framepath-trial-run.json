@@ -69,6 +69,7 @@
     "greps": "Task 2.5 A 組 0；B 組 3 命中皆非 V1（IC 三元組 list_features、IC cube store load_manifest）；Task 2.6 parquet: 0；Task 2.7 0",
     "pytest_serial": "29 檔逐檔串行：22 檔全過；失敗 5 項＝HEAD 既有紅 4（failopen_consumer::test_training_rejects_partial、run_lifecycle 兩項、l7_raw_streaming 一項〔新列入本清單〕）＋試作引起 1（icfirstalign_timeaxis mutant helper 解包，已以處置表 rewrite 修正並重跑）",
     "frontend_tsc": "試作與主工作樹同為既有 8 錯（FactorReturnChart.test、useFeatureFactory.batchDate.test）＋2 條暫存路徑大小寫之環境假錯；HardwareStatusPanel 變更零型別錯",
-    "behavior_probe": "只有 V1 之目錄 ⇒ *_v2 讀取皆 FileNotFoundError 且訊息不提 V1；coverage 無資料；V2 往返不變；IC /features/list 帶 parquet:／.h5 ⇒ 400"
+    "behavior_probe": "只有 V1 之目錄 ⇒ *_v2 讀取皆 FileNotFoundError 且訊息不提 V1；coverage 無資料；V2 往返不變；IC /features/list 帶 parquet:／.h5 ⇒ 400",
+    "r36_followup": "審查 r36：試作工作樹補完 Task 2.3 factory h5 讀取刪除（_load_hdf5_features_df、_csv_chunk_generator_from_hdf5 刪；_load_hdf5_schema／_load_selected_feature_rows 去 h5py 枝；h5py 只剩 _load_cgsa_kline_timestamps）；API 相關 9 檔逐檔串行，失敗僅 run_lifecycle 兩項 HEAD 既有紅；test_framepath_api_h5 boundary_13／16–21 與全部 mutation 17 項於試作全過，錨點碼態 boundary_21 紅"
   }
 }

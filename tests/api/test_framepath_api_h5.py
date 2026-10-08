@@ -764,3 +764,111 @@ def test_mutation_dead_class_member_scan_detects_residue():
     assert dead_class_members([(spec, residue)]) == [("api/core/config.py", "Settings", "enable_hdf5_cache")]
     assert dead_class_members([(method, "class FeatureStorage:\n    def delete_features(self):\n        pass\n")]) != []
     assert dead_class_members([(spec, "class Other:\n    enable_hdf5_cache = 1\n")]) == []
+
+
+# ---------------------------------------------------------------- Task 2.3／2.5／2.6 舊分支結構性殘留（審查 r36）
+# 只驗收行為（400／無資料）不足：正常實作可在舊分支前加早退而留下後方死碼（CODEX-R36-P1-01）。以下以 AST 判
+# 指名之舊讀取結構確實不存在；V2 合法讀取（如 `fast.get("total_rows")`、kline_cache.h5 之 h5py 讀取）不誤中。
+
+def _func_nodes(tree, name: str):
+    import ast
+
+    return [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name]
+
+
+def _names_in(node, ident: str) -> int:
+    import ast
+
+    uses = sum(1 for n in ast.walk(node) if isinstance(n, ast.Name) and n.id == ident)
+    imports = sum(1 for n in ast.walk(node) if isinstance(n, (ast.Import, ast.ImportFrom))
+                  for a in n.names if (a.asname or a.name).split(".")[0] == ident)
+    return uses + imports
+
+
+def _str_consts(node) -> list:
+    import ast
+
+    return [n.value for n in ast.walk(node) if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+
+
+def structural_residues(sources: dict) -> list:
+    """sources＝{repo 相對路徑: 原始碼}；回傳殘留描述（空＝合格）。"""
+    import ast
+
+    hits = []
+    cov = ast.parse(sources["momentum/Analysis/coverage_analyzer.py"])
+    if _names_in(cov, "h5py") or "manifest.json" in _str_consts(cov):
+        hits.append("coverage_analyzer：仍有 h5py 或 V1 `manifest.json` 掃描")
+    ic = ast.parse(sources["api/services/ic_analysis_service.py"])
+    for fn in _func_nodes(ic, "list_features"):
+        consts = _str_consts(fn)
+        if _names_in(fn, "h5py") or "data" in consts or any(c.startswith("parquet:") for c in consts):
+            hits.append("ic_analysis_service.list_features：仍有舊 h5／parquet: 讀取枝")
+    ffs = ast.parse(sources["api/services/feature_factory_service.py"])
+    consts = _str_consts(ffs)
+    if "parquet_path" in consts or "7.0" in consts:
+        hits.append("feature_factory_service：仍有舊 cgsa_work 列表格式（parquet_path）或 V7 轉向（7.0）")
+    for n in ast.walk(ffs):
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "get" \
+                and isinstance(n.func.value, ast.Name) and n.func.value.id in {"manifest", "raw_manifest"} \
+                and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "total_rows":
+            hits.append(f"feature_factory_service：L{n.lineno} 仍有舊格式 total_rows 退回")
+    for gone in ("_load_hdf5_features_df", "_csv_chunk_generator_from_hdf5"):
+        if _func_nodes(ffs, gone):
+            hits.append(f"feature_factory_service：仍定義 {gone}")
+    allowed = {id(x) for fn in _func_nodes(ffs, "_load_cgsa_kline_timestamps") for x in ast.walk(fn)}
+    stray = [n.lineno for n in ast.walk(ffs) if isinstance(n, ast.Name) and n.id == "h5py" and id(n) not in allowed]
+    if stray:
+        hits.append(f"feature_factory_service：kline 讀取以外仍用 h5py（L{stray}）")
+    fbs = ast.parse(sources["api/services/feature_browser_service.py"])
+    attrs = [n.attr for n in ast.walk(fbs) if isinstance(n, ast.Attribute) and n.attr in {"_feature_library", "_feature_reader"}]
+    imports = [a.name for n in ast.walk(fbs) if isinstance(n, ast.ImportFrom) for a in n.names
+               if a.name in {"create_feature_library", "create_feature_reader"}]
+    if attrs or imports:
+        hits.append(f"feature_browser_service：仍有無用屬性或工廠匯入 {sorted(set(attrs + imports))}")
+    return hits
+
+
+STRUCTURAL_FILES = ("momentum/Analysis/coverage_analyzer.py", "api/services/ic_analysis_service.py",
+                    "api/services/feature_factory_service.py", "api/services/feature_browser_service.py")
+
+
+def test_boundary_21_old_branches_structurally_absent():
+    """Task 2.3／2.5／2.6：coverage 無 h5py／V1 manifest 掃描；IC list_features 無舊 h5／parquet: 枝；瀏覽服務無舊 cgsa_work
+    列表格式、V7 轉向、舊格式 total_rows 退回、factory h5 讀取（h5py 只准於 kline 讀取）；瀏覽器服務無無用屬性與工廠匯入
+    （審查 r36 CODEX-R36-P1-01／P2-03）。"""
+    assert structural_residues({p: (REPO / p).read_text(encoding="utf-8") for p in STRUCTURAL_FILES}) == []
+
+
+def test_mutation_structural_residue_scan_detects_early_guard_leftovers():
+    """在舊枝前加早退而保留後方死碼 ⇒ 命中；V2 合法寫法不命中。"""
+    clean = {
+        "momentum/Analysis/coverage_analyzer.py": "def f():\n    return reader.list_features_v2(a, b, c)\n",
+        "api/services/ic_analysis_service.py": (
+            "def list_features(self, features_path=None, *, symbol=None):\n"
+            "    if features_path:\n        raise ValueError('use symbol, timeframe and config_hash')\n"
+            "    return reader.list_features_v2(symbol)\n"),
+        "api/services/feature_factory_service.py": (
+            "import h5py\n"
+            "def _load_cgsa_kline_timestamps(self):\n    with h5py.File(p) as f:\n        return f\n"
+            "def summary(self, fast):\n    return fast.get('total_rows')\n"),
+        "api/services/feature_browser_service.py": (
+            "from momentum.factories import create_coverage_analyzer\n"
+            "class FeatureBrowserService:\n    def __init__(self):\n        self._coverage_analyzer = create_coverage_analyzer()\n"),
+    }
+    assert structural_residues(clean) == []
+    leftovers = {
+        "momentum/Analysis/coverage_analyzer.py": "import h5py\n",
+        "api/services/ic_analysis_service.py": (
+            "def list_features(self, features_path=None):\n"
+            "    if features_path:\n        raise ValueError('x')\n"
+            "    with h5py.File(features_path) as f:\n        return f['data']\n"),
+        "api/services/feature_factory_service.py": "def g(manifest):\n    return manifest.get('total_rows')\n",
+        "api/services/feature_browser_service.py": "class S:\n    def __init__(self):\n        self._feature_reader = 1\n",
+    }
+    for path, src in leftovers.items():
+        assert structural_residues({**clean, path: src}) != [], path
+    assert structural_residues({**clean, "api/services/feature_factory_service.py":
+                                "def _load_hdf5_features_df(self):\n    pass\n"}) != []
+    assert structural_residues({**clean, "api/services/feature_factory_service.py":
+                                "x = {'parquet_path': 1}\n"}) != []
