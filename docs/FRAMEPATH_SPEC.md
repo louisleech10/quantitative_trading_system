@@ -1,7 +1,7 @@
 # FRAMEPATH — 刪除非 CGSA 舊引擎（frame）與舊特徵 h5 讀寫鏈 — SPEC
 
 > 來源 PLAN/診斷：`handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md`（去留查證）、`handoffs/reconcile/20260928-framepath-x-consult-r2/synth.md`（偵察）　|　日期：2026-10-08　|　對應 TODO：docs/manifests/FRAMEPATH.json（SPEC 凍結後生成）
-> 版本：v1（起草，HEAD 6e07e0ad）
+> 版本：v2（審查 r1 修補，基準 HEAD 6e07e0ad）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（全票排序第 5 步，`docs/TICKET_ORDER.md`）。
@@ -27,13 +27,13 @@
 - 驗收母體不得含 frame 臂（`FFACT_USE_CGSA=0`、canonical legacy-*、batch2d frame 對照）。
 - 本機 8 GB：真實資料重測試一律單組串行；委員審碼期間不跑重型生成；禁跑多週期全史生成。
 - 不新增 manifest 快取命中行為（見 §N）；不改欄名、不加命名世代鹽（屬 FF-NAME）。
-- 共用路徑注意：`FeatureFactory._combine_layers` 之 `layer3_input`／`layer4_input`／`layer5_input` 為 CGSA 所用（feature_factory.py:2063、2180、2182），保留；`layer6_5_input`／`layer7_final`／`multi_tf_merged` 之呼叫者全在 frame 碼內（feature_factory.py:572、4484；multi_tf_generator.py:1532、1584，主委 `grep -n "_combine_layers(" ` 2026-10-08），刪 frame 後零呼叫者，改具名拒絕守住「CGSA 不做全欄合併」；`feature_naming.tag_timeframe`、`FeatureFactory._timeframe_tagged_name` 服務 CGSA，保留；L3 `persist_mode == "in_memory"` 之非串流分支為 CGSA in_memory 級距所用，保留。
+- 共用路徑注意：`FeatureFactory._combine_layers` 現行呼叫之 context 字面共六種（主委 `grep -o 'context="[a-z0-9_]*"'` 於 feature_factory.py／multi_tf_generator.py，2026-10-08）：`layer3_input`（feature_factory.py:2063）、`layer4_input`（:2180、:2182）為 CGSA 所用，保留；`layer6_5_input`（:572）、`layer7_final`（:4484）、`multi_tf_layers`（multi_tf_generator.py:1532）、`multi_tf_legacy_merged`（:1584）皆在 frame 碼內，刪 frame 後零呼叫者；`_combine_layers` 改為 context 白名單（`layer3_input`、`layer4_input`），其餘一律具名拒絕，守住「CGSA 不做全欄合併」。L3 `feature_factory.py:2084` 之串流條件改寫後，其後非串流分支（:2126 起）保留給 `in_memory` 級距；`feature_naming.tag_timeframe`、`FeatureFactory._timeframe_tagged_name` 服務 CGSA，保留；L3 `persist_mode == "in_memory"` 之非串流分支為 CGSA in_memory 級距所用，保留。
 
 ## §G Golden / Baseline
 - **feature/kline 條件**：真實 `data_cache/feature_klines/kline_cache.h5`；禁合成 fixture；三方數據正確性簽核。
 - **凍結時機**：Phase 1 任何生產碼改動之前，於 HEAD 6e07e0ad 以 `scripts/freeze_framepath_baseline.py`（新）凍結至 `tests/_golden/framepath/cgsa_fingerprint.json`；比對域之納入／排除清單唯一來源＝`tests/_golden/framepath/compare_domain.json`（新），本 SPEC 不列舉鍵名。
-- **設定矩陣**（`stat_payload` 級精簡指標、短窗；每格峰值 < 2 GB，凍結收據記 max RSS 與秒數）：C1 單週期平穩化開；C2 單週期平穩化關；C3 多週期主週期＋一個較長次週期（`FFACT_MULTI_TF_PARALLEL=0`）平穩化開；C4＝C1 於 `FFACT_L3_PERSIST_MODE` 之 streaming 與 hybrid 各一；C5＝C1 同 work dir 第二次生成（resume 命中）。週期取值由 `stat_payload` 參數給定，不寫死於比對器。
-- **baseline 內容**：每格之公開輸出欄名序列 sha256、欄數、列數、時間索引 sha256；逐欄 NaN／inf mask sha256 與 float32 值位元 sha256（沿用 `ffstat_helpers.base_fingerprints`／`public_fingerprints` 之 parquet 枝）；平穩化決策表 sha256；manifest 經 `compare_domain.json` 篩選後之 canonical JSON sha256；run_status。
+- **設定矩陣**（`stat_payload` 級精簡指標、短窗；每格峰值 < 2 GB，凍結收據記 max RSS 與秒數）：C1 單週期平穩化開；C2 單週期平穩化關；C3 多週期主週期＋一個較長次週期（`FFACT_MULTI_TF_PARALLEL=0`）平穩化開；C4＝C1 於 `FFACT_L3_PERSIST_MODE` 之 streaming 與 hybrid 各一；C5＝C1 同 work dir 第二次生成（resume 命中）；C6＝C3 同參數但 `FFACT_MULTI_TF_PARALLEL=1`；C7＝C1＋`persist=False`；C8＝C1＋`FFACT_L3_PERSIST_MODE=in_memory`；C9＝C3 以 `ffstat_helpers.drop_kline_rows_before` 截去次週期前史之真實 kline 副本（次週期不足 ⇒ partial）。週期取值由 `stat_payload` 參數給定，不寫死於比對器。
+- **baseline 內容**：每格之公開輸出欄名序列 sha256、欄數、列數、時間索引 sha256；逐欄 NaN／inf mask sha256 與 float32 值位元 sha256（沿用 `ffstat_helpers.base_fingerprints`／`public_fingerprints` 之 parquet 枝）；平穩化決策表 sha256；manifest 經 `compare_domain.json` 篩選後之 canonical JSON sha256；run_status、各週期 completeness 與失敗／降級原因；生成路徑收據（L3 落地模式、多週期 serial／parallel、L6.5 CGSA 臂）。C7 無落盤 parquet 者以回傳結果與 completeness metadata 為比對對象。
 - **通過條件**：改後同設定重跑，上列每項逐項相等（無容差：同碼路徑、同資料、已實測可重現）；任一不等 ⇒ 列出設定格、欄名、項目 ＝ FAIL。
 
 ## §P Phase 與依賴
@@ -42,7 +42,7 @@
 
 **Task 1.1 — 凍結 CGSA 指紋基準**
 - 目標：改前凍結 §G 基準與比對器。　檔案：`scripts/freeze_framepath_baseline.py`（新）、`tests/_golden/framepath/cgsa_fingerprint.json`（新）、`tests/_golden/framepath/compare_domain.json`（新）、`tests/feature_engineering/test_framepath_invariance.py`（新）　既有 caller：新建無 caller。
-- 改法：凍結腳本於 HEAD 6e07e0ad 跑 C1–C5 並寫 JSON（含 `head_commit`、每格 max RSS 與秒數）；測試以同設定重跑並逐項比對；`compare_domain.json` 列 manifest 排除鍵（時間戳、計時、絕對路徑、暫存 uuid）之封閉集合，未列者一律納入比對。
+- 改法：凍結腳本於 HEAD 6e07e0ad 跑 C1–C9 並寫 JSON（含 `head_commit`、每格 max RSS 與秒數）；測試以同設定重跑並逐項比對；`compare_domain.json` 列 manifest 排除鍵（時間戳、計時、絕對路徑、暫存 uuid）之封閉集合，未列者一律納入比對。
 - **驗證**：`pytest tests/feature_engineering/test_framepath_invariance.py` 於 HEAD 綠；mutation（暫存工作樹，不提交）：M1 `feature_naming.tag_timeframe` 少標一週期、M2 `_combine_layers` 對 `layer4_input` 回傳空表、M3 L7 落盤前改 float64、M4 manifest 新增未登記鍵 ⇒ 各自紅，收據 `handoffs/run_receipts/<date>-framepath-b1-mutation.txt`。
 - **邊界**：C5 resume 與 C1 之 fingerprint 相等；某格生成 `run_status` 非 complete ⇒ 凍結腳本拒寫並具名報錯。
 - **存活至**：收案後保留（作為 FF-NAME 前之 CGSA 不變基準；FF-NAME 改名時依其 SPEC 重凍）。
@@ -51,8 +51,8 @@
 
 **Task 1.2 — 單週期與 L3／L4／L6.5／L7 分派改為唯一 CGSA**
 - 目標：刪環境分派與單週期 frame 尾段。　檔案：`momentum/FeatureEngineering/feature_factory.py`（`_cgsa_enabled` 定義與其 8 呼叫點、`generate_features` 單週期尾段 :569–597、`_layer6_5_preprocessing` 之記憶體分支 :3413–3420、`_layer7_validate_and_persist` 非 CGSA 體 :4484–4617、`_combine_layers` 之環境判斷、`_prepare_cgsa_registry` 之環境早退、`run_ic_first` :2895–2898 之環境守衛）　既有 caller：`generate_features`、`MultiTFGenerator`、`run_ic_first`、API 生成服務。
-- 改法：分派點一律走 CGSA；`self._cgsa_registry is None` 之處改為拋具名例外（新類別，定義於 feature_factory.py，訊息含 symbol／timeframe／呼叫點）；`_combine_layers` 對 `layer6_5_input`／`layer7_final`／`multi_tf_merged` 拋同一具名例外，其餘 context 不變；`FFACT_USE_CGSA` 於生產碼零讀取。
-- **驗證**：Task 1.1 不變測試綠；新測 `tests/feature_engineering/test_framepath_cgsa_only.py`：registry 為 None 呼叫三分派點各拋具名例外；`_combine_layers` 三 context 拋具名例外、`layer4_input` 照常 concat；設 `FFACT_USE_CGSA=0` 之生成仍產 CGSA manifest 且無 `*_factory.h5`。
+- 改法：分派點一律走 CGSA；`self._cgsa_registry is None` 之處改為拋具名例外（新類別，定義於 feature_factory.py，訊息含 symbol／timeframe／呼叫點）；`_combine_layers` 改 context 白名單（`layer3_input`、`layer4_input`），白名單外一律拋同一具名例外；L3 串流條件改為 `persist_mode in {"streaming","hybrid"}`，其後非串流分支原樣保留給 `in_memory`；`FFACT_USE_CGSA` 於生產碼零讀取。
+- **驗證**：Task 1.1 不變測試綠；新測 `tests/feature_engineering/test_framepath_cgsa_only.py`：registry 為 None 呼叫 L3／L6.5／L7 分派點各拋具名例外；`_combine_layers` 對白名單外之六種以上 context 字面（含 `layer6_5_input`、`layer7_final`、`multi_tf_layers`、`multi_tf_legacy_merged`、任意字串）拋具名例外、兩白名單照常 concat；AST 掃描 momentum／api／scripts 全部 `_combine_layers(` 呼叫之 context 字面 ⊆ 白名單（非字面引數亦判 FAIL）；設 `FFACT_USE_CGSA=0` 之生成仍產 CGSA manifest 且無 `*_factory.h5`。
   `ASSERT pytest tests/feature_engineering/test_framepath_cgsa_only.py WHEN state=after THEN rc=0`
   mutation：把任一分派點之具名例外改回 `pass`／舊分支 ⇒ 該測紅。
 - **邊界**：`FFACT_USE_CGSA=0` 殘留於使用者環境 ⇒ 無作用（不報錯、不分派）；`persist=False` 生成 ⇒ 走 CGSA raw pipeline 且 completeness 照寫。
@@ -61,9 +61,9 @@
 - 不可做：不得保留「registry 為 None 時之記憶體後備」；不得改 CGSA 分支內任何計算。
 
 **Task 1.3 — 刪多週期 legacy 組裝與 frame 列對應**
-- 目標：`generate_multi_tf` 唯一進入 `_generate_multi_tf_cgsa`。　檔案：`momentum/FeatureEngineering/timeframe/multi_tf_generator.py`（`_cgsa_enabled`、`_generate_multi_tf_legacy` 與其專用 helpers、`_combine_layers` 非 CGSA 側、`_apply_timeframe_tag` 之 registry 為 None 側）、`feature_factory.py:391–404`（`_legacy_native_row_maps`）、`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:226`（`set_no_start_calibration` 之 `native_maps` 參數與 `_no_start_native_maps` 之消費邏輯）　既有 caller：`FeatureFactory.generate_features`（多週期）、`_attach_calibration`。
+- 目標：`generate_multi_tf` 唯一進入 `_generate_multi_tf_cgsa`。　檔案：`momentum/FeatureEngineering/timeframe/multi_tf_generator.py`（`_cgsa_enabled`、`_generate_multi_tf_legacy` 與其專用 helpers（含 `multi_tf_layers`／`multi_tf_legacy_merged` 兩處 `_combine_layers` 呼叫）、`MultiTFGenerator._combine_layers`（:1873，repo 內零呼叫者）、`_apply_timeframe_tag` 之 registry 為 None 側）、`feature_factory.py:391–404`（`_legacy_native_row_maps`）、`momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:226`（`set_no_start_calibration` 之 `native_maps` 參數與 `_no_start_native_maps` 之消費邏輯）　既有 caller：`FeatureFactory.generate_features`（多週期）、`_attach_calibration`。
 - 改法：刪除上列；`set_no_start_calibration()` 改無參數；其消費端刪 row-map 分支（CGSA 原生子實例路徑不變）。
-- **驗證**：Task 1.1 C3 綠；`grep -rn "_legacy_native_row_maps\|_generate_multi_tf_legacy\|_no_start_native_maps" momentum` → 0。
+- **驗證**：Task 1.1 C3、C6、C9 綠；`grep -rn "_legacy_native_row_maps\|_generate_multi_tf_legacy\|_no_start_native_maps\|multi_tf_legacy_merged\|multi_tf_layers" momentum` → 0。
 - **邊界**：多週期 parallel 與 serial（`FFACT_MULTI_TF_PARALLEL`）皆經 CGSA；次週期資料不足之既有 partial 語意不變（既有 `tests/test_cgsa_multi_tf.py` 之 missing lower TF 測試綠）。
 - **存活至**：收案後保留。
 - **覆蓋風險**：無。
@@ -79,10 +79,10 @@
 - 不可做：不得刪 CGSA 仍呼叫者；不得順手重構。
 
 **Task 1.5 — 治理清單與測試遷移（產生路徑）**
-- 目標：刪 frame 產生後之測試同批遷移，Phase 1 結束時受影響測試全綠。　檔案：`momentum/FeatureEngineering/memory_budget.py:178`（刪 `FFACT_USE_CGSA` 列）、`tests/feature_engineering/test_icfirstalign_memory.py`（掃描對齊）、31 檔中涉生成者（處置表＝`tests/_golden/framepath/test_disposition.json`，新）、`tests/_golden/prered/allowed_red.json`（FRAMEPATH 列與 EXPECTED）、`tests/_golden/ffstat/nan_propagation_classes.json`（`_generate_multi_tf_legacy` 條目）。
-- 改法：`test_disposition.json` 以 HEAD 之 `pytest --collect-only -q` 為母體，逐 nodeid 標 `keep`／`edit-env-only`／`migrate:<CGSA 承接之 nodeid>`／`delete-frame-only:<理由>`；frame 對照臂刪除，有效意圖以 CGSA 斷言承接；`test_failopen_manifest::test_persist_false_generate_features_metadata` 改驗 CGSA `persist=False`，轉綠同批刪 allowed_red FRAMEPATH 列並同步 EXPECTED。
-- **驗證**：新測 `tests/feature_engineering/test_framepath_disposition.py`：HEAD 母體與現行 collect 之差集中每個消失之 nodeid 必在 `test_disposition.json` 標 `migrate` 或 `delete-frame-only`，且 `migrate` 指向之 nodeid 現行存在；mutation：刪一條未登記測試 ⇒ 紅。受影響測試檔明列路徑跑綠（真實資料者單組串行）。
-- **邊界**：參數化測試之 frame 參數值刪除視為 nodeid 消失，須登記；`edit-env-only` 之測試 nodeid 不變。
+- 目標：刪 frame 產生後之測試同批遷移，Phase 1 結束時受影響測試全綠。　檔案：`momentum/FeatureEngineering/memory_budget.py:178`（刪 `FFACT_USE_CGSA` 列）、`tests/feature_engineering/test_icfirstalign_memory.py`（掃描對齊）、受影響測試檔（處置表＝`tests/_golden/framepath/test_disposition.json`，新）、`tests/_golden/prered/allowed_red.json`（FRAMEPATH 列與 EXPECTED）、`tests/_golden/ffstat/nan_propagation_classes.json`（`_generate_multi_tf_legacy` 條目）。
+- 改法：受影響測試檔母體＝`grep -rlE "FFACT_USE_CGSA|_cgsa_enabled|_generate_multi_tf_legacy|_legacy_native_row_maps|load_factory_output|save_factory_output|_factory\.h5|_factory_meta\.json|_try_load_cache|register_hdf5_for_browse|_load_hdf5_features|multi_tf_legacy_merged|multi_tf_layers" tests frontend/src` 於 HEAD 之結果（清單寫入處置表檔頭）；`test_disposition.json` 以該母體於 HEAD 之 `pytest --collect-only -q` 為 nodeid 母體，逐 nodeid 標 `keep`／`edit-env-only`／`migrate:<CGSA 承接之 nodeid>`／`delete-frame-only:<理由>`；非 factory 用途之 h5（kline、case、IC fixture、generic mock）標 `keep` 並附用途；frame 對照臂刪除，有效意圖以 CGSA 斷言承接；`test_failopen_manifest::test_persist_false_generate_features_metadata` 改驗 CGSA `persist=False`，轉綠同批刪 allowed_red FRAMEPATH 列並同步 EXPECTED。
+- **驗證**：新測 `tests/feature_engineering/test_framepath_disposition.py`（秒級，不跑被測測試）：①HEAD 母體與現行 collect 之差集中每個消失之 nodeid 必在 `test_disposition.json` 標 `migrate` 或 `delete-frame-only`，且 `migrate` 指向之 nodeid 現行存在；②標 `keep`／`edit-env-only` 之 nodeid，其測試函式 AST 去除「設定或刪除 `FFACT_USE_CGSA` 之敘述」後須與 HEAD 版逐節點相等（HEAD 版以 `git show 6e07e0ad:<path>` 取得）。mutation：刪一條未登記測試 ⇒ ①紅；把一條 `keep` 測試之斷言改為 `assert True` ⇒ ②紅。處置表本身只防未登記刪測與 keep 類弱化；`migrate` 類之新斷言是否不弱於原意圖，逐條列入審碼 brief 由委員確認。受影響測試檔明列路徑跑綠（真實資料者單組串行）。
+- **邊界**：參數化測試之 frame 參數值刪除視為 nodeid 消失，須登記；`edit-env-only` 之測試 nodeid 不變；fixture 函式（非 test_ 開頭）之改動屬 `migrate` 審碼範圍。
 - **存活至**：收案後保留（`test_disposition.json` 為刪除審計紀錄）。
 - **覆蓋風險**：Phase 2 Task 2.4 追加 h5 讀取測試之處置列（同檔增列，不覆蓋）。
 - 不可做：不得放寬既有 CGSA 斷言換綠；不得以檔為單位宣稱已覆蓋。
@@ -109,8 +109,8 @@
 
 **Task 2.3 — API 舊 h5 分支**
 - 目標：API 對 factory h5 具名拒絕，CGSA manifest 路徑不變。　檔案：`api/services/feature_factory_service.py`（:305 非 `.json` 之 stats warmup 分支、`_load_task_context` :4692 非 `.json` 分支、`_load_hdf5_features_df` :4790、:5264、:5298、:5797 之 h5 後備；:5572 `kline_cache.h5` 不動）、`api/services/feature_browser_service.py`（`.h5`／`.hdf5` 分支與 `_load_hdf5_features`、`_find_dataset_group`）、`api/routes/feature_factory.py:628`（`register_hdf5_for_browse` 保留，非 `.json` 路徑具名拒絕）　既有 caller：Feature Explorer 之 browse／schema／rows／CSV 路由、批次結果登錄。
-- 改法：非 `.json` 之 task 路徑 ⇒ 具名錯誤（HTTP 400，訊息含「舊 factory h5 已不支援」與路徑）；`_start_stats_cache_warmup` 若刪後無呼叫者則刪，否則保留。
-- **驗證**：新測 `tests/api/test_framepath_api_h5.py`：register／task context／schema／selected rows／CSV 對 `.h5` 皆回具名錯誤；同檔以 CGSA manifest fixture 斷言 feature list、selected rows、CSV 匯出成功。
+- 改法：非 `.json` 之 task 路徑 ⇒ service 拋 `ValueError`（訊息含「舊 factory h5 已不支援」與路徑）；`/browse/register` 與其他受影響 route 於 broad `except Exception` 之前加 `except ValueError` → HTTP 400（對齊同檔 browse route 既有模式）；`_start_stats_cache_warmup` 若刪後無呼叫者則刪，否則保留。
+- **驗證**：新測 `tests/api/test_framepath_api_h5.py`：register／task context／schema／selected rows／CSV 對 `.h5` 皆 `status_code == 400` 且 body 含該訊息與路徑；同檔以 CGSA manifest fixture 斷言 feature list、selected rows、CSV 匯出成功（200）。mutation：刪 route 之 `except ValueError` ⇒ register 回 500、測試紅。
   `ASSERT pytest tests/api/test_framepath_api_h5.py WHEN state=after THEN rc=0`
   既有 `tests/api/test_feature_browser_routes.py`、`tests/api/test_feature_browser_service.py` 依處置表遷移。
 - **邊界**：`hdf5_path` 為空字串之舊 registry 列（11 筆）⇒ 既有行為不變；`.JSON` 大寫副檔名 ⇒ 與現行判定一致。
@@ -130,19 +130,19 @@
 ### Phase 3 — 腳本與 golden（依賴：Phase 2）
 
 **Task 3.1 — 腳本逐檔處置**
-- 目標：腳本不再呼叫已刪路徑。　檔案與處置：`scripts/freeze_batch2d_baseline.py`（刪 control／frame run，只留 CGSA）、`scripts/golden_multi_symbol_c3.py`（改 CGSA-only 或退休，依 Task 3.2）、`scripts/icfirstalign_preic_diff.py`（刪 `=0` 舊臂；無剩餘用途則刪檔）、`scripts/profile_v6v7_comparison.py`（刪 `=0` 前優化臂；無剩餘用途則刪檔）、`scripts/profile_gate3_to_4_full.py`（刪「可用 FFACT_USE_CGSA=0 關閉」說明）、`scripts/freeze_failopen_baseline.py`／`scripts/verify_cgsa_pipeline.py`／`scripts/l65_native_tf_profile.py`／`scripts/profile_l65_native_tf_groups.py`／`scripts/profile_multi_tf_baseline.py`（只刪 env 設定與印出）；`scripts/fix_spec_v1_to_v1_1.py`、`scripts/capture_full_golden_baseline.py`、`scripts/compare_with_full_golden_baseline.py` 若呼叫已刪函式或讀 `_factory_meta.json` ⇒ 刪檔或刪該段　既有 caller：`scripts/*.sh` 與文件引用。
+- 目標：腳本不再呼叫已刪路徑。　檔案與處置：`scripts/freeze_batch2d_baseline.py`（刪 control／frame run，只留 CGSA）、`scripts/golden_multi_symbol_c3.py`（退休刪檔：其產物 `tests/fixtures/golden/multi_symbol_c3/` 在 tests／momentum／api 零讀者，主委 `grep -rln "multi_symbol_c3" tests momentum api` 2026-10-08 → 空）、`scripts/icfirstalign_preic_diff.py`（刪 `=0` 舊臂；無剩餘用途則刪檔）、`scripts/profile_v6v7_comparison.py`（刪 `=0` 前優化臂；無剩餘用途則刪檔）、`scripts/profile_gate3_to_4_full.py`（刪「可用 FFACT_USE_CGSA=0 關閉」說明）、`scripts/freeze_failopen_baseline.py`／`scripts/verify_cgsa_pipeline.py`／`scripts/l65_native_tf_profile.py`／`scripts/profile_l65_native_tf_groups.py`／`scripts/profile_multi_tf_baseline.py`（只刪 env 設定與印出）；`scripts/fix_spec_v1_to_v1_1.py`、`scripts/capture_full_golden_baseline.py`、`scripts/compare_with_full_golden_baseline.py` 若呼叫已刪函式或讀 `_factory_meta.json` ⇒ 刪檔或刪該段　既有 caller：`scripts/*.sh` 與文件引用。
 - 改法：逐檔照上列；刪檔者同批刪其引用。
-- **驗證**：受影響腳本 `python -m py_compile` rc=0；`grep -rn "FFACT_USE_CGSA\|_factory\.h5\|_factory_meta\.json\|save_factory_output\|load_factory_output" scripts --include=*.py` → 0。
+- **驗證**：受影響腳本 `python -m py_compile` rc=0；`grep -rn "FFACT_USE_CGSA\|_factory\.h5\|_factory_meta\.json\|save_factory_output\|load_factory_output" scripts --include=*.py` → 0；保留之腳本 `git diff --numstat 6e07e0ad -- <腳本>` 新增行數 == 0（只准刪行；例外須於 `test_disposition.json` 之 scripts 段具名附理由並列入審碼 brief）。
 - **邊界**：刪檔之腳本若被 `scripts/*.sh` 或文件引用 ⇒ 同批刪引用或改指向；只改 env 之腳本行為不變。
 - **存活至**：收案後保留。
 - **覆蓋風險**：無。
 - 不可做：不得跑 `freeze_*` 全量重凍（只做靜態處置）。
 
 **Task 3.2 — frame 產出之 golden**
-- 目標：驗收母體不含 frame 產物。　檔案：`tests/_golden/batch2d/control.json`（刪）、`tests/fixtures/golden/multi_symbol_c3/`（逐讀者測試判定）　既有 caller：batch2d 對照測試、multi_symbol_c3 讀者測試。
-- 改法：control.json 及其 frame 對照斷言刪除並登記處置表；multi_symbol_c3 之讀者測試若其意圖已由 CGSA golden 覆蓋 ⇒ 刪 fixture 與讀者斷言、登記覆蓋者；否則以真實 kline、CGSA 重產（單組串行，記 RSS 與秒數）。
-- **驗證**：Task 1.5 處置測試綠；`git diff --stat -- tests/_golden/batch2d/cgsa_baseline.json tests/_golden/failopen/baseline.json` 為空。
-- **邊界**：重產之 fixture 不得由 frame 臂產生；歷史凍結快照之 env 記錄不重凍。
+- 目標：驗收母體不含 frame 產物。　檔案：`tests/_golden/batch2d/control.json`（刪）、`tests/fixtures/golden/multi_symbol_c3/`（刪，零讀者）　既有 caller：batch2d 對照測試。
+- 改法：control.json 及其 frame 對照斷言刪除並登記處置表；multi_symbol_c3 三檔刪除；`scripts/fact_keys.json` 等文字引用同批改。
+- **驗證**：Task 1.5 處置測試綠；`git diff --stat 6e07e0ad -- tests/_golden/batch2d/cgsa_baseline.json tests/_golden/failopen/baseline.json` 為空；`grep -rn "multi_symbol_c3\|batch2d/control" tests momentum api scripts --include=*.py` → 0。
+- **邊界**：刪除前再跑一次讀者 grep，若出現讀者 ⇒ 停下回 SPEC；歷史凍結快照之 env 記錄不重凍。
 - **存活至**：收案後保留。
 - **覆蓋風險**：無。
 - 不可做：不重簽 batch2d「不得相等」oracle；不修改兩份 CGSA 凍結快照。
@@ -172,7 +172,7 @@
 - **測試層級**：Golden 對照（Task 1.1，真實資料、單組串行）＋單元（具名例外、處置表、API h5 拒絕）＋既有 CGSA 測試回歸（明列路徑）。全部可獨立 `pytest tests/...`，不需 run_api.py。
 - **防假綠**：每批 diff 既有測試斷言；刪除之測試必登記 `test_disposition.json`，不得放寬 CGSA 斷言。
 - **三方簽核**：Phase 1、Phase 2 收批前，Claude＋三家各自獨立確認 Task 1.1 收據之比對域與結果（資料正確性簽核）。
-- **邊界目錄**：resume（C5）、多週期 serial（C3）、L3 streaming／hybrid（C4）、`persist=False`、殘留環境變數、手放舊 h5、空 `hdf5_path`、大寫副檔名。
+- **邊界目錄**：resume（C5）、多週期 serial（C3）與 parallel（C6）、L3 streaming／hybrid（C4）與 in_memory（C8）、`persist=False`（C7）、次週期不足 partial（C9）、殘留環境變數、手放舊 h5、空 `hdf5_path`、大寫副檔名、白名單外 combine context。
 - 每批收尾：`bash scripts/restore_golden_inventory.sh`；列本批暫存（pytest-of-louis、中斷測試殘留、委員 /private/tmp 副本）與刪除指令交使用者。
 
 ## §R 回退
