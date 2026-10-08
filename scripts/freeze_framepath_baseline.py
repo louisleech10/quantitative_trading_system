@@ -106,8 +106,19 @@ def generate_cell(cell: str, work_root: Path, *, force_regenerate_second: bool =
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
+def summarize_readings(samples: List[Mapping[str, Any]], root: int) -> Dict[str, Any]:
+    """`_Readings.sample()` 逐筆讀數 → 記憶體摘要（純函式；審查 r26 CODEX-R26-P1-02）：
+    {"readings": 筆數, "peak_bytes": 各筆 footprint 最大值（無讀數＝0）, "failed": 各筆 failed pid 之排序聯集,
+    "injected": 任一筆 injected 為真, "non_root_member_seen": 任一筆 members 含 pid ≠ root,
+    "root_missing": 有 members 而不含 root 之筆數}。`run_cell` 之 memory 除 `seconds` 外須等於本函式對其實際取樣
+    結果之輸出，不得另行填值。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
 def run_cell(cell: str, work_root: Path) -> Dict[str, Any]:
-    """於子行程跑一格生成，父行程以 `memory_guard._Readings`（根＝子行程）每 0.1 秒取樣；回傳
+    """於子行程跑一格生成，父行程以 `memory_guard._Readings`（根＝子行程）每 0.1 秒取樣——取樣器一律於呼叫當下以
+    模組屬性 `memory_guard._Readings(memory_guard._System(), <子行程 pid>)` 建構並呼叫其 `sample()`（測試以
+    monkeypatch 置換該屬性觀測實際讀數），memory＝`summarize_readings(<全部讀數>, <子行程 pid>)` 加 `seconds`；回傳
     {"fingerprint": {FINGERPRINT_KEYS…}, "memory": {"peak_bytes", "readings", "seconds", "non_root_member_seen"},
     "receipt": {"resume_entered": bool（第二次生成進入 CGSA resume 分支之觀測值，見 generate_cell；C5 須 True、其餘格須
     False——SPEC v16 A10）, …，C9 另含 symbol、source_kline、kline_copy、
@@ -118,7 +129,8 @@ def run_cell(cell: str, work_root: Path) -> Dict[str, Any]:
 
 
 def memory_gate_errors(cell: str, memory: Mapping[str, Any]) -> List[str]:
-    """§G 記憶體閘：讀數 failed 非空、injected、無讀數、峰值 ≥ PEAK_LIMIT_BYTES、C6 無根以外成員 ⇒ 錯誤字串。"""
+    """§G 記憶體閘：讀數 failed 非空、injected、無讀數、峰值 ≥ PEAK_LIMIT_BYTES、C6 無根以外成員、root_missing > 0
+    （有讀數而不含根，審查 r26）⇒ 錯誤字串。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 

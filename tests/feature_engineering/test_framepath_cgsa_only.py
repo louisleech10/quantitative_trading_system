@@ -294,11 +294,25 @@ def _defs(src: str) -> List[str]:
 def _referenced_names(sources: Iterable[Tuple[str, str]]) -> Dict[str, int]:
     """引用計數：`ast.Name`、`ast.Attribute` 之名稱，加上封閉之動態 lookup 形式中之字串常數（審查 r25
     CODEX-R25-P1-02：任意識別字字串不計，否則文件字串、fixture label 即可讓死碼消失）——
-    呼叫名 ∈ {getattr, hasattr, setattr, delattr, object}（含 `monkeypatch.setattr`、`patch.object`）之第 2 個位置
-    引數為字串常數 ⇒ 計該字串；呼叫名 ∈ {setattr, delattr, patch} 之第 1 個位置引數為含 `.` 之字串常數 ⇒ 計其最後一段
-    （`monkeypatch.setattr("a.b._x", …)`、`patch("a.b._x")`）。"""
-    second_arg_calls = {"getattr", "hasattr", "setattr", "delattr", "object"}
-    dotted_first_arg_calls = {"setattr", "delattr", "patch"}
+    以呼叫目標之完整點分名（receiver 須可解析為名稱鏈；審查 r26 CODEX-R26-P1-03：`thing.object(...)` 等無關
+    receiver 不計）比對封閉清單——第 2 個位置引數為字串常數 ⇒ 計該字串：builtin `getattr／hasattr／setattr／delattr`、
+    `monkeypatch.setattr／delattr`、`patch.object`（含 `mock.`、`mocker.`、`unittest.mock.` 前綴）；第 1 個位置引數為含
+    `.` 之字串常數 ⇒ 計其最後一段：`patch`（同前綴）、`monkeypatch.setattr／delattr`。"""
+    patch_heads = ("patch", "mock.patch", "mocker.patch", "unittest.mock.patch")
+    second_arg_calls = {"getattr", "hasattr", "setattr", "delattr", "monkeypatch.setattr", "monkeypatch.delattr"} \
+        | {f"{p}.object" for p in patch_heads}
+    dotted_first_arg_calls = {"monkeypatch.setattr", "monkeypatch.delattr", *patch_heads}
+
+    def dotted(func: ast.AST) -> str:
+        parts: List[str] = []
+        while isinstance(func, ast.Attribute):
+            parts.append(func.attr)
+            func = func.value
+        if not isinstance(func, ast.Name):
+            return ""
+        parts.append(func.id)
+        return ".".join(reversed(parts))
+
     counts: Dict[str, int] = {}
     for _path, src in sources:
         try:
@@ -312,8 +326,7 @@ def _referenced_names(sources: Iterable[Tuple[str, str]]) -> Dict[str, int]:
             elif isinstance(node, ast.Attribute):
                 names.append(node.attr)
             elif isinstance(node, ast.Call):
-                func = node.func
-                call = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
+                call = dotted(node.func)
                 args = node.args
                 if call in second_arg_calls and len(args) >= 2 and isinstance(args[1], ast.Constant) \
                         and isinstance(args[1].value, str):
@@ -395,10 +408,14 @@ def test_mutation_dead_scan_counts_added_zero_reference_def():
     # 審查 r25 CODEX-R25-P1-02：同名字串（label、文件字串、dict 鍵、非 lookup 呼叫）不算引用
     orphan = [("m.py", "def _orphan():\n    pass\n")]
     for ref in ("label = '_orphan'\n", "'''_orphan'''\n", "d = {'_orphan': 1}\n", "log('_orphan')\n",
-                "getattr(obj)\n", "patch('_orphan')\n"):
+                "getattr(obj)\n", "patch('_orphan')\n",
+                # 審查 r26 CODEX-R26-P1-03：receiver 非封閉清單者不計
+                "thing.object(None, '_orphan')\n", "object(None, '_orphan')\n", "thing.setattr(m, '_orphan', f)\n",
+                "thing.patch('pkg.m._orphan')\n", "obj.getattr(m, '_orphan')\n", "f()(m, '_orphan')\n"):
         assert dead_defs(orphan, [("n.py", ref)]) == {"_orphan"}, ref
     # 封閉動態 lookup 形式仍算引用
     for ref in ("getattr(m, '_orphan')()\n", "hasattr(m, '_orphan')\n", "monkeypatch.setattr(m, '_orphan', f)\n",
                 "monkeypatch.setattr('pkg.m._orphan', f)\n", "patch('pkg.m._orphan')\n",
-                "patch.object(m, '_orphan')\n", "delattr(m, '_orphan')\n"):
+                "patch.object(m, '_orphan')\n", "delattr(m, '_orphan')\n", "mock.patch.object(m, '_orphan')\n",
+                "mocker.patch('pkg.m._orphan')\n", "monkeypatch.delattr(m, '_orphan')\n"):
         assert dead_defs(orphan, [("n.py", ref)]) == set(), ref

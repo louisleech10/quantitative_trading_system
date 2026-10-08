@@ -823,9 +823,9 @@ def _is_terminal(stmt: ast.stmt) -> bool:
 Link = Tuple[ast.AST, str]  # (祖先節點之標頭〔區塊欄位清空〕, 下一層所在欄位)
 
 
-def _stmt_paths(func: ast.AST) -> List[Tuple[str, List[Link], bool]]:
-    """func 內每個敘述 → (傾印, 祖先鏈〔不含 func 本身〕, 沿途是否位於前置終止敘述之後)。"""
-    out: List[Tuple[str, List[Link], bool]] = []
+def _stmt_paths(func: ast.AST) -> List[Tuple[str, List[Link], bool, int]]:
+    """func 內每個敘述 → (傾印, 祖先鏈〔不含 func 本身〕, 沿途是否位於前置終止敘述之後, 行號)。"""
+    out: List[Tuple[str, List[Link], bool, int]] = []
 
     def walk(owner: ast.AST, chain: List[Link], blocked: bool) -> None:
         for field, val in ast.iter_fields(owner):
@@ -837,7 +837,7 @@ def _stmt_paths(func: ast.AST) -> List[Tuple[str, List[Link], bool]]:
                 if not isinstance(child, ast.AST):
                     continue
                 if isinstance(child, ast.stmt):
-                    out.append((ast_dump(child), here, seen_terminal))
+                    out.append((ast_dump(child), here, seen_terminal, child.lineno))
                 walk(child, here, seen_terminal)
                 if isinstance(child, ast.stmt) and _is_terminal(child):
                     seen_terminal = True
@@ -876,20 +876,41 @@ def _skip_markers(func: ast.AST) -> Set[str]:
     return {ast_dump(d) for d in getattr(func, "decorator_list", []) if _call_name(d) in _SKIP_MARKER_NAMES}
 
 
-def preserved_position_errors(head_func: ast.AST, new_def: ast.AST, dump: str) -> Optional[str]:
-    """保留斷言（HEAD 傾印＝dump）於改寫後函式之位置等價判定；None＝合格。"""
-    head_hits = [(c, b) for d, c, b in _stmt_paths(head_func) if d == dump]
-    if not head_hits:
-        return "不在 HEAD 被改寫函式內"
-    new_hits = [(c, b) for d, c, b in _stmt_paths(new_def) if d == dump]
-    if not new_hits:
-        return "未出現於改寫後全文"
-    for new_chain, new_blocked in new_hits:
-        if new_blocked:
+def preserved_position_errors(head_func: ast.AST, new_def: ast.AST,
+                              rows: Sequence[Tuple[int, str]]) -> Dict[int, str]:
+    """保留斷言列（HEAD 行號, 傾印）於改寫後函式之位置等價判定；回傳 {列序: 不合格理由}（空＝全合格）。
+    每列以其 HEAD 行號之敘述定祖先鏈；改寫後候選＝同傾印、不在終止敘述後、祖先鏈為該列 HEAD 鏈子序列之敘述；
+    列與候選須一對一配對（審查 r26 CODEX-R26-P1-01：兩個相同斷言只留一個 ⇒ 紅），以增廣路徑求最大配對。"""
+    head_paths = {(ln, d): c for d, c, _b, ln in _stmt_paths(head_func)}
+    new_paths = _stmt_paths(new_def)
+    errs: Dict[int, str] = {}
+    cands: Dict[int, List[int]] = {}
+    for i, (lineno, dump) in enumerate(rows):
+        head_chain = head_paths.get((lineno, dump))
+        if head_chain is None:
+            errs[i] = "不在 HEAD 被改寫函式內"
             continue
-        if any(_is_subsequence(new_chain, head_chain) for head_chain, _ in head_hits):
-            return None
-    return "改寫後位置不等價（新增外層控制結構或位於終止敘述之後）"
+        cands[i] = [j for j, (d, c, b, _ln) in enumerate(new_paths)
+                    if d == dump and not b and _is_subsequence(c, head_chain)]
+        if not cands[i]:
+            errs[i] = ("未出現於改寫後全文" if not any(d == dump for d, _c, _b, _ln in new_paths)
+                       else "改寫後位置不等價（新增外層控制結構或位於終止敘述之後）")
+    owner: Dict[int, int] = {}
+
+    def augment(i: int, seen: Set[int]) -> bool:
+        for j in cands.get(i, []):
+            if j in seen:
+                continue
+            seen.add(j)
+            if j not in owner or augment(owner[j], seen):
+                owner[j] = i
+                return True
+        return False
+
+    for i in cands:
+        if cands[i] and not augment(i, set()):
+            errs[i] = "無一對一可配之改寫後敘述（重複斷言數量少於保留列）"
+    return errs
 
 
 def check_3(disp: Dict[str, Any], phase: int, head: HeadReader) -> List[str]:
@@ -917,9 +938,8 @@ def check_3(disp: Dict[str, Any], phase: int, head: HeadReader) -> List[str]:
         for (lineno, dump), item in zip(pres, rw["preserved_assertions"]):
             if sha256_text(dump) != item["ast_sha256"]:
                 errs.append(f"③ {op['id']} 保留斷言 L{lineno} 之 HEAD 雜湊不符")
-            why = preserved_position_errors(head_func, new_def, dump)
-            if why:
-                errs.append(f"③ {op['id']} 保留斷言 L{lineno}：{why}")
+        for i, why in sorted(preserved_position_errors(head_func, new_def, pres).items()):
+            errs.append(f"③ {op['id']} 保留斷言 L{pres[i][0]}：{why}")
     return errs
 
 
@@ -1493,6 +1513,25 @@ def test_mutation_check_3_preserved_assertion_position():
     }
     for label, src in bad.items():
         assert _pos_errs(src) != [], label
+
+
+def test_mutation_check_3_duplicate_preserved_assertions_need_one_to_one_match():
+    """審查 r26 CODEX-R26-P1-01：HEAD 有兩個相同斷言且皆列保留，改寫只留一個 ⇒ ③紅；兩個都留 ⇒ ③綠。"""
+    head = "def test_d():\n    value = run()\n    assert value\n    rerun()\n    assert value\n"
+    tree = ast.parse(head)
+    items = [{"lineno": n.lineno, "ast_sha256": sha256_text(ast_dump(n))}
+             for n in ast.walk(tree) if isinstance(n, ast.Assert)]
+    assert len(items) == 2
+
+    def errs(new_src: str) -> List[str]:
+        rw = {"reason": "r", "preserved_assertions": items, "new_source": new_src,
+              "new_source_ast_sha256": sha256_text(ast_dump(parse_rewrite_source(new_src)))}
+        op = {"id": "OP-D", "phase": 1, "kind": "rewrite", "path": "t.py",
+              "locator": {"category": "def", "qualname": "test_d"}, "rewrite": rw}
+        return check_3({"operations": [op]}, 1, _SrcHead(head))
+
+    assert errs("def test_d():\n    value = run()\n    assert value\n    rerun()\n    assert value\n") == []
+    assert errs("def test_d():\n    value = run()\n    assert value\n    rerun()\n") != []
 
 
 def test_mutation_rename_with_changed_fixture_is_red():

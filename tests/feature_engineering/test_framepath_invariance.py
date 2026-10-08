@@ -143,7 +143,7 @@ def test_boundary_03_memory_gates_in_frozen_baseline(baseline):
 
 
 _HEALTHY_MEMORY = {"peak_bytes": 512 * 1024 ** 2, "readings": 30, "seconds": 3.0, "failed": [], "injected": False,
-                   "non_root_member_seen": True}
+                   "non_root_member_seen": True, "root_missing": 0}
 
 
 @pytest.mark.parametrize("cell,override", [
@@ -152,6 +152,7 @@ _HEALTHY_MEMORY = {"peak_bytes": 512 * 1024 ** 2, "readings": 30, "seconds": 3.0
     ("C1", {"readings": 0}),
     ("C1", {"peak_bytes": fb.PEAK_LIMIT_BYTES}),
     ("C6", {"non_root_member_seen": False}),
+    ("C1", {"root_missing": 1}),
 ])
 def test_boundary_08_memory_gate_rejects_each_fail_condition(cell, override):
     """§G 記憶體閘五種 FAIL 條件逐一（審查 r16 CODEX-R16-P1-02）：讀數 failed 非空、injected、無讀數、峰值 ≥ 2 GB、
@@ -310,6 +311,51 @@ def test_boundary_06_injected_readings_refused(monkeypatch, tmp_path):
     monkeypatch.setenv(memory_guard.READINGS_ENV, str(tmp_path / "readings.jsonl"))
     with pytest.raises(fb.FramepathBaselineError):
         fb.run_cell("C1", tmp_path)
+
+
+def test_boundary_15_memory_summary_comes_from_readings_sampler(monkeypatch, tmp_path):
+    """審查 r26 CODEX-R26-P1-02：記憶體摘要須來自 `memory_guard._Readings` 對子行程之實際取樣——以 spy 置換該
+    模組屬性跑 C1（真實 kline、單週期秒級），run_cell 之 memory（除 seconds）須等於 summarize_readings(spy 讀數,
+    spy root)；root 為子行程（非本行程）、至少一筆讀數、每筆 members 含 root。回傳固定健康常數之實作 ⇒ 紅。"""
+    import os
+
+    from momentum.FeatureEngineering import memory_guard
+
+    seen: dict = {"roots": [], "samples": []}
+    real = memory_guard._Readings
+
+    class _Spy(real):  # type: ignore[misc, valid-type]
+        def __init__(self, system, root):
+            super().__init__(system, root)
+            seen["roots"].append(root)
+
+        def sample(self):
+            row = super().sample()
+            seen["samples"].append(copy.deepcopy(row))
+            return row
+
+    monkeypatch.setattr(memory_guard, "_Readings", _Spy)
+    mem = fb.run_cell("C1", tmp_path)["memory"]
+    assert len(set(seen["roots"])) == 1 and seen["roots"][0] != os.getpid()
+    root = seen["roots"][0]
+    assert len(seen["samples"]) >= 1
+    assert {k: v for k, v in mem.items() if k != "seconds"} == fb.summarize_readings(seen["samples"], root)
+    assert mem["root_missing"] == 0 and mem["readings"] == len(seen["samples"])
+
+
+def test_mutation_summarize_readings_derives_every_field():
+    """summarize_readings 逐欄可證偽：峰值取最大 footprint、failed 聯集、injected 任一、非根成員、缺根計數。"""
+    root = 100
+    rows = [{"footprint": 5, "failed": [], "members": [{"pid": root}]},
+            {"footprint": 9, "failed": [7], "members": [{"pid": root}, {"pid": 101}]},
+            {"footprint": 3, "failed": [7, 2], "members": [{"pid": 101}], "injected": True}]
+    got = fb.summarize_readings(rows, root)
+    assert got == {"readings": 3, "peak_bytes": 9, "failed": [2, 7], "injected": True,
+                   "non_root_member_seen": True, "root_missing": 1}
+    only_root = fb.summarize_readings(rows[:1], root)
+    assert only_root["non_root_member_seen"] is False and only_root["injected"] is False
+    assert only_root["failed"] == [] and only_root["root_missing"] == 0
+    assert fb.summarize_readings([], root)["readings"] == 0 and fb.summarize_readings([], root)["peak_bytes"] == 0
 
 
 def test_boundary_07_comparator_has_no_timeframe_or_symbol_literals():
