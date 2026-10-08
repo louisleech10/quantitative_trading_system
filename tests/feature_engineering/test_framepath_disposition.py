@@ -971,6 +971,37 @@ def collect_nodeids(files: Sequence[str]) -> Set[str]:
     return {line.strip() for line in proc.stdout.splitlines() if "::" in line and not line.startswith(" ")}
 
 
+def check_table_vs_head(disp: Dict[str, Any], head_nodeids: Set[str]) -> List[str]:
+    """nodeid 表須恰等於 HEAD 於 `collect.files` 之實際收集（審查 r18 CODEX-R18-P1-03：表本身漏列／多列時，①④ 以表
+    為 HEAD 母體將無從察覺，delete-file 之「涵蓋該檔全部 HEAD nodeid」亦失準）。"""
+    table = {r["nodeid"] for r in disp["nodeids"]}
+    if table == head_nodeids:
+        return []
+    return [f"nodeid 表與 HEAD 實際收集不等：表缺 {sorted(head_nodeids - table)[:20]} 表多 {sorted(table - head_nodeids)[:20]}"]
+
+
+def collect_at_commit(commit: str, files: Sequence[str]) -> Set[str]:
+    """於暫存 worktree（detach 於 commit）收集；`data_cache` 以 symlink 指回主工作樹（部分測試模組匯入即讀資料）。"""
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="framepath_head_collect_") as tmp:
+        wt = Path(tmp) / "wt"
+        _git("worktree", "add", "--detach", str(wt), commit)
+        try:
+            if (REPO / "data_cache").exists():
+                (wt / "data_cache").symlink_to(REPO / "data_cache")
+            existing = [f for f in files if (wt / f).is_file()]
+            proc = subprocess.run(
+                [sys.executable, "-m", "pytest", "--collect-only", "-q", "-o", "addopts=--import-mode=importlib",
+                 "-p", "no:cacheprovider", *existing], cwd=wt, capture_output=True, text=True,
+            )
+            if proc.returncode != 0:
+                raise RuntimeError(f"HEAD collect rc={proc.returncode}\n{proc.stdout[-3000:]}")
+            return {line.strip() for line in proc.stdout.splitlines() if "::" in line and not line.startswith(" ")}
+        finally:
+            _git("worktree", "remove", "--force", str(wt), check=False)
+
+
 def collect_files(disp: Dict[str, Any]) -> List[str]:
     files = set(disp["collect"]["files"])
     files |= {r["new_nodeid"].split("::")[0] for r in disp["nodeids"] if r["disposition"] == "rename"}
@@ -1008,6 +1039,20 @@ def test_check_0_sha_schema_and_kinds(ctx):
 def test_check_1_collect_difference(ctx):
     current = collect_nodeids(collect_files(ctx["disp"]))
     assert check_1(ctx["disp"], ctx["phase"], current) == []
+
+
+def test_nodeid_table_equals_head_collect(ctx):
+    disp = ctx["disp"]
+    assert check_table_vs_head(disp, collect_at_commit(disp["head_commit"], disp["collect"]["files"])) == []
+
+
+def test_mutation_nodeid_table_row_dropped_with_op_ids_is_red():
+    """同時自表與 delete-file 之 nodeids 移除某檔全部列（CODEX-R18-P1-03 之繞法）⇒ 表與 HEAD 收集不等。"""
+    head = {"t.py::a", "t.py::b", "u.py::c"}
+    full = {"nodeids": [{"nodeid": n, "phase": 1, "disposition": "keep"} for n in sorted(head)]}
+    dropped = {"nodeids": [r for r in full["nodeids"] if not r["nodeid"].startswith("u.py")]}
+    assert check_table_vs_head(full, head) == []
+    assert check_table_vs_head(dropped, head) != []
 
 
 def test_check_2_per_file_expected(ctx):

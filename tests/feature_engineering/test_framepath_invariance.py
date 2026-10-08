@@ -40,15 +40,23 @@ def test_baseline_frozen_at_head_with_all_cells(baseline):
 def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
     """凍結碼態以 git 實核（審查 r17 CODEX-R17-P1-01）：momentum／api／config 與 6e07e0ad 不同 ⇒ 錯誤；相同 ⇒ 無錯；
     freeze 遇錯不產任何輸出。"""
-    def runner(diff_out):
+    anchor = "6e07e0ad952d3cccbe3fd2bef39b5ff49dd13581"
+
+    def runner(diff_out="", untracked_out=""):
         def _run(args):
             if args[:1] == ["rev-parse"]:
-                return 0, "6e07e0ad952d3cccbe3fd2bef39b5ff49dd13581\n"
-            return 0, diff_out
+                return 0, anchor + "\n"
+            if args[:1] == ["diff"]:
+                # 只有以錨點為比較端之 diff 才回傳受控結果；以 HEAD 或其他端比較 ⇒ 視為有差（防比錯基準，r18 CODEX-R18-P1-01）
+                return 0, diff_out if any(a.startswith(fb.HEAD_COMMIT_PREFIX) for a in args) else "momentum/x.py\n"
+            if args[:1] == ["ls-files"]:
+                return 0, untracked_out
+            return 1, ""
         return _run
 
-    assert fb.code_state_errors(runner("")) == []
-    assert fb.code_state_errors(runner("momentum/FeatureEngineering/feature_factory.py\n")) != []
+    assert fb.code_state_errors(runner()) == []
+    assert fb.code_state_errors(runner(diff_out="momentum/FeatureEngineering/feature_factory.py\n")) != []
+    assert fb.code_state_errors(runner(untracked_out="api/services/new_untracked.py\n")) != []
     out = tmp_path / "cgsa_fingerprint.json"
     monkeypatch.setattr(fb, "code_state_errors", lambda git_runner=None: ["momentum 與 6e07e0ad 不同"])
     with pytest.raises(fb.FramepathBaselineError):
@@ -140,6 +148,28 @@ def test_boundary_05_compare_domain_rejects_forbidden_and_non_scalar(tmp_path):
     ok = fb.load_compare_domain()
     with pytest.raises(fb.FramepathBaselineError):
         fb.filter_manifest({"created_at": {"nested": 1}}, ok)
+
+
+def test_boundary_11_c5_resume_hit_is_observed_not_declared(tmp_path):
+    """C5 之 resume_hit 由 resume 實際呼叫觀測（審查 r18 CODEX-R18-P1-02）：第二次強制重算 ⇒ resume_hit 須 False；
+    正常 C5 ⇒ True 且與強制重算之 fingerprint 相等（resume 不改輸出）。真實 kline 單週期輕量設定，單組串行。"""
+    normal = fb.generate_cell("C5", tmp_path / "normal")
+    forced = fb.generate_cell("C5", tmp_path / "forced", force_regenerate_second=True)
+    assert normal["receipt"]["resume_hit"] is True
+    assert forced["receipt"]["resume_hit"] is False
+    strip = lambda fp: {k: v for k, v in fp.items() if k != "path_receipt"}  # noqa: E731
+    assert fb.compare_cell(strip(normal["fingerprint"]), strip(forced["fingerprint"])) == []
+
+
+def test_boundary_12_generation_metadata_exclusion_scalar_only():
+    """非萬用之多段排除鍵 `generation_metadata.source_registry_manifest`（審查 r18 GROK-R18-P1-01）：純量排除、
+    同層其他鍵保留；物件／陣列 ⇒ 拒跑。"""
+    domain = fb.load_compare_domain()
+    out = fb.filter_manifest({"generation_metadata": {"source_registry_manifest": "/abs/x", "other": 1}}, domain)
+    assert out["generation_metadata"] == {"other": 1}
+    for bad in ({"nested": 1}, ["/abs/x"]):
+        with pytest.raises(fb.FramepathBaselineError):
+            fb.filter_manifest({"generation_metadata": {"source_registry_manifest": bad, "other": 1}}, domain)
 
 
 def test_boundary_10_wildcard_exclusion_scalar_only_and_not_across_arrays():

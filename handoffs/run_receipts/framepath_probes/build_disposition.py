@@ -136,7 +136,7 @@ def main() -> int:
         "schema": "framepath-test-disposition/1",
         "head_commit": head,
         "python": "%d.%d" % sys.version_info[:2],
-        "spec": "docs/FRAMEPATH_SPEC.md v15 Task 1.5",
+        "spec": "docs/FRAMEPATH_SPEC.md v16 Task 1.5",
         "population": {"roots": ROOTS, "literals": LITERALS, "extra": EXTRA, "excluded": EXCLUDED,
                        "command": "git grep -l -F <literals> 6e07e0ad -- tests frontend/src scripts", "files": pop},
         "collect": {"command": "python -m pytest --collect-only -q -o addopts=--import-mode=importlib -p no:cacheprovider <files>",

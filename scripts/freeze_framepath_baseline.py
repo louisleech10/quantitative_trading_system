@@ -59,9 +59,12 @@ CODE_STATE_ROOTS = ("momentum", "api", "config")
 
 
 def code_state_errors(git_runner: Any = None) -> List[str]:
-    """凍結前置：工作樹之 `momentum／api／config` 須與 HEAD 6e07e0ad 逐位元相同（`git diff --name-only 6e07e0ad --
-    <roots>` 為空，含未提交改動），且 `git rev-parse 6e07e0ad` 可解析；不成立 ⇒ 錯誤字串（freeze 具名拒寫、不產任何
-    輸出）。`git_runner(args) -> (rc, stdout)` 供測試注入（審查 r17 CODEX-R17-P1-01：不得只填 head_commit 字串）。"""
+    """凍結前置：工作樹之 `momentum／api／config` 須與錨點 6e07e0ad 逐位元相同——①`git rev-parse 6e07e0ad` 可解析
+    ②`git diff --name-only <錨點完整 sha> -- <roots>`（以錨點為比較端、含未提交改動；不得以 HEAD 為比較端）為空
+    ③`git ls-files --others --exclude-standard -- <roots>` 為空（未追蹤之原始碼亦屬碼態）；任一不成立 ⇒ 錯誤字串
+    （freeze 具名拒寫、不產任何輸出）。執行時 HEAD 可為錨點之後之提交（TODO／審查提交只動 tests／docs），故判準是
+    碼態而非 HEAD 值；HEAD 值只記入基準供追溯。`git_runner(args) -> (rc, stdout)` 供測試注入（審查 r17
+    CODEX-R17-P1-01、r18 CODEX-R18-P1-01）。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
@@ -84,6 +87,14 @@ def manifest_sha256(manifest: Mapping[str, Any], domain: Mapping[str, Any]) -> s
 def cell_settings(cell: str) -> Dict[str, Any]:
     """格之設定：payload（ffstat_helpers.stat_payload 系）、env 覆寫、training_tfs、persist、repeat（C5＝2）、
     allow_partial、drop_secondary（C9）。週期與標的一律取自 ffstat_helpers 常數。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def generate_cell(cell: str, work_root: Path, *, force_regenerate_second: bool = False) -> Dict[str, Any]:
+    """行程內跑一格生成並回傳 {"fingerprint", "receipt"}（不含記憶體；`run_cell` 於子行程呼叫本函式並取樣）。
+    `receipt["resume_hit"]`＝第二次生成期間 `ColumnGroupRegistry.resume_from_manifest` 實際被呼叫且回傳非空 registry
+    （以包裝該 classmethod 之 spy 觀測，不以格名推定；審查 r18 CODEX-R18-P1-02）；只 C5 有第二次生成，其兩次皆以
+    `force_regenerate=False`。`force_regenerate_second=True` 只供 mutation 測試（第二次強制重算 ⇒ resume_hit 須 False）。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 

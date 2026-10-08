@@ -2,7 +2,7 @@
  "schema": "framepath-test-disposition/1",
  "head_commit": "6e07e0ad952d3cccbe3fd2bef39b5ff49dd13581",
  "python": "3.9",
- "spec": "docs/FRAMEPATH_SPEC.md v15 Task 1.5",
+ "spec": "docs/FRAMEPATH_SPEC.md v16 Task 1.5",
  "population": {
   "roots": [
    "tests",
