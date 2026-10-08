@@ -597,12 +597,55 @@ def _cgsa_work_list_manifest(tmp_path: Path) -> Path:
     return manifest
 
 
-async def _cgsa_work_routes_rejected(client, tid: str) -> bool:
-    for route in BROWSE_ROUTES:
+async def _route_results(client, tid: str, routes) -> dict:
+    """逐路由累積 (status, text)（審查 r35：不在第一個不符處提早返回，逐路由皆可判）。"""
+    out = {}
+    for route in routes:
         resp = await client.get(route.format(tid=tid))
-        if not (resp.status_code == 400 and CGSA_WORK_REJECT in resp.text):
-            return False
-    return True
+        out[route] = (resp.status_code, resp.text)
+    return out
+
+
+async def _cgsa_work_routes_rejected(client, tid: str) -> bool:
+    results = await _route_results(client, tid, BROWSE_ROUTES)
+    return all(code == 400 and CGSA_WORK_REJECT in text for code, text in results.values())
+
+
+V2_BROWSE_ROUTES = (  # 審查 r35 CODEX-R35-P1-04：同 11 個讀者對有效 V2 run 皆 200（錨點與試作實測皆 200）
+    "/api/v1/features/browse/{tid}/features",
+    "/api/v1/features/browse/{tid}/data?features=feat_a",
+    "/api/v1/features/browse/{tid}/correlation?features=feat_a,feat_b",
+    "/api/v1/features/browse/{tid}/vif?features=feat_a,feat_b",
+    "/api/v1/features/browse/{tid}/distribution?feature=feat_a",
+    "/api/v1/features/browse/{tid}/nan-pattern",
+    "/api/v1/features/browse/{tid}/data-quality",
+    "/api/v1/features/browse/{tid}/summary",
+    "/api/v1/features/export/{tid}/csv",
+    "/api/v1/features/export/{tid}/json",
+    "/api/v1/features/export/{tid}/markdown",
+)
+
+
+def v2_routes_all_served(results: dict) -> list:
+    """不合格之路由（非 200、或回應含舊格式／舊 h5 拒絕字樣）；空＝全部照常服務。"""
+    return [route for route, (code, text) in results.items()
+            if code != 200 or CGSA_WORK_REJECT in text or H5_REJECT in text]
+
+
+@pytest.mark.asyncio
+async def test_boundary_19_v2_manifest_served_by_all_browse_routes(client, monkeypatch, tmp_path):
+    """Task 2.6 底線：有效 V2 run 之 task 於全部 11 個 browse／export 讀者照常 200（舊格式拒絕不得誤傷 V2）。"""
+    service = _service_with_tasks({"task-v2": _task(str(_cgsa_run(tmp_path)))})
+    monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
+    assert v2_routes_all_served(await _route_results(client, "task-v2", V2_BROWSE_ROUTES)) == []
+
+
+def test_mutation_v2_route_single_wrong_rejection_is_detected():
+    """單一路由（如 summary）對 V2 誤拒 ⇒ 判定逐路由命中該路由。"""
+    ok = {route: (200, "{}") for route in V2_BROWSE_ROUTES}
+    summary = "/api/v1/features/browse/{tid}/summary"
+    bad = {**ok, summary: (400, CGSA_WORK_REJECT)}
+    assert v2_routes_all_served(ok) == [] and v2_routes_all_served(bad) == [summary]
 
 
 @pytest.mark.asyncio
@@ -633,7 +676,57 @@ DEAD_CLASS_MEMBERS = (
     ("momentum/FeatureEngineering/feature_storage.py", "FeatureStorage",
      ("delete_features", "feature_file_exists", "list_feature_files")),
     ("api/core/config.py", "Settings", ("enable_hdf5_cache", "hdf5_cache_dir", "hdf5_cache_compression")),
+    # 審查 r35 CODEX-R35-P1-01：瀏覽服務之舊讀取方法（Task 2.3／2.6）
+    ("api/services/feature_browser_service.py", "FeatureBrowserService",
+     ("_load_features_df", "_load_via_reader", "_load_hdf5_features", "_find_dataset_group")),
 )
+# 審查 r35 CODEX-R35-P1-01／P2-03：舊格式之字串契約殘留（以 AST 字串常數判，註解不計）
+DEAD_STRING_CONTRACTS = (
+    ("api/services/feature_browser_service.py", ("library:", "parquet:")),
+    ("momentum/Analysis/ic_engine.py", ("legacy_format",)),
+    ("api/services/ic_analysis_service.py", ("parquet:",)),
+)
+
+
+def dead_string_constants(file_sources) -> list:
+    """檔內字串常數以禁用前綴起首（`library:`、`parquet:`）或等於禁用鍵（`legacy_format`）者。"""
+    import ast
+
+    hits = []
+    for (path, tokens), src in file_sources:
+        for node in ast.walk(ast.parse(src)):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                hits += [(path, t) for t in tokens if node.value == t or (t.endswith(":") and node.value.startswith(t))]
+    return hits
+
+
+def legacy_quality_statuses(src: str) -> list:
+    """`QUALITY_STATUS_PRECEDENCE` 字面中之 V1 專屬狀態 `legacy`。"""
+    import ast
+
+    for node in ast.walk(ast.parse(src)):
+        target = node.target if isinstance(node, ast.AnnAssign) else (node.targets[0] if isinstance(node, ast.Assign) else None)
+        if isinstance(target, ast.Name) and target.id == "QUALITY_STATUS_PRECEDENCE" and node.value is not None:
+            return [e.value for e in ast.walk(node.value) if isinstance(e, ast.Constant) and e.value == "legacy"]
+    return []
+
+
+def test_boundary_20_old_format_string_contracts_and_legacy_status_absent():
+    """Task 2.5 ④／2.6：瀏覽服務無 `library:`／`parquet:` 位址字串、ic_engine 無 `legacy_format`、IC 服務無 `parquet:`
+    位址字串；`QUALITY_STATUS_PRECEDENCE` 不含 V1 專屬 `legacy`。"""
+    srcs = [(spec, (REPO / spec[0]).read_text(encoding="utf-8")) for spec in DEAD_STRING_CONTRACTS]
+    assert dead_string_constants(srcs) == []
+    storage = (REPO / "momentum/FeatureEngineering/feature_storage.py").read_text(encoding="utf-8")
+    assert legacy_quality_statuses(storage) == []
+
+
+def test_mutation_old_format_contract_scans_detect_residue():
+    spec = ("m.py", ("library:", "legacy_format"))
+    assert dead_string_constants([(spec, "if p.startswith('library:'):\n    pass\n")]) == [("m.py", "library:")]
+    assert dead_string_constants([(spec, "if manifest.get('legacy_format'):\n    pass\n")]) == [("m.py", "legacy_format")]
+    assert dead_string_constants([(spec, "# library: 舊位址已刪\nx = 'libraryX'\n")]) == []
+    assert legacy_quality_statuses("QUALITY_STATUS_PRECEDENCE: Tuple[str, ...] = ('legacy', 'partial')\n") == ["legacy"]
+    assert legacy_quality_statuses("QUALITY_STATUS_PRECEDENCE = ('failed', 'partial', 'complete')\n") == []
 
 
 def dead_class_members(class_sources) -> list:

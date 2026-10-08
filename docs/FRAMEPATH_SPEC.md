@@ -161,7 +161,7 @@
 **Task 2.8 — 讀 V1 之腳本與測試處置（v17 B4）**
 - 目標：讀 V1 之腳本與 V1 專測依處置表刪除或遷移。　檔案：`scripts/profile_multi_tf_baseline.py`（OP-147 既有改寫另去掉 :330 `stream_groups`）、`scripts/benchmark_ethusdt_multitf.py`、`scripts/smoke_test_pipeline.py`（`capture_full_golden_baseline.py`、`compare_with_full_golden_baseline.py`、`profile_v6v7_comparison.py` 已列 Phase 3 刪除）；測試 `tests/test_multi_symbol_parallel.py`、`tests/test_l7_parallel_persist.py`、`tests/performance/test_l7_persist_perf.py`、`tests/momentum/test_feature_storage.py`（V1 臂）、`tests/test_feature_factory_batch2c.py`／`batch2d.py`／`batch2e.py`（V1 呼叫）、`tests/feature_engineering/test_l7_raw_streaming.py`（`Mock(spec=FeatureStorage)` 之 `persist_registry_to_parquet` 斷言改為符號不存在）、`tests/feature_engineering/test_ic_first_pipeline.py`（`legacy_format`）、`tests/feature_engineering/test_l7_codec.py`（`test_old_parquet_no_metadata`）、`tests/test_hardware_api.py`、`tests/test_hardware_utils.py`、`tests/feature_engineering/preprocessing/test_d_star_legacy_migration_audit.py`、`tests/api/test_ic_list_features.py` 及偵察 r3 列名之其餘檔。
 - 改法：處置表新增操作（母體字面擴充見 Task 1.5 v17 補充）；V1 專測中驗共用 helper 者改寫為 V2 串流寫入版承接；只驗 V1 者刪。
-- **驗證**：`FRAMEPATH_PHASE=2 pytest tests/feature_engineering/test_framepath_disposition.py` rc=0（⓪–⑦）；處置表所涉測試檔明列路徑 `pytest` rc=0（真實資料者單組串行）。
+- **驗證**：`FRAMEPATH_PHASE=2 pytest tests/feature_engineering/test_framepath_disposition.py` rc=0（⓪–⑦）；manifest `affected_tests phase=2` 所列全部測試檔（由處置表機械導出：該 phase 操作所在、非 delete-file 之 tests/**/test_*.py）逐檔 `pytest` rc=0（真實資料者單組串行；HEAD 既有紅以收據 handoffs/run_receipts/20261008-framepath-trial-run.json 列名者為限，審查 r35）。
 - **邊界**：處置表 nodeid 表中標 keep 者刪除 V1 後仍收集得到且綠；`stream_groups_v2` 之讀回腳本輸出與 V2 run 欄集合相等。
 - **存活至**：收案後保留。
 - **覆蓋風險**：見 Task 2.5。
