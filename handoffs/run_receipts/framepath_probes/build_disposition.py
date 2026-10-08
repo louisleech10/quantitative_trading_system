@@ -34,6 +34,12 @@ LITERALS = [
     "save_factory_output", "_factory.h5", "_factory_meta.json", "_try_load_cache", "_load_hdf5_features",
     "register_hdf5_for_browse", "multi_tf_legacy_merged", "multi_tf_layers", "multi_symbol_c3", "batch2d/control",
     "hdf5_path", "hdf5_relative_path", ".h5",
+    # SPEC v17 B5（Task 2.5–2.8；使用者 2026-10-08 擴大刪除面）
+    "persist_registry_to_parquet", "stream_groups(", "load_manifest(", "list_features(", "load_columns(",
+    "load_cross_symbol", "AsyncParquetCompactor", "FFACT_L7_WORKERS", "FFACT_L7_COMPACTOR", "l7_workers",
+    "migrate_d_star_cache", "FFACT_DSTAR_CACHE_MIGRATE_LEGACY", "export_for_ml", "enable_hdf5_cache",
+    "hdf5_cache_compression", "FFACT_HDF5_CHUNK", "legacy_v7", "feature_file_exists", "list_feature_files",
+    "delete_features", "_adapt_legacy_manifest_v2", "parquet:",
 ]
 ROOTS = ["tests", "frontend/src", "scripts"]
 EXTRA = ["tests/governance/test_prered_allowed_red.py"]
