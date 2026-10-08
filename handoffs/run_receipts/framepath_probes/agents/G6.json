@@ -1,0 +1,826 @@
+{
+  "group": "G6",
+  "files": [
+    {
+      "path": "scripts/_inspect_klines.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體；非 factory h5，未呼叫任何改動函式。",
+      "evidence": [
+        "HEAD :1 docstring 與 :4 path 皆為 data_cache/feature_klines/kline_cache.h5"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/b7_l65_threadpool_microbench.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體；未呼叫改動函式。",
+      "evidence": [
+        "HEAD :30 KLINE_CACHE = .../feature_klines/kline_cache.h5"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/benchmark_ethusdt_multitf.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面（報表文字與印出）入母體；force_regenerate 參數保留；讀 results/full_golden_baseline 之 checksums.json（overall/column sha），不讀 hdf5 欄位。",
+      "evidence": [
+        "HEAD :425、:656 只印 kline_cache.h5 路徑",
+        "HEAD :266-277 讀 baseline checksums.json 之 overall_dataframe_sha256／column_sha256，不讀 hdf5_file_sha256"
+      ],
+      "ops": [],
+      "uncertain": [
+        "CGSA 讀回以 FeatureReader.stream_groups（V1 `<base>/<symbol>/<config_hash>/manifest.json`）讀，CGSA 只寫 V2，HEAD 預設下該讀回段既已讀不到（同 capture／compare 結論）；本檔不引用 FRAMEPATH 刪除之路徑，屬既存問題、非本票範圍，維持 no-op。"
+      ]
+    },
+    {
+      "path": "scripts/benchmark_l65_v2.py",
+      "verdict": "no-op",
+      "reason": "hdf5_path 參數為 kline_cache.h5（h5py 讀 K 線），非 factory h5。",
+      "evidence": [
+        "HEAD :19 DEFAULT_KLINE_CACHE_PATH = .../kline_cache.h5",
+        "HEAD :142-158 h5py.File(hdf5_path) 讀 kline；:197 hdf5_path 取自 CLI 預設 kline 路徑"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/build_l65_golden.py",
+      "verdict": "no-op",
+      "reason": "只讀 kline_cache.h5；apply_to 為 L6.5 前處理設定（非 L4 apply_to）；未呼叫改動函式。",
+      "evidence": [
+        "HEAD :35 KLINE_CACHE_PATH；:392-399 _load_hdf5_kline_frame 以 h5py 讀 kline",
+        "grep `\\._layer|_combine_layers|set_no_start_calibration` → 無命中"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/build_l65_golden_baseline.py",
+      "verdict": "no-op",
+      "reason": "只讀 kline_cache.h5；_run_ic_first_l65 為腳本自有函式，未呼叫 FeatureFactory 改動之分派點。",
+      "evidence": [
+        "HEAD :43 KLINE_CACHE_PATH；:190-203 h5py 讀 kline",
+        "grep `\\._layer|_combine_layers|_cgsa_enabled` → 無命中"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/capture_full_golden_baseline.py",
+      "verdict": "ops",
+      "reason": "改判 delete-file（主委補件第 3 點，讀碼結論）：本檔只有兩條執行路徑，於 HEAD 預設（CGSA）下 CGSA 路徑已壞，唯一可用者為 frame 路徑（複製 `*_factory.h5`／`_factory_meta.json`），刪 frame 後無任何可用路徑、亦無他用途。CGSA 生成之 FeatureGenerationResult.features_df 為無欄 DataFrame（feature_factory.py:4256 `pd.DataFrame(index=trimmed_raw.index)`）⇒ :269 cgsa_mode 恆真 ⇒ :274 `FeatureReader.stream_groups(symbol, config_hash)` ⇒ feature_reader.py:252-257 `load_manifest` 讀 `<base>/<symbol>/<config_hash>/manifest.json`（V1/V7 佈局），不存在即 FileNotFoundError（未捕捉、腳本中止）。CGSA 實際只寫 V2：`_layer7_raw_from_cgsa_pipeline`（單週期 feature_factory.py:555-566、多週期 multi_tf_generator.py:206/:675）→ `write_raw_from_registry_stream` → `feature_run_dir` = `<base>/<symbol>/<tf>/<config_hash>/feature_manifest.json`（feature_storage.py:886-891、:971、:872）。V1 `manifest.json` 唯一寫入者 `persist_registry_to_parquet`（feature_storage.py:2573、:2817 _write_v7_manifest；output_dir = base/symbol/config_hash）之唯一呼叫者 `_layer7_validate_and_persist_cgsa`（feature_factory.py:4358）只經 `_layer7_validate_and_persist`:4468-4469 之 `_cgsa_enabled() and registry is not None` 進入，而 `_layer7_validate_and_persist` 之呼叫者（feature_factory.py:585、multi_tf_generator.py:1612）只在同一條件為假時才到達 ⇒ HEAD 中不可達（本票 Phase 1 亦整刪之）。工作樹 `ls data_cache/features/*/*/manifest.json` → 0 筆、`results/full_golden_baseline/` 不存在（無殘留 V1 產物、無既有 baseline）。repo 引用：git grep capture_full_golden_baseline（排除 handoffs/.claude）只命中 docs/FRAMEPATH_SPEC.md；scripts/*.sh、tests、momentum、api 零引用。同目錄格式之其他生產者／消費者（scripts/register_v8_golden_lite.py 寫、scripts/benchmark_ethusdt_multitf.py 讀 results/full_golden_baseline）不以名稱引用本檔，不受影響。",
+      "evidence": [
+        "scripts/capture_full_golden_baseline.py HEAD :268-278 cgsa_mode → reader.stream_groups(args.symbol, config_hash)；:280-299 frame 分支複製 factory h5／meta；:282 features_factory.h5 佔位",
+        "momentum/FeatureEngineering/feature_reader.py HEAD :344-353 stream_groups → load_manifest；:252-257 path = base/symbol/config_hash/manifest.json，不存在 raise FileNotFoundError",
+        "momentum/FeatureEngineering/feature_factory.py HEAD :4255-4264 CGSA 結果 features_df=pd.DataFrame(index=…)（無欄 ⇒ .empty）",
+        "momentum/FeatureEngineering/feature_storage.py HEAD :886-891 feature_run_dir = base/symbol/tf/config_hash；:872 L7_V2_MANIFEST_NAME = feature_manifest.json；:2573-2600 persist_registry_to_parquet output_dir = base/symbol/config_hash（V7 manifest.json 唯一寫入者）",
+        "git grep persist_registry_to_parquet 6e07e0ad -- momentum api scripts → 唯一呼叫 feature_factory.py:4358（_layer7_validate_and_persist_cgsa 內）",
+        "git grep -ln capture_full_golden_baseline HEAD（排除 handoffs/.claude）→ docs/FRAMEPATH_SPEC.md、本檔"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "delete-file",
+          "locator": {},
+          "frame_basis": "唯一可用路徑為 frame（HEAD :292-299 複製 `*_factory.h5`／`*_factory_meta.json`）；CGSA 路徑（:270-278）於 HEAD 經 V1 stream_groups 讀不到 V2 產物而必拋 FileNotFoundError；刪 frame 後整支無可用路徑",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（腳本不被 pytest 收集；CGSA 輸出不變基準由 Task 1.1 test_framepath_invariance 承擔）"
+        }
+      ],
+      "uncertain": [
+        "docs/FRAMEPATH_SPEC.md 對本檔之文字（Task 1.5／3.1「去留於處置表定案」）屬 Task 4.1 文字同步，不在本處置表。"
+      ]
+    },
+    {
+      "path": "scripts/capture_ic1eb_baseline.py",
+      "verdict": "no-op",
+      "reason": "`.h5` 為 IC 輸入（ICAnalysisService._write_features_h5 物化之 IC 服務內部 h5），屬 §C 不在本票之 IC h5。",
+      "evidence": [
+        "HEAD :200-202 h5_path = inputs_dir / f\"{tag}.h5\"; service._write_features_h5(...)",
+        "HEAD :289 labels_..._return5.h5 為 IC 標籤輸入"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/cleanup_pattern_nan_artifacts.py",
+      "verdict": "no-op",
+      "reason": "`.h5` 只為通用清理之副檔名集合（掃 data_cache 輸出目錄之舊檔），不呼叫任何改動函式；§C 不得以副檔名全域禁 h5。",
+      "evidence": [
+        "HEAD :60 suffixes = {\".parquet\", \".npy\", \".json\", \".h5\"}，只用於 rglob 篩選候選檔"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/compare_with_full_golden_baseline.py",
+      "verdict": "ops",
+      "reason": "改判 delete-file（主委補件第 3 點，讀碼結論，同 capture_full_golden_baseline.py 條）：CGSA 生成之 features_df 為無欄 DataFrame ⇒ :529 `df.empty and feature_count > 0` 恆真 ⇒ :533 `FeatureReader.stream_groups(symbol, config_hash)` 讀 V1 `<base>/<symbol>/<config_hash>/manifest.json`，CGSA 只寫 V2 `<base>/<symbol>/<tf>/<config_hash>/feature_manifest.json`，V1 唯一寫入者 persist_registry_to_parquet 於 HEAD 不可達 ⇒ FileNotFoundError（未捕捉）。故於 HEAD 預設（CGSA）下本檔必在比對前中止；唯一可用者為 frame 路徑（features_df 實體化＋每輪刪 `*_factory.h5` 快取 :74-94/:494）。其比對對象（capture_full_golden_baseline.py 產之 manifest）之生產者同批刪除。刪 frame 後無可用路徑、無他用途。repo 引用：git grep compare_with_full_golden_baseline（排除 handoffs/.claude）只命中 docs/FRAMEPATH_SPEC.md；scripts/*.sh、tests、momentum、api 零引用。",
+      "evidence": [
+        "scripts/compare_with_full_golden_baseline.py HEAD :528-537 df.empty → reader.stream_groups(symbol, config_hash)；:74-94 _factory_output_paths／_reset_factory_output_files（`*_factory.h5`、`*_factory_meta.json`）；:494 每輪重置",
+        "momentum/FeatureEngineering/feature_reader.py HEAD :252-257、:344-353（V1 佈局讀取）",
+        "momentum/FeatureEngineering/feature_factory.py HEAD :4255-4256（CGSA features_df 無欄）、:555-566（單週期 CGSA → _layer7_raw_from_cgsa_pipeline）；multi_tf_generator.py HEAD :94-100、:206/:675（多週期 CGSA 同）",
+        "momentum/FeatureEngineering/feature_storage.py HEAD :886-891、:971（V2 run_dir）；:2573-2600（V1/V7 唯一寫入者）；其唯一呼叫 feature_factory.py:4358 於 HEAD 不可達（:4468 條件與呼叫端 :555/:585、multi_tf_generator :94/:1612 互斥）",
+        "git grep -ln compare_with_full_golden_baseline HEAD（排除 handoffs/.claude）→ docs/FRAMEPATH_SPEC.md、本檔"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "delete-file",
+          "locator": {},
+          "frame_basis": "唯一可用路徑為 frame（features_df 實體化；HEAD :74-94、:492-494 重置 `*_factory.h5` 快取）；CGSA 讀回（:529-537）於 HEAD 必拋 FileNotFoundError；比對基準之生產者 capture_full_golden_baseline.py 同批刪除",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（腳本不被 pytest 收集）"
+        }
+      ],
+      "uncertain": [
+        "docs/FRAMEPATH_SPEC.md 對本檔之文字屬 Task 4.1 文字同步。"
+      ]
+    },
+    {
+      "path": "scripts/compare_wq_numba_vs_pandas.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體。",
+      "evidence": [
+        "HEAD :21 H5 = .../data_cache/kline_cache.h5（K 線）"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/dstar_empirical_probe.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體。",
+      "evidence": [
+        "HEAD :15 H5 = \"data_cache/feature_klines/kline_cache.h5\""
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/freeze_batch2d_baseline.py",
+      "verdict": "ops",
+      "reason": "刪 control（frame，FFACT_USE_CGSA=0）run，只留 CGSA：刪 _run_control 與其專用 _tagged_map；_phase_env 刪 env[\"FFACT_USE_CGSA\"] 設定（非 os.environ 形態、正規化不剝）與非 cgsa 分支；rewrite _run_phase（只認 cgsa）與 main（只跑 cgsa 子程序、只寫 cgsa_baseline.json，不再寫 control.json 與 frame/CGSA provenance.json）。_metadata 內 dict 項 \"FFACT_USE_CGSA\"（:190）與 _run_cgsa 之 os.environ[...]=\"1\"（:259）屬正規化 (c)/(b)，只剝不列。（補件）Phase 1 另整刪 FeatureFactory._apply_timeframe_tag：_tagged_map 已隨 _run_control 刪除；保留之 CGSA 凍結路徑 _registry_layer_map（HEAD :166-168）改以 FeatureFactory._timeframe_tagged_name 逐欄標記（rewrite），逐欄規則等價、輸出 layer_map 不變。",
+      "evidence": [
+        "HEAD :214-250 _run_control：:219 os.environ[\"FFACT_USE_CGSA\"]=\"0\"、:240/:243 錯誤訊息 non-CGSA control",
+        "HEAD :131-137 _tagged_map 唯一呼叫者 :244（_run_control 內）",
+        "HEAD :310 env[\"FFACT_USE_CGSA\"] = \"1\" if phase == \"cgsa\" else \"0\"（`env[...]` 非 os.environ ⇒ 不在正規化 (b)）；:311-312 if phase != \"cgsa\": env.pop(...)",
+        "HEAD :325-326 if phase == \"control\": _run_control；:346 choices=[\"control\",\"cgsa\"]；:359 for phase in (\"control\",\"cgsa\")；:369-391 frame/CGSA provenance 比對並寫 control.json、provenance.json",
+        "外部 import：tests/feature_engineering/test_batch2d_dstar_align.py:20-25 import FREEZE_ENV_DEFAULTS, KLINE_PATH, _run_cgsa, _run_control；:91 子程序字串 import KLINE_PATH,SYMBOL,TIMEFRAME,_base_override；:401/:403 呼叫 _run_control",
+        "momentum/FeatureEngineering/feature_factory.py HEAD :4835-4842 _timeframe_tagged_name(column, timeframe, tf_keys)：label_ 開頭不動；split('_') 段數 <2 不動；parts[1:] 任一段 ∈ tf_keys 不動；否則 parts[0] + timeframe + parts[1:] 以 '_' 接回",
+        "feature_factory.py HEAD :4845-4870 _apply_timeframe_tag：tf_keys = set(TimeframeAligner._timeframe_seconds_keys())；_rename 逐欄同四步（label_／<2 段／parts[1:] 含週期／插入 timeframe），再 DataFrame.rename(columns=rename_map) ⇒ 逐欄映射與 _timeframe_tagged_name(col, timeframe, 同一 tf_keys) 相同；rename 不改欄序、重複欄名各自同映射",
+        "momentum/FeatureEngineering/core/column_group.py HEAD :81 ColumnGroup.columns: tuple[str, ...]（全為 str，_timeframe_tagged_name 之 str 方法前提成立；舊式 pd.DataFrame(columns=list(...)) 保留原字串）",
+        "既有生產呼叫慣例：feature_factory.py HEAD :3888-3889、:4776-4779 以 set(TimeframeAligner._timeframe_seconds_keys()) 為 tf_keys 呼叫 _timeframe_tagged_name；tests/feature_engineering/ffstat_helpers.py:448-449 同"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "_run_control"
+          },
+          "frame_basis": "HEAD :219 os.environ[\"FFACT_USE_CGSA\"] = \"0\"；整函式＝frame（非 CGSA）control 生成，產 control.json（Task 3.2 刪）",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（腳本；CGSA 凍結由 _run_cgsa 承接，不變）"
+        },
+        {
+          "phase": 3,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "_tagged_map"
+          },
+          "frame_basis": "HEAD :131-137 只供 _run_control（:244）把 frame 之 _column_layer_map 加週期標記；_run_control 刪後零呼叫者",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 3,
+          "kind": "delete-node",
+          "locator": {
+            "category": "stmt",
+            "qualname": "_phase_env",
+            "lineno": 310,
+            "end_lineno": 310
+          },
+          "frame_basis": "HEAD :310 依 phase 設 FFACT_USE_CGSA=0（frame）／1；`env[...]` 形態不在 SPEC 正規化 (b)，必須列操作；刪後 CGSA 為唯一路徑",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 3,
+          "kind": "delete-node",
+          "locator": {
+            "category": "stmt",
+            "qualname": "_phase_env",
+            "lineno": 311,
+            "end_lineno": 312
+          },
+          "frame_basis": "HEAD :311-312 只對非 cgsa（control/frame）phase 移除 FFACT_CGSA_WORK_DIR；只剩 cgsa phase 後為死分支",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 3,
+          "kind": "rewrite",
+          "locator": {
+            "category": "def",
+            "qualname": "_run_phase"
+          },
+          "rewrite": {
+            "reason": "HEAD :325-330 為單一 if/elif/else 敘述，無法以 stmt 只刪 control 分支；改寫為只認 cgsa（其他 phase 照舊 ValueError），其餘逐字保留。",
+            "preserved_assertion_lines": [
+              322,
+              328,
+              330,
+              331,
+              332
+            ],
+            "new_source": "def _run_phase(phase: str, out_path: Path) -> None:\n    \"\"\"Run a single generation phase in this (fresh) process and dump its result.\n\n    每個 phase 跑在獨立子程序，避免同進程連續兩次全特徵生成累積記憶體被 OOM-kill\n    （control 成功、CGSA 接著死的實測根因；UI 一次一個 generation 故無此問題）。\n    \"\"\"\n    _apply_freeze_env()\n    with tempfile.TemporaryDirectory(prefix=f\"batch2d_{phase}_\") as temp_dir:\n        temp_root = Path(temp_dir)\n        if phase == \"cgsa\":\n            payload, provenance = _run_cgsa(temp_root)\n        else:\n            raise ValueError(f\"unknown phase: {phase}\")\n        out_path.parent.mkdir(parents=True, exist_ok=True)\n        out_path.write_text(\n            json.dumps({\"payload\": payload, \"provenance\": provenance}, ensure_ascii=False),\n            encoding=\"utf-8\",\n        )\n"
+          },
+          "frame_basis": "HEAD :325-326 if phase == \"control\": payload, provenance = _run_control(temp_root)",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 3,
+          "kind": "rewrite",
+          "locator": {
+            "category": "def",
+            "qualname": "main"
+          },
+          "rewrite": {
+            "reason": "main 之 argparse choices（:346）、迴圈 tuple（:359）與收尾（:369-391 frame/CGSA provenance 比對、寫 control.json 與 provenance.json）皆含 control/frame，非單一敘述可刪；改寫為只跑 cgsa 子程序並只寫 cgsa_baseline.json。不寫 provenance.json（其內容 frame_column_to_layer 與 frame/CGSA 同層判定須 frame run 才產得出）。",
+            "preserved_assertion_lines": [
+              339,
+              342,
+              343,
+              345,
+              347,
+              348,
+              350,
+              360,
+              361,
+              367,
+              371,
+              390
+            ],
+            "new_source": "def main() -> None:\n    if not KLINE_PATH.is_file():\n        raise FileNotFoundError(f\"required real kline cache missing: {KLINE_PATH}\")\n\n    import argparse\n    import subprocess\n\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--phase\", choices=[\"cgsa\"])\n    parser.add_argument(\"--out\")\n    args = parser.parse_args()\n\n    if args.phase:\n        # 子程序：跑單一 phase 並寫出結果（記憶體隔離）\n        _run_phase(args.phase, Path(args.out))\n        return\n\n    # Orchestrator：CGSA phase 於乾淨子程序生成。\n    with tempfile.TemporaryDirectory(prefix=\"batch2d_freeze_\") as temp_dir:\n        temp_root = Path(temp_dir)\n        results: Dict[str, Dict[str, Any]] = {}\n        for phase in (\"cgsa\",):\n            out_path = temp_root / f\"{phase}.json\"\n            subprocess.run(\n                [sys.executable, str(Path(__file__).resolve()),\n                 \"--phase\", phase, \"--out\", str(out_path)],\n                check=True,\n                env=_phase_env(phase),\n            )\n            results[phase] = json.loads(out_path.read_text(encoding=\"utf-8\"))\n\n    cgsa = results[\"cgsa\"][\"payload\"]\n    _write_json(GOLDEN_DIR / \"cgsa_baseline.json\", cgsa)\n"
+          },
+          "frame_basis": "HEAD :359 for phase in (\"control\", \"cgsa\")；:369-370 control/frame_provenance；:374-388 frame vs CGSA provenance；:389 寫 control.json（Task 3.2 刪）",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "n/a（cgsa_baseline.json 不重凍、不改；腳本只靜態處置）"
+        },
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {
+            "category": "def",
+            "qualname": "_registry_layer_map"
+          },
+          "rewrite": {
+            "reason": "Phase 1 整刪 FeatureFactory._apply_timeframe_tag（主委補件生產碼模型），HEAD :166-168 `factory._apply_timeframe_tag(pd.DataFrame(columns=list(group.columns)), TIMEFRAME).columns` 將 AttributeError；改為以保留之 FeatureFactory._timeframe_tagged_name 逐欄標記，tf_keys 取同一來源 set(TimeframeAligner._timeframe_seconds_keys())。逐欄等價證據見 evidence（feature_factory.py:4835-4870）；其餘敘述（registry 缺失具名拒絕、層別衝突 AssertionError）逐字保留。",
+            "preserved_assertion_lines": [
+              150,
+              152,
+              160,
+              161,
+              163,
+              170,
+              171
+            ],
+            "new_source": "def _registry_layer_map(factory: Any) -> Dict[str, str]:\n    from momentum.FeatureEngineering.core.column_group import LayerSource\n    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner\n\n    layer_sources = (\n        LayerSource.L1,\n        LayerSource.L2,\n        LayerSource.L3,\n        LayerSource.L4,\n        LayerSource.L5,\n        LayerSource.L6,\n    )\n    registry = factory._cgsa_registry\n    if registry is None:\n        raise RuntimeError(\"CGSA registry missing after baseline generation\")\n    tf_keys = set(TimeframeAligner._timeframe_seconds_keys())\n    layer_map: Dict[str, str] = {}\n    for layer_source in layer_sources:\n        for group in registry.list_by_layer(layer_source):\n            tagged = [\n                factory._timeframe_tagged_name(column, TIMEFRAME, tf_keys)\n                for column in group.columns\n            ]\n            for column in tagged:\n                existing = layer_map.setdefault(str(column), layer_source.value)\n                if existing != layer_source.value:\n                    raise AssertionError(\n                        f\"CGSA column layer mismatch: {column} {existing} != {layer_source.value}\"\n                    )\n    return layer_map\n"
+          },
+          "frame_basis": "非 frame 臂；為保留之 CGSA 凍結路徑隨生產碼刪除 _apply_timeframe_tag 之必要遷移。等價：_apply_timeframe_tag（HEAD :4845-4870）與 _timeframe_tagged_name（HEAD :4835-4842）四步規則逐字相同（label_ 前綴不動／段數<2 不動／parts[1:] 任一段為週期鍵不動／否則於首段後插入 timeframe），且兩者 tf_keys 同為 set(TimeframeAligner._timeframe_seconds_keys())；_apply_timeframe_tag 之 DataFrame.rename 為逐欄套用同一映射且不改欄序 ⇒ 對 ColumnGroup.columns（tuple[str]）逐欄輸出相同序列。Phase=1：_apply_timeframe_tag 於 Phase 1 刪除即壞（雖只在執行期、不被 pytest 收集，但 tests/feature_engineering/test_batch2d_dstar_align.py 經 import 呼叫 _run_cgsa → _registry_layer_map）。",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "CGSA layer provenance 之語意不變；G2 之 test_batch2d_dstar_align 若比對 _run_cgsa 回傳之 provenance 與凍結 provenance.json 之 cgsa_column_to_layer，即可實跑驗證等價（主委實跑確認）"
+        }
+      ],
+      "uncertain": [
+        "跨組協調：tests/feature_engineering/test_batch2d_dstar_align.py（G2）:24 import _run_control、:401/:403 呼叫之；本檔 phase 3 刪 _run_control 前，G2 須已（phase ≤3）刪該 import alias 與呼叫之測試，否則 collect 期 ImportError。請主委核對 G2 處置表。",
+        "tests/_golden/batch2d/provenance.json（frame_column_to_layer＋cgsa_column_to_layer）為 frame 產物，但 SPEC Task 3.2 只列 control.json 刪除；G2 之 test_batch2d_golden_files_are_complete_and_read_only 讀 provenance。本處置 main 不再寫 provenance.json；該 golden 檔之去留請主委於 golden／G2 處置定案。",
+        "_metadata 之 storage_schema \"frame\": \"factory_hdf5\"（HEAD :200）未列操作：非驗證 grep 字樣，且與凍結之 cgsa_baseline.json metadata（line 1159687）一致；若要清除須 rewrite _metadata（函式內 dict 無法 dict_item 定位）。",
+        "FREEZE_ENV_DEFAULTS 上方註解（HEAD :26-28 \"Freeze control is the classic in-memory path\"）為註解，AST 不見，實作者可自由改寫；_run_phase docstring 之 control 敘述保留為沿革。",
+        "_registry_layer_map 改寫列 phase 1（_apply_timeframe_tag 於 Phase 1 刪除；G2 測試經 _run_cgsa 呼叫之）；其餘本檔操作仍 phase 3。若主委要求腳本操作一律 phase 3，則 Phase 1–2 期間 G2 經 _run_cgsa 之測試會 AttributeError。",
+        "tests/feature_engineering/test_batch2d_dstar_align.py:16 import 模組層 _build_column_layer_map（主委補件列為 Phase 1 整刪），屬 G2，請一併核對。"
+      ]
+    },
+    {
+      "path": "scripts/freeze_failopen_baseline.py",
+      "verdict": "no-op",
+      "reason": "只設 env：模組層 FIXED_ENV dict 字面之 \"FFACT_USE_CGSA\": \"1\" 屬正規化 (c)，只剝不列；無印出 FFACT_USE_CGSA 之敘述；result.hdf5_path 為 CGSA manifest 路徑（§C 欄名不改）。",
+      "evidence": [
+        "HEAD :29-37 FIXED_ENV；:31 \"FFACT_USE_CGSA\": \"1\"（dict 字面項）",
+        "HEAD :652 **FIXED_ENV 寫入環境 manifest；tests 只對凍結 baseline.json 斷言 PYTHONHASHSEED／resolved_l3_persist_mode（test_failopen_golden.py:50-54），不以 FIXED_ENV 比對凍結 env ⇒ 剝鍵不改測試意義",
+        "HEAD :594/:629 hdf5_path＝CGSA manifest 路徑"
+      ],
+      "ops": [],
+      "uncertain": [
+        "tests/feature_engineering/test_failopen_*.py 與 fftfmeta_golden_helpers.py 於 runtime 讀 freeze.FIXED_ENV（剝鍵後少設 FFACT_USE_CGSA=1，生產碼已零讀取，行為不變）。"
+      ]
+    },
+    {
+      "path": "scripts/freeze_fracdiff_maxlag_golden.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面（記錄於輸出 JSON）入母體；FeatureStorage 為 CGSA 落盤根，未呼叫改動函式。",
+      "evidence": [
+        "HEAD :371 \"kline_cache\": \"data_cache/feature_klines/kline_cache.h5\"",
+        "HEAD :130 factory._storage = FeatureStorage(...)（非 save/load_factory_output）"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/freeze_ratiounsafe_baseline.py",
+      "verdict": "no-op",
+      "reason": "只讀 kline_cache.h5；生成走 CGSA raw；apply_to 為 L6.5 設定。",
+      "evidence": [
+        "HEAD :4 docstring、:46 h5py.File(kline_cache.h5)",
+        "HEAD :64-65 FeatureStorage + generate_features(force_regenerate=True)"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/gap3_scan_benchmark.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體。",
+      "evidence": [
+        "HEAD :15 docstring、:133 輸出 JSON 記錄 kline 路徑"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/gen_uat_samples.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體。",
+      "evidence": [
+        "HEAD :4、:44、:120 皆 kline_cache.h5"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/gen_winsor_perf_fixture.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體。",
+      "evidence": [
+        "HEAD :17 KLINE = ROOT / \"data_cache/feature_klines/kline_cache.h5\""
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/golden_multi_symbol_c3.py",
+      "verdict": "ops",
+      "reason": "SPEC Task 3.1 定案退休刪檔：整支以 FFACT_USE_CGSA=0（frame）凍結 tests/fixtures/golden/multi_symbol_c3/（Task 3.2 刪，零讀者）。repo 內引用：docs/ROADMAP.md（RM-FRAMEPATH 列待做描述）、scripts/fact_keys.json（同列，排除於母體、由 fact_key_rows／Task 4.1 處理）、docs/FRAMEPATH_SPEC.md；scripts/*.sh、tests、momentum、api 零引用。",
+      "evidence": [
+        "HEAD :63-79 _golden_environment 設 os.environ[\"FFACT_USE_CGSA\"] = \"0\"",
+        "HEAD :23-26 FIXTURE_DIR = tests/fixtures/golden/multi_symbol_c3（config/baseline.parquet/env_snapshot）",
+        "git grep golden_multi_symbol_c3 HEAD（排除 handoffs/.claude）→ docs/FRAMEPATH_SPEC.md、docs/ROADMAP.md、scripts/fact_keys.json、本檔"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "delete-file",
+          "locator": {},
+          "frame_basis": "HEAD :67 os.environ[\"FFACT_USE_CGSA\"] = \"0\"：整支只產 frame 指紋 golden（multi_symbol_c3），SPEC Task 3.1 列為退休刪檔",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（腳本不被 pytest 收集；其 golden 零讀者）"
+        }
+      ],
+      "uncertain": [
+        "docs/ROADMAP.md 與 scripts/fact_keys.json 之文字引用歸 Task 4.1／fact_key_rows，不在本處置表。"
+      ]
+    },
+    {
+      "path": "scripts/ic1c_freeze_baseline.py",
+      "verdict": "no-op",
+      "reason": "kline_cache.h5 與暫存 features.h5／labels.h5 為 IC 輸入（腳本自寫之 IC fixture h5），非 factory h5。",
+      "evidence": [
+        "HEAD :35 KLINE_CACHE",
+        "HEAD :1251-1260 tmp_path/features.h5、labels.h5 以 _write_h5 自寫供 IC 服務"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/ic1cfr_stopgap_freeze.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體。",
+      "evidence": [
+        "HEAD :56 KLINE_CACHE = .../kline_cache.h5"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/ic1d_baseline_freeze.py",
+      "verdict": "no-op",
+      "reason": "kline 與 IC 輸入 h5（work_dir/features.h5、labels.h5 自寫），非 factory h5。",
+      "evidence": [
+        "HEAD :57 KLINE_CACHE；:280-288 _write_h5(features_path, ...)"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/ic1eb_b5_replay.py",
+      "verdict": "no-op",
+      "reason": "`{tag}.h5` 為 IC 預物化輸入（sha500），屬 IC h5。",
+      "evidence": [
+        "HEAD :76-86 input_paths_for_longitudinal：INPUTS_DIR / f\"{tag}.h5\" 與 _meta.json"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/icfirstalign_preic_diff.py",
+      "verdict": "ops",
+      "reason": "刪 `=0` 舊臂後無剩餘用途 ⇒ delete-file。理由：`old` 臂（run_old，:48-68）以 FFACT_USE_CGSA=0 記憶體路徑跑改前樹；`compare`（:138-182）唯一用途是比對該 old 產物與 CGSA `new` 產物（receipt 之 setting.old 寫死「記憶體路徑 FFACT_USE_CGSA=0（改前樹）」:169）；`new` 臂只是一次 run_ic_first。ICFIRSTALIGN Task 2.3 收據已產出（handoffs/run_receipts/20261004-icfirstalign-preic-diff.json），ICFIRSTALIGN 已收案。刪 old 後 compare 無來源、new 單獨無比較意義。同批須刪唯一引用者 tests/feature_engineering/test_icfirstalign_preic_diff.py（以 spec_from_file_location 載入本檔測 classify；見該檔條目）。其他 repo 引用：docs/FRAMEPATH_SPEC.md、handoffs 歷史收據；scripts/*.sh 零引用。",
+      "evidence": [
+        "HEAD :4 docstring `FFACT_USE_CGSA=0`；:29 os.environ.update dict 項 \"FFACT_USE_CGSA\": \"1\" if cgsa else \"0\"；:55 run_old 呼叫 _prepare(out, cgsa=False)",
+        "HEAD :169 receipt 字串 \"記憶體路徑 FFACT_USE_CGSA=0（改前樹）\"（非 env 形態，若保留檔須另列操作）",
+        "git grep icfirstalign_preic_diff 6e07e0ad → 本檔、tests/feature_engineering/test_icfirstalign_preic_diff.py:14、handoffs/run_receipts/20261004-icfirstalign-preic-diff.json"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "delete-file",
+          "locator": {},
+          "frame_basis": "整支為 ICFIRSTALIGN 新（CGSA）舊（FFACT_USE_CGSA=0 記憶體路徑）pre-IC 差異收據工具（HEAD :1-11、:48-68、:169）；frame 臂刪後 compare 無舊產物來源",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（收據工具；收據已存於 handoffs/run_receipts）"
+        }
+      ],
+      "uncertain": [
+        "替代方案（若主委認為 classify 之可證偽測試仍有價值）：保留檔，刪 run_old（def）、rewrite main 去 old 分支、rewrite compare 改 :169 字串、刪模組 docstring（:1-11，<module> stmt），test_icfirstalign_preic_diff.py 不動；但 compare 之 old 輸入只能來自改前樹自身之腳本複本，本樹 compare 實質無用。",
+        "test_icfirstalign_preic_diff.py 不在關鍵字母體內（不含任何母體關鍵字），刪之須將其列入處置表（操作表 path ∪ nodeid 表），請主委確認①之母體 collect 是否涵蓋操作表 path。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_preic_diff.py",
+      "verdict": "ops",
+      "reason": "母體外檔（非 G6 指派，因 scripts/icfirstalign_preic_diff.py 刪檔而壞）：模組層以 spec_from_file_location 載入該腳本（:14-16），腳本刪後 collect 期 FileNotFoundError；5 條測試只驗收據工具 classify（非生產碼）⇒ 同批 delete-file。",
+      "evidence": [
+        "HEAD :14-16 _spec = importlib.util.spec_from_file_location(\"icfirstalign_preic_diff\", h.REPO / \"scripts\" / \"icfirstalign_preic_diff.py\"); _spec.loader.exec_module(diff)",
+        "collect-only：5 tests（test_exact_float16_conversion_classified … test_partial_sanitize_is_unexplained）"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "delete-file",
+          "locator": {},
+          "frame_basis": "受測對象為 FFACT_USE_CGSA=0 舊臂對 CGSA 之差異分類器（scripts/icfirstalign_preic_diff.py:109-135），該腳本刪除後無受測對象",
+          "deleted_nodeids": [
+            "tests/feature_engineering/test_icfirstalign_preic_diff.py::test_exact_float16_conversion_classified",
+            "tests/feature_engineering/test_icfirstalign_preic_diff.py::test_one_ulp_float32_drift_is_unexplained",
+            "tests/feature_engineering/test_icfirstalign_preic_diff.py::test_nan_new_only_without_sanitize_source_is_unexplained",
+            "tests/feature_engineering/test_icfirstalign_preic_diff.py::test_sanitize_exact_classified",
+            "tests/feature_engineering/test_icfirstalign_preic_diff.py::test_partial_sanitize_is_unexplained"
+          ],
+          "coverage_note": "n/a：驗證意圖為收據工具之分類嚴謹度（只認精確 float16／numeric_sanitize 轉換），非 CGSA 生產行為；生產之 numeric_sanitize 由 momentum/FeatureEngineering/utils/numeric_guards 自有測試承擔（未逐一核對路徑）"
+        }
+      ],
+      "uncertain": [
+        "本檔不在關鍵字母體、亦不在任何組之指派清單；若主委選擇保留 icfirstalign_preic_diff.py（見該條替代方案），本條改為 no-op。"
+      ]
+    },
+    {
+      "path": "scripts/ichc_freeze_p2_golden.py",
+      "verdict": "no-op",
+      "reason": "`.h5` 為 la0 IC fixture 與 kline，非 factory h5。",
+      "evidence": [
+        "HEAD :4-5 docstring；:33 H5_GLOB = f\"{SYMBOL}_{TIMEFRAME}_*_a0_tail2000.h5\"（tests/golden/la0/inputs IC fixture）"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/l65_native_tf_profile.py",
+      "verdict": "no-op",
+      "reason": "只設 env：:287 os.environ[\"FFACT_USE_CGSA\"] = \"1\" 屬正規化 (b)，只剝不列；無印出 FFACT_USE_CGSA 之敘述；result.hdf5_path 為 CGSA manifest。",
+      "evidence": [
+        "HEAD :287 os.environ[\"FFACT_USE_CGSA\"] = \"1\"（唯一 FFACT_USE_CGSA 命中）",
+        "HEAD :326 \"result_hdf5_path\": str(result.hdf5_path)"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/mutation_worktree.py",
+      "verdict": "no-op",
+      "reason": "`.h5` 只出現在註解與 la0 IC fixture glob（*.h5 gitignore 說明），非 factory h5。",
+      "evidence": [
+        "HEAD :60、:69、:238 註解／docstring；:239 glob ETHUSDT_12h_*_a0_tail2000.h5"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/profile_gate3_to_4_full.py",
+      "verdict": "no-op",
+      "reason": "唯一命中（HEAD :23「# 如需關閉特定優化可設 FFACT_USE_CGSA=0 等」）為註解，非 AST 節點；實作者直接刪改該註解行即可，②之 AST 比對視為相等，不須列操作。",
+      "evidence": [
+        "HEAD :21-23 皆為 `#` 註解；FFACT_USE_CGSA 於本檔無其他命中"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/profile_l65_native_tf_groups.py",
+      "verdict": "no-op",
+      "reason": "只設 env：:381 os.environ[\"FFACT_USE_CGSA\"] = \"1\" 屬正規化 (b)；無印出；monkeypatch 之 _layer7_raw_from_cgsa_pipeline 為 CGSA 函式（保留）。",
+      "evidence": [
+        "HEAD :381 唯一 FFACT_USE_CGSA 命中",
+        "HEAD :411-432 _stop_before_l65_l7 取 self._cgsa_registry 並掛在 _layer7_raw_from_cgsa_pipeline"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/profile_multi_tf_baseline.py",
+      "verdict": "ops",
+      "reason": "只刪 env 與印出＋不再引用已刪方法：rewrite main。(1) HEAD :162 \"FFACT_USE_CGSA\" 為 main 內 flag_names list 元素（驅動 :174-175 印出與報表 feature_flags），非正規化形態、函式內 list 元素無 seq_elem 定位；:388 code_defaults dict 項屬正規化 (c)，新全文一併不含。(2)（補件）:214 layer_methods 之 \"_layer6_5_preprocessing\" 與 :256-268 包裝 `_layer7_validate_and_persist` 之區塊刪除（兩方法 Phase 1 整刪）。於 HEAD CGSA 下兩方法本即不被呼叫（單週期 feature_factory.py:555-566 直接 return _layer7_raw_from_cgsa_pipeline；多週期 multi_tf_generator.py:94-100 走 _generate_multi_tf_cgsa → :206/:675 _layer7_raw_from_cgsa_pipeline；_layer6_5_preprocessing 只在 multi_tf_generator.py:1600 legacy 與 feature_factory 非 CGSA 尾段），故刪包裝不改 CGSA 下之 profile 紀錄；不另加新包裝（避免改變輸出）。其餘逐字保留。",
+      "evidence": [
+        "HEAD :161-166 flag_names 含 \"FFACT_USE_CGSA\"（:162）→ flag_snapshot → :173-175 印出",
+        "HEAD :386-392 code_defaults dict 項 \"FFACT_USE_CGSA\": \"1\"（:388）",
+        "HEAD :214/:257 包裝 _layer6_5_preprocessing／_layer7_validate_and_persist（方法保留，CGSA 多週期路徑下仍存在）",
+        "HEAD :206-215 layer_methods 含 \"_layer6_5_preprocessing\"（:214）；:256-268 orig_l7 = factory._layer7_validate_and_persist 包裝並回寫",
+        "git grep 6e07e0ad：_layer7_validate_and_persist 呼叫者 feature_factory.py:585（CGSA 早退 :555 之後）、multi_tf_generator.py:1612（legacy）；_layer6_5_preprocessing 呼叫者 multi_tf_generator.py:1600（legacy）"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "rewrite",
+          "locator": {
+            "category": "def",
+            "qualname": "main"
+          },
+          "rewrite": {
+            "reason": "SPEC Task 3.1「只刪 env 設定與印出」＋主委補件（Phase 1 整刪 _layer6_5_preprocessing、_layer7_validate_and_persist）：FFACT_USE_CGSA 之印出來自函式內 list 元素（HEAD :162），stmt 級刪除 flag_names 會使 :166 NameError；layer_methods list 元素同樣無法定位 ⇒ 整函式改寫。差異僅三處：flag_names 去 \"FFACT_USE_CGSA\"；layer_methods 去 \"_layer6_5_preprocessing\"；刪 :256-268 之 _layer7_validate_and_persist 包裝（含其註解與 3 個敘述）；code_defaults 去該鍵（亦屬正規化 (c)）。",
+            "preserved_assertion_lines": [
+              166,
+              178,
+              179,
+              182,
+              189,
+              285,
+              324,
+              325,
+              419,
+              423
+            ],
+            "new_source": "def main() -> None:\n    # Feature flag snapshot\n    flag_names = [\n        \"FFACT_USE_SEARCHSORTED\", \"FFACT_USE_NUMBA_ROLLING\",\n        \"FFACT_USE_POLARS\", \"FFACT_LAYER1_PARALLEL\", \"FFACT_L3_STREAMING\",\n        \"FFACT_L65_CHUNK_SIZE\", \"MAX_L2_ESTIMATED_COLS\",\n    ]\n    flag_snapshot = {name: os.environ.get(name, \"<unset (code default)>\") for name in flag_names}\n    print(\"=\" * 70)\n    print(\"Feature Factory Multi-TF Profiled Baseline\")\n    print(\"=\" * 70)\n    print(f\"Symbol: ETHUSDT | Primary: 1h | Training: [1h, 12h]\")\n    print(f\"Time:   {datetime.now().isoformat()}\")\n    print()\n    print(\"Feature Flags:\")\n    for k, v in flag_snapshot.items():\n        print(f\"  {k} = {v}\")\n    print()\n\n    from momentum.factories import create_feature_factory\n    from momentum.FeatureEngineering.feature_reader import FeatureReader\n\n    # Use feature_klines cache which has full ETHUSDT 1h (17928 rows) + 12h (1494 rows)\n    factory = create_feature_factory(\n        cache_dir=\"data_cache/feature_klines\",\n        validate_continuity=False,\n    )\n    profiler = LayerProfiler()\n\n    # Config override: primary=1h, training=[1h, 12h]\n    config_override = {\n        \"preset\": \"full\",\n        \"timeframes\": {\n            \"primary\": \"1h\",\n            \"training\": [\"1h\", \"12h\"],\n        },\n    }\n\n    print(\"Starting generation with per-layer profiling...\")\n    print(\"-\" * 70)\n\n    tracemalloc.start()\n    overall_start = time.perf_counter()\n\n    # We intercept generate_features to wrap layer methods.\n    # Since multi-TF CGSA calls factory layer methods directly,\n    # we patch them on the factory instance.\n    layer_methods = [\n        \"_layer0_data_ingestion\",\n        \"_layer1_atomic_indicators\",\n        \"_layer2_derived_features\",\n        \"_layer3_rolling_aggregation\",\n        \"_layer4_lag_features\",\n        \"_layer5_cross_sectional\",\n        \"_layer6_meta_features\",\n    ]\n\n    # Save originals\n    originals = {}\n    for method_name in layer_methods:\n        if hasattr(factory, method_name):\n            originals[method_name] = getattr(factory, method_name)\n\n    # Dynamic wrapping: We need to know which TF is being processed.\n    # We'll wrap using a mutable label reference.\n    current_tf_label = [\"init\"]\n\n    def make_wrapper(method_name: str, orig_fn):\n        @functools.wraps(orig_fn)\n        def wrapper(*args, **kwargs):\n            layer_key = f\"{current_tf_label[0]}/{method_name}\"\n            profiler.start(layer_key)\n            result = orig_fn(*args, **kwargs)\n            cols = 0\n            if isinstance(result, pd.DataFrame) and not result.empty:\n                cols = result.shape[1]\n            profiler.end(layer_key, feature_count=cols)\n            print(f\"  [{current_tf_label[0]}] {method_name}: {cols} cols, \"\n                  f\"{profiler.records[layer_key]['elapsed_s']:.2f}s, \"\n                  f\"RSS={profiler.records[layer_key]['rss_after_mb']:.0f} MB\")\n            return result\n        return wrapper\n\n    for method_name, orig_fn in originals.items():\n        setattr(factory, method_name, make_wrapper(method_name, orig_fn))\n\n    # Intercept _current_timeframe setter to track TF label\n    _orig_setattr = factory.__class__.__setattr__\n\n    def _tracked_setattr(self, name, value):\n        _orig_setattr(self, name, value)\n        if name == \"_current_timeframe\" and isinstance(value, str):\n            current_tf_label[0] = value\n\n    factory.__class__.__setattr__ = _tracked_setattr\n\n    # Also wrap _spill_to_memmap\n    orig_spill = factory._spill_to_memmap\n    @functools.wraps(orig_spill)\n    def wrapped_spill(df, label):\n        layer_key = f\"{current_tf_label[0]}/_spill_to_memmap({label})\"\n        profiler.start(layer_key)\n        result = orig_spill(df, label)\n        profiler.end(layer_key)\n        rec = profiler.records[layer_key]\n        print(f\"  [{current_tf_label[0]}] _spill_to_memmap({label}): \"\n              f\"{rec['elapsed_s']:.2f}s, RSS={rec['rss_after_mb']:.0f} MB\")\n        return result\n    factory._spill_to_memmap = wrapped_spill\n\n    # Run generation\n    try:\n        result = factory.generate_features(\n            symbol=\"ETHUSDT\",\n            timeframe=\"1h\",\n            config_override=config_override,\n            force_regenerate=True,\n        )\n    except Exception as exc:\n        print(f\"\\n*** GENERATION FAILED: {exc}\")\n        import traceback\n        traceback.print_exc()\n        # Cleanup CGSA temp dir on failure\n        _cleanup_cgsa_temp(factory)\n        return\n    finally:\n        # Restore __setattr__\n        factory.__class__.__setattr__ = _orig_setattr\n        # Restore originals\n        for method_name, orig_fn in originals.items():\n            setattr(factory, method_name, orig_fn)\n\n    overall_elapsed = time.perf_counter() - overall_start\n    tm_current, tm_peak = tracemalloc.get_traced_memory()\n    tracemalloc.stop()\n\n    peak_rss = _rss_mb()\n\n    print()\n    print(\"=\" * 70)\n    print(\"GENERATION COMPLETE\")\n    print(\"=\" * 70)\n    print(f\"Total elapsed:       {overall_elapsed:.2f}s\")\n    print(f\"Peak RSS:            {peak_rss:.0f} MB\")\n    print(f\"tracemalloc peak:    {tm_peak / (1024*1024):.1f} MB\")\n    print(f\"Feature count:       {result.feature_count}\")\n    print(f\"Generation time:     {result.generation_time:.2f}s\")\n    print()\n\n    # Load features from CGSA if needed\n    features_df = result.features_df\n    cgsa_mode = features_df.empty and result.feature_count > 0\n    if cgsa_mode:\n        config_hash = str(result.metadata.get(\"config_hash\", \"\"))\n        reader = FeatureReader(\"data_cache/features\")\n        frames: List[pd.DataFrame] = []\n        for _group_name, group_df in reader.stream_groups(\"ETHUSDT\", config_hash):\n            frames.append(group_df)\n        if frames:\n            features_df = pd.concat(frames, axis=1)\n        print(f\"[CGSA] Loaded {features_df.shape[1]} features from per-group Parquet\")\n\n    print(f\"Final shape: {features_df.shape[0]} rows × {features_df.shape[1]} cols\")\n    print()\n\n    # Collect CGSA file sizes\n    features_dir = Path(\"data_cache/features\")\n    parquet_sizes = _collect_parquet_sizes(features_dir)\n    features_total_mb = _dir_size_mb(features_dir)\n\n    # Per-layer summary table\n    print(\"-\" * 70)\n    print(f\"{'Layer':<50} {'Time(s)':>8} {'Cols':>6} {'RSS(MB)':>8} {'ΔRSS':>8}\")\n    print(\"-\" * 70)\n    total_layer_time = 0.0\n    for layer_key, rec in profiler.records.items():\n        elapsed = rec.get(\"elapsed_s\", 0)\n        cols = rec.get(\"feature_count\", 0)\n        rss = rec.get(\"rss_after_mb\", 0)\n        delta = rec.get(\"rss_delta_mb\", 0)\n        total_layer_time += elapsed\n        print(f\"{layer_key:<50} {elapsed:>8.2f} {cols:>6} {rss:>8.0f} {delta:>+8.0f}\")\n    print(\"-\" * 70)\n    print(f\"{'TOTAL layer time':<50} {total_layer_time:>8.2f}\")\n    print(f\"{'Overall wall-clock':<50} {overall_elapsed:>8.2f}\")\n    print()\n\n    # File sizes\n    print(\"CGSA Parquet file sizes:\")\n    if parquet_sizes:\n        for pq in parquet_sizes:\n            print(f\"  {pq['path']}: {pq['size_mb']:.3f} MB\")\n    print(f\"  TOTAL features dir: {features_total_mb:.2f} MB\")\n    print()\n\n    # Layer counts from result\n    layer_counts = result.layer_counts or {}\n    print(\"Layer counts:\", json.dumps(layer_counts, indent=2))\n    print()\n\n    # Write full report\n    report_dir = Path(\"results/profiled_baselines\")\n    report_id = datetime.utcnow().strftime(\"%Y%m%dT%H%M%SZ\") + \"_ETHUSDT_1h_multi_tf\"\n    report_path = report_dir / f\"{report_id}.json\"\n\n    report = {\n        \"report_id\": report_id,\n        \"created_at\": datetime.utcnow().isoformat() + \"Z\",\n        \"symbol\": \"ETHUSDT\",\n        \"primary_tf\": \"1h\",\n        \"training_tfs\": [\"1h\", \"12h\"],\n        \"feature_flags\": flag_snapshot,\n        \"code_defaults\": {\n            \"FFACT_USE_SEARCHSORTED\": \"1\",\n            \"FFACT_USE_NUMBA_ROLLING\": \"1\",\n            \"FFACT_USE_POLARS\": \"1\",\n            \"FFACT_L3_STREAMING\": \"1\",\n        },\n        \"performance\": {\n            \"overall_elapsed_s\": round(overall_elapsed, 3),\n            \"factory_generation_time_s\": round(result.generation_time, 3),\n            \"peak_rss_mb\": round(peak_rss, 1),\n            \"tracemalloc_current_mb\": round(tm_current / (1024 * 1024), 1),\n            \"tracemalloc_peak_mb\": round(tm_peak / (1024 * 1024), 1),\n        },\n        \"features\": {\n            \"feature_count\": result.feature_count,\n            \"rows\": features_df.shape[0],\n            \"columns\": features_df.shape[1],\n            \"cgsa_mode\": cgsa_mode,\n        },\n        \"layer_counts\": layer_counts,\n        \"per_layer_profile\": dict(profiler.records),\n        \"file_sizes\": {\n            \"features_dir_total_mb\": round(features_total_mb, 2),\n            \"parquet_files\": parquet_sizes,\n        },\n        \"metadata\": {\n            \"skipped_timeframes\": result.metadata.get(\"skipped_timeframes\", []),\n            \"present_timeframes\": result.metadata.get(\"present_timeframes\", []),\n            \"config_hash\": str(result.metadata.get(\"config_hash\", \"\")),\n        },\n    }\n\n    _write_json(report_path, report)\n    print(f\"Full report written to: {report_path}\")\n\n    # Cleanup CGSA temp dir to free disk space\n    _cleanup_cgsa_temp(factory)\n    print(\"Done.\")\n"
+          },
+          "frame_basis": "HEAD :162 列印 FFACT_USE_CGSA 旗標值（生產碼零讀取後誤導）；HEAD :214、:257-268 以名稱引用 Phase 1 整刪之 _layer6_5_preprocessing／_layer7_validate_and_persist（後者 :257 屬性存取將 AttributeError），且兩者於 HEAD 僅在 frame／legacy 路徑被呼叫",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "n/a（profiling 腳本）"
+        }
+      ],
+      "uncertain": [
+        "讀回段（HEAD :323-334）以 FeatureReader.stream_groups 讀 V1 `<base>/<symbol>/<config_hash>/manifest.json`，CGSA 只寫 V2 `<base>/<symbol>/<tf>/<hash>/feature_manifest.json` ⇒ 於 HEAD 預設下此腳本在印出「GENERATION COMPLETE」後、逐層表與 JSON 報表前即 FileNotFoundError（FRAMEPATH 前既存之壞，與 capture／compare 同因）。SPEC Task 3.1 明定本檔「只刪 env 設定與印出」，故不改判刪檔、不修讀回；是否另修（改 stream_groups_v2(symbol, tf, hash)）或退休請主委裁定。",
+        "同一 V1 讀回亦見於本組判 no-op 之 scripts/benchmark_ethusdt_multitf.py:761、scripts/smoke_test_pipeline.py:202（不引用本票刪除之路徑或方法，屬既存問題、非 FRAMEPATH 範圍，未列操作）。"
+      ]
+    },
+    {
+      "path": "scripts/profile_v6v7_comparison.py",
+      "verdict": "ops",
+      "reason": "刪 `=0` 前優化臂後無剩餘用途 ⇒ delete-file。理由：整支定義為 pre-opt（CGSA=0 等全關）對 v7（全開）之比較（docstring :2、:19-21 Flag mapping、報表 all_optimizations_enabled :428）；CGSA=0 刪後 pre-opt 臂不再是「全關」而會誤標；剩下之 v7 臂與保留之 scripts/profile_multi_tf_baseline.py 同為 ETHUSDT 1h+12h full preset 逐層 profiling（同 LayerProfiler／同包裝法／同報表目錄 results/profiled_baselines），功能重疊。repo 內引用：docs/ROADMAP.md 與 scripts/fact_keys.json 之 RM-FRAMEPATH 待做描述（Task 4.1）、docs/FRAMEPATH_SPEC.md；scripts/*.sh、tests 零引用。",
+      "evidence": [
+        "HEAD :147-163 依 mode 設 os.environ[\"FFACT_USE_CGSA\"]=\"1\"/\"0\"（:158 為 =0 臂）；:166-170 flag_names 含 FFACT_USE_CGSA 並印出",
+        "HEAD :6、:9 自身用法字串；git grep profile_v6v7_comparison HEAD（排除 handoffs/.claude）→ docs/FRAMEPATH_SPEC.md、docs/ROADMAP.md、scripts/fact_keys.json、本檔"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "delete-file",
+          "locator": {},
+          "frame_basis": "HEAD :156-163 pre-opt 臂設 FFACT_USE_CGSA=0（frame）；比較腳本之存在理由即此臂",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（v7 逐層 profiling 由 scripts/profile_multi_tf_baseline.py 承接）"
+        }
+      ],
+      "uncertain": [
+        "v7 臂另強制 preprocessing.enabled=True 以涵蓋 L6.5（HEAD :201-205），profile_multi_tf_baseline.py 未強制；若主委認為「含 L6.5 之 v7 逐層 profile」為剩餘用途，替代為保留檔並 rewrite main 去 pre-opt 臂＋刪模組 docstring（<module> stmt，含 CGSA=0 字樣）。"
+      ]
+    },
+    {
+      "path": "scripts/prune_dead_feature_runs.sh",
+      "verdict": "no-op",
+      "reason": "只因 `hdf5_relative_path` 欄名入母體（無 `.h5` 字面）：讀 registry.json 之 hdf5_relative_path 判斷檔是否存在，與 factory h5 無關；§C 規定欄名不改（CGSA 下承載 manifest .json 路徑）；判準（路徑存在或慣例目錄存在）刪 frame 後仍成立，不須 replace-file。",
+      "evidence": [
+        "HEAD :7、:11 註解；:40 [ -e \"$p\" ]；:49 jq 取 (.hdf5_relative_path|tostring)",
+        "SPEC §C：hdf5_path／hdf5_relative_path 欄名不改"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/recon_xsectional_label_alignment.py",
+      "verdict": "no-op",
+      "reason": "只因 docstring 之 kline_cache.h5 入母體；特徵讀取走 V2（load_row_index_v2）。",
+      "evidence": [
+        "HEAD :3 docstring",
+        "HEAD :32 lib._reader.load_row_index_v2(..., artifact_kind=\"raw\")"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/signoff_l65_b3b_codex.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體；apply_to 為 L6.5 設定。",
+      "evidence": [
+        "HEAD :33 KLINE_CACHE"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/smoke_test_pipeline.py",
+      "verdict": "no-op",
+      "reason": "只因印出 kline_cache.h5 路徑入母體；force_regenerate 參數保留。",
+      "evidence": [
+        "HEAD :118 print Kline cache 路徑"
+      ],
+      "ops": [],
+      "uncertain": [
+        "CGSA 讀回以 FeatureReader.stream_groups（V1 `<base>/<symbol>/<config_hash>/manifest.json`）讀，CGSA 只寫 V2，HEAD 預設下該讀回段既已讀不到（同 capture／compare 結論）；本檔不引用 FRAMEPATH 刪除之路徑，屬既存問題、非本票範圍，維持 no-op。"
+      ]
+    },
+    {
+      "path": "scripts/splitunify_ic_event_report_diff.py",
+      "verdict": "no-op",
+      "reason": "`{key}.h5` 為 data_cache/reports/ic_ingest_cache 之 IC 輸入（ICAnalysisService._write_features_h5），屬 IC 服務內部 h5。",
+      "evidence": [
+        "HEAD :100-106 cache = REPO / \"data_cache/reports/ic_ingest_cache\"；ICAnalysisService._write_features_h5(h5, ...)"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/splitunify_r5_parity.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體。",
+      "evidence": [
+        "HEAD :51 KLINE = REPO / \"data_cache/feature_klines/kline_cache.h5\""
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/template_check.sh",
+      "verdict": "no-op",
+      "reason": "`\\.h5` 為驗收命令「具體性」啟發式之副檔名白名單元素（與 .py/.json/.csv/.parquet 並列），表示「提到具體檔案」，與 factory h5 無關；§C 不得以副檔名全域禁 h5，kline／IC h5 仍是合法具體產物 ⇒ 不改，不須 replace-file。",
+      "evidence": [
+        "HEAD :410 awk 正規式 `...|\\.py|\\.json|\\.h5|\\.csv|\\.parquet|...` 用於判定驗收行是否含具體可驗字樣"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/tmp/b7_l65_threadpool_microbench.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5（--h5 預設值）入母體。",
+      "evidence": [
+        "HEAD :333 --h5 預設 data_cache/feature_klines/kline_cache.h5"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/tmp/b7_l65_threadpool_microbench_results.json",
+      "verdict": "no-op",
+      "reason": "歷史結果 JSON，只記錄 kline 路徑。",
+      "evidence": [
+        "HEAD :4 \"h5\": \"data_cache/feature_klines/kline_cache.h5\""
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/tmp/b7_smoke.json",
+      "verdict": "no-op",
+      "reason": "歷史結果 JSON，只記錄 kline 路徑。",
+      "evidence": [
+        "HEAD :4 \"h5\": \"data_cache/feature_klines/kline_cache.h5\""
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/tmp/dstar_option_a_empirical.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5（--kline 預設值）入母體；apply_to 為 L6.5 設定。",
+      "evidence": [
+        "HEAD :264 --kline 預設 kline_cache.h5"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/verify_cgsa_pipeline.py",
+      "verdict": "ops",
+      "reason": "只刪 env 設定與印出：:21 os.environ.setdefault(\"FFACT_USE_CGSA\", \"1\") 為 setdefault 形態，不在 SPEC 正規化 (b)（只含賦值／del／pop）⇒ 列 <module> stmt 刪除；:73 印出 FFACT_USE_CGSA 值 ⇒ 列 stmt 刪除；兩者刪後 `import os`（:9）零使用，一併列 import_alias 刪除。",
+      "evidence": [
+        "HEAD :20 註解「# Ensure CGSA is enabled」、:21 os.environ.setdefault(\"FFACT_USE_CGSA\", \"1\")",
+        "HEAD :73 print(f\"FFACT_USE_CGSA={os.environ.get('FFACT_USE_CGSA', 'unset')}\")",
+        "grep `\\bos\\.` 本檔 → 只有 :21、:73"
+      ],
+      "ops": [
+        {
+          "phase": 3,
+          "kind": "delete-node",
+          "locator": {
+            "category": "stmt",
+            "qualname": "<module>",
+            "lineno": 21,
+            "end_lineno": 21
+          },
+          "frame_basis": "HEAD :21 以 setdefault 開 CGSA 開關；刪 frame 後生產碼零讀取，且 setdefault 非正規化剝除形態，須列操作",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 3,
+          "kind": "delete-node",
+          "locator": {
+            "category": "stmt",
+            "qualname": "main",
+            "lineno": 73,
+            "end_lineno": 73
+          },
+          "frame_basis": "HEAD :73 印出 FFACT_USE_CGSA 值（SPEC Task 3.1 刪印出）",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 3,
+          "kind": "delete-node",
+          "locator": {
+            "category": "import_alias",
+            "lineno": 9,
+            "name": "os"
+          },
+          "frame_basis": "HEAD :9 import os 之唯二使用（:21、:73）皆為 FFACT_USE_CGSA，刪後成死 import",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        }
+      ],
+      "uncertain": [
+        "import os 之刪除為非必要清理（brief：helper／import 死碼可列）；若主委偏好最小改動可去掉此列（留死 import 不會壞）。"
+      ]
+    },
+    {
+      "path": "scripts/verify_l1_warmup_requirements.py",
+      "verdict": "no-op",
+      "reason": "只因 kline_cache.h5 字面入母體；ent.apply_to 為 L1 暖身登記之屬性（非 L4 config）。",
+      "evidence": [
+        "HEAD :55、:112、:116 kline_cache.h5",
+        "HEAD :665 for source in ent.apply_to"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/verify_nan_poisoning_fix.py",
+      "verdict": "no-op",
+      "reason": "只讀 kline_cache.h5；直接呼叫 DerivedOperatorEngine／RollingAggregator 等引擎（不經 FeatureFactory 分派點），apply_to:\"all\" 為各引擎自有設定，不受 L4 apply_to 強制影響。",
+      "evidence": [
+        "HEAD :43 KLINE_PATH",
+        "HEAD :126-131 DerivedOperatorEngine(config=...)、:144-149 RollingAggregator(config=...) 直接 compute_all"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "scripts/fix_spec_v1_to_v1_1.py",
+      "verdict": "ops",
+      "reason": "SPEC Task 1.2 定案 Phase 1 整檔刪除（歷史 SPEC 改寫腳本，非生成路徑；其 content.replace 之三引號字串字面內含兩處無 context 之 `_combine_layers(` 文字——AST 層為字串非呼叫，但文字掃描會命中）。repo 內引用：只有 docs/FRAMEPATH_SPEC.md；scripts/*.sh、tests、docs 他檔零引用。",
+      "evidence": [
+        "HEAD :67-102 content.replace(\"\"\"...\"\"\", \"\"\"...\"\"\") 字串字面內：:70 `self._combine_layers([layer1, ..., layer6])`、:88 `self._combine_layers(layers_for_validation)`（皆無 context）",
+        "git grep fix_spec_v1_to_v1_1 HEAD（排除 handoffs/.claude）→ 只命中 docs/FRAMEPATH_SPEC.md"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-file",
+          "locator": {},
+          "frame_basis": "HEAD :70、:88 字串內之無 context `_combine_layers(`（對應預設 \"unknown\"，Phase 1 後具名拒絕之形態）；SPEC Task 1.2 明列同批整檔刪除",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        }
+      ],
+      "uncertain": []
+    }
+  ]
+}

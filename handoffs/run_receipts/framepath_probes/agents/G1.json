@@ -1,0 +1,412 @@
+{
+  "group": "G1",
+  "files": [
+    {
+      "path": "tests/feature_engineering/test_failopen_consumer.py",
+      "verdict": "ops",
+      "reason": "兩支測試直接驗已刪之舊 factory h5 快取（mock storage.load_factory_output＋呼叫 factory._try_load_cache），Phase 2 刪該鏈後 AttributeError：快取閘矩陣測試 rewrite 為 CGSA resume 閘（同一 is_run_status_cacheable 判定、L7 manifest 之 partial／unknown 不續跑、complete 續跑），legacy-complete-無 completeness 測試整函式刪（意圖已由純函式測試承接）；兩個因而失去使用者之 import 一併刪。test_cgsa_skips_resume_when_l7_manifest_missing 只有 setenv FFACT_USE_CGSA=1（正規化剝除），keep。",
+      "evidence": [
+        "HEAD:179 factory._storage.load_factory_output = MagicMock(...)；HEAD:181 factory._try_load_cache(...)",
+        "HEAD:346 load_factory_output mock；HEAD:348 assert factory._try_load_cache(...) is None",
+        "feature_factory.py:4687-4696 _try_load_cache 首步 self._storage.load_factory_output（SPEC Task 2.1 整刪）",
+        "feature_factory.py:1266-1300 CGSA _prepare_cgsa_registry 之 resume 閘：讀 L7 manifest resolve_run_status → is_run_status_cacheable，非 complete ⇒ resume_allowed=False（現行無測試覆蓋 partial／unknown 狀態；tests/test_cgsa_resume.py 與本檔 test_cgsa_skips_resume_when_l7_manifest_missing 只覆蓋 manifest 缺失／force_fresh）",
+        "HEAD:7 from types import SimpleNamespace、HEAD:8 from unittest.mock import MagicMock：只被 HEAD:178,179,345,346 使用",
+        "HEAD:357 monkeypatch.setenv(\"FFACT_USE_CGSA\", \"1\") 屬正規化 (a) 剝除形，不列操作",
+        "test_training_rejects_partial／test_legacy_reader_strict_rejects_ic_and_training 走 FeatureLibrary V2 分支（registry 有 config_hash，reader 先拋 TrainingReadError），不經 feature_library.py:211 之 h5 後備，Task 2.2 後不變"
+      ],
+      "ops": [
+        {
+          "phase": 2,
+          "kind": "rewrite",
+          "locator": {
+            "category": "def",
+            "qualname": "test_cache_gate_partial_unknown_miss_complete_hit"
+          },
+          "rewrite": {
+            "reason": "原測試以 MagicMock 替換 storage.load_factory_output 並呼叫 _try_load_cache 驗『partial／unknown 不命中、complete 命中』；Phase 2 刪 load_factory_output 與 _try_load_cache 後無對象。CGSA 下唯一之『重用既有成果』為 _prepare_cgsa_registry 之 resume，其閘使用同一 consumer_gate.is_run_status_cacheable 對 L7 manifest 判定，且現行無測試覆蓋 partial／unknown 狀態 ⇒ 改寫為 CGSA resume 閘測試承接同一意圖；沿用同檔 _partial_manifest 造 L7 manifest（與原測試同一 fixture），以 resume_from_manifest 是否被呼叫（call_args 是否為 None）作 result，原兩條斷言逐字保留。不新增函式、名稱不變。",
+            "preserved_assertion_lines": [
+              183,
+              185
+            ],
+            "new_source": "def test_cache_gate_partial_unknown_miss_complete_hit(\n    tmp_path: Path,\n    monkeypatch: pytest.MonkeyPatch,\n) -> None:\n    \"\"\"CGSA resume 閘（FRAMEPATH：承接已刪之舊 factory h5 快取閘意圖）：L7 manifest run_status 為 partial／unknown\n    ⇒ 不 resume；complete ⇒ resume。\"\"\"\n    from unittest.mock import patch\n\n    factory = create_feature_factory(validate_continuity=False)\n\n    for status in (\"partial\", \"unknown\", \"complete\"):\n        storage, config_hash, _ = _partial_manifest(tmp_path / status, run_status=status)\n        factory._storage = storage\n        work_dir = tmp_path / status / \"cgsa_work\"\n        work_dir.mkdir(parents=True)\n        (work_dir / \"manifest.json\").write_text(\n            json.dumps({\"groups\": {\"g1\": {\"status\": \"complete\"}}}),\n            encoding=\"utf-8\",\n        )\n        monkeypatch.setenv(\"FFACT_CGSA_WORK_DIR\", str(work_dir))\n\n        with patch(\n            \"momentum.FeatureEngineering.feature_factory.ColumnGroupRegistry.resume_from_manifest\"\n        ) as resume_mock:\n            factory._prepare_cgsa_registry(\"BTCUSDT\", \"1h\", config_hash=config_hash)\n        result = resume_mock.call_args\n        if status == \"complete\":\n            assert result is not None\n        else:\n            assert result is None\n"
+          },
+          "frame_basis": "HEAD:179／181 依賴 FeatureStorage.load_factory_output 與 FeatureFactory._try_load_cache（只讀 frame L7 分支寫出之 *_factory.h5；save_factory_output 唯一呼叫在 frame L7 feature_factory.py:4595）",
+          "deleted_nodeids": [],
+          "coverage_note": "改寫後即為 CGSA 承接：L7 manifest run_status 之 resume 閘（partial／unknown 不續跑、complete 續跑）"
+        },
+        {
+          "phase": 2,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "test_try_load_cache_rejects_legacy_complete_without_completeness"
+          },
+          "frame_basis": "整支只驗 _try_load_cache 對 load_factory_output（mock）回傳之 metadata 判定（HEAD:339-348）；兩者 Phase 2 刪除，無 CGSA 對應物（§N：不新增 manifest 快取命中）",
+          "deleted_nodeids": [
+            "tests/feature_engineering/test_failopen_consumer.py::test_try_load_cache_rejects_legacy_complete_without_completeness"
+          ],
+          "coverage_note": "『complete 但缺 completeness ⇒ unknown 且不可快取』由 tests/feature_engineering/test_failopen_consumer.py::test_metadata_complete_without_completeness_is_unknown 與 ::test_is_run_status_cacheable_matrix 承接；CGSA resume 閘之 artifact 層缺證據 ⇒ unknown 由 tests/feature_engineering/test_failopen_manifest.py::test_status_model 承接"
+        },
+        {
+          "phase": 2,
+          "kind": "delete-node",
+          "locator": {
+            "category": "import_alias",
+            "lineno": 8,
+            "name": "MagicMock"
+          },
+          "frame_basis": "只服務 HEAD:179、346 之 load_factory_output mock（上兩操作刪／改寫後零使用）",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 2,
+          "kind": "delete-node",
+          "locator": {
+            "category": "import_alias",
+            "lineno": 7,
+            "name": "SimpleNamespace"
+          },
+          "frame_basis": "只服務 HEAD:178、345 之 cached 假 FeatureGenerationResult（上兩操作刪／改寫後零使用）",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        }
+      ],
+      "uncertain": [
+        "rewrite 之 test_cache_gate_partial_unknown_miss_complete_hit 未實跑：假設 _partial_manifest(status='complete') 之 L7 manifest 經 resolve_run_status 得 complete（HEAD 原測試 complete 分支經 _try_load_cache:4730-4734 同一判定且回傳非 None，故推定成立）；partial／unknown 只需非 complete。請主委實跑確認綠，並做 mutation：把 feature_factory.py:1295 之 `if not is_run_status_cacheable(l7_status)` 改為恆 False ⇒ 本測試應紅。",
+        "MagicMock／SimpleNamespace import 刪除為整潔性操作（殘留不會壞）；若主委偏好最小操作可去掉這兩列。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_correctness.py",
+      "verdict": "ops",
+      "reason": "test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor 以 FFACT_USE_CGSA=0 在無 registry 下直呼 L3；FIXED_ENV 設 FFACT_L3_PERSIST_MODE=streaming，Phase 1 後此組合拋 CGSARegistryRequiredError ⇒ rewrite 改設 in_memory（保留之非串流分支＝原 frame 所走同一碼），全部斷言（含 L3 存活欄數 59962）逐字保留。test_v7_cgsa_resume_matches_fresh 之 monkeypatch.setattr(...FeatureFactory._try_load_cache...) 於 Phase 2 刪函式後 AttributeError ⇒ 刪該敘述。其餘測試皆經 freeze FIXED_ENV（FFACT_USE_CGSA=1）走 CGSA，keep。",
+      "evidence": [
+        "HEAD:374 monkeypatch.setenv(\"FFACT_USE_CGSA\", \"0\")；HEAD:372 _apply_baseline_env 套 scripts/freeze_failopen_baseline.py:29-37 FIXED_ENV（含 FFACT_L3_PERSIST_MODE=streaming）",
+        "HEAD:397 factory._layer3_rolling_aggregation(direct_l1, direct_l2, config) 未建 registry；feature_factory.py:2084 串流條件於 Phase 1 改為 persist_mode in {streaming,hybrid} 且 registry None ⇒ 具名例外；:2126 起非串流分支保留給 in_memory",
+        "HEAD:1187-1190 monkeypatch.setattr(\"momentum.FeatureEngineering.feature_factory.FeatureFactory._try_load_cache\", lambda ...)（raising 預設 True，屬性不存在即 AttributeError）",
+        "HEAD:1105 setenv FFACT_USE_CGSA=1 屬正規化剝除形",
+        "test_v7_cache_cold_hot_identical（HEAD:1070）：CGSA 下 _try_load_cache 恆不命中，hot 實為 CGSA resume／重算，Phase 2 後語意不變，keep"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {
+            "category": "def",
+            "qualname": "test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor"
+          },
+          "rewrite": {
+            "reason": "HEAD:374 以 FFACT_USE_CGSA=0 讓未建 registry 之直接 L3 呼叫走非串流分支；Phase 1 後環境變數無作用，FIXED_ENV 之 streaming 下 registry None ⇒ CGSARegistryRequiredError。測試意圖（direct 與 preserve_dtype 兩呼叫者 L1-L3 欄／dtype／值逐位元一致、12h L3 存活欄數）屬 CGSA 亦須成立之計算正確性，且 L3 非串流分支於 Phase 1 後原樣保留給 in_memory 級距 ⇒ 只把該行改為 FFACT_L3_PERSIST_MODE=in_memory（覆寫 FIXED_ENV 之 streaming），其餘逐字不變，全部斷言保留。",
+            "preserved_assertion_lines": [
+              393,
+              409,
+              420,
+              421
+            ],
+            "new_source": "@pytest.mark.requires_kline\ndef test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor(\n    monkeypatch: pytest.MonkeyPatch,\n    tmp_path: Path,\n) -> None:\n    \"\"\"12h L1-L3：direct 層呼叫 vs preserve_dtype typed caller dtype/values/columns 一致（L3 走 in_memory 級距之非串流分支）。\"\"\"\n    _require_kline()\n    freeze = _freeze_baseline_module()\n    _apply_baseline_env(monkeypatch)\n    monkeypatch.setenv(\"FFACT_LAYER1_PARALLEL\", \"0\")\n    # FRAMEPATH：未建 registry 之直接層呼叫只能走 L3 in_memory 非串流分支（streaming／hybrid 須 registry，否則具名拒絕）\n    monkeypatch.setenv(\"FFACT_L3_PERSIST_MODE\", \"in_memory\")\n\n    factory = create_feature_factory(cache_dir=KLINE_CACHE_DIR, validate_continuity=False)\n    payload = _fast_config_payload(\n        timeframes={\n            \"primary\": \"12h\",\n            \"training\": [\"12h\", \"1h\"],\n            \"alignment_mode\": \"open_minus\",\n        },\n    )\n    config = factory._resolve_config(payload)\n    start_date, end_date = freeze._window_dates()\n    raw_data = factory._layer0_data_ingestion(\n        BASELINE_SYMBOL,\n        \"12h\",\n        config,\n        start_date=start_date,\n        end_date=end_date,\n    )\n    assert raw_data is not None and not raw_data.empty\n\n    direct_l1 = factory._layer1_atomic_indicators(raw_data, config).data\n    direct_l2 = factory._layer2_derived_features(direct_l1, raw_data, config).data\n    direct_l3 = factory._layer3_rolling_aggregation(direct_l1, direct_l2, config).data\n\n    typed_l1 = factory._execute_layer1_6_preserve_dtype(\n        \"Layer 1\", factory._layer1_atomic_indicators, raw_data, config\n    ).data\n    typed_l2 = factory._execute_layer1_6_preserve_dtype(\n        \"Layer 2\", factory._layer2_derived_features, typed_l1, raw_data, config\n    ).data\n    typed_l3 = factory._execute_layer1_6_preserve_dtype(\n        \"Layer 3\", factory._layer3_rolling_aggregation, typed_l1, typed_l2, config\n    ).data\n\n    for direct, typed, layer_name in (\n        (direct_l1, typed_l1, \"L1\"),\n        (direct_l2, typed_l2, \"L2\"),\n        (direct_l3, typed_l3, \"L3\"),\n    ):\n        assert list(direct.columns) == list(typed.columns), f\"{layer_name} column set drift\"\n        assert {str(dtype) for dtype in direct.dtypes} == {str(dtype) for dtype in typed.dtypes}, (\n            f\"{layer_name} dtype set drift\"\n        )\n        _assert_columns_byte_equal(direct, typed)\n\n    assert direct_l3.shape[1] == MTF_12H_L3_SURVIVOR_COUNT\n    assert \"close_trend_MIDPOINT_233_ZScore_W3\" in direct_l3.columns\n"
+          },
+          "frame_basis": "HEAD:374 設 FFACT_USE_CGSA=0 使 feature_factory.py:2084 之 _cgsa_enabled() 為 False 而走 frame 非串流 L3",
+          "deleted_nodeids": [],
+          "coverage_note": "改寫後即為 CGSA in_memory 級距之 L3 非串流分支承接（SPEC §C 註明該分支保留給 in_memory）"
+        },
+        {
+          "phase": 2,
+          "kind": "delete-node",
+          "locator": {
+            "category": "stmt",
+            "qualname": "test_v7_cgsa_resume_matches_fresh",
+            "lineno": 1187,
+            "end_lineno": 1190
+          },
+          "frame_basis": "防止 frame factory h5 快取搶先命中之護欄；_try_load_cache 只讀 *_factory.h5（frame L7 寫出），Phase 2 刪除後 monkeypatch.setattr 字串路徑 AttributeError；CGSA 本無此快取，刪後測試語意不變",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（測試其餘 CGSA resume 斷言全保留）"
+        }
+      ],
+      "uncertain": [
+        "rewrite 之 test_mtf_12h_... 未實跑：假設 FFACT_L3_PERSIST_MODE=in_memory 下 L1/L2（registry None）與 L3 非串流分支輸出與 HEAD frame 臂逐位元相同，且 MTF_12H_L3_SURVIVOR_COUNT=59962 不變（同一 aggregator.compute_all(base) 呼叫，無 persist_callback）。請主委於 Phase 1 改前（HEAD）先以 in_memory 實跑一次確認綠，再於改後跑。",
+        "若主委判定 in_memory 級距記憶體不可承受（12h 全窗 L3 約 6 萬欄全表），替代方案為整函式 delete（但會失去 L3 存活欄數之釘點）；HEAD frame 臂本即同一全表計算，故推定可承受。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_layers.py",
+      "verdict": "no-op",
+      "reason": "全檔經 _make_factory 套 FIXED_ENV（FFACT_USE_CGSA=1）走 CGSA；直接呼叫之 L1/L2/L5/L6 不在 Phase 1 具名例外範圍；唯一真 L3 呼叫（test_l3_streaming_offload_status）已先建 registry；test_layer3 類以 monkeypatch 替換 L3。兩處 setenv FFACT_USE_CGSA=1 屬正規化剝除形。",
+      "evidence": [
+        "HEAD:139、HEAD:320 monkeypatch.setenv(\"FFACT_USE_CGSA\", \"1\")",
+        "HEAD:327 factory._cgsa_registry = factory._prepare_cgsa_registry(...) 先於 HEAD:334 _layer3_rolling_aggregation",
+        "全檔無 _combine_layers／_layer6_5／_layer7／_try_load_cache／*_factory.h5 字面"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_manifest.py",
+      "verdict": "ops",
+      "reason": "test_persist_false_generate_features_metadata 依 SPEC Task 1.5 改驗 CGSA persist=False（rewrite；轉綠同批由 allowed_red 之持有者刪 FRAMEPATH 列並同步 EXPECTED）；test_degradation_in_manifest_frame_l65_failure 整支只驗 frame L6.5 降級與 *_factory_meta.json ⇒ 刪。其餘皆純函式／storage 單元，keep。",
+      "evidence": [
+        "HEAD:171 docstring「FFACT_USE_CGSA=0 + persist=False 走非 CGSA generate_features」；HEAD:175 setenv FFACT_USE_CGSA=0",
+        "tests/_golden/prered/allowed_red.json 第 1 列 node=…::test_persist_false_generate_features_metadata、owner_ticket=FRAMEPATH",
+        "CGSA persist=False：feature_factory.py:4102 `if persist:` 才寫 raw；:4200 completeness_meta 為 None 時以 _final_completeness 形成；:4264 hdf5_path=manifest_path if persist else \"\"；:4268-4282 仍寫 FeatureRegistry（:4278 self._registry.add）（故改寫加 FFACT_FEATURE_REGISTRY_PATH 隔離，feature_registry.py:39）",
+        "HEAD:1012 fg.prepare_env(..., FFACT_USE_CGSA=\"0\")、HEAD:1013 patch FeatureFactory._layer6_5_pre_ic（只在 frame 尾段 feature_factory.py:579-580 經 _execute_l65_with_degradation 呼叫）、HEAD:1014 fg.meta_json（讀 save_factory_output 寫之 *_factory_meta.json）",
+        "本檔於 docs/FF_FAILOPEN_FROZEN_TESTS.md:13 為整檔 wildcard 登記，test_failopen_matrix::test_v8 不因本檔斷言變動而紅"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {
+            "category": "def",
+            "qualname": "test_persist_false_generate_features_metadata"
+          },
+          "rewrite": {
+            "reason": "SPEC Task 1.5 指定改驗 CGSA persist=False。刪 HEAD:175 之 FFACT_USE_CGSA=0（Phase 1 後無作用）；docstring 與註解改述 CGSA；新增 FFACT_FEATURE_REGISTRY_PATH 與 factory._storage 指向 tmp（CGSA persist=False 仍寫 FeatureRegistry，且 manifest 不存在斷言須對本次隔離根才有意義，避免碰專案 data_cache）；新增 `assert factory._cgsa_registry is not None` 證明走 CGSA；HEAD:198-202、208 六條原斷言逐字保留（未放寬：仍要求 complete、hdf5_path 空、無 L7 manifest）。",
+            "preserved_assertion_lines": [
+              198,
+              199,
+              200,
+              201,
+              202,
+              208
+            ],
+            "new_source": "def test_persist_false_generate_features_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:\n    \"\"\"CGSA + persist=False：走 CGSA raw pipeline（不落 L7 manifest、不寫 raw），metadata 帶 completeness status。\"\"\"\n    from tests.feature_engineering.test_failopen_contract import _apply_baseline_env, _freeze_baseline_module\n\n    _apply_baseline_env(monkeypatch)\n    monkeypatch.setenv(\"FFACT_LAYER1_PARALLEL\", \"0\")\n    monkeypatch.setenv(\"FFACT_CGSA_WORK_DIR\", str(tmp_path / \"cgsa_work\"))\n    monkeypatch.setenv(\"FFACT_FEATURE_REGISTRY_PATH\", str(tmp_path / \"features\" / \"registry.json\"))\n\n    freeze = _freeze_baseline_module()\n    start_date, end_date = freeze._window_dates()\n\n    factory = create_feature_factory(\n        cache_dir=TEST_KLINE_CACHE_DIR,\n        validate_continuity=False,\n    )\n    factory._storage = FeatureStorage(str(tmp_path / \"features\"))\n    result = factory.generate_features(\n        BASELINE_SYMBOL,\n        BASELINE_TIMEFRAME,\n        # 本測試驗 metadata completeness 欄(L1-L6),非 L6.5 數值\n        config_override={\"preprocessing\": {\"enabled\": False}},\n        force_regenerate=True,\n        persist=False,\n        start_date=start_date,\n        end_date=end_date,\n    )\n\n    assert factory._cgsa_registry is not None\n    assert result.hdf5_path == \"\"\n    assert result.metadata[\"quality_status\"] == \"complete\"\n    assert result.metadata[\"run_status\"] == \"complete\"\n    assert result.metadata[\"failed_layers\"] == []\n    assert factory.layer_results\n    run_dir = factory._storage.feature_run_dir(\n        BASELINE_SYMBOL,\n        BASELINE_TIMEFRAME,\n        str(result.metadata[\"config_hash\"]),\n    )\n    assert not (run_dir / FeatureStorage.L7_V2_MANIFEST_NAME).exists()\n"
+          },
+          "frame_basis": "HEAD:171/175 顯式 FFACT_USE_CGSA=0 測非 CGSA _layer7_validate_and_persist 之 persist=False（docs/FF_FAILOPEN_FROZEN_TESTS.md:16）",
+          "deleted_nodeids": [],
+          "coverage_note": "改寫後即為 CGSA persist=False（SPEC §G C7／Task 1.2 邊界『persist=False 生成 ⇒ 走 CGSA raw pipeline 且 completeness 照寫』）之單元承接"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "test_degradation_in_manifest_frame_l65_failure"
+          },
+          "frame_basis": "HEAD:1004-1019 整支：FFACT_USE_CGSA=0 ＋ patch _layer6_5_pre_ic（僅 frame 尾段呼叫）＋讀 fg.meta_json（frame save_factory_output 產物）；CGSA 之 L6.5 失敗設計為 fail-closed（不降級續行），無對應行為",
+          "deleted_nodeids": [
+            "tests/feature_engineering/test_failopen_manifest.py::test_degradation_in_manifest_frame_l65_failure"
+          ],
+          "coverage_note": "CGSA L6.5 失敗具名上拋：tests/feature_engineering/test_icfirstalign_icfirst.py::test_l65_failure_raises_named_not_write_raw_empty、::test_boundary_02_single_group_failure_fails_whole_run；降級原因排序之純函式：本檔 ::test_boundary_16_degradation_in_manifest_reason_order_timeframe_layer_quality；manifest 與 metadata 同源（CGSA）：本檔 ::test_degradation_in_manifest_cgsa_nan_threshold"
+        }
+      ],
+      "uncertain": [
+        "rewrite 未實跑：CGSA（FIXED_ENV：streaming、Polars、L1 預設全指標、preprocessing 關）於 BTCUSDT/12h 365 天窗 persist=False 之 quality_status 是否為 complete 未驗；若 CGSA 如實判 partial（例：nan_ratio 超門檻，參照 test_failopen_correctness.py:1111-1113 之 14 天窗前例），不得放寬斷言，須回 TODO 審查改 config_override（如精簡 L1）。請主委實跑。",
+        "allowed_red.json 之 FRAMEPATH 列刪除與 tests/governance/test_prered_allowed_red.py 之 EXPECTED 同步不在本組檔案內，須由持有該兩檔之組列操作（phase 1，與本 rewrite 同批）。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_matrix.py",
+      "verdict": "ops",
+      "reason": "test_matrix_l65_failure_degrades_metadata 整支驗 frame L6.5 降級（FFACT_USE_CGSA=0、patch _layer6_5_pre_ic）⇒ 刪。其餘矩陣測試經 FIXED_ENV 走 CGSA，test_matrix_cgsa_tf_failure_rollback_state 之 setenv=1 屬剝除形，keep。",
+      "evidence": [
+        "HEAD:379 monkeypatch.setenv(\"FFACT_USE_CGSA\", \"0\")；HEAD:384 monkeypatch.setattr(factory, \"_layer6_5_pre_ic\", _boom)",
+        "_layer6_5_pre_ic 生產呼叫者：feature_factory.py:580（frame 尾段 :569-597，Phase 1 刪）與 :3218（_layer6_5_preprocessing 無 selected_features 分支，生產零呼叫者，只 multi_tf_generator.py:1600 legacy 內）；CGSA L6.5 不經 _execute_l65_with_degradation（feature_factory.py:4158 註解）",
+        "HEAD:340 setenv FFACT_USE_CGSA=1 屬正規化剝除形",
+        "本檔於 docs/FF_FAILOPEN_FROZEN_TESTS.md:33 為整檔 wildcard 登記"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "test_matrix_l65_failure_degrades_metadata"
+          },
+          "frame_basis": "HEAD:371-404：frame 路徑 L6.5 失敗降級續行（preprocessing_applied=False＋partial）；Phase 1 後 FFACT_USE_CGSA=0 無作用、被 patch 之 _layer6_5_pre_ic 不再被呼叫 ⇒ 斷言 HEAD:400 必紅；CGSA 之 L6.5 失敗為 fail-closed，無降級語意",
+          "deleted_nodeids": [
+            "tests/feature_engineering/test_failopen_matrix.py::test_matrix_l65_failure_degrades_metadata"
+          ],
+          "coverage_note": "CGSA L6.5 失敗具名上拋：tests/feature_engineering/test_icfirstalign_icfirst.py::test_l65_failure_raises_named_not_write_raw_empty；NaN 門檻降級（CGSA）仍由本檔 ::test_matrix_nan_ratio_exceeds_marks_partial 承接"
+        }
+      ],
+      "uncertain": [
+        "🔴 跨組風險（本檔 test_v8_frozen_doc_covers_every_existing_assertion_change，keep 但會被他組改動打紅）：該測試以 `git diff d654237..HEAD -- tests/` 找出每個斷言行被增刪之測試（含被整函式刪除者，以舊檔範圍歸屬），要求其檔案為 docs/FF_FAILOPEN_FROZEN_TESTS.md 之整檔 wildcard 或 `path` 與 `test_name` 皆出現於該文件。FRAMEPATH 各批 commit 後，凡 d654237 時已存在、且非 wildcard 之測試檔中被刪／改寫之含斷言測試（他組檔，如 tests/test_multi_tf_generator.py、tests/test_feature_factory_batch2d.py 等）未登記於該文件 ⇒ 本測試紅。另：若某 d654237 已存在之 tests/*.py 被 delete-file，HEAD:131 `git show HEAD:<path>` 失敗 ⇒ 本測試直接報錯。SPEC Task 4.1 只排 Phase 4 改該文件之 non-CGSA L7 列 ⇒ Phase 1–3 收批時本測試會紅。建議：每批同批於 docs/FF_FAILOPEN_FROZEN_TESTS.md 補登列（docs/ 不受 Task 1.5 ⑦ 約束），或於 TODO 審查定案處理；本組 G1 之檔僅 test_failopen_layers.py／test_failopen_contract.py 存在於 d654237 且本組未改其斷言，test_failopen_manifest.py／test_failopen_matrix.py 為 wildcard。",
+        "test_v8 未實跑（需 git 歷史，執行時間未知）；其現況是否綠未知。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_producer.py",
+      "verdict": "ops",
+      "reason": "四路徑整合測試之 legacy 參數（FFACT_USE_CGSA=0＋無 registry 之 StubFactory ⇒ _generate_multi_tf_legacy）刪 parametrize 元素；frame meta.json 同源測試整支刪；_execute_l65_with_degradation 之降級單元測試整支刪（該 helper 於 Phase 1 後生產零呼叫者，供 Task 1.4 死碼掃除）；_CgsaStubFactory._cgsa_enabled 覆寫刪（Phase 1 後無任何讀者，且 Task 4.2 收案 grep `_cgsa_enabled` 於 tests 命中即 FAIL）。其餘（含 install_inprocess_mtf_pool 之 memory_budget 用法）與 NON_ARM_FFACT_KEYS 無關，keep。",
+      "evidence": [
+        "HEAD:242-245 parametrize generator_path=[\"legacy\", ...]；HEAD:261-264 legacy 分支 setenv FFACT_USE_CGSA=0、factory=StubFactory(...)（無 _cgsa_registry）⇒ multi_tf_generator.py:95-107 走 _generate_multi_tf_legacy；Phase 1 後 registry None ⇒ 具名例外",
+        "HEAD:102-104 `@staticmethod def _cgsa_enabled() -> bool: return True`：MultiTFGenerator 只讀自身 MultiTFGenerator._cgsa_enabled（multi_tf_generator.py:95,1874,1895），StubFactory 非 FeatureFactory ⇒ 此覆寫於 HEAD 已無讀者",
+        "HEAD:400-415 test_l65_failure_records_effective_config_and_continues 直呼 factory._execute_l65_with_degradation；生產呼叫者僅 feature_factory.py:579（frame 尾段）與 multi_tf_generator.py:1598（_generate_multi_tf_legacy 內），Phase 1 兩者皆刪；HEAD:412 _apply_preprocessing_degradation_metadata 於 HEAD 已無生產呼叫者",
+        "HEAD:584-590 test_persist_completeness_same_source_frame_path：prepare_env(FFACT_USE_CGSA=\"0\")＋_fg.meta_json（*_factory_meta.json）",
+        "grep NON_ARM／SELECTORS 於本檔：無（只有 install_inprocess_mtf_pool 用 mb.sample_memory_bytes 等），NON_ARM_FFACT_KEYS 刪列不影響本檔"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {
+            "category": "parametrize_elem",
+            "qualname": "test_four_generator_paths_fail_closed_integration",
+            "decorator_index": 0,
+            "index": 0
+          },
+          "frame_basis": "generator_path=\"legacy\" ＝ FFACT_USE_CGSA=0 之 frame 多週期組裝（_generate_multi_tf_legacy，Task 1.3 刪）",
+          "deleted_nodeids": [
+            "tests/feature_engineering/test_failopen_producer.py::test_four_generator_paths_fail_closed_integration[False-legacy]",
+            "tests/feature_engineering/test_failopen_producer.py::test_four_generator_paths_fail_closed_integration[True-legacy]"
+          ],
+          "coverage_note": "多週期 fail-closed／partial 語意由同測試之 cgsa_serial、cgsa_parallel_primary、cgsa_parallel_worker 三參數承接"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "_CgsaStubFactory._cgsa_enabled"
+          },
+          "frame_basis": "frame／CGSA 環境切換之覆寫（HEAD:102-104）；Phase 1 刪 _cgsa_enabled 後無讀者，殘留誤導且使 Task 4.2 收案 grep（`_cgsa_enabled` 於 tests）命中",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "test_l65_failure_records_effective_config_and_continues"
+          },
+          "frame_basis": "_execute_l65_with_degradation 為 frame 專用 L6.5 降級包裝（生產呼叫者只在 frame 單週期尾段 :579 與 legacy 多週期 :1598）；CGSA L6.5 不經此包裝（feature_factory.py:4158）且失敗為 fail-closed",
+          "deleted_nodeids": [
+            "tests/feature_engineering/test_failopen_producer.py::test_l65_failure_records_effective_config_and_continues"
+          ],
+          "coverage_note": "CGSA L6.5 失敗具名上拋：tests/feature_engineering/test_icfirstalign_icfirst.py::test_l65_failure_raises_named_not_write_raw_empty；NON_DEGRADABLE 原樣上拋：同檔 ::test_boundary_01_non_degradable_errors_reraised_as_is"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "test_persist_completeness_same_source_frame_path"
+          },
+          "frame_basis": "HEAD:584-590 整支：FFACT_USE_CGSA=\"0\" 之 frame 路徑 meta.json（save_factory_output 產物）與 result.metadata 同源；Phase 1 後不產 meta.json ⇒ FileNotFoundError",
+          "deleted_nodeids": [
+            "tests/feature_engineering/test_failopen_producer.py::test_persist_completeness_same_source_frame_path"
+          ],
+          "coverage_note": "CGSA manifest 與 result.metadata 同源：本檔 ::test_persist_completeness_same_source_multi_tf_cgsa、::test_persist_completeness_same_source_degraded_single_tf、::test_boundary_13_persist_completeness_same_source_single_generate_defaults"
+        }
+      ],
+      "uncertain": [
+        "刪 legacy 參數後，函式內 HEAD:261-264 之 `if generator_path == \"legacy\":` 分支成為不可達死碼（其中 FFACT_USE_CGSA 行經正規化剝除）；本表未列 rewrite 以免整函式重寫風險。若審查要求清除，須改為 rewrite 整函式（保留 HEAD:300-310 之全部斷言）。",
+        "test_l65_failure_records_effective_config_and_continues 之刪除前提為 Task 1.4 將 _execute_l65_with_degradation 列為死碼；但 tests/feature_engineering/test_ffstat_layer.py:159 亦直呼該 helper（他組檔），Task 1.4『被保留之 CGSA 測試引用者保留』規則下，若他組保留該測試則 helper 存活、本刪除成為非必要（仍不會壞）。請主委跨組對齊。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/test_failopen_contract.py",
+      "verdict": "no-op",
+      "reason": "全檔不設 FFACT_USE_CGSA（_apply_baseline_env 套 FIXED_ENV=1）；直接層呼叫只有 L1/L2，L3 測試以 monkeypatch 替換 _layer3_rolling_aggregation，不觸及 Phase 1 具名例外；無 h5／快取依賴。",
+      "evidence": [
+        "grep FFACT_USE_CGSA／_cgsa_enabled／_try_load_cache／load_factory_output／_factory.h5：0 命中",
+        "HEAD:421-425 monkeypatch.setattr(factory, \"_layer3_rolling_aggregation\", ...) 取代真 L3",
+        "HEAD:77 _compute_l1_canonical_sha256 先建 registry 再跑 L1"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "tests/feature_engineering/ff_truncation_mr_helpers.py",
+      "verdict": "no-op",
+      "reason": "唯一相關字面為模組層 FIXED_ENV 之 \"FFACT_USE_CGSA\": \"1\" dict 項（正規化 (c) 剝除形，值為 CGSA，剝除後語意不變）；無 frame／h5 依賴。",
+      "evidence": [
+        "HEAD:110-116 FIXED_ENV = {\"FFACT_LAYER1_PARALLEL\": \"0\", \"FFACT_USE_CGSA\": \"1\", \"FFACT_USE_POLARS\": \"1\", \"FFACT_L3_PERSIST_MODE\": \"streaming\", \"FFACT_MULTI_TF_PARALLEL\": \"0\"}",
+        "grep _layer／_combine_layers／_try_load_cache／load_factory_output／_factory.h5：0 命中；HEAD:367 generate_features(persist=True) 走 CGSA"
+      ],
+      "ops": [],
+      "uncertain": [
+        "FIXED_ENV 經 fftfmeta_golden_helpers.prepare_env（`{**FIXED_ENV, **env}`）合併；他組測試以 prepare_env(..., FFACT_USE_CGSA=\"0\") 覆寫之 frame 臂由他組處置，本 helper 剝鍵後不影響。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/ffstat_helpers.py",
+      "verdict": "ops",
+      "reason": "public_fingerprints 含 frame 枝（rglob *_factory.h5 ＋ FeatureStorage.load_factory_output）與 docstring 之 `*_factory.h5` 字面；SPEC Task 2.4 指名處置。唯一呼叫者 test_ffstat_stable_start.py::test_paths_same_stable_start_and_masks 已只跑 CGSA 路徑（frame 枝恆空迴圈）⇒ rewrite 刪該枝並改 docstring，CGSA parquet 枝逐字保留。",
+      "evidence": [
+        "HEAD:387-389 docstring「frame 路徑（`*_factory.h5`，全部欄同一檔）與 CGSA 路徑…同式」",
+        "HEAD:402-406 for h5 in sorted(root.rglob(\"*_factory.h5\")): … FeatureStorage(str(h5.parent)).load_factory_output(symbol, timeframe).features_df",
+        "呼叫者：tests/feature_engineering/test_ffstat_stable_start.py:1505（mode∈cgsa_parallel／resume／tier_24gb／tier_32gb 對 cgsa_serial，皆 CGSA）",
+        "SPEC Task 4.2 收案 grep 含 `_factory\\.h5`、`load_factory_output` 於 tests ⇒ docstring 亦須改"
+      ],
+      "ops": [
+        {
+          "phase": 2,
+          "kind": "rewrite",
+          "locator": {
+            "category": "def",
+            "qualname": "public_fingerprints"
+          },
+          "rewrite": {
+            "reason": "刪 HEAD:402-406 之 *_factory.h5 讀取枝（load_factory_output 於 Task 2.1 刪除；CGSA 從不產此檔，枝恆不執行）與 docstring 之 frame 敘述；fp 與 parquet 枝（HEAD:390-401、407-414）逐字保留，CGSA 指紋語意不變。helper 無斷言，preserved_assertion_lines 為空。",
+            "preserved_assertion_lines": [],
+            "new_source": "def public_fingerprints(root: Path) -> Dict[str, Dict[str, Any]]:\n    \"\"\"公開輸出之全部欄（基礎欄 parquet＋`*_L65.parquet` 衍生欄）→ {NaN mask hash, float32 值 hash}，供 ⑪ 跨路徑比對。\n    值一律轉 float32（落盤精度）後比，NaN 以 0 取代。\"\"\"\n    import hashlib\n\n    import numpy as np\n    import pyarrow.parquet as pq\n\n    def fp(values: Any) -> Dict[str, Any]:\n        arr = np.asarray(values, dtype=np.float32)\n        nan = np.isnan(arr)\n        return {\"nan\": hashlib.sha256(np.packbits(nan).tobytes()).hexdigest(),\n                \"values\": hashlib.sha256(np.where(nan, np.float32(0), arr).tobytes()).hexdigest()}\n\n    out: Dict[str, Dict[str, Any]] = {}\n    for p in sorted(root.rglob(\"*.parquet\")):\n        if p.name == \"timestamps.parquet\":\n            continue\n        table = pq.read_table(p)\n        for n in table.column_names:\n            if n not in (\"timestamp\", \"__index_level_0__\", \"index\"):\n                out[n] = fp(table.column(n).to_numpy(zero_copy_only=False))\n    return out\n"
+          },
+          "frame_basis": "HEAD:402-406 讀 frame L7 之 *_factory.h5（save_factory_output 唯一呼叫在 frame L7 feature_factory.py:4595）",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（helper；CGSA 跨路徑比對由 test_ffstat_stable_start.py::test_paths_same_stable_start_and_masks 承接，語意不變）"
+        }
+      ],
+      "uncertain": [
+        "改寫後 ffstat_helpers 之 FeatureStorage import 仍被 HEAD:108、266、626 等使用，不列 import 刪除。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/fftfmeta_golden_helpers.py",
+      "verdict": "ops",
+      "reason": "meta_json 只讀 frame save_factory_output 之 *_factory_meta.json（docstring 含 `save_factory_output` 字面，Task 4.2 收案 grep 命中）；本組兩個呼叫者（test_failopen_manifest::test_degradation_in_manifest_frame_l65_failure、test_failopen_producer::test_persist_completeness_same_source_frame_path）於 Phase 1 刪 ⇒ 整函式刪。prepare_env 之 **env 只轉交（呼叫端之 FFACT_USE_CGSA= 關鍵字引數屬正規化 (d)），keep。",
+      "evidence": [
+        "HEAD:138-140 def meta_json(...): \"\"\"frame／legacy 路徑之 `save_factory_output` 所寫 meta.json。\"\"\" return json.loads((root / f\"{SYMBOL}_{primary_tf}_factory_meta.json\")...)",
+        "呼叫者 grep：tests/feature_engineering/test_failopen_manifest.py:1015、tests/feature_engineering/test_failopen_producer.py:588（本組 Phase 1 刪）、tests/test_multi_tf_generator.py:519（他組；只在 path == \"legacy\" 時呼叫）",
+        "json 於刪後仍被 l7_manifest（HEAD:133-135）等使用"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {
+            "category": "def",
+            "qualname": "meta_json"
+          },
+          "frame_basis": "只讀 frame L7（save_factory_output）寫出之 *_factory_meta.json；Phase 1 後不再產生，殘留之 docstring 字面使 Task 4.2 收案 grep 命中",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（helper；CGSA 對應為同檔 l7_manifest）"
+        }
+      ],
+      "uncertain": [
+        "跨組依賴：tests/test_multi_tf_generator.py:519 `_artifact` 於 path == \"legacy\" 呼叫 fg.meta_json；須持有該檔之組於同一 Phase 1 批刪 legacy 路徑並改寫／刪除 `_artifact` 之 meta_json 分支，否則留下指向已刪函式之死引用（legacy 參數已刪時不會執行，不會壞，但會誤導）。"
+      ]
+    },
+    {
+      "path": "tests/feature_engineering/test_cgsa_disk_precheck.py",
+      "verdict": "no-op",
+      "reason": "三處 setenv FFACT_USE_CGSA=1 屬正規化剝除形；整合測試之 _CgsaIntegrationFactory 皆先給 registry（CGSA 分支），不覆寫 _cgsa_enabled、無 h5／快取依賴。",
+      "evidence": [
+        "HEAD:296、309、322 monkeypatch.setenv(\"FFACT_USE_CGSA\", \"1\")",
+        "HEAD:301、314、327 ColumnGroupRegistry(...) 傳入 _CgsaIntegrationFactory",
+        "grep _cgsa_enabled／_try_load_cache／load_factory_output／_factory.h5：0 命中"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "tests/feature_engineering/test_icfirstalign_memory.py",
+      "verdict": "no-op",
+      "reason": "掃描對齊測試 test_static_scan_selector_single_entry_and_registered_keys 斷言『producer 模組（含 feature_factory.py、multi_tf_generator.py）每個 FFACT_ 環境讀取鍵 ∈ SELECTORS ∪ NON_ARM_FFACT_KEYS』，只單向檢查讀取 ⊆ 清單、不檢查清單項必有讀者；Task 1.2／1.3 使 FFACT_USE_CGSA 生產零讀取、memory_budget.py:178 同批刪列 ⇒ 仍綠且無須改碼。反向防護自動成立：若生產碼殘留 FFACT_USE_CGSA 讀取而清單已刪 ⇒ 本測試報『未登記之 FFACT_ 鍵』而紅。檔內無 FFACT_USE_CGSA 字面、無 frame／h5 依賴；run_ic_first 呼叫（HEAD:621、690）本即走 CGSA，:2895 環境守衛刪除不影響。",
+      "evidence": [
+        "HEAD:36-43 PRODUCER_MODULES 含 momentum/FeatureEngineering/feature_factory.py 與 timeframe/multi_tf_generator.py",
+        "HEAD:387-396 _scan_violations：key in selectors ⇒ 旁路；elif key not in non_arm ⇒ 未登記",
+        "HEAD:403-404 assert _scan_violations(mb.SELECTORS, mb.NON_ARM_FFACT_KEYS, _producer_sources()) == []",
+        "memory_budget.py:177-191 NON_ARM_FFACT_KEYS 首列 \"FFACT_USE_CGSA\"；feature_factory.py:1200、multi_tf_generator.py:1916 為現行唯二讀取（Phase 1 刪）",
+        "tests/_golden/icfirstalign/contract.json 無 FFACT_USE_CGSA（grep 0 命中），test_selectors_closed_name_set_matches_contract 只比 SELECTORS",
+        "grep FFACT_USE_CGSA／_cgsa_enabled／_try_load_cache／load_factory_output／_factory.h5 於本檔：0 命中"
+      ],
+      "ops": [],
+      "uncertain": [
+        "若實作者只刪 NON_ARM 列而漏刪某處 os.getenv(\"FFACT_USE_CGSA\") ⇒ 本測試紅（屬正確擋下，非處置表問題）；反之若只刪生產讀取而未刪 NON_ARM 列 ⇒ 本測試仍綠（清單多一死項不被偵測），需靠 Task 4.2 收案 grep `FFACT_USE_CGSA` 於 momentum 抓。"
+      ]
+    }
+  ]
+}

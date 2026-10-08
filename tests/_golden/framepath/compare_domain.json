@@ -1,0 +1,34 @@
+{
+  "schema": "framepath-compare-domain/1",
+  "spec": "docs/FRAMEPATH_SPEC.md §G、Task 1.1",
+  "applies_to": "L7 V2 特徵 manifest（momentum/FeatureEngineering/feature_storage.py 之 L7_V2_MANIFEST_NAME＝feature_manifest.json）於 canonical JSON sha256 前之篩選；未列於 exclude 者一律納入比對",
+  "path_syntax": "以 . 分隔之 JSON 物件鍵路徑；* 只匹配單一層任意物件鍵；不匹配陣列元素；不得含其他萬用字元",
+  "allowed_categories": ["timestamp", "timing", "absolute_path", "temp_uuid"],
+  "exclude": [
+    {
+      "path": "created_at",
+      "category": "timestamp",
+      "source": "feature_storage.py:2145（manifest 首次寫入之 datetime.utcnow）"
+    },
+    {
+      "path": "updated_at",
+      "category": "timestamp",
+      "source": "feature_storage.py:2146（每次寫 manifest 之 datetime.utcnow）"
+    },
+    {
+      "path": "generation_metadata.source_registry_manifest",
+      "category": "absolute_path",
+      "source": "feature_factory.py:4169（str(self._cgsa_registry.manifest_path)，CGSA work dir 之絕對路徑）"
+    },
+    {
+      "path": "artifacts.*.metadata.source_registry_manifest",
+      "category": "absolute_path",
+      "source": "同上；artifact 層 metadata 複寫同一值"
+    }
+  ],
+  "forbidden_exclusions": {
+    "keys": ["run_status", "quality_status", "failure_reasons", "feature_names", "columns", "config_hash", "skipped_timeframes"],
+    "completeness_field_names_from": "momentum/FeatureEngineering/feature_storage.py:COMPLETENESS_FIELD_NAMES",
+    "rule": "exclude 之任一 path 之最後一段屬 keys 或 COMPLETENESS_FIELD_NAMES ⇒ 比對器具名拒跑；exclude 之 path 於被比對之 manifest 中所指之值須為純量（字串／數字／布林／null），指向物件或陣列 ⇒ 具名拒跑（防以祖先鍵整段排除）；category 不在 allowed_categories ⇒ 具名拒跑"
+  }
+}

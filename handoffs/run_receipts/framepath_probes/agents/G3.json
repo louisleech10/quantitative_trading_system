@@ -1,0 +1,671 @@
+{
+  "group": "G3",
+  "files": [
+    {
+      "path": "tests/test_cgsa_multi_tf.py",
+      "verdict": "ops",
+      "reason": "TestCombineLayersContextSkip 三支「CGSA 下回傳空表」之測試在白名單改制後改為拋具名例外（rewrite＋改名）；test_non_cgsa_never_skips 純驗 FFACT_USE_CGSA=0 之 frame 行為（刪）；TestCGSABoundary 兩支直接呼叫被刪之 _cgsa_enabled（刪）。其餘（_align_group_array、registry 對齊、layer3/layer4_input 照常 concat、build_asof_index_map）只剝 setenv，keep。",
+      "evidence": [
+        "HEAD :90-95 test_layer7_final_skipped_in_cgsa：_combine_layers(context=\"layer7_final\") 後 assert result.empty；改制後 layer7_final 不在白名單 ⇒ CGSARegistryRequiredError",
+        "HEAD :97-102 layer6_5_input、:104-109 multi_tf_merged 同上",
+        "HEAD :111-128 layer3_input／layer4_input 為白名單 ⇒ 只剝 :113/:122 setenv，keep",
+        "HEAD :130-137 test_non_cgsa_never_skips：setenv FFACT_USE_CGSA=0 並斷言 layer7_final 等 context 非空（frame 合併行為）",
+        "HEAD :274-280 test_cgsa_enabled_default_is_one：呼叫 MultiTFGenerator._cgsa_enabled()／FeatureFactory._cgsa_enabled()（Task 1.2/1.3 刪除 ⇒ AttributeError）",
+        "HEAD :282-285 test_cgsa_disabled_via_env：FFACT_USE_CGSA=0 ⇒ _cgsa_enabled() is False（frame 開關本身）"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "TestCombineLayersContextSkip.test_layer7_final_skipped_in_cgsa"},
+          "rewrite": {
+            "reason": "Task 1.2 將 _combine_layers 改為 context 白名單（layer3_input、layer4_input），layer7_final 改為拋 CGSARegistryRequiredError；原斷言 `assert result.empty`（HEAD :95）與新契約矛盾，無法逐字保留。驗證意圖「CGSA 不做 L7 全欄合併」改以 pytest.raises 承接（較原斷言更嚴：由靜默空表改為具名拒絕）。函式名 skipped→rejected 以符合新語意。",
+            "preserved_assertion_lines": [],
+            "new_source": "def test_layer7_final_rejected_in_cgsa(self):\n    \"\"\"CGSA 不做全欄合併：layer7_final 不在 context 白名單 ⇒ 具名拒絕（FRAMEPATH Task 1.2）。\"\"\"\n    from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError, FeatureFactory\n    layer = pd.DataFrame({\"x\": [1.0]})\n    with pytest.raises(CGSARegistryRequiredError):\n        FeatureFactory._combine_layers([layer], context=\"layer7_final\")\n"
+          },
+          "frame_basis": "非 frame 臂；Phase 1 契約變更（HEAD feature_factory.py:4879-4882 之 CGSA skip→回傳空表 改為白名單外拋具名例外）使原斷言失效",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {"tests/test_cgsa_multi_tf.py::TestCombineLayersContextSkip::test_layer7_final_skipped_in_cgsa": "tests/test_cgsa_multi_tf.py::TestCombineLayersContextSkip::test_layer7_final_rejected_in_cgsa"},
+          "coverage_note": "意圖原地承接；另見新測 tests/feature_engineering/test_framepath_cgsa_only.py（Task 1.2）"
+        },
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "TestCombineLayersContextSkip.test_layer6_5_input_skipped_in_cgsa"},
+          "rewrite": {
+            "reason": "同上：layer6_5_input 白名單外 ⇒ CGSARegistryRequiredError；原斷言 `assert result.empty`（HEAD :102）與新契約矛盾，改為 pytest.raises。函式名 skipped→rejected。",
+            "preserved_assertion_lines": [],
+            "new_source": "def test_layer6_5_input_rejected_in_cgsa(self):\n    \"\"\"CGSA 不做全欄合併：layer6_5_input 不在 context 白名單 ⇒ 具名拒絕（FRAMEPATH Task 1.2）。\"\"\"\n    from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError, FeatureFactory\n    layer = pd.DataFrame({\"x\": [1.0]})\n    with pytest.raises(CGSARegistryRequiredError):\n        FeatureFactory._combine_layers([layer], context=\"layer6_5_input\")\n"
+          },
+          "frame_basis": "非 frame 臂；Phase 1 白名單改制使原「回傳空表」斷言失效",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {"tests/test_cgsa_multi_tf.py::TestCombineLayersContextSkip::test_layer6_5_input_skipped_in_cgsa": "tests/test_cgsa_multi_tf.py::TestCombineLayersContextSkip::test_layer6_5_input_rejected_in_cgsa"},
+          "coverage_note": "意圖原地承接；另見 tests/feature_engineering/test_framepath_cgsa_only.py"
+        },
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "TestCombineLayersContextSkip.test_multi_tf_merged_skipped_in_cgsa"},
+          "rewrite": {
+            "reason": "同上：multi_tf_merged 白名單外 ⇒ CGSARegistryRequiredError；原斷言 `assert result.empty`（HEAD :109）與新契約矛盾，改為 pytest.raises。函式名 skipped→rejected。",
+            "preserved_assertion_lines": [],
+            "new_source": "def test_multi_tf_merged_rejected_in_cgsa(self):\n    \"\"\"CGSA 不做全欄合併：multi_tf_merged 不在 context 白名單 ⇒ 具名拒絕（FRAMEPATH Task 1.2）。\"\"\"\n    from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError, FeatureFactory\n    layer = pd.DataFrame({\"x\": [1.0]})\n    with pytest.raises(CGSARegistryRequiredError):\n        FeatureFactory._combine_layers([layer], context=\"multi_tf_merged\")\n"
+          },
+          "frame_basis": "非 frame 臂；Phase 1 白名單改制使原「回傳空表」斷言失效",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {"tests/test_cgsa_multi_tf.py::TestCombineLayersContextSkip::test_multi_tf_merged_skipped_in_cgsa": "tests/test_cgsa_multi_tf.py::TestCombineLayersContextSkip::test_multi_tf_merged_rejected_in_cgsa"},
+          "coverage_note": "意圖原地承接（multi_tf_merged 未列於 Task 1.2 新測之具名字面清單，本測補足）"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "TestCombineLayersContextSkip.test_non_cgsa_never_skips"},
+          "frame_basis": "HEAD :132 setenv FFACT_USE_CGSA=0，:135-137 斷言 layer7_final／layer6_5_input／multi_tf_merged 於 frame 下合併非空——純 frame 合併行為；改制後此三 context 恆拒絕",
+          "deleted_nodeids": ["tests/test_cgsa_multi_tf.py::TestCombineLayersContextSkip::test_non_cgsa_never_skips"],
+          "coverage_note": "layer3_input 照常 concat 由同檔 TestCombineLayersContextSkip::test_layer3_input_not_skipped_in_cgsa 承接；其餘為 frame 專屬，n/a"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "TestCGSABoundary.test_cgsa_enabled_default_is_one"},
+          "frame_basis": "HEAD :277、:280 呼叫 MultiTFGenerator._cgsa_enabled／FeatureFactory._cgsa_enabled（Task 1.2/1.3 刪除 ⇒ AttributeError）；驗的是 frame/CGSA 開關預設值",
+          "deleted_nodeids": ["tests/test_cgsa_multi_tf.py::TestCGSABoundary::test_cgsa_enabled_default_is_one"],
+          "coverage_note": "「預設即 CGSA」改為結構性（無開關）；Task 1.2 新測 tests/feature_engineering/test_framepath_cgsa_only.py 驗 FFACT_USE_CGSA=0 仍產 CGSA manifest"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "TestCGSABoundary.test_cgsa_disabled_via_env"},
+          "frame_basis": "HEAD :284-285 FFACT_USE_CGSA=0 ⇒ _cgsa_enabled() is False：frame 開關本身，函式刪除",
+          "deleted_nodeids": ["tests/test_cgsa_multi_tf.py::TestCGSABoundary::test_cgsa_disabled_via_env"],
+          "coverage_note": "n/a（frame 開關已不存在；殘留環境變數無作用由 test_framepath_cgsa_only.py 驗）"
+        }
+      ],
+      "uncertain": [
+        "三支 rewrite 同時改名（skipped→rejected）；若驗證器不接受 rewrite 附帶改名，退回保留原函式名、只換函式體（new_source 之 def 名改回原名）",
+        "CGSARegistryRequiredError 之匯入路徑依生產碼模型為 momentum.FeatureEngineering.feature_factory；實作若命名不同須同步",
+        "SPEC Task 1.3 邊界寫「既有 tests/test_cgsa_multi_tf.py 之 missing lower TF 測試綠」，但本檔 HEAD 無任何 missing lower TF 測試（grep missing/lower 皆無）；實際 CGSA 覆蓋在 tests/feature_engineering/test_failopen_producer.py::test_four_generator_paths_fail_closed_integration 之 cgsa_serial 參數"
+      ]
+    },
+    {
+      "path": "tests/test_cgsa_pipeline.py",
+      "verdict": "ops",
+      "reason": "test_cgsa_no_global_concat 依賴 layer7_final 回傳空表與 MultiTFGenerator._combine_layers（Task 1.3 刪除），改寫為具名拒絕且不得呼叫 concat_with_memmap。test_cgsa_vs_legacy_numeric_equivalence 只以合成 parquet 驗 scripts/validate_cgsa_ab.run_validation 比對器，不觸 frame 引擎，Phase 1–3 皆不壞，keep（見 uncertain）。",
+      "evidence": [
+        "HEAD :111 factory._combine_layers([sample], context=\"layer7_final\") → 改制後拋 CGSARegistryRequiredError",
+        "HEAD :112 MultiTFGenerator._combine_layers([sample])：Task 1.3 刪除（零生產呼叫者）⇒ AttributeError",
+        "HEAD :25-93 test_cgsa_vs_legacy_numeric_equivalence 只讀寫 tmp_path parquet 並呼叫 scripts.validate_cgsa_ab.run_validation；該腳本不含母體關鍵字（grep FFACT_USE_CGSA/_factory.h5/load_factory_output 無），不在 Task 3.1 清單"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "test_cgsa_no_global_concat"},
+          "rewrite": {
+            "reason": "原斷言 HEAD :114 `assert combined_factory.empty` 與新契約（layer7_final 白名單外拋具名例外）矛盾；HEAD :115 所依之 MultiTFGenerator._combine_layers 被刪。保留意圖「CGSA 不做全欄合併、不得呼叫 concat_with_memmap」：concat 打樁為拋 AssertionError 不變，改以 pytest.raises(CGSARegistryRequiredError) 斷言（若實作先 concat 再拒絕，AssertionError 會使測試紅）。模組層無 pytest 匯入，故於函式內匯入。",
+            "preserved_assertion_lines": [],
+            "new_source": "def test_cgsa_no_global_concat(monkeypatch):\n    \"\"\"T2.12（FRAMEPATH Task 1.2 改契約）：CGSA 不做全欄合併——layer7_final 具名拒絕，且不得呼叫 concat_with_memmap。\"\"\"\n    import pytest\n\n    from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError\n\n    def _raise_if_called(*_args, **_kwargs):\n        raise AssertionError(\"concat_with_memmap should not be called in CGSA mode\")\n\n    monkeypatch.setattr(\n        \"momentum.FeatureEngineering.memmap_utils.concat_with_memmap\",\n        _raise_if_called,\n    )\n\n    sample = pd.DataFrame({\"f\": [1.0, 2.0, 3.0]})\n\n    factory = FeatureFactory(config_manager=Mock(), adapter_registry=Mock())\n    with pytest.raises(CGSARegistryRequiredError):\n        factory._combine_layers([sample], context=\"layer7_final\")\n"
+          },
+          "frame_basis": "非 frame 臂；Phase 1 契約變更（_combine_layers 白名單、MultiTFGenerator._combine_layers 刪除）",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "MultiTF 側之「不做全欄合併」由 Task 1.2 新測之 AST 掃描（全部 _combine_layers 呼叫之 context ⊆ 白名單）承接"
+        }
+      ],
+      "uncertain": [
+        "test_cgsa_vs_legacy_numeric_equivalence 名稱含 legacy、語意為 CGSA vs legacy 逐層比對，但實際只測比對腳本（合成資料、無 frame 引擎），判 keep；若主委依「不再花時間在 frame 相關測試」裁定一併退休 scripts/validate_cgsa_ab.py，此測需改列 delete-node（def）",
+        "rewrite 後模組層 `from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator`（HEAD :11）成為未使用匯入；未列刪除（不壞）"
+      ]
+    },
+    {
+      "path": "tests/test_cgsa_resume.py",
+      "verdict": "ops",
+      "reason": "test_cgsa_config_hash_passed_correctly 以 monkeypatch.setattr 打樁 _try_load_cache（Phase 2 Task 2.1 刪除 ⇒ setattr raising=True 拋 AttributeError）；刪該敘述後其餘仍成立（_prepare_cgsa_registry 於 _layer0 之前，見 feature_factory.py:482 vs :501）。其餘測試皆 CGSA（含 _CanonicalStubFactory 多週期 resume），只剝 FFACT_USE_CGSA=1，keep。",
+      "evidence": [
+        "HEAD :135 monkeypatch.setattr(feature_factory, \"_try_load_cache\", lambda *args, **kwargs: None)",
+        "feature_factory.py:461-465 快取查詢於 Task 2.1 刪除；:482 _prepare_cgsa_registry 先於 :501 _layer0_data_ingestion ⇒ 刪 :135 後 stop-after-prepare 仍在 prepare 之後觸發",
+        "HEAD :515、:546、fg.prepare_env(... FFACT_USE_CGSA=\"1\" ...)（:690 附近）皆只為 =1，剝除不影響"
+      ],
+      "ops": [
+        {
+          "phase": 2,
+          "kind": "delete-node",
+          "locator": {"category": "stmt", "qualname": "test_cgsa_config_hash_passed_correctly", "lineno": 135, "end_lineno": 135},
+          "frame_basis": "_try_load_cache 首步讀 load_factory_output（factory h5，SPEC §A FACT-RECEIPT），Task 2.1 整刪；打樁目標不存在即 AttributeError",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（測試本身保留，驗證意圖不變）"
+        }
+      ],
+      "uncertain": []
+    },
+    {
+      "path": "tests/test_feature_factory_batch2b.py",
+      "verdict": "ops",
+      "reason": "test_task25_feature_factory_combine_layers_cgsa_noop 改寫為具名拒絕（＋改名）；test_task25_multitf_combine_layers_cgsa_noop 之 MultiTFGenerator._combine_layers 被刪（刪）；test_task26_multitf_tagging_fallback_when_registry_absent 純驗 registry=None／FFACT_USE_CGSA=0 之舊 rename 路徑（刪）；（補件）test_task26_multitf_tagging_skips_when_registry_present 因 MultiTFGenerator._apply_timeframe_tag 整刪亦刪，連帶清 MultiTFGenerator 匯入。L1/L2 per-group、L4 強制 layer1_and_raw，只剝 setenv，keep。",
+      "evidence": [
+        "HEAD :140-142 FeatureFactory._combine_layers(context=\"layer7_final\") 後 assert combined.empty",
+        "HEAD :185 MultiTFGenerator._combine_layers([layer])：Task 1.3 刪除",
+        "HEAD :202 setenv FFACT_USE_CGSA=0、:205 _apply_timeframe_tag(registry=None)：模型 6 ⇒ registry None 改拋具名例外",
+        "HEAD :145-177 L4：模型 4 改後一律強制 layer1_and_raw ⇒ 斷言 layer_count==2 仍成立",
+        "HEAD :190-197 registry=object()：補件模型 MultiTFGenerator._apply_timeframe_tag 整刪 ⇒ :195 AttributeError",
+        "HEAD :17 MultiTFGenerator 之使用點僅 :185、:195、:205"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "test_task25_feature_factory_combine_layers_cgsa_noop"},
+          "rewrite": {
+            "reason": "原斷言 HEAD :142 `assert combined.empty` 與 Task 1.2 白名單契約矛盾；意圖「CGSA 下 L7 全欄合併不執行」改以 pytest.raises(CGSARegistryRequiredError) 承接。模組層無 pytest 匯入，函式內匯入。函式名 cgsa_noop→rejects_final_merge。",
+            "preserved_assertion_lines": [],
+            "new_source": "def test_task25_feature_factory_combine_layers_rejects_final_merge():\n    \"\"\"Task 2.5（FRAMEPATH Task 1.2 改契約）：FeatureFactory._combine_layers 對 layer7_final 具名拒絕，不做全欄合併。\"\"\"\n    import pytest\n\n    from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError\n\n    layer = pd.DataFrame({\"f1\": [1.0, 2.0]})\n    with pytest.raises(CGSARegistryRequiredError):\n        FeatureFactory._combine_layers([layer], context=\"layer7_final\")\n"
+          },
+          "frame_basis": "非 frame 臂；Phase 1 契約變更",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {"tests/test_feature_factory_batch2b.py::test_task25_feature_factory_combine_layers_cgsa_noop": "tests/test_feature_factory_batch2b.py::test_task25_feature_factory_combine_layers_rejects_final_merge"},
+          "coverage_note": "意圖原地承接"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_task25_multitf_combine_layers_cgsa_noop"},
+          "frame_basis": "MultiTFGenerator._combine_layers（multi_tf_generator.py:1873）其非 CGSA 側為 frame 合併、repo 內零生產呼叫者，Task 1.3 整刪 ⇒ AttributeError",
+          "deleted_nodeids": ["tests/test_feature_factory_batch2b.py::test_task25_multitf_combine_layers_cgsa_noop"],
+          "coverage_note": "MultiTF 不做全欄合併由 Task 1.2 新測 tests/feature_engineering/test_framepath_cgsa_only.py 之 AST 掃描（全部 _combine_layers 呼叫 context ⊆ 白名單）承接"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_task26_multitf_tagging_fallback_when_registry_absent"},
+          "frame_basis": "HEAD :202 FFACT_USE_CGSA=0＋:205 registry=None ⇒ 驗 frame 之 rename 標記路徑；該側於 Task 1.3 刪除",
+          "deleted_nodeids": ["tests/test_feature_factory_batch2b.py::test_task26_multitf_tagging_fallback_when_registry_absent"],
+          "coverage_note": "CGSA 週期標記規則由 tests/feature_engineering/test_feature_naming.py::test_named_tagging_cases、::test_boundary_01_label_prefix_neither_tagged_nor_stripped 承接"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_task26_multitf_tagging_skips_when_registry_present"},
+          "frame_basis": "（主委補件模型）MultiTFGenerator._apply_timeframe_tag 於 Phase 1 整刪（刪 None 側後零生產呼叫者：唯一呼叫點 multi_tf_generator.py:1568 在 _generate_multi_tf_legacy 內）⇒ HEAD :195 AttributeError；所驗「registry 存在時跳過 rename」本身即 legacy／frame 雙軌分派之一側",
+          "deleted_nodeids": ["tests/test_feature_factory_batch2b.py::test_task26_multitf_tagging_skips_when_registry_present"],
+          "coverage_note": "n/a：CGSA 多週期不經任何事後 rename（欄名於 L1 產生時即由 feature_naming.tag_timeframe／FeatureFactory._timeframe_tagged_name 標週期），該規則由 tests/feature_engineering/test_feature_naming.py::test_named_tagging_cases 承接；CGSA 多週期公開欄名不變由 Task 1.1 C3／C6 欄名序列 sha256 承擔"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "import_alias", "lineno": 17, "name": "MultiTFGenerator"},
+          "frame_basis": "HEAD :17 之 MultiTFGenerator 只被 :185、:195、:205 三支已刪測試使用，刪後為未使用匯入（死碼清理，非必要）",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        }
+      ],
+      "uncertain": [
+        "rewrite 改名之可接受性同 test_cgsa_multi_tf.py",
+        "import_alias 刪除為非必要清理；若主委不列，未使用匯入不壞"
+      ]
+    },
+    {
+      "path": "tests/test_feature_factory_batch2d.py",
+      "verdict": "ops",
+      "reason": "（補件模型）_layer7_validate_and_persist 與 _layer7_validate_and_persist_cgsa 於 Phase 1 整刪 ⇒ test_task210 之 :212 呼叫 AttributeError。其驗證意圖（per-group 掃描驗證、不 materialize、persist=False 不落盤、has_nan/has_inf、NaN ratio 警告、manifest 落地、feature_count＝registry 欄數、hdf5_path 空）未被既有 raw pipeline 測試完整承接 ⇒ rewrite 至唯一 CGSA L7 入口 _layer7_raw_from_cgsa_pipeline（persist=False）。另兩支（manifest 欄位、materialize_wide_df）只用 ColumnGroupRegistry，keep。",
+      "evidence": [
+        "HEAD :212 factory._layer7_validate_and_persist(...)（補件模型整刪）",
+        "feature_factory.py:4049-4300 _layer7_raw_from_cgsa_pipeline：:4098 validation＝同一 _scan_cgsa_registry_validation；persist=False 不呼叫 storage；:4231-4243 metadata validation 含 has_nan/has_inf/warnings；manifest_path＝registry.manifest_path（save_state 寫入）；features_df＝pd.DataFrame(index=trimmed_raw.index)（無欄 ⇒ empty）；hdf5_path＝manifest_path if persist else \"\"",
+        "既有 raw pipeline 測試：tests/feature_engineering/test_l7_raw_streaming.py::test_feature_factory_cgsa_generation_routes_to_l7_raw_writer 只驗 persist=True 路由與 metadata 鍵（storage 全 Mock，validation 為假值）；tests/feature_engineering/test_batch1_followup.py 驗 storage 串流 nan_ratio；皆未驗 registry 掃描之 has_inf/has_nan/NaN 警告經 L7 入口回傳、亦未驗不 materialize",
+        "feature_factory.py:4088 呼叫 _resolve_l65_generation_mode(config)，其定義以 getattr 取 config.preprocessing 並要求 .enabled ⇒ _DummyConfig（HEAD :26-36）缺 preprocessing，rewrite 於函式內補 `config.preprocessing = SimpleNamespace(enabled=False)`（Mode C none）",
+        "HEAD :171 monkeypatch.setenv(\"FFACT_USE_CGSA\", \"1\") 於 rewrite 中移除（正規化等價）"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "test_task210_layer7_cgsa_per_group_validate_without_materialize"},
+          "rewrite": {
+            "reason": "被測入口 _layer7_validate_and_persist（及其 CGSA 體 _layer7_validate_and_persist_cgsa）整刪；CGSA 之 L7 唯一入口為 _layer7_raw_from_cgsa_pipeline，其 validation 亦取自 _scan_cgsa_registry_validation。改呼叫該入口（persist=False，參數名與值同 HEAD，去除已不接受之 layers 參數），config 補 preprocessing.enabled=False 以滿足 Mode 分派；另把 storage.write_raw_from_registry_stream 打樁為拋 AssertionError，使「persist=False 不落盤」對新入口同樣可證偽。輸入資料、registry 群組、materialize 打樁與全部斷言逐字保留。",
+            "preserved_assertion_lines": [224, 225, 226, 227, 230, 231, 232, 233],
+            "new_source": "def test_task210_layer7_cgsa_per_group_validate_without_materialize(tmp_path: Path, monkeypatch):\n    \"\"\"Task 2.10（FRAMEPATH：改走唯一 CGSA L7 入口 `_layer7_raw_from_cgsa_pipeline`）：per-group validate，且不在 validate 階段 materialize、persist=False 不落盤。\"\"\"\n    from types import SimpleNamespace\n\n    factory = FeatureFactory(config_manager=Mock(), adapter_registry=Mock())\n    registry = ColumnGroupRegistry(work_dir=tmp_path / \"registry\")\n    factory._cgsa_registry = registry\n\n    group_nan = _make_group(\n        group_id=\"1h_L3_nan_group\",\n        layer=LayerSource.L3,\n        timeframe=\"1h\",\n        columns=(\"close_1h_trend_EMA_5_mean\",),\n        indicator=\"EMA\",\n    )\n    group_inf = _make_group(\n        group_id=\"1h_L3_inf_group\",\n        layer=LayerSource.L3,\n        timeframe=\"1h\",\n        columns=(\"close_1h_trend_EMA_5_std\",),\n        indicator=\"EMA\",\n    )\n\n    registry.save_data(group_nan, np.array([[np.nan], [np.nan], [np.nan]], dtype=np.float32))\n    registry.save_data(group_inf, np.array([[1.0], [np.inf], [2.0]], dtype=np.float32))\n\n    # 若被呼叫代表違反 Task 2.10（validate 階段不應 materialize）。\n    monkeypatch.setattr(\n        registry,\n        \"materialize_wide_df\",\n        lambda: (_ for _ in ()).throw(AssertionError(\"materialize_wide_df should not be called\")),\n    )\n\n    persist_called = {\"value\": False}\n\n    def _fake_persist_registry_to_parquet(*args, **kwargs):\n        del args, kwargs\n        persist_called[\"value\"] = True\n        return []\n\n    def _fake_write_raw_from_registry_stream(*args, **kwargs):\n        del args, kwargs\n        raise AssertionError(\"persist=False 不得呼叫 write_raw_from_registry_stream\")\n\n    monkeypatch.setattr(factory._storage, \"persist_registry_to_parquet\", _fake_persist_registry_to_parquet)\n    monkeypatch.setattr(factory._storage, \"write_raw_from_registry_stream\", _fake_write_raw_from_registry_stream)\n\n    config = _DummyConfig()\n    config.preprocessing = SimpleNamespace(enabled=False)\n    raw_data = pd.DataFrame({\"close\": [100.0, 101.0, 102.0]})\n    result = factory._layer7_raw_from_cgsa_pipeline(\n        symbol=\"ETHUSDT\",\n        timeframe=\"1h\",\n        raw_data=raw_data,\n        config=config,\n        elapsed=1.23,\n        config_hash=\"cfg_batch2d\",\n        compute_warnings=[\"pre-existing warning\"],\n        persist=False,\n    )\n\n    assert persist_called[\"value\"] is False\n    assert result.features_df.empty\n    assert result.feature_count == registry.total_columns()\n    assert result.hdf5_path == \"\"\n\n    validation = result.metadata[\"validation\"]\n    assert validation[\"has_inf\"] is True\n    assert validation[\"has_nan\"] is True\n    assert any(\"NaN ratio\" in warning for warning in validation[\"warnings\"])\n    assert Path(result.metadata[\"manifest_path\"]).exists()\n"
+          },
+          "frame_basis": "非 frame 臂；補件模型：L7 舊分派入口（frame L7＋其 CGSA 委派體）整刪，CGSA 測試改指唯一入口",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "意圖原地承接於 _layer7_raw_from_cgsa_pipeline（persist=False）；persist=True 路由另由 tests/feature_engineering/test_l7_raw_streaming.py::test_feature_factory_cgsa_generation_routes_to_l7_raw_writer 驗"
+        }
+      ],
+      "uncertain": [
+        "rewrite 未實跑：persist=False 路徑另呼叫 _resolve_l65_generation_mode（已補 preprocessing）、_final_completeness、_apply_warmup_metadata（窗為 None ⇒ 直接返回）、_stable_start_metadata、_stationarity_metadata、self._registry.add——後四者 HEAD 之 _layer7_validate_and_persist_cgsa 以同一 _DummyConfig／真建構子亦呼叫且現綠，推定可過；請主委實跑",
+        "_scan_cgsa_registry_validation 之 NaN ratio 警告文字於兩入口同源（raw pipeline :4098 與舊 cgsa 體 :4346 呼叫同一函式），:232 斷言意義不變",
+        "self._registry.add 寫入真實 FeatureFactory 建構子預設之 registry（HEAD 同此行為，未改變）"
+      ]
+    },
+    {
+      "path": "tests/test_feature_factory_batch2e.py",
+      "verdict": "no-op",
+      "reason": "皆為 CGSA registry／L2 per-group／L6.5 per-group／storage 測試；只剝 :97、:172 setenv FFACT_USE_CGSA=1。test_cgsa_l2_cross_group_operators 之 legacy_factory 為 registry=None 之 L2（L2 之無 registry 分支不在刪除模型內，見 feature_factory.py:1930 `if self._cgsa_registry is None`），Phase 1–3 皆不壞。",
+      "evidence": [
+        "HEAD :125 legacy_factory = _make_factory(with_registry=False) ⇒ :130 _layer2_derived_features（L2 不在模型 2 之拋例外清單）",
+        "HEAD :97、:172 為唯一 FFACT_USE_CGSA 行"
+      ],
+      "ops": [],
+      "uncertain": [
+        "test_cgsa_l2_cross_group_operators 形式上為「CGSA vs legacy」比對（HEAD :132-154），但 legacy 臂＝registry=None 之 L2 整表計算（非 FFACT_USE_CGSA=0、非 frame L3/L6.5/L7），作為 per-group 落盤之整表 oracle 仍有效，判 keep；若主委認定 L2 無 registry 分支亦屬 frame 須刪，則此測應改列 rewrite（以固定期望值取代 legacy 臂）"
+      ]
+    },
+    {
+      "path": "tests/test_multi_tf_generator.py",
+      "verdict": "ops",
+      "reason": "StubFactory 無 _cgsa_registry ⇒ HEAD 經 generate_multi_tf 者皆走 _generate_multi_tf_legacy；改後拋具名例外。刪 5 支 legacy-stub 測試（意圖由 CGSA 測試覆蓋）、rewrite 日期傳遞測試改走 CGSA stub（無 CGSA 覆蓋）、刪 _PATH_ENV 之 legacy 鍵（4 個參數化 nodeid）、rewrite _artifact helper 去除 legacy 分支；（補件）刪 StubFactory 內只服務 legacy 組裝之三個樁方法（_layer6_5_preprocessing、_combine_layers、_layer7_validate_and_persist）。StubFactory 類別本身必須保留（tests/feature_engineering/test_failopen_producer.py:26 匯入）。",
+      "evidence": [
+        "multi_tf_generator.py:95 use_cgsa = _cgsa_enabled() and getattr(factory, \"_cgsa_registry\", None) is not None；StubFactory（HEAD :32-99）無此屬性 ⇒ legacy",
+        "HEAD :111/:148/:187+:191/:206/:451 經 generate_multi_tf；:163 _apply_timeframe_tag(df, \"1h\") registry=None",
+        "HEAD :230-238 test_primary_missing_raises_error：primary 載入失敗於 :69-84 拋 ValueError，早於 :95 分派 ⇒ keep",
+        "HEAD :477-481 _PATH_ENV 含 \"legacy\": {FFACT_USE_CGSA: \"0\", ...}；:518-519 _artifact 之 legacy 分支讀 fg.meta_json（*_factory_meta.json，save_factory_output 產物）",
+        "collect-only：test_canonical_completeness_three_paths_four_cases[legacy-healthy|legacy-skip|legacy-failed|legacy-single]",
+        "tests/feature_engineering/test_failopen_producer.py:26 `from tests.test_multi_tf_generator import StubFactory`"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_multi_tf_generator_aligns_and_tags"},
+          "frame_basis": "HEAD :109-111 StubFactory（無 registry）⇒ legacy 組裝；:115-123 斷言之週期標記由 legacy 之 _apply_timeframe_tag rename 產生（multi_tf_generator.py:1568）",
+          "deleted_nodeids": ["tests/test_multi_tf_generator.py::test_multi_tf_generator_aligns_and_tags"],
+          "coverage_note": "CGSA 多週期 OPEN_MINUS 對齊無前視：tests/feature_engineering/test_mtf_align_golden.py::test_real_generate_down_cgsa_path_matrix（真實 kline）、tests/test_cgsa_multi_tf.py::TestCGSABoundary::test_build_asof_index_map_basic；CGSA 週期標記：tests/feature_engineering/test_feature_naming.py::test_named_tagging_cases"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_multi_tf_generator_skips_primary_self_alignment"},
+          "frame_basis": "HEAD :137-151 spy TimeframeAligner.align_to_primary——該呼叫只在 legacy 組裝（multi_tf_generator.py:1555）；CGSA 走 build_asof_index_map",
+          "deleted_nodeids": ["tests/test_multi_tf_generator.py::test_multi_tf_generator_skips_primary_self_alignment"],
+          "coverage_note": "CGSA 主週期不對齊（multi_tf_generator.py:332-336）：tests/test_cgsa_multi_tf.py::TestCGSAMultiTFAlignment::test_primary_groups_not_aligned、::test_mixed_tf_groups_in_registry"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_apply_timeframe_tag_format_and_skip_prefixes"},
+          "frame_basis": "HEAD :163 MultiTFGenerator._apply_timeframe_tag(df, \"1h\")（registry=None）＝frame rename 側；補件模型 MultiTFGenerator._apply_timeframe_tag 整刪 ⇒ AttributeError",
+          "deleted_nodeids": ["tests/test_multi_tf_generator.py::test_apply_timeframe_tag_format_and_skip_prefixes"],
+          "coverage_note": "CGSA 標記規則（含 label_ 前綴不標）：tests/feature_engineering/test_feature_naming.py::test_named_tagging_cases、::test_boundary_01_label_prefix_neither_tagged_nor_stripped"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_lower_tf_missing_fails_closed_unless_partial_enabled"},
+          "frame_basis": "HEAD :183-191 StubFactory ⇒ legacy 組裝之缺週期 fail-closed／partial",
+          "deleted_nodeids": ["tests/test_multi_tf_generator.py::test_lower_tf_missing_fails_closed_unless_partial_enabled"],
+          "coverage_note": "同一 stub 之 CGSA serial 版：tests/feature_engineering/test_failopen_producer.py::test_four_generator_paths_fail_closed_integration（generator_path=cgsa_serial，allow_partial False／True：缺 1h ⇒ RuntimeError「Timeframe 1h failed」；partial ⇒ skipped/present/failed 週期斷言）；真實 kline：本檔 test_canonical_completeness_three_paths_four_cases[cgsa_serial-skip]"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_short_primary_data_still_generates"},
+          "frame_basis": "HEAD :204-206 StubFactory ⇒ legacy 組裝",
+          "deleted_nodeids": ["tests/test_multi_tf_generator.py::test_short_primary_data_still_generates"],
+          "coverage_note": "CGSA 短主週期生成：tests/feature_engineering/test_failopen_producer.py::test_four_generator_paths_fail_closed_integration（cgsa_serial、allow_partial=True，主週期 2 列）、tests/test_cgsa_resume.py 之 _checkpoint 系列（12h 4 列）"
+        },
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "test_multi_tf_generator_propagates_date_range_to_all_layer0_calls"},
+          "rewrite": {
+            "reason": "HEAD 之 SpyFactory 繼承 StubFactory（無 registry）⇒ legacy；改後拋具名例外。日期傳遞至各週期 _layer0（_multi_tf_layer0_start，legacy 與 CGSA 共用）在 CGSA 下無其他測試覆蓋（grep _multi_tf_layer0_start／propagat 於 tests 無他處），故改以 _CgsaStubFactory（tests/feature_engineering/test_failopen_producer.py:93，已用於本 repo 之 CGSA serial stub 測試）承接；強制 FFACT_MULTI_TF_PARALLEL=0 使次週期 _layer0 於本行程被 spy（平行臂於 worker 內建新 factory）。輸入資料、日期、斷言逐字保留。",
+            "preserved_assertion_lines": [457, 458, 459, 460, 461],
+            "new_source": "def test_multi_tf_generator_propagates_date_range_to_all_layer0_calls(tmp_path, monkeypatch):\n    from tests.feature_engineering.test_failopen_producer import _CgsaStubFactory\n\n    monkeypatch.setenv(\"FFACT_MULTI_TF_PARALLEL\", \"0\")\n\n    class SpyFactory(_CgsaStubFactory):\n        def __init__(self, data_by_tf, registry):\n            super().__init__(data_by_tf, registry)\n            self.calls = []\n\n        def _layer0_data_ingestion(self, symbol, timeframe, config, start_date=None, end_date=None):\n            self.calls.append(\n                {\n                    \"symbol\": symbol,\n                    \"timeframe\": timeframe,\n                    \"start_date\": start_date,\n                    \"end_date\": end_date,\n                }\n            )\n            return super()._layer0_data_ingestion(\n                symbol,\n                timeframe,\n                config,\n                start_date=start_date,\n                end_date=end_date,\n            )\n\n    primary_ts = [0, 12 * 3600 * 1000, 24 * 3600 * 1000]\n    primary_data = pd.DataFrame({\"timestamp\": primary_ts, \"value\": [10, 11, 12]})\n    hourly_ts = [i * 3600 * 1000 for i in range(25)]\n    hourly_data = pd.DataFrame({\"timestamp\": hourly_ts, \"value\": list(range(25))})\n\n    factory = SpyFactory({\"12h\": primary_data, \"1h\": hourly_data}, ColumnGroupRegistry(tmp_path / \"cgsa_work\"))\n    generator = MultiTFGenerator(factory, DummyConfig())\n\n    result = generator.generate_multi_tf(\n        \"BTCUSDT\",\n        start_date=\"2024-01-02\",\n        end_date=\"2024-01-03\",\n    )\n\n    assert result.features_df is not None\n    assert len(factory.calls) == 2\n    assert {call[\"timeframe\"] for call in factory.calls} == {\"12h\", \"1h\"}\n    assert all(call[\"start_date\"] == \"2024-01-02\" for call in factory.calls)\n    assert all(call[\"end_date\"] == \"2024-01-03\" for call in factory.calls)\n"
+          },
+          "frame_basis": "HEAD :421-449 SpyFactory(StubFactory) 無 _cgsa_registry ⇒ multi_tf_generator.py:102 _generate_multi_tf_legacy",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "改寫後即為 CGSA serial 承接（_generate_multi_tf_cgsa：primary 於 :69、次週期於 _process_timeframe_inroot :260 各呼叫一次 _layer0）"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "dict_item", "target": "_PATH_ENV", "path": ["legacy"]},
+          "frame_basis": "HEAD :480 \"legacy\": {\"FFACT_USE_CGSA\": \"0\", ...}——frame 多週期路徑參數臂；SPEC §C 驗收母體排除 canonical legacy-*",
+          "deleted_nodeids": [
+            "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[legacy-healthy]",
+            "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[legacy-skip]",
+            "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[legacy-failed]",
+            "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[legacy-single]"
+          ],
+          "coverage_note": "同四情況之 CGSA 臂保留：test_canonical_completeness_three_paths_four_cases[cgsa_serial-*]、[cgsa_parallel-*]"
+        },
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "_artifact"},
+          "rewrite": {
+            "reason": "helper：刪 legacy 鍵後 `path == \"legacy\"` 分支（HEAD :519 讀 fg.meta_json＝*_factory_meta.json，frame save_factory_output 產物）成死碼且指向 factory h5 鏈（fftfmeta_golden_helpers.meta_json 可能由他組刪除）；改為只讀 L7 manifest。保留簽名以免動呼叫端 _assert_canonical_case（HEAD :538）。無斷言。",
+            "preserved_assertion_lines": [],
+            "new_source": "def _artifact(path: str, root, primary_tf: str, result) -> dict:\n    del path\n    return fg.l7_manifest(root, primary_tf, result)\n"
+          },
+          "frame_basis": "HEAD :519 legacy 分支讀 frame 產物 meta.json",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "n/a（helper）"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "StubFactory._layer6_5_preprocessing"},
+          "frame_basis": "HEAD :73-74 仿 FeatureFactory._layer6_5_preprocessing（補件模型整刪）；生成器唯一呼叫點 multi_tf_generator.py:1600 在 _generate_multi_tf_legacy 內（Task 1.3 刪）；CGSA serial／parallel 路徑不呼叫",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（stub 死碼）"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "StubFactory._combine_layers"},
+          "frame_basis": "HEAD :76-83 仿 FeatureFactory._combine_layers 之全欄合併；生成器呼叫點 multi_tf_generator.py:1532、:1584 皆在 legacy 內；本 stub 內唯一其他使用者為 :89 之 _layer7_validate_and_persist（同批刪）；_CgsaStubFactory（test_failopen_producer.py:93）與 _CanonicalStubFactory（test_cgsa_resume.py:485）之 L7 樁以 pd.concat 自組、不呼叫此方法；_run_tf_l1_l6_results（multi_tf_generator.py:1642-1678）只用 _execute_layer1_6_preserve_dtype／_layer1–6／_spill_to_memmap",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（stub 死碼）"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "StubFactory._layer7_validate_and_persist"},
+          "frame_basis": "HEAD :88-99 仿 FeatureFactory._layer7_validate_and_persist（補件模型整刪）；生成器唯一呼叫點 multi_tf_generator.py:1612 在 legacy 內；CGSA 路徑呼叫 _layer7_raw_from_cgsa_pipeline（StubFactory 無此方法，由子類 _CgsaStubFactory 提供）",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（stub 死碼）"
+        }
+      ],
+      "uncertain": [
+        "（補件第 5 點）StubFactory 刪後保留之方法：_layer0_data_ingestion、_execute_layer1_6、_execute_layer1_6_preserve_dtype、_spill_to_memmap、layer_data、_layer1–_layer6、_compute_config_hash（CGSA 路徑 multi_tf_generator.py:200 仍呼叫）——皆為 _CgsaStubFactory／_CanonicalStubFactory 經 CGSA serial 路徑所用。前提：tests/feature_engineering/test_failopen_producer.py 之 test_four_generator_paths_fail_closed_integration[*-legacy] 臂（HEAD 該檔 :259-262 直接用 StubFactory 走 legacy）由負責該檔之組別刪除；若該臂保留（不可能綠，因 legacy 已刪），此三方法刪除與否不影響其結果",
+        "test_multi_tf_generator_propagates_date_range_to_all_layer0_calls 之 rewrite 未實跑：依 _CgsaStubFactory 與 DummyConfig（無 allow_partial_*，multi_tf_generator.py 以 getattr 讀）推定可走 CGSA serial；_CanonicalStubFactory（同父類）已在 tests/test_cgsa_resume.py::_checkpoint 以兩週期 serial 跑通。請主委實跑確認綠",
+        "rewrite 於函式內匯入 tests.feature_engineering.test_failopen_producer（該模組模組層反向匯入本檔 StubFactory）；本檔 _thread_pool（HEAD :490-492）已有同樣之函式內匯入先例，判無循環問題",
+        "_artifact 之 rewrite 為非必要清理；若 fg.meta_json 於 fftfmeta_golden_helpers 被他組刪除，未改之 _artifact 也不會在執行期壞（分支不可達），主委可改判不列",
+        "test_canonical_completeness_three_paths_four_cases 之名稱與 docstring 仍寫「三路徑」「legacy 為 meta.json」；刪 legacy 鍵後語意過時，但改名會改動 8 個 nodeid，未列",
+        "docs/FF_FAILOPEN_FROZEN_TESTS.md:18 引用 test_lower_tf_missing_fails_closed_unless_partial_enabled（Task 4.1 現況文件同步範圍）"
+      ]
+    },
+    {
+      "path": "tests/test_feature_storage_validator_factory.py",
+      "verdict": "ops",
+      "reason": "test_feature_storage_factory_roundtrip 純驗 save_factory_output／load_factory_output（Task 2.1 刪除）⇒ Phase 2 刪整函式；test_feature_validator_factory 只用 FeatureValidator.validate_factory_output（不在刪除模型內），keep。",
+      "evidence": [
+        "HEAD :26 storage.save_factory_output(\"BTCUSDT\", \"12h\", result)",
+        "HEAD :29 storage.load_factory_output(\"BTCUSDT\", \"12h\")",
+        "HEAD :34-50 test_feature_validator_factory 不觸 storage"
+      ],
+      "ops": [
+        {
+          "phase": 2,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_feature_storage_factory_roundtrip"},
+          "frame_basis": "整支只驗 *_factory.h5 寫讀往返（save_factory_output 唯一生產呼叫者為 frame L7 分支，SPEC §A FACT-RECEIPT）",
+          "deleted_nodeids": ["tests/test_feature_storage_validator_factory.py::test_feature_storage_factory_roundtrip"],
+          "coverage_note": "n/a（factory h5 讀寫鏈整刪；CGSA manifest 往返由 Task 2.2/2.3 之 V2／manifest 測試承擔）"
+        }
+      ],
+      "uncertain": []
+    },
+    {
+      "path": "tests/test_primary_self_align_skip.py",
+      "verdict": "ops",
+      "reason": "整檔皆為 legacy 多週期之主週期 self-align skip（T1.6、T1.B11–B13）：_manual_multi_tf 直接呼叫 MultiTFGenerator._apply_timeframe_tag（registry=None）；其餘三支經無 registry 之 _FactoryStub 走 legacy 並 spy _apply_timeframe_tag。改後全數拋具名例外 ⇒ delete-file。",
+      "evidence": [
+        "HEAD :159 MultiTFGenerator._apply_timeframe_tag(aligned, timeframe)（registry=None）",
+        "HEAD :30-132 _FactoryStub 無 _cgsa_registry ⇒ :216/:248/:280 generate_multi_tf 走 legacy",
+        "HEAD :206-214 等 spy _apply_timeframe_tag：CGSA 路徑不呼叫此方法（multi_tf_generator.py 唯一呼叫點 :1568 在 legacy 內）",
+        "collect-only 4 nodeid"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-file",
+          "frame_basis": "整檔驗 _generate_multi_tf_legacy 之 primary self-align skip（multi_tf_generator.py:1538-1549）與其 rename；兩者 Task 1.3 刪除",
+          "deleted_nodeids": [
+            "tests/test_primary_self_align_skip.py::test_primary_self_align_skip_produces_same_output",
+            "tests/test_primary_self_align_skip.py::test_self_align_skip_with_mismatched_index",
+            "tests/test_primary_self_align_skip.py::test_self_align_skip_with_nan_in_combined",
+            "tests/test_primary_self_align_skip.py::test_self_align_skip_preserves_column_order"
+          ],
+          "coverage_note": "CGSA 主週期不對齊：tests/test_cgsa_multi_tf.py::TestCGSAMultiTFAlignment::test_primary_groups_not_aligned；對齊保 NaN：tests/test_cgsa_multi_tf.py::TestAlignGroupArray::test_alignment_preserves_nan_in_source；欄序：tests/test_feature_factory_batch2e.py::test_phase2_column_ordering_confirmation；索引重設為 legacy DataFrame 專屬（CGSA 為無索引陣列），n/a"
+        }
+      ],
+      "uncertain": [
+        "本檔不在關鍵字母體內（母體外直接呼叫者），以 delete-file 列入操作表即納入⑦允許集合；docs/plan/feature-factory-optimization/plan.yaml:643/671-672/695/717 與 docs/FF_FAILOPEN_FROZEN_TESTS.md:20 引用本檔（Task 4.1 範圍）"
+      ]
+    },
+    {
+      "path": "tests/test_multi_tf_golden_equivalence.py",
+      "verdict": "ops",
+      "reason": "唯一測試 test_multi_tf_golden_output_equivalence 以無 registry 之 _FactoryStub 經 generate_multi_tf（legacy）比較 FFACT_USE_SEARCHSORTED 開關下之 align_to_primary 輸出；改後拋具名例外，且 CGSA 不經 align_to_primary ⇒ delete-file。",
+      "evidence": [
+        "HEAD :29-115 _FactoryStub 無 _cgsa_registry；:128 generate_multi_tf ⇒ legacy",
+        "HEAD :119 FFACT_USE_SEARCHSORTED 只影響 TimeframeAligner.align_to_primary（legacy 組裝 :1555 呼叫）",
+        "collect-only 1 nodeid"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-file",
+          "frame_basis": "整檔驗 legacy 多週期組裝在 searchsorted／merge_asof 下之等價；legacy 組裝 Task 1.3 刪除",
+          "deleted_nodeids": ["tests/test_multi_tf_golden_equivalence.py::test_multi_tf_golden_output_equivalence"],
+          "coverage_note": "searchsorted vs merge_asof 數值等價於對齊器層：tests/test_searchsorted_align.py::test_searchsorted_vs_merge_asof_numeric_equivalence、::test_env_var_fallback_to_merge_asof；CGSA 多週期輸出逐位元不變由 Task 1.1 C3／C6 承擔"
+        }
+      ],
+      "uncertain": [
+        "docs/plan/feature-factory-optimization/plan.yaml:644/671/673 引用本檔（Task 4.1 範圍）"
+      ]
+    },
+    {
+      "path": "tests/test_l65_parallel.py",
+      "verdict": "ops",
+      "reason": "（補件模型）FeatureFactory._layer6_5_preprocessing 於 Phase 1 整刪 ⇒ test_tier_auto_selects_workers（:340）AttributeError。正式路徑之 L6.5 worker 數由 _layer7_raw_from_cgsa_pipeline（feature_factory.py:4111-4118，FFACT_L65_WORKERS 未設 ⇒ tier_cfg[\"l65_workers\"]）決定並以 n_workers 傳給 storage.write_raw_from_registry_stream；repo 內無任何測試承接此處之 tier 自動選擇 ⇒ rewrite 至該入口。fixture feature_factory 唯一使用者被改寫後成死碼（frame 時代 `_cgsa_registry=None` 初值樁），一併刪。其餘 FeaturePreprocessor／ColumnGroupRegistry 層測試 keep。",
+      "evidence": [
+        "HEAD :340 feature_factory._layer6_5_preprocessing(...)（補件模型整刪）",
+        "feature_factory.py:4111-4118 `n_workers = self._parse_positive_int_env(\"FFACT_L65_WORKERS\", int(tier_cfg[\"l65_workers\"]))` → :4135 write_raw_from_registry_stream(n_workers=n_workers)",
+        "grep l65_workers|FFACT_L65_WORKERS 於 tests：tests/test_hardware_utils.py:51（只驗 get_tier_config 表值）、tests/test_hardware_api.py（API 設定回顯）、tests/test_l7_parallel_persist.py::test_tier_auto_selects_l7_workers（驗 l7_workers 於 persist_registry_to_parquet，非 l65）、tests/performance/test_l7_persist_perf.py——皆未驗 L7_raw 入口之 l65 worker 選擇",
+        "feature_factory.py:4068 raw pipeline 開頭 self._cgsa_registry.finalize() 一次（column_group_registry.save_state 不呼叫 finalize）⇒ HEAD :343 斷言可原樣保留",
+        "HEAD :76-92 fixture feature_factory 之唯一使用者為 :313 test_tier_auto_selects_workers"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "test_tier_auto_selects_workers"},
+          "rewrite": {
+            "reason": "被測入口 _layer6_5_preprocessing 整刪；正式 L6.5 worker 選擇移至 _layer7_raw_from_cgsa_pipeline 之串流寫入（同一 tier 表、同一環境變數）。改以真建構子之 factory（避免 __new__ 缺 _current_output_window／layer_results）＋真實小 registry（finalize 以 Mock(wraps=...) 監看），storage.write_raw_from_registry_stream 打樁擷取 n_workers 並回傳最小 summary；tier 打樁與 FFACT_L65_WORKERS 刪除同 HEAD。HEAD :342、:343 兩斷言逐字保留（局部變數仍名 feature_factory）。",
+            "preserved_assertion_lines": [342, 343],
+            "new_source": "def test_tier_auto_selects_workers(\n    tmp_path: Path,\n    monkeypatch: pytest.MonkeyPatch,\n) -> None:\n    \"\"\"測試 Layer 6.5 呼叫端（FRAMEPATH：正式入口 `_layer7_raw_from_cgsa_pipeline` 之串流 L6.5）：8GB tier 應自動選擇 4 workers。\"\"\"\n    captured: dict[str, int] = {}\n    registry = _make_registry_with_layers(tmp_path / \"tier_workers\", [(2, LayerSource.L1)])\n    monkeypatch.setattr(registry, \"finalize\", Mock(wraps=registry.finalize))\n    feature_factory = FeatureFactory(config_manager=Mock(), adapter_registry=Mock())\n    feature_factory._cgsa_registry = registry\n    feature_factory._registry = Mock()\n    config = SimpleNamespace(\n        preprocessing=SimpleNamespace(enabled=False),\n        labels=SimpleNamespace(model_dump=lambda: {}),\n        model_dump=lambda by_alias=False: {\"timeframes\": {\"primary\": \"1h\", \"training\": [\"1h\"]}},\n    )\n\n    monkeypatch.delenv(\"FFACT_L65_WORKERS\", raising=False)\n    monkeypatch.setattr(\n        \"momentum.FeatureEngineering.utils.hardware_utils.get_memory_tier\",\n        lambda: \"8gb\",\n    )\n    monkeypatch.setattr(\n        \"momentum.FeatureEngineering.utils.hardware_utils.get_tier_config\",\n        lambda tier: {\"l65_workers\": 4, \"cgsa_memory_buffer\": 0, \"l7_workers\": 4, \"chunk_bars\": 50_000},\n    )\n\n    def fake_write_raw_from_registry_stream(**kwargs):\n        captured[\"n_workers\"] = kwargs[\"n_workers\"]\n        raw_path = tmp_path / \"raw\"\n        return raw_path, {\n            \"raw_path\": str(raw_path),\n            \"manifest_path\": str(registry.manifest_path),\n            \"feature_count\": registry.total_columns(),\n            \"validation\": {\n                \"has_nan\": False,\n                \"has_inf\": False,\n                \"coverage\": 1.0,\n                \"nan_ratio\": 0.0,\n                \"inf_count\": 0,\n                \"inf_ratio\": 0.0,\n                \"groups_with_inf\": 0,\n                \"warnings\": [],\n            },\n        }\n\n    monkeypatch.setattr(feature_factory._storage, \"write_raw_from_registry_stream\", fake_write_raw_from_registry_stream)\n\n    feature_factory._layer7_raw_from_cgsa_pipeline(\n        symbol=\"ETHUSDT\",\n        timeframe=\"1h\",\n        raw_data=pd.DataFrame({\"open\": np.ones(8, dtype=np.float64)}),\n        config=config,\n        elapsed=0.0,\n        config_hash=\"cfg_tier\",\n    )\n\n    assert captured[\"n_workers\"] == 4\n    feature_factory._cgsa_registry.finalize.assert_called_once()\n"
+          },
+          "frame_basis": "非 frame 臂；補件模型：_layer6_5_preprocessing（frame 記憶體分支＋CGSA registry 分支之舊入口）整刪，tier 自動選 worker 之驗證改指正式入口",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "rewrite 後即為正式路徑 feature_factory.py:4111-4118 之唯一承接測試"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "feature_factory"},
+          "frame_basis": "HEAD :76-92 fixture 以 __new__ 造 `_cgsa_registry=None` 之 factory 供 _layer6_5_preprocessing 接線測試；唯一使用者已改寫為不使用 fixture ⇒ 死碼",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        }
+      ],
+      "uncertain": [
+        "rewrite 未實跑：persist=True 路徑另呼叫 _resolve_quality_thresholds（max_nan_ratio 走 _default_max_nan_ratio 讀 repo 內健康 run artifact）、_build_l7_raw_preprocessing_metadata（preprocessing=None 設定時以 getattr 取 False）、_derive_row_index_for_artifact（無 timestamp 欄 ⇒ 回 None 不中斷）、_final_completeness（summary 無 completeness 時）、registry.save_state；raw_data 無 close 欄 ⇒ 不產 label。請主委實跑確認綠",
+        "Mock(wraps=registry.finalize) 以 monkeypatch 設於 registry 實例；若 ColumnGroupRegistry 使用 __slots__ 則需改為包一層，HEAD 之 test_cgsa_buffer_* 已對 registry 實例 monkeypatch `_write_manifest_thread_safe`，推定可行",
+        "fixture 刪除為死碼清理；若主委不列亦不壞",
+        "已查 tests/_golden/icpostleak/contract.json：本檔列於 oracle_update_files，tests/feature_engineering/test_icpostleak.py::test_boundary_08 要求 assert-like 行數（regex `^\\s*assert |np\\.testing\\.assert|pd\\.testing\\.assert|pytest\\.raises`）≥ 凍結值 40。HEAD 全檔 40；被改寫函式 HEAD 含 1 行（:342）、new_source 亦 1 行；fixture 0 行 ⇒ 改後仍 40，不觸發；grep 檔案清單 regex（rank_transform enabled True 等）命中之 l65_config fixture 不動"
+      ]
+    },
+    {
+      "path": "tests/test_golden_output_generation.py",
+      "verdict": "no-op",
+      "reason": "test_l2_timing_log_emitted 以 _cgsa_registry=None 呼叫 _layer2_derived_features——L2 之無 registry 分支不在刪除模型內（只 L3／L6.5／L7 拋例外）；其餘測 memmap_utils 與 scripts/generate_golden_output.py（以假 factory 打樁，該腳本不含母體關鍵字），Phase 1–3 皆不壞。",
+      "evidence": [
+        "HEAD :77 factory._cgsa_registry = None；:87/:95 只呼叫 _layer2_derived_features",
+        "feature_factory.py:1930 L2 `if self._cgsa_registry is None:` 分支保留",
+        "grep FFACT_USE_CGSA|_factory.h5|load_factory_output|hdf5_path|.h5 於 scripts/generate_golden_output.py 無命中"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "tests/test_feature_factory_e2e.py",
+      "verdict": "ops",
+      "reason": "test_multi_timeframe_alignment 以 create_feature_factory() 之真實 factory（_cgsa_registry 初值 None，feature_factory.py:208）直接呼叫 MultiTFGenerator.generate_multi_tf ⇒ HEAD 走 legacy（frame）全史三週期組裝；改後拋具名例外，且 CGSA 結果 features_df 為空、原斷言 `not aligned.empty` 不成立。改寫為 CGSA 版須全史多週期生成（§C 8GB 禁跑），故刪。其餘單週期測試經 generate_features（恆建 registry），keep。",
+      "evidence": [
+        "HEAD :97-98 MultiTFGenerator(factory, config).generate_multi_tf(symbol)，未經 generate_features ⇒ registry None",
+        "HEAD :100 assert not aligned.empty（CGSA L7 回傳 features_df 為空，見 tests/test_feature_factory_batch2d.py:225）",
+        "HEAD :89 training ['1h','4h','12h'] 無日期窗（全史）"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_multi_timeframe_alignment"},
+          "frame_basis": "無 registry 直呼 generate_multi_tf ＝ _generate_multi_tf_legacy（frame 全欄合併）；Task 1.3 刪除",
+          "deleted_nodeids": ["tests/test_feature_factory_e2e.py::test_multi_timeframe_alignment"],
+          "coverage_note": "CGSA 真實 kline 多週期：tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_serial-healthy]、[cgsa_parallel-healthy]、tests/feature_engineering/test_mtf_align_golden.py::test_real_generate_down_cgsa_path_matrix（週期標記與對齊）"
+        }
+      ],
+      "uncertain": [
+        "跨檔連動已處理：tests/momentum/Analysis/test_ic_persist_redirect_inventory.py:87 之 `_create_e2e_factory()` 計數 8→7，見本 JSON 該檔條目之 rewrite（phase 1，與本刪除同批）",
+        "刪後模組層 ConfigManager（HEAD :9）、MultiTFGenerator（HEAD :11）匯入成未使用；未列刪除（不壞）",
+        "scripts/run_ic_persist_hermetic.sh:31 之 skip 過濾 regex 含「missing multi-timeframe data」（僅本測產生）；刪後該 regex 分支無命中，不壞"
+      ]
+    },
+    {
+      "path": "tests/test_multi_symbol_parallel.py",
+      "verdict": "no-op",
+      "reason": "皆為 FeatureStorage V2 parquet／FeatureReader／registry／run_multi_symbol IPC／Arrow IPC 測試，不觸 frame 分派、registry=None 直呼或 factory h5；test_no_h5py_in_library 斷言 feature_library 不 import h5py（Task 2.2 後仍成立）。",
+      "evidence": [
+        "HEAD :383-389 assert \"import h5py\" not in source（feature_library.py）",
+        "HEAD :450-453 run_multi_symbol 經 generate_features（恆建 registry）",
+        "grep FFACT_USE_CGSA|\\.h5|hdf5_path|_try_load_cache|load_factory_output 於本檔無命中（:624 僅註解提及 h5 data）"
+      ],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "tests/performance/test_cgsa_memory.py",
+      "verdict": "no-op",
+      "reason": "只呼叫 factory._scan_cgsa_registry_validation(registry)（CGSA 驗證掃描），不經分派點、不讀 env。",
+      "evidence": ["HEAD :80 factory._scan_cgsa_registry_validation(registry)"],
+      "ops": [],
+      "uncertain": []
+    },
+    {
+      "path": "tests/performance/test_searchsorted_perf.py",
+      "verdict": "ops",
+      "reason": "test_self_align_skip_eliminates_memmap 與 test_phase1_gate_b2_plus_d_under_50s 之 B2 段以無 registry 之 _PrimaryOnlyFactory 經 generate_multi_tf（legacy）⇒ 改後拋具名例外；兩者皆刪（後者 D 段由同檔 test_searchsorted_align_speed 以更嚴條件覆蓋）。test_searchsorted_align_speed／_memory 只測 TimeframeAligner，keep。（補件）刪後 _PrimaryOnlyFactory（含仿已刪生產方法之 :155/:159/:173 樁）、_PrimaryOnlyConfig、_TimeframesPrimaryOnly 與四處匯入皆零用途，一併列刪。",
+      "evidence": [
+        "HEAD :103-184 _PrimaryOnlyFactory 無 _cgsa_registry",
+        "HEAD :204 generator.generate_multi_tf(\"BTCUSDT\")；:244 同",
+        "HEAD :188-206 斷言「primary self-align skip 不建 searchsorted memmap」＝legacy 組裝之 align_to_primary 行為（CGSA 不經 align_to_primary）",
+        "HEAD :215-235 D 段：12,888×600 searchsorted；:16-42 test_searchsorted_align_speed：12,888×1,000 且 <30 秒（嚴於 <50 秒）"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_self_align_skip_eliminates_memmap"},
+          "frame_basis": "HEAD :194-204 無 registry factory ⇒ legacy 組裝；所驗之 self-align skip 為 legacy 專屬（multi_tf_generator.py:1538-1549）",
+          "deleted_nodeids": ["tests/performance/test_searchsorted_perf.py::test_self_align_skip_eliminates_memmap"],
+          "coverage_note": "CGSA 主週期不對齊（無對齊配置）：tests/test_cgsa_multi_tf.py::TestCGSAMultiTFAlignment::test_primary_groups_not_aligned；CGSA 記憶體由 Task 1.1 phys_footprint 峰值閘承擔"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "test_phase1_gate_b2_plus_d_under_50s"},
+          "frame_basis": "HEAD :237-245 B2 段為 legacy primary self-align skip 計時；:247 斷言 d_elapsed + b2_elapsed，B2 移除後原斷言無法成立，D 段單獨保留與 test_searchsorted_align_speed 重複",
+          "deleted_nodeids": ["tests/performance/test_searchsorted_perf.py::test_phase1_gate_b2_plus_d_under_50s"],
+          "coverage_note": "D 段：tests/performance/test_searchsorted_perf.py::test_searchsorted_align_speed（同 12,888 列、欄更多、門檻更嚴）"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "_PrimaryOnlyFactory"},
+          "frame_basis": "（補件第 5 點）HEAD :103-184 整個 fake 類只被 :194、:240 兩支已刪測試使用；其 :155 _layer6_5_preprocessing、:159 _combine_layers、:173 _layer7_validate_and_persist 仿補件模型整刪之生產方法，只服務 legacy 組裝 ⇒ 整類零用途",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a（fake 死碼）"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "_PrimaryOnlyConfig"},
+          "frame_basis": "HEAD :89-93 只被 :195、:241 兩支已刪測試使用",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "def", "qualname": "_TimeframesPrimaryOnly"},
+          "frame_basis": "HEAD :83-86 只被 :90 _PrimaryOnlyConfig（同批刪）使用",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "stmt", "qualname": "<module>", "lineno": 96, "end_lineno": 100},
+          "frame_basis": "HEAD :96-100 `from tests._helpers.stub_layer_execute import (...)` 三名只被 _PrimaryOnlyFactory（:116、:120、:122、:123）使用",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "import_alias", "lineno": 3, "name": "SimpleNamespace"},
+          "frame_basis": "HEAD :3 只被 :176（_PrimaryOnlyFactory._layer7_validate_and_persist）使用",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "import_alias", "lineno": 10, "name": "tf_aligner_module"},
+          "frame_basis": "HEAD :10 只被 :201-202（已刪 test_self_align_skip_eliminates_memmap）使用",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        },
+        {
+          "phase": 1,
+          "kind": "delete-node",
+          "locator": {"category": "import_alias", "lineno": 11, "name": "MultiTFGenerator"},
+          "frame_basis": "HEAD :11 只被 :195、:241（兩支已刪測試）使用",
+          "deleted_nodeids": [],
+          "coverage_note": "n/a"
+        }
+      ],
+      "uncertain": [
+        "（補件第 5 點）helper／import 七筆為死碼清理（grep 於 HEAD 全檔確認各名稱之使用點只在已刪兩測與 _PrimaryOnlyFactory 內）；非必要，主委可整批不列——殘留不壞，但 _PrimaryOnlyFactory 仿已刪生產方法簽名，判屬「誤導」故列",
+        "import_alias 刪除對單名 `from x import y` 敘述之處理（整敘述消失）依驗證器實作；若驗證器要求整敘述，改用 stmt <module> 對應行"
+      ]
+    },
+    {
+      "path": "tests/momentum/Analysis/test_ic_persist_redirect_inventory.py",
+      "verdict": "ops",
+      "reason": "（補件第 4 點；母體外跨檔連動）test_s9_s11_helpers_are_not_bypassed 以 regex 計 tests/test_feature_factory_e2e.py 中 `_create_e2e_factory()` 出現次數 == 8；本組 Phase 1 刪 test_feature_factory_e2e.py::test_multi_timeframe_alignment（其 :93 為一次呼叫）後實際為 7 ⇒ 該斷言須同批改為 7。其餘三支（marker 合約、function-only marker、十六呼叫端 inventory）不受影響。",
+      "evidence": [
+        "HEAD :87 `assert len(re.findall(r\"_create_e2e_factory\\(\\)\", ff_source)) == 8`",
+        "tests/test_feature_factory_e2e.py HEAD 中 `_create_e2e_factory()` 出現於 :21（def）、:51、:64、:76、:93、:107、:139、:153 共 8；刪 :87-103 函式後剩 7",
+        "HEAD :88 `create_feature_factory\\(\\)` 計數 == 1（e2e :22）不受影響；tests/fixtures/ic_persist_redirect.py:320 只引用 ff_test_mod._create_e2e_factory 存在性，不受影響",
+        "collect-only 本檔 4 nodeid；本檔模組 docstring 明言「靜態 inventory gate；刻意不使用 pytest collect-only」"
+      ],
+      "ops": [
+        {
+          "phase": 1,
+          "kind": "rewrite",
+          "locator": {"category": "def", "qualname": "test_s9_s11_helpers_are_not_bypassed"},
+          "rewrite": {
+            "reason": "與 tests/test_feature_factory_e2e.py::test_multi_timeframe_alignment 之刪除（本組 Phase 1 操作）同批：該檔 `_create_e2e_factory()` 之 helper 呼叫減一，計數期望值 8→7。閘之語意（e2e 檔內 factory 一律經 _create_e2e_factory，不得繞過 redirect）不變，`==` 不放寬。其餘兩斷言逐字保留。",
+            "preserved_assertion_lines": [84, 88],
+            "new_source": "def test_s9_s11_helpers_are_not_bypassed() -> None:\n    export_source = Path(\"tests/api/test_export_api.py\").read_text()\n    assert export_source.count(\"_export_fixture_filtered_path(\") == 2\n\n    ff_source = Path(\"tests/test_feature_factory_e2e.py\").read_text()\n    assert len(re.findall(r\"_create_e2e_factory\\(\\)\", ff_source)) == 7\n    assert len(re.findall(r\"create_feature_factory\\(\\)\", ff_source)) == 1\n"
+          },
+          "frame_basis": "非 frame 臂；跨檔計數閘隨 frame 測試（e2e 之 legacy 多週期直呼）刪除而同步",
+          "deleted_nodeids": [],
+          "renamed_nodeids": {},
+          "coverage_note": "閘之意圖原地承接（計數仍為嚴格相等）"
+        }
+      ],
+      "uncertain": [
+        "本檔不在 G3 指派清單，依主委補件第 4 點直接列入；若他組亦列本檔，須合併為單一操作",
+        "phase 必須與 tests/test_feature_factory_e2e.py 之 delete-node 同為 1，否則中間批次此閘紅"
+      ]
+    }
+  ]
+}

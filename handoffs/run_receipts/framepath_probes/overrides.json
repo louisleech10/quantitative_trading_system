@@ -1,0 +1,170 @@
+{
+ "add": [
+  {
+   "phase": 1,
+   "path": "tests/feature_engineering/test_failopen_matrix.py",
+   "kind": "rewrite",
+   "locator": {
+    "category": "def",
+    "qualname": "_changed_assertion_tests"
+   },
+   "rewrite": {
+    "reason": "HEAD 之 `git show HEAD:<path>` 對自基準 d654237 後已刪之測試檔失敗（HEAD 已因 tests/phase25/test_net_ic_analyzer.py 而紅，主委 2026-10-08 於 6e07e0ad 實跑）；本票 Phase 1 刪 d654237 時代之 tests/test_primary_self_align_skip.py、tests/test_multi_tf_golden_equivalence.py 必觸發同一失敗。改為：HEAD 無此路徑 ⇒ 新側視為空檔，其全部斷言計為變更（須列於 frozen doc）；有此路徑者行為逐字不變",
+    "preserved_assertion_lines": [
+     149
+    ],
+    "new_source": "def _changed_assertion_tests(path: str) -> set[str]:\n    old_source = _git_output(\"show\", f\"{BASELINE_COMMIT}:{path}\")\n    # 自基準後已刪除之測試檔（HEAD 無此路徑；如 FRAMEPATH 刪 frame 專屬測試檔）：新側視為空檔 ⇒ 其全部斷言計為變更\n    exists_at_head = bool(_git_output(\"ls-tree\", \"--name-only\", \"HEAD\", \"--\", path).strip())\n    new_source = _git_output(\"show\", f\"HEAD:{path}\") if exists_at_head else \"\"\n    old_ranges, _ = _function_ranges(old_source)\n    new_ranges, callers = _function_ranges(new_source)\n    diff = _git_output(\"diff\", \"-U0\", f\"{BASELINE_COMMIT}..HEAD\", \"--\", path)\n\n    changed: set[str] = set()\n    old_line = new_line = 0\n    for raw in diff.splitlines():\n        if raw.startswith(\"@@\"):\n            match = re.match(r\"@@ -(\\d+)(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@\", raw)\n            assert match is not None, raw\n            old_line, new_line = int(match.group(1)), int(match.group(2))\n            continue\n        if raw.startswith((\"---\", \"+++\")) or not raw:\n            continue\n        sign, line = raw[0], raw[1:]\n        if sign == \"-\":\n            if ASSERTION_RE.search(line):\n                owner = _owner_for_line(old_ranges, old_line)\n                if owner:\n                    changed.add(owner)\n            old_line += 1\n        elif sign == \"+\":\n            if ASSERTION_RE.search(line):\n                owner = _owner_for_line(new_ranges, new_line)\n                if owner:\n                    changed.update(callers.get(owner, {owner}))\n            new_line += 1\n        else:\n            old_line += 1\n            new_line += 1\n    return {name for name in changed if name.startswith(\"test_\")}\n\n\n"
+   },
+   "frame_basis": "非 frame 臂；本票刪 d654237 時代之 frame 專屬測試檔使 V-8 helper 之 HEAD 讀取失敗（同型既有紅：phase25 刪檔）；不放寬：已刪檔之全部斷言仍須列於 docs/FF_FAILOPEN_FROZEN_TESTS.md",
+   "deleted_nodeids": []
+  },
+  {
+   "phase": 1,
+   "path": "tests/_golden/ffstat/nan_propagation_classes.json",
+   "kind": "delete-json-path",
+   "pointer": "/steps/momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._apply_timeframe_tag",
+   "frame_basis": "MultiTFGenerator._apply_timeframe_tag 刪 registry 為 None 側後零生產呼叫者（HEAD 兩呼叫皆在 legacy／frame L7），Task 1.4 整刪；閉包實算（主委於暫存工作樹試作刪除後以 test_nan_propagation_inventory_complete 同演算法）不再含此鍵",
+   "deleted_nodeids": []
+  },
+  {
+   "phase": 1,
+   "path": "tests/_golden/ffstat/nan_propagation_classes.json",
+   "kind": "delete-json-path",
+   "pointer": "/steps/momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._timeframe_seconds_keys",
+   "frame_basis": "步驟閉包中唯一經由 MultiTFGenerator._apply_timeframe_tag 可達；該 tagger 刪除後閉包實算不再含此鍵（函式本身保留，CGSA 標記仍以之取週期鍵）",
+   "deleted_nodeids": []
+  }
+ ],
+ "drop": [],
+ "replace": {
+  "tests/feature_engineering/test_ratiounsafe_wiring.py#0": {
+   "phase": 1,
+   "kind": "rewrite",
+   "locator": {
+    "category": "def",
+    "qualname": "test_frame_path_taggers_untouched"
+   },
+   "rewrite": {
+    "reason": "tuple 去除已整刪之 FeatureFactory._apply_timeframe_tag；其餘兩標記器之 inspect 斷言（:207）逐字保留。",
+    "preserved_assertion_lines": [
+     207
+    ],
+    "new_source": "def test_frame_path_taggers_untouched() -> None:\n    \"\"\"Task 1.3 不可做：既有標記器不改，不得改呼叫 feature_naming（FRAMEPATH 已刪 frame 整表標記\n    `FeatureFactory._apply_timeframe_tag`、`MultiTFGenerator._apply_timeframe_tag`；保留之單欄標記器受檢）。\"\"\"\n    import inspect\n\n    from momentum.FeatureEngineering.feature_factory import FeatureFactory\n\n    for fn_obj in (FeatureFactory._timeframe_tagged_name,):\n        assert \"feature_naming\" not in inspect.getsource(fn_obj)\n"
+   },
+   "frame_basis": "HEAD :205 FeatureFactory._apply_timeframe_tag＝frame L7 體之整表標記器（生產呼叫只 feature_factory.py:4492）；兩個整表 tagger（FeatureFactory／MultiTFGenerator._apply_timeframe_tag）皆於 SPEC v16 A1／A2 刪除，只剩單欄標記器受檢",
+   "deleted_nodeids": [],
+   "renamed_nodeids": {},
+   "coverage_note": "同函式"
+  },
+  "tests/feature_engineering/test_b6_warmup_trim.py#3": {
+   "phase": 1,
+   "kind": "rewrite",
+   "locator": {
+    "category": "def",
+    "qualname": "test_warmup_quality_gain_position_independent"
+   },
+   "rewrite": {
+    "reason": "HEAD :351/:364 釘 FFACT_USE_CGSA=0 讀 frame 之 features_df 欄；CGSA 之 features_df 零欄 ⇒ 剝鍵後 :379 必紅。改由兩次 run 各自落盤之 raw（FeatureReader.load_manifest_v2／load_columns_v2）讀回欄值，其餘計算與斷言不變；不放寬任何斷言。",
+    "preserved_assertion_lines": [
+     377,
+     379,
+     387,
+     389
+    ],
+    "new_source": "@pytest.mark.requires_kline\ndef test_warmup_quality_gain_position_independent(\n    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,\n) -> None:\n    from momentum.FeatureEngineering.feature_reader import FeatureReader\n\n    _require_kline()\n    before = _snapshot_production_features()\n    features_root = _isolate_feature_output(monkeypatch, tmp_path)\n\n    start, end = _date_window(120)\n    cfg = _minimal_config()\n\n    def _persisted(root: Path, result: Any) -> pd.DataFrame:\n        # FRAMEPATH：CGSA 之 features_df 只帶索引不帶欄 ⇒ 欄值改由本次落盤之 raw 讀回（同一輸出窗）\n        reader = FeatureReader(str(root))\n        config_hash = str(result.metadata[\"config_hash\"])\n        manifest = reader.load_manifest_v2(\"BTCUSDT\", \"12h\", config_hash, allow_partial=True)\n        columns = [c for group in manifest[\"artifacts\"][\"raw\"][\"groups\"].values() for c in group.get(\"columns\", [])]\n        return reader.load_columns_v2(\"BTCUSDT\", \"12h\", config_hash, columns, allow_partial=True)\n\n    monkeypatch.setenv(\"FFACT_WARMUP_TRIM\", \"0\")\n    factory_off = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)\n    factory_off._storage = FeatureStorage(str(features_root / \"off\"))\n    res_off = factory_off.generate_features(\n        \"BTCUSDT\",\n        \"12h\",\n        config_override=cfg,\n        force_regenerate=True,\n        start_date=start,\n        end_date=end,\n    )\n\n    monkeypatch.setenv(\"FFACT_WARMUP_TRIM\", \"1\")\n    factory_on = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)\n    factory_on._storage = FeatureStorage(str(features_root / \"on\"))\n    res_on = factory_on.generate_features(\n        \"BTCUSDT\",\n        \"12h\",\n        config_override=cfg,\n        force_regenerate=True,\n        start_date=start,\n        end_date=end,\n    )\n    off_df = _persisted(features_root / \"off\", res_off)\n    on_df = _persisted(features_root / \"on\", res_on)\n\n    window = factory_on._current_output_window\n    assert window is not None and window.warmup_enabled\n    cols = _position_independent_columns(list(on_df.columns))\n    # CGSA 落盤保留全 NaN 死欄（frame 之 L7 死欄刪除不在 CGSA 落盤路徑；主委 2026-10-08 探針：本設定 25 欄中\n    # meta_12h_Momentum_Divergence、meta_12h_Volatility_Regime 全 NaN、stable_start 為 None）⇒ 只量有有效值之欄\n    cols = [c for c in cols if on_df[c].notna().any()]\n    assert cols, \"no position-independent columns to measure\"\n    k = min(50, max(1, window.max_warmup_bars // 4))\n    off_sub = off_df[cols].iloc[:k]\n    on_sub = on_df[cols].iloc[:k]\n    valid_off = float(off_sub.notna().mean().mean())\n    valid_on = float(on_sub.notna().mean().mean())\n    # FFSTAT v32（使用者 2026-09-27 R1「預熱恆開」、刪 FFACT_WARMUP_TRIM）：環境變數不再能關預熱 ⇒ 兩次輸出開頭 k 列\n    # 之有效率相同，且位置無關欄於輸出開頭即全數有效（改前斷言「開啟比關閉多 5%」之前提已不存在）\n    assert valid_off == valid_on, f\"FFACT_WARMUP_TRIM 仍影響結果：on={valid_on:.3f} off={valid_off:.3f}\"\n    if \"warmup_insufficient\" not in (res_on.metadata or {}):\n        assert valid_on >= 0.999, f\"預熱恆開後輸出開頭仍有空值：on={valid_on:.3f}\"\n    _assert_data_cache_unchanged(before)\n\n"
+   },
+   "frame_basis": "HEAD :351、:364 setenv(\"FFACT_USE_CGSA\",\"0\")；:378-382 直接取 features_df 欄（frame 專屬輸出形態）；CGSA 落盤保留全 NaN 死欄（frame L7 會刪），量測母體排除全 NaN 欄（探針實測 25 欄中 2 欄全 NaN，排除後開頭有效率 1.0）",
+   "deleted_nodeids": [],
+   "renamed_nodeids": {},
+   "coverage_note": "同函式承接（CGSA 版）"
+  },
+  "tests/feature_engineering/test_ff_cross_symbol_value_isolation.py#3": {
+   "phase": 1,
+   "kind": "rewrite",
+   "locator": {
+    "category": "def",
+    "qualname": "test_v5_slow_solo_a_equals_batch_b_then_a_artifacts"
+   },
+   "rewrite": {
+    "reason": "剝 :379 後 assert_full_chain_runtime（frame 逐層 data／_preprocessing_applied 稽核）於 CGSA 必紅、features_df 零欄 ⇒ :439 紅。改為 CGSA 版：逐層稽核以 registry 群組之 L1–L6 layer 皆在＋feature_count>2＋run_status 只容許 v19 calibration_insufficient partial 取代；A 之值由落盤 raw 讀回；solo／batch 各設獨立 FFACT_CGSA_WORK_DIR 防工作目錄互蓋；其餘比對斷言全保留。",
+    "preserved_assertion_lines": [
+     382,
+     393,
+     411,
+     439,
+     440,
+     441,
+     442,
+     446,
+     449,
+     450
+    ],
+    "new_source": "@pytest.mark.slow\n@pytest.mark.requires_kline\ndef test_v5_slow_solo_a_equals_batch_b_then_a_artifacts(\n    requires_kline_data,\n    monkeypatch: pytest.MonkeyPatch,\n    tmp_path: Path,\n) -> None:\n    \"\"\"Slow tier：solo(A) vs same-factory batch-like B→A 的全鏈 A artifact 一致（FRAMEPATH：改經 CGSA；A 之值由落盤\n    raw 讀回比對；原 frame 逐層執行稽核改為 registry 之 L1–L6 群組皆在、品質只容許 v19 partial）。\"\"\"\n    from momentum.FeatureEngineering.feature_reader import FeatureReader\n    from momentum.FeatureEngineering.feature_storage import resolve_run_status\n    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import EVENT_CALIBRATION_INSUFFICIENT\n    from momentum.FeatureEngineering.warmup_window import WARMUP_INSUFFICIENT_EVENT\n\n    def _persisted_a(factory, result):\n        reader = FeatureReader(str(factory._storage.base_path))\n        config_hash = str(result.metadata[\"config_hash\"])\n        manifest = reader.load_manifest_v2(BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, allow_partial=True)\n        columns = [c for group in manifest[\"artifacts\"][\"raw\"][\"groups\"].values() for c in group.get(\"columns\", [])]\n        return reader.load_columns_v2(\n            BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, columns, allow_partial=True, attach_row_index=True,\n        )\n\n    def _assert_cgsa_full_chain(factory, result, manifest):\n        assert int(result.feature_count) > 2\n        layers = {group.layer.value for _, group in factory._cgsa_registry.iter_all()}\n        assert {\"L1\", \"L2\", \"L3\", \"L4\", \"L5\", \"L6\"} <= layers, sorted(layers)\n        status = resolve_run_status(manifest)\n        if status == \"partial\":\n            # FFSTAT v19（使用者 2026-09-26 裁定：開始日前有效值不足 N 之欄只該欄不平穩化）與公開域預熱不足\n            # （FFSTAT §C）之降級品質 partial；只容許此兩封閉原因（主委 2026-10-08 試作實跑：兩者皆出現）\n            allowed = (f\"{EVENT_CALIBRATION_INSUFFICIENT}:\", f\"{WARMUP_INSUFFICIENT_EVENT}:\")\n            reasons = [str(r) for r in ((result.metadata or {}).get(\"failure_reasons\") or [])]\n            assert reasons and all(r.startswith(allowed) for r in reasons), reasons\n        else:\n            assert status == \"complete\", status\n\n    baseline_kline = requires_kline_data(BASELINE_SYMBOL, BASELINE_TIMEFRAME, min_rows=1600)\n    other_kline = requires_kline_data(OTHER_SYMBOL, BASELINE_TIMEFRAME, min_rows=1600)\n    assert len(baseline_kline) == len(other_kline)\n    _, end = kline_full_window_dates(baseline_kline, other_kline)\n    start = max(\n        pd.Timestamp(int(kline[\"timestamp\"].astype(np.int64).iloc[SLOW_PRE_HISTORY_BARS]), unit=\"s\", tz=\"UTC\")\n        for kline in (baseline_kline, other_kline)\n    ).strftime(\"%Y-%m-%d\")\n    config = slow_full_chain_config_payload(reference_symbol=OTHER_SYMBOL)\n\n    solo_dstar_dir = tmp_path / \"dstar\" / \"solo\"\n    batch_dstar_dir = tmp_path / \"dstar\" / \"batch\"\n    solo_factory = make_factory(tmp_path / \"solo\")\n    assert_slow_full_chain_config(solo_factory, config)\n    monkeypatch.setattr(FeaturePreprocessor, \"_d_star_cache_dir\", staticmethod(lambda: solo_dstar_dir))\n    monkeypatch.setenv(\"FFACT_CGSA_WORK_DIR\", str(tmp_path / \"cgsa\" / \"solo\"))\n    solo_result = run_symbol_result(\n        solo_factory,\n        symbol=BASELINE_SYMBOL,\n        start_date=start,\n        end_date=end,\n        config_payload=config,\n        persist=True,\n    )\n    solo_manifest = runtime_output_manifest(\n        solo_result,\n        factory=solo_factory,\n        symbol=BASELINE_SYMBOL,\n    )\n    _assert_cgsa_full_chain(solo_factory, solo_result, solo_manifest)\n    solo = _persisted_a(solo_factory, solo_result)\n\n    batch_factory = make_factory(tmp_path / \"batch\")\n    assert_slow_full_chain_config(batch_factory, config)\n    monkeypatch.setattr(FeaturePreprocessor, \"_d_star_cache_dir\", staticmethod(lambda: batch_dstar_dir))\n    monkeypatch.setenv(\"FFACT_CGSA_WORK_DIR\", str(tmp_path / \"cgsa\" / \"batch\"))\n    run_symbol_frame(\n        batch_factory,\n        symbol=OTHER_SYMBOL,\n        start_date=start,\n        end_date=end,\n        config_payload=config,\n        persist=True,\n    )\n    batch_a_result = run_symbol_result(\n        batch_factory,\n        symbol=BASELINE_SYMBOL,\n        start_date=start,\n        end_date=end,\n        config_payload=config,\n        persist=True,\n    )\n    batch_a_manifest = runtime_output_manifest(\n        batch_a_result,\n        factory=batch_factory,\n        symbol=BASELINE_SYMBOL,\n    )\n    _assert_cgsa_full_chain(batch_factory, batch_a_result, batch_a_manifest)\n    batch_a = _persisted_a(batch_factory, batch_a_result)\n\n    sampled = representative_columns(solo, limit=20)\n    assert sampled\n    assert canonical_frame_digest(solo) == canonical_frame_digest(batch_a)\n    assert_sampled_values_equal(solo, batch_a, columns=sampled)\n    assert_manifest_semantics_equal(\n        solo_manifest,\n        batch_a_manifest,\n    )\n    assert_dstar_payloads_equal(solo_dstar_dir, batch_dstar_dir, BASELINE_SYMBOL)\n\n    dstar_files = list(batch_dstar_dir.glob(\"*.json\"))\n    assert dstar_files, \"slow tier must materialize d* artifacts\"\n    for path in dstar_files:\n        if BASELINE_SYMBOL in path.name:\n            assert OTHER_SYMBOL not in path.name\n\n"
+   },
+   "frame_basis": "HEAD :379 FFACT_USE_CGSA=0；:408/:434 assert_full_chain_runtime（frame 逐層稽核）；:436-437 frame features_df",
+   "deleted_nodeids": [],
+   "renamed_nodeids": {},
+   "coverage_note": "同函式承接（CGSA 版全鏈 solo vs batch B→A）"
+  }
+ },
+ "new_files": [
+  {
+   "path": "scripts/freeze_framepath_baseline.py",
+   "phase": 1,
+   "task": "1.1"
+  },
+  {
+   "path": "tests/_golden/framepath/cgsa_fingerprint.json",
+   "phase": 1,
+   "task": "1.1"
+  },
+  {
+   "path": "tests/_golden/framepath/compare_domain.json",
+   "phase": 1,
+   "task": "1.1"
+  },
+  {
+   "path": "tests/feature_engineering/test_framepath_invariance.py",
+   "phase": 1,
+   "task": "1.1"
+  },
+  {
+   "path": "tests/feature_engineering/test_framepath_cgsa_only.py",
+   "phase": 1,
+   "task": "1.2"
+  },
+  {
+   "path": "tests/_golden/framepath/test_disposition.json",
+   "phase": 1,
+   "task": "1.5"
+  },
+  {
+   "path": "tests/feature_engineering/test_framepath_disposition.py",
+   "phase": 1,
+   "task": "1.5"
+  },
+  {
+   "path": "tests/api/test_framepath_api_h5.py",
+   "phase": 1,
+   "task": "2.3"
+  }
+ ],
+ "fact_key_rows": [
+  {
+   "row_id": "RM-FRAMEPATH",
+   "phase": 1
+  },
+  {
+   "row_id": "HP-FRAMEPATH",
+   "phase": 1
+  },
+  {
+   "row_id": "RM-HDF5PATHNAME",
+   "phase": 3
+  },
+  {
+   "row_id": "RM-FFSTORE",
+   "phase": 3
+  }
+ ]
+}

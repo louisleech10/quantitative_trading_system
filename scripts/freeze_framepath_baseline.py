@@ -1,0 +1,114 @@
+"""FRAMEPATH Task 1.1：CGSA 指紋基準之凍結與比對（docs/FRAMEPATH_SPEC.md §G、Task 1.1）。
+
+於 HEAD 6e07e0ad（Phase 1 任何生產碼改動之前）以真實 `data_cache/feature_klines/kline_cache.h5` 跑設定矩陣 C1–C9，
+寫 `tests/_golden/framepath/cgsa_fingerprint.json`；`tests/feature_engineering/test_framepath_invariance.py`
+以同一 `run_cell` 重跑並以 `compare_cell` 逐項比對（無容差）。
+
+設定矩陣（`stat_payload` 級精簡指標、短窗；週期取值由 `ffstat_helpers` 參數給定，比對器不寫死週期或標的）：
+- C1 單週期平穩化開；C2 單週期平穩化關；C3 多週期（主週期＋一個較長次週期，`FFACT_MULTI_TF_PARALLEL=0`）平穩化開；
+- C4 ＝C1 於 `FFACT_L3_PERSIST_MODE` 之 streaming 與 hybrid 各一（子格 C4-streaming、C4-hybrid）；
+- C5 ＝C1 同 work dir 第二次生成（resume 命中）；C6 ＝C3 但 `FFACT_MULTI_TF_PARALLEL=1`；
+- C7 ＝C1＋`persist=False`；C8 ＝C1＋`FFACT_L3_PERSIST_MODE=in_memory`；
+- C9 ＝C3＋`allow_partial_timeframes=True`，真實 kline 副本刪 `<symbol>/<次週期>` 之 data dataset 並讀回確認缺失，
+  子行程啟動前（kline storage 建構前）於其環境把 `LEGACY_KLINE_CACHE_DIR` 指向空受控目錄 ⇒ `run_status=partial`。
+
+每格內容（§G baseline 內容）：公開輸出欄名序列 sha256、欄數、列數、時間索引 sha256；逐欄 NaN／inf mask sha256
+與 float32 值位元 sha256；平穩化決策表 sha256；manifest 經 `compare_domain.json` 篩選後之 canonical JSON sha256；
+run_status、各週期 completeness 與失敗／降級原因；生成路徑收據（L3 落地模式、多週期 serial／parallel、L6.5 CGSA 臂）；
+記憶體（`memory_guard._Readings`，根＝該格生成子行程，間隔 0.1 秒）峰值、讀數筆數、秒數。C7 以回傳結果與
+completeness metadata 為比對對象。
+
+凍結拒寫條件（§G、Task 1.1 邊界）：C5 與 C1 fingerprint 不等；C1–C8 任一 `run_status` 非 complete；C9 之
+`run_status` 非 partial 或 skipped／failed 週期不含該次週期；任一格記憶體 FAIL（讀數 `failed` 非空、`injected`
+為真、無讀數、峰值 ≥ 2 GB；C6 無任一讀數含根以外成員）；`ICFA_GUARD_READINGS_FILE` 已設 ⇒ 具名拒跑。
+
+用法：
+  PYTHONPATH=. venv/bin/python scripts/freeze_framepath_baseline.py freeze   # 只准於 HEAD 6e07e0ad 碼態執行
+  PYTHONPATH=. venv/bin/python scripts/freeze_framepath_baseline.py check    # 重跑並比對，列出差異
+真實資料重測試：各格單組串行；委員審查期間不跑。
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Mapping
+
+REPO = Path(__file__).resolve().parents[1]
+BASELINE_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
+COMPARE_DOMAIN_REL = "tests/_golden/framepath/compare_domain.json"
+HEAD_COMMIT_PREFIX = "6e07e0ad"
+CELLS = ("C1", "C2", "C3", "C4-streaming", "C4-hybrid", "C5", "C6", "C7", "C8", "C9")
+PARTIAL_CELLS = ("C9",)
+PEAK_LIMIT_BYTES = 2 * 1024 ** 3
+SAMPLE_INTERVAL_SECONDS = 0.1
+# 每格 fingerprint 之比對項（§G baseline 內容；compare_cell 逐項無容差比對）
+FINGERPRINT_KEYS = (
+    "column_names_sha256", "column_count", "row_count", "time_index_sha256", "columns",
+    "stationarity_decisions_sha256", "manifest_sha256", "run_status", "completeness", "failure_reasons",
+    "path_receipt",
+)
+
+
+class FramepathBaselineError(RuntimeError):
+    """凍結／比對前置條件不成立（具名拒寫或拒跑）。"""
+
+
+def load_compare_domain(path: Path = REPO / COMPARE_DOMAIN_REL) -> Dict[str, Any]:
+    """讀 `compare_domain.json` 並驗：category ∈ allowed_categories；path 之最後一段不屬 forbidden keys 或
+    `feature_storage.COMPLETENESS_FIELD_NAMES`；path 語法只含物件鍵與單層 `*`。違反 ⇒ `FramepathBaselineError`。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def filter_manifest(manifest: Mapping[str, Any], domain: Mapping[str, Any]) -> Dict[str, Any]:
+    """依 domain.exclude 刪除 manifest 中匹配之純量鍵；匹配到物件或陣列 ⇒ `FramepathBaselineError`（防祖先鍵整段排除）。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def manifest_sha256(manifest: Mapping[str, Any], domain: Mapping[str, Any]) -> str:
+    """`filter_manifest` 後之 canonical JSON（sort_keys、(",", ":")、ensure_ascii=False）utf-8 sha256。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def cell_settings(cell: str) -> Dict[str, Any]:
+    """格之設定：payload（ffstat_helpers.stat_payload 系）、env 覆寫、training_tfs、persist、repeat（C5＝2）、
+    allow_partial、drop_secondary（C9）。週期與標的一律取自 ffstat_helpers 常數。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def run_cell(cell: str, work_root: Path) -> Dict[str, Any]:
+    """於子行程跑一格生成，父行程以 `memory_guard._Readings`（根＝子行程）每 0.1 秒取樣；回傳
+    {"fingerprint": {FINGERPRINT_KEYS…}, "memory": {"peak_bytes", "readings", "seconds", "non_root_member_seen"},
+    "receipt": {...，C9 含 legacy_kline_dir 與 deleted_readback}}。`ICFA_GUARD_READINGS_FILE` 已設 ⇒ 拒跑。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def memory_gate_errors(cell: str, memory: Mapping[str, Any]) -> List[str]:
+    """§G 記憶體閘：讀數 failed 非空、injected、無讀數、峰值 ≥ PEAK_LIMIT_BYTES、C6 無根以外成員 ⇒ 錯誤字串。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def compare_cell(baseline: Mapping[str, Any], fresh: Mapping[str, Any]) -> List[str]:
+    """逐項（FINGERPRINT_KEYS；columns 逐欄之 NaN／inf mask 與 float32 值位元 sha256）無容差比對；回傳
+    「項目／欄名」差異列表（空＝相等）。不得含任何週期或標的字面。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def freeze(out: Path = REPO / BASELINE_REL) -> Dict[str, Any]:
+    """於 HEAD 6e07e0ad 碼態跑全部格、驗拒寫條件後寫基準（含 head_commit、python、各格 memory）。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+def main(argv: List[str]) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("action", choices=("freeze", "check"))
+    args = ap.parse_args(argv)
+    if args.action == "freeze":
+        freeze()
+        return 0
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

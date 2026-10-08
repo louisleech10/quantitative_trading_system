@@ -1,0 +1,28 @@
+schema_version: 1
+command: 暫存 worktree（git worktree add --detach <scratch>/wt2 6e07e0ad）上試作 Phase 1 刪除；死碼掃描以 dead_iter（同 tests/feature_engineering/test_framepath_cgsa_only.py::dead_defs 之引用計數法，生產引用只計 momentum／api／scripts）反覆至不動點；閉包以 test_ffstat_stable_start::test_nan_propagation_inventory_complete 同演算法重算
+exit_code: 0
+date: 2026-10-08
+author: 主委（Claude）
+purpose: TODO 階段凍結處置表與生產刪除清單之依據（不提交、試作 worktree 已於收尾刪除）；b1 實作仍須自行實作並以驗收測試確認，不得沿用本試作為已驗證之實作
+
+試作刪除內容（Phase 1）：
+- feature_factory.py：_cgsa_enabled 定義與全部呼叫改恆 CGSA；單週期 frame 尾段（:569–597）；L3 串流條件改 persist_mode ∈ {streaming, hybrid}（registry 為 None ⇒ 具名例外）；_combine_layers 白名單（layer3_input、layer4_input）；_legacy_native_row_maps；set_no_start_calibration() 無參數
+- multi_tf_generator.py：_cgsa_enabled、_generate_multi_tf_legacy、MultiTFGenerator._combine_layers、MultiTFGenerator._apply_timeframe_tag；generate_multi_tf registry 為 None ⇒ 具名例外
+- feature_preprocessor.py：native_maps 參數與 _no_start_native_maps 消費
+- memory_budget.py：NON_ARM_FFACT_KEYS 刪 FFACT_USE_CGSA
+
+死碼掃描（HEAD 生產零引用者另計，不屬本票：FeatureFactory._safe_execute、_apply_runtime_quality_gate、_apply_preprocessing_degradation_metadata、MultiTFGenerator._present_timeframes、FeaturePreprocessor._transform_single_group_chunked_to_arrays、_winsorize_2d_inplace；其中三者另於 HEAD 即零引用含測試：FeatureFactory._calibration_short_columns、_resolve_config_float、FeaturePreprocessor._rolling_last_rank_pct_for_preprocess＝HEAD_DEAD）
+第 1 輪本票新增零生產引用：_build_column_layer_map（模組層）、FeatureFactory._execute_l65_with_degradation、FeatureFactory._apply_l7_dead_feature_drop
+人工核對呼叫鏈（grep 全 repo 生產碼，未截斷）：FeatureFactory._layer6_5_preprocessing／_layer6_5_pre_ic／_layer6_5_post_ic 之生產呼叫者只有 frame 單週期尾段 :580 與彼此；_layer7_validate_and_persist 之生產呼叫者只有 frame 尾段 :585 與 legacy 多週期 multi_tf_generator.py:1612；_layer7_validate_and_persist_cgsa 之唯一呼叫者為 _layer7_validate_and_persist :4469；FeatureFactory._apply_timeframe_tag 唯一呼叫者為 frame L7 體 :4492。CGSA 之 L7 為 _layer7_raw_from_cgsa_pipeline（feature_factory.py:557、multi_tf_generator.py:206、:675），L6.5 經 feature_storage.py:1261 transform_registry_groups_to_sink
+第 2 輪：刪 _layer6_5_preprocessing、_layer6_5_pre_ic、_layer6_5_post_ic、_layer7_validate_and_persist、FeatureFactory._apply_timeframe_tag 後新增零生產引用：_run_layer6_5_preprocessor、_layer7_validate_and_persist_cgsa
+第 3 輪：再刪上二者後無新增 ⇒ 不動點
+試作後 pytest --collect-only tests/test_cgsa_pipeline.py rc=0（匯入完整）；試作 diff 5 檔 +32／−815 行（不含 tests/golden/l65/test_inventory.txt 之測試副作用）
+
+nan_propagation 閉包（tests/_golden/ffstat/nan_propagation_classes.json）：試作後閉包較 golden 少 4 鍵——
+  momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._apply_timeframe_tag
+  momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._cgsa_enabled
+  momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._generate_multi_tf_legacy
+  momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._timeframe_seconds_keys
+  多 0 鍵
+
+誠實邊界：引用計數為名稱層級（同名方法互相遮蔽之可能已以人工 grep 呼叫鏈核對上列各項）；未於試作 worktree 跑真實資料生成；Phase 2（h5 讀寫鏈）未試作

@@ -1,0 +1,861 @@
+{
+ "group": "G4",
+ "files": [
+  {
+   "path": "tests/api/test_feature_browser_routes.py",
+   "verdict": "ops",
+   "reason": "Coverage matrix 兩測以 `*_factory.h5` 為輸入；Phase 2 coverage 只走 V2 後 h5 不再被讀（matrix 全 1.0，斷言意義喪失）且字面違反 Task 4.1 grep。endpoint_200 改寫為 V2 fixture（同值）、requires_two 只刪 h5 寫入敘述；h5 helper 與 h5py import 成死碼一併刪。",
+   "evidence": [
+    "HEAD :32-41、:65-69 寫 `BTCUSDT_12h_factory.h5`／`ETHUSDT_12h_factory.h5`",
+    "momentum/Analysis/coverage_analyzer.py:201-210 legacy HDF5 後備為唯一讀 h5 處（Task 2.2 刪）",
+    "api/services/feature_browser_service.py:44 `len(normalized_symbols) < 2` ⇒ ValueError ⇒ route `_http_error` 400，與檔案無關",
+    "同檔 :85-94 已有 `_write_v2_raw_fixture`（模組層，執行期可用）"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_coverage_matrix_endpoint_200"
+     },
+     "rewrite": {
+      "reason": "h5 fixture 改為同值之 V2 raw fixture（BTC feature_b 首列 NaN），使 endpoint 仍以真實資料計算；另加 BTC feature_b NaN 率 0.5 斷言證明 V2 實際被讀（原斷言全保留，只增不減）。",
+      "preserved_assertion_lines": [
+       43,
+       54,
+       55,
+       56,
+       57,
+       58
+      ],
+      "new_source": "def test_coverage_matrix_endpoint_200(tmp_path: Path) -> None:\n    feature_base = tmp_path / \"feature_matrix\"\n    feature_base.mkdir()\n\n    _write_v2_raw_fixture(\n        feature_base,\n        symbol=\"BTCUSDT\",\n        timeframe=\"12h\",\n        config_hash=\"cfg_route_matrix\",\n        raw_groups={\n            \"group_alpha\": pd.DataFrame(\n                {\n                    \"feature_a\": np.array([1.0, 2.0], dtype=np.float32),\n                    \"feature_b\": np.array([np.nan, 3.0], dtype=np.float32),\n                }\n            )\n        },\n    )\n    _write_v2_raw_fixture(\n        feature_base,\n        symbol=\"ETHUSDT\",\n        timeframe=\"12h\",\n        config_hash=\"cfg_route_matrix\",\n        raw_groups={\n            \"group_alpha\": pd.DataFrame(\n                {\n                    \"feature_a\": np.array([1.0, 2.0], dtype=np.float32),\n                    \"feature_b\": np.array([2.0, 3.0], dtype=np.float32),\n                }\n            )\n        },\n    )\n\n    response = client.post(\n        \"/api/v1/feature-browser/coverage-matrix\",\n        json={\n            \"symbols\": [\"BTCUSDT\", \"ETHUSDT\"],\n            \"timeframe\": \"12h\",\n            \"feature_names\": [\"feature_a\", \"feature_b\"],\n            \"feature_base_path\": str(feature_base),\n            \"timeout_seconds\": 10,\n        },\n    )\n\n    assert response.status_code == 200\n    payload = response.json()\n    assert payload[\"symbols\"] == [\"BTCUSDT\", \"ETHUSDT\"]\n    assert \"matrix\" in payload\n    assert \"summary\" in payload\n    assert payload[\"matrix\"][\"feature_b\"][\"BTCUSDT\"] == 0.5\n"
+     },
+     "frame_basis": "輸入為 frame 產物 `*_factory.h5`（:32-41），Task 2.2 刪 coverage h5 後備後成無效輸入",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後即 CGSA（V2 manifest）版承接；值域斷言另由 tests/api/test_feature_browser_service.py::test_get_coverage_matrix（改寫版）覆蓋"
+    },
+    {
+     "phase": 2,
+     "kind": "delete-node",
+     "locator": {
+      "category": "stmt",
+      "qualname": "test_coverage_matrix_requires_at_least_two_symbols",
+      "lineno": 65,
+      "end_lineno": 69
+     },
+     "frame_basis": "寫 `BTCUSDT_12h_factory.h5`（frame 產物格式）之 fixture 敘述；400 由 symbols<2 驗證產生，與檔案無關",
+     "deleted_nodeids": [],
+     "coverage_note": "剩餘敘述（:71 post、:82 assert 400）不變，仍驗 <2 symbols ⇒ 400"
+    },
+    {
+     "phase": 2,
+     "kind": "delete-node",
+     "locator": {
+      "category": "def",
+      "qualname": "_write_symbol_feature_h5"
+     },
+     "frame_basis": "只服務上列兩處 h5 fixture；改寫／刪除後零呼叫者",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    },
+    {
+     "phase": 2,
+     "kind": "delete-node",
+     "locator": {
+      "category": "import_alias",
+      "lineno": 5,
+      "name": "h5py"
+     },
+     "frame_basis": "只被 `_write_symbol_feature_h5` 使用；helper 刪後死 import",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    }
+   ],
+   "uncertain": [
+    "改寫新增之 `payload[\"matrix\"][\"feature_b\"][\"BTCUSDT\"] == 0.5` 屬加強斷言；依 V2 raw（write_raw float32 NaN）→ load_columns_v2 → nan_ratio=1-1/2 推得，未實跑。若主委不願加斷言可刪該行（其餘保留斷言不變）。",
+    "HEAD 之 V7（`{symbol}/*/manifest.json`）掃描分支是否算 Task 2.2「legacy 掃描分支」由實作定；兩測只依 V2，不受影響。"
+   ]
+  },
+  {
+   "path": "tests/api/test_feature_browser_service.py",
+   "verdict": "ops",
+   "reason": "test_get_coverage_matrix 以 `*_factory.h5` 為輸入並斷言 BTC feature_a 0.0／feature_b 0.5；Phase 2 h5 後備刪後兩值變 1.0 ⇒ 紅。改寫為同值 V2 fixture；h5 helper／h5py import 死碼刪。其餘 V2 測試不動。",
+   "evidence": [
+    "HEAD :36-45 寫 `*_12h_factory.h5`；:56-57 斷言依該 h5 內容",
+    "coverage_analyzer.py:150-210 `_load_symbol_features` V2→V7→legacy HDF5；Task 2.2 刪 legacy HDF5",
+    "test_v2_layout_loads（:83-103）已證 `_write_v2_raw_fixture` + `_load_symbol_features` 可讀 V2"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_get_coverage_matrix"
+     },
+     "rewrite": {
+      "reason": "h5 fixture 換成同值 V2 raw fixture（BTC: a=[1,2], b=[nan,3]；ETH: a=[1,2], b=[2,3]），呼叫與五條斷言逐字保留。",
+      "preserved_assertion_lines": [
+       47,
+       54,
+       55,
+       56,
+       57,
+       58
+      ],
+      "new_source": "def test_get_coverage_matrix(service: FeatureBrowserService, tmp_path: Path) -> None:\n    feature_base = tmp_path / \"features\"\n    feature_base.mkdir()\n\n    _write_v2_raw_fixture(\n        feature_base,\n        symbol=\"BTCUSDT\",\n        timeframe=\"12h\",\n        config_hash=\"cfg_cov_matrix\",\n        raw_groups={\n            \"group_alpha\": pd.DataFrame(\n                {\n                    \"feature_a\": np.array([1.0, 2.0], dtype=np.float32),\n                    \"feature_b\": np.array([np.nan, 3.0], dtype=np.float32),\n                }\n            )\n        },\n    )\n    _write_v2_raw_fixture(\n        feature_base,\n        symbol=\"ETHUSDT\",\n        timeframe=\"12h\",\n        config_hash=\"cfg_cov_matrix\",\n        raw_groups={\n            \"group_alpha\": pd.DataFrame(\n                {\n                    \"feature_a\": np.array([1.0, 2.0], dtype=np.float32),\n                    \"feature_b\": np.array([2.0, 3.0], dtype=np.float32),\n                }\n            )\n        },\n    )\n\n    payload = service.get_coverage_matrix(\n        symbols=[\"BTCUSDT\", \"ETHUSDT\"],\n        timeframe=\"12h\",\n        feature_names=[\"feature_a\", \"feature_b\"],\n        feature_base_path=str(feature_base),\n    )\n\n    assert payload[\"symbols\"] == [\"BTCUSDT\", \"ETHUSDT\"]\n    assert payload[\"features\"] == [\"feature_a\", \"feature_b\"]\n    assert np.isclose(payload[\"matrix\"][\"feature_a\"][\"BTCUSDT\"], 0.0)\n    assert np.isclose(payload[\"matrix\"][\"feature_b\"][\"BTCUSDT\"], 0.5)\n    assert payload[\"summary\"][\"worst_symbol\"] == \"BTCUSDT\"\n"
+     },
+     "frame_basis": "輸入為 frame 產物 `*_factory.h5`（:36-45）；值斷言（:56-57）只在 h5 後備存在時成立",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後即 CGSA（V2）版承接 symbol×feature NaN 率矩陣之值驗證（原無 V2 版之 get_coverage_matrix 值測試）"
+    },
+    {
+     "phase": 2,
+     "kind": "delete-node",
+     "locator": {
+      "category": "def",
+      "qualname": "_write_symbol_feature_h5"
+     },
+     "frame_basis": "只服務 test_get_coverage_matrix 之 h5 fixture；改寫後零呼叫者",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    },
+    {
+     "phase": 2,
+     "kind": "delete-node",
+     "locator": {
+      "category": "import_alias",
+      "lineno": 5,
+      "name": "h5py"
+     },
+     "frame_basis": "只被 `_write_symbol_feature_h5` 使用",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    }
+   ],
+   "uncertain": []
+  },
+  {
+   "path": "tests/api/test_run_lifecycle_api.py",
+   "verdict": "ops",
+   "reason": "三處：(1) test_hdf5_completion_releases_then_auto_cleans 走 `_run_task` 非 `.json` 分支（Task 2.3 刪 :305 非 json stats warmup 分支）⇒ 改寫為 manifest 分支之 release→cleanup 版並改名；(2)(3) 兩測以字面 `BTCUSDT_12h_factory.h5` 模擬舊 checkpoint（batch service 不在本票、行為不變，測試仍綠），但字面違反 Task 4.1 驗證之 `_factory\\.h5` grep ⇒ 只換字面為不含 `_factory` 之舊路徑。其餘（register_hdf5_for_browse 以 manifest .json）不動。",
+   "evidence": [
+    "HEAD :250-251 summary `hdf5_path: /tmp/features.h5`；api/services/feature_factory_service.py:305 `.endswith('.json')` 否則 :322-334 release+auto_cleanup（Task 2.3 刪此非 json 分支）",
+    "feature_factory_service.py:1122-1135 `_run_warmups_then_release`：finally release 後 auto_cleanup ⇒ manifest 分支仍有 release→cleanup 順序",
+    "既有 CGSA 測 test_warmup_coordinator_holds_continuous_lease（:85-111）只驗 lease 釋放，不驗經 `_run_task` 之 release→cleanup 順序",
+    "HEAD :226、:528 字面 `BTCUSDT_12h_factory.h5`；api/services/feature_factory_batch_service.py:322-336 `_resolve_completed_run_hash` 對任何不含 symbol/tf/hash 鏈之路徑回 None（與副檔名無關）",
+    "SPEC Phase 4 驗證：`grep ... _factory\\.h5 ... tests` 命中只准 cgsa_baseline／failopen baseline／framepath golden／fact_keys 沿革／Task 1.2/2.2/2.3 負向測試字面"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_resume_hash_resolver_three_branches"
+     },
+     "rewrite": {
+      "reason": "只把 legacy 項之 output_paths 字面由 `BTCUSDT_12h_factory.h5` 換為 `BTCUSDT_12h_legacy_output.h5`（同樣無 symbol/tf/hash 路徑鏈 ⇒ 解析仍為 None），四條斷言逐字保留；目的為通過 Task 4.1 之 `_factory\\.h5` 殘留 grep。",
+      "preserved_assertion_lines": [
+       228,
+       229,
+       230,
+       231
+      ],
+      "new_source": "def test_resume_hash_resolver_three_branches(tmp_path: Path) -> None:\n    run_dir = tmp_path / \"features\" / \"BTCUSDT\" / \"12h\" / \"cfg_batch2d\"\n    run_dir.mkdir(parents=True)\n    manifest = run_dir / \"feature_manifest.json\"\n    manifest.write_text(\"{}\")\n    by_path = {\"symbol\": \"BTCUSDT\", \"timeframe\": \"12h\", \"output_paths\": [str(manifest)]}\n    by_browse = {\"symbol\": \"BTCUSDT\", \"timeframe\": \"12h\", \"output_paths\": [],\n                 \"browse_task_id\": \"browse_BTCUSDT_12h_cfg_batch2d\"}\n    legacy = {\"symbol\": \"BTCUSDT\", \"timeframe\": \"12h\", \"output_paths\": [\"BTCUSDT_12h_legacy_output.h5\"],\n              \"browse_task_id\": \"browse_BTCUSDT_12h\"}\n    assert FeatureFactoryBatchService._resolve_completed_run_hash(by_path) == \"cfg_batch2d\"\n    assert FeatureFactoryBatchService._completed_manifest_exists(by_path, \"cfg_batch2d\")\n    assert FeatureFactoryBatchService._resolve_completed_run_hash(by_browse) == \"cfg_batch2d\"\n    assert FeatureFactoryBatchService._resolve_completed_run_hash(legacy) is None\n"
+     },
+     "frame_basis": "字面為 frame 產物檔名 `*_factory.h5`（:226）；Phase 4 grep 不允許其殘留於非負向測試",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a（行為與斷言不變）"
+    },
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_hdf5_completion_releases_then_auto_cleans"
+     },
+     "rewrite": {
+      "reason": "原測經 `_run_task` 之非 `.json`（frame h5）完成分支驗 release→cleanup；Task 2.3 刪該分支。改寫為 manifest（`.json`）完成分支：warmup 函式 stub 回 None，等待背景協調執行緒完成 cleanup 後斷言同一順序；改名以反映路徑。",
+      "preserved_assertion_lines": [
+       273,
+       281
+      ],
+      "new_source": "@pytest.mark.asyncio\nasync def test_manifest_completion_releases_then_auto_cleans(\n    monkeypatch: pytest.MonkeyPatch,\n) -> None:\n    service = FeatureFactoryService.__new__(FeatureFactoryService)\n    service._lock = threading.Lock()\n    service._tasks = {\"task\": {\n        \"task_id\": \"task\", \"status\": \"running\", \"progress\": 0.0,\n        \"current_stage\": None, \"completed_stages\": [], \"error\": None, \"result\": None,\n    }}\n    events: list[str] = []\n    cleaned = threading.Event()\n\n    class Lease:\n        def release(self) -> None:\n            events.append(\"release\")\n\n    def _auto_cleanup(symbol: str, timeframe: str, keep_latest: int) -> None:\n        events.append(\"cleanup\")\n        cleaned.set()\n\n    summary = {\n        \"hdf5_path\": \"/tmp/features/BTCUSDT/12h/cfg_batch2d/feature_manifest.json\",\n        \"metadata\": {\n            \"symbol\": \"BTCUSDT\", \"timeframe\": \"12h\", \"config_hash\": \"cfg_batch2d\",\n        },\n    }\n    manager = SimpleNamespace(auto_cleanup=_auto_cleanup)\n    monkeypatch.setattr(service, \"_resolve_config_override\", lambda value: value)\n    monkeypatch.setattr(service, \"_merge_fail_open_flags\", lambda config, flags: config)\n    monkeypatch.setattr(\n        service,\n        \"_invoke_generation_with_lease_sink\",\n        lambda **kwargs: kwargs[\"lease_sink\"].append(Lease()) or object(),\n    )\n    monkeypatch.setattr(service, \"_summarize_result\", lambda _result: summary)\n    monkeypatch.setattr(service, \"_persist_task_record\", lambda *_args: None)\n    monkeypatch.setattr(service, \"_write_run_size\", lambda *_args: None)\n    monkeypatch.setattr(service, \"_load_task_context\", lambda _task_id: {})\n    monkeypatch.setattr(service, \"_start_cgsa_catalog_warmup\", lambda *_args: None)\n    monkeypatch.setattr(service, \"_start_data_quality_warmup\", lambda *_args: None)\n    monkeypatch.setattr(service, \"_notify_callbacks\", lambda *_args: None)\n    monkeypatch.setattr(service, \"_lifecycle\", lambda: manager)\n\n    await service._run_task(\n        \"task\",\n        SimpleNamespace(\n            symbol=\"BTCUSDT\", timeframe=\"12h\", config_override=None, fail_open=None,\n            force_regenerate=False, start_date=None, end_date=None,\n        ),\n    )\n\n    assert await asyncio.to_thread(cleaned.wait, 5)\n    assert events == [\"release\", \"cleanup\"]\n"
+     },
+     "frame_basis": "summary.hdf5_path=`/tmp/features.h5`（:251）驅動 :322-334 frame h5 完成分支",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後由本測（CGSA manifest 版）承接「生成完成 ⇒ 先釋放 lease 再 auto_cleanup」意圖；原無經 `_run_task` 之 CGSA 版覆蓋",
+     "renamed_nodeids": {
+      "tests/api/test_run_lifecycle_api.py::test_hdf5_completion_releases_then_auto_cleans": "tests/api/test_run_lifecycle_api.py::test_manifest_completion_releases_then_auto_cleans"
+     }
+    },
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_resume_batch_keeps_legacy_completed_item"
+     },
+     "rewrite": {
+      "reason": "只把 completed_items.output_paths 字面 `BTCUSDT_12h_factory.h5` 換為 `BTCUSDT_12h_legacy_output.h5`；其餘逐字保留（含四條斷言）。目的同上。",
+      "preserved_assertion_lines": [
+       537,
+       539,
+       540,
+       541,
+       542
+      ],
+      "new_source": "@pytest.mark.asyncio\nasync def test_resume_batch_keeps_legacy_completed_item(\n    tmp_path: Path,\n    batch_service_factory,\n    caplog: pytest.LogCaptureFixture,\n    monkeypatch: pytest.MonkeyPatch,\n) -> None:\n    service = batch_service_factory(tmp_path / \"checkpoints\")\n    request = BatchGenerateRequest(symbols=[\"BTCUSDT\"], timeframe=\"12h\")\n    checkpoint = service._build_initial_checkpoint(\"batch-legacy\", request)\n    checkpoint[\"completed_items\"] = [{\n        \"symbol\": \"BTCUSDT\",\n        \"timeframe\": \"12h\",\n        \"output_paths\": [\"BTCUSDT_12h_legacy_output.h5\"],\n        \"browse_task_id\": \"browse_BTCUSDT_12h\",\n    }]\n    checkpoint[\"queued_items\"] = []\n    service._safe_persist_checkpoint(checkpoint)\n    execute_mock = AsyncMock()\n    monkeypatch.setattr(service, \"execute_resume\", execute_mock)\n\n    with caplog.at_level(\"WARNING\", logger=\"api.feature_factory_batch_service\"):\n        response = await service.resume_batch(\"batch-legacy\")\n\n    assert response[\"status\"] == \"completed\"\n    assert response[\"skipped_items\"] == 1\n    execute_mock.assert_not_called()\n    assert \"Legacy completed item has no resolvable run hash\" in caplog.text\n"
+     },
+     "frame_basis": "字面為 frame 產物檔名 `*_factory.h5`（:528）",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a（行為與斷言不變）"
+    }
+   ],
+   "uncertain": [
+    "(2)(3) 兩條純字面替換之必要性只來自 SPEC Phase 4 之 `_factory\\.h5` grep 允許清單；若主委改採「把這兩處列為允許命中」（需改 SPEC 驗證字串），則這兩筆可改 no-op。",
+    "test_hdf5_completion 改寫採 rewrite＋改名（renamed_nodeids）；若驗證器之 rewrite 不允許函式改名，請改為保留舊名 `test_hdf5_completion_releases_then_auto_cleans`（new_source 首行函式名同步改回）。",
+    "改寫版依賴 Task 2.3 實作後 `_run_task` 之 `.json` 分支結構不變（:305-321：`_load_task_context` → lease_sink 非空 ⇒ 背景執行緒 `_run_warmups_then_release`）；以 `asyncio.to_thread(cleaned.wait, 5)` 等背景執行緒，未實跑。"
+   ]
+  },
+  {
+   "path": "tests/api/test_batch_alias.py",
+   "verdict": "no-op",
+   "reason": "無 frame／h5 字面；test_multi_tf_generate_forwards_batch_id 設 `factory._cgsa_registry = object()` 並替換 `_generate_multi_tf_cgsa`，Phase 1 後 `generate_multi_tf` 唯一走 CGSA，照綠。",
+   "evidence": [
+    "HEAD :200-226；multi_tf_generator.py:95 `use_cgsa = self._cgsa_enabled() and ... _cgsa_registry is not None`（預設環境即 CGSA）"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/api/test_feature_explorer_optimizations.py",
+   "verdict": "ops",
+   "reason": "test_browse_distribution_skips_adf_by_default 以 `{\"is_cgsa\": False}` context（舊 h5 任務形）走 `_browse_distribution_impl` 之非 CGSA 分支；Phase 2 後 `_load_task_context` 對非 `.json` 一律拋 ValueError，is_cgsa=False 之 context 不再可達。改寫為 CGSA context（stub `_load_cgsa_selected_df`），ADF opt-in 斷言逐字保留。其餘（coalesce、dq_v1 pack）無關不動。",
+   "evidence": [
+    "HEAD :134-136 context is_cgsa False + monkeypatch `_load_task_features`",
+    "feature_factory_service.py:2415-2419 `_browse_distribution_impl`：is_cgsa ⇒ `_load_cgsa_selected_df(context, [feature])`，否則 `_load_task_features`（:4509-4512 非 cgsa ⇒ `_load_hdf5_features_df`，Task 2.3 刪）",
+    "feature_factory_service.py:4692-4693 is_cgsa 由 `.json` 後綴判定；Task 2.3 非 json ⇒ ValueError"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_browse_distribution_skips_adf_by_default"
+     },
+     "rewrite": {
+      "reason": "context 改 is_cgsa True，改 stub `_load_cgsa_selected_df` 回 (df, len(df))，其餘（adfuller 監測、呼叫、三條斷言）逐字保留。",
+      "preserved_assertion_lines": [
+       150,
+       153,
+       154,
+       155
+      ],
+      "new_source": "def test_browse_distribution_skips_adf_by_default(monkeypatch):\n    \"\"\"When compute_adf=False, adfuller must NOT be called and adf_pvalue\n    must be None even if statsmodels is available.\"\"\"\n    service = _make_service()\n    service._stats_cache = {}\n    service._adf_cache = {}\n\n    df = pd.DataFrame({\"feature_a\": np.linspace(0.0, 1.0, 100)})\n    context = {\"is_cgsa\": True}\n    monkeypatch.setattr(service, \"_load_task_context\", lambda _task: context)\n    monkeypatch.setattr(\n        service,\n        \"_load_cgsa_selected_df\",\n        lambda _context, _features: (df, len(df)),\n    )\n\n    called = {\"adf\": 0}\n\n    def fake_adfuller(*_a, **_k):  # pragma: no cover - should not run\n        called[\"adf\"] += 1\n        return (0.0, 0.01, 0, 0, {}, 0.0)\n\n    monkeypatch.setattr(\n        \"api.services.feature_factory_service.adfuller\",\n        fake_adfuller,\n        raising=False,\n    )\n\n    result = service._browse_distribution_impl(\n        \"task\", \"feature_a\", n_bins=10, compute_adf=False,\n    )\n    assert called[\"adf\"] == 0\n    assert result[\"stats\"][\"adf_pvalue\"] is None\n    assert result[\"stats\"][\"is_stationary\"] is False\n"
+     },
+     "frame_basis": "is_cgsa=False context（:134）代表舊 h5 任務，資料經 `_load_task_features`→`_load_hdf5_features_df` 路徑",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後即 CGSA 版承接「compute_adf=False 不呼叫 adfuller」意圖"
+    }
+   ],
+   "uncertain": [
+    "SPEC Task 2.3 未明列 `_browse_distribution_impl` 之 else 分支；若實作保留該分支，原測仍綠（兩路皆 stub）。改寫版於兩種實作下皆成立，故列 rewrite 以免依賴不可達狀態。"
+   ]
+  },
+  {
+   "path": "tests/api/test_feature_factory_batch_quality.py",
+   "verdict": "no-op",
+   "reason": "全以 CGSA `feature_manifest.json` fixture 與 batch checkpoint（manifest 路徑）驗品質；無 h5／frame 字面，不受 Phase 1–3 影響。",
+   "evidence": [
+    "HEAD :17-48 `_write_cgsa_manifest`；:257-260 `*_manifest.json`；grep h5/hdf5/FFACT 無命中"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/api/test_feature_factory_service_browse_summary.py",
+   "verdict": "no-op",
+   "reason": "以 monkeypatch `_load_task_features` 驅動 browse_summary 之 full-load 路徑（context 探測失敗 ⇒ None），或測 CGSA catalog／stats 快取；SPEC Task 2.3 不刪 browse_summary full-load（亦為 CGSA fast-path 失敗之後備），`_start_stats_cache_warmup` 尚有 :3598／:5189 呼叫者而保留 ⇒ 照綠。",
+   "evidence": [
+    "feature_factory_service.py:3521-3545 context 失敗 ⇒ None ⇒ full-load `_load_task_features`",
+    "`_start_stats_cache_warmup` 呼叫點 :323（Task 2.3 刪）、:3598、:5189 ⇒ 刪後仍有呼叫者"
+   ],
+   "ops": [],
+   "uncertain": [
+    "若實作者連帶刪除 browse_summary 之 full-load 後備（SPEC 未要求），本檔 :49/:110/:191 三測會紅；屬 SPEC 範圍外，須由實作遵守。"
+   ]
+  },
+  {
+   "path": "tests/feature_library/test_phase1.py",
+   "verdict": "ops",
+   "reason": "test_load_factory_output_returns_float32 直接呼叫 `FeatureStorage.load_factory_output`（Task 2.1 刪）並寫 `TESTUSDT_1h_factory.h5` ⇒ 整函式刪。save_features_to_hdf5（case 特徵 h5）與 kline get_last_timestamp（kline h5）不在本票，保留。",
+   "evidence": [
+    "HEAD :44-73；:51 `TESTUSDT_1h_factory.h5`；:71 `storage.load_factory_output(...)`",
+    "SPEC §C：case 特徵 h5（save_features_to_hdf5）與 kline 不在本票"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "delete-node",
+     "locator": {
+      "category": "def",
+      "qualname": "test_load_factory_output_returns_float32"
+     },
+     "frame_basis": "只驗 frame 舊 factory h5 讀取端 `load_factory_output` 之 dtype；該函式 Task 2.1 刪除",
+     "deleted_nodeids": [
+      "tests/feature_library/test_phase1.py::test_load_factory_output_returns_float32"
+     ],
+     "coverage_note": "CGSA 落盤 float32 由 Task 1.1 不變基準（逐欄 float32 值位元 sha256）與其 mutation M3（L7 落盤前改 float64 ⇒ 紅）承接"
+    }
+   ],
+   "uncertain": [
+    "HEAD :42 註解 `# ── T1-02: load_factory_output returns float32 ──` 非 AST 節點，delete-node 刪不到；實作須一併刪該註解行（AST 比對不受影響），否則 Task 4.1 之 `load_factory_output` grep 會命中。"
+   ]
+  },
+  {
+   "path": "tests/feature_library/test_phase3.py",
+   "verdict": "ops",
+   "reason": "load_success 與 load_multi_raises 以 `mock_storage.load_factory_output` 走 FeatureLibrary h5 後備（:212-235，Task 2.2 刪）；改寫為注入 mock FeatureReader 之 V2 版。其餘（entry 凍結、錯誤屬性、list_available、raises_on_missing、ensure_fresh）不碰 h5 讀取，不動。",
+   "evidence": [
+    "feature_library.py:137 實際呼叫 `find_latest_materialized`（測試 mock 的是 `find_latest`）⇒ MagicMock entry、V2 讀不到 ⇒ :212 `self._storage.load_factory_output` 後備",
+    "HEAD :88、:125 `mock_storage.load_factory_output.return_value`",
+    "feature_library.py:31-39 建構子接受 `feature_reader` 注入"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_feature_library_load_success"
+     },
+     "rewrite": {
+      "reason": "h5 後備刪後 load 只走 V2；改以 mock FeatureReader（manifest／list／columns／row_index=None）與 `find_latest_materialized` 回傳 entry，保留 load 呼叫與列數斷言。",
+      "preserved_assertion_lines": [
+       91,
+       92
+      ],
+      "new_source": "def test_feature_library_load_success() -> None:\n    \"\"\"load should return DataFrame when registry/V2 reader both have data.\"\"\"\n    from momentum.FeatureEngineering.feature_library import FeatureLibrary\n\n    mock_registry = MagicMock()\n    mock_registry.find_latest_materialized.return_value = {\n        \"symbol\": \"BTC\",\n        \"timeframe\": \"1h\",\n        \"config_hash\": \"h\",\n    }\n\n    mock_reader = MagicMock()\n    mock_reader.load_manifest_v2.return_value = {\"run_status\": \"complete\"}\n    mock_reader.list_features_v2.return_value = [\"feat_a\"]\n    mock_reader.load_columns_v2.return_value = pd.DataFrame({\"feat_a\": [1.0, 2.0]})\n    mock_reader.load_row_index_v2.return_value = None\n\n    mock_storage = MagicMock()\n\n    lib = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)\n    df = lib.load(\"BTC\", \"1h\")\n    assert len(df) == 2\n"
+     },
+     "frame_basis": "HEAD 綠燈完全依賴 `load_factory_output` 後備（:88），即舊 factory h5 讀取",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後即 V2（CGSA）讀取成功之單元測試；原無以 mock 驗 FeatureLibrary V2 成功載入者"
+    },
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_feature_library_load_multi_raises_on_any_missing"
+     },
+     "rewrite": {
+      "reason": "改 mock `find_latest_materialized`（實際被呼叫之 API）並注入 V2 mock reader；ETH 無 entry ⇒ FeatureNotFoundError。pytest.raises 敘述逐字保留。",
+      "preserved_assertion_lines": [
+       128
+      ],
+      "new_source": "def test_feature_library_load_multi_raises_on_any_missing() -> None:\n    \"\"\"load_multi should raise FeatureNotFoundError if any symbol is missing.\"\"\"\n    from momentum.FeatureEngineering.feature_library import FeatureLibrary\n\n    mock_registry = MagicMock()\n\n    def fake_find(symbol: str, timeframe: str):\n        if symbol == \"BTC\":\n            return {\"symbol\": \"BTC\", \"timeframe\": \"1h\", \"config_hash\": \"h\"}\n        return None\n\n    mock_registry.find_latest_materialized.side_effect = fake_find\n\n    mock_reader = MagicMock()\n    mock_reader.load_manifest_v2.return_value = {\"run_status\": \"complete\"}\n    mock_reader.list_features_v2.return_value = [\"f\"]\n    mock_reader.load_columns_v2.return_value = pd.DataFrame({\"f\": [1.0]})\n    mock_reader.load_row_index_v2.return_value = None\n\n    mock_storage = MagicMock()\n\n    lib = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)\n    with pytest.raises(FeatureNotFoundError):\n        lib.load_multi([\"BTC\", \"ETH\"], \"1h\")\n"
+     },
+     "frame_basis": "HEAD 以 `load_factory_output` mock（:125）供資料，屬 h5 後備路徑",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後即 V2 版承接「任一 symbol 缺 ⇒ 拋錯」"
+    }
+   ],
+   "uncertain": [
+    "依碼推斷 HEAD 之 test_feature_library_load_multi_raises_on_any_missing 與 test_feature_library_ensure_fresh_true 現已為紅（mock `find_latest` 而碼用 `find_latest_materialized` ⇒ 兩 symbol 皆經 h5 後備載入成功、ensure_fresh 比到 MagicMock）；handoffs/20260828-gap3uxb9consult-r1-codex.runlog 亦記此二者 FAILED。未實跑確認；load_multi 之改寫會使其轉綠，ensure_fresh_true 與本票無關不列。",
+    "test_feature_library_load_raises_on_missing 同樣 mock `find_latest`；Phase 2 後經 V2 FileNotFoundError ⇒ FeatureNotFoundError，推斷仍綠（未實跑）。",
+    "test_feature_library_entry_frozen 之 `hdf5_relative_path=\"a/b.h5\"` 為 DTO 欄任意字串，視為 generic，不列。"
+   ]
+  },
+  {
+   "path": "tests/feature_library/test_phase4.py",
+   "verdict": "no-op",
+   "reason": "test_feature_browser_load_features_library_prefix 走 `_load_features_df` 之 `library:` 前綴分支（先於 `.h5` 後綴判斷），Task 2.3 只刪 `.h5`／`.hdf5` 分支；其餘測試與 h5 無關。",
+   "evidence": [
+    "api/services/feature_browser_service.py:93-98 library: 分支；:118-123 `.h5` 分支（刪）"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/feature_library/test_phase5.py",
+   "verdict": "ops",
+   "reason": "test_load_multi_returns_dict_keyed_by_symbol 以 `mock_storage.load_factory_output` 經 h5 後備供資料 ⇒ Phase 2 紅；改寫為 V2 mock reader 版。`ICAnalyzeRequest(features_path=\"test.h5\")` 為 IC 請求之任意字串（IC h5 不在本票），不動。",
+   "evidence": [
+    "HEAD :83 `mock_storage.load_factory_output.return_value`；feature_library.py:212 後備",
+    "HEAD :16、:20 `features_path=\"test.h5\"` 只驗 mode 欄位"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_load_multi_returns_dict_keyed_by_symbol"
+     },
+     "rewrite": {
+      "reason": "以 `find_latest_materialized` 回傳 entry 並注入 V2 mock reader；load_multi 呼叫與三條斷言逐字保留。",
+      "preserved_assertion_lines": [
+       86,
+       87,
+       88,
+       89
+      ],
+      "new_source": "def test_load_multi_returns_dict_keyed_by_symbol() -> None:\n    \"\"\"FeatureLibrary.load_multi should return Dict[str, DataFrame].\"\"\"\n    from momentum.FeatureEngineering.feature_library import FeatureLibrary\n\n    mock_registry = MagicMock()\n    mock_registry.find_latest_materialized.return_value = {\n        \"symbol\": \"X\",\n        \"timeframe\": \"1h\",\n        \"config_hash\": \"h\",\n    }\n\n    mock_reader = MagicMock()\n    mock_reader.load_manifest_v2.return_value = {\"run_status\": \"complete\"}\n    mock_reader.list_features_v2.return_value = [\"f\"]\n    mock_reader.load_columns_v2.return_value = pd.DataFrame({\"f\": [1.0]})\n    mock_reader.load_row_index_v2.return_value = None\n\n    mock_storage = MagicMock()\n\n    library = FeatureLibrary(mock_registry, mock_storage, feature_reader=mock_reader)\n    result = library.load_multi([\"SYM1\", \"SYM2\"], \"1h\")\n    assert isinstance(result, dict)\n    assert \"SYM1\" in result\n    assert \"SYM2\" in result\n"
+     },
+     "frame_basis": "HEAD 綠燈依賴 `load_factory_output` h5 後備（:83）",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後即 V2 版承接 load_multi 回傳 Dict[str, DataFrame]"
+    }
+   ],
+   "uncertain": []
+  },
+  {
+   "path": "tests/momentum/test_coverage_analyzer.py",
+   "verdict": "ops",
+   "reason": "兩個 symbol coverage matrix 測以 `*_factory.h5` 為輸入，Phase 2（Task 2.2 coverage 只走 V2）後讀不到 ⇒ 值斷言紅；改寫為同值 V2 raw fixture（函式內 import FeatureStorage）。h5 helper 與 h5py import 死碼刪。前五個純序列測試不動。",
+   "evidence": [
+    "HEAD :85-108、:135-139 寫 `*_12h_factory.h5`",
+    "coverage_analyzer.py:76-78 `_resolve_feature_file_path` 組 `{symbol}_{tf}_factory.h5`、:201-210 legacy HDF5 後備（刪）"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_compute_symbol_coverage_matrix"
+     },
+     "rewrite": {
+      "reason": "h5 fixture 換為同值 V2 raw（BTC a=[1,nan,3]、b=[nan,nan,1]；ETH a=[1,2,3]、b=[4,5,6]），compute 呼叫與十條斷言逐字保留。",
+      "preserved_assertion_lines": [
+       110,
+       117,
+       118,
+       119,
+       120,
+       121,
+       122,
+       123,
+       124,
+       125,
+       126
+      ],
+      "new_source": "def test_compute_symbol_coverage_matrix(tmp_path):\n    \"\"\"features x symbols NaN 率矩陣計算正確。\"\"\"\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    analyzer = CoverageAnalyzer()\n    base = tmp_path / \"features\"\n    base.mkdir()\n\n    storage = FeatureStorage(str(base))\n    storage.write_raw(\n        \"BTCUSDT\",\n        \"12h\",\n        \"cfg_cov_btc\",\n        {\n            \"group_alpha\": pd.DataFrame(\n                {\n                    \"feature_a\": np.array([1.0, np.nan, 3.0], dtype=np.float32),\n                    \"feature_b\": np.array([np.nan, np.nan, 1.0], dtype=np.float32),\n                }\n            )\n        },\n    )\n    storage.write_raw(\n        \"ETHUSDT\",\n        \"12h\",\n        \"cfg_cov_eth\",\n        {\n            \"group_alpha\": pd.DataFrame(\n                {\n                    \"feature_a\": np.array([1.0, 2.0, 3.0], dtype=np.float32),\n                    \"feature_b\": np.array([4.0, 5.0, 6.0], dtype=np.float32),\n                }\n            )\n        },\n    )\n\n    result = analyzer.compute_symbol_coverage_matrix(\n        symbols=[\"btcusdt\", \"ethusdt\"],\n        timeframe=\"12h\",\n        feature_names=[\"feature_a\", \"feature_b\"],\n        feature_base_path=str(base),\n    )\n\n    assert result[\"symbols\"] == [\"BTCUSDT\", \"ETHUSDT\"]\n    assert result[\"features\"] == [\"feature_a\", \"feature_b\"]\n    assert np.isclose(result[\"matrix\"][\"feature_a\"][\"BTCUSDT\"], 1.0 / 3.0)\n    assert np.isclose(result[\"matrix\"][\"feature_a\"][\"ETHUSDT\"], 0.0)\n    assert np.isclose(result[\"matrix\"][\"feature_b\"][\"BTCUSDT\"], 2.0 / 3.0)\n    assert np.isclose(result[\"matrix\"][\"feature_b\"][\"ETHUSDT\"], 0.0)\n    assert result[\"valid_counts\"][\"feature_b\"][\"BTCUSDT\"] == 1\n    assert result[\"row_counts\"][\"BTCUSDT\"] == 3\n    assert result[\"summary\"][\"worst_symbol\"] == \"BTCUSDT\"\n    assert result[\"summary\"][\"worst_feature\"] == \"feature_b\"\n"
+     },
+     "frame_basis": "輸入為 frame 產物 `*_factory.h5`；值斷言只在 h5 後備存在時成立",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後即 CGSA（V2）版承接 NaN 率／valid_counts／row_counts／worst 判定"
+    },
+    {
+     "phase": 2,
+     "kind": "rewrite",
+     "locator": {
+      "category": "def",
+      "qualname": "test_compute_symbol_coverage_matrix_missing_symbol_file"
+     },
+     "rewrite": {
+      "reason": "BTC 之 h5 fixture 換為同值 V2 raw；SOL 無 run ⇒ 1.0／0／0。compute 呼叫與四條斷言逐字保留。",
+      "preserved_assertion_lines": [
+       141,
+       148,
+       149,
+       150,
+       151
+      ],
+      "new_source": "def test_compute_symbol_coverage_matrix_missing_symbol_file(tmp_path):\n    \"\"\"缺失 Symbol 之 V2 run 時，應回傳 100% NaN。\"\"\"\n    from momentum.FeatureEngineering.feature_storage import FeatureStorage\n\n    analyzer = CoverageAnalyzer()\n    base = tmp_path / \"features\"\n    base.mkdir()\n\n    FeatureStorage(str(base)).write_raw(\n        \"BTCUSDT\",\n        \"12h\",\n        \"cfg_cov_btc\",\n        {\"group_alpha\": pd.DataFrame({\"feature_a\": np.array([1.0, 2.0, 3.0], dtype=np.float32)})},\n    )\n\n    result = analyzer.compute_symbol_coverage_matrix(\n        symbols=[\"BTCUSDT\", \"SOLUSDT\"],\n        timeframe=\"12h\",\n        feature_names=[\"feature_a\"],\n        feature_base_path=str(base),\n    )\n\n    assert np.isclose(result[\"matrix\"][\"feature_a\"][\"BTCUSDT\"], 0.0)\n    assert np.isclose(result[\"matrix\"][\"feature_a\"][\"SOLUSDT\"], 1.0)\n    assert result[\"valid_counts\"][\"feature_a\"][\"SOLUSDT\"] == 0\n    assert result[\"row_counts\"][\"SOLUSDT\"] == 0\n"
+     },
+     "frame_basis": "BTC 輸入為 `BTCUSDT_12h_factory.h5`（:135-139）",
+     "deleted_nodeids": [],
+     "coverage_note": "改寫後即 V2 版承接「缺 symbol ⇒ 100% NaN」"
+    },
+    {
+     "phase": 2,
+     "kind": "delete-node",
+     "locator": {
+      "category": "def",
+      "qualname": "_write_feature_h5"
+     },
+     "frame_basis": "只服務上列兩測之 h5 fixture；改寫後零呼叫者",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    },
+    {
+     "phase": 2,
+     "kind": "delete-node",
+     "locator": {
+      "category": "import_alias",
+      "lineno": 3,
+      "name": "h5py"
+     },
+     "frame_basis": "只被 `_write_feature_h5` 使用",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    }
+   ],
+   "uncertain": [
+    "改寫以 `FeatureStorage.write_raw`（無 row_index）寫 V2 raw；`load_columns_v2` 回傳 3 列、NaN 保留之假設依 tests/api/test_feature_browser_service.py::test_v2_layout_loads／test_group_drilldown_per_feature 同手法推得，未實跑。"
+   ]
+  },
+  {
+   "path": "tests/momentum/test_feature_library_config_hash.py",
+   "verdict": "no-op",
+   "reason": "真實 registry run 之 V2 載入（config_hash 消歧、bogus hash ⇒ FeatureNotFoundError）；不經 h5 後備（缺 run 即 skip／已列 allowed_red FFSTORE）。Phase 2 後 V2 找不到 ⇒ FeatureNotFoundError，與 bogus 斷言一致。",
+   "evidence": [
+    "HEAD 檔內 grep FFACT_USE_CGSA|_cgsa_enabled|load_factory_output|_factory\\.h5|hdf5_path|hdf5_relative_path|\\.h5 皆無命中"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/momentum/test_feature_library_registry_facade.py",
+   "verdict": "no-op",
+   "reason": "只測 get_entry／find_latest_materialized 轉發 façade，不碰載入。",
+   "evidence": [
+    "HEAD 檔內 grep FFACT_USE_CGSA|_cgsa_enabled|load_factory_output|_factory\\.h5|hdf5_path|hdf5_relative_path|\\.h5 皆無命中"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/momentum/test_feature_library_row_index.py",
+   "verdict": "no-op",
+   "reason": "`_attach_row_index` 與真實 V2 run 之 row_index；無 h5。",
+   "evidence": [
+    "HEAD 檔內 grep FFACT_USE_CGSA|_cgsa_enabled|load_factory_output|_factory\\.h5|hdf5_path|hdf5_relative_path|\\.h5 皆無命中"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/decoupling/test_import_scanner.py",
+   "verdict": "no-op",
+   "reason": "import scanner 對 tmp 樹之規則測試；`feature_library` 字面僅為被掃描之 import 字串，與生產碼刪除無關。",
+   "evidence": [
+    "HEAD 檔內 grep FFACT_USE_CGSA|_cgsa_enabled|load_factory_output|_factory\\.h5|hdf5_path|hdf5_relative_path|\\.h5 皆無命中"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/_golden/batch2d/cgsa_baseline.json",
+   "verdict": "no-op",
+   "reason": "SPEC Task 3.2 明定不得修改（歷史凍結 CGSA 快照；其 env 快照內之 FFACT_USE_CGSA 字面屬 Task 4.1 grep 允許命中）。",
+   "evidence": [
+    "HEAD 檔含 `FFACT_USE_CGSA` 1 處；SPEC Task 3.2 驗證 `git diff --stat 6e07e0ad -- ...cgsa_baseline.json` 為空"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/_golden/batch2d/control.json",
+   "verdict": "ops",
+   "reason": "frame（non-CGSA control）對照產物，SPEC Task 3.2 指定刪檔。",
+   "evidence": [
+    "scripts/freeze_batch2d_baseline.py:214-243 `_run_control` 為 non-CGSA control 產生者；:20 GOLDEN_DIR=tests/_golden/batch2d"
+   ],
+   "ops": [
+    {
+     "phase": 3,
+     "kind": "delete-file",
+     "frame_basis": "batch2d frame 對照（control＝非 CGSA 經典記憶體路徑）之凍結輸出；SPEC Task 3.2",
+     "deleted_nodeids": [],
+     "coverage_note": "CGSA 側仍由 tests/_golden/batch2d/cgsa_baseline.json（不改）承接"
+    }
+   ],
+   "uncertain": [
+    "同目錄 `tests/_golden/batch2d/provenance.json`（不在 G4 指派、亦不含母體關鍵字）含 `frame_column_to_layer` 與 `same_layer_for_common_columns`（frame 與 CGSA 欄層比對，由 freeze_batch2d_baseline.py:369-378 產出）；其讀者（tests/test_feature_factory_batch2d.py／test_batch2d_dstar_align.py 一帶）與去留請主委確認是否歸他組處置，否則違 §C「驗收母體不得含 batch2d frame 對照」。"
+   ]
+  },
+  {
+   "path": "tests/_golden/failopen/baseline.json",
+   "verdict": "no-op",
+   "reason": "SPEC Task 3.2 明定不得修改（歷史凍結 env 快照）。",
+   "evidence": [
+    "HEAD 檔含 `FFACT_USE_CGSA` 1 處；屬 Task 4.1 grep 允許命中"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "tests/_golden/ffstat/nan_propagation_classes.json",
+   "verdict": "ops",
+   "reason": "test_ffstat_stable_start.py::test_nan_propagation_inventory_complete 要求 golden steps 鍵集合＝AST 閉包；Task 1.3 刪 `MultiTFGenerator._generate_multi_tf_legacy`／`_cgsa_enabled` 後閉包少此二鍵 ⇒ 同批刪。",
+   "evidence": [
+    "以測試同一閉包演算法（_ast_step_functions／_called_qualified 之複刻，唯讀 AST）模擬：HEAD 閉包＝golden（420 鍵）；自 defined 移除 `_generate_multi_tf_legacy`、`_cgsa_enabled`、`MultiTFGenerator._combine_layers` 後，閉包恰少此二鍵",
+    "legacy 所呼叫之 self 方法（_apply_timeframe_tag、_canonical_completeness、_collect_layer_counts、_layer_statuses、_report_progress、_run_tf_l1_l6_results…）皆另有 CGSA 呼叫者或為前綴種子，仍在閉包",
+    "檔內 Task 4.1 關鍵字只出現在這兩個鍵名（:1745、:1820）"
+   ],
+   "ops": [
+    {
+     "phase": 1,
+     "kind": "delete-json-path",
+     "pointer": "/steps/momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._cgsa_enabled",
+     "frame_basis": "frame/CGSA 環境分派旗標，Task 1.3 刪",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    },
+    {
+     "phase": 1,
+     "kind": "delete-json-path",
+     "pointer": "/steps/momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._generate_multi_tf_legacy",
+     "frame_basis": "多週期 frame 組裝派發，Task 1.3 刪",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    }
+   ],
+   "uncertain": [
+    "test_nan_propagation_inventory_complete 另要求最新收據 `handoffs/run_receipts/*-ffstat-nan-propagation-inventory.json` 之 steps 等於閉包；該收據在 handoffs/（處置表範圍外），Phase 1 須另產新收據刪同二列，否則此測紅。",
+    "若 Task 1.4 死碼掃除另刪 multi_tf_generator.py／feature_preprocessor.py 中任何列於本 golden 之步驟函式（例：只被已刪測試引用者），golden 需追加對應 delete-json-path；處置表凍結時無法預知，請主委於 TODO 審查定案掃描結果後補列（目前模擬只計 Task 1.3 明列刪除）。"
+   ]
+  },
+  {
+   "path": "tests/_golden/prered/allowed_red.json",
+   "verdict": "ops",
+   "reason": "唯一 FRAMEPATH 列（index 0：test_failopen_manifest::test_persist_false_generate_features_metadata）於 Task 1.5 改驗 CGSA persist=False 轉綠，同批刪列。",
+   "evidence": [
+    "HEAD 共 31 列；`owner_ticket==\"FRAMEPATH\"` 只有索引 0"
+   ],
+   "ops": [
+    {
+     "phase": 1,
+     "kind": "delete-json-path",
+     "pointer": "/0",
+     "frame_basis": "FRAMEPATH 擁有之 frame 路徑紅燈列；SPEC Task 1.5",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    }
+   ],
+   "uncertain": []
+  },
+  {
+   "path": "tests/governance/test_prered_allowed_red.py",
+   "verdict": "ops",
+   "reason": "EXPECTED 為逐列精確集合；allowed_red.json 刪 FRAMEPATH 列須同批刪 EXPECTED 第一元素（源碼順序 index 0）。其餘測試（含以 `FRAMEPATH` 為 owner 之鑑別力測 :112-116、rows[0] 之兩測）於刪後仍成立。",
+   "evidence": [
+    "HEAD :28 `(\"tests/feature_engineering/test_failopen_manifest.py::test_persist_false_generate_features_metadata\", \"FRAMEPATH\", ...)` 為 EXPECTED set 字面第 0 元素",
+    ":88 `set(keys) != EXPECTED` 精確比對"
+   ],
+   "ops": [
+    {
+     "phase": 1,
+     "kind": "delete-node",
+     "locator": {
+      "category": "seq_elem",
+      "target": "EXPECTED",
+      "path": [
+       0
+      ]
+     },
+     "frame_basis": "對應 allowed_red.json 被刪之 FRAMEPATH 列",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a（test_allowed_red_exact_set_and_collectable 繼續驗其餘 30 列）"
+    }
+   ],
+   "uncertain": [
+    ":112-116 鑑別力測仍以 owner_ticket \"FRAMEPATH\" 造假列；只要 docs/TICKET_ORDER.md 表仍含 FRAMEPATH 即有效（收案後票名仍在排序表）。"
+   ]
+  },
+  {
+   "path": "tests/fixtures/golden/multi_symbol_c3/env_snapshot.json",
+   "verdict": "ops",
+   "reason": "scripts/golden_multi_symbol_c3.py（Task 3.1 退休刪檔）之產物；tests／momentum／api 零讀者；SPEC Task 3.2 逐檔 delete-file。",
+   "evidence": [
+    "`grep -rln multi_symbol_c3 tests scripts momentum api` 只命中 scripts/golden_multi_symbol_c3.py、scripts/fact_keys.json、tests/feature_engineering/test_framepath_disposition.py（工作樹新檔）"
+   ],
+   "ops": [
+    {
+     "phase": 3,
+     "kind": "delete-file",
+     "frame_basis": "frame 時期多標的 golden 產物（SPEC Task 3.2）",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    }
+   ],
+   "uncertain": []
+  },
+  {
+   "path": "tests/fixtures/golden/multi_symbol_c3/baseline.parquet",
+   "verdict": "ops",
+   "reason": "scripts/golden_multi_symbol_c3.py（Task 3.1 退休刪檔）之產物；tests／momentum／api 零讀者；SPEC Task 3.2 逐檔 delete-file。",
+   "evidence": [
+    "`grep -rln multi_symbol_c3 tests scripts momentum api` 只命中 scripts/golden_multi_symbol_c3.py、scripts/fact_keys.json、tests/feature_engineering/test_framepath_disposition.py（工作樹新檔）"
+   ],
+   "ops": [
+    {
+     "phase": 3,
+     "kind": "delete-file",
+     "frame_basis": "frame 時期多標的 golden 產物（SPEC Task 3.2）",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    }
+   ],
+   "uncertain": []
+  },
+  {
+   "path": "tests/fixtures/golden/multi_symbol_c3/config.json",
+   "verdict": "ops",
+   "reason": "scripts/golden_multi_symbol_c3.py（Task 3.1 退休刪檔）之產物；tests／momentum／api 零讀者；SPEC Task 3.2 逐檔 delete-file。",
+   "evidence": [
+    "`grep -rln multi_symbol_c3 tests scripts momentum api` 只命中 scripts/golden_multi_symbol_c3.py、scripts/fact_keys.json、tests/feature_engineering/test_framepath_disposition.py（工作樹新檔）"
+   ],
+   "ops": [
+    {
+     "phase": 3,
+     "kind": "delete-file",
+     "frame_basis": "frame 時期多標的 golden 產物（SPEC Task 3.2）",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a"
+    }
+   ],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/app/data-preparation/page.tsx",
+   "verdict": "no-op",
+   "reason": "`.h5` 只見於 :208 `data_cache/kline_cache.h5` 說明與 :324「存儲到HDF5」文案——皆 kline 下載鏈，§C 不在本票。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/app/data-preparation/page.tsx` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/app/ic-analysis/page.tsx",
+   "verdict": "no-op",
+   "reason": ":828／:830 為 IC 套用後處理輸出 `post_ic_transforms_<task_id>.h5` 之驗收說明（IC h5，§C 不在本票）；:273 legacy 指 ICHC 回應形，與 frame 無關。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/app/ic-analysis/page.tsx` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/components/case/BatchDownloadPanel.tsx",
+   "verdict": "no-op",
+   "reason": ":4 註解指 `data_cache/kline_cache.h5`（kline），不在本票。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/components/case/BatchDownloadPanel.tsx` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/components/case/CaseImportForm.tsx",
+   "verdict": "no-op",
+   "reason": ":4 註解指 kline_cache.h5 批量下載鏈，不在本票。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/components/case/CaseImportForm.tsx` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/components/feature-factory/__tests__/BatchProgressPanel.test.tsx",
+   "verdict": "no-op",
+   "reason": ":95/:97/:108/:158/:170 之 `/tmp/BTCUSDT_*.h5` 為 batch output_paths／results 之顯示用 mock 字串（前端只原樣顯示、無副檔名分支），非 `_factory.h5`；斷言意義不變。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/components/feature-factory/__tests__/BatchProgressPanel.test.tsx` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/components/feature-factory/__tests__/BatchRetentionPanel.test.tsx",
+   "verdict": "no-op",
+   "reason": ":21/:28 `hdf5_path: '/tmp/*_12h.h5'` 為 BatchRetentionItem 之 mock 值（欄名依 §C 不改），前端不依副檔名分支。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/components/feature-factory/__tests__/BatchRetentionPanel.test.tsx` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/components/feature-factory/__tests__/FeatureExplorer.test.tsx",
+   "verdict": "no-op",
+   "reason": ":164/:203 `results: { BTCUSDT: '/tmp/btc.h5' }` 為 generic mock 路徑，不依副檔名分支。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/components/feature-factory/__tests__/FeatureExplorer.test.tsx` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/components/ic-analysis/ApplyTransformsResult.test.tsx",
+   "verdict": "no-op",
+   "reason": ":19 `post_ic_transforms_x.h5` 為 IC 匯出 h5（不在本票）。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/components/ic-analysis/ApplyTransformsResult.test.tsx` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/lib/runExplorer.test.ts",
+   "verdict": "no-op",
+   "reason": ":76/:95 `/tmp/btc.h5` 為 generic mock 路徑。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/lib/runExplorer.test.ts` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/lib/runExplorer.ts",
+   "verdict": "no-op",
+   "reason": ":64 `hdf5_relative_path: run.browse_path ?? ''` 只是欄名對映（§C 欄名不改），無 h5 分支。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/lib/runExplorer.ts` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/store/featureFactoryStore.test.ts",
+   "verdict": "no-op",
+   "reason": ":52/:84/:124 `/tmp/BTCUSDT_1h.h5` 為 batch results generic mock。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/store/featureFactoryStore.test.ts` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/store/featureFactoryStore.ts",
+   "verdict": "no-op",
+   "reason": ":272 `record.path ?? record.hdf5_path`、:360 `hdf5_path` 正規化——只讀欄名、無 `.h5` 專屬文案或分支（SPEC Task 2.4「若有」不成立 ⇒ 零改動）。",
+   "evidence": [
+    "HEAD `grep -n -i 'hdf5\\|\\.h5\\|_factory\\|FFACT' frontend/src/store/featureFactoryStore.ts` 命中如 reason 所列；無 `_factory.h5`／FFACT_USE_CGSA"
+   ],
+   "ops": [],
+   "uncertain": []
+  },
+  {
+   "path": "frontend/src/lib/types.ts",
+   "verdict": "ops",
+   "reason": "SPEC Task 2.4 指定 `FeatureRegistryEntry.hdf5_relative_path` 註解改述為 manifest 路徑；HEAD 該欄無註解 ⇒ 於 :298 前加 JSDoc（欄名不改、無其他改動）。",
+   "evidence": [
+    "HEAD :291-299 `export interface FeatureRegistryEntry { ... hdf5_relative_path: string; }`",
+    "後端 feature_factory.py:4274/4439 寫入 `result.hdf5_path`（CGSA＝feature_manifest.json 路徑）；SPEC §A：registry 值 29 筆 json、11 筆空字串",
+    "新註解不含 `_factory.h5`／FFACT_USE_CGSA 字面（避開 Task 4.1 grep）"
+   ],
+   "ops": [
+    {
+     "phase": 2,
+     "kind": "replace-file",
+     "new_content": "// frontend/src/lib/types.ts - 安全擴充版本\n// 在現有內容基礎上添加20個新參數，保持向後兼容\n\n// ===== 保持現有的基礎類型定義 =====\n\n/**\n * 價格變動計算方式\n * OPEN_TO_CLOSE: 使用 (Close - Open) / Open，適合日內交易\n * CLOSE_TO_CLOSE: 使用 pct_change()，適合波段交易，包含跳空\n */\nexport enum PriceChangeMethod {\n  OPEN_TO_CLOSE = \"OPEN_TO_CLOSE\",\n  CLOSE_TO_CLOSE = \"CLOSE_TO_CLOSE\"\n}\n\nexport interface CaseData {\n  symbol: string;\n  timestamp: string;\n  trigger_idx: number;\n  open: number;\n  high: number;\n  low: number;\n  close: number;\n  volume: number;\n  price_change: number;\n  market_phase: string;\n  \n  // 現有的未來表現參數 (保持不變)\n  future1_close_return?: number;\n  future2_close_return?: number;\n  future4_close_return?: number;\n  future6_close_return?: number;\n  future_max_return?: number;\n  future_max_drawdown?: number;\n  future24_close?: number;\n  future24_low?: number;\n  prior_volatility?: number;\n  prior_range?: number;\n  prior_abs_change_sum?: number;\n  \n  // ===== 新增：基礎觸發條件參數 (5個新增) =====\n  closing_strength?: number;      // 收盤強度\n  price_position?: number;        // 價格位置\n  volume_multiplier?: number;     // 成交量倍數\n  taker_buy_ratio?: number;       // 主動買入比例\n  timeframe?: string;             // 時間框架\n  \n  // ===== 新增：未來收益參數 (1-12根K線) =====\n  future_1bar_return?: number;\n  future_2bar_return?: number;\n  future_3bar_return?: number;\n  future_4bar_return?: number;\n  future_5bar_return?: number;\n  future_6bar_return?: number;\n  future_7bar_return?: number;\n  future_8bar_return?: number;\n  future_9bar_return?: number;\n  future_10bar_return?: number;\n  future_11bar_return?: number;\n  future_12bar_return?: number;\n  \n  // ===== 新增：未來回撤參數 (1-12根K線) =====\n  future_1bar_max_drawdown?: number;\n  future_2bar_max_drawdown?: number;\n  future_3bar_max_drawdown?: number;\n  future_4bar_max_drawdown?: number;\n  future_5bar_max_drawdown?: number;\n  future_6bar_max_drawdown?: number;\n  future_7bar_max_drawdown?: number;\n  future_8bar_max_drawdown?: number;\n  future_9bar_max_drawdown?: number;\n  future_10bar_max_drawdown?: number;\n  future_11bar_max_drawdown?: number;\n  future_12bar_max_drawdown?: number;\n  \n  // ===== 新增：時間相關描述參數 =====\n  hour_of_day?: number;           // 觸發時的小時 (0-23)\n  day_of_week?: number;           // 觸發時的星期 (1-7)\n\n  // ===== 改寫：分類特徵參數 (9個) =====\n  // 數值參數（3個）\n  past_3day_max_volatility?: number;   // 過去3天最大波動度(%)\n  past_3day_direction?: number;        // 過去3天方向性(%)\n  past_3day_volume_cv?: number;        // 過去3天量能變異係數\n\n  // 分類參數（6個）\n  volatility_class?: string;   // L/M/H/X\n  direction_class?: string;    // D/S/U/V\n  volume_class?: string;       // A/B/C\n  market_class?: string;       // C1-C12\n  market_class_name?: string;  // 平靜橫盤等\n  difficulty_level?: string;   // 簡單/中等/困難\n\n  // ===== 新增：標準化時間回報 (向後兼容) =====\n  future24_close_return?: number;\n  future48_close_return?: number;\n  future72_close_return?: number;\n  future72_max_return?: number;\n  future72_max_drawdown?: number;\n  \n  // ===== 新增：反例專用參數 =====\n  positive_negative_ratio?: string;  // 正負比例 (如 \"1:2\")\n  time_separation_days?: number;     // 時間分離天數\n  case_type?: 'positive' | 'negative'; // 案例類型\n  label?: 0 | 1;                     // 標籤 (1=正例, 0=負例)\n  \n  // 現有的時間範圍 (保持不變)\n  time_range: {\n    start: string;\n    end: string;\n  };\n}\n\n// ===== 保持現有的其他類型定義不變 =====\n\nexport interface CaseSummary {\n  total_cases: number;\n  positive_cases: number;\n    positive_case?: boolean | number;\n  unique_symbols: number;\n  time_range: {\n    start: string;\n    end: string;\n  };\n  market_phase_distribution: Record<string, number>;\n}\n\nexport interface SamplingQuality {\n  time_separation_score: number;\n  symbol_diversity_score: number;\n  market_phase_balance: number;\n  overall_quality_score: number;\n  warnings: string[];\n}\n\nexport interface SearchResultData {\n  cases: CaseData[];\n  summary: CaseSummary;\n  sampling_quality: SamplingQuality;\n  execution_time: number;\n  cache_used: boolean;\n\n  // ===== GAP-3 UX Task 1.3：來源 canonical bytes（一律由後端計算；前端不得自算）=====\n  /** 本結果集之來源 canonical 文字（後端 §G S-9 exact bytes 之 UTF-8 解碼，無尾端 newline）。 */\n  source_file_text?: string;\n  /** `sha256(source_file_text)`＝契約 `source_file_digest`；與 `rule_digest` 為兩件事。 */\n  source_file_digest?: string;\n\n  // ===== 新增：參數統計和驗證報告 =====\n  parameter_statistics?: ParameterStatistics;\n  validation_report?: ParameterValidationReport;\n  basic_trigger_stats?: Record<string, unknown>;\n  future_performance_stats?: Record<string, unknown>;\n  time_distribution_stats?: Record<string, unknown>;\n}\n\nexport interface ApiResponse<T> {\n  success: boolean;\n  data?: T;\n  error?: {\n    code: string;\n    message: string;\n    details?: unknown;\n  };\n  timestamp: string;\n}\n\n// ===== Feature Factory 類型定義 =====\n\nexport interface FailOpenGateFlags {\n  allow_partial_layers?: boolean;\n  allow_partial_timeframes?: boolean;\n  allow_partial_ic?: boolean;\n  allow_partial_training?: boolean;\n  max_inf_ratio?: number;\n  max_nan_ratio?: number | null;\n}\n\nexport interface FeatureFactoryConfig {\n  allow_partial_layers?: boolean;\n  allow_partial_timeframes?: boolean;\n  allow_partial_ic?: boolean;\n  allow_partial_training?: boolean;\n  max_inf_ratio?: number;\n  max_nan_ratio?: number | null;\n  global_settings: {\n    sequence_length: number;\n    max_lag_ratio: number;\n    lag_strategy?: string;\n    custom_lags?: number[] | null;\n  };\n  data_sources: {\n    enabled_sources: string[];\n    synthetic_sources?: string[];\n  };\n  timeframes: {\n    primary: string;\n    training: string[];\n    alignment?: string;\n    alignment_mode?: 'open_minus' | 'close_time';\n  };\n  atomic_indicators: Record<\n    string,\n    {\n      enabled: boolean;\n      indicators?: Array<{ name: string; enabled?: boolean; [key: string]: unknown }>;\n      features?: Record<string, { enabled: boolean; [key: string]: unknown }>;\n      data_sources?: string[] | null;\n    }\n  >;\n  operators?: {\n    enabled?: boolean;\n    [key: string]: { enabled: boolean; [key: string]: unknown } | boolean | undefined;\n  };\n  rolling_aggregation?: {\n    enabled?: boolean;\n    windows: number[];\n    aggregators?: Record<string, { enabled: boolean; [key: string]: unknown }> | string[];\n    apply_to?: string | string[];\n  };\n  lag_features?: {\n    enabled?: boolean;\n    apply_to?: string | string[];\n    exclude_patterns?: string[];\n  };\n  cross_sectional?: {\n    enabled?: boolean;\n    reference_symbol?: string;\n    features?: Record<string, { enabled: boolean; [key: string]: unknown }> | string[];\n  };\n  meta_features?: {\n    enabled?: boolean;\n    consensus?: boolean;\n    interaction?: boolean;\n    time_features?: boolean;\n    trend_consensus?: boolean;\n    momentum_divergence?: boolean;\n    volume_price_divergence?: boolean;\n    volatility_regime?: boolean;\n  };\n  labels?: {\n    binary?: { horizons?: number[]; threshold?: number };\n    regression?: { horizons?: number[] };\n  };\n  custom_indicators?: unknown[];\n  preprocessing?: {\n    enabled?: boolean;\n    mode?: 'append' | 'replace';\n    winsorization?: {\n      enabled?: boolean;\n      method?: 'sigma' | 'quantile';\n      sigma_k?: number;\n      quantile_range?: [number, number] | number[];\n      apply_to?: string | string[];\n    };\n    adf_differencing?: {\n      enabled?: boolean;\n      adf_threshold?: number;\n      max_diff?: number;\n      sample_size?: number;\n      apply_to?: string;\n    };\n    fractional_differencing?: {\n      enabled?: boolean;\n      d_range?: [number, number] | number[];\n      adf_threshold?: number;\n      weight_threshold?: number;\n      precision?: number;\n      apply_to?: string;\n      cache_d_star?: boolean;\n    };\n    rank_transform?: {\n      enabled?: boolean;\n      window?: number;\n      apply_to?: string | string[];\n    };\n    gaussian_normalize?: {\n      enabled?: boolean;\n      clip_range?: [number, number] | number[];\n      apply_to?: string | string[];\n    };\n    adaptive_zscore?: {\n      enabled?: boolean;\n      windows?: number[];\n      epsilon?: number;\n      apply_to?: string | string[];\n    };\n  };\n}\n\nexport interface FeatureRegistryEntry {\n  symbol: string;\n  timeframe: string;\n  config_hash: string;\n  feature_count: number;\n  row_count: number;\n  created_at: number;\n  /**\n   * 欄名沿用舊稱（DTO 不改名）：值為該 run 之 V2 `feature_manifest.json` 路徑；\n   * 舊 registry 列可能為空字串。舊特徵 h5 已不支援（FRAMEPATH）。\n   */\n  hdf5_relative_path: string;\n}\n\nexport interface FeatureRegistryResponse {\n  entries: FeatureRegistryEntry[];\n  total: number;\n}\n\nexport interface FeatureGenerationRequest {\n  config?: Record<string, unknown>;\n  symbols: string[];\n  timeframe: string;\n  start_date?: string;\n  end_date?: string;\n  force_regenerate?: boolean;\n}\n\n// ===== Feature Factory Schema Types =====\n\nexport interface SchemaIndicator {\n  name: string;\n  enabled: boolean;\n  description: string;\n  params?: Record<string, unknown>;\n}\n\nexport interface SchemaCategory {\n  enabled: boolean;\n  level: string;\n  description: string;\n  indicators?: SchemaIndicator[];\n  features?: SchemaIndicator[];\n  params?: Record<string, unknown>;\n}\n\nexport interface SchemaOperator {\n  enabled: boolean;\n  description: string;\n  rules?: Array<{\n    indicator: string;\n    condition: string;\n    name_suffix: string;\n    enabled: boolean;\n  }>;\n  operators?: Record<string, { enabled: boolean }>;\n}\n\nexport interface SchemaAggregator {\n  enabled: boolean;\n  description: string;\n}\n\nexport interface SchemaSubEngine {\n  enabled: boolean;\n  description: string;\n}\n\nexport interface SchemaMethod {\n  enabled: boolean;\n  description: string;\n  params?: Record<string, unknown>;\n}\n\nexport interface FeatureSchema {\n  layers: {\n    layer1: {\n      name: string;\n      enabled: boolean;\n      categories: Record<string, SchemaCategory>;\n    };\n    layer2: {\n      name: string;\n      enabled: boolean;\n      operators: Record<string, SchemaOperator>;\n    };\n    layer3: {\n      name: string;\n      enabled: boolean;\n      windows: number[];\n      aggregators: Record<string, SchemaAggregator>;\n      apply_to: string;\n    };\n    layer4: {\n      name: string;\n      enabled: boolean;\n      apply_to: string;\n      exclude_patterns: string[];\n    };\n    layer5: {\n      name: string;\n      enabled: boolean;\n      reference_symbol: string;\n      features: Record<string, { enabled: boolean; description: string }>;\n    };\n    layer6: {\n      name: string;\n      enabled: boolean;\n      sub_engines: Record<string, SchemaSubEngine>;\n    };\n    layer6_5: {\n      name: string;\n      enabled: boolean;\n      mode: string;\n      methods: Record<string, SchemaMethod>;\n    };\n  };\n}\n\nexport interface BatchToggleItem {\n  path: string;\n  value: boolean;\n}\n\nexport interface BatchGenerateRequest {\n  symbols: string[];\n  timeframe: string;\n  start_date?: string;\n  end_date?: string;\n  config_override?: Record<string, unknown>;\n  force_regenerate?: boolean;\n  max_workers?: number;\n}\n\nexport type BatchTaskStatusValue =\n  | 'idle'\n  | 'pending'\n  | 'running'\n  | 'completed'\n  | 'failed'\n  | 'partial'\n  | 'paused'\n  | 'paused_ram_gate';\n\nexport interface BatchOutputPath {\n  symbol: string;\n  timeframe: string;\n  path: string;\n  download_url?: string;\n}\n\nexport interface BatchItemRss {\n  symbol: string;\n  timeframe: string;\n  rssBeforeItemMB?: number;\n  rssPeakMB: number;\n  rssAfterGcMB: number;\n}\n\nexport interface BatchItemMetrics {\n  current_symbol?: string | null;\n  current_timeframe?: string | null;\n  rss_before_item_mb?: number;\n  rss_peak_item_mb?: number;\n  rss_after_gc_mb?: number;\n}\n\n/** GET /batch/list 單筆可恢復批次摘要 */\nexport interface RecoverableBatchSummary {\n  batch_id: string;\n  symbols: string[];\n  timeframe: string;\n  completed_count: number;\n  updated_at: string;\n}\n\nexport interface BatchTaskStatus {\n  task_id: string;\n  batch_id?: string;\n  status: BatchTaskStatusValue;\n  total: number;\n  completed: number;\n  failed: number;\n  progress: number;\n  current_symbol?: string | null;\n  current_timeframe?: string | null;\n  current_stage?: string | null;\n  stage_progress?: number | null;\n  process_rss_mb?: number | null;\n  worker_rss_mb?: number | null;\n  current_rss_mb?: number | null;\n  schema_version?: number;\n  queued?: number;\n  concurrent_symbols?: number;\n  memory_sanity_failed?: boolean;\n  eta_seconds?: number;\n  resume_available?: boolean;\n  output_paths?: BatchOutputPath[];\n  per_item_rss?: BatchItemRss[];\n  last_item_metrics?: BatchItemMetrics | null;\n  results?: Record<string, string>;\n  browse_task_ids?: Record<string, string>;\n  errors?: Record<string, string>;\n  retention_pending?: BatchRetentionItem[];\n  warmup_insufficient_items?: BatchWarmupInsufficientItem[];\n}\n\nexport interface BatchRetentionItem {\n  symbol: string;\n  timeframe: string;\n  config_hash: string;\n  state: string;\n  hdf5_path?: string | null;\n  error?: string | null;\n}\n\nexport interface BatchRetentionDecisionRequest {\n  decision: 'retain' | 'discard';\n}\n\nexport interface BatchRetentionDecisionResponse {\n  batch_id: string;\n  symbol: string;\n  timeframe: string;\n  config_hash: string;\n  state: string;\n  hdf5_path?: string | null;\n  error?: string | null;\n}\n\nexport interface BatchRetentionPendingResponse {\n  batch_id: string;\n  pending: BatchRetentionItem[];\n}\n\nexport interface BatchRetentionRunRef {\n  symbol: string;\n  timeframe: string;\n  config_hash: string;\n}\n\nexport interface BatchRetentionBulkRequest {\n  decision: 'retain' | 'discard';\n  runs: BatchRetentionRunRef[];\n}\n\nexport interface BatchRetentionBulkResultItem {\n  symbol: string;\n  timeframe: string;\n  config_hash: string;\n  status: 'succeeded' | 'failed' | 'skipped';\n  state: string;\n  error?: string | null;\n  code?: string | null;\n}\n\nexport interface BatchRetentionBulkResponse {\n  results: BatchRetentionBulkResultItem[];\n}\n\nexport interface WarmupInsufficient {\n  needed: number;\n  available: number;\n  affected_bars: number;\n}\n\nexport interface BatchWarmupInsufficientItem {\n  symbol: string;\n  timeframe: string;\n  warmup_insufficient: WarmupInsufficient;\n}\n\nexport interface FeaturePreview {\n  total_features: number;\n  estimated_time_seconds: number;\n  memory_mb: number;\n  breakdown: Record<string, number>;\n}\n\nexport interface FeatureValidationSummary {\n  has_nan: boolean;\n  has_inf: boolean;\n  coverage: number;\n  inf_count: number;\n  inf_ratio: number;\n  groups_with_inf: number;\n  warnings?: string[];\n}\n\nexport interface FeatureTask {\n  task_id: string;\n  status: string;\n  progress: number;\n  current_stage: string | null;\n  completed_stages: string[];\n  error: string | null;\n  process_rss_mb?: number | null;\n  worker_rss_mb?: number | null;\n  current_rss_mb?: number | null;\n  schema_version?: number;\n  compute_warnings?: string[];\n  validation_summary?: FeatureValidationSummary;\n  retention_prompt?: boolean;\n  run_identity?: RunIdentity;\n  warmup_insufficient?: WarmupInsufficient | null;\n  result?: Record<string, unknown>;\n}\n\nexport interface RunIdentity { symbol: string; timeframe: string; config_hash: string; }\n\n/** completionQueue 項目來源：單 symbol modal vs batch 面板 */\nexport type CompletionSource = 'single' | 'batch';\n\nexport interface CompletionQueueItem extends RunIdentity {\n  source: CompletionSource;\n}\nexport interface RunInfo extends RunIdentity {\n  alias?: string | null;\n  batch_id?: string | null;\n  batch_alias?: string | null;\n  training_timeframes?: string[] | null;\n  created_at?: string | null;\n  last_generated_at?: string | null;\n  size_bytes?: number | null;\n  active: boolean;\n  browse_task_id: string;\n  browse_ready: boolean;\n  browse_path?: string | null;\n  feature_count?: number | null;\n  row_count?: number | null;\n  quality_status?: string | null;\n  /**\n   * GAP-3 UX Task 7.7 ①：feature run 之時間範圍，形狀與後端 manifest **同形**。\n   *\n   * 🔴 值為**字串**（實測現存 manifest 皆為 epoch **秒之數字字串**，例 `\"1704067200\"`），\n   *    **不是** epoch 毫秒整數——前端不得自行轉型別或比較大小，\n   *    涵蓋判定一律由後端 `check_feature_run_coverage()` 做。\n   * 🔴 舊 run 可能是 `{start: null, end: null}` 或整個鍵不存在（實掃 14 份 manifest 有 2 份缺鍵）；\n   *    兩者後端都判 `feature_coverage_unknown_legacy_run` 而 fail-closed。\n   */\n  time_range?: { start: string | null; end: string | null } | null;\n  /** FF-STAT 逐欄穩定點：`user`＝有起始日；`per_column`＝各欄依自身預熱期起算（未填起始日）。舊 run 無此欄。 */\n  output_start_source?: 'user' | 'per_column' | null;\n  /** 各欄首個有效值（stable_start）之最早／最晚（ISO 字串）。 */\n  stable_start_earliest?: string | null;\n  stable_start_latest?: string | null;\n  /** 有起始日而歷史不足、開頭為空值之欄數。 */\n  warmup_insufficient_count?: number | null;\n  /** 未填起始日且開平穩化：每欄前 N 個穩定值保留供校準、不輸出。 */\n  calibration_rows_withheld?: boolean | null;\n}\nexport interface EnsureBrowseResponse extends RunIdentity {\n  browse_task_id: string;\n  browse_ready: boolean;\n}\nexport interface DeleteRunResponse extends RunIdentity {\n  features_deleted: boolean; cgsa_deleted: boolean; registry_removed: boolean;\n  skipped: string[]; errors: string[]; total_bytes: number;\n}\n\n/** B4 bulk-delete 單筆目標 */\nexport type BulkDeleteRunItem = RunIdentity;\n\n/** B4 bulk-delete 單筆結果 */\nexport interface BulkDeleteRunOutcome extends RunIdentity {\n  bytes: number;\n  error?: string | null;\n}\n\n/** B4 bulk-delete 彙整報告（HTTP 200 + per-run status） */\nexport interface BulkDeleteResponse {\n  deleted: BulkDeleteRunOutcome[];\n  failed: BulkDeleteRunOutcome[];\n  skipped: BulkDeleteRunOutcome[];\n}\n\n/** B4 孤兒掃描條目 */\nexport interface OrphanEntry {\n  kind: string;\n  symbol: string;\n  timeframe: string;\n  config_hash: string;\n  leaf_kind?: string | null;\n}\n\n/** B4 孤兒掃描報告 */\nexport interface OrphanScanResponse {\n  orphans: OrphanEntry[];\n  count: number;\n}\n\n/** B4 孤兒清理報告 */\nexport interface OrphanCleanResponse {\n  orphans: OrphanEntry[];\n  cleaned_registry: number;\n  cleaned_leaves: number;\n  errors: string[];\n  dry_run: boolean;\n}\n\nexport interface FeatureFactoryPreset {\n  name: string;\n  description?: string;\n  level?: 'L1' | 'L2' | 'L3' | 'ML';\n  config?: FeatureFactoryConfig;\n}\n\nexport interface FeatureIndicatorSpec {\n  name: string;\n  category?: string;\n  input_type?: string;\n  output_count?: number;\n}\n\nexport interface FeatureGenerationProgress {\n  status?: string;\n  stage?: string;\n  progress?: number;\n  message?: string;\n  process_rss_mb?: number | null;\n  worker_rss_mb?: number | null;\n  current_rss_mb?: number | null;\n  schema_version?: number;\n}\n\nexport interface FeatureNLResult {\n  config_patch: Record<string, unknown>;\n  description: string;\n  preview?: FeaturePreview;\n}\n\nexport interface FeatureGenerationResult {\n  feature_names?: string[];\n  metadata?: {\n    compute_warnings?: string[];\n    feature_count?: number;\n    layer_counts?: Record<string, number>;\n    [key: string]: unknown;\n  };\n}\n\nexport type ExplorerTab =\n  | 'overview'\n  | 'table'\n  | 'timeseries'\n  | 'correlation'\n  | 'distribution'\n  | 'nan';\n\nexport interface FeatureSummary {\n  total_features: number;\n  total_rows: number;\n  by_category: Record<string, number>;\n  by_level: Record<string, number>;\n  by_layer: Record<string, number>;\n  quality: {\n    nan_ratio_mean: number;\n    nan_ratio_max: number;\n    nan_ratio_quantiles?: {\n      min: number;\n      q1: number;\n      median: number;\n      q3: number;\n      max: number;\n    };\n    nan_ratio_distribution: number[];\n    constant_features: string[];\n    high_corr_pairs_count: number;\n    stationary_ratio: number;\n    quality_alerts?: Array<{\n      severity: 'info' | 'warning' | 'error';\n      feature: string;\n      message: string;\n    }>;\n  };\n  stats_warmup?: {\n    computed: number;\n    total: number;\n    pct: number;\n    complete: boolean;\n  };\n  generation_info: {\n    task_id: string;\n    symbol?: string;\n    timeframe?: string;\n    generated_at?: string;\n    generation_time?: number;\n    config_hash?: string;\n  };\n}\n\nexport interface BrowseFeatureItem {\n  name: string;\n  category: string;\n  level: 'L1' | 'L2' | 'L3';\n  layer: string;\n  nan_ratio: number;\n  mean: number | null;\n  std: number | null;\n  min: number | null;\n  q25: number | null;\n  median: number | null;\n  q75: number | null;\n  max: number | null;\n  skewness: number | null;\n  kurtosis: number | null;\n  is_stationary: boolean | null;\n  adf_pvalue: number | null;\n}\n\nexport interface BrowseFeaturesResponse {\n  total: number;\n  offset: number;\n  limit: number;\n  cursor?: string | null;\n  next_cursor?: string | null;\n  has_more?: boolean;\n  filters_applied: {\n    category?: string | null;\n    level?: string | null;\n    search?: string | null;\n  };\n  features: BrowseFeatureItem[];\n}\n\nexport interface FeatureDataRow {\n  timestamp: string | null;\n  [featureName: string]: number | string | null;\n}\n\nexport interface BrowseFeatureDataResponse {\n  total_rows: number;\n  offset: number;\n  limit: number;\n  features: string[];\n  rows: FeatureDataRow[];\n}\n\nexport interface BrowseCorrelationMatrix {\n  features: string[];\n  method?: 'pearson' | 'spearman' | 'kendall';\n  matrix: number[][];\n}\n\nexport interface VifRow {\n  feature_name: string;\n  vif: number;\n  status: 'stable' | 'warning' | 'severe';\n}\n\nexport interface BrowseVifResponse {\n  items: VifRow[];\n}\n\nexport interface FeatureStats {\n  count: number;\n  nan_ratio: number;\n  mean: number | null;\n  std: number | null;\n  min: number | null;\n  q25: number | null;\n  median: number | null;\n  q75: number | null;\n  max: number | null;\n  skewness: number | null;\n  kurtosis: number | null;\n  adf_pvalue: number | null;\n  is_stationary: boolean;\n}\n\nexport interface DistributionData {\n  feature: string;\n  n_bins: number;\n  bins: number[];\n  edges: number[];\n  stats: FeatureStats;\n}\n\nexport interface NanPatternData {\n  features: string[];\n  timestamps: string[];\n  timestamps_total?: number;  // total time points before subsampling\n  matrix: boolean[][];        // [N_features, T_sampled] — one row per feature\n  nan_ratios: number[];\n}\n\n// ---- Data Quality Diagnostics --------------------------------------------\nexport interface DataQualityWarmupBucket {\n  bucket: string;     // e.g. \"0\", \"1-50\", \"51-200\", \"201-1000\", \">1000\"\n  count: number;\n  ratio: number;\n}\n\nexport interface DataQualityCoveragePoint {\n  index: number;\n  timestamp: string;\n  coverage: number;   // [0, 1]\n}\n\nexport interface DataQualityFeatureHole {\n  name: string;\n  hole_count: number;\n  hole_ratio: number;\n}\n\nexport interface DataQualityFeatureTrailing {\n  name: string;\n  trailing_length: number;\n}\n\nexport interface DataQualityFeatureScattered {\n  name: string;\n  nan_ratio: number;\n}\n\nexport interface DataQualityGroupStat {\n  layer: string;\n  tf: string;\n  feature_count: number;\n  mean_nan_ratio: number;\n  warmup_only: number;\n  real_problem: number;\n}\n\nexport interface DataQualityRealProblemFeature {\n  name: string;\n  nan_ratio: number;\n  hole_count: number;\n  kind: 'all_nan' | 'high_nan_hole';\n}\n\nexport interface NanRatioQuantiles {\n  min: number;\n  q1: number;\n  median: number;\n  q3: number;\n  max: number;\n}\n\nexport interface DataQualityReport {\n  schema_version?: string;\n  nan_ratio_mean?: number;\n  nan_ratio_max?: number;\n  nan_ratio_quantiles?: NanRatioQuantiles;\n  total_features: number;\n  total_timesteps: number;\n  timestamp_start: string;\n  timestamp_end: string;\n  is_clean: boolean;\n  recommended_start_index: number;\n  recommended_start_timestamp: string;\n  warmup_loss_ratio: number;\n  max_warmup: number;\n  p95_warmup: number;\n  warmup_distribution: DataQualityWarmupBucket[];\n  coverage_timeline: DataQualityCoveragePoint[];\n  min_coverage: number;\n  min_coverage_timestamp: string;\n  mid_holes: DataQualityFeatureHole[];\n  trailing_nans: DataQualityFeatureTrailing[];\n  scattered_nans: DataQualityFeatureScattered[];\n  real_problem_features?: DataQualityRealProblemFeature[];\n  counts: {\n    mid_holes: number;\n    trailing_nans: number;\n    high_nan: number;\n    warmup_only_high_nan?: number;\n    real_problem?: number;\n  };\n  group_breakdown?: DataQualityGroupStat[];\n}\n\nexport interface AutoResearchStatus {\n  status: string;\n  research_id?: string;\n}\n\nexport interface AutoResearchLogEntry {\n  iteration: number;\n  decision: string;\n  next_action: string;\n}\n\nexport interface TaskInfo {\n  task_id: string;\n  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';\n  created_at: string;\n  updated_at: string;\n  config_name: string;\n  progress?: {\n    current: number;\n    total: number;\n    percentage: number;\n    current_symbol?: string;\n    estimated_remaining_seconds?: number;\n  };\n  error_message?: string;\n}\n\nexport interface SearchTemplate {\n  name: string;\n  description: string;\n  config: unknown;\n  is_default: boolean;\n  created_at: string;\n}\n\nexport type SearchResult = SearchResultData;\n\nexport interface SimpleSearchRequest {\n  name: string;\n  symbols: string[];\n  timeframe: string;\n  searchMode?: 'research' | 'realtime';\n  startDate?: string | null;\n  endDate?: string | null;\n  priceChangeMethod?: PriceChangeMethod;\n  priceChange?: number | null;\n  volumeMultiplier?: number | null;\n  closingStrength?: number | null;\n  takerBuyRatio?: number | null;\n  pricePosition?: number | null;\n  saveResults?: boolean;\n}\n\nexport interface SearchRequest {\n  config: {\n    name: string;\n    description?: string;\n    timeframe: string;\n    start_date: string;\n    end_date: string;\n    lookback_periods: number;\n    forward_periods: number;\n    sample_limit: number;\n    min_volume: number;\n    exclude_new_listing_days: number;\n    price_change_method?: PriceChangeMethod; // 可選，預設 CLOSE_TO_CLOSE\n    initial_conditions: FilterCondition[];\n    advanced_conditions: FilterCondition[];\n  };\n  symbols?: string[];\n  save_results?: boolean;\n  export_format?: string;\n}\n\nexport interface FilterCondition {\n  condition_type: string;\n  parameter: string;\n  operator: string;\n  value: number | number[];\n  description?: string;\n}\n\n// ===== 新增：參數相關的類型定義 =====\n\n// 參數統計類型\nexport interface ParameterStatistics {\n  basic_trigger_params: {\n    price_change: ParameterStat;\n    closing_strength: ParameterStat;\n    price_position: ParameterStat;\n    volume_multiplier: ParameterStat;\n    taker_buy_ratio: ParameterStat;\n  };\n  \n  future_return_params: Record<string, ParameterStat>;\n  future_drawdown_params: Record<string, ParameterStat>;\n  \n  time_distribution: {\n    hour_distribution: Record<number, number>;\n    day_distribution: Record<number, number>;\n    market_phase_distribution: Record<string, number>;\n  };\n}\n\nexport interface ParameterStat {\n  min: number;\n  max: number;\n  avg: number;\n  count: number;\n  valid_percentage: number;\n}\n\n// 參數驗證報告類型\nexport interface ParameterValidationReport {\n  total_rows: number;\n  parameters_status: {\n    basic_trigger: Record<string, ParameterStatus>;\n    future_returns: Record<string, ParameterStatus>;\n    future_drawdowns: Record<string, ParameterStatus>;\n    descriptive: Record<string, ParameterStatus>;\n  };\n  data_quality: {\n    total_parameters: number;\n    existing_parameters: number;\n    completion_rate: number;\n    has_errors: boolean;\n    has_warnings: boolean;\n  };\n  warnings: string[];\n  errors: string[];\n  basic_trigger_params_count: number;\n  future_return_params_count: number;\n  future_drawdown_params_count: number;\n  descriptive_params_count: number;\n  total_new_params_count: number;\n  completion_rate: number;\n  quality_score: number;\n}\n\nexport interface ParameterStatus {\n  exists: boolean;\n  nan_count?: number;\n  nan_percentage?: number;\n  data_type?: string;\n  sample_values?: unknown[];\n}\n\n// ===== 新增：參數常數定義 =====\n\n// 基礎觸發條件參數列表\nexport const BASIC_TRIGGER_PARAMETERS = [\n  'price_change',\n  'closing_strength', \n  'price_position',\n  'volume_multiplier',\n  'taker_buy_ratio'\n] as const;\n\n// 未來收益參數列表 (1-12根K線)\nexport const FUTURE_RETURN_PARAMETERS = [\n  'future_1bar_return', 'future_2bar_return', 'future_3bar_return', \n  'future_4bar_return', 'future_5bar_return', 'future_6bar_return',\n  'future_7bar_return', 'future_8bar_return', 'future_9bar_return',\n  'future_10bar_return', 'future_11bar_return', 'future_12bar_return'\n] as const;\n\n// 未來回撤參數列表 (1-12根K線)\nexport const FUTURE_DRAWDOWN_PARAMETERS = [\n  'future_1bar_max_drawdown', 'future_2bar_max_drawdown', 'future_3bar_max_drawdown',\n  'future_4bar_max_drawdown', 'future_5bar_max_drawdown', 'future_6bar_max_drawdown',\n  'future_7bar_max_drawdown', 'future_8bar_max_drawdown', 'future_9bar_max_drawdown',\n  'future_10bar_max_drawdown', 'future_11bar_max_drawdown', 'future_12bar_max_drawdown'\n] as const;\n\n// 時間描述參數列表\nexport const DESCRIPTIVE_PARAMETERS = [\n  'hour_of_day',\n  'day_of_week', \n  'market_phase',\n  'timeframe'\n] as const;\n\n// 反例專用參數列表\nexport const NEGATIVE_SAMPLING_PARAMETERS = [\n  'positive_negative_ratio',\n  'enable_time_separation',\n  'time_separation_days'\n] as const;\n\n// 向後兼容的現有參數列表\nexport const LEGACY_PARAMETERS = [\n  'future1_close_return',\n  'future2_close_return', \n  'future4_close_return',\n  'future6_close_return',\n  'future24_close_return',\n  'future48_close_return',\n  'future72_close_return',\n  'future_max_return',\n  'future_max_drawdown',\n  'future72_max_return',\n  'future72_max_drawdown',\n  'future24_close',\n  'future24_low'\n] as const;\n\n// 所有新參數的聯合類型\nexport type NewParameterNames = \n  | typeof BASIC_TRIGGER_PARAMETERS[number]\n  | typeof FUTURE_RETURN_PARAMETERS[number] \n  | typeof FUTURE_DRAWDOWN_PARAMETERS[number]\n  | typeof DESCRIPTIVE_PARAMETERS[number]\n  | typeof NEGATIVE_SAMPLING_PARAMETERS[number];\n\n// 參數分組\nexport interface ParameterGroups {\n  basicTrigger: typeof BASIC_TRIGGER_PARAMETERS;\n  futureReturn: typeof FUTURE_RETURN_PARAMETERS;\n  futureDrawdown: typeof FUTURE_DRAWDOWN_PARAMETERS;\n  descriptive: typeof DESCRIPTIVE_PARAMETERS;\n  negativeSampling: typeof NEGATIVE_SAMPLING_PARAMETERS;\n  legacy: typeof LEGACY_PARAMETERS;\n}\n\n// 參數類別常數\nexport const PARAMETER_CATEGORIES = {\n  BASIC_TRIGGER: 'basic_trigger',\n  FUTURE_RETURN: 'future_return', \n  FUTURE_DRAWDOWN: 'future_drawdown',\n  DESCRIPTIVE: 'descriptive',\n  NEGATIVE_SAMPLING: 'negative_sampling',\n  LEGACY: 'legacy'\n} as const;\n\n// ===== 新增：工具函數類型 =====\n\n// 參數格式化函數類型\nexport type ParameterFormatter = (value: number | undefined | null) => string;\n\n// 參數驗證函數類型\nexport type ParameterValidator = (value: number | undefined | null) => boolean;\n\n// 參數範圍類型\nexport interface ParameterRange {\n  min: number;\n  max: number;\n  step?: number;\n  default?: number;\n}\n\n// 參數配置界面類型\nexport interface ParameterUIConfig {\n  label: string;\n  description: string;\n  range: ParameterRange;\n  formatter: ParameterFormatter;\n  validator: ParameterValidator;\n  category: keyof typeof PARAMETER_CATEGORIES;\n}\n\n// ===== Phase 3.2: 信號密度分析類型定義 =====\n\n/**\n * 訓練窗口配置\n * 定義從哪個參考點開始,往前/往後看多少根K線作為訓練窗口\n */\nexport interface TrainingWindowConfig {\n  /** 參考點類型: TO(開單點)/TC(平倉點)/custom(自定義時間戳) */\n  reference_point: \"TO\" | \"TC\" | \"custom\";\n  /** 從參考點往前看N根K線(1~1000) */\n  lookback_bars: number;\n  /** 從參考點往後看M根K線(0~100,預設0避免未來函數洩漏) */\n  lookforward_bars: number;\n  /** 窗口模式: relative(嚴格N根)/full_range(使用全部可用K線) */\n  mode: \"relative\" | \"full_range\";\n  /** 自定義時間戳(僅當reference_point='custom'時使用) */\n  custom_timestamp?: number;\n}\n\n/**\n * 策略配置\n * 定義策略使用的指標類型、數據源、策略邏輯和參數\n */\nexport interface StrategyConfig {\n  /** 數據源(close/open/high/low/volume/taker_buy_volume/taker_ratio/quote_volume) */\n  data_source: string;\n  /** 指標類型(ema/sma/rsi等,必須已在IndicatorEngine中註冊) */\n  indicator_type: string;\n  /** 策略邏輯類型(three_line/crossover/threshold/ma_distance等) */\n  strategy_logic: string;\n  /** 策略參數字典,包含指標參數(如period)和策略參數(如閾值) */\n  params: Record<string, unknown>;\n}\n\n/**\n * 信號密度分析請求\n */\nexport interface SignalDensityRequest {\n  /** 策略配置 */\n  strategy_config: StrategyConfig;\n  /** 訓練窗口配置 */\n  training_window: TrainingWindowConfig;\n  /** 正例案例ID列表(建議≥10個) */\n  positive_cases: string[];\n  /** 反例案例ID列表(建議≥10個) */\n  negative_cases: string[];\n}\n\n/**\n * 信號密度分析響應\n *\n * 判斷標準:\n * - 優秀策略: separation>0.3 AND p_value<0.05 AND cohens_d>0.5\n * - 中等策略: separation>0.2 AND p_value<0.10\n * - 較弱策略: separation<0.2 OR p_value>0.10\n */\nexport interface SignalDensityResponse {\n  /** 正例平均信號密度(0.0~1.0) */\n  positive_avg_density: number;\n  /** 反例平均信號密度(0.0~1.0) */\n  negative_avg_density: number;\n  /** 密度差異(positive - negative),Optuna優化目標,範圍-1.0~1.0 */\n  separation: number;\n  /** 統計顯著性p-value(獨立t-test),<0.05為顯著,<0.01為高度顯著 */\n  p_value: number;\n  /** Cohen's d效果量,>0.2小效果,>0.5中效果,>0.8大效果 */\n  cohens_d: number;\n  /** 穩定性係數(按月分組CV),<0.3穩定,<0.5可接受,>0.5不穩定 */\n  stability_cv: number;\n  /** 正例信號密度標準差 */\n  positive_std: number;\n  /** 反例信號密度標準差 */\n  negative_std: number;\n  /** 正例樣本數量 */\n  positive_sample_size: number;\n  /** 反例樣本數量 */\n  negative_sample_size: number;\n  /** 每個案例的信號密度字典(case_id → density) */\n  case_level_densities: Record<string, number>;\n}\n\n/**\n * 訓練窗口預覽響應(Debug用)\n */\nexport interface TrainingWindowPreview {\n  /** 案例ID */\n  case_id: string;\n  /** 交易對 */\n  symbol: string;\n  /** 時間框架 */\n  timeframe: string;\n  /** 參考點類型 */\n  reference_point: string;\n  /** 往前看根數 */\n  lookback_bars: number;\n  /** 往後看根數 */\n  lookforward_bars: number;\n  /** 實際K線數量 */\n  actual_bars: number;\n  /** 時間戳範圍 */\n  timestamp_range: {\n    start: number | null;\n    end: number | null;\n  };\n}\n\n// ===== Phase 3.6: 優化結果展示UI 類型定義 =====\n\n/**\n * 策略參數\n * 定義策略的完整參數組合\n */\nexport interface StrategyParameters {\n  /** 數據源 (close/open/high/low/volume/taker_ratio) */\n  data_source: string;\n  /** 指標類型 (ema/sma/rsi等) */\n  indicator_type: string;\n  /** 策略邏輯 (three_line/short_long_cross/mid_long_cross) */\n  strategy_logic: string;\n  /** EMA短週期參數 */\n  ema_short?: number;\n  /** EMA中週期參數 */\n  ema_mid?: number;\n  /** EMA長週期參數 */\n  ema_long?: number;\n  /** 其他動態參數 */\n  [key: string]: unknown;\n}\n\n/**\n * 試驗摘要\n * 單個Optuna試驗的完整信息\n */\nexport interface TrialSummary {\n  /** 試驗編號 */\n  trial_number: number;\n  /** 參數組合 */\n  params: StrategyParameters;\n  /** 目標值 (separation) */\n  value: number;\n  /** 試驗狀態 */\n  state: 'COMPLETE' | 'PRUNED' | 'FAIL';\n  /** 完成時間 */\n  datetime_complete: string;\n  /** 中間值（用於剪枝分析） */\n  intermediate_values?: number[];\n  /** 試驗持續時間（單位：秒） */\n  duration?: number;\n}\n\n/**\n * 參數重要性\n * Optuna計算的參數影響力分析\n */\nexport interface ParamImportance {\n  /** 參數名稱 */\n  parameter_name: string;\n  /** 重要性得分 (範圍 0-1, 1=最重要) */\n  importance: number;\n  /** 排名 (1=最重要) */\n  rank: number;\n}\n\n/**\n * Trial - 單次優化試驗記錄\n * 對應 OptimizationHistoryPoint\n */\nexport interface Trial {\n  /** 試驗編號 */\n  trial_number: number;\n  /** 目標值 (separation) */\n  value: number;\n  /** 截至當前的最佳值 */\n  best_value_so_far: number;\n  /** 完成時間 */\n  datetime: string;\n  /** 參數組合 */\n  params: Record<string, unknown>;\n  /** 試驗狀態 */\n  state: 'COMPLETE' | 'PRUNED' | 'FAIL';\n}\n\n/**\n * 月度數據\n * 按月分組的穩定性分析數據\n */\nexport interface MonthlyData {\n  /** 月份 (YYYY-MM) */\n  month: string;\n  /** 該月的separation值 */\n  separation: number;\n  /** 該月的正例平均密度 */\n  positive_density: number;\n  /** 該月的反例平均密度 */\n  negative_density: number;\n  /** 該月的案例數量 */\n  case_count: number;\n}\n\n/**\n * 穩定性分析\n * 策略在不同時期的表現穩定性評估\n */\nexport interface StabilityAnalysis {\n  /** 月度separation數據 */\n  monthly_separations: MonthlyData[];\n  /** 平均separation */\n  mean_separation: number;\n  /** separation標準差 */\n  std_separation: number;\n  /** 變異係數 (CV = std / mean) */\n  cv: number;\n  /** separation > 0的月份占比 */\n  positive_ratio: number;\n  /** 表現最差的月份 */\n  worst_month: MonthlyData;\n  /** 表現最好的月份 */\n  best_month: MonthlyData;\n}\n\n/**\n * Pareto前沿解\n * 多目標優化中的非支配解\n */\nexport interface ParetoSolution {\n  /** 試驗編號 */\n  trial_number: number;\n  /** 參數組合 */\n  params: StrategyParameters;\n  /** 目標1: separation */\n  separation: number;\n  /** 目標2: 穩定性得分 (1 - CV) */\n  stability_score: number;\n  /** 是否為推薦解 */\n  is_recommended: boolean;\n}\n\n/**\n * 優化結果\n * 完整的Optuna優化結果數據\n */\nexport interface OptimizationResult {\n  /** 任務ID */\n  task_id: string;\n  /** 最佳目標值 (最佳separation) */\n  best_value: number;\n  /** 最佳參數組合 */\n  best_params: StrategyParameters;\n  /** 最佳試驗編號 */\n  best_trial_number: number;\n  /** 總試驗次數 */\n  total_trials: number;\n  /** 優化總耗時（秒） */\n  optimization_time: number;\n  /** 收斂歷史（每次試驗的當前最佳值） */\n  convergence_history: number[];\n  /** 所有試驗摘要 */\n  trials_summary: TrialSummary[];\n  /** 參數重要性分析 */\n  param_importances?: ParamImportance[];\n  /** 信號密度分析結果 */\n  density_analysis: SignalDensityResponse;\n  /** 穩定性分析 */\n  stability_analysis?: StabilityAnalysis;\n  /** Pareto前沿數據（多目標優化） */\n  pareto_front?: ParetoSolution[];\n  /** 創建時間 */\n  created_at: string;\n  /** 完成時間 */\n  completed_at?: string;\n}\n\n// ===== Phase 4: Model Enhancement UI 類型定義 =====\n\nexport interface CalibrationReliabilityCurve {\n  bin_midpoints: number[];\n  original_freq: number[];\n  calibrated_freq: number[];\n}\n\nexport interface CalibrationMethodMetric {\n  ece: number;\n  brier: number;\n}\n\nexport interface CalibrationResult {\n  method: string;\n  best_method: string;\n  improvement_pct: number;\n  calibration_failed: boolean;\n  reliability_curve: CalibrationReliabilityCurve;\n  comparison: Record<string, CalibrationMethodMetric>;\n  sample_size: number;\n  cv_folds: number;\n  status?: 'skipped';\n  skipped?: SkippedResult;\n}\n\nexport interface WalkForwardPeriod {\n  period_index: number;\n  train_start_idx: number;\n  train_end_idx: number;\n  test_start_idx: number;\n  test_end_idx: number;\n  train_samples: number;\n  test_samples: number;\n  test_auc: number | null;\n  test_precision_at_k: number | null;\n  test_brier_score: number | null;\n  is_auc: number | null;\n  is_oos_gap: number | null;\n  top_features: string[];\n}\n\nexport interface WalkForwardResult {\n  mode: 'rolling' | 'expanding';\n  n_periods: number;\n  period_results: WalkForwardPeriod[];\n  mean_oos_auc: number;\n  std_oos_auc: number;\n  min_oos_auc: number;\n  max_oos_auc: number;\n  oos_hit_rate: number;\n  mean_is_oos_gap: number;\n  auc_trend: 'improving' | 'degrading' | 'stable';\n  degradation_periods: number[];\n  feature_stability: Record<string, number>;\n  assessment: 'robust' | 'moderate' | 'unstable';\n}\n\nexport interface WalkForwardMultiModeResult {\n  rolling?: WalkForwardResult;\n  expanding?: WalkForwardResult;\n}\n\nexport interface AdversarialFeatureTest {\n  ks_statistic?: number;\n  ks_pvalue?: number;\n  psi?: number;\n  status: 'stable' | 'warning' | 'severe';\n  method?: string;\n}\n\nexport interface AdversarialDistributionTest {\n  auc: number;\n  std: number;\n  status: 'good' | 'warning' | 'severe';\n  top_discriminating_features: string[];\n}\n\nexport interface AdversarialLeakageDetection {\n  suspicious_features: string[];\n  autocorrelation_flags: Record<string, {\n    future_corr: number;\n    lag_1_corr: number;\n    is_suspicious: boolean;\n  }>;\n  status: 'ok' | 'skipped';\n}\n\nexport interface AdversarialResult {\n  distribution_test: AdversarialDistributionTest;\n  feature_level_tests: Record<string, AdversarialFeatureTest>;\n  leakage_detection: AdversarialLeakageDetection;\n  overall_status: 'good' | 'warning' | 'severe';\n  recommendations: string[];\n}\n\nexport interface CPCVPathResult {\n  path_index: number;\n  test_groups: number[];\n  auc: number | null;\n  n_train: number;\n  n_test: number;\n}\n\nexport interface CPCVResult {\n  config: {\n    n_groups: number;\n    n_test_groups: number;\n    purge_gap: number;\n    embargo_pct: number;\n  };\n  n_paths: number;\n  summary: {\n    mean_auc: number;\n    std_auc: number;\n    min_auc: number;\n    max_auc: number;\n    hit_rate: number;\n  };\n  path_results: CPCVPathResult[];\n  path_aucs: number[];\n  backtest_paths: number[][];\n  feature_stability: Record<string, number>;\n  status?: 'skipped';\n  skipped?: SkippedResult;\n}\n\nexport interface LearningCurveDataCurve {\n  fractions: number[];\n  train_scores: number[];\n  cv_scores: number[];\n  cv_stds?: number[];\n  feature_names?: string[];\n}\n\nexport interface LearningCurveFeatureCurve {\n  feature_counts: number[];\n  cv_scores: number[];\n  optimal_n_features: number;\n  feature_ranking: string[];\n}\n\nexport interface LearningCurveDiagnosis {\n  type: 'high_bias' | 'high_variance' | 'good_fit' | 'no_predictive_power' | 'insufficient_data';\n  description: string;\n  train_cv_gap: number;\n  convergence: boolean;\n  recommendation: string;\n}\n\nexport interface LearningCurveResult {\n  data_curve: LearningCurveDataCurve;\n  feature_curve: LearningCurveFeatureCurve;\n  diagnosis: LearningCurveDiagnosis;\n}\n\nexport interface ModelEnhancementModuleResponse {\n  task_id: string;\n  status: 'running' | 'completed' | 'failed' | 'skipped';\n  module: 'calibration' | 'walk_forward' | 'sample_weight' | 'adversarial' | 'cpcv' | 'learning_curve';\n  result?: Record<string, unknown>;\n  skipped_reason?: string | null;\n  execution_time_seconds?: number;\n  created_at: string;\n}\n\nexport interface ModelEnhancementResult {\n  modules: {\n    calibration?: CalibrationResult;\n    walk_forward?: WalkForwardResult | WalkForwardMultiModeResult;\n    adversarial?: AdversarialResult;\n    cpcv?: CPCVResult;\n    learning_curve?: LearningCurveResult;\n    sample_weight?: Record<string, unknown>;\n  };\n  module_statuses?: Record<string, ModelEnhancementModuleResponse>;\n  task_id?: string;\n  status?: 'running' | 'completed' | 'failed' | 'skipped';\n  total_execution_time_seconds?: number;\n}\n\n// ===== Phase 6: Feature Toggle 類型定義 =====\n\nexport interface FeatureToggle {\n  feature_id: string;\n  name: string;\n  description: string;\n  difficulty: 'L1' | 'L2' | 'L3';\n  is_enabled: boolean;\n  is_locked: boolean;\n  engine_types: string[];\n  dependencies: string[];\n  phase: string;\n  module?: string | null;\n  estimated_time?: string | null;\n  tags: string[];\n}\n\nexport interface FeatureToggleSummaryResponse {\n  total: number;\n  enabled: number;\n  by_difficulty: Record<string, { total: number; enabled: number }>;\n  estimated_total_seconds: number;\n}\n\nexport interface FeatureToggleListResponse {\n  toggles: FeatureToggle[];\n  summary: FeatureToggleSummaryResponse;\n  presets: string[];\n}\n\nexport interface FeatureToggleUpdateRequest {\n  enabled: boolean;\n}\n\nexport interface FeatureToggleResponse {\n  toggle: FeatureToggle;\n  cascaded: string[];\n  summary: FeatureToggleSummaryResponse;\n}\n\nexport interface BatchToggleUpdateRequest {\n  updates: Record<string, boolean>;\n}\n\nexport interface BatchToggleResponse {\n  updated: Record<string, boolean>;\n  cascaded: string[];\n  summary: FeatureToggleSummaryResponse;\n}\n\n/**\n * 參數重要性分析響應\n * 後端API返回的參數重要性數據\n */\nexport interface ImportanceAnalysisResponse {\n  /** 任務ID */\n  task_id: string;\n  /** 參數重要性列表 */\n  importances: ParamImportance[];\n  /** 分析方法 (fanova/permutation) */\n  method: string;\n  /** 計算時間戳 */\n  computed_at: string;\n}\n\n/**\n * 優化歷史響應\n * 後端API返回的優化歷程數據\n */\nexport interface OptimizationHistoryResponse {\n  /** 任務ID */\n  task_id: string;\n  /** 收斂歷史（累積最佳值） */\n  convergence_history: number[];\n  /** 所有試驗的目標值 */\n  trial_values: number[];\n  /** 試驗編號列表 */\n  trial_numbers: number[];\n  /** 試驗狀態列表 */\n  trial_states: string[];\n  /** 總試驗次數 */\n  total_trials: number;\n  /** 完成試驗次數 */\n  completed_trials: number;\n  /** 剪枝試驗次數 */\n  pruned_trials: number;\n  /** 失敗試驗次數 */\n  failed_trials: number;\n}\n\n/**\n * 參數空間響應\n * 後端API返回的參數空間探索數據\n */\nexport interface ParamSpaceResponse {\n  /** 任務ID */\n  task_id: string;\n  /** 所有試驗數據 */\n  trials: {\n    /** 試驗編號 */\n    number: number;\n    /** 參數字典 */\n    params: Record<string, unknown>;\n    /** 目標值 */\n    value: number;\n    /** 狀態 */\n    state: string;\n  }[];\n  /** 參數名稱列表 */\n  param_names: string[];\n  /** 參數範圍 */\n  param_ranges: Record<string, { min: number; max: number }>;\n}\n\n/**\n * 策略對比結果\n * 多個策略的並列對比數據\n */\nexport interface ComparisonResult {\n  /** 對比的策略列表 */\n  strategies: {\n    /** 任務ID */\n    task_id: string;\n    /** 策略名稱 */\n    name: string;\n    /** 核心指標 */\n    metrics: {\n      separation: number;\n      p_value: number;\n      cohens_d: number;\n      cv: number;\n      positive_density: number;\n      negative_density: number;\n    };\n    /** 最佳參數 */\n    best_params: StrategyParameters;\n  }[];\n  /** 對比時間戳 */\n  compared_at: string;\n}\n\n/**\n * 匯出格式類型\n */\nexport type ExportFormat = 'csv' | 'png' | 'pdf';\n\n/**\n * 圖表類型\n */\nexport type ChartType = \n  | 'box_plot'           // 箱型圖\n  | 'histogram'          // 直方圖\n  | 'violin_plot'        // 小提琴圖\n  | 'convergence'        // 收斂曲線\n  | 'param_importance'   // 參數重要性\n  | 'stability'          // 穩定性時間序列\n  | 'param_space_2d'     // 2D參數空間\n  | 'param_space_3d'     // 3D參數空間\n  | 'pareto_front';      // Pareto前沿\n\n/**\n * 圖表配置\n */\nexport interface ChartConfig {\n  /** 圖表類型 */\n  type: ChartType;\n  /** 圖表標題 */\n  title: string;\n  /** 圖表寬度 */\n  width?: number;\n  /** 圖表高度 */\n  height?: number;\n  /** 是否顯示圖例 */\n  showLegend?: boolean;\n  /** 自定義顏色方案 */\n  colors?: string[];\n}\n\n/**\n * 統計顯著性等級\n */\nexport type SignificanceLevel = 'highly_significant' | 'significant' | 'not_significant';\n\n/**\n * 效果量等級\n */\nexport type EffectSizeLevel = 'large' | 'medium' | 'small' | 'negligible';\n\n/**\n * 穩定性等級\n */\nexport type StabilityLevel = 'stable' | 'moderate' | 'unstable';\n\n/**\n * 策略質量評估\n */\nexport interface StrategyQualityAssessment {\n  /** 整體評級 (excellent/good/weak) */\n  overall_rating: 'excellent' | 'good' | 'weak';\n  /** 統計顯著性等級 */\n  significance: SignificanceLevel;\n  /** 效果量等級 */\n  effect_size: EffectSizeLevel;\n  /** 穩定性等級 */\n  stability: StabilityLevel;\n  /** 警告信息 */\n  warnings: string[];\n  /** 建議信息 */\n  recommendations: string[];\n}\n\n/**\n * 獲取統計顯著性等級\n */\nexport function getSignificanceLevel(pValue: number): SignificanceLevel {\n  if (pValue < 0.01) return 'highly_significant';\n  if (pValue < 0.05) return 'significant';\n  return 'not_significant';\n}\n\n/**\n * 獲取效果量等級\n */\nexport function getEffectSizeLevel(cohensD: number): EffectSizeLevel {\n  const absD = Math.abs(cohensD);\n  if (absD >= 0.8) return 'large';\n  if (absD >= 0.5) return 'medium';\n  if (absD >= 0.2) return 'small';\n  return 'negligible';\n}\n\n/**\n * 獲取穩定性等級\n */\nexport function getStabilityLevel(cv: number): StabilityLevel {\n  if (cv < 0.3) return 'stable';\n  if (cv < 0.5) return 'moderate';\n  return 'unstable';\n}\n\n/**\n * 評估策略質量\n */\nexport function assessStrategyQuality(\n  result: OptimizationResult\n): StrategyQualityAssessment {\n  const { separation, p_value, cohens_d, stability_cv } = result.density_analysis;\n  \n  // NaN 檢查：數據包含無效值時返回弱評級\n  if (isNaN(separation) || isNaN(p_value) || isNaN(cohens_d) || isNaN(stability_cv)) {\n    return {\n      overall_rating: 'weak',\n      significance: 'not_significant',\n      effect_size: 'negligible',\n      stability: 'unstable',\n      warnings: ['數據包含無效值 (NaN)，無法進行質量評估'],\n      recommendations: ['請檢查輸入數據的完整性']\n    };\n  }\n  \n  const significance = getSignificanceLevel(p_value);\n  const effectSize = getEffectSizeLevel(cohens_d);\n  const stability = getStabilityLevel(stability_cv);\n  \n  const warnings: string[] = [];\n  const recommendations: string[] = [];\n  \n  // 判斷整體評級\n  let overallRating: 'excellent' | 'good' | 'weak' = 'weak';\n  \n  if (separation > 0.3 && p_value < 0.05 && cohens_d > 0.5 && stability_cv < 0.5) {\n    overallRating = 'excellent';\n  } else if (separation > 0.2 && p_value < 0.10) {\n    overallRating = 'good';\n  }\n  \n  // 生成警告\n  if (p_value >= 0.05) {\n    warnings.push(`統計顯著性不足 (p-value = ${p_value.toFixed(4)})`);\n    recommendations.push('建議增加樣本數量或調整策略參數');\n  }\n  \n  if (cohens_d < 0.2) {\n    warnings.push(`效果量較小 (Cohen's d = ${cohens_d.toFixed(2)})`);\n    recommendations.push('策略區分能力較弱，可能需要優化參數範圍');\n  }\n  \n  if (stability_cv > 0.5) {\n    warnings.push(`穩定性較差 (CV = ${stability_cv.toFixed(2)})`);\n    recommendations.push('策略在不同時期表現波動大，需謹慎使用');\n  }\n  \n  return {\n    overall_rating: overallRating,\n    significance,\n    effect_size: effectSize,\n    stability,\n    warnings,\n    recommendations,\n  };\n}\n\n// ===== Phase 2.4: IC 分析 UI 類型定義 =====\n\nexport interface ICAnalysisConfig {\n  features_path: string;\n  symbol?: string;\n  timeframe?: string;\n  config_hash?: string;\n  cross_sectional_runs?: { symbol: string; config_hash: string }[];\n  labels_path?: string;\n  meta_path?: string;\n  mode: 'global' | 'event' | 'cross_sectional';\n  cross_sectional_symbols?: string[];\n  event_query?: string;\n  /**\n   * legacy 事件路徑之時間戳。\n   * 🔴 **選了 `event_import_id` 時不得同時送**（後端定死互斥 ⇒ 422，兩個真相源）。\n   * 🔴 Task 7.7 ⑦ 起，選批**不再**寫入本欄——映射由後端依 receipt 之 `decision_at_ms` 產生。\n   */\n  event_timestamps?: number[];\n  /** GAP-3 B5.2：從已匯入事件批（/case/events）選事件。Task 7.0b ③ 起**直接送到後端**。 */\n  event_import_id?: string;\n  /**\n   * GAP-3 UX Task 7.0b ③：分析參數，**只作用於本次分析、不回寫事件批**。\n   *\n   * 🔴 `horizon_bars` 之缺省為**字面常數 `1`**——**禁**以匯出檔／已落檔批之\n   * `label_definition.window.horizon_bars` 種子化：該欄語意為 D-7 深度宣告，\n   * 分析層禁止讀成答案窗（既有批之殘值為 `3`，種子化＝靜默給錯預設答案窗）。\n   * 其餘三鍵之初始值由**後端**取該批 F-0 種子，前端不猜。\n   */\n  event_label_spec?: {\n    horizon_bars: number;\n    entry_price_semantic?: string;\n    label_return_mode?: string;\n    decision_offset_bars?: number;\n  };\n  /**\n   * `G3-D2` D4.3：k／h 掃描網格之上界（裁定③「填 m 就掃 0～m」，h 自 1 起）。\n   *\n   * 🔴 **請求頂層 sibling，不在 `event_label_spec` 內**——後者恆四鍵，\n   * 多一鍵後端 normalizer 直接 fail-closed。\n   * 未掃描 ⇒ 整個鍵**省略**（送空物件在後端仍代表「有掃描」）。\n   */\n  event_label_scan?: ICEventLabelScan;\n  /**\n   * EVTLABEL Task 3.2：事件 label 之取用模式。\n   *\n   * - `imported_binary`：直接對匯入的 0/1 正反標籤算分辨力（AUC／rank-biserial）。\n   * - `return_rule`：一律用規則重算的報酬。\n   * - `auto`（預設）：有可用的 0/1 就用，否則退回報酬版並在報告寫明原因。\n   *\n   * 🔴 只在**事件批**分支（帶 `event_import_id`）送；非 auto 而缺批 ⇒ 後端 400。\n   * 實際採用哪一種由後端切分後決定，前端送的是**請求**不是結論。\n   */\n  event_label_mode?: ICEventLabelMode;\n  horizons: number[];\n  thresholds: {\n    ic_mean_min: number;\n    icir_min: number;\n    p_value_max: number;\n    monotonicity_score_min?: number;\n    correlation_threshold: number;\n  };\n  feature_tiers?: FeatureTierConfig;\n}\n\nexport type FeatureTierLevel = 'foundation' | 'intermediate' | 'advanced' | 'custom';\n\nexport interface FeatureTierConfig {\n  active_preset: FeatureTierLevel;\n  custom_overrides?: {\n    stage_overrides?: Record<string, boolean>;\n    module_overrides?: Record<string, boolean>;\n  };\n}\n\nexport interface FeatureToggleItem {\n  key: string;\n  label: string;\n  tier: 'L1' | 'L2' | 'L3';\n  locked: boolean;\n  enabled: boolean;\n  tooltip: string;\n  category: 'stage' | 'module';\n}\n\nexport interface ICFeatureInfo {\n  rank: number;\n  feature_name: string;\n  ic_mean: number;\n  ic_std?: number;\n  /**\n   * EVTLABEL Task 3.9：匯入標籤模式之分辨力欄（欄集＝契約 `summary_columns_binary`）。\n   *\n   * 🔴 只在該模式下存在——`rank_biserial` 是否為 `undefined` 即「本次是不是 binary 模式」\n   * 之判準（表格據此決定要不要渲染這幾欄），所以**不得**補預設值。\n   * 名稱一律統計學標準名：`auc`（ROC AUC）、`rank_biserial`（rank-biserial r＝2·AUC−1）、\n   * `mw_u`（Mann-Whitney U）、`mw_p_value`（雙尾 p）、`mw_p_value_adj`（BH-FDR q）。\n   */\n  rank_biserial?: number;\n  auc?: number;\n  mw_u?: number;\n  mw_p_value?: number;\n  mw_p_value_adj?: number;\n  n_pos_selection?: number;\n  n_neg_selection?: number;\n  n_used_binary?: number;\n  binary_status?: string;\n  /** EVTWARMUP：事件路徑 rolling 視窗 > 事件數時為 null（診斷欄，不進門檻）；UI 顯示 `--`。 */\n  icir: number | null;\n  /** HAC raw p；舊 report / 不可用時可為 null（CODEX-6） */\n  p_value?: number | null;\n  /** BH FDR q（p_value_adj）；舊 report 可缺欄 */\n  p_value_adj?: number | null;\n  ic_hit_rate?: number;\n  /** HAC t-stat；禁前端 i.i.d. 推導 */\n  t_stat?: number | null;\n  monotonicity_score?: number;\n  coverage?: number;\n  turnover_rate?: number;\n}\n\nexport interface ICDecayData {\n  horizons: number[];\n  ic_values: number[];\n  half_life?: number;\n  peak_horizon?: number;\n  decay_rate?: number;\n  decay_type?: string;\n  fit_r2?: number;\n}\n\nexport interface TurnoverTimeSeriesData {\n  /** S2/RULING-5: warmup [0, first_valid) 為 null；長度=源 raw n */\n  quantile_turnovers: (number | null)[];\n  rank_change_rates: (number | null)[];\n  timestamps: Array<number | string>;\n}\n\nexport interface TurnoverFeatureData {\n  quantile_turnover?: number;\n  rank_change_rate?: number;\n  autocorrelation?: number;\n  time_series?: TurnoverTimeSeriesData;\n}\n\n// ===== ICHC 契約對應段（SoT＝momentum/Analysis/contracts/ic_report_contract.json；Task 5.2 機檢三方一致，勿在此自行增刪值）=====\nexport type CapabilityStatus =\n  | 'ok'\n  | 'not_applicable'\n  | 'not_computed'\n  | 'computation_failed'\n  | 'disabled'\n  | 'unavailable';\n\nexport interface SectionStatusObject {\n  status: CapabilityStatus;\n  reason?: string;\n}\n\n/** ICHC type guard：節是 status 物件（不適用/停用…）而非 feature 資料 map */\nexport function isSectionStatus(value: unknown): value is SectionStatusObject {\n  return (\n    typeof value === 'object' &&\n    value !== null &&\n    'status' in value &&\n    typeof (value as { status: unknown }).status === 'string'\n  );\n}\n// ===== ICHC 契約對應段結束 =====\n\nexport interface QuantileReturnData {\n  quantile_mean_returns: Record<string, number>;\n  long_short_spread?: number;\n  long_short_tstat?: number;\n  monotonicity_score?: number;\n  cumulative_returns?: Record<string, number[]>;\n}\n\nexport interface EquityCurvePoint {\n  bar_index: number;\n  Q1: number;\n  Q5: number;\n  ls_spread: number;\n  drawdown?: number;\n}\n\nexport interface CorrelationMatrix {\n  features: string[];\n  matrix: number[][];\n}\n\nexport interface CrossSectionalICMatrix {\n  symbols: string[];\n  features: string[];\n  matrix: Record<string, Record<string, number | null>>;\n}\n\nexport interface CrossSymbolValidationSummary {\n  status?: 'completed' | 'skipped' | 'not_run';\n  reason?: string | null;\n  consistency_score?: number | null;\n  best_symbol?: string | null;\n  worst_symbol?: string | null;\n  symbol_scores?: Record<string, number>;\n  feature_summary?: {\n    total_features?: number;\n    universal_features?: number;\n    symbol_specific_features?: number;\n    sign_conflict_features?: number;\n  };\n  samples?: {\n    universal_features?: string[];\n    symbol_specific_features?: string[];\n    sign_conflict_features?: string[];\n  };\n  suggestions?: string[];\n}\n\nexport interface FilterLogStage {\n  input: number;\n  output: number;\n  removed_reasons?: Record<string, number>;\n}\n\nexport interface FilterLogData {\n  [stage: string]: FilterLogStage;\n}\n\nexport type RollingICSeries = Record<string, number[]>;\n\nexport type GroupedICData = Record<string, Record<string, number> | Record<string, Record<string, number>>>;\n\n// ===== GAP-2 邊際 IC／倖存者輸出（SoT＝momentum/Analysis/contracts/ic_survivor_contract.json；此處為前端型別鏡像，欄名以契約為準；ICHC 契約段外）=====\nexport interface MarginalICPerFeature {\n  status: CapabilityStatus;\n  reason: string | null;\n  conditioning_set: string[];\n  marginal_ic: number | null;\n  gross_ic: number | null;\n  ic_retained_ratio: number | null;\n  marginal_ic_train_insample: number | null;\n  ci95: [number, number] | null;\n  condition_number: number | null;\n  r2_train: number | null;\n  n_used_train: number;\n  n_used_test: number;\n}\n\nexport interface MarginalICSequentialEntry extends MarginalICPerFeature {\n  feature: string;\n  step: number;\n}\n\nexport interface MarginalICComposite {\n  status: CapabilityStatus;\n  reason: string | null;\n  method?: 'equal' | 'ic_weighted';\n  weights?: Record<string, number>;\n  signs?: Record<string, number>;\n  excluded?: Record<string, string>;\n  composite_ic?: number | null;\n  composite_ic_train_insample?: number | null;\n  top_train_single?: string | null;\n  top_train_single_test_ic?: number | null;\n  best_single_test_ic?: number | null;\n  best_single_feature?: string | null;\n  delta_vs_top_train_single?: number | null;\n  delta_ci95?: [number, number] | null;\n  n_used_test?: number;\n  n_used_train?: number;\n  fit_scope?: 'train' | 'full_sample' | null;\n  oos_guarantees?: boolean | null;\n}\n\nexport interface MarginalICSection {\n  status: CapabilityStatus;\n  reason: string | null;\n  fit_scope: 'train' | 'full_sample' | null;\n  oos_guarantees: boolean | null;\n  pass_class: 'oos' | 'full_sample_research_only' | null;\n  statistic: string;\n  projection_space: string;\n  /** D3′：恆 false（契約 independent_oos_validation_allowed=[false]） */\n  independent_oos_validation: boolean;\n  selection_sample: string;\n  oos_semantics: string;\n  algorithm_version: string;\n  views: Record<string, SectionStatusObject>;\n  per_feature: Record<string, MarginalICPerFeature>;\n  sequential: MarginalICSequentialEntry[];\n  removed_candidates: Record<string, MarginalICPerFeature>;\n  train_ic: Record<string, number | null>;\n  n_train: number | null;\n  n_test: number | null;\n  n_regressions: number;\n  budget: Record<string, number>;\n  composite?: MarginalICComposite;\n}\n\n/** 報告 metadata.survivor_output 五鍵（契約 survivor_output_status_keys） */\nexport interface SurvivorOutputMeta {\n  status: CapabilityStatus;\n  reason: string | null;\n  path: string | null;\n  sha256: string | null;\n  case_id: string;\n}\n\n/** type guard：完整邊際 IC 節（含 per_feature）而非純 status 物件 */\nexport function isMarginalICSection(value: unknown): value is MarginalICSection {\n  return (\n    isSectionStatus(value) &&\n    typeof (value as { per_feature?: unknown }).per_feature === 'object' &&\n    (value as { per_feature?: unknown }).per_feature !== null\n  );\n}\n// ===== GAP-2 段結束 =====\n\nexport interface ICReport {\n  version?: string;\n  /** LA-1 B3：ok_oos | degraded_full_sample（optional 相容舊 artifact；禁 |string 塌 union） */\n  analysis_status?: 'ok_oos' | 'degraded_full_sample';\n  /** LA-1 B3：root 鏡像 OOS 保證（optional 相容舊 artifact） */\n  oos_guarantees?: boolean;\n  metadata?: Record<string, unknown> & { survivor_output?: SurvivorOutputMeta };\n  filter_log?: FilterLogData;\n  summary_table?: ICFeatureInfo[];\n  /** GAP-2 Task 5.1：邊際 IC／多因子組合節（status object 或完整節；舊報告缺席） */\n  marginal_ic?: MarginalICSection | SectionStatusObject;\n  /** ICHC Task 3.2：五節 union——SectionStatusObject（xsec 不適用）或 legacy 資料形 */\n  ic_decay?: SectionStatusObject | Record<string, ICDecayData>;\n  quantile_returns?: SectionStatusObject | Record<string, QuantileReturnData>;\n  correlation_matrix?: CorrelationMatrix;\n  grouped_ic?: SectionStatusObject | GroupedICData;\n  rolling_ic_series?: Record<string, RollingICSeries>;\n  turnover_analysis?: SectionStatusObject | Record<string, TurnoverFeatureData>;\n  /** coverage 目前無 UI consumer（wiring allowlist 具名孤兒欄）；型別先入契約 */\n  coverage_analysis?: SectionStatusObject | Record<string, unknown>;\n  diversification_metrics?: Record<string, number>;\n  cross_sectional_symbol_ic?: CrossSectionalICMatrix;\n  cross_symbol_validation?: CrossSymbolValidationSummary;\n  ai_summary?: string;\n  deep_analysis_enabled?: boolean;\n  deep_analysis_version?: string;\n  deep_analysis_errors?: SkippedResult[];\n  module_statuses?: ModuleStatus[];\n  deep_analysis_summary?: {\n    total: number;\n    completed: number;\n    skipped: number;\n    failed: number;\n  };\n  factor_returns?: FactorReturnData;\n  factor_centrality?: FactorCentralityData;\n  trend_analysis?: TrendAnalysisData;\n  parameter_sensitivity?: ParameterSensitivityData;\n  rolling_oos?: RollingOOSData;\n  factor_orthogonalization?: FactorOrthogonalizationData;\n  factor_exposure?: FactorExposureData;\n  long_short_analysis?: LongShortAnalysisData;\n  feature_quality_diagnostics?: FeatureQualityDiagnosticsData;\n  net_ic_analysis?: NetICAnalysisData;\n}\n\nexport interface FeatureListItem {\n  feature_name: string;\n  category?: string | null;\n  data_source?: string | null;\n  family?: string | null;\n  layer?: number | null;\n}\n\nexport interface FeatureFilterConfig {\n  include_features?: string[];\n  exclude_features?: string[];\n  include_pattern?: string;\n  include_categories?: string[];\n  include_data_sources?: string[];\n  include_families?: string[];\n  max_features?: number;\n}\n\nexport interface DeepAnalysisModules {\n  factor_return: boolean;\n  factor_centrality: boolean;\n  trend_analysis: boolean;\n  parameter_sensitivity: boolean;\n  rolling_oos: boolean;\n  factor_orthogonalization: boolean;\n  factor_exposure: boolean;\n  long_short_analysis: boolean;\n  feature_quality_diagnostics: boolean;\n  net_ic_analysis: boolean;\n}\n\n/** Deep analysis 成本參數(與 API NetICAnalysisRequest 同構)。 */\nexport interface NetICAnalysisRequest {\n  cost_enabled: boolean;\n  cost_bps?: number | null;\n}\n\nexport interface DeepAnalysisConfig {\n  selected_features?: string[];\n  top_n?: number;\n  modules: DeepAnalysisModules;\n  config_override?: Record<string, unknown>;\n  /** request 欄名 net_ic;config/模組鍵 net_ic_analysis — 不得混用。 */\n  net_ic?: NetICAnalysisRequest;\n}\n\n/** deep module_summary 合法 scalar 狀態（D-4 completed_partial；closed union，禁 `| string` 逃生） */\nexport type ModuleSummaryStatus =\n  | 'completed'\n  | 'completed_partial'\n  | 'skipped'\n  | 'unavailable'\n  | 'not_run';\n\nexport interface ModuleStatus {\n  module_name: string;\n  status: ModuleSummaryStatus;\n  reason?: string;\n  error_type?: string;\n}\n\nexport interface DeepAnalysisResponse {\n  task_id: string;\n  status: string;\n  progress: number;\n  current_step?: string | null;\n  applied_tier?: string | null;\n  summary?: {\n    total_modules: number;\n    completed_count: number;\n    skipped_count: number;\n    failed_count: number;\n    total_execution_time_s: number;\n  } | null;\n  module_status?: ModuleStatus[] | null;\n  results?: Record<string, unknown> | null;\n  error?: string | null;\n}\n\nexport type WatchlistStatus = 'candidate' | 'verified' | 'rejected' | 'watching';\n\nexport interface WatchlistEntry {\n  feature_name: string;\n  task_id: string;\n  status: WatchlistStatus;\n  note: string;\n  ic_snapshot: number | null;\n  icir_snapshot: number | null;\n  turnover_snapshot?: number | null;\n  added_at: string;\n  updated_at: string;\n}\n\nexport interface WatchlistExportPayload {\n  version: '1.0';\n  exported_at: string;\n  entries: WatchlistEntry[];\n}\n\nexport interface SkippedResult {\n  module_name: string;\n  reason: string;\n  error_type: string;\n  retryable?: boolean;\n  timestamp?: string;\n}\n\n/**\n * IC1C-FR-FULL §U: results.factor_returns = discriminated union。\n * ok → value 含 metadata + features(非裸 feature map); unavailable → value=null + reason。\n * legacy 裸 map 僅 runtime 可能殘留,型別不收納為合法形狀。\n */\n/** 單特徵 payload(ok union value.features 葉)。 */\nexport type FactorReturnFeaturePayload = {\n  long_short_mean_return?: number;\n  ls_cumulative_sampled?: number[];\n  risk_metrics?: {\n    sharpe_ratio?: number;\n    [key: string]: number | undefined;\n  };\n  active_bar_count?: number;\n  turnover?: number | number[];\n  quantile_summary?: Record<string, unknown>;\n  num_quantiles_used?: number;\n  /** legacy 欄位保留型別可讀性;ok 路徑不依賴 */\n  quantile_returns_summary?: Record<string, number>;\n  cumulative_returns_sampled?: Record<string, number[]>;\n  skipped?: boolean;\n  reason?: string;\n};\n\n/** @deprecated 僅供 runtime legacy 辨識;ok 路徑不用此形狀 */\nexport type FactorReturnLegacyFeaturePayload = FactorReturnFeaturePayload;\n\n/** @deprecated 裸 feature map(無 status);sanitizer 擋,前端不繪 */\nexport type FactorReturnLegacyMap = Record<string, FactorReturnFeaturePayload>;\n\n/** §U ok value: metadata 與 features 分層(SPEC §U / F3.1)。literal 鎖死,禁 `| string` 放寬。 */\nexport type FactorReturnDataOkValue = {\n  schema_version: 'fr_full_v1';\n  semantics: 'single_asset_factor_timing_ls';\n  quantile_fit: 'pit_expanding';\n  return_transform: 'identity';\n  turnover_semantics?: string;\n  warmup_periods?: number;\n  features: Record<string, FactorReturnFeaturePayload>;\n};\n\nexport type FactorReturnDataOk = {\n  status: 'ok';\n  value: FactorReturnDataOkValue;\n  reason: null;\n};\n\nexport type FactorReturnDataUnavailable = {\n  status: 'unavailable';\n  value: null;\n  reason: string;\n};\n\n/** ICReport.factor_returns / API 節 = §U union(非只新增旁路型別)。 */\nexport type FactorReturnData = FactorReturnDataOk | FactorReturnDataUnavailable;\n\nexport interface FactorCentralityData {\n  pca_summary?: {\n    explained_variance_ratio?: number[];\n    total_variance_explained?: number;\n    effective_rank?: number;\n    n_components_used?: number;\n    crowded_threshold?: number;\n  };\n  features?: Record<string, {\n    centrality?: number;\n    crowded?: boolean;\n    risk_level?: string;\n    percentile_rank?: number;\n    trend?: string;\n  }>;\n  crowded_features?: string[];\n  independent_features?: string[];\n}\n\nexport interface TrendResult {\n  slope?: number;\n  p_value?: number;\n  r_squared?: number;\n  tail_estimate?: number;\n  trend?: 'up' | 'down' | 'flat' | 'indeterminate' | string;\n  interpretation?: string;\n}\n\nexport type TrendAnalysisData = Record<string, {\n  ic_trend?: TrendResult;\n  centrality_trend?: TrendResult;\n  factor_return_trend?: TrendResult;\n  ls_spread_trend?: TrendResult;\n  combined_signal?: {\n    recommendation?: string;\n    reason?: string;\n    action?: string;\n  };\n}>;\n\nexport interface ParameterSensitivityFamily {\n  variants?: string[];\n  param_axis?: string;\n  sensitivity_table?: Array<{\n    variant: string;\n    param_value: string | number;\n    ic_mean: number;\n    icir: number;\n  }>;\n  stability_metrics?: {\n    ic_std_across_params?: number;\n    icir_std_across_params?: number;\n    overfitting_risk?: 'low' | 'medium' | 'high' | string;\n    best_param?: string | number;\n  };\n}\n\nexport interface ParameterSensitivityData {\n  families?: Record<string, ParameterSensitivityFamily>;\n  summary?: {\n    total_families?: number;\n    high_risk_count?: number;\n    robust_count?: number;\n  };\n  high_risk_families?: string[];\n  robust_families?: string[];\n}\n\nexport interface RollingOOSFeatureResult {\n  oos_stability?: {\n    mean_oos_ic?: number;\n    std_oos_ic?: number;\n    oos_hit_rate?: number;\n    mean_is_oos_gap?: number;\n    oos_icir?: number;\n    degradation_ratio?: number;\n  };\n  assessment?: 'robust' | 'moderate' | 'overfitting' | string;\n  splits_sampled?: Array<{\n    split_id: number;\n    is_ic: number;\n    oos_ic: number;\n  }>;\n  skipped?: boolean;\n  reason?: string;\n}\n\nexport interface RollingOOSData {\n  config?: {\n    train_window?: number;\n    test_window?: number;\n    step?: number;\n    n_splits?: number;\n  };\n  features?: Record<string, RollingOOSFeatureResult>;\n  summary?: {\n    total_validated?: number;\n    robust_count?: number;\n    moderate_count?: number;\n    overfitting_count?: number;\n  };\n}\n\nexport type LongShortFeatureResult = {\n  long_analysis?: {\n    mean_return?: number;\n    ic?: number;\n    hit_rate?: number;\n    sharpe?: number;\n    side?: string;\n    samples?: number;\n  };\n  short_analysis?: {\n    mean_return?: number;\n    ic?: number;\n    hit_rate?: number;\n    sharpe?: number;\n    side?: string;\n    samples?: number;\n  };\n  asymmetry?: {\n    type?: string;\n    long_contribution?: number;\n    short_contribution?: number;\n    ratio?: number;\n  };\n  recommendation?: string;\n  num_quantiles_used?: number;\n  skipped?: boolean;\n  reason?: string;\n};\n\nexport type LongShortAnalysisData = Record<string, LongShortFeatureResult>;\n\nexport interface FactorOrthogonalizationData {\n  orthogonalization_matrix?: number[][];\n  feature_names?: string[];\n  residual_variance_ratio?: Record<string, number>;\n}\n\n/**\n * B3/B5 幽靈契約：factor_attribution 三態 discriminated union。\n * - unavailable：§U 三鍵（未接真 OLS）\n * - ok：B1+ 新形（必有 status:'ok' + intercept + 非 null 數值）\n * - legacy：真 p0 舊 stub 形（無 status、數值可 null、無 intercept）\n * 反例 `{factor_betas:{x:1}}` 不得被當成 unavailable（須靠 status 判別）。\n */\nexport type FactorAttributionUnavailable = {\n  status: 'unavailable';\n  value: null;\n  reason: string;\n  /** 禁幽靈數值欄與 unavailable 共存 */\n  factor_betas?: never;\n  alpha?: never;\n  r_squared?: never;\n  intercept?: never;\n  unexplained?: never;\n  attribution?: never;\n};\n\n/** B1+ 接真 OLS 形：status 必為 'ok'，數值非 null，含 intercept */\nexport type FactorAttributionOk = {\n  status: 'ok';\n  alpha: number;\n  r_squared: number;\n  intercept: number;\n  unexplained: number;\n  factor_betas: Record<string, number>;\n  attribution: Record<string, number>;\n  value?: never;\n  reason?: never;\n};\n\n/**\n * 真實 p0 legacy 舊 stub 形（handoffs/ic1d_baseline/p0_before.json）：\n * 無 status、無 intercept、alpha/r_squared/unexplained 可 null、可有 factor_betas。\n * 使 typed consumer 消費真 p0 legacy 不需 unsafe cast。\n */\nexport type FactorAttributionLegacy = {\n  /** 無 status 欄；禁止寫入 status 以免與 ok/unavailable 混淆 */\n  status?: never;\n  alpha: number | null;\n  r_squared: number | null;\n  unexplained: number | null;\n  /** intercept 為 B1 才加，legacy 可缺 */\n  intercept?: number;\n  factor_betas?: Record<string, number>;\n  attribution?: Record<string, number>;\n  value?: never;\n  reason?: never;\n};\n\n/** FactorExposureData.factor_attribution = unavailable | ok | legacy */\nexport type FactorAttributionData =\n  | FactorAttributionUnavailable\n  | FactorAttributionOk\n  | FactorAttributionLegacy;\n\nexport interface FactorExposureData {\n  portfolio_exposure?: Record<string, number>;\n  neutralized_portfolio_exposure?: Record<string, number>;\n  neutralization_mode?: 'none' | 'beta_neutral' | 'vol_neutral' | string;\n  neutralization_lookback?: number;\n  neutralization_delta_hhi?: number | null;\n  factor_attribution?: FactorAttributionData;\n  concentration?: {\n    max_exposure_factor?: string | null;\n    max_exposure_value?: number;\n    hhi?: number;\n    concentrated?: boolean;\n    warnings?: string[];\n  };\n  neutralized_concentration?: {\n    max_exposure_factor?: string | null;\n    max_exposure_value?: number;\n    hhi?: number;\n    concentrated?: boolean;\n    warnings?: string[];\n  };\n}\n\nexport interface FeatureQualityDiagnosticsData {\n  adf_results?: Record<string, {\n    adf_statistic?: number;\n    p_value?: number;\n    is_stationary?: boolean;\n    skipped?: boolean;\n    reason?: string;\n  }>;\n  autocorrelation_results?: Record<string, {\n    ljungbox_stat?: number;\n    p_value?: number;\n    significant_autocorrelation?: boolean;\n    effective_sample_ratio?: number;\n    skipped?: boolean;\n    reason?: string;\n  }>;\n  drift_results?: Record<string, {\n    cusum_breakpoint?: string | null;\n    psi_score?: number;\n    drifted?: boolean;\n    skipped?: boolean;\n    reason?: string;\n  }>;\n  coverage_stats?: Record<string, {\n    coverage?: number;\n    nan_count?: number;\n    total?: number;\n  }>;\n  redundancy_scan?: {\n    high_correlation_pairs?: [string, string, number][];\n    threshold?: number;\n    method?: string;\n    skipped?: boolean;\n  };\n  quality_flags?: {\n    non_stationary?: string[];\n    high_autocorrelation?: string[];\n    low_coverage?: string[];\n    drifted?: string[];\n  };\n  summary?: {\n    total_features?: number;\n    stationary_rate?: number;\n    mean_coverage?: number;\n    low_quality_count?: number;\n  };\n}\n\n/**\n * §U conditional metric — 真 discriminated union(同構 API)。\n * ok → value 有值 + reason=null; unavailable → value=null + reason 非空。\n * 禁止 status:'ok'+value:null 或 status:'unavailable'+reason:null 等非法形狀。\n */\nexport type ConditionalMetricOk = {\n  status: 'ok';\n  value: number | boolean;\n  reason: null;\n};\n\nexport type ConditionalMetricUnavailable = {\n  status: 'unavailable';\n  value: null;\n  reason: string;\n};\n\nexport type ConditionalMetricUnion =\n  | ConditionalMetricOk\n  | ConditionalMetricUnavailable;\n\n/** capacity 子鍵集合(SPEC v1.1 精確鍵,多/少=FAIL)。 */\nexport type NetICCapacity = {\n  estimated_capacity_usd: number | null;\n  capacity_tier: string;\n  /** 恒 \"uncalibrated\"(未建 canonical capacity 校準前) */\n  calibration: 'uncalibrated';\n};\n\n/** SCHEMA_SKIPPED 精確鍵={skipped, reason};排除全部非 skipped 鍵。 */\nexport type NetICFeatureSkipped = {\n  skipped: true;\n  reason: string;\n  gross_ic?: never;\n  turnover?: never;\n  turnover_semantics?: never;\n  capacity?: never;\n  net_factor_return?: never;\n  cost_bps?: never;\n  cost_semantics?: never;\n  cost_drag_return?: never;\n  cost_sensitivity?: never;\n  breakeven_cost_bps?: never;\n  profitable_after_cost?: never;\n};\n\n/** GROSS_ONLY 共用欄(無 cost / 無 skipped)。 */\ntype NetICFeatureGrossCore = {\n  gross_ic: number;\n  turnover: number;\n  turnover_semantics: string;\n  capacity: NetICCapacity;\n  net_factor_return: ConditionalMetricUnion;\n};\n\n/** SCHEMA_GROSS_ONLY 精確鍵集合;cost_* / skipped 以 never 排除混合 profile。 */\nexport type NetICFeatureGrossOnly = NetICFeatureGrossCore & {\n  cost_bps?: never;\n  cost_semantics?: never;\n  cost_drag_return?: never;\n  cost_sensitivity?: never;\n  breakeven_cost_bps?: never;\n  profitable_after_cost?: never;\n  skipped?: never;\n  reason?: never;\n};\n\n/** SCHEMA_COST_ENABLED = GROSS core ∪ 全部 cost 鍵;排除 skipped 鍵。 */\nexport type NetICFeatureCostEnabled = NetICFeatureGrossCore & {\n  cost_bps: number;\n  cost_semantics: string;\n  cost_drag_return: number;\n  cost_sensitivity: Array<{ cost_bps: number; cost_drag_return: number }>;\n  breakeven_cost_bps: ConditionalMetricUnion;\n  profitable_after_cost: ConditionalMetricUnion;\n  skipped?: never;\n  reason?: never;\n};\n\n/** 三 profile 精確型別 union(非全 optional 單 interface;非 subtype 互滲)。 */\nexport type NetICFeatureResult =\n  | NetICFeatureSkipped\n  | NetICFeatureGrossOnly\n  | NetICFeatureCostEnabled;\n\n/** 頂層:模組 SKIPPED 或完整 features+summary。 */\nexport type NetICAnalysisSkipped = {\n  skipped: true;\n  reason: string;\n  features?: never;\n  summary?: never;\n};\n\nexport type NetICAnalysisOk = {\n  skipped?: never;\n  features: Record<string, NetICFeatureResult>;\n  summary: {\n    total_analyzed: number;\n    evaluable_count: number;\n    profitable_count: number;\n    /** cost_enabled 時存在;GROSS_ONLY 可省略 */\n    avg_cost_drag_return?: number;\n  };\n};\n\nexport type NetICAnalysisData = NetICAnalysisSkipped | NetICAnalysisOk;\n\nexport interface CorrelationMatrix {\n  method?: 'pearson' | 'spearman' | 'kendall';\n  features: string[];\n  matrix: number[][];\n  truncated?: boolean;\n  original_feature_count?: number;\n}\n\nexport interface GroupCoverageResponsePayload {\n  groups: string[];\n  symbols: string[];\n  matrix: Record<string, Record<string, number | null>>;\n  divergence: Record<string, number>;\n  summary: {\n    avg_coverage: number;\n    worst_symbol: string | null;\n    worst_group: string | null;\n    missing_symbols: string[];\n  };\n}\n\nexport interface GroupFeatureCoverageResponsePayload {\n  group_name: string;\n  features: string[];\n  symbols: string[];\n  matrix: Record<string, Record<string, number | null>>;\n  divergence: Record<string, number>;\n  row_counts: Record<string, number>;\n}\n\n// ============================================================\n// GAP-3 事件型（B5.2）：匯入批與兩張表（欄位字面以後端契約為準，前端不重算統計）\n// ============================================================\nexport interface EventImportSummary {\n  import_id: string;\n  source_name: string | null;\n  upload_sha256: string;\n  imported_at: string;\n  n_events: number;\n  symbols: string[];\n  timeframes: string[];\n  direction: string | null;\n  scenario: string | null;\n}\n\nexport interface EventImportListResponse {\n  total: number;\n  imports: EventImportSummary[];\n}\n\n/**\n * GAP-3 UX Task 7.6：事件批 detail 之**批次事實欄**（封閉五鍵，SPEC R11 定死 wire shape）。\n *\n * 🔴 `t0`／`label` 為**逐列陣列**（按 `event_id` UTF-8 升冪），元素鍵集**互不含對方**；\n *    前端**不得**由此另算一份 t0 語意（只做摘要顯示，見 `eventFieldFormatters.ts`）。\n * 🔴 `control_kind` 為 `null` 有兩種意思（批內混值／該批無此欄）\n *    ⇒ 兩者之區分在 `batch_fact_notes.control_kind_values`，不要只看 `null`。\n */\nexport interface EventBatchFacts {\n  scenario: string | null;\n  control_kind: string | null;\n  direction: string | null;\n  /** 這批的答案是怎麼來的（provenance）。批內混值或舊批未宣告 ⇒ `null`（顯示「（未宣告）」）。 */\n  label_origin: string | null;\n  t0: { event_id: string; t0_ms: number }[];\n  label: { event_id: string; label: number }[];\n}\n\n/**\n * 批次宣告種子（F-0）；分析參數區之初始值來源，**不計入**批次事實欄之鍵集。\n *\n * 🔴 `G3-D2` **D4.3**：`decision_offset_bars` **已移除**（裁定②）。k 是分析參數，\n * 同一批可以用不同 k 各分析一次 ⇒ 拿匯入檔的 k 當初始值等於讓宣告偷偷決定參數。\n * 批內**記錄**之 k 改由 `batch_fact_notes.decision_offset_bars_record_values` 揭露。\n */\nexport interface EventDeclarationSeeds {\n  entry_price_semantic: string | null;\n  label_return_mode: string | null;\n}\n\nexport interface EventImportDetail {\n  summary: EventImportSummary;\n  records: Record<string, unknown>[];\n  batch_facts: EventBatchFacts;\n  declaration_seeds: EventDeclarationSeeds;\n  batch_fact_notes: {\n    control_kind_values: string[];\n    /** `G3-D2` D4.3：批內**記錄**之 k distinct 值（升冪）；空＝該批無此欄（≠ `[0]`）。 */\n    decision_offset_bars_record_values: number[];\n  };\n  /** `G3-D2` D5.1／D5.3：`receipt.batch` 之投影（舊批兩欄皆 `null`，那是通則不是例外）。 */\n  receipt_batch: EventReceiptBatch;\n}\n\n/**\n * 沒有 OOS 保證時之**具名原因**（`GAP3_EVENT_DISCLOSURE` Task 1.3）。\n *\n * 🔴 三個列數為 `number | null`：**只有** full-sample fallback 那條路會產生它們；\n *    其餘四條降級分支（事件樣本不足／config 直設 `fit_mode=full_sample`／\n *    `split` 未套用／無 holdout 證據）只有 `reason`。\n *    後端在列數未知時填 `null`（**不是 0**）——0 會被讀成「訓練 0 列」這種假事實。\n */\nexport interface ICOosDowngrade {\n  reason: string;\n  train_rows: number | null;\n  test_rows: number | null;\n  min_test_rows: number | null;\n  /** EVTWARMUP `insufficient_test_events`：測試段事件數與地板（其他 reason 缺席） */\n  test_events?: number | null;\n  min_test_events?: number | null;\n}\n\n/** `G3-D2` D5.1：標籤規則之身分（`close_to_close` 門檻＋答案窗長度）。 */\nexport interface EventLabelRule {\n  threshold: number;\n  horizon_bars: number;\n}\n\n/**\n * `G3-D2` D5.1：批次 receipt 之投影。\n *\n * 🔴 `random_control_spec` 刻意為寬型別（`Record<string, unknown>`）：其形狀之唯一真相源＝\n *    後端契約 `receipt_schema.batch.random_control_spec`，在 TS 複寫一份等於第二份真相源\n *    （契約加葉時 TS 這份不會有人同步）。前端只讀它的少數幾個揭露欄。\n */\nexport interface EventReceiptBatch {\n  label_rule: EventLabelRule | null;\n  random_control_spec: Record<string, unknown> | null;\n}\n\n/** `G3-D2` D5.3：`POST /case/import-events/random-control` 之 body。 */\nexport interface RandomControlGenerateRequest {\n  event_import_id: string;\n  random_control_spec: Record<string, unknown>;\n}\n\n/** `G3-D2` D5.3：`POST /case/events/compare-random-control` 之 body。 */\nexport interface RandomControlCompareRequest {\n  trigger_import_id: string;\n  random_import_id: string;\n}\n\n/**\n * 規則身分閘之結論。\n *\n * 🔴 `status='unavailable'` 時兩個 prevalence 一律 `null`——**不給半套數字**。\n *    `reason` 取自後端契約之封閉集合，前端只負責把它翻成白話，**不自寫第二份字面**。\n */\nexport interface RandomControlCompareResult {\n  status: 'ok' | 'unavailable';\n  reason: string | null;\n  message: string | null;\n  trigger_prevalence: number | null;\n  random_prevalence: number | null;\n  lift: number | null;\n  n_trigger: number;\n  n_random: number;\n  sample_design: string;\n  n_requested: number | null;\n  n_drawn: number | null;\n}\n\n/**\n * EVTLABEL Task 3.2：事件 label 之取用模式（請求值，非結論）。\n *\n * 值集之單一真相源＝`momentum/Analysis/contracts/event_label_mode.json::label_modes`，\n * 由 `icLabelMode.test.ts` 對證，兩端不得各自手打。\n */\nexport type ICEventLabelMode = 'auto' | 'return_rule' | 'imported_binary';\n\n/** `G3-D2` D4.3：k／h 掃描網格之請求上界（請求**頂層 sibling**，不在 `event_label_spec` 內）。 */\nexport interface ICEventLabelScan {\n  decision_offset_bars_max?: number;\n  horizon_bars_max?: number;\n}\n\n/** 掃描網格單格之結果（行 k、列 h）。 */\nexport interface ICEventScanCell {\n  k: number;\n  h: number;\n  capability: 'available' | 'unavailable';\n  reason?: string | null;\n  n_events: number;\n  analysis_alignment_receipt_hash: string | null;\n  ic_summary?: Record<string, unknown> | null;\n}\n\n/**\n * `G3-D2` D4.2／D4.3：**後端**回傳之事件分析揭露。\n *\n * 🔴 兩個上界為**幾何／coverage 上界**（`D-001` D4.2 誠實邊界）：\n *    超過 ⇒ 幾何上必失敗；**未超過不保證**零 failures。UI 文案不得寫成成功保證。\n */\nexport interface ICEventScanDisclosure {\n  decision_offset_bars_capability?: string | null;\n  decision_offset_bars_reason?: string | null;\n  /** 批內**記錄**之 k distinct 值（事實）。 */\n  decision_offset_bars_record_values?: number[] | null;\n  /** **本次分析**採用之 k（參數）。與上一欄同名不同義。 */\n  decision_offset_bars_analysis?: number | null;\n  k_max_feasible_at_h?: number | null;\n  h_max_feasible_at_k?: number | null;\n  /** `bounded` ｜ `no_feasible_k` ｜ `no_feasible_h` ｜ `h_inert_for_mode`。 */\n  k_bound_status?: string | null;\n  h_bound_status?: string | null;\n  /** 契約 `analysis_params.decision_offset_bars_scan_max`（建議上限；超過只警示不擋）。 */\n  decision_offset_bars_scan_max?: number | null;\n  /**\n   * 🔴 `CODEX-R1-P2-04`：兩上界是**對誰**算的。\n   * `bounds_scope_symbol` ＝本次 IC 的 run symbol（`null` ⇒ 未指定、對全批算）；\n   * `bounds_scope_excluded_events` ＝因 symbol 不符而未計入上界的事件筆數。\n   */\n  bounds_scope_symbol?: string | null;\n  bounds_scope_excluded_events?: number | null;\n  event_label_scan?: {\n    scan_total: number;\n    scan_done: number;\n    scan_results: ICEventScanCell[];\n    capability: 'available' | 'unavailable';\n    reason?: string | null;\n    message?: string | null;\n    /**\n     * `SCANCUBE`：立方體之**就緒訊號＋摘要**（後端在 `build_cube` 之後才填）。\n     *\n     * 🔴 這一欄是掃描結果瀏覽器唯一可靠的「可以去抓了」訊號。\n     *    UAT（2026-09-07）：瀏覽器原本以「有沒有掃描結果」當觸發，\n     *    而掃描**進行中**就已經有結果 ⇒ 抓 manifest 得 404、狀態卡住不再重抓。\n     *    立方體是在整個網格跑完之後才寫的，所以只有本欄能代表「寫好了」。\n     */\n    cube?: ICScanCubeSummary | null;\n  } | null;\n}\n\nexport interface EventImportFailure {\n  row: number | null;\n  event_id: string | number | null;\n  field: string | null;\n  reason: string;\n}\n\nexport interface EventImportResponse {\n  accepted: boolean;\n  import_id: string | null;\n  n_rows: number;\n  n_valid: number;\n  failures: EventImportFailure[];\n  warnings: string[];\n  upload_sha256: string | null;\n  source_digest_verified: boolean;\n  contract_version: string | null;\n  stored_path: string | null;\n  /** GAP-3 UX Task 1.9／1.11／1.12：答案窗宣告 receipt（深度語意住 lookahead_bars_declared） */\n  lookahead_declaration?: EventLookaheadDeclarationReceipt | null;\n}\n\n/** GAP-3 UX Task 1.9／1.12：落檔之答案窗宣告與 L3 狀態（後端算，前端只顯示）。 */\nexport interface EventLookaheadDeclarationReceipt {\n  requires_declaration: boolean;\n  referenced_columns: string[];\n  default_window_bars: Record<string, number>;\n  declared_window_bars: Record<string, number> | null;\n  /** 逐 timeframe 的真實深度；🔴 深度語意看這個，不是 label_definition.window.horizon_bars */\n  lookahead_bars_declared: Record<string, number> | null;\n  acknowledged_unverifiable: boolean;\n  embargo_ms_by_symbol: Record<string, number>;\n  /** true ⇒ 該批禁進 train/test 切分與條件 IC，只能產事件研究表 */\n  split_blocked: boolean;\n}\n\n/**\n * GAP-3 UX Task 1.5／1.6：CSV 欄名對映之送出內容。\n *\n * `columnMapping` ＝ `{契約欄名: CSV 欄名}`；🔴 **無預設對映**（A-4′），每一項都得使用者自己選。\n * `confirmedAt` ＝ 使用者勾選「我聲明這是我標好的正反例」之時間（UTC ISO-8601），\n * 落進 receipt 之 `mapping_provenance`（Task 1.6）。\n */\nexport interface EventCsvMappingSubmission {\n  columnMapping: Record<string, string>;\n  batchDefaults?: Record<string, unknown> | null;\n  confirmedAt: string;\n  validateOnly: boolean;\n  /**\n   * 由後端在 t0 單位正規化後依契約模板逐列產生 `event_id`（殘留 `R-B2-1`）。\n   * 🔴 預設 `false`／不送＝不推斷（A-4′）；上傳位元組不因此改變。\n   */\n  deriveEventId?: boolean;\n}\n\nexport interface EventImportRejected {\n  kind: 'legacy_schema_detected' | 'new_schema_on_legacy_endpoint' | 'contract_violation' | 'parse_error'\n    | 'lookahead_declaration_required' | 'lookahead_declaration_invalid'\n    | 'lookahead_declaration_unacknowledged_lowering' | 'lookahead_declaration_unacknowledged_unverifiable' | string;\n  message: string;\n  failures: EventImportFailure[];\n  migration_hint?: Record<string, unknown> | null;\n  /** 結構化補充（如 default_window_bars／lowered_timeframes），供 UI 預填與說明 */\n  detail?: Record<string, unknown> | null;\n}\n\n/** 表格 capability：ok ⇒ 數值；其他 ⇒ 顯示 reason（不得空白） */\nexport interface EventTableStatus {\n  capability_status?: 'ok' | 'unavailable' | 'not_computed' | 'not_applicable' | string;\n  reason?: string | null;\n  [k: string]: unknown;\n}\n\n/**\n * SPLITUNIFY `R5-C3` 1.（`Task 10.6`）：事件掃描端所指定之特徵 run。\n *\n * 🔴 **三欄皆必填且非空**（後端 `FeatureRunRef` 之 `min_length=1`）：`config_hash` 缺即 422，\n * 後端**不回退最新 run**。前端同理不得自行 auto-discover——兩端各自挑 run 正是本票要消滅的形態。\n */\nexport interface EventFeatureRunRef {\n  symbol: string;\n  timeframe: string;\n  config_hash: string;\n}\n\nexport interface EventAnalyzeResponse {\n  import_id: string;\n  summary: Record<string, unknown>;\n  align_failures: { event_id: string; reason: string }[];\n  tables: {\n    event_forward_return_table: EventTableStatus;\n    binary_discrimination_table: EventTableStatus;\n    all_bars_evaluation?: EventTableStatus;\n  };\n  /** epoch ms（契約單位） */\n  event_timestamps: number[];\n  /** bar open 秒（IC 主線單位） */\n  event_timestamps_ic_seconds?: number[];\n  /** GAP-3 UX Task 1.9：該批落檔之答案窗宣告 receipt（舊批為 null） */\n  lookahead_declaration?: EventLookaheadDeclarationReceipt | null;\n  /** GAP-3 UX Task 1.12：`split` 為 `unavailable` ⇒ 該批只走事件研究，未執行切分與條件 IC */\n  capability?: { split: 'ok' | 'unavailable' | string; reason?: string };\n  /**\n   * GAP-3 UX Task 1.9：**實際**送進切分的隔離寬度。\n   * 🔴 宣告深度是下界：`source === 'lookahead_declaration_lower_bound'` 表示請求值低於宣告深度而被提高\n   * ——UI 顯示隔離寬度時必須讀 `applied_ms`，不是使用者送出的請求值。\n   */\n  embargo?: {\n    applied_ms: number | null;\n    source: 'lookahead_declaration_lower_bound' | 'request' | 'label_window_max'\n      | 'not_applicable_event_study_only' | string;\n  };\n  // ── SPLITUNIFY `R5-C3` 3.（`Task 10.5` 後端／`Task 10.6` 前端）：投影路徑之四個新欄 ──\n  // 🔴 四欄**只在帶 `feature_run` 之投影路徑**出現；event-study-only 回應無此四鍵\n  //    （不是填 `null`，是整個鍵不存在）⇒ 型別一律選填，畫面以「鍵在不在」判斷要不要渲染。\n  /**\n   * `R5-C3` 3.：鍵集＝契約 `split_unify.json` 之 `split_unify_keys`（唯一產生點\n   * `build_split_unify_disclosure`）。🔴 fail-closed 時 `n_test` 為 `null`**而非 0**，\n   * 並帶 `reason`——`0` 是「切了但測試段空」，`null` 是「根本沒切」，畫面不得混為一談。\n   */\n  split_unify?: {\n    n_test: number | null;\n    split_authority?: string | null;\n    boundary_hash?: string | null;\n    per_symbol_counts?: Record<string, number> | null;\n    reason?: string | null;\n  } | null;\n  /** `R5-C4` 1.：三段具名剔除之事件 ID 與計數，加 post-trim 特徵索引之首尾時刻。 */\n  period_alignment?: {\n    dropped_in_alignment: { count: number; ids: string[] };\n    dropped_by_coverage: { count: number; ids: string[] };\n    dropped_outside_post_trim_index: { count: number; ids: string[] };\n    post_trim_index_bounds_ms: number[];\n  } | null;\n  /** `R5-C4` 2.：非 run symbol 之事件排除揭露（symbol → 事件數與 ID）。 */\n  excluded_by_symbol?: Record<string, { count: number; event_ids: string[] }> | null;\n  /**\n   * `R5-C10` 1.：**解析後實際使用**之標籤參數（不是請求送出的值）。\n   * 🔴 使用者未指定時由後端依宣告深度導出，`seed_note` 說明預設來源——畫面顯示這一份，\n   * 顯示請求值會在「後端導出預設」時講出與實際不符的參數。\n   */\n  event_label_spec?: { spec: Record<string, unknown>; seed_note?: string | null } | null;\n}\n\n// ══════════════════════════════════════════════════════════════════════════\n// `SCANCUBE` — 掃描結果立方體之型別\n// ══════════════════════════════════════════════════════════════════════════\n\n/** 某一層之 fail-closed 狀態。🔴 `stored` 是唯一權威，**不得**以路徑存在與否推論。 */\nexport interface ICScanCubeTier {\n  stored: boolean;\n  truncated: boolean;\n  reason: string | null;\n  max_rows?: number;\n  max_rows_per_cell?: number;\n  requested_rows?: number;\n  max_bytes?: number;\n  observed_bytes?: number;\n  observed_bytes_at_stop?: number;\n  chart_bytes_observed_per_feature?: number;\n  /** 「幾格 × 幾特徵存得下」——由**執行期實測**導出，不是寫死的常數。 */\n  fits_hint?: {\n    bytes_per_feature: number;\n    max_feature_cells: number;\n    examples: { cells: number; features_per_cell: number }[];\n  } | null;\n}\n\nexport interface ICScanCubeCell {\n  k: number;\n  h: number;\n  capability: string | null;\n  reason: string | null;\n  n_events: number | null;\n  rows: number;\n  /** 🔴 該層未保存時恆為 `null`（不得填檔名，否則前端會照它請求得 404）。 */\n  path: string | null;\n  chart_path: string | null;\n}\n\nexport interface ICScanCubeManifest {\n  task_id: string;\n  symbol: string | null;\n  timeframe: string | null;\n  created_at: string;\n  k_axis: number[];\n  h_axis: number[];\n  metrics: string[];\n  chart_sections: string[];\n  /** 明確告訴使用者「這幾節不在瀏覽器內」，不得靜默省略。 */\n  excluded_sections: string[];\n  tier_a: ICScanCubeTier;\n  tier_b: ICScanCubeTier;\n  cells: ICScanCubeCell[];\n}\n\nexport interface ICScanCubeRow {\n  k: number;\n  h: number;\n  feature_name: string;\n  [metric: string]: number | string | null;\n}\n\nexport interface ICScanCubeRowsPage {\n  /** 🔴 篩選後的**真實總數**，不是本頁筆數。 */\n  total: number;\n  offset: number;\n  limit: number;\n  rows: ICScanCubeRow[];\n}\n\nexport interface ICScanCubeCharts {\n  k: number;\n  h: number;\n  feature_name: string;\n  /** 與主分析 report **同形狀**之單特徵切片（`grouped_ic` 保持 `{group:{feature:…}}` 巢狀）。 */\n  sections: Record<string, unknown>;\n}\n\n/** `scan.cube` 之摘要（掃描回應裡的那一小塊；**不含** rows／sections）。 */\nexport interface ICScanCubeSummary {\n  status: 'ok' | 'failed';\n  reason?: string;\n  created_at?: string;\n  metrics?: string[];\n  chart_sections?: string[];\n  excluded_sections?: string[];\n  tier_a?: ICScanCubeTier;\n  tier_b?: ICScanCubeTier;\n}\n\n/** EVTALIGN Task 4.1：階段內進度（後端 `/task` 之 `sub_progress`）。`eta_state==='estimating'` ⇒ 顯示「預估中」，不填假 ETA。 */\nexport interface ICSubProgress {\n  step: string | null;\n  done: number | null;\n  total: number | null;\n  eta_seconds: number | null;\n  eta_state: 'estimating' | 'ok' | 'done' | null;\n  message?: string | null;\n}\n\n/** EVTALIGN Task 4.1：後端 WARN（例：`memory_pressure_observed`）——只揭露、不擋。 */\nexport interface ICTaskWarning {\n  code: string;\n  detail?: Record<string, unknown> | null;\n}\n\n/** 降級重跑（全樣本、無 OOS 保證）之原因；後端於重跑**當下**推送，reason 與報告 `metadata.oos_downgrade.reason` 同一枚舉。 */\nexport interface ICTaskFallback {\n  reason: string;\n  details?: { train_rows?: number | null; test_rows?: number | null; min_test_rows?: number | null } | null;\n}\n\n// ===== ICRESULT_PAGING（SoT＝momentum/Analysis/contracts/ic_result_paging_contract.json；docs/ICRESULT_PAGING_SPEC.md §C-6～8） =====\nexport type ICSortOrder = 'asc' | 'desc';\n\n/** summary 分頁參數（命名對齊 Feature Factory `/browse/{task}/features`）。 */\nexport interface SummaryPageParams {\n  sort_by: string;\n  sort_order: ICSortOrder;\n  offset: number;\n  limit: number;\n  search?: string;\n  pass_class?: string;\n}\n\nexport interface ICSummaryPage {\n  total: number;\n  offset: number;\n  limit: number;\n  sort_by: string;\n  sort_order: ICSortOrder;\n  result_revision: number | null;\n  rows: ICFeatureInfo[];\n}\n\n/** 單特徵詳情：contract `per_feature_sections` 六段＋summary_row；段缺席 ⇒ null（不補假值）。 */\nexport interface ICFeatureDetail {\n  feature_name: string;\n  summary_row: ICFeatureInfo;\n  result_revision: number | null;\n  ic_decay?: ICDecayData | SectionStatusObject | null;\n  quantile_returns?: QuantileReturnData | SectionStatusObject | null;\n  turnover_analysis?: TurnoverFeatureData | SectionStatusObject | null;\n  coverage_analysis?: unknown;\n  rolling_ic_series?: RollingICSeries | null;\n  grouped_ic?: Record<string, unknown> | SectionStatusObject | null;\n}\n\n/** 漏斗 adapter 輸出：每 stage `{input, output}`，皆可 null（顯示不適用，不補 0）。 */\nexport type FilterLogFunnel = Record<string, { input: number | null; output: number | null }>;\n\n/**\n * light 視圖＝全量報告刪 contract `drop_sections` 七段（Omit 與之對齊，讀已刪段為編譯錯誤）＋附加鍵。\n * 因 ICReport 全欄 optional，ICReportLight 可指派給接受 ICReport 的既有元件。\n */\nexport type ICReportLight = Omit<\n  ICReport,\n  'summary_table' | 'ic_decay' | 'quantile_returns' | 'turnover_analysis' | 'coverage_analysis' | 'rolling_ic_series' | 'grouped_ic'\n> & {\n  view: 'light';\n  total_features: number;\n  result_revision: number | null;\n  summary_page: ICSummaryPage;\n  filter_log_funnel: FilterLogFunnel;\n};\n\nexport type FeatureDetailStatus = 'idle' | 'loading' | 'ready' | 'missing' | 'error';\n",
+     "frame_basis": "註解層同步：舊欄名 hdf5_relative_path 在 frame 時代承載 factory h5 路徑，本票後只承載 manifest 路徑",
+     "deleted_nodeids": [],
+     "coverage_note": "n/a（純註解；驗收＝npm run build 與受影響 vitest）"
+    }
+   ],
+   "uncertain": [
+    "同檔 :499、:513 之 `hdf5_path?: string | null`（BatchRetentionItem／DecisionResponse）SPEC 未要求加註解，未列。",
+    "new_content 以 HEAD 版逐位元組為底只插入 4 行註解（含結尾換行與原檔一致）。"
+   ]
+  }
+ ]
+}

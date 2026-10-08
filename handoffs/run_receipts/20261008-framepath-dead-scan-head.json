@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "command": "handoffs/run_receipts/framepath_probes/dead_scan_head.py --out handoffs/run_receipts/20261008-framepath-dead-scan-head.json",
+  "exit_code": 0,
+  "head": "6e07e0ad",
+  "scan_files": [
+    "momentum/FeatureEngineering/feature_factory.py",
+    "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+    "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py"
+  ],
+  "ref_roots": [
+    "momentum",
+    "api",
+    "scripts",
+    "tests"
+  ],
+  "ref_file_count": 1209,
+  "head_dead": [
+    "FeatureFactory._calibration_short_columns",
+    "FeatureFactory._resolve_config_float",
+    "FeaturePreprocessor._rolling_last_rank_pct_for_preprocess"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "command": "暫存 worktree（6e07e0ad）試作：wt2＝Phase 1 生產刪除（見 20261008-framepath-trial-dead.txt）＋處置表 phase≤1 以 handoffs/run_receipts/framepath_probes/text_apply.py 文字層套用；wt3＝wt2 生產改動＋Phase 2（快取／h5 storage／FeatureLibrary 後備／coverage h5／API .h5 拒絕）＋處置表 phase≤2，後再套 phase≤3；wt0＝乾淨 6e07e0ad。各檔或 nodeid 以 venv/bin/python -m pytest -q -p no:cacheprovider -o addopts=--import-mode=importlib --junitxml 逐一串行執行（單組，不並行）",
+  "exit_code": 0,
+  "date": "2026-10-08",
+  "author": "主委（Claude）",
+  "honest_bounds": "試作補丁只為驗證處置表與驗收測試之可達成性，非 b1 實作（不提交、worktree 收尾刪除）；重型檔只跑處置表所涉測試函式與原設 FFACT_USE_CGSA 為假值之 keep 測試（target_nodeids 規則見 summary），未跑整檔；Phase 3 只跑 batch2d 整檔與腳本 py_compile；macOS 8 GB 本機",
+  "text_apply": {
+    "phase_le_1": {"files": 33, "mismatch_vs_verifier_check_2": 0},
+    "phase_le_2": {"files": 48, "mismatch_vs_verifier_check_2": 0},
+    "phase_le_3": {"files": 60, "mismatch_vs_verifier_check_2": 0}
+  },
+  "summary": {
+    "phase1_light_files": "38 檔整檔跑（api／feature_library／momentum／performance／tests 根與輕量 feature_engineering）",
+    "phase1_heavy_targets": "19 nodeid：處置表 phase≤1 操作所在測試函式＋HEAD 中 FFACT_USE_CGSA 假值之 keep 測試（failopen_correctness 1、failopen_manifest 1、failopen_producer cgsa 六參數、cross_symbol 4、ffstat_dstar_failure 2、ffstat_golden 1、ffstat_layer 1、mtf_align_golden 1、b6 1、ratiounsafe 整檔）",
+    "phase2_files": "33 項（API／library／coverage 整檔 28＋重型 5 nodeid）",
+    "phase3": "tests/feature_engineering/test_batch2d_dstar_align.py 整檔＋三支改寫腳本 py_compile"
+  },
+  "disposition_fixes_from_trial": [
+    "tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_quality_gain_position_independent（G2 改寫）：CGSA 落盤保留全 NaN 死欄（meta_12h_Momentum_Divergence、meta_12h_Volatility_Regime，stable_start=None），frame L7 會刪 ⇒ 量測母體排除全 NaN 欄（探針：25 欄中 2 欄全 NaN，排除後開頭有效率 1.0）",
+    "tests/feature_engineering/test_ff_cross_symbol_value_isolation.py::test_v5_slow_solo_a_equals_batch_b_then_a_artifacts（G2 改寫）：partial 原因實得 calibration_insufficient_history 與 warmup_insufficient_history ⇒ 允許集合改為此兩封閉原因",
+    "tests/feature_engineering/test_ratiounsafe_wiring.py::test_frame_path_taggers_untouched（G2 改寫）：兩個整表 tagger 皆刪，只留 _timeframe_tagged_name",
+    "生產刪除清單補 FeatureFactory._apply_preprocessing_degradation_metadata（Phase 2 試作死碼掃描實得）",
+    "tests/api/test_framepath_api_h5.py（主委）：V2 讀回期望改用 manifest 欄集合；明給 hash 缺 artifacts 改以真 run 刪 raw 構造；service 改用正式建構子 ⇒ 15/15 綠",
+    "tests/feature_engineering/test_framepath_cgsa_only.py（主委）：persist=False 改驗 feature_count 與無落盤（CGSA features_df 只帶索引）"
+  ],
+  "trial_result": {
+    "phase1": "除下列 HEAD 既有紅外全綠（修正後重跑 v5_slow、b6、ratiounsafe 綠）",
+    "phase2": "除下列 HEAD 既有紅與 allowed_red FFSTORE 列外全綠；test_framepath_api_h5 15 passed",
+    "phase3": "tests/feature_engineering/test_batch2d_dstar_align.py 6 passed（637 秒）；scripts/freeze_batch2d_baseline.py、profile_multi_tf_baseline.py、verify_cgsa_pipeline.py py_compile 通過",
+    "new_tests_contract_red_on_trial_by_design": "test_framepath_cgsa_only 之 boundary_01／04／04b（試作補丁之例外訊息未含 symbol／timeframe／呼叫點、且單週期 L3 例外被層執行器包裝）、boundary_09／12（試作未清殘留字面）——屬實作契約，b1 須照做"
+  },
+  "head_red_not_in_allowed_red": [
+    "tests/feature_engineering/test_failopen_matrix.py::test_v8_frozen_doc_covers_every_existing_assertion_change（本票處置表改寫 helper）",
+    "tests/api/test_run_lifecycle_api.py::test_lease_sink_holds_until_release",
+    "tests/api/test_run_lifecycle_api.py::test_generate_warmup_delete_lease_chain",
+    "tests/feature_engineering/test_failopen_consumer.py::test_training_rejects_partial",
+    "tests/feature_engineering/test_failopen_consumer.py::test_legacy_reader_strict_rejects_ic_and_training",
+    "tests/feature_library/test_phase3.py::test_feature_library_load_multi_raises_on_any_missing（本票 Phase 2 改寫為 V2 版後轉綠）",
+    "tests/feature_library/test_phase3.py::test_feature_library_ensure_fresh_true",
+    "tests/momentum/Analysis/test_ic_persist_redirect_inventory.py::test_sixteen_caller_inventory_is_complete",
+    "tests/test_feature_factory_e2e.py::test_multi_data_source",
+    "tests/test_feature_factory_e2e.py::test_user_override_rsi_period",
+    "tests/test_feature_factory_e2e.py::test_metadata_completeness",
+    "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_serial-healthy]",
+    "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_serial-skip]",
+    "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_serial-failed]",
+    "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_parallel-healthy]",
+    "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_parallel-skip]",
+    "tests/test_multi_tf_generator.py::test_canonical_completeness_three_paths_four_cases[cgsa_parallel-failed]",
+    "tests/test_multi_tf_generator.py::test_boundary_19_canonical_completeness_parallel_error_fail_closed",
+    "tests/feature_engineering/test_batch1_followup.py 之 5 支（golden／N3／perf／real_kline_stream；模擬補丁與試作皆紅、未改其碼，HEAD 對照未單獨跑）"
+  ],
+  "head_red_verification": "上列除 batch1_followup 外皆於乾淨 6e07e0ad worktree（wt0）逐支實跑同紅；lifecycle／failopen_consumer／inventory 另於主工作樹實跑同紅"
+}

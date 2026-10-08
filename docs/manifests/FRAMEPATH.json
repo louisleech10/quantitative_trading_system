@@ -1,0 +1,249 @@
+{
+  "spec_path": "docs/FRAMEPATH_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [],
+  "test_files": [
+    "tests/feature_engineering/test_framepath_invariance.py",
+    "tests/feature_engineering/test_framepath_cgsa_only.py",
+    "tests/feature_engineering/test_framepath_disposition.py",
+    "tests/api/test_framepath_api_h5.py"
+  ],
+  "script_acceptance": [
+    "scripts/freeze_framepath_baseline.py",
+    "handoffs/run_receipts/framepath_probes/build_disposition.py",
+    "handoffs/run_receipts/framepath_probes/dead_scan_head.py"
+  ],
+  "contract_jsons": [
+    "tests/_golden/framepath/test_disposition.json",
+    "tests/_golden/framepath/compare_domain.json"
+  ],
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20261008-framepath-dead-scan-head.json",
+      "cmd": "PYTHONPATH=. venv/bin/python handoffs/run_receipts/framepath_probes/dead_scan_head.py --out handoffs/run_receipts/20261008-framepath-dead-scan-head.json",
+      "rc": 0,
+      "honest_bounds": "讀 HEAD 6e07e0ad 之 git blob（不讀工作樹）；名稱層級引用計數（Name／Attribute／識別字字串常數）"
+    },
+    {
+      "path": "handoffs/run_receipts/20261008-framepath-trial-run.json",
+      "cmd": "暫存 worktree 試作（Phase 1／2／3 生產刪除試作＋處置表 text_apply 套用）上逐檔／逐 nodeid 串行 pytest；HEAD 既有紅於乾淨 6e07e0ad worktree 對照",
+      "rc": 0,
+      "honest_bounds": "試作非實作、不提交；重型檔只跑處置表所涉測試與 FFACT 假值 keep 測試；macOS 8 GB 本機；試作過程之刪除依據另見 handoffs/run_receipts/20261008-framepath-trial-dead.txt"
+    }
+  ],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/FeatureEngineering/preprocessing/feature_preprocessor.py",
+      "momentum/FeatureEngineering/memory_budget.py",
+      "momentum/FeatureEngineering/feature_storage.py",
+      "momentum/FeatureEngineering/feature_library.py",
+      "momentum/Analysis/coverage_analyzer.py",
+      "api/services/feature_factory_service.py",
+      "api/services/feature_browser_service.py",
+      "api/routes/feature_factory.py",
+      "docs/FRAMEPATH_SPEC.md",
+      "docs/manifests/FRAMEPATH.json",
+      "docs/ARCHITECTURE.md",
+      "docs/DEVELOPMENT_GUIDE.md",
+      "docs/FF_FAILOPEN_FROZEN_TESTS.md",
+      "docs/plan/feature-factory-optimization/plan.yaml",
+      "docs/FFNAME_SPEC.md",
+      "docs/ROADMAP.md",
+      "HANDOFF.md",
+      "scripts/fact_keys.json",
+      "scripts/live_doc_registry.json",
+      "scripts/freeze_framepath_baseline.py",
+      "tests/_golden/framepath/compare_domain.json",
+      "tests/feature_engineering/test_framepath_invariance.py",
+      "tests/feature_engineering/test_framepath_cgsa_only.py",
+      "tests/_golden/framepath/test_disposition.json",
+      "tests/feature_engineering/test_framepath_disposition.py",
+      "tests/api/test_framepath_api_h5.py",
+      "frontend/src/lib/types.ts",
+      "scripts/capture_full_golden_baseline.py",
+      "scripts/compare_with_full_golden_baseline.py",
+      "scripts/fix_spec_v1_to_v1_1.py",
+      "scripts/freeze_batch2d_baseline.py",
+      "scripts/golden_multi_symbol_c3.py",
+      "scripts/icfirstalign_preic_diff.py",
+      "scripts/profile_multi_tf_baseline.py",
+      "scripts/profile_v6v7_comparison.py",
+      "scripts/verify_cgsa_pipeline.py",
+      "tests/_golden/batch2d/control.json",
+      "tests/_golden/ffstat/nan_propagation_classes.json",
+      "tests/_golden/prered/allowed_red.json",
+      "tests/api/test_feature_browser_routes.py",
+      "tests/api/test_feature_browser_service.py",
+      "tests/api/test_feature_explorer_optimizations.py",
+      "tests/api/test_run_lifecycle_api.py",
+      "tests/feature_engineering/ff_artifact_compare_helpers.py",
+      "tests/feature_engineering/ffstat_helpers.py",
+      "tests/feature_engineering/fftfmeta_golden_helpers.py",
+      "tests/feature_engineering/test_b6_warmup_trim.py",
+      "tests/feature_engineering/test_batch2d_dstar_align.py",
+      "tests/feature_engineering/test_failopen_consumer.py",
+      "tests/feature_engineering/test_failopen_correctness.py",
+      "tests/feature_engineering/test_failopen_manifest.py",
+      "tests/feature_engineering/test_failopen_matrix.py",
+      "tests/feature_engineering/test_failopen_producer.py",
+      "tests/feature_engineering/test_ff_cross_symbol_value_isolation.py",
+      "tests/feature_engineering/test_ffstat_dstar_failure.py",
+      "tests/feature_engineering/test_ffstat_golden.py",
+      "tests/feature_engineering/test_ffstat_layer.py",
+      "tests/feature_engineering/test_ffstat_stable_start.py",
+      "tests/feature_engineering/test_ffstat_warmup_table.py",
+      "tests/feature_engineering/test_ic_first_pipeline.py",
+      "tests/feature_engineering/test_icfirstalign_icfirst.py",
+      "tests/feature_engineering/test_icfirstalign_preic_diff.py",
+      "tests/feature_engineering/test_mtf_align_golden.py",
+      "tests/feature_engineering/test_multi_symbol_ic_first.py",
+      "tests/feature_engineering/test_ratiounsafe_wiring.py",
+      "tests/feature_library/test_phase1.py",
+      "tests/feature_library/test_phase3.py",
+      "tests/feature_library/test_phase5.py",
+      "tests/fixtures/golden/multi_symbol_c3/baseline.parquet",
+      "tests/fixtures/golden/multi_symbol_c3/config.json",
+      "tests/fixtures/golden/multi_symbol_c3/env_snapshot.json",
+      "tests/governance/test_prered_allowed_red.py",
+      "tests/momentum/Analysis/test_ic_persist_redirect_inventory.py",
+      "tests/momentum/test_coverage_analyzer.py",
+      "tests/performance/test_searchsorted_perf.py",
+      "tests/test_cgsa_multi_tf.py",
+      "tests/test_cgsa_pipeline.py",
+      "tests/test_cgsa_resume.py",
+      "tests/test_feature_factory_batch2b.py",
+      "tests/test_feature_factory_batch2d.py",
+      "tests/test_feature_factory_e2e.py",
+      "tests/test_feature_storage_validator_factory.py",
+      "tests/test_l65_parallel.py",
+      "tests/test_multi_tf_generator.py",
+      "tests/test_multi_tf_golden_equivalence.py",
+      "tests/test_primary_self_align_skip.py"
+    ],
+    "callers_now": [
+      "api/services/feature_factory_service.py",
+      "api/services/feature_factory_batch_service.py",
+      "api/services/ic_analysis_service.py",
+      "api/routes/feature_factory.py",
+      "api/routes/feature_browser.py",
+      "momentum/Analysis/coverage_analyzer.py",
+      "momentum/FeatureEngineering/feature_library.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/factories.py"
+    ],
+    "callers_later": [
+      "docs/ROADMAP.md",
+      "docs/TICKET_ORDER.md",
+      "HANDOFF.md"
+    ],
+    "gate_cmd": "FRAMEPATH_PHASE=<本批 Phase：b1=1、b2=2、b3=3、b4=3> venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_framepath_disposition.py tests/feature_engineering/test_framepath_cgsa_only.py tests/feature_engineering/test_framepath_invariance.py tests/api/test_framepath_api_h5.py（b1 不含 tests/api/test_framepath_api_h5.py；另逐檔明列本批處置表所涉測試檔，真實資料者單組串行）",
+    "forbidden": [
+      {
+        "rule": "momentum／ 不得 import api／；服務取工廠一律經 momentum.factories；跨域經 Protocol（解耦 R1–R5、R7）",
+        "observable": true
+      },
+      {
+        "rule": "不得放寬或刪除處置表未列之既有測試斷言；不得新增 skip／xfail；處置表外之 tests／scripts／frontend/src 改動一律紅（Task 1.5 ⓪–⑦）",
+        "observable": true
+      },
+      {
+        "rule": "CGSA 輸出於 §G 比對域內改前改後逐位元一致；不得以容差替代；不得改 CGSA 分支內任何計算；不得改輸出大小或欄集合",
+        "observable": true
+      },
+      {
+        "rule": "不得弱化 NaN／inf 閘、run_status／completeness 語意、partial 與 fail-closed 行為",
+        "observable": true
+      },
+      {
+        "rule": "不得保留 registry 為 None 時之記憶體後備；不得新增 manifest 型快取命中（§N）",
+        "observable": true
+      },
+      {
+        "rule": "驗收母體不得含 frame 臂（FFACT_USE_CGSA=0、canonical legacy-*、batch2d frame 對照）",
+        "observable": true
+      },
+      {
+        "rule": "不得改 hdf5_path／hdf5_relative_path 欄名；不得動 kline_cache.h5、hdf5_cache/、IC 服務內部 h5、IC *_filtered.h5、case 特徵 h5（load_features_from_hdf5／save_features_to_hdf5）",
+        "observable": true
+      },
+      {
+        "rule": "不得統一或改寫週期標記規則（屬 FF-NAME）；不加命名世代鹽",
+        "observable": true
+      },
+      {
+        "rule": "不得重簽 batch2d「不得相等」oracle；不得修改 tests/_golden/batch2d/cgsa_baseline.json、tests/_golden/failopen/baseline.json",
+        "observable": true
+      },
+      {
+        "rule": "特徵工廠真實資料重測試一律單組串行；委員審查期間不跑重型生成；不跑 scripts/freeze_* 全量重凍；不跑 pytest tests/governance 全套",
+        "observable": false
+      },
+      {
+        "rule": "不得侷限加密貨幣：比對器與測試不寫死週期、標的、交易時段（週期取自 ffstat_helpers 參數）",
+        "observable": true
+      }
+    ],
+    "risk_mitigation": [
+      "contract_sha256 tests/_golden/framepath/test_disposition.json 38db9d418560d5d91d3f6a97aec7f818502efc14c9cc100f26f7fb0ea0082f13",
+      "contract_sha256 tests/_golden/framepath/compare_domain.json 9a36f3467ae7246e2768ec23efcc2fff64f43277ac0944da44553fde1aa70b50",
+      "分批：b1＝Phase 1（Task 1.1→1.2→1.3→1.4→1.5；處置表 phase=1 之列，含 scripts/fix_spec_v1_to_v1_1.py 刪檔與 scripts/freeze_batch2d_baseline.py::_registry_layer_map 改寫）；b2＝Phase 2（Task 2.1–2.4，phase=2 之列）；b3＝Phase 3（Task 3.1–3.2，phase=3 之列）；b4＝Phase 4（Task 4.1–4.2 收案）。每批收尾以 FRAMEPATH_PHASE=<批 Phase> 跑 test_framepath_disposition.py（E＝phase ≤ 本批）",
+      "b1 首步＝Task 1.1：於 HEAD 6e07e0ad 碼態實作並執行 scripts/freeze_framepath_baseline.py freeze（任何生產碼改動之前），產 tests/_golden/framepath/cgsa_fingerprint.json；凍結腳本與 test_framepath_invariance.py 之比對器、記憶體閘、compare_domain 驗證於此實作（TODO 只凍結介面與斷言）",
+      "Phase 1 生產刪除清單（TODO 凍結，SPEC v16 A1–A3）：FeatureFactory._cgsa_enabled、_layer6_5_preprocessing、_layer6_5_pre_ic、_layer6_5_post_ic、_run_layer6_5_preprocessor、_layer7_validate_and_persist、_layer7_validate_and_persist_cgsa、_apply_timeframe_tag、_execute_l65_with_degradation、_apply_l7_dead_feature_drop、_apply_preprocessing_degradation_metadata、模組層 _build_column_layer_map、單週期 frame 尾段、L4 apply_to 非 layer1_and_raw 死分支；MultiTFGenerator._cgsa_enabled、_generate_multi_tf_legacy（與其專用 helper）、_combine_layers、_apply_timeframe_tag；FeaturePreprocessor.set_no_start_calibration 參數與 _no_start_native_maps 消費；memory_budget NON_ARM_FFACT_KEYS 之 FFACT_USE_CGSA。實作期 Task 1.4 掃描另得零引用 def ⇒ 回 TODO 重審（依據收據 handoffs/run_receipts/20261008-framepath-trial-dead.txt）",
+      "具名例外 CGSARegistryRequiredError 定義於 momentum/FeatureEngineering/feature_factory.py，訊息含 symbol、timeframe、呼叫點名（generate_features／generate_multi_tf／_layer3_rolling_aggregation）；multi_tf_generator 以函式內 import 或模組屬性取用，避免循環匯入；生成入口（generate_features 單週期與 generate_multi_tf）於 registry 準備後、L1 之前即檢查並拋，避免被 _execute_layer1_6 包成 RuntimeError（試作實證）",
+      "Phase 1 同批：tests/_golden/ffstat/nan_propagation_classes.json 依處置表刪 4 鍵，並產新收據 handoffs/run_receipts/<date>-ffstat-nan-propagation-inventory.json（test_ffstat_stable_start::test_nan_propagation_inventory_complete 讀最新收據）；docs/FF_FAILOPEN_FROZEN_TESTS.md 每批補列該批刪改之斷言與已刪測試檔（V-8，SPEC v16 A7）",
+      "Phase 2 Task 2.3：api/services/feature_factory_service.py:305 附近非 .json 之 stats warmup 分支與 _run_task 完成之非 .json 分支只刪不拋（tests/api/test_failopen_api_flags.py、test_single_progress_rss.py 以 /tmp/fake.h5 走該分支，處置表列 no-op）；非 .json 之 task 路徑於 register／task context 拋 ValueError（「舊 factory h5 已不支援」＋路徑）→ route 400",
+      "Phase 2 Task 2.1：require_raw 自 generate_features／內部生成函式／run_ic_first 呼叫刪除（SPEC v16 A8）",
+      "前置（使用者處置）：b1 開工前主工作樹須無下列既有髒檔／未追蹤檔，否則⑤⑦必紅——未追蹤 scripts/_add_cube_contract_keys.py、scripts/_todo_r2_patch.py（2026-09-10 一次性補丁）；測試副作用改動 tests/.DS_Store、tests/golden/l65/fast_adf_gate_report.json、tests/golden/l65/tier2_reduced/*（含已刪之 ETHUSDT_1h_2000rows.BLOCKED，屬母體）",
+      "處置表產生方式：G1–G6 分組逐檔分析（Claude 子代理，唯讀）＋主委整併與覆寫，經 handoffs/run_receipts/framepath_probes/build_disposition.py 機械衍生摘錄雜湊／nodeid 表；Phase 1 列已於試作工作樹以文字層套用並通過驗證器 ② 期望值比對、受影響測試實跑（收據 handoffs/run_receipts/20261008-framepath-trial-run.json）",
+      "實作期每批：先跑本批處置表所涉測試檔（明列路徑、單組串行），再跑 FRAMEPATH_PHASE=<批> 之 test_framepath_disposition.py；跑完 bash scripts/restore_golden_inventory.sh；收尾列暫存（pytest-of-louis、中斷測試殘留、委員 /private/tmp 副本）刪除指令交使用者",
+      "stub_modules 為空之理由：本票無新生產模組；具名例外 CGSARegistryRequiredError 新增於既有 momentum/FeatureEngineering/feature_factory.py（列 touches），其餘皆刪除與改寫既有函式"
+    ],
+    "coverage_risk": [
+      "Task 1.1：test_framepath_invariance（C1–C9 逐格無容差、C5＝C1、run_status、記憶體閘、C9 前置條件、compare_domain 禁排除鍵與非純量、注入讀數拒跑、比對器無週期／標的字面、兩 mutant）；M1–M4 worktree mutation 收據",
+      "Task 1.2：test_framepath_cgsa_only（L3 streaming／hybrid 具名例外、in_memory 非串流分支保留、frame L6.5／L7 入口不存在、單週期與多週期 registry 為 None 具名例外、_combine_layers 白名單與預設 context、AST 掃 momentum／api／scripts 呼叫點、生產零讀 FFACT_USE_CGSA、殘留 =0 仍產 CGSA、persist=False completeness、mutant）",
+      "Task 1.3：test_framepath_cgsa_only（legacy 符號於 momentum 零出現、set_no_start_calibration 無參數、tagger 刪除）＋test_failopen_producer 之 cgsa_serial／parallel 參數（既有，partial 語意）",
+      "Task 1.4：test_framepath_cgsa_only::test_boundary_15（本票零引用 def＝0；HEAD_DEAD 凍結）＋dead-scan mutant",
+      "Task 1.5：test_framepath_disposition（⓪–⑦ 對現行工作樹；處置表內部一致與 HEAD 摘錄雜湊；24 支邊界／mutant 以合成輸入驗檢查器鑑別力）",
+      "Task 2.1–2.3：test_framepath_api_h5（手放 h5 被忽略、force 兩值指紋相等、h5 讀寫鏈符號零出現、FeatureLibrary／coverage 只讀 V2、明給 hash 缺 artifacts 訊息不變、register／features／data／CSV 對 .h5 皆 400、CGSA manifest 200、空 hdf5_path 與 .JSON 不變、兩 mutant）",
+      "Task 2.4：前端只改 frontend/src/lib/types.ts 註解（replace-file 凍結全文），npm run build 與受影響 vitest",
+      "Task 3.1–3.2、4.1–4.2：處置表 phase=3 之列＋SPEC 列之 grep／py_compile／gen_fact_key_blocks.sh 檢查與收案收據",
+      "既有行為不得變更：CGSA 正式生成（單週期、多週期 serial／parallel、L3 三模式、resume、persist=False、partial）、IC-first raw、API 之 CGSA manifest 瀏覽／匯出、kline／case／IC h5"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "FRAMEPATH",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "特徵工廠真實資料重測試一律單組串行；委員審查期間不跑重型生成；不跑 scripts/freeze_* 全量重凍；不跑 pytest tests/governance 全套",
+        "reason": "user-ruling",
+        "owner": "FRAMEPATH",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 1.1 CGSA 指紋基準 tests/_golden/framepath/cgsa_fingerprint.json 與 M1–M4 mutation 收據（b1 首步於 HEAD 6e07e0ad 碼態產出）",
+        "reason": "blocked-by",
+        "owner": "FRAMEPATH",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 1.4 死碼掃描前後收據 handoffs/run_receipts/<date>-framepath-dead-scan.txt（b1 實作後產出）",
+        "reason": "blocked-by",
+        "owner": "FRAMEPATH",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "Task 4.2 收案收據 handoffs/run_receipts/<date>-framepath-close.txt 與 repo 外 base_path 之 *_factory.h5 查核／刪除指令（收案白話閘交使用者）",
+        "reason": "user-ruling",
+        "owner": "FRAMEPATH",
+        "expiry": "2026-12-31"
+      }
+    ]
+  }
+}
