@@ -421,7 +421,12 @@ V1_REMOVED_SYMBOLS = (
     "legacy_v7", "FFACT_HDF5_CHUNK", "FFACT_HDF5_GZIP", "_build_2d_chunks", "_build_1d_chunks",
     "feature_file_exists", "list_feature_files", "export_for_ml", "FFACT_DSTAR_CACHE_MIGRATE_LEGACY",
     "migrate_d_star_cache", "l7_workers", "hdf5_cache_compression",
+    # 審查 r34 CODEX-R34-P1-01：V1 寫入專用 helper、save_factory_output 殘留 helper、只由 V1 寫入讀取之 chunk_bars
+    "_persist_parts_parallel", "_precheck_l7_disk_space", "_classify_persist_failure", "_resolve_bounded_env",
+    "chunk_bars",
 )
+# 只由已刪 save_factory_output 讀取之 FeatureStorage 實例屬性（以 `self.` 前綴精確比對，避免誤中 tf_aligner 之 n_chunk_cols）
+V1_REMOVED_ATTR_RE = r"self\.(_chunk_rows|_chunk_cols|_gzip_level)\b"
 V1_READER_CALLS = ("load_manifest", "list_features", "load_columns", "stream_groups", "load_cross_symbol")
 
 
@@ -432,7 +437,13 @@ V1_READER_CLASSES = (("momentum/FeatureEngineering/feature_reader.py", "FeatureR
 def v1_symbol_hits(sources) -> list:
     """Task 2.5–2.7 刪除之符號殘留（字面）。V1 讀取方法另由 `v1_reader_methods` 以 AST 判（同名之他類 API——如 IC
     cube store 之 `load_manifest`、IC 服務三元組 `list_features`——不在刪除範圍，不以字面判）。"""
-    return [(path, s) for path, src in sources for s in V1_REMOVED_SYMBOLS if s in src]
+    import re
+
+    hits = []
+    for path, src in sources:
+        hits += [(path, s) for s in V1_REMOVED_SYMBOLS if s in src]
+        hits += [(path, m.group(0)) for m in re.finditer(V1_REMOVED_ATTR_RE, src)]
+    return hits
 
 
 def v1_reader_methods(class_sources) -> list:
@@ -452,7 +463,8 @@ def test_boundary_13_v1_and_dead_format_symbols_absent():
     """SPEC v17 Task 2.5／2.7 驗證之符號清零（momentum／api／scripts）；`frontend/src` 另驗 `l7_workers`。"""
     assert v1_symbol_hits(_py_sources(("momentum", "api", "scripts"))) == []
     assert v1_reader_methods([(pc, (REPO / pc[0]).read_text(encoding="utf-8")) for pc in V1_READER_CLASSES]) == []
-    tsx = [p for p in (REPO / "frontend" / "src").rglob("*.ts*") if "l7_workers" in p.read_text(encoding="utf-8")]
+    tsx = [p for p in (REPO / "frontend" / "src").rglob("*.ts*")
+           if any(s in p.read_text(encoding="utf-8") for s in ("l7_workers", "chunk_bars", "Compactor=ON"))]
     assert tsx == []
 
 
@@ -461,6 +473,13 @@ def test_mutation_v1_symbol_scan_detects_residue():
     他類同名 API（IC cube store `load_manifest`）不命中。"""
     assert v1_symbol_hits([("m.py", "x = 'persist_registry_to_parquet'\n")]) != []
     assert v1_symbol_hits([("m.py", "store.load_manifest(root, tid)\n")]) == []
+    # 審查 r34：主入口已刪而專用 helper／屬性殘留 ⇒ 各自命中；V2 同族名與他模組之 n_chunk_cols 不命中
+    for residue in ("def _persist_parts_parallel(self):\n", "def _precheck_l7_disk_space(self):\n",
+                    "def _classify_persist_failure(e):\n", "def _resolve_bounded_env(n):\n",
+                    "cfg = {'chunk_bars': 1}\n", "self._chunk_rows = 1\n", "self._chunk_cols = 1\n",
+                    "x = self._gzip_level\n"):
+        assert v1_symbol_hits([("m.py", residue)]) != [], residue
+    assert v1_symbol_hits([("m.py", "def _precheck_l7_raw_stream_disk_space(self):\n    n_chunk_cols = 2\n")]) == []
     key = ("momentum/FeatureEngineering/feature_reader.py", "FeatureReader")
     residue = "class FeatureReader:\n    def stream_groups(self, s, h):\n        pass\n"
     clean = "class FeatureReader:\n    def stream_groups_v2(self, s, t, h):\n        pass\n"
@@ -515,7 +534,8 @@ async def _ic_list_old_address_rejected(app: FastAPI, features_path: str) -> boo
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         resp = await c.get("/api/v1/ic/features/list", params={"features_path": features_path})
-    return resp.status_code == 400 and "config_hash" in resp.text and features_path in resp.text
+    return resp.status_code == 400 and features_path in resp.text and all(
+        token in resp.text for token in ("symbol", "timeframe", "config_hash"))
 
 
 @pytest.mark.asyncio
@@ -544,10 +564,18 @@ async def test_mutation_ic_list_old_h5_branch_restored_is_detected(ic_app, monke
 # ---------------------------------------------------------------- Task 2.6 舊 cgsa_work 瀏覽格式（審查 r33 CODEX-R33-P1-02）
 
 CGSA_WORK_REJECT = "舊 cgsa_work 瀏覽格式已不支援"
-BROWSE_ROUTES = (
+BROWSE_ROUTES = (  # 審查 r34 CODEX-R34-P1-02：全部 browse／export 讀者（含 summary 與其 fast path）
     "/api/v1/features/browse/{tid}/features",
     "/api/v1/features/browse/{tid}/data?features=legacy_a",
+    "/api/v1/features/browse/{tid}/correlation?features=legacy_a,legacy_b",
+    "/api/v1/features/browse/{tid}/vif?features=legacy_a,legacy_b",
+    "/api/v1/features/browse/{tid}/distribution?feature=legacy_a",
+    "/api/v1/features/browse/{tid}/nan-pattern",
+    "/api/v1/features/browse/{tid}/data-quality",
+    "/api/v1/features/browse/{tid}/summary",
     "/api/v1/features/export/{tid}/csv",
+    "/api/v1/features/export/{tid}/json",
+    "/api/v1/features/export/{tid}/markdown",
 )
 
 
@@ -562,10 +590,10 @@ def _cgsa_work_list_manifest(tmp_path: Path) -> Path:
     work = tmp_path / "cgsa_work" / f"{SYMBOL}_{PRIMARY_TF}_deadbeef"
     work.mkdir(parents=True)
     parquet = work / "g.parquet"
-    pq.write_table(pa.table({"legacy_a": [1.0, 2.0, 3.0]}), str(parquet))
+    pq.write_table(pa.table({"legacy_a": [1.0, 2.0, 3.0, 4.0], "legacy_b": [2.0, 1.0, 4.0, 3.0]}), str(parquet))
     manifest = work / "manifest.json"
     manifest.write_text(json.dumps({"symbol": SYMBOL, "timeframe": PRIMARY_TF, "groups": [
-        {"group_id": "g", "parquet_path": str(parquet), "columns": ["legacy_a"]}]}), encoding="utf-8")
+        {"group_id": "g", "parquet_path": str(parquet), "columns": ["legacy_a", "legacy_b"]}]}), encoding="utf-8")
     return manifest
 
 
@@ -579,7 +607,8 @@ async def _cgsa_work_routes_rejected(client, tid: str) -> bool:
 
 @pytest.mark.asyncio
 async def test_boundary_17_cgsa_work_list_format_routes_are_400(client, monkeypatch, tmp_path):
-    """Task 2.6：task 指向舊 cgsa_work 列表格式 manifest ⇒ feature list／selected rows／CSV 皆 400 且含訊息。"""
+    """Task 2.6：task 指向舊 cgsa_work 列表格式 manifest ⇒ 全部 browse／export 讀者（features、data、correlation、vif、
+    distribution、nan-pattern、data-quality、summary、csv／json／markdown 匯出）皆 400 且含訊息。"""
     service = _service_with_tasks({"task-cgsa-work": _task(str(_cgsa_work_list_manifest(tmp_path)))})
     monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
     assert await _cgsa_work_routes_rejected(client, "task-cgsa-work")
@@ -587,11 +616,14 @@ async def test_boundary_17_cgsa_work_list_format_routes_are_400(client, monkeypa
 
 @pytest.mark.asyncio
 async def test_mutation_cgsa_work_list_format_branch_restored_is_detected(client, monkeypatch, tmp_path):
-    """還原列表格式枝（task context 照讀、不拒絕）⇒ 驗收判定翻轉為 False。"""
-    service = _service_with_tasks({"task-cgsa-work": _task(str(_cgsa_work_list_manifest(tmp_path)))})
+    """還原列表格式讀取（舊 manifest 之 task 照讀出資料、不拒絕；以導向一個可讀 V2 run 模擬錨點碼態讀出資料）
+    ⇒ 驗收判定翻轉為 False。"""
+    service = _service_with_tasks({"task-cgsa-work": _task(str(_cgsa_work_list_manifest(tmp_path))),
+                                   "task-v2": _task(str(_cgsa_run(tmp_path)))})
     monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
+    original = service._load_task_context
     monkeypatch.setattr(service, "_load_task_context",
-                        lambda task_id: (_ for _ in ()).throw(FileNotFoundError("restored list-format branch")))
+                        lambda task_id: original("task-v2" if task_id == "task-cgsa-work" else task_id))
     assert not await _cgsa_work_routes_rejected(client, "task-cgsa-work")
 
 
