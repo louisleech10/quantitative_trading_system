@@ -250,6 +250,29 @@ def test_boundary_11_c5_resume_entered_is_observed_not_declared(tmp_path):
     assert fb.compare_cell(strip(normal["fingerprint"]), strip(forced["fingerprint"])) == []
 
 
+def test_boundary_14_c9_legacy_dir_observed_in_process(tmp_path):
+    """C9 之 legacy 目錄以測試端獨立觀測（審查 r21–r24 CODEX P1-03 系列）：行程內 generate_cell("C9") 期間，每個
+    KlineStorageManager 建構後之 legacy_cache_dir 皆為收據所報之受控空目錄（不靠子行程自報）。真實 kline 多週期短窗。"""
+    from momentum.DataExtraction.kline_storage import KlineStorageManager
+
+    seen = []
+    original_init = KlineStorageManager.__init__
+
+    def init_spy(self, *a, **k):
+        original_init(self, *a, **k)
+        seen.append(Path(self.legacy_cache_dir).resolve())
+
+    mp = pytest.MonkeyPatch()
+    mp.setattr(KlineStorageManager, "__init__", init_spy)
+    try:
+        out = fb.generate_cell("C9", tmp_path)
+    finally:
+        mp.undo()
+    legacy = Path(out["receipt"]["legacy_kline_dir"]).resolve()
+    assert seen and all(p == legacy for p in seen), (seen, legacy)
+    assert str(legacy).startswith(str(tmp_path.resolve())) and legacy.is_dir() and not any(legacy.iterdir())
+
+
 def test_boundary_12_generation_metadata_exclusion_scalar_only():
     """非萬用之多段排除鍵 `generation_metadata.source_registry_manifest`（審查 r18 GROK-R18-P1-01）：純量排除、
     同層其他鍵保留；物件／陣列 ⇒ 拒跑。"""

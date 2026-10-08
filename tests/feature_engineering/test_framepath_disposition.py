@@ -870,12 +870,17 @@ def git_ignored() -> List[str]:
                            .decode().splitlines())
 
 
-def check_5(disp: Dict[str, Any], phase: int, added: Set[str], ignored: List[str]) -> List[str]:
+def check_5(disp: Dict[str, Any], phase: int, added: Set[str], ignored: List[str],
+            exists=lambda p: (REPO / p).is_file()) -> List[str]:
     errs = []
     allowed = {item["path"] for item in disp["new_files"] if item["phase"] <= phase}
     extra = sorted(added - allowed)
     if extra:
         errs.append(f"⑤(a) 新增檔不在 new_files（phase ≤ {phase}）：{extra}")
+    # 審查 r24 CODEX-R24-P2-01：phase ≤ 本批之 new_files 須實際存在（如 b1 之凍結腳本與 CGSA 指紋基準）
+    missing = sorted(p for p in allowed if not exists(p))
+    if missing:
+        errs.append(f"⑤(a) new_files（phase ≤ {phase}）應存在而缺：{missing}")
     if ignored != disp["ignored_baseline"]:
         errs.append(f"⑤(b) 被忽略檔集合與凍結基線不等：多 {sorted(set(ignored) - set(disp['ignored_baseline']))} "
                     f"缺 {sorted(set(disp['ignored_baseline']) - set(ignored))}")
@@ -1386,6 +1391,8 @@ def test_mutation_new_file_outside_list_is_red_in_check_5():
     assert check_5(disp, 1, {"tests/feature_engineering/unlisted_probe.py"}, ["a.py"]) != []
     assert check_5(disp, 1, set(), ["a.py", "tests/x/ignored_new.py"]) != []
     assert check_5(disp, 1, {"tests/feature_engineering/test_framepath_disposition.py"}, ["a.py"]) == []
+    # 列於 new_files（phase ≤ 本批）而缺檔 ⇒ 紅（審查 r24 CODEX-R24-P2-01）
+    assert check_5(disp, 1, set(), ["a.py"], exists=lambda p: False) != []
 
 
 def test_mutation_fact_keys_other_row_change_is_red_in_check_6():

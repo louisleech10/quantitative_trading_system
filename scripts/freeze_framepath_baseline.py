@@ -100,7 +100,8 @@ def generate_cell(cell: str, work_root: Path, *, force_regenerate_second: bool =
     """行程內跑一格生成並回傳 {"fingerprint", "receipt"}（不含記憶體；`run_cell` 於子行程呼叫本函式並取樣）。
     `receipt["resume_entered"]`＝第二次生成期間 `ColumnGroupRegistry.resume_from_manifest` 對本格 work dir 實際被呼叫
     （以包裝該 classmethod 之 spy 觀測，不以格名推定；另記 `resume_groups`＝其回傳 registry 之群組數，HEAD 實測已完成
-    run 為 0；SPEC v16 A10）；只 C5 有第二次生成，其兩次皆以
+    run 為 0；SPEC v16 A10）；C9 於本函式內、任何 kline storage 建構之前把 `LEGACY_KLINE_CACHE_DIR` 設為受控空目錄並於
+    結束還原（行程內呼叫時測試端可直接觀測 KlineStorageManager.legacy_cache_dir；審查 r24）；只 C5 有第二次生成，其兩次皆以
     `force_regenerate=False`。`force_regenerate_second=True` 只供 mutation 測試（第二次強制重算 ⇒ resume_entered 須 False）。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
