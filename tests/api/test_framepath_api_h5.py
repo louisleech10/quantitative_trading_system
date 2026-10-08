@@ -776,13 +776,33 @@ def _func_nodes(tree, name: str):
     return [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == name]
 
 
-def _names_in(node, ident: str) -> int:
+def _bound_names(tree, module: str) -> set:
+    """模組 `module` 於本檔綁定之全部名稱（審查 r37 CODEX-R37-P1-01：含別名）：`import m`→m、`import m as x`→x、
+    `import m.sub`→m、`from m import a`／`from m import a as b`／`from m.sub import a`→a／b。"""
     import ast
 
-    uses = sum(1 for n in ast.walk(node) if isinstance(n, ast.Name) and n.id == ident)
-    imports = sum(1 for n in ast.walk(node) if isinstance(n, (ast.Import, ast.ImportFrom))
-                  for a in n.names if (a.asname or a.name).split(".")[0] == ident)
-    return uses + imports
+    out = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Import):
+            for a in n.names:
+                if a.name == module or a.name.startswith(module + "."):
+                    out.add(a.asname or a.name.split(".")[0])
+        elif isinstance(n, ast.ImportFrom) and n.module and (n.module == module or n.module.startswith(module + ".")):
+            out |= {a.asname or a.name for a in n.names}
+    return out
+
+
+def _module_uses(node, tree, module: str) -> list:
+    """node 範圍內對 `module` 之匯入與名稱使用（行號；名稱集合取自整檔之綁定）。"""
+    import ast
+
+    bound = _bound_names(tree, module)
+    imports = [n.lineno for n in ast.walk(node) if isinstance(n, ast.Import)
+               for a in n.names if a.name == module or a.name.startswith(module + ".")]
+    imports += [n.lineno for n in ast.walk(node) if isinstance(n, ast.ImportFrom) and n.module
+                and (n.module == module or n.module.startswith(module + "."))]
+    uses = [n.lineno for n in ast.walk(node) if isinstance(n, ast.Name) and n.id in bound]
+    return imports + uses
 
 
 def _str_consts(node) -> list:
@@ -797,12 +817,12 @@ def structural_residues(sources: dict) -> list:
 
     hits = []
     cov = ast.parse(sources["momentum/Analysis/coverage_analyzer.py"])
-    if _names_in(cov, "h5py") or "manifest.json" in _str_consts(cov):
+    if _module_uses(cov, cov, "h5py") or "manifest.json" in _str_consts(cov):
         hits.append("coverage_analyzer：仍有 h5py 或 V1 `manifest.json` 掃描")
     ic = ast.parse(sources["api/services/ic_analysis_service.py"])
     for fn in _func_nodes(ic, "list_features"):
         consts = _str_consts(fn)
-        if _names_in(fn, "h5py") or "data" in consts or any(c.startswith("parquet:") for c in consts):
+        if _module_uses(fn, ic, "h5py") or "data" in consts or any(c.startswith("parquet:") for c in consts):
             hits.append("ic_analysis_service.list_features：仍有舊 h5／parquet: 讀取枝")
     ffs = ast.parse(sources["api/services/feature_factory_service.py"])
     consts = _str_consts(ffs)
@@ -817,7 +837,9 @@ def structural_residues(sources: dict) -> list:
         if _func_nodes(ffs, gone):
             hits.append(f"feature_factory_service：仍定義 {gone}")
     allowed = {id(x) for fn in _func_nodes(ffs, "_load_cgsa_kline_timestamps") for x in ast.walk(fn)}
-    stray = [n.lineno for n in ast.walk(ffs) if isinstance(n, ast.Name) and n.id == "h5py" and id(n) not in allowed]
+    bound = _bound_names(ffs, "h5py")
+    stray = [n.lineno for n in ast.walk(ffs) if isinstance(n, ast.Name) and n.id in bound and id(n) not in allowed]
+    stray += [n.lineno for n in ast.walk(ffs) if isinstance(n, ast.ImportFrom) and n.module == "h5py"]
     if stray:
         hits.append(f"feature_factory_service：kline 讀取以外仍用 h5py（L{stray}）")
     fbs = ast.parse(sources["api/services/feature_browser_service.py"])
@@ -872,3 +894,17 @@ def test_mutation_structural_residue_scan_detects_early_guard_leftovers():
                                 "def _load_hdf5_features_df(self):\n    pass\n"}) != []
     assert structural_residues({**clean, "api/services/feature_factory_service.py":
                                 "x = {'parquet_path': 1}\n"}) != []
+    # 審查 r37 CODEX-R37-P1-01：別名匯入與別名使用
+    for path, src in (
+        ("momentum/Analysis/coverage_analyzer.py", "import h5py as hp\ndef f(p):\n    return hp.File(p)\n"),
+        ("momentum/Analysis/coverage_analyzer.py", "from h5py import File as H5File\ndef f(p):\n    return H5File(p)\n"),
+        ("api/services/feature_factory_service.py",
+         "import h5py as hp\ndef _load_cgsa_kline_timestamps(self):\n    return hp.File(k)\n"
+         "def _load_old(self, p):\n    return hp.File(p)\n"),
+        ("api/services/ic_analysis_service.py",
+         "import h5py as hp\ndef list_features(self, features_path=None):\n    return hp.File(features_path)\n"),
+    ):
+        assert structural_residues({**clean, path: src}) != [], (path, src)
+    # 別名之 kline 讀取仍屬合法
+    assert structural_residues({**clean, "api/services/feature_factory_service.py":
+                                "import h5py as hp\ndef _load_cgsa_kline_timestamps(self):\n    return hp.File(k)\n"}) == []
