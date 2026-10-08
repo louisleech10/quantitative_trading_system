@@ -29,7 +29,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple  # noqa: F401
 
 import pytest
 
@@ -912,29 +912,47 @@ def git_changed_paths() -> Set[str]:
 
 LIVE_DOC_REGISTRY_REL = "scripts/live_doc_registry.json"
 # SPEC v16 ⑦：活文件登記表只准本票文件之 `exact` 列增刪（SPEC／TODO manifest 之生命週期登記）
-# 只准本票之 SPEC 與 TODO manifest 兩列（審查 r16 CODEX-R16-P1-03：原 FRAMEPATH_* 萬用過寬）
-LIVE_DOC_ROW_RE = re.compile(r"^docs/(FRAMEPATH_SPEC\.md|manifests/FRAMEPATH\.json)$")
+# 只准本票之 SPEC 與 TODO manifest 兩路徑（審查 r16 CODEX-R16-P1-03），且每路徑至多一列、列形恰為
+# [路徑, 類別]、類別屬封閉集合（審查 r17 CODEX-R17-P1-04：類別錯、重複、多欄皆不得藏於豁免）
+LIVE_DOC_TICKET_ROWS: Dict[str, Tuple[str, ...]] = {
+    "docs/FRAMEPATH_SPEC.md": ("LIVE-SPEC", "HIST"),          # 收案時 SPEC 可轉 HIST
+    "docs/manifests/FRAMEPATH.json": ("LIVE-CONTRACT", "HIST"),
+}
+
+
+def _live_doc_ticket_row_errors(doc: Dict[str, Any]) -> List[str]:
+    errs: List[str] = []
+    seen: Dict[str, int] = {}
+    for r in doc.get("exact") or []:
+        if not (isinstance(r, list) and r and r[0] in LIVE_DOC_TICKET_ROWS):
+            continue
+        seen[r[0]] = seen.get(r[0], 0) + 1
+        if len(r) != 2 or r[1] not in LIVE_DOC_TICKET_ROWS[r[0]]:
+            errs.append(f"⑦ {LIVE_DOC_REGISTRY_REL} 本票列形或類別不合：{r}")
+    errs += [f"⑦ {LIVE_DOC_REGISTRY_REL} 本票列重複：{p}×{n}" for p, n in seen.items() if n > 1]
+    return errs
 
 
 def _live_doc_without_ticket_rows(doc: Dict[str, Any]) -> Dict[str, Any]:
     out = copy.deepcopy(doc)
     rows = out.get("exact")
     if isinstance(rows, list):
-        out["exact"] = [r for r in rows if not (isinstance(r, list) and r and isinstance(r[0], str)
-                                                and LIVE_DOC_ROW_RE.match(r[0]))]
+        out["exact"] = [r for r in rows if not (isinstance(r, list) and r and r[0] in LIVE_DOC_TICKET_ROWS)]
     return out
 
 
 def check_7_live_doc(head_doc: Dict[str, Any], cur_doc: Dict[str, Any]) -> List[str]:
+    errs = _live_doc_ticket_row_errors(cur_doc)
     if canonical_json(_live_doc_without_ticket_rows(head_doc)) != canonical_json(_live_doc_without_ticket_rows(cur_doc)):
-        return [f"⑦ {LIVE_DOC_REGISTRY_REL} 於本票文件 exact 列以外與 HEAD 不等"]
-    return []
+        errs.append(f"⑦ {LIVE_DOC_REGISTRY_REL} 於本票文件 exact 列以外與 HEAD 不等")
+    return errs
 
 
 def check_7(disp: Dict[str, Any], changed: Set[str]) -> List[str]:
     allowed = set(governed_files(disp)) | {item["path"] for item in disp["new_files"]}
     exempt = {FACT_KEYS_REL, LIVE_DOC_REGISTRY_REL}  # 前者由⑥、後者由 check_7_live_doc 裁決
-    bad = sorted(p for p in changed if p not in exempt and p not in allowed)
+    # 已追蹤之 numba／位元組碼快取（`__pycache__/`，任一測試執行即改寫；同⑤(b) 之過濾，SPEC v16 A5）
+    bad = sorted(p for p in changed if p not in exempt and p not in allowed and "__pycache__/" not in p)
     return [f"⑦ 既有檔改動不在母體 ∪ 操作表 ∪ new_files：{bad}"] if bad else []
 
 
@@ -1022,7 +1040,11 @@ def test_check_7_changed_paths_in_scope(ctx):
 def test_mutation_live_doc_registry_foreign_row_is_red():
     head = {"exact": [["docs/A_SPEC.md", "LIVE-SPEC"]], "prefix": []}
     ok = {"exact": [["docs/A_SPEC.md", "LIVE-SPEC"], ["docs/FRAMEPATH_SPEC.md", "LIVE-SPEC"],
-                    ["docs/manifests/FRAMEPATH.json", "LIVE-TODO"]], "prefix": []}
+                    ["docs/manifests/FRAMEPATH.json", "LIVE-CONTRACT"]], "prefix": []}
+    for rows in ([["docs/FRAMEPATH_SPEC.md", "FOREIGN"]],                                   # 類別錯
+                 [["docs/FRAMEPATH_SPEC.md", "LIVE-SPEC"], ["docs/FRAMEPATH_SPEC.md", "LIVE-SPEC"]],  # 重複
+                 [["docs/FRAMEPATH_SPEC.md", "LIVE-SPEC", "FOREIGN"]]):                     # 多欄
+        assert check_7_live_doc(head, {"exact": [["docs/A_SPEC.md", "LIVE-SPEC"], *rows], "prefix": []}) != []
     bad = {"exact": [["docs/A_SPEC.md", "ARCHIVED"]], "prefix": []}
     other = {"exact": [["docs/A_SPEC.md", "LIVE-SPEC"], ["docs/FRAMEPATH_OTHER.md", "FOREIGN"]], "prefix": []}
     assert check_7_live_doc(head, ok) == []
@@ -1254,6 +1276,8 @@ def test_mutation_out_of_scope_rename_is_red_in_check_7():
     assert check_7(disp, {"tests/_fixtures/x.json", "tests/_fixtures/y.json"}) != []
     assert check_7(disp, {"tests/_golden/batch2d/control.json"}) == []
     assert check_7(disp, {FACT_KEYS_REL}) == []
+    assert check_7(disp, {"tests/_fixtures/__pycache__/rolling_quantile_legacy.f-1.py39.nbi"}) == []
+    assert check_7(disp, {"tests/_fixtures/pycache_lookalike.py"}) != []
 
 
 def test_mutation_schema_rejects_unlisted_new_file_task_and_foreign_row(ctx):

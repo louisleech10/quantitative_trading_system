@@ -55,6 +55,16 @@ class FramepathBaselineError(RuntimeError):
     """凍結／比對前置條件不成立（具名拒寫或拒跑）。"""
 
 
+CODE_STATE_ROOTS = ("momentum", "api", "config")
+
+
+def code_state_errors(git_runner: Any = None) -> List[str]:
+    """凍結前置：工作樹之 `momentum／api／config` 須與 HEAD 6e07e0ad 逐位元相同（`git diff --name-only 6e07e0ad --
+    <roots>` 為空，含未提交改動），且 `git rev-parse 6e07e0ad` 可解析；不成立 ⇒ 錯誤字串（freeze 具名拒寫、不產任何
+    輸出）。`git_runner(args) -> (rc, stdout)` 供測試注入（審查 r17 CODEX-R17-P1-01：不得只填 head_commit 字串）。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
 def load_compare_domain(path: Path = REPO / COMPARE_DOMAIN_REL) -> Dict[str, Any]:
     """讀 `compare_domain.json` 並驗：category ∈ allowed_categories；path 之最後一段不屬 forbidden keys 或
     `feature_storage.COMPLETENESS_FIELD_NAMES`；path 語法只含物件鍵與單層 `*`。違反 ⇒ `FramepathBaselineError`。"""
@@ -80,7 +90,9 @@ def cell_settings(cell: str) -> Dict[str, Any]:
 def run_cell(cell: str, work_root: Path) -> Dict[str, Any]:
     """於子行程跑一格生成，父行程以 `memory_guard._Readings`（根＝子行程）每 0.1 秒取樣；回傳
     {"fingerprint": {FINGERPRINT_KEYS…}, "memory": {"peak_bytes", "readings", "seconds", "non_root_member_seen"},
-    "receipt": {...，C9 含 legacy_kline_dir 與 deleted_readback}}。`ICFA_GUARD_READINGS_FILE` 已設 ⇒ 拒跑。"""
+    "receipt": {"resume_hit": bool（第二次生成實際由 CGSA resume 跳過層計算之觀測值，取自 registry 之 resume 狀態而非
+    比對輸出；C5 須 True、其餘格須 False——審查 r17 CODEX-R17-P1-02）, …，C9 另含 legacy_kline_dir 與
+    deleted_readback}}。`ICFA_GUARD_READINGS_FILE` 已設 ⇒ 拒跑。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
@@ -96,7 +108,9 @@ def compare_cell(baseline: Mapping[str, Any], fresh: Mapping[str, Any]) -> List[
 
 
 def freeze(out: Path = REPO / BASELINE_REL) -> Dict[str, Any]:
-    """於 HEAD 6e07e0ad 碼態跑全部格、驗拒寫條件後寫基準（含 head_commit、python、各格 memory）。"""
+    """先以 `code_state_errors()` 核對碼態（非空 ⇒ `FramepathBaselineError`，不產任何輸出），再跑全部格、驗拒寫條件後
+    寫基準：`code_anchor`（6e07e0ad 完整 sha）、`head_commit`（執行時 `git rev-parse HEAD`）、`code_state_errors`（[]）、
+    python、各格 fingerprint／memory／receipt。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 

@@ -32,18 +32,42 @@ def baseline():
 
 
 def test_baseline_frozen_at_head_with_all_cells(baseline):
-    assert baseline["head_commit"].startswith(fb.HEAD_COMMIT_PREFIX)
+    assert baseline["code_anchor"].startswith(fb.HEAD_COMMIT_PREFIX) and len(baseline["code_anchor"]) == 40
+    assert baseline["code_state_errors"] == []
     assert tuple(baseline["cells"]) == fb.CELLS
+
+
+def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
+    """凍結碼態以 git 實核（審查 r17 CODEX-R17-P1-01）：momentum／api／config 與 6e07e0ad 不同 ⇒ 錯誤；相同 ⇒ 無錯；
+    freeze 遇錯不產任何輸出。"""
+    def runner(diff_out):
+        def _run(args):
+            if args[:1] == ["rev-parse"]:
+                return 0, "6e07e0ad952d3cccbe3fd2bef39b5ff49dd13581\n"
+            return 0, diff_out
+        return _run
+
+    assert fb.code_state_errors(runner("")) == []
+    assert fb.code_state_errors(runner("momentum/FeatureEngineering/feature_factory.py\n")) != []
+    out = tmp_path / "cgsa_fingerprint.json"
+    monkeypatch.setattr(fb, "code_state_errors", lambda git_runner=None: ["momentum 與 6e07e0ad 不同"])
+    with pytest.raises(fb.FramepathBaselineError):
+        fb.freeze(out)
+    assert not out.exists()
 
 
 @pytest.mark.parametrize("cell", fb.CELLS)
 def test_cell_matches_frozen_baseline(baseline, tmp_path, cell):
     fresh = fb.run_cell(cell, tmp_path)
+    assert fresh["receipt"]["resume_hit"] is (cell == "C5")
     assert fb.memory_gate_errors(cell, fresh["memory"]) == []
     assert fb.compare_cell(baseline["cells"][cell]["fingerprint"], fresh["fingerprint"]) == []
 
 
 def test_boundary_01_resume_cell_equals_single_tf_cell(baseline):
+    # C5 須有實際 resume 之觀測證據（審查 r17 CODEX-R17-P1-02：只比輸出相等無法分辨「每次重算」）
+    assert baseline["cells"]["C5"]["receipt"]["resume_hit"] is True
+    assert all(baseline["cells"][c]["receipt"]["resume_hit"] is False for c in fb.CELLS if c != "C5")
     c1 = baseline["cells"]["C1"]["fingerprint"]
     c5 = baseline["cells"]["C5"]["fingerprint"]
     assert fb.compare_cell({k: v for k, v in c1.items() if k != "path_receipt"},
@@ -116,6 +140,26 @@ def test_boundary_05_compare_domain_rejects_forbidden_and_non_scalar(tmp_path):
     ok = fb.load_compare_domain()
     with pytest.raises(fb.FramepathBaselineError):
         fb.filter_manifest({"created_at": {"nested": 1}}, ok)
+
+
+def test_boundary_10_wildcard_exclusion_scalar_only_and_not_across_arrays():
+    """萬用鍵 `artifacts.*.metadata.source_registry_manifest`（審查 r17 CODEX-R17-P1-03）：多個 artifact 之純量值皆
+    排除；任一指向物件／陣列 ⇒ 拒跑；`*` 不匹配陣列元素（陣列內同名鍵保留於比對域）。"""
+    domain = fb.load_compare_domain()
+    manifest = {"run_status": "complete",
+                "artifacts": {"raw": {"metadata": {"source_registry_manifest": "/abs/a", "k": 1}},
+                              "processed": {"metadata": {"source_registry_manifest": "/abs/b", "k": 2}}},
+                "groups": [{"metadata": {"source_registry_manifest": "/abs/c"}}]}
+    out = fb.filter_manifest(manifest, domain)
+    assert "source_registry_manifest" not in out["artifacts"]["raw"]["metadata"]
+    assert "source_registry_manifest" not in out["artifacts"]["processed"]["metadata"]
+    assert out["artifacts"]["raw"]["metadata"]["k"] == 1
+    assert out["groups"][0]["metadata"]["source_registry_manifest"] == "/abs/c"
+    for bad in ({"nested": 1}, ["/abs/x"]):
+        m = copy.deepcopy(manifest)
+        m["artifacts"]["processed"]["metadata"]["source_registry_manifest"] = bad
+        with pytest.raises(fb.FramepathBaselineError):
+            fb.filter_manifest(m, domain)
 
 
 def test_boundary_06_injected_readings_refused(monkeypatch, tmp_path):

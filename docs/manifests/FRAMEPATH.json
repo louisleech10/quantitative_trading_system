@@ -199,7 +199,9 @@
       "前置（使用者處置）：b1 開工前主工作樹須無下列既有髒檔／未追蹤檔，否則⑤⑦必紅——未追蹤 scripts/_add_cube_contract_keys.py、scripts/_todo_r2_patch.py（2026-09-10 一次性補丁）；測試副作用改動 tests/.DS_Store、tests/golden/l65/fast_adf_gate_report.json、tests/golden/l65/tier2_reduced/*（含已刪之 ETHUSDT_1h_2000rows.BLOCKED，屬母體）",
       "處置表產生方式：G1–G6 分組逐檔分析（Claude 子代理，唯讀）＋主委整併與覆寫，經 handoffs/run_receipts/framepath_probes/build_disposition.py 機械衍生摘錄雜湊／nodeid 表；Phase 1 列已於試作工作樹以文字層套用並通過驗證器 ② 期望值比對、受影響測試實跑（收據 handoffs/run_receipts/20261008-framepath-trial-run.json）",
       "實作期每批：先跑本批處置表所涉測試檔（明列路徑、單組串行），再跑 FRAMEPATH_PHASE=<批> 之 test_framepath_disposition.py；跑完 bash scripts/restore_golden_inventory.sh；收尾列暫存（pytest-of-louis、中斷測試殘留、委員 /private/tmp 副本）刪除指令交使用者",
-      "stub_modules 為空之理由：本票無新生產模組；具名例外 CGSARegistryRequiredError 新增於既有 momentum/FeatureEngineering/feature_factory.py（列 touches），其餘皆刪除與改寫既有函式"
+      "stub_modules 為空之理由：本票無新生產模組；具名例外 CGSARegistryRequiredError 新增於既有 momentum/FeatureEngineering/feature_factory.py（列 touches），其餘皆刪除與改寫既有函式",
+      "處置閘⑤(b)與⑦皆不判路徑含 `__pycache__/` 者（repo 內已追蹤之 numba／位元組碼快取，任一測試執行即改寫；SPEC v16 補充）",
+      "Task 1.1 凍結（審查 r17）：freeze 先以 code_state_errors 實核 momentum／api／config 與 6e07e0ad 逐位元相同，否則不產輸出；基準記 code_anchor、head_commit、code_state_errors；每格 receipt 記 resume_hit（registry resume 實際觀測，C5 須 True、其餘 False）"
     ],
     "coverage_risk": [
       "Task 1.1：test_framepath_invariance（C1–C9 逐格無容差、C5＝C1、run_status、記憶體閘、C9 前置條件、compare_domain 禁排除鍵與非純量、注入讀數拒跑、比對器無週期／標的字面、兩 mutant）；M1–M4 worktree mutation 收據",
