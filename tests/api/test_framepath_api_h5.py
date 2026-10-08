@@ -510,23 +510,132 @@ def ic_app() -> FastAPI:
     return test_app
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize("features_path", ["parquet:BTCUSDT:abc123", "/tmp/legacy_features.h5"])
-async def test_boundary_16_ic_feature_list_old_address_is_400(ic_app, features_path):
-    """Task 2.6：IC `/features/list` 帶 `features_path`（舊 `parquet:` 位址或 h5 檔）⇒ HTTP 400，訊息指向
-    symbol／timeframe／config_hash；不再讀 V1 或舊 h5。"""
-    transport = httpx.ASGITransport(app=ic_app)
+async def _ic_list_old_address_rejected(app: FastAPI, features_path: str) -> bool:
+    """IC `/features/list` 帶舊位址 ⇒ HTTP 400、訊息含該位址並指向 symbol／timeframe／config_hash。"""
+    transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         resp = await c.get("/api/v1/ic/features/list", params={"features_path": features_path})
-    assert resp.status_code == 400
-    assert "config_hash" in resp.text
+    return resp.status_code == 400 and "config_hash" in resp.text and features_path in resp.text
 
 
-def test_mutation_ic_list_old_address_branch_restored_is_detected(monkeypatch):
-    """還原 IC `parquet:` 枝（帶 features_path 時讀出清單）⇒ service 不再拋 ValueError（驗收之前提翻轉）。"""
-    from api.services.ic_analysis_service import ICAnalysisService
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["parquet_key", "real_legacy_h5"])
+async def test_boundary_16_ic_feature_list_old_address_is_400(ic_app, tmp_path, kind):
+    """Task 2.6：IC `/features/list` 帶 `features_path`——舊 `parquet:` 位址，或**實際存在**之 `data/` group 舊 h5
+    （錨點碼態會讀出 `framepath_a`／`framepath_b` 回 200）——一律 HTTP 400；審查 r33 CODEX-R33-P1-01。"""
+    if kind == "parquet_key":
+        features_path = "parquet:BTCUSDT:abc123"
+    else:
+        features_path = str(_write_factory_h5(tmp_path / "legacy_features.h5"))
+    assert await _ic_list_old_address_rejected(ic_app, features_path)
 
-    monkeypatch.setattr(ICAnalysisService, "list_features",
-                        lambda self, features_path=None, meta_path=None, **kw: [{"name": "framepath_v1"}])
-    service = ICAnalysisService.__new__(ICAnalysisService)
-    assert service.list_features(features_path="parquet:BTCUSDT:abc123") == [{"name": "framepath_v1"}]
+
+@pytest.mark.asyncio
+async def test_mutation_ic_list_old_h5_branch_restored_is_detected(ic_app, monkeypatch, tmp_path):
+    """還原舊 h5 讀取枝（實檔回清單、200）⇒ 驗收判定翻轉為 False；以 route 實際呼叫之服務實例置換其方法。"""
+    import api.routes.ic_analysis as ic_routes
+
+    h5 = _write_factory_h5(tmp_path / "legacy_features.h5")
+    monkeypatch.setattr(ic_routes.ic_analysis_service, "list_features",
+                        lambda features_path=None, meta_path=None, **kw: [{"name": "framepath_a"}])
+    assert not await _ic_list_old_address_rejected(ic_app, str(h5))
+
+
+# ---------------------------------------------------------------- Task 2.6 舊 cgsa_work 瀏覽格式（審查 r33 CODEX-R33-P1-02）
+
+CGSA_WORK_REJECT = "舊 cgsa_work 瀏覽格式已不支援"
+BROWSE_ROUTES = (
+    "/api/v1/features/browse/{tid}/features",
+    "/api/v1/features/browse/{tid}/data?features=legacy_a",
+    "/api/v1/features/export/{tid}/csv",
+)
+
+
+def _cgsa_work_list_manifest(tmp_path: Path) -> Path:
+    """舊 CGSA registry 列表格式（`groups` 為串列、各組以絕對 `parquet_path` 指檔；無 version）；產生者
+    `_layer7_validate_and_persist_cgsa` 已由 v16 A1 刪除。錨點碼態會經 `parquet_path` 讀出 `legacy_a`。"""
+    import json
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    work = tmp_path / "cgsa_work" / f"{SYMBOL}_{PRIMARY_TF}_deadbeef"
+    work.mkdir(parents=True)
+    parquet = work / "g.parquet"
+    pq.write_table(pa.table({"legacy_a": [1.0, 2.0, 3.0]}), str(parquet))
+    manifest = work / "manifest.json"
+    manifest.write_text(json.dumps({"symbol": SYMBOL, "timeframe": PRIMARY_TF, "groups": [
+        {"group_id": "g", "parquet_path": str(parquet), "columns": ["legacy_a"]}]}), encoding="utf-8")
+    return manifest
+
+
+async def _cgsa_work_routes_rejected(client, tid: str) -> bool:
+    for route in BROWSE_ROUTES:
+        resp = await client.get(route.format(tid=tid))
+        if not (resp.status_code == 400 and CGSA_WORK_REJECT in resp.text):
+            return False
+    return True
+
+
+@pytest.mark.asyncio
+async def test_boundary_17_cgsa_work_list_format_routes_are_400(client, monkeypatch, tmp_path):
+    """Task 2.6：task 指向舊 cgsa_work 列表格式 manifest ⇒ feature list／selected rows／CSV 皆 400 且含訊息。"""
+    service = _service_with_tasks({"task-cgsa-work": _task(str(_cgsa_work_list_manifest(tmp_path)))})
+    monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
+    assert await _cgsa_work_routes_rejected(client, "task-cgsa-work")
+
+
+@pytest.mark.asyncio
+async def test_mutation_cgsa_work_list_format_branch_restored_is_detected(client, monkeypatch, tmp_path):
+    """還原列表格式枝（task context 照讀、不拒絕）⇒ 驗收判定翻轉為 False。"""
+    service = _service_with_tasks({"task-cgsa-work": _task(str(_cgsa_work_list_manifest(tmp_path)))})
+    monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
+    monkeypatch.setattr(service, "_load_task_context",
+                        lambda task_id: (_ for _ in ()).throw(FileNotFoundError("restored list-format branch")))
+    assert not await _cgsa_work_routes_rejected(client, "task-cgsa-work")
+
+
+# ---------------------------------------------------------------- Task 2.7 定義級殘留（審查 r33 CODEX-R33-P2-03）
+
+DEAD_CLASS_MEMBERS = (
+    ("momentum/FeatureEngineering/feature_storage.py", "FeatureStorage",
+     ("delete_features", "feature_file_exists", "list_feature_files")),
+    ("api/core/config.py", "Settings", ("enable_hdf5_cache", "hdf5_cache_dir", "hdf5_cache_compression")),
+)
+
+
+def dead_class_members(class_sources) -> list:
+    """類別本體內仍定義之已刪成員（方法或類別層欄位指派）。"""
+    import ast
+
+    hits = []
+    for (path, cls, names), src in class_sources:
+        for node in ast.walk(ast.parse(src)):
+            if isinstance(node, ast.ClassDef) and node.name == cls:
+                for n in node.body:
+                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in names:
+                        hits.append((path, cls, n.name))
+                    targets = [n.target] if isinstance(n, ast.AnnAssign) else n.targets if isinstance(n, ast.Assign) else []
+                    hits += [(path, cls, t.id) for t in targets if isinstance(t, ast.Name) and t.id in names]
+    return hits
+
+
+def test_boundary_18_dead_class_members_absent_dataloader_param_kept():
+    """Task 2.7：`FeatureStorage.delete_features`／`feature_file_exists`／`list_feature_files` 與 api `Settings` 三個 HDF5
+    設定欄不存在；`DataLoader(enable_hdf5_cache=…)` 建構參數保留（快取本身現役）。"""
+    import inspect
+
+    from momentum.DataExtraction.data_loader_momentum import DataLoader
+
+    srcs = [(spec, (REPO / spec[0]).read_text(encoding="utf-8")) for spec in DEAD_CLASS_MEMBERS]
+    assert dead_class_members(srcs) == []
+    assert "enable_hdf5_cache" in inspect.signature(DataLoader.__init__).parameters
+
+
+def test_mutation_dead_class_member_scan_detects_residue():
+    spec = ("api/core/config.py", "Settings", ("enable_hdf5_cache",))
+    residue = "class Settings:\n    enable_hdf5_cache: bool = True\n"
+    method = ("x.py", "FeatureStorage", ("delete_features",))
+    assert dead_class_members([(spec, residue)]) == [("api/core/config.py", "Settings", "enable_hdf5_cache")]
+    assert dead_class_members([(method, "class FeatureStorage:\n    def delete_features(self):\n        pass\n")]) != []
+    assert dead_class_members([(spec, "class Other:\n    enable_hdf5_cache = 1\n")]) == []
