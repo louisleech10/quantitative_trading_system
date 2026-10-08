@@ -247,13 +247,21 @@ def test_boundary_10_empty_hdf5_path_behavior_unchanged():
     assert "HDF5 path not found for task: task-empty" in str(exc.value)
 
 
-def test_boundary_11_uppercase_json_suffix_treated_as_manifest(tmp_path):
+@pytest.mark.asyncio
+async def test_boundary_11_uppercase_json_suffix_treated_as_manifest(client, monkeypatch, tmp_path):
+    """`.JSON` 大寫副檔名與現行判定一致（視為 CGSA manifest）：登錄成功、task context 走 manifest、features 路由 200
+    （審查 r19 CODEX-R19-P1-05：不只驗 task id）。"""
     manifest = _cgsa_run(tmp_path)
     upper = manifest.with_name("feature_manifest.JSON")
     upper.write_bytes(manifest.read_bytes())
     service = _service_with_tasks({})
     task_id = service.register_hdf5_for_browse(SYMBOL, PRIMARY_TF, str(upper))
     assert task_id.startswith(f"browse_{SYMBOL}_{PRIMARY_TF}_")
+    context = service._load_task_context(task_id)
+    assert context.get("is_cgsa") is True
+    monkeypatch.setattr(feature_factory_routes, "feature_factory_service", service)
+    feats = await client.get(f"/api/v1/features/browse/{task_id}/features?detail_level=names")
+    assert feats.status_code == 200 and "feat_a" in feats.text
 
 
 ROUTES_PATH = REPO / "api" / "routes" / "feature_factory.py"

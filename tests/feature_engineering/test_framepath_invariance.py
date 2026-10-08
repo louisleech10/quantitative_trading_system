@@ -55,6 +55,15 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
         return _run
 
     assert fb.code_state_errors(runner()) == []
+    # 錨點與執行時 HEAD 分開解析（審查 r19 CODEX-R19-P1-02）：rev-parse HEAD 回不同 sha ⇒ head_commit 取該值
+    later = "74fdd4d1" + "0" * 32
+
+    def two_commits(args):
+        if args[:1] == ["rev-parse"]:
+            return 0, (later if args[-1] == "HEAD" else anchor) + "\n"
+        return runner()(args)
+
+    assert fb.resolve_commits(two_commits) == {"code_anchor": anchor, "head_commit": later}
     assert fb.code_state_errors(runner(diff_out="momentum/FeatureEngineering/feature_factory.py\n")) != []
     assert fb.code_state_errors(runner(untracked_out="api/services/new_untracked.py\n")) != []
     out = tmp_path / "cgsa_fingerprint.json"
@@ -122,8 +131,19 @@ def test_boundary_08_memory_gate_rejects_each_fail_condition(cell, override):
 
 
 def test_boundary_04_c9_preconditions_recorded(baseline):
-    receipt = baseline["cells"]["C9"]["receipt"]
-    assert receipt["legacy_kline_dir"] and receipt["deleted_readback"] == "missing"
+    """C9 前置條件之收據須可核（審查 r19 CODEX-R19-P1-06）：受控 kline 複本路徑、被刪之 `<symbol>/<次週期>` dataset、
+    刪前存在／刪後讀回缺失、子行程環境之 LEGACY_KLINE_CACHE_DIR 指向空受控目錄；且該次週期出現於 partial 之
+    failed／skipped 週期。"""
+    cell = baseline["cells"]["C9"]
+    receipt = cell["receipt"]
+    tf = receipt["dropped_timeframe"]
+    assert receipt["kline_copy"] and receipt["kline_copy"] != receipt["source_kline"]
+    assert receipt["deleted_dataset"] == f"{receipt['symbol']}/{tf}"
+    assert receipt["readback_before"] == "present" and receipt["deleted_readback"] == "missing"
+    assert receipt["legacy_kline_dir"] and receipt["legacy_kline_dir_entries_at_start"] == []
+    assert receipt["child_env"]["LEGACY_KLINE_CACHE_DIR"] == receipt["legacy_kline_dir"]
+    fp = cell["fingerprint"]
+    assert tf in set(fp["completeness"].get("failed_timeframes", [])) | set(fp.get("skipped_timeframes", []))
 
 
 def test_boundary_05_compare_domain_rejects_forbidden_and_non_scalar(tmp_path):
@@ -150,11 +170,48 @@ def test_boundary_05_compare_domain_rejects_forbidden_and_non_scalar(tmp_path):
         fb.filter_manifest({"created_at": {"nested": 1}}, ok)
 
 
+@pytest.mark.parametrize("path", ["", ".created_at", "created_at.", "a..b", "a.**.b", "a.*.*.b", "a.0.b",
+                                  "a[0].b", "a.[].b", "a.*", "*"])
+def test_boundary_13_compare_domain_path_grammar_rejects_malformed(tmp_path, path):
+    """path 語法封閉（審查 r19 CODEX-R19-P1-03）：只准以 . 分隔之物件鍵與中間層單一 `*`；空、首尾點、連續點、`**`、
+    兩個 `*`、數字或陣列記號、末段萬用 ⇒ 拒跑。"""
+    domain = json.loads((REPO / fb.COMPARE_DOMAIN_REL).read_text(encoding="utf-8"))
+    domain["exclude"].append({"path": path, "category": "timestamp", "source": "t"})
+    p = tmp_path / "grammar.json"
+    p.write_text(json.dumps(domain), encoding="utf-8")
+    with pytest.raises(fb.FramepathBaselineError):
+        fb.load_compare_domain(p)
+
+
 def test_boundary_11_c5_resume_hit_is_observed_not_declared(tmp_path):
     """C5 之 resume_hit 由 resume 實際呼叫觀測（審查 r18 CODEX-R18-P1-02）：第二次強制重算 ⇒ resume_hit 須 False；
     正常 C5 ⇒ True 且與強制重算之 fingerprint 相等（resume 不改輸出）。真實 kline 單週期輕量設定，單組串行。"""
-    normal = fb.generate_cell("C5", tmp_path / "normal")
-    forced = fb.generate_cell("C5", tmp_path / "forced", force_regenerate_second=True)
+    from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
+
+    calls = []
+    original = ColumnGroupRegistry.resume_from_manifest.__func__
+
+    def spy(cls, work_dir):
+        registry = original(cls, work_dir)
+        calls.append((str(work_dir), sum(1 for _ in registry.iter_all())))
+        return registry
+
+    import pytest as _pytest
+
+    mp = _pytest.MonkeyPatch()
+    mp.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(spy))
+    try:
+        normal = fb.generate_cell("C5", tmp_path / "normal")
+        normal_calls = list(calls)
+        calls.clear()
+        forced = fb.generate_cell("C5", tmp_path / "forced", force_regenerate_second=True)
+        forced_calls = list(calls)
+    finally:
+        mp.undo()
+    # 測試端獨立觀測（審查 r19 CODEX-R19-P1-01）：正常 C5 之第二次生成實際呼叫 resume 且回傳非空 registry；
+    # 強制重算之第二次不呼叫 resume。receipt 之 resume_hit 須與此觀測一致（不得硬編）
+    assert any(str(tmp_path / "normal") in w and n > 0 for w, n in normal_calls), normal_calls
+    assert not any(str(tmp_path / "forced") in w for w, _ in forced_calls), forced_calls
     assert normal["receipt"]["resume_hit"] is True
     assert forced["receipt"]["resume_hit"] is False
     strip = lambda fp: {k: v for k, v in fp.items() if k != "path_receipt"}  # noqa: E731
@@ -228,6 +285,17 @@ def test_mutation_compare_detects_value_mask_and_manifest_changes():
         changed = copy.deepcopy(fresh)
         mutate(changed)
         assert fb.compare_cell(base, changed) != []
+
+
+@pytest.mark.parametrize("key", fb.FINGERPRINT_KEYS)
+def test_mutation_compare_detects_missing_required_key(key):
+    """任一必要比對項缺席（單側）⇒ 差異（審查 r19 CODEX-R19-P1-04：比較器不得只比共同鍵或以 .get 預設）。"""
+    base, fresh = _synthetic_pair()
+    fresh.pop(key)
+    assert fb.compare_cell(base, fresh) != []
+    base2, fresh2 = _synthetic_pair()
+    base2.pop(key)
+    assert fb.compare_cell(base2, fresh2) != []
 
 
 def test_mutation_unregistered_manifest_key_changes_digest():

@@ -68,6 +68,12 @@ def code_state_errors(git_runner: Any = None) -> List[str]:
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
+def resolve_commits(git_runner: Any = None) -> Dict[str, str]:
+    """{"code_anchor": `git rev-parse 6e07e0ad` 之完整 sha, "head_commit": `git rev-parse HEAD`}——兩次獨立解析，
+    freeze 寫入基準（審查 r19 CODEX-R19-P1-02）。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
 def load_compare_domain(path: Path = REPO / COMPARE_DOMAIN_REL) -> Dict[str, Any]:
     """讀 `compare_domain.json` 並驗：category ∈ allowed_categories；path 之最後一段不屬 forbidden keys 或
     `feature_storage.COMPLETENESS_FIELD_NAMES`；path 語法只含物件鍵與單層 `*`。違反 ⇒ `FramepathBaselineError`。"""
@@ -102,8 +108,10 @@ def run_cell(cell: str, work_root: Path) -> Dict[str, Any]:
     """於子行程跑一格生成，父行程以 `memory_guard._Readings`（根＝子行程）每 0.1 秒取樣；回傳
     {"fingerprint": {FINGERPRINT_KEYS…}, "memory": {"peak_bytes", "readings", "seconds", "non_root_member_seen"},
     "receipt": {"resume_hit": bool（第二次生成實際由 CGSA resume 跳過層計算之觀測值，取自 registry 之 resume 狀態而非
-    比對輸出；C5 須 True、其餘格須 False——審查 r17 CODEX-R17-P1-02）, …，C9 另含 legacy_kline_dir 與
-    deleted_readback}}。`ICFA_GUARD_READINGS_FILE` 已設 ⇒ 拒跑。"""
+    比對輸出；C5 須 True、其餘格須 False——審查 r17 CODEX-R17-P1-02）, …，C9 另含 symbol、source_kline、kline_copy、
+    dropped_timeframe、deleted_dataset（`<symbol>/<次週期>`）、readback_before（"present"）、deleted_readback
+    （"missing"）、legacy_kline_dir、legacy_kline_dir_entries_at_start（[]）、child_env（子行程實際之
+    LEGACY_KLINE_CACHE_DIR）——審查 r19 CODEX-R19-P1-06}}。`ICFA_GUARD_READINGS_FILE` 已設 ⇒ 拒跑。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
