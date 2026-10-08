@@ -1036,6 +1036,38 @@ def test_check_0_sha_schema_and_kinds(ctx):
     assert check_0(ctx["disp"], ctx["disp_bytes"], recorded, ctx["head"], ctx["spec"]) == []
 
 
+FROZEN_ACCEPTANCE_TESTS = (
+    "tests/feature_engineering/test_framepath_invariance.py",
+    "tests/feature_engineering/test_framepath_cgsa_only.py",
+    "tests/feature_engineering/test_framepath_disposition.py",
+    "tests/api/test_framepath_api_h5.py",
+)
+
+
+def frozen_file_errors(recorded: Dict[str, str], paths: Sequence[str], reader=current_bytes) -> List[str]:
+    """TODO 凍結之具名驗收測試：現行位元組 sha256 須等於 manifest 所記（審查 r22 CODEX-R22-P1-01：實作期不得以
+    弱化新增驗收檔過閘；需改者回 TODO 重審並更新 manifest）。"""
+    errs = []
+    for p in paths:
+        data = reader(p)
+        if p not in recorded:
+            errs.append(f"⓪ manifest 未記 {p} 之 contract_sha256")
+        elif data is None or sha256_bytes(data) != recorded[p]:
+            errs.append(f"⓪ {p} 與 TODO 凍結之 sha256 不等")
+    return errs
+
+
+def test_check_0_frozen_acceptance_tests_unchanged():
+    assert frozen_file_errors(manifest_contract_shas(), FROZEN_ACCEPTANCE_TESTS) == []
+
+
+def test_mutation_weakened_acceptance_test_is_red():
+    recorded = {"t.py": sha256_bytes(b"assert x == 1\n")}
+    assert frozen_file_errors(recorded, ["t.py"], lambda p: b"assert x == 1\n") == []
+    assert frozen_file_errors(recorded, ["t.py"], lambda p: b"assert True\n") != []
+    assert frozen_file_errors({}, ["t.py"], lambda p: b"assert x == 1\n") != []
+
+
 def test_check_1_collect_difference(ctx):
     current = collect_nodeids(collect_files(ctx["disp"]))
     assert check_1(ctx["disp"], ctx["phase"], current) == []

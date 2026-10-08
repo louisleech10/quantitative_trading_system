@@ -334,6 +334,13 @@ def ticket_dead_defs() -> Set[str]:
 def test_boundary_15_no_ticket_dead_defs_remain():
     assert sorted(ticket_dead_defs()) == []
     assert all(isinstance(v, str) and v.strip() for v in RETAINED.values())
+    # HEAD_DEAD 須等於其產生收據（審查 r22 CODEX-R22-P1-02：豁免集合不得自行擴張；本檔內容另由處置驗證器之
+    # sha256 凍結，掃描器與豁免改動皆須回 TODO 重審）
+    import json
+
+    receipt = json.loads((REPO / "handoffs/run_receipts/20261008-framepath-dead-scan-head.json").read_text(encoding="utf-8"))
+    assert tuple(receipt["head_dead"]) == HEAD_DEAD
+    assert receipt["scan_files"] == list(DEAD_SCAN_FILES) and receipt["ref_roots"] == list(DEAD_REF_ROOTS)
 
 
 # ---------------------------------------------------------------- mutation
