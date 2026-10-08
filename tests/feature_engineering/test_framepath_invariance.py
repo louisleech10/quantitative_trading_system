@@ -89,8 +89,42 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
     assert not out.exists()
 
 
+def _install_sampler_spy(monkeypatch) -> dict:
+    """以 spy 置換 `memory_guard._Readings`，記錄每個取樣器之 root 與每筆 sample()（審查 r26／r27）。"""
+    from momentum.FeatureEngineering import memory_guard
+
+    seen: dict = {"roots": [], "samples": []}
+    real = memory_guard._Readings
+
+    class _Spy(real):  # type: ignore[misc, valid-type]
+        def __init__(self, system, root):
+            super().__init__(system, root)
+            seen["roots"].append(root)
+
+        def sample(self):
+            row = super().sample()
+            seen["samples"].append(copy.deepcopy(row))
+            return row
+
+    monkeypatch.setattr(memory_guard, "_Readings", _Spy)
+    return seen
+
+
+def _assert_memory_from_sampler(mem: dict, seen: dict) -> None:
+    """記憶體摘要之來源核對：唯一 root 為子行程（非本行程）、至少一筆讀數、memory（除 seconds）等於
+    summarize_readings(實際讀數, root)，且每筆讀數之 members 皆含 root（root_missing == 0）。"""
+    import os
+
+    assert len(set(seen["roots"])) == 1 and seen["roots"][0] != os.getpid()
+    root = seen["roots"][0]
+    assert len(seen["samples"]) >= 1
+    assert {k: v for k, v in mem.items() if k != "seconds"} == fb.summarize_readings(seen["samples"], root)
+    assert mem["root_missing"] == 0 and mem["readings"] == len(seen["samples"])
+
+
 @pytest.mark.parametrize("cell", fb.CELLS)
-def test_cell_matches_frozen_baseline(baseline, tmp_path, cell):
+def test_cell_matches_frozen_baseline(baseline, tmp_path, cell, monkeypatch):
+    seen = _install_sampler_spy(monkeypatch)
     fresh = fb.run_cell(cell, tmp_path)
     assert fresh["receipt"]["resume_entered"] is (cell == "C5")
     if cell == "C9":
@@ -108,6 +142,7 @@ def test_cell_matches_frozen_baseline(baseline, tmp_path, cell):
             assert primary in h5 and h5[primary].shape == src[primary].shape
         legacy = Path(receipt["legacy_kline_dir"])
         assert legacy.is_dir() and str(legacy).startswith(str(tmp_path)) and not any(legacy.iterdir())
+    _assert_memory_from_sampler(fresh["memory"], seen)  # 逐格取樣來源核對（審查 r27 CODEX-R27-P1-01）
     assert fb.memory_gate_errors(cell, fresh["memory"]) == []
     assert fb.compare_cell(baseline["cells"][cell]["fingerprint"], fresh["fingerprint"]) == []
 
@@ -315,32 +350,10 @@ def test_boundary_06_injected_readings_refused(monkeypatch, tmp_path):
 
 def test_boundary_15_memory_summary_comes_from_readings_sampler(monkeypatch, tmp_path):
     """審查 r26 CODEX-R26-P1-02：記憶體摘要須來自 `memory_guard._Readings` 對子行程之實際取樣——以 spy 置換該
-    模組屬性跑 C1（真實 kline、單週期秒級），run_cell 之 memory（除 seconds）須等於 summarize_readings(spy 讀數,
-    spy root)；root 為子行程（非本行程）、至少一筆讀數、每筆 members 含 root。回傳固定健康常數之實作 ⇒ 紅。"""
-    import os
-
-    from momentum.FeatureEngineering import memory_guard
-
-    seen: dict = {"roots": [], "samples": []}
-    real = memory_guard._Readings
-
-    class _Spy(real):  # type: ignore[misc, valid-type]
-        def __init__(self, system, root):
-            super().__init__(system, root)
-            seen["roots"].append(root)
-
-        def sample(self):
-            row = super().sample()
-            seen["samples"].append(copy.deepcopy(row))
-            return row
-
-    monkeypatch.setattr(memory_guard, "_Readings", _Spy)
-    mem = fb.run_cell("C1", tmp_path)["memory"]
-    assert len(set(seen["roots"])) == 1 and seen["roots"][0] != os.getpid()
-    root = seen["roots"][0]
-    assert len(seen["samples"]) >= 1
-    assert {k: v for k, v in mem.items() if k != "seconds"} == fb.summarize_readings(seen["samples"], root)
-    assert mem["root_missing"] == 0 and mem["readings"] == len(seen["samples"])
+    模組屬性跑 C1（真實 kline、單週期秒級）；全部格之同一核對另於 test_cell_matches_frozen_baseline 逐格執行
+    （審查 r27 CODEX-R27-P1-01）。回傳固定健康常數之實作 ⇒ 紅。"""
+    seen = _install_sampler_spy(monkeypatch)
+    _assert_memory_from_sampler(fb.run_cell("C1", tmp_path)["memory"], seen)
 
 
 def test_mutation_summarize_readings_derives_every_field():
@@ -356,6 +369,8 @@ def test_mutation_summarize_readings_derives_every_field():
     assert only_root["non_root_member_seen"] is False and only_root["injected"] is False
     assert only_root["failed"] == [] and only_root["root_missing"] == 0
     assert fb.summarize_readings([], root)["readings"] == 0 and fb.summarize_readings([], root)["peak_bytes"] == 0
+    # 審查 r27 CODEX-R27-P1-01：members 為空之讀數亦屬缺根
+    assert fb.summarize_readings([{"footprint": 1, "failed": [], "members": []}], root)["root_missing"] == 1
 
 
 def test_boundary_07_comparator_has_no_timeframe_or_symbol_literals():

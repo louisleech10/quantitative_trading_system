@@ -110,7 +110,7 @@ def summarize_readings(samples: List[Mapping[str, Any]], root: int) -> Dict[str,
     """`_Readings.sample()` 逐筆讀數 → 記憶體摘要（純函式；審查 r26 CODEX-R26-P1-02）：
     {"readings": 筆數, "peak_bytes": 各筆 footprint 最大值（無讀數＝0）, "failed": 各筆 failed pid 之排序聯集,
     "injected": 任一筆 injected 為真, "non_root_member_seen": 任一筆 members 含 pid ≠ root,
-    "root_missing": 有 members 而不含 root 之筆數}。`run_cell` 之 memory 除 `seconds` 外須等於本函式對其實際取樣
+    "root_missing": members 不含 root 之筆數（含 members 為空者；審查 r27）}。`run_cell` 之 memory 除 `seconds` 外須等於本函式對其實際取樣
     結果之輸出，不得另行填值。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
@@ -130,7 +130,7 @@ def run_cell(cell: str, work_root: Path) -> Dict[str, Any]:
 
 def memory_gate_errors(cell: str, memory: Mapping[str, Any]) -> List[str]:
     """§G 記憶體閘：讀數 failed 非空、injected、無讀數、峰值 ≥ PEAK_LIMIT_BYTES、C6 無根以外成員、root_missing > 0
-    （有讀數而不含根，審查 r26）⇒ 錯誤字串。"""
+    （任一筆讀數之 members 不含根〔含空〕，審查 r26／r27）⇒ 錯誤字串。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
