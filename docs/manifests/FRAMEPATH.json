@@ -29,6 +29,12 @@
       "cmd": "暫存 worktree 試作（Phase 1／2／3 生產刪除試作＋處置表 text_apply 套用）上逐檔／逐 nodeid 串行 pytest；HEAD 既有紅於乾淨 6e07e0ad worktree 對照",
       "rc": 0,
       "honest_bounds": "試作非實作、不提交；重型檔只跑處置表所涉測試與 FFACT 假值 keep 測試；macOS 8 GB 本機；試作過程之刪除依據另見 handoffs/run_receipts/20261008-framepath-trial-dead.txt"
+    },
+    {
+      "path": "handoffs/run_receipts/20261008-framepath-c5-probe.json",
+      "cmd": "乾淨 6e07e0ad worktree 單週期同 work dir 兩次生成＋resume／L1 spy（handoffs/run_receipts/framepath_probes/c5_probe.py）",
+      "rc": 0,
+      "honest_bounds": "stat_payload 單週期短窗；未測中途中斷之部分 run"
     }
   ],
   "batch_card": {
@@ -201,7 +207,7 @@
       "實作期每批：先跑本批處置表所涉測試檔（明列路徑、單組串行），再跑 FRAMEPATH_PHASE=<批> 之 test_framepath_disposition.py；跑完 bash scripts/restore_golden_inventory.sh；收尾列暫存（pytest-of-louis、中斷測試殘留、委員 /private/tmp 副本）刪除指令交使用者",
       "stub_modules 為空之理由：本票無新生產模組；具名例外 CGSARegistryRequiredError 新增於既有 momentum/FeatureEngineering/feature_factory.py（列 touches），其餘皆刪除與改寫既有函式",
       "處置閘⑤(b)與⑦皆不判路徑含 `__pycache__/` 者（repo 內已追蹤之 numba／位元組碼快取，任一測試執行即改寫；SPEC v16 補充）",
-      "Task 1.1 凍結（審查 r17）：freeze 先以 code_state_errors 實核 momentum／api／config 與 6e07e0ad 逐位元相同，否則不產輸出；基準記 code_anchor、head_commit、code_state_errors；每格 receipt 記 resume_hit（registry resume 實際觀測，C5 須 True、其餘 False）"
+      "Task 1.1 凍結（審查 r17–r21）：freeze 先以 code_state_errors 實核 momentum／api／config 與 6e07e0ad 逐位元相同，否則不產輸出；基準之 code_anchor／head_commit 由 resolve_commits 兩次獨立解析；每格 receipt 記 resume_entered（resume_from_manifest 對本格 work dir 之實際呼叫，C5 須 True、其餘 False；SPEC v16 A10：已完成 run 之 resume 回傳空 registry、L1–L6 重算，C5 驗輸出不變）"
     ],
     "coverage_risk": [
       "Task 1.1：test_framepath_invariance（C1–C9 逐格無容差、C5＝C1、run_status、記憶體閘、C9 前置條件、compare_domain 禁排除鍵與非純量、注入讀數拒跑、比對器無週期／標的字面、兩 mutant）；M1–M4 worktree mutation 收據",

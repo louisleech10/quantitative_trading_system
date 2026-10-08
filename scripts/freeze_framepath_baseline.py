@@ -98,18 +98,19 @@ def cell_settings(cell: str) -> Dict[str, Any]:
 
 def generate_cell(cell: str, work_root: Path, *, force_regenerate_second: bool = False) -> Dict[str, Any]:
     """行程內跑一格生成並回傳 {"fingerprint", "receipt"}（不含記憶體；`run_cell` 於子行程呼叫本函式並取樣）。
-    `receipt["resume_hit"]`＝第二次生成期間 `ColumnGroupRegistry.resume_from_manifest` 實際被呼叫且回傳非空 registry
-    （以包裝該 classmethod 之 spy 觀測，不以格名推定；審查 r18 CODEX-R18-P1-02）；只 C5 有第二次生成，其兩次皆以
-    `force_regenerate=False`。`force_regenerate_second=True` 只供 mutation 測試（第二次強制重算 ⇒ resume_hit 須 False）。"""
+    `receipt["resume_entered"]`＝第二次生成期間 `ColumnGroupRegistry.resume_from_manifest` 對本格 work dir 實際被呼叫
+    （以包裝該 classmethod 之 spy 觀測，不以格名推定；另記 `resume_groups`＝其回傳 registry 之群組數，HEAD 實測已完成
+    run 為 0；SPEC v16 A10）；只 C5 有第二次生成，其兩次皆以
+    `force_regenerate=False`。`force_regenerate_second=True` 只供 mutation 測試（第二次強制重算 ⇒ resume_entered 須 False）。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
 def run_cell(cell: str, work_root: Path) -> Dict[str, Any]:
     """於子行程跑一格生成，父行程以 `memory_guard._Readings`（根＝子行程）每 0.1 秒取樣；回傳
     {"fingerprint": {FINGERPRINT_KEYS…}, "memory": {"peak_bytes", "readings", "seconds", "non_root_member_seen"},
-    "receipt": {"resume_hit": bool（第二次生成實際由 CGSA resume 跳過層計算之觀測值，取自 registry 之 resume 狀態而非
-    比對輸出；C5 須 True、其餘格須 False——審查 r17 CODEX-R17-P1-02）, …，C9 另含 symbol、source_kline、kline_copy、
-    dropped_timeframe、deleted_dataset（`<symbol>/<次週期>`）、readback_before（"present"）、deleted_readback
+    "receipt": {"resume_entered": bool（第二次生成進入 CGSA resume 分支之觀測值，見 generate_cell；C5 須 True、其餘格須
+    False——SPEC v16 A10）, …，C9 另含 symbol、source_kline、kline_copy、
+    primary_timeframe、dropped_timeframe、deleted_dataset（`<symbol>/<次週期>`）、readback_before（"present"）、deleted_readback
     （"missing"）、legacy_kline_dir、legacy_kline_dir_entries_at_start（[]）、child_env（子行程實際之
     LEGACY_KLINE_CACHE_DIR）——審查 r19 CODEX-R19-P1-06}}。`ICFA_GUARD_READINGS_FILE` 已設 ⇒ 拒跑。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
@@ -128,7 +129,7 @@ def compare_cell(baseline: Mapping[str, Any], fresh: Mapping[str, Any]) -> List[
 
 def _freeze_refusals(cells: Mapping[str, Mapping[str, Any]]) -> List[str]:
     """凍結拒寫條件（Task 1.1 邊界）：C5 與 C1 fingerprint 不等、run_status 不合、C9 次週期未入 failed／skipped、
-    任一格 memory_gate_errors 非空、C5 resume_hit 非 True 或他格非 False ⇒ 錯誤字串。"""
+    任一格 memory_gate_errors 非空、C5 resume_entered 非 True 或他格非 False ⇒ 錯誤字串。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 

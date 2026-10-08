@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "command": "WT=wt0（git worktree 6e07e0ad，乾淨碼態）下以 tests/feature_engineering/ffstat_helpers.run_stat(stat_payload(), force_regenerate=False) 同一 tmp（同 CGSA work dir、同 storage）連跑兩次；spy 包裝 ColumnGroupRegistry.resume_from_manifest 與 FeatureFactory._layer1_atomic_indicators",
+  "exit_code": 0,
+  "date": "2026-10-08",
+  "author": "主委（Claude）",
+  "purpose": "審查 r21 CODEX-R21-P1-02：SPEC §G C5「resume 命中」之現行碼語意",
+  "result": {
+    "resume_from_manifest_calls": 1,
+    "resume_registry_groups": 0,
+    "l1_calls_before_resume": 7,
+    "l1_calls_after_resume": 1,
+    "run_status": ["complete", "complete"],
+    "group_count": [43, 43],
+    "suffixed_group_ids_second_run": [],
+    "base_fingerprints_equal": true,
+    "columns": [3632, 3632]
+  },
+  "conclusion": "單週期已完成 run 之第二次生成進入 CGSA resume 分支，但中間群組已清、resume 回傳空 registry，L1–L6 照常重算；輸出逐位元相等、無 _2 後綴群組。C5 之可驗語意＝「resume 分支之輸出不變」，非「跳過計算」（SPEC v16 A10）",
+  "honest_bounds": "stat_payload 單週期 BTCUSDT 1h 短窗；未測中途中斷之部分 run（其 resume 跳過語意由既有 tests/test_cgsa_resume.py 承擔）"
+}

@@ -75,7 +75,7 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
         "fingerprint": dict(stub_fp, run_status="partial" if cell in fb.PARTIAL_CELLS else "complete"),
         "memory": {"peak_bytes": 1, "readings": 1, "seconds": 1.0, "failed": [], "injected": False,
                    "non_root_member_seen": True},
-        "receipt": {"resume_hit": cell == "C5"}})
+        "receipt": {"resume_entered": cell == "C5"}})
     monkeypatch.setattr(fb, "_freeze_refusals", lambda cells: [])
     fb.freeze(wired)
     written = json.loads(wired.read_text(encoding="utf-8"))
@@ -92,7 +92,7 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
 @pytest.mark.parametrize("cell", fb.CELLS)
 def test_cell_matches_frozen_baseline(baseline, tmp_path, cell):
     fresh = fb.run_cell(cell, tmp_path)
-    assert fresh["receipt"]["resume_hit"] is (cell == "C5")
+    assert fresh["receipt"]["resume_entered"] is (cell == "C5")
     if cell == "C9":
         # 前置條件以檔案系統實核，不只讀收據字串（審查 r20 CODEX-R20-P1-04）
         import h5py
@@ -100,8 +100,12 @@ def test_cell_matches_frozen_baseline(baseline, tmp_path, cell):
         receipt = fresh["receipt"]
         copy_path = Path(receipt["kline_copy"])
         assert copy_path.is_file() and str(copy_path).startswith(str(tmp_path))
-        with h5py.File(copy_path, "r") as h5:
+        primary = f"{receipt['symbol']}/{receipt['primary_timeframe']}/data"
+        with h5py.File(receipt["source_kline"], "r") as src, h5py.File(copy_path, "r") as h5:
+            # 刪前證據（審查 r21 CODEX-R21-P1-03）：原始 kline 確有該 dataset；複本為原始之真複本（主週期等長）且只缺該 dataset
+            assert f"{receipt['deleted_dataset']}/data" in src
             assert f"{receipt['deleted_dataset']}/data" not in h5
+            assert primary in h5 and h5[primary].shape == src[primary].shape
         legacy = Path(receipt["legacy_kline_dir"])
         assert legacy.is_dir() and str(legacy).startswith(str(tmp_path)) and not any(legacy.iterdir())
     assert fb.memory_gate_errors(cell, fresh["memory"]) == []
@@ -110,8 +114,8 @@ def test_cell_matches_frozen_baseline(baseline, tmp_path, cell):
 
 def test_boundary_01_resume_cell_equals_single_tf_cell(baseline):
     # C5 須有實際 resume 之觀測證據（審查 r17 CODEX-R17-P1-02：只比輸出相等無法分辨「每次重算」）
-    assert baseline["cells"]["C5"]["receipt"]["resume_hit"] is True
-    assert all(baseline["cells"][c]["receipt"]["resume_hit"] is False for c in fb.CELLS if c != "C5")
+    assert baseline["cells"]["C5"]["receipt"]["resume_entered"] is True
+    assert all(baseline["cells"][c]["receipt"]["resume_entered"] is False for c in fb.CELLS if c != "C5")
     c1 = baseline["cells"]["C1"]["fingerprint"]
     c5 = baseline["cells"]["C5"]["fingerprint"]
     assert fb.compare_cell({k: v for k, v in c1.items() if k != "path_receipt"},
@@ -210,51 +214,38 @@ def test_boundary_13_compare_domain_path_grammar_rejects_malformed(tmp_path, pat
         fb.load_compare_domain(p)
 
 
-def test_boundary_11_c5_resume_hit_is_observed_not_declared(tmp_path):
-    """C5 之 resume_hit 由 resume 實際呼叫觀測（審查 r18 CODEX-R18-P1-02）：第二次強制重算 ⇒ resume_hit 須 False；
-    正常 C5 ⇒ True 且與強制重算之 fingerprint 相等（resume 不改輸出）。真實 kline 單週期輕量設定，單組串行。"""
+def test_boundary_11_c5_resume_entered_is_observed_not_declared(tmp_path):
+    """C5（SPEC v16 A10）：同 work dir 第二次生成進入 CGSA resume 分支（`resume_from_manifest` 對本格 work dir 被呼叫），
+    強制重算則不進入；兩者輸出逐位元相等。HEAD 實測（收據 handoffs/run_receipts/20261008-framepath-c5-probe.json）：
+    已完成 run 之中間群組已清，resume 回傳空 registry、L1–L6 照常重算，故本格驗「resume 分支之輸出不變」而非「跳過
+    計算」（r19／r20 所加之「非空 registry」「L1 不重算」斷言於現行碼不成立，r21 撤回）。真實 kline 單週期輕量設定。"""
     from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 
-    from momentum.FeatureEngineering.feature_factory import FeatureFactory
-
     calls = []
-    l1_calls = []
     original = ColumnGroupRegistry.resume_from_manifest.__func__
-    original_l1 = FeatureFactory._layer1_atomic_indicators
 
     def spy(cls, work_dir):
         registry = original(cls, work_dir)
-        calls.append((str(work_dir), sum(1 for _ in registry.iter_all())))
+        calls.append(str(work_dir))
         return registry
-
-    def l1_spy(self, *a, **k):
-        l1_calls.append(len(calls))  # 記錄 L1 計算發生時已發生之 resume 次數
-        return original_l1(self, *a, **k)
 
     import pytest as _pytest
 
     mp = _pytest.MonkeyPatch()
     mp.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(spy))
-    mp.setattr(FeatureFactory, "_layer1_atomic_indicators", l1_spy)
     try:
         normal = fb.generate_cell("C5", tmp_path / "normal")
-        normal_calls, normal_l1 = list(calls), list(l1_calls)
+        normal_calls = list(calls)
         calls.clear()
-        l1_calls.clear()
         forced = fb.generate_cell("C5", tmp_path / "forced", force_regenerate_second=True)
-        forced_calls, forced_l1 = list(calls), list(l1_calls)
+        forced_calls = list(calls)
     finally:
         mp.undo()
-    # 已完成之檢查點未重算（審查 r20 CODEX-R20-P1-06：呼叫 resume 後丟棄回傳、照常重算亦須翻紅）：
-    # 正常 C5 之 L1 只在第一次生成發生（resume 前），強制重算則兩次皆算
-    assert normal_l1 and all(n == 0 for n in normal_l1), normal_l1
-    assert len(forced_l1) >= 2, forced_l1
-    # 測試端獨立觀測（審查 r19 CODEX-R19-P1-01）：正常 C5 之第二次生成實際呼叫 resume 且回傳非空 registry；
-    # 強制重算之第二次不呼叫 resume。receipt 之 resume_hit 須與此觀測一致（不得硬編）
-    assert any(str(tmp_path / "normal") in w and n > 0 for w, n in normal_calls), normal_calls
-    assert not any(str(tmp_path / "forced") in w for w, _ in forced_calls), forced_calls
-    assert normal["receipt"]["resume_hit"] is True
-    assert forced["receipt"]["resume_hit"] is False
+    # 測試端獨立觀測：正常 C5 之第二次生成對本格 work dir 呼叫 resume；強制重算不呼叫。receipt 須與觀測一致
+    assert any(str(tmp_path / "normal") in w for w in normal_calls), normal_calls
+    assert not any(str(tmp_path / "forced") in w for w in forced_calls), forced_calls
+    assert normal["receipt"]["resume_entered"] is True
+    assert forced["receipt"]["resume_entered"] is False
     strip = lambda fp: {k: v for k, v in fp.items() if k != "path_receipt"}  # noqa: E731
     assert fb.compare_cell(strip(normal["fingerprint"]), strip(forced["fingerprint"])) == []
 
