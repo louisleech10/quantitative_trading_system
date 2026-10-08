@@ -1262,6 +1262,14 @@ FROZEN_ACCEPTANCE_TESTS = (
     "tests/feature_engineering/test_framepath_disposition.py",
     "tests/api/test_framepath_api_h5.py",
 )
+# 審查 r39 CODEX-R39-P1-01：V1 版面 fixture（boundary_14／15 之反向 oracle）與驗收測試同等凍結——manifest 記 sha256、
+# 實作許可錨點後不得改、首個生產碼提交後不得改
+V1_FIXTURE_FILES = (
+    "tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/manifest.json",
+    "tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/columns.json.gz",
+    "tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/g1.parquet",
+)
+FROZEN_CONTRACT_FILES = FROZEN_ACCEPTANCE_TESTS + V1_FIXTURE_FILES
 
 
 def frozen_file_errors(recorded: Dict[str, str], paths: Sequence[str], reader=current_bytes) -> List[str]:
@@ -1291,14 +1299,14 @@ def test_check_0_disposition_view_bound_to_table():
 
 
 def test_check_0_frozen_acceptance_tests_unchanged():
-    assert frozen_file_errors(manifest_contract_shas(), FROZEN_ACCEPTANCE_TESTS) == []
+    assert frozen_file_errors(manifest_contract_shas(), FROZEN_CONTRACT_FILES) == []
 
 
 # 審查 r28 CODEX-R28-P1-01：manifest 之 contract_sha256 由 manifest 自我宣告，首個生產碼提交前可整批同步改寫
 # 而自洽。外部錨點＝gate 於核可後發 FRAMEPATH 實作許可時寫入已提交審計紀錄之 `round_start_head`（gate.sh
 # impl_token_issued；manifest 無從改寫）：自該提交起，下列核定檔之位元組不得再變。
 AUDIT_REL = ".claude/gate/audit.log"
-APPROVAL_FROZEN = FROZEN_ACCEPTANCE_TESTS + (MANIFEST_REL, DISPOSITION_REL, COMPARE_DOMAIN_REL)
+APPROVAL_FROZEN = FROZEN_CONTRACT_FILES + (MANIFEST_REL, DISPOSITION_REL, COMPARE_DOMAIN_REL)
 TICKET_ROOT = "20260928-FRAMEPATH"  # 本票 task-id 根（同票跨日沿用首日前綴）；exact match（審查 r29）
 
 
@@ -1397,7 +1405,7 @@ def git_commits_after_anchor() -> List[Tuple[str, Set[str]]]:
 
 
 def test_check_0_history_freeze_order():
-    assert history_errors(git_commits_after_anchor(), (*FROZEN_ACCEPTANCE_TESTS, MANIFEST_REL)) == []
+    assert history_errors(git_commits_after_anchor(), (*FROZEN_CONTRACT_FILES, MANIFEST_REL)) == []
 
 
 def test_mutation_history_freeze_order_violations_are_red():
@@ -1416,6 +1424,18 @@ def test_mutation_weakened_acceptance_test_is_red():
     assert frozen_file_errors(recorded, ["t.py"], lambda p: b"assert x == 1\n") == []
     assert frozen_file_errors(recorded, ["t.py"], lambda p: b"assert True\n") != []
     assert frozen_file_errors({}, ["t.py"], lambda p: b"assert x == 1\n") != []
+
+
+def test_mutation_hollowed_v1_fixture_is_red():
+    """審查 r39 CODEX-R39-P1-01：V1 fixture 列入凍結契約；改成仍可解壓之空 columns 等任一位元組變動 ⇒ ⓪紅。"""
+    import gzip
+
+    assert set(V1_FIXTURE_FILES) <= set(FROZEN_CONTRACT_FILES) and set(V1_FIXTURE_FILES) <= set(APPROVAL_FROZEN)
+    path = V1_FIXTURE_FILES[1]
+    real = current_bytes(path)
+    recorded = {path: sha256_bytes(real)}
+    assert frozen_file_errors(recorded, [path], lambda p: real) == []
+    assert frozen_file_errors(recorded, [path], lambda p: gzip.compress(b"[]")) != []
 
 
 def test_check_1_collect_difference(ctx):
