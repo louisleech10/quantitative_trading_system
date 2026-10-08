@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FRAMEPATH 規格書審閱（刪掉舊的 frame 生成路徑與舊特徵 h5 讀寫）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">FRAMEPATH規格審閱.md</span></nav>
+<main>
+<h1 id="framepath-規格書審閱刪掉舊的-frame-生成路徑與舊特徵-h5-讀寫">FRAMEPATH 規格書審閱（刪掉舊的 frame 生成路徑與舊特徵 h5 讀寫）</h1>
+<blockquote>
+<p><strong>這份是給你審的。</strong> 規格書原文在 <code>docs/FRAMEPATH_SPEC.md</code>（給委員看的技術版，第 15 版）；這份是白話逐條版。
+規格書已由三家委員審 15 輪收斂（最後一輪三家都沒意見）。<strong>你同意後我才寫施工清單、才動程式；現在一行程式都還沒改。</strong></p>
+</blockquote>
+<hr />
+<h2 id="一要解決什麼">一、要解決什麼</h2>
+<p>特徵工廠有兩套生成方式：</p>
+<ul>
+<li><strong>CGSA</strong>（現在正式在用的）：特徵分組存成 parquet 檔＋一份 manifest 說明檔。</li>
+<li><strong>frame</strong>（舊的）：所有特徵塞進一張大表、存成 <code>&lt;幣種&gt;_&lt;週期&gt;_factory.h5</code>。只有手動設環境變數 <code>FFACT_USE_CGSA=0</code> 才會走到。</li>
+</ul>
+<p>9/28 查證輪三家一致確認：<strong>正式流程（API、批次、前端）沒有任何地方會走 frame</strong>，而且 frame 的多週期平穩化算法本身是錯的。你當時裁定：「若是frame都不需要，那不就不要花時間在任何跟frame有關的部份和測試上？」「舊的h5什麼的也可以刪除，這樣可以專注在把現行的模組做好吧？」</p>
+<p>這張票就是照這個裁定，把 frame 的生成程式、它存的舊 h5 檔讀寫，以及只為它存在的測試與腳本刪乾淨。</p>
+<h2 id="二刪什麼不刪什麼">二、刪什麼、不刪什麼</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>刪</th>
+<th>不刪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FFACT_USE_CGSA</code> 這個開關（刪後設成 0 也沒作用，一律走 CGSA）</td>
+<td>K 線資料 <code>kline_cache.h5</code></td>
+</tr>
+<tr>
+<td>frame 單週期、多週期的組裝與存檔程式</td>
+<td>IC 分析內部用的 h5、IC 頁匯出的 <code>*_filtered.h5</code></td>
+</tr>
+<tr>
+<td>讀寫 <code>*_factory.h5</code> 的程式（含特徵庫、覆蓋率分析、API 的舊 h5 分支）</td>
+<td>ML 功能（SHAP、XGBoost）用的案例特徵 h5</td>
+</tr>
+<tr>
+<td>一個只會讀 <code>*_factory.h5</code> 的快取查詢（正式路徑從來沒命中過，刪了行為不變）</td>
+<td><code>hdf5_path</code> 這個欄位名（現在裝的其實是 manifest 路徑，改名牽動前後端，另議）</td>
+</tr>
+<tr>
+<td>只為 frame 存在的測試、腳本與兩份比對基準</td>
+<td>兩份正式路徑的凍結基準（一個位元都不准動）</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>你會看到的差異：</strong> 幾乎沒有。實測 repo 裡 <code>*_factory.h5</code> 一個都沒有、特徵登記表 40 筆沒有一筆指向它。唯一差別是：若有人手動把舊 h5 拿去「登錄瀏覽」，以前會被讀進來，以後會收到明確錯誤訊息「舊 factory h5 已不支援」。</p>
+<h2 id="三分四批做每批可單獨退回">三、分四批做（每批可單獨退回）</h2>
+<ol>
+<li><strong>刪 frame 生成路徑</strong>：動手前先在現在的版本把正式路徑的輸出錄下指紋，刪完再跑一次比對。</li>
+<li><strong>刪舊 h5 讀寫</strong>：特徵庫、覆蓋率分析、API 遇到舊 h5 一律明確報錯，不再偷偷讀。</li>
+<li><strong>處理腳本與舊基準</strong>：一支只產 frame 基準、而且沒有任何測試在讀的腳本與其基準檔一起退休。</li>
+<li><strong>文件同步、收案</strong>：收案時把票名改成不含 <code>FFACT_USE_CGSA</code> 等字的穩定名稱。</li>
+</ol>
+<h2 id="四怎麼保證沒改壞">四、怎麼保證沒改壞</h2>
+<ol>
+<li><strong>正式路徑的輸出一個位元都不能變</strong>：動手前用真實 K 線、9 種設定各跑一次錄指紋，改完再跑必須逐欄完全相同（不給容差）。9 種設定涵蓋：單週期平穩化開／關、多週期（逐一跑與平行跑）、三種存檔模式（對應不同記憶體大小的機器）、接續上次進度、不存檔、次週期資料缺失。
+<ul>
+<li>比對的是每一欄的數值、空值位置、欄名順序、平穩化決策、完成狀態與失敗原因。整個檔案的位元組沒法比，因為檔內有時間戳。</li>
+<li>每種設定的記憶體高峰必須低於 2 GB，超過就判失敗。這台機器 8 GB，這樣才不會再發生撐爆的事。</li>
+</ul>
+</li>
+<li><strong>測試不能偷偷變弱</strong>：審查 15 輪裡超過一半在磨這一項，最後定案的做法如下。
+<ul>
+<li><strong>寫施工清單時就定死</strong>：列出每一條受影響的測試（包含測試、腳本、前端，共約 55 個檔），逐條標明保留、刪除、改名或改寫。改寫的測試要把改寫後的全文先寫好。這份清單交三家逐條審過並蓋章，之後不准改。</li>
+<li><strong>動工時只能照表做</strong>：機器逐檔比對「改動前的檔案照表改完應該長什麼樣」，有任何一處不一樣就判失敗。該刪沒刪、多新增沒登記的檔、改到清單外的測試或改名，全部會被抓到。</li>
+<li><strong>為什麼要這麼嚴</strong>：中途我試過讓實作時自己判斷「哪些算 frame 專用」，結果規則會把 ICPOSTLEAK、L65 等跟 frame 無關的測試也當成可刪。所以「該不該刪」改由三家逐條審，不靠規則猜。</li>
+</ul>
+</li>
+<li><strong>故意改壞測試要能抓到</strong>：例如少標一個週期、把 CGSA 的合併改成整表合併、把一條保留的檢查改成恆成立，對應的測試都必須變紅。</li>
+</ol>
+<h2 id="五這次不做逐條說明為何現在不做">五、這次不做（逐條說明為何現在不做）</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>項目</th>
+<th>為何現在不做</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>讓 CGSA「同設定已算過就直接用」的快取</td>
+<td>要先研究失效條件（K 線補資料、校準重算等）；跟第 14 步 FFSTORE 的儲存設計一起評估</td>
+</tr>
+<tr>
+<td><code>hdf5_path</code> 欄位改名</td>
+<td>牽動 API、前端與登記表 40 筆，要另做相容遷移，跟刪 frame 無依賴</td>
+</tr>
+<tr>
+<td>FF-NAME 規格裡依賴 frame 的兩項（frame 臂、h5 世代閘）</td>
+<td>FF-NAME 是第 6 步，開工時第一件事就是重寫規格，到時刪掉</td>
+</tr>
+<tr>
+<td>repo 外你自訂目錄裡可能有的舊 <code>*_factory.h5</code></td>
+<td>你 2026-08-05「面向未來不溯及既往」的裁定；收案時我給你查核與刪除的指令，由你決定刪不刪</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="六請你決定">六、請你決定</h2>
+<p>同意這份規格嗎？同意後我寫施工清單（含上面第四節第 2 點那份逐條測試清單），再交三家審，然後才動程式。</p>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/FRAMEPATH規格審閱.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>
