@@ -3,7 +3,8 @@
 輸入 `--decisions`（JSON）：{"operations": [...], "nodeid_reasons": {nodeid: 理由}, "new_files": [...],
 "fact_key_rows": [...], "collect_extra": [...]}；每個操作：
   {"phase", "path", "kind", "frame_basis", "deleted_nodeids": [...], "renamed_nodeids": {舊: 新},
-   + 種類專屬欄：locator／new_name／rewrite{reason, preserved_assertion_lines, new_source}／pointer／new_content}
+   + 種類專屬欄：locator／new_name／rewrite{reason, preserved_assertion_lines, removed_assertion_lines{行: 理由}, new_source}／
+     pointer／new_content}
 本工具只做機械衍生（不做處置判斷）：
 - 母體＝HEAD 6e07e0ad 中 SPEC Task 1.5 所列字面任一命中之 tests／frontend/src／scripts 檔 ＋ extra，排除 fact_keys；
 - collect 檔集合＝母體與操作表 path 中位於 tests/ 之 .py；nodeid 表＝其於 HEAD 碼態之 `pytest --collect-only`
@@ -97,6 +98,10 @@ def main() -> int:
                 op["rewrite"] = {
                     "reason": rw["reason"],
                     "preserved_assertions": [{"lineno": n, "ast_sha256": V.sha256_text(dump)} for n, dump in pres],
+                    "removed_assertions": [
+                        {"lineno": n, "ast_sha256": V.sha256_text(dump), "reason": rw["removed_assertion_lines"][str(n)]}
+                        for n, dump in V.preserved_assertion_dumps(
+                            src, [{"lineno": int(k)} for k in rw.get("removed_assertion_lines", {})])],
                     "new_source": rw["new_source"],
                     "new_source_ast_sha256": V.sha256_text(V.ast_dump(new_def)),
                 }

@@ -28,7 +28,8 @@ def main() -> int:
         f"- HEAD：`{disp['head_commit']}`；母體 {len(disp['population']['files'])} 檔；collect 檔 {len(disp['collect']['files'])}；"
         f"nodeid {len(rows)}（keep {sum(r['disposition'] == 'keep' for r in rows)}、delete {sum(r['disposition'] == 'delete' for r in rows)}、"
         f"rename {sum(r['disposition'] == 'rename' for r in rows)}）；操作 {len(disp['operations'])}",
-        "- 每列附 HEAD 摘錄；rewrite 附改寫後全文與須保留之 HEAD 斷言行號；replace-file 附新檔全文。",
+        "- 每列附 HEAD 摘錄；rewrite 附改寫後全文、須保留與刪除之 HEAD 斷言；replace-file 附新檔全文。",
+        "- 本檔逐字轉錄處置表之 frame 依據（描述 HEAD 碼態之測試綠紅），非營運宣稱：VERIFY-EXEMPT:doc-example:framepath-disposition-view",
         "",
     ]
     for phase in (1, 2, 3):
@@ -46,7 +47,8 @@ def main() -> int:
             if op["kind"] == "rewrite":
                 rw = op["rewrite"]
                 out += [f"- 改寫理由：{rw['reason']}",
-                        f"- 須保留之 HEAD 斷言行：{[p['lineno'] for p in rw['preserved_assertions']]}", "",
+                        f"- 須保留之 HEAD 斷言行：{[p['lineno'] for p in rw['preserved_assertions']]}",
+                        *[f"- 刪除之 HEAD 斷言 L{r['lineno']}：{r['reason']}" for r in rw.get('removed_assertions', [])], "",
                         "改寫後全文：", "", "```python", rw["new_source"].rstrip("\n"), "```", ""]
             if op["kind"] == "replace-file":
                 out += ["", "新檔全文：", "", "```", op["new_content"].rstrip("\n"), "```", ""]

@@ -564,7 +564,8 @@ OP_EXTRA = {
     "replace-file": {"new_content", "new_sha256"},
     "delete-file": set(),
 }
-REWRITE_KEYS = {"reason", "preserved_assertions", "new_source", "new_source_ast_sha256"}
+REWRITE_KEYS = {"reason", "preserved_assertions", "removed_assertions", "new_source", "new_source_ast_sha256"}
+REMOVED_ASSERTION_KEYS = {"lineno", "ast_sha256", "reason"}
 NEW_FILE_KEYS = {"path", "phase", "task"}
 FACT_ROW_KEYS = {"row_id", "phase"}
 TOP_KEYS = {"schema", "head_commit", "python", "spec", "population", "collect", "hash_algorithms", "nodeids",
@@ -622,6 +623,10 @@ def schema_errors(disp: Dict[str, Any], spec_text: str) -> List[str]:
             rw = op["rewrite"]
             if set(rw) != REWRITE_KEYS or not str(rw.get("reason", "")).strip():
                 errs.append(f"操作 {op['id']} rewrite 欄位不符或缺理由")
+            elif not isinstance(rw["removed_assertions"], list) or not all(
+                    isinstance(r, dict) and set(r) == REMOVED_ASSERTION_KEYS and isinstance(r["lineno"], int)
+                    and str(r["reason"]).strip() for r in rw["removed_assertions"]):
+                errs.append(f"操作 {op['id']} removed_assertions 每項須為 {{lineno, ast_sha256, reason}} 且理由非空")
     # new_files
     paths_seen: Set[str] = set()
     for item in disp["new_files"]:
@@ -940,6 +945,42 @@ def check_3(disp: Dict[str, Any], phase: int, head: HeadReader) -> List[str]:
                 errs.append(f"③ {op['id']} 保留斷言 L{lineno} 之 HEAD 雜湊不符")
         for i, why in sorted(preserved_position_errors(head_func, new_def, pres).items()):
             errs.append(f"③ {op['id']} 保留斷言 L{pres[i][0]}：{why}")
+        errs.extend(f"③ {op['id']} {e}" for e in assertion_coverage_errors(head_func, rw))
+    return errs
+
+
+def _is_assertion_stmt(node: ast.AST) -> bool:
+    """斷言敘述（封閉）：`assert` 或呼叫名以 assert 起首之運算式敘述（如 assert_frame_equal、自訂 assert_* helper）。"""
+    if isinstance(node, ast.Assert):
+        return True
+    return isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) \
+        and (_call_name(node.value) or "").startswith("assert")
+
+
+def assertion_coverage_errors(head_func: ast.AST, rw: Dict[str, Any]) -> List[str]:
+    """審查 r30 CODEX-R30-P1-01：HEAD 被改寫函式內每個斷言敘述須被「保留列之敘述（含其內部）」涵蓋，或列於
+    removed_assertions（行號＋正規化 AST 雜湊＋理由）；刪除列須確為該函式內之斷言、雜湊相符、且不與保留列重疊。"""
+    errs: List[str] = []
+    pres_lines = {p["lineno"] for p in rw["preserved_assertions"]}
+    covered: Set[int] = set()
+    for node in ast.walk(head_func):
+        if isinstance(node, ast.stmt) and not isinstance(node, _DEF_TYPES) and node.lineno in pres_lines:
+            covered |= {id(x) for x in ast.walk(node)}
+    asserts = {n.lineno: n for n in ast.walk(head_func) if _is_assertion_stmt(n)}
+    removed: Set[int] = set()
+    for r in rw["removed_assertions"]:
+        node = asserts.get(r["lineno"])
+        if node is None:
+            errs.append(f"刪除斷言 L{r['lineno']} 不是被改寫函式內之斷言敘述")
+        elif sha256_text(ast_dump(node)) != r["ast_sha256"]:
+            errs.append(f"刪除斷言 L{r['lineno']} 之 HEAD 雜湊不符")
+        elif id(node) in covered:
+            errs.append(f"刪除斷言 L{r['lineno']} 同時落在保留列內")
+        else:
+            removed.add(r["lineno"])
+    for lineno, node in sorted(asserts.items()):
+        if id(node) not in covered and lineno not in removed:
+            errs.append(f"HEAD 斷言 L{lineno} 既未列保留亦未列刪除（含理由）")
     return errs
 
 
@@ -1204,6 +1245,19 @@ def frozen_file_errors(recorded: Dict[str, str], paths: Sequence[str], reader=cu
         elif data is None or sha256_bytes(data) != recorded[p]:
             errs.append(f"⓪ {p} 與 TODO 凍結之 sha256 不等")
     return errs
+
+
+DISPOSITION_VIEW_REL = "handoffs/run_receipts/20261008-framepath-disposition-view.md"
+
+
+def test_check_0_disposition_view_bound_to_table():
+    """審查 r30 CODEX-R30-P1-03：逐項閱讀視圖（衍生物）入版控、其 sha256 記於 manifest，且首段所記來源 JSON
+    sha256 等於現行處置表（視圖與權威表不同步 ⇒ 紅）。"""
+    view = current_bytes(DISPOSITION_VIEW_REL)
+    assert view is not None
+    assert manifest_contract_shas().get(DISPOSITION_VIEW_REL) == sha256_bytes(view)
+    table_sha = sha256_bytes(current_bytes(DISPOSITION_REL) or b"")
+    assert f"sha256 `{table_sha}`" in view.decode("utf-8").split("\n", 4)[2]
 
 
 def test_check_0_frozen_acceptance_tests_unchanged():
@@ -1540,7 +1594,7 @@ def _pos_errs(new_src: str) -> List[str]:
     tree = ast.parse(_POS_HEAD)
     items = [{"lineno": n.lineno, "ast_sha256": sha256_text(ast_dump(n))}
              for n in ast.walk(tree) if isinstance(n, ast.Assert)]
-    rw = {"reason": "r", "preserved_assertions": items, "new_source": new_src,
+    rw = {"reason": "r", "preserved_assertions": items, "removed_assertions": [], "new_source": new_src,
           "new_source_ast_sha256": sha256_text(ast_dump(parse_rewrite_source(new_src)))}
     op = {"id": "OP-X", "phase": 1, "kind": "rewrite", "path": "t.py",
           "locator": {"category": "def", "qualname": "test_p"}, "rewrite": rw}
@@ -1580,6 +1634,31 @@ def test_mutation_check_3_preserved_assertion_position():
         assert _pos_errs(src) != [], label
 
 
+def test_mutation_check_3_unlisted_removed_assertion_is_red():
+    """審查 r30 CODEX-R30-P1-01：HEAD 兩個斷言、只列一個保留、改寫刪掉另一個而未列刪除 ⇒ ③紅；列入
+    removed_assertions（行號、雜湊、理由）⇒ ③綠；刪除列雜湊錯、理由空、指向非斷言、與保留列重疊 ⇒ 紅。"""
+    head = "def test_u():\n    x = run()\n    assert a(x)\n    assert_frame_equal(x, y)\n"
+    tree = ast.parse(head)
+    nodes = {n.lineno: n for n in ast.walk(tree) if isinstance(n, ast.stmt) and n.lineno in (2, 3, 4)}
+    sha = {ln: sha256_text(ast_dump(n)) for ln, n in nodes.items()}
+    new_src = "def test_u():\n    x = run()\n    assert a(x)\n"
+
+    def errs(removed, preserved=(3,)):
+        rw = {"reason": "r", "preserved_assertions": [{"lineno": ln, "ast_sha256": sha[ln]} for ln in preserved],
+              "removed_assertions": removed, "new_source": new_src,
+              "new_source_ast_sha256": sha256_text(ast_dump(parse_rewrite_source(new_src)))}
+        op = {"id": "OP-U", "phase": 1, "kind": "rewrite", "path": "t.py",
+              "locator": {"category": "def", "qualname": "test_u"}, "rewrite": rw}
+        return check_3({"operations": [op]}, 1, _SrcHead(head))
+
+    assert errs([]) != []
+    assert errs([{"lineno": 4, "ast_sha256": sha[4], "reason": "frame 對照臂"}]) == []
+    assert errs([{"lineno": 4, "ast_sha256": "0" * 64, "reason": "frame 對照臂"}]) != []
+    assert errs([{"lineno": 2, "ast_sha256": sha[2], "reason": "非斷言"}]) != []
+    assert errs([{"lineno": 3, "ast_sha256": sha[3], "reason": "重疊"},
+                 {"lineno": 4, "ast_sha256": sha[4], "reason": "frame"}]) != []
+
+
 def test_mutation_check_3_duplicate_preserved_assertions_need_one_to_one_match():
     """審查 r26 CODEX-R26-P1-01：HEAD 有兩個相同斷言且皆列保留，改寫只留一個 ⇒ ③紅；兩個都留 ⇒ ③綠。"""
     head = "def test_d():\n    value = run()\n    assert value\n    rerun()\n    assert value\n"
@@ -1589,7 +1668,7 @@ def test_mutation_check_3_duplicate_preserved_assertions_need_one_to_one_match()
     assert len(items) == 2
 
     def errs(new_src: str) -> List[str]:
-        rw = {"reason": "r", "preserved_assertions": items, "new_source": new_src,
+        rw = {"reason": "r", "preserved_assertions": items, "removed_assertions": [], "new_source": new_src,
               "new_source_ast_sha256": sha256_text(ast_dump(parse_rewrite_source(new_src)))}
         op = {"id": "OP-D", "phase": 1, "kind": "rewrite", "path": "t.py",
               "locator": {"category": "def", "qualname": "test_d"}, "rewrite": rw}

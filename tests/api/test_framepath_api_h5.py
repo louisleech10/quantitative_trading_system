@@ -278,8 +278,17 @@ def route_maps_value_error_to_400(src: str, route: str = "register_hdf5_for_brow
     import ast
 
     def has_call(stmts: list) -> bool:
-        return any(isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == call_attr
-                   for s in stmts for n in ast.walk(s))
+        # 審查 r30 CODEX-R30-P1-02：service 呼叫須位於頂層 try 本體之直接路徑——不下探巢狀 try（其 handler 可先把
+        # ValueError 轉成 500）與巢狀函式／lambda
+        stack = list(stmts)
+        while stack:
+            n = stack.pop()
+            if isinstance(n, (ast.Try, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+                continue
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == call_attr:
+                return True
+            stack.extend(ast.iter_child_nodes(n))
+        return False
 
     def raises_400(handler: ast.ExceptHandler) -> bool:
         # 審查 r29 CODEX-R29-P1-02／COMPOSER-R29-P1-02：只看 handler 本體之頂層敘述——其中第一個 raise／return
@@ -366,5 +375,14 @@ def test_mutation_register_route_without_value_error_handler_is_detected():
         "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n",
         "    except ValueError as exc:\n        logger.warning(str(exc))\n        raise HTTPException(status_code=400, detail=str(exc))\n")
     assert route_maps_value_error_to_400(logged)
-    for bad in (nested, not_400, call_outside, handler_nested, handler_cond):
+    # 審查 r30：service 呼叫位於頂層 try 內之巢狀 try、其 ValueError 先轉 500 ⇒ 外層 400 handler 不算
+    inner_500 = (
+        "async def register_hdf5_for_browse(request):\n"
+        "    try:\n"
+        "        try:\n            return feature_factory_service.register_hdf5_for_browse(request)\n"
+        "        except ValueError:\n            raise HTTPException(status_code=500)\n"
+        "    except ValueError:\n        raise HTTPException(status_code=400)\n"
+        "    except Exception:\n        raise HTTPException(status_code=500)\n"
+    )
+    for bad in (nested, not_400, call_outside, handler_nested, handler_cond, inner_500):
         assert not route_maps_value_error_to_400(bad)
