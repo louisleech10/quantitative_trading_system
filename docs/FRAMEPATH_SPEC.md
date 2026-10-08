@@ -1,7 +1,7 @@
 # FRAMEPATH — 刪除非 CGSA 舊引擎（frame）與舊特徵 h5 讀寫鏈 — SPEC
 
 > 來源 PLAN/診斷：`handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md`（去留查證）、`handoffs/reconcile/20260928-framepath-x-consult-r2/synth.md`（偵察）　|　日期：2026-10-08　|　對應 TODO：docs/manifests/FRAMEPATH.json（SPEC 凍結後生成）
-> 版本：v15（審查 r14 修補，基準 HEAD 6e07e0ad）
+> 版本：v15（審查 r1–r15 收斂、使用者 2026-10-08 核可；基準 HEAD 6e07e0ad）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（全票排序第 5 步，`docs/TICKET_ORDER.md`）。
@@ -19,7 +19,7 @@
   - FACT-RECEIPT: 兩次同設定 CGSA 生成（`tests/feature_engineering/ffstat_helpers.stat_payload` 單週期）→ `base_fingerprints` 3632/3632 欄值 hash 全等、manifest 檔 bytes 不等（composer 實跑 2026-10-08，見偵察 r2 synth）
   - FACT-RECEIPT: `grep -n "FFACT_USE_CGSA" momentum/FeatureEngineering/memory_budget.py` → 印出 `178:    "FFACT_USE_CGSA",` 屬 `NON_ARM_FFACT_KEYS`；`_compute_config_hash` 不讀環境變數（主委 實跑 2026-10-08）⇒ 刪該鍵不改 config hash。
 - **待使用者確認**：待確認：無
-- **已確認結果**：2026-09-28 使用者裁定刪除 frame 產生路徑與舊特徵 h5 讀取、不再花時間在 frame 測試（逐字：「若是frame都不需要，那不就不要花時間在任何跟frame有關的部份和測試上？」「舊的h5什麼的也可以刪除，這樣可以專注在把現行的模組做好吧？」）；2026-10-02 使用者定案全票排序（FRAMEPATH＝第 5 步，FF-NAME＝第 6 步）。
+- **已確認結果**：2026-09-28 使用者裁定刪除 frame 產生路徑與舊特徵 h5 讀取、不再花時間在 frame 測試（逐字：「若是frame都不需要，那不就不要花時間在任何跟frame有關的部份和測試上？」「舊的h5什麼的也可以刪除，這樣可以專注在把現行的模組做好吧？」）；2026-10-02 使用者定案全票排序（FRAMEPATH＝第 5 步，FF-NAME＝第 6 步）；2026-10-08 使用者白話審閱本 SPEC v15 後核可（逐字：「ok，那我沒問題了。核可規格。」；審閱中確認大記憶體級距仍走 CGSA，僅 L3 落盤模式不同，C8 涵蓋）。
 
 ## §C 約束
 - 解耦 7 條；不弱化 NaN／inf gate、不擅改 CGSA 輸出大小；`kline_cache.h5`、`data_cache/hdf5_cache/`、IC 服務內部 h5、IC `*_filtered.h5` 匯出、case 特徵 h5（`FeatureStorage.load_features_from_hdf5`／`save_features_to_hdf5`）**不在本票**；不得以副檔名全域禁止 h5。
