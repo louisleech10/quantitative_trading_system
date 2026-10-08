@@ -1215,11 +1215,12 @@ def test_check_0_frozen_acceptance_tests_unchanged():
 # impl_token_issued；manifest 無從改寫）：自該提交起，下列核定檔之位元組不得再變。
 AUDIT_REL = ".claude/gate/audit.log"
 APPROVAL_FROZEN = FROZEN_ACCEPTANCE_TESTS + (MANIFEST_REL, DISPOSITION_REL, COMPARE_DOMAIN_REL)
-TICKET_ROOT_SUFFIX = "-FRAMEPATH"
+TICKET_ROOT = "20260928-FRAMEPATH"  # 本票 task-id 根（同票跨日沿用首日前綴）；exact match（審查 r29）
 
 
 def approval_anchor(audit_lines: Iterable[str]) -> Optional[str]:
-    """審計紀錄中最早一筆本票（root 以 -FRAMEPATH 結尾）`impl_token_issued` 之 round_start_head；無則 None。"""
+    """審計紀錄中最早一筆本票（root 恰為 TICKET_ROOT；審查 r29 CODEX-R29-P1-01／COMPOSER-R29-P1-01：不以後綴比對，
+    他票同後綴之事件不算）`impl_token_issued` 之 round_start_head；無則 None。"""
     for line in audit_lines:
         if '"impl_token_issued"' not in line:
             continue
@@ -1227,7 +1228,7 @@ def approval_anchor(audit_lines: Iterable[str]) -> Optional[str]:
             ev = json.loads(line)
         except ValueError:
             continue
-        if ev.get("event") == "impl_token_issued" and str(ev.get("root", "")).endswith(TICKET_ROOT_SUFFIX) \
+        if ev.get("event") == "impl_token_issued" and ev.get("root") == TICKET_ROOT \
                 and re.fullmatch(r"[0-9a-f]{40}", str(ev.get("round_start_head", ""))):
             return ev["round_start_head"]
     return None
@@ -1264,6 +1265,9 @@ def test_mutation_self_consistent_rewrite_after_approval_is_red():
     other = json.dumps({"event": "impl_token_issued", "root": "20261004-OTHER", "round_start_head": "b" * 40})
     assert approval_anchor(["=== text ===", other, ev]) == anchor
     assert approval_anchor([other]) is None
+    # 審查 r29：他票同後綴（-FRAMEPATH）之較早事件不得被選中
+    sibling = json.dumps({"event": "impl_token_issued", "root": "20260927-FRAMEPATH", "round_start_head": "c" * 40})
+    assert approval_anchor([sibling, ev]) == anchor and approval_anchor([sibling]) is None
     read_at = lambda c, path: approved[path]  # noqa: E731
     assert approval_errors(anchor, True, list(approved), read_at, reader=approved.get) == []
     assert approval_errors(anchor, True, list(approved), read_at, reader=weakened.get) != []

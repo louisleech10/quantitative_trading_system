@@ -282,10 +282,16 @@ def route_maps_value_error_to_400(src: str, route: str = "register_hdf5_for_brow
                    for s in stmts for n in ast.walk(s))
 
     def raises_400(handler: ast.ExceptHandler) -> bool:
-        return any(isinstance(sub, ast.Raise) and isinstance(sub.exc, ast.Call)
-                   and getattr(sub.exc.func, "id", None) == "HTTPException"
-                   and any(kw.arg == "status_code" and getattr(kw.value, "value", None) == 400 for kw in sub.exc.keywords)
-                   for sub in ast.walk(handler))
+        # 審查 r29 CODEX-R29-P1-02／COMPOSER-R29-P1-02：只看 handler 本體之頂層敘述——其中第一個 raise／return
+        # 須為 raise HTTPException(status_code=400)；巢狀 try／if 內之 400 不算（可被同 handler 內 broad catch 轉 500）
+        for stmt in handler.body:
+            if isinstance(stmt, ast.Raise):
+                return isinstance(stmt.exc, ast.Call) and getattr(stmt.exc.func, "id", None) == "HTTPException" \
+                    and any(kw.arg == "status_code" and getattr(kw.value, "value", None) == 400
+                            for kw in stmt.exc.keywords)
+            if isinstance(stmt, (ast.Return, ast.Try, ast.If, ast.With, ast.For, ast.While)):
+                return False
+        return False
 
     for node in ast.walk(ast.parse(src)):
         if not (isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)) and node.name == route):
@@ -343,5 +349,22 @@ def test_mutation_register_route_without_value_error_handler_is_detected():
         "    try:\n        return respond(task_id)\n"
         "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n"
     )
-    for bad in (nested, not_400, call_outside):
+    # 審查 r29：handler 內層 try 之 400 被同 handler 之 broad catch 轉 500、或 400 位於條件分支內 ⇒ 皆判失敗
+    handler_nested = (
+        "async def register_hdf5_for_browse(request):\n"
+        "    try:\n        return feature_factory_service.register_hdf5_for_browse(request)\n"
+        "    except ValueError:\n"
+        "        try:\n            raise HTTPException(status_code=400)\n"
+        "        except Exception:\n            raise HTTPException(status_code=500)\n"
+        "    except Exception:\n        raise HTTPException(status_code=500)\n"
+    )
+    handler_cond = good.replace(
+        "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n",
+        "    except ValueError as exc:\n        if flag:\n            raise HTTPException(status_code=400, detail=str(exc))\n"
+        "        raise HTTPException(status_code=500, detail=str(exc))\n")
+    logged = good.replace(
+        "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n",
+        "    except ValueError as exc:\n        logger.warning(str(exc))\n        raise HTTPException(status_code=400, detail=str(exc))\n")
+    assert route_maps_value_error_to_400(logged)
+    for bad in (nested, not_400, call_outside, handler_nested, handler_cond):
         assert not route_maps_value_error_to_400(bad)
