@@ -64,6 +64,22 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
         return runner()(args)
 
     assert fb.resolve_commits(two_commits) == {"code_anchor": anchor, "head_commit": later}
+    # freeze 之接線（審查 r20 CODEX-R20-P1-05、GROK-R20-P1-01）：寫入基準之 head_commit 取執行時 HEAD、
+    # code_anchor 取錨點（格生成以替身代之，只驗組裝）
+    wired = tmp_path / "wired.json"
+    monkeypatch.setattr(fb, "code_state_errors", lambda git_runner=None: [])
+    monkeypatch.setattr(fb, "resolve_commits", lambda git_runner=None: {"code_anchor": anchor, "head_commit": later})
+    stub_fp = {k: None for k in fb.FINGERPRINT_KEYS}
+    stub_fp.update(run_status="complete")
+    monkeypatch.setattr(fb, "run_cell", lambda cell, work_root: {
+        "fingerprint": dict(stub_fp, run_status="partial" if cell in fb.PARTIAL_CELLS else "complete"),
+        "memory": {"peak_bytes": 1, "readings": 1, "seconds": 1.0, "failed": [], "injected": False,
+                   "non_root_member_seen": True},
+        "receipt": {"resume_hit": cell == "C5"}})
+    monkeypatch.setattr(fb, "_freeze_refusals", lambda cells: [])
+    fb.freeze(wired)
+    written = json.loads(wired.read_text(encoding="utf-8"))
+    assert written["head_commit"] == later and written["code_anchor"] == anchor
     assert fb.code_state_errors(runner(diff_out="momentum/FeatureEngineering/feature_factory.py\n")) != []
     assert fb.code_state_errors(runner(untracked_out="api/services/new_untracked.py\n")) != []
     out = tmp_path / "cgsa_fingerprint.json"
@@ -77,6 +93,17 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
 def test_cell_matches_frozen_baseline(baseline, tmp_path, cell):
     fresh = fb.run_cell(cell, tmp_path)
     assert fresh["receipt"]["resume_hit"] is (cell == "C5")
+    if cell == "C9":
+        # 前置條件以檔案系統實核，不只讀收據字串（審查 r20 CODEX-R20-P1-04）
+        import h5py
+
+        receipt = fresh["receipt"]
+        copy_path = Path(receipt["kline_copy"])
+        assert copy_path.is_file() and str(copy_path).startswith(str(tmp_path))
+        with h5py.File(copy_path, "r") as h5:
+            assert f"{receipt['deleted_dataset']}/data" not in h5
+        legacy = Path(receipt["legacy_kline_dir"])
+        assert legacy.is_dir() and str(legacy).startswith(str(tmp_path)) and not any(legacy.iterdir())
     assert fb.memory_gate_errors(cell, fresh["memory"]) == []
     assert fb.compare_cell(baseline["cells"][cell]["fingerprint"], fresh["fingerprint"]) == []
 
@@ -188,26 +215,40 @@ def test_boundary_11_c5_resume_hit_is_observed_not_declared(tmp_path):
     正常 C5 ⇒ True 且與強制重算之 fingerprint 相等（resume 不改輸出）。真實 kline 單週期輕量設定，單組串行。"""
     from momentum.FeatureEngineering.core.column_group_registry import ColumnGroupRegistry
 
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+
     calls = []
+    l1_calls = []
     original = ColumnGroupRegistry.resume_from_manifest.__func__
+    original_l1 = FeatureFactory._layer1_atomic_indicators
 
     def spy(cls, work_dir):
         registry = original(cls, work_dir)
         calls.append((str(work_dir), sum(1 for _ in registry.iter_all())))
         return registry
 
+    def l1_spy(self, *a, **k):
+        l1_calls.append(len(calls))  # 記錄 L1 計算發生時已發生之 resume 次數
+        return original_l1(self, *a, **k)
+
     import pytest as _pytest
 
     mp = _pytest.MonkeyPatch()
     mp.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(spy))
+    mp.setattr(FeatureFactory, "_layer1_atomic_indicators", l1_spy)
     try:
         normal = fb.generate_cell("C5", tmp_path / "normal")
-        normal_calls = list(calls)
+        normal_calls, normal_l1 = list(calls), list(l1_calls)
         calls.clear()
+        l1_calls.clear()
         forced = fb.generate_cell("C5", tmp_path / "forced", force_regenerate_second=True)
-        forced_calls = list(calls)
+        forced_calls, forced_l1 = list(calls), list(l1_calls)
     finally:
         mp.undo()
+    # 已完成之檢查點未重算（審查 r20 CODEX-R20-P1-06：呼叫 resume 後丟棄回傳、照常重算亦須翻紅）：
+    # 正常 C5 之 L1 只在第一次生成發生（resume 前），強制重算則兩次皆算
+    assert normal_l1 and all(n == 0 for n in normal_l1), normal_l1
+    assert len(forced_l1) >= 2, forced_l1
     # 測試端獨立觀測（審查 r19 CODEX-R19-P1-01）：正常 C5 之第二次生成實際呼叫 resume 且回傳非空 registry；
     # 強制重算之第二次不呼叫 resume。receipt 之 resume_hit 須與此觀測一致（不得硬編）
     assert any(str(tmp_path / "normal") in w and n > 0 for w, n in normal_calls), normal_calls

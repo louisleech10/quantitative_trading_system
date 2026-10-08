@@ -33,6 +33,25 @@
    "pointer": "/steps/momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._timeframe_seconds_keys",
    "frame_basis": "步驟閉包中唯一經由 MultiTFGenerator._apply_timeframe_tag 可達；該 tagger 刪除後閉包實算不再含此鍵（函式本身保留，CGSA 標記仍以之取週期鍵）",
    "deleted_nodeids": []
+  },
+  {
+   "phase": 1,
+   "path": "tests/feature_engineering/test_ffstat_stable_start.py",
+   "kind": "rewrite",
+   "locator": {
+    "category": "def",
+    "qualname": "test_inventory_closure_reaches_off_prefix_and_nested_steps"
+   },
+   "rewrite": {
+    "reason": "範例 tuple 之 TimeframeAligner._timeframe_seconds_keys 只經 legacy 多週期 MultiTFGenerator._apply_timeframe_tag（Task 1.3 刪）以 import 解析可達；刪後閉包內無只經該解析可達之 TimeframeAligner 方法（試作工作樹以去除 multi_tf_generator 之閉包差集實算為空），故移除該元素；其餘六個範例與斷言逐字保留",
+    "preserved_assertion_lines": [
+     537,
+     547
+    ],
+    "new_source": "def test_inventory_closure_reaches_off_prefix_and_nested_steps() -> None:\n    \"\"\"r27 codex P1-01：盤點為呼叫鏈遞移閉包——名稱不合前綴（縮尾核心）、模組層 `if HAS_NUMBA:` 內定義（WQ 核心）、\n    polars_adapter 經 import 呼叫、以及 L6.5 公開入口皆須入列。（FRAMEPATH：r28 之 `from … import TimeframeAligner`\n    後 `TimeframeAligner._timeframe_seconds_keys` 範例只經 legacy 多週期之 `_apply_timeframe_tag` 可達，隨 frame 刪除；\n    刪後閉包內已無只經該解析可達之 TimeframeAligner 方法，主委 2026-10-08 試作工作樹實算）\"\"\"\n    got = _ast_step_functions()\n    fe = \"momentum.FeatureEngineering\"\n    for name in (f\"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor._winsorize_2d_legacy_equivalent\",\n                 f\"{fe}.operators._worldquant_numba:_ts_argmax_2d\",\n                 f\"{fe}.polars_adapter:polars_l2_derived_momentum\",\n                 f\"{fe}.polars_adapter:polars_l65_winsorization\",\n                 f\"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor.transform_registry_groups_to_sink\",\n                 f\"{fe}.preprocessing._numba_transforms:transform_array_fast\"):\n        assert name in got, name\n"
+   },
+   "frame_basis": "斷言範例依賴 frame／legacy 多週期 tagger 之呼叫鏈（審查 r20 CODEX-R20-P1-01 實證：刪後 test_inventory_closure_reaches_off_prefix_and_nested_steps 於試作工作樹紅）",
+   "deleted_nodeids": []
   }
  ],
  "drop": [],

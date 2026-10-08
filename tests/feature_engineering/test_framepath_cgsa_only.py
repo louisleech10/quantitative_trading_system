@@ -114,6 +114,10 @@ def test_boundary_02_l3_in_memory_keeps_non_streaming_branch(monkeypatch):
     layer1 = _real_close_frame()
     result = factory._layer3_rolling_aggregation(layer1, pd.DataFrame(index=layer1.index), config)
     assert result.data.index.equals(layer1.index)
+    # 非串流分支須真的算出 L3 欄（審查 r20 CODEX-R20-P1-02：只驗 index 會放過「回傳空表」）
+    assert result.data.shape[1] > 0
+    assert result.data.notna().to_numpy().any()
+    assert int(getattr(result, "present_engines", 1)) >= 1
 
 
 def test_boundary_03_frame_l65_l7_entries_removed():
@@ -265,13 +269,25 @@ def test_boundary_14_frame_timeframe_taggers_removed():
 # ---------------------------------------------------------------- Task 1.4 死碼掃除
 
 def _defs(src: str) -> List[str]:
-    tree = ast.parse(src)
+    """三檔內全部 def（含巢狀函式與巢狀類別方法；審查 r20 CODEX-R20-P1-03），以 `.` 連接之限定名。"""
     out: List[str] = []
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            out.append(node.name)
-        elif isinstance(node, ast.ClassDef):
-            out.extend(f"{node.name}.{n.name}" for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)))
+
+    def visit(body: list, prefix: str) -> None:
+        for node in body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                out.append(prefix + node.name)
+                visit(node.body, f"{prefix}{node.name}.")
+            elif isinstance(node, ast.ClassDef):
+                visit(node.body, f"{prefix}{node.name}.")
+            else:  # if／for／while／with／try 等複合敘述內之定義
+                for field in ("body", "orelse", "finalbody"):
+                    sub = getattr(node, field, None)
+                    if isinstance(sub, list):
+                        visit(sub, prefix)
+                for handler in getattr(node, "handlers", []) or []:
+                    visit(handler.body, prefix)
+
+    visit(ast.parse(src).body, "")
     return out
 
 
@@ -350,3 +366,6 @@ def test_mutation_dead_scan_counts_added_zero_reference_def():
     scan = [("m.py", "class A:\n    def _used(self):\n        pass\n\n    def _orphan_framepath_probe(self):\n        pass\n")]
     refs = [("n.py", "A()._used()\n")]
     assert dead_defs(scan, refs) == {"A._orphan_framepath_probe"}
+    nested = [("m.py", "def outer():\n    def _orphan_nested_probe():\n        pass\n    return 1\n\n"
+                       "class B:\n    class C:\n        def _orphan_inner_method(self):\n            pass\n")]
+    assert dead_defs(nested, [("n.py", "outer()\nB.C\n")]) == {"outer._orphan_nested_probe", "B.C._orphan_inner_method"}

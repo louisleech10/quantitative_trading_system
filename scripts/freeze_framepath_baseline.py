@@ -126,10 +126,16 @@ def compare_cell(baseline: Mapping[str, Any], fresh: Mapping[str, Any]) -> List[
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
+def _freeze_refusals(cells: Mapping[str, Mapping[str, Any]]) -> List[str]:
+    """凍結拒寫條件（Task 1.1 邊界）：C5 與 C1 fingerprint 不等、run_status 不合、C9 次週期未入 failed／skipped、
+    任一格 memory_gate_errors 非空、C5 resume_hit 非 True 或他格非 False ⇒ 錯誤字串。"""
+    raise NotImplementedError("FRAMEPATH Task 1.1")
+
+
 def freeze(out: Path = REPO / BASELINE_REL) -> Dict[str, Any]:
     """先以 `code_state_errors()` 核對碼態（非空 ⇒ `FramepathBaselineError`，不產任何輸出），再跑全部格、驗拒寫條件後
-    寫基準：`code_anchor`（6e07e0ad 完整 sha）、`head_commit`（執行時 `git rev-parse HEAD`）、`code_state_errors`（[]）、
-    python、各格 fingerprint／memory／receipt。"""
+    寫基準：`code_anchor` 與 `head_commit` 取自 `resolve_commits()`、`code_state_errors`（[]）、python、各格
+    fingerprint／memory／receipt（各格以模組屬性 `run_cell` 呼叫，拒寫條件以 `_freeze_refusals` 判定；非空 ⇒ 不寫檔）。"""
     raise NotImplementedError("FRAMEPATH Task 1.1")
 
 
