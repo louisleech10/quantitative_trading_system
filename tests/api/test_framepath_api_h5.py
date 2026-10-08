@@ -271,23 +271,34 @@ ROUTES_PATH = REPO / "api" / "routes" / "feature_factory.py"
 
 
 def route_maps_value_error_to_400(src: str, route: str = "register_hdf5_for_browse",
-                                  call_attr: str = "register_hdf5_for_browse") -> bool:
+                                  call_attr: str = "register_hdf5_for_browse",
+                                  receiver: str = "feature_factory_service") -> bool:
     """route 函式本體之頂層 `try`（不得被其他 try 包住；審查 r28 CODEX-R28-P1-02）其本體含 service 呼叫
     `<x>.<call_attr>(...)`，且其 handlers 中 `except ValueError` 之本體 raise HTTPException(status_code=400)，
     並排在任何 `except Exception` 之前（否則 broad handler 先吞成 500）。巢狀 try 內之 ValueError 分支不算。"""
     import ast
 
     def has_call(stmts: list) -> bool:
-        # 審查 r30 CODEX-R30-P1-02：service 呼叫須位於頂層 try 本體之直接路徑——不下探巢狀 try（其 handler 可先把
-        # ValueError 轉成 500）與巢狀函式／lambda
-        stack = list(stmts)
-        while stack:
-            n = stack.pop()
-            if isinstance(n, (ast.Try, ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+        # 審查 r30／r31：service 呼叫須為頂層 try 本體之「直接敘述」（Assign／AnnAssign／Return／Expr，不下探任何
+        # 複合敘述如巢狀 try／if／with／for 及函式／lambda），且呼叫目標恰為 `<receiver>.<call_attr>`（receiver 為
+        # 名稱 feature_factory_service；CODEX-R31-P1-03：他物件同名方法不算）
+        def direct_calls(expr: ast.AST):
+            stack = [expr]
+            while stack:
+                n = stack.pop()
+                if isinstance(n, ast.Lambda):
+                    continue
+                if isinstance(n, ast.Call):
+                    yield n
+                stack.extend(ast.iter_child_nodes(n))
+
+        for s in stmts:
+            if not isinstance(s, (ast.Assign, ast.AnnAssign, ast.Return, ast.Expr)) or s.value is None:
                 continue
-            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == call_attr:
-                return True
-            stack.extend(ast.iter_child_nodes(n))
+            for c in direct_calls(s.value):
+                if isinstance(c.func, ast.Attribute) and c.func.attr == call_attr \
+                        and isinstance(c.func.value, ast.Name) and c.func.value.id == receiver:
+                    return True
         return False
 
     def raises_400(handler: ast.ExceptHandler) -> bool:
@@ -384,5 +395,19 @@ def test_mutation_register_route_without_value_error_handler_is_detected():
         "    except ValueError:\n        raise HTTPException(status_code=400)\n"
         "    except Exception:\n        raise HTTPException(status_code=500)\n"
     )
-    for bad in (nested, not_400, call_outside, handler_nested, handler_cond, inner_500):
+    # 審查 r31 CODEX-R31-P1-03：try 內為他物件之同名方法、或 service 呼叫藏於 if／with 複合敘述內 ⇒ 不算
+    service_call = "feature_factory_service.register_hdf5_for_browse(request)"
+    wrong_receiver = (
+        "async def register_hdf5_for_browse(request):\n"
+        "    task_id = feature_factory_service.register_hdf5_for_browse(request)\n"
+        "    try:\n        return other.register_hdf5_for_browse(request)\n"
+        "    except ValueError as exc:\n        raise HTTPException(status_code=400, detail=str(exc))\n"
+    )
+    in_if_false = good.replace(f"        return {service_call}\n",
+                               f"        if False:\n            return {service_call}\n        return None\n")
+    in_with = good.replace(f"        return {service_call}\n",
+                           f"        with ctx():\n            return {service_call}\n")
+    assert route_maps_value_error_to_400(good.replace(f"return {service_call}", f"task_id = {service_call}"))
+    for bad in (nested, not_400, call_outside, handler_nested, handler_cond, inner_500, wrong_receiver, in_if_false,
+                in_with):
         assert not route_maps_value_error_to_400(bad)

@@ -945,7 +945,7 @@ def check_3(disp: Dict[str, Any], phase: int, head: HeadReader) -> List[str]:
                 errs.append(f"③ {op['id']} 保留斷言 L{lineno} 之 HEAD 雜湊不符")
         for i, why in sorted(preserved_position_errors(head_func, new_def, pres).items()):
             errs.append(f"③ {op['id']} 保留斷言 L{pres[i][0]}：{why}")
-        errs.extend(f"③ {op['id']} {e}" for e in assertion_coverage_errors(head_func, rw))
+        errs.extend(f"③ {op['id']} {e}" for e in assertion_coverage_errors(head_func, new_def, rw))
     return errs
 
 
@@ -957,21 +957,30 @@ def _is_assertion_stmt(node: ast.AST) -> bool:
         and (_call_name(node.value) or "").startswith("assert")
 
 
-def assertion_coverage_errors(head_func: ast.AST, rw: Dict[str, Any]) -> List[str]:
+def assertion_coverage_errors(head_func: ast.AST, new_def: ast.AST, rw: Dict[str, Any]) -> List[str]:
     """審查 r30 CODEX-R30-P1-01：HEAD 被改寫函式內每個斷言敘述須被「保留列之敘述（含其內部）」涵蓋，或列於
-    removed_assertions（行號＋正規化 AST 雜湊＋理由）；刪除列須確為該函式內之斷言、雜湊相符、且不與保留列重疊。"""
+    removed_assertions（行號＋正規化 AST 雜湊＋理由）；刪除列須確為該函式內之斷言、雜湊相符、且不與保留列重疊。
+    審查 r31：同一行有兩個以上斷言敘述 ⇒ 無法以行號唯一定位，fail-closed（CODEX-R31-P1-01）；列為刪除之斷言不得
+    殘留於改寫後函式——其傾印於改寫後之出現次數不得超過 HEAD 中同傾印且未列刪除者之個數（CODEX-R31-P1-02）。"""
     errs: List[str] = []
     pres_lines = {p["lineno"] for p in rw["preserved_assertions"]}
     covered: Set[int] = set()
     for node in ast.walk(head_func):
         if isinstance(node, ast.stmt) and not isinstance(node, _DEF_TYPES) and node.lineno in pres_lines:
             covered |= {id(x) for x in ast.walk(node)}
-    asserts = {n.lineno: n for n in ast.walk(head_func) if _is_assertion_stmt(n)}
+    by_line: Dict[int, List[ast.AST]] = {}
+    for n in ast.walk(head_func):
+        if _is_assertion_stmt(n):
+            by_line.setdefault(n.lineno, []).append(n)
+    for lineno, nodes in sorted(by_line.items()):
+        if len(nodes) > 1:
+            errs.append(f"HEAD L{lineno} 有 {len(nodes)} 個斷言敘述，無法以行號唯一定位（fail-closed）")
+    asserts = {ln: nodes[0] for ln, nodes in by_line.items() if len(nodes) == 1}
     removed: Set[int] = set()
     for r in rw["removed_assertions"]:
         node = asserts.get(r["lineno"])
         if node is None:
-            errs.append(f"刪除斷言 L{r['lineno']} 不是被改寫函式內之斷言敘述")
+            errs.append(f"刪除斷言 L{r['lineno']} 不是被改寫函式內可唯一定位之斷言敘述")
         elif sha256_text(ast_dump(node)) != r["ast_sha256"]:
             errs.append(f"刪除斷言 L{r['lineno']} 之 HEAD 雜湊不符")
         elif id(node) in covered:
@@ -981,6 +990,18 @@ def assertion_coverage_errors(head_func: ast.AST, rw: Dict[str, Any]) -> List[st
     for lineno, node in sorted(asserts.items()):
         if id(node) not in covered and lineno not in removed:
             errs.append(f"HEAD 斷言 L{lineno} 既未列保留亦未列刪除（含理由）")
+    new_counts: Dict[str, int] = {}
+    for n in ast.walk(new_def):
+        if isinstance(n, ast.stmt):
+            new_counts[ast_dump(n)] = new_counts.get(ast_dump(n), 0) + 1
+    head_kept: Dict[str, int] = {}
+    for n in ast.walk(head_func):
+        if isinstance(n, ast.stmt) and not (_is_assertion_stmt(n) and n.lineno in removed):
+            head_kept[ast_dump(n)] = head_kept.get(ast_dump(n), 0) + 1
+    for lineno in sorted(removed):
+        dump = ast_dump(asserts[lineno])
+        if new_counts.get(dump, 0) > head_kept.get(dump, 0):
+            errs.append(f"刪除斷言 L{lineno} 仍殘留於改寫後函式")
     return errs
 
 
@@ -1657,6 +1678,32 @@ def test_mutation_check_3_unlisted_removed_assertion_is_red():
     assert errs([{"lineno": 2, "ast_sha256": sha[2], "reason": "非斷言"}]) != []
     assert errs([{"lineno": 3, "ast_sha256": sha[3], "reason": "重疊"},
                  {"lineno": 4, "ast_sha256": sha[4], "reason": "frame"}]) != []
+
+
+def test_mutation_check_3_removed_assertion_residue_and_same_line_are_red():
+    """審查 r31：同一行兩個斷言 ⇒ fail-closed（CODEX-R31-P1-01）；列為刪除之斷言殘留於改寫後（如 return 之後）
+    ⇒ 紅（CODEX-R31-P1-02）。"""
+    def run(head: str, new_src: str, preserved, removed) -> List[str]:
+        tree = ast.parse(head)
+        stmts = {}
+        for n in ast.walk(tree):
+            if isinstance(n, ast.stmt) and not isinstance(n, ast.FunctionDef):
+                stmts.setdefault(n.lineno, n)
+        rw = {"reason": "r",
+              "preserved_assertions": [{"lineno": ln, "ast_sha256": sha256_text(ast_dump(stmts[ln]))} for ln in preserved],
+              "removed_assertions": [{"lineno": ln, "ast_sha256": sha256_text(ast_dump(stmts[ln])), "reason": "frame"}
+                                     for ln in removed],
+              "new_source": new_src, "new_source_ast_sha256": sha256_text(ast_dump(parse_rewrite_source(new_src)))}
+        op = {"id": "OP-R", "phase": 1, "kind": "rewrite", "path": "t.py",
+              "locator": {"category": "def", "qualname": "test_r"}, "rewrite": rw}
+        return check_3({"operations": [op]}, 1, _SrcHead(head))
+
+    same_line = "def test_r():\n    x = 1\n    assert a(); assert b()\n"
+    assert run(same_line, "def test_r():\n    x = 1\n", [], [3]) != []
+    two = "def test_r():\n    assert a()\n    assert b()\n"
+    assert run(two, "def test_r():\n    assert a()\n", [2], [3]) == []
+    assert run(two, "def test_r():\n    assert a()\n    return\n    assert b()\n", [2], [3]) != []
+    assert run(two, "def test_r():\n    assert a()\n    assert b()\n", [2], [3]) != []
 
 
 def test_mutation_check_3_duplicate_preserved_assertions_need_one_to_one_match():
