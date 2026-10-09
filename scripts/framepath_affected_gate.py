@@ -219,7 +219,7 @@ def probe_hits(probe_dir: Path) -> set:
     return hits
 
 
-ENV_PREFIXES = ("FFACT_", "ICFA_", "FRAMEPATH_", "PYTHON", "NUMBA_", "OMP_", "MKL_", "LEGACY_KLINE")
+ENV_PREFIXES = ("FFACT_", "ICFA_", "FRAMEPATH_", "PYTHON", "NUMBA_", "OMP_", "MKL_", "LEGACY_KLINE", "PYTEST")  # PYTEST＝PYTEST_ADDOPTS 等（審查 r55）
 
 
 def env_fingerprint(env: Mapping[str, str]) -> str:
@@ -799,6 +799,13 @@ def _cgsa_propagate(fn: ast.AST) -> bool:
                 stores[n.id] = stores.get(n.id, 0) + 1
         elif isinstance(n, ast.arg):
             stores[n.arg] = stores.get(n.arg, 0) + 1
+        elif isinstance(n, ast.ExceptHandler) and n.name:  # 審查 r55：`except … as 名` 以字串保存
+            stores[n.name] = stores.get(n.name, 0) + 1
+        elif isinstance(n, ast.alias):  # 函式內 import（含 as 別名）
+            nm = n.asname or n.name.split(".")[0]
+            stores[nm] = stores.get(nm, 0) + 1
+        elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and n is not fn:
+            stores[n.name] = stores.get(n.name, 0) + 1
         elif isinstance(n, (ast.Global, ast.Nonlocal)):
             for nm in n.names:
                 stores[nm] = stores.get(nm, 0) + 2
@@ -975,7 +982,8 @@ def _row_nodeids(rows: Sequence[str], prefix: str) -> List[str]:
 ADMISSION_BUDGET_SECONDS = 7200
 
 
-def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterable[Path] = ()) -> str:
+def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterable[Path] = (),
+                       env: Optional[Mapping[str, str]] = None) -> str:
     """挑選之輸入指紋：錨點、phase、HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、manifest、處置表、本執行器原始碼、
     admission 估時來源（各目錄下 junit xml 之路徑與內容，審查 r53）。`--admit` 須等於此值方得於估時未知或逾預算時執行
     （批准綁定確切輸入）。"""
@@ -995,6 +1003,8 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterabl
     for rel in (MANIFEST_REL, DISPOSITION_REL, "scripts/framepath_affected_gate.py"):
         h.update((repo / rel).read_bytes() if (repo / rel).is_file() else b"")
         h.update(b"\0")
+    # 審查 r55：子行程有效環境（含 PYTEST_ADDOPTS 等會改變收集與執行者）綁入
+    h.update(b"env\0" + env_fingerprint(env if env is not None else os.environ).encode("utf-8", "replace") + b"\0")
     for d in timing_dirs:
         d = Path(d).resolve()
         h.update(b"timings\0" + str(d).encode("utf-8", "replace") + b"\0")
@@ -1103,7 +1113,7 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
     return {
         "groups": {"B": b_group, "C": c_group}, "collected": collected, "selected": selected, "skipped": skipped,
         "s2_symbols": sorted(symbols), "production_files": prod_files, "align_triggered": align_triggered,
-        "residual_defs": residual_specs, "inputs_digest": plan_inputs_digest(repo, anchor, phase, timing_dirs),
+        "residual_defs": residual_specs, "inputs_digest": plan_inputs_digest(repo, anchor, phase, timing_dirs, env),
         "extra_files": extra,
         "light_files": sorted(f for f, s in scans.items() if not s["heavy"] and f not in set(heavy_pinned)),
         "invariance_baseline_sha256": hashlib.sha256(baseline.read_bytes()).hexdigest() if baseline.is_file() else None,

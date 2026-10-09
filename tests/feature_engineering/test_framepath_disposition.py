@@ -2109,7 +2109,20 @@ def test_mutation_affected_gate_r53_hardening(tmp_path):
                "    if use:\n        return self._a()\n    return self._b()\n")
     assert nf(fn(old_top)) == nf(fn("def f(self):\n    self._require_cgsa_registry('f')\n    return self._a()\n"))
 
+    # 審查 r55：`except … as 名`、函式內 import 別名、巢狀定義名皆計為綁定 ⇒ 不代入
+    cases = (  # (原碼其餘本體, 誤代入後之本體)
+        ("    try:\n        return flag / x\n    except ZeroDivisionError as flag:\n        return flag\n",
+         "    try:\n        return True / x\n    except ZeroDivisionError as flag:\n        return True\n"),
+        ("    import os as flag\n    return flag\n", "    import os as flag\n    return True\n"),
+        ("    def flag():\n        return 0\n    return flag\n", "    def flag():\n        return 0\n    return True\n"),
+    )
+    for rest, wrongly_substituted in cases:
+        old55 = "def f(self, x):\n    flag = self._cgsa_enabled()\n" + rest
+        assert nf(fn(old55)) != nf(fn("def f(self, x):\n" + wrongly_substituted)), rest
+
     repo, anchor = _git_tmp_repo(tmp_path, {"README": "x\n"})
+    e1 = g.plan_inputs_digest(repo, anchor, 1, (), {"PATH": "/bin"})
+    assert g.plan_inputs_digest(repo, anchor, 1, (), {"PATH": "/bin", "PYTEST_ADDOPTS": "--deselect=x"}) != e1
     tdir = tmp_path / "timings"
     tdir.mkdir()
     xml = tdir / "a.xml"
