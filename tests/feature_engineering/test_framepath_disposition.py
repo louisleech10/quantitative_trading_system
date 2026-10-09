@@ -2097,6 +2097,18 @@ def test_mutation_affected_gate_r53_hardening(tmp_path):
            "tests/test_x.py": "from tests import a as aa\n\ndef test_x():\n    aa.helper()\n"}.get
     assert g.module_taint("tests/test_x.py", src, frozenset({"Deleted"}))["test_x"]
 
+    # 審查 r54：分支內之單次賦值不支配後續讀取 ⇒ 不代入（原碼 cond 為假時 UnboundLocalError，不得判等價）
+    old54 = "def f(self, cond):\n    if cond:\n        flag = True\n    return flag and self._cgsa_enabled()\n"
+    new54 = "def f(self, cond):\n    if cond:\n        flag = True\n    return True\n"
+    assert nf(fn(old54)) != nf(fn(new54))
+    # 讀取先於最外層賦值（原碼 UnboundLocalError）⇒ 不代入
+    old54b = "def f(self):\n    y = flag\n    flag = self._cgsa_enabled()\n    return y\n"
+    assert nf(fn(old54b)) != nf(fn("def f(self):\n    y = True\n    return y\n"))
+    # 最外層、先於全部讀取之單次賦值仍代入（b1 之 generate_multi_tf 形態）
+    old_top = ("def f(self):\n    use = self._cgsa_enabled() and self._cgsa_registry is not None\n"
+               "    if use:\n        return self._a()\n    return self._b()\n")
+    assert nf(fn(old_top)) == nf(fn("def f(self):\n    self._require_cgsa_registry('f')\n    return self._a()\n"))
+
     repo, anchor = _git_tmp_repo(tmp_path, {"README": "x\n"})
     tdir = tmp_path / "timings"
     tdir.mkdir()

@@ -786,17 +786,35 @@ def _cgsa_block(stmts: List[ast.stmt]) -> List[ast.stmt]:
 
 
 def _cgsa_propagate(fn: ast.AST) -> bool:
-    """函式內只賦值一次之布林常數區域名稱代入並刪除該賦值。"""
-    assigns: Dict[str, List[ast.AST]] = {}
+    """布林常數區域名稱代入並刪除該賦值——只限可證支配全部讀取者（審查 r54）：賦值為函式本體**最外層**敘述、該名於
+    函式內恰一次綁定（含 for／with／except／walrus 等任何 Store、參數、global／nonlocal 皆計），且每一處讀取皆位於該
+    賦值之後。分支內、迴圈內或讀取先於賦值者一律不代入（保守保留，判不等價）。"""
+    stores: Dict[str, int] = {}
+    loads: Dict[str, List[Tuple[int, int]]] = {}
     for n in ast.walk(fn):
-        if isinstance(n, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
-            for t in (n.targets if isinstance(n, ast.Assign) else [n.target]):
-                if isinstance(t, ast.Name):
-                    assigns.setdefault(t.id, []).append(n)
-    consts = {k: v[0].value.value for k, v in assigns.items()
-              if len(v) == 1 and isinstance(v[0], ast.Assign) and _const_bool(v[0].value)}
+        if isinstance(n, ast.Name):
+            if isinstance(n.ctx, ast.Load):
+                loads.setdefault(n.id, []).append((n.lineno, n.col_offset))
+            else:
+                stores[n.id] = stores.get(n.id, 0) + 1
+        elif isinstance(n, ast.arg):
+            stores[n.arg] = stores.get(n.arg, 0) + 1
+        elif isinstance(n, (ast.Global, ast.Nonlocal)):
+            for nm in n.names:
+                stores[nm] = stores.get(nm, 0) + 2
+    consts: Dict[str, bool] = {}
+    top: Dict[str, ast.Assign] = {}
+    for st in getattr(fn, "body", []):
+        if (isinstance(st, ast.Assign) and len(st.targets) == 1 and isinstance(st.targets[0], ast.Name)
+                and _const_bool(st.value)):
+            name = st.targets[0].id
+            end = (getattr(st, "end_lineno", st.lineno), getattr(st, "end_col_offset", 0))
+            if stores.get(name) == 1 and all(pos > end for pos in loads.get(name, [])):
+                consts[name] = st.value.value
+                top[name] = st
     if not consts:
         return False
+    assigns = {k: [top[k]] for k in consts}
 
     class _Sub(ast.NodeTransformer):
         def visit_Name(self, n: ast.Name) -> ast.AST:
