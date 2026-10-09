@@ -1417,6 +1417,65 @@ def test_check_0_history_freeze_order():
     assert history_errors(git_commits_after_anchor(), (*FROZEN_CONTRACT_FILES, MANIFEST_REL)) == []
 
 
+# 審查 r43 CODEX-R43-P1-01：D2 准生產碼前重凍，但既有格之 fingerprint 與語意 receipt 不得被改寫（只准新增格）；
+# receipt 中隨每次執行之暫存路徑不同之鍵不比
+BASELINE_RUN_PATH_KEYS = frozenset({"kline_copy", "legacy_kline_dir", "child_env"})
+
+
+def baseline_lineage_errors(versions: Sequence[Tuple[str, Dict[str, Any]]]) -> List[str]:
+    """基準各版本（依時間序之 (版本名, 基準 JSON)）之承續：後版須含前版每一格，且該格 fingerprint 逐項相等、
+    receipt 除 `BASELINE_RUN_PATH_KEYS` 外相等、`code_anchor` 不變；只准新增格（memory 屬量測值不比）。"""
+    errs: List[str] = []
+    for (prev_name, prev), (name, cur) in zip(versions, versions[1:]):
+        if prev.get("code_anchor") != cur.get("code_anchor"):
+            errs.append(f"⓪ 基準 {name} 之 code_anchor 與 {prev_name} 不同")
+        for cell, old in (prev.get("cells") or {}).items():
+            new = (cur.get("cells") or {}).get(cell)
+            if new is None:
+                errs.append(f"⓪ 基準 {name} 刪除了既有格 {cell}")
+                continue
+            if new.get("fingerprint") != old.get("fingerprint"):
+                errs.append(f"⓪ 基準 {name} 改寫了既有格 {cell} 之 fingerprint")
+            strip = lambda r: {k: v for k, v in (r or {}).items() if k not in BASELINE_RUN_PATH_KEYS}  # noqa: E731
+            if strip(new.get("receipt")) != strip(old.get("receipt")):
+                errs.append(f"⓪ 基準 {name} 改寫了既有格 {cell} 之 receipt")
+    return errs
+
+
+def git_baseline_versions() -> List[Tuple[str, Dict[str, Any]]]:
+    """錨點後每個改動基準之提交之版本，加上工作樹現行版本（依時間序）。"""
+    out = _git("log", "--reverse", "--format=%H", f"{HEAD_SHORT}..HEAD", "--", BASELINE_REL).decode().split()
+    versions = [(c[:8], json.loads(_git_show_bytes(c, BASELINE_REL) or b"{}")) for c in out]
+    current = REPO / BASELINE_REL
+    if current.is_file():
+        versions.append(("worktree", json.loads(current.read_text(encoding="utf-8"))))
+    return versions
+
+
+def test_check_0_baseline_existing_cells_preserved():
+    assert baseline_lineage_errors(git_baseline_versions()) == []
+
+
+def test_mutation_baseline_lineage_rewrites_are_red():
+    fp = {"run_status": "complete", "columns": {"x": {"values": "v"}}}
+    rc = {"resume_entered": False, "kline_copy": "/tmp/a"}
+    v1 = {"code_anchor": "a", "cells": {"C1": {"fingerprint": fp, "receipt": rc, "memory": {"peak_bytes": 1}}}}
+    added = {"code_anchor": "a", "cells": {"C1": {"fingerprint": fp, "receipt": dict(rc, kline_copy="/tmp/b"),
+                                                   "memory": {"peak_bytes": 2}},
+                                           "C10": {"fingerprint": fp, "receipt": {}}}}
+    assert baseline_lineage_errors([("v1", v1), ("v2", added)]) == []
+    rewritten = json.loads(json.dumps(added))
+    rewritten["cells"]["C1"]["fingerprint"]["columns"]["x"]["values"] = "w"
+    assert baseline_lineage_errors([("v1", v1), ("v2", rewritten)]) != []
+    dropped = {"code_anchor": "a", "cells": {"C10": added["cells"]["C10"]}}
+    assert baseline_lineage_errors([("v1", v1), ("v2", dropped)]) != []
+    semantic = json.loads(json.dumps(added))
+    semantic["cells"]["C1"]["receipt"]["resume_entered"] = True
+    assert baseline_lineage_errors([("v1", v1), ("v2", semantic)]) != []
+    moved = dict(added, code_anchor="b")
+    assert baseline_lineage_errors([("v1", v1), ("v2", moved)]) != []
+
+
 def test_mutation_history_freeze_order_violations_are_red():
     t, m, b, prod = FROZEN_ACCEPTANCE_TESTS[0], MANIFEST_REL, BASELINE_REL, "momentum/x.py"
     ok = [("a" * 40, {t, m}), ("b" * 40, {b}), ("c" * 40, {prod})]

@@ -1,6 +1,6 @@
 """FRAMEPATH Task 1.1：CGSA 指紋基準之凍結與比對（docs/FRAMEPATH_SPEC.md §G、Task 1.1）。
 
-於 HEAD 6e07e0ad（Phase 1 任何生產碼改動之前）以真實 `data_cache/feature_klines/kline_cache.h5` 跑設定矩陣 C1–C9，
+於 HEAD 6e07e0ad（Phase 1 任何生產碼改動之前）以真實 `data_cache/feature_klines/kline_cache.h5` 跑設定矩陣 C1–C10（SPEC v19），
 寫 `tests/_golden/framepath/cgsa_fingerprint.json`；`tests/feature_engineering/test_framepath_invariance.py`
 以同一 `run_cell` 重跑並以 `compare_cell` 逐項比對（無容差）。
 

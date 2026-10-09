@@ -44,7 +44,7 @@
 
 **Task 1.1 — 凍結 CGSA 指紋基準**
 - 目標：改前凍結 §G 基準與比對器。　檔案：`scripts/freeze_framepath_baseline.py`（新）、`tests/_golden/framepath/cgsa_fingerprint.json`（新）、`tests/_golden/framepath/compare_domain.json`（新）、`tests/feature_engineering/test_framepath_invariance.py`（新）　既有 caller：新建無 caller。
-- 改法：凍結腳本於 HEAD 6e07e0ad 跑 C1–C9 並寫 JSON（含 `head_commit`、每格 phys_footprint 行程樹峰值、讀數筆數與秒數）；測試以同設定重跑並逐項比對；`compare_domain.json` 列 manifest 排除鍵（時間戳、計時、絕對路徑、暫存 uuid）之封閉集合，未列者一律納入比對。
+- 改法：凍結腳本於 HEAD 6e07e0ad 跑 C1–C10（v19）並寫 JSON（含 `head_commit`、每格 phys_footprint 行程樹峰值、讀數筆數與秒數）；測試以同設定重跑並逐項比對；`compare_domain.json` 列 manifest 排除鍵（時間戳、計時、絕對路徑、暫存 uuid）之封閉集合，未列者一律納入比對。
 - **驗證**：`pytest tests/feature_engineering/test_framepath_invariance.py` 於 HEAD 綠；mutation（暫存工作樹，不提交）：M1 `feature_naming.tag_timeframe` 少標一週期、M2 `_combine_layers` 對 `layer4_input` 回傳空表、M3 L7 落盤前改 float64、M4 manifest 新增未登記鍵 ⇒ 各自紅（v19 D3：以 C10 實跑，四者皆須紅），收據 `handoffs/run_receipts/<date>-framepath-b1-mutation.txt`。
 - **邊界**：C5 resume 與 C1 之 fingerprint 相等；C1–C8 任一格 `run_status` 非 complete（C3／C6 例外：須為只因 `calibration_insufficient_history` 之 partial，v18 C4）、或 C9 之 `run_status` 非 refused 或其拒絕原因未指名缺載之 `<symbol>/<次週期>` 或拒絕前留有產物（v18）⇒ 凍結腳本拒寫並具名報錯；任一格記憶體 FAIL ⇒ 拒寫。
 - **存活至**：收案後保留（作為 FF-NAME 前之 CGSA 不變基準；FF-NAME 改名時依其 SPEC 重凍）。
@@ -261,3 +261,4 @@
 - D1（§G 設定矩陣）：新增 C10＝C2＋L4 lag 開＋L5 橫截面開（參考標的取 `ffstat_helpers.stat_payload(cross_sectional=True)` 之設定）。依據：`stat_payload` 一律關 lag 與橫截面 ⇒ C1–C9 皆不產 L4／L5 欄（基準 C1 欄名含 lag＝0），M2「`_combine_layers` 對 `layer4_input` 回傳空表」於 C2 實跑差異 0，Task 1.2 所改之 L4 分派無任何不變覆蓋。錨點碼態實測 C10：complete、4851 欄（lag 1216）、L1–L6 皆 present、峰值 0.68 GB、23 秒、兩次獨立實跑 0 差異。
 - D2（Task 1.5 ⓪ 之 git 歷史凍結次序②）：原「基準加入後不得再改」改為「基準之每次加入或改動皆須在首個生產碼提交之前（不得同一提交混改）」——錨點碼態下補格重凍不改任何行為；生產碼開始改動後一律禁改（同原規則）。
 - D3（Task 1.1 驗證）：M1–M4 收據以 C10 實跑（暫存工作樹、錨點碼態）：M1 差異 9704、M2 1219（欄數 4851→3635）、M3 7441、M4 1（manifest 指紋）；另 C2 實跑 M3 6212、M4 1、M2 0（即 D1 之依據）。收據 handoffs/run_receipts/20261009-framepath-b1-mutation.txt。
+- D4（Task 1.5 ⓪；審查 r43）：D2 之重凍只准新增格——處置驗證器另驗基準承續：錨點後每個改動基準之提交版本與工作樹現行版本依序比對，既有格之 fingerprint 逐項相等、receipt 除每次執行之暫存路徑鍵（`kline_copy`、`legacy_kline_dir`、`child_env`）外相等、`code_anchor` 不變；改寫或刪除既有格 ⇒ 紅。
