@@ -1660,6 +1660,44 @@ def test_mutation_affected_gate_r48_hardening(tmp_path, monkeypatch):
     assert g.BATCH_PHASE == {1: 1, 2: 2, 3: 3, 4: 3}
 
 
+def test_mutation_affected_gate_anchor_worktree_real(tmp_path):
+    """審查 r49（CODEX-R49-P1-01）：以真實錨點工作樹（本票最晚實作許可之提交，稀疏檢出只含 pytest.ini 以控秒級與磁碟）
+    實跑 verify_anchor_worktree：合法狀態（無 data_cache 或指向主工作樹之 symlink）通過；實體 data_cache 目錄、
+    指向他處之 symlink、被忽略之輸入檔（.env）、追蹤檔改動，各自拒絕。"""
+    g = _affected_gate()
+    anchor = g.resolve_anchor()
+    wt = tmp_path / "anchor_wt"
+    git = lambda *a: subprocess.run(["git", *a], cwd=REPO, check=True, capture_output=True)  # noqa: E731
+    git("worktree", "add", "--no-checkout", "--detach", str(wt), anchor)
+    try:
+        subprocess.run(["git", "-C", str(wt), "sparse-checkout", "set", "--no-cone", "/pytest.ini"], check=True,
+                       capture_output=True)
+        subprocess.run(["git", "-C", str(wt), "checkout", "--quiet"], check=True, capture_output=True)
+        g.verify_anchor_worktree(wt, anchor)  # 合法：無 data_cache
+        (wt / "data_cache").symlink_to(REPO / "data_cache")
+        g.verify_anchor_worktree(wt, anchor)  # 合法：指向主工作樹之 symlink
+        (wt / "data_cache").unlink()
+        (wt / "data_cache").mkdir()
+        with pytest.raises(g.GateError):  # 實體 data_cache
+            g.verify_anchor_worktree(wt, anchor)
+        (wt / "data_cache").rmdir()
+        (wt / "data_cache").symlink_to(tmp_path)
+        with pytest.raises(g.GateError):  # 指向他處之 symlink
+            g.verify_anchor_worktree(wt, anchor)
+        (wt / "data_cache").unlink()
+        (wt / ".env").write_text("X=1\n", encoding="utf-8")
+        with pytest.raises(g.GateError):  # 被忽略之輸入檔
+            g.verify_anchor_worktree(wt, anchor)
+        (wt / ".env").unlink()
+        (wt / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+        with pytest.raises(g.GateError):  # 追蹤檔改動
+            g.verify_anchor_worktree(wt, anchor)
+        with pytest.raises(g.GateError):  # HEAD ≠ 錨點
+            g.verify_anchor_worktree(wt, "0" * 40)
+    finally:
+        git("worktree", "remove", "--force", str(wt))
+
+
 def test_affected_gate_manifest_groups():
     """C 組須為 affected_tests 之子集；A 組（本票具名驗收）不入 B／C；缺 affected_groups 列 ⇒ 拒跑。"""
     g = _affected_gate()
