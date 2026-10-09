@@ -25,8 +25,15 @@ else
 fi
 _head="$(git log -1 --format=%h 2>/dev/null || echo '-')"
 
-LC_ALL=C jq -Rs --arg ts "${_ts}" --arg d "${_dirty}" --arg h "${_head}" \
-  '{"systemMessage": ("=== HANDOFF.md (自動注入) ===\n" +
+# Javis 信箱：寄給 Claude 且未回覆之信（規則見 CLAUDE.md「Javis 信箱」節）。
+#   無信 ⇒ 輸出與未加此段時逐位元相同；有信 ⇒ 另走 additionalContext，確保進到模型 context。
+_mail="$(bash scripts/javis_mail.sh list --unanswered --for cc 2>/dev/null)"
+
+LC_ALL=C jq -Rs --arg ts "${_ts}" --arg d "${_dirty}" --arg h "${_head}" --arg mail "${_mail}" \
+  '("=== Javis 信箱：寄給 Claude、尚未回覆（處理規則見 CLAUDE.md「Javis 信箱」節）===\n" + $mail + "\n") as $mb
+   | {"systemMessage": ("=== HANDOFF.md (自動注入) ===\n" +
      "🕐 本檔最後提交：" + $ts + "｜當前 HEAD：" + $h + $d + "\n" +
-     "（時間由 git 導出，非手寫；用於判斷本檔相對於其他資訊的新舊）\n\n" + .)}' \
+     "（時間由 git 導出，非手寫；用於判斷本檔相對於其他資訊的新舊）\n\n" + . +
+     (if $mail == "" then "" else "\n\n" + $mb end))}
+   + (if $mail == "" then {} else {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": $mb}} end)' \
   HANDOFF.md 2>/dev/null || echo '{}'
