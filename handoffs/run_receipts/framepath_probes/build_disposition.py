@@ -47,7 +47,7 @@ EXCLUDED = ["scripts/fact_keys.json"]
 
 
 def git(*args: str) -> str:
-    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, check=True).stdout
+    return subprocess.run(["git", "-c", "core.quotepath=off", *args], cwd=REPO, capture_output=True, text=True, check=True).stdout
 
 
 def population(head: str) -> list:
@@ -62,7 +62,7 @@ def population(head: str) -> list:
 def clean_ignored(wt: Path) -> list:
     if subprocess.run(["git", "-C", str(wt), "status", "--porcelain"], capture_output=True, text=True, check=True).stdout:
         raise SystemExit(f"--clean-worktree 非乾淨：{wt}")
-    out = subprocess.run(["git", "-C", str(wt), "ls-files", "--others", "--ignored", "--exclude-standard", "--", *V.R_ROOTS],
+    out = subprocess.run(["git", "-c", "core.quotepath=off", "-C", str(wt), "ls-files", "--others", "--ignored", "--exclude-standard", "--", *V.R_ROOTS],
                          capture_output=True, text=True, check=True).stdout
     return V._filter_ignored(out.splitlines())
 

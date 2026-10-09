@@ -16512,6 +16512,11 @@
    "path": "tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/g1.parquet",
    "phase": 1,
    "task": "2.5"
+  },
+  {
+   "path": "scripts/framepath_affected_gate.py",
+   "phase": 1,
+   "task": "1.5"
   }
  ],
  "fact_key_rows": [

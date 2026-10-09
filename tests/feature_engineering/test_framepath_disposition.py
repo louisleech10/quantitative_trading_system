@@ -75,8 +75,11 @@ def ast_dump(node: ast.AST) -> str:
     return ast.dump(node, annotate_fields=True, include_attributes=False)
 
 
+GIT_PREFIX = ("git", "-c", "core.quotepath=off")  # 審查 r46：路徑輸出一律不跳脫（非 ASCII 路徑原樣）
+
+
 def _git(*args: str, check: bool = True) -> bytes:
-    proc = subprocess.run(["git", *args], cwd=REPO, capture_output=True)
+    proc = subprocess.run([*GIT_PREFIX, *args], cwd=REPO, capture_output=True)
     if check and proc.returncode != 0:
         raise RuntimeError(f"git {' '.join(args)} rc={proc.returncode}: {proc.stderr.decode('utf-8', 'replace')}")
     return proc.stdout
@@ -1539,6 +1542,91 @@ def test_check_3_rewrite_keeps_assertions(ctx):
 
 def test_check_4_internal_consistency_and_excerpts(ctx):
     assert check_4(ctx["disp"], ctx["head"]) == []
+
+
+NON_ASCII_TRACKED = "tests/3.2C- 雙窗口密度驗證.py"  # repo 內現存之非 ASCII 路徑（處置表母體成員）
+
+
+def _affected_gate():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("framepath_affected_gate", REPO / "scripts/framepath_affected_gate.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_JUNIT = """<testsuites><testsuite>
+<testcase classname="tests.x.test_a" name="test_ok"/>
+<testcase classname="tests.x.test_a" name="test_p[1h]"><failure type="AssertionError" message="assert 1 == 2">t</failure></testcase>
+<testcase classname="tests.x.test_a.TestK" name="test_m"><error type="ValueError" message="bad /private/var/folders/zz/abc at 0x10ab">t</error></testcase>
+<testcase classname="tests.x.test_a" name="test_s"><skipped type="pytest.skip" message="needs data"/></testcase>
+<testcase classname="tests.x.other" name="test_z"/>
+</testsuite></testsuites>"""
+
+
+def test_affected_gate_junit_nodeid_and_identity():
+    """審查 r46（CODEX-R46-P1-01／02、GROK-R46-P1-01）：junit → nodeid 重建（模組函式、參數化、類別方法；他檔略）
+    與失敗身分（只遮暫存路徑與位址，數字不遮）。"""
+    g = _affected_gate()
+    res = g.junit_results(_JUNIT, "tests/x/test_a.py")
+    assert set(res) == {"tests/x/test_a.py::test_ok", "tests/x/test_a.py::test_p[1h]",
+                        "tests/x/test_a.py::TestK::test_m", "tests/x/test_a.py::test_s"}
+    assert res["tests/x/test_a.py::test_ok"]["outcome"] == "passed"
+    assert res["tests/x/test_a.py::test_s"]["outcome"] == "skipped"
+    ident = g.failure_identity(res["tests/x/test_a.py::TestK::test_m"])
+    assert ident == ("error", "ValueError", "bad <tmp> at <hex>")
+    assert g.failure_identity({"outcome": "failed", "type": "AssertionError", "message": "assert 1 == 2"}) != \
+        g.failure_identity({"outcome": "failed", "type": "AssertionError", "message": "assert 1 == 3"})
+
+
+def test_mutation_affected_gate_classify_cannot_absorb_caused():
+    """三類歸屬封閉：完整性缺漏 ⇒ missing；錨點同身分 ⇒ 既有紅；錨點綠／缺／身分或類別不同 ⇒ 本批造成；略過亦比身分。"""
+    g = _affected_gate()
+    f = lambda msg, outcome="failed", t="AssertionError": {"outcome": outcome, "type": t, "message": msg}  # noqa: E731
+    exp = ["a::ok", "a::red", "a::changed", "a::anchor_green", "a::anchor_missing", "a::skip_same", "a::skip_new",
+           "a::kind", "a::absent"]
+    batch = {"a::ok": f("", "passed"), "a::red": f("x"), "a::changed": f("x 2"), "a::anchor_green": f("x"),
+             "a::anchor_missing": f("x"), "a::skip_same": f("r", "skipped", "skip"),
+             "a::skip_new": f("r", "skipped", "skip"), "a::kind": f("x", "error", "AssertionError"),
+             "a::extra": f("", "passed")}
+    anchor = {"a::red": f("x"), "a::changed": f("x 1"), "a::anchor_green": f("", "passed"),
+              "a::skip_same": f("r", "skipped", "skip"), "a::kind": f("x")}
+    out = g.classify(exp, batch, anchor)
+    assert out["missing"] == ["a::absent"] and out["unexpected"] == ["a::extra"]
+    assert out["head_red"] == ["a::red", "a::skip_same"]
+    assert out["caused"] == ["a::changed", "a::anchor_green", "a::anchor_missing", "a::skip_new", "a::kind"]
+    assert out["passed"] == ["a::ok"]
+
+
+def test_affected_gate_manifest_groups():
+    """C 組須為 affected_tests 之子集；A 組（本票具名驗收）不入 B／C；缺 affected_groups 列 ⇒ 拒跑。"""
+    g = _affected_gate()
+    rows = ["affected_tests phase=1 tests/a.py tests/feature_engineering/test_framepath_invariance.py tests/c.py",
+            "affected_groups phase=1 C=tests/c.py"]
+    assert g.manifest_groups({"batch_card": {"risk_mitigation": rows}}, 1) == (["tests/a.py"], ["tests/c.py"])
+    with pytest.raises(g.GateError):
+        g.manifest_groups({"batch_card": {"risk_mitigation": rows[:1]}}, 1)
+    with pytest.raises(g.GateError):
+        g.manifest_groups({"batch_card": {"risk_mitigation": [rows[0], "affected_groups phase=1 C=tests/zz.py"]}}, 1)
+    real = json.loads((REPO / MANIFEST_REL).read_text(encoding="utf-8"))
+    b, c = g.manifest_groups(real, 1)
+    assert c and set(b).isdisjoint(c) and not set(b + c) & set(g.A_GROUP)
+
+
+def test_git_path_output_not_escaped():
+    """審查 r46（GROK-R46-P1-02、CODEX-R46-P1-03）：驗證器之 git 路徑輸出（ls-files、diff、log --name-only）對非 ASCII
+    路徑原樣輸出，不得出現 git 引號／八進位逸出形態；處置表母體不得含逸出形態。mutation：拿掉 core.quotepath=off ⇒ 紅。"""
+    listed = _git("ls-files", "--", NON_ASCII_TRACKED).decode("utf-8").splitlines()
+    assert listed == [NON_ASCII_TRACKED]
+    names = _git("log", "--format=", "--name-only", "-1", "--", NON_ASCII_TRACKED).decode("utf-8").splitlines()
+    assert NON_ASCII_TRACKED in names
+    escaped = subprocess.run(["git", "-c", "core.quotepath=on", "ls-files", "--", NON_ASCII_TRACKED], cwd=REPO,
+                             capture_output=True).stdout.decode("utf-8").strip()
+    assert escaped != NON_ASCII_TRACKED and escaped.startswith('"')  # 證 mutation 有效：預設會逸出
+    disp = json.loads((REPO / DISPOSITION_REL).read_text(encoding="utf-8"))
+    paths = list(disp["population"]["files"]) + [op["path"] for op in disp["operations"]]
+    assert not [p for p in paths if p.startswith('"') or re.search(r"\\[0-7]{3}", p)]
 
 
 def test_check_5_new_and_ignored_files(ctx):
