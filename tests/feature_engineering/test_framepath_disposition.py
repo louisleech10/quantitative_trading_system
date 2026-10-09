@@ -1713,6 +1713,184 @@ def test_affected_gate_manifest_groups():
     assert c and set(b).isdisjoint(c) and not set(b + c) & set(g.A_GROUP)
 
 
+def test_affected_gate_collect_real_nodeids():
+    """諮詢 r5 CODEX-R5-P1-01：以真實 pytest collect（本專案 pytest.ini）取得 nodeid；mutation：collect 改回 `-q` ⇒
+    輸出為表頭與 `<Function …>`、無 nodeid 行 ⇒ GateError（紅）。"""
+    g = _affected_gate()
+    env = dict(os.environ, PYTHONPATH=str(REPO))
+    ids = g.collect("tests/test_cgsa_pipeline.py", REPO, env)
+    assert ids and all(i.startswith("tests/test_cgsa_pipeline.py::") for i in ids)
+
+
+_D8_HELPER = '''
+def prepare_env(mp, **env):
+    for k, v in env.items():
+        mp.setenv(k, v)
+
+def run_frame(mp):
+    mp.setenv("FFACT_USE_CGSA", "0")
+
+def generate_s2(factory):
+    return factory.generate_features("X", "1h")
+'''
+_D8_CONFTEST = '''
+import pytest
+
+@pytest.fixture
+def frame_env(monkeypatch):
+    monkeypatch.setenv("FFACT_USE_CGSA", "0")
+'''
+_D8_TEST = '''
+from tests import d8help as h
+
+_PATH_ENV = {"legacy": {"FFACT_USE_CGSA": "0"}, "cgsa": {}}
+
+def test_dict_spread(path, monkeypatch):
+    h.prepare_env(monkeypatch, **_PATH_ENV[path])
+
+def test_condexp(use, monkeypatch):
+    monkeypatch.setenv("FFACT_USE_CGSA", "1" if use else "0")
+
+def test_truthy_only(monkeypatch):
+    monkeypatch.setenv("FFACT_USE_CGSA", "1")
+
+def test_helper_module_call(monkeypatch):
+    h.run_frame(monkeypatch)
+
+def _local_env():
+    return {"FFACT_USE_CGSA": "0"}
+
+def test_local_helper_call():
+    env = _local_env()
+
+def test_conftest_fixture(frame_env):
+    pass
+
+def test_deleted_symbol_attr(factory):
+    factory._cgsa_enabled()
+
+def test_deleted_symbol_string(monkeypatch, factory):
+    monkeypatch.setattr(factory, "_cgsa_enabled", lambda: False)
+
+def test_kw_value_unknown(monkeypatch, v):
+    h.prepare_env(monkeypatch, FFACT_USE_CGSA=v)
+
+def test_untouched():
+    assert 1 + 1 == 2
+'''
+
+
+def _d8_sources(test_src=_D8_TEST, helper_src=_D8_HELPER):
+    src = {"tests/d8help.py": helper_src, "tests/conftest.py": _D8_CONFTEST, "tests/test_d8.py": test_src}
+    return src.get
+
+
+def test_mutation_affected_gate_s2_taint_transitive():
+    """諮詢 r5 CODEX-R5-P1-02／COMPOSER-R5-P1-01／GROK-R5-P1-01：S2 以 AST 傳遞分析判「會走被刪／被改分支」——模組層
+    dict 經 `**` 展開、CondExp 假值臂、tests/ 輔助模組呼叫、同模組 helper、conftest fixture、被刪符號（屬性或字串）、
+    值不可決定之關鍵字引數皆選入；可證真值常數與無關測試不選入。mutation：關閉 ffact 與符號表 ⇒ 前述全數消失（紅）。"""
+    g = _affected_gate()
+    scan = g.file_scan("tests/test_d8.py", _d8_sources(), frozenset({"_cgsa_enabled"}))
+    tainted = set(scan["taint"])
+    must = {"test_dict_spread", "test_condexp", "test_helper_module_call", "test_local_helper_call",
+            "test_conftest_fixture", "test_deleted_symbol_attr", "test_deleted_symbol_string", "test_kw_value_unknown"}
+    assert must <= tainted, sorted(must - tainted)
+    assert not {"test_truthy_only", "test_untouched"} & tainted
+    assert "name:_PATH_ENV" in scan["taint"]["test_dict_spread"]
+    assert any(r.startswith("call:tests/d8help.py:") for r in scan["taint"]["test_helper_module_call"])
+    assert any(r.startswith("call:tests/conftest.py:") for r in scan["taint"]["test_conftest_fixture"])
+    off = g.module_taint("tests/test_d8.py", _d8_sources(), frozenset(), ffact=False)
+    assert not any(off.values())
+
+
+def test_affected_gate_heavy_is_transitive():
+    """S3 輕量判定須經輔助模組傳遞（諮詢 r5 實測：直接字面判定把經 helper 呼叫真實生成之檔誤判輕量）。"""
+    g = _affected_gate()
+    heavy_src = "from tests import d8help as h\n\ndef test_x(factory):\n    h.generate_s2(factory)\n"
+    assert g.is_heavy("tests/test_d8.py", _d8_sources(test_src=heavy_src))
+    assert g.is_heavy("tests/test_d8.py", _d8_sources(test_src="P = 'data_cache/feature_klines/kline_cache.h5'\n"))
+    assert not g.is_heavy("tests/test_d8.py", _d8_sources(test_src="def test_y():\n    assert True\n"))
+
+
+def test_affected_gate_s1_targets_locators():
+    """S1：qualname locator 取該函式（含全部參數化）；target／import_alias 取引用該名之函式；顯式 nodeids；rename 取
+    new_nodeid；phase>N 之操作不入。空 nodeids 不等於沒有測試。"""
+    g = _affected_gate()
+    disp = {"operations": [
+        {"id": "OP-1", "phase": 1, "path": "tests/t.py", "kind": "rewrite", "nodeids": [],
+         "locator": {"category": "def", "qualname": "test_a"}},
+        {"id": "OP-2", "phase": 1, "path": "tests/t.py", "kind": "delete-node", "nodeids": [],
+         "locator": {"category": "dict_item", "target": "_ENV", "path": ["legacy"]}},
+        {"id": "OP-3", "phase": 1, "path": "tests/t.py", "kind": "delete-node", "nodeids": [],
+         "locator": {"category": "import_alias", "lineno": 3, "name": "MagicMock"}},
+        {"id": "OP-4", "phase": 1, "path": "tests/t.py", "kind": "delete-node",
+         "nodeids": ["tests/t.py::test_p[legacy]"], "locator": {"category": "parametrize_elem", "qualname": "test_p"}},
+        {"id": "OP-5", "phase": 2, "path": "tests/t.py", "kind": "rewrite", "nodeids": [],
+         "locator": {"category": "def", "qualname": "test_late"}},
+    ], "nodeids": [{"nodeid": "tests/t.py::C::test_old", "phase": 1, "disposition": "rename", "op": "OP-6",
+                    "new_nodeid": "tests/t.py::C::test_new"}]}
+    scans = {"tests/t.py": {"refs": {"test_b": {"_ENV"}, "test_c": {"MagicMock"}, "test_d": {"x"}}}}
+    funcs, nodes = g.s1_targets(disp, 1, scans)
+    assert set(funcs["tests/t.py"]) == {"test_a", "test_b", "test_c", "test_p", "C.test_new"}
+    assert "tests/t.py::test_p[legacy]" in nodes and "tests/t.py::C::test_new" in nodes
+    collected = {"tests/t.py": ["tests/t.py::test_a[1]", "tests/t.py::test_a[2]", "tests/t.py::test_p[cgsa]",
+                                "tests/t.py::C::test_new", "tests/t.py::test_d", "tests/t.py::test_late"]}
+    sel, skip = g.select_expected(collected, {"tests/t.py": {"refs": scans["tests/t.py"]["refs"], "taint": {},
+                                                             "heavy": True}}, funcs, nodes, [], [], False)
+    assert set(sel) == {"tests/t.py::test_a[1]", "tests/t.py::test_a[2]", "tests/t.py::test_p[cgsa]",
+                        "tests/t.py::C::test_new"}
+    assert skip == {"tests/t.py::test_d": "invariance_envelope", "tests/t.py::test_late": "invariance_envelope"}
+
+
+def test_mutation_affected_gate_select_partition_and_align():
+    """選入與未跑互斥且聯集＝collected；輕量檔整檔選入、釘扎重型不得整檔；必跑選入；引用對齊名者未觸發時理由為
+    align_static_proof、觸發時選入（CODEX-R5-P2-03 條件觸發）。mutation：對齊觸發旗標失效 ⇒ 觸發案仍為 skipped（紅）。"""
+    g = _affected_gate()
+    collected = {"tests/light.py": ["tests/light.py::test_1", "tests/light.py::test_2"],
+                 "tests/pinned.py": ["tests/pinned.py::test_3"],
+                 "tests/heavy.py": ["tests/heavy.py::test_v6", "tests/heavy.py::test_must", "tests/heavy.py::test_x"]}
+    scans = {"tests/light.py": {"refs": {}, "taint": {}, "heavy": False},
+             "tests/pinned.py": {"refs": {}, "taint": {}, "heavy": False},
+             "tests/heavy.py": {"refs": {"test_v6": {"TimeframeAligner"}}, "taint": {}, "heavy": True}}
+    must = ["tests/heavy.py::test_must"]
+    for trig in (False, True):
+        sel, skip = g.select_expected(collected, scans, {}, {}, must, ["tests/pinned.py"], trig)
+        allids = {n for ids in collected.values() for n in ids}
+        assert set(sel) | set(skip) == allids and not set(sel) & set(skip)
+        assert {"tests/light.py::test_1", "tests/light.py::test_2", "tests/heavy.py::test_must"} <= set(sel)
+        assert skip["tests/pinned.py::test_3"] == "invariance_envelope"
+        assert skip["tests/heavy.py::test_x"] == "invariance_envelope"
+        assert set(skip.values()) <= set(g.SKIP_REASONS)
+        if trig:
+            assert sel["tests/heavy.py::test_v6"] == ["align_trigger"]
+        else:
+            assert skip["tests/heavy.py::test_v6"] == "align_static_proof"
+
+
+def test_affected_gate_production_changes_symbols(tmp_path):
+    """S2 符號表由錨點→工作樹之生產碼 AST 差異機械導出：被刪定義 ∪ 本體改變之私有定義；公開入口改變不入表；
+    改動對齊檔即觸發。以暫存 git 實跑。"""
+    g = _affected_gate()
+    repo = tmp_path / "r"
+    (repo / "momentum").mkdir(parents=True)
+    src = repo / "momentum" / "m.py"
+    src.write_text("def gone():\n    return 1\n\ndef _priv():\n    return 1\n\ndef public():\n    return 1\n\n"
+                   "class K:\n    def _meth(self):\n        return 1\n", encoding="utf-8")
+
+    def git(*a):
+        return subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True, text=True).stdout
+
+    git("init", "-q")
+    git("-c", "user.email=t@t", "-c", "user.name=t", "add", ".")
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "a")
+    anchor = git("rev-parse", "HEAD").strip()
+    src.write_text("def _priv():\n    return 2\n\ndef public():\n    return 2\n\n"
+                   "class K:\n    def _meth(self):\n        return 2\n", encoding="utf-8")
+    deleted, changed, files = g.production_changes(repo, anchor)
+    assert deleted == {"gone"} and changed == {"_priv", "public", "_meth"} and files == ["momentum/m.py"]
+    assert g.s2_symbols(deleted, changed) == frozenset({"gone", "_priv", "_meth"})
+
+
 def test_git_path_output_not_escaped():
     """審查 r46（GROK-R46-P1-02、CODEX-R46-P1-03）：驗證器之 git 路徑輸出（ls-files、diff、log --name-only）對非 ASCII
     路徑原樣輸出，不得出現 git 引號／八進位逸出形態；處置表母體不得含逸出形態。mutation：拿掉 core.quotepath=off ⇒ 紅。"""

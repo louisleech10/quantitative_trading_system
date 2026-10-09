@@ -1,10 +1,12 @@
-"""FRAMEPATH 受影響測試閘（SPEC v20 D6、審查 r46／r47）：A 組全綠＋B／C 組逐 nodeid 照跑、完整性機械比對、
-失敗逐項與錨點碼態比對歸屬。
+"""FRAMEPATH 受影響測試閘（SPEC v21 D8、諮詢 r5；v20 D6 之歸屬與錨點防護沿用）：A 組全綠＋B／C 組只跑本批
+改動可能影響其結果之 nodeid（測試影響分析），其餘逐項收據；完整性機械比對、失敗逐項與錨點碼態比對歸屬。
 
 流程（單組串行）：
 1. A 組＝本票具名驗收（`A_GROUP_BY_PHASE`），須全部 passed（不適用既有紅豁免）。
-2. B／C 組應跑集合 E：manifest `affected_tests phase=<P>` 所列檔扣 A 組，逐檔 `pytest --collect-only -q`（rc 須 0，
-   否則拒跑）；C 組（`affected_groups phase=<P> C=…`）排在 B 組之後，只影響順序。
+2. B／C 組：manifest `affected_tests phase=<P>` 所列檔扣 A 組，逐檔 `pytest --collect-only -qq`（rc 須 0，否則拒跑）；
+   應跑集合 E 由 `plan` 挑選（S1 處置操作所及／S2 會走被刪或被改分支／S3 靜態輕量檔整檔／必跑／對齊觸發），
+   未選者逐項記 `skipped` 封閉理由；C 組（`affected_groups phase=<P> C=…`）排在 B 組之後，只影響順序。
+   `--plan` 只產挑選收據（秒級），供執行前估時。
 3. 逐檔執行寫 junit xml；結果檔附狀態指紋（repo HEAD、工作樹相對 HEAD 之完整 diff、未追蹤檔清單、該測試檔內容、
    pytest 參數、phase），指紋相同且結果完整才沿用（中斷後接續），否則重跑；pytest rc 非 0／1 ⇒ 該檔視為未完成。
 4. 非綠 nodeid 於錨點工作樹重跑同 nodeid；錨點＝本票最晚一筆實作許可之 round_start_head（`.claude/gate/audit.log`，
@@ -21,6 +23,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -186,7 +189,8 @@ def _pytest(args: Sequence[str], cwd: Path, env: Mapping[str, str]) -> subproces
 
 
 def collect(test_file: str, cwd: Path, env: Mapping[str, str]) -> List[str]:
-    proc = _pytest(["--collect-only", "-q", "-p", "no:cacheprovider", test_file], cwd, env)
+    # 諮詢 r5 CODEX-R5-P1-01：本專案 pytest.ini 下 `-q` 輸出表頭與 `<Function …>`，`-qq` 才逐行輸出 nodeid
+    proc = _pytest(["--collect-only", "-qq", "-p", "no:cacheprovider", test_file], cwd, env)
     ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
     if proc.returncode != 0 or not ids:
         raise GateError(f"{test_file} 收集失敗或為空 rc={proc.returncode}：{proc.stdout[-500:]}{proc.stderr[-500:]}")
@@ -255,6 +259,372 @@ def make_anchor_worktree(anchor: str) -> Path:
     return wt
 
 
+# ── SPEC v21 D8（諮詢 r5）：應跑集合 E＝A∪S1∪S2∪S3∪必跑；其餘逐項收據 ─────────────────────────────────────────
+FFACT_KEY = "FFACT_USE_CGSA"
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
+ALIGN_TRIGGER_FILES = frozenset({"momentum/FeatureEngineering/timeframe/tf_aligner.py"})
+ALIGN_TRIGGER_SYMBOLS = frozenset({"TimeframeAligner", "build_asof_index_map", "_align_group_array",
+                                   "_capture_multi_tf_alignment"})
+ALIGN_TEST_NAMES = frozenset({"TimeframeAligner", "build_asof_index_map", "FFACT_MULTI_TF_COMPACT_ALIGNMENT",
+                              "_capture_multi_tf_alignment"})
+HEAVY_NAMES = frozenset({"requires_kline", "requires_kline_data", "FEATURE_KLINE_H5_PATH", "generate_features",
+                         "generate_multi_tf", "run_stat", "run_generation", "generate_cell", "run_ic_first",
+                         "kline_close"})
+SKIP_REASONS = ("invariance_envelope", "align_static_proof")
+INVARIANCE_BASELINE_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
+DISPOSITION_REL = "tests/_golden/framepath/test_disposition.json"
+
+
+def _is_keyconst(node: Optional[ast.AST]) -> bool:
+    return isinstance(node, ast.Constant) and node.value == FFACT_KEY
+
+
+def _is_truthy(node: Optional[ast.AST]) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.strip().lower() in _TRUTHY
+
+
+def ffact_unproven(node: ast.AST) -> bool:
+    """節點內出現 `FFACT_USE_CGSA`（字串常數或關鍵字引數）且並非每一處皆可證為真值常數 ⇒ True（fail-closed：
+    值經變數、CondExp、dict 展開、delenv 等無法靜態決定者一律視為可能走 frame）。"""
+    total = proven = 0
+    for n in ast.walk(node):
+        if _is_keyconst(n):
+            total += 1
+        if isinstance(n, ast.keyword) and n.arg == FFACT_KEY:
+            total += 1
+            proven += _is_truthy(n.value)
+        if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "setenv"
+                and len(n.args) > 1 and _is_keyconst(n.args[0])):
+            proven += _is_truthy(n.args[1])
+        if isinstance(n, ast.Dict):
+            proven += sum(1 for k, v in zip(n.keys, n.values) if _is_keyconst(k) and _is_truthy(v))
+        if (isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Subscript)
+                and _is_keyconst(_slice(n.targets[0]))):
+            proven += _is_truthy(n.value)
+    return total > proven
+
+
+def _slice(node: ast.Subscript) -> ast.AST:
+    sl = node.slice
+    return sl.value if isinstance(sl, ast.Index) else sl  # type: ignore[attr-defined]  # python<3.9
+
+
+def refs_of(node: ast.AST) -> set:
+    """節點引用之名稱：Name、Attribute 屬性名、字串常數（setattr 以字串指名者）、參數名（fixture）、關鍵字名。"""
+    out = set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Name):
+            out.add(n.id)
+        elif isinstance(n, ast.Attribute):
+            out.add(n.attr)
+        elif isinstance(n, ast.Constant) and isinstance(n.value, str):
+            out.add(n.value)
+        elif isinstance(n, ast.arg):
+            out.add(n.arg)
+        elif isinstance(n, ast.keyword) and n.arg:
+            out.add(n.arg)
+    return out
+
+
+def _defs(tree: ast.Module) -> Dict[str, ast.AST]:
+    """頂層函式／類別與類別方法 → {qualname: node}（類別本身亦列，方法為 `Cls.meth`）。"""
+    out: Dict[str, ast.AST] = {}
+    for st in tree.body:
+        if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            out[st.name] = st
+        elif isinstance(st, ast.ClassDef):
+            out[st.name] = st
+            for m in st.body:
+                if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    out[f"{st.name}.{m.name}"] = m
+    return out
+
+
+def _module_path(dotted: str, level: int, here: str, source_of) -> Optional[str]:
+    """測試輔助模組之 repo 相對路徑（只解析 tests/ 下且來源存在者；第三方與生產模組回 None）。"""
+    if level:
+        base = Path(here).parent
+        for _ in range(level - 1):
+            base = base.parent
+        parts = [*base.parts, *(dotted.split(".") if dotted else [])]
+    else:
+        parts = dotted.split(".")
+    if not parts or parts[0] != "tests":
+        return None
+    for cand in ("/".join(parts) + ".py", "/".join(parts) + "/__init__.py"):
+        if source_of(cand) is not None:
+            return cand
+    return None
+
+
+def module_taint(path: str, source_of, symbols: frozenset, _cache: Optional[dict] = None,
+                 _stack: Tuple[str, ...] = (), ffact: bool = True) -> Dict[str, set]:
+    """S2：模組內各定義（含 fixture）之 taint 理由——直接（`ffact`／`sym:<名>`）、經模組層名稱（`name:<名>`）、
+    經同模組或 tests/ 下輔助模組之被 taint 定義（`call:<模組>:<名>`）傳遞，至不動點。conftest 由呼叫端併入。"""
+    cache = _cache if _cache is not None else {}
+    if path in cache:
+        return cache[path]
+    src = source_of(path)
+    if src is None or path in _stack:
+        return {}
+    tree = ast.parse(src)
+    defs = _defs(tree)
+    reasons: Dict[str, set] = {q: set() for q in defs}
+    for q, node in defs.items():
+        if isinstance(node, ast.ClassDef):
+            continue
+        if ffact and ffact_unproven(node):
+            reasons[q].add("ffact")
+        reasons[q] |= {f"sym:{s}" for s in refs_of(node) & symbols}
+    tainted_names: Dict[str, str] = {}
+    for st in tree.body:
+        targets = st.targets if isinstance(st, ast.Assign) else [st.target] if isinstance(st, ast.AnnAssign) else []
+        value = getattr(st, "value", None)
+        if value is None:
+            continue
+        hit = (ffact and ffact_unproven(value)) or bool(refs_of(value) & symbols)
+        for t in targets:
+            if hit and isinstance(t, ast.Name):
+                tainted_names[t.id] = "ffact/sym"
+    ext: Dict[str, Tuple[str, str]] = {}  # 本地名 → (輔助模組路徑, 該模組中之名；"" 表整個模組)
+    for st in ast.walk(tree):
+        if isinstance(st, ast.Import):
+            for a in st.names:
+                mp = _module_path(a.name, 0, path, source_of)
+                if mp:
+                    ext[(a.asname or a.name).split(".")[0] if not a.asname else a.asname] = (mp, "")
+        elif isinstance(st, ast.ImportFrom):
+            for a in st.names:
+                sub = _module_path(f"{st.module}.{a.name}" if st.module else a.name, st.level, path, source_of)
+                if sub:
+                    ext[a.asname or a.name] = (sub, "")
+                    continue
+                mp = _module_path(st.module or "", st.level, path, source_of)
+                if mp:
+                    ext[a.asname or a.name] = (mp, a.name)
+    ext_taint = {mp: module_taint(mp, source_of, symbols, cache, (*_stack, path), ffact)
+                 for mp in {v[0] for v in ext.values()}}
+    changed = True
+    while changed:
+        changed = False
+        live = {q.split(".")[-1]: q for q, r in reasons.items() if r}
+        for q, node in defs.items():
+            if isinstance(node, ast.ClassDef):
+                continue
+            refs = refs_of(node)
+            add = {f"name:{n}" for n in refs & set(tainted_names)}
+            add |= {f"call:{path}:{live[b]}" for b in refs & set(live) if live[b] != q}
+            for local, (mp, name) in ext.items():
+                if local not in refs:
+                    continue
+                bad = {k.split(".")[-1] for k, r in ext_taint.get(mp, {}).items() if r}
+                hits = ({name} & bad) if name else (refs & bad)
+                add |= {f"call:{mp}:{h}" for h in hits}
+            if not add <= reasons[q]:
+                reasons[q] |= add
+                changed = True
+    cache[path] = reasons
+    return reasons
+
+
+def _conftests(test_file: str, source_of) -> List[str]:
+    parts = Path(test_file).parts[:-1]
+    out = []
+    for i in range(1, len(parts) + 1):
+        cand = "/".join(parts[:i]) + "/conftest.py"
+        if source_of(cand) is not None:
+            out.append(cand)
+    return out
+
+
+def file_scan(test_file: str, source_of, symbols: frozenset) -> Dict[str, object]:
+    """單一測試檔之 {"refs": {qualname: 名稱集}, "taint": {qualname: 理由集}, "heavy": bool}；fixture 引用
+    conftest 之被 taint fixture 亦傳遞。"""
+    src = source_of(test_file)
+    if src is None:
+        return {"refs": {}, "taint": {}, "heavy": False}
+    tree = ast.parse(src)
+    defs = _defs(tree)
+    refs = {q: refs_of(n) for q, n in defs.items()}
+    cache: dict = {}
+    taint = {q: set(r) for q, r in module_taint(test_file, source_of, symbols, cache).items()}
+    for cf in _conftests(test_file, source_of):
+        bad = {k.split(".")[-1] for k, r in module_taint(cf, source_of, symbols, cache).items() if r}
+        for q in defs:
+            hits = refs[q] & bad
+            if hits:
+                taint.setdefault(q, set()).update(f"call:{cf}:{h}" for h in hits)
+    return {"refs": refs, "taint": {q: r for q, r in taint.items() if r}, "heavy": is_heavy(test_file, source_of)}
+
+
+def is_heavy(test_file: str, source_of) -> bool:
+    """重型（不得 S3 整檔）：檔內或其經 tests/ 輔助模組（含 conftest）傳遞之定義引用 `HEAVY_NAMES`（真實 kline／
+    生成入口），或任一字串常數含 `kline_cache`。與 S2 同一傳遞分析（ffact 關閉）；判不出者不會因此變輕量。"""
+    src = source_of(test_file)
+    if src is None:
+        return True
+    tree = ast.parse(src)
+    module_refs = refs_of(tree)
+    if module_refs & HEAVY_NAMES or any("kline_cache" in r for r in module_refs):
+        return True
+    cache: dict = {}
+    if any(module_taint(test_file, source_of, HEAVY_NAMES, cache, ffact=False).values()):
+        return True
+    for cf in _conftests(test_file, source_of):
+        bad = {k.split(".")[-1] for k, r in module_taint(cf, source_of, HEAVY_NAMES, cache, ffact=False).items() if r}
+        if module_refs & bad:
+            return True
+    return False
+
+
+def nodeid_qualname(nodeid: str) -> str:
+    """`path::Cls::test_x[p]` → `Cls.test_x`。"""
+    parts = nodeid.split("::")[1:]
+    if parts:
+        parts[-1] = parts[-1].split("[", 1)[0]
+    return ".".join(parts)
+
+
+def s1_targets(disposition: Mapping, phase: int, scans: Mapping[str, Mapping]) -> Tuple[Dict[str, Dict[str, set]], Dict[str, set]]:
+    """S1：處置表 phase≤N 之操作 → ({檔: {qualname: {OP-id}}}, {nodeid: {OP-id}})。locator 有 qualname 者取該函式；
+    `target`（模組層 dict／序列）與 `import_alias` 取引用該名之函式；顯式 nodeids 與 rename 之 new_nodeid 另列
+    （其所屬函式之其餘參數化 nodeid 亦選入）。空 nodeids 不等於「沒有測試」（CODEX-R5-P1-02）。"""
+    funcs: Dict[str, Dict[str, set]] = {}
+    nodes: Dict[str, set] = {}
+    for op in disposition.get("operations", []):
+        if int(op.get("phase", 99)) > phase:
+            continue
+        path, oid, loc = op["path"], op["id"], op.get("locator") or {}
+        quals = set()
+        if loc.get("qualname"):
+            quals.add(loc["qualname"])
+        name = loc.get("target") or (loc.get("name") if loc.get("category") == "import_alias" else None)
+        if name:
+            quals |= {q for q, r in scans.get(path, {}).get("refs", {}).items() if name in r}
+        for nid in op.get("nodeids") or []:
+            nodes.setdefault(nid, set()).add(oid)
+            quals.add(nodeid_qualname(nid))
+        for q in quals:
+            funcs.setdefault(path, {}).setdefault(q, set()).add(oid)
+    for row in disposition.get("nodeids", []):
+        if row.get("disposition") == "rename" and int(row.get("phase", 99)) <= phase and row.get("new_nodeid"):
+            nid = row["new_nodeid"]
+            nodes.setdefault(nid, set()).add(row.get("op", "rename"))
+            funcs.setdefault(nid.split("::", 1)[0], {}).setdefault(nodeid_qualname(nid), set()).add(row.get("op", "rename"))
+    return funcs, nodes
+
+
+def select_expected(collected: Mapping[str, Sequence[str]], scans: Mapping[str, Mapping],
+                    s1_funcs: Mapping[str, Mapping[str, set]], s1_nodes: Mapping[str, set],
+                    must: Sequence[str], heavy_pinned: Iterable[str], align_triggered: bool,
+                    ) -> Tuple[Dict[str, List[str]], Dict[str, str]]:
+    """把 collected 之每個 nodeid 分入「選入（理由清單）」或「未跑（封閉理由）」——兩者互斥且聯集＝collected。
+    S1＝處置操作所及函式；S2＝taint；S3＝靜態輕量檔（無 kline／生成呼叫且不在釘扎重型表）整檔；必跑＝manifest
+    `affected_must`；對齊觸發時引用對齊名之函式選入，否則該等函式未跑理由為 `align_static_proof`。"""
+    heavy_pinned = set(heavy_pinned)
+    selected: Dict[str, List[str]] = {}
+    skipped: Dict[str, str] = {}
+    must_set = set(must)
+    for f, ids in collected.items():
+        scan = scans.get(f, {"refs": {}, "taint": {}, "heavy": True})
+        light = not scan.get("heavy", True) and f not in heavy_pinned
+        for nid in ids:
+            q = nodeid_qualname(nid)
+            why: List[str] = []
+            if nid in must_set:
+                why.append("must")
+            if q in s1_funcs.get(f, {}) or nid in s1_nodes:
+                why += sorted(f"S1:{o}" for o in s1_funcs.get(f, {}).get(q, set()) | s1_nodes.get(nid, set()))
+            if q in scan.get("taint", {}):
+                why += sorted(f"S2:{r}" for r in scan["taint"][q])
+            if light:
+                why.append("S3:light")
+            aligned = bool(scan.get("refs", {}).get(q, set()) & ALIGN_TEST_NAMES)
+            if aligned and align_triggered:
+                why.append("align_trigger")
+            if why:
+                selected[nid] = why
+            else:
+                skipped[nid] = "align_static_proof" if aligned else "invariance_envelope"
+    return selected, skipped
+
+
+def production_changes(repo: Path, anchor: str) -> Tuple[set, set, List[str]]:
+    """錨點 → 工作樹之生產碼（momentum／api／config 之 .py）：(被刪定義名, 本體改變之定義名, 改動檔)；名稱取末段。"""
+    files = [p for p in _git(repo, "diff", "--name-only", anchor, "--", *PRODUCTION_ROOTS).splitlines()
+             if p.endswith(".py") and "/__pycache__/" not in p]
+    deleted, changed = set(), set()
+    for f in files:
+        old = _git_show(repo, anchor, f)
+        new = (repo / f).read_text(encoding="utf-8") if (repo / f).is_file() else None
+        od = {q: ast.dump(n) for q, n in _defs(ast.parse(old)).items()} if old is not None else {}
+        nd = {q: ast.dump(n) for q, n in _defs(ast.parse(new)).items()} if new is not None else {}
+        for q, d in od.items():
+            bare = q.split(".")[-1]
+            if q not in nd:
+                deleted.add(bare)
+            elif nd[q] != d and not isinstance(_defs(ast.parse(old))[q], ast.ClassDef):
+                changed.add(bare)
+    return deleted, changed, files
+
+
+def s2_symbols(deleted: Iterable[str], changed: Iterable[str]) -> frozenset:
+    """S2 符號表：被刪定義 ∪ 本體改變之私有定義（單底線開頭、非 dunder）。公開入口（generate_features 等）之 CGSA
+    行為由 11 格不變性涵蓋，不入表。"""
+    return frozenset(set(deleted) | {c for c in changed if c.startswith("_") and not c.startswith("__")})
+
+
+def _git_show(repo: Path, rev: str, path: str) -> Optional[str]:
+    proc = subprocess.run(["git", "-c", "core.quotepath=off", "-C", str(repo), "show", f"{rev}:{path}"],
+                          capture_output=True, text=True)
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _row_nodeids(rows: Sequence[str], prefix: str) -> List[str]:
+    hits = [r for r in rows if r.startswith(prefix)]
+    if len(hits) > 1:
+        raise GateError(f"manifest 重複 {prefix.strip()}")
+    return [p for p in hits[0][len(prefix):].split() if p] if hits else []
+
+
+def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[str, str]) -> Dict[str, object]:
+    """D8 挑選（秒級、不執行測試本體）：collect B／C 檔、靜態掃描錨點與工作樹兩版之測試檔並取聯集。"""
+    b_group, c_group = manifest_groups(manifest, phase)
+    rows = manifest["batch_card"]["risk_mitigation"]
+    must = _row_nodeids(rows, f"affected_must phase={phase} ")
+    heavy_pinned = _row_nodeids(rows, f"heavy_files phase={phase} ")
+    deleted, changed, prod_files = production_changes(repo, anchor)
+    symbols = s2_symbols(deleted, changed)
+    align_triggered = bool(set(prod_files) & ALIGN_TRIGGER_FILES or (deleted | changed) & ALIGN_TRIGGER_SYMBOLS)
+
+    def post(p: str) -> Optional[str]:
+        return (repo / p).read_text(encoding="utf-8") if (repo / p).is_file() else None
+
+    def pre(p: str) -> Optional[str]:
+        return _git_show(repo, anchor, p)
+
+    collected = {f: collect(f, repo, env) for f in b_group + c_group}
+    scans: Dict[str, Dict[str, object]] = {}
+    for f in collected:
+        a, b = file_scan(f, pre, symbols), file_scan(f, post, symbols)
+        refs = {q: set(a["refs"].get(q, set())) | set(b["refs"].get(q, set())) for q in {*a["refs"], *b["refs"]}}
+        taint = {q: set(a["taint"].get(q, set())) | set(b["taint"].get(q, set())) for q in {*a["taint"], *b["taint"]}}
+        scans[f] = {"refs": refs, "taint": taint, "heavy": bool(a["heavy"] or b["heavy"])}
+    disposition = json.loads((repo / DISPOSITION_REL).read_text(encoding="utf-8"))
+    s1_funcs, s1_nodes = s1_targets(disposition, phase, scans)
+    selected, skipped = select_expected(collected, scans, s1_funcs, s1_nodes, must, heavy_pinned, align_triggered)
+    missing_must = sorted(set(must) - set(selected))
+    if missing_must:
+        raise GateError(f"manifest affected_must 之 nodeid 未被收集：{missing_must}")
+    baseline = repo / INVARIANCE_BASELINE_REL
+    return {
+        "groups": {"B": b_group, "C": c_group}, "collected": collected, "selected": selected, "skipped": skipped,
+        "s2_symbols": sorted(symbols), "production_files": prod_files, "align_triggered": align_triggered,
+        "light_files": sorted(f for f, s in scans.items() if not s["heavy"] and f not in set(heavy_pinned)),
+        "invariance_baseline_sha256": hashlib.sha256(baseline.read_bytes()).hexdigest() if baseline.is_file() else None,
+    }
+
+
 BATCH_PHASE = {1: 1, 2: 2, 3: 3, 4: 3}
 
 
@@ -281,20 +651,31 @@ def main(argv: Sequence[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--out", default=None, help="junit 暫存目錄（預設系統暫存下固定名，供接續）")
     ap.add_argument("--anchor-worktree", default=None)
+    ap.add_argument("--plan", action="store_true",
+                    help="只產出 D8 挑選（選入／未跑逐項理由）收據，不執行測試本體（秒級）")
     args = ap.parse_args(argv)
     batch = current_batch()
     args.phase = BATCH_PHASE[batch]
     args.receipt = str(REPO / f"handoffs/run_receipts/framepath-b{batch}-affected.json")
     out = Path(args.out or Path(tempfile.gettempdir()) / f"framepath_affected_b{batch}").resolve()
     anchor = resolve_anchor()
+    env = dict(os.environ, FRAMEPATH_PHASE=str(args.phase), PYTHONPATH=str(REPO))
+    manifest = json.loads((REPO / MANIFEST_REL).read_text(encoding="utf-8"))
+    sel = plan(REPO, anchor, args.phase, manifest, env)
+    if args.plan:
+        plan_path = REPO / f"handoffs/run_receipts/framepath-b{batch}-affected-plan.json"
+        plan_path.write_text(json.dumps({"spec": "docs/FRAMEPATH_SPEC.md v21 D8", "phase": args.phase, "anchor": anchor,
+                                         **sel}, ensure_ascii=False, indent=1, default=sorted) + "\n",
+                             encoding="utf-8")
+        print(f"FRAMEPATH affected plan：collected={sum(len(v) for v in sel['collected'].values())} "
+              f"selected={len(sel['selected'])} skipped={len(sel['skipped'])} → {plan_path.relative_to(REPO)}")
+        return 0
     anchor_wt = Path(args.anchor_worktree).resolve() if args.anchor_worktree else make_anchor_worktree(anchor)
     verify_anchor_worktree(anchor_wt, anchor)
     if not (anchor_wt / "data_cache").exists():
         (anchor_wt / "data_cache").symlink_to(REPO / "data_cache")
-    env = dict(os.environ, FRAMEPATH_PHASE=str(args.phase), PYTHONPATH=str(REPO))
     anchor_env = dict(os.environ, PYTHONPATH=str(anchor_wt))
-    manifest = json.loads((REPO / MANIFEST_REL).read_text(encoding="utf-8"))
-    b_group, c_group = manifest_groups(manifest, args.phase)
+    b_group, c_group = sel["groups"]["B"], sel["groups"]["C"]
 
     a_failures: List[str] = []
     a_results: Dict[str, Dict[str, str]] = {}
@@ -311,8 +692,13 @@ def main(argv: Sequence[str]) -> int:
     per_file: Dict[str, Dict[str, object]] = {}
     incomplete: List[str] = []
     for f in b_group + c_group:
-        ids = collect(f, REPO, env)
+        all_ids = sel["collected"][f]
+        ids = [n for n in all_ids if n in sel["selected"]]
         expected += ids
+        if not ids:
+            per_file[f] = {"collected": len(all_ids), "expected": 0, "results": 0, "rc": None}
+            continue
+        whole = len(ids) == len(all_ids)
         xml = out / "junit" / (f.replace("/", "_") + ".xml")
         meta = xml.with_suffix(".meta.json")
         key = state_key(REPO, f, args.phase, env)
@@ -323,12 +709,13 @@ def main(argv: Sequence[str]) -> int:
             if m.get("state_key") == key and m.get("rc") in RUN_RC_OK:
                 res, rc = junit_results(xml.read_text(encoding="utf-8"), f), m["rc"]
         if rc is None or set(ids) - set(res):
-            rc, res = run_file(f, xml, REPO, env)
+            rc, res = run_file(f, xml, REPO, env, None if whole else ids)
             meta.write_text(json.dumps({"state_key": key, "rc": rc, "file": f}), encoding="utf-8")
         if rc not in RUN_RC_OK or set(ids) - set(res):
             incomplete.append(f)
-        batch.update(res)
-        per_file[f] = {"expected": len(ids), "results": len(set(ids) & set(res)), "rc": rc}
+        # 只計入選入之 nodeid（沿用之舊結果檔可能含整檔結果）；junit 名稱對不上者以 missing 擋下
+        batch.update({n: r for n, r in res.items() if n in sel["selected"] or n not in all_ids})
+        per_file[f] = {"collected": len(all_ids), "expected": len(ids), "results": len(set(ids) & set(res)), "rc": rc}
 
     not_passed = [n for n in expected if n in batch and batch[n]["outcome"] != "passed"]
     anchor_res: Dict[str, Dict[str, str]] = {}
@@ -340,7 +727,10 @@ def main(argv: Sequence[str]) -> int:
     result = classify(expected, batch, anchor_res)
     passed = verdict(result, a_failures, incomplete)
     receipt = {
-        "spec": "docs/FRAMEPATH_SPEC.md v20 D6", "phase": args.phase, "repo_head": _git(REPO, "rev-parse", "HEAD").strip(),
+        "spec": "docs/FRAMEPATH_SPEC.md v21 D8", "phase": args.phase, "repo_head": _git(REPO, "rev-parse", "HEAD").strip(),
+        "selection": {"selected": sel["selected"], "skipped": sel["skipped"], "s2_symbols": sel["s2_symbols"],
+                      "align_triggered": sel["align_triggered"], "light_files": sel["light_files"],
+                      "invariance_baseline_sha256": sel["invariance_baseline_sha256"]},
         "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(A_GROUP_BY_PHASE[args.phase]),
                                                                         "B": b_group, "C": c_group},
         "a_failures": a_failures, "incomplete_files": incomplete, "per_file": per_file,
