@@ -262,3 +262,4 @@
 - D2（Task 1.5 ⓪ 之 git 歷史凍結次序②）：原「基準加入後不得再改」改為「基準之每次加入或改動皆須在首個生產碼提交之前（不得同一提交混改）」——錨點碼態下補格重凍不改任何行為；生產碼開始改動後一律禁改（同原規則）。
 - D3（Task 1.1 驗證）：M1–M4 收據以 C10 實跑（暫存工作樹、錨點碼態）：M1 差異 9704、M2 1219（欄數 4851→3635）、M3 7441、M4 1（manifest 指紋）；另 C2 實跑 M3 6212、M4 1、M2 0（即 D1 之依據）。收據 handoffs/run_receipts/20261009-framepath-b1-mutation.txt。
 - D4（Task 1.5 ⓪；審查 r43）：D2 之重凍只准新增格——處置驗證器另驗基準承續：錨點後每個改動基準之提交版本與工作樹現行版本依序比對，既有格之 fingerprint 逐項相等、receipt 除每次執行之暫存路徑鍵（`kline_copy`、`legacy_kline_dir`、`child_env`）外相等、`code_anchor` 不變；改寫或刪除既有格 ⇒ 紅。
+- D5（Task 1.1；審查 r44）：凍結腳本於基準檔已存在時只跑其缺之格並併入（既有格原樣保留、不重跑；頂層沿用、`extensions` 追加本次 `head_commit` 與新增格；既有 `code_anchor` 不同 ⇒ 拒寫）；C9 收據之 `source_kline` 記 resolve 後實路徑（暫存工作樹以 symlink 指向同一資料時字面一致）。

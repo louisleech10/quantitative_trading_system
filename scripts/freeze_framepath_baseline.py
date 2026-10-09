@@ -296,7 +296,8 @@ def _prepare_partial_kline(work_dir: Path, settings: Mapping[str, Any], source_d
     import h5py
 
     symbol, tf = settings["symbol"], settings["drop_secondary"]
-    source = Path(source_dir) / "kline_cache.h5"
+    # 審查 r44 GROK-R44-P1-01：記 resolve 後之實路徑（暫存工作樹以 symlink 指向同一資料時字面仍一致）
+    source = (Path(source_dir) / "kline_cache.h5").resolve()
     copy_dir = work_dir / "klines"
     copy_dir.mkdir(parents=True, exist_ok=True)
     target = copy_dir / "kline_cache.h5"
@@ -632,22 +633,36 @@ def _freeze_refusals(cells: Mapping[str, Mapping[str, Any]]) -> List[str]:
 def freeze(out: Path = REPO / BASELINE_REL) -> Dict[str, Any]:
     """先以 `code_state_errors()` 核對碼態（非空 ⇒ `FramepathBaselineError`，不產任何輸出），再跑全部格、驗拒寫條件後
     寫基準：`code_anchor` 與 `head_commit` 取自 `resolve_commits()`、`code_state_errors`（[]）、python、各格
-    fingerprint／memory／receipt（各格以模組屬性 `run_cell` 呼叫，拒寫條件以 `_freeze_refusals` 判定；非空 ⇒ 不寫檔）。"""
+    fingerprint／memory／receipt（各格以模組屬性 `run_cell` 呼叫，拒寫條件以 `_freeze_refusals` 判定；非空 ⇒ 不寫檔）。
+
+    基準檔已存在 ⇒ 只跑其缺之格並併入（SPEC v19 D2／D4：重凍只准新增格；既有格原樣保留、不重跑），頂層欄位沿用、
+    另於 `extensions` 追加本次之 `head_commit` 與新增格；既有基準之 `code_anchor` 與本次不同 ⇒ 具名拒寫。"""
     mod = sys.modules[__name__]
     state = mod.code_state_errors()
     if state:
         raise FramepathBaselineError(f"碼態不符，拒寫：{state}")
     commits = mod.resolve_commits()
+    existing = json.loads(Path(out).read_text(encoding="utf-8")) if Path(out).is_file() else None
+    if existing is not None and existing.get("code_anchor") != commits["code_anchor"]:
+        raise FramepathBaselineError(f"既有基準 code_anchor {existing.get('code_anchor')} 與本次不同，拒寫")
+    have = dict((existing or {}).get("cells") or {})
+    missing = [cell for cell in CELLS if cell not in have]
     work_root = Path(tempfile.mkdtemp(prefix="framepath_freeze_"))
     try:
-        cells = {cell: mod.run_cell(cell, work_root) for cell in CELLS}
+        fresh = {cell: mod.run_cell(cell, work_root) for cell in missing}
     finally:
         shutil.rmtree(work_root, ignore_errors=True)
+    cells = {cell: (have[cell] if cell in have else fresh[cell]) for cell in CELLS}
     refusals = mod._freeze_refusals(cells)
     if refusals:
         raise FramepathBaselineError(f"凍結拒寫：{refusals}")
-    baseline = {"schema": "framepath-cgsa-fingerprint/1", "spec": "docs/FRAMEPATH_SPEC.md §G、Task 1.1",
-                **commits, "code_state_errors": [], "python": sys.version.split()[0], "cells": cells}
+    if existing is None:
+        baseline = {"schema": "framepath-cgsa-fingerprint/1", "spec": "docs/FRAMEPATH_SPEC.md §G、Task 1.1",
+                    **commits, "code_state_errors": [], "python": sys.version.split()[0], "cells": cells}
+    else:
+        baseline = dict(existing, cells=cells)
+        baseline["extensions"] = list(existing.get("extensions") or []) + [
+            {"head_commit": commits["head_commit"], "python": sys.version.split()[0], "cells_added": missing}]
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(out).write_text(json.dumps(baseline, ensure_ascii=False, indent=1, sort_keys=False) + "\n", encoding="utf-8")
     return baseline

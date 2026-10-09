@@ -90,6 +90,63 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
     assert not out.exists()
 
 
+def test_freeze_extends_existing_baseline_only_with_missing_cells(monkeypatch, tmp_path):
+    """審查 r44 GROK-R44-P1-01（SPEC v19 D2／D4）：基準已存在 ⇒ 只跑缺格並併入、既有格原樣保留、extensions 記本次；
+    既有 code_anchor 與本次不同 ⇒ 拒寫且不動檔。"""
+    anchor = "6e07e0ad952d3cccbe3fd2bef39b5ff49dd13581"
+    monkeypatch.setattr(fb, "code_state_errors", lambda git_runner=None: [])
+    monkeypatch.setattr(fb, "resolve_commits", lambda git_runner=None: {"code_anchor": anchor, "head_commit": "f" * 40})
+    monkeypatch.setattr(fb, "_freeze_refusals", lambda cells: [])
+    ran = []
+
+    def fake_run(cell, work_root):
+        ran.append(cell)
+        return {"fingerprint": {"run_status": "new"}, "memory": {}, "receipt": {}}
+
+    monkeypatch.setattr(fb, "run_cell", fake_run)
+    kept = {"fingerprint": {"run_status": "complete", "marker": "kept"}, "memory": {"peak_bytes": 1}, "receipt": {}}
+    existing = {"code_anchor": anchor, "head_commit": "e" * 40, "cells": {c: kept for c in fb.CELLS[:-1]}}
+    out = tmp_path / "base.json"
+    out.write_text(json.dumps(existing), encoding="utf-8")
+    written = fb.freeze(out)
+    assert ran == [fb.CELLS[-1]]
+    assert tuple(written["cells"]) == fb.CELLS and written["head_commit"] == "e" * 40
+    assert all(written["cells"][c] == kept for c in fb.CELLS[:-1])
+    assert written["extensions"][-1]["cells_added"] == [fb.CELLS[-1]]
+    before = out.read_text(encoding="utf-8")
+    other = tmp_path / "other.json"
+    other.write_text(json.dumps(dict(existing, code_anchor="0" * 40)), encoding="utf-8")
+    with pytest.raises(fb.FramepathBaselineError):
+        fb.freeze(other)
+    assert out.read_text(encoding="utf-8") == before
+
+
+def test_partial_kline_receipt_records_resolved_source(tmp_path):
+    """審查 r44 GROK-R44-P1-01：C9 收據之 source_kline 記 resolve 後實路徑——經 symlink 目錄（暫存工作樹慣用）與實目錄
+    之字面相同；指向不同實檔 ⇒ 不同。"""
+    import h5py
+    import numpy as np
+
+    real = tmp_path / "real"
+    real.mkdir()
+    with h5py.File(real / "kline_cache.h5", "w") as h5:
+        for tf in ("1h", "12h"):
+            h5.create_dataset(f"SYM/{tf}/data", data=np.zeros(3))
+    link = tmp_path / "link"
+    link.symlink_to(real)
+    settings = {"symbol": "SYM", "drop_secondary": "12h", "primary_timeframe": "1h"}
+    _, via_real = fb._prepare_partial_kline(tmp_path / "w1", settings, str(real))
+    _, via_link = fb._prepare_partial_kline(tmp_path / "w2", settings, str(link))
+    assert via_real["source_kline"] == via_link["source_kline"] == str((real / "kline_cache.h5").resolve())
+    other = tmp_path / "other"
+    other.mkdir()
+    with h5py.File(other / "kline_cache.h5", "w") as h5:
+        for tf in ("1h", "12h"):
+            h5.create_dataset(f"SYM/{tf}/data", data=np.zeros(3))
+    _, via_other = fb._prepare_partial_kline(tmp_path / "w3", settings, str(other))
+    assert via_other["source_kline"] != via_real["source_kline"]
+
+
 def _install_sampler_spy(monkeypatch) -> dict:
     """以 spy 置換 `memory_guard._Readings`，記錄每個取樣器之 root 與每筆 sample()（審查 r26／r27）。"""
     from momentum.FeatureEngineering import memory_guard
