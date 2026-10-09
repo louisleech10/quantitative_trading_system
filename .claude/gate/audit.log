@@ -84210,3 +84210,113 @@ ts=2026-09-22 23:41:46 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "gate", "blocked_by": [], "closed": [], "event": "committee_output", "event_id": "a6068bd2-d2bd-403f-8b02-b780567efb00", "family": "grok", "origin_script": "gate.sh", "output_path": "handoffs/reconcile/20260928-framepath-x-review-r40/synth.md", "output_sha256": "858d427dc318789bda146c5f60d5f1490e4bf973c37ff8523d26a85017f99d17", "producer": "audit_append.sh", "round_id": "489de707-6142-4dae-840c-878bf1aca263", "schema_version": 1, "sequence": 8292, "task_id": "20260928-FRAMEPATH-X-STAMP-R2", "ts": "2026-10-08T23:52:27Z", "verdict": "null"}
 {"actor": "debt_clear", "brief_kind": "stamp", "canonical_count": 0, "category_counts": {"code-contract": 0, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}, "grok": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "a89c9206-7aa4-4348-b785-cfad18fc2f4b", "handoff_tree_commit": "6807e56aa951e849c11d2c75f7c3dab8a7e390b2", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "489de707-6142-4dae-840c-878bf1aca263", "round_open_sequence": 8286, "schema_version": 1, "sequence": 8293, "session_name": "20260928-framepath-x-stamp-r2", "stamps": [{"body_sha_after": "4cb079b38b14c572ad35916eb6ba875789b218005ed43e577cc19a9ade895c31", "body_sha_before": "none", "history_only": 0, "stamp_target": "handoffs/reconcile/20260928-framepath-x-review-r40/synth.md"}], "task_id": "20260928-FRAMEPATH-X-STAMP-R2", "ts": "2026-10-08T23:53:07Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "2b213644-7d5b-4595-95d3-c066ba4b6a76", "lock_sha256": "dd2d49a6944cfae5ef3053ac30a7dceff0e487caf4a4d0e2945357b953613161", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "489de707-6142-4dae-840c-878bf1aca263", "schema_version": 1, "sequence": 8294, "session_id": "20260928-framepath-x-stamp-r2", "synth_sha256": "648db2d73db2378580d14b6ee7044f0f7ed7746e7208798d8ad843cd8d15d832", "ts": "2026-10-08T23:53:07Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260928-FRAMEPATH-impl-b1-claude", "ts": "2026-10-08T23:55:03Z"}
+=== 2026-10-09 07:55:03 | dispatch ===
+  ts=2026-10-09 07:55:03
+  kind=dispatch
+  intent=FRAMEPATH b1：Phase 1（Task 1.1 凍結 CGSA 指紋、Task 1.2–1.5 刪 frame 產生路徑）
+  risk=high
+  facts_asked=SPEC v17 Phase 1 Task 1.1–1.5；manifest affected_tests phase=1
+  review_role=impl
+  template=SPEC+TODO manifest
+  adversarial=waived:impl-self
+  reconcile=handoffs/reconcile/20260928-framepath-x-review-r40/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/FRAMEPATH_SPEC.md
+  todo=docs/manifests/FRAMEPATH.json
+  manifest=
+{"actor": "gate", "batch": "1", "event": "impl_token_issued", "event_id": "2d1fc192-e596-4aab-ad61-eb45d7161399", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260928-FRAMEPATH", "round_start_head": "a38de54c3055eea61dcc43eb3e62bb06855e35cb", "schema_version": 1, "sequence": 8295, "task_id": "20260928-FRAMEPATH-impl-b1-claude", "ts": "2026-10-08T23:55:03Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260928-FRAMEPATH-X-REVIEW-R41", "ts": "2026-10-09T01:06:54Z"}
+=== 2026-10-09 09:06:54 | dispatch ===
+  ts=2026-10-09 09:06:54
+  kind=dispatch
+  intent=FRAMEPATH TODO 審查 r41：SPEC v18 與凍結驗收測試更正（實作期 b1 發現）
+  risk=low
+  facts_asked=C9 改凍結拒絕、錨點最晚許可、boundary_09、C3/C6 partial 與 dstar 旗標、凍結腳本實作是否正確
+  review_role=adversarial review
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260928-FRAMEPATH-X-REVIEW-R41", "ts": "2026-10-09T01:06:59Z"}
+=== 2026-10-09 09:06:59 | dispatch ===
+  ts=2026-10-09 09:06:59
+  kind=dispatch
+  intent=FRAMEPATH TODO 審查 r41：SPEC v18 與凍結驗收測試更正（實作期 b1 發現）
+  risk=low
+  facts_asked=C9 改凍結拒絕、錨點最晚許可、boundary_09、C3/C6 partial 與 dstar 旗標、凍結腳本實作是否正確
+  review_role=adversarial review
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260928-FRAMEPATH-X-REVIEW-R41-BRIEF.md", "brief_sha256": "62eab8ed48f7e4f761b44d43bb97f152c0524eba7efcbcb4b3a7069480ac72d7", "brief_sha256_norm": "62eab8ed48f7e4f761b44d43bb97f152c0524eba7efcbcb4b3a7069480ac72d7", "event": "committee_round_open", "event_id": "560d78f2-8c8a-42c7-9a97-452a8b42662a", "expected_outputs": {"codex": "handoffs/20260928-framepath-x-review-r41-codex.md", "composer": "handoffs/20260928-framepath-x-review-r41-composer.md", "grok": "handoffs/20260928-framepath-x-review-r41-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8296, "session_name": "20260928-framepath-x-review-r41", "task_id": "20260928-FRAMEPATH-X-REVIEW-R41", "ts": "2026-10-09T01:07:09Z"}
+{"event":"gate_deny","ts":"2026-10-09T01:07:34Z","tool":"Bash","kind":"dispatch","reason":"open_debt","match_rule":"open_debt","cmd_sha256":"4d1e24d5a48eb5d6bc979802bd2f9cd62e72b1054c26759dfb8f6db2a6bb7fad","cmd_head":"printf '%s\\n' '--- prior codex review files ---' && rg --files handoffs | rg 'framepath-x-review-r(3[0-9]|4[0])-(codex|composer|grok|claude)\\.md$|framepath-x-review-r41' | sort && printf '%s\\n' '--- prior codex R40 ---' && sed -n '1,260p' handoffs/20260928-framepath-x-review-r40-codex.md && printf '%s\\n' '--- prior codex R39 ---' && sed -n '1,240p' handoffs/20260928-framepath-x-review-r39-codex.md"}
+{"actor": "cx_run", "attempt_id": "39014a02-b212-4f8f-b531-4414ea46d758", "cli_rc": "0", "event": "committee_family_result", "event_id": "13104383-d1ca-4de4-a6d6-1176ac5e362b", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260928-framepath-x-review-r41-codex.md", "output_sha256": "", "producer": "audit_append.sh", "result_state": "failed", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8297, "ts": "2026-10-09T01:07:56Z"}
+{"actor": "cx_run", "attempt_id": "657d015f-fdf7-4d36-8ea1-5f21294fe24f", "cli_rc": "0", "event": "committee_family_result", "event_id": "a10a24c3-ae08-4459-ae82-0027ae31d109", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260928-framepath-x-review-r41-composer.md", "output_sha256": "ca3ebee0d603e827128a8631404ea9dce65376e911dc075061094570c681e09c", "producer": "audit_append.sh", "result_state": "success", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8298, "ts": "2026-10-09T01:10:31Z"}
+{"actor": "gate", "blocked_by": [], "closed": ["COMPOSER-R29-P1-01", "COMPOSER-R29-P1-02"], "event": "committee_output", "event_id": "2d2f6af5-d9e0-4c7a-81a4-6fdb275dc9c0", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260928-framepath-x-review-r41-composer.md", "output_sha256": "ca3ebee0d603e827128a8631404ea9dce65376e911dc075061094570c681e09c", "producer": "audit_append.sh", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8299, "task_id": "20260928-FRAMEPATH-X-REVIEW-R41", "ts": "2026-10-09T01:10:32Z", "verdict": "proceed"}
+{"actor": "cx_run", "attempt_id": "ffd02063-c137-4076-9aa8-6dafd0bc70e9", "cli_rc": "0", "event": "committee_family_result", "event_id": "9bdfd153-222d-4cae-8f82-60d5bb6754d4", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260928-framepath-x-review-r41-grok.md", "output_sha256": "8439671e55bc6f2b56fdcf9190776b4cf3341530cc4044186f1a4d787a0a42de", "producer": "audit_append.sh", "result_state": "success", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8300, "ts": "2026-10-09T01:13:52Z"}
+{"actor": "gate", "blocked_by": [], "closed": [], "event": "committee_output", "event_id": "cafd639a-a290-4845-b4c5-1676f16f43e8", "family": "grok", "origin_script": "gate.sh", "output_path": "handoffs/20260928-framepath-x-review-r41-grok.md", "output_sha256": "8439671e55bc6f2b56fdcf9190776b4cf3341530cc4044186f1a4d787a0a42de", "producer": "audit_append.sh", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8301, "task_id": "20260928-FRAMEPATH-X-REVIEW-R41", "ts": "2026-10-09T01:13:53Z", "verdict": "proceed"}
+{"actor": "gate", "attempt_no": "1", "brief_path": "handoffs/20260928-FRAMEPATH-X-REVIEW-R41-BRIEF.md", "brief_sha256": "62eab8ed48f7e4f761b44d43bb97f152c0524eba7efcbcb4b3a7069480ac72d7", "event": "redispatch_token_issued", "event_id": "620e4eb7-5d4e-408e-923e-6520a7560000", "family": "codex", "issue_nonce": "dca3cd49-6bf9-4000-9c39-eff0e61445ef", "origin_script": "gate.sh", "output_path": "handoffs/20260928-framepath-x-review-r41-codex.md", "permit_secret_sha256": "dcd79432567e9dc993b67b1f7ede35334fbbe982d16547d1bfc11ec3b3fcf30d", "prev_output_archive": "none", "prev_output_sha256": "none", "producer": "audit_append.sh", "reason": "codex 首派產出缺（open-debt hook 擋唯讀指令之已知坑）", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8302, "ts": "2026-10-09T01:14:03Z"}
+{"actor": "gate_check", "command_sha256": "d1f28015cab3bc33c651d2c0edc50a623cefcd27f97ee5668a8cd094183e9077", "event": "redispatch_token_consumed", "event_id": "5ed2f476-05b1-49c9-89e1-c692e7c65036", "family": "codex", "issue_nonce": "dca3cd49-6bf9-4000-9c39-eff0e61445ef", "origin_script": "gate_check.sh", "producer": "audit_append.sh", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8303, "ts": "2026-10-09T01:14:06Z"}
+{"actor": "cx_run", "event": "redispatch_token_claimed", "event_id": "3eb14cd6-6c30-4699-8fea-3f64b839f36d", "family": "codex", "issue_nonce": "dca3cd49-6bf9-4000-9c39-eff0e61445ef", "origin_script": "cx_run.sh", "producer": "audit_append.sh", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8304, "ts": "2026-10-09T01:14:07Z"}
+{"actor": "cx_run", "attempt_id": "f81df038-a63e-4803-8ce9-49c182c3144a", "cli_rc": "0", "event": "committee_family_result", "event_id": "eed89bae-0b93-43f2-a04f-c3f4f5fb1467", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260928-framepath-x-review-r41-codex.md", "output_sha256": "fd5ea49f4675fc594abbf229309048598aedd33fdfad50c4198a51101f9df4d5", "producer": "audit_append.sh", "result_state": "success", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8305, "ts": "2026-10-09T01:22:00Z"}
+{"actor": "gate", "blocked_by": ["CODEX-R41-P1-01"], "closed": ["CODEX-R39-P1-01"], "event": "committee_output", "event_id": "7f19ec0d-6693-4792-ac96-f7abe654ed09", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260928-framepath-x-review-r41-codex.md", "output_sha256": "fd5ea49f4675fc594abbf229309048598aedd33fdfad50c4198a51101f9df4d5", "producer": "audit_append.sh", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8306, "task_id": "20260928-FRAMEPATH-X-REVIEW-R41", "ts": "2026-10-09T01:22:01Z", "verdict": "blocked"}
+{"actor": "live_doc_write_guard.sh", "class": "LIVE-SPEC", "event": "docrot2_gate_block", "event_id": "e198d3fc-d845-43cc-bcf6-84cb92a874ab", "origin_script": "live_doc_write_guard.sh", "path": "docs/FRAMEPATH_SPEC.md", "producer": "audit_append.sh", "rule_id": "archaeology", "schema_version": 1, "sequence": 8307, "ts": "2026-10-09T01:29:22Z"}
+{"actor": "debt_clear", "brief_kind": "review", "canonical_count": 1, "category_counts": {"code-contract": 1, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}, "grok": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "c63206ab-ad28-44dd-9279-b4d62e7ea757", "handoff_tree_commit": "85b17e784a54d39d0994b57f1b18cfbc9c1c249c", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "round_open_sequence": 8296, "schema_version": 1, "sequence": 8308, "session_name": "20260928-framepath-x-review-r41", "stamps": [], "task_id": "20260928-FRAMEPATH-X-REVIEW-R41", "ts": "2026-10-09T01:29:28Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "cba41134-78fd-44b6-97bb-07a951f7820c", "lock_sha256": "822b14b1e45459e23887b5b9cca3ca8e919838f5581abb61cf248e9d895b554e", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "b30a0730-c2b5-45a8-9003-5920cc9fab97", "schema_version": 1, "sequence": 8309, "session_id": "20260928-framepath-x-review-r41", "synth_sha256": "b785d951e0b067e745023b7f52323f8e1da5e44c7ee44a97a8fb5e76bade56da", "ts": "2026-10-09T01:29:29Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260928-FRAMEPATH-X-REVIEW-R42", "ts": "2026-10-09T01:30:34Z"}
+=== 2026-10-09 09:30:34 | dispatch ===
+  ts=2026-10-09 09:30:34
+  kind=dispatch
+  intent=FRAMEPATH TODO 審查 r42：r41 修補重驗（C7 回傳表與 registry 群組逐欄指紋）與 v18 全部
+  risk=low
+  facts_asked=CODEX-R41-P1-01 是否閉合、C7 值比對對象是否正確可證偽、v18 其餘更正
+  review_role=adversarial review
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260928-FRAMEPATH-X-REVIEW-R42", "ts": "2026-10-09T01:30:39Z"}
+=== 2026-10-09 09:30:39 | dispatch ===
+  ts=2026-10-09 09:30:39
+  kind=dispatch
+  intent=FRAMEPATH TODO 審查 r42：r41 修補重驗（C7 回傳表與 registry 群組逐欄指紋）與 v18 全部
+  risk=low
+  facts_asked=CODEX-R41-P1-01 是否閉合、C7 值比對對象是否正確可證偽、v18 其餘更正
+  review_role=adversarial review
+  template=n/a: 用 brief
+  adversarial=
+  reconcile=
+  file=
+  template_opened=
+  sections=
+  spec=
+  todo=
+  manifest=
+{"actor": "committee_run", "brief_kind": "review", "brief_path": "handoffs/20260928-FRAMEPATH-X-REVIEW-R42-BRIEF.md", "brief_sha256": "a76a2bdf76d32dc9409a3d195e946b6e396cf4ea93a05c2182bfe80add64527c", "brief_sha256_norm": "a76a2bdf76d32dc9409a3d195e946b6e396cf4ea93a05c2182bfe80add64527c", "event": "committee_round_open", "event_id": "26c92190-e04f-4c5e-91b2-8d38b327d6a6", "expected_outputs": {"codex": "handoffs/20260928-framepath-x-review-r42-codex.md", "composer": "handoffs/20260928-framepath-x-review-r42-composer.md", "grok": "handoffs/20260928-framepath-x-review-r42-grok.md"}, "lock_mode": "discovery", "origin_script": "committee_run.sh", "participants": ["codex", "composer", "grok"], "producer": "audit_append.sh", "quorum_eligible": ["codex", "composer", "grok"], "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "schema_version": 1, "sequence": 8310, "session_name": "20260928-framepath-x-review-r42", "task_id": "20260928-FRAMEPATH-X-REVIEW-R42", "ts": "2026-10-09T01:30:50Z"}
+{"actor": "cx_run", "attempt_id": "9d339cbb-55f2-4675-9e0f-36e7898b3321", "cli_rc": "0", "event": "committee_family_result", "event_id": "710da489-f840-4e6a-a968-8ba73d84f73d", "family": "composer", "origin_script": "cx_run.sh", "output_path": "handoffs/20260928-framepath-x-review-r42-composer.md", "output_sha256": "d8dbf91c22f35fe1c4e6cbd62df08540d0493740002b4b6f422ccad41524d3de", "producer": "audit_append.sh", "result_state": "success", "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "schema_version": 1, "sequence": 8311, "ts": "2026-10-09T01:32:52Z"}
+{"actor": "gate", "blocked_by": [], "closed": ["COMPOSER-R29-P1-01", "COMPOSER-R29-P1-02"], "event": "committee_output", "event_id": "5acfe0ff-fc70-437b-a981-f88020b44c44", "family": "composer", "origin_script": "gate.sh", "output_path": "handoffs/20260928-framepath-x-review-r42-composer.md", "output_sha256": "d8dbf91c22f35fe1c4e6cbd62df08540d0493740002b4b6f422ccad41524d3de", "producer": "audit_append.sh", "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "schema_version": 1, "sequence": 8312, "task_id": "20260928-FRAMEPATH-X-REVIEW-R42", "ts": "2026-10-09T01:32:53Z", "verdict": "proceed"}
+{"actor": "cx_run", "attempt_id": "e035b734-d558-4918-a5c6-971a75340cf4", "cli_rc": "0", "event": "committee_family_result", "event_id": "75752f64-e1b2-42c7-8926-366154a72122", "family": "codex", "origin_script": "cx_run.sh", "output_path": "handoffs/20260928-framepath-x-review-r42-codex.md", "output_sha256": "a297d1653258236248931b0f69811a19e3d3cabcecc212126b042caac11bc5ef", "producer": "audit_append.sh", "result_state": "success", "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "schema_version": 1, "sequence": 8313, "ts": "2026-10-09T01:34:37Z"}
+{"actor": "gate", "blocked_by": [], "closed": ["CODEX-R41-P1-01"], "event": "committee_output", "event_id": "f9119e4d-1b31-45b0-8591-c5e8bf3e3b97", "family": "codex", "origin_script": "gate.sh", "output_path": "handoffs/20260928-framepath-x-review-r42-codex.md", "output_sha256": "a297d1653258236248931b0f69811a19e3d3cabcecc212126b042caac11bc5ef", "producer": "audit_append.sh", "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "schema_version": 1, "sequence": 8314, "task_id": "20260928-FRAMEPATH-X-REVIEW-R42", "ts": "2026-10-09T01:34:38Z", "verdict": "proceed"}
+{"actor": "cx_run", "attempt_id": "f019a701-bf2f-445b-b7bf-9e923b76484a", "cli_rc": "0", "event": "committee_family_result", "event_id": "20ffe4e6-a95c-45d3-8581-20d615224003", "family": "grok", "origin_script": "cx_run.sh", "output_path": "handoffs/20260928-framepath-x-review-r42-grok.md", "output_sha256": "37f8c20b6e3f20384ef4f65dbcd6735698b9ce28d6c5c4da4f65ac3b15690619", "producer": "audit_append.sh", "result_state": "success", "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "schema_version": 1, "sequence": 8315, "ts": "2026-10-09T01:35:17Z"}
+{"actor": "gate", "blocked_by": [], "closed": [], "event": "committee_output", "event_id": "481a255a-054c-4fe0-b205-96bb90caff96", "family": "grok", "origin_script": "gate.sh", "output_path": "handoffs/20260928-framepath-x-review-r42-grok.md", "output_sha256": "37f8c20b6e3f20384ef4f65dbcd6735698b9ce28d6c5c4da4f65ac3b15690619", "producer": "audit_append.sh", "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "schema_version": 1, "sequence": 8316, "task_id": "20260928-FRAMEPATH-X-REVIEW-R42", "ts": "2026-10-09T01:35:18Z", "verdict": "proceed"}
+{"actor": "debt_clear", "brief_kind": "review", "canonical_count": 0, "category_counts": {"code-contract": 0, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}, "grok": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "0b873bbd-6b3d-4e51-aeab-66f1a9fac600", "handoff_tree_commit": "653806f2ef0a3f3d5355b44eaeb0681271094d51", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "round_open_sequence": 8310, "schema_version": 1, "sequence": 8317, "session_name": "20260928-framepath-x-review-r42", "stamps": [], "task_id": "20260928-FRAMEPATH-X-REVIEW-R42", "ts": "2026-10-09T01:35:48Z"}
+{"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "4a99a7fb-e25a-4f74-882e-b2502ef63f31", "lock_sha256": "f17eff2a6c8d201fed6b8955427497288d3186ef6536b2ddb7a98b3812334d78", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "16dfbd1b-db2e-4752-9db7-9f5e62aed35a", "schema_version": 1, "sequence": 8318, "session_id": "20260928-framepath-x-review-r42", "synth_sha256": "6fe5e89427d01b87850299c3a520f3c40dcf149ea9eb75a358f5f2395e24738d", "ts": "2026-10-09T01:35:48Z"}
