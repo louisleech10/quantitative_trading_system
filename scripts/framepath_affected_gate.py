@@ -366,7 +366,10 @@ def ffact_unproven(node: ast.AST) -> bool:
                 and len(n.args) > 1 and _is_keyconst(n.args[0])):
             proven += _is_truthy(n.args[1])
         if isinstance(n, ast.Dict):
-            proven += sum(1 for k, v in zip(n.keys, n.values) if _is_keyconst(k) and _is_truthy(v))
+            # 審查 r53：其後有 `**展開`（keys 中之 None）者可覆寫該鍵 ⇒ 不得計為已證真值
+            keys = list(n.keys)
+            proven += sum(1 for i, (k, v) in enumerate(zip(keys, n.values))
+                          if _is_keyconst(k) and _is_truthy(v) and None not in keys[i + 1:])
         if (isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Subscript)
                 and _is_keyconst(_slice(n.targets[0]))):
             proven += _is_truthy(n.value)
@@ -434,6 +437,19 @@ def module_taint(path: str, source_of, symbols: frozenset, _cache: Optional[dict
     graph = cache.setdefault(("__taint_graph__", ffact, tuple(substrings), symbols), _TaintGraph(
         source_of, symbols, ffact, tuple(substrings)))
     return graph.reasons_of(path)
+
+
+def _tainted_names(reasons: Mapping[str, set]) -> Dict[str, str]:
+    """被 taint 定義之可引用名 → 限定名：末段名，以及方法所屬之類別名（審查 r53：經匯入類別再呼叫其方法者亦須傳遞）。"""
+    out: Dict[str, str] = {}
+    for q, r in reasons.items():
+        if not r:
+            continue
+        parts = q.split(".")
+        out.setdefault(parts[-1], q)
+        if len(parts) > 1:
+            out.setdefault(parts[0], q)
+    return out
 
 
 class _TaintGraph:
@@ -504,14 +520,14 @@ class _TaintGraph:
             for path in paths:
                 mod = self.mods[path]
                 reasons = self.reasons[path]
-                live = {q.split(".")[-1]: q for q, r in reasons.items() if r}
+                live = _tainted_names(reasons)
                 for q, refs in mod["refs"].items():
                     add = {f"name:{n}" for n in refs & mod["names"]}
                     add |= {f"call:{path}:{live[b]}" for b in refs & set(live) if live[b] != q}
                     for local, (mp, name) in mod["ext"].items():
                         if local not in refs:
                             continue
-                        bad = {k.split(".")[-1] for k, r in self.reasons.get(mp, {}).items() if r}
+                        bad = set(_tainted_names(self.reasons.get(mp, {})))
                         hits = ({name} & bad) if name else (refs & bad)
                         add |= {f"call:{mp}:{h}" for h in hits}
                     if not add <= reasons[q]:
@@ -550,7 +566,7 @@ def file_scan(test_file: str, source_of, symbols: frozenset, cache: Optional[dic
     cache = {} if cache is None else cache
     taint = {q: set(r) for q, r in module_taint(test_file, source_of, symbols, cache).items()}
     for cf in _conftests(test_file, source_of):
-        bad = {k.split(".")[-1] for k, r in module_taint(cf, source_of, symbols, cache).items() if r}
+        bad = set(_tainted_names(module_taint(cf, source_of, symbols, cache)))
         for q in defs:
             hits = refs[q] & bad
             if hits:
@@ -574,8 +590,8 @@ def is_heavy(test_file: str, source_of, cache: Optional[dict] = None) -> bool:
     if any(module_taint(test_file, source_of, HEAVY_NAMES, cache, ffact=False, substrings=HEAVY_SUBSTRINGS).values()):
         return True
     for cf in _conftests(test_file, source_of):
-        bad = {k.split(".")[-1] for k, r in module_taint(cf, source_of, HEAVY_NAMES, cache, ffact=False,
-                                                         substrings=HEAVY_SUBSTRINGS).items() if r}
+        bad = set(_tainted_names(module_taint(cf, source_of, HEAVY_NAMES, cache, ffact=False,
+                                              substrings=HEAVY_SUBSTRINGS)))
         if module_refs & bad:
             return True
     return False
@@ -719,7 +735,9 @@ class _CgsaFold(ast.NodeTransformer):
 
 
 def _truthy_fold(e: ast.AST) -> ast.AST:
-    """只看真假值之位置（if／while／三元／assert 條件、not 與其內之 and／or 運算元）：任一位置之布林常數皆可折疊。"""
+    """只看真假值之位置（if／while／三元／assert 條件、not 與其內之 and／or 運算元）：非吸收之布林常數任一位置可去除；
+    吸收常數（and 之 False、or 之 True）只在其前無其他運算元時整式化為常數——其前之運算元仍會被求值（可能有副作用，
+    審查 r53），故保留為 `前段 and/or 常數`，其後運算元不會被求值而去除。"""
     if isinstance(e, ast.UnaryOp) and isinstance(e.op, ast.Not):
         inner = _truthy_fold(e.operand)
         return ast.Constant(not inner.value) if _const_bool(inner) else ast.UnaryOp(op=e.op, operand=inner)
@@ -730,7 +748,9 @@ def _truthy_fold(e: ast.AST) -> ast.AST:
     for v in (_truthy_fold(x) for x in e.values):
         if _const_bool(v):
             if v.value is absorbing:
-                return ast.Constant(absorbing)
+                if not vals:
+                    return ast.Constant(absorbing)
+                return ast.BoolOp(op=e.op, values=[*vals, ast.Constant(absorbing)])
             continue
         vals.append(v)
     if not vals:
@@ -937,9 +957,10 @@ def _row_nodeids(rows: Sequence[str], prefix: str) -> List[str]:
 ADMISSION_BUDGET_SECONDS = 7200
 
 
-def plan_inputs_digest(repo: Path, anchor: str, phase: int) -> str:
-    """挑選之輸入指紋：錨點、phase、HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、manifest、處置表、本執行器原始碼。
-    `--admit` 須等於此值方得於估時未知或逾預算時執行（批准綁定確切輸入）。"""
+def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterable[Path] = ()) -> str:
+    """挑選之輸入指紋：錨點、phase、HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、manifest、處置表、本執行器原始碼、
+    admission 估時來源（各目錄下 junit xml 之路徑與內容，審查 r53）。`--admit` 須等於此值方得於估時未知或逾預算時執行
+    （批准綁定確切輸入）。"""
     h = hashlib.sha256()
     no_cache = ":(exclude,glob)**/__pycache__/**"  # 已追蹤之 numba 快取於任何測試執行即改寫，非挑選輸入
     own = ":(exclude,glob)handoffs/run_receipts/framepath-b*-affected*"  # 本執行器自身之收據輸出，非挑選輸入
@@ -956,6 +977,11 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int) -> str:
     for rel in (MANIFEST_REL, DISPOSITION_REL, "scripts/framepath_affected_gate.py"):
         h.update((repo / rel).read_bytes() if (repo / rel).is_file() else b"")
         h.update(b"\0")
+    for d in timing_dirs:
+        d = Path(d).resolve()
+        h.update(b"timings\0" + str(d).encode("utf-8", "replace") + b"\0")
+        for x in sorted(d.rglob("*.xml")) if d.is_dir() else []:
+            h.update(str(x.relative_to(d)).encode("utf-8", "replace") + b"\0" + hashlib.sha256(x.read_bytes()).digest())
     return h.hexdigest()
 
 
@@ -1002,7 +1028,8 @@ def load_times(repo: Path, dirs: Iterable[Path]) -> Dict[str, float]:
     return times
 
 
-def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[str, str]) -> Dict[str, object]:
+def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[str, str],
+         timing_dirs: Sequence[Path] = ()) -> Dict[str, object]:
     """D8 挑選（不執行測試本體；耗時主要為逐檔 collect）：collect B／C 檔、靜態掃描錨點與工作樹兩版之測試檔並取聯集。
     須於本批完整改動（生產碼＋測試處置）套上後執行；任一檔 collect 失敗 ⇒ 拒跑。"""
     b_group, c_group = manifest_groups(manifest, phase)
@@ -1058,7 +1085,7 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
     return {
         "groups": {"B": b_group, "C": c_group}, "collected": collected, "selected": selected, "skipped": skipped,
         "s2_symbols": sorted(symbols), "production_files": prod_files, "align_triggered": align_triggered,
-        "residual_defs": residual_specs, "inputs_digest": plan_inputs_digest(repo, anchor, phase),
+        "residual_defs": residual_specs, "inputs_digest": plan_inputs_digest(repo, anchor, phase, timing_dirs),
         "extra_files": extra,
         "light_files": sorted(f for f, s in scans.items() if not s["heavy"] and f not in set(heavy_pinned)),
         "invariance_baseline_sha256": hashlib.sha256(baseline.read_bytes()).hexdigest() if baseline.is_file() else None,
@@ -1105,9 +1132,10 @@ def main(argv: Sequence[str]) -> int:
     anchor = resolve_anchor()
     env = dict(os.environ, FRAMEPATH_PHASE=str(args.phase), PYTHONPATH=str(REPO))
     manifest = json.loads((REPO / MANIFEST_REL).read_text(encoding="utf-8"))
-    sel = plan(REPO, anchor, args.phase, manifest, env)
+    timing_dirs = [out, *[Path(t) for t in args.timings]]
+    sel = plan(REPO, anchor, args.phase, manifest, env, timing_dirs)
     a_ids = [n for f in A_GROUP_BY_PHASE[args.phase] for n in collect(f, REPO, env)]
-    times = load_times(REPO, [out, *[Path(t) for t in args.timings]])
+    times = load_times(REPO, timing_dirs)
     adm = admission([*a_ids, *sel["selected"]], times)
     if args.plan:
         plan_path = REPO / f"handoffs/run_receipts/framepath-b{batch}-affected-plan.json"

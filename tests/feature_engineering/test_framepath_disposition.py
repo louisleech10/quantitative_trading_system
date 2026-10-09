@@ -1993,7 +1993,10 @@ def test_mutation_affected_gate_r52_value_semantics_and_bindings(tmp_path):
         nf(fn("def f(self, x):\n    if x:\n        return 1\n    return 0\n"))
     assert nf(fn("def f(self, x):\n    y = self._cgsa_enabled() and x\n    return y\n")) == \
         nf(fn("def f(self, x):\n    y = x\n    return y\n"))
-    assert nf(fn("def f(self, x):\n    return not (x and not self._cgsa_enabled())\n")) == \
+    assert nf(fn("def f(self, x):\n    return not (not self._cgsa_enabled() and x)\n")) == \
+        nf(fn("def f(self, x):\n    return True\n"))
+    # 審查 r53：吸收常數之前有運算元（x 仍被求值）⇒ 不得化為常數
+    assert nf(fn("def f(self, x):\n    return not (x and not self._cgsa_enabled())\n")) != \
         nf(fn("def f(self, x):\n    return True\n"))
 
     old = "LIMIT = 1\n\nclass C:\n    MODE = 'old'\n\n    def value(self):\n        return self.MODE\n\n" \
@@ -2069,6 +2072,39 @@ def test_mutation_affected_gate_digest_and_timing_hardening(tmp_path):
     assert g.junit_times(xml, REPO) == {}
     adm = g.admission(["n"], {"n": float("nan")}, 10)
     assert adm["status"] == "unknown" and adm["unknown"] == ["n"]
+
+
+def test_mutation_affected_gate_r53_hardening(tmp_path):
+    """審查 r53：①條件位置之吸收常數不吞掉其前運算元之求值（`if x() and False` ≠ `if False`）②dict 中其後有
+    `**展開` 之 FFACT 真值不算已證 ③經匯入類別再呼叫其方法之 taint 須傳遞（含別名匯入鏈）④--timings 估時來源綁入
+    inputs_digest。mutation：任一修補撤回 ⇒ 對應斷言紅。"""
+    g = _affected_gate()
+
+    def fn(src):
+        return ast.parse(src).body[0]
+
+    nf = g.cgsa_normal_form
+    assert nf(fn("def f(x):\n    if x() and False:\n        return 1\n    return 0\n")) != \
+        nf(fn("def f(x):\n    if False:\n        return 1\n    return 0\n"))
+    assert nf(fn("def f(x):\n    if False and x():\n        return 1\n    return 0\n")) == \
+        nf(fn("def f(x):\n    return 0\n"))
+
+    assert g.ffact_unproven(ast.parse('cfg = {"FFACT_USE_CGSA": "1", **extra}'))
+    assert not g.ffact_unproven(ast.parse('cfg = {**extra, "FFACT_USE_CGSA": "1"}'))
+
+    src = {"tests/h.py": "class C:\n    def g(self):\n        return Deleted\n",
+           "tests/a.py": "from tests.h import C\n\ndef helper():\n    return C().g()\n",
+           "tests/test_x.py": "from tests import a as aa\n\ndef test_x():\n    aa.helper()\n"}.get
+    assert g.module_taint("tests/test_x.py", src, frozenset({"Deleted"}))["test_x"]
+
+    repo, anchor = _git_tmp_repo(tmp_path, {"README": "x\n"})
+    tdir = tmp_path / "timings"
+    tdir.mkdir()
+    xml = tdir / "a.xml"
+    xml.write_text('<testsuites><testcase classname="tests.t" name="a" time="1"/></testsuites>', encoding="utf-8")
+    d1 = g.plan_inputs_digest(repo, anchor, 1, [tdir])
+    xml.write_text('<testsuites><testcase classname="tests.t" name="a" time="2"/></testsuites>', encoding="utf-8")
+    assert g.plan_inputs_digest(repo, anchor, 1, [tdir]) != d1
 
 
 def test_affected_gate_def_probe_records_calls(tmp_path):
