@@ -1,7 +1,7 @@
 # FRAMEPATH — 刪除非 CGSA 舊引擎（frame）與舊特徵 h5 讀寫鏈 — SPEC
 
 > 來源 PLAN/診斷：`handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md`（去留查證）、`handoffs/reconcile/20260928-framepath-x-consult-r2/synth.md`（偵察）　|　日期：2026-10-08　|　對應 TODO：docs/manifests/FRAMEPATH.json（SPEC 凍結後生成）
-> 版本：v18（v18＝實作期 b1 實作 Task 1.1 凍結腳本時實測之更正 C1–C3：C9 改凍結具名拒絕、⓪ 核定錨點改最晚一筆許可、凍結驗收測試之自身缺陷；見文末 §M v18）。前版 v17（v17＝使用者 2026-10-08 擴大刪除面裁定後之修訂 B1–B5〔Task 2.5–2.8、母體字面〕，依偵察 r3 handoffs/reconcile/20260928-framepath-x-consult-r3/synth.md，使用者核可擴大清單；見文末 §M v17；TODO 審查 r33–r40 收斂、使用者 2026-10-09 白話逐條審閱後核可 v17 全部〔含 Chunk_Bars 同類併入〕，審閱文件 白話說明/Archived/FRAMEPATH規格v17修正審閱.md）。前版 v16（v15 經審查 r1–r15 收斂、使用者 2026-10-08 核可；v16＝TODO 起草時以暫存工作樹試作刪除與逐檔分析實證後之修訂 A1–A15，見文末 §M；TODO 審查 r16–r32 收斂、使用者 2026-10-08 白話逐條審閱後核可 A1–A14 與 A15〔白話說明/Archived/FRAMEPATH規格v16修正審閱.md〕；基準 HEAD 6e07e0ad）
+> 版本：v18（v18＝實作期 b1 實作 Task 1.1 凍結腳本時實測之更正 C1–C3：C9 改凍結具名拒絕、⓪ 核定錨點改最晚一筆許可、凍結驗收測試之自身缺陷；見文末 §M v18；TODO 審查 r41–r42 收斂、使用者 2026-10-09 白話逐條審閱後核可 v18 全部〔C1–C5〕，審閱文件 白話說明/Archived/FRAMEPATH規格v18修正審閱.md）。前版 v17（v17＝使用者 2026-10-08 擴大刪除面裁定後之修訂 B1–B5〔Task 2.5–2.8、母體字面〕，依偵察 r3 handoffs/reconcile/20260928-framepath-x-consult-r3/synth.md，使用者核可擴大清單；見文末 §M v17；TODO 審查 r33–r40 收斂、使用者 2026-10-09 白話逐條審閱後核可 v17 全部〔含 Chunk_Bars 同類併入〕，審閱文件 白話說明/Archived/FRAMEPATH規格v17修正審閱.md）。前版 v16（v15 經審查 r1–r15 收斂、使用者 2026-10-08 核可；v16＝TODO 起草時以暫存工作樹試作刪除與逐檔分析實證後之修訂 A1–A15，見文末 §M；TODO 審查 r16–r32 收斂、使用者 2026-10-08 白話逐條審閱後核可 A1–A14 與 A15〔白話說明/Archived/FRAMEPATH規格v16修正審閱.md〕；基準 HEAD 6e07e0ad）
 
 ## §RISK 風險分級（gate 讀此決定要求強度）
 - **大小**：大（全票排序第 5 步，`docs/TICKET_ORDER.md`）。
