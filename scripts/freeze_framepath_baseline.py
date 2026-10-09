@@ -53,8 +53,10 @@ BASELINE_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
 COMPARE_DOMAIN_REL = "tests/_golden/framepath/compare_domain.json"
 HEAD_COMMIT_PREFIX = "6e07e0ad"
 # SPEC v19 D1：C10＝C2＋L4 lag 開＋L5 橫截面開（他格之 stat_payload 皆關 lag 與橫截面 ⇒ L4／L5 原無覆蓋）
-CELLS = ("C1", "C2", "C3", "C4-streaming", "C4-hybrid", "C5", "C6", "C7", "C8", "C9", "C10")
+# SPEC v21 D9：C11＝C1 但不填起始日（逐欄校準路徑；受影響測試閘之殘差探針實測 C1–C10 皆不經此路徑）
+CELLS = ("C1", "C2", "C3", "C4-streaming", "C4-hybrid", "C5", "C6", "C7", "C8", "C9", "C10", "C11")
 LAYER_COVERAGE_CELLS = ("C10",)
+NO_START_CELLS = ("C11",)
 # SPEC v18（實作期實測）：HEAD 於 allow_partial 下缺次週期 K 線 ⇒ 生成前具名拒絕（平穩化開：校準前置關卡
 # CalibrationError；關：_resolve_public_window 之 L0 ValueError），非 partial ⇒ C9 凍結拒絕之型別與訊息
 REFUSED_CELLS = ("C9",)
@@ -230,6 +232,7 @@ def cell_settings(cell: str) -> Dict[str, Any]:
         "persist": cell != "C7",
         "repeat": 2 if cell == "C5" else 1,
         "drop_secondary": training[-1] if cell == "C9" else None,
+        "start_date": None if cell in NO_START_CELLS else fh.WINDOW[0],
     }
 
 
@@ -261,13 +264,13 @@ def generate_cell(cell: str, work_root: Path, *, force_regenerate_second: bool =
         force = settings["repeat"] == 1
         if cell in REFUSED_CELLS:
             try:
-                fh.run_stat(work_dir, settings["payload"], persist=settings["persist"], force_regenerate=force,
+                fh.run_stat(work_dir, settings["payload"], persist=settings["persist"], start_date=settings["start_date"], force_regenerate=force,
                             kline_dir=kline_dir)
             except Exception as exc:  # noqa: BLE001 — 拒絕之型別與訊息即本格指紋（改後須相同）
                 return {"fingerprint": _refused_fingerprint(settings, work_dir / "features", exc),
                         "receipt": receipt}
             raise FramepathBaselineError(f"{cell}：缺次週期之生成未被拒絕（HEAD 實測為具名拒絕）")
-        root, _factory, result = fh.run_stat(work_dir, settings["payload"], persist=settings["persist"],
+        root, _factory, result = fh.run_stat(work_dir, settings["payload"], persist=settings["persist"], start_date=settings["start_date"],
                                              force_regenerate=force, kline_dir=kline_dir)
         if settings["repeat"] == 2:
             calls: List[Tuple[str, int]] = []
@@ -279,7 +282,7 @@ def generate_cell(cell: str, work_root: Path, *, force_regenerate_second: bool =
                 return registry
 
             mp.setattr(ColumnGroupRegistry, "resume_from_manifest", classmethod(observed))
-            root, _factory, result = fh.run_stat(work_dir, settings["payload"], persist=settings["persist"],
+            root, _factory, result = fh.run_stat(work_dir, settings["payload"], persist=settings["persist"], start_date=settings["start_date"],
                                                  force_regenerate=force_regenerate_second, kline_dir=kline_dir)
             mine = [c for c in calls if str(work_dir) in str(Path(c[0]).resolve())]
             receipt["resume_entered"] = bool(mine)
@@ -538,7 +541,16 @@ def run_cell(cell: str, work_root: Path) -> Dict[str, Any]:
 
 
 def _child_main(cell: str, work_dir: str, out_json: str) -> int:
-    """子行程：跑一格、原子寫結果檔，之後阻塞讀 stdin 至 EOF（父行程停止取樣後關閉）。"""
+    """子行程：跑一格、原子寫結果檔，之後阻塞讀 stdin 至 EOF（父行程停止取樣後關閉）。受影響測試閘於 A 組設
+    `FRAMEPATH_DEF_PROBE_DIR` 時，先裝 CGSA 殘差定義之執行探針（SPEC v21 D8；只記呼叫、不改值）。"""
+    if os.environ.get("FRAMEPATH_DEF_PROBE_DIR", "").strip():
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("framepath_affected_gate",
+                                                      REPO / "scripts" / "framepath_affected_gate.py")
+        gate = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(gate)
+        gate.install_def_probe()
     out = generate_cell(cell, Path(work_dir))
     tmp = Path(out_json + ".tmp")
     tmp.write_text(json.dumps(out, ensure_ascii=False, sort_keys=True, default=str), encoding="utf-8")

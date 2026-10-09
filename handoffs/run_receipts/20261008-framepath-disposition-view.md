@@ -1,6 +1,6 @@
 # FRAMEPATH 處置表審查視圖（衍生物，權威＝JSON）
 
-- 來源：`tests/_golden/framepath/test_disposition.json` sha256 `f0447564128611399ef1778e72b0a5f20a9b42895261731ec563fe2ceee8add8`
+- 來源：`tests/_golden/framepath/test_disposition.json` sha256 `0430e1bb21fd20c836e74e5ba922169030bed9d9f491e7b2dfb21c7b6d23ca20`
 - HEAD：`6e07e0ad952d3cccbe3fd2bef39b5ff49dd13581`；母體 249 檔；collect 檔 163；nodeid 2245（keep 2152、delete 88、rename 5）；操作 203
 - 每列附 HEAD 摘錄；rewrite 附改寫後全文、須保留與刪除之 HEAD 斷言；replace-file 附新檔全文。
 - 本檔逐字轉錄處置表之 frame 依據（描述 HEAD 碼態之測試綠紅），非營運宣稱：VERIFY-EXEMPT:doc-example:framepath-disposition-view
@@ -12913,6 +12913,7 @@ import os
 - `tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/manifest.json`（phase 1，Task 2.5）
 - `tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/columns.json.gz`（phase 1，Task 2.5）
 - `tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/g1.parquet`（phase 1，Task 2.5）
+- `scripts/framepath_affected_gate.py`（phase 1，Task 1.5）
 
 ## fact_key_rows
 

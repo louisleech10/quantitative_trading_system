@@ -1810,6 +1810,13 @@ def test_affected_gate_heavy_is_transitive():
     assert g.is_heavy("tests/test_d8.py", _d8_sources(test_src=heavy_src))
     assert g.is_heavy("tests/test_d8.py", _d8_sources(test_src="P = 'data_cache/feature_klines/kline_cache.h5'\n"))
     assert not g.is_heavy("tests/test_d8.py", _d8_sources(test_src="def test_y():\n    assert True\n"))
+    # 審查 r51 GROK-R51-P1-01：helper 內只有 kline 路徑字面（函式內或模組層名稱），測試只呼叫該 helper ⇒ 重型
+    helper = "def kline_frame():\n    return open('data_cache/feature_klines/kline_cache.h5')\n"
+    caller = "from tests import d8help as h\n\ndef test_z():\n    h.kline_frame()\n"
+    assert g.is_heavy("tests/test_d8.py", _d8_sources(test_src=caller, helper_src=helper))
+    helper2 = "KLINE = 'data_cache/feature_klines/kline_cache.h5'\n\ndef load():\n    return KLINE\n"
+    caller2 = "from tests import d8help as h\n\ndef test_z():\n    h.load()\n"
+    assert g.is_heavy("tests/test_d8.py", _d8_sources(test_src=caller2, helper_src=helper2))
 
 
 def test_affected_gate_s1_targets_locators():
@@ -1867,28 +1874,152 @@ def test_mutation_affected_gate_select_partition_and_align():
             assert skip["tests/heavy.py::test_v6"] == "align_static_proof"
 
 
-def test_affected_gate_production_changes_symbols(tmp_path):
-    """S2 符號表由錨點→工作樹之生產碼 AST 差異機械導出：被刪定義 ∪ 本體改變之私有定義；公開入口改變不入表；
-    改動對齊檔即觸發。以暫存 git 實跑。"""
-    g = _affected_gate()
+_CGSA_OLD = '''
+def gone():
+    return 1
+
+def _priv():
+    return 1
+
+def public():
+    return 1
+
+class K:
+    def _meth(self):
+        return 1
+
+    def dispatch(self):
+        use_cgsa = self._cgsa_enabled() and getattr(self, "_cgsa_registry", None) is not None
+        if use_cgsa:
+            return self._cgsa_path()
+        return self._legacy_path()
+
+    def gated(self, mode):
+        if self._cgsa_enabled() and self._cgsa_registry is not None and mode == "s":
+            return 1
+        if not self._cgsa_enabled():
+            raise RuntimeError("off")
+        return 2
+'''
+_CGSA_NEW = '''
+def _priv():
+    return 2
+
+def public():
+    return 2
+
+class K:
+    def _meth(self):
+        return 2
+
+    def dispatch(self):
+        """docstring 不影響。"""
+        self._require_cgsa_registry("dispatch")
+        return self._cgsa_path()
+
+    def gated(self, mode):
+        if mode == "s":
+            self._require_cgsa_registry("gated")
+            return 1
+        return 2
+'''
+
+
+def _git_tmp_repo(tmp_path, files):
     repo = tmp_path / "r"
-    (repo / "momentum").mkdir(parents=True)
-    src = repo / "momentum" / "m.py"
-    src.write_text("def gone():\n    return 1\n\ndef _priv():\n    return 1\n\ndef public():\n    return 1\n\n"
-                   "class K:\n    def _meth(self):\n        return 1\n", encoding="utf-8")
 
     def git(*a):
-        return subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True, text=True).stdout
+        return subprocess.run(["git", "-C", str(repo), "-c", "user.email=t@t", "-c", "user.name=t", *a], check=True,
+                              capture_output=True, text=True).stdout
 
+    for rel, text in files.items():
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text, encoding="utf-8")
     git("init", "-q")
-    git("-c", "user.email=t@t", "-c", "user.name=t", "add", ".")
-    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "a")
-    anchor = git("rev-parse", "HEAD").strip()
-    src.write_text("def _priv():\n    return 2\n\ndef public():\n    return 2\n\n"
-                   "class K:\n    def _meth(self):\n        return 2\n", encoding="utf-8")
-    deleted, changed, files = g.production_changes(repo, anchor)
-    assert deleted == {"gone"} and changed == {"_priv", "public", "_meth"} and files == ["momentum/m.py"]
-    assert g.s2_symbols(deleted, changed) == frozenset({"gone", "_priv", "_meth"})
+    git("add", ".")
+    git("commit", "-qm", "a")
+    return repo, git("rev-parse", "HEAD").strip()
+
+
+def test_mutation_affected_gate_cgsa_equivalence_and_dangling(tmp_path):
+    """審查 r51 CODEX-R51-P1-01：S2 符號表＝被刪定義 ∪ CGSA 殘差（CGSA 開啟且 registry 已建立之假設下正規形仍不同者，
+    不分公開私有）；只拿掉 `_cgsa_enabled()` 判斷、改加 registry 守衛之改動（dispatch、gated）判等價不入表。被刪且已無
+    定義之名稱仍被引用 ⇒ GateError。mutation：正規化失效（等價判斷恆假）⇒ dispatch／gated 入殘差（紅）。"""
+    g = _affected_gate()
+    repo, anchor = _git_tmp_repo(tmp_path, {"momentum/m.py": _CGSA_OLD})
+    (repo / "momentum" / "m.py").write_text(_CGSA_NEW, encoding="utf-8")
+    deleted, residual, files, specs = g.production_changes(repo, anchor)
+    assert deleted == {"gone"} and files == ["momentum/m.py"]
+    assert residual == {"_priv", "public", "_meth"}
+    assert specs == ["momentum.m:K._meth", "momentum.m:_priv", "momentum.m:public"]
+    assert g.s2_symbols(deleted, residual) == frozenset({"gone", "_priv", "public", "_meth"})
+    old_k = {n.name: n for n in ast.parse(_CGSA_OLD).body if isinstance(n, ast.ClassDef)}["K"]
+    new_k = {n.name: n for n in ast.parse(_CGSA_NEW).body if isinstance(n, ast.ClassDef)}["K"]
+    for name in ("dispatch", "gated"):
+        o = next(m for m in old_k.body if getattr(m, "name", "") == name)
+        n = next(m for m in new_k.body if getattr(m, "name", "") == name)
+        assert ast.dump(o) != ast.dump(n) and g.cgsa_normal_form(o) == g.cgsa_normal_form(n)
+    (repo / "momentum" / "user.py").write_text("def use():\n    return gone()\n", encoding="utf-8")
+    with pytest.raises(g.GateError):
+        g.production_changes(repo, anchor)
+
+
+def test_affected_gate_cgsa_equivalence_rejects_real_change():
+    """CGSA 開啟下行為確有不同者不得判等價：保留分支之值改變、白名單改拒絕、條件不涉 CGSA 之刪除。"""
+    g = _affected_gate()
+
+    def fn(src):
+        return ast.parse(src).body[0]
+
+    old = "def f(self, c):\n    if self._cgsa_enabled() and c in SKIP:\n        return None\n    return c\n"
+    new = "def f(self, c):\n    if c not in OK:\n        raise ValueError(c)\n    return c\n"
+    assert g.cgsa_normal_form(fn(old)) != g.cgsa_normal_form(fn(new))
+    old2 = "def f(self):\n    if self._cgsa_enabled():\n        return 1\n    return 0\n"
+    assert g.cgsa_normal_form(fn(old2)) == g.cgsa_normal_form(fn("def f(self):\n    return 1\n"))
+    assert g.cgsa_normal_form(fn(old2)) != g.cgsa_normal_form(fn("def f(self):\n    return 0\n"))
+
+
+def test_affected_gate_def_probe_records_calls(tmp_path):
+    """殘差定義執行探針：環境變數已設之行程內包裝模組函式、類別方法、staticmethod，呼叫後結束寫 `<pid>.json`；回傳值
+    不變。未呼叫者不記。以子行程實跑。"""
+    mod = tmp_path / "probe_mod.py"
+    mod.write_text("def f(x):\n    return x + 1\n\nclass C:\n    def m(self):\n        return 2\n\n"
+                   "    @staticmethod\n    def s():\n        return 3\n\n    def unused(self):\n        return 4\n",
+                   encoding="utf-8")
+    driver = tmp_path / "driver.py"
+    driver.write_text(
+        "import importlib.util, sys\n"
+        f"spec = importlib.util.spec_from_file_location('g', {str(REPO / 'scripts/framepath_affected_gate.py')!r})\n"
+        "g = importlib.util.module_from_spec(spec); spec.loader.exec_module(g)\n"
+        "g.install_def_probe(); g.install_def_probe()\n"
+        "import probe_mod\n"
+        "assert probe_mod.f(1) == 2 and probe_mod.C().m() == 2 and probe_mod.C.s() == 3 and probe_mod.C().s() == 3\n",
+        encoding="utf-8")
+    out = tmp_path / "probe"
+    env = dict(os.environ, PYTHONPATH=f"{tmp_path}{os.pathsep}{REPO}", FRAMEPATH_DEF_PROBE_DIR=str(out),
+               FRAMEPATH_DEF_PROBE_DEFS="probe_mod:f,probe_mod:C.m,probe_mod:C.s,probe_mod:C.unused")
+    proc = subprocess.run([sys.executable, str(driver)], env=env, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr
+    hits = _affected_gate().probe_hits(out)
+    assert hits == {"probe_mod:f", "probe_mod:C.m", "probe_mod:C.s"}
+
+
+def test_mutation_affected_gate_admission_and_residual_verdict(tmp_path):
+    """admission：全部已知且 ≤ 預算＝within、有未知＝unknown、已知逾預算＝over；junit 時間依 repo 內 .py 還原 nodeid。
+    verdict：CGSA 殘差定義未被 A 組執行 ⇒ 不通過。mutation：verdict 忽略殘差未執行 ⇒ 紅。"""
+    g = _affected_gate()
+    assert g.admission(["a", "b"], {"a": 1.0, "b": 2.0}, 10)["status"] == "within"
+    assert g.admission(["a", "b"], {"a": 1.0}, 10) == {"budget_seconds": 10, "known_seconds": 1.0, "unknown": ["b"],
+                                                      "status": "unknown"}
+    assert g.admission(["a", "b"], {"a": 11.0}, 10)["status"] == "over"
+    xml = ('<testsuites><testsuite><testcase classname="tests.test_cgsa_pipeline" name="test_x" time="1.5"/>'
+           '<testcase classname="tests.feature_engineering.test_framepath_disposition.K" name="t[1]" time="2"/>'
+           '</testsuite></testsuites>')
+    assert g.junit_times(xml, REPO) == {"tests/test_cgsa_pipeline.py::test_x": 1.5,
+                                        "tests/feature_engineering/test_framepath_disposition.py::K::t[1]": 2.0}
+    ok = {"missing": [], "unexpected": [], "caused": []}
+    assert g.verdict(ok, [], []) and g.verdict(ok, [], [], [])
+    assert not g.verdict(ok, [], [], ["momentum.m:K._meth"])
 
 
 def test_git_path_output_not_escaped():

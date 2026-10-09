@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import copy
 import hashlib
 import json
 import os
@@ -146,9 +147,66 @@ def anchor_usable(rc: int, res: Mapping[str, Mapping[str, str]], requested: Sequ
     return {n: dict(res[n]) for n in requested}
 
 
-def verdict(result: Mapping[str, Sequence[str]], a_failures: Sequence[str], incomplete_files: Sequence[str]) -> bool:
-    """通過＝A 組全綠、無未完成檔、無缺、無多出、本批造成＝0（純函式）。"""
-    return not (a_failures or incomplete_files or result["missing"] or result["unexpected"] or result["caused"])
+def verdict(result: Mapping[str, Sequence[str]], a_failures: Sequence[str], incomplete_files: Sequence[str],
+            residual_unexecuted: Sequence[str] = ()) -> bool:
+    """通過＝A 組全綠、無未完成檔、無缺、無多出、本批造成＝0、CGSA 殘差定義皆於 A 組不變性比對中被執行（純函式）。"""
+    return not (a_failures or incomplete_files or result["missing"] or result["unexpected"] or result["caused"]
+                or residual_unexecuted)
+
+
+PROBE_DIR_ENV = "FRAMEPATH_DEF_PROBE_DIR"
+PROBE_DEFS_ENV = "FRAMEPATH_DEF_PROBE_DEFS"
+
+
+def install_def_probe() -> None:
+    """環境變數 `FRAMEPATH_DEF_PROBE_DIR`／`_DEFS`（`模組:限定名` 逗號分隔）已設 ⇒ 以保留描述子型別之包裝記錄各定義
+    是否被呼叫，行程結束寫 `<dir>/<pid>.json`（不改回傳值與例外）。由 `scripts/freeze_framepath_baseline.py` 之子行程
+    呼叫（A 組不變性比對之 11 格皆於子行程生成）。重複呼叫無作用。"""
+    import atexit
+    import functools
+    import importlib
+    import inspect
+
+    out_dir, specs = os.environ.get(PROBE_DIR_ENV, "").strip(), os.environ.get(PROBE_DEFS_ENV, "").strip()
+    if not out_dir or not specs or getattr(install_def_probe, "_installed", False):
+        return
+    install_def_probe._installed = True  # type: ignore[attr-defined]
+    hit: set = set()
+    for spec in [s for s in specs.split(",") if s]:
+        mod_name, qual = spec.split(":", 1)
+        owner = importlib.import_module(mod_name)
+        parts = qual.split(".")
+        for p in parts[:-1]:
+            owner = getattr(owner, p)
+        raw = inspect.getattr_static(owner, parts[-1])
+        fn = raw.__func__ if isinstance(raw, (staticmethod, classmethod)) else raw
+
+        def _wrap(fn=fn, spec=spec):
+            @functools.wraps(fn)
+            def wrapper(*a, **k):
+                hit.add(spec)
+                return fn(*a, **k)
+            return wrapper
+
+        w = _wrap()
+        setattr(owner, parts[-1], type(raw)(w) if isinstance(raw, (staticmethod, classmethod)) else w)
+
+    def _flush() -> None:
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        (Path(out_dir) / f"{os.getpid()}.json").write_text(json.dumps(sorted(hit)), encoding="utf-8")
+
+    atexit.register(_flush)
+    install_def_probe._flush = _flush  # type: ignore[attr-defined]
+
+
+def probe_hits(probe_dir: Path) -> set:
+    hits: set = set()
+    for p in sorted(Path(probe_dir).glob("*.json")) if Path(probe_dir).is_dir() else []:
+        try:
+            hits |= set(json.loads(p.read_text(encoding="utf-8")))
+        except ValueError:
+            continue
+    return hits
 
 
 ENV_PREFIXES = ("FFACT_", "ICFA_", "FRAMEPATH_", "PYTHON", "NUMBA_", "OMP_", "MKL_", "LEGACY_KLINE")
@@ -270,6 +328,7 @@ ALIGN_TEST_NAMES = frozenset({"TimeframeAligner", "build_asof_index_map", "FFACT
 HEAVY_NAMES = frozenset({"requires_kline", "requires_kline_data", "FEATURE_KLINE_H5_PATH", "generate_features",
                          "generate_multi_tf", "run_stat", "run_generation", "generate_cell", "run_ic_first",
                          "kline_close"})
+HEAVY_SUBSTRINGS = ("kline_cache",)
 SKIP_REASONS = ("invariance_envelope", "align_static_proof")
 INVARIANCE_BASELINE_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
 DISPOSITION_REL = "tests/_golden/framepath/test_disposition.json"
@@ -358,7 +417,7 @@ def _module_path(dotted: str, level: int, here: str, source_of) -> Optional[str]
 
 
 def module_taint(path: str, source_of, symbols: frozenset, _cache: Optional[dict] = None,
-                 _stack: Tuple[str, ...] = (), ffact: bool = True) -> Dict[str, set]:
+                 _stack: Tuple[str, ...] = (), ffact: bool = True, substrings: Tuple[str, ...] = ()) -> Dict[str, set]:
     """S2：模組內各定義（含 fixture）之 taint 理由——直接（`ffact`／`sym:<名>`）、經模組層名稱（`name:<名>`）、
     經同模組或 tests/ 下輔助模組之被 taint 定義（`call:<模組>:<名>`）傳遞，至不動點。conftest 由呼叫端併入。"""
     cache = _cache if _cache is not None else {}
@@ -375,14 +434,18 @@ def module_taint(path: str, source_of, symbols: frozenset, _cache: Optional[dict
             continue
         if ffact and ffact_unproven(node):
             reasons[q].add("ffact")
-        reasons[q] |= {f"sym:{s}" for s in refs_of(node) & symbols}
+        node_refs = refs_of(node)
+        reasons[q] |= {f"sym:{s}" for s in node_refs & symbols}
+        reasons[q] |= {f"str:{s}" for s in substrings if any(s in r for r in node_refs)}
     tainted_names: Dict[str, str] = {}
     for st in tree.body:
         targets = st.targets if isinstance(st, ast.Assign) else [st.target] if isinstance(st, ast.AnnAssign) else []
         value = getattr(st, "value", None)
         if value is None:
             continue
-        hit = (ffact and ffact_unproven(value)) or bool(refs_of(value) & symbols)
+        vrefs = refs_of(value)
+        hit = ((ffact and ffact_unproven(value)) or bool(vrefs & symbols)
+               or any(s in r for s in substrings for r in vrefs))
         for t in targets:
             if hit and isinstance(t, ast.Name):
                 tainted_names[t.id] = "ffact/sym"
@@ -402,7 +465,7 @@ def module_taint(path: str, source_of, symbols: frozenset, _cache: Optional[dict
                 mp = _module_path(st.module or "", st.level, path, source_of)
                 if mp:
                     ext[a.asname or a.name] = (mp, a.name)
-    ext_taint = {mp: module_taint(mp, source_of, symbols, cache, (*_stack, path), ffact)
+    ext_taint = {mp: module_taint(mp, source_of, symbols, cache, (*_stack, path), ffact, substrings)
                  for mp in {v[0] for v in ext.values()}}
     changed = True
     while changed:
@@ -437,16 +500,18 @@ def _conftests(test_file: str, source_of) -> List[str]:
     return out
 
 
-def file_scan(test_file: str, source_of, symbols: frozenset) -> Dict[str, object]:
+def file_scan(test_file: str, source_of, symbols: frozenset, cache: Optional[dict] = None,
+              heavy_cache: Optional[dict] = None, want_heavy: bool = True) -> Dict[str, object]:
     """單一測試檔之 {"refs": {qualname: 名稱集}, "taint": {qualname: 理由集}, "heavy": bool}；fixture 引用
-    conftest 之被 taint fixture 亦傳遞。"""
+    conftest 之被 taint fixture 亦傳遞。`cache`／`heavy_cache` 可於同一 source_of 與符號表之多檔掃描間共用（輔助模組
+    只解析一次）；`want_heavy=False` 時 heavy 恆 True（不計算，只供不得整檔之清單外檔）。"""
     src = source_of(test_file)
     if src is None:
         return {"refs": {}, "taint": {}, "heavy": False}
     tree = ast.parse(src)
     defs = _defs(tree)
     refs = {q: refs_of(n) for q, n in defs.items()}
-    cache: dict = {}
+    cache = {} if cache is None else cache
     taint = {q: set(r) for q, r in module_taint(test_file, source_of, symbols, cache).items()}
     for cf in _conftests(test_file, source_of):
         bad = {k.split(".")[-1] for k, r in module_taint(cf, source_of, symbols, cache).items() if r}
@@ -454,24 +519,27 @@ def file_scan(test_file: str, source_of, symbols: frozenset) -> Dict[str, object
             hits = refs[q] & bad
             if hits:
                 taint.setdefault(q, set()).update(f"call:{cf}:{h}" for h in hits)
-    return {"refs": refs, "taint": {q: r for q, r in taint.items() if r}, "heavy": is_heavy(test_file, source_of)}
+    heavy = is_heavy(test_file, source_of, heavy_cache) if want_heavy else True
+    return {"refs": refs, "taint": {q: r for q, r in taint.items() if r}, "heavy": heavy}
 
 
-def is_heavy(test_file: str, source_of) -> bool:
+def is_heavy(test_file: str, source_of, cache: Optional[dict] = None) -> bool:
     """重型（不得 S3 整檔）：檔內或其經 tests/ 輔助模組（含 conftest）傳遞之定義引用 `HEAVY_NAMES`（真實 kline／
-    生成入口），或任一字串常數含 `kline_cache`。與 S2 同一傳遞分析（ffact 關閉）；判不出者不會因此變輕量。"""
+    生成入口），或其字串常數含 `kline_cache`——字串規則與符號規則同經輔助模組定義、模組層名稱與 conftest 傳遞
+    （審查 r51：只呼叫內含 kline 路徑字面之 helper 者亦屬重型）。與 S2 同一傳遞分析（ffact 關閉）。"""
     src = source_of(test_file)
     if src is None:
         return True
     tree = ast.parse(src)
     module_refs = refs_of(tree)
-    if module_refs & HEAVY_NAMES or any("kline_cache" in r for r in module_refs):
+    if module_refs & HEAVY_NAMES or any(s in r for s in HEAVY_SUBSTRINGS for r in module_refs):
         return True
-    cache: dict = {}
-    if any(module_taint(test_file, source_of, HEAVY_NAMES, cache, ffact=False).values()):
+    cache = {} if cache is None else cache
+    if any(module_taint(test_file, source_of, HEAVY_NAMES, cache, ffact=False, substrings=HEAVY_SUBSTRINGS).values()):
         return True
     for cf in _conftests(test_file, source_of):
-        bad = {k.split(".")[-1] for k, r in module_taint(cf, source_of, HEAVY_NAMES, cache, ffact=False).items() if r}
+        bad = {k.split(".")[-1] for k, r in module_taint(cf, source_of, HEAVY_NAMES, cache, ffact=False,
+                                                         substrings=HEAVY_SUBSTRINGS).items() if r}
         if module_refs & bad:
             return True
     return False
@@ -549,29 +617,192 @@ def select_expected(collected: Mapping[str, Sequence[str]], scans: Mapping[str, 
     return selected, skipped
 
 
-def production_changes(repo: Path, anchor: str) -> Tuple[set, set, List[str]]:
-    """錨點 → 工作樹之生產碼（momentum／api／config 之 .py）：(被刪定義名, 本體改變之定義名, 改動檔)；名稱取末段。"""
+# ── CGSA 模式等價（審查 r51）：假設 CGSA 開啟且 registry 已建立，把錨點與工作樹之定義正規化後比對 ──────────────
+def _is_enabled_call(n: ast.AST) -> bool:
+    return (isinstance(n, ast.Call) and not n.args and not n.keywords
+            and ((isinstance(n.func, ast.Attribute) and n.func.attr == "_cgsa_enabled")
+                 or (isinstance(n.func, ast.Name) and n.func.id == "_cgsa_enabled")))
+
+
+def _is_registry_expr(n: ast.AST) -> bool:
+    if isinstance(n, ast.Attribute) and n.attr == "_cgsa_registry":
+        return True
+    return (isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "getattr" and len(n.args) >= 2
+            and isinstance(n.args[1], ast.Constant) and n.args[1].value == "_cgsa_registry")
+
+
+def _is_guard_stmt(st: ast.stmt) -> bool:
+    return (isinstance(st, ast.Expr) and isinstance(st.value, ast.Call) and isinstance(st.value.func, ast.Attribute)
+            and st.value.func.attr == "_require_cgsa_registry")
+
+
+def _const_bool(n: ast.AST) -> bool:
+    return isinstance(n, ast.Constant) and isinstance(n.value, bool)
+
+
+class _CgsaFold(ast.NodeTransformer):
+    """`*._cgsa_enabled()`→True；`<registry> is not None`→True、`is None`→False；not／and／or 常數折疊。"""
+
+    def visit_Call(self, n: ast.Call) -> ast.AST:
+        self.generic_visit(n)
+        return ast.Constant(True) if _is_enabled_call(n) else n
+
+    def visit_Compare(self, n: ast.Compare) -> ast.AST:
+        self.generic_visit(n)
+        if (len(n.ops) == 1 and isinstance(n.ops[0], (ast.Is, ast.IsNot)) and isinstance(n.comparators[0], ast.Constant)
+                and n.comparators[0].value is None and _is_registry_expr(n.left)):
+            return ast.Constant(isinstance(n.ops[0], ast.IsNot))
+        return n
+
+    def visit_UnaryOp(self, n: ast.UnaryOp) -> ast.AST:
+        self.generic_visit(n)
+        if isinstance(n.op, ast.Not) and _const_bool(n.operand):
+            return ast.Constant(not n.operand.value)
+        return n
+
+    def visit_BoolOp(self, n: ast.BoolOp) -> ast.AST:
+        self.generic_visit(n)
+        vals = []
+        for v in n.values:
+            if _const_bool(v):
+                if isinstance(n.op, ast.And) and v.value is False:
+                    return ast.Constant(False)
+                if isinstance(n.op, ast.Or) and v.value is True:
+                    return ast.Constant(True)
+                continue
+            vals.append(v)
+        if not vals:
+            return ast.Constant(isinstance(n.op, ast.And))
+        return vals[0] if len(vals) == 1 else ast.BoolOp(op=n.op, values=vals)
+
+
+def _cgsa_block(stmts: List[ast.stmt]) -> List[ast.stmt]:
+    """常數條件 if 展開、守衛敘述（`_require_cgsa_registry`，registry 已建立時無作用）移除、return／raise 後截斷（遞迴）。"""
+    out: List[ast.stmt] = []
+    for st in stmts:
+        if _is_guard_stmt(st):
+            continue
+        if isinstance(st, ast.If) and _const_bool(st.test):
+            out.extend(_cgsa_block(st.body if st.test.value else st.orelse))
+            if out and isinstance(out[-1], (ast.Return, ast.Raise)):
+                break
+            continue
+        for field in ("body", "orelse", "finalbody"):
+            if isinstance(getattr(st, field, None), list):
+                setattr(st, field, _cgsa_block(getattr(st, field)))
+        if isinstance(st, ast.Try):
+            for h in st.handlers:
+                h.body = _cgsa_block(h.body) or [ast.Pass()]
+        if isinstance(st, ast.If) and not st.body and not st.orelse:
+            continue  # 守衛移除後成空殼之 if（條件為無副作用之比較／名稱）
+        if hasattr(st, "body") and isinstance(st.body, list) and not st.body:
+            st.body = [ast.Pass()]
+        out.append(st)
+        if isinstance(st, (ast.Return, ast.Raise)):
+            break
+    return out
+
+
+def _cgsa_propagate(fn: ast.AST) -> bool:
+    """函式內只賦值一次之布林常數區域名稱代入並刪除該賦值。"""
+    assigns: Dict[str, List[ast.AST]] = {}
+    for n in ast.walk(fn):
+        if isinstance(n, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
+            for t in (n.targets if isinstance(n, ast.Assign) else [n.target]):
+                if isinstance(t, ast.Name):
+                    assigns.setdefault(t.id, []).append(n)
+    consts = {k: v[0].value.value for k, v in assigns.items()
+              if len(v) == 1 and isinstance(v[0], ast.Assign) and _const_bool(v[0].value)}
+    if not consts:
+        return False
+
+    class _Sub(ast.NodeTransformer):
+        def visit_Name(self, n: ast.Name) -> ast.AST:
+            return ast.Constant(consts[n.id]) if isinstance(n.ctx, ast.Load) and n.id in consts else n
+
+    _Sub().visit(fn)
+    drop = {id(assigns[k][0]) for k in consts}
+    for parent in ast.walk(fn):
+        for field in ("body", "orelse", "finalbody"):
+            lst = getattr(parent, field, None)
+            if isinstance(lst, list):
+                setattr(parent, field, [s for s in lst if id(s) not in drop])
+    return True
+
+
+def cgsa_normal_form(fn: ast.AST) -> str:
+    """CGSA 開啟且 registry 已建立之假設下之正規形（去 docstring、折疊、代入、展開至不動點）。"""
+    fn = copy.deepcopy(fn)
+    body = getattr(fn, "body", [])
+    if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+            and isinstance(body[0].value.value, str):
+        fn.body = body[1:] or [ast.Pass()]
+    for _ in range(8):
+        _CgsaFold().visit(fn)
+        changed = _cgsa_propagate(fn)
+        _CgsaFold().visit(fn)
+        fn.body = _cgsa_block(fn.body) or [ast.Pass()]
+        if not changed:
+            break
+    return ast.dump(fn)
+
+
+def _module_of(path: str) -> str:
+    return path[:-3].replace("/", ".")
+
+
+def production_changes(repo: Path, anchor: str) -> Tuple[set, set, List[str], List[str]]:
+    """錨點 → 工作樹之生產碼（momentum／api／config 之 .py）：(被刪定義名, CGSA 殘差定義名, 改動檔, 殘差定義規格
+    `模組:限定名`)。本體改變之定義經 `cgsa_normal_form` 比對：正規形相同（CGSA 開啟下等價，例如只拿掉
+    `_cgsa_enabled()` 判斷、加 registry 守衛）者不入殘差；不同者（不論公開或私有）入殘差。另：被刪且於全部生產碼
+    已無定義之名稱若仍被引用 ⇒ GateError（懸空引用）。名稱取末段。"""
     files = [p for p in _git(repo, "diff", "--name-only", anchor, "--", *PRODUCTION_ROOTS).splitlines()
              if p.endswith(".py") and "/__pycache__/" not in p]
-    deleted, changed = set(), set()
+    deleted, residual, specs = set(), set(), []
     for f in files:
         old = _git_show(repo, anchor, f)
         new = (repo / f).read_text(encoding="utf-8") if (repo / f).is_file() else None
-        od = {q: ast.dump(n) for q, n in _defs(ast.parse(old)).items()} if old is not None else {}
-        nd = {q: ast.dump(n) for q, n in _defs(ast.parse(new)).items()} if new is not None else {}
-        for q, d in od.items():
+        od = _defs(ast.parse(old)) if old is not None else {}
+        nd = _defs(ast.parse(new)) if new is not None else {}
+        for q, node in od.items():
             bare = q.split(".")[-1]
             if q not in nd:
                 deleted.add(bare)
-            elif nd[q] != d and not isinstance(_defs(ast.parse(old))[q], ast.ClassDef):
-                changed.add(bare)
-    return deleted, changed, files
+            elif isinstance(node, ast.ClassDef) or ast.dump(node) == ast.dump(nd[q]):
+                continue
+            elif cgsa_normal_form(node) != cgsa_normal_form(nd[q]):
+                residual.add(bare)
+                specs.append(f"{_module_of(f)}:{q}")
+    dangling = _dangling_refs(repo, deleted)
+    if dangling:
+        raise GateError(f"生產碼仍引用已無定義之被刪名稱：{dangling[:10]}")
+    return deleted, residual, files, sorted(specs)
 
 
-def s2_symbols(deleted: Iterable[str], changed: Iterable[str]) -> frozenset:
-    """S2 符號表：被刪定義 ∪ 本體改變之私有定義（單底線開頭、非 dunder）。公開入口（generate_features 等）之 CGSA
-    行為由 11 格不變性涵蓋，不入表。"""
-    return frozenset(set(deleted) | {c for c in changed if c.startswith("_") and not c.startswith("__")})
+def _dangling_refs(repo: Path, deleted: Iterable[str]) -> List[str]:
+    """全部生產碼（工作樹）中，被刪且已無任何定義之名稱之引用（`檔:名`）。"""
+    deleted = set(deleted)
+    if not deleted:
+        return []
+    trees = {}
+    for root in PRODUCTION_ROOTS:
+        for p in sorted((repo / root).rglob("*.py")) if (repo / root).is_dir() else []:
+            if "__pycache__" in p.parts:
+                continue
+            try:
+                trees[str(p.relative_to(repo))] = ast.parse(p.read_text(encoding="utf-8"))
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+    defined = {n.name for t in trees.values() for n in ast.walk(t)
+               if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    gone = deleted - defined
+    return sorted(f"{f}:{n}" for f, t in trees.items() for n in (refs_of(t) & gone))
+
+
+def s2_symbols(deleted: Iterable[str], residual: Iterable[str]) -> frozenset:
+    """S2 符號表：被刪定義 ∪ CGSA 殘差定義（不分公開私有）。CGSA 下可證等價之改動不入表；殘差定義經公開入口之執行由
+    A 組不變性比對之殘差探針（`FRAMEPATH_DEF_PROBE_*`）證明已被執行。"""
+    return frozenset(set(deleted) | set(residual))
 
 
 def _git_show(repo: Path, rev: str, path: str) -> Optional[str]:
@@ -587,29 +818,110 @@ def _row_nodeids(rows: Sequence[str], prefix: str) -> List[str]:
     return [p for p in hits[0][len(prefix):].split() if p] if hits else []
 
 
+ADMISSION_BUDGET_SECONDS = 7200
+
+
+def plan_inputs_digest(repo: Path, anchor: str, phase: int) -> str:
+    """挑選之輸入指紋：錨點、phase、HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、manifest、處置表、本執行器原始碼。
+    `--admit` 須等於此值方得於估時未知或逾預算時執行（批准綁定確切輸入）。"""
+    h = hashlib.sha256()
+    no_cache = ":(exclude,glob)**/__pycache__/**"  # 已追蹤之 numba 快取於任何測試執行即改寫，非挑選輸入
+    for part in (anchor, str(phase), _git(repo, "rev-parse", "HEAD"),
+                 _git(repo, "diff", "--binary", "HEAD", "--", ".", no_cache),
+                 _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", no_cache)):
+        h.update(part.encode("utf-8", "replace"))
+        h.update(b"\0")
+    for rel in (MANIFEST_REL, DISPOSITION_REL, "scripts/framepath_affected_gate.py"):
+        h.update((repo / rel).read_bytes() if (repo / rel).is_file() else b"")
+        h.update(b"\0")
+    return h.hexdigest()
+
+
+def junit_times(xml_text: str, repo: Path) -> Dict[str, float]:
+    """junit xml → {nodeid: 秒}；classname 之模組段以 repo 內存在之 `.py` 判定，其後為類別段。"""
+    out: Dict[str, float] = {}
+    for case in ET.fromstring(xml_text).iter("testcase"):
+        parts = case.get("classname", "").split(".")
+        for i in range(len(parts), 0, -1):
+            path = "/".join(parts[:i]) + ".py"
+            if (repo / path).is_file():
+                try:
+                    out["::".join([path, *parts[i:], case.get("name", "")])] = float(case.get("time", "0") or 0)
+                except ValueError:
+                    pass
+                break
+    return out
+
+
+def admission(selected: Iterable[str], times: Mapping[str, float], budget: float = ADMISSION_BUDGET_SECONDS
+              ) -> Dict[str, object]:
+    """執行前 admission（純函式）：已知估時總和、估時未知之 nodeid；status＝within（全部已知且 ≤ 預算）｜over｜unknown。"""
+    sel = list(selected)
+    known = round(sum(times[n] for n in sel if n in times), 3)
+    unknown = sorted(n for n in sel if n not in times)
+    status = "over" if known > budget else ("unknown" if unknown else "within")
+    return {"budget_seconds": budget, "known_seconds": known, "unknown": unknown, "status": status}
+
+
+def load_times(repo: Path, dirs: Iterable[Path]) -> Dict[str, float]:
+    """估時來源：給定目錄下全部 junit xml（本執行器先前之結果檔與歷次收據）；同 nodeid 取最大值（保守）。"""
+    times: Dict[str, float] = {}
+    for d in dirs:
+        for x in sorted(Path(d).rglob("*.xml")) if Path(d).is_dir() else []:
+            try:
+                for n, t in junit_times(x.read_text(encoding="utf-8"), repo).items():
+                    times[n] = max(t, times.get(n, 0.0))
+            except ET.ParseError:
+                continue
+    return times
+
+
 def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[str, str]) -> Dict[str, object]:
-    """D8 挑選（秒級、不執行測試本體）：collect B／C 檔、靜態掃描錨點與工作樹兩版之測試檔並取聯集。"""
+    """D8 挑選（不執行測試本體；耗時主要為逐檔 collect）：collect B／C 檔、靜態掃描錨點與工作樹兩版之測試檔並取聯集。
+    須於本批完整改動（生產碼＋測試處置）套上後執行；任一檔 collect 失敗 ⇒ 拒跑。"""
     b_group, c_group = manifest_groups(manifest, phase)
     rows = manifest["batch_card"]["risk_mitigation"]
     must = _row_nodeids(rows, f"affected_must phase={phase} ")
     heavy_pinned = _row_nodeids(rows, f"heavy_files phase={phase} ")
-    deleted, changed, prod_files = production_changes(repo, anchor)
-    symbols = s2_symbols(deleted, changed)
-    align_triggered = bool(set(prod_files) & ALIGN_TRIGGER_FILES or (deleted | changed) & ALIGN_TRIGGER_SYMBOLS)
+    deleted, residual, prod_files, residual_specs = production_changes(repo, anchor)
+    symbols = s2_symbols(deleted, residual)
+    align_triggered = bool(set(prod_files) & ALIGN_TRIGGER_FILES or (deleted | residual) & ALIGN_TRIGGER_SYMBOLS)
 
     def post(p: str) -> Optional[str]:
         return (repo / p).read_text(encoding="utf-8") if (repo / p).is_file() else None
 
-    def pre(p: str) -> Optional[str]:
-        return _git_show(repo, anchor, p)
+    # 錨點版只對錨點→工作樹有改動（含刪除）之 tests/ 檔讀 git，其餘與工作樹同
+    changed_tests = set(_git(repo, "diff", "--name-only", anchor, "--", "tests").splitlines())
 
-    collected = {f: collect(f, repo, env) for f in b_group + c_group}
-    scans: Dict[str, Dict[str, object]] = {}
-    for f in collected:
-        a, b = file_scan(f, pre, symbols), file_scan(f, post, symbols)
+    def pre(p: str) -> Optional[str]:
+        return _git_show(repo, anchor, p) if p in changed_tests else post(p)
+
+    caches: Dict[str, dict] = {"pre": {}, "post": {}, "heavy_pre": {}, "heavy_post": {}}
+
+    def merged_scan(f: str, want_heavy: bool = True) -> Dict[str, object]:
+        a = file_scan(f, pre, symbols, caches["pre"], caches["heavy_pre"], want_heavy)
+        b = file_scan(f, post, symbols, caches["post"], caches["heavy_post"], want_heavy)
         refs = {q: set(a["refs"].get(q, set())) | set(b["refs"].get(q, set())) for q in {*a["refs"], *b["refs"]}}
         taint = {q: set(a["taint"].get(q, set())) | set(b["taint"].get(q, set())) for q in {*a["taint"], *b["taint"]}}
-        scans[f] = {"refs": refs, "taint": taint, "heavy": bool(a["heavy"] or b["heavy"])}
+        return {"refs": refs, "taint": taint, "heavy": bool(a["heavy"] or b["heavy"])}
+
+    collected = {f: collect(f, repo, env) for f in b_group + c_group}
+    scans: Dict[str, Dict[str, object]] = {f: merged_scan(f) for f in collected}
+    # 清單外之測試檔亦受 S2 約束（審查 r51）：全部 tests/ 下 test_*.py 經同一傳遞分析，有 taint 者納入（只選 taint 之
+    # nodeid，不整檔），收據記 extra_files。
+    known = set(collected) | set(A_GROUP)
+    extra: List[str] = []
+    for p in sorted((repo / "tests").rglob("test_*.py")):
+        rel = str(p.relative_to(repo))
+        if rel in known or "__pycache__" in p.parts:
+            continue
+        scan = merged_scan(rel, want_heavy=False)
+        if scan["taint"]:
+            scan["heavy"] = True
+            scans[rel] = scan
+            extra.append(rel)
+    for rel in extra:
+        collected[rel] = collect(rel, repo, env)
     disposition = json.loads((repo / DISPOSITION_REL).read_text(encoding="utf-8"))
     s1_funcs, s1_nodes = s1_targets(disposition, phase, scans)
     selected, skipped = select_expected(collected, scans, s1_funcs, s1_nodes, must, heavy_pinned, align_triggered)
@@ -620,6 +932,8 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
     return {
         "groups": {"B": b_group, "C": c_group}, "collected": collected, "selected": selected, "skipped": skipped,
         "s2_symbols": sorted(symbols), "production_files": prod_files, "align_triggered": align_triggered,
+        "residual_defs": residual_specs, "inputs_digest": plan_inputs_digest(repo, anchor, phase),
+        "extra_files": extra,
         "light_files": sorted(f for f, s in scans.items() if not s["heavy"] and f not in set(heavy_pinned)),
         "invariance_baseline_sha256": hashlib.sha256(baseline.read_bytes()).hexdigest() if baseline.is_file() else None,
     }
@@ -652,7 +966,11 @@ def main(argv: Sequence[str]) -> int:
     ap.add_argument("--out", default=None, help="junit 暫存目錄（預設系統暫存下固定名，供接續）")
     ap.add_argument("--anchor-worktree", default=None)
     ap.add_argument("--plan", action="store_true",
-                    help="只產出 D8 挑選（選入／未跑逐項理由）收據，不執行測試本體（秒級）")
+                    help="只產出 D8 挑選（選入／未跑逐項理由、估時與 admission）收據，不執行測試本體")
+    ap.add_argument("--timings", action="append", default=[],
+                    help="估時來源目錄（其下 junit xml；可重複）；本執行器之結果目錄恆納入")
+    ap.add_argument("--admit", default=None,
+                    help="admission 非 within（估時未知或逾預算）時，呈報後以該次挑選之 inputs_digest 批准執行")
     args = ap.parse_args(argv)
     batch = current_batch()
     args.phase = BATCH_PHASE[batch]
@@ -662,14 +980,22 @@ def main(argv: Sequence[str]) -> int:
     env = dict(os.environ, FRAMEPATH_PHASE=str(args.phase), PYTHONPATH=str(REPO))
     manifest = json.loads((REPO / MANIFEST_REL).read_text(encoding="utf-8"))
     sel = plan(REPO, anchor, args.phase, manifest, env)
+    a_ids = [n for f in A_GROUP_BY_PHASE[args.phase] for n in collect(f, REPO, env)]
+    times = load_times(REPO, [out, *[Path(t) for t in args.timings]])
+    adm = admission([*a_ids, *sel["selected"]], times)
     if args.plan:
         plan_path = REPO / f"handoffs/run_receipts/framepath-b{batch}-affected-plan.json"
         plan_path.write_text(json.dumps({"spec": "docs/FRAMEPATH_SPEC.md v21 D8", "phase": args.phase, "anchor": anchor,
-                                         **sel}, ensure_ascii=False, indent=1, default=sorted) + "\n",
+                                         **sel, "admission": adm}, ensure_ascii=False, indent=1, default=sorted) + "\n",
                              encoding="utf-8")
         print(f"FRAMEPATH affected plan：collected={sum(len(v) for v in sel['collected'].values())} "
-              f"selected={len(sel['selected'])} skipped={len(sel['skipped'])} → {plan_path.relative_to(REPO)}")
+              f"selected={len(sel['selected'])} skipped={len(sel['skipped'])} admission={adm['status']} "
+              f"known={adm['known_seconds']}s unknown={len(adm['unknown'])} inputs_digest={sel['inputs_digest']} "
+              f"→ {plan_path.relative_to(REPO)}")
         return 0
+    if adm["status"] != "within" and args.admit != sel["inputs_digest"]:
+        raise GateError(f"admission={adm['status']}（已知 {adm['known_seconds']} 秒、估時未知 {len(adm['unknown'])} 項、"
+                        f"預算 {adm['budget_seconds']} 秒）：先 --plan 呈報，批准後以 --admit {sel['inputs_digest']} 執行")
     anchor_wt = Path(args.anchor_worktree).resolve() if args.anchor_worktree else make_anchor_worktree(anchor)
     verify_anchor_worktree(anchor_wt, anchor)
     if not (anchor_wt / "data_cache").exists():
@@ -679,9 +1005,14 @@ def main(argv: Sequence[str]) -> int:
 
     a_failures: List[str] = []
     a_results: Dict[str, Dict[str, str]] = {}
+    probe_dir = out / "def_probe"
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    for stale in probe_dir.glob("*.json"):
+        stale.unlink()
+    a_env = dict(env, FRAMEPATH_DEF_PROBE_DIR=str(probe_dir), FRAMEPATH_DEF_PROBE_DEFS=",".join(sel["residual_defs"]))
     for f in A_GROUP_BY_PHASE[args.phase]:
         ids = collect(f, REPO, env)
-        rc, res = run_file(f, out / "a_junit" / (f.replace("/", "_") + ".xml"), REPO, env)
+        rc, res = run_file(f, out / "a_junit" / (f.replace("/", "_") + ".xml"), REPO, a_env)
         a_results.update(res)
         a_failures += [n for n in ids if res.get(n, {}).get("outcome") != "passed"]
         if rc not in RUN_RC_OK:
@@ -691,7 +1022,7 @@ def main(argv: Sequence[str]) -> int:
     batch: Dict[str, Dict[str, str]] = {}
     per_file: Dict[str, Dict[str, object]] = {}
     incomplete: List[str] = []
-    for f in b_group + c_group:
+    for f in b_group + c_group + list(sel["extra_files"]):
         all_ids = sel["collected"][f]
         ids = [n for n in all_ids if n in sel["selected"]]
         expected += ids
@@ -725,12 +1056,17 @@ def main(argv: Sequence[str]) -> int:
             arc, res = run_file(f, out / "anchor_junit" / (f.replace("/", "_") + ".xml"), anchor_wt, anchor_env, ids)
             anchor_res.update(anchor_usable(arc, res, ids))
     result = classify(expected, batch, anchor_res)
-    passed = verdict(result, a_failures, incomplete)
+    hits = probe_hits(probe_dir)
+    unexecuted = sorted(set(sel["residual_defs"]) - hits)
+    passed = verdict(result, a_failures, incomplete, unexecuted)
     receipt = {
         "spec": "docs/FRAMEPATH_SPEC.md v21 D8", "phase": args.phase, "repo_head": _git(REPO, "rev-parse", "HEAD").strip(),
         "selection": {"selected": sel["selected"], "skipped": sel["skipped"], "s2_symbols": sel["s2_symbols"],
                       "align_triggered": sel["align_triggered"], "light_files": sel["light_files"],
-                      "invariance_baseline_sha256": sel["invariance_baseline_sha256"]},
+                      "invariance_baseline_sha256": sel["invariance_baseline_sha256"],
+                      "inputs_digest": sel["inputs_digest"], "admission": adm, "admitted": args.admit is not None},
+        "residual_defs": sel["residual_defs"], "residual_executed_by_a": sorted(hits & set(sel["residual_defs"])),
+        "residual_unexecuted": unexecuted,
         "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(A_GROUP_BY_PHASE[args.phase]),
                                                                         "B": b_group, "C": c_group},
         "a_failures": a_failures, "incomplete_files": incomplete, "per_file": per_file,
