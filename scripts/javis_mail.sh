@@ -8,6 +8,12 @@
 #   bash scripts/javis_mail.sh list  [--unanswered] [--for cc|javis]         列 open 之信（--unanswered：且無對應回信）
 #   bash scripts/javis_mail.sh close <caller> <id>                            原寄件者關閉自己的信
 #   bash scripts/javis_mail.sh notify                                         UserPromptSubmit 用：有寄給 cc 之未回覆信才印一行
+#   bash scripts/javis_mail.sh pending                                        SessionStart 用：列寄給 cc 之未回覆信
+#   bash scripts/javis_mail.sh watch [--interval 秒] [--max-min 分]           信箱 session 背景守候：有信即印出並結束
+#   bash scripts/javis_mail.sh unwatch                                        解除守候標記（其他 session 立即恢復提示）
+#
+# 守候語意：watch 每輪更新 handoffs/javis/.watcher；該檔 15 分鐘內有更新 ⇒ notify／pending 不輸出，
+#   由守候中之信箱 session 處理，不打斷其他工作 session。守候中斷 >15 分鐘 ⇒ 自動恢復提示，信不會漏。
 #
 # 規則見 CLAUDE.md「Javis 信箱」節：每封信只由寄件者寫；建檔後寄件者填一次內文，之後唯一可改＝status→closed。
 # 「已回覆」不記欄位，由對向資料夾之 in-reply-to 導出。信箱不進 git（.git/info/exclude 之 handoffs/*）。
@@ -20,10 +26,15 @@ BOX="handoffs/javis"
 TO_CC="${BOX}/to_cc"
 TO_JAVIS="${BOX}/to_javis"
 ID_RE='^[0-9]{8}-[0-9]{4}-(javis|cc)-[a-z0-9]+(-[a-z0-9]+)*$'
+WATCH_MARK="${BOX}/.watcher"
+WATCH_FRESH_MIN=15
+
+# 守候中＝標記檔 WATCH_FRESH_MIN 分鐘內被更新過（find -mmin 跨 BSD／GNU，免 stat 平台差異）
+_watching() { [ -f "${WATCH_MARK}" ] && [ -n "$(find "${WATCH_MARK}" -mmin -"${WATCH_FRESH_MIN}" 2>/dev/null)" ]; }
 
 die() { echo "[javis_mail] $*" >&2; exit 2; }
 
-_usage() { sed -n '4,10p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+_usage() { sed -n '4,13p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 
 # 寄件者 → 其寄件夾（javis 寄給 cc ⇒ to_cc；cc 寄給 javis ⇒ to_javis）
 _outbox() { case "$1" in javis) echo "${TO_CC}" ;; cc) echo "${TO_JAVIS}" ;; *) return 1 ;; esac; }
@@ -160,8 +171,45 @@ cmd_close() {
 }
 
 # hook 用：永遠 rc=0、無信時零輸出
+cmd_pending() {
+  _watching && return 0
+  _list 1 cc
+}
+
+cmd_watch() {
+  local interval=60 maxmin=110 start out
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --interval) [ "$#" -ge 2 ] || die "--interval 缺值"; interval="$2"; shift 2 ;;
+      --max-min) [ "$#" -ge 2 ] || die "--max-min 缺值"; maxmin="$2"; shift 2 ;;
+      *) die "不認得的參數：$1" ;;
+    esac
+  done
+  printf '%s%s' "${interval}" "${maxmin}" | LC_ALL=C grep -Eq '^[0-9]+$' || die "--interval／--max-min 須為非負整數"
+  [ "${interval}" -ge 1 ] || die "--interval 須 ≥1"
+  mkdir -p "${TO_CC}" "${TO_JAVIS}" || die "建立信箱資料夾失敗"
+  start="$(date +%s)"
+  while :; do
+    touch "${WATCH_MARK}"
+    out="$(_list 1 cc 2>&1)" || { echo "⚠️ Javis 信箱守候：讀信失敗，守候結束：${out}"; exit 1; }
+    if [ -n "${out}" ]; then
+      echo "📬 Javis 信箱：有寄給 Claude 之未回覆信"; printf '%s\n' "${out}"; exit 0
+    fi
+    if [ $(( $(date +%s) - start )) -ge $(( maxmin * 60 )) ]; then
+      echo "⏱ Javis 信箱守候：${maxmin} 分鐘無新信，到期結束（請重啟守候）"; exit 0
+    fi
+    sleep "${interval}"
+  done
+}
+
+cmd_unwatch() {
+  [ -f "${WATCH_MARK}" ] && rm -f "${WATCH_MARK}"
+  echo "已解除守候標記：其他 session 恢復信件提示"
+}
+
 cmd_notify() {
   local n out
+  _watching && exit 0   # 信箱 session 守候中 ⇒ 不打斷其他 session
   # 列信失敗不得靜默成「沒信」：改印一行警告（仍 rc=0，不擋使用者送出）
   out="$(_list 1 cc 2>&1)" || { echo "⚠️ Javis 信箱：讀信失敗（bash scripts/javis_mail.sh list --unanswered --for cc 查原因）"; exit 0; }
   n="$(printf '%s' "${out}" | LC_ALL=C grep -c .)"
@@ -179,5 +227,8 @@ case "${sub}" in
   list) cmd_list "$@" ;;
   close) cmd_close "$@" ;;
   notify) cmd_notify ;;
+  pending) cmd_pending ;;
+  watch) cmd_watch "$@" ;;
+  unwatch) cmd_unwatch ;;
   *) _usage ;;
 esac

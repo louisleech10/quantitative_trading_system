@@ -27,7 +27,8 @@ _head="$(git log -1 --format=%h 2>/dev/null || echo '-')"
 
 # Javis 信箱：寄給 Claude 且未回覆之信（規則見 CLAUDE.md「Javis 信箱」節）。
 #   無信 ⇒ 輸出與未加此段時逐位元相同；有信 ⇒ 另走 additionalContext，確保進到模型 context。
-_mail="$(bash scripts/javis_mail.sh list --unanswered --for cc 2>/dev/null)"
+#   信箱 session 守候中 ⇒ pending 不輸出（不打斷工作 session）。
+_mail="$(bash scripts/javis_mail.sh pending 2>/dev/null)"
 
 LC_ALL=C jq -Rs --arg ts "${_ts}" --arg d "${_dirty}" --arg h "${_head}" --arg mail "${_mail}" \
   '("=== Javis 信箱：寄給 Claude、尚未回覆（處理規則見 CLAUDE.md「Javis 信箱」節）===\n" + $mail + "\n") as $mb
