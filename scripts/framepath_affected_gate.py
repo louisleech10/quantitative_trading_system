@@ -27,6 +27,7 @@ import ast
 import copy
 import hashlib
 import json
+import math
 import os
 import re
 import subprocess
@@ -199,6 +200,15 @@ def install_def_probe() -> None:
     install_def_probe._flush = _flush  # type: ignore[attr-defined]
 
 
+def pytest_configure(config) -> None:  # noqa: ARG001 — 以 `-p framepath_affected_gate` 載入時之 pytest 鉤子
+    """受影響測試閘以本模組為 pytest 外掛（`-p framepath_affected_gate`，PYTHONPATH 含 scripts/）執行 A／B／C 時，
+    於測試行程內裝殘差定義探針（環境變數未設則無作用）。"""
+    install_def_probe()
+
+
+PROBE_PLUGIN_ARGS = ("-p", "framepath_affected_gate")
+
+
 def probe_hits(probe_dir: Path) -> set:
     hits: set = set()
     for p in sorted(Path(probe_dir).glob("*.json")) if Path(probe_dir).is_dir() else []:
@@ -256,11 +266,11 @@ def collect(test_file: str, cwd: Path, env: Mapping[str, str]) -> List[str]:
 
 
 def run_file(test_file: str, xml_path: Path, cwd: Path, env: Mapping[str, str],
-             nodeids: Optional[Sequence[str]] = None) -> Tuple[int, Dict[str, Dict[str, str]]]:
+             nodeids: Optional[Sequence[str]] = None, extra: Sequence[str] = ()) -> Tuple[int, Dict[str, Dict[str, str]]]:
     xml_path.parent.mkdir(parents=True, exist_ok=True)
     if xml_path.exists():
         xml_path.unlink()
-    proc = _pytest([*PYTEST_FLAGS, f"--junitxml={xml_path}", *(nodeids or [test_file])], cwd, env)
+    proc = _pytest([*PYTEST_FLAGS, *extra, f"--junitxml={xml_path}", *(nodeids or [test_file])], cwd, env)
     res = junit_results(xml_path.read_text(encoding="utf-8"), test_file) if xml_path.is_file() else {}
     return proc.returncode, res
 
@@ -421,73 +431,99 @@ def module_taint(path: str, source_of, symbols: frozenset, _cache: Optional[dict
     """S2：模組內各定義（含 fixture）之 taint 理由——直接（`ffact`／`sym:<名>`）、經模組層名稱（`name:<名>`）、
     經同模組或 tests/ 下輔助模組之被 taint 定義（`call:<模組>:<名>`）傳遞，至不動點。conftest 由呼叫端併入。"""
     cache = _cache if _cache is not None else {}
-    if path in cache:
-        return cache[path]
-    src = source_of(path)
-    if src is None or path in _stack:
-        return {}
-    tree = ast.parse(src)
-    defs = _defs(tree)
-    reasons: Dict[str, set] = {q: set() for q in defs}
-    for q, node in defs.items():
-        if isinstance(node, ast.ClassDef):
-            continue
-        if ffact and ffact_unproven(node):
-            reasons[q].add("ffact")
-        node_refs = refs_of(node)
-        reasons[q] |= {f"sym:{s}" for s in node_refs & symbols}
-        reasons[q] |= {f"str:{s}" for s in substrings if any(s in r for r in node_refs)}
-    tainted_names: Dict[str, str] = {}
-    for st in tree.body:
-        targets = st.targets if isinstance(st, ast.Assign) else [st.target] if isinstance(st, ast.AnnAssign) else []
-        value = getattr(st, "value", None)
-        if value is None:
-            continue
-        vrefs = refs_of(value)
-        hit = ((ffact and ffact_unproven(value)) or bool(vrefs & symbols)
-               or any(s in r for s in substrings for r in vrefs))
-        for t in targets:
-            if hit and isinstance(t, ast.Name):
-                tainted_names[t.id] = "ffact/sym"
-    ext: Dict[str, Tuple[str, str]] = {}  # 本地名 → (輔助模組路徑, 該模組中之名；"" 表整個模組)
-    for st in ast.walk(tree):
-        if isinstance(st, ast.Import):
-            for a in st.names:
-                mp = _module_path(a.name, 0, path, source_of)
-                if mp:
-                    ext[(a.asname or a.name).split(".")[0] if not a.asname else a.asname] = (mp, "")
-        elif isinstance(st, ast.ImportFrom):
-            for a in st.names:
-                sub = _module_path(f"{st.module}.{a.name}" if st.module else a.name, st.level, path, source_of)
-                if sub:
-                    ext[a.asname or a.name] = (sub, "")
-                    continue
-                mp = _module_path(st.module or "", st.level, path, source_of)
-                if mp:
-                    ext[a.asname or a.name] = (mp, a.name)
-    ext_taint = {mp: module_taint(mp, source_of, symbols, cache, (*_stack, path), ffact, substrings)
-                 for mp in {v[0] for v in ext.values()}}
-    changed = True
-    while changed:
-        changed = False
-        live = {q.split(".")[-1]: q for q, r in reasons.items() if r}
+    graph = cache.setdefault(("__taint_graph__", ffact, tuple(substrings), symbols), _TaintGraph(
+        source_of, symbols, ffact, tuple(substrings)))
+    return graph.reasons_of(path)
+
+
+class _TaintGraph:
+    """S2／重型判定之跨模組傳遞（審查 r52：循環引用不得以不完整結果入快取）。先載入 `path` 之 tests/ 匯入閉包
+    （每模組只解析一次），再對全部已載入模組以「同模組定義、模組層名稱、匯入之輔助模組定義」三種邊做全域不動點
+    迭代；結果與掃描順序無關。"""
+
+    def __init__(self, source_of, symbols: frozenset, ffact: bool, substrings: Tuple[str, ...]):
+        self.source_of, self.symbols, self.ffact, self.substrings = source_of, symbols, ffact, substrings
+        self.mods: Dict[str, Dict[str, object]] = {}
+        self.reasons: Dict[str, Dict[str, set]] = {}
+        self._fresh: List[str] = []
+
+    def _load(self, path: str) -> None:
+        if path in self.mods:
+            return
+        src = self.source_of(path)
+        if src is None:
+            self.mods[path] = {"defs": {}, "refs": {}, "names": set(), "ext": {}}
+            self.reasons[path] = {}
+            return
+        tree = ast.parse(src)
+        defs = {q: n for q, n in _defs(tree).items() if not isinstance(n, ast.ClassDef)}
+        refs = {q: refs_of(n) for q, n in defs.items()}
+        reasons: Dict[str, set] = {q: set() for q in defs}
         for q, node in defs.items():
-            if isinstance(node, ast.ClassDef):
+            if self.ffact and ffact_unproven(node):
+                reasons[q].add("ffact")
+            reasons[q] |= {f"sym:{s}" for s in refs[q] & self.symbols}
+            reasons[q] |= {f"str:{s}" for s in self.substrings if any(s in r for r in refs[q])}
+        names = set()
+        for st in tree.body:
+            targets = st.targets if isinstance(st, ast.Assign) else [st.target] if isinstance(st, ast.AnnAssign) else []
+            value = getattr(st, "value", None)
+            if value is None:
                 continue
-            refs = refs_of(node)
-            add = {f"name:{n}" for n in refs & set(tainted_names)}
-            add |= {f"call:{path}:{live[b]}" for b in refs & set(live) if live[b] != q}
-            for local, (mp, name) in ext.items():
-                if local not in refs:
-                    continue
-                bad = {k.split(".")[-1] for k, r in ext_taint.get(mp, {}).items() if r}
-                hits = ({name} & bad) if name else (refs & bad)
-                add |= {f"call:{mp}:{h}" for h in hits}
-            if not add <= reasons[q]:
-                reasons[q] |= add
-                changed = True
-    cache[path] = reasons
-    return reasons
+            vrefs = refs_of(value)
+            if ((self.ffact and ffact_unproven(value)) or vrefs & self.symbols
+                    or any(s in r for s in self.substrings for r in vrefs)):
+                names |= {t.id for t in targets if isinstance(t, ast.Name)}
+        ext: Dict[str, Tuple[str, str]] = {}  # 本地名 → (輔助模組路徑, 該模組中之名；"" 表整個模組)
+        for st in ast.walk(tree):
+            if isinstance(st, ast.Import):
+                for a in st.names:
+                    mp = _module_path(a.name, 0, path, self.source_of)
+                    if mp:
+                        ext[a.asname or a.name.split(".")[0]] = (mp, "")
+            elif isinstance(st, ast.ImportFrom):
+                for a in st.names:
+                    sub = _module_path(f"{st.module}.{a.name}" if st.module else a.name, st.level, path, self.source_of)
+                    if sub:
+                        ext[a.asname or a.name] = (sub, "")
+                        continue
+                    mp = _module_path(st.module or "", st.level, path, self.source_of)
+                    if mp:
+                        ext[a.asname or a.name] = (mp, a.name)
+        self.mods[path] = {"defs": defs, "refs": refs, "names": names, "ext": ext}
+        self.reasons[path] = reasons
+        self._fresh.append(path)
+        for mp, _ in ext.values():
+            self._load(mp)
+
+    def _fixpoint(self, paths: Sequence[str]) -> None:
+        """只迭代本次新載入者：既有模組之閉包已穩定，且不匯入新載入者（否則先前已一併載入）。"""
+        changed = True
+        while changed:
+            changed = False
+            for path in paths:
+                mod = self.mods[path]
+                reasons = self.reasons[path]
+                live = {q.split(".")[-1]: q for q, r in reasons.items() if r}
+                for q, refs in mod["refs"].items():
+                    add = {f"name:{n}" for n in refs & mod["names"]}
+                    add |= {f"call:{path}:{live[b]}" for b in refs & set(live) if live[b] != q}
+                    for local, (mp, name) in mod["ext"].items():
+                        if local not in refs:
+                            continue
+                        bad = {k.split(".")[-1] for k, r in self.reasons.get(mp, {}).items() if r}
+                        hits = ({name} & bad) if name else (refs & bad)
+                        add |= {f"call:{mp}:{h}" for h in hits}
+                    if not add <= reasons[q]:
+                        reasons[q] |= add
+                        changed = True
+
+    def reasons_of(self, path: str) -> Dict[str, set]:
+        if path not in self.mods:
+            self._fresh: List[str] = []
+            self._load(path)
+            self._fixpoint(self._fresh)
+        return self.reasons[path]
 
 
 def _conftests(test_file: str, source_of) -> List[str]:
@@ -656,24 +692,50 @@ class _CgsaFold(ast.NodeTransformer):
 
     def visit_UnaryOp(self, n: ast.UnaryOp) -> ast.AST:
         self.generic_visit(n)
-        if isinstance(n.op, ast.Not) and _const_bool(n.operand):
-            return ast.Constant(not n.operand.value)
+        if isinstance(n.op, ast.Not):
+            n.operand = _truthy_fold(n.operand)
+            if _const_bool(n.operand):
+                return ast.Constant(not n.operand.value)
         return n
 
     def visit_BoolOp(self, n: ast.BoolOp) -> ast.AST:
+        """值語意折疊（審查 r52：`x and True` 之值不等於 `x`）：只去除**開頭**之布林常數——and 開頭 True 去除、開頭
+        False 即 False；or 開頭 False 去除、開頭 True 即 True。非開頭常數保留。"""
         self.generic_visit(n)
-        vals = []
-        for v in n.values:
-            if _const_bool(v):
-                if isinstance(n.op, ast.And) and v.value is False:
-                    return ast.Constant(False)
-                if isinstance(n.op, ast.Or) and v.value is True:
-                    return ast.Constant(True)
-                continue
-            vals.append(v)
-        if not vals:
-            return ast.Constant(isinstance(n.op, ast.And))
+        vals = list(n.values)
+        absorbing = isinstance(n.op, ast.Or)  # or：True 吸收；and：False 吸收
+        while vals and _const_bool(vals[0]) and len(vals) > 1:
+            if vals[0].value is absorbing:
+                return ast.Constant(absorbing)
+            vals = vals[1:]
         return vals[0] if len(vals) == 1 else ast.BoolOp(op=n.op, values=vals)
+
+    def _test(self, n: ast.AST) -> ast.AST:
+        self.generic_visit(n)
+        n.test = _truthy_fold(n.test)
+        return n
+
+    visit_If = visit_While = visit_IfExp = visit_Assert = _test
+
+
+def _truthy_fold(e: ast.AST) -> ast.AST:
+    """只看真假值之位置（if／while／三元／assert 條件、not 與其內之 and／or 運算元）：任一位置之布林常數皆可折疊。"""
+    if isinstance(e, ast.UnaryOp) and isinstance(e.op, ast.Not):
+        inner = _truthy_fold(e.operand)
+        return ast.Constant(not inner.value) if _const_bool(inner) else ast.UnaryOp(op=e.op, operand=inner)
+    if not isinstance(e, ast.BoolOp):
+        return e
+    absorbing = isinstance(e.op, ast.Or)
+    vals = []
+    for v in (_truthy_fold(x) for x in e.values):
+        if _const_bool(v):
+            if v.value is absorbing:
+                return ast.Constant(absorbing)
+            continue
+        vals.append(v)
+    if not vals:
+        return ast.Constant(not absorbing)
+    return vals[0] if len(vals) == 1 else ast.BoolOp(op=e.op, values=vals)
 
 
 def _cgsa_block(stmts: List[ast.stmt]) -> List[ast.stmt]:
@@ -758,25 +820,79 @@ def production_changes(repo: Path, anchor: str) -> Tuple[set, set, List[str], Li
     已無定義之名稱若仍被引用 ⇒ GateError（懸空引用）。名稱取末段。"""
     files = [p for p in _git(repo, "diff", "--name-only", anchor, "--", *PRODUCTION_ROOTS).splitlines()
              if p.endswith(".py") and "/__pycache__/" not in p]
-    deleted, residual, specs = set(), set(), []
+    deleted, residual, specs = set(), set(), set()
+    deleted_defs = set()
     for f in files:
         old = _git_show(repo, anchor, f)
         new = (repo / f).read_text(encoding="utf-8") if (repo / f).is_file() else None
-        od = _defs(ast.parse(old)) if old is not None else {}
-        nd = _defs(ast.parse(new)) if new is not None else {}
+        old_tree = ast.parse(old) if old is not None else ast.Module(body=[], type_ignores=[])
+        new_tree = ast.parse(new) if new is not None else ast.Module(body=[], type_ignores=[])
+        od, nd = _defs(old_tree), _defs(new_tree)
         for q, node in od.items():
             bare = q.split(".")[-1]
             if q not in nd:
                 deleted.add(bare)
-            elif isinstance(node, ast.ClassDef) or ast.dump(node) == ast.dump(nd[q]):
-                continue
-            elif cgsa_normal_form(node) != cgsa_normal_form(nd[q]):
+                deleted_defs.add(bare)
+            elif isinstance(node, ast.ClassDef):
+                if _class_header(node) != _class_header(nd[q]):
+                    raise GateError(f"{f}:{q} 類別標頭（基底／decorator／keywords）改變，無法機械判定影響範圍")
+            elif ast.dump(node) != ast.dump(nd[q]) and cgsa_normal_form(node) != cgsa_normal_form(nd[q]):
                 residual.add(bare)
-                specs.append(f"{_module_of(f)}:{q}")
-    dangling = _dangling_refs(repo, deleted)
+                specs.add(f"{_module_of(f)}:{q}")
+        # 審查 r52：模組層與類別層之非定義綁定（常數、匯入、類別屬性）亦比對；值改變之名入殘差，且新碼中引用該名之
+        # 定義一併入殘差規格（以執行探針觀測）；其他無法以名稱歸屬之模組層敘述改變 ⇒ 拒跑
+        scopes = [("", old_tree.body, new_tree.body)]
+        scopes += [(q, od[q].body, nd[q].body) for q in od if isinstance(od[q], ast.ClassDef) and q in nd]
+        for owner, old_body, new_body in scopes:
+            ob, o_other = _bindings(old_body)
+            nb, n_other = _bindings(new_body)
+            if o_other != n_other:
+                raise GateError(f"{f}{':' + owner if owner else ''} 之非定義、非綁定敘述改變，無法機械判定影響範圍")
+            gone = set(ob) - set(nb)
+            changed_names = {k for k in set(ob) & set(nb) if ob[k] != nb[k]}
+            deleted |= gone
+            residual |= changed_names
+            for q, node in nd.items():
+                if isinstance(node, ast.ClassDef) or (owner and not q.startswith(owner + ".")):
+                    continue
+                if refs_of(node) & (changed_names | gone):
+                    residual.add(q.split(".")[-1])
+                    specs.add(f"{_module_of(f)}:{q}")
+    dangling = _dangling_refs(repo, deleted_defs)
     if dangling:
         raise GateError(f"生產碼仍引用已無定義之被刪名稱：{dangling[:10]}")
     return deleted, residual, files, sorted(specs)
+
+
+def _class_header(node: ast.ClassDef) -> str:
+    return "|".join(ast.dump(x) for x in [*node.bases, *node.keywords, *node.decorator_list])
+
+
+def _bindings(body: Sequence[ast.stmt]) -> Tuple[Dict[str, str], List[str]]:
+    """非定義敘述 → ({綁定名: 該名所有綁定敘述之 dump 串接}, [其他敘述 dump])。賦值（含解構、註記、增量）以目標名
+    歸屬；匯入以本地名歸屬（逐別名）；docstring 與 pass 不計；其餘（模組層 if／try／呼叫等）入「其他」。"""
+    named: Dict[str, str] = {}
+    other: List[str] = []
+    for i, st in enumerate(body):
+        if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Pass)):
+            continue
+        if i == 0 and isinstance(st, ast.Expr) and isinstance(st.value, ast.Constant) and isinstance(st.value.value, str):
+            continue
+        if isinstance(st, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+            targets = st.targets if isinstance(st, ast.Assign) else [st.target]
+            names = [n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name)]
+            if names:
+                for nm in names:
+                    named[nm] = named.get(nm, "") + ast.dump(st)
+                continue
+        if isinstance(st, (ast.Import, ast.ImportFrom)):
+            for a in st.names:
+                local = a.asname or a.name.split(".")[0]
+                src = f"{getattr(st, 'module', '') or ''}|{getattr(st, 'level', 0)}|{a.name}"
+                named[local] = named.get(local, "") + src
+            continue
+        other.append(ast.dump(st))
+    return named, other
 
 
 def _dangling_refs(repo: Path, deleted: Iterable[str]) -> List[str]:
@@ -826,10 +942,16 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int) -> str:
     `--admit` 須等於此值方得於估時未知或逾預算時執行（批准綁定確切輸入）。"""
     h = hashlib.sha256()
     no_cache = ":(exclude,glob)**/__pycache__/**"  # 已追蹤之 numba 快取於任何測試執行即改寫，非挑選輸入
+    own = ":(exclude,glob)handoffs/run_receipts/framepath-b*-affected*"  # 本執行器自身之收據輸出，非挑選輸入
+    untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", no_cache, own).splitlines()
     for part in (anchor, str(phase), _git(repo, "rev-parse", "HEAD"),
-                 _git(repo, "diff", "--binary", "HEAD", "--", ".", no_cache),
-                 _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", no_cache)):
+                 _git(repo, "diff", "--binary", "HEAD", "--", ".", no_cache)):
         h.update(part.encode("utf-8", "replace"))
+        h.update(b"\0")
+    for rel in sorted(untracked):  # 審查 r52：未追蹤檔綁路徑＋內容（同一路徑內容改變 ⇒ 批准失效）
+        p = repo / rel
+        h.update(rel.encode("utf-8", "replace") + b"\0")
+        h.update(hashlib.sha256(p.read_bytes()).digest() if p.is_file() else b"<non-file>")
         h.update(b"\0")
     for rel in (MANIFEST_REL, DISPOSITION_REL, "scripts/framepath_affected_gate.py"):
         h.update((repo / rel).read_bytes() if (repo / rel).is_file() else b"")
@@ -846,19 +968,23 @@ def junit_times(xml_text: str, repo: Path) -> Dict[str, float]:
             path = "/".join(parts[:i]) + ".py"
             if (repo / path).is_file():
                 try:
-                    out["::".join([path, *parts[i:], case.get("name", "")])] = float(case.get("time", "0") or 0)
+                    t = float(case.get("time", ""))
                 except ValueError:
-                    pass
+                    break
+                if math.isfinite(t) and t >= 0:  # 審查 r52：非有限、負值、缺值一律不採（該 nodeid 估時未知）
+                    out["::".join([path, *parts[i:], case.get("name", "")])] = t
                 break
     return out
 
 
 def admission(selected: Iterable[str], times: Mapping[str, float], budget: float = ADMISSION_BUDGET_SECONDS
               ) -> Dict[str, object]:
-    """執行前 admission（純函式）：已知估時總和、估時未知之 nodeid；status＝within（全部已知且 ≤ 預算）｜over｜unknown。"""
+    """執行前 admission（純函式）：已知估時總和、估時未知之 nodeid；status＝within（全部已知且 ≤ 預算）｜over｜unknown。
+    非有限或負值之估時視為未知（不得以 NaN 比較語意落入 within）。"""
     sel = list(selected)
-    known = round(sum(times[n] for n in sel if n in times), 3)
-    unknown = sorted(n for n in sel if n not in times)
+    ok = {n: times[n] for n in sel if n in times and math.isfinite(times[n]) and times[n] >= 0}
+    known = round(sum(ok.values()), 3)
+    unknown = sorted(n for n in sel if n not in ok)
     status = "over" if known > budget else ("unknown" if unknown else "within")
     return {"budget_seconds": budget, "known_seconds": known, "unknown": unknown, "status": status}
 
@@ -1005,14 +1131,26 @@ def main(argv: Sequence[str]) -> int:
 
     a_failures: List[str] = []
     a_results: Dict[str, Dict[str, str]] = {}
-    probe_dir = out / "def_probe"
-    probe_dir.mkdir(parents=True, exist_ok=True)
-    for stale in probe_dir.glob("*.json"):
-        stale.unlink()
-    a_env = dict(env, FRAMEPATH_DEF_PROBE_DIR=str(probe_dir), FRAMEPATH_DEF_PROBE_DEFS=",".join(sel["residual_defs"]))
+    # 殘差定義探針（審查 r52：A 組與選入之 B／C 皆記；證據為「定義被呼叫」，非改動行之執行）：每檔獨立目錄，
+    # 重跑時清空、沿用舊結果檔時一併沿用其觀測
+    probe_root = out / "def_probe"
+
+    def probe_env(name: str, fresh: bool) -> Dict[str, str]:
+        d = probe_root / name
+        d.mkdir(parents=True, exist_ok=True)
+        if fresh:
+            for stale in d.glob("*.json"):
+                stale.unlink()
+        return dict(env, PYTHONPATH=f"{REPO}{os.pathsep}{REPO / 'scripts'}", FRAMEPATH_DEF_PROBE_DIR=str(d),
+                    FRAMEPATH_DEF_PROBE_DEFS=",".join(sel["residual_defs"]))
+
+    probe_dirs: List[Path] = []
     for f in A_GROUP_BY_PHASE[args.phase]:
         ids = collect(f, REPO, env)
-        rc, res = run_file(f, out / "a_junit" / (f.replace("/", "_") + ".xml"), REPO, a_env)
+        name = "A_" + f.replace("/", "_")
+        probe_dirs.append(probe_root / name)
+        rc, res = run_file(f, out / "a_junit" / (f.replace("/", "_") + ".xml"), REPO, probe_env(name, True), None,
+                           PROBE_PLUGIN_ARGS)
         a_results.update(res)
         a_failures += [n for n in ids if res.get(n, {}).get("outcome") != "passed"]
         if rc not in RUN_RC_OK:
@@ -1039,8 +1177,10 @@ def main(argv: Sequence[str]) -> int:
             m = json.loads(meta.read_text(encoding="utf-8"))
             if m.get("state_key") == key and m.get("rc") in RUN_RC_OK:
                 res, rc = junit_results(xml.read_text(encoding="utf-8"), f), m["rc"]
+        name = "BC_" + f.replace("/", "_")
+        probe_dirs.append(probe_root / name)
         if rc is None or set(ids) - set(res):
-            rc, res = run_file(f, xml, REPO, env, None if whole else ids)
+            rc, res = run_file(f, xml, REPO, probe_env(name, True), None if whole else ids, PROBE_PLUGIN_ARGS)
             meta.write_text(json.dumps({"state_key": key, "rc": rc, "file": f}), encoding="utf-8")
         if rc not in RUN_RC_OK or set(ids) - set(res):
             incomplete.append(f)
@@ -1056,7 +1196,7 @@ def main(argv: Sequence[str]) -> int:
             arc, res = run_file(f, out / "anchor_junit" / (f.replace("/", "_") + ".xml"), anchor_wt, anchor_env, ids)
             anchor_res.update(anchor_usable(arc, res, ids))
     result = classify(expected, batch, anchor_res)
-    hits = probe_hits(probe_dir)
+    hits = set().union(*(probe_hits(d) for d in probe_dirs)) if probe_dirs else set()
     unexecuted = sorted(set(sel["residual_defs"]) - hits)
     passed = verdict(result, a_failures, incomplete, unexecuted)
     receipt = {
@@ -1065,7 +1205,7 @@ def main(argv: Sequence[str]) -> int:
                       "align_triggered": sel["align_triggered"], "light_files": sel["light_files"],
                       "invariance_baseline_sha256": sel["invariance_baseline_sha256"],
                       "inputs_digest": sel["inputs_digest"], "admission": adm, "admitted": args.admit is not None},
-        "residual_defs": sel["residual_defs"], "residual_executed_by_a": sorted(hits & set(sel["residual_defs"])),
+        "residual_defs": sel["residual_defs"], "residual_executed": sorted(hits & set(sel["residual_defs"])),
         "residual_unexecuted": unexecuted,
         "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(A_GROUP_BY_PHASE[args.phase]),
                                                                         "B": b_group, "C": c_group},

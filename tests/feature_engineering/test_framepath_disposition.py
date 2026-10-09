@@ -1979,6 +1979,98 @@ def test_affected_gate_cgsa_equivalence_rejects_real_change():
     assert g.cgsa_normal_form(fn(old2)) != g.cgsa_normal_form(fn("def f(self):\n    return 0\n"))
 
 
+def test_mutation_affected_gate_r52_value_semantics_and_bindings(tmp_path):
+    """審查 r52：①and／or 只在只看真假之位置任意折疊，值位置只去開頭常數（`x and <CGSA 開>` ≠ `x`）②類別屬性與模組
+    常數之值改變入殘差，且新碼中引用者入殘差規格 ③類別標頭或無法以名稱歸屬之模組層敘述改變 ⇒ 拒跑。"""
+    g = _affected_gate()
+
+    def fn(src):
+        return ast.parse(src).body[0]
+
+    nf = g.cgsa_normal_form
+    assert nf(fn("def f(self, x):\n    return x and self._cgsa_enabled()\n")) != nf(fn("def f(self, x):\n    return x\n"))
+    assert nf(fn("def f(self, x):\n    if x and self._cgsa_enabled():\n        return 1\n    return 0\n")) == \
+        nf(fn("def f(self, x):\n    if x:\n        return 1\n    return 0\n"))
+    assert nf(fn("def f(self, x):\n    y = self._cgsa_enabled() and x\n    return y\n")) == \
+        nf(fn("def f(self, x):\n    y = x\n    return y\n"))
+    assert nf(fn("def f(self, x):\n    return not (x and not self._cgsa_enabled())\n")) == \
+        nf(fn("def f(self, x):\n    return True\n"))
+
+    old = "LIMIT = 1\n\nclass C:\n    MODE = 'old'\n\n    def value(self):\n        return self.MODE\n\n" \
+          "    def other(self):\n        return 0\n\ndef use():\n    return LIMIT\n"
+    new = old.replace("MODE = 'old'", "MODE = 'new'").replace("LIMIT = 1", "LIMIT = 2")
+    repo, anchor = _git_tmp_repo(tmp_path / "a", {"momentum/m.py": old})
+    (repo / "momentum" / "m.py").write_text(new, encoding="utf-8")
+    deleted, residual, _files, specs = g.production_changes(repo, anchor)
+    assert {"MODE", "LIMIT"} <= residual and not deleted
+    assert specs == ["momentum.m:C.value", "momentum.m:use"]
+    for bad in (old.replace("class C:", "class C(object):"), old + "\nif LIMIT:\n    print('x')\n"):
+        repo2, anchor2 = _git_tmp_repo(tmp_path / f"b{len(bad)}", {"momentum/m.py": old})
+        (repo2 / "momentum" / "m.py").write_text(bad, encoding="utf-8")
+        with pytest.raises(g.GateError):
+            g.production_changes(repo2, anchor2)
+
+
+_CYCLE_SOURCES = {
+    "tests/h1.py": "from tests import h2\n\ndef fn():\n    return Deleted\n\ndef other():\n    return h2.g()\n",
+    "tests/h2.py": "from tests import h1\n\ndef g():\n    return h1.fn()\n",
+    "tests/test_a.py": "from tests import h1\n\ndef test_a():\n    h1.other()\n",
+    "tests/test_b.py": "from tests import h2\n\ndef test_b():\n    h2.g()\n",
+}
+
+
+def test_mutation_affected_gate_cycle_taint_order_independent():
+    """審查 r52 CODEX-R52-P1-03／GROK-R52-P1-01：輔助模組循環匯入時，S2 taint 與掃描順序無關、共用快取不存不完整
+    結果。mutation：遇循環回空並快取（原實作）⇒ 後掃之 test_b 無 taint（紅）。"""
+    g = _affected_gate()
+    src = _CYCLE_SOURCES.get
+    sym = frozenset({"Deleted"})
+    for order in (("tests/test_a.py", "tests/test_b.py"), ("tests/test_b.py", "tests/test_a.py")):
+        cache: dict = {}
+        got = {p: g.module_taint(p, src, sym, cache) for p in order}
+        assert got["tests/test_a.py"]["test_a"] and got["tests/test_b.py"]["test_b"], order
+    assert g.module_taint("tests/h2.py", src, sym)["g"] == {"call:tests/h1.py:fn"}
+
+
+def test_affected_gate_probe_plugin_records_in_pytest(tmp_path):
+    """殘差探針於 B／C 之 pytest 行程內亦記錄（`-p framepath_affected_gate`）。以子行程實跑 pytest。"""
+    (tmp_path / "probe_mod2.py").write_text("def f():\n    return 1\n", encoding="utf-8")
+    (tmp_path / "test_probe_use.py").write_text("import probe_mod2\n\ndef test_x():\n    assert probe_mod2.f() == 1\n",
+                                                encoding="utf-8")
+    out = tmp_path / "probe"
+    g = _affected_gate()
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(tmp_path), str(REPO), str(REPO / "scripts")]),
+               FRAMEPATH_DEF_PROBE_DIR=str(out), FRAMEPATH_DEF_PROBE_DEFS="probe_mod2:f")
+    proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *g.PROBE_PLUGIN_ARGS,
+                           "-c", os.devnull, "--rootdir", str(tmp_path), str(tmp_path / "test_probe_use.py")],
+                          env=env, cwd=tmp_path, capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stdout[-800:] + proc.stderr[-800:]
+    assert g.probe_hits(out) == {"probe_mod2:f"}
+
+
+def test_mutation_affected_gate_digest_and_timing_hardening(tmp_path):
+    """審查 r52：①未追蹤檔內容改變 ⇒ inputs_digest 改變（本執行器自身收據除外）②junit 時間非有限／負值不採、
+    admission 之 NaN 計為未知。mutation：digest 只雜湊路徑清單、admission 不檢有限 ⇒ 紅。"""
+    g = _affected_gate()
+    repo, anchor = _git_tmp_repo(tmp_path, {"README": "x\n"})
+    (repo / "u.txt").write_text("one", encoding="utf-8")
+    d1 = g.plan_inputs_digest(repo, anchor, 1)
+    (repo / "u.txt").write_text("two", encoding="utf-8")
+    d2 = g.plan_inputs_digest(repo, anchor, 1)
+    assert d1 != d2
+    own = repo / "handoffs" / "run_receipts" / "framepath-b1-affected-plan.json"
+    own.parent.mkdir(parents=True)
+    own.write_text("{}", encoding="utf-8")
+    assert g.plan_inputs_digest(repo, anchor, 1) == d2
+    xml = ('<testsuites><testsuite><testcase classname="tests.test_cgsa_pipeline" name="a" time="nan"/>'
+           '<testcase classname="tests.test_cgsa_pipeline" name="b" time="-1"/>'
+           '<testcase classname="tests.test_cgsa_pipeline" name="c" time="inf"/>'
+           '<testcase classname="tests.test_cgsa_pipeline" name="d"/></testsuite></testsuites>')
+    assert g.junit_times(xml, REPO) == {}
+    adm = g.admission(["n"], {"n": float("nan")}, 10)
+    assert adm["status"] == "unknown" and adm["unknown"] == ["n"]
+
+
 def test_affected_gate_def_probe_records_calls(tmp_path):
     """殘差定義執行探針：環境變數已設之行程內包裝模組函式、類別方法、staticmethod，呼叫後結束寫 `<pid>.json`；回傳值
     不變。未呼叫者不記。以子行程實跑。"""
