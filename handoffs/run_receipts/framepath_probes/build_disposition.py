@@ -79,7 +79,7 @@ def main() -> int:
     pop = population(head)
 
     # 核對：主工作樹 .py 與 HEAD 相同（collect 於主工作樹執行之前提）
-    drift = [p for p in git("diff", "--name-only", head, "--", "*.py").split() if not p.startswith("handoffs/")]
+    drift = [p for p in git("diff", "--name-only", head, "--", "*.py").splitlines() if p and not p.startswith("handoffs/")]
     new_paths = {item["path"] for item in dec["new_files"]}
     drift = [p for p in drift if p not in new_paths]
     if drift:

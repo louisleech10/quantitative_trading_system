@@ -180,7 +180,7 @@
       "docs/TICKET_ORDER.md",
       "HANDOFF.md"
     ],
-    "gate_cmd": "A 組：FRAMEPATH_PHASE=<本批 Phase：b1=1、b2=2、b3=3、b4=3> venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_framepath_disposition.py tests/feature_engineering/test_framepath_cgsa_only.py tests/feature_engineering/test_framepath_invariance.py tests/api/test_framepath_api_h5.py（b1 不含 tests/api/test_framepath_api_h5.py）須全綠；B／C 組：PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --phase <本批 Phase> --out <暫存目錄> --receipt handoffs/run_receipts/<date>-framepath-b<N>-affected.json --anchor-worktree <錨點碼態乾淨工作樹>（應跑集合＝risk_mitigation 之 affected_tests phase=<P> 扣 A 組逐檔 collect 之全部 nodeid，C 組＝affected_groups phase=<P> C=… 排後、單組串行；結果須與應跑集合逐一對上〔缺即未完成、接續重跑至齊〕；非綠者於錨點碼態重跑同 nodeid，結果類別與失敗身分皆同者歸 HEAD 既有紅，其餘一律本批造成）須收據 pass＝true（完整且本批造成＝0）。審查 r46 修補；諮詢 r4 收斂：handoffs/reconcile/20260928-framepath-x-consult-r4/synth.md",
+    "gate_cmd": "b1: PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --phase 1 --receipt handoffs/run_receipts/framepath-b1-affected.json；b2: PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --phase 2 --receipt handoffs/run_receipts/framepath-b2-affected.json；b3: PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --phase 3 --receipt handoffs/run_receipts/framepath-b3-affected.json；b4: PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --phase 3 --receipt handoffs/run_receipts/framepath-b4-affected.json（rc＝0 且收據 pass＝true 即通過：A 組本票具名驗收全綠、B／C 組〔affected_tests 扣 A 組〕逐 nodeid 完整、無多出、本批造成＝0；錨點工作樹由腳本依本票最晚實作許可自建並驗乾淨與生產碼；詳腳本 docstring 與 SPEC Task 1.5 v20 D6）",
     "forbidden": [
       {
         "rule": "momentum／ 不得 import api／；服務取工廠一律經 momentum.factories；跨域經 Protocol（解耦 R1–R5、R7）",
@@ -232,7 +232,7 @@
       "contract_sha256 tests/_golden/framepath/compare_domain.json 9a36f3467ae7246e2768ec23efcc2fff64f43277ac0944da44553fde1aa70b50",
       "contract_sha256 tests/feature_engineering/test_framepath_invariance.py 268ce549cc47c5bf5dd4088021149d49274b4bba2607d5ae37f8cae620d38d77",
       "contract_sha256 tests/feature_engineering/test_framepath_cgsa_only.py d89de272a19b08327d27689774e5b186adc012c7085b476d2c19cd4cd380a4a2",
-      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py f3397be47780db8f71530538709fa1d9f4e5bd9666d0bf0de9617495d1d93b4f",
+      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py 3645a5e12b61f64138456f35ce25f4a29c67dc65dcd6cb7a4f73d3d843bc0267",
       "contract_sha256 tests/api/test_framepath_api_h5.py cff7c8e1e2d1f8dbe28c4a1ed789bb940969716dc0def2ed4098b5aeec2df562",
       "contract_sha256 handoffs/run_receipts/20261008-framepath-disposition-view.md b36c9dae82a088e6d44dda66ce029ca6b8ede88ba4210f0ddf31c67f9e111066",
       "contract_sha256 tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/manifest.json 2578303559d26e59ccfd5542fc686a844a5fe375b4191a3264fa5799488c00b5",

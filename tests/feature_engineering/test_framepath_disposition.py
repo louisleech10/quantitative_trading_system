@@ -1599,6 +1599,52 @@ def test_mutation_affected_gate_classify_cannot_absorb_caused():
     assert out["passed"] == ["a::ok"]
 
 
+def test_mutation_affected_gate_verdict_every_condition_blocks():
+    """審查 r47（CODEX-R47-P1-03／04）：通過條件逐項——A 組失敗、未完成檔（pytest rc 非 0／1 或結果不齊）、缺、多出、
+    本批造成，任一非空即不通過；全空才通過。"""
+    g = _affected_gate()
+    ok = {"missing": [], "unexpected": [], "caused": [], "head_red": ["x"], "passed": ["y"]}
+    assert g.verdict(ok, [], []) is True
+    assert g.verdict(ok, ["a::t"], []) is False
+    assert g.verdict(ok, [], ["tests/f.py"]) is False
+    for key in ("missing", "unexpected", "caused"):
+        assert g.verdict(dict(ok, **{key: ["n"]}), [], []) is False
+    assert g.RUN_RC_OK == (0, 1)
+
+
+def test_affected_gate_state_key_binds_tree_and_file(tmp_path):
+    """審查 r47（CODEX-R47-P1-05）：結果檔沿用之狀態指紋隨工作樹 diff、未追蹤檔、測試檔內容、phase 改變而改變。"""
+    g = _affected_gate()
+    repo = tmp_path / "r"
+    repo.mkdir()
+    run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    run("init", "-q")
+    run("config", "user.email", "t@t")
+    run("config", "user.name", "t")
+    (repo / "t.py").write_text("def test_a():\n    assert True\n", encoding="utf-8")
+    run("add", "t.py")
+    run("commit", "-qm", "c")
+    k0 = g.state_key(repo, "t.py", 1)
+    assert g.state_key(repo, "t.py", 1) == k0
+    assert g.state_key(repo, "t.py", 2) != k0
+    (repo / "u.py").write_text("x = 1\n", encoding="utf-8")
+    k1 = g.state_key(repo, "t.py", 1)
+    assert k1 != k0
+    (repo / "t.py").write_text("def test_a():\n    assert 1\n", encoding="utf-8")
+    assert g.state_key(repo, "t.py", 1) not in (k0, k1)
+
+
+def test_affected_gate_anchor_worktree_verification(tmp_path):
+    """審查 r47（CODEX-R47-P1-02）：錨點工作樹須 HEAD＝本票最晚許可錨點、乾淨（封閉豁免僅 data_cache symlink 與
+    __pycache__）、生產碼同碼態錨點；主工作樹（HEAD 非錨點或不乾淨）⇒ 拒。"""
+    g = _affected_gate()
+    assert g._benign_status("?? data_cache") and g._benign_status(" M momentum/x/__pycache__/a.nbi")
+    assert not g._benign_status("?? data_cache_other") and not g._benign_status(" M tests/a.py")
+    assert not g._benign_status("?? scripts/new.py")
+    with pytest.raises(g.GateError):
+        g.verify_anchor_worktree(REPO, "0" * 40)
+
+
 def test_affected_gate_manifest_groups():
     """C 組須為 affected_tests 之子集；A 組（本票具名驗收）不入 B／C；缺 affected_groups 列 ⇒ 拒跑。"""
     g = _affected_gate()
