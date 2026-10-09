@@ -55,6 +55,9 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
         return _run
 
     assert fb.code_state_errors(runner()) == []
+    # 實作期 r41：真函式之錯誤判定須於下方以替身置換 code_state_errors 之前驗（原置於置換後，恆呼叫替身）
+    assert fb.code_state_errors(runner(diff_out="momentum/FeatureEngineering/feature_factory.py\n")) != []
+    assert fb.code_state_errors(runner(untracked_out="api/services/new_untracked.py\n")) != []
     # 錨點與執行時 HEAD 分開解析（審查 r19 CODEX-R19-P1-02）：rev-parse HEAD 回不同 sha ⇒ head_commit 取該值
     later = "74fdd4d1" + "0" * 32
 
@@ -72,7 +75,7 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
     stub_fp = {k: None for k in fb.FINGERPRINT_KEYS}
     stub_fp.update(run_status="complete")
     monkeypatch.setattr(fb, "run_cell", lambda cell, work_root: {
-        "fingerprint": dict(stub_fp, run_status="partial" if cell in fb.PARTIAL_CELLS else "complete"),
+        "fingerprint": dict(stub_fp, run_status="refused" if cell in fb.REFUSED_CELLS else "complete"),
         "memory": {"peak_bytes": 1, "readings": 1, "seconds": 1.0, "failed": [], "injected": False,
                    "non_root_member_seen": True},
         "receipt": {"resume_entered": cell == "C5"}})
@@ -80,8 +83,6 @@ def test_boundary_09_freeze_refuses_off_anchor_code(monkeypatch, tmp_path):
     fb.freeze(wired)
     written = json.loads(wired.read_text(encoding="utf-8"))
     assert written["head_commit"] == later and written["code_anchor"] == anchor
-    assert fb.code_state_errors(runner(diff_out="momentum/FeatureEngineering/feature_factory.py\n")) != []
-    assert fb.code_state_errors(runner(untracked_out="api/services/new_untracked.py\n")) != []
     out = tmp_path / "cgsa_fingerprint.json"
     monkeypatch.setattr(fb, "code_state_errors", lambda git_runner=None: ["momentum 與 6e07e0ad 不同"])
     with pytest.raises(fb.FramepathBaselineError):
@@ -158,13 +159,23 @@ def test_boundary_01_resume_cell_equals_single_tf_cell(baseline):
 
 
 def test_boundary_02_run_status_per_cell(baseline):
+    """實作期 r41（SPEC v18）：HEAD 實測 allow_partial 下缺次週期 K 線 ⇒ 生成前具名拒絕（非 partial）；C9 凍結
+    拒絕之例外型別與訊息（須指名缺載之 `<symbol>/<次週期>`）且拒絕前不留 parquet／manifest。"""
     for cell in fb.CELLS:
         fp = baseline["cells"][cell]["fingerprint"]
-        if cell in fb.PARTIAL_CELLS:
-            assert fp["run_status"] == "partial", cell
-            secondary = baseline["cells"][cell]["receipt"]["dropped_timeframe"]
-            failed = set(fp["completeness"].get("failed_timeframes", [])) | set(fp.get("skipped_timeframes", []))
-            assert secondary in failed, cell
+        if cell in fb.REFUSED_CELLS:
+            assert fp["run_status"] == "refused", cell
+            receipt = baseline["cells"][cell]["receipt"]
+            assert any(receipt["deleted_dataset"] in r for r in fp["failure_reasons"]), cell
+            assert fp["completeness"]["leftover_artifacts"] == [], cell
+        elif cell in fb.CALIBRATION_PARTIAL_CELLS:
+            # 實作期 r41（SPEC v18 C4）：多週期平穩化開之短窗，部分欄前史不足校準長度 ⇒ 逐欄不平穩化之 partial；
+            # 原因只准 calibration_insufficient_history、週期與層皆 present、無失敗
+            comp = fp["completeness"]
+            assert fp["run_status"] == "partial" and fp["failure_reasons"], cell
+            assert all(r.startswith(fb.CALIBRATION_PARTIAL_REASON) for r in fp["failure_reasons"]), cell
+            assert comp["failed_timeframes"] == [] and comp["failed_layers"] == [], cell
+            assert comp["present_timeframes"] == comp["expected_timeframes"], cell
         else:
             assert fp["run_status"] == "complete", cell
 
@@ -199,8 +210,8 @@ def test_boundary_08_memory_gate_rejects_each_fail_condition(cell, override):
 
 def test_boundary_04_c9_preconditions_recorded(baseline):
     """C9 前置條件之收據須可核（審查 r19 CODEX-R19-P1-06）：受控 kline 複本路徑、被刪之 `<symbol>/<次週期>` dataset、
-    刪前存在／刪後讀回缺失、子行程環境之 LEGACY_KLINE_CACHE_DIR 指向空受控目錄；且該次週期出現於 partial 之
-    failed／skipped 週期。"""
+    刪前存在／刪後讀回缺失、子行程環境之 LEGACY_KLINE_CACHE_DIR 指向空受控目錄；且拒絕原因指名該
+    `<symbol>/<次週期>`（實作期 r41：HEAD 為具名拒絕，非 partial）。"""
     cell = baseline["cells"]["C9"]
     receipt = cell["receipt"]
     tf = receipt["dropped_timeframe"]
@@ -210,7 +221,7 @@ def test_boundary_04_c9_preconditions_recorded(baseline):
     assert receipt["legacy_kline_dir"] and receipt["legacy_kline_dir_entries_at_start"] == []
     assert receipt["child_env"]["LEGACY_KLINE_CACHE_DIR"] == receipt["legacy_kline_dir"]
     fp = cell["fingerprint"]
-    assert tf in set(fp["completeness"].get("failed_timeframes", [])) | set(fp.get("skipped_timeframes", []))
+    assert fp["run_status"] == "refused" and any(receipt["deleted_dataset"] in r for r in fp["failure_reasons"])
 
 
 def test_boundary_05_compare_domain_rejects_forbidden_and_non_scalar(tmp_path):

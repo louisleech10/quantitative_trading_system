@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "author": "主委（Claude）",
+  "purpose": "FRAMEPATH b1 Task 1.1 實作期：SPEC §G C9（C3＋allow_partial_timeframes=True、真實 kline 受控複本刪 <symbol>/<次週期>/data、LEGACY_KLINE_CACHE_DIR 指向空受控目錄）於錨點碼態之實際結果",
+  "code_state": "momentum／api／config 與 6e07e0ad 相同（__pycache__ 除外）；HEAD a38de54c",
+  "runs": [
+    {
+      "command": "venv/bin/python -m pytest tests/feature_engineering/test_framepath_invariance.py -k boundary_14（generate_cell(\"C9\") 行程內；平穩化開）",
+      "result": "CalibrationError：校準前史讀取失敗：BTCUSDT 週期 12h：No data returned for BTCUSDT/12h（feature_factory.py _run_calibration_gate → run_calibration_preflight → _calibrate_timeframe → load_calibration_klines → _layer0_data_ingestion → crypto_spot_adapter.fetch）"
+    },
+    {
+      "command": "scratch probe_c9.py off（同前置；fracdiff／adf 關）",
+      "result": "ValueError：No data returned for BTCUSDT/12h（feature_factory.py _generate_features_impl:468 _resolve_public_window → _layer0_data_ingestion(start_date=None)）"
+    },
+    {
+      "command": "scratch probe_c9_trunc.py stat_on 2026-01-01（改為次週期 12h 只刪輸出窗內之列：1696 → 1462 列，前史保留）",
+      "result": "run_status=partial，但 failure_reasons=[calibration_insufficient_history:533]、present_timeframes=[1h, 12h]、failed_timeframes=[]——次週期仍 present，非 C9 欲驗之「次週期失敗之 partial」"
+    }
+  ],
+  "discovery": {
+    "command": "scratch discover_freeze.py（fb.freeze 至暫存路徑、拒寫條件只記錄不擋；錨點碼態）",
+    "cells": {
+      "C1": "complete 3729 欄 peak 0.64 GB", "C2": "complete 3632 欄 peak 0.37 GB",
+      "C3": "partial（calibration_insufficient_history:546）8323 欄 peak 1.10 GB",
+      "C4-streaming": "complete 3729 欄 peak 0.62 GB", "C4-hybrid": "complete 3729 欄 peak 0.63 GB",
+      "C5": "complete 3729 欄 peak 0.72 GB resume_entered=True", "C6": "partial（同 C3）8323 欄 peak 1.12 GB，非根成員已取樣",
+      "C7": "complete 3632 欄（persist=False）peak 0.61 GB", "C8": "complete 3729 欄 peak 1.81 GB", "C9": "refused peak 0.77 GB"
+    },
+    "refusals_found": ["C5≠C1：stationarity_decisions_sha256（另探針：唯一差異為 22 欄 dstar_cache_hit False→True，第二次生成重用 d* 快取）",
+                       "C3、C6：run_status=partial 非 complete（原因只為 calibration_insufficient_history:546）"]
+  },
+  "conclusion": "HEAD 之 allow_partial_timeframes 不容許次週期資料缺載：生成前具名拒絕；C9 之 partial 前提不成立 ⇒ SPEC v18 C1 改凍結拒絕之型別與訊息；partial 語意（次週期管線失敗）由 test_failopen_producer.py::test_four_generator_paths_fail_closed_integration 之 cgsa 三參數承擔（替身注入失敗、真實 CGSA 編排）",
+  "honest_bounds": "未找到不經替身而以真實資料使次週期管線失敗之設定；此拒絕行為屬本票範圍外之既有行為（使用者底線：不改既有功能），是否另開票由審查判定"
+}

@@ -1311,8 +1311,12 @@ TICKET_ROOT = "20260928-FRAMEPATH"  # 本票 task-id 根（同票跨日沿用首
 
 
 def approval_anchor(audit_lines: Iterable[str]) -> Optional[str]:
-    """審計紀錄中最早一筆本票（root 恰為 TICKET_ROOT；審查 r29 CODEX-R29-P1-01／COMPOSER-R29-P1-01：不以後綴比對，
-    他票同後綴之事件不算）`impl_token_issued` 之 round_start_head；無則 None。"""
+    """審計紀錄中最晚一筆本票（root 恰為 TICKET_ROOT；審查 r29 CODEX-R29-P1-01／COMPOSER-R29-P1-01：不以後綴比對，
+    他票同後綴之事件不算）`impl_token_issued` 之 round_start_head；無則 None。
+    實作期 r41：原取最早一筆 ⇒ 實作期發現凍結驗收之缺陷時，經 TODO 重審＋戳記後亦永無法再核定（錨點恆停在首張許可）。
+    改取最晚一筆：工作樹內之改動恆對最新許可時之提交比對（意外漂移照擋）；生產碼開始改動後之凍結檔提交另由
+    `history_errors` ①擋；許可之重領須過 gate（戳記、TODOFMT），屬重新核定。"""
+    anchor: Optional[str] = None
     for line in audit_lines:
         if '"impl_token_issued"' not in line:
             continue
@@ -1322,8 +1326,8 @@ def approval_anchor(audit_lines: Iterable[str]) -> Optional[str]:
             continue
         if ev.get("event") == "impl_token_issued" and ev.get("root") == TICKET_ROOT \
                 and re.fullmatch(r"[0-9a-f]{40}", str(ev.get("round_start_head", ""))):
-            return ev["round_start_head"]
-    return None
+            anchor = ev["round_start_head"]
+    return anchor
 
 
 def approval_errors(anchor: Optional[str], production_changed: bool, paths: Sequence[str],
@@ -1360,6 +1364,10 @@ def test_mutation_self_consistent_rewrite_after_approval_is_red():
     # 審查 r29：他票同後綴（-FRAMEPATH）之較早事件不得被選中
     sibling = json.dumps({"event": "impl_token_issued", "root": "20260927-FRAMEPATH", "round_start_head": "c" * 40})
     assert approval_anchor([sibling, ev]) == anchor and approval_anchor([sibling]) is None
+    # 實作期 r41：本票多筆許可取最晚一筆；其後之他票事件不改變錨點
+    later = json.dumps({"event": "impl_token_issued", "root": "20260928-FRAMEPATH", "round_start_head": "d" * 40})
+    assert approval_anchor([ev, later, other, sibling]) == "d" * 40
+    assert approval_anchor([later, ev]) == anchor
     read_at = lambda c, path: approved[path]  # noqa: E731
     assert approval_errors(anchor, True, list(approved), read_at, reader=approved.get) == []
     assert approval_errors(anchor, True, list(approved), read_at, reader=weakened.get) != []
