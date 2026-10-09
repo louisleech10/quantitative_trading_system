@@ -179,7 +179,7 @@
       "docs/TICKET_ORDER.md",
       "HANDOFF.md"
     ],
-    "gate_cmd": "FRAMEPATH_PHASE=<本批 Phase：b1=1、b2=2、b3=3、b4=3> venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_framepath_disposition.py tests/feature_engineering/test_framepath_cgsa_only.py tests/feature_engineering/test_framepath_invariance.py tests/api/test_framepath_api_h5.py（b1 不含 tests/api/test_framepath_api_h5.py；另逐檔跑本 manifest risk_mitigation 之 `affected_tests phase=<本批 Phase>` 所列全部檔〔由處置表機械導出〕，真實資料者單組串行）",
+    "gate_cmd": "FRAMEPATH_PHASE=<本批 Phase：b1=1、b2=2、b3=3、b4=3> venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_framepath_disposition.py tests/feature_engineering/test_framepath_cgsa_only.py tests/feature_engineering/test_framepath_invariance.py tests/api/test_framepath_api_h5.py（b1 不含 tests/api/test_framepath_api_h5.py）＝A 組；另逐檔跑本 manifest risk_mitigation 之 `affected_tests phase=<本批 Phase>` 所列其餘全部檔〔由處置表機械導出；全部 nodeid 照跑，不以觸及子集代替〕：先 B 組（一般檔）後 C 組（真實資料或單檔逾 10 分鐘者），單組串行；每個 nodeid 之結果歸屬為「本批造成」／「HEAD 既有紅（handoffs/run_receipts/20261008-framepath-trial-run.json 之 head_red_not_in_allowed_red 或於錨點碼態實跑同結果，收據列名）」／「資源中止（具名，須重跑至完成）」三類之一；通過條件＝A 組全綠、本批造成＝0、資源中止＝0；不以單一 rc 判定（諮詢 r4 收斂：handoffs/reconcile/20260928-framepath-x-consult-r4/synth.md）",
     "forbidden": [
       {
         "rule": "momentum／ 不得 import api／；服務取工廠一律經 momentum.factories；跨域經 Protocol（解耦 R1–R5、R7）",
@@ -227,7 +227,7 @@
       }
     ],
     "risk_mitigation": [
-      "contract_sha256 tests/_golden/framepath/test_disposition.json f0447564128611399ef1778e72b0a5f20a9b42895261731ec563fe2ceee8add8",
+      "contract_sha256 tests/_golden/framepath/test_disposition.json 00bd21f59281519af1b696c40bdbe0d9ecfb744928a96c97a0abdd79088d3de4",
       "contract_sha256 tests/_golden/framepath/compare_domain.json 9a36f3467ae7246e2768ec23efcc2fff64f43277ac0944da44553fde1aa70b50",
       "contract_sha256 tests/feature_engineering/test_framepath_invariance.py 268ce549cc47c5bf5dd4088021149d49274b4bba2607d5ae37f8cae620d38d77",
       "contract_sha256 tests/feature_engineering/test_framepath_cgsa_only.py d89de272a19b08327d27689774e5b186adc012c7085b476d2c19cd4cd380a4a2",

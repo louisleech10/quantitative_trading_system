@@ -59,7 +59,6 @@
   ],
   "command": "git grep -l -F <literals> 6e07e0ad -- tests frontend/src scripts",
   "files": [
-   "\"tests/3.2C- \\351\\233\\231\\347\\252\\227\\345\\217\\243\\345\\257\\206\\345\\272\\246\\351\\251\\227\\350\\255\\211.py\"",
    "frontend/src/app/data-preparation/page.tsx",
    "frontend/src/app/ic-analysis/page.tsx",
    "frontend/src/components/case/BatchDownloadPanel.tsx",
@@ -124,6 +123,7 @@
    "scripts/verify_cgsa_pipeline.py",
    "scripts/verify_l1_warmup_requirements.py",
    "scripts/verify_nan_poisoning_fix.py",
+   "tests/3.2C- 雙窗口密度驗證.py",
    "tests/_fixtures/winsor_input_eth1h.npy",
    "tests/_golden/batch2d/cgsa_baseline.json",
    "tests/_golden/batch2d/control.json",

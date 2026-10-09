@@ -52,7 +52,8 @@ def git(*args: str) -> str:
 
 def population(head: str) -> list:
     cmd = ["grep", "-l", "-F"] + [x for lit in LITERALS for x in ("-e", lit)] + [head, "--", *ROOTS]
-    out = subprocess.run(["git", *cmd], cwd=REPO, capture_output=True, text=True)
+    # 實作期 b1：非 ASCII 路徑須關 core.quotepath，否則 git grep 輸出帶引號與八進位逸出（母體路徑失真）
+    out = subprocess.run(["git", "-c", "core.quotepath=off", *cmd], cwd=REPO, capture_output=True, text=True)
     files = {line.split(":", 1)[1] for line in out.stdout.splitlines() if line}
     files |= set(EXTRA)
     return sorted(files - set(EXCLUDED))
