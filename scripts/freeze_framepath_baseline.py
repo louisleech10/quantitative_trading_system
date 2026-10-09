@@ -64,7 +64,7 @@ PEAK_LIMIT_BYTES = 2 * 1024 ** 3
 SAMPLE_INTERVAL_SECONDS = 0.1
 # 每格 fingerprint 之比對項（§G baseline 內容；compare_cell 逐項無容差比對）
 FINGERPRINT_KEYS = (
-    "column_names_sha256", "column_count", "row_count", "time_index_sha256", "columns",
+    "column_names_sha256", "column_count", "row_count", "time_index_sha256", "columns", "result_columns",
     "stationarity_decisions_sha256", "manifest_sha256", "run_status", "completeness", "failure_reasons",
     "path_receipt",
 )
@@ -329,6 +329,7 @@ def _refused_fingerprint(settings: Mapping[str, Any], root: Path, exc: BaseExcep
     return {
         "column_names_sha256": _canonical_sha256([]), "column_count": 0, "row_count": 0,
         "time_index_sha256": _canonical_sha256([]), "columns": {},
+        "result_columns": {"names_sha256": _canonical_sha256([]), "columns": {}},
         "stationarity_decisions_sha256": _canonical_sha256({}), "manifest_sha256": _canonical_sha256({}),
         "run_status": "refused", "completeness": {"leftover_artifacts": leftovers},
         "failure_reasons": [f"{type(exc).__name__}: {exc}"],
@@ -349,6 +350,31 @@ def _column_fingerprint(values: Any) -> Dict[str, str]:
     return {"dtype": str(raw.dtype), "nan": hashlib.sha256(np.packbits(nan).tobytes()).hexdigest(),
             "inf": hashlib.sha256(np.packbits(inf).tobytes()).hexdigest(),
             "values": hashlib.sha256(vals.tobytes()).hexdigest()}
+
+
+def _registry_columns(manifest_path: Path, columns: Dict[str, Dict[str, str]]) -> Tuple[List[str], Dict[str, Any]]:
+    """CGSA registry 工作目錄（manifest.json＋群組 .npy）之逐欄指紋寫入 `columns`（鍵＝`<group_id>/<欄名>`）；回傳
+    (欄序, manifest)。manifest 缺、群組無 npy_path 或有 shards、欄數與陣列不符 ⇒ 具名拒跑（不靜默略過）。"""
+    import numpy as np
+
+    if not manifest_path.is_file():
+        raise FramepathBaselineError(f"persist=False 之 registry manifest 不存在：{manifest_path}")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    names: List[str] = []
+    for group in manifest.get("groups") or []:
+        if not group.get("npy_path") or group.get("shards"):
+            raise FramepathBaselineError(f"registry 群組 {group.get('group_id')} 無單一 npy（shards 未支援）")
+        arr = np.load(manifest_path.parent / group["npy_path"], mmap_mode="r")
+        cols = list(group.get("columns") or [])
+        if arr.ndim != 2 or arr.shape[1] != len(cols):
+            raise FramepathBaselineError(f"registry 群組 {group['group_id']} 欄數 {len(cols)} 與陣列 {arr.shape} 不符")
+        for i, col in enumerate(cols):
+            key = f"{group['group_id']}/{col}"
+            if key in columns:
+                raise FramepathBaselineError(f"registry 欄重複：{key}")
+            names.append(key)
+            columns[key] = _column_fingerprint(np.asarray(arr[:, i]))
+    return names, manifest
 
 
 def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any) -> Dict[str, Any]:
@@ -381,11 +407,22 @@ def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any) -> Dict[s
             columns[n] = _column_fingerprint(table.column(n).to_numpy(zero_copy_only=False))
     for m in sorted(root.rglob(FeatureStorage.L7_V2_MANIFEST_NAME)) if root.exists() else []:
         manifests[str(m.relative_to(root))] = filter_manifest(json.loads(m.read_text(encoding="utf-8")), domain)
-    index = result.features_df.index
+    # 審查 r41 CODEX-R41-P1-01：回傳之 features_df 逐欄指紋（每格皆記；C7 無落盤時為其唯一之值比對對象）
+    frame = result.features_df
+    result_columns = {"names_sha256": _canonical_sha256([str(c) for c in frame.columns]),
+                      "columns": {str(c): _column_fingerprint(frame[c].to_numpy()) for c in frame.columns}}
+    if len(result_columns["columns"]) != len(frame.columns):
+        raise FramepathBaselineError("回傳 features_df 欄名重複")
+    index = frame.index
     time_parts.append("result_index:" + hashlib.sha256(
         index.asi8.tobytes() if hasattr(index, "asi8") else json.dumps([str(i) for i in index]).encode()).hexdigest())
     if not settings["persist"]:
-        names = [str(n) for n in md.get("feature_names") or []]
+        # 審查 r41 CODEX-R41-P1-01：CGSA 之 persist=False 回傳空 features_df（實測 0 欄），產出留在 registry 工作目錄之
+        # 群組 .npy ⇒ C7 之值比對對象＝registry manifest（metadata.manifest_path）所列全部群組之逐欄指紋
+        names, registry_manifest = _registry_columns(Path(str(md.get("manifest_path") or "")), columns)
+        manifests["registry"] = filter_manifest(registry_manifest, domain)
+        if len(names) != int(md.get("feature_count", -1)):
+            raise FramepathBaselineError(f"registry 欄數 {len(names)} ≠ 回傳 feature_count {md.get('feature_count')}")
     completeness = {k: md.get(k) for k in COMPLETENESS_FIELD_NAMES}
     completeness["quality_status"] = md.get("quality_status")
     if "skipped_timeframes" in md:
@@ -399,10 +436,11 @@ def _fingerprint(settings: Mapping[str, Any], root: Path, result: Any) -> Dict[s
                         if isinstance(d, dict) and d.get(DSTAR_CACHE_FLAG))
     return {
         "column_names_sha256": _canonical_sha256(names),
-        "column_count": len(names) if settings["persist"] else int(md.get("feature_count", 0)),
+        "column_count": len(names),
         "row_count": int(len(index)),
         "time_index_sha256": hashlib.sha256("\n".join(time_parts).encode("utf-8")).hexdigest(),
         "columns": columns,
+        "result_columns": result_columns,
         "stationarity_decisions_sha256": _canonical_sha256(decisions),
         "manifest_sha256": _canonical_sha256(manifests),
         "run_status": md.get("run_status"),
@@ -530,19 +568,24 @@ def compare_cell(baseline: Mapping[str, Any], fresh: Mapping[str, Any]) -> List[
             continue
         if key not in baseline:
             continue  # 兩側皆無（呼叫端明示剔除之項，如 C5／C1 比對剔除 path_receipt）
-        if key != "columns":
-            if baseline[key] != fresh[key]:
-                diffs.append(f"{key}：{baseline[key]!r} != {fresh[key]!r}")
-            continue
-        base_cols, new_cols = baseline[key] or {}, fresh[key] or {}
-        for name in sorted(set(base_cols) - set(new_cols)):
-            diffs.append(f"columns／{name}：改後缺欄")
-        for name in sorted(set(new_cols) - set(base_cols)):
-            diffs.append(f"columns／{name}：改後多欄")
-        for name in sorted(set(base_cols) & set(new_cols)):
-            for item in sorted(set(base_cols[name]) | set(new_cols[name])):
-                if base_cols[name].get(item) != new_cols[name].get(item):
-                    diffs.append(f"columns／{name}／{item}")
+        if key == "columns":
+            diffs += _column_diffs(key, baseline[key] or {}, fresh[key] or {})
+        elif key == "result_columns" and isinstance(baseline[key], dict) and isinstance(fresh[key], dict):
+            if baseline[key].get("names_sha256") != fresh[key].get("names_sha256"):
+                diffs.append(f"{key}／names_sha256")
+            diffs += _column_diffs(key, baseline[key].get("columns") or {}, fresh[key].get("columns") or {})
+        elif baseline[key] != fresh[key]:
+            diffs.append(f"{key}：{baseline[key]!r} != {fresh[key]!r}")
+    return diffs
+
+
+def _column_diffs(key: str, base_cols: Mapping[str, Any], new_cols: Mapping[str, Any]) -> List[str]:
+    diffs = [f"{key}／{name}：改後缺欄" for name in sorted(set(base_cols) - set(new_cols))]
+    diffs += [f"{key}／{name}：改後多欄" for name in sorted(set(new_cols) - set(base_cols))]
+    for name in sorted(set(base_cols) & set(new_cols)):
+        for item in sorted(set(base_cols[name]) | set(new_cols[name])):
+            if base_cols[name].get(item) != new_cols[name].get(item):
+                diffs.append(f"{key}／{name}／{item}")
     return diffs
 
 

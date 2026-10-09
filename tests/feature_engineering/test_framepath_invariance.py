@@ -414,6 +414,62 @@ def test_mutation_compare_detects_value_mask_and_manifest_changes():
         assert fb.compare_cell(base, changed) != []
 
 
+def test_mutation_result_frame_values_detected(tmp_path):
+    """審查 r41 CODEX-R41-P1-01：回傳 features_df 之欄值（每格皆記）改變 ⇒ 差異；同值 ⇒ 相等。
+    同一 index／feature_names／metadata，只改一欄之值、dtype 或 NaN 位置。"""
+    from types import SimpleNamespace
+
+    import numpy as np
+    import pandas as pd
+
+    settings = {"persist": True, "repeat": 1, "training_tfs": ["x"]}
+    idx = pd.date_range("2024-01-01", periods=3, freq="h", tz="UTC")
+    meta = {"feature_names": ["x"], "feature_count": 1, "stationarity_decisions": {}}
+
+    def fp(values, dtype="float32"):
+        res = SimpleNamespace(features_df=pd.DataFrame({"x": np.asarray(values, dtype=dtype)}, index=idx), metadata=meta)
+        return fb._fingerprint(settings, tmp_path / "absent", res)
+
+    base = fp([1.0, 2.0, 3.0])
+    assert fb.compare_cell(base, fp([1.0, 2.0, 3.0])) == []
+    for changed in (fp([9.0, 8.0, 7.0]), fp([1.0, 2.0, 3.0], dtype="float64"), fp([1.0, np.nan, 3.0])):
+        assert fb.compare_cell(base, changed) != []
+
+
+def test_mutation_persist_false_registry_values_detected(tmp_path):
+    """審查 r41 CODEX-R41-P1-01：CGSA persist=False 回傳空 features_df（實測 0 欄），產出在 registry 工作目錄之群組
+    .npy ⇒ C7 指紋須逐欄涵蓋 registry 群組：改一格值、NaN 位置或 dtype ⇒ 差異；manifest 缺 ⇒ 具名拒跑。"""
+    from types import SimpleNamespace
+
+    import numpy as np
+    import pandas as pd
+
+    settings = {"persist": False, "repeat": 1, "training_tfs": ["x"]}
+    idx = pd.date_range("2024-01-01", periods=3, freq="h", tz="UTC")
+
+    def fp(values, dtype="float32", name="g"):
+        work = tmp_path / name
+        work.mkdir()
+        np.save(work / "g1.npy", np.asarray(values, dtype=dtype))
+        (work / "manifest.json").write_text(json.dumps({"created_at": name, "groups": [
+            {"group_id": "g1", "columns": ["a", "b"], "npy_path": "g1.npy", "shards": []}]}), encoding="utf-8")
+        meta = {"feature_names": [], "feature_count": 2, "stationarity_decisions": {},
+                "manifest_path": str(work / "manifest.json")}
+        res = SimpleNamespace(features_df=pd.DataFrame(index=idx), metadata=meta)
+        return fb._fingerprint(settings, tmp_path / "absent", res)
+
+    rows = [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]
+    base = fp(rows, name="base")
+    assert set(base["columns"]) == {"g1/a", "g1/b"} and base["column_count"] == 2
+    assert fb.compare_cell(base, fp(rows, name="same")) == []
+    assert fb.compare_cell(base, fp([[1.0, 2.0], [3.0, 9.0], [5.0, 6.0]], name="value")) != []
+    assert fb.compare_cell(base, fp([[1.0, 2.0], [np.nan, 4.0], [5.0, 6.0]], name="nan")) != []
+    assert fb.compare_cell(base, fp(rows, dtype="float64", name="dtype")) != []
+    with pytest.raises(fb.FramepathBaselineError):
+        fb._fingerprint(settings, tmp_path / "absent", SimpleNamespace(
+            features_df=pd.DataFrame(index=idx), metadata={"feature_count": 0, "manifest_path": str(tmp_path / "no")}))
+
+
 @pytest.mark.parametrize("key", fb.FINGERPRINT_KEYS)
 def test_mutation_compare_detects_missing_required_key(key):
     """任一必要比對項缺席（單側）⇒ 差異（審查 r19 CODEX-R19-P1-04：比較器不得只比共同鍵或以 .get 預設）。"""

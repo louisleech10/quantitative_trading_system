@@ -228,7 +228,7 @@
     "risk_mitigation": [
       "contract_sha256 tests/_golden/framepath/test_disposition.json f0447564128611399ef1778e72b0a5f20a9b42895261731ec563fe2ceee8add8",
       "contract_sha256 tests/_golden/framepath/compare_domain.json 9a36f3467ae7246e2768ec23efcc2fff64f43277ac0944da44553fde1aa70b50",
-      "contract_sha256 tests/feature_engineering/test_framepath_invariance.py f3b6f89b8875b814144d95125017ae6c5c07625eac3cb9b1a5115d3cfa87baa6",
+      "contract_sha256 tests/feature_engineering/test_framepath_invariance.py d098a941857ea5b97a3cd1d1db496b433105a5428d6fcb9c5f09f11d6c520cb4",
       "contract_sha256 tests/feature_engineering/test_framepath_cgsa_only.py d89de272a19b08327d27689774e5b186adc012c7085b476d2c19cd4cd380a4a2",
       "contract_sha256 tests/feature_engineering/test_framepath_disposition.py 2cfc2a68db7e1060465e2abd6101e07219ed6dc272686cc792e358bd90a69b75",
       "contract_sha256 tests/api/test_framepath_api_h5.py cff7c8e1e2d1f8dbe28c4a1ed789bb940969716dc0def2ed4098b5aeec2df562",
