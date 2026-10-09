@@ -1645,6 +1645,21 @@ def test_affected_gate_anchor_worktree_verification(tmp_path):
         g.verify_anchor_worktree(REPO, "0" * 40)
 
 
+def test_mutation_affected_gate_r48_hardening(tmp_path, monkeypatch):
+    """審查 r48（CODEX-R48-P1-02／03／04）：錨點重跑 rc 非 0／1 或結果不齊 ⇒ 不採（不得吸收為既有紅）；狀態指紋綁定
+    有效環境；錨點工作樹之實體 data_cache 或被忽略檔 ⇒ 拒。"""
+    g = _affected_gate()
+    r = {"a::x": {"outcome": "failed", "type": "E", "message": "m"}}
+    assert g.anchor_usable(0, r, ["a::x"]) == r and g.anchor_usable(1, r, ["a::x"]) == r
+    assert g.anchor_usable(2, r, ["a::x"]) == {} and g.anchor_usable(1, r, ["a::x", "a::y"]) == {}
+    out = g.classify(["a::x"], r, g.anchor_usable(3, r, ["a::x"]))
+    assert out["caused"] == ["a::x"] and out["head_red"] == []
+    assert g.env_fingerprint({"FFACT_X": "1"}) != g.env_fingerprint({"FFACT_X": "2"})
+    assert g.env_fingerprint({"FFACT_X": "1", "HOME": "a"}) == g.env_fingerprint({"FFACT_X": "1", "HOME": "b"})
+    assert g._benign_ignored("momentum/a/__pycache__/x.nbi") and not g._benign_ignored("data_cache/x.h5")
+    assert g.BATCH_PHASE == {1: 1, 2: 2, 3: 3, 4: 3}
+
+
 def test_affected_gate_manifest_groups():
     """C 組須為 affected_tests 之子集；A 組（本票具名驗收）不入 B／C；缺 affected_groups 列 ⇒ 拒跑。"""
     g = _affected_gate()

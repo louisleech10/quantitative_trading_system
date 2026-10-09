@@ -13,9 +13,9 @@
    數字不遮）皆同者歸「HEAD 既有紅」，其餘一律「本批造成」。
 5. 通過＝A 組全綠、E 完整、無多出之 nodeid、本批造成＝0。收據寫 `--receipt`。
 
-用法（每批一行；`--anchor-worktree` 省略則自建於系統暫存）：
-  PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py --phase 1 \
-      --receipt handoffs/run_receipts/framepath-b1-affected.json
+用法（各批同一命令；批次取自本票最晚實作許可之 batch 欄，phase＝b1→1、b2→2、b3→3、b4→3，收據寫
+`handoffs/run_receipts/framepath-b<N>-affected.json`；`--anchor-worktree` 省略則自建於系統暫存）：
+  PYTHONPATH=. venv/bin/python scripts/framepath_affected_gate.py
 """
 
 from __future__ import annotations
@@ -135,20 +135,38 @@ def classify(expected: Iterable[str], batch: Mapping[str, Mapping[str, str]],
     return {"missing": missing, "unexpected": unexpected, "caused": caused, "head_red": head_red, "passed": passed}
 
 
+def anchor_usable(rc: int, res: Mapping[str, Mapping[str, str]], requested: Sequence[str]) -> Dict[str, Dict[str, str]]:
+    """審查 r48：錨點重跑之結果只在 pytest rc ∈ {0,1} 且所請 nodeid 皆有結果時採用；否則整批不採（相關 nodeid
+    因錨點無結果而歸本批造成，不得以不完整之錨點吸收）。"""
+    if rc not in RUN_RC_OK or set(requested) - set(res):
+        return {}
+    return {n: dict(res[n]) for n in requested}
+
+
 def verdict(result: Mapping[str, Sequence[str]], a_failures: Sequence[str], incomplete_files: Sequence[str]) -> bool:
     """通過＝A 組全綠、無未完成檔、無缺、無多出、本批造成＝0（純函式）。"""
     return not (a_failures or incomplete_files or result["missing"] or result["unexpected"] or result["caused"])
 
 
-def state_key(repo: Path, test_file: str, phase: int) -> str:
-    """結果檔沿用之狀態指紋：HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、測試檔內容、pytest 參數、phase。"""
+ENV_PREFIXES = ("FFACT_", "ICFA_", "FRAMEPATH_", "PYTHON", "NUMBA_", "OMP_", "MKL_", "LEGACY_KLINE")
+
+
+def env_fingerprint(env: Mapping[str, str]) -> str:
+    """有效執行環境（審查 r48）：影響生成／測試之環境變數前綴之鍵值、Python 執行檔與版本。"""
+    keys = sorted(k for k in env if k.startswith(ENV_PREFIXES))
+    return json.dumps({"env": {k: env[k] for k in keys}, "python": sys.executable, "version": sys.version},
+                      sort_keys=True, ensure_ascii=False)
+
+
+def state_key(repo: Path, test_file: str, phase: int, env: Optional[Mapping[str, str]] = None) -> str:
+    """結果檔沿用之狀態指紋：HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、測試檔內容、pytest 參數、phase、有效環境。"""
     h = hashlib.sha256()
     for part in (
         _git(repo, "rev-parse", "HEAD"),
         _git(repo, "diff", "--binary", "HEAD"),
         _git(repo, "ls-files", "--others", "--exclude-standard"),
         (repo / test_file).read_bytes().decode("utf-8", "replace") if (repo / test_file).is_file() else "",
-        json.dumps(PYTEST_FLAGS), str(phase),
+        json.dumps(PYTEST_FLAGS), str(phase), env_fingerprint(env if env is not None else os.environ),
     ):
         h.update(part.encode("utf-8", "replace"))
         h.update(b"\0")
@@ -214,6 +232,20 @@ def verify_anchor_worktree(wt: Path, anchor: str) -> None:
             if p and "/__pycache__/" not in p]
     if prod:
         raise GateError(f"錨點之生產碼與碼態錨點 {CODE_ANCHOR} 不同：{prod[:10]}")
+    # 審查 r48：被 git 忽略之實體輸入（實體 data_cache 等）不得存在；data_cache 只准指向主工作樹之 symlink 或不存在
+    dc = wt / "data_cache"
+    if dc.exists() or dc.is_symlink():
+        if not (dc.is_symlink() and dc.resolve() == (REPO / "data_cache").resolve()):
+            raise GateError(f"錨點工作樹之 data_cache 須為指向 {REPO / 'data_cache'} 之 symlink：{dc}")
+    ignored = [ln[3:] for ln in _git(wt, "status", "--porcelain", "--ignored").splitlines()
+               if ln.startswith("!! ") and not _benign_ignored(ln[3:])]
+    if ignored:
+        raise GateError(f"錨點工作樹含被忽略之檔：{ignored[:10]}")
+
+
+def _benign_ignored(path: str) -> bool:
+    """錨點工作樹之被忽略檔封閉豁免：位元組碼與 numba 快取（`__pycache__/`、`.pyc`）。"""
+    return "__pycache__/" in path or path.endswith(".pyc")
 
 
 def make_anchor_worktree(anchor: str) -> Path:
@@ -223,14 +255,37 @@ def make_anchor_worktree(anchor: str) -> Path:
     return wt
 
 
+BATCH_PHASE = {1: 1, 2: 2, 3: 3, 4: 3}
+
+
+def current_batch() -> int:
+    """本票最晚一筆實作許可之批次（審計 `impl_token_issued` 之 batch 欄；與錨點同一筆）。"""
+    from tests.feature_engineering.test_framepath_disposition import AUDIT_REL, TICKET_ROOT
+
+    batch = None
+    for line in (REPO / AUDIT_REL).read_text(encoding="utf-8", errors="replace").splitlines():
+        if '"impl_token_issued"' not in line:
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if ev.get("event") == "impl_token_issued" and ev.get("root") == TICKET_ROOT:
+            batch = ev.get("batch")
+    if batch is None or int(batch) not in BATCH_PHASE:
+        raise GateError(f"審計紀錄無本票實作許可或批次不合法：{batch!r}")
+    return int(batch)
+
+
 def main(argv: Sequence[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--phase", type=int, required=True, choices=sorted(A_GROUP_BY_PHASE))
-    ap.add_argument("--receipt", required=True)
     ap.add_argument("--out", default=None, help="junit 暫存目錄（預設系統暫存下固定名，供接續）")
     ap.add_argument("--anchor-worktree", default=None)
     args = ap.parse_args(argv)
-    out = Path(args.out or Path(tempfile.gettempdir()) / f"framepath_affected_b{args.phase}").resolve()
+    batch = current_batch()
+    args.phase = BATCH_PHASE[batch]
+    args.receipt = str(REPO / f"handoffs/run_receipts/framepath-b{batch}-affected.json")
+    out = Path(args.out or Path(tempfile.gettempdir()) / f"framepath_affected_b{batch}").resolve()
     anchor = resolve_anchor()
     anchor_wt = Path(args.anchor_worktree).resolve() if args.anchor_worktree else make_anchor_worktree(anchor)
     verify_anchor_worktree(anchor_wt, anchor)
@@ -260,7 +315,7 @@ def main(argv: Sequence[str]) -> int:
         expected += ids
         xml = out / "junit" / (f.replace("/", "_") + ".xml")
         meta = xml.with_suffix(".meta.json")
-        key = state_key(REPO, f, args.phase)
+        key = state_key(REPO, f, args.phase, env)
         res: Dict[str, Dict[str, str]] = {}
         rc: Optional[int] = None
         if xml.is_file() and meta.is_file():
@@ -280,8 +335,8 @@ def main(argv: Sequence[str]) -> int:
     for f in dict.fromkeys(n.split("::", 1)[0] for n in not_passed):
         ids = [n for n in not_passed if n.startswith(f + "::")]
         if (anchor_wt / f).is_file():
-            _, res = run_file(f, out / "anchor_junit" / (f.replace("/", "_") + ".xml"), anchor_wt, anchor_env, ids)
-            anchor_res.update(res)
+            arc, res = run_file(f, out / "anchor_junit" / (f.replace("/", "_") + ".xml"), anchor_wt, anchor_env, ids)
+            anchor_res.update(anchor_usable(arc, res, ids))
     result = classify(expected, batch, anchor_res)
     passed = verdict(result, a_failures, incomplete)
     receipt = {
