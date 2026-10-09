@@ -1,0 +1,24 @@
+FRAMEPATH b1 Task 1.1 mutation 收據（SPEC Task 1.1 驗證 M1–M4；v19 D3）
+日期：2026-10-09　作者：主委（Claude）
+碼態：暫存工作樹（git worktree --detach，HEAD 0cf6df45；生產碼＝錨點 6e07e0ad），data_cache 以 symlink 指向主工作樹
+工具：scratch mutation_m1_m4.py（比對已凍結基準）、mutation_fresh.py（比對同工作樹未變異之同格實跑）；每個 mutation 只改一處、跑一格、還原
+
+mutation 定義：
+- M1 feature_naming.tag_timeframe：週期為 1h 時不加週期標記（少標一週期）
+- M2 FeatureFactory._combine_layers：context == "layer4_input" 時回傳空表
+- M3 FeatureStorage._select_parquet_storage_array：一律回傳 float64（L7 落盤前改 float64）
+- M4 L7 V2 manifest 寫入：新增未登記鍵 framepath_mutant=1
+
+C10（v19 新增格：C2＋L4 lag 開＋L5 橫截面開；比對同工作樹未變異之 C10 實跑）：
+- M1：差異 9704（column_names_sha256、columns／close_1h_Lag_1：改後缺欄 …）⇒ 紅
+- M2：差異 1219（column_count 4851 != 3635、columns／close_1h_Lag_1：改後缺欄 …）⇒ 紅
+- M3：差異 7441（columns／close_1h_Lag_1／dtype …）⇒ 紅
+- M4：差異 1（manifest_sha256）⇒ 紅
+
+C2（比對已凍結基準 0cf6df45）：
+- M1：未執行（錨點字串出現 2 次，腳本拒套）；後於 C10 以唯一錨點重跑
+- M2：差異 0 ——C1–C9 之 stat_payload 皆關 lag 與橫截面，L4 無覆蓋 ⇒ v19 D1 新增 C10
+- M3：差異 6212 ⇒ 紅
+- M4：差異 1 ⇒ 紅
+
+C10 候選格探針（同工作樹）：complete、failure_reasons []、4851 欄（lag 1216、L5 類 268）、present L1–L6、峰值 0.68 GB、23.0 秒、記憶體閘 []；兩次獨立 run_cell 差異 0。

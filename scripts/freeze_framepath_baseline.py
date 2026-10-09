@@ -12,6 +12,7 @@
 - C9 ＝C3＋`allow_partial_timeframes=True`，真實 kline 副本刪 `<symbol>/<次週期>` 之 data dataset 並讀回確認缺失，
   子行程啟動前（kline storage 建構前）於其環境把 `LEGACY_KLINE_CACHE_DIR` 指向空受控目錄 ⇒ HEAD 為生成前具名拒絕
   （SPEC v18；非 partial），本格凍結 `run_status=refused` 與拒絕之例外型別及訊息。
+- C10 ＝C2＋L4 lag 開＋L5 橫截面開（參考標的取 ffstat_helpers 之橫截面設定；SPEC v19 D1：他格皆不產 L4／L5 欄）。
 
 每格內容（§G baseline 內容）：公開輸出欄名序列 sha256、欄數、列數、時間索引 sha256；逐欄 NaN／inf mask sha256
 與 float32 值位元 sha256；平穩化決策表 sha256；manifest 經 `compare_domain.json` 篩選後之 canonical JSON sha256；
@@ -51,7 +52,9 @@ if str(REPO) not in sys.path:
 BASELINE_REL = "tests/_golden/framepath/cgsa_fingerprint.json"
 COMPARE_DOMAIN_REL = "tests/_golden/framepath/compare_domain.json"
 HEAD_COMMIT_PREFIX = "6e07e0ad"
-CELLS = ("C1", "C2", "C3", "C4-streaming", "C4-hybrid", "C5", "C6", "C7", "C8", "C9")
+# SPEC v19 D1：C10＝C2＋L4 lag 開＋L5 橫截面開（他格之 stat_payload 皆關 lag 與橫截面 ⇒ L4／L5 原無覆蓋）
+CELLS = ("C1", "C2", "C3", "C4-streaming", "C4-hybrid", "C5", "C6", "C7", "C8", "C9", "C10")
+LAYER_COVERAGE_CELLS = ("C10",)
 # SPEC v18（實作期實測）：HEAD 於 allow_partial 下缺次週期 K 線 ⇒ 生成前具名拒絕（平穩化開：校準前置關卡
 # CalibrationError；關：_resolve_public_window 之 L0 ValueError），非 partial ⇒ C9 凍結拒絕之型別與訊息
 REFUSED_CELLS = ("C9",)
@@ -206,7 +209,11 @@ def cell_settings(cell: str) -> Dict[str, Any]:
         raise FramepathBaselineError(f"未知設定格 {cell!r}")
     multi = cell in ("C3", "C6", "C9")
     training = list(fg.MULTI_TFS) if multi else [fh.PRIMARY_TF]
-    payload = fh.stat_payload(training, fracdiff=cell != "C2", adf=cell != "C2")
+    stationarity = cell not in ("C2", *LAYER_COVERAGE_CELLS)
+    payload = fh.stat_payload(training, fracdiff=stationarity, adf=stationarity,
+                              cross_sectional=cell in LAYER_COVERAGE_CELLS)
+    if cell in LAYER_COVERAGE_CELLS:
+        payload["lag_features"] = {"enabled": True}
     env: Dict[str, str] = {"FFACT_MULTI_TF_PARALLEL": "1" if cell == "C6" else "0"}
     if cell in ("C4-streaming", "C4-hybrid"):
         env["FFACT_L3_PERSIST_MODE"] = cell.split("-", 1)[1]

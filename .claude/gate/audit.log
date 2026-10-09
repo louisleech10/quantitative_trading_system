@@ -84365,3 +84365,21 @@ ts=2026-09-22 23:41:46 mutation_receipt=/Users/louis/Desktop/quantitative_tradin
 {"actor": "gate", "blocked_by": [], "closed": [], "event": "committee_output", "event_id": "278e77ae-cf39-4bab-8543-ed7dd14fa102", "family": "grok", "origin_script": "gate.sh", "output_path": "handoffs/reconcile/20260928-framepath-x-review-r42/synth.md", "output_sha256": "3dbf2e635d3d3937a494f2430dd7e923a8fb804fcfb128d201d0178b1adc3b7e", "producer": "audit_append.sh", "round_id": "50f6e965-5597-42dc-9035-d7a348024b1d", "schema_version": 1, "sequence": 8325, "task_id": "20260928-FRAMEPATH-X-STAMP-R3", "ts": "2026-10-09T01:59:11Z", "verdict": "null"}
 {"actor": "debt_clear", "brief_kind": "stamp", "canonical_count": 0, "category_counts": {"code-contract": 0, "doc-sync": 0, "format-reject": 0, "other": 0}, "committee_models": {"codex": {"model": "unavailable", "reasoning_effort": "unavailable"}, "composer": {"model": "unavailable", "reasoning_effort": "unavailable"}, "grok": {"model": "unavailable", "reasoning_effort": "unavailable"}}, "event": "docrot2_round_metric", "event_id": "cbd055d7-e50c-471a-91d1-06252b7876c8", "handoff_tree_commit": "bfd683b0585e7adada16af53e5bf6546c17e9d6c", "mismatch_count": 0, "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "round_id": "50f6e965-5597-42dc-9035-d7a348024b1d", "round_open_sequence": 8319, "schema_version": 1, "sequence": 8326, "session_name": "20260928-framepath-x-stamp-r3", "stamps": [{"body_sha_after": "2f93708eb4d653eb9cf0f4b05867b7c43d1a0c00a7feaee9ce548a9cec3d70f2", "body_sha_before": "none", "history_only": 0, "stamp_target": "handoffs/reconcile/20260928-framepath-x-review-r42/synth.md"}], "task_id": "20260928-FRAMEPATH-X-STAMP-R3", "ts": "2026-10-09T01:59:46Z"}
 {"actor": "debt_clear", "completeness_rc": "0", "event": "committee_debt_clear", "event_id": "4e2cc25e-37f8-4512-a7a9-b785599c6456", "lock_sha256": "374571b2db9b1bd04fac0a26c1ec9fe93b0197525903de326f21ae4ee65979df", "origin_script": "debt_clear.sh", "producer": "audit_append.sh", "roster": ["codex", "composer", "grok"], "round_id": "50f6e965-5597-42dc-9035-d7a348024b1d", "schema_version": 1, "sequence": 8327, "session_id": "20260928-framepath-x-stamp-r3", "synth_sha256": "22ac90c7e98b0132c4711035b5bee46df5ade991175410da9ae8c0e04ccef171", "ts": "2026-10-09T01:59:46Z"}
+{"event": "committee_dispatch", "family": "unknown", "output_path": "", "output_sha256": "pending", "task_id": "20260928-FRAMEPATH-impl-b1-claude", "ts": "2026-10-09T02:00:39Z"}
+=== 2026-10-09 10:00:39 | dispatch ===
+  ts=2026-10-09 10:00:39
+  kind=dispatch
+  intent=FRAMEPATH b1：Phase 1（Task 1.1 凍結 CGSA 指紋、Task 1.2–1.5 刪 frame 產生路徑）
+  risk=high
+  facts_asked=SPEC v18 Phase 1 Task 1.1–1.5；manifest affected_tests phase=1
+  review_role=impl
+  template=SPEC+TODO manifest
+  adversarial=waived:impl-self
+  reconcile=handoffs/reconcile/20260928-framepath-x-review-r42/synth.md
+  file=
+  template_opened=
+  sections=
+  spec=docs/FRAMEPATH_SPEC.md
+  todo=docs/manifests/FRAMEPATH.json
+  manifest=
+{"actor": "gate", "batch": "1", "event": "impl_token_issued", "event_id": "dbaa2d05-6b98-4d56-9cd2-9dcfb3ce0884", "family": "claude", "origin_script": "gate.sh", "producer": "audit_append.sh", "root": "20260928-FRAMEPATH", "round_start_head": "e351f5001b0ab41f64182a743f0c78553f745720", "schema_version": 1, "sequence": 8328, "task_id": "20260928-FRAMEPATH-impl-b1-claude", "ts": "2026-10-09T02:00:39Z"}
