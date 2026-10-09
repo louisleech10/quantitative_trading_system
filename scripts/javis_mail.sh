@@ -109,15 +109,18 @@ _list() {
   for d in "${dirs[@]}"; do
     [ -d "${d}" ] || continue
     other="$(_other "${d}")"
-    replied=""
-    [ "${unans}" = 1 ] && replied="$(_heads "${other}"/*.md | LC_ALL=C awk -F'\t' '$5 != "" { print $5 }')"
-    _heads "${d}"/*.md | LC_ALL=C awk -F'\t' -v rep="${replied}" '
-      BEGIN { n = split(rep, a, "\n"); for (i = 1; i <= n; i++) if (a[i] != "") done[a[i]] = 1 }
-      $3 == "open" {
-        id = $1; sub(/^.*\//, "", id); sub(/\.md$/, "", id)
+    # 對向回信（R 列）與本資料夾信件（M 列）同一條管線餵進 awk。
+    # 🔴 不得以 awk -v 傳多行值：BSD awk 拒收含換行之 -v（"newline in string"），
+    #   初版即因此在回信 ≥2 封時 rc=2（Javis 2026-10-09 回報）。
+    { _heads "${other}"/*.md | sed 's/^/R	/'
+      _heads "${d}"/*.md | sed 's/^/M	/'
+    } | LC_ALL=C awk -F'\t' -v u="${unans}" '
+      $1 == "R" { if (u == 1 && $6 != "") done[$6] = 1; next }
+      $1 == "M" && $4 == "open" {
+        id = $2; sub(/^.*\//, "", id); sub(/\.md$/, "", id)
         if (id in done) next
-        printf "%s\tneeds-louis=%s\n", $1, $4
-      }'
+        printf "%s\tneeds-louis=%s\n", $2, $5
+      }' || return 2
   done
 }
 
@@ -158,8 +161,10 @@ cmd_close() {
 
 # hook 用：永遠 rc=0、無信時零輸出
 cmd_notify() {
-  local n
-  n="$(_list 1 cc 2>/dev/null | LC_ALL=C grep -c .)"
+  local n out
+  # 列信失敗不得靜默成「沒信」：改印一行警告（仍 rc=0，不擋使用者送出）
+  out="$(_list 1 cc 2>&1)" || { echo "⚠️ Javis 信箱：讀信失敗（bash scripts/javis_mail.sh list --unanswered --for cc 查原因）"; exit 0; }
+  n="$(printf '%s' "${out}" | LC_ALL=C grep -c .)"
   [ "${n:-0}" -gt 0 ] 2>/dev/null \
     && echo "📬 Javis 信箱：${n} 封寄給 Claude 的信未回覆（bash scripts/javis_mail.sh list --unanswered --for cc；規則見 CLAUDE.md「Javis 信箱」節）"
   exit 0
