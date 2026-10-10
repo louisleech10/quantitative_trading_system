@@ -2282,6 +2282,11 @@ def test_mutation_affected_gate_runner_resume_pause_progress(tmp_path):
     kl.write_bytes(b"B")
     s3 = fps()
     assert s1[0] != s2[0] != s3[0] and s1[1] != s2[1] != s3[1]
+    # 審查 r61：同大小換內容且回撥 mtime（metadata 全同）⇒ 仍改兩指紋（不以 metadata 快取）
+    st = kl.stat()
+    kl.write_bytes(b"C")
+    os.utime(kl, ns=(st.st_atime_ns, st.st_mtime_ns))
+    assert fps() != s3
 
 
 def test_affected_gate_def_probe_records_calls(tmp_path):

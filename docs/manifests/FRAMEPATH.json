@@ -232,7 +232,7 @@
       "contract_sha256 tests/_golden/framepath/compare_domain.json 9a36f3467ae7246e2768ec23efcc2fff64f43277ac0944da44553fde1aa70b50",
       "contract_sha256 tests/feature_engineering/test_framepath_invariance.py 268ce549cc47c5bf5dd4088021149d49274b4bba2607d5ae37f8cae620d38d77",
       "contract_sha256 tests/feature_engineering/test_framepath_cgsa_only.py d89de272a19b08327d27689774e5b186adc012c7085b476d2c19cd4cd380a4a2",
-      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py 1c4159aff99263dff15453d563842512033c4e717bb41e341d6983e502f53b85",
+      "contract_sha256 tests/feature_engineering/test_framepath_disposition.py e0ad74229dacc179dc86fc5fe847210045c039547d42a7dd23240bf8dcea4579",
       "contract_sha256 tests/api/test_framepath_api_h5.py cff7c8e1e2d1f8dbe28c4a1ed789bb940969716dc0def2ed4098b5aeec2df562",
       "contract_sha256 handoffs/run_receipts/20261008-framepath-disposition-view.md 35808ff1cfe4ddcea5cab435113adcc1e13947c5f705c02f0e7a91d6925740ba",
       "contract_sha256 tests/_golden/framepath/v1_layout/FPV1USDT/cfgv1fixture/manifest.json 2578303559d26e59ccfd5542fc686a844a5fe375b4191a3264fa5799488c00b5",

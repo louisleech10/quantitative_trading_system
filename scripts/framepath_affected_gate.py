@@ -7,7 +7,7 @@
    應跑集合 E 由 `plan` 挑選（S1 處置操作所及／S2 會走被刪或被改分支／S3 靜態輕量檔整檔／必跑／對齊觸發），
    未選者逐項記 `skipped` 封閉理由；C 組（`affected_groups phase=<P> C=…`）排在 B 組之後，只影響順序。
    `--plan` 只產挑選與 admission 收據（不執行測試本體），供執行前估時。
-3. 逐檔執行寫 junit xml；結果檔附狀態指紋（排除後之 HEAD 檔案樹身分〔路徑＋blob，排除 numba 快取、handoffs/、生成之清冊〕、同排除之相對 HEAD diff 與未追蹤檔清單、該測試檔內容、
+3. 逐檔執行寫 junit xml；結果檔附狀態指紋（排除後之 HEAD 檔案樹身分〔路徑＋blob，排除 numba 快取、handoffs/、生成之清冊〕、同排除之相對 HEAD diff、未追蹤檔路徑＋內容雜湊、資料輸入 kline_cache.h5 內容雜湊、該測試檔內容、
    pytest 參數、phase、有效環境），指紋相同且結果完整才沿用（中斷後接續），否則重跑；pytest rc 非 0／1 ⇒ 該檔視為未完成。
 4. 非綠 nodeid 於錨點工作樹重跑同 nodeid；錨點＝本票最晚一筆實作許可之 round_start_head（`.claude/gate/audit.log`，
    與處置驗證器 ⓪ 同一函式），工作樹由本腳本自建（或 `--anchor-worktree` 指定）並驗：HEAD＝錨點、工作樹乾淨、
@@ -239,20 +239,15 @@ FP_EXCLUDES = (":(exclude,glob)**/__pycache__/**", ":(exclude,glob)handoffs/**",
 
 # 被 git 忽略、但測試讀取之資料輸入（審查 r60）：內容入指紋
 DATA_INPUTS = ("data_cache/feature_klines/kline_cache.h5",)
-_CONTENT_MEMO: Dict[Tuple[str, int, int], str] = {}
 
 
 def _file_sha(p: Path) -> str:
-    """檔案內容 sha256；同一行程內依（路徑, 大小, mtime_ns）快取（指紋每檔計算一次即可，不重讀大檔）。"""
-    st = p.stat()
-    key = (str(p), st.st_size, st.st_mtime_ns)
-    if key not in _CONTENT_MEMO:
-        h = hashlib.sha256()
-        with open(p, "rb") as fh:
-            for chunk in iter(lambda: fh.read(1 << 20), b""):
-                h.update(chunk)
-        _CONTENT_MEMO[key] = h.hexdigest()
-    return _CONTENT_MEMO[key]
+    """檔案內容 sha256；每次實讀位元組（審查 r61：不以大小／mtime 快取——metadata 可被保留而內容已換）。"""
+    h = hashlib.sha256()
+    with open(p, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def content_inputs(repo: Path) -> str:
@@ -289,7 +284,7 @@ def restore_generated(repo: Path) -> None:
 
 
 def state_key(repo: Path, test_file: str, phase: int, env: Optional[Mapping[str, str]] = None) -> str:
-    """結果檔沿用之狀態指紋：HEAD 檔案樹身分、相對 HEAD 之完整 diff、未追蹤檔清單、測試檔內容、pytest 參數、phase、
+    """結果檔沿用之狀態指紋：HEAD 檔案樹身分、相對 HEAD 之完整 diff、未追蹤檔路徑＋內容與資料輸入內容（content_inputs）、測試檔內容、pytest 參數、phase、
     有效環境；皆排除 FP_EXCLUDES——否則中斷後接續永遠無法沿用（實作期 b1；審查 r58）。"""
     h = hashlib.sha256()
     skip = FP_EXCLUDES
@@ -1123,7 +1118,7 @@ ADMISSION_BUDGET_SECONDS = 7200
 
 def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterable[Path] = (),
                        env: Optional[Mapping[str, str]] = None) -> str:
-    """挑選之輸入指紋：錨點、phase、HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、manifest、處置表、本執行器原始碼、
+    """挑選之輸入指紋：錨點、phase、排除後之 HEAD 檔案樹身分、相對 HEAD 之 diff、未追蹤檔路徑＋內容與資料輸入內容（content_inputs）、manifest、處置表、本執行器原始碼、
     admission 估時來源（各目錄下 junit xml 之路徑與內容，審查 r53）。`--admit` 須等於此值方得於估時未知或逾預算時執行
     （批准綁定確切輸入）。"""
     h = hashlib.sha256()
