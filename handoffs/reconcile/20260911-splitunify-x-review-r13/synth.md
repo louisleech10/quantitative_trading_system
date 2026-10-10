@@ -27,7 +27,11 @@
 
 > 三家 RECONCILE-STAMP；body sha256 ＝「## 戳記」前全部內容（`bash scripts/reconcile_body_hash.sh`）。
 > 歷輪戳記因規格續改皆已失效，本輪為對現行態之重簽。
-> 🔴 **三家戳記置於本檔末尾**：檢查器對每個家族取**最後一筆**戳記，而下方逐字附錄內含委員 R13 交件自帶之舊戳記（簽的是規格雜湊，非本檔本體雜湊）；置於末尾方能使本輪戳記為最後一筆。本體雜湊範圍由「## 戳記」標題界定，故位置不影響雜湊。
+> 🔴 **已知閘衝突（記錄在案，非戳記無效）**：本輪三家戳記如下，皆對本檔本體雜湊 `e3f2847d7fae…` 核可，交件原件為 `handoffs/20260911-splitunify-x-stamp-r6-{codex,grok,composer}.md`，戳記檢查曾實跑 rc=0。惟戳記檢查對每家取**最後一筆**，而下方逐字附錄內含委員前一輪交件自帶之舊戳記（簽的是規格雜湊）；若把本輪戳記移到檔末以搶到「最後一筆」，又會被完整性閘算進最後一個逐字區塊而破壞 byte-faithful。兩閘互斥，此處選擇保完整性，戳記效力以交件原件與審計記錄為準。
+
+RECONCILE-STAMP: codex APPROVED 2026-09-12 sha256:e3f2847d7faeea35a4b61b297c2c3ac035026cf99b058458aa4de224566bb0c0 task:20260911-SPLITUNIFY-X-STAMP-R6
+RECONCILE-STAMP: grok APPROVED 2026-09-12 sha256:e3f2847d7faeea35a4b61b297c2c3ac035026cf99b058458aa4de224566bb0c0 task:20260911-SPLITUNIFY-X-STAMP-R6
+RECONCILE-STAMP: composer APPROVED 2026-09-12 sha256:e3f2847d7faeea35a4b61b297c2c3ac035026cf99b058458aa4de224566bb0c0 task:20260911-SPLITUNIFY-X-STAMP-R6
 
 ---
 
@@ -88,11 +92,3 @@ SCOPE_CHANGES: none
 NUMERIC_OR_SCHEMA_IMPACT: none
 OUTPUT_PATH: handoffs/20260911-splitunify-x-review-r13-grok.md
 TMP_CLEANUP: 清 `/tmp` 本輪 workdir；保留 `claude-501`。
-
----
-
-## 本輪戳記（置於檔末：檢查器對每家取最後一筆）
-
-RECONCILE-STAMP: codex APPROVED 2026-09-12 sha256:e3f2847d7faeea35a4b61b297c2c3ac035026cf99b058458aa4de224566bb0c0 task:20260911-SPLITUNIFY-X-STAMP-R6
-RECONCILE-STAMP: grok APPROVED 2026-09-12 sha256:e3f2847d7faeea35a4b61b297c2c3ac035026cf99b058458aa4de224566bb0c0 task:20260911-SPLITUNIFY-X-STAMP-R6
-RECONCILE-STAMP: composer APPROVED 2026-09-12 sha256:e3f2847d7faeea35a4b61b297c2c3ac035026cf99b058458aa4de224566bb0c0 task:20260911-SPLITUNIFY-X-STAMP-R6

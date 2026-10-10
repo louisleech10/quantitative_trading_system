@@ -1,13 +1,13 @@
 # VERDICTGATE TODO adversarial review（R1）＋ codex R8 閉合確認
 
 brief-kind: review
-task-id: 20260911-VERDICTGATE-X-TODOREVIEW-R1
-findings-round: R1
+task-id: 20260911-VERDICTGATE-X-REVIEW-R9
+findings-round: R9
 
 🔴 **這是審查（review），不是實作。AGENTS.md Rule 12 只約束「動工」，對審查任務不適用。禁改碼、禁動 tracked 檔（含 git checkout／stash）。**
 
 ## 範本
-照 `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` §0 與 canonical finding 四欄格式；findings 用 `## <FAMILY>-R1-P<0-3>-<NN>`（本 brief 之 R 計數自 TODO 審查起算）。產出**末段**必含機械裁決塊：
+照 `templates/SPEC_TODO_ADVERSARIAL_REVIEW_PROMPT.md` §0 與 canonical finding 四欄格式；findings 用 `## <FAMILY>-R9-P<0-3>-<NN>`（延續本票 SPEC 審查之 R 計數；TODO 審查為 R9）。產出**末段**必含機械裁決塊：
 ```
 VERDICT: proceed|blocked
 BLOCKED-BY: <ID,ID>        （blocked 時必填；只列你自己的 P0/P1）
