@@ -1,0 +1,77 @@
+{
+  "verify": "VERIFY:splitunify-r5-parity-mutations",
+  "mutations": [
+    {
+      "id": "M-SU-R5-08",
+      "what": "對證腳本只比 boundary_hash（拿掉逐值比對面）",
+      "rc": 1,
+      "red": true,
+      "first_fail": "PARITY FAIL: [non_default_spec] 對證失敗：",
+      "note": "同時把掃描端 purge_gap 位移一列：逐值面被拿掉後，仍須有東西會紅才算對證面有效"
+    },
+    {
+      "id": "M-SU-R5-09",
+      "what": "對證接受未附原因之差集（拿掉 unexplained 那條）",
+      "rc": 1,
+      "red": true,
+      "first_fail": "PARITY FAIL: [non_default_spec] 對證失敗：",
+      "note": "以匯入原值對齊造出無原因差集；拿掉該條後須由集合等式那條接住"
+    },
+    {
+      "id": "M-SU-R5-12",
+      "what": "對證腳本自填差集原因（把未消費者一律當成有原因）",
+      "rc": 1,
+      "red": true,
+      "first_fail": "PARITY FAIL: [non_default_spec] 對證失敗：",
+      "note": "同上：自填原因＝該條恆不觸發，須由集合等式接住"
+    },
+    {
+      "id": "M-SU-R5-14",
+      "what": "處置帳由 stage3 觀測回填（預測＝觀測，對證失去意義）",
+      "rc": 1,
+      "red": true,
+      "first_fail": "",
+      "note": "處置帳入口被改壞（索引截短 40 列）時，若預測改由觀測回填即看不出來"
+    },
+    {
+      "id": "M-SU-R5-15",
+      "what": "對證略過預測與觀測逐事件相等（拿掉 ⑤）",
+      "rc": 1,
+      "red": true,
+      "first_fail": "",
+      "note": "處置帳預測被改壞後，⑤ 是唯一會紅的那條"
+    },
+    {
+      "id": "M-SU-R5-25",
+      "what": "對證腳本不比逐事件錨點與答案窗（拿掉 ④）",
+      "rc": 1,
+      "red": true,
+      "first_fail": "PARITY FAIL: [non_default_spec] 對證失敗：",
+      "note": "匯入原值對齊時，逐事件窗是最直接會紅的面"
+    },
+    {
+      "id": "M-SU-R5-19",
+      "what": "投影判側錨點改回 decision_at_ms",
+      "rc": 1,
+      "red": true,
+      "first_fail": "PARITY FAIL: [non_default_spec] 對證失敗：",
+      "note": "以收盤時刻當錨點＝晚一根，邊界事件改側"
+    },
+    {
+      "id": "M-SU-R5-21",
+      "what": "處置帳以 feature_cutoff_ms 預測（特徵列鍵改用收盤時刻）",
+      "rc": 1,
+      "red": true,
+      "first_fail": "PARITY FAIL: [post_trim_drop] 對證失敗：",
+      "note": "鍵位移一根 1h＝以收盤取列之等價形態；須配 post-trim 剔除非零之組合才有鑑別力"
+    },
+    {
+      "id": "ONESIDED-OOS",
+      "what": "一側 oos_test_size=0.3（IC 端）",
+      "rc": 1,
+      "red": true,
+      "first_fail": "PARITY FAIL: [non_default_spec] 對證失敗：",
+      "note": "切分輸入逐值那條須當場紅（不必等指紋）"
+    }
+  ]
+}

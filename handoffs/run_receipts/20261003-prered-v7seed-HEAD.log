@@ -1,0 +1,401 @@
+[2026-10-03 04:03:50,851] INFO momentum.FeatureEngineering.strategy_registry: ✅ 成功註冊 EMAExtractor
+2026-10-03 04:03:52,182 - momentum.Indicators.indicator_engine - INFO - Registered indicator: ema -> EMAIndicator
+2026-10-03 04:03:52,185 - momentum.DataExtraction.kline_storage - INFO - KlineStorageManager initialized: data_cache/feature_klines/kline_cache.h5
+[2026-10-03 04:03:52,185] INFO momentum.FeatureEngineering.adapters.adapter_registry: Registered adapter: crypto_spot
+2026-10-03 04:03:52,185 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Registered adapter: crypto_spot
+[2026-10-03 04:03:52,186] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 2 entries
+2026-10-03 04:03:52,186 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 2 entries
+[2026-10-03 04:03:52,252] INFO momentum.FeatureEngineering.atomic.talib_wrapper: Loaded 134 TA-Lib indicators
+2026-10-03 04:03:52,252 - momentum.FeatureEngineering.atomic.talib_wrapper - INFO - Loaded 134 TA-Lib indicators
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,485 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,486 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,490 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+[2026-10-03 04:03:52,492] INFO momentum.FeatureEngineering.adapters.crypto_spot_adapter: Fetching spot data: BTCUSDT/12h
+2026-10-03 04:03:52,492 - momentum.FeatureEngineering.adapters.crypto_spot_adapter - INFO - Fetching spot data: BTCUSDT/12h
+2026-10-03 04:03:52,495 - momentum.DataExtraction.kline_storage - INFO - Read 1696 klines from BTCUSDT/12h in 0.002s
+[2026-10-03 04:03:52,498] INFO momentum.FeatureEngineering.adapters.adapter_registry: Aligned data for BTCUSDT/12h: 1696 rows, 5 columns
+2026-10-03 04:03:52,498 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Aligned data for BTCUSDT/12h: 1696 rows, 5 columns
+[2026-10-03 04:03:52,500] INFO momentum.FeatureEngineering.adapters.crypto_spot_adapter: Fetching spot data: BTCUSDT/1h
+2026-10-03 04:03:52,500 - momentum.FeatureEngineering.adapters.crypto_spot_adapter - INFO - Fetching spot data: BTCUSDT/1h
+2026-10-03 04:03:52,507 - momentum.DataExtraction.kline_storage - INFO - Read 20352 klines from BTCUSDT/1h in 0.007s
+[2026-10-03 04:03:52,511] INFO momentum.FeatureEngineering.adapters.adapter_registry: Aligned data for BTCUSDT/1h: 20352 rows, 5 columns
+2026-10-03 04:03:52,511 - momentum.FeatureEngineering.adapters.adapter_registry - INFO - Aligned data for BTCUSDT/1h: 20352 rows, 5 columns
+[2026-10-03 04:03:52,521] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 2 entries
+2026-10-03 04:03:52,521 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 2 entries
+[2026-10-03 04:03:52,521] INFO momentum.FeatureEngineering.feature_factory: [Layer 1] 0% - Starting Layer 1...
+2026-10-03 04:03:52,521 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 1] 0% - Starting Layer 1...
+[2026-10-03 04:03:52,521] INFO momentum.FeatureEngineering.feature_factory: Layer 1 starting, rss=261MB
+2026-10-03 04:03:52,521 - momentum.FeatureEngineering.feature_factory - INFO - Layer 1 starting, rss=261MB
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,606 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,610 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,610 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,610 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,610 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,610 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,610 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,610 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,610 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+2026-10-03 04:03:52,612 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,612 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,612 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,612 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,612 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,612 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,612 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+[2026-10-03 04:03:52,774] INFO momentum.FeatureEngineering.feature_factory: [Layer 1] 100% - Layer 1 completed: 739 features
+2026-10-03 04:03:52,774 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 1] 100% - Layer 1 completed: 739 features
+[2026-10-03 04:03:52,774] INFO momentum.FeatureEngineering.feature_factory: Layer 1 done: 739 cols, status=ok, rss=297MB
+2026-10-03 04:03:52,774 - momentum.FeatureEngineering.feature_factory - INFO - Layer 1 done: 739 cols, status=ok, rss=297MB
+[2026-10-03 04:03:52,775] INFO momentum.FeatureEngineering.feature_factory: [Layer 2] 0% - Starting Layer 2...
+2026-10-03 04:03:52,775 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 2] 0% - Starting Layer 2...
+[2026-10-03 04:03:52,775] INFO momentum.FeatureEngineering.feature_factory: Layer 2 starting, rss=297MB
+2026-10-03 04:03:52,775 - momentum.FeatureEngineering.feature_factory - INFO - Layer 2 starting, rss=297MB
+[2026-10-03 04:03:52,775] INFO momentum.FeatureEngineering.feature_factory: [L2] Starting derived features: 739 L1 cols
+2026-10-03 04:03:52,775 - momentum.FeatureEngineering.feature_factory - INFO - [L2] Starting derived features: 739 L1 cols
+[2026-10-03 04:03:52,784] INFO momentum.FeatureEngineering.feature_factory: [NaN Blacklist][L2_input] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+2026-10-03 04:03:52,784 - momentum.FeatureEngineering.feature_factory - INFO - [NaN Blacklist][L2_input] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+2026-10-03 04:03:52,786 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,786 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,786 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,786 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,786 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,786 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,786 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,786 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:03:52,787 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+[2026-10-03 04:03:56,919] INFO momentum.FeatureEngineering.feature_factory: [L2] Completed: 19467 cols in 4.14s
+2026-10-03 04:03:56,919 - momentum.FeatureEngineering.feature_factory - INFO - [L2] Completed: 19467 cols in 4.14s
+[2026-10-03 04:03:58,540] INFO momentum.FeatureEngineering.feature_factory: [Layer 2] 100% - Layer 2 completed: 19467 features
+2026-10-03 04:03:58,540 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 2] 100% - Layer 2 completed: 19467 features
+[2026-10-03 04:03:58,541] INFO momentum.FeatureEngineering.feature_factory: Layer 2 done: 19467 cols, status=ok, rss=1039MB
+2026-10-03 04:03:58,541 - momentum.FeatureEngineering.feature_factory - INFO - Layer 2 done: 19467 cols, status=ok, rss=1039MB
+[2026-10-03 04:03:58,547] INFO momentum.FeatureEngineering.feature_factory: [Layer 3] 0% - Starting Layer 3...
+2026-10-03 04:03:58,547 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 3] 0% - Starting Layer 3...
+[2026-10-03 04:03:58,547] INFO momentum.FeatureEngineering.feature_factory: Layer 3 starting, rss=1039MB
+2026-10-03 04:03:58,547 - momentum.FeatureEngineering.feature_factory - INFO - Layer 3 starting, rss=1039MB
+[2026-10-03 04:03:58,556] INFO momentum.FeatureEngineering.feature_factory: [NaN Blacklist][L3_input] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+2026-10-03 04:03:58,556 - momentum.FeatureEngineering.feature_factory - INFO - [NaN Blacklist][L3_input] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+[2026-10-03 04:04:05,945] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 10/100 (W3_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:05,945 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 10/100 (W3_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:05,960] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 20/100 (W5_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:05,960 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 20/100 (W5_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:05,977] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 30/100 (W8_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:05,977 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 30/100 (W8_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:05,993] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 40/100 (W13_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:05,993 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 40/100 (W13_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:06,011] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 50/100 (W21_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:06,011 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 50/100 (W21_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:06,028] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 60/100 (W34_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:06,028 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 60/100 (W34_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:06,059] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 70/100 (W55_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:06,059 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 70/100 (W55_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:06,083] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 80/100 (W89_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:06,083 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 80/100 (W89_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:06,109] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 90/100 (W144_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:06,109 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 90/100 (W144_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:06,137] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 100/100 (W233_range): 670→670 cols (-0 dead)
+2026-10-03 04:04:06,137 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 100/100 (W233_range): 670→670 cols (-0 dead)
+[2026-10-03 04:04:06,140] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] complete: 67000 total generated, 0 dead dropped, 67000 survivors
+2026-10-03 04:04:06,140 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] complete: 67000 total generated, 0 dead dropped, 67000 survivors
+[2026-10-03 04:04:08,342] INFO momentum.FeatureEngineering.feature_factory: [Layer 3] 100% - Layer 3 completed: 67000 features
+2026-10-03 04:04:08,342 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 3] 100% - Layer 3 completed: 67000 features
+[2026-10-03 04:04:08,342] INFO momentum.FeatureEngineering.feature_factory: Layer 3 done: 67000 cols, status=ok, rss=1007MB
+2026-10-03 04:04:08,342 - momentum.FeatureEngineering.feature_factory - INFO - Layer 3 done: 67000 cols, status=ok, rss=1007MB
+[2026-10-03 04:04:08,342] INFO momentum.FeatureEngineering.feature_factory: [Layer 4] 0% - Starting Layer 4...
+2026-10-03 04:04:08,342 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 4] 0% - Starting Layer 4...
+[2026-10-03 04:04:08,342] INFO momentum.FeatureEngineering.feature_factory: Layer 4 starting, rss=1007MB
+2026-10-03 04:04:08,342 - momentum.FeatureEngineering.feature_factory - INFO - Layer 4 starting, rss=1007MB
+[2026-10-03 04:04:08,352] INFO momentum.FeatureEngineering.feature_factory: [NaN Blacklist][L4_input[layer1_and_raw]] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+2026-10-03 04:04:08,352 - momentum.FeatureEngineering.feature_factory - INFO - [NaN Blacklist][L4_input[layer1_and_raw]] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+[2026-10-03 04:04:08,480] INFO momentum.FeatureEngineering.feature_factory: [Layer 4] 100% - Layer 4 completed: 5400 features
+2026-10-03 04:04:08,480 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 4] 100% - Layer 4 completed: 5400 features
+[2026-10-03 04:04:08,480] INFO momentum.FeatureEngineering.feature_factory: Layer 4 done: 5400 cols, status=ok, rss=1121MB
+2026-10-03 04:04:08,480 - momentum.FeatureEngineering.feature_factory - INFO - Layer 4 done: 5400 cols, status=ok, rss=1121MB
+[2026-10-03 04:04:08,480] INFO momentum.FeatureEngineering.feature_factory: [Layer 5] 0% - Starting Layer 5...
+2026-10-03 04:04:08,480 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 5] 0% - Starting Layer 5...
+[2026-10-03 04:04:08,480] INFO momentum.FeatureEngineering.feature_factory: Layer 5 starting, rss=1121MB
+2026-10-03 04:04:08,480 - momentum.FeatureEngineering.feature_factory - INFO - Layer 5 starting, rss=1121MB
+[2026-10-03 04:04:08,480] INFO momentum.FeatureEngineering.feature_factory: [Layer 5] 100% - Layer 5 completed: 0 features
+2026-10-03 04:04:08,480 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 5] 100% - Layer 5 completed: 0 features
+[2026-10-03 04:04:08,481] INFO momentum.FeatureEngineering.feature_factory: Layer 5 done: 0 cols, status=empty_disabled, rss=1121MB
+2026-10-03 04:04:08,481 - momentum.FeatureEngineering.feature_factory - INFO - Layer 5 done: 0 cols, status=empty_disabled, rss=1121MB
+[2026-10-03 04:04:08,481] INFO momentum.FeatureEngineering.feature_factory: [Layer 6] 0% - Starting Layer 6...
+2026-10-03 04:04:08,481 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 6] 0% - Starting Layer 6...
+[2026-10-03 04:04:08,481] INFO momentum.FeatureEngineering.feature_factory: Layer 6 starting, rss=1121MB
+2026-10-03 04:04:08,481 - momentum.FeatureEngineering.feature_factory - INFO - Layer 6 starting, rss=1121MB
+[2026-10-03 04:04:08,489] INFO momentum.FeatureEngineering.feature_factory: [Layer 6] 100% - Layer 6 completed: 11 features
+2026-10-03 04:04:08,489 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 6] 100% - Layer 6 completed: 11 features
+[2026-10-03 04:04:08,489] INFO momentum.FeatureEngineering.feature_factory: Layer 6 done: 11 cols, status=ok, rss=1122MB
+2026-10-03 04:04:08,489 - momentum.FeatureEngineering.feature_factory - INFO - Layer 6 done: 11 cols, status=ok, rss=1122MB
+[2026-10-03 04:04:08,489] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] 5 DFs → 92617 cols × 1695 rows ≈ 0.63 GB → disk-backed
+2026-10-03 04:04:08,489 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] 5 DFs → 92617 cols × 1695 rows ≈ 0.63 GB → disk-backed
+[2026-10-03 04:04:08,494] INFO momentum.FeatureEngineering.memmap_utils: [memmap] created: shape=(1695, 92617), dtype=<class 'numpy.float32'>, est=0.63 GB  (file auto-unlinked)
+2026-10-03 04:04:08,494 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap] created: shape=(1695, 92617), dtype=<class 'numpy.float32'>, est=0.63 GB  (file auto-unlinked)
+[2026-10-03 04:04:08,494] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 1/5 (739 cols)
+2026-10-03 04:04:08,494 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 1/5 (739 cols)
+[2026-10-03 04:04:08,918] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 2/5 (19467 cols)
+2026-10-03 04:04:08,918 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 2/5 (19467 cols)
+[2026-10-03 04:04:09,623] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 3/5 (67000 cols)
+2026-10-03 04:04:09,623 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 3/5 (67000 cols)
+[2026-10-03 04:04:10,791] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 4/5 (5400 cols)
+2026-10-03 04:04:10,791 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 4/5 (5400 cols)
+[2026-10-03 04:04:11,203] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 5/5 (11 cols)
+2026-10-03 04:04:11,203 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 5/5 (11 cols)
+[2026-10-03 04:05:07,759] INFO momentum.FeatureEngineering.feature_registry: Loaded feature registry with 2 entries
+2026-10-03 04:05:07,759 - momentum.FeatureEngineering.feature_registry - INFO - Loaded feature registry with 2 entries
+[2026-10-03 04:05:07,766] INFO momentum.FeatureEngineering.feature_factory: [Layer 1] 0% - Starting Layer 1...
+2026-10-03 04:05:07,766 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 1] 0% - Starting Layer 1...
+[2026-10-03 04:05:07,769] INFO momentum.FeatureEngineering.feature_factory: Layer 1 starting, rss=2020MB
+2026-10-03 04:05:07,769 - momentum.FeatureEngineering.feature_factory - INFO - Layer 1 starting, rss=2020MB
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,065 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:08,075 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:05:08,075 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:05:08,075 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:05:08,075 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:05:08,075 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:05:08,075 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:05:08,075 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:05:08,075 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+2026-10-03 04:05:08,082 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:05:08,082 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:05:08,082 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+2026-10-03 04:05:08,082 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:05:08,082 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:05:08,082 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:05:08,082 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+[2026-10-03 04:05:09,006] INFO momentum.FeatureEngineering.feature_factory: [Layer 1] 100% - Layer 1 completed: 739 features
+2026-10-03 04:05:09,006 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 1] 100% - Layer 1 completed: 739 features
+[2026-10-03 04:05:09,007] INFO momentum.FeatureEngineering.feature_factory: Layer 1 done: 739 cols, status=ok, rss=1190MB
+2026-10-03 04:05:09,007 - momentum.FeatureEngineering.feature_factory - INFO - Layer 1 done: 739 cols, status=ok, rss=1190MB
+[2026-10-03 04:05:09,007] INFO momentum.FeatureEngineering.feature_factory: [Layer 2] 0% - Starting Layer 2...
+2026-10-03 04:05:09,007 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 2] 0% - Starting Layer 2...
+[2026-10-03 04:05:09,007] INFO momentum.FeatureEngineering.feature_factory: Layer 2 starting, rss=1190MB
+2026-10-03 04:05:09,007 - momentum.FeatureEngineering.feature_factory - INFO - Layer 2 starting, rss=1190MB
+[2026-10-03 04:05:09,007] INFO momentum.FeatureEngineering.feature_factory: [L2] Starting derived features: 739 L1 cols
+2026-10-03 04:05:09,007 - momentum.FeatureEngineering.feature_factory - INFO - [L2] Starting derived features: 739 L1 cols
+[2026-10-03 04:05:09,224] INFO momentum.FeatureEngineering.feature_factory: [NaN Blacklist][L2_input] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+2026-10-03 04:05:09,224 - momentum.FeatureEngineering.feature_factory - INFO - [NaN Blacklist][L2_input] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [5, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [8, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [13, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 3, 3] is missing 2 parameter(s); using defaults slowk=3 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [21, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 3] is missing 2 parameter(s); using defaults slowk=5 slowd=3 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [34, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 5, 5] is missing 2 parameter(s); using defaults slowk=5 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [55, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCH combo [89, 8, 5] is missing 2 parameter(s); using defaults slowk=8 slowd=5 slowk_matype=0 slowd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [5, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [8, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [13, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 3] is missing 1 parameter(s); using defaults fastd_period=3 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [21, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [34, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [55, 5] is missing 1 parameter(s); using defaults fastd_period=5 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHF combo [89, 8] is missing 1 parameter(s); using defaults fastd_period=8 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [9, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [14, 3, 3] is missing 1 parameter(s); using defaults fastk_period=3 fastd_period=3 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 5, 3] is missing 1 parameter(s); using defaults fastk_period=5 fastd_period=3 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [21, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [34, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+2026-10-03 04:05:09,226 - momentum.FeatureEngineering.atomic.parameter_generator - WARNING - STOCHRSI combo [55, 8, 5] is missing 1 parameter(s); using defaults fastk_period=8 fastd_period=5 fastd_matype=0
+[2026-10-03 04:06:02,304] INFO momentum.FeatureEngineering.feature_factory: [L2] Completed: 19467 cols in 53.29s
+2026-10-03 04:06:02,304 - momentum.FeatureEngineering.feature_factory - INFO - [L2] Completed: 19467 cols in 53.29s
+[2026-10-03 04:06:05,387] INFO momentum.FeatureEngineering.feature_factory: [Layer 2] 100% - Layer 2 completed: 19467 features
+2026-10-03 04:06:05,387 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 2] 100% - Layer 2 completed: 19467 features
+[2026-10-03 04:06:05,387] INFO momentum.FeatureEngineering.feature_factory: Layer 2 done: 19467 cols, status=ok, rss=2025MB
+2026-10-03 04:06:05,387 - momentum.FeatureEngineering.feature_factory - INFO - Layer 2 done: 19467 cols, status=ok, rss=2025MB
+[2026-10-03 04:06:05,401] INFO momentum.FeatureEngineering.memmap_utils: [memmap] created: shape=(20329, 19467), dtype=<class 'numpy.float32'>, est=1.58 GB  (file auto-unlinked)
+2026-10-03 04:06:05,401 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap] created: shape=(20329, 19467), dtype=<class 'numpy.float32'>, est=1.58 GB  (file auto-unlinked)
+[2026-10-03 04:06:12,608] INFO momentum.FeatureEngineering.feature_factory: [spill] calib_layer2: 20329×19467 → float32 memmap in 7.2s (freed ~3.2 GB float64)
+2026-10-03 04:06:12,608 - momentum.FeatureEngineering.feature_factory - INFO - [spill] calib_layer2: 20329×19467 → float32 memmap in 7.2s (freed ~3.2 GB float64)
+[2026-10-03 04:06:12,608] INFO momentum.FeatureEngineering.feature_factory: [Layer 3] 0% - Starting Layer 3...
+2026-10-03 04:06:12,608 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 3] 0% - Starting Layer 3...
+[2026-10-03 04:06:12,608] INFO momentum.FeatureEngineering.feature_factory: Layer 3 starting, rss=2798MB
+2026-10-03 04:06:12,608 - momentum.FeatureEngineering.feature_factory - INFO - Layer 3 starting, rss=2798MB
+[2026-10-03 04:06:13,031] INFO momentum.FeatureEngineering.feature_factory: [NaN Blacklist][L3_input] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+2026-10-03 04:06:13,031 - momentum.FeatureEngineering.feature_factory - INFO - [NaN Blacklist][L3_input] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+[2026-10-03 04:07:30,896] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 10/100 (W3_range): 670→670 cols (-0 dead)
+2026-10-03 04:07:30,896 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 10/100 (W3_range): 670→670 cols (-0 dead)
+[2026-10-03 04:07:34,107] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 20/100 (W5_range): 670→670 cols (-0 dead)
+2026-10-03 04:07:34,107 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 20/100 (W5_range): 670→670 cols (-0 dead)
+[2026-10-03 04:07:37,839] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 30/100 (W8_range): 670→670 cols (-0 dead)
+2026-10-03 04:07:37,839 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 30/100 (W8_range): 670→670 cols (-0 dead)
+[2026-10-03 04:07:41,572] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 40/100 (W13_range): 670→670 cols (-0 dead)
+2026-10-03 04:07:41,572 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 40/100 (W13_range): 670→670 cols (-0 dead)
+[2026-10-03 04:07:46,372] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 50/100 (W21_range): 670→670 cols (-0 dead)
+2026-10-03 04:07:46,372 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 50/100 (W21_range): 670→670 cols (-0 dead)
+[2026-10-03 04:07:50,850] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 60/100 (W34_range): 670→670 cols (-0 dead)
+2026-10-03 04:07:50,850 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 60/100 (W34_range): 670→670 cols (-0 dead)
+[2026-10-03 04:07:55,348] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 70/100 (W55_range): 670→670 cols (-0 dead)
+2026-10-03 04:07:55,348 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 70/100 (W55_range): 670→670 cols (-0 dead)
+[2026-10-03 04:08:00,045] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 80/100 (W89_range): 670→670 cols (-0 dead)
+2026-10-03 04:08:00,045 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 80/100 (W89_range): 670→670 cols (-0 dead)
+[2026-10-03 04:08:04,738] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 90/100 (W144_range): 670→670 cols (-0 dead)
+2026-10-03 04:08:04,738 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 90/100 (W144_range): 670→670 cols (-0 dead)
+[2026-10-03 04:08:09,796] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] step 100/100 (W233_range): 670→670 cols (-0 dead)
+2026-10-03 04:08:09,796 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] step 100/100 (W233_range): 670→670 cols (-0 dead)
+[2026-10-03 04:08:10,395] INFO momentum.FeatureEngineering.operators.rolling_aggregator: [L3 streaming][numba][multi] complete: 67000 total generated, 0 dead dropped, 67000 survivors
+2026-10-03 04:08:10,395 - momentum.FeatureEngineering.operators.rolling_aggregator - INFO - [L3 streaming][numba][multi] complete: 67000 total generated, 0 dead dropped, 67000 survivors
+[2026-10-03 04:10:43,608] INFO momentum.FeatureEngineering.feature_factory: [Layer 3] 100% - Layer 3 completed: 67000 features
+2026-10-03 04:10:43,608 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 3] 100% - Layer 3 completed: 67000 features
+[2026-10-03 04:10:43,609] INFO momentum.FeatureEngineering.feature_factory: Layer 3 done: 67000 cols, status=ok, rss=403MB
+2026-10-03 04:10:43,609 - momentum.FeatureEngineering.feature_factory - INFO - Layer 3 done: 67000 cols, status=ok, rss=403MB
+[2026-10-03 04:10:43,609] INFO momentum.FeatureEngineering.feature_factory: [Layer 4] 0% - Starting Layer 4...
+2026-10-03 04:10:43,609 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 4] 0% - Starting Layer 4...
+[2026-10-03 04:10:43,609] INFO momentum.FeatureEngineering.feature_factory: Layer 4 starting, rss=404MB
+2026-10-03 04:10:43,609 - momentum.FeatureEngineering.feature_factory - INFO - Layer 4 starting, rss=404MB
+[2026-10-03 04:10:44,033] INFO momentum.FeatureEngineering.feature_factory: [NaN Blacklist][L4_input[layer1_and_raw]] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+2026-10-03 04:10:44,033 - momentum.FeatureEngineering.feature_factory - INFO - [NaN Blacklist][L4_input[layer1_and_raw]] stripped 62 cols (e.g. ['ohlc_pattern_CDLADVANCEBLOCK', 'ohlc_pattern_CDLDOJISTAR', 'ohlc_pattern_CDLHIKKAKEMOD'])
+[2026-10-03 04:10:44,913] INFO momentum.FeatureEngineering.feature_factory: [Layer 4] 100% - Layer 4 completed: 5400 features
+2026-10-03 04:10:44,913 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 4] 100% - Layer 4 completed: 5400 features
+[2026-10-03 04:10:44,914] INFO momentum.FeatureEngineering.feature_factory: Layer 4 done: 5400 cols, status=ok, rss=391MB
+2026-10-03 04:10:44,914 - momentum.FeatureEngineering.feature_factory - INFO - Layer 4 done: 5400 cols, status=ok, rss=391MB
+[2026-10-03 04:10:44,914] INFO momentum.FeatureEngineering.feature_factory: [Layer 5] 0% - Starting Layer 5...
+2026-10-03 04:10:44,914 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 5] 0% - Starting Layer 5...
+[2026-10-03 04:10:44,914] INFO momentum.FeatureEngineering.feature_factory: Layer 5 starting, rss=391MB
+2026-10-03 04:10:44,914 - momentum.FeatureEngineering.feature_factory - INFO - Layer 5 starting, rss=391MB
+[2026-10-03 04:10:44,917] INFO momentum.FeatureEngineering.feature_factory: [Layer 5] 100% - Layer 5 completed: 0 features
+2026-10-03 04:10:44,917 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 5] 100% - Layer 5 completed: 0 features
+[2026-10-03 04:10:44,917] INFO momentum.FeatureEngineering.feature_factory: Layer 5 done: 0 cols, status=empty_disabled, rss=395MB
+2026-10-03 04:10:44,917 - momentum.FeatureEngineering.feature_factory - INFO - Layer 5 done: 0 cols, status=empty_disabled, rss=395MB
+[2026-10-03 04:10:44,917] INFO momentum.FeatureEngineering.feature_factory: [Layer 6] 0% - Starting Layer 6...
+2026-10-03 04:10:44,917 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 6] 0% - Starting Layer 6...
+[2026-10-03 04:10:44,917] INFO momentum.FeatureEngineering.feature_factory: Layer 6 starting, rss=395MB
+2026-10-03 04:10:44,917 - momentum.FeatureEngineering.feature_factory - INFO - Layer 6 starting, rss=395MB
+[2026-10-03 04:10:45,017] INFO momentum.FeatureEngineering.feature_factory: [Layer 6] 100% - Layer 6 completed: 11 features
+2026-10-03 04:10:45,017 - momentum.FeatureEngineering.feature_factory - INFO - [Layer 6] 100% - Layer 6 completed: 11 features
+[2026-10-03 04:10:45,017] INFO momentum.FeatureEngineering.feature_factory: Layer 6 done: 11 cols, status=ok, rss=356MB
+2026-10-03 04:10:45,017 - momentum.FeatureEngineering.feature_factory - INFO - Layer 6 done: 11 cols, status=ok, rss=356MB
+[2026-10-03 04:10:45,017] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] 5 DFs → 92617 cols × 20329 rows ≈ 7.53 GB → disk-backed
+2026-10-03 04:10:45,017 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] 5 DFs → 92617 cols × 20329 rows ≈ 7.53 GB → disk-backed
+[2026-10-03 04:10:45,335] INFO momentum.FeatureEngineering.memmap_utils: [memmap] created: shape=(20329, 92617), dtype=<class 'numpy.float32'>, est=7.53 GB  (file auto-unlinked)
+2026-10-03 04:10:45,335 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap] created: shape=(20329, 92617), dtype=<class 'numpy.float32'>, est=7.53 GB  (file auto-unlinked)
+[2026-10-03 04:10:45,337] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 1/5 (739 cols)
+2026-10-03 04:10:45,337 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 1/5 (739 cols)
+[2026-10-03 04:10:51,801] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 2/5 (19467 cols)
+2026-10-03 04:10:51,801 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 2/5 (19467 cols)
+[2026-10-03 04:11:22,065] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 3/5 (67000 cols)
+2026-10-03 04:11:22,065 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 3/5 (67000 cols)
+[2026-10-03 04:14:17,342] INFO momentum.FeatureEngineering.memmap_utils: [concat_memmap] DF 3/5: 9216/20329 rows copied, RSS=1211 MB
+2026-10-03 04:14:17,342 - momentum.FeatureEngineering.memmap_utils - INFO - [concat_memmap] DF 3/5: 9216/20329 rows copied, RSS=1211 MB
+[2026-10-03 04:14:47,365] INFO momentum.FeatureEngineering.memmap_utils: [concat_memmap] DF 3/5: 15360/20329 rows copied, RSS=871 MB
+2026-10-03 04:14:47,365 - momentum.FeatureEngineering.memmap_utils - INFO - [concat_memmap] DF 3/5: 15360/20329 rows copied, RSS=871 MB
+[2026-10-03 04:15:06,230] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 4/5 (5400 cols)
+2026-10-03 04:15:06,230 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 4/5 (5400 cols)
+[2026-10-03 04:15:26,603] INFO momentum.FeatureEngineering.memmap_utils: [memmap concat] copying DF 5/5 (11 cols)
+2026-10-03 04:15:26,603 - momentum.FeatureEngineering.memmap_utils - INFO - [memmap concat] copying DF 5/5 (11 cols)
+time: command terminated abnormally
+      918.32 real       221.97 user        88.47 sys
+          3170516992  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            11186811  page reclaims
+             1225311  page faults
+                   0  swaps
+                   0  block input operations
+                 117  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+             1813694  voluntary context switches
+              988464  involuntary context switches
+       2633901571146  instructions retired
+        951717463449  cycles elapsed
+         29027358608  peak memory footprint
+time: signal: Invalid argument

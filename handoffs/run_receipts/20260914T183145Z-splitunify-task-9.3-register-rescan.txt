@@ -1,0 +1,31 @@
+TASK: 20260911-SPLITUNIFY-impl-b9-claude
+COMMIT: 75be4280b2929acd68b73b37badae22d360d9403
+C5-01 甲 -> 甲 NO-ANCHOR
+C5-02 甲 -> 甲 NO-ANCHOR
+C5-03 甲 -> 甲 NO-ANCHOR
+C5-04 甲 -> 甲 NO-ANCHOR
+C5-05 甲 -> 甲 NO-ANCHOR
+C5-06 甲 -> 甲 NO-ANCHOR
+C5-07 甲 -> 甲 NO-ANCHOR
+C5-08 甲 -> 甲 NO-ANCHOR
+C5-09 甲 -> 甲 NO-ANCHOR
+C5-10 甲 -> 甲 NO-ANCHOR
+C5-11 甲 -> 甲 NO-ANCHOR
+C5-12 甲 -> 甲 NO-ANCHOR
+C5-13 甲 -> 甲 momentum/Analysis/event_samples/tables.py:214
+C5-14 甲 -> 甲 momentum/Analysis/event_samples/baseline.py:120
+C5-15 甲 -> 甲 frontend/src/lib/types.ts:2951
+C5-16 甲 -> 甲 tests/golden/splitunify/clusters_oracle.json:6
+C5-17 甲 -> 甲 tests/golden/splitunify/report_int_keys.json:2
+C5-18 甲 -> 甲 frontend/src/app/search/page.tsx:825
+C5-19 乙 -> 乙 momentum/Analysis/event_samples/split_projection.py:329
+C5-20 甲 -> 甲 NO-ANCHOR
+C5-21 甲 -> 甲 momentum/Analysis/event_samples/split_projection.py:875
+C5-22 甲 -> 甲 NO-ANCHOR
+C5-23 甲 -> 甲 tests/momentum/event_samples/test_splitunify_wiring.py:110
+C5-24 甲 -> 甲 NO-ANCHOR
+C5-25 丙 -> 丙 momentum/Analysis/event_samples/ic_feed.py:57
+C5-26 丙 -> 丙 momentum/Analysis/event_samples/pipeline.py:825
+C5-27 丙 -> 丙 momentum/Analysis/event_samples/split_projection.py:881
+C5-28 丙 -> 丙 frontend/src/components/ic-analysis/EventTablesPanel.tsx:361
+C5-29 甲 -> 甲 momentum/Analysis/event_samples/tables.py:372

@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "command": "zsh <S>/gov/run_list.sh <chunk> <log>（三段串行：A＝tests/governance 除 test_govb1_contract_matrix.py 外 111 檔；B／C＝contract matrix 84 節點對半；皆 --deselect test_r6_u1u2u4_g7_worktree_space_quote_paths，同 FKPERF 收據）",
+  "exit_code": 0,
+  "head": "203023c8",
+  "ticket": "PRE-RED 收案前全套治理測試（動共用控制流 _redispatch_check／audit_events.json 且收 epic 前）",
+  "segments": [
+    {
+      "name": "A",
+      "files": 111,
+      "passed": 2693,
+      "failed": 0,
+      "skipped": 5,
+      "xfailed": 3,
+      "xpassed": 0,
+      "elapsed_seconds": 3837
+    },
+    {
+      "name": "B",
+      "nodes": 42,
+      "passed": 40,
+      "failed": 0,
+      "xfailed": 2,
+      "xpassed": 0,
+      "elapsed_seconds": 1313
+    },
+    {
+      "name": "C",
+      "nodes": 42,
+      "passed": 38,
+      "failed": 0,
+      "xfailed": 4,
+      "xpassed": 0,
+      "elapsed_seconds": 450
+    }
+  ],
+  "totals": {
+    "passed": 2771,
+    "failed": 0,
+    "xfailed": 9,
+    "xpassed": 0,
+    "skipped": 5
+  },
+  "baseline_compare": "FKPERF 收據 20261003-fkperf-govsuite.json 之 12 failed 全部轉綠；新增紅 0",
+  "worktree_dirty_count_before": 120,
+  "worktree_dirty_count_after": 120
+}

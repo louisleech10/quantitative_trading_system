@@ -1,0 +1,145 @@
+{
+  "schema_version": 1,
+  "command": "zsh handoffs/run_receipts/prered_probes/ffstore_messages.sh <S> handoffs/run_receipts/20261003-prered-ffstore-messages.txt",
+  "exit_code": 0,
+  "note": "pytest 本身 rc=1（34 failed，Task 2.8 修補前）；本收據產生器 rc=0",
+  "summary": "pytest_rc=1 ============ 34 failed, 82 passed, 26 skipped, 2 warnings in 5.93s =============",
+  "failures": [
+    {
+      "node": "test_gap3_event_analysis_horizon_purge::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly",
+      "message": "momentum.Analysis.event_samples.canonical_holdout.FeatureRunCoverageError: feature_coverage_unknown_legacy_run: feature run manifest 無 time_range（缺鍵或非 dict）——無法對證涵蓋範圍"
+    },
+    {
+      "node": "test_gap3_event_analysis_horizon_purge::test_event_analysis_horizon_purge_10i_prepare_called_once",
+      "message": "momentum.Analysis.event_samples.canonical_holdout.FeatureRunCoverageError: feature_coverage_unknown_legacy_run: feature run manifest 無 time_range（缺鍵或非 dict）——無法對證涵蓋範圍"
+    },
+    {
+      "node": "test_gap3_event_analysis_horizon_purge::test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed",
+      "message": "AssertionError: Regex pattern did not match.  Regex: 'purge 下界不一致'  Input: 'feature_coverage_unknown_legacy_run: feature run manifest 無 time_range（缺鍵或非 dict）——無法對證涵蓋範圍'"
+    },
+    {
+      "node": "test_gap3_event_analysis_horizon_purge::test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud",
+      "message": "AssertionError: Regex pattern did not match.  Regex: '映射到同一個 feature 列'  Input: 'feature_coverage_unknown_legacy_run: feature run manifest 無 time_range（缺鍵或非 dict）——無法對證涵蓋範圍'"
+    },
+    {
+      "node": "test_gap3_event_analysis_horizon_purge::test_event_analysis_horizon_purge_timeframe_seconds_identity",
+      "message": "momentum.Analysis.event_samples.canonical_holdout.FeatureRunCoverageError: feature_coverage_unknown_legacy_run: feature run manifest 無 time_range（缺鍵或非 dict）——無法對證涵蓋範圍"
+    },
+    {
+      "node": "test_gap3_event_analysis_horizon_purge::test_event_analysis_d16_discloses_event_known_at_decision_values",
+      "message": "momentum.Analysis.event_samples.canonical_holdout.FeatureRunCoverageError: feature_coverage_unknown_legacy_run: feature run manifest 無 time_range（缺鍵或非 dict）——無法對證涵蓋範圍"
+    },
+    {
+      "node": "test_gap3_ic_progress_fields::test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis",
+      "message": "AssertionError: 隱式 latest 的任務仍回 None ⇒ Task 6.3 的欄位是空的 assert False  +  where False = isinstance(None, int)"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
+      "message": "AssertionError: start_analysis 被呼叫了 ⇒ 閘門沒擋在它前面 assert [ICAnalyzeReq...e_tiers=None)] == []      Left contains one more item: ICAnalyzeRequest(features_path=None, symbol='BTCUSDT', symbols=None, timefr"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
+      "message": "KeyError: 'detail'"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+      "message": "AssertionError: 橫截面請求繞過了閘門：{\"task_id\":\"gap3-stop-gate-observed\",\"status\":\"running\"} assert 200 == 400  +  where 200 = <Response [200 OK]>.status_code"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
+      "message": "AssertionError: 本機 registry 無該 hash，無法做正向對照 assert []"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_covers_implicit_latest_longitudinal",
+      "message": "AssertionError: 省略 config_hash 就繞過了閘門：{\"task_id\":\"gap3-stop-gate-observed\",\"status\":\"running\"} assert 200 == 400  +  where 200 = <Response [200 OK]>.status_code"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_covers_implicit_latest_cross_sectional",
+      "message": "AssertionError: symbols-only 橫截面繞過了閘門：{\"task_id\":\"gap3-stop-gate-observed\",\"status\":\"running\"} assert 200 == 400  +  where 200 = <Response [200 OK]>.status_code"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_cross_run_empty_hash_means_latest",
+      "message": "AssertionError: 空字串 hash 繞過了閘門：{\"task_id\":\"gap3-stop-gate-observed\",\"status\":\"running\"} assert 200 == 400  +  where 200 = <Response [200 OK]>.status_code"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_matrix_duplicate_symbol_last_is_big_must_block",
+      "message": "AssertionError: 最後那筆超標卻放行：{\"task_id\":\"gap3-stop-gate-observed\",\"status\":\"running\"} assert 200 == 400  +  where 200 = <Response [200 OK]>.status_code"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest",
+      "message": "AssertionError: 本機無可用 manifest，無法做正向對照 assert None"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot",
+      "message": "AssertionError: 本機無可用 manifest，無法做正向對照 assert None"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
+      "message": "assert 200 == 400  +  where 200 = <Response [200 OK]>.status_code"
+    },
+    {
+      "node": "test_gap3_ic_stop_gate::test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
+      "message": "assert 200 == 400  +  where 200 = <Response [200 OK]>.status_code"
+    },
+    {
+      "node": "test_gap3_scan_grid::test_scan_grid_shape_is_exactly_nine_cells",
+      "message": "AssertionError: 每格各跑一次條件 IC assert 0 == 9  +  where 0 = len([])  +    where [] = <api.test_gap3_scan_grid._FakeAnalyzerFactory object at 0x14972eb50>.calls"
+    },
+    {
+      "node": "test_gap3_scan_grid::test_scan_grid_each_cell_has_its_own_receipt_hash",
+      "message": "AssertionError: 每格皆須有 hash assert False  +  where False = all(<generator object test_scan_grid_each_cell_has_its_own_receipt_hash.<locals>.<genexpr> at 0x14971bb30>)"
+    },
+    {
+      "node": "test_gap3_scan_grid::test_scan_grid_infeasible_cell_is_unavailable_without_killing_others",
+      "message": "AssertionError: k=0 之格須算得出來 assert 'unavailable' == 'available'      - available   + unavailable   ? ++"
+    },
+    {
+      "node": "test_gap3_scan_grid::test_scan_grid_cell_timeout_keeps_partial_results",
+      "message": "AssertionError: assert {'feature_cov...t）——無法對證涵蓋範圍'} == {'scan_cell_timeout'}      Extra items in the left set:   'feature_coverage_unknown_legacy_run: feature run manifest 無 time_range（缺鍵或非 dict）——無"
+    },
+    {
+      "node": "test_gap3_scan_grid::test_scan_grid_each_cell_gets_its_own_analyzer",
+      "message": "assert 0 == 9  +  where 0 = len([])  +    where [] = <api.test_gap3_scan_grid._FakeAnalyzerFactory object at 0x14976eeb0>.instances"
+    },
+    {
+      "node": "test_gap3_scan_grid::test_scan_grid_cell_receives_its_own_embargo_override",
+      "message": "assert 0 == 2  +  where 0 = len([])"
+    },
+    {
+      "node": "test_gap3_scan_grid::test_scan_grid_cell_summary_is_populated_from_real_shape",
+      "message": "TypeError: 'NoneType' object is not subscriptable"
+    },
+    {
+      "node": "test_ic_analysis_service::test_append_cross_sectional_labels_real_3sym_oracle",
+      "message": "FileNotFoundError: manifest.json not found: data_cache/features/BTCUSDT/e53e22906c35363757f4cd49d27f973e/manifest.json"
+    },
+    {
+      "node": "test_ic_analysis_service::test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise",
+      "message": "FileNotFoundError: manifest.json not found: data_cache/features/BTCUSDT/e53e22906c35363757f4cd49d27f973e/manifest.json"
+    },
+    {
+      "node": "test_ic_analysis_service::test_append_cross_sectional_labels_mutation_rangeindex_regresses",
+      "message": "FileNotFoundError: manifest.json not found: data_cache/features/BTCUSDT/e53e22906c35363757f4cd49d27f973e/manifest.json"
+    },
+    {
+      "node": "test_splitunify_event_scan_projection::test_required_real_data_present_or_fail_closed",
+      "message": "AssertionError: 本檔之驗收依賴下列真實資料，現已缺席：['RUN_1H', 'RUN_1H_SHORT']。缺席時其餘各條會 skip 而 pytest 仍 rc=0 ⇒ 守衛靜默消失，故在此 fail-closed。#x1F534 **不得**以合成 fixture 補齊（CLAUDE.md 資料真實性鐵律）。 assert not ['RUN_1H', 'RUN_1H_SHOR"
+    },
+    {
+      "node": "test_feature_library_config_hash::test_load_with_config_hash_disambig",
+      "message": "momentum.core.contracts.FeatureNotFoundError: Features not found for BTCUSDT/12h: V2 artifacts missing for config_hash: e53e22906c35363757f4cd49d27f973e"
+    },
+    {
+      "node": "test_feature_library_config_hash::test_load_without_config_hash_matches_find_latest_materialized",
+      "message": "assert None is not None"
+    },
+    {
+      "node": "test_feature_library_config_hash::test_load_multi_without_config_hashes_byte_stable",
+      "message": "momentum.core.contracts.FeatureNotFoundError: Features not found for BTCUSDT/12h: No materialized registry entry"
+    },
+    {
+      "node": "test_ic_cross_sectional_cut2::test_cross_sectional_e2e_real_path_append_and_analyze",
+      "message": "FileNotFoundError: manifest.json not found: data_cache/features/BTCUSDT/e53e22906c35363757f4cd49d27f973e/manifest.json"
+    }
+  ]
+}

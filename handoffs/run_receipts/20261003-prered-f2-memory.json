@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "command": "zsh handoffs/run_receipts/prered_probes/f2_memory_receipt.sh handoffs/run_receipts/20261003-prered-v7seed-HEAD.log <out>",
+  "exit_code": 0,
+  "source_run": "v7_seed_at.sh HEAD（v7 種子原設定：BTCUSDT 12h＋1h、14 天公開窗、全史預熱）；/usr/bin/time -l",
+  "terminated_by_os": true,
+  "wall_seconds": 918.32,
+  "max_rss_bytes": 3170516992,
+  "peak_footprint_bytes": 29027358608,
+  "last_explicitly_completed_segment": {
+    "ts": "2026-10-03 04:10:45,017",
+    "event": "Layer 6 done: 11 cols, status=ok, rss=356MB",
+    "rss_mb": 356
+  },
+  "last_observed_event": {
+    "ts": "2026-10-03 04:15:26,603",
+    "event": "[memmap concat] copying DF 5/5 (11 cols)",
+    "rss_mb": null
+  },
+  "last_rss_observation": {
+    "ts": "2026-10-03 04:14:47,365",
+    "event": "[concat_memmap] DF 3/5: 15360/20329 rows copied, RSS=871 MB",
+    "rss_mb": 871
+  },
+  "completion_semantics": "memmap_utils 之 copying DF 行記於該塊物化與複製之前（非完成）；故 DF 5/5 只代表開始複製，其完成與當時 RSS 無證據",
+  "segments": [
+    {
+      "ts": "2026-10-03 04:03:52,521",
+      "event": "Layer 1 starting, rss=261MB",
+      "rss_mb": 261
+    },
+    {
+      "ts": "2026-10-03 04:03:52,774",
+      "event": "Layer 1 done: 739 cols, status=ok, rss=297MB",
+      "rss_mb": 297
+    },
+    {
+      "ts": "2026-10-03 04:03:52,775",
+      "event": "Layer 2 starting, rss=297MB",
+      "rss_mb": 297
+    },
+    {
+      "ts": "2026-10-03 04:03:58,541",
+      "event": "Layer 2 done: 19467 cols, status=ok, rss=1039MB",
+      "rss_mb": 1039
+    },
+    {
+      "ts": "2026-10-03 04:03:58,547",
+      "event": "Layer 3 starting, rss=1039MB",
+      "rss_mb": 1039
+    },
+    {
+      "ts": "2026-10-03 04:04:08,342",
+      "event": "Layer 3 done: 67000 cols, status=ok, rss=1007MB",
+      "rss_mb": 1007
+    },
+    {
+      "ts": "2026-10-03 04:04:08,342",
+      "event": "Layer 4 starting, rss=1007MB",
+      "rss_mb": 1007
+    },
+    {
+      "ts": "2026-10-03 04:04:08,480",
+      "event": "Layer 4 done: 5400 cols, status=ok, rss=1121MB",
+      "rss_mb": 1121
+    },
+    {
+      "ts": "2026-10-03 04:04:08,480",
+      "event": "Layer 5 starting, rss=1121MB",
+      "rss_mb": 1121
+    },
+    {
+      "ts": "2026-10-03 04:04:08,481",
+      "event": "Layer 5 done: 0 cols, status=empty_disabled, rss=1121MB",
+      "rss_mb": 1121
+    },
+    {
+      "ts": "2026-10-03 04:04:08,481",
+      "event": "Layer 6 starting, rss=1121MB",
+      "rss_mb": 1121
+    },
+    {
+      "ts": "2026-10-03 04:04:08,489",
+      "event": "Layer 6 done: 11 cols, status=ok, rss=1122MB",
+      "rss_mb": 1122
+    },
+    {
+      "ts": "2026-10-03 04:04:08,489",
+      "event": "[memmap concat] 5 DFs → 92617 cols × 1695 rows ≈ 0.63 GB → disk-backed",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:04:08,494",
+      "event": "[memmap concat] copying DF 1/5 (739 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:04:08,918",
+      "event": "[memmap concat] copying DF 2/5 (19467 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:04:09,623",
+      "event": "[memmap concat] copying DF 3/5 (67000 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:04:10,791",
+      "event": "[memmap concat] copying DF 4/5 (5400 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:04:11,203",
+      "event": "[memmap concat] copying DF 5/5 (11 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:05:07,769",
+      "event": "Layer 1 starting, rss=2020MB",
+      "rss_mb": 2020
+    },
+    {
+      "ts": "2026-10-03 04:05:09,007",
+      "event": "Layer 1 done: 739 cols, status=ok, rss=1190MB",
+      "rss_mb": 1190
+    },
+    {
+      "ts": "2026-10-03 04:05:09,007",
+      "event": "Layer 2 starting, rss=1190MB",
+      "rss_mb": 1190
+    },
+    {
+      "ts": "2026-10-03 04:06:05,387",
+      "event": "Layer 2 done: 19467 cols, status=ok, rss=2025MB",
+      "rss_mb": 2025
+    },
+    {
+      "ts": "2026-10-03 04:06:12,608",
+      "event": "[spill] calib_layer2: 20329×19467 → float32 memmap in 7.2s (freed ~3.2 GB float64)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:06:12,608",
+      "event": "Layer 3 starting, rss=2798MB",
+      "rss_mb": 2798
+    },
+    {
+      "ts": "2026-10-03 04:10:43,609",
+      "event": "Layer 3 done: 67000 cols, status=ok, rss=403MB",
+      "rss_mb": 403
+    },
+    {
+      "ts": "2026-10-03 04:10:43,609",
+      "event": "Layer 4 starting, rss=404MB",
+      "rss_mb": 404
+    },
+    {
+      "ts": "2026-10-03 04:10:44,914",
+      "event": "Layer 4 done: 5400 cols, status=ok, rss=391MB",
+      "rss_mb": 391
+    },
+    {
+      "ts": "2026-10-03 04:10:44,914",
+      "event": "Layer 5 starting, rss=391MB",
+      "rss_mb": 391
+    },
+    {
+      "ts": "2026-10-03 04:10:44,917",
+      "event": "Layer 5 done: 0 cols, status=empty_disabled, rss=395MB",
+      "rss_mb": 395
+    },
+    {
+      "ts": "2026-10-03 04:10:44,917",
+      "event": "Layer 6 starting, rss=395MB",
+      "rss_mb": 395
+    },
+    {
+      "ts": "2026-10-03 04:10:45,017",
+      "event": "Layer 6 done: 11 cols, status=ok, rss=356MB",
+      "rss_mb": 356
+    },
+    {
+      "ts": "2026-10-03 04:10:45,017",
+      "event": "[memmap concat] 5 DFs → 92617 cols × 20329 rows ≈ 7.53 GB → disk-backed",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:10:45,337",
+      "event": "[memmap concat] copying DF 1/5 (739 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:10:51,801",
+      "event": "[memmap concat] copying DF 2/5 (19467 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:11:22,065",
+      "event": "[memmap concat] copying DF 3/5 (67000 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:14:17,342",
+      "event": "[concat_memmap] DF 3/5: 9216/20329 rows copied, RSS=1211 MB",
+      "rss_mb": 1211
+    },
+    {
+      "ts": "2026-10-03 04:14:47,365",
+      "event": "[concat_memmap] DF 3/5: 15360/20329 rows copied, RSS=871 MB",
+      "rss_mb": 871
+    },
+    {
+      "ts": "2026-10-03 04:15:06,230",
+      "event": "[memmap concat] copying DF 4/5 (5400 cols)",
+      "rss_mb": null
+    },
+    {
+      "ts": "2026-10-03 04:15:26,603",
+      "event": "[memmap concat] copying DF 5/5 (11 cols)",
+      "rss_mb": null
+    }
+  ],
+  "unmeasured_segments": [
+    "校準域讀取（_resolve_public_window）之獨立 RSS：log 無對應行",
+    "多週期對齊合併後之 L6.5",
+    "L7 寫檔"
+  ],
+  "honest_bounds": "各段 RSS 取自生產碼既有 log 行（Layer 起訖與 memmap 複製進度），非獨立取樣器；peak footprint 含 memmap 與 swap 映射，大於常駐 RSS。最後 log 明示完成之段＝1h Layer 6 done（rss 356 MB）；其後進入 memmap 合併，最後觀測事件＝開始複製 DF 5/5（無 rss），最後一筆 rss＝DF 3/5 複製中 871 MB；終止點之 RSS 無證據；合併之完成、L6.5、L7 未到達、未量測（本機無法於原設定下走到）。v6 測試另於 HEAD 量得 peak footprint 約 71 GB（watch 與 /usr/bin/time 收據於 node_at_commit_watched.sh 產出），d229336e^ 同測試 0.80 GB。修復歸全票排序第 4 步 ICFIRSTALIGN 乙之 MEM-RSS：原設定須完成，或於超出記憶體預算前以具名錯誤 fail-closed；被系統終止不算通過。"
+}

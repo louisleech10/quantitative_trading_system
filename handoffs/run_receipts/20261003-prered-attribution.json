@@ -1,0 +1,133 @@
+{
+  "schema_version": 1,
+  "ticket": "PRE-RED",
+  "command": "handoffs/run_receipts/prered_probes/*.sh（逐項見 items[].cmd）",
+  "exit_code": 0,
+  "head": "c89f32de",
+  "run_date": "2026-10-03",
+  "kline_sha256": "b1ee5b9abcc106631b06a625432e2b5241ffcd384bce548aa3c11d2b2b80d32a",
+  "items": [
+    {
+      "id": "GOV-12",
+      "cmd": "venv/bin/python -m pytest -q -p no:cacheprovider tests/governance/test_mutation_scope_extension.py::test_true_positive_i_quant_fatal_set_is_the_named_12 tests/governance/test_todofmt_sample_fftfmeta.py tests/governance/test_todofmt_constitution_sync.py::test_step1b_no_new_exception_clause_outside_allowlist",
+      "result": "12 failed, 8 passed in 3.15s",
+      "first_bad": {"3adc84d9": 1, "5156d074": 10, "7cdbca15": 1},
+      "first_bad_source": "handoffs/run_receipts/20261003-fkperf-govsuite.json",
+      "verdict": "測試前提過期（三組）"
+    },
+    {
+      "id": "L1-DIRECT-SEGMENTS",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/l1_segments.sh <S> d829754a 04176c18^ 04176c18 2247c394^ 2247c394 d229336e^ d229336e HEAD",
+      "result": {
+        "d829754a": "b092a651", "711b3871(04176c18^)": "b092a651", "04176c18": "b092a651",
+        "d6de3ba6(2247c394^)": "b092a651", "2247c394": "cb398514", "1cbc93f4(d229336e^)": "cb398514",
+        "d229336e": "4f457390", "c89f32de(HEAD)": "4f457390"
+      },
+      "frozen": "b092a651",
+      "components_head_vs_frozen": "column_order／values／nan_mask 不同；dtypes、index、rows 731、columns 739 相同；nan_count 48047→116204"
+    },
+    {
+      "id": "FULL-SINGLE-TF-SEGMENTS",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/full_at_commits.sh <S> d829754a 2247c394^ 2247c394 d229336e^ d229336e HEAD（另以 PRERED_SYMBOL=ETHUSDT PRERED_TF=1h）",
+      "order": "L1 L2 L3 L4 L5 L6 final_L7（canonical 前 8 碼）",
+      "BTCUSDT_12h": {
+        "frozen": "b092a651 df753158 88f49b9a bf303e89 1104a157 ef514660 a6466384",
+        "d829754a": "b092a651 df753158 88f49b9a bf303e89 1104a157 ef514660 a6466384",
+        "d6de3ba6": "b092a651 df753158 88f49b9a bf303e89 1104a157 ef514660 a6466384",
+        "2247c394": "cb398514 63bc5f0a 2cf90487 ff687f81 1104a157 ef514660 8cd67700",
+        "1cbc93f4": "cb398514 63bc5f0a 2cf90487 ff687f81 1104a157 ef514660 8cd67700",
+        "d229336e": "02ae6fa3 2118b6fc 28deccfc f4c22d74 1104a157 f2b3d094 9daed6c3",
+        "c89f32de": "02ae6fa3 2118b6fc 28deccfc f4c22d74 1104a157 f2b3d094 9daed6c3"
+      },
+      "ETHUSDT_1h": {
+        "frozen": "27e5d392 d5524d53 cd7e5d73 c8f176cb f278f767 19d40753 9093147d",
+        "d829754a": "27e5d392 d5524d53 cd7e5d73 c8f176cb f278f767 19d40753 9093147d",
+        "d6de3ba6": "27e5d392 d5524d53 cd7e5d73 c8f176cb f278f767 19d40753 9093147d",
+        "2247c394": "20f82e94 3391a5db fa6dd06c 9ae0f173 f278f767 19d40753 86b40ba3",
+        "1cbc93f4": "20f82e94 3391a5db fa6dd06c 9ae0f173 f278f767 19d40753 86b40ba3",
+        "d229336e": "8912ee39 82abd649 5f1c1c4c 4c24eb89 f278f767 030df72e 58ed1717",
+        "c89f32de": "8912ee39 82abd649 5f1c1c4c 4c24eb89 f278f767 030df72e 58ed1717"
+      },
+      "elapsed_seconds": "BTCUSDT/12h 42–124；ETHUSDT/1h 146–1034"
+    },
+    {
+      "id": "CHANGE-2247c394-COLUMNS",
+      "cmd": "venv/bin/python handoffs/run_receipts/prered_probes/full_coldiff.py <S>/full_d6de3ba6.json <S>/full_2247c394.json 'BETA|CORREL|Klinger|ForceIndex'（ETHUSDT/1h 同）",
+      "result": "兩標的各層 changed_not_matching_pattern＝0；BTCUSDT/12h：L1 18↔18 改名＋1 數值＋1 遮罩；L2 540↔540＋26＋26；L3 1782↔1782＋99＋99；L4 144↔144＋8＋8；L5、L6 不變；final_L7 2484↔2484＋134＋134；欄序（共同欄）不變；feature_count 91099 不變",
+      "verdict": "改變完全落在深稽 BUG-1（BETA／CORREL 改 hl）／BUG-2（Klinger canonical、ForceIndex EMA13）"
+    },
+    {
+      "id": "CHANGE-d229336e-L1-DIRECT",
+      "cmd": "venv/bin/python handoffs/run_receipts/prered_probes/l1_prefix_only.py <S>/l1_1cbc93f4.npz <S>/l1_d229336e.npz",
+      "result": {"columns": 739, "identical": 138, "prefix_mask_only": 601, "added_nan_total": 68145, "violations": 0}
+    },
+    {
+      "id": "CHANGE-d229336e-FULL",
+      "cmd": "venv/bin/python handoffs/run_receipts/prered_probes/full_coldiff.py <S>/full_1cbc93f4.json <S>/full_d229336e.json；zsh suffix_pair.sh <S> d229336e 1cbc93f4；l1_tolerance.py <S>/dump_L1_1cbc93f4.npz <S>/dump_L1_d229336e.npz",
+      "result": {
+        "feature_count": "91099→89966",
+        "L3_columns": "65482→64349（只舊 1439、只新 306）",
+        "all_layers_mask_changed": true,
+        "registry_rows_new": "1695＝預熱 964＋輸出窗 731",
+        "L1_rel_diff_p90_by_segment": {"first_quarter": 0.2816, "middle_half": 0.0012, "last_quarter": 7.78e-7},
+        "L1_last_quarter_over_0.005": 18,
+        "L1_last_quarter_over_0.005_kinds": "OBV、AD（累積型）；CMO_144、TRIX_144、TEMA_233、ADX_144、ADXR_144、MINUS-DM_233、DEMA_233、DX_144、ATR_233、NATR_233 等（長週期遞迴型）"
+      },
+      "verdict": "FF-STAT 第 4 批預熱恆開與已核准之 L3 變更；舊版冷啟動未收斂"
+    },
+    {
+      "id": "HARNESS-SCOPE",
+      "evidence": "新版 registry 列 1695、凍結腳本 raw.index 731 ⇒ _hash_registry_table 雜湊含預熱列、rows 報 731",
+      "verdict": "凍結工具之單週期雜湊範圍過期"
+    },
+    {
+      "id": "ALIAS-409",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/light_at_commit.sh <S> 28596e1e^|28596e1e tests/api/test_batch_alias.py::test_patch_batch_alias_deleting_returns_409",
+      "result": {"a03ca443(28596e1e^)": "1 passed", "28596e1e": "1 failed"},
+      "verdict": "測試前提過期（公開 get 隱藏 deleting）"
+    },
+    {
+      "id": "RESUME-CONFIG-HASH",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/bisect_light.sh <S> 935b24fd c89f32de tests/test_cgsa_resume.py::test_cgsa_config_hash_passed_correctly",
+      "result": {"first_bad": "04176c18", "935b24fd": "1 passed", "04176c18": "AttributeError: SimpleNamespace 缺屬性"},
+      "verdict": "測試前提過期（stub 不全）"
+    },
+    {
+      "id": "V7-RESUME",
+      "cmd": "zsh handoffs/run_receipts/prered_probes/bisect_light.sh <S> 67c4f28e 5a148b8e <v7>；node_at_commit.sh <S> cb53ff19^|cb53ff19 <v7>；v7_seed_at.sh <S> 3d26adda|cb53ff19",
+      "result": {
+        "first_bad": "cb53ff19",
+        "3d26adda": "1 passed（125s，peak footprint 0.89 GB）",
+        "cb53ff19": "AssertionError: CGSA resume_from_manifest was not invoked（Skipping resume … L7 run_status=partial）",
+        "seed_L7_quality": {"3d26adda": "complete（run 結果 partial）", "cb53ff19": "partial：nan_ratio=0.178736601689>max_nan_ratio=0.16346106472"},
+        "HEAD_seed_12h_1h": "1h 20329 列×92617 欄、合併 7.53 GB 磁碟映射、peak footprint 29.0 GB、被系統終止",
+        "HEAD_seed_12h_4h": "完成、partial（warmup_insufficient_history:111）、peak footprint 27.5 GB、1135s",
+        "HEAD_seed_reduced_L1": "complete、33.7s、peak footprint 0.65 GB"
+      },
+      "verdict": "測試前提過期（種子 run 本即品質 partial；cb53ff19 修正 manifest 不一致後如實反映）"
+    }
+  ],
+  "items_v5": [
+    {"id": "MULTI-SEGMENTS", "cmd": "multi_at_commits.sh <S> d829754a 2247c394^ 2247c394 d229336e^",
+     "result": {"d829754a": "b74e57c3/8852c5ad/181173（＝凍結）", "d6de3ba6": "同", "2247c394": "cf1e912c/46b1b6fe/181158", "1cbc93f4": "同"}},
+    {"id": "MULTI-2247c394-COLUMNS", "cmd": "multi_cols_pair.sh <S>",
+     "result": "只舊 4968、只新 4953、數值 268、遮罩 268、型別 119，全屬 BETA|CORREL|Klinger|ForceIndex（範圍外 0）"},
+    {"id": "F2-MULTI-d229336e", "cmd": "watch_run.sh … multi_record.py（d229336e，單獨）",
+     "result": "swap 18.1 GB、磁碟剩 3.3 GB 時看門狗終止 rc=143；最後完成段＝合併 5/5"},
+    {"id": "F2-BTC-1h-single", "cmd": "ablation_big.sh <S>/abl_BTCUSDT_1h BTCUSDT 1h", "result": "新版生成 rc=137（合併 5/5 段）"},
+    {"id": "ABLATION-BTCUSDT-12h", "result": {"C1-full": 82479, "C1-public": 1445, "C2": 6042, "only_old": 1743, "only_new": 0, "U": 0,
+     "C3_reasons": {"nan_rate_rule": 1353, "stable_samples_below_min": 88, "constant": 21, "low_cardinality_skip": 281},
+     "negative_controls": {"mutate_l3": "1 欄 U", "mutate_upstream": "8 欄 U（上游非 C1-full）"}}},
+    {"id": "ABLATION-ETHUSDT-12h", "result": {"C1-full": 82530, "C1-public": 1181, "C2": 6263, "only_old": 1740, "only_new": 0, "U": 0}},
+    {"id": "ABLATION-ETHUSDT-1h", "result": {"C1-full": 74812, "C1-public": 818, "C2": 16137, "only_old": 4, "only_new": 0, "U": 0},
+     "note": "修正探針之 Kurt 界判式前 9 欄判 U；以測試原版 _l3_oracle 重算 0 格不符，屬探針缺陷"},
+    {"id": "F4-CHECK", "cmd": "quality_probe.py BTCUSDT 12h（HEAD）",
+     "result": "partial：warmup_insufficient_history:5239；nan_ratio 未觸發 ⇒ 門檻過期疑點不成立"}
+  ],
+  "pending": ["BTCUSDT/1h 與多週期兩單元之 d229336e 歸因（blocked-by F-2）"],
+  "honest_bounds": [
+    "治理 12 項之首紅沿用 FKPERF 收據之 bisect，本票只在 HEAD 重跑確認仍紅",
+    "全量 run 之 d229336e 數值差異只對 L1 做逐格容差分段；L2–L6 只做逐欄雜湊與尾段比對（尾段多數不等，屬預熱傳導與 FF-STAT 第 4 批明列之 L3 演算法變更，未逐欄歸類到具體子項）",
+    "bisect 之測試檔以 bad 版覆蓋到各 commit；首紅 commit 與其前一版另以該 commit 自身之測試檔單跑確認"
+  ]
+}

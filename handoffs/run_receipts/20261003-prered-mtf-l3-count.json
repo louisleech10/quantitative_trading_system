@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "command": "zsh handoffs/run_receipts/prered_probes/mtf_count_at.sh <S> d229336e^ d229336e; zsh handoffs/run_receipts/prered_probes/mtf_l3_cols_at.sh <S> d229336e^ d229336e; venv/bin/python handoffs/run_receipts/prered_probes/mtf_l3_diff.py …; venv/bin/python handoffs/run_receipts/prered_probes/mtf_l3_newcols_c2.py …",
+  "exit_code": 0,
+  "test": "tests/feature_engineering/test_failopen_correctness.py::test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor",
+  "first_bad": "d229336e（d229336e^ 1 passed；d229336e assert 59962 == 65483）",
+  "old_count": 65483,
+  "new_count": 59962,
+  "only_old": 5524,
+  "only_old_with_dead_reason": {"nan_rate_rule": 4376, "stable_samples_below_min": 160, "constant": 67},
+  "only_old_low_cardinality_skew_kurt": 921,
+  "only_old_low_cardinality_verified_upstream_nunique_le2": 921,
+  "only_new": ["close_trend_MIDPOINT_233_Skew_W3", "hl_momentum_AROONOSC_233_Skew_W3", "hl_trend_MIDPRICE_233_Skew_W3"],
+  "only_new_oracle_check": "三欄皆 mask_equal True、values_within_1e-5 True（tests/feature_engineering/test_ffstat_stable_start.py::_l3_oracle）",
+  "unexplained": 0,
+  "direct_vs_typed_byte_equal": "同測試前段斷言於 HEAD 通過（L1／L2／L3 欄集合、dtype 集合、逐欄位元組）"
+}

@@ -1,0 +1,58 @@
+# PRE-RED red census（審碼 r1 後重產）：FF 三檔沿用首輪實跑段；其餘 19 檔於 Task 2.8 修補後重跑
+## tests/feature_engineering/test_failopen_producer.py rc=1  1 failed, 22 passed in 215.50s (0:03:35) 
+FAILED tests/feature_engineering/test_failopen_producer.py::test_quality_gate_max_ratios_do_not_change_config_hash
+## tests/feature_engineering/test_failopen_manifest.py rc=1  1 failed, 52 passed in 1777.70s (0:29:37) 
+FAILED tests/feature_engineering/test_failopen_manifest.py::test_persist_false_generate_features_metadata
+## tests/feature_engineering/test_b6_warmup_trim.py rc=1  2 failed, 11 passed in 4.81s 
+FAILED tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_trim_ic_first
+FAILED tests/feature_engineering/test_b6_warmup_trim.py::test_warmup_trim_ic_first_public_window_init
+## tests/api/test_batch_retention.py rc=0  39 passed in 3.99s 
+## tests/api/test_gap3_event_analysis_horizon_purge.py rc=1  6 failed, 21 passed in 1.17s 
+FAILED tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly
+FAILED tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_10i_prepare_called_once
+FAILED tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed
+FAILED tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud
+FAILED tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_timeframe_seconds_identity
+FAILED tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values
+## tests/api/test_gap3_ic_progress_fields.py rc=1  1 failed, 4 passed in 1.03s 
+FAILED tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis
+## tests/api/test_gap3_ic_stop_gate.py rc=1  8 failed, 21 passed, 1 skipped in 1.13s 
+FAILED tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_rejects_big_run_without_creating_task
+FAILED tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded
+FAILED tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_covers_cross_sectional_runs
+FAILED tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file
+FAILED tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest
+FAILED tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot
+FAILED tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action
+FAILED tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_stop_gate_alive_no_big_matrix_loaded
+## tests/api/test_gap3_scan_grid.py rc=1  7 failed, 12 passed in 0.95s 
+FAILED tests/api/test_gap3_scan_grid.py::test_scan_grid_shape_is_exactly_nine_cells
+FAILED tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_has_its_own_receipt_hash
+FAILED tests/api/test_gap3_scan_grid.py::test_scan_grid_infeasible_cell_is_unavailable_without_killing_others
+FAILED tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_timeout_keeps_partial_results
+FAILED tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_gets_its_own_analyzer
+FAILED tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_receives_its_own_embargo_override
+FAILED tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_summary_is_populated_from_real_shape
+## tests/api/test_ic_analysis_service.py rc=1  3 failed, 6 passed, 2 skipped in 1.77s 
+FAILED tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_real_3sym_oracle
+FAILED tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise
+FAILED tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_mutation_rangeindex_regresses
+## tests/api/test_ic_la1_degraded_gate.py rc=0  28 passed in 59.57s 
+## tests/api/test_ic_list_features.py rc=0  1 skipped in 0.47s 
+## tests/api/test_ic_run_selector.py rc=0  3 passed, 4 skipped in 0.68s 
+## tests/api/test_splitunify_event_scan_projection.py rc=1  1 failed, 15 passed, 23 skipped in 3.26s 
+FAILED tests/api/test_splitunify_event_scan_projection.py::test_required_real_data_present_or_fail_closed
+## tests/api/test_splitunify_ic_disposition_wiring.py rc=0  1 skipped in 0.03s 
+## tests/api/test_splitunify_route_shared_resolver.py rc=0  1 passed in 0.51s 
+## tests/momentum/Analysis/test_ic_1eb_b5_golden.py rc=0  3 passed, 15 skipped in 0.32s 
+## tests/momentum/Analysis/test_splitunify_canonical_holdout.py rc=0  11 passed, 8 skipped in 0.40s 
+## tests/momentum/Analysis/test_splitunify_stage3_observation.py rc=0  3 passed, 1 skipped in 0.40s 
+## tests/momentum/event_samples/test_ic_event_feature_row_key.py rc=0  14 skipped in 0.04s 
+## tests/momentum/test_feature_library_config_hash.py rc=1  3 failed, 1 passed in 0.04s 
+FAILED tests/momentum/test_feature_library_config_hash.py::test_load_with_config_hash_disambig
+FAILED tests/momentum/test_feature_library_config_hash.py::test_load_without_config_hash_matches_find_latest_materialized
+FAILED tests/momentum/test_feature_library_config_hash.py::test_load_multi_without_config_hashes_byte_stable
+## tests/momentum/test_feature_library_row_index.py rc=0  3 passed, 2 skipped in 0.04s 
+## tests/momentum/test_ic_cross_sectional_cut2.py rc=1  1 failed, 6 passed, 2 warnings in 1.01s 
+FAILED tests/momentum/test_ic_cross_sectional_cut2.py::test_cross_sectional_e2e_real_path_append_and_analyze
+done

@@ -1,0 +1,30 @@
+{
+  "purpose": "EVENTSCAN 寫 SPEC 時同步建「同一事實只寫一次」（代號 B）之 BEFORE 基線。使用者 2026-09-21 裁定：『在 EVENTSCAN 寫 SPEC 時候開始建 B，看用起來如何』。出生理由＝DOCROT2 曾在未量測的情況下宣稱有效，實際指標變差 4.5 倍；本次先記 before 再動手。",
+  "measured_at": "2026-09-21",
+  "source": ".claude/gate/audit.log 之 docrot2_round_metric 事件（debt_clear.sh 銷帳時機械寫入，非人工填）",
+  "command": "python3 -c \"import json,io;recs=[json.loads(l) for l in io.open('.claude/gate/audit.log',encoding='utf-8',errors='replace') if '\\\"docrot2_round_metric\\\"' in l];recs=[r for r in recs if r.get('event')=='docrot2_round_metric'];tot=sum(r.get('canonical_count',0) for r in recs);ds=sum((r.get('category_counts') or {}).get('doc-sync',0) for r in recs);print(tot,ds)\"",
+  "baseline": {
+    "rounds_total": 69,
+    "rounds_with_findings": 55,
+    "canonical_findings_total": 251,
+    "doc_sync_total": 55,
+    "doc_sync_share_pct": 21.9,
+    "doc_sync_per_round": 1.0
+  },
+  "recent_8_rounds": [
+    {"date": "2026-09-20", "session": "20260920-search2event-x-review-r7", "canonical": 6, "doc_sync": 1},
+    {"date": "2026-09-20", "session": "20260920-eventscan-x-consult-r1", "canonical": 11, "doc_sync": 0},
+    {"date": "2026-09-20", "session": "20260920-eventscan-x-consult-r2", "canonical": 14, "doc_sync": 0},
+    {"date": "2026-09-20", "session": "20260920-plaindocs-x-review-r1", "canonical": 14, "doc_sync": 11},
+    {"date": "2026-09-20", "session": "20260920-plaindocs-x-review-r2", "canonical": 9, "doc_sync": 3},
+    {"date": "2026-09-20", "session": "20260920-agentops-x-consult-r1", "canonical": 10, "doc_sync": 5},
+    {"date": "2026-09-20", "session": "20260921-agentops-x-consult-r2", "canonical": 7, "doc_sync": 4},
+    {"date": "2026-09-21", "session": "20260921-docfix-x-consult-r1", "canonical": 10, "doc_sync": 4}
+  ],
+  "after_metric_definition": "EVENTSCAN 之 SPEC／TODO 各審查輪的 doc-sync 條數與佔比，用同一支 docrot2_round_metric、同一組欄位比較。",
+  "honest_limits": [
+    "doc-sync 是委員自標的四值之一，涵蓋『文件與文件、文件與實作不同步』整個類別，比 B 能解的『同一個值多處不一致』寬 ⇒ B 即使完全有效，本指標也不會歸零。",
+    "分母是輪數不是文件數；一輪 findings 多寡受 brief 影響，跨票比較不可靠。",
+    "本基線含治理票（plaindocs／agentops／docfix），其 doc-sync 比例明顯高於量化票（eventscan r1/r2 皆為 0）⇒ 與 EVENTSCAN 後續輪比較時須同時看『同為量化票』之基線，否則會誤判成 B 有效。"
+  ]
+}

@@ -1,0 +1,513 @@
+{
+  "schema_version": 1,
+  "command": "zsh handoffs/run_receipts/prered_probes/refreeze_ab.sh <S>; venv/bin/python handoffs/run_receipts/prered_probes/refreeze_compare.py tests/_golden/failopen/baseline.json <S>/refreeze_B/baseline.json <S>/baseline_before_refreeze.json <out> BTCUSDT/12h,ETHUSDT/12h,ETHUSDT/1h",
+  "exit_code": 0,
+  "units": {
+    "BTCUSDT/12h": {
+      "A_equals_B": true,
+      "changes_old_to_new": {
+        "L1": {
+          "canonical_sha256": [
+            "b092a65105dc",
+            "9198b259a1c1"
+          ],
+          "column_order_sha256": [
+            "abac4a7aac6f",
+            "af56af899e5f"
+          ],
+          "values_sha256": [
+            "2d02e223c6ee",
+            "2618bd72aa9c"
+          ],
+          "nan_mask_sha256": [
+            "710eb874ba19",
+            "6b6cdb9a9a6b"
+          ],
+          "nan_count": [
+            48047,
+            17432
+          ]
+        },
+        "L2": {
+          "canonical_sha256": [
+            "df753158b150",
+            "84373f4e2596"
+          ],
+          "column_order_sha256": [
+            "1fe48c3b68f8",
+            "cfcedf2b4e68"
+          ],
+          "values_sha256": [
+            "857667745091",
+            "846b251e8320"
+          ],
+          "nan_mask_sha256": [
+            "8c8d4660897a",
+            "aabb8fab24cc"
+          ],
+          "nan_count": [
+            2060169,
+            760807
+          ]
+        },
+        "L3": {
+          "canonical_sha256": [
+            "88f49b9a4162",
+            "290226a289bc"
+          ],
+          "column_order_sha256": [
+            "7e1d9d12cbc2",
+            "5b76c8cb6a84"
+          ],
+          "dtypes_sha256": [
+            "f3a1a4390ea2",
+            "54fab30ffd5c"
+          ],
+          "values_sha256": [
+            "ceeef0e8b3f4",
+            "174837e29ec0"
+          ],
+          "nan_mask_sha256": [
+            "673441ffb577",
+            "ae128beaff1e"
+          ],
+          "columns": [
+            65482,
+            64349
+          ],
+          "nan_count": [
+            8334838,
+            688585
+          ],
+          "cell_count": [
+            47867342,
+            47039119
+          ]
+        },
+        "L4": {
+          "canonical_sha256": [
+            "bf303e893b37",
+            "46dabe715de5"
+          ],
+          "column_order_sha256": [
+            "c4e67e384bf2",
+            "935e3ab065c7"
+          ],
+          "values_sha256": [
+            "a2d8d2a9c5e3",
+            "4e3a137c4036"
+          ],
+          "nan_mask_sha256": [
+            "c5093fe7d6d7",
+            "deac2ecd3631"
+          ],
+          "nan_count": [
+            442271,
+            141638
+          ]
+        },
+        "L5": {},
+        "L6": {
+          "canonical_sha256": [
+            "ef51466000cc",
+            "484c7ea1a891"
+          ],
+          "values_sha256": [
+            "0106da257a3e",
+            "1bfe6f152000"
+          ],
+          "nan_mask_sha256": [
+            "bc5a82ba6404",
+            "dca67435629d"
+          ],
+          "nan_count": [
+            98,
+            0
+          ]
+        },
+        "final_L7": {
+          "canonical_sha256": [
+            "a6466384ec8b",
+            "7cb33272db51"
+          ],
+          "column_order_sha256": [
+            "d02551f6eb8d",
+            "463ea05b7705"
+          ],
+          "dtypes_sha256": [
+            "8baefead7141",
+            "34840713c198"
+          ],
+          "values_sha256": [
+            "d345350548e3",
+            "1ab6e6410c36"
+          ],
+          "nan_mask_sha256": [
+            "b9e19e20180e",
+            "5dc337ef9bae"
+          ],
+          "columns": [
+            91099,
+            89966
+          ],
+          "nan_count": [
+            10885423,
+            1608462
+          ],
+          "cell_count": [
+            66593369,
+            65765146
+          ]
+        }
+      },
+      "l1_direct_new": "4f457390b328d7ac59cc91ed2aae487522839a32e448fbb6c3024ef81d6f0a20",
+      "feature_count": [
+        91099,
+        89966
+      ],
+      "config_hash": [
+        "ed7b07065cd492a7526e0def6ea06c93",
+        "e30a7f0a5e709cabbd4429e7df2a5d1e"
+      ]
+    },
+    "ETHUSDT/12h": {
+      "A_equals_B": true,
+      "changes_old_to_new": {
+        "L1": {
+          "canonical_sha256": [
+            "379d0f2522e9",
+            "a89927edb09a"
+          ],
+          "column_order_sha256": [
+            "abac4a7aac6f",
+            "af56af899e5f"
+          ],
+          "values_sha256": [
+            "363cc25aa401",
+            "5c35728a0c29"
+          ],
+          "nan_mask_sha256": [
+            "710eb874ba19",
+            "6b6cdb9a9a6b"
+          ],
+          "nan_count": [
+            48047,
+            17432
+          ]
+        },
+        "L2": {
+          "canonical_sha256": [
+            "b7d416d13a66",
+            "ef20f354efa5"
+          ],
+          "column_order_sha256": [
+            "1fe48c3b68f8",
+            "cfcedf2b4e68"
+          ],
+          "values_sha256": [
+            "3109320f1b77",
+            "9a8550ae53e0"
+          ],
+          "nan_mask_sha256": [
+            "b54460c55a6e",
+            "2c9b23d7f486"
+          ],
+          "nan_count": [
+            2061929,
+            761783
+          ]
+        },
+        "L3": {
+          "canonical_sha256": [
+            "c78d15d2d50d",
+            "8fafa42ebc56"
+          ],
+          "column_order_sha256": [
+            "bfdc06c86c9b",
+            "0066c1612be7"
+          ],
+          "dtypes_sha256": [
+            "865edf9b60c2",
+            "b446ebb9dbb7"
+          ],
+          "values_sha256": [
+            "562ed2c2f2b0",
+            "64d12993b1fd"
+          ],
+          "nan_mask_sha256": [
+            "370fd216140d",
+            "9cc9d13429dd"
+          ],
+          "columns": [
+            65508,
+            64357
+          ],
+          "nan_count": [
+            8332104,
+            680609
+          ],
+          "cell_count": [
+            47886348,
+            47044967
+          ]
+        },
+        "L4": {
+          "canonical_sha256": [
+            "60b1f404b9e8",
+            "eeedd03a4319"
+          ],
+          "column_order_sha256": [
+            "c4e67e384bf2",
+            "935e3ab065c7"
+          ],
+          "values_sha256": [
+            "190dcba5aab1",
+            "114acf21f781"
+          ],
+          "nan_mask_sha256": [
+            "c5093fe7d6d7",
+            "deac2ecd3631"
+          ],
+          "nan_count": [
+            442271,
+            141638
+          ]
+        },
+        "L5": {},
+        "L6": {
+          "canonical_sha256": [
+            "f007b6a8d553",
+            "9ebbdba83d56"
+          ],
+          "values_sha256": [
+            "810d6a375a9f",
+            "de311e88f34c"
+          ],
+          "nan_mask_sha256": [
+            "bc5a82ba6404",
+            "dca67435629d"
+          ],
+          "nan_count": [
+            98,
+            0
+          ]
+        },
+        "final_L7": {
+          "canonical_sha256": [
+            "62a3598853a3",
+            "928ee0237937"
+          ],
+          "column_order_sha256": [
+            "cc53912e343e",
+            "6857fa21f52e"
+          ],
+          "dtypes_sha256": [
+            "3e3b9c48bb20",
+            "2bd616798c3d"
+          ],
+          "values_sha256": [
+            "7bdd233cee8e",
+            "f7b131b1447e"
+          ],
+          "nan_mask_sha256": [
+            "881528a15283",
+            "5b2d2a6d20af"
+          ],
+          "columns": [
+            91125,
+            89974
+          ],
+          "nan_count": [
+            10884449,
+            1601462
+          ],
+          "cell_count": [
+            66612375,
+            65770994
+          ]
+        }
+      },
+      "l1_direct_new": "664d047a4bf9330eb43ba90f89b7c0a751d813132c88632ec90f80535b7a2b97",
+      "feature_count": [
+        91125,
+        89974
+      ],
+      "config_hash": [
+        "ed7b07065cd492a7526e0def6ea06c93",
+        "e30a7f0a5e709cabbd4429e7df2a5d1e"
+      ]
+    },
+    "ETHUSDT/1h": {
+      "A_equals_B": true,
+      "changes_old_to_new": {
+        "L1": {
+          "canonical_sha256": [
+            "27e5d3921ef1",
+            "49411b564110"
+          ],
+          "column_order_sha256": [
+            "abac4a7aac6f",
+            "af56af899e5f"
+          ],
+          "values_sha256": [
+            "3838ec8617e6",
+            "ed8354148596"
+          ],
+          "nan_mask_sha256": [
+            "b06102ed5455",
+            "f31fd62b7458"
+          ],
+          "nan_count": [
+            48835,
+            0
+          ]
+        },
+        "L2": {
+          "canonical_sha256": [
+            "d5524d5372ae",
+            "0c2f07c35482"
+          ],
+          "column_order_sha256": [
+            "1fe48c3b68f8",
+            "cfcedf2b4e68"
+          ],
+          "values_sha256": [
+            "b576fef12f43",
+            "e02e6c4db771"
+          ],
+          "nan_mask_sha256": [
+            "d225ad32548e",
+            "b2610c30a893"
+          ],
+          "nan_count": [
+            2471559,
+            410420
+          ]
+        },
+        "L3": {
+          "canonical_sha256": [
+            "cd7e5d73941b",
+            "25d7b025243d"
+          ],
+          "column_order_sha256": [
+            "85e0ae3ed2cf",
+            "c70d823b4e8e"
+          ],
+          "dtypes_sha256": [
+            "1f16ee8ef517",
+            "91f311049820"
+          ],
+          "values_sha256": [
+            "bdad57f1cf4f",
+            "04d691756adc"
+          ],
+          "nan_mask_sha256": [
+            "faf85e291aec",
+            "9f015f1618a8"
+          ],
+          "columns": [
+            66144,
+            66150
+          ],
+          "nan_count": [
+            9687435,
+            1025267
+          ],
+          "cell_count": [
+            579487584,
+            579540150
+          ]
+        },
+        "L4": {
+          "canonical_sha256": [
+            "c8f176cbff41",
+            "b195b2309c4a"
+          ],
+          "column_order_sha256": [
+            "c4e67e384bf2",
+            "935e3ab065c7"
+          ],
+          "values_sha256": [
+            "d0a2abbde496",
+            "1b41f4580faa"
+          ],
+          "nan_mask_sha256": [
+            "f8f5f1795293",
+            "c798c8ee9320"
+          ],
+          "nan_count": [
+            448749,
+            0
+          ]
+        },
+        "L5": {},
+        "L6": {
+          "canonical_sha256": [
+            "19d40753bc39",
+            "a8d25055805e"
+          ],
+          "values_sha256": [
+            "9d680241e41b",
+            "5f6cdf25f564"
+          ],
+          "nan_mask_sha256": [
+            "f0b7f4ed6e27",
+            "7ca61dc675d8"
+          ],
+          "nan_count": [
+            98,
+            0
+          ]
+        },
+        "final_L7": {
+          "canonical_sha256": [
+            "9093147d42ef",
+            "a02d1808d4b0"
+          ],
+          "column_order_sha256": [
+            "62ea92260e83",
+            "539f9092c1ca"
+          ],
+          "dtypes_sha256": [
+            "d7b4735e54c3",
+            "c29bff92518d"
+          ],
+          "values_sha256": [
+            "b99649abaa0d",
+            "e3db878c3047"
+          ],
+          "nan_mask_sha256": [
+            "b2bb459d1b8e",
+            "3b53e1615f44"
+          ],
+          "columns": [
+            91761,
+            91767
+          ],
+          "nan_count": [
+            12656676,
+            1435687
+          ],
+          "cell_count": [
+            803918121,
+            803970687
+          ]
+        }
+      },
+      "l1_direct_new": "c32e0b78d3af6087ee429d58c3450187c587ed6a1c34f51cbcaa5ef99f458638",
+      "feature_count": [
+        91761,
+        91767
+      ],
+      "config_hash": [
+        "8db16f20ef0c2133c216ef6a2f34a89c",
+        "508a5678a5e04342e5d2e9173bdea6e5"
+      ]
+    }
+  },
+  "deterministic": true,
+  "unlisted_units_preserved": {
+    "BTCUSDT/1h": true,
+    "multi_tf": true
+  }
+}

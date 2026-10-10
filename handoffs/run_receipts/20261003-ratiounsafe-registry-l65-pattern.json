@@ -1,0 +1,673 @@
+{
+ "schema_version": 1,
+ "command": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/ratiounsafe_probes/registry_l65_pattern_probe.py",
+ "exit_code": 0,
+ "tf": "12h",
+ "days": 1000,
+ "artifact_kinds": [
+  "raw（L6.5 經 raw-sink 寫入）"
+ ],
+ "compare": "preprocessing.enabled=False 之 raw 對 preprocessing.enabled=True 之 raw",
+ "rows_raw": 1695,
+ "rows_processed": 1695,
+ "n_pattern_raw": 62,
+ "n_pattern_processed": 62,
+ "pattern_only_in_raw": [],
+ "n_identical": 0,
+ "nonzero_total_raw": 5137,
+ "nonzero_total_processed": 4286,
+ "n_cols_signal_erased": 13,
+ "columns_raw_head": [
+  "ohlc_12h_pattern_BearishCount_W13",
+  "ohlc_12h_pattern_BearishCount_W21",
+  "ohlc_12h_pattern_BearishCount_W5",
+  "ohlc_12h_pattern_BullishCount_W13",
+  "ohlc_12h_pattern_BullishCount_W21",
+  "ohlc_12h_pattern_BullishCount_W5",
+  "ohlc_12h_pattern_CDL2CROWS",
+  "ohlc_12h_pattern_CDL3BLACKCROWS",
+  "ohlc_12h_pattern_CDL3INSIDE",
+  "ohlc_12h_pattern_CDL3LINESTRIKE",
+  "ohlc_12h_pattern_CDL3OUTSIDE",
+  "ohlc_12h_pattern_CDL3STARSINSOUTH"
+ ],
+ "columns_processed_head": [
+  "ohlc_12h_pattern_BearishCount_W13",
+  "ohlc_12h_pattern_BearishCount_W21",
+  "ohlc_12h_pattern_BearishCount_W5",
+  "ohlc_12h_pattern_BullishCount_W13",
+  "ohlc_12h_pattern_BullishCount_W21",
+  "ohlc_12h_pattern_BullishCount_W5",
+  "ohlc_12h_pattern_CDL2CROWS",
+  "ohlc_12h_pattern_CDL3BLACKCROWS",
+  "ohlc_12h_pattern_CDL3INSIDE",
+  "ohlc_12h_pattern_CDL3LINESTRIKE",
+  "ohlc_12h_pattern_CDL3OUTSIDE",
+  "ohlc_12h_pattern_CDL3STARSINSOUTH"
+ ],
+ "per_column": [
+  {
+   "col": "ohlc_12h_pattern_CDL2CROWS",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDL3BLACKCROWS",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDL3INSIDE",
+   "nonzero_raw": 3,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDL3LINESTRIKE",
+   "nonzero_raw": 3,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDL3OUTSIDE",
+   "nonzero_raw": 61,
+   "nonzero_processed": 46,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    -49.0,
+    0.0,
+    49.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDL3STARSINSOUTH",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDL3WHITESOLDIERS",
+   "nonzero_raw": 1,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLABANDONEDBABY",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLADVANCEBLOCK",
+   "nonzero_raw": 30,
+   "nonzero_processed": 25,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    -49.0,
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLBELTHOLD",
+   "nonzero_raw": 210,
+   "nonzero_processed": 182,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLBREAKAWAY",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLCLOSINGMARUBOZU",
+   "nonzero_raw": 134,
+   "nonzero_processed": 117,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    -49.0,
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLCONCEALBABYSWALL",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLCOUNTERATTACK",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLDARKCLOUDCOVER",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLDOJI",
+   "nonzero_raw": 323,
+   "nonzero_processed": 271,
+   "identical": false,
+   "distinct_processed": [
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLDOJISTAR",
+   "nonzero_raw": 11,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLDRAGONFLYDOJI",
+   "nonzero_raw": 61,
+   "nonzero_processed": 56,
+   "identical": false,
+   "distinct_processed": [
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLENGULFING",
+   "nonzero_raw": 344,
+   "nonzero_processed": 294,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    -80.0,
+    0.0,
+    80.0,
+    89.8125,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLEVENINGDOJISTAR",
+   "nonzero_raw": 2,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLEVENINGSTAR",
+   "nonzero_raw": 7,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLGAPSIDESIDEWHITE",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLGRAVESTONEDOJI",
+   "nonzero_raw": 46,
+   "nonzero_processed": 40,
+   "identical": false,
+   "distinct_processed": [
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLHAMMER",
+   "nonzero_raw": 61,
+   "nonzero_processed": 52,
+   "identical": false,
+   "distinct_processed": [
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLHANGINGMAN",
+   "nonzero_raw": 24,
+   "nonzero_processed": 20,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    -49.0,
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLHARAMI",
+   "nonzero_raw": 148,
+   "nonzero_processed": 130,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    -89.8125,
+    -80.0,
+    0.0,
+    80.0,
+    89.8125,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLHARAMICROSS",
+   "nonzero_raw": 41,
+   "nonzero_processed": 30,
+   "identical": false,
+   "distinct_processed": [
+    -89.8125,
+    -80.0,
+    -39.1875,
+    0.0,
+    39.1875,
+    80.0,
+    89.8125
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLHIGHWAVE",
+   "nonzero_raw": 244,
+   "nonzero_processed": 203,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLHIKKAKE",
+   "nonzero_raw": 298,
+   "nonzero_processed": 261,
+   "identical": false,
+   "distinct_processed": [
+    -200.0,
+    -149.0,
+    -100.0,
+    0.0,
+    100.0,
+    149.0,
+    200.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLHIKKAKEMOD",
+   "nonzero_raw": 10,
+   "nonzero_processed": 1,
+   "identical": false,
+   "distinct_processed": [
+    -49.0,
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLHOMINGPIGEON",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLIDENTICAL3CROWS",
+   "nonzero_raw": 2,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLINNECK",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLINVERTEDHAMMER",
+   "nonzero_raw": 3,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLKICKING",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLKICKINGBYLENGTH",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLLADDERBOTTOM",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLLONGLEGGEDDOJI",
+   "nonzero_raw": 321,
+   "nonzero_processed": 269,
+   "identical": false,
+   "distinct_processed": [
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLLONGLINE",
+   "nonzero_raw": 253,
+   "nonzero_processed": 217,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLMARUBOZU",
+   "nonzero_raw": 42,
+   "nonzero_processed": 28,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    -49.0,
+    0.0,
+    49.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLMATCHINGLOW",
+   "nonzero_raw": 26,
+   "nonzero_processed": 20,
+   "identical": false,
+   "distinct_processed": [
+    0.0,
+    49.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLMATHOLD",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLMORNINGDOJISTAR",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLMORNINGSTAR",
+   "nonzero_raw": 2,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLONNECK",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLPIERCING",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLRICKSHAWMAN",
+   "nonzero_raw": 236,
+   "nonzero_processed": 194,
+   "identical": false,
+   "distinct_processed": [
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLRISEFALL3METHODS",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLSEPARATINGLINES",
+   "nonzero_raw": 5,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLSHOOTINGSTAR",
+   "nonzero_raw": 8,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLSHORTLINE",
+   "nonzero_raw": 381,
+   "nonzero_processed": 321,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLSPINNINGTOP",
+   "nonzero_raw": 445,
+   "nonzero_processed": 369,
+   "identical": false,
+   "distinct_processed": [
+    -100.0,
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLSTALLEDPATTERN",
+   "nonzero_raw": 4,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLSTICKSANDWICH",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLTAKURI",
+   "nonzero_raw": 56,
+   "nonzero_processed": 51,
+   "identical": false,
+   "distinct_processed": [
+    0.0,
+    100.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLTASUKIGAP",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLTHRUSTING",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLTRISTAR",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLUNIQUE3RIVER",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLUPSIDEGAP2CROWS",
+   "nonzero_raw": 0,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_CDLXSIDEGAP3METHODS",
+   "nonzero_raw": 7,
+   "nonzero_processed": 0,
+   "identical": false,
+   "distinct_processed": [
+    0.0
+   ]
+  },
+  {
+   "col": "ohlc_12h_pattern_Consensus",
+   "nonzero_raw": 1284,
+   "nonzero_processed": 1089,
+   "identical": false,
+   "distinct_processed": [
+    -1.0,
+    -0.66650390625,
+    -0.60009765625,
+    -0.5,
+    -0.428466796875,
+    -0.333251953125,
+    -0.25,
+    -0.142822265625
+   ]
+  }
+ ]
+}

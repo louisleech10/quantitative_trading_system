@@ -1,0 +1,32 @@
+{
+ "schema_version": 1,
+ "command": "env PYTHONPATH=. PYTHONHASHSEED=0 venv/bin/python handoffs/run_receipts/ratiounsafe_probes/deaddrop_probe.py",
+ "exit_code": 0,
+ "tf": "12h",
+ "days": 1000,
+ "l7_dead_feature_drop": "預設（開）",
+ "n_cols_preprocessing_off": 363,
+ "n_cols_preprocessing_on": 350,
+ "n_pattern_off": 51,
+ "n_pattern_on": 38,
+ "pattern_only_in_off": [
+  "ohlc_12h_pattern_CDL3INSIDE",
+  "ohlc_12h_pattern_CDL3LINESTRIKE",
+  "ohlc_12h_pattern_CDL3WHITESOLDIERS",
+  "ohlc_12h_pattern_CDLDOJISTAR",
+  "ohlc_12h_pattern_CDLEVENINGDOJISTAR",
+  "ohlc_12h_pattern_CDLEVENINGSTAR",
+  "ohlc_12h_pattern_CDLIDENTICAL3CROWS",
+  "ohlc_12h_pattern_CDLINVERTEDHAMMER",
+  "ohlc_12h_pattern_CDLMORNINGSTAR",
+  "ohlc_12h_pattern_CDLSEPARATINGLINES",
+  "ohlc_12h_pattern_CDLSHOOTINGSTAR",
+  "ohlc_12h_pattern_CDLSTALLEDPATTERN",
+  "ohlc_12h_pattern_CDLXSIDEGAP3METHODS"
+ ],
+ "pattern_only_in_on": [],
+ "nonpattern_set_equal": true,
+ "parquet_bytes_preprocessing_off": 1372641,
+ "parquet_bytes_preprocessing_on": 1170890,
+ "honest_bounds": "以前處理關之 pattern 欄近似修後原值通過；非 pattern 欄於兩臂之值不同（前處理本身），故 bytes 差含非 pattern 欄之編碼差，非純 pattern 增量；修後實際增量須於實作後以同設定實測"
+}

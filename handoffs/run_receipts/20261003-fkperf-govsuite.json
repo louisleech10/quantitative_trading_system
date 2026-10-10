@@ -1,0 +1,33 @@
+{
+  "ticket": "FKPERF",
+  "task": "Task 4.5 收尾驗收：全套 pytest tests/governance 與 4bdc2d56 基線逐名比對",
+  "head": "a6af5fb3",
+  "run_date": "2026-10-02/03",
+  "command": "venv/bin/python -m pytest -q -p no:cacheprovider <檔清單> --deselect tests/governance/test_govb1_contract_matrix.py::test_r6_u1u2u4_g7_worktree_space_quote_paths -rfEX（111 檔依 def test_ 數切兩段；背景任務 2 小時上限）",
+  "deselected_reason": "test_r6_u1u2u4_g7_worktree_space_quote_paths 已知會掛住（HANDOFF 坑段），與基線同法排除",
+  "segments": [
+    {"name": "chunk1", "files": 56, "selected": 1417, "passed": 1358, "failed": 0, "xfailed": 4, "xpassed": 0, "elapsed_seconds": 7200, "note": "撞 2 小時上限被停；未跑之 55 節點全屬 test_govb1_contract_matrix.py，由 chunk1b 補跑"},
+    {"name": "chunk1b", "nodes": 55, "passed": 51, "failed": 0, "xfailed": 4, "xpassed": 0, "elapsed_seconds": 3937},
+    {"name": "chunk2", "files": 55, "passed": 1339, "failed": 12, "skipped": 5, "xfailed": 1, "xpassed": 0, "elapsed_seconds": 622}
+  ],
+  "totals": {"passed": 2748, "failed": 12, "skipped": 5, "xfailed": 9, "xpassed": 0, "wall_seconds": 11759},
+  "baseline": {"commit": "4bdc2d56", "red": 0, "note": "4bdc2d56 之 0 紅＝0 failed＋11 strict xfail（commit 訊息）"},
+  "new_red_attribution": {
+    "method": "於 4bdc2d56 與 bcb04a5b（FKPERF 最後一個實作 commit）之 worktree 重跑 12 節點：4bdc2d56 12 passed；bcb04a5b 11 failed 1 passed；再以 git bisect run 於兩者之間逐組定位首個變紅 commit",
+    "groups": [
+      {"tests": ["tests/governance/test_mutation_scope_extension.py::test_true_positive_i_quant_fatal_set_is_the_named_12"], "first_bad_commit": "3adc84d9", "owner": "FF-TFMETA（test：r5 五條修補）", "fkperf_caused": false},
+      {"tests": ["tests/governance/test_todofmt_sample_fftfmeta.py 之 test_boundary_03／test_boundary_06（4 參數）／test_coverage_risk_lists_each_equation_with_named_test（5 參數）共 10 節點"], "first_bad_commit": "5156d074", "owner": "FF-TFMETA（施工清單 manifest）", "fkperf_caused": false},
+      {"tests": ["tests/governance/test_todofmt_constitution_sync.py::test_step1b_no_new_exception_clause_outside_allowlist"], "first_bad_commit": "7cdbca15", "owner": "2026-09-29 設定檔事實修正（.cursorrules 第 12 條新增例外條款）", "fkperf_caused": false, "evidence": "bcb04a5b 上此節點 passed，bcb04a5b..HEAD 唯一改 .cursorrules 者為 7cdbca15"}
+    ],
+    "fkperf_new_red": 0
+  },
+  "boundaries": {
+    "strict_xfail_not_xpass": "XPASS=0（全段）",
+    "workspace_residue": "git status --porcelain 行數開跑前 102、結束後 102；未執行 restore_golden_inventory.sh——開跑前 tests/golden/l65 已有他源之未提交改動，盲目還原會覆蓋之"
+  },
+  "verdict": "Task 4.5 通過：FKPERF 造成之新增紅＝0；12 項既有紅歸 FF-TFMETA 兩 commit 與 2026-09-29 設定檔修正，移交全票排序第 2 步 PRE-RED 一併處理",
+  "honest_boundary": [
+    "chunk1 因時限被停，其 55 未跑節點於 chunk1b 補跑；兩段之間工作區未改動（行數 102 不變）",
+    "全套牆鐘 11,759 秒，較 2026-09-23 之 7,625 秒長；主因為 G-7 檢查對 62787fe..HEAD（1,684 commit）逐次做 git diff -M -C，每次約 20 分鐘，隨歷史成長；與 FKPERF 無關，依使用者『治理不再擴建』未處理，僅登記"
+  ]
+}

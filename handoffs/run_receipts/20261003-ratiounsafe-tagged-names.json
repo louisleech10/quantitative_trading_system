@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "command": "env PYTHONPATH=. venv/bin/python handoffs/run_receipts/ratiounsafe_probes/tagged_names_probe.py",
+  "exit_code": 0,
+  "tf_keys": [
+    "12h",
+    "15m",
+    "1d",
+    "1h",
+    "1m",
+    "1w",
+    "30m",
+    "4h",
+    "5m"
+  ],
+  "n_pattern_l1": 61,
+  "n_pattern_l2": 122,
+  "n_others": 74,
+  "untagged": {
+    "12h": {
+      "pattern_flagged_preprocessor": 183,
+      "pattern_flagged_rolling_aggregator": 183,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_pattern_CDL2CROWS"
+    }
+  },
+  "storage_tagged": {
+    "12h": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_12h_pattern_CDL2CROWS"
+    },
+    "15m": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_15m_pattern_CDL2CROWS"
+    },
+    "1d": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_1d_pattern_CDL2CROWS"
+    },
+    "1h": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_1h_pattern_CDL2CROWS"
+    },
+    "1m": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_1m_pattern_CDL2CROWS"
+    },
+    "1w": {
+      "pattern_flagged_preprocessor": 183,
+      "pattern_flagged_rolling_aggregator": 183,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_pattern_CDL2CROWS"
+    },
+    "30m": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_30m_pattern_CDL2CROWS"
+    },
+    "4h": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_4h_pattern_CDL2CROWS"
+    },
+    "5m": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_5m_pattern_CDL2CROWS"
+    }
+  },
+  "factory_tagged": {
+    "12h": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_12h_pattern_CDL2CROWS"
+    },
+    "15m": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_15m_pattern_CDL2CROWS"
+    },
+    "1d": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_1d_pattern_CDL2CROWS"
+    },
+    "1h": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_1h_pattern_CDL2CROWS"
+    },
+    "1m": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_1m_pattern_CDL2CROWS"
+    },
+    "1w": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_1w_pattern_CDL2CROWS"
+    },
+    "30m": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_30m_pattern_CDL2CROWS"
+    },
+    "4h": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_4h_pattern_CDL2CROWS"
+    },
+    "5m": {
+      "pattern_flagged_preprocessor": 0,
+      "pattern_flagged_rolling_aggregator": 0,
+      "pattern_total": 183,
+      "others_false_positive": 0,
+      "example": "ohlc_5m_pattern_CDL2CROWS"
+    }
+  }
+}
