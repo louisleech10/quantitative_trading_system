@@ -175,7 +175,6 @@ SELECTOR_DEFAULTS: Dict[str, str] = {
 
 # 非臂選擇之 FFACT_ 鍵（具名排除清單；producer 模組 AST 掃描未列於兩清單之任一鍵 ⇒ 紅）。
 NON_ARM_FFACT_KEYS: Sequence[str] = (
-    "FFACT_USE_CGSA",                   # CGSA 開關（frame 路徑刪除屬 FRAMEPATH）
     "FFACT_CGSA_DISK_PRECHECK",         # 磁碟預檢開關
     "FFACT_CGSA_WORK_DIR",              # 工作目錄
     "FFACT_CGSA_MEMORY_BUFFER",         # registry 緩衝群組數（形狀參數）

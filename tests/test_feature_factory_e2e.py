@@ -84,23 +84,6 @@ def test_multi_data_source():
     assert any(col.startswith("volume_") for col in columns)
 
 
-def test_multi_timeframe_alignment():
-    symbol = "BTCUSDT"
-    timeframes = ["1h", "4h", "12h"]
-    if not _has_timeframes(symbol, timeframes):
-        pytest.skip("missing multi-timeframe data")
-
-    factory = _create_e2e_factory()
-    config = ConfigManager().get_merged_config(
-        {"timeframes": {"primary": "12h", "training": timeframes}}
-    )
-    generator = MultiTFGenerator(factory, config)
-    result = generator.generate_multi_tf(symbol)
-    aligned = result.features_df
-    assert not aligned.empty
-    assert any("_1h_" in col for col in aligned.columns) or any(
-        col.startswith("close_1h_") for col in aligned.columns
-    )
 
 
 def test_user_override_rsi_period():

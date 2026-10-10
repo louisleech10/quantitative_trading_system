@@ -168,13 +168,13 @@ def test_completeness_fields(tmp_path: Path) -> None:
 
 
 def test_persist_false_generate_features_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """FFACT_USE_CGSA=0 + persist=False 走非 CGSA generate_features，metadata 帶 completeness status。"""
+    """CGSA + persist=False：走 CGSA raw pipeline（不落 L7 manifest、不寫 raw），metadata 帶 completeness status。"""
     from tests.feature_engineering.test_failopen_contract import _apply_baseline_env, _freeze_baseline_module
 
     _apply_baseline_env(monkeypatch)
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
     monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
     monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa_work"))
+    monkeypatch.setenv("FFACT_FEATURE_REGISTRY_PATH", str(tmp_path / "features" / "registry.json"))
 
     freeze = _freeze_baseline_module()
     start_date, end_date = freeze._window_dates()
@@ -183,11 +183,11 @@ def test_persist_false_generate_features_metadata(monkeypatch: pytest.MonkeyPatc
         cache_dir=TEST_KLINE_CACHE_DIR,
         validate_continuity=False,
     )
+    factory._storage = FeatureStorage(str(tmp_path / "features"))
     result = factory.generate_features(
         BASELINE_SYMBOL,
         BASELINE_TIMEFRAME,
-        # 本測試驗 metadata completeness 欄(L1-L6),非 L6.5 數值;非 CGSA 路徑
-        # d* cache 不可用,開 preprocessing 會觸發全寬 ADF/d* 搜尋跑 30+ 分。
+        # 本測試驗 metadata completeness 欄(L1-L6),非 L6.5 數值
         config_override={"preprocessing": {"enabled": False}},
         force_regenerate=True,
         persist=False,
@@ -195,6 +195,7 @@ def test_persist_false_generate_features_metadata(monkeypatch: pytest.MonkeyPatc
         end_date=end_date,
     )
 
+    assert factory._cgsa_registry is not None
     assert result.hdf5_path == ""
     assert result.metadata["quality_status"] == "complete"
     assert result.metadata["run_status"] == "complete"
@@ -1000,23 +1001,6 @@ def test_writer_timeframe_completeness_ic_first_rewrite_preserves_quality_degrad
     assert after["quality_status"] == "partial"
 
 
-@pytest.mark.requires_kline
-def test_degradation_in_manifest_frame_l65_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Task 2.3 驗證：frame 路徑 L6.5 失敗 ⇒ meta.json 與 result.metadata 皆含 L6.5:preprocessing_failed。"""
-    from momentum.FeatureEngineering.feature_factory import FeatureFactory
-    from tests.feature_engineering import fftfmeta_golden_helpers as fg
-
-    def _boom(self, *_args, **_kwargs):
-        raise RuntimeError("injected preprocessing failure")
-
-    fg.prepare_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
-    monkeypatch.setattr(FeatureFactory, "_layer6_5_pre_ic", _boom)
-    root, _factory, result = fg.generate(tmp_path, fg.fast_payload(["1h"], **fg.HEALTHY))
-    meta = fg.meta_json(root, "1h")
-    for source in (meta, result.metadata):
-        assert "L6.5:preprocessing_failed" in source["failure_reasons"]
-        assert source["quality_status"] == "partial"
-    assert meta["failure_reasons"] == result.metadata["failure_reasons"]
 
 
 def test_boundary_15_degradation_in_manifest_none_threshold_matches_old_verdict() -> None:

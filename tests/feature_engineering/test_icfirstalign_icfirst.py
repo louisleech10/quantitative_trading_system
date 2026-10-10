@@ -552,17 +552,6 @@ def test_migrated_callers_have_no_second_engine_kwargs() -> None:
     assert offenders == []
 
 
-def test_migrated_files_ic_first_paths_not_cgsa_off() -> None:
-    """遷移清單內 IC-first 之呼叫不得在 FFACT_USE_CGSA=0 下（以文字掃描：檔內 IC-first helper 不設 CGSA 關）。"""
-    offenders = []
-    for path in MIGRATED:
-        text = (h.REPO / path).read_text(encoding="utf-8")
-        if "IC_FIRST_OFF_ENV" in text and re.search(r"IC_FIRST_OFF_ENV\s*=.*FFACT_USE_CGSA", text):
-            offenders.append(path)
-        for match in re.finditer(r"def (\w*ic_first\w*)\(.*?\n(?=def |\Z)", text, flags=re.S):
-            if '"FFACT_USE_CGSA", "0"' in match.group(0) or "FFACT_USE_CGSA=0" in match.group(0):
-                offenders.append(f"{path}:{match.group(1)}")
-    assert offenders == []
 
 
 def _swallows_alignment(source: str) -> bool:

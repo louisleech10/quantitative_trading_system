@@ -116,22 +116,11 @@ class _RealLayer0Factory:
     def _layer6_meta_features(self, layer1, layer2, data, config):
         return pd.DataFrame(index=layer1.index)
 
-    def _layer6_5_preprocessing(self, all_features, config):
-        return all_features
 
-    def _combine_layers(self, layers, context="unknown"):
-        valid = [layer for layer in layers if layer is not None and not layer.empty]
-        if not valid:
-            return pd.DataFrame()
-        combined = pd.concat(valid, axis=1)
-        return combined.loc[:, ~combined.columns.duplicated(keep="first")]
 
     def _compute_config_hash(self, config, symbol=None, timeframe=None, start_date=None, end_date=None):
         return "golden"
 
-    @staticmethod
-    def _cgsa_enabled() -> bool:
-        return True
 
     def _persist_layer_output_groups(self, frame, layer, label):
         del frame, layer, label
@@ -167,17 +156,6 @@ class _RealLayer0Factory:
             config_used={},
         )
 
-    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash, batch_id=None, **_canonical):
-        features_df = self._combine_layers(layers).reindex(raw_data.index)
-        return SimpleNamespace(
-            features_df=features_df,
-            labels_df=pd.DataFrame(index=features_df.index),
-            metadata={"config_hash": config_hash},
-            feature_count=features_df.shape[1],
-            generation_time=elapsed,
-            layer_counts={},
-            config_used={},
-        )
 
 
 def test_before_baseline_shows_lookahead() -> None:
@@ -262,6 +240,8 @@ def test_real_generate_down_open_close_and_invariant(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    # FRAMEPATH：多週期 legacy（registry 為 None）已刪 ⇒ 粗→細（1h 主週期、12h 來源）之 open_minus／close_time
+    # 逐值與無前視斷言改經 CGSA 多週期組裝承接
     open_df, open_captures = _run_real_generate(
         monkeypatch,
         tmp_path,
@@ -269,7 +249,7 @@ def test_real_generate_down_open_close_and_invariant(
         training=["1h", "12h"],
         mode=AlignmentMode.OPEN_MINUS,
         use_searchsorted=True,
-        use_cgsa=False,
+        use_cgsa=True,
     )
     assert not open_df.empty
     assert open_captures
@@ -286,7 +266,7 @@ def test_real_generate_down_open_close_and_invariant(
         training=["1h", "12h"],
         mode=AlignmentMode.CLOSE_TIME,
         use_searchsorted=True,
-        use_cgsa=False,
+        use_cgsa=True,
     )
     assert not close_df.empty
     _assert_no_lookahead(close_captures[0])
@@ -294,28 +274,6 @@ def test_real_generate_down_open_close_and_invariant(
     _assert_down_close_after_exact(close_df)
 
 
-@pytest.mark.requires_kline
-def test_real_generate_up_and_path_matrix(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    outputs = []
-    for use_cgsa in (False, True):
-        for use_searchsorted in (False, True):
-            df, captures = _run_real_generate(
-                monkeypatch,
-                tmp_path,
-                primary="12h",
-                training=["12h", "1h"],
-                mode=AlignmentMode.OPEN_MINUS,
-                use_searchsorted=use_searchsorted,
-                use_cgsa=use_cgsa,
-            )
-            assert not df.empty
-            if use_cgsa or use_searchsorted:
-                assert captures
-                _assert_no_lookahead(captures[0])
-            outputs.append(df)
-
-    pd.testing.assert_frame_equal(outputs[0], outputs[1], check_dtype=False)
-    pd.testing.assert_frame_equal(outputs[2], outputs[3], check_dtype=False)
 
 
 @pytest.mark.requires_kline

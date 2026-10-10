@@ -70,102 +70,17 @@ class StubFactory:
     def _layer6_meta_features(self, layer1, layer2, data, config):
         return pd.DataFrame()
 
-    def _layer6_5_preprocessing(self, all_features, config):
-        return all_features
 
-    def _combine_layers(self, layers, context="unknown"):
-        valid_layers = [layer for layer in layers if layer is not None and not layer.empty]
-        if not valid_layers:
-            return pd.DataFrame()
-        combined = pd.concat(valid_layers, axis=1)
-        if combined.columns.has_duplicates:
-            combined = combined.loc[:, ~combined.columns.duplicated(keep="first")]
-        return combined
 
     def _compute_config_hash(self, config, symbol=None, timeframe=None, start_date=None, end_date=None):
         return "dummy_hash"
 
-    def _layer7_validate_and_persist(self, symbol, timeframe, raw_data, layers, config, elapsed, config_hash, batch_id=None, **_canonical):
-        features_df = self._combine_layers(layers).reindex(raw_data.index)
-        return SimpleNamespace(
-            features_df=features_df,
-            labels_df=pd.DataFrame(index=features_df.index),
-            # 新契約：週期三欄由工廠依產生器傳入之 canonical 物件產出（FF-TFMETA Task 2.2）
-            metadata={"config_hash": config_hash, "layer_counts": {}, **(_canonical.get("timeframe_completeness") or {})},
-            feature_count=features_df.shape[1],
-            generation_time=elapsed,
-            layer_counts={},
-            config_used={},
-        )
 
 
-def test_multi_tf_generator_aligns_and_tags():
-    primary_ts = [0, 12 * 3600 * 1000, 24 * 3600 * 1000]
-    primary_data = pd.DataFrame({"timestamp": primary_ts, "value": [10, 11, 12]})
-
-    hourly_ts = [i * 3600 * 1000 for i in range(25)]
-    hourly_data = pd.DataFrame({"timestamp": hourly_ts, "value": list(range(25))})
-
-    factory = StubFactory({"12h": primary_data, "1h": hourly_data})
-    generator = MultiTFGenerator(factory, DummyConfig())
-    result = generator.generate_multi_tf("BTCUSDT")
-    df = result.features_df
-
-    assert len(df) == 3
-    assert "close_12h_trend_EMA_21" in df.columns
-    assert "close_1h_trend_EMA_21" in df.columns
-    assert df.columns.is_unique
-
-    # OPEN_MINUS: for 12h open at 12:00, lower TF uses 11:00 bar (value=11), not 12:00 bar (value=12).
-    assert df["close_1h_trend_EMA_21"].iloc[1] == 11
-
-    # MultiTF mode: primary timeframe columns are also tagged for explicit TF identity.
-    assert "close_trend_EMA_21" not in df.columns
 
 
-def test_multi_tf_generator_skips_primary_self_alignment(monkeypatch):
-    """測試 primary timeframe 會跳過 self-alignment 呼叫。"""
-    primary_ts = [0, 12 * 3600 * 1000, 24 * 3600 * 1000]
-    primary_data = pd.DataFrame({"timestamp": primary_ts, "value": [10, 11, 12]})
-
-    hourly_ts = [i * 3600 * 1000 for i in range(25)]
-    hourly_data = pd.DataFrame({"timestamp": hourly_ts, "value": list(range(25))})
-
-    factory = StubFactory({"12h": primary_data, "1h": hourly_data})
-    generator = MultiTFGenerator(factory, DummyConfig())
-
-    original_align = TimeframeAligner.align_to_primary
-    called_source_tfs = []
-
-    def _spy_align(source_df, source_tf, primary_timestamps, primary_tf, alignment_mode=AlignmentMode.OPEN_MINUS):
-        called_source_tfs.append(source_tf)
-        if source_tf == primary_tf:
-            raise AssertionError("Primary TF should skip self-alignment")
-        return original_align(source_df, source_tf, primary_timestamps, primary_tf, alignment_mode)
-
-    monkeypatch.setattr(TimeframeAligner, "align_to_primary", staticmethod(_spy_align))
-
-    result = generator.generate_multi_tf("BTCUSDT")
-
-    assert result.features_df.shape[0] == 3
-    assert called_source_tfs == ["1h"]
 
 
-def test_apply_timeframe_tag_format_and_skip_prefixes():
-    df = pd.DataFrame(
-        {
-            "close_RSI_14": [1.0],
-            "close_RSI_14_Lag_3": [2.0],
-            "meta_quality": [3.0],
-            "label_return_5": [4.0],
-        }
-    )
-    tagged = MultiTFGenerator._apply_timeframe_tag(df, "1h")
-
-    assert "close_1h_RSI_14" in tagged.columns
-    assert "close_1h_RSI_14_Lag_3" in tagged.columns
-    assert "meta_1h_quality" in tagged.columns
-    assert "label_return_5" in tagged.columns
 
 
 def test_ensure_primary_appends_and_deduplicates():
@@ -177,35 +92,8 @@ def test_ensure_primary_appends_and_deduplicates():
     assert result_no_primary == ["4h", "1h", "12h"]
 
 
-def test_lower_tf_missing_fails_closed_unless_partial_enabled():
-    primary_ts = [0, 12 * 3600 * 1000]
-    primary_data = pd.DataFrame({"timestamp": primary_ts, "value": [10, 11]})
-    factory = StubFactory({"12h": primary_data})
-
-    generator = MultiTFGenerator(factory, DummyConfig())
-    with pytest.raises(RuntimeError, match="Timeframe 1h failed"):
-        generator.generate_multi_tf("BTCUSDT")
-
-    partial_config = DummyConfig()
-    partial_config.allow_partial_timeframes = True
-    result = MultiTFGenerator(factory, partial_config).generate_multi_tf("BTCUSDT")
-
-    assert result.features_df.shape[0] == 2
-    assert result.metadata["skipped_timeframes"] == ["1h"]
-    assert result.metadata["present_timeframes"] == ["12h"]
 
 
-def test_short_primary_data_still_generates():
-    primary_ts = [i * 12 * 3600 * 1000 for i in range(10)]
-    primary_data = pd.DataFrame({"timestamp": primary_ts, "value": list(range(10))})
-    hourly_ts = [i * 3600 * 1000 for i in range(120)]
-    hourly_data = pd.DataFrame({"timestamp": hourly_ts, "value": list(range(120))})
-
-    factory = StubFactory({"12h": primary_data, "1h": hourly_data})
-    generator = MultiTFGenerator(factory, DummyConfig())
-    result = generator.generate_multi_tf("BTCUSDT")
-
-    assert result.features_df.shape[0] == 10
 
 
 def test_sparse_lower_tf_alignment_yields_leading_nan_without_error():
@@ -417,10 +305,14 @@ def test_open_minus_does_not_shift_primary_self_alignment():
     assert aligned["feature"].tolist() == [10, 11, 12]
 
 
-def test_multi_tf_generator_propagates_date_range_to_all_layer0_calls():
-    class SpyFactory(StubFactory):
-        def __init__(self, data_by_tf):
-            super().__init__(data_by_tf)
+def test_multi_tf_generator_propagates_date_range_to_all_layer0_calls(tmp_path, monkeypatch):
+    from tests.feature_engineering.test_failopen_producer import _CgsaStubFactory
+
+    monkeypatch.setenv("FFACT_MULTI_TF_PARALLEL", "0")
+
+    class SpyFactory(_CgsaStubFactory):
+        def __init__(self, data_by_tf, registry):
+            super().__init__(data_by_tf, registry)
             self.calls = []
 
         def _layer0_data_ingestion(self, symbol, timeframe, config, start_date=None, end_date=None):
@@ -445,7 +337,7 @@ def test_multi_tf_generator_propagates_date_range_to_all_layer0_calls():
     hourly_ts = [i * 3600 * 1000 for i in range(25)]
     hourly_data = pd.DataFrame({"timestamp": hourly_ts, "value": list(range(25))})
 
-    factory = SpyFactory({"12h": primary_data, "1h": hourly_data})
+    factory = SpyFactory({"12h": primary_data, "1h": hourly_data}, ColumnGroupRegistry(tmp_path / "cgsa_work"))
     generator = MultiTFGenerator(factory, DummyConfig())
 
     result = generator.generate_multi_tf(
@@ -477,7 +369,6 @@ _TF_KEYS = ("expected_timeframes", "present_timeframes", "failed_timeframes")
 _PATH_ENV = {
     "cgsa_serial": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "0"},
     "cgsa_parallel": {"FFACT_USE_CGSA": "1", "FFACT_MULTI_TF_PARALLEL": "1"},
-    "legacy": {"FFACT_USE_CGSA": "0", "FFACT_MULTI_TF_PARALLEL": "0"},
 }
 _CASES = {
     "healthy": (["1h", "12h"], (["1h", "12h"], ["1h", "12h"], []), "complete"),
@@ -516,7 +407,8 @@ def _inject_layer_status(monkeypatch: pytest.MonkeyPatch, timeframe: str, layer_
 
 
 def _artifact(path: str, root, primary_tf: str, result) -> dict:
-    return fg.meta_json(root, primary_tf) if path == "legacy" else fg.l7_manifest(root, primary_tf, result)
+    del path
+    return fg.l7_manifest(root, primary_tf, result)
 
 
 def _run_case(tmp_path, monkeypatch, path: str, case: str, **overrides):

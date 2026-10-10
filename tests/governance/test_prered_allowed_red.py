@@ -25,7 +25,6 @@ STATES = {"pending-approval", "owned-by-later-ticket"}
 # 重凍（使用者 2026-10-03 核可）後之狀態：五支 pending 列已刪；多週期基準與 config_hash 釘值歸 F-2；
 # 刪除舊特徵 run（使用者 2026-10-03 核可）所致之紅經 red census 實跑列入（收據 handoffs/run_receipts/20261003-prered-red-census.txt）
 EXPECTED = {
-    ("tests/feature_engineering/test_failopen_manifest.py::test_persist_false_generate_features_metadata", "FRAMEPATH", "user-ruling", "owned-by-later-ticket"),
     ("tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values", "FFSTORE", "user-ruling", "owned-by-later-ticket"),
     ("tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_10i_prepare_called_once", "FFSTORE", "user-ruling", "owned-by-later-ticket"),
     ("tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly", "FFSTORE", "user-ruling", "owned-by-later-ticket"),

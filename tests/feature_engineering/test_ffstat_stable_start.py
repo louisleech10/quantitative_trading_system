@@ -533,7 +533,9 @@ def test_dispatcher_call_resolution_is_class_bound() -> None:
 
 def test_inventory_closure_reaches_off_prefix_and_nested_steps() -> None:
     """r27 codex P1-01：盤點為呼叫鏈遞移閉包——名稱不合前綴（縮尾核心）、模組層 `if HAS_NUMBA:` 內定義（WQ 核心）、
-    polars_adapter 經 import 呼叫、以及 L6.5 公開入口皆須入列。"""
+    polars_adapter 經 import 呼叫、以及 L6.5 公開入口皆須入列。（FRAMEPATH：r28 之 `from … import TimeframeAligner`
+    後 `TimeframeAligner._timeframe_seconds_keys` 範例只經 legacy 多週期之 `_apply_timeframe_tag` 可達，隨 frame 刪除；
+    刪後閉包內已無只經該解析可達之 TimeframeAligner 方法，主委 2026-10-08 試作工作樹實算）"""
     got = _ast_step_functions()
     fe = "momentum.FeatureEngineering"
     for name in (f"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor._winsorize_2d_legacy_equivalent",
@@ -541,9 +543,7 @@ def test_inventory_closure_reaches_off_prefix_and_nested_steps() -> None:
                  f"{fe}.polars_adapter:polars_l2_derived_momentum",
                  f"{fe}.polars_adapter:polars_l65_winsorization",
                  f"{fe}.preprocessing.feature_preprocessor:FeaturePreprocessor.transform_registry_groups_to_sink",
-                 f"{fe}.preprocessing._numba_transforms:transform_array_fast",
-                 # r28 codex P2-02：`from … import TimeframeAligner` 後之 TimeframeAligner.X 解析為類別方法
-                 f"{fe}.timeframe.tf_aligner:TimeframeAligner._timeframe_seconds_keys"):
+                 f"{fe}.preprocessing._numba_transforms:transform_array_fast"):
         assert name in got, name
 
 

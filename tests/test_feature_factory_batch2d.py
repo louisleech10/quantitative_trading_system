@@ -167,8 +167,8 @@ def test_task211_materialize_wide_df_prefers_parquet(tmp_path: Path):
 
 
 def test_task210_layer7_cgsa_per_group_validate_without_materialize(tmp_path: Path, monkeypatch):
-    """Task 2.10: CGSA Layer 7 應做 per-group validate，且不在 validate 階段 materialize。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
+    """Task 2.10（FRAMEPATH：改走唯一 CGSA L7 入口 `_layer7_raw_from_cgsa_pipeline`）：per-group validate，且不在 validate 階段 materialize、persist=False 不落盤（V1 版面寫入 persist_registry_to_parquet 已刪，落盤探針改掛 V2 串流寫入）。"""
+    from types import SimpleNamespace
 
     factory = FeatureFactory(config_manager=Mock(), adapter_registry=Mock())
     registry = ColumnGroupRegistry(work_dir=tmp_path / "registry")
@@ -201,20 +201,21 @@ def test_task210_layer7_cgsa_per_group_validate_without_materialize(tmp_path: Pa
 
     persist_called = {"value": False}
 
-    def _fake_persist_registry_to_parquet(*args, **kwargs):
+    def _fake_write_raw_from_registry_stream(*args, **kwargs):
         del args, kwargs
         persist_called["value"] = True
-        return []
+        raise AssertionError("persist=False 不得呼叫 write_raw_from_registry_stream")
 
-    monkeypatch.setattr(factory._storage, "persist_registry_to_parquet", _fake_persist_registry_to_parquet)
+    monkeypatch.setattr(factory._storage, "write_raw_from_registry_stream", _fake_write_raw_from_registry_stream)
 
+    config = _DummyConfig()
+    config.preprocessing = SimpleNamespace(enabled=False)
     raw_data = pd.DataFrame({"close": [100.0, 101.0, 102.0]})
-    result = factory._layer7_validate_and_persist(
+    result = factory._layer7_raw_from_cgsa_pipeline(
         symbol="ETHUSDT",
         timeframe="1h",
         raw_data=raw_data,
-        layers=[],
-        config=_DummyConfig(),
+        config=config,
         elapsed=1.23,
         config_hash="cfg_batch2d",
         compute_warnings=["pre-existing warning"],

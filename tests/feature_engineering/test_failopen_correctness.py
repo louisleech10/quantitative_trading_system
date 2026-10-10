@@ -366,12 +366,13 @@ def test_mtf_12h_l1_l3_direct_matches_preserve_dtype_executor(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """12h L1-L3：direct 層呼叫 vs preserve_dtype typed caller dtype/values/columns 一致。"""
+    """12h L1-L3：direct 層呼叫 vs preserve_dtype typed caller dtype/values/columns 一致（L3 走 in_memory 級距之非串流分支）。"""
     _require_kline()
     freeze = _freeze_baseline_module()
     _apply_baseline_env(monkeypatch)
     monkeypatch.setenv("FFACT_LAYER1_PARALLEL", "0")
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
+    # FRAMEPATH：未建 registry 之直接層呼叫只能走 L3 in_memory 非串流分支（streaming／hybrid 須 registry，否則具名拒絕）
+    monkeypatch.setenv("FFACT_L3_PERSIST_MODE", "in_memory")
 
     factory = create_feature_factory(cache_dir=KLINE_CACHE_DIR, validate_continuity=False)
     payload = _fast_config_payload(

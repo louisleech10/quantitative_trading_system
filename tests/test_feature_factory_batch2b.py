@@ -14,7 +14,6 @@ from momentum.FeatureEngineering.feature_factory import (
     MAX_L2_ESTIMATED_COLS,
     FeatureFactory,
 )
-from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
 
 
 class _DummyOperators:
@@ -132,14 +131,15 @@ def test_task24_l2_estimate_cols_respects_breaker_threshold():
     assert estimated > MAX_L2_ESTIMATED_COLS
 
 
-def test_task25_feature_factory_combine_layers_cgsa_noop(monkeypatch):
-    """Task 2.5: FeatureFactory._combine_layers 在 CGSA 模式下為 no-op。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
+def test_task25_feature_factory_combine_layers_rejects_final_merge():
+    """Task 2.5（FRAMEPATH Task 1.2 改契約）：FeatureFactory._combine_layers 對 layer7_final 具名拒絕，不做全欄合併。"""
+    import pytest
+
+    from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError
 
     layer = pd.DataFrame({"f1": [1.0, 2.0]})
-    combined = FeatureFactory._combine_layers([layer], context="layer7_final")
-
-    assert combined.empty
+    with pytest.raises(CGSARegistryRequiredError):
+        FeatureFactory._combine_layers([layer], context="layer7_final")
 
 
 def test_task25_layer4_forces_layer1_and_raw_in_cgsa(monkeypatch):
@@ -177,31 +177,7 @@ def test_task25_layer4_forces_layer1_and_raw_in_cgsa(monkeypatch):
     assert captured["layer_count"] == 2
 
 
-def test_task25_multitf_combine_layers_cgsa_noop(monkeypatch):
-    """Task 2.5: MultiTFGenerator._combine_layers 在 CGSA 模式下為 no-op。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
-
-    layer = pd.DataFrame({"f1": [1.0, 2.0]})
-    combined = MultiTFGenerator._combine_layers([layer])
-
-    assert combined.empty
 
 
-def test_task26_multitf_tagging_skips_when_registry_present(monkeypatch):
-    """Task 2.6: CGSA + registry 存在時，Multi-TF tagging 應跳過 rename。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
-
-    features_df = pd.DataFrame({"close_trend_EMA_5": [1.0, 2.0]})
-    tagged = MultiTFGenerator._apply_timeframe_tag(features_df, "1h", registry=object())
-
-    assert tagged.columns.tolist() == ["close_trend_EMA_5"]
 
 
-def test_task26_multitf_tagging_fallback_when_registry_absent(monkeypatch):
-    """Task 2.6: 非 CGSA 或無 registry 時，Multi-TF tagging 應維持舊 rename 路徑。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
-
-    features_df = pd.DataFrame({"close_trend_EMA_5": [1.0, 2.0]})
-    tagged = MultiTFGenerator._apply_timeframe_tag(features_df, "1h", registry=None)
-
-    assert tagged.columns.tolist() == ["close_1h_trend_EMA_5"]

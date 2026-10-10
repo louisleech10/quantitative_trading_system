@@ -340,6 +340,8 @@ def test_warmup_insufficient_report_near_dataset_start(
 def test_warmup_quality_gain_position_independent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
     _require_kline()
     before = _snapshot_production_features()
     features_root = _isolate_feature_output(monkeypatch, tmp_path)
@@ -347,8 +349,15 @@ def test_warmup_quality_gain_position_independent(
     start, end = _date_window(120)
     cfg = _minimal_config()
 
+    def _persisted(root: Path, result: Any) -> pd.DataFrame:
+        # FRAMEPATH：CGSA 之 features_df 只帶索引不帶欄 ⇒ 欄值改由本次落盤之 raw 讀回（同一輸出窗）
+        reader = FeatureReader(str(root))
+        config_hash = str(result.metadata["config_hash"])
+        manifest = reader.load_manifest_v2("BTCUSDT", "12h", config_hash, allow_partial=True)
+        columns = [c for group in manifest["artifacts"]["raw"]["groups"].values() for c in group.get("columns", [])]
+        return reader.load_columns_v2("BTCUSDT", "12h", config_hash, columns, allow_partial=True)
+
     monkeypatch.setenv("FFACT_WARMUP_TRIM", "0")
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
     factory_off = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
     factory_off._storage = FeatureStorage(str(features_root / "off"))
     res_off = factory_off.generate_features(
@@ -361,7 +370,6 @@ def test_warmup_quality_gain_position_independent(
     )
 
     monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
     factory_on = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
     factory_on._storage = FeatureStorage(str(features_root / "on"))
     res_on = factory_on.generate_features(
@@ -372,14 +380,19 @@ def test_warmup_quality_gain_position_independent(
         start_date=start,
         end_date=end,
     )
+    off_df = _persisted(features_root / "off", res_off)
+    on_df = _persisted(features_root / "on", res_on)
 
     window = factory_on._current_output_window
     assert window is not None and window.warmup_enabled
-    cols = _position_independent_columns(list(res_on.features_df.columns))
+    cols = _position_independent_columns(list(on_df.columns))
+    # CGSA 落盤保留全 NaN 死欄（frame 之 L7 死欄刪除不在 CGSA 落盤路徑；主委 2026-10-08 探針：本設定 25 欄中
+    # meta_12h_Momentum_Divergence、meta_12h_Volatility_Regime 全 NaN、stable_start 為 None）⇒ 只量有有效值之欄
+    cols = [c for c in cols if on_df[c].notna().any()]
     assert cols, "no position-independent columns to measure"
     k = min(50, max(1, window.max_warmup_bars // 4))
-    off_sub = res_off.features_df[cols].iloc[:k]
-    on_sub = res_on.features_df[cols].iloc[:k]
+    off_sub = off_df[cols].iloc[:k]
+    on_sub = on_df[cols].iloc[:k]
     valid_off = float(off_sub.notna().mean().mean())
     valid_on = float(on_sub.notna().mean().mean())
     # FFSTAT v32（使用者 2026-09-27 R1「預熱恆開」、刪 FFACT_WARMUP_TRIM）：環境變數不再能關預熱 ⇒ 兩次輸出開頭 k 列
@@ -405,60 +418,6 @@ def test_trim_dataframe_preserves_values() -> None:
     np.testing.assert_array_equal(trimmed["a"].to_numpy(), np.array([6.0, 7.0, 8.0]))
 
 
-def _run_cgsa_l1_l6_into_registry(
-    factory: Any,
-    symbol: str,
-    timeframe: str,
-    config: Any,
-    start: str,
-    end: str,
-    window: OutputWindow,
-) -> pd.DataFrame:
-    """執行與 generate_features 一致的 CGSA L1-L6，將非空 groups 寫入 registry。"""
-    factory._current_symbol = symbol
-    factory._current_timeframe = timeframe
-    factory._current_output_window = window
-
-    config_hash = factory._compute_config_hash(
-        config, symbol, timeframe, start_date=start, end_date=end,
-    )
-    factory._current_config_hash = config_hash
-    factory._cgsa_registry = factory._prepare_cgsa_registry(symbol, timeframe, config_hash)
-
-    raw_data = factory._layer0_data_ingestion(
-        symbol,
-        timeframe,
-        config,
-        start_date=factory._layer0_ingest_start_date_for_tf(
-            timeframe, config.timeframes.primary,
-        ),
-        end_date=end,
-    )
-    factory._current_raw_data = raw_data
-
-    layer1 = factory._execute_layer1_6(
-        "Layer 1", factory._layer1_atomic_indicators, raw_data, config,
-    ).data
-    layer2 = factory._spill_to_memmap(
-        factory._execute_layer1_6(
-            "Layer 2", factory._layer2_derived_features, layer1, raw_data, config,
-        ).data,
-        "layer2",
-    )
-    layer3 = factory._execute_layer1_6(
-        "Layer 3", factory._layer3_rolling_aggregation, layer1, layer2, config,
-    ).data
-    layer4 = factory._execute_layer1_6(
-        "Layer 4", factory._layer4_lag_features, layer1, layer2, layer3, raw_data, config,
-    ).data
-    layer5 = factory._execute_layer1_6(
-        "Layer 5", factory._layer5_cross_sectional, layer1, layer2, config,
-    ).data
-    layer6 = factory._execute_layer1_6(
-        "Layer 6", factory._layer6_meta_features, layer1, layer2, raw_data, config,
-    ).data
-    factory._persist_single_tf_l3_l6_to_cgsa(layer3, layer4, layer5, layer6)
-    return raw_data
 
 
 def _assert_warmup_trim_artifact(
@@ -522,17 +481,6 @@ def _assert_warmup_trim_artifact(
     _assert_data_cache_unchanged(before)
 
 
-@pytest.mark.requires_kline
-def test_warmup_trim_non_cgsa_l7_validate(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
-) -> None:
-    _assert_warmup_trim_artifact(
-        monkeypatch,
-        tmp_path,
-        path_name="non_cgsa",
-        env={"FFACT_WARMUP_TRIM": "1", "FFACT_USE_CGSA": "0"},
-        config_override=_minimal_config(),
-    )
 
 
 @pytest.mark.requires_kline
@@ -548,56 +496,6 @@ def test_warmup_trim_cgsa_raw(
     )
 
 
-@pytest.mark.requires_kline
-def test_warmup_trim_cgsa_validate(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
-) -> None:
-    """CGSA validate/V7：非空 registry groups + row_slice trim + manifest row_count。"""
-    _require_kline()
-    before = _snapshot_production_features()
-    features_root = _isolate_feature_output(monkeypatch, tmp_path)
-    monkeypatch.setenv("FFACT_WARMUP_TRIM", "1")
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
-
-    start, end = _date_window(90)
-    factory = create_feature_factory(cache_dir=TEST_KLINE_CACHE_DIR, validate_continuity=False)
-    factory._storage = FeatureStorage(str(features_root))
-    config = factory._resolve_config(_minimal_config())
-    window = resolve_output_window(config, "12h", start, end)
-
-    raw_data = _run_cgsa_l1_l6_into_registry(
-        factory, "BTCUSDT", "12h", config, start, end, window,
-    )
-    registry = factory._cgsa_registry
-    assert registry is not None
-    group_count = len(list(registry.iter_all()))
-    total_features = int(registry.total_columns())
-    assert group_count > 0, "CGSA validate test requires non-empty registry groups"
-    assert total_features > 0, "CGSA validate test requires non-empty feature columns"
-
-    config_hash = factory._compute_config_hash(
-        config, "BTCUSDT", "12h", start_date=start, end_date=end,
-    )
-    result = factory._layer7_validate_and_persist(
-        symbol="BTCUSDT",
-        timeframe="12h",
-        raw_data=raw_data,
-        layers=[],
-        config=config,
-        elapsed=1.0,
-        config_hash=config_hash,
-        persist=True,
-    )
-    expected_rows = _expected_output_row_count_from_ingest(
-        factory, "BTCUSDT", "12h", config, start, end, window,
-    )
-    assert result.feature_count == total_features
-    assert len(result.features_df) == expected_rows
-    _assert_trimmed_first_row_is_start(result.features_df.index, start, window)
-    manifest_path = _resolve_manifest_path(result, features_root)
-    if manifest_path is not None:
-        assert _read_manifest_row_count(manifest_path) == expected_rows
-    _assert_data_cache_unchanged(before)
 
 
 @pytest.mark.requires_kline

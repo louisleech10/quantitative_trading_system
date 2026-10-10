@@ -13,7 +13,6 @@ import pytest
 
 from momentum.FeatureEngineering.feature_factory import (
     FeatureFactory,
-    _build_column_layer_map,
 )
 from momentum.FeatureEngineering.preprocessing._d_star_cache import read_d_star_json
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
@@ -21,7 +20,6 @@ from scripts.freeze_batch2d_baseline import (
     FREEZE_ENV_DEFAULTS,
     KLINE_PATH,
     _run_cgsa,
-    _run_control,
 )
 
 
@@ -67,130 +65,10 @@ def _read_d_star_cache_dir(cache_dir: Path) -> Dict[str, float]:
     return read_d_star_json(cache_paths[0])
 
 
-def _subprocess_dstar_phase(phase: str) -> Dict[str, Any]:
-    """隔離記憶體：子程序跑 frame/cgsa d* phase（fracdiff ON）。"""
-    with tempfile.TemporaryDirectory(prefix=f"batch2d_p4_{phase}_") as temp_dir:
-        out_path = Path(temp_dir) / "result.json"
-        env = os.environ.copy()
-        for key, value in FREEZE_ENV_DEFAULTS.items():
-            env.setdefault(key, value)
-        env["FFACT_USE_CGSA"] = "1" if phase == "cgsa" else "0"
-        if phase != "cgsa":
-            env.pop("FFACT_CGSA_WORK_DIR", None)
-        runner = f"""
-import json
-import os
-import sys
-import tempfile
-from pathlib import Path
-
-ROOT = {str(REPO_ROOT)!r}
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
-
-from scripts.freeze_batch2d_baseline import (
-    KLINE_PATH,
-    SYMBOL,
-    TIMEFRAME,
-    _base_override,
-)
-# FFSTAT b3b：fracdiff 開啟時校準值只取起始日前之前史（每欄 ≥ N＝500 個有效值，否則 fail-closed）；
-# 凍結窗 2024-06-01 起之 12h 前史僅約 300 根 ⇒ 本 frame／CGSA 同值比對改用前史充足之窗（不依凍結基準）
-START_DATE = "2025-10-01"
-END_DATE = "2026-04-01"
-from momentum.FeatureEngineering.feature_storage import FeatureStorage
-from momentum.FeatureEngineering.preprocessing._d_star_cache import read_d_star_json
-from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
-from momentum.factories import create_feature_factory
-
-def _read_cache(cache_dir: Path):
-    paths = sorted(cache_dir.glob("d_star_*.json"))
-    if len(paths) != 1:
-        raise RuntimeError(f"expected one d-star cache, found {{len(paths)}}")
-    return read_d_star_json(paths[0])
-
-with tempfile.TemporaryDirectory(prefix="batch2d_p4_worker_") as temp_dir:
-    temp_root = Path(temp_dir)
-    override = _base_override()
-    # FFSTAT b3b：完整設定之部分欄於 12h 前史有效值不足 500（實跑：close_12h_trend_MIDPOINT_144_Std_W3 於 2025-10-01 前
-    # 僅 407 個；N=200 時 MIDPOINT_233_Skew_W3 僅 197 個）⇒ fail-closed；
-    # 本測試只驗 frame 與 CGSA 兩路 d* 同值（兩路同 N），故設 N=100
-    override["preprocessing"] = {{"calibration_bars": 100, "fractional_differencing": {{"enabled": True}}}}
-    if {phase!r} == "frame":
-        os.environ["FFACT_USE_CGSA"] = "0"
-        feature_dir = temp_root / "frame" / "features"
-        cache_dir = temp_root / "frame" / "d_star"
-        FeaturePreprocessor._d_star_cache_dir = staticmethod(lambda: cache_dir)
-        factory = create_feature_factory(
-            cache_dir=str(KLINE_PATH.parent), validate_continuity=False
-        )
-        factory._storage = FeatureStorage(str(feature_dir))
-        result = factory.generate_features(
-            SYMBOL,
-            TIMEFRAME,
-            config_override=override,
-            force_regenerate=True,
-            start_date=START_DATE,
-            end_date=END_DATE,
-            persist=True,
-        )
-        if result.features_df.empty:
-            raise RuntimeError("non-CGSA frame path returned empty features_df")
-        column_layer_map = dict(factory._column_layer_map or {{}})
-        if not column_layer_map:
-            raise RuntimeError("non-CGSA frame path missing column_layer_map")
-        payload = {{
-            "d_star": _read_cache(cache_dir),
-            "column_layer_map": column_layer_map,
-        }}
-    else:
-        os.environ["FFACT_USE_CGSA"] = "1"
-        os.environ["FFACT_CGSA_WORK_DIR"] = str(temp_root / "cgsa" / "registry")
-        feature_dir = temp_root / "cgsa" / "features"
-        cache_dir = temp_root / "cgsa" / "d_star"
-        FeaturePreprocessor._d_star_cache_dir = staticmethod(lambda: cache_dir)
-        factory = create_feature_factory(
-            cache_dir=str(KLINE_PATH.parent), validate_continuity=False
-        )
-        factory._storage = FeatureStorage(str(feature_dir))
-        factory.generate_features(
-            SYMBOL,
-            TIMEFRAME,
-            config_override=override,
-            force_regenerate=True,
-            start_date=START_DATE,
-            end_date=END_DATE,
-            persist=True,
-        )
-        payload = {{"d_star": _read_cache(cache_dir)}}
-    Path({str(out_path)!r}).write_text(
-        json.dumps(payload, ensure_ascii=False), encoding="utf-8"
-    )
-"""
-        subprocess.run(
-            [sys.executable, "-c", runner],
-            cwd=REPO_ROOT,
-            env=env,
-            check=True,
-        )
-        return json.loads(out_path.read_text(encoding="utf-8"))
 
 
-def _l12_dstar_intersection(
-    frame_d_star: Dict[str, float],
-    cgsa_d_star: Dict[str, float],
-    bare_layer_map: Dict[str, str],
-) -> List[str]:
-    return sorted(
-        column
-        for column in frame_d_star
-        if column in cgsa_d_star
-        and bare_layer_map.get(column) in _L12_LAYERS
-    )
 
 
-def _tagged_l36_columns(provenance: Dict[str, str]) -> List[str]:
-    return sorted(column for column, layer in provenance.items() if layer in _L36_LAYERS)
 
 
 def _assert_nan_mask_gate(
@@ -250,34 +128,8 @@ class TestGolden:
         assert provenance["same_layer_for_common_columns"] is True
 
 
-def test_batch2d_map_unit_keep_first_and_matches_combine() -> None:
-    index = pd.RangeIndex(2)
-    layers = [
-        pd.DataFrame({"shared": [1.0, 2.0], "l1": [3.0, 4.0]}, index=index),
-        pd.DataFrame({"shared": [5.0, 6.0], "l2": [7.0, 8.0]}, index=index),
-        pd.DataFrame(index=index),
-        None,
-        pd.DataFrame({"l5": [9.0, 10.0]}, index=index),
-        pd.DataFrame({"l6": [11.0, 12.0]}, index=index),
-    ]
-
-    column_layer_map = _build_column_layer_map(layers)
-    combined = FeatureFactory._combine_layers(layers, context="batch2d_map_unit")
-
-    assert column_layer_map == {
-        "shared": "L1",
-        "l1": "L1",
-        "l2": "L2",
-        "l5": "L5",
-        "l6": "L6",
-    }
-    assert set(combined.columns) == set(column_layer_map)
 
 
-def test_batch2d_map_unit_rejects_non_string_column() -> None:
-    layers = [pd.DataFrame({1: [1.0]})]
-    with pytest.raises(AssertionError, match="non-str column"):
-        _build_column_layer_map(layers)
 
 
 def test_batch2d_filter_parity_map_matches_registry_layer(
@@ -341,83 +193,7 @@ def test_batch2d_read_d_star_json_exports_values(tmp_path: Path) -> None:
 
 
 class TestP4Parity:
-    @pytest.mark.slow
-    @pytest.mark.requires_kline
-    def test_t3_d_star_parity_exact_on_l12_intersection(self) -> None:
-        """T3 主 gate：非 CGSA vs CGSA L1/L2 交集 d* exact，0 mismatch。"""
-        _require_real_kline()
-        frame_payload = _subprocess_dstar_phase("frame")
-        cgsa_payload = _subprocess_dstar_phase("cgsa")
-        frame_d_star = {str(k): float(v) for k, v in frame_payload["d_star"].items()}
-        cgsa_d_star = {str(k): float(v) for k, v in cgsa_payload["d_star"].items()}
-        bare_layer_map = {
-            str(column): str(layer)
-            for column, layer in frame_payload["column_layer_map"].items()
-        }
 
-        intersection = _l12_dstar_intersection(frame_d_star, cgsa_d_star, bare_layer_map)
-        if not intersection:
-            pytest.fail("T3 vacuous: L1/L2 d* intersection is empty")
-
-        mismatches = [
-            column
-            for column in intersection
-            if frame_d_star[column] != cgsa_d_star[column]
-        ]
-        if mismatches:
-            sample = mismatches[:5]
-            details = [
-                f"{column}: frame={frame_d_star[column]} cgsa={cgsa_d_star[column]}"
-                for column in sample
-            ]
-            pytest.fail(
-                f"T3 d* mismatch count={len(mismatches)}/{len(intersection)} "
-                f"sample={details}"
-            )
-
-        assert len(mismatches) == 0
-        assert len(intersection) >= 3000
-
-    @pytest.mark.slow
-    @pytest.mark.requires_kline
-    def test_control_l3_l6_runs_ic_first_not_legacy_frozen(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
-        """control：L65 B2 後不得再回到 legacy-era frozen full-output。"""
-        _require_real_kline()
-        frozen_control = _load_golden("control")
-        provenance = _load_golden("provenance")["frame_column_to_layer"]
-        # Provenance 含 CGSA registry 全欄位；control baseline 僅含 frame 實際輸出欄。
-        l36_columns = [
-            column
-            for column in _tagged_l36_columns(provenance)
-            if column in frozen_control["frame"]["per_column"]
-        ]
-        if not l36_columns:
-            pytest.fail("control gate vacuous: no L3-L6 columns in frozen control")
-
-        _apply_batch2d_env(monkeypatch, use_cgsa=False)
-        with tempfile.TemporaryDirectory(prefix="batch2d_p4_control_") as temp_dir:
-            payload, _ = _run_control(Path(temp_dir))
-        with tempfile.TemporaryDirectory(prefix="batch2d_p4_control_repeat_") as temp_dir:
-            repeat_payload, _ = _run_control(Path(temp_dir))
-
-        assert payload["frame"]["rows"] > 0
-        assert payload["frame"]["columns"] > 0
-        assert payload["frame"]["canonical_sha256"] != frozen_control["frame"]["canonical_sha256"]
-        live_per_column = payload["frame"]["per_column"]
-        repeat_per_column = repeat_payload["frame"]["per_column"]
-        live_l36 = [column for column in l36_columns if column in live_per_column]
-        assert live_l36, "control gate vacuous: no live L3-L6 columns under IC-First"
-        assert all(
-            column in repeat_per_column for column in live_l36
-        ), "control repeat gate vacuous: repeated run missing live L3-L6 columns"
-        _assert_nan_mask_gate(
-            live_per_column,
-            repeat_per_column,
-            live_l36,
-            label="control L3-L6",
-        )
 
     @pytest.mark.slow
     @pytest.mark.requires_kline

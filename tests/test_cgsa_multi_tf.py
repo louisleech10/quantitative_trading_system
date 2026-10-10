@@ -87,26 +87,26 @@ class TestAlignGroupArray:
 class TestCombineLayersContextSkip:
     """Test that _combine_layers skips only for final merge contexts in CGSA mode."""
 
-    def test_layer7_final_skipped_in_cgsa(self, monkeypatch):
-        monkeypatch.setenv("FFACT_USE_CGSA", "1")
-        from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    def test_layer7_final_rejected_in_cgsa(self):
+        """CGSA 不做全欄合併：layer7_final 不在 context 白名單 ⇒ 具名拒絕（FRAMEPATH Task 1.2）。"""
+        from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError, FeatureFactory
         layer = pd.DataFrame({"x": [1.0]})
-        result = FeatureFactory._combine_layers([layer], context="layer7_final")
-        assert result.empty
+        with pytest.raises(CGSARegistryRequiredError):
+            FeatureFactory._combine_layers([layer], context="layer7_final")
 
-    def test_layer6_5_input_skipped_in_cgsa(self, monkeypatch):
-        monkeypatch.setenv("FFACT_USE_CGSA", "1")
-        from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    def test_layer6_5_input_rejected_in_cgsa(self):
+        """CGSA 不做全欄合併：layer6_5_input 不在 context 白名單 ⇒ 具名拒絕（FRAMEPATH Task 1.2）。"""
+        from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError, FeatureFactory
         layer = pd.DataFrame({"x": [1.0]})
-        result = FeatureFactory._combine_layers([layer], context="layer6_5_input")
-        assert result.empty
+        with pytest.raises(CGSARegistryRequiredError):
+            FeatureFactory._combine_layers([layer], context="layer6_5_input")
 
-    def test_multi_tf_merged_skipped_in_cgsa(self, monkeypatch):
-        monkeypatch.setenv("FFACT_USE_CGSA", "1")
-        from momentum.FeatureEngineering.feature_factory import FeatureFactory
+    def test_multi_tf_merged_rejected_in_cgsa(self):
+        """CGSA 不做全欄合併：multi_tf_merged 不在 context 白名單 ⇒ 具名拒絕（FRAMEPATH Task 1.2）。"""
+        from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError, FeatureFactory
         layer = pd.DataFrame({"x": [1.0]})
-        result = FeatureFactory._combine_layers([layer], context="multi_tf_merged")
-        assert result.empty
+        with pytest.raises(CGSARegistryRequiredError):
+            FeatureFactory._combine_layers([layer], context="multi_tf_merged")
 
     def test_layer3_input_not_skipped_in_cgsa(self, monkeypatch):
         """Internal concat for layer3 input MUST still work in CGSA mode."""
@@ -127,14 +127,6 @@ class TestCombineLayersContextSkip:
         assert not result.empty
         assert set(result.columns) == {"a", "b"}
 
-    def test_non_cgsa_never_skips(self, monkeypatch):
-        """With CGSA disabled, all contexts should produce non-empty results."""
-        monkeypatch.setenv("FFACT_USE_CGSA", "0")
-        from momentum.FeatureEngineering.feature_factory import FeatureFactory
-        layer = pd.DataFrame({"x": [1.0]})
-        for ctx in ("layer7_final", "layer6_5_input", "multi_tf_merged", "layer3_input"):
-            result = FeatureFactory._combine_layers([layer], context=ctx)
-            assert not result.empty, f"Context '{ctx}' should NOT be skipped when CGSA=0"
 
 
 # ---------------------------------------------------------------------------
@@ -271,18 +263,7 @@ class TestCGSABoundary:
         assert result.shape == (4, 2)
         assert np.all(np.isnan(result))
 
-    def test_cgsa_enabled_default_is_one(self, monkeypatch):
-        """Default FFACT_USE_CGSA should be '1' (enabled)."""
-        monkeypatch.delenv("FFACT_USE_CGSA", raising=False)
-        assert MultiTFGenerator._cgsa_enabled() is True
 
-        from momentum.FeatureEngineering.feature_factory import FeatureFactory
-        assert FeatureFactory._cgsa_enabled() is True
-
-    def test_cgsa_disabled_via_env(self, monkeypatch):
-        """FFACT_USE_CGSA=0 should disable CGSA."""
-        monkeypatch.setenv("FFACT_USE_CGSA", "0")
-        assert MultiTFGenerator._cgsa_enabled() is False
 
     def test_build_asof_index_map_basic(self):
         """Verify build_asof_index_map used by CGSA alignment."""

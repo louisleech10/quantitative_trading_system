@@ -57,10 +57,8 @@ def _assert_search_failed_one(root: Path, result: Any, dstar_dir: Path) -> None:
     assert entries and untag(col) not in entries
     assert entries <= fracdiffed
     meta = result.metadata
-    # CGSA 路徑之落盤紀錄＝manifest；frame 路徑無 manifest，落盤紀錄為 `<symbol>_<tf>_factory_meta.json`
-    # （`FeatureStorage.save_metadata_json`，主委實跑 2026-09-25）
-    persisted_path = (Path(meta["manifest_path"]) if "manifest_path" in meta
-                      else root / f"{h.SYMBOL}_{h.PRIMARY_TF}_factory_meta.json")
+    # 落盤紀錄＝CGSA manifest（FRAMEPATH：frame 路徑與其 `save_metadata_json` 已刪）
+    persisted_path = Path(meta["manifest_path"])
     manifest = json.loads(persisted_path.read_text(encoding="utf-8"))
     for src in (meta, manifest):
         assert f"{EV['search_failed']}:1" in src["failure_reasons"]
@@ -106,8 +104,7 @@ def _fail_first_parallel_search(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_search_failure_keeps_original_and_degrades(path: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Task 3.1 驗證：注入 d* 搜尋例外（ADF 差分同時開啟）⇒ 該欄無衍生欄、快取無該欄、manifest 與
     result.metadata 之 failure_reasons 皆含 `fracdiff_search_failed:1`、quality_status == partial。"""
-    env = {"FFACT_USE_CGSA": "0"} if path == "frame" else {"FFACT_USE_CGSA": "1"}
-    dstar = h.prepare_stat_env(monkeypatch, tmp_path, **env)
+    dstar = h.prepare_stat_env(monkeypatch, tmp_path)
     if path == "parallel":
         _fail_first_parallel_search(monkeypatch)
     else:

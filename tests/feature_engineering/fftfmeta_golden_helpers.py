@@ -135,9 +135,6 @@ def l7_manifest(root: Path, primary_tf: str, result: Any) -> Dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def meta_json(root: Path, primary_tf: str) -> Dict[str, Any]:
-    """frame／legacy 路徑之 `save_factory_output` 所寫 meta.json。"""
-    return json.loads((root / f"{SYMBOL}_{primary_tf}_factory_meta.json").read_text(encoding="utf-8"))
 
 
 def _sha(data: bytes) -> str:

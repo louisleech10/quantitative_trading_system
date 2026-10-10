@@ -223,15 +223,11 @@ class FeaturePreprocessor:
         }
         self._calibration_packets = None
 
-    def set_no_start_calibration(self, native_maps: Optional[Mapping[str, np.ndarray]] = None) -> None:
+    def set_no_start_calibration(self) -> None:
         """未填起始日之逐欄校準（FFSTAT Task 2.3 ④，v32）：不經前置關卡與封包；各欄於轉換時以公開值（逐欄穩定點
-        遮罩後）最早 N 個有效值校準，校準列於輸出遮為 NaN（`_mask_no_start_rows`）。
-
-        `native_maps`：frame 多週期（legacy）路徑之 {次週期: 逐主週期列之原生列號（對齊前為 NaN）}——該週期之欄
-        於主週期列空間轉換、值為 ffill，最早 N 個值以「不同原生 K 棒」計（不以重複值充數），校準列含顯示這些
-        K 棒之全部主週期列。"""
+        遮罩後）最早 N 個有效值校準，校準列於輸出遮為 NaN（`_mask_no_start_rows`）。多週期由 CGSA native 子實例
+        各自於原生列空間轉換。"""
         self._no_start_calibration = True
-        self._no_start_native_maps = {str(k): np.asarray(v, dtype=np.float64) for k, v in (native_maps or {}).items()}
         self._calibration_source = None
         self._calibration_identity = None
         self._calibration_packets = {}
@@ -366,27 +362,6 @@ class FeaturePreprocessor:
                                    column=name, field="values")
         values = np.asarray(public_values, dtype=np.float64)
         n = self._stationarity_n_for(timeframe)
-        native = getattr(self, "_no_start_native_maps", {}).get(timeframe)
-        if native is not None and len(native) == len(values):
-            # frame 多週期：值為原生 K 棒 ffill 至主週期 ⇒ 每個原生 K 棒只取其首次出現之列
-            finite = np.isfinite(values) & np.isfinite(native)
-            positions = np.flatnonzero(finite)
-            ids = native[positions]
-            firsts = positions[np.r_[True, ids[1:] != ids[:-1]]] if positions.size else positions
-            if firsts.size < n:
-                if firsts.size:
-                    self._record_decision(column, events=[EVENT_CALIBRATION_INSUFFICIENT],
-                                          calibration_shortfall=int(n - firsts.size))
-                return np.empty(0, dtype=np.float64)
-            _stable_mask.calibration_rows_no_start(values[firsts], n)  # 同一純函式（spy 可觀測）
-            first = int(firsts[0])
-            last = int(np.flatnonzero(native == native[firsts[n - 1]])[-1])
-            calibration = values[firsts[:n]]
-            with self._decisions_lock:
-                self._no_start_rows[key] = (first, last)
-                self._no_start_values[key] = calibration
-            self._record_decision(column, n=int(n), calibration_rows=[first, last])
-            return calibration
         rows = _stable_mask.calibration_rows_no_start(values, n)
         if rows is None:
             finite = int(np.isfinite(values).sum())

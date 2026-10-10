@@ -156,8 +156,6 @@ def test_provenance_error_not_degraded() -> None:
         raise StationarityProvenanceError("no layer source")
 
     with pytest.raises(StationarityProvenanceError):
-        factory._execute_l65_with_degradation("Layer 6.5", _missing, pd.DataFrame({"a": [1.0]}), config)
-    with pytest.raises(StationarityProvenanceError):
         factory._safe_execute("Layer 6.5 pre_ic", _missing)
 
 

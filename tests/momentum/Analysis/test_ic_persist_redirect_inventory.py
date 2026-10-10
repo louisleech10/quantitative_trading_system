@@ -84,7 +84,7 @@ def test_s9_s11_helpers_are_not_bypassed() -> None:
     assert export_source.count("_export_fixture_filtered_path(") == 2
 
     ff_source = Path("tests/test_feature_factory_e2e.py").read_text()
-    assert len(re.findall(r"_create_e2e_factory\(\)", ff_source)) == 8
+    assert len(re.findall(r"_create_e2e_factory\(\)", ff_source)) == 7
     assert len(re.findall(r"create_feature_factory\(\)", ff_source)) == 1
 
 

@@ -20,16 +20,6 @@ from momentum.FeatureEngineering.feature_storage import FeatureStorage
 from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
 
-def _make_factory() -> FeatureFactory:
-    factory = FeatureFactory.__new__(FeatureFactory)
-    factory._current_symbol = "SYNTHETIC"
-    factory._current_timeframe = "fixture"
-    factory._current_config_hash = "ic-first-test"
-    factory._current_raw_data = None
-    factory._column_layer_map = {}
-    factory._cgsa_registry = None
-    factory.layer_results = {}
-    return factory
 
 
 def _make_config() -> Any:
@@ -51,26 +41,8 @@ def _make_config() -> Any:
     return SimpleNamespace(preprocessing=preprocessing)
 
 
-def _expected_pre_ic(frame: pd.DataFrame, config: Any) -> pd.DataFrame:
-    preprocessing_config: Dict[str, Any] = config.preprocessing.model_dump()
-    preprocessing_config["rank_transform"]["enabled"] = False
-    preprocessing_config["adaptive_zscore"]["enabled"] = False
-    preprocessing_config["gaussian_normalize"]["enabled"] = False
-    preprocessing_config["adf_differencing"]["enabled"] = False
-    return FeaturePreprocessor(preprocessing_config).transform(frame)
 
 
-def _assert_frame_allclose(left: pd.DataFrame, right: pd.DataFrame) -> None:
-    assert list(left.columns) == list(right.columns)
-    assert left.index.equals(right.index)
-    assert left.isna().equals(right.isna())
-    np.testing.assert_allclose(
-        left.to_numpy(dtype=np.float32),
-        right.to_numpy(dtype=np.float32),
-        rtol=1e-5,
-        atol=1e-8,
-        equal_nan=True,
-    )
 
 
 # ICFIRSTALIGN Task 1.1：選窗只收時間戳（與 _ic_fixture 之 row_index 同一範圍）
@@ -176,67 +148,10 @@ def _load_selected_payload(result) -> Dict[str, Any]:
     return json.loads(Path(result.selected_path).read_text(encoding="utf-8"))
 
 
-def test_routing(monkeypatch) -> None:
-    factory = _make_factory()
-    config = _make_config()
-    frame = pd.DataFrame(
-        {
-            "alpha": [1.0, 2.0, 3.0, 100.0, 5.0],
-            "beta": [10.0, 9.0, 8.0, 7.0, 6.0],
-            "gamma": [5.0, 5.0, 5.0, 5.0, 5.0],
-        }
-    )
-
-    pre_ic = factory._layer6_5_preprocessing(frame, config)
-    expected_pre_ic = _expected_pre_ic(frame, config)
-    _assert_frame_allclose(pre_ic, expected_pre_ic)
-
-    selected_features: List[str] = ["alpha", "gamma"]
-    post_ic = factory._layer6_5_preprocessing(
-        frame,
-        config,
-        selected_features=selected_features,
-    )
-
-    assert list(post_ic.columns) == selected_features
-    assert post_ic.index.equals(frame.index)
-    assert "beta" not in post_ic.columns
 
 
-def test_generation_routes_to_pre_ic_without_env(monkeypatch) -> None:
-    factory = _make_factory()
-    config = _make_config()
-    frame = pd.DataFrame(
-        {
-            "alpha": [1.0, 2.0, 3.0, 100.0, 5.0],
-            "beta": [10.0, 9.0, 8.0, 7.0, 6.0],
-            "gamma": [5.0, 5.0, 5.0, 5.0, 5.0],
-        }
-    )
-
-    pre_ic = factory._layer6_5_preprocessing(frame, config)
-    expected_pre_ic = _expected_pre_ic(frame, config)
-    _assert_frame_allclose(pre_ic, expected_pre_ic)
 
 
-def test_selected_features_route_to_post_ic(monkeypatch) -> None:
-    factory = _make_factory()
-    config = _make_config()
-    frame = pd.DataFrame(
-        {
-            "alpha": [1.0, 2.0, 3.0, 100.0, 5.0],
-            "beta": [10.0, 9.0, 8.0, 7.0, 6.0],
-            "gamma": [5.0, 5.0, 5.0, 5.0, 5.0],
-        }
-    )
-
-    result = factory._layer6_5_preprocessing(
-        frame,
-        config,
-        selected_features=["alpha"],
-    )
-    assert list(result.columns) == ["alpha"]
-    assert result.index.equals(frame.index)
 
 
 def test_transform_selected_only_processes_ic_features(monkeypatch) -> None:

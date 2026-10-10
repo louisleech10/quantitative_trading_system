@@ -99,9 +99,6 @@ class _CgsaStubFactory(StubFactory):
         self._current_timeframe = "12h"
         self._adapter_registry = SimpleNamespace(_adapters={})
 
-    @staticmethod
-    def _cgsa_enabled() -> bool:
-        return True
 
     def _layer1_atomic_indicators(self, data, config):
         del config
@@ -241,7 +238,7 @@ def _build_mtf_generator(
 
 @pytest.mark.parametrize(
     "generator_path",
-    ["legacy", "cgsa_serial", "cgsa_parallel_primary", "cgsa_parallel_worker"],
+    ["cgsa_serial", "cgsa_parallel_primary", "cgsa_parallel_worker"],
 )
 @pytest.mark.parametrize("allow_partial", [False, True])
 def test_four_generator_paths_fail_closed_integration(
@@ -399,22 +396,6 @@ def test_quality_gate_max_ratios_do_not_change_config_hash() -> None:
     assert default_hash == multi["config_hash"]
 
 
-def test_l65_failure_records_effective_config_and_continues() -> None:
-    factory = create_feature_factory(validate_continuity=False)
-    config = _config()
-    frame = pd.DataFrame({"x": np.arange(8, dtype=np.float32)})
-
-    def _boom(_frame, _config):
-        raise RuntimeError("injected preprocessing failure")
-
-    output = factory._execute_l65_with_degradation("Layer 6.5", _boom, frame, config)
-    metadata = {"quality_status": "complete", "run_status": "complete", "failure_reasons": []}
-    factory._apply_preprocessing_degradation_metadata(metadata)
-
-    pd.testing.assert_frame_equal(output, frame)
-    assert metadata["preprocessing_applied"] is False
-    assert metadata["effective_preprocessing_config"]
-    assert metadata["quality_status"] == "partial"
 
 
 def _save_group(registry: ColumnGroupRegistry, group_id: str, timeframe: str) -> None:
@@ -580,13 +561,6 @@ def test_persist_completeness_same_source_degraded_single_tf(monkeypatch: pytest
     assert result.metadata["quality_status"] == "partial"
 
 
-@pytest.mark.requires_kline
-def test_persist_completeness_same_source_frame_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """非 CGSA frame 路徑：meta.json 之 completeness 各鍵與 quality_status ＝ result.metadata（同一物件寫出）。"""
-    _fg.prepare_env(monkeypatch, tmp_path, FFACT_USE_CGSA="0")
-    root, _factory, result = _fg.generate(tmp_path, _fg.fast_payload(["1h"], **_fg.HEALTHY))
-    _assert_same_source(_fg.meta_json(root, "1h"), result.metadata)
-    assert result.metadata["present_timeframes"] == ["1h"]
 
 
 @pytest.mark.requires_kline

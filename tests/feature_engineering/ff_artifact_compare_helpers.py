@@ -252,50 +252,6 @@ def assert_slow_full_chain_config(factory, config_payload: Mapping[str, object])
     assert config.preprocessing.fractional_differencing.cache_d_star is True
 
 
-def assert_full_chain_runtime(factory, result, *, manifest: Mapping[str, Any] | None = None) -> None:
-    """執行稽核：L1-L7 每層實跑完成，不得 empty/disabled/degraded。"""
-    assert int(result.feature_count) > 2
-    assert result.features_df.shape[1] > 2
-    for layer_name in ["Layer 1", "Layer 2", "Layer 3", "Layer 4", "Layer 5", "Layer 6"]:
-        layer = factory.layer_results.get(layer_name)
-        assert layer is not None, f"missing {layer_name}"
-        status = getattr(layer, "status", None)
-        status_value = getattr(status, "value", str(status))
-        assert status_value == "ok", (
-            layer_name,
-            status,
-            getattr(layer, "reason", None),
-            getattr(layer, "failed_engines", None),
-        )
-        assert int(getattr(layer, "present_engines", 0)) > 0, (
-            layer_name,
-            getattr(layer, "status", None),
-            getattr(layer, "reason", None),
-        )
-        data = getattr(layer, "data", pd.DataFrame())
-        assert data is not None and not data.empty, (
-            layer_name,
-            getattr(layer, "status", None),
-        )
-        assert int(data.shape[1]) > 0, (layer_name, data.shape)
-    assert getattr(factory, "_preprocessing_applied", None) is True
-    effective = getattr(factory, "_effective_preprocessing_config", None) or {}
-    fracdiff = effective.get("fractional_differencing") or {}
-    assert effective.get("enabled") is True
-    assert fracdiff.get("enabled") is True
-    assert fracdiff.get("cache_d_star") is True
-    output_manifest = manifest or runtime_output_manifest(result)
-    assert int(output_manifest.get("feature_count", output_manifest.get("total_features", result.feature_count))) > 0
-    status = str(output_manifest.get("run_status", output_manifest.get("quality_status", "complete")))
-    if status == "partial":
-        # FFSTAT v19（使用者 2026-09-26 裁定）：開始日前有效值不足 N 之欄只該欄不平穩化、品質 partial；
-        # 只容許此一原因，其餘任何降級照擋
-        from momentum.FeatureEngineering.preprocessing.feature_preprocessor import EVENT_CALIBRATION_INSUFFICIENT
-
-        reasons = [str(r) for r in ((result.metadata or {}).get("failure_reasons") or [])]
-        assert reasons and all(r.startswith(f"{EVENT_CALIBRATION_INSUFFICIENT}:") for r in reasons), reasons
-    else:
-        assert status in {"complete", "ok"}, status
 
 
 def make_factory(tmp_path: Path):

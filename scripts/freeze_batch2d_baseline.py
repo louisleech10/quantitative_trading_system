@@ -148,6 +148,7 @@ def _manifest_columns(manifest: Dict[str, Any]) -> list[str]:
 
 def _registry_layer_map(factory: Any) -> Dict[str, str]:
     from momentum.FeatureEngineering.core.column_group import LayerSource
+    from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 
     layer_sources = (
         LayerSource.L1,
@@ -160,12 +161,14 @@ def _registry_layer_map(factory: Any) -> Dict[str, str]:
     registry = factory._cgsa_registry
     if registry is None:
         raise RuntimeError("CGSA registry missing after baseline generation")
+    tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
     layer_map: Dict[str, str] = {}
     for layer_source in layer_sources:
         for group in registry.list_by_layer(layer_source):
-            tagged = factory._apply_timeframe_tag(
-                pd.DataFrame(columns=list(group.columns)), TIMEFRAME
-            ).columns
+            tagged = [
+                factory._timeframe_tagged_name(column, TIMEFRAME, tf_keys)
+                for column in group.columns
+            ]
             for column in tagged:
                 existing = layer_map.setdefault(str(column), layer_source.value)
                 if existing != layer_source.value:

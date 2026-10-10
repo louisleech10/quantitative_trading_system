@@ -21,7 +21,6 @@ from tests.feature_engineering.ff_artifact_compare_helpers import (
     OTHER_SYMBOL,
     assert_dstar_symbol_isolated,
     assert_dstar_payloads_equal,
-    assert_full_chain_runtime,
     assert_manifest_semantics_equal,
     assert_path_excludes_symbol,
     assert_sampled_values_equal,
@@ -115,8 +114,19 @@ def test_v5_1_fast_order_permutation_keeps_hash_and_sampled_values(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """V5.1/V5.3/V5.8：三序 [A]/[A,B]/[B,A] 的 A 值與 manifest 不變。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
+    """V5.1/V5.3/V5.8：三序 [A]/[A,B]/[B,A] 的 A 值與 manifest 不變（FRAMEPATH：CGSA 之 features_df 不帶欄，
+    A 之值改由各 factory 落盤之 raw 讀回比對）。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    def _persisted_a(factory, result):
+        reader = FeatureReader(str(factory._storage.base_path))
+        config_hash = str(result.metadata["config_hash"])
+        manifest = reader.load_manifest_v2(BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, allow_partial=True)
+        columns = [c for group in manifest["artifacts"]["raw"]["groups"].values() for c in group.get("columns", [])]
+        return reader.load_columns_v2(
+            BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, columns, allow_partial=True, attach_row_index=True,
+        )
+
     kline = requires_kline_data(BASELINE_SYMBOL, BASELINE_TIMEFRAME, min_rows=120)
     start, end = kline_window_dates(kline, days=14)
     config = fast_config_payload()
@@ -129,6 +139,7 @@ def test_v5_1_fast_order_permutation_keeps_hash_and_sampled_values(
         config_payload=config,
         persist=True,
     )
+    only_a = _persisted_a(solo_factory, solo_result)
 
     a_then_b_factory = make_factory(tmp_path / "a_then_b")
     run_symbol_result(
@@ -154,6 +165,7 @@ def test_v5_1_fast_order_permutation_keeps_hash_and_sampled_values(
         config_payload=config,
         persist=True,
     )
+    a_then_b = _persisted_a(a_then_b_factory, a_after_b_result)
 
     b_then_a_factory = make_factory(tmp_path / "b_then_a")
     run_symbol_frame(
@@ -171,10 +183,8 @@ def test_v5_1_fast_order_permutation_keeps_hash_and_sampled_values(
         config_payload=config,
         persist=True,
     )
+    b_then_a = _persisted_a(b_then_a_factory, b_then_a_result)
 
-    only_a = solo_result.features_df
-    a_then_b = a_after_b_result.features_df
-    b_then_a = b_then_a_result.features_df
     sampled = representative_columns(only_a, limit=20)
     assert sampled, "fast isolation test needs at least one numeric feature column"
     assert canonical_frame_digest(only_a) == canonical_frame_digest(a_then_b)
@@ -197,20 +207,33 @@ def test_v5_5_l5_reference_cache_uses_reference_symbol_timeframe_key(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """V5.5 medium：L5 reference cache key 保留 reference symbol + timeframe。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
+    """V5.5 medium：L5 reference cache key 保留 reference symbol + timeframe（FRAMEPATH：CGSA 之 features_df 不帶欄，
+    A 之值改由落盤之 raw 讀回比對）。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    def _persisted_a(factory, result):
+        reader = FeatureReader(str(factory._storage.base_path))
+        config_hash = str(result.metadata["config_hash"])
+        manifest = reader.load_manifest_v2(BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, allow_partial=True)
+        columns = [c for group in manifest["artifacts"]["raw"]["groups"].values() for c in group.get("columns", [])]
+        return reader.load_columns_v2(
+            BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, columns, allow_partial=True, attach_row_index=True,
+        )
+
     kline = requires_kline_data(BASELINE_SYMBOL, BASELINE_TIMEFRAME, min_rows=120)
     start, end = kline_window_dates(kline, days=14)
     factory = make_factory(tmp_path)
     config = cross_sectional_config_payload(reference_symbol=OTHER_SYMBOL)
 
-    first = run_symbol_frame(
+    first_result = run_symbol_result(
         factory,
         symbol=BASELINE_SYMBOL,
         start_date=start,
         end_date=end,
         config_payload=config,
+        persist=True,
     )
+    first = _persisted_a(factory, first_result)
     run_symbol_frame(
         factory,
         symbol=OTHER_SYMBOL,
@@ -218,18 +241,21 @@ def test_v5_5_l5_reference_cache_uses_reference_symbol_timeframe_key(
         end_date=end,
         config_payload=config,
     )
-    second = run_symbol_frame(
+    second_result = run_symbol_result(
         factory,
         symbol=BASELINE_SYMBOL,
         start_date=start,
         end_date=end,
         config_payload=config,
+        persist=True,
     )
+    second = _persisted_a(factory, second_result)
 
     # FFSTAT b3 r4：鍵＝(參考標的, 週期, L0 載入起點, 輸出終點)；參考標的仍在鍵內（跨標的隔離）
     assert any(key[:2] == (OTHER_SYMBOL, BASELINE_TIMEFRAME) for key in factory._reference_data_cache)
     assert all(len(key) == 4 for key in factory._reference_data_cache)
     sampled = representative_columns(first, limit=20)
+    assert sampled, "V5.5 needs at least one numeric feature column"
     assert_sampled_values_equal(first, second, columns=sampled)
 
 
@@ -271,20 +297,33 @@ def test_mutation_m5_2_reference_cache_poisoning_fails_runtime_values(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """M5.2：A 的 L5 reference cache 若被 runtime 毒化，V5.5 值斷言會紅。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
+    """M5.2：A 的 L5 reference cache 若被 runtime 毒化，V5.5 值斷言會紅（FRAMEPATH：CGSA 之 features_df 不帶欄，
+    A 之值改由落盤之 raw 讀回比對）。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+
+    def _persisted_a(factory, result):
+        reader = FeatureReader(str(factory._storage.base_path))
+        config_hash = str(result.metadata["config_hash"])
+        manifest = reader.load_manifest_v2(BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, allow_partial=True)
+        columns = [c for group in manifest["artifacts"]["raw"]["groups"].values() for c in group.get("columns", [])]
+        return reader.load_columns_v2(
+            BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, columns, allow_partial=True, attach_row_index=True,
+        )
+
     kline = requires_kline_data(BASELINE_SYMBOL, BASELINE_TIMEFRAME, min_rows=120)
     start, end = kline_window_dates(kline, days=14)
     config = cross_sectional_config_payload(reference_symbol=OTHER_SYMBOL)
 
     clean_factory = make_factory(tmp_path / "clean")
-    clean = run_symbol_frame(
+    clean_result = run_symbol_result(
         clean_factory,
         symbol=BASELINE_SYMBOL,
         start_date=start,
         end_date=end,
         config_payload=config,
+        persist=True,
     )
+    clean = _persisted_a(clean_factory, clean_result)
 
     poisoned_factory = make_factory(tmp_path / "poisoned")
     original_ingestion = poisoned_factory._layer0_data_ingestion
@@ -295,13 +334,15 @@ def test_mutation_m5_2_reference_cache_poisoning_fails_runtime_values(
         return original_ingestion(symbol, timeframe, cfg, *args, **kwargs)
 
     monkeypatch.setattr(poisoned_factory, "_layer0_data_ingestion", _poisoned_reference_ingestion)
-    poisoned = run_symbol_frame(
+    poisoned_result = run_symbol_result(
         poisoned_factory,
         symbol=BASELINE_SYMBOL,
         start_date=start,
         end_date=end,
         config_payload=config,
+        persist=True,
     )
+    poisoned = _persisted_a(poisoned_factory, poisoned_result)
 
     relative_price_columns = [column for column in clean.columns if "relative_price" in str(column)]
     assert relative_price_columns
@@ -375,8 +416,36 @@ def test_v5_slow_solo_a_equals_batch_b_then_a_artifacts(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    """Slow tier：solo(A) vs same-factory batch-like B→A 的全鏈 A artifact 一致。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
+    """Slow tier：solo(A) vs same-factory batch-like B→A 的全鏈 A artifact 一致（FRAMEPATH：改經 CGSA；A 之值由落盤
+    raw 讀回比對；原 frame 逐層執行稽核改為 registry 之 L1–L6 群組皆在、品質只容許 v19 partial）。"""
+    from momentum.FeatureEngineering.feature_reader import FeatureReader
+    from momentum.FeatureEngineering.feature_storage import resolve_run_status
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import EVENT_CALIBRATION_INSUFFICIENT
+    from momentum.FeatureEngineering.warmup_window import WARMUP_INSUFFICIENT_EVENT
+
+    def _persisted_a(factory, result):
+        reader = FeatureReader(str(factory._storage.base_path))
+        config_hash = str(result.metadata["config_hash"])
+        manifest = reader.load_manifest_v2(BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, allow_partial=True)
+        columns = [c for group in manifest["artifacts"]["raw"]["groups"].values() for c in group.get("columns", [])]
+        return reader.load_columns_v2(
+            BASELINE_SYMBOL, BASELINE_TIMEFRAME, config_hash, columns, allow_partial=True, attach_row_index=True,
+        )
+
+    def _assert_cgsa_full_chain(factory, result, manifest):
+        assert int(result.feature_count) > 2
+        layers = {group.layer.value for _, group in factory._cgsa_registry.iter_all()}
+        assert {"L1", "L2", "L3", "L4", "L5", "L6"} <= layers, sorted(layers)
+        status = resolve_run_status(manifest)
+        if status == "partial":
+            # FFSTAT v19（使用者 2026-09-26 裁定：開始日前有效值不足 N 之欄只該欄不平穩化）與公開域預熱不足
+            # （FFSTAT §C）之降級品質 partial；只容許此兩封閉原因（主委 2026-10-08 試作實跑：兩者皆出現）
+            allowed = (f"{EVENT_CALIBRATION_INSUFFICIENT}:", f"{WARMUP_INSUFFICIENT_EVENT}:")
+            reasons = [str(r) for r in ((result.metadata or {}).get("failure_reasons") or [])]
+            assert reasons and all(r.startswith(allowed) for r in reasons), reasons
+        else:
+            assert status == "complete", status
+
     baseline_kline = requires_kline_data(BASELINE_SYMBOL, BASELINE_TIMEFRAME, min_rows=1600)
     other_kline = requires_kline_data(OTHER_SYMBOL, BASELINE_TIMEFRAME, min_rows=1600)
     assert len(baseline_kline) == len(other_kline)
@@ -392,6 +461,7 @@ def test_v5_slow_solo_a_equals_batch_b_then_a_artifacts(
     solo_factory = make_factory(tmp_path / "solo")
     assert_slow_full_chain_config(solo_factory, config)
     monkeypatch.setattr(FeaturePreprocessor, "_d_star_cache_dir", staticmethod(lambda: solo_dstar_dir))
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa" / "solo"))
     solo_result = run_symbol_result(
         solo_factory,
         symbol=BASELINE_SYMBOL,
@@ -405,11 +475,13 @@ def test_v5_slow_solo_a_equals_batch_b_then_a_artifacts(
         factory=solo_factory,
         symbol=BASELINE_SYMBOL,
     )
-    assert_full_chain_runtime(solo_factory, solo_result, manifest=solo_manifest)
+    _assert_cgsa_full_chain(solo_factory, solo_result, solo_manifest)
+    solo = _persisted_a(solo_factory, solo_result)
 
     batch_factory = make_factory(tmp_path / "batch")
     assert_slow_full_chain_config(batch_factory, config)
     monkeypatch.setattr(FeaturePreprocessor, "_d_star_cache_dir", staticmethod(lambda: batch_dstar_dir))
+    monkeypatch.setenv("FFACT_CGSA_WORK_DIR", str(tmp_path / "cgsa" / "batch"))
     run_symbol_frame(
         batch_factory,
         symbol=OTHER_SYMBOL,
@@ -431,10 +503,9 @@ def test_v5_slow_solo_a_equals_batch_b_then_a_artifacts(
         factory=batch_factory,
         symbol=BASELINE_SYMBOL,
     )
-    assert_full_chain_runtime(batch_factory, batch_a_result, manifest=batch_a_manifest)
+    _assert_cgsa_full_chain(batch_factory, batch_a_result, batch_a_manifest)
+    batch_a = _persisted_a(batch_factory, batch_a_result)
 
-    solo = solo_result.features_df
-    batch_a = batch_a_result.features_df
     sampled = representative_columns(solo, limit=20)
     assert sampled
     assert canonical_frame_digest(solo) == canonical_frame_digest(batch_a)

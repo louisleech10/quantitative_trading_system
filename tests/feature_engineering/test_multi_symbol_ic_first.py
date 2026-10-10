@@ -107,31 +107,6 @@ class _InlineProcessPoolExecutor:
 class TestMultiSymbolIcIsolation:
     """T3.1: 每個標的的輸出路徑必須互相隔離，不能相互覆寫。"""
 
-    def test_l65_always_routes_to_pre_ic(self, tmp_path):
-        """
-        Given: preprocessing enabled
-        When:  FeatureFactory 執行 L6.5 preprocessing dispatch
-        Then:  走 _layer6_5_pre_ic
-        """
-        import pandas as pd
-
-        from momentum.factories import create_feature_factory
-
-        factory = create_feature_factory(cache_dir=str(tmp_path), validate_continuity=False)
-        config = factory._resolve_config(
-            {
-                "preset": "minimal",
-                "preprocessing": {"enabled": True},
-            }
-        )
-        frame = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
-        expected = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
-
-        with patch.object(factory, "_layer6_5_pre_ic", return_value=expected) as pre_ic:
-            result = factory._layer6_5_preprocessing(frame, config)
-
-        pre_ic.assert_called_once()
-        assert result.equals(expected)
 
     def test_compute_single_returns_isolated_paths(self, tmp_path):
         """

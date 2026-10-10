@@ -52,6 +52,8 @@ A_FILES = (
 )
 A_GROUP = A_FILES  # 自 B／C 扣除之集合（不分 phase）
 A_GROUP_BY_PHASE = {1: A_FILES[:3], 2: A_FILES, 3: A_FILES}
+# 須於乾淨工作樹先單獨呼叫之 A 組測試（檢查工作樹改動者；同檔他測之 collect-only 會改寫已追蹤清冊）
+A_ISOLATED_FIRST = {"tests/feature_engineering/test_framepath_disposition.py": ("test_check_7_changed_paths_in_scope",)}
 PYTEST_FLAGS = ("-q", "-p", "no:cacheprovider", "-o", "log_cli=false", "--log-level=WARNING", "--tb=short")
 RUN_RC_OK = (0, 1)  # pytest：0 全過、1 有測試失敗；其餘（中斷、內部錯誤、用法、無測試）＝未完成
 
@@ -1336,11 +1338,24 @@ def main(argv: Sequence[str]) -> int:
     probe_dirs: List[Path] = []
     for f in A_GROUP_BY_PHASE[args.phase]:
         ids = collect(f, REPO, env)
-        name = "A_" + f.replace("/", "_")
-        probe_dirs.append(probe_root / name)
-        rc, res = runner.run(f, out / "a_junit" / (f.replace("/", "_") + ".xml"), REPO, probe_env(name, False), None,
-                             PROBE_PLUGIN_ARGS, state_key(REPO, f, args.phase, env), ids, phase="A",
-                             probe_dir=probe_root / name)
+        # 實作期 b1：處置驗證器 ⑦ 檢查工作樹改動，而同檔之 check_1／check_2 以 collect-only 子行程改寫已追蹤清冊
+        # （tests/conftest.py 之副作用）⇒ 同一呼叫中 ⑦ 見到生成物而紅。把「檢查工作樹」之 nodeid 先於乾淨樹單獨
+        # 呼叫（呼叫前已還原清冊），其餘再一次呼叫；不跳過、不放寬任何斷言
+        first = [n for n in ids if nodeid_qualname(n) in A_ISOLATED_FIRST.get(f, ())]
+        rest = [n for n in ids if n not in first]
+        res, rcs = {}, []
+        for part, suffix in ((first, "__first"), (rest, "")):
+            if not part:
+                continue
+            name = "A_" + f.replace("/", "_") + suffix
+            probe_dirs.append(probe_root / name)
+            prc, pres = runner.run(f, out / "a_junit" / (f.replace("/", "_") + suffix + ".xml"), REPO,
+                                   probe_env(name, False), None if (part is rest and not first) else part,
+                                   PROBE_PLUGIN_ARGS, state_key(REPO, f, args.phase, env) + "|" + "|".join(part),
+                                   part, phase="A", probe_dir=probe_root / name)
+            rcs.append(prc)
+            res.update(pres)
+        rc = max(rcs) if all(r in RUN_RC_OK for r in rcs) else next(r for r in rcs if r not in RUN_RC_OK)
         a_results.update(res)
         a_failures += [n for n in ids if res.get(n, {}).get("outcome") != "passed"]
         if rc not in RUN_RC_OK:

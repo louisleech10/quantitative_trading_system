@@ -136,7 +136,9 @@ def _owner_for_line(ranges: list[tuple[int, int, str]], line_no: int) -> str | N
 
 def _changed_assertion_tests(path: str) -> set[str]:
     old_source = _git_output("show", f"{BASELINE_COMMIT}:{path}")
-    new_source = _git_output("show", f"HEAD:{path}")
+    # 自基準後已刪除之測試檔（HEAD 無此路徑；如 FRAMEPATH 刪 frame 專屬測試檔）：新側視為空檔 ⇒ 其全部斷言計為變更
+    exists_at_head = bool(_git_output("ls-tree", "--name-only", "HEAD", "--", path).strip())
+    new_source = _git_output("show", f"HEAD:{path}") if exists_at_head else ""
     old_ranges, _ = _function_ranges(old_source)
     new_ranges, callers = _function_ranges(new_source)
     diff = _git_output("diff", "-U0", f"{BASELINE_COMMIT}..HEAD", "--", path)
@@ -368,37 +370,3 @@ def test_matrix_cgsa_tf_failure_rollback_state(
     assert not list(work_dir.glob("*1h*"))
 
 
-@pytest.mark.requires_kline
-def test_matrix_l65_failure_degrades_metadata(
-    _require_kline: None,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    """⑤ L6.5 失敗：降級續行，preprocessing_applied=False + partial。"""
-    factory = _make_factory(monkeypatch, tmp_path)
-    monkeypatch.setenv("FFACT_USE_CGSA", "0")
-    start, end = _short_window_dates()
-
-    def _boom(_frame, _config):  # noqa: ANN001
-        raise RuntimeError("injected preprocessing failure")
-
-    monkeypatch.setattr(factory, "_layer6_5_pre_ic", _boom)
-
-    result = factory.generate_features(
-        MATRIX_SYMBOL,
-        MATRIX_TF,
-        config_override={
-            **_fast_config_payload(),
-            "preprocessing": {"enabled": True},
-        },
-        force_regenerate=True,
-        start_date=start,
-        end_date=end,
-        persist=False,
-    )
-    quality, run_status = _status_pair(result.metadata)
-    assert result.metadata.get("preprocessing_applied") is False
-    assert result.metadata.get("effective_preprocessing_config")
-    assert quality == "partial"
-    assert run_status == "partial"
-    assert any("L6.5" in reason for reason in result.metadata.get("failure_reasons", []))

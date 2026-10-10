@@ -189,10 +189,10 @@ def test_column_set_reasons_keyed_by_public_timeframe_tagged_names() -> None:
 
 
 def test_timeframe_tag_single_name_matches_frame_rule_and_idempotent() -> None:
-    """v55（審查 r39 codex P2-07）：`column_set_reasons` 之單欄標記（`_timeframe_tagged_name`）須與公開欄名之整表
-    標記（`_apply_timeframe_tag`）同一結果，且已標記者再標不變（含自訂引擎欄名、欄名後段含週期字樣者）。"""
-    import pandas as pd
-
+    """v55（審查 r39 codex P2-07）：`column_set_reasons` 之單欄標記（`_timeframe_tagged_name`）規則：未標記者於第二段
+    插入週期、`label_` 不標、任一後段已為週期者不動，且已標記者再標不變（含自訂引擎欄名、欄名後段含週期字樣者）。
+    （FRAMEPATH：整表標記 `FeatureFactory._apply_timeframe_tag` 與多週期 legacy 標記已刪，原「單欄＝整表」比對改為
+    對單欄規則之逐值斷言。）"""
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
     from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
 
@@ -201,14 +201,14 @@ def test_timeframe_tag_single_name_matches_frame_rule_and_idempotent() -> None:
              "ent_shannon_close_21", "tr_cvar_5pct_55", "ms_amihud_illiq_21", "meta_consensus_score",
              "close_momentum_RSI_14_Momentum_L1h", "hl_1h_momentum_AROON-aroonup_21_Min_W89", "label_fwd_ret_4",
              "taker_ratio_momentum_RSI_14", "taker_ratio_1h_momentum_RSI_14"]
-    from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
 
     for tf in ("1h", "12h", "1d"):
-        frame = pd.DataFrame([[0.0] * len(names)], columns=names)  # 多週期版對空表直接回傳
-        framed = list(FeatureFactory._apply_timeframe_tag(frame, tf).columns)
-        multi = list(MultiTFGenerator._apply_timeframe_tag(frame, tf).columns)
         single = [FeatureFactory._timeframe_tagged_name(n, tf, tf_keys) for n in names]
-        assert single == framed == multi, list(zip(names, single, framed, multi))
+        assert single[names.index("close_trend_EMA_144_Kurt_W13")] == f"close_{tf}_trend_EMA_144_Kurt_W13"
+        assert single[names.index("meta_consensus_score")] == f"meta_{tf}_consensus_score"
+        assert single[names.index("label_fwd_ret_4")] == "label_fwd_ret_4"
+        assert single[names.index("hl_1h_momentum_AROON-aroonup_21_Min_W89")] == \
+            "hl_1h_momentum_AROON-aroonup_21_Min_W89"
         assert [FeatureFactory._timeframe_tagged_name(n, tf, tf_keys) for n in single] == single  # 冪等
         # r40 codex P2-01：底線來源且週期段在後方者不重複加標記
         assert FeatureFactory._timeframe_tagged_name("taker_ratio_1h_momentum_RSI_14", tf, tf_keys) == \

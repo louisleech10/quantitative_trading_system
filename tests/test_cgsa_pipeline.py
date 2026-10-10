@@ -94,8 +94,10 @@ def test_cgsa_vs_legacy_numeric_equivalence(tmp_path: Path):
 
 
 def test_cgsa_no_global_concat(monkeypatch):
-    """T2.12: 啟用 CGSA 時不得呼叫 concat_with_memmap（FeatureFactory/MultiTF 皆同）。"""
-    monkeypatch.setenv("FFACT_USE_CGSA", "1")
+    """T2.12（FRAMEPATH Task 1.2 改契約）：CGSA 不做全欄合併——layer7_final 具名拒絕，且不得呼叫 concat_with_memmap。"""
+    import pytest
+
+    from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError
 
     def _raise_if_called(*_args, **_kwargs):
         raise AssertionError("concat_with_memmap should not be called in CGSA mode")
@@ -108,8 +110,5 @@ def test_cgsa_no_global_concat(monkeypatch):
     sample = pd.DataFrame({"f": [1.0, 2.0, 3.0]})
 
     factory = FeatureFactory(config_manager=Mock(), adapter_registry=Mock())
-    combined_factory = factory._combine_layers([sample], context="layer7_final")
-    combined_multi_tf = MultiTFGenerator._combine_layers([sample])
-
-    assert combined_factory.empty
-    assert combined_multi_tf.empty
+    with pytest.raises(CGSARegistryRequiredError):
+        factory._combine_layers([sample], context="layer7_final")

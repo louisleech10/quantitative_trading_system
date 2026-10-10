@@ -92,17 +92,18 @@ class MultiTFGenerator:
         if primary_timestamps.empty:
             raise ValueError(f"Primary timestamps empty for {symbol}/{self._primary_tf}")
 
-        use_cgsa = self._cgsa_enabled() and getattr(self._factory, "_cgsa_registry", None) is not None
-        if use_cgsa:
-            return self._generate_multi_tf_cgsa(
-                symbol, primary_raw, primary_timestamps, start_time,
-                start_date=start_date, end_date=end_date, persist=persist,
-                batch_id=batch_id,
+        # FRAMEPATH Task 1.2：多週期只走 CGSA；於原分派點（主週期讀入之後）檢查 registry——以屬性判斷（工廠介面為
+        # duck-typed，不要求工廠另有方法），未建立 ⇒ 具名拒絕、不回退記憶體路徑
+        if getattr(self._factory, "_cgsa_registry", None) is None:
+            from momentum.FeatureEngineering.feature_factory import CGSARegistryRequiredError
+
+            raise CGSARegistryRequiredError(
+                f"CGSA registry 未建立：{symbol}/{self._primary_tf}（呼叫點 generate_multi_tf）；生成只走 CGSA，無記憶體後備"
             )
 
-        return self._generate_multi_tf_legacy(
+        return self._generate_multi_tf_cgsa(
             symbol, primary_raw, primary_timestamps, start_time,
-            start_date=start_date, end_date=end_date,
+            start_date=start_date, end_date=end_date, persist=persist,
             batch_id=batch_id,
         )
 
@@ -1456,179 +1457,6 @@ class MultiTFGenerator:
     # ------------------------------------------------------------------
     # Legacy path: wide DataFrame concat + alignment (non-CGSA)
     # ------------------------------------------------------------------
-    def _generate_multi_tf_legacy(
-        self,
-        symbol: str,
-        primary_raw: pd.DataFrame,
-        primary_timestamps: pd.DatetimeIndex,
-        start_time: float,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        batch_id: Optional[str] = None,
-    ) -> "FeatureGenerationResult":
-        """Legacy multi-TF: combine layers into wide DF, align, then L6.5 + L7."""
-        aligned_outputs: List[pd.DataFrame] = []
-        # FFSTAT Task 1.1：合併後各欄之結構化來源層（隨週期標記改名），供 L6.5 fracdiff 目標層判定
-        merged_layer_map: Dict[str, str] = {}
-        merged_timeframe_map: Dict[str, str] = {}
-        skipped_tfs: List[str] = []
-        fresh_failed: Dict[str, List[str]] = {}
-        local_statuses: Dict[str, Dict[str, Tuple[str, str]]] = {}
-        tf_layer_counts: Dict[str, Dict[str, int]] = {}
-        total_tfs = len(self._training_tfs)
-
-        for index, timeframe in enumerate(self._training_tfs):
-            self._report_progress(
-                "multi_tf",
-                ((index + 1) / max(total_tfs, 1)) * 0.7,
-                f"Processing timeframe {timeframe} ({index + 1}/{total_tfs})",
-            )
-
-            try:
-                raw_data = (
-                    primary_raw
-                    if timeframe == self._primary_tf
-                    else self._factory._layer0_data_ingestion(
-                        symbol, timeframe, self._config,
-                        start_date=self._multi_tf_layer0_start(timeframe, start_date),
-                        end_date=end_date,
-                    )
-                )
-            except FileNotFoundError:
-                logger.warning("MultiTF: missing data for %s/%s, skipping timeframe", symbol, timeframe)
-                skipped_tfs.append(timeframe)
-                self._raise_for_failed_timeframe(timeframe, "missing data")
-                continue
-            except Exception as exc:
-                logger.error("MultiTF: load failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
-                skipped_tfs.append(timeframe)
-                self._raise_for_failed_timeframe(timeframe, str(exc))
-                continue
-
-            if raw_data is None or raw_data.empty:
-                logger.warning("MultiTF: empty data for %s/%s, skipping timeframe", symbol, timeframe)
-                skipped_tfs.append(timeframe)
-                self._raise_for_failed_timeframe(timeframe, "empty data")
-                continue
-
-            try:
-                layer_results = self._run_tf_l1_l6_results(raw_data)
-                layer1, layer2, layer3, layer4, layer5, layer6 = [
-                    self._factory.layer_data(item) for item in layer_results
-                ]
-                fresh_failed[timeframe] = self._collect_failed_layer_ids(layer_results, timeframe)
-                local_statuses[timeframe] = self._layer_statuses(layer_results)
-            except Exception as exc:
-                logger.error("Multi-TF pipeline failed for %s/%s: %s", symbol, timeframe, exc, exc_info=True)
-                skipped_tfs.append(timeframe)
-                self._raise_for_failed_timeframe(timeframe, str(exc))
-                continue
-
-            tf_layer_counts[timeframe] = self._collect_layer_counts(layer_results)
-
-            from momentum.FeatureEngineering.feature_factory import _build_column_layer_map
-
-            tf_layer_map = _build_column_layer_map([layer1, layer2, layer3, layer4, layer5, layer6])
-            combined = self._factory._combine_layers(
-                [layer1, layer2, layer3, layer4, layer5, layer6],
-                context="multi_tf_layers",
-            )
-            del layer1, layer2, layer3, layer4, layer5, layer6, layer_results
-            gc.collect()
-            if timeframe == self._primary_tf:
-                if len(combined.index) != len(primary_timestamps):
-                    raise ValueError(
-                        f"Primary self-alignment length mismatch: combined={len(combined.index)} "
-                        f"primary={len(primary_timestamps)}"
-                    )
-                logger.info(
-                    "[multi_tf] Skipping self-alignment for primary TF %s (%d cols)",
-                    timeframe, combined.shape[1],
-                )
-                aligned = combined.copy(deep=False)
-                aligned.index = primary_timestamps
-            else:
-                # FFSTAT Task 2.3 ④：原生列號隨同對齊 ⇒ 逐主週期列之原生列對應（未填起始日之逐欄校準數「不同原生
-                # K 棒」之最早 N 個值，不以 ffill 重複值充數；對齊前 NaN 之列為 NaN）
-                marker = "__ffstat_native_row__"
-                combined[marker] = np.arange(len(combined.index), dtype=np.float64)
-                aligned = TimeframeAligner.align_to_primary(
-                    combined, timeframe, primary_timestamps,
-                    self._primary_tf, self._config.timeframes.alignment_mode,
-                )
-                native_rows = aligned.pop(marker).to_numpy(dtype=np.float64)
-                combined.drop(columns=[marker], inplace=True)
-                maps = getattr(self._factory, "_legacy_native_row_maps", None)
-                if maps is None:
-                    maps = {}
-                    self._factory._legacy_native_row_maps = maps
-                maps[str(timeframe)] = native_rows
-            aligned.attrs = {}
-            untagged_columns = [str(column) for column in aligned.columns]
-            aligned = self._apply_timeframe_tag(
-                aligned, timeframe,
-                registry=getattr(self._factory, "_cgsa_registry", None),
-            )
-            for before, after in zip(untagged_columns, aligned.columns):
-                if before in tf_layer_map:
-                    merged_layer_map.setdefault(str(after), tf_layer_map[before])
-                    merged_timeframe_map.setdefault(str(after), timeframe)
-            aligned_outputs.append(aligned)
-
-        if self._primary_tf in skipped_tfs:
-            raise ValueError(f"Primary timeframe data missing for {symbol}/{self._primary_tf}")
-
-        if not aligned_outputs:
-            raise ValueError(f"All training timeframes skipped for {symbol}")
-
-        merged_df = self._factory._combine_layers(
-            aligned_outputs,
-            context="multi_tf_legacy_merged",
-        )
-        if merged_df.empty:
-            raise ValueError(f"Merged MultiTF features empty for {symbol}")
-
-        if len(merged_df.index) == len(primary_raw.index):
-            merged_df.index = primary_raw.index
-
-        if self._config.preprocessing.enabled:
-            self._report_progress("preprocessing", 0.75, "Running Layer 6.5 preprocessing")
-            self._factory._column_layer_map = merged_layer_map
-            self._factory._column_timeframe_map = merged_timeframe_map
-            merged_df = self._factory._execute_l65_with_degradation(
-                "Layer 6.5",
-                self._factory._layer6_5_preprocessing,
-                merged_df,
-                self._config,
-            )
-
-        self._report_progress("persist", 0.9, "Running Layer 7 validate and persist")
-        canonical = self._canonical_completeness(skipped_tfs, fresh_failed, local_statuses=local_statuses)
-        config_hash = self._factory._compute_config_hash(
-            self._config, symbol, self._primary_tf,
-            start_date=start_date, end_date=end_date,
-        )
-        elapsed = time.time() - start_time
-        result = self._factory._layer7_validate_and_persist(
-            symbol=symbol,
-            timeframe=self._primary_tf,
-            raw_data=primary_raw,
-            layers=[merged_df],
-            config=self._config,
-            elapsed=elapsed,
-            config_hash=config_hash,
-            batch_id=batch_id,
-            **canonical,
-        )
-
-        total_layer_counts = self._apply_total_layer_counts_to_result(result, tf_layer_counts)
-        # Task 3.1：completeness／quality 由 persist 前之 canonical 物件定案，此處不再覆寫；
-        # skipped_timeframes 僅為 diagnostic 鍵，值＝failed_timeframes
-        result.metadata["skipped_timeframes"] = list(canonical["timeframe_completeness"]["failed_timeframes"])
-
-        self._report_progress("complete", 1.0, f"MultiTF generation completed ({elapsed:.2f}s)")
-        return result
-
     def _report_progress(self, stage: str, progress: float, message: str) -> None:
         if self._progress_callback:
             self._progress_callback({"stage": stage, "progress": progress, "message": message})
@@ -1868,54 +1696,6 @@ class MultiTFGenerator:
         result.layer_counts = total_layer_counts
         result.metadata["layer_counts"] = total_layer_counts
         return total_layer_counts
-
-    @staticmethod
-    def _combine_layers(layers: Iterable[pd.DataFrame]) -> pd.DataFrame:
-        if MultiTFGenerator._cgsa_enabled():
-            logger.info("[CGSA] Skip MultiTFGenerator._combine_layers (registry-based path)")
-            return pd.DataFrame()
-
-        valid_layers = [layer for layer in layers if layer is not None and not layer.empty]
-        if not valid_layers:
-            return pd.DataFrame()
-
-        from momentum.FeatureEngineering.memmap_utils import concat_with_memmap
-
-        return concat_with_memmap(valid_layers)
-
-    @staticmethod
-    def _apply_timeframe_tag(
-        features_df: pd.DataFrame,
-        timeframe: str,
-        registry: Optional[object] = None,
-    ) -> pd.DataFrame:
-        if features_df is None or features_df.empty:
-            return features_df
-
-        if registry is not None and MultiTFGenerator._cgsa_enabled():
-            return features_df
-
-        tf_keys = TimeframeAligner._timeframe_seconds_keys()
-
-        def _rename(col: str) -> str:
-            if col.startswith("label_"):
-                return col  # Labels come from primary TF only, no TF tag needed
-            # meta_ columns MUST be tagged with TF prefix (meta_1h_*, meta_12h_*)
-            # to avoid duplicate column names when merging multi-TF outputs.
-            parts = col.split("_")
-            if len(parts) < 2:
-                return col
-            if any(p in tf_keys for p in parts[1:]):
-                return col  # 已含週期段（FFSTAT v55，審查 r40 codex P2-01：來源名含底線時週期段不在第二段，勿重複加）
-            return "_".join([parts[0], timeframe] + parts[1:])
-
-        rename_map = {col: _rename(col) for col in features_df.columns}
-        return features_df.rename(columns=rename_map)
-
-    @staticmethod
-    def _cgsa_enabled() -> bool:
-        raw = os.getenv("FFACT_USE_CGSA", "1").strip().lower()
-        return raw not in {"0", "false", "no", "off"}
 
     @staticmethod
     def _multi_tf_parallel_enabled() -> bool:

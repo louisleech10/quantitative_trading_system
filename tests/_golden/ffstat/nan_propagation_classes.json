@@ -1722,11 +1722,6 @@
       "class": "helper",
       "evidence": "multi_tf_generator.py:1169 參數驗證"
     },
-    "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._apply_timeframe_tag": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "multi_tf_generator.py:1701 欄名標籤"
-    },
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._apply_total_layer_counts_to_result": {
       "propagates_nan": false,
       "class": "helper",
@@ -1738,11 +1733,6 @@
       "evidence": "timeframe/multi_tf_generator.py 計數／狀態／旗標／清理／idx_map 持久化（不產值）"
     },
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._canonical_completeness": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "timeframe/multi_tf_generator.py 計數／狀態／旗標／清理／idx_map 持久化（不產值）"
-    },
-    "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._cgsa_enabled": {
       "propagates_nan": false,
       "class": "helper",
       "evidence": "timeframe/multi_tf_generator.py 計數／狀態／旗標／清理／idx_map 持久化（不產值）"
@@ -1813,11 +1803,6 @@
       "evidence": "timeframe/multi_tf_generator.py:55-984 逐週期執行 L1–L6、對齊、L6.5 之派發"
     },
     "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._generate_multi_tf_cgsa_parallel": {
-      "propagates_nan": false,
-      "class": "dispatcher",
-      "evidence": "timeframe/multi_tf_generator.py:55-984 逐週期執行 L1–L6、對齊、L6.5 之派發"
-    },
-    "momentum.FeatureEngineering.timeframe.multi_tf_generator:MultiTFGenerator._generate_multi_tf_legacy": {
       "propagates_nan": false,
       "class": "dispatcher",
       "evidence": "timeframe/multi_tf_generator.py:55-984 逐週期執行 L1–L6、對齊、L6.5 之派發"
@@ -1966,11 +1951,6 @@
       "propagates_nan": false,
       "class": "helper",
       "evidence": "tf_aligner.py:90-512 時間索引換算／參數／洩漏驗證（不產值）"
-    },
-    "momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._timeframe_seconds_keys": {
-      "propagates_nan": false,
-      "class": "helper",
-      "evidence": "tf_aligner.py:513-517 週期名稱清單（r28 codex P2-02 補入）"
     },
     "momentum.FeatureEngineering.timeframe.tf_aligner:TimeframeAligner._timeframe_to_seconds": {
       "propagates_nan": false,

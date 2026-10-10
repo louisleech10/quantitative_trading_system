@@ -73,23 +73,6 @@ def l65_config() -> dict:
     }
 
 
-@pytest.fixture
-def feature_factory() -> FeatureFactory:
-    """建立最小 FeatureFactory 實例供 Layer 6.5 接線測試使用。"""
-    factory = FeatureFactory.__new__(FeatureFactory)
-    factory._config_manager = Mock()
-    factory._adapter_registry = Mock()
-    factory._progress_callback = None
-    factory._storage = Mock()
-    factory._registry = Mock()
-    factory._validator = Mock()
-    factory._current_symbol = None
-    factory._current_timeframe = None
-    factory._current_config_hash = None
-    factory._current_raw_data = None
-    factory._reference_data_cache = {}
-    factory._cgsa_registry = None
-    return factory
 
 
 def test_parallel_transform_matches_serial(tmp_path: Path, l65_config: dict) -> None:
@@ -310,16 +293,21 @@ def test_l65_transform_defers_manifest_rewrites(
 
 
 def test_tier_auto_selects_workers(
-    feature_factory: FeatureFactory,
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """測試 Layer 6.5 呼叫端：8GB tier 應自動選擇 4 workers。"""
+    """測試 Layer 6.5 呼叫端（FRAMEPATH：正式入口 `_layer7_raw_from_cgsa_pipeline` 之串流 L6.5）：8GB tier 應自動選擇 4 workers。"""
     captured: dict[str, int] = {}
-    feature_factory._cgsa_registry = Mock(
-        finalize=Mock(),
-        all_column_names=Mock(return_value=[]),
+    registry = _make_registry_with_layers(tmp_path / "tier_workers", [(2, LayerSource.L1)])
+    monkeypatch.setattr(registry, "finalize", Mock(wraps=registry.finalize))
+    feature_factory = FeatureFactory(config_manager=Mock(), adapter_registry=Mock())
+    feature_factory._cgsa_registry = registry
+    feature_factory._registry = Mock()
+    config = SimpleNamespace(
+        preprocessing=SimpleNamespace(enabled=False),
+        labels=SimpleNamespace(model_dump=lambda: {}),
+        model_dump=lambda by_alias=False: {"timeframes": {"primary": "1h", "training": ["1h"]}},
     )
-    config = SimpleNamespace(preprocessing=SimpleNamespace(model_dump=lambda: {}))
 
     monkeypatch.delenv("FFACT_L65_WORKERS", raising=False)
     monkeypatch.setattr(
@@ -331,13 +319,35 @@ def test_tier_auto_selects_workers(
         lambda tier: {"l65_workers": 4, "cgsa_memory_buffer": 0, "l7_workers": 4, "chunk_bars": 50_000},
     )
 
-    def fake_transform_registry_groups(self: FeaturePreprocessor, registry: ColumnGroupRegistry, n_workers: int = 1) -> int:
-        captured["n_workers"] = n_workers
-        return 0
+    def fake_write_raw_from_registry_stream(**kwargs):
+        captured["n_workers"] = kwargs["n_workers"]
+        raw_path = tmp_path / "raw"
+        return raw_path, {
+            "raw_path": str(raw_path),
+            "manifest_path": str(registry.manifest_path),
+            "feature_count": registry.total_columns(),
+            "validation": {
+                "has_nan": False,
+                "has_inf": False,
+                "coverage": 1.0,
+                "nan_ratio": 0.0,
+                "inf_count": 0,
+                "inf_ratio": 0.0,
+                "groups_with_inf": 0,
+                "warnings": [],
+            },
+        }
 
-    monkeypatch.setattr(FeaturePreprocessor, "transform_registry_groups", fake_transform_registry_groups)
+    monkeypatch.setattr(feature_factory._storage, "write_raw_from_registry_stream", fake_write_raw_from_registry_stream)
 
-    feature_factory._layer6_5_preprocessing(pd.DataFrame(index=range(4)), config)
+    feature_factory._layer7_raw_from_cgsa_pipeline(
+        symbol="ETHUSDT",
+        timeframe="1h",
+        raw_data=pd.DataFrame({"open": np.ones(8, dtype=np.float64)}),
+        config=config,
+        elapsed=0.0,
+        config_hash="cfg_tier",
+    )
 
     assert captured["n_workers"] == 4
     feature_factory._cgsa_registry.finalize.assert_called_once()

@@ -41,3 +41,33 @@
 | `tests/test_hardware_api.py` | pre-existing assertion changes | wildcard audit registration only | Mechanical audit補登：session 前已缺 frozen-doc 登記 |
 | `tests/test_hardware_utils.py` | pre-existing assertion changes | wildcard audit registration only | Mechanical audit補登：session 前已缺 frozen-doc 登記 |
 | `tests/test_phase_d_granular_control.py` | pre-existing assertion changes | wildcard audit registration only | Mechanical audit補登：session 前已缺 frozen-doc 登記 |
+| `tests/feature_engineering/ff_artifact_compare_helpers.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/fftfmeta_golden_helpers.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_b6_warmup_trim.py` | frame／legacy 對照斷言 | 刪 3 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_batch2d_dstar_align.py` | frame／legacy 對照斷言 | 刪 9 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_failopen_correctness.py` | frame／legacy 對照斷言 | 改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_failopen_manifest.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_failopen_matrix.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_failopen_producer.py` | frame／legacy 對照斷言 | 刪 4 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_ff_cross_symbol_value_isolation.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 4 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_ffstat_dstar_failure.py` | frame／legacy 對照斷言 | 改寫 2 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_ffstat_golden.py` | frame／legacy 對照斷言 | 改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_ffstat_layer.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_ffstat_stable_start.py` | frame／legacy 對照斷言 | 改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_ic_first_pipeline.py` | frame／legacy 對照斷言 | 刪 6 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_icfirstalign_icfirst.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_mtf_align_golden.py` | frame／legacy 對照斷言 | 刪 5 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_multi_symbol_ic_first.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/feature_engineering/test_ratiounsafe_wiring.py` | frame／legacy 對照斷言 | 改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/governance/test_prered_allowed_red.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/momentum/Analysis/test_ic_persist_redirect_inventory.py` | frame／legacy 對照斷言 | 改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/performance/test_searchsorted_perf.py` | frame／legacy 對照斷言 | 刪 9 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_cgsa_multi_tf.py` | frame／legacy 對照斷言 | 刪 3 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 3 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_cgsa_pipeline.py` | frame／legacy 對照斷言 | 改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_feature_factory_batch2b.py` | frame／legacy 對照斷言 | 刪 4 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_feature_factory_batch2d.py` | frame／legacy 對照斷言 | 改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_feature_factory_e2e.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_l65_parallel.py` | frame／legacy 對照斷言 | 刪 1 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 1 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_multi_tf_generator.py` | frame／legacy 對照斷言 | 刪 9 個節點（frame 臂、legacy 參數、FFACT_USE_CGSA=0 對照）；改寫 2 個函式（保留原斷言、刪除斷言逐條附理由） | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_multi_tf_golden_equivalence.py` | 整檔（frame 臂／legacy 專用） | 整檔刪除 | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |
+| `tests/test_primary_self_align_skip.py` | 整檔（frame 臂／legacy 專用） | 整檔刪除 | FRAMEPATH b1（Phase 1）：依 tests/_golden/framepath/test_disposition.json phase=1 操作列 |

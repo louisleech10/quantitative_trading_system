@@ -96,19 +96,12 @@ from momentum.FeatureEngineering.warmup_window import (
 
 logger = get_logger(__name__)
 
-_LAYER_LABELS = ("L1", "L2", "L3", "L4", "L5", "L6")
+
+class CGSARegistryRequiredError(RuntimeError):
+    """生成路徑只有 CGSA（docs/FRAMEPATH_SPEC.md Task 1.2）：分派點遇 CGSA registry 未建立、或 `_combine_layers`
+    之 context 不在白名單時具名拒絕（訊息含 symbol／timeframe／呼叫點），不再有 frame 記憶體後備。"""
 
 
-def _build_column_layer_map(layers: List[pd.DataFrame]) -> Dict[str, str]:
-    """建立合併前欄位的來源層對照，重複欄位保留最先出現的層。"""
-    column_layer_map: Dict[str, str] = {}
-    for layer_label, layer in zip(_LAYER_LABELS, layers):
-        if layer is None or layer.empty:
-            continue
-        for column in layer.columns:
-            assert isinstance(column, str), f"non-str column: {column!r}"
-            column_layer_map.setdefault(column, layer_label)
-    return column_layer_map
 _PROC = psutil.Process()  # Cached for low-overhead RSS sampling
 _MAX_NAN_RATIO_ARTIFACT_PATH = Path(__file__).parent / "_resources/max_nan_ratio.json"
 
@@ -389,9 +382,7 @@ class FeatureFactory:
         self._calibration_result = result
 
     def _no_start_calibration_result(self, config: "FactoryConfig", training_tfs: List[str]) -> Dict[str, Any]:
-        """未填起始日之逐欄校準（v32 §C、Task 2.3 ④）之本次 run 標記。frame 多週期（legacy）路徑由對齊時產生之
-        原生列對應（`_legacy_native_row_maps`）使 L6.5 以不同原生 K 棒計最早 N 個值；CGSA 走 native 子實例。"""
-        self._legacy_native_row_maps = {}
+        """未填起始日之逐欄校準（v32 §C、Task 2.3 ④）之本次 run 標記；多週期由 CGSA native 子實例各自計原生 K 棒。"""
         return {"output_start": None, "output_start_source": "per_column", "packets": None, "no_start": True}
 
     def _attach_calibration(self, preprocessor: FeaturePreprocessor) -> None:
@@ -400,8 +391,8 @@ class FeatureFactory:
         if result is None:
             return
         if result.get("no_start"):
-            # Task 2.3 ④：逐欄以公開值最早 N 個有效值校準（frame 多週期帶原生列對應，數不同原生 K 棒）
-            preprocessor.set_no_start_calibration(getattr(self, "_legacy_native_row_maps", None))
+            # Task 2.3 ④：逐欄以公開值最早 N 個有效值校準
+            preprocessor.set_no_start_calibration()
             return
         preprocessor.set_calibration(
             result["packets"], symbol=str(self._current_symbol), output_start=result["output_start"],
@@ -480,6 +471,9 @@ class FeatureFactory:
 
         self._cgsa_force_fresh = force_regenerate
         self._cgsa_registry = self._prepare_cgsa_registry(symbol, timeframe, config_hash or "")
+        if len(training_tfs) <= 1:
+            # FRAMEPATH Task 1.2：單週期只走 CGSA；registry 未建立 ⇒ 於 L1 之前具名拒絕（L3 內拋會被層執行器包成層失敗）
+            self._require_cgsa_registry("generate_features", symbol, timeframe)
 
         if len(training_tfs) > 1:
             from momentum.FeatureEngineering.timeframe import MultiTFGenerator
@@ -551,50 +545,18 @@ class FeatureFactory:
         self._raise_for_failed_layer(layer6_result, "Layer 6", config)
         layer6 = layer6_result.data
 
-        layers = [layer1, layer2, layer3, layer4, layer5, layer6]
-        if self._cgsa_enabled() and self._cgsa_registry is not None:
-            self._persist_single_tf_l3_l6_to_cgsa(layer3, layer4, layer5, layer6)
-            return self._layer7_raw_from_cgsa_pipeline(
-                symbol=symbol,
-                timeframe=timeframe,
-                raw_data=raw_data,
-                config=config,
-                elapsed=time.time() - start_time,
-                config_hash=config_hash,
-                compute_warnings=compute_warnings,
-                persist=persist,
-                batch_id=batch_id,
-            )
-
-        if config.preprocessing.enabled:
-            self._column_layer_map = _build_column_layer_map(layers)
-            self._column_timeframe_map = None
-            all_features = self._combine_layers(layers, context="layer6_5_input")
-            # IC-First is now the only generation path: run winsorization +
-            # fracdiff/ADF now; rank/zscore/gaussian remain downstream transforms.
-            logger.info(
-                "[IC-First] Generation mode: skipping rank/zscore/gaussian. "
-                "IC Gatekeeper and selected transforms are downstream actions after L7_raw."
-            )
-            preprocessed = self._execute_l65_with_degradation(
-                "Layer 6.5 (IC-First)", self._layer6_5_pre_ic, all_features, config
-            )
-            if not preprocessed.empty:
-                layers = [preprocessed]
-
-        result = self._layer7_validate_and_persist(
-            symbol,
-            timeframe,
-            raw_data,
-            layers,
-            config,
-            time.time() - start_time,
-            config_hash,
+        self._persist_single_tf_l3_l6_to_cgsa(layer3, layer4, layer5, layer6)
+        return self._layer7_raw_from_cgsa_pipeline(
+            symbol=symbol,
+            timeframe=timeframe,
+            raw_data=raw_data,
+            config=config,
+            elapsed=time.time() - start_time,
+            config_hash=config_hash,
             compute_warnings=compute_warnings,
             persist=persist,
             batch_id=batch_id,
         )
-        return result
 
     @staticmethod
     def _spill_to_memmap(df: pd.DataFrame, label: str, dir: Optional[str] = None) -> pd.DataFrame:
@@ -859,31 +821,6 @@ class FeatureFactory:
             return
         reason = result.reason or "unknown layer failure"
         raise RuntimeError(f"{layer_name} failed: {reason}")
-
-    def _execute_l65_with_degradation(
-        self,
-        layer_name: str,
-        func: Callable,
-        all_features: pd.DataFrame,
-        config: "FactoryConfig",
-    ) -> pd.DataFrame:
-        """L6.5 失敗時保留原始特徵並記錄實際生效設定。"""
-        self._effective_preprocessing_config = self._preprocessing_config_dict(config)
-        try:
-            self._report_progress(layer_name, 0.0, f"Starting {layer_name}...")
-            result = func(all_features, config)
-            if result is None or (result.empty and not all_features.empty):
-                raise ValueError("preprocessing returned empty output")
-            self._preprocessing_applied = True
-            self._report_progress(layer_name, 1.0, f"{layer_name} completed: {result.shape[1]} features")
-            return self._ensure_float32(result) if not result.empty else result
-        except NON_DEGRADABLE_ERRORS:
-            raise  # FFSTAT：平穩化來源缺漏不可降級為「未做 L6.5 照常輸出」
-        except Exception as exc:
-            self._preprocessing_applied = False
-            logger.error("%s failed; continuing without preprocessing: %s", layer_name, exc, exc_info=True)
-            self._report_progress(layer_name, 1.0, f"{layer_name} degraded: {exc}")
-            return all_features
 
     def _safe_execute(self, layer_name: str, func: Callable, *args) -> pd.DataFrame:
         """Execute a layer safely; return empty DataFrame on failure (L6.5 等非 L1-L6 路徑)."""
@@ -1197,11 +1134,6 @@ class FeatureFactory:
         return max(1, workers)
 
     @staticmethod
-    def _cgsa_enabled() -> bool:
-        raw = os.getenv("FFACT_USE_CGSA", "1").strip().lower()
-        return raw not in {"0", "false", "no", "off"}
-
-    @staticmethod
     def _cgsa_disk_precheck_enabled() -> bool:
         raw = os.getenv("FFACT_CGSA_DISK_PRECHECK", "1").strip().lower()
         return raw not in {"0", "false", "no", "off"}
@@ -1225,15 +1157,22 @@ class FeatureFactory:
             timeframe=timeframe,
         )
 
+    def _require_cgsa_registry(self, site: str, symbol: Optional[str] = None,
+                               timeframe: Optional[str] = None) -> None:
+        """CGSA registry 未建立 ⇒ `CGSARegistryRequiredError`（訊息含 symbol／timeframe／呼叫點；FRAMEPATH Task 1.2）。"""
+        if self._cgsa_registry is None:
+            sym = symbol or self._current_symbol or "unknown"
+            tf = timeframe or self._current_timeframe or "unknown"
+            raise CGSARegistryRequiredError(
+                f"CGSA registry 未建立：{sym}/{tf}（呼叫點 {site}）；生成只走 CGSA，無記憶體後備"
+            )
+
     def _prepare_cgsa_registry(
         self,
         symbol: str,
         timeframe: str,
         config_hash: str = "",
     ) -> Optional[ColumnGroupRegistry]:
-        if not self._cgsa_enabled():
-            return None
-
         configured_work_dir = os.getenv("FFACT_CGSA_WORK_DIR", "").strip()
         if configured_work_dir:
             work_dir = Path(configured_work_dir).expanduser().resolve()
@@ -2081,7 +2020,8 @@ class FeatureFactory:
             get_l3_streaming_buffer_cols,
         )
         persist_mode = get_l3_persist_mode()
-        if self._cgsa_enabled() and self._cgsa_registry is not None and persist_mode in {"streaming", "hybrid"}:
+        if persist_mode in {"streaming", "hybrid"}:
+            self._require_cgsa_registry("_layer3_rolling_aggregation")
             persister = _StreamingL3Persister(
                 factory=self,
                 layer=LayerSource.L3,
@@ -2168,19 +2108,14 @@ class FeatureFactory:
         # Instead, pass only [data, layer1] — the layers that LagProcessor
         # actually uses — avoiding the 2-minute memmap copy entirely.
         apply_to = getattr(config.lag_features, "apply_to", "all")
-        if self._cgsa_enabled() and apply_to != "layer1_and_raw":
+        if apply_to != "layer1_and_raw":
             logger.warning(
                 "[L4] CGSA mode requires lag_features.apply_to='layer1_and_raw'; forcing fast path from '%s'",
                 apply_to,
             )
             apply_to = "layer1_and_raw"
-
-        if apply_to == "layer1_and_raw":
-            # Fast path: only the columns that will be selected
-            base = self._combine_layers([data, layer1], context="layer4_input")
-        else:
-            base = self._combine_layers([data, layer1, layer2, layer3], context="layer4_input")
-        # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L4 lag（含 non-CGSA fallback 路徑）
+        base = self._combine_layers([data, layer1], context="layer4_input")
+        # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L4 lag
         base = self._apply_cascade_blacklist(base, f"L4_input[{apply_to}]", config)
         index = base.index if len(base.index) > 0 else layer1.index
         if base.empty:
@@ -2892,10 +2827,6 @@ class FeatureFactory:
             selection_window=selection_window, split_id=split_id,
             label_spec={"kind": "explicit" if label is not None else "close_forward_return", "horizon": label_horizon},
         )
-        if not self._cgsa_enabled():
-            raise icc.ICFirstGenerationError(
-                f"IC-first 之 raw 只由 CGSA 正式生成產出（Task 2.1），FFACT_USE_CGSA 關閉時拒跑：{symbol}/{tf}"
-            )
         storage_manager = storage or self._storage
         if Path(storage_manager.base_path).resolve() != Path(self._storage.base_path).resolve():
             raise ValueError(
@@ -3206,26 +3137,7 @@ class FeatureFactory:
                 return model_dump()
         return {}
 
-    def _layer6_5_preprocessing(
-        self,
-        all_features: pd.DataFrame,
-        config: "FactoryConfig",
-        *,
-        selected_features: Optional[List[str]] = None,
-    ) -> pd.DataFrame:
-        """Layer 6.5: Feature preprocessing and normalization."""
-        if selected_features is None:
-            return self._layer6_5_pre_ic(all_features, config)
-        return self._layer6_5_post_ic(all_features, config, selected_features)
 
-    def _layer6_5_pre_ic(self, all_features: pd.DataFrame, config: "FactoryConfig") -> pd.DataFrame:
-        """Pre-IC path: winsorization plus FracDiff/ADF only."""
-        preprocessing_config = self._preprocessing_config_dict(config)
-        self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", False)
-        self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", False)
-        self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", False)
-        logger.info("[IC-First] Layer 6.5 pre_ic enabled: winsorization/fracdiff/adf only")
-        return self._run_layer6_5_preprocessor(all_features, config, preprocessing_config)
 
     def _build_l7_raw_preprocessing_config(self, config: "FactoryConfig") -> Dict[str, Any]:
         """Return the L6.5 config used by generation before writing L7_raw."""
@@ -3319,104 +3231,7 @@ class FeatureFactory:
             return "none"
         return "ic_first_pre"
 
-    def _layer6_5_post_ic(
-        self,
-        all_features: pd.DataFrame,
-        config: "FactoryConfig",
-        selected_features: List[str],
-    ) -> pd.DataFrame:
-        """Post-IC path: rank, zscore, and gaussian only for selected features."""
-        selected_columns = [str(feature) for feature in selected_features]
-        if not selected_columns:
-            logger.warning("[IC-First] post_ic received no selected features; returning empty output")
-            return pd.DataFrame(index=all_features.index if all_features is not None else None)
 
-        if all_features is None and self._cgsa_registry is None:
-            logger.warning("[IC-First] post_ic received no L6.5 input features")
-            return pd.DataFrame()
-
-        post_ic_features = all_features
-        if all_features is not None:
-            available_columns = [column for column in selected_columns if column in all_features.columns]
-            missing_columns = [column for column in selected_columns if column not in all_features.columns]
-            if missing_columns:
-                logger.warning(
-                    "[IC-First] post_ic skipped %d selected features missing from L6.5 input",
-                    len(missing_columns),
-                )
-            if not available_columns:
-                logger.warning("[IC-First] post_ic selected features are absent from L6.5 input")
-                return pd.DataFrame(index=all_features.index)
-            selected_columns = available_columns
-            post_ic_features = all_features.loc[:, selected_columns].copy()
-
-        preprocessing_config = self._preprocessing_config_dict(config)
-        preprocessing_config["mode"] = "replace"
-        self._set_preprocessing_step_enabled(preprocessing_config, "winsorization", False)
-        self._set_preprocessing_step_enabled(preprocessing_config, "fractional_differencing", False)
-        self._set_preprocessing_step_enabled(preprocessing_config, "adf_differencing", False)
-        # 尊重使用者在 config 中的開關設定，而不是強制全開
-        _rank_on = preprocessing_config.get("rank_transform", {}).get("enabled", True)
-        _zscore_on = preprocessing_config.get("adaptive_zscore", {}).get("enabled", True)
-        _gaussian_on = preprocessing_config.get("gaussian_normalize", {}).get("enabled", False)
-        self._set_preprocessing_step_enabled(preprocessing_config, "rank_transform", _rank_on, selected_columns if _rank_on else None)
-        self._set_preprocessing_step_enabled(preprocessing_config, "adaptive_zscore", _zscore_on, selected_columns if _zscore_on else None)
-        self._set_preprocessing_step_enabled(preprocessing_config, "gaussian_normalize", _gaussian_on, selected_columns if _gaussian_on else None)
-        logger.info(
-            "[IC-First] Layer 6.5 post_ic enabled: transforming %d selected features",
-            len(selected_columns),
-        )
-        return self._run_layer6_5_preprocessor(post_ic_features, config, preprocessing_config)
-
-    def _run_layer6_5_preprocessor(
-        self,
-        all_features: pd.DataFrame,
-        config: "FactoryConfig",
-        preprocessing_config: Dict[str, Any],
-    ) -> pd.DataFrame:
-        # Cascade blacklist：阻斷 CDL/HT_DCPHASE 進入 L6.5 preprocessing
-        # （legacy / ic_first_pre / post_ic 三 mode 都經由此函式 → 一處覆蓋全部）
-        all_features = self._apply_cascade_blacklist(all_features, "L65_input", config)
-        context = self._build_preprocessing_context(all_features, config)
-        preprocessor = FeaturePreprocessor(
-            preprocessing_config,
-            context=context,
-            column_layer_map=self._column_layer_map,
-            column_timeframe_map=getattr(self, "_column_timeframe_map", None),
-        )
-        self._attach_calibration(preprocessor)  # FFSTAT Task 2.1：三路校準值只取前置關卡之封包
-
-        if self._cgsa_enabled() and self._cgsa_registry is not None:
-            from momentum.FeatureEngineering.utils.hardware_utils import get_memory_tier, get_tier_config
-
-            tier = get_memory_tier()
-            tier_cfg = get_tier_config(tier)
-            n_workers = self._parse_positive_int_env(
-                "FFACT_L65_WORKERS",
-                int(tier_cfg["l65_workers"]),
-            )
-            n_workers = max(1, n_workers)
-
-            try:
-                preprocessor.transform_registry_groups(
-                    self._cgsa_registry,
-                    n_workers=n_workers,
-                )
-            finally:
-                self._cgsa_registry.finalize()
-            self._capture_stationarity_decisions(preprocessor, config)
-            # CGSA streaming path: L6.5 outputs live in CGSA registry, not in this
-            # frame. L7 dead-feature drop on registry-side data is out of scope for
-            # this step (see NAN_REDUCTION_STRATEGY.md §5.3 / PLAN §2.7).
-            return pd.DataFrame(index=all_features.index if all_features is not None else None)
-
-        # Classic in-memory path: apply L7 dead-feature drop on the transformed
-        # frame (covers L1, L2, L4-fast/fallback, L5, L6 + L6.5 outputs).
-        # See NAN_REDUCTION_STRATEGY.md §5.3 — drops ONLY constant/insufficient-
-        # sample columns, NEVER drops by NaN ratio.
-        result_frame = preprocessor.transform(all_features)
-        self._capture_stationarity_decisions(preprocessor, config)
-        return self._apply_l7_dead_feature_drop(result_frame, config)
 
     def _apply_cascade_blacklist(
         self,
@@ -3450,49 +3265,6 @@ class FeatureFactory:
         logger.info(
             "[NaN Blacklist][%s] stripped %d cols (e.g. %s)",
             context, len(blacklisted), list(blacklisted)[:3],
-        )
-        return result
-
-    def _apply_l7_dead_feature_drop(
-        self,
-        frame: pd.DataFrame,
-        config: "FactoryConfig",
-    ) -> pd.DataFrame:
-        """L7 死特徵清理（frame path）。
-
-        Per-column drop only — never group-level（safety invariant I-1）。
-        詳見 docs/NAN_REDUCTION_STRATEGY.md §5.3 與 utils/dead_feature_filter.py。
-        """
-        from momentum.FeatureEngineering.utils.dead_feature_filter import (
-            drop_dead_columns,
-            find_dead_columns,
-        )
-
-        if frame is None or frame.empty or len(frame.columns) == 0:
-            return frame
-        nan_strategy = getattr(config, "nan_strategy", None)
-        if nan_strategy is None:
-            return frame
-        dead_cfg = getattr(nan_strategy, "l7_dead_feature_drop", None)
-        if dead_cfg is None:
-            return frame
-        enabled = bool(getattr(dead_cfg, "enabled", True))
-        min_valid = int(getattr(dead_cfg, "min_valid_samples", 100))
-
-        dead, diag = find_dead_columns(frame, min_valid_samples=min_valid, enabled=enabled)
-        if not dead:
-            return frame
-        # FFSTAT Task 2.3 ⑦：L7 死欄原因（有效樣本不足優先於常數）供欄集合差異收據
-        reasons = {c: "constant" for c in diag.constant_cols}
-        reasons.update({c: "stable_samples_below_min" for c in diag.sparse_cols})
-        self._l7_dead_reasons = {**dict(getattr(self, "_l7_dead_reasons", None) or {}), **reasons}
-        result = drop_dead_columns(frame, dead)
-        logger.info(
-            "[L7 Dead Drop] dropped %d cols (constant=%d, sparse=%d); examples: %s",
-            diag.total_dropped,
-            len(diag.constant_cols),
-            len(diag.sparse_cols),
-            list(dead)[:5],
         )
         return result
 
@@ -3961,20 +3733,6 @@ class FeatureFactory:
                 getattr(self, "_effective_preprocessing_config", None) or {}
             )
 
-    def _apply_preprocessing_degradation_metadata(self, metadata: Dict[str, Any]) -> None:
-        """僅 L6.5 實際失敗時寫降級資訊，健康 run metadata 不變。"""
-        if getattr(self, "_preprocessing_applied", None) is not False:
-            return
-        metadata["preprocessing_applied"] = False
-        metadata["effective_preprocessing_config"] = copy.deepcopy(
-            getattr(self, "_effective_preprocessing_config", None) or {}
-        )
-        metadata["quality_status"] = "partial"
-        metadata["run_status"] = "partial"
-        metadata["failure_reasons"] = list(metadata.get("failure_reasons", [])) + [
-            "L6.5:preprocessing_failed"
-        ]
-
     def _persist_single_tf_l3_l6_to_cgsa(
         self,
         layer3: pd.DataFrame,
@@ -4312,309 +4070,7 @@ class FeatureFactory:
             return str(value.item())
         return str(value)
 
-    def _layer7_validate_and_persist_cgsa(
-        self,
-        symbol: str,
-        timeframe: str,
-        raw_data: pd.DataFrame,
-        config: "FactoryConfig",
-        elapsed: float,
-        config_hash: str,
-        compute_warnings: Optional[List[str]] = None,
-        persist: bool = True,
-        batch_id: Optional[str] = None,
-        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
-        cross_tf_layer_failures: Sequence[str] = (),
-        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
-    ) -> FeatureGenerationResult:
-        """CGSA Layer 7 path: per-group scan validation + per-group parquet persistence."""
-        if self._cgsa_registry is None:
-            raise ValueError("CGSA Layer 7 requested without initialized registry")
 
-        labels_df = pd.DataFrame(index=raw_data.index)
-        if "close" in raw_data.columns:
-            label_generator = LabelGenerator(config.labels.model_dump())
-            labels_df = label_generator.generate_all(raw_data["close"])
-
-        trimmed_raw, _, labels_df = self._trim_for_public_output(
-            raw_data,
-            pd.DataFrame(index=raw_data.index),
-            labels_df,
-        )
-        row_slice = self._output_row_slice(raw_data.index)
-
-        validation_summary = self._scan_cgsa_registry_validation(self._cgsa_registry)
-        layer_counts = self._collect_cgsa_layer_counts(self._cgsa_registry)
-        feature_names = self._cgsa_registry.all_column_names()
-        feature_count = int(self._cgsa_registry.total_columns())
-
-        config_payload = config.model_dump(by_alias=True)
-        training_tfs = config_payload.get("timeframes", {}).get("training", [])
-        if not isinstance(training_tfs, list):
-            training_tfs = [timeframe]
-
-        persisted_group_paths: List[str] = []
-        if persist:
-            persisted_group_paths = self._storage.persist_registry_to_parquet(
-                symbol=symbol,
-                config_hash=config_hash,
-                registry=self._cgsa_registry,
-                cleanup_intermediate=False,
-                row_slice=row_slice,
-            )
-
-        self._cgsa_registry.save_state(
-            symbol=symbol,
-            primary_tf=timeframe,
-            training_tfs=training_tfs,
-            config_hash=config_hash,
-            config_snapshot=config_payload,
-        )
-
-        manifest_path = str(self._cgsa_registry.manifest_path)
-        merged_warnings = (compute_warnings or []) + list(validation_summary["warnings"])
-
-        metadata = {
-            "feature_names": feature_names,
-            "feature_count": feature_count,
-            "layer_counts": layer_counts,
-            "config_hash": config_hash,
-            "generation_time": float(elapsed),
-            "compute_warnings": merged_warnings,
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "data_range": self._data_range(trimmed_raw),
-            "config_used": config_payload,
-            "manifest_path": manifest_path,
-            "persisted_group_paths": persisted_group_paths,
-            "validation": {
-                "has_nan": bool(validation_summary["has_nan"]),
-                "has_inf": bool(validation_summary["has_inf"]),
-                "max_correlation": 0.0,
-                "high_correlation_pairs": [],
-                "warnings": list(validation_summary["warnings"]),
-                "coverage": float(validation_summary["coverage"]),
-                "inf_count": int(validation_summary.get("inf_count", 0)),
-                "inf_ratio": float(validation_summary.get("inf_ratio", 0.0)),
-                "groups_with_inf": int(validation_summary.get("groups_with_inf", 0)),
-                "constant_features_removed": [],
-            },
-        }
-        completeness_meta = self._final_completeness(
-            config,
-            symbol,
-            timeframe,
-            nan_ratio=float(validation_summary.get("nan_ratio", 1.0 - float(validation_summary["coverage"]))),
-            inf_ratio=float(validation_summary.get("inf_ratio", 0.0)),
-            preprocessing_applied=getattr(self, "_preprocessing_applied", None),
-            timeframe_completeness=timeframe_completeness,
-            cross_tf_layer_failures=cross_tf_layer_failures,
-            layer_status_by_tf=layer_status_by_tf,
-        )
-        self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
-        self._apply_warmup_metadata(metadata, config, raw_data)
-        # FFSTAT §C 紀錄：此路徑於現行呼叫圖不可達（CGSA 單／多週期皆走 L7_raw 串流、無 CGSA 走 frame）——只寫鍵
-        metadata.update(self._stable_start_metadata({}, []))
-
-        metadata.update(self._stationarity_metadata(trimmed_raw.index))  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
-        result = FeatureGenerationResult(
-            features_df=pd.DataFrame(index=trimmed_raw.index),
-            labels_df=labels_df,
-            metadata=metadata,
-            feature_count=feature_count,
-            generation_time=float(elapsed),
-            layer_counts=layer_counts,
-            config_used=config_payload,
-            compute_warnings=merged_warnings,
-            hdf5_path=manifest_path if persist else "",
-        )
-
-        try:
-            registry_payload: Dict[str, Any] = {
-                "symbol": symbol,
-                "timeframe": timeframe,
-                "config_hash": config_hash,
-                "feature_count": result.feature_count,
-                "row_count": len(trimmed_raw.index),
-                "hdf5_relative_path": result.hdf5_path,
-            }
-            if batch_id is not None:
-                registry_payload["batch_id"] = batch_id
-            self._registry.add(registry_payload)
-        except Exception as exc:
-            if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
-                logger.warning("Failed to update feature registry: %s", exc)
-            else:
-                raise RuntimeError(f"Failed to update feature registry: {exc}") from exc
-
-        return result
-
-    def _layer7_validate_and_persist(
-        self,
-        symbol: str,
-        timeframe: str,
-        raw_data: pd.DataFrame,
-        layers: List[pd.DataFrame],
-        config: "FactoryConfig",
-        elapsed: float,
-        config_hash: str,
-        compute_warnings: Optional[List[str]] = None,
-        persist: bool = True,
-        batch_id: Optional[str] = None,
-        timeframe_completeness: Optional[Dict[str, List[str]]] = None,
-        cross_tf_layer_failures: Sequence[str] = (),
-        layer_status_by_tf: Optional[Dict[str, Dict[str, Tuple[str, str]]]] = None,
-    ) -> FeatureGenerationResult:
-        if self._cgsa_enabled() and self._cgsa_registry is not None:
-            return self._layer7_validate_and_persist_cgsa(
-                symbol=symbol,
-                timeframe=timeframe,
-                raw_data=raw_data,
-                config=config,
-                elapsed=elapsed,
-                config_hash=config_hash,
-                compute_warnings=compute_warnings,
-                persist=persist,
-                batch_id=batch_id,
-                timeframe_completeness=timeframe_completeness,
-                cross_tf_layer_failures=cross_tf_layer_failures,
-                layer_status_by_tf=layer_status_by_tf,
-            )
-
-        features_df = self._combine_layers(layers, context="layer7_final")
-        features_df = features_df.reindex(raw_data.index)
-        if not features_df.empty:
-            # copy=False: if already float32 (memmap), avoids duplicating 11+ GB
-            features_df = features_df.astype("float32", copy=False)
-        # Add timeframe tag to all feature columns so single-TF and multi-TF outputs
-        # share the same naming convention (e.g. ema_20 → ema_12h_20).
-        if not features_df.empty:
-            features_df = self._apply_timeframe_tag(features_df, timeframe)
-
-        labels_df = pd.DataFrame(index=raw_data.index)
-        if "close" in raw_data.columns:
-            label_generator = LabelGenerator(config.labels.model_dump())
-            labels_df = label_generator.generate_all(raw_data["close"])
-
-        raw_data, features_df, labels_df = self._trim_for_public_output(
-            raw_data,
-            features_df,
-            labels_df,
-        )
-
-        layer_counts = {
-            "layer1": layers[0].shape[1] if len(layers) > 0 else 0,
-            "layer2": layers[1].shape[1] if len(layers) > 1 else 0,
-            "layer3": layers[2].shape[1] if len(layers) > 2 else 0,
-            "layer4": layers[3].shape[1] if len(layers) > 3 else 0,
-            "layer5": layers[4].shape[1] if len(layers) > 4 else 0,
-            "layer6": layers[5].shape[1] if len(layers) > 5 else 0,
-        }
-
-        data_range = self._data_range(raw_data)
-        completeness_meta = resolve_completeness_meta(
-            self.layer_results,
-            timeframe,
-            timeframe_completeness=timeframe_completeness,
-            cross_tf_layer_failures=cross_tf_layer_failures,
-            layer_status_by_tf=layer_status_by_tf,
-        )
-        metadata = {
-            "feature_names": list(features_df.columns),
-            "feature_count": int(features_df.shape[1]),
-            "layer_counts": layer_counts,
-            "config_hash": config_hash,
-            "generation_time": float(elapsed),
-            "compute_warnings": compute_warnings or [],
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "data_range": data_range,
-            "config_used": config.model_dump(by_alias=True),
-            "quality_status": str(completeness_meta["quality_status"]),
-            "run_status": str(completeness_meta["quality_status"]),
-            "failed_layers": qualify_failed_layer_ids(
-                completeness_meta.get("failed_layers", []), timeframe
-            ),
-            "failure_reasons": qualify_failed_layer_ids(
-                completeness_meta.get("failure_reasons", []), timeframe
-            ),
-        }
-        ingest_raw = self._current_raw_data if self._current_raw_data is not None else raw_data
-        self._apply_warmup_metadata(metadata, config, ingest_raw)
-
-        metadata.update(self._stationarity_metadata(features_df.index))  # FFSTAT：逐欄平穩化決策與摘要（平穩化關閉時為空）
-        result = FeatureGenerationResult(
-            features_df=features_df,
-            labels_df=labels_df,
-            metadata=metadata,
-            feature_count=int(features_df.shape[1]),
-            generation_time=float(elapsed),
-            layer_counts=layer_counts,
-            config_used=config.model_dump(by_alias=True),
-            compute_warnings=compute_warnings or [],
-        )
-
-        validation = self._validator.validate_factory_output(
-            result,
-            winsor_window=config.preprocessing.winsorization.window,
-        )
-        metadata["validation"] = validation.__dict__
-        metadata["feature_names"] = list(result.features_df.columns)
-        metadata["feature_count"] = int(result.features_df.shape[1])
-        values = result.features_df.to_numpy(copy=False)
-        value_count = int(values.size)
-        nan_ratio = float(self._abnormal_nan_count(values) / value_count) if value_count else 0.0
-        inf_ratio = float(np.isinf(values).sum() / value_count) if value_count else 0.0
-        # FFSTAT §C 紀錄：逐欄 stable_start；有起始日而首個有效值晚於起始日之欄 ⇒ warmup_insufficient_history
-        from momentum.FeatureEngineering.warmup_window import (
-            WARMUP_INSUFFICIENT_EVENT,
-            stable_start_from_frame,
-            warmup_late_columns,
-        )
-
-        stable_start = stable_start_from_frame(result.features_df)
-        warmup_late = warmup_late_columns(stable_start, self._warmup_output_start(), self._warmup_probe_late())
-        metadata.update(self._stable_start_metadata(stable_start, warmup_late))
-        # Task 2.3 ④：frame 路徑 L6.5 旗標與比率皆於 persist 前已知，以同一函式先判再存
-        max_inf_ratio, max_nan_ratio = self._resolve_quality_thresholds(config, symbol, timeframe)
-        completeness_meta = apply_quality_degradation(
-            completeness_meta,
-            inf_ratio=inf_ratio,
-            nan_ratio=nan_ratio,
-            max_inf_ratio=max_inf_ratio,
-            max_nan_ratio=max_nan_ratio,
-            preprocessing_applied=getattr(self, "_preprocessing_applied", None),
-            extra_failure_reasons=self._stationarity_failure_reasons()
-            + ([f"{WARMUP_INSUFFICIENT_EVENT}:{len(warmup_late)}"] if warmup_late else []),
-        )
-        self._apply_completeness_to_metadata(metadata, completeness_meta, timeframe)
-        result.metadata = metadata
-        result.feature_count = int(result.features_df.shape[1])
-
-        if persist:
-            result.hdf5_path = self._storage.save_factory_output(symbol, timeframe, result)
-        else:
-            result.hdf5_path = ""
-
-        try:
-            registry_payload: Dict[str, Any] = {
-                "symbol": symbol,
-                "timeframe": timeframe,
-                "config_hash": config_hash,
-                "feature_count": len(result.features_df.columns),
-                "row_count": len(result.features_df.index),
-                "hdf5_relative_path": result.hdf5_path,
-            }
-            if batch_id is not None:
-                registry_payload["batch_id"] = batch_id
-            self._registry.add(registry_payload)
-        except Exception as exc:
-            if bool(self._runtime_config_value(config, "allow_partial_layers", False)):
-                logger.warning("Failed to update feature registry: %s", exc)
-            else:
-                raise RuntimeError(f"Failed to update feature registry: {exc}") from exc
-
-        return result
 
     def _report_progress(self, stage: str, progress: float, message: str) -> None:
         """Report progress for WebSocket or other observers."""
@@ -4842,44 +4298,18 @@ class FeatureFactory:
             return column
         return "_".join([parts[0], timeframe] + parts[1:])
 
-    @staticmethod
-    def _apply_timeframe_tag(features_df: pd.DataFrame, timeframe: str) -> pd.DataFrame:
-        """Add timeframe tag to feature column names (e.g. ``ema_20`` → ``ema_12h_20``).
 
-        Columns that already carry a timeframe tag or start with ``label_`` prefix
-        are left unchanged.  ``meta_`` columns also get tagged to avoid duplicate
-        names when merging multi-TF outputs.  The convention matches
-        ``MultiTFGenerator._apply_timeframe_tag`` so single-TF and multi-TF outputs
-        share the same naming scheme.
-        """
-        from momentum.FeatureEngineering.timeframe.tf_aligner import TimeframeAligner
-        tf_keys = set(TimeframeAligner._timeframe_seconds_keys())
-
-        def _rename(col: str) -> str:
-            if col.startswith("label_"):
-                return col  # Labels come from primary TF only, no TF tag needed
-            # meta_ columns MUST be tagged with TF prefix (meta_1h_*, meta_12h_*)
-            # to stay consistent with MultiTFGenerator._apply_timeframe_tag.
-            parts = col.split("_")
-            if len(parts) < 2:
-                return col
-            if any(p in tf_keys for p in parts[1:]):
-                return col  # already tagged（FFSTAT v55 審查 r40：任一段已為週期即不再加，同 MultiTFGenerator）
-            return "_".join([parts[0], timeframe] + parts[1:])
-
-        rename_map = {col: _rename(col) for col in features_df.columns}
-        return features_df.rename(columns=rename_map)
+    _COMBINE_CONTEXTS = frozenset({"layer3_input", "layer4_input"})
 
     @staticmethod
     def _combine_layers(layers: List[pd.DataFrame], context: str = "unknown") -> pd.DataFrame:
-        # In CGSA mode, skip the heavyweight multi-layer merge used for L7 and
-        # multi-TF final merge.  Internal single-layer concats (layer3_input,
-        # layer4_input, layer5_input) still need to materialize a DF because
-        # the computation engines expect a pandas DataFrame as input.
-        _cgsa_skip_contexts = {"layer6_5_input", "layer7_final", "multi_tf_merged"}
-        if FeatureFactory._cgsa_enabled() and context in _cgsa_skip_contexts:
-            logger.info("[CGSA] Skip _combine_layers in context=%s (registry-based path)", context)
-            return pd.DataFrame()
+        """L3／L4 計算輸入之層內合併（計算引擎需 DataFrame）。CGSA 不做全欄合併（FRAMEPATH Task 1.2）：
+        context 只准 `_COMBINE_CONTEXTS` 白名單，其餘具名拒絕。"""
+        if context not in FeatureFactory._COMBINE_CONTEXTS:
+            raise CGSARegistryRequiredError(
+                f"_combine_layers 之 context {context!r} 不在白名單 {sorted(FeatureFactory._COMBINE_CONTEXTS)}"
+                "（CGSA 不做全欄合併；呼叫點 _combine_layers）"
+            )
 
         valid_layers = [layer for layer in layers if layer is not None and not layer.empty]
         if not valid_layers:

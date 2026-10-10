@@ -1,219 +1,212 @@
 [
- {
-  "node": "tests/feature_engineering/test_failopen_manifest.py::test_persist_false_generate_features_metadata",
-  "owner_ticket": "FRAMEPATH",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "FFACT_USE_CGSA=0 之 frame 路徑；2026-09-28 使用者裁定刪除 frame 產生路徑；FRAMEPATH（第 5 步）收案時刪本列"
- },
- {
-  "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_10i_prepare_called_once",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_timeframe_seconds_identity",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_covers_cross_sectional_runs",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_receives_its_own_embargo_override",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_summary_is_populated_from_real_shape",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_timeout_keeps_partial_results",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_gets_its_own_analyzer",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_has_its_own_receipt_hash",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_infeasible_cell_is_unavailable_without_killing_others",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_shape_is_exactly_nine_cells",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_mutation_rangeindex_regresses",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_real_3sym_oracle",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/api/test_splitunify_event_scan_projection.py::test_required_real_data_present_or_fail_closed",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/momentum/test_feature_library_config_hash.py::test_load_multi_without_config_hashes_byte_stable",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/momentum/test_feature_library_config_hash.py::test_load_with_config_hash_disambig",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/momentum/test_feature_library_config_hash.py::test_load_without_config_hash_matches_find_latest_materialized",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- },
- {
-  "node": "tests/momentum/test_ic_cross_sectional_cut2.py::test_cross_sectional_e2e_real_path_append_and_analyze",
-  "owner_ticket": "FFSTORE",
-  "reason": "user-ruling",
-  "state": "owned-by-later-ticket",
-  "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
- }
+  {
+    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_d16_discloses_event_known_at_decision_values",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_10i_prepare_called_once",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_13_other_symbol_events_are_excluded_loudly",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_divergent_purge_is_fail_closed",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_r1_duplicate_cutoff_is_loud",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_event_analysis_horizon_purge.py::test_event_analysis_horizon_purge_timeframe_seconds_identity",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_progress_fields.py::test_gap3_ic_progress_fields_populated_for_implicit_latest_and_full_analysis",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_covers_cross_sectional_runs",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_features_path_can_be_identifier_not_file",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_gate_and_service_share_one_registry_snapshot",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_message_does_not_ask_for_impossible_action",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_reason_comes_from_contract_not_hardcoded",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_registry_lowball_is_caught_by_manifest",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_feature_cap_rejects_big_run_without_creating_task",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_ic_stop_gate.py::test_gap3_ic_stop_gate_alive_no_big_matrix_loaded",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_receives_its_own_embargo_override",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_summary_is_populated_from_real_shape",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_cell_timeout_keeps_partial_results",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_gets_its_own_analyzer",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_each_cell_has_its_own_receipt_hash",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_infeasible_cell_is_unavailable_without_killing_others",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_gap3_scan_grid.py::test_scan_grid_shape_is_exactly_nine_cells",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_kline_hole_becomes_nan_not_raise",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_mutation_rangeindex_regresses",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_ic_analysis_service.py::test_append_cross_sectional_labels_real_3sym_oracle",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/api/test_splitunify_event_scan_projection.py::test_required_real_data_present_or_fail_closed",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/momentum/test_feature_library_config_hash.py::test_load_multi_without_config_hashes_byte_stable",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/momentum/test_feature_library_config_hash.py::test_load_with_config_hash_disambig",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/momentum/test_feature_library_config_hash.py::test_load_without_config_hash_matches_find_latest_materialized",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  },
+  {
+    "node": "tests/momentum/test_ic_cross_sectional_cut2.py::test_cross_sectional_e2e_real_path_append_and_analyze",
+    "owner_ticket": "FFSTORE",
+    "reason": "user-ruling",
+    "state": "owned-by-later-ticket",
+    "trigger": "使用者 2026-10-03 核可刪除全部舊算法特徵 run（data_cache/features）；FFSTORE（第 14 步）以新算法產新快照後，改寫本測試之資料參照並刪本列"
+  }
 ]

@@ -196,12 +196,11 @@ def test_registry_fast_transform_has_no_ratio_unsafe_check() -> None:
 
 
 def test_frame_path_taggers_untouched() -> None:
-    """Task 1.3 不可做：frame 路徑標記器不改（FRAMEPATH 刪除），不得改呼叫 feature_naming。"""
+    """Task 1.3 不可做：既有標記器不改，不得改呼叫 feature_naming（FRAMEPATH 已刪 frame 整表標記
+    `FeatureFactory._apply_timeframe_tag`、`MultiTFGenerator._apply_timeframe_tag`；保留之單欄標記器受檢）。"""
     import inspect
 
     from momentum.FeatureEngineering.feature_factory import FeatureFactory
-    from momentum.FeatureEngineering.timeframe.multi_tf_generator import MultiTFGenerator
 
-    for fn_obj in (FeatureFactory._timeframe_tagged_name, FeatureFactory._apply_timeframe_tag,
-                   MultiTFGenerator._apply_timeframe_tag):
+    for fn_obj in (FeatureFactory._timeframe_tagged_name,):
         assert "feature_naming" not in inspect.getsource(fn_obj)
