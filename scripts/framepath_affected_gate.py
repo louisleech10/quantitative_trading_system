@@ -237,6 +237,37 @@ FP_EXCLUDES = (":(exclude,glob)**/__pycache__/**", ":(exclude,glob)handoffs/**",
                *(f":(exclude){p}" for p in GENERATED_TRACKED))
 
 
+# 被 git 忽略、但測試讀取之資料輸入（審查 r60）：內容入指紋
+DATA_INPUTS = ("data_cache/feature_klines/kline_cache.h5",)
+_CONTENT_MEMO: Dict[Tuple[str, int, int], str] = {}
+
+
+def _file_sha(p: Path) -> str:
+    """檔案內容 sha256；同一行程內依（路徑, 大小, mtime_ns）快取（指紋每檔計算一次即可，不重讀大檔）。"""
+    st = p.stat()
+    key = (str(p), st.st_size, st.st_mtime_ns)
+    if key not in _CONTENT_MEMO:
+        h = hashlib.sha256()
+        with open(p, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        _CONTENT_MEMO[key] = h.hexdigest()
+    return _CONTENT_MEMO[key]
+
+
+def content_inputs(repo: Path) -> str:
+    """未追蹤檔（排除 FP_EXCLUDES）之路徑＋內容雜湊，及 DATA_INPUTS 之內容雜湊（審查 r60：路徑未變不等於內容未變）。"""
+    rows = []
+    for rel in sorted(p for p in _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".",
+                                      *FP_EXCLUDES).splitlines() if p):
+        f = repo / rel
+        rows.append(f"{rel}\t{_file_sha(f) if f.is_file() else '<non-file>'}")
+    for rel in DATA_INPUTS:
+        f = repo / rel
+        rows.append(f"data:{rel}\t{_file_sha(f) if f.is_file() else '<missing>'}")
+    return "\n".join(rows)
+
+
 def tree_identity(repo: Path) -> str:
     """HEAD 之檔案樹身分（排除 FP_EXCLUDES）：以路徑＋blob 雜湊取代提交編號——只改排除路徑之提交（如交接）不改身分，
     任何輸入檔之提交仍改（審查 r58）。"""
@@ -265,7 +296,7 @@ def state_key(repo: Path, test_file: str, phase: int, env: Optional[Mapping[str,
     for part in (
         tree_identity(repo),
         _git(repo, "diff", "--binary", "HEAD", "--", ".", *skip),
-        _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", *skip),
+        content_inputs(repo),  # 審查 r60：未追蹤檔路徑＋內容與資料輸入內容
         (repo / test_file).read_bytes().decode("utf-8", "replace") if (repo / test_file).is_file() else "",
         json.dumps(PYTEST_FLAGS), str(phase), env_fingerprint(env if env is not None else os.environ),
     ):
@@ -1096,15 +1127,10 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterabl
     admission 估時來源（各目錄下 junit xml 之路徑與內容，審查 r53）。`--admit` 須等於此值方得於估時未知或逾預算時執行
     （批准綁定確切輸入）。"""
     h = hashlib.sha256()
-    untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", *FP_EXCLUDES).splitlines()
     for part in (anchor, str(phase), tree_identity(repo),  # 審查 r58：檔案樹身分取代提交編號
-                 _git(repo, "diff", "--binary", "HEAD", "--", ".", *FP_EXCLUDES)):
+                 _git(repo, "diff", "--binary", "HEAD", "--", ".", *FP_EXCLUDES),
+                 content_inputs(repo)):  # 審查 r52／r60：未追蹤檔路徑＋內容、資料輸入內容
         h.update(part.encode("utf-8", "replace"))
-        h.update(b"\0")
-    for rel in sorted(untracked):  # 審查 r52：未追蹤檔綁路徑＋內容（同一路徑內容改變 ⇒ 批准失效）
-        p = repo / rel
-        h.update(rel.encode("utf-8", "replace") + b"\0")
-        h.update(hashlib.sha256(p.read_bytes()).digest() if p.is_file() else b"<non-file>")
         h.update(b"\0")
     for rel in (MANIFEST_REL, DISPOSITION_REL, "scripts/framepath_affected_gate.py"):
         h.update((repo / rel).read_bytes() if (repo / rel).is_file() else b"")

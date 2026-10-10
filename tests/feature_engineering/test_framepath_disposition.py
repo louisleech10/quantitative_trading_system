@@ -2266,6 +2266,22 @@ def test_mutation_affected_gate_runner_resume_pause_progress(tmp_path):
     assert (repo2 / "tests/golden/l65/test_inventory.txt").read_text(encoding="utf-8") == "inv\n"
     commit("src.py", "a = 3\n")
     assert fps()[0] != before[0] and fps()[1] != before[1]
+    # 審查 r60：未追蹤檔與被忽略之資料輸入，同路徑內容改變即改 state_key／digest
+    (repo2 / ".gitignore").write_text("data_cache/\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo2), "-c", "user.email=t@t", "-c", "user.name=t", "add", ".gitignore"],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo2), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "gi"],
+                   check=True, capture_output=True)
+    (repo2 / "fixture.json").write_text("1", encoding="utf-8")
+    kl = repo2 / "data_cache/feature_klines/kline_cache.h5"
+    kl.parent.mkdir(parents=True)
+    kl.write_bytes(b"A")
+    s1 = fps()
+    (repo2 / "fixture.json").write_text("2", encoding="utf-8")
+    s2 = fps()
+    kl.write_bytes(b"B")
+    s3 = fps()
+    assert s1[0] != s2[0] != s3[0] and s1[1] != s2[1] != s3[1]
 
 
 def test_affected_gate_def_probe_records_calls(tmp_path):
