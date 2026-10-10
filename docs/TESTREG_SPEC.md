@@ -1,7 +1,7 @@
 # TESTREG：測試清冊自動維護與受影響測試挑選 — SPEC
 
 > 來源 PLAN/診斷：`docs/TICKET_ORDER.md` 第 5a 步；諮詢 r1 收斂 `handoffs/reconcile/20261009-testreg-x-consult-r1/synth.md`（26 條全處置、三家 proceed；主委獨立版 `handoffs/20261009-testreg-x-consult-r1-claude.md`）；靜態盤點 `handoffs/run_receipts/testreg_probes/20261010-test-inventory.json`　|　日期：2026-10-10　|　對應 TODO：`docs/manifests/TESTREG.json`（SPEC 凍結後生成）
-> 版本：v16（審查 r15 `handoffs/reconcile/20261010-testreg-x-review-r15/synth.md` 3 條處置後改版；契約 version 16）
+> 版本：v16（審查 r15 `handoffs/reconcile/20261010-testreg-x-review-r15/synth.md` 3 條處置後改版；契約 version 16；審查 r16 三家零 finding 收斂；使用者 2026-10-10 白話審閱核可）
 > 契約單一真相源：`tests/registry/testreg_schema.json`（欄位、枚舉、證據收據格式、驗證規則 V01–V22、挑選規則、閘收據欄皆只定義於該檔；本 SPEC 以鍵名引用，不重列值）。
 
 ## §RISK 風險分級
@@ -23,7 +23,7 @@
 - **待使用者確認**：待確認：無
 - **已確認結果**：
   - `2026-10-09 使用者`：插入第 5a 步（「做；FRAMEPATH 第一批收尾後插入」）；「我完全不懂程式碼，所以要如何分類和存放和建議清冊以及決定去留等，你跟委員決定」；「你跟委員要參考軟體業界是如何做的」。
-  - `2026-10-10 使用者`：核可設計方向（`白話說明/TESTREG設計方向審閱.md`，選「同意」）。
+  - `2026-10-10 使用者`：核可設計方向（`白話說明/Archived/TESTREG設計方向審閱.md`，選「同意」）；同日核可 SPEC v16（`白話說明/Archived/TESTREG規格審閱.md`，選「同意」）。
   - `2026-10-09 使用者`：「不要莫名被什麼時間上限砍掉，然後又重來，不允許這種事情。還有卡住沒動或跑太久也不知道也不允許」。
   - `2026-09-28 使用者`（嚴謹只能多不能少）：提速只准砍流程浪費，不得少驗路徑。
   - `2026-09-22 使用者`（嚴禁慢閘）：新增每次都跑之檢查須秒級並擋在產出端。
