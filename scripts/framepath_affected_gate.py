@@ -230,14 +230,40 @@ def env_fingerprint(env: Mapping[str, str]) -> str:
                       sort_keys=True, ensure_ascii=False)
 
 
+# 指紋排除集合（實作期 b1；審查 r58）：已追蹤 numba 快取（任一測試執行即改寫）、`handoffs/`（收據與交接）、
+# collect-only 時 `tests/conftest.py` 改寫之已追蹤清冊（生成物）——皆非測試輸入
+GENERATED_TRACKED = ("tests/golden/l65/test_inventory.txt",)
+FP_EXCLUDES = (":(exclude,glob)**/__pycache__/**", ":(exclude,glob)handoffs/**",
+               *(f":(exclude){p}" for p in GENERATED_TRACKED))
+
+
+def tree_identity(repo: Path) -> str:
+    """HEAD 之檔案樹身分（排除 FP_EXCLUDES）：以路徑＋blob 雜湊取代提交編號——只改排除路徑之提交（如交接）不改身分，
+    任何輸入檔之提交仍改（審查 r58）。"""
+    lines = _git(repo, "ls-tree", "-r", "HEAD").splitlines()  # ls-tree 不支援 pathspec magic，改於此過濾
+    return "\n".join(ln for ln in lines if not _fp_excluded(ln.split("\t", 1)[-1]))
+
+
+def _fp_excluded(path: str) -> bool:
+    return "/__pycache__/" in f"/{path}" or path.startswith("handoffs/") or path in GENERATED_TRACKED
+
+
+def restore_generated(repo: Path) -> None:
+    """把 collect-only 生成之已追蹤清冊還原為 HEAD 版本（每次 pytest 呼叫前；處置驗證器 ⑦ 不因生成物而紅）。"""
+    for rel in GENERATED_TRACKED:
+        blob = subprocess.run(["git", "-C", str(repo), "show", f"HEAD:{rel}"], capture_output=True)
+        p = repo / rel
+        if blob.returncode == 0 and (not p.is_file() or p.read_bytes() != blob.stdout):
+            p.write_bytes(blob.stdout)
+
+
 def state_key(repo: Path, test_file: str, phase: int, env: Optional[Mapping[str, str]] = None) -> str:
-    """結果檔沿用之狀態指紋：HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、測試檔內容、pytest 參數、phase、有效環境。
-    已追蹤之 numba `__pycache__`（任一測試執行即改寫）與 `handoffs/`（收據與交接，非測試輸入）不計——否則中斷後
-    接續永遠無法沿用（實作期 b1 發現；與 `plan_inputs_digest` 同一排除）。"""
+    """結果檔沿用之狀態指紋：HEAD 檔案樹身分、相對 HEAD 之完整 diff、未追蹤檔清單、測試檔內容、pytest 參數、phase、
+    有效環境；皆排除 FP_EXCLUDES——否則中斷後接續永遠無法沿用（實作期 b1；審查 r58）。"""
     h = hashlib.sha256()
-    skip = (":(exclude,glob)**/__pycache__/**", ":(exclude,glob)handoffs/**")
+    skip = FP_EXCLUDES
     for part in (
-        _git(repo, "rev-parse", "HEAD"),
+        tree_identity(repo),
         _git(repo, "diff", "--binary", "HEAD", "--", ".", *skip),
         _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", *skip),
         (repo / test_file).read_bytes().decode("utf-8", "replace") if (repo / test_file).is_file() else "",
@@ -263,6 +289,7 @@ def _pytest(args: Sequence[str], cwd: Path, env: Mapping[str, str]) -> subproces
 def collect(test_file: str, cwd: Path, env: Mapping[str, str]) -> List[str]:
     # 諮詢 r5 CODEX-R5-P1-01：本專案 pytest.ini 下 `-q` 輸出表頭與 `<Function …>`，`-qq` 才逐行輸出 nodeid
     proc = _pytest(["--collect-only", "-qq", "-p", "no:cacheprovider", test_file], cwd, env)
+    restore_generated(cwd)  # 審查 r58：collect-only 會改寫已追蹤清冊（tests/conftest.py），立即還原
     ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
     if proc.returncode != 0 or not ids:
         raise GateError(f"{test_file} 收集失敗或為空 rc={proc.returncode}：{proc.stdout[-500:]}{proc.stderr[-500:]}")
@@ -322,6 +349,7 @@ class Runner:
             probe_dir.mkdir(parents=True, exist_ok=True)
             for stale in probe_dir.glob("*.json"):
                 stale.unlink()
+        restore_generated(REPO)  # 審查 r58：前一呼叫或挑選之 collect 所改寫之清冊先還原
         self.progress(phase, test_file, count_ids)
         t0 = time.monotonic()
         if meta.exists():
@@ -1051,11 +1079,9 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterabl
     admission 估時來源（各目錄下 junit xml 之路徑與內容，審查 r53）。`--admit` 須等於此值方得於估時未知或逾預算時執行
     （批准綁定確切輸入）。"""
     h = hashlib.sha256()
-    no_cache = ":(exclude,glob)**/__pycache__/**"  # 已追蹤之 numba 快取於任何測試執行即改寫，非挑選輸入
-    own = ":(exclude,glob)handoffs/**"  # 收據與交接（含本執行器自身收據），非挑選輸入
-    untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", no_cache, own).splitlines()
-    for part in (anchor, str(phase), _git(repo, "rev-parse", "HEAD"),
-                 _git(repo, "diff", "--binary", "HEAD", "--", ".", no_cache, own)):  # 審查 r57：已追蹤之 handoffs 亦排除
+    untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", *FP_EXCLUDES).splitlines()
+    for part in (anchor, str(phase), tree_identity(repo),  # 審查 r58：檔案樹身分取代提交編號
+                 _git(repo, "diff", "--binary", "HEAD", "--", ".", *FP_EXCLUDES)):
         h.update(part.encode("utf-8", "replace"))
         h.update(b"\0")
     for rel in sorted(untracked):  # 審查 r52：未追蹤檔綁路徑＋內容（同一路徑內容改變 ⇒ 批准失效）

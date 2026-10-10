@@ -2216,6 +2216,27 @@ def test_mutation_affected_gate_runner_resume_pause_progress(tmp_path):
     assert g.plan_inputs_digest(repo, anchor, 1, (), {"PATH": "/bin"}) == base
     (repo / "src.py").write_text("a = 2\n", encoding="utf-8")
     assert g.plan_inputs_digest(repo, anchor, 1, (), {"PATH": "/bin"}) != base
+    # 審查 r58：只改排除路徑之提交（交接）與生成之已追蹤清冊不改 state_key／digest；輸入檔之提交則改；清冊可還原
+    repo2, anchor2 = _git_tmp_repo(tmp_path / "e", {"handoffs/a.md": "x\n", "src.py": "a = 1\n",
+                                                    "tests/golden/l65/test_inventory.txt": "inv\n"})
+
+    def fps():
+        return (g.state_key(repo2, "src.py", 1, {"PATH": "/bin"}),
+                g.plan_inputs_digest(repo2, anchor2, 1, (), {"PATH": "/bin"}))
+
+    def commit(rel, text):
+        (repo2 / rel).write_text(text, encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo2), "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qam", "c"],
+                       check=True, capture_output=True)
+
+    before = fps()
+    commit("handoffs/a.md", "y\n")
+    (repo2 / "tests/golden/l65/test_inventory.txt").write_text("regenerated\n", encoding="utf-8")
+    assert fps() == before
+    g.restore_generated(repo2)
+    assert (repo2 / "tests/golden/l65/test_inventory.txt").read_text(encoding="utf-8") == "inv\n"
+    commit("src.py", "a = 3\n")
+    assert fps()[0] != before[0] and fps()[1] != before[1]
 
 
 def test_affected_gate_def_probe_records_calls(tmp_path):
