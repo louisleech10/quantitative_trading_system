@@ -1,6 +1,13 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 3,
+  "version": 4,
+  "formats": {
+    "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
+    "date": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+    "repo_path": "^[^/][^\\0]*$（repo 相對 POSIX，不含 .. 段）",
+    "hex": "^[0-9a-f]{64}$",
+    "sha40": "^[0-9a-f]{40}$"
+  },
   "catalog": {
     "path": "tests/registry/catalog.json",
     "tracked": true,
@@ -47,24 +54,27 @@
       "否則 unknown"
     ],
     "defaults": {"guarantee": ["unclassified"], "oracle": ["unclassified"], "claim": ["unclassified"], "disposition": "keep", "rewrite_targets": [], "disposition_ref": null, "rewrite_receipt": null, "quarantine": []},
-    "exemption": "只有 `testreg.py bootstrap` 產生之提交（訊息帶 trailer `Testreg-Bootstrap: yes`）得寫入含 unclassified 之新 entry（V16 豁免）"
+    "paths_file": "tests/registry/bootstrap_paths.txt",
+    "paths_rule": "bootstrap 寫出當下 `git ls-files` 之全部測試檔路徑（排序、一行一個）；一經提交即不可變（V18）。只有列於此檔之路徑之 entry 得含 unclassified（V16）。"
   },
   "assertion_nodes": {
-    "desc": "E1 與 mutation 收據所稱「斷言節點」之封閉定義",
+    "desc": "E1、mutation 收據與 V19 所稱「斷言節點」之封閉定義",
     "kinds": [
       "ast.Assert",
       "ast.Call 其被呼叫者末段名稱以 assert 開頭（含 numpy.testing.assert_*、pandas.testing.assert_*、unittest self.assert*、本 repo helper assert_*）",
-      "ast.Call／ast.With 之被呼叫者末段名稱屬 raises、warns、fail、approx（pytest 與 numpy.testing 同名者）"
-    ]
+      "ast.Call／ast.With 之被呼叫者末段名稱屬 raises、warns、deprecated_call、fail、approx、xfail、skip"
+    ],
+    "normalize": "ast.dump(node, annotate_fields=True, include_attributes=False)"
   },
   "receipts": {
     "E0": {
-      "fields": ["nodeid", "head", "ledger_ref", "exception_type", "exception_origin", "missing_symbol", "deleting_commit"],
+      "fields": ["nodeid", "head", "ledger_ref", "exception_type", "exception_origin", "deleted_module", "deleted_symbol", "deleting_commit"],
       "rule": [
         "ledger_ref 所指紀錄之 head＝收據 head、diff_digest＝clean、outcome∈{failed,error}、exception_type∈enums.e0_exception_types",
-        "exception_origin＝該紀錄之 exception_origin（file:line）；該行位於目標測試檔，且其 AST 節點為 Import／ImportFrom／Name／Attribute 並以 missing_symbol 為名",
-        "missing_symbol 於 deleting_commit^ 之 production_roots 內有定義（def／class／賦值／模組檔），於 deleting_commit 與 head 之 production_roots 內皆無定義；tests/ 內任何位置亦無其定義",
-        "於 head 通過之測試（含守『符號不得存在』之負向測試）不可能符合第一條，故不得持 E0"
+        "exception_origin＝該紀錄之 exception_origin（file:line），該行位於目標測試檔；該行之 AST 節點須為下列二者之一並靜態解析到 (deleted_module, deleted_symbol)：(a) ImportFrom，其 module＝deleted_module、names 含 deleted_symbol，且 exception_type∈{ImportError,ModuleNotFoundError}；(b) Attribute `X.deleted_symbol`，X 為本檔模組層 `import deleted_module [as X]` 所綁之名，且 exception_type＝AttributeError",
+        "exception_head 含 deleted_symbol 字面",
+        "deleted_module 對應之檔於 deleting_commit^ 位於 production_roots 且模組層定義 deleted_symbol（def／class／賦值）；於 deleting_commit 與 head 該模組皆無此定義（或模組檔不存在）；deleting_commit 為 head 之祖先",
+        "於 head 通過之測試不可能符合第一條；局部變數、setup 回傳值之屬性、測試自身 helper 不可能符合第二條，故皆不得持 E0"
       ],
       "production_roots": ["momentum/", "api/", "scripts/", "run_api.py"]
     },
@@ -83,6 +93,7 @@
       "rule": [
         "用於 E2（compare_nodeids＝碑之 replaced_by）與 rewrite（compare_nodeids＝改寫後之 nodeid）",
         "target_assertion_lines＝target 函式內全部 assertion_nodes 之行號（由 AST 機械導出並由 validate 重算比對）",
+        "mutants 至少 1 個；且至少 1 個 mutant 之 target_outcome∈{failed,error}（含 target_assertion_lines 為空之情形：其隱含斷言為『不拋例外』，須有使 target error 之 mutant）",
         "對每一 target_assertion_lines 之行 L，至少一個 mutant 之 target_outcome∈{failed,error} 且 target_fail_line＝L",
         "每一 target_outcome∈{failed,error} 之 mutant，compare_outcomes 中至少一個 ∈{failed,error}",
         "收據含作者執行過之全部 mutant；patch_path 存在且 sha256 相符；mutant 集合之充分性由每子批審碼委員判（殘留 R5）"
@@ -99,7 +110,7 @@
       "started": "ISO-8601 UTC",
       "head": "40-hex",
       "diff_digest": "sha256(`git diff HEAD --binary` ‖ 排序後之未追蹤非忽略檔路徑與內容)；工作樹乾淨⇒字面 clean",
-      "kline_sha256": "data_cache/feature_klines/kline_cache.h5 全檔 sha256；以 (dev, inode, size, mtime_ns, ctime_ns) 為鍵快取於 .testreg/kline_sha_cache.json（ctime 不可由使用者回設，任何寫入皆變）；檔不存在⇒字面 absent",
+      "kline_sha256": "data_cache/feature_klines/kline_cache.h5 全檔 sha256；以 (dev, inode, size, mtime_ns, ctime_ns) 為鍵快取於 .testreg/kline_sha_cache.json（ctime 不可由使用者回設，任何寫入皆變）；計算序＝stat→雜湊→stat，兩次 stat 鍵不同⇒本 session 用算得值但不寫快取；快取寫入於 .testreg/kline_sha_cache.lock 獨占鎖內以暫存檔＋rename 原子替換；快取毀損⇒視同不存在；檔不存在⇒字面 absent",
       "python": "sys.executable 之 realpath 與 sys.version",
       "packages_digest": "sha256(排序後之 site-packages 內 *.dist-info 目錄名)",
       "env": "排序後之 env_prefixes 開頭環境變數（與 scripts/framepath_affected_gate.py ENV_PREFIXES 同源，Task 2.3 起閘改讀本鍵）",
@@ -172,16 +183,23 @@
     {"id": "V11", "rule": "quarantine.expires ≥ 今日（本機日期）"},
     {"id": "V12", "rule": "quarantine.evidence 所指 ledger 紀錄皆存在、fingerprint 皆相同，且其中至少一筆 outcome=passed、至少一筆 outcome∈{failed,error}；ledger 不在本機⇒報 unverifiable 並 rc≠0"},
     {"id": "V13", "rule": "catalog 頂層鍵集合 == top_level_keys"},
-    {"id": "V14", "rule": "新立之碑（HEAD catalog 無該碑）所指 nodeid 或其檔路徑字串出現在任一 docs/manifests/*.json ⇒ 該 manifest 之票於 scripts/fact_keys.json 為已完成，或其 gate_cmd 經 framepath_affected_gate（會解析碑）；否則 rc≠0"},
+    {"id": "V14", "rule": "新立之碑（HEAD catalog 無該碑）所指 nodeid 或其檔路徑字串出現在某 docs/manifests/*.json（字串值逐一比對）⇒ 須滿足 manifest_closed 或 manifest_tombstone_aware 之一，否則 rc≠0"},
     {"id": "V15", "rule": "rewrite_targets 每一 nodeid 屬該 entry 之檔且其函式存在"},
-    {"id": "V16", "rule": "HEAD catalog 無該鍵之新 entry，其 guarantee／oracle／claim 不得含 unclassified（bootstrap.exemption 除外）"}
+    {"id": "V16", "rule": "entry 之 guarantee／oracle／claim 含 unclassified ⇒ 其 path 列於 bootstrap.paths_file"},
+    {"id": "V17", "rule": "全部欄位依其 type、items、items_enum、formats 遞迴驗形（nodeid、date、hex、sha40 依 formats 正則；type 不含 null 者不得為 null；陣列元素型別逐一驗）"},
+    {"id": "V18", "rule": "bootstrap.paths_file 若存在於 HEAD，則工作樹內容 == HEAD 內容"},
+    {"id": "V19", "rule": "暫存區或工作樹相對 HEAD 修改之測試函式，其 assertion_nodes 正規化後之多重集合若有任一元素減少 ⇒ 該函式 nodeid 須於同提交立碑，或屬某 disposition=rewrite 之 entry 之 rewrite_targets（空＝整檔）且同提交之 rewrite_receipt 驗過；否則 rc≠0"}
   ],
+  "manifest_status": {
+    "manifest_closed": "manifest 之 spec_path 等於 scripts/fact_keys.json 中某陣列列之第 4 元素，且該列第 3 元素＝已完成；找不到對應列⇒視為未收案",
+    "manifest_tombstone_aware": "manifest 內每一 gate_cmd 字串以 shlex 切分、去除開頭 NAME=value 環境指派後，argv[0]∈{venv/bin/python, python, python3}、argv[1]＝scripts/framepath_affected_gate.py，且整串不含 shell 運算子 token（&&、||、;、|、&）；任一 gate_cmd 不符⇒否"
+  },
   "enums": {
     "file_disposition": ["keep", "rewrite"],
     "oracle": ["EXACT", "TOLERANCE", "METAMORPHIC", "STATISTICAL", "PROPERTY", "SMOKE", "unclassified"],
     "claim": ["correctness", "contract", "regression", "smoke", "perf", "unclassified"],
     "retire_evidence_level": ["E0", "E1", "E2"],
-    "e0_exception_types": ["ImportError", "ModuleNotFoundError", "AttributeError", "NameError"],
+    "e0_exception_types": ["ImportError", "ModuleNotFoundError", "AttributeError"],
     "outcome": ["passed", "failed", "error", "skipped", "xfailed", "xpassed"],
     "review_signal": ["prod_symbol_gone", "duration_regression", "outcome_flip_same_fingerprint", "collect_error", "allowed_red_owner_closed", "quarantine_expired"],
     "size_class": {"small": [0, 1], "medium": [1, 60], "large": [60, 600], "huge": [600, null], "interval": "半開 [下界, 上界)；null＝無上界"},
