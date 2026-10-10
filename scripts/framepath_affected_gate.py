@@ -306,12 +306,16 @@ class Runner:
             probe_dir: Optional[Path] = None) -> Tuple[int, Dict[str, Dict[str, str]]]:
         meta = xml.with_suffix(".meta.json")
         if xml.is_file() and meta.is_file():
-            m = json.loads(meta.read_text(encoding="utf-8"))
-            if m.get("state_key") == key and m.get("rc") in RUN_RC_OK:
-                res = junit_results(xml.read_text(encoding="utf-8"), test_file)
-                if not set(count_ids) - set(res):
-                    self.done += len(count_ids)
-                    return m["rc"], res
+            # 審查 r57：結果檔或 meta 損毀（中斷於寫入中）一律視為未命中、重跑該呼叫，不得使接續崩潰
+            try:
+                m = json.loads(meta.read_text(encoding="utf-8"))
+                res = junit_results(xml.read_text(encoding="utf-8"), test_file) \
+                    if isinstance(m, dict) and m.get("state_key") == key and m.get("rc") in RUN_RC_OK else None
+            except (ValueError, ET.ParseError, OSError):
+                res = None
+            if res is not None and not set(count_ids) - set(res):
+                self.done += len(count_ids)
+                return m["rc"], res
         if self.max_seconds is not None and time.monotonic() - self.start > self.max_seconds:
             raise Paused(f"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}")
         if probe_dir is not None:
@@ -320,9 +324,13 @@ class Runner:
                 stale.unlink()
         self.progress(phase, test_file, count_ids)
         t0 = time.monotonic()
+        if meta.exists():
+            meta.unlink()  # 先撤舊 meta：本次呼叫中斷時不得留下與新結果檔不符之舊 meta
         rc, res = run_file(test_file, xml, cwd, env, nodeids, extra)
-        meta.write_text(json.dumps({"state_key": key, "rc": rc, "file": test_file,
-                                    "seconds": round(time.monotonic() - t0, 1)}), encoding="utf-8")
+        tmp = meta.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"state_key": key, "rc": rc, "file": test_file,
+                                   "seconds": round(time.monotonic() - t0, 1)}), encoding="utf-8")
+        os.replace(tmp, meta)  # 審查 r57：原子替換
         self.done += len(count_ids)
         self.progress(phase, test_file, count_ids, state="finished-call")
         return rc, res
@@ -1047,7 +1055,7 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterabl
     own = ":(exclude,glob)handoffs/**"  # 收據與交接（含本執行器自身收據），非挑選輸入
     untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", no_cache, own).splitlines()
     for part in (anchor, str(phase), _git(repo, "rev-parse", "HEAD"),
-                 _git(repo, "diff", "--binary", "HEAD", "--", ".", no_cache)):
+                 _git(repo, "diff", "--binary", "HEAD", "--", ".", no_cache, own)):  # 審查 r57：已追蹤之 handoffs 亦排除
         h.update(part.encode("utf-8", "replace"))
         h.update(b"\0")
     for rel in sorted(untracked):  # 審查 r52：未追蹤檔綁路徑＋內容（同一路徑內容改變 ⇒ 批准失效）
@@ -1286,21 +1294,14 @@ def main(argv: Sequence[str]) -> int:
             per_file[f] = {"collected": len(all_ids), "expected": 0, "results": 0, "rc": None}
             continue
         whole = len(ids) == len(all_ids)
-        key = state_key(REPO, f, args.phase, env)
-        # 重型檔逐 nodeid 一次呼叫（各自結果檔與探針目錄、可於 nodeid 之間暫停接續）；輕量檔一次呼叫
-        chunks = [[n] for n in ids] if f not in light else [ids]
-        res: Dict[str, Dict[str, str]] = {}
-        rcs: List[int] = []
-        for chunk in chunks:
-            tag = f.replace("/", "_") + ("" if len(chunks) == 1 else "__" + hashlib.sha256(chunk[0].encode()).hexdigest()[:12])
-            name = "BC_" + tag
-            probe_dirs.append(probe_root / name)
-            crc, cres = runner.run(f, out / "junit" / (tag + ".xml"), REPO, probe_env(name, False),
-                                   None if (whole and len(chunks) == 1) else chunk, PROBE_PLUGIN_ARGS,
-                                   key + "|" + "|".join(chunk), chunk, probe_dir=probe_root / name)
-            rcs.append(crc)
-            res.update(cres)
-        rc = max(rcs) if all(r in RUN_RC_OK for r in rcs) else next(r for r in rcs if r not in RUN_RC_OK)
+        # 每檔一次呼叫（整檔或選入之 nodeid 子集，同 D8 原語意；審查 r57：逐 nodeid 拆呼叫會改變 fixture 生命週期與
+        # 模組共享狀態，未證等價不採）；接續之粒度＝檔
+        tag = f.replace("/", "_")
+        name = "BC_" + tag
+        probe_dirs.append(probe_root / name)
+        rc, res = runner.run(f, out / "junit" / (tag + ".xml"), REPO, probe_env(name, False), None if whole else ids,
+                             PROBE_PLUGIN_ARGS, state_key(REPO, f, args.phase, env) + "|" + "|".join(ids), ids,
+                             probe_dir=probe_root / name)
         if rc not in RUN_RC_OK or set(ids) - set(res):
             incomplete.append(f)
         # 只計入選入之 nodeid（沿用之舊結果檔可能含整檔結果）；junit 名稱對不上者以 missing 擋下
@@ -1309,15 +1310,14 @@ def main(argv: Sequence[str]) -> int:
 
     not_passed = [n for n in expected if n in batch and batch[n]["outcome"] != "passed"]
     anchor_res: Dict[str, Dict[str, str]] = {}
-    anchor_key = _git(anchor_wt, "rev-parse", "HEAD").strip()
     for f in dict.fromkeys(n.split("::", 1)[0] for n in not_passed):
         ids = [n for n in not_passed if n.startswith(f + "::")]
         if (anchor_wt / f).is_file():
-            for nid in ids:  # 錨點重跑亦逐 nodeid（可暫停接續）
-                tag = f.replace("/", "_") + "__" + hashlib.sha256(nid.encode()).hexdigest()[:12]
-                arc, res = runner.run(f, out / "anchor_junit" / (tag + ".xml"), anchor_wt, anchor_env, [nid], (),
-                                      f"anchor|{anchor_key}|{nid}", [nid], phase="anchor")
-                anchor_res.update(anchor_usable(arc, res, [nid]))
+            # 審查 r57：錨點結果之沿用綁錨點工作樹狀態指紋（HEAD、樹、測試檔、pytest 參數、有效環境）＋所請 nodeid
+            akey = "anchor|" + state_key(anchor_wt, f, args.phase, anchor_env) + "|" + "|".join(ids)
+            arc, res = runner.run(f, out / "anchor_junit" / (f.replace("/", "_") + ".xml"), anchor_wt, anchor_env,
+                                  ids, (), akey, ids, phase="anchor")
+            anchor_res.update(anchor_usable(arc, res, ids))
     runner.progress("done", "", [])
     result = classify(expected, batch, anchor_res)
     hits = set().union(*(probe_hits(d) for d in probe_dirs)) if probe_dirs else set()

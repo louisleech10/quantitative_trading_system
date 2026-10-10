@@ -2198,6 +2198,24 @@ def test_mutation_affected_gate_runner_resume_pause_progress(tmp_path):
     r.progress("paused", "", [], state="paused")
     prog = json.loads((out / "progress.json").read_text(encoding="utf-8"))
     assert prog["state"] == "paused" and prog["done"] == 1 and prog["total"] == 2 and prog["pid"] == os.getpid()
+    # 審查 r57：meta 或結果檔損毀（中斷於寫入中）⇒ 視為未命中（此處逾預算故 Paused），不得 JSONDecodeError
+    xml.with_suffix(".meta.json").write_text('{"state_key": "K", "rc"', encoding="utf-8")
+    with pytest.raises(g.Paused):
+        r.run("tests/test_cgsa_pipeline.py", xml, REPO, os.environ, None, (), "K",
+              ["tests/test_cgsa_pipeline.py::test_x"])
+    xml.with_suffix(".meta.json").write_text(json.dumps({"state_key": "K", "rc": 0}), encoding="utf-8")
+    xml.write_text("<testsuites><testcase", encoding="utf-8")
+    with pytest.raises(g.Paused):
+        r.run("tests/test_cgsa_pipeline.py", xml, REPO, os.environ, None, (), "K",
+              ["tests/test_cgsa_pipeline.py::test_x"])
+    # 審查 r57：已追蹤之 handoffs 改動不影響 inputs_digest（未追蹤者亦然）；其他已追蹤檔改動則影響
+    repo, anchor = _git_tmp_repo(tmp_path / "d", {"handoffs/a.md": "x\n", "src.py": "a = 1\n"})
+    base = g.plan_inputs_digest(repo, anchor, 1, (), {"PATH": "/bin"})
+    (repo / "handoffs" / "a.md").write_text("y\n", encoding="utf-8")
+    (repo / "handoffs" / "new.md").write_text("z\n", encoding="utf-8")
+    assert g.plan_inputs_digest(repo, anchor, 1, (), {"PATH": "/bin"}) == base
+    (repo / "src.py").write_text("a = 2\n", encoding="utf-8")
+    assert g.plan_inputs_digest(repo, anchor, 1, (), {"PATH": "/bin"}) != base
 
 
 def test_affected_gate_def_probe_records_calls(tmp_path):
