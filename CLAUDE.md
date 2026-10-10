@@ -27,7 +27,8 @@ Louis 之個人助理 Javis（Grok 系 bot）↔ Claude 之非同步管道；`to
 - **Javis 權限**：只寫 `handoffs/javis/to_cc/`；唯讀範圍＝`git status/log/diff`、`cat`、`grep`、`ls`，不跑 pytest／探針、不做 `git add/commit/push/checkout`
 - 回信對象＝Louis，依白話規則；驗證宣稱須附可查證據（內文用 Edit 填，經 `verify_pretooluse.sh`）
 - 信箱不進 git（`handoffs/*` 由 `.git/info/exclude` 排除）；值得留存之結論寫入 HANDOFF／docs
-- **信箱 session 守候**：使用者指定之信箱 session 以 Bash `run_in_background` 跑 `bash scripts/javis_mail.sh watch`；結束即處理信（或到期），處理完立即重啟。守候中其他 session 之提示自動靜音（`.watcher` 15 分鐘內更新），不打斷委員／量化作業；工作 session 不得自行開守候
+- **信箱 session 守候**：使用者指定之信箱 session 以 Bash `run_in_background` 跑 `bash scripts/javis_mail.sh watch`；結束即處理信（或到期），處理完立即重啟。工作 session 不得自行開守候
+- **分流**（腳本依檔頭 `session:` 自動判定，見 `javis_mail.sh` 檔頭）：Javis 回覆某 session 寄出之信 ⇒ 只提示**原寄件 session**（你下次對它送訊息時才出現，不中途打斷）；Javis 主動寄來之新話題、或回信逾 2 小時無人回 ⇒ 歸信箱 session（守候中其他 session 靜音）。寄信之 session 負責處理對應回信
 
 ### 任務分派規則（Claude 每次必做）
 

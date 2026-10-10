@@ -159,7 +159,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash scripts/javis_mail.sh notify",
+            "command": "bash scripts/javis_mail.sh notify --hook",
             "timeout": 5
           }
         ]
