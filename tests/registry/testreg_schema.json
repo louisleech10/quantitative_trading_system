@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 10,
+  "version": 11,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -10,7 +10,13 @@
     "iso_utc": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$",
     "uuid": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
     "hex": "^[0-9a-f]{64}$",
-    "sha40": "^[0-9a-f]{40}$"
+    "sha40": "^[0-9a-f]{40}$",
+    "file_line": "^[A-Za-z0-9_./-]+\\.py:[1-9][0-9]*$",
+    "dotted_name": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+    "identifier": "^[A-Za-z_][A-Za-z0-9_-]*$",
+    "env_name": "^[A-Z_][A-Z0-9_]*$",
+    "hex_or_clean": "^([0-9a-f]{64}|clean)$",
+    "hex_or_absent": "^([0-9a-f]{64}|absent)$"
   },
   "formats_note": "formats 之值皆為 Python re.fullmatch 用之純正則；欄位以 format 鍵指名套用（V17）。repo_path＝repo 相對 POSIX、不以 / 開頭、無 .. 段。",
   "types": {
@@ -20,6 +26,13 @@
     "impact_selected": {"type": "object", "additional_properties": false, "fields": {"path": {"type": "string", "format": "test_path", "required": true}, "reasons": {"type": "array", "items_enum": "enums.select_reason", "min_items": 1, "required": true}}},
     "impact_excluded": {"type": "object", "additional_properties": false, "fields": {"path": {"type": "string", "format": "test_path", "required": true}, "excluded_reason": {"type": "enum", "values": "enums.exclude_reason", "required": true}}},
     "summary_record": {"type": "object", "additional_properties": false, "fields": {"session_id": {"type": "string", "format": "uuid", "required": true}, "started": {"type": "string", "format": "iso_utc", "required": true}, "fingerprint": {"type": "string", "format": "hex", "required": true}, "duration_class": {"type": "string", "format": "hex", "required": true}, "outcome": {"type": "enum", "values": "enums.outcome", "required": true}, "duration_s": {"type": "number", "required": true}, "exception_type": {"type": "string|null", "required": true}, "exception_head": {"type": "string|null", "required": true}}},
+    "receipt_E0": {"type": "object", "additional_properties": false, "fields": {"nodeid": {"type": "string", "format": "nodeid", "required": true}, "head": {"type": "string", "format": "sha40", "required": true}, "ledger_ref": {"type": "types.ledger_ref", "required": true}, "exception_type": {"type": "enum", "values": "enums.e0_exception_types", "required": true}, "exception_origin": {"type": "string", "format": "file_line", "required": true}, "deleted_module": {"type": "string", "format": "dotted_name", "required": true}, "deleted_symbol": {"type": "string", "format": "identifier", "required": true}, "deleting_commit": {"type": "string", "format": "sha40", "required": true}}},
+    "receipt_E1": {"type": "object", "additional_properties": false, "fields": {"nodeid": {"type": "string", "format": "nodeid", "required": true}, "head": {"type": "string", "format": "sha40", "required": true}, "replacement_nodeid": {"type": "string", "format": "nodeid", "required": true}, "target_ast_sha256": {"type": "string", "format": "hex", "required": true}, "replacement_ast_sha256": {"type": "string", "format": "hex", "required": true}, "fixture_closure_sha256": {"type": "string", "format": "hex", "required": true}, "module_context_sha256": {"type": "string", "format": "hex", "required": true}}},
+    "receipt_mutation": {"type": "object", "additional_properties": false, "fields": {"target_nodeid": {"type": "string", "format": "nodeid", "required": true}, "compare_nodeids": {"type": "array", "items": "string", "items_format": "nodeid", "min_items": 1, "required": true}, "head": {"type": "string", "format": "sha40", "required": true}, "fingerprint": {"type": "string", "format": "hex", "required": true}, "target_assertion_lines": {"type": "array", "items": "string", "items_format": "file_line", "required": true}, "mutants": {"type": "array", "items": "types.mutant_item", "min_items": 1, "required": true}}},
+    "mutant_item": {"type": "object", "additional_properties": false, "fields": {"id": {"type": "string", "format": "identifier", "required": true}, "patch_path": {"type": "string", "format": "repo_path", "required": true}, "patch_sha256": {"type": "string", "format": "hex", "required": true}, "session_id": {"type": "string", "format": "uuid", "required": true}, "target_outcome": {"type": "enum", "values": "enums.outcome", "required": true}, "target_fail_loc": {"type": "string|null", "format": "file_line", "required": true}, "compare_outcomes": {"type": "map", "key_format": "nodeid", "values": {"type": "enum", "values": "enums.outcome"}, "required": true}}},
+    "session_record": {"type": "object", "additional_properties": false, "fields": {"kind": {"type": "string", "const": "session", "required": true}, "session_id": {"type": "string", "format": "uuid", "required": true}, "started": {"type": "string", "format": "iso_utc", "required": true}, "head": {"type": "string", "format": "sha40", "required": true}, "diff_digest": {"type": "string", "format": "hex_or_clean", "required": true}, "kline_sha256": {"type": "string", "format": "hex_or_absent", "required": true}, "python": {"type": "string", "required": true}, "packages_digest": {"type": "string", "format": "hex", "required": true}, "env": {"type": "map", "key_format": "env_name", "values": {"type": "string"}, "required": true}, "argv_norm": {"type": "array", "items": "string", "required": true}, "argv_raw": {"type": "array", "items": "string", "required": true}, "fingerprint": {"type": "string", "format": "hex", "required": true}, "duration_class": {"type": "string", "format": "hex", "required": true}}},
+    "test_record": {"type": "object", "additional_properties": false, "fields": {"kind": {"type": "string", "const": "test", "required": true}, "session_id": {"type": "string", "format": "uuid", "required": true}, "nodeid": {"type": "string", "format": "nodeid_param", "required": true}, "order": {"type": "int", "required": true}, "outcome": {"type": "enum", "values": "enums.outcome", "required": true}, "duration_s": {"type": "number", "required": true}, "phase_failed": {"type": "enum", "values": "enums.phase", "required": true}, "exception_type": {"type": "string|null", "required": true}, "exception_head": {"type": "string|null", "required": true}, "exception_origin": {"type": "string|null", "format": "file_line", "required": true}, "fail_line": {"type": "int|null", "required": true}, "fail_frames": {"type": "array", "items": "string", "items_format": "file_line", "required": true}, "teardown_failed": {"type": "bool", "required": true}, "markers": {"type": "array", "items": "string", "required": true}}},
+    "collect_record": {"type": "object", "additional_properties": false, "fields": {"kind": {"type": "string", "const": "collect", "required": true}, "session_id": {"type": "string", "format": "uuid", "required": true}, "path": {"type": "string", "format": "test_path", "required": true}, "exception_type": {"type": "string", "required": true}, "exception_head": {"type": "string", "required": true}}},
     "tombstone_resolution": {"type": "object", "additional_properties": false, "fields": {"from": {"type": "string", "format": "nodeid", "required": true}, "to": {"type": "array", "items": "string", "items_format": "nodeid", "required": true}, "evidence_level": {"type": "enum", "values": "enums.retire_evidence_level", "required": true}}}
   },
   "container_rule": "V17 之根：catalog.json＝object，鍵集合 == catalog.top_level_keys；entries＝object（map，鍵依 formats.test_path，值依 catalog.entries.fields 且 additional_properties=false）；tombstones＝array，元素依 catalog.tombstones（object，additional_properties=false）；entries 之 quarantine 元素依 catalog.quarantine_record（object，additional_properties=false）；types.* 依各自宣告。凡標 object 者欄位集合 == 其 required=true 鍵集合",
@@ -88,10 +101,11 @@
     ],
     "assertion_helpers": "tests/ 下（含 conftest.py、fixtures/、測試模組）定義之函式中，其本體遞移地（經同為 tests/ 下之函式呼叫）含上列節點者之集合；以名稱＋定義檔解析，由 AST 機械導出",
     "inline_rule": "計算某測試函式之斷言多重集合時，對其本體、其 fixture 參數所解析到之 tests/ 下 fixture 定義、以及依 pytest 可見範圍（同模組、各層 conftest.py）自動套用之 autouse fixture 定義中，每一斷言節點計入（上列各 fixture 之 fixture 參數依同一可見範圍遞迴解析，其定義一併納入，遞迴環以已納入者為止），每一呼叫 assertion_helpers 之節點，以該 helper 之斷言多重集合（遞移展開，遞迴環以已展開集合為止）取代；展開時做呼叫點引數代入：依 helper 簽名之靜態綁定（位置引數依序、關鍵字引數依名、未給者用預設值運算式）將呼叫點引數運算式（已於呼叫端做常數摺疊）代入 helper 斷言節點中之對應參數名，再於代入後之節點做 normalize ②③；helper 簽名含 *args／**kwargs 或呼叫點含 *x／**x 而無法靜態綁定者，該呼叫以單一不透明元素表示＝(helper 限定名, 各引數經 normalize 後之 dump, 該 helper 本身斷言多重集合（於 helper 範圍內 normalize）之 sha256)，故 helper 刪減斷言即改變此元素、使舊元素減少；展開所得每一元素帶 provenance＝(定義檔, 行號)，供 mutation 收據之 target_assertion_lines 以 file:line 表示。故抽出 helper 不改多重集合，修改 helper 刪除斷言則使每一呼叫者之多重集合減少",
-    "normalize": "三步：①常數摺疊：同一函式內僅被賦值一次且右值為 ast.Constant（含 tuple／list of Constant）之區域名，以及同測試檔模組層僅賦值一次之同類常數名，代入其出現處；②函式範圍序號化：以測試函式為範圍，只對「出現在（inline 展開後之）斷言節點中、且於該函式內綁定」之名編號（綁定＝參數、Store 目標、for／with／except as、comprehension 變數，以及 inline 展開之 helper 區域名——其順位取呼叫點位置）；此等名依其在函式本體原始碼之首次綁定位置排序後改為 _0、_1…（未出現在任何斷言節點之綁定不參與排序，故插入無關之區域賦值不改編號）；未於函式內綁定之名（模組層名、import 之模組、內建名）保留原 id；Attribute 鏈之屬性名保留；③ast.dump(node, annotate_fields=True, include_attributes=False)。故改名與抽 helper（經引數代入）不算變化；改斷言所用之常數值、把 `a == b` 改為 `a == a`、或把 `assert a < b` 之運算元交換為 `assert b < a`（_0 < _1 變 _1 < _0）皆算舊元素減少；helper 含區域名而抽出後順位改變者可能誤判為減少，屬安全側，以 rewrite 收據通過"
+    "normalize": "三步：①常數摺疊：同一函式內僅被賦值一次且右值為 ast.Constant（含 tuple／list of Constant）之區域名、同測試檔模組層僅賦值一次之同類常數名，以及經 ImportFrom 自 tests/ 下模組匯入且於該模組模組層僅賦值一次之同類常數名（遞移解析 re-export），代入其出現處；②函式範圍序號化：以測試函式為範圍，只對「出現在（inline 展開後之）斷言節點中、且於該函式內綁定」之名編號（綁定＝參數、Store 目標、for／with／except as、comprehension 變數，以及 inline 展開之 helper 區域名——其順位取呼叫點位置）；此等名依其在函式本體原始碼之首次綁定位置排序後改為 _0、_1…（未出現在任何斷言節點之綁定不參與排序，故插入無關之區域賦值不改編號）；未於函式內綁定之名（模組層名、import 之模組、內建名）保留原 id；Attribute 鏈之屬性名保留；③ast.dump(node, annotate_fields=True, include_attributes=False)。故改名與抽 helper（經引數代入）不算變化；改斷言所用之常數值、把 `a == b` 改為 `a == a`、或把 `assert a < b` 之運算元交換為 `assert b < a`（_0 < _1 變 _1 < _0）皆算舊元素減少；helper 含區域名而抽出後順位改變者可能誤判為減少，屬安全側，以 rewrite 收據通過"
   },
   "receipts": {
     "E0": {
+      "type": "types.receipt_E0",
       "fields": ["nodeid", "head", "ledger_ref", "exception_type", "exception_origin", "deleted_module", "deleted_symbol", "deleting_commit"],
       "rule": [
         "ledger_ref 所指紀錄之 head＝收據 head、diff_digest＝clean、outcome∈{failed,error}、exception_type∈enums.e0_exception_types",
@@ -104,6 +118,7 @@
       "production_roots": ["momentum/", "api/", "scripts/", "run_api.py"]
     },
     "E1": {
+      "type": "types.receipt_E1",
       "fields": ["nodeid", "head", "replacement_nodeid", "target_ast_sha256", "replacement_ast_sha256", "fixture_closure_sha256", "module_context_sha256"],
       "rule": [
         "E1＝完全重複：target 與 replacement 之 FunctionDef 經正規化（去函式名、去 lineno 等屬性）後 ast.dump 之 sha256 相等（含參數、decorator 含 parametrize、函式本體全部語句）",
@@ -114,6 +129,7 @@
       ]
     },
     "mutation": {
+      "type": "types.receipt_mutation",
       "fields": ["target_nodeid", "compare_nodeids", "head", "fingerprint", "target_assertion_lines", "mutants"],
       "mutants_item": {"id": "string", "patch_path": "string", "patch_sha256": "hex", "session_id": "uuid（套用該 patch 後執行 target 與全部 compare_nodeids 之單一 pytest session）", "target_outcome": "enums.outcome", "target_fail_loc": "string（file:line）|null", "compare_outcomes": "map nodeid→enums.outcome"},
       "binding_rule": "每一 mutant 之 session_id 所指 ledger session：head＝收據 head；diff_digest＝於 head 乾淨樹套用該 patch 後依 ledger.session_record.diff_digest 算法重算之值（validate 於暫存 worktree 重算）；該 session 之 test_record 含 target_nodeid 與每一 compare_nodeids（函式層比對，參數化取任一案例失敗即視為失敗），其 outcome 與 target_fail_loc（取該紀錄 fail_frames）逐一等於收據所載；ledger 不在本機⇒unverifiable 並 rc≠0",
@@ -123,7 +139,7 @@
         "mutants 至少 1 個；且至少 1 個 mutant 之 target_outcome∈{failed,error}（含 target_assertion_lines 為空之情形：其隱含斷言為『不拋例外』，須有使 target error 之 mutant）",
         "對每一 target_assertion_lines 之位置 P，至少一個 mutant 之 target_outcome∈{failed,error} 且 target_fail_loc＝P（target_fail_loc 取自 ledger 之 traceback：最後一個落在 target_assertion_lines 任一檔之 frame）",
         "每一 mutant 之 compare_outcomes 鍵集合恰等於 compare_nodeids 集合（無多無少）；每一 target_outcome∈{failed,error} 之 mutant，compare_outcomes 中至少一個 ∈{failed,error}",
-        "計為殺死之 mutant，其 target 紀錄之 phase_failed＝call（setup 或收集期失敗不計），且 fail_frames 至少一個落在 target 函式（或其 inline 展開之 helper）之行範圍內；無斷言 target 亦同",
+        "殺死之計入條件依斷言位置 P 所在函式之種類：P 位於 target 測試函式或其 inline 展開之 helper ⇒ target 紀錄之 phase_failed＝call 且 fail_frames 含落在該函式行範圍內之 frame；P 位於 fixture（含 autouse 與其遞迴依賴）⇒ phase_failed∈{setup, teardown} 且 fail_frames 含落在該 fixture 行範圍內之 frame；無斷言 target 之殺 mutant ⇒ phase_failed＝call 且 fail_frames 含落在 target 函式行範圍內之 frame；收集期失敗一律不計",
         "每一 mutant 之 patch 只得修改 receipts.E0.production_roots 下之檔（不得改測試、conftest、fixtures）；無斷言 target 之殺 mutant 因而必經 target 實際執行之生產碼路徑",
         "收據含作者執行過之全部 mutant；patch_path 存在且 sha256 相符；mutant 集合之充分性由每子批審碼委員判（殘留 R5）"
       ]
@@ -135,6 +151,7 @@
     "file_unit": "每 pytest session 一個 JSONL 檔（<session_id>.jsonl），暫存檔＋rename 原子寫",
     "env_prefixes": ["FFACT_", "ICFA_", "FRAMEPATH_", "PYTHON", "NUMBA_", "OMP_", "MKL_", "LEGACY_KLINE", "PYTEST"],
     "session_record": {
+      "type": "types.session_record",
       "session_id": "uuid4",
       "started": "ISO-8601 UTC",
       "head": "40-hex",
@@ -151,6 +168,7 @@
     "argv_norm_drop": ["-q", "-qq", "-v", "-vv", "--tb", "-r", "--junitxml", "--durations", "--color"],
     "nested_rule": "環境變數 TESTREG_PARENT_SESSION 存在之 session 不寫任何 ledger 檔",
     "test_record": {
+      "type": "types.test_record",
       "session_id": "uuid4",
       "nodeid": "string",
       "order": "int；本 session 內 pytest_runtest_logreport 首次見到該 nodeid 之序號",
@@ -177,6 +195,7 @@
       "其餘 ⇒ passed"
     ],
     "collect_record": {
+      "type": "types.collect_record",
       "desc": "pytest_collectreport 之 outcome=failed 者各一筆（收集期錯誤無 nodeid）",
       "session_id": "uuid4",
       "path": "收集失敗之測試檔 repo 相對路徑（report.nodeid 之 :: 前段）",
@@ -232,13 +251,13 @@
     {"id": "V05", "rule": "所有 enum 與 items_enum 欄位值屬其 enums 集合；陣列長度 ≥ min_items"},
     {"id": "V06", "rule": "disposition=rewrite ⇒ disposition_ref 非 null"},
     {"id": "V07", "rule": "rewrite_receipt 非 null ⇒ 依 receipts.mutation 驗過；暫存區中 disposition=rewrite 之檔有內容變更 ⇒ 同提交之 rewrite_receipt 非 null 且驗過"},
-    {"id": "V08", "rule": "每一碑 evidence_receipt 存在且依其 evidence_level 對應之 receipts 規則驗過"},
+    {"id": "V08", "rule": "每一碑 evidence_receipt 存在且依其 evidence_level 對應之 receipts 規則與 type（V17）驗過；收據須綁定其授權對象：E0／E1 收據之 nodeid、mutation 收據之 target_nodeid 均 == 該碑之 nodeid；rewrite_receipt 之 target_nodeid 屬該 entry 之 rewrite_targets 所涵蓋函式；target_assertion_lines 於收據 head 重算相等；本提交新增之收據其 head == 當前 HEAD（pre-commit 時即新提交之父），既有收據其 head 為 HEAD 之祖先"},
     {"id": "V09", "rule": "evidence_level∈{E1,E2} ⇒ replaced_by 非空，且每一 replaced_by 之函式於「受驗之樹」存在（pre-commit＝暫存區之樹；hook 與手動 validate＝工作樹；收據之 head 欄記執行 mutation 時之 HEAD，replacement 可為該提交新增者）；E0 ⇒ replaced_by 為空"},
     {"id": "V10", "rule": "碑之 nodeid 之函式於工作樹不存在"},
     {"id": "V11", "rule": "quarantine.expires ≥ 今日（本機日期）"},
     {"id": "V12", "rule": "quarantine.evidence 每一元素之 nodeid 去參數化後綴 == 該 quarantine.nodeid；所指 ledger 紀錄皆存在、fingerprint 皆相同，且其中至少一筆 outcome=passed、至少一筆 outcome∈{failed,error}；ledger 不在本機⇒報 unverifiable 並 rc≠0"},
     {"id": "V13", "rule": "catalog 頂層鍵集合 == top_level_keys"},
-    {"id": "V14", "rule": "新立之碑（HEAD catalog 無該碑）所指 nodeid 或其檔路徑，出現在某 docs/manifests/*.json 之選測位置（manifest_selection_keys.keys 所列鍵下之任一字串，含 gate_cmd 之 shlex token；及 manifest_selection_keys.prefixed_strings 所定之列）⇒ 須滿足 manifest_closed 或 manifest_tombstone_aware 之一，否則 rc≠0；其他欄位之字串不計"},
+    {"id": "V14", "rule": "新立之碑（HEAD catalog 無該碑）所指 nodeid 或其檔路徑，出現在某 docs/manifests/*.json 之選測位置（manifest_selection_keys.keys 所列鍵下之任一字串，含 gate_cmd 之 shlex token；及 manifest_selection_keys.prefixed_strings 所定之列）⇒ 每一個出現該字串之 manifest（全數量化，非存在一個即可）皆須滿足 manifest_closed 或 manifest_tombstone_aware 之一，任一不滿足即 rc≠0；其他欄位之字串不計"},
     {"id": "V15", "rule": "rewrite_targets 每一 nodeid 屬該 entry 之檔且其函式存在"},
     {"id": "V16", "rule": "guarantee／oracle／claim 任一欄含 unclassified ⇒ 該欄必恰為 [\"unclassified\"]（不得與其他值混用）、其 path 列於 bootstrap.paths_file，且 HEAD catalog 中同鍵之同欄不含非 unclassified 值（已分類者不得改回 unclassified）；「已分類」之計數一律以「三欄皆不含 unclassified」判定"},
     {"id": "V17", "rule": "全部欄位依其 type、format、items、items_format、items_enum、min_items、max_items_ref、key_format、additional_properties 與 types.* 遞迴驗形（format 以 formats 正則 re.fullmatch；type 含 null 者方可為 null；陣列元素逐一驗）；本規則同一實作供 catalog、summary、收據與閘收據共用"},
@@ -251,7 +270,8 @@
   "manifest_status": {
     "manifest_closed": "讀 scripts/fact_keys.json 之 handoff-pending 區塊，依其 columns 找「權威路徑」與「狀態」兩欄之索引；存在某列其「權威路徑」欄 == manifest.spec_path 且「狀態」欄 == 已完成 ⇒ closed；找不到對應列或區塊／欄名不存在 ⇒ 未收案",
     "manifest_tombstone_aware": "manifest 內每一 gate_cmd 字串以 shlex 切分；每一 token 須 re.fullmatch `[A-Za-z0-9_./=:,+-]+`（排除 $、`、(、)、<、>、;、&、|、引號等一切 shell 展開與運算字元）；去除開頭 NAME=value 環境指派後 argv[0]∈{venv/bin/python, python, python3}、argv[1]＝scripts/framepath_affected_gate.py，argv[2:] 只得由 gate_cmd_allowed_options 所列選項（及其值）組成，不得含 --plan、-h、--help 或任何未列選項；任一 gate_cmd 不符⇒否",
-    "gate_cmd_allowed_options": ["--out", "--anchor-worktree", "--timings", "--admit", "--max-seconds"]
+    "gate_cmd_allowed_options": {"--out": {"arity": 1, "repeat": false}, "--anchor-worktree": {"arity": 1, "repeat": false}, "--timings": {"arity": 1, "repeat": true}, "--admit": {"arity": 1, "repeat": false}, "--max-seconds": {"arity": 1, "repeat": false}},
+    "gate_cmd_parse": "argv[2:] 須可完全切分為 (選項, 值) 對：選項 ∈ gate_cmd_allowed_options、值恰一個 token 且不以 - 開頭；repeat=false 之選項至多一次；無位置參數；無引數之裸呼叫合法——Task 2.3 保證閘之預設模式（無 --plan）必經 plan 之碑解析與 collect 後 must 核對再執行"
   },
   "enums": {
     "file_disposition": ["keep", "rewrite"],
@@ -259,6 +279,7 @@
     "claim": ["correctness", "contract", "regression", "smoke", "perf", "unclassified"],
     "retire_evidence_level": ["E0", "E1", "E2"],
     "e0_exception_types": ["ImportError", "ModuleNotFoundError", "AttributeError"],
+    "phase": ["setup", "call", "teardown", "none"],
     "outcome": ["passed", "failed", "error", "skipped", "xfailed", "xpassed"],
     "review_signal": ["prod_symbol_gone", "duration_regression", "outcome_flip_same_fingerprint", "collect_error", "allowed_red_owner_closed", "quarantine_expired"],
     "size_class": {"small": [0, 1], "medium": [1, 60], "large": [60, 600], "huge": [600, null], "interval": "半開 [下界, 上界)；null＝無上界"},
