@@ -296,7 +296,8 @@ def bootstrap(repo_root: Path, receipt: Optional[Path] = None) -> Dict[str, Any]
 
 def unregistered_markers(repo_root: Path) -> List[Tuple[str, int, str]]:
     """AST 掃描 tests/ 下 `pytest.mark.<name>` 屬性存取（含清單形式 pytestmark；註解與字串不計），對照 pytest.ini
-    註冊集合與 pytest 內建集合；回傳未註冊者 (路徑, 行號, 名稱)。"""
+    註冊集合、tests/ 與 repo 根 conftest／外掛中 `config.addinivalue_line("markers", "<name>: …")` 字面註冊者與 pytest
+    內建集合；回傳未註冊者 (路徑, 行號, 名稱)。"""
     raise NotImplementedError("TESTREG Task 1.4")
 
 

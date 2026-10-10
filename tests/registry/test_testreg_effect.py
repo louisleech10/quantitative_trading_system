@@ -72,6 +72,8 @@ BAD_REPORTS = {
     "extra_key": lambda rep: dict(rep, extra=1),
     "wrong_type": lambda rep: dict(rep, retired_functions=str(rep["retired_functions"])),
     "non_finite": lambda rep: dict(rep, saved_seconds_per_full_run=float("nan")),
+    "unknown_wrong_case": lambda rep: dict(rep, saved_seconds_per_full_run="UNKNOWN"),
+    "other_string": lambda rep: dict(rep, saved_seconds_per_full_run="N/A"),
     "missing_level_key": lambda rep: dict(rep, evidence_levels={k: v for k, v in rep["evidence_levels"].items()
                                                                 if k != "E0"}),
 }

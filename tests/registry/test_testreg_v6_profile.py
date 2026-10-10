@@ -35,12 +35,32 @@ def _v6_errors(r: Dict[str, Any]) -> List[str]:
         errs.append("durations_s 之函式層名集合 ≠ AST 導出之 test_v6_*")
     if r["slowest"] != max(r["durations_s"], key=r["durations_s"].get):
         errs.append("slowest ≠ 最慢項")
+    for ev in r["evidence"]:
+        path, line = ev.rsplit(":", 1)
+        p = REPO / path
+        if not p.is_file() or int(line) > len(p.read_text(encoding="utf-8", errors="replace").splitlines()):
+            errs.append(f"evidence {ev} 不存在")
     if r["classification"] == schema()["enums"]["v6_classification"][0] and r["test_changed"]:
-        if r["outcomes_sha256_before"] != r["outcomes_sha256_after"] or not r["mutation_receipt"] \
-                or not (REPO / r["mutation_receipt"]).is_file():
-            errs.append("改測試須 outcome 不變且附 mutation 收據")
+        errs += _mutation_receipt_errors(r)
     elif r["test_changed"]:
         errs.append("生產端歸類不得改測試")
+    return errs
+
+
+def _mutation_receipt_errors(r: Dict[str, Any]) -> List[str]:
+    """改測試時：outcome 前後相同；mutation_receipt 為合法 types.receipt_mutation，其 target 為本檔之 test_v6_* 函式。"""
+    if not r["outcomes_sha256_before"] or r["outcomes_sha256_before"] != r["outcomes_sha256_after"]:
+        return ["改測試須 outcome 前後 sha256 相同"]
+    rel = r["mutation_receipt"]
+    if not rel or not (REPO / rel).is_file():
+        return ["改測試須附 mutation 收據"]
+    try:
+        m = json.loads((REPO / rel).read_text(encoding="utf-8"))
+    except ValueError:
+        return ["mutation 收據非 JSON"]
+    errs = list(testreg.validate_shape(m, {"type": "types.receipt_mutation"}, schema()))
+    if not errs and not m["target_nodeid"].startswith(f"{TARGET}::test_v6_"):
+        errs.append("mutation 收據之 target 非本檔之 test_v6_*")
     return errs
 
 
@@ -49,7 +69,7 @@ def _synthetic() -> Dict[str, Any]:
     durs = {f"{TARGET}::{n}": float(i + 1) for i, n in enumerate(fns)}
     return {"durations_s": durs, "slowest": max(durs, key=durs.get),
             "hotspots_top30": [{"function": f"m.py:{i}(f)", "cumtime_s": float(30 - i)} for i in range(30)],
-            "classification": schema()["enums"]["v6_classification"][1], "evidence": ["momentum/x.py:10"],
+            "classification": schema()["enums"]["v6_classification"][1], "evidence": [f"{TARGET}:1"],
             "window_and_symbols_unchanged": True, "test_changed": False, "outcomes_sha256_before": None,
             "outcomes_sha256_after": None, "mutation_receipt": None}
 
@@ -74,6 +94,11 @@ SYNTH_NEGATIVES = {
     "extra_top_level_key": lambda r: r.__setitem__("note", "x"),
     "slowest_wrong": lambda r: r.__setitem__("slowest", min(r["durations_s"], key=r["durations_s"].get)),
     "production_class_but_test_changed": lambda r: r.__setitem__("test_changed", True),
+    "evidence_anchor_missing": lambda r: r.__setitem__("evidence", ["momentum/no_such_file_testreg.py:10"]),
+    "evidence_line_beyond_file": lambda r: r.__setitem__("evidence", [f"{TARGET}:99999999"]),
+    "test_changed_with_arbitrary_file_as_mutation_receipt": lambda r: r.update(
+        classification=schema()["enums"]["v6_classification"][0], test_changed=True,
+        outcomes_sha256_before="a" * 64, outcomes_sha256_after="a" * 64, mutation_receipt="README.md"),
 }
 
 

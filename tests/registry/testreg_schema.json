@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 18,
+  "version": 19,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -19,7 +19,7 @@
     "hex_or_absent": "^([0-9a-f]{64}|absent)$",
     "hex_or_absent_or_unstable": "^([0-9a-f]{64}|absent|unstable)$"
   },
-  "formats_note": "formats 之值皆為 Python re.fullmatch 用之純正則；欄位以 format 鍵指名套用（V17）。repo_path＝repo 相對 POSIX、不以 / 開頭、無 .. 段。",
+  "formats_note": "formats 之值皆為 Python re.fullmatch 用之純正則；欄位以 format 鍵指名套用（V17）。repo_path＝repo 相對 POSIX、不以 / 開頭、無 .. 段。數值欄之 allow_unknown＝另許字面 unknown（大小寫敏感，其他字串一律不符）。",
   "types": {
     "ledger_ref": {"type": "object", "additional_properties": false, "fields": {"session_id": {"type": "string", "format": "uuid", "required": true}, "nodeid": {"type": "string", "format": "nodeid_param", "required": true}}},
     "quarantined_failure": {"type": "object", "additional_properties": false, "fields": {"nodeid": {"type": "string", "format": "nodeid_param", "required": true}, "quarantine_expires": {"type": "string", "format": "date", "required": true}, "disposition_ref": {"type": "string", "format": "repo_path", "required": true}}},
@@ -252,7 +252,7 @@
     "desc": "Task 2.3 起 framepath_affected_gate 之 verdict 收據新增欄位",
     "fields": {"quarantined_failures": {"type": "array", "items": "types.quarantined_failure", "required": true, "desc": "非空時 verdict 仍可為 pass，但白話與審碼 brief 必列；只收 quarantine_match 成立之失敗"}, "tombstone_resolutions": {"type": "array", "items": "types.tombstone_resolution", "required": true}},
     "plan_receipt_fields": {"testreg_impact": {"type": "types.impact_result", "required": true}, "catalog_sha256": {"type": "string", "format": "hex", "required": true}, "previously_failed": {"type": "array", "items": "string", "items_format": "nodeid_param", "required": true}, "tombstone_resolutions": {"type": "array", "items": "types.tombstone_resolution", "required": true}, "must_check": {"type": "types.must_check", "required": true}},
-    "current_failure_source": "quarantine_match 之當前四欄取自本次 pytest 呼叫之 ledger session（閘之具名縫 current_failures(ledger_dir, before_names, test_file)）：閘於每次呼叫前記 ledger.dir 之檔名集合，呼叫後新增、且 argv_raw 有 token 等於該測試檔或以「該測試檔::」開頭者＝本次呼叫之 session，取其 outcome∈{failed,error} 之 test_record（沿用之舊結果檔亦沿用其 session_id，記於結果 meta）；caused nodeid 於此無紀錄 ⇒ 不得歸 quarantined_failures",
+    "current_failure_source": "quarantine_match 之當前四欄取自本次 pytest 呼叫之 ledger session（閘之具名縫 current_failures(ledger_dir, before_names, test_file)）：閘於每次呼叫前記 ledger.dir 之檔名集合，呼叫後新增、且 argv_raw 有 token 等於該測試檔或以「該測試檔::」開頭者＝本次呼叫之 session，取其 outcome∈{failed,error} 之 test_record（沿用之舊結果檔亦沿用其 session_id，記於結果 meta）；caused nodeid 於此無紀錄 ⇒ 不得歸 quarantined_failures。編排：閘之 Runner 於每次 pytest 呼叫前記 ledger 檔名集合（ledger_snapshots），verdict 前以 classify_quarantine 呼叫 current_failures 與 split_quarantined",
     "quarantine_match": "當前 caused 失敗之 nodeid 有未逾期 quarantine，且其 (exception_type, exception_head, exception_origin, fail_line) 四欄等於該 quarantine.evidence 所指之某筆 failed／error 紀錄之同四欄 ⇒ 歸 quarantined_failures；任一欄不同（新失敗或不同位置）⇒ 照擋",
     "validation": "閘寫 plan 收據前依 V17 同法驗 plan_receipt_fields（含 min_items、max_items_ref），並驗 impact_universe；寫 verdict 收據前驗 fields 二欄；任一不符⇒閘 rc≠0、不得寫收據或 pass",
     "impact_universe": "testreg_impact.selected 之 path 集合與 excluded 之 path 集合互斥、各自無重複，且兩者聯集 == 受驗之樹中實際存在、符合 formats.test_path 之測試檔集合（不以 catalog.entries 鍵集合代之：V01 允許已全數立碑之已刪檔仍留 entry）"
@@ -267,7 +267,7 @@
       "saved_seconds_per_full_run": "每一被淘汰函式層 nodeid 之全部參數化 nodeid 於 summary 中 outcome=passed 紀錄之 duration_s 中位數之和；任一被淘汰 nodeid 無此紀錄 ⇒ 字面 unknown（不寫 0、不外插）"
     }
   },
-  "v6_profile": {"desc": "Task 2.4 收據 handoffs/run_receipts/testreg-v6-profile.json 之形狀＝types.v6_profile_receipt；durations_s 之函式層名集合＝tests/feature_engineering/test_failopen_correctness.py 中全部 test_v6_* 函式（不多不少）；slowest＝durations_s 之最大者；classification＝測試端重複計算 且 test_changed ⇒ outcomes_sha256_before＝after 且 mutation_receipt 存在；否則 test_changed＝false", "hotspot_count": 30},
+  "v6_profile": {"desc": "Task 2.4 收據 handoffs/run_receipts/testreg-v6-profile.json 之形狀＝types.v6_profile_receipt；durations_s 之函式層名集合＝tests/feature_engineering/test_failopen_correctness.py 中全部 test_v6_* 函式（不多不少）；slowest＝durations_s 之最大者；evidence 之檔與行須存在；classification＝測試端重複計算 且 test_changed ⇒ outcomes_sha256_before＝after（非 null）且 mutation_receipt 為合法 types.receipt_mutation、其 target_nodeid 為該檔之 test_v6_* 函式；否則 test_changed＝false", "hotspot_count": 30},
   "subbatch_gate": "Task 3.2／4.2 子批閘＝testreg.py run（不得以 framepath_affected_gate 代之：該閘之 manifest、批次、錨點與 A 組寫死 FRAMEPATH，其 changed_paths 相對 FRAMEPATH 錨點）；V14 之放行只看碑所指之各 manifest 是否 manifest_closed 或 manifest_tombstone_aware，與本票之閘無關。收據形狀＝types.subbatch_receipt，寫入前依 V17 驗形並驗下列關係，任一不符⇒rc≠0 且不寫 pass：expected＝selection.selected 各檔 collect 所得 nodeid 之聯集；files 鍵集合＝selection.selected 之 path 集合；results 鍵 ⊆ expected；missing＝expected 中無 results 者；caused 與 head_red 互斥、其聯集＝results 中非 passed 者；pass ⇔ caused、missing、incomplete_files 皆空；inputs_digest＝sha256(base ‖ head ‖ 排除 FP_EXCLUDES 後之 diff ‖ 未追蹤檔路徑與內容 ‖ manifest_sha256 ‖ phase ‖ catalog、schema、scripts/testreg.py 之 sha256)。接續：每檔結果之沿用依 framepath_affected_gate.Runner 之 state_key（檔內容、樹、diff、未追蹤、環境）；沿用者 files.reused＝true，檔或其輸入改變者重跑",
   "validation_rules": [
     {"id": "V01", "rule": "entries 每鍵為存在之測試檔，或其全部函式皆有碑"},

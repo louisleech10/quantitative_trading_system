@@ -10,7 +10,10 @@
 `impact_universe_errors`、`validate_plan_receipt`；plan 經 `scripts.testreg.impact` 取 impact（模組屬性）。
 `current_failures(ledger_dir, before_names, test_file)`＝契約 `gate_report.current_failure_source`：只取呼叫前不存在、且
 `argv_raw` 有 token 等於該測試檔或以「該測試檔::」開頭之 session 之 failed／error test_record；`split_quarantined` 對
-current 中無紀錄之 caused nodeid 一律不吸收。實作前為紅（AttributeError 或斷言）。
+current 中無紀錄之 caused nodeid 一律不吸收。編排：`Runner(out, max_seconds, total, ledger_dir=…)` 於每次 pytest 呼叫前
+記 ledger 檔名集合於 `runner.ledger_snapshots[test_file]`（沿用之結果另記於 meta）；`classify_quarantine(caused, runner,
+catalog, ledger_dir, today)` 以之呼叫 `current_failures` 與 `split_quarantined`（皆模組屬性），verdict 前使用。
+實作前為紅（AttributeError 或斷言）。
 """
 from __future__ import annotations
 
@@ -373,6 +376,55 @@ def test_04c_no_matching_new_session_never_quarantined(qfx):
     assert cur == {}
     still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
     assert still == ["tests/t.py::test_x[1]"] and qf == []
+
+
+def _fake_run_file(d: Path, rec: Dict[str, Any], argv_file: str = "tests/t.py"):
+    """模擬一次 pytest 呼叫：寫 junit 結果與（記錄器所寫之）ledger session（argv_raw 含該測試檔）。"""
+
+    def run_file(test_file, xml_path, cwd, env, nodeids, extra):
+        _write_ledger(d, str(uuid.uuid4()), "failed", rec, argv=["-q", argv_file])
+        Path(xml_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(xml_path).write_text('<testsuite><testcase classname="tests.t" name="test_x[1]"><failure type="AssertionError" '
+                                  'message="assert 1 == 2"/></testcase></testsuite>', encoding="utf-8")
+        return 1, {"tests/t.py::test_x[1]": {"outcome": "failed", "type": "AssertionError", "message": "assert 1 == 2"}}
+
+    return run_file
+
+
+def _orchestrate(qfx, tmp_path, monkeypatch, rec: Dict[str, Any]):
+    """經實際編排路徑：Runner.run（呼叫前後快照 ledger 檔名於 runner.ledger_snapshots）→ classify_quarantine。"""
+    monkeypatch.setattr(g, "run_file", _fake_run_file(qfx["dir"], rec))
+    runner = g.Runner(tmp_path / "out", None, 1, ledger_dir=qfx["dir"])
+    runner.run("tests/t.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/t.py::test_x[1]"])
+    assert "tests/t.py" in runner.ledger_snapshots
+    return g.classify_quarantine(["tests/t.py::test_x[1]"], runner, qfx["catalog"](), qfx["dir"], TODAY)
+
+
+def test_04d_orchestration_absorbs_only_matching_new_failure(qfx, tmp_path, monkeypatch):
+    still, qf = _orchestrate(qfx, tmp_path, monkeypatch, FAIL)
+    assert still == [] and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
+
+
+def test_04d_orchestration_moved_failure_blocks(qfx, tmp_path, monkeypatch):
+    still, qf = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
+    assert still == ["tests/t.py::test_x[1]"] and qf == []
+
+
+def test_mutation_orchestration_ignores_snapshot_absorbs_moved_failure(qfx, tmp_path, monkeypatch):
+    """mutant：編排不用呼叫前快照（current_failures 改取前史）⇒ 位置已變之新失敗被吸收。"""
+    def from_history(ledger_dir, before_names, test_file):
+        out = {}
+        for p in sorted(Path(ledger_dir).glob("*.jsonl")):
+            if p.name in before_names:
+                for line in p.read_text(encoding="utf-8").splitlines():
+                    r = json.loads(line)
+                    if r.get("kind") == "test" and r["outcome"] in ("failed", "error"):
+                        out[r["nodeid"]] = r
+        return out
+
+    monkeypatch.setattr(g, "current_failures", from_history)
+    still, _ = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
+    assert still == []
 
 
 def test_mutation_current_failures_reusing_old_sessions_absorbs_new_failure(qfx, monkeypatch):

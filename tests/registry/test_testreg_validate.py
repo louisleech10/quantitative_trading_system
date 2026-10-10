@@ -356,10 +356,27 @@ def test_e1_context_differs_red(tmp_path, variant):
     assert proc.returncode != 0 and rule_lines(proc, "V08"), proc.stderr
 
 
-@pytest.mark.parametrize("variant", sorted(E1_VARIANTS))
+E1_BODYDIFF = E1_TESTS.replace("\n\ndef test_a(two):\n    assert add(1, two) == K\n", "").replace(
+    "def test_b(two):\n    assert add(1, two) == K\n", "def test_b(two):\n    assert add(two, 1) == K\n")
+
+
+def test_e1_function_body_differs_red(tmp_path):
+    """函式本文不同（情境相同）⇒ ast 雜湊須不同（恆回常數之 ast 雜湊於此即紅）⇒ 誠實收據 V08 紅。"""
+    r = _e1_repo(tmp_path, {"tests/test_dup.py": E1_TESTS, "tests/test_other.py": E1_BODYDIFF})
+    tgt = testreg.e1_hashes(r.root, "tests/test_other.py::test_b", "HEAD")
+    rep = testreg.e1_hashes(r.root, "tests/test_dup.py::test_a", "HEAD")
+    assert tgt["ast"] != rep["ast"]
+    assert tgt["fixture_closure"] == rep["fixture_closure"] and tgt["module_context"] == rep["module_context"]
+    _e1_retire(r, "tests/test_other.py::test_b", "tests/test_dup.py::test_a")
+    proc = _validate(r)
+    assert proc.returncode != 0 and rule_lines(proc, "V08"), proc.stderr
+
+
+@pytest.mark.parametrize("variant", sorted(E1_VARIANTS) + ["function_body"])
 def test_e1_forged_equal_hashes_recomputed_red(tmp_path, variant):
-    """偽造收據：把 target 之三雜湊照抄（宣稱完全重複）而兩者情境實際不同 ⇒ validate 重算不等 ⇒ V08。"""
-    r = _e1_repo(tmp_path, {"tests/test_dup.py": E1_TESTS, "tests/test_other.py": E1_VARIANTS[variant]})
+    """偽造收據：把 target 之三雜湊照抄（宣稱完全重複）而兩者情境或本文實際不同 ⇒ validate 重算不等 ⇒ V08。"""
+    other = E1_BODYDIFF if variant == "function_body" else E1_VARIANTS[variant]
+    r = _e1_repo(tmp_path, {"tests/test_dup.py": E1_TESTS, "tests/test_other.py": other})
     tgt = testreg.e1_hashes(r.root, "tests/test_other.py::test_b", "HEAD")
     rel = f"{RETIRE_DIR}/forged.json"
     r.write_json(rel, {"nodeid": "tests/test_other.py::test_b", "head": r.head(),

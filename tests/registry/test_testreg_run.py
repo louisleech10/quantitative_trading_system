@@ -43,11 +43,18 @@ def _run(r: TmpRepo, base: str, tmp_path: Path, *extra: str):
     return proc, rcpt
 
 
-def _relations(rcpt: Dict[str, Any]) -> None:
-    """契約 subbatch_gate 所列欄間關係（獨立重算）。"""
+def _collected(r: TmpRepo, path: str) -> set:
+    """獨立 oracle：暫存倉測試檔之頂層 test_* 函式（本檔情境無參數化與類別）。"""
+    import ast
+    tree = ast.parse(r.read(path))
+    return {f"{path}::{n.name}" for n in tree.body if isinstance(n, ast.FunctionDef) and n.name.startswith("test")}
+
+
+def _relations(rcpt: Dict[str, Any], r: TmpRepo) -> None:
+    """契約 subbatch_gate 所列欄間關係（獨立重算）；expected 須恰等於選中各檔之完整收集集合。"""
     sel = {x["path"] for x in rcpt["selection"]["selected"]}
     assert set(rcpt["files"]) == sel
-    assert all(n.split("::")[0] in sel for n in rcpt["expected"])
+    assert set(rcpt["expected"]) == set().union(*(_collected(r, p) for p in sel))
     assert set(rcpt["results"]) <= set(rcpt["expected"])
     assert rcpt["missing"] == sorted(n for n in rcpt["expected"] if n not in rcpt["results"])
     bad = {n for n, o in rcpt["results"].items() if o != "passed"}
@@ -62,7 +69,7 @@ def test_run_receipt_shape_and_relations(tmp_path):
     proc, rcpt = _run(r, base, tmp_path)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert testreg.validate_shape(rcpt, {"type": "types.subbatch_receipt"}, schema()) == []
-    _relations(rcpt)
+    _relations(rcpt, r)
     assert rcpt["base"] == base and rcpt["head"] == r.head() and rcpt["phase"] == 3
     assert "tests/test_rw.py" in rcpt["changed_paths"]
 
@@ -83,17 +90,21 @@ def test_run_subbatch_caused_red_blocks(tmp_path):
     r.write("tests/test_rw.py", FILES["tests/test_rw.py"].replace("assert f() == 1\n", "assert f() == 3\n"))
     proc, rcpt = _run(r, base, tmp_path)
     assert proc.returncode == 1 and rcpt["caused"] == ["tests/test_rw.py::test_r1"] and rcpt["pass"] is False
-    _relations(rcpt)
+    _relations(rcpt, r)
 
 
 def test_run_inputs_digest_binds_base(tmp_path):
+    """兩個 base 之差只在被 FP_EXCLUDES 排除之 handoffs/ 檔 ⇒ HEAD、樹、diff、changed_paths、選集皆相同，唯 base 不同；
+    inputs_digest 須不同（忽略 base 之實作即紅）。"""
     r = _repo(tmp_path)
-    first = r.head()
-    r.write("tests/test_untouched.py", "def test_u():\n    assert 1 == 1\n")
-    second = r.commit("advance")
+    r.write("handoffs/note.txt", "a\n")
+    first = r.commit("note a")
+    r.write("handoffs/note.txt", "b\n")
+    second = r.commit("note b")
     r.write("tests/test_rw.py", FILES["tests/test_rw.py"] + "\n\ndef test_more():\n    assert True\n")
     _, a = _run(r, first, tmp_path / "a")
     _, b = _run(r, second, tmp_path / "b")
+    assert a["changed_paths"] == b["changed_paths"] and a["selection"] == b["selection"]
     assert a["inputs_digest"] != b["inputs_digest"]
 
 
@@ -129,6 +140,22 @@ def test_boundary_02_pause_then_same_command_resumes_without_restart(tmp_path):
     assert proc.returncode == 0 and rcpt["pass"] is True
     assert rcpt["files"]["tests/test_other.py"]["reused"] is True
     assert rcpt["files"]["tests/test_rw.py"]["reused"] is False
+
+
+def test_resume_after_dependency_change_reruns_unchanged_test_file(tmp_path):
+    """暫停後測試檔本身未變、但其匯入之生產模組改變 ⇒ 該檔不得沿用（state_key 不得只雜湊測試檔內容）。"""
+    slow_dep = "import time\nfrom momentum.m import f\n\n\ndef test_o():\n    time.sleep(1.2)\n    assert f() == 1\n"
+    r = _repo(tmp_path, {**FILES, "tests/test_other.py": slow_dep})
+    base = r.head()
+    r.write("tests/test_rw.py", FILES["tests/test_rw.py"] + "\n\ndef test_more():\n    assert True\n")
+    r.write("tests/test_other.py", slow_dep + "\n\ndef test_o2():\n    assert True\n")
+    proc, _ = _run(r, base, tmp_path, "--max-seconds", "0.5")
+    assert proc.returncode == 3
+    before = r.read("tests/test_other.py")
+    r.write("momentum/m.py", "def f():\n    return 1  # 註解改變\n")
+    proc, rcpt = _run(r, base, tmp_path)
+    assert proc.returncode == 0 and r.read("tests/test_other.py") == before
+    assert rcpt["files"]["tests/test_other.py"]["reused"] is False
 
 
 def test_resume_after_change_reruns_changed_file(tmp_path):

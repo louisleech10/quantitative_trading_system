@@ -54,6 +54,19 @@ def test_comment_and_string_not_counted(tmp_path):
     assert proc.returncode == 0, proc.stderr
 
 
+def test_plugin_registered_marker_allowed(tmp_path):
+    """外掛／conftest 以 `config.addinivalue_line("markers", "<名>: …")` 註冊之標記視同已註冊（真實樹之
+    ic_persist_redirect 即此形態）；同檔未註冊者仍報。"""
+    conftest = 'def pytest_configure(config):\n    config.addinivalue_line("markers", "custom_reg: by plugin")\n'
+    test = ("import pytest\n\n\n@pytest.mark.custom_reg\ndef test_x():\n    assert True\n\n\n"
+            "@pytest.mark.not_registered_anywhere\ndef test_y():\n    assert True\n")
+    r = make_repo(tmp_path, {"tests/conftest.py": conftest, "tests/test_m.py": test}, catalog=False)
+    r.write("pytest.ini", INI_HEAD)
+    proc = r.run("markers")
+    lines = [l for l in proc.stderr.splitlines() if l.startswith("MARKER ")]
+    assert proc.returncode != 0 and len(lines) == 1 and "not_registered_anywhere" in lines[0], proc.stderr
+
+
 def test_builtin_markers_allowed(tmp_path):
     src = ("import pytest\n\n\n@pytest.mark.parametrize('a', [1])\n@pytest.mark.skipif(False, reason='r')\n"
            "@pytest.mark.xfail(reason='r')\n@pytest.mark.usefixtures('tmp_path')\n@pytest.mark.filterwarnings('ignore')\n"
