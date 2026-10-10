@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 6,
+  "version": 7,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -15,9 +15,10 @@
   "types": {
     "ledger_ref": {"type": "object", "additional_properties": false, "fields": {"session_id": {"type": "string", "format": "uuid", "required": true}, "nodeid": {"type": "string", "format": "nodeid_param", "required": true}}},
     "quarantined_failure": {"type": "object", "additional_properties": false, "fields": {"nodeid": {"type": "string", "format": "nodeid_param", "required": true}, "quarantine_expires": {"type": "string", "format": "date", "required": true}, "disposition_ref": {"type": "string", "format": "repo_path", "required": true}}},
+    "summary_record": {"type": "object", "additional_properties": false, "fields": {"session_id": {"type": "string", "format": "uuid", "required": true}, "started": {"type": "string", "required": true, "desc": "ISO-8601 UTC"}, "fingerprint": {"type": "string", "format": "hex", "required": true}, "duration_class": {"type": "string", "format": "hex", "required": true}, "outcome": {"type": "enum", "values": "enums.outcome", "required": true}, "duration_s": {"type": "number", "required": true}, "exception_type": {"type": "string|null", "required": true}, "exception_head": {"type": "string|null", "required": true}}},
     "tombstone_resolution": {"type": "object", "additional_properties": false, "fields": {"from": {"type": "string", "format": "nodeid", "required": true}, "to": {"type": "array", "items": "string", "items_format": "nodeid", "required": true}, "evidence_level": {"type": "enum", "values": "enums.retire_evidence_level", "required": true}}}
   },
-  "container_rule": "catalog.entries 之每一值、catalog.tombstones 之每一元素、quarantine_record、types.* 皆為 object，欄位集合 == 其 required=true 鍵集合（additional_properties=false），由 V03／V17 驗",
+  "container_rule": "V17 之根：catalog.json＝object，鍵集合 == catalog.top_level_keys；entries＝object（map，鍵依 formats.test_path，值依 catalog.entries.fields 且 additional_properties=false）；tombstones＝array，元素依 catalog.tombstones（object，additional_properties=false）；entries 之 quarantine 元素依 catalog.quarantine_record（object，additional_properties=false）；types.* 依各自宣告。凡標 object 者欄位集合 == 其 required=true 鍵集合",
   "catalog": {
     "path": "tests/registry/catalog.json",
     "tracked": true,
@@ -34,12 +35,14 @@
         "rewrite_targets": {"type": "array", "required": true, "items": "string", "items_format": "nodeid", "writer": "committee", "desc": "disposition=rewrite 時之函式層 nodeid 範圍；空陣列＝整檔"},
         "disposition_ref": {"type": "string|null", "format": "repo_path", "required": true, "writer": "committee", "desc": "裁定所在收斂檔路徑；keep 且未經委員分類者為 null"},
         "rewrite_receipt": {"type": "string|null", "format": "repo_path", "required": true, "writer": "committee", "desc": "rewrite 執行後之 receipts.mutation 收據路徑；未執行為 null"},
-        "quarantine": {"type": "array", "required": true, "items": "quarantine_record", "writer": "committee"}
+        "quarantine": {"type": "array", "required": true, "items": "catalog.quarantine_record", "writer": "committee"}
       },
       "forbidden_fields": ["owner", "value_score", "purpose_freeform", "duration", "size", "last_run", "markers", "prod_modules", "test_count", "retire_evidence", "replaced_by"]
     },
     "tombstones": {
       "desc": "淘汰一律以函式層 nodeid 為單位；整檔淘汰＝該檔全部函式各一碑。刪除與立碑同一提交。merge＝帶 replaced_by 之碑。",
+      "type": "object",
+      "additional_properties": false,
       "fields": {
         "nodeid": {"type": "string", "format": "nodeid", "required": true, "desc": "函式層 nodeid：path::[Class::]function，不含參數化後綴；參數化之個別案例不得單獨立碑"},
         "evidence_level": {"type": "enum", "required": true, "values": "enums.retire_evidence_level"},
@@ -49,11 +52,15 @@
       }
     },
     "quarantine_record": {
-      "nodeid": {"type": "string", "format": "nodeid", "required": true},
-      "reason": {"type": "string", "required": true},
-      "evidence": {"type": "array", "required": true, "items": "types.ledger_ref", "min_items": 2, "desc": "ledger_ref＝{session_id, nodeid}；規則見 V12"},
-      "expires": {"type": "string", "format": "date", "required": true, "desc": "YYYY-MM-DD"},
-      "disposition_ref": {"type": "string", "format": "repo_path", "required": true}
+      "type": "object",
+      "additional_properties": false,
+      "fields": {
+        "nodeid": {"type": "string", "format": "nodeid", "required": true},
+        "reason": {"type": "string", "required": true},
+        "evidence": {"type": "array", "required": true, "items": "types.ledger_ref", "min_items": 2, "desc": "規則見 V12"},
+        "expires": {"type": "string", "format": "date", "required": true},
+        "disposition_ref": {"type": "string", "format": "repo_path", "required": true}
+      }
     }
   },
   "bootstrap": {
@@ -76,8 +83,8 @@
       "ast.Call 其被呼叫者末段名稱符合 re `^(check|verify|validate|expect)_`（不論定義於 tests/ 或生產碼）"
     ],
     "assertion_helpers": "tests/ 下（含 conftest.py、fixtures/、測試模組）定義之函式中，其本體遞移地（經同為 tests/ 下之函式呼叫）含上列節點者之集合；以名稱＋定義檔解析，由 AST 機械導出",
-    "inline_rule": "計算某測試函式之斷言多重集合時，對其本體（及其 fixture 參數所解析到之 tests/ 下 fixture 定義）中每一呼叫 assertion_helpers 之節點，以該 helper 之斷言多重集合（遞移展開，遞迴環以已展開集合為止）取代；故抽出 helper 不改多重集合，修改 helper 刪除斷言則使每一呼叫者之多重集合減少",
-    "normalize": "先將函式內區域綁定名（參數、本體內 Store 目標、for／with／except as、comprehension 變數）依首次出現序重命名為 _v0、_v1…，再 ast.dump(node, annotate_fields=True, include_attributes=False)"
+    "inline_rule": "計算某測試函式之斷言多重集合時，對其本體（及其 fixture 參數所解析到之 tests/ 下 fixture 定義）中每一呼叫 assertion_helpers 之節點，以該 helper 之斷言多重集合（遞移展開，遞迴環以已展開集合為止）取代；不做呼叫點引數代入（normalize 已抹除名稱，故引數名不影響比對）；展開所得每一元素帶 provenance＝(定義檔, 行號)，供 mutation 收據之 target_assertion_lines 以 file:line 表示。故抽出 helper 不改多重集合，修改 helper 刪除斷言則使每一呼叫者之多重集合減少",
+    "normalize": "三步：①常數摺疊：同一函式內僅被賦值一次且右值為 ast.Constant（含 tuple／list of Constant）之區域名，以及同測試檔模組層僅賦值一次之同類常數名，代入其出現處；②名稱抹除：其餘所有 ast.Name 之 id 一律改為 `_`（Attribute 鏈之屬性名保留）；③ast.dump(node, annotate_fields=True, include_attributes=False)。故改名不算變化，改斷言所用之常數值則算（舊元素減少）"
   },
   "receipts": {
     "E0": {
@@ -97,18 +104,18 @@
       "rule": [
         "E1＝完全重複：target 與 replacement 之 FunctionDef 經正規化（去函式名、去 lineno 等屬性）後 ast.dump 之 sha256 相等（含參數、decorator 含 parametrize、函式本體全部語句）",
         "兩者所用 fixture 名稱集合相同，且各 fixture 解析到之定義（依 pytest 可見範圍：同模組、各層 conftest.py）之正規化 AST sha256 集合相等 ⇒ fixture_closure_sha256 相等",
-        "replacement_nodeid ∈ 碑之 replaced_by，且其函式於 head 存在",
+        "replacement_nodeid ∈ 碑之 replaced_by，且其函式於受驗之樹存在（同 V09）",
         "不符完全重複者一律改用 E2"
       ]
     },
     "mutation": {
       "fields": ["target_nodeid", "compare_nodeids", "head", "fingerprint", "target_assertion_lines", "mutants"],
-      "mutants_item": {"id": "string", "patch_path": "string", "patch_sha256": "hex", "target_outcome": "enums.outcome", "target_fail_line": "int|null", "compare_outcomes": "map nodeid→enums.outcome"},
+      "mutants_item": {"id": "string", "patch_path": "string", "patch_sha256": "hex", "target_outcome": "enums.outcome", "target_fail_loc": "string（file:line）|null", "compare_outcomes": "map nodeid→enums.outcome"},
       "rule": [
         "用於 E2（compare_nodeids＝碑之 replaced_by）與 rewrite（compare_nodeids＝改寫後之 nodeid）",
-        "target_assertion_lines＝target 函式內全部 assertion_nodes 之行號（由 AST 機械導出並由 validate 重算比對）",
+        "target_assertion_lines＝target 之斷言多重集合（含 inline_rule 展開者）之 provenance 位置清單（file:line），由 AST 機械導出並由 validate 重算比對",
         "mutants 至少 1 個；且至少 1 個 mutant 之 target_outcome∈{failed,error}（含 target_assertion_lines 為空之情形：其隱含斷言為『不拋例外』，須有使 target error 之 mutant）",
-        "對每一 target_assertion_lines 之行 L，至少一個 mutant 之 target_outcome∈{failed,error} 且 target_fail_line＝L",
+        "對每一 target_assertion_lines 之位置 P，至少一個 mutant 之 target_outcome∈{failed,error} 且 target_fail_loc＝P（target_fail_loc 取自 ledger 之 traceback：最後一個落在 target_assertion_lines 任一檔之 frame）",
         "每一 target_outcome∈{failed,error} 之 mutant，compare_outcomes 中至少一個 ∈{failed,error}",
         "每一 mutant 之 patch 只得修改 receipts.E0.production_roots 下之檔（不得改測試、conftest、fixtures）；無斷言 target 之殺 mutant 因而必經 target 實際執行之生產碼路徑",
         "收據含作者執行過之全部 mutant；patch_path 存在且 sha256 相符；mutant 集合之充分性由每子批審碼委員判（殘留 R5）"
@@ -140,15 +147,27 @@
       "session_id": "uuid4",
       "nodeid": "string",
       "order": "int；本 session 內 pytest_runtest_logreport 首次見到該 nodeid 之序號",
-      "outcome": "enums.outcome",
+      "outcome": "enums.outcome；依 outcome_aggregation 由三階段報告導出",
       "duration_s": "setup+call+teardown 秒",
       "phase_failed": "setup|call|teardown|none",
       "exception_type": "失敗或錯誤時之例外類名；否則 null",
       "exception_head": "失敗或錯誤時例外訊息首行，截 300 字；否則 null",
       "exception_origin": "失敗或錯誤時 traceback 中最後一個位於 repo 內且非 _pytest／importlib 之 frame 之 file:line；否則 null",
       "fail_line": "失敗時 traceback 中位於該測試函式所在檔之最後一個 frame 之行號；否則 null",
+      "fail_frames": "失敗或錯誤時 traceback 中位於 tests/ 下之全部 frame（file:line）清單，由內而外；否則 []",
       "markers": "applied marker names"
     },
+    "outcome_aggregation": [
+      "依序判定，先中者為準：",
+      "setup 報告 failed ⇒ error（phase_failed=setup）",
+      "setup 報告 skipped ⇒ 若帶 wasxfail ⇒ xfailed；否則 skipped（phase_failed=none）",
+      "call 報告 skipped 且帶 wasxfail ⇒ xfailed",
+      "call 報告 passed 且帶 wasxfail ⇒ xpassed（strict xfail 時 pytest 已回報 failed，依下條）",
+      "call 報告 failed ⇒ failed（phase_failed=call）",
+      "call 報告 skipped（無 wasxfail）⇒ skipped",
+      "teardown 報告 failed ⇒ error（phase_failed=teardown；即使 call 為 passed）",
+      "其餘 ⇒ passed"
+    ],
     "collect_record": {
       "desc": "pytest_collectreport 之 outcome=failed 者各一筆（收集期錯誤無 nodeid）",
       "session_id": "uuid4",
@@ -162,7 +181,7 @@
     "lock": ".testreg/summary.lock",
     "tracked": false,
     "k": 20,
-    "shape": {"schema_version": "int，＝本檔 version", "k": "int", "nodes": "map nodeid_param → array（≤k）of {session_id, started, fingerprint, duration_class, outcome, duration_s}"},
+    "shape": {"type": "object", "additional_properties": false, "fields": {"schema_version": {"type": "int", "required": true, "desc": "＝本檔 version"}, "k": {"type": "int", "required": true}, "nodes": {"type": "map", "key_format": "nodeid_param", "values": "array（長度 ≤ k）of types.summary_record", "required": true}}},
     "desc": "sessionfinish 時以 fcntl.flock 獨占鎖包住「讀→合併→暫存檔→rename」；JSON 無法解析、schema_version ≠ 本檔 version、k 不同或形狀不符 shape ⇒ 視同不存在並由 ledger 全量重建（同鎖內）"
   },
   "derived": {
@@ -182,7 +201,7 @@
     ],
     "domain_rule": "prefix(f)＝f 之前兩層路徑（不足兩層取一層）。import_closure(t)＝自測試檔 t 起，沿 repo 內模組之全部 Import／ImportFrom 節點（含函式內 import、from x import *、套件 __init__ 之 re-export）之遞移閉包。dyn_modules＝repo 內含 importlib.import_module 或 __import__ 且第一參數非字串常值之模組。domain(f)＝{t | import_closure(t) 含 prefix(f) 下任一模組} ∪ {t | import_closure(t) 含 dyn_modules 任一模組}",
     "shared_test_infra": {"conftest.py": "全部測試檔", "pytest.ini": "全部測試檔", "tests/conftest.py": "全部測試檔", "tests/fixtures/": "全部測試檔", "tests/registry/testreg_schema.json": "tests/registry/ 下全部測試檔", "tests/<dir>/conftest.py": "tests/<dir>/ 下全部測試檔"},
-    "gate_wiring": "framepath_affected_gate plan 於行程內直接呼叫 `scripts.testreg.impact(changed_paths: list[str], manifest: dict, phase: int) -> dict`（不經中介檔）；changed_paths＝plan 既有之變更檔集合（同一函式算出，錨點不變）；回傳 {selected: [{path, reasons}], excluded: [{path, excluded_reason}]}，path 皆依 formats.test_path；nodeid 轉檔＝取 `::` 前段；完整回傳存入 plan 收據之 testreg_impact 欄；plan 之 inputs_digest 另納 tests/registry/catalog.json 之 sha256 與 previously_failed 之排序後 nodeid 清單",
+    "gate_wiring": "framepath_affected_gate plan 於行程內直接呼叫 `scripts.testreg.impact(changed_paths: list[str], manifest: dict, phase: int) -> dict`（不經中介檔）；changed_paths＝排序去重之 ( `git diff --name-only <anchor>` ∪ `git diff --name-only HEAD` ∪ `git ls-files --others --exclude-standard` )，三者皆扣除閘之 FP_EXCLUDES，涵蓋全部路徑（不限 tests/）；manifest 與 phase 即 plan 所收之同一 manifest 物件與 phase 整數，impact 之 must 以 framepath_affected_gate.manifest_groups(manifest, phase) 之回傳為準；回傳 {selected: [{path, reasons}], excluded: [{path, excluded_reason}]}，path 皆依 formats.test_path；nodeid 轉檔＝取 `::` 前段；完整回傳存入 plan 收據之 testreg_impact 欄；plan 之 inputs_digest 另納 tests/registry/catalog.json 之 sha256 與 previously_failed 之排序後 nodeid 清單",
     "gate_feed": [
       "於 collect 之前：manifest 中每一 nodeid／路徑若已立碑，以碑之 replaced_by 遞迴取代（循環⇒rc≠0）；E0 碑無 replaced_by ⇒ 記 tombstoned 排除且附碑；取代者加入原項所屬之同一組（原屬 A 者入 A）",
       "selected_files＝原計畫檔 ∪ impact.selected；被選中檔整檔執行；原計畫之每一 must nodeid（取代後）須出現在新計畫之 nodeid 集合（collect 後逐一核對，缺⇒rc≠0）",
@@ -191,7 +210,9 @@
   },
   "gate_report": {
     "desc": "Task 2.3 起 framepath_affected_gate 之 verdict 收據新增欄位",
-    "fields": {"quarantined_failures": {"type": "array", "items": "types.quarantined_failure", "required": true, "desc": "非空時 verdict 仍可為 pass，但白話與審碼 brief 必列"}, "tombstone_resolutions": {"type": "array", "items": "types.tombstone_resolution", "required": true}},
+    "fields": {"quarantined_failures": {"type": "array", "items": "types.quarantined_failure", "required": true, "desc": "非空時 verdict 仍可為 pass，但白話與審碼 brief 必列；只收 quarantine_match 成立之失敗"}, "tombstone_resolutions": {"type": "array", "items": "types.tombstone_resolution", "required": true}},
+    "plan_receipt_fields": {"testreg_impact": {"type": "object", "required": true, "desc": "impact 完整回傳（selected、excluded）"}, "catalog_sha256": {"type": "string", "format": "hex", "required": true}, "previously_failed": {"type": "array", "items": "string", "items_format": "nodeid_param", "required": true}},
+    "quarantine_match": "當前 caused 失敗之 nodeid 有未逾期 quarantine，且其 (exception_type, exception_head) 等於該 quarantine.evidence 所指之某筆 failed／error 紀錄之同二欄 ⇒ 歸 quarantined_failures；失敗特徵不同（新失敗）⇒ 照擋",
     "validation": "閘寫收據前依 V17 同法驗此二欄；不符⇒閘 rc≠0、不得寫 pass"
   },
   "validation_rules": [
@@ -203,12 +224,12 @@
     {"id": "V06", "rule": "disposition=rewrite ⇒ disposition_ref 非 null"},
     {"id": "V07", "rule": "rewrite_receipt 非 null ⇒ 依 receipts.mutation 驗過；暫存區中 disposition=rewrite 之檔有內容變更 ⇒ 同提交之 rewrite_receipt 非 null 且驗過"},
     {"id": "V08", "rule": "每一碑 evidence_receipt 存在且依其 evidence_level 對應之 receipts 規則驗過"},
-    {"id": "V09", "rule": "evidence_level∈{E1,E2} ⇒ replaced_by 非空，且每一 replaced_by 之函式於 HEAD 存在；E0 ⇒ replaced_by 為空"},
+    {"id": "V09", "rule": "evidence_level∈{E1,E2} ⇒ replaced_by 非空，且每一 replaced_by 之函式於「受驗之樹」存在（pre-commit＝暫存區之樹；hook 與手動 validate＝工作樹；收據之 head 欄記執行 mutation 時之 HEAD，replacement 可為該提交新增者）；E0 ⇒ replaced_by 為空"},
     {"id": "V10", "rule": "碑之 nodeid 之函式於工作樹不存在"},
     {"id": "V11", "rule": "quarantine.expires ≥ 今日（本機日期）"},
     {"id": "V12", "rule": "quarantine.evidence 所指 ledger 紀錄皆存在、fingerprint 皆相同，且其中至少一筆 outcome=passed、至少一筆 outcome∈{failed,error}；ledger 不在本機⇒報 unverifiable 並 rc≠0"},
     {"id": "V13", "rule": "catalog 頂層鍵集合 == top_level_keys"},
-    {"id": "V14", "rule": "新立之碑（HEAD catalog 無該碑）所指 nodeid 或其檔路徑字串出現在某 docs/manifests/*.json（字串值逐一比對）⇒ 須滿足 manifest_closed 或 manifest_tombstone_aware 之一，否則 rc≠0"},
+    {"id": "V14", "rule": "新立之碑（HEAD catalog 無該碑）所指 nodeid 或其檔路徑，出現在某 docs/manifests/*.json 之選測位置（manifest_selection_keys.keys 所列鍵下之任一字串，含 gate_cmd 之 shlex token；及 manifest_selection_keys.prefixed_strings 所定之列）⇒ 須滿足 manifest_closed 或 manifest_tombstone_aware 之一，否則 rc≠0；其他欄位之字串不計"},
     {"id": "V15", "rule": "rewrite_targets 每一 nodeid 屬該 entry 之檔且其函式存在"},
     {"id": "V16", "rule": "guarantee／oracle／claim 任一欄含 unclassified ⇒ 該欄必恰為 [\"unclassified\"]（不得與其他值混用）、其 path 列於 bootstrap.paths_file，且 HEAD catalog 中同鍵之同欄不含非 unclassified 值（已分類者不得改回 unclassified）；「已分類」之計數一律以「三欄皆不含 unclassified」判定"},
     {"id": "V17", "rule": "全部欄位依其 type、format、items、items_format、items_enum 與 types.* 遞迴驗形（format 以 formats 正則 re.fullmatch；type 含 null 者方可為 null；陣列元素逐一驗）"},
@@ -216,6 +237,7 @@
     {"id": "V19", "rule": "對每一測試函式（函式層 nodeid），比較 HEAD 與暫存區或工作樹之斷言多重集合（assertion_nodes 經 normalize 與 inline_rule 展開；tests/ 下 helper 或 fixture 之修改因展開而反映到其每一呼叫者）；任一元素減少 ⇒ 該 nodeid 須於同提交立碑，或屬某 disposition=rewrite 之 entry 之 rewrite_targets（空＝整檔）且同提交之 rewrite_receipt 驗過；否則 rc≠0"},
     {"id": "V20", "rule": "HEAD 中存在之測試函式（函式層 nodeid）於暫存區或工作樹不存在 ⇒ 須於同提交立碑；改名＝刪除＋新增：純改名立 E1 碑、改名兼改內容立 E2 碑（mutation 收據以舊函式為 target、新函式為 compare），replaced_by 皆為新名；否則 rc≠0"}
   ],
+  "manifest_selection_keys": {"keys": ["test_files", "script_acceptance", "gate_cmd"], "prefixed_strings": "manifest 任一處之字串，其首個空白分隔 token ∈ {affected_tests, affected_must, affected_groups}（即 framepath_affected_gate.manifest_groups 所解析之列，例 batch_card.risk_mitigation）"},
   "manifest_status": {
     "manifest_closed": "讀 scripts/fact_keys.json 之 handoff-pending 區塊，依其 columns 找「權威路徑」與「狀態」兩欄之索引；存在某列其「權威路徑」欄 == manifest.spec_path 且「狀態」欄 == 已完成 ⇒ closed；找不到對應列或區塊／欄名不存在 ⇒ 未收案",
     "manifest_tombstone_aware": "manifest 內每一 gate_cmd 字串以 shlex 切分；每一 token 須 re.fullmatch `[A-Za-z0-9_./=:,+-]+`（排除 $、`、(、)、<、>、;、&、|、引號等一切 shell 展開與運算字元）；去除開頭 NAME=value 環境指派後 argv[0]∈{venv/bin/python, python, python3}、argv[1]＝scripts/framepath_affected_gate.py；任一 gate_cmd 不符⇒否"
