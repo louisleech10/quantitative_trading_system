@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 5,
+  "version": 6,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -13,8 +13,11 @@
   },
   "formats_note": "formats 之值皆為 Python re.fullmatch 用之純正則；欄位以 format 鍵指名套用（V17）。repo_path＝repo 相對 POSIX、不以 / 開頭、無 .. 段。",
   "types": {
-    "ledger_ref": {"session_id": {"type": "string", "format": "uuid", "required": true}, "nodeid": {"type": "string", "format": "nodeid_param", "required": true}}
+    "ledger_ref": {"type": "object", "additional_properties": false, "fields": {"session_id": {"type": "string", "format": "uuid", "required": true}, "nodeid": {"type": "string", "format": "nodeid_param", "required": true}}},
+    "quarantined_failure": {"type": "object", "additional_properties": false, "fields": {"nodeid": {"type": "string", "format": "nodeid_param", "required": true}, "quarantine_expires": {"type": "string", "format": "date", "required": true}, "disposition_ref": {"type": "string", "format": "repo_path", "required": true}}},
+    "tombstone_resolution": {"type": "object", "additional_properties": false, "fields": {"from": {"type": "string", "format": "nodeid", "required": true}, "to": {"type": "array", "items": "string", "items_format": "nodeid", "required": true}, "evidence_level": {"type": "enum", "values": "enums.retire_evidence_level", "required": true}}}
   },
+  "container_rule": "catalog.entries 之每一值、catalog.tombstones 之每一元素、quarantine_record、types.* 皆為 object，欄位集合 == 其 required=true 鍵集合（additional_properties=false），由 V03／V17 驗",
   "catalog": {
     "path": "tests/registry/catalog.json",
     "tracked": true,
@@ -70,9 +73,10 @@
       "ast.Assert",
       "ast.Call 其被呼叫者末段名稱以 assert 開頭（含 numpy.testing.assert_*、pandas.testing.assert_*、unittest self.assert*、本 repo helper assert_*）",
       "ast.Call／ast.With 之被呼叫者末段名稱屬 raises、warns、deprecated_call、fail、approx、xfail、skip",
-      "ast.Call 其被呼叫者靜態解析到 assertion_helpers 之一"
+      "ast.Call 其被呼叫者末段名稱符合 re `^(check|verify|validate|expect)_`（不論定義於 tests/ 或生產碼）"
     ],
-    "assertion_helpers": "tests/ 下（含 conftest.py、fixtures/、測試模組）定義之函式中，其本體遞移地（經同為 tests/ 下之函式呼叫）含上列前三類節點者之集合；以名稱＋定義檔解析，由 AST 機械導出",
+    "assertion_helpers": "tests/ 下（含 conftest.py、fixtures/、測試模組）定義之函式中，其本體遞移地（經同為 tests/ 下之函式呼叫）含上列節點者之集合；以名稱＋定義檔解析，由 AST 機械導出",
+    "inline_rule": "計算某測試函式之斷言多重集合時，對其本體（及其 fixture 參數所解析到之 tests/ 下 fixture 定義）中每一呼叫 assertion_helpers 之節點，以該 helper 之斷言多重集合（遞移展開，遞迴環以已展開集合為止）取代；故抽出 helper 不改多重集合，修改 helper 刪除斷言則使每一呼叫者之多重集合減少",
     "normalize": "先將函式內區域綁定名（參數、本體內 Store 目標、for／with／except as、comprehension 變數）依首次出現序重命名為 _v0、_v1…，再 ast.dump(node, annotate_fields=True, include_attributes=False)"
   },
   "receipts": {
@@ -158,7 +162,8 @@
     "lock": ".testreg/summary.lock",
     "tracked": false,
     "k": 20,
-    "desc": "sessionfinish 時以 fcntl.flock 獨占鎖包住「讀→合併→暫存檔→rename」；逐 nodeid 存最近 k 筆 (session_id, started, fingerprint, duration_class, outcome, duration_s)；毀損或 schema 版本不符⇒視同不存在並由 ledger 全量重建（同鎖內）"
+    "shape": {"schema_version": "int，＝本檔 version", "k": "int", "nodes": "map nodeid_param → array（≤k）of {session_id, started, fingerprint, duration_class, outcome, duration_s}"},
+    "desc": "sessionfinish 時以 fcntl.flock 獨占鎖包住「讀→合併→暫存檔→rename」；JSON 無法解析、schema_version ≠ 本檔 version、k 不同或形狀不符 shape ⇒ 視同不存在並由 ledger 全量重建（同鎖內）"
   },
   "derived": {
     "review_signals": "enums.review_signal",
@@ -177,7 +182,7 @@
     ],
     "domain_rule": "prefix(f)＝f 之前兩層路徑（不足兩層取一層）。import_closure(t)＝自測試檔 t 起，沿 repo 內模組之全部 Import／ImportFrom 節點（含函式內 import、from x import *、套件 __init__ 之 re-export）之遞移閉包。dyn_modules＝repo 內含 importlib.import_module 或 __import__ 且第一參數非字串常值之模組。domain(f)＝{t | import_closure(t) 含 prefix(f) 下任一模組} ∪ {t | import_closure(t) 含 dyn_modules 任一模組}",
     "shared_test_infra": {"conftest.py": "全部測試檔", "pytest.ini": "全部測試檔", "tests/conftest.py": "全部測試檔", "tests/fixtures/": "全部測試檔", "tests/registry/testreg_schema.json": "tests/registry/ 下全部測試檔", "tests/<dir>/conftest.py": "tests/<dir>/ 下全部測試檔"},
-    "gate_wiring": "framepath_affected_gate plan 於行程內直接呼叫 testreg impact 之函式（不經中介檔），impact 之完整輸出存入 plan 收據之 testreg_impact 欄；plan 之 inputs_digest 另納 tests/registry/catalog.json 之 sha256 與 previously_failed 之排序後 nodeid 清單",
+    "gate_wiring": "framepath_affected_gate plan 於行程內直接呼叫 `scripts.testreg.impact(changed_paths: list[str], manifest: dict, phase: int) -> dict`（不經中介檔）；changed_paths＝plan 既有之變更檔集合（同一函式算出，錨點不變）；回傳 {selected: [{path, reasons}], excluded: [{path, excluded_reason}]}，path 皆依 formats.test_path；nodeid 轉檔＝取 `::` 前段；完整回傳存入 plan 收據之 testreg_impact 欄；plan 之 inputs_digest 另納 tests/registry/catalog.json 之 sha256 與 previously_failed 之排序後 nodeid 清單",
     "gate_feed": [
       "於 collect 之前：manifest 中每一 nodeid／路徑若已立碑，以碑之 replaced_by 遞迴取代（循環⇒rc≠0）；E0 碑無 replaced_by ⇒ 記 tombstoned 排除且附碑；取代者加入原項所屬之同一組（原屬 A 者入 A）",
       "selected_files＝原計畫檔 ∪ impact.selected；被選中檔整檔執行；原計畫之每一 must nodeid（取代後）須出現在新計畫之 nodeid 集合（collect 後逐一核對，缺⇒rc≠0）",
@@ -186,7 +191,8 @@
   },
   "gate_report": {
     "desc": "Task 2.3 起 framepath_affected_gate 之 verdict 收據新增欄位",
-    "fields": {"quarantined_failures": "array of {nodeid, quarantine_expires, disposition_ref}；非空時 verdict 仍可為 pass，但白話與審碼 brief 必列", "tombstone_resolutions": "array of {from, to, evidence_level}"}
+    "fields": {"quarantined_failures": {"type": "array", "items": "types.quarantined_failure", "required": true, "desc": "非空時 verdict 仍可為 pass，但白話與審碼 brief 必列"}, "tombstone_resolutions": {"type": "array", "items": "types.tombstone_resolution", "required": true}},
+    "validation": "閘寫收據前依 V17 同法驗此二欄；不符⇒閘 rc≠0、不得寫 pass"
   },
   "validation_rules": [
     {"id": "V01", "rule": "entries 每鍵為存在之測試檔，或其全部函式皆有碑"},
@@ -204,11 +210,11 @@
     {"id": "V13", "rule": "catalog 頂層鍵集合 == top_level_keys"},
     {"id": "V14", "rule": "新立之碑（HEAD catalog 無該碑）所指 nodeid 或其檔路徑字串出現在某 docs/manifests/*.json（字串值逐一比對）⇒ 須滿足 manifest_closed 或 manifest_tombstone_aware 之一，否則 rc≠0"},
     {"id": "V15", "rule": "rewrite_targets 每一 nodeid 屬該 entry 之檔且其函式存在"},
-    {"id": "V16", "rule": "entry 之 guarantee／oracle／claim 含 unclassified ⇒ 其 path 列於 bootstrap.paths_file，且 HEAD catalog 中同鍵之同欄不含非 unclassified 值（已分類者不得改回 unclassified）"},
+    {"id": "V16", "rule": "guarantee／oracle／claim 任一欄含 unclassified ⇒ 該欄必恰為 [\"unclassified\"]（不得與其他值混用）、其 path 列於 bootstrap.paths_file，且 HEAD catalog 中同鍵之同欄不含非 unclassified 值（已分類者不得改回 unclassified）；「已分類」之計數一律以「三欄皆不含 unclassified」判定"},
     {"id": "V17", "rule": "全部欄位依其 type、format、items、items_format、items_enum 與 types.* 遞迴驗形（format 以 formats 正則 re.fullmatch；type 含 null 者方可為 null；陣列元素逐一驗）"},
     {"id": "V18", "rule": "bootstrap.paths_file 若存在於 HEAD，則工作樹內容 == HEAD 內容"},
-    {"id": "V19", "rule": "暫存區或工作樹相對 HEAD 修改之測試函式，其 assertion_nodes 正規化後之多重集合若有任一元素減少 ⇒ 該函式 nodeid 須於同提交立碑，或屬某 disposition=rewrite 之 entry 之 rewrite_targets（空＝整檔）且同提交之 rewrite_receipt 驗過；否則 rc≠0"},
-    {"id": "V20", "rule": "HEAD 中存在之測試函式（函式層 nodeid）於暫存區或工作樹不存在 ⇒ 須於同提交立碑；改名＝刪除＋新增，舊名須立 E1 碑（以改名後函式為 replaced_by）；否則 rc≠0"}
+    {"id": "V19", "rule": "對每一測試函式（函式層 nodeid），比較 HEAD 與暫存區或工作樹之斷言多重集合（assertion_nodes 經 normalize 與 inline_rule 展開；tests/ 下 helper 或 fixture 之修改因展開而反映到其每一呼叫者）；任一元素減少 ⇒ 該 nodeid 須於同提交立碑，或屬某 disposition=rewrite 之 entry 之 rewrite_targets（空＝整檔）且同提交之 rewrite_receipt 驗過；否則 rc≠0"},
+    {"id": "V20", "rule": "HEAD 中存在之測試函式（函式層 nodeid）於暫存區或工作樹不存在 ⇒ 須於同提交立碑；改名＝刪除＋新增：純改名立 E1 碑、改名兼改內容立 E2 碑（mutation 收據以舊函式為 target、新函式為 compare），replaced_by 皆為新名；否則 rc≠0"}
   ],
   "manifest_status": {
     "manifest_closed": "讀 scripts/fact_keys.json 之 handoff-pending 區塊，依其 columns 找「權威路徑」與「狀態」兩欄之索引；存在某列其「權威路徑」欄 == manifest.spec_path 且「狀態」欄 == 已完成 ⇒ closed；找不到對應列或區塊／欄名不存在 ⇒ 未收案",
