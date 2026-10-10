@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 15,
+  "version": 16,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -157,14 +157,14 @@
       "started": "ISO-8601 UTC",
       "head": "40-hex",
       "diff_digest": "sha256(`git diff HEAD --binary` ‖ 排序後之未追蹤非忽略檔路徑與內容)；工作樹乾淨⇒字面 clean",
-      "kline_sha256": "data_cache/feature_klines/kline_cache.h5 全檔 sha256；以 (dev, inode, size, mtime_ns, ctime_ns) 為鍵快取於 .testreg/kline_sha_cache.json（ctime 不可由使用者回設，任何寫入皆變）；計算序＝stat→雜湊→stat，兩次 stat 鍵不同⇒重試一次，仍不同⇒本 session 記字面 unstable（不寫快取；fingerprint 與 duration_class 因含 unstable 而另納 session_id，使該 session 不與任何其他 session 同指紋）；快取寫入於 .testreg/kline_sha_cache.lock 獨占鎖內以暫存檔＋rename 原子替換；快取毀損⇒視同不存在；檔不存在⇒字面 absent",
+      "kline_sha256": "data_cache/feature_klines/kline_cache.h5 全檔 sha256；以 (dev, inode, size, mtime_ns, ctime_ns) 為鍵快取於 .testreg/kline_sha_cache.json（ctime 不可由使用者回設，任何寫入皆變）；計算序＝stat→雜湊→stat，兩次 stat 鍵不同⇒重試一次，仍不同⇒本 session 記字面 unstable（不寫快取；fingerprint 與 duration_class 公式中之 U 因此為 session_id，使該 session 不與任何其他 session 同指紋）；快取寫入於 .testreg/kline_sha_cache.lock 獨占鎖內以暫存檔＋rename 原子替換；快取毀損⇒視同不存在；檔不存在⇒字面 absent",
       "python": "sys.executable 之 realpath 與 sys.version",
       "packages_digest": "sha256(排序後之 site-packages 內 *.dist-info 目錄名)",
       "env": "排序後之 env_prefixes 開頭環境變數（與 scripts/framepath_affected_gate.py ENV_PREFIXES 同源，Task 2.3 起閘改讀本鍵）",
       "argv_norm": "以 pytest 自身解析結果為準（不做字串層剔除）：取 config.option 之全部 dest＝value，去除 argv_norm_drop_dests 所列之 dest，連同 config.args（位置參數，保序）序列化為正規 JSON（sort_keys、無空白）；故 `--tb=short` 與 `--tb short`、`-rA` 與 `-r A`、`-qq` 與 `-q -q` 之寫法差異皆不影響",
       "argv_raw": "原始參數",
-      "fingerprint": "sha256(head ‖ diff_digest ‖ kline_sha256 ‖ python ‖ packages_digest ‖ env ‖ argv_norm)",
-      "duration_class": "sha256(kline_sha256 ‖ python ‖ packages_digest ‖ env)；只供 duration_regression 比較，不供 outcome 比較"
+      "fingerprint": "sha256(head ‖ diff_digest ‖ kline_sha256 ‖ python ‖ packages_digest ‖ env ‖ argv_norm ‖ U)；U＝session_id 若 kline_sha256＝unstable，否則空字串",
+      "duration_class": "sha256(kline_sha256 ‖ python ‖ packages_digest ‖ env ‖ U)，U 同 fingerprint；只供 duration_regression 比較，不供 outcome 比較"
     },
     "argv_norm_drop_dests": ["verbose", "quiet", "tbstyle", "reportchars", "xmlpath", "durations", "durations_min", "color", "code_highlight", "showlocals", "showcapture"],
     "nested_rule": "環境變數 TESTREG_PARENT_SESSION 存在之 session 不寫任何 ledger 檔",
