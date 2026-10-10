@@ -185,7 +185,10 @@
 - 🔴 **派下一輪委員前先領 `--impl-self` 實作許可**：有未銷之債即拒發，且須帶 `--brief`（impl 型）、`--reconcile`（該 synth 須有 `## 戳記` 段與全部 active_stampers 之 RECONCILE-STAMP）。先派審查再領許可，會被自己剛開的債擋住。
 - 🔴 **`Ticket-Batch:` trailer 只放在動 `momentum/`、`api/`、`frontend/src` 之 commit，且須與 `Co-Authored-By` 同在訊息最末段**（中間隔空行即視為無 trailer）；過期 token 之 trailer 會讓 pre-push 拒收，修法是 amend 尚未推之 commit。
 - 🔴 **委員之 `CLOSED:` 只准列本家族前綴之 ID**，列他家即 `verdict_rejected`；修法＝主委改檔後 `gate.sh register-output`。
-- 🔴 **`debt_clear` 之 synth 交叉引用只比對所宣告之「修訂標的」一檔**：只存在於測試檔之識別字不要加反引號。
+- 🔴 **`debt_clear` 之 synth 交叉引用只比對所宣告之「修訂標的」一檔**：只存在於測試檔之識別字不要加反引號。只存在於契約 JSON（如 `tests/registry/testreg_schema.json`）之鍵名同理：synth 寫無反引號字面，或在 SPEC 加一處 pointer 引用。
+- 🔴 **委員交件 `**碼證**:` 標籤後空行、內容從下一行條列 ⇒ completeness 判空殼、cx_run rc≠0**：主委只把首列移到標籤同行（不改字）→ `bash scripts/completeness_check.sh --single <檔>` PASS → `bash scripts/gate.sh register-output <TASK-ID> <檔>`。不必同輪重派。
+- **synth 群集表儲存格內不可含 `|`（即使在反引號內）**：會被拆成多欄，主委類別欄錯位 ⇒ synth hook 擋；正則請改寫為「以 a／b 開頭」等文字。
+- **`committee_run` 收尾警告「ambient 修改消失（疑似被還原）」**：若是委員執行期間主委自己 commit 了該檔，屬誤報（先 `git log -1 -- <檔>` 確認），不是委員 checkout。
 - 🔴 **`tests/feature_engineering/conftest.py:13` 自動把 `FFACT_CGSA_WORK_DIR` 設到 tmp**：真實 parallel run 須取消此變數（worker 以 `_prepare_cgsa_registry(symbol, tf, "worker")` 取目錄，設了會與主程序共用同一目錄）；FF 測試不可 `chdir`（`config/scan_config.yaml` 等為相對路徑）。
 - 🔴 **FKPERF 語料②為錄製重播**（`tests/governance/_fkperf_record.py`）：差分測試開跑時先跑既有兩檔建沙箱測試並攔截每次生成器呼叫，repo 側於錄製開始時凍結；跑差分時仍勿改 `scripts/fact_keys.json` 與宿主檔，錄得之標籤與凍結樹須同一時點。
 - 🔴 **FKPERF 切換後入口是薄殼、邏輯在 `scripts/_gen_fact_key_blocks.py`**：任何「把入口複製或物化到別處再執行」之處都要連核心一起帶（2026-09-24 活文件守衛快照模式、四個測試檔沙箱依賴清單都漏過）；`scripts/fact_keys.json` 之 E-028 等 `檔案:行號` 引用與四個 fixture（`tests/governance/fixtures/govb1/factkey_{clean,drifted}/docs/GOV_{ENFORCEMENT_REGISTRY,TICKET_SOT}.md`）在核心或守衛檔插行後會位移，改完先跑 `--check`，紅了就改那一行（`scripts/regen_factkey_fixtures.sh` 本 session 前就已壞：fixture 缺新 key 之宿主檔）。

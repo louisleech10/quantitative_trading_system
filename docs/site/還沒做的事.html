@@ -125,9 +125,9 @@
 </tr>
 <tr>
 <td>5a</td>
-<td><strong>TESTREG 測試清冊</strong>（你 10/9 插入）</td>
-<td>600 多個測試檔建清冊並自動維護：哪些還有用、哪些已過時或本來就壞、各跑多久；建「哪個測試跑到哪段程式」對照表，之後每批只跑相關測試。另查明 <code>test_failopen_correctness.py</code> 的 V-6 項目為何單項要 1 小時 40 分（施工前的程式上一樣慢，不是 FRAMEPATH 造成；先前「預熱造成」的推論已被委員否定，原因未定）</td>
-<td>排在 FRAMEPATH 第一批收尾之後；要參考軟體業界做法</td>
+<td><strong>TESTREG 測試清冊</strong>（你 10/9 插入；<strong>規格你 10/10 已核可、三家已蓋章，程式還沒動</strong>）</td>
+<td>642 個測試檔建清冊並自動維護：自動記錄結果與耗時、新增測試當下就檢查、有證據才淘汰、全專案測試檢查只能變多不能變少、只跑相關測試且一定不少跑；另查明 <code>test_failopen_correctness.py</code> 的 V-6 項目為何單項要 1 小時 40 分。分四批做（規格 <code>docs/TESTREG_SPEC.md</code>，白話審閱 <code>Archived/TESTREG規格審閱.md</code>）。「每行程式被哪些測試跑到」動態對照表列為先不做（要先累積記錄器資料）</td>
+<td>下一步寫施工清單並審，之後動工；做完才回 FRAMEPATH 第二批</td>
 </tr>
 <tr>
 <td>6</td>
