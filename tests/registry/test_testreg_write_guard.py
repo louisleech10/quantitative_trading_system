@@ -19,7 +19,7 @@ from typing import Dict
 import pytest
 
 from tests.registry.testreg_helpers import (
-    CATALOG_REL, PY, REPO, TmpRepo, bootstrap_entry, clean_env, entry, fact_keys_rows, make_repo, schema,
+    CATALOG_REL, PY, REPO, TmpRepo, bootstrap_entry, clean_env, entry, fact_keys_rows, is_test_path, make_repo, schema,
 )
 
 testreg = importlib.import_module("scripts.testreg")
@@ -327,7 +327,7 @@ FX_FILES = {**BASE, "tests/test_local.py": T_LOCAL, "tests/__init__.py": "", "te
             "tests/fixtures/fx_helpers.py": HELPERS_FX,
             "tests/conftest.py": CONFTEST, "tests/test_fx.py": T_FX, "tests/test_autouse.py": T_AUTOUSE,
             "tests/helpers/__init__.py": "", "tests/helpers/tolerances.py": TOL_MOD, "tests/helpers/checks.py": CHECKS_MOD,
-            "tests/test_tol.py": T_TOL}
+            "tests/helpers/loose.py": "TOL = 1e-3\n", "tests/test_tol.py": T_TOL}
 
 
 def _v19_subjects(stderr: str) -> set:
@@ -369,6 +369,13 @@ HOOK_CASES = {
                                          {f"tests/test_tol.py::{n}" for n in (
                                              "test_from_import", "test_module_alias", "test_package_from_import",
                                              "test_default_value", "test_function_level_import")}),
+    # 07p（審查 r22）：helper 模組層非定義敘述改變——差量判定須退回完整反推
+    "07p_helper_import_source_changed": ("tests/helpers/checks.py", "from tests.helpers.tolerances import TOL\n",
+                                         "from tests.helpers.loose import TOL\n",
+                                         {"tests/test_tol.py::test_default_value"}),
+    "07p_helper_import_replaced_by_rebinding": ("tests/helpers/checks.py", "from tests.helpers.tolerances import TOL\n",
+                                                "TOL = 1e-3\n", {"tests/test_tol.py::test_default_value"}),
+    "07p_conftest_unrelated_import_ok": ("tests/conftest.py", "import pytest\n", "import os\nimport pytest\n", set()),
 }
 
 
@@ -407,6 +414,45 @@ def test_mutation_hook_v19_count_only_misses_weaker(tmp_path, monkeypatch, capsy
     monkeypatch.setattr(testreg, "multiset_decreased",
                         lambda o, n: ["<count>"] if sum(o.values()) > sum(n.values()) else [])
     assert testreg.main(["--repo", str(r.root), "check", "--paths", "tests/test_keep.py"]) == 0
+    capsys.readouterr()
+
+
+HELPER_CASES = sorted(c for c, (rel, *_) in HOOK_CASES.items() if not is_test_path(rel))
+
+
+def _full_oracle(r: TmpRepo) -> set:
+    """完整反推之定義：暫存倉每一測試函式於 HEAD 與工作樹各自完整展開之斷言多重集合比較（不經呼叫者反推）。"""
+    out = set()
+    for rel in sorted(p for p in FX_FILES if is_test_path(p)):
+        for n in ast.parse(r.read(rel)).body:
+            if isinstance(n, ast.FunctionDef) and n.name.startswith("test_"):
+                nid = f"{rel}::{n.name}"
+                if testreg.multiset_decreased(testreg.assertion_multiset(r.root, nid, "HEAD"),
+                                              testreg.assertion_multiset(r.root, nid, "worktree")):
+                    out.add(nid)
+    return out
+
+
+@pytest.mark.parametrize("case", HELPER_CASES)
+def test_07p_delta_equals_full_reverse_oracle(tmp_path, case):
+    """差量判定（產出端 hook 只對自身斷言輪廓減少之定義反推；模組層非定義敘述改變退回完整反推）之 V19 主體，
+    逐案等於完整反推 oracle（暫存倉全量逐函式比較）；oracle 只在本測試算，不進產出端。"""
+    rel, old, new, expect = HOOK_CASES[case]
+    r = _repo(tmp_path, FX_FILES)
+    _edit(r, rel, old, new)
+    assert _v19_subjects(r.hook(rel).stderr) == _full_oracle(r) == expect
+
+
+def test_mutation_delta_without_module_fallback_misses_07p(tmp_path, monkeypatch, capsys):
+    """mutant：模組層非定義敘述改變時不退回完整反推（decreased_defs 回空而非 None）⇒ 07p 之 import 來源改變放行。"""
+    rel, old, new, _ = HOOK_CASES["07p_helper_import_source_changed"]
+    r = _repo(tmp_path, FX_FILES)
+    _edit(r, rel, old, new)
+    assert testreg.decreased_defs(r.root, rel) is None
+    assert testreg.main(["--repo", str(r.root), "check", "--helpers", rel]) != 0
+    real = testreg.decreased_defs
+    monkeypatch.setattr(testreg, "decreased_defs", lambda *a, **k: real(*a, **k) or [])
+    assert testreg.main(["--repo", str(r.root), "check", "--helpers", rel]) == 0
     capsys.readouterr()
 
 
@@ -548,6 +594,12 @@ def test_precommit_wired_with_direct_rc():
     assert i < final
 
 
+def _tracked_tests() -> set:
+    """全量規模＝真實 repo 現行 tracked 測試檔（不寫死檔數）。"""
+    return set(subprocess.run(["git", "-C", str(REPO), "ls-files", "tests/test_*.py", "tests/**/test_*.py"],
+                              capture_output=True, text=True, check=True).stdout.split())
+
+
 def _hook_times(rel: str) -> list:
     payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(REPO / rel)}})
     times = []
@@ -557,7 +609,7 @@ def _hook_times(rel: str) -> list:
                               text=True, env=clean_env(), cwd=str(REPO))
         times.append(time.perf_counter() - t0)
         assert proc.returncode == 0, proc.stderr
-    assert len(json.loads((REPO / CATALOG_REL).read_text(encoding="utf-8"))["entries"]) >= 642
+    assert _tracked_tests() <= set(json.loads((REPO / CATALOG_REL).read_text(encoding="utf-8"))["entries"])
     return times
 
 

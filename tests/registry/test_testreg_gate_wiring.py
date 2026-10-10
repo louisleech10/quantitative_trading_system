@@ -536,6 +536,118 @@ def test_04h_gate_main_verdict_statement_form():
     assert {"classify_quarantine", "verdict"} <= inner
 
 
+def test_04e_anchor_call_does_not_overwrite_snapshot(qfx, tmp_path, monkeypatch):
+    """錨點呼叫（phase="anchor"）不記、不覆寫 ledger_snapshots：caused 之錨點重跑恆在 B／C 呼叫之後，覆寫即使本次
+    B／C 之 session 落入「呼叫前已存在」而永不被吸收（審查 r22：全程驅動 main 時現形）。"""
+    runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
+    snap = set(runner.ledger_snapshots["tests/t.py"])
+    monkeypatch.setattr(g, "run_file", lambda *a, **k: (0, {"tests/t.py::test_x[1]": {"outcome": "passed", "type": "",
+                                                                                         "message": ""}}))
+    (tmp_path / "out" / "anchor_junit").mkdir(parents=True, exist_ok=True)
+    runner.run("tests/t.py", tmp_path / "out" / "anchor_junit" / "t.xml", tmp_path, {}, ["tests/t.py::test_x[1]"], (),
+               "a1", ["tests/t.py::test_x[1]"], phase="anchor")
+    assert set(runner.ledger_snapshots["tests/t.py"]) == snap
+
+
+# ── ⑥g 全程驅動 main（審查 r22）：裁決之資料流與結束碼以行為驗，不只看 AST 形狀 ───────────────────────────────
+
+NODE = "tests/t.py::test_x[1]"
+MAIN_SCENARIOS = ["absorbed", "residual_unexecuted", "moved", "a_failure", "incomplete"]
+
+
+def _drive_main(tmp_path, monkeypatch, scenario: str):
+    """`REPO` 指向暫存 git 倉（catalog 之 tests/t.py 有有效隔離、`<REPO>/<ledger.dir>` 有其翻轉證據）；plan、collect、
+    錨點工作樹驗證、估時、admission、狀態指紋、清冊還原、探針以模組屬性替身。B 組呼叫之替身於 `<REPO>/<ledger.dir>` 寫一個
+    session（argv 含該檔）並回報失敗，錨點呼叫回報通過（⇒ caused）。main 須自行由 REPO 導出 ledger_dir 與 catalog。
+    回傳 (rc, 收據, quarantined_verdict 呼叫次數)。"""
+    r = make_repo(tmp_path, {"tests/t.py": "def test_x():\n    assert True\n", g.MANIFEST_REL: "{}\n"}, catalog=False)
+    ledger = r.p(schema()["ledger"]["dir"])
+    sp, sf = str(uuid.uuid4()), str(uuid.uuid4())
+    _write_ledger(ledger, sp, "passed", {})
+    _write_ledger(ledger, sf, "failed", FAIL)
+    q = {"nodeid": "tests/t.py::test_x", "reason": "flaky", "expires": FUTURE, "disposition_ref": REF,
+         "evidence": [{"session_id": sp, "nodeid": NODE}, {"session_id": sf, "nodeid": NODE}]}
+    r.set_catalog({"entries": {"tests/t.py": entry("tests/t.py", quarantine=[q])}, "tombstones": []})
+    r.commit("catalog")
+    wt = tmp_path / "anchor_wt"
+    (wt / "tests").mkdir(parents=True)
+    (wt / "tests/t.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
+    rec = dict(FAIL, exception_origin="tests/t.py:9", fail_line=9) if scenario == "moved" else FAIL
+    hits = set() if scenario == "residual_unexecuted" else {"momentum/x.py:f", "momentum/x.py:g"}
+    a_group = ["tests/a.py"] if scenario == "a_failure" else []
+    sel = {"selected": [NODE], "skipped": [], "s2_symbols": [], "align_triggered": False, "light_files": [],
+           "invariance_baseline_sha256": "", "inputs_digest": "d" * 64, "collected": {"tests/t.py": [NODE]},
+           "groups": {"B": ["tests/t.py"], "C": []}, "extra_files": [], "residual_defs": ["momentum/x.py:f"],
+           "tombstone_resolutions": [], "must_check": {"missing": []}}
+
+    def run_file(test_file, xml_path, cwd, env, nodeids=None, extra=()):
+        Path(xml_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(xml_path).write_text("<testsuite/>", encoding="utf-8")
+        if Path(cwd) == wt:
+            return 0, {NODE: {"outcome": "passed", "type": "", "message": ""}}
+        if test_file == "tests/a.py":
+            return 1, {"tests/a.py::test_a": {"outcome": "failed", "type": "AssertionError", "message": "a"}}
+        _write_ledger(ledger, str(uuid.uuid4()), "failed", rec, argv=["-q", test_file])
+        return (2 if scenario == "incomplete" else 1), {NODE: {"outcome": "failed", "type": "AssertionError",
+                                                               "message": "assert 1 == 2"}}
+
+    calls: List[Any] = []
+    orig = g.quarantined_verdict  # 呼叫當下之模組屬性（mutant 先行置換者亦經此）
+
+    def spy(*a, **k):
+        calls.append((a, k))
+        return orig(*a, **k)
+
+    for name, value in {"REPO": r.root, "_RUNNER": None, "current_batch": lambda: 1, "resolve_anchor": lambda: r.head(),
+                        "plan": lambda *a, **k: sel, "A_GROUP_BY_PHASE": {1: a_group, 2: a_group, 3: a_group},
+                        "collect": lambda f, cwd, env: ["tests/a.py::test_a"] if f == "tests/a.py" else [NODE],
+                        "load_times": lambda *a, **k: {},
+                        "admission": lambda *a, **k: {"status": "within", "known_seconds": 0, "unknown": [],
+                                                      "budget_seconds": 1},
+                        "verify_anchor_worktree": lambda *a, **k: None, "state_key": lambda *a, **k: "k",
+                        "restore_generated": lambda *a, **k: None, "run_file": run_file,
+                        "probe_hits": lambda d: set(hits), "quarantined_verdict": spy}.items():
+        monkeypatch.setattr(g, name, value)
+    rc = g.main(["--out", str(tmp_path / "out"), "--anchor-worktree", str(wt)])
+    receipt = json.loads(r.read("handoffs/run_receipts/framepath-b1-affected.json"))
+    return rc, receipt, len(calls)
+
+
+@pytest.mark.parametrize("scenario", MAIN_SCENARIOS)
+def test_04i_gate_main_end_to_end_verdict(tmp_path, monkeypatch, scenario):
+    """⑥g：全程驅動 main。相符之新失敗被吸收且無其他失敗 ⇒ rc 0、收據 pass、quarantined_failures 列該 nodeid；
+    殘差定義未執行（探針另觀測到一個非殘差定義，殘差差集方向寫反即誤判）、位置已變、A 組失敗、未完成檔 ⇒ rc 1。
+    ledger_dir、catalog 任一由錯誤來源導出、或 quarantined_verdict 引數漏接 ⇒ absorbed 案 rc≠0。"""
+    rc, rcpt, n_calls = _drive_main(tmp_path, monkeypatch, scenario)
+    absorbed = [x["nodeid"] for x in rcpt["quarantined_failures"]]
+    assert n_calls == 1
+    assert rcpt["caused"] == [NODE]
+    if scenario == "absorbed":
+        assert (rc, rcpt["pass"], absorbed, rcpt["residual_unexecuted"]) == (0, True, [NODE], [])
+        return
+    assert rc == 1 and rcpt["pass"] is False
+    if scenario == "residual_unexecuted":
+        assert rcpt["residual_unexecuted"] == ["momentum/x.py:f"] and absorbed == [NODE]
+    elif scenario == "moved":
+        assert absorbed == []
+    elif scenario == "a_failure":
+        assert rcpt["a_failures"] == ["tests/a.py::test_a"] and absorbed == [NODE]
+    else:
+        assert rcpt["incomplete_files"] == ["tests/t.py"] and absorbed == [NODE]
+
+
+def test_mutation_main_drops_unexecuted_passes_residual_case(tmp_path, monkeypatch):
+    """mutant：main 傳給 quarantined_verdict 之 unexecuted 恆空 ⇒ 殘差未執行案 rc 0（即 04i 該案之紅來自資料流）。"""
+    real = g.quarantined_verdict
+
+    def drop_unexecuted(result, a_failures, incomplete, unexecuted, *rest, **k):
+        return real(result, a_failures, incomplete, [], *rest, **k)
+
+    monkeypatch.setattr(g, "quarantined_verdict", drop_unexecuted)
+    rc, rcpt, _ = _drive_main(tmp_path, monkeypatch, "residual_unexecuted")
+    assert rc == 0 and rcpt["pass"] is True
+
+
 def test_mutation_current_failures_reusing_old_sessions_absorbs_new_failure(qfx, monkeypatch):
     """mutant：當前四欄改取前史（不看呼叫前後新增與 argv_raw）⇒ 位置已變之新失敗被吸收（即 04c 之紅來自 session 選擇）。"""
     d = qfx["dir"]

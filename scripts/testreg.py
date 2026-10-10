@@ -24,7 +24,7 @@ TODO 凍結之介面（docs/manifests/TESTREG.json）：本檔目前只含簽章
 具名縫（呼叫端一律於呼叫當下以模組屬性取用，使 `monkeypatch.setattr(testreg, <名>, …)` 生效）：
   - 規則：`rule_v01`…`rule_v22`；`rule_v07` 由 `rule_v07_receipt_valid` 與 `rule_v07_change_requires_receipt` 組成。
   - 斷言多重集合比較：`multiset_decreased`；暫存區變更清單：`staged_changes`；形狀驗證（V17 共用實作）：`validate_shape`。
-  - bootstrap 之票代號：`ticket_of`；產出端呼叫者反推：`helper_callers`。
+  - bootstrap 之票代號：`ticket_of`；產出端呼叫者反推：`helper_callers`（完整）與 `decreased_defs`（差量判定）。
   - 複查訊號：`signal_<名>`，名＝schema `enums.review_signal` 之各值。
   - 挑選：`combine_sources`、`domain_prefix`、`import_closure`、`shared_infra_scope`。
 """
@@ -313,6 +313,13 @@ def check(repo_root: Path, *, paths: Sequence[str] = (), manifest: Optional[str]
 def helper_callers(repo_root: Path, helper_path: str, tree: str = "worktree") -> List[str]:
     """tests/ 下非測試檔（conftest、fixtures、helper 模組）變更時，依 `assertion_nodes.inline_rule` 受影響之全部呼叫者
     測試函式（函式層 nodeid，排序）。"""
+    raise NotImplementedError("TESTREG Task 1.5")
+
+
+def decreased_defs(repo_root: Path, helper_path: str, tree: str = "worktree") -> Optional[List[str]]:
+    """產出端差量判定：helper 檔於 HEAD 與受驗之樹間，自身斷言輪廓（本體斷言元素、參數預設值、模組層常數值）減少之
+    頂層定義名（排序）；模組層非定義敘述（import 等）改變 ⇒ None（呼叫端退回 `helper_callers` 完整反推）。
+    回傳空串列 ⇒ 不可能有呼叫者之展開減少，不必反推。"""
     raise NotImplementedError("TESTREG Task 1.5")
 
 

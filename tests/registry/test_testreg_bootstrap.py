@@ -1,10 +1,11 @@
 """TESTREG Task 1.2 驗收：`scripts/testreg.py bootstrap`（docs/TESTREG_SPEC.md；schema `bootstrap`）。
 
-暫存 git 倉驗 ticket_rule、defaults、paths_file、冪等與改名；真實 repo 驗建檔結果（642 檔全數有 entry、validate rc=0、
+暫存 git 倉驗 ticket_rule、defaults、paths_file、冪等與改名；真實 repo 驗建檔結果（全部 tracked 測試檔有 entry、paths_file 等於其加入提交之測試檔集合、validate rc=0、
 收據 handoffs/run_receipts/testreg-bootstrap.json 之 unknown 筆數與 catalog 一致）。實作前全部為紅。
 """
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import subprocess
@@ -133,6 +134,13 @@ def test_real_repo_catalog_complete_and_valid():
     assert tracked <= set(cat["entries"])
     boot = (REPO / PATHS_FILE).read_text(encoding="utf-8").splitlines()
     assert boot == sorted(boot) and len(boot) == len(set(boot))
+    # 規模不寫死（盤點 642 後本票新增測試檔）：paths_file 須等於其加入提交之樹中全部測試檔（git pathspec 萬用字元可跨 /）
+    add = subprocess.run(["git", "-C", str(REPO), "log", "--diff-filter=A", "--format=%H", "--", PATHS_FILE],
+                         capture_output=True, text=True, check=True).stdout.split()[-1]
+    tree = subprocess.run(["git", "-C", str(REPO), "ls-tree", "-r", "--name-only", add], capture_output=True, text=True,
+                          check=True).stdout.split()
+    assert boot == sorted(p for p in tree if fnmatch.fnmatchcase(p, "tests/test_*.py")
+                          or fnmatch.fnmatchcase(p, "tests/**/test_*.py"))
     proc = subprocess.run([PY, str(TESTREG), "validate"], capture_output=True, text=True, env=clean_env(), cwd=str(REPO))
     assert proc.returncode == 0, proc.stderr[-3000:]
 

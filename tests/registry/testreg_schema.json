@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 22,
+  "version": 23,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -252,7 +252,7 @@
     "desc": "Task 2.3 起 framepath_affected_gate 之 verdict 收據新增欄位",
     "fields": {"quarantined_failures": {"type": "array", "items": "types.quarantined_failure", "required": true, "desc": "非空時 verdict 仍可為 pass，但白話與審碼 brief 必列；只收 quarantine_match 成立之失敗"}, "tombstone_resolutions": {"type": "array", "items": "types.tombstone_resolution", "required": true}},
     "plan_receipt_fields": {"testreg_impact": {"type": "types.impact_result", "required": true}, "catalog_sha256": {"type": "string", "format": "hex", "required": true}, "previously_failed": {"type": "array", "items": "string", "items_format": "nodeid_param", "required": true}, "tombstone_resolutions": {"type": "array", "items": "types.tombstone_resolution", "required": true}, "must_check": {"type": "types.must_check", "required": true}},
-    "current_failure_source": "quarantine_match 之當前四欄取自本次 pytest 呼叫之 ledger session（閘之具名縫 current_failures(ledger_dir, before_names, test_file)）：閘於每次呼叫前記 ledger.dir 之檔名集合，呼叫後新增、且 argv_raw 有 token 等於該測試檔或以「該測試檔::」開頭者＝本次呼叫之 session，取其 outcome∈{failed,error} 之 test_record（沿用之舊結果檔亦沿用其 session_id，記於結果 meta）；caused nodeid 於此無紀錄 ⇒ 不得歸 quarantined_failures。編排：閘之 Runner 於每次 pytest 呼叫前記 ledger 檔名集合（ledger_snapshots），verdict 前以 classify_quarantine 呼叫 current_failures 與 split_quarantined",
+    "current_failure_source": "quarantine_match 之當前四欄取自本次 pytest 呼叫之 ledger session（閘之具名縫 current_failures(ledger_dir, before_names, test_file)）：閘於每次呼叫前記 ledger.dir 之檔名集合，呼叫後新增、且 argv_raw 有 token 等於該測試檔或以「該測試檔::」開頭者＝本次呼叫之 session，取其 outcome∈{failed,error} 之 test_record（沿用之舊結果檔亦沿用其 session_id，記於結果 meta）；caused nodeid 於此無紀錄 ⇒ 不得歸 quarantined_failures。編排：閘之 Runner 於每次 pytest 呼叫前記 ledger 檔名集合（ledger_snapshots；錨點呼叫 phase=anchor 不記、不覆寫——caused 之錨點重跑恆在 B／C 呼叫之後），verdict 前以 classify_quarantine 呼叫 current_failures 與 split_quarantined；main 之 ledger_dir＝REPO 下 ledger.dir、catalog 讀 REPO 下 tests/registry/catalog.json（皆經模組屬性 REPO 導出）、today＝當日",
     "quarantine_match": "當前 caused 失敗之 nodeid 有未逾期 quarantine，且其 (exception_type, exception_head, exception_origin, fail_line) 四欄等於該 quarantine.evidence 所指之某筆 failed／error 紀錄之同四欄 ⇒ 歸 quarantined_failures；任一欄不同（新失敗或不同位置）⇒ 照擋",
     "validation": "閘寫 plan 收據前依 V17 同法驗 plan_receipt_fields（含 min_items、max_items_ref），並驗 impact_universe；寫 verdict 收據前驗 fields 二欄；任一不符⇒閘 rc≠0、不得寫收據或 pass",
     "impact_universe": "testreg_impact.selected 之 path 集合與 excluded 之 path 集合互斥、各自無重複，且兩者聯集 == 受驗之樹中實際存在、符合 formats.test_path 之測試檔集合（不以 catalog.entries 鍵集合代之：V01 允許已全數立碑之已刪檔仍留 entry）"
