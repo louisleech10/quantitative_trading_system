@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 9,
+  "version": 10,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -87,8 +87,8 @@
       "ast.Call 其被呼叫者末段名稱符合 re `^(check|verify|validate|expect)_`（不論定義於 tests/ 或生產碼）"
     ],
     "assertion_helpers": "tests/ 下（含 conftest.py、fixtures/、測試模組）定義之函式中，其本體遞移地（經同為 tests/ 下之函式呼叫）含上列節點者之集合；以名稱＋定義檔解析，由 AST 機械導出",
-    "inline_rule": "計算某測試函式之斷言多重集合時，對其本體、其 fixture 參數所解析到之 tests/ 下 fixture 定義、以及依 pytest 可見範圍（同模組、各層 conftest.py）自動套用之 autouse fixture 定義中，每一斷言節點計入，每一呼叫 assertion_helpers 之節點，以該 helper 之斷言多重集合（遞移展開，遞迴環以已展開集合為止）取代；展開時做呼叫點引數代入：依 helper 簽名之靜態綁定（位置引數依序、關鍵字引數依名、未給者用預設值運算式）將呼叫點引數運算式（已於呼叫端做常數摺疊）代入 helper 斷言節點中之對應參數名，再於代入後之節點做 normalize ②③；helper 簽名含 *args／**kwargs 或呼叫點含 *x／**x 而無法靜態綁定者，該呼叫以單一不透明元素表示＝(helper 限定名, 各引數經 normalize 後之 dump, 該 helper 本身斷言多重集合（於 helper 範圍內 normalize）之 sha256)，故 helper 刪減斷言即改變此元素、使舊元素減少；展開所得每一元素帶 provenance＝(定義檔, 行號)，供 mutation 收據之 target_assertion_lines 以 file:line 表示。故抽出 helper 不改多重集合，修改 helper 刪除斷言則使每一呼叫者之多重集合減少",
-    "normalize": "三步：①常數摺疊：同一函式內僅被賦值一次且右值為 ast.Constant（含 tuple／list of Constant）之區域名，以及同測試檔模組層僅賦值一次之同類常數名，代入其出現處；②函式範圍序號化：以測試函式為範圍，凡於該函式內綁定之名（參數、Store 目標、for／with／except as、comprehension 變數，以及 inline 展開之 helper 區域名——其順位取呼叫點位置），依函式本體原始碼順序之首次綁定序改為 _0、_1…；未於函式內綁定之名（模組層名、import 之模組、內建名）保留原 id；Attribute 鏈之屬性名保留；③ast.dump(node, annotate_fields=True, include_attributes=False)。故改名與抽 helper（經引數代入）不算變化；改斷言所用之常數值、把 `a == b` 改為 `a == a`、或把 `assert a < b` 之運算元交換為 `assert b < a`（_0 < _1 變 _1 < _0）皆算舊元素減少；helper 含區域名而抽出後順位改變者可能誤判為減少，屬安全側，以 rewrite 收據通過"
+    "inline_rule": "計算某測試函式之斷言多重集合時，對其本體、其 fixture 參數所解析到之 tests/ 下 fixture 定義、以及依 pytest 可見範圍（同模組、各層 conftest.py）自動套用之 autouse fixture 定義中，每一斷言節點計入（上列各 fixture 之 fixture 參數依同一可見範圍遞迴解析，其定義一併納入，遞迴環以已納入者為止），每一呼叫 assertion_helpers 之節點，以該 helper 之斷言多重集合（遞移展開，遞迴環以已展開集合為止）取代；展開時做呼叫點引數代入：依 helper 簽名之靜態綁定（位置引數依序、關鍵字引數依名、未給者用預設值運算式）將呼叫點引數運算式（已於呼叫端做常數摺疊）代入 helper 斷言節點中之對應參數名，再於代入後之節點做 normalize ②③；helper 簽名含 *args／**kwargs 或呼叫點含 *x／**x 而無法靜態綁定者，該呼叫以單一不透明元素表示＝(helper 限定名, 各引數經 normalize 後之 dump, 該 helper 本身斷言多重集合（於 helper 範圍內 normalize）之 sha256)，故 helper 刪減斷言即改變此元素、使舊元素減少；展開所得每一元素帶 provenance＝(定義檔, 行號)，供 mutation 收據之 target_assertion_lines 以 file:line 表示。故抽出 helper 不改多重集合，修改 helper 刪除斷言則使每一呼叫者之多重集合減少",
+    "normalize": "三步：①常數摺疊：同一函式內僅被賦值一次且右值為 ast.Constant（含 tuple／list of Constant）之區域名，以及同測試檔模組層僅賦值一次之同類常數名，代入其出現處；②函式範圍序號化：以測試函式為範圍，只對「出現在（inline 展開後之）斷言節點中、且於該函式內綁定」之名編號（綁定＝參數、Store 目標、for／with／except as、comprehension 變數，以及 inline 展開之 helper 區域名——其順位取呼叫點位置）；此等名依其在函式本體原始碼之首次綁定位置排序後改為 _0、_1…（未出現在任何斷言節點之綁定不參與排序，故插入無關之區域賦值不改編號）；未於函式內綁定之名（模組層名、import 之模組、內建名）保留原 id；Attribute 鏈之屬性名保留；③ast.dump(node, annotate_fields=True, include_attributes=False)。故改名與抽 helper（經引數代入）不算變化；改斷言所用之常數值、把 `a == b` 改為 `a == a`、或把 `assert a < b` 之運算元交換為 `assert b < a`（_0 < _1 變 _1 < _0）皆算舊元素減少；helper 含區域名而抽出後順位改變者可能誤判為減少，屬安全側，以 rewrite 收據通過"
   },
   "receipts": {
     "E0": {
@@ -108,7 +108,7 @@
       "rule": [
         "E1＝完全重複：target 與 replacement 之 FunctionDef 經正規化（去函式名、去 lineno 等屬性）後 ast.dump 之 sha256 相等（含參數、decorator 含 parametrize、函式本體全部語句）",
         "兩者所用 fixture（明示參數＋依可見範圍自動套用之 autouse fixture）名稱集合相同，且各 fixture 解析到之定義之正規化 AST sha256 集合相等 ⇒ fixture_closure_sha256 相等",
-        "module_context＝函式所引用之模組層名之定義（賦值、def、class、import 敘述）之正規化 AST、模組層 pytestmark、所在類別之類別層 decorator 與 pytestmark；兩者 module_context_sha256 相等",
+        "module_context＝函式所引用之模組層名之定義（賦值、def、class、import 敘述）之正規化 AST、模組層 pytestmark、所在類別之類別層 decorator 與 pytestmark、所在類別之基底類別（遞移解析至 tests/ 外為止）之 AST，以及 pytest 生命週期方法（setup_method、teardown_method、setup_class、teardown_class、setup_module、teardown_module、setup_function、teardown_function，含繼承所得）之正規化 AST；兩者 module_context_sha256 相等",
         "replacement_nodeid ∈ 碑之 replaced_by，且其函式於受驗之樹存在（同 V09）",
         "不符完全重複者一律改用 E2"
       ]
@@ -118,11 +118,12 @@
       "mutants_item": {"id": "string", "patch_path": "string", "patch_sha256": "hex", "session_id": "uuid（套用該 patch 後執行 target 與全部 compare_nodeids 之單一 pytest session）", "target_outcome": "enums.outcome", "target_fail_loc": "string（file:line）|null", "compare_outcomes": "map nodeid→enums.outcome"},
       "binding_rule": "每一 mutant 之 session_id 所指 ledger session：head＝收據 head；diff_digest＝於 head 乾淨樹套用該 patch 後依 ledger.session_record.diff_digest 算法重算之值（validate 於暫存 worktree 重算）；該 session 之 test_record 含 target_nodeid 與每一 compare_nodeids（函式層比對，參數化取任一案例失敗即視為失敗），其 outcome 與 target_fail_loc（取該紀錄 fail_frames）逐一等於收據所載；ledger 不在本機⇒unverifiable 並 rc≠0",
       "rule": [
-        "用於 E2（compare_nodeids＝碑之 replaced_by）與 rewrite（compare_nodeids＝改寫後之 nodeid）",
+        "用於 E2 與 rewrite；compare_nodeids 之集合須等於：E2＝碑之 replaced_by 集合；rewrite＝改寫後 rewrite_targets 所涵蓋之全部函式層 nodeid 集合（rewrite_targets 為空＝該檔全部測試函式）；不得為子集或超集",
         "target_assertion_lines＝target 之斷言多重集合（含 inline_rule 展開者）之 provenance 位置清單（file:line），由 AST 機械導出並由 validate 重算比對",
         "mutants 至少 1 個；且至少 1 個 mutant 之 target_outcome∈{failed,error}（含 target_assertion_lines 為空之情形：其隱含斷言為『不拋例外』，須有使 target error 之 mutant）",
         "對每一 target_assertion_lines 之位置 P，至少一個 mutant 之 target_outcome∈{failed,error} 且 target_fail_loc＝P（target_fail_loc 取自 ledger 之 traceback：最後一個落在 target_assertion_lines 任一檔之 frame）",
-        "每一 target_outcome∈{failed,error} 之 mutant，compare_outcomes 中至少一個 ∈{failed,error}",
+        "每一 mutant 之 compare_outcomes 鍵集合恰等於 compare_nodeids 集合（無多無少）；每一 target_outcome∈{failed,error} 之 mutant，compare_outcomes 中至少一個 ∈{failed,error}",
+        "計為殺死之 mutant，其 target 紀錄之 phase_failed＝call（setup 或收集期失敗不計），且 fail_frames 至少一個落在 target 函式（或其 inline 展開之 helper）之行範圍內；無斷言 target 亦同",
         "每一 mutant 之 patch 只得修改 receipts.E0.production_roots 下之檔（不得改測試、conftest、fixtures）；無斷言 target 之殺 mutant 因而必經 target 實際執行之生產碼路徑",
         "收據含作者執行過之全部 mutant；patch_path 存在且 sha256 相符；mutant 集合之充分性由每子批審碼委員判（殘留 R5）"
       ]
@@ -208,7 +209,7 @@
     ],
     "domain_rule": "prefix(f)＝f 之前兩層路徑（不足兩層取一層）。import_closure(t)＝自測試檔 t 起，沿 repo 內模組之全部 Import／ImportFrom 節點（含函式內 import、from x import *、套件 __init__ 之 re-export）之遞移閉包。dyn_modules＝repo 內含 importlib.import_module 或 __import__ 且第一參數非字串常值之模組。domain(f)＝{t | import_closure(t) 含 prefix(f) 下任一模組} ∪ {t | import_closure(t) 含 dyn_modules 任一模組}",
     "shared_test_infra": {"conftest.py": "全部測試檔", "pytest.ini": "全部測試檔", "tests/conftest.py": "全部測試檔", "tests/fixtures/": "全部測試檔", "tests/registry/testreg_schema.json": "tests/registry/ 下全部測試檔", "tests/<dir>/conftest.py": "tests/<dir>/ 下全部測試檔"},
-    "gate_wiring": "framepath_affected_gate plan 於行程內直接呼叫 `scripts.testreg.impact(changed_paths: list[str], manifest: dict, phase: int, previously_failed: list[str]) -> dict`（不經中介檔；previously_failed 即 plan 自 summary 取出並納入 inputs_digest 之同一排序清單，impact 只用此參數、不自讀 summary）；changed_paths＝排序去重之 ( `git diff --name-only <anchor>` ∪ `git diff --name-only HEAD` ∪ `git ls-files --others --exclude-standard` )，三者皆扣除閘之 FP_EXCLUDES，涵蓋全部路徑（不限 tests/）；manifest 與 phase 即 plan 所收之同一 manifest 物件與 phase 整數，impact 之 must 以 framepath_affected_gate.manifest_groups(manifest, phase) 之回傳為準；回傳 {selected: [{path, reasons}], excluded: [{path, excluded_reason}]}，path 皆依 formats.test_path；nodeid 轉檔＝取 `::` 前段；完整回傳存入 plan 收據之 testreg_impact 欄；plan 之 inputs_digest 另納 tests/registry/catalog.json、tests/registry/testreg_schema.json、scripts/testreg.py 三檔之 sha256 與 previously_failed 之排序後 nodeid 清單；timing_dirs 中等於本次 --out 或位於其下者不納入 digest",
+    "gate_wiring": "framepath_affected_gate plan 於行程內直接呼叫 `scripts.testreg.impact(changed_paths: list[str], manifest: dict, phase: int, previously_failed: list[str]) -> dict`（不經中介檔；previously_failed 即 plan 自 summary 取出並納入 inputs_digest 之同一排序清單，impact 只用此參數、不自讀 summary）；changed_paths＝排序去重之 ( `git diff --name-only <anchor>` ∪ `git diff --name-only HEAD` ∪ `git ls-files --others --exclude-standard` )，三者皆扣除閘之 FP_EXCLUDES，涵蓋全部路徑（不限 tests/）；manifest 與 phase 即 plan 所收之同一 manifest 物件與 phase 整數，impact 之 must 以 framepath_affected_gate.manifest_groups(manifest, phase) 之回傳為準；回傳 {selected: [{path, reasons}], excluded: [{path, excluded_reason}]}，path 皆依 formats.test_path；nodeid 轉檔＝取 `::` 前段；完整回傳存入 plan 收據之 testreg_impact 欄；plan 之 inputs_digest 另納 plan 實際收到之 manifest 物件之正規 JSON（sort_keys、無空白）之 sha256，及 tests/registry/catalog.json、tests/registry/testreg_schema.json、scripts/testreg.py 三檔之 sha256 與 previously_failed 之排序後 nodeid 清單；timing_dirs 中等於本次 --out 或位於其下者不納入 digest",
     "gate_feed": [
       "於 collect 之前：manifest 中每一 nodeid／路徑若已立碑，以碑之 replaced_by 遞迴取代（循環⇒rc≠0）；E0 碑無 replaced_by ⇒ 記 tombstoned 排除且附碑；取代者加入原項所屬之同一組（原屬 A 者入 A）",
       "selected_files＝原計畫檔 ∪ impact.selected；被選中檔整檔執行；原計畫之每一 must nodeid（取代後）須出現在新計畫之 nodeid 集合（collect 後逐一核對，缺⇒rc≠0）",
@@ -221,7 +222,7 @@
     "plan_receipt_fields": {"testreg_impact": {"type": "types.impact_result", "required": true}, "catalog_sha256": {"type": "string", "format": "hex", "required": true}, "previously_failed": {"type": "array", "items": "string", "items_format": "nodeid_param", "required": true}},
     "quarantine_match": "當前 caused 失敗之 nodeid 有未逾期 quarantine，且其 (exception_type, exception_head, exception_origin, fail_line) 四欄等於該 quarantine.evidence 所指之某筆 failed／error 紀錄之同四欄 ⇒ 歸 quarantined_failures；任一欄不同（新失敗或不同位置）⇒ 照擋",
     "validation": "閘寫 plan 收據前依 V17 同法驗 plan_receipt_fields（含 min_items、max_items_ref），並驗 impact_universe；寫 verdict 收據前驗 fields 二欄；任一不符⇒閘 rc≠0、不得寫收據或 pass",
-    "impact_universe": "testreg_impact.selected 之 path 集合與 excluded 之 path 集合互斥、各自無重複，且兩者聯集 == 受驗之樹中全部符合 formats.test_path 之測試檔集合（即 catalog.entries 之鍵集合，V01／V02 保證兩者相同）"
+    "impact_universe": "testreg_impact.selected 之 path 集合與 excluded 之 path 集合互斥、各自無重複，且兩者聯集 == 受驗之樹中實際存在、符合 formats.test_path 之測試檔集合（不以 catalog.entries 鍵集合代之：V01 允許已全數立碑之已刪檔仍留 entry）"
   },
   "validation_rules": [
     {"id": "V01", "rule": "entries 每鍵為存在之測試檔，或其全部函式皆有碑"},
@@ -249,7 +250,8 @@
   "manifest_selection_keys": {"keys": ["test_files", "script_acceptance", "gate_cmd"], "prefixed_strings": "manifest 任一處之字串，其首個空白分隔 token ∈ {affected_tests, affected_must, affected_groups}（即 framepath_affected_gate.manifest_groups 所解析之列，例 batch_card.risk_mitigation）"},
   "manifest_status": {
     "manifest_closed": "讀 scripts/fact_keys.json 之 handoff-pending 區塊，依其 columns 找「權威路徑」與「狀態」兩欄之索引；存在某列其「權威路徑」欄 == manifest.spec_path 且「狀態」欄 == 已完成 ⇒ closed；找不到對應列或區塊／欄名不存在 ⇒ 未收案",
-    "manifest_tombstone_aware": "manifest 內每一 gate_cmd 字串以 shlex 切分；每一 token 須 re.fullmatch `[A-Za-z0-9_./=:,+-]+`（排除 $、`、(、)、<、>、;、&、|、引號等一切 shell 展開與運算字元）；去除開頭 NAME=value 環境指派後 argv[0]∈{venv/bin/python, python, python3}、argv[1]＝scripts/framepath_affected_gate.py；任一 gate_cmd 不符⇒否"
+    "manifest_tombstone_aware": "manifest 內每一 gate_cmd 字串以 shlex 切分；每一 token 須 re.fullmatch `[A-Za-z0-9_./=:,+-]+`（排除 $、`、(、)、<、>、;、&、|、引號等一切 shell 展開與運算字元）；去除開頭 NAME=value 環境指派後 argv[0]∈{venv/bin/python, python, python3}、argv[1]＝scripts/framepath_affected_gate.py，argv[2:] 只得由 gate_cmd_allowed_options 所列選項（及其值）組成，不得含 --plan、-h、--help 或任何未列選項；任一 gate_cmd 不符⇒否",
+    "gate_cmd_allowed_options": ["--out", "--anchor-worktree", "--timings", "--admit", "--max-seconds"]
   },
   "enums": {
     "file_disposition": ["keep", "rewrite"],
