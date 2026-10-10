@@ -1,0 +1,89 @@
+{
+  "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。",
+  "version": 1,
+  "catalog": {
+    "path": "tests/registry/catalog.json",
+    "tracked": true,
+    "entry_key": "path",
+    "fields": {
+      "path": {"type": "string", "writer": "bootstrap|author", "required": true, "desc": "repo 相對路徑，tests/**/test_*.py"},
+      "ticket": {"type": "string", "writer": "bootstrap|author", "required": true, "write_once": true, "desc": "建立該檔之票代號；bootstrap 由首次提交訊息之票標記導出，導不出寫 unknown"},
+      "guarantee": {"type": "array", "items": "charter_category", "writer": "committee|author", "required": true, "desc": "所守之章程類別；未分類＝[\"unclassified\"]"},
+      "oracle": {"type": "enum", "values_ref": "enums.oracle_level", "writer": "committee|author", "required": true},
+      "disposition": {"type": "enum", "values_ref": "enums.disposition", "writer": "committee", "required": true, "default": "keep"},
+      "disposition_ref": {"type": "string", "writer": "committee", "required_when": "disposition!=keep", "desc": "裁定所在之收斂檔路徑"},
+      "replaced_by": {"type": "array", "items": "nodeid|path", "writer": "committee", "required_when": "disposition in [merge, retire] and retire_evidence.level=E1"},
+      "quarantine": {"type": "array", "items": "quarantine_record", "writer": "committee", "required": false}
+    },
+    "tombstones": {
+      "desc": "已淘汰之 nodeid 或整檔；刪除與立碑同一提交",
+      "fields": {
+        "target": {"type": "string", "desc": "nodeid 或 path"},
+        "retire_evidence": {"type": "object", "fields": {"level": {"type": "enum", "values_ref": "enums.retire_evidence_level"}, "ref": {"type": "string", "desc": "證據檔路徑（收據／對照表／mutation 收據）"}}},
+        "disposition_ref": {"type": "string"},
+        "removed_in": {"type": "string", "desc": "提交 sha，寫入時填 pending，由下一次查詢以 git log 導出驗證"}
+      }
+    },
+    "quarantine_record": {
+      "nodeid": {"type": "string"},
+      "reason": {"type": "string"},
+      "evidence_ref": {"type": "string", "desc": "ledger 中同指紋結果翻轉之紀錄定位"},
+      "expires": {"type": "date", "desc": "YYYY-MM-DD；逾期即產出端與 pre-commit 報錯"}
+    },
+    "forbidden_fields": ["owner", "value_score", "purpose_freeform", "duration", "size", "last_run", "markers", "prod_modules", "test_count"]
+  },
+  "ledger": {
+    "dir": ".testreg/ledger",
+    "tracked": false,
+    "file_unit": "one JSONL file per pytest session; append-only",
+    "session_record": {
+      "session_id": "uuid4",
+      "started": "ISO-8601 UTC",
+      "head": "40-hex",
+      "diff_digest": "sha256 of `git diff HEAD --binary` plus untracked test/source paths content; empty tree ⇒ fixed literal clean",
+      "kline_identity": "size+mtime_ns+sha256 of first and last 1 MiB of data_cache/feature_klines/kline_cache.h5; absent ⇒ absent",
+      "env": "python version, platform, sorted PYTEST* and FFACT* env vars",
+      "argv": "pytest invocation args",
+      "nested": "never written: sessions with TESTREG_PARENT_SESSION set do not write"
+    },
+    "test_record": {
+      "session_id": "uuid4",
+      "nodeid": "string",
+      "outcome": {"values_ref": "enums.outcome"},
+      "duration_s": "setup+call+teardown wall seconds",
+      "phase_failed": "setup|call|teardown|none",
+      "markers": "applied marker names"
+    }
+  },
+  "summary": {
+    "path": ".testreg/summary.json",
+    "tracked": false,
+    "desc": "sessionfinish 增量合併；逐 nodeid 存最近 K 筆 (fingerprint, outcome, duration_s)；K 由實作期定、須 ≥5",
+    "rebuildable": "可由 ledger 全量重建；summary 毀損視同不存在"
+  },
+  "derived": {
+    "review_needed_signals": {"values_ref": "enums.review_signal"},
+    "size_class": {"desc": "由 summary 中位耗時自動歸級，閾值見 enums.size_class；無紀錄＝unknown"}
+  },
+  "impact": {
+    "output_fields": ["nodeid_or_path", "reasons", "excluded_reason"],
+    "reasons_ref": "enums.select_reason",
+    "excluded_reasons_ref": "enums.exclude_reason",
+    "rule": "輸出＝各 select_reason 之聯集；不存在使結果為空集合之分支；任何來源無法判定⇒加入 registry_unresolved 並擴大"
+  },
+  "enums": {
+    "disposition": ["keep", "rewrite", "merge", "retire"],
+    "oracle_level": ["golden_byte", "independent_oracle", "property", "smoke", "unclassified"],
+    "retire_evidence_level": {
+      "E0": "受測生產符號已全數刪除（AST 掃描收據，含 dead-scan 同法）",
+      "E1": "同一斷言由 replaced_by 所列測試覆蓋（逐斷言對照表）",
+      "E2": "mutation 轉移：對原測試所守之每一 mutant，replaced_by 測試皆紅（mutation 收據）"
+    },
+    "outcome": ["passed", "failed", "error", "skipped", "xfailed", "xpassed"],
+    "review_signal": ["prod_symbol_gone", "duration_regression", "outcome_flip_same_fingerprint", "collect_error", "allowed_red_owner_closed", "quarantine_expired"],
+    "size_class": {"small": "<1s", "medium": "<60s", "large": "<600s", "huge": ">=600s", "unknown": "no record"},
+    "select_reason": ["must", "changed_test", "static_taint", "dynamic_hit", "previously_failed", "registry_unresolved"],
+    "exclude_reason": ["outside_changed_dependency", "tombstoned", "not_collected"],
+    "charter_category": "A1..A22 of docs/TEST_DESIGN_CHARTER.md, or unclassified"
+  }
+}

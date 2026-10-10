@@ -726,6 +726,10 @@
       "LIVE-SPEC"
     ],
     [
+      "docs/TESTREG_SPEC.md",
+      "LIVE-SPEC"
+    ],
+    [
       "docs/TESTSPEED_SPEC.md",
       "LIVE-SPEC"
     ],
