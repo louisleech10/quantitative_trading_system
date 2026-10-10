@@ -1,7 +1,7 @@
 # TESTREG：測試清冊自動維護與受影響測試挑選 — SPEC
 
 > 來源 PLAN/診斷：`docs/TICKET_ORDER.md` 第 5a 步；諮詢 r1 收斂 `handoffs/reconcile/20261009-testreg-x-consult-r1/synth.md`（26 條全處置、三家 proceed；主委獨立版 `handoffs/20261009-testreg-x-consult-r1-claude.md`）；靜態盤點 `handoffs/run_receipts/testreg_probes/20261010-test-inventory.json`　|　日期：2026-10-10　|　對應 TODO：`docs/manifests/TESTREG.json`（SPEC 凍結後生成）
-> 版本：v17（v16 經審查 r16 收斂、使用者 2026-10-10 核可、戳記 R1；v17＝起草 TODO 時以暫存倉試作實證之修訂，契約 version 17，修訂項逐條列於 TODO 審查 brief `handoffs/20261010-TESTREG-TODO-REVIEW-R17-BRIEF.md`；待審查收斂與使用者白話審閱）
+> 版本：v17（v16 經審查 r16 收斂、使用者 2026-10-10 核可、戳記 R1；v17＝起草 TODO 時以暫存倉試作實證之修訂，契約 version 17，修訂項逐條列於 TODO 審查 brief `handoffs/20261010-TESTREG-X-REVIEW-R17-BRIEF.md`；待審查收斂與使用者白話審閱）
 > 契約單一真相源：`tests/registry/testreg_schema.json`（欄位、枚舉、證據收據格式、驗證規則 V01–V22、挑選規則、閘收據欄皆只定義於該檔；本 SPEC 以鍵名引用，不重列值）。
 
 ## §RISK 風險分級
