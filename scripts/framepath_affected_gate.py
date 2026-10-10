@@ -33,6 +33,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
@@ -230,12 +231,15 @@ def env_fingerprint(env: Mapping[str, str]) -> str:
 
 
 def state_key(repo: Path, test_file: str, phase: int, env: Optional[Mapping[str, str]] = None) -> str:
-    """結果檔沿用之狀態指紋：HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、測試檔內容、pytest 參數、phase、有效環境。"""
+    """結果檔沿用之狀態指紋：HEAD、相對 HEAD 之完整 diff、未追蹤檔清單、測試檔內容、pytest 參數、phase、有效環境。
+    已追蹤之 numba `__pycache__`（任一測試執行即改寫）與 `handoffs/`（收據與交接，非測試輸入）不計——否則中斷後
+    接續永遠無法沿用（實作期 b1 發現；與 `plan_inputs_digest` 同一排除）。"""
     h = hashlib.sha256()
+    skip = (":(exclude,glob)**/__pycache__/**", ":(exclude,glob)handoffs/**")
     for part in (
         _git(repo, "rev-parse", "HEAD"),
-        _git(repo, "diff", "--binary", "HEAD"),
-        _git(repo, "ls-files", "--others", "--exclude-standard"),
+        _git(repo, "diff", "--binary", "HEAD", "--", ".", *skip),
+        _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", *skip),
         (repo / test_file).read_bytes().decode("utf-8", "replace") if (repo / test_file).is_file() else "",
         json.dumps(PYTEST_FLAGS), str(phase), env_fingerprint(env if env is not None else os.environ),
     ):
@@ -273,6 +277,55 @@ def run_file(test_file: str, xml_path: Path, cwd: Path, env: Mapping[str, str],
     proc = _pytest([*PYTEST_FLAGS, *extra, f"--junitxml={xml_path}", *(nodeids or [test_file])], cwd, env)
     res = junit_results(xml_path.read_text(encoding="utf-8"), test_file) if xml_path.is_file() else {}
     return proc.returncode, res
+
+
+class Paused(Exception):
+    """已達本段時間預算：於兩次 pytest 呼叫之間正常停下（已完成之結果檔保留，下次以同一命令接續）。"""
+
+
+class Runner:
+    """逐次 pytest 呼叫之執行器（實作期 b1；使用者 2026-10-10「不要莫名被什麼時間上限砍掉，然後又重來」「卡住沒動或
+    跑太久也不知道也不允許」）：①同狀態指紋之結果檔沿用（中斷後接續不重跑）②已用時間逾 `max_seconds` 即不再開新呼叫、
+    丟 `Paused`（停在呼叫之間，不砍進行中之測試）③每次呼叫前後寫 `<out>/progress.json`（目前檔／nodeid、開始時刻、
+    已完成數、行程 pid），供外部監看判斷是否卡住。"""
+
+    def __init__(self, out: Path, max_seconds: Optional[float], total: int):
+        self.out, self.max_seconds, self.total = out, max_seconds, total
+        self.start = time.monotonic()
+        self.done = 0
+
+    def progress(self, phase: str, test_file: str, nodeids: Sequence[str], state: str = "running") -> None:
+        self.out.mkdir(parents=True, exist_ok=True)
+        (self.out / "progress.json").write_text(json.dumps({
+            "state": state, "phase": phase, "file": test_file, "nodeids": list(nodeids)[:5], "n_nodeids": len(nodeids),
+            "done": self.done, "total": self.total, "pid": os.getpid(), "updated_at": time.time(),
+            "segment_elapsed": round(time.monotonic() - self.start, 1)}, ensure_ascii=False), encoding="utf-8")
+
+    def run(self, test_file: str, xml: Path, cwd: Path, env: Mapping[str, str], nodeids: Optional[Sequence[str]],
+            extra: Sequence[str], key: str, count_ids: Sequence[str], phase: str = "BC",
+            probe_dir: Optional[Path] = None) -> Tuple[int, Dict[str, Dict[str, str]]]:
+        meta = xml.with_suffix(".meta.json")
+        if xml.is_file() and meta.is_file():
+            m = json.loads(meta.read_text(encoding="utf-8"))
+            if m.get("state_key") == key and m.get("rc") in RUN_RC_OK:
+                res = junit_results(xml.read_text(encoding="utf-8"), test_file)
+                if not set(count_ids) - set(res):
+                    self.done += len(count_ids)
+                    return m["rc"], res
+        if self.max_seconds is not None and time.monotonic() - self.start > self.max_seconds:
+            raise Paused(f"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}")
+        if probe_dir is not None:
+            probe_dir.mkdir(parents=True, exist_ok=True)
+            for stale in probe_dir.glob("*.json"):
+                stale.unlink()
+        self.progress(phase, test_file, count_ids)
+        t0 = time.monotonic()
+        rc, res = run_file(test_file, xml, cwd, env, nodeids, extra)
+        meta.write_text(json.dumps({"state_key": key, "rc": rc, "file": test_file,
+                                    "seconds": round(time.monotonic() - t0, 1)}), encoding="utf-8")
+        self.done += len(count_ids)
+        self.progress(phase, test_file, count_ids, state="finished-call")
+        return rc, res
 
 
 def resolve_anchor() -> str:
@@ -320,10 +373,12 @@ def _benign_ignored(path: str) -> bool:
     return "__pycache__/" in path or path.endswith(".pyc")
 
 
-def make_anchor_worktree(anchor: str) -> Path:
-    wt = Path(tempfile.mkdtemp(prefix="framepath_anchor_")) / "wt"
-    subprocess.run(["git", "-C", str(REPO), "worktree", "add", "--detach", str(wt), anchor], check=True,
-                   capture_output=True)
+def make_anchor_worktree(anchor: str, wt: Optional[Path] = None) -> Path:
+    """錨點工作樹：指定路徑已存在則沿用（接續時同一棵；仍由 `verify_anchor_worktree` 核驗），否則新建。"""
+    wt = wt or Path(tempfile.mkdtemp(prefix="framepath_anchor_")) / "wt"
+    if not wt.exists():
+        subprocess.run(["git", "-C", str(REPO), "worktree", "add", "--detach", str(wt), anchor], check=True,
+                       capture_output=True)
     return wt
 
 
@@ -989,7 +1044,7 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterabl
     （批准綁定確切輸入）。"""
     h = hashlib.sha256()
     no_cache = ":(exclude,glob)**/__pycache__/**"  # 已追蹤之 numba 快取於任何測試執行即改寫，非挑選輸入
-    own = ":(exclude,glob)handoffs/run_receipts/framepath-b*-affected*"  # 本執行器自身之收據輸出，非挑選輸入
+    own = ":(exclude,glob)handoffs/**"  # 收據與交接（含本執行器自身收據），非挑選輸入
     untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".", no_cache, own).splitlines()
     for part in (anchor, str(phase), _git(repo, "rev-parse", "HEAD"),
                  _git(repo, "diff", "--binary", "HEAD", "--", ".", no_cache)):
@@ -1152,6 +1207,8 @@ def main(argv: Sequence[str]) -> int:
                     help="估時來源目錄（其下 junit xml；可重複）；本執行器之結果目錄恆納入")
     ap.add_argument("--admit", default=None,
                     help="admission 非 within（估時未知或逾預算）時，呈報後以該次挑選之 inputs_digest 批准執行")
+    ap.add_argument("--max-seconds", type=float, default=3600.0,
+                    help="本段時間預算：已用逾此值即不再開新 pytest 呼叫、於呼叫之間停下（rc 3），同命令接續")
     args = ap.parse_args(argv)
     batch = current_batch()
     args.phase = BATCH_PHASE[batch]
@@ -1178,12 +1235,15 @@ def main(argv: Sequence[str]) -> int:
     if adm["status"] != "within" and args.admit != sel["inputs_digest"]:
         raise GateError(f"admission={adm['status']}（已知 {adm['known_seconds']} 秒、估時未知 {len(adm['unknown'])} 項、"
                         f"預算 {adm['budget_seconds']} 秒）：先 --plan 呈報，批准後以 --admit {sel['inputs_digest']} 執行")
-    anchor_wt = Path(args.anchor_worktree).resolve() if args.anchor_worktree else make_anchor_worktree(anchor)
+    anchor_wt = (Path(args.anchor_worktree).resolve() if args.anchor_worktree
+                 else make_anchor_worktree(anchor, out / f"anchor_{anchor[:12]}" / "wt"))
     verify_anchor_worktree(anchor_wt, anchor)
     if not (anchor_wt / "data_cache").exists():
         (anchor_wt / "data_cache").symlink_to(REPO / "data_cache")
     anchor_env = dict(os.environ, PYTHONPATH=str(anchor_wt))
     b_group, c_group = sel["groups"]["B"], sel["groups"]["C"]
+    global _RUNNER
+    runner = _RUNNER = Runner(out, args.max_seconds, len(a_ids) + len(sel["selected"]))
 
     a_failures: List[str] = []
     a_results: Dict[str, Dict[str, str]] = {}
@@ -1205,8 +1265,9 @@ def main(argv: Sequence[str]) -> int:
         ids = collect(f, REPO, env)
         name = "A_" + f.replace("/", "_")
         probe_dirs.append(probe_root / name)
-        rc, res = run_file(f, out / "a_junit" / (f.replace("/", "_") + ".xml"), REPO, probe_env(name, True), None,
-                           PROBE_PLUGIN_ARGS)
+        rc, res = runner.run(f, out / "a_junit" / (f.replace("/", "_") + ".xml"), REPO, probe_env(name, False), None,
+                             PROBE_PLUGIN_ARGS, state_key(REPO, f, args.phase, env), ids, phase="A",
+                             probe_dir=probe_root / name)
         a_results.update(res)
         a_failures += [n for n in ids if res.get(n, {}).get("outcome") != "passed"]
         if rc not in RUN_RC_OK:
@@ -1216,6 +1277,7 @@ def main(argv: Sequence[str]) -> int:
     batch: Dict[str, Dict[str, str]] = {}
     per_file: Dict[str, Dict[str, object]] = {}
     incomplete: List[str] = []
+    light = set(sel["light_files"])
     for f in b_group + c_group + list(sel["extra_files"]):
         all_ids = sel["collected"][f]
         ids = [n for n in all_ids if n in sel["selected"]]
@@ -1224,20 +1286,21 @@ def main(argv: Sequence[str]) -> int:
             per_file[f] = {"collected": len(all_ids), "expected": 0, "results": 0, "rc": None}
             continue
         whole = len(ids) == len(all_ids)
-        xml = out / "junit" / (f.replace("/", "_") + ".xml")
-        meta = xml.with_suffix(".meta.json")
         key = state_key(REPO, f, args.phase, env)
+        # 重型檔逐 nodeid 一次呼叫（各自結果檔與探針目錄、可於 nodeid 之間暫停接續）；輕量檔一次呼叫
+        chunks = [[n] for n in ids] if f not in light else [ids]
         res: Dict[str, Dict[str, str]] = {}
-        rc: Optional[int] = None
-        if xml.is_file() and meta.is_file():
-            m = json.loads(meta.read_text(encoding="utf-8"))
-            if m.get("state_key") == key and m.get("rc") in RUN_RC_OK:
-                res, rc = junit_results(xml.read_text(encoding="utf-8"), f), m["rc"]
-        name = "BC_" + f.replace("/", "_")
-        probe_dirs.append(probe_root / name)
-        if rc is None or set(ids) - set(res):
-            rc, res = run_file(f, xml, REPO, probe_env(name, True), None if whole else ids, PROBE_PLUGIN_ARGS)
-            meta.write_text(json.dumps({"state_key": key, "rc": rc, "file": f}), encoding="utf-8")
+        rcs: List[int] = []
+        for chunk in chunks:
+            tag = f.replace("/", "_") + ("" if len(chunks) == 1 else "__" + hashlib.sha256(chunk[0].encode()).hexdigest()[:12])
+            name = "BC_" + tag
+            probe_dirs.append(probe_root / name)
+            crc, cres = runner.run(f, out / "junit" / (tag + ".xml"), REPO, probe_env(name, False),
+                                   None if (whole and len(chunks) == 1) else chunk, PROBE_PLUGIN_ARGS,
+                                   key + "|" + "|".join(chunk), chunk, probe_dir=probe_root / name)
+            rcs.append(crc)
+            res.update(cres)
+        rc = max(rcs) if all(r in RUN_RC_OK for r in rcs) else next(r for r in rcs if r not in RUN_RC_OK)
         if rc not in RUN_RC_OK or set(ids) - set(res):
             incomplete.append(f)
         # 只計入選入之 nodeid（沿用之舊結果檔可能含整檔結果）；junit 名稱對不上者以 missing 擋下
@@ -1246,11 +1309,16 @@ def main(argv: Sequence[str]) -> int:
 
     not_passed = [n for n in expected if n in batch and batch[n]["outcome"] != "passed"]
     anchor_res: Dict[str, Dict[str, str]] = {}
+    anchor_key = _git(anchor_wt, "rev-parse", "HEAD").strip()
     for f in dict.fromkeys(n.split("::", 1)[0] for n in not_passed):
         ids = [n for n in not_passed if n.startswith(f + "::")]
         if (anchor_wt / f).is_file():
-            arc, res = run_file(f, out / "anchor_junit" / (f.replace("/", "_") + ".xml"), anchor_wt, anchor_env, ids)
-            anchor_res.update(anchor_usable(arc, res, ids))
+            for nid in ids:  # 錨點重跑亦逐 nodeid（可暫停接續）
+                tag = f.replace("/", "_") + "__" + hashlib.sha256(nid.encode()).hexdigest()[:12]
+                arc, res = runner.run(f, out / "anchor_junit" / (tag + ".xml"), anchor_wt, anchor_env, [nid], (),
+                                      f"anchor|{anchor_key}|{nid}", [nid], phase="anchor")
+                anchor_res.update(anchor_usable(arc, res, [nid]))
+    runner.progress("done", "", [])
     result = classify(expected, batch, anchor_res)
     hits = set().union(*(probe_hits(d) for d in probe_dirs)) if probe_dirs else set()
     unexecuted = sorted(set(sel["residual_defs"]) - hits)
@@ -1282,5 +1350,14 @@ def main(argv: Sequence[str]) -> int:
     return 0 if passed else 1
 
 
+_RUNNER: Optional[Runner] = None
+PAUSED_RC = 3
+
 if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except Paused as exc:
+        if _RUNNER is not None:
+            _RUNNER.progress("paused", "", [], state="paused")
+        print(f"FRAMEPATH affected gate：PAUSED（{exc}）；已完成之結果已保留，以同一命令接續")
+        raise SystemExit(PAUSED_RC)

@@ -1064,9 +1064,38 @@ def _filter_ignored(paths: Iterable[str]) -> List[str]:
     return sorted({p for p in paths if p.endswith(IGNORED_EXTS) and "__pycache__/" not in p})
 
 
+TICKET_COMMIT_RE = re.compile(r"framepath", re.IGNORECASE)
+_LOG_FMT = ("%x00%H%x1f%s%x1f%(trailers:key=Ticket-Batch,valueonly,separator=;)"
+            "%x1f%(trailers:key=Governance-Scope,valueonly,separator=;)")
+
+
+def split_commit_paths(log_text: str) -> Tuple[Set[str], Set[str]]:
+    """`git log --format=_LOG_FMT --name-only` 之輸出 → (本票提交所改路徑, 他票提交所改路徑)。本票提交＝標題或
+    Ticket-Batch／Governance-Scope 附註含 FRAMEPATH（不分大小寫）。"""
+    ticket: Set[str] = set()
+    foreign: Set[str] = set()
+    for block in log_text.split("\x00")[1:]:
+        head, _, files = block.partition("\n")
+        fields = (head.split("\x1f") + ["", "", "", ""])[:4]
+        paths = {p for p in files.splitlines() if p.strip()}
+        (ticket if TICKET_COMMIT_RE.search(" ".join(fields[1:])) else foreign).update(paths)
+    return ticket, foreign
+
+
+def foreign_only_paths() -> Set[str]:
+    """實作期 b1（並行他票提交）：錨點 6e07e0ad 至 HEAD 間只被他票提交改過、未被本票提交改過、且工作樹相對 HEAD
+    未改之路徑——他票之正常提交（如 Javis 信箱工具）不屬本票範圍，自 ⑤(a)／⑦ 之「錨點以來改動」中排除；本票提交
+    或工作樹（本批未提交改動）碰到者一律照常受檢。"""
+    ticket, foreign = split_commit_paths(_git("log", f"--format={_LOG_FMT}", "--name-only",
+                                              f"{HEAD_SHORT}..HEAD", "--").decode("utf-8", "replace"))
+    wt = {p for p in _git("diff", "--name-only", "HEAD").decode().splitlines() if p}
+    wt |= {p for p in _git("ls-files", "--others", "--exclude-standard").decode().splitlines() if p}
+    return foreign - ticket - wt
+
+
 def git_added_and_untracked() -> Set[str]:
     added = _git("diff", "--name-status", "--diff-filter=A", HEAD_SHORT, "--", *R_ROOTS).decode().splitlines()
-    out = {line.split("\t", 1)[1] for line in added if "\t" in line}
+    out = {line.split("\t", 1)[1] for line in added if "\t" in line} - foreign_only_paths()
     out |= {p for p in _git("ls-files", "--others", "--exclude-standard", "--", *R_ROOTS).decode().splitlines() if p}
     return out
 
@@ -1130,7 +1159,7 @@ def git_changed_paths() -> Set[str]:
     for line in _git("diff", "--name-status", "-M", HEAD_SHORT, "--", *DIFF_ROOTS).decode().splitlines():
         parts = line.split("\t")
         out.update(p for p in parts[1:] if p)
-    return out
+    return out - foreign_only_paths()
 
 
 LIVE_DOC_REGISTRY_REL = "scripts/live_doc_registry.json"
@@ -2130,6 +2159,45 @@ def test_mutation_affected_gate_r53_hardening(tmp_path):
     d1 = g.plan_inputs_digest(repo, anchor, 1, [tdir])
     xml.write_text('<testsuites><testcase classname="tests.t" name="a" time="2"/></testsuites>', encoding="utf-8")
     assert g.plan_inputs_digest(repo, anchor, 1, [tdir]) != d1
+
+
+def test_mutation_split_commit_paths_foreign_vs_ticket():
+    """實作期 b1：他票並行提交（如 Javis 信箱工具）之路徑不計入本票 ⑤(a)／⑦；本票提交（標題或附註含 FRAMEPATH）
+    之路徑照常受檢；同一路徑兩者皆改者屬本票。mutation：分類規則改成全部本票 ⇒ 他票路徑入本票（紅）。"""
+    log = ("\x00a1\x1fdocs(framepath): SPEC v21\x1f\x1fout-of-epic FRAMEPATH TODO\n\ndocs/FRAMEPATH_SPEC.md\nshared.txt\n"
+           "\x00b2\x1ffeat(javis): 信箱\x1f\x1fout-of-epic Javis 信箱工具\n\nscripts/javis_mail.sh\nshared.txt\n"
+           "\x00c3\x1frefactor: 刪 frame\x1f20260928-FRAMEPATH/b1\x1f\n\nmomentum/x.py\n")
+    ticket, foreign = split_commit_paths(log)
+    assert ticket == {"docs/FRAMEPATH_SPEC.md", "shared.txt", "momentum/x.py"}
+    assert foreign == {"scripts/javis_mail.sh", "shared.txt"}
+    assert foreign - ticket == {"scripts/javis_mail.sh"}
+    real_ticket, real_foreign = split_commit_paths(_git("log", f"--format={_LOG_FMT}", "--name-only",
+                                                        f"{HEAD_SHORT}..HEAD", "--").decode("utf-8", "replace"))
+    assert "scripts/javis_mail.sh" in real_foreign - real_ticket  # 本 repo 實況：Javis 信箱工具為他票
+    assert "docs/FRAMEPATH_SPEC.md" in real_ticket
+
+
+def test_mutation_affected_gate_runner_resume_pause_progress(tmp_path):
+    """實作期 b1（使用者 2026-10-10：不得被時間上限砍掉重來、卡住須可知）：同狀態指紋之結果檔沿用（不呼叫 pytest）；
+    無可沿用結果且本段已逾預算 ⇒ Paused（停在呼叫之間）；progress.json 記狀態、已完成數與 pid。mutation：沿用條件或
+    預算檢查撤回 ⇒ 紅。"""
+    g = _affected_gate()
+    out = tmp_path / "out"
+    xml = out / "junit" / "t.xml"
+    xml.parent.mkdir(parents=True)
+    xml.write_text('<testsuites><testcase classname="tests.test_cgsa_pipeline" name="test_x"/></testsuites>',
+                   encoding="utf-8")
+    xml.with_suffix(".meta.json").write_text(json.dumps({"state_key": "K", "rc": 0}), encoding="utf-8")
+    r = g.Runner(out, 0.0, 2)
+    rc, res = r.run("tests/test_cgsa_pipeline.py", xml, REPO, os.environ, None, (), "K",
+                    ["tests/test_cgsa_pipeline.py::test_x"])
+    assert rc == 0 and "tests/test_cgsa_pipeline.py::test_x" in res and r.done == 1
+    with pytest.raises(g.Paused):
+        r.run("tests/test_cgsa_pipeline.py", xml, REPO, os.environ, None, (), "OTHER",
+              ["tests/test_cgsa_pipeline.py::test_x"])
+    r.progress("paused", "", [], state="paused")
+    prog = json.loads((out / "progress.json").read_text(encoding="utf-8"))
+    assert prog["state"] == "paused" and prog["done"] == 1 and prog["total"] == 2 and prog["pid"] == os.getpid()
 
 
 def test_affected_gate_def_probe_records_calls(tmp_path):
