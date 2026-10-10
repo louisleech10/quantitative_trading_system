@@ -82,6 +82,20 @@ def test_registration_only_from_loaded_conftest_or_plugins(tmp_path):
     assert proc.returncode != 0 and len(lines) == 1 and "via_helper" in lines[0], proc.stderr
 
 
+def test_repo_root_conftest_and_its_plugins_registration_allowed(tmp_path):
+    """repo 根之 conftest.py 及其 pytest_plugins 所列外掛之字面註冊亦承認（忽略根層之掃描器即紅）。"""
+    root_conftest = ('pytest_plugins = ["rootplug"]\n\n\ndef pytest_configure(config):\n'
+                     '    config.addinivalue_line("markers", "root_reg: root conftest")\n')
+    rootplug = 'def pytest_configure(config):\n    config.addinivalue_line("markers", "rootplug_reg: root plugin")\n'
+    test = ("import pytest\n\n\n@pytest.mark.root_reg\ndef test_x():\n    assert True\n\n\n"
+            "@pytest.mark.rootplug_reg\ndef test_y():\n    assert True\n")
+    r = make_repo(tmp_path, {"conftest.py": root_conftest, "rootplug.py": rootplug, "tests/test_m.py": test},
+                  catalog=False)
+    r.write("pytest.ini", INI_HEAD)
+    proc = r.run("markers")
+    assert proc.returncode == 0, proc.stderr
+
+
 def test_builtin_markers_allowed(tmp_path):
     src = ("import pytest\n\n\n@pytest.mark.parametrize('a', [1])\n@pytest.mark.skipif(False, reason='r')\n"
            "@pytest.mark.xfail(reason='r')\n@pytest.mark.usefixtures('tmp_path')\n@pytest.mark.filterwarnings('ignore')\n"

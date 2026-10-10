@@ -497,6 +497,40 @@ def test_04g_gate_main_uses_quarantined_verdict_only():
     pairs = {(k.value, v.id) for d in dicts for k, v in zip(d.keys, d.values)
              if isinstance(k, ast.Constant) and isinstance(v, ast.Name)}
     assert ("pass", ok_name) in pairs and ("quarantined_failures", qf_name) in pairs
+
+
+def test_04h_gate_main_verdict_statement_form():
+    """main 之裁決敘述形狀固定（自然接線錯誤即紅；刻意以別名／動態呼叫繞過屬 §N R6）：
+    ① `quarantined_verdict` 之前五個引數依序為 `result, a_failures, incomplete, unexecuted, runner` 之名稱；
+    ② `result` 為 `classify(...)` 之回傳、`a_failures`／`incomplete` 於 main 內有累加（`+=`／append／extend）、
+       `unexecuted` 由非字面運算式指定（不得只綁空串列）；③ main 之結束碼敘述為 `return 0 if <裁決名> else 1`。"""
+    tree = ast.parse((REPO / "scripts/framepath_affected_gate.py").read_text(encoding="utf-8"))
+    main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+    call = next(n.value for n in ast.walk(main) if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call)
+                and isinstance(n.value.func, ast.Name) and n.value.func.id == "quarantined_verdict")
+    names = [a.id if isinstance(a, ast.Name) else None for a in call.args[:5]]
+    assert names == ["result", "a_failures", "incomplete", "unexecuted", "runner"], names
+    binds: Dict[str, List[ast.AST]] = {}
+    for n in ast.walk(main):
+        if isinstance(n, ast.Assign):
+            for t in n.targets:
+                if isinstance(t, ast.Name):
+                    binds.setdefault(t.id, []).append(n.value)
+        elif isinstance(n, ast.AugAssign) and isinstance(n.target, ast.Name):
+            binds.setdefault(n.target.id, []).append(n)
+    assert any(isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and v.func.id == "classify"
+               for v in binds.get("result", []))
+    grows = {n.func.value.id for n in ast.walk(main) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+             and n.func.attr in ("append", "extend") and isinstance(n.func.value, ast.Name)}
+    for nm in ("a_failures", "incomplete"):
+        assert nm in grows or any(isinstance(v, ast.AugAssign) for v in binds.get(nm, [])), nm
+    assert binds.get("unexecuted") and all(not isinstance(v, (ast.List, ast.Tuple, ast.Constant))
+                                           for v in binds["unexecuted"])
+    ok_name = next(n.targets[0].elts[0].id for n in ast.walk(main) if isinstance(n, ast.Assign)
+                   and isinstance(n.value, ast.Call) and getattr(n.value.func, "id", "") == "quarantined_verdict")
+    rets = [n.value for n in ast.walk(main) if isinstance(n, ast.Return) and isinstance(n.value, ast.IfExp)]
+    assert any(isinstance(r.test, ast.Name) and r.test.id == ok_name and getattr(r.body, "value", None) == 0
+               and getattr(r.orelse, "value", None) == 1 for r in rets)
     qv = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "quarantined_verdict")
     inner = {c.func.id for c in ast.walk(qv) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
     assert {"classify_quarantine", "verdict"} <= inner

@@ -7,6 +7,7 @@ hook 案例以 PostToolUse payload 呼叫暫存倉內之 hook 複本（repo 根�
 """
 from __future__ import annotations
 
+import ast
 import importlib
 import json
 import statistics
@@ -467,9 +468,49 @@ def test_boundary_04_add_assertion_rc0(tmp_path):
     assert _hook_rc(r, "tests/test_keep.py") == 0
 
 
-def test_boundary_05_helper_backprop_wall_clock_median_under_1s():
-    """真實 repo：tests/conftest.py（全部 fixture 之呼叫者反推）未改動而觸發 hook，10 次牆鐘中位 < 1 s。"""
-    times = _hook_times("tests/conftest.py")
+@pytest.fixture(scope="module")
+def head_worktree(tmp_path_factory):
+    """真實 repo HEAD 之 detached 工作樹（含 catalog；venv 以 symlink 共用），供改動共用 helper 之量測；用畢移除。"""
+    wt = tmp_path_factory.mktemp("headwt") / "wt"
+    subprocess.run(["git", "-C", str(REPO), "worktree", "add", "-q", "--detach", str(wt), "HEAD"], check=True,
+                   capture_output=True, env=clean_env())
+    (wt / "venv").symlink_to(REPO / "venv")
+    yield wt
+    subprocess.run(["git", "-C", str(REPO), "worktree", "remove", "--force", str(wt)], capture_output=True,
+                   env=clean_env())
+
+
+def _hook_times_at(root: Path, rel: str) -> list:
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(root / rel)}})
+    times = []
+    for _ in range(10):
+        t0 = time.perf_counter()
+        proc = subprocess.run(["bash", str(root / "scripts/testreg_write_guard.sh")], input=payload, capture_output=True,
+                              text=True, env=clean_env(), cwd=str(root))
+        times.append(time.perf_counter() - t0)
+        assert proc.returncode == 0, proc.stderr
+    return times
+
+
+@pytest.mark.parametrize("edit", ["unchanged", "comment_appended", "fixture_docstring_added"])
+def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, edit):
+    """真實規模（HEAD 全部測試檔）：tests/conftest.py 未改／加註解／為一個 fixture 加說明（皆不減斷言）後觸發 hook，
+    10 次牆鐘中位 < 1 s（實作須以差量判定：只對自身斷言輪廓減少之定義反推呼叫者——完整反推實測 245 秒）。"""
+    p = head_worktree / "tests/conftest.py"
+    src = p.read_text(encoding="utf-8")
+    if edit == "comment_appended":
+        p.write_text(src + "\n# 註解\n", encoding="utf-8")
+    elif edit == "fixture_docstring_added":
+        tree = ast.parse(src)
+        fx = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                  and any("fixture" in ast.dump(d) for d in n.decorator_list))
+        lines = src.splitlines(keepends=True)
+        lines.insert(fx.body[0].lineno - 1, ' ' * fx.body[0].col_offset + '"""說明。"""\n')
+        p.write_text("".join(lines), encoding="utf-8")
+    try:
+        times = _hook_times_at(head_worktree, "tests/conftest.py")
+    finally:
+        p.write_text(src, encoding="utf-8")
     assert statistics.median(times) < 1.0, times
 
 
