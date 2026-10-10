@@ -2161,6 +2161,35 @@ def test_mutation_affected_gate_r53_hardening(tmp_path):
     assert g.plan_inputs_digest(repo, anchor, 1, [tdir]) != d1
 
 
+def test_mutation_affected_gate_r59_anchor_restore_and_collect_progress(tmp_path, monkeypatch):
+    """審查 r59：①Runner 呼叫前還原的是本次呼叫之工作樹（錨點呼叫還原錨點樹之清冊）②collect 前後寫 progress.json，
+    逾時具名停下（collect-timeout）。mutation：還原寫死主 REPO、collect 無逾時 ⇒ 紅。"""
+    g = _affected_gate()
+    other, _ = _git_tmp_repo(tmp_path / "anchor", {"tests/golden/l65/test_inventory.txt": "anchor-head\n"})
+    inv = other / "tests/golden/l65/test_inventory.txt"
+    inv.write_text("regenerated\n", encoding="utf-8")
+    seen = {}
+
+    def fake_run_file(test_file, xml, cwd, env, nodeids=None, extra=()):
+        seen["inv"] = inv.read_text(encoding="utf-8")
+        return 0, {"t::x": {"outcome": "passed", "type": "", "message": ""}}
+
+    monkeypatch.setattr(g, "run_file", fake_run_file)
+    r = g.Runner(tmp_path / "out", None, 1)
+    r.run("t", tmp_path / "out" / "j.xml", other, os.environ, ["t::x"], (), "K", ["t::x"], phase="anchor")
+    assert seen["inv"] == "anchor-head\n"
+
+    (tmp_path / "slow").mkdir()
+    (tmp_path / "slow" / "test_slow_import.py").write_text("import time\ntime.sleep(30)\n\ndef test_a():\n    pass\n",
+                                                          encoding="utf-8")
+    monkeypatch.setattr(g, "COLLECT_TIMEOUT_SECONDS", 2)
+    monkeypatch.setattr(g, "_RUNNER", g.Runner(tmp_path / "out2", None, 0))
+    with pytest.raises(g.GateError):
+        g.collect("test_slow_import.py", tmp_path / "slow", dict(os.environ, PYTHONPATH=str(REPO)))
+    prog = json.loads((tmp_path / "out2" / "progress.json").read_text(encoding="utf-8"))
+    assert prog["phase"] == "collect" and prog["state"] == "collect-timeout" and prog["file"] == "test_slow_import.py"
+
+
 def test_mutation_split_commit_paths_foreign_vs_ticket():
     """實作期 b1：他票並行提交（如 Javis 信箱工具）之路徑不計入本票 ⑤(a)／⑦；本票提交（標題或附註含 FRAMEPATH）
     之路徑照常受檢；同一路徑兩者皆改者屬本票。mutation：分類規則改成全部本票 ⇒ 他票路徑入本票（紅）。"""

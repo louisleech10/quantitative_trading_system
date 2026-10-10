@@ -6,9 +6,9 @@
 2. B／C 組：manifest `affected_tests phase=<P>` 所列檔扣 A 組，逐檔 `pytest --collect-only -qq`（rc 須 0，否則拒跑）；
    應跑集合 E 由 `plan` 挑選（S1 處置操作所及／S2 會走被刪或被改分支／S3 靜態輕量檔整檔／必跑／對齊觸發），
    未選者逐項記 `skipped` 封閉理由；C 組（`affected_groups phase=<P> C=…`）排在 B 組之後，只影響順序。
-   `--plan` 只產挑選收據（秒級），供執行前估時。
-3. 逐檔執行寫 junit xml；結果檔附狀態指紋（repo HEAD、工作樹相對 HEAD 之完整 diff、未追蹤檔清單、該測試檔內容、
-   pytest 參數、phase），指紋相同且結果完整才沿用（中斷後接續），否則重跑；pytest rc 非 0／1 ⇒ 該檔視為未完成。
+   `--plan` 只產挑選與 admission 收據（不執行測試本體），供執行前估時。
+3. 逐檔執行寫 junit xml；結果檔附狀態指紋（排除後之 HEAD 檔案樹身分〔路徑＋blob，排除 numba 快取、handoffs/、生成之清冊〕、同排除之相對 HEAD diff 與未追蹤檔清單、該測試檔內容、
+   pytest 參數、phase、有效環境），指紋相同且結果完整才沿用（中斷後接續），否則重跑；pytest rc 非 0／1 ⇒ 該檔視為未完成。
 4. 非綠 nodeid 於錨點工作樹重跑同 nodeid；錨點＝本票最晚一筆實作許可之 round_start_head（`.claude/gate/audit.log`，
    與處置驗證器 ⓪ 同一函式），工作樹由本腳本自建（或 `--anchor-worktree` 指定）並驗：HEAD＝錨點、工作樹乾淨、
    生產碼（momentum／api／config）與碼態錨點 6e07e0ad 相同。結果類別＋例外型別＋訊息首行（只遮暫存路徑與位址、
@@ -281,15 +281,32 @@ def _git(repo: Path, *args: str) -> str:
     return proc.stdout
 
 
-def _pytest(args: Sequence[str], cwd: Path, env: Mapping[str, str]) -> subprocess.CompletedProcess:
+def _pytest(args: Sequence[str], cwd: Path, env: Mapping[str, str],
+            timeout: Optional[float] = None) -> subprocess.CompletedProcess:
     return subprocess.run([sys.executable, "-m", "pytest", *args], cwd=cwd, env=dict(env), capture_output=True,
-                          text=True)
+                          text=True, timeout=timeout)
+
+
+COLLECT_TIMEOUT_SECONDS = 900  # 單檔 collect-only（只匯入與收集，不執行測試本體）之上限；逾時即具名停下
 
 
 def collect(test_file: str, cwd: Path, env: Mapping[str, str]) -> List[str]:
     # 諮詢 r5 CODEX-R5-P1-01：本專案 pytest.ini 下 `-q` 輸出表頭與 `<Function …>`，`-qq` 才逐行輸出 nodeid
-    proc = _pytest(["--collect-only", "-qq", "-p", "no:cacheprovider", test_file], cwd, env)
+    # 審查 r59：collect 前後亦寫 progress.json（挑選與 A 組收集階段可監看），逾時具名停下（不無限等待）
+    runner = globals().get("_RUNNER")
+    if runner is not None:
+        runner.progress("collect", test_file, [])
+    try:
+        proc = _pytest(["--collect-only", "-qq", "-p", "no:cacheprovider", test_file], cwd, env,
+                       timeout=COLLECT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        restore_generated(cwd)
+        if runner is not None:
+            runner.progress("collect", test_file, [], state="collect-timeout")
+        raise GateError(f"{test_file} collect 逾 {COLLECT_TIMEOUT_SECONDS} 秒未返回（匯入或收集卡住）") from exc
     restore_generated(cwd)  # 審查 r58：collect-only 會改寫已追蹤清冊（tests/conftest.py），立即還原
+    if runner is not None:
+        runner.progress("collect", test_file, [], state="finished-call")
     ids = [ln.strip() for ln in proc.stdout.splitlines() if ln.startswith(test_file + "::")]
     if proc.returncode != 0 or not ids:
         raise GateError(f"{test_file} 收集失敗或為空 rc={proc.returncode}：{proc.stdout[-500:]}{proc.stderr[-500:]}")
@@ -349,7 +366,7 @@ class Runner:
             probe_dir.mkdir(parents=True, exist_ok=True)
             for stale in probe_dir.glob("*.json"):
                 stale.unlink()
-        restore_generated(REPO)  # 審查 r58：前一呼叫或挑選之 collect 所改寫之清冊先還原
+        restore_generated(cwd)  # 審查 r58／r59：本次呼叫之工作樹（主或錨點）之清冊先還原
         self.progress(phase, test_file, count_ids)
         t0 = time.monotonic()
         if meta.exists():
@@ -1249,6 +1266,8 @@ def main(argv: Sequence[str]) -> int:
     args.receipt = str(REPO / f"handoffs/run_receipts/framepath-b{batch}-affected.json")
     out = Path(args.out or Path(tempfile.gettempdir()) / f"framepath_affected_b{batch}").resolve()
     anchor = resolve_anchor()
+    global _RUNNER
+    runner = _RUNNER = Runner(out, args.max_seconds, 0)  # 審查 r59：挑選與收集階段即寫 progress.json
     env = dict(os.environ, FRAMEPATH_PHASE=str(args.phase), PYTHONPATH=str(REPO))
     manifest = json.loads((REPO / MANIFEST_REL).read_text(encoding="utf-8"))
     timing_dirs = [out, *[Path(t) for t in args.timings]]
@@ -1276,8 +1295,7 @@ def main(argv: Sequence[str]) -> int:
         (anchor_wt / "data_cache").symlink_to(REPO / "data_cache")
     anchor_env = dict(os.environ, PYTHONPATH=str(anchor_wt))
     b_group, c_group = sel["groups"]["B"], sel["groups"]["C"]
-    global _RUNNER
-    runner = _RUNNER = Runner(out, args.max_seconds, len(a_ids) + len(sel["selected"]))
+    runner.total = len(a_ids) + len(sel["selected"])
 
     a_failures: List[str] = []
     a_results: Dict[str, Dict[str, str]] = {}
