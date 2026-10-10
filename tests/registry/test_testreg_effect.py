@@ -61,6 +61,34 @@ def test_effect_report_values(tmp_path):
     assert rep["saved_seconds_per_full_run"] == pytest.approx(2.0 + 10.0 + 5.0 + 0.5)
 
 
+def test_effect_report_shape(tmp_path):
+    r = _repo(tmp_path)
+    for rep in (testreg.effect_report(r.root), testreg.effect_report(_repo(tmp_path / "u", {}).root)):
+        assert testreg.validate_shape(rep, {"type": "types.effect_report"}, schema()) == []
+        assert set(rep["evidence_levels"]) == set(schema()["enums"]["retire_evidence_level"])
+
+
+BAD_REPORTS = {
+    "extra_key": lambda rep: dict(rep, extra=1),
+    "wrong_type": lambda rep: dict(rep, retired_functions=str(rep["retired_functions"])),
+    "non_finite": lambda rep: dict(rep, saved_seconds_per_full_run=float("nan")),
+    "missing_level_key": lambda rep: dict(rep, evidence_levels={k: v for k, v in rep["evidence_levels"].items()
+                                                                if k != "E0"}),
+}
+
+
+@pytest.mark.parametrize("case", sorted(BAD_REPORTS))
+def test_effect_recompute_rejects_malformed_report(tmp_path, case):
+    """手寫報告之未知鍵／錯型／非有限值／缺等級鍵 ⇒ --recompute rc≠0（先驗形再逐欄比對）。"""
+    r = _repo(tmp_path)
+    rel = "handoffs/run_receipts/testreg-phase3-effect.json"
+    assert r.run("effect", "--out", rel).returncode == 0
+    rep = json.loads(r.read(rel))
+    r.write(rel, json.dumps(BAD_REPORTS[case](rep)))
+    proc = r.run("effect", "--recompute", rel)
+    assert proc.returncode != 0 and any(l.startswith("EFFECT ") for l in proc.stderr.splitlines()), proc.stderr
+
+
 def test_effect_scope_prefix(tmp_path):
     r = _repo(tmp_path)
     rep = testreg.effect_report(r.root, ["tests/feature_engineering/"])

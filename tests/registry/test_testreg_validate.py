@@ -339,11 +339,36 @@ def test_e1_variants_have_identical_function_text():
     assert all(body in v for v in E1_VARIANTS.values()) and body in E1_TESTS
 
 
+E1_DIFF_KEY = {"fixture_definition": "fixture_closure", "module_constant": "module_context",
+               "autouse_fixture": "fixture_closure", "pytestmark": "module_context"}
+
+
 @pytest.mark.parametrize("variant", sorted(E1_VARIANTS))
 def test_e1_context_differs_red(tmp_path, variant):
-    """fixture 定義不同而函式相同／所引用之模組層常數不同／autouse fixture 不同／pytestmark 不同 ⇒ 非完全重複 ⇒ V08。"""
+    """fixture 定義不同而函式相同／所引用之模組層常數不同／autouse fixture 不同／pytestmark 不同 ⇒ 非完全重複 ⇒ V08。
+    獨立斷言（不依收據）：兩者 ast 雜湊相同而該變體對應之情境雜湊不同——恆回相同雜湊之 e1_hashes 於此即紅。"""
     r = _e1_repo(tmp_path, {"tests/test_dup.py": E1_TESTS, "tests/test_other.py": E1_VARIANTS[variant]})
+    tgt = testreg.e1_hashes(r.root, "tests/test_other.py::test_b", "HEAD")
+    rep = testreg.e1_hashes(r.root, "tests/test_dup.py::test_a", "HEAD")
+    assert tgt["ast"] == rep["ast"] and tgt[E1_DIFF_KEY[variant]] != rep[E1_DIFF_KEY[variant]]
     _e1_retire(r, "tests/test_other.py::test_b", "tests/test_dup.py::test_a")
+    proc = _validate(r)
+    assert proc.returncode != 0 and rule_lines(proc, "V08"), proc.stderr
+
+
+@pytest.mark.parametrize("variant", sorted(E1_VARIANTS))
+def test_e1_forged_equal_hashes_recomputed_red(tmp_path, variant):
+    """偽造收據：把 target 之三雜湊照抄（宣稱完全重複）而兩者情境實際不同 ⇒ validate 重算不等 ⇒ V08。"""
+    r = _e1_repo(tmp_path, {"tests/test_dup.py": E1_TESTS, "tests/test_other.py": E1_VARIANTS[variant]})
+    tgt = testreg.e1_hashes(r.root, "tests/test_other.py::test_b", "HEAD")
+    rel = f"{RETIRE_DIR}/forged.json"
+    r.write_json(rel, {"nodeid": "tests/test_other.py::test_b", "head": r.head(),
+                       "replacement_nodeid": "tests/test_dup.py::test_a", "target_ast_sha256": tgt["ast"],
+                       "replacement_ast_sha256": tgt["ast"], "fixture_closure_sha256": tgt["fixture_closure"],
+                       "module_context_sha256": tgt["module_context"]})
+    r.add_tombstone({"nodeid": "tests/test_other.py::test_b", "evidence_level": "E1", "evidence_receipt": rel,
+                     "replaced_by": ["tests/test_dup.py::test_a"], "disposition_ref": REF})
+    _delete_function(r, "tests/test_other.py", "test_b")
     proc = _validate(r)
     assert proc.returncode != 0 and rule_lines(proc, "V08"), proc.stderr
 
@@ -635,8 +660,15 @@ def _omit_allclose(rc):
     return rc
 
 
+def _wrong_fingerprint(rc):
+    """合法 64-hex 但不等於各 session 之 duration_class（binding_rule ④）。"""
+    rc["fingerprint"] = "0" * 64 if rc["fingerprint"] != "0" * 64 else "1" * 64
+    return rc
+
+
 MUTATION_NEGATIVES = {
     "compare_nodeids_proper_subset_of_replaced_by": (lambda rc: rc, [f"{MF}::test_new", f"{MF}::test_dep"]),
+    "fingerprint_valid_hex_wrong_value": (_wrong_fingerprint, None),
     "compare_outcomes_unlisted_key": (_extra_compare_key, None),
     "assertion_line_without_killing_mutant": (lambda rc: _drop_mutant(rc, "m_scale"), None),
     "assert_allclose_line_not_listed": (_omit_allclose, None),
@@ -857,7 +889,7 @@ V14_CASES = {
     "description_string_not_counted": (_manifest("docs/OPEN_SPEC.md", rows=[
         "說明：tests/test_calc.py::test_add_twice 曾為重複"]), False),
     "closed_manifest": (_manifest("docs/DONE_SPEC.md", test_files=["tests/test_calc.py"]), False),
-    "aware_gate_phase3_subbatch": (_manifest("docs/OPEN_SPEC.md", gate_cmd=AWARE_GATE, rows=[
+    "aware_gate_cmd_allows_v14": (_manifest("docs/OPEN_SPEC.md", gate_cmd=AWARE_GATE, rows=[
         "affected_tests phase=1 tests/test_calc.py"]), False),
 }
 
@@ -993,6 +1025,15 @@ def test_three():
     assert value == 3
     assert value > 0
     assert value < 10
+
+
+def check_local(x):
+    assert x > 0
+    assert x < 9
+
+
+def test_local_helper():
+    check_local(add(1, 2))
 '''
 V19_OTHER = "from tests.helpers_v19 import check_four\nfrom momentum.calc import add\n\n\ndef test_shared_too():\n    check_four(add(3, 1))\n"
 V19_BASE = {"momentum/__init__.py": "", "momentum/calc.py": M_CALC.replace("import warnings\n\n\n", ""),
@@ -1010,6 +1051,10 @@ V19_EDITS = {
                              {"tests/test_v19.py::test_validate"}),
     "shared_helper_drops_assert": ("tests/helpers_v19.py", "    assert x > 0\n", "",
                                    {"tests/test_v19.py::test_shared", "tests/test_v19b.py::test_shared_too"}),
+    "local_helper_in_test_module_drops_assert": ("tests/test_v19.py", "    assert x < 9\n", "",
+                                                 {"tests/test_v19.py::test_local_helper"}),
+    "local_helper_param_rename_ok": ("tests/test_v19.py", "def check_local(x):\n    assert x > 0\n    assert x < 9\n",
+                                     "def check_local(y):\n    assert y > 0\n    assert y < 9\n", set()),
     "rename_local_variable": ("tests/test_v19.py", "    value = add(1, 2)\n    assert value == 3\n    assert value > 0\n"
                               "    assert value < 10\n", "    v = add(1, 2)\n    assert v == 3\n    assert v > 0\n"
                               "    assert v < 10\n", set()),

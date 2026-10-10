@@ -83,6 +83,22 @@ class HookCopy:
         self.path.write_text(body, encoding="utf-8")
 
 
+def test_02b_catalog_hook_checks_all_entries(tmp_path):
+    """寫 catalog.json 時 entry 規則對全部 entry：HEAD 已有一筆壞 entry（未經本次改動），本次只改另一筆 ⇒ 仍 rc≠0
+    且指名壞 entry；修正後 rc=0。"""
+    r = _repo(tmp_path, {**BASE, "tests/test_other.py": "def test_o():\n    assert True\n"})
+    cat = r.catalog()
+    cat["entries"]["tests/test_other.py"]["owner"] = "x"
+    r.set_catalog(cat)
+    r.commit("bad entry (無 pre-commit)")
+    r.put_entry(entry("tests/test_keep.py", disposition_ref=REF))
+    proc = r.hook(CATALOG_REL)
+    assert proc.returncode == 2 and any(l.startswith("V03 tests/test_other.py") for l in proc.stderr.splitlines()), \
+        proc.stderr
+    r.put_entry(entry("tests/test_other.py"))
+    assert _hook_rc(r, CATALOG_REL) == 0
+
+
 def test_mutation_hook_always_zero_misses_01(tmp_path):
     """mutant：hook 恆 rc=0 ⇒ ① 之案放行（即 ① 之紅來自 hook 判定）。"""
     r = _repo(tmp_path)
@@ -295,7 +311,19 @@ def test_function_level_import():
 def test_unrelated():
     assert add(1, 1) == 2
 '''
-FX_FILES = {**BASE, "tests/__init__.py": "", "tests/fixtures/__init__.py": "", "tests/fixtures/fx_helpers.py": HELPERS_FX,
+T_LOCAL = '''from momentum.calc import add
+
+
+def check_local(x):
+    assert x > 0
+    assert x < 9
+
+
+def test_local():
+    check_local(add(1, 2))
+'''
+FX_FILES = {**BASE, "tests/test_local.py": T_LOCAL, "tests/__init__.py": "", "tests/fixtures/__init__.py": "",
+            "tests/fixtures/fx_helpers.py": HELPERS_FX,
             "tests/conftest.py": CONFTEST, "tests/test_fx.py": T_FX, "tests/test_autouse.py": T_AUTOUSE,
             "tests/helpers/__init__.py": "", "tests/helpers/tolerances.py": TOL_MOD, "tests/helpers/checks.py": CHECKS_MOD,
             "tests/test_tol.py": T_TOL}
@@ -331,6 +359,11 @@ HOOK_CASES = {
     "07k_unrelated_assignment_ok": ("tests/test_fx.py", "    assert a < b\n", "    unused = 7\n    assert a < b\n", set()),
     "07l_fixture_dependency_of_autouse": ("tests/test_autouse.py", "    assert v == 2\n", "",
                                           {"tests/test_autouse.py::test_a", "tests/test_autouse.py::test_b"}),
+    "07o_local_helper_in_test_module_drops_assert": ("tests/test_local.py", "    assert x < 9\n", "",
+                                                     {"tests/test_local.py::test_local"}),
+    "07o_local_helper_param_rename_ok": ("tests/test_local.py", "def check_local(x):\n    assert x > 0\n"
+                                         "    assert x < 9\n", "def check_local(y):\n    assert y > 0\n    assert y < 9\n",
+                                         set()),
     "07m_module_constant_import_forms": ("tests/helpers/tolerances.py", "TOL = 1e-9\n", "TOL = 1e-3\n",
                                          {f"tests/test_tol.py::{n}" for n in (
                                              "test_from_import", "test_module_alias", "test_package_from_import",

@@ -6,8 +6,11 @@
 維持不動且須保持綠（回歸）。
 
 閘之新增具名縫（呼叫端以模組屬性取用）：`resolve_tombstones`、`expanded_nodeids`、`must_missing`、`quarantine_active`、
-`quarantine_match`、`split_quarantined`、`out_exclusion`、`check_out_dir`、`changed_paths`、`impact_universe_errors`、
-`validate_plan_receipt`；plan 經 `scripts.testreg.impact` 取 impact（模組屬性）。實作前為紅（AttributeError 或斷言）。
+`quarantine_match`、`split_quarantined`、`current_failures`、`out_exclusion`、`check_out_dir`、`changed_paths`、
+`impact_universe_errors`、`validate_plan_receipt`；plan 經 `scripts.testreg.impact` 取 impact（模組屬性）。
+`current_failures(ledger_dir, before_names, test_file)`＝契約 `gate_report.current_failure_source`：只取呼叫前不存在、且
+`argv_raw` 有 token 等於該測試檔或以「該測試檔::」開頭之 session 之 failed／error test_record；`split_quarantined` 對
+current 中無紀錄之 caused nodeid 一律不吸收。實作前為紅（AttributeError 或斷言）。
 """
 from __future__ import annotations
 
@@ -273,10 +276,11 @@ FAIL = {"exception_type": "AssertionError", "exception_head": "assert 1 == 2", "
         "fail_line": 5}
 
 
-def _write_ledger(d: Path, sid: str, outcome: str, rec: Dict[str, Any], nodeid: str = "tests/t.py::test_x[1]") -> None:
+def _write_ledger(d: Path, sid: str, outcome: str, rec: Dict[str, Any], nodeid: str = "tests/t.py::test_x[1]",
+                  argv: List[str] = ()) -> None:
     sess = {"kind": "session", "session_id": sid, "started": "2026-10-01T00:00:00Z", "head": "a" * 40,
             "diff_digest": "clean", "kline_sha256": "absent", "python": "py", "packages_digest": "b" * 64, "env": {},
-            "argv_norm": "{}", "argv_raw": [], "fingerprint": "c" * 64, "duration_class": "d" * 64}
+            "argv_norm": "{}", "argv_raw": list(argv), "fingerprint": "c" * 64, "duration_class": "d" * 64}
     test = {"kind": "test", "session_id": sid, "nodeid": nodeid, "order": 0, "outcome": outcome, "duration_s": 0.1,
             "phase_failed": "call" if outcome == "failed" else "none", "exception_type": rec.get("exception_type"),
             "exception_head": rec.get("exception_head"), "exception_origin": rec.get("exception_origin"),
@@ -340,6 +344,58 @@ def test_06_quarantine_mismatch_blocks(qfx, field, value):
     still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": cur}, qfx["catalog"](),
                                     qfx["dir"], TODAY)
     assert still == ["tests/t.py::test_x[1]"] and qf == []
+
+
+def _ledger_names(d: Path) -> set:
+    return {p.name for p in d.glob("*.jsonl")}
+
+
+def test_04c_current_failures_only_from_new_session_matching_argv(qfx):
+    """C4：當前四欄只取「本次呼叫前後新增、且 argv_raw 含該測試檔」之 session；舊 session 與他檔之新 session 不採。"""
+    d = qfx["dir"]
+    before = _ledger_names(d)
+    moved = dict(FAIL, exception_origin="tests/t.py:9", fail_line=9)
+    s_other, s_this = str(uuid.uuid4()), str(uuid.uuid4())
+    _write_ledger(d, s_other, "failed", FAIL, argv=["tests/other.py"])
+    _write_ledger(d, s_this, "failed", moved, argv=["-q", "tests/t.py"])
+    cur = g.current_failures(d, before, "tests/t.py")
+    assert set(cur) == {"tests/t.py::test_x[1]"}
+    assert cur["tests/t.py::test_x[1]"]["exception_origin"] == "tests/t.py:9" and cur["tests/t.py::test_x[1]"]["fail_line"] == 9
+    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+    assert still == ["tests/t.py::test_x[1]"] and qf == []  # 新失敗位置不同 ⇒ 照擋（不得以前史四欄冒充）
+
+
+def test_04c_no_matching_new_session_never_quarantined(qfx):
+    d = qfx["dir"]
+    before = _ledger_names(d)
+    _write_ledger(d, str(uuid.uuid4()), "failed", FAIL, argv=["tests/other.py"])
+    cur = g.current_failures(d, before, "tests/t.py")
+    assert cur == {}
+    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+    assert still == ["tests/t.py::test_x[1]"] and qf == []
+
+
+def test_mutation_current_failures_reusing_old_sessions_absorbs_new_failure(qfx, monkeypatch):
+    """mutant：當前四欄改取前史（不看呼叫前後新增與 argv_raw）⇒ 位置已變之新失敗被吸收（即 04c 之紅來自 session 選擇）。"""
+    d = qfx["dir"]
+    before = _ledger_names(d)
+    _write_ledger(d, str(uuid.uuid4()), "failed", dict(FAIL, exception_origin="tests/t.py:9", fail_line=9),
+                  argv=["tests/t.py"])
+
+    def from_history(ledger_dir, before_names, test_file):
+        out = {}
+        for p in sorted(Path(ledger_dir).glob("*.jsonl")):
+            if p.name in before_names:
+                for line in p.read_text(encoding="utf-8").splitlines():
+                    r = json.loads(line)
+                    if r.get("kind") == "test" and r["outcome"] in ("failed", "error"):
+                        out[r["nodeid"]] = r
+        return out
+
+    monkeypatch.setattr(g, "current_failures", from_history)
+    cur = g.current_failures(d, before, "tests/t.py")
+    still, _ = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+    assert still == []
 
 
 def test_06b_evidence_other_nodeid_v12_red(tmp_path):

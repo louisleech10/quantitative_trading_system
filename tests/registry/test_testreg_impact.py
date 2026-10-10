@@ -138,6 +138,26 @@ def test_04c_dynamic_import_module_in_every_domain(tmp_path):
     assert "tests/test_dyn.py" in sel and "registry_unresolved" in sel["tests/test_dyn.py"]
 
 
+def test_domain_prefix_directory_levels():
+    """契約例：層＝目錄層、不含檔名。"""
+    assert testreg.domain_prefix("momentum/core/c.py") == "momentum/core"
+    assert testreg.domain_prefix("momentum/dyn.py") == "momentum"
+    assert testreg.domain_prefix("momentum/FeatureEngineering/timeframe/x.py") == "momentum/FeatureEngineering"
+    assert testreg.domain_prefix("run_api.py") == ""
+
+
+def test_mutation_domain_prefix_counts_filename_breaks_shallow_path(tmp_path, monkeypatch):
+    """mutant：prefix 取路徑前兩段（把檔名當一層）⇒ momentum/dyn.py 得 momentum/dyn.py，淺路徑之 domain 縮小。"""
+    r = _repo(tmp_path)
+    r.write("momentum/dyn.py", FILES["momentum/dyn.py"] + "\n\ndef again(n):\n    return __import__(n)\n")
+    want = {"tests/test_a.py", "tests/test_b.py", "tests/test_fact.py", "tests/test_dyn.py", "tests/test_d.py"}
+    sel = _sel(_impact(r, changed=["momentum/dyn.py"]))
+    assert {p for p, v in sel.items() if "registry_unresolved" in v} == want
+    monkeypatch.setattr(testreg, "domain_prefix", lambda p: "/".join(p.split("/")[:2]))
+    sel = _sel(testreg.impact(r.root, ["momentum/dyn.py"], [], []))
+    assert {p for p, v in sel.items() if "registry_unresolved" in v} != want
+
+
 def test_mutation_domain_one_layer_breaks_04(tmp_path, monkeypatch):
     r = _dyn_repo(tmp_path)
     monkeypatch.setattr(testreg, "domain_prefix", lambda p: p.split("/")[0])
@@ -312,5 +332,11 @@ def test_boundary_02_changed_file_fully_tombstoned_excluded_tombstoned(tmp_path)
     cat["tombstones"].append({"nodeid": "tests/test_d.py::test_d", "evidence_level": "E0",
                               "evidence_receipt": "handoffs/run_receipts/testreg-retire/x.json", "replaced_by": [],
                               "disposition_ref": "handoffs/reconcile/x/synth.md"})
+    cat["tombstones"].append({"nodeid": "tests/test_none.py::test_none", "evidence_level": "E0",
+                              "evidence_receipt": "handoffs/run_receipts/testreg-retire/y.json", "replaced_by": [],
+                              "disposition_ref": "handoffs/reconcile/x/synth.md"})
     r.set_catalog(cat)
-    assert _exc(_impact(r, changed=["tests/test_d.py"]))["tests/test_d.py"] == "tombstoned"
+    r.delete("tests/test_none.py")
+    res = _impact(r, changed=["tests/test_d.py", "tests/test_none.py"])
+    assert _exc(res)["tests/test_d.py"] == "tombstoned"
+    assert "tests/test_none.py" not in _sel(res) and "tests/test_none.py" not in _exc(res)

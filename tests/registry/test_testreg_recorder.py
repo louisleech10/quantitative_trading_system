@@ -97,7 +97,8 @@ EXPECT = {  # nodeid 尾 → (outcome, phase_failed, teardown_failed)，依 sche
     "test_teardown_fail_call_pass": ("error", "teardown", True),
     "test_call_and_teardown_fail": ("failed", "call", True),
     "test_call_skip_teardown_fail": ("error", "teardown", True),
-    "test_call_xfail_teardown_fail": ("error", "teardown", True),
+    # pytest 對帶 xfail 標記之測試，teardown 例外亦由 skipping 外掛改報為 skipped＋wasxfail（非 failed）⇒ 依彙整規則為 xfailed
+    "test_call_xfail_teardown_fail": ("xfailed", "none", False),
 }
 SIMPLE = {"tests/test_a.py": "def test_a1():\n    assert True\n\n\ndef test_a2():\n    assert 1 == 1\n",
           "tests/test_b.py": "def test_b1():\n    assert True\n"}
@@ -318,7 +319,9 @@ def test_mutation_recorder_raises_changes_rc(tmp_path):
     inj = Inject().prelude(RAISE_WRITE).setattr("safe", "lambda fn, *a, **k: fn(*a, **k)")
     r = _proj(tmp_path, FAILING, inj.conftest(), name="mut")
     proc, _ = recorded_pytest(r, "tests/test_mix.py")
-    assert proc.returncode != ref.returncode
+    notes = [l for l in proc.stderr.splitlines() if l.startswith("testreg-recorder:")]
+    # ③ 之通過條件＝rc 同未裝記錄器 且 恰一列單行告知；mutant 下（例外上拋）此條件必不成立
+    assert not (proc.returncode == ref.returncode and len(notes) == 1), proc.stderr
 
 
 # ── ⑤ fingerprint／duration_class ────────────────────────────────────────────────────────────────────
@@ -482,7 +485,7 @@ def test_collect_error_recorded(tmp_path):
     assert [c["path"] for c in colls] == ["tests/test_broken.py"]
     assert isinstance(colls[0]["exception_type"], str) and colls[0]["exception_type"]
     assert colls[0]["exception_head"] and len(colls[0]["exception_head"]) <= 300
-    assert [x for x in r.ledger(ids[0]) if x.get("kind") == "test"]  # 其他檔照常記錄
+    assert session_of(r, ids[0])["session_id"] == ids[0]  # 收集錯誤中止之 session 仍寫 ledger（pytest 預設不跑其餘測試）
 
 
 # ── 邊界 ─────────────────────────────────────────────────────────────────────────────────────────────

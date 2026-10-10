@@ -109,7 +109,8 @@ def validate(repo_root: Path, *, tree: str = "worktree", require_executed: bool 
 
 def validate_shape(value: Any, type_spec: Mapping[str, Any], schema: Mapping[str, Any], where: str = "") -> List[str]:
     """V17 之單一實作：依 type／format／items／items_format／items_enum／min_items／max_items_ref／min／finite／const／
-    key_format／additional_properties 與 types.* 遞迴驗形；catalog、summary、收據與閘收據共用。回傳錯誤訊息清單。"""
+    key_format／additional_properties／allow_unknown（數值欄另許字面 "unknown"）與 types.* 遞迴驗形；catalog、summary、
+    收據、閘收據、子批收據、成效報告與 V-6 收據共用。回傳錯誤訊息清單。"""
     raise NotImplementedError("TESTREG Task 1.1")
 
 
@@ -359,8 +360,9 @@ def signal_quarantine_expired(ctx: Context, path: str) -> SignalValue:
 def impact(repo_root: Path, changed_paths: List[str], must_resolved: List[str],
            previously_failed: List[str]) -> Dict[str, List[Dict[str, Any]]]:
     """schema `impact`＋`gate_wiring` 之簽名：catalog、schema、AST 與測試檔集合一律自 repo_root 讀取；
-    回傳 {"selected": [{"path", "reasons"}], "excluded": [{"path", "excluded_reason"}]}；catalog validate 失敗 ⇒
-    TestregError（不輸出）；不存在使 selected 為空之分支。"""
+    回傳 {"selected": [{"path", "reasons"}], "excluded": [{"path", "excluded_reason"}]}；schema `impact.precheck_rules`
+    任一不符 ⇒ TestregError（不輸出；未登記之測試檔不拒跑而依 registry_unresolved 選入）；已立碑之檔依
+    `impact.tombstoned_rule`；不存在使 selected 為空之分支。"""
     raise NotImplementedError("TESTREG Task 2.2")
 
 
@@ -370,7 +372,8 @@ def combine_sources(sources: Mapping[str, Iterable[str]]) -> Dict[str, List[str]
 
 
 def domain_prefix(path: str) -> str:
-    """schema `impact.domain_rule` 之 prefix(f)：f 之前兩層路徑（不足兩層取一層）。"""
+    """schema `impact.domain_rule` 之 prefix(f)：f 所在目錄之前兩層目錄（層＝目錄層，不含檔名；不足兩層取一層；
+    repo 根層之檔為空字串）。"""
     raise NotImplementedError("TESTREG Task 2.2")
 
 
@@ -400,7 +403,8 @@ def run_subbatch(repo_root: Path, manifest_path: str, phase: int, base: str, *, 
     選測＝`impact`（must＝`must_from_manifest`；previously_failed 取自 summary）之 selected，整檔執行；執行器＝
     `framepath_affected_gate.Runner`（分段、`max_seconds` 用盡於呼叫之間停下回 3、同指紋沿用、progress.json）；非綠
     nodeid 於 base 之 detached worktree 重跑同 nodeid，以 `framepath_affected_gate.classify` 歸屬（模組屬性取用）；
-    收據寫 receipt；回傳 0＝本子批造成＝0 且無未完成檔、1＝否、3＝暫停。"""
+    收據形狀＝schema `types.subbatch_receipt`，寫入前驗形並驗 `subbatch_gate` 所列欄間關係；回傳 0＝本子批造成＝0
+    且無缺且無未完成檔、1＝否、3＝暫停（progress.json state＝paused）。"""
     raise NotImplementedError("TESTREG Task 3.2")
 
 
@@ -408,7 +412,7 @@ def run_subbatch(repo_root: Path, manifest_path: str, phase: int, base: str, *, 
 
 
 def effect_report(repo_root: Path, scope: Sequence[str] = ()) -> Dict[str, Any]:
-    """由 catalog 碑與 summary 重算（SPEC v17 C9 定義各欄）：retired_functions（碑數）、retired_files（工作樹已不存在
+    """由 catalog 碑與 summary 重算（形狀＝schema `types.effect_report`；欄位語意見 schema `effect_report`）：retired_functions（碑數）、retired_files（工作樹已不存在
     且其 entry 之函式皆有碑之檔數）、evidence_levels（各等級碑數）、saved_seconds_per_full_run（每一被淘汰函式層 nodeid
     之全部參數化 nodeid 於 summary 中 outcome=passed 紀錄之 duration_s 中位數之和；任一被淘汰 nodeid 無此紀錄 ⇒ 字面
     "unknown"，不寫 0、不外插）；scope 為碑 nodeid 之路徑前綴（空＝全部），記於報告 scope 欄。"""
