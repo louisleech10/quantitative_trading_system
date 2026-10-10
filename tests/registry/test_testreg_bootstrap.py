@@ -46,13 +46,14 @@ def test_bootstrap_writes_defaults_and_paths_file(tmp_path):
 
 
 def test_bootstrap_ticket_rule_trailer_subject_unknown(tmp_path):
+    """三檔內容須相異：內容相同時 `git log --follow` 會把後加入之檔視為前檔之改名而歸錯票（試作實證）。"""
     r = _repo(tmp_path)
-    r.write("tests/test_trailer.py", T)
+    r.write("tests/test_trailer.py", "def test_trailer():\n    assert 1 + 1 == 2\n")
     r.git("add", "-A")
     r.git("commit", "-q", "-m", "feat: x\n\nTicket-Batch: 20260928-FRAMEPATH/b1")
-    r.write("tests/test_subject.py", T)
+    r.write("tests/test_subject.py", "def test_subject():\n    assert 'a' * 3 == 'aaa'\n")
     r.commit("test(ffstat): y")
-    r.write("tests/test_none.py", T)
+    r.write("tests/test_none.py", "def test_none():\n    assert [1, 2][::-1] == [2, 1]\n")
     r.commit("misc change")
     assert r.run("bootstrap").returncode == 0
     tickets = {p: e["ticket"] for p, e in r.catalog()["entries"].items()}

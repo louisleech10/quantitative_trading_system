@@ -44,12 +44,15 @@ def _run(r: TmpRepo, base: str, tmp_path: Path, *extra: str):
 
 
 def _collected(r: TmpRepo, path: str) -> set:
-    """獨立 oracle：於暫存倉以真實 pytest --collect-only 取該檔之完整 nodeid（含類別方法與參數化）。"""
+    """獨立 oracle：於暫存倉以真實 pytest --collect-only 取該檔之完整 nodeid（含類別方法與參數化）。暫存倉之
+    pytest.ini 無 `-v` addopts，`-q` 才逐列印 nodeid（`-qq` 只印檔案彙總；真實 repo 因 addopts 含 -v 而相反）。"""
     import subprocess
     from tests.registry.testreg_helpers import PY, clean_env
-    proc = subprocess.run([PY, "-m", "pytest", "--collect-only", "-qq", "-p", "no:cacheprovider", path], cwd=str(r.root),
+    proc = subprocess.run([PY, "-m", "pytest", "--collect-only", "-q", "-p", "no:cacheprovider", path], cwd=str(r.root),
                           capture_output=True, text=True, env=clean_env(PYTHONPATH=str(r.root)))
-    return {l.strip() for l in proc.stdout.splitlines() if l.startswith(path + "::")}
+    ids = {l.strip() for l in proc.stdout.splitlines() if l.startswith(path + "::")}
+    assert ids, proc.stdout + proc.stderr  # oracle 不得為空（空集合會使比較失去意義）
+    return ids
 
 
 RICH_RW = ('import pytest\nfrom momentum.m import f\n\n\ndef test_r1():\n    assert f() == 1\n    assert f() > 0\n\n\n'

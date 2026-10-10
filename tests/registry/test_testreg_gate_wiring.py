@@ -460,13 +460,43 @@ def test_mutation_quarantined_verdict_without_classify_blocks(qfx, tmp_path, mon
     assert ok is False
 
 
+@pytest.mark.parametrize("other", ["a_failures", "incomplete", "unexecuted", "missing", "unexpected"])
+def test_04f_other_failure_inputs_never_absorbed(qfx, tmp_path, monkeypatch, other):
+    """caused 全被隔離吸收時，其餘任一失敗輸入（A 組失敗、未完成檔、殘差未執行、缺、多出）非空 ⇒ 仍不 pass。"""
+    runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
+    result = _result(["tests/t.py::test_x[1]"])
+    a_f, inc, unexe = [], [], []
+    if other == "a_failures":
+        a_f = ["tests/a.py::test_a"]
+    elif other == "incomplete":
+        inc = ["tests/b.py"]
+    elif other == "unexecuted":
+        unexe = ["momentum/x.py:f"]
+    else:
+        result[other] = ["tests/c.py::test_c"]
+    ok, qf = g.quarantined_verdict(result, a_f, inc, unexe, runner, qfx["catalog"](), qfx["dir"], TODAY)
+    assert ok is False and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
+
+
 def test_04g_gate_main_uses_quarantined_verdict_only():
-    """結構：閘 main 之 verdict 只經 quarantined_verdict（不直接呼叫 verdict／split_quarantined／current_failures）。"""
+    """結構：閘 main 之 verdict 只經 quarantined_verdict（不直接呼叫 verdict／split_quarantined／current_failures），
+    且其回傳值確為最終裁決：解構之第一名同時用於收據之 "pass" 與 main 之 return，第二名用於收據之
+    "quarantined_failures"。"""
     tree = ast.parse((REPO / "scripts/framepath_affected_gate.py").read_text(encoding="utf-8"))
     main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
     called = {c.func.id for c in ast.walk(main) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
     assert "quarantined_verdict" in called
     assert not called & {"verdict", "split_quarantined", "current_failures"}
+    asg = [n for n in ast.walk(main) if isinstance(n, ast.Assign) and isinstance(n.value, ast.Call)
+           and isinstance(n.value.func, ast.Name) and n.value.func.id == "quarantined_verdict"]
+    assert len(asg) == 1 and isinstance(asg[0].targets[0], ast.Tuple)
+    ok_name, qf_name = (e.id for e in asg[0].targets[0].elts)
+    rets = [n for n in ast.walk(main) if isinstance(n, ast.Return) and n.value is not None]
+    assert any(isinstance(x, ast.Name) and x.id == ok_name for r in rets for x in ast.walk(r.value))
+    dicts = [d for d in ast.walk(main) if isinstance(d, ast.Dict)]
+    pairs = {(k.value, v.id) for d in dicts for k, v in zip(d.keys, d.values)
+             if isinstance(k, ast.Constant) and isinstance(v, ast.Name)}
+    assert ("pass", ok_name) in pairs and ("quarantined_failures", qf_name) in pairs
     qv = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "quarantined_verdict")
     inner = {c.func.id for c in ast.walk(qv) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
     assert {"classify_quarantine", "verdict"} <= inner

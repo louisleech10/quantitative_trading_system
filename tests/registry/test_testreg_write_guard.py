@@ -391,7 +391,9 @@ def test_07b_delete_whole_function_hook_red(tmp_path):
 def test_07c_helper_change_lists_callers(tmp_path):
     r = _repo(tmp_path, FX_FILES)
     _edit(r, "tests/fixtures/fx_helpers.py", "    assert x < 100\n", "")
-    assert testreg.helper_callers(r.root, "tests/fixtures/fx_helpers.py") == ["tests/test_fx.py::test_uses_helper"]
+    # helper_callers 為檔層候選集合：該檔任一 helper 之呼叫者（試作實證；被報 V19 者另由 07c 案例斷言只有 test_uses_helper）
+    assert testreg.helper_callers(r.root, "tests/fixtures/fx_helpers.py") == [
+        "tests/test_fx.py::test_star", "tests/test_fx.py::test_threshold", "tests/test_fx.py::test_uses_helper"]
     proc = r.hook("tests/fixtures/fx_helpers.py")
     assert "tests/test_fx.py::test_uses_helper" in proc.stderr
 
