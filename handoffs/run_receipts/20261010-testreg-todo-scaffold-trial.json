@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "command": "venv/bin/python handoffs/run_receipts/testreg_probes/todo_scaffold_trial.py",
+  "exit_code": 0,
+  "output": "handoffs/run_receipts/testreg_probes/20261010-todo-scaffold-trial.txt",
+  "purpose": "TESTREG TODO 落點之腳手架試跑：不經記錄器，驗 tests/registry/test_testreg_validate.py 之 mutant 補丁可套、各情境之 junit 結果與失敗行號符合測試之構造",
+  "findings": [
+    "m_add 殺 test_old 於第 13 行、m_scale 於第 14 行、m_guard 於 setup（guard fixture 第 8 行）——與 _old_lines 之三行一致",
+    "m_legacy：test_dep 之 with pytest.deprecated_call()（第 23 行）失敗時 traceback 行號為第 24 行（區塊內 legacy()）⇒ SPEC v17 殺點改以斷言敘述之行範圍判定",
+    "m_raise 於 setup（val fixture 第 7 行）、m_raise3 於 call（target 函式第 11 行）——無斷言 target 之兩反例構造成立",
+    "E0 情境：test_guard_passes 通過、test_helper_gone 失敗行位於 tests/helper_gone.py:2，其餘目標於本檔失敗——①–⑦ 之前提成立"
+  ],
+  "honest_bounds": "未載入記錄器（記錄器為空殼）；ledger 欄位（fail_frames、exception_origin、diff_digest）之實際值待第 1 批實作後由 test_mreceipt_scenario_records 與 test_e0_records_shape 驗；暫存倉建於系統暫存目錄"
+}

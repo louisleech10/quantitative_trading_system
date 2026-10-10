@@ -1,0 +1,12 @@
+m_add {'test_old': 'failure tests/test_m.py:13', 'test_new': 'failure tests/test_m.py:18', 'test_dep': 'failure tests/test_m.py:25', 'test_dep_twin': 'failure tests/test_m.py:31'}
+m_scale {'test_old': 'failure tests/test_m.py:14', 'test_new': 'failure tests/test_m.py:19', 'test_dep': 'passed', 'test_dep_twin': 'passed'}
+m_guard {'test_old': 'error tests/test_m.py:8', 'test_new': 'error tests/test_m.py:8', 'test_dep': 'error tests/test_m.py:8', 'test_dep_twin': 'error tests/test_m.py:8'}
+m_noop {'test_old': 'passed', 'test_new': 'passed', 'test_dep': 'passed', 'test_dep_twin': 'passed'}
+m_legacy {'test_old': 'passed', 'test_new': 'passed', 'test_dep': 'failure tests/test_m.py:24', 'test_dep_twin': 'failure tests/test_m.py:30'}
+m_testfile {'test_old': 'failure tests/test_m.py:13', 'test_new': 'passed', 'test_dep': 'passed', 'test_dep_twin': 'passed'}
+m_raise {'test_noassert': 'error tests/test_n.py:7', 'test_noassert_twin': 'error tests/test_n.py:7'}
+m_raise3 {'test_noassert': 'failure tests/test_n.py:11', 'test_noassert_twin': 'failure tests/test_n.py:15'}
+rw+m_add {'test_old': 'failure tests/test_m.py:13'}
+ren+m_legacy {'test_dep_renamed': 'failure tests/test_m.py:30'}
+lines ['tests/test_m.py:8', 'tests/test_m.py:13', 'tests/test_m.py:14']
+e0 {'test_import_gone': 'failure tests/test_e0.py:13', 'test_attr_gone': 'failure tests/test_e0.py:18', 'test_guard_passes': 'passed', 'test_helper_gone': 'failure tests/test_e0.py:27,tests/helper_gone.py:2', 'test_never': 'failure tests/test_e0.py:31', 'test_tests_symbol': 'failure tests/test_e0.py:36', 'test_obj_attr': 'failure tests/test_e0.py:42', 'test_name_error': 'failure tests/test_e0.py:46', 'test_patched_then_deleted': 'failure tests/test_e0.py:52'}

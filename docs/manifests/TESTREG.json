@@ -1,0 +1,138 @@
+{
+  "spec_path": "docs/TESTREG_SPEC.md",
+  "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
+  "stub_modules": [],
+  "test_files": [
+    "tests/registry/test_testreg_validate.py",
+    "tests/registry/test_testreg_bootstrap.py",
+    "tests/registry/test_testreg_recorder.py",
+    "tests/registry/test_testreg_markers.py",
+    "tests/registry/test_testreg_write_guard.py",
+    "tests/registry/test_testreg_review.py",
+    "tests/registry/test_testreg_impact.py",
+    "tests/registry/test_testreg_gate_wiring.py",
+    "tests/registry/test_testreg_v6_profile.py",
+    "tests/registry/test_testreg_run.py",
+    "tests/registry/test_testreg_effect.py"
+  ],
+  "script_acceptance": [
+    "scripts/testreg.py",
+    "scripts/testreg_write_guard.sh",
+    "handoffs/run_receipts/testreg_probes/recorder_invariance.py",
+    "handoffs/run_receipts/testreg_probes/todo_scaffold_trial.py"
+  ],
+  "contract_jsons": [
+    "tests/registry/testreg_schema.json"
+  ],
+  "run_receipts": [
+    {
+      "path": "handoffs/run_receipts/20261010-testreg-todo-scaffold-trial.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/testreg_probes/todo_scaffold_trial.py",
+      "rc": 0,
+      "honest_bounds": "不經記錄器（空殼）；只驗 mutant 補丁可套與 junit 結果／失敗行號符合 test_testreg_validate.py 之構造；ledger 欄位之實值待第 1 批由 test_mreceipt_scenario_records 與 test_e0_records_shape 驗"
+    }
+  ],
+  "batch_card": {
+    "depends": [],
+    "touches": [
+      "scripts/testreg.py",
+      "scripts/testreg_write_guard.sh",
+      "tests/fixtures/testreg_recorder_plugin.py",
+      "tests/conftest.py",
+      ".gitignore",
+      "pytest.ini",
+      ".claude/settings.json",
+      "scripts/git_hooks/pre-commit",
+      "docs/GOV_ENFORCEMENT_REGISTRY.md",
+      "docs/GOV_ACTIVE_MECHANISMS.md",
+      "scripts/framepath_affected_gate.py",
+      "tests/registry/testreg_schema.json",
+      "tests/registry/testreg_helpers.py",
+      "tests/registry/test_testreg_validate.py",
+      "tests/registry/test_testreg_bootstrap.py",
+      "tests/registry/test_testreg_recorder.py",
+      "tests/registry/test_testreg_markers.py",
+      "tests/registry/test_testreg_write_guard.py",
+      "tests/registry/test_testreg_review.py",
+      "tests/registry/test_testreg_impact.py",
+      "tests/registry/test_testreg_gate_wiring.py",
+      "tests/registry/test_testreg_v6_profile.py",
+      "tests/registry/test_testreg_run.py",
+      "tests/registry/test_testreg_effect.py",
+      "handoffs/run_receipts/testreg_probes/recorder_invariance.py",
+      "handoffs/run_receipts/testreg_probes/todo_scaffold_trial.py",
+      "docs/TESTREG_SPEC.md",
+      "docs/manifests/TESTREG.json",
+      "docs/ROADMAP.md",
+      "HANDOFF.md",
+      "scripts/fact_keys.json"
+    ],
+    "callers_now": [
+      "tests/feature_engineering/test_framepath_disposition.py",
+      "docs/manifests/FRAMEPATH.json"
+    ],
+    "callers_later": [
+      "tests/registry/catalog.json",
+      "tests/registry/bootstrap_paths.txt",
+      "handoffs/run_receipts/testreg-bootstrap.json",
+      "handoffs/run_receipts/testreg-recorder-baseline.json",
+      "handoffs/run_receipts/testreg-recorder-verify.json",
+      "handoffs/run_receipts/testreg-v6-profile.json",
+      "handoffs/run_receipts/testreg-phase3-effect.json",
+      "handoffs/run_receipts/testreg-final-effect.json"
+    ],
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/registry/test_testreg_validate.py tests/registry/test_testreg_bootstrap.py tests/registry/test_testreg_recorder.py tests/registry/test_testreg_markers.py tests/registry/test_testreg_write_guard.py",
+    "forbidden": [
+      {"rule": "不得改 momentum／api／frontend 生產碼（SPEC §C）", "observable": true},
+      {"rule": "不得刪除或放寬既有測試斷言換綠；不得新增 skip／xfail；既有測試之斷言只可經 Task 3.2／4.2 之 rewrite（附 mutation 收據）或立碑（附證據收據）改變", "observable": true},
+      {"rule": "不得改 FRAMEPATH 凍結之驗收測試（tests/feature_engineering/test_framepath_disposition.py 等四支）與 docs/manifests/FRAMEPATH.json", "observable": true},
+      {"rule": "記錄器不得改 outcome、執行順序、rc；除 .testreg/ 外不得新增或改任何檔；記錄器例外不得上拋", "observable": true},
+      {"rule": "產出端 hook 與 pre-commit 檢查不得呼叫 pytest（含 --collect-only）、不得全量讀 ledger、不得讀 git 全史；單次牆鐘 10 次中位 < 1 s", "observable": true},
+      {"rule": "scripts/testreg.py 不得存任何枚舉值副本（一律讀 tests/registry/testreg_schema.json）", "observable": true},
+      {"rule": "不得安裝新 pytest 外掛；9 處 pytest.mark.timeout 宣告不得改動", "observable": true},
+      {"rule": "挑選器只得對既有必跑集合作加法與排序；review 訊號不得導致少跑", "observable": true},
+      {"rule": "tests/registry/ 之驗收須可獨立執行，不依賴 run_api.py（解耦規則 R6）", "observable": true},
+      {"rule": "不得以「未執行過」「年代久」「慢」為擬淘汰理由", "observable": false},
+      {"rule": "真實資料重測試單組串行，長跑一律經分段執行器與監看，不得被背景上限砍斷重來；委員輪執行中不跑重探針", "observable": false},
+      {"rule": "Task 2.4 不得以縮小資料窗或減少 symbol 數提速", "observable": true}
+    ],
+    "risk_mitigation": [
+      "affected_tests phase=3 tests/registry/test_testreg_validate.py tests/registry/test_testreg_bootstrap.py tests/registry/test_testreg_write_guard.py",
+      "affected_must phase=3 tests/registry/test_testreg_bootstrap.py::test_real_repo_catalog_complete_and_valid",
+      "affected_tests phase=4 tests/registry/test_testreg_validate.py tests/registry/test_testreg_bootstrap.py tests/registry/test_testreg_write_guard.py",
+      "affected_must phase=4 tests/registry/test_testreg_bootstrap.py::test_real_repo_catalog_complete_and_valid",
+      "分批：b1＝Phase 1（Task 1.1→1.5，gate_cmd 所列五檔全綠＋§G 收據比對）；b2＝Phase 2（Task 2.1–2.4：test_testreg_review.py、test_testreg_impact.py、test_testreg_gate_wiring.py、test_testreg_v6_profile.py，另 tests/feature_engineering/test_framepath_disposition.py -k affected_gate 既有案例回歸須綠）；b3＝Task 3.1 分類（委員三家獨立逐檔判定＋synth）；b4 起＝Task 3.2 子批（每子批 ≤20 個目標檔、單一提交、閘＝testreg.py run --phase 3）並以 Task 3.3 收 Phase 3（test_testreg_run.py、test_testreg_effect.py）；Phase 4 同法接續編號，Task 4.3 收案",
+      "SPEC v17（本 TODO 起草時以暫存倉試作實證之修訂，逐條見 handoffs/20261010-TESTREG-TODO-REVIEW-R17-BRIEF.md）：Task 2.3 驗收落新檔 test_testreg_gate_wiring.py；改寫／改名之收據以 compare_patch_path＋compare_session_id 綁定改寫後之樹；收據 fingerprint＝各 session 之 duration_class；斷言殺點以斷言敘述之行範圍判定（Python 3.9 with 型斷言行號落於區塊內）；assertion_helpers 呼叫優先展開；impact 前置檢查只依 precheck_rules（未登記檔不拒跑）；domain prefix 為目錄層；已立碑之存在檔 excluded＝tombstoned；allowed_red owner 查 handoff-pending 與 roadmap-status 兩區塊；子批閘＝testreg.py run；成效報告欄位定義；隔離失敗四欄取自本次呼叫之 ledger session",
+      "TODO 凍結之介面：scripts/testreg.py、tests/fixtures/testreg_recorder_plugin.py、handoffs/run_receipts/testreg_probes/recorder_invariance.py 目前只含簽章（NotImplementedError），其具名縫（rule_v01…rule_v22、rule_v07 兩半、multiset_decreased、staged_changes、validate_shape、e1_hashes、assertion_lines、ticket_of、helper_callers、signal_<名>、combine_sources、domain_prefix、import_closure、shared_infra_scope、must_from_manifest、run_subbatch；記錄器 safe／is_nested／argv_norm／sha256_file／kline_cache_key／read_summary／summary_lock／write_ledger）由 tests/registry/ 之 mutation 置換，實作期不得改名；需改者回 TODO 重審",
+      "閘之新增具名縫（Task 2.3，現不存在、測試以 AttributeError 為紅）：resolve_tombstones、expanded_nodeids、must_missing、quarantine_active、quarantine_match、split_quarantined、out_exclusion、check_out_dir、changed_paths、impact_universe_errors、validate_plan_receipt；plan 新增 out 參數並經 scripts.testreg.impact（模組屬性）取 impact",
+      "tests/registry/catalog.json 與 bootstrap_paths.txt 於 Task 1.2 由 bootstrap 產生（禁手寫），產生前不存在故列 callers_later；第 1 批提交時補入 touches",
+      "暫存倉測試一律以 testreg_helpers.make_repo 自建 git 倉並複製真實工具；子行程環境去除 TESTREG_PARENT_SESSION；記錄器 mutation 以暫存倉根層 conftest 之 setattr 置換（生產碼不含測試開關）",
+      "實作期每批：先跑本批測試檔（明列路徑、單組串行；真實 repo 牆鐘測試獨占機器），跑完 bash scripts/restore_golden_inventory.sh；收尾列暫存（pytest-of-louis、測試暫存倉、委員 /private/tmp 副本）刪除指令交使用者",
+      "stub_modules 為空之理由：本票不改 momentum／api／frontend 生產碼（SPEC §C）；新建者皆為治理腳本與測試基礎設施，列 script_acceptance／touches",
+      "本票不改數值計算、不觸 NaN／inf 閘與輸出大小（不可違反原則之資料品質條不適用）；IC 兩路皆不涉及"
+    ],
+    "coverage_risk": [
+      "Task 1.1 驗證：test_testreg_validate.py——A 節 V01–V22 正反例與逐規則恆真 mutation；B 節 E0 ①–⑦、E1 四變體＋基底類別、mutation 收據反例與 binding、改寫與改名之 compare_patch、V14／V16／V18／V19／V20／V21／V22；C 節 validate_shape 反例；D 節邊界 01／02 與無枚舉副本",
+      "Task 1.2 驗證：test_testreg_bootstrap.py——ticket_rule 三分支、defaults、冪等、收據、邊界 01／02、不跟改名之 mutation、真實 repo 建檔結果",
+      "Task 1.3 驗證：test_testreg_recorder.py——outcome 彙整 11 情形、失敗欄位、summary 重建五條件、巢狀、例外不改 rc、fingerprint 變／不變之參數、unstable、並行合併、kline 快取、收集錯誤、邊界 01／02、五支 mutation、§G 收據比對",
+      "Task 1.4 驗證：test_testreg_markers.py——註冊、9 處宣告不動、未註冊 rc≠0、註解字串不計、內建標記、邊界 01 清單形式、mutation",
+      "Task 1.5 驗證：test_testreg_write_guard.py——①–⑦n、邊界 01–05、⑧ 牆鐘、hook 掛載與 pre-commit 接線、四支 mutation",
+      "Task 2.1 驗證：test_testreg_review.py——六訊號正反例與反轉 mutation、owner 查表兩區塊與 unknown、邊界 01／02、不寫回 catalog",
+      "Task 2.2 驗證：test_testreg_impact.py——①–⑦、⑤b–⑤f、邊界 01／02、四支 mutation；期望集合由暫存倉之已知匯入圖寫出",
+      "Task 2.3 驗證：test_testreg_gate_wiring.py——①–⑪、邊界 01／02、四支 mutation；既有 test_framepath_disposition.py -k affected_gate 案例須維持綠（ENV_PREFIXES 改讀 schema 後 state_key 改變屬預期）",
+      "Task 2.4 驗證：test_testreg_v6_profile.py——收據完整性（全部 test_v6_* 有耗時、前 30 熱點、歸類、碼證）與改測試時之 mutation 收據",
+      "Task 3.2／4.2 驗證：test_testreg_run.py——只跑選中檔、子批造成之紅擋下、base 既有紅不擋、邊界 02 暫停接續、mutation",
+      "Task 3.3／4.3 驗證：test_testreg_effect.py——欄位值、scope、--out／--recompute、竄改 rc≠0、邊界 01 unknown、mutation"
+    ],
+    "lifecycle": "keep",
+    "not_executable": [
+      {"item": "stub_modules", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
+      {"item": "不得以「未執行過」「年代久」「慢」為擬淘汰理由", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
+      {"item": "真實資料重測試單組串行，長跑一律經分段執行器與監看，不得被背景上限砍斷重來；委員輪執行中不跑重探針", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
+      {"item": "Task 2.4 邊界：記憶體不足被終止 ⇒ 以 watch_run.sh 記峰值、重試至多一次（執行程序）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
+      {"item": "Task 3.1／4.1 邊界：三家皆擬淘汰而無可得證據等級 ⇒ keep 並登 §N needs-research；只部分函式擬淘汰 ⇒ 只列該些函式（委員分類程序；淘汰之機械約束由 V01／V08／V10 驗）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
+      {"item": "Task 3.2／4.2 邊界：收據驗不過 ⇒ 該 nodeid 退回 keep 並登 §N（執行程序；收據之機械驗證由 V07–V10 擋）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"},
+      {"item": "Task 4.3 邊界：任一檔處置阻於後續票 ⇒ 分類仍須填、處置以 blocked-by 登 §N（收案程序；分類完整由 V16 與 Task 4.1 驗證計數擋）", "reason": "user-ruling", "owner": "TESTREG", "expiry": "2026-12-31"}
+    ]
+  }
+}
