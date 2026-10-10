@@ -26,7 +26,7 @@ def _v6_functions() -> List[str]:
     return sorted(n.name for n in tree.body if isinstance(n, ast.FunctionDef) and n.name.startswith("test_v6_"))
 
 
-def _v6_errors(r: Dict[str, Any]) -> List[str]:
+def _v6_errors(r: Dict[str, Any], receipt_root=REPO) -> List[str]:
     errs = list(testreg.validate_shape(r, {"type": "types.v6_profile_receipt"}, schema()))
     if errs:
         return errs
@@ -41,27 +41,50 @@ def _v6_errors(r: Dict[str, Any]) -> List[str]:
         if not p.is_file() or int(line) > len(p.read_text(encoding="utf-8", errors="replace").splitlines()):
             errs.append(f"evidence {ev} 不存在")
     if r["classification"] == schema()["enums"]["v6_classification"][0] and r["test_changed"]:
-        errs += _mutation_receipt_errors(r)
+        errs += _mutation_receipt_errors(r, receipt_root)
     elif r["test_changed"]:
         errs.append("生產端歸類不得改測試")
     return errs
 
 
-def _mutation_receipt_errors(r: Dict[str, Any]) -> List[str]:
-    """改測試時：outcome 前後相同；mutation_receipt 為合法 types.receipt_mutation，其 target 為本檔之 test_v6_* 函式。"""
+def _mutation_receipt_errors(r: Dict[str, Any], root=REPO) -> List[str]:
+    """改測試時：outcome 前後相同；mutation_receipt 為合法 types.receipt_mutation，其 target 為本檔 AST 導出之 test_v6_*
+    函式之一（實存，非僅字首相符）。"""
     if not r["outcomes_sha256_before"] or r["outcomes_sha256_before"] != r["outcomes_sha256_after"]:
         return ["改測試須 outcome 前後 sha256 相同"]
     rel = r["mutation_receipt"]
-    if not rel or not (REPO / rel).is_file():
+    if not rel or not (root / rel).is_file():
         return ["改測試須附 mutation 收據"]
     try:
-        m = json.loads((REPO / rel).read_text(encoding="utf-8"))
+        m = json.loads((root / rel).read_text(encoding="utf-8"))
     except ValueError:
         return ["mutation 收據非 JSON"]
     errs = list(testreg.validate_shape(m, {"type": "types.receipt_mutation"}, schema()))
-    if not errs and not m["target_nodeid"].startswith(f"{TARGET}::test_v6_"):
-        errs.append("mutation 收據之 target 非本檔之 test_v6_*")
+    if not errs:
+        path, _, name = m["target_nodeid"].partition("::")
+        if path != TARGET or name.split("[")[0] not in _v6_functions():
+            errs.append("mutation 收據之 target 非本檔實存之 test_v6_* 函式")
     return errs
+
+
+def _mutation_receipt_json(target: str) -> Dict[str, Any]:
+    compare = f"{TARGET}::{_v6_functions()[0]}"
+    return {"target_nodeid": target, "compare_nodeids": [compare], "head": "a" * 40, "fingerprint": "b" * 64,
+            "target_assertion_lines": [], "compare_patch_path": None, "compare_patch_sha256": None,
+            "mutants": [{"id": "m1", "patch_path": "m1.patch", "patch_sha256": "c" * 64,
+                         "session_id": "12345678-1234-4123-8123-123456789abc",
+                         "compare_session_id": "12345678-1234-4123-8123-123456789abc", "target_outcome": "failed",
+                         "target_fail_loc": None, "compare_outcomes": {compare: "failed"}}]}
+
+
+@pytest.mark.parametrize("target_ok", [True, False])
+def test_v6_mutation_receipt_target_must_exist(tmp_path, target_ok):
+    """合法形狀之 mutation 收據：target 為實存之 test_v6_* ⇒ 收據條件通過；名稱合字首而不存在 ⇒ 被拒。"""
+    name = _v6_functions()[-1] if target_ok else "test_v6_does_not_exist_testreg"
+    (tmp_path / "m.json").write_text(json.dumps(_mutation_receipt_json(f"{TARGET}::{name}")), encoding="utf-8")
+    r = dict(_synthetic(), classification=schema()["enums"]["v6_classification"][0], test_changed=True,
+             outcomes_sha256_before="d" * 64, outcomes_sha256_after="d" * 64, mutation_receipt="m.json")
+    assert (_v6_errors(r, receipt_root=tmp_path) == []) is target_ok
 
 
 def _synthetic() -> Dict[str, Any]:

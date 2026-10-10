@@ -108,6 +108,10 @@ def test_obj_attr():
 
 def test_name_error():
     assert gone(1) == 1  # noqa: F821
+'''
+E0_FILE = "tests/test_e0.py"
+# ⑦ 須獨立成檔：契約 E0 規則 5 掃描整個目標測試檔，與正例同檔則正例亦被判違規（試作實證）
+E0_PATCH_TESTS = '''import momentum.calc as calc
 
 
 def test_patched_then_deleted(monkeypatch):
@@ -115,7 +119,7 @@ def test_patched_then_deleted(monkeypatch):
     monkeypatch.delattr(calc, "gone")
     assert calc.gone(3) == 3
 '''
-E0_FILE = "tests/test_e0.py"
+E0_PATCH_FILE = "tests/test_e0_patch.py"
 
 
 @pytest.fixture(scope="module")
@@ -124,36 +128,37 @@ def e0_base(tmp_path_factory) -> Dict[str, Any]:
     root = tmp_path_factory.mktemp("e0")
     r = make_repo(root, {"momentum/__init__.py": "", "momentum/calc.py": E0_CALC_A,
                          "tests/__init__.py": "", "tests/util_mod.py": E0_UTIL_A,
-                         "tests/helper_gone.py": E0_HELPER, E0_FILE: E0_TESTS})
+                         "tests/helper_gone.py": E0_HELPER, E0_FILE: E0_TESTS, E0_PATCH_FILE: E0_PATCH_TESTS})
     r.write("momentum/calc.py", CALC)
     r.write("tests/util_mod.py", "def other():\n    return 0\n")
     deleting = r.commit("remove gone")
-    proc, ids = recorded_pytest(r, E0_FILE)
+    proc, ids = recorded_pytest(r, E0_FILE, E0_PATCH_FILE)
     assert len(ids) == 1, proc.stdout + proc.stderr
     recs = test_records(r, ids[0])
     return {"repo": r, "session": ids[0], "records": recs, "deleting": deleting}
 
 
 def _e0_receipt(fx: Mapping[str, Any], fn: str, *, module: str = "momentum.calc", symbol: str = "gone",
-                exc: str = None, origin_needle: str = None) -> Dict[str, Any]:
+                exc: str = None, origin_needle: str = None, file: str = E0_FILE) -> Dict[str, Any]:
     """收據欄一律取自真實紀錄；exc／origin_needle 只用於構造「宣稱與紀錄不符」之反例。"""
-    nodeid = f"{E0_FILE}::{fn}"
+    nodeid = f"{file}::{fn}"
     rec = fx["records"][nodeid]
     origin = rec["exception_origin"]
     if origin_needle is not None:
-        origin = f"{E0_FILE}:{lines_with(fx['repo'], E0_FILE, origin_needle)[0]}"
+        origin = f"{file}:{lines_with(fx['repo'], file, origin_needle)[0]}"
     return {"nodeid": nodeid, "head": fx["deleting"], "ledger_ref": {"session_id": fx["session"], "nodeid": nodeid},
             "exception_type": exc or rec["exception_type"], "exception_origin": origin, "deleted_module": module,
             "deleted_symbol": symbol, "deleting_commit": fx["deleting"]}
 
 
-def _retire_e0(r: TmpRepo, fx: Mapping[str, Any], fn: str, receipt: Mapping[str, Any], *, delete_fn: bool = True):
+def _retire_e0(r: TmpRepo, fx: Mapping[str, Any], fn: str, receipt: Mapping[str, Any], *, delete_fn: bool = True,
+               file: str = E0_FILE):
     rel = f"{RETIRE_DIR}/{fn}.json"
     r.write_json(rel, receipt)
-    r.add_tombstone({"nodeid": f"{E0_FILE}::{fn}", "evidence_level": "E0", "evidence_receipt": rel,
+    r.add_tombstone({"nodeid": f"{file}::{fn}", "evidence_level": "E0", "evidence_receipt": rel,
                      "replaced_by": [], "disposition_ref": REF})
     if delete_fn:
-        _delete_function(r, E0_FILE, fn)
+        _delete_function(r, file, fn)
 
 
 def _delete_function(r: TmpRepo, rel: str, fn: str) -> None:
@@ -205,7 +210,7 @@ E0_NEGATIVES = {
     # ⑥ 局部名 NameError
     "e0_6_local_name_error": ("test_name_error", {"exc": "AttributeError"}),
     # ⑦ 測試先 monkeypatch.setattr 後 delattr 製造 AttributeError
-    "e0_7_monkeypatch_setattr_then_delattr": ("test_patched_then_deleted", {}),
+    "e0_7_monkeypatch_setattr_then_delattr": ("test_patched_then_deleted", {"file": E0_PATCH_FILE}),
 }
 
 
@@ -213,7 +218,7 @@ E0_NEGATIVES = {
 def test_e0_negative_receipts_red(e0_base, tmp_path, case):
     fn, kw = E0_NEGATIVES[case]
     r = copy_repo(e0_base["repo"], tmp_path, "r")
-    _retire_e0(r, e0_base, fn, _e0_receipt(e0_base, fn, **kw))
+    _retire_e0(r, e0_base, fn, _e0_receipt(e0_base, fn, **kw), file=kw.get("file", E0_FILE))
     proc = _validate(r)
     assert proc.returncode != 0 and rule_lines(proc, "V08"), proc.stderr
 

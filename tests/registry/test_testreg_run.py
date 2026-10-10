@@ -44,10 +44,17 @@ def _run(r: TmpRepo, base: str, tmp_path: Path, *extra: str):
 
 
 def _collected(r: TmpRepo, path: str) -> set:
-    """獨立 oracle：暫存倉測試檔之頂層 test_* 函式（本檔情境無參數化與類別）。"""
-    import ast
-    tree = ast.parse(r.read(path))
-    return {f"{path}::{n.name}" for n in tree.body if isinstance(n, ast.FunctionDef) and n.name.startswith("test")}
+    """獨立 oracle：於暫存倉以真實 pytest --collect-only 取該檔之完整 nodeid（含類別方法與參數化）。"""
+    import subprocess
+    from tests.registry.testreg_helpers import PY, clean_env
+    proc = subprocess.run([PY, "-m", "pytest", "--collect-only", "-qq", "-p", "no:cacheprovider", path], cwd=str(r.root),
+                          capture_output=True, text=True, env=clean_env(PYTHONPATH=str(r.root)))
+    return {l.strip() for l in proc.stdout.splitlines() if l.startswith(path + "::")}
+
+
+RICH_RW = ('import pytest\nfrom momentum.m import f\n\n\ndef test_r1():\n    assert f() == 1\n    assert f() > 0\n\n\n'
+           'def test_red():\n    assert f() == 2\n\n\nclass TestK:\n    def test_k(self):\n        assert f() == 1\n\n\n'
+           '@pytest.mark.parametrize("v", [1, 2])\ndef test_p(v):\n    assert v > 0\n')
 
 
 def _relations(rcpt: Dict[str, Any], r: TmpRepo) -> None:
@@ -65,8 +72,10 @@ def _relations(rcpt: Dict[str, Any], r: TmpRepo) -> None:
 def test_run_receipt_shape_and_relations(tmp_path):
     r = _repo(tmp_path)
     base = r.head()
-    r.write("tests/test_rw.py", FILES["tests/test_rw.py"].replace("assert f() == 1\n", "assert f() == 1\n    assert f() > 0\n"))
+    r.write("tests/test_rw.py", RICH_RW)
     proc, rcpt = _run(r, base, tmp_path)
+    assert {"tests/test_rw.py::TestK::test_k", "tests/test_rw.py::test_p[1]", "tests/test_rw.py::test_p[2]"} <= set(
+        rcpt["expected"])
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert testreg.validate_shape(rcpt, {"type": "types.subbatch_receipt"}, schema()) == []
     _relations(rcpt, r)

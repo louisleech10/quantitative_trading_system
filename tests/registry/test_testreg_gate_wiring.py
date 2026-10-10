@@ -427,6 +427,51 @@ def test_mutation_orchestration_ignores_snapshot_absorbs_moved_failure(qfx, tmp_
     assert still == []
 
 
+def _result(caused: List[str]) -> Dict[str, Any]:
+    return {"missing": [], "unexpected": [], "caused": list(caused), "head_red": [], "passed": []}
+
+
+def _run_once(qfx, tmp_path, monkeypatch, rec: Dict[str, Any]):
+    monkeypatch.setattr(g, "run_file", _fake_run_file(qfx["dir"], rec))
+    runner = g.Runner(tmp_path / "out", None, 1, ledger_dir=qfx["dir"])
+    runner.run("tests/t.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/t.py::test_x[1]"])
+    return runner
+
+
+def test_04f_quarantined_verdict_is_the_verdict_path(qfx, tmp_path, monkeypatch):
+    """verdict 之唯一組合：`quarantined_verdict(result, a_failures, incomplete, unexecuted, runner, catalog, ledger_dir,
+    today) -> (pass, quarantined_failures)`：相符之新失敗 ⇒ pass 且列報；位置已變 ⇒ 不 pass。"""
+    runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
+    ok, qf = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+                                   TODAY)
+    assert ok is True and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
+    runner = _run_once(qfx, tmp_path / "b", monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
+    ok, qf = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+                                   TODAY)
+    assert ok is False and qf == []
+
+
+def test_mutation_quarantined_verdict_without_classify_blocks(qfx, tmp_path, monkeypatch):
+    """mutant：組合不經 classify_quarantine（一律不吸收）⇒ 相符之新失敗亦不 pass（即 04f 之吸收來自該縫）。"""
+    runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
+    monkeypatch.setattr(g, "classify_quarantine", lambda caused, *a, **k: (list(caused), []))
+    ok, _ = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+                                  TODAY)
+    assert ok is False
+
+
+def test_04g_gate_main_uses_quarantined_verdict_only():
+    """結構：閘 main 之 verdict 只經 quarantined_verdict（不直接呼叫 verdict／split_quarantined／current_failures）。"""
+    tree = ast.parse((REPO / "scripts/framepath_affected_gate.py").read_text(encoding="utf-8"))
+    main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+    called = {c.func.id for c in ast.walk(main) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+    assert "quarantined_verdict" in called
+    assert not called & {"verdict", "split_quarantined", "current_failures"}
+    qv = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "quarantined_verdict")
+    inner = {c.func.id for c in ast.walk(qv) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+    assert {"classify_quarantine", "verdict"} <= inner
+
+
 def test_mutation_current_failures_reusing_old_sessions_absorbs_new_failure(qfx, monkeypatch):
     """mutant：當前四欄改取前史（不看呼叫前後新增與 argv_raw）⇒ 位置已變之新失敗被吸收（即 04c 之紅來自 session 選擇）。"""
     d = qfx["dir"]

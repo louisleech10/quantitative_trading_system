@@ -67,6 +67,21 @@ def test_plugin_registered_marker_allowed(tmp_path):
     assert proc.returncode != 0 and len(lines) == 1 and "not_registered_anywhere" in lines[0], proc.stderr
 
 
+def test_registration_only_from_loaded_conftest_or_plugins(tmp_path):
+    """承認範圍限 conftest.py 與其 pytest_plugins 所列外掛：未被載入之 helper 檔中之 addinivalue_line 不算註冊。"""
+    plugin = 'def pytest_configure(config):\n    config.addinivalue_line("markers", "via_plugin: listed plugin")\n'
+    helper = 'def pytest_configure(config):\n    config.addinivalue_line("markers", "via_helper: not loaded")\n'
+    test = ("import pytest\n\n\n@pytest.mark.via_plugin\ndef test_x():\n    assert True\n\n\n"
+            "@pytest.mark.via_helper\ndef test_y():\n    assert True\n")
+    r = make_repo(tmp_path, {"tests/__init__.py": "", "tests/conftest.py": 'pytest_plugins = ["tests.my_plugin"]\n',
+                             "tests/my_plugin.py": plugin, "tests/helper_reg.py": helper, "tests/test_m.py": test},
+                  catalog=False)
+    r.write("pytest.ini", INI_HEAD)
+    proc = r.run("markers")
+    lines = [l for l in proc.stderr.splitlines() if l.startswith("MARKER ")]
+    assert proc.returncode != 0 and len(lines) == 1 and "via_helper" in lines[0], proc.stderr
+
+
 def test_builtin_markers_allowed(tmp_path):
     src = ("import pytest\n\n\n@pytest.mark.parametrize('a', [1])\n@pytest.mark.skipif(False, reason='r')\n"
            "@pytest.mark.xfail(reason='r')\n@pytest.mark.usefixtures('tmp_path')\n@pytest.mark.filterwarnings('ignore')\n"
