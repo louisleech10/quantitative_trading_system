@@ -1,8 +1,8 @@
 # TESTREG：測試清冊自動維護與受影響測試挑選 — SPEC
 
 > 來源 PLAN/診斷：`docs/TICKET_ORDER.md` 第 5a 步；諮詢 r1 收斂 `handoffs/reconcile/20261009-testreg-x-consult-r1/synth.md`（26 條全處置、三家 proceed；主委獨立版 `handoffs/20261009-testreg-x-consult-r1-claude.md`）；靜態盤點 `handoffs/run_receipts/testreg_probes/20261010-test-inventory.json`　|　日期：2026-10-10　|　對應 TODO：`docs/manifests/TESTREG.json`（SPEC 凍結後生成）
-> 版本：v2（審查 r1 `handoffs/reconcile/20261010-testreg-x-review-r1/synth.md` 24 條全採納後改版）
-> 契約單一真相源：`tests/registry/testreg_schema.json`（欄位、枚舉、證據收據格式、驗證規則 V01–V12、挑選規則皆只定義於該檔；本 SPEC 以鍵名引用，不重列值）。
+> 版本：v3（審查 r2 `handoffs/reconcile/20261010-testreg-x-review-r2/synth.md` 20 條全採納後改版；契約 version 3）
+> 契約單一真相源：`tests/registry/testreg_schema.json`（欄位、枚舉、證據收據格式、驗證規則 V01–V16、挑選規則、閘收據欄皆只定義於該檔；本 SPEC 以鍵名引用，不重列值）。
 
 ## §RISK 風險分級
 - **大小**：大（`docs/TICKET_ORDER.md` 第 5a 步定案）。
@@ -34,9 +34,10 @@
 - **記錄器不改測試行為**：不改 outcome、執行順序、rc；除 `.testreg/` 外不新增、不改任何檔；記錄器自身之例外一律攔截並以單行 stderr 告知，不上拋。巢狀 pytest 依 `ledger.nested_rule` 不寫。
 - **產出端秒級**：產出端 hook 與 pre-commit 檢查只讀 `catalog.json`、`testreg_schema.json`、變更檔清單與其 AST；禁呼叫 pytest（含 `--collect-only`）、禁全量讀 ledger。單次牆鐘以 642 entries 量測 10 次中位 <1 s。
 - **catalog 只存無法導出之欄**：`catalog.entries.forbidden_fields` 列者寫入即 V03 錯。
-- **淘汰只以碑、只憑收據**：淘汰單位為函式層 nodeid；整檔淘汰＝該檔全部函式各一碑；每碑之收據須依 `receipts` 對應規則機械驗過（V08、V09）。提交年齡、未執行、單次成本不得作證據。於 HEAD 通過之測試不得持 E0（`receipts.E0.rule`），負向守衛因此不可能以 E0 淘汰。
-- **改寫只憑 mutation 收據**：`rewrite` 執行後須有 `receipts.mutation` 格式收據（原測試殺之 mutant，改寫後至少一條仍殺；對應 `docs/TEST_DESIGN_CHARTER.md` §B1 之可證偽要求）。
-- **隔離不變綠**：`flaky_quarantine` 之測試照跑；票級閘依 Task 2.3 將其失敗列 `quarantined_failure` 不擋但列報；不得 rerun 取綠；隔離須有 ledger 同 fingerprint 翻轉證據（V12）且未逾期（V11）。
+- **淘汰只以碑、只憑收據**：淘汰單位為函式層 nodeid；整檔淘汰＝該檔全部函式各一碑；每碑之收據須依 `receipts` 對應規則機械驗過（V08、V09）。提交年齡、未執行、單次成本不得作證據。E0 須於 HEAD 失敗且失敗位置為目標測試檔中引用缺失符號之行、該符號確曾存在於 `receipts.E0.production_roots` 並由 `deleting_commit` 刪除（`receipts.E0.rule`）；於 HEAD 通過之負向守衛、測試自身拼錯之 helper、從未存在於生產碼之選用依賴皆不可能持 E0。E1 只限完全重複（函式與 fixture 閉包 AST 相等）；其餘一律 E2。
+- **改寫只憑 mutation 收據**：`rewrite` 執行後須有 `receipts.mutation` 格式收據——target 每一斷言行（`assertion_nodes`，含 numpy／pandas 之 assert 呼叫）至少一個 mutant 於該行使 target 失敗，且每一被 target 殺之 mutant 改寫後至少一條仍殺；對應 `docs/TEST_DESIGN_CHARTER.md` §B1 之可證偽要求。V07 使「改了待改寫檔卻無收據」之提交不可能。
+- **隔離不變綠**：`flaky_quarantine` 之測試照跑；票級閘依 Task 2.3 將其失敗列入 `gate_report.quarantined_failures` 不擋但列報；不得 rerun 取綠；隔離須有 ledger 同 fingerprint 之 passed 與 failed／error 翻轉證據（V12）且未逾期（V11）。
+- **退役不留斷鏈**：新碑所指 nodeid／路徑出現在未收案票之 manifest，且該票閘不解析碑 ⇒ 不得立碑（V14）。
 - 真實資料重測試單組串行；長跑一律走分段續跑執行器（FRAMEPATH D10 執行器）＋監看，不得被背景上限砍斷重來。
 - 跑完測試執行 `bash scripts/restore_golden_inventory.sh`。
 
@@ -49,16 +50,16 @@
 
 ### Phase 1 — 契約、清冊建檔、記錄器、標記、產出端登記（依賴：無；Task 順序 1.1→1.2→1.3→1.4→1.5）
 **Task 1.1 — 契約與 validate**
-- 目標：`scripts/testreg.py validate` 依 `tests/registry/testreg_schema.json` 之 `validation_rules` V01–V12 逐條實作。　檔案：`scripts/testreg.py`（新建）。既有 caller：無。
+- 目標：`scripts/testreg.py validate` 依 `tests/registry/testreg_schema.json` 之 `validation_rules` V01–V16 逐條實作。　檔案：`scripts/testreg.py`（新建）。既有 caller：無。
 - 改法：每條規則一個具名函式，錯誤訊息帶規則 id；enum 一律讀 schema（含 `items_enum` 所指之 `enums.charter_category` 等）；不另存副本。
-- **驗證**：`pytest tests/registry/test_testreg_validate.py`：V01–V12 各一正例一反例（暫存 catalog／暫存 git 倉）；mutant：任一規則函式改為恆真 ⇒ 其反例紅；`grep -c "A22\|EXACT\|correctness" scripts/testreg.py` == 0（無枚舉副本）。
+- **驗證**：`pytest tests/registry/test_testreg_validate.py`：V01–V16 各一正例一反例（暫存 catalog／暫存 git 倉）；另含收據反例——E0：①目標於 HEAD 通過、②失敗行位於 helper 而非目標測試檔、③缺失符號從未存在於 production_roots、④符號定義於 tests/ 內，各 ⇒ V08 紅；E1：fixture 定義不同而函式相同 ⇒ 紅；mutation：某斷言行無對應 mutant、或 numpy `assert_allclose` 行未列入 target_assertion_lines ⇒ 紅；mutant：任一規則函式改為恆真 ⇒ 其反例紅；`grep -c "A22\|EXACT\|correctness" scripts/testreg.py` == 0（無枚舉副本）。
 - **邊界**：catalog 不存在 ⇒ rc≠0 並具名；ledger 目錄不存在而 catalog 有 quarantine ⇒ V12 報 unverifiable、rc≠0。
 - **存活至**：票收案後保留。　**覆蓋風險**：無。
 - 不可做：不在程式內寫死枚舉值。
 
 **Task 1.2 — bootstrap 建檔**
 - 目標：642 檔全數有 entry（V02 綠），使 Task 1.5 掛載時 catalog 已完整。　檔案：`scripts/testreg.py`（子命令 `bootstrap`）、`tests/registry/catalog.json`。
-- 改法：`ticket` 依 `bootstrap.ticket_rule`；其餘欄依 `bootstrap.defaults`。
+- 改法：`ticket` 依 `bootstrap.ticket_rule`；其餘欄依 `bootstrap.defaults`；提交帶 `bootstrap.exemption` 所定 trailer。
 - **驗證**：bootstrap 後 `testreg.py validate` rc=0；entry 數 == `git ls-files 'tests/test_*.py' 'tests/**/test_*.py' | sort -u | wc -l`；重跑 bootstrap ⇒ catalog sha256 不變（冪等）；`ticket=unknown` 之筆數列於收據 `handoffs/run_receipts/testreg-bootstrap.json`。
 - **邊界**：首次提交無票標記 ⇒ `unknown`；改名檔 ⇒ `--follow` 取最早加入提交。
 - **存活至**：票收案後保留。　**覆蓋風險**：Phase 3／4 只改委員欄，`ticket` 受 V04 保護。
@@ -66,8 +67,8 @@
 
 **Task 1.3 — 記錄器**
 - 目標：每次 pytest session 自動寫 `ledger` 與增量 `summary`。　檔案：`tests/fixtures/testreg_recorder_plugin.py`（新建）、`tests/conftest.py`（`pytest_plugins` 加入）、`.gitignore`（`.testreg/`）。既有 caller：全部測試經 `tests/conftest.py`。
-- 改法：`pytest_sessionstart` 依 `ledger.session_record` 計算各欄（kline 全檔 sha256 依快取鍵；首算後同檔不再算），設 `TESTREG_PARENT_SESSION`；`pytest_runtest_logreport` 累積 setup/call/teardown 為一筆 `test_record`（含 `order`、`exception_type`、`exception_head`）；`pytest_sessionfinish` 一次原子寫 `<session_id>.jsonl` 並原子合併 `summary`（k 依 schema）。
-- **驗證**：§G 不變性基準；`pytest tests/registry/test_testreg_recorder.py`：①暫存測試檔含 pass/fail/skip/xfail/error ⇒ ledger 五種 outcome 各一筆、`exception_type` 對應；②巢狀 pytest ⇒ ledger 檔數不變；③monkeypatch 使寫檔丟例外 ⇒ 被測 session rc == 未裝記錄器時；④summary 毀損 ⇒ 下一 session 重建且逐 nodeid 筆數 == min(k, ledger 筆數)；⑤同參數兩次執行 ⇒ `fingerprint` 相等；改 `-p` 或 `PYTEST_ADDOPTS` ⇒ 不等；只改 `-q` ⇒ 相等。mutant：記錄器上拋例外 ⇒ ③紅；巢狀判斷移除 ⇒ ②紅；`argv_norm` 不去 `-q` ⇒ ⑤紅。
+- 改法：`pytest_sessionstart` 依 `ledger.session_record` 計算各欄（kline 全檔 sha256 依快取鍵；鍵相同才沿用），設 `TESTREG_PARENT_SESSION`；`pytest_runtest_logreport` 累積 setup/call/teardown 為一筆 `test_record`（含 `order`、`exception_type`、`exception_head`、`exception_origin`、`fail_line`）；`pytest_sessionfinish` 一次原子寫 `<session_id>.jsonl`，並於 `summary.lock` 獨占鎖內合併 `summary`（k 依 schema）。
+- **驗證**：§G 不變性基準；`pytest tests/registry/test_testreg_recorder.py`：①暫存測試檔含 pass/fail/skip/xfail/error ⇒ ledger 五種 outcome 各一筆、`exception_type`／`exception_origin`／`fail_line` 對應；②巢狀 pytest ⇒ ledger 檔數不變；③monkeypatch 使寫檔丟例外 ⇒ 被測 session rc == 未裝記錄器時；④summary 毀損 ⇒ 下一 session 重建且逐 nodeid 筆數 == min(k, ledger 筆數)；⑤同參數兩次執行 ⇒ `fingerprint` 相等；改 `-p`、`-k`、位置參數順序、`PYTEST_ADDOPTS` 或 `NUMBA_DISABLE_JIT` ⇒ 不等；只改 `-q` ⇒ 相等；⑥兩個 session 並行結束 ⇒ summary 含兩者全部紀錄；⑦暫存 kline 檔以同 size 覆寫內容並以 `os.utime` 回設 mtime ⇒ `kline_sha256` 改變。mutant：記錄器上拋例外 ⇒ ③紅；巢狀判斷移除 ⇒ ②紅；`argv_norm` 不去 `-q` ⇒ ⑤紅；去鎖 ⇒ ⑥紅（以注入延遲使交錯必現）；快取鍵去 ctime ⇒ ⑦紅。
 - **邊界**：`kline_cache.h5` 不存在 ⇒ `kline_sha256=absent` 仍記錄；session 被 SIGKILL ⇒ 無半寫 jsonl（暫存檔由下一 session 清除）。
 - **存活至**：票收案後保留。　**覆蓋風險**：無。
 - 不可做：不改 `pytest_collection_modifyitems` 既有清冊寫入；不在每條測試後寫檔。
@@ -82,8 +83,8 @@
 
 **Task 1.5 — 產出端登記檢查**
 - 目標：新增、改名或刪除 `tests/**/test_*.py` 而 catalog 不一致 ⇒ 寫檔當下報錯；Bash 建檔與 `git mv`／`git rm` 之漏網由 pre-commit 同檢查擋。　檔案：`scripts/testreg_write_guard.sh`（新建，PostToolUse `Edit|Write`）、`.claude/settings.json`、pre-commit 掛載、`docs/GOV_ENFORCEMENT_REGISTRY.md`（產出端列）。
-- 改法：hook 取工具輸入檔路徑；命中測試檔樣式 ⇒ `testreg.py check --paths <p>`（V02、該 entry 之 V03–V07、V11）；pre-commit 以暫存區新增／刪除／改名之測試檔與 `catalog.json` 變更呼叫 `check --staged`（另加 V01、V08–V10）。
-- **驗證**：`pytest tests/registry/test_testreg_write_guard.py`：①新測試檔無 entry ⇒ hook rc≠0、訊息含路徑；②補 entry ⇒ rc=0；③`git rm` 測試檔而無碑 ⇒ pre-commit rc≠0；④quarantine 逾期 ⇒ rc≠0；⑤642 entries 下 hook 牆鐘 10 次中位 <1 s（收據）。mutant：hook 恆 rc=0 ⇒ ①紅；pre-commit 不查刪除 ⇒ ③紅。
+- 改法：hook 取工具輸入檔路徑；命中測試檔樣式或 `catalog.json` ⇒ `testreg.py check --paths <p>`（V02、該 entry 之 V03、V05、V06、V11、V15、V16）；pre-commit 以暫存區新增／刪除／改名之測試檔與 `catalog.json` 變更呼叫 `check --staged`（全部 V01–V16）。
+- **驗證**：`pytest tests/registry/test_testreg_write_guard.py`：①新測試檔無 entry ⇒ hook rc≠0、訊息含路徑；②補 entry 但分類欄為 unclassified ⇒ rc≠0（V16）；補完整分類 ⇒ rc=0；③`git rm` 測試檔而無碑 ⇒ pre-commit rc≠0；④quarantine 逾期 ⇒ rc≠0；⑤待改寫檔有暫存變更而無收據 ⇒ pre-commit rc≠0（V07）；⑥新碑所指路徑在未收案且閘不解析碑之 manifest ⇒ rc≠0（V14）；⑦642 entries 下 hook 牆鐘 10 次中位 <1 s（收據）。mutant：hook 恆 rc=0 ⇒ ①紅；pre-commit 不查刪除 ⇒ ③紅；V07 只查 rewrite_receipt 非 null 方向 ⇒ ⑤紅。
 - **邊界**：`conftest.py`、`tests/fixtures/`、`tests/registry/` 非測試檔 ⇒ 不檢；編輯既有且已登記之測試檔 ⇒ rc=0（不阻正常工作）。
 - **存活至**：票收案後保留。　**覆蓋風險**：無。
 - 不可做：hook 內不跑 pytest、不讀 git 全史。
@@ -100,15 +101,15 @@
 **Task 2.2 — impact 挑選器**
 - 目標：`scripts/testreg.py impact --changed-from <git-range|worktree> --manifest <m> --phase <n>` 依 `impact` 契約輸出（單位依 `impact.output_unit`）。　檔案：`scripts/testreg.py`。
 - 改法：`must`＝manifest 必跑；`changed_test`＝變更之測試檔；`static_taint`＝呼叫 `framepath_affected_gate._TaintGraph`；`previously_failed`＝summary 中最近一筆 outcome∈{failed,error,xpassed} 之 nodeid 所在檔；`registry_unresolved` 依 `impact.registry_unresolved_rule`、`impact.domain_rule`、`impact.shared_test_infra`。生產檔變更本身不觸發 unresolved（catalog 只登記測試檔）。
-- **驗證**：`pytest tests/registry/test_testreg_impact.py`：①改 `tests/conftest.py` ⇒ selected == 全部測試檔；②改 `tests/feature_engineering/conftest.py`（暫存）⇒ selected ⊇ 該目錄全部測試檔；③生產檔可被 taint 解析 ⇒ 不出現 `registry_unresolved`；④生產檔含 `importlib.import_module(var)` 不可定 ⇒ selected ⊇ domain 且 domain 依 `domain_rule` 之重算 ==；⑤任何輸入 selected ⊇ manifest 必跑；⑥構造各來源皆空 ⇒ selected 非空或 rc≠0（不輸出空集合）；⑦catalog validate 失敗 ⇒ rc≠0。mutant：聯集改交集 ⇒ ⑤紅；domain 改取一層 ⇒ ④紅；shared_test_infra 移除 ⇒ ①紅。
+- **驗證**：`pytest tests/registry/test_testreg_impact.py`：①改 `tests/conftest.py` ⇒ selected == 全部測試檔；②改 `tests/feature_engineering/conftest.py`（暫存）⇒ selected ⊇ 該目錄全部測試檔；③生產檔可被 taint 解析 ⇒ 不出現 `registry_unresolved`；④生產檔含 `importlib.import_module(var)` 不可定 ⇒ selected ⊇ domain 且 domain 依 `domain_rule` 之重算 ==；④b 暫存樹中測試只經 `momentum/factories.py` 之函式內 import 間接到達變更模組 ⇒ 該測試 ∈ domain；④c 測試 import 含不可定動態 import 之模組 ⇒ 該測試 ∈ 任何 domain；⑤任何輸入 selected ⊇ manifest 必跑；⑥構造各來源皆空 ⇒ selected 非空或 rc≠0（不輸出空集合）；⑦catalog validate 失敗 ⇒ rc≠0。mutant：聯集改交集 ⇒ ⑤紅；domain 改取一層 ⇒ ④紅；閉包改只取直接 import ⇒ ④b 紅；shared_test_infra 移除 ⇒ ①紅。
 - **邊界**：manifest 不含 `affected_tests` ⇒ rc≠0；變更檔為已立碑之測試 ⇒ `tombstoned` 且附碑。
 - **存活至**：票收案後保留。　**覆蓋風險**：無。
 - 不可做：不實作覆蓋率收集（§N R1）；不以 `size_class` 排除。
 
 **Task 2.3 — FRAMEPATH 閘接線**
 - 目標：`scripts/framepath_affected_gate.py` 之 plan 吃 impact 聯集、解析碑、判隔離失敗、修接續指紋。　檔案：`scripts/framepath_affected_gate.py`。既有 caller：FRAMEPATH b2／b3 之 gate。
-- 改法：①plan 依 `impact.gate_feed`；②manifest 指向之 nodeid／檔若已立碑 ⇒ 以碑之 `replaced_by` 取代（E0 碑無 replaced_by ⇒ 列 `tombstoned` 排除且附碑），不再因 collect 不到而拒跑；③verdict：`caused` 失敗之 nodeid 若有未逾期 quarantine ⇒ 歸 `quarantined_failure`，不擋 verdict、列報；逾期 ⇒ 照擋；④`inputs_digest` 之未追蹤內容排除本次 `--out` 目錄（前綴由參數導出）；`--out` 為 repo 根 ⇒ rc≠0。
-- **驗證**：`pytest tests/feature_engineering/test_framepath_disposition.py -k "affected_gate"`（新增案例）：②manifest 列已立碑 E1 nodeid ⇒ plan 含其 replaced_by、不拒跑；③有效隔離之 caused 失敗 ⇒ verdict pass 且報告列 `quarantined_failure`；逾期 ⇒ verdict fail；④分段一後於 out 目錄新增 junit ⇒ 接續 digest 不變；新增非 out 之未追蹤原始碼 ⇒ digest 變；①以 `handoffs/run_receipts/framepath-b1-affected-plan.json` 重放 ⇒ 新計畫 selected ⊇ 原計畫。mutant：②之取代移除 ⇒ 拒跑而紅；③不查 expires ⇒ 逾期案紅；④排除前綴改空 ⇒ digest 案紅。
+- 改法：①plan 依 `impact.gate_feed` 三步（collect 前以碑之 `replaced_by` 取代並保留原組別、E0 碑記 `tombstoned` → 檔層聯集整檔執行 → collect 後逐一核對原 must nodeid 皆在）；②verdict：`caused` 失敗之 nodeid 若有未逾期 quarantine ⇒ 列入 `gate_report.quarantined_failures`，不擋 verdict；逾期 ⇒ 照擋；碑之取代列入 `gate_report.tombstone_resolutions`；③`inputs_digest` 之未追蹤內容排除本次 `--out` 目錄（前綴由參數導出）；`--out` 為 repo 根 ⇒ rc≠0；④`ENV_PREFIXES` 改讀 schema `ledger.env_prefixes`（單一來源）。
+- **驗證**：`pytest tests/feature_engineering/test_framepath_disposition.py -k "affected_gate"`（新增案例）：①manifest 之 A 組列已立碑 E1 nodeid、其 replacement 位於另一檔且原檔已刪 ⇒ plan 不拒跑、replacement 於 A 組、`tombstone_resolutions` 有該列；②有效隔離之 caused 失敗 ⇒ verdict pass 且 `quarantined_failures` 含該 nodeid；逾期 ⇒ verdict fail；③分段一後於 out 目錄新增 junit ⇒ 接續 digest 不變；新增非 out 之未追蹤原始碼 ⇒ digest 變；④以 `handoffs/run_receipts/framepath-b1-affected-plan.json` 重放 ⇒ 新計畫 nodeid 集合 ⊇ 原計畫 must nodeid 集合；⑤刪除某 must nodeid 而無碑 ⇒ collect 後核對 rc≠0。mutant：碑解析移到 collect 之後 ⇒ ①紅；不查 expires ⇒ ②逾期案紅；排除前綴改空 ⇒ ③紅；略過 collect 後核對 ⇒ ⑤紅。
 - **邊界**：碑之 replaced_by 指向亦已立碑之 nodeid ⇒ 遞迴解析，循環 ⇒ rc≠0；quarantine 之 nodeid 參數化 ⇒ 以函式層比對。
 - **存活至**：票收案後保留。　**覆蓋風險**：無。
 - 不可做：不放寬其他 digest 成分；不改 FRAMEPATH 已凍結之 manifest 內容。
@@ -181,7 +182,7 @@
 ## §N N/A 登記與殘留
 - **委員審議項（v2 主委定案，請 r2 判定）**：
   - Q1（`timeout` 標記）：移除 9 處無效宣告（Task 1.4）。理由：未安裝外掛，宣告無任何效力，移除為行為恆等（以改前改後 nodeid 集合相等驗）；安裝外掛則會改變該 9 處執行行為（新增逾時失敗），屬引入新行為而非清冊範圍。卡住偵測於閘級執行由 D10 監看承擔；一般手動 pytest 無逾時保護，此為現況（未因本票變差）。
-  - Q2（k 與複查閾值）：k＝20、`duration_regression_rule` 如 schema。現無同設定多次執行之耗時資料可校準（b1 收據每項僅一次）；此訊號只標記不影響挑選，誤設之代價為複查清單噪音，不減驗證。
+  - Q2（k 與複查閾值）：k＝20、`duration_regression_rule`（取樣、中位數、門檻皆封閉定義於 schema）。現無同設定多次執行之耗時資料可校準（b1 收據每項僅一次）；此訊號只標記不影響挑選，誤設之代價為複查清單噪音，不減驗證。
 - **殘留**：
   - R1 動態覆蓋對照表（逐行覆蓋率→測試，原 `dynamic_hit`）— `為何現在不做: blocked-by:Task 1.3 記錄器上線後須另收覆蓋邊（ledger 無檔案觸及欄）`；觸發：summary 中 ≥80% 測試檔具 ≥3 筆同 env_class 紀錄；登記處：`白話說明/還沒做的事.md` 第四節。
   - R2 定期全套自動執行 — `為何現在不做: user-ruling:2026-08-13 使用者刪除全部 CI（.github/workflows/）`；觸發：使用者恢復 CI；登記處：同上。
