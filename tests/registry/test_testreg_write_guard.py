@@ -476,6 +476,8 @@ HOOK_CASES = {
                                  {"tests/test_autouse.py::test_a"}),
     "07v_body_skip_call_added": ("tests/test_autouse.py", "def test_b():\n", "def test_b():\n    pytest.skip(\"r30\")\n",
                                  {"tests/test_autouse.py::test_b"}),
+    "07v_body_xfail_call_added": ("tests/test_autouse.py", "def test_b():\n", "def test_b():\n    pytest.xfail(\"r31\")\n",
+                                  {"tests/test_autouse.py::test_b"}),
     "07v_module_pytestmark_skipif_added": ("tests/test_autouse.py", "from momentum.calc import add\n",
                                            "from momentum.calc import add\n\npytestmark = pytest.mark.skipif(True, reason=\"r30\")\n",
                                            {"tests/test_autouse.py::test_a", "tests/test_autouse.py::test_b"}),
