@@ -771,9 +771,20 @@ class _Engine:
         def element(node: ast.AST, lo: int, hi: int) -> None:
             out.append({"node": self.fold(mi, node, consts, imps), "prov": (mi.path, lo, hi), "owner": owner})
 
+        def expand_calls_within(node: ast.AST) -> None:
+            # 契約 inline_rule「每一呼叫 assertion_helpers 之節點」：斷言式子內（及 helper 呼叫之引數內）之 helper 呼叫亦展開
+            # ——`assert x == h.f(...)` 之 f 刪斷言須使呼叫者減少（第 1 批審碼 r3 後主委自查：原整句只記一個元素，漏擋）
+            for ch in ast.walk(node):
+                if isinstance(ch, ast.Call):
+                    tgt_ = self.resolve_callee(mi, ch.func, imps)
+                    if tgt_ and self.is_helper(tgt_[0], tgt_[1]):
+                        self.touched.add(tgt_[0])
+                        out.extend(self.expand(mi, ch, tgt_, consts, imps, stack))
+
         def visit(node: ast.AST) -> None:
             if isinstance(node, ast.Assert):
                 element(node, node.lineno, node.end_lineno)
+                expand_calls_within(node)
                 return
             if isinstance(node, (ast.With, ast.AsyncWith)):
                 for item in node.items:
@@ -790,6 +801,8 @@ class _Engine:
                 if tgt and self.is_helper(tgt[0], tgt[1]):
                     self.touched.add(tgt[0])
                     out.extend(self.expand(mi, node, tgt, consts, imps, stack))
+                    for a in [*node.args, *(k.value for k in node.keywords)]:
+                        expand_calls_within(a)  # 引數內之 helper 呼叫（如 `check(h.f(x))`）
                     return
                 nm = _last_name(node.func)
                 if nm and (nm.startswith("assert") or nm in _SPECIAL or _CHECK_RE.match(nm)):
@@ -836,8 +849,9 @@ class _Engine:
         inner = self.collect(hmi, hfn, "helper", stack | {key})
         self._inst += 1
         inst = self._inst
-        local = {n for n in _bound_names(hfn) if n not in binding}
-        order = {n: i for i, n in enumerate(sorted(local, key=lambda n: _bound_names(hfn)[n]))}
+        hbn = _bound_names(hfn)  # 一次算出（原於排序 key 內逐名重算，真實規模 28,696 次占 34 秒）
+        local = {n for n in hbn if n not in binding}
+        order = {n: i for i, n in enumerate(sorted(local, key=lambda n: hbn[n]))}
         pos = (call.lineno, call.col_offset)
 
         class Sub(ast.NodeTransformer):
@@ -903,8 +917,9 @@ class _Engine:
             inner = self.collect(fmi, ffn, "fixture", frozenset())
             self._inst += 1
             inst = self._inst
-            local = set(_bound_names(ffn))
-            order = {n: i for i, n in enumerate(sorted(local, key=lambda n: _bound_names(ffn)[n]))}
+            fbn = _bound_names(ffn)  # 一次算出（同上）
+            local = set(fbn)
+            order = {n: i for i, n in enumerate(sorted(local, key=lambda n: fbn[n]))}
 
             class Ren(ast.NodeTransformer):
                 def visit_Name(self, n):
@@ -2703,6 +2718,70 @@ def _reverse_importers(engs: Sequence["_Engine"], pyfiles: Sequence[str], target
     return reached
 
 
+def _node_text(src: str, n: ast.AST) -> str:
+    """模組層 def／class 之原文（含裝飾器）。"""
+    lines = src.splitlines()
+    lo = min([n.lineno, *(d.lineno for d in getattr(n, "decorator_list", []))])
+    return "\n".join(lines[lo - 1:n.end_lineno])
+
+
+def _import_route_tests(ctx: Context, he: "_Engine", ce: "_Engine", reach: set, seeds: set) -> set:
+    """匯入途徑之候選測試：自 helper 輪廓減少之名稱（seeds）出發，於反向匯入閉包（reach）內之模組，遞移納入原文提及
+    已納入名稱之模組層 def／class 名、`from … import 名 as 別名` 之別名與模組層賦值之目標名（靜態引用必於原文寫出名稱；
+    動態取用屬 SPEC §N R6）；閉包內測試檔中，原文（含裝飾器；類別方法取整個類別）提及任一已納入名稱之測試函式為候選，
+    模組層非 import 敘述（如 pytestmark）提及、或模組內 autouse fixture 已納入者 ⇒ 該檔全部測試（主委自查：原取匯入檔之
+    全部測試，被 27 檔匯入之 helper 刪斷言 438 個測試逐一比較約 6–7 秒）。"""
+    tpat = ctx.schema["formats"]["test_path"]
+    names = set(seeds)
+    grow = True
+    while grow and names:
+        grow = False
+        wpat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\b")
+        for p in sorted(reach):
+            for eng in (he, ce):
+                src, m = eng.tree.read(p) or "", eng.mod(p)
+                if m is None or wpat.search(src) is None:
+                    continue
+                for n in m.tree.body:
+                    new: set = set()
+                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                        if wpat.search(_node_text(src, n)):
+                            new = {n.name}
+                    elif isinstance(n, ast.ImportFrom):
+                        new = {a.asname for a in n.names if a.asname and a.name in names}
+                    elif isinstance(n, (ast.Assign, ast.AnnAssign)) and wpat.search(ast.get_source_segment(src, n) or ""):
+                        tg = n.targets if isinstance(n, ast.Assign) else [n.target]
+                        new = {x.id for t_ in tg for x in ast.walk(t_) if isinstance(x, ast.Name)}
+                    if new - names:
+                        names |= new
+                        grow = True
+    out: set = set()
+    if not names:
+        return out
+    wpat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\b")
+    for f in sorted(p for p in reach if re.fullmatch(tpat, p)):
+        nids = _function_nodeids(ce.tree, f)
+        if not nids:
+            continue
+        src, m = ce.tree.read(f) or "", ce.mod(f)
+        if m is None:
+            out |= set(nids)
+            continue
+        whole = any(not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Import, ast.ImportFrom))
+                    and wpat.search(ast.get_source_segment(src, n) or "") for n in m.tree.body) \
+            or any(a and nm in names for nm, (_, a) in m.fixtures.items())
+        if whole:
+            out |= set(nids)
+            continue
+        texts = {n.name: _node_text(src, n) for n in m.tree.body
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+        for nid in nids:
+            top = nid.split("::")[1]
+            if wpat.search(texts.get(top, "")):
+                out.add(nid)
+    return out
+
+
 def _fx_info(eng: "_Engine", m: Optional["_Mod"], n: str):
     """fixture 之 (形狀, 自身元素鍵多重集合)；形狀＝(參數列, autouse, 元素中局部名→序號, 元素中非局部名集合)。"""
     if m is None or n not in m.fixtures:
@@ -2716,7 +2795,7 @@ def _fx_info(eng: "_Engine", m: Optional["_Mod"], n: str):
     return shape, collections.Counter(e["key"] for e in eng.normalize(ffn, inner))
 
 
-def _nontest_route(ctx: Context, he: "_Engine", ce: "_Engine", route: set) -> Tuple[Dict[str, List[str]], set]:
+def _nontest_route(ctx: Context, he: "_Engine", ce: "_Engine", route: Mapping[str, set]) -> Tuple[Dict[str, List[str]], set]:
     """tests/ 下非測試檔（conftest、外掛、helper 模組）之差量減少（`route`：已扣除 pytest_plugins 與類別之處理）⇒ 受影響
     測試之路由，不做完整呼叫者反推（第 1 批審碼 r3：外掛 fixture 157 秒；主委自查：autouse fixture 120 秒、經 fixture 使用之
     helper 同型）。影響只經兩途：①fixture——各 conftest 與其外掛（holders）之 fixture 中，兩樹自身展開（`_fx_info`）不同者
@@ -2758,7 +2837,7 @@ def _nontest_route(ctx: Context, he: "_Engine", ce: "_Engine", route: set) -> Tu
     cands: set = set()
     for c, names in sorted(by_scope.items()):
         cands |= _fixture_dependents(ctx, ce, c, names) | _fixture_dependents(ctx, he, c, names)
-    exact = {nid for f in sorted(reach_route) if re.fullmatch(tpat, f) for nid in _function_nodeids(ce.tree, f)}
+    exact = _import_route_tests(ctx, he, ce, reach_route, set().union(*route.values()))
     nt_changed = {p for p in changed if p.endswith(".py") and not p.startswith("tests/")}
     if "pytest.ini" in changed or (nt_changed and _star_reaches((he, ce), pyfiles, nt_changed)):
         return {}, cands | exact  # 免展開判定之前提不成立：全部逐一精確比較
@@ -2899,7 +2978,7 @@ def rule_v19(ctx: Context) -> List[Finding]:
                 nids |= _subclass_users(ctx, he, ce, cls_dec)
     decided: Dict[str, List[str]] = {}
     decided_fx: Dict[str, List[str]] = {}  # fixture 改變之免展開判定（`_fixture_change_decide`；存在性已依受驗樹確認）
-    route: set = set()
+    route: Dict[str, set] = {}  # 非測試檔 → 其（扣除外掛清單與類別後之）輪廓減少名稱
     for h in helpers:
         dec = _seam("decreased_defs")(ctx.repo_root, h, tree=ctx.tree)
         dec = None if dec is None else set(dec)
@@ -2926,7 +3005,7 @@ def rule_v19(ctx: Context) -> List[Finding]:
         if dec is None:  # 不可解析：完整呼叫者反推
             nids |= set(callers(ctx.repo_root, h, tree=ctx.tree)) | set(callers(ctx.repo_root, h, tree="HEAD"))
         else:
-            route.add(h)
+            route[h] = set(dec)
     if route:  # 經 fixture 或匯入之影響（`_nontest_route`；不做完整呼叫者反推——審碼 r3 外掛 157 秒、autouse 120 秒）
         decided_fx, u_ = _nontest_route(ctx, he, ce, route)
         nids |= u_

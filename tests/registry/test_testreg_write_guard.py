@@ -1290,6 +1290,108 @@ def test_07z_autouse_fixture_change_decision_equals_full_oracle(tmp_path, monkey
     assert (pc.returncode != 0) == bool(want) and _v19_subjects(pc.stderr) == want, pc.stderr
 
 
+# ── ⑦za（主委自查）：①斷言式子內之 helper 呼叫亦展開（契約 inline_rule「每一呼叫 assertion_helpers 之節點」；原整句只記
+# 一個元素，`assert x == h.f(...)` 之 f 刪斷言漏擋）；②匯入途徑只取原文遞移提及輪廓減少名稱之測試（原取匯入檔全部測試，
+# 被 27 檔匯入之 helper 刪斷言 438 個測試逐一比較約 6–7 秒）——各種引用形式皆不得漏 ──
+HMOD = "def f(v):\n    assert v > 0\n    assert v < 9\n\n\ndef g(v):\n    assert v != 2\n"
+HM2 = "from tests.helpers.hmod import f\n\n\ndef wrap(v):\n    f(v)\n"
+T_IMP_A = '''import pytest
+
+from tests.helpers import hmod as h
+from tests.helpers.hmod import f as ff
+from tests.helpers.m2 import wrap
+
+
+def local_check(v):
+    h.f(v)
+
+
+@pytest.fixture
+def uses_f():
+    h.f(3)
+    yield
+
+
+def test_direct():
+    h.f(3)
+
+
+def test_in_assert():
+    assert h.f(3) is None
+
+
+def test_in_args():
+    assert len([h.f(4)]) == 1
+
+
+def test_alias():
+    ff(4)
+
+
+def test_local():
+    local_check(6)
+
+
+def test_via_m2():
+    wrap(7)
+
+
+def test_fixture(uses_f):
+    assert True
+
+
+@pytest.mark.usefixtures("uses_f")
+class TestCls:
+    def test_m(self):
+        assert True
+
+
+def test_unrelated():
+    h.g(1)
+'''
+T_IMP_B = '''import pytest
+
+from tests.helpers import hmod
+
+
+@pytest.fixture(autouse=True)
+def auto_f():
+    hmod.f(1)
+    yield
+
+
+def test_b1():
+    assert True
+'''
+IMP_FILES = {**FX_FILES, "tests/helpers/hmod.py": HMOD, "tests/helpers/m2.py": HM2,
+             "tests/test_imp_a.py": T_IMP_A, "tests/test_imp_b.py": T_IMP_B}
+IMP_MUST = {f"tests/test_imp_a.py::{n}" for n in ("test_direct", "test_in_assert", "test_in_args", "test_alias",
+                                                  "test_local", "test_via_m2", "test_fixture", "TestCls::test_m")} \
+    | {"tests/test_imp_b.py::test_b1"}
+
+
+def test_07za_import_route_reference_forms_and_nested_calls(tmp_path, monkeypatch):
+    """helper 模組 f 刪一個斷言：經直接呼叫、斷言式子內、斷言式子內之引數內、匯入別名、同檔 helper、他 helper 模組、模組內
+    fixture（參數與類別 usefixtures）、模組內 autouse fixture 引用 f 之測試皆 V19（與完整反推 oracle 相等，且含 IMP_MUST）；
+    只用 g 之 test_unrelated 不列且不逐一展開（匯入途徑只取原文遞移提及者）；hook 與 pre-commit 同判。"""
+    r = _repo(tmp_path, IMP_FILES)
+    _edit(r, "tests/helpers/hmod.py", "    assert v < 9\n", "")
+    oracle = _full_oracle(r, IMP_FILES)
+    assert IMP_MUST <= oracle and "tests/test_imp_a.py::test_unrelated" not in oracle, sorted(IMP_MUST - oracle)
+    calls = []
+    orig = testreg._Engine.elements
+    monkeypatch.setattr(testreg._Engine, "elements", lambda self, nid: calls.append(nid) or orig(self, nid))
+    got = {f.subject for f in testreg.check(r.root, helpers=["tests/helpers/hmod.py"]) if f.rule == "V19"}
+    monkeypatch.undo()
+    assert got == oracle and "tests/test_imp_a.py::test_unrelated" not in calls, (sorted(got ^ oracle), len(calls))
+    proc = r.hook("tests/helpers/hmod.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) == oracle, proc.stderr
+    r.install_precommit()
+    r.stage("tests/helpers/hmod.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) == oracle, pc.stderr
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)
@@ -1751,6 +1853,73 @@ def test_boundary_07f_autouse_plugin_fixture_change_wall_clock(autouse_worktree,
         expected = _collected_real(wt)
         got = _v19_subjects(first.stderr)
         assert got == expected, (len(got), len(expected), sorted(got ^ expected)[:5])
+
+
+def _pick_wide_helper(root: Path):
+    """真實樹（不經 testreg）：tests/ 下非測試、非 conftest 之模組依「以 import 敘述匯入它之測試檔數」由多而少，取第一個
+    「模組層函式本體頂層有單行 assert，且有測試函式原文以 `名稱(` 呼叫它」者 ⇒ (路徑, 函式名, assert 行號, 字面呼叫者 nodeid)。"""
+    rels = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "tests/*.py", "tests/**/*.py"], capture_output=True,
+                          text=True, check=True).stdout.split("\0")
+    rels = [r for r in rels if r]
+    is_test = lambda r: fnmatch.fnmatchcase(r.rsplit("/", 1)[-1], "test_*.py")
+    trees = {r: ast.parse((root / r).read_text(encoding="utf-8")) for r in rels}
+    importers: Dict[str, set] = {}
+    for r in filter(is_test, rels):
+        for n in ast.walk(trees[r]):
+            mods = [a.name for a in n.names] if isinstance(n, ast.Import) else \
+                [n.module, *(f"{n.module}.{a.name}" for a in n.names)] if isinstance(n, ast.ImportFrom) and n.module else []
+            for m in mods:
+                p = m.replace(".", "/") + ".py"
+                if p in trees and not is_test(p) and not p.endswith("conftest.py"):
+                    importers.setdefault(p, set()).add(r)
+    fn = (ast.FunctionDef, ast.AsyncFunctionDef)
+    for p in sorted(importers, key=lambda x: (-len(importers[x]), x)):
+        for d in trees[p].body:
+            asserts = [s for s in getattr(d, "body", []) if isinstance(s, ast.Assert) and s.lineno == s.end_lineno]
+            if not isinstance(d, fn) or not asserts:
+                continue
+            callers = set()
+            for r in sorted(importers[p]):
+                src = (root / r).read_text(encoding="utf-8")
+                for n in trees[r].body:
+                    tests = [(n.name, n)] if isinstance(n, fn) and n.name.startswith("test") else \
+                        [(f"{n.name}::{m.name}", m) for m in n.body if isinstance(m, fn) and m.name.startswith("test")] \
+                        if isinstance(n, ast.ClassDef) and n.name.startswith("Test") else []
+                    callers |= {f"{r}::{q}" for q, t in tests if f"{d.name}(" in (ast.get_source_segment(src, t) or "")}
+            if callers:
+                return p, d.name, asserts[0].lineno, callers
+    return None
+
+
+def test_boundary_07g_widely_imported_helper_decrease_wall_clock(head_worktree):
+    """真實規模（主委自查）：被最多測試檔匯入之 helper 模組，刪其一個「有測試字面呼叫」之函式之一行斷言（必擋）⇒ hook rc 2、
+    pre-commit rc≠0、各 3 次中位 < 5 s，且字面呼叫該函式之測試（含寫在 assert 式子內者）全數在 V19 主體。匯入途徑不得取
+    匯入檔之全部測試逐一比較（被 27 檔匯入之 helper 實測約 6–7 秒；式子內呼叫未展開時漏擋）。每案起點斷言共用工作樹乾淨。"""
+    _assert_clean(head_worktree)
+    pick = _pick_wide_helper(head_worktree)
+    assert pick, "前提：真實樹有被測試檔匯入、含單行斷言且有字面呼叫者之 helper 函式"
+    rel, _name, line, callers = pick
+    p = head_worktree / rel
+    src = p.read_text(encoding="utf-8")
+    lines = src.splitlines(keepends=True)
+    del lines[line - 1]
+    p.write_text("".join(lines), encoding="utf-8")
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(p)}})
+    times, first = [], None
+    try:
+        for _ in range(3):
+            t0 = time.perf_counter()
+            proc = subprocess.run(["bash", str(head_worktree / "scripts/testreg_write_guard.sh")], input=payload,
+                                  capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
+            times.append(time.perf_counter() - t0)
+            assert proc.returncode == 2, proc.stderr[-2000:]
+            first = first or proc
+        staged = _staged_times_at(head_worktree, rel, 3, True)
+    finally:
+        p.write_text(src, encoding="utf-8")
+    assert statistics.median(times) < 5.0, times
+    assert statistics.median(staged) < 5.0, staged
+    assert callers <= _v19_subjects(first.stderr), sorted(callers - _v19_subjects(first.stderr))[:5]
 
 
 def _asserting_fixtures(root: Path, dotted: str) -> set:
