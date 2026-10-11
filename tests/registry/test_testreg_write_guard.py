@@ -280,10 +280,12 @@ def test_b():
     assert add(2, 3) == 5
 '''
 TOL_MOD = "TOL = 1e-9\n"
-CHECKS_MOD = "from tests.helpers.tolerances import TOL\n\n\ndef check_close(x, t=TOL):\n    assert abs(x) < t\n"
+CHECKS_MOD = ("from tests.helpers.tolerances import TOL\nimport tests.helpers.tolerances as tolmod\n"
+              "from tests.helpers import tolerances as tolpkg\n\n\ndef check_close(x, t=TOL):\n    assert abs(x) < t\n\n\n"
+              "def check_alias(x):\n    assert abs(x) < tolmod.TOL\n\n\ndef check_pkg(x):\n    assert abs(x) < tolpkg.TOL\n")
 T_TOL = '''import tests.helpers.tolerances as tol
 from tests.helpers import tolerances
-from tests.helpers.checks import check_close
+from tests.helpers.checks import check_alias, check_close, check_pkg
 from tests.helpers.tolerances import TOL
 from momentum.calc import add
 
@@ -311,6 +313,27 @@ def test_function_level_import():
 
 def test_unrelated():
     assert add(1, 1) == 2
+
+
+def test_alias_helper():
+    check_alias(add(0.1, -0.1))
+
+
+def test_pkg_helper():
+    check_pkg(add(0.1, -0.1))
+'''
+T_SHAPES = '''from momentum.calc import add
+from tests.fixtures.fx_helpers import check_pos
+from tests.helpers.checks import check_close
+
+
+class TestK:
+    def test_k(self):
+        check_pos(add(1, 2))
+
+
+async def test_async():
+    check_close(add(0.1, -0.1))
 '''
 T_LOCAL = '''from momentum.calc import add
 
@@ -327,7 +350,7 @@ FX_FILES = {**BASE, "tests/test_local.py": T_LOCAL, "tests/__init__.py": "", "te
             "tests/fixtures/fx_helpers.py": HELPERS_FX,
             "tests/conftest.py": CONFTEST, "tests/test_fx.py": T_FX, "tests/test_autouse.py": T_AUTOUSE,
             "tests/helpers/__init__.py": "", "tests/helpers/tolerances.py": TOL_MOD, "tests/helpers/checks.py": CHECKS_MOD,
-            "tests/helpers/loose.py": "TOL = 1e-3\n", "tests/test_tol.py": T_TOL}
+            "tests/helpers/loose.py": "TOL = 1e-3\n", "tests/test_tol.py": T_TOL, "tests/test_shapes.py": T_SHAPES}
 
 
 def _v19_subjects(stderr: str) -> set:
@@ -339,7 +362,7 @@ HOOK_CASES = {
     "07_delete_assert_in_keep_file": ("tests/test_keep.py", "    assert result > 0\n", "",
                                       {"tests/test_keep.py::test_one"}),
     "07c_fixtures_helper_drops_assert": ("tests/fixtures/fx_helpers.py", "    assert x < 100\n", "",
-                                         {"tests/test_fx.py::test_uses_helper"}),
+                                         {"tests/test_fx.py::test_uses_helper", "tests/test_shapes.py::TestK::test_k"}),
     "07c_conftest_fixture_drops_assert": ("tests/conftest.py", "    assert value < 10\n", "",
                                           {"tests/test_fx.py::test_uses_fixture"}),
     "07c_helper_local_rename_ok": ("tests/conftest.py", "    value = 5\n    assert value > 0\n    assert value < 10\n"
@@ -368,15 +391,25 @@ HOOK_CASES = {
     "07m_module_constant_import_forms": ("tests/helpers/tolerances.py", "TOL = 1e-9\n", "TOL = 1e-3\n",
                                          {f"tests/test_tol.py::{n}" for n in (
                                              "test_from_import", "test_module_alias", "test_package_from_import",
-                                             "test_default_value", "test_function_level_import")}),
-    # 07p（審查 r22）：helper 模組層非定義敘述改變——差量判定須退回完整反推
+                                             "test_default_value", "test_function_level_import", "test_alias_helper",
+                                             "test_pkg_helper")} | {"tests/test_shapes.py::test_async"}),
+    # 07p（審查 r22／r23）：helper 模組層 import 改變——差量判定須回 None、退回完整反推
     "07p_helper_import_source_changed": ("tests/helpers/checks.py", "from tests.helpers.tolerances import TOL\n",
                                          "from tests.helpers.loose import TOL\n",
-                                         {"tests/test_tol.py::test_default_value"}),
+                                         {"tests/test_tol.py::test_default_value", "tests/test_shapes.py::test_async"}),
     "07p_helper_import_replaced_by_rebinding": ("tests/helpers/checks.py", "from tests.helpers.tolerances import TOL\n",
-                                                "TOL = 1e-3\n", {"tests/test_tol.py::test_default_value"}),
+                                                "TOL = 1e-3\n", {"tests/test_tol.py::test_default_value",
+                                                                 "tests/test_shapes.py::test_async"}),
+    "07p_helper_alias_import_source_changed": ("tests/helpers/checks.py", "import tests.helpers.tolerances as tolmod\n",
+                                               "import tests.helpers.loose as tolmod\n",
+                                               {"tests/test_tol.py::test_alias_helper"}),
+    "07p_helper_package_import_source_changed": ("tests/helpers/checks.py",
+                                                 "from tests.helpers import tolerances as tolpkg\n",
+                                                 "from tests.helpers import loose as tolpkg\n",
+                                                 {"tests/test_tol.py::test_pkg_helper"}),
     "07p_conftest_unrelated_import_ok": ("tests/conftest.py", "import pytest\n", "import os\nimport pytest\n", set()),
 }
+IMPORT_CASES = sorted(c for c in HOOK_CASES if c.startswith("07p_"))
 
 
 @pytest.mark.parametrize("case", sorted(HOOK_CASES))
@@ -401,7 +434,8 @@ def test_07c_helper_change_lists_callers(tmp_path):
     _edit(r, "tests/fixtures/fx_helpers.py", "    assert x < 100\n", "")
     # helper_callers 為檔層候選集合：該檔任一 helper 之呼叫者（試作實證；被報 V19 者另由 07c 案例斷言只有 test_uses_helper）
     assert testreg.helper_callers(r.root, "tests/fixtures/fx_helpers.py") == [
-        "tests/test_fx.py::test_star", "tests/test_fx.py::test_threshold", "tests/test_fx.py::test_uses_helper"]
+        "tests/test_fx.py::test_star", "tests/test_fx.py::test_threshold", "tests/test_fx.py::test_uses_helper",
+        "tests/test_shapes.py::TestK::test_k"]
     proc = r.hook("tests/fixtures/fx_helpers.py")
     assert "tests/test_fx.py::test_uses_helper" in proc.stderr
 
@@ -421,15 +455,21 @@ HELPER_CASES = sorted(c for c, (rel, *_) in HOOK_CASES.items() if not is_test_pa
 
 
 def _full_oracle(r: TmpRepo) -> set:
-    """完整反推之定義：暫存倉每一測試函式於 HEAD 與工作樹各自完整展開之斷言多重集合比較（不經呼叫者反推）。"""
+    """完整反推之定義：暫存倉每一測試函式（pytest 預設收集規則：模組層 `test*` 函式含 async、`Test*` 類別內 `test*`
+    方法）於 HEAD 與工作樹各自完整展開之斷言多重集合比較（不經呼叫者反推）。"""
+    fn = (ast.FunctionDef, ast.AsyncFunctionDef)
     out = set()
     for rel in sorted(p for p in FX_FILES if is_test_path(p)):
+        nids = []
         for n in ast.parse(r.read(rel)).body:
-            if isinstance(n, ast.FunctionDef) and n.name.startswith("test_"):
-                nid = f"{rel}::{n.name}"
-                if testreg.multiset_decreased(testreg.assertion_multiset(r.root, nid, "HEAD"),
-                                              testreg.assertion_multiset(r.root, nid, "worktree")):
-                    out.add(nid)
+            if isinstance(n, fn) and n.name.startswith("test"):
+                nids.append(f"{rel}::{n.name}")
+            elif isinstance(n, ast.ClassDef) and n.name.startswith("Test"):
+                nids += [f"{rel}::{n.name}::{m.name}" for m in n.body if isinstance(m, fn) and m.name.startswith("test")]
+        for nid in nids:
+            if testreg.multiset_decreased(testreg.assertion_multiset(r.root, nid, "HEAD"),
+                                          testreg.assertion_multiset(r.root, nid, "worktree")):
+                out.add(nid)
     return out
 
 
@@ -441,6 +481,16 @@ def test_07p_delta_equals_full_reverse_oracle(tmp_path, case):
     r = _repo(tmp_path, FX_FILES)
     _edit(r, rel, old, new)
     assert _v19_subjects(r.hook(rel).stderr) == _full_oracle(r) == expect
+
+
+@pytest.mark.parametrize("case", IMPORT_CASES)
+def test_07p_import_change_decreased_defs_none(tmp_path, case):
+    """模組層 import 之任一改變（ImportFrom 來源、改為同名賦值、`import … as` 別名來源、套件 `from … import 模組 as`
+    來源、無關 import）⇒ `decreased_defs` 回 None（退回完整反推），不以字面形態挑選。"""
+    rel, old, new, _ = HOOK_CASES[case]
+    r = _repo(tmp_path, FX_FILES)
+    _edit(r, rel, old, new)
+    assert testreg.decreased_defs(r.root, rel) is None
 
 
 def test_mutation_delta_without_module_fallback_misses_07p(tmp_path, monkeypatch, capsys):

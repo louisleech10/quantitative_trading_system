@@ -312,7 +312,8 @@ def check(repo_root: Path, *, paths: Sequence[str] = (), manifest: Optional[str]
 
 def helper_callers(repo_root: Path, helper_path: str, tree: str = "worktree") -> List[str]:
     """tests/ 下非測試檔（conftest、fixtures、helper 模組）變更時，依 `assertion_nodes.inline_rule` 受影響之全部呼叫者
-    測試函式（函式層 nodeid，排序）。"""
+    測試函式（函式層 nodeid，排序）。候選檔＝遞移 import 閉包含該模組之測試檔（conftest 為其目錄範圍內之測試檔），
+    不以檔內字面名比對。"""
     raise NotImplementedError("TESTREG Task 1.5")
 
 
