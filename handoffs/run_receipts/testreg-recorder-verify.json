@@ -37,8 +37,8 @@
     "tests/api/test_batch_status_layer.py",
     "tests/api/test_cross_timeframe_event_analysis.py"
   ],
-  "base_head": "959984ddea0080309349f2f3a52ee1c8d0fd3c81",
-  "worktree_commit": "e89ab22783dd58b5c3c0056c3af69169f031e414",
+  "base_head": "4f6e9f0b7b68baef5c4c714607213a93a591737a",
+  "worktree_commit": "cc8220513fb62caa753323a463cfd3e5392001ea",
   "tree_paths": [
     ".gitignore",
     "pytest.ini",
@@ -47,7 +47,7 @@
     "tests/fixtures/testreg_recorder_plugin.py",
     "tests/registry/testreg_schema.json"
   ],
-  "head": "e89ab22783dd58b5c3c0056c3af69169f031e414",
+  "head": "cc8220513fb62caa753323a463cfd3e5392001ea",
   "recorder_loaded": true,
   "ledger_sessions_written": 1,
   "outcomes_sha256": "3885a0d03f22e31cab2d4babe646b0c342da676bcf48c5fc25c6aab5648a7f9f",
@@ -69,7 +69,7 @@
     "FAILED": 4,
     "PASSED": 195
   },
-  "wall_s": 108.4,
+  "wall_s": 100.3,
   "porcelain_lines": [
     "?? data_cache",
     "?? venv",
@@ -78,8 +78,8 @@
   "stdout_tail": [
     "  +     '⑦ scripts/live_doc_registry.json 於本票文件 exact 列以外與 HEAD 不等',",
     "  + ]",
-    "============ 4 failed, 195 passed, 2 warnings in 103.48s (0:01:43) ============="
+    "============= 4 failed, 195 passed, 2 warnings in 95.40s (0:01:35) ============="
   ],
-  "generated": "2026-10-11T07:59:06Z",
+  "generated": "2026-10-11T12:25:30Z",
   "honest_bounds": "兩次執行各於暫存 worktree（乾淨 checkout＋venv／data_cache 連結）；porcelain 只見被追蹤檔之狀態改變與未追蹤／被忽略路徑之出現（整個被忽略之既有目錄內新增檔不可見）；outcome 由 -v 報告列解析（同一 nodeid 之 teardown ERROR 另成一列）"
 }
