@@ -733,11 +733,42 @@ def _hook_times_at(root: Path, rel: str) -> list:
     return times
 
 
+def _assert_clean(root: Path) -> None:
+    """共用之 HEAD 工作樹每案起點：已追蹤檔無改動、暫存區為空、HEAD 未變（量測不得受前案污染；審查 r28）。"""
+    st = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"], capture_output=True,
+                        text=True, check=True, env=clean_env()).stdout
+    head = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True, check=True,
+                          env=clean_env()).stdout.strip()
+    main = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True, check=True,
+                          env=clean_env()).stdout.strip()
+    assert st == "" and head == main, (st, head, main)
+
+
+def _staged_times_at(root: Path, rel: str, runs: int, want_red: bool) -> list:
+    """pre-commit 路徑之真實規模計時：暫存 rel 後直接呼叫 pre-commit 所跑之 `testreg.py check --staged`（不提交），
+    rc 依 want_red；跑完撤回暫存。"""
+    subprocess.run(["git", "-C", str(root), "add", "--", rel], check=True, capture_output=True, env=clean_env())
+    times = []
+    try:
+        for _ in range(runs):
+            t0 = time.perf_counter()
+            proc = subprocess.run([PY, str(root / "scripts/testreg.py"), "check", "--staged"], capture_output=True,
+                                  text=True, env=clean_env(), cwd=str(root))
+            times.append(time.perf_counter() - t0)
+            assert (proc.returncode != 0) == want_red, proc.stderr[-2000:]
+    finally:
+        subprocess.run(["git", "-C", str(root), "reset", "-q", "--", rel], check=True, capture_output=True,
+                       env=clean_env())
+    return times
+
+
 @pytest.mark.parametrize("edit", ["unchanged", "comment_appended", "fixture_docstring_added", "import_added"])
 def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, edit):
     """真實規模（HEAD 全部測試檔）：tests/conftest.py 未改／加註解／為一個 fixture 加說明／於最後一個模組層 import
     之後加一行無關 import（皆不減斷言）後觸發 hook，10 次牆鐘中位 < 1 s（實作須以差量判定：只對完整展開輪廓減少之
-    名稱反推呼叫者——完整反推實測 245 秒；import 改變不得一律退回完整反推）。"""
+    名稱反推呼叫者——完整反推實測 245 秒；import 改變不得一律退回完整反推）；同一改動暫存後之 pre-commit
+    （`check --staged`）亦 rc 0 且 10 次中位 < 1 s。每案起點斷言共用工作樹乾淨。"""
+    _assert_clean(head_worktree)
     p = head_worktree / "tests/conftest.py"
     src = p.read_text(encoding="utf-8")
     if edit == "comment_appended":
@@ -758,9 +789,11 @@ def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, e
         p.write_text("".join(lines), encoding="utf-8")
     try:
         times = _hook_times_at(head_worktree, "tests/conftest.py")
+        staged = _staged_times_at(head_worktree, "tests/conftest.py", 10, False)
     finally:
         p.write_text(src, encoding="utf-8")
     assert statistics.median(times) < 1.0, times
+    assert statistics.median(staged) < 1.0, staged
 
 
 INI_TIMING = {
@@ -778,7 +811,9 @@ INI_TIMING = {
 def test_boundary_06_pytest_ini_wall_clock(head_worktree, edit):
     """真實規模 pytest.ini：加標記註冊、python_functions 只增模式（超集，不檢）⇒ rc 0 且 10 次中位 < 1 s；四項收集設定
     任一縮減（必擋：全部測試檔 V20，兩樹以單一批次讀取）⇒ rc 2 且 3 次中位 < 5 s（§C 之必擋例外；試作逐檔讀 HEAD 約 20 秒、
-    批次讀取後四項分別約 1.5–2.6 秒——成本為解析全部測試檔以列出消失之 nodeid）。"""
+    批次讀取後四項分別約 1.5–2.6 秒——成本為解析全部測試檔以列出消失之 nodeid）；同一改動暫存後之 pre-commit
+    （`check --staged`）同一 rc 方向與同一門檻。每案起點斷言共用工作樹乾淨。"""
+    _assert_clean(head_worktree)
     old, new, blocking = INI_TIMING[edit]
     p = head_worktree / "pytest.ini"
     src = p.read_text(encoding="utf-8")
@@ -797,9 +832,11 @@ def test_boundary_06_pytest_ini_wall_clock(head_worktree, edit):
                                   capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
             times.append(time.perf_counter() - t0)
             assert proc.returncode == want_rc, proc.stderr[-2000:]
+        staged = _staged_times_at(head_worktree, "pytest.ini", runs, blocking)
     finally:
         p.write_text(src, encoding="utf-8")
     assert statistics.median(times) < limit, times
+    assert statistics.median(staged) < limit, staged
 
 
 def test_boundary_02_registry_contract_runs_validate_only(tmp_path):
