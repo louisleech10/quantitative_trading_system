@@ -541,7 +541,6 @@ def test_mutation_hook_v19_count_only_misses_weaker(tmp_path, monkeypatch, capsy
     capsys.readouterr()
 
 
-HELPER_CASES = sorted(c for c, (rel, *_) in HOOK_CASES.items() if not is_test_path(rel))
 
 
 def _full_oracle(r: TmpRepo) -> set:
@@ -557,10 +556,11 @@ def _full_oracle(r: TmpRepo) -> set:
                                           testreg.assertion_multiset(r.root, nid, "worktree"))}
 
 
-@pytest.mark.parametrize("case", HELPER_CASES)
+@pytest.mark.parametrize("case", sorted(HOOK_CASES))
 def test_07p_delta_equals_full_reverse_oracle(tmp_path, case):
-    """差量判定（產出端 hook 只對完整展開輪廓減少之模組層名稱反推呼叫者）之 V19 主體，逐案等於完整反推 oracle
-    （暫存倉全量逐函式比較）；oracle 只在本測試算，不進產出端。"""
+    """差量判定（helper 檔：只對完整展開輪廓減少之模組層名稱反推呼叫者；測試檔：模組層共用定義減少才全檔，否則只算
+    本體改了之測試函式——審查 r29）之 V19 主體，逐案（helper 檔與測試檔全部 hook 案例）等於完整反推 oracle（暫存倉
+    全量逐函式比較）；oracle 只在本測試算，不進產出端。"""
     rel, old, new, expect = HOOK_CASES[case]
     r = _repo(tmp_path, FX_FILES)
     _edit(r, rel, old, new)
@@ -837,6 +837,32 @@ def test_boundary_06_pytest_ini_wall_clock(head_worktree, edit):
         p.write_text(src, encoding="utf-8")
     assert statistics.median(times) < limit, times
     assert statistics.median(staged) < limit, staged
+
+
+ROUTE_TIMING = {
+    # 名稱: (改動之檔, 附加之尾字串)——皆不減斷言、語意不變；分別走測試檔、catalog（全部 entry 規則）、manifest（V22）路由
+    "test_file_comment": ("tests/registry/test_testreg_validate.py", "\n# 註解\n"),
+    "catalog_trailing_newline": (CATALOG_REL, "\n"),
+    "manifest_trailing_newline": ("docs/manifests/TESTREG.json", "\n"),
+}
+
+
+@pytest.mark.parametrize("edit", sorted(ROUTE_TIMING))
+def test_boundary_07_route_wall_clock_hook_and_precommit(head_worktree, edit):
+    """真實規模之其餘產出端路由（審查 r29）：測試檔、catalog、manifest 各做一個不減檢查之改動 ⇒ hook 與 pre-commit
+    （暫存後直接跑 `check --staged`）皆 rc 0 且各 10 次中位 < 1 s（§C 各自計時）。每案起點斷言共用工作樹乾淨。"""
+    _assert_clean(head_worktree)
+    rel, tail = ROUTE_TIMING[edit]
+    p = head_worktree / rel
+    src = p.read_text(encoding="utf-8")
+    p.write_text(src + tail, encoding="utf-8")
+    try:
+        times = _hook_times_at(head_worktree, rel)
+        staged = _staged_times_at(head_worktree, rel, 10, False)
+    finally:
+        p.write_text(src, encoding="utf-8")
+    assert statistics.median(times) < 1.0, times
+    assert statistics.median(staged) < 1.0, staged
 
 
 def test_boundary_02_registry_contract_runs_validate_only(tmp_path):
