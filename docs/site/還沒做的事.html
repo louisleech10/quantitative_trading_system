@@ -265,6 +265,14 @@
 <td>GAP-2b 橋本體</td>
 <td>等 ML 層穩定</td>
 </tr>
+<tr>
+<td><strong>FF 生成提速</strong>（2026-10-11 實測：你 UI 全開設定 ETHUSDT 1h＋12h 全歷史，7 月 58.5 分 → 現在 74 分；多出的 16 分全在 FF-STAT 逐欄平穩化，屬正確性換來的計算，非 bug。預處理 L6.5 佔總時間約四分之三且只用 1 核；6 月寫好但擱置的 B7 多核並行（<code>docs/B7_L65_PARALLEL_SPEC.md</code>）可重啟，並檢討平穩化檢定算法；結果須逐位元相同，先小規模實測、省不到三成不做）</td>
+<td>排序位置先經委員討論再請你決定；計時腳本與各版耗時見主委收據</td>
+</tr>
+<tr>
+<td>市場資料快取被截短（<code>market_data/fear_greed_daily_cache.csv</code> 9/22 自動更新後只剩 2021 年起，少了 2018–2021；工作區版本勿提交）</td>
+<td>下次動市場資料抓取時修抓取上限與合併邏輯</td>
+</tr>
 </tbody>
 </table></div>
 <hr />
