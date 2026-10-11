@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TESTREG 測試清冊：規格修正審閱（第 33–34 版）</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="top"><a href="index.html">← 白話說明</a><span class="crumb">TESTREG規格v33修正審閱.md</span></nav>
+<main>
+<h1 id="testreg-測試清冊規格修正審閱第-3334-版">TESTREG 測試清冊：規格修正審閱（第 33–34 版）</h1>
+<blockquote>
+<p><strong>要你決定的事</strong>：是否核可規格第 34 版（相對你 10/11 交委員共識核可的第 32 版之修正，逐條列在下面）。核可後三家蓋章，我就把已試做好的程式修正放進第 1 批，再審一輪收尾。
+<strong>審查狀態：🔄 三家審查中（第 34 輪）。</strong> 第 1 批審碼第 2 輪三家一致認定規格有一個漏洞，要改規格才能修（第 33 版）；第 33 輪 codex 又找到 3 處不夠嚴謹（第 34 版）；composer、grok 兩輪都零意見。
+<strong>程式改了沒：⚠️ 一部分。</strong> 第 1 批主體（清冊、自動記錄、寫檔當下檢查）已提交並推上 GitHub，驗收 367 項全過。這次的修正已在暫存環境試做、驗過，存成補丁，<strong>還沒放進正式程式</strong>——要等你核可、三家蓋章。
+規格：<code>docs/TESTREG_SPEC.md</code>；施工清單：<code>docs/manifests/TESTREG.json</code>；試做補丁：<code>handoffs/run_receipts/testreg_probes/v33_trial_impl.patch</code>。</p>
+</blockquote>
+<hr />
+<h2 id="一漏洞是什麼第-33-版">一、漏洞是什麼（第 33 版）</h2>
+<p>「測試裡的檢查只能變多不能變少」這條規則，要算出每個測試有哪些檢查，包括它用到的<strong>共用準備步驟</strong>（pytest 叫 fixture）裡的檢查。</p>
+<p>第 32 版只算兩種「用到」：</p>
+<ul>
+<li>測試在參數裡點名要哪個準備步驟；</li>
+<li>自動套用到所有測試的準備步驟。</li>
+</ul>
+<p><strong>漏了第三種</strong>：在測試上方加一個標註「先跑某某準備步驟」（<code>@pytest.mark.usefixtures(...)</code>），或在檔案開頭對整個檔加這個標註。pytest 會照跑，但第 32 版不算它。</p>
+<p><strong>後果</strong>：那個準備步驟裡的檢查被刪掉，或提供它的外掛被拿掉，不會被擋。真實專案有 15 處這樣寫（都是 IC 相關測試，用來確保測試不會把結果寫進真實資料夾）。</p>
+<p><strong>修法</strong>：這三種「用到」都算。標註寫在測試上、寫在測試所屬的類別上（包括從別的類別繼承來的）、寫在檔案開頭，都算。</p>
+<h2 id="二第-34-版第-33-輪-codex-找到的-3-處">二、第 34 版：第 33 輪 codex 找到的 3 處</h2>
+<ol>
+<li><strong>（會漏擋）繼承寫成「模組.類別」時沒算到</strong>：例如 <code>class TestX(base.Base)</code>，而標註寫在另一個檔案的 <code>Base</code> 上。修好後，另一個檔案的基底類別、基底的基底，都會追到。也順手補了兩個同類的洞：
+<ul>
+<li>在共用檔裡把基底類別的標註拿掉 → 現在會擋，並列出所有繼承它的測試；</li>
+<li>在測試檔裡把某個類別的標註拿掉 → 現在會擋，連同繼承它的子類別一起列出。</li>
+</ul>
+</li>
+<li><strong>（會誤擋）把標註「當成資料」也算進去</strong>：例如把標註放在參數清單裡當值、或塞在別的標註裡面，pytest 其實不會照跑，但第 33 版會算。改成只算 pytest 真的會套用的寫法。另外查到一個要算的特例：參數化測試的某一組參數掛了這個標註，pytest 只對那一組套用；我們以「整個測試函式」為單位，所以算這個函式有用到。</li>
+<li><strong>（格式）試做補丁檔有多餘空白</strong>：已重產並確認仍能正確套用。</li>
+</ol>
+<h2 id="三速度寫檔當下檢查仍守一般改動-1-秒內會被擋的-5-秒內">三、速度（寫檔當下檢查仍守「一般改動 1 秒內、會被擋的 5 秒內」）</h2>
+<p>都在真實專案規模實測過：</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>情況</th>
+<th>會不會擋</th>
+<th>時間</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>從共用設定檔拿掉一個外掛（真實專案：提供上述準備步驟的外掛）</td>
+<td>會擋，列出 138 個測試</td>
+<td>約 0.6 秒</td>
+</tr>
+<tr>
+<td>只調換外掛順序</td>
+<td>不擋</td>
+<td>約 0.6 秒</td>
+</tr>
+<tr>
+<td>拿掉一個「對所有測試自動做檢查」的外掛（真實專案沒有這種，造一個來量）</td>
+<td>會擋，列出全部 8,563 個測試</td>
+<td>約 3 秒</td>
+</tr>
+<tr>
+<td>測試檔裡把一個輔助類別改換基底</td>
+<td>不擋</td>
+<td>約 0.7 秒</td>
+</tr>
+</tbody>
+</table></div>
+<p>最後一項我試做第一版時要 <strong>41 秒</strong>（拿全部測試重算一遍），改成「只找名字出現過這個類別的檔案」後約 0.7 秒。</p>
+<h2 id="四驗收怎麼證明真的會擋">四、驗收怎麼證明「真的會擋」</h2>
+<ul>
+<li>新加的驗收（用標註套用、繼承、外掛移除、拿掉標註、只當資料不算等情況）：用第 32 版的程式跑全部紅燈，換第 33 版試做跑第 34 版新增的 4 項也紅燈，用第 34 版試做全綠。</li>
+<li>真實規模另加兩項：拿掉外掛時，用一個<strong>只看原始碼文字、不依賴主程式</strong>的獨立方法算出「該被擋的測試」，必須全部出現在擋下名單裡；以及上表的速度。</li>
+</ul>
+<h2 id="五這兩輪另外決定的事三家已判不用你決定">五、這兩輪另外決定的事（三家已判，不用你決定）</h2>
+<ul>
+<li><strong>審碼第 1 輪 codex 的兩個問題已修並提交</strong>：提交的檔案很多時，提交前檢查會被跳過（1 萬個檔名實測重現）；拿掉測試外掛時檢查要好幾分鐘。兩個修正與對應驗收已記進規格第 1 批的驗收項目。</li>
+<li><strong>跨票影響</strong>：這批把新檢查登記進總表後，FRAMEPATH 一條過嚴的既有檢查會變紅（它規定 FRAMEPATH 進行期間總表只准 FRAMEPATH 自己改）。三家同意照規格登記，FRAMEPATH 第二批開工前先把那條檢查改成只看 FRAMEPATH 自己的改動。</li>
+</ul>
+<h2 id="六沒做的邊界">六、沒做的（邊界）</h2>
+<ul>
+<li>標註的內容不是直接寫出名字、而是用變數或程式算出來的：無法事先判讀，不算。真實專案沒有這種寫法；這和規格既有的「刻意寫成怪樣子來繞過」歸同一類。</li>
+</ul>
+
+<footer>由 <code>scripts/plain_docs_render.sh</code> 自 <code>白話說明/TESTREG規格v33修正審閱.md</code> 生成；HTML 是產物，請改 .md。</footer>
+</main>
+</body>
+</html>

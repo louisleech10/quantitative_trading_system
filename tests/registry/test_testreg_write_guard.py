@@ -803,10 +803,11 @@ USEFX2_NEW = {n for n in _collected(USEFX2_FILES) if "/test_usefx_attr.py" in n 
 
 def test_07x_v34_attribute_base_conftest_fixture_assert_deleted(tmp_path):
     """helper 模組之基底類別（子類別以 `別名.類別` 繼承）以 usefixtures 套用 conftest fixture，刪其斷言 ⇒ 子類別測試 V19；
-    巢狀標記不計、pytest.param(marks=…) 計入（hook 與 pre-commit 同判）。"""
+    巢狀標記不計；掛在 pytest.param(marks=…) 之 usefixtures 為 pytest 8.4 收集時拒收之非法寫法（ValueError），不計
+    （SPEC v35，審查 r34 GROK-R34-P1-01）。hook 與 pre-commit 同判。"""
     r = _repo(tmp_path, USEFX2_FILES)
     _edit(r, "tests/conftest.py", "    assert value < 10\n", "")
-    want = {"tests/test_usefx_attr.py::TestAttrBase::test_attr_base", "tests/test_usefx_nest.py::test_param_marks"}
+    want = {"tests/test_usefx_attr.py::TestAttrBase::test_attr_base"}
     proc = r.hook("tests/conftest.py")
     assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX2_NEW == want, proc.stderr
     r.install_precommit()
@@ -848,6 +849,75 @@ def test_07x_v34_test_class_marker_removed(tmp_path):
     assert proc.returncode != 0 and _v19_subjects(proc.stderr) == {
         "tests/test_usefx_cls.py::TestDecorated::test_cls_decorated",
         "tests/test_usefx_cls.py::TestChild::test_inherited"}, proc.stderr
+
+
+# ── ⑦x（v35；審查 r34 CODEX-R34-P1-01／P1-02）：基底類別以套件內相對匯入、或匯入後改名（別名）繼承 ──
+T_USEFX_REL = '''from .helpers.usefx_base import Base, PlugBase
+
+
+class TestRelBase(Base):
+    def test_rel_base(self):
+        assert 1 == 1
+
+
+class TestRelPlug(PlugBase):
+    def test_rel_plug(self):
+        assert 1 == 1
+'''
+T_USEFX_ALIAS = '''from tests.helpers.usefx_base import Base as B, PlugBase as PB
+
+
+class TestAliasBase(B):
+    def test_alias_base(self):
+        assert 1 == 1
+
+
+class TestAliasPlug(PB):
+    def test_alias_plug(self):
+        assert 1 == 1
+'''
+USEFX3_FILES = {**USEFX2_FILES, "tests/test_usefx_rel.py": T_USEFX_REL, "tests/test_usefx_alias.py": T_USEFX_ALIAS}
+USEFX3_NEW = {n for n in _collected(USEFX3_FILES) if "/test_usefx_rel.py" in n or "/test_usefx_alias.py" in n}
+
+
+def test_07x_v35_premise():
+    """反例前提：相對匯入與別名繼承之測試檔原文不含 fixture 名；兩檔各兩個測試。"""
+    assert "checked_value" not in T_USEFX_REL + T_USEFX_ALIAS and "plug_req" not in T_USEFX_REL + T_USEFX_ALIAS
+    assert len(USEFX3_NEW) == 4
+
+
+def test_07x_v35_relative_and_alias_base_conftest_fixture_assert_deleted(tmp_path):
+    """conftest fixture 刪斷言 ⇒ 經相對匯入或別名繼承之基底以 usefixtures 套用該 fixture 之測試 V19（hook 與 pre-commit）。"""
+    r = _repo(tmp_path, USEFX3_FILES)
+    _edit(r, "tests/conftest.py", "    assert value < 10\n", "")
+    want = {"tests/test_usefx_rel.py::TestRelBase::test_rel_base", "tests/test_usefx_alias.py::TestAliasBase::test_alias_base"}
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX3_NEW == want, proc.stderr
+    r.install_precommit()
+    r.stage("tests/conftest.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX3_NEW == want, pc.stderr
+
+
+def test_07x_v35_relative_and_alias_base_plugin_removed(tmp_path):
+    """外掛移除 ⇒ 經相對匯入或別名繼承之基底以 usefixtures 請求其 fixture 之測試 V19。"""
+    r = _repo(tmp_path, USEFX3_FILES)
+    _edit(r, "tests/conftest.py", 'pytest_plugins = ["tests.plugins.plug", "tests.plugins.plugreq"]',
+          'pytest_plugins = ["tests.plugins.plug"]')
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX3_NEW == {
+        "tests/test_usefx_rel.py::TestRelPlug::test_rel_plug",
+        "tests/test_usefx_alias.py::TestAliasPlug::test_alias_plug"}, proc.stderr
+
+
+def test_07x_v35_helper_base_marker_removed_relative_and_alias(tmp_path):
+    """helper 基底類別拿掉 usefixtures ⇒ 經相對匯入或別名繼承之子類別測試亦列出（hook）。"""
+    r = _repo(tmp_path, USEFX3_FILES)
+    _edit(r, "tests/helpers/usefx_base.py", '@pytest.mark.usefixtures("checked_value")\nclass Base:', "class Base:")
+    proc = r.hook("tests/helpers/usefx_base.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX3_NEW == {
+        "tests/test_usefx_rel.py::TestRelBase::test_rel_base",
+        "tests/test_usefx_alias.py::TestAliasBase::test_alias_base"}, proc.stderr
 
 
 def test_07c_helper_change_precommit_red(tmp_path):

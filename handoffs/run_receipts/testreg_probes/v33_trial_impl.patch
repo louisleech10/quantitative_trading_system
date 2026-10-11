@@ -1,5 +1,5 @@
 diff --git a/scripts/testreg.py b/scripts/testreg.py
-index e9a75ff7..15774160 100644
+index e9a75ff7..c813e4ce 100644
 --- a/scripts/testreg.py
 +++ b/scripts/testreg.py
 @@ -324,6 +324,90 @@ def _fixture_info(fn: ast.AST) -> Tuple[bool, bool]:
@@ -12,26 +12,26 @@ index e9a75ff7..15774160 100644
 +
 +
 +def _usefixtures_in(nodes: Iterable[ast.AST]) -> List[str]:
-+    """裝飾器或 pytestmark 值中 usefixtures 標記之字串字面引數（依出現序；SPEC v34）。只認 pytest 實際套用者：直接標記
-+    （裝飾器本身、pytestmark 值本身或其清單元素）與 parametrize 參數值中 `pytest.param(…, marks=…)` 之直接標記（pytest
-+    對該參數實例套用）；巢狀於其他標記之引數、或本身作為參數值者不計（審查 r33 CODEX-R33-P2-02）；非字串字面之引數無法
-+    靜態解析，不納入。"""
++    """裝飾器或 pytestmark 值中 usefixtures 標記之字串字面引數（依出現序；SPEC v35）。只認 pytest 實際套用者＝直接標記
++    （裝飾器本身、pytestmark 值本身或其清單元素）；巢狀於其他標記之引數、本身作為參數值者不計（審查 r33 CODEX-R33-P2-02），
++    掛在 `pytest.param(…, marks=…)` 者 pytest 8.4 收集時直接拒收（ValueError），亦不計（審查 r34 GROK-R34-P1-01）；
++    非字串字面之引數無法靜態解析，不納入。"""
 +    out: List[str] = []
-+
-+    def take(x: ast.AST) -> None:
-+        if _is_usefixtures(x):
-+            out.extend(a.value for a in x.args if isinstance(a, ast.Constant) and isinstance(a.value, str))
-+
 +    for d in nodes:
 +        for x in (d.elts if isinstance(d, (ast.List, ast.Tuple)) else [d]):
-+            take(x)
-+            if isinstance(x, ast.Call) and isinstance(x.func, ast.Attribute) and x.func.attr == "parametrize":
-+                for p in ast.walk(x):
-+                    if isinstance(p, ast.Call) and _last_name(p.func) == "param":
-+                        for k in p.keywords:
-+                            if k.arg == "marks":
-+                                for m in (k.value.elts if isinstance(k.value, (ast.List, ast.Tuple)) else [k.value]):
-+                                    take(m)
++            if _is_usefixtures(x):
++                out.extend(a.value for a in x.args if isinstance(a, ast.Constant) and isinstance(a.value, str))
++    return out
++
++
++def _base_names(eng: "_Engine", m: "_Mod", c: ast.ClassDef) -> set:
++    """類別之基底名集合＝原始書寫名（名稱或屬性名）∪ 經 `_base_class` 還原之定義類別名（別名繼承、相對匯入；SPEC v35，
++    審查 r34 CODEX-R34-P1-02）——供以類別名比對之預篩使用。"""
++    out = {b.id if isinstance(b, ast.Name) else b.attr for b in c.bases if isinstance(b, (ast.Name, ast.Attribute))}
++    for b in c.bases:
++        hit = _base_class(eng, m, b)
++        if hit is not None:
++            out.add(hit[1].name)
 +    return out
 +
 +
@@ -93,7 +93,62 @@ index e9a75ff7..15774160 100644
  def _bound_names(fn: ast.AST) -> Dict[str, Tuple[int, int]]:
      """函式內綁定之名 → 首次綁定位置（參數、Store、for／with／except as、comprehension、函式內 import）。"""
      pos: Dict[str, Tuple[int, int]] = {}
-@@ -690,8 +774,8 @@ class _Engine:
+@@ -388,7 +472,7 @@ class _Mod:
+             elif isinstance(n, ast.ClassDef):
+                 self.classes[n.name] = n
+             elif isinstance(n, (ast.Import, ast.ImportFrom)):
+-                _note_imports(n, self.imports)
++                _note_imports(n, self.imports, path)
+             if isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                 for t in (n.targets if isinstance(n, ast.Assign) else [n.target]):
+                     for nm in ast.walk(t):
+@@ -398,16 +482,33 @@ class _Mod:
+         self.consts = {k: v for k, v in rhs.items() if counts.get(k) == 1 and _is_const_node(v)}
+
+
+-def _note_imports(n: ast.AST, out: Dict[str, Tuple[str, str, Optional[str]]]) -> None:
++def _note_imports(n: ast.AST, out: Dict[str, Tuple[str, str, Optional[str]]], path: Optional[str] = None) -> None:
++    """匯入敘述 → {本地名: ("module", 模組) | ("from", 模組, 名)}。相對匯入（`from .x import y`）依所在檔 path 還原為絕對
++    模組名（SPEC v35；審查 r34 CODEX-R34-P1-01）；無 path 或層數超出 repo 根者不登記。"""
+     if isinstance(n, ast.Import):
+         for al in n.names:
+             if al.asname:
+                 out[al.asname] = ("module", al.name, None)
+             else:
+                 out[al.name.split(".")[0]] = ("module", al.name.split(".")[0], None)
+-    elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
++    elif isinstance(n, ast.ImportFrom):
++        module = _from_module(n, path)
++        if not module:
++            return
+         for al in n.names:
+-            out[al.asname or al.name] = ("from", n.module, al.name)
++            if al.name != "*":
++                out[al.asname or al.name] = ("from", module, al.name)
++
++
++def _from_module(n: ast.ImportFrom, path: Optional[str]) -> Optional[str]:
++    """from 匯入之絕對模組名：相對匯入依所在檔 path 還原（`from .a import b` 於 tests/x/t.py ⇒ tests.x.a）；無法還原 ⇒ None。"""
++    if not n.level:
++        return n.module
++    pkg = path.split("/")[:-1] if path else None
++    if pkg is None or n.level - 1 > len(pkg):
++        return None
++    parts = pkg[:len(pkg) - (n.level - 1)] + (n.module.split(".") if n.module else [])
++    return ".".join(parts) or None
+
+
+ class _Engine:
+@@ -532,7 +633,7 @@ class _Engine:
+         imports: Dict[str, Tuple[str, str, Optional[str]]] = {}
+         for n in ast.walk(fn):
+             if isinstance(n, (ast.Import, ast.ImportFrom)):
+-                _note_imports(n, imports)
++                _note_imports(n, imports, mi.path)
+         return consts, imports
+
+     # helper 判定
+@@ -690,8 +791,8 @@ class _Engine:
              return []
          els = self.collect(mi, fn, "test", frozenset())
          fx = self.fixture_defs(path)
@@ -104,7 +159,7 @@ index e9a75ff7..15774160 100644
          queue += [(n, (fn.lineno, -1)) for n, (_, _, auto) in sorted(fx.items()) if auto]
          seen: set = set()
          while queue:
-@@ -1033,8 +1117,8 @@ def _e1_parts(eng: "_Engine", nodeid: str) -> Optional[Dict[str, str]]:
+@@ -1033,8 +1134,8 @@ def _e1_parts(eng: "_Engine", nodeid: str) -> Optional[Dict[str, str]]:
      anon.name = ""
      ast_sha = _sha256_text(ast.dump(anon, annotate_fields=True, include_attributes=False))
      fx = eng.fixture_defs(path)
@@ -115,7 +170,22 @@ index e9a75ff7..15774160 100644
      seen: Dict[str, str] = {}
      while queue:
          name = queue.pop(0)
-@@ -1967,6 +2051,15 @@ def _def_profiles(eng: "_Engine", path: str, only: Optional[set] = None) -> Opti
+@@ -1915,9 +2016,11 @@ def helper_callers(repo_root: Path, helper_path: str, tree: str = "worktree") ->
+             for n in ast.walk(tree_):
+                 if isinstance(n, ast.Import):
+                     mods |= {a.name for a in n.names}
+-                elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
+-                    mods.add(n.module)
+-                    mods |= {f"{n.module}.{a.name}" for a in n.names}
++                elif isinstance(n, ast.ImportFrom):
++                    mod_ = _from_module(n, path)  # v35：相對匯入依所在檔還原為絕對模組名
++                    if mod_:
++                        mods.add(mod_)
++                        mods |= {f"{mod_}.{a.name}" for a in n.names}
+             out_ = set()
+             for m in mods:
+                 base_ = m.replace(".", "/")
+@@ -1967,6 +2070,15 @@ def _def_profiles(eng: "_Engine", path: str, only: Optional[set] = None) -> Opti
          if name in mi.fixtures and mi.fixtures[name][1]:
              keys["fixture:autouse"] += 1
          out[name] = keys
@@ -131,7 +201,20 @@ index e9a75ff7..15774160 100644
      for name, v in mi.consts.items():
          plugins = _plugin_list(v) if name == "pytest_plugins" and path.endswith("conftest.py") else None
          if plugins is not None:
-@@ -2082,7 +2175,7 @@ def _affected_tests(hsrc: Optional[str], csrc: Optional[str], path: str, common:
+@@ -1976,9 +2088,10 @@ def _def_profiles(eng: "_Engine", path: str, only: Optional[set] = None) -> Opti
+         else:
+             out[name] = collections.Counter({"const:" + ast.dump(v): 1})
+     for n in mi.tree.body:  # 匯入名：解析目標（他模組 `from 本模組 import 名` 之使用者經此反推）
+-        if isinstance(n, ast.ImportFrom) and n.module and not n.level:
++        if isinstance(n, ast.ImportFrom) and _from_module(n, path):
++            mod_ = _from_module(n, path)  # v35：相對匯入依所在檔還原為絕對模組名
+             for a in n.names:
+-                out.setdefault(a.asname or a.name, collections.Counter())[f"import:{n.module}.{a.name}"] += 1
++                out.setdefault(a.asname or a.name, collections.Counter())[f"import:{mod_}.{a.name}"] += 1
+         elif isinstance(n, ast.Import):
+             for a in n.names:
+                 out.setdefault(a.asname or a.name.split(".")[0], collections.Counter())[f"import:{a.name}"] += 1
+@@ -2082,7 +2195,7 @@ def _affected_tests(hsrc: Optional[str], csrc: Optional[str], path: str, common:
          return out
      def deps(fn):
          loads = {x.id for x in ast.walk(fn) if isinstance(x, ast.Name)}
@@ -140,7 +223,7 @@ index e9a75ff7..15774160 100644
      auto = set()
      for m in (hm, cm):
          for s in m.body:
-@@ -2099,6 +2192,15 @@ def _affected_tests(hsrc: Optional[str], csrc: Optional[str], path: str, common:
+@@ -2099,6 +2212,15 @@ def _affected_tests(hsrc: Optional[str], csrc: Optional[str], path: str, common:
                      grow = True
      if s_ & auto:
          return set(common)
@@ -156,7 +239,7 @@ index e9a75ff7..15774160 100644
      for n in common:
          q = n.split("::", 1)[1]
          for u in (hu, cu):
-@@ -2170,18 +2272,18 @@ def _fixture_dependents(ctx: Context, eng: "_Engine", conftest: str, dec: set) -
+@@ -2170,18 +2292,18 @@ def _fixture_dependents(ctx: Context, eng: "_Engine", conftest: str, dec: set) -
                    if n in names)
      out = set()
      for f in files:
@@ -182,7 +265,7 @@ index e9a75ff7..15774160 100644
      out: Dict[str, str] = {}
      while queue:
          n = queue.pop(0)
-@@ -2247,11 +2349,37 @@ def _plugin_change_dependents(ctx: Context, he: "_Engine", ce: "_Engine", confte
+@@ -2247,11 +2369,35 @@ def _plugin_change_dependents(ctx: Context, he: "_Engine", ce: "_Engine", confte
                      names.add(n)
                      auto = auto or a
                      grow = True
@@ -208,9 +291,7 @@ index e9a75ff7..15774160 100644
 +                        if c.name in words:
 +                            continue
 +                        req = set(_usefixtures_in(c.decorator_list)) | set(_usefixtures_in(_pytestmark_values(c.body)))
-+                        based = {b.id if isinstance(b, ast.Name) else b.attr for b in c.bases
-+                                 if isinstance(b, (ast.Name, ast.Attribute))}
-+                        if req & names or based & words:
++                        if req & names or _base_names(eng, m, c) & words:
 +                            words.add(c.name)
 +                            grow = True
 +    pat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(words))) + r")\b") if words else None
@@ -222,7 +303,7 @@ index e9a75ff7..15774160 100644
 
      # 每檔只解析一次（兩樹原始碼相同時共用）；conftest 鏈與其外掛之 fixture 依目錄快取（與 `_Engine.fixture_defs` 同序：
      # 本模組 → 由近而遠之 conftest.py → 各 conftest 之外掛）；失去之 fixture 有無斷言元素依定義快取。真實規模 autouse 外掛
-@@ -2304,13 +2432,13 @@ def _plugin_change_dependents(ctx: Context, he: "_Engine", ce: "_Engine", confte
+@@ -2304,13 +2450,13 @@ def _plugin_change_dependents(ctx: Context, he: "_Engine", ce: "_Engine", confte
          cfx = defs(ce, f, cm)
          cfns = hfns if cm is hm else (_test_functions_of(cm.tree, fp, cpp) if cm else {})
          for q, fn in hfns.items():
@@ -238,7 +319,7 @@ index e9a75ff7..15774160 100644
              if hb == cb:
                  continue
              nid = f"{f}::{q}"
-@@ -2325,6 +2453,47 @@ def _plugin_change_dependents(ctx: Context, he: "_Engine", ce: "_Engine", confte
+@@ -2325,6 +2471,45 @@ def _plugin_change_dependents(ctx: Context, he: "_Engine", ce: "_Engine", confte
      return decided, unsure
 
 
@@ -264,9 +345,7 @@ index e9a75ff7..15774160 100644
 +                    continue
 +                m = eng.mod(p)
 +                for c in (m.classes.values() if m else []):
-+                    based = {b.id if isinstance(b, ast.Name) else b.attr for b in c.bases
-+                             if isinstance(b, (ast.Name, ast.Attribute))}
-+                    if c.name not in words and based & words:
++                    if c.name not in words and _base_names(eng, m, c) & words:
 +                        words.add(c.name)
 +                        grow = True
 +    tpat = ctx.schema["formats"]["test_path"]
@@ -286,7 +365,7 @@ index e9a75ff7..15774160 100644
  def rule_v19(ctx: Context) -> List[Finding]:
      """V19（以 `assertion_multiset` 與 `multiset_decreased` 判定）。"""
      pat = ctx.schema["formats"]["test_path"]
-@@ -2337,15 +2506,25 @@ def rule_v19(ctx: Context) -> List[Finding]:
+@@ -2337,15 +2522,25 @@ def rule_v19(ctx: Context) -> List[Finding]:
          files &= set(ctx.scope_paths)
          helpers &= set(ctx.extra.get("helper_paths", []))
      nids = set()
@@ -315,7 +394,7 @@ index e9a75ff7..15774160 100644
      decided: Dict[str, List[str]] = {}
      for h in helpers:
          dec = _seam("decreased_defs")(ctx.repo_root, h, tree=ctx.tree)
-@@ -2363,6 +2542,13 @@ def rule_v19(ctx: Context) -> List[Finding]:
+@@ -2363,6 +2558,13 @@ def rule_v19(ctx: Context) -> List[Finding]:
              dec = dec - {"pytest_plugins"}
              if not dec:
                  continue
