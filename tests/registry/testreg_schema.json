@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 26,
+  "version": 27,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -19,7 +19,7 @@
     "hex_or_absent": "^([0-9a-f]{64}|absent)$",
     "hex_or_absent_or_unstable": "^([0-9a-f]{64}|absent|unstable)$"
   },
-  "formats_note": "formats 之值皆為 Python re.fullmatch 用之純正則；欄位以 format 鍵指名套用（V17）。repo_path＝repo 相對 POSIX、不以 / 開頭、無 .. 段。數值欄之 allow_unknown＝另許字面 unknown（大小寫敏感，其他字串一律不符）。函式層 nodeid 之集合（V19、V20、碑、helper 反推、對照 oracle 共用）依受驗樹 pytest.ini 之 python_classes／python_functions 收集（真實樹 Test*／test_*，fnmatch；含 async 函式），未設定時依 pytest 預設前綴 Test／test。",
+  "formats_note": "formats 之值皆為 Python re.fullmatch 用之純正則；欄位以 format 鍵指名套用（V17）。repo_path＝repo 相對 POSIX、不以 / 開頭、無 .. 段。數值欄之 allow_unknown＝另許字面 unknown（大小寫敏感，其他字串一律不符）。函式層 nodeid 之集合（V19、V20、碑、helper 反推、對照 oracle 共用）依受驗樹 pytest.ini 之 testpaths（路徑前綴）、python_files（檔名）、python_classes、python_functions 收集（真實樹 tests／test_*.py／Test*／test_*，含萬用字元者 fnmatch、否則前綴；含 async 函式），未設定者依 pytest 預設。",
   "types": {
     "ledger_ref": {"type": "object", "additional_properties": false, "fields": {"session_id": {"type": "string", "format": "uuid", "required": true}, "nodeid": {"type": "string", "format": "nodeid_param", "required": true}}},
     "quarantined_failure": {"type": "object", "additional_properties": false, "fields": {"nodeid": {"type": "string", "format": "nodeid_param", "required": true}, "quarantine_expires": {"type": "string", "format": "date", "required": true}, "disposition_ref": {"type": "string", "format": "repo_path", "required": true}}},

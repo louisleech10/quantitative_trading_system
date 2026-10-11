@@ -498,6 +498,20 @@ def test_07_hook_assertion_multiset(tmp_path, case):
     assert _v19_subjects(proc.stderr) == expect, proc.stderr
 
 
+@pytest.mark.parametrize("case", sorted(HOOK_CASES))
+def test_07u_precommit_matches_hook(tmp_path, case):
+    """pre-commit 路徑與 hook 同判：每一 hook 案例只暫存被改之檔後提交 ⇒ 預期非空則 rc≠0、空則 rc=0，且 V19 主體
+    逐案等於預期（測試檔、helper、conftest、外掛、autouse、import 改變各路由皆經 `check --staged`，審查 r26）。"""
+    rel, old, new, expect = HOOK_CASES[case]
+    r = _repo(tmp_path, FX_FILES)
+    r.install_precommit()
+    _edit(r, rel, old, new)
+    r.stage(rel)
+    proc = r.try_commit()
+    assert (proc.returncode != 0) == bool(expect), proc.stderr
+    assert _v19_subjects(proc.stderr) == expect, proc.stderr
+
+
 def test_07b_delete_whole_function_hook_red(tmp_path):
     r = _repo(tmp_path)
     _edit(r, "tests/test_keep.py", "\n\ndef test_two():\n    assert add(2, 2) == 4\n", "\n")
@@ -588,24 +602,35 @@ def test_07c_helper_change_precommit_red(tmp_path):
     assert proc.returncode != 0 and "tests/test_fx.py::test_uses_helper" in _v19_subjects(proc.stderr), proc.stderr
 
 
-@pytest.mark.parametrize("change,expect_red", [("python_functions = test_*", True), ("python_classes = Test*", True),
-                                               ("markers =", False)])
-def test_07s_pytest_ini_collection_change_hook_and_precommit(tmp_path, change, expect_red):
-    """pytest.ini 之收集設定（python_functions／python_classes 等）改變致 HEAD 收集之測試函式於受驗樹不再被收集
-    ⇒ hook 與 pre-commit 皆 rc≠0（V20）；非收集設定之改動（加一個標記註冊）⇒ rc=0。"""
+INI_CASES = {
+    # 名稱: (舊行, 新行〔None＝於檔尾加一行標記註冊〕, HEAD 收集而受驗樹不再收集之代表 nodeid〔None＝不得有 V20〕)
+    "python_functions_narrowed": ("python_functions = test_*", "python_functions = check_*", "tests/test_keep.py::test_one"),
+    "python_classes_narrowed": ("python_classes = Test*", "python_classes = Check*", "tests/test_shapes.py::TestK::test_k"),
+    "testpaths_narrowed": ("testpaths = tests", "testpaths = tests/sub", "tests/test_keep.py::test_one"),
+    "python_files_narrowed": ("python_files = test_*.py", "python_files = check_*.py", "tests/test_keep.py::test_one"),
+    "python_functions_superset_ok": ("python_functions = test_*", "python_functions = test_* check_*", None),
+    "marker_added_ok": (None, None, None),
+}
+
+
+@pytest.mark.parametrize("case", sorted(INI_CASES))
+def test_07s_pytest_ini_collection_change_hook_and_precommit(tmp_path, case):
+    """pytest.ini 之收集設定（testpaths、python_files、python_classes、python_functions 四者任一）縮減致 HEAD 收集之
+    測試函式於受驗樹不再被收集 ⇒ hook 與 pre-commit 皆 rc≠0（V20）；模式只增（超集）或非收集設定之改動 ⇒ rc=0。"""
+    old, new, gone = INI_CASES[case]
     r = _repo(tmp_path, FX_FILES)
     r.install_precommit()
     ini = r.read("pytest.ini")
-    if change == "markers =":
+    if old is None:
         r.write("pytest.ini", ini + "    extra_marker: e\n")
     else:
-        r.write("pytest.ini", ini.replace(change, change.split(" = ")[0] + " = check_*"))
+        assert ini.count(old + "\n") == 1, ini
+        r.write("pytest.ini", ini.replace(old + "\n", new + "\n"))
     proc = r.hook("pytest.ini")
     v20 = [l for l in proc.stderr.splitlines() if l.startswith("V20 ")]
-    if not expect_red:
+    if gone is None:
         assert proc.returncode == 0 and not v20, proc.stderr
         return
-    gone = "tests/test_keep.py::test_one" if change.startswith("python_functions") else "tests/test_shapes.py::TestK::test_k"
     assert proc.returncode == 2 and any(l.startswith(f"V20 {gone}") for l in v20), proc.stderr
     r.stage("pytest.ini")
     proc = r.try_commit()
@@ -733,6 +758,33 @@ def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, e
     finally:
         p.write_text(src, encoding="utf-8")
     assert statistics.median(times) < 1.0, times
+
+
+@pytest.mark.parametrize("edit", ["marker_added", "functions_superset", "functions_narrowed"])
+def test_boundary_06_pytest_ini_wall_clock(head_worktree, edit):
+    """真實規模 pytest.ini：加標記註冊、python_functions 只增模式（超集，不檢）⇒ rc 0 且 10 次中位 < 1 s；python_functions
+    縮減（必擋：全部測試檔 V20，HEAD 以批次讀取）⇒ rc 2 且 3 次中位 < 5 s（試作逐檔讀 HEAD 實測約 20 秒、批次約 2.9 秒）。"""
+    p = head_worktree / "pytest.ini"
+    src = p.read_text(encoding="utf-8")
+    assert src.count("python_functions = test_*\n") == 1
+    if edit == "marker_added":
+        p.write_text(src + "    extra_marker: e\n", encoding="utf-8")
+    else:
+        repl = "test_* check_*" if edit == "functions_superset" else "check_*"
+        p.write_text(src.replace("python_functions = test_*\n", f"python_functions = {repl}\n"), encoding="utf-8")
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(p)}})
+    want_rc, runs, limit = (2, 3, 5.0) if edit == "functions_narrowed" else (0, 10, 1.0)
+    times = []
+    try:
+        for _ in range(runs):
+            t0 = time.perf_counter()
+            proc = subprocess.run(["bash", str(head_worktree / "scripts/testreg_write_guard.sh")], input=payload,
+                                  capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
+            times.append(time.perf_counter() - t0)
+            assert proc.returncode == want_rc, proc.stderr[-2000:]
+    finally:
+        p.write_text(src, encoding="utf-8")
+    assert statistics.median(times) < limit, times
 
 
 def test_boundary_02_registry_contract_runs_validate_only(tmp_path):
