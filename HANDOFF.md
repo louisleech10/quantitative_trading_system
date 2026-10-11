@@ -257,6 +257,8 @@
 - 🔴 **FRAMEPATH 凍結驗收 ⑥ 比對整份 `scripts/fact_keys.json`（只剔除 FRAMEPATH 自身列）**：FRAMEPATH 存續期間任何他票改 fact_keys（含登記表列）即使 ⑥ 紅；TESTREG b1 新增 E-041／E-042 後即紅，FRAMEPATH b2 前須以 TODO 修訂改為只計本票提交與工作樹（同 D10）。
 - 🔴 **他票提交之標題與 `Ticket-Batch`／`Governance-Scope` 不得含 framepath 字樣**：FRAMEPATH ⑦ 以此三欄判「本票提交」，命中即把該提交所改路徑全算進 ⑦ 之範圍檢查。
 - 🔴 **解析 pytest `-v` 輸出時，`pytest.ini` 之 `log_cli=true` 使結果字串落在 live log 之後另起一列**；且 warnings summary 段有 nodeid 單列、short summary 有 `FAILED <nodeid>`。解析器須認分列形式、結果段後停止配對，並與摘要列計數對證（範例 `handoffs/run_receipts/testreg_probes/recorder_invariance.py` 之 `parse_report`）。
+- 🔴 **`scripts/git_hooks/pre-commit` 有 `set -o pipefail`，路由判定不可用 `grep -q`**：命中即退出使上游 `tr` 收 SIGPIPE（rc 141），暫存路徑多時整條管線判為假而跳過該段檢查；改 `grep -E … >/dev/null`。TESTREG 段已修，同檔其他既有段落仍為 `grep -q`（同型隱患，未修）。
+- 🔴 **大規模 AST 工具之 Python 行程結束拆解可達數秒**：`scripts/testreg.py` 真實規模 8,563 個測試函式時，正常結束釋放語法樹約 2.6 秒；CLI 已改 flush 後 `os._exit`（亦使 `-m cProfile` 來不及印統計——profile 改用行程內呼叫 `main` 之探針）。
 - 🔴 **TESTREG 真實 repo 驗收須清冊已提交**：`test_real_repo_catalog_complete_and_valid` 以 `git log --diff-filter=A` 取 `bootstrap_paths.txt` 之加入提交，`test_testreg_write_guard.py` 邊界 05–07b 以 HEAD 之 detached worktree 量測 ⇒ 提交前必紅；順序＝暫存倉部分先跑 → 本地提交 → 全 gate_cmd → 綠才推送。
 
 ## 進行中紀錄

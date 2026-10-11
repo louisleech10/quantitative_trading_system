@@ -188,13 +188,19 @@ def _name_ok(name: str, pats: Sequence[str]) -> bool:
 def _test_functions(src: Optional[str], fpats: Sequence[str] = ("test_*",),
                     cpats: Sequence[str] = ("Test*",)) -> Dict[str, ast.AST]:
     """{qualname（`f` 或 `Cls::f`）: FunctionDef}；依 pytest.ini 之 python_functions／python_classes。"""
-    out: Dict[str, ast.AST] = {}
     if src is None:
-        return out
+        return {}
     try:
         mod = _parse(src)
     except SyntaxError:
-        return out
+        return {}
+    return _test_functions_of(mod, fpats, cpats)
+
+
+def _test_functions_of(mod: ast.Module, fpats: Sequence[str] = ("test_*",),
+                       cpats: Sequence[str] = ("Test*",)) -> Dict[str, ast.AST]:
+    """`_test_functions` 之核心：已解析之模組 → {qualname: FunctionDef}（供已持有語法樹者免重解析）。"""
+    out: Dict[str, ast.AST] = {}
     for n in mod.body:
         if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and _name_ok(n.name, fpats):
             out[n.name] = n
@@ -218,7 +224,15 @@ def _collect_patterns(tree: "_Tree") -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
 
 
 def _plugin_paths(tree: "_Tree", conftest: str) -> List[str]:
-    """conftest 之 `pytest_plugins` 字面所列模組之 repo 路徑（存在者）。"""
+    """conftest 之 `pytest_plugins` 字面所列模組之 repo 路徑（存在者）；依樹快取（`fixture_defs` 對每個測試檔之 conftest
+    鏈逐一呼叫，未快取時真實規模每次 hook 重複解析 conftest 上千次）。"""
+    cache = tree.__dict__.setdefault("_plugin_paths_cache", {})
+    if conftest not in cache:
+        cache[conftest] = _plugin_paths_uncached(tree, conftest)
+    return list(cache[conftest])
+
+
+def _plugin_paths_uncached(tree: "_Tree", conftest: str) -> List[str]:
     if not tree.exists(conftest):
         return []
     try:
@@ -2163,6 +2177,154 @@ def _fixture_dependents(ctx: Context, eng: "_Engine", conftest: str, dec: set) -
     return out
 
 
+def _fixture_closure(fn: ast.AST, fx: Mapping[str, Tuple[str, ast.AST, bool]]) -> Dict[str, str]:
+    """與 `_Engine.elements` 同一解析序（測試參數中之 fixture、可見之 autouse fixture，再遞移 fixture 參數）⇒
+    {fixture 名: 定義檔}。"""
+    params = [x.arg for x in [*getattr(fn.args, "posonlyargs", []), *fn.args.args, *fn.args.kwonlyargs]]
+    queue = [p for p in params if p in fx] + [n for n, (_, _, auto) in sorted(fx.items()) if auto]
+    out: Dict[str, str] = {}
+    while queue:
+        n = queue.pop(0)
+        if n in out or n not in fx:
+            continue
+        out[n] = fx[n][0]
+        queue += [a.arg for a in fx[n][1].args.args if a.arg in fx]
+    return out
+
+
+def _plugin_change_dependents(ctx: Context, he: "_Engine", ce: "_Engine", conftest: str
+                              ) -> Tuple[Dict[str, List[str]], set]:
+    """conftest 之 `pytest_plugins` 移除或改序（審碼 r1 CODEX-R1-P1-02）。被移動之外掛＝HEAD 清單自首個與受驗樹不同之
+    位置起之外掛（其前者解析優先序不變）。作用範圍內每一測試：HEAD 解析未經被移動外掛取得 fixture ⇒ 不受影響（新外掛只會
+    增加元素）；兩樹解析（名→定義檔）相同 ⇒ 展開不變；純移除（受驗樹解析為 HEAD 之子集、測試檔與保留之 fixture 本體皆
+    未變）⇒ 失去之 fixture 有任何斷言元素即必減（其元素整組消失、他處不變），皆無元素即不減；其餘 ⇒ 交逐一精確比較。
+    回傳 ({必減 nodeid: 失去之有斷言 fixture 名}, 須精確比較之 nodeid)。不做完整呼叫者反推（真實規模分鐘級）。"""
+    head, cur = he.tree, ce.tree  # 用引擎自身之樹：讀檔快取與 `he.mod`／`fixture_defs` 共用（批次預取才生效）
+    confs = {t_: [c for c in t_.files() if c.endswith("conftest.py")] for t_ in (head, cur)}
+    for t_ in (head, cur):
+        t_.prefetch(confs[t_])
+        t_.prefetch([pl for c in confs[t_] for pl in _plugin_paths(t_, c)])
+    hp, cp = _plugin_paths(head, conftest), _plugin_paths(cur, conftest)
+    i = 0
+    while i < min(len(hp), len(cp)) and hp[i] == cp[i]:
+        i += 1
+    moved = set(hp[i:])
+    decided: Dict[str, List[str]] = {}
+    unsure: set = set()
+    if not moved:
+        return decided, unsure
+    base = conftest[: -len("conftest.py")]
+    dumps: Dict[Tuple[int, str, str], str] = {}
+
+    def body(eng: "_Engine", path: str, name: str) -> str:
+        key = (id(eng), path, name)
+        if key not in dumps:
+            m = eng.mod(path)
+            fn_ = m.fixtures[name][0] if m and name in m.fixtures else None
+            dumps[key] = ast.dump(fn_) if fn_ is not None else ""
+        return dumps[key]
+
+    # 文字預篩：測試只能以參數名請求 fixture（或經 autouse 套用）⇒ 被移動外掛提供之 fixture 名及遞移依賴它們之 fixture 名
+    # （全部 conftest 與外掛模組，兩樹）皆未於測試檔出現、且其中無 autouse 者 ⇒ 該檔必不受影響，不必解析
+    names: set = set()
+    auto = False
+    for pl in moved:
+        m = he.mod(pl)
+        for n, (_, a) in (m.fixtures.items() if m else []):
+            names.add(n)
+            auto = auto or a
+    holders = []
+    for eng in (he, ce):
+        cs = confs[eng.tree]
+        holders += [(eng, c) for c in cs] + [(eng, pl) for c in cs for pl in _plugin_paths(eng.tree, c)]
+    grow = True
+    while grow and not auto:
+        grow = False
+        for eng, p in holders:
+            m = eng.mod(p)
+            for n, (ffn, a) in (m.fixtures.items() if m else []):
+                if n not in names and {x.arg for x in ffn.args.args} & names:
+                    names.add(n)
+                    auto = auto or a
+                    grow = True
+    pat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(names))) + r")\b") if names else None
+
+    def mentions(src: Optional[str]) -> bool:  # 子字串快篩後才以詞界正則確認
+        s = src or ""
+        return any(n in s for n in names) and pat.search(s) is not None
+
+    # 每檔只解析一次（兩樹原始碼相同時共用）；conftest 鏈與其外掛之 fixture 依目錄快取（與 `_Engine.fixture_defs` 同序：
+    # 本模組 → 由近而遠之 conftest.py → 各 conftest 之外掛）；失去之 fixture 有無斷言元素依定義快取。真實規模 autouse 外掛
+    # 移除（8,563 個測試函式全數必減）時原逐檔多次解析＋逐 nodeid 重讀 pytest.ini 耗 18–30 秒。
+    fp, cpp, files_pat, tps = _collect_patterns(cur)
+    dir_defs: Dict[Tuple[int, str], Dict[str, Tuple[str, ast.AST, bool]]] = {}
+    has_el: Dict[Tuple[str, str], bool] = {}
+
+    def defs(eng: "_Engine", f: str, own: Optional["_Mod"]) -> Dict[str, Tuple[str, ast.AST, bool]]:
+        parts = f.split("/")[:-1]
+        key = (id(eng), "/".join(parts))
+        if key not in dir_defs:
+            chain = ["/".join(parts[:i] + ["conftest.py"]) for i in range(len(parts), -1, -1)]
+            chain += [pl for c in chain for pl in _plugin_paths(eng.tree, c)]
+            acc: Dict[str, Tuple[str, ast.AST, bool]] = {}
+            for p in chain:
+                m = eng.mod(p) if eng.tree.exists(p) else None
+                for name, (fn_, a) in (m.fixtures.items() if m else []):
+                    acc.setdefault(name, (p, fn_, a))
+            dir_defs[key] = acc
+        out = {name: (f, fn_, a) for name, (fn_, a) in (own.fixtures.items() if own else [])}
+        for k, v in dir_defs[key].items():
+            out.setdefault(k, v)
+        return out
+
+    def elements_nonempty(path: str, name: str, fn_: ast.AST) -> bool:
+        if (path, name) not in has_el:
+            has_el[(path, name)] = bool(he.collect(he.mod(path), fn_, "fixture", frozenset()))
+        return has_el[(path, name)]
+
+    tests = [f for f in head.test_files(ctx.schema) if f.startswith(base)
+             and (not tps or any(f == tp or f.startswith(tp.rstrip("/") + "/") for tp in tps))
+             and _name_ok(f.rsplit("/", 1)[-1], files_pat)]
+    head.prefetch(tests)
+    cur.prefetch(tests)
+    for f in tests:
+        hsrc, csrc = head.read(f), cur.read(f)
+        if not auto and (pat is None or not (mentions(hsrc) or (csrc != hsrc and mentions(csrc)))):
+            continue
+        hm = he.mod(f)
+        if hm is None:
+            continue
+        hfns = _test_functions_of(hm.tree, fp, cpp)
+        if not hfns:
+            continue
+        hfx = defs(he, f, hm)
+        if not moved & {p for p, _, _ in hfx.values()}:
+            continue
+        cm = hm if csrc == hsrc else ce.mod(f)
+        cfx = defs(ce, f, cm)
+        cfns = hfns if cm is hm else (_test_functions_of(cm.tree, fp, cpp) if cm else {})
+        for q, fn in hfns.items():
+            hb = _fixture_closure(fn, hfx)
+            if not moved & set(hb.values()):
+                continue
+            cfn = cfns.get(q)
+            if cfn is None:
+                continue  # 函式已不在：V20 管
+            cb = _fixture_closure(cfn, cfx)
+            if hb == cb:
+                continue
+            nid = f"{f}::{q}"
+            pure = (hsrc == csrc and all(hb.get(n) == p for n, p in cb.items())
+                    and all(p == f or body(he, p, n) == body(ce, p, n) for n, p in cb.items()))
+            if not pure:
+                unsure.add(nid)
+                continue
+            lost = sorted(n for n in hb if n not in cb and elements_nonempty(hb[n], n, hfx[n][1]))
+            if lost:
+                decided[nid] = lost  # nid 依受驗樹 pytest.ini 之收集規則存在（cfns 含 q、檔名與 testpaths 已篩）
+    return decided, unsure
+
+
 def rule_v19(ctx: Context) -> List[Finding]:
     """V19（以 `assertion_multiset` 與 `multiset_decreased` 判定）。"""
     pat = ctx.schema["formats"]["test_path"]
@@ -2184,16 +2346,20 @@ def rule_v19(ctx: Context) -> List[Finding]:
         nids |= _affected_tests(head.read(f), t.read(f), f, common, {d for d in dec if not d.startswith("test")})
     callers = _seam("helper_callers")
     he, ce = _engine_for(ctx, "HEAD"), _engine_for(ctx, ctx.tree)
+    decided: Dict[str, List[str]] = {}
     for h in helpers:
         dec = _seam("decreased_defs")(ctx.repo_root, h, tree=ctx.tree)
         dec = None if dec is None else set(dec)
         if dec is not None and not dec:
             continue  # 差量：本檔無任何定義之自身斷言輪廓減少 ⇒ 不可能有呼叫者減少
         if h.endswith("conftest.py") and dec is not None and "pytest_plugins" in dec:
-            # 外掛移除／改序：外掛之 fixture 於展開時只記為觸及外掛檔（非 conftest）⇒ 受影響者＝HEAD 時經各外掛取得斷言之
-            # 測試（實作期 b1 由 test_07w 移除案抓到：只反推 conftest 本身會漏掉只用外掛 fixture 之測試）
-            for pl in _plugin_paths(head, h):
-                nids |= set(callers(ctx.repo_root, pl, tree="HEAD"))
+            # 外掛移除／改序：外掛之 fixture 於展開時只記為觸及外掛檔（非 conftest），反推 conftest 本身會漏掉只經外掛取得
+            # 斷言之測試（實作期 b1 test_07w 抓到）；改依兩樹之 fixture 解析逐測試判定（審碼 r1 CODEX-R1-P1-02：原對外掛做
+            # 完整呼叫者反推，真實規模分鐘級）
+            d_, u_ = _plugin_change_dependents(ctx, he, ce, h)
+            for nid_, names_ in d_.items():
+                decided[nid_] = sorted(set(decided.get(nid_, [])) | set(names_))
+            nids |= u_
             dec = dec - {"pytest_plugins"}
             if not dec:
                 continue
@@ -2202,8 +2368,17 @@ def rule_v19(ctx: Context) -> List[Finding]:
             continue
         nids |= set(callers(ctx.repo_root, h, tree=ctx.tree)) | set(callers(ctx.repo_root, h, tree="HEAD"))
     tombs, out = _tomb_ids(ctx), []
-    for nid in sorted(nids):
-        if nid not in _function_nodeids(t, nid.split("::")[0]):
+    present: Dict[str, set] = {}
+    for nid in sorted(nids | set(decided)):
+        if nid in decided and nid not in nids:  # 存在性已於 `_plugin_change_dependents` 依受驗樹收集規則確認
+            if nid not in tombs and not _rewrite_ok(ctx, nid):
+                out.append(Finding("V19", nid, f"斷言多重集合減少（pytest_plugins 移除／改序使 fixture "
+                                               f"{', '.join(decided[nid])} 之斷言不再套用；須同提交立碑或附 rewrite 收據）"))
+            continue
+        path_ = nid.split("::")[0]
+        if path_ not in present:
+            present[path_] = set(_function_nodeids(t, path_))
+        if nid not in present[path_]:
             continue
         old = collections.Counter(e["key"] for e in he.elements(nid))
         new = collections.Counter(e["key"] for e in ce.elements(nid))
@@ -2590,4 +2765,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    _rc = main(sys.argv[1:])
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # 略過直譯器拆解：大規模檢查持有之語法樹於正常結束時逐一釋放，真實規模 autouse 外掛移除（8,563 個測試函式）實測多耗
+    # 約 2.6 秒（審碼 r1 CODEX-R1-P1-02 之計時）；輸出已 flush、檔案寫入皆於 with／write_text 內完成，無 atexit 收尾需求
+    os._exit(_rc)

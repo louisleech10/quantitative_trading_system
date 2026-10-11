@@ -831,6 +831,44 @@ def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, e
     assert statistics.median(staged) < 1.0, staged
 
 
+@pytest.mark.parametrize("edit", ["plugin_removed", "plugins_reordered"])
+def test_boundary_07c_conftest_pytest_plugins_change_wall_clock(head_worktree, edit):
+    """真實規模（審碼 r1 CODEX-R1-P1-02）：tests/conftest.py 之 `pytest_plugins` 移除首個外掛／前後對調 ⇒ hook 與 pre-commit
+    同一 rc 方向；不擋（rc 0）者 10 次中位 < 1 s，必擋者 3 次中位 < 5 s（§C 兩層）。實作不得對外掛做完整呼叫者反推
+    （真實規模分鐘級）。每案起點斷言共用工作樹乾淨。"""
+    _assert_clean(head_worktree)
+    p = head_worktree / "tests/conftest.py"
+    src = p.read_text(encoding="utf-8")
+    node = next(n for n in ast.parse(src).body if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "pytest_plugins" for t in n.targets))
+    plugins = [e.value for e in node.value.elts]
+    assert len(plugins) >= 2, plugins
+    new = plugins[1:] if edit == "plugin_removed" else [plugins[1], plugins[0], *plugins[2:]]
+    lines = src.splitlines(keepends=True)
+    lines[node.lineno - 1:node.end_lineno] = [f"pytest_plugins = {json.dumps(new)}\n"]
+    p.write_text("".join(lines), encoding="utf-8")
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(p)}})
+    try:
+        first = subprocess.run(["bash", str(head_worktree / "scripts/testreg_write_guard.sh")], input=payload,
+                               capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
+        assert first.returncode in (0, 2), first.stderr
+        blocking = first.returncode == 2
+        runs = 3 if blocking else 10
+        times = []
+        for _ in range(runs):
+            t0 = time.perf_counter()
+            proc = subprocess.run(["bash", str(head_worktree / "scripts/testreg_write_guard.sh")], input=payload,
+                                  capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
+            times.append(time.perf_counter() - t0)
+            assert proc.returncode == first.returncode, proc.stderr
+        staged = _staged_times_at(head_worktree, "tests/conftest.py", runs, blocking)
+    finally:
+        p.write_text(src, encoding="utf-8")
+    limit = 5.0 if blocking else 1.0
+    assert statistics.median(times) < limit, (edit, blocking, times)
+    assert statistics.median(staged) < limit, (edit, blocking, staged)
+
+
 INI_TIMING = {
     # 名稱: (舊行, 新行〔None＝於檔尾加一行標記註冊〕, 是否必擋)
     "marker_added": (None, None, False),
@@ -971,6 +1009,23 @@ def test_hook_mounted_and_registered():
     assert "bash scripts/testreg_write_guard.sh" in cmds
     reg = (REPO / "docs/GOV_ENFORCEMENT_REGISTRY.md").read_text(encoding="utf-8")
     assert "testreg_write_guard.sh" in reg
+
+
+def test_precommit_routing_reads_full_input_under_pipefail(tmp_path):
+    """審碼 r1 CODEX-R1-P1-01：真實 pre-commit 之 TESTREG 路由條件於 `set -o pipefail` 下，對 10,000 筆命中之暫存路徑
+    仍須命中（`grep -q` 命中即退出會使上游 `tr` 收 SIGPIPE、整條管線判為假而跳過 check）；不命中輸入須不命中。"""
+    lines = (REPO / "scripts/git_hooks/pre-commit").read_text(encoding="utf-8").splitlines()
+    i = next(j for j, l in enumerate(lines) if "scripts/testreg.py check --staged" in l)
+    start = max(j for j in range(i) if lines[j].startswith("if git diff --cached"))
+    cond = "\n".join(lines[start:i]).strip()
+    assert cond.startswith("if ") and cond.endswith("; then"), cond
+    cond = cond[len("if "):-len("; then")].replace("git diff --cached --name-only -z", "gen")
+    for paths, want in ((["tests/test_%05d.py" % k for k in range(10000)], "matched"), (["docs/x.md"], "skipped")):
+        src = tmp_path / "paths.bin"
+        src.write_bytes(b"".join(p.encode() + b"\0" for p in paths))
+        script = f"set -o pipefail\ngen() {{ cat '{src}'; }}\nif {cond}; then echo matched; else echo skipped; fi\n"
+        out = subprocess.run(["bash", "-c", script], capture_output=True, text=True).stdout.strip()
+        assert out == want, (cond, out)
 
 
 def test_precommit_wired_with_direct_rc():

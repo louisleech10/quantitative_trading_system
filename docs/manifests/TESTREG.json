@@ -48,7 +48,7 @@
       "path": "handoffs/run_receipts/testreg-recorder-verify.json",
       "cmd": "venv/bin/python handoffs/run_receipts/testreg_probes/recorder_invariance.py verify",
       "rc": 0,
-      "honest_bounds": "第 1 批 §G 驗證：於 HEAD 加記錄器掛載所需之檔（MOUNT_PATHS）之暫存提交之 worktree 執行同一命令；本批其餘改動不在驗證樹內（只量記錄器之影響）"
+      "honest_bounds": "第 1 批 §G 驗證：於凍結收據之 head（動工前 HEAD）加記錄器掛載所需之檔（MOUNT_PATHS）之暫存提交之 worktree 執行同一命令；本批其餘改動不在驗證樹內（只量記錄器之影響）"
     }
   ],
   "batch_card": {

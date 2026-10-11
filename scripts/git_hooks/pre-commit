@@ -236,8 +236,10 @@ fi
 # 產出端 hook（scripts/testreg_write_guard.sh）只看 Edit/Write；Bash 建檔、git mv／git rm 之漏網由此擋：
 #   暫存區含 tests/**/*.py、tests/registry/catalog.json、docs/manifests/*.json 或 pytest.ini 變更 ⇒
 #   `testreg.py check --staged`（V01–V20、V22；V21 只於收尾 validate --require-executed 跑）。不跑 pytest、不讀 git 全史。
+#   🔴 grep 須讀完輸入（不用 -q）：本檔 set -o pipefail，-q 命中即退出會使上游 tr 收 SIGPIPE（rc 141），暫存路徑多時
+#   整條管線判為假而跳過檢查（審碼 r1 CODEX-R1-P1-01，10,000 行命中輸入實測重現）。
 if git diff --cached --name-only -z | tr '\0' '\n' \
-   | grep -qE '^tests/.*\.py$|^tests/registry/catalog\.json$|^docs/manifests/[^/]+\.json$|^pytest\.ini$'; then
+   | grep -E '^tests/.*\.py$|^tests/registry/catalog\.json$|^docs/manifests/[^/]+\.json$|^pytest\.ini$' >/dev/null; then
   "$py" scripts/testreg.py check --staged
   _tr_rc=$?          # 🔴 rc 直接取，禁經 pipe
   if [ "${_tr_rc}" -ne 0 ]; then

@@ -17,8 +17,8 @@
 以符號連結指向主工作樹），使 ④ 之起點皆為「乾淨 checkout＋同一組連結」——主工作樹於提交前必含本批改動與他票髒檔，
 字面 porcelain 不可能前後相等，且 FRAMEPATH 驗證器 ⑦ 讀工作樹改動。
   freeze：worktree＝主工作樹 HEAD（動工前、記錄器未掛載）。
-  verify：worktree＝HEAD 加上記錄器掛載所需之檔（`MOUNT_PATHS`）於主工作樹之現行內容所成之暫存提交（以暫存 index＋
-  `commit-tree` 建立，不入任何分支）。
+  verify：worktree＝凍結收據之 head（動工前 HEAD）加上記錄器掛載所需之檔（`MOUNT_PATHS`）於主工作樹之現行內容所成之
+  暫存提交（以暫存 index＋`commit-tree` 建立，不入任何分支）。
   worktree 用畢以 `git worktree remove --force` 移除（本程式自建之暫存）。
 """
 from __future__ import annotations
@@ -176,16 +176,18 @@ def _batch_paths() -> List[str]:
     return sorted(MOUNT_PATHS)
 
 
-def _verify_commit() -> str:
-    """HEAD ＋本批檔案於主工作樹之現行內容 ⇒ 暫存提交（暫存 index；不動主 index、不入分支）。"""
-    head_paths = set(_git("ls-tree", "-r", "--name-only", "HEAD").splitlines())
-    paths = [p for p in _batch_paths() if (REPO / p).exists() or p in head_paths]
+def _verify_commit(base: str) -> str:
+    """凍結時之 HEAD（base）＋記錄器掛載所需之檔於主工作樹之現行內容 ⇒ 暫存提交（暫存 index；不動主 index、不入分支）。
+    以凍結之 base 為底而非現行 HEAD：本批提交後 HEAD 前進，現行 HEAD 會帶入記錄器以外之改動（實測：b1 提交之 fact_keys
+    登記列使樣本之 FRAMEPATH ⑥ 轉紅），使驗證與凍結之差異不再只有記錄器掛載。"""
+    base_paths = set(_git("ls-tree", "-r", "--name-only", base).splitlines())
+    paths = [p for p in _batch_paths() if (REPO / p).exists() or p in base_paths]
     with tempfile.TemporaryDirectory(prefix="testreg_g_idx_") as d:
         env = {**os.environ, "GIT_INDEX_FILE": str(Path(d) / "index")}
-        _git("read-tree", "HEAD", env=env)
+        _git("read-tree", base, env=env)
         _git("update-index", "--add", "--remove", "--", *paths, env=env)
         tree = _git("write-tree", env=env).strip()
-    return _git("commit-tree", tree, "-p", "HEAD", "-m", "TESTREG §G verify tree (temporary, not on any branch)").strip()
+    return _git("commit-tree", tree, "-p", base, "-m", "TESTREG §G verify tree (temporary, not on any branch)").strip()
 
 
 def _with_worktree(commit: str, files: List[str]) -> Dict[str, object]:
@@ -216,7 +218,7 @@ def main(argv: List[str]) -> int:
     else:
         base = json.loads((REPO / BASELINE_REL).read_text(encoding="utf-8"))
         files = list(base["sample"])
-        commit, tree_paths = _verify_commit(), _batch_paths()
+        commit, tree_paths = _verify_commit(base["head"]), _batch_paths()
     rec = _with_worktree(commit, files)
     out = {"schema_version": 1, "exit_code": 0, "mode": mode, "sample": files, "sample_rule": SAMPLE_RULE, "command": command(files),
            "base_head": base_head, "worktree_commit": commit, "tree_paths": tree_paths, **rec,
