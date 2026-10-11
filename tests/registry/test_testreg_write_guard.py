@@ -471,6 +471,16 @@ HOOK_CASES = {
                                         {"tests/sub/test_sub.py::test_s1", "tests/sub/test_sub.py::test_s2"}),
     "07r_module_autouse_turned_off": ("tests/test_autouse.py", "@pytest.fixture(autouse=True)\n", "@pytest.fixture\n",
                                       {"tests/test_autouse.py::test_a", "tests/test_autouse.py::test_b"}),
+    # 07v（審查 r30）：對既有測試新增 skip／skipif／xfail（斷言不變但不再執行）⇒ 視同斷言歸零（schema skip_rule）
+    "07v_function_xfail_added": ("tests/test_autouse.py", "def test_a():\n", "@pytest.mark.xfail(reason=\"r30\")\ndef test_a():\n",
+                                 {"tests/test_autouse.py::test_a"}),
+    "07v_body_skip_call_added": ("tests/test_autouse.py", "def test_b():\n", "def test_b():\n    pytest.skip(\"r30\")\n",
+                                 {"tests/test_autouse.py::test_b"}),
+    "07v_module_pytestmark_skipif_added": ("tests/test_autouse.py", "from momentum.calc import add\n",
+                                           "from momentum.calc import add\n\npytestmark = pytest.mark.skipif(True, reason=\"r30\")\n",
+                                           {"tests/test_autouse.py::test_a", "tests/test_autouse.py::test_b"}),
+    "07v_class_skip_added": ("tests/test_shapes.py", "\n\nclass TestK:\n", "\nimport pytest\n\n\n@pytest.mark.skip(reason=\"r30\")\nclass TestK:\n",
+                             {"tests/test_shapes.py::TestK::test_k"}),
     # 07t（審查 r25）：pytest_plugins 所列外掛之 autouse fixture（作用於全部測試）
     "07t_plugin_autouse_external_helper_drops_assert": ("tests/helpers/plughelp.py", "    assert v < 5\n", "",
                                                         ALL_FX_TESTS),
@@ -863,6 +873,57 @@ def test_boundary_07_route_wall_clock_hook_and_precommit(head_worktree, edit):
         p.write_text(src, encoding="utf-8")
     assert statistics.median(times) < 1.0, times
     assert statistics.median(staged) < 1.0, staged
+
+
+def _pick_helper_decrease(root: Path):
+    """真實樹中「模組層非測試、非 fixture 函式含單行 assert，且被本檔測試函式呼叫」之測試檔，取測試函式最多者
+    ⇒ (路徑, assert 行號)；最壞規模之測試檔路由差量（模組內共用定義減少）。"""
+    files = subprocess.run(["git", "-C", str(root), "ls-files", "tests/test_*.py", "tests/**/test_*.py"],
+                           capture_output=True, text=True, check=True).stdout.split()
+    best = None
+    for rel in files:
+        mod = ast.parse((root / rel).read_text(encoding="utf-8"))
+        tests = [n for n in mod.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                 and fnmatch.fnmatchcase(n.name, "test_*")]
+        for cls in (n for n in mod.body if isinstance(n, ast.ClassDef) and fnmatch.fnmatchcase(n.name, "Test*")):
+            tests += [m for m in cls.body if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef))
+                      and fnmatch.fnmatchcase(m.name, "test_*")]
+        called = {c.func.id for t in tests for c in ast.walk(t) if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)}
+        for h in mod.body:
+            if isinstance(h, ast.FunctionDef) and not h.name.startswith("test") and h.name in called \
+                    and not any("fixture" in ast.dump(d) for d in h.decorator_list):
+                asserts = [s for s in h.body if isinstance(s, ast.Assert) and s.lineno == s.end_lineno]
+                if asserts and (best is None or len(tests) > best[0]):
+                    best = (len(tests), rel, asserts[0].lineno)
+    assert best is not None
+    return best[1], best[2]
+
+
+def test_boundary_07b_test_file_helper_decrease_wall_clock(head_worktree):
+    """真實規模最壞之測試檔路由（審查 r30）：最大之「模組內 helper 有斷言」測試檔刪該 helper 一行斷言（必擋：其呼叫者 V19）
+    ⇒ hook rc 2、pre-commit rc≠0，且各 3 次中位 < 5 s（§C 必擋層；試作整檔重算 hook 約 2.7 秒，改只算受影響函式後
+    hook 約 0.77 秒、pre-commit 約 0.95 秒）。每案起點斷言共用工作樹乾淨。"""
+    _assert_clean(head_worktree)
+    rel, line = _pick_helper_decrease(head_worktree)
+    p = head_worktree / rel
+    src = p.read_text(encoding="utf-8")
+    lines = src.splitlines(keepends=True)
+    del lines[line - 1]
+    p.write_text("".join(lines), encoding="utf-8")
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(p)}})
+    times = []
+    try:
+        for _ in range(3):
+            t0 = time.perf_counter()
+            proc = subprocess.run(["bash", str(head_worktree / "scripts/testreg_write_guard.sh")], input=payload,
+                                  capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
+            times.append(time.perf_counter() - t0)
+            assert proc.returncode == 2 and "V19 " in proc.stderr, proc.stderr[-2000:]
+        staged = _staged_times_at(head_worktree, rel, 3, True)
+    finally:
+        p.write_text(src, encoding="utf-8")
+    assert statistics.median(times) < 5.0, times
+    assert statistics.median(staged) < 5.0, staged
 
 
 def test_boundary_02_registry_contract_runs_validate_only(tmp_path):
