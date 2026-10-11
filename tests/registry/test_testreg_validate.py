@@ -17,14 +17,15 @@ import hashlib
 import importlib
 import json
 import math
+import subprocess
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping
 
 import pytest
 
 from tests.registry.testreg_helpers import (
-    CATALOG_REL, REPO, TESTREG, TmpRepo, bootstrap_entry, classified, copy_repo, entry, enum, fact_keys_rows,
-    lines_with, make_repo, recorded_pytest, rule_lines, schema, session_of, test_records, write_patch,
+    CATALOG_REL, PY, REPO, TESTREG, TmpRepo, bootstrap_entry, classified, clean_env, copy_repo, entry, enum,
+    fact_keys_rows, lines_with, make_repo, recorded_pytest, rule_lines, schema, session_of, test_records, write_patch,
 )
 
 testreg = importlib.import_module("scripts.testreg")
@@ -416,6 +417,36 @@ def test_from_module_relative_import_boundary(src, path, want):
 def test_star_exported_follows_all_and_underscore(src, name, want):
     """SPEC v36（審查 r35 CODEX-R35-P1-02）：星號匯入之匯出名依 `__all__`；無 `__all__` 時不含底線開頭之名。"""
     assert testreg._star_exported(testreg._Mod("tests/helpers/m.py", src), name) is want
+
+
+ORDER_BODY = "\n\nclass TestX(Base):\n    def test_x(self):\n        assert 1 == 1\n"
+ORDER_CASES = {
+    "tests/test_order_a.py": "from tests.helpers.sm1 import *\nfrom tests.helpers.sm2 import *\n" + ORDER_BODY,
+    "tests/test_order_b.py": "from tests.helpers.sm1 import *\n" + ORDER_BODY + "\n\nfrom tests.helpers.sm2 import *\n",
+    "tests/test_order_c.py": "from tests.helpers.sm1 import Base\nfrom tests.helpers.sm2 import *\n" + ORDER_BODY,
+    "tests/test_order_d.py": "from tests.helpers.sm2 import *\nfrom tests.helpers.sm1 import Base\n" + ORDER_BODY,
+}
+
+
+def test_base_resolution_follows_python_statement_order(tmp_path):
+    """SPEC v37（審查 r36 CODEX-R36-P1-01）：基底類別之名稱解析＝類別建立時之最後一次模組層綁定（星號匯入後出現者覆蓋、
+    類別之後之匯入不影響、具名匯入與星號匯入依出現序）。oracle＝暫存倉實際 Python 載入之 `TestX.__bases__[0].__module__`。"""
+    files = {"tests/__init__.py": "", "tests/helpers/__init__.py": "",
+             "tests/helpers/sm1.py": "class Base:\n    marker = 1\n", "tests/helpers/sm2.py": "class Base:\n    marker = 2\n",
+             **ORDER_CASES}
+    r = make_repo(tmp_path, files)
+    eng = testreg._Engine(testreg._Tree(r.root, "HEAD"))
+    runtime = {}
+    for rel in sorted(ORDER_CASES):
+        dotted = rel[:-3].replace("/", ".")
+        rt = subprocess.run([PY, "-c", f"import importlib; print(importlib.import_module('{dotted}').TestX.__bases__[0].__module__)"],
+                            cwd=str(r.root), capture_output=True, text=True, env=clean_env())
+        assert rt.returncode == 0, rt.stderr
+        runtime[rel] = rt.stdout.strip()
+        mi = eng.mod(rel)
+        hit = testreg._base_class(eng, mi, mi.classes["TestX"].bases[0])
+        assert hit is not None and hit[0].path[:-3].replace("/", ".") == runtime[rel], (rel, runtime[rel])
+    assert set(runtime.values()) == {"tests.helpers.sm1", "tests.helpers.sm2"}  # 反例前提：四案兩種結果皆出現
 
 
 E1_BODYDIFF = E1_TESTS.replace("\n\ndef test_a(two):\n    assert add(1, two) == K\n", "").replace(

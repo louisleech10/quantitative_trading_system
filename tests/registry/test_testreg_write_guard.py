@@ -964,6 +964,44 @@ def test_07x_v36_star_import_base_three_paths(tmp_path):
         "tests/test_usefx_star.py::TestStarBase::test_star_base"}, p3.stderr
 
 
+# ── ⑦x（v37；審查 r36 CODEX-R36-P1-01）：兩星號來源匯出同名基底，Python 以後出現者為準 ──
+USEFX_PLAIN = "class Base:\n    pass\n"
+T_USEFX_ORDER = '''from tests.helpers.usefx_base import *
+from tests.helpers.usefx_plain import *
+
+
+class TestOverride(Base):
+    def test_override(self):
+        assert 1 == 1
+'''
+T_USEFX_ORDER2 = '''from tests.helpers.usefx_plain import *
+from tests.helpers.usefx_base import *
+
+
+class TestOverride2(Base):
+    def test_override2(self):
+        assert 1 == 1
+'''
+USEFX5_FILES = {**USEFX2_FILES, "tests/helpers/usefx_plain.py": USEFX_PLAIN, "tests/test_usefx_order.py": T_USEFX_ORDER,
+                "tests/test_usefx_order2.py": T_USEFX_ORDER2}
+USEFX5_NEW = {n for n in _collected(USEFX5_FILES) if "/test_usefx_order" in n}
+
+
+def test_07x_v37_star_import_later_source_wins(tmp_path):
+    """後出現之星號來源覆蓋同名基底：基底為無 usefixtures 者（TestOverride）不列、為有 usefixtures 者（TestOverride2）
+    列出——conftest fixture 刪斷言時 hook 與 pre-commit 同判（取第一個來源之實作兩案皆錯）。"""
+    assert len(USEFX5_NEW) == 2
+    r = _repo(tmp_path, USEFX5_FILES)
+    _edit(r, "tests/conftest.py", "    assert value < 10\n", "")
+    want = {"tests/test_usefx_order2.py::TestOverride2::test_override2"}
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX5_NEW == want, proc.stderr
+    r.install_precommit()
+    r.stage("tests/conftest.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX5_NEW == want, pc.stderr
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)
