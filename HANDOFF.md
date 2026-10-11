@@ -280,4 +280,5 @@
 <!-- ENTRY: RM-FRAMEPATH,RM-TESTSPEED,RM-FULLSCALE -->
 - 2026-09-28：RM-FRAMEPATH → `handoffs/reconcile/20260928-framepath-x-consult-r1/synth.md`
 - 2026-09-28：RM-FULLSCALE → `docs/FFSTAT_SPEC.md`
+- 2026-10-11：RM-FRAMEPATH → `docs/manifests/TESTREG.json`
 <!-- HISTORY-END -->
