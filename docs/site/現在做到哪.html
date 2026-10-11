@@ -60,7 +60,7 @@
 </tr>
 </tbody>
 </table></div>
-<p><strong>TESTREG 這一票的全部項目</strong>——詳細做法與驗收寫在規格 <code>docs/TESTREG_SPEC.md</code> 的「§P Phase 與依賴」（Phase 1 從第 55 行起、Phase 2 第 96 行、Phase 3 第 129 行、Phase 4 第 153 行）；分批與每批要過的驗收寫在施工清單 <code>docs/manifests/TESTREG.json</code>。</p>
+<p><strong>TESTREG 這一票的全部項目</strong>（第 1 批之清冊、自動記錄、寫檔當下檢查已套用全部 653 個測試檔；第 3、4 批逐檔分類合起來涵蓋全部測試，一個不漏）——詳細做法與驗收寫在規格 <code>docs/TESTREG_SPEC.md</code> 的「§P Phase 與依賴」（Phase 1 從第 55 行起、Phase 2 第 96 行、Phase 3 第 129 行、Phase 4 第 153 行）；分批與每批要過的驗收寫在施工清單 <code>docs/manifests/TESTREG.json</code>。</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -134,7 +134,7 @@
 <tr>
 <td>第 3 批起</td>
 <td>3.1 分類</td>
-<td>特徵工廠相關的測試，三家逐檔判定該留、該改還是該淘汰</td>
+<td>特徵工廠相關的測試，三家逐檔判定該留、該改還是該淘汰（先做這段：FRAMEPATH 第二批要刪的就是特徵工廠舊引擎，等著用這些結果）</td>
 <td>⏳ 未開始</td>
 </tr>
 <tr>
@@ -151,8 +151,8 @@
 </tr>
 <tr>
 <td>第 4 批起</td>
-<td>4.1–4.2 其餘目錄</td>
-<td>其他目錄的測試照同樣方法分類、跑</td>
+<td>4.1–4.2 其餘全部測試</td>
+<td>第 3 批以外的全部測試檔（IC、API、治理、回測等）照同樣方法分類、跑；驗收＝全庫未分類 0 個；順序依各票實際用到的次數排</td>
 <td>⏳ 未開始</td>
 </tr>
 <tr>
