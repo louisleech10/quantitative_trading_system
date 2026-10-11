@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import ast
 import collections
 import hashlib
 import importlib
@@ -375,6 +376,46 @@ def test_e1_usefixtures_fixture_definition_differs(tmp_path):
     b = testreg.e1_hashes(r.root, "tests/b/test_ub.py::test_u", "HEAD")
     assert a["ast"] == b["ast"] and a["module_context"] == b["module_context"]
     assert a["fixture_closure"] != b["fixture_closure"]
+
+
+E1_RELBASE_TEST = ("from .base import Base\n\n\nclass TestX(Base):\n    def test_same(self):\n        assert 1 == 1\n")
+E1_RELBASE_BASE = "class Base:\n    marker = {v}\n"
+
+
+def test_e1_module_context_includes_relative_import_base(tmp_path):
+    """SPEC v36（審查 r35 CODEX-R35-P1-01）：模組情境遞移納入他模組（此為套件內相對匯入）基底類別之 AST——兩套件之
+    基底類別內容不同而測試函式與測試模組逐字相同 ⇒ module_context 不同（只解析同模組基底者於此即紅）。"""
+    r = make_repo(tmp_path, {"tests/__init__.py": "", "tests/a/__init__.py": "", "tests/a/base.py": E1_RELBASE_BASE.format(v=1),
+                             "tests/a/test_a.py": E1_RELBASE_TEST, "tests/b/__init__.py": "",
+                             "tests/b/base.py": E1_RELBASE_BASE.format(v=2), "tests/b/test_b.py": E1_RELBASE_TEST})
+    a = testreg.e1_hashes(r.root, "tests/a/test_a.py::TestX::test_same", "HEAD")
+    b = testreg.e1_hashes(r.root, "tests/b/test_b.py::TestX::test_same", "HEAD")
+    assert a["ast"] == b["ast"] and a["fixture_closure"] == b["fixture_closure"]
+    assert a["module_context"] != b["module_context"]
+
+
+@pytest.mark.parametrize("src,path,want", [
+    ("from .base import B", "tests/x/t.py", "tests.x.base"),
+    ("from ..base import B", "tests/x/t.py", "tests.base"),
+    ("from ...base import B", "tests/x/t.py", None),        # 越過頂層套件（Python 拒收）
+    ("from ....base import B", "tests/x/y/t.py", None),
+    ("from . import helpers", "tests/x/t.py", "tests.x"),
+    ("from tests.a import B", "tests/x/t.py", "tests.a"),
+])
+def test_from_module_relative_import_boundary(src, path, want):
+    """SPEC v36（審查 r35 CODEX-R35-P2-03）：相對匯入依所在檔還原為絕對模組名；層數大於所在套件深度 ⇒ None。"""
+    assert testreg._from_module(ast.parse(src).body[0], path) == want
+
+
+@pytest.mark.parametrize("src,name,want", [
+    ("class Base: pass\n", "Base", True),
+    ("class _Hidden: pass\n", "_Hidden", False),                       # 無 __all__：底線開頭不匯出
+    ("__all__ = ['Other']\nclass Base: pass\nclass Other: pass\n", "Base", False),
+    ("__all__ = ['_Hidden']\nclass _Hidden: pass\n", "_Hidden", True),  # __all__ 列名即匯出
+])
+def test_star_exported_follows_all_and_underscore(src, name, want):
+    """SPEC v36（審查 r35 CODEX-R35-P1-02）：星號匯入之匯出名依 `__all__`；無 `__all__` 時不含底線開頭之名。"""
+    assert testreg._star_exported(testreg._Mod("tests/helpers/m.py", src), name) is want
 
 
 E1_BODYDIFF = E1_TESTS.replace("\n\ndef test_a(two):\n    assert add(1, two) == K\n", "").replace(

@@ -920,6 +920,50 @@ def test_07x_v35_helper_base_marker_removed_relative_and_alias(tmp_path):
         "tests/test_usefx_alias.py::TestAliasBase::test_alias_base"}, proc.stderr
 
 
+# ── ⑦x（v36；審查 r35 CODEX-R35-P1-02）：基底類別經星號匯入取得 ──
+T_USEFX_STAR = '''from tests.helpers.usefx_base import *
+
+
+class TestStarBase(Base):
+    def test_star_base(self):
+        assert 1 == 1
+
+
+class TestStarPlug(PlugBase):
+    def test_star_plug(self):
+        assert 1 == 1
+'''
+USEFX4_FILES = {**USEFX2_FILES, "tests/test_usefx_star.py": T_USEFX_STAR}
+USEFX4_NEW = {n for n in _collected(USEFX4_FILES) if "/test_usefx_star.py" in n}
+
+
+def test_07x_v36_star_import_base_three_paths(tmp_path):
+    """星號匯入之基底類別以 usefixtures 請求 fixture：conftest fixture 刪斷言、外掛移除、helper 基底拿掉標記三路徑
+    皆列出對應子類別測試（hook；conftest 案另驗 pre-commit）。"""
+    assert len(USEFX4_NEW) == 2 and "checked_value" not in T_USEFX_STAR
+    r = _repo(tmp_path, USEFX4_FILES)
+    _edit(r, "tests/conftest.py", "    assert value < 10\n", "")
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX4_NEW == {
+        "tests/test_usefx_star.py::TestStarBase::test_star_base"}, proc.stderr
+    r.install_precommit()
+    r.stage("tests/conftest.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX4_NEW == {
+        "tests/test_usefx_star.py::TestStarBase::test_star_base"}, pc.stderr
+    r2 = _repo(tmp_path / "plug", USEFX4_FILES)
+    _edit(r2, "tests/conftest.py", 'pytest_plugins = ["tests.plugins.plug", "tests.plugins.plugreq"]',
+          'pytest_plugins = ["tests.plugins.plug"]')
+    p2 = r2.hook("tests/conftest.py")
+    assert p2.returncode != 0 and _v19_subjects(p2.stderr) & USEFX4_NEW == {
+        "tests/test_usefx_star.py::TestStarPlug::test_star_plug"}, p2.stderr
+    r3 = _repo(tmp_path / "helper", USEFX4_FILES)
+    _edit(r3, "tests/helpers/usefx_base.py", '@pytest.mark.usefixtures("checked_value")\nclass Base:', "class Base:")
+    p3 = r3.hook("tests/helpers/usefx_base.py")
+    assert p3.returncode != 0 and _v19_subjects(p3.stderr) & USEFX4_NEW == {
+        "tests/test_usefx_star.py::TestStarBase::test_star_base"}, p3.stderr
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)
