@@ -753,6 +753,103 @@ def test_07x_usefixtures_no_decrease_rc0(tmp_path):
     assert r.hook("tests/conftest.py").returncode == 0
 
 
+# ── ⑦x（v34；審查 r33 CODEX-R33-P1-01／P2-02）：基底類別以模組屬性形式書寫且位於 helper 模組；usefixtures 只認直接標記
+# 與 pytest.param(marks=…)（pytest 套用者），巢狀於他標記引數或作為參數值者不計 ──
+USEFX_BASE = '''import pytest
+
+
+@pytest.mark.usefixtures("checked_value")
+class Base:
+    pass
+
+
+@pytest.mark.usefixtures("plug_req")
+class PlugBase:
+    pass
+'''
+T_USEFX_ATTR = '''import tests.helpers.usefx_base as ub
+
+
+class TestAttrBase(ub.Base):
+    def test_attr_base(self):
+        assert 1 == 1
+
+
+class TestAttrPlug(ub.PlugBase):
+    def test_attr_plug(self):
+        assert 1 == 1
+'''
+T_USEFX_NEST = '''import pytest
+
+
+@pytest.mark.parametrize("x", [pytest.mark.usefixtures("checked_value")])
+def test_marker_as_value(x):
+    assert x is not None
+
+
+@pytest.mark.custom_tag(pytest.mark.usefixtures("checked_value"))
+def test_marker_as_argument():
+    assert 1 == 1
+
+
+@pytest.mark.parametrize("x", [pytest.param(1, marks=pytest.mark.usefixtures("checked_value")), 2])
+def test_param_marks(x):
+    assert x > 0
+'''
+USEFX2_FILES = {**USEFX_FILES, "tests/helpers/usefx_base.py": USEFX_BASE, "tests/test_usefx_attr.py": T_USEFX_ATTR,
+                "tests/test_usefx_nest.py": T_USEFX_NEST}
+USEFX2_NEW = {n for n in _collected(USEFX2_FILES) if "/test_usefx_attr.py" in n or "/test_usefx_nest.py" in n}
+
+
+def test_07x_v34_attribute_base_conftest_fixture_assert_deleted(tmp_path):
+    """helper 模組之基底類別（子類別以 `別名.類別` 繼承）以 usefixtures 套用 conftest fixture，刪其斷言 ⇒ 子類別測試 V19；
+    巢狀標記不計、pytest.param(marks=…) 計入（hook 與 pre-commit 同判）。"""
+    r = _repo(tmp_path, USEFX2_FILES)
+    _edit(r, "tests/conftest.py", "    assert value < 10\n", "")
+    want = {"tests/test_usefx_attr.py::TestAttrBase::test_attr_base", "tests/test_usefx_nest.py::test_param_marks"}
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX2_NEW == want, proc.stderr
+    r.install_precommit()
+    r.stage("tests/conftest.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX2_NEW == want, pc.stderr
+
+
+def test_07x_v34_attribute_base_plugin_removed(tmp_path):
+    """外掛之 fixture 只經他模組基底類別之 usefixtures 請求（測試檔原文不含該 fixture 名），外掛移除 ⇒ 子類別測試 V19。"""
+    r = _repo(tmp_path, USEFX2_FILES)
+    assert "plug_req" not in T_USEFX_ATTR
+    _edit(r, "tests/conftest.py", 'pytest_plugins = ["tests.plugins.plug", "tests.plugins.plugreq"]',
+          'pytest_plugins = ["tests.plugins.plug"]')
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX2_NEW == {
+        "tests/test_usefx_attr.py::TestAttrPlug::test_attr_plug"}, proc.stderr
+
+
+def test_07x_v34_helper_base_marker_removed(tmp_path):
+    """helper 模組之基底類別拿掉 usefixtures 標記 ⇒ 寫該 helper 之 hook 列出經其請求 fixture 之子類別測試（hook 與 pre-commit）。"""
+    r = _repo(tmp_path, USEFX2_FILES)
+    _edit(r, "tests/helpers/usefx_base.py", '@pytest.mark.usefixtures("checked_value")\nclass Base:', "class Base:")
+    proc = r.hook("tests/helpers/usefx_base.py")
+    want = {"tests/test_usefx_attr.py::TestAttrBase::test_attr_base"}
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) == want, proc.stderr
+    r.install_precommit()
+    r.stage("tests/helpers/usefx_base.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) == want, pc.stderr
+
+
+def test_07x_v34_test_class_marker_removed(tmp_path):
+    """測試檔內類別拿掉 usefixtures 裝飾器 ⇒ 該類別與同檔子類別之測試 V19，他類別不列。"""
+    r = _repo(tmp_path, USEFX2_FILES)
+    _edit(r, "tests/test_usefx_cls.py", '@pytest.mark.usefixtures("checked_value")\nclass TestDecorated:',
+          "class TestDecorated:")
+    proc = r.hook("tests/test_usefx_cls.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) == {
+        "tests/test_usefx_cls.py::TestDecorated::test_cls_decorated",
+        "tests/test_usefx_cls.py::TestChild::test_inherited"}, proc.stderr
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)
@@ -997,6 +1094,52 @@ def test_boundary_07c_conftest_pytest_plugins_change_wall_clock(head_worktree, e
         expected = _usefixtures_users(head_worktree, _asserting_fixtures(head_worktree, plugins[0]))
         assert expected, "前提：被移除之外掛須有經 usefixtures 套用之含斷言 fixture（真實樹 ic_persist_redirect）"
         assert blocking and expected <= _v19_subjects(first.stderr), sorted(expected - _v19_subjects(first.stderr))[:5]
+
+
+def test_boundary_07d_test_file_class_base_change_wall_clock(head_worktree):
+    """真實規模（v34）：測試檔內一個帶基底之非測試類別改以 object 為基底（類別輪廓減少 ⇒ 全檔比較＋子類別文字預篩，
+    不做完整呼叫者反推——實測完整反推 41 秒）⇒ hook 與 pre-commit 同一 rc 方向；不擋者 10 次中位 < 1 s、必擋者 3 次中位
+    < 5 s。標的由 AST 自 HEAD 測試檔導出（字典序第一個），不寫死。"""
+    _assert_clean(head_worktree)
+    rels = subprocess.run(["git", "-C", str(head_worktree), "ls-files", "tests/test_*.py", "tests/**/test_*.py"],
+                          capture_output=True, text=True, check=True).stdout.split()
+    pick = None
+    for rel in sorted(rels):
+        src = (head_worktree / rel).read_text(encoding="utf-8")
+        for n in ast.parse(src).body:
+            if isinstance(n, ast.ClassDef) and not n.name.startswith("Test") and len(n.bases) == 1 \
+                    and isinstance(n.bases[0], ast.Name) and n.bases[0].id != "object":
+                line = src.splitlines()[n.lineno - 1]
+                if line.startswith(f"class {n.name}({n.bases[0].id}):"):
+                    pick = (rel, line, f"class {n.name}(object):")
+                    break
+        if pick:
+            break
+    assert pick, "前提：HEAD 測試檔中有帶單一名稱基底之非測試類別"
+    rel, old, new = pick
+    p = head_worktree / rel
+    src = p.read_text(encoding="utf-8")
+    p.write_text(src.replace(old, new, 1), encoding="utf-8")
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(p)}})
+    try:
+        first = subprocess.run(["bash", str(head_worktree / "scripts/testreg_write_guard.sh")], input=payload,
+                               capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
+        assert first.returncode in (0, 2), first.stderr
+        blocking = first.returncode == 2
+        runs = 3 if blocking else 10
+        times = []
+        for _ in range(runs):
+            t0 = time.perf_counter()
+            proc = subprocess.run(["bash", str(head_worktree / "scripts/testreg_write_guard.sh")], input=payload,
+                                  capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
+            times.append(time.perf_counter() - t0)
+            assert proc.returncode == first.returncode, proc.stderr
+        staged = _staged_times_at(head_worktree, rel, runs, blocking)
+    finally:
+        p.write_text(src, encoding="utf-8")
+    limit = 5.0 if blocking else 1.0
+    assert statistics.median(times) < limit, (rel, blocking, times)
+    assert statistics.median(staged) < limit, (rel, blocking, staged)
 
 
 def _asserting_fixtures(root: Path, dotted: str) -> set:
