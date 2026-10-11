@@ -8,6 +8,8 @@ hook 案例以 PostToolUse payload 呼叫暫存倉內之 hook 複本（repo 根�
 from __future__ import annotations
 
 import ast
+import configparser
+import fnmatch
 import importlib
 import json
 import statistics
@@ -267,6 +269,8 @@ def base_value():
 
 @pytest.fixture(autouse=True)
 def env_ready(base_value):
+    from tests.fixtures.fx_helpers import check_pos
+    check_pos(base_value)
     assert add(0, 0) == 0
     assert base_value > 0
     yield
@@ -334,8 +338,24 @@ class TestK:
 
 async def test_async():
     check_close(add(0.1, -0.1))
+
+
+def testhelper():
+    check_close(add(0.1, -0.1))
 '''
-T_LOCAL = '''from momentum.calc import add
+# autouse fixture 在子目錄 conftest、斷言在外部 helper：測試檔本身不 import 該 helper（審查 r24）
+SUB_CONFTEST = '''import pytest
+
+
+@pytest.fixture(autouse=True)
+def env_checked():
+    from tests.helpers.envcheck import check_env
+    check_env("x")
+    yield
+'''
+ENVCHECK = "def check_env(v):\n    assert v is not None\n    assert v != ''\n"
+T_SUB = "def test_s1():\n    assert 1 + 1 == 2\n\n\ndef test_s2():\n    assert 2 + 2 == 4\n"
+T_LOCAL ='''from momentum.calc import add
 
 
 def check_local(x):
@@ -350,7 +370,9 @@ FX_FILES = {**BASE, "tests/test_local.py": T_LOCAL, "tests/__init__.py": "", "te
             "tests/fixtures/fx_helpers.py": HELPERS_FX,
             "tests/conftest.py": CONFTEST, "tests/test_fx.py": T_FX, "tests/test_autouse.py": T_AUTOUSE,
             "tests/helpers/__init__.py": "", "tests/helpers/tolerances.py": TOL_MOD, "tests/helpers/checks.py": CHECKS_MOD,
-            "tests/helpers/loose.py": "TOL = 1e-3\n", "tests/test_tol.py": T_TOL, "tests/test_shapes.py": T_SHAPES}
+            "tests/helpers/loose.py": "TOL = 1e-3\n", "tests/test_tol.py": T_TOL, "tests/test_shapes.py": T_SHAPES,
+            "tests/helpers/envcheck.py": ENVCHECK, "tests/sub/__init__.py": "", "tests/sub/conftest.py": SUB_CONFTEST,
+            "tests/sub/test_sub.py": T_SUB}
 
 
 def _v19_subjects(stderr: str) -> set:
@@ -362,7 +384,8 @@ HOOK_CASES = {
     "07_delete_assert_in_keep_file": ("tests/test_keep.py", "    assert result > 0\n", "",
                                       {"tests/test_keep.py::test_one"}),
     "07c_fixtures_helper_drops_assert": ("tests/fixtures/fx_helpers.py", "    assert x < 100\n", "",
-                                         {"tests/test_fx.py::test_uses_helper", "tests/test_shapes.py::TestK::test_k"}),
+                                         {"tests/test_fx.py::test_uses_helper", "tests/test_shapes.py::TestK::test_k",
+                                          "tests/test_autouse.py::test_a", "tests/test_autouse.py::test_b"}),
     "07c_conftest_fixture_drops_assert": ("tests/conftest.py", "    assert value < 10\n", "",
                                           {"tests/test_fx.py::test_uses_fixture"}),
     "07c_helper_local_rename_ok": ("tests/conftest.py", "    value = 5\n    assert value > 0\n    assert value < 10\n"
@@ -408,8 +431,20 @@ HOOK_CASES = {
                                                  "from tests.helpers import loose as tolpkg\n",
                                                  {"tests/test_tol.py::test_pkg_helper"}),
     "07p_conftest_unrelated_import_ok": ("tests/conftest.py", "import pytest\n", "import os\nimport pytest\n", set()),
+    # 07q（審查 r24）：子目錄 conftest 之 autouse fixture 呼叫外部 helper，測試檔不 import 該 helper
+    "07q_conftest_autouse_external_helper_drops_assert": ("tests/helpers/envcheck.py", "    assert v != ''\n", "",
+                                                          {"tests/sub/test_sub.py::test_s1",
+                                                           "tests/sub/test_sub.py::test_s2"}),
 }
 IMPORT_CASES = sorted(c for c in HOOK_CASES if c.startswith("07p_"))
+# 各 import 改變案之 decreased_defs：須含（⊇）之使用者定義、不得含之無關定義
+IMPORT_DEFS = {
+    "07p_helper_import_source_changed": ({"check_close"}, {"check_alias", "check_pkg"}),
+    "07p_helper_import_replaced_by_rebinding": ({"check_close"}, {"check_alias", "check_pkg"}),
+    "07p_helper_alias_import_source_changed": ({"check_alias"}, {"check_close", "check_pkg"}),
+    "07p_helper_package_import_source_changed": ({"check_pkg"}, {"check_close", "check_alias"}),
+    "07p_conftest_unrelated_import_ok": (set(), {"checked_value"}),
+}
 
 
 @pytest.mark.parametrize("case", sorted(HOOK_CASES))
@@ -434,8 +469,8 @@ def test_07c_helper_change_lists_callers(tmp_path):
     _edit(r, "tests/fixtures/fx_helpers.py", "    assert x < 100\n", "")
     # helper_callers 為檔層候選集合：該檔任一 helper 之呼叫者（試作實證；被報 V19 者另由 07c 案例斷言只有 test_uses_helper）
     assert testreg.helper_callers(r.root, "tests/fixtures/fx_helpers.py") == [
-        "tests/test_fx.py::test_star", "tests/test_fx.py::test_threshold", "tests/test_fx.py::test_uses_helper",
-        "tests/test_shapes.py::TestK::test_k"]
+        "tests/test_autouse.py::test_a", "tests/test_autouse.py::test_b", "tests/test_fx.py::test_star",
+        "tests/test_fx.py::test_threshold", "tests/test_fx.py::test_uses_helper", "tests/test_shapes.py::TestK::test_k"]
     proc = r.hook("tests/fixtures/fx_helpers.py")
     assert "tests/test_fx.py::test_uses_helper" in proc.stderr
 
@@ -455,17 +490,22 @@ HELPER_CASES = sorted(c for c, (rel, *_) in HOOK_CASES.items() if not is_test_pa
 
 
 def _full_oracle(r: TmpRepo) -> set:
-    """完整反推之定義：暫存倉每一測試函式（pytest 預設收集規則：模組層 `test*` 函式含 async、`Test*` 類別內 `test*`
-    方法）於 HEAD 與工作樹各自完整展開之斷言多重集合比較（不經呼叫者反推）。"""
+    """完整反推之定義：暫存倉每一測試函式（依暫存倉 pytest.ini 之 python_classes／python_functions 以 fnmatch 收集，
+    與真實樹同為 `Test*`／`test_*`；含 async 函式與類別方法；`testhelper` 不收）於 HEAD 與工作樹各自完整展開之
+    斷言多重集合比較（不經呼叫者反推）。"""
+    ini = configparser.ConfigParser()
+    ini.read_string(r.read("pytest.ini"))
+    cls_pat, fn_pat = ini["pytest"]["python_classes"], ini["pytest"]["python_functions"]
     fn = (ast.FunctionDef, ast.AsyncFunctionDef)
     out = set()
     for rel in sorted(p for p in FX_FILES if is_test_path(p)):
         nids = []
         for n in ast.parse(r.read(rel)).body:
-            if isinstance(n, fn) and n.name.startswith("test"):
+            if isinstance(n, fn) and fnmatch.fnmatchcase(n.name, fn_pat):
                 nids.append(f"{rel}::{n.name}")
-            elif isinstance(n, ast.ClassDef) and n.name.startswith("Test"):
-                nids += [f"{rel}::{n.name}::{m.name}" for m in n.body if isinstance(m, fn) and m.name.startswith("test")]
+            elif isinstance(n, ast.ClassDef) and fnmatch.fnmatchcase(n.name, cls_pat):
+                nids += [f"{rel}::{n.name}::{m.name}" for m in n.body
+                         if isinstance(m, fn) and fnmatch.fnmatchcase(m.name, fn_pat)]
         for nid in nids:
             if testreg.multiset_decreased(testreg.assertion_multiset(r.root, nid, "HEAD"),
                                           testreg.assertion_multiset(r.root, nid, "worktree")):
@@ -475,8 +515,8 @@ def _full_oracle(r: TmpRepo) -> set:
 
 @pytest.mark.parametrize("case", HELPER_CASES)
 def test_07p_delta_equals_full_reverse_oracle(tmp_path, case):
-    """差量判定（產出端 hook 只對自身斷言輪廓減少之定義反推；模組層非定義敘述改變退回完整反推）之 V19 主體，
-    逐案等於完整反推 oracle（暫存倉全量逐函式比較）；oracle 只在本測試算，不進產出端。"""
+    """差量判定（產出端 hook 只對完整展開輪廓減少之模組層名稱反推呼叫者）之 V19 主體，逐案等於完整反推 oracle
+    （暫存倉全量逐函式比較）；oracle 只在本測試算，不進產出端。"""
     rel, old, new, expect = HOOK_CASES[case]
     r = _repo(tmp_path, FX_FILES)
     _edit(r, rel, old, new)
@@ -484,24 +524,26 @@ def test_07p_delta_equals_full_reverse_oracle(tmp_path, case):
 
 
 @pytest.mark.parametrize("case", IMPORT_CASES)
-def test_07p_import_change_decreased_defs_none(tmp_path, case):
-    """模組層 import 之任一改變（ImportFrom 來源、改為同名賦值、`import … as` 別名來源、套件 `from … import 模組 as`
-    來源、無關 import）⇒ `decreased_defs` 回 None（退回完整反推），不以字面形態挑選。"""
+def test_07p_import_change_decreased_defs_by_expanded_profile(tmp_path, case):
+    """import 改變之差量以名稱之完整展開輪廓判定（不以字面形態挑選、不一律退回完整反推）：引用改變之綁定之定義必在、
+    無關定義不在；無關 import ⇒ 空串列（不反推，產出端維持秒級）。"""
     rel, old, new, _ = HOOK_CASES[case]
+    must, must_not = IMPORT_DEFS[case]
     r = _repo(tmp_path, FX_FILES)
     _edit(r, rel, old, new)
-    assert testreg.decreased_defs(r.root, rel) is None
+    got = testreg.decreased_defs(r.root, rel)
+    assert got is not None and must <= set(got) and not (must_not & set(got)), got
+    if not must:
+        assert got == []
 
 
-def test_mutation_delta_without_module_fallback_misses_07p(tmp_path, monkeypatch, capsys):
-    """mutant：模組層非定義敘述改變時不退回完整反推（decreased_defs 回空而非 None）⇒ 07p 之 import 來源改變放行。"""
+def test_mutation_delta_ignores_binding_change_misses_07p(tmp_path, monkeypatch, capsys):
+    """mutant：差量只比本體字面、不展開綁定（import 來源改變時回空）⇒ 07p 之 import 來源改變放行。"""
     rel, old, new, _ = HOOK_CASES["07p_helper_import_source_changed"]
     r = _repo(tmp_path, FX_FILES)
     _edit(r, rel, old, new)
-    assert testreg.decreased_defs(r.root, rel) is None
     assert testreg.main(["--repo", str(r.root), "check", "--helpers", rel]) != 0
-    real = testreg.decreased_defs
-    monkeypatch.setattr(testreg, "decreased_defs", lambda *a, **k: real(*a, **k) or [])
+    monkeypatch.setattr(testreg, "decreased_defs", lambda *a, **k: [])
     assert testreg.main(["--repo", str(r.root), "check", "--helpers", rel]) == 0
     capsys.readouterr()
 
@@ -588,14 +630,22 @@ def _hook_times_at(root: Path, rel: str) -> list:
     return times
 
 
-@pytest.mark.parametrize("edit", ["unchanged", "comment_appended", "fixture_docstring_added"])
+@pytest.mark.parametrize("edit", ["unchanged", "comment_appended", "fixture_docstring_added", "import_added"])
 def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, edit):
-    """真實規模（HEAD 全部測試檔）：tests/conftest.py 未改／加註解／為一個 fixture 加說明（皆不減斷言）後觸發 hook，
-    10 次牆鐘中位 < 1 s（實作須以差量判定：只對自身斷言輪廓減少之定義反推呼叫者——完整反推實測 245 秒）。"""
+    """真實規模（HEAD 全部測試檔）：tests/conftest.py 未改／加註解／為一個 fixture 加說明／於最後一個模組層 import
+    之後加一行無關 import（皆不減斷言）後觸發 hook，10 次牆鐘中位 < 1 s（實作須以差量判定：只對完整展開輪廓減少之
+    名稱反推呼叫者——完整反推實測 245 秒；import 改變不得一律退回完整反推）。"""
     p = head_worktree / "tests/conftest.py"
     src = p.read_text(encoding="utf-8")
     if edit == "comment_appended":
         p.write_text(src + "\n# 註解\n", encoding="utf-8")
+    elif edit == "import_added":
+        tree = ast.parse(src)
+        assert "colorsys" not in src
+        last = max(n.end_lineno for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom)))
+        lines = src.splitlines(keepends=True)
+        lines.insert(last, "import colorsys  # noqa: F401\n")
+        p.write_text("".join(lines), encoding="utf-8")
     elif edit == "fixture_docstring_added":
         tree = ast.parse(src)
         fx = next(n for n in tree.body if isinstance(n, ast.FunctionDef)

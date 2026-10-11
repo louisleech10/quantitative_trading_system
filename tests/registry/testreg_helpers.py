@@ -25,7 +25,8 @@ PLUGIN_DIR = REPO / "tests/fixtures"
 PLUGIN_MOD = "testreg_recorder_plugin"
 TOOLS = ("scripts/testreg.py", "scripts/testreg_write_guard.sh", SCHEMA_REL)
 GITIGNORE = ".testreg/\n__pycache__/\n.pytest_cache/\ndata_cache/\n"
-PYTEST_INI = "[pytest]\ntestpaths = tests\npython_files = test_*.py\nmarkers =\n    slow: s\n"
+PYTEST_INI = ("[pytest]\ntestpaths = tests\npython_files = test_*.py\npython_classes = Test*\npython_functions = test_*\n"
+              "markers =\n    slow: s\n")
 STRIP_ENV = ("TESTREG_PARENT_SESSION", "PYTEST_ADDOPTS", "PYTEST_CURRENT_TEST", "PYTEST_XDIST_WORKER")
 
 
