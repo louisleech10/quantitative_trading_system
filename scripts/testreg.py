@@ -3252,40 +3252,348 @@ def check(repo_root: Path, *, paths: Sequence[str] = (), manifest: Optional[str]
 # ── Task 2.1：複查訊號 ───────────────────────────────────────────────────────────────────────────────
 
 
+ALLOWED_RED_REL = "tests/_golden/prered/allowed_red.json"
+FACT_KEYS_REL = "scripts/fact_keys.json"
+
+
 def review(repo_root: Path) -> Dict[str, Dict[str, SignalValue]]:
     """逐 catalog entry 逐訊號：{path: {訊號名: True|False|"unknown"}}；訊號名依 schema `enums.review_signal`，
     每訊號以 `signal_<名>`（呼叫當下以模組屬性取用）判定；不寫回 catalog。"""
-    raise NotImplementedError("TESTREG Task 2.1")
+    ctx = build_context(repo_root, "worktree")
+    names = list(ctx.schema["enums"]["review_signal"])
+    return {p: {s: _seam(f"signal_{s}")(ctx, p) for s in names} for p in sorted(_entries(ctx))}
+
+
+def _file_of(nodeid: str) -> str:
+    return nodeid.split("::")[0]
+
+
+def _review_summary(ctx: Context) -> Optional[Dict[str, List[Dict[str, Any]]]]:
+    """summary 依檔分組（{檔: [(nodeid, 紀錄)…]} 之扁平形：紀錄附 nodeid）；不存在或不合法（同記錄器 read_summary：
+    JSON 不可解析、schema_version／k 不符、形狀不符）⇒ None。"""
+    if "review_summary" not in ctx.extra:
+        s = ctx.schema
+        p = ctx.repo_root / s["summary"]["path"]
+        by_file: Optional[Dict[str, List[Dict[str, Any]]]] = None
+        try:
+            obj = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            obj = None
+        if isinstance(obj, dict) and obj.get("schema_version") == s["version"] and obj.get("k") == s["summary"]["k"] \
+                and not _seam("validate_shape")(obj, s["summary"]["shape"], s):
+            by_file = collections.defaultdict(list)
+            for nid, recs in obj["nodes"].items():
+                for r in recs:
+                    by_file[_file_of(nid)].append(dict(r, nodeid=nid))
+        ctx.extra["review_summary"] = by_file
+    return ctx.extra["review_summary"]
+
+
+def _review_ledger(ctx: Context) -> Optional[Dict[str, Tuple[str, str, bool]]]:
+    """ledger 目錄不存在 ⇒ None；否則 {檔: (started, session_id, 該 session 有該檔之 collect_record)}，取收集過該檔
+    （有該檔之 test 或 collect 紀錄）之 session 中 started 最晚者（同 started 以 session_id 定序）。"""
+    if "review_ledger" not in ctx.extra:
+        d = ctx.ledger_dir
+        latest: Optional[Dict[str, Tuple[str, str, bool]]] = None
+        if d.is_dir():
+            latest = {}
+            for f in sorted(d.glob("*.jsonl")):
+                started, sid, seen, coll = None, f.name[:-len(".jsonl")], set(), set()
+                try:
+                    lines = f.read_text(encoding="utf-8").splitlines()
+                except OSError:
+                    continue
+                for line in lines:
+                    try:
+                        rec = json.loads(line) if line.strip() else None
+                    except ValueError:
+                        continue
+                    if not isinstance(rec, dict):
+                        continue
+                    kind = rec.get("kind")
+                    if kind == "session":
+                        started, sid = str(rec.get("started")), str(rec.get("session_id", sid))
+                    elif kind == "test" and isinstance(rec.get("nodeid"), str):
+                        seen.add(_file_of(rec["nodeid"]))
+                    elif kind == "collect" and isinstance(rec.get("path"), str):
+                        seen.add(rec["path"])
+                        coll.add(rec["path"])
+                if started is None:
+                    continue
+                for path in seen:
+                    cand = (started, sid, path in coll)
+                    if path not in latest or cand[:2] > latest[path][:2]:
+                        latest[path] = cand
+        ctx.extra["review_ledger"] = latest
+    return ctx.extra["review_ledger"]
+
+
+def _prod_module_file(head: "_Tree", dotted: str, roots: Tuple[str, ...]) -> Tuple[bool, Optional[str]]:
+    """(是否屬 production_roots 之模組名, HEAD 中之檔)；非生產模組回 (False, None)。無 __init__.py 之套件目錄
+    （namespace package）回目錄路徑加 "/"（無模組層綁定，只有子模組）。"""
+    base = dotted.replace(".", "/")
+    if not any((base + "/").startswith(r) if r.endswith("/") else base + ".py" == r for r in roots):
+        return False, None
+    for cand in (base + ".py", base + "/__init__.py"):
+        if head.exists(cand):
+            return True, cand
+    if getattr(head, "_dirset", None) is None:
+        head._dirset = {f.rsplit("/", 1)[0] for f in head.files() if "/" in f}
+        head._dirset |= {d.rsplit("/", i)[0] for d in list(head._dirset) for i in range(1, d.count("/") + 1)}
+    return (True, base + "/") if base in head._dirset else (True, None)
+
+
+def _module_level_binds(src: Optional[str]) -> Tuple[set, bool]:
+    """模組層（含模組層 if／try／with／for 區塊內）綁定之名稱，與是否有不可列舉之來源（星號匯入、模組層 __getattr__）。"""
+    names: set = set()
+    if src is None:
+        return names, False
+    try:
+        mod = _parse(src)
+    except SyntaxError:
+        return names, True
+    wildcard = False
+
+    def targets(t: ast.AST) -> None:
+        for n in ast.walk(t):
+            if isinstance(n, ast.Name):
+                names.add(n.id)
+
+    def visit(body: Sequence[ast.stmt]) -> None:
+        nonlocal wildcard
+        for n in body:
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                names.add(n.name)
+                wildcard = wildcard or n.name == "__getattr__"
+            elif isinstance(n, ast.Assign):
+                for t in n.targets:
+                    targets(t)
+            elif isinstance(n, (ast.AnnAssign, ast.AugAssign)):
+                targets(n.target)
+            elif isinstance(n, ast.Import):
+                names.update((al.asname or al.name).split(".")[0] for al in n.names)
+            elif isinstance(n, ast.ImportFrom):
+                for al in n.names:
+                    if al.name == "*":
+                        wildcard = True
+                    else:
+                        names.add(al.asname or al.name)
+            elif isinstance(n, (ast.For, ast.AsyncFor)):
+                targets(n.target)
+                visit(n.body)
+                visit(n.orelse)
+            elif isinstance(n, (ast.With, ast.AsyncWith)):
+                for it in n.items:
+                    if it.optional_vars is not None:
+                        targets(it.optional_vars)
+                visit(n.body)
+            elif isinstance(n, ast.If):
+                visit(n.body)
+                visit(n.orelse)
+            elif isinstance(n, ast.Try):
+                visit(n.body)
+                visit(n.orelse)
+                visit(n.finalbody)
+                for h in n.handlers:
+                    visit(h.body)
+
+    visit(mod.body)
+    return names, wildcard
+
+
+def _prod_symbol_present(ctx: Context, dotted: str, sym: str) -> Optional[bool]:
+    """sym 於 HEAD 之生產模組 dotted 是否存在（模組層綁定或子模組）；dotted 非生產模組 ⇒ None。"""
+    cache = ctx.extra.setdefault("review_prod", {})
+    key = (dotted, sym)
+    if re.fullmatch(r"__\w+__", sym):  # 模組物件之內建屬性（__file__、__name__…）
+        return True if _prod_module_file(ctx.extra["head_obj"], dotted, tuple(
+            ctx.schema["receipts"]["E0"]["production_roots"]))[0] else None
+    if key not in cache:
+        head = ctx.extra["head_obj"]
+        roots = tuple(ctx.schema["receipts"]["E0"]["production_roots"])
+        is_prod, mf = _prod_module_file(head, dotted, roots)
+        if not is_prod:
+            cache[key] = None
+        elif mf is None:
+            cache[key] = False
+        else:
+            binds = ctx.extra.setdefault("review_binds", {})
+            if mf not in binds:
+                binds[mf] = _module_level_binds(head.read(mf))
+            names, wildcard = binds[mf]
+            sub = dotted.replace(".", "/") + "/" + sym
+            cache[key] = wildcard or sym in names or head.exists(sub + ".py") or head.exists(sub + "/__init__.py")
+    return cache[key]
+
+
+def _dotted_chain(n: ast.AST) -> Optional[List[str]]:
+    parts: List[str] = []
+    while isinstance(n, ast.Attribute):
+        parts.append(n.attr)
+        n = n.value
+    if not isinstance(n, ast.Name):
+        return None
+    parts.append(n.id)
+    return parts[::-1]
 
 
 def signal_prod_symbol_gone(ctx: Context, path: str) -> SignalValue:
-    """測試檔 import 之生產符號於 HEAD AST 不存在。"""
-    raise NotImplementedError("TESTREG Task 2.1")
+    """測試檔 import 之生產符號於 HEAD AST 不存在。測試檔讀工作樹；生產模組（schema `receipts.E0.production_roots`）讀
+    HEAD。計入：`from <生產模組> import <名>`（含函式內；名須為模組層綁定或子模組）、`import <生產模組>[ as 別名]` 後之
+    屬性鏈 `<模組>.<名>`（Load）、及所 import 之生產模組本身於 HEAD 不存在；模組有星號匯入或模組層 __getattr__ ⇒ 不判
+    缺。測試檔不可解析或不存在 ⇒ False。"""
+    src = _tree(ctx).read(path)
+    if src is None:
+        return False
+    try:
+        mod = _parse(src)
+    except SyntaxError:
+        return False
+    head = ctx.extra["head_obj"]
+    roots = tuple(ctx.schema["receipts"]["E0"]["production_roots"])
+    aliases: Dict[str, str] = {}
+    modules: set = set()
+    for n in ast.walk(mod):
+        if isinstance(n, ast.ImportFrom) and n.level == 0 and n.module:
+            is_prod, mf = _prod_module_file(head, n.module, roots)
+            if not is_prod:
+                continue
+            for al in n.names:
+                if al.name != "*" and _prod_symbol_present(ctx, n.module, al.name) is False:
+                    return True
+            if mf is None:
+                return True
+        elif isinstance(n, ast.Import):
+            for al in n.names:
+                is_prod, mf = _prod_module_file(head, al.name, roots)
+                if not is_prod:
+                    continue
+                if mf is None:
+                    return True
+                if al.asname:
+                    aliases[al.asname] = al.name
+                else:
+                    modules.add(al.name)
+    if not aliases and not modules:
+        return False
+    for n in ast.walk(mod):
+        if not (isinstance(n, ast.Attribute) and isinstance(n.ctx, ast.Load)):
+            continue
+        chain = _dotted_chain(n)
+        if chain is None:
+            continue
+        if chain[0] in aliases:
+            chain = aliases[chain[0]].split(".") + chain[1:]
+        elif not any(m.split(".")[0] == chain[0] for m in modules | set(aliases.values())):
+            continue
+        # 鏈之最長前綴為所 import 之生產模組者；其下一節須存在
+        for i in range(len(chain) - 1, 0, -1):
+            dotted = ".".join(chain[:i])
+            if dotted in modules or dotted in aliases.values():
+                if _prod_symbol_present(ctx, dotted, chain[i]) is False:
+                    return True
+                break
+    return False
+
+
+def _dur_triggered(recs: List[Dict[str, Any]], rule: Mapping[str, Any]) -> bool:
+    passed = [r for r in recs if r.get("outcome") == "passed"]
+    if not passed:
+        return False
+    latest = max(passed, key=lambda r: (r["started"], r["session_id"]))
+    prior = [r for r in passed if r["session_id"] != latest["session_id"]
+             and r["duration_class"] == latest["duration_class"] and r["duration_s"] > 0]
+    prior.sort(key=lambda r: (r["started"], r["session_id"]))
+    prior = prior[-int(rule["min_prior"]):]
+    if len(prior) < int(rule["min_prior"]):
+        return False
+    vals = sorted(r["duration_s"] for r in prior)
+    med = vals[len(vals) // 2]
+    d = latest["duration_s"]
+    return d >= float(rule["ratio_over_median"]) * med and d >= float(rule["min_seconds"])
 
 
 def signal_duration_regression(ctx: Context, path: str) -> SignalValue:
     """依 schema `derived.duration_regression_rule`；summary 不存在 ⇒ "unknown"。"""
-    raise NotImplementedError("TESTREG Task 2.1")
+    summ = _review_summary(ctx)
+    if summ is None:
+        return "unknown"
+    rule = ctx.schema["derived"]["duration_regression_rule"]
+    by_node: Dict[str, List[Dict[str, Any]]] = collections.defaultdict(list)
+    for r in summ.get(path, []):
+        by_node[r["nodeid"]].append(r)
+    return any(_dur_triggered(recs, rule) for recs in by_node.values())
 
 
 def signal_outcome_flip_same_fingerprint(ctx: Context, path: str) -> SignalValue:
     """summary 中同 fingerprint 不同 outcome；summary 不存在 ⇒ "unknown"。"""
-    raise NotImplementedError("TESTREG Task 2.1")
+    summ = _review_summary(ctx)
+    if summ is None:
+        return "unknown"
+    seen: Dict[Tuple[str, str], set] = collections.defaultdict(set)
+    for r in summ.get(path, []):
+        seen[(r["nodeid"], r["fingerprint"])].add(r["outcome"])
+    return any(len(v) > 1 for v in seen.values())
 
 
 def signal_collect_error(ctx: Context, path: str) -> SignalValue:
     """最近一個收集過該檔之 session 有該檔之 ledger collect_record；ledger 不存在 ⇒ "unknown"。"""
-    raise NotImplementedError("TESTREG Task 2.1")
+    led = _review_ledger(ctx)
+    if led is None:
+        return "unknown"
+    hit = led.get(path)
+    return bool(hit and hit[2])
+
+
+def _owner_status(ctx: Context, owner: str) -> SignalValue:
+    if "review_fact_keys" not in ctx.extra:
+        try:
+            fk = json.loads((ctx.repo_root / FACT_KEYS_REL).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            fk = {}
+        ctx.extra["review_fact_keys"] = fk if isinstance(fk, dict) else {}
+    fk = ctx.extra["review_fact_keys"]
+    statuses: List[str] = []
+    for blk, prefix in (("handoff-pending", "HP-"), ("roadmap-status", "RM-")):
+        b = fk.get(blk)
+        if not isinstance(b, dict):
+            continue
+        try:
+            iid, ist = b["columns"].index("識別碼"), b["columns"].index("狀態")
+        except (KeyError, ValueError):
+            continue
+        statuses += [r[ist] for r in b.get("rows", []) if isinstance(r, list) and len(r) > max(iid, ist)
+                     and r[iid] == prefix + owner]
+    if not statuses:
+        return "unknown"
+    return any(s == "已完成" for s in statuses)
 
 
 def signal_allowed_red_owner_closed(ctx: Context, path: str) -> SignalValue:
     """該檔之 allowed_red.json 列之 owner_ticket 於 scripts/fact_keys.json 已完成（查表規則見 SPEC Task 2.1）。"""
-    raise NotImplementedError("TESTREG Task 2.1")
+    if "review_allowed_red" not in ctx.extra:
+        try:
+            rows = json.loads((ctx.repo_root / ALLOWED_RED_REL).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            rows = []
+        ctx.extra["review_allowed_red"] = rows if isinstance(rows, list) else []
+    owners = sorted({r.get("owner_ticket") for r in ctx.extra["review_allowed_red"] if isinstance(r, dict)
+                     and isinstance(r.get("node"), str) and _file_of(r["node"]) == path
+                     and isinstance(r.get("owner_ticket"), str)})
+    if not owners:
+        return False
+    vals = [_owner_status(ctx, o) for o in owners]
+    if any(v is True for v in vals):
+        return True
+    return "unknown" if any(v == "unknown" for v in vals) else False
 
 
 def signal_quarantine_expired(ctx: Context, path: str) -> SignalValue:
     """該 entry 有 quarantine 之 expires 早於今日（V11 反例）。"""
-    raise NotImplementedError("TESTREG Task 2.1")
+    e = _entries(ctx).get(path)
+    today = _today()
+    return isinstance(e, dict) and any(isinstance(q, dict) and isinstance(q.get("expires"), str) and q["expires"] < today
+                                       for q in e.get("quarantine") or [])
 
 
 # ── Task 2.2：impact ─────────────────────────────────────────────────────────────────────────────────
@@ -3401,6 +3709,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         elif args.cmd == "check":
             findings = _seam("check")(root, paths=args.paths or (), manifest=args.manifest, helpers=args.helpers or (),
                                       staged=args.staged)
+        elif args.cmd == "review":
+            sys.stdout.write(json.dumps(_seam("review")(root), ensure_ascii=False, sort_keys=True) + "\n")
         else:
             raise TestregError(f"USAGE {args.cmd}: 第 2 批以後實作")
     except TestregError as exc:
