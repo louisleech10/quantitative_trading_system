@@ -16,7 +16,7 @@ import statistics
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 import pytest
 
@@ -209,6 +209,8 @@ def all_positive(*args):
 '''
 CONFTEST = '''import pytest
 
+pytest_plugins = ["tests.plugins.plug"]
+
 
 @pytest.fixture
 def checked_value():
@@ -354,6 +356,17 @@ def env_checked():
     yield
 '''
 ENVCHECK = "def check_env(v):\n    assert v is not None\n    assert v != ''\n"
+# pytest_plugins 所列外掛之 autouse fixture 呼叫外部 helper（審查 r25）：作用於全部測試，測試檔皆不 import 該 helper
+PLUG = '''import pytest
+
+
+@pytest.fixture(autouse=True)
+def plug_ready():
+    from tests.helpers.plughelp import check_plug
+    check_plug(3)
+    yield
+'''
+PLUGHELP = "def check_plug(v):\n    assert v > 0\n    assert v < 5\n"
 T_SUB = "def test_s1():\n    assert 1 + 1 == 2\n\n\ndef test_s2():\n    assert 2 + 2 == 4\n"
 T_LOCAL ='''from momentum.calc import add
 
@@ -372,7 +385,25 @@ FX_FILES = {**BASE, "tests/test_local.py": T_LOCAL, "tests/__init__.py": "", "te
             "tests/helpers/__init__.py": "", "tests/helpers/tolerances.py": TOL_MOD, "tests/helpers/checks.py": CHECKS_MOD,
             "tests/helpers/loose.py": "TOL = 1e-3\n", "tests/test_tol.py": T_TOL, "tests/test_shapes.py": T_SHAPES,
             "tests/helpers/envcheck.py": ENVCHECK, "tests/sub/__init__.py": "", "tests/sub/conftest.py": SUB_CONFTEST,
-            "tests/sub/test_sub.py": T_SUB}
+            "tests/sub/test_sub.py": T_SUB, "tests/plugins/__init__.py": "", "tests/plugins/plug.py": PLUG,
+            "tests/helpers/plughelp.py": PLUGHELP}
+
+
+def _collected(files: Dict[str, str], fn_pat: str = "test_*", cls_pat: str = "Test*") -> List[str]:
+    """函式層 nodeid（fnmatch：模組層函式含 async、類別內方法；與真實樹 pytest.ini 同規則）。"""
+    fn = (ast.FunctionDef, ast.AsyncFunctionDef)
+    out = []
+    for rel in sorted(p for p in files if is_test_path(p)):
+        for n in ast.parse(files[rel]).body:
+            if isinstance(n, fn) and fnmatch.fnmatchcase(n.name, fn_pat):
+                out.append(f"{rel}::{n.name}")
+            elif isinstance(n, ast.ClassDef) and fnmatch.fnmatchcase(n.name, cls_pat):
+                out += [f"{rel}::{n.name}::{m.name}" for m in n.body
+                        if isinstance(m, fn) and fnmatch.fnmatchcase(m.name, fn_pat)]
+    return out
+
+
+ALL_FX_TESTS = set(_collected(FX_FILES))
 
 
 def _v19_subjects(stderr: str) -> set:
@@ -435,6 +466,16 @@ HOOK_CASES = {
     "07q_conftest_autouse_external_helper_drops_assert": ("tests/helpers/envcheck.py", "    assert v != ''\n", "",
                                                           {"tests/sub/test_sub.py::test_s1",
                                                            "tests/sub/test_sub.py::test_s2"}),
+    # 07r（審查 r25）：fixture 由 autouse 改為普通（本體不變）——受其保護之測試失去其斷言
+    "07r_conftest_autouse_turned_off": ("tests/sub/conftest.py", "@pytest.fixture(autouse=True)\n", "@pytest.fixture\n",
+                                        {"tests/sub/test_sub.py::test_s1", "tests/sub/test_sub.py::test_s2"}),
+    "07r_module_autouse_turned_off": ("tests/test_autouse.py", "@pytest.fixture(autouse=True)\n", "@pytest.fixture\n",
+                                      {"tests/test_autouse.py::test_a", "tests/test_autouse.py::test_b"}),
+    # 07t（審查 r25）：pytest_plugins 所列外掛之 autouse fixture（作用於全部測試）
+    "07t_plugin_autouse_external_helper_drops_assert": ("tests/helpers/plughelp.py", "    assert v < 5\n", "",
+                                                        ALL_FX_TESTS),
+    "07t_plugin_autouse_turned_off": ("tests/plugins/plug.py", "@pytest.fixture(autouse=True)\n", "@pytest.fixture\n",
+                                      ALL_FX_TESTS),
 }
 IMPORT_CASES = sorted(c for c in HOOK_CASES if c.startswith("07p_"))
 # 各 import 改變案之 decreased_defs：須含（⊇）之使用者定義、不得含之無關定義
@@ -496,21 +537,10 @@ def _full_oracle(r: TmpRepo) -> set:
     ini = configparser.ConfigParser()
     ini.read_string(r.read("pytest.ini"))
     cls_pat, fn_pat = ini["pytest"]["python_classes"], ini["pytest"]["python_functions"]
-    fn = (ast.FunctionDef, ast.AsyncFunctionDef)
-    out = set()
-    for rel in sorted(p for p in FX_FILES if is_test_path(p)):
-        nids = []
-        for n in ast.parse(r.read(rel)).body:
-            if isinstance(n, fn) and fnmatch.fnmatchcase(n.name, fn_pat):
-                nids.append(f"{rel}::{n.name}")
-            elif isinstance(n, ast.ClassDef) and fnmatch.fnmatchcase(n.name, cls_pat):
-                nids += [f"{rel}::{n.name}::{m.name}" for m in n.body
-                         if isinstance(m, fn) and fnmatch.fnmatchcase(m.name, fn_pat)]
-        for nid in nids:
+    files = {p: r.read(p) for p in FX_FILES if is_test_path(p)}
+    return {nid for nid in _collected(files, fn_pat, cls_pat)
             if testreg.multiset_decreased(testreg.assertion_multiset(r.root, nid, "HEAD"),
-                                          testreg.assertion_multiset(r.root, nid, "worktree")):
-                out.add(nid)
-    return out
+                                          testreg.assertion_multiset(r.root, nid, "worktree"))}
 
 
 @pytest.mark.parametrize("case", HELPER_CASES)
@@ -535,6 +565,51 @@ def test_07p_import_change_decreased_defs_by_expanded_profile(tmp_path, case):
     assert got is not None and must <= set(got) and not (must_not & set(got)), got
     if not must:
         assert got == []
+
+
+@pytest.mark.parametrize("case,name", [("07r_conftest_autouse_turned_off", "env_checked"),
+                                       ("07t_plugin_autouse_turned_off", "plug_ready")])
+def test_07r_fixture_autouse_flag_in_profile(tmp_path, case, name):
+    """fixture 之完整展開輪廓含 decorator 之 autouse 狀態：本體不變而 autouse 關閉 ⇒ 該 fixture 在 decreased_defs 內
+    （conftest 與 pytest_plugins 外掛皆然）。"""
+    rel, old, new, _ = HOOK_CASES[case]
+    r = _repo(tmp_path, FX_FILES)
+    _edit(r, rel, old, new)
+    assert name in (testreg.decreased_defs(r.root, rel) or [])
+
+
+def test_07c_helper_change_precommit_red(tmp_path):
+    """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
+    r = _repo(tmp_path, FX_FILES)
+    r.install_precommit()
+    _edit(r, "tests/fixtures/fx_helpers.py", "    assert x < 100\n", "")
+    r.stage("tests/fixtures/fx_helpers.py")
+    proc = r.try_commit()
+    assert proc.returncode != 0 and "tests/test_fx.py::test_uses_helper" in _v19_subjects(proc.stderr), proc.stderr
+
+
+@pytest.mark.parametrize("change,expect_red", [("python_functions = test_*", True), ("python_classes = Test*", True),
+                                               ("markers =", False)])
+def test_07s_pytest_ini_collection_change_hook_and_precommit(tmp_path, change, expect_red):
+    """pytest.ini 之收集設定（python_functions／python_classes 等）改變致 HEAD 收集之測試函式於受驗樹不再被收集
+    ⇒ hook 與 pre-commit 皆 rc≠0（V20）；非收集設定之改動（加一個標記註冊）⇒ rc=0。"""
+    r = _repo(tmp_path, FX_FILES)
+    r.install_precommit()
+    ini = r.read("pytest.ini")
+    if change == "markers =":
+        r.write("pytest.ini", ini + "    extra_marker: e\n")
+    else:
+        r.write("pytest.ini", ini.replace(change, change.split(" = ")[0] + " = check_*"))
+    proc = r.hook("pytest.ini")
+    v20 = [l for l in proc.stderr.splitlines() if l.startswith("V20 ")]
+    if not expect_red:
+        assert proc.returncode == 0 and not v20, proc.stderr
+        return
+    gone = "tests/test_keep.py::test_one" if change.startswith("python_functions") else "tests/test_shapes.py::TestK::test_k"
+    assert proc.returncode == 2 and any(l.startswith(f"V20 {gone}") for l in v20), proc.stderr
+    r.stage("pytest.ini")
+    proc = r.try_commit()
+    assert proc.returncode != 0 and any(l.startswith(f"V20 {gone}") for l in proc.stderr.splitlines()), proc.stderr
 
 
 def test_mutation_delta_ignores_binding_change_misses_07p(tmp_path, monkeypatch, capsys):

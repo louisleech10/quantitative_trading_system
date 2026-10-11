@@ -7,6 +7,7 @@
 #
 # 管轄（路徑相對本檔所在 repo 根；repo 由本檔位置推導，不讀環境變數）：
 #   tests/**/test_*.py 或 tests/registry/catalog.json ⇒ testreg.py check --paths <p>
+#   pytest.ini（repo 根）                              ⇒ testreg.py check --paths pytest.ini（收集設定改變 ⇒ 全部測試檔 V20）
 #   docs/manifests/*.json                              ⇒ testreg.py check --manifest <p>
 #   tests/ 下其他 .py（conftest、fixtures、helper）     ⇒ testreg.py check --helpers <p>
 #   tests/registry/ 之非 .py 契約檔                     ⇒ testreg.py validate
