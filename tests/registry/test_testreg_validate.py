@@ -449,6 +449,35 @@ def test_base_resolution_follows_python_statement_order(tmp_path):
     assert set(runtime.values()) == {"tests.helpers.sm1", "tests.helpers.sm2"}  # 反例前提：四案兩種結果皆出現
 
 
+SHADOW_CASES = {
+    # 同模組先定義 Base、建立子類別、再定義同名 Base ⇒ 子類別之基底為前者
+    "tests/test_shadow_a.py": ("class Base:\n    marker = 1\n\n\nclass TestX(Base):\n    def test_x(self):\n"
+                               "        assert 1 == 1\n\n\nclass Base:\n    marker = 2\n"),
+    # 匯入 Base、建立子類別、其後本模組再定義同名 Base ⇒ 子類別之基底為匯入者
+    "tests/test_shadow_b.py": ("from tests.helpers.sm1 import Base\n\n\nclass TestX(Base):\n    def test_x(self):\n"
+                               "        assert 1 == 1\n\n\nclass Base:\n    marker = 3\n"),
+}
+
+
+def test_base_resolution_keeps_binding_time_class_node(tmp_path):
+    """SPEC v38（審查 r37 CODEX-R37-P1-01）：基底解析回傳獲勝綁定當時之類別節點（同名重定義不誤取後者）。oracle＝暫存倉
+    實際 Python 載入之 `TestX.__bases__[0].marker`，靜態側取所得 ClassDef 本體之 `marker = N`。"""
+    files = {"tests/__init__.py": "", "tests/helpers/__init__.py": "",
+             "tests/helpers/sm1.py": "class Base:\n    marker = 1\n", **SHADOW_CASES}
+    r = make_repo(tmp_path, files)
+    eng = testreg._Engine(testreg._Tree(r.root, "HEAD"))
+    for rel in sorted(SHADOW_CASES):
+        dotted = rel[:-3].replace("/", ".")
+        rt = subprocess.run([PY, "-c", f"import importlib; print(importlib.import_module('{dotted}').TestX.__bases__[0].marker)"],
+                            cwd=str(r.root), capture_output=True, text=True, env=clean_env())
+        assert rt.returncode == 0, rt.stderr
+        mi = eng.mod(rel)
+        hit = testreg._base_class(eng, mi, mi.classes["TestX"].bases[0])
+        assert hit is not None, rel
+        static = next(s.value.value for s in hit[1].body if isinstance(s, ast.Assign) and s.targets[0].id == "marker")
+        assert str(static) == rt.stdout.strip() == "1", (rel, static, rt.stdout)
+
+
 E1_BODYDIFF = E1_TESTS.replace("\n\ndef test_a(two):\n    assert add(1, two) == K\n", "").replace(
     "def test_b(two):\n    assert add(1, two) == K\n", "def test_b(two):\n    assert add(two, 1) == K\n")
 

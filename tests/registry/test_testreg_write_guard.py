@@ -1002,6 +1002,47 @@ def test_07x_v37_star_import_later_source_wins(tmp_path):
     assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX5_NEW == want, pc.stderr
 
 
+# ── ⑦x（v38；審查 r37 CODEX-R37-P1-01）：同模組同名基底重定義，子類別取建立當時之基底 ──
+T_USEFX_SHADOW = '''import pytest
+
+
+@pytest.mark.usefixtures("checked_value")
+class Base:
+    pass
+
+
+class TestBefore(Base):
+    def test_before(self):
+        assert 1 == 1
+
+
+class Base:
+    pass
+
+
+class TestAfter(Base):
+    def test_after(self):
+        assert 1 == 1
+'''
+USEFX6_FILES = {**USEFX2_FILES, "tests/test_usefx_shadow.py": T_USEFX_SHADOW}
+USEFX6_NEW = {n for n in _collected(USEFX6_FILES) if "/test_usefx_shadow.py" in n}
+
+
+def test_07x_v38_shadowed_base_binding_time(tmp_path):
+    """同名基底重定義：重定義前建立之子類別（TestBefore）經帶 usefixtures 之前者請求 fixture，之後者（TestAfter）不請求——
+    conftest fixture 刪斷言時只列 TestBefore（hook 與 pre-commit 同判；依名取最後定義之實作漏列）。"""
+    assert len(USEFX6_NEW) == 2
+    r = _repo(tmp_path, USEFX6_FILES)
+    _edit(r, "tests/conftest.py", "    assert value < 10\n", "")
+    want = {"tests/test_usefx_shadow.py::TestBefore::test_before"}
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX6_NEW == want, proc.stderr
+    r.install_precommit()
+    r.stage("tests/conftest.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX6_NEW == want, pc.stderr
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)
