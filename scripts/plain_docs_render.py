@@ -48,7 +48,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,
 a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}
 .top{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--border);padding:.5rem 1rem;display:flex;gap:1rem;align-items:center;font-size:.9rem;z-index:1}
 .top .crumb{color:var(--muted)}
-main{max-width:52rem;margin:0 auto;padding:1rem 1rem 4rem}
+main{max-width:90rem;margin:0 auto;padding:1rem 1rem 4rem}
 h1{font-size:1.6rem;line-height:1.3;margin:1rem 0 .75rem}h2{font-size:1.3rem;margin:2rem 0 .5rem;padding-top:.5rem;border-top:1px solid var(--border)}
 h3{font-size:1.1rem;margin:1.5rem 0 .5rem}h4{font-size:1rem}
 h1,h2,h3,h4{scroll-margin-top:3rem}
@@ -60,7 +60,7 @@ pre{background:var(--code);padding:.75rem;border-radius:6px;overflow-x:auto;font
 pre code{background:none;padding:0;white-space:pre}
 .table-wrap{overflow-x:auto;margin:1rem 0;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;min-width:100%;font-size:.92rem}
-th,td{border:1px solid var(--border);padding:.4rem .6rem;vertical-align:top;text-align:left}
+th,td{border:1px solid var(--border);padding:.4rem .6rem;vertical-align:top;text-align:left;min-width:5em}
 th{background:var(--accent);position:sticky;top:0}
 tr:nth-child(even) td{background:var(--accent)}
 hr{border:0;border-top:1px solid var(--border);margin:2rem 0}
