@@ -3599,41 +3599,531 @@ def signal_quarantine_expired(ctx: Context, path: str) -> SignalValue:
 # ── Task 2.2：impact ─────────────────────────────────────────────────────────────────────────────────
 
 
+class _ImportGraph:
+    """受驗之樹（repo_root 之工作樹）內 .py 模組之匯入圖：每模組只解析一次，直接相依含函式內 import、星號匯入、
+    `importlib.import_module`／`__import__` 之字串常值目標；套件之 `__init__.py` 依 Python 匯入語意一併納入。
+    指向 repo 內頂層目錄而模組檔不存在者（例：已刪之生產模組）以其應有路徑（`a/b.py`）記為成員，使「已刪之變更檔」
+    仍可由閉包找到匯入它之測試。"""
+
+    def __init__(self, root: Path):
+        self.root = Path(root)
+        self.tree = _Tree(self.root, "worktree")
+        self.files = set(self.tree.files())
+        self.top_dirs = {f.split("/", 1)[0] for f in self.files if "/" in f}
+        self.dirs = {f.rsplit("/", 1)[0] for f in self.files if "/" in f}
+        self.dirs |= {d.rsplit("/", i)[0] for d in list(self.dirs) for i in range(1, d.count("/") + 1)}
+        self._deps: Dict[str, FrozenSet[str]] = {}
+        self._closure: Dict[str, FrozenSet[str]] = {}
+        self._parsed: Dict[str, Optional[ast.Module]] = {}
+
+    def parsed(self, path: str) -> Optional[ast.Module]:
+        if path not in self._parsed:
+            src = self.tree.read(path)
+            try:
+                self._parsed[path] = _parse(src) if src is not None else None
+            except SyntaxError:
+                self._parsed[path] = None
+        return self._parsed[path]
+
+    def _module_targets(self, parts: Sequence[str], ghost: bool) -> List[str]:
+        out: List[str] = []
+        for i in range(1, len(parts) + 1):
+            base = "/".join(parts[:i])
+            if base + "/__init__.py" in self.files:
+                out.append(base + "/__init__.py")
+            elif base + ".py" in self.files:
+                out.append(base + ".py")
+            elif base in self.dirs:
+                continue  # namespace package
+            else:
+                if ghost and i == len(parts) and parts[0] in self.top_dirs:
+                    out.append(base + ".py")
+                break
+        return out
+
+    def _abs_parts(self, here: str, module: Optional[str], level: int) -> Optional[List[str]]:
+        if not level:
+            return module.split(".") if module else None
+        base = here.split("/")[:-1]
+        if level - 1 > len(base):
+            return None
+        base = base[:len(base) - (level - 1)]
+        return base + (module.split(".") if module else [])
+
+    def deps(self, path: str) -> FrozenSet[str]:
+        if path in self._deps:
+            return self._deps[path]
+        tree = self.parsed(path)
+        out: set = set()
+        for n in ast.walk(tree) if tree is not None else ():
+            if isinstance(n, ast.Import):
+                for al in n.names:
+                    out.update(self._module_targets(al.name.split("."), ghost=True))
+            elif isinstance(n, ast.ImportFrom):
+                parts = self._abs_parts(path, n.module, n.level)
+                if not parts:
+                    continue
+                out.update(self._module_targets(parts, ghost=bool(n.module)))
+                for al in n.names:
+                    if al.name != "*":
+                        sub = "/".join([*parts, al.name])
+                        for cand in (sub + "/__init__.py", sub + ".py"):
+                            if cand in self.files:
+                                out.add(cand)
+                                break
+            elif isinstance(n, ast.Call) and _last_name(n.func) in ("import_module", "__import__") and n.args \
+                    and isinstance(n.args[0], ast.Constant) and isinstance(n.args[0].value, str) \
+                    and not n.args[0].value.startswith("."):
+                out.update(self._module_targets(n.args[0].value.split("."), ghost=False))
+        out.discard(path)
+        self._deps[path] = frozenset(out)
+        return self._deps[path]
+
+    def closure(self, start: str) -> FrozenSet[str]:
+        if start not in self._closure:
+            seen = {start}
+            stack = [start]
+            while stack:
+                cur = stack.pop()
+                for d in self.deps(cur):
+                    if d not in seen:
+                        seen.add(d)
+                        stack.append(d)
+            self._closure[start] = frozenset(seen)
+        return self._closure[start]
+
+    def is_dynamic(self, path: str) -> bool:
+        """schema `impact.domain_rule` 之 dyn_modules：含 importlib.import_module 或 __import__ 且第一參數非字串常值。"""
+        tree = self.parsed(path)
+        if tree is None:
+            return False
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Call) and _last_name(n.func) in ("import_module", "__import__") and n.args \
+                    and not (isinstance(n.args[0], ast.Constant) and isinstance(n.args[0].value, str)):
+                return True
+        return False
+
+
+_IMPORT_GRAPHS: Dict[str, _ImportGraph] = {}
+
+
+def _import_graph(root: Path) -> _ImportGraph:
+    """impact 呼叫期間共用之匯入圖（impact 結束即丟棄；impact 以外之呼叫每次新建，不沿用舊樹內容）。"""
+    key = str(Path(root).resolve())
+    return _IMPORT_GRAPHS.get(key) or _ImportGraph(Path(root).resolve())
+
+
+def _conftest_chain(files: set, test_path: str) -> List[str]:
+    parts = test_path.split("/")[:-1]
+    out = ["conftest.py"] if "conftest.py" in files else []
+    for i in range(1, len(parts) + 1):
+        cand = "/".join(parts[:i]) + "/conftest.py"
+        if cand in files:
+            out.append(cand)
+    return out
+
+
+def _name_refs(node: ast.AST) -> set:
+    """節點引用之名稱：Name、Attribute 屬性名、參數名（fixture 請求）、字串常值（usefixtures 字面）。"""
+    out = set()
+    for n in ast.walk(node):
+        if isinstance(n, ast.Name):
+            out.add(n.id)
+        elif isinstance(n, ast.Attribute):
+            out.add(n.attr)
+        elif isinstance(n, ast.arg):
+            out.add(n.arg)
+        elif isinstance(n, ast.Constant) and isinstance(n.value, str):
+            out.add(n.value)
+    return out
+
+
+def _import_node_targets(graph: _ImportGraph, path: str, n: ast.AST) -> List[str]:
+    if isinstance(n, ast.Import):
+        return [t for al in n.names for t in graph._module_targets(al.name.split("."), ghost=True)]
+    parts = graph._abs_parts(path, n.module, n.level)
+    if not parts:
+        return []
+    out = graph._module_targets(parts, ghost=bool(n.module))
+    for al in n.names:
+        sub = "/".join([*parts, al.name])
+        out += [c for c in (sub + "/__init__.py", sub + ".py") if c in graph.files][:1]
+    return out
+
+
+def _module_def_reach(graph: _ImportGraph, path: str) -> Dict[str, Tuple[FrozenSet[str], set, bool]]:
+    """conftest／外掛模組之頂層定義 → (可達 repo 模組, 引用名, autouse)。可達＝定義本體內之 import 目標、本體引用之
+    模組層匯入名之目標、同模組被引用定義之可達（不動點），各取 import_closure（含函式內 import）；並含本模組。"""
+    cache = graph.__dict__.setdefault("_def_reach", {})
+    if path in cache:
+        return cache[path]
+    tree = graph.parsed(path)
+    binds: Dict[str, List[str]] = collections.defaultdict(list)
+    defs: Dict[str, ast.AST] = {}
+
+    def visit(body: Sequence[ast.stmt]) -> None:
+        for n in body:
+            if isinstance(n, (ast.Import, ast.ImportFrom)):
+                for al in n.names:
+                    if al.name != "*":
+                        local = al.asname or al.name.split(".")[0]
+                        binds[local] += _import_node_targets(graph, path, n)
+            elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                defs[n.name] = n
+            elif isinstance(n, (ast.If, ast.Try, ast.With)):
+                for b in ("body", "orelse", "finalbody"):
+                    visit(getattr(n, b, []) or [])
+                for h in getattr(n, "handlers", []) or []:
+                    visit(h.body)
+
+    visit(tree.body if tree is not None else [])
+    own: Dict[str, set] = {}
+    refs: Dict[str, set] = {}
+    for name, d in defs.items():
+        refs[name] = _name_refs(d)
+        mods = {path}
+        for n in ast.walk(d):
+            if isinstance(n, (ast.Import, ast.ImportFrom)):
+                mods.update(_import_node_targets(graph, path, n))
+        for r in refs[name] & set(binds):
+            mods.update(binds[r])
+        own[name] = mods
+    changed = True
+    while changed:
+        changed = False
+        for name in defs:
+            for r in refs[name] & set(defs):
+                if not own[r] <= own[name]:
+                    own[name] |= own[r]
+                    changed = True
+    out = {}
+    for name, d in defs.items():
+        acc: set = set()
+        for m in own[name]:
+            acc |= graph.closure(m)
+        out[name] = (frozenset(acc), refs[name], _fixture_info(d)[1])
+    cache[path] = out
+    return out
+
+
+def _reach(root: Path, graph: _ImportGraph, test_path: str) -> FrozenSet[str]:
+    """測試檔可達之 repo 模組：自身之 import_closure（經具名縫）∪ 其目錄鏈上 conftest.py（含 repo 根）與其
+    `pytest_plugins` 所列模組中，測試檔以名稱請求（參數、usefixtures 字面）或 autouse 之定義及其遞移依賴之可達。
+    conftest 之 `pytest_*` hook 與未被請求之定義不計：前者為 session 層（其 import 期失敗使全部測試失敗，任一被選
+    之測試即可察覺，且 impact 不輸出空集合），後者不影響該測試之結果。"""
+    cache = graph.__dict__.setdefault("_reach", {})
+    if test_path not in cache:
+        acc = set(_seam("import_closure")(root, test_path))
+        pool: Dict[str, List[Tuple[FrozenSet[str], set, bool]]] = collections.defaultdict(list)
+        for cf in _conftest_chain(graph.files, test_path):
+            for mod in [cf, *[p for p in _plugin_paths(graph.tree, cf) if p in graph.files]]:
+                for name, info in _module_def_reach(graph, mod).items():
+                    pool[name].append(info)
+        tree = graph.parsed(test_path)
+        want = (_name_refs(tree) if tree is not None else set()) & set(pool)
+        want |= {n for n, infos in pool.items() if any(i[2] for i in infos)}
+        todo, seen = list(want), set()
+        while todo:
+            n = todo.pop()
+            if n in seen:
+                continue
+            seen.add(n)
+            for mods, refs, _ in pool[n]:
+                acc |= mods
+                todo += [r for r in refs & set(pool) if r not in seen]
+        cache[test_path] = frozenset(acc)
+    return cache[test_path]
+
+
+def _gate_module():
+    """`scripts/framepath_affected_gate.py`（static_taint 之 `_TaintGraph`）；已載入者沿用。"""
+    for name in ("scripts.framepath_affected_gate", "framepath_affected_gate"):
+        if name in sys.modules:
+            return sys.modules[name]
+    p = Path(__file__).resolve().parent / "framepath_affected_gate.py"
+    if not p.is_file():
+        raise TestregError(f"USAGE impact: 缺 {p.name}（static_taint 之 _TaintGraph）")
+    spec = importlib.util.spec_from_file_location("framepath_affected_gate", p)
+    mod = importlib.util.module_from_spec(spec)
+    old = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        sys.modules["framepath_affected_gate"] = mod
+        spec.loader.exec_module(mod)
+    finally:
+        sys.dont_write_bytecode = old
+    return mod
+
+
+def _string_taint(graph: _ImportGraph, tests: Sequence[str], substrings: Tuple[str, ...]) -> set:
+    """`framepath_affected_gate._TaintGraph`（ffact 關閉、符號表空、字串子字串＝變更生產檔之模組名與路徑）：測試檔
+    或其經 tests/ 輔助模組、conftest fixture 傳遞之定義含指名變更檔之字串（`mock.patch("momentum.x.f")`、以路徑讀原始
+    碼、以子行程執行腳本等不經 import 之依賴），或測試檔模組層字串含之。"""
+    if not substrings:
+        return set()
+    gate = _gate_module()
+
+    def source_of(p: str) -> Optional[str]:
+        return graph.tree.read(p) if graph.parsed(p) is not None else None
+
+    tg = gate._TaintGraph(source_of, frozenset(), False, substrings)
+    out = set()
+    for t in tests:
+        tree = graph.parsed(t)
+        if tree is None:
+            continue
+        if any(s in r for r in gate.refs_of(tree) for s in substrings) or any(tg.reasons_of(t).values()):
+            out.add(t)
+            continue
+        test_refs = gate.refs_of(tree)
+        for cf in _conftest_chain(graph.files, t):
+            if graph.parsed(cf) is not None and set(gate._tainted_names(tg.reasons_of(cf))) & test_refs:
+                out.add(t)
+                break
+    return out
+
+
+def _schema_scope_prefix(value: str, root_all: str) -> Optional[str]:
+    """shared_test_infra 之值：「全部測試檔」⇒ ""（全部）；「X 下全部測試檔」⇒ X。"""
+    if value == root_all:
+        return ""
+    if value.endswith(" 下" + root_all):
+        return value[:-len(" 下" + root_all)]
+    return None
+
+
+def _tomb_index(tombstones: Iterable[Mapping[str, Any]]) -> Dict[str, Mapping[str, Any]]:
+    return {t["nodeid"]: t for t in tombstones if isinstance(t, Mapping) and isinstance(t.get("nodeid"), str)}
+
+
+def resolve_tomb_items(items: Sequence[str], tombstones: Iterable[Mapping[str, Any]],
+                       exists=None) -> Tuple[List[str], List[Dict[str, Any]]]:
+    """schema `impact.gate_feed` 第一步之碑解析（純函式）：items 為 nodeid 或測試檔路徑。nodeid（參數化以函式層比對）
+    已立碑 ⇒ 以 `replaced_by` 遞迴取代（循環 ⇒ TestregError）、E0 無 replaced_by ⇒ 除去；路徑有碑而該檔已不存在
+    （`exists(path)` 為假）⇒ 以其各碑 replaced_by 之所在檔取代、仍存在 ⇒ 保留並加上取代者所在檔。回傳
+    (解析後之 items〔保序去重〕, 解析紀錄 [{"from", "to", "evidence_level"}]〔每碑一列〕)。"""
+    idx = _tomb_index(tombstones)
+    rows: Dict[str, Dict[str, Any]] = {}
+
+    def node(n: str, stack: Tuple[str, ...]) -> List[str]:
+        base = re.sub(r"\[.*\]$", "", n)
+        tb = idx.get(base)
+        if tb is None:
+            return [n]
+        if base in stack:
+            raise TestregError(f"USAGE 碑循環：{' → '.join(stack + (base,))}")
+        rows.setdefault(base, {"from": base, "to": list(tb.get("replaced_by") or []),
+                               "evidence_level": tb.get("evidence_level")})
+        out: List[str] = []
+        for r in tb.get("replaced_by") or []:
+            out += node(r, stack + (base,))
+        return out
+
+    resolved: List[str] = []
+    for it in items:
+        if "::" in it:
+            resolved += node(it, ())
+            continue
+        tbs = sorted(b for b in idx if b.split("::")[0] == it)
+        repl = [p.split("::")[0] for b in tbs for p in node(b, ())]
+        alive = exists(it) if exists is not None else True
+        resolved += ([it] if alive or not tbs else []) + repl
+    return list(dict.fromkeys(resolved)), [rows[k] for k in sorted(rows)]
+
+
+def previously_failed_from_summary(repo_root: Path) -> List[str]:
+    """`previously_failed`：summary 中各 nodeid 依 started 最近一筆之 outcome∈{failed, error, xpassed} 者（排序）；
+    summary 不存在或不合法（同記錄器 read_summary）⇒ []。"""
+    s = load_schema(repo_root)
+    try:
+        obj = json.loads((Path(repo_root) / s["summary"]["path"]).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(obj, dict) or obj.get("schema_version") != s["version"] or obj.get("k") != s["summary"]["k"] \
+            or _seam("validate_shape")(obj, s["summary"]["shape"], s):
+        return []
+    out = []
+    for nid, recs in obj["nodes"].items():
+        if recs and max(recs, key=lambda r: (r["started"], r["session_id"]))["outcome"] in ("failed", "error", "xpassed"):
+            out.append(nid)
+    return sorted(out)
+
+
 def impact(repo_root: Path, changed_paths: List[str], must_resolved: List[str],
            previously_failed: List[str]) -> Dict[str, List[Dict[str, Any]]]:
     """schema `impact`＋`gate_wiring` 之簽名：catalog、schema、AST 與測試檔集合一律自 repo_root 讀取；
     回傳 {"selected": [{"path", "reasons"}], "excluded": [{"path", "excluded_reason"}]}；schema `impact.precheck_rules`
     任一不符 ⇒ TestregError（不輸出；未登記之測試檔不拒跑而依 registry_unresolved 選入）；已立碑之檔依
-    `impact.tombstoned_rule`；不存在使 selected 為空之分支。"""
-    raise NotImplementedError("TESTREG Task 2.2")
+    `impact.tombstoned_rule`；不存在使 selected 為空之分支。
+
+    各來源（schema `enums.select_reason`）：must＝must_resolved 所在檔；changed_test＝變更之測試檔；static_taint＝變更之
+    非測試 .py（tests/ 外）——測試檔經 `_reach`（自身與 conftest 鏈、外掛之 import_closure）可達者 ∪ `_TaintGraph` 字串
+    傳遞命中者，及 tests/ 下 helper 模組（非 shared_test_infra）之變更——`_reach` 含該模組者；previously_failed＝其
+    nodeid 所在檔；registry_unresolved＝`impact.registry_unresolved_rule` 五條。各來源皆空 ⇒ TestregError；來源非空而
+    全部落在已刪或已立碑之檔 ⇒ 改選全部（未立碑之）測試檔、理由 registry_unresolved（不輸出空集合）。"""
+    root = Path(repo_root).resolve()
+    ctx = build_context(root, "worktree")
+    s = ctx.schema
+    precheck: List[Finding] = []
+    for rid in s["impact"]["precheck_rules"]:
+        precheck += _seam(f"rule_{rid.lower()}")(ctx)
+    if precheck:
+        raise TestregError(f"CATALOG impact 前置驗證不符（{len(precheck)} 項）：{precheck[0].render()}")
+    key = str(root)
+    _IMPORT_GRAPHS[key] = graph = _ImportGraph(root)
+    try:
+        return _impact_select(root, ctx, graph, changed_paths, must_resolved, previously_failed)
+    finally:
+        _IMPORT_GRAPHS.pop(key, None)
+
+
+def _impact_select(root: Path, ctx: Context, graph: _ImportGraph, changed_paths: Sequence[str],
+                   must_resolved: Sequence[str], previously_failed: Sequence[str]) -> Dict[str, List[Dict[str, Any]]]:
+    s = ctx.schema
+    pat = s["formats"]["test_path"]
+    tests = sorted(f for f in graph.files if re.fullmatch(pat, f))
+    entries = _entries(ctx)
+    changed = sorted({p for p in changed_paths if isinstance(p, str) and p})
+    src: Dict[str, set] = {r: set() for r in s["enums"]["select_reason"]}
+    src["must"] |= {n.split("::")[0] for n in must_resolved}
+    src["previously_failed"] |= {n.split("::")[0] for n in previously_failed}
+    substrings: List[str] = []
+    for p in changed:
+        if re.fullmatch(pat, p):
+            src["changed_test"].add(p)
+            if p not in entries:
+                src["registry_unresolved"].add(p)
+            continue
+        scope = _seam("shared_infra_scope")(root, p, tests)
+        if scope is not None:
+            src["registry_unresolved"] |= set(scope)
+            continue
+        if not p.endswith(".py") or p.split("/")[-1] == "conftest.py":  # conftest 只依 shared_test_infra
+            continue
+        if p.startswith("tests/"):
+            src["static_taint"] |= {t for t in tests if p in _reach(root, graph, t)}
+            continue
+        src["static_taint"] |= {t for t in tests if p in _reach(root, graph, t)}
+        dotted = p[:-3].replace("/", ".")
+        substrings += [p, dotted[:-len(".__init__")] if dotted.endswith(".__init__") else dotted]
+        if p in graph.files and (graph.parsed(p) is None or graph.is_dynamic(p)):
+            prefix = _seam("domain_prefix")(p)
+            if "dyn_modules" not in ctx.extra:
+                ctx.extra["dyn_modules"] = frozenset(f for f in graph.files if f.endswith(".py") and graph.is_dynamic(f))
+            dyn = ctx.extra["dyn_modules"]
+            dom = {t for t in tests if any(m.startswith(prefix + "/") or prefix == "" for m in _reach(root, graph, t))
+                   or _reach(root, graph, t) & dyn}
+            src["registry_unresolved"] |= dom if dom else set(tests)
+    src["static_taint"] |= _string_taint(graph, tests, tuple(dict.fromkeys(substrings)))
+    combined = _seam("combine_sources")({k: sorted(v) for k, v in src.items()})
+    if not combined:
+        raise TestregError("USAGE impact: 各來源皆空（must、變更、previously_failed 皆無），不輸出空集合")
+    funcs = {t: _function_nodeids(graph.tree, t) for t in tests}
+    tomb_paths = {tb["nodeid"].split("::")[0] for tb in _tombs(ctx) if isinstance(tb.get("nodeid"), str)}
+    tomb_files = {t for t in tests if not funcs[t] and t in tomb_paths}
+    selected = {f: r for f, r in combined.items() if f in set(tests) and f not in tomb_files}
+    if not selected:
+        selected = {t: ["registry_unresolved"] for t in tests if t not in tomb_files}
+        if not selected:
+            raise TestregError("USAGE impact: 受驗之樹無未立碑之測試檔，不輸出空集合")
+    excluded = []
+    for t in tests:
+        if t not in selected:
+            why = "tombstoned" if t in tomb_files else "not_collected" if not funcs[t] else "outside_changed_dependency"
+            excluded.append({"path": t, "excluded_reason": why})
+    return {"selected": [{"path": f, "reasons": list(selected[f])} for f in sorted(selected)], "excluded": excluded}
 
 
 def combine_sources(sources: Mapping[str, Iterable[str]]) -> Dict[str, List[str]]:
     """{select_reason: 檔集合} → {檔: 排序後之理由清單}（聯集）。"""
-    raise NotImplementedError("TESTREG Task 2.2")
+    out: Dict[str, set] = collections.defaultdict(set)
+    for reason, files in sources.items():
+        for f in files:
+            out[f].add(reason)
+    return {f: sorted(r) for f, r in sorted(out.items())}
 
 
 def domain_prefix(path: str) -> str:
     """schema `impact.domain_rule` 之 prefix(f)：f 所在目錄之前兩層目錄（層＝目錄層，不含檔名；不足兩層取一層；
     repo 根層之檔為空字串）。"""
-    raise NotImplementedError("TESTREG Task 2.2")
+    return "/".join(path.split("/")[:-1][:2])
 
 
 def import_closure(repo_root: Path, test_path: str) -> FrozenSet[str]:
     """schema `impact.domain_rule` 之 import_closure(t)：repo 內模組之遞移閉包（含函式內 import、星號匯入、
     套件 __init__ 之 re-export），以 repo 相對 .py 路徑表示。"""
-    raise NotImplementedError("TESTREG Task 2.2")
+    return _import_graph(repo_root).closure(test_path)
 
 
 def shared_infra_scope(repo_root: Path, changed_path: str, tests: Iterable[str]) -> Optional[FrozenSet[str]]:
-    """schema `impact.shared_test_infra`：changed_path 屬共用基礎設施 ⇒ 其作用範圍內之測試檔集合；否則 None。"""
-    raise NotImplementedError("TESTREG Task 2.2")
+    """schema `impact.shared_test_infra`：changed_path 屬共用基礎設施 ⇒ 其作用範圍內之測試檔集合；否則 None。
+    鍵以 `/` 結尾者為前綴；含 `<dir>` 者為樣板（`<dir>` 對應一或多層目錄，值中同名代入）；值「全部測試檔」或
+    「X 下全部測試檔」（皆讀自 schema）。"""
+    table = load_schema(repo_root)["impact"]["shared_test_infra"]
+    all_word = table.get("conftest.py") or next(iter(table.values()))
+    tests = list(tests)
+    for key, value in table.items():
+        sub: Dict[str, str] = {}
+        if "<dir>" in key:
+            m = re.fullmatch(re.escape(key).replace(re.escape("<dir>"), r"(?P<dir>.+)"), changed_path)
+            if not m:
+                continue
+            sub["<dir>"] = m.group("dir")
+        elif key.endswith("/"):
+            if not changed_path.startswith(key):
+                continue
+        elif changed_path != key:
+            continue
+        for k, v in sub.items():
+            value = value.replace(k, v)
+        prefix = _schema_scope_prefix(value, all_word)
+        if prefix is None:
+            raise TestregError(f"SCHEMA impact.shared_test_infra[{key}] 之值不可解析：{value}")
+        return frozenset(t for t in tests if not prefix or t.startswith(prefix.rstrip("/") + "/"))
+    return None
+
+
+def _manifest_rows(manifest: Mapping[str, Any]) -> List[str]:
+    rows = (manifest.get("batch_card") or {}).get("risk_mitigation") if isinstance(manifest, Mapping) else None
+    return [r for r in rows if isinstance(r, str)] if isinstance(rows, list) else []
 
 
 def must_from_manifest(repo_root: Path, manifest: Mapping[str, Any], phase: int) -> List[str]:
     """CLI impact 用：manifest 須含 `affected_tests phase=<phase> ` 列（否則 TestregError）；回傳 `affected_must
     phase=<phase> ` 列之 nodeid 經碑解析（schema `impact.gate_feed` 第一步）後之結果。"""
-    raise NotImplementedError("TESTREG Task 2.2")
+    rows = _manifest_rows(manifest)
+    if not any(r.startswith(f"affected_tests phase={phase} ") for r in rows):
+        raise TestregError(f"MANIFEST 缺 affected_tests phase={phase} 列")
+    hits = [r for r in rows if r.startswith(f"affected_must phase={phase} ")]
+    if len(hits) > 1:
+        raise TestregError(f"MANIFEST 重複 affected_must phase={phase} 列")
+    must = [p for p in hits[0][len(f"affected_must phase={phase} "):].split() if p] if hits else []
+    cat = load_catalog(repo_root)
+    return resolve_tomb_items(must, cat.get("tombstones", []))[0]
+
+
+def _changed_from(root: Path, spec: str) -> List[str]:
+    """CLI `--changed-from`：`worktree`＝相對 HEAD 之 diff ∪ 未追蹤檔；`A..B`＝兩提交之 diff；其餘＝該 rev 至工作樹之
+    diff ∪ 未追蹤檔。"""
+    out: set = set()
+    if spec == "worktree":
+        out |= set(_changed_paths(root, "worktree"))
+    elif ".." in spec:
+        a, b = spec.split("..", 1)
+        out |= {p for p in _git_out(root, "diff", "--name-only", "--no-renames", a, b).splitlines() if p}
+    else:
+        out |= {p for p in _git_out(root, "diff", "--name-only", "--no-renames", spec).splitlines() if p}
+        out |= {p for p in _git_out(root, "ls-files", "--others", "--exclude-standard", "-z").split("\0") if p}
+    return sorted(out)
+
+
+def _cli_impact(root: Path, changed_from: str, manifest_rel: str, phase: int) -> Dict[str, Any]:
+    try:
+        manifest = json.loads((root / manifest_rel).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise TestregError(f"MANIFEST {manifest_rel}: 不存在或不可解析") from exc
+    must = _seam("must_from_manifest")(root, manifest, phase)
+    return _seam("impact")(root, _changed_from(root, changed_from), must, previously_failed_from_summary(root))
 
 
 # ── Task 3.2／4.2：子批閘（SPEC v17 C3）──────────────────────────────────────────────────────────────
@@ -3711,6 +4201,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                       staged=args.staged)
         elif args.cmd == "review":
             sys.stdout.write(json.dumps(_seam("review")(root), ensure_ascii=False, sort_keys=True) + "\n")
+        elif args.cmd == "impact":
+            sys.stdout.write(json.dumps(_cli_impact(root, args.changed_from, args.manifest, args.phase),
+                                        ensure_ascii=False, sort_keys=True) + "\n")
         else:
             raise TestregError(f"USAGE {args.cmd}: 第 2 批以後實作")
     except TestregError as exc:
