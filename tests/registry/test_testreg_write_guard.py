@@ -627,6 +627,132 @@ def test_07w_conftest_pytest_plugins_profile_is_ordered_plugins(tmp_path, new_li
         assert _v19_subjects(proc.stderr) == _full_oracle(r) == ALL_FX_TESTS
 
 
+# ── ⑦x usefixtures（SPEC v33；b1 審碼 r2 CODEX-R2-P1-01）：fixture 請求含 usefixtures 字面（函式裝飾器、類別裝飾器與
+# 類別層 pytestmark〔含基底類別〕、模組層 pytestmark）——經此套用之 fixture 刪斷言或其外掛被移除 ⇒ 該等測試 V19 減少 ──
+PLUGREQ = "import pytest\n\n\n@pytest.fixture\ndef plug_req():\n    assert 2 > 1\n    yield\n"
+T_USEFX_FN = '''import pytest
+
+
+@pytest.mark.usefixtures("checked_value")
+def test_fn_marked():
+    assert 1 == 1
+
+
+def test_fn_plain():
+    assert 2 == 2
+'''
+T_USEFX_CLS = '''import pytest
+
+
+@pytest.mark.usefixtures("checked_value")
+class TestDecorated:
+    def test_cls_decorated(self):
+        assert 1 == 1
+
+
+class TestAttr:
+    pytestmark = pytest.mark.usefixtures("checked_value")
+
+    def test_cls_attr(self):
+        assert 1 == 1
+
+
+class TestChild(TestDecorated):
+    def test_inherited(self):
+        assert 1 == 1
+
+
+class TestPlain:
+    def test_cls_plain(self):
+        assert 1 == 1
+'''
+T_USEFX_MOD = '''import pytest
+
+pytestmark = [pytest.mark.usefixtures("plug_req")]
+
+
+def test_mod_a():
+    assert 1 == 1
+
+
+def test_mod_b():
+    assert 2 == 2
+'''
+T_USEFX_LOCAL = '''import pytest
+
+
+@pytest.fixture
+def local_ready():
+    assert 3 > 2
+    assert 4 > 3
+    yield
+
+
+@pytest.mark.usefixtures("local_ready")
+def test_local_marked():
+    assert 1 == 1
+
+
+def test_local_plain():
+    assert 1 == 1
+'''
+USEFX_CONFTEST = CONFTEST.replace('pytest_plugins = ["tests.plugins.plug"]',
+                                  'pytest_plugins = ["tests.plugins.plug", "tests.plugins.plugreq"]')
+USEFX_FILES = {**FX_FILES, "tests/conftest.py": USEFX_CONFTEST, "tests/plugins/plugreq.py": PLUGREQ,
+               "tests/test_usefx_fn.py": T_USEFX_FN, "tests/test_usefx_cls.py": T_USEFX_CLS,
+               "tests/test_usefx_mod.py": T_USEFX_MOD, "tests/test_usefx_local.py": T_USEFX_LOCAL}
+USEFX_TESTS = {n for n in _collected(USEFX_FILES) if "/test_usefx_" in n}
+USEFX_CHECKED = {"tests/test_usefx_fn.py::test_fn_marked", "tests/test_usefx_cls.py::TestDecorated::test_cls_decorated",
+                 "tests/test_usefx_cls.py::TestAttr::test_cls_attr", "tests/test_usefx_cls.py::TestChild::test_inherited"}
+
+
+def test_07x_usefixtures_premise():
+    """反例前提：USEFX_CONFTEST 確實多列一個外掛；四種 usefixtures 來源之測試皆在 USEFX_TESTS。"""
+    assert USEFX_CONFTEST != CONFTEST and "tests.plugins.plugreq" in USEFX_CONFTEST
+    assert USEFX_CHECKED < USEFX_TESTS and {"tests/test_usefx_mod.py::test_mod_a",
+                                            "tests/test_usefx_local.py::test_local_marked"} < USEFX_TESTS
+
+
+def test_07x_usefixtures_conftest_fixture_assert_deleted(tmp_path):
+    """conftest 之 fixture 刪一個斷言 ⇒ 經函式裝飾器、類別裝飾器、類別層 pytestmark、基底類別裝飾器以 usefixtures 套用
+    該 fixture 之測試 hook 與 pre-commit 皆 V19（未套用者不列）。"""
+    r = _repo(tmp_path, USEFX_FILES)
+    _edit(r, "tests/conftest.py", "    assert value < 10\n", "")
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX_TESTS == USEFX_CHECKED, proc.stderr
+    r.install_precommit()
+    r.stage("tests/conftest.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX_TESTS == USEFX_CHECKED, pc.stderr
+
+
+def test_07x_usefixtures_plugin_removed(tmp_path):
+    """模組層 pytestmark 以 usefixtures 請求外掛之 fixture，該外掛自 conftest 之 pytest_plugins 移除 ⇒ 該模組全部測試 V19。"""
+    r = _repo(tmp_path, USEFX_FILES)
+    _edit(r, "tests/conftest.py", 'pytest_plugins = ["tests.plugins.plug", "tests.plugins.plugreq"]',
+          'pytest_plugins = ["tests.plugins.plug"]')
+    assert testreg.decreased_defs(r.root, "tests/conftest.py") == ["pytest_plugins"]
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX_TESTS == {
+        "tests/test_usefx_mod.py::test_mod_a", "tests/test_usefx_mod.py::test_mod_b"}, proc.stderr
+
+
+def test_07x_usefixtures_module_fixture_assert_deleted(tmp_path):
+    """測試模組內之 fixture 經函式裝飾器 usefixtures 請求，刪其一個斷言 ⇒ 寫該測試檔之 hook 只列請求者。"""
+    r = _repo(tmp_path, USEFX_FILES)
+    _edit(r, "tests/test_usefx_local.py", "    assert 4 > 3\n", "")
+    proc = r.hook("tests/test_usefx_local.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) == {"tests/test_usefx_local.py::test_local_marked"}, \
+        proc.stderr
+
+
+def test_07x_usefixtures_no_decrease_rc0(tmp_path):
+    """不減之改動（conftest 加註解、fixture 加一個斷言）⇒ rc 0。"""
+    r = _repo(tmp_path, USEFX_FILES)
+    _edit(r, "tests/conftest.py", "    assert value < 10\n", "    assert value < 10\n    assert value != 7\n")
+    assert r.hook("tests/conftest.py").returncode == 0
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)
@@ -867,6 +993,46 @@ def test_boundary_07c_conftest_pytest_plugins_change_wall_clock(head_worktree, e
     limit = 5.0 if blocking else 1.0
     assert statistics.median(times) < limit, (edit, blocking, times)
     assert statistics.median(staged) < limit, (edit, blocking, staged)
+    if edit == "plugin_removed":  # SPEC v33：經 usefixtures 套用被移除外掛之含斷言 fixture 之真實測試須全數被擋
+        expected = _usefixtures_users(head_worktree, _asserting_fixtures(head_worktree, plugins[0]))
+        assert expected, "前提：被移除之外掛須有經 usefixtures 套用之含斷言 fixture（真實樹 ic_persist_redirect）"
+        assert blocking and expected <= _v19_subjects(first.stderr), sorted(expected - _v19_subjects(first.stderr))[:5]
+
+
+def _asserting_fixtures(root: Path, dotted: str) -> set:
+    """獨立 oracle（只看字面）：外掛模組中本體直接含 assert 敘述或呼叫 assert* 名稱之 fixture 名。"""
+    tree = ast.parse((root / (dotted.replace(".", "/") + ".py")).read_text(encoding="utf-8"))
+    out = set()
+    for n in tree.body:
+        if isinstance(n, ast.FunctionDef) and any("fixture" in ast.dump(d) for d in n.decorator_list):
+            if any(isinstance(x, ast.Assert) or (isinstance(x, ast.Call) and getattr(x.func, "id", getattr(x.func, "attr", ""))
+                                                 .startswith("assert")) for x in ast.walk(n)):
+                out.add(n.name)
+    return out
+
+
+def _usefixtures_users(root: Path, names: set) -> set:
+    """獨立 oracle（只看字面）：函式裝飾器、類別裝飾器或模組層 pytestmark 以 usefixtures 字面請求 names 之測試函式。"""
+    def uses(nodes) -> bool:
+        return any(isinstance(x, ast.Call) and getattr(x.func, "attr", "") == "usefixtures"
+                   and any(isinstance(a, ast.Constant) and a.value in names for a in x.args)
+                   for d in nodes for x in ast.walk(d))
+    out = set()
+    rels = subprocess.run(["git", "-C", str(root), "ls-files", "tests/test_*.py", "tests/**/test_*.py"],
+                          capture_output=True, text=True, check=True).stdout.split()
+    fn = (ast.FunctionDef, ast.AsyncFunctionDef)
+    for rel in rels:
+        tree = ast.parse((root / rel).read_text(encoding="utf-8"))
+        mod = uses([s.value for s in tree.body if isinstance(s, ast.Assign)
+                    and any(getattr(t, "id", "") == "pytestmark" for t in s.targets)])
+        for n in tree.body:
+            if isinstance(n, fn) and n.name.startswith("test") and (mod or uses(n.decorator_list)):
+                out.add(f"{rel}::{n.name}")
+            elif isinstance(n, ast.ClassDef) and n.name.startswith("Test"):
+                cls = mod or uses(n.decorator_list)
+                out |= {f"{rel}::{n.name}::{m.name}" for m in n.body
+                        if isinstance(m, fn) and m.name.startswith("test") and (cls or uses(m.decorator_list))}
+    return out
 
 
 INI_TIMING = {

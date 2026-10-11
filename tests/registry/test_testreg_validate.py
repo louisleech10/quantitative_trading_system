@@ -361,6 +361,22 @@ def test_e1_context_differs_red(tmp_path, variant):
     assert proc.returncode != 0 and rule_lines(proc, "V08"), proc.stderr
 
 
+E1_USEFX_TEST = 'import pytest\n\n\n@pytest.mark.usefixtures("ready")\ndef test_u():\n    assert 1 == 1\n'
+E1_USEFX_FX = 'import pytest\n\n\n@pytest.fixture\ndef ready():\n    assert {v} > 0\n    yield\n'
+
+
+def test_e1_usefixtures_fixture_definition_differs(tmp_path):
+    """SPEC v33（b1 審碼 r2 CODEX-R2-P1-01）：usefixtures 字面請求之 fixture 納入 fixture 閉包——兩目錄之同名 fixture 定義
+    不同而測試函式逐字相同 ⇒ ast 與 module_context 相同、fixture_closure 不同（usefixtures 不入閉包者於此即紅）。"""
+    r = make_repo(tmp_path, {"tests/a/__init__.py": "", "tests/a/conftest.py": E1_USEFX_FX.format(v=1),
+                             "tests/a/test_ua.py": E1_USEFX_TEST, "tests/b/__init__.py": "",
+                             "tests/b/conftest.py": E1_USEFX_FX.format(v=2), "tests/b/test_ub.py": E1_USEFX_TEST})
+    a = testreg.e1_hashes(r.root, "tests/a/test_ua.py::test_u", "HEAD")
+    b = testreg.e1_hashes(r.root, "tests/b/test_ub.py::test_u", "HEAD")
+    assert a["ast"] == b["ast"] and a["module_context"] == b["module_context"]
+    assert a["fixture_closure"] != b["fixture_closure"]
+
+
 E1_BODYDIFF = E1_TESTS.replace("\n\ndef test_a(two):\n    assert add(1, two) == K\n", "").replace(
     "def test_b(two):\n    assert add(1, two) == K\n", "def test_b(two):\n    assert add(two, 1) == K\n")
 

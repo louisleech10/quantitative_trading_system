@@ -1,0 +1,20 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0
+rootdir: /Users/louis/Desktop/quantitative_trading_system
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 367 items
+
+tests/registry/test_testreg_validate.py ................................ [  8%]
+........................................................................ [ 28%]
+........................................................                 [ 43%]
+tests/registry/test_testreg_bootstrap.py .........                       [ 46%]
+tests/registry/test_testreg_recorder.py ................................ [ 54%]
+....                                                                     [ 55%]
+tests/registry/test_testreg_markers.py ...........                       [ 58%]
+tests/registry/test_testreg_write_guard.py ............................. [ 66%]
+........................................................................ [ 86%]
+..................................................                       [100%]
+
+======================= 367 passed in 425.09s (0:07:05) ========================
