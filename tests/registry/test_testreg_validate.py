@@ -456,6 +456,9 @@ SHADOW_CASES = {
     # 匯入 Base、建立子類別、其後本模組再定義同名 Base ⇒ 子類別之基底為匯入者
     "tests/test_shadow_b.py": ("from tests.helpers.sm1 import Base\n\n\nclass TestX(Base):\n    def test_x(self):\n"
                                "        assert 1 == 1\n\n\nclass Base:\n    marker = 3\n"),
+    # v39（審查 r38 CODEX-R38-P1-01）：模組別名於類別建立後重綁 ⇒ 屬性形式基底取建立時之別名
+    "tests/test_shadow_c.py": ("import tests.helpers.sm1 as h\n\n\nclass TestX(h.Base):\n    def test_x(self):\n"
+                               "        assert 1 == 1\n\n\nimport tests.helpers.sm2 as h\n"),
 }
 
 
@@ -463,7 +466,8 @@ def test_base_resolution_keeps_binding_time_class_node(tmp_path):
     """SPEC v38（審查 r37 CODEX-R37-P1-01）：基底解析回傳獲勝綁定當時之類別節點（同名重定義不誤取後者）。oracle＝暫存倉
     實際 Python 載入之 `TestX.__bases__[0].marker`，靜態側取所得 ClassDef 本體之 `marker = N`。"""
     files = {"tests/__init__.py": "", "tests/helpers/__init__.py": "",
-             "tests/helpers/sm1.py": "class Base:\n    marker = 1\n", **SHADOW_CASES}
+             "tests/helpers/sm1.py": "class Base:\n    marker = 1\n", "tests/helpers/sm2.py": "class Base:\n    marker = 2\n",
+             **SHADOW_CASES}
     r = make_repo(tmp_path, files)
     eng = testreg._Engine(testreg._Tree(r.root, "HEAD"))
     for rel in sorted(SHADOW_CASES):

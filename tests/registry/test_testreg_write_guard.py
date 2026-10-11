@@ -1043,6 +1043,51 @@ def test_07x_v38_shadowed_base_binding_time(tmp_path):
     assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX6_NEW == want, pc.stderr
 
 
+# ── ⑦x（v39；審查 r38 CODEX-R38-P1-01／P1-02）：模組別名於類別建立後重綁；改前一個同名基底之標記 ──
+T_USEFX_REALIAS = '''import tests.helpers.usefx_base as h
+
+
+class TestAliasBefore(h.Base):
+    def test_alias_before(self):
+        assert 1 == 1
+
+
+import tests.helpers.usefx_plain as h
+'''
+USEFX7_FILES = {**USEFX2_FILES, "tests/helpers/usefx_plain.py": USEFX_PLAIN, "tests/test_usefx_realias.py": T_USEFX_REALIAS,
+                "tests/test_usefx_shadow.py": T_USEFX_SHADOW}
+USEFX7_NEW = {n for n in _collected(USEFX7_FILES) if "/test_usefx_realias.py" in n or "/test_usefx_shadow.py" in n}
+
+
+def test_07x_v39_module_alias_rebound_after_class(tmp_path):
+    """模組別名於類別建立後重綁至他模組：子類別之基底為建立時別名所指者（帶 usefixtures）——conftest fixture 刪斷言時列出
+    TestAliasBefore（hook 與 pre-commit；以模組最終別名解析之實作漏列）。"""
+    r = _repo(tmp_path, USEFX7_FILES)
+    _edit(r, "tests/conftest.py", "    assert value < 10\n", "")
+    want = {"tests/test_usefx_realias.py::TestAliasBefore::test_alias_before",
+            "tests/test_usefx_shadow.py::TestBefore::test_before"}
+    proc = r.hook("tests/conftest.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) & USEFX7_NEW == want, proc.stderr
+    r.install_precommit()
+    r.stage("tests/conftest.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) & USEFX7_NEW == want, pc.stderr
+
+
+def test_07x_v39_earlier_same_name_base_marker_removed(tmp_path):
+    """同名基底重定義時，拿掉前一個 Base 之 usefixtures（後一個不變）⇒ 寫該測試檔之 hook 與 pre-commit 列出重定義前建立之
+    子類別 TestBefore（差量輪廓只看最後一個定義之實作漏列）。"""
+    r = _repo(tmp_path, USEFX7_FILES)
+    _edit(r, "tests/test_usefx_shadow.py", '@pytest.mark.usefixtures("checked_value")\nclass Base:', "class Base:")
+    want = {"tests/test_usefx_shadow.py::TestBefore::test_before"}
+    proc = r.hook("tests/test_usefx_shadow.py")
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) == want, proc.stderr
+    r.install_precommit()
+    r.stage("tests/test_usefx_shadow.py")
+    pc = r.try_commit()
+    assert pc.returncode != 0 and _v19_subjects(pc.stderr) == want, pc.stderr
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)
