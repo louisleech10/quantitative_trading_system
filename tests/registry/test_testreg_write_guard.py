@@ -555,14 +555,14 @@ def test_mutation_hook_v19_count_only_misses_weaker(tmp_path, monkeypatch, capsy
 
 
 
-def _full_oracle(r: TmpRepo) -> set:
+def _full_oracle(r: TmpRepo, fileset: Dict[str, str] = FX_FILES) -> set:
     """完整反推之定義：暫存倉每一測試函式（依暫存倉 pytest.ini 之 python_classes／python_functions 以 fnmatch 收集，
     與真實樹同為 `Test*`／`test_*`；含 async 函式與類別方法；`testhelper` 不收）於 HEAD 與工作樹各自完整展開之
     斷言多重集合比較（不經呼叫者反推）。"""
     ini = configparser.ConfigParser()
     ini.read_string(r.read("pytest.ini"))
     cls_pat, fn_pat = ini["pytest"]["python_classes"], ini["pytest"]["python_functions"]
-    files = {p: r.read(p) for p in FX_FILES if is_test_path(p)}
+    files = {p: r.read(p) for p in fileset if is_test_path(p)}
     return {nid for nid in _collected(files, fn_pat, cls_pat)
             if testreg.multiset_decreased(testreg.assertion_multiset(r.root, nid, "HEAD"),
                                           testreg.assertion_multiset(r.root, nid, "worktree"))}
@@ -1088,6 +1088,191 @@ def test_07x_v39_earlier_same_name_base_marker_removed(tmp_path):
     assert pc.returncode != 0 and _v19_subjects(pc.stderr) == want, pc.stderr
 
 
+# ── ⑦y（第 1 批審碼 r3 CODEX-R3-P1-01／COMPOSER-R3-P1-01）：`pytest_plugins` 外掛模組內 fixture 輪廓減少，依列它之 conftest
+# 作用範圍之 fixture 請求關係判定（不做完整呼叫者反推：真實規模 157 秒）——須與完整反推 oracle 相等 ──
+PLUGDEP = ("import pytest\n\n\n@pytest.fixture\ndef plug_req():\n    assert 2 > 1\n    yield\n\n\n"
+           "@pytest.fixture\ndef plug_wrap(plug_req):\n    yield\n")
+PLUGBASE = 'import pytest\n\n\n@pytest.mark.usefixtures("plug_wrap")\nclass PlugBase:\n    pass\n'
+# 只經他模組別名基底類別請求者獨立一檔：該檔原文不含任何 fixture 名（文字預篩須納入遞移之類別名才不漏）
+T_PLUG_VIABASE = '''from tests.helpers.plugbase import PlugBase as PB
+
+
+class TestViaBase(PB):
+    def test_via_base(self):
+        assert 1 == 1
+'''
+T_PLUG_USERS = '''def test_param(plug_req):
+    assert 1 == 1
+
+
+def test_plain():
+    assert 1 == 1
+'''
+T_PLUG_LOCALAUTO = '''import pytest
+
+
+@pytest.fixture(autouse=True)
+def local_guard(plug_req):
+    yield
+
+
+def test_la():
+    assert 1 == 1
+'''
+PLUGDEP_FILES = {**USEFX_FILES, "tests/plugins/plugreq.py": PLUGDEP, "tests/helpers/plugbase.py": PLUGBASE,
+                 "tests/test_plug_viabase.py": T_PLUG_VIABASE, "tests/test_plug_users.py": T_PLUG_USERS,
+                 "tests/test_plug_localauto.py": T_PLUG_LOCALAUTO}
+PLUGDEP_WANT = {"tests/test_usefx_mod.py::test_mod_a", "tests/test_usefx_mod.py::test_mod_b",
+                "tests/test_plug_viabase.py::TestViaBase::test_via_base", "tests/test_plug_users.py::test_param",
+                "tests/test_plug_localauto.py::test_la"}
+
+
+@pytest.mark.parametrize("old,new,want", [
+    ("    assert 2 > 1\n", "", PLUGDEP_WANT),                                 # 外掛 fixture 刪斷言
+    ("    assert 2 > 1\n", "    assert 2 > 1\n    assert 3 > 2\n", set()),   # 加斷言：不減
+    ("    yield\n\n\n@pytest", "    yield\n\n\n# 註解\n@pytest", set()),      # 加註解：不減
+])
+def test_07y_plugin_fixture_change_equals_full_oracle(tmp_path, old, new, want):
+    """外掛模組內 fixture 刪一個斷言 ⇒ 經參數、模組層 pytestmark、他模組別名基底類別之 usefixtures（經外掛內遞移 fixture）、
+    測試模組內 autouse fixture 請求者，hook 與 pre-commit 之 V19 主體皆等於完整反推 oracle；不減之改動 rc 0。"""
+    r = _repo(tmp_path, PLUGDEP_FILES)
+    _edit(r, "tests/plugins/plugreq.py", old, new)
+    proc = r.hook("tests/plugins/plugreq.py")
+    assert (proc.returncode != 0) == bool(want), proc.stderr
+    assert _v19_subjects(proc.stderr) == _full_oracle(r, PLUGDEP_FILES) == want, proc.stderr
+    r.install_precommit()
+    r.stage("tests/plugins/plugreq.py")
+    pc = r.try_commit()
+    assert (pc.returncode != 0) == bool(want) and _v19_subjects(pc.stderr) == want, pc.stderr
+
+
+# ── ⑦z（第 1 批審碼 r3 後主委實測：autouse fixture 刪斷言時候選為範圍內全部測試，逐一展開比較真實規模 120 秒）：fixture
+# 改變之免展開判定（`_fixture_change_decide`）——前提成立者不逐一展開、不成立者逐一精確比較，兩者皆須與完整反推 oracle 相等 ──
+PLUGAUTO = '''import pytest
+
+
+@pytest.fixture
+def auto_dep():
+    yield 5
+
+
+@pytest.fixture(autouse=True)
+def auto_guard(auto_dep):
+    value = auto_dep
+    assert value > 0
+    assert value < 10
+    yield
+
+
+@pytest.fixture(autouse=True)
+def auto_quiet():
+    yield
+
+
+@pytest.fixture
+def ord_r():
+    r = list(range(2))
+    assert len(r) > 0
+    yield
+
+
+@pytest.fixture
+def ord_q():
+    q = list(range(3))
+    assert len(q) > 1
+    yield
+
+
+@pytest.fixture(autouse=True)
+def aa_lost(ord_r):
+    yield
+
+
+@pytest.fixture(autouse=True)
+def ab_keep(ord_q, ord_r):
+    yield
+
+
+@pytest.fixture
+def sub_only():
+    s = list(range(4))
+    assert len(s) > 2
+    yield
+'''
+T_AUTO_SUB = "def test_sub_only(sub_only):\n    assert True\n"
+# 同名 fixture 遮蔽：以名稱入選候選，但閉包中 sub_only 解析至本模組（非外掛）
+T_AUTO_SHADOW = ("import pytest\n\n\n@pytest.fixture\ndef sub_only():\n    yield\n\n\n"
+                 "def test_shadowed(sub_only):\n    assert True\n")
+AUTO_FILES = {**USEFX_FILES, "tests/plugins/plugauto.py": PLUGAUTO, "tests/test_auto_sub.py": T_AUTO_SUB,
+              "tests/test_auto_shadow.py": T_AUTO_SHADOW,
+              "tests/conftest.py": USEFX_CONFTEST.replace('"tests.plugins.plugreq"]',
+                                                          '"tests.plugins.plugreq", "tests.plugins.plugauto"]')}
+AUTO_ALL = set(_collected(AUTO_FILES))
+ORDER_WANT = None  # 以完整反推 oracle 為準（局部名序號重排使部分測試舊鍵計數減少，視各測試其他局部名之並列而定）
+AUTO_CASES = {
+    # 名稱: ([(檔, 舊, 新)…], 預期 V19 主體, 是否走免展開判定〔不逐一展開〕)
+    "assert_removed": ([("tests/plugins/plugauto.py", "    assert value < 10\n", "")], AUTO_ALL, True),
+    "assert_weakened": ([("tests/plugins/plugauto.py", "    assert value < 10\n", "    assert value <= 10\n")],
+                        AUTO_ALL, True),
+    "assert_added": ([("tests/plugins/plugauto.py", "    assert value < 10\n",
+                       "    assert value < 10\n    assert value != 7\n")], set(), True),
+    "elementless_autouse_off": ([("tests/plugins/plugauto.py", "@pytest.fixture(autouse=True)\ndef auto_quiet",
+                                  "@pytest.fixture\ndef auto_quiet")], set(), True),
+    "asserting_autouse_off": ([("tests/plugins/plugauto.py", "@pytest.fixture(autouse=True)\ndef auto_guard",
+                                "@pytest.fixture\ndef auto_guard")], AUTO_ALL, True),
+    # 關閉無元素之 aa_lost 之 autouse：留下之 ord_r 改經 ab_keep 進入、展開順序與 ord_q 對調（同位置同序號之局部名改依出現序
+    # 排序）⇒ 須交逐一精確比較（不得以「失去者皆無元素」逕判不減）
+    "order_changed_elementless_off": ([("tests/plugins/plugauto.py", "@pytest.fixture(autouse=True)\ndef aa_lost",
+                                        "@pytest.fixture\ndef aa_lost")], ORDER_WANT, False),
+    # sub_only 刪斷言（減少）＋autouse 之 auto_guard 加斷言（增加）：test_sub_only 閉包含兩個改變者 ⇒ 精確比較、必減；
+    # test_shadowed 之 sub_only 為本模組者、閉包中改變者只 auto_guard 且未減少 ⇒ 免展開判不減
+    "mixed_shadowed": ([("tests/plugins/plugauto.py", "    assert len(s) > 2\n", ""),
+                        ("tests/plugins/plugauto.py", "    assert value < 10\n",
+                         "    assert value < 10\n    assert value != 7\n")],
+                       {"tests/test_auto_sub.py::test_sub_only"}, False),
+    "signature_changed": ([("tests/plugins/plugauto.py", "def auto_guard(auto_dep):",
+                            "def auto_guard(auto_dep, request):"),
+                           ("tests/plugins/plugauto.py", "    assert value < 10\n", "")], AUTO_ALL, False),
+    "two_fixtures_changed": ([("tests/plugins/plugauto.py", "    assert value < 10\n", ""),
+                              ("tests/plugins/plugauto.py", "    yield 5\n", "    assert 5 > 4\n    yield 5\n")],
+                             AUTO_ALL, False),
+    # 另一個 conftest 亦變更（conftest 不以模組名被引用，只能由「除 h 外變更之 tests/ 下 .py 皆為測試檔」閘擋下）
+    "other_conftest_dirty": ([("tests/plugins/plugauto.py", "    assert value < 10\n", ""),
+                              ("tests/sub/conftest.py", 'check_env("x")', 'check_env("xy")')], AUTO_ALL, False),
+    "other_helper_dirty": ([("tests/plugins/plugauto.py", "    assert value < 10\n", ""),
+                            ("tests/helpers/plughelp.py", "    assert v > 0\n", "    assert v > 0  # 註\n")],
+                           AUTO_ALL, False),
+}
+
+
+@pytest.mark.parametrize("case", sorted(AUTO_CASES))
+def test_07z_autouse_fixture_change_decision_equals_full_oracle(tmp_path, monkeypatch, case):
+    """autouse 外掛 fixture 之改法：刪斷言、換弱斷言、加斷言、關閉無元素／有元素 fixture 之 autouse（前提成立 ⇒ 免展開判定）；
+    改簽章、閉包內兩個 fixture 同改、另有 helper 檔變更（前提不成立 ⇒ 逐一精確比較）——hook 與 pre-commit 之 V19 主體皆等於
+    完整反推 oracle 與預期；行程內以 `_Engine.elements` 呼叫數驗證走哪一條（免展開判定者為 0）。"""
+    edits, want, fast = AUTO_CASES[case]
+    r = _repo(tmp_path, AUTO_FILES)
+    for rel, old, new in edits:
+        _edit(r, rel, old, new)
+    if want is None:
+        want = _full_oracle(r, AUTO_FILES)
+        assert want, "前提：序號重排須使至少一個測試減少（省略展開順序檢查而逕判不減之實作因此必紅）"
+    calls = []
+    orig = testreg._Engine.elements
+    monkeypatch.setattr(testreg._Engine, "elements", lambda self, nid: calls.append(nid) or orig(self, nid))
+    got = {f.subject for f in testreg.check(r.root, helpers=["tests/plugins/plugauto.py"]) if f.rule == "V19"}
+    monkeypatch.undo()
+    assert got == want and (not calls) == fast, (sorted(got ^ want)[:5], len(calls))
+    proc = r.hook("tests/plugins/plugauto.py")
+    assert (proc.returncode != 0) == bool(want), proc.stderr
+    assert _v19_subjects(proc.stderr) == _full_oracle(r, AUTO_FILES) == want, proc.stderr
+    r.install_precommit()
+    for rel in sorted({e[0] for e in edits}):
+        r.stage(rel)
+    pc = r.try_commit()
+    assert (pc.returncode != 0) == bool(want) and _v19_subjects(pc.stderr) == want, pc.stderr
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)
@@ -1378,6 +1563,171 @@ def test_boundary_07d_test_file_class_base_change_wall_clock(head_worktree):
     limit = 5.0 if blocking else 1.0
     assert statistics.median(times) < limit, (rel, blocking, times)
     assert statistics.median(staged) < limit, (rel, blocking, staged)
+
+
+def _plugin_assert_line(root: Path):
+    """真實樹 tests/conftest.py 之 `pytest_plugins` 中，第一個含「本體直接含斷言之 fixture」之外掛 ⇒ (外掛路徑, fixture 名,
+    該 fixture 本體內第一個單行斷言敘述〔assert 或 assert* 呼叫〕之行號)；標的由 AST 導出，不寫死。"""
+    src = (root / "tests/conftest.py").read_text(encoding="utf-8")
+    node = next(n for n in ast.parse(src).body if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "pytest_plugins" for t in n.targets))
+    for dotted in (e.value for e in node.value.elts):
+        names = _asserting_fixtures(root, dotted)
+        rel = dotted.replace(".", "/") + ".py"
+        for n in ast.parse((root / rel).read_text(encoding="utf-8")).body:
+            if isinstance(n, ast.FunctionDef) and n.name in names:
+                for s in ast.walk(n):
+                    if (isinstance(s, ast.Assert) or (isinstance(s, ast.Expr) and isinstance(s.value, ast.Call)
+                                                      and getattr(s.value.func, "id", getattr(s.value.func, "attr", ""))
+                                                      .startswith("assert"))) and s.lineno == s.end_lineno:
+                        return rel, n.name, s.lineno
+    return None
+
+
+@pytest.mark.parametrize("edit", ["assert_removed", "comment_added"])
+def test_boundary_07e_plugin_fixture_change_wall_clock(head_worktree, edit):
+    """真實規模（第 1 批審碼 r3 CODEX-R3-P1-01／COMPOSER-R3-P1-01）：`pytest_plugins` 外掛內 fixture 刪一行斷言（必擋：經
+    usefixtures 套用之真實測試全數 V19）⇒ hook rc 2、pre-commit rc≠0，各 3 次中位 < 5 s；同處加一行註解（不減）⇒ 皆 rc 0、
+    各 10 次中位 < 1 s（§C 兩層）。實作不得對外掛做完整呼叫者反推（v39 實測 157–176 秒）。每案起點斷言共用工作樹乾淨。"""
+    _assert_clean(head_worktree)
+    pick = _plugin_assert_line(head_worktree)
+    assert pick, "前提：tests/conftest.py 之外掛中有本體含斷言之 fixture（真實樹 ic_persist_redirect）"
+    rel, name, line = pick
+    p = head_worktree / rel
+    src = p.read_text(encoding="utf-8")
+    lines = src.splitlines(keepends=True)
+    if edit == "assert_removed":
+        del lines[line - 1]
+    else:
+        lines.insert(line - 1, " " * (len(lines[line - 1]) - len(lines[line - 1].lstrip())) + "# 註解\n")
+    p.write_text("".join(lines), encoding="utf-8")
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(p)}})
+    blocking = edit == "assert_removed"
+    runs, limit = (3, 5.0) if blocking else (10, 1.0)
+    times, first = [], None
+    try:
+        for _ in range(runs):
+            t0 = time.perf_counter()
+            proc = subprocess.run(["bash", str(head_worktree / "scripts/testreg_write_guard.sh")], input=payload,
+                                  capture_output=True, text=True, env=clean_env(), cwd=str(head_worktree))
+            times.append(time.perf_counter() - t0)
+            assert proc.returncode == (2 if blocking else 0), proc.stderr[-2000:]
+            first = first or proc
+        staged = _staged_times_at(head_worktree, rel, runs, blocking)
+    finally:
+        p.write_text(src, encoding="utf-8")
+    assert statistics.median(times) < limit, (edit, times)
+    assert statistics.median(staged) < limit, (edit, staged)
+    if blocking:  # 獨立字面 oracle：以 usefixtures 字面請求該 fixture 之真實測試須全數被擋
+        expected = _usefixtures_users(head_worktree, {name})
+        assert expected and expected <= _v19_subjects(first.stderr), sorted(expected - _v19_subjects(first.stderr))[:5]
+
+
+AUTOUSE_PROBE = ("import pytest\n\n\n@pytest.fixture(autouse=True)\ndef zz_probe_guard():\n"
+                 "    assert 1 + 1 == 2\n    assert 2 + 2 == 4\n    yield\n")
+AUTOUSE_EDITS = {
+    # 名稱: (舊, 新, 是否必擋)
+    "assert_removed": ("    assert 2 + 2 == 4\n", "", True),
+    "assert_weakened": ("    assert 2 + 2 == 4\n", "    assert 2 + 2 >= 4\n", True),
+    "assert_added": ("    assert 2 + 2 == 4\n", "    assert 2 + 2 == 4\n    assert 3 + 3 == 6\n", False),
+}
+
+
+def _collected_real(root: Path) -> set:
+    """獨立 oracle（不經 testreg）：依 pytest.ini 之 testpaths／python_files／python_classes／python_functions 以 fnmatch
+    收集真實樹之函式層 nodeid（模組層函式含 async、類別內方法）。"""
+    ini = configparser.ConfigParser()
+    ini.read_string((root / "pytest.ini").read_text(encoding="utf-8"))
+    sec = ini["pytest"]
+    tps = sec.get("testpaths", "").split() or ["."]
+    fpat, cpat = sec.get("python_functions", "test").split(), sec.get("python_classes", "Test").split()
+    filepat = sec.get("python_files", "test_*.py").split()
+    match = lambda name, pats: any(fnmatch.fnmatchcase(name, p) if any(c in p for c in "*?[") else name.startswith(p)
+                                   for p in pats)
+    rels = subprocess.run(["git", "-C", str(root), "ls-files", "--", *tps], capture_output=True, text=True,
+                          check=True).stdout.split()
+    files = {rel: (root / rel).read_text(encoding="utf-8") for rel in rels
+             if rel.endswith(".py") and any(fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], p) for p in filepat)}
+    out = set()
+    fn = (ast.FunctionDef, ast.AsyncFunctionDef)
+    for rel, src in files.items():
+        for n in ast.parse(src).body:
+            if isinstance(n, fn) and match(n.name, fpat):
+                out.add(f"{rel}::{n.name}")
+            elif isinstance(n, ast.ClassDef) and match(n.name, cpat):
+                out |= {f"{rel}::{n.name}::{m.name}" for m in n.body if isinstance(m, fn) and match(m.name, fpat)}
+    return out
+
+
+@pytest.fixture(scope="module")
+def autouse_worktree(tmp_path_factory):
+    """真實 repo HEAD 加一個合成提交（不入任何分支）之 detached 工作樹：新增外掛 tests/fixtures/zz_probe_autouse_plugin.py
+    （帶兩行斷言之 autouse fixture）並列於 tests/conftest.py 之 `pytest_plugins` 末尾；用畢移除。"""
+    wt = tmp_path_factory.mktemp("autowt") / "wt"
+    env = clean_env()
+    subprocess.run(["git", "-C", str(REPO), "worktree", "add", "-q", "--detach", str(wt), "HEAD"], check=True,
+                   capture_output=True, env=env)
+    (wt / "venv").symlink_to(REPO / "venv")
+    conf = (wt / "tests/conftest.py").read_text(encoding="utf-8")
+    node = next(n for n in ast.parse(conf).body if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == "pytest_plugins" for t in n.targets))
+    lines = conf.splitlines(keepends=True)
+    plugins = [e.value for e in node.value.elts] + ["tests.fixtures.zz_probe_autouse_plugin"]
+    lines[node.lineno - 1:node.end_lineno] = [f"pytest_plugins = {json.dumps(plugins)}\n"]
+    idx = tmp_path_factory.mktemp("autoidx") / "index"
+    genv = {**env, "GIT_INDEX_FILE": str(idx)}
+    git = lambda *a, e=genv, **k: subprocess.run(["git", "-C", str(wt), *a], check=True, capture_output=True, text=True,
+                                                 env=e, **k).stdout.strip()
+    git("read-tree", "HEAD")
+    for rel, content in (("tests/conftest.py", "".join(lines)), ("tests/fixtures/zz_probe_autouse_plugin.py", AUTOUSE_PROBE)):
+        blob = git("hash-object", "-w", "--stdin", input=content)
+        git("update-index", "--add", "--cacheinfo", f"100644,{blob},{rel}")
+    sha = git("commit-tree", git("write-tree"), "-p", "HEAD", "-m", "TESTREG 07f autouse probe (temporary)")
+    git("checkout", "-q", "--detach", sha, e=env)
+    git("update-index", "-q", "--refresh", e=env)
+    yield wt
+    subprocess.run(["git", "-C", str(REPO), "worktree", "remove", "--force", str(wt)], capture_output=True, env=env)
+
+
+@pytest.mark.parametrize("edit", sorted(AUTOUSE_EDITS))
+def test_boundary_07f_autouse_plugin_fixture_change_wall_clock(autouse_worktree, edit):
+    """真實規模（第 1 批審碼 r3 後主委實測：autouse fixture 刪斷言時逐一展開比較 120 秒）：合成提交上之 autouse 外掛 fixture
+    刪一行斷言／換成較弱斷言（必擋：依 pytest.ini 收集之全部測試函式 V19，以獨立 oracle 比對相等）⇒ hook rc 2、pre-commit
+    rc≠0、各 3 次中位 < 5 s；加一行斷言（不減）⇒ rc 0、各 10 次中位 < 1 s（§C 兩層）。每案起點斷言共用工作樹乾淨。"""
+    wt = autouse_worktree
+    st = subprocess.run(["git", "-C", str(wt), "status", "--porcelain", "--untracked-files=no"], capture_output=True,
+                        text=True, check=True, env=clean_env()).stdout
+    parent = subprocess.run(["git", "-C", str(wt), "rev-parse", "HEAD^"], capture_output=True, text=True, check=True,
+                            env=clean_env()).stdout.strip()
+    main = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True, check=True,
+                          env=clean_env()).stdout.strip()
+    assert st == "" and parent == main, (st, parent, main)  # 起點：合成提交之上乾淨（量測不得受前案污染）
+    old, new, blocking = AUTOUSE_EDITS[edit]
+    rel = "tests/fixtures/zz_probe_autouse_plugin.py"
+    p = wt / rel
+    src = p.read_text(encoding="utf-8")
+    assert src.count(old) == 1, src
+    p.write_text(src.replace(old, new), encoding="utf-8")
+    payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(p)}})
+    runs, limit = (3, 5.0) if blocking else (10, 1.0)
+    times, first = [], None
+    try:
+        for _ in range(runs):
+            t0 = time.perf_counter()
+            proc = subprocess.run(["bash", str(wt / "scripts/testreg_write_guard.sh")], input=payload,
+                                  capture_output=True, text=True, env=clean_env(), cwd=str(wt))
+            times.append(time.perf_counter() - t0)
+            assert proc.returncode == (2 if blocking else 0), proc.stderr[-2000:]
+            first = first or proc
+        staged = _staged_times_at(wt, rel, runs, blocking)
+    finally:
+        p.write_text(src, encoding="utf-8")
+    assert statistics.median(times) < limit, (edit, times)
+    assert statistics.median(staged) < limit, (edit, staged)
+    if blocking:
+        expected = _collected_real(wt)
+        got = _v19_subjects(first.stderr)
+        assert got == expected, (len(got), len(expected), sorted(got ^ expected)[:5])
 
 
 def _asserting_fixtures(root: Path, dotted: str) -> set:

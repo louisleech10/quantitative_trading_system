@@ -472,6 +472,11 @@ def _assign_counts(body: Sequence[ast.stmt], deep: bool) -> Tuple[Dict[str, int]
     return counts, rhs
 
 
+# (repo 相對路徑, 原始碼) → 解析結果：兩樹內容相同之檔共用一份（`_Mod` 只含由原始碼導出之唯讀資料，建立後不被改寫；
+# 元素展開對語法樹節點一律先深複製）——HEAD 與受驗樹各解析全部測試檔時省一半解析（真實規模 autouse 判定實測）
+_MOD_SHARED: Dict[Tuple[str, str], Optional["_Mod"]] = {}
+
+
 class _Mod:
     def __init__(self, path: str, src: str):
         self.path = path
@@ -571,10 +576,16 @@ class _Engine:
     def mod(self, path: str) -> Optional[_Mod]:
         if path not in self._mods:
             src = self.tree.read(path)
-            try:
-                self._mods[path] = _Mod(path, src) if src is not None else None
-            except SyntaxError:
+            if src is None:
                 self._mods[path] = None
+            else:
+                key = (path, src)
+                if key not in _MOD_SHARED:
+                    try:
+                        _MOD_SHARED[key] = _Mod(path, src)
+                    except SyntaxError:
+                        _MOD_SHARED[key] = None
+                self._mods[path] = _MOD_SHARED[key]
         return self._mods[path]
 
     def module_path(self, dotted: str) -> Optional[str]:
@@ -2368,29 +2379,77 @@ def decreased_defs(repo_root: Path, helper_path: str, tree: str = "worktree") ->
     return None if d is None else sorted(d)
 
 
+def _usefixtures_class_words(engs: Sequence["_Engine"], names: set) -> set:
+    """names ∪（遞移）以 usefixtures 字面請求 names 之類別名及以之為基底之類別名（各引擎之樹之 tests/ 下 .py）。測試請求
+    fixture 之字面——參數名、usefixtures 字串、基底類別名（基底可在他模組，其上之標記不出現在測試檔原文；審查 r33
+    CODEX-R33-P1-01）——皆出現於測試檔原文 ⇒ 供文字預篩；同名誤中只多解析、不漏。"""
+    words = set(names)
+    pyfiles = sorted({p for e in engs for p in e.tree.files() if p.startswith("tests/") and p.endswith(".py")})
+    for e in engs:
+        e.tree.prefetch(pyfiles)
+    grow = True
+    while grow:
+        grow = False
+        wpat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(words))) + r")\b")
+        for eng in engs:
+            for p in pyfiles:
+                s = eng.tree.read(p) or ""
+                if not any(w in s for w in words) or wpat.search(s) is None:
+                    continue
+                m = eng.mod(p)
+                for c in (m.classes.values() if m else []):
+                    if c.name in words:
+                        continue
+                    req = set(_usefixtures_in(c.decorator_list)) | set(_usefixtures_in(_pytestmark_values(c.body)))
+                    if req & names or _base_names(eng, m, c) & words:
+                        words.add(c.name)
+                        grow = True
+    return words
+
+
 def _fixture_dependents(ctx: Context, eng: "_Engine", conftest: str, dec: set) -> set:
-    """conftest 中自身輪廓減少之 fixture 集合 dec ⇒ 其作用範圍內直接或經 fixture 傳遞使用者之測試函式（含 autouse）。"""
+    """conftest 或其 `pytest_plugins` 外掛中自身輪廓減少之 fixture 集合 dec ⇒ 該 conftest 作用範圍內直接或經 fixture 傳遞
+    （範圍內之 conftest 與其外掛、測試模組本身之 fixture）請求者之測試函式（參數與 usefixtures 字面含基底類別，SPEC v33；
+    經 autouse 者為範圍內全部或該模組全部）。非 autouse 時以 fixture 名與遞移之類別名做文字預篩、只解析提及者（第 1 批
+    審碼 r3：外掛 fixture 減少原走完整呼叫者反推，真實規模 157 秒）。受影響者之精確判定由呼叫端之逐一多重集合比較決定。"""
     base = conftest[: -len("conftest.py")]
     names = set(dec)
     files = [f for f in _tree(ctx).test_files(ctx.schema) if f.startswith(base)]
-    conftests = [f for f in _tree(ctx).files() if f.startswith(base) and f.endswith("conftest.py")]
+    conftests = [f for f in eng.tree.files() if f.startswith(base) and f.endswith("conftest.py")]
+    holders = [*conftests, *(pl for c in conftests for pl in _plugin_paths(eng.tree, c))]
+    eng.tree.prefetch(holders)
     changed = True
     while changed:
         changed = False
-        for f in [*conftests, *files]:
+        for f in holders:
             m = eng.mod(f)
             for fname, (ffn, _) in (m.fixtures.items() if m else []):
                 if fname not in names and {a.arg for a in ffn.args.args} & names:
                     names.add(fname)
                     changed = True
-    autouse = any(auto for c in conftests for n, (_, auto) in ((eng.mod(c).fixtures.items()) if eng.mod(c) else [])
+    autouse = any(auto for c in holders for n, (_, auto) in ((eng.mod(c).fixtures.items()) if eng.mod(c) else [])
                   if n in names)
+    eng.tree.prefetch(files)
+    if not autouse:
+        words = _usefixtures_class_words((eng,), names)
+        wpat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(words))) + r")\b")
+        files = [f for f in files if (lambda s: any(w in s for w in words) and wpat.search(s) is not None)(
+            eng.tree.read(f) or "")]
     out = set()
     for f in files:
         mf = eng.mod(f)
-        for q, fn in _test_functions(_tree(ctx).read(f)).items():
-            requested = set(_requested_fixtures(eng, mf, q, fn)) if mf is not None else {a.arg for a in fn.args.args}
-            if autouse or requested & names:  # 參數與 usefixtures 字面（SPEC v33）
+        local, local_auto = set(names), autouse
+        grow = mf is not None
+        while grow:  # 測試模組本身之 fixture（只作用於本模組）遞移請求 names
+            grow = False
+            for fname, (ffn, a) in mf.fixtures.items():
+                if fname not in local and {x.arg for x in ffn.args.args} & local:
+                    local.add(fname)
+                    grow = True
+        if mf is not None:
+            local_auto = local_auto or any(a for n, (_, a) in mf.fixtures.items() if n in local)
+        for q, fn in (_test_functions_of(mf.tree) if mf is not None else {}).items():  # 不可解析之檔 ⇒ 無測試函式
+            if local_auto or set(_requested_fixtures(eng, mf, q, fn)) & local:
                 out.add(f"{f}::{q}")
     return out
 
@@ -2464,31 +2523,9 @@ def _plugin_change_dependents(ctx: Context, he: "_Engine", ce: "_Engine", confte
                     names.add(n)
                     auto = auto or a
                     grow = True
-    # 候選字再納入（遞移）以 usefixtures 字面請求上列名稱之類別名：基底類別可在他模組（審查 r33 CODEX-R33-P1-01），其上之
-    # 標記不出現在測試檔原文；以子類別名或其基底之名在測試檔出現與否篩選（基底名同名誤中只多解析、不漏）
-    words = set(names)
-    if words and not auto:
-        pyfiles = sorted({p for t_ in (head, cur) for p in t_.files() if p.startswith("tests/") and p.endswith(".py")})
-        head.prefetch(pyfiles)
-        cur.prefetch(pyfiles)
-        grow = True
-        while grow:
-            grow = False
-            wpat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(words))) + r")\b")
-            for eng in (he, ce):
-                for p in pyfiles:
-                    s = eng.tree.read(p) or ""
-                    if not any(w in s for w in words) or wpat.search(s) is None:
-                        continue
-                    m = eng.mod(p)
-                    for c in (m.classes.values() if m else []):
-                        if c.name in words:
-                            continue
-                        req = set(_usefixtures_in(c.decorator_list)) | set(_usefixtures_in(_pytestmark_values(c.body)))
-                        if req & names or _base_names(eng, m, c) & words:
-                            words.add(c.name)
-                            grow = True
-    pat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(words))) + r")\b") if words else None
+    # 候選字再納入（遞移）以 usefixtures 字面請求上列名稱之類別名（見 `_usefixtures_class_words`）
+    words = _usefixtures_class_words((he, ce), names) if names and not auto else set(names)
+    pat =re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(words))) + r")\b") if words else None
 
     def mentions(src: Optional[str]) -> bool:  # 子字串快篩後才以詞界正則確認
         s = src or ""
@@ -2605,6 +2642,169 @@ def _subclass_users(ctx: Context, he: "_Engine", ce: "_Engine", classes: set) ->
     return out
 
 
+def _star_reaches(engs: Sequence["_Engine"], pyfiles: Sequence[str], targets: set) -> bool:
+    """tests/ 下模組之星號匯入鏈（遞移經 tests/ 以外之 repo 模組）是否觸及 targets 中任一檔（名稱解析之 `_binds` 經此改變）。"""
+    for eng in engs:
+        queue: List[str] = []
+        for p in pyfiles:
+            if "import *" in (eng.tree.read(p) or ""):
+                m = eng.mod(p)
+                queue += [info[1] for _ln, _nm, info in (m.order if m else []) if info[0] == "star"]
+        seen: set = set()
+        while queue:
+            q = eng.module_path(queue.pop())
+            if q is None or q in seen:
+                continue
+            seen.add(q)
+            if q in targets:
+                return True
+            m = eng.mod(q)
+            queue += [info[1] for _ln, _nm, info in (m.order if m else []) if info[0] == "star"]
+    return False
+
+
+def _fixture_change_decide(ctx: Context, he: "_Engine", ce: "_Engine", h: str, cands: set
+                           ) -> Tuple[Dict[str, List[str]], set]:
+    """helper h（conftest 或其 `pytest_plugins` 外掛）只有 fixture 改變時，候選測試之斷言多重集合是否減少之免逐一展開判定
+    （第 1 批審碼 r3 後實測：autouse fixture 刪斷言時候選＝範圍內全部 8,592 個測試，逐一比較 120 秒）。元素鍵＝改名後
+    語法樹之 dump（不含行號），全域序號依用名之位置元組排序 ⇒ 下列前提成立時免展開即可判定；不成立者交逐一精確比較：
+    ①除 h 外，變更之 tests/ 下 .py 皆為測試檔且其模組名未見於 tests/ 下非測試檔原文；pytest.ini 未變；變更之 tests/ 以外
+      .py 不在 tests/ 模組之星號匯入鏈上（引擎只展開 tests/ 下定義，其他檔只經星號匯入之綁定判定影響解析）；
+    ②h 中語法樹改變之模組層名稱（`_changed_names`，含模組內遞移引用者）皆為 fixture；
+    ③該測試檔兩版相同、原文未提及①之變更測試模組；
+    ④兩樹 fixture 閉包（名→定義檔）——(a) 相同，且其中改變者恰一個 f，f 之參數列、autouse 與元素用名（局部名→序號、
+      非局部名集合）兩版相同 ⇒ 其餘元素與全域序號不變、f 部分之鍵經同一單射改名 ⇒ 減少 ⟺ f 自身元素鍵多重集合減少；
+      (b) 受驗樹閉包為 HEAD 閉包之真子集（留下者項目相同）且留下者無改變之 fixture ⇒ 失去之 fixture 有任何元素即必減
+      （元素總數減少），皆無元素即不減（其局部名不在任何元素中、序號不變）。
+    回傳 ({必減 nodeid: fixture 名}, 須精確比較之 nodeid)。"""
+    everything: Tuple[Dict[str, List[str]], set] = ({}, set(cands))
+    changed = ctx.extra["changed"]
+    if "pytest.ini" in changed:
+        return everything
+    tpat = ctx.schema["formats"]["test_path"]
+    others = [p for p in changed if p != h and p.endswith(".py")]
+    t_others = [p for p in others if p.startswith("tests/")]
+    if any(not re.fullmatch(tpat, p) for p in t_others):
+        return everything
+    pyfiles = sorted({p for e in (he, ce) for p in e.tree.files() if p.startswith("tests/") and p.endswith(".py")})
+    stems = {p[:-3].rsplit("/", 1)[-1] for p in t_others}
+    spat = re.compile(r"\b(?:" + "|".join(map(re.escape, sorted(stems))) + r")\b") if stems else None
+    if spat is not None and any(not re.fullmatch(tpat, p) and spat.search(e.tree.read(p) or "")
+                                for e in (he, ce) for p in pyfiles):
+        return everything
+    nt_others = {p for p in others if not p.startswith("tests/")}
+    if nt_others and _star_reaches((he, ce), pyfiles, nt_others):
+        return everything
+    hm, cm = he.mod(h), ce.mod(h)
+    names = _changed_names(he.tree.read(h), ce.tree.read(h))
+    if names is None or hm is None or cm is None or not names <= set(hm.fixtures) | set(cm.fixtures):
+        return everything
+
+    def info(eng: "_Engine", m: "_Mod", n: str):
+        if n not in m.fixtures:
+            return None
+        ffn, auto = m.fixtures[n]
+        inner = eng.collect(m, ffn, "fixture", frozenset())
+        bn = _bound_names(ffn)
+        order = {x: i for i, x in enumerate(sorted(bn, key=lambda x: bn[x]))}
+        ids = {x.id for el in inner if el.get("node") is not None for x in ast.walk(el["node"]) if isinstance(x, ast.Name)}
+        sig = ([a.arg for a in ffn.args.args], auto, {x: order[x] for x in ids if x in bn}, ids - set(bn))
+        return sig, collections.Counter(e["key"] for e in eng.normalize(ffn, inner))
+
+    same_shape, decreased = {}, {}
+    for n in names:
+        a, b = info(he, hm, n), info(ce, cm, n)
+        same_shape[n] = a is not None and b is not None and a[0] == b[0]
+        decreased[n] = same_shape[n] and bool(multiset_decreased(a[1], b[1]))
+    has_el: Dict[Tuple[str, str], bool] = {}
+
+    def elements_nonempty(path: str, n: str) -> bool:
+        if (path, n) not in has_el:
+            m = he.mod(path)
+            has_el[(path, n)] = bool(m and n in m.fixtures and he.collect(m, m.fixtures[n][0], "fixture", frozenset()))
+        return has_el[(path, n)]
+
+    cache: Dict[Tuple[int, str], Dict[str, Tuple[str, ast.AST, bool]]] = {}
+    fp, cpp, files_pat, tps = _collect_patterns(ce.tree)
+    fns: Dict[str, Dict[str, ast.AST]] = {}
+    decided: Dict[str, List[str]] = {}
+    unsure: set = set()
+    for nid in sorted(cands):
+        path, qual = _split_nodeid(nid)
+        src = ce.tree.read(path)
+        if path in t_others or src != he.tree.read(path) or (spat is not None and spat.search(src or "")):
+            unsure.add(nid)
+            continue
+        hmod = he.mod(path)  # 兩版原始碼相同 ⇒ 同一解析結果（`_MOD_SHARED`）
+        if path not in fns:  # 依受驗樹（pytest.ini 未變）之收集規則：檔名與 testpaths 不符者無 nodeid
+            ok = (not tps or any(path == tp or path.startswith(tp.rstrip("/") + "/") for tp in tps)) \
+                and _name_ok(path.rsplit("/", 1)[-1], files_pat)
+            fns[path] = _test_functions_of(hmod.tree, fp, cpp) if hmod is not None and ok else {}
+        fn = fns[path].get(qual)
+        if fn is None:
+            continue  # 依受驗樹收集規則不存在之 nodeid：精確比較路徑亦不報（存在性檢查）
+        ho = _fixture_order(_requested_fixtures(he, hmod, qual, fn), _dir_fixture_defs(he, path, hmod, cache), fn.lineno)
+        co = _fixture_order(_requested_fixtures(ce, hmod, qual, fn), _dir_fixture_defs(ce, path, hmod, cache), fn.lineno)
+        if [x for x in ho if any(x[0] == y[0] for y in co)] != co:
+            unsure.add(nid)  # 留下之 fixture 之展開順序、定義檔或位置改變：全域序號可能重排
+            continue
+        hb, cb = {n: p for n, p, _ in ho}, {n: p for n, p, _ in co}
+        hs = {n for n, p in hb.items() if p == h and n in names}
+        if hb == cb:
+            if not hs:
+                continue  # 閉包不含改變之 fixture ⇒ 全部元素不變
+            if len(hs) == 1 and same_shape[next(iter(hs))]:
+                if decreased[next(iter(hs))]:
+                    decided[nid] = sorted(hs)
+                continue
+        elif not {n for n, p in cb.items() if p == h and n in names}:
+            lost = sorted(n for n in hb if n not in cb and elements_nonempty(hb[n], n))
+            if lost:
+                decided[nid] = lost
+            continue
+        unsure.add(nid)
+    return decided, unsure
+
+
+def _fixture_order(requested: Sequence[str], fx: Mapping[str, Tuple[str, ast.AST, bool]], lineno: int
+                   ) -> List[Tuple[str, str, Tuple[int, int]]]:
+    """與 `_Engine.elements` 同一佇列（請求者依序、可見之 autouse、再遞移 fixture 參數並承襲位置）⇒ 依展開順序之
+    [(fixture 名, 定義檔, 位置)]；位置進入元素之局部名佔位、決定全域序號。"""
+    queue = [(p, (lineno, i)) for i, p in enumerate(requested) if p in fx]
+    queue += [(n, (lineno, -1)) for n, (_, _, auto) in sorted(fx.items()) if auto]
+    seen: set = set()
+    out: List[Tuple[str, str, Tuple[int, int]]] = []
+    while queue:
+        name, pos = queue.pop(0)
+        if name in seen or name not in fx:
+            continue
+        seen.add(name)
+        out.append((name, fx[name][0], pos))
+        queue += [(a.arg, pos) for a in fx[name][1].args.args if a.arg in fx]
+    return out
+
+
+def _dir_fixture_defs(eng: "_Engine", f: str, own: Optional["_Mod"],
+                      cache: Dict[Tuple[int, str], Dict[str, Tuple[str, ast.AST, bool]]]
+                      ) -> Dict[str, Tuple[str, ast.AST, bool]]:
+    """與 `_Engine.fixture_defs` 同序（本模組 → 由近而遠之 conftest.py → 各 conftest 之外掛），conftest 鏈部分依目錄快取。"""
+    parts = f.split("/")[:-1]
+    key = (id(eng), "/".join(parts))
+    if key not in cache:
+        chain = ["/".join(parts[:i] + ["conftest.py"]) for i in range(len(parts), -1, -1)]
+        chain += [pl for c in chain for pl in _plugin_paths(eng.tree, c)]
+        acc: Dict[str, Tuple[str, ast.AST, bool]] = {}
+        for p in chain:
+            m = eng.mod(p) if eng.tree.exists(p) else None
+            for name, (fn_, a) in (m.fixtures.items() if m else []):
+                acc.setdefault(name, (p, fn_, a))
+        cache[key] = acc
+    out = {name: (f, fn_, a) for name, (fn_, a) in (own.fixtures.items() if own else [])}
+    for k, v in cache[key].items():
+        out.setdefault(k, v)
+    return out
+
+
 def rule_v19(ctx: Context) -> List[Finding]:
     """V19（以 `assertion_multiset` 與 `multiset_decreased` 判定）。"""
     pat = ctx.schema["formats"]["test_path"]
@@ -2637,6 +2837,7 @@ def rule_v19(ctx: Context) -> List[Finding]:
             if cls_dec:  # 本檔類別之 usefixtures 或基底減少：他檔之（遞移）子類別經此請求 fixture
                 nids |= _subclass_users(ctx, he, ce, cls_dec)
     decided: Dict[str, List[str]] = {}
+    decided_fx: Dict[str, List[str]] = {}  # fixture 改變之免展開判定（`_fixture_change_decide`；存在性已依受驗樹確認）
     for h in helpers:
         dec = _seam("decreased_defs")(ctx.repo_root, h, tree=ctx.tree)
         dec = None if dec is None else set(dec)
@@ -2660,17 +2861,33 @@ def rule_v19(ctx: Context) -> List[Finding]:
                 dec = dec - cls_dec
                 if not dec:
                     continue
-        if h.endswith("conftest.py") and dec is not None and dec <= set((ce.mod(h) or he.mod(h)).fixtures if (ce.mod(h) or he.mod(h)) else []):
-            nids |= _fixture_dependents(ctx, ce, h, dec) | _fixture_dependents(ctx, he, h, dec)
-            continue
+        if dec is not None and dec <= {n for m_ in (he.mod(h), ce.mod(h)) if m_ for n in m_.fixtures}:
+            # 只有 fixture 輪廓減少：conftest 本身，或為某 conftest 之 `pytest_plugins` 外掛（第 1 批審碼 r3：外掛原走完整
+            # 呼叫者反推，真實規模 157 秒）⇒ 依該 conftest 作用範圍之 fixture 請求關係，不做完整反推
+            scopes = [h] if h.endswith("conftest.py") else sorted(
+                {c for t_ in (he.tree, ce.tree) for c in t_.files() if c.endswith("conftest.py") and h in _plugin_paths(t_, c)})
+            if scopes:
+                cands: set = set()
+                for c in scopes:
+                    cands |= _fixture_dependents(ctx, ce, c, dec) | _fixture_dependents(ctx, he, c, dec)
+                d_, u_ = _fixture_change_decide(ctx, he, ce, h, cands)  # autouse 時候選為範圍內全部測試
+                for nid_, names_ in d_.items():
+                    decided_fx[nid_] = sorted(set(decided_fx.get(nid_, [])) | set(names_))
+                nids |= u_
+                continue
         nids |= set(callers(ctx.repo_root, h, tree=ctx.tree)) | set(callers(ctx.repo_root, h, tree="HEAD"))
     tombs, out = _tomb_ids(ctx), []
     present: Dict[str, set] = {}
-    for nid in sorted(nids | set(decided)):
+    for nid in sorted(nids | set(decided) | set(decided_fx)):
         if nid in decided and nid not in nids:  # 存在性已於 `_plugin_change_dependents` 依受驗樹收集規則確認
             if nid not in tombs and not _rewrite_ok(ctx, nid):
                 out.append(Finding("V19", nid, f"斷言多重集合減少（pytest_plugins 移除／改序使 fixture "
                                                f"{', '.join(decided[nid])} 之斷言不再套用；須同提交立碑或附 rewrite 收據）"))
+            continue
+        if nid in decided_fx and nid not in nids:
+            if nid not in tombs and not _rewrite_ok(ctx, nid):
+                out.append(Finding("V19", nid, f"斷言多重集合減少（fixture {', '.join(decided_fx[nid])} 之斷言減少或"
+                                               f"不再套用；須同提交立碑或附 rewrite 收據）"))
             continue
         path_ = nid.split("::")[0]
         if path_ not in present:
