@@ -630,6 +630,9 @@ def test_07s_pytest_ini_collection_change_hook_and_precommit(tmp_path, case):
     v20 = [l for l in proc.stderr.splitlines() if l.startswith("V20 ")]
     if gone is None:
         assert proc.returncode == 0 and not v20, proc.stderr
+        r.stage("pytest.ini")
+        proc = r.try_commit()
+        assert proc.returncode == 0 and not any(l.startswith("V20 ") for l in proc.stderr.splitlines()), proc.stderr
         return
     assert proc.returncode == 2 and any(l.startswith(f"V20 {gone}") for l in v20), proc.stderr
     r.stage("pytest.ini")
@@ -760,20 +763,32 @@ def test_boundary_05_helper_backprop_wall_clock_median_under_1s(head_worktree, e
     assert statistics.median(times) < 1.0, times
 
 
-@pytest.mark.parametrize("edit", ["marker_added", "functions_superset", "functions_narrowed"])
+INI_TIMING = {
+    # 名稱: (舊行, 新行〔None＝於檔尾加一行標記註冊〕, 是否必擋)
+    "marker_added": (None, None, False),
+    "functions_superset": ("python_functions = test_*", "python_functions = test_* check_*", False),
+    "functions_narrowed": ("python_functions = test_*", "python_functions = check_*", True),
+    "classes_narrowed": ("python_classes = Test*", "python_classes = Check*", True),
+    "files_narrowed": ("python_files = test_*.py", "python_files = check_*.py", True),
+    "testpaths_narrowed": ("testpaths = tests", "testpaths = tests/registry", True),
+}
+
+
+@pytest.mark.parametrize("edit", sorted(INI_TIMING))
 def test_boundary_06_pytest_ini_wall_clock(head_worktree, edit):
-    """真實規模 pytest.ini：加標記註冊、python_functions 只增模式（超集，不檢）⇒ rc 0 且 10 次中位 < 1 s；python_functions
-    縮減（必擋：全部測試檔 V20，HEAD 以批次讀取）⇒ rc 2 且 3 次中位 < 5 s（試作逐檔讀 HEAD 實測約 20 秒、批次約 2.9 秒）。"""
+    """真實規模 pytest.ini：加標記註冊、python_functions 只增模式（超集，不檢）⇒ rc 0 且 10 次中位 < 1 s；四項收集設定
+    任一縮減（必擋：全部測試檔 V20，兩樹以單一批次讀取）⇒ rc 2 且 3 次中位 < 5 s（§C 之必擋例外；試作逐檔讀 HEAD 約 20 秒、
+    批次讀取後四項分別約 1.5–2.6 秒——成本為解析全部測試檔以列出消失之 nodeid）。"""
+    old, new, blocking = INI_TIMING[edit]
     p = head_worktree / "pytest.ini"
     src = p.read_text(encoding="utf-8")
-    assert src.count("python_functions = test_*\n") == 1
-    if edit == "marker_added":
+    if old is None:
         p.write_text(src + "    extra_marker: e\n", encoding="utf-8")
     else:
-        repl = "test_* check_*" if edit == "functions_superset" else "check_*"
-        p.write_text(src.replace("python_functions = test_*\n", f"python_functions = {repl}\n"), encoding="utf-8")
+        assert src.count(old + "\n") == 1, src
+        p.write_text(src.replace(old + "\n", new + "\n"), encoding="utf-8")
     payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": str(p)}})
-    want_rc, runs, limit = (2, 3, 5.0) if edit == "functions_narrowed" else (0, 10, 1.0)
+    want_rc, runs, limit = (2, 3, 5.0) if blocking else (0, 10, 1.0)
     times = []
     try:
         for _ in range(runs):
