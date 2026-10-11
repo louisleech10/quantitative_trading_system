@@ -232,4 +232,18 @@ if [ -f scripts/spec_xref_check.sh ]; then
   fi
 fi
 
+# ── TESTREG 測試清冊（docs/TESTREG_SPEC.md Task 1.5）──────────────────────────────────────────────
+# 產出端 hook（scripts/testreg_write_guard.sh）只看 Edit/Write；Bash 建檔、git mv／git rm 之漏網由此擋：
+#   暫存區含 tests/**/*.py、tests/registry/catalog.json、docs/manifests/*.json 或 pytest.ini 變更 ⇒
+#   `testreg.py check --staged`（V01–V20、V22；V21 只於收尾 validate --require-executed 跑）。不跑 pytest、不讀 git 全史。
+if git diff --cached --name-only -z | tr '\0' '\n' \
+   | grep -qE '^tests/.*\.py$|^tests/registry/catalog\.json$|^docs/manifests/[^/]+\.json$|^pytest\.ini$'; then
+  "$py" scripts/testreg.py check --staged
+  _tr_rc=$?          # 🔴 rc 直接取，禁經 pipe
+  if [ "${_tr_rc}" -ne 0 ]; then
+    echo "pre-commit: 🔴 TESTREG 清冊檢查未過（新增／刪除／改名測試檔須同步 catalog；刪改斷言須立碑或附改寫收據）" >&2
+    exit 1
+  fi
+fi
+
 exec "$py" "$checker" --staged

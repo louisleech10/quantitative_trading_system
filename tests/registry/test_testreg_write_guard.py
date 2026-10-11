@@ -604,6 +604,29 @@ def test_07r_fixture_autouse_flag_in_profile(tmp_path, case, name):
     assert name in (testreg.decreased_defs(r.root, rel) or [])
 
 
+PLUG2 = "import pytest\n\n\n@pytest.fixture\ndef plug_extra():\n    assert 1 > 0\n    yield\n"
+
+
+@pytest.mark.parametrize("new_line,expect", [
+    ('pytest_plugins = ["tests.plugins.plug", "tests.plugins.plug2"]\n', []),                  # 追加外掛
+    ("pytest_plugins = []\n", ["pytest_plugins"]),                                            # 移除外掛
+    ('pytest_plugins = ["tests.plugins.plug2", "tests.plugins.plug"]\n', ["pytest_plugins"]),  # 前插改序（保守判減）
+])
+def test_07w_conftest_pytest_plugins_profile_is_ordered_plugins(tmp_path, new_line, expect):
+    """conftest 之 `pytest_plugins` 輪廓＝依序之外掛元素：外掛於 fixture 解析序最後（不遮蔽既有名稱）⇒ 追加不減、
+    不反推呼叫者；移除或改序 ⇒ 減。實作期 b1 實測：追加一個外掛被當成常數減少而走完整呼叫者反推，真實
+    tests/conftest.py 之 pre-commit `check --staged` 耗 175 秒。"""
+    r = _repo(tmp_path, {**FX_FILES, "tests/plugins/plug2.py": PLUG2})
+    _edit(r, "tests/conftest.py", 'pytest_plugins = ["tests.plugins.plug"]\n', new_line)
+    assert testreg.decreased_defs(r.root, "tests/conftest.py") == expect
+    proc = r.hook("tests/conftest.py")
+    assert (proc.returncode != 0) == bool(_full_oracle(r)), proc.stderr
+    if not expect:
+        assert proc.returncode == 0 and _full_oracle(r) == set()
+    if new_line == "pytest_plugins = []\n":  # 移除帶 autouse fixture 之外掛 ⇒ 全部測試之斷言減少
+        assert _v19_subjects(proc.stderr) == _full_oracle(r) == ALL_FX_TESTS
+
+
 def test_07c_helper_change_precommit_red(tmp_path):
     """pre-commit 路徑：helper 刪一個斷言後只暫存該 helper 檔 ⇒ `check --staged` rc≠0 且列出受影響呼叫者（V19）。"""
     r = _repo(tmp_path, FX_FILES)

@@ -41,7 +41,7 @@ try:
 except Exception:  # pragma: no cover - binance 未安裝時略過
     pass
 
-pytest_plugins = ["tests.fixtures.ic_persist_redirect_plugin"]
+pytest_plugins = ["tests.fixtures.ic_persist_redirect_plugin", "tests.fixtures.testreg_recorder_plugin"]
 
 FEATURE_KLINE_CACHE_DIR = "data_cache/feature_klines"
 FEATURE_KLINE_H5_PATH = Path(FEATURE_KLINE_CACHE_DIR) / "kline_cache.h5"

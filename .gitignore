@@ -205,3 +205,6 @@ handoffs/ic1eb_newpath_freeze.bak.*/
 .claude/gate/*.out
 .claude/gate/*.last.log
 .claude/gate/ff_regen_payload.json
+
+# TESTREG 記錄器之 ledger／summary／kline 雜湊快取（本機執行紀錄，不入版控；docs/TESTREG_SPEC.md Task 1.3）
+.testreg/

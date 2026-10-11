@@ -31,6 +31,24 @@
       "cmd": "venv/bin/python handoffs/run_receipts/testreg_probes/todo_scaffold_trial.py",
       "rc": 0,
       "honest_bounds": "不經記錄器（空殼）；只驗 mutant 補丁可套與 junit 結果／失敗行號符合 test_testreg_validate.py 之構造；ledger 欄位之實值待第 1 批由 test_mreceipt_scenario_records 與 test_e0_records_shape 驗"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg-bootstrap.json",
+      "cmd": "venv/bin/python scripts/testreg.py bootstrap --receipt handoffs/run_receipts/testreg-bootstrap.json",
+      "rc": 0,
+      "honest_bounds": "第 1 批 Task 1.2：entry 數由當下 git ls-files 導出（653）；ticket 依 bootstrap.ticket_rule，導不出者 unknown（256），未人工補值"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg-recorder-baseline.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/testreg_probes/recorder_invariance.py freeze",
+      "rc": 0,
+      "honest_bounds": "第 1 批 §G 凍結：於 HEAD（記錄器未掛載）之暫存 worktree 執行樣本；樣本之 4 個既有紅屬 HEAD 原狀；porcelain 只見狀態改變與新路徑之出現，被忽略之既有目錄內新增檔不可見"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg-recorder-verify.json",
+      "cmd": "venv/bin/python handoffs/run_receipts/testreg_probes/recorder_invariance.py verify",
+      "rc": 0,
+      "honest_bounds": "第 1 批 §G 驗證：於 HEAD 加記錄器掛載所需之檔（MOUNT_PATHS）之暫存提交之 worktree 執行同一命令；本批其餘改動不在驗證樹內（只量記錄器之影響）"
     }
   ],
   "batch_card": {
@@ -66,7 +84,11 @@
       "docs/manifests/TESTREG.json",
       "docs/ROADMAP.md",
       "HANDOFF.md",
-      "scripts/fact_keys.json"
+      "scripts/fact_keys.json",
+      "docs/GOV_TICKET_SOT.md",
+      "白話說明/README.md",
+      "tests/registry/catalog.json",
+      "tests/registry/bootstrap_paths.txt"
     ],
     "callers_now": [
       "tests/feature_engineering/test_framepath_disposition.py",
@@ -74,11 +96,6 @@
     ],
     "callers_later": [
       "scripts/framepath_affected_gate.py",
-      "tests/registry/catalog.json",
-      "tests/registry/bootstrap_paths.txt",
-      "handoffs/run_receipts/testreg-bootstrap.json",
-      "handoffs/run_receipts/testreg-recorder-baseline.json",
-      "handoffs/run_receipts/testreg-recorder-verify.json",
       "handoffs/run_receipts/testreg-v6-profile.json",
       "handoffs/run_receipts/testreg-phase3-effect.json",
       "handoffs/run_receipts/testreg-final-effect.json"

@@ -224,6 +224,10 @@
           {
             "type": "command",
             "command": "bash scripts/todofmt_manifest_guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash scripts/testreg_write_guard.sh"
           }
         ]
       }

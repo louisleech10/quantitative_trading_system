@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "exit_code": 0,
+  "mode": "verify",
+  "sample": [
+    "tests/feature_engineering/test_framepath_disposition.py",
+    "tests/governance/test_mutation_scope_extension.py",
+    "tests/api/test_b4_bulk_delete_orphan.py",
+    "tests/api/test_batch_adapters_injection.py",
+    "tests/api/test_batch_alias.py",
+    "tests/api/test_batch_date.py",
+    "tests/api/test_batch_download_multi_timeframe.py",
+    "tests/api/test_batch_layer_metrics.py",
+    "tests/api/test_batch_progress_normalize.py",
+    "tests/api/test_batch_retention.py",
+    "tests/api/test_batch_status_layer.py",
+    "tests/api/test_cross_timeframe_event_analysis.py"
+  ],
+  "sample_rule": "tests/api 依路徑字典序前 10 檔（凍結時之 git ls-files）",
+  "command": [
+    "venv/bin/python",
+    "-m",
+    "pytest",
+    "-p",
+    "no:cacheprovider",
+    "-v",
+    "tests/feature_engineering/test_framepath_disposition.py",
+    "tests/governance/test_mutation_scope_extension.py",
+    "tests/api/test_b4_bulk_delete_orphan.py",
+    "tests/api/test_batch_adapters_injection.py",
+    "tests/api/test_batch_alias.py",
+    "tests/api/test_batch_date.py",
+    "tests/api/test_batch_download_multi_timeframe.py",
+    "tests/api/test_batch_layer_metrics.py",
+    "tests/api/test_batch_progress_normalize.py",
+    "tests/api/test_batch_retention.py",
+    "tests/api/test_batch_status_layer.py",
+    "tests/api/test_cross_timeframe_event_analysis.py"
+  ],
+  "base_head": "5be4f0ac8c0734254c406ab04491acec72af53c0",
+  "worktree_commit": "57798deb5dfa2ec34168cc2c9e263b155af439aa",
+  "tree_paths": [
+    ".gitignore",
+    "pytest.ini",
+    "scripts/testreg.py",
+    "tests/conftest.py",
+    "tests/fixtures/testreg_recorder_plugin.py",
+    "tests/registry/testreg_schema.json"
+  ],
+  "head": "57798deb5dfa2ec34168cc2c9e263b155af439aa",
+  "recorder_loaded": true,
+  "ledger_sessions_written": 1,
+  "outcomes_sha256": "3885a0d03f22e31cab2d4babe646b0c342da676bcf48c5fc25c6aab5648a7f9f",
+  "order_sha256": "aea71841d3b582794a80d04bdc2bba21a1a43cf4f5286af3768bf514d5c6b131",
+  "rc": 1,
+  "porcelain_sha256_without_testreg": "704072a4cf50065bff0015a6a9d2b3ba475395ac78b6fe99ca9088d377816295",
+  "n_report_lines": 199,
+  "outcome_counts": {
+    "FAILED": 4,
+    "PASSED": 195
+  },
+  "non_passed": [
+    "tests/feature_engineering/test_framepath_disposition.py::test_check_0_frozen_since_approval_anchor FAILED",
+    "tests/feature_engineering/test_framepath_disposition.py::test_check_1_collect_difference FAILED",
+    "tests/feature_engineering/test_framepath_disposition.py::test_check_2_per_file_expected FAILED",
+    "tests/feature_engineering/test_framepath_disposition.py::test_check_7_changed_paths_in_scope FAILED"
+  ],
+  "pytest_summary": {
+    "FAILED": 4,
+    "PASSED": 195
+  },
+  "wall_s": 98.1,
+  "porcelain_lines": [
+    "?? data_cache",
+    "?? venv",
+    "!! logs/"
+  ],
+  "stdout_tail": [
+    "  +     '⑦ scripts/live_doc_registry.json 於本票文件 exact 列以外與 HEAD 不等',",
+    "  + ]",
+    "============= 4 failed, 195 passed, 2 warnings in 92.51s (0:01:32) ============="
+  ],
+  "generated": "2026-10-11T07:06:13Z",
+  "honest_bounds": "兩次執行各於暫存 worktree（乾淨 checkout＋venv／data_cache 連結）；porcelain 只見被追蹤檔之狀態改變與未追蹤／被忽略路徑之出現（整個被忽略之既有目錄內新增檔不可見）；outcome 由 -v 報告列解析（同一 nodeid 之 teardown ERROR 另成一列）"
+}
