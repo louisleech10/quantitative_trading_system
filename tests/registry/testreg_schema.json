@@ -123,7 +123,7 @@
       "boundary_chars": "A-Za-z0-9_./",
       "rule": [
         "用途：凍結驗收測試之假資料以「不合 formats.test_path 之假測試檔識別」為值，致對任何合契約之實作必紅；以識別改名修正。V19 對該檔之測試一次性放行，其他規則照常",
-        "path＝被修正之測試檔；head＝受驗時之 HEAD（一次性：之後之提交 HEAD 已前進，收據不再生效）；approval_ref 存在於受驗之樹",
+        "path＝被修正之測試檔；head＝受驗時之 HEAD（一次性：之後之提交 HEAD 已前進，收據不再生效）；approval_ref 存在於 repo 工作目錄（收斂檔依慣例不進 git）；收據檔與 patch_path 須在受驗之樹（pre-commit 時須已暫存）",
         "map 非空、雙射、鍵與值不交",
         "每鍵為假測試檔識別：路徑形須 fullmatch key_path_pattern 且不 fullmatch formats.test_path；點號形須 fullmatch key_dotted_pattern，且其路徑形（. 換 /、加 .py）符合前者",
         "每值：路徑形之鍵之值 fullmatch formats.test_path；點號形之鍵之值 fullmatch key_dotted_pattern 且其路徑形 fullmatch formats.test_path；同一識別之點號形之值＝其路徑形之值之點號形",
