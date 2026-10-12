@@ -1,6 +1,6 @@
 {
   "$comment": "TESTREG 契約單一真相源（docs/TESTREG_SPEC.md 只引用本檔，不在散文列舉欄位或枚舉值）。catalog＝git 追蹤、只存無法由程式導出之欄；ledger＝git 忽略、由記錄器全自動寫入；derived＝查詢當下計算、不落盤。驗證規則只以 validation_rules 之具名規則表達，不用條件字串。",
-  "version": 41,
+  "version": 42,
   "formats": {
     "nodeid": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*$",
     "nodeid_param": "^tests/([A-Za-z0-9_]+/)*test_[A-Za-z0-9_]+\\.py::([A-Za-z_][A-Za-z0-9_]*::)?[A-Za-z_][A-Za-z0-9_]*(\\[.*\\])?$",
@@ -121,6 +121,7 @@
       "key_path_pattern": "^tests/([A-Za-z0-9_]+/)*[A-Za-z0-9_]+\\.py$",
       "key_dotted_pattern": "^tests(\\.[A-Za-z0-9_]+)+$",
       "boundary_chars": "A-Za-z0-9_./",
+      "allowed_patch_paths": ["scripts/testreg.py", "scripts/framepath_affected_gate.py"],
       "rule": [
         "用途：凍結驗收測試之假資料以「不合 formats.test_path 之假測試檔識別」為值，致對任何合契約之實作必紅；以識別改名修正。V19 對該檔之測試一次性放行，其他規則照常",
         "path＝被修正之測試檔；head＝受驗時之 HEAD（一次性：之後之提交 HEAD 已前進，收據不再生效）；approval_ref 存在於 repo 工作目錄（收斂檔依慣例不進 git）；收據檔與 patch_path 須在受驗之樹（pre-commit 時須已暫存）",
@@ -130,7 +131,8 @@
         "代換＝以正則 (?<![boundary_chars])(鍵1|鍵2…)(?![boundary_chars])（長鍵先、不重疊）對全文做子字串代換",
         "HEAD 版中鍵之每一出現、受驗版中值之每一出現皆位於字串 token（tokenize.STRING）內；值不出現於 HEAD 版",
         "HEAD 版全文代換後與受驗之樹之該檔逐位元相等（不得夾帶其他改動）",
-        "（v41）改名後全檔須實跑全過：session_id 所指 ledger session 之 head＝收據 head、diff_digest＝head 乾淨樹依序套 patch_path 後之 diff_digest（記錄器之單一實作，同 receipts.mutation 之綁定），patch_path 套於 head 後之該檔＝受驗之樹之該檔，且受驗之樹中該檔每一函式層 nodeid 於該 session 皆有紀錄且 outcome 全為 passed；故依賴舊識別不合格之斷言改名後轉紅即不成立，不能靜默轉弱"
+        "（v41）改名後全檔須實跑全過：session_id 所指 ledger session 之 head＝收據 head、diff_digest＝head 乾淨樹依序套 patch_path 後之 diff_digest（記錄器之單一實作，同 receipts.mutation 之綁定），patch_path 套於 head 後之該檔＝受驗之樹之該檔，且受驗之樹中該檔每一函式層 nodeid 於該 session 皆有紀錄且 outcome 全為 passed；故依賴舊識別不合格之斷言改名後轉紅即不成立，不能靜默轉弱",
+        "（v42）patch_path 所及之檔（patch 標頭）⊆ allowed_patch_paths ∪ {path}；allowed_patch_paths 為本契約核定之實作檔（TESTREG 第 2 批 Task 2.3 之兩檔），擴大須另修本契約——不得以夾帶改被測生產碼使改名後之負向斷言仍綠"
       ]
     },
     "E0": {

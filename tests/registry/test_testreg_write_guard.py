@@ -2196,9 +2196,10 @@ def _lf_apply(text: str, m: Dict[str, str]) -> str:
 
 
 def _lf_receipt(r: TmpRepo, m: Dict[str, str], new_text: str, head: str = None, path: str = LF_REL,
-                approval: str = LF_APPROVAL, run_session: bool = True) -> List[str]:
-    """寫入改名後之測試檔、patch（`git diff HEAD -- <檔>`）與收據；run_session ⇒ 於 head 乾淨 worktree 套 patch 後以真實
-    記錄器跑該檔，session 檔複製回本倉 ledger（v42：收據綁定改名後實跑全過之 session）。回傳須暫存之收據與 patch 路徑。"""
+                approval: str = LF_APPROVAL, run_session: bool = True, extra: Dict[str, str] = None) -> List[str]:
+    """寫入改名後之測試檔（與 extra 所列之其他檔改動）、patch（`git diff HEAD -- <檔…>`）與收據；run_session ⇒ 於 head
+    乾淨 worktree 套 patch 後以真實記錄器跑該檔，session 檔複製回本倉 ledger（v42：收據綁定改名後實跑全過之
+    session）。回傳須暫存之收據、patch 與 extra 路徑。"""
     import shutil
     import uuid as _uuid
     from tests.registry.testreg_helpers import recorded_pytest
@@ -2206,7 +2207,9 @@ def _lf_receipt(r: TmpRepo, m: Dict[str, str], new_text: str, head: str = None, 
     r.write(path, new_text)
     rel = testreg.literal_fix_receipt_rel(schema(), path)
     patch_rel = rel[:-len(".json")] + ".patch"
-    r.write(patch_rel, r.git("diff", "HEAD", "--binary", "--", path))
+    for rel_x, text_x in (extra or {}).items():
+        r.write(rel_x, text_x)
+    r.write(patch_rel, r.git("diff", "HEAD", "--binary", "--", path, *(extra or {})))
     sid = str(_uuid.uuid4())
     if run_session:
         wt = r.root.parent / f"lfwt-{_uuid.uuid4().hex[:8]}"
@@ -2223,7 +2226,7 @@ def _lf_receipt(r: TmpRepo, m: Dict[str, str], new_text: str, head: str = None, 
             r.git("worktree", "remove", "--force", str(wt), check=False)
     r.write_json(rel, {"path": path, "head": head, "map": m, "approval_ref": approval, "session_id": sid,
                        "patch_path": patch_rel})
-    return [rel, patch_rel]
+    return [rel, patch_rel, *(extra or {})]
 
 
 LF_CASES = {
@@ -2361,3 +2364,32 @@ def test_07lf_session_not_bound_to_patch_blocks(tmp_path):
     r.write_json(rels[0], rcpt)
     proc = r.hook(LF_REL)
     assert proc.returncode == 2 and "不綁定" in proc.stderr, proc.stderr
+
+
+# v43（修訂審查 r41 CODEX-R41-P1-01）：patch 所及之檔限契約 allowed_patch_paths ∪ {path}
+LF_VALIDATOR = ("import re\n\n\ndef valid_nodeid(n):\n"
+                "    return re.fullmatch(r\"tests/(\\w+/)*test_\\w+\\.py::\\w+\", n) is not None\n")
+LF_NEG_PROD = '''from momentum.valid import valid_nodeid
+
+FAKE = "tests/t.py::test_x"
+
+
+def test_lf_neg_prod():
+    assert not valid_nodeid(FAKE)
+'''
+
+
+def test_07lf_patch_touching_validator_blocks(tmp_path):
+    """改名同時於 patch 夾帶改被測之生產 validator（使改名後之負向斷言仍綠）⇒ session 雖全 passed，patch 含契約
+    allowed_patch_paths 以外之檔 ⇒ 收據不成立，hook 與 pre-commit 皆擋。"""
+    r = make_repo(tmp_path, {LF_REL: LF_NEG_PROD, "momentum/__init__.py": "", "momentum/valid.py": LF_VALIDATOR,
+                             **_lf_base()})
+    r.install_precommit()
+    m = {"tests/t.py": "tests/test_qt.py"}
+    rels = _lf_receipt(r, m, _lf_apply(LF_NEG_PROD, m),
+                       extra={"momentum/valid.py": "def valid_nodeid(n):\n    return False\n"})
+    hook = r.hook(LF_REL)
+    assert hook.returncode == 2 and "allowed_patch_paths" in hook.stderr, hook.stderr
+    r.stage(LF_REL, *rels)
+    proc = r.try_commit()
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) == {f"{LF_REL}::test_lf_neg_prod"}, proc.stderr
