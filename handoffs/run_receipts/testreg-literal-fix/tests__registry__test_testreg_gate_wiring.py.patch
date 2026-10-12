@@ -1,0 +1,1268 @@
+diff --git a/scripts/framepath_affected_gate.py b/scripts/framepath_affected_gate.py
+index 27b6b68c..e007c47d 100644
+--- a/scripts/framepath_affected_gate.py
++++ b/scripts/framepath_affected_gate.py
+@@ -25,7 +25,9 @@ from __future__ import annotations
+ import argparse
+ import ast
+ import copy
++import datetime
+ import hashlib
++import importlib
+ import json
+ import math
+ import os
+@@ -158,6 +160,101 @@ def verdict(result: Mapping[str, Sequence[str]], a_failures: Sequence[str], inco
+                 or residual_unexecuted)
+ 
+ 
++# ── TESTREG Task 2.3：隔離失敗（契約 tests/registry/testreg_schema.json `gate_report`）──────────────────────────────
++QUARANTINE_FIELDS = ("exception_type", "exception_head", "exception_origin", "fail_line")
++
++
++def _ledger_records(p: Path) -> Tuple[Dict[str, object], List[Dict[str, object]]]:
++    """ledger 檔 → (session 紀錄, test 紀錄清單)；不可讀或損毀之列略過。"""
++    sess: Dict[str, object] = {}
++    tests: List[Dict[str, object]] = []
++    try:
++        lines = p.read_text(encoding="utf-8").splitlines()
++    except OSError:
++        return sess, tests
++    for line in lines:
++        try:
++            rec = json.loads(line) if line.strip() else None
++        except ValueError:
++            continue
++        if isinstance(rec, dict) and rec.get("kind") == "session" and not sess:
++            sess = rec
++        elif isinstance(rec, dict) and rec.get("kind") == "test":
++            tests.append(rec)
++    return sess, tests
++
++
++def current_failures(ledger_dir: Path, before_names: Iterable[str], test_file: str) -> Dict[str, Dict[str, object]]:
++    """契約 `gate_report.current_failure_source`：呼叫前不存在（檔名不在 before_names）、且 argv_raw 有 token 等於該
++    測試檔或以「該測試檔::」開頭之 session 之 outcome∈{failed, error} test_record → {nodeid: 紀錄}。"""
++    before = set(before_names)
++    out: Dict[str, Dict[str, object]] = {}
++    for p in sorted(Path(ledger_dir).glob("*.jsonl")) if Path(ledger_dir).is_dir() else []:
++        if p.name in before:
++            continue
++        sess, tests = _ledger_records(p)
++        argv = sess.get("argv_raw") if isinstance(sess.get("argv_raw"), list) else []
++        if not any(isinstance(t, str) and (t == test_file or t.startswith(test_file + "::")) for t in argv):
++            continue
++        out.update({str(r["nodeid"]): r for r in tests if r.get("outcome") in ("failed", "error")})
++    return out
++
++
++def quarantine_active(q: Mapping[str, object], today: datetime.date) -> bool:
++    """未逾期：expires（YYYY-MM-DD）≥ 今日（V11 之反面）。"""
++    return isinstance(q.get("expires"), str) and str(q["expires"]) >= today.isoformat()
++
++
++def quarantine_match(q: Mapping[str, object], current: Mapping[str, object], ledger_dir: Path) -> bool:
++    """契約 `gate_report.quarantine_match`：當前失敗之四欄等於 q.evidence 所指之某筆 failed／error 紀錄之同四欄。"""
++    for ev in q.get("evidence") or []:
++        if not isinstance(ev, dict):
++            continue
++        for r in _ledger_records(Path(ledger_dir) / f"{ev.get('session_id')}.jsonl")[1]:
++            if r.get("nodeid") == ev.get("nodeid") and r.get("outcome") in ("failed", "error") and \
++                    all(r.get(k) == current.get(k) for k in QUARANTINE_FIELDS):
++                return True
++    return False
++
++
++def split_quarantined(caused: Sequence[str], current: Mapping[str, Mapping[str, object]], catalog: Mapping,
++                      ledger_dir: Path, today: datetime.date) -> Tuple[List[str], List[Dict[str, object]]]:
++    """caused → (仍擋者, quarantined_failures)。以函式層 nodeid 比對 quarantine；current 中無紀錄者一律不吸收；
++    逾期（`quarantine_active` 為假）或四欄不符（`quarantine_match`）者照擋。"""
++    still: List[str] = []
++    absorbed: List[Dict[str, object]] = []
++    entries = catalog.get("entries", {}) if isinstance(catalog, Mapping) else {}
++    for n in caused:
++        base = re.sub(r"\[.*\]$", "", n)
++        qs = [q for q in ((entries.get(n.split("::", 1)[0]) or {}).get("quarantine") or [])
++              if isinstance(q, dict) and q.get("nodeid") == base and quarantine_active(q, today)]
++        hit = next((q for q in qs if n in current and quarantine_match(q, current[n], ledger_dir)), None)
++        if hit is None:
++            still.append(n)
++        else:
++            absorbed.append({"nodeid": n, "quarantine_expires": hit["expires"], "disposition_ref": hit["disposition_ref"]})
++    return still, absorbed
++
++
++def classify_quarantine(caused: Sequence[str], runner: "Runner", catalog: Mapping, ledger_dir: Path,
++                        today: datetime.date) -> Tuple[List[str], List[Dict[str, object]]]:
++    """編排：每個 caused 所在測試檔以 Runner 於該檔呼叫前所記之 ledger 檔名集合呼叫 `current_failures`（未經 Runner
++    呼叫之檔無當前紀錄），再交 `split_quarantined`。"""
++    current: Dict[str, Dict[str, object]] = {}
++    for f in dict.fromkeys(n.split("::", 1)[0] for n in caused):
++        if f in runner.ledger_snapshots:
++            current.update(current_failures(ledger_dir, runner.ledger_snapshots[f], f))
++    return split_quarantined(caused, current, catalog, ledger_dir, today)
++
++
++def quarantined_verdict(result: Mapping[str, Sequence[str]], a_failures: Sequence[str], incomplete: Sequence[str],
++                        unexecuted: Sequence[str], runner: "Runner", catalog: Mapping, ledger_dir: Path,
++                        today: datetime.date) -> Tuple[bool, List[Dict[str, object]]]:
++    """main 之唯一裁決組合：caused 經隔離分流（`classify_quarantine`）後之 `verdict`；其餘失敗輸入不受隔離影響。"""
++    still, absorbed = classify_quarantine(result["caused"], runner, catalog, ledger_dir, today)
++    return verdict(dict(result, caused=still), a_failures, incomplete, unexecuted), absorbed
++
++
+ PROBE_DIR_ENV = "FRAMEPATH_DEF_PROBE_DIR"
+ PROBE_DEFS_ENV = "FRAMEPATH_DEF_PROBE_DEFS"
+ 
+@@ -222,7 +319,16 @@ def probe_hits(probe_dir: Path) -> set:
+     return hits
+ 
+ 
+-ENV_PREFIXES = ("FFACT_", "ICFA_", "FRAMEPATH_", "PYTHON", "NUMBA_", "OMP_", "MKL_", "LEGACY_KLINE", "PYTEST")  # PYTEST＝PYTEST_ADDOPTS 等（審查 r55）
++TESTREG_SCHEMA_REL = "tests/registry/testreg_schema.json"
++TESTREG_CATALOG_REL = "tests/registry/catalog.json"
++
++
++def _testreg_schema(repo: Path) -> Dict[str, object]:
++    return json.loads((Path(repo) / TESTREG_SCHEMA_REL).read_text(encoding="utf-8"))
++
++
++# TESTREG Task 2.3：單一來源＝契約 `ledger.env_prefixes`（記錄器之 fingerprint 同表；PYTEST＝PYTEST_ADDOPTS 等，審查 r55）
++ENV_PREFIXES = tuple(_testreg_schema(REPO)["ledger"]["env_prefixes"])
+ 
+ 
+ def env_fingerprint(env: Mapping[str, str]) -> str:
+@@ -252,11 +358,12 @@ def _file_sha(p: Path) -> str:
+     return h.hexdigest()
+ 
+ 
+-def content_inputs(repo: Path) -> str:
+-    """未追蹤檔（排除 FP_EXCLUDES）之路徑＋內容雜湊，及 DATA_INPUTS 之內容雜湊（審查 r60：路徑未變不等於內容未變）。"""
++def content_inputs(repo: Path, extra_excludes: Sequence[str] = ()) -> str:
++    """未追蹤檔（排除 FP_EXCLUDES 與 extra_excludes〔pathspec〕）之路徑＋內容雜湊，及 DATA_INPUTS 之內容雜湊（審查
++    r60：路徑未變不等於內容未變）。"""
+     rows = []
+     for rel in sorted(p for p in _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".",
+-                                      *FP_EXCLUDES).splitlines() if p):
++                                      *FP_EXCLUDES, *extra_excludes).splitlines() if p):
+         f = repo / rel
+         rows.append(f"{rel}\t{_file_sha(f) if f.is_file() else '<non-file>'}")
+     for rel in DATA_INPUTS:
+@@ -361,10 +468,17 @@ class Runner:
+     丟 `Paused`（停在呼叫之間，不砍進行中之測試）③每次呼叫前後寫 `<out>/progress.json`（目前檔／nodeid、開始時刻、
+     已完成數、行程 pid），供外部監看判斷是否卡住。"""
+ 
+-    def __init__(self, out: Path, max_seconds: Optional[float], total: int):
++    def __init__(self, out: Path, max_seconds: Optional[float], total: int, ledger_dir: Optional[Path] = None):
+         self.out, self.max_seconds, self.total = out, max_seconds, total
+         self.start = time.monotonic()
+         self.done = 0
++        # TESTREG Task 2.3：每檔最近一次（非錨點）呼叫前之 ledger 檔名集合，供 current_failures 取本次呼叫之 session
++        self.ledger_dir = Path(ledger_dir) if ledger_dir is not None else None
++        self.ledger_snapshots: Dict[str, set] = {}
++
++    def _ledger_names(self) -> set:
++        d = self.ledger_dir
++        return {p.name for p in d.glob("*.jsonl")} if d is not None and d.is_dir() else set()
+ 
+     def progress(self, phase: str, test_file: str, nodeids: Sequence[str], state: str = "running") -> None:
+         self.out.mkdir(parents=True, exist_ok=True)
+@@ -387,6 +501,9 @@ class Runner:
+                 res = None
+             if res is not None and not set(count_ids) - set(res):
+                 self.done += len(count_ids)
++                if phase != "anchor" and self.ledger_dir is not None:
++                    # 沿用之結果：其呼叫所產之 session 記於 meta（ledger_new），視為本次之「呼叫後新增」
++                    self.ledger_snapshots[test_file] = self._ledger_names() - set(m.get("ledger_new") or [])
+                 return m["rc"], res
+         if self.max_seconds is not None and time.monotonic() - self.start > self.max_seconds:
+             raise Paused(f"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}")
+@@ -399,10 +516,14 @@ class Runner:
+         t0 = time.monotonic()
+         if meta.exists():
+             meta.unlink()  # 先撤舊 meta：本次呼叫中斷時不得留下與新結果檔不符之舊 meta
++        before = self._ledger_names()
++        if phase != "anchor" and self.ledger_dir is not None:
++            self.ledger_snapshots[test_file] = before  # 錨點呼叫不記、不覆寫（其恆在 B／C 呼叫之後）
+         rc, res = run_file(test_file, xml, cwd, env, nodeids, extra)
+         tmp = meta.with_suffix(".tmp")
+         tmp.write_text(json.dumps({"state_key": key, "rc": rc, "file": test_file,
+-                                   "seconds": round(time.monotonic() - t0, 1)}), encoding="utf-8")
++                                   "seconds": round(time.monotonic() - t0, 1),
++                                   "ledger_new": sorted(self._ledger_names() - before)}), encoding="utf-8")
+         os.replace(tmp, meta)  # 審查 r57：原子替換
+         self.done += len(count_ids)
+         self.progress(phase, test_file, count_ids, state="finished-call")
+@@ -1118,15 +1239,48 @@ def _row_nodeids(rows: Sequence[str], prefix: str) -> List[str]:
+ ADMISSION_BUDGET_SECONDS = 7200
+ 
+ 
++def out_exclusion(repo: Path, out_dir: Optional[Path]) -> Optional[str]:
++    """本次 `--out` 位於 repo 內 ⇒ 排除其下未追蹤內容之 pathspec（前綴由參數導出）；位於 repo 外或未給 ⇒ None。"""
++    if out_dir is None:
++        return None
++    try:
++        rel = Path(out_dir).resolve().relative_to(Path(repo).resolve())
++    except ValueError:
++        return None
++    return f":(exclude){rel.as_posix()}/**" if rel.parts else None
++
++
++def check_out_dir(out_dir: Path, repo: Path) -> None:
++    """`--out` 不得為 repo 根或其祖先（排除前綴會吞掉全部未追蹤內容）。"""
++    o, r = Path(out_dir).resolve(), Path(repo).resolve()
++    if o == r or o in r.parents:
++        raise GateError(f"--out 不得為 repo 根或其上層：{o}")
++
++
++def _within(d: Path, out_dir: Optional[Path]) -> bool:
++    if out_dir is None:
++        return False
++    d, o = Path(d).resolve(), Path(out_dir).resolve()
++    return d == o or o in d.parents
++
++
++def _sha_file_or_empty(p: Path) -> str:
++    return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else ""
++
++
+ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterable[Path] = (),
+-                       env: Optional[Mapping[str, str]] = None) -> str:
++                       env: Optional[Mapping[str, str]] = None, *, out: Optional[Path] = None,
++                       manifest: Optional[Mapping] = None, previously_failed: Optional[Sequence[str]] = None) -> str:
+     """挑選之輸入指紋：錨點、phase、排除後之 HEAD 檔案樹身分、相對 HEAD 之 diff、未追蹤檔路徑＋內容與資料輸入內容（content_inputs）、manifest、處置表、本執行器原始碼、
+     admission 估時來源（各目錄下 junit xml 之路徑與內容，審查 r53）。`--admit` 須等於此值方得於估時未知或逾預算時執行
+-    （批准綁定確切輸入）。"""
++    （批准綁定確切輸入）。TESTREG Task 2.3（契約 `impact.gate_wiring`）：另納 plan 實際收到之 manifest 物件之正規
++    JSON、catalog／schema／scripts/testreg.py 之 sha256、previously_failed 之排序清單；本次 `--out` 之下之未追蹤內容與
++    估時目錄（等於 out 或位於其下者）不納入（`out_exclusion`）。"""
+     h = hashlib.sha256()
++    excl = out_exclusion(repo, out)
+     for part in (anchor, str(phase), tree_identity(repo),  # 審查 r58：檔案樹身分取代提交編號
+                  _git(repo, "diff", "--binary", "HEAD", "--", ".", *FP_EXCLUDES),
+-                 content_inputs(repo)):  # 審查 r52／r60：未追蹤檔路徑＋內容、資料輸入內容
++                 content_inputs(repo, (excl,) if excl else ())):  # 審查 r52／r60：未追蹤檔路徑＋內容、資料輸入內容
+         h.update(part.encode("utf-8", "replace"))
+         h.update(b"\0")
+     for rel in (MANIFEST_REL, DISPOSITION_REL, "scripts/framepath_affected_gate.py"):
+@@ -1136,12 +1290,116 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterabl
+     h.update(b"env\0" + env_fingerprint(env if env is not None else os.environ).encode("utf-8", "replace") + b"\0")
+     for d in timing_dirs:
+         d = Path(d).resolve()
++        if _within(d, out):
++            continue
+         h.update(b"timings\0" + str(d).encode("utf-8", "replace") + b"\0")
+         for x in sorted(d.rglob("*.xml")) if d.is_dir() else []:
+             h.update(str(x.relative_to(d)).encode("utf-8", "replace") + b"\0" + hashlib.sha256(x.read_bytes()).digest())
++    if manifest is not None:
++        h.update(b"manifest\0" + json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
++                 .encode("utf-8") + b"\0")
++    for rel in (TESTREG_CATALOG_REL, TESTREG_SCHEMA_REL, "scripts/testreg.py"):
++        h.update(f"{rel}\0{_sha_file_or_empty(Path(repo) / rel)}\0".encode("utf-8"))
++    h.update(b"previously_failed\0" + json.dumps(sorted(previously_failed or [])).encode("utf-8") + b"\0")
+     return h.hexdigest()
+ 
+ 
++# ── TESTREG Task 2.3：plan 吃 impact、碑解析、must 核對（契約 `impact.gate_feed`、`gate_report`）────────────────────
++
++
++def _testreg():
++    """`scripts.testreg`（模組屬性取用，`monkeypatch.setattr(testreg, "impact", …)` 生效）。"""
++    return importlib.import_module("scripts.testreg")
++
++
++def changed_paths(repo: Path, anchor: str) -> List[str]:
++    """契約 `impact.gate_wiring`：排序去重之（`git diff --name-only <anchor>` ∪ `git diff --name-only HEAD` ∪
++    `git ls-files --others --exclude-standard`），三者皆扣除 FP_EXCLUDES，不限 tests/。"""
++    out = set()
++    for args in (("diff", "--name-only", "--no-renames", anchor), ("diff", "--name-only", "--no-renames", "HEAD"),
++                 ("ls-files", "--others", "--exclude-standard")):
++        out |= {p for p in _git(repo, *args, "--", ".", *FP_EXCLUDES).splitlines() if p}
++    return sorted(p for p in out if not _fp_excluded(p))
++
++
++def resolve_tombstones(repo: Path, items: Sequence[str], catalog: Mapping) -> Tuple[List[str], List[Dict[str, object]]]:
++    """契約 `impact.gate_feed` 第一步：items（nodeid 或測試檔路徑）中已立碑者以 replaced_by 遞迴取代（循環 ⇒
++    GateError）、E0 除去並記；路徑有碑而檔已不存在 ⇒ 以取代者所在檔取代。回傳 (解析後 items, tombstone_resolutions)。"""
++    try:
++        return _testreg().resolve_tomb_items(list(items), (catalog or {}).get("tombstones", []),
++                                             exists=lambda p: (Path(repo) / p).is_file())
++    except _testreg().TestregError as exc:
++        raise GateError(str(exc)) from exc
++
++
++def must_missing(must: Sequence[str], collected: Mapping[str, Sequence[str]]) -> List[str]:
++    """collect 後核對：must nodeid 不在收集結果者（缺 ⇒ 閘拒跑）。"""
++    have = {n for ids in collected.values() for n in ids}
++    return [m for m in must if m not in have]
++
++
++def expanded_nodeids(selected: Iterable[str], collected: Mapping[str, Sequence[str]],
++                     whole_files: Iterable[str]) -> set:
++    """新計畫之 nodeid 集合：原計畫選入者 ∪ 整檔執行之檔（impact.selected）之全部收集 nodeid。"""
++    out = set(selected)
++    for f in whole_files:
++        out |= set(collected.get(f, ()))
++    return out
++
++
++def impact_universe_errors(impact: Mapping, tree_tests: Iterable[str]) -> List[str]:
++    """契約 `gate_report.impact_universe`：selected／excluded 之 path 各自無重複、互斥、聯集＝受驗之樹之測試檔集合。"""
++    errs: List[str] = []
++    sel = [x.get("path") for x in impact.get("selected", []) if isinstance(x, dict)]
++    exc = [x.get("path") for x in impact.get("excluded", []) if isinstance(x, dict)]
++    for name, xs in (("selected", sel), ("excluded", exc)):
++        dup = sorted({p for p in xs if xs.count(p) > 1})
++        if dup:
++            errs.append(f"impact {name} 重複：{dup[:5]}")
++    both = sorted(set(sel) & set(exc))
++    if both:
++        errs.append(f"impact selected 與 excluded 重疊：{both[:5]}")
++    tree = set(tree_tests)
++    if set(sel) | set(exc) != tree:
++        errs.append(f"impact 涵蓋 ≠ 受驗之樹之測試檔：缺 {sorted(tree - set(sel) - set(exc))[:5]} "
++                    f"多 {sorted((set(sel) | set(exc)) - tree)[:5]}")
++    return errs
++
++
++def _tree_tests(repo: Path) -> List[str]:
++    tr = _testreg()
++    pat = _testreg_schema(repo)["formats"]["test_path"]
++    return sorted(f for f in tr._Tree(Path(repo), "worktree").files() if re.fullmatch(pat, f))
++
++
++def validate_plan_receipt(fields: Mapping[str, object], repo: Path) -> List[str]:
++    """契約 `gate_report.validation`：所給之 plan 收據欄依 `plan_receipt_fields` 驗形（V17 同法，testreg.validate_shape），
++    testreg_impact 必備並驗 impact_universe。"""
++    tr = _testreg()
++    schema = _testreg_schema(repo)
++    spec = schema["gate_report"]["plan_receipt_fields"]
++    errs: List[str] = []
++    if "testreg_impact" not in fields:
++        errs.append("plan 收據缺 testreg_impact")
++    for k, v in fields.items():
++        if k not in spec:
++            errs.append(f"plan 收據未知欄 {k}")
++            continue
++        errs += [f"{k}: {e}" for e in tr.validate_shape(v, spec[k], schema, k)]
++    imp = fields.get("testreg_impact")
++    if isinstance(imp, dict) and not errs:
++        errs += impact_universe_errors(imp, _tree_tests(repo))
++    return errs
++
++
++def _load_catalog(repo: Path) -> Dict[str, object]:
++    p = Path(repo) / TESTREG_CATALOG_REL
++    try:
++        return json.loads(p.read_text(encoding="utf-8"))
++    except (OSError, ValueError) as exc:
++        raise GateError(f"{TESTREG_CATALOG_REL} 不存在或不可解析") from exc
++
++
+ def junit_times(xml_text: str, repo: Path) -> Dict[str, float]:
+     """junit xml → {nodeid: 秒}；classname 之模組段以 repo 內存在之 `.py` 判定，其後為類別段。"""
+     out: Dict[str, float] = {}
+@@ -1186,13 +1444,40 @@ def load_times(repo: Path, dirs: Iterable[Path]) -> Dict[str, float]:
+ 
+ 
+ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[str, str],
+-         timing_dirs: Sequence[Path] = ()) -> Dict[str, object]:
++         timing_dirs: Sequence[Path] = (), out: Optional[Path] = None) -> Dict[str, object]:
+     """D8 挑選（不執行測試本體；耗時主要為逐檔 collect）：collect B／C 檔、靜態掃描錨點與工作樹兩版之測試檔並取聯集。
+-    須於本批完整改動（生產碼＋測試處置）套上後執行；任一檔 collect 失敗 ⇒ 拒跑。"""
+-    b_group, c_group = manifest_groups(manifest, phase)
++    須於本批完整改動（生產碼＋測試處置）套上後執行；任一檔 collect 失敗 ⇒ 拒跑。
++
++    TESTREG Task 2.3（契約 `impact.gate_feed`）：①collect 之前，B／C 組與 must 之已立碑項以碑之 replaced_by 取代並
++    留原組（`resolve_tombstones`）②於行程內呼叫 `scripts.testreg.impact`（changed_paths、must、previously_failed），
++    其 selected 之檔整檔執行（不在 A／B／C 者併入 extra_files）③collect 後逐一核對 must 皆被收集（`must_missing`）
++    ④plan 收據欄（`plan_receipt_fields`）驗形與 impact_universe 不符 ⇒ GateError。"""
+     rows = manifest["batch_card"]["risk_mitigation"]
+-    must = _row_nodeids(rows, f"affected_must phase={phase} ")
++    catalog = _load_catalog(repo)
++    b_raw, c_raw = manifest_groups(manifest, phase)
++    a_group, res_a = resolve_tombstones(repo, list(A_GROUP_BY_PHASE[phase]), catalog)
++    b_group, res_b = resolve_tombstones(repo, b_raw, catalog)
++    c_group, res_c = resolve_tombstones(repo, c_raw, catalog)
++    must, res_m = resolve_tombstones(repo, _row_nodeids(rows, f"affected_must phase={phase} "), catalog)
++    resolutions = list({r["from"]: r for r in [*res_a, *res_b, *res_c, *res_m]}.values())
++    resolutions.sort(key=lambda r: str(r["from"]))
++    a_group = [p.split("::", 1)[0] for p in a_group]
++    a_group = list(dict.fromkeys(a_group))
++    c_group = [p for p in c_group if p not in A_GROUP and p not in a_group]
++    b_group = [p for p in b_group if p not in A_GROUP and p not in a_group and p not in c_group]
+     heavy_pinned = _row_nodeids(rows, f"heavy_files phase={phase} ")
++    tr = _testreg()
++    previously_failed = tr.previously_failed_from_summary(repo)
++    try:
++        impact = tr.impact(repo, changed_paths(repo, anchor), list(must), list(previously_failed),
++                           production_taint=False)
++    except tr.TestregError as exc:
++        raise GateError(f"testreg impact 拒跑：{exc}") from exc
++    if not isinstance(impact, dict):
++        impact = {}
++    pre_errs = validate_plan_receipt({"testreg_impact": impact}, repo)
++    if pre_errs:
++        raise GateError(f"plan 收據驗證不符：{pre_errs[:5]}")
+     deleted, residual, prod_files, residual_specs = production_changes(repo, anchor)
+     symbols = s2_symbols(deleted, residual)
+     align_triggered = bool(set(prod_files) & ALIGN_TRIGGER_FILES or (deleted | residual) & ALIGN_TRIGGER_SYMBOLS)
+@@ -1219,7 +1504,7 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
+     scans: Dict[str, Dict[str, object]] = {f: merged_scan(f) for f in collected}
+     # 清單外之測試檔亦受 S2 約束（審查 r51）：全部 tests/ 下 test_*.py 經同一傳遞分析，有 taint 者納入（只選 taint 之
+     # nodeid，不整檔），收據記 extra_files。
+-    known = set(collected) | set(A_GROUP)
++    known = set(collected) | set(A_GROUP) | set(a_group)
+     extra: List[str] = []
+     for p in sorted((repo / "tests").rglob("test_*.py")):
+         rel = str(p.relative_to(repo))
+@@ -1232,20 +1517,40 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
+             extra.append(rel)
+     for rel in extra:
+         collected[rel] = collect(rel, repo, env)
++    # impact.selected 之檔整檔執行（gate_feed 第二步）；不在 A／B／C／extra 者併入 extra_files
++    impact_files = {x["path"]: list(x["reasons"]) for x in impact["selected"]}
++    for rel in sorted(impact_files):
++        if rel not in collected and rel not in A_GROUP and rel not in a_group:
++            collected[rel] = collect(rel, repo, env)
++            extra.append(rel)
++    missing = must_missing(must, collected)
++    if missing:
++        raise GateError(f"manifest affected_must（碑解析後）之 nodeid 未被收集：{missing}")
+     disposition = json.loads((repo / DISPOSITION_REL).read_text(encoding="utf-8"))
+     s1_funcs, s1_nodes = s1_targets(disposition, phase, scans)
+     selected, skipped = select_expected(collected, scans, s1_funcs, s1_nodes, must, heavy_pinned, align_triggered)
+-    missing_must = sorted(set(must) - set(selected))
+-    if missing_must:
+-        raise GateError(f"manifest affected_must 之 nodeid 未被收集：{missing_must}")
++    for rel, reasons in impact_files.items():
++        for nid in collected.get(rel, []):
++            selected.setdefault(nid, [])
++            selected[nid] += [f"impact:{r}" for r in reasons]
++            skipped.pop(nid, None)
+     baseline = repo / INVARIANCE_BASELINE_REL
++    fields = {"testreg_impact": impact, "catalog_sha256": _sha_file_or_empty(repo / TESTREG_CATALOG_REL),
++              "previously_failed": list(previously_failed), "tombstone_resolutions": resolutions,
++              "must_check": {"must": list(must), "missing": missing}}
++    errs = validate_plan_receipt(fields, repo)
++    if errs:
++        raise GateError(f"plan 收據驗證不符：{errs[:5]}")
+     return {
+-        "groups": {"B": b_group, "C": c_group}, "collected": collected, "selected": selected, "skipped": skipped,
++        "groups": {"A": a_group, "B": b_group, "C": c_group}, "collected": collected, "selected": selected, "skipped": skipped,
+         "s2_symbols": sorted(symbols), "production_files": prod_files, "align_triggered": align_triggered,
+-        "residual_defs": residual_specs, "inputs_digest": plan_inputs_digest(repo, anchor, phase, timing_dirs, env),
++        "residual_defs": residual_specs,
++        "inputs_digest": plan_inputs_digest(repo, anchor, phase, timing_dirs, env, out=out, manifest=manifest,
++                                            previously_failed=previously_failed),
+         "extra_files": extra,
+         "light_files": sorted(f for f, s in scans.items() if not s["heavy"] and f not in set(heavy_pinned)),
+         "invariance_baseline_sha256": hashlib.sha256(baseline.read_bytes()).hexdigest() if baseline.is_file() else None,
++        **fields,
+     }
+ 
+ 
+@@ -1288,14 +1593,19 @@ def main(argv: Sequence[str]) -> int:
+     args.phase = BATCH_PHASE[batch]
+     args.receipt = str(REPO / f"handoffs/run_receipts/framepath-b{batch}-affected.json")
+     out = Path(args.out or Path(tempfile.gettempdir()) / f"framepath_affected_b{batch}").resolve()
++    check_out_dir(out, REPO)
+     anchor = resolve_anchor()
+     global _RUNNER
+-    runner = _RUNNER = Runner(out, args.max_seconds, 0)  # 審查 r59：挑選與收集階段即寫 progress.json
++    # TESTREG Task 2.3：ledger_dir 與 catalog 一律由模組屬性 REPO 導出（契約 gate_report.current_failure_source）
++    ledger_dir = REPO / _testreg_schema(REPO)["ledger"]["dir"]
++    runner = _RUNNER = Runner(out, args.max_seconds, 0, ledger_dir=ledger_dir)  # 審查 r59：挑選與收集階段即寫 progress.json
+     env = dict(os.environ, FRAMEPATH_PHASE=str(args.phase), PYTHONPATH=str(REPO))
+     manifest = json.loads((REPO / MANIFEST_REL).read_text(encoding="utf-8"))
+     timing_dirs = [out, *[Path(t) for t in args.timings]]
+-    sel = plan(REPO, anchor, args.phase, manifest, env, timing_dirs)
+-    a_ids = [n for f in A_GROUP_BY_PHASE[args.phase] for n in collect(f, REPO, env)]
++    sel = plan(REPO, anchor, args.phase, manifest, env, timing_dirs, out=out)
++    # TESTREG v41（諮詢 r2 CODEX-R2-P1-03）：A 組亦經碑解析，以 plan 回傳之解析後 A 收集與執行
++    a_files = list(sel["groups"].get("A", A_GROUP_BY_PHASE[args.phase]))
++    a_ids = [n for f in a_files for n in collect(f, REPO, env)]
+     times = load_times(REPO, timing_dirs)
+     adm = admission([*a_ids, *sel["selected"]], times)
+     if args.plan:
+@@ -1336,7 +1646,7 @@ def main(argv: Sequence[str]) -> int:
+                     FRAMEPATH_DEF_PROBE_DEFS=",".join(sel["residual_defs"]))
+ 
+     probe_dirs: List[Path] = []
+-    for f in A_GROUP_BY_PHASE[args.phase]:
++    for f in a_files:
+         ids = collect(f, REPO, env)
+         # 實作期 b1：處置驗證器 ⑦ 檢查工作樹改動，而同檔之 check_1／check_2 以 collect-only 子行程改寫已追蹤清冊
+         # （tests/conftest.py 之副作用）⇒ 同一呼叫中 ⑦ 見到生成物而紅。把「檢查工作樹」之 nodeid 先於乾淨樹單獨
+@@ -1402,7 +1712,16 @@ def main(argv: Sequence[str]) -> int:
+     result = classify(expected, batch, anchor_res)
+     hits = set().union(*(probe_hits(d) for d in probe_dirs)) if probe_dirs else set()
+     unexecuted = sorted(set(sel["residual_defs"]) - hits)
+-    passed = verdict(result, a_failures, incomplete, unexecuted)
++    catalog = _load_catalog(REPO)
++    passed, quarantined = quarantined_verdict(result, a_failures, incomplete, unexecuted, runner, catalog, ledger_dir,
++                                              datetime.date.today())
++    tomb_rows = list(sel.get("tombstone_resolutions", []))
++    tr = _testreg()
++    schema = _testreg_schema(REPO)
++    bad = [f"{k}: {e}" for k, v in (("quarantined_failures", quarantined), ("tombstone_resolutions", tomb_rows))
++           for e in tr.validate_shape(v, schema["gate_report"]["fields"][k], schema, k)]
++    if bad:
++        raise GateError(f"verdict 收據欄驗證不符：{bad[:5]}")
+     receipt = {
+         "spec": "docs/FRAMEPATH_SPEC.md v21 D8", "phase": args.phase, "repo_head": _git(REPO, "rev-parse", "HEAD").strip(),
+         "selection": {"selected": sel["selected"], "skipped": sel["skipped"], "s2_symbols": sel["s2_symbols"],
+@@ -1411,7 +1730,7 @@ def main(argv: Sequence[str]) -> int:
+                       "inputs_digest": sel["inputs_digest"], "admission": adm, "admitted": args.admit is not None},
+         "residual_defs": sel["residual_defs"], "residual_executed": sorted(hits & set(sel["residual_defs"])),
+         "residual_unexecuted": unexecuted,
+-        "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(A_GROUP_BY_PHASE[args.phase]),
++        "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(a_files),
+                                                                         "B": b_group, "C": c_group},
+         "a_failures": a_failures, "incomplete_files": incomplete, "per_file": per_file,
+         "expected_count": len(expected), "result_count": len(set(expected) & set(batch)),
+@@ -1420,6 +1739,7 @@ def main(argv: Sequence[str]) -> int:
+         "caused_detail": {n: {"batch": list(failure_identity(batch[n])),
+                               "anchor": list(failure_identity(anchor_res[n])) if n in anchor_res else None}
+                           for n in result["caused"]},
++        "quarantined_failures": quarantined, "tombstone_resolutions": tomb_rows,
+         "pass": passed,
+     }
+     Path(args.receipt).parent.mkdir(parents=True, exist_ok=True)
+diff --git a/scripts/testreg.py b/scripts/testreg.py
+index c26c2731..bc82b390 100644
+--- a/scripts/testreg.py
++++ b/scripts/testreg.py
+@@ -1488,23 +1488,41 @@ def _load_receipt(ctx: Context, rel: Optional[str]) -> Tuple[Optional[Dict[str,
+         return None, f"收據 {rel} 非 JSON"
+ 
+ 
++_GIT_CTX_ENV = ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "GIT_PREFIX", "GIT_OBJECT_DIRECTORY")
++
++
++class _NoGitCtxEnv:
++    """暫時移除 git hook 執行期注入之環境變數（pre-commit 中 `GIT_INDEX_FILE` 等會被暫存 worktree 之 git 子行程繼承，
++    使 `worktree add`／`apply`／`diff` 作用於主倉索引而失敗）。"""
++
++    def __enter__(self):
++        self._saved = {k: os.environ.pop(k) for k in _GIT_CTX_ENV if k in os.environ}
++        return self
++
++    def __exit__(self, *exc):
++        os.environ.update(self._saved)
++        return False
++
++
+ def _digest_with(ctx: Context, head: str, patches: Sequence[str]) -> str:
+     """於 head 乾淨樹依序套用 patches（取受驗之樹之補丁內容）後之 diff_digest（記錄器之單一實作）。"""
+     key = (head, tuple(patches))
+     cache = ctx.extra.setdefault("digests", {})
+     if key in cache:
+         return cache[key]
++    texts = [_tree(ctx).read(rel) or "" for rel in patches]  # 受驗之樹（含暫存區）之內容先於移除環境前讀出
+     tmp = Path(tempfile.mkdtemp(prefix="testreg-digest-"))
+     wt = tmp / "wt"
+-    _run_git(ctx.repo_root, "worktree", "add", "-q", "--detach", str(wt), head)
+-    try:
+-        for rel in patches:
+-            pf = tmp / f"p{len(list(tmp.iterdir()))}.patch"
+-            pf.write_text(_tree(ctx).read(rel) or "", encoding="utf-8")
+-            _run_git(wt, "apply", str(pf))
+-        cache[key] = _plugin_module().diff_digest(wt)
+-    finally:
+-        _run_git(ctx.repo_root, "worktree", "remove", "--force", str(wt), check=False)
++    with _NoGitCtxEnv():
++        _run_git(ctx.repo_root, "worktree", "add", "-q", "--detach", str(wt), head)
++        try:
++            for i, text in enumerate(texts):
++                pf = tmp / f"p{i}.patch"
++                pf.write_text(text, encoding="utf-8")
++                _run_git(wt, "apply", str(pf))
++            cache[key] = _plugin_module().diff_digest(wt)
++        finally:
++            _run_git(ctx.repo_root, "worktree", "remove", "--force", str(wt), check=False)
+     return cache[key]
+ 
+ 
+@@ -1624,17 +1642,19 @@ class _PatchedTree:
+ 
+     def __init__(self, ctx: Context, head: str, patch_rel: str):
+         self._files: Dict[str, Optional[str]] = {}
++        text = _tree(ctx).read(patch_rel) or ""
+         tmp = Path(tempfile.mkdtemp(prefix="testreg-cp-"))
+         wt = tmp / "wt"
+-        _run_git(ctx.repo_root, "worktree", "add", "-q", "--detach", str(wt), head)
+-        try:
+-            pf = tmp / "c.patch"
+-            pf.write_text(_tree(ctx).read(patch_rel) or "", encoding="utf-8")
+-            ok = _run_git(wt, "apply", str(pf), check=False).returncode == 0
+-            for p in _patch_paths(pf.read_text(encoding="utf-8")):
+-                self._files[p] = (wt / p).read_text(encoding="utf-8") if ok and (wt / p).is_file() else None
+-        finally:
+-            _run_git(ctx.repo_root, "worktree", "remove", "--force", str(wt), check=False)
++        with _NoGitCtxEnv():
++            _run_git(ctx.repo_root, "worktree", "add", "-q", "--detach", str(wt), head)
++            try:
++                pf = tmp / "c.patch"
++                pf.write_text(text, encoding="utf-8")
++                ok = _run_git(wt, "apply", str(pf), check=False).returncode == 0
++                for p in _patch_paths(text):
++                    self._files[p] = (wt / p).read_text(encoding="utf-8") if ok and (wt / p).is_file() else None
++            finally:
++                _run_git(ctx.repo_root, "worktree", "remove", "--force", str(wt), check=False)
+ 
+     def read(self, rel: str) -> Optional[str]:
+         return self._files.get(rel)
+@@ -2945,8 +2965,121 @@ def _dir_fixture_defs(eng: "_Engine", f: str, own: Optional["_Mod"],
+     return out
+ 
+ 
++def literal_fix_receipt_rel(schema: Mapping[str, Any], path: str) -> str:
++    """契約 `receipts.literal_fix`：測試檔 path 之字面對映修正收據之 repo 相對路徑。"""
++    return f"{schema['receipts']['literal_fix']['dir']}/{path.replace('/', '__')}.json"
++
++
++def _string_spans(src: str) -> List[Tuple[int, int]]:
++    """原始碼中字串 token（含 f-string）之 [起, 迄) 字元位置；不可 tokenize ⇒ []。"""
++    import io
++    import tokenize
++    starts = [0]
++    for line in src.splitlines(keepends=True):
++        starts.append(starts[-1] + len(line))
++    spans = []
++    try:
++        for tok in tokenize.generate_tokens(io.StringIO(src).readline):
++            if tok.type == tokenize.STRING:
++                spans.append((starts[tok.start[0] - 1] + tok.start[1], starts[tok.end[0] - 1] + tok.end[1]))
++    except (tokenize.TokenError, IndentationError, SyntaxError):
++        return []
++    return spans
++
++
++def _literal_regex(keys: Iterable[str], boundary: str) -> "re.Pattern[str]":
++    alt = "|".join(re.escape(k) for k in sorted(keys, key=lambda k: (-len(k), k)))
++    return re.compile(f"(?<![{boundary}])(?:{alt})(?![{boundary}])")
++
++
++def literal_fix_errors(ctx: Context, path: str) -> Optional[List[str]]:
++    """契約 `receipts.literal_fix`（SPEC v41）：受驗之樹中測試檔 path 之字面對映修正收據。無收據 ⇒ None；有 ⇒ 不符之
++    清單（空＝成立，該檔之 V19 一次性放行）。條件：形狀＝`types.receipt_literal_fix`；path 相符；head＝HEAD（一次性）；
++    approval_ref 存在於受驗之樹；對映非空且雙射、鍵值不交；每鍵為假測試檔識別（路徑形合 `key_path_pattern` 而不合
++    `formats.test_path`，或點號形合 `key_dotted_pattern` 且其路徑形如前），值為對應之合 `formats.test_path` 者
++    （點號形之值之路徑形合之），同一識別之路徑形與點號形之值相對應；HEAD 版中鍵之每一出現、受驗版中值之每一出現皆
++    位於字串 token 內，且值不出現於 HEAD 版；HEAD 版全文以識別字邊界之子字串代換（長鍵先、不重疊）後與受驗版逐位元
++    相等（不得夾帶其他改動）；（v42）session_id 所指記錄器 session 綁定 head＋patch_path（patch 後之該檔＝受驗版），
++    且該檔每一函式層 nodeid 於其中全為 passed。"""
++    s = ctx.schema
++    lf = s["receipts"]["literal_fix"]
++    t = _tree(ctx)
++    text = t.read(literal_fix_receipt_rel(s, path))
++    if text is None:
++        return None
++    try:
++        r = json.loads(text)
++    except ValueError:
++        return ["字面對映修正收據非 JSON"]
++    errs = list(_seam("validate_shape")(r, {"type": "types.receipt_literal_fix"}, s))
++    if errs:
++        return errs
++    if r["path"] != path:
++        errs.append(f"收據 path {r['path']} ≠ {path}")
++    if r["head"] != ctx.extra["head_sha"]:
++        errs.append("收據 head ≠ HEAD（字面對映修正收據為一次性）")
++    if not (ctx.repo_root / r["approval_ref"]).is_file():  # 收斂檔依慣例不進 git（.git/info/exclude 之 handoffs/*）
++        errs.append(f"approval_ref {r['approval_ref']} 不存在")
++    m: Dict[str, str] = r["map"]
++    if not m or len(set(m.values())) != len(m) or set(m) & set(m.values()):
++        return errs + ["對映須非空、雙射且鍵值不交"]
++    tp = s["formats"]["test_path"]
++
++    def as_path(x: str, dotted: bool) -> str:
++        return x.replace(".", "/") + ".py" if dotted else x
++
++    for k, v in m.items():
++        dotted = re.fullmatch(lf["key_dotted_pattern"], k) is not None
++        kp = as_path(k, dotted)
++        if re.fullmatch(lf["key_path_pattern"], kp) is None or re.fullmatch(tp, kp) is not None:
++            errs.append(f"鍵 {k!r} 非不合 formats.test_path 之假測試檔識別")
++        if re.fullmatch(tp, as_path(v, dotted)) is None or (dotted and re.fullmatch(lf["key_dotted_pattern"], v) is None):
++            errs.append(f"值 {v!r} 須為合 formats.test_path 之{'點號形' if dotted else '路徑'}")
++        if dotted and kp in m and as_path(v, True) != m[kp]:
++            errs.append(f"點號形 {k!r}→{v!r} 與路徑形 {kp!r}→{m[kp]!r} 不對應")
++    old, new = ctx.extra["head_obj"].read(path), t.read(path)
++    if old is None or new is None:
++        return errs + ["HEAD 或受驗之樹缺該測試檔"]
++    rx_k, rx_v = _literal_regex(m, lf["boundary_chars"]), _literal_regex(m.values(), lf["boundary_chars"])
++    for src, rx, what in ((old, rx_k, "鍵（HEAD 版）"), (new, rx_v, "值（受驗版）")):
++        spans = _string_spans(src)
++        bad = [x.group(0) for x in rx.finditer(src) if not any(a <= x.start() and x.end() <= b for a, b in spans)]
++        if bad:
++            errs.append(f"{what}出現於字串 token 外：{sorted(set(bad))[:3]}")
++    if rx_v.search(old):
++        errs.append("值已出現於 HEAD 版（對映不可逆）")
++    if rx_k.sub(lambda x: m[x.group(0)], old) != new:
++        errs.append("HEAD 版套對映後與受驗版不相等（不得夾帶其他改動）")
++    if errs:
++        return errs
++    # v42（修訂審查 r40 CODEX-R40-P1-01）：改名後全檔須實跑全過——依賴舊識別「不合格」之斷言改名後必紅，故不能靜默
++    # 轉弱；收據綁定一次記錄器 session：head＝收據 head、diff_digest＝head 乾淨樹套 patch_path 之 diff_digest、patch 後
++    # 之該檔＝受驗版，且該檔每一函式層 nodeid 於 session 皆有紀錄且全為 passed
++    if not t.exists(r["patch_path"]):
++        return [f"patch_path {r['patch_path']} 不存在"]
++    # v43（修訂審查 r41 CODEX-R41-P1-01）：patch 所及之檔 ⊆ 契約 allowed_patch_paths ∪ {path}——不得夾帶改被測生產碼
++    # 使改名後之負向斷言仍綠
++    extra = sorted(set(_patch_paths(t.read(r["patch_path"]) or "")) - set(lf["allowed_patch_paths"]) - {path})
++    if extra:
++        return errs + [f"patch_path 含契約 allowed_patch_paths 以外之檔：{extra[:5]}"]
++    if _PatchedTree(ctx, r["head"], r["patch_path"]).read(path) != new:
++        errs.append("patch_path 套於 head 後之該檔 ≠ 受驗版")
++    s = _ledger_session(ctx, r["session_id"])
++    if s is None:
++        return errs + [f"unverifiable：session {r['session_id']} 不在 ledger"]
++    info = s["session"] or {}
++    if info.get("head") != r["head"] or info.get("diff_digest") != _digest_with(ctx, r["head"], [r["patch_path"]]):
++        errs.append("session 不綁定 head＋patch_path")
++    for fn in _function_nodeids(t, path):
++        recs = [x for n_, x in s["tests"].items() if re.sub(r"\[.*\]$", "", n_) == fn]
++        if not recs or any(x.get("outcome") != "passed" for x in recs):
++            errs.append(f"session 中 {fn} 未全為 passed（{sorted({x.get('outcome') for x in recs}) or '無紀錄'}）")
++    return errs
++
++
+ def rule_v19(ctx: Context) -> List[Finding]:
+-    """V19（以 `assertion_multiset` 與 `multiset_decreased` 判定）。"""
++    """V19（以 `assertion_multiset` 與 `multiset_decreased` 判定；測試檔有成立之字面對映修正收據〔`literal_fix_errors`
++    為空〕⇒ 該檔之測試一次性放行）。"""
+     pat = ctx.schema["formats"]["test_path"]
+     t, head = _tree(ctx), ctx.extra["head_obj"]
+     files, helpers = set(), set(ctx.extra.get("helper_paths", []))
+@@ -3011,6 +3144,7 @@ def rule_v19(ctx: Context) -> List[Finding]:
+         nids |= u_
+     tombs, out = _tomb_ids(ctx), []
+     present: Dict[str, set] = {}
++    lit: Dict[str, Optional[List[str]]] = {}
+     for nid in sorted(nids | set(decided) | set(decided_fx)):
+         if nid in decided and nid not in nids:  # 存在性已於 `_plugin_change_dependents` 依受驗樹收集規則確認
+             if nid not in tombs and not _rewrite_ok(ctx, nid):
+@@ -3027,13 +3161,18 @@ def rule_v19(ctx: Context) -> List[Finding]:
+             present[path_] = set(_function_nodeids(t, path_))
+         if nid not in present[path_]:
+             continue
++        if path_ not in lit:
++            lit[path_] = _seam("literal_fix_errors")(ctx, path_)
++        if lit[path_] == []:
++            continue  # 字面對映修正（SPEC v41）：HEAD 版全文套對映＝受驗版，斷言之改變只來自假測試檔識別之改名
+         old = collections.Counter(e["key"] for e in he.elements(nid))
+         new = collections.Counter(e["key"] for e in ce.elements(nid))
+         if _skip_like(t, nid) and not _skip_like(head, nid):
+             new = collections.Counter()  # 新增 skip／skipif／xfail（函式、類別、模組 pytestmark、本體 pytest.skip／xfail）⇒ 視為空
+         dec = _seam("multiset_decreased")(old, new)
+         if dec and nid not in tombs and not _rewrite_ok(ctx, nid):
+-            out.append(Finding("V19", nid, f"斷言多重集合減少 {len(dec)} 項（須同提交立碑或附 rewrite 收據）"))
++            why = f"；字面對映修正收據不成立：{'；'.join(lit[path_][:3])}" if lit[path_] else ""
++            out.append(Finding("V19", nid, f"斷言多重集合減少 {len(dec)} 項（須同提交立碑或附 rewrite 收據）{why}"))
+     return out
+ 
+ 
+@@ -3806,19 +3945,109 @@ def _module_def_reach(graph: _ImportGraph, path: str) -> Dict[str, Tuple[FrozenS
+     return out
+ 
+ 
+-def _reach(root: Path, graph: _ImportGraph, test_path: str) -> FrozenSet[str]:
+-    """測試檔可達之 repo 模組：自身之 import_closure（經具名縫）∪ 其目錄鏈上 conftest.py（含 repo 根）與其
+-    `pytest_plugins` 所列模組中，測試檔以名稱請求（參數、usefixtures 字面）或 autouse 之定義及其遞移依賴之可達。
+-    conftest 之 `pytest_*` hook 與未被請求之定義不計：前者為 session 層（其 import 期失敗使全部測試失敗，任一被選
+-    之測試即可察覺，且 impact 不輸出空集合），後者不影響該測試之結果。"""
++def _module_index(graph: _ImportGraph, path: str) -> Tuple[Dict[str, List[Tuple[str, Optional[str]]]],
++                                                             Dict[str, List[ast.AST]]]:
++    """模組層（含模組層 if／try／with 區塊）：匯入名 → [(被匯入之 repo 模組檔, 被匯入名；整個模組為 None)]；
++    頂層 def／class 與模組層賦值目標名 → 其全部綁定節點。同名多次綁定（重綁、條件綁定）取全部之聯集（v42，修訂審查
++    r40 CODEX-R40-P1-02：hook 執行時取最後綁定，聯集為其保守超集，不依敘述順序推斷）。"""
++    cache = graph.__dict__.setdefault("_module_index", {})
++    if path in cache:
++        return cache[path]
++    tree = graph.parsed(path)
++    binds: Dict[str, List[Tuple[str, Optional[str]]]] = collections.defaultdict(list)
++    defs: Dict[str, List[ast.AST]] = collections.defaultdict(list)
++
++    def visit(body: Sequence[ast.stmt]) -> None:
++        for n in body:
++            if isinstance(n, ast.Import):
++                for al in n.names:
++                    tg = graph._module_targets(al.name.split("."), ghost=True)
++                    # `import a.b as c` ⇒ c 指 a.b；`import a.b` ⇒ a 可經屬性取到 a 與 a.b（皆計）
++                    binds[al.asname or al.name.split(".")[0]] += [(t, None) for t in (tg[-1:] if al.asname else tg)]
++            elif isinstance(n, ast.ImportFrom):
++                parts = graph._abs_parts(path, n.module, n.level)
++                tg = graph._module_targets(parts, ghost=bool(n.module)) if parts else []
++                for al in n.names:
++                    if al.name == "*" or not parts:
++                        continue
++                    sub = "/".join([*parts, al.name])
++                    sub_f = next((c for c in (sub + "/__init__.py", sub + ".py") if c in graph.files), None)
++                    if sub_f:
++                        binds[al.asname or al.name].append((sub_f, None))
++                    elif tg:
++                        binds[al.asname or al.name].append((tg[-1], al.name))
++            elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
++                defs[n.name].append(n)
++            elif isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
++                for t in (n.targets if isinstance(n, ast.Assign) else [n.target]):
++                    for x in ast.walk(t):
++                        if isinstance(x, ast.Name):
++                            defs[x.id].append(n)
++            elif isinstance(n, (ast.If, ast.Try, ast.With, ast.For, ast.AsyncFor, ast.While)):
++                for b in ("body", "orelse", "finalbody"):
++                    visit(getattr(n, b, []) or [])
++                for h in getattr(n, "handlers", []) or []:
++                    visit(h.body)
++
++    visit(tree.body if tree is not None else [])
++    cache[path] = (binds, defs)
++    return cache[path]
++
++
++def _hook_reach(graph: _ImportGraph, path: str, name: str) -> FrozenSet[str]:
++    """hook（及其引用之定義）之定義層可達：自 (path, name) 起，定義本體內之 import 目標取 import_closure；本體引用之
++    同模組定義／模組層賦值遞移；引用之模組層匯入名——被匯入者為定義則遞移進該模組之該定義（只計其本體，不計該模組
++    其他定義之函式內 import）、為整個模組則取其 import_closure。經過之定義所在檔皆計入。被匯入模組之模組層程式碼
++    屬 import 期（失敗即全部測試失敗，任一被選測試即察覺），不另計。名稱解析不到（星號匯入、動態）⇒ 該模組之
++    import_closure（保守）。"""
++    seen: set = set()
++    files: set = set()
++    mods: set = set()
++    stack: List[Tuple[str, str]] = [(path, name)]
++    while stack:
++        p, n = stack.pop()
++        if (p, n) in seen:
++            continue
++        seen.add((p, n))
++        files.add(p)
++        binds, defs = _module_index(graph, p)
++        nodes = defs.get(n, [])
++        for tp, attr in binds.get(n, ()):  # 名稱亦（或只）由匯入綁定：一併追
++            stack.append((tp, attr)) if attr else mods.add(tp)
++        if not nodes and n not in binds:
++            mods.add(p)
++            continue
++        for node in nodes:
++            for x in ast.walk(node):
++                if isinstance(x, (ast.Import, ast.ImportFrom)):
++                    mods.update(_import_node_targets(graph, p, x))
++            for r in _name_refs(node):
++                if r in defs and r != n:
++                    stack.append((p, r))
++                for tp, attr in binds.get(r, ()):
++                    stack.append((tp, attr)) if attr else mods.add(tp)
++    out = set(files)
++    for m in mods:
++        out |= graph.closure(m)
++    return frozenset(out)
++
++
++def _reach_parts(root: Path, graph: _ImportGraph, test_path: str) -> Tuple[FrozenSet[str], FrozenSet[str]]:
++    """(測試檔與 fixture 可達, hook 可達)。前者＝自身之 import_closure（經具名縫）∪ 目錄鏈上 conftest.py（含 repo 根）
++    與其 `pytest_plugins` 所列模組中，測試檔以名稱請求（參數、usefixtures 字面）或 autouse 之定義及其遞移依賴之可達；
++    後者＝同一範圍內全部 `pytest_*` hook 之 `_hook_reach`（hook 套用於其作用範圍內全部測試）。未被請求之非 hook
++    定義不計（不影響該測試之結果）。"""
+     cache = graph.__dict__.setdefault("_reach", {})
+     if test_path not in cache:
+         acc = set(_seam("import_closure")(root, test_path))
++        hooks: set = set()
+         pool: Dict[str, List[Tuple[FrozenSet[str], set, bool]]] = collections.defaultdict(list)
+         for cf in _conftest_chain(graph.files, test_path):
+             for mod in [cf, *[p for p in _plugin_paths(graph.tree, cf) if p in graph.files]]:
+                 for name, info in _module_def_reach(graph, mod).items():
+                     pool[name].append(info)
++                    if name.startswith("pytest_"):
++                        hooks |= _hook_reach(graph, mod, name)
+         tree = graph.parsed(test_path)
+         want = (_name_refs(tree) if tree is not None else set()) & set(pool)
+         want |= {n for n, infos in pool.items() if any(i[2] for i in infos)}
+@@ -3831,10 +4060,16 @@ def _reach(root: Path, graph: _ImportGraph, test_path: str) -> FrozenSet[str]:
+             for mods, refs, _ in pool[n]:
+                 acc |= mods
+                 todo += [r for r in refs & set(pool) if r not in seen]
+-        cache[test_path] = frozenset(acc)
++        cache[test_path] = (frozenset(acc), frozenset(hooks))
+     return cache[test_path]
+ 
+ 
++def _reach(root: Path, graph: _ImportGraph, test_path: str) -> FrozenSet[str]:
++    """`_reach_parts` 兩者之聯集（tests/ helper、domain 用）。"""
++    tf, hk = _reach_parts(root, graph, test_path)
++    return tf | hk
++
++
+ def _gate_module():
+     """`scripts/framepath_affected_gate.py`（static_taint 之 `_TaintGraph`）；已載入者沿用。"""
+     for name in ("scripts.framepath_affected_gate", "framepath_affected_gate"):
+@@ -3950,17 +4185,19 @@ def previously_failed_from_summary(repo_root: Path) -> List[str]:
+ 
+ 
+ def impact(repo_root: Path, changed_paths: List[str], must_resolved: List[str],
+-           previously_failed: List[str]) -> Dict[str, List[Dict[str, Any]]]:
++           previously_failed: List[str], production_taint: bool = True) -> Dict[str, List[Dict[str, Any]]]:
+     """schema `impact`＋`gate_wiring` 之簽名：catalog、schema、AST 與測試檔集合一律自 repo_root 讀取；
+     回傳 {"selected": [{"path", "reasons"}], "excluded": [{"path", "excluded_reason"}]}；schema `impact.precheck_rules`
+     任一不符 ⇒ TestregError（不輸出；未登記之測試檔不拒跑而依 registry_unresolved 選入）；已立碑之檔依
+     `impact.tombstoned_rule`；不存在使 selected 為空之分支。
+ 
+     各來源（schema `enums.select_reason`）：must＝must_resolved 所在檔；changed_test＝變更之測試檔；static_taint＝變更之
+-    非測試 .py（tests/ 外）——測試檔經 `_reach`（自身與 conftest 鏈、外掛之 import_closure）可達者 ∪ `_TaintGraph` 字串
+-    傳遞命中者，及 tests/ 下 helper 模組（非 shared_test_infra）之變更——`_reach` 含該模組者；previously_failed＝其
+-    nodeid 所在檔；registry_unresolved＝`impact.registry_unresolved_rule` 五條。各來源皆空 ⇒ TestregError；來源非空而
+-    全部落在已刪或已立碑之檔 ⇒ 改選全部（未立碑之）測試檔、理由 registry_unresolved（不輸出空集合）。"""
++    非測試 .py（tests/ 外）——測試檔與其 fixture 可達者（`_reach_parts` 前者）∪ `_TaintGraph` 字串傳遞命中者 ∪ hook
++    可達者（`_reach_parts` 後者），及 tests/ 下 helper 模組（非 shared_test_infra）之變更——`_reach` 含該模組者；
++    previously_failed＝其 nodeid 所在檔；registry_unresolved＝`impact.registry_unresolved_rule` 五條。
++    `production_taint=False`（schema `impact.production_taint`；FRAMEPATH 閘之呼叫）⇒ 省略源自 tests/ 外 .py 變更之
++    「測試檔與 fixture 可達」與字串傳遞兩者，hook 可達、domain、helper 與其餘來源照常。各來源皆空 ⇒ TestregError；
++    來源非空而全部落在已刪或已立碑之檔 ⇒ 改選全部（未立碑之）測試檔、理由 registry_unresolved（不輸出空集合）。"""
+     root = Path(repo_root).resolve()
+     ctx = build_context(root, "worktree")
+     s = ctx.schema
+@@ -3972,13 +4209,14 @@ def impact(repo_root: Path, changed_paths: List[str], must_resolved: List[str],
+     key = str(root)
+     _IMPORT_GRAPHS[key] = graph = _ImportGraph(root)
+     try:
+-        return _impact_select(root, ctx, graph, changed_paths, must_resolved, previously_failed)
++        return _impact_select(root, ctx, graph, changed_paths, must_resolved, previously_failed, production_taint)
+     finally:
+         _IMPORT_GRAPHS.pop(key, None)
+ 
+ 
+ def _impact_select(root: Path, ctx: Context, graph: _ImportGraph, changed_paths: Sequence[str],
+-                   must_resolved: Sequence[str], previously_failed: Sequence[str]) -> Dict[str, List[Dict[str, Any]]]:
++                   must_resolved: Sequence[str], previously_failed: Sequence[str],
++                   production_taint: bool = True) -> Dict[str, List[Dict[str, Any]]]:
+     s = ctx.schema
+     pat = s["formats"]["test_path"]
+     tests = sorted(f for f in graph.files if re.fullmatch(pat, f))
+@@ -4003,9 +4241,11 @@ def _impact_select(root: Path, ctx: Context, graph: _ImportGraph, changed_paths:
+         if p.startswith("tests/"):
+             src["static_taint"] |= {t for t in tests if p in _reach(root, graph, t)}
+             continue
+-        src["static_taint"] |= {t for t in tests if p in _reach(root, graph, t)}
+-        dotted = p[:-3].replace("/", ".")
+-        substrings += [p, dotted[:-len(".__init__")] if dotted.endswith(".__init__") else dotted]
++        src["static_taint"] |= {t for t in tests if p in _reach_parts(root, graph, t)[1]}  # hook 可達：恆計
++        if production_taint:
++            src["static_taint"] |= {t for t in tests if p in _reach_parts(root, graph, t)[0]}
++            dotted = p[:-3].replace("/", ".")
++            substrings += [p, dotted[:-len(".__init__")] if dotted.endswith(".__init__") else dotted]
+         if p in graph.files and (graph.parsed(p) is None or graph.is_dynamic(p)):
+             prefix = _seam("domain_prefix")(p)
+             if "dyn_modules" not in ctx.extra:
+diff --git a/tests/registry/test_testreg_gate_wiring.py b/tests/registry/test_testreg_gate_wiring.py
+index 8a28831f..c84d10a3 100644
+--- a/tests/registry/test_testreg_gate_wiring.py
++++ b/tests/registry/test_testreg_gate_wiring.py
+@@ -275,11 +275,11 @@ def test_e0_tombstone_removed_and_recorded(tmp_path):
+ 
+ # ── ②⑥ 隔離失敗 ────────────────────────────────────────────────────────────────────────────────────
+ 
+-FAIL = {"exception_type": "AssertionError", "exception_head": "assert 1 == 2", "exception_origin": "tests/t.py:5",
++FAIL = {"exception_type": "AssertionError", "exception_head": "assert 1 == 2", "exception_origin": "tests/test_qt.py:5",
+         "fail_line": 5}
+ 
+ 
+-def _write_ledger(d: Path, sid: str, outcome: str, rec: Dict[str, Any], nodeid: str = "tests/t.py::test_x[1]",
++def _write_ledger(d: Path, sid: str, outcome: str, rec: Dict[str, Any], nodeid: str = "tests/test_qt.py::test_x[1]",
+                   argv: List[str] = ()) -> None:
+     sess = {"kind": "session", "session_id": sid, "started": "2026-10-01T00:00:00Z", "head": "a" * 40,
+             "diff_digest": "clean", "kline_sha256": "absent", "python": "py", "packages_digest": "b" * 64, "env": {},
+@@ -300,10 +300,10 @@ def qfx(tmp_path):
+     _write_ledger(d, sf, "failed", FAIL)
+ 
+     def catalog(expires=FUTURE):
+-        q = {"nodeid": "tests/t.py::test_x", "reason": "flaky", "expires": expires, "disposition_ref": REF,
+-             "evidence": [{"session_id": sp, "nodeid": "tests/t.py::test_x[1]"},
+-                          {"session_id": sf, "nodeid": "tests/t.py::test_x[1]"}]}
+-        return {"entries": {"tests/t.py": entry("tests/t.py", quarantine=[q])}, "tombstones": []}
++        q = {"nodeid": "tests/test_qt.py::test_x", "reason": "flaky", "expires": expires, "disposition_ref": REF,
++             "evidence": [{"session_id": sp, "nodeid": "tests/test_qt.py::test_x[1]"},
++                          {"session_id": sf, "nodeid": "tests/test_qt.py::test_x[1]"}]}
++        return {"entries": {"tests/test_qt.py": entry("tests/test_qt.py", quarantine=[q])}, "tombstones": []}
+     return {"dir": d, "catalog": catalog}
+ 
+ 
+@@ -313,40 +313,40 @@ def _verdict_after(caused: List[str]) -> bool:
+ 
+ def test_boundary_02_quarantine_parametrized_nodeid_matched_at_function_level(qfx):
+     """quarantine 之 nodeid 為函式層；caused 為參數化 nodeid ⇒ 以函式層比對而吸收；他函式之參數化 nodeid 不吸收。"""
+-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]", "tests/t.py::test_y[1]"],
+-                                    {"tests/t.py::test_x[1]": FAIL, "tests/t.py::test_y[1]": FAIL}, qfx["catalog"](),
++    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]", "tests/test_qt.py::test_y[1]"],
++                                    {"tests/test_qt.py::test_x[1]": FAIL, "tests/test_qt.py::test_y[1]": FAIL}, qfx["catalog"](),
+                                     qfx["dir"], TODAY)
+-    assert still == ["tests/t.py::test_y[1]"] and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
++    assert still == ["tests/test_qt.py::test_y[1]"] and [x["nodeid"] for x in qf] == ["tests/test_qt.py::test_x[1]"]
+ 
+ 
+ def test_02_valid_quarantine_absorbs_matching_caused(qfx):
+-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": FAIL}, qfx["catalog"](),
++    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], {"tests/test_qt.py::test_x[1]": FAIL}, qfx["catalog"](),
+                                     qfx["dir"], TODAY)
+     assert still == [] and _verdict_after(still)
+-    assert qf == [{"nodeid": "tests/t.py::test_x[1]", "quarantine_expires": FUTURE, "disposition_ref": REF}]
++    assert qf == [{"nodeid": "tests/test_qt.py::test_x[1]", "quarantine_expires": FUTURE, "disposition_ref": REF}]
+     assert all(testreg.validate_shape(x, {"type": "types.quarantined_failure"}, schema()) == [] for x in qf)
+ 
+ 
+ def test_02_expired_quarantine_still_blocks(qfx):
+-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": FAIL}, qfx["catalog"](PAST),
++    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], {"tests/test_qt.py::test_x[1]": FAIL}, qfx["catalog"](PAST),
+                                     qfx["dir"], TODAY)
+-    assert still == ["tests/t.py::test_x[1]"] and qf == [] and not _verdict_after(still)
++    assert still == ["tests/test_qt.py::test_x[1]"] and qf == [] and not _verdict_after(still)
+ 
+ 
+ def test_mutation_no_expiry_check_absorbs_expired(qfx, monkeypatch):
+     monkeypatch.setattr(g, "quarantine_active", lambda q, today: True)
+-    still, _ = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": FAIL}, qfx["catalog"](PAST),
++    still, _ = g.split_quarantined(["tests/test_qt.py::test_x[1]"], {"tests/test_qt.py::test_x[1]": FAIL}, qfx["catalog"](PAST),
+                                    qfx["dir"], TODAY)
+     assert still == []
+ 
+ 
+ @pytest.mark.parametrize("field,value", [("exception_type", "ValueError"), ("exception_head", "other message"),
+-                                         ("exception_origin", "tests/t.py:9"), ("fail_line", 9)])
++                                         ("exception_origin", "tests/test_qt.py:9"), ("fail_line", 9)])
+ def test_06_quarantine_mismatch_blocks(qfx, field, value):
+     cur = dict(FAIL, **{field: value})
+-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": cur}, qfx["catalog"](),
++    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], {"tests/test_qt.py::test_x[1]": cur}, qfx["catalog"](),
+                                     qfx["dir"], TODAY)
+-    assert still == ["tests/t.py::test_x[1]"] and qf == []
++    assert still == ["tests/test_qt.py::test_x[1]"] and qf == []
+ 
+ 
+ def _ledger_names(d: Path) -> set:
+@@ -357,36 +357,36 @@ def test_04c_current_failures_only_from_new_session_matching_argv(qfx):
+     """C4：當前四欄只取「本次呼叫前後新增、且 argv_raw 含該測試檔」之 session；舊 session 與他檔之新 session 不採。"""
+     d = qfx["dir"]
+     before = _ledger_names(d)
+-    moved = dict(FAIL, exception_origin="tests/t.py:9", fail_line=9)
++    moved = dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9)
+     s_other, s_this = str(uuid.uuid4()), str(uuid.uuid4())
+     _write_ledger(d, s_other, "failed", FAIL, argv=["tests/other.py"])
+-    _write_ledger(d, s_this, "failed", moved, argv=["-q", "tests/t.py"])
+-    cur = g.current_failures(d, before, "tests/t.py")
+-    assert set(cur) == {"tests/t.py::test_x[1]"}
+-    assert cur["tests/t.py::test_x[1]"]["exception_origin"] == "tests/t.py:9" and cur["tests/t.py::test_x[1]"]["fail_line"] == 9
+-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+-    assert still == ["tests/t.py::test_x[1]"] and qf == []  # 新失敗位置不同 ⇒ 照擋（不得以前史四欄冒充）
++    _write_ledger(d, s_this, "failed", moved, argv=["-q", "tests/test_qt.py"])
++    cur = g.current_failures(d, before, "tests/test_qt.py")
++    assert set(cur) == {"tests/test_qt.py::test_x[1]"}
++    assert cur["tests/test_qt.py::test_x[1]"]["exception_origin"] == "tests/test_qt.py:9" and cur["tests/test_qt.py::test_x[1]"]["fail_line"] == 9
++    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
++    assert still == ["tests/test_qt.py::test_x[1]"] and qf == []  # 新失敗位置不同 ⇒ 照擋（不得以前史四欄冒充）
+ 
+ 
+ def test_04c_no_matching_new_session_never_quarantined(qfx):
+     d = qfx["dir"]
+     before = _ledger_names(d)
+     _write_ledger(d, str(uuid.uuid4()), "failed", FAIL, argv=["tests/other.py"])
+-    cur = g.current_failures(d, before, "tests/t.py")
++    cur = g.current_failures(d, before, "tests/test_qt.py")
+     assert cur == {}
+-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+-    assert still == ["tests/t.py::test_x[1]"] and qf == []
++    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
++    assert still == ["tests/test_qt.py::test_x[1]"] and qf == []
+ 
+ 
+-def _fake_run_file(d: Path, rec: Dict[str, Any], argv_file: str = "tests/t.py"):
++def _fake_run_file(d: Path, rec: Dict[str, Any], argv_file: str = "tests/test_qt.py"):
+     """模擬一次 pytest 呼叫：寫 junit 結果與（記錄器所寫之）ledger session（argv_raw 含該測試檔）。"""
+ 
+     def run_file(test_file, xml_path, cwd, env, nodeids, extra):
+         _write_ledger(d, str(uuid.uuid4()), "failed", rec, argv=["-q", argv_file])
+         Path(xml_path).parent.mkdir(parents=True, exist_ok=True)
+-        Path(xml_path).write_text('<testsuite><testcase classname="tests.t" name="test_x[1]"><failure type="AssertionError" '
++        Path(xml_path).write_text('<testsuite><testcase classname="tests.test_qt" name="test_x[1]"><failure type="AssertionError" '
+                                   'message="assert 1 == 2"/></testcase></testsuite>', encoding="utf-8")
+-        return 1, {"tests/t.py::test_x[1]": {"outcome": "failed", "type": "AssertionError", "message": "assert 1 == 2"}}
++        return 1, {"tests/test_qt.py::test_x[1]": {"outcome": "failed", "type": "AssertionError", "message": "assert 1 == 2"}}
+ 
+     return run_file
+ 
+@@ -395,19 +395,19 @@ def _orchestrate(qfx, tmp_path, monkeypatch, rec: Dict[str, Any]):
+     """經實際編排路徑：Runner.run（呼叫前後快照 ledger 檔名於 runner.ledger_snapshots）→ classify_quarantine。"""
+     monkeypatch.setattr(g, "run_file", _fake_run_file(qfx["dir"], rec))
+     runner = g.Runner(tmp_path / "out", None, 1, ledger_dir=qfx["dir"])
+-    runner.run("tests/t.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/t.py::test_x[1]"])
+-    assert "tests/t.py" in runner.ledger_snapshots
+-    return g.classify_quarantine(["tests/t.py::test_x[1]"], runner, qfx["catalog"](), qfx["dir"], TODAY)
++    runner.run("tests/test_qt.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/test_qt.py::test_x[1]"])
++    assert "tests/test_qt.py" in runner.ledger_snapshots
++    return g.classify_quarantine(["tests/test_qt.py::test_x[1]"], runner, qfx["catalog"](), qfx["dir"], TODAY)
+ 
+ 
+ def test_04d_orchestration_absorbs_only_matching_new_failure(qfx, tmp_path, monkeypatch):
+     still, qf = _orchestrate(qfx, tmp_path, monkeypatch, FAIL)
+-    assert still == [] and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
++    assert still == [] and [x["nodeid"] for x in qf] == ["tests/test_qt.py::test_x[1]"]
+ 
+ 
+ def test_04d_orchestration_moved_failure_blocks(qfx, tmp_path, monkeypatch):
+-    still, qf = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
+-    assert still == ["tests/t.py::test_x[1]"] and qf == []
++    still, qf = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9))
++    assert still == ["tests/test_qt.py::test_x[1]"] and qf == []
+ 
+ 
+ def test_mutation_orchestration_ignores_snapshot_absorbs_moved_failure(qfx, tmp_path, monkeypatch):
+@@ -423,7 +423,7 @@ def test_mutation_orchestration_ignores_snapshot_absorbs_moved_failure(qfx, tmp_
+         return out
+ 
+     monkeypatch.setattr(g, "current_failures", from_history)
+-    still, _ = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
++    still, _ = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9))
+     assert still == []
+ 
+ 
+@@ -434,7 +434,7 @@ def _result(caused: List[str]) -> Dict[str, Any]:
+ def _run_once(qfx, tmp_path, monkeypatch, rec: Dict[str, Any]):
+     monkeypatch.setattr(g, "run_file", _fake_run_file(qfx["dir"], rec))
+     runner = g.Runner(tmp_path / "out", None, 1, ledger_dir=qfx["dir"])
+-    runner.run("tests/t.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/t.py::test_x[1]"])
++    runner.run("tests/test_qt.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/test_qt.py::test_x[1]"])
+     return runner
+ 
+ 
+@@ -442,11 +442,11 @@ def test_04f_quarantined_verdict_is_the_verdict_path(qfx, tmp_path, monkeypatch)
+     """verdict 之唯一組合：`quarantined_verdict(result, a_failures, incomplete, unexecuted, runner, catalog, ledger_dir,
+     today) -> (pass, quarantined_failures)`：相符之新失敗 ⇒ pass 且列報；位置已變 ⇒ 不 pass。"""
+     runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
+-    ok, qf = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
++    ok, qf = g.quarantined_verdict(_result(["tests/test_qt.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+                                    TODAY)
+-    assert ok is True and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
+-    runner = _run_once(qfx, tmp_path / "b", monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
+-    ok, qf = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
++    assert ok is True and [x["nodeid"] for x in qf] == ["tests/test_qt.py::test_x[1]"]
++    runner = _run_once(qfx, tmp_path / "b", monkeypatch, dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9))
++    ok, qf = g.quarantined_verdict(_result(["tests/test_qt.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+                                    TODAY)
+     assert ok is False and qf == []
+ 
+@@ -455,7 +455,7 @@ def test_mutation_quarantined_verdict_without_classify_blocks(qfx, tmp_path, mon
+     """mutant：組合不經 classify_quarantine（一律不吸收）⇒ 相符之新失敗亦不 pass（即 04f 之吸收來自該縫）。"""
+     runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
+     monkeypatch.setattr(g, "classify_quarantine", lambda caused, *a, **k: (list(caused), []))
+-    ok, _ = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
++    ok, _ = g.quarantined_verdict(_result(["tests/test_qt.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+                                   TODAY)
+     assert ok is False
+ 
+@@ -464,7 +464,7 @@ def test_mutation_quarantined_verdict_without_classify_blocks(qfx, tmp_path, mon
+ def test_04f_other_failure_inputs_never_absorbed(qfx, tmp_path, monkeypatch, other):
+     """caused 全被隔離吸收時，其餘任一失敗輸入（A 組失敗、未完成檔、殘差未執行、缺、多出）非空 ⇒ 仍不 pass。"""
+     runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
+-    result = _result(["tests/t.py::test_x[1]"])
++    result = _result(["tests/test_qt.py::test_x[1]"])
+     a_f, inc, unexe = [], [], []
+     if other == "a_failures":
+         a_f = ["tests/a.py::test_a"]
+@@ -475,7 +475,7 @@ def test_04f_other_failure_inputs_never_absorbed(qfx, tmp_path, monkeypatch, oth
+     else:
+         result[other] = ["tests/c.py::test_c"]
+     ok, qf = g.quarantined_verdict(result, a_f, inc, unexe, runner, qfx["catalog"](), qfx["dir"], TODAY)
+-    assert ok is False and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
++    assert ok is False and [x["nodeid"] for x in qf] == ["tests/test_qt.py::test_x[1]"]
+ 
+ 
+ def test_04g_gate_main_uses_quarantined_verdict_only():
+@@ -540,44 +540,44 @@ def test_04e_anchor_call_does_not_overwrite_snapshot(qfx, tmp_path, monkeypatch)
+     """錨點呼叫（phase="anchor"）不記、不覆寫 ledger_snapshots：caused 之錨點重跑恆在 B／C 呼叫之後，覆寫即使本次
+     B／C 之 session 落入「呼叫前已存在」而永不被吸收（審查 r22：全程驅動 main 時現形）。"""
+     runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
+-    snap = set(runner.ledger_snapshots["tests/t.py"])
+-    monkeypatch.setattr(g, "run_file", lambda *a, **k: (0, {"tests/t.py::test_x[1]": {"outcome": "passed", "type": "",
++    snap = set(runner.ledger_snapshots["tests/test_qt.py"])
++    monkeypatch.setattr(g, "run_file", lambda *a, **k: (0, {"tests/test_qt.py::test_x[1]": {"outcome": "passed", "type": "",
+                                                                                          "message": ""}}))
+     (tmp_path / "out" / "anchor_junit").mkdir(parents=True, exist_ok=True)
+-    runner.run("tests/t.py", tmp_path / "out" / "anchor_junit" / "t.xml", tmp_path, {}, ["tests/t.py::test_x[1]"], (),
+-               "a1", ["tests/t.py::test_x[1]"], phase="anchor")
+-    assert set(runner.ledger_snapshots["tests/t.py"]) == snap
++    runner.run("tests/test_qt.py", tmp_path / "out" / "anchor_junit" / "t.xml", tmp_path, {}, ["tests/test_qt.py::test_x[1]"], (),
++               "a1", ["tests/test_qt.py::test_x[1]"], phase="anchor")
++    assert set(runner.ledger_snapshots["tests/test_qt.py"]) == snap
+ 
+ 
+ # ── ⑥g 全程驅動 main（審查 r22）：裁決之資料流與結束碼以行為驗，不只看 AST 形狀 ───────────────────────────────
+ 
+-NODE = "tests/t.py::test_x[1]"
++NODE = "tests/test_qt.py::test_x[1]"
+ MAIN_SCENARIOS = ["absorbed", "residual_unexecuted", "moved", "a_failure", "incomplete"]
+ 
+ 
+ def _drive_main(tmp_path, monkeypatch, scenario: str):
+-    """`REPO` 指向暫存 git 倉（catalog 之 tests/t.py 有有效隔離、`<REPO>/<ledger.dir>` 有其翻轉證據）；plan、collect、
++    """`REPO` 指向暫存 git 倉（catalog 之 tests/test_qt.py 有有效隔離、`<REPO>/<ledger.dir>` 有其翻轉證據）；plan、collect、
+     錨點工作樹驗證、估時、admission、狀態指紋、清冊還原、探針以模組屬性替身。B 組呼叫之替身於 `<REPO>/<ledger.dir>` 寫一個
+     session（argv 含該檔）並回報失敗，錨點呼叫回報通過（⇒ caused）。main 須自行由 REPO 導出 ledger_dir 與 catalog。
+     回傳 (rc, 收據, quarantined_verdict 呼叫次數)。"""
+-    r = make_repo(tmp_path, {"tests/t.py": "def test_x():\n    assert True\n", g.MANIFEST_REL: "{}\n"}, catalog=False)
++    r = make_repo(tmp_path, {"tests/test_qt.py": "def test_x():\n    assert True\n", g.MANIFEST_REL: "{}\n"}, catalog=False)
+     ledger = r.p(schema()["ledger"]["dir"])
+     sp, sf = str(uuid.uuid4()), str(uuid.uuid4())
+     _write_ledger(ledger, sp, "passed", {})
+     _write_ledger(ledger, sf, "failed", FAIL)
+-    q = {"nodeid": "tests/t.py::test_x", "reason": "flaky", "expires": FUTURE, "disposition_ref": REF,
++    q = {"nodeid": "tests/test_qt.py::test_x", "reason": "flaky", "expires": FUTURE, "disposition_ref": REF,
+          "evidence": [{"session_id": sp, "nodeid": NODE}, {"session_id": sf, "nodeid": NODE}]}
+-    r.set_catalog({"entries": {"tests/t.py": entry("tests/t.py", quarantine=[q])}, "tombstones": []})
++    r.set_catalog({"entries": {"tests/test_qt.py": entry("tests/test_qt.py", quarantine=[q])}, "tombstones": []})
+     r.commit("catalog")
+     wt = tmp_path / "anchor_wt"
+     (wt / "tests").mkdir(parents=True)
+-    (wt / "tests/t.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
+-    rec = dict(FAIL, exception_origin="tests/t.py:9", fail_line=9) if scenario == "moved" else FAIL
++    (wt / "tests/test_qt.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
++    rec = dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9) if scenario == "moved" else FAIL
+     hits = set() if scenario == "residual_unexecuted" else {"momentum/x.py:f", "momentum/x.py:g"}
+     a_group = ["tests/a.py"] if scenario == "a_failure" else []
+     sel = {"selected": [NODE], "skipped": [], "s2_symbols": [], "align_triggered": False, "light_files": [],
+-           "invariance_baseline_sha256": "", "inputs_digest": "d" * 64, "collected": {"tests/t.py": [NODE]},
+-           "groups": {"B": ["tests/t.py"], "C": []}, "extra_files": [], "residual_defs": ["momentum/x.py:f"],
++           "invariance_baseline_sha256": "", "inputs_digest": "d" * 64, "collected": {"tests/test_qt.py": [NODE]},
++           "groups": {"B": ["tests/test_qt.py"], "C": []}, "extra_files": [], "residual_defs": ["momentum/x.py:f"],
+            "tombstone_resolutions": [], "must_check": {"missing": []}}
+ 
+     def run_file(test_file, xml_path, cwd, env, nodeids=None, extra=()):
+@@ -633,7 +633,7 @@ def test_04i_gate_main_end_to_end_verdict(tmp_path, monkeypatch, scenario):
+     elif scenario == "a_failure":
+         assert rcpt["a_failures"] == ["tests/a.py::test_a"] and absorbed == [NODE]
+     else:
+-        assert rcpt["incomplete_files"] == ["tests/t.py"] and absorbed == [NODE]
++        assert rcpt["incomplete_files"] == ["tests/test_qt.py"] and absorbed == [NODE]
+ 
+ 
+ def test_mutation_main_drops_unexecuted_passes_residual_case(tmp_path, monkeypatch):
+@@ -652,8 +652,8 @@ def test_mutation_current_failures_reusing_old_sessions_absorbs_new_failure(qfx,
+     """mutant：當前四欄改取前史（不看呼叫前後新增與 argv_raw）⇒ 位置已變之新失敗被吸收（即 04c 之紅來自 session 選擇）。"""
+     d = qfx["dir"]
+     before = _ledger_names(d)
+-    _write_ledger(d, str(uuid.uuid4()), "failed", dict(FAIL, exception_origin="tests/t.py:9", fail_line=9),
+-                  argv=["tests/t.py"])
++    _write_ledger(d, str(uuid.uuid4()), "failed", dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9),
++                  argv=["tests/test_qt.py"])
+ 
+     def from_history(ledger_dir, before_names, test_file):
+         out = {}
+@@ -666,8 +666,8 @@ def test_mutation_current_failures_reusing_old_sessions_absorbs_new_failure(qfx,
+         return out
+ 
+     monkeypatch.setattr(g, "current_failures", from_history)
+-    cur = g.current_failures(d, before, "tests/t.py")
+-    still, _ = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
++    cur = g.current_failures(d, before, "tests/test_qt.py")
++    still, _ = g.split_quarantined(["tests/test_qt.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+     assert still == []
+ 
+ 

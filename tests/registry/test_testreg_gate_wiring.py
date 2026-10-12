@@ -275,11 +275,11 @@ def test_e0_tombstone_removed_and_recorded(tmp_path):
 
 # ── ②⑥ 隔離失敗 ────────────────────────────────────────────────────────────────────────────────────
 
-FAIL = {"exception_type": "AssertionError", "exception_head": "assert 1 == 2", "exception_origin": "tests/t.py:5",
+FAIL = {"exception_type": "AssertionError", "exception_head": "assert 1 == 2", "exception_origin": "tests/test_qt.py:5",
         "fail_line": 5}
 
 
-def _write_ledger(d: Path, sid: str, outcome: str, rec: Dict[str, Any], nodeid: str = "tests/t.py::test_x[1]",
+def _write_ledger(d: Path, sid: str, outcome: str, rec: Dict[str, Any], nodeid: str = "tests/test_qt.py::test_x[1]",
                   argv: List[str] = ()) -> None:
     sess = {"kind": "session", "session_id": sid, "started": "2026-10-01T00:00:00Z", "head": "a" * 40,
             "diff_digest": "clean", "kline_sha256": "absent", "python": "py", "packages_digest": "b" * 64, "env": {},
@@ -300,10 +300,10 @@ def qfx(tmp_path):
     _write_ledger(d, sf, "failed", FAIL)
 
     def catalog(expires=FUTURE):
-        q = {"nodeid": "tests/t.py::test_x", "reason": "flaky", "expires": expires, "disposition_ref": REF,
-             "evidence": [{"session_id": sp, "nodeid": "tests/t.py::test_x[1]"},
-                          {"session_id": sf, "nodeid": "tests/t.py::test_x[1]"}]}
-        return {"entries": {"tests/t.py": entry("tests/t.py", quarantine=[q])}, "tombstones": []}
+        q = {"nodeid": "tests/test_qt.py::test_x", "reason": "flaky", "expires": expires, "disposition_ref": REF,
+             "evidence": [{"session_id": sp, "nodeid": "tests/test_qt.py::test_x[1]"},
+                          {"session_id": sf, "nodeid": "tests/test_qt.py::test_x[1]"}]}
+        return {"entries": {"tests/test_qt.py": entry("tests/test_qt.py", quarantine=[q])}, "tombstones": []}
     return {"dir": d, "catalog": catalog}
 
 
@@ -313,40 +313,40 @@ def _verdict_after(caused: List[str]) -> bool:
 
 def test_boundary_02_quarantine_parametrized_nodeid_matched_at_function_level(qfx):
     """quarantine 之 nodeid 為函式層；caused 為參數化 nodeid ⇒ 以函式層比對而吸收；他函式之參數化 nodeid 不吸收。"""
-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]", "tests/t.py::test_y[1]"],
-                                    {"tests/t.py::test_x[1]": FAIL, "tests/t.py::test_y[1]": FAIL}, qfx["catalog"](),
+    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]", "tests/test_qt.py::test_y[1]"],
+                                    {"tests/test_qt.py::test_x[1]": FAIL, "tests/test_qt.py::test_y[1]": FAIL}, qfx["catalog"](),
                                     qfx["dir"], TODAY)
-    assert still == ["tests/t.py::test_y[1]"] and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
+    assert still == ["tests/test_qt.py::test_y[1]"] and [x["nodeid"] for x in qf] == ["tests/test_qt.py::test_x[1]"]
 
 
 def test_02_valid_quarantine_absorbs_matching_caused(qfx):
-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": FAIL}, qfx["catalog"](),
+    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], {"tests/test_qt.py::test_x[1]": FAIL}, qfx["catalog"](),
                                     qfx["dir"], TODAY)
     assert still == [] and _verdict_after(still)
-    assert qf == [{"nodeid": "tests/t.py::test_x[1]", "quarantine_expires": FUTURE, "disposition_ref": REF}]
+    assert qf == [{"nodeid": "tests/test_qt.py::test_x[1]", "quarantine_expires": FUTURE, "disposition_ref": REF}]
     assert all(testreg.validate_shape(x, {"type": "types.quarantined_failure"}, schema()) == [] for x in qf)
 
 
 def test_02_expired_quarantine_still_blocks(qfx):
-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": FAIL}, qfx["catalog"](PAST),
+    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], {"tests/test_qt.py::test_x[1]": FAIL}, qfx["catalog"](PAST),
                                     qfx["dir"], TODAY)
-    assert still == ["tests/t.py::test_x[1]"] and qf == [] and not _verdict_after(still)
+    assert still == ["tests/test_qt.py::test_x[1]"] and qf == [] and not _verdict_after(still)
 
 
 def test_mutation_no_expiry_check_absorbs_expired(qfx, monkeypatch):
     monkeypatch.setattr(g, "quarantine_active", lambda q, today: True)
-    still, _ = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": FAIL}, qfx["catalog"](PAST),
+    still, _ = g.split_quarantined(["tests/test_qt.py::test_x[1]"], {"tests/test_qt.py::test_x[1]": FAIL}, qfx["catalog"](PAST),
                                    qfx["dir"], TODAY)
     assert still == []
 
 
 @pytest.mark.parametrize("field,value", [("exception_type", "ValueError"), ("exception_head", "other message"),
-                                         ("exception_origin", "tests/t.py:9"), ("fail_line", 9)])
+                                         ("exception_origin", "tests/test_qt.py:9"), ("fail_line", 9)])
 def test_06_quarantine_mismatch_blocks(qfx, field, value):
     cur = dict(FAIL, **{field: value})
-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], {"tests/t.py::test_x[1]": cur}, qfx["catalog"](),
+    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], {"tests/test_qt.py::test_x[1]": cur}, qfx["catalog"](),
                                     qfx["dir"], TODAY)
-    assert still == ["tests/t.py::test_x[1]"] and qf == []
+    assert still == ["tests/test_qt.py::test_x[1]"] and qf == []
 
 
 def _ledger_names(d: Path) -> set:
@@ -357,36 +357,36 @@ def test_04c_current_failures_only_from_new_session_matching_argv(qfx):
     """C4：當前四欄只取「本次呼叫前後新增、且 argv_raw 含該測試檔」之 session；舊 session 與他檔之新 session 不採。"""
     d = qfx["dir"]
     before = _ledger_names(d)
-    moved = dict(FAIL, exception_origin="tests/t.py:9", fail_line=9)
+    moved = dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9)
     s_other, s_this = str(uuid.uuid4()), str(uuid.uuid4())
     _write_ledger(d, s_other, "failed", FAIL, argv=["tests/other.py"])
-    _write_ledger(d, s_this, "failed", moved, argv=["-q", "tests/t.py"])
-    cur = g.current_failures(d, before, "tests/t.py")
-    assert set(cur) == {"tests/t.py::test_x[1]"}
-    assert cur["tests/t.py::test_x[1]"]["exception_origin"] == "tests/t.py:9" and cur["tests/t.py::test_x[1]"]["fail_line"] == 9
-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
-    assert still == ["tests/t.py::test_x[1]"] and qf == []  # 新失敗位置不同 ⇒ 照擋（不得以前史四欄冒充）
+    _write_ledger(d, s_this, "failed", moved, argv=["-q", "tests/test_qt.py"])
+    cur = g.current_failures(d, before, "tests/test_qt.py")
+    assert set(cur) == {"tests/test_qt.py::test_x[1]"}
+    assert cur["tests/test_qt.py::test_x[1]"]["exception_origin"] == "tests/test_qt.py:9" and cur["tests/test_qt.py::test_x[1]"]["fail_line"] == 9
+    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+    assert still == ["tests/test_qt.py::test_x[1]"] and qf == []  # 新失敗位置不同 ⇒ 照擋（不得以前史四欄冒充）
 
 
 def test_04c_no_matching_new_session_never_quarantined(qfx):
     d = qfx["dir"]
     before = _ledger_names(d)
     _write_ledger(d, str(uuid.uuid4()), "failed", FAIL, argv=["tests/other.py"])
-    cur = g.current_failures(d, before, "tests/t.py")
+    cur = g.current_failures(d, before, "tests/test_qt.py")
     assert cur == {}
-    still, qf = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
-    assert still == ["tests/t.py::test_x[1]"] and qf == []
+    still, qf = g.split_quarantined(["tests/test_qt.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+    assert still == ["tests/test_qt.py::test_x[1]"] and qf == []
 
 
-def _fake_run_file(d: Path, rec: Dict[str, Any], argv_file: str = "tests/t.py"):
+def _fake_run_file(d: Path, rec: Dict[str, Any], argv_file: str = "tests/test_qt.py"):
     """模擬一次 pytest 呼叫：寫 junit 結果與（記錄器所寫之）ledger session（argv_raw 含該測試檔）。"""
 
     def run_file(test_file, xml_path, cwd, env, nodeids, extra):
         _write_ledger(d, str(uuid.uuid4()), "failed", rec, argv=["-q", argv_file])
         Path(xml_path).parent.mkdir(parents=True, exist_ok=True)
-        Path(xml_path).write_text('<testsuite><testcase classname="tests.t" name="test_x[1]"><failure type="AssertionError" '
+        Path(xml_path).write_text('<testsuite><testcase classname="tests.test_qt" name="test_x[1]"><failure type="AssertionError" '
                                   'message="assert 1 == 2"/></testcase></testsuite>', encoding="utf-8")
-        return 1, {"tests/t.py::test_x[1]": {"outcome": "failed", "type": "AssertionError", "message": "assert 1 == 2"}}
+        return 1, {"tests/test_qt.py::test_x[1]": {"outcome": "failed", "type": "AssertionError", "message": "assert 1 == 2"}}
 
     return run_file
 
@@ -395,19 +395,19 @@ def _orchestrate(qfx, tmp_path, monkeypatch, rec: Dict[str, Any]):
     """經實際編排路徑：Runner.run（呼叫前後快照 ledger 檔名於 runner.ledger_snapshots）→ classify_quarantine。"""
     monkeypatch.setattr(g, "run_file", _fake_run_file(qfx["dir"], rec))
     runner = g.Runner(tmp_path / "out", None, 1, ledger_dir=qfx["dir"])
-    runner.run("tests/t.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/t.py::test_x[1]"])
-    assert "tests/t.py" in runner.ledger_snapshots
-    return g.classify_quarantine(["tests/t.py::test_x[1]"], runner, qfx["catalog"](), qfx["dir"], TODAY)
+    runner.run("tests/test_qt.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/test_qt.py::test_x[1]"])
+    assert "tests/test_qt.py" in runner.ledger_snapshots
+    return g.classify_quarantine(["tests/test_qt.py::test_x[1]"], runner, qfx["catalog"](), qfx["dir"], TODAY)
 
 
 def test_04d_orchestration_absorbs_only_matching_new_failure(qfx, tmp_path, monkeypatch):
     still, qf = _orchestrate(qfx, tmp_path, monkeypatch, FAIL)
-    assert still == [] and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
+    assert still == [] and [x["nodeid"] for x in qf] == ["tests/test_qt.py::test_x[1]"]
 
 
 def test_04d_orchestration_moved_failure_blocks(qfx, tmp_path, monkeypatch):
-    still, qf = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
-    assert still == ["tests/t.py::test_x[1]"] and qf == []
+    still, qf = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9))
+    assert still == ["tests/test_qt.py::test_x[1]"] and qf == []
 
 
 def test_mutation_orchestration_ignores_snapshot_absorbs_moved_failure(qfx, tmp_path, monkeypatch):
@@ -423,7 +423,7 @@ def test_mutation_orchestration_ignores_snapshot_absorbs_moved_failure(qfx, tmp_
         return out
 
     monkeypatch.setattr(g, "current_failures", from_history)
-    still, _ = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
+    still, _ = _orchestrate(qfx, tmp_path, monkeypatch, dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9))
     assert still == []
 
 
@@ -434,7 +434,7 @@ def _result(caused: List[str]) -> Dict[str, Any]:
 def _run_once(qfx, tmp_path, monkeypatch, rec: Dict[str, Any]):
     monkeypatch.setattr(g, "run_file", _fake_run_file(qfx["dir"], rec))
     runner = g.Runner(tmp_path / "out", None, 1, ledger_dir=qfx["dir"])
-    runner.run("tests/t.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/t.py::test_x[1]"])
+    runner.run("tests/test_qt.py", tmp_path / "out" / "junit" / "t.xml", tmp_path, {}, None, (), "k1", ["tests/test_qt.py::test_x[1]"])
     return runner
 
 
@@ -442,11 +442,11 @@ def test_04f_quarantined_verdict_is_the_verdict_path(qfx, tmp_path, monkeypatch)
     """verdict 之唯一組合：`quarantined_verdict(result, a_failures, incomplete, unexecuted, runner, catalog, ledger_dir,
     today) -> (pass, quarantined_failures)`：相符之新失敗 ⇒ pass 且列報；位置已變 ⇒ 不 pass。"""
     runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
-    ok, qf = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+    ok, qf = g.quarantined_verdict(_result(["tests/test_qt.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
                                    TODAY)
-    assert ok is True and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
-    runner = _run_once(qfx, tmp_path / "b", monkeypatch, dict(FAIL, exception_origin="tests/t.py:9", fail_line=9))
-    ok, qf = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+    assert ok is True and [x["nodeid"] for x in qf] == ["tests/test_qt.py::test_x[1]"]
+    runner = _run_once(qfx, tmp_path / "b", monkeypatch, dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9))
+    ok, qf = g.quarantined_verdict(_result(["tests/test_qt.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
                                    TODAY)
     assert ok is False and qf == []
 
@@ -455,7 +455,7 @@ def test_mutation_quarantined_verdict_without_classify_blocks(qfx, tmp_path, mon
     """mutant：組合不經 classify_quarantine（一律不吸收）⇒ 相符之新失敗亦不 pass（即 04f 之吸收來自該縫）。"""
     runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
     monkeypatch.setattr(g, "classify_quarantine", lambda caused, *a, **k: (list(caused), []))
-    ok, _ = g.quarantined_verdict(_result(["tests/t.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
+    ok, _ = g.quarantined_verdict(_result(["tests/test_qt.py::test_x[1]"]), [], [], [], runner, qfx["catalog"](), qfx["dir"],
                                   TODAY)
     assert ok is False
 
@@ -464,7 +464,7 @@ def test_mutation_quarantined_verdict_without_classify_blocks(qfx, tmp_path, mon
 def test_04f_other_failure_inputs_never_absorbed(qfx, tmp_path, monkeypatch, other):
     """caused 全被隔離吸收時，其餘任一失敗輸入（A 組失敗、未完成檔、殘差未執行、缺、多出）非空 ⇒ 仍不 pass。"""
     runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
-    result = _result(["tests/t.py::test_x[1]"])
+    result = _result(["tests/test_qt.py::test_x[1]"])
     a_f, inc, unexe = [], [], []
     if other == "a_failures":
         a_f = ["tests/a.py::test_a"]
@@ -475,7 +475,7 @@ def test_04f_other_failure_inputs_never_absorbed(qfx, tmp_path, monkeypatch, oth
     else:
         result[other] = ["tests/c.py::test_c"]
     ok, qf = g.quarantined_verdict(result, a_f, inc, unexe, runner, qfx["catalog"](), qfx["dir"], TODAY)
-    assert ok is False and [x["nodeid"] for x in qf] == ["tests/t.py::test_x[1]"]
+    assert ok is False and [x["nodeid"] for x in qf] == ["tests/test_qt.py::test_x[1]"]
 
 
 def test_04g_gate_main_uses_quarantined_verdict_only():
@@ -540,44 +540,44 @@ def test_04e_anchor_call_does_not_overwrite_snapshot(qfx, tmp_path, monkeypatch)
     """錨點呼叫（phase="anchor"）不記、不覆寫 ledger_snapshots：caused 之錨點重跑恆在 B／C 呼叫之後，覆寫即使本次
     B／C 之 session 落入「呼叫前已存在」而永不被吸收（審查 r22：全程驅動 main 時現形）。"""
     runner = _run_once(qfx, tmp_path, monkeypatch, FAIL)
-    snap = set(runner.ledger_snapshots["tests/t.py"])
-    monkeypatch.setattr(g, "run_file", lambda *a, **k: (0, {"tests/t.py::test_x[1]": {"outcome": "passed", "type": "",
+    snap = set(runner.ledger_snapshots["tests/test_qt.py"])
+    monkeypatch.setattr(g, "run_file", lambda *a, **k: (0, {"tests/test_qt.py::test_x[1]": {"outcome": "passed", "type": "",
                                                                                          "message": ""}}))
     (tmp_path / "out" / "anchor_junit").mkdir(parents=True, exist_ok=True)
-    runner.run("tests/t.py", tmp_path / "out" / "anchor_junit" / "t.xml", tmp_path, {}, ["tests/t.py::test_x[1]"], (),
-               "a1", ["tests/t.py::test_x[1]"], phase="anchor")
-    assert set(runner.ledger_snapshots["tests/t.py"]) == snap
+    runner.run("tests/test_qt.py", tmp_path / "out" / "anchor_junit" / "t.xml", tmp_path, {}, ["tests/test_qt.py::test_x[1]"], (),
+               "a1", ["tests/test_qt.py::test_x[1]"], phase="anchor")
+    assert set(runner.ledger_snapshots["tests/test_qt.py"]) == snap
 
 
 # ── ⑥g 全程驅動 main（審查 r22）：裁決之資料流與結束碼以行為驗，不只看 AST 形狀 ───────────────────────────────
 
-NODE = "tests/t.py::test_x[1]"
+NODE = "tests/test_qt.py::test_x[1]"
 MAIN_SCENARIOS = ["absorbed", "residual_unexecuted", "moved", "a_failure", "incomplete"]
 
 
 def _drive_main(tmp_path, monkeypatch, scenario: str):
-    """`REPO` 指向暫存 git 倉（catalog 之 tests/t.py 有有效隔離、`<REPO>/<ledger.dir>` 有其翻轉證據）；plan、collect、
+    """`REPO` 指向暫存 git 倉（catalog 之 tests/test_qt.py 有有效隔離、`<REPO>/<ledger.dir>` 有其翻轉證據）；plan、collect、
     錨點工作樹驗證、估時、admission、狀態指紋、清冊還原、探針以模組屬性替身。B 組呼叫之替身於 `<REPO>/<ledger.dir>` 寫一個
     session（argv 含該檔）並回報失敗，錨點呼叫回報通過（⇒ caused）。main 須自行由 REPO 導出 ledger_dir 與 catalog。
     回傳 (rc, 收據, quarantined_verdict 呼叫次數)。"""
-    r = make_repo(tmp_path, {"tests/t.py": "def test_x():\n    assert True\n", g.MANIFEST_REL: "{}\n"}, catalog=False)
+    r = make_repo(tmp_path, {"tests/test_qt.py": "def test_x():\n    assert True\n", g.MANIFEST_REL: "{}\n"}, catalog=False)
     ledger = r.p(schema()["ledger"]["dir"])
     sp, sf = str(uuid.uuid4()), str(uuid.uuid4())
     _write_ledger(ledger, sp, "passed", {})
     _write_ledger(ledger, sf, "failed", FAIL)
-    q = {"nodeid": "tests/t.py::test_x", "reason": "flaky", "expires": FUTURE, "disposition_ref": REF,
+    q = {"nodeid": "tests/test_qt.py::test_x", "reason": "flaky", "expires": FUTURE, "disposition_ref": REF,
          "evidence": [{"session_id": sp, "nodeid": NODE}, {"session_id": sf, "nodeid": NODE}]}
-    r.set_catalog({"entries": {"tests/t.py": entry("tests/t.py", quarantine=[q])}, "tombstones": []})
+    r.set_catalog({"entries": {"tests/test_qt.py": entry("tests/test_qt.py", quarantine=[q])}, "tombstones": []})
     r.commit("catalog")
     wt = tmp_path / "anchor_wt"
     (wt / "tests").mkdir(parents=True)
-    (wt / "tests/t.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
-    rec = dict(FAIL, exception_origin="tests/t.py:9", fail_line=9) if scenario == "moved" else FAIL
+    (wt / "tests/test_qt.py").write_text("def test_x():\n    assert True\n", encoding="utf-8")
+    rec = dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9) if scenario == "moved" else FAIL
     hits = set() if scenario == "residual_unexecuted" else {"momentum/x.py:f", "momentum/x.py:g"}
     a_group = ["tests/a.py"] if scenario == "a_failure" else []
     sel = {"selected": [NODE], "skipped": [], "s2_symbols": [], "align_triggered": False, "light_files": [],
-           "invariance_baseline_sha256": "", "inputs_digest": "d" * 64, "collected": {"tests/t.py": [NODE]},
-           "groups": {"B": ["tests/t.py"], "C": []}, "extra_files": [], "residual_defs": ["momentum/x.py:f"],
+           "invariance_baseline_sha256": "", "inputs_digest": "d" * 64, "collected": {"tests/test_qt.py": [NODE]},
+           "groups": {"B": ["tests/test_qt.py"], "C": []}, "extra_files": [], "residual_defs": ["momentum/x.py:f"],
            "tombstone_resolutions": [], "must_check": {"missing": []}}
 
     def run_file(test_file, xml_path, cwd, env, nodeids=None, extra=()):
@@ -633,7 +633,7 @@ def test_04i_gate_main_end_to_end_verdict(tmp_path, monkeypatch, scenario):
     elif scenario == "a_failure":
         assert rcpt["a_failures"] == ["tests/a.py::test_a"] and absorbed == [NODE]
     else:
-        assert rcpt["incomplete_files"] == ["tests/t.py"] and absorbed == [NODE]
+        assert rcpt["incomplete_files"] == ["tests/test_qt.py"] and absorbed == [NODE]
 
 
 def test_mutation_main_drops_unexecuted_passes_residual_case(tmp_path, monkeypatch):
@@ -652,8 +652,8 @@ def test_mutation_current_failures_reusing_old_sessions_absorbs_new_failure(qfx,
     """mutant：當前四欄改取前史（不看呼叫前後新增與 argv_raw）⇒ 位置已變之新失敗被吸收（即 04c 之紅來自 session 選擇）。"""
     d = qfx["dir"]
     before = _ledger_names(d)
-    _write_ledger(d, str(uuid.uuid4()), "failed", dict(FAIL, exception_origin="tests/t.py:9", fail_line=9),
-                  argv=["tests/t.py"])
+    _write_ledger(d, str(uuid.uuid4()), "failed", dict(FAIL, exception_origin="tests/test_qt.py:9", fail_line=9),
+                  argv=["tests/test_qt.py"])
 
     def from_history(ledger_dir, before_names, test_file):
         out = {}
@@ -666,8 +666,8 @@ def test_mutation_current_failures_reusing_old_sessions_absorbs_new_failure(qfx,
         return out
 
     monkeypatch.setattr(g, "current_failures", from_history)
-    cur = g.current_failures(d, before, "tests/t.py")
-    still, _ = g.split_quarantined(["tests/t.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
+    cur = g.current_failures(d, before, "tests/test_qt.py")
+    still, _ = g.split_quarantined(["tests/test_qt.py::test_x[1]"], cur, qfx["catalog"](), d, TODAY)
     assert still == []
 
 

@@ -1,0 +1,8 @@
+{
+ "approval_ref": "handoffs/reconcile/20261010-testreg-x-consult-r2/synth.md",
+ "head": "b9c06d3e91e3f2fbf105618eee86b87af4715236",
+ "map": {"tests.t": "tests.test_qt", "tests/t.py": "tests/test_qt.py"},
+ "patch_path": "handoffs/run_receipts/testreg-literal-fix/tests__registry__test_testreg_gate_wiring.py.patch",
+ "path": "tests/registry/test_testreg_gate_wiring.py",
+ "session_id": "e9731a03-a66a-4186-b7e7-fa4234945e74"
+}

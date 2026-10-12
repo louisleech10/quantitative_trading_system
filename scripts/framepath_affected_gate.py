@@ -25,7 +25,9 @@ from __future__ import annotations
 import argparse
 import ast
 import copy
+import datetime
 import hashlib
+import importlib
 import json
 import math
 import os
@@ -158,6 +160,101 @@ def verdict(result: Mapping[str, Sequence[str]], a_failures: Sequence[str], inco
                 or residual_unexecuted)
 
 
+# ── TESTREG Task 2.3：隔離失敗（契約 tests/registry/testreg_schema.json `gate_report`）──────────────────────────────
+QUARANTINE_FIELDS = ("exception_type", "exception_head", "exception_origin", "fail_line")
+
+
+def _ledger_records(p: Path) -> Tuple[Dict[str, object], List[Dict[str, object]]]:
+    """ledger 檔 → (session 紀錄, test 紀錄清單)；不可讀或損毀之列略過。"""
+    sess: Dict[str, object] = {}
+    tests: List[Dict[str, object]] = []
+    try:
+        lines = p.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return sess, tests
+    for line in lines:
+        try:
+            rec = json.loads(line) if line.strip() else None
+        except ValueError:
+            continue
+        if isinstance(rec, dict) and rec.get("kind") == "session" and not sess:
+            sess = rec
+        elif isinstance(rec, dict) and rec.get("kind") == "test":
+            tests.append(rec)
+    return sess, tests
+
+
+def current_failures(ledger_dir: Path, before_names: Iterable[str], test_file: str) -> Dict[str, Dict[str, object]]:
+    """契約 `gate_report.current_failure_source`：呼叫前不存在（檔名不在 before_names）、且 argv_raw 有 token 等於該
+    測試檔或以「該測試檔::」開頭之 session 之 outcome∈{failed, error} test_record → {nodeid: 紀錄}。"""
+    before = set(before_names)
+    out: Dict[str, Dict[str, object]] = {}
+    for p in sorted(Path(ledger_dir).glob("*.jsonl")) if Path(ledger_dir).is_dir() else []:
+        if p.name in before:
+            continue
+        sess, tests = _ledger_records(p)
+        argv = sess.get("argv_raw") if isinstance(sess.get("argv_raw"), list) else []
+        if not any(isinstance(t, str) and (t == test_file or t.startswith(test_file + "::")) for t in argv):
+            continue
+        out.update({str(r["nodeid"]): r for r in tests if r.get("outcome") in ("failed", "error")})
+    return out
+
+
+def quarantine_active(q: Mapping[str, object], today: datetime.date) -> bool:
+    """未逾期：expires（YYYY-MM-DD）≥ 今日（V11 之反面）。"""
+    return isinstance(q.get("expires"), str) and str(q["expires"]) >= today.isoformat()
+
+
+def quarantine_match(q: Mapping[str, object], current: Mapping[str, object], ledger_dir: Path) -> bool:
+    """契約 `gate_report.quarantine_match`：當前失敗之四欄等於 q.evidence 所指之某筆 failed／error 紀錄之同四欄。"""
+    for ev in q.get("evidence") or []:
+        if not isinstance(ev, dict):
+            continue
+        for r in _ledger_records(Path(ledger_dir) / f"{ev.get('session_id')}.jsonl")[1]:
+            if r.get("nodeid") == ev.get("nodeid") and r.get("outcome") in ("failed", "error") and \
+                    all(r.get(k) == current.get(k) for k in QUARANTINE_FIELDS):
+                return True
+    return False
+
+
+def split_quarantined(caused: Sequence[str], current: Mapping[str, Mapping[str, object]], catalog: Mapping,
+                      ledger_dir: Path, today: datetime.date) -> Tuple[List[str], List[Dict[str, object]]]:
+    """caused → (仍擋者, quarantined_failures)。以函式層 nodeid 比對 quarantine；current 中無紀錄者一律不吸收；
+    逾期（`quarantine_active` 為假）或四欄不符（`quarantine_match`）者照擋。"""
+    still: List[str] = []
+    absorbed: List[Dict[str, object]] = []
+    entries = catalog.get("entries", {}) if isinstance(catalog, Mapping) else {}
+    for n in caused:
+        base = re.sub(r"\[.*\]$", "", n)
+        qs = [q for q in ((entries.get(n.split("::", 1)[0]) or {}).get("quarantine") or [])
+              if isinstance(q, dict) and q.get("nodeid") == base and quarantine_active(q, today)]
+        hit = next((q for q in qs if n in current and quarantine_match(q, current[n], ledger_dir)), None)
+        if hit is None:
+            still.append(n)
+        else:
+            absorbed.append({"nodeid": n, "quarantine_expires": hit["expires"], "disposition_ref": hit["disposition_ref"]})
+    return still, absorbed
+
+
+def classify_quarantine(caused: Sequence[str], runner: "Runner", catalog: Mapping, ledger_dir: Path,
+                        today: datetime.date) -> Tuple[List[str], List[Dict[str, object]]]:
+    """編排：每個 caused 所在測試檔以 Runner 於該檔呼叫前所記之 ledger 檔名集合呼叫 `current_failures`（未經 Runner
+    呼叫之檔無當前紀錄），再交 `split_quarantined`。"""
+    current: Dict[str, Dict[str, object]] = {}
+    for f in dict.fromkeys(n.split("::", 1)[0] for n in caused):
+        if f in runner.ledger_snapshots:
+            current.update(current_failures(ledger_dir, runner.ledger_snapshots[f], f))
+    return split_quarantined(caused, current, catalog, ledger_dir, today)
+
+
+def quarantined_verdict(result: Mapping[str, Sequence[str]], a_failures: Sequence[str], incomplete: Sequence[str],
+                        unexecuted: Sequence[str], runner: "Runner", catalog: Mapping, ledger_dir: Path,
+                        today: datetime.date) -> Tuple[bool, List[Dict[str, object]]]:
+    """main 之唯一裁決組合：caused 經隔離分流（`classify_quarantine`）後之 `verdict`；其餘失敗輸入不受隔離影響。"""
+    still, absorbed = classify_quarantine(result["caused"], runner, catalog, ledger_dir, today)
+    return verdict(dict(result, caused=still), a_failures, incomplete, unexecuted), absorbed
+
+
 PROBE_DIR_ENV = "FRAMEPATH_DEF_PROBE_DIR"
 PROBE_DEFS_ENV = "FRAMEPATH_DEF_PROBE_DEFS"
 
@@ -222,7 +319,16 @@ def probe_hits(probe_dir: Path) -> set:
     return hits
 
 
-ENV_PREFIXES = ("FFACT_", "ICFA_", "FRAMEPATH_", "PYTHON", "NUMBA_", "OMP_", "MKL_", "LEGACY_KLINE", "PYTEST")  # PYTEST＝PYTEST_ADDOPTS 等（審查 r55）
+TESTREG_SCHEMA_REL = "tests/registry/testreg_schema.json"
+TESTREG_CATALOG_REL = "tests/registry/catalog.json"
+
+
+def _testreg_schema(repo: Path) -> Dict[str, object]:
+    return json.loads((Path(repo) / TESTREG_SCHEMA_REL).read_text(encoding="utf-8"))
+
+
+# TESTREG Task 2.3：單一來源＝契約 `ledger.env_prefixes`（記錄器之 fingerprint 同表；PYTEST＝PYTEST_ADDOPTS 等，審查 r55）
+ENV_PREFIXES = tuple(_testreg_schema(REPO)["ledger"]["env_prefixes"])
 
 
 def env_fingerprint(env: Mapping[str, str]) -> str:
@@ -252,11 +358,12 @@ def _file_sha(p: Path) -> str:
     return h.hexdigest()
 
 
-def content_inputs(repo: Path) -> str:
-    """未追蹤檔（排除 FP_EXCLUDES）之路徑＋內容雜湊，及 DATA_INPUTS 之內容雜湊（審查 r60：路徑未變不等於內容未變）。"""
+def content_inputs(repo: Path, extra_excludes: Sequence[str] = ()) -> str:
+    """未追蹤檔（排除 FP_EXCLUDES 與 extra_excludes〔pathspec〕）之路徑＋內容雜湊，及 DATA_INPUTS 之內容雜湊（審查
+    r60：路徑未變不等於內容未變）。"""
     rows = []
     for rel in sorted(p for p in _git(repo, "ls-files", "--others", "--exclude-standard", "--", ".",
-                                      *FP_EXCLUDES).splitlines() if p):
+                                      *FP_EXCLUDES, *extra_excludes).splitlines() if p):
         f = repo / rel
         rows.append(f"{rel}\t{_file_sha(f) if f.is_file() else '<non-file>'}")
     for rel in DATA_INPUTS:
@@ -361,10 +468,17 @@ class Runner:
     丟 `Paused`（停在呼叫之間，不砍進行中之測試）③每次呼叫前後寫 `<out>/progress.json`（目前檔／nodeid、開始時刻、
     已完成數、行程 pid），供外部監看判斷是否卡住。"""
 
-    def __init__(self, out: Path, max_seconds: Optional[float], total: int):
+    def __init__(self, out: Path, max_seconds: Optional[float], total: int, ledger_dir: Optional[Path] = None):
         self.out, self.max_seconds, self.total = out, max_seconds, total
         self.start = time.monotonic()
         self.done = 0
+        # TESTREG Task 2.3：每檔最近一次（非錨點）呼叫前之 ledger 檔名集合，供 current_failures 取本次呼叫之 session
+        self.ledger_dir = Path(ledger_dir) if ledger_dir is not None else None
+        self.ledger_snapshots: Dict[str, set] = {}
+
+    def _ledger_names(self) -> set:
+        d = self.ledger_dir
+        return {p.name for p in d.glob("*.jsonl")} if d is not None and d.is_dir() else set()
 
     def progress(self, phase: str, test_file: str, nodeids: Sequence[str], state: str = "running") -> None:
         self.out.mkdir(parents=True, exist_ok=True)
@@ -387,6 +501,9 @@ class Runner:
                 res = None
             if res is not None and not set(count_ids) - set(res):
                 self.done += len(count_ids)
+                if phase != "anchor" and self.ledger_dir is not None:
+                    # 沿用之結果：其呼叫所產之 session 記於 meta（ledger_new），視為本次之「呼叫後新增」
+                    self.ledger_snapshots[test_file] = self._ledger_names() - set(m.get("ledger_new") or [])
                 return m["rc"], res
         if self.max_seconds is not None and time.monotonic() - self.start > self.max_seconds:
             raise Paused(f"本段已用 {round(time.monotonic() - self.start)} 秒 ≥ {self.max_seconds}")
@@ -399,10 +516,14 @@ class Runner:
         t0 = time.monotonic()
         if meta.exists():
             meta.unlink()  # 先撤舊 meta：本次呼叫中斷時不得留下與新結果檔不符之舊 meta
+        before = self._ledger_names()
+        if phase != "anchor" and self.ledger_dir is not None:
+            self.ledger_snapshots[test_file] = before  # 錨點呼叫不記、不覆寫（其恆在 B／C 呼叫之後）
         rc, res = run_file(test_file, xml, cwd, env, nodeids, extra)
         tmp = meta.with_suffix(".tmp")
         tmp.write_text(json.dumps({"state_key": key, "rc": rc, "file": test_file,
-                                   "seconds": round(time.monotonic() - t0, 1)}), encoding="utf-8")
+                                   "seconds": round(time.monotonic() - t0, 1),
+                                   "ledger_new": sorted(self._ledger_names() - before)}), encoding="utf-8")
         os.replace(tmp, meta)  # 審查 r57：原子替換
         self.done += len(count_ids)
         self.progress(phase, test_file, count_ids, state="finished-call")
@@ -1118,15 +1239,48 @@ def _row_nodeids(rows: Sequence[str], prefix: str) -> List[str]:
 ADMISSION_BUDGET_SECONDS = 7200
 
 
+def out_exclusion(repo: Path, out_dir: Optional[Path]) -> Optional[str]:
+    """本次 `--out` 位於 repo 內 ⇒ 排除其下未追蹤內容之 pathspec（前綴由參數導出）；位於 repo 外或未給 ⇒ None。"""
+    if out_dir is None:
+        return None
+    try:
+        rel = Path(out_dir).resolve().relative_to(Path(repo).resolve())
+    except ValueError:
+        return None
+    return f":(exclude){rel.as_posix()}/**" if rel.parts else None
+
+
+def check_out_dir(out_dir: Path, repo: Path) -> None:
+    """`--out` 不得為 repo 根或其祖先（排除前綴會吞掉全部未追蹤內容）。"""
+    o, r = Path(out_dir).resolve(), Path(repo).resolve()
+    if o == r or o in r.parents:
+        raise GateError(f"--out 不得為 repo 根或其上層：{o}")
+
+
+def _within(d: Path, out_dir: Optional[Path]) -> bool:
+    if out_dir is None:
+        return False
+    d, o = Path(d).resolve(), Path(out_dir).resolve()
+    return d == o or o in d.parents
+
+
+def _sha_file_or_empty(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else ""
+
+
 def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterable[Path] = (),
-                       env: Optional[Mapping[str, str]] = None) -> str:
+                       env: Optional[Mapping[str, str]] = None, *, out: Optional[Path] = None,
+                       manifest: Optional[Mapping] = None, previously_failed: Optional[Sequence[str]] = None) -> str:
     """挑選之輸入指紋：錨點、phase、排除後之 HEAD 檔案樹身分、相對 HEAD 之 diff、未追蹤檔路徑＋內容與資料輸入內容（content_inputs）、manifest、處置表、本執行器原始碼、
     admission 估時來源（各目錄下 junit xml 之路徑與內容，審查 r53）。`--admit` 須等於此值方得於估時未知或逾預算時執行
-    （批准綁定確切輸入）。"""
+    （批准綁定確切輸入）。TESTREG Task 2.3（契約 `impact.gate_wiring`）：另納 plan 實際收到之 manifest 物件之正規
+    JSON、catalog／schema／scripts/testreg.py 之 sha256、previously_failed 之排序清單；本次 `--out` 之下之未追蹤內容與
+    估時目錄（等於 out 或位於其下者）不納入（`out_exclusion`）。"""
     h = hashlib.sha256()
+    excl = out_exclusion(repo, out)
     for part in (anchor, str(phase), tree_identity(repo),  # 審查 r58：檔案樹身分取代提交編號
                  _git(repo, "diff", "--binary", "HEAD", "--", ".", *FP_EXCLUDES),
-                 content_inputs(repo)):  # 審查 r52／r60：未追蹤檔路徑＋內容、資料輸入內容
+                 content_inputs(repo, (excl,) if excl else ())):  # 審查 r52／r60：未追蹤檔路徑＋內容、資料輸入內容
         h.update(part.encode("utf-8", "replace"))
         h.update(b"\0")
     for rel in (MANIFEST_REL, DISPOSITION_REL, "scripts/framepath_affected_gate.py"):
@@ -1136,10 +1290,114 @@ def plan_inputs_digest(repo: Path, anchor: str, phase: int, timing_dirs: Iterabl
     h.update(b"env\0" + env_fingerprint(env if env is not None else os.environ).encode("utf-8", "replace") + b"\0")
     for d in timing_dirs:
         d = Path(d).resolve()
+        if _within(d, out):
+            continue
         h.update(b"timings\0" + str(d).encode("utf-8", "replace") + b"\0")
         for x in sorted(d.rglob("*.xml")) if d.is_dir() else []:
             h.update(str(x.relative_to(d)).encode("utf-8", "replace") + b"\0" + hashlib.sha256(x.read_bytes()).digest())
+    if manifest is not None:
+        h.update(b"manifest\0" + json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+                 .encode("utf-8") + b"\0")
+    for rel in (TESTREG_CATALOG_REL, TESTREG_SCHEMA_REL, "scripts/testreg.py"):
+        h.update(f"{rel}\0{_sha_file_or_empty(Path(repo) / rel)}\0".encode("utf-8"))
+    h.update(b"previously_failed\0" + json.dumps(sorted(previously_failed or [])).encode("utf-8") + b"\0")
     return h.hexdigest()
+
+
+# ── TESTREG Task 2.3：plan 吃 impact、碑解析、must 核對（契約 `impact.gate_feed`、`gate_report`）────────────────────
+
+
+def _testreg():
+    """`scripts.testreg`（模組屬性取用，`monkeypatch.setattr(testreg, "impact", …)` 生效）。"""
+    return importlib.import_module("scripts.testreg")
+
+
+def changed_paths(repo: Path, anchor: str) -> List[str]:
+    """契約 `impact.gate_wiring`：排序去重之（`git diff --name-only <anchor>` ∪ `git diff --name-only HEAD` ∪
+    `git ls-files --others --exclude-standard`），三者皆扣除 FP_EXCLUDES，不限 tests/。"""
+    out = set()
+    for args in (("diff", "--name-only", "--no-renames", anchor), ("diff", "--name-only", "--no-renames", "HEAD"),
+                 ("ls-files", "--others", "--exclude-standard")):
+        out |= {p for p in _git(repo, *args, "--", ".", *FP_EXCLUDES).splitlines() if p}
+    return sorted(p for p in out if not _fp_excluded(p))
+
+
+def resolve_tombstones(repo: Path, items: Sequence[str], catalog: Mapping) -> Tuple[List[str], List[Dict[str, object]]]:
+    """契約 `impact.gate_feed` 第一步：items（nodeid 或測試檔路徑）中已立碑者以 replaced_by 遞迴取代（循環 ⇒
+    GateError）、E0 除去並記；路徑有碑而檔已不存在 ⇒ 以取代者所在檔取代。回傳 (解析後 items, tombstone_resolutions)。"""
+    try:
+        return _testreg().resolve_tomb_items(list(items), (catalog or {}).get("tombstones", []),
+                                             exists=lambda p: (Path(repo) / p).is_file())
+    except _testreg().TestregError as exc:
+        raise GateError(str(exc)) from exc
+
+
+def must_missing(must: Sequence[str], collected: Mapping[str, Sequence[str]]) -> List[str]:
+    """collect 後核對：must nodeid 不在收集結果者（缺 ⇒ 閘拒跑）。"""
+    have = {n for ids in collected.values() for n in ids}
+    return [m for m in must if m not in have]
+
+
+def expanded_nodeids(selected: Iterable[str], collected: Mapping[str, Sequence[str]],
+                     whole_files: Iterable[str]) -> set:
+    """新計畫之 nodeid 集合：原計畫選入者 ∪ 整檔執行之檔（impact.selected）之全部收集 nodeid。"""
+    out = set(selected)
+    for f in whole_files:
+        out |= set(collected.get(f, ()))
+    return out
+
+
+def impact_universe_errors(impact: Mapping, tree_tests: Iterable[str]) -> List[str]:
+    """契約 `gate_report.impact_universe`：selected／excluded 之 path 各自無重複、互斥、聯集＝受驗之樹之測試檔集合。"""
+    errs: List[str] = []
+    sel = [x.get("path") for x in impact.get("selected", []) if isinstance(x, dict)]
+    exc = [x.get("path") for x in impact.get("excluded", []) if isinstance(x, dict)]
+    for name, xs in (("selected", sel), ("excluded", exc)):
+        dup = sorted({p for p in xs if xs.count(p) > 1})
+        if dup:
+            errs.append(f"impact {name} 重複：{dup[:5]}")
+    both = sorted(set(sel) & set(exc))
+    if both:
+        errs.append(f"impact selected 與 excluded 重疊：{both[:5]}")
+    tree = set(tree_tests)
+    if set(sel) | set(exc) != tree:
+        errs.append(f"impact 涵蓋 ≠ 受驗之樹之測試檔：缺 {sorted(tree - set(sel) - set(exc))[:5]} "
+                    f"多 {sorted((set(sel) | set(exc)) - tree)[:5]}")
+    return errs
+
+
+def _tree_tests(repo: Path) -> List[str]:
+    tr = _testreg()
+    pat = _testreg_schema(repo)["formats"]["test_path"]
+    return sorted(f for f in tr._Tree(Path(repo), "worktree").files() if re.fullmatch(pat, f))
+
+
+def validate_plan_receipt(fields: Mapping[str, object], repo: Path) -> List[str]:
+    """契約 `gate_report.validation`：所給之 plan 收據欄依 `plan_receipt_fields` 驗形（V17 同法，testreg.validate_shape），
+    testreg_impact 必備並驗 impact_universe。"""
+    tr = _testreg()
+    schema = _testreg_schema(repo)
+    spec = schema["gate_report"]["plan_receipt_fields"]
+    errs: List[str] = []
+    if "testreg_impact" not in fields:
+        errs.append("plan 收據缺 testreg_impact")
+    for k, v in fields.items():
+        if k not in spec:
+            errs.append(f"plan 收據未知欄 {k}")
+            continue
+        errs += [f"{k}: {e}" for e in tr.validate_shape(v, spec[k], schema, k)]
+    imp = fields.get("testreg_impact")
+    if isinstance(imp, dict) and not errs:
+        errs += impact_universe_errors(imp, _tree_tests(repo))
+    return errs
+
+
+def _load_catalog(repo: Path) -> Dict[str, object]:
+    p = Path(repo) / TESTREG_CATALOG_REL
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise GateError(f"{TESTREG_CATALOG_REL} 不存在或不可解析") from exc
 
 
 def junit_times(xml_text: str, repo: Path) -> Dict[str, float]:
@@ -1186,13 +1444,40 @@ def load_times(repo: Path, dirs: Iterable[Path]) -> Dict[str, float]:
 
 
 def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[str, str],
-         timing_dirs: Sequence[Path] = ()) -> Dict[str, object]:
+         timing_dirs: Sequence[Path] = (), out: Optional[Path] = None) -> Dict[str, object]:
     """D8 挑選（不執行測試本體；耗時主要為逐檔 collect）：collect B／C 檔、靜態掃描錨點與工作樹兩版之測試檔並取聯集。
-    須於本批完整改動（生產碼＋測試處置）套上後執行；任一檔 collect 失敗 ⇒ 拒跑。"""
-    b_group, c_group = manifest_groups(manifest, phase)
+    須於本批完整改動（生產碼＋測試處置）套上後執行；任一檔 collect 失敗 ⇒ 拒跑。
+
+    TESTREG Task 2.3（契約 `impact.gate_feed`）：①collect 之前，B／C 組與 must 之已立碑項以碑之 replaced_by 取代並
+    留原組（`resolve_tombstones`）②於行程內呼叫 `scripts.testreg.impact`（changed_paths、must、previously_failed），
+    其 selected 之檔整檔執行（不在 A／B／C 者併入 extra_files）③collect 後逐一核對 must 皆被收集（`must_missing`）
+    ④plan 收據欄（`plan_receipt_fields`）驗形與 impact_universe 不符 ⇒ GateError。"""
     rows = manifest["batch_card"]["risk_mitigation"]
-    must = _row_nodeids(rows, f"affected_must phase={phase} ")
+    catalog = _load_catalog(repo)
+    b_raw, c_raw = manifest_groups(manifest, phase)
+    a_group, res_a = resolve_tombstones(repo, list(A_GROUP_BY_PHASE[phase]), catalog)
+    b_group, res_b = resolve_tombstones(repo, b_raw, catalog)
+    c_group, res_c = resolve_tombstones(repo, c_raw, catalog)
+    must, res_m = resolve_tombstones(repo, _row_nodeids(rows, f"affected_must phase={phase} "), catalog)
+    resolutions = list({r["from"]: r for r in [*res_a, *res_b, *res_c, *res_m]}.values())
+    resolutions.sort(key=lambda r: str(r["from"]))
+    a_group = [p.split("::", 1)[0] for p in a_group]
+    a_group = list(dict.fromkeys(a_group))
+    c_group = [p for p in c_group if p not in A_GROUP and p not in a_group]
+    b_group = [p for p in b_group if p not in A_GROUP and p not in a_group and p not in c_group]
     heavy_pinned = _row_nodeids(rows, f"heavy_files phase={phase} ")
+    tr = _testreg()
+    previously_failed = tr.previously_failed_from_summary(repo)
+    try:
+        impact = tr.impact(repo, changed_paths(repo, anchor), list(must), list(previously_failed),
+                           production_taint=False)
+    except tr.TestregError as exc:
+        raise GateError(f"testreg impact 拒跑：{exc}") from exc
+    if not isinstance(impact, dict):
+        impact = {}
+    pre_errs = validate_plan_receipt({"testreg_impact": impact}, repo)
+    if pre_errs:
+        raise GateError(f"plan 收據驗證不符：{pre_errs[:5]}")
     deleted, residual, prod_files, residual_specs = production_changes(repo, anchor)
     symbols = s2_symbols(deleted, residual)
     align_triggered = bool(set(prod_files) & ALIGN_TRIGGER_FILES or (deleted | residual) & ALIGN_TRIGGER_SYMBOLS)
@@ -1219,7 +1504,7 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
     scans: Dict[str, Dict[str, object]] = {f: merged_scan(f) for f in collected}
     # 清單外之測試檔亦受 S2 約束（審查 r51）：全部 tests/ 下 test_*.py 經同一傳遞分析，有 taint 者納入（只選 taint 之
     # nodeid，不整檔），收據記 extra_files。
-    known = set(collected) | set(A_GROUP)
+    known = set(collected) | set(A_GROUP) | set(a_group)
     extra: List[str] = []
     for p in sorted((repo / "tests").rglob("test_*.py")):
         rel = str(p.relative_to(repo))
@@ -1232,20 +1517,40 @@ def plan(repo: Path, anchor: str, phase: int, manifest: Mapping, env: Mapping[st
             extra.append(rel)
     for rel in extra:
         collected[rel] = collect(rel, repo, env)
+    # impact.selected 之檔整檔執行（gate_feed 第二步）；不在 A／B／C／extra 者併入 extra_files
+    impact_files = {x["path"]: list(x["reasons"]) for x in impact["selected"]}
+    for rel in sorted(impact_files):
+        if rel not in collected and rel not in A_GROUP and rel not in a_group:
+            collected[rel] = collect(rel, repo, env)
+            extra.append(rel)
+    missing = must_missing(must, collected)
+    if missing:
+        raise GateError(f"manifest affected_must（碑解析後）之 nodeid 未被收集：{missing}")
     disposition = json.loads((repo / DISPOSITION_REL).read_text(encoding="utf-8"))
     s1_funcs, s1_nodes = s1_targets(disposition, phase, scans)
     selected, skipped = select_expected(collected, scans, s1_funcs, s1_nodes, must, heavy_pinned, align_triggered)
-    missing_must = sorted(set(must) - set(selected))
-    if missing_must:
-        raise GateError(f"manifest affected_must 之 nodeid 未被收集：{missing_must}")
+    for rel, reasons in impact_files.items():
+        for nid in collected.get(rel, []):
+            selected.setdefault(nid, [])
+            selected[nid] += [f"impact:{r}" for r in reasons]
+            skipped.pop(nid, None)
     baseline = repo / INVARIANCE_BASELINE_REL
+    fields = {"testreg_impact": impact, "catalog_sha256": _sha_file_or_empty(repo / TESTREG_CATALOG_REL),
+              "previously_failed": list(previously_failed), "tombstone_resolutions": resolutions,
+              "must_check": {"must": list(must), "missing": missing}}
+    errs = validate_plan_receipt(fields, repo)
+    if errs:
+        raise GateError(f"plan 收據驗證不符：{errs[:5]}")
     return {
-        "groups": {"B": b_group, "C": c_group}, "collected": collected, "selected": selected, "skipped": skipped,
+        "groups": {"A": a_group, "B": b_group, "C": c_group}, "collected": collected, "selected": selected, "skipped": skipped,
         "s2_symbols": sorted(symbols), "production_files": prod_files, "align_triggered": align_triggered,
-        "residual_defs": residual_specs, "inputs_digest": plan_inputs_digest(repo, anchor, phase, timing_dirs, env),
+        "residual_defs": residual_specs,
+        "inputs_digest": plan_inputs_digest(repo, anchor, phase, timing_dirs, env, out=out, manifest=manifest,
+                                            previously_failed=previously_failed),
         "extra_files": extra,
         "light_files": sorted(f for f, s in scans.items() if not s["heavy"] and f not in set(heavy_pinned)),
         "invariance_baseline_sha256": hashlib.sha256(baseline.read_bytes()).hexdigest() if baseline.is_file() else None,
+        **fields,
     }
 
 
@@ -1288,14 +1593,19 @@ def main(argv: Sequence[str]) -> int:
     args.phase = BATCH_PHASE[batch]
     args.receipt = str(REPO / f"handoffs/run_receipts/framepath-b{batch}-affected.json")
     out = Path(args.out or Path(tempfile.gettempdir()) / f"framepath_affected_b{batch}").resolve()
+    check_out_dir(out, REPO)
     anchor = resolve_anchor()
     global _RUNNER
-    runner = _RUNNER = Runner(out, args.max_seconds, 0)  # 審查 r59：挑選與收集階段即寫 progress.json
+    # TESTREG Task 2.3：ledger_dir 與 catalog 一律由模組屬性 REPO 導出（契約 gate_report.current_failure_source）
+    ledger_dir = REPO / _testreg_schema(REPO)["ledger"]["dir"]
+    runner = _RUNNER = Runner(out, args.max_seconds, 0, ledger_dir=ledger_dir)  # 審查 r59：挑選與收集階段即寫 progress.json
     env = dict(os.environ, FRAMEPATH_PHASE=str(args.phase), PYTHONPATH=str(REPO))
     manifest = json.loads((REPO / MANIFEST_REL).read_text(encoding="utf-8"))
     timing_dirs = [out, *[Path(t) for t in args.timings]]
-    sel = plan(REPO, anchor, args.phase, manifest, env, timing_dirs)
-    a_ids = [n for f in A_GROUP_BY_PHASE[args.phase] for n in collect(f, REPO, env)]
+    sel = plan(REPO, anchor, args.phase, manifest, env, timing_dirs, out=out)
+    # TESTREG v41（諮詢 r2 CODEX-R2-P1-03）：A 組亦經碑解析，以 plan 回傳之解析後 A 收集與執行
+    a_files = list(sel["groups"].get("A", A_GROUP_BY_PHASE[args.phase]))
+    a_ids = [n for f in a_files for n in collect(f, REPO, env)]
     times = load_times(REPO, timing_dirs)
     adm = admission([*a_ids, *sel["selected"]], times)
     if args.plan:
@@ -1336,7 +1646,7 @@ def main(argv: Sequence[str]) -> int:
                     FRAMEPATH_DEF_PROBE_DEFS=",".join(sel["residual_defs"]))
 
     probe_dirs: List[Path] = []
-    for f in A_GROUP_BY_PHASE[args.phase]:
+    for f in a_files:
         ids = collect(f, REPO, env)
         # 實作期 b1：處置驗證器 ⑦ 檢查工作樹改動，而同檔之 check_1／check_2 以 collect-only 子行程改寫已追蹤清冊
         # （tests/conftest.py 之副作用）⇒ 同一呼叫中 ⑦ 見到生成物而紅。把「檢查工作樹」之 nodeid 先於乾淨樹單獨
@@ -1402,7 +1712,16 @@ def main(argv: Sequence[str]) -> int:
     result = classify(expected, batch, anchor_res)
     hits = set().union(*(probe_hits(d) for d in probe_dirs)) if probe_dirs else set()
     unexecuted = sorted(set(sel["residual_defs"]) - hits)
-    passed = verdict(result, a_failures, incomplete, unexecuted)
+    catalog = _load_catalog(REPO)
+    passed, quarantined = quarantined_verdict(result, a_failures, incomplete, unexecuted, runner, catalog, ledger_dir,
+                                              datetime.date.today())
+    tomb_rows = list(sel.get("tombstone_resolutions", []))
+    tr = _testreg()
+    schema = _testreg_schema(REPO)
+    bad = [f"{k}: {e}" for k, v in (("quarantined_failures", quarantined), ("tombstone_resolutions", tomb_rows))
+           for e in tr.validate_shape(v, schema["gate_report"]["fields"][k], schema, k)]
+    if bad:
+        raise GateError(f"verdict 收據欄驗證不符：{bad[:5]}")
     receipt = {
         "spec": "docs/FRAMEPATH_SPEC.md v21 D8", "phase": args.phase, "repo_head": _git(REPO, "rev-parse", "HEAD").strip(),
         "selection": {"selected": sel["selected"], "skipped": sel["skipped"], "s2_symbols": sel["s2_symbols"],
@@ -1411,7 +1730,7 @@ def main(argv: Sequence[str]) -> int:
                       "inputs_digest": sel["inputs_digest"], "admission": adm, "admitted": args.admit is not None},
         "residual_defs": sel["residual_defs"], "residual_executed": sorted(hits & set(sel["residual_defs"])),
         "residual_unexecuted": unexecuted,
-        "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(A_GROUP_BY_PHASE[args.phase]),
+        "anchor": anchor, "anchor_worktree": str(anchor_wt), "groups": {"A": list(a_files),
                                                                         "B": b_group, "C": c_group},
         "a_failures": a_failures, "incomplete_files": incomplete, "per_file": per_file,
         "expected_count": len(expected), "result_count": len(set(expected) & set(batch)),
@@ -1420,6 +1739,7 @@ def main(argv: Sequence[str]) -> int:
         "caused_detail": {n: {"batch": list(failure_identity(batch[n])),
                               "anchor": list(failure_identity(anchor_res[n])) if n in anchor_res else None}
                           for n in result["caused"]},
+        "quarantined_failures": quarantined, "tombstone_resolutions": tomb_rows,
         "pass": passed,
     }
     Path(args.receipt).parent.mkdir(parents=True, exist_ok=True)

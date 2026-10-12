@@ -1488,23 +1488,41 @@ def _load_receipt(ctx: Context, rel: Optional[str]) -> Tuple[Optional[Dict[str, 
         return None, f"收據 {rel} 非 JSON"
 
 
+_GIT_CTX_ENV = ("GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE", "GIT_PREFIX", "GIT_OBJECT_DIRECTORY")
+
+
+class _NoGitCtxEnv:
+    """暫時移除 git hook 執行期注入之環境變數（pre-commit 中 `GIT_INDEX_FILE` 等會被暫存 worktree 之 git 子行程繼承，
+    使 `worktree add`／`apply`／`diff` 作用於主倉索引而失敗）。"""
+
+    def __enter__(self):
+        self._saved = {k: os.environ.pop(k) for k in _GIT_CTX_ENV if k in os.environ}
+        return self
+
+    def __exit__(self, *exc):
+        os.environ.update(self._saved)
+        return False
+
+
 def _digest_with(ctx: Context, head: str, patches: Sequence[str]) -> str:
     """於 head 乾淨樹依序套用 patches（取受驗之樹之補丁內容）後之 diff_digest（記錄器之單一實作）。"""
     key = (head, tuple(patches))
     cache = ctx.extra.setdefault("digests", {})
     if key in cache:
         return cache[key]
+    texts = [_tree(ctx).read(rel) or "" for rel in patches]  # 受驗之樹（含暫存區）之內容先於移除環境前讀出
     tmp = Path(tempfile.mkdtemp(prefix="testreg-digest-"))
     wt = tmp / "wt"
-    _run_git(ctx.repo_root, "worktree", "add", "-q", "--detach", str(wt), head)
-    try:
-        for rel in patches:
-            pf = tmp / f"p{len(list(tmp.iterdir()))}.patch"
-            pf.write_text(_tree(ctx).read(rel) or "", encoding="utf-8")
-            _run_git(wt, "apply", str(pf))
-        cache[key] = _plugin_module().diff_digest(wt)
-    finally:
-        _run_git(ctx.repo_root, "worktree", "remove", "--force", str(wt), check=False)
+    with _NoGitCtxEnv():
+        _run_git(ctx.repo_root, "worktree", "add", "-q", "--detach", str(wt), head)
+        try:
+            for i, text in enumerate(texts):
+                pf = tmp / f"p{i}.patch"
+                pf.write_text(text, encoding="utf-8")
+                _run_git(wt, "apply", str(pf))
+            cache[key] = _plugin_module().diff_digest(wt)
+        finally:
+            _run_git(ctx.repo_root, "worktree", "remove", "--force", str(wt), check=False)
     return cache[key]
 
 
@@ -1624,17 +1642,19 @@ class _PatchedTree:
 
     def __init__(self, ctx: Context, head: str, patch_rel: str):
         self._files: Dict[str, Optional[str]] = {}
+        text = _tree(ctx).read(patch_rel) or ""
         tmp = Path(tempfile.mkdtemp(prefix="testreg-cp-"))
         wt = tmp / "wt"
-        _run_git(ctx.repo_root, "worktree", "add", "-q", "--detach", str(wt), head)
-        try:
-            pf = tmp / "c.patch"
-            pf.write_text(_tree(ctx).read(patch_rel) or "", encoding="utf-8")
-            ok = _run_git(wt, "apply", str(pf), check=False).returncode == 0
-            for p in _patch_paths(pf.read_text(encoding="utf-8")):
-                self._files[p] = (wt / p).read_text(encoding="utf-8") if ok and (wt / p).is_file() else None
-        finally:
-            _run_git(ctx.repo_root, "worktree", "remove", "--force", str(wt), check=False)
+        with _NoGitCtxEnv():
+            _run_git(ctx.repo_root, "worktree", "add", "-q", "--detach", str(wt), head)
+            try:
+                pf = tmp / "c.patch"
+                pf.write_text(text, encoding="utf-8")
+                ok = _run_git(wt, "apply", str(pf), check=False).returncode == 0
+                for p in _patch_paths(text):
+                    self._files[p] = (wt / p).read_text(encoding="utf-8") if ok and (wt / p).is_file() else None
+            finally:
+                _run_git(ctx.repo_root, "worktree", "remove", "--force", str(wt), check=False)
 
     def read(self, rel: str) -> Optional[str]:
         return self._files.get(rel)
@@ -2945,8 +2965,121 @@ def _dir_fixture_defs(eng: "_Engine", f: str, own: Optional["_Mod"],
     return out
 
 
+def literal_fix_receipt_rel(schema: Mapping[str, Any], path: str) -> str:
+    """契約 `receipts.literal_fix`：測試檔 path 之字面對映修正收據之 repo 相對路徑。"""
+    return f"{schema['receipts']['literal_fix']['dir']}/{path.replace('/', '__')}.json"
+
+
+def _string_spans(src: str) -> List[Tuple[int, int]]:
+    """原始碼中字串 token（含 f-string）之 [起, 迄) 字元位置；不可 tokenize ⇒ []。"""
+    import io
+    import tokenize
+    starts = [0]
+    for line in src.splitlines(keepends=True):
+        starts.append(starts[-1] + len(line))
+    spans = []
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(src).readline):
+            if tok.type == tokenize.STRING:
+                spans.append((starts[tok.start[0] - 1] + tok.start[1], starts[tok.end[0] - 1] + tok.end[1]))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return []
+    return spans
+
+
+def _literal_regex(keys: Iterable[str], boundary: str) -> "re.Pattern[str]":
+    alt = "|".join(re.escape(k) for k in sorted(keys, key=lambda k: (-len(k), k)))
+    return re.compile(f"(?<![{boundary}])(?:{alt})(?![{boundary}])")
+
+
+def literal_fix_errors(ctx: Context, path: str) -> Optional[List[str]]:
+    """契約 `receipts.literal_fix`（SPEC v41）：受驗之樹中測試檔 path 之字面對映修正收據。無收據 ⇒ None；有 ⇒ 不符之
+    清單（空＝成立，該檔之 V19 一次性放行）。條件：形狀＝`types.receipt_literal_fix`；path 相符；head＝HEAD（一次性）；
+    approval_ref 存在於受驗之樹；對映非空且雙射、鍵值不交；每鍵為假測試檔識別（路徑形合 `key_path_pattern` 而不合
+    `formats.test_path`，或點號形合 `key_dotted_pattern` 且其路徑形如前），值為對應之合 `formats.test_path` 者
+    （點號形之值之路徑形合之），同一識別之路徑形與點號形之值相對應；HEAD 版中鍵之每一出現、受驗版中值之每一出現皆
+    位於字串 token 內，且值不出現於 HEAD 版；HEAD 版全文以識別字邊界之子字串代換（長鍵先、不重疊）後與受驗版逐位元
+    相等（不得夾帶其他改動）；（v42）session_id 所指記錄器 session 綁定 head＋patch_path（patch 後之該檔＝受驗版），
+    且該檔每一函式層 nodeid 於其中全為 passed。"""
+    s = ctx.schema
+    lf = s["receipts"]["literal_fix"]
+    t = _tree(ctx)
+    text = t.read(literal_fix_receipt_rel(s, path))
+    if text is None:
+        return None
+    try:
+        r = json.loads(text)
+    except ValueError:
+        return ["字面對映修正收據非 JSON"]
+    errs = list(_seam("validate_shape")(r, {"type": "types.receipt_literal_fix"}, s))
+    if errs:
+        return errs
+    if r["path"] != path:
+        errs.append(f"收據 path {r['path']} ≠ {path}")
+    if r["head"] != ctx.extra["head_sha"]:
+        errs.append("收據 head ≠ HEAD（字面對映修正收據為一次性）")
+    if not (ctx.repo_root / r["approval_ref"]).is_file():  # 收斂檔依慣例不進 git（.git/info/exclude 之 handoffs/*）
+        errs.append(f"approval_ref {r['approval_ref']} 不存在")
+    m: Dict[str, str] = r["map"]
+    if not m or len(set(m.values())) != len(m) or set(m) & set(m.values()):
+        return errs + ["對映須非空、雙射且鍵值不交"]
+    tp = s["formats"]["test_path"]
+
+    def as_path(x: str, dotted: bool) -> str:
+        return x.replace(".", "/") + ".py" if dotted else x
+
+    for k, v in m.items():
+        dotted = re.fullmatch(lf["key_dotted_pattern"], k) is not None
+        kp = as_path(k, dotted)
+        if re.fullmatch(lf["key_path_pattern"], kp) is None or re.fullmatch(tp, kp) is not None:
+            errs.append(f"鍵 {k!r} 非不合 formats.test_path 之假測試檔識別")
+        if re.fullmatch(tp, as_path(v, dotted)) is None or (dotted and re.fullmatch(lf["key_dotted_pattern"], v) is None):
+            errs.append(f"值 {v!r} 須為合 formats.test_path 之{'點號形' if dotted else '路徑'}")
+        if dotted and kp in m and as_path(v, True) != m[kp]:
+            errs.append(f"點號形 {k!r}→{v!r} 與路徑形 {kp!r}→{m[kp]!r} 不對應")
+    old, new = ctx.extra["head_obj"].read(path), t.read(path)
+    if old is None or new is None:
+        return errs + ["HEAD 或受驗之樹缺該測試檔"]
+    rx_k, rx_v = _literal_regex(m, lf["boundary_chars"]), _literal_regex(m.values(), lf["boundary_chars"])
+    for src, rx, what in ((old, rx_k, "鍵（HEAD 版）"), (new, rx_v, "值（受驗版）")):
+        spans = _string_spans(src)
+        bad = [x.group(0) for x in rx.finditer(src) if not any(a <= x.start() and x.end() <= b for a, b in spans)]
+        if bad:
+            errs.append(f"{what}出現於字串 token 外：{sorted(set(bad))[:3]}")
+    if rx_v.search(old):
+        errs.append("值已出現於 HEAD 版（對映不可逆）")
+    if rx_k.sub(lambda x: m[x.group(0)], old) != new:
+        errs.append("HEAD 版套對映後與受驗版不相等（不得夾帶其他改動）")
+    if errs:
+        return errs
+    # v42（修訂審查 r40 CODEX-R40-P1-01）：改名後全檔須實跑全過——依賴舊識別「不合格」之斷言改名後必紅，故不能靜默
+    # 轉弱；收據綁定一次記錄器 session：head＝收據 head、diff_digest＝head 乾淨樹套 patch_path 之 diff_digest、patch 後
+    # 之該檔＝受驗版，且該檔每一函式層 nodeid 於 session 皆有紀錄且全為 passed
+    if not t.exists(r["patch_path"]):
+        return [f"patch_path {r['patch_path']} 不存在"]
+    # v43（修訂審查 r41 CODEX-R41-P1-01）：patch 所及之檔 ⊆ 契約 allowed_patch_paths ∪ {path}——不得夾帶改被測生產碼
+    # 使改名後之負向斷言仍綠
+    extra = sorted(set(_patch_paths(t.read(r["patch_path"]) or "")) - set(lf["allowed_patch_paths"]) - {path})
+    if extra:
+        return errs + [f"patch_path 含契約 allowed_patch_paths 以外之檔：{extra[:5]}"]
+    if _PatchedTree(ctx, r["head"], r["patch_path"]).read(path) != new:
+        errs.append("patch_path 套於 head 後之該檔 ≠ 受驗版")
+    s = _ledger_session(ctx, r["session_id"])
+    if s is None:
+        return errs + [f"unverifiable：session {r['session_id']} 不在 ledger"]
+    info = s["session"] or {}
+    if info.get("head") != r["head"] or info.get("diff_digest") != _digest_with(ctx, r["head"], [r["patch_path"]]):
+        errs.append("session 不綁定 head＋patch_path")
+    for fn in _function_nodeids(t, path):
+        recs = [x for n_, x in s["tests"].items() if re.sub(r"\[.*\]$", "", n_) == fn]
+        if not recs or any(x.get("outcome") != "passed" for x in recs):
+            errs.append(f"session 中 {fn} 未全為 passed（{sorted({x.get('outcome') for x in recs}) or '無紀錄'}）")
+    return errs
+
+
 def rule_v19(ctx: Context) -> List[Finding]:
-    """V19（以 `assertion_multiset` 與 `multiset_decreased` 判定）。"""
+    """V19（以 `assertion_multiset` 與 `multiset_decreased` 判定；測試檔有成立之字面對映修正收據〔`literal_fix_errors`
+    為空〕⇒ 該檔之測試一次性放行）。"""
     pat = ctx.schema["formats"]["test_path"]
     t, head = _tree(ctx), ctx.extra["head_obj"]
     files, helpers = set(), set(ctx.extra.get("helper_paths", []))
@@ -3011,6 +3144,7 @@ def rule_v19(ctx: Context) -> List[Finding]:
         nids |= u_
     tombs, out = _tomb_ids(ctx), []
     present: Dict[str, set] = {}
+    lit: Dict[str, Optional[List[str]]] = {}
     for nid in sorted(nids | set(decided) | set(decided_fx)):
         if nid in decided and nid not in nids:  # 存在性已於 `_plugin_change_dependents` 依受驗樹收集規則確認
             if nid not in tombs and not _rewrite_ok(ctx, nid):
@@ -3027,13 +3161,18 @@ def rule_v19(ctx: Context) -> List[Finding]:
             present[path_] = set(_function_nodeids(t, path_))
         if nid not in present[path_]:
             continue
+        if path_ not in lit:
+            lit[path_] = _seam("literal_fix_errors")(ctx, path_)
+        if lit[path_] == []:
+            continue  # 字面對映修正（SPEC v41）：HEAD 版全文套對映＝受驗版，斷言之改變只來自假測試檔識別之改名
         old = collections.Counter(e["key"] for e in he.elements(nid))
         new = collections.Counter(e["key"] for e in ce.elements(nid))
         if _skip_like(t, nid) and not _skip_like(head, nid):
             new = collections.Counter()  # 新增 skip／skipif／xfail（函式、類別、模組 pytestmark、本體 pytest.skip／xfail）⇒ 視為空
         dec = _seam("multiset_decreased")(old, new)
         if dec and nid not in tombs and not _rewrite_ok(ctx, nid):
-            out.append(Finding("V19", nid, f"斷言多重集合減少 {len(dec)} 項（須同提交立碑或附 rewrite 收據）"))
+            why = f"；字面對映修正收據不成立：{'；'.join(lit[path_][:3])}" if lit[path_] else ""
+            out.append(Finding("V19", nid, f"斷言多重集合減少 {len(dec)} 項（須同提交立碑或附 rewrite 收據）{why}"))
     return out
 
 
@@ -3806,19 +3945,109 @@ def _module_def_reach(graph: _ImportGraph, path: str) -> Dict[str, Tuple[FrozenS
     return out
 
 
-def _reach(root: Path, graph: _ImportGraph, test_path: str) -> FrozenSet[str]:
-    """測試檔可達之 repo 模組：自身之 import_closure（經具名縫）∪ 其目錄鏈上 conftest.py（含 repo 根）與其
-    `pytest_plugins` 所列模組中，測試檔以名稱請求（參數、usefixtures 字面）或 autouse 之定義及其遞移依賴之可達。
-    conftest 之 `pytest_*` hook 與未被請求之定義不計：前者為 session 層（其 import 期失敗使全部測試失敗，任一被選
-    之測試即可察覺，且 impact 不輸出空集合），後者不影響該測試之結果。"""
+def _module_index(graph: _ImportGraph, path: str) -> Tuple[Dict[str, List[Tuple[str, Optional[str]]]],
+                                                             Dict[str, List[ast.AST]]]:
+    """模組層（含模組層 if／try／with 區塊）：匯入名 → [(被匯入之 repo 模組檔, 被匯入名；整個模組為 None)]；
+    頂層 def／class 與模組層賦值目標名 → 其全部綁定節點。同名多次綁定（重綁、條件綁定）取全部之聯集（v42，修訂審查
+    r40 CODEX-R40-P1-02：hook 執行時取最後綁定，聯集為其保守超集，不依敘述順序推斷）。"""
+    cache = graph.__dict__.setdefault("_module_index", {})
+    if path in cache:
+        return cache[path]
+    tree = graph.parsed(path)
+    binds: Dict[str, List[Tuple[str, Optional[str]]]] = collections.defaultdict(list)
+    defs: Dict[str, List[ast.AST]] = collections.defaultdict(list)
+
+    def visit(body: Sequence[ast.stmt]) -> None:
+        for n in body:
+            if isinstance(n, ast.Import):
+                for al in n.names:
+                    tg = graph._module_targets(al.name.split("."), ghost=True)
+                    # `import a.b as c` ⇒ c 指 a.b；`import a.b` ⇒ a 可經屬性取到 a 與 a.b（皆計）
+                    binds[al.asname or al.name.split(".")[0]] += [(t, None) for t in (tg[-1:] if al.asname else tg)]
+            elif isinstance(n, ast.ImportFrom):
+                parts = graph._abs_parts(path, n.module, n.level)
+                tg = graph._module_targets(parts, ghost=bool(n.module)) if parts else []
+                for al in n.names:
+                    if al.name == "*" or not parts:
+                        continue
+                    sub = "/".join([*parts, al.name])
+                    sub_f = next((c for c in (sub + "/__init__.py", sub + ".py") if c in graph.files), None)
+                    if sub_f:
+                        binds[al.asname or al.name].append((sub_f, None))
+                    elif tg:
+                        binds[al.asname or al.name].append((tg[-1], al.name))
+            elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                defs[n.name].append(n)
+            elif isinstance(n, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+                for t in (n.targets if isinstance(n, ast.Assign) else [n.target]):
+                    for x in ast.walk(t):
+                        if isinstance(x, ast.Name):
+                            defs[x.id].append(n)
+            elif isinstance(n, (ast.If, ast.Try, ast.With, ast.For, ast.AsyncFor, ast.While)):
+                for b in ("body", "orelse", "finalbody"):
+                    visit(getattr(n, b, []) or [])
+                for h in getattr(n, "handlers", []) or []:
+                    visit(h.body)
+
+    visit(tree.body if tree is not None else [])
+    cache[path] = (binds, defs)
+    return cache[path]
+
+
+def _hook_reach(graph: _ImportGraph, path: str, name: str) -> FrozenSet[str]:
+    """hook（及其引用之定義）之定義層可達：自 (path, name) 起，定義本體內之 import 目標取 import_closure；本體引用之
+    同模組定義／模組層賦值遞移；引用之模組層匯入名——被匯入者為定義則遞移進該模組之該定義（只計其本體，不計該模組
+    其他定義之函式內 import）、為整個模組則取其 import_closure。經過之定義所在檔皆計入。被匯入模組之模組層程式碼
+    屬 import 期（失敗即全部測試失敗，任一被選測試即察覺），不另計。名稱解析不到（星號匯入、動態）⇒ 該模組之
+    import_closure（保守）。"""
+    seen: set = set()
+    files: set = set()
+    mods: set = set()
+    stack: List[Tuple[str, str]] = [(path, name)]
+    while stack:
+        p, n = stack.pop()
+        if (p, n) in seen:
+            continue
+        seen.add((p, n))
+        files.add(p)
+        binds, defs = _module_index(graph, p)
+        nodes = defs.get(n, [])
+        for tp, attr in binds.get(n, ()):  # 名稱亦（或只）由匯入綁定：一併追
+            stack.append((tp, attr)) if attr else mods.add(tp)
+        if not nodes and n not in binds:
+            mods.add(p)
+            continue
+        for node in nodes:
+            for x in ast.walk(node):
+                if isinstance(x, (ast.Import, ast.ImportFrom)):
+                    mods.update(_import_node_targets(graph, p, x))
+            for r in _name_refs(node):
+                if r in defs and r != n:
+                    stack.append((p, r))
+                for tp, attr in binds.get(r, ()):
+                    stack.append((tp, attr)) if attr else mods.add(tp)
+    out = set(files)
+    for m in mods:
+        out |= graph.closure(m)
+    return frozenset(out)
+
+
+def _reach_parts(root: Path, graph: _ImportGraph, test_path: str) -> Tuple[FrozenSet[str], FrozenSet[str]]:
+    """(測試檔與 fixture 可達, hook 可達)。前者＝自身之 import_closure（經具名縫）∪ 目錄鏈上 conftest.py（含 repo 根）
+    與其 `pytest_plugins` 所列模組中，測試檔以名稱請求（參數、usefixtures 字面）或 autouse 之定義及其遞移依賴之可達；
+    後者＝同一範圍內全部 `pytest_*` hook 之 `_hook_reach`（hook 套用於其作用範圍內全部測試）。未被請求之非 hook
+    定義不計（不影響該測試之結果）。"""
     cache = graph.__dict__.setdefault("_reach", {})
     if test_path not in cache:
         acc = set(_seam("import_closure")(root, test_path))
+        hooks: set = set()
         pool: Dict[str, List[Tuple[FrozenSet[str], set, bool]]] = collections.defaultdict(list)
         for cf in _conftest_chain(graph.files, test_path):
             for mod in [cf, *[p for p in _plugin_paths(graph.tree, cf) if p in graph.files]]:
                 for name, info in _module_def_reach(graph, mod).items():
                     pool[name].append(info)
+                    if name.startswith("pytest_"):
+                        hooks |= _hook_reach(graph, mod, name)
         tree = graph.parsed(test_path)
         want = (_name_refs(tree) if tree is not None else set()) & set(pool)
         want |= {n for n, infos in pool.items() if any(i[2] for i in infos)}
@@ -3831,8 +4060,14 @@ def _reach(root: Path, graph: _ImportGraph, test_path: str) -> FrozenSet[str]:
             for mods, refs, _ in pool[n]:
                 acc |= mods
                 todo += [r for r in refs & set(pool) if r not in seen]
-        cache[test_path] = frozenset(acc)
+        cache[test_path] = (frozenset(acc), frozenset(hooks))
     return cache[test_path]
+
+
+def _reach(root: Path, graph: _ImportGraph, test_path: str) -> FrozenSet[str]:
+    """`_reach_parts` 兩者之聯集（tests/ helper、domain 用）。"""
+    tf, hk = _reach_parts(root, graph, test_path)
+    return tf | hk
 
 
 def _gate_module():
@@ -3950,17 +4185,19 @@ def previously_failed_from_summary(repo_root: Path) -> List[str]:
 
 
 def impact(repo_root: Path, changed_paths: List[str], must_resolved: List[str],
-           previously_failed: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+           previously_failed: List[str], production_taint: bool = True) -> Dict[str, List[Dict[str, Any]]]:
     """schema `impact`＋`gate_wiring` 之簽名：catalog、schema、AST 與測試檔集合一律自 repo_root 讀取；
     回傳 {"selected": [{"path", "reasons"}], "excluded": [{"path", "excluded_reason"}]}；schema `impact.precheck_rules`
     任一不符 ⇒ TestregError（不輸出；未登記之測試檔不拒跑而依 registry_unresolved 選入）；已立碑之檔依
     `impact.tombstoned_rule`；不存在使 selected 為空之分支。
 
     各來源（schema `enums.select_reason`）：must＝must_resolved 所在檔；changed_test＝變更之測試檔；static_taint＝變更之
-    非測試 .py（tests/ 外）——測試檔經 `_reach`（自身與 conftest 鏈、外掛之 import_closure）可達者 ∪ `_TaintGraph` 字串
-    傳遞命中者，及 tests/ 下 helper 模組（非 shared_test_infra）之變更——`_reach` 含該模組者；previously_failed＝其
-    nodeid 所在檔；registry_unresolved＝`impact.registry_unresolved_rule` 五條。各來源皆空 ⇒ TestregError；來源非空而
-    全部落在已刪或已立碑之檔 ⇒ 改選全部（未立碑之）測試檔、理由 registry_unresolved（不輸出空集合）。"""
+    非測試 .py（tests/ 外）——測試檔與其 fixture 可達者（`_reach_parts` 前者）∪ `_TaintGraph` 字串傳遞命中者 ∪ hook
+    可達者（`_reach_parts` 後者），及 tests/ 下 helper 模組（非 shared_test_infra）之變更——`_reach` 含該模組者；
+    previously_failed＝其 nodeid 所在檔；registry_unresolved＝`impact.registry_unresolved_rule` 五條。
+    `production_taint=False`（schema `impact.production_taint`；FRAMEPATH 閘之呼叫）⇒ 省略源自 tests/ 外 .py 變更之
+    「測試檔與 fixture 可達」與字串傳遞兩者，hook 可達、domain、helper 與其餘來源照常。各來源皆空 ⇒ TestregError；
+    來源非空而全部落在已刪或已立碑之檔 ⇒ 改選全部（未立碑之）測試檔、理由 registry_unresolved（不輸出空集合）。"""
     root = Path(repo_root).resolve()
     ctx = build_context(root, "worktree")
     s = ctx.schema
@@ -3972,13 +4209,14 @@ def impact(repo_root: Path, changed_paths: List[str], must_resolved: List[str],
     key = str(root)
     _IMPORT_GRAPHS[key] = graph = _ImportGraph(root)
     try:
-        return _impact_select(root, ctx, graph, changed_paths, must_resolved, previously_failed)
+        return _impact_select(root, ctx, graph, changed_paths, must_resolved, previously_failed, production_taint)
     finally:
         _IMPORT_GRAPHS.pop(key, None)
 
 
 def _impact_select(root: Path, ctx: Context, graph: _ImportGraph, changed_paths: Sequence[str],
-                   must_resolved: Sequence[str], previously_failed: Sequence[str]) -> Dict[str, List[Dict[str, Any]]]:
+                   must_resolved: Sequence[str], previously_failed: Sequence[str],
+                   production_taint: bool = True) -> Dict[str, List[Dict[str, Any]]]:
     s = ctx.schema
     pat = s["formats"]["test_path"]
     tests = sorted(f for f in graph.files if re.fullmatch(pat, f))
@@ -4003,9 +4241,11 @@ def _impact_select(root: Path, ctx: Context, graph: _ImportGraph, changed_paths:
         if p.startswith("tests/"):
             src["static_taint"] |= {t for t in tests if p in _reach(root, graph, t)}
             continue
-        src["static_taint"] |= {t for t in tests if p in _reach(root, graph, t)}
-        dotted = p[:-3].replace("/", ".")
-        substrings += [p, dotted[:-len(".__init__")] if dotted.endswith(".__init__") else dotted]
+        src["static_taint"] |= {t for t in tests if p in _reach_parts(root, graph, t)[1]}  # hook 可達：恆計
+        if production_taint:
+            src["static_taint"] |= {t for t in tests if p in _reach_parts(root, graph, t)[0]}
+            dotted = p[:-3].replace("/", ".")
+            substrings += [p, dotted[:-len(".__init__")] if dotted.endswith(".__init__") else dotted]
         if p in graph.files and (graph.parsed(p) is None or graph.is_dynamic(p)):
             prefix = _seam("domain_prefix")(p)
             if "dyn_modules" not in ctx.extra:
