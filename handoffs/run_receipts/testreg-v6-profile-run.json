@@ -1,61 +1,111 @@
 {
- "schema_version": 1,
- "command": [
-  "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py run --max-seconds 120 --skip-done",
-  "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py profile --nodeid 'tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]' --every 600",
-  "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py receipt --classification 生產端本身耗時 --evidence momentum/FeatureEngineering/feature_factory.py:459 momentum/FeatureEngineering/feature_factory.py:2640 momentum/FeatureEngineering/feature_factory.py:2688 momentum/FeatureEngineering/feature_factory.py:3863 momentum/FeatureEngineering/preprocessing/_numba_transforms.py:218 momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py:101 tests/feature_engineering/test_failopen_correctness.py:102 tests/feature_engineering/test_failopen_correctness.py:916",
-  "venv/bin/python -m pytest -q -p no:cacheprovider tests/registry/test_testreg_v6_profile.py"
- ],
- "exit_code": 0,
- "receipt": "handoffs/run_receipts/testreg-v6-profile.json",
- "receipt_sha256": "fac9ef4f3b4fd7427b3017dc9bad309f928e2f3b813c24b7c998977abd5c38bd",
- "why_companion": "契約收據 types.v6_profile_receipt 為 additional_properties=false，不得含 todofmt 之 schema_version／command／exit_code ⇒ 以本伴隨收據列入 manifest run_receipts，綁契約收據 sha256",
- "runs": {
-  "run": "D10 執行器逐 nodeid 一次 pytest 呼叫、每段一重項後暫停（rc 3），5 段同命令接續；末段 rc 0（DONE，6/6）",
-  "profile": "rc 0、complete=true、6,105.02 秒（pytest 報告 1:41:45）、partial 快照 8 次；主執行緒檔複製為 v6_run/profile/<slug>.prof",
-  "receipt": "rc 0；slowest＝close_time[True] 5,997.9 秒（ledger）",
-  "acceptance": "tests/registry/test_testreg_v6_profile.py 16 passed（0.55 秒）"
- },
- "wall_seconds": {
-  "test_v6_independent_asof_oracle_matches_multi_tf_columns": 5813.6,
-  "test_v6_asof_oracle_boundary_cases": 3.5,
-  "test_v6_backend_output_matches_independent_oracle[False]": 5787.0,
-  "test_v6_backend_output_matches_independent_oracle[True]": 5855.7,
-  "test_v6_close_time_oracle_matches_pipeline[False]": 5952.2,
-  "test_v6_close_time_oracle_matches_pipeline[True]": 6001.6
- },
- "profile_breakdown_s": {
-  "test_total": 6104.5,
-  "_resolve_public_window（公開域預熱探測）": 5569.9,
-  "探測內 _apply_winsorization": 5200.0,
-  "探測內 L1–L6（_iter_calibration_domain_groups）": 362.6,
-  "_generate_multi_tf_cgsa（實際多週期生成）": 533.5,
-  "測試端 _capturing_align（含生產 _align_group_array 14.8）": 15.5
- },
- "per_item_state": {
-  "verdict": "各項耗時為「於下列各自記錄之狀態下實測」；不宣稱其已證對 19791c3e 之狀態有效（撤回 6dd54b8d 版 reuse_validity 之「證其有效」：impact 只作測試選擇之靜態來源分析，不涵蓋執行驅動與非 Python 輸入；mtime 非內容指紋——審碼 b2 r2）",
-  "why_not_rerun": "第 1–5 項於當時以 v6_profile.py run --skip-done 接續（只依結果 meta 之 rc 與 ledger_new 判定、未比 state_key）；該旁路已於 6dd54b8d 刪除。重跑 5 項約 8 小時。下列可查證事實只及「各項 head 之已提交程式碼與測試路徑與 19791c3e 相同」，不及執行時之未提交內容、kline 內容與驅動內容（逐列於 not_attested）⇒ 不宣稱各項之執行狀態與 19791c3e 等值，亦不宣稱歷史結果於 19791c3e 可重現；Task 2.4 之用途（逐項耗時之歷史觀測、最慢項與其 cProfile 歸類）以各項自身記錄之狀態為準",
-  "source": "記錄器於 pytest 執行時寫入之 ledger session（.testreg/ledger/<session>.jsonl 首行 kind=session；session id 見各 junit/*.meta.json 之 ledger_new），非由驅動程式產生",
-  "items": {
-   "test_v6_independent_asof_oracle_matches_multi_tf_columns": {"session": "1dc6fb2e-f7f1-45d3-bf3b-ada4bc4c56e9", "head": "1e3c0dfa", "diff_digest": "66ac605dd21fbf17ae89170d16d4065ebd053c613057fd203660d96dd99e9b5b"},
-   "test_v6_asof_oracle_boundary_cases": {"session": "e6de1fa2-ade7-4c4b-a1de-9338181614be", "head": "1e3c0dfa", "diff_digest": "7f6827693af3e33e1d521643ea21b7069ccd6adcd5bb0e33e86ea6dc154b8b6c"},
-   "test_v6_backend_output_matches_independent_oracle[False]": {"session": "daa7ebf4-fd38-412e-8f61-eba71316f1dd", "head": "1e3c0dfa", "diff_digest": "f09aa630df23e6af15c25a68dc2e62ab97ab9be9603e20f133a333b11c8bd611"},
-   "test_v6_backend_output_matches_independent_oracle[True]": {"session": "eb8c21b4-1b0e-449e-a57a-a76ff43d224e", "head": "1e3c0dfa", "diff_digest": "9ece16abd98a6409abd820f5929fb7254e7fac2064447b9719d82a499c43a12d"},
-   "test_v6_close_time_oracle_matches_pipeline[False]": {"session": "09811a56-e316-491d-ad32-258fbd2577fd", "head": "14452799", "diff_digest": "3bae7c30b1e9ba3911fd6b0286b46f8d1d7325d36ee0ee511e172f9e1f599921"},
-   "test_v6_close_time_oracle_matches_pipeline[True]": {"session": "48fe7e4b-b7c9-406c-9125-4b26cca40113", "head": "286d1e61", "diff_digest": "c151eabd290d2a791fda9cdc111eb72d3f7401a41cc5c9039b50aed9e75f0a89"}
+  "schema_version": 1,
+  "command": [
+    "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py run --max-seconds 120 --skip-done",
+    "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py profile --nodeid 'tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]' --every 600",
+    "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py receipt --classification 生產端本身耗時 --evidence momentum/FeatureEngineering/feature_factory.py:459 momentum/FeatureEngineering/feature_factory.py:2640 momentum/FeatureEngineering/feature_factory.py:2688 momentum/FeatureEngineering/feature_factory.py:3863 momentum/FeatureEngineering/preprocessing/_numba_transforms.py:218 momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py:101 tests/feature_engineering/test_failopen_correctness.py:102 tests/feature_engineering/test_failopen_correctness.py:916",
+    "venv/bin/python -m pytest -q -p no:cacheprovider tests/registry/test_testreg_v6_profile.py"
+  ],
+  "exit_code": 0,
+  "receipt": "handoffs/run_receipts/testreg-v6-profile.json",
+  "receipt_sha256": "fac9ef4f3b4fd7427b3017dc9bad309f928e2f3b813c24b7c998977abd5c38bd",
+  "why_companion": "契約收據 types.v6_profile_receipt 為 additional_properties=false，不得含 todofmt 之 schema_version／command／exit_code ⇒ 以本伴隨收據列入 manifest run_receipts，綁契約收據 sha256",
+  "runs": {
+    "run": "D10 執行器逐 nodeid 一次 pytest 呼叫、每段一重項後暫停（rc 3），5 段同命令接續；末段 rc 0（DONE，6/6）",
+    "profile": "rc 0、complete=true、6,105.02 秒（pytest 報告 1:41:45）、partial 快照 8 次；主執行緒檔複製為 v6_run/profile/<slug>.prof",
+    "receipt": "rc 0；slowest＝close_time[True] 5,997.9 秒（ledger）",
+    "acceptance": "tests/registry/test_testreg_v6_profile.py 16 passed（0.55 秒）"
   },
-  "attested_check": "bash handoffs/run_receipts/testreg_probes/v6_session_check.sh（fail-closed：meta 之 nodeid 集合須等於契約收據 durations_s 鍵集合、每項恰一個存在之 session、args 恰為 nodeid、argv 與 {env, python} 指紋各一致，任一不符 rc 1）⇒ rc 0：六項 args 皆恰為 nodeid；去 args 後 argv 指紋皆 1b31436f1a18；{env, python} 指紋皆 05484bf98476。mutation（bash handoffs/run_receipts/testreg_probes/v6_session_check_mutations.sh；複本以 V6_META_DIR／V6_LEDGER_DIR 指入）：meta 改 nodeid／少一項／多一項／session 不存在／ledger_new 為字串，ledger 六項皆刪 env 與 python、單項 PYTEST_VERSION 改值、單項刪 argv_norm、單項 kind 改、單項刪 head 共 11 種皆 rc 1；正常與原樣複本 rc 0。取值前驗 ledger_new 為恰含一字串之陣列、head 為 40 位提交雜湊、env 為含 NUMBA_CACHE_DIR／PYTEST_VERSION／PYTHONPATH 非空字串之物件、python 為非空字串、argv_norm 含 args 陣列與 option 物件（缺欄不得以 null 指紋一致放行）",
-  "attested": [
-   "pytest 之呼叫：各 session 之 argv_norm 之 args 恰為該項 nodeid、其餘選項同（驅動程式只傳 nodeid 與環境；結果由 pytest 子行程與記錄器產生）",
-   "環境：各 session 之 env（NUMBA_CACHE_DIR、PYTEST_VERSION 8.4.2、PYTHONPATH＝repo 根）與 python 路徑六項相同",
-   "已提交之程式碼與測試路徑（不含未提交內容）：git diff --name-only <各項 head> 19791c3e -- momentum api tests scripts conftest.py pytest.ini setup.cfg pyproject.toml requirements.txt ⇒ 1e3c0dfa、14452799 只差 scripts/fact_keys.json，286d1e61 無差；fact_keys.json 於 momentum/、tests/conftest.py、tests/fixtures/ 與 V-6 測試檔皆無引用（grep；唯一引用之測試檔為 tests/feature_engineering/test_framepath_disposition.py，非 V-6）"
-  ],
-  "not_attested": [
-   "各項執行時之未提交改動：只有 diff_digest（git diff HEAD 之摘要），內容無法事後還原；工作樹當時之已知未提交改動為 market_data 快取、momentum/**/__pycache__ 之 numba 快取、.claude/gate 紀錄與 handoffs 檔，主控端於 V-6 執行期間未改 momentum／tests 原始碼（依本 session 操作紀錄，非機械證明）",
-   "data_cache/feature_klines/kline_cache.h5 於各項執行時之內容：執行時未記內容指紋（只知 mtime 2026-04-28T19:59 早於全部執行）；2026-10-12 收據修訂時之 sha256＝b1ee5b9abcc106631b06a625432e2b5241ffcd384bce548aa3c11d2b2b80d32a，供日後比對",
-   "執行驅動 v6_profile.py 於各段之內容：當時未入版控（19791c3e 才加入），第 4 段起增 --skip-done 參數；驅動之影響面以 attested 之 argv／env 界定"
-  ],
-  "rule_now": "v6_profile.py run 無 --skip-done，沿用一律經 Runner.run 之 state_key＋rc＋junit 完整性守衛（tests/feature_engineering/test_framepath_disposition.py::test_affected_gate_state_key_binds_tree_and_file、::test_mutation_affected_gate_runner_resume_pause_progress）"
- },
- "honest_bounds": "逐項耗時之收據值取記錄器 ledger 之 duration_s（只計測試呼叫本身），wall_seconds 為執行器牆鐘；第 1–5 項跑於 b9c06d3e 至 286d1e61 間（期間只提交文件，續跑以 --skip-done 依結果 meta 判定不重跑）；cProfile 只量主執行緒（與 python -m cProfile 同義、未截斷），執行緒與 spawn 子行程另錄於 v6_run/profile/*.parts 供判讀（本項無工作執行緒、唯一子行程為記憶體守護取樣器）；.prof 二進位檔與 v6_run/ 不入版控；本機 8GB RAM，校準期大量使用 swap（10–13GB），耗時含此因素；慢因歸類與附帶發現見 docs/TESTREG_SPEC.md §N R8"
+  "wall_seconds": {
+    "test_v6_independent_asof_oracle_matches_multi_tf_columns": 5813.6,
+    "test_v6_asof_oracle_boundary_cases": 3.5,
+    "test_v6_backend_output_matches_independent_oracle[False]": 5787.0,
+    "test_v6_backend_output_matches_independent_oracle[True]": 5855.7,
+    "test_v6_close_time_oracle_matches_pipeline[False]": 5952.2,
+    "test_v6_close_time_oracle_matches_pipeline[True]": 6001.6
+  },
+  "profile_breakdown_s": {
+    "test_total": 6104.5,
+    "_resolve_public_window（公開域預熱探測）": 5569.9,
+    "探測內 _apply_winsorization": 5200.0,
+    "探測內 L1–L6（_iter_calibration_domain_groups）": 362.6,
+    "_generate_multi_tf_cgsa（實際多週期生成）": 533.5,
+    "測試端 _capturing_align（含生產 _align_group_array 14.8）": 15.5
+  },
+  "per_item_state": {
+    "verdict": "各項耗時為「於下列各自記錄之狀態下實測」；不宣稱其已證對 19791c3e 之狀態有效（撤回 6dd54b8d 版 reuse_validity 之「證其有效」：impact 只作測試選擇之靜態來源分析，不涵蓋執行驅動與非 Python 輸入；mtime 非內容指紋——審碼 b2 r2）",
+    "why_not_rerun": "第 1–5 項於當時以 v6_profile.py run --skip-done 接續（只依結果 meta 之 rc 與 ledger_new 判定、未比 state_key）；該旁路已於 6dd54b8d 刪除。重跑 5 項約 8 小時。下列可查證事實只及「各項 head 之已提交程式碼與測試路徑與 19791c3e 相同」，不及執行時之未提交內容、kline 內容與驅動內容（逐列於 not_attested）⇒ 不宣稱各項之執行狀態與 19791c3e 等值，亦不宣稱歷史結果於 19791c3e 可重現；Task 2.4 之用途（逐項耗時之歷史觀測、最慢項與其 cProfile 歸類）以各項自身記錄之狀態為準",
+    "source": "記錄器於 pytest 執行時寫入之 ledger session（.testreg/ledger/<session>.jsonl 首行 kind=session；session id 見各 junit/*.meta.json 之 ledger_new），非由驅動程式產生",
+    "items": {
+      "test_v6_independent_asof_oracle_matches_multi_tf_columns": {
+        "session": "1dc6fb2e-f7f1-45d3-bf3b-ada4bc4c56e9",
+        "head": "1e3c0dfa233417eebb5820072d485934d611c972",
+        "diff_digest": "66ac605dd21fbf17ae89170d16d4065ebd053c613057fd203660d96dd99e9b5b"
+      },
+      "test_v6_asof_oracle_boundary_cases": {
+        "session": "e6de1fa2-ade7-4c4b-a1de-9338181614be",
+        "head": "1e3c0dfa233417eebb5820072d485934d611c972",
+        "diff_digest": "7f6827693af3e33e1d521643ea21b7069ccd6adcd5bb0e33e86ea6dc154b8b6c"
+      },
+      "test_v6_backend_output_matches_independent_oracle[False]": {
+        "session": "daa7ebf4-fd38-412e-8f61-eba71316f1dd",
+        "head": "1e3c0dfa233417eebb5820072d485934d611c972",
+        "diff_digest": "f09aa630df23e6af15c25a68dc2e62ab97ab9be9603e20f133a333b11c8bd611"
+      },
+      "test_v6_backend_output_matches_independent_oracle[True]": {
+        "session": "eb8c21b4-1b0e-449e-a57a-a76ff43d224e",
+        "head": "1e3c0dfa233417eebb5820072d485934d611c972",
+        "diff_digest": "9ece16abd98a6409abd820f5929fb7254e7fac2064447b9719d82a499c43a12d"
+      },
+      "test_v6_close_time_oracle_matches_pipeline[False]": {
+        "session": "09811a56-e316-491d-ad32-258fbd2577fd",
+        "head": "144527995275ebb69fe5186a9cc7b5d0a51444ea",
+        "diff_digest": "3bae7c30b1e9ba3911fd6b0286b46f8d1d7325d36ee0ee511e172f9e1f599921"
+      },
+      "test_v6_close_time_oracle_matches_pipeline[True]": {
+        "session": "48fe7e4b-b7c9-406c-9125-4b26cca40113",
+        "head": "286d1e61fa5f492ad92d32364d3be0940b0e5e12",
+        "diff_digest": "c151eabd290d2a791fda9cdc111eb72d3f7401a41cc5c9039b50aed9e75f0a89"
+      }
+    },
+    "attested_check": "bash handoffs/run_receipts/testreg_probes/v6_session_check.sh ⇒ rc 0。以本 per_item_state 為預期值逐一機械核對 attested 每一事實（fail-closed，任一不符或讀取錯誤 rc 1）：meta／契約收據／items 三者之 nodeid 集合相等；每項 meta 之 ledger_new 恰一字串且等於 items.session；session 檔存在、首行 kind=session、head（40 位）與 diff_digest 等於 items 所記；args 恰為 [nodeid]；去 args 後 argv 之 sha256＝argv_rest_sha256、{env, python}（env 含三欄非空字串、python 非空字串）之 sha256＝env_python_sha256；各 head 至 code_compare_to 於 code_paths 之差 ⊆ code_diff_allowed，且 code_diff_allowed 之檔名於 no_reference_roots（皆須存在）下無引用。mutation：bash handoffs/run_receipts/testreg_probes/v6_session_check_mutations.sh（每案斷言預期 rc，任一不符該腳本 rc 1）",
+    "attested": [
+      "pytest 之呼叫：各 session 之 argv_norm.args 恰為 [該項 nodeid]，其餘選項之 sha256 皆＝argv_rest_sha256（驅動程式只傳 nodeid 與環境；結果由 pytest 子行程與記錄器產生）",
+      "環境：各 session 之 {env, python} 之 sha256 皆＝env_python_sha256（env 含 NUMBA_CACHE_DIR、PYTEST_VERSION 8.4.2、PYTHONPATH＝repo 根）",
+      "各項 session、head、diff_digest 等於 items 所記（diff_digest 只為摘要，其內容見 not_attested）",
+      "已提交之程式碼與測試路徑（不含未提交內容）：各 head 至 code_compare_to（19791c3e）於 code_paths 之差 ⊆ code_diff_allowed（scripts/fact_keys.json；286d1e61 無差），該檔名於 no_reference_roots（V-6 測試檔、其載入之 scripts/freeze_failopen_baseline.py、tests/conftest.py、tests/feature_engineering/conftest.py、tests/fixtures、momentum）皆無引用"
+    ],
+    "not_attested": [
+      "各項執行時之未提交改動：只有 diff_digest（git diff HEAD 之摘要），內容無法事後還原；工作樹當時之已知未提交改動為 market_data 快取、momentum/**/__pycache__ 之 numba 快取、.claude/gate 紀錄與 handoffs 檔，主控端於 V-6 執行期間未改 momentum／tests 原始碼（依本 session 操作紀錄，非機械證明）",
+      "data_cache/feature_klines/kline_cache.h5 於各項執行時之內容：執行時未記內容指紋（只知 mtime 2026-04-28T19:59 早於全部執行）；2026-10-12 收據修訂時之 sha256＝b1ee5b9abcc106631b06a625432e2b5241ffcd384bce548aa3c11d2b2b80d32a，供日後比對",
+      "執行驅動 v6_profile.py 於各段之內容：當時未入版控（19791c3e 才加入），第 4 段起增 --skip-done 參數；驅動之影響面以 attested 之 argv／env 界定"
+    ],
+    "rule_now": "v6_profile.py run 無 --skip-done，沿用一律經 Runner.run 之 state_key＋rc＋junit 完整性守衛（tests/feature_engineering/test_framepath_disposition.py::test_affected_gate_state_key_binds_tree_and_file、::test_mutation_affected_gate_runner_resume_pause_progress）",
+    "argv_rest_sha256": "6ef1aba407fedf4c95315deff0eb4dd9d0852eff8725bbd2f9b8bee34d188e44",
+    "env_python_sha256": "b7ab81dfadeb8a619d1f029a00b831981396393c6eaf4cab4051aaa6f38466ec",
+    "code_compare_to": "19791c3e6ce38f2ad3476d5269ce17c9ca04281e",
+    "code_paths": [
+      "momentum",
+      "api",
+      "tests",
+      "scripts",
+      "conftest.py",
+      "pytest.ini",
+      "setup.cfg",
+      "pyproject.toml",
+      "requirements.txt"
+    ],
+    "code_diff_allowed": [
+      "scripts/fact_keys.json"
+    ],
+    "no_reference_roots": [
+      "momentum",
+      "tests/conftest.py",
+      "tests/fixtures",
+      "tests/feature_engineering/conftest.py",
+      "tests/feature_engineering/test_failopen_correctness.py",
+      "scripts/freeze_failopen_baseline.py"
+    ]
+  },
+  "honest_bounds": "逐項耗時之收據值取記錄器 ledger 之 duration_s（只計測試呼叫本身），wall_seconds 為執行器牆鐘；第 1–5 項跑於 b9c06d3e 至 286d1e61 間（期間只提交文件，續跑以 --skip-done 依結果 meta 判定不重跑）；cProfile 只量主執行緒（與 python -m cProfile 同義、未截斷），執行緒與 spawn 子行程另錄於 v6_run/profile/*.parts 供判讀（本項無工作執行緒、唯一子行程為記憶體守護取樣器）；.prof 二進位檔與 v6_run/ 不入版控；本機 8GB RAM，校準期大量使用 swap（10–13GB），耗時含此因素；慢因歸類與附帶發現見 docs/TESTREG_SPEC.md §N R8"
 }
