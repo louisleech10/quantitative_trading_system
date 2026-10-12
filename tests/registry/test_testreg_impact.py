@@ -422,3 +422,14 @@ def test_production_taint_false_drops_test_reach_keeps_other_sources(tmp_path):
     assert {p for p, v in dom.items() if "registry_unresolved" in v} == DOMAIN_C
     chg = _sel(testreg.impact(r.root, ["tests/test_d.py", "momentum/a.py"], [], [], production_taint=False))
     assert "changed_test" in chg["tests/test_d.py"]
+
+
+def test_hook_module_level_rebind_selects_scope(tmp_path):
+    """v42（修訂審查 r40 CODEX-R40-P1-02）：root conftest 先 `helper = noop`、定義 hook 呼叫 `helper(item)`、再
+    `from momentum.a import fa; helper = fa` ⇒ hook 執行時之 helper＝fa ⇒ 變更 momentum/a.py 時 root 範圍全部測試選入
+    （同名多次綁定取聯集，不只取第一次）。"""
+    conf = ("def noop(item):\n    return None\n\n\nhelper = noop\n\n\ndef pytest_runtest_call(item):\n    helper(item)\n\n\n"
+            "from momentum.a import fa  # noqa: E402\n\nhelper = fa\n")
+    r = _hook_repo(tmp_path, {"tests/conftest.py": conf})
+    sel = _sel(testreg.impact(r.root, ["momentum/a.py"], ["tests/test_b.py::test_b"], [], production_taint=False))
+    assert sorted(sel) == ALL_TESTS

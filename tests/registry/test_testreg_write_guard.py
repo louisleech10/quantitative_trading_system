@@ -2173,8 +2173,16 @@ LF_REL = "tests/test_lf.py"
 LF_APPROVAL = "handoffs/reconcile/lf/synth.md"
 
 
+def _lf_base() -> Dict[str, str]:
+    """字面對映測試之暫存倉共同檔：核可檔與真實記錄器（收據之 session 綁定以記錄器之 diff_digest 單一實作重算，
+    hook 以暫存倉內之 testreg.py 複本執行、自其所在 repo 載入記錄器）。"""
+    return {LF_APPROVAL: "# approval\n",
+            "tests/fixtures/testreg_recorder_plugin.py":
+                (REPO / "tests/fixtures/testreg_recorder_plugin.py").read_text(encoding="utf-8")}
+
+
 def _lf_repo(tmp_path: Path) -> TmpRepo:
-    r = make_repo(tmp_path, {LF_REL: LF_TEST, LF_APPROVAL: "# approval\n"})
+    r = make_repo(tmp_path, {LF_REL: LF_TEST, **_lf_base()})
     return r
 
 
@@ -2187,10 +2195,35 @@ def _lf_apply(text: str, m: Dict[str, str]) -> str:
     return rx.sub(lambda x: m[x.group(0)], text)
 
 
-def _lf_receipt(r: TmpRepo, m: Dict[str, str], head: str = None, path: str = LF_REL, approval: str = LF_APPROVAL) -> str:
+def _lf_receipt(r: TmpRepo, m: Dict[str, str], new_text: str, head: str = None, path: str = LF_REL,
+                approval: str = LF_APPROVAL, run_session: bool = True) -> List[str]:
+    """寫入改名後之測試檔、patch（`git diff HEAD -- <檔>`）與收據；run_session ⇒ 於 head 乾淨 worktree 套 patch 後以真實
+    記錄器跑該檔，session 檔複製回本倉 ledger（v42：收據綁定改名後實跑全過之 session）。回傳須暫存之收據與 patch 路徑。"""
+    import shutil
+    import uuid as _uuid
+    from tests.registry.testreg_helpers import recorded_pytest
+    head = head or r.head()
+    r.write(path, new_text)
     rel = testreg.literal_fix_receipt_rel(schema(), path)
-    r.write_json(rel, {"path": path, "head": head or r.head(), "map": m, "approval_ref": approval})
-    return rel
+    patch_rel = rel[:-len(".json")] + ".patch"
+    r.write(patch_rel, r.git("diff", "HEAD", "--binary", "--", path))
+    sid = str(_uuid.uuid4())
+    if run_session:
+        wt = r.root.parent / f"lfwt-{_uuid.uuid4().hex[:8]}"
+        r.git("worktree", "add", "-q", "--detach", str(wt), head)
+        try:
+            ok = subprocess.run(["git", "-C", str(wt), "apply", str(r.p(patch_rel))], capture_output=True).returncode == 0
+            if ok:
+                _, sids = recorded_pytest(TmpRepo(wt), path)
+                if sids:
+                    sid = sids[0]
+                    r.p(".testreg/ledger").mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(wt / f".testreg/ledger/{sid}.jsonl", r.p(f".testreg/ledger/{sid}.jsonl"))
+        finally:
+            r.git("worktree", "remove", "--force", str(wt), check=False)
+    r.write_json(rel, {"path": path, "head": head, "map": m, "approval_ref": approval, "session_id": sid,
+                       "patch_path": patch_rel})
+    return [rel, patch_rel]
 
 
 LF_CASES = {
@@ -2217,11 +2250,10 @@ def test_07lf_literal_fix_hook_and_precommit(tmp_path, case):
     m, make, ok = LF_CASES[case]
     r = _lf_repo(tmp_path)
     r.install_precommit()
-    rel = _lf_receipt(r, m)
-    r.write(LF_REL, make(LF_TEST))
+    rels = _lf_receipt(r, m, make(LF_TEST))
     hook = r.hook(LF_REL)
     assert (hook.returncode == 0) is ok, hook.stderr
-    r.stage(LF_REL, rel)
+    r.stage(LF_REL, *rels)
     proc = r.try_commit()
     assert (proc.returncode == 0) is ok, proc.stderr
     if not ok:
@@ -2244,8 +2276,7 @@ def test_07lf_stale_receipt_head_blocks(tmp_path):
     old_head = r.head()
     r.write("README", "x\n")
     r.commit("advance")
-    _lf_receipt(r, LF_MAP, head=old_head)
-    r.write(LF_REL, _lf_apply(LF_TEST, LF_MAP))
+    _lf_receipt(r, LF_MAP, _lf_apply(LF_TEST, LF_MAP), head=old_head)
     proc = r.hook(LF_REL)
     assert proc.returncode == 2 and "一次性" in proc.stderr, proc.stderr
 
@@ -2253,9 +2284,8 @@ def test_07lf_stale_receipt_head_blocks(tmp_path):
 def test_07lf_key_outside_string_token_blocks(tmp_path):
     """鍵出現於字串 token 外（註解）⇒ 不放行（對映只得改字串資料中之假測試檔識別）。"""
     src = LF_TEST + "\n# 對照 tests/t.py\n"
-    r = make_repo(tmp_path, {LF_REL: src, LF_APPROVAL: "# approval\n"})
-    _lf_receipt(r, LF_MAP)
-    r.write(LF_REL, _lf_apply(src, LF_MAP))
+    r = make_repo(tmp_path, {LF_REL: src, **_lf_base()})
+    _lf_receipt(r, LF_MAP, _lf_apply(src, LF_MAP))
     proc = r.hook(LF_REL)
     assert proc.returncode == 2 and "字串 token 外" in proc.stderr, proc.stderr
 
@@ -2263,9 +2293,8 @@ def test_07lf_key_outside_string_token_blocks(tmp_path):
 def test_07lf_value_already_in_head_blocks(tmp_path):
     """值已出現於 HEAD 版 ⇒ 對映不可逆、不放行。"""
     src = LF_TEST + '\n\ndef test_lf_c():\n    assert "tests/test_t.py" != "tests/t.py"\n'
-    r = make_repo(tmp_path, {LF_REL: src, LF_APPROVAL: "# approval\n"})
-    _lf_receipt(r, LF_MAP)
-    r.write(LF_REL, _lf_apply(src, LF_MAP))
+    r = make_repo(tmp_path, {LF_REL: src, **_lf_base()})
+    _lf_receipt(r, LF_MAP, _lf_apply(src, LF_MAP))
     proc = r.hook(LF_REL)
     assert proc.returncode == 2 and "不可逆" in proc.stderr, proc.stderr
 
@@ -2275,11 +2304,60 @@ def test_07lf_errors_function_and_mutation(tmp_path, monkeypatch):
     該縫）。"""
     r = _lf_repo(tmp_path)
     assert testreg.literal_fix_errors(testreg.build_context(r.root), LF_REL) is None
-    _lf_receipt(r, LF_MAP)
-    r.write(LF_REL, _lf_apply(LF_TEST, LF_MAP))
+    _lf_receipt(r, LF_MAP, _lf_apply(LF_TEST, LF_MAP))
     assert testreg.literal_fix_errors(testreg.build_context(r.root), LF_REL) == []
     r.write(LF_REL, _lf_apply(LF_TEST, LF_MAP).replace("    assert len(FAKE) > 3\n", ""))
     assert testreg.literal_fix_errors(testreg.build_context(r.root), LF_REL)
     assert {f.subject for f in testreg.check(r.root, paths=[LF_REL]) if f.rule == "V19"}
     monkeypatch.setattr(testreg, "literal_fix_errors", lambda ctx, p: [])
     assert not {f.subject for f in testreg.check(r.root, paths=[LF_REL]) if f.rule == "V19"}
+
+
+# v42（修訂審查 r40 CODEX-R40-P1-01）：收據綁定改名後實跑全過之 session
+LF_NEG = '''import re
+
+FAKE = "tests/t.py::test_x"
+
+
+def valid_nodeid(n):
+    return re.fullmatch(r"tests/(\\w+/)*test_\\w+\\.py::\\w+", n) is not None
+
+
+def test_lf_neg():
+    """負向：假識別不合格式須被拒。"""
+    assert not valid_nodeid(FAKE)
+'''
+
+
+def test_07lf_validity_sensitive_assertion_turns_red_blocks(tmp_path):
+    """依賴舊識別不合格之負向斷言：改名後實跑轉紅 ⇒ session 非全 passed ⇒ 收據不成立、hook 與 pre-commit 擋下
+    （不能靜默轉弱）。"""
+    r = make_repo(tmp_path, {LF_REL: LF_NEG, **_lf_base()})
+    r.install_precommit()
+    rels = _lf_receipt(r, {"tests/t.py": "tests/test_qt.py"}, _lf_apply(LF_NEG, {"tests/t.py": "tests/test_qt.py"}))
+    hook = r.hook(LF_REL)
+    assert hook.returncode == 2 and "未全為 passed" in hook.stderr, hook.stderr
+    r.stage(LF_REL, *rels)
+    proc = r.try_commit()
+    assert proc.returncode != 0 and _v19_subjects(proc.stderr) == {f"{LF_REL}::test_lf_neg"}, proc.stderr
+
+
+def test_07lf_missing_session_blocks(tmp_path):
+    """收據所指 session 不在 ledger ⇒ 不成立（unverifiable）。"""
+    r = _lf_repo(tmp_path)
+    _lf_receipt(r, LF_MAP, _lf_apply(LF_TEST, LF_MAP), run_session=False)
+    proc = r.hook(LF_REL)
+    assert proc.returncode == 2 and "不在 ledger" in proc.stderr, proc.stderr
+
+
+def test_07lf_session_not_bound_to_patch_blocks(tmp_path):
+    """session 跑在未改名之 HEAD（diff_digest＝clean），收據卻指之 ⇒ 不綁定 head＋patch ⇒ 不成立。"""
+    from tests.registry.testreg_helpers import recorded_pytest
+    r = _lf_repo(tmp_path)
+    _, sids = recorded_pytest(r, LF_REL)
+    rels = _lf_receipt(r, LF_MAP, _lf_apply(LF_TEST, LF_MAP), run_session=False)
+    rcpt = json.loads(r.read(rels[0]))
+    rcpt["session_id"] = sids[0]
+    r.write_json(rels[0], rcpt)
+    proc = r.hook(LF_REL)
+    assert proc.returncode == 2 and "不綁定" in proc.stderr, proc.stderr
