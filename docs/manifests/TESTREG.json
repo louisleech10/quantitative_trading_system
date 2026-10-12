@@ -49,6 +49,12 @@
       "cmd": "venv/bin/python handoffs/run_receipts/testreg_probes/recorder_invariance.py verify",
       "rc": 0,
       "honest_bounds": "第 1 批 §G 驗證：於凍結收據之 head（動工前 HEAD）加記錄器掛載所需之檔（MOUNT_PATHS）之暫存提交之 worktree 執行同一命令；本批其餘改動不在驗證樹內（只量記錄器之影響）"
+    },
+    {
+      "path": "handoffs/run_receipts/testreg-v6-profile-run.json",
+      "cmd": "（伴隨收據，綁契約收據 handoffs/run_receipts/testreg-v6-profile.json 之 sha256）venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py run --max-seconds 120 --skip-done（分 5 段同命令接續）；venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py profile --nodeid 'tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]' --every 600；venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py receipt --classification 生產端本身耗時 --evidence …（8 條，見收據）",
+      "rc": 0,
+      "honest_bounds": "第 2 批 Task 2.4：逐項耗時取記錄器 ledger 之 duration_s（只計測試呼叫本身，略低於執行器牆鐘：6 項全 passed，最慢 close_time[True] 5,997.9 秒／牆鐘 6,001.6 秒）；第 1–5 項跑於 2026-10-12 b9c06d3e 至 286d1e61 間（期間只提交文件，以 --skip-done 依結果 meta 判定不重跑）；cProfile 只量主執行緒（與 python -m cProfile 同義，6,104 秒、未截斷，執行緒與 spawn 子行程另錄於 v6_run/profile/*.parts 供判讀，本項無工作執行緒、唯一子行程為記憶體守護取樣器）；.prof 二進位檔不入版控；本機 8GB RAM，校準期大量使用 swap（10–13GB），耗時含此因素；慢因歸類依 SPEC §N R8"
     }
   ],
   "batch_card": {
@@ -151,7 +157,7 @@
       "SPEC v20（TODO 審查 r19 處置，見 handoffs/reconcile/20261010-testreg-x-review-r19/synth.md）：閘 verdict 唯一組合 quarantined_verdict（功能案例、mutant、main 之 AST 結構檢查）；子批收據 expected 以真實 pytest 收集為 oracle（含類別方法與參數化）；V-6 mutation 收據 target 須為實存之 test_v6_*；標記註冊之承認範圍限 conftest 與其 pytest_plugins 所列外掛；E0 情境之 setattr 反例獨立成檔（主委試作抓到：規則 5 掃描整檔）",
       "SPEC v19（TODO 審查 r18 處置，見 handoffs/reconcile/20261010-testreg-x-review-r18/synth.md）：隔離之編排層案例（Runner 快照＋classify_quarantine，正反例與 mutant）；子批收據 expected 完整性、base 隔離之 inputs_digest、匯入模組改變後不得沿用；V-6 之 mutation 收據驗形與綁定、碼證存在；E1 本文不同反例；allow_unknown 只放行字面 unknown；外掛以 addinivalue_line 註冊之標記視同已註冊（主委試作抓到）",
       "tests/registry/catalog.json 與 bootstrap_paths.txt 於 Task 1.2 由 bootstrap 產生（禁手寫），產生前不存在故列 callers_later；第 1 批提交時補入 touches",
-      "實跑收據之落點：testreg-bootstrap.json、testreg-recorder-baseline.json／verify.json（第 1 批）、testreg-v6-profile.json（第 2 批）、testreg-phase3-effect.json（Phase 3 收尾）、testreg-final-effect.json（收案）與各子批 testreg-run-<子批>.json，於產生之提交同時補入 run_receipts（含命令、rc、誠實邊界）；產生前檔不存在（run_receipts 之路徑須存在），故現列 callers_later 為消費者索引",
+      "實跑收據之落點：testreg-bootstrap.json、testreg-recorder-baseline.json／verify.json（第 1 批）、testreg-v6-profile.json（第 2 批；契約 types.v6_profile_receipt 不容額外鍵、與 todofmt 收據三鍵 schema_version／command／exit_code 互斥 ⇒ 2026-10-12 實作期改列伴隨收據 testreg-v6-profile-run.json，含三鍵與契約收據 sha256）、testreg-phase3-effect.json（Phase 3 收尾）、testreg-final-effect.json（收案）與各子批 testreg-run-<子批>.json，於產生之提交同時補入 run_receipts（含命令、rc、誠實邊界）；產生前檔不存在（run_receipts 之路徑須存在），故現列 callers_later 為消費者索引",
       "暫存倉測試一律以 testreg_helpers.make_repo 自建 git 倉並複製真實工具；子行程環境去除 TESTREG_PARENT_SESSION；記錄器 mutation 以暫存倉根層 conftest 之 setattr 置換（生產碼不含測試開關）",
       "實作期每批：先跑本批測試檔（明列路徑、單組串行；真實 repo 牆鐘測試獨占機器），跑完 bash scripts/restore_golden_inventory.sh；收尾列暫存（pytest-of-louis、測試暫存倉、委員 /private/tmp 副本）刪除指令交使用者",
       "stub_modules 為空之理由：本票不改 momentum／api／frontend 生產碼（SPEC §C）；新建者皆為治理腳本與測試基礎設施，列 script_acceptance／touches",

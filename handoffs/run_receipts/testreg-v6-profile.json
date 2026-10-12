@@ -1,0 +1,149 @@
+{
+ "durations_s": {
+  "tests/feature_engineering/test_failopen_correctness.py::test_v6_asof_oracle_boundary_cases": 0.007048,
+  "tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[False]": 5783.781055,
+  "tests/feature_engineering/test_failopen_correctness.py::test_v6_backend_output_matches_independent_oracle[True]": 5852.210807,
+  "tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[False]": 5948.777181,
+  "tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]": 5997.923939,
+  "tests/feature_engineering/test_failopen_correctness.py::test_v6_independent_asof_oracle_matches_multi_tf_columns": 5810.077442
+ },
+ "slowest": "tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]",
+ "hotspots_top30": [
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/config/__init__.py:139(main)",
+   "cumtime_s": 6108.986714
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/pluggy/_manager.py:111(_hookexec)",
+   "cumtime_s": 6108.972643
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/pluggy/_callers.py:76(_multicall)",
+   "cumtime_s": 6108.972617
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/pluggy/_hooks.py:497(__call__)",
+   "cumtime_s": 6108.971721
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/main.py:335(pytest_cmdline_main)",
+   "cumtime_s": 6105.516864
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/main.py:276(wrap_session)",
+   "cumtime_s": 6105.516863
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/main.py:339(_main)",
+   "cumtime_s": 6104.579669
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/runner.py:323(from_call)",
+   "cumtime_s": 6104.576409
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/main.py:356(pytest_runtestloop)",
+   "cumtime_s": 6104.532963
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/runner.py:114(pytest_runtest_protocol)",
+   "cumtime_s": 6104.53287
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/runner.py:122(runtestprotocol)",
+   "cumtime_s": 6104.532609
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/runner.py:230(call_and_report)",
+   "cumtime_s": 6104.532589
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/runner.py:246(<lambda>)",
+   "cumtime_s": 6104.531734
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/runner.py:167(pytest_runtest_call)",
+   "cumtime_s": 6104.520983
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/python.py:1669(runtest)",
+   "cumtime_s": 6104.520961
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/venv/lib/python3.9/site-packages/_pytest/python.py:150(pytest_pyfunc_call)",
+   "cumtime_s": 6104.520811
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/tests/feature_engineering/test_failopen_correctness.py:954(test_v6_close_time_oracle_matches_pipeline)",
+   "cumtime_s": 6104.520768
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/tests/feature_engineering/test_failopen_correctness.py:850(_capture_multi_tf_alignment)",
+   "cumtime_s": 6104.42971
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/feature_factory.py:219(generate_features)",
+   "cumtime_s": 6104.420599
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/feature_factory.py:402(_generate_features_impl)",
+   "cumtime_s": 6103.667861
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/feature_factory.py:2595(_resolve_public_window)",
+   "cumtime_s": 5569.897988
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/preprocessing/feature_preprocessor.py:3206(_apply_winsorization)",
+   "cumtime_s": 5200.038723
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/preprocessing/_numba_transforms.py:313(rolling_quantile_2d)",
+   "cumtime_s": 5054.96325
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/preprocessing/_numba_transforms.py:218(_rolling_quantile_sliding_numba)",
+   "cumtime_s": 5054.857141
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/feature_factory.py:673(_execute_layer1_6)",
+   "cumtime_s": 720.336266
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/timeframe/multi_tf_generator.py:57(generate_multi_tf)",
+   "cumtime_s": 533.628086
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/timeframe/multi_tf_generator.py:113(_generate_multi_tf_cgsa)",
+   "cumtime_s": 533.525096
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/timeframe/multi_tf_generator.py:237(_process_timeframe_inroot)",
+   "cumtime_s": 530.168049
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/timeframe/multi_tf_generator.py:1470(_run_tf_l1_l6_results)",
+   "cumtime_s": 396.083358
+  },
+  {
+   "function": "/Users/louis/Desktop/quantitative_trading_system/momentum/FeatureEngineering/feature_factory.py:667(_execute_layer1_6_preserve_dtype)",
+   "cumtime_s": 379.825544
+  }
+ ],
+ "classification": "生產端本身耗時",
+ "evidence": [
+  "momentum/FeatureEngineering/feature_factory.py:459",
+  "momentum/FeatureEngineering/feature_factory.py:2640",
+  "momentum/FeatureEngineering/feature_factory.py:2688",
+  "momentum/FeatureEngineering/feature_factory.py:3863",
+  "momentum/FeatureEngineering/preprocessing/_numba_transforms.py:218",
+  "momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py:101",
+  "tests/feature_engineering/test_failopen_correctness.py:102",
+  "tests/feature_engineering/test_failopen_correctness.py:916"
+ ],
+ "window_and_symbols_unchanged": true,
+ "test_changed": false,
+ "outcomes_sha256_before": null,
+ "outcomes_sha256_after": null,
+ "mutation_receipt": null
+}

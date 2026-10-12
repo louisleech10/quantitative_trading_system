@@ -1,0 +1,36 @@
+{
+ "schema_version": 1,
+ "command": [
+  "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py run --max-seconds 120 --skip-done",
+  "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py profile --nodeid 'tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]' --every 600",
+  "venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py receipt --classification 生產端本身耗時 --evidence momentum/FeatureEngineering/feature_factory.py:459 momentum/FeatureEngineering/feature_factory.py:2640 momentum/FeatureEngineering/feature_factory.py:2688 momentum/FeatureEngineering/feature_factory.py:3863 momentum/FeatureEngineering/preprocessing/_numba_transforms.py:218 momentum/FeatureEngineering/preprocessing/_native_tf_helpers.py:101 tests/feature_engineering/test_failopen_correctness.py:102 tests/feature_engineering/test_failopen_correctness.py:916",
+  "venv/bin/python -m pytest -q -p no:cacheprovider tests/registry/test_testreg_v6_profile.py"
+ ],
+ "exit_code": 0,
+ "receipt": "handoffs/run_receipts/testreg-v6-profile.json",
+ "receipt_sha256": "fac9ef4f3b4fd7427b3017dc9bad309f928e2f3b813c24b7c998977abd5c38bd",
+ "why_companion": "契約收據 types.v6_profile_receipt 為 additional_properties=false，不得含 todofmt 之 schema_version／command／exit_code ⇒ 以本伴隨收據列入 manifest run_receipts，綁契約收據 sha256",
+ "runs": {
+  "run": "D10 執行器逐 nodeid 一次 pytest 呼叫、每段一重項後暫停（rc 3），5 段同命令接續；末段 rc 0（DONE，6/6）",
+  "profile": "rc 0、complete=true、6,105.02 秒（pytest 報告 1:41:45）、partial 快照 8 次；主執行緒檔複製為 v6_run/profile/<slug>.prof",
+  "receipt": "rc 0；slowest＝close_time[True] 5,997.9 秒（ledger）",
+  "acceptance": "tests/registry/test_testreg_v6_profile.py 16 passed（0.55 秒）"
+ },
+ "wall_seconds": {
+  "test_v6_independent_asof_oracle_matches_multi_tf_columns": 5813.6,
+  "test_v6_asof_oracle_boundary_cases": 3.5,
+  "test_v6_backend_output_matches_independent_oracle[False]": 5787.0,
+  "test_v6_backend_output_matches_independent_oracle[True]": 5855.7,
+  "test_v6_close_time_oracle_matches_pipeline[False]": 5952.2,
+  "test_v6_close_time_oracle_matches_pipeline[True]": 6001.6
+ },
+ "profile_breakdown_s": {
+  "test_total": 6104.5,
+  "_resolve_public_window（公開域預熱探測）": 5569.9,
+  "探測內 _apply_winsorization": 5200.0,
+  "探測內 L1–L6（_iter_calibration_domain_groups）": 362.6,
+  "_generate_multi_tf_cgsa（實際多週期生成）": 533.5,
+  "測試端 _capturing_align（含生產 _align_group_array 14.8）": 15.5
+ },
+ "honest_bounds": "逐項耗時之收據值取記錄器 ledger 之 duration_s（只計測試呼叫本身），wall_seconds 為執行器牆鐘；第 1–5 項跑於 b9c06d3e 至 286d1e61 間（期間只提交文件，續跑以 --skip-done 依結果 meta 判定不重跑）；cProfile 只量主執行緒（與 python -m cProfile 同義、未截斷），執行緒與 spawn 子行程另錄於 v6_run/profile/*.parts 供判讀（本項無工作執行緒、唯一子行程為記憶體守護取樣器）；.prof 二進位檔與 v6_run/ 不入版控；本機 8GB RAM，校準期大量使用 swap（10–13GB），耗時含此因素；慢因歸類與附帶發現見 docs/TESTREG_SPEC.md §N R8"
+}
