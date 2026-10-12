@@ -40,14 +40,65 @@ def baseline() -> Dict[str, Any]:
     return json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
 
 
-# 凍結之輸入（Task 1.0 來源證明）：產生 baseline 之碼與設定；寫入時須與 HEAD 一致，並記其 blob 於 baseline
+# 凍結之輸入（Task 1.0 來源證明）：產生 baseline 之碼與設定（含生成時經 `config/` symlink 讀取之 YAML）；寫入時須與
+# HEAD 一致，並記其 blob 於 baseline
 INPUT_PATHSPECS = ("tests/feature_engineering", "tests/_golden/probewinsor/contract.json",
-                   "scripts/freeze_probewinsor_baseline.py")
-INPUT_FILES = ("tests/_golden/probewinsor/contract.json", "tests/feature_engineering/probewinsor_helpers.py",
-               "tests/feature_engineering/icfirstalign_helpers.py", "tests/feature_engineering/fftfmeta_golden_helpers.py",
-               "tests/feature_engineering/ff_truncation_mr_helpers.py", "tests/feature_engineering/ffstat_helpers.py",
-               "scripts/freeze_probewinsor_baseline.py")
+                   "scripts/freeze_probewinsor_baseline.py", "config")
 _CONTRACT_REL = "tests/_golden/probewinsor/contract.json"
+_PRODUCTION_ROOTS = ("momentum", "api")
+
+
+def _ls_tree(commit: str, specs: Any) -> Dict[str, str]:
+    """`git ls-tree -r <commit> -- <specs>` → {路徑: blob sha}（略 `__pycache__`）；失敗即 RuntimeError。"""
+    import subprocess
+
+    proc = subprocess.run(["git", "ls-tree", "-r", "-z", commit, "--", *specs], cwd=str(REPO), capture_output=True,
+                          text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"git ls-tree {commit} 失敗：{proc.stderr.strip()}")
+    out: Dict[str, str] = {}
+    for entry in proc.stdout.split("\0"):
+        if not entry:
+            continue
+        meta, path = entry.split("\t", 1)
+        if "__pycache__" not in path:
+            out[path] = meta.split()[2]
+    return out
+
+
+def production_py_digest(commit: str) -> str:
+    """該提交之 `momentum/`、`api/` 全部 .py（路徑與 blob）之 sha256——生產碼之身分（Task 1.0 錨點）。"""
+    tree = _ls_tree(commit, _PRODUCTION_ROOTS)
+    lines = "".join(f"{p} {b}\n" for p, b in sorted(tree.items()) if p.endswith(".py"))
+    return hashlib.sha256(lines.encode("utf-8")).hexdigest()
+
+
+def kline_sha256() -> str:
+    """真實 kline（contract `kline_dir`/kline_cache.h5）之 sha256。"""
+    digest = hashlib.sha256()
+    with (REPO / contract()["kline_dir"] / "kline_cache.h5").open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def environment_versions() -> Dict[str, str]:
+    """生成之執行環境（Python 與數值套件版本）；baseline 記之、驗收核對與目前相同（環境不同之逐位元比較無意義）。"""
+    import importlib.metadata as md
+    import platform
+
+    out = {"python": platform.python_version()}
+    for dist in ("numpy", "pandas", "numba", "polars", "TA-Lib", "scipy", "pyarrow"):
+        try:
+            out[dist] = md.version(dist)
+        except md.PackageNotFoundError:
+            out[dist] = "absent"
+    return out
+
+
+def contract_at(commit: str) -> Dict[str, Any]:
+    """該提交自身之契約（不讀工作樹）。"""
+    return json.loads(_git_show(commit, _CONTRACT_REL))
 
 
 def _git_show(rev: str, path: str) -> str:
@@ -60,16 +111,8 @@ def _git_show(rev: str, path: str) -> str:
 
 
 def input_blobs(commit: str) -> Dict[str, str]:
-    """`INPUT_FILES` 於該提交之 blob sha（`git rev-parse <commit>:<path>`）；任一取不到即 RuntimeError。"""
-    import subprocess
-
-    out: Dict[str, str] = {}
-    for path in INPUT_FILES:
-        proc = subprocess.run(["git", "rev-parse", f"{commit}:{path}"], cwd=str(REPO), capture_output=True, text=True)
-        if proc.returncode != 0:
-            raise RuntimeError(f"git rev-parse {commit}:{path} 失敗：{proc.stderr.strip()}")
-        out[path] = proc.stdout.strip()
-    return out
+    """`INPUT_PATHSPECS` 於該提交之全部檔（路徑 → blob sha）；取不到即 RuntimeError。"""
+    return _ls_tree(commit, INPUT_PATHSPECS)
 
 
 def absent_symbol_violations(commit: str, reader: Optional[Any] = None) -> List[str]:

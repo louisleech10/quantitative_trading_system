@@ -1,0 +1,43 @@
+stashed prod
+== A 輸入未提交 ⇒ 應拒（rc 2）
+rc=2
+ERROR: 來源不合（凍結只准於改前碼寫入）：工作樹之凍結輸入對 HEAD 有改動
+committed inputs: a0bad34d
+== B 錨點碼態、輸入已提交 ⇒ 凍結（rc 0）
+rc=0
+[freeze] 已寫入 /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/b433f210-2afd-44b3-b365-54a46b211dec/scratchpad/pw_wt/tests/_golden/probewinsor/baseline.json（29 格）
+      196.70 real       275.23 user        33.70 sys
+           588922880  maximum resident set size
+committed baseline: 0b23146d
+== D 錨點碼態驗收
+  12 FAILED tests/feature_engineering/test_probewinsor.py::test_boundary_07_missing_master_key_raises
+   8 FAILED tests/feature_engineering/test_probewinsor.py::test_boundary_04_child_on_equals_anchor_child_off
+   8 FAILED tests/feature_engineering/test_probewinsor.py::test_boundary_01_master_off_child_inert
+   1 PASSED tests/feature_engineering/test_probewinsor.py::test_mutation_m9_freeze_gate_skips_symbol_check
+   1 PASSED tests/feature_engineering/test_probewinsor.py::test_mutation_m10_freeze_gate_skips_input_arm
+   1 PASSED tests/feature_engineering/test_probewinsor.py::test_boundary_10c_freeze_gate_refuses_polluted_source
+   1 PASSED tests/feature_engineering/test_probewinsor.py::test_boundary_10b_provenance_detector_flags_post_change_code
+   1 PASSED tests/feature_engineering/test_probewinsor.py::test_boundary_10_baseline_provenance
+   1 FAILED tests/feature_engineering/test_probewinsor.py::test_mutation_m5_salt_always
+   1 FAILED tests/feature_engineering/test_probewinsor.py::test_mutation_m4_salt_never
+   1 FAILED tests/feature_engineering/test_probewinsor.py::test_boundary_10d_anchor_symbols_present_after_fix
+   1 FAILED tests/feature_engineering/test_probewinsor.py::test_boundary_05_cache_identity
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_mutation_m7d_public_resume_bypasses_public_identity
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_mutation_m7c_public_resume_uses_fixed_identity
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_mutation_m7b_public_resume_ignores_identity
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_mutation_m7_resume_ignores_identity
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_boundary_09g_public_resume_requeues_identity_mismatch
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_boundary_09f_resume_identity_is_factory_identity
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_boundary_09e_identity_error_requeued
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_boundary_09d_legacy_unresolvable_retained
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_boundary_09c_manifest_missing_requeued
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_boundary_09b_identity_mismatch_requeued
+   1 FAILED tests/api/test_probewinsor_batch_resume.py::test_boundary_09a_identity_match_retained
+   1 ================== 43 failed, 33 passed in 217.15s (0:03:37) ===================
+restored prod
+ 5 files changed, 113 insertions(+), 37 deletions(-)
+== E 試作碼驗收
+pytest rc=0
+======================== 76 passed in 231.58s (0:03:51) ========================
+
+[exited with code 0]

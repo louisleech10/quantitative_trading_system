@@ -56,8 +56,18 @@ def provenance_errors() -> List[str]:
     head = _git("rev-parse", "HEAD")
     if head.returncode != 0:
         errors.append(f"git rev-parse 失敗：{head.stderr.strip()}")
-    else:
-        errors.extend(ph.absent_symbol_violations(head.stdout.strip()))
+        return errors
+    commit = head.stdout.strip()
+    errors.extend(ph.absent_symbol_violations(commit))
+    # 錨點＝HEAD 自身契約所記之改前生產碼身分與真實 kline 身分（已提交、不可由凍結當下工作樹改寫）
+    try:
+        anchor = ph.contract_at(commit)
+        if ph.production_py_digest(commit) != anchor["anchor_production_py_sha256"]:
+            errors.append("HEAD 之生產 .py 身分不等於契約 anchor_production_py_sha256（非改前生產碼）")
+        if ph.kline_sha256() != anchor["kline_sha256"]:
+            errors.append("真實 kline 之 sha256 不等於契約 kline_sha256")
+    except Exception as exc:  # noqa: BLE001 — 錨點取不到即無法證明改前
+        errors.append(f"錨點核對失敗：{type(exc).__name__}: {exc}")
     return errors
 
 
@@ -144,7 +154,8 @@ def main(argv: List[str]) -> int:
         return 1
     if not args.check:
         head = _git("rev-parse", "HEAD").stdout.strip()
-        document = {"version": 1, "frozen_at_head": head, "input_blobs": ph.input_blobs(head), **produced}
+        document = {"version": 1, "frozen_at_head": head, "input_blobs": ph.input_blobs(head),
+                    "environment": ph.environment_versions(), **produced}
         ph.BASELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = ph.BASELINE_PATH.with_suffix(".json.tmp")
         tmp_path.write_text(json.dumps(document, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")

@@ -503,5 +503,8 @@
       "api/services/feature_factory_batch_service.py",
       "def _partition_completed_items"
     ]
-  ]
+  ],
+  "anchor_production_py_sha256": "ae28bc0d497a03c1d134336e5c37d319420708667bf8183142121d6943b42c17",
+  "kline_sha256": "b1ee5b9abcc106631b06a625432e2b5241ffcd384bce548aa3c11d2b2b80d32a",
+  "kline_sha256_authority": "tests/_golden/failopen/baseline.json#environment.kline_sha256"
 }

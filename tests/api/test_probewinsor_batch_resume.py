@@ -105,7 +105,30 @@ def test_boundary_09f_resume_identity_is_factory_identity(batch_service_factory:
                                    "2026-01-01", "2026-01-31") == ph.baseline()["cells"]["e1h.on.w1"]["config_hash"]
 
 
-async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tuple[Dict[str, Any], List[str]]:
+# 公開入口對每個可解析之完成項各呼叫一次 `FeatureFactory.config_identity`（依完成項順序；參數＝該項與請求之設定、起訖日）
+_EXPECTED_IDENTITY_ARGS = [
+    {"symbol": "BTCUSDT", "timeframe": "1h", "config_override": {}, "start_date": "2026-01-01", "end_date": "2026-01-31"},
+    {"symbol": "SOLUSDT", "timeframe": "1h", "config_override": {}, "start_date": "2026-01-01", "end_date": "2026-01-31"},
+]
+
+
+def _identity_args(identity_calls: List[Any]) -> List[Dict[str, Any]]:
+    """監聽到之 `config_identity` 呼叫 → 依簽章綁定後之參數字典（不論位置或關鍵字傳入）。"""
+    import inspect
+
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
+
+    signature = inspect.signature(FeatureFactory.config_identity)
+    out = []
+    for args, kwargs in identity_calls:
+        bound = signature.bind(None, *args, **kwargs)
+        bound.apply_defaults()
+        out.append({k: v for k, v in bound.arguments.items() if k != "self"})
+    return out
+
+
+async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+                         identity_calls: Any = None) -> Tuple[Dict[str, Any], List[str]]:
     """經公開 `resume_batch`（**不替換**身分函式）：完成項 A 之 run hash＝目前碼之真實身分（同 `_resume_identity` 之
     kline 目錄與請求）、B 之 run hash 為舊值；待排 ETHUSDT；生成函式以替身記錄被重算者。"""
     import asyncio
@@ -113,6 +136,7 @@ async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.Monke
     from api.core.config import settings
     from api.services.feature_factory_batch_service import FeatureFactoryBatchService
     from momentum.factories import create_feature_factory
+    from momentum.FeatureEngineering.feature_factory import FeatureFactory
     from tests.api.batch_wave_helpers import use_thread_wave
 
     calls: List[str] = []
@@ -128,6 +152,17 @@ async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.Monke
     items = [_item(tmp_path, "BTCUSDT", "1h", real), _item(tmp_path, "SOLUSDT", "1h", "cccc3333")]
     checkpoint = _checkpoint(service, items, {})
     service._safe_persist_checkpoint(checkpoint)
+    if identity_calls is not None:  # 監聽（不替換）公開身分方法：記錄參數後委派原方法
+        import functools
+
+        original = FeatureFactory.config_identity
+
+        @functools.wraps(original)  # 保留原簽章（`_identity_args` 依簽章綁定參數）
+        def _spy(self: Any, *args: Any, **kwargs: Any) -> str:
+            identity_calls.append((args, kwargs))
+            return original(self, *args, **kwargs)
+
+        monkeypatch.setattr(FeatureFactory, "config_identity", _spy)
     response = await service.resume_batch("batch-probewinsor")
     for _ in range(250):  # 同 test_feature_factory_batch_resume._wait_until_done 之終止狀態（上限 5 秒）
         status = service.get_status("batch-probewinsor")
@@ -144,10 +179,12 @@ async def test_boundary_09g_public_resume_requeues_identity_mismatch(
         monkeypatch: pytest.MonkeyPatch, batch_service_factory: Any, tmp_path: Path) -> None:
     """經公開 `resume_batch`：身分相符之完成項跳過（skipped 1）、不符者與原待排者重算（queued 2）。"""
     service = batch_service_factory(tmp_path / "ckpt")
-    response, calls = await _public_resume(service, tmp_path, monkeypatch)
+    identity_calls: List[Any] = []
+    response, calls = await _public_resume(service, tmp_path, monkeypatch, identity_calls)
     assert response["skipped_items"] == 1
     assert response["queued_items"] == 2
     assert calls == ["ETHUSDT", "SOLUSDT"]
+    assert _identity_args(identity_calls) == _EXPECTED_IDENTITY_ARGS
 
 
 @pytest.mark.asyncio
@@ -179,6 +216,28 @@ async def test_mutation_m7c_public_resume_uses_fixed_identity(
     service = batch_service_factory(tmp_path / "ckpt")
     response, calls = await _public_resume(service, tmp_path, monkeypatch)
     assert (response["skipped_items"], calls) != (1, ["ETHUSDT", "SOLUSDT"])
+
+
+@pytest.mark.asyncio
+async def test_mutation_m7d_public_resume_bypasses_public_identity(
+        monkeypatch: pytest.MonkeyPatch, batch_service_factory: Any, tmp_path: Path) -> None:
+    """M7d：續跑之身分改走私有 `_compute_config_hash`（結果相同、繞過公開方法）⇒ 邊界 09g 之公開方法呼叫紀錄偵出。"""
+    from api.core.config import settings
+    from api.services.feature_factory_batch_service import FeatureFactoryBatchService
+    from momentum.factories import create_feature_factory
+
+    def _private_identity(checkpoint: Dict[str, Any]) -> Any:
+        payload = checkpoint.get("request_payload") or {}
+        factory = create_feature_factory(cache_dir=str(settings.data_cache_path / "feature_klines"))
+        return lambda symbol, timeframe: factory._compute_config_hash(
+            factory._resolve_config(payload.get("config_override")), symbol, timeframe,
+            start_date=payload.get("start_date"), end_date=payload.get("end_date"))
+
+    monkeypatch.setattr(FeatureFactoryBatchService, "_resume_identity", staticmethod(_private_identity))
+    service = batch_service_factory(tmp_path / "ckpt")
+    identity_calls: List[Any] = []
+    await _public_resume(service, tmp_path, monkeypatch, identity_calls)
+    assert _identity_args(identity_calls) != _EXPECTED_IDENTITY_ARGS
 
 
 def test_mutation_m7_resume_ignores_identity(monkeypatch: pytest.MonkeyPatch, batch_service_factory: Any,

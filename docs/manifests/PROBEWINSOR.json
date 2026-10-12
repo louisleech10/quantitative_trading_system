@@ -110,10 +110,10 @@
       "TESTREG SPEC §N R9 於本票收案時改指本票提交；R8 不動"
     ],
     "coverage_risk": [
-      "Task 1.0 驗證：freeze_probewinsor_baseline.py 寫入模式之來源檢查（錨點＝HEAD 自取；生產 .py 與凍結輸入 INPUT_PATHSPECS 對 HEAD 無改動、無未追蹤含被忽略之 .py、HEAD 自身契約之 anchor_absent_symbols 非空且 HEAD 不含）與一次性寫入；baseline 記 input_blobs；--check 重跑逐鍵相同；anchor_expect 兩格；邊界 10（frozen_at_head 與加入提交不含本票符號、input_blobs 等於 frozen_at_head 之 blob）、10b（偵測器）、10c（實際凍結入口之拒絕與放行）、10d（實作後符號存在）；mutation M9",
+      "Task 1.0 驗證：freeze_probewinsor_baseline.py 寫入模式之來源檢查（錨點＝HEAD 自取；HEAD 契約之 anchor_production_py_sha256 等於 HEAD 生產 .py 身分、kline_sha256 等於真實 kline〔權威＝failopen 凍結基準〕、anchor_absent_symbols 非空且 HEAD 不含；生產 .py 與凍結輸入 INPUT_PATHSPECS〔含 config/〕對 HEAD 無改動、無未追蹤含被忽略之 .py）與一次性寫入；baseline 記 input_blobs 與 environment（套件版本，邊界 10 核對等於目前環境）；--check 重跑逐鍵相同；anchor_expect 兩格；邊界 10、10b、10c（八案）、10d；mutation M9–M12（凍結腳本原始碼變體各拿掉一臂）",
       "Task 1.1 驗證：test_probewinsor.py 邊界 01（總開關關時子開關無效果，contract 全部成對族）、02（全部總開關開格逐位元不變）、03（全部總開關關＋縮尾關格不變）、04（刻意差異釘於錨點、anchor_differs／anchor_public_differs）、06（未填起始日）、07（6 呼叫點缺鍵訊息逐字）、08（16 輸入真值表）；平穩化開啟族實跑校準前置關卡與 d* 搜尋；mutation M1／M2／M3／M6",
       "Task 1.2 驗證：邊界 05（全部格 hash 三類＋config_identity 等於 _compute_config_hash）；mutation M4／M5",
-      "Task 1.4 驗證：test_probewinsor_batch_resume.py 邊界 09a–09g（09g 經公開 resume_batch、不替換身分函式、完成項 run hash 取真實 config_identity）；mutation M7、M7b、M7c；既有續跑測試兩支之身分替身（試作 handoffs/run_receipts/probewinsor_probes/trial_test_setup.patch）",
+      "Task 1.4 驗證：test_probewinsor_batch_resume.py 邊界 09a–09g（09g 經公開 resume_batch、不替換身分函式、run hash 取真實 config_identity、監聽公開身分方法之呼叫）；mutation M7、M7b、M7c、M7d；既有續跑測試兩支之身分替身（試作 handoffs/run_receipts/probewinsor_probes/trial_test_setup.patch）",
       "Task 1.3 驗證：handoffs/run_receipts/probewinsor-affected.json（affected_tests 錨點與修正後逐 nodeid 結果）"
     ],
     "lifecycle": "keep",

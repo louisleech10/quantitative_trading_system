@@ -177,6 +177,16 @@ def test_boundary_08_call_site_truth_table() -> None:
     assert ph.truth_table() == ph.baseline()["truth_table"]
 
 
+def _failopen_kline_sha() -> str:
+    import json as _json
+
+    path, key = _SPEC["kline_sha256_authority"].split("#", 1)
+    node: Any = _json.loads((ph.REPO / path).read_text(encoding="utf-8"))
+    for part in key.split("."):
+        node = node[part]
+    return str(node)
+
+
 def _baseline_add_commit() -> str:
     import subprocess
 
@@ -195,6 +205,11 @@ def test_boundary_10_baseline_provenance() -> None:
     assert ph.absent_symbol_violations(_baseline_add_commit()) == []
     # 產生 baseline 之輸入（契約、helper、凍結腳本）即 frozen_at_head 之已提交版本
     assert frozen["input_blobs"] == ph.input_blobs(frozen["frozen_at_head"])
+    # 生產碼錨點與 kline 權威：frozen_at_head 之生產 .py 身分等於契約所記、baseline 之 kline 等於契約與 failopen 基準所記
+    assert ph.production_py_digest(frozen["frozen_at_head"]) == _SPEC["anchor_production_py_sha256"]
+    assert frozen["kline_sha256"] == _SPEC["kline_sha256"] == _failopen_kline_sha()
+    # 執行環境與凍結時相同（套件版本不同之逐位元比較無意義，須重凍並經審查）
+    assert frozen["environment"] == ph.environment_versions()
 
 
 # ---------------------------------------------------------------- mutation（改壞必紅）
@@ -291,18 +306,39 @@ def _freeze_module() -> Any:
 
 
 def _stub_git(fz: Any, monkeypatch: pytest.MonkeyPatch, *, diff_rc: int = 0, others: str = "",
-              head_rc: int = 0) -> None:
-    """以確定之 git 結果替換凍結腳本之 `_git`（diff 皆回 diff_rc、ls-files --others 回 others、rev-parse HEAD 回 head_rc）。"""
+              head_rc: int = 0, diff_input_rc: Any = None, digest: str = "P", kline: str = "K") -> None:
+    """以確定之來源替換凍結腳本之 `_git` 與錨點讀取：生產 pathspec 之 diff 回 diff_rc、凍結輸入 pathspec 之 diff 回
+    diff_input_rc（None＝同 diff_rc）、ls-files --others 回 others、rev-parse HEAD 回 head_rc；HEAD 契約之錨點固定為
+    生產身分 "P"、kline "K"，實際生產身分與 kline 由 digest／kline 決定。"""
     import subprocess
+
+    input_rc = diff_rc if diff_input_rc is None else diff_input_rc
 
     def _git(*args: str) -> subprocess.CompletedProcess:
         if args[0] == "diff":
-            return subprocess.CompletedProcess(args, diff_rc, "", "")
+            is_input = any(spec in args for spec in fz.ph.INPUT_PATHSPECS)
+            return subprocess.CompletedProcess(args, input_rc if is_input else diff_rc, "", "")
         if args[0] == "ls-files":
             return subprocess.CompletedProcess(args, 0, others, "")
         return subprocess.CompletedProcess(args, head_rc, "HEADSHA\n", "" if head_rc == 0 else "boom")
 
     monkeypatch.setattr(fz, "_git", _git)
+    monkeypatch.setattr(fz.ph, "contract_at", lambda commit: {"anchor_production_py_sha256": "P", "kline_sha256": "K"})
+    monkeypatch.setattr(fz.ph, "production_py_digest", lambda commit: digest)
+    monkeypatch.setattr(fz.ph, "kline_sha256", lambda: kline)
+
+
+def _mutant_freeze(old: str, new: str) -> Any:
+    """凍結腳本之變體：原始碼中 `old` 換為 `new`（`old` 須恰出現一次）後以同一檔名載入（REPO 解析不變）。"""
+    import types
+
+    path = ph.REPO / "scripts" / "freeze_probewinsor_baseline.py"
+    source = path.read_text(encoding="utf-8")
+    assert source.count(old) == 1, f"變體錨點不唯一：{old!r}"
+    module = types.ModuleType("freeze_probewinsor_baseline_mutant")
+    module.__file__ = str(path)
+    exec(compile(source.replace(old, new), str(path), "exec"), module.__dict__)  # noqa: S102 — 測試內載入變體
+    return module
 
 
 def _run_freeze_write(fz: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Tuple[int, bool]:
@@ -312,6 +348,7 @@ def _run_freeze_write(fz: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     monkeypatch.setattr(fz, "run_all", lambda ids: {"contract_sha256": "c", "kline_sha256": "k", "cells": {},
                                                     "truth_table": []})
     monkeypatch.setattr(fz.ph, "input_blobs", lambda commit: {"x": "y"})
+    monkeypatch.setattr(fz.ph, "environment_versions", lambda: {"python": "x"})
     return fz.main([]), target.exists()
 
 
@@ -331,6 +368,13 @@ def test_boundary_10c_freeze_gate_refuses_polluted_source(monkeypatch: pytest.Mo
     assert _run_freeze_write(fz, monkeypatch, tmp_path / "d") == (2, False)
     _stub_git(fz, monkeypatch)
     assert _run_freeze_write(fz, monkeypatch, tmp_path / "e") == (0, True)
+    # 單臂：只有凍結輸入髒（生產碼乾淨）、生產身分不等於契約錨點、kline 不等於契約權威
+    _stub_git(fz, monkeypatch, diff_input_rc=1)
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "f") == (2, False)
+    _stub_git(fz, monkeypatch, digest="CHANGED")
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "g") == (2, False)
+    _stub_git(fz, monkeypatch, kline="ALTERED")
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "h") == (2, False)
 
 
 def test_boundary_10d_anchor_symbols_present_after_fix() -> None:
@@ -339,11 +383,35 @@ def test_boundary_10d_anchor_symbols_present_after_fix() -> None:
 
 
 def test_mutation_m9_freeze_gate_skips_symbol_check(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """M9：凍結閘拿掉本票符號檢查（`provenance_errors` 只回傳 git 結果）⇒ HEAD 含本票符號時仍寫出 baseline（邊界 10c 偵出）。"""
-    fz = _freeze_module()
+    """M9：凍結閘之變體只拿掉本票符號檢查那一行 ⇒ HEAD 含本票符號時仍寫出 baseline（邊界 10c 案 a 偵出）。"""
+    fz = _mutant_freeze("    errors.extend(ph.absent_symbol_violations(commit))\n", "")
     _stub_git(fz, monkeypatch)
     monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: ["HEAD 已含本票生產符號"])
-    monkeypatch.setattr(fz, "provenance_errors", lambda: [])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
+
+
+def test_mutation_m10_freeze_gate_skips_input_arm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M10：凍結閘之變體拿掉「凍結輸入對 HEAD 有改動」那一臂 ⇒ 只有輸入髒時仍寫出（邊界 10c 案 f 偵出）。"""
+    fz = _mutant_freeze(', ("凍結輸入", ph.INPUT_PATHSPECS)', ",")
+    _stub_git(fz, monkeypatch, diff_input_rc=1)
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
+
+
+def test_mutation_m11_freeze_gate_skips_production_anchor(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M11：凍結閘之變體不比對生產碼錨點 ⇒ 生產身分不等於契約時仍寫出（邊界 10c 案 g 偵出）。"""
+    fz = _mutant_freeze('if ph.production_py_digest(commit) != anchor["anchor_production_py_sha256"]:',
+                        "if False:")
+    _stub_git(fz, monkeypatch, digest="CHANGED")
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
+
+
+def test_mutation_m12_freeze_gate_skips_kline_authority(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M12：凍結閘之變體不比對 kline 權威 ⇒ kline 不等於契約時仍寫出（邊界 10c 案 h 偵出）。"""
+    fz = _mutant_freeze('if ph.kline_sha256() != anchor["kline_sha256"]:', "if False:")
+    _stub_git(fz, monkeypatch, kline="ALTERED")
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
     assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
 
 
