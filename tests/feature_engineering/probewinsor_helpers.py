@@ -172,7 +172,7 @@ def runtime_environment() -> Dict[str, Any]:
     blas = []
     for info in threadpoolctl.threadpool_info():
         owner = [name for name, root in roots.items() if str(info.get("filepath", "")).startswith(root + os.sep)]
-        if owner:
+        if owner and info.get("user_api") == "blas":  # 只取 BLAS（同目錄下之 openmp 等執行緒庫不算）
             blas.append({"package": owner[0], **{k: info.get(k) for k in ("user_api", "internal_api", "version",
                                                                            "num_threads", "threading_layer",
                                                                            "architecture")}})

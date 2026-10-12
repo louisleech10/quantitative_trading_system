@@ -485,6 +485,27 @@ def test_boundary_10i_environment_requires_numpy_and_scipy_blas(monkeypatch: pyt
     assert len(ph.environment_errors(unrelated)) == 2
     monkeypatch.setattr(threadpoolctl, "threadpool_info", lambda: both[:1])
     assert ph.environment_errors(ph.environment_versions()) == ["執行期 BLAS 無 scipy 自帶者之紀錄（threadpoolctl 未觀測到）"]
+    # 路徑在 numpy／scipy 目錄下但非 BLAS（如 openmp 執行緒庫）⇒ 不算 BLAS 紀錄
+    monkeypatch.setattr(threadpoolctl, "threadpool_info", lambda: [{**d, "user_api": "openmp"} for d in both])
+    assert ph.environment_versions()["blas_runtime"] == []
+    assert len(ph.environment_errors(ph.environment_versions())) == 2
+
+
+def test_boundary_10j_incomplete_environment_refused_before_generation(monkeypatch: pytest.MonkeyPatch,
+                                                                        tmp_path: Path) -> None:
+    """邊界 10j：凍結寫入於生成前檢查環境紀錄完整性：不完整 ⇒ rc 2、不寫檔、且生成（`run_all`）未被呼叫。"""
+    fz = _freeze_module()
+    _stub_git(fz, monkeypatch)
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
+    generated: List[Any] = []
+    monkeypatch.setattr(fz.ph, "BASELINE_PATH", tmp_path / "baseline.json")
+    monkeypatch.setattr(fz.ph, "environment_versions", lambda: _INCOMPLETE_ENV)
+    monkeypatch.setattr(fz, "run_all", lambda ids: generated.append(ids) or {"contract_sha256": "c",
+                                                                            "kline_sha256": "k", "cells": {},
+                                                                            "truth_table": []})
+    assert fz.main([]) == 2
+    assert generated == []
+    assert not (tmp_path / "baseline.json").exists()
 
 
 def _run_freeze_check(fz: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, environment: Dict[str, Any]) -> int:

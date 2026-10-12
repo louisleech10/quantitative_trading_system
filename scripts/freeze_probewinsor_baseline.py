@@ -134,6 +134,13 @@ def main(argv: List[str]) -> int:
             for line in refused:
                 print(f"ERROR: 來源不合（凍結只准於改前碼寫入）：{line}", file=sys.stderr)
             return 2
+        # 環境於生成前取得並檢查（不完整即不生成；空紀錄兩側同空亦相等，不得凍結）
+        environment = ph.environment_versions()
+        env_errors = ph.environment_errors(environment)
+        if env_errors:
+            for line in env_errors:
+                print(f"ERROR: 環境紀錄不完整：{line}", file=sys.stderr)
+            return 2
     try:
         produced = run_all(wanted)
     except Exception as exc:  # 任一格失敗 ⇒ 整次失敗、不寫部分 baseline
@@ -158,12 +165,6 @@ def main(argv: List[str]) -> int:
     if errors:
         return 1
     if not args.check:
-        environment = ph.environment_versions()
-        env_errors = ph.environment_errors(environment)
-        if env_errors:  # 環境紀錄不完整（如未觀測到 numpy／scipy 之 BLAS）⇒ 不得凍結（空紀錄兩側同空亦相等）
-            for line in env_errors:
-                print(f"ERROR: 環境紀錄不完整：{line}", file=sys.stderr)
-            return 2
         head = _git("rev-parse", "HEAD").stdout.strip()
         document = {"version": 1, "frozen_at_head": head, "input_blobs": ph.input_blobs(head),
                     "environment": environment, **produced}
