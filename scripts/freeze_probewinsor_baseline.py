@@ -3,7 +3,8 @@
 
 用法：
   venv/bin/python scripts/freeze_probewinsor_baseline.py --anchor <commit>
-      寫入模式：生產碼（momentum/ 之 .py）須與錨點逐位元相同（工作樹對錨點之 git diff 為空），否則拒絕。
+      寫入模式（一次性）：baseline 已存在 ⇒ 拒絕；生產碼（momentum/ 與 api/ 之 .py）須與錨點逐位元相同
+      （工作樹對錨點之 git diff 為空、無未追蹤 .py），否則拒絕。
   venv/bin/python scripts/freeze_probewinsor_baseline.py --anchor <commit> --check [--cells id1,id2]
       比對模式：重跑（全部或指定）格與真值表，逐鍵比對既有 baseline，不寫檔。
 rc：0＝寫入成功或比對全同；1＝比對不符或 contract 之 anchor_expect 不符；2＝拒絕（生產碼已改、參數錯、生成例外）。
@@ -26,7 +27,7 @@ sys.path.insert(0, str(REPO))
 
 from tests.feature_engineering import probewinsor_helpers as ph  # noqa: E402
 
-_PRODUCTION_PATHSPEC = ":(glob)momentum/**/*.py"
+_PRODUCTION_PATHSPECS = (":(glob)momentum/**/*.py", ":(glob)api/**/*.py")
 
 
 def _git(*args: str) -> subprocess.CompletedProcess:
@@ -34,11 +35,11 @@ def _git(*args: str) -> subprocess.CompletedProcess:
 
 
 def production_matches_anchor(anchor: str) -> bool:
-    """工作樹之 momentum/**/*.py 對錨點無差異（含已提交與未提交之改動）。"""
-    proc = _git("diff", "--quiet", anchor, "--", _PRODUCTION_PATHSPEC)
+    """工作樹之 momentum/、api/ 之 .py 對錨點無差異（含已提交與未提交之改動）且無未追蹤 .py。"""
+    proc = _git("diff", "--quiet", anchor, "--", *_PRODUCTION_PATHSPECS)
     if proc.returncode not in (0, 1):
         raise RuntimeError(f"git diff 失敗：{proc.stderr.strip()}")
-    untracked = _git("ls-files", "--others", "--exclude-standard", "--", _PRODUCTION_PATHSPEC).stdout.strip()
+    untracked = _git("ls-files", "--others", "--exclude-standard", "--", *_PRODUCTION_PATHSPECS).stdout.strip()
     return proc.returncode == 0 and not untracked
 
 
@@ -93,6 +94,10 @@ def main(argv: List[str]) -> int:
     if not args.check:
         if args.cells:
             print("ERROR: 寫入模式不接受 --cells（baseline 須含全部格）", file=sys.stderr)
+            return 2
+        if ph.BASELINE_PATH.exists():
+            # 一次性寫入：baseline 一經凍結即只讀（否則可於生產碼改後以新錨點覆寫，「改前基準」即失效）
+            print(f"ERROR: {ph.BASELINE_PATH.relative_to(REPO)} 已存在；凍結為一次性寫入，不得覆寫", file=sys.stderr)
             return 2
         if not production_matches_anchor(args.anchor):
             print(f"ERROR: momentum/ 之 .py 與錨點 {args.anchor} 不同；凍結只准於生產碼未改時寫入", file=sys.stderr)

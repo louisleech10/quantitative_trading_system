@@ -3,7 +3,8 @@
   "contract_digest": "0e1148d86b7c5a7ca808b5f980fe49acdf91a6910b0550628171274ed082b464f3e45db6fc0b71d58c5304073cb1c6b29bdd1d810d26de2917736bd30132f3fc",
   "stub_modules": [],
   "test_files": [
-    "tests/feature_engineering/test_probewinsor.py"
+    "tests/feature_engineering/test_probewinsor.py",
+    "tests/api/test_probewinsor_batch_resume.py"
   ],
   "script_acceptance": [
     "scripts/freeze_probewinsor_baseline.py",
@@ -17,71 +18,116 @@
   "batch_card": {
     "depends": [],
     "touches": [
+      "HANDOFF.md",
+      "api/services/feature_factory_batch_service.py",
+      "docs/PROBEWINSOR_SPEC.md",
+      "docs/ROADMAP.md",
+      "docs/TESTREG_SPEC.md",
+      "docs/manifests/PROBEWINSOR.json",
+      "momentum/FeatureEngineering/config_manager.py",
       "momentum/FeatureEngineering/feature_config.py",
       "momentum/FeatureEngineering/feature_factory.py",
       "momentum/FeatureEngineering/warmup_window.py",
-      "momentum/FeatureEngineering/config_manager.py",
+      "scripts/fact_keys.json",
       "scripts/freeze_probewinsor_baseline.py",
+      "tests/_golden/probewinsor/contract.json",
+      "tests/api/test_probewinsor_batch_resume.py",
       "tests/feature_engineering/probewinsor_helpers.py",
       "tests/feature_engineering/test_probewinsor.py",
-      "tests/_golden/probewinsor/contract.json",
-      "tests/registry/catalog.json",
-      "docs/PROBEWINSOR_SPEC.md",
-      "docs/manifests/PROBEWINSOR.json",
-      "docs/TESTREG_SPEC.md",
-      "docs/ROADMAP.md",
-      "HANDOFF.md",
-      "scripts/fact_keys.json"
+      "tests/registry/catalog.json"
     ],
     "callers_now": [
-      "momentum/FeatureEngineering/feature_factory.py",
-      "momentum/FeatureEngineering/warmup_window.py",
-      "momentum/FeatureEngineering/config_manager.py",
-      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
-      "momentum/FeatureEngineering/mcp/feature_factory_mcp.py",
-      "momentum/Analysis/event_samples/feature_materialization.py",
       "api/routes/feature_factory.py",
-      "api/services/feature_factory_service.py",
       "api/services/feature_factory_batch_service.py",
-      "scripts/freeze_ratiounsafe_baseline.py",
-      "scripts/freeze_icfirstalign_baseline.py",
+      "api/services/feature_factory_service.py",
+      "momentum/Analysis/event_samples/feature_materialization.py",
+      "momentum/FeatureEngineering/config_manager.py",
+      "momentum/FeatureEngineering/feature_factory.py",
+      "momentum/FeatureEngineering/mcp/feature_factory_mcp.py",
+      "momentum/FeatureEngineering/timeframe/multi_tf_generator.py",
+      "momentum/FeatureEngineering/warmup_window.py",
+      "scripts/freeze_failopen_baseline.py",
       "scripts/freeze_framepath_baseline.py",
-      "scripts/freeze_failopen_baseline.py"
+      "scripts/freeze_icfirstalign_baseline.py",
+      "scripts/freeze_ratiounsafe_baseline.py",
+      "tests/api/test_feature_factory_batch_resume.py"
     ],
     "callers_later": [
       "tests/_golden/probewinsor/baseline.json",
       "handoffs/run_receipts/probewinsor-affected.json"
     ],
-    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_probewinsor.py",
+    "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_probewinsor.py tests/api/test_probewinsor_batch_resume.py",
     "forbidden": [
-      {"rule": "不得改 SPEC §P Task 1.1／1.2 所列以外之生產碼（momentum／api／frontend）", "observable": true},
-      {"rule": "不得於 _resolve_public_window 另加總開關判斷；前處理總開關之判斷只准經 feature_config.l65_enabled", "observable": true},
-      {"rule": "不得改縮尾演算法、窗長、原生週期放大、加倍規則、_classify_calibration_column、warmup_late_columns、FeaturePreprocessor 內部子開關語意", "observable": true},
-      {"rule": "不得刪除或放寬既有測試斷言換綠；不得新增 skip／xfail", "observable": true},
-      {"rule": "不得以修正後碼態凍結或改寫 tests/_golden/probewinsor/baseline.json；不得容差比對", "observable": true},
-      {"rule": "不得以合成 fixture 代替真實 kline（data_cache/feature_klines/kline_cache.h5）", "observable": true},
-      {"rule": "momentum/ 不得 import api/（解耦 R1）；不新增服務互相 import（R4）", "observable": true},
-      {"rule": "不得改其他 config_hash 鹽或 payload 正規化；不得以清空 data_cache/cgsa_work 代替快取身分改變", "observable": true},
-      {"rule": "總開關開或縮尾關之生成不得改變任何輸出、中繼資料或 config_hash（不擅改輸出大小）", "observable": true}
+      {
+        "rule": "不得改 SPEC §P Task 1.1／1.2 所列以外之生產碼（momentum／api／frontend）",
+        "observable": true
+      },
+      {
+        "rule": "不得於 _resolve_public_window 另加總開關判斷；前處理總開關之判斷只准經 feature_config.l65_enabled",
+        "observable": true
+      },
+      {
+        "rule": "不得改縮尾演算法、窗長、原生週期放大、加倍規則、_classify_calibration_column、warmup_late_columns、FeaturePreprocessor 內部子開關語意",
+        "observable": true
+      },
+      {
+        "rule": "不得刪除或放寬既有測試斷言換綠；不得新增 skip／xfail",
+        "observable": true
+      },
+      {
+        "rule": "不得以修正後碼態凍結或改寫 tests/_golden/probewinsor/baseline.json；不得容差比對",
+        "observable": true
+      },
+      {
+        "rule": "不得以合成 fixture 代替真實 kline（data_cache/feature_klines/kline_cache.h5）",
+        "observable": true
+      },
+      {
+        "rule": "momentum/ 不得 import api/（解耦 R1）；不新增服務互相 import（R4）",
+        "observable": true
+      },
+      {
+        "rule": "不得改其他 config_hash 鹽或 payload 正規化；不得以清空 data_cache/cgsa_work 代替快取身分改變",
+        "observable": true
+      },
+      {
+        "rule": "總開關開或縮尾關之生成不得改變任何輸出、中繼資料或 config_hash（不擅改輸出大小）",
+        "observable": true
+      },
+      {
+        "rule": "API 批次續跑不得改 checkpoint 格式與 _resolve_completed_run_hash／_completed_manifest_exists 語意；API 層不得自行計算 hash（只經 FeatureFactory.config_identity）",
+        "observable": true
+      }
     ],
     "risk_mitigation": [
-      "affected_tests phase=1 tests/api/test_batch_alias.py tests/feature_engineering/test_batch1_followup.py tests/feature_engineering/test_failopen_correctness.py tests/feature_engineering/test_failopen_manifest.py tests/feature_engineering/test_failopen_matrix.py tests/feature_engineering/test_failopen_winsor.py tests/feature_engineering/test_icfirstalign_l3_arms.py tests/momentum/test_feature_factory_optimization_e2e.py tests/momentum/test_feature_factory_optimization_perf.py tests/test_l65_parallel.py tests/test_preview_feature_count.py tests/feature_engineering/preprocessing/test_causal_winsor.py tests/feature_engineering/test_b6_warmup_trim.py tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_failopen_producer.py tests/feature_engineering/test_ffstat_calibration.py tests/feature_engineering/test_ffstat_stable_start.py tests/feature_engineering/test_icfirstalign_icfirst.py tests/feature_engineering/test_l65_raw_metadata.py tests/feature_engineering/test_tf_aligner.py tests/feature_library/test_phase1.py tests/feature_library/test_phase4.py tests/test_feature_factory_config.py tests/test_feature_factory_mcp.py tests/test_phase_b_granular_control.py tests/test_phase_d_granular_control.py tests/feature_engineering/test_ratiounsafe_registry.py",
+      "affected_tests phase=1 tests/api/test_batch_alias.py tests/feature_engineering/test_batch1_followup.py tests/feature_engineering/test_cgsa_disk_precheck.py tests/feature_engineering/test_failopen_correctness.py tests/feature_engineering/test_failopen_manifest.py tests/feature_engineering/test_failopen_matrix.py tests/feature_engineering/test_failopen_producer.py tests/feature_engineering/test_failopen_winsor.py tests/feature_engineering/test_icfirstalign_l3_arms.py tests/feature_engineering/test_mtf_align_golden.py tests/feature_engineering/test_tf_aligner.py tests/momentum/test_feature_factory_optimization_e2e.py tests/momentum/test_feature_factory_optimization_perf.py tests/test_cgsa_resume.py tests/test_feature_factory_batch2d.py tests/test_l65_parallel.py tests/test_preview_feature_count.py tests/feature_engineering/preprocessing/test_causal_winsor.py tests/feature_engineering/test_b6_warmup_trim.py tests/feature_engineering/test_failopen_contract.py tests/feature_engineering/test_ffstat_calibration.py tests/feature_engineering/test_ffstat_stable_start.py tests/feature_engineering/test_icfirstalign_icfirst.py tests/feature_engineering/test_l65_raw_metadata.py tests/feature_library/test_phase1.py tests/feature_library/test_phase4.py tests/test_feature_factory_config.py tests/test_feature_factory_mcp.py tests/test_phase_b_granular_control.py tests/test_phase_d_granular_control.py tests/feature_engineering/test_ratiounsafe_registry.py tests/api/test_feature_factory_batch_resume.py tests/api/test_batch_retention.py tests/api/test_batch_date.py tests/api/test_run_lifecycle_api.py",
       "affected_deselect phase=1 tests/feature_engineering/test_failopen_correctness.py -k \"not test_v6_\"（V-6 五重項屬 TESTREG 第 3 批 Task 3.2，SPEC §N R1）",
-      "affected_tests 之來源：handoffs/run_receipts/probewinsor_probes/affected_scan.py（AST；R1 前處理總開關設為 False 之寫法、R2 直接引用被改符號；收據 handoffs/run_receipts/probewinsor_probes/out/affected_scan.json）＋RATIOUNSAFE 前處理關臂之測試（scripts/freeze_ratiounsafe_baseline.py 之 s1_payload 經 tests/feature_engineering/test_ratiounsafe_registry.py 使用）；helper 檔（ff_artifact_compare_helpers.py、ff_truncation_mr_helpers.py）以其使用者測試涵蓋",
-      "分批：b1＝Task 1.0（錨點凍結，先行提交 baseline.json）→ Task 1.1＋1.2（同一生產碼提交）→ Task 1.3（受影響測試錨點／修正後各跑一次、RATIOUNSAFE 前處理關臂比對、收據 handoffs/run_receipts/probewinsor-affected.json）；gate_cmd 全綠＋Task 1.3 收據錨點綠而修正後紅之 nodeid 數 == 0（或逐項歸因 §C 並經審碼核可）",
+      "affected_tests 之來源：handoffs/run_receipts/probewinsor_probes/affected_scan.py（AST；R1 前處理總開關設為 False 之寫法——字面、下標、屬性、建構子關鍵字與 SimpleNamespace 指派；R2 直接引用被改符號；讀檔或語法錯誤 rc 1；收據 handoffs/run_receipts/probewinsor_probes/out/affected_scan.json，739 檔、0 錯誤）＋RATIOUNSAFE 前處理關臂之測試（scripts/freeze_ratiounsafe_baseline.py 之 s1_payload 經 tests/feature_engineering/test_ratiounsafe_registry.py 使用）＋Task 1.4 批次續跑既有測試（tests/api 四檔）；helper 檔（ff_artifact_compare_helpers.py、ff_truncation_mr_helpers.py）以其使用者測試涵蓋",
+      "分批：b1＝Task 1.0（錨點凍結，先行提交 baseline.json）→ Task 1.1＋1.2＋1.4（同一生產碼提交）→ Task 1.3（受影響測試錨點／修正後各跑一次、RATIOUNSAFE 前處理關臂比對、收據 handoffs/run_receipts/probewinsor-affected.json）；gate_cmd 全綠＋Task 1.3 收據錨點綠而修正後紅之 nodeid 數 == 0（或逐項歸因 §C 並經審碼核可）",
       "真實資料重測試單組串行；不與委員輪並行；開跑前磁碟 ≥30GB；暫存 worktree 試作（TODO 階段）：錨點凍結 22 格 163 秒、峰值 0.53 GB",
       "TESTREG SPEC §N R9 於本票收案時改指本票提交；R8 不動"
     ],
     "coverage_risk": [
-      "Task 1.0 驗證：freeze_probewinsor_baseline.py 寫入模式拒絕生產碼已改（git diff 錨點 -- momentum/**/*.py 非空）、--check 重跑逐鍵相同、anchor_expect 兩格與 §A 收據一致",
-      "Task 1.1 驗證：test_probewinsor.py 邊界 01（6 族總開關關時子開關無效果）、02（9 格總開關開逐位元不變）、03（6 格總開關關＋縮尾關不變）、04（6 族刻意差異釘於錨點、anchor_differs 三族）、06（未填起始日）、07（6 呼叫點缺鍵訊息逐字）、08（16 輸入真值表）；mutation M1／M2／M3／M6",
-      "Task 1.2 驗證：邊界 05（22 格 hash 三類）；mutation M4／M5",
+      "Task 1.0 驗證：freeze_probewinsor_baseline.py 寫入模式拒絕 baseline 已存在與生產碼（momentum／api 之 .py）已改；--check 重跑逐鍵相同；anchor_expect 兩格與 §A 收據一致",
+      "Task 1.1 驗證：test_probewinsor.py 邊界 01（總開關關時子開關無效果，contract 全部成對族）、02（全部總開關開格逐位元不變）、03（全部總開關關＋縮尾關格不變）、04（刻意差異釘於錨點、anchor_differs／anchor_public_differs）、06（未填起始日）、07（6 呼叫點缺鍵訊息逐字）、08（16 輸入真值表）；平穩化開啟族實跑校準前置關卡與 d* 搜尋；mutation M1／M2／M3／M6",
+      "Task 1.2 驗證：邊界 05（全部格 hash 三類＋config_identity 等於 _compute_config_hash）；mutation M4／M5",
+      "Task 1.4 驗證：test_probewinsor_batch_resume.py 邊界 09a–09f；mutation M7",
       "Task 1.3 驗證：handoffs/run_receipts/probewinsor-affected.json（affected_tests 錨點與修正後逐 nodeid 結果）"
     ],
     "lifecycle": "keep",
     "not_executable": [
-      {"item": "stub_modules", "reason": "blocked-by", "owner": "PROBEWINSOR", "expiry": "2026-12-31"},
-      {"item": "V-6 五重項（test_failopen_correctness.py::test_v6_*）與 12h 主＋1h 完整生成不在本票實跑（TESTREG 第 3 批 Task 3.2）", "reason": "blocked-by", "owner": "PROBEWINSOR", "expiry": "2026-12-31"}
+      {
+        "item": "stub_modules",
+        "reason": "blocked-by",
+        "owner": "PROBEWINSOR",
+        "expiry": "2026-12-31"
+      },
+      {
+        "item": "V-6 五重項（test_failopen_correctness.py::test_v6_*）與 12h 主＋1h 完整生成不在本票實跑（TESTREG 第 3 批 Task 3.2）",
+        "reason": "blocked-by",
+        "owner": "PROBEWINSOR",
+        "expiry": "2026-12-31"
+      }
     ]
   }
 }

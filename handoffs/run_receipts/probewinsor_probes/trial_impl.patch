@@ -1,3 +1,93 @@
+diff --git a/api/services/feature_factory_batch_service.py b/api/services/feature_factory_batch_service.py
+index e4f327ac..cfdcf687 100644
+--- a/api/services/feature_factory_batch_service.py
++++ b/api/services/feature_factory_batch_service.py
+@@ -253,21 +253,11 @@ class FeatureFactoryBatchService:
+         if checkpoint is None:
+             raise FileNotFoundError(f"batch checkpoint not found: {batch_id}")
+ 
+-        completed_items = checkpoint.get("completed_items", [])
+-        retained_completed = []
+-        for item in completed_items:
+-            run_hash = self._resolve_completed_run_hash(item)
+-            if run_hash is None:
+-                logger.warning("Legacy completed item has no resolvable run hash: %s", item)
+-                retained_completed.append(item)
+-                continue
+-            if self._completed_manifest_exists(item, run_hash):
+-                retained_completed.append(item)
+-                continue
++        retained_completed, requeued = self._partition_completed_items(checkpoint, self._resume_identity(checkpoint))
++        for item in requeued:
+             checkpoint.setdefault("queued_items", []).append({
+                 "symbol": item.get("symbol"), "timeframe": item.get("timeframe")
+             })
+-            logger.info("Requeued completed item with missing run manifest: %s", item)
+         checkpoint["completed_items"] = retained_completed
+ 
+         if self._is_batch_retention_enabled():
+@@ -334,6 +324,61 @@ class FeatureFactoryBatchService:
+         match = re.fullmatch(rf"browse_{re.escape(symbol)}_{re.escape(timeframe)}_([A-Za-z0-9_.-]{{1,64}})", browse_id)
+         return match.group(1) if match else None
+ 
++    def _partition_completed_items(
++        self,
++        checkpoint: Dict[str, Any],
++        identity: Callable[[str, str], str],
++    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
++        """續跑時完成項之去留（PROBEWINSOR Task 1.4）：run hash 無法解析之舊項保留（不重算身分）；manifest 不在、
++        或目前碼之身分（`identity(symbol, timeframe)`）拋例外或不等於 run hash ⇒ 重排；其餘保留。"""
++        retained: List[Dict[str, Any]] = []
++        requeued: List[Dict[str, Any]] = []
++        for item in checkpoint.get("completed_items", []):
++            run_hash = self._resolve_completed_run_hash(item)
++            if run_hash is None:
++                logger.warning("Legacy completed item has no resolvable run hash: %s", item)
++                retained.append(item)
++                continue
++            if not self._completed_manifest_exists(item, run_hash):
++                logger.info("Requeued completed item with missing run manifest: %s", item)
++                requeued.append(item)
++                continue
++            try:
++                current = identity(str(item.get("symbol") or ""), str(item.get("timeframe") or ""))
++            except Exception as exc:  # 無法確認身分 ⇒ 不以舊結果充當完成
++                logger.warning("Requeued completed item; identity check failed: %s (%s)", item, exc)
++                requeued.append(item)
++                continue
++            if current != run_hash:
++                logger.info("Requeued completed item; identity changed %s -> %s: %s", run_hash, current, item)
++                requeued.append(item)
++                continue
++            retained.append(item)
++        return retained, requeued
++
++    @staticmethod
++    def _resume_identity(checkpoint: Dict[str, Any]) -> Callable[[str, str], str]:
++        """以 checkpoint 之請求（設定、起訖日）與批次生成同一 kline 目錄建目前碼之身分函式（PROBEWINSOR Task 1.4）。"""
++        from momentum.factories import create_feature_factory
++
++        payload = checkpoint.get("request_payload") or {}
++        config_override = payload.get("config_override")
++        start_date = payload.get("start_date")
++        end_date = payload.get("end_date")
++        cache_dir: Optional[str] = None
++        try:
++            from api.core.config import settings
++
++            cache_dir = str(settings.data_cache_path / "feature_klines")
++        except Exception:
++            pass  # 同 _compute_single_body：使用 create_feature_factory 預設值
++        factory = create_feature_factory(cache_dir=cache_dir)
++
++        def identity(symbol: str, timeframe: str) -> str:
++            return factory.config_identity(symbol, timeframe, config_override, start_date, end_date)
++
++        return identity
++
+     @staticmethod
+     def _completed_manifest_exists(item: Dict[str, Any], run_hash: str) -> bool:
+         symbol = str(item.get("symbol") or "")
 diff --git a/momentum/FeatureEngineering/config_manager.py b/momentum/FeatureEngineering/config_manager.py
 index 3298148e..ae869ec9 100644
 --- a/momentum/FeatureEngineering/config_manager.py
@@ -50,7 +140,7 @@ index 9f5bf2a6..640eed4c 100644
                               by_timeframe: Optional[Dict[str, int]]) -> int:
      """平穩化校準長度 N（FFSTAT v58 §C）之唯一決定處：`calibration_bars_by_timeframe` 列有該週期者用之；否則
 diff --git a/momentum/FeatureEngineering/feature_factory.py b/momentum/FeatureEngineering/feature_factory.py
-index 658aa580..7497e190 100644
+index 658aa580..9de23c94 100644
 --- a/momentum/FeatureEngineering/feature_factory.py
 +++ b/momentum/FeatureEngineering/feature_factory.py
 @@ -81,6 +81,7 @@ from momentum.FeatureEngineering.preprocessing.feature_preprocessor import (
@@ -139,10 +229,16 @@ index 658aa580..7497e190 100644
                  preprocessing_config = self._build_l7_raw_preprocessing_config(config)
                  context = self._build_preprocessing_context(raw_data, config)
                  preprocessor = FeaturePreprocessor(preprocessing_config, context=context)
-@@ -4101,6 +4093,13 @@ class FeatureFactory:
+@@ -4101,6 +4093,19 @@ class FeatureFactory:
              return preset_config.__class__.model_validate(merged_payload)
          return self._config_manager.get_merged_config(config_override)
  
++    def config_identity(self, symbol: str, timeframe: str, config_override: Optional[dict] = None,
++                        start_date: Optional[str] = None, end_date: Optional[str] = None) -> str:
++        """一次生成之身分（＝`generate_features` 所用之 config_hash；PROBEWINSOR Task 1.4 供批次續跑核對完成項）。"""
++        return self._compute_config_hash(self._resolve_config(config_override), symbol, timeframe,
++                                         start_date=start_date, end_date=end_date)
++
 +    @staticmethod
 +    def _probe_gate_salt(config: "FactoryConfig") -> Optional[str]:
 +        """快取身分鹽（PROBEWINSOR Task 1.2）：前處理總開關關且縮尾子開關開 ⇒ `PROBE_L65_GATE_SALT`；否則 None。"""
@@ -153,7 +249,7 @@ index 658aa580..7497e190 100644
      def _compute_config_hash(
          self,
          config: "FactoryConfig",
-@@ -4137,6 +4136,11 @@ class FeatureFactory:
+@@ -4137,6 +4142,11 @@ class FeatureFactory:
          # FFSTAT Task 2.3 ⑨：預熱政策（逐欄穩定點）與倍數表內容皆改變輸出值 ⇒ 納入快取鍵（改前快取一律未命中）
          config_payload["_warmup_policy"] = _stable_mask.WARMUP_POLICY
          config_payload["_warmup_table_sha256"] = _warmup_lookup.table_sha256()

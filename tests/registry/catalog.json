@@ -1620,6 +1620,27 @@
    "rewrite_targets": [],
    "ticket": "unknown"
   },
+  "tests/api/test_probewinsor_batch_resume.py": {
+   "claim": [
+    "correctness",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A6",
+    "A9",
+    "A13"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/api/test_probewinsor_batch_resume.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "PROBEWINSOR"
+  },
   "tests/api/test_progress_rss_fields.py": {
    "claim": [
     "unclassified"

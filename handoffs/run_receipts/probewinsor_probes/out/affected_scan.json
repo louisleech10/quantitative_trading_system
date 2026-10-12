@@ -1,5 +1,6 @@
 {
- "count": 28,
+ "count": 32,
+ "errors": [],
  "files": {
   "tests/api/test_batch_alias.py": {
    "r1_master_off_lines": [
@@ -43,6 +44,13 @@
    "r2_symbols": [],
    "r3_hash_literal": false
   },
+  "tests/feature_engineering/test_cgsa_disk_precheck.py": {
+   "r1_master_off_lines": [
+    194
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": false
+  },
   "tests/feature_engineering/test_failopen_contract.py": {
    "r1_master_off_lines": [],
    "r2_symbols": [
@@ -72,11 +80,13 @@
    "r3_hash_literal": false
   },
   "tests/feature_engineering/test_failopen_producer.py": {
-   "r1_master_off_lines": [],
+   "r1_master_off_lines": [
+    89
+   ],
    "r2_symbols": [
     "_compute_config_hash"
    ],
-   "r3_hash_literal": false
+   "r3_hash_literal": true
   },
   "tests/feature_engineering/test_failopen_winsor.py": {
    "r1_master_off_lines": [
@@ -121,8 +131,17 @@
    ],
    "r3_hash_literal": false
   },
+  "tests/feature_engineering/test_mtf_align_golden.py": {
+   "r1_master_off_lines": [
+    44
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": true
+  },
   "tests/feature_engineering/test_tf_aligner.py": {
-   "r1_master_off_lines": [],
+   "r1_master_off_lines": [
+    98
+   ],
    "r2_symbols": [
     "_compute_config_hash"
    ],
@@ -155,6 +174,20 @@
    ],
    "r2_symbols": [],
    "r3_hash_literal": false
+  },
+  "tests/test_cgsa_resume.py": {
+   "r1_master_off_lines": [
+    480
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": true
+  },
+  "tests/test_feature_factory_batch2d.py": {
+   "r1_master_off_lines": [
+    212
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": true
   },
   "tests/test_feature_factory_config.py": {
    "r1_master_off_lines": [],
@@ -208,5 +241,6 @@
    ],
    "r3_hash_literal": false
   }
- }
+ },
+ "scanned": 739
 }

@@ -61,6 +61,14 @@ def _hash_of(factory: Any, cell_id: str) -> str:
                                         start_date=fam["window"][0], end_date=fam["window"][1])
 
 
+def _identity_of(factory: Any, cell_id: str) -> str:
+    """公開身分入口 `FeatureFactory.config_identity`（批次續跑核對所用，Task 1.4）。"""
+    cell = _CELLS[cell_id]
+    fam = _FAMILIES[cell["family"]]
+    return factory.config_identity(_SPEC["symbol"], fam["primary"], ph.cell_payload(cell),
+                                   fam["window"][0], fam["window"][1])
+
+
 def _hash_violations(factory: Any) -> List[str]:
     """§P Task 1.2 三條邊界之違反清單（空＝通過）。"""
     frozen = ph.baseline()["cells"]
@@ -120,6 +128,7 @@ def test_boundary_05_cache_identity() -> None:
         config = factory._resolve_config(ph.cell_payload(cell))
         expected = _SPEC["salt"] if (not cell["pp"] and cell["winsor"]) else None
         assert factory._probe_gate_salt(config) == expected, cell_id
+        assert _identity_of(factory, cell_id) == _hash_of(factory, cell_id), cell_id
 
 
 @pytest.mark.parametrize("cell_id", _NOSTART_CELLS)

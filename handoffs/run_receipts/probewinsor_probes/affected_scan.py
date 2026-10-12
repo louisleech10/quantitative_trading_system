@@ -60,10 +60,15 @@ class Scan(ast.NodeVisitor):
                 if (isinstance(target, ast.Attribute) and target.attr == "enabled"
                         and isinstance(target.value, ast.Attribute) and target.value.attr == "preprocessing"):
                     self.r1.append(node.lineno)
-            # X["preprocessing"] = {"enabled": False, ...}
-            if (isinstance(target, ast.Subscript) and isinstance(target.slice, ast.Constant)
-                    and target.slice.value == "preprocessing" and isinstance(node.value, ast.Dict)
-                    and _is_false(_dict_get(node.value, "enabled"))):
+            # X["preprocessing"] = {"enabled": False, ...} ／ X.preprocessing = {...}
+            is_pre_target = ((isinstance(target, ast.Subscript) and isinstance(target.slice, ast.Constant)
+                              and target.slice.value == "preprocessing")
+                             or (isinstance(target, ast.Attribute) and target.attr == "preprocessing"))
+            if is_pre_target and isinstance(node.value, ast.Dict) and _is_false(_dict_get(node.value, "enabled")):
+                self.r1.append(node.lineno)
+            # X.preprocessing = SimpleNamespace(enabled=False, ...) ／ X["preprocessing"] = Cfg(enabled=False)
+            if (is_pre_target and isinstance(node.value, ast.Call)
+                    and any(k.arg == "enabled" and _is_false(k.value) for k in node.value.keywords)):
                 self.r1.append(node.lineno)
         self.generic_visit(node)
 
@@ -102,12 +107,14 @@ def main() -> int:
     listing = subprocess.run(["git", "ls-files", "-z", "--", "tests"], cwd=str(REPO), capture_output=True).stdout
     files = sorted(p for p in listing.decode("utf-8").split("\0") if p.endswith(".py"))
     result = {}
+    errors = []
     for rel in files:
-        if rel.endswith(("test_probewinsor.py", "probewinsor_helpers.py")):
+        if rel.endswith(("test_probewinsor.py", "probewinsor_helpers.py", "test_probewinsor_batch_resume.py")):
             continue
         try:
             tree = ast.parse((REPO / rel).read_text(encoding="utf-8"))
-        except (SyntaxError, UnicodeDecodeError, FileNotFoundError):
+        except (SyntaxError, UnicodeDecodeError, FileNotFoundError) as exc:  # fail-closed：列名並以 rc 1 結束
+            errors.append(f"{rel}: {type(exc).__name__}: {exc}")
             continue
         scan = Scan()
         scan.visit(tree)
@@ -117,11 +124,14 @@ def main() -> int:
                 "r2_symbols": sorted({s for _, s in scan.r2}),
                 "r3_hash_literal": bool(scan.r1) and scan.has_hash,
             }
-    out.write_text(json.dumps({"files": result, "count": len(result)}, ensure_ascii=False, indent=1, sort_keys=True),
-                   encoding="utf-8")
-    print(json.dumps({"count": len(result), "r1": sum(1 for v in result.values() if v["r1_master_off_lines"]),
+    out.write_text(json.dumps({"files": result, "count": len(result), "scanned": len(files), "errors": errors},
+                              ensure_ascii=False, indent=1, sort_keys=True), encoding="utf-8")
+    print(json.dumps({"count": len(result), "scanned": len(files), "errors": len(errors),
+                      "r1": sum(1 for v in result.values() if v["r1_master_off_lines"]),
                       "r2": sum(1 for v in result.values() if v["r2_symbols"])}, ensure_ascii=False))
-    return 0
+    for line in errors:
+        print(f"ERROR: {line}", file=sys.stderr)
+    return 1 if errors else 0
 
 
 if __name__ == "__main__":

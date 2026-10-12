@@ -61,9 +61,13 @@ def _deep_merge(base: Dict[str, Any], extra: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-def cell_payload(cell: Dict[str, Any], *, fracdiff: bool = False, adf: bool = False) -> Dict[str, Any]:
+def cell_payload(cell: Dict[str, Any], *, fracdiff: Optional[bool] = None, adf: Optional[bool] = None) -> Dict[str, Any]:
     """格之 config_override：族之 base payload（s2＝`icfirstalign_helpers.s2_payload`、fast＝`fftfmeta_golden_helpers.fast_payload`）
-    ＋族之 extras＋格之總開關／縮尾子開關；fracdiff／adf 只供真值表（不用於生成格）。"""
+    ＋族之 extras＋格之總開關／縮尾子開關；fracdiff／adf 未指定 ⇒ 取族之 `stationarity`（缺＝False；開啟時 apply_to
+    ＝non_stationary，同 `ffstat_helpers.stat_payload`）；真值表另行指定。"""
+    fam_st = bool(family_of(cell).get("stationarity", False))
+    fracdiff = fam_st if fracdiff is None else fracdiff
+    adf = fam_st if adf is None else adf
     fam = family_of(cell)
     if fam["base"] == "s2":
         from tests.feature_engineering import icfirstalign_helpers as ih
@@ -81,19 +85,27 @@ def cell_payload(cell: Dict[str, Any], *, fracdiff: bool = False, adf: bool = Fa
     pre = payload["preprocessing"]
     pre["enabled"] = bool(cell["pp"])
     pre["winsorization"] = {**(pre.get("winsorization") or {}), "enabled": bool(cell["winsor"])}
-    pre["fractional_differencing"] = {**(pre.get("fractional_differencing") or {}), "enabled": bool(fracdiff)}
-    pre["adf_differencing"] = {**(pre.get("adf_differencing") or {}), "enabled": bool(adf)}
+    for step, on in (("fractional_differencing", fracdiff), ("adf_differencing", adf)):
+        pre[step] = {**(pre.get(step) or {}), "enabled": bool(on)}
+        if on:
+            pre[step]["apply_to"] = "non_stationary"
     return payload
 
 
 @contextlib.contextmanager
 def isolated(work: Path) -> Iterator[Path]:
-    """單格寫入隔離：固定環境、cwd 移至 work（`config/` 以 symlink 指回 repo）、feature registry 與 CGSA 工作目錄
-    與系統暫存皆落 work 之下；離開時還原環境並刪 work。"""
+    """單格寫入隔離：固定環境、cwd 移至 work（`config/` 以 symlink 指回 repo）、feature registry、CGSA 工作目錄、
+    系統暫存與 d* 快取（`FeaturePreprocessor._d_star_cache_dir` 固定指向專案 data_cache，與 cwd 無關 ⇒ 另行導向，
+    同 `ffstat_helpers.prepare_stat_env`）皆落 work 之下；離開時還原環境並刪 work。"""
+    from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
+
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir(parents=True)
     (work / "config").symlink_to(REPO / "config")
     (work / "sys_tmp").mkdir()
+    dstar = work / "dstar_cache"
+    dstar.mkdir()
+    saved_dstar = FeaturePreprocessor.__dict__["_d_star_cache_dir"]
     env = {**FIXED_ENV,
            "FFACT_FEATURE_REGISTRY_PATH": str(work / "features" / "registry.json"),
            "FFACT_CGSA_WORK_DIR": str(work / "cgsa_work")}
@@ -104,8 +116,10 @@ def isolated(work: Path) -> Iterator[Path]:
         os.environ.update(env)
         os.chdir(work)
         tempfile.tempdir = str(work / "sys_tmp")
+        FeaturePreprocessor._d_star_cache_dir = staticmethod(lambda: dstar)
         yield work
     finally:
+        FeaturePreprocessor._d_star_cache_dir = saved_dstar
         tempfile.tempdir = saved_tmp
         os.chdir(saved_cwd)
         for key, value in saved_env.items():

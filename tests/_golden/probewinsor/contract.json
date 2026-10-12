@@ -117,6 +117,37 @@
       "extras": {},
       "anchor_differs": false,
       "anchor_public_differs": false
+    },
+    "e1h_st": {
+      "base": "s2",
+      "primary": "1h",
+      "training": [
+        "1h"
+      ],
+      "window": [
+        "2026-01-01",
+        "2026-01-31"
+      ],
+      "extras": {},
+      "stationarity": true,
+      "anchor_differs": true,
+      "anchor_public_differs": true
+    },
+    "e1h12h_st": {
+      "base": "s2",
+      "primary": "1h",
+      "training": [
+        "1h",
+        "12h"
+      ],
+      "window": [
+        "2026-01-01",
+        "2026-01-31"
+      ],
+      "extras": {},
+      "stationarity": true,
+      "anchor_differs": true,
+      "anchor_public_differs": false
     }
   },
   "cells": [
@@ -251,6 +282,48 @@
       "family": "e1h_nostart",
       "pp": false,
       "winsor": true
+    },
+    {
+      "id": "e1h_st.on.w1",
+      "family": "e1h_st",
+      "pp": true,
+      "winsor": true
+    },
+    {
+      "id": "e1h_st.on.w0",
+      "family": "e1h_st",
+      "pp": true,
+      "winsor": false
+    },
+    {
+      "id": "e1h_st.off.w1",
+      "family": "e1h_st",
+      "pp": false,
+      "winsor": true
+    },
+    {
+      "id": "e1h_st.off.w0",
+      "family": "e1h_st",
+      "pp": false,
+      "winsor": false
+    },
+    {
+      "id": "e1h12h_st.on.w1",
+      "family": "e1h12h_st",
+      "pp": true,
+      "winsor": true
+    },
+    {
+      "id": "e1h12h_st.off.w1",
+      "family": "e1h12h_st",
+      "pp": false,
+      "winsor": true
+    },
+    {
+      "id": "e1h12h_st.off.w0",
+      "family": "e1h12h_st",
+      "pp": false,
+      "winsor": false
     }
   ],
   "anchor_expect": {
