@@ -18,8 +18,8 @@ metas=("$META_DIR"/*.meta.json)
 seen=""; argv_set=""; env_set=""; bad=0
 for m in "${metas[@]}"; do
   nid=$(jq -er '.state_key | split("|")[1]' "$m") || fail "$m state_key 讀取失敗"
-  n_sess=$(jq -er '.ledger_new | length' "$m") || fail "$m ledger_new 讀取失敗"
-  [ "$n_sess" = "1" ] || fail "$m ledger_new 非恰一個 session（$n_sess）"
+  jq -e '(.ledger_new | type) == "array" and (.ledger_new | length) == 1 and (.ledger_new[0] | type) == "string"' "$m" > /dev/null \
+    || fail "$m ledger_new 須為恰含一個字串之陣列"
   sid=$(jq -er '.ledger_new[0]' "$m") || fail "$m ledger_new 讀取失敗"
   [ -f "$L/$sid" ] || fail "ledger session 不存在：$L/$sid"
   s=$(head -1 "$L/$sid")
@@ -35,7 +35,8 @@ for m in "${metas[@]}"; do
     then {env, python} else error("env／python 缺欄") end') || fail "$sid env／python 缺欄或型別不符"
   rest=$(printf "%s" "$rest_json" | shasum -a 256 | cut -c1-12)
   envh=$(printf "%s" "$env_json" | shasum -a 256 | cut -c1-12)
-  head_=$(echo "$s" | jq -er '.head[0:8]') || fail "$sid head 讀取失敗"
+  head_=$(echo "$s" | jq -er 'if (.head | type) == "string" and (.head | test("^[0-9a-f]{40}$")) then .head[0:8] else error("head") end') \
+    || fail "$sid head 缺欄或非 40 位提交雜湊"
   ok=yes; [ "$args" = "$nid" ] || { ok=NO; bad=1; }
   printf "%s head=%s args_eq_nodeid=%s argv_rest=%s env_python=%s\n" "${sid%.jsonl}" "$head_" "$ok" "$rest" "$envh"
   seen="$seen$nid"$'\n'; argv_set="$argv_set$rest"$'\n'; env_set="$env_set$envh"$'\n'
