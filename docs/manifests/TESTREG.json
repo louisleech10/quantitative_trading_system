@@ -52,7 +52,7 @@
     },
     {
       "path": "handoffs/run_receipts/testreg-v6-profile-run.json",
-      "cmd": "（伴隨收據，綁契約收據 handoffs/run_receipts/testreg-v6-profile.json 之 sha256）venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py run --max-seconds 120（當時以 --skip-done 分 5 段接續；該旁路已於審碼 b2 r1 刪除，既有結果之有效性見伴隨收據 reuse_validity）；venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py profile --nodeid 'tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]' --every 600；venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py receipt --classification 生產端本身耗時 --evidence …（8 條，見收據）",
+      "cmd": "（伴隨收據，綁契約收據 handoffs/run_receipts/testreg-v6-profile.json 之 sha256）venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py run --max-seconds 120（當時以 --skip-done 分 5 段接續；該旁路已於審碼 b2 r1 刪除；各項實測時之狀態與未證部分見伴隨收據 per_item_state，不宣稱對 19791c3e 已證有效）；venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py profile --nodeid 'tests/feature_engineering/test_failopen_correctness.py::test_v6_close_time_oracle_matches_pipeline[True]' --every 600；venv/bin/python handoffs/run_receipts/testreg_probes/v6_profile.py receipt --classification 生產端本身耗時 --evidence …（8 條，見收據）",
       "rc": 0,
       "honest_bounds": "第 2 批 Task 2.4：逐項耗時取記錄器 ledger 之 duration_s（只計測試呼叫本身，略低於執行器牆鐘：6 項全 passed，最慢 close_time[True] 5,997.9 秒／牆鐘 6,001.6 秒）；第 1–5 項跑於 2026-10-12 b9c06d3e 至 286d1e61 間（期間只提交文件，以 --skip-done 依結果 meta 判定不重跑）；cProfile 只量主執行緒（與 python -m cProfile 同義，6,104 秒、未截斷，執行緒與 spawn 子行程另錄於 v6_run/profile/*.parts 供判讀，本項無工作執行緒、唯一子行程為記憶體守護取樣器）；.prof 二進位檔不入版控；本機 8GB RAM，校準期大量使用 swap（10–13GB），耗時含此因素；慢因歸類依 SPEC §N R8"
     }
