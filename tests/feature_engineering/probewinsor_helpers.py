@@ -134,7 +134,49 @@ def environment_versions() -> Dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         out["numba_threading"] = f"unavailable: {type(exc).__name__}"
     out["thread_env"] = {name: os.environ.get(name) for name in _THREAD_ENV}
+    out.update(runtime_environment())
     return out
+
+
+def _numba_parallel_probe() -> float:
+    """極小之 numba 平行函式：執行一次使 numba 依環境解析執行緒層（`numba.threading_layer()` 須於平行函式執行後才可讀）。"""
+    import numba
+    import numpy as np
+
+    @numba.njit(parallel=True, cache=False)
+    def _sum(values: Any) -> float:
+        total = 0.0
+        for i in numba.prange(values.shape[0]):
+            total += values[i]
+        return total
+
+    return float(_sum(np.ones(64)))
+
+
+def runtime_environment() -> Dict[str, Any]:
+    """已載入之執行期數值後端（非設定值）：numba 實際解析之執行緒層與目前執行緒數、numpy／scipy 自帶 BLAS 之執行期
+    資訊（threadpoolctl；只取路徑位於 numpy、scipy 套件目錄者，與行程內其他套件之載入順序無關）。取不到即拋（fail-closed）。"""
+    import numba
+    import numpy as np
+    import scipy
+    import scipy.linalg  # noqa: F401 — 載入 scipy 之 BLAS，使兩側皆可觀測
+    import threadpoolctl
+
+    try:
+        layer = numba.threading_layer()
+    except ValueError:  # 本行程尚未執行過平行函式
+        _numba_parallel_probe()
+        layer = numba.threading_layer()
+    roots = {"numpy": os.path.dirname(np.__file__), "scipy": os.path.dirname(scipy.__file__)}
+    blas = []
+    for info in threadpoolctl.threadpool_info():
+        owner = [name for name, root in roots.items() if str(info.get("filepath", "")).startswith(root + os.sep)]
+        if owner:
+            blas.append({"package": owner[0], **{k: info.get(k) for k in ("user_api", "internal_api", "version",
+                                                                           "num_threads", "threading_layer",
+                                                                           "architecture")}})
+    return {"numba_threading_layer": str(layer), "numba_get_num_threads": int(numba.get_num_threads()),
+            "blas_runtime": sorted(blas, key=lambda d: (d["package"], str(d["internal_api"])))}
 
 
 def contract_at(commit: str) -> Dict[str, Any]:

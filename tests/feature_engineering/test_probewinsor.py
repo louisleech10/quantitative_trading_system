@@ -213,12 +213,15 @@ def test_boundary_10_baseline_provenance() -> None:
     assert _ENVIRONMENT_KEYS <= set(frozen["environment"])
     # 生產碼之非 .py 資源（執行期讀取之 YAML／JSON 等）錨點亦等於契約所記
     assert ph.production_resource_digest(frozen["frozen_at_head"]) == _SPEC["anchor_production_resource_sha256"]
+    # 執行期數值後端（實際解析之 numba 執行緒層與數、numpy／scipy 之 BLAS）亦在環境紀錄內（讀執行期之證明見 10g）
+    assert _RUNTIME_ENVIRONMENT_KEYS <= set(frozen["environment"])
 
 
 # 環境紀錄之必備欄（兩側同時漏記亦會被逐鍵相等放過 ⇒ 另鎖欄位存在）
 _ENVIRONMENT_KEYS = {"python", "python_implementation", "python_compiler", "system", "release", "machine", "numpy",
                      "pandas", "numba", "llvmlite", "numpy_blas", "numba_threading_layer_config", "numba_num_threads",
                      "thread_env"}
+_RUNTIME_ENVIRONMENT_KEYS = {"numba_threading_layer", "numba_get_num_threads", "blas_runtime"}
 
 
 # ---------------------------------------------------------------- mutation（改壞必紅）
@@ -419,6 +422,51 @@ def test_boundary_10f_production_pathspec_covers_digest() -> None:
     assert "momentum/FeatureEngineering/atomic/warmup_table.yaml" in proc.stdout.split("\0")
 
 
+def test_boundary_10g_environment_reads_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    """邊界 10g：環境紀錄之執行期欄取自執行期 API（非設定值）：替換 numba 實際解析之執行緒層與執行緒數、threadpoolctl
+    回報之 numpy BLAS ⇒ 紀錄隨之改變（邊界 10 之 frozen＝current 因而能偵出執行期漂移）。"""
+    import os
+
+    import numba
+    import numpy as np
+    import threadpoolctl
+
+    fake = {"user_api": "blas", "internal_api": "fakeblas", "version": "9.9", "num_threads": 3,
+            "threading_layer": "fake-layer", "architecture": "fake-arch"}
+    blas_path = os.path.join(os.path.dirname(np.__file__), "fake", "libfakeblas.dylib")
+    monkeypatch.setattr(numba, "threading_layer", lambda: "mutated-layer")
+    monkeypatch.setattr(numba, "get_num_threads", lambda: -7)
+    monkeypatch.setattr(threadpoolctl, "threadpool_info", lambda: [{"filepath": blas_path, **fake}])
+    env = ph.environment_versions()
+    assert (env["numba_threading_layer"], env["numba_get_num_threads"]) == ("mutated-layer", -7)
+    assert env["blas_runtime"] == [{"package": "numpy", **fake}]
+
+
+def _run_freeze_check(fz: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, environment: Dict[str, Any]) -> int:
+    """以替身生成執行 `--check`（單格、記錄與 baseline 相同），baseline 為 tmp 之替身且其 environment＝`environment`、
+    目前環境由呼叫者以替身固定；回傳 rc。"""
+    import json
+
+    cell_id = next(c["id"] for c in _SPEC["cells"] if c["id"] not in _SPEC.get("anchor_expect", {}))
+    target = tmp_path / "baseline.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps({"cells": {cell_id: {}}, "truth_table": [], "contract_sha256": "c",
+                                  "kline_sha256": "k", "environment": environment}), encoding="utf-8")
+    monkeypatch.setattr(fz.ph, "BASELINE_PATH", target)
+    monkeypatch.setattr(fz, "run_all", lambda ids: {"contract_sha256": "c", "kline_sha256": "k",
+                                                    "cells": {cell_id: {}}, "truth_table": []})
+    monkeypatch.setattr(fz.ph, "diff", lambda a, b, keys: [])
+    return fz.main(["--check", "--cells", cell_id])
+
+
+def test_boundary_10h_check_compares_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """邊界 10h：凍結腳本 `--check` 比對 baseline 之 environment 與目前環境：相同 rc 0、不同 rc 1。"""
+    fz = _freeze_module()
+    monkeypatch.setattr(fz.ph, "environment_versions", lambda: {"python": "current"})
+    assert _run_freeze_check(fz, monkeypatch, tmp_path / "a", {"python": "current"}) == 0
+    assert _run_freeze_check(fz, monkeypatch, tmp_path / "b", {"python": "frozen"}) == 1
+
+
 def test_boundary_10d_anchor_symbols_present_after_fix() -> None:
     """邊界 10d（實作後）：contract `anchor_absent_symbols` 所列字面皆存在於工作樹之生產檔（清單確為本票生產符號）。"""
     assert ph.present_symbol_violations() == []
@@ -481,6 +529,13 @@ def test_mutation_m15_freeze_gate_skips_resource_anchor(monkeypatch: pytest.Monk
     _stub_git(fz, monkeypatch, resource="CHANGED")
     monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
     assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
+
+
+def test_mutation_m16_check_skips_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M16：凍結腳本 `--check` 之變體不比對 environment ⇒ 環境不同時仍回 rc 0（邊界 10h 偵出）。"""
+    fz = _mutant_freeze('        if ph.environment_versions() != frozen.get("environment"):\n', "        if False:\n")
+    monkeypatch.setattr(fz.ph, "environment_versions", lambda: {"python": "current"})
+    assert _run_freeze_check(fz, monkeypatch, tmp_path, {"python": "frozen"}) != 1
 
 
 def test_mutation_m6_stack_bars_ignore_master(monkeypatch: pytest.MonkeyPatch, work_root: Path) -> None:

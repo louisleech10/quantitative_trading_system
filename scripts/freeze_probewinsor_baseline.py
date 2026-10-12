@@ -151,6 +151,8 @@ def main(argv: List[str]) -> int:
             errors.append("contract_sha256 不同")
         if produced["kline_sha256"] != frozen.get("kline_sha256"):
             errors.append("kline_sha256 不同")
+        if ph.environment_versions() != frozen.get("environment"):
+            errors.append("environment 不同（執行環境與凍結時不同，逐位元比較無意義）")
     for line in errors:
         print(f"FAIL: {line}", file=sys.stderr)
     if errors:
