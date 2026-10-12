@@ -1,0 +1,62 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.4.2, pluggy-1.6.0 -- /Users/louis/Desktop/quantitative_trading_system/venv/bin/python
+rootdir: /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/b433f210-2afd-44b3-b365-54a46b211dec/scratchpad/pw_wt
+configfile: pytest.ini
+plugins: asyncio-1.2.0, anyio-4.10.0, cov-7.0.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 18 items
+
+tests/api/test_run_lifecycle_api.py::test_lease_sink_holds_until_release FAILED [  5%]
+tests/api/test_run_lifecycle_api.py::test_warmup_coordinator_holds_continuous_lease PASSED [ 11%]
+tests/api/test_run_lifecycle_api.py::test_generate_warmup_delete_lease_chain FAILED [ 16%]
+tests/api/test_run_lifecycle_api.py::test_register_browse_id_uses_full_hash PASSED [ 22%]
+tests/api/test_run_lifecycle_api.py::test_pass2_restores_two_full_hash_browse_tasks PASSED [ 27%]
+tests/api/test_run_lifecycle_api.py::test_task_status_completion_contract PASSED [ 33%]
+tests/api/test_run_lifecycle_api.py::test_resume_hash_resolver_three_branches PASSED [ 38%]
+tests/api/test_run_lifecycle_api.py::test_hdf5_completion_releases_then_auto_cleans PASSED [ 44%]
+tests/api/test_run_lifecycle_api.py::test_runs_http_error_contracts PASSED [ 50%]
+tests/api/test_run_lifecycle_api.py::test_list_runs_created_at_iso_samples PASSED [ 55%]
+tests/api/test_run_lifecycle_api.py::test_list_runs_includes_browse_metadata PASSED [ 61%]
+tests/api/test_run_lifecycle_api.py::test_ensure_browse_task_for_run_idempotent PASSED [ 66%]
+tests/api/test_run_lifecycle_api.py::test_ensure_browse_task_not_ready_returns_404 PASSED [ 72%]
+tests/api/test_run_lifecycle_api.py::test_delete_idempotent_artifact_and_browse_reconciliation PASSED [ 77%]
+tests/api/test_run_lifecycle_api.py::test_resume_batch_requeues_missing_resolved_run[output_path] PASSED [ 83%]
+tests/api/test_run_lifecycle_api.py::test_resume_batch_requeues_missing_resolved_run[browse_task_id] PASSED [ 88%]
+tests/api/test_run_lifecycle_api.py::test_resume_batch_keeps_legacy_completed_item PASSED [ 94%]
+tests/api/test_run_lifecycle_api.py::test_resume_batch_retains_completed_item_with_present_manifest FAILED [100%]
+
+=================================== FAILURES ===================================
+_____________________ test_lease_sink_holds_until_release ______________________
+tests/api/test_run_lifecycle_api.py:77: in test_lease_sink_holds_until_release
+    assert factory.generate_features("BTCUSDT", "12h", lease_sink=sink) == "result"
+momentum/FeatureEngineering/feature_factory.py:240: in generate_features
+    check_l1_warmup_coverage(config)
+momentum/FeatureEngineering/atomic/l1_output_points.py:150: in check_config_coverage
+    ai = config.atomic_indicators
+E   AttributeError: 'object' object has no attribute 'atomic_indicators'
+----------------------------- Captured stderr call -----------------------------
+[2026-10-13 00:15:36,370] INFO momentum.FeatureEngineering.atomic.talib_wrapper: Loaded 134 TA-Lib indicators
+2026-10-13 00:15:36,370 - momentum.FeatureEngineering.atomic.talib_wrapper - INFO - Loaded 134 TA-Lib indicators
+___________________ test_generate_warmup_delete_lease_chain ____________________
+tests/api/test_run_lifecycle_api.py:132: in test_generate_warmup_delete_lease_chain
+    assert factory.generate_features("BTCUSDT", "12h", lease_sink=sink) == "result"
+momentum/FeatureEngineering/feature_factory.py:240: in generate_features
+    check_l1_warmup_coverage(config)
+momentum/FeatureEngineering/atomic/l1_output_points.py:150: in check_config_coverage
+    ai = config.atomic_indicators
+E   AttributeError: 'object' object has no attribute 'atomic_indicators'
+---------------------------- Captured stderr setup -----------------------------
+2026-10-13 00:15:36,784 - asyncio - DEBUG - Using selector: KqueueSelector
+________ test_resume_batch_retains_completed_item_with_present_manifest ________
+tests/api/test_run_lifecycle_api.py:570: in test_resume_batch_retains_completed_item_with_present_manifest
+    monkeypatch.setattr(service, "_resume_identity", lambda _checkpoint: (lambda _symbol, _timeframe: "cfg_batch2d"))
+E   AttributeError: <api.services.feature_factory_batch_service.FeatureFactoryBatchService object at 0x14213d4c0> has no attribute '_resume_identity'
+---------------------------- Captured stderr setup -----------------------------
+2026-10-13 00:15:37,026 - asyncio - DEBUG - Using selector: KqueueSelector
+----------------------------- Captured stderr call -----------------------------
+2026-10-13 00:15:37,026 - api.feature_factory_batch_service - INFO - [L65] IC-First is the only pipeline; forcing concurrent_symbols=1 to prevent multi-symbol OOM
+=========================== short test summary info ============================
+FAILED tests/api/test_run_lifecycle_api.py::test_lease_sink_holds_until_release - AttributeError: 'object' object has no attribute 'atomic_indicators'
+FAILED tests/api/test_run_lifecycle_api.py::test_generate_warmup_delete_lease_chain - AttributeError: 'object' object has no attribute 'atomic_indicators'
+FAILED tests/api/test_run_lifecycle_api.py::test_resume_batch_retains_completed_item_with_present_manifest - AttributeError: <api.services.feature_factory_batch_service.FeatureFactoryBatchService object at 0x14213d4c0> has no attribute '_resume_identity'
+========================= 3 failed, 15 passed in 0.99s =========================

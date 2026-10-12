@@ -1,5 +1,5 @@
 diff --git a/api/services/feature_factory_batch_service.py b/api/services/feature_factory_batch_service.py
-index e4f327ac..cfdcf687 100644
+index e4f327ac..e568b257 100644
 --- a/api/services/feature_factory_batch_service.py
 +++ b/api/services/feature_factory_batch_service.py
 @@ -253,21 +253,11 @@ class FeatureFactoryBatchService:
@@ -35,8 +35,8 @@ index e4f327ac..cfdcf687 100644
 +        checkpoint: Dict[str, Any],
 +        identity: Callable[[str, str], str],
 +    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-+        """續跑時完成項之去留（PROBEWINSOR Task 1.4）：run hash 無法解析之舊項保留（不重算身分）；manifest 不在、
-+        或目前碼之身分（`identity(symbol, timeframe)`）拋例外或不等於 run hash ⇒ 重排；其餘保留。"""
++        """續跑時完成項之去留（PROBEWINSOR Task 1.4）：run hash 無法解析之舊格式項保留（改前契約，不重算身分）；
++        manifest 不在、或目前碼之身分（`identity(symbol, timeframe)`）拋例外或不等於 run hash ⇒ 重排；其餘保留。"""
 +        retained: List[Dict[str, Any]] = []
 +        requeued: List[Dict[str, Any]] = []
 +        for item in checkpoint.get("completed_items", []):

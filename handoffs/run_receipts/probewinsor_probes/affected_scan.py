@@ -104,10 +104,14 @@ class Scan(ast.NodeVisitor):
 
 def main() -> int:
     out = Path(sys.argv[1])
-    listing = subprocess.run(["git", "ls-files", "-z", "--", "tests"], cwd=str(REPO), capture_output=True).stdout
-    files = sorted(p for p in listing.decode("utf-8").split("\0") if p.endswith(".py"))
-    result = {}
+    proc = subprocess.run(["git", "ls-files", "-z", "--", "tests"], cwd=str(REPO), capture_output=True)
     errors = []
+    if proc.returncode != 0 or proc.stderr.strip():  # 清單取得失敗不得當成「0 檔」成功
+        errors.append(f"git ls-files rc={proc.returncode}: {proc.stderr.decode('utf-8', 'replace').strip()}")
+    files = sorted(p for p in proc.stdout.decode("utf-8").split("\0") if p.endswith(".py"))
+    if not files and not errors:
+        errors.append("git ls-files 回傳 0 個 tests/ 之 .py（不可能之母體，fail-closed）")
+    result = {}
     for rel in files:
         if rel.endswith(("test_probewinsor.py", "probewinsor_helpers.py", "test_probewinsor_batch_resume.py")):
             continue

@@ -40,6 +40,31 @@ def baseline() -> Dict[str, Any]:
     return json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
 
 
+def absent_symbol_violations(commit: str, reader: Optional[Any] = None) -> List[str]:
+    """改前碼之內容證明（§P Task 1.0）：contract `anchor_absent_symbols` 所列 [路徑, 字面] 於該提交之檔案內容
+    皆不得出現；回傳違反清單（空＝該提交為本票生產改動前之碼）。`reader(commit, path) -> str` 預設 `git show`；
+    讀檔失敗列為違反（fail-closed）。"""
+    import subprocess
+
+    def _git_show(rev: str, path: str) -> str:
+        proc = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=str(REPO), capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(proc.stderr.strip() or f"git show {rev}:{path} 失敗")
+        return proc.stdout
+
+    read = reader or _git_show
+    out: List[str] = []
+    for path, needle in contract()["anchor_absent_symbols"]:
+        try:
+            text = read(commit, path)
+        except Exception as exc:  # noqa: BLE001 — 讀不到即無法證明改前
+            out.append(f"{commit}:{path} 讀取失敗：{exc}")
+            continue
+        if needle in text:
+            out.append(f"{commit}:{path} 已含本票生產符號 {needle!r}")
+    return out
+
+
 def cell_by_id(cell_id: str) -> Dict[str, Any]:
     for cell in contract()["cells"]:
         if cell["id"] == cell_id:

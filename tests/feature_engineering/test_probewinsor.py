@@ -177,6 +177,24 @@ def test_boundary_08_call_site_truth_table() -> None:
     assert ph.truth_table() == ph.baseline()["truth_table"]
 
 
+def _baseline_add_commit() -> str:
+    import subprocess
+
+    proc = subprocess.run(["git", "log", "--diff-filter=A", "--format=%H", "--",
+                           str(ph.BASELINE_PATH.relative_to(ph.REPO))],
+                          cwd=str(ph.REPO), capture_output=True, text=True)
+    commits = [c for c in proc.stdout.split() if c]
+    return commits[-1] if proc.returncode == 0 and commits else ""
+
+
+def test_boundary_10_baseline_provenance() -> None:
+    """凍結來源：baseline 之 frozen_at_head 與首次加入 baseline 之提交，皆不含本票生產符號（＝改前碼之產物）。"""
+    frozen = ph.baseline()
+    assert _baseline_add_commit() != ""
+    assert ph.absent_symbol_violations(frozen["frozen_at_head"]) == []
+    assert ph.absent_symbol_violations(_baseline_add_commit()) == []
+
+
 # ---------------------------------------------------------------- mutation（改壞必紅）
 
 def _anchor_calibration_winsorizer(self: Any, config: Any, timeframe: str) -> Any:
@@ -236,6 +254,20 @@ def test_mutation_m5_salt_always(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(FeatureFactory, "_probe_gate_salt", lambda self, config: _SPEC["salt"])
     found = _hash_violations(_factory())
     assert any(v.split(":")[0] in _ON_CELLS for v in found)
+
+
+def test_boundary_10b_provenance_detector_flags_post_change_code() -> None:
+    """邊界 10b：凍結來源檢查遇「已含本票生產符號」之碼必報違反（邊界 10 之偵測器非空轉）；讀檔失敗亦報。"""
+    def _post_change(commit: str, path: str) -> str:
+        return "\n".join(needle for p, needle in _SPEC["anchor_absent_symbols"] if p == path)
+
+    found = ph.absent_symbol_violations("POST", reader=_post_change)
+    assert len(found) == len(_SPEC["anchor_absent_symbols"])
+
+    def _unreadable(commit: str, path: str) -> str:
+        raise RuntimeError("missing")
+
+    assert len(ph.absent_symbol_violations("POST", reader=_unreadable)) == len(_SPEC["anchor_absent_symbols"])
 
 
 def test_mutation_m6_stack_bars_ignore_master(monkeypatch: pytest.MonkeyPatch, work_root: Path) -> None:

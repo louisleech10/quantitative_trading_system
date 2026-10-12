@@ -485,5 +485,23 @@
         "adf": true
       }
     ]
-  }
+  },
+  "anchor_absent_symbols": [
+    [
+      "momentum/FeatureEngineering/feature_config.py",
+      "def l65_enabled"
+    ],
+    [
+      "momentum/FeatureEngineering/feature_factory.py",
+      "def config_identity"
+    ],
+    [
+      "momentum/FeatureEngineering/feature_factory.py",
+      "def _probe_gate_salt"
+    ],
+    [
+      "api/services/feature_factory_batch_service.py",
+      "def _partition_completed_items"
+    ]
+  ]
 }

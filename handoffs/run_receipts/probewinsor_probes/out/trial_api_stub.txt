@@ -1,0 +1,6 @@
+pytest rc=1
+FAILED tests/api/test_run_lifecycle_api.py::test_lease_sink_holds_until_release
+FAILED tests/api/test_run_lifecycle_api.py::test_generate_warmup_delete_lease_chain
+================== 2 failed, 91 passed, 3 warnings in 28.80s ===================
+
+[exited with code 0]
