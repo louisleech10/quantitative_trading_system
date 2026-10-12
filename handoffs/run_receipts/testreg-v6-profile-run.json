@@ -34,7 +34,7 @@
  },
  "per_item_state": {
   "verdict": "各項耗時為「於下列各自記錄之狀態下實測」；不宣稱其已證對 19791c3e 之狀態有效（撤回 6dd54b8d 版 reuse_validity 之「證其有效」：impact 只作測試選擇之靜態來源分析，不涵蓋執行驅動與非 Python 輸入；mtime 非內容指紋——審碼 b2 r2）",
-  "why_not_rerun": "第 1–5 項於當時以 v6_profile.py run --skip-done 接續（只依結果 meta 之 rc 與 ledger_new 判定、未比 state_key）；該旁路已於 6dd54b8d 刪除。重跑 5 項約 8 小時，下列可查證事實顯示各項執行時之程式碼與測試與 19791c3e 相同；未證部分逐列於 not_attested",
+  "why_not_rerun": "第 1–5 項於當時以 v6_profile.py run --skip-done 接續（只依結果 meta 之 rc 與 ledger_new 判定、未比 state_key）；該旁路已於 6dd54b8d 刪除。重跑 5 項約 8 小時。下列可查證事實只及「各項 head 之已提交程式碼與測試路徑與 19791c3e 相同」，不及執行時之未提交內容、kline 內容與驅動內容（逐列於 not_attested）⇒ 不宣稱各項之執行狀態與 19791c3e 等值，亦不宣稱歷史結果於 19791c3e 可重現；Task 2.4 之用途（逐項耗時之歷史觀測、最慢項與其 cProfile 歸類）以各項自身記錄之狀態為準",
   "source": "記錄器於 pytest 執行時寫入之 ledger session（.testreg/ledger/<session>.jsonl 首行 kind=session；session id 見各 junit/*.meta.json 之 ledger_new），非由驅動程式產生",
   "items": {
    "test_v6_independent_asof_oracle_matches_multi_tf_columns": {"session": "1dc6fb2e-f7f1-45d3-bf3b-ada4bc4c56e9", "head": "1e3c0dfa", "diff_digest": "66ac605dd21fbf17ae89170d16d4065ebd053c613057fd203660d96dd99e9b5b"},
@@ -44,11 +44,11 @@
    "test_v6_close_time_oracle_matches_pipeline[False]": {"session": "09811a56-e316-491d-ad32-258fbd2577fd", "head": "14452799", "diff_digest": "3bae7c30b1e9ba3911fd6b0286b46f8d1d7325d36ee0ee511e172f9e1f599921"},
    "test_v6_close_time_oracle_matches_pipeline[True]": {"session": "48fe7e4b-b7c9-406c-9125-4b26cca40113", "head": "286d1e61", "diff_digest": "c151eabd290d2a791fda9cdc111eb72d3f7401a41cc5c9039b50aed9e75f0a89"}
   },
-  "attested_check": "handoffs/run_receipts/testreg_probes/v6_session_check.sh：六項 args 皆恰為 nodeid；去 args 後 argv 指紋皆 1b31436f1a18；{env, python} 指紋皆 05484bf98476",
+  "attested_check": "bash handoffs/run_receipts/testreg_probes/v6_session_check.sh（fail-closed：meta 之 nodeid 集合須等於契約收據 durations_s 鍵集合、每項恰一個存在之 session、args 恰為 nodeid、argv 與 {env, python} 指紋各一致，任一不符 rc 1）⇒ rc 0：六項 args 皆恰為 nodeid；去 args 後 argv 指紋皆 1b31436f1a18；{env, python} 指紋皆 05484bf98476。mutation（複本以 V6_META_DIR 指入）：改 nodeid／少一項／多一項／session 不存在 皆 rc 1",
   "attested": [
    "pytest 之呼叫：各 session 之 argv_norm 之 args 恰為該項 nodeid、其餘選項同（驅動程式只傳 nodeid 與環境；結果由 pytest 子行程與記錄器產生）",
    "環境：各 session 之 env（NUMBA_CACHE_DIR、PYTEST_VERSION 8.4.2、PYTHONPATH＝repo 根）與 python 路徑六項相同",
-   "程式碼與測試：git diff --name-only <各項 head> 19791c3e -- momentum api tests scripts conftest.py pytest.ini setup.cfg pyproject.toml requirements.txt ⇒ 1e3c0dfa、14452799 只差 scripts/fact_keys.json，286d1e61 無差；fact_keys.json 於 momentum/、tests/conftest.py、tests/fixtures/ 與 V-6 測試檔皆無引用（grep；唯一引用之測試檔為 tests/feature_engineering/test_framepath_disposition.py，非 V-6）"
+   "已提交之程式碼與測試路徑（不含未提交內容）：git diff --name-only <各項 head> 19791c3e -- momentum api tests scripts conftest.py pytest.ini setup.cfg pyproject.toml requirements.txt ⇒ 1e3c0dfa、14452799 只差 scripts/fact_keys.json，286d1e61 無差；fact_keys.json 於 momentum/、tests/conftest.py、tests/fixtures/ 與 V-6 測試檔皆無引用（grep；唯一引用之測試檔為 tests/feature_engineering/test_framepath_disposition.py，非 V-6）"
   ],
   "not_attested": [
    "各項執行時之未提交改動：只有 diff_digest（git diff HEAD 之摘要），內容無法事後還原；工作樹當時之已知未提交改動為 market_data 快取、momentum/**/__pycache__ 之 numba 快取、.claude/gate 紀錄與 handoffs 檔，主控端於 V-6 執行期間未改 momentum／tests 原始碼（依本 session 操作紀錄，非機械證明）",
