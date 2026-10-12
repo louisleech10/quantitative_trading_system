@@ -340,3 +340,85 @@ def test_boundary_02_changed_file_fully_tombstoned_excluded_tombstoned(tmp_path)
     res = _impact(r, changed=["tests/test_d.py", "tests/test_none.py"])
     assert _exc(res)["tests/test_d.py"] == "tombstoned"
     assert "tests/test_none.py" not in _sel(res) and "tests/test_none.py" not in _exc(res)
+
+
+# ── v41（諮詢 r2 CODEX-R2-P1-02）：conftest／外掛 hook 之定義層可達；production_taint 參數 ─────────────────────
+HOOK_CALL_A = "def pytest_runtest_call(item):\n    from momentum.a import fa\n    fa()\n"
+HELPER_TWO = "def used():\n    return 1\n\n\ndef other():\n    from momentum.core.d import dx\n    return dx()\n"
+FE_TESTS = {"tests/feature_engineering/test_fe1.py", "tests/feature_engineering/test_fe2.py"}
+
+
+def _hook_repo(tmp_path: Path, extra: Dict[str, str]) -> TmpRepo:
+    files = dict(FILES)
+    files.update(extra)
+    return make_repo(tmp_path, files)
+
+
+@pytest.mark.parametrize("taint", [True, False])
+def test_hook_root_conftest_selects_all(tmp_path, taint):
+    """root tests/conftest.py 之 hook 於本體 import 並呼叫變更之生產模組 ⇒ 全部測試檔以 static_taint 選入（不論
+    production_taint）。"""
+    r = _hook_repo(tmp_path, {"tests/conftest.py": HOOK_CALL_A})
+    res = testreg.impact(r.root, ["momentum/a.py"], [], [], production_taint=taint)
+    sel = _sel(res)
+    assert sorted(sel) == ALL_TESTS and all("static_taint" in v for v in sel.values())
+
+
+def test_hook_subdir_conftest_selects_subdir_only(tmp_path):
+    r = _hook_repo(tmp_path, {"tests/feature_engineering/conftest.py": HOOK_CALL_A})
+    sel = _sel(testreg.impact(r.root, ["momentum/a.py"], MUST, [], production_taint=False))
+    assert FE_TESTS <= set(sel) and "tests/test_a.py" not in sel and "tests/test_b.py" not in sel
+
+
+def test_hook_plugin_selects_root_scope(tmp_path):
+    r = _hook_repo(tmp_path, {"tests/conftest.py": 'pytest_plugins = ["tests.plugins.hp"]\n',
+                              "tests/plugins/__init__.py": "",
+                              "tests/plugins/hp.py": "def pytest_runtest_setup(item):\n    from momentum.b import fb\n"
+                                                     "    fb()\n"})
+    sel = _sel(testreg.impact(r.root, ["momentum/a.py"], [], [], production_taint=False))
+    assert sorted(sel) == ALL_TESTS
+
+
+def test_hook_def_level_not_whole_module(tmp_path):
+    """hook 只引用 helper 模組之 used()，該模組另一函式之函式內 import 生產模組 ⇒ 變更該生產模組不經 hook 選入
+    （定義層，不以被匯入模組之整個閉包計）。"""
+    r = _hook_repo(tmp_path, {"tests/helpers/hk.py": HELPER_TWO,
+                              "tests/conftest.py": "from tests.helpers.hk import used\n\n\n"
+                                                   "def pytest_configure(config):\n    used()\n"})
+    sel = _sel(testreg.impact(r.root, ["momentum/core/d.py"], MUST, [], production_taint=False))
+    assert not FE_TESTS & set(sel) and "tests/test_d.py" not in sel
+
+
+def test_mutation_hook_reach_whole_module_breaks_def_level(tmp_path, monkeypatch):
+    r = _hook_repo(tmp_path, {"tests/helpers/hk.py": HELPER_TWO,
+                              "tests/conftest.py": "from tests.helpers.hk import used\n\n\n"
+                                                   "def pytest_configure(config):\n    used()\n"})
+    graph_cls = testreg._ImportGraph
+    monkeypatch.setattr(testreg, "_hook_reach",
+                        lambda graph, path, name: graph_cls.closure(graph, "tests/helpers/hk.py") | {path})
+    sel = _sel(testreg.impact(r.root, ["momentum/core/d.py"], MUST, [], production_taint=False))
+    assert FE_TESTS <= set(sel)
+
+
+def test_mutation_hooks_ignored_breaks_root_case(tmp_path, monkeypatch):
+    r = _hook_repo(tmp_path, {"tests/conftest.py": HOOK_CALL_A})
+    monkeypatch.setattr(testreg, "_hook_reach", lambda graph, path, name: frozenset())
+    sel = _sel(testreg.impact(r.root, ["momentum/a.py"], MUST, [], production_taint=False))
+    assert sorted(sel) != ALL_TESTS
+
+
+def test_production_taint_false_drops_test_reach_keeps_other_sources(tmp_path):
+    """production_taint=False：源自生產檔變更之「測試檔與 fixture 可達」不選；helper 變更、domain（不可解析）、must、
+    changed_test 照常。"""
+    r = _repo(tmp_path)
+    on = _sel(testreg.impact(r.root, ["momentum/a.py"], MUST, []))
+    off = _sel(testreg.impact(r.root, ["momentum/a.py"], MUST, [], production_taint=False))
+    assert {"tests/test_a.py", "tests/test_b.py"} <= set(on)
+    assert "tests/test_a.py" not in off and "tests/test_b.py" not in off and "tests/test_none.py" in off
+    helper = _sel(testreg.impact(r.root, ["tests/helpers/h.py"], [], [], production_taint=False))
+    assert "static_taint" in helper["tests/test_h.py"]
+    rd = _dyn_repo(tmp_path / "d")
+    dom = _sel(testreg.impact(rd.root, ["momentum/core/c.py"], [], [], production_taint=False))
+    assert {p for p, v in dom.items() if "registry_unresolved" in v} == DOMAIN_C
+    chg = _sel(testreg.impact(r.root, ["tests/test_d.py", "momentum/a.py"], [], [], production_taint=False))
+    assert "changed_test" in chg["tests/test_d.py"]

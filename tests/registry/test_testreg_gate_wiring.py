@@ -722,3 +722,84 @@ def test_10_same_tombstone_in_safe_and_unsafe_manifest_v14_red(tmp_path):
     r.add_tombstone(_tomb("tests/test_t.py::test_y", [], "E0"))
     proc = r.run("validate")
     assert any(l.startswith("V14 ") and "UNSAFE" in l for l in proc.stderr.splitlines()), proc.stderr
+
+
+# ── v41（諮詢 r2 CODEX-R2-P1-03、CODEX-R2-P1-02）：A 組碑解析；impact 以 production_taint=False 呼叫 ─────────────
+A_FILES_V41 = {**GATE_FILES, "tests/test_aold.py": "def test_ao():\n    assert True\n",
+               "tests/test_anew.py": "def test_an():\n    assert True\n"}
+
+
+@pytest.fixture
+def a_repo(tmp_path, monkeypatch):
+    """A 組＝tests/test_aold.py（以模組屬性替身）；工作樹刪除之並立跨檔 E1 碑（replaced_by tests/test_anew.py::test_an）。"""
+    r = make_repo(tmp_path, A_FILES_V41)
+    anchor = r.head()
+    r.delete("tests/test_aold.py")
+    r.add_tombstone(_tomb("tests/test_aold.py::test_ao", ["tests/test_anew.py::test_an"]))
+    monkeypatch.setattr(g, "collect", _fake_collect)
+    monkeypatch.setattr(g, "production_changes", lambda repo, anc: (set(), set(), [], []))
+    monkeypatch.setattr(g, "A_GROUP_BY_PHASE", {1: ["tests/test_aold.py"], 2: ["tests/test_aold.py"],
+                                                3: ["tests/test_aold.py"]})
+    return {"repo": r, "anchor": anchor, "env": clean_env(), "out": tmp_path / "gate_out"}
+
+
+def test_v41_a_group_tombstone_resolved(a_repo):
+    sel = _plan(a_repo)
+    assert sel["groups"]["A"] == ["tests/test_anew.py"]
+    assert {"from": "tests/test_aold.py::test_ao", "to": ["tests/test_anew.py::test_an"], "evidence_level": "E1"} in \
+        sel["tombstone_resolutions"]
+    assert "tests/test_anew.py" not in sel["groups"]["B"] + sel["groups"]["C"]
+
+
+def test_v41_a_group_e0_removed(a_repo):
+    r = a_repo["repo"]
+    cat = r.catalog()
+    cat["tombstones"] = [_tomb("tests/test_aold.py::test_ao", [], "E0")]
+    r.set_catalog(cat)
+    sel = _plan(a_repo)
+    assert sel["groups"]["A"] == []
+    assert {"from": "tests/test_aold.py::test_ao", "to": [], "evidence_level": "E0"} in sel["tombstone_resolutions"]
+
+
+def test_mutation_a_group_unresolved_refuses(a_repo, monkeypatch):
+    """mutant：A 組不經碑解析（plan 直接用常數）⇒ main 收集已刪之 A 檔 ⇒ 拒跑。"""
+    real = g.resolve_tombstones
+    monkeypatch.setattr(g, "resolve_tombstones", lambda repo, items, catalog: (
+        (list(items), []) if list(items) == ["tests/test_aold.py"] else real(repo, items, catalog)))
+    sel = _plan(a_repo)
+    with pytest.raises(g.GateError):
+        [g.collect(f, a_repo["repo"].root, a_repo["env"]) for f in sel["groups"]["A"]]
+
+
+def test_v41_plan_calls_impact_without_production_taint(gate_repo, monkeypatch):
+    calls: List[Dict[str, Any]] = []
+    real = testreg.impact
+
+    def spy(*a, **k):
+        calls.append(k)
+        return real(*a, **k)
+
+    monkeypatch.setattr(testreg, "impact", spy)
+    _plan(gate_repo)
+    assert calls and all(k.get("production_taint") is False for k in calls)
+
+
+def test_v41_main_uses_plan_a_group():
+    """main 以 plan 回傳之 groups.A 收集與執行（AST：a_files 取自 sel["groups"]，A 組迴圈與 a_ids 皆經 a_files）。"""
+    tree = ast.parse((REPO / "scripts/framepath_affected_gate.py").read_text(encoding="utf-8"))
+    main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+    src = ast.unparse(main) if hasattr(ast, "unparse") else ""
+    loops = [n for n in ast.walk(main) if isinstance(n, ast.For) and isinstance(n.iter, ast.Name)]
+    assert any(n.iter.id == "a_files" for n in loops)
+    assert not [n for n in ast.walk(main) if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
+                and n.value.id == "A_GROUP_BY_PHASE" and not _in_get_default(main, n)]
+    assert src == "" or "sel['groups'].get('A'" in src or 'sel["groups"].get("A"' in src
+
+
+def _in_get_default(main: ast.AST, node: ast.AST) -> bool:
+    """node 是否為 `<x>.get("A", A_GROUP_BY_PHASE[...])` 之預設值（plan 未回傳 A 時之退路）。"""
+    for c in ast.walk(main):
+        if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute) and c.func.attr == "get" and len(c.args) == 2 \
+                and c.args[1] is node:
+            return True
+    return False

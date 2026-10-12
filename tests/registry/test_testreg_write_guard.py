@@ -2152,3 +2152,134 @@ def _hook_times(rel: str) -> list:
 def test_08_hook_wall_clock_median_under_1s(rel):
     """⑧：真實 repo（全量 entries）未改動之測試檔／manifest 觸發 hook，10 次牆鐘中位 < 1 s（helper 反推見邊界 05）。"""
     assert statistics.median(_hook_times(rel)) < 1.0
+
+
+# ── v41（諮詢 r2：凍結驗收測試自身缺陷之字面對映修正；契約 receipts.literal_fix）──────────────────────────────────
+LF_TEST = '''CLS = "tests.t"
+FAKE = "tests/t.py::test_x[1]"
+
+
+def test_lf_a():
+    """假測試檔 tests/t.py 之 nodeid。"""
+    assert FAKE.split("::")[0] == "tests/t.py"
+
+
+def test_lf_b():
+    assert ["tests/t.py:5", CLS] == ["tests/t.py:5", "tests.t"]
+    assert len(FAKE) > 3
+'''
+LF_MAP = {"tests/t.py": "tests/test_t.py", "tests.t": "tests.test_t"}
+LF_REL = "tests/test_lf.py"
+LF_APPROVAL = "handoffs/reconcile/lf/synth.md"
+
+
+def _lf_repo(tmp_path: Path) -> TmpRepo:
+    r = make_repo(tmp_path, {LF_REL: LF_TEST, LF_APPROVAL: "# approval\n"})
+    return r
+
+
+def _lf_apply(text: str, m: Dict[str, str]) -> str:
+    """獨立 oracle：依契約 receipts.literal_fix 之代換（長鍵先、識別字邊界）。"""
+    import re as _re
+    lf = schema()["receipts"]["literal_fix"]
+    alt = "|".join(_re.escape(k) for k in sorted(m, key=lambda k: (-len(k), k)))
+    rx = _re.compile(f"(?<![{lf['boundary_chars']}])(?:{alt})(?![{lf['boundary_chars']}])")
+    return rx.sub(lambda x: m[x.group(0)], text)
+
+
+def _lf_receipt(r: TmpRepo, m: Dict[str, str], head: str = None, path: str = LF_REL, approval: str = LF_APPROVAL) -> str:
+    rel = testreg.literal_fix_receipt_rel(schema(), path)
+    r.write_json(rel, {"path": path, "head": head or r.head(), "map": m, "approval_ref": approval})
+    return rel
+
+
+LF_CASES = {
+    # 名稱: (對映, 改後內容之產生, 是否放行)
+    "valid_rename": (LF_MAP, lambda t: _lf_apply(t, LF_MAP), True),
+    "extra_literal_change": (LF_MAP, lambda t: _lf_apply(t, LF_MAP).replace("len(FAKE) > 3", "len(FAKE) > 0"), False),
+    "extra_assert_removed": (LF_MAP, lambda t: _lf_apply(t, LF_MAP).replace("    assert len(FAKE) > 3\n", ""), False),
+    "key_already_conforms": ({"tests/test_lf.py": "tests/test_lf2.py", **LF_MAP},
+                             lambda t: _lf_apply(t, LF_MAP), False),
+    "value_not_conforming": ({"tests/t.py": "tests/u.py", "tests.t": "tests.u"},
+                             lambda t: _lf_apply(t, {"tests/t.py": "tests/u.py", "tests.t": "tests.u"}), False),
+    "dotted_inconsistent": ({"tests/t.py": "tests/test_t.py", "tests.t": "tests.test_q"},
+                            lambda t: _lf_apply(t, {"tests/t.py": "tests/test_t.py", "tests.t": "tests.test_q"}), False),
+    "non_bijective": ({"tests/t.py": "tests/test_t.py", "tests/u.py": "tests/test_t.py"},
+                      lambda t: _lf_apply(t, {"tests/t.py": "tests/test_t.py"}), False),
+}
+
+
+@pytest.mark.parametrize("case", sorted(LF_CASES))
+def test_07lf_literal_fix_hook_and_precommit(tmp_path, case):
+    """v41：測試檔之假測試檔識別改名，同提交附字面對映修正收據且成立 ⇒ hook 與 pre-commit 皆 rc 0（V19 一次性放行）；
+    夾帶其他改動（改非鍵字面、刪斷言）、鍵為合格式路徑、值不合格式、點號形與路徑形不對應、非雙射 ⇒ 兩者皆 V19 擋下，
+    訊息含「字面對映修正收據不成立」。"""
+    m, make, ok = LF_CASES[case]
+    r = _lf_repo(tmp_path)
+    r.install_precommit()
+    rel = _lf_receipt(r, m)
+    r.write(LF_REL, make(LF_TEST))
+    hook = r.hook(LF_REL)
+    assert (hook.returncode == 0) is ok, hook.stderr
+    r.stage(LF_REL, rel)
+    proc = r.try_commit()
+    assert (proc.returncode == 0) is ok, proc.stderr
+    if not ok:
+        assert _v19_subjects(hook.stderr) and "字面對映修正收據不成立" in hook.stderr
+        assert _v19_subjects(proc.stderr) == _v19_subjects(hook.stderr)
+
+
+def test_07lf_without_receipt_blocks(tmp_path):
+    """無收據之同一改名 ⇒ V19 擋下 test_lf_a、test_lf_b（斷言內字串常值改變＝舊元素消失）。"""
+    r = _lf_repo(tmp_path)
+    r.write(LF_REL, _lf_apply(LF_TEST, LF_MAP))
+    proc = r.hook(LF_REL)
+    assert proc.returncode == 2
+    assert _v19_subjects(proc.stderr) == {f"{LF_REL}::test_lf_a", f"{LF_REL}::test_lf_b"}, proc.stderr
+
+
+def test_07lf_stale_receipt_head_blocks(tmp_path):
+    """收據為一次性：head ≠ HEAD ⇒ 不放行。"""
+    r = _lf_repo(tmp_path)
+    old_head = r.head()
+    r.write("README", "x\n")
+    r.commit("advance")
+    _lf_receipt(r, LF_MAP, head=old_head)
+    r.write(LF_REL, _lf_apply(LF_TEST, LF_MAP))
+    proc = r.hook(LF_REL)
+    assert proc.returncode == 2 and "一次性" in proc.stderr, proc.stderr
+
+
+def test_07lf_key_outside_string_token_blocks(tmp_path):
+    """鍵出現於字串 token 外（註解）⇒ 不放行（對映只得改字串資料中之假測試檔識別）。"""
+    src = LF_TEST + "\n# 對照 tests/t.py\n"
+    r = make_repo(tmp_path, {LF_REL: src, LF_APPROVAL: "# approval\n"})
+    _lf_receipt(r, LF_MAP)
+    r.write(LF_REL, _lf_apply(src, LF_MAP))
+    proc = r.hook(LF_REL)
+    assert proc.returncode == 2 and "字串 token 外" in proc.stderr, proc.stderr
+
+
+def test_07lf_value_already_in_head_blocks(tmp_path):
+    """值已出現於 HEAD 版 ⇒ 對映不可逆、不放行。"""
+    src = LF_TEST + '\n\ndef test_lf_c():\n    assert "tests/test_t.py" != "tests/t.py"\n'
+    r = make_repo(tmp_path, {LF_REL: src, LF_APPROVAL: "# approval\n"})
+    _lf_receipt(r, LF_MAP)
+    r.write(LF_REL, _lf_apply(src, LF_MAP))
+    proc = r.hook(LF_REL)
+    assert proc.returncode == 2 and "不可逆" in proc.stderr, proc.stderr
+
+
+def test_07lf_errors_function_and_mutation(tmp_path, monkeypatch):
+    """具名縫 `literal_fix_errors`：成立 ⇒ []、無收據 ⇒ None；mutant（恆 []）⇒ 夾帶刪斷言之案被放行（即上列擋下來自
+    該縫）。"""
+    r = _lf_repo(tmp_path)
+    assert testreg.literal_fix_errors(testreg.build_context(r.root), LF_REL) is None
+    _lf_receipt(r, LF_MAP)
+    r.write(LF_REL, _lf_apply(LF_TEST, LF_MAP))
+    assert testreg.literal_fix_errors(testreg.build_context(r.root), LF_REL) == []
+    r.write(LF_REL, _lf_apply(LF_TEST, LF_MAP).replace("    assert len(FAKE) > 3\n", ""))
+    assert testreg.literal_fix_errors(testreg.build_context(r.root), LF_REL)
+    assert {f.subject for f in testreg.check(r.root, paths=[LF_REL]) if f.rule == "V19"}
+    monkeypatch.setattr(testreg, "literal_fix_errors", lambda ctx, p: [])
+    assert not {f.subject for f in testreg.check(r.root, paths=[LF_REL]) if f.rule == "V19"}
