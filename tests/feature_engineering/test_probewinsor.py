@@ -205,11 +205,20 @@ def test_boundary_10_baseline_provenance() -> None:
     assert ph.absent_symbol_violations(_baseline_add_commit()) == []
     # 產生 baseline 之輸入（契約、helper、凍結腳本）即 frozen_at_head 之已提交版本
     assert frozen["input_blobs"] == ph.input_blobs(frozen["frozen_at_head"])
-    # 生產碼錨點與 kline 權威：frozen_at_head 之生產 .py 身分等於契約所記、baseline 之 kline 等於契約與 failopen 基準所記
+    # 生產碼錨點（momentum/、api/ 之 .py）與 kline 權威：皆等於契約所記（kline 另等於 failopen 基準所記）
     assert ph.production_py_digest(frozen["frozen_at_head"]) == _SPEC["anchor_production_py_sha256"]
     assert frozen["kline_sha256"] == _SPEC["kline_sha256"] == _failopen_kline_sha()
-    # 執行環境與凍結時相同（套件版本不同之逐位元比較無意義，須重凍並經審查）
+    # 執行環境（平台、套件、BLAS、numba 執行緒、執行緒環境變數）與凍結時相同（不同即須重凍並經審查）
     assert frozen["environment"] == ph.environment_versions()
+    assert _ENVIRONMENT_KEYS <= set(frozen["environment"])
+    # 生產碼之非 .py 資源（執行期讀取之 YAML／JSON 等）錨點亦等於契約所記
+    assert ph.production_resource_digest(frozen["frozen_at_head"]) == _SPEC["anchor_production_resource_sha256"]
+
+
+# 環境紀錄之必備欄（兩側同時漏記亦會被逐鍵相等放過 ⇒ 另鎖欄位存在）
+_ENVIRONMENT_KEYS = {"python", "python_implementation", "python_compiler", "system", "release", "machine", "numpy",
+                     "pandas", "numba", "llvmlite", "numpy_blas", "numba_threading_layer_config", "numba_num_threads",
+                     "thread_env"}
 
 
 # ---------------------------------------------------------------- mutation（改壞必紅）
@@ -306,10 +315,11 @@ def _freeze_module() -> Any:
 
 
 def _stub_git(fz: Any, monkeypatch: pytest.MonkeyPatch, *, diff_rc: int = 0, others: str = "",
-              head_rc: int = 0, diff_input_rc: Any = None, digest: str = "P", kline: str = "K") -> None:
+              head_rc: int = 0, diff_input_rc: Any = None, digest: str = "P", kline: str = "K",
+              resource: str = "R") -> None:
     """以確定之來源替換凍結腳本之 `_git` 與錨點讀取：生產 pathspec 之 diff 回 diff_rc、凍結輸入 pathspec 之 diff 回
     diff_input_rc（None＝同 diff_rc）、ls-files --others 回 others、rev-parse HEAD 回 head_rc；HEAD 契約之錨點固定為
-    生產身分 "P"、kline "K"，實際生產身分與 kline 由 digest／kline 決定。"""
+    生產 .py 身分 "P"、生產資源檔身分 "R"、kline "K"，實際值由 digest／resource／kline 決定。"""
     import subprocess
 
     input_rc = diff_rc if diff_input_rc is None else diff_input_rc
@@ -323,8 +333,11 @@ def _stub_git(fz: Any, monkeypatch: pytest.MonkeyPatch, *, diff_rc: int = 0, oth
         return subprocess.CompletedProcess(args, head_rc, "HEADSHA\n", "" if head_rc == 0 else "boom")
 
     monkeypatch.setattr(fz, "_git", _git)
-    monkeypatch.setattr(fz.ph, "contract_at", lambda commit: {"anchor_production_py_sha256": "P", "kline_sha256": "K"})
+    monkeypatch.setattr(fz.ph, "contract_at", lambda commit: {"anchor_production_py_sha256": "P",
+                                                              "anchor_production_resource_sha256": "R",
+                                                              "kline_sha256": "K"})
     monkeypatch.setattr(fz.ph, "production_py_digest", lambda commit: digest)
+    monkeypatch.setattr(fz.ph, "production_resource_digest", lambda commit: resource)
     monkeypatch.setattr(fz.ph, "kline_sha256", lambda: kline)
 
 
@@ -375,6 +388,35 @@ def test_boundary_10c_freeze_gate_refuses_polluted_source(monkeypatch: pytest.Mo
     assert _run_freeze_write(fz, monkeypatch, tmp_path / "g") == (2, False)
     _stub_git(fz, monkeypatch, kline="ALTERED")
     assert _run_freeze_write(fz, monkeypatch, tmp_path / "h") == (2, False)
+    # 單臂：只有生產碼髒（凍結輸入乾淨）；未追蹤之非 .py 可載入檔（執行期讀取之 YAML 等）
+    _stub_git(fz, monkeypatch, diff_rc=1, diff_input_rc=0)
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "i") == (2, False)
+    _stub_git(fz, monkeypatch, others="momentum/FeatureEngineering/atomic/extra_table.yaml\0")
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "j") == (2, False)
+    # 單臂：生產資源檔（非 .py）身分不等於契約錨點（.py 身分相符）
+    _stub_git(fz, monkeypatch, resource="CHANGED")
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "k") == (2, False)
+
+
+def test_boundary_10e_isolated_links_only_tracked_config(tmp_path: Path) -> None:
+    """邊界 10e：單格隔離之 `config/` 為實目錄，只含受版控設定檔之 symlink（未追蹤之使用者設定不進生成）。"""
+    with ph.isolated(tmp_path / "w") as work:
+        linked = sorted(str(p.relative_to(work)) for p in (work / "config").iterdir())
+        assert not (work / "config").is_symlink()
+        assert linked == ph.tracked_config_files()
+        assert all((work / rel).resolve() == (ph.REPO / rel).resolve() for rel in linked)
+
+
+def test_boundary_10f_production_pathspec_covers_digest() -> None:
+    """邊界 10f：凍結閘之生產碼工作樹比對範圍＝生產碼身分之檔案集合（含非 .py 資源、不含 __pycache__）。"""
+    import subprocess
+
+    fz = _freeze_module()
+    proc = subprocess.run(["git", "ls-files", "-z", "--", *fz._PRODUCTION_PATHSPECS], cwd=str(ph.REPO),
+                          capture_output=True, text=True)
+    assert proc.returncode == 0
+    assert sorted(p for p in proc.stdout.split("\0") if p) == sorted(ph._ls_tree("HEAD", ph._PRODUCTION_ROOTS))
+    assert "momentum/FeatureEngineering/atomic/warmup_table.yaml" in proc.stdout.split("\0")
 
 
 def test_boundary_10d_anchor_symbols_present_after_fix() -> None:
@@ -411,6 +453,32 @@ def test_mutation_m12_freeze_gate_skips_kline_authority(monkeypatch: pytest.Monk
     """M12：凍結閘之變體不比對 kline 權威 ⇒ kline 不等於契約時仍寫出（邊界 10c 案 h 偵出）。"""
     fz = _mutant_freeze('if ph.kline_sha256() != anchor["kline_sha256"]:', "if False:")
     _stub_git(fz, monkeypatch, kline="ALTERED")
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
+
+
+def test_mutation_m13_freeze_gate_skips_production_arm(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M13：凍結閘之變體拿掉「生產碼對 HEAD 有改動」那一臂 ⇒ 只有生產碼髒時仍寫出（邊界 10c 案 i 偵出）。"""
+    fz = _mutant_freeze('("生產碼（momentum/、api/）", _PRODUCTION_PATHSPECS), ("凍結輸入", ph.INPUT_PATHSPECS))',
+                        '("凍結輸入", ph.INPUT_PATHSPECS),)')
+    _stub_git(fz, monkeypatch, diff_rc=1, diff_input_rc=0)
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
+
+
+def test_mutation_m14_freeze_gate_untracked_py_only(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M14：凍結閘之未追蹤檢查退回只看 .py ⇒ 未追蹤之執行期 YAML 存在時仍寫出（邊界 10c 案 j 偵出）。"""
+    fz = _mutant_freeze("p.endswith(ph.LOADABLE_SUFFIXES)", 'p.endswith(".py")')
+    _stub_git(fz, monkeypatch, others="momentum/FeatureEngineering/atomic/extra_table.yaml\0")
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
+
+
+def test_mutation_m15_freeze_gate_skips_resource_anchor(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M15：凍結閘之變體不比對生產資源檔錨點 ⇒ 資源檔身分不等於契約時仍寫出（邊界 10c 案 k 偵出）。"""
+    fz = _mutant_freeze('if ph.production_resource_digest(commit) != anchor["anchor_production_resource_sha256"]:',
+                        "if False:")
+    _stub_git(fz, monkeypatch, resource="CHANGED")
     monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
     assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
 

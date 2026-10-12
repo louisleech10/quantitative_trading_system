@@ -40,7 +40,7 @@ def baseline() -> Dict[str, Any]:
     return json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
 
 
-# 凍結之輸入（Task 1.0 來源證明）：產生 baseline 之碼與設定（含生成時經 `config/` symlink 讀取之 YAML）；寫入時須與
+# 凍結之輸入（Task 1.0 來源證明）：產生 baseline 之碼與設定（含生成時經 `config/` symlink 讀取之受版控 YAML）；寫入時須與
 # HEAD 一致，並記其 blob 於 baseline
 INPUT_PATHSPECS = ("tests/feature_engineering", "tests/_golden/probewinsor/contract.json",
                    "scripts/freeze_probewinsor_baseline.py", "config")
@@ -66,10 +66,22 @@ def _ls_tree(commit: str, specs: Any) -> Dict[str, str]:
     return out
 
 
+# 執行期可能讀入之檔案類型（未追蹤檢查之範圍；.DS_Store、log、.bak 等不會被讀入者不計）
+LOADABLE_SUFFIXES = (".py", ".yaml", ".yml", ".json", ".toml", ".csv", ".npy", ".parquet", ".h5", ".pkl")
+
+
 def production_py_digest(commit: str) -> str:
     """該提交之 `momentum/`、`api/` 全部 .py（路徑與 blob）之 sha256——生產碼之身分（Task 1.0 錨點）。"""
     tree = _ls_tree(commit, _PRODUCTION_ROOTS)
     lines = "".join(f"{p} {b}\n" for p, b in sorted(tree.items()) if p.endswith(".py"))
+    return hashlib.sha256(lines.encode("utf-8")).hexdigest()
+
+
+def production_resource_digest(commit: str) -> str:
+    """該提交之 `momentum/`、`api/` 全部受版控之非 .py 檔（執行期讀取之 YAML／JSON 等資源；略 `__pycache__`）之路徑與
+    blob 之 sha256——生產碼身分之另一半（與 `production_py_digest` 合為全部受版控檔；Task 1.0 錨點）。"""
+    tree = _ls_tree(commit, _PRODUCTION_ROOTS)
+    lines = "".join(f"{p} {b}\n" for p, b in sorted(tree.items()) if not p.endswith(".py"))
     return hashlib.sha256(lines.encode("utf-8")).hexdigest()
 
 
@@ -82,17 +94,46 @@ def kline_sha256() -> str:
     return digest.hexdigest()
 
 
-def environment_versions() -> Dict[str, str]:
-    """生成之執行環境（Python 與數值套件版本）；baseline 記之、驗收核對與目前相同（環境不同之逐位元比較無意義）。"""
+_THREAD_ENV = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS",
+               "NUMEXPR_NUM_THREADS", "NUMBA_NUM_THREADS", "NUMBA_THREADING_LAYER", "PYTHONHASHSEED")
+
+
+def environment_versions() -> Dict[str, Any]:
+    """生成之執行環境：平台（作業系統、架構、Python 實作與編譯器）、數值套件版本、numpy 之 BLAS／LAPACK 後端、
+    numba 執行緒層與數、執行緒相關環境變數；baseline 記之、驗收核對與目前相同（環境不同之逐位元比較無意義）。"""
     import importlib.metadata as md
     import platform
 
-    out = {"python": platform.python_version()}
-    for dist in ("numpy", "pandas", "numba", "polars", "TA-Lib", "scipy", "pyarrow"):
+    out: Dict[str, Any] = {
+        "python": platform.python_version(),
+        "python_implementation": platform.python_implementation(),
+        "python_compiler": platform.python_compiler(),
+        "system": platform.system(),
+        "release": platform.release(),
+        "machine": platform.machine(),
+    }
+    for dist in ("numpy", "pandas", "numba", "polars", "TA-Lib", "scipy", "pyarrow", "llvmlite"):
         try:
             out[dist] = md.version(dist)
         except md.PackageNotFoundError:
             out[dist] = "absent"
+    try:
+        import numpy as np
+
+        config = np.show_config(mode="dicts")
+        deps = (config or {}).get("Build Dependencies", {})
+        out["numpy_blas"] = {k: {f: (deps.get(k) or {}).get(f) for f in ("name", "version", "openblas configuration")}
+                             for k in ("blas", "lapack")}
+    except Exception as exc:  # noqa: BLE001 — 取不到即記錄原因（仍可比對）
+        out["numpy_blas"] = f"unavailable: {type(exc).__name__}"
+    try:
+        import numba
+
+        out["numba_threading_layer_config"] = str(numba.config.THREADING_LAYER)
+        out["numba_num_threads"] = int(numba.config.NUMBA_NUM_THREADS)
+    except Exception as exc:  # noqa: BLE001
+        out["numba_threading"] = f"unavailable: {type(exc).__name__}"
+    out["thread_env"] = {name: os.environ.get(name) for name in _THREAD_ENV}
     return out
 
 
@@ -204,16 +245,32 @@ def cell_payload(cell: Dict[str, Any], *, fracdiff: Optional[bool] = None, adf: 
     return payload
 
 
+def tracked_config_files() -> List[str]:
+    """`config/` 下受版控之檔（`git ls-files -z -- config`；頂層，不含子目錄）；取不到即 RuntimeError。"""
+    import subprocess
+
+    proc = subprocess.run(["git", "ls-files", "-z", "--", "config"], cwd=str(REPO), capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(f"git ls-files config 失敗：{proc.stderr.strip()}")
+    files = sorted(p for p in proc.stdout.split("\0") if p)
+    if not files or any(p.count("/") != 1 for p in files):
+        raise RuntimeError(f"config 受版控檔不符預期（須為頂層檔且非空）：{files[:5]}")
+    return files
+
+
 @contextlib.contextmanager
 def isolated(work: Path) -> Iterator[Path]:
-    """單格寫入隔離：固定環境、cwd 移至 work（`config/` 以 symlink 指回 repo）、feature registry、CGSA 工作目錄、
+    """單格寫入隔離：固定環境、cwd 移至 work（`config/` 下只以 symlink 連結受版控之設定檔）、feature registry、CGSA 工作目錄、
     系統暫存與 d* 快取（`FeaturePreprocessor._d_star_cache_dir` 固定指向專案 data_cache，與 cwd 無關 ⇒ 另行導向，
     同 `ffstat_helpers.prepare_stat_env`）皆落 work 之下；離開時還原環境並刪 work。"""
     from momentum.FeatureEngineering.preprocessing.feature_preprocessor import FeaturePreprocessor
 
     shutil.rmtree(work, ignore_errors=True)
     work.mkdir(parents=True)
-    (work / "config").symlink_to(REPO / "config")
+    # 只連結受版控之 config 檔：使用者本機之未追蹤設定（如 user_scan_config.yaml，ConfigManager 會合併）不得進入生成
+    (work / "config").mkdir()
+    for rel in tracked_config_files():
+        (work / rel).symlink_to(REPO / rel)
     (work / "sys_tmp").mkdir()
     dstar = work / "dstar_cache"
     dstar.mkdir()

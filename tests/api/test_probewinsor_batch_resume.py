@@ -128,9 +128,11 @@ def _identity_args(identity_calls: List[Any]) -> List[Dict[str, Any]]:
 
 
 async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-                         identity_calls: Any = None) -> Tuple[Dict[str, Any], List[str]]:
+                         identity_calls: Any = None,
+                         substitute: Any = None) -> Tuple[Dict[str, Any], List[str]]:
     """經公開 `resume_batch`（**不替換**身分函式）：完成項 A 之 run hash＝目前碼之真實身分（同 `_resume_identity` 之
-    kline 目錄與請求）、B 之 run hash 為舊值；待排 ETHUSDT；生成函式以替身記錄被重算者。"""
+    kline 目錄與請求）、B 之 run hash 為舊值；待排 ETHUSDT；生成函式以替身記錄被重算者。給 `substitute`（symbol →
+    身分）時監聽仍委派原方法，但改回傳替代身分（驗續跑之決策取自公開方法之回傳值）。"""
     import asyncio
 
     from api.core.config import settings
@@ -160,7 +162,10 @@ async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.Monke
         @functools.wraps(original)  # 保留原簽章（`_identity_args` 依簽章綁定參數）
         def _spy(self: Any, *args: Any, **kwargs: Any) -> str:
             identity_calls.append((args, kwargs))
-            return original(self, *args, **kwargs)
+            result = original(self, *args, **kwargs)
+            if substitute is None:
+                return result
+            return substitute[_identity_args([(args, kwargs)])[0]["symbol"]]
 
         monkeypatch.setattr(FeatureFactory, "config_identity", _spy)
     response = await service.resume_batch("batch-probewinsor")
@@ -185,6 +190,56 @@ async def test_boundary_09g_public_resume_requeues_identity_mismatch(
     assert response["queued_items"] == 2
     assert calls == ["ETHUSDT", "SOLUSDT"]
     assert _identity_args(identity_calls) == _EXPECTED_IDENTITY_ARGS
+
+
+@pytest.mark.asyncio
+async def test_boundary_09h_public_resume_decides_on_public_return(
+        monkeypatch: pytest.MonkeyPatch, batch_service_factory: Any, tmp_path: Path) -> None:
+    """經公開 `resume_batch`：公開身分方法之回傳值被替換（BTCUSDT 改為不符、SOLUSDT 改為等於其完成項之 run hash）⇒
+    跳過與重算隨替代值反轉（決策取自公開方法之回傳值，非另行計算）。"""
+    service = batch_service_factory(tmp_path / "ckpt")
+    identity_calls: List[Any] = []
+    response, calls = await _public_resume(service, tmp_path, monkeypatch, identity_calls,
+                                           substitute=_SUBSTITUTE_IDENTITY)
+    assert response["skipped_items"] == 1
+    assert response["queued_items"] == 2
+    assert calls == ["BTCUSDT", "ETHUSDT"]
+    assert _identity_args(identity_calls) == _EXPECTED_IDENTITY_ARGS
+
+
+# 09h 之替代身分：BTCUSDT（完成項為真實身分）改為不符、SOLUSDT（完成項為舊值 cccc3333）改為相符
+_SUBSTITUTE_IDENTITY = {"BTCUSDT": "zzzz9999", "SOLUSDT": "cccc3333"}
+
+
+@pytest.mark.asyncio
+async def test_mutation_m7e_public_call_private_return(
+        monkeypatch: pytest.MonkeyPatch, batch_service_factory: Any, tmp_path: Path) -> None:
+    """M7e：續跑呼叫公開身分方法（參數相同、監聽可見）卻丟棄其回傳值、改回傳私有 `_compute_config_hash` ⇒
+    邊界 09h 偵出（決策不隨替代值反轉）。"""
+    from api.core.config import settings
+    from api.services.feature_factory_batch_service import FeatureFactoryBatchService
+    from momentum.factories import create_feature_factory
+
+    def _public_call_private_return(checkpoint: Dict[str, Any]) -> Any:
+        payload = checkpoint.get("request_payload") or {}
+        factory = create_feature_factory(cache_dir=str(settings.data_cache_path / "feature_klines"))
+
+        def _identity(symbol: str, timeframe: str) -> str:
+            factory.config_identity(symbol, timeframe, payload.get("config_override"), payload.get("start_date"),
+                                    payload.get("end_date"))
+            return factory._compute_config_hash(
+                factory._resolve_config(payload.get("config_override")), symbol, timeframe,
+                start_date=payload.get("start_date"), end_date=payload.get("end_date"))
+
+        return _identity
+
+    monkeypatch.setattr(FeatureFactoryBatchService, "_resume_identity", staticmethod(_public_call_private_return))
+    service = batch_service_factory(tmp_path / "ckpt")
+    identity_calls: List[Any] = []
+    response, calls = await _public_resume(service, tmp_path, monkeypatch, identity_calls,
+                                           substitute=_SUBSTITUTE_IDENTITY)
+    assert _identity_args(identity_calls) == _EXPECTED_IDENTITY_ARGS  # 公開方法確被同參數呼叫（09g 之監聽看不出）
+    assert (response["skipped_items"], calls) != (1, ["BTCUSDT", "ETHUSDT"])
 
 
 @pytest.mark.asyncio

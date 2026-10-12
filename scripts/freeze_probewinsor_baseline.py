@@ -28,7 +28,8 @@ sys.path.insert(0, str(REPO))
 
 from tests.feature_engineering import probewinsor_helpers as ph  # noqa: E402
 
-_PRODUCTION_PATHSPECS = (":(glob)momentum/**/*.py", ":(glob)api/**/*.py")
+# 生產碼＝momentum/、api/ 下全部受版控檔（含執行期讀取之 YAML／JSON 等資源；略 __pycache__）
+_PRODUCTION_PATHSPECS = ("momentum", "api", ":(exclude,glob)**/__pycache__/**")
 
 
 def _git(*args: str) -> subprocess.CompletedProcess:
@@ -36,11 +37,11 @@ def _git(*args: str) -> subprocess.CompletedProcess:
 
 
 def provenance_errors() -> List[str]:
-    """寫入前之來源檢查（錨點＝HEAD）：工作樹生產 .py 對 HEAD 無改動、無未追蹤（含被忽略）之生產 .py、
+    """寫入前之來源檢查（錨點＝HEAD）：工作樹生產碼對 HEAD 無改動、無未追蹤（含被忽略）之可載入檔（`LOADABLE_SUFFIXES`）、
     HEAD 不含本票生產符號（`probewinsor_helpers.absent_symbol_violations`）。任一 git 呼叫失敗即列為錯誤。"""
     errors: List[str] = []
     # 生產碼與凍結之輸入（契約、helper、本腳本）皆須等於 HEAD 之已提交版本：baseline 只得由已提交之改前碼產生
-    for label, specs in (("生產碼（momentum/、api/ 之 .py）", _PRODUCTION_PATHSPECS), ("凍結輸入", ph.INPUT_PATHSPECS)):
+    for label, specs in (("生產碼（momentum/、api/）", _PRODUCTION_PATHSPECS), ("凍結輸入", ph.INPUT_PATHSPECS)):
         diff = _git("diff", "--quiet", "HEAD", "--", *specs)
         if diff.returncode == 1:
             errors.append(f"工作樹之{label}對 HEAD 有改動")
@@ -50,9 +51,9 @@ def provenance_errors() -> List[str]:
     if others.returncode != 0:
         errors.append(f"git ls-files 失敗：{others.stderr.strip()}")
     else:
-        stray = sorted(p for p in others.stdout.split("\0") if p.endswith(".py") and "__pycache__" not in p)
+        stray = sorted(p for p in others.stdout.split("\0") if p.endswith(ph.LOADABLE_SUFFIXES) and "__pycache__" not in p)
         if stray:
-            errors.append(f"未追蹤（含被忽略）之 .py：{stray[:10]}")
+            errors.append(f"未追蹤（含被忽略）之可載入檔：{stray[:10]}")
     head = _git("rev-parse", "HEAD")
     if head.returncode != 0:
         errors.append(f"git rev-parse 失敗：{head.stderr.strip()}")
@@ -64,6 +65,8 @@ def provenance_errors() -> List[str]:
         anchor = ph.contract_at(commit)
         if ph.production_py_digest(commit) != anchor["anchor_production_py_sha256"]:
             errors.append("HEAD 之生產 .py 身分不等於契約 anchor_production_py_sha256（非改前生產碼）")
+        if ph.production_resource_digest(commit) != anchor["anchor_production_resource_sha256"]:
+            errors.append("HEAD 之生產資源檔（非 .py）身分不等於契約 anchor_production_resource_sha256（非改前生產碼）")
         if ph.kline_sha256() != anchor["kline_sha256"]:
             errors.append("真實 kline 之 sha256 不等於契約 kline_sha256")
     except Exception as exc:  # noqa: BLE001 — 錨點取不到即無法證明改前

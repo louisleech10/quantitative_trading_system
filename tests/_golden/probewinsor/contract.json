@@ -505,6 +505,7 @@
     ]
   ],
   "anchor_production_py_sha256": "ae28bc0d497a03c1d134336e5c37d319420708667bf8183142121d6943b42c17",
+  "anchor_production_resource_sha256": "896a5ebe4084ab611080c7f33c4b6ff6324f85f15a2b66544dba39e9140cf55d",
   "kline_sha256": "b1ee5b9abcc106631b06a625432e2b5241ffcd384bce548aa3c11d2b2b80d32a",
   "kline_sha256_authority": "tests/_golden/failopen/baseline.json#environment.kline_sha256"
 }
