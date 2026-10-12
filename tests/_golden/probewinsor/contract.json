@@ -1,0 +1,416 @@
+{
+  "version": 1,
+  "spec": "docs/PROBEWINSOR_SPEC.md",
+  "symbol": "BTCUSDT",
+  "kline_dir": "data_cache/feature_klines",
+  "salt": "probe_winsor_follows_public_l65_v1",
+  "families": {
+    "e1h": {
+      "base": "s2",
+      "primary": "1h",
+      "training": [
+        "1h"
+      ],
+      "window": [
+        "2026-01-01",
+        "2026-01-31"
+      ],
+      "extras": {},
+      "anchor_differs": true,
+      "anchor_public_differs": true
+    },
+    "e12h": {
+      "base": "s2",
+      "primary": "12h",
+      "training": [
+        "12h"
+      ],
+      "window": [
+        "2026-01-01",
+        "2026-01-31"
+      ],
+      "extras": {},
+      "anchor_differs": true,
+      "anchor_public_differs": true
+    },
+    "e1h12h": {
+      "base": "s2",
+      "primary": "1h",
+      "training": [
+        "1h",
+        "12h"
+      ],
+      "window": [
+        "2026-01-01",
+        "2026-01-31"
+      ],
+      "extras": {},
+      "anchor_differs": true,
+      "anchor_public_differs": false
+    },
+    "e1h_l45": {
+      "base": "s2",
+      "primary": "1h",
+      "training": [
+        "1h"
+      ],
+      "window": [
+        "2026-01-01",
+        "2026-01-31"
+      ],
+      "extras": {
+        "lag_features": {
+          "enabled": true
+        },
+        "cross_sectional": {
+          "enabled": true,
+          "reference_symbol": "ETHUSDT"
+        }
+      },
+      "anchor_differs": true,
+      "anchor_public_differs": false
+    },
+    "e12h_dd": {
+      "base": "s2",
+      "primary": "12h",
+      "training": [
+        "12h"
+      ],
+      "window": [
+        "2026-01-01",
+        "2026-03-01"
+      ],
+      "extras": {
+        "nan_strategy": {
+          "l7_dead_feature_drop": {
+            "enabled": true
+          }
+        }
+      },
+      "anchor_differs": true,
+      "anchor_public_differs": true
+    },
+    "s1h": {
+      "base": "fast",
+      "primary": "1h",
+      "training": [
+        "1h"
+      ],
+      "window": [
+        "2026-01-01",
+        "2026-01-31"
+      ],
+      "extras": {},
+      "anchor_differs": true,
+      "anchor_public_differs": false
+    },
+    "e1h_nostart": {
+      "base": "s2",
+      "primary": "1h",
+      "training": [
+        "1h"
+      ],
+      "window": [
+        null,
+        "2026-01-31"
+      ],
+      "extras": {},
+      "anchor_differs": false,
+      "anchor_public_differs": false
+    }
+  },
+  "cells": [
+    {
+      "id": "e1h.on.w1",
+      "family": "e1h",
+      "pp": true,
+      "winsor": true
+    },
+    {
+      "id": "e1h.on.w0",
+      "family": "e1h",
+      "pp": true,
+      "winsor": false
+    },
+    {
+      "id": "e1h.off.w1",
+      "family": "e1h",
+      "pp": false,
+      "winsor": true
+    },
+    {
+      "id": "e1h.off.w0",
+      "family": "e1h",
+      "pp": false,
+      "winsor": false
+    },
+    {
+      "id": "e12h.on.w1",
+      "family": "e12h",
+      "pp": true,
+      "winsor": true
+    },
+    {
+      "id": "e12h.on.w0",
+      "family": "e12h",
+      "pp": true,
+      "winsor": false
+    },
+    {
+      "id": "e12h.off.w1",
+      "family": "e12h",
+      "pp": false,
+      "winsor": true
+    },
+    {
+      "id": "e12h.off.w0",
+      "family": "e12h",
+      "pp": false,
+      "winsor": false
+    },
+    {
+      "id": "e1h12h.on.w1",
+      "family": "e1h12h",
+      "pp": true,
+      "winsor": true
+    },
+    {
+      "id": "e1h12h.on.w0",
+      "family": "e1h12h",
+      "pp": true,
+      "winsor": false
+    },
+    {
+      "id": "e1h12h.off.w1",
+      "family": "e1h12h",
+      "pp": false,
+      "winsor": true
+    },
+    {
+      "id": "e1h12h.off.w0",
+      "family": "e1h12h",
+      "pp": false,
+      "winsor": false
+    },
+    {
+      "id": "e1h_l45.on.w1",
+      "family": "e1h_l45",
+      "pp": true,
+      "winsor": true
+    },
+    {
+      "id": "e1h_l45.off.w1",
+      "family": "e1h_l45",
+      "pp": false,
+      "winsor": true
+    },
+    {
+      "id": "e1h_l45.off.w0",
+      "family": "e1h_l45",
+      "pp": false,
+      "winsor": false
+    },
+    {
+      "id": "e12h_dd.on.w1",
+      "family": "e12h_dd",
+      "pp": true,
+      "winsor": true
+    },
+    {
+      "id": "e12h_dd.off.w1",
+      "family": "e12h_dd",
+      "pp": false,
+      "winsor": true
+    },
+    {
+      "id": "e12h_dd.off.w0",
+      "family": "e12h_dd",
+      "pp": false,
+      "winsor": false
+    },
+    {
+      "id": "s1h.on.w1",
+      "family": "s1h",
+      "pp": true,
+      "winsor": true
+    },
+    {
+      "id": "s1h.off.w1",
+      "family": "s1h",
+      "pp": false,
+      "winsor": true
+    },
+    {
+      "id": "s1h.off.w0",
+      "family": "s1h",
+      "pp": false,
+      "winsor": false
+    },
+    {
+      "id": "e1h_nostart.off.w1",
+      "family": "e1h_nostart",
+      "pp": false,
+      "winsor": true
+    }
+  ],
+  "anchor_expect": {
+    "e1h.off.w1": {
+      "rounds": [
+        {
+          "depth": 374,
+          "late_columns": 0
+        }
+      ],
+      "quality_status": "partial"
+    },
+    "e1h.off.w0": {
+      "rounds": [
+        {
+          "depth": 374,
+          "late_columns": 2
+        },
+        {
+          "depth": 748,
+          "late_columns": 0
+        }
+      ],
+      "quality_status": "complete"
+    }
+  },
+  "compare_keys": {
+    "all": [
+      "config_hash",
+      "output_window",
+      "rounds",
+      "probe_late_count",
+      "probe_late_sha256",
+      "first_finite_sha256",
+      "columns",
+      "fingerprints",
+      "stable_start_sha256",
+      "warmup_insufficient_columns",
+      "quality_status"
+    ],
+    "no_hash": [
+      "output_window",
+      "rounds",
+      "probe_late_count",
+      "probe_late_sha256",
+      "first_finite_sha256",
+      "columns",
+      "fingerprints",
+      "stable_start_sha256",
+      "warmup_insufficient_columns",
+      "quality_status"
+    ],
+    "public": [
+      "output_window",
+      "columns",
+      "fingerprints",
+      "stable_start_sha256",
+      "warmup_insufficient_columns",
+      "quality_status"
+    ]
+  },
+  "truth_table": {
+    "family": "e1h",
+    "inputs": [
+      {
+        "pp": true,
+        "winsor": true,
+        "fracdiff": false,
+        "adf": false
+      },
+      {
+        "pp": true,
+        "winsor": true,
+        "fracdiff": true,
+        "adf": false
+      },
+      {
+        "pp": true,
+        "winsor": true,
+        "fracdiff": false,
+        "adf": true
+      },
+      {
+        "pp": true,
+        "winsor": true,
+        "fracdiff": true,
+        "adf": true
+      },
+      {
+        "pp": true,
+        "winsor": false,
+        "fracdiff": false,
+        "adf": false
+      },
+      {
+        "pp": true,
+        "winsor": false,
+        "fracdiff": true,
+        "adf": false
+      },
+      {
+        "pp": true,
+        "winsor": false,
+        "fracdiff": false,
+        "adf": true
+      },
+      {
+        "pp": true,
+        "winsor": false,
+        "fracdiff": true,
+        "adf": true
+      },
+      {
+        "pp": false,
+        "winsor": true,
+        "fracdiff": false,
+        "adf": false
+      },
+      {
+        "pp": false,
+        "winsor": true,
+        "fracdiff": true,
+        "adf": false
+      },
+      {
+        "pp": false,
+        "winsor": true,
+        "fracdiff": false,
+        "adf": true
+      },
+      {
+        "pp": false,
+        "winsor": true,
+        "fracdiff": true,
+        "adf": true
+      },
+      {
+        "pp": false,
+        "winsor": false,
+        "fracdiff": false,
+        "adf": false
+      },
+      {
+        "pp": false,
+        "winsor": false,
+        "fracdiff": true,
+        "adf": false
+      },
+      {
+        "pp": false,
+        "winsor": false,
+        "fracdiff": false,
+        "adf": true
+      },
+      {
+        "pp": false,
+        "winsor": false,
+        "fracdiff": true,
+        "adf": true
+      }
+    ]
+  }
+}

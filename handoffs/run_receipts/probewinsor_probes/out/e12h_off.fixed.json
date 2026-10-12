@@ -1,0 +1,43 @@
+{
+ "case": "e12h_off",
+ "mode": "fixed",
+ "primary": "12h",
+ "training": [
+  "12h"
+ ],
+ "preprocessing_enabled": false,
+ "winsorization_enabled": true,
+ "winsor_window": 252,
+ "window": [
+  "2026-01-01",
+  "2026-01-31"
+ ],
+ "data_start": {
+  "12h": "2024-01-01 00:00:00+00:00"
+ },
+ "max_warmup_bars": 748,
+ "ingest_start": "2024-11-15T14:24:00",
+ "rounds": [
+  {
+   "depth": 374,
+   "late_columns": 1
+  },
+  {
+   "depth": 748,
+   "late_columns": 0
+  }
+ ],
+ "late_count": 3,
+ "late_sha256": "c1fc2213abf8537f97acafa65cf8f8005b9865a7d5e57b680156e3138507c733",
+ "late_sample": [
+  "meta_12h_Momentum_Divergence",
+  "meta_12h_Trend_Consensus",
+  "meta_12h_Volatility_Regime"
+ ],
+ "first_finite_columns": {
+  "12h": 161
+ },
+ "first_finite_sha256": "b4ce3b05818593b9d8d45f2e09125fb25813544c9c56cc8a3e8dfcffe3310f32",
+ "elapsed_seconds": 2.5,
+ "peak_rss_mb": 266.9
+}

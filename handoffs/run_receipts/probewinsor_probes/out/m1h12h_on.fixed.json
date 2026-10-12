@@ -1,0 +1,55 @@
+{
+ "case": "m1h12h_on",
+ "mode": "fixed",
+ "primary": "1h",
+ "training": [
+  "1h",
+  "12h"
+ ],
+ "preprocessing_enabled": true,
+ "winsorization_enabled": true,
+ "winsor_window": 252,
+ "window": [
+  "2026-01-01",
+  "2026-01-31"
+ ],
+ "max_warmup_bars": 31464,
+ "ingest_start": "2022-01-19T21:36:00",
+ "rounds": [
+  {
+   "depth": 31464,
+   "late_columns": 1
+  }
+ ],
+ "late_count": 121,
+ "late_sha256": "0338c8cb39d80f57598360413c9bdf6a7db9a243bbc5e3fbdc0aae2509c3bd5d",
+ "late_sample": [
+  "close_12h_trend_KAMA_144",
+  "close_12h_trend_KAMA_144_Kurt_W13",
+  "close_12h_trend_KAMA_144_Kurt_W5",
+  "close_12h_trend_KAMA_144_Lag_1",
+  "close_12h_trend_KAMA_144_Lag_13",
+  "close_12h_trend_KAMA_144_Lag_2",
+  "close_12h_trend_KAMA_144_Lag_21",
+  "close_12h_trend_KAMA_144_Lag_3",
+  "close_12h_trend_KAMA_144_Lag_34",
+  "close_12h_trend_KAMA_144_Lag_5",
+  "close_12h_trend_KAMA_144_Lag_8",
+  "close_12h_trend_KAMA_144_Max_W13",
+  "close_12h_trend_KAMA_144_Max_W5",
+  "close_12h_trend_KAMA_144_Mean_W13",
+  "close_12h_trend_KAMA_144_Mean_W5",
+  "close_12h_trend_KAMA_144_Min_W13",
+  "close_12h_trend_KAMA_144_Min_W5",
+  "close_12h_trend_KAMA_144_Range_W13",
+  "close_12h_trend_KAMA_144_Range_W5",
+  "close_12h_trend_KAMA_144_Rank_W13"
+ ],
+ "first_finite_columns": {
+  "1h": 4312,
+  "12h": 4312
+ },
+ "first_finite_sha256": "fffb2af012e67a0c34a6ea8ae76e0977f1206e968c464e7b4c39028a5e24a2e1",
+ "elapsed_seconds": 58.31,
+ "peak_rss_mb": 739.9
+}

@@ -1,0 +1,23 @@
+[freeze] e1h.on.w1 rounds=[{'depth': 878, 'late_columns': 0}] quality=complete cols=161 9.71s
+[freeze] e1h.on.w0 rounds=[{'depth': 626, 'late_columns': 0}] quality=complete cols=161 4.3s
+[freeze] e1h.off.w1 rounds=[{'depth': 374, 'late_columns': 0}] quality=partial cols=161 3.09s
+[freeze] e1h.off.w0 rounds=[{'depth': 374, 'late_columns': 2}, {'depth': 748, 'late_columns': 0}] quality=complete cols=161 4.55s
+[freeze] e12h.on.w1 rounds=[{'depth': 878, 'late_columns': 0}] quality=complete cols=161 4.54s
+[freeze] e12h.on.w0 rounds=[{'depth': 626, 'late_columns': 0}] quality=complete cols=161 4.38s
+[freeze] e12h.off.w1 rounds=[{'depth': 374, 'late_columns': 0}] quality=partial cols=161 3.01s
+[freeze] e12h.off.w0 rounds=[{'depth': 374, 'late_columns': 1}, {'depth': 748, 'late_columns': 0}] quality=complete cols=161 4.54s
+[freeze] e1h12h.on.w1 rounds=[{'depth': 4992, 'late_columns': 1}, {'depth': 9984, 'late_columns': 0}] quality=complete cols=322 14.06s
+[freeze] e1h12h.on.w0 rounds=[{'depth': 4740, 'late_columns': 0}] quality=complete cols=322 8.9s
+[freeze] e1h12h.off.w1 rounds=[{'depth': 4488, 'late_columns': 2}, {'depth': 8976, 'late_columns': 0}] quality=complete cols=322 10.41s
+[freeze] e1h12h.off.w0 rounds=[{'depth': 4488, 'late_columns': 1}, {'depth': 8976, 'late_columns': 0}] quality=complete cols=322 12.96s
+[freeze] e1h_l45.on.w1 rounds=[{'depth': 938, 'late_columns': 0}] quality=complete cols=164 8.65s
+[freeze] e1h_l45.off.w1 rounds=[{'depth': 434, 'late_columns': 15}, {'depth': 868, 'late_columns': 0}] quality=complete cols=164 5.05s
+[freeze] e1h_l45.off.w0 rounds=[{'depth': 434, 'late_columns': 2}, {'depth': 868, 'late_columns': 0}] quality=complete cols=164 4.55s
+[freeze] e12h_dd.on.w1 rounds=[{'depth': 878, 'late_columns': 0}] quality=complete cols=154 5.13s
+[freeze] e12h_dd.off.w1 rounds=[{'depth': 374, 'late_columns': 0}] quality=complete cols=151 3.03s
+[freeze] e12h_dd.off.w0 rounds=[{'depth': 374, 'late_columns': 2}, {'depth': 748, 'late_columns': 0}] quality=complete cols=154 8.62s
+[freeze] s1h.on.w1 rounds=[{'depth': 3084, 'late_columns': 0}] quality=complete cols=4312 20.92s
+[freeze] s1h.off.w1 rounds=[{'depth': 2580, 'late_columns': 0}] quality=complete cols=4312 9.58s
+[freeze] s1h.off.w0 rounds=[{'depth': 2580, 'late_columns': 0}] quality=complete cols=4312 4.96s
+[freeze] e1h_nostart.off.w1 rounds=[] quality=complete cols=161 2.12s
+[freeze] 已寫入 tests/_golden/probewinsor/baseline.json（22 格）

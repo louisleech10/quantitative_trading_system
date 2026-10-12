@@ -1,0 +1,1645 @@
+{
+ "case": "e1h12h_on",
+ "elapsed_seconds": 16.95,
+ "found_keys": {
+  "failure_reasons": "result.metadata/failure_reasons",
+  "quality_status": "result.metadata/quality_status",
+  "stable_start": "result.metadata/stable_start",
+  "start_dependent_columns": "result.metadata/start_dependent_columns",
+  "warmup_insufficient_columns": "BTCUSDT/1h/7f7ac19526c6f456eea4fd608747d40d/feature_manifest.json/artifacts/raw/metadata/warmup_insufficient_columns"
+ },
+ "mode": "current",
+ "other_found": {
+  "failure_reasons": [],
+  "quality_status": "complete",
+  "start_dependent_columns": [],
+  "warmup_insufficient_columns": []
+ },
+ "output_window": {
+  "ingest_start": "2024-09-30T09:36:00",
+  "max_warmup_bars": 9984,
+  "output_end": "2026-01-31",
+  "output_start": "2026-01-01",
+  "warmup_enabled": true
+ },
+ "peak_rss_mb": 325.2,
+ "public_column_count": 322,
+ "public_fingerprints": {
+  "close_12h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d1b68f65f90374a8decf1b7e480182258f2d5683ecbc3734873d1fce9a7d92f9"
+  },
+  "close_12h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9e3e90f28d34b9e2931da64c7bfdee4e75d785b970e9a91ce408607fd6eecdf6"
+  },
+  "close_12h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "53a35dae332680fa68ad131c50b07e4cabf29deb285909b651b09bdbe88d6f7e"
+  },
+  "close_12h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ce66092bad8152ce0a81ab4a3747393410bd9754adba448a3c324681da4d61b2"
+  },
+  "close_12h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "722ed479c465ecd786cd1b9c93772f87ce6e0b13d2905df647e085898389bde5"
+  },
+  "close_12h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "539bffd54dc4499f3fb07ee1931ede550313086883352ee6f82de8b090dea201"
+  },
+  "close_12h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c9c157bb821663b1c443e992ae8bc294ac6bc1be44810dc5cf74cf6c793da8d7"
+  },
+  "close_12h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2c0fc15147315dba217d651b59eb7023f870346d0e4f82dd62f74d708d330362"
+  },
+  "close_12h_trend_EMA_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d0e8fa77d4519fc06a6bc68ab6ecc2bc1e934a6b2598607a8ae5182b44ebbacf"
+  },
+  "close_12h_trend_EMA_8_Abs": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d0e8fa77d4519fc06a6bc68ab6ecc2bc1e934a6b2598607a8ae5182b44ebbacf"
+  },
+  "close_12h_trend_EMA_8_Clip": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8b583d570481936be367801145917abb9cd49428fda01603ca5db75fb92b9ea5"
+  },
+  "close_12h_trend_EMA_8_DecayLinear_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "5030220b9b18a5b4be2e428673cdfbbdfb5ffaffc05bdf37d1bf833e41342247"
+  },
+  "close_12h_trend_EMA_8_DecayLinear_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e878555c5c678de8e822c1580a2395665fdc43bd6736a3f39b7e038fa95ac821"
+  },
+  "close_12h_trend_EMA_8_DecayLinear_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a666e63b00cc075babf4f5efb1fa3b488d77011505173d4a0dd40df24fc9eb5f"
+  },
+  "close_12h_trend_EMA_8_Distance": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0c2b93c4afe43bceaf5c0732c73ce416c476d6e168b839dd1b76cb0d5c236eae"
+  },
+  "close_12h_trend_EMA_8_Kurt_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e4a05d68b5bd66a1fe726b2e1523342d9f931ffd187726e0f3906a867a326b5b"
+  },
+  "close_12h_trend_EMA_8_Kurt_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9025996cd388ac5e4b9c496f3a5eea0c45a7a72aed8cd50f601ada866cb548b0"
+  },
+  "close_12h_trend_EMA_8_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "6cf0b19fa2192eca10beb016dc6f727eb83e0386b76c8b0722d47643e4d475d8"
+  },
+  "close_12h_trend_EMA_8_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "07670e06308b535d677c6f1a2bb485f6f2e40241fb318d12155c5168a493e9f6"
+  },
+  "close_12h_trend_EMA_8_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ca2e47df34ce262465cea79772219b54bfcf1abbee32c677aa9f97f3db4384a9"
+  },
+  "close_12h_trend_EMA_8_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "775ad8091d9acc844719cbceaf45511127544f65c0e819bd6823d2f69d52cfde"
+  },
+  "close_12h_trend_EMA_8_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7a862fd0e01d711a212c9d884f0ea032c436f36dffb91794611d7fc1ede4fcec"
+  },
+  "close_12h_trend_EMA_8_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "067a93f0e1e1719ebf5ef1c936821f630909b559d79a5331d05a4bd332c2ac61"
+  },
+  "close_12h_trend_EMA_8_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ac6535c9d057f72642858420ef5d4871641451c6577c73c81991af34063d57c4"
+  },
+  "close_12h_trend_EMA_8_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "6f37502d0ad202449ac92bed9d18c5aca02783c53f3490aa2e52d966c4c522bd"
+  },
+  "close_12h_trend_EMA_8_Log1p": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "18ec0babaae044b9c32ee7d62085b9220aafaffea2659c89eacb6bb4434950c1"
+  },
+  "close_12h_trend_EMA_8_Max_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "648356ab074354d991ac7b4a0e1fed982d4fae6cf3765734b7b58305a8b7ccb6"
+  },
+  "close_12h_trend_EMA_8_Max_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "6e07fef5fca8aff013ba9e802de07358ee76d0293b7a64b6b589dfe4a023aa12"
+  },
+  "close_12h_trend_EMA_8_Mean_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "dfc5d631c7bf0e356ad5abd84d7e840229b19acc2c2becb0535c2e6ac76483a9"
+  },
+  "close_12h_trend_EMA_8_Mean_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a93f67d52dc531f34e6fe526dcebf741f0f42bf40126ef47612435716912447e"
+  },
+  "close_12h_trend_EMA_8_Min_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "af52749c882243f3f364ef5a2745fbf7409948bf982089b1bcd2e570c9731d21"
+  },
+  "close_12h_trend_EMA_8_Min_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0941fa1c4c699018310bc497f188deb2d32020fb28e7577e20d391bcd2024cb0"
+  },
+  "close_12h_trend_EMA_8_Momentum_L13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7837da5a7166309afc443917fe3433f767f857476438e6788d6129aa888c2e81"
+  },
+  "close_12h_trend_EMA_8_Momentum_L144": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "757fe3d00b7aa383afcaaa795048ae886dda988de59ea1d3b48bada5a301300f"
+  },
+  "close_12h_trend_EMA_8_Momentum_L21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a77caf58dd11b292ed72faa9c58d379f1e0fd0621c45baf0a4c175335ea26e02"
+  },
+  "close_12h_trend_EMA_8_Momentum_L233": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8238f984b3dc737fadab0c3c8a6de783de595e6e1514f1ebacfaa14409d9f9dd"
+  },
+  "close_12h_trend_EMA_8_Momentum_L3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f6ae46e9ed689689aa391343757ec034efee33f498556e3de72022d392cc0467"
+  },
+  "close_12h_trend_EMA_8_Momentum_L34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "792b5a6beee770f35a6dbe6fcc4977f931d24757cc2531b9eee7e745b7432e63"
+  },
+  "close_12h_trend_EMA_8_Momentum_L5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "56b58dbda5cc9c7310f8e14e919dba0c4108c9646bc6dd5df61dc43e078a6bc4"
+  },
+  "close_12h_trend_EMA_8_Momentum_L55": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "538cc5a4c8baa20df33941bc834eab58761dcbf9dedf97321803ced41af1c48d"
+  },
+  "close_12h_trend_EMA_8_Momentum_L8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3738f030ac2b9e0acd4ba7c0d3431b3b2838c1fd514ac7ae7f7d7f8d943a184a"
+  },
+  "close_12h_trend_EMA_8_Momentum_L89": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f95b8a587c1df188f1eaea745c78830c8faffa878eb46dec35fb9c7d0b5c5dc8"
+  },
+  "close_12h_trend_EMA_8_Range_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d5bcff748af42a2bf952122ff2f40520f8510bb44157f847499df164b14764c4"
+  },
+  "close_12h_trend_EMA_8_Range_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ce3350f1a455cb96ebf69f0e3214d173ff50f31e49b22f2b84247c14010f6194"
+  },
+  "close_12h_trend_EMA_8_Rank_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4da20d47c2daf04796e05603471fc603fa13fe3aaf06da9f82f6fc730cf9e6bb"
+  },
+  "close_12h_trend_EMA_8_Rank_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8fbd7f43b311147ece907c9364e75abaa1d880394f4809f1d0eef5cecaa37c0f"
+  },
+  "close_12h_trend_EMA_8_Sign": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d1e63610d2e2c94f33cd456c4b676b4e0a5834ffb035c1e80e2f555155e1a84a"
+  },
+  "close_12h_trend_EMA_8_Skew_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3052d20ac3b3ac5d5dc8884d3e9a45d1847cae6a6ed56edd8229ec26fe79a975"
+  },
+  "close_12h_trend_EMA_8_Skew_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e8af00765ed035682a7d2116a972ae15142f1eff26638f815a4610983949159b"
+  },
+  "close_12h_trend_EMA_8_Slope_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3d1443006562540b2d5164d41e6aef71fe3bba7387958037a7d713277153c636"
+  },
+  "close_12h_trend_EMA_8_Slope_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c6c137308d0bb598d6703ac8b4721ba513e2f52c59d38cb0857b3ca2b6255dc9"
+  },
+  "close_12h_trend_EMA_8_Std_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f93e16891d0f159720d5953cb0a0d72059777964aad50944a4b21d47dc141e27"
+  },
+  "close_12h_trend_EMA_8_Std_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "bd5ccc79b3b01aa1dfb9cc372ffcea2a851710127eaeda63a48edcc24614438e"
+  },
+  "close_12h_trend_EMA_8_TsArgmax_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "441b2c74b290a6338efec4dca05be807ea6a2fe9b7201a005dd3135f838f7b66"
+  },
+  "close_12h_trend_EMA_8_TsArgmax_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "5b754d7ca25159afe606c13a799812a530f851be9ed70600f08901cd8fa3bcd3"
+  },
+  "close_12h_trend_EMA_8_TsArgmax_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "fc4e5c12588814ee67c1e52aa1ab9057d3dd32298e10e344e40d538116799de0"
+  },
+  "close_12h_trend_EMA_8_TsArgmin_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e50d27d803441061f2cf526869c2409d681b6762f7285cea3ce0d25be90b1c86"
+  },
+  "close_12h_trend_EMA_8_TsArgmin_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b5d01f4614caafcb4df3aa9a23b0353ce5b9d17546e06a4983f3f5499a500cad"
+  },
+  "close_12h_trend_EMA_8_TsArgmin_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8720b3fc8979d1de07719dacbd4946ec5fab057e52884412330c5b057e353888"
+  },
+  "close_12h_trend_EMA_8_TsRank_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4da20d47c2daf04796e05603471fc603fa13fe3aaf06da9f82f6fc730cf9e6bb"
+  },
+  "close_12h_trend_EMA_8_TsRank_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "5d33c4c24e44f8965e9f1a58fcf321a7b47b31dffa4627ec80731165f51af061"
+  },
+  "close_12h_trend_EMA_8_TsRank_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8fbd7f43b311147ece907c9364e75abaa1d880394f4809f1d0eef5cecaa37c0f"
+  },
+  "close_12h_trend_EMA_8_ZScore_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b71f0deb96e6168951df9afcb3c546b0c58a3befa2087e2efd793be86c746764"
+  },
+  "close_12h_trend_EMA_8_ZScore_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "5d0fa6ddc658b667c127e446f60587ce69fe5e50d025b839a0b3c05fa760b62c"
+  },
+  "close_12h_trend_SMA_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1f2ef1382a1e015a49d21bb2d0c01023c52384e8041fb66a216634923de3017f"
+  },
+  "close_12h_trend_SMA_13_Abs": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1f2ef1382a1e015a49d21bb2d0c01023c52384e8041fb66a216634923de3017f"
+  },
+  "close_12h_trend_SMA_13_Clip": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8b583d570481936be367801145917abb9cd49428fda01603ca5db75fb92b9ea5"
+  },
+  "close_12h_trend_SMA_13_DecayLinear_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8df1a0c9248051079abf12318e31e1dacd09b7002ca34cc76ffa628cc97b174f"
+  },
+  "close_12h_trend_SMA_13_DecayLinear_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "757fd7dc5a9c0f562bd08dd1f36dda055a74cebfbaf487924195c981667137a9"
+  },
+  "close_12h_trend_SMA_13_DecayLinear_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ead100ead7091b05c51d9d950257e2d899d3cd1d463181062f2845a912ed3a9a"
+  },
+  "close_12h_trend_SMA_13_Distance": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d67feca2526ebee1102de3ee9483b2fe12adb771f9ce7592f865d40b2853fb9a"
+  },
+  "close_12h_trend_SMA_13_Kurt_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "88436bd7824b3be17b3897bcd6a89bf3f32b66a57ef698dbdb591556e16efd69"
+  },
+  "close_12h_trend_SMA_13_Kurt_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0a759c653935c1d83a74988d49cba91feb92142fce51c6621ef482a11ee30539"
+  },
+  "close_12h_trend_SMA_13_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7a53dae26784ca2572e736d4cebc9980d3acfbda736a5fefb8511cb194cb1bd5"
+  },
+  "close_12h_trend_SMA_13_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "eb328bb5ac5ad7f92d6845d72e2b9c80068ea086c92cea1278aad2e3669ceedc"
+  },
+  "close_12h_trend_SMA_13_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "eaddfa1c6480a49c8838aee9b1adbda7f8f8684ae8b546fd978288338a72555c"
+  },
+  "close_12h_trend_SMA_13_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9a37914d43a66397e369a8d39c1de610c083e88edb2fbb716050be2d59d0063e"
+  },
+  "close_12h_trend_SMA_13_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7020765902d8416597fef4a20d3bf12b6b7e110ff1b1d85df3dc140e8d7ec8ce"
+  },
+  "close_12h_trend_SMA_13_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0cf1d6bf0733a0eb5a4c5350bd51fb61dee5da5b58392782660343bc3e0f793e"
+  },
+  "close_12h_trend_SMA_13_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "cca4f19d0075a599b1bd3488c5c97a6c752400519b1d8bd4a843ddcc9e7e7cee"
+  },
+  "close_12h_trend_SMA_13_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8db5f212b58a5976b9479fac339b121eea55a2b2c388a3f06577501a8647c6ea"
+  },
+  "close_12h_trend_SMA_13_Log1p": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "717e1e659af977b27ae8f58f7c5c0f6de4becd59c9331d79e32e2bf58939e59c"
+  },
+  "close_12h_trend_SMA_13_Max_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d8725d9d4246c51093fad256b6745f57e4c92970f93ec493041a43105c007fc7"
+  },
+  "close_12h_trend_SMA_13_Max_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2d7216f4f0f2cd34a25b6e94299198444c2402784f2d4b5c5b242960ff1f036f"
+  },
+  "close_12h_trend_SMA_13_Mean_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ce9ab4a86330bd7003b440f53b8b5f75a0d3d003e6fe190f7916add0d155e2a2"
+  },
+  "close_12h_trend_SMA_13_Mean_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "39795f5ccc964ce339f00eab7298d48f82f59346fcee776f5fd921d1afc4184e"
+  },
+  "close_12h_trend_SMA_13_Min_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b1fdb73cdffdce12dea9f16d02549e1ba7ac0e0e098ff1eadd93f8ee1ab7d834"
+  },
+  "close_12h_trend_SMA_13_Min_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ea7a41728c88e0c439937219aa6d5c3ea7b6031dd27047026a50b2b4d39cde25"
+  },
+  "close_12h_trend_SMA_13_Momentum_L13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c86b46954f728d4ac3124db1905021b64f2d678f2ff63b5f97549706015a5867"
+  },
+  "close_12h_trend_SMA_13_Momentum_L144": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7bab9bc20b299e1cbd76e0386b841a821e85c63d2ca0b7d19b98525f9b26ceac"
+  },
+  "close_12h_trend_SMA_13_Momentum_L21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0141d53c17b1602c8b2c1a32c223a9ae000c83b71c9cceee76509a9deb2cd31b"
+  },
+  "close_12h_trend_SMA_13_Momentum_L233": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c796bdab6ccb7d47df6ee44bcdc454b2ff6c4fe5315899abb1f5337200207382"
+  },
+  "close_12h_trend_SMA_13_Momentum_L3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "fcc69616c713861422a96791f3710f85d6baea56a8f99e99959095513f2c2dfe"
+  },
+  "close_12h_trend_SMA_13_Momentum_L34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "43bba66f02ded498742964100614ec69e3f2124f4d0ed080781af4187d245034"
+  },
+  "close_12h_trend_SMA_13_Momentum_L5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "42ca601694ae003d79d5c23029073877249ed8b22d4ea2160e9f65f45a155eed"
+  },
+  "close_12h_trend_SMA_13_Momentum_L55": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "22064181321285814fa549df737dbdd6a945406dfbcc46a70c446cac17fd4184"
+  },
+  "close_12h_trend_SMA_13_Momentum_L8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2fee0967c69e9ac36177405406c683a568001a8c9c039b192be3d9621eb9f792"
+  },
+  "close_12h_trend_SMA_13_Momentum_L89": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "539747084cee73c2fb1d62f4e03e0e1995cf3a09d102aa2af5a1774dc6497af0"
+  },
+  "close_12h_trend_SMA_13_Range_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "22d053c1a94510f8314c9d2bbaad67f497323267ce1e322f8e995ad07e0acd31"
+  },
+  "close_12h_trend_SMA_13_Range_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "19290b2ad73968d5d9b6135ec5223bd8a431931b7571587c602d534efe800eb2"
+  },
+  "close_12h_trend_SMA_13_Rank_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0d7a3d0bdb21b6313b0d211f6efe4f2161aded54730e48d1ab8a85ba4dfe3d23"
+  },
+  "close_12h_trend_SMA_13_Rank_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a337136c373a78a41d0815fdc5fe29662684a8e45c8578a2a51ad6786f90b482"
+  },
+  "close_12h_trend_SMA_13_Sign": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d1e63610d2e2c94f33cd456c4b676b4e0a5834ffb035c1e80e2f555155e1a84a"
+  },
+  "close_12h_trend_SMA_13_Skew_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "5213d2425122ee2c8b71abe8f72ee1e3cd346e206e85a662e36226a8c5f4a079"
+  },
+  "close_12h_trend_SMA_13_Skew_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c70e369550e4bf91c2afbff0815e1ba6ddef7216eea0183444fccfe6a7bccf17"
+  },
+  "close_12h_trend_SMA_13_Slope_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "44015047084bf2010f7f0169af50b0d08bf0ab01382ef95cf0c6327f192320d4"
+  },
+  "close_12h_trend_SMA_13_Slope_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c91e1654fcfba0ce8abe11d7747dd28d5e3fa827d8a09ae20217cda216b0c407"
+  },
+  "close_12h_trend_SMA_13_Std_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0790b3efae60853c6257b7523459c3b05ac65d1bb4fa00934183b5a432e6b1df"
+  },
+  "close_12h_trend_SMA_13_Std_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a07e2f289013e7b2651a671f392023c24ba6fed4bcd8eb19b57ee749202fee33"
+  },
+  "close_12h_trend_SMA_13_TsArgmax_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b0f7c2b09f238316a03f2d30a8af48e50bb7a9c9a8b015f041bd03475e984ee5"
+  },
+  "close_12h_trend_SMA_13_TsArgmax_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7348dd0ffa3133017388a7df5a9686eef04401e82b6d423595cb8a318d4e8a43"
+  },
+  "close_12h_trend_SMA_13_TsArgmax_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c38cc305b67d5b462c6b0b35ec6431324fbb144bad36899984dc07021ac95fe6"
+  },
+  "close_12h_trend_SMA_13_TsArgmin_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "327300c3ee0d0fe8ff577627b60ffebdf05f8db9618d0c39237b4b3b7d808717"
+  },
+  "close_12h_trend_SMA_13_TsArgmin_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f3bd8b61e63fa6430dbcd085f091ff0c01eb2b98c6c24bd7d569e90365f74ae3"
+  },
+  "close_12h_trend_SMA_13_TsArgmin_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e882c76002a987f5fc5766f1480e9bac219bb4a8e51a8a4372a6c38125e690b4"
+  },
+  "close_12h_trend_SMA_13_TsRank_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0d7a3d0bdb21b6313b0d211f6efe4f2161aded54730e48d1ab8a85ba4dfe3d23"
+  },
+  "close_12h_trend_SMA_13_TsRank_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "56cc08cfbbb61466c0db40585c596eac8b8bbf252becda7bb8e8e1433c6a0b8c"
+  },
+  "close_12h_trend_SMA_13_TsRank_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a337136c373a78a41d0815fdc5fe29662684a8e45c8578a2a51ad6786f90b482"
+  },
+  "close_12h_trend_SMA_13_ZScore_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e9e5dbf6d3f57cfd1ddac711a25b0adf58e00f0c79b5c2870f8a1cdd6cb264c1"
+  },
+  "close_12h_trend_SMA_13_ZScore_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e8a7c52d468b0d22be9ef0cea67dab910ce2c924dc53e23bf6e15f4a9b14089d"
+  },
+  "close_1h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "52b1726edb794cd73d29641073a827e8336b75d0358df652e7d6f08cfd6dcf69"
+  },
+  "close_1h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d2e7c4933cb1aef901f9801914729e88514f513e7da79da78fafea53d84bc236"
+  },
+  "close_1h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d6908ca3d13b11d4ab2d655f81dca69ddbe79f262485f612950bb9924bfc9b72"
+  },
+  "close_1h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4e49c4ee61f70f0bdfa29ad8756dedce10bde8149d1a9a5e09c9279c6ce8e255"
+  },
+  "close_1h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "02ec5ea0daffcacbe5ce040fb922ffb06cdc87f487b86881bafb43768d5af6f7"
+  },
+  "close_1h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8f0efc265f23ecb5838ba99595384f6864011c93081d1d176f130c126dfbc770"
+  },
+  "close_1h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e7a588b8ac9a010d4e1985d89641cfa92ef49c2149e808c56d829d0d646bda71"
+  },
+  "close_1h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "230de86c7993f3959696f953a514a6b06884605dca776be967a17b78cb0c8595"
+  },
+  "close_1h_trend_EMA_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c33cef9d05970e934ab45f16eac904e0d81fbe04e9b50546dd2a718b1f4d36fb"
+  },
+  "close_1h_trend_EMA_8_Abs": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c33cef9d05970e934ab45f16eac904e0d81fbe04e9b50546dd2a718b1f4d36fb"
+  },
+  "close_1h_trend_EMA_8_Clip": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8b583d570481936be367801145917abb9cd49428fda01603ca5db75fb92b9ea5"
+  },
+  "close_1h_trend_EMA_8_DecayLinear_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1757fc7c6e736c51740033e5f0031cd913caeb38ba32cd43e4865dfc6cb18b91"
+  },
+  "close_1h_trend_EMA_8_DecayLinear_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f3357a74ae442e4378ccdee09d4e9cdf03bafe2659ef2b648077c87f6361fb13"
+  },
+  "close_1h_trend_EMA_8_DecayLinear_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "dfde2b1ba43484fab581fe693b54ce465a482dfb37d83c1be4acf3bf3746c3fa"
+  },
+  "close_1h_trend_EMA_8_Distance": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "62b96117baadaf950016bec91f0f1c266eb3d5d261756ccc097e1f9aadf00dd5"
+  },
+  "close_1h_trend_EMA_8_Kurt_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "07c532ab956a3693e36fdaa5dae1140836d6fae2df4811b3bf81e7b5bd9f6ce3"
+  },
+  "close_1h_trend_EMA_8_Kurt_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "61246f20fb2cfc92eb47068a1b1dddfa38d493b38d3723dcaf3a4f090ba6cf41"
+  },
+  "close_1h_trend_EMA_8_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "726bb2f6f2284ded72d5d34c27435a8b794df78624031bb7238fe3d73d1facd4"
+  },
+  "close_1h_trend_EMA_8_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3391d990a8b6f433c10c5f77edef9de6992ecf4913e38bed42926de229b772e0"
+  },
+  "close_1h_trend_EMA_8_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f76350c46c31466e829b701e8bee3973ce23fa83e62c33c69a3a0f9215f4605a"
+  },
+  "close_1h_trend_EMA_8_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e0e42f8689a71c447a63b97bb687e080f76f78a8d9ef1d045b0efc2eab4fb9ad"
+  },
+  "close_1h_trend_EMA_8_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "894447c27778e01c0e7d0e0f4e243283162ecb2a8917c96d15d88e2a8103cc50"
+  },
+  "close_1h_trend_EMA_8_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2f7c4bfd7f5875f86f52b339154bafa0b24b276e0d894e25e5c908b01a5bde63"
+  },
+  "close_1h_trend_EMA_8_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a8e0a880734030a8af425715ebad710d05558650f72887786408865c672d2767"
+  },
+  "close_1h_trend_EMA_8_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3e69d482f8748da60ecb6d3297f085ccace76c036029dbbfc690221f08472906"
+  },
+  "close_1h_trend_EMA_8_Log1p": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a4eb37d4bd49b91da968d66ad05c1d19e796fdba5309164991d89b0bcc908eaf"
+  },
+  "close_1h_trend_EMA_8_Max_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e993c9510b18ad2348915884403037d9bd4a4c1863b546c575f0d6428e8fe7c9"
+  },
+  "close_1h_trend_EMA_8_Max_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8514c80fa266003faf53a583e3a3363101ac99e9bc043abe7835bb1499127395"
+  },
+  "close_1h_trend_EMA_8_Mean_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4733e8aaa67d952fdd3ef4dc2bbdf2d99b1bc2cf1c8aaf7e173558f7593cc1cc"
+  },
+  "close_1h_trend_EMA_8_Mean_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "51b53d2e1dd0707c668d668cceaf0d8d1638bc06ac7c3d2bfafb8f59454b6b8d"
+  },
+  "close_1h_trend_EMA_8_Min_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "6f43b92553ec75a5536a26abb5ced4aae48b6911da2628200f56693c5f9d9093"
+  },
+  "close_1h_trend_EMA_8_Min_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "633b8738e3c5000ca2646fb4e10b5013a9460ebbb933b1a4e57b7753a1073242"
+  },
+  "close_1h_trend_EMA_8_Momentum_L13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f6bb36954827baadd95a2ae8e77f561b78a85a2e6c5f839c3c9333866a46afba"
+  },
+  "close_1h_trend_EMA_8_Momentum_L144": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "dd8ff6929cb0bd779602c50f4c3de25c32baf8570bf12601f695623934fc6218"
+  },
+  "close_1h_trend_EMA_8_Momentum_L21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0a522576533ad8b51b319a1f147f133be945de233fb2b817ac42b8902f53f909"
+  },
+  "close_1h_trend_EMA_8_Momentum_L233": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c8cfd7f588ea6ddf8442b232180bfaff6a66394af609c3948b9050fe034e243f"
+  },
+  "close_1h_trend_EMA_8_Momentum_L3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9429822e81c5293db11f6fecef8d4dd517ef2be38967a9fa30179c45b51bff41"
+  },
+  "close_1h_trend_EMA_8_Momentum_L34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7e1cecbebc49b424e37bdfcb8888492f7f7ce6e13cbd713e399ababa4e7daccc"
+  },
+  "close_1h_trend_EMA_8_Momentum_L5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9062ff47a0d8b014cd7ad87cfa115e06075280e793d2f6cdbbc9a351dacf8d83"
+  },
+  "close_1h_trend_EMA_8_Momentum_L55": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a7505e6afdc658b824d1dfb68adeb0d5860cdc3ac034e253149cfd1caa980f88"
+  },
+  "close_1h_trend_EMA_8_Momentum_L8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b3490acc844336647b37afb106d3cd70d87eac840db809ba8a15f7452a11930b"
+  },
+  "close_1h_trend_EMA_8_Momentum_L89": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "35088c20b9d34c1073dcaf402fbd564f58287b13db509ad40cc246543daf4984"
+  },
+  "close_1h_trend_EMA_8_Range_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "94f1a7f2216534a8c1ac310aeb410376f982f338fa52cedde0d9c6484c09f8d2"
+  },
+  "close_1h_trend_EMA_8_Range_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "66c2347a7b2af93e0989dbec2e00354153e28801bf3e43fc006b6f1fa0e3d0c0"
+  },
+  "close_1h_trend_EMA_8_Rank_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0fb8a11a035183f5ccedf96fa75e333db517fc6f867425eba65a14e8681946f3"
+  },
+  "close_1h_trend_EMA_8_Rank_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3770a420a3b7795735dcfb2106d8a6e83fe176dc2acdba224344a0e937ac9e8f"
+  },
+  "close_1h_trend_EMA_8_Sign": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d1e63610d2e2c94f33cd456c4b676b4e0a5834ffb035c1e80e2f555155e1a84a"
+  },
+  "close_1h_trend_EMA_8_Skew_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7690dbdf14c80f1155717fb23c841ee4fa10b16e928a9bb799e2be7a6a02fc62"
+  },
+  "close_1h_trend_EMA_8_Skew_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9826ad5086fd76aa9031c12be911a4443fae4b69eed8af6421cf47391f176ff1"
+  },
+  "close_1h_trend_EMA_8_Slope_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2a84e06f3ddc81e55d5eb0eed1e46491acef9f98b02e42aa9873f47b76e71db2"
+  },
+  "close_1h_trend_EMA_8_Slope_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "58110d3dc07503de625cade708630fd51accd92f173b7e3bf1185c4d01e583d2"
+  },
+  "close_1h_trend_EMA_8_Std_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "5dfe78e2ba7733af9310e8525059d53f8a6ffbb1bcbd9d65e1e032a0a0dcc454"
+  },
+  "close_1h_trend_EMA_8_Std_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9afa56977cdf18e04a0c0e2d3ab911c80cbe1141b2ce5aa33a992c0eb42be77b"
+  },
+  "close_1h_trend_EMA_8_TsArgmax_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "20b2315ff5a630dbc9ccde0cffd269ae159be7f0903b03e23d01484bba400eb2"
+  },
+  "close_1h_trend_EMA_8_TsArgmax_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9ab07b3d2ebda413bd1594cbad12038323e46bfd81c32940a4eff501e8ff29f5"
+  },
+  "close_1h_trend_EMA_8_TsArgmax_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e2765b6da867cfac6d2e78ce7b2320738e66b0123ecc0e8cd9ca5e80650dd09f"
+  },
+  "close_1h_trend_EMA_8_TsArgmin_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c5881f238b9506b0bb2222b50217f657abccfda7868d199f05fe5f5512ffa026"
+  },
+  "close_1h_trend_EMA_8_TsArgmin_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "68f4d12cb5faef6f03c8bbc17ca56e7f0f7d4197d4929339f0426edcc1ec51f2"
+  },
+  "close_1h_trend_EMA_8_TsArgmin_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a5b82bea1aef494defe6f77f49bae46c24a0d0f1b592aa7a81b762d00c660cb4"
+  },
+  "close_1h_trend_EMA_8_TsRank_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0fb8a11a035183f5ccedf96fa75e333db517fc6f867425eba65a14e8681946f3"
+  },
+  "close_1h_trend_EMA_8_TsRank_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2fd4764c43c29043bb6f50041107e334d618bc024fcf104a9769077bf44a4edf"
+  },
+  "close_1h_trend_EMA_8_TsRank_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3770a420a3b7795735dcfb2106d8a6e83fe176dc2acdba224344a0e937ac9e8f"
+  },
+  "close_1h_trend_EMA_8_ZScore_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7e2ddcfe51ff0cb6785f12765c592015bf0e76b0da27ca6a4541ef93dcee223a"
+  },
+  "close_1h_trend_EMA_8_ZScore_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7b725ec14afe89906fb7f91365e05b84902874d19caff8687aeb0271f75927d3"
+  },
+  "close_1h_trend_SMA_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "bddc2d72c5c4cf99160d7b04b4f920a5cdfe7dbf0aa4a8a12ba8b7b8bf5ec21c"
+  },
+  "close_1h_trend_SMA_13_Abs": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "bddc2d72c5c4cf99160d7b04b4f920a5cdfe7dbf0aa4a8a12ba8b7b8bf5ec21c"
+  },
+  "close_1h_trend_SMA_13_Clip": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8b583d570481936be367801145917abb9cd49428fda01603ca5db75fb92b9ea5"
+  },
+  "close_1h_trend_SMA_13_DecayLinear_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "14e5552d86b95d4a9a97c945a43e5776f3ae378ce676908c63d99d526542880d"
+  },
+  "close_1h_trend_SMA_13_DecayLinear_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "985103a0edfa2184d3829986df00b0aac76044daacb3c2829fbe2b2c28d82929"
+  },
+  "close_1h_trend_SMA_13_DecayLinear_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "edb9170efa1908d9d953a9c8645e2fece032b8b6eaa16efbe922a38ba0b56b3b"
+  },
+  "close_1h_trend_SMA_13_Distance": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d27d93a1037e09aedad7e9d36623a80b9c33557738a67e4ae117eacac5d4ce41"
+  },
+  "close_1h_trend_SMA_13_Kurt_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a62fee61bcd3626ef039d969ad3c4ccb4f132f44a726434834c85c47a1cc7295"
+  },
+  "close_1h_trend_SMA_13_Kurt_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1200a94876dbf50204957503c6345681fb656fd9d1461b2e5ebf5d8d9162eee4"
+  },
+  "close_1h_trend_SMA_13_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "25f17449f6b679dda464e83766077146f094b5489dd516cbd3083fa5293f1ad7"
+  },
+  "close_1h_trend_SMA_13_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "285537c51cbcd179238b783e1881e9ca26a5f5d30f76f8feacc0127393f2ac36"
+  },
+  "close_1h_trend_SMA_13_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "fd1662e8a34d7c5e27ef784088ab6f6220cfdb526405efc2314034c00fc69b3e"
+  },
+  "close_1h_trend_SMA_13_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4da9c39c9733d1d5b620b5295d963ba015f6385dd4ed7a7c683da42f58b106e6"
+  },
+  "close_1h_trend_SMA_13_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "23d7aa8661c03399173dd964490b1cd98e7ccce41283608e92f9061140c0e2f4"
+  },
+  "close_1h_trend_SMA_13_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "078bb8bd75ffe37c00a3cf2d44131d76f46ae1f3bfad193db32aec6a6e884790"
+  },
+  "close_1h_trend_SMA_13_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ee46e7a1bbca61aea701060d57e34fd896a1fcd017749ac1d6a1492d1d2846a6"
+  },
+  "close_1h_trend_SMA_13_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1db97976c4d44b5f5d9f2aa8ed29608b494e15b38c5cf300e791eeedaab53dc7"
+  },
+  "close_1h_trend_SMA_13_Log1p": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "be2add88897ba4c05bb01fa21a0c602b9229ff963ba58f4a3bf8069669da4295"
+  },
+  "close_1h_trend_SMA_13_Max_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b427023d30939f74ba8e50c008749e6df4a4d8a772ffb3a1525135454c4fe9db"
+  },
+  "close_1h_trend_SMA_13_Max_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "34f176ee5b290e4738f24bb32b0e6e2bb9843f8f733dec18bb5cb0bf6bb2ce34"
+  },
+  "close_1h_trend_SMA_13_Mean_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2d8a5f99fa1cc83ce5320e0ab3fb06c32d7d80d8d7fcfc510434759f9902c3c4"
+  },
+  "close_1h_trend_SMA_13_Mean_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0df644a0bc8c54afff3381c1f22499644018f97e90a2a68979f0f22b9333e53f"
+  },
+  "close_1h_trend_SMA_13_Min_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b66a9ba2630c26a06c089841fcc22514e51fc4bbcbdd07a0f50f00e35fec99b2"
+  },
+  "close_1h_trend_SMA_13_Min_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "730cda29343190baee6c95f8b7d551bf752dafc3f05504c117a15095a3d62462"
+  },
+  "close_1h_trend_SMA_13_Momentum_L13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d6bb002c571b550c846191800ddb841a922e105ea850b97ea51146069ec5734f"
+  },
+  "close_1h_trend_SMA_13_Momentum_L144": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e1351883b8f12ce66d8bf0385b3686d930d2b46a562efea1b92a15c2be718258"
+  },
+  "close_1h_trend_SMA_13_Momentum_L21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "dd7d1c26b4fe2a7a43855e3661d2c65b7740ad03d216e976a1567e3503972366"
+  },
+  "close_1h_trend_SMA_13_Momentum_L233": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "6f147a89b9bac7c7883ae3aaf299ed62ceb0d4d2c4208ceddcc01979a72130d5"
+  },
+  "close_1h_trend_SMA_13_Momentum_L3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c83a5fa70a6a5ded60d5a0646b4d98e7e753636e19fa28a0636ed17b9d71f5d8"
+  },
+  "close_1h_trend_SMA_13_Momentum_L34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "70d63fdbfefe3b0ab2c22e76ba1fbd35a408908ece2b20c4ae6e3f5e1ec968a6"
+  },
+  "close_1h_trend_SMA_13_Momentum_L5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "67c724d6b1bebe70d74957e9170730b8200ce4263800e0efb3a45bb79ee44408"
+  },
+  "close_1h_trend_SMA_13_Momentum_L55": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1691781ab65142fc528cb22f004e71aae6a93b3be5c9770733ec88f4de03fb88"
+  },
+  "close_1h_trend_SMA_13_Momentum_L8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "061010fe06dfc181ef88d3b81a468492eb59dc6aa6be6a5af8d89178c969f367"
+  },
+  "close_1h_trend_SMA_13_Momentum_L89": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "221ed5e3e89c63ba7eb314b262a2a9e0e316281c80e67c4736583c1237e8031d"
+  },
+  "close_1h_trend_SMA_13_Range_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "02228425f5ba039094a75bf385b2328ee0531b957248858d1ef06a47839600e0"
+  },
+  "close_1h_trend_SMA_13_Range_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "28faff2aff3b941d734d86cd6a0142a5802554708fd75f438c924d4fd731e81e"
+  },
+  "close_1h_trend_SMA_13_Rank_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "eb523cb31409222fcff6c2841b770479dc7d5743e35ae38c0a5eaa359e7a3d0e"
+  },
+  "close_1h_trend_SMA_13_Rank_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ecde6d27bc7a28335806f053434a40f8d28f0fecbb61f65baae99f680e895339"
+  },
+  "close_1h_trend_SMA_13_Sign": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d1e63610d2e2c94f33cd456c4b676b4e0a5834ffb035c1e80e2f555155e1a84a"
+  },
+  "close_1h_trend_SMA_13_Skew_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b4d5c0a75e56d11769e04d08d5cb9fe7159fda088c5d5eb93eac357135c525b7"
+  },
+  "close_1h_trend_SMA_13_Skew_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "01bcf92f7edd2a4b3d2f295b934c94a1ff50bd24ed9c75dd83c27150127804ce"
+  },
+  "close_1h_trend_SMA_13_Slope_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "29ff36dbef04dac11c7698433d83b1ab0eb2cfa0fc4836964b4dc295b44cc2d3"
+  },
+  "close_1h_trend_SMA_13_Slope_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "75be72bf7539271c5fbe4ae16714805f4bbe73658e172a087ba6c8b1e06e4aa6"
+  },
+  "close_1h_trend_SMA_13_Std_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4d2d33de6797edd6e6e3235655166876607e2e49ccca961e94b7c049faeac06f"
+  },
+  "close_1h_trend_SMA_13_Std_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "bccba4bf5084b3766659135a0262702c95dd1ce115e57c71f9ed42316672fa87"
+  },
+  "close_1h_trend_SMA_13_TsArgmax_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "171b084d225102a81e59dc9af6944c3d1a5b09ca3f9ba93270989712008b056d"
+  },
+  "close_1h_trend_SMA_13_TsArgmax_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3bfb38bbd3a040305b98864bff7bbaafca2c8a1c2323d925fe8b1a821731d434"
+  },
+  "close_1h_trend_SMA_13_TsArgmax_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "cde58e626afd077dcd2940d06908cd4fb8f5ec863b331389fbc295e0b73f96a5"
+  },
+  "close_1h_trend_SMA_13_TsArgmin_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9c7839c8e484b6b78209e92a6471dfb4cd77dda37e755434bef38343930a87eb"
+  },
+  "close_1h_trend_SMA_13_TsArgmin_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d8c7d97bb1f66571ae1ce0ca07c2221d25e74b5e21a03f7748ba725f58dd0723"
+  },
+  "close_1h_trend_SMA_13_TsArgmin_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "82b089cc932ecf8ecdb75b8f8596ea8a3f8a8c598d4d86f20251a7ec38126662"
+  },
+  "close_1h_trend_SMA_13_TsRank_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "eb523cb31409222fcff6c2841b770479dc7d5743e35ae38c0a5eaa359e7a3d0e"
+  },
+  "close_1h_trend_SMA_13_TsRank_W21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d746ab6723f01dbdfc12440dc28ba34363075487937ac851190d0eafc0fd9723"
+  },
+  "close_1h_trend_SMA_13_TsRank_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ecde6d27bc7a28335806f053434a40f8d28f0fecbb61f65baae99f680e895339"
+  },
+  "close_1h_trend_SMA_13_ZScore_W13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2a16758c5c75485bbf1f3bc7cc12e2c67adb914792f6436ce33de905dcee40b4"
+  },
+  "close_1h_trend_SMA_13_ZScore_W5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9ccd1da93ade484a610a7c5bbd358854a643cc43473bec695f4b2ea20a10ded6"
+  },
+  "high_12h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "982ac8c8c5be9fe8ac1b78bee88d01d59d023f9e67fadb93276e3882d5f734b8"
+  },
+  "high_12h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8b71e7bc0a4d181cb50cae38ec4e7b140b4ecc43f6f244a8f0da133a5c67daca"
+  },
+  "high_12h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d16c4c91c704dc8c15720895ce194c11869723e8f4571f0547781b27145eb7df"
+  },
+  "high_12h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4d26756a0d07308c0e5974d9ef9ba7f687961b1004b44f95a7e4e2207fa2b95d"
+  },
+  "high_12h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "37a37626e6a3193d41b8afc589b354aa8e39c873a4738b24e3d38e5a96c55948"
+  },
+  "high_12h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "6304299f1b6cf8ea3cb002e42e0f60cc35ae47c96c1484bb3d4d5df77c26502c"
+  },
+  "high_12h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "892070ceff26a334cd14ff0921ea533587fdb9d6cf6ebde8102ed0244e271e9d"
+  },
+  "high_12h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "45bcdc1c569a1fe39dfe86d635ca8614f4c595e4d544efb1f7d053d5741f17ef"
+  },
+  "high_1h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9b8fce2d7f6dbdd5355fb3d5eec1b216fdd763af24e00f2092181b900a8f2487"
+  },
+  "high_1h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e96fa4d20fd9bd3de3b1b1e2eba544e0888414f3987eef5056430a05d5b39771"
+  },
+  "high_1h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "10a1939fa95779f9a7ae97677c5363b2464dc25a10e519b814cb7450fc143aec"
+  },
+  "high_1h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3520a870ac3a1c6529a2f5f85122935b90816f202275c8b0d8e1c0187fee95e5"
+  },
+  "high_1h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2c8107cc7bab57af8100ca04530bfff13a9012ad563ac6320a7241464bfc7308"
+  },
+  "high_1h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "097e234f32282bb4e81914f9a54eefb306bb222eb96ed4a39a2e913a0f27ab2b"
+  },
+  "high_1h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1f07fef314d9ed0203fe2aec1713a6dde58fa4dfc245a24a6ee0bc799642b51f"
+  },
+  "high_1h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "6a490229b06c5740151973481b289851692ca663e6cf83893aea3caf2b419fe4"
+  },
+  "low_12h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "79434d0aa4f05a045a18e912b936041b8cdba558f5ad3ca4aadf771dc60c5d1d"
+  },
+  "low_12h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "484facd60e3f847a2c7481f693606ff0eb975d5108b50ac01e7e0f4fef4204fc"
+  },
+  "low_12h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0b4ac6f7ef0af75fbe1aabea312a29f1be1fd5298a841c725b5590cc46577008"
+  },
+  "low_12h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "842253d5a0b57ed6d78135860dab65c561d117d240b726abda5db8d8b6b07f70"
+  },
+  "low_12h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4ceb8964d8d30f1d383daab48f257aff5c5993b366fe5ac3653b2705894f4104"
+  },
+  "low_12h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a0cc31cd86e0f7fb9d097c2bdaead4c2c0372baff9e1fda46c8d52443d8afbce"
+  },
+  "low_12h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1ed88e4432089b2ca03dcaa067ca27c8600ed353131aaecde1b5deffdf2ee37e"
+  },
+  "low_12h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "68e5a60015e0bb2aaba60eff08a6401bd50c85e75d1287dd0e3a8d0aed17fe75"
+  },
+  "low_1h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9f0b8be6705ad7a76db11acccb48d6f77aaeacbf698645adf7f55c65e5858c05"
+  },
+  "low_1h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "739969e6db9283b58eabd3666c0b0629d433580675ba43fbab5bbd9cde953123"
+  },
+  "low_1h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e26c98eec0adc0f285f6e152a48e60aca62f7bad671ad28e44102204beb4509d"
+  },
+  "low_1h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "676ff197815ce4be1f6480207dba93793c56a7ab5e5c4c82c924e54cabe664bb"
+  },
+  "low_1h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8758754c2b279fc77608dc6ca487cca1be7d9912605f76afaa49c4db941af47e"
+  },
+  "low_1h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "111ea6959adbe8bbcc91568d8976824235bcc610fe53b2c7e36d893235d07cf0"
+  },
+  "low_1h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "c2990d699d6b033ce07576961c94107d194b7dd983178f19415f7b180da3def6"
+  },
+  "low_1h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "2d6e01c93e507764fb4b53cfd1637dc23b023cc3985a85c15ae93eab1ef9d669"
+  },
+  "meta_12h_Momentum_Divergence": {
+   "nan": "22f38f525cb13175e0f705259b2bd86373b43ffd20cc0726126efc9d4c6a3264",
+   "values": "6450b8bb30d9db3e344fe578ad5aa16deb47396446ad216112fdf5eaa2069b28"
+  },
+  "meta_12h_Time_DayOfWeek": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "43f0dc4858df411893b2b3c67721f4866b4361338e9c04ec24191c998a6024a5"
+  },
+  "meta_12h_Time_HourOfDay": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "5778c7f67321e084cb999d145625f83276c9c3b1a1b5e8d91eb9780ca53e5943"
+  },
+  "meta_12h_Time_IsWeekend": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3ca716dce9fbac62215636e66c40d42416c9e759df96fb1baa9f210696e33e8c"
+  },
+  "meta_12h_Time_MonthOfYear": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "6b441ed086a1a3dd70fa60c06851b01cb108baf78b4697fa10dc2818899d074b"
+  },
+  "meta_12h_Trend_Consensus": {
+   "nan": "22f38f525cb13175e0f705259b2bd86373b43ffd20cc0726126efc9d4c6a3264",
+   "values": "6450b8bb30d9db3e344fe578ad5aa16deb47396446ad216112fdf5eaa2069b28"
+  },
+  "meta_12h_Volatility_Regime": {
+   "nan": "22f38f525cb13175e0f705259b2bd86373b43ffd20cc0726126efc9d4c6a3264",
+   "values": "6450b8bb30d9db3e344fe578ad5aa16deb47396446ad216112fdf5eaa2069b28"
+  },
+  "meta_12h_VolumePrice_Divergence": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "183df29eaa29075a3ebab6ee5f15ac75284add9759df48b6626542ea3efb5c02"
+  },
+  "meta_12h_Volume_PriceChange": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "49cb4209df3a95368d77c3293bb9a17eb2ed0dabef16b2f8562387505c9dd0ca"
+  },
+  "meta_1h_Momentum_Divergence": {
+   "nan": "22f38f525cb13175e0f705259b2bd86373b43ffd20cc0726126efc9d4c6a3264",
+   "values": "6450b8bb30d9db3e344fe578ad5aa16deb47396446ad216112fdf5eaa2069b28"
+  },
+  "meta_1h_Time_DayOfWeek": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1cf3f60c28b8d3fd7f2d8205e70a1b9001d3a0c174c7d80e27c6094d206d8fb8"
+  },
+  "meta_1h_Time_HourOfDay": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1d1d5c93d28f55781c39e39d8413d552586589948f95aeaaee7edf7726bf34ef"
+  },
+  "meta_1h_Time_IsWeekend": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "023df958a6b604cfeec999044ba76e31ce66992285660649df87afd9703a3327"
+  },
+  "meta_1h_Time_MonthOfYear": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8b5e3b963cc733764f689cf0b68ea503131618d223b725735c3000d2dfc00453"
+  },
+  "meta_1h_Trend_Consensus": {
+   "nan": "22f38f525cb13175e0f705259b2bd86373b43ffd20cc0726126efc9d4c6a3264",
+   "values": "6450b8bb30d9db3e344fe578ad5aa16deb47396446ad216112fdf5eaa2069b28"
+  },
+  "meta_1h_Volatility_Regime": {
+   "nan": "22f38f525cb13175e0f705259b2bd86373b43ffd20cc0726126efc9d4c6a3264",
+   "values": "6450b8bb30d9db3e344fe578ad5aa16deb47396446ad216112fdf5eaa2069b28"
+  },
+  "meta_1h_VolumePrice_Divergence": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "dd04741fdd7d7caa66c708a0656f677352bae21a217ab80ddedcda40766656d8"
+  },
+  "meta_1h_Volume_PriceChange": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "04e007cf6f5f1415b2ee7248c2c30d33d072c3bcfc0059a863a34c8e3fc09de4"
+  },
+  "open_12h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "999eaaf31668aa64cb33fb82258d87d4120b1cf229e6c57cc5d24bab40991f34"
+  },
+  "open_12h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "abade3da1d8b60e5ee7d66e44ae1e8f979972afc846c68b624403ed1c76896be"
+  },
+  "open_12h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "bf43fd53f22422636ac69aefaf938bc35b7709f7684b0a7308113e0ad6845ae6"
+  },
+  "open_12h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "fb418c0ef33788ed52db9b9ee60ac6bd3b7e0892576c37a45f5c43112637f27f"
+  },
+  "open_12h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7d236f7c8d8c8b21b86e18571f0494fee4a75f0aa4f59ff20b5a958e1218c665"
+  },
+  "open_12h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "274cde2c8d0704d6e33b893ed0ac423002dd16b8094840cab5d495ebbcec4553"
+  },
+  "open_12h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "0beb5c0b9f81b75b94282d8f6073cb897afd33c795b85421347787d9873e1f07"
+  },
+  "open_12h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "e86dbfe8b3706725cba52d66b65492e352ade45cc0e6f58e111e7482f8920cce"
+  },
+  "open_1h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "84b4d5e72b9d9d61ab056f4f4d89d38dc070b988784aa42ee75ad168bac25e55"
+  },
+  "open_1h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "4fbff3eca566514a545cf3e41241a3d12cc101fad81cda5591e784f3842b4529"
+  },
+  "open_1h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "103bddac41e689a1ef162631b0e02677651cb62ccd5bb6aafbdf889e700079ca"
+  },
+  "open_1h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "25ac81eb7d638d465c2b6e2325ba809abca19b489fec82dbc4afdcdf3c0d95d1"
+  },
+  "open_1h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3f81b02bf104e89da7d2e4a817bd6f9eea0bf43c7787d82dffec4843931d36ac"
+  },
+  "open_1h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "803c5061cedc61b51e4e6cabdb5eff3d2a1ee937a027fc31c7554c7c40990f9b"
+  },
+  "open_1h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "25d5c1a9a8bf81c7a7ef834526a1f176d2fffa2f7a7f72b82a81bdea8ba85610"
+  },
+  "open_1h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d104226e9ffce1116ed8d77aad9d0d6818cb20424dcfcd7dbb4d0202b53db526"
+  },
+  "volume_12h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "3f7c1c892f2a3d271e89a10e217b966fbdb3b853a9e99b7d95f148adb760a5a1"
+  },
+  "volume_12h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8ef14f9139a8c6241daccc5b0af1b5685bc71942ed194502c85941349b128fe4"
+  },
+  "volume_12h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "a8a4fb56c9d1fef21e217ca8a6ae8c17490b4a3b348c32242d8b56ede37827a5"
+  },
+  "volume_12h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "beacea23e7222ecdd6b8c951bd0dd6f07bc1fca9ee6423440e8bf8f2443b8fe3"
+  },
+  "volume_12h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "d81094432abe507fa64588a15bac942767b9c82203a4666887f9f30f0c12b9b9"
+  },
+  "volume_12h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f3acf3265ebe9022eb5354cf33ef335e4337f1616612d5b4a26d4e759c43edf0"
+  },
+  "volume_12h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "1a3bc2fa4efa822ea62c1ac26f97d62cba1cc3a3abec3967ec606edc3ba6d6ae"
+  },
+  "volume_12h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f6f852d401496da5d649a20472d1ee6b2d8e88f49347322db539734ffd3a9450"
+  },
+  "volume_1h_Lag_1": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "62c4fc75e08bf15b0de3c447885bce76ee94850dc6f1b792643c47d79dca6a02"
+  },
+  "volume_1h_Lag_13": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "7b85d4188a4ba02c1d287405f1ae7533075d240cf88a796227b1aa8153dbccc2"
+  },
+  "volume_1h_Lag_2": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "9fd4d7a1781f137d04651163b72e802e0807a1a2b3950adf9692ebf6d49b0cf9"
+  },
+  "volume_1h_Lag_21": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "b0e19386285eb4a5b1d0253f9e74ad3d794a60ee6f4c62cfb29244a21ccf614c"
+  },
+  "volume_1h_Lag_3": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "ca6637baa0a0ea407a691ab953ccee15094d87bdd118fbc834ea1cc2178b6079"
+  },
+  "volume_1h_Lag_34": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "5aff0dbd5febd43b8e23e03ea1aa540c3a7110fd8ba81c4b5d68fc525e68f5d6"
+  },
+  "volume_1h_Lag_5": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "8d5884f28d11aa1d8ed27f803b97d9f7b50eb9d2c844341883b802247ceb1bf6"
+  },
+  "volume_1h_Lag_8": {
+   "nan": "2795ec931b5b17c9e0e5e5adb2ce787d413ab0c2bb29cfbf554668fea090eeea",
+   "values": "f66ac4dabab807d2529be3beed5a3596c4d728ad214d9e20efb4b424d36cfbf6"
+  }
+ },
+ "quality_status": "complete",
+ "stable_start": {
+  "close_12h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "close_12h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "close_12h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "close_12h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "close_12h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "close_12h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "close_12h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "close_12h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Abs": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Clip": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_DecayLinear_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_DecayLinear_W21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_DecayLinear_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Distance": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Kurt_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Kurt_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Lag_1": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Lag_13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Lag_2": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Lag_21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Lag_3": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Lag_34": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Lag_5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Lag_8": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Log1p": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Max_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Max_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Mean_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Mean_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Min_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Min_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L144": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L233": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L3": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L34": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L55": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L8": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Momentum_L89": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Range_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Range_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Rank_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Rank_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Sign": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Skew_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Skew_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Slope_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Slope_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Std_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_Std_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsArgmax_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsArgmax_W21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsArgmax_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsArgmin_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsArgmin_W21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsArgmin_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsRank_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsRank_W21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_TsRank_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_ZScore_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_EMA_8_ZScore_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Abs": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Clip": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_DecayLinear_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_DecayLinear_W21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_DecayLinear_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Distance": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Kurt_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Kurt_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Lag_1": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Lag_13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Lag_2": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Lag_21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Lag_3": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Lag_34": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Lag_5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Lag_8": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Log1p": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Max_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Max_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Mean_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Mean_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Min_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Min_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L144": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L233": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L3": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L34": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L55": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L8": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Momentum_L89": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Range_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Range_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Rank_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Rank_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Sign": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Skew_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Skew_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Slope_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Slope_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Std_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_Std_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsArgmax_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsArgmax_W21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsArgmax_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsArgmin_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsArgmin_W21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsArgmin_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsRank_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsRank_W21": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_TsRank_W5": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_ZScore_W13": "2026-01-01T00:00:00+00:00",
+  "close_12h_trend_SMA_13_ZScore_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "close_1h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "close_1h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "close_1h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "close_1h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "close_1h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "close_1h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "close_1h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Abs": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Clip": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_DecayLinear_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_DecayLinear_W21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_DecayLinear_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Distance": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Kurt_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Kurt_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Lag_1": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Lag_13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Lag_2": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Lag_21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Lag_3": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Lag_34": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Lag_5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Lag_8": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Log1p": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Max_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Max_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Mean_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Mean_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Min_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Min_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L144": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L233": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L3": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L34": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L55": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L8": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Momentum_L89": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Range_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Range_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Rank_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Rank_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Sign": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Skew_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Skew_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Slope_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Slope_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Std_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_Std_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsArgmax_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsArgmax_W21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsArgmax_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsArgmin_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsArgmin_W21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsArgmin_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsRank_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsRank_W21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_TsRank_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_ZScore_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_EMA_8_ZScore_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Abs": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Clip": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_DecayLinear_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_DecayLinear_W21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_DecayLinear_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Distance": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Kurt_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Kurt_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Lag_1": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Lag_13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Lag_2": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Lag_21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Lag_3": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Lag_34": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Lag_5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Lag_8": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Log1p": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Max_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Max_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Mean_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Mean_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Min_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Min_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L144": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L233": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L3": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L34": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L55": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L8": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Momentum_L89": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Range_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Range_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Rank_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Rank_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Sign": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Skew_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Skew_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Slope_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Slope_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Std_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_Std_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsArgmax_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsArgmax_W21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsArgmax_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsArgmin_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsArgmin_W21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsArgmin_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsRank_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsRank_W21": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_TsRank_W5": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_ZScore_W13": "2026-01-01T00:00:00+00:00",
+  "close_1h_trend_SMA_13_ZScore_W5": "2026-01-01T00:00:00+00:00",
+  "high_12h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "high_12h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "high_12h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "high_12h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "high_12h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "high_12h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "high_12h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "high_12h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "high_1h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "high_1h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "high_1h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "high_1h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "high_1h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "high_1h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "high_1h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "high_1h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "low_12h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "low_12h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "low_12h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "low_12h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "low_12h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "low_12h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "low_12h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "low_12h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "low_1h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "low_1h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "low_1h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "low_1h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "low_1h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "low_1h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "low_1h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "low_1h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "meta_12h_Momentum_Divergence": null,
+  "meta_12h_Time_DayOfWeek": "2026-01-01T00:00:00+00:00",
+  "meta_12h_Time_HourOfDay": "2026-01-01T00:00:00+00:00",
+  "meta_12h_Time_IsWeekend": "2026-01-01T00:00:00+00:00",
+  "meta_12h_Time_MonthOfYear": "2026-01-01T00:00:00+00:00",
+  "meta_12h_Trend_Consensus": null,
+  "meta_12h_Volatility_Regime": null,
+  "meta_12h_VolumePrice_Divergence": "2026-01-01T00:00:00+00:00",
+  "meta_12h_Volume_PriceChange": "2026-01-01T00:00:00+00:00",
+  "meta_1h_Momentum_Divergence": null,
+  "meta_1h_Time_DayOfWeek": "2026-01-01T00:00:00+00:00",
+  "meta_1h_Time_HourOfDay": "2026-01-01T00:00:00+00:00",
+  "meta_1h_Time_IsWeekend": "2026-01-01T00:00:00+00:00",
+  "meta_1h_Time_MonthOfYear": "2026-01-01T00:00:00+00:00",
+  "meta_1h_Trend_Consensus": null,
+  "meta_1h_Volatility_Regime": null,
+  "meta_1h_VolumePrice_Divergence": "2026-01-01T00:00:00+00:00",
+  "meta_1h_Volume_PriceChange": "2026-01-01T00:00:00+00:00",
+  "open_12h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "open_12h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "open_12h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "open_12h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "open_12h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "open_12h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "open_12h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "open_12h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "open_1h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "open_1h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "open_1h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "open_1h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "open_1h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "open_1h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "open_1h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "open_1h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "volume_12h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "volume_12h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "volume_12h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "volume_12h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "volume_12h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "volume_12h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "volume_12h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "volume_12h_Lag_8": "2026-01-01T00:00:00+00:00",
+  "volume_1h_Lag_1": "2026-01-01T00:00:00+00:00",
+  "volume_1h_Lag_13": "2026-01-01T00:00:00+00:00",
+  "volume_1h_Lag_2": "2026-01-01T00:00:00+00:00",
+  "volume_1h_Lag_21": "2026-01-01T00:00:00+00:00",
+  "volume_1h_Lag_3": "2026-01-01T00:00:00+00:00",
+  "volume_1h_Lag_34": "2026-01-01T00:00:00+00:00",
+  "volume_1h_Lag_5": "2026-01-01T00:00:00+00:00",
+  "volume_1h_Lag_8": "2026-01-01T00:00:00+00:00"
+ },
+ "stable_start_count": 322,
+ "warmup_insufficient_columns": [],
+ "warmup_probe": null
+}

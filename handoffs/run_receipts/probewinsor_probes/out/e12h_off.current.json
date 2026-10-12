@@ -1,0 +1,56 @@
+{
+ "case": "e12h_off",
+ "mode": "current",
+ "primary": "12h",
+ "training": [
+  "12h"
+ ],
+ "preprocessing_enabled": false,
+ "winsorization_enabled": true,
+ "winsor_window": 252,
+ "window": [
+  "2026-01-01",
+  "2026-01-31"
+ ],
+ "data_start": {
+  "12h": "2024-01-01 00:00:00+00:00"
+ },
+ "max_warmup_bars": 374,
+ "ingest_start": "2025-06-09T07:12:00",
+ "rounds": [
+  {
+   "depth": 374,
+   "late_columns": 0
+  }
+ ],
+ "late_count": 25,
+ "late_sha256": "8e4cb00b380a30f299e0ecee69218ad9d90e2d1fe9caa169c97d3a4b5f15bf16",
+ "late_sample": [
+  "close_12h_trend_EMA_8_Distance",
+  "close_12h_trend_EMA_8_Momentum_L13",
+  "close_12h_trend_EMA_8_Momentum_L144",
+  "close_12h_trend_EMA_8_Momentum_L21",
+  "close_12h_trend_EMA_8_Momentum_L233",
+  "close_12h_trend_EMA_8_Momentum_L3",
+  "close_12h_trend_EMA_8_Momentum_L34",
+  "close_12h_trend_EMA_8_Momentum_L5",
+  "close_12h_trend_EMA_8_Momentum_L55",
+  "close_12h_trend_EMA_8_Momentum_L8",
+  "close_12h_trend_EMA_8_Momentum_L89",
+  "close_12h_trend_SMA_13_Distance",
+  "close_12h_trend_SMA_13_Momentum_L13",
+  "close_12h_trend_SMA_13_Momentum_L144",
+  "close_12h_trend_SMA_13_Momentum_L21",
+  "close_12h_trend_SMA_13_Momentum_L233",
+  "close_12h_trend_SMA_13_Momentum_L3",
+  "close_12h_trend_SMA_13_Momentum_L34",
+  "close_12h_trend_SMA_13_Momentum_L5",
+  "close_12h_trend_SMA_13_Momentum_L55"
+ ],
+ "first_finite_columns": {
+  "12h": 161
+ },
+ "first_finite_sha256": "6b14d0ae273e9cd2537a79fda1e57bcc5fb576afe9c968a52aeabee76525fa87",
+ "elapsed_seconds": 1.24,
+ "peak_rss_mb": 267.3
+}

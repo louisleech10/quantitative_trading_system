@@ -1,0 +1,212 @@
+{
+ "count": 28,
+ "files": {
+  "tests/api/test_batch_alias.py": {
+   "r1_master_off_lines": [
+    204
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": true
+  },
+  "tests/feature_engineering/ff_artifact_compare_helpers.py": {
+   "r1_master_off_lines": [
+    73
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": true
+  },
+  "tests/feature_engineering/ff_truncation_mr_helpers.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "estimate_max_warmup_bars"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/preprocessing/test_causal_winsor.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_b6_warmup_trim.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "estimate_max_warmup_bars"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_batch1_followup.py": {
+   "r1_master_off_lines": [
+    438
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_failopen_contract.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_failopen_correctness.py": {
+   "r1_master_off_lines": [
+    95
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": true
+  },
+  "tests/feature_engineering/test_failopen_manifest.py": {
+   "r1_master_off_lines": [
+    191
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": true
+  },
+  "tests/feature_engineering/test_failopen_matrix.py": {
+   "r1_master_off_lines": [
+    64
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_failopen_producer.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_failopen_winsor.py": {
+   "r1_master_off_lines": [
+    73
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_ffstat_calibration.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "estimate_max_warmup_bars"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_ffstat_stable_start.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash",
+    "_resolve_public_window"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_icfirstalign_icfirst.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_icfirstalign_l3_arms.py": {
+   "r1_master_off_lines": [
+    41
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": true
+  },
+  "tests/feature_engineering/test_l65_raw_metadata.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_build_l7_raw_preprocessing_metadata"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_engineering/test_tf_aligner.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_library/test_phase1.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/feature_library/test_phase4.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/momentum/test_feature_factory_optimization_e2e.py": {
+   "r1_master_off_lines": [
+    22
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": false
+  },
+  "tests/momentum/test_feature_factory_optimization_perf.py": {
+   "r1_master_off_lines": [
+    46
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": false
+  },
+  "tests/test_feature_factory_config.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "_compute_config_hash",
+    "preview_feature_count"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/test_feature_factory_mcp.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "preview_feature_count"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/test_l65_parallel.py": {
+   "r1_master_off_lines": [
+    306
+   ],
+   "r2_symbols": [],
+   "r3_hash_literal": false
+  },
+  "tests/test_phase_b_granular_control.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "preview_feature_count"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/test_phase_d_granular_control.py": {
+   "r1_master_off_lines": [],
+   "r2_symbols": [
+    "preview_feature_count"
+   ],
+   "r3_hash_literal": false
+  },
+  "tests/test_preview_feature_count.py": {
+   "r1_master_off_lines": [
+    226,
+    271,
+    305,
+    339,
+    375,
+    413,
+    466,
+    800
+   ],
+   "r2_symbols": [
+    "preview_feature_count"
+   ],
+   "r3_hash_literal": false
+  }
+ }
+}

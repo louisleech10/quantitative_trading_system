@@ -1,0 +1,35 @@
+{
+ "case": "s1h_on",
+ "mode": "fixed",
+ "primary": "1h",
+ "training": [
+  "1h"
+ ],
+ "preprocessing_enabled": true,
+ "winsorization_enabled": true,
+ "winsor_window": 252,
+ "window": [
+  "2026-01-01",
+  "2026-01-31"
+ ],
+ "max_warmup_bars": 3084,
+ "ingest_start": "2025-08-12T15:36:00",
+ "rounds": [
+  {
+   "depth": 3084,
+   "late_columns": 0
+  }
+ ],
+ "late_count": 2,
+ "late_sha256": "8a40c1eb5084dcbae70b2056be0e91c11aa6483a37861d4a3e8fe160d58ff497",
+ "late_sample": [
+  "meta_1h_Momentum_Divergence",
+  "meta_1h_Volatility_Regime"
+ ],
+ "first_finite_columns": {
+  "1h": 4312
+ },
+ "first_finite_sha256": "0c516398c146ae12dab8579cfea798100a9f4ee0932846ea924825dc8aefde4f",
+ "elapsed_seconds": 7.71,
+ "peak_rss_mb": 369.3
+}

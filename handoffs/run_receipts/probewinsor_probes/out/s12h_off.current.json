@@ -1,0 +1,53 @@
+{
+ "case": "s12h_off",
+ "mode": "current",
+ "primary": "12h",
+ "training": [
+  "12h"
+ ],
+ "preprocessing_enabled": false,
+ "winsorization_enabled": true,
+ "winsor_window": 252,
+ "window": [
+  "2026-01-01",
+  "2026-01-31"
+ ],
+ "max_warmup_bars": 2580,
+ "ingest_start": "2022-02-12T00:00:00",
+ "rounds": [
+  {
+   "depth": 2580,
+   "late_columns": 0
+  }
+ ],
+ "late_count": 205,
+ "late_sha256": "7d42931a479ff476a0453e573511bb67947043be6f43752281229a98f18d62fa",
+ "late_sample": [
+  "close_12h_trend_DEMA_233",
+  "close_12h_trend_DEMA_233_Kurt_W13",
+  "close_12h_trend_DEMA_233_Kurt_W5",
+  "close_12h_trend_DEMA_233_Lag_1",
+  "close_12h_trend_DEMA_233_Lag_13",
+  "close_12h_trend_DEMA_233_Lag_2",
+  "close_12h_trend_DEMA_233_Lag_21",
+  "close_12h_trend_DEMA_233_Lag_3",
+  "close_12h_trend_DEMA_233_Lag_34",
+  "close_12h_trend_DEMA_233_Lag_5",
+  "close_12h_trend_DEMA_233_Lag_8",
+  "close_12h_trend_DEMA_233_Max_W13",
+  "close_12h_trend_DEMA_233_Max_W5",
+  "close_12h_trend_DEMA_233_Mean_W13",
+  "close_12h_trend_DEMA_233_Mean_W5",
+  "close_12h_trend_DEMA_233_Min_W13",
+  "close_12h_trend_DEMA_233_Min_W5",
+  "close_12h_trend_DEMA_233_Range_W13",
+  "close_12h_trend_DEMA_233_Range_W5",
+  "close_12h_trend_DEMA_233_Rank_W13"
+ ],
+ "first_finite_columns": {
+  "12h": 4312
+ },
+ "first_finite_sha256": "89d9472bc799b08500239ab737eb37cb88f3e9eed57ec60cc081c3dff0ea61df",
+ "elapsed_seconds": 3.69,
+ "peak_rss_mb": 326.1
+}

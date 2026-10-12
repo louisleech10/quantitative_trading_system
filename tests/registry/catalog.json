@@ -3636,6 +3636,30 @@
    "rewrite_targets": [],
    "ticket": "NUMERIC"
   },
+  "tests/feature_engineering/test_probewinsor.py": {
+   "claim": [
+    "correctness",
+    "regression"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A1",
+    "A3",
+    "A7",
+    "A8",
+    "A14"
+   ],
+   "oracle": [
+    "EXACT",
+    "METAMORPHIC"
+   ],
+   "path": "tests/feature_engineering/test_probewinsor.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "PROBEWINSOR"
+  },
   "tests/feature_engineering/test_progress_failopen.py": {
    "claim": [
     "unclassified"
