@@ -155,7 +155,8 @@ def _numba_parallel_probe() -> float:
 
 def runtime_environment() -> Dict[str, Any]:
     """已載入之執行期數值後端（非設定值）：numba 實際解析之執行緒層與目前執行緒數、numpy／scipy 自帶 BLAS 之執行期
-    資訊（threadpoolctl；只取路徑位於 numpy、scipy 套件目錄者，與行程內其他套件之載入順序無關）。取不到即拋（fail-closed）。"""
+    資訊（threadpoolctl；只取路徑位於 numpy、scipy 套件目錄者，與行程內其他套件之載入順序無關）。API 取不到即拋；
+    觀測是否完整由 `environment_errors` 判定（凍結寫入與邊界 10 皆檢，fail-closed）。"""
     import numba
     import numpy as np
     import scipy
@@ -177,6 +178,23 @@ def runtime_environment() -> Dict[str, Any]:
                                                                            "architecture")}})
     return {"numba_threading_layer": str(layer), "numba_get_num_threads": int(numba.get_num_threads()),
             "blas_runtime": sorted(blas, key=lambda d: (d["package"], str(d["internal_api"])))}
+
+
+# 生成路徑之 BLAS 使用者：numpy 核心；scipy.stats／scipy.special（`feature_preprocessor`、`rolling_aggregator` 等）
+_REQUIRED_BLAS_PACKAGES = ("numpy", "scipy")
+
+
+def environment_errors(env: Dict[str, Any]) -> List[str]:
+    """環境紀錄之完整性（fail-closed）：執行期 numba 執行緒層非空；numpy、scipy 自帶 BLAS 之執行期紀錄各至少一筆。
+    空清單（兩側同空亦相等）不得當作穩定環境。"""
+    errors: List[str] = []
+    if not env.get("numba_threading_layer"):
+        errors.append("執行期 numba 執行緒層未記錄")
+    seen = {str(d.get("package")) for d in env.get("blas_runtime") or [] if isinstance(d, dict)}
+    for package in _REQUIRED_BLAS_PACKAGES:
+        if package not in seen:
+            errors.append(f"執行期 BLAS 無 {package} 自帶者之紀錄（threadpoolctl 未觀測到）")
+    return errors
 
 
 def contract_at(commit: str) -> Dict[str, Any]:

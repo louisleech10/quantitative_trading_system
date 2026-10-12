@@ -215,6 +215,8 @@ def test_boundary_10_baseline_provenance() -> None:
     assert ph.production_resource_digest(frozen["frozen_at_head"]) == _SPEC["anchor_production_resource_sha256"]
     # 執行期數值後端（實際解析之 numba 執行緒層與數、numpy／scipy 之 BLAS）亦在環境紀錄內（讀執行期之證明見 10g）
     assert _RUNTIME_ENVIRONMENT_KEYS <= set(frozen["environment"])
+    # 執行期觀測完整（numba 層非空、numpy 與 scipy 之 BLAS 各至少一筆；空紀錄兩側同空亦相等，不得放過）
+    assert ph.environment_errors(frozen["environment"]) == []
 
 
 # 環境紀錄之必備欄（兩側同時漏記亦會被逐鍵相等放過 ⇒ 另鎖欄位存在）
@@ -357,14 +359,22 @@ def _mutant_freeze(old: str, new: str) -> Any:
     return module
 
 
-def _run_freeze_write(fz: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Tuple[int, bool]:
-    """以替身生成（不跑真實生成）執行凍結寫入模式，baseline 導向 tmp；回傳 (rc, 是否寫出 baseline)。"""
+# 完整之環境替身（執行期 numba 層與 numpy、scipy 之 BLAS 紀錄皆在；`environment_errors` 為空）
+_COMPLETE_ENV = {"python": "x", "numba_threading_layer": "w",
+                 "blas_runtime": [{"package": "numpy"}, {"package": "scipy"}]}
+
+
+def _run_freeze_write(fz: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+                      environment: Any = None) -> Tuple[int, bool]:
+    """以替身生成（不跑真實生成）執行凍結寫入模式，baseline 導向 tmp、環境為 `environment`（None＝完整替身）；
+    回傳 (rc, 是否寫出 baseline)。"""
     target = tmp_path / "baseline.json"
+    env = _COMPLETE_ENV if environment is None else environment
     monkeypatch.setattr(fz.ph, "BASELINE_PATH", target)
     monkeypatch.setattr(fz, "run_all", lambda ids: {"contract_sha256": "c", "kline_sha256": "k", "cells": {},
                                                     "truth_table": []})
     monkeypatch.setattr(fz.ph, "input_blobs", lambda commit: {"x": "y"})
-    monkeypatch.setattr(fz.ph, "environment_versions", lambda: {"python": "x"})
+    monkeypatch.setattr(fz.ph, "environment_versions", lambda: env)
     return fz.main([]), target.exists()
 
 
@@ -399,6 +409,13 @@ def test_boundary_10c_freeze_gate_refuses_polluted_source(monkeypatch: pytest.Mo
     # 單臂：生產資源檔（非 .py）身分不等於契約錨點（.py 身分相符）
     _stub_git(fz, monkeypatch, resource="CHANGED")
     assert _run_freeze_write(fz, monkeypatch, tmp_path / "k") == (2, False)
+    # 環境紀錄不完整（未觀測到 scipy 之 BLAS）⇒ 拒寫
+    _stub_git(fz, monkeypatch)
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "l", _INCOMPLETE_ENV) == (2, False)
+
+
+# 不完整之環境替身（只有 numpy 之 BLAS 紀錄）
+_INCOMPLETE_ENV = {"python": "x", "numba_threading_layer": "w", "blas_runtime": [{"package": "numpy"}]}
 
 
 def test_boundary_10e_isolated_links_only_tracked_config(tmp_path: Path) -> None:
@@ -440,6 +457,34 @@ def test_boundary_10g_environment_reads_runtime(monkeypatch: pytest.MonkeyPatch)
     env = ph.environment_versions()
     assert (env["numba_threading_layer"], env["numba_get_num_threads"]) == ("mutated-layer", -7)
     assert env["blas_runtime"] == [{"package": "numpy", **fake}]
+
+
+def test_boundary_10i_environment_requires_numpy_and_scipy_blas(monkeypatch: pytest.MonkeyPatch) -> None:
+    """邊界 10i：執行期 BLAS 觀測須含 numpy 與 scipy 自帶者：兩筆哨兵（路徑各在 numpy、scipy 套件目錄下）皆入紀錄且
+    `environment_errors` 為空；只有無關路徑（紀錄為空）或缺 scipy ⇒ `environment_errors` 具名報出。"""
+    import os
+
+    import numpy as np
+    import scipy
+    import threadpoolctl
+
+    def _record(package: Any, name: str) -> Dict[str, Any]:
+        return {"filepath": os.path.join(os.path.dirname(package.__file__), ".libs", f"lib{name}.so"),
+                "user_api": "blas", "internal_api": name, "version": "1.0", "num_threads": 2,
+                "threading_layer": "sentinel", "architecture": "sentinel"}
+
+    both = [_record(np, "npsentinel"), _record(scipy, "spsentinel")]
+    monkeypatch.setattr(threadpoolctl, "threadpool_info", lambda: both)
+    env = ph.environment_versions()
+    assert [(d["package"], d["internal_api"]) for d in env["blas_runtime"]] == [("numpy", "npsentinel"),
+                                                                                  ("scipy", "spsentinel")]
+    assert ph.environment_errors(env) == []
+    monkeypatch.setattr(threadpoolctl, "threadpool_info", lambda: [{**both[0], "filepath": "/unrelated/libblas.so"}])
+    unrelated = ph.environment_versions()
+    assert unrelated["blas_runtime"] == []
+    assert len(ph.environment_errors(unrelated)) == 2
+    monkeypatch.setattr(threadpoolctl, "threadpool_info", lambda: both[:1])
+    assert ph.environment_errors(ph.environment_versions()) == ["執行期 BLAS 無 scipy 自帶者之紀錄（threadpoolctl 未觀測到）"]
 
 
 def _run_freeze_check(fz: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, environment: Dict[str, Any]) -> int:
@@ -536,6 +581,14 @@ def test_mutation_m16_check_skips_environment(monkeypatch: pytest.MonkeyPatch, t
     fz = _mutant_freeze('        if ph.environment_versions() != frozen.get("environment"):\n', "        if False:\n")
     monkeypatch.setattr(fz.ph, "environment_versions", lambda: {"python": "current"})
     assert _run_freeze_check(fz, monkeypatch, tmp_path, {"python": "frozen"}) != 1
+
+
+def test_mutation_m17_freeze_skips_environment_completeness(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M17：凍結寫入之變體不檢查環境紀錄完整性 ⇒ 未觀測到 scipy 之 BLAS 時仍寫出（邊界 10c 案 l 偵出）。"""
+    fz = _mutant_freeze("        env_errors = ph.environment_errors(environment)\n", "        env_errors = []\n")
+    _stub_git(fz, monkeypatch)
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path, _INCOMPLETE_ENV) != (2, False)
 
 
 def test_mutation_m6_stack_bars_ignore_master(monkeypatch: pytest.MonkeyPatch, work_root: Path) -> None:

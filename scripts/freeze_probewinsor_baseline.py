@@ -158,9 +158,15 @@ def main(argv: List[str]) -> int:
     if errors:
         return 1
     if not args.check:
+        environment = ph.environment_versions()
+        env_errors = ph.environment_errors(environment)
+        if env_errors:  # 環境紀錄不完整（如未觀測到 numpy／scipy 之 BLAS）⇒ 不得凍結（空紀錄兩側同空亦相等）
+            for line in env_errors:
+                print(f"ERROR: 環境紀錄不完整：{line}", file=sys.stderr)
+            return 2
         head = _git("rev-parse", "HEAD").stdout.strip()
         document = {"version": 1, "frozen_at_head": head, "input_blobs": ph.input_blobs(head),
-                    "environment": ph.environment_versions(), **produced}
+                    "environment": environment, **produced}
         ph.BASELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = ph.BASELINE_PATH.with_suffix(".json.tmp")
         tmp_path.write_text(json.dumps(document, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
