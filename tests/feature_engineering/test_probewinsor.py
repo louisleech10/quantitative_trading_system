@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import pytest
 
@@ -193,6 +193,8 @@ def test_boundary_10_baseline_provenance() -> None:
     assert _baseline_add_commit() != ""
     assert ph.absent_symbol_violations(frozen["frozen_at_head"]) == []
     assert ph.absent_symbol_violations(_baseline_add_commit()) == []
+    # 產生 baseline 之輸入（契約、helper、凍結腳本）即 frozen_at_head 之已提交版本
+    assert frozen["input_blobs"] == ph.input_blobs(frozen["frozen_at_head"])
 
 
 # ---------------------------------------------------------------- mutation（改壞必紅）
@@ -258,16 +260,91 @@ def test_mutation_m5_salt_always(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_boundary_10b_provenance_detector_flags_post_change_code() -> None:
     """邊界 10b：凍結來源檢查遇「已含本票生產符號」之碼必報違反（邊界 10 之偵測器非空轉）；讀檔失敗亦報。"""
+    import json as _json
+
+    contract_rel = str(ph.CONTRACT_PATH.relative_to(ph.REPO))
+
     def _post_change(commit: str, path: str) -> str:
+        if path == contract_rel:  # 清單取自該提交自身之契約
+            return _json.dumps(_SPEC)
         return "\n".join(needle for p, needle in _SPEC["anchor_absent_symbols"] if p == path)
 
     found = ph.absent_symbol_violations("POST", reader=_post_change)
     assert len(found) == len(_SPEC["anchor_absent_symbols"])
 
     def _unreadable(commit: str, path: str) -> str:
+        if path == contract_rel:
+            return _json.dumps(_SPEC)
         raise RuntimeError("missing")
 
     assert len(ph.absent_symbol_violations("POST", reader=_unreadable)) == len(_SPEC["anchor_absent_symbols"])
+
+
+def _freeze_module() -> Any:
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("freeze_probewinsor_baseline",
+                                                  ph.REPO / "scripts" / "freeze_probewinsor_baseline.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _stub_git(fz: Any, monkeypatch: pytest.MonkeyPatch, *, diff_rc: int = 0, others: str = "",
+              head_rc: int = 0) -> None:
+    """以確定之 git 結果替換凍結腳本之 `_git`（diff 皆回 diff_rc、ls-files --others 回 others、rev-parse HEAD 回 head_rc）。"""
+    import subprocess
+
+    def _git(*args: str) -> subprocess.CompletedProcess:
+        if args[0] == "diff":
+            return subprocess.CompletedProcess(args, diff_rc, "", "")
+        if args[0] == "ls-files":
+            return subprocess.CompletedProcess(args, 0, others, "")
+        return subprocess.CompletedProcess(args, head_rc, "HEADSHA\n", "" if head_rc == 0 else "boom")
+
+    monkeypatch.setattr(fz, "_git", _git)
+
+
+def _run_freeze_write(fz: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Tuple[int, bool]:
+    """以替身生成（不跑真實生成）執行凍結寫入模式，baseline 導向 tmp；回傳 (rc, 是否寫出 baseline)。"""
+    target = tmp_path / "baseline.json"
+    monkeypatch.setattr(fz.ph, "BASELINE_PATH", target)
+    monkeypatch.setattr(fz, "run_all", lambda ids: {"contract_sha256": "c", "kline_sha256": "k", "cells": {},
+                                                    "truth_table": []})
+    monkeypatch.setattr(fz.ph, "input_blobs", lambda commit: {"x": "y"})
+    return fz.main([]), target.exists()
+
+
+def test_boundary_10c_freeze_gate_refuses_polluted_source(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """邊界 10c：實際凍結閘 `provenance_errors` 於 HEAD 含本票生產符號、生產碼或凍結輸入有改動、有未追蹤 .py、git 失敗時
+    皆拒（rc 2 且不寫 baseline）；全部乾淨時放行寫入。"""
+    fz = _freeze_module()
+    _stub_git(fz, monkeypatch)
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: ["HEAD 已含本票生產符號"])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "a") == (2, False)
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: [])
+    _stub_git(fz, monkeypatch, diff_rc=1)
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "b") == (2, False)
+    _stub_git(fz, monkeypatch, others="momentum/x.py\0")
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "c") == (2, False)
+    _stub_git(fz, monkeypatch, head_rc=1)
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "d") == (2, False)
+    _stub_git(fz, monkeypatch)
+    assert _run_freeze_write(fz, monkeypatch, tmp_path / "e") == (0, True)
+
+
+def test_boundary_10d_anchor_symbols_present_after_fix() -> None:
+    """邊界 10d（實作後）：contract `anchor_absent_symbols` 所列字面皆存在於工作樹之生產檔（清單確為本票生產符號）。"""
+    assert ph.present_symbol_violations() == []
+
+
+def test_mutation_m9_freeze_gate_skips_symbol_check(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """M9：凍結閘拿掉本票符號檢查（`provenance_errors` 只回傳 git 結果）⇒ HEAD 含本票符號時仍寫出 baseline（邊界 10c 偵出）。"""
+    fz = _freeze_module()
+    _stub_git(fz, monkeypatch)
+    monkeypatch.setattr(fz.ph, "absent_symbol_violations", lambda commit, reader=None: ["HEAD 已含本票生產符號"])
+    monkeypatch.setattr(fz, "provenance_errors", lambda: [])
+    assert _run_freeze_write(fz, monkeypatch, tmp_path) != (2, False)
 
 
 def test_mutation_m6_stack_bars_ignore_master(monkeypatch: pytest.MonkeyPatch, work_root: Path) -> None:

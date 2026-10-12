@@ -282,6 +282,7 @@
 - 🔴 **todofmt 要求 manifest `run_receipts` 所列檔含 `schema_version`／`command`／`exit_code`**；契約收據若為 `additional_properties=false`（如 `types.v6_profile_receipt`）兩者互斥 ⇒ 列伴隨收據（含三鍵與契約收據 sha256），契約收據不動。
 - 🔴 **cProfile 長跑之背景 2 小時上限**：`python -m cProfile` 只在結束時寫檔，截斷即全失 ⇒ 用 `handoffs/run_receipts/testreg_probes/v6_prof_site/v6_prof_core.py`（主執行緒同義、每 600 秒 partial、另錄執行緒與 spawn 子行程）；主執行緒卡在單一 numba 長呼叫時快照會延到返回 Python 才寫。V-6 最慢項實測 profile 僅慢約 2%（6,105 秒）。
 - 🔴 **TESTREG 斷言正規化之誤報（PROBEWINSOR 實作期發現，2026-10-12）**：測試函式內之區域名依「在斷言中首次出現」之順序編號（`_0`、`_1`…），新增一條引用了先前未出現於斷言之區域名（如迴圈變數 `cell`）之斷言，會使既有斷言之編號位移 ⇒ 產出端 V19 誤判「斷言多重集合減少」。迴避：新斷言只引用已出現之區域名，或改呼叫模組層 helper；根治屬 TESTREG（第 3 批處理）。探針 `scripts/testreg.py` 之 `assertion_multiset(repo, nodeid, tree="HEAD"|"worktree")` 可直接比對兩版。
+- 🔴 **暫存 worktree 內 `git stash pop` 會被 numba 快取檔（追蹤中之 `momentum/**/__pycache__/*.nbi`／`*.nbc`）擋下**：在錨點碼態跑過真實生成後快取被改寫，pop 報「local changes would be overwritten」且 stash 保留未還原——後續步驟會在錯誤碼態上跑而不自知（PROBEWINSOR r5 試作實犯，E 段誤跑在錨點碼）。pop 前先 `git checkout -- $(git diff --name-only -- momentum | grep __pycache__)`，且 pop 後以 `git diff --stat` 確認試作改動確實回來。
 - 🔴 **`.gitignore` 第 84 行之 `out/` 全域忽略**：`handoffs/run_receipts/<票>_probes/out/` 之收據須 `git add -f` 明列（PROBEWINSOR 收據即如此）。
 - 🔴 **真實生成之探路腳本若未導向 `FFACT_FEATURE_REGISTRY_PATH`、`FFACT_CGSA_WORK_DIR` 與 cwd，會寫入專案 `data_cache/features/registry.json` 與 `data_cache/cgsa_work/`**（PROBEWINSOR 偵察時實犯）；一律經 `tests/feature_engineering/probewinsor_helpers.py` 之 `isolated` 或 `fftfmeta_golden_helpers.prepare_env` 同式隔離（含 `FeaturePreprocessor._d_star_cache_dir`）。
 

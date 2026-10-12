@@ -39,18 +39,20 @@ def provenance_errors() -> List[str]:
     """寫入前之來源檢查（錨點＝HEAD）：工作樹生產 .py 對 HEAD 無改動、無未追蹤（含被忽略）之生產 .py、
     HEAD 不含本票生產符號（`probewinsor_helpers.absent_symbol_violations`）。任一 git 呼叫失敗即列為錯誤。"""
     errors: List[str] = []
-    diff = _git("diff", "--quiet", "HEAD", "--", *_PRODUCTION_PATHSPECS)
-    if diff.returncode == 1:
-        errors.append("工作樹之 momentum/、api/ 之 .py 對 HEAD 有改動")
-    elif diff.returncode != 0:
-        errors.append(f"git diff 失敗：{diff.stderr.strip()}")
-    others = _git("ls-files", "--others", "-z", "--", "momentum", "api")
+    # 生產碼與凍結之輸入（契約、helper、本腳本）皆須等於 HEAD 之已提交版本：baseline 只得由已提交之改前碼產生
+    for label, specs in (("生產碼（momentum/、api/ 之 .py）", _PRODUCTION_PATHSPECS), ("凍結輸入", ph.INPUT_PATHSPECS)):
+        diff = _git("diff", "--quiet", "HEAD", "--", *specs)
+        if diff.returncode == 1:
+            errors.append(f"工作樹之{label}對 HEAD 有改動")
+        elif diff.returncode != 0:
+            errors.append(f"git diff 失敗：{diff.stderr.strip()}")
+    others = _git("ls-files", "--others", "-z", "--", "momentum", "api", "tests/feature_engineering", "scripts")
     if others.returncode != 0:
         errors.append(f"git ls-files 失敗：{others.stderr.strip()}")
     else:
         stray = sorted(p for p in others.stdout.split("\0") if p.endswith(".py") and "__pycache__" not in p)
         if stray:
-            errors.append(f"未追蹤（含被忽略）之生產 .py：{stray[:10]}")
+            errors.append(f"未追蹤（含被忽略）之 .py：{stray[:10]}")
     head = _git("rev-parse", "HEAD")
     if head.returncode != 0:
         errors.append(f"git rev-parse 失敗：{head.stderr.strip()}")
@@ -112,7 +114,7 @@ def main(argv: List[str]) -> int:
             return 2
         if ph.BASELINE_PATH.exists():
             # 一次性寫入：baseline 一經凍結即只讀（否則可於生產碼改後以新錨點覆寫，「改前基準」即失效）
-            print(f"ERROR: {ph.BASELINE_PATH.relative_to(REPO)} 已存在；凍結為一次性寫入，不得覆寫", file=sys.stderr)
+            print(f"ERROR: {ph.BASELINE_PATH} 已存在；凍結為一次性寫入，不得覆寫", file=sys.stderr)
             return 2
         refused = provenance_errors()
         if refused:
@@ -142,12 +144,12 @@ def main(argv: List[str]) -> int:
         return 1
     if not args.check:
         head = _git("rev-parse", "HEAD").stdout.strip()
-        document = {"version": 1, "frozen_at_head": head, **produced}
+        document = {"version": 1, "frozen_at_head": head, "input_blobs": ph.input_blobs(head), **produced}
         ph.BASELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
         tmp_path = ph.BASELINE_PATH.with_suffix(".json.tmp")
         tmp_path.write_text(json.dumps(document, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
         tmp_path.replace(ph.BASELINE_PATH)
-        print(f"[freeze] 已寫入 {ph.BASELINE_PATH.relative_to(REPO)}（{len(produced['cells'])} 格）")
+        print(f"[freeze] 已寫入 {ph.BASELINE_PATH}（{len(produced['cells'])} 格）")
     else:
         print(f"[freeze] --check 全同（{len(wanted)} 格）")
     return 0

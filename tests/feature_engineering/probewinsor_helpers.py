@@ -40,21 +40,51 @@ def baseline() -> Dict[str, Any]:
     return json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
 
 
-def absent_symbol_violations(commit: str, reader: Optional[Any] = None) -> List[str]:
-    """改前碼之內容證明（§P Task 1.0）：contract `anchor_absent_symbols` 所列 [路徑, 字面] 於該提交之檔案內容
-    皆不得出現；回傳違反清單（空＝該提交為本票生產改動前之碼）。`reader(commit, path) -> str` 預設 `git show`；
-    讀檔失敗列為違反（fail-closed）。"""
+# 凍結之輸入（Task 1.0 來源證明）：產生 baseline 之碼與設定；寫入時須與 HEAD 一致，並記其 blob 於 baseline
+INPUT_PATHSPECS = ("tests/feature_engineering", "tests/_golden/probewinsor/contract.json",
+                   "scripts/freeze_probewinsor_baseline.py")
+INPUT_FILES = ("tests/_golden/probewinsor/contract.json", "tests/feature_engineering/probewinsor_helpers.py",
+               "tests/feature_engineering/icfirstalign_helpers.py", "tests/feature_engineering/fftfmeta_golden_helpers.py",
+               "tests/feature_engineering/ff_truncation_mr_helpers.py", "tests/feature_engineering/ffstat_helpers.py",
+               "scripts/freeze_probewinsor_baseline.py")
+_CONTRACT_REL = "tests/_golden/probewinsor/contract.json"
+
+
+def _git_show(rev: str, path: str) -> str:
     import subprocess
 
-    def _git_show(rev: str, path: str) -> str:
-        proc = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=str(REPO), capture_output=True, text=True)
-        if proc.returncode != 0:
-            raise RuntimeError(proc.stderr.strip() or f"git show {rev}:{path} 失敗")
-        return proc.stdout
+    proc = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=str(REPO), capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.strip() or f"git show {rev}:{path} 失敗")
+    return proc.stdout
 
+
+def input_blobs(commit: str) -> Dict[str, str]:
+    """`INPUT_FILES` 於該提交之 blob sha（`git rev-parse <commit>:<path>`）；任一取不到即 RuntimeError。"""
+    import subprocess
+
+    out: Dict[str, str] = {}
+    for path in INPUT_FILES:
+        proc = subprocess.run(["git", "rev-parse", f"{commit}:{path}"], cwd=str(REPO), capture_output=True, text=True)
+        if proc.returncode != 0:
+            raise RuntimeError(f"git rev-parse {commit}:{path} 失敗：{proc.stderr.strip()}")
+        out[path] = proc.stdout.strip()
+    return out
+
+
+def absent_symbol_violations(commit: str, reader: Optional[Any] = None) -> List[str]:
+    """改前碼之內容證明（§P Task 1.0）：**該提交自身之** contract 之 `anchor_absent_symbols`（不讀工作樹，防凍結當下改
+    清單）須非空，且所列 [路徑, 字面] 於該提交之檔案內容皆不得出現；回傳違反清單（空＝該提交為本票生產改動前之碼）。
+    `reader(commit, path) -> str` 預設 `git show`；讀檔失敗列為違反（fail-closed）。"""
     read = reader or _git_show
+    try:
+        symbols = json.loads(read(commit, _CONTRACT_REL))["anchor_absent_symbols"]
+    except Exception as exc:  # noqa: BLE001 — 讀不到該提交之清單即無法證明改前
+        return [f"{commit}:{_CONTRACT_REL} 之 anchor_absent_symbols 讀取失敗：{exc}"]
+    if not symbols:
+        return [f"{commit}:{_CONTRACT_REL} 之 anchor_absent_symbols 為空"]
     out: List[str] = []
-    for path, needle in contract()["anchor_absent_symbols"]:
+    for path, needle in symbols:
         try:
             text = read(commit, path)
         except Exception as exc:  # noqa: BLE001 — 讀不到即無法證明改前
@@ -62,6 +92,20 @@ def absent_symbol_violations(commit: str, reader: Optional[Any] = None) -> List[
             continue
         if needle in text:
             out.append(f"{commit}:{path} 已含本票生產符號 {needle!r}")
+    return out
+
+
+def present_symbol_violations() -> List[str]:
+    """實作後之反向證明：contract `anchor_absent_symbols` 所列字面於工作樹之生產檔皆須存在（清單確為本票之生產符號、
+    非空殼）；回傳違反清單。"""
+    out: List[str] = []
+    symbols = contract()["anchor_absent_symbols"]
+    if not symbols:
+        return ["anchor_absent_symbols 為空"]
+    for path, needle in symbols:
+        target = REPO / path
+        if not target.is_file() or needle not in target.read_text(encoding="utf-8"):
+            out.append(f"{path} 不含 {needle!r}")
     return out
 
 

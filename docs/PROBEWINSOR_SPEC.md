@@ -1,7 +1,7 @@
 # PROBEWINSOR — 公開域預熱探測之縮尾門檻與公開輸出同源 — SPEC
 
 > 來源：偵察 r1 收斂檔 `handoffs/reconcile/20261012-probewinsor-x-consult-r1/synth.md`（主委獨立版 `handoffs/20261012-probewinsor-x-consult-r1-claude.md`）；起因 TESTREG 第 2 批審碼 r1（`handoffs/reconcile/20261010-testreg-b2-review-r1/synth.md`）、TESTREG SPEC §N R9　|　日期：2026-10-12　|　對應 TODO：`docs/manifests/PROBEWINSOR.json`
-> 版本：v3（2026-10-13；v2 經審查 r3 修訂：凍結錨點改自動取 HEAD 並以內容證明改前碼、Task 1.4 經公開續跑入口驗收、舊格式完成項維持保留並列殘留、兩支既有續跑測試之身分替身、manifest 禁令納入 Task 1.4、受影響測試掃描之清單取得 fail-closed）
+> 版本：v4（2026-10-13；v3 經審查 r4 修訂：凍結之輸入〔契約、helper、凍結腳本〕亦須為已提交版本並記其 blob、本票符號清單改讀該提交自身之契約、驗收直接覆蓋實際凍結閘〔10c〕與實作後符號存在〔10d〕、09g 改用真實身分不替換身分函式）。v3（v2 經審查 r3 修訂：凍結錨點改自動取 HEAD 並以內容證明改前碼、Task 1.4 經公開續跑入口驗收、舊格式完成項維持保留並列殘留、兩支既有續跑測試之身分替身、manifest 禁令納入 Task 1.4、受影響測試掃描之清單取得 fail-closed）
 
 ## §RISK 風險分級
 - **大小**：大（全票排序第 5a-1 步；使用者 2026-10-12 裁定）。
@@ -39,8 +39,8 @@
 
 ## §G Golden / Baseline
 - **feature/kline 條件**：真實 `data_cache/feature_klines/kline_cache.h5`；禁合成 fixture。
-- **凍結時機**：Task 1.0 於錨點碼態（錨點＝執行時之 HEAD，由腳本自取、不由呼叫者指定；須為本票首個生產碼提交前之碼，以 contract `anchor_absent_symbols` 所列本票生產符號皆不存在於 HEAD 為內容證明）以 `scripts/freeze_probewinsor_baseline.py` 產生 `tests/_golden/probewinsor/baseline.json`；設定格之唯一定義＝`tests/_golden/probewinsor/contract.json`（payload 族、週期、總開關、子開關、平穩化開關、窗、附加層；本 SPEC 不重列格數）。凍結為一次性寫入：baseline 已存在即拒寫；之後只讀。
-- **baseline 內容（每格）**：`config_hash`；`output_window` 全欄位；探測 `rounds`（每輪 depth、late_columns）；`probe_late` 之排序清單 sha256 與數量；末輪首個有限值表之 canonical JSON sha256；公開輸出欄名集合（排序清單）；每欄 `{nan, values}` 指紋（`tests/feature_engineering/ffstat_helpers.public_fingerprints` 同式，float32、NaN 以 0 取代）；`stable_start` canonical sha256；`warmup_insufficient_columns` 清單；`quality_status`；牆鐘與峰值 RSS（資訊性，不比對）。另記 §V 邊界 08 所需之呼叫點真值表（同 contract 所列輸入）。
+- **凍結時機**：Task 1.0 於錨點碼態（錨點＝執行時之 HEAD，由腳本自取、不由呼叫者指定；須為本票首個生產碼提交前之碼，以 **HEAD 自身之** contract `anchor_absent_symbols`（非空）所列本票生產符號皆不存在於 HEAD 為內容證明；產生 baseline 之輸入——`probewinsor_helpers.INPUT_PATHSPECS` 所涵蓋之契約、`tests/feature_engineering/` 下 helper 與凍結腳本——須等於 HEAD 之已提交版本，並以 `input_blobs` 記於 baseline）以 `scripts/freeze_probewinsor_baseline.py` 產生 `tests/_golden/probewinsor/baseline.json`；設定格之唯一定義＝`tests/_golden/probewinsor/contract.json`（payload 族、週期、總開關、子開關、平穩化開關、窗、附加層；本 SPEC 不重列格數）。凍結為一次性寫入：baseline 已存在即拒寫；之後只讀。
+- **baseline 內容（每格）**：`config_hash`；`output_window` 全欄位；探測 `rounds`（每輪 depth、late_columns）；`probe_late` 之排序清單 sha256 與數量；末輪首個有限值表之 canonical JSON sha256；公開輸出欄名集合（排序清單）；每欄 `{nan, values}` 指紋（`tests/feature_engineering/ffstat_helpers.public_fingerprints` 同式，float32、NaN 以 0 取代）；`stable_start` canonical sha256；`warmup_insufficient_columns` 清單；`quality_status`；牆鐘與峰值 RSS（資訊性，不比對）。另記 §V 邊界 08 所需之呼叫點真值表（同 contract 所列輸入）。文件層另記 `frozen_at_head` 與 `input_blobs`（`probewinsor_helpers.INPUT_FILES` 於 frozen_at_head 之 blob sha）。
 - **通過條件（全部精確相等，無容差）**：見 §V 邊界 01–08、10；任一欄指紋、清單或 sha 不同即列出該格與該鍵 = FAIL。
 
 ## §P Phase 與依賴
@@ -50,7 +50,7 @@
 - 目標：於生產碼改動前凍結 §G baseline。　檔案：`scripts/freeze_probewinsor_baseline.py`（新建）、`tests/_golden/probewinsor/contract.json`（TODO 階段寫定）、`tests/_golden/probewinsor/baseline.json`（產出）。　既有 caller：新建無 caller。
 - 改法：讀 contract 之每格，逐格於獨立暫存目錄（cwd、`FFACT_FEATURE_REGISTRY_PATH`、`FFACT_CGSA_WORK_DIR`、`FeatureStorage` 根、`tempfile.tempdir`、`FeaturePreprocessor._d_star_cache_dir` 皆指向該格暫存目錄；`tests/feature_engineering/probewinsor_helpers.py` 之 `isolated`）以 `create_feature_factory(cache_dir=<kline dir>, validate_continuity=False).generate_features(..., force_regenerate=True, persist=True)` 生成，自工廠實例讀探測狀態（`_public_warmup_probe`、`_public_warmup_late`、`_public_warmup_first_finite`），自成品讀公開指紋與中繼資料；單組串行；每格完成即刪暫存。`--check` 模式重跑全部格並與既有 baseline 逐鍵比對（rc 0／1），不寫檔。
 - **驗證**：於錨點碼態執行 `venv/bin/python scripts/freeze_probewinsor_baseline.py` rc 0，再 `--check` rc 0（凍結可重現）；baseline 之格數等於 contract 之格數；contract 所標 `anchor_expect` 之格（e1h 前處理關＋縮尾開：`rounds` 等於 `[{"depth":374,"late_columns":0}]`、`quality_status` 等於 `partial`）與 §A 收據一致；baseline 單獨提交（先於生產碼提交），§V 邊界 10 綠。
-- **邊界**：①寫入模式之來源檢查（`provenance_errors`）任一不合 ⇒ 具名拒絕（rc 2）、不寫檔：工作樹之 `momentum/`、`api/` 之 .py 對 HEAD 有改動；有未追蹤（含被 `.gitignore` 忽略者）之生產 .py；HEAD 已含 `anchor_absent_symbols` 任一字面；任一 git 呼叫失敗；②baseline 已存在時執行寫入模式 ⇒ 具名拒絕（rc 2）；③某格生成拋例外 ⇒ 整次凍結失敗（rc 2）、不寫部分 baseline。
+- **邊界**：①寫入模式之來源檢查（`provenance_errors`）任一不合 ⇒ 具名拒絕（rc 2）、不寫檔：工作樹之 `momentum/`、`api/` 之 .py 或凍結輸入（`INPUT_PATHSPECS`）對 HEAD 有改動；`momentum/`、`api/`、`tests/feature_engineering/`、`scripts/` 有未追蹤（含被 `.gitignore` 忽略者）之 .py；HEAD 自身之 `anchor_absent_symbols` 為空、讀不到或 HEAD 已含其任一字面；任一 git 呼叫失敗；②baseline 已存在時執行寫入模式 ⇒ 具名拒絕（rc 2）；③某格生成拋例外 ⇒ 整次凍結失敗（rc 2）、不寫部分 baseline。
 - **存活至**：本票收案後保留（PROBEWINSOR 驗收之錨點證據）。
 - **覆蓋風險**：無（後續 Task 只讀）。
 - 不可做：不得以修正後碼態凍結；不得合成資料；不得容差比對。
@@ -114,11 +114,11 @@
   - 邊界 05（快取身分）：§P Task 1.2 三條邊界；且每格 `config_identity` 等於 `_compute_config_hash`。
   - 邊界 06（未填起始日）：contract 之未填起始日格（總開關關＋縮尾開），修正後比較鍵等於錨點。
   - 邊界 07（缺鍵）：`preprocessing=None`、`enabled=None` 兩種設定物件對 `l65_enabled`、`_resolve_l65_generation_mode`、`_collect_l65_stack_bars`、`_stationarity_config_enabled`、`_calibration_winsorizer`、`_probe_gate_salt` 之行為：皆拋 `ValueError` 且訊息逐字等於 §P Task 1.1。
-  - 邊界 09（批次續跑，Task 1.4）：09a 身分相符保留、09b 身分不符重排、09c manifest 不在重排、09d 舊格式項不解析且保留、09e 身分拋例外重排、09f `_resume_identity` 等於 `config_identity` 等於 `_compute_config_hash`，且「總開關關＋縮尾開」格之身分不等於錨點凍結之 hash、總開關開格之身分等於錨點；09g 經公開 `resume_batch`：身分相符者跳過（`skipped_items` 1）、不符者與原待排者重算（`queued_items` 2、生成替身記錄之重算者恰為該兩者）。
-  - 邊界 10（凍結來源）：baseline 之 `frozen_at_head` 與首次加入 baseline 之提交，皆不含 contract `anchor_absent_symbols` 任一字面（`probewinsor_helpers.absent_symbol_violations` 為空）；10b 該檢查對「含本票生產符號」與「讀檔失敗」之輸入必報違反（偵測器非空轉）。
+  - 邊界 09（批次續跑，Task 1.4）：09a 身分相符保留、09b 身分不符重排、09c manifest 不在重排、09d 舊格式項不解析且保留、09e 身分拋例外重排、09f `_resume_identity` 等於 `config_identity` 等於 `_compute_config_hash`，且「總開關關＋縮尾開」格之身分不等於錨點凍結之 hash、總開關開格之身分等於錨點；09g 經公開 `resume_batch` 且不替換身分函式（完成項之 run hash 一筆取目前碼之真實 `config_identity`、一筆為舊值）：相符者跳過（`skipped_items` 1）、不符者與原待排者重算（`queued_items` 2、生成替身記錄之重算者恰為該兩者）。
+  - 邊界 10（凍結來源）：baseline 之 `frozen_at_head` 與首次加入 baseline 之提交，皆不含該提交自身契約之 `anchor_absent_symbols` 任一字面（`probewinsor_helpers.absent_symbol_violations` 為空），且 baseline 之 `input_blobs` 等於 `frozen_at_head` 之輸入 blob；10b 該檢查對「含本票生產符號」與「讀檔失敗」之輸入必報違反（偵測器非空轉）；10c 實際凍結入口（`freeze_probewinsor_baseline.main` 寫入模式，git 結果以替身決定、生成以替身代替）於 HEAD 含本票符號、生產碼或輸入有改動、有未追蹤 .py、git 失敗時皆 rc 2 且不寫 baseline，全部乾淨時 rc 0 且寫出；10d（實作後）`anchor_absent_symbols` 所列字面皆存在於工作樹生產檔（清單確為本票符號）。
   - 邊界 08（呼叫點真值表）：contract 所列設定（總開關 × 縮尾 × fracdiff × adf）下 `_stationarity_config_enabled`、`_resolve_l65_generation_mode`、`_collect_l65_stack_bars`（值）、`_build_l7_raw_preprocessing_metadata`（整個回傳字典）、`ConfigManager` 估欄數之結果等於錨點凍結之真值表。
-- **mutation（每支皆以 monkeypatch 換入改壞版本，斷言對應邊界之比較器回報非空差異）**：M1 `_calibration_winsorizer` 還原為只看子開關 ⇒ 邊界 01、04 偵出；M2 `_calibration_winsorizer` 恆回 None ⇒ 邊界 02 於 e1h 總開關開格偵出（首個有限值表）；M3 `_resolve_l65_generation_mode` 恆回 `"ic_first_pre"` ⇒ 邊界 01 偵出；M4 `_probe_gate_salt` 恆回 None ⇒ 邊界 05③偵出；M5 `_probe_gate_salt` 恆回鹽 ⇒ 邊界 05①偵出；M6 `_collect_l65_stack_bars` 忽略總開關 ⇒ 邊界 03 偵出；M7 `_partition_completed_items` 改回只看 manifest ⇒ 邊界 09b 偵出；M7b 同一改壞經公開 `resume_batch` ⇒ 邊界 09g 偵出。`venv/bin/python scripts/mutation_probe_static.py` 對兩支測試檔皆 rc 0。
-- **防假綠**：Task 1.0 提交後、生產碼提交前：邊界 01、04、05、07、09 紅（函式不存在或行為不符），邊界 02、03、06、08、10、10b 綠；不得改寫 baseline 以換綠。
+- **mutation（每支皆以 monkeypatch 換入改壞版本，斷言對應邊界之比較器回報非空差異）**：M1 `_calibration_winsorizer` 還原為只看子開關 ⇒ 邊界 01、04 偵出；M2 `_calibration_winsorizer` 恆回 None ⇒ 邊界 02 於 e1h 總開關開格偵出（首個有限值表）；M3 `_resolve_l65_generation_mode` 恆回 `"ic_first_pre"` ⇒ 邊界 01 偵出；M4 `_probe_gate_salt` 恆回 None ⇒ 邊界 05③偵出；M5 `_probe_gate_salt` 恆回鹽 ⇒ 邊界 05①偵出；M6 `_collect_l65_stack_bars` 忽略總開關 ⇒ 邊界 03 偵出；M7 `_partition_completed_items` 改回只看 manifest ⇒ 邊界 09b 偵出；M7b 同一改壞經公開 `resume_batch` ⇒ 邊界 09g 偵出；M7c `_resume_identity` 改為固定值 ⇒ 邊界 09g 偵出；M9 凍結閘拿掉本票符號檢查 ⇒ 邊界 10c 偵出（HEAD 含本票符號仍寫出 baseline）。`venv/bin/python scripts/mutation_probe_static.py` 對兩支測試檔皆 rc 0。
+- **防假綠**：Task 1.0 提交後、生產碼提交前：邊界 01、04、05、07、09、10d 紅（函式不存在或行為不符），邊界 02、03、06、08、10、10b、10c 綠；不得改寫 baseline 以換綠。
 - 測試層級：整合（真實生成）＋單元（邊界 07、08）。可獨立 `pytest tests/feature_engineering/test_probewinsor.py`，不需 `run_api.py`。
 
 ## §R 回退

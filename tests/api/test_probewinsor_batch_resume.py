@@ -106,10 +106,13 @@ def test_boundary_09f_resume_identity_is_factory_identity(batch_service_factory:
 
 
 async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Tuple[Dict[str, Any], List[str]]:
-    """經公開 `resume_batch`：完成項 A（身分相符）、B（身分不符）、待排 ETHUSDT；生成函式以替身記錄被重算者。"""
+    """經公開 `resume_batch`（**不替換**身分函式）：完成項 A 之 run hash＝目前碼之真實身分（同 `_resume_identity` 之
+    kline 目錄與請求）、B 之 run hash 為舊值；待排 ETHUSDT；生成函式以替身記錄被重算者。"""
     import asyncio
 
+    from api.core.config import settings
     from api.services.feature_factory_batch_service import FeatureFactoryBatchService
+    from momentum.factories import create_feature_factory
     from tests.api.batch_wave_helpers import use_thread_wave
 
     calls: List[str] = []
@@ -120,11 +123,11 @@ async def _public_resume(service: Any, tmp_path: Path, monkeypatch: pytest.Monke
 
     use_thread_wave(monkeypatch)
     monkeypatch.setattr(FeatureFactoryBatchService, "_compute_single", staticmethod(_compute))
-    items = [_item(tmp_path, "BTCUSDT", "1h", "aaaa1111"), _item(tmp_path, "SOLUSDT", "1h", "cccc3333")]
+    real = create_feature_factory(cache_dir=str(settings.data_cache_path / "feature_klines")).config_identity(
+        "BTCUSDT", "1h", {}, "2026-01-01", "2026-01-31")
+    items = [_item(tmp_path, "BTCUSDT", "1h", real), _item(tmp_path, "SOLUSDT", "1h", "cccc3333")]
     checkpoint = _checkpoint(service, items, {})
     service._safe_persist_checkpoint(checkpoint)
-    current = {"BTCUSDT": "aaaa1111", "SOLUSDT": "dddd4444"}
-    monkeypatch.setattr(service, "_resume_identity", lambda _ckpt: (lambda symbol, _tf: current[symbol]))
     response = await service.resume_batch("batch-probewinsor")
     for _ in range(250):  # 同 test_feature_factory_batch_resume._wait_until_done 之終止狀態（上限 5 秒）
         status = service.get_status("batch-probewinsor")
@@ -160,6 +163,19 @@ async def test_mutation_m7b_public_resume_ignores_identity(
         return kept, [i for i in checkpoint.get("completed_items", []) if i not in kept]
 
     monkeypatch.setattr(FeatureFactoryBatchService, "_partition_completed_items", _manifest_only)
+    service = batch_service_factory(tmp_path / "ckpt")
+    response, calls = await _public_resume(service, tmp_path, monkeypatch)
+    assert (response["skipped_items"], calls) != (1, ["ETHUSDT", "SOLUSDT"])
+
+
+@pytest.mark.asyncio
+async def test_mutation_m7c_public_resume_uses_fixed_identity(
+        monkeypatch: pytest.MonkeyPatch, batch_service_factory: Any, tmp_path: Path) -> None:
+    """M7c：續跑之身分改為固定值（不經目前碼之 config_identity）⇒ 經公開入口時身分相符之完成項被重排（邊界 09g 偵出）。"""
+    from api.services.feature_factory_batch_service import FeatureFactoryBatchService
+
+    monkeypatch.setattr(FeatureFactoryBatchService, "_resume_identity",
+                        staticmethod(lambda _checkpoint: (lambda _symbol, _timeframe: "aaaa1111")))
     service = batch_service_factory(tmp_path / "ckpt")
     response, calls = await _public_resume(service, tmp_path, monkeypatch)
     assert (response["skipped_items"], calls) != (1, ["ETHUSDT", "SOLUSDT"])
