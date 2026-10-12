@@ -67,14 +67,8 @@ def cmd_run(args) -> int:
     g._RUNNER = runner
     try:
         for nid in ids:
-            meta = OUT / "junit" / f"{_slug(nid)}.meta.json"
-            if args.skip_done and meta.is_file():
-                m = json.loads(meta.read_text(encoding="utf-8"))
-                if m.get("rc") in g.RUN_RC_OK and m.get("ledger_new"):
-                    # 已完成之項（結果 meta＋ledger session 齊備）不重跑：期間只提交文件而使狀態指紋改變時用
-                    runner.done += 1
-                    print(f"{nid}: skip-done（{m.get('seconds')}s）", flush=True)
-                    continue
+            # 沿用與否只由 Runner.run 依 state_key＋rc＋junit 完整性判定（審碼 b2 r1 CODEX-R1-P1-01：原 --skip-done 旁路
+            # 只查 meta 之 rc 與 ledger_new，測試／生產碼／資料改變後仍會沿用舊結果 ⇒ 已刪）
             key = g.state_key(REPO, TARGET, 0, env) + "|" + nid
             rc, res = runner.run(TARGET, OUT / "junit" / f"{_slug(nid)}.xml", REPO, env, [nid], (), key, [nid],
                                  phase="V6")
@@ -164,8 +158,6 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("run")
     p.add_argument("--max-seconds", type=float, default=1.0)
-    p.add_argument("--skip-done", action="store_true",
-                   help="結果 meta（rc 0/1 且有 ledger_new）已存在之項不重跑（狀態指紋只因文件提交而變時用）")
     p = sub.add_parser("profile")
     p.add_argument("--nodeid", required=True)
     p.add_argument("--every", type=float, default=600.0, help="partial 快照間隔秒數")

@@ -32,5 +32,13 @@
   "_generate_multi_tf_cgsa（實際多週期生成）": 533.5,
   "測試端 _capturing_align（含生產 _align_group_array 14.8）": 15.5
  },
+ "reuse_validity": {
+  "why": "第 1–5 項於當時以 v6_profile.py run --skip-done 接續（只依結果 meta 之 rc 與 ledger_new 判定不重跑、未比 state_key）；審碼 b2 r1 指出此旁路可能沿用過時結果 ⇒ 旁路已刪（沿用一律經 Runner.run 之 state_key＋junit 完整性守衛），既有結果另以下列核對證其有效",
+  "first_item_head": "1e3c0dfa（第 1 項 2026-10-12 09:52 開跑時之 HEAD；其後各項皆於 1e3c0dfa 至 19791c3e 間開跑）",
+  "changed_paths_1e3c0dfa_to_19791c3e": ["HANDOFF.md", "docs/ROADMAP.md", "docs/TESTREG_SPEC.md", "docs/manifests/TESTREG.json", "docs/site/README.html", "docs/site/現在做到哪.html", "handoffs/run_receipts/testreg-v6-profile-run.json", "handoffs/run_receipts/testreg-v6-profile.json", "handoffs/run_receipts/testreg_probes/v6_prof_site/sitecustomize.py", "handoffs/run_receipts/testreg_probes/v6_prof_site/v6_prof_core.py", "handoffs/run_receipts/testreg_probes/v6_profile.py", "scripts/fact_keys.json", "白話說明/README.md", "白話說明/現在做到哪.md"],
+  "impact_check": "scripts/testreg.impact(repo, 上列路徑, [], [], production_taint=True) ⇒ TestregError「各來源皆空」（上列路徑無一為測試檔、生產模組或其字串傳遞來源）⇒ 無任何測試受影響，tests/feature_engineering/test_failopen_correctness.py 不在其內",
+  "data_input": "data_cache/feature_klines/kline_cache.h5 之 mtime 2026-04-28T19:59，早於全部執行（本票不寫該檔）",
+  "rule_now": "v6_profile.py run 無 --skip-done；Runner.run 沿用守衛由 tests/feature_engineering/test_framepath_disposition.py::test_affected_gate_state_key_binds_tree_and_file 與 ::test_mutation_affected_gate_runner_resume_pause_progress 覆蓋"
+ },
  "honest_bounds": "逐項耗時之收據值取記錄器 ledger 之 duration_s（只計測試呼叫本身），wall_seconds 為執行器牆鐘；第 1–5 項跑於 b9c06d3e 至 286d1e61 間（期間只提交文件，續跑以 --skip-done 依結果 meta 判定不重跑）；cProfile 只量主執行緒（與 python -m cProfile 同義、未截斷），執行緒與 spawn 子行程另錄於 v6_run/profile/*.parts 供判讀（本項無工作執行緒、唯一子行程為記憶體守護取樣器）；.prof 二進位檔與 v6_run/ 不入版控；本機 8GB RAM，校準期大量使用 swap（10–13GB），耗時含此因素；慢因歸類與附帶發現見 docs/TESTREG_SPEC.md §N R8"
 }
