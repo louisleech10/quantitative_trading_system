@@ -47,10 +47,17 @@ resetl; editfirst "$(first_l)" '.diff_digest = ("0" * 64)'; expect ledger_one_di
 # 伴隨收據（預期值）破壞
 resetc; jq '.per_item_state.items |= del(.["test_v6_asof_oracle_boundary_cases"])' "$COMP" > "$T/c.json"; expect companion_item_missing 1 V6_COMPANION="$T/c.json"
 resetc; jq --arg h "$ROOT" '.per_item_state.code_compare_to = $h' "$COMP" > "$T/c.json"; expect companion_compare_to_root_commit 1 V6_COMPANION="$T/c.json"
-resetc; jq '.per_item_state.code_diff_allowed = ["no/such/file"]' "$COMP" > "$T/c.json"; expect companion_allowed_without_fact_keys 1 V6_COMPANION="$T/c.json"
-resetc; jq '.per_item_state.no_reference_roots += ["no/such/root"]' "$COMP" > "$T/c.json"; expect companion_root_nonexistent 1 V6_COMPANION="$T/c.json"
-resetc; jq '.per_item_state.no_reference_roots += ["tests/feature_engineering/test_framepath_disposition.py"]' "$COMP" > "$T/c.json"; expect companion_root_referencing_fact_keys 1 V6_COMPANION="$T/c.json"
+resetc; jq '.per_item_state.code_compare_to = "1e3c0dfa233417eebb5820072d485934d611c972"' "$COMP" > "$T/c.json"; expect companion_compare_to_other_valid_head 1 V6_COMPANION="$T/c.json"
+resetc; jq '.per_item_state.code_scope_exclude += ["scripts"]' "$COMP" > "$T/c.json"; expect companion_scope_exclude_widened 1 V6_COMPANION="$T/c.json"
+resetc; jq '.per_item_state.code_diff_allowed = ["no/such/file"]' "$COMP" > "$T/c.json"; expect companion_allowed_changed 1 V6_COMPANION="$T/c.json"
+resetc; jq '.per_item_state.no_reference_roots = ["momentum"]' "$COMP" > "$T/c.json"; expect companion_roots_narrowed 1 V6_COMPANION="$T/c.json"
+resetc; jq '.per_item_state.no_reference_roots += ["tests/feature_engineering/test_framepath_disposition.py"]' "$COMP" > "$T/c.json"; expect companion_roots_changed 1 V6_COMPANION="$T/c.json"
 resetc; jq '.per_item_state.env_python_sha256 = ("0" * 64)' "$COMP" > "$T/c.json"; expect companion_env_fp 1 V6_COMPANION="$T/c.json"
+# 覆寫時結果須標 MUTATION-MODE（與正式核對區分）
+resetm; V6_META_DIR="$T/m" "$BASH" "$S" 2>/dev/null | tail -1 | grep -q "MUTATION-MODE"; mm=$?
+n=$((n + 1)); if [ "$mm" = "0" ]; then echo "PASS override_marked_mutation_mode"; else echo "MISMATCH override_marked_mutation_mode"; bad=$((bad + 1)); fi
+"$BASH" "$S" 2>/dev/null | tail -1 | grep -q "MUTATION-MODE"; nm=$?
+n=$((n + 1)); if [ "$nm" = "1" ]; then echo "PASS normal_not_marked_mutation_mode"; else echo "MISMATCH normal_not_marked_mutation_mode"; bad=$((bad + 1)); fi
 
 echo "cases=$n mismatches=$bad"
 [ "$bad" = "0" ]

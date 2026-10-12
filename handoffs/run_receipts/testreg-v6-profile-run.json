@@ -68,12 +68,12 @@
         "diff_digest": "c151eabd290d2a791fda9cdc111eb72d3f7401a41cc5c9039b50aed9e75f0a89"
       }
     },
-    "attested_check": "bash handoffs/run_receipts/testreg_probes/v6_session_check.sh ⇒ rc 0。以本 per_item_state 為預期值逐一機械核對 attested 每一事實（fail-closed，任一不符或讀取錯誤 rc 1）：meta／契約收據／items 三者之 nodeid 集合相等；每項 meta 之 ledger_new 恰一字串且等於 items.session；session 檔存在、首行 kind=session、head（40 位）與 diff_digest 等於 items 所記；args 恰為 [nodeid]；去 args 後 argv 之 sha256＝argv_rest_sha256、{env, python}（env 含三欄非空字串、python 非空字串）之 sha256＝env_python_sha256；各 head 至 code_compare_to 於 code_paths 之差 ⊆ code_diff_allowed，且 code_diff_allowed 之檔名於 no_reference_roots（皆須存在）下無引用。mutation：bash handoffs/run_receipts/testreg_probes/v6_session_check_mutations.sh（每案斷言預期 rc，任一不符該腳本 rc 1）",
+    "attested_check": "bash handoffs/run_receipts/testreg_probes/v6_session_check.sh ⇒ rc 0。以本 per_item_state 為逐項預期值機械核對 attested 每一事實（fail-closed，任一不符或讀取錯誤 rc 1）：meta／契約收據／items 三方 nodeid 集合相等；每項 meta 之 ledger_new 恰一字串且＝items.session；session 檔存在、首行 kind=session、head（40 位）與 diff_digest＝items 所記；args＝[nodeid]；去 args 後 argv 之 sha256＝argv_rest_sha256、{env, python}（env 含三欄非空字串、python 非空字串）之 sha256＝env_python_sha256。範圍參數（比較基準＝契約收據首次加入之提交〔git 導出〕、純文件排除清單、允許差異檔、無引用掃描根）為核對器常數、不取自收據，收據之 code_compare_to／code_scope_exclude／code_diff_allowed／no_reference_roots 須與之相等。mutation：bash handoffs/run_receipts/testreg_probes/v6_session_check_mutations.sh（每案斷言預期 rc，任一不符該腳本 rc 1）",
     "attested": [
       "pytest 之呼叫：各 session 之 argv_norm.args 恰為 [該項 nodeid]，其餘選項之 sha256 皆＝argv_rest_sha256（驅動程式只傳 nodeid 與環境；結果由 pytest 子行程與記錄器產生）",
       "環境：各 session 之 {env, python} 之 sha256 皆＝env_python_sha256（env 含 NUMBA_CACHE_DIR、PYTEST_VERSION 8.4.2、PYTHONPATH＝repo 根）",
       "各項 session、head、diff_digest 等於 items 所記（diff_digest 只為摘要，其內容見 not_attested）",
-      "已提交之程式碼與測試路徑（不含未提交內容）：各 head 至 code_compare_to（19791c3e）於 code_paths 之差 ⊆ code_diff_allowed（scripts/fact_keys.json；286d1e61 無差），該檔名於 no_reference_roots（V-6 測試檔、其載入之 scripts/freeze_failopen_baseline.py、tests/conftest.py、tests/feature_engineering/conftest.py、tests/fixtures、momentum）皆無引用"
+      "已提交之變更（不含未提交內容）：各 head 至 code_compare_to（＝契約收據首次加入之提交 19791c3e，由 git 導出）之整棵樹差，排除 code_scope_exclude 之純文件路徑後 ⊆ code_diff_allowed（scripts/fact_keys.json；286d1e61 無差）；其主檔名 fact_keys 於 no_reference_roots（V-6 測試檔、其載入之 scripts/freeze_failopen_baseline.py、根與 tests 之 conftest、tests/fixtures、momentum）皆無引用"
     ],
     "not_attested": [
       "各項執行時之未提交改動：只有 diff_digest（git diff HEAD 之摘要），內容無法事後還原；工作樹當時之已知未提交改動為 market_data 快取、momentum/**/__pycache__ 之 numba 快取、.claude/gate 紀錄與 handoffs 檔，主控端於 V-6 執行期間未改 momentum／tests 原始碼（依本 session 操作紀錄，非機械證明）",
@@ -84,27 +84,41 @@
     "argv_rest_sha256": "6ef1aba407fedf4c95315deff0eb4dd9d0852eff8725bbd2f9b8bee34d188e44",
     "env_python_sha256": "b7ab81dfadeb8a619d1f029a00b831981396393c6eaf4cab4051aaa6f38466ec",
     "code_compare_to": "19791c3e6ce38f2ad3476d5269ce17c9ca04281e",
-    "code_paths": [
-      "momentum",
-      "api",
-      "tests",
-      "scripts",
-      "conftest.py",
-      "pytest.ini",
-      "setup.cfg",
-      "pyproject.toml",
-      "requirements.txt"
-    ],
     "code_diff_allowed": [
       "scripts/fact_keys.json"
     ],
     "no_reference_roots": [
       "momentum",
+      "conftest.py",
       "tests/conftest.py",
       "tests/fixtures",
       "tests/feature_engineering/conftest.py",
       "tests/feature_engineering/test_failopen_correctness.py",
       "scripts/freeze_failopen_baseline.py"
+    ],
+    "code_scope_exclude": [
+      "docs",
+      "handoffs",
+      "白話說明",
+      "HANDOFF.md",
+      "README.md",
+      "未來優化清單.md",
+      "program.md",
+      "AGENTS.md",
+      "CLAUDE.md",
+      ".cursorrules",
+      "specs",
+      "templates",
+      "sessions",
+      "frontend",
+      ".github",
+      ".vscode",
+      ".vscode_settings.json",
+      "ruff_output.txt",
+      "git_push.sh",
+      "uat_samples",
+      "archived",
+      ".claude"
     ]
   },
   "honest_bounds": "逐項耗時之收據值取記錄器 ledger 之 duration_s（只計測試呼叫本身），wall_seconds 為執行器牆鐘；第 1–5 項跑於 b9c06d3e 至 286d1e61 間（期間只提交文件，續跑以 --skip-done 依結果 meta 判定不重跑）；cProfile 只量主執行緒（與 python -m cProfile 同義、未截斷），執行緒與 spawn 子行程另錄於 v6_run/profile/*.parts 供判讀（本項無工作執行緒、唯一子行程為記憶體守護取樣器）；.prof 二進位檔與 v6_run/ 不入版控；本機 8GB RAM，校準期大量使用 swap（10–13GB），耗時含此因素；慢因歸類與附帶發現見 docs/TESTREG_SPEC.md §N R8"

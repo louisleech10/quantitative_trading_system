@@ -7,10 +7,17 @@
 #   ④ argv_norm.args 恰為 [nodeid]；去 args 後之 argv 之 sha256 等於 per_item_state.argv_rest_sha256
 #   ⑤ env 為含 NUMBA_CACHE_DIR／PYTEST_VERSION／PYTHONPATH 非空字串之物件、python 為非空字串，
 #      {env, python} 之 sha256 等於 per_item_state.env_python_sha256
-#   ⑥ 每個出現之 head 至 per_item_state.code_compare_to 之已提交程式碼與測試路徑差 ⊆ per_item_state.code_diff_allowed
-#   ⑦ code_diff_allowed 之每檔於 per_item_state.no_reference_roots 下皆無引用（grep -rlF 檔名）
-# 覆寫（只供 mutation 驗證複本）：V6_META_DIR、V6_LEDGER_DIR、V6_COMPANION。
+#   ⑥ 每個出現之 head 至 BASE 之已提交差（整棵樹，只排除 DOC_EXCLUDE 之純文件路徑）⊆ CODE_DIFF_ALLOWED
+#   ⑦ CODE_DIFF_ALLOWED 之每檔之主檔名（去副檔名）於 NO_REF_ROOTS（皆須存在）下皆無引用（grep -rlF）
+# 範圍參數為本腳本之常數（不取自收據；審碼 b2 r6）：BASE＝契約收據首次加入之提交（git 導出）；收據之對應欄位須與常數相等。
+# 覆寫（只供 mutation 驗證複本）：V6_META_DIR、V6_LEDGER_DIR、V6_COMPANION；有任一覆寫時結果標 MUTATION-MODE。
 set -uo pipefail
+DOC_EXCLUDE=(docs handoffs 白話說明 HANDOFF.md README.md 未來優化清單.md program.md AGENTS.md CLAUDE.md .cursorrules
+  specs templates sessions frontend .github .vscode .vscode_settings.json ruff_output.txt git_push.sh uat_samples archived .claude)
+CODE_DIFF_ALLOWED=(scripts/fact_keys.json)
+NO_REF_ROOTS=(momentum conftest.py tests/conftest.py tests/fixtures tests/feature_engineering/conftest.py
+  tests/feature_engineering/test_failopen_correctness.py scripts/freeze_failopen_baseline.py)
+MODE=""; [ -n "${V6_META_DIR:-}${V6_LEDGER_DIR:-}${V6_COMPANION:-}" ] && MODE=" (MUTATION-MODE)"
 RCPT=handoffs/run_receipts/testreg-v6-profile.json
 COMP=${V6_COMPANION:-handoffs/run_receipts/testreg-v6-profile-run.json}
 META_DIR=${V6_META_DIR:-handoffs/run_receipts/testreg_probes/v6_run/junit}
@@ -24,7 +31,13 @@ item_keys=$(jq -er "$P.items | keys[]" "$COMP" | sort) || fail "$COMP per_item_s
 [ "$exp_short" = "$item_keys" ] || fail "per_item_state.items 鍵集合 ≠ 契約收據 durations_s 之函式層名集合"
 argv_exp=$(jq -er "$P.argv_rest_sha256 | select(test(\"^[0-9a-f]{64}\$\"))" "$COMP") || fail "argv_rest_sha256 缺或格式不符"
 env_exp=$(jq -er "$P.env_python_sha256 | select(test(\"^[0-9a-f]{64}\$\"))" "$COMP") || fail "env_python_sha256 缺或格式不符"
-cmp_to=$(jq -er "$P.code_compare_to | select(test(\"^[0-9a-f]{40}\$\"))" "$COMP") || fail "code_compare_to 缺或非 40 位"
+BASE=$(git log --diff-filter=A --format=%H -- "$RCPT" | tail -1)
+[[ "$BASE" =~ ^[0-9a-f]{40}$ ]] || fail "無法由 git 導出契約收據之首次加入提交"
+canon() { printf "%s\n" "$@" | sort | jq -Rsc 'split("\n") | map(select(length > 0))'; }
+[ "$(jq -er "$P.code_compare_to" "$COMP")" = "$BASE" ] || fail "收據 code_compare_to ≠ 契約收據首次加入之提交 $BASE"
+[ "$(jq -c "$P.code_scope_exclude | sort" "$COMP")" = "$(canon "${DOC_EXCLUDE[@]}")" ] || fail "收據 code_scope_exclude ≠ 核對器常數"
+[ "$(jq -c "$P.code_diff_allowed | sort" "$COMP")" = "$(canon "${CODE_DIFF_ALLOWED[@]}")" ] || fail "收據 code_diff_allowed ≠ 核對器常數"
+[ "$(jq -c "$P.no_reference_roots | sort" "$COMP")" = "$(canon "${NO_REF_ROOTS[@]}")" ] || fail "收據 no_reference_roots ≠ 核對器常數"
 shopt -s nullglob
 metas=("$META_DIR"/*.meta.json)
 [ "${#metas[@]}" -gt 0 ] || fail "無 meta 檔"
@@ -59,21 +72,17 @@ for m in "${metas[@]}"; do
   seen="$seen$nid"$'\n'; heads="$heads$head_"$'\n'
 done
 [ "$(printf "%s" "$seen" | sort)" = "$exp_keys" ] || fail "meta 之 nodeid 集合 ≠ 收據 durations_s 鍵集合"
-allowed=$(jq -er "$P.code_diff_allowed[]" "$COMP" | sort) || fail "code_diff_allowed 讀取失敗"
-paths=()
-while IFS= read -r p; do paths+=("$p"); done < <(jq -er "$P.code_paths[]" "$COMP") || fail "code_paths 讀取失敗"
-[ "${#paths[@]}" -gt 0 ] || fail "code_paths 為空"
+excl=(); for e in "${DOC_EXCLUDE[@]}"; do excl+=(":(exclude,literal)$e"); done
+allowed=$(printf "%s\n" "${CODE_DIFF_ALLOWED[@]}" | sort)
 for h in $(printf "%s" "$heads" | sort -u); do
-  d=$(git -c core.quotepath=off diff --name-only "$h" "$cmp_to" -- "${paths[@]}") || fail "git diff $h $cmp_to 失敗"
+  d=$(git -c core.quotepath=off diff --name-only "$h" "$BASE" -- . "${excl[@]}") || fail "git diff $h $BASE 失敗"
   extra=$(comm -23 <(printf "%s\n" "$d" | sed '/^$/d' | sort) <(printf "%s\n" "$allowed"))
-  [ -z "$extra" ] || fail "$h → $cmp_to 之程式碼路徑差含未允許之檔：$extra"
+  [ -z "$extra" ] || fail "$h → $BASE 之已提交差（排除純文件路徑後）含未允許之檔：$extra"
 done
-roots=()
-while IFS= read -r r; do [ -e "$r" ] || fail "no_reference_roots 之 $r 不存在"; roots+=("$r"); done \
-  < <(jq -er "$P.no_reference_roots[]" "$COMP") || fail "no_reference_roots 讀取失敗"
-[ "${#roots[@]}" -gt 0 ] || fail "no_reference_roots 為空"
-for a in $allowed; do
-  hits=$(grep -rlF "$(basename "$a")" "${roots[@]}" 2>/dev/null)
-  [ -z "$hits" ] || fail "$a 於 V-6 執行路徑被引用：$hits"
+for r in "${NO_REF_ROOTS[@]}"; do [ -e "$r" ] || fail "NO_REF_ROOTS 之 $r 不存在"; done
+for a in "${CODE_DIFF_ALLOWED[@]}"; do
+  stem=$(basename "$a"); stem=${stem%.*}
+  hits=$(grep -rlF "$stem" "${NO_REF_ROOTS[@]}" 2>/dev/null)
+  [ -z "$hits" ] || fail "$a（$stem）於 V-6 執行路徑被引用：$hits"
 done
-echo "OK: ${#metas[@]} 項；session／head／diff_digest／argv／env 皆等於收據所記；程式碼路徑差 ⊆ {$(echo $allowed)} 且無引用"
+echo "OK${MODE}: ${#metas[@]} 項；session／head／diff_digest／argv／env 皆等於收據所記；各 head 至 ${BASE:0:8} 之已提交差（排除純文件路徑）⊆ {${CODE_DIFF_ALLOWED[*]}} 且其主檔名於 V-6 執行路徑無引用"
