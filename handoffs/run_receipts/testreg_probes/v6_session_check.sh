@@ -10,6 +10,7 @@ RCPT=handoffs/run_receipts/testreg-v6-profile.json
 META_DIR=${V6_META_DIR:-handoffs/run_receipts/testreg_probes/v6_run/junit}  # 覆寫只供 mutation 驗證（複本）
 fail() { echo "FAIL: $*" >&2; exit 1; }
 L=$(jq -er '.ledger.dir' tests/registry/testreg_schema.json) || fail "schema ledger.dir 讀取失敗"
+L=${V6_LEDGER_DIR:-$L}  # 覆寫只供 mutation 驗證（複本）
 expected=$(jq -er '.durations_s | keys[]' "$RCPT" | sort) || fail "$RCPT 讀取失敗"
 shopt -s nullglob
 metas=("$META_DIR"/*.meta.json)
@@ -24,8 +25,16 @@ for m in "${metas[@]}"; do
   s=$(head -1 "$L/$sid")
   [ "$(echo "$s" | jq -er '.kind')" = "session" ] || fail "$sid 首行非 kind=session"
   args=$(echo "$s" | jq -er '.argv_norm | fromjson | .args | join(" ")') || fail "$sid argv_norm 讀取失敗"
-  rest=$(echo "$s" | jq -cSe '.argv_norm | fromjson | del(.args) | del(.option.file_or_dir)' | shasum -a 256 | cut -c1-12)
-  envh=$(echo "$s" | jq -cSe '{env, python}' | shasum -a 256 | cut -c1-12)
+  # 取值前驗證據欄存在且型別正確（缺欄不得以 null 指紋「一致」放行——審碼 b2 r4）
+  rest_json=$(echo "$s" | jq -cSe '.argv_norm | fromjson
+    | if (.args | type) == "array" and (.option | type) == "object" then del(.args) | del(.option.file_or_dir)
+      else error("argv_norm 缺 args／option") end') || fail "$sid argv_norm 缺欄或型別不符"
+  env_json=$(echo "$s" | jq -cSe 'if (.env | type) == "object"
+      and ([.env.NUMBA_CACHE_DIR, .env.PYTEST_VERSION, .env.PYTHONPATH] | all(type == "string" and length > 0))
+      and (.python | type) == "string" and (.python | length) > 0
+    then {env, python} else error("env／python 缺欄") end') || fail "$sid env／python 缺欄或型別不符"
+  rest=$(printf "%s" "$rest_json" | shasum -a 256 | cut -c1-12)
+  envh=$(printf "%s" "$env_json" | shasum -a 256 | cut -c1-12)
   head_=$(echo "$s" | jq -er '.head[0:8]') || fail "$sid head 讀取失敗"
   ok=yes; [ "$args" = "$nid" ] || { ok=NO; bad=1; }
   printf "%s head=%s args_eq_nodeid=%s argv_rest=%s env_python=%s\n" "${sid%.jsonl}" "$head_" "$ok" "$rest" "$envh"
