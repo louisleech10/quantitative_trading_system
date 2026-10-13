@@ -1,0 +1,679 @@
+diff --git a/scripts/testreg.py b/scripts/testreg.py
+index d4d33db9..80b64a77 100644
+--- a/scripts/testreg.py
++++ b/scripts/testreg.py
+@@ -1758,8 +1758,14 @@ def rule_v07_change_requires_receipt(ctx: Context) -> List[Finding]:
+     for p, e in sorted(_entries(ctx).items()):
+         if isinstance(e, dict) and e.get("disposition") == "rewrite" and changed.get(p) in ("M", "A"):
+             if not e.get("rewrite_receipt"):
+-                if not _defective_all_ok(ctx, e):  # v44：每一目標皆有成立之缺陷目標改寫收據亦可
+-                    out.append(Finding("V07", p, "待改寫檔有暫存變更而無 rewrite_receipt（或缺陷目標改寫收據未全成立）"))
++                if not _defective_all_ok(ctx, e):  # v44：每一目標皆有成立之缺陷目標改寫收據亦可；v47：或純增改寫收據
++                    msg = "待改寫檔有暫存變更而無 rewrite_receipt（或缺陷目標改寫收據未全成立）"
++                    errs_a = _seam("additive_rewrite_errors")(ctx, p)
++                    if errs_a:
++                        msg += "；純增改寫收據不成立：" + "；".join(errs_a[:3])
++                    elif not _function_nodeids(ctx.extra["head_obj"], p):
++                        msg += "（head 時本檔無測試函式：只能以純增改寫收據〔receipts.additive_rewrite〕改寫）"
++                    out.append(Finding("V07", p, msg))
+             else:
+                 out.extend(Finding("V07", p, err) for err in _rewrite_receipt_errors(ctx, e))
+     return out
+@@ -3379,13 +3385,655 @@ def defective_rewrite_errors(ctx: Context, nodeid: str) -> Optional[List[str]]:
+             errs.append(f"改寫後斷言 {f}:{elo} 無對應之殺 mutant")
+     if None in dcs or len(dcs) > 1 or (dcs and r["fingerprint"] not in dcs):
+         errs.append("各 session 之 duration_class 不一或不等於 fingerprint")
++    # SPEC v47：target、good、bad、compare_baseline 之 session 須含目標全部參數案例（receipts.session_scope）
++    base_tree = _OverlayTree(ctx.repo_root, r["head"], {path: patched})
++    for label, sid, tree_ in (("target", r["target_session_id"], None), ("good", r["good_session_id"], None),
++                              ("bad", r["bad_session_id"], None), ("compare_baseline", r["compare_baseline_session_id"],
++                                                                   base_tree)):
++        errs += [f"{label} 之 session 不合全案例：{x}" for x in _seam("session_scope_errors")(ctx, sid, nodeid, tree_)]
+     return errs
+ 
+ 
+ def _defective_all_ok(ctx: Context, entry: Mapping[str, Any]) -> bool:
+-    """v44：rewrite_targets 所涵蓋之每一函式層 nodeid 皆有成立之缺陷目標改寫收據。"""
++    """v44：rewrite_targets 所涵蓋之每一函式層 nodeid 皆有成立之缺陷目標改寫收據；（SPEC v47）逐目標亦認準備步驟既有紅
++    修復收據，或該檔有成立之純增改寫收據（檔級）。"""
++    if _seam("additive_rewrite_errors")(ctx, entry["path"]) == []:
++        return True
+     cov = _covered(ctx, entry)
+-    return bool(cov) and all(_seam("defective_rewrite_errors")(ctx, n) == [] for n in cov)
++    return bool(cov) and all(_seam("defective_rewrite_errors")(ctx, n) == []
++                             or _seam("infrastructure_repair_errors")(ctx, n) == [] for n in cov)
++
++
++# ── SPEC v47（設計諮詢 r8）：參數化全案例、準備步驟既有紅修復收據、純增改寫收據 ────────────────────────────────
++
++def _receipt_rel(schema: Mapping[str, Any], kind: str, key: str) -> str:
++    """契約 `receipts.<kind>.file_rule`：infrastructure_repair 以函式層 nodeid、additive_rewrite 以測試檔路徑為鍵。"""
++    return f"{schema['receipts'][kind]['dir']}/{key.replace('/', '__').replace('::', '--')}.json"
++
++
++def _literal_seq_len(node: Optional[ast.AST]) -> Optional[int]:
++    return len(node.elts) if isinstance(node, (ast.List, ast.Tuple)) else None
++
++
++def _name_literal_len(body: Sequence[ast.stmt], name: str, before: int) -> Optional[int]:
++    """模組層（或類別本體）於 before 行之前最後一次綁定 name 之值為字面 list／tuple ⇒ 其長度；否則 None。"""
++    val: Optional[ast.AST] = None
++    for st in body:
++        if getattr(st, "lineno", 0) >= before:
++            break
++        if isinstance(st, ast.Assign) and any(isinstance(x, ast.Name) and x.id == name for x in st.targets):
++            val = st.value
++        elif isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and st.name == name:
++            val = None
++        elif isinstance(st, (ast.Import, ast.ImportFrom)) and any((a.asname or a.name.split(".")[0]) == name
++                                                                    for a in st.names):
++            val = None
++    return _literal_seq_len(val)
++
++
++def _parametrize_of(marks: Sequence[ast.AST]) -> List[ast.Call]:
++    out = []
++    for d in marks:
++        for x in (d.elts if isinstance(d, (ast.List, ast.Tuple)) else [d]):
++            if isinstance(x, ast.Call) and _last_name(x.func) == "parametrize":
++                out.append(x)
++    return out
++
++
++def _pytestmark_values(body: Sequence[ast.stmt]) -> List[ast.AST]:
++    return [st.value for st in body if isinstance(st, ast.Assign)
++            and any(isinstance(x, ast.Name) and x.id == "pytestmark" for x in st.targets)]
++
++
++def _fixture_param_names(tree: "_Tree", path: str) -> Tuple[set, Dict[str, Any]]:
++    """測試檔與其目錄鏈上 conftest.py 之 fixture（近者覆蓋遠者）：(帶 params 之名, {"deps": 名→其參數名, "auto": autouse 名})。"""
++    files = [path]
++    d = path.rsplit("/", 1)[0] if "/" in path else ""
++    while True:
++        files.append(f"{d}/conftest.py" if d else "conftest.py")
++        if not d:
++            break
++        d = d.rsplit("/", 1)[0] if "/" in d else ""
++    with_params: Dict[str, bool] = {}
++    deps: Dict[str, List[str]] = {}
++    autouse: Dict[str, bool] = {}
++    for f in reversed(files):
++        src = tree.read(f)
++        if src is None:
++            continue
++        try:
++            mod = ast.parse(src)
++        except SyntaxError:
++            continue
++        for n in mod.body:
++            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
++                isfx, auto = _fixture_info(n)
++                if not isfx:
++                    continue
++                params = any(isinstance(dec, ast.Call) and _last_name(dec.func if isinstance(dec, ast.Call) else dec)
++                             == "fixture" and any(k.arg == "params" for k in dec.keywords) for dec in n.decorator_list)
++                with_params[n.name] = params
++                deps[n.name] = [a.arg for a in n.args.args]
++                autouse[n.name] = auto
++    return {k for k, v in with_params.items() if v}, {"deps": deps, "auto": [k for k, v in autouse.items() if v]}
++
++
++def _case_count(tree: "_Tree", nodeid: str) -> Optional[int]:
++    """契約 `receipts.session_scope` ②：靜態列舉函式層 nodeid 之參數案例數；不可列舉 ⇒ None。"""
++    path, qual = _split_nodeid(nodeid)
++    src = tree.read(path)
++    if src is None:
++        return None
++    try:
++        mod = ast.parse(src)
++    except SyntaxError:
++        return None
++    parts = qual.split("::")
++    cls: Optional[ast.ClassDef] = None
++    body: Sequence[ast.stmt] = mod.body
++    if len(parts) == 2:
++        cls = next((n for n in mod.body if isinstance(n, ast.ClassDef) and n.name == parts[0]), None)
++        if cls is None:
++            return None
++        body = cls.body
++    fn = next((n for n in body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == parts[-1]), None)
++    if fn is None:
++        return None
++    layers: List[Tuple[Sequence[ast.AST], Sequence[ast.stmt], int]] = [(fn.decorator_list, mod.body, fn.lineno)]
++    chain_ = [cls] if cls is not None else []
++    while chain_:  # v48：類別與其同模組基底（遞移）之裝飾器與 pytestmark；基底不可於同模組解析 ⇒ 不可列舉
++        c = chain_.pop(0)
++        layers += [(c.decorator_list, mod.body, c.lineno), (_pytestmark_values(c.body), mod.body, c.lineno)]
++        for b in c.bases:
++            if isinstance(b, ast.Name) and b.id == "object":
++                continue
++            base = next((n for n in mod.body if isinstance(n, ast.ClassDef) and isinstance(b, ast.Name)
++                         and n.name == b.id and n.lineno < c.lineno), None)
++            if base is None:
++                return None
++            chain_.append(base)
++    layers.append((_pytestmark_values(mod.body), mod.body, fn.lineno))
++    total, argnames = 1, set()
++    for marks, scope_body, before in layers:
++        for call in _parametrize_of(marks):
++            names = call.args[0] if call.args else next((k.value for k in call.keywords if k.arg == "argnames"), None)
++            vals = call.args[1] if len(call.args) > 1 else next((k.value for k in call.keywords if k.arg == "argvalues"),
++                                                                 None)
++            if isinstance(names, ast.Constant) and isinstance(names.value, str):
++                argnames |= {x.strip() for x in names.value.split(",") if x.strip()}
++            elif isinstance(names, (ast.List, ast.Tuple)) and all(isinstance(e, ast.Constant) for e in names.elts):
++                argnames |= {str(e.value) for e in names.elts}
++            else:
++                return None
++            k = _literal_seq_len(vals)
++            if k is None and isinstance(vals, ast.Name):
++                k = _name_literal_len(scope_body, vals.id, before)
++            if k is None:
++                return None
++            total *= k
++    param_fx, info = _fixture_param_names(tree, path)
++    used = _usefixtures_in([m for marks, _b, _l in layers for m in marks])  # v48：usefixtures 直接標記
++    deps, todo, seen = info["deps"], [a.arg for a in fn.args.args if a.arg not in ("self", "request")] + \
++        info["auto"] + used, set()
++    while todo:
++        name = todo.pop()
++        if name in seen or name in argnames:
++            continue
++        seen.add(name)
++        if name in param_fx:
++            return None
++        todo += deps.get(name, [])
++    return total
++
++
++def session_scope_errors(ctx: Context, session_id: str, nodeid: str, tree: Optional["_Tree"] = None) -> List[str]:
++    """契約 `receipts.session_scope`：session 須含函式層 nodeid 之全部參數案例——argv 位置參數含 nodeid／所在檔／上層
++    目錄且無篩選旗標；session 中該目標之紀錄數＝AST 靜態列舉數（不可列舉 ⇒ 不成立）。tree 預設為該 session 之 head。"""
++    sess = _ledger_session(ctx, session_id)
++    if sess is None:
++        return [f"unverifiable：session {session_id} 不在 ledger"]
++    info = sess["session"] or {}
++    try:
++        an = json.loads(info.get("argv_norm") or "{}")
++    except ValueError:
++        an = {}
++    args, opt = an.get("args") or [], an.get("option") or {}
++    path, _q = _split_nodeid(nodeid)
++    errs = []
++
++    def covers(a: str) -> bool:
++        a = a.rstrip("/")
++        return a in ("", ".", nodeid, path) or path.startswith(a + "/")
++
++    if args and not any(covers(str(a)) for a in args):
++        errs.append(f"session 之位置參數 {args[:3]} 未涵蓋 {nodeid} 之全部案例")
++    if opt.get("keyword") or opt.get("markexpr") or opt.get("deselect") or opt.get("lf") or opt.get("stepwise") or \
++            opt.get("keepduplicates"):
++        errs.append("session 帶篩選或重複旗標（-k／-m／--deselect／--lf／--sw／--keep-duplicates）")
++    e = _case_count(tree if tree is not None else _Tree(ctx.repo_root, f"rev:{info.get('head')}"), nodeid)
++    if e is None:
++        return errs + [f"{nodeid} 之參數案例不可靜態列舉（非字面 argvalues、fixture params 或基底類別不可解析）"]
++    # v48：以 ledger 檔原始 test 紀錄逐筆計（以 nodeid 為鍵之彙整會吞掉重複）
++    raw: Dict[str, int] = collections.Counter()
++    p = ctx.ledger_dir / f"{session_id}.jsonl"
++    for line in p.read_text(encoding="utf-8").splitlines() if p.is_file() else []:
++        if line.strip():
++            rec = json.loads(line)
++            if rec.get("kind") == "test" and re.sub(r"\[.*\]$", "", rec.get("nodeid", "")) == nodeid:
++                raw[rec["nodeid"]] += 1
++    dup = sorted(k for k, c in raw.items() if c > 1)
++    if dup:
++        errs.append(f"session 中 {dup[:3]} 有重複紀錄")
++    n = sum(raw.values())
++    if n != e:
++        errs.append(f"session 中 {nodeid} 之紀錄數 {n} ≠ 靜態列舉之案例數 {e}")
++    return errs
++
++
++def _elements_ranges(eng: "_Engine", nodeid: str) -> List[Tuple[str, int, int]]:
++    return [e["prov"] for e in eng.elements(nodeid) if e.get("prov")]
++
++
++def _frame_in_any(rec: Mapping[str, Any], ranges: Sequence[Tuple[str, int, int]]) -> bool:
++    return any(_frame_in(rec, f, lo, hi) for f, lo, hi in ranges)
++
++
++def _kill_errors(ctx: Context, nodeid: str, els: Sequence[Mapping[str, Any]], kills: Sequence[Tuple[Any, Any]],
++                 label: str) -> List[str]:
++    """每一斷言元素之殺點（phase 與 frame 規定同 receipts.mutation.rule）。kills＝[(target_fail_loc, 紀錄)]。"""
++    errs = []
++    for e in els:
++        f, elo, ehi = e["prov"]
++        owner = e.get("owner") or (f, elo, ehi, "helper")
++        hit = False
++        for loc, mr in kills:
++            if not loc or loc.rsplit(":", 1)[0] != f or not elo <= int(loc.rsplit(":", 1)[1]) <= ehi:
++                continue
++            if owner[3] == "fixture":
++                hit = mr["phase_failed"] in ("setup", "teardown") and _frame_in(mr, owner[0], owner[1], owner[2])
++            else:
++                hit = mr["phase_failed"] == "call" and _frame_in(mr, owner[0], owner[1], owner[2])
++            if hit:
++                break
++        if not hit:
++            errs.append(f"{label}斷言 {f}:{elo} 無對應之殺 mutant")
++    return errs
++
++
++def infrastructure_repair_errors(ctx: Context, nodeid: str) -> Optional[List[str]]:
++    """契約 `receipts.infrastructure_repair`（SPEC v47 G-a）：準備步驟既有紅之修復收據。無收據 ⇒ None；有 ⇒ 不符清單。"""
++    s, t = ctx.schema, _tree(ctx)
++    rel = _receipt_rel(s, "infrastructure_repair", nodeid)
++    text = t.read(rel)
++    if text is None:
++        return None
++    try:
++        r = json.loads(text)
++    except ValueError:
++        return ["準備步驟既有紅修復收據非 JSON"]
++    errs = list(_seam("validate_shape")(r, {"type": "types.receipt_infrastructure_repair"}, s))
++    if errs:
++        return errs
++    if r["target_nodeid"] != nodeid:
++        errs.append(f"收據 target_nodeid {r['target_nodeid']} ≠ {nodeid}")
++    hp = _receipt_head_problem(ctx, rel, r["head"])
++    if hp:
++        errs.append(hp)
++    ap = ctx.repo_root / r["approval_ref"]
++    body = ap.read_text(encoding="utf-8", errors="replace") if ap.is_file() else ""
++    if nodeid not in body or r["first_bad_commit"][:8] not in body:
++        errs.append("approval_ref 不存在或未同時引用目標 nodeid 與首個壞提交前 8 碼")
++    path, _q = _split_nodeid(nodeid)
++    head_eng = _engine_for(ctx, f"rev:{r['head']}")
++    if nodeid not in _function_nodeids(head_eng.tree, path) or nodeid not in _function_nodeids(t, path):
++        return errs + ["目標函式不存在於 head 或受驗之樹"]
++    rp = r["repair_patch_path"]
++    pt = t.read(rp)
++    if pt is None or hashlib.sha256(pt.encode("utf-8")).hexdigest() != r["repair_patch_sha256"]:
++        return errs + ["repair_patch 不存在或 sha256 不符"]
++    pat = s["formats"]["test_path"]
++    touched = _patch_paths(pt)
++    if not touched or path in touched or any(not p.startswith("tests/") or re.fullmatch(pat, p) for p in touched):
++        errs.append("修復補丁只得及於 tests/ 下之非測試檔（helper、conftest），不得及於測試檔")
++    patched = _PatchedTree(ctx, r["head"], rp)
++    over = {}
++    for p in touched:
++        got = patched.read(p)
++        over[p] = got if got is not None else ""
++        if got != t.read(p):
++            errs.append(f"repair_patch 套於 head 後之 {p} ≠ 受驗之樹")
++    if t.read(path) != head_eng.tree.read(path):
++        errs.append("目標所在測試檔須與 head 零差異")
++    dcs: set = set()
++
++    def bound(sid: str, rev: str, patches: List[str], label: str) -> Optional[Dict[str, Any]]:
++        sess = _ledger_session(ctx, sid)
++        if sess is None:
++            errs.append(f"unverifiable：{label} 之 session {sid} 不在 ledger")
++            return None
++        info = sess["session"] or {}
++        dcs.add(info.get("duration_class"))
++        if info.get("head") != rev or info.get("diff_digest") != _digest_with(ctx, rev, patches):
++            errs.append(f"{label} 之 session 不綁定其提交＋補丁")
++        return sess
++
++    def scope(sid: str, label: str, tree: Optional[_Tree] = None) -> None:
++        errs.extend(f"{label} 之 session 不合全案例：{x}" for x in _seam("session_scope_errors")(ctx, sid, nodeid, tree))
++
++    def all_passed(sess: Optional[Mapping[str, Any]]) -> bool:
++        recs = [x for k, x in (sess or {"tests": {}})["tests"].items() if re.sub(r"\[.*\]$", "", k) == nodeid]
++        return bool(recs) and all(x.get("outcome") == "passed" for x in recs)
++
++    head_ranges = _elements_ranges(head_eng, nodeid)
++    ts = bound(r["target_session_id"], r["head"], [], "target")
++    tr = _fn_record(ts, nodeid) if ts is not None else None
++    if tr is None or tr["outcome"] not in ("failed", "error"):
++        errs.append("目標於 head 未失敗（非既有紅）")
++    else:
++        if not any(fr.rsplit(":", 1)[0] in touched for fr in tr.get("fail_frames", [])):
++            errs.append("目標於 head 之失敗 frame 不在修復補丁所及之檔")
++        if _frame_in_any(tr, head_ranges):
++            errs.append("目標於 head 之失敗落在斷言敘述內（非準備步驟既有紅）")
++    scope(r["target_session_id"], "target")
++    overlay = _OverlayTree(ctx.repo_root, r["head"], over)
++    if not all_passed(bound(r["repaired_session_id"], r["head"], [rp], "repaired")):
++        errs.append("修復後之 session 中目標未全過")
++    scope(r["repaired_session_id"], "repaired", overlay)
++    fb, gd = r["first_bad_commit"], r["good_commit"]
++    if not (fb == r["head"] or _is_ancestor(ctx.repo_root, fb, r["head"])):
++        errs.append("first_bad_commit 非收據 head 之祖先")
++    if gd != _run_git(ctx.repo_root, "rev-parse", f"{fb}^1", check=False).stdout.strip():
++        errs.append("good_commit 須為 first_bad_commit 之第一親代")
++    else:
++        if not all_passed(bound(r["good_session_id"], gd, [], "good")):
++            errs.append("good 提交之 session 中目標未全過")
++        scope(r["good_session_id"], "good")
++        bs = bound(r["bad_session_id"], fb, [], "bad")
++        btr = _fn_record(bs, nodeid) if bs is not None else None
++        if btr is None or btr["outcome"] not in ("failed", "error"):
++            errs.append("bad 提交之 session 中目標未失敗")
++        elif _frame_in_any(btr, _elements_ranges(_engine_for(ctx, f"rev:{fb}"), nodeid)):
++            errs.append("bad 提交之失敗落在斷言敘述內（非準備步驟既有紅）")
++        scope(r["bad_session_id"], "bad")
++    new_els = _Engine(overlay).elements(nodeid)
++    roots = tuple(s["receipts"]["E0"]["production_roots"])
++    files = {e["prov"][0] for e in new_els} or {path}
++    kills = []
++    for m in r["mutants"]:
++        label = f"mutant {m['id']}"
++        mp = t.read(m["patch_path"])
++        if mp is None or hashlib.sha256(mp.encode("utf-8")).hexdigest() != m["patch_sha256"]:
++            errs.append(f"{label} 補丁不存在或 sha256 不符")
++            continue
++        if any(not p.startswith(roots) for p in _patch_paths(mp)):
++            errs.append(f"{label} 修改 production_roots 以外之檔")
++            continue
++        if m["session_id"] != m["compare_session_id"] or set(m["compare_outcomes"]) != {nodeid}:
++            errs.append(f"{label} 之 session 或 compare_outcomes 不合（須同一 session、鍵＝目標）")
++        sm = bound(m["session_id"], r["head"], [rp, m["patch_path"]], label)
++        mr = _fn_record(sm, nodeid) if sm is not None else None
++        if mr is None:
++            errs.append(f"{label} 之 session 無目標紀錄")
++            continue
++        loc = next((f for f in mr.get("fail_frames", []) if f.rsplit(":", 1)[0] in files), None)
++        if mr["outcome"] != m["target_outcome"] or loc != m["target_fail_loc"] or \
++                mr["outcome"] != m["compare_outcomes"].get(nodeid):
++            errs.append(f"{label} 之結果與紀錄不符")
++        if mr["outcome"] in ("failed", "error"):
++            kills.append((m["target_fail_loc"], mr))
++    errs += _kill_errors(ctx, nodeid, new_els, kills, "修復後")
++    if None in dcs or len(dcs) > 1 or (dcs and r["fingerprint"] not in dcs):
++        errs.append("各 session 之 duration_class 不一或不等於 fingerprint")
++    return errs
++
++
++_EXIT_CALLS = frozenset({"exit", "quit"})
++
++
++def _is_exit_stmt(st: ast.stmt) -> bool:
++    """結束類敘述：呼叫 exit／quit／sys.exit／os._exit 之運算式敘述、raise SystemExit…、本體與 else 皆只含結束類之 if。"""
++    if isinstance(st, ast.Expr) and isinstance(st.value, ast.Call):
++        f = st.value.func
++        if isinstance(f, ast.Name) and f.id in _EXIT_CALLS:
++            return True
++        if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and \
++                (f.value.id, f.attr) in (("sys", "exit"), ("os", "_exit")):
++            return True
++    if isinstance(st, ast.Raise) and st.exc is not None:
++        exc = st.exc.func if isinstance(st.exc, ast.Call) else st.exc
++        return _last_name(exc) == "SystemExit"
++    if isinstance(st, ast.If):
++        return bool(st.body) and all(_is_exit_stmt(x) for x in st.body) and all(_is_exit_stmt(x) for x in st.orelse)
++    return False
++
++
++def _is_main_guard(st: ast.stmt) -> bool:
++    t = getattr(st, "test", None)
++    return isinstance(st, ast.If) and isinstance(t, ast.Compare) and isinstance(t.left, ast.Name) and \
++        t.left.id == "__name__" and len(t.comparators) == 1 and isinstance(t.comparators[0], ast.Constant) and \
++        t.comparators[0].value == "__main__"
++
++
++def _is_module_exec(st: ast.stmt, first: bool) -> bool:
++    """G-c 之模組層可執行敘述（import／def／class／首句 docstring／純字面賦值／__main__ 區塊以外者）。"""
++    if isinstance(st, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
++        return False
++    if first and isinstance(st, ast.Expr) and isinstance(st.value, ast.Constant) and isinstance(st.value.value, str):
++        return False
++    if isinstance(st, ast.Assign) and _pure_literal(st.value):
++        return False
++    return not _is_main_guard(st)
++
++
++def _added_ok(st: ast.stmt, fp_: Sequence[str], cp_: Sequence[str]) -> bool:
++    """純增之結構白名單：import、測試函式（非 fixture）、無裝飾器且只含 docstring 與測試方法之測試類別。"""
++    def test_fn(n: ast.AST) -> bool:  # v48：裝飾器只准 pytest.mark.parametrize
++        return isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and _name_ok(n.name, fp_) and \
++            all(isinstance(d, ast.Call) and _last_name(d.func) == "parametrize" for d in n.decorator_list)
++    if isinstance(st, (ast.Import, ast.ImportFrom)):  # v48：星號匯入不准（名稱衝突另於呼叫端判）
++        return not any(a.name == "*" for a in st.names)
++    if test_fn(st):
++        return True
++    if isinstance(st, ast.ClassDef) and _name_ok(st.name, cp_) and not st.decorator_list:
++        return all(test_fn(x) or (i == 0 and isinstance(x, ast.Expr) and isinstance(x.value, ast.Constant))
++                   for i, x in enumerate(st.body))
++    return False
++
++
++def _star_all(src: str) -> set:
++    """模組之 `__all__`（字面 list／tuple 之字串）；無或不可解析 ⇒ 空集合。"""
++    try:
++        mod = ast.parse(src)
++    except SyntaxError:
++        return set()
++    for st in mod.body:
++        if isinstance(st, ast.Assign) and any(isinstance(x, ast.Name) and x.id == "__all__" for x in st.targets) and \
++                isinstance(st.value, (ast.List, ast.Tuple)):
++            return {e.value for e in st.value.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)}
++    return set()
++
++
++def _prod_symbols(eng: "_Engine", path: str, fn: ast.AST, roots: Tuple[str, ...]) -> set:
++    """函式本體（含遞移呼叫之同模組非測試函式、函式內匯入）以 Name／Attribute 載入、經匯入解析至 production_roots 下
++    模組之符號（模組檔, 名稱）。"""
++    mi = eng.mod(path)
++    if mi is None:
++        return set()
++    out, seen, todo = set(), set(), [fn]
++    while todo:
++        node = todo.pop()
++        local: Dict[str, Tuple[str, str, Optional[str]]] = {}
++        for n in ast.walk(node):
++            if isinstance(n, (ast.Import, ast.ImportFrom)):
++                _note_imports(n, local, path)
++        binds = {**mi.imports, **local}
++        for n in ast.walk(node):
++            chain: List[str] = []
++            x: ast.AST = n
++            if isinstance(n, ast.Attribute):
++                while isinstance(x, ast.Attribute):
++                    chain.insert(0, x.attr)
++                    x = x.value
++            if not isinstance(x, ast.Name) or not isinstance(x.ctx, ast.Load):
++                continue
++            b = binds.get(x.id)
++            if b is None:
++                if not chain and x.id in mi.defs and x.id not in seen and not _fixture_info(mi.defs[x.id])[0]:
++                    seen.add(x.id)
++                    todo.append(mi.defs[x.id])
++                elif x.id not in mi.defs:  # v48：無明示綁定 ⇒ 依模組層星號匯入之來源（後者優先）解析
++                    for star in reversed(mi.stars):
++                        sp = eng.module_path(star)
++                        src = eng.tree.read(sp) if sp else None
++                        exported = _star_all(src) if src is not None else set()
++                        if sp and sp.startswith(roots) and src is not None and \
++                                ((x.id in exported) if exported else
++                                 (_module_defines(src, x.id) and not x.id.startswith("_"))):
++                            out.add((sp, x.id))
++                            break
++                continue
++            mod = b[1] if b[0] == "module" else f"{b[1]}.{b[2]}"
++            mp = eng.module_path(mod)
++            if b[0] == "from" and mp is None:  # from M import f：f 為 M 之屬性
++                mp2 = eng.module_path(b[1])
++                if mp2 and mp2.startswith(roots):
++                    out.add((mp2, b[2]))
++                continue
++            while chain and mp is not None and eng.module_path(f"{mod}.{chain[0]}"):
++                mod = f"{mod}.{chain.pop(0)}"
++                mp = eng.module_path(mod)
++            if mp and mp.startswith(roots) and chain:
++                out.add((mp, chain[0]))
++    return out
++
++
++def additive_rewrite_errors(ctx: Context, path: str) -> Optional[List[str]]:
++    """契約 `receipts.additive_rewrite`（SPEC v47 G-b／G-c，檔級）：純增改寫收據。無收據 ⇒ None；有 ⇒ 不符清單。"""
++    s, t = ctx.schema, _tree(ctx)
++    rel = _receipt_rel(s, "additive_rewrite", path)
++    text = t.read(rel)
++    if text is None:
++        return None
++    try:
++        r = json.loads(text)
++    except ValueError:
++        return ["純增改寫收據非 JSON"]
++    errs = list(_seam("validate_shape")(r, {"type": "types.receipt_additive_rewrite"}, s))
++    if errs:
++        return errs
++    if r["path"] != path:
++        errs.append(f"收據 path {r['path']} ≠ {path}")
++    e = _entries(ctx).get(path)
++    if not isinstance(e, dict) or e.get("disposition") != "rewrite":
++        errs.append("path 須為 disposition＝rewrite 之 entry")
++    hp = _receipt_head_problem(ctx, rel, r["head"])
++    if hp:
++        errs.append(hp)
++    ap = ctx.repo_root / r["approval_ref"]
++    if not ap.is_file() or path not in ap.read_text(encoding="utf-8", errors="replace"):
++        errs.append("approval_ref 不存在或未引用 path")
++    head_eng = _engine_for(ctx, f"rev:{r['head']}")
++    head_src, cur_src = head_eng.tree.read(path), t.read(path)
++    cp = r["compare_patch_path"]
++    ptext = t.read(cp)
++    if ptext is None or hashlib.sha256(ptext.encode("utf-8")).hexdigest() != r["compare_patch_sha256"]:
++        return errs + ["compare_patch 不存在或 sha256 不符"]
++    if set(_patch_paths(ptext)) != {path}:
++        errs.append("compare_patch 所及之檔須恰為 path")
++    patched = _PatchedTree(ctx, r["head"], cp).read(path)
++    if patched is None or patched != cur_src or head_src is None:
++        return errs + ["compare_patch 套於 head 後 ≠ 受驗之樹之 path"]
++    fp_, cp_, _f, _t = _collect_patterns(t)
++    head_fns, cur_fns = _test_functions(head_src, fp_, cp_), _test_functions(cur_src, fp_, cp_)
++    for q, n in head_fns.items():
++        if q not in cur_fns:
++            errs.append(f"舊函式 {q} 被刪或改名")
++        elif ast.dump(n) != ast.dump(cur_fns[q]):
++            errs.append(f"舊函式 {q} 已改動（須一字不動）")
++    added = sorted(f"{path}::{q}" for q in set(cur_fns) - set(head_fns))
++    if not added or set(r["added_nodeids"]) != set(added):
++        errs.append(f"added_nodeids 須恰為新增之函式層 nodeid 全集 {added}")
++    hmod, cmod = ast.parse(head_src), ast.parse(cur_src)
++    gc = not head_fns
++    keep = [st for i, st in enumerate(hmod.body) if not (gc and _is_module_exec(st, i == 0))]
++    i = 0
++    added_nodes: List[ast.AST] = []
++    # v48：head 模組中任何綁定或載入之名（新增 import 不得綁定之，防覆蓋舊函式所用之全域）
++    head_names = {n.id for n in ast.walk(hmod) if isinstance(n, ast.Name)} | \
++        {n.name for n in ast.walk(hmod) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))} | \
++        {(a.asname or a.name).split(".")[0] for n in ast.walk(hmod) if isinstance(n, (ast.Import, ast.ImportFrom))
++         for a in n.names}
++    for st in cmod.body:
++        if i < len(keep) and ast.dump(st) == ast.dump(keep[i]):
++            i += 1
++            continue
++        if _added_ok(st, fp_, cp_):
++            if isinstance(st, (ast.Import, ast.ImportFrom)):
++                clash = sorted({(a.asname or a.name).split(".")[0] for a in st.names} & head_names)
++                if clash:
++                    errs.append(f"結構白名單：新增 import 之名 {clash} 與 head 已綁定或載入之名相同（第 {st.lineno} 行）")
++            else:
++                added_nodes.append(st)
++            continue
++        errs.append(f"結構白名單外之模組層敘述（第 {st.lineno} 行；只准新增 import、測試函式、只含測試方法之測試類別）")
++    if i != len(keep):
++        errs.append("head 之模組層敘述被刪除或改動（結構須只增）")
++    bodies: List[ast.stmt] = []
++    for n in added_nodes:
++        for fn in ([n] if not isinstance(n, ast.ClassDef) else [x for x in n.body if not isinstance(x, ast.Expr)]):
++            bodies += fn.body
++            if any(_is_exit_stmt(x) for x in ast.walk(fn) if isinstance(x, ast.stmt)):
++                errs.append(f"新增函式 {fn.name} 含結束類敘述（exit／SystemExit；須以斷言取代）")
++    if gc:
++        need = [ast.dump(st) for k, st in enumerate(hmod.body) if _is_module_exec(st, k == 0) and not _is_exit_stmt(st)]
++        it = iter(ast.dump(x) for x in bodies)
++        if not all(any(d == y for y in it) for d in need):
++            errs.append("G-c：head 之模組層可執行敘述未依序搬入新增函式本體")
++    overlay = _OverlayTree(ctx.repo_root, r["head"], {path: cur_src})
++    oeng = _Engine(overlay)
++    for a in added:
++        if not oeng.elements(a):
++            errs.append(f"新增函式 {a} 無斷言")
++    dcs: set = set()
++
++    def bound(sid: str, patches: List[str], label: str) -> Optional[Dict[str, Any]]:
++        sess = _ledger_session(ctx, sid)
++        if sess is None:
++            errs.append(f"unverifiable：{label} 之 session {sid} 不在 ledger")
++            return None
++        info = sess["session"] or {}
++        dcs.add(info.get("duration_class"))
++        if info.get("head") != r["head"] or info.get("diff_digest") != _digest_with(ctx, r["head"], patches):
++            errs.append(f"{label} 之 session 不綁定 head＋補丁")
++        return sess
++
++    base = bound(r["baseline_session_id"], [cp], "baseline")
++    for a in added:
++        recs = [x for k, x in (base or {"tests": {}})["tests"].items() if re.sub(r"\[.*\]$", "", k) == a]
++        if not recs or any(x.get("outcome") != "passed" for x in recs):
++            errs.append(f"baseline session 中 {a} 未全過")
++        errs += [f"baseline 之 session 不合全案例：{x}"
++                 for x in _seam("session_scope_errors")(ctx, r["baseline_session_id"], a, overlay)]
++    roots = tuple(s["receipts"]["E0"]["production_roots"])
++    killers: List[Tuple[Dict[str, Any], set]] = []
++    kills: Dict[str, List[Tuple[Any, Any]]] = {a: [] for a in added}
++    for m in r["mutants"]:
++        label = f"mutant {m['id']}"
++        mp = t.read(m["patch_path"])
++        if mp is None or hashlib.sha256(mp.encode("utf-8")).hexdigest() != m["patch_sha256"]:
++            errs.append(f"{label} 補丁不存在或 sha256 不符")
++            continue
++        mfiles = set(_patch_paths(mp))
++        if any(not p.startswith(roots) for p in mfiles):
++            errs.append(f"{label} 修改 production_roots 以外之檔")
++            continue
++        sm = bound(m["session_id"], [cp, m["patch_path"]], label)
++        if sm is None:
++            continue
++        killed = False
++        for a in added:
++            errs += [f"{label} 之 session 不合全案例：{x}"
++                     for x in _seam("session_scope_errors")(ctx, m["session_id"], a, overlay)]
++            mr = _fn_record(sm, a)
++            if mr is not None and mr["outcome"] in ("failed", "error"):
++                apath = a.split("::")[0]
++                loc = next((f for f in mr.get("fail_frames", []) if f.rsplit(":", 1)[0] == apath), None)
++                kills[a].append((loc, mr))
++                killed = True
++        if killed:
++            killers.append((m, mfiles, sm))
++    for a in added:
++        errs += _kill_errors(ctx, a, oeng.elements(a), kills[a], "新增")
++    if not gc:
++        cov = _covered(ctx, e) if isinstance(e, dict) else []
++        targets = [n for n in cov if _split_nodeid(n)[1] in head_fns] if (e or {}).get("rewrite_targets") else \
++            [f"{path}::{q}" for q in head_fns]
++        radd: set = set()
++        for a in added:
++            fn_a = _test_functions(cur_src, fp_, cp_).get(_split_nodeid(a)[1])
++            if fn_a is not None:
++                radd |= _prod_symbols(oeng, path, fn_a, roots)
++        for tg in targets:
++            rt = _prod_symbols(head_eng, path, head_fns[_split_nodeid(tg)[1]], roots)
++            if not rt:
++                errs.append(f"情境綁定：舊目標 {tg} 未引用任何生產符號（本收據不適用）")
++                continue
++            miss = sorted(rt - radd)
++            if miss:
++                errs.append(f"情境綁定：新增函式未引用舊目標 {tg} 之生產符號 {miss}")
++            mods = {mp_ for mp_, _n in rt}
++            if not any(mfiles & mods for _m, mfiles, _s in killers):
++                errs.append(f"情境綁定：無殺 mutant 改動舊目標 {tg} 引用符號之定義檔 {sorted(mods)}")
++            # v48：新增偵測力——至少一個殺新增函式之 mutant 下舊目標全部紀錄 passed（舊目標對之盲）
++            def blind(sess: Mapping[str, Any]) -> bool:
++                recs = [x for k, x in sess["tests"].items() if re.sub(r"\[.*\]$", "", k) == tg]
++                return bool(recs) and all(x.get("outcome") == "passed" for x in recs)
++            if not any(blind(sm_) for _m, _f, sm_ in killers):
++                errs.append(f"新增偵測力：舊目標 {tg} 對全部殺新增函式之 mutant 亦失敗（新增無舊目標所無之偵測力；"
++                            "應以 receipts.mutation 改寫）")
++    if None in dcs or len(dcs) > 1 or (dcs and r["fingerprint"] not in dcs):
++        errs.append("各 session 之 duration_class 不一或不等於 fingerprint")
++    return errs
+ 
+ 
+ def rule_v19(ctx: Context) -> List[Finding]:

@@ -1,0 +1,13 @@
+# SPEC v48（修訂審查 r46 處置）新判定之 mutation 自證——主委 2026-10-14
+# 暫存樹＝8d65e332 之 detached worktree＋v48_trial_impl.patch＋v48 驗收檔
+# 全檔：test_testreg_repair_additive.py＋test_testreg_defective_rewrite.py → 98 passed（172.3 秒）
+# bash handoffs/run_receipts/testreg_probes/b3/v48_mut.sh <暫存樹>（逐一改壞、只跑 v48 新增 7 案、還原）
+M1_detection_off rc=1  FAILED test_o_killable_old_target_without_new_detection_blocks
+M2_star_off rc=1  FAILED test_r_star_import_old_target_additive_valid
+M3_clash_off rc=1  FAILED test_p_whitelist_v48_negatives_block[import_shadow]
+M4_decorator_off rc=1  FAILED test_p_whitelist_v48_negatives_block[decorator]
+M5_usefixtures_off rc=1  FAILED test_q_session_scope_usefixtures_inherited_duplicates
+M6_base_unresolved rc=1  FAILED test_q_session_scope_usefixtures_inherited_duplicates
+M7_keepdup_off rc=1  FAILED test_q_session_scope_usefixtures_inherited_duplicates
+# 註：M5 首跑存活（test_uf 仍因「紀錄數 2 ≠ 列舉 1」被擋）⇒ 該案斷言改為須以「不可靜態列舉」為理由後轉紅。
+# 註：記錄器以 nodeid 彙整、同 nodeid 只寫一筆，自然之重複執行由 keepduplicates 旗標擋（M7）；原始筆數重複判定為防竄改之餘裕。

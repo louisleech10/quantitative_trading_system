@@ -181,6 +181,36 @@ GC_VARIANTS = {
     "order": GC_NEW.replace("    a = add(1, 1)\n    b = add(2, 2)\n", "    b = add(2, 2)\n    a = add(1, 1)\n", 1),
 }
 
+# ── v48（修訂審查 r46 處置；只增）──────────────────────────────────────────────────────────────────────────────
+GK, GS = "tests/test_gk.py", "tests/test_gs.py"
+N_K, N_K2, N_S, N_S2 = f"{GK}::test_k", f"{GK}::test_k2", f"{GS}::test_s", f"{GS}::test_s_strict"
+T_GK = "from momentum.calc import add\n\n\ndef test_k():\n    assert add(1, 2) == 3\n"
+T_GS = ("from momentum.calc import *\n\n\ndef test_s():\n    try:\n        assert safe_div(8, 4) == 2\n"
+        "    except Exception:\n        return False\n    return True\n")
+GK_VARIANTS = {"dup": T_GK + "\n\ndef test_k2():\n    assert add(2, 2) == 4\n"}
+GS_VARIANTS = {"ok": T_GS + "\n\ndef test_s_strict():\n    assert safe_div(8, 4) == 2\n"}
+GB_VARIANTS["import_shadow"] = T_GB + "\n\nfrom momentum.calc import add as safe_div\n" + GB_NEW_FN
+GB_VARIANTS["star_import"] = T_GB + "\n\nfrom momentum.other import *\n" + GB_NEW_FN
+GB_VARIANTS["decorator"] = (T_GB.replace("from momentum.calc", "import pytest\nfrom momentum.calc", 1)
+                            + "\n\n@pytest.mark.skipif(False, reason=\"x\")\ndef test_quick_strict():\n"
+                            "    assert safe_div(6, 3) == 2\n")
+T_P_V48 = T_P + '''
+
+@pytest.mark.usefixtures("fx")
+def test_uf():
+    assert True
+
+
+@pytest.mark.parametrize("a", [1, 2])
+class TestBase:
+    pass
+
+
+class TestChild(TestBase):
+    def test_c(self, a):
+        assert a > 0
+'''
+
 
 def infra_rel(nodeid: str) -> str:
     """獨立 oracle：依契約 receipts.infrastructure_repair.file_rule。"""
@@ -229,6 +259,14 @@ def ra(tmp_path_factory) -> Dict[str, Any]:
     cat["entries"][GB].update(entry(GB, disposition="rewrite", rewrite_targets=[N_QUICK], disposition_ref=APPROVAL))
     cat["entries"][GC].update(entry(GC, disposition="rewrite", rewrite_targets=[], disposition_ref=APPROVAL))
     r.set_catalog(cat)
+    # v48（只增）：可殺舊目標檔、星號匯入檔；參數化檔追加 usefixtures 與繼承類別
+    r.write(GK, T_GK)
+    r.write(GS, T_GS)
+    r.write(PF, T_P_V48)
+    cat2 = r.catalog()
+    cat2["entries"][GK] = entry(GK, disposition="rewrite", rewrite_targets=[N_K], disposition_ref=APPROVAL)
+    cat2["entries"][GS] = entry(GS, disposition="rewrite", rewrite_targets=[N_S], disposition_ref=APPROVAL)
+    r.set_catalog(cat2)
     good = r.commit("catalog")
     r.write("momentum/calc.py", CALC_BAD)
     bad = r.commit("tag strict")
@@ -236,6 +274,7 @@ def ra(tmp_path_factory) -> Dict[str, Any]:
     r.commit("hist to setup form")
     r.write(APPROVAL, f"# approval\n{N_GA} {N_GA_INLINE} {N_HIST} {GB} {GC} first bad {bad[:8]}\n")
     r.write("handoffs/reconcile/ra/plain.md", "# approval without cross reference\n")
+    r.write(APPROVAL, r.read(APPROVAL) + f"{GK} {GS}\n")
     rp = "handoffs/run_receipts/testreg-infra-repair/helpers_tf.repair.patch"
     rsha = write_patch(r, "tests/helpers_tf.py", HELPER_FIXED, rp)
     rp_bad = "handoffs/run_receipts/testreg-infra-repair/helpers_tf_and_test.repair.patch"
@@ -257,6 +296,10 @@ def ra(tmp_path_factory) -> Dict[str, Any]:
     for k, text in GC_VARIANTS.items():
         cp[f"gc_{k}"] = f"handoffs/run_receipts/testreg-additive/gc_{k}.compare.patch"
         csha[f"gc_{k}"] = write_patch(r, GC, text, cp[f"gc_{k}"])
+    for pre, path_, variants in (("gk", GK, GK_VARIANTS), ("gs", GS, GS_VARIANTS)):
+        for k, text in variants.items():
+            cp[f"{pre}_{k}"] = f"handoffs/run_receipts/testreg-additive/{pre}_{k}.compare.patch"
+            csha[f"{pre}_{k}"] = write_patch(r, path_, text, cp[f"{pre}_{k}"])
     head = r.commit("patches")
     branch = r.git("rev-parse", "--abbrev-ref", "HEAD").strip()
     s: Dict[str, str] = {}
@@ -281,6 +324,12 @@ def ra(tmp_path_factory) -> Dict[str, Any]:
     s["p@one"] = _run_with(r, [], f"{PF}::test_p[1]")
     s["p@k"] = _run_with(r, [], PF, "-k", "test_p")
     s["p@file"] = _run_with(r, [], PF)
+    # v48（只增）
+    s["gk_dup@base"] = _run_with(r, [cp["gk_dup"]], GK)
+    s["gk_dup+m_add"] = _run_with(r, [cp["gk_dup"], msha["m_add"][0]], GK)
+    s["gs_ok@base"] = _run_with(r, [cp["gs_ok"]], GS)
+    s["gs_ok+m_div"] = _run_with(r, [cp["gs_ok"], msha["m_div"][0]], GS)
+    s["p@dup"] = _run_with(r, [], "--keep-duplicates", f"{PF}::test_plain", f"{PF}::test_plain")
     return {"repo": r, "head": head, "good": good, "bad": bad, "branch": branch, "rp": rp, "rsha": rsha,
             "rp_bad": rp_bad, "rbsha": rbsha, "msha": msha, "cp": cp, "csha": csha, "s": s}
 
@@ -419,7 +468,7 @@ def test_mutation_infra_errors_always_empty_lets_negative_through(ra, tmp_path, 
     r = _work(ra, tmp_path, "mut")
     _apply(r, "tests/helpers_tf.py", HELPER_FIXED)
     cat = r.catalog()  # 只留 test_ga.py 一個 rewrite entry（他檔之未執行與本 mutant 無關）
-    for other in (GB, GC):
+    for other in (GB, GC, GK, GS):
         cat["entries"][other].update(entry(other))
     r.set_catalog(cat)
     r.write_json(infra_rel(N_GA), infra_receipt(ra, repaired_session_id=ra["s"]["ga@head"]))
@@ -588,3 +637,68 @@ def test_n_receipt_release_timing(ra, tmp_path):
         secs.append(time.perf_counter() - t0)
         assert proc.returncode == 0, proc.stderr
     assert statistics.median(secs) < 5.0, secs
+
+
+# ── v48（修訂審查 r46 處置；只增）────────────────────────────────────────────────────────────────────────────────
+
+def _additive_receipt_v48(fx, path: str, pre: str, variant: str, mutants, added: List[str]) -> Dict[str, Any]:
+    s = fx["s"]
+    rc = {"path": path, "head": fx["head"], "approval_ref": APPROVAL, "fingerprint": "",
+          "compare_patch_path": fx["cp"][f"{pre}_{variant}"], "compare_patch_sha256": fx["csha"][f"{pre}_{variant}"],
+          "added_nodeids": added, "baseline_session_id": s[f"{pre}_{variant}@base"],
+          "mutants": [{"id": m, "patch_path": fx["msha"][m][0], "patch_sha256": fx["msha"][m][1],
+                       "session_id": s[f"{pre}_{variant}+{m}"]} for m in mutants]}
+    rc["fingerprint"] = _dc(fx, rc["baseline_session_id"], *[m["session_id"] for m in rc["mutants"]])
+    return rc
+
+
+def test_o_killable_old_target_without_new_detection_blocks(ra, tmp_path):
+    """(o) 舊目標 test_k 可殺且對殺新增函式之 m_add 亦失敗 ⇒ 純增不成立（理由含「偵測力」；應走 receipts.mutation）。"""
+    rec = test_records(ra["repo"], ra["s"]["gk_dup+m_add"])
+    assert rec[N_K]["outcome"] == "failed" and rec[N_K2]["outcome"] == "failed"  # 前提（獨立 oracle）
+    r = _work(ra, tmp_path, "gk")
+    _apply(r, GK, GK_VARIANTS["dup"])
+    r.write_json(additive_rel(GK), _additive_receipt_v48(ra, GK, "gk", "dup", ("m_add",), [N_K2]))
+    errs = testreg.additive_rewrite_errors(_ctx(r), GK)
+    assert errs and any("偵測力" in e for e in errs), errs
+
+
+GB_NEG_V48 = ["decorator", "import_shadow", "star_import"]
+
+
+@pytest.mark.parametrize("variant", GB_NEG_V48)
+def test_p_whitelist_v48_negatives_block(ra, tmp_path, variant):
+    """(p) 新增 import 覆蓋 head 已用之名、星號匯入、新增函式帶非 parametrize 裝飾器 ⇒ 擋（理由含「結構」）。"""
+    rc = additive_receipt(ra, GB, variant, ("m_div",), [N_STRICT])
+    r = _work(ra, tmp_path, f"gb48_{variant}")
+    _apply(r, GB, GB_VARIANTS[variant])
+    r.write_json(additive_rel(GB), rc)
+    errs = testreg.additive_rewrite_errors(_ctx(r), GB)
+    assert errs and any("結構" in e for e in errs), errs
+
+
+def test_q_precondition_inherited_and_duplicate_counts(ra):
+    """前提（獨立 oracle）：繼承同模組基底之類別參數化使 TestChild::test_c 有 2 筆；--keep-duplicates 之 session 之
+    argv_norm 確記 keepduplicates（記錄器以 nodeid 彙整、同 nodeid 只寫一筆，故以旗標擋下自然之重複執行）。"""
+    recs = test_records(ra["repo"], ra["s"]["p@file"])
+    assert sum(1 for n in recs if n.startswith(f"{PF}::TestChild::test_c[")) == 2
+    an = json.loads(session_of(ra["repo"], ra["s"]["p@dup"])["argv_norm"])
+    assert an["option"]["keepduplicates"] is True
+
+
+def test_q_session_scope_usefixtures_inherited_duplicates(ra):
+    """(q) usefixtures 請求 params fixture ⇒ 不可列舉；同模組基底類別之 parametrize 遞移納入 ⇒ 成立；重複執行同一 nodeid
+    之 session ⇒ 不成立。"""
+    ctx = _ctx(ra["repo"])
+    errs_uf = testreg.session_scope_errors(ctx, ra["s"]["p@file"], f"{PF}::test_uf")
+    assert any("不可靜態列舉" in e for e in errs_uf), errs_uf  # 須因列舉判定而擋，不只因筆數不符
+    assert testreg.session_scope_errors(ctx, ra["s"]["p@file"], f"{PF}::TestChild::test_c") == []
+    assert testreg.session_scope_errors(ctx, ra["s"]["p@dup"], f"{PF}::test_plain")
+
+
+def test_r_star_import_old_target_additive_valid(ra, tmp_path):
+    """(r) 舊目標經模組層星號匯入取得 safe_div ⇒ 情境綁定解析得之，純增成立。"""
+    r = _work(ra, tmp_path, "gs")
+    _apply(r, GS, GS_VARIANTS["ok"])
+    r.write_json(additive_rel(GS), _additive_receipt_v48(ra, GS, "gs", "ok", ("m_div",), [N_S2]))
+    assert testreg.additive_rewrite_errors(_ctx(r), GS) == []
