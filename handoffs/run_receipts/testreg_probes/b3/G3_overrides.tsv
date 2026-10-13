@@ -1,0 +1,2 @@
+tests/feature_engineering/preprocessing/test_l65_phase0_gate.py	disposition	rewrite	輕量掃描實證既有紅（scripts/benchmark_l65.py 以週期 fixture 呼叫、FF-STAT 校準長度無法換算 ⇒ FAIL；20261013-light-sweep.tsv）；codex 判 rewrite、grok 指出漏標既有紅
+tests/feature_engineering/preprocessing/test_l65_phase0_gate.py	add_targets	tests/feature_engineering/preprocessing/test_l65_phase0_gate.py::test_l65_phase0_gate_command_smoke	同上
