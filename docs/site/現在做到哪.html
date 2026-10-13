@@ -21,10 +21,11 @@
 <p>你 10/13 睡前交代「依序做，有問題你跟委員共識決定」，所以期間的取捨都由我和三家委員（codex、composer、grok）共識決定，做完寫給你看。</p>
 <p><strong>這一段已經查到的事（用真實資料實跑過）</strong>：</p>
 <ol>
-<li><strong>有 29 個測試在改動前就已經失敗、以前沒登記</strong>。每一個都找到是哪一次修改弄壞的。其中 14 個是同一個原因（測試的輔助程式用了一個不合法的週期名稱），改一個地方就能全部修好，不用改任何判斷條件。</li>
+<li><strong>有 33 個測試在改動前就已經失敗、以前沒登記</strong>。每一個都找到是哪一次修改弄壞的。其中 17 個是同一個原因（測試的輔助程式用了一個不合法的週期名稱），改一個地方就能全部修好，不用改任何判斷條件。</li>
 <li><strong>FRAMEPATH 第一批（10/10）弄壞了 2 個測試，但當時的「挑選要跑哪些測試」漏掉了它們</strong>，所以當時報告「這批沒弄壞任何東西」是錯的。這套挑選方式原本也要用在 FRAMEPATH 第二批，現在要先修好才能用。</li>
 <li><strong>很多特徵工廠測試其實在比對空表</strong>：生成程式現在只回傳時間、不回傳特徵值，所以拿它比對數值的測試永遠會過，但其實什麼都沒驗到。全專案約 22 個檔有這個問題，要改成去讀實際存下來的資料再比。</li>
-<li><strong>你 10/12 問的「粗接細」（主 1 小時＋12 小時）</strong>：用真實資料試跑過，獨立寫的檢查程式和正式程式逐列一致；這種檢查每跑一次約 14 分鐘。原本的「細接粗」檢查，在 PROBEWINSOR 修好後從 98 分鐘降到 15 分鐘。</li>
+<li><strong>你 10/12 問的「粗接細」（主 1 小時＋12 小時）</strong>：三家同意<strong>加上、不取代</strong>原本的「細接粗」。用真實資料試跑過，獨立寫的檢查程式和正式程式逐列一致；這種檢查每跑一次約 14 分鐘。原本的「細接粗」檢查，在 PROBEWINSOR 修好後從 98 分鐘降到 15 分鐘。另外查到：原本 5 個「細接粗」檢查裡，有 3 個其實在重複跑同一件事（每次全跑白耗約 45 分鐘），之後依判定去重。</li>
+<li><strong>規則需要補一條</strong>：測試規則要求「改測試時，必須證明改壞程式能讓測試失敗」，但「本來就失敗」或「怎樣都不會失敗（空心）」的測試沒辦法滿足這條，等於沒有合法的修法。三家同意新增一種「缺陷測試改寫證明」，我已寫好規格與驗收、也試做了實作（驗收 24 項全過），正在請三家審。</li>
 </ol>
 <h2 id="做到哪">做到哪</h2>
 <p><strong>TESTREG 全部項目</strong>（規格 <code>docs/TESTREG_SPEC.md</code> 的「§P Phase 與依賴」：Phase 1 第 55 行起、Phase 2 第 96 行、Phase 3 第 129 行、Phase 4 第 153 行；施工清單 <code>docs/manifests/TESTREG.json</code>）：</p>
@@ -71,8 +72,8 @@
 <td>第 3 批</td>
 <td>3.1 分類</td>
 <td>特徵工廠相關 149 檔（<code>tests/feature_engineering/</code> 全部 98 檔＋根目錄 <code>tests/</code> 下用到特徵工廠的 50 檔＋<code>tests/momentum/feature_engineering/</code> 1 檔），三家逐檔判定</td>
-<td>🔨 進行中：我的版本 4 組已完成；三家正在回答 6 個先決問題（粗接細要不要加、29 個失敗測試怎麼處理、挑選漏掉怎麼補、和 FRAMEPATH 互相卡住怎麼解、空表測試怎麼改、分組方式）</td>
-<td>三家回覆並收斂 → 分 4 組逐組請三家判定 → 寫進清冊</td>
+<td>🔨 進行中：6 個先決問題三家已共識；第 1 組（41 檔）四方判定已完成（留 20、改 21）；新規則（缺陷測試改寫證明）三家審查中</td>
+<td>第 2–4 組（108 檔）各一輪 → 新規則審完、蓋章 → 寫進清冊</td>
 </tr>
 <tr>
 <td>第 3 批</td>
@@ -101,7 +102,7 @@
 <h2 id="要你決定嗎">要你決定嗎</h2>
 <ol>
 <li><strong>推送被擋</strong>：今天有幾筆提交在本機，推上 GitHub 時被工具的權限檢查擋下（理由寫「放到不該放的地方」，可能是因為提交裡有測試跑出的紀錄檔）。我沒有繞過。你醒來可以看一下，決定要不要推：<code>git push origin main</code>。</li>
-<li><strong>暫存清理</strong>（權限不讓我刪）：我探路時在暫存區建了 3 個工作目錄，用完可刪：<code>git worktree remove --force /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/9fa03a2f-8653-4b8d-a632-cc80fa7b1e68/scratchpad/wt_bis</code>（另兩個同目錄下 <code>wt_5584102d</code>、<code>wt_5584102d_1</code> 同法）。另有先前留下的：<code>data_cache/cgsa_work</code> 中 10/12 晚上之後的暫存目錄，和 <code>handoffs/run_receipts/probewinsor_probes/run_five.sh</code>。</li>
+<li><strong>暫存清理</strong>（權限不讓我刪）：我探路時在暫存區建了 3 個工作目錄，用完可刪：<code>git worktree remove --force /private/tmp/claude-501/-Users-louis-Desktop-quantitative-trading-system/9fa03a2f-8653-4b8d-a632-cc80fa7b1e68/scratchpad/wt_bis</code>（另三個同目錄下 <code>wt_5584102d</code>、<code>wt_5584102d_1</code>、<code>wt_impl</code> 同法；<code>wt_impl</code> 等規則審完才可刪）。另有先前留下的：<code>data_cache/cgsa_work</code> 中 10/12 晚上之後的暫存目錄，和 <code>handoffs/run_receipts/probewinsor_probes/run_five.sh</code>。另：兩位委員違規在 <code>handoffs/run_receipts/testreg_probes/b3/</code> 留了暫存檔，可刪：<code>rm handoffs/run_receipts/testreg_probes/b3/_g1_31_41_scope.txt handoffs/run_receipts/testreg_probes/b3/_g1_31_41_grok_compare.tsv</code>。</li>
 </ol>
 <h2 id="卡住嗎">卡住嗎</h2>
 <p>沒有。</p>
