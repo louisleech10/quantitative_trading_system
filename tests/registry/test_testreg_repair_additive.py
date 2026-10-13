@@ -747,3 +747,73 @@ def test_t_session_scope_plugin_autouse_param_fixture_not_enumerable(ra_auto):
     assert sum(1 for n in recs if n.startswith(f"{PA}::test_pa[")) == 2
     errs = testreg.session_scope_errors(_ctx(ra_auto["repo"]), ra_auto["sid"], f"{PA}::test_pa")
     assert any("不可靜態列舉" in e for e in errs), errs
+
+
+# ── v51（修訂審查 r49 處置；只增）：autouse 遞移依賴外掛 params fixture；類別裝飾器／類別 pytestmark／模組 pytestmark 之
+#    usefixtures 請求外掛 params fixture ──────────────────────────────────────────────────────────────────────────
+CONFTEST_V51T = 'pytest_plugins = ["tests.plug_trans"]\n'
+PLUG_V51T = ("import pytest\n\n\n@pytest.fixture(params=[1, 2])\ndef inner(request):\n    return request.param\n\n\n"
+             "@pytest.fixture(autouse=True)\ndef outer(inner):\n    return inner\n")
+PT = "tests/test_tr.py"
+T_PT_V51 = "def test_tr():\n    assert True\n"
+CONFTEST_V51U = 'pytest_plugins = ["tests.plug_uf"]\n'
+PLUG_V51U = "import pytest\n\n\n@pytest.fixture(params=[1, 2])\ndef ufx(request):\n    return request.param\n"
+UCD, UCM, UMOD = "tests/test_ucd.py", "tests/test_ucm.py", "tests/test_umod.py"
+T_UCD = ('import pytest\n\n\n@pytest.mark.usefixtures("ufx")\nclass TestUcd:\n    def test_c(self):\n'
+         '        assert True\n')
+T_UCM = ('import pytest\n\n\nclass TestUcm:\n    pytestmark = pytest.mark.usefixtures("ufx")\n\n'
+         '    def test_c(self):\n        assert True\n')
+T_UMOD = 'import pytest\n\npytestmark = pytest.mark.usefixtures("ufx")\n\n\ndef test_m():\n    assert True\n'
+
+
+@pytest.fixture(scope="module")
+def ra_trans(tmp_path_factory) -> Dict[str, Any]:
+    """(u) 專用暫存 repo：autouse 外掛 fixture 會參數化同一 session 之全部測試，故不併入 ra／ra_auto。"""
+    r = make_repo(tmp_path_factory.mktemp("ra_trans"), {"momentum/__init__.py": "", "momentum/other.py": OTHER,
+                                                        "tests/conftest.py": CONFTEST_V51T,
+                                                        "tests/plug_trans.py": PLUG_V51T, PT: T_PT_V51})
+    return {"repo": r, "sid": _run_with(r, [], PT)}
+
+
+@pytest.fixture(scope="module")
+def ra_uf(tmp_path_factory) -> Dict[str, Any]:
+    """(v)(w)(x) 共用暫存 repo：外掛 ufx 帶 params、非 autouse；三檔各以一種 usefixtures 宣告請求它，各跑一 session。"""
+    r = make_repo(tmp_path_factory.mktemp("ra_uf"), {"momentum/__init__.py": "", "momentum/other.py": OTHER,
+                                                     "tests/conftest.py": CONFTEST_V51U, "tests/plug_uf.py": PLUG_V51U,
+                                                     UCD: T_UCD, UCM: T_UCM, UMOD: T_UMOD})
+    return {"repo": r, "sid": {p: _run_with(r, [], p) for p in (UCD, UCM, UMOD)}}
+
+
+def test_u_session_scope_autouse_transitive_plugin_param_fixture_not_enumerable(ra_trans):
+    """(u) test_tr 不請求任何 fixture；外掛中 autouse 之 outer 依賴帶 params 之 inner（前提：整檔 session 中 2 筆）⇒
+    session_scope 以「不可靜態列舉」為理由不成立（不展開 autouse 遞移依賴之實作會少算為 1）。"""
+    recs = test_records(ra_trans["repo"], ra_trans["sid"])
+    assert sum(1 for n in recs if n.startswith(f"{PT}::test_tr[")) == 2
+    errs = testreg.session_scope_errors(_ctx(ra_trans["repo"]), ra_trans["sid"], f"{PT}::test_tr")
+    assert any("不可靜態列舉" in e for e in errs), errs
+
+
+def test_v_session_scope_class_decorator_usefixtures_plugin_param_not_enumerable(ra_uf):
+    """(v) 類別裝飾器 @pytest.mark.usefixtures("ufx")（前提：2 筆）⇒「不可靜態列舉」（不讀類別裝飾器層會少算為 1）。"""
+    sid = ra_uf["sid"][UCD]
+    assert sum(1 for n in test_records(ra_uf["repo"], sid) if n.startswith(f"{UCD}::TestUcd::test_c[")) == 2
+    errs = testreg.session_scope_errors(_ctx(ra_uf["repo"]), sid, f"{UCD}::TestUcd::test_c")
+    assert any("不可靜態列舉" in e for e in errs), errs
+
+
+def test_w_session_scope_class_pytestmark_usefixtures_plugin_param_not_enumerable(ra_uf):
+    """(w) 類別本體 pytestmark = pytest.mark.usefixtures("ufx")（前提：2 筆）⇒「不可靜態列舉」（不讀類別 pytestmark 層會少算
+    為 1）。"""
+    sid = ra_uf["sid"][UCM]
+    assert sum(1 for n in test_records(ra_uf["repo"], sid) if n.startswith(f"{UCM}::TestUcm::test_c[")) == 2
+    errs = testreg.session_scope_errors(_ctx(ra_uf["repo"]), sid, f"{UCM}::TestUcm::test_c")
+    assert any("不可靜態列舉" in e for e in errs), errs
+
+
+def test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerable(ra_uf):
+    """(x) 模組層 pytestmark = pytest.mark.usefixtures("ufx")（前提：2 筆）⇒「不可靜態列舉」（不讀模組 pytestmark 層會少算
+    為 1）。"""
+    sid = ra_uf["sid"][UMOD]
+    assert sum(1 for n in test_records(ra_uf["repo"], sid) if n.startswith(f"{UMOD}::test_m[")) == 2
+    errs = testreg.session_scope_errors(_ctx(ra_uf["repo"]), sid, f"{UMOD}::test_m")
+    assert any("不可靜態列舉" in e for e in errs), errs

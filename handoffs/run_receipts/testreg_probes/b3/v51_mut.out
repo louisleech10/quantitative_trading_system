@@ -1,0 +1,46 @@
+== M10 不展開 autouse 遞移依賴 ==
+test_s_session_scope_plugin_param_fixture_not_enumerable PASSED [ 16%]
+test_t_session_scope_plugin_autouse_param_fixture_not_enumerable PASSED [ 33%]
+test_u_session_scope_autouse_transitive_plugin_param_fixture_not_enumerable FAILED [ 50%]
+test_v_session_scope_class_decorator_usefixtures_plugin_param_not_enumerable PASSED [ 66%]
+test_w_session_scope_class_pytestmark_usefixtures_plugin_param_not_enumerable PASSED [ 83%]
+test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerable PASSED [100%]
+FAILED tests/registry/test_testreg_repair_additive.py::test_u_session_scope_autouse_transitive_plugin_param_fixture_not_enumerable
+================= 1 failed, 5 passed, 47 deselected in 27.84s ==================
+== M11 不讀類別裝飾器層 ==
+test_s_session_scope_plugin_param_fixture_not_enumerable PASSED [ 16%]
+test_t_session_scope_plugin_autouse_param_fixture_not_enumerable PASSED [ 33%]
+test_u_session_scope_autouse_transitive_plugin_param_fixture_not_enumerable PASSED [ 50%]
+test_v_session_scope_class_decorator_usefixtures_plugin_param_not_enumerable FAILED [ 66%]
+test_w_session_scope_class_pytestmark_usefixtures_plugin_param_not_enumerable PASSED [ 83%]
+test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerable PASSED [100%]
+FAILED tests/registry/test_testreg_repair_additive.py::test_v_session_scope_class_decorator_usefixtures_plugin_param_not_enumerable
+================= 1 failed, 5 passed, 47 deselected in 27.40s ==================
+== M12 不讀類別 pytestmark 層 ==
+test_s_session_scope_plugin_param_fixture_not_enumerable PASSED [ 16%]
+test_t_session_scope_plugin_autouse_param_fixture_not_enumerable PASSED [ 33%]
+test_u_session_scope_autouse_transitive_plugin_param_fixture_not_enumerable PASSED [ 50%]
+test_v_session_scope_class_decorator_usefixtures_plugin_param_not_enumerable PASSED [ 66%]
+test_w_session_scope_class_pytestmark_usefixtures_plugin_param_not_enumerable FAILED [ 83%]
+test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerable PASSED [100%]
+FAILED tests/registry/test_testreg_repair_additive.py::test_w_session_scope_class_pytestmark_usefixtures_plugin_param_not_enumerable
+================= 1 failed, 5 passed, 47 deselected in 27.40s ==================
+== M13 不讀模組 pytestmark 層 ==
+test_s_session_scope_plugin_param_fixture_not_enumerable PASSED [ 16%]
+test_t_session_scope_plugin_autouse_param_fixture_not_enumerable PASSED [ 33%]
+test_u_session_scope_autouse_transitive_plugin_param_fixture_not_enumerable PASSED [ 50%]
+test_v_session_scope_class_decorator_usefixtures_plugin_param_not_enumerable PASSED [ 66%]
+test_w_session_scope_class_pytestmark_usefixtures_plugin_param_not_enumerable PASSED [ 83%]
+test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerable FAILED [100%]
+FAILED tests/registry/test_testreg_repair_additive.py::test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerable
+================= 1 failed, 5 passed, 47 deselected in 27.46s ==================
+== M14 usefixtures 只取函式裝飾器層 ==
+test_u_session_scope_autouse_transitive_plugin_param_fixture_not_enumerable PASSED [ 50%]
+test_v_session_scope_class_decorator_usefixtures_plugin_param_not_enumerable FAILED [ 66%]
+test_w_session_scope_class_pytestmark_usefixtures_plugin_param_not_enumerable FAILED [ 83%]
+test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerable FAILED [100%]
+FAILED tests/registry/test_testreg_repair_additive.py::test_v_session_scope_class_decorator_usefixtures_plugin_param_not_enumerable
+FAILED tests/registry/test_testreg_repair_additive.py::test_w_session_scope_class_pytestmark_usefixtures_plugin_param_not_enumerable
+FAILED tests/registry/test_testreg_repair_additive.py::test_x_session_scope_module_pytestmark_usefixtures_plugin_param_not_enumerable
+================= 3 failed, 3 passed, 47 deselected in 27.46s ==================
+restored to trial
