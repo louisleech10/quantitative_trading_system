@@ -10855,6 +10855,25 @@
    "rewrite_targets": [],
    "ticket": "TESTREG"
   },
+  "tests/registry/test_testreg_repair_additive.py": {
+   "claim": [
+    "contract"
+   ],
+   "disposition": "keep",
+   "disposition_ref": null,
+   "guarantee": [
+    "A11",
+    "A16"
+   ],
+   "oracle": [
+    "EXACT"
+   ],
+   "path": "tests/registry/test_testreg_repair_additive.py",
+   "quarantine": [],
+   "rewrite_receipt": null,
+   "rewrite_targets": [],
+   "ticket": "TESTREG"
+  },
   "tests/registry/test_testreg_review.py": {
    "claim": [
     "unclassified"

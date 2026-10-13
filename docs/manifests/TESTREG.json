@@ -14,7 +14,8 @@
     "tests/registry/test_testreg_v6_profile.py",
     "tests/registry/test_testreg_run.py",
     "tests/registry/test_testreg_effect.py",
-    "tests/registry/test_testreg_defective_rewrite.py"
+    "tests/registry/test_testreg_defective_rewrite.py",
+    "tests/registry/test_testreg_repair_additive.py"
   ],
   "script_acceptance": [
     "scripts/testreg.py",
@@ -86,6 +87,7 @@
       "tests/registry/test_testreg_run.py",
       "tests/registry/test_testreg_effect.py",
       "tests/registry/test_testreg_defective_rewrite.py",
+      "tests/registry/test_testreg_repair_additive.py",
       "handoffs/run_receipts/testreg_probes/recorder_invariance.py",
       "handoffs/run_receipts/testreg_probes/todo_scaffold_trial.py",
       "docs/TESTREG_SPEC.md",
@@ -124,11 +126,12 @@
       {"rule": "Task 2.4 不得以縮小資料窗或減少 symbol 數提速", "observable": true}
     ],
     "risk_mitigation": [
-      "affected_tests phase=3 tests/registry/test_testreg_validate.py tests/registry/test_testreg_bootstrap.py tests/registry/test_testreg_write_guard.py tests/registry/test_testreg_defective_rewrite.py",
+      "affected_tests phase=3 tests/registry/test_testreg_validate.py tests/registry/test_testreg_bootstrap.py tests/registry/test_testreg_write_guard.py tests/registry/test_testreg_defective_rewrite.py tests/registry/test_testreg_repair_additive.py",
       "affected_must phase=3 tests/registry/test_testreg_bootstrap.py::test_real_repo_catalog_complete_and_valid",
       "affected_tests phase=4 tests/registry/test_testreg_validate.py tests/registry/test_testreg_bootstrap.py tests/registry/test_testreg_write_guard.py",
       "affected_must phase=4 tests/registry/test_testreg_bootstrap.py::test_real_repo_catalog_complete_and_valid",
-      "分批：b1＝Phase 1（Task 1.1→1.5，gate_cmd 所列五檔全綠＋§G 收據比對）；b2＝Phase 2（Task 2.1–2.4：test_testreg_review.py、test_testreg_impact.py、test_testreg_gate_wiring.py、test_testreg_v6_profile.py，另 tests/feature_engineering/test_framepath_disposition.py -k affected_gate 既有案例回歸須綠）；b3＝Task 3.0（缺陷目標改寫收據：scripts/testreg.py＋契約 version 45＋test_testreg_defective_rewrite.py 全綠，且 test_testreg_validate.py、test_testreg_write_guard.py 回歸綠）＋Task 3.1 分類（委員三家獨立逐檔判定＋synth，G1–G4 四輪，比對器 compare_classify.py fail-closed；寫 catalog 委員欄）；b4 起＝Task 3.2 子批（每子批 ≤20 個目標檔、單一提交、閘＝testreg.py run --phase 3）並以 Task 3.3 收 Phase 3（test_testreg_run.py、test_testreg_effect.py）；Phase 4 同法接續編號，Task 4.3 收案",
+      "分批：b1＝Phase 1（Task 1.1→1.5，gate_cmd 所列五檔全綠＋§G 收據比對）；b2＝Phase 2（Task 2.1–2.4：test_testreg_review.py、test_testreg_impact.py、test_testreg_gate_wiring.py、test_testreg_v6_profile.py，另 tests/feature_engineering/test_framepath_disposition.py -k affected_gate 既有案例回歸須綠）；b3＝Task 3.0（缺陷目標改寫收據：scripts/testreg.py＋契約 version 46＋test_testreg_defective_rewrite.py 與 test_testreg_repair_additive.py 全綠，且 test_testreg_validate.py、test_testreg_write_guard.py 回歸綠）＋Task 3.1 分類（委員三家獨立逐檔判定＋synth，G1–G4 四輪，比對器 compare_classify.py fail-closed；寫 catalog 委員欄）；b4 起＝Task 3.2 子批（每子批 ≤20 個目標檔、單一提交、閘＝testreg.py run --phase 3）並以 Task 3.3 收 Phase 3（test_testreg_run.py、test_testreg_effect.py）；Phase 4 同法接續編號，Task 4.3 收案",
+      "SPEC v47（設計諮詢 r8 處置，見 handoffs/reconcile/20261010-testreg-x-consult-r8/synth.md；源自第 3 批審碼 r1 handoffs/reconcile/20261010-testreg-b3-review-r1/synth.md）：Task 3.2 契約缺口——新增契約 receipts.infrastructure_repair（準備步驟既有紅：只改 tests/ 下共用測試基礎設施、測試檔零差異、分類欄不改、修復後目標每一斷言元素有殺 mutant）、receipts.additive_rewrite（舊斷言殺不死或檔內無測試函式：舊函式 AST 全同、補丁結構白名單、新增函式可殺、情境綁定、G-c 搬移且禁 exit）、receipts.session_scope（參數化全案例：argv 無篩選且 ledger 紀錄數＝AST 靜態列舉案例數，不可列舉 fail-closed；套 existing_red 修只看現有參數案例之缺陷）；§N R13；契約 version 46；新驗收 tests/registry/test_testreg_repair_additive.py（實作前紅）",
       "SPEC v46（修訂審查 r44 處置，見 handoffs/reconcile/20261010-testreg-x-review-r44/synth.md）：期望值字面限定（單一 == 比較之純字面一側或 pytest.raises 之 match；輸入常數與容差不得改）、first_bad 之失敗須落在同正規化鍵之斷言、diff_digest 重算與補丁樹讀取改暫存 index（只修改既有檔之補丁；真實規模 0.05–0.13 秒、與 worktree 法逐位元相等）；契約 version 45；驗收增 test_v46_* 五案（含真實規模兩法等價與耗時）；試作 handoffs/run_receipts/testreg_probes/b3/v46_trial_impl.patch 下全檔 48 passed",
       "SPEC v45（修訂審查 r43 處置，見 handoffs/reconcile/20261010-testreg-x-review-r43/synth.md；三家 12 條全採納）：刪除 vacuous 型（空心測試改上游資料來源而不減斷言、刪死碼空心斷言登 §N R11）；existing_red 收緊——defect_lines 恰一項且為 head 失敗所在之目標函式本體斷言、改寫只准改該敘述內字面常數（AST 同構）、好壞兩提交以乾淨樹記錄器 session 綁定（good＝first_bad 第一親代、first_bad 為 head 祖先）、approval_ref 交叉引用、刪 bisect 紀錄檔欄與 survivor 型別；契約 version 44；驗收檔 v44 函式本體逐字保留（V19／V20），語意經常數與無斷言輔助改為 v45，新增 test_v45_* 十二案（實作前 41 紅 2 綠、試作 handoffs/run_receipts/testreg_probes/b3/v45_trial_impl.patch 下 43 全過）；§N R12 記 TODO 期驗收測試只能增不能改之程序缺口",
       "SPEC v44（第 3 批 Task 3.1 諮詢 r3 處置，見 handoffs/reconcile/20261010-testreg-x-consult-r3/synth.md；三家 17 條全採納）：新增 Task 3.0 缺陷目標改寫收據（契約 receipts.defective_rewrite、types.receipt_defective_rewrite、types.survivor_item、enums.defective_kind；existing_red＝HEAD 已紅於過期斷言，vacuous＝斷言空心；以缺陷證據＋改寫後函式逐斷言行殺點＋斷言差限縮於 defect_lines 取代對目標之殺點要求；V07／V19／V21 接入；契約 version 43；新驗收 tests/registry/test_testreg_defective_rewrite.py 實作前 22 紅 1 綠）；Task 3.1 分類規則 handoffs/run_receipts/testreg_probes/b3/CLASSIFY_RUBRIC.md、四組清單、fail-closed 比對器與反例 compare_classify_mutations.sh；Task 3.2 之 FRAMEPATH 治理檔改寫待其檢查② 修訂戳記（§N R10）、V-6 增列粗接細臂、凍結值重凍依章程第 17 類",
