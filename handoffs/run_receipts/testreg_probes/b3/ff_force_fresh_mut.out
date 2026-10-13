@@ -1,0 +1,10 @@
+# 分類輪 G4（諮詢 r7）P1 分歧查證：test_cgsa_force_fresh_skips_existing_manifest 是否為空心改寫目標
+# 主委 2026-10-14；暫存樹＝HEAD 493fedcb 之 detached worktree＋v46 試作（生產碼與 HEAD 相同）
+# 指令：bash handoffs/run_receipts/testreg_probes/b3/ff_force_fresh_mut.sh <暫存樹> <log>
+needle_before=1
+needle_after=0
+mutant_rc=0  (1 passed in 0.29s)
+baseline_rc=0
+# 結論：把 momentum/FeatureEngineering/feature_factory.py:1210 之 `and not force_fresh` 拿掉，該測試仍綠。
+# 原因：測試未寫 L7 manifest，而 config_hash 非空 ⇒ :1219-1226 以「L7 manifest missing」令 resume_allowed=False，
+# resume 恆不被呼叫，`resume_mock.call_count == 0` 與 force_fresh 無關 ⇒ 所宣稱分支不受驗；維持為改寫目標。

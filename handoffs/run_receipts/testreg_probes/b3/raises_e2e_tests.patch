@@ -1,0 +1,141 @@
+diff --git a/tests/registry/test_testreg_defective_rewrite.py b/tests/registry/test_testreg_defective_rewrite.py
+index c600133f..446376e5 100644
+--- a/tests/registry/test_testreg_defective_rewrite.py
++++ b/tests/registry/test_testreg_defective_rewrite.py
+@@ -49,10 +49,18 @@ def empty_result(n):
+ 
+ def validate_input(x):
+     return x
++
++
++def check_positive(x):
++    if x <= 0:
++        raise ValueError("must be positive")
++    return x
+ '''
+ # 首個壞提交同時改 scale（×2→×3）與 values（i*2→i*3）⇒ test_red、test_hollow 之期望值皆過期（兩個既有紅目標）
+ CALC_BAD = CALC_GOOD.replace("    return x * 2\n", "    return x * 3\n", 1).replace(
+     "    return [i * 2 for i in range(n)]\n", "    return [i * 3 for i in range(n)]\n", 1)
++# 實作期追加（修訂審查 r45 處置）：首個壞提交另改 check_positive 之錯誤訊息 ⇒ test_raises 之 match 期望值過期
++CALC_BAD = CALC_BAD.replace('raise ValueError("must be positive")', 'raise ValueError("expected positive value")', 1)
+ DR_TESTS = '''from momentum.calc import add, empty_result, scale, values
+ 
+ 
+@@ -101,6 +109,13 @@ def test_tol():
+ def test_mixed():
+     assert values(3) == [0, 2, 4]
+     assert scale(1) == 2
++
++
++def test_raises():
++    import pytest
++    from momentum.calc import check_positive
++    with pytest.raises(ValueError, match="must be positive"):
++        check_positive(-1)
+ '''
+ # v46：首個壞提交之後、head 之前另有一提交——檔首加一行（全檔行號位移＋1）並修正 test_mixed 之 values 期望值
+ # ⇒ test_mixed 於 first_bad 失敗在 values 斷言、於 head 失敗在 scale 斷言（同鍵綁定之反例）；其餘目標行號位移而同鍵
+@@ -132,9 +147,19 @@ MUTANTS = {  # 名稱: (calc.py〔首個壞提交後〕舊片段, 新片段)
+                 '    return {"index": list(range(n + 1)), "cols": {}}\n'),
+     "m_noop": ("def validate_input(x):\n", "# noop\ndef validate_input(x):\n"),
+     "m_testfile": None,  # 改測試檔之 mutant（反例用）
++    "m_msg": ('raise ValueError("expected positive value")', 'raise ValueError("expected negative value")'),
++    "m_cond": ("    if x <= 0:\n", "    if x < -5:\n"),
+ }
+ NID = {n: f"{DF}::{n}" for n in ("test_red", "test_hollow", "test_vac", "test_dup", "test_helper_red", "test_other",
+                                   "test_tol", "test_mixed")}
++# 實作期追加（修訂審查 r45 處置）：pytest.raises 之 match 期望值端到端正例與兩反例（改例外型別、改輸入常數）
++NID["test_raises"] = f"{DF}::test_raises"
++RAISES_OLD = '    with pytest.raises(ValueError, match="must be positive"):\n        check_positive(-1)\n'
++RAISES_FIX = {
++    "raises": '    with pytest.raises(ValueError, match="expected positive"):\n        check_positive(-1)\n',
++    "raises_type": '    with pytest.raises(Exception, match="expected positive"):\n        check_positive(-1)\n',
++    "raises_input": '    with pytest.raises(ValueError, match="expected positive"):\n        check_positive(-2)\n',
++}
+ 
+ 
+ def receipt_rel(nodeid: str) -> str:
+@@ -199,6 +224,11 @@ def dr_base(tmp_path_factory) -> Dict[str, Any]:
+         "tol": write_patch(r, DF, src.replace(TOL_OLD, TOL_NEW, 1), cp["tol"]),
+         "mixed": write_patch(r, DF, src.replace(MIXED_OLD, MIXED_NEW, 1), cp["mixed"]),
+     }
++    # 實作期追加（r45 處置）：raises 之三個改寫補丁與裁定檔交叉引用
++    for k, fixed in RAISES_FIX.items():
++        cp[k] = f"{d}/{k}.compare.patch"
++        csha[k] = write_patch(r, DF, src.replace(RAISES_OLD, fixed, 1), cp[k])
++    r.write(APPROVAL, r.read(APPROVAL) + f"{NID['test_raises']}\n")
+     # 補丁與裁定檔本身為未追蹤檔，會進 diff_digest ⇒ 提交使 HEAD 乾淨，收據 head＝此提交
+     head = r.commit("patches")
+     branch = r.git("rev-parse", "--abbrev-ref", "HEAD").strip()
+@@ -239,6 +269,18 @@ def dr_base(tmp_path_factory) -> Dict[str, Any]:
+             sess[name] = _run_with(r, [], NID["test_dup"], NID["test_tol"], NID["test_mixed"])
+         finally:
+             r.git("checkout", "-q", branch)
++    # 實作期追加（r45 處置）：test_raises 之 head、改寫 baseline、殺 mutant 與好壞兩提交 session
++    sess["raises@head"] = _run_with(r, [], NID["test_raises"])
++    for k in RAISES_FIX:
++        sess[f"{k}@base"] = _run_with(r, [cp[k]], NID["test_raises"])
++    for m in ("m_msg", "m_cond"):
++        sess[f"raises+{m}"] = _run_with(r, [cp["raises"], pp[m]], NID["test_raises"])
++    for name, rev in (("good3", good), ("bad3", bad)):
++        r.git("checkout", "-q", "--detach", rev)
++        try:
++            sess[name] = _run_with(r, [], NID["test_raises"])
++        finally:
++            r.git("checkout", "-q", branch)
+     # 非 head 祖先之「首個壞提交」：自 good 分出之另一分支提交（第一親代＝good）
+     r.git("checkout", "-q", "-b", "fbside", good)
+     r.write("README", "side\n")
+@@ -340,6 +382,8 @@ def _apply_rewrite(r: TmpRepo, which: str) -> None:
+         r.write(DF, src.replace(TOL_OLD, TOL_NEW, 1))
+     elif which == "mixed":
+         r.write(DF, src.replace(MIXED_OLD, MIXED_NEW, 1))
++    elif which in RAISES_FIX:
++        r.write(DF, src.replace(RAISES_OLD, RAISES_FIX[which], 1))
+     else:
+         raise AssertionError(which)
+ 
+@@ -758,3 +802,43 @@ def test_v46_digest_index_equals_worktree_real_scale(tmp_path, monkeypatch):
+         assert pa == pb and pa is not None and "# probe a" in pa
+     finally:
+         _sp.run(["git", "-C", str(REPO), "worktree", "remove", "--force", str(wt)], capture_output=True)
++
++
++# ── 實作期追加（修訂審查 r45 處置）：pytest.raises 之 match 期望值端到端 ──────────────────────────────────────────
++
++RAISES_NEEDLE = 'with pytest.raises(ValueError, match="must be positive")'
++
++
++def _raises_receipt(fx, compare: str) -> Dict[str, Any]:
++    """test_raises 之收據：好壞兩提交 session 取 good3／bad3、head 取 raises@head；成立形之 mutant 紀錄取
++    「改寫＋mutant」session，反例取該補丁之 baseline session（收據本即不成立，mutant 內容不影響結論）。"""
++    mut_sess = None if compare == "raises" else f"{compare}@base"
++    rc = _receipt(fx, "test_raises", RAISES_NEEDLE, compare, ("m_msg", "m_cond"), "raises@head", mut_sess=mut_sess)
++    rc["good_session_id"], rc["bad_session_id"] = fx["sess"]["good3"], fx["sess"]["bad3"]
++    rc["fingerprint"] = _fingerprint(fx, rc)
++    return rc
++
++
++def test_raises_match_fix_receipt_releases_v19(dr_base, tmp_path):
++    """錯誤訊息於首個壞提交改寫 ⇒ `pytest.raises(…, match=…)` 之期望值過期；只改 match 字面、附收據 ⇒ 具名縫回 []、
++    hook 與 pre-commit 皆 rc 0；無收據 ⇒ V19 擋下該 nodeid。失敗行（with 本體之呼叫行）≠ 缺陷行（with 行）而同屬
++    該 with 敘述範圍。"""
++    r = _work(dr_base, tmp_path, "raises_ok")
++    _apply_rewrite(r, "raises")
++    blocked = r.hook(DF)
++    assert blocked.returncode == 2 and _v19(blocked.stderr) == {NID["test_raises"]}, blocked.stderr
++    rc = _raises_receipt(dr_base, "raises")
++    rec = test_records(dr_base["repo"], dr_base["sess"]["raises@head"])[NID["test_raises"]]
++    assert rec["outcome"] == "failed" and _fail_loc(rec) != rc["defect_lines"][0], rec
++    r.write_json(receipt_rel(NID["test_raises"]), rc)
++    assert testreg.defective_rewrite_errors(testreg.build_context(r.root), NID["test_raises"]) == []
++    hook, proc = _hook_and_commit(r, [receipt_rel(NID["test_raises"])])
++    assert hook.returncode == 0, hook.stderr
++    assert proc.returncode == 0, proc.stderr
++
++
++@pytest.mark.parametrize("which", ["raises_type", "raises_input"])
++def test_raises_non_match_change_blocks(dr_base, tmp_path, which):
++    """改例外型別（ValueError → Exception：非常數差、AST 不同構）或改輸入常數（-1 → -2：常數不在 match 子樹）
++    並修 match ⇒ 擋下（只准改期望值字面）。"""
++    _blocked_with(dr_base, tmp_path, which, which, "test_raises", _raises_receipt(dr_base, which), "期望值字面")

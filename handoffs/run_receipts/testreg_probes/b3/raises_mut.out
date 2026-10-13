@@ -1,0 +1,11 @@
+# 修訂審查 r45 處置：pytest.raises 之 match 期望值端到端驗收（實作期追加，只增）之實跑與 mutation 自證
+# 主委 2026-10-14；暫存樹＝HEAD 493fedcb 之 detached worktree＋v46_trial_impl.patch＋raises_e2e_tests.patch
+# 全檔：venv/bin/python -m pytest -p no:cacheprovider -q tests/registry/test_testreg_defective_rewrite.py → 51 passed in 109.12s（rc 0）
+# 新增三案：test_raises_match_fix_receipt_releases_v19、test_raises_non_match_change_blocks[raises_type]、[raises_input]
+# testreg.py check --paths tests/registry/test_testreg_defective_rewrite.py → rc 0
+# mutation（bash handoffs/run_receipts/testreg_probes/b3/raises_mut.sh <暫存樹>；逐一改壞 scripts/testreg.py、只跑 -k test_raises_、還原）：
+M1_raises_branch_off rc=1  1 failed, 2 passed  FAILED test_raises_match_fix_receipt_releases_v19
+M2_allowed_ignored rc=1  1 failed, 2 passed  FAILED test_raises_non_match_change_blocks[raises_input]
+M3_nonconst_diff_ignored rc=1  1 failed, 2 passed  FAILED test_raises_non_match_change_blocks[raises_type]
+# M1＝_expected_literal_ids 之 raises 分支停用（match 字面不被認作期望值）；M2＝_iso_const_only 不檢查常數是否屬期望值子樹；
+# M3＝_iso_const_only 不檢查非常數欄位差（例外型別 Name 改變）。三者各使對應之一案轉紅。
