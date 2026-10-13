@@ -1,7 +1,7 @@
 # PROBEWINSOR — 公開域預熱探測之縮尾門檻與公開輸出同源 — SPEC
 
 > 來源：偵察 r1 收斂檔 `handoffs/reconcile/20261012-probewinsor-x-consult-r1/synth.md`（主委獨立版 `handoffs/20261012-probewinsor-x-consult-r1-claude.md`）；起因 TESTREG 第 2 批審碼 r1（`handoffs/reconcile/20261010-testreg-b2-review-r1/synth.md`）、TESTREG SPEC §N R9　|　日期：2026-10-12　|　對應 TODO：`docs/manifests/PROBEWINSOR.json`
-> 版本：v9（2026-10-13；v8 經審查 r9 修訂：BLAS 紀錄只取 `user_api` 為 blas 者〔10i 增非 BLAS 臂〕、環境完整性改於生成前檢查〔10j〕）。歷次修訂內容見 `handoffs/reconcile/20261012-probewinsor-x-{consult-r1,review-r2..r9}/synth.md`。
+> 版本：v10（2026-10-13；實作 b1 期 Task 1.3 歸因：`test_tf_aligner` 之 config 替身補前處理段一行〔§P Task 1.3 邊界③〕，送 b1 審碼核可）。v9（v8 經審查 r9 修訂：BLAS 紀錄只取 `user_api` 為 blas 者〔10i 增非 BLAS 臂〕、環境完整性改於生成前檢查〔10j〕）。歷次修訂內容見 `handoffs/reconcile/20261012-probewinsor-x-{consult-r1,review-r2..r9}/synth.md`。
 
 ## §RISK 風險分級
 - **大小**：大（全票排序第 5a-1 步；使用者 2026-10-12 裁定）。
@@ -99,7 +99,7 @@
 - 目標：證明修正只在 §C 子空間造成差異，且差異已逐項歸因。　檔案：無生產碼；收據 `handoffs/run_receipts/probewinsor-affected.json`。
 - 改法：於 Task 1.1、1.2、1.4 之後執行。manifest `risk_mitigation` 之 `affected_tests`（`handoffs/run_receipts/probewinsor_probes/affected_scan.py` 機械挑選：前處理總開關設為 False 之寫法、被改符號之直接引用；掃描遇讀檔或語法錯誤即 rc 1；另加批次續跑測試與 RATIOUNSAFE 測試）於錨點碼態與修正後碼態各跑一次（單組串行），逐 nodeid 記結果；`scripts/freeze_ratiounsafe_baseline.py` 之前處理關臂於修正後碼態以其既有比對模式比對 `tests/_golden/ratiounsafe/`。
 - **驗證**：收據 `handoffs/run_receipts/probewinsor-affected.json` 中錨點綠而修正後紅之 nodeid 數 == 0，或每一項皆附「屬 §C 刻意差異」之具名歸因且經審碼核可後以 TODO 修訂處置（不得放寬斷言換綠）；RATIOUNSAFE 比對 rc 0，或差異逐鍵列於收據並歸因 §C。
-- **邊界**：①錨點即紅之 nodeid ⇒ 記「HEAD 既有紅」不歸本票；②`tests/feature_engineering/test_failopen_correctness.py` 之 V-6 重項（`test_v6_*`）⇒ 不在本票跑（見 §N R1）。
+- **邊界**：①錨點即紅之 nodeid ⇒ 記「HEAD 既有紅」不歸本票；②`tests/feature_engineering/test_failopen_correctness.py` 之 V-6 重項（`test_v6_*`）⇒ 不在本票跑（見 §N R1）；③實作期歸因（v10）：`tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version` 錨點綠、修正後紅——其 config 替身無 `preprocessing`，而 Task 1.2 之 `_probe_gate_salt` 依邊界 07 經 `l65_enabled` 缺鍵即拋（刻意 fail-closed），致 `_compute_config_hash` 拋 ValueError；真實 FactoryConfig 必有 `preprocessing`，生產路徑不受影響 ⇒ 處置＝該替身補前處理段一行（`enabled=True`、縮尾開：總開關開故不加鹽，雜湊與改前同），不改斷言，經審碼核可。
 - **存活至**：收據保留至本票收案。
 - **覆蓋風險**：無。
 - 不可做：不得刪改既有斷言；不得以 skip／xfail 暫避。

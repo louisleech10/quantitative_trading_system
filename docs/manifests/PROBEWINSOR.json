@@ -61,7 +61,7 @@
     "gate_cmd": "venv/bin/python -m pytest -q -p no:cacheprovider -o log_cli=false --log-level=WARNING tests/feature_engineering/test_probewinsor.py tests/api/test_probewinsor_batch_resume.py",
     "forbidden": [
       {
-        "rule": "不得改 SPEC §P Task 1.1／1.2／1.4 所列以外之生產碼（momentum／api／frontend）；既有測試只准 Task 1.4 所列兩支補身分替身一行，不得改任何斷言",
+        "rule": "不得改 SPEC §P Task 1.1／1.2／1.4 所列以外之生產碼（momentum／api／frontend）；既有測試只准 Task 1.4 所列兩支補身分替身一行，及 Task 1.3 實作期歸因之 tests/feature_engineering/test_tf_aligner.py::test_hash_changes_with_align_version 之 config 替身補前處理段一行，不得改任何斷言",
         "observable": true
       },
       {

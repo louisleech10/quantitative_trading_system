@@ -144,7 +144,9 @@ def test_multitf_durations_and_updown(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_hash_changes_with_align_version() -> None:
     factory = FeatureFactory.__new__(FeatureFactory)
     factory._adapter_registry = SimpleNamespace(get_last_timestamp=lambda symbol, timeframe: 123)
+    # PROBEWINSOR Task 1.3：config 替身補前處理段（真實 FactoryConfig 必有；身分路徑之 l65_enabled 缺鍵即拋）
     config = SimpleNamespace(
+        preprocessing=SimpleNamespace(enabled=True, winsorization=SimpleNamespace(enabled=True)),
         model_dump=lambda by_alias=True: {
             "timeframes": {"training": ["12h", "1h"], "alignment_mode": "open_minus"},
         }
